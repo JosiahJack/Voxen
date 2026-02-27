@@ -297,7 +297,7 @@ void BioMonitorUpdate(void) {
     else bioMonitor.ecgValue = 0.0f;
 
         // Inject variation when beating
-    if (bioMonitor.ecgValue > beatThresh || bioMonitor.ecgValue < (beatThresh * -1.0f)) bioMonitor.ecgValue += random_range(-beatVariation,beatVariation);
+    if (bioMonitor.ecgValue > beatThresh || bioMonitor.ecgValue < (beatThresh * -1.0f)) bioMonitor.ecgValue += random_range_i32(-beatVariation,beatVariation);
     if (bioMonitor.tick0Finished < Sys_Global.pauseRelativeTime) {
         bioMonitor.tick0Finished = Sys_Global.pauseRelativeTime + bioMonitor.tick0;
         Push(0,bioMonitor.ergValue); IncrementERG();

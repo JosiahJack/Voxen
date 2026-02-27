@@ -106,6 +106,19 @@ typedef struct {
 } SettingsSystem;
 extern SettingsSystem Sys_Settings;
 
+typedef struct {
+    bool inCombat;
+    bool inZone;
+    bool twoPlaying;
+    double clipFinished;
+    double combatImpulseFinished;
+    bool distortion;
+    bool cyberTube;
+    bool elevator;
+    bool levelEntry;
+} MusicSystem;
+extern MusicSystem Sys_Music;
+
 typedef struct { bool down; bool pressed; bool released; } KeyState;
 
 #define MAX_KEYS 512
@@ -349,27 +362,21 @@ static const uint8_t AccessCardType_Per5 = 19;
 
 // MusicType
 typedef uint8_t MusicType;
-static const uint8_t MusicType_None = 0;
-static const uint8_t MusicType_Walking = 1;
-static const uint8_t MusicType_Combat = 2;
-static const uint8_t MusicType_Overlay = 3;
-static const uint8_t MusicType_Override = 4;
+static const uint8_t MusicType_None     = 0;
+static const uint8_t MusicType_Walking  = 1;
+static const uint8_t MusicType_Combat   = 2;
+static const uint8_t MusicType_Override = 3;
 
 // TrackType
 typedef uint8_t TrackType;
-static const uint8_t TrackType_None = 0;
-static const uint8_t TrackType_Walking = 1;
-static const uint8_t TrackType_Combat = 2;
-static const uint8_t TrackType_MutantNear = 3;
-static const uint8_t TrackType_CyborgNear = 4;
-static const uint8_t TrackType_CyborgDroneNear = 5;
-static const uint8_t TrackType_RobotNear = 6;
-static const uint8_t TrackType_Transition = 7;
-static const uint8_t TrackType_Revive = 8;
-static const uint8_t TrackType_Death = 9;
-static const uint8_t TrackType_Cybertube = 10;
-static const uint8_t TrackType_Elevator = 11;
-static const uint8_t TrackType_Distortion = 12;
+static const uint8_t TrackType_None       = 0;
+static const uint8_t TrackType_Walking    = 1;
+static const uint8_t TrackType_Combat     = 2;
+static const uint8_t TrackType_Revive     = 3;
+static const uint8_t TrackType_Death      = 4;
+static const uint8_t TrackType_Cybertube  = 5;
+static const uint8_t TrackType_Elevator   = 6;
+static const uint8_t TrackType_Distortion = 7;
 
 // BloodType
 typedef uint8_t BloodType;
@@ -988,7 +995,7 @@ extern uint16_t activatorIdx;
 #define TARG_IOFLAGS_DISABLE_ON_AWAKE   (1ull << 57)
 #define TARG_IOFLAGS_DISABLD_ONCE_4EVER (1ull << 58)
 #define TARGET_STRING_LENGTH 40
-static inline void flag_set(uint64_t *flags, uint64_t bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
+static inline __attribute__((always_inline)) void flag_set(uint64_t *flags, uint64_t bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
 typedef /*FAT*/ struct {
     uint64_t entflags;
     uint64_t ioflags;
@@ -1028,6 +1035,8 @@ typedef /*FAT*/ struct {
     DoorState doorOpen;
     ForceFieldColor fieldColor;
     bool lerping;
+    TrackType trackType;
+    MusicType musicType;
     
     // Player
     float radiated;
@@ -1036,29 +1045,29 @@ typedef /*FAT*/ struct {
     uint16_t patchActive;
     uint16_t drainJPM;
     double berserkFinishedTime;
-	double berserkIncrementFinishedTime;
-	double detoxFinishedTime;
-	double geniusFinishedTime;
-	double mediFinishedTime;
-	double reflexFinishedTime;
-	double sightFinishedTime;
-	double sightSideEffectFinishedTime;
-	double staminupFinishedTime;
-	int berserkIncrement;
+    double berserkIncrementFinishedTime;
+    double detoxFinishedTime;
+    double geniusFinishedTime;
+    double mediFinishedTime;
+    double reflexFinishedTime;
+    double sightFinishedTime;
+    double sightSideEffectFinishedTime;
+    double staminupFinishedTime;
+    int berserkIncrement;
     double turboCyberTime;
     double turboFinished;
     double energyDrainTickFinished;
     double noiseFinished;
-	double painSoundFinished;
-	double radSoundFinished;
-	double radFXFinished;
-	float radAdjust;
-	float initialRadiation;
+    double painSoundFinished;
+    double radSoundFinished;
+    double radFXFinished;
+    float radAdjust;
+    float initialRadiation;
     int32_t heldObjectIndex;
     bool playerDead;
 
-	// Rendering
-	uint16_t modelIndex;
+    // Rendering
+    uint16_t modelIndex;
     uint16_t texIndex;
     uint16_t altTexIndex;
     uint16_t glowIndex;
@@ -1067,7 +1076,7 @@ typedef /*FAT*/ struct {
     uint16_t normIndex;
     uint16_t lodIndex;
 
-	// Animation
+    // Animation
     uint8_t clip;
     uint8_t numclips;
     uint16_t animationNum; // Global animation identifier into short table of AnimationClip's
@@ -1080,11 +1089,11 @@ typedef /*FAT*/ struct {
     double animSwapFinished;
     bool alternateOn;
     uint16_t mainSwitchMaterial;
-	uint16_t alternateSwitchMaterial;
+    uint16_t alternateSwitchMaterial;
 
-	// Physics
-	Vector3 position;
-	Vector3 lastPosition;
+    // Physics
+    Vector3 position;
+    Vector3 lastPosition;
     Quaternion rotation;
     Vector3 scale;
     Vector3 forward;
@@ -1112,18 +1121,18 @@ typedef /*FAT*/ struct {
     PhysCombineType frictionCombine;
     PhysCombineType bounceCombine;
 
-	// Audio
+    // Audio
     float volume;
 
-	// Attachment
+    // Attachment
     uint16_t   child[MAX_CHILD_COUNT];
     Vector3    child_offset[MAX_CHILD_COUNT];
     Quaternion child_rotation[MAX_CHILD_COUNT];
     Vector3    child_scale[MAX_CHILD_COUNT];
 
-	// NPC logic
+    // NPC logic
     uint8_t npcIndex;
-	AIState currentState;
+    AIState currentState;
     double timeForTranquilization;
     Vector3 sightPointOffset;
     Vector3 gunPointOffset;
@@ -1131,44 +1140,44 @@ typedef /*FAT*/ struct {
     uint16_t muzzleBurst;
     uint16_t muzzleBurst2;
     uint16_t enemey;
-	double gracePeriodFinished;
-	double meleeDamageFinished;
+    double gracePeriodFinished;
+    double meleeDamageFinished;
     uint8_t walkWaypointsLength;
     Vector3 walkWaypoints[MAX_WAYPOINTS];
-	uint16_t dyingTexture;
-	uint16_t deathTexture;
-	uint16_t deathBurst;
-	float rangeToEnemy;
-	int currentWaypoint;
-	Vector3 currentDestination;
-	float idleTime;
-	float attack1SoundTime;
-	float attack2SoundTime;
-	float attack3SoundTime;
-	double timeTillEnemyChangeFinished;
-	double timeTillDeadFinished;
-	double timeTillPainFinished;
-	double huntFinished;
-	Vector3 lastKnownEnemyPos;
-	double randomWaitForNextAttack1Finished;
-	double randomWaitForNextAttack2Finished;
-	double randomWaitForNextAttack3Finished;
-	Vector3 idealTransformForward;
-	Vector3 idealPos;
-	double attackFinished;
-	double attack2Finished;
-	double attack3Finished;
-	Vector3 targettingPosition;
-	double deathBurstFinished;
-	double tranquilizeFinished;
-	double wanderFinished;
-	double timeSinceMovedEnough;
-	double posCheckFinished;
-	char targetID[TARGET_ID_LENGTH];
+    uint16_t dyingTexture;
+    uint16_t deathTexture;
+    uint16_t deathBurst;
+    float rangeToEnemy;
+    int currentWaypoint;
+    Vector3 currentDestination;
+    float idleTime;
+    float attack1SoundTime;
+    float attack2SoundTime;
+    float attack3SoundTime;
+    double timeTillEnemyChangeFinished;
+    double timeTillDeadFinished;
+    double timeTillPainFinished;
+    double huntFinished;
+    Vector3 lastKnownEnemyPos;
+    double randomWaitForNextAttack1Finished;
+    double randomWaitForNextAttack2Finished;
+    double randomWaitForNextAttack3Finished;
+    Vector3 idealTransformForward;
+    Vector3 idealPos;
+    double attackFinished;
+    double attack2Finished;
+    double attack3Finished;
+    Vector3 targettingPosition;
+    double deathBurstFinished;
+    double tranquilizeFinished;
+    double wanderFinished;
+    double timeSinceMovedEnough;
+    double posCheckFinished;
+    char targetID[TARGET_ID_LENGTH];
 
-	// Misc
+    // Misc
     char path[128];
-	// phew what a porker of a struct, it's been a eatin!
+    // phew what a porker of a struct, it's been a eatin!
 } Entity;
 extern Entity entities[MAX_ENTITIES]; // Global array of entity definitions
 extern Entity instances[INSTANCE_COUNT];
@@ -1188,16 +1197,14 @@ typedef struct {
 #define vmax(a,b) ((a) > (b) ? (a) : (b))
 #define PI 3.14159265f
 #define TAU 6.2831853f
-static inline float vfloor(float x) { int i = (int)x; return (float)(i > x ? i - 1 : i); }
-static inline float vceil(float x) { int i = (int)x; return (float)(x > 0 && x > (float)i ? i + 1 : i); }
-// static inline float vclamp(float x, float a, float b) { return x < a ? a : (x > b ? b : x); }
+static inline __attribute__((always_inline)) float vfloor(float x) { int i = (int)x; return (float)(i > x ? i - 1 : i); }
+static inline __attribute__((always_inline)) float vceil(float x) { int i = (int)x; return (float)(x > 0 && x > (float)i ? i + 1 : i); }
 #define vclamp(x,a,b) __builtin_fminf(__builtin_fmaxf(x, a), b)
-// static inline float vsqrtf(float x) { union { float f; unsigned int i; } u = { x }; u.i = 0x1fbd1df5 + (u.i >> 1); return 0.5f * (u.f + x / u.f); }
 #define vsqrtf(x) __builtin_sqrtf(x)
-static inline float vsign(float x) { return x < 0.0f ? -1.0f : 1.0f; } // Follow Unity Sign convention where 0 = 1.0f sign.
-static inline float vsinf(float x) { x -= TAU * vfloor(x / TAU); if (x > PI) { x -= TAU; } float s = (4/PI)*x - (4/(PI*PI))*x*vabs(x); return 0.225f*(s*vabs(s) - s) + s; }
-static inline float vcosf(float x) { return vsinf(x + 1.57079632f); }
-static inline float vacosf(float x) {
+static inline __attribute__((always_inline)) float vsign(float x) { return x < 0.0f ? -1.0f : 1.0f; } // Follow Unity Sign convention where 0 = 1.0f sign.
+static inline __attribute__((always_inline)) float vsinf(float x) { x -= TAU * vfloor(x / TAU); if (x > PI) { x -= TAU; } float s = (4/PI)*x - (4/(PI*PI))*x*vabs(x); return 0.225f*(s*vabs(s) - s) + s; }
+static inline __attribute__((always_inline)) float vcosf(float x) { return vsinf(x + 1.57079632f); }
+static inline __attribute__((always_inline)) float vacosf(float x) {
     float negate = (x < 0.0f) ? 1.0f : 0.0f;
     x = vabs(x);
     float ret = -0.0187293f;
@@ -1208,10 +1215,10 @@ static inline float vacosf(float x) {
     ret = ret - 2.0f * negate * ret;
     return negate * PI + (1.0f - 2.0f * negate) * ret;
 }
-static inline float vtan(float x) { return vsinf(x) / vcosf(x); }
-static inline float vcot(float x) { float x2 = x * x; float t = x + (x2 * x) * 0.33333333f; return 1.0f / t; }
-static inline float deg2rad(float degrees) { return degrees * (PI / 180.0f); }
-static inline float vlog2f(float x) {
+static inline __attribute__((always_inline)) float vtan(float x) { return vsinf(x) / vcosf(x); }
+static inline __attribute__((always_inline)) float vcot(float x) { float x2 = x * x; float t = x + (x2 * x) * 0.33333333f; return 1.0f / t; }
+static inline __attribute__((always_inline)) float deg2rad(float degrees) { return degrees * (PI / 180.0f); }
+static inline __attribute__((always_inline)) float vlog2f(float x) {
     union { float f; unsigned int i; } v = { x };
     int e = (int)((v.i >> 23) & 255) - 127;
     v.i = (v.i & 0x7FFFFF) | 0x3F800000;   // normalize mantissa to [1,2)
@@ -1221,8 +1228,8 @@ static inline float vlog2f(float x) {
     return (float)e + log2m;
 }
 
-static inline float vlog(float x) { return vlog2f(x) * 0.69314718f; }
-static inline float vexp2f(float x) {
+static inline __attribute__((always_inline)) float vlog(float x) { return vlog2f(x) * 0.69314718f; }
+static inline __attribute__((always_inline)) float vexp2f(float x) {
     float ip = vfloor(x);
     float fp = x - ip;
     float p = 1.0f + fp * (0.69314718f + fp * (0.24022651f + fp * 0.05550411f)); // poly approximation for 2^fp on [0,1]
@@ -1232,8 +1239,8 @@ static inline float vexp2f(float x) {
     return u.f * p;
 }
 
-static inline float vexp(float x) { return vexp2f(x * 1.4426950409f); } // 1/ln(2)
-static inline float vpow(float a, float b) { return vexp(b * vlog(a)); }
+static inline __attribute__((always_inline)) float vexp(float x) { return vexp2f(x * 1.4426950409f); } // 1/ln(2)
+static inline __attribute__((always_inline)) float vpow(float a, float b) { return vexp(b * vlog(a)); }
 void DualLog(const char* fmt, ...);
 void DualLogWarn(const char* fmt, ...);
 void DualLogError(const char* fmt, ...);
@@ -1245,7 +1252,7 @@ void play_wav(const char* path, float volume, Vector3 pos, bool positional);
 #define MAX_TEXTURE_DIMENSION 2048
 #define MAX_PALETTE_SIZE 256
 #define MAX_TOTAL_PIXELS 26400000u
-#define MAX_UNIQUE_COLORS 76800u
+#define MAX_UNIQUE_COLORS 80000u
 #define VERTEX_ATTRIBUTES_COUNT 8 // x,y,z,nx,ny,nz,u,v
 #define BOUNDS_ATTRIBUTES_COUNT 7
 #define BOUNDS_DATA_OFFSET_MINX 0
@@ -1353,10 +1360,9 @@ void RemoveCameraPosition(uint16_t i);
 void CullInit(void);
 bool CullCore(void);
 bool get_cull_bit(const uint32_t* arr, int idx);
-static inline bool EntityIndexIsPortalBlockingDoor(uint16_t entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }// All doors except see-through doors.
+static inline __attribute__((always_inline)) bool EntityIndexIsPortalBlockingDoor(uint16_t entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }// All doors except see-through doors.
 // Credits
 extern char creditStats[4096];
-void CreditsStats(void);
 void CreditsScroll(void);
 void RenderFormattedText(int16_t x, int16_t y, uint32_t color, uint8_t fontID, float scale, const char * restrict format, ...);
 // ----------------------------------------------------------------------------
@@ -1558,9 +1564,11 @@ void DebugRAM(const char *context);
 extern uint32_t random_range_rng;
 double get_time(void);
 void AddInstance(uint16_t entIdx, uint16_t instanceIdx);
-uint32_t xs32(uint32_t *s);
+uint32_t xs32(void);
 uint8_t random_range_u8(uint8_t a, uint8_t b);
-uint8_t random_range(float a, float b);
+uint32_t random_range_u32(uint32_t a, uint32_t b);
+int32_t random_range_i32(int32_t a, int32_t b);
+float random_range(float a, float b);
 float lerp(float min, float max, float val);
 float inverse_lerp(float min, float max, float val);
 char* data_parser_trim(char* s);
@@ -1594,46 +1602,46 @@ uint8_t GetCurrentLevelSecurity(void);
 uint16_t GetImpactType(uint16_t instanceIdx);
 int hardware14fromConstdex(int constdex);
 const char* GetPrefabNameFromIndex(int constIndex);
-static inline void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* pos_z) {
+static inline __attribute__((always_inline)) void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* pos_z) {
     *pos_x = worldMin_x + (x * WORLDCELL_WIDTH_F);
     *pos_z = worldMin_z + (z * WORLDCELL_WIDTH_F);
 }
 
-static inline int32_t clamp(int32_t val, int32_t min, int32_t max) { return (val > max) ? max : ((val < min) ? min : val); }
-static inline int32_t PosGetCellCoordX(float pos_x) { return (uint16_t)clamp((int32_t)vfloor((pos_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED); }
-static inline int32_t PosGetCellCoordZ(float pos_z) { return (uint16_t)clamp((int32_t)vfloor((pos_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED); }
-static inline int32_t PosGetCellCoords(float pos_x, float pos_z) { return (PosGetCellCoordZ(pos_z) * WORLDX) + PosGetCellCoordX(pos_x); } // Clamped just above.
-static inline bool XZPairInBounds(int32_t x, int32_t z) { return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0); }
+static inline __attribute__((always_inline)) int32_t clamp(int32_t val, int32_t min, int32_t max) { return (val > max) ? max : ((val < min) ? min : val); }
+static inline __attribute__((always_inline)) int32_t PosGetCellCoordX(float pos_x) { return (uint16_t)clamp((int32_t)vfloor((pos_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED); }
+static inline __attribute__((always_inline)) int32_t PosGetCellCoordZ(float pos_z) { return (uint16_t)clamp((int32_t)vfloor((pos_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED); }
+static inline __attribute__((always_inline)) int32_t PosGetCellCoords(float pos_x, float pos_z) { return (PosGetCellCoordZ(pos_z) * WORLDX) + PosGetCellCoordX(pos_x); } // Clamped just above.
+static inline __attribute__((always_inline)) bool XZPairInBounds(int32_t x, int32_t z) { return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0); }
 
 extern RenderSystem Sys_Render; // Added last to make use of all defines for sizes.
 
 // Math, Vectors, Quaternions
-static inline Vector3 Vector3_A_plus_B(Vector3 a, Vector3 b) { return (Vector3){a.x + b.x, a.y + b.y, a.z + b.z}; }
-static inline Vector3 Vector3_A_minus_B(Vector3 a, Vector3 b) { return (Vector3){a.x - b.x, a.y - b.y, a.z - b.z}; }
-static inline Vector3 scale_vector3(Vector3 v, float s) { Vector3 res = {v.x * s, v.y * s, v.z * s}; return res; }
-static inline float dot(float x1, float y1, float z1, float x2, float y2, float z2) { return x1*x2 + y1*y2 + z1*z2; }
-static inline float dot_vector3(Vector3 a, Vector3 b) { return dot(a.x,a.y,a.z, b.x,b.y,b.z); }
-static inline float quat_dot(Quaternion a, Quaternion b) { return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w; }
-static inline float magnitude_vector3(const Vector3 v) { return vsqrtf(dot_vector3(v, v)); }
-static inline Vector3 min_vector3(Vector3 a, Vector3 b) { return (Vector3){ a.x<b.x ? a.x : b.x, a.y<b.y ? a.y : b.y, a.z<b.z ? a.z : b.z }; }
-static inline Vector3 max_vector3(Vector3 a, Vector3 b) { return (Vector3){ a.x>b.x ? a.x : b.x, a.y>b.y ? a.y : b.y, a.z>b.z ? a.z : b.z }; }
-static inline float dist_sq_vector3(Vector3 a, Vector3 b) { Vector3 d = Vector3_A_minus_B(a, b); return dot_vector3(d, d); }
-static inline float distance_vector3(Vector3 a, Vector3 b) { return magnitude_vector3(Vector3_A_minus_B(a, b)); }
-static inline Vector3 cross_vector3(Vector3 a, Vector3 b) { return (Vector3){a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x}; }
-static inline void normalize_vector(float* x, float* y, float* z) { float len = vsqrtf(*x * *x + *y * *y + *z * *z); if (len > 1e-6f) { *x /= len; *y /= len; *z /= len; } }
-static inline Vector3 normalize_vector3(Vector3 v) { float len = magnitude_vector3(v); return len > 0.000001f ? (Vector3){v.x / len, v.y / len, v.z / len} : v; }
-static inline float squareDistance2D(float x1, float z1, float x2, float z2) { float dx = x2 - x1; float dz = z2 - z1; return dx * dx + dz * dz; }
-static inline float squareDistance3D(float x1, float y1, float z1, float x2, float y2, float z2) { float dx = x2 - x1; float dy = y2 - y1; float dz = z2 - z1; return dx * dx + dy * dy + dz * dz; }
+static inline __attribute__((always_inline)) Vector3 Vector3_A_plus_B(Vector3 a, Vector3 b) { return (Vector3){a.x + b.x, a.y + b.y, a.z + b.z}; }
+static inline __attribute__((always_inline)) Vector3 Vector3_A_minus_B(Vector3 a, Vector3 b) { return (Vector3){a.x - b.x, a.y - b.y, a.z - b.z}; }
+static inline __attribute__((always_inline)) Vector3 scale_vector3(Vector3 v, float s) { Vector3 res = {v.x * s, v.y * s, v.z * s}; return res; }
+static inline __attribute__((always_inline)) float dot(float x1, float y1, float z1, float x2, float y2, float z2) { return x1*x2 + y1*y2 + z1*z2; }
+static inline __attribute__((always_inline)) float dot_vector3(Vector3 a, Vector3 b) { return dot(a.x,a.y,a.z, b.x,b.y,b.z); }
+static inline __attribute__((always_inline)) float quat_dot(Quaternion a, Quaternion b) { return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w; }
+static inline __attribute__((always_inline)) float magnitude_vector3(const Vector3 v) { return vsqrtf(dot_vector3(v, v)); }
+static inline __attribute__((always_inline)) Vector3 min_vector3(Vector3 a, Vector3 b) { return (Vector3){ a.x<b.x ? a.x : b.x, a.y<b.y ? a.y : b.y, a.z<b.z ? a.z : b.z }; }
+static inline __attribute__((always_inline)) Vector3 max_vector3(Vector3 a, Vector3 b) { return (Vector3){ a.x>b.x ? a.x : b.x, a.y>b.y ? a.y : b.y, a.z>b.z ? a.z : b.z }; }
+static inline __attribute__((always_inline)) float dist_sq_vector3(Vector3 a, Vector3 b) { Vector3 d = Vector3_A_minus_B(a, b); return dot_vector3(d, d); }
+static inline __attribute__((always_inline)) float distance_vector3(Vector3 a, Vector3 b) { return magnitude_vector3(Vector3_A_minus_B(a, b)); }
+static inline __attribute__((always_inline)) Vector3 cross_vector3(Vector3 a, Vector3 b) { return (Vector3){a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x}; }
+static inline __attribute__((always_inline)) void normalize_vector(float* x, float* y, float* z) { float len = vsqrtf(*x * *x + *y * *y + *z * *z); if (len > 1e-6f) { *x /= len; *y /= len; *z /= len; } }
+static inline __attribute__((always_inline)) Vector3 normalize_vector3(Vector3 v) { float len = magnitude_vector3(v); return len > 0.000001f ? (Vector3){v.x / len, v.y / len, v.z / len} : v; }
+static inline __attribute__((always_inline)) float squareDistance2D(float x1, float z1, float x2, float z2) { float dx = x2 - x1; float dz = z2 - z1; return dx * dx + dz * dz; }
+static inline __attribute__((always_inline)) float squareDistance3D(float x1, float y1, float z1, float x2, float y2, float z2) { float dx = x2 - x1; float dy = y2 - y1; float dz = z2 - z1; return dx * dx + dy * dy + dz * dz; }
 uint16_t PointInSolid(Vector3 point, uint32_t layerMask);
 bool EntityIsAnimated(uint16_t entIdx);
 
-static inline float quat_angle_deg(Quaternion a, Quaternion b) {
+static inline __attribute__((always_inline)) float quat_angle_deg(Quaternion a, Quaternion b) {
     float d = vabs(quat_dot(a, b));
     if (d > 1.0f) d = 1.0f;
     return vacosf(d) * 2.0f * (180.0f / PI);
 }
 
-static inline Quaternion mul_quaternion(Quaternion a, Quaternion b) {
+static inline __attribute__((always_inline)) Quaternion mul_quaternion(Quaternion a, Quaternion b) {
     return (Quaternion){
         a.w*b.w - a.x*b.x - a.y*b.y - a.z*b.z,
         a.w*b.x + a.x*b.w + a.y*b.z - a.z*b.y,
@@ -1642,13 +1650,13 @@ static inline Quaternion mul_quaternion(Quaternion a, Quaternion b) {
     };
 }
 
-static inline Vector3 rotate_quaternion(Quaternion rotation, Vector3 axis) {
+static inline __attribute__((always_inline)) Vector3 rotate_quaternion(Quaternion rotation, Vector3 axis) {
     Vector3 qv = {rotation.x, rotation.y, rotation.z}; // Take only the xyz, not w
     Vector3 uv = cross_vector3(qv, axis);
     return Vector3_A_plus_B(axis,Vector3_A_plus_B(scale_vector3(uv, 2.0f * rotation.w), scale_vector3(cross_vector3(qv, uv), 2.0f)));
 }
 
-static inline void mul_mat4(float *out, const float *a, const float *b) { // out = a * b
+static inline __attribute__((always_inline)) void mul_mat4(float *out, const float *a, const float *b) { // out = a * b
 	out[0] =  a[0] * b[0]  + a[4] * b[1]  + a[8]  * b[2] + a[12]  * b[3];
 	out[1] =  a[1] * b[0]  + a[5] * b[1]  + a[9]  * b[2] + a[13]  * b[3];
 	out[2] =  a[2] * b[0]  + a[6] * b[1] + a[10]  * b[2] + a[14]  * b[3];
@@ -1719,9 +1727,11 @@ const char* StringFindLastChar(const char* str, const char c);
 char* StringFindFirstCharWithin(const char *s, char c);
 char* StringReturnUpToDelimiterAndLopOffAndShiftOriginal(char* str, const char delim, char** saveptr);
 int StringCompareUpToLength(const char* s1, const char* s2, size_t n);
-
 extern uint32_t totalPixels;
 extern uint32_t totalPaletteColors;
 extern uint16_t loadedTexturesMaxIndex;
 extern bool doubleSidedTexture[MAX_VALID_TEXTURE];
 extern bool transparentTexture[MAX_VALID_TEXTURE];
+void UpdateMusic(void);
+void PlayMenuMusic(void);
+void PlayGameMusic(void);

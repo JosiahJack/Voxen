@@ -82,9 +82,9 @@ public class NewGameGraphSystem : MonoBehaviour {
         tick1Finished = Time.time + tick1;
         tick2Finished = Time.time + tick2;
         tickFinished = Time.time + tick;
-        currentIndex0 = (int)(graphWidth * random_range(0f,1f));
-        currentIndex1 = (int)(graphWidth * random_range(0f,1f));
-        currentIndex2 = (int)(graphWidth * random_range(0f,1f));
+        currentIndex0 = random_range_i32(0,graphWidth);
+        currentIndex1 = random_range_i32(0,graphWidth);
+        currentIndex2 = random_range_i32(0,graphWidth);
         colorsERG = new Color[graphWidth][];
         colorsCHI = new Color[graphWidth][];
         colorsECG = new Color[graphWidth][];
@@ -102,9 +102,9 @@ public class NewGameGraphSystem : MonoBehaviour {
     }
 
     void OnEnable() {
-        currentIndex0 = (int)(graphWidth * random_range(0f,1f));
-        currentIndex1 = (int)(graphWidth * random_range(0f,1f));
-        currentIndex2 = (int)(graphWidth * random_range(0f,1f));
+        currentIndex0 = random_range_i32(0,graphWidth);
+        currentIndex1 = random_range_i32(0,graphWidth);
+        currentIndex2 = random_range_i32(0,graphWidth);
     }
 
     public void IncrementERG() {
@@ -125,17 +125,17 @@ public class NewGameGraphSystem : MonoBehaviour {
     public void Update() {
 		// Energy Usage
 		ergValue = 0.35f;
-		if (random_range(0f,1f) < 0.05f) ergValue = 0.4f;
-		else if (random_range(0f,1f) > 0.95f) ergValue = 0.3f;
+		if (random_range(0.0f,1.0f) < 0.05f) ergValue = 0.4f;
+		else if (random_range(0.0f,1.0f) > 0.95f) ergValue = 0.3f;
 
 		// Chi Brain Waves
 		chiValue = vsinf(Time.time * beatTime * 0.15f);
 
 		// ECG: Create shifted sine wave for heart beat.
-		if (beatFinished < Time.time) beatFinished = Time.time + 5f;
+		if (beatFinished < Time.time) beatFinished = Time.time + 5.0f;
 		beatShift = (beatFinished - Time.time)/(beatTime * 0.5f);
 		if (beatShift > 0.94f) ecgValue = vsinf(beatShift * freq);
-		else ecgValue = 0;
+		else ecgValue = 0.0f;
 
 		 // Inject variation when beating
 		if (ecgValue > beatThresh || ecgValue < (beatThresh * -1f)) {

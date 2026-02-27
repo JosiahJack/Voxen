@@ -1,5 +1,8 @@
 // os.h - starts most translation units and defines the shim layer between Voxen and the OS as well as defining project wide OS defines.
 #pragma once
+#if !defined(__GNUC__) || defined(__clang__) || !defined(__GNUC_MINOR__)
+#error This project is only intended to be compiled with GCC (not Clang, MSVC, etc.)
+#endif
 #define bool _Bool
 #define true 1
 #define false 0
@@ -12,6 +15,11 @@ typedef __INT64_TYPE__ int64_t;
 typedef __UINT64_TYPE__ uint64_t;
 #define likely(x)   __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
+#define PROT_READ  0x1 // From mman.h
+#define PROT_WRITE 0x2
+#define MAP_PRIVATE 0x02
+#define MAP_ANONYMOUS 0x20
+#define MAP_POPULATE 0x08000
 #include <stdio.h>
 #include <fcntl.h>
 void DualLog(const char* fmt, ...);
@@ -34,16 +42,10 @@ typedef struct {
     #include <direct.h>
     typedef HANDLE OsFileHandle;
     #define OS_INVALID_HANDLE INVALID_HANDLE_VALUE
-    #define PROT_READ  0x1 // From mman.h
-    #define PROT_WRITE 0x2
-    #define MAP_PRIVATE 0x02
-    #define MAP_ANONYMOUS 0x20
-    #define MAP_POPULATE 0x08000
-
     #define OS_MakeFolder(path) _mkdir(path)
-    static inline void OS_Close(OsFileHandle fileDescriptor) { CloseHandle(fileDescriptor); }
+    static inline __attribute__((always_inline)) void OS_Close(OsFileHandle fileDescriptor) { CloseHandle(fileDescriptor); }
     
-    static inline void* OS_AllocateRAM(void* addr, size_t length, int prot, int flags, OsFileHandle fd) {
+    static inline __attribute__((always_inline)) void* OS_AllocateRAM(void* addr, size_t length, int prot, int flags, OsFileHandle fd) {
         (void)flags;
         bool writable = (prot & PROT_WRITE);
         if (fd == INVALID_HANDLE_VALUE) {
@@ -80,16 +82,16 @@ typedef struct {
     #include <fcntl.h>
     #include <unistd.h>    
     #define OS_MakeFolder(path) mkdir(path, 0755)
-    static inline void OS_Close(OsFileHandle fileDescriptor) { close(fileDescriptor); }
+    static inline __attribute__((always_inline)) void OS_Close(OsFileHandle fileDescriptor) { close(fileDescriptor); }
 
-    static inline void* OS_AllocateRAM(void* addr, size_t length, int prot, int flags, OsFileHandle fd) {
+    static inline __attribute__((always_inline)) void* OS_AllocateRAM(void* addr, size_t length, int prot, int flags, OsFileHandle fd) {
         void* ptr = mmap(addr,length,prot,flags,fd,0);
         if (ptr == MAP_FAILED || ptr == NULL) { DualLogError("Failed to allocate RAM\n"); OS_Exit(1); }
         return ptr;
     }
 #endif
 
-static inline int64_t OS_RawWrite(OsFileHandle fd, const void* buf, size_t count, const char* filePath) {
+static inline __attribute__((always_inline)) int64_t OS_RawWrite(OsFileHandle fd, const void* buf, size_t count, const char* filePath) {
     #ifdef WINDOWS
         DWORD written = 0;
         if (WriteFile((HANDLE)fd, buf, (DWORD)count, &written, NULL)) return (int64_t)written;
@@ -105,7 +107,7 @@ static inline int64_t OS_RawWrite(OsFileHandle fd, const void* buf, size_t count
     #endif
 }
 
-static inline void OS_Write(OsFileHandle fd, const void* buffer, size_t size, const char* filePath) {
+static inline __attribute__((always_inline)) void OS_Write(OsFileHandle fd, const void* buffer, size_t size, const char* filePath) {
     size_t total = 0;
     while (total < size) {
         int64_t written = OS_RawWrite(fd, (const char*)buffer + total, size - total, filePath);
@@ -114,7 +116,7 @@ static inline void OS_Write(OsFileHandle fd, const void* buffer, size_t size, co
     }
 }
 
-static inline OsFileHandle OS_OpenReadonly(const char* filePath) {
+static inline __attribute__((always_inline)) OsFileHandle OS_OpenReadonly(const char* filePath) {
     #ifdef WINDOWS
         HANDLE fp = CreateFileA(filePath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
         if (fp == OS_INVALID_HANDLE) { DualLog("Could not open file %s\n", filePath); return OS_INVALID_HANDLE; }
@@ -125,7 +127,7 @@ static inline OsFileHandle OS_OpenReadonly(const char* filePath) {
     return fp;
 }
 
-static inline OsFileHandle OS_OpenWriteonly(const char* filePath) {
+static inline __attribute__((always_inline)) OsFileHandle OS_OpenWriteonly(const char* filePath) {
     #ifdef WINDOWS
         OsFileHandle h = CreateFileA(filePath, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
         return (h == OS_INVALID_HANDLE) ? (DualLogError("Failed to open %s\n", filePath), OS_Exit(1), OS_INVALID_HANDLE) : h;
@@ -135,7 +137,7 @@ static inline OsFileHandle OS_OpenWriteonly(const char* filePath) {
     #endif
 }
 
-static inline int OS_FileSize(OsFileHandle fileDescriptor) {
+static inline __attribute__((always_inline)) int OS_FileSize(OsFileHandle fileDescriptor) {
     #ifdef WINDOWS
         if (fileDescriptor == OS_INVALID_HANDLE) return -1;
         
@@ -149,7 +151,7 @@ static inline int OS_FileSize(OsFileHandle fileDescriptor) {
     #endif
 }
 
-static inline void* OS_AllocateFileBackedRAMReadonly(size_t size, OsFileHandle fileDescriptor, char* filePath) {
+static inline __attribute__((always_inline)) void* OS_AllocateFileBackedRAMReadonly(size_t size, OsFileHandle fileDescriptor, char* filePath) {
     #ifdef WINDOWS
         if (fileDescriptor == OS_INVALID_HANDLE || size == 0) return NULL;
 
@@ -166,7 +168,7 @@ static inline void* OS_AllocateFileBackedRAMReadonly(size_t size, OsFileHandle f
     return ramSpacePointer;
 }
 
-static inline void* OS_OpenAndAllocateFileBufferReadonly(const char* filePath, OsFileHandle* fileDescriptor, int* size) {
+static inline __attribute__((always_inline)) void* OS_OpenAndAllocateFileBufferReadonly(const char* filePath, OsFileHandle* fileDescriptor, int* size) {
     *fileDescriptor = OS_OpenReadonly(filePath);
     if (*fileDescriptor == OS_INVALID_HANDLE) { *size = 0; return NULL; } // NULL not exit, since this is the path for re-importing instead of using the cache files.
     
@@ -178,7 +180,7 @@ static inline void* OS_OpenAndAllocateFileBufferReadonly(const char* filePath, O
     return ramSpacePointer;
 }
 
-static inline void OS_DeallocateRAM(void* ramSpacePointer, size_t size) {    
+static inline __attribute__((always_inline)) void OS_DeallocateRAM(void* ramSpacePointer, size_t size) {    
     #ifdef WINDOWS
         (void)size;
         if (!ramSpacePointer) { DualLogError("Attempting to double free!\n"); OS_Exit(1); }
@@ -191,45 +193,7 @@ static inline void OS_DeallocateRAM(void* ramSpacePointer, size_t size) {
     #endif
 }
 
-static inline void OS_CPUInfo(void) {
-    char brand[256] = "Unknown CPU";
-    int cores = 0;
-    #if defined(WINDOWS)
-        SYSTEM_INFO si; GetSystemInfo(&si);
-        cores = si.dwNumberOfProcessors;
-        HKEY k;
-        if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0", 0, KEY_READ, &k) == 0) {
-            DWORD s = sizeof(brand);
-            RegQueryValueExA(k, "ProcessorNameString", NULL, NULL, (LPBYTE)brand, &s);
-            RegCloseKey(k);
-        }
-    #elif defined(MAC)
-//         size_t s = sizeof(brand), c = sizeof(cores);
-//         sysctlbyname("machdep.cpu.brand_string", brand, &s, NULL, 0);
-//         sysctlbyname("hw.logicalcpu", &cores, &c, NULL, 0);
-    #else // Linux / Android
-        cores = sysconf(_SC_NPROCESSORS_ONLN); // One-liner for Linux cores
-        OsFileHandle fd = open("/proc/cpuinfo", O_RDONLY);
-        if (fd >= 0) {
-            char buf[4096];
-            int n = read(fd, buf, sizeof(buf)-1);
-            OS_Close(fd);
-            if (n > 0) {
-                buf[n] = 0;
-                char* f = StringFindSubstring(buf, "model name");
-                if (f && (f = StringFindFirstCharWithin(f, ':'))) {
-                    f += 2; // Skip ": "
-                    int i = 0;
-                    while (f[i] && f[i] != '\n' && i < 255) { brand[i] = f[i]; i++; }
-                    brand[i] = 0;
-                }
-            }
-        }
-    #endif
-    DualLog("CPU: %s | Cores: %d\n", brand, cores);
-}
-
-static inline uint64_t mix64(uint64_t x) {
+static inline __attribute__((always_inline)) uint64_t mix64(uint64_t x) {
     x ^= x >> 33;
     x *= 0xff51afd7ed558ccdULL;
     x ^= x >> 33;
@@ -238,10 +202,10 @@ static inline uint64_t mix64(uint64_t x) {
     return x;
 }
 
-// static inline uint64_t OS_GetFilestamp(const FileFingerprint *fp) { uint64_t h = 0; h ^= mix64(fp->mtime_ns); h ^= mix64(fp->size); h ^= mix64(fp->inode); h ^= mix64(fp->dev); return h; }
-static inline uint64_t OS_GetFilestamp(const FileFingerprint *fp) { return mix64(fp->size); }
+// static inline __attribute__((always_inline)) uint64_t OS_GetFilestamp(const FileFingerprint *fp) { uint64_t h = 0; h ^= mix64(fp->mtime_ns); h ^= mix64(fp->size); h ^= mix64(fp->inode); h ^= mix64(fp->dev); return h; }
+static inline __attribute__((always_inline)) uint64_t OS_GetFilestamp(const FileFingerprint *fp) { return mix64(fp->size); }
 
-static inline bool OS_GetFileFingerprint(const char *path, FileFingerprint *fp) {
+static inline __attribute__((always_inline)) bool OS_GetFileFingerprint(const char *path, FileFingerprint *fp) {
     #ifdef _WIN32
         // Use CreateFile to get a handle (required for detailed file info)
         HANDLE hFile = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -260,3 +224,7 @@ static inline bool OS_GetFileFingerprint(const char *path, FileFingerprint *fp) 
     #endif
     return true;
 }
+
+void* __stack_chk_guard = (void*)0xdeadbeefcafebabeULL;
+__attribute__((noreturn))
+void __stack_chk_fail(void) { DualLogError("Stack protector: canary corrupted - possible stack smash!"); while(1); }

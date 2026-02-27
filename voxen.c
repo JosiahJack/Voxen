@@ -3,7 +3,6 @@
 #include "voxen.h"
 #include "Shaders/shaders.h"
 #include "credits.h"
-const char* EngineName = "Voxen, the Voxel Lit Open Source Game Engine";
 GlobalContext Sys_Global = { .menuActive = true, .screenshotTimeout = 1.0, .creditsPageIndex = 1, .difficultyCombat = 2, .difficultyCyber = 2, .difficultyPuzzle = 2, .difficultyMission = 2, .deaths = 0 };
 DiagnosticsSystem Sys_Dx = { .worstFPS = UINT32_MAX };
 CheatsSystem Sys_Cheats = { .god = false, .noclip = true, .showLocation = true, .showFPS = true, .editMode = true };
@@ -102,9 +101,9 @@ void DualLog(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogM
 void DualLogWarn(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, "\033[1;38;5;208mWARN:", fmt, args); va_end(args); }
 void DualLogError(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stderr, "\033[1;31mERROR:", fmt, args); va_end(args); }
 
-static inline void LogShaderError(GLuint s, const char* name) { char er[512]; glGetShaderInfoLog(s, 512, NULL, er); DualLogError("%s Compilation Failed: %s\n", name, er); OS_Exit(1); }
-static inline GLuint CompileShader(GLenum type, const char* source, const char* name) { GLuint s = glCreateShader(type); glShaderSource(s, 1, &source, NULL); glCompileShader(s); GLint ok; glGetShaderiv(s, GL_COMPILE_STATUS, &ok); if (!ok) LogShaderError(s, name); return s; }
-static inline GLuint LinkProgram(GLuint* s, int32_t num, const char* name) { GLuint p = glCreateProgram(); for (int32_t i = 0; i < num; i++) { glAttachShader(p, s[i]); glDeleteShader(s[i]); } glLinkProgram(p); GLint ok; glGetProgramiv(p, GL_LINK_STATUS, &ok); if (!ok) LogShaderError(p, name); return p; }
+static inline __attribute__((always_inline)) void LogShaderError(GLuint s, const char* name) { char er[512]; glGetShaderInfoLog(s, 512, NULL, er); DualLogError("%s Compilation Failed: %s\n", name, er); OS_Exit(1); }
+static inline __attribute__((always_inline)) GLuint CompileShader(GLenum type, const char* source, const char* name) { GLuint s = glCreateShader(type); glShaderSource(s, 1, &source, NULL); glCompileShader(s); GLint ok; glGetShaderiv(s, GL_COMPILE_STATUS, &ok); if (!ok) LogShaderError(s, name); return s; }
+static inline __attribute__((always_inline)) GLuint LinkProgram(GLuint* s, int32_t num, const char* name) { GLuint p = glCreateProgram(); for (int32_t i = 0; i < num; i++) { glAttachShader(p, s[i]); glDeleteShader(s[i]); } glLinkProgram(p); GLint ok; glGetProgramiv(p, GL_LINK_STATUS, &ok); if (!ok) LogShaderError(p, name); return p; }
 GLuint CompileStandardShader(const char* vsrc, const char* fsrc, const char* name) { GLuint vertShader = CompileShader(GL_VERTEX_SHADER, vsrc, name); GLuint fragShader = CompileShader(GL_FRAGMENT_SHADER, fsrc, name); return LinkProgram((GLuint[]){vertShader, fragShader}, 2, name); }
 GLuint CompileComputeShader(const char* src, const char* name) { GLuint computeShader = CompileShader(GL_COMPUTE_SHADER, src, name); return LinkProgram((GLuint[]){computeShader}, 1, name); }
 void CompileShaders(void) {
@@ -425,7 +424,7 @@ void CenterStatusPrint(const char * restrict fmt, ...) {
     Sys_Global.statusTextDecayFinished = get_time() + 2.5; // 2.5 second decay time before text dissappears.
 }
 
-void NewGame(void) { // Reset World States
+__attribute__((cold)) void NewGame(void) { // Reset World States
     RenderLoadingProgress(100,"Loading new game...");
     instances[WORLD].ioflags = 0u;
     instances[WORLD].lev1SecCode = random_range_u8(0u,9u); // Must do rand's repeatedly to prevent
@@ -456,7 +455,7 @@ void NewGame(void) { // Reset World States
     Sys_Input.lastUse = false;
 }
 
-void LoadGameModDefinition(void) { // Unique set separate from savedata path and resource data to keep it focussed
+__attribute__((cold)) void LoadGameModDefinition(void) { // Unique set separate from savedata path and resource data to keep it focussed
     double start_time = get_time();
     DualLog("Loading game definition...");
     OsFileHandle fp    = OS_OpenReadonly("./Data/gamedata.txt");
@@ -499,7 +498,7 @@ void LoadGameModDefinition(void) { // Unique set separate from savedata path and
     DualLog(" %s:: num levels: %d, start level: %d... took %f secs\n",Sys_Global.global_modname, Sys_Global.numLevels, Sys_Global.startLevel, get_time() - start_time);
 }
 
-void LoadEntities(void) {
+__attribute__((cold)) void LoadEntities(void) {
     double start_time = get_time();
     entityCount = 0;
     DataParser entity_parser;
@@ -542,11 +541,11 @@ extern int32_t stbi_arena_size;
 extern uint8_t*  stbi__arena_base;
 extern void stbi__arena_init(void);
 #define STBI_ARENA_SIZE 16 * 1024 * 1024
-void InitializeEnvironment(void) {
+__attribute__((cold)) void InitializeEnvironment(void) {
     double init_start_time = get_time();
     Sys_Dx.globalFrameNum = 0;
     DebugRAM("InitializeEnvironment start");
-    DualLog("%s by W. Josiah Jack, MIT-0 licensed\n", EngineName);
+    DualLog("Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed\n");
     if (!glfwInit()) { DualLogError("GLFW initialization failed\n"); OS_Exit(1); }
     
     glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
@@ -564,9 +563,6 @@ void InitializeEnvironment(void) {
     
     CycleToNextMonitor(Sys_Global.window);
     glfwSetInputMode(Sys_Global.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    DualLog("OpenGL Version: %s, ", (const char*)glGetString(GL_VERSION));
-    DualLog("GPU: %s", (const char*)glGetString(GL_RENDERER));
-    OS_CPUInfo();
     Input_Init(Sys_Global.window);
     glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Globally same alpha blending
@@ -658,13 +654,12 @@ void InitializeEnvironment(void) {
     Sys_Render.uniqueLightListsID      = SetupSSBO(&Sys_Render.uniqueLightListsID,      27, VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     if (Sys_Global.introNotPlayed) {} // TODO: Play intro
     NewGame();
-    mp3_clear();
     play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500);
     DebugRAM("InitializeEnvironment end");
 }
 
 float debugLineBuffer[MAX_DEBUG_LINE_VERTS * 3]; // xyz only
-void DrawDebugLines(float* viewProj) {    
+static inline __attribute__((always_inline)) void DrawDebugLines(float* viewProj) {    
     glNamedBufferSubData(Sys_Render.debugLinesVBO, 0, Sys_Dx.debugLineVertCount * sizeof(float), debugLineBuffer);
     glUseProgram(Sys_Render.debugUnlitShaderProgram);
     glUniformMatrix4fv(0, 1, GL_FALSE, viewProj);
@@ -677,7 +672,7 @@ void DrawDebugLines(float* viewProj) {
     Sys_Dx.debugLineVertCount = 0;
 }
 
-void AddDebugLine(Vector3 start, Vector3 end) {
+static inline __attribute__((always_inline)) void AddDebugLine(Vector3 start, Vector3 end) {
     int32_t i = Sys_Dx.debugLineVertCount;
     debugLineBuffer[i++] = start.x; debugLineBuffer[i++] = start.y; debugLineBuffer[i++] = start.z;
     debugLineBuffer[i++] =   end.x; debugLineBuffer[i++] =   end.y; debugLineBuffer[i++] =   end.z;
@@ -685,7 +680,7 @@ void AddDebugLine(Vector3 start, Vector3 end) {
 }
 
 #define FROB_DISTANCE 4.9f
-void Frob(Vector3 pos, Vector3 forward, Vector3 right) {
+static inline __attribute__((always_inline)) void Frob(Vector3 pos, Vector3 forward, Vector3 right) {
     float offsetX = cursorPosition_x - (Sys_Settings.ScreenWidth * 0.5f);
     float offsetY = cursorPosition_y - (Sys_Settings.ScreenHeight * 0.5f);
     float ndcX = offsetX / (Sys_Settings.ScreenWidth * 0.5f);
@@ -722,7 +717,7 @@ typedef struct {
     Vector3 position;
 } LightCandidate;
 
-void RenderShadowmaps(void) {    
+static inline __attribute__((always_inline)) __attribute__((hot)) void RenderShadowmaps(void) {    
     double shadowStartTime = get_time();
     glEnable(GL_DEPTH_TEST);
     LightCandidate candidates[MAX_SHADOWMAPS];
@@ -860,7 +855,7 @@ void RenderShadowmaps(void) {
 }
 
 char creditStats[4096];
-float GetScore(float stupid, bool isFinal) {
+static inline __attribute__((always_inline)) float GetScore(float stupid, bool isFinal) {
     float score = 0.0f;
     float victories = (float)(Sys_Global.kills + Sys_Global.cyberkills);
     float secs = 0.0f;
@@ -883,7 +878,7 @@ float GetScore(float stupid, bool isFinal) {
     return vfloor(score);
 }
 
-void CreditsStats(void) {
+static inline __attribute__((always_inline)) void CreditsStats(void) {
     size_t off = 0;
     off += snprintf(creditStats + off, sizeof(creditStats), "================================================================================\nCITADEL\n");
     off += snprintf(creditStats + off, sizeof(creditStats), "================================================================================\nCONGRATULATIONS %s\n", Sys_Global.playerName);
@@ -932,7 +927,7 @@ void RenderCredits(void) {
 
 void RenderMenu(void);
 void RenderPausedUI(void);
-static inline double RenderUI(void) {
+static inline __attribute__((always_inline)) double RenderUI(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     drawCallsNormal = drawCallsRenderedThisFrame;
     if (Sys_Global.creditsActive) { RenderCredits(); return get_time(); }
@@ -981,7 +976,7 @@ static inline double RenderUI(void) {
 
 DepthSort visibleInstances[INSTANCE_COUNT];
 void qsort(void* aa, size_t n, size_t es, int (*cmp)(const void*, const void*));
-static inline void RenderInstances(Vector3 playerPos, bool transparents) {
+static inline __attribute__((always_inline)) void RenderInstances(Vector3 playerPos, bool transparents) {
     uint16_t visibleCount = 0, currentTexIndex = 0, currentNormIndex = 0, currentGlowIndex = 0, currentSpecIndex = 0, currentModelType = 0;
     bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX);
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
@@ -1056,7 +1051,7 @@ static inline void RenderInstances(Vector3 playerPos, bool transparents) {
     }
 }
 
-void Render(void) {
+static inline __attribute__((always_inline)) __attribute__((hot)) void Render(void) {
     drawCallsRenderedThisFrame = textDrawCallsRenderedThisFrame = uiImageDrawCallsRenderedThisFrame = shadowDrawCallsRenderedThisFrame = verticesRenderedThisFrame = 0; // Reset per frame
     
     // Frame prep, View Matrix, and Projection Matrix
@@ -1163,7 +1158,7 @@ void Render(void) {
 }
 
 bool UpdatedPlayerCell(void);
-static void UpdateVoxelsAndInstances(void) {
+static inline __attribute__((always_inline)) void UpdateVoxelsAndInstances(void) {
     Sys_Render.shadowmapsNeedUpdated = UpdatedPlayerCell();
     Sys_Render.shadowmapsNeedUpdated = UpdateLights(&Sys_Render.shadowmapsNeedUpdated);
     if (Sys_Render.shadowmapsNeedUpdated) CullCore(); // 1. Culling
@@ -1237,6 +1232,7 @@ int32_t main(void) {
         }
         
         UpdateAnims();
+        if (likely(!Sys_Global.gamePaused && !Sys_Global.menuActive)) UpdateMusic();
         if (likely(!Sys_Global.gamePaused || Sys_Global.menuActive)) UpdateVoxelsAndInstances();
         Render();
         Sys_Dx.globalFrameNum++;
@@ -1251,4 +1247,9 @@ int32_t main(void) {
         #endif
     }
     return 0;
+}
+
+void _start(void) {
+    main();
+    __asm__ __volatile__("mov $60, %%rax; xor %%rdi, %%rdi; syscall");
 }

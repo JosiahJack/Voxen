@@ -73,7 +73,7 @@ const Setting configTable[] = {
 };
 const int configTableSize = sizeof(configTable) / sizeof(Setting);
 
-static inline int32_t GetGLFWIndirectionIndexForAnInput(const char* val) {
+static inline __attribute__((always_inline)) int32_t GetGLFWIndirectionIndexForAnInput(const char* val) {
     for (int i=0;i<149;++i) { if (StringsAreEqual(val,inputElements[i].name)) return i; }
     return 148;
 }
@@ -490,10 +490,26 @@ bool SwimDn(void) {      return GetKey(39); }
 bool Console(void) {     return Sys_Input.keyStates[GLFW_KEY_GRAVE_ACCENT].pressed; }
 bool TakeScreenshot(void) {  return GetKeyPressed(41); }
 
+// #include <unistd.h>
+// void play_sound(const char* wav_path, float volume) {
+//     if (volume <= 0.01f) return;
+// 
+//     char vol_str[16];
+//     snprintf(vol_str, sizeof(vol_str), "%.3f", (double)volume);
+//     pid_t pid = fork();
+//     if (pid == -1) return;
+//     
+//     if (pid == 0) {
+//         execlp("sox", "sox", "-q", wav_path, "-t", "alsa", "default", "vol", vol_str, "dither","-s", (char*)NULL);
+//         _exit(127);
+//     }
+// }
+
 // void MenuInput(void); TODO
 void ProcessInput(void) {
     Input_PollJoysticks();
     Input_PollGamepad();
+//     if (Sys_Input.keyStates[GLFW_KEY_E].pressed) play_sound("./Audio/music/THM1-19_medicalstart.mp3",0.1f); //play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f,(Vector3){},false);
     if (!Sys_Input.window_has_focus) return;
     
     if (Sys_Input.keyStates[GLFW_KEY_CAPS_LOCK].pressed) Sys_Input.isCapsLockOn = !Sys_Input.isCapsLockOn; // Change capslock state to match keyboard having toggled.  Must always happen regardless of paused/menu.

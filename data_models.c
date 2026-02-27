@@ -128,7 +128,6 @@ void LoadModels(void) {
     DataParser model_parser;
     if (!parse_data_file(&model_parser, MODEL_IDX_MAX, "./Data/models.txt")) { DualLogError("Could not parse ./Data/models.txt!\n"); OS_Exit(1); }
 
-    DualLog("After parse_data_file model_parser.entries[0].path is \"%s\"\n", model_parser.entries[0].path);
     int32_t maxIndex = -1;
     for (uint32_t k = 0; k < model_parser.count; k++) {
         if (model_parser.entries[k].index > maxIndex && model_parser.entries[k].index != UINT16_MAX) maxIndex = model_parser.entries[k].index;

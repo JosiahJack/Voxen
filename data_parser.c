@@ -105,11 +105,11 @@ bool parse_data_file(DataParser *parser, uint16_t maxSize, const char *filename)
     uint32_t entry_count = max_index + 1;
     Entity *new_entries = OS_AllocateRAM(NULL, entry_count * sizeof(Entity), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);  
     parser->entries = new_entries;
-    for (uint32_t i = parser->capacity; i < entry_count; ++i) InitializeEntity(&parser->entries[i]);
+    for (uint32_t i = 0; i < entry_count; ++i) { InitializeEntity(&parser->entries[i]); parser->entries[i].index = UINT16_MAX; }
     parser->capacity = entry_count;
     parser->count = entry_count;
     Entity entry;
-    InitializeEntity(&entry);
+    InitializeEntity(&entry); entry.index = UINT16_MAX;
     lineNum = 0;
     int32_t currentChild = -1;
     cursor = data; end = data + st_size; // Rewind
@@ -127,7 +127,7 @@ bool parse_data_file(DataParser *parser, uint16_t maxSize, const char *filename)
 
         if (*start == '#') {
             if (entry.path[0] && entry.index != UINT16_MAX && entry.index < parser->capacity) parser->entries[entry.index] = entry;
-            InitializeEntity(&entry);
+            InitializeEntity(&entry); entry.index = UINT16_MAX;
             if (lineend > start) {
                 size_t actualLen = lineend - (start + 1) + 1;
                 if (actualLen >= sizeof(entry.path)) actualLen = sizeof(entry.path) - 1;

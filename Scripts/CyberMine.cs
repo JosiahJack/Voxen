@@ -8,17 +8,17 @@ public class CyberMine : MonoBehaviour {
     void Start() {
 		dmg = 55f;
         if (Sys_Global.difficultyCyber < 3) {
-			if (random_range(0,1f) < 0.2f) flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false); // 20% chance of not spawning on normal
+			if (random_range(0.0f,1.0f) < 0.2f) flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false); // 20% chance of not spawning on normal
 			dmg = 33f;
 		}
 
         if (Sys_Global.difficultyCyber < 2) {
-			if (random_range(0,1f) < 0.33f) flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false); // 33% chance of not spawning on easy
+			if (random_range(0.0f,1.0f) < 0.33f) flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false); // 33% chance of not spawning on easy
 			dmg = 22f;
 		}
 
         if (Sys_Global.difficultyCyber < 1) {
-			if (random_range(0,1f) < 0.50f) flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false); // 50% chance of not spawning on grandma
+			if (random_range(0.0f,1.0f) < 0.50f) flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false); // 50% chance of not spawning on grandma
 			dmg = 11f;
 		}
     }

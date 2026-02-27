@@ -19,6 +19,8 @@
 //
 // Unneeded fields do not need to be specified.
 // Index 0 is reserved for black, alpha 1.0 (fully opaque)!
+#Textures/med1_7.png
+index: 499
 #Textures/black.png
 index: 0
 persistent: 1
@@ -1081,8 +1083,7 @@ index: 496
 index: 497
 #Textures/med1_7_normal.png
 index: 498
-#Textures/med1_7.png
-index: 499
+
 #Textures/med1_8d_glow.png
 index: 500
 #Textures/med1_8d.png

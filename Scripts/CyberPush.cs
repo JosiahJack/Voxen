@@ -20,7 +20,7 @@ public class CyberPush : MonoBehaviour {
 					otherRbody.AddForce(direction * force * Time.deltaTime, ForceMode.Acceleration);
 				}
 			}
-			Music.a.NotifyCyberTube();
+			Sys_Music.cyberTube = true;
 		}
 	}
 
@@ -28,7 +28,7 @@ public class CyberPush : MonoBehaviour {
 		if (col.gameObject.CompareTag("Player")) {
 			PlayerMovement pm = col.gameObject.GetComponent<PlayerMovement>();
 			if (pm != null) pm.inCyberTube = false; // To re-allow for easy cyber difficulty to stop motion
-			Music.a.NotifyLeftCyberTube();
+			Sys_Music.cyberTube = false;
 		}
 	}
 }

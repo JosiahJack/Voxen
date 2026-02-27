@@ -4743,7 +4743,6 @@ This is for preventing greying out of the implementation section.
 #ifndef miniaudio_c
 #define miniaudio_c
 
-#include <assert.h>
 #include <limits.h>         /* For INT_MAX */
 #include <stdlib.h>         /* For malloc(), free(), wcstombs(). */
 #include <string.h>         /* For memset() */
@@ -5261,7 +5260,7 @@ Standard Library Stuff
 
 ******************************************************************************/
 #ifndef MA_ASSERT
-#define MA_ASSERT(condition)            assert(condition)
+#define MA_ASSERT(condition)            (void)0
 #endif
 
 #ifndef MA_MALLOC

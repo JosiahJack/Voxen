@@ -46,10 +46,10 @@ public class MinigamePing : MonoBehaviour {
         playerScore = 0;
         computerScore = 0;
         servecount = 0;
-        playerServing = random_range(0f,1f) < 0.5f ? true : false;
+        playerServing = random_range(0.0f,1.0f) < 0.5f ? true : false;
         UpdateScoreText();
-        playerPaddle.localPosition = (Vector3){0f,-100f,0f);
-        computerPaddle.localPosition = (Vector3){0f,100f,0f);
+        playerPaddle.localPosition = (Vector3){0.0f,-100.0f,0.0f);
+        computerPaddle.localPosition = (Vector3){0.0f,100.0f,0.0f);
         gameOver.SetActive(false);
         winPizzazz.SetActive(false);
         ResetBall();

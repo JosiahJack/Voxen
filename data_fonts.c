@@ -131,7 +131,7 @@ static bool load_font_cache(const char *path, int32_t expected_glyphs, const uin
 
 void InitFontAtlasses(void) {
     double t0 = get_time();
-    DualLog("Loaded    5 fonts...");
+    DualLog("Loading    5 fonts...");
     OsFileHandle fd1; int sz1; fontData[0] = OS_OpenAndAllocateFileBufferReadonly(fontPaths[0], &fd1, &sz1);
     OsFileHandle fd2; int sz2; fontData[1] = OS_OpenAndAllocateFileBufferReadonly(fontPaths[1], &fd2, &sz2);
     if (!stbtt_InitFont_internal(&fontInfo[0], fontData[0], 0)) { DualLogError("%s font init failed\n", fontPaths[0]); OS_Exit(1); }
@@ -149,7 +149,7 @@ void InitFontAtlasses(void) {
     const char *sec_cache = "./Fonts/StopD.vfnt";
     bool pri_hit = load_font_cache(pri_cache, pri_expected, fbx_stamp1, fontPackedChar, &numPackedGlyphs, &fixedNumberAdvanceWidth, &fontAtlasTex);
     bool sec_hit = load_font_cache(sec_cache, sec_expected, fbx_stamp2, fontPackedCharStopD, &numPackedGlyphsStopD, &fixedNumberAdvanceWidthStopD, &fontAtlasTexStopD);
-    if (pri_hit && sec_hit) { DualLog("in %.3f s\n", get_time() - t0); return; }
+    if (pri_hit && sec_hit) { DualLog("took %f secs\n", get_time() - t0); return; }
 
     fallbackFonts[0] = LoadFallbackFont(fallbackFontPaths[0], 2); // Preload known fallback fonts for Cyrillic, Kanji, etc.
     fallbackFonts[1] = LoadFallbackFont(fallbackFontPaths[1], 3);
@@ -233,5 +233,5 @@ void InitFontAtlasses(void) {
     glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     write_font_cache(sec_cache, sec_expected, fbx_stamp2, fontPackedCharStopD, numPackedGlyphsStopD, fixedNumberAdvanceWidthStopD, bmp);
     OS_DeallocateRAM(bmp,FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * sizeof(unsigned char));
-    DualLog(" took %.3f s\n", get_time() - t0);
+    DualLog(" took %f s\n", get_time() - t0);
 }

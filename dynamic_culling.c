@@ -25,7 +25,7 @@ __attribute__((pure)) bool get_cull_bit(const uint32_t* arr, int idx) {
     return ((arr[word] & (1U << bit)) != 0);
 }
 
-static inline void set_cull_bit(uint32_t* arr, int idx, bool val) {
+static inline __attribute__((always_inline)) void set_cull_bit(uint32_t* arr, int idx, bool val) {
     int word = idx / 32;
     int bit = idx % 32;
     if (val) arr[word] |= (1U << bit);

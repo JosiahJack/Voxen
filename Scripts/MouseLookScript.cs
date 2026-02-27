@@ -188,10 +188,10 @@ public class MouseLookScript : MonoBehaviour {
 		}
 
 		if(GetInput.a.ToggleMode()) ToggleInventoryMode(); // Toggle inventory mode<->shoot mode
-		if (Const.a.questData.SelfDestructActivated && LevelManager.a.currentLevel != 13 && LevelManager.a.currentLevel != 9) { // Not Cyberspace, Not the bridge, separated
+		if (Sys_Global.SelfDestructActivated && Sys_Global.currentLevel != 13 && Sys_Global.currentLevel != 9) { // Not Cyberspace, Not the bridge, separated
 			if (randomShakeFinished < Sys_Global.pauseRelativeTime) {
 				randomShakeFinished = Sys_Global.pauseRelativeTime + random_range(5f,20f);
-				ScreenShake(3f,2f);
+				ScreenShake(3.0f,2.0f);
 			}
 			
 			if (randomKlaxonFinished < Sys_Global.pauseRelativeTime) {
@@ -201,7 +201,7 @@ public class MouseLookScript : MonoBehaviour {
 		}
 
 		RecoilAndRest(); // Spring Back to Rest from Recoil
-		keyboardTurnSpeed = 15f * Const.a.MouseSensitivity;
+		keyboardTurnSpeed = 15.0f * Const.a.MouseSensitivity;
 		KeyboardTurn();
 		KeyboardLookUpDn();
 		TouchLook();

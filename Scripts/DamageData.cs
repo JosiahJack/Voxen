@@ -102,56 +102,24 @@ public class DamageData {
 	// 7. Return the damage to original TakeDamage() function
 	public static float GetDamageTakeAmount (DamageData dd) {
 		float take, crit;
-
-		// a_* = attacker
-		float a_damage = dd.damage;
-		float a_offense = dd.offense;
-		float a_penetration = dd.penetration;
+		float      a_damage = dd.damage; // a_* = attacker
+		float      a_offense = dd.offense;
+		float      a_penetration = dd.penetration;
 		AttackType a_att_type = dd.attackType;
-		bool a_berserk = dd.berserkActive;
-
-		// o_* = other (one being attacked)
-		bool o_isnpc = dd.isOtherNPC;
+		bool       a_berserk = dd.berserkActive;
+		bool  o_isnpc = dd.isOtherNPC; // o_* = other (one being attacked)
 		float o_armorvalue = dd.armorvalue;
 		float o_defense = dd.defense;
-
- 		// 1. Armor Absorption (NPC armor, not player)
-		take = (o_armorvalue > a_penetration ? a_damage - a_penetration : a_damage);
-
-		// 2. Weapon Vulnerabilities
-		//    Handled by HealthManager.
-
-		// 3. Critical Hits (NPCs only)
-		if (o_isnpc) {
+		take = (o_armorvalue > a_penetration ? a_damage - a_penetration : a_damage); // 1. Armor Absorption (NPC armor, not player).  2. Weapon Vulnerabilities: Handled by HealthManager.
+		if (o_isnpc) { // 3. Critical Hits (NPCs only)
 			crit = (a_offense - o_defense);
-			if (crit > 0) {
-				// 71% success with 5/6  5 = f, 6 = max offense or defense.
-				// 62% success with 4/6
-				// 50% success with 3/6
-				// 24% success with 2/6
-				// 10% success with 1/6
-				// chance of f/6 = 5/6|4/6|3/6|2/6|1/6 = .833|.666|.5|.333|.166
-				if ((random_range(0f,1f) < (crit/6))
-					&& (random_range(0f,1f) < 0.2f)) {
-
-					// SUCCESS! Maximum extra is 5X + 1X Damage.
-					take += crit * take;
-				}
+			if (crit > 0) { // 71% success with 5/6  5 = f, 6 = max offense or defense.  62% success with 4/6.  50% success with 3/6.  24% success with 2/6.  10% success with 1/6.  chance of f/6 = 5/6|4/6|3/6|2/6|1/6 = .833|.666|.5|.333|.166
+				if ((random_range(0.0f,1.0f) < (crit / 6.0f)) && (random_range(0.0f,1.0f) < 0.2f)) take += crit * take; // SUCCESS! Maximum extra is 5X + 1X Damage.
 			}
 		}
 
-		// 4. Random Factor +/- 10% (aka 0.10 damage).
-		take *= random_range(0.9f,1.1f);
-
-		// 5. Apply Impact Velocity for Damage
-		//    Handled by HealthManager.
-
-		// 6. Berserk Damage Increase.
-		if (a_berserk) {
-			take *= Const.berserkDamageMultiplier;
-		}
-
-		// 7. Return the Damage.
-		return take;
+		take *= random_range(0.9f,1.1f); // 4. Random Factor +/- 10% (aka 0.10 damage).  5. Apply Impact Velocity for Damage:  Handled by HealthManager.
+		if (unlikely(a_berserk)) take *= 4.0f; // 6. Berserk Damage Increase.
+		return take; // 7. Return the Damage.
 	}
 }

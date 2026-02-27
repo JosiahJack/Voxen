@@ -54,7 +54,7 @@ public class Minigame15 : MonoBehaviour {
         while (shuffleIter > 0) {
             int randIter = 32;
             while (randIter > 0) { // Find cell next to empty slot
-                int randint = random_range(1,17); // Top end exclusive, [1,16]
+                int randint = random_range_i32(1,17); // Top end exclusive, [1,16]
                 int emp = EmptyNeighbor(randint);
                 if (emp != 0) {
                     Slide(randint,emp,true);

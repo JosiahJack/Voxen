@@ -291,7 +291,7 @@
 						CenterStatusPrint("%s", Sys_Text.stringTable[208] + abs.ToString() + Sys_Text.stringTable[209],dd.other);  // Shield absorbs x% damage
 					}
 				}
-				if (take > 0 && ((absorb <0.4f) || random_range(0,1f) < 0.5f)) {
+				if (take > 0 && ((absorb <0.4f) || random_range(0.0f,1.0f) < 0.5f)) {
 					Utils.PlayUIOneShotSavable(140); // Play player pain noise
 					int intensityOfPainFlash = 0; // 0 = light
 					if (take > 15f) {
@@ -490,7 +490,7 @@
 			Utils.Deactivate(linkedOverlay.gameObject);
 		}
 
-		if (securityAffected != SecurityType.None) {
+		if (securityAffected != SecurityType_None) {
 			LevelManager.a.ReduceCurrentLevelSecurity(securityAffected);
 		}
 

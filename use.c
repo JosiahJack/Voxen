@@ -239,7 +239,7 @@ void DoorUse (UseData ud) {
     if (ud.owner == null) return;
     if (GetCurrentLevelSecurity() > securityThreshhold) { Sys_UI.BlockedBySecurity(instances[i].position); return; }
 
-    if (LevelManager.a.superoverride || Sys_Global.difficultyMission <= 0) { // SHODAN can go anywhere!  Full security override!
+    if (Sys_Cheats.superoverride || Sys_Global.difficultyMission <= 0) { // SHODAN can go anywhere!  Full security override!
         locked = false;
         requiredAccessCard = AccessCardType_None;
         accessCardUsedByPlayer = true;

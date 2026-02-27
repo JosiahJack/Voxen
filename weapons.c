@@ -215,15 +215,15 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 //     void HeatBleedOff() {
 //         if (heatTickFinished < Sys_Global.pauseRelativeTime) {
 // 			fogFac--;
-// 			if (fogFac < 0) fogFac = 0;
+// 			if (fogFac < 0.0f) fogFac = 0.0f;
 // 			if (WeaponsHaveAnyHeat() || CurrentWeaponUsesEnergy()) {
-// 				inventoryPlayer1.currentEnergyWeaponHeat[0] -= 10f; if (inventoryPlayer1.currentEnergyWeaponHeat[0] <= 0f) inventoryPlayer1.currentEnergyWeaponHeat[0] = 0f;
-// 				inventoryPlayer1.currentEnergyWeaponHeat[1] -= 10f; if (inventoryPlayer1.currentEnergyWeaponHeat[1] <= 0f) inventoryPlayer1.currentEnergyWeaponHeat[1] = 0f;
-// 				inventoryPlayer1.currentEnergyWeaponHeat[2] -= 10f; if (inventoryPlayer1.currentEnergyWeaponHeat[2] <= 0f) inventoryPlayer1.currentEnergyWeaponHeat[2] = 0f;
-// 				inventoryPlayer1.currentEnergyWeaponHeat[3] -= 10f; if (inventoryPlayer1.currentEnergyWeaponHeat[3] <= 0f) inventoryPlayer1.currentEnergyWeaponHeat[3] = 0f;
-// 				inventoryPlayer1.currentEnergyWeaponHeat[4] -= 10f; if (inventoryPlayer1.currentEnergyWeaponHeat[4] <= 0f) inventoryPlayer1.currentEnergyWeaponHeat[4] = 0f;
-// 				inventoryPlayer1.currentEnergyWeaponHeat[5] -= 10f; if (inventoryPlayer1.currentEnergyWeaponHeat[5] <= 0f) inventoryPlayer1.currentEnergyWeaponHeat[5] = 0f;
-// 				inventoryPlayer1.currentEnergyWeaponHeat[6] -= 10f; if (inventoryPlayer1.currentEnergyWeaponHeat[6] <= 0f) inventoryPlayer1.currentEnergyWeaponHeat[6] = 0f;
+// 				inventoryPlayer1.currentEnergyWeaponHeat[0] -= 10f; if (inventoryPlayer1.currentEnergyWeaponHeat[0] <= 0.0f) inventoryPlayer1.currentEnergyWeaponHeat[0] = 0.0f;
+// 				inventoryPlayer1.currentEnergyWeaponHeat[1] -= 10f; if (inventoryPlayer1.currentEnergyWeaponHeat[1] <= 0.0f) inventoryPlayer1.currentEnergyWeaponHeat[1] = 0.0f;
+// 				inventoryPlayer1.currentEnergyWeaponHeat[2] -= 10f; if (inventoryPlayer1.currentEnergyWeaponHeat[2] <= 0.0f) inventoryPlayer1.currentEnergyWeaponHeat[2] = 0.0f;
+// 				inventoryPlayer1.currentEnergyWeaponHeat[3] -= 10f; if (inventoryPlayer1.currentEnergyWeaponHeat[3] <= 0.0f) inventoryPlayer1.currentEnergyWeaponHeat[3] = 0.0f;
+// 				inventoryPlayer1.currentEnergyWeaponHeat[4] -= 10f; if (inventoryPlayer1.currentEnergyWeaponHeat[4] <= 0.0f) inventoryPlayer1.currentEnergyWeaponHeat[4] = 0.0f;
+// 				inventoryPlayer1.currentEnergyWeaponHeat[5] -= 10f; if (inventoryPlayer1.currentEnergyWeaponHeat[5] <= 0.0f) inventoryPlayer1.currentEnergyWeaponHeat[5] = 0.0f;
+// 				inventoryPlayer1.currentEnergyWeaponHeat[6] -= 10f; if (inventoryPlayer1.currentEnergyWeaponHeat[6] <= 0.0f) inventoryPlayer1.currentEnergyWeaponHeat[6] = 0.0f;
 // 				if (CurrentWeaponUsesEnergy()) energheatMgr.HeatBleed(inventoryPlayer1.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent]); // update hud heat ticks if current weapon uses energy
 // 			}
 // 			
@@ -237,7 +237,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 		if (strength <= 0f) return;
 // 		if (instances[PLAYER1].fatigue > 80.0f) strength = strength * 2f;
 // 		strength = strength * 0.25f;
-// 		Vector3 wepJoltPosition = (Vector3){reloadContainer.localPosition.x - (strength * 0.5f * random_range(-1f,1f)), reloadContainer.localPosition.y, (reloadContainerHome.z - strength));
+// 		Vector3 wepJoltPosition = (Vector3){reloadContainer.localPosition.x - (strength * 0.5f * random_range(-1.0f,1.0f)), reloadContainer.localPosition.y, (reloadContainerHome.z - strength));
 // 		if (wepJoltPosition.x > 999f) wepJoltPosition.x = 0;
 // 		if (wepJoltPosition.y > 999f) wepJoltPosition.y = 0;
 // 		if (wepJoltPosition.z > 999f) wepJoltPosition.z = 0;

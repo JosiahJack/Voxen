@@ -147,7 +147,6 @@ public class PlayerMovement : MonoBehaviour {
 	private float leanSpeed = 70f;
 	bool Notarget = false; // for cheat to disable enemy sight checks against this player
 	bool fatigueWarned; // save
-	float ressurectingFinished; // save
 	private float burstForce = 35f;
 	float doubleJumpFinished; // save
 	private Vector3 playerHome;
@@ -178,7 +177,7 @@ public class PlayerMovement : MonoBehaviour {
 
     void Start() {
 		currentCrouchRatio = def1;
-		bodyState = BodyState.Standing;
+		bodyState = BodyState_Standing;
 		cyberDesetup = false;
 		oldBodyState = bodyState;
 		fatigueFinished = Sys_Global.pauseRelativeTime;
@@ -198,7 +197,7 @@ public class PlayerMovement : MonoBehaviour {
 		jumpSFXFinished = Sys_Global.pauseRelativeTime;
 		fatigueWarned = false;
 		jumpJetEnergySuckTickFinished = Sys_Global.pauseRelativeTime;
-		ressurectingFinished = Sys_Global.pauseRelativeTime;
+		instances[PLAYER1].ressurectingFinished = Sys_Global.pauseRelativeTime;
 		tempInt = -1;
 		doubleJumpFinished = Sys_Global.pauseRelativeTime;
 		doubleJumpTicks = 0;
@@ -206,11 +205,6 @@ public class PlayerMovement : MonoBehaviour {
 		playerHome = instances[i].position;
 		ConsoleEmulator.lastCommand = new string[7];
 		ConsoleEmulator.consoleMemdex = consoleMemdex = 0;
-		FatigueCheat = false;
-		if (Application.platform == RuntimePlatform.Android) {
-		    fpsCounter.SetActive(true);
-		}
-
 		stepFinished = Sys_Global.pauseRelativeTime;
 		rustleFinished = Sys_Global.pauseRelativeTime;
 		bodyLerpGravityOffDelayFinished = 0;
@@ -381,513 +375,47 @@ public class PlayerMovement : MonoBehaviour {
 			return;
 		}
 
-		if (rbody.velocity.sqrMagnitude <= 0.05f) {
-			SFXClothes.Stop();
-		}
-
+		if (rbody.velocity.sqrMagnitude <= 0.05f) SFXClothes.Stop();
 		if ((vabs(relForward) + vabs(relSideways)) == 0) return;
 
 		if (rustleFinished < Sys_Global.pauseRelativeTime) {
-			rustleFinished = isSprinting
-							 ? Sys_Global.pauseRelativeTime
-							   + random_range(0.4f,0.6f)
-							 : Sys_Global.pauseRelativeTime
-							   + random_range(0.8f,1.2f);
-
-			AudioClip rustle =
-				sounds[random_range(459,465 + 1)];
-
-			Utils.PlayOneShotSavable(SFXClothes,rustle,
-									 random_range(0.3f,0.5f));
+			rustleFinished = Sys_Global.pauseRelativeTime + (isSprinting ? random_range(0.4f,0.6f) : random_range(0.8f,1.2f));
+			AudioClip rustle = sounds[random_range_u32(459,465 + 1)];
+			Utils.PlayOneShotSavable(SFXClothes,rustle,random_range(0.3f,0.5f));
 		}
 
 		if (!grounded) return;
 
-		successfulRay = Raycast(instances[i].position, Vector3.down,
-										out tempHit,feetRayLength,
-										Const.a.layerMaskPlayerFeet);
-		
+		successfulRay = Raycast(instances[i].position, Vector3.down,out tempHit,feetRayLength,Const.a.layerMaskPlayerFeet);
 		if (tempHit.collider == null) return;
-		hitGO = tempHit.collider.transform.gameObject;
-		PrefabIdentifier prefID = hitGO.GetComponent<PrefabIdentifier>();
-		if (prefID == null) {
-			if (hitGO.transform.parent != null) {
-				prefID = hitGO.transform.parent.gameObject.GetComponent<PrefabIdentifier>();
-			}
-		}
-		if (prefID == null) return;
+		other = tempHit.collider.transform.gameObject;
 
 		// Footsteps
 		if (stepFinished < Sys_Global.pauseRelativeTime) {
-			stepFinished = isSprinting
-						   ? Sys_Global.pauseRelativeTime
-							 + random_range(0.2f,0.3f)
-						   : Sys_Global.pauseRelativeTime
-							 + random_range(0.35f,0.65f);
-
-			FootStepType fstep = GetFootstepTypeForPrefab(prefID.constIndex);
+			stepFinished = Sys_Global.pauseRelativeTime + (isSprinting ? random_range(0.2f,0.3f) : random_range(0.35f,0.65f));
+			FootStepType fstep = GetFootstepTypeForPrefab(instances[other].constIndex);
 			AudioClip stcp = FootStepSound(fstep);
-			Utils.PlayOneShotSavable(SFXFootsteps,stcp,
-									 random_range(0.4f,0.55f));
+			Utils.PlayOneShotSavable(SFXFootsteps,stcp,random_range(0.4f,0.55f));
 		}
-	}
-
-	public FootStepType GetFootstepTypeForPrefab(int pid) {
-		switch(pid) {
-			case 0: return FootStepType.None;
-			case 1: return FootStepType.Glass;
-			case 2: return FootStepType.Squish;
-			case 3: return FootStepType.Squish;
-			case 4: return FootStepType.Squish;
-			case 5: return FootStepType.Squish;
-			case 6: return FootStepType.Squish;
-			case 7: return FootStepType.Squish;
-			case 8: return FootStepType.Squish;
-			case 9: return FootStepType.Squish;
-			case 10: return FootStepType.Squish;
-			case 11: return FootStepType.Metpanel;
-			case 12: return FootStepType.Marble;
-			case 13: return FootStepType.Metal2;
-			case 14: return FootStepType.Metal2;
-			case 15: return FootStepType.Metal2;
-			case 16: return FootStepType.Metal2;
-			case 17: return FootStepType.Metal2;
-			case 18: return FootStepType.Metal2;
-			case 19: return FootStepType.Glass;
-			case 20: return FootStepType.Wood2;
-			case 21: return FootStepType.None;
-			case 22: return FootStepType.None;
-			case 23: return FootStepType.Plastic2;
-			case 24: return FootStepType.Plastic2;
-			case 25: return FootStepType.Plastic2;
-			case 26: return FootStepType.Plastic2;
-			case 27: return FootStepType.Plastic2;
-			case 28: return FootStepType.Plastic2;
-			case 29: return FootStepType.Plastic2;
-			case 30: return FootStepType.Plastic2;
-			case 31: return FootStepType.Plastic2;
-			case 32: return FootStepType.Plastic2;
-			case 33: return FootStepType.Plastic2;
-			case 34: return FootStepType.Plastic2;
-			case 35: return FootStepType.Plastic2;
-			case 36: return FootStepType.Plastic2;
-			case 37: return FootStepType.Plastic2;
-			case 38: return FootStepType.Plastic2;
-			case 39: return FootStepType.Plastic2;
-			case 40: return FootStepType.Plastic2;
-			case 41: return FootStepType.Plastic;
-			case 42: return FootStepType.Plastic;
-			case 43: return FootStepType.Plastic;
-			case 44: return FootStepType.Plastic;
-			case 45: return FootStepType.Plastic;
-			case 46: return FootStepType.Plastic;
-			case 47: return FootStepType.Plastic;
-			case 48: return FootStepType.Plastic2;
-			case 49: return FootStepType.Plastic2;
-			case 50: return FootStepType.Carpet;
-			case 51: return FootStepType.Metpanel;
-			case 52: return FootStepType.Metpanel;
-			case 53: return FootStepType.Plastic2;
-			case 54: return FootStepType.Gravel;
-			case 55: return FootStepType.Gravel;
-			case 56: return FootStepType.Metpanel;
-			case 57: return FootStepType.Metpanel;
-			case 58: return FootStepType.Plastic;
-			case 59: return FootStepType.Plastic;
-			case 60: return FootStepType.Plastic;
-			case 61: return FootStepType.Marble;
-			case 62: return FootStepType.Metal;
-			case 63: return FootStepType.Metal;
-			case 64: return FootStepType.Sand;
-			case 65: return FootStepType.Sand;
-			case 66: return FootStepType.Sand;
-			case 67: return FootStepType.Plastic;
-			case 68: return FootStepType.Plastic;
-			case 69: return FootStepType.Plastic;
-			case 70: return FootStepType.Carpet;
-			case 71: return FootStepType.Metpanel;
-			case 72: return FootStepType.Marble;
-			case 73: return FootStepType.Marble;
-			case 74: return FootStepType.Plaster;
-			case 75: return FootStepType.Carpet;
-			case 76: return FootStepType.Marble;
-			case 77: return FootStepType.Glass;
-			case 78: return FootStepType.Metal;
-			case 79: return FootStepType.Grate;
-			case 80: return FootStepType.Rubber;
-			case 81: return FootStepType.Rubber;
-			case 82: return FootStepType.Metal2;
-			case 83: return FootStepType.Metal2;
-			case 84: return FootStepType.Metal2;
-			case 85: return FootStepType.Metal2;
-			case 86: return FootStepType.Metal2;
-			case 87: return FootStepType.Metal2;
-			case 88: return FootStepType.Metal2;
-			case 89: return FootStepType.Metal;
-			case 90: return FootStepType.Plastic;
-			case 91: return FootStepType.Plastic;
-			case 92: return FootStepType.Plastic;
-			case 93: return FootStepType.Glass;
-			case 94: return FootStepType.Grass;
-			case 95: return FootStepType.Grass;
-			case 96: return FootStepType.Grass;
-			case 97: return FootStepType.Water;
-			case 98: return FootStepType.Squish;
-			case 99: return FootStepType.Squish;
-			case 100: return FootStepType.Squish;
-			case 101: return FootStepType.GrittyCrete;
-			case 102: return FootStepType.GrittyCrete;
-			case 103: return FootStepType.GrittyCrete;
-			case 104: return FootStepType.GrittyCrete;
-			case 105: return FootStepType.GrittyCrete;
-			case 106: return FootStepType.GrittyCrete;
-			case 107: return FootStepType.GrittyCrete;
-			case 108: return FootStepType.GrittyCrete;
-			case 109: return FootStepType.GrittyCrete;
-			case 110: return FootStepType.Squish;
-			case 111: return FootStepType.GrittyCrete;
-			case 112: return FootStepType.Metal;
-			case 113: return FootStepType.Panel;
-			case 114: return FootStepType.Panel;
-			case 115: return FootStepType.Panel;
-			case 116: return FootStepType.Metpanel;
-			case 117: return FootStepType.Metpanel;
-			case 118: return FootStepType.Panel;
-			case 119: return FootStepType.Panel;
-			case 120: return FootStepType.Metpanel;
-			case 121: return FootStepType.Metpanel;
-			case 122: return FootStepType.Glass;
-			case 123: return FootStepType.Panel;
-			case 124: return FootStepType.Rubber;
-			case 125: return FootStepType.Rubber;
-			case 126: return FootStepType.Glass;
-			case 127: return FootStepType.Metal;
-			case 128: return FootStepType.Glass;
-			case 129: return FootStepType.Metal;
-			case 130: return FootStepType.Grate;
-			case 131: return FootStepType.Metal;
-			case 132: return FootStepType.Metal;
-			case 133: return FootStepType.Metal;
-			case 134: return FootStepType.Metal;
-			case 135: return FootStepType.Metpanel;
-			case 136: return FootStepType.Metpanel;
-			case 137: return FootStepType.Metal;
-			case 138: return FootStepType.Metal;
-			case 139: return FootStepType.Metpanel;
-			case 140: return FootStepType.Metpanel;
-			case 141: return FootStepType.Metal;
-			case 142: return FootStepType.Metal;
-			case 143: return FootStepType.Metal;
-			case 144: return FootStepType.Vent;
-			case 145: return FootStepType.Vent;
-			case 146: return FootStepType.Vent;
-			case 147: return FootStepType.Vent;
-			case 148: return FootStepType.Vent;
-			case 149: return FootStepType.Plastic;
-			case 150: return FootStepType.Plastic;
-			case 151: return FootStepType.Plastic;
-			case 152: return FootStepType.Plastic;
-			case 153: return FootStepType.Plastic;
-			case 154: return FootStepType.Plastic;
-			case 155: return FootStepType.Plastic;
-			case 156: return FootStepType.Plastic;
-			case 157: return FootStepType.Plastic;
-			case 158: return FootStepType.Plastic;
-			case 159: return FootStepType.Plastic;
-			case 160: return FootStepType.Panel;
-			case 161: return FootStepType.Panel;
-			case 162: return FootStepType.Plastic2;
-			case 163: return FootStepType.Plastic2;
-			case 164: return FootStepType.Plastic2;
-			case 165: return FootStepType.Plastic2;
-			case 166: return FootStepType.Plastic2;
-			case 167: return FootStepType.Plastic2;
-			case 168: return FootStepType.Plastic2;
-			case 169: return FootStepType.Panel;
-			case 170: return FootStepType.Panel;
-			case 171: return FootStepType.Panel;
-			case 172: return FootStepType.Panel;
-			case 173: return FootStepType.Panel;
-			case 174: return FootStepType.Panel;
-			case 175: return FootStepType.Panel;
-			case 176: return FootStepType.Panel;
-			case 177: return FootStepType.Panel;
-			case 178: return FootStepType.Plastic;
-			case 179: return FootStepType.Plastic;
-			case 180: return FootStepType.Plastic;
-			case 181: return FootStepType.Plastic;
-			case 182: return FootStepType.Plastic;
-			case 183: return FootStepType.Plastic;
-			case 184: return FootStepType.Plastic;
-			case 185: return FootStepType.Plastic;
-			case 186: return FootStepType.Plastic;
-			case 187: return FootStepType.Glass;
-			case 188: return FootStepType.Plastic;
-			case 189: return FootStepType.Metal;
-			case 190: return FootStepType.Plastic;
-			case 191: return FootStepType.Plastic;
-			case 192: return FootStepType.Plastic;
-			case 193: return FootStepType.Plastic;
-			case 194: return FootStepType.Plastic;
-			case 195: return FootStepType.Plastic;
-			case 196: return FootStepType.Metal;
-			case 197: return FootStepType.Metal2;
-			case 198: return FootStepType.Metal2;
-			case 199: return FootStepType.Metal;
-			case 200: return FootStepType.Metal2;
-			case 201: return FootStepType.Metal2;
-			case 202: return FootStepType.Metal2;
-			case 203: return FootStepType.Metal;
-			case 204: return FootStepType.Metpanel;
-			case 205: return FootStepType.Metpanel;
-			case 206: return FootStepType.Metpanel;
-			case 207: return FootStepType.Metpanel;
-			case 208: return FootStepType.Metal;
-			case 209: return FootStepType.Metal;
-			case 210: return FootStepType.Metal;
-			case 211: return FootStepType.Metal;
-			case 212: return FootStepType.Metal;
-			case 213: return FootStepType.Metal;
-			case 214: return FootStepType.Metal;
-			case 215: return FootStepType.Metal;
-			case 216: return FootStepType.Metal;
-			case 217: return FootStepType.Metal;
-			case 218: return FootStepType.Metal;
-			case 219: return FootStepType.Metal;
-			case 220: return FootStepType.Metal;
-			case 221: return FootStepType.Glass;
-			case 222: return FootStepType.Metal;
-			case 223: return FootStepType.Metal;
-			case 224: return FootStepType.Metal;
-			case 225: return FootStepType.Metal;
-			case 226: return FootStepType.Metal;
-			case 227: return FootStepType.Metal;
-			case 228: return FootStepType.Metal;
-			case 229: return FootStepType.Metal;
-			case 230: return FootStepType.Metal;
-			case 231: return FootStepType.Grate;
-			case 232: return FootStepType.Plastic;
-			case 233: return FootStepType.Plastic;
-			case 234: return FootStepType.Metpanel;
-			case 235: return FootStepType.Glass;
-			case 236: return FootStepType.Glass;
-			case 237: return FootStepType.Glass;
-			case 238: return FootStepType.Metal;
-			case 239: return FootStepType.Metal;
-			case 240: return FootStepType.Metal;
-			case 241: return FootStepType.Plastic;
-			case 242: return FootStepType.Plastic;
-			case 243: return FootStepType.Plastic;
-			case 244: return FootStepType.Plastic;
-			case 245: return FootStepType.Plastic;
-			case 246: return FootStepType.Plastic;
-			case 247: return FootStepType.Plastic;
-			case 248: return FootStepType.Plastic;
-			case 249: return FootStepType.Plastic;
-			case 250: return FootStepType.Plastic;
-			case 251: return FootStepType.Plastic;
-			case 252: return FootStepType.Plastic;
-			case 253: return FootStepType.Panel;
-			case 254: return FootStepType.Panel;
-			case 255: return FootStepType.Panel;
-			case 256: return FootStepType.Plastic;
-			case 257: return FootStepType.Plastic;
-			case 258: return FootStepType.Plastic;
-			case 259: return FootStepType.Plastic;
-			case 260: return FootStepType.Glass;
-			case 261: return FootStepType.Glass;
-			case 262: return FootStepType.Grate;
-			case 263: return FootStepType.Grate;
-			case 264: return FootStepType.Grate;
-			case 265: return FootStepType.Grate;
-			case 266: return FootStepType.Plastic;
-			case 267: return FootStepType.Plastic;
-			case 268: return FootStepType.Plastic;
-			case 269: return FootStepType.Plastic;
-			case 270: return FootStepType.Glass;
-			case 271: return FootStepType.Glass;
-			case 272: return FootStepType.Plastic;
-			case 273: return FootStepType.Plastic;
-			case 274: return FootStepType.Plastic;
-			case 275: return FootStepType.Plastic;
-			case 276: return FootStepType.Plastic;
-			case 277: return FootStepType.Plastic;
-			case 278: return FootStepType.Plastic;
-			case 279: return FootStepType.Glass;
-			case 280: return FootStepType.Marble;
-			case 281: return FootStepType.Marble;
-			case 282: return FootStepType.Marble;
-			case 283: return FootStepType.Marble;
-			case 284: return FootStepType.Marble;
-			case 285: return FootStepType.Marble;
-			case 286: return FootStepType.Marble;
-			case 287: return FootStepType.Marble;
-			case 288: return FootStepType.Plastic;
-			case 289: return FootStepType.Plastic;
-			case 290: return FootStepType.Plastic;
-			case 291: return FootStepType.Plastic;
-			case 292: return FootStepType.Metal;
-			case 293: return FootStepType.Metal;
-			case 294: return FootStepType.Metal;
-			case 295: return FootStepType.Metal;
-			case 296: return FootStepType.Metal;
-			case 297: return FootStepType.Metal;
-			case 298: return FootStepType.Metal;
-			case 299: return FootStepType.Metal;
-			case 300: return FootStepType.Metal;
-			case 301: return FootStepType.Metal;
-			case 302: return FootStepType.Rubber;
-			case 303: return FootStepType.Rubber;
-			case 304: return FootStepType.Rubber;
-			case 305: return FootStepType.Metal;
-			case 306: return FootStepType.Plaster;
-
-			// Props
-			case 458: return FootStepType.Metpanel;
-			case 459: return FootStepType.Metpanel;
-			case 460: return FootStepType.Metpanel;
-			case 461: return FootStepType.Metal;
-
-			case 463: return FootStepType.Metal;
-			case 464: return FootStepType.Wood2;
-
-			case 472: return FootStepType.Wood2;
-			case 473: return FootStepType.Wood2;
-			case 474: return FootStepType.Wood2;
-			case 475: return FootStepType.Wood2;
-			case 476: return FootStepType.Wood2;
-			case 477: return FootStepType.Metpanel;
-			case 478: return FootStepType.Metpanel;
-			case 479: return FootStepType.Metpanel;
-
-			case 500: return FootStepType.Metal;
-
-			case 515: return FootStepType.Panel;
-			case 516: return FootStepType.Metal;
-
-			case 525: return FootStepType.Metal;
-			case 526: return FootStepType.Metal;
-			case 527: return FootStepType.Grate;
-			case 528: return FootStepType.Grate;
-			case 529: return FootStepType.Grate;
-			default: return FootStepType.Plastic;
-		}
-	}
-	
-	public AudioClip JumpSound(FootStepType fstep) {
-		switch(fstep) {
-			case FootStepType.None: return sounds[0];
-			// + 1 because its exclusive, :eyeroll:
-			case FootStepType.Carpet:      return sounds[random_range(540,542 + 1)];
-			case FootStepType.Concrete:    return sounds[random_range(546,548 + 1)];
-			case FootStepType.GrittyCrete: return sounds[random_range(552,554 + 1)];
-			case FootStepType.Grass:       return sounds[random_range(558,560 + 1)];
-			case FootStepType.Gravel:      return sounds[random_range(564,566 + 1)];
-			case FootStepType.Rock:        return sounds[random_range(570,572 + 1)];
-			case FootStepType.Glass:       return sounds[random_range(576,578 + 1)];
-			case FootStepType.Marble:      return sounds[random_range(582,584 + 1)];
-			case FootStepType.Metal:       return sounds[random_range(588,590 + 1)];
-			case FootStepType.Grate:       return sounds[random_range(594,596 + 1)];
-			case FootStepType.Metal2:      return sounds[random_range(600,602 + 1)];
-			case FootStepType.Metpanel:    return sounds[random_range(606,608 + 1)];
-			case FootStepType.Panel:       return sounds[random_range(612,614 + 1)];
-			case FootStepType.Plaster:     return sounds[random_range(618,620 + 1)];
-			case FootStepType.Plastic:     return sounds[random_range(624,626 + 1)];
-			case FootStepType.Plastic2:    return sounds[random_range(630,632 + 1)];
-			case FootStepType.Rubber:      return sounds[random_range(636,638 + 1)];
-			case FootStepType.Sand:        return sounds[random_range(642,644 + 1)];
-			case FootStepType.Squish:      return sounds[random_range(648,650 + 1)];
-			case FootStepType.Vent:        return sounds[random_range(429,430 + 1)];
-			case FootStepType.Water:       return sounds[random_range(651,654 + 1)];
-			case FootStepType.Wood:        return sounds[random_range(661,663 + 1)];
-			case FootStepType.Wood2:       return sounds[random_range(667,669 + 1)];
-		}
-		
-		return sounds[0]; // null wav fallback
-	}
-	
-	public AudioClip JumpLandSound(FootStepType fstep) {
-		switch(fstep) {
-			case FootStepType.None: return sounds[0];
-			// + 1 because its exclusive, :eyeroll:
-			case FootStepType.Carpet:      return sounds[random_range(537,539 + 1)];
-			case FootStepType.Concrete:    return sounds[random_range(543,545 + 1)];
-			case FootStepType.GrittyCrete: return sounds[random_range(549,551 + 1)];
-			case FootStepType.Grass:       return sounds[random_range(555,557 + 1)];
-			case FootStepType.Gravel:      return sounds[random_range(561,563 + 1)];
-			case FootStepType.Rock:        return sounds[random_range(567,569 + 1)];
-			case FootStepType.Glass:       return sounds[random_range(573,575 + 1)];
-			case FootStepType.Marble:      return sounds[random_range(579,581 + 1)];
-			case FootStepType.Metal:       return sounds[random_range(585,587 + 1)];
-			case FootStepType.Grate:       return sounds[random_range(591,593 + 1)];
-			case FootStepType.Metal2:      return sounds[random_range(597,599 + 1)];
-			case FootStepType.Metpanel:    return sounds[random_range(603,605 + 1)];
-			case FootStepType.Panel:       return sounds[random_range(609,611 + 1)];
-			case FootStepType.Plaster:     return sounds[random_range(615,617 + 1)];
-			case FootStepType.Plastic:     return sounds[random_range(621,623 + 1)];
-			case FootStepType.Plastic2:    return sounds[random_range(627,629 + 1)];
-			case FootStepType.Rubber:      return sounds[random_range(633,635 + 1)];
-			case FootStepType.Sand:        return sounds[random_range(639,641 + 1)];
-			case FootStepType.Squish:      return sounds[random_range(645,647 + 1)];
-			case FootStepType.Vent:        return sounds[random_range(428,437 + 1)];
-			case FootStepType.Water:       return sounds[random_range(655,657 + 1)];
-			case FootStepType.Wood:        return sounds[random_range(658,660 + 1)];
-			case FootStepType.Wood2:       return sounds[random_range(664,666 + 1)];
-		}
-		
-		return sounds[0]; // null wav fallback
-	}
-
-	public AudioClip FootStepSound(FootStepType fstep) {
-		switch(fstep) {
-			case FootStepType.None: return sounds[0];
-			// + 1 because its exclusive, :eyeroll:
-			case FootStepType.Carpet:      return sounds[random_range(268,275 + 1)];
-			case FootStepType.Concrete:    return sounds[random_range(276,283 + 1)];
-			case FootStepType.GrittyCrete: return sounds[random_range(284,291 + 1)];
-			case FootStepType.Grass:       return sounds[random_range(292,299 + 1)];
-			case FootStepType.Gravel:      return sounds[random_range(300,307 + 1)];
-			case FootStepType.Rock:        return sounds[random_range(308,315 + 1)];
-			case FootStepType.Glass:       return sounds[random_range(316,323 + 1)];
-			case FootStepType.Marble:      return sounds[random_range(324,331 + 1)];
-			case FootStepType.Metal:       return sounds[random_range(332,339 + 1)];
-			case FootStepType.Grate:       return sounds[random_range(340,347 + 1)];
-			case FootStepType.Metal2:      return sounds[random_range(348,355 + 1)];
-			case FootStepType.Metpanel:    return sounds[random_range(356,363 + 1)];
-			case FootStepType.Panel:       return sounds[random_range(364,371 + 1)];
-			case FootStepType.Plaster:     return sounds[random_range(372,379 + 1)];
-			case FootStepType.Plastic:     return sounds[random_range(380,387 + 1)];
-			case FootStepType.Plastic2:    return sounds[random_range(388,395 + 1)];
-			case FootStepType.Rubber:      return sounds[random_range(396,403 + 1)];
-			case FootStepType.Sand:        return sounds[random_range(404,411 + 1)];
-			case FootStepType.Squish:      return sounds[random_range(412,427 + 1)];
-			case FootStepType.Vent:        return sounds[random_range(428,437 + 1)];
-			case FootStepType.Water:       return sounds[random_range(438,442 + 1)];
-			case FootStepType.Wood:        return sounds[random_range(443,450 + 1)];
-			case FootStepType.Wood2:       return sounds[random_range(451,458 + 1)];
-		}
-
-		return sounds[0]; // null wav
 	}
 
 	float GetBasePlayerSpeed() {
 		// Cheat speeds
 		if (CheatNoclip && isSprinting) return maxCyberSpeed * 2.5f;
 		if (CheatNoclip) return maxCyberSpeed * 1.5f;
-
 		if (inCyberSpace) return maxCyberSpeed; //Cyber space speed
 
 		float retval = maxWalkSpeed;
 		bonus = 0f;
 		if (inventoryPlayer1.BoosterActive()) bonus = boosterSpeedBoost;
 		switch (bodyState) {
-			case BodyState.Standing: 		retval = maxWalkSpeed;   break;
-			case BodyState.Crouch: 			retval = maxCrouchSpeed; break;
-			case BodyState.CrouchingDown: 	retval = maxCrouchSpeed; break;
-			case BodyState.StandingUp: 		retval = maxWalkSpeed;   break;
-			case BodyState.Prone: 			retval = maxProneSpeed;  break;
-			case BodyState.ProningDown: 	retval = maxProneSpeed;  break;
-			case BodyState.ProningUp: 		retval = maxProneSpeed;  break;
+			case BodyState_Standing: 		retval = maxWalkSpeed;   break;
+			case BodyState_Crouch: 			retval = maxCrouchSpeed; break;
+			case BodyState_CrouchingDown: 	retval = maxCrouchSpeed; break;
+			case BodyState_StandingUp: 		retval = maxWalkSpeed;   break;
+			case BodyState_Prone: 			retval = maxProneSpeed;  break;
+			case BodyState_ProningDown: 	retval = maxProneSpeed;  break;
+			case BodyState_ProningUp: 		retval = maxProneSpeed;  break;
 		}
 
 		if ((isSprinting || inventoryPlayer1.BoosterActive()) && running) {
@@ -897,16 +425,16 @@ public class PlayerMovement : MonoBehaviour {
 				retval = maxSprintSpeed;
 			}
 
-			if (bodyState == BodyState.Standing
-				|| bodyState == BodyState.Crouch
-				|| bodyState == BodyState.CrouchingDown) {
+			if (bodyState == BodyState_Standing
+				|| bodyState == BodyState_Crouch
+				|| bodyState == BodyState_CrouchingDown) {
 
 				// Subtract off the difference in speed between walking and
 				// crouching from the sprint speed
 				retval -= ((maxWalkSpeed - maxCrouchSpeed)*1.5f);
-			} else if (bodyState == BodyState.Prone
-					   || bodyState == BodyState.ProningDown
-					   || bodyState == BodyState.ProningUp) {
+			} else if (bodyState == BodyState_Prone
+					   || bodyState == BodyState_ProningDown
+					   || bodyState == BodyState_ProningUp) {
 
 				// Subtract off the difference in speed between walking and
 				// proning from the sprint speed.
@@ -919,18 +447,18 @@ public class PlayerMovement : MonoBehaviour {
 
 	void ApplyBodyStateLerps() {
 		switch (bodyState) {
-		case BodyState.CrouchingDown:
+		case BodyState_CrouchingDown:
 			currentCrouchRatio = smooth_damp(currentCrouchRatio,-0.01f, ref crouchingVelocity, transitionToCrouchSec);
 			break;
-		case BodyState.StandingUp:
+		case BodyState_StandingUp:
 			lastCrouchRatio = currentCrouchRatio;
 			currentCrouchRatio = smooth_damp(currentCrouchRatio,1.01f, ref crouchingVelocity, transitionToCrouchSec);
 			LocalPositionSetY(transform,(((currentCrouchRatio - lastCrouchRatio) * capsuleHeight) / 2) + instances[i].position.y);
 			break;
-		case BodyState.ProningDown:
+		case BodyState_ProningDown:
 			currentCrouchRatio = smooth_damp(currentCrouchRatio,-0.01f, ref crouchingVelocity, transitionToCrouchSec);
 			break;
-		case BodyState.ProningUp: // Prone to crouch
+		case BodyState_ProningUp: // Prone to crouch
 			lastCrouchRatio = currentCrouchRatio;
 			currentCrouchRatio = smooth_damp(currentCrouchRatio,1.01f, ref crouchingVelocity, (transitionToCrouchSec + transitionToProneAdd));
 			LocalPositionSetY(transform,(((currentCrouchRatio - lastCrouchRatio) * capsuleHeight) / 2) + instances[i].position.y);
@@ -1089,10 +617,10 @@ public class PlayerMovement : MonoBehaviour {
 		if (inCyberSpace) return false;
 		if (CheatNoclip) return false;
 		if (ladderState > 0) return false;
-		if (bodyState == BodyState.StandingUp
-			|| bodyState == BodyState.CrouchingDown
-			|| bodyState == BodyState.ProningDown
-			|| bodyState == BodyState.ProningUp) {
+		if (bodyState == BodyState_StandingUp
+			|| bodyState == BodyState_CrouchingDown
+			|| bodyState == BodyState_ProningDown
+			|| bodyState == BodyState_ProningUp) {
 			bodyLerpGravityOffDelayFinished = 0;
 // 			DualLog("Crouching gravity! " + rbody.useGravity.ToString());
 			return true;
@@ -1501,12 +1029,12 @@ public class PlayerMovement : MonoBehaviour {
 
 		fatigueFinished = Sys_Global.pauseRelativeTime + fatigueWaneTickSecs;
 		switch (bodyState) {
-			case BodyState.Standing:    instances[PLAYER1].fatigue -= fatigueWanePerTick; break;
-			case BodyState.Crouch:      instances[PLAYER1].fatigue -= fatigueWanePerTickCrouched; break;
-			case BodyState.StandingUp:  instances[PLAYER1].fatigue -= fatigueWanePerTickCrouched; break;
-			case BodyState.ProningDown: instances[PLAYER1].fatigue -= fatigueWanePerTickCrouched; break;
-			case BodyState.Prone:       instances[PLAYER1].fatigue -= fatigueWanePerTickProne; break;
-			case BodyState.ProningUp:   instances[PLAYER1].fatigue -= fatigueWanePerTickProne; break;
+			case BodyState_Standing:    instances[PLAYER1].fatigue -= fatigueWanePerTick; break;
+			case BodyState_Crouch:      instances[PLAYER1].fatigue -= fatigueWanePerTickCrouched; break;
+			case BodyState_StandingUp:  instances[PLAYER1].fatigue -= fatigueWanePerTickCrouched; break;
+			case BodyState_ProningDown: instances[PLAYER1].fatigue -= fatigueWanePerTickCrouched; break;
+			case BodyState_Prone:       instances[PLAYER1].fatigue -= fatigueWanePerTickProne; break;
+			case BodyState_ProningUp:   instances[PLAYER1].fatigue -= fatigueWanePerTickProne; break;
 			default:                    instances[PLAYER1].fatigue -= fatigueWanePerTick; break;
 		}
 		if (instances[PLAYER1].fatigue < 0) instances[PLAYER1].fatigue = 0; // Clamp at 0% minimum.
@@ -1516,28 +1044,28 @@ public class PlayerMovement : MonoBehaviour {
 		if (inCyberSpace) return;
 
 		if (currentCrouchRatio >= 1) {
-			if (bodyState == BodyState.StandingUp // Should overshoot slightly.
-			    || bodyState == BodyState.Standing) { // Maintain it.
+			if (bodyState == BodyState_StandingUp // Should overshoot slightly.
+			    || bodyState == BodyState_Standing) { // Maintain it.
 				currentCrouchRatio = 1; //Clamp it
-				bodyState = BodyState.Standing;
+				bodyState = BodyState_Standing;
 			}
 		} else if (currentCrouchRatio < crouchRatio) {
-			if (bodyState == BodyState.CrouchingDown // Should undershoot slightly
-				|| bodyState == BodyState.Crouch) { // Maintain it.
+			if (bodyState == BodyState_CrouchingDown // Should undershoot slightly
+				|| bodyState == BodyState_Crouch) { // Maintain it.
 				currentCrouchRatio = crouchRatio; //Clamp it
-				bodyState = BodyState.Crouch;
-			} else if (bodyState == BodyState.ProningDown // Should undershoot slightly
-					   || bodyState == BodyState.Prone) { // Maintain it.
+				bodyState = BodyState_Crouch;
+			} else if (bodyState == BodyState_ProningDown // Should undershoot slightly
+					   || bodyState == BodyState_Prone) { // Maintain it.
 				if (currentCrouchRatio < proneRatio) {
 					currentCrouchRatio = proneRatio; //Clamp it
-					bodyState = BodyState.Prone;
+					bodyState = BodyState_Prone;
 				}
 			}
 		} else {
-			if (bodyState == BodyState.ProningUp) { // Should overshoot slightly
+			if (bodyState == BodyState_ProningUp) { // Should overshoot slightly
 				if (currentCrouchRatio > crouchRatio) {
 					currentCrouchRatio = crouchRatio; //Clamp it
-					bodyState = BodyState.Crouch;
+					bodyState = BodyState_Crouch;
 				}
 			}
 		}
@@ -1549,20 +1077,20 @@ public class PlayerMovement : MonoBehaviour {
 		if (consoleActivated) return;
 		if (!GetInput.a.Prone()) return;
 
-		if (bodyState != BodyState.Prone && bodyState != BodyState.ProningDown) {
-			bodyState = BodyState.ProningDown;
+		if (bodyState != BodyState_Prone && bodyState != BodyState_ProningDown) {
+			bodyState = BodyState_ProningDown;
 		} else {
-			if (bodyState == BodyState.Prone || bodyState == BodyState.ProningDown) {
+			if (bodyState == BodyState_Prone || bodyState == BodyState_ProningDown) {
 				if (CantStand()) {
 					if (CantCrouch()) {
 						CenterStatusPrint("%s", Sys_Text.stringTable[188]);
 						return; // Can't crouch here
-					} else bodyState = BodyState.ProningUp; // Can't stand, but can crouch here
+					} else bodyState = BodyState_ProningUp; // Can't stand, but can crouch here
 
 					return;
 				}
 				
-				bodyState = BodyState.StandingUp;
+				bodyState = BodyState_StandingUp;
 			}
 		}
 	}
@@ -1597,17 +1125,17 @@ public class PlayerMovement : MonoBehaviour {
 		if (consoleActivated) return;
 		if (!GetInput.a.Crouch()) return;
 
-		if ((bodyState == BodyState.Crouch) || (bodyState == BodyState.CrouchingDown)) {
+		if ((bodyState == BodyState_Crouch) || (bodyState == BodyState_CrouchingDown)) {
 			if (CantStand()) CenterStatusPrint("%s", Sys_Text.stringTable[187]); // Can't stand here
-			else bodyState = BodyState.StandingUp; // Start standing up
+			else bodyState = BodyState_StandingUp; // Start standing up
 		} else {
-			if ((bodyState == BodyState.Standing) || (bodyState == BodyState.StandingUp)) {
-				bodyState = BodyState.CrouchingDown; // Start crouching down
+			if ((bodyState == BodyState_Standing) || (bodyState == BodyState_StandingUp)) {
+				bodyState = BodyState_CrouchingDown; // Start crouching down
 			} else {
-				if ((bodyState == BodyState.Prone) || (bodyState == BodyState.ProningDown)) {
+				if ((bodyState == BodyState_Prone) || (bodyState == BodyState_ProningDown)) {
 					if ((CantCrouch())) { CenterStatusPrint("%s", Sys_Text.stringTable[188]); return; } // Can't crouch here
 					
-					bodyState = BodyState.ProningUp; // Start getting up to crouch
+					bodyState = BodyState_ProningUp; // Start getting up to crouch
 				}
 			}
 		}
@@ -1634,7 +1162,7 @@ public class PlayerMovement : MonoBehaviour {
 			capsuleCollider.enabled = false;
 			MouseLookScript.a.inCyberSpace = true; // Enable full camera rotation up/down by disabling clamp
 			oldBodyState = bodyState;
-			bodyState = BodyState.Standing; // Put to "standing" to prevent speed anomolies
+			bodyState = BodyState_Standing; // Put to "standing" to prevent speed anomolies
 			cyberSetup = true;
 			cyberDesetup = true;
 		}

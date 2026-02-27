@@ -14,7 +14,7 @@ float Tranquilize(uint16_t i, float amount, bool energy) {
     return tranqSecs;
 }
 
-static inline bool IsCyberNPC() { return npcTable[NPCID].type == NPCType_Cyber; }
+static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable[NPCID].type == NPCType_Cyber; }
 
 void SetHuntFinished() {
     instances[i].huntFinished = Sys_Global.pauseRelativeTime;

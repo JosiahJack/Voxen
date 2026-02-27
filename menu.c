@@ -16,8 +16,7 @@ void GoIntoGame(void) {
     currentMenuItem = currentMenuTab = 0; currentMenuPage = MenuPages_FrontPage;
     Sys_Global.inventoryMode = false;
     NewGame();
-    mp3_clear();
-    play_mp3("./Audio/music/THM1-19_medicalstart.mp3",100);
+    PlayGameMusic();
     DualLog("Player named \"%s\" started the game!\n", Sys_Global.playerName);
 }
 
@@ -154,7 +153,7 @@ GLFWmonitor* GetCurrentMonitor(GLFWwindow* window) {
 }
 
 void MenuGoBack(void) {
-    if (returnToPause) { returnToPause = false; Sys_Global.gamePaused = true; Sys_Global.menuActive = false; }
+    if (returnToPause) { returnToPause = false; Sys_Global.gamePaused = true; Sys_Global.menuActive = false; PlayGameMusic(); }
     if (currentMenuPage == MenuPages_Singleplayer || currentMenuPage == MenuPages_Multiplayer || currentMenuPage == MenuPages_Options) currentMenuPage = MenuPages_FrontPage;//News
     else if (currentMenuPage == MenuPages_Load || currentMenuPage == MenuPages_NewGame || currentMenuPage == MenuPages_IntroVideo || currentMenuPage == MenuPages_CreditsVideo) currentMenuPage = MenuPages_Singleplayer;
 }
@@ -512,16 +511,16 @@ void RenderPausedUI(void) {
     if (UI_Button(522,330, 322,52, &overResume, 0) || (MenuEnter() && currentMenuItem == 0)) Sys_Global.gamePaused = false;
     overResume = overResume || currentMenuItem == 0;
     RenderFormattedText(610,306,overResume ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"RESUME");
-    if (UI_Button(522,390, 322,52, &overLoad, 1) || (MenuEnter() && currentMenuItem == 1)) { currentMenuPage = MenuPages_Load; Sys_Global.menuActive = true; returnToPause = true; }
+    if (UI_Button(522,390, 322,52, &overLoad, 1) || (MenuEnter() && currentMenuItem == 1)) { currentMenuPage = MenuPages_Load; PlayMenuMusic(); Sys_Global.menuActive = true; returnToPause = true; }
     overLoad = overLoad || currentMenuItem == 1;
     RenderFormattedText(630,364, overLoad ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"LOAD");
-    if (UI_Button(522,450, 322,60, &overSave, 2) || (MenuEnter() && currentMenuItem == 2)) { currentMenuPage = MenuPages_Save; Sys_Global.menuActive = true; returnToPause = true; }
+    if (UI_Button(522,450, 322,60, &overSave, 2) || (MenuEnter() && currentMenuItem == 2)) { currentMenuPage = MenuPages_Save; PlayMenuMusic(); Sys_Global.menuActive = true; returnToPause = true; }
     overSave = overSave || currentMenuItem == 2;
     RenderFormattedText(635,422,overSave ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"SAVE");
-    if (UI_Button(522,510, 322,60, &overOptions, 3) || (MenuEnter() && currentMenuItem == 3)) { currentMenuPage = MenuPages_Options; Sys_Global.menuActive = true; returnToPause = true; }
+    if (UI_Button(522,510, 322,60, &overOptions, 3) || (MenuEnter() && currentMenuItem == 3)) { currentMenuPage = MenuPages_Options; PlayMenuMusic(); Sys_Global.menuActive = true; returnToPause = true; }
     overOptions = overOptions || currentMenuItem == 3;
     RenderFormattedText(599,480,overOptions ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"OPTIONS");
-    if (UI_Button(522,570, 322,60, &overQuitMenu, 4) || (MenuEnter() && currentMenuItem == 4)) { Sys_Global.menuActive = true; currentMenuPage = MenuPages_FrontPage; }
+    if (UI_Button(522,570, 322,60, &overQuitMenu, 4) || (MenuEnter() && currentMenuItem == 4)) { PlayMenuMusic(); Sys_Global.menuActive = true; currentMenuPage = MenuPages_FrontPage; }
     overQuitMenu = overQuitMenu || currentMenuItem == 4;
     RenderFormattedText(546,538,overQuitMenu ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"QUIT TO MENU");
     RenderUIImage(519,672,328,42,1252); // Pause Quit Game background
