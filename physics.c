@@ -175,19 +175,120 @@ void ClampVelocity(void) {
     }
 }
 
+void UpdateTriggers(void) {
+    
+}
+
 int32_t Physics(void) {
     UpdateVelocityFromGravity();
     ClampVelocity();
     UpdatePositions();
+    UpdateTriggers();
     return 0; // Ok.
 }
 
-RaycastHit Raycast(Vector3 origin, Vector3 dir, float distance, uint32_t layerMask) {
-    RaycastHit result = { .hit = false };
-    (void)origin;
-    (void)dir;
-    (void)distance;
-    (void)layerMask;
+Vector3 quat_rotate(Quaternion q, Vector3 v) {
+    float x2 = q.x + q.x;
+    float y2 = q.y + q.y;
+    float z2 = q.z + q.z;
+    float xx2 = q.x * x2;
+    float yy2 = q.y * y2;
+    float zz2 = q.z * z2;
+    float xy2 = q.x * y2;
+    float xz2 = q.x * z2;
+    float yz2 = q.y * z2;
+    float wx2 = q.w * x2;
+    float wy2 = q.w * y2;
+    float wz2 = q.w * z2;
+    return (Vector3){
+        v.x * (1.0f - yy2 - zz2) + v.y * (xy2 - wz2) + v.z * (xz2 + wy2),
+        v.x * (xy2 + wz2) + v.y * (1.0f - xx2 - zz2) + v.z * (yz2 - wx2),
+        v.x * (xz2 - wy2) + v.y * (yz2 + wx2) + v.z * (1.0f - xx2 - yy2)
+    };
+}
+
+uint16_t PointInSolid(Vector3 point, uint32_t layerMask) {
+    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
+        if (instances[i].collider == COLLIDER_TYPE_NONE || instances[i].collider == COLLIDER_TYPE_MESH) continue;
+
+        Vector3 pos = instances[i].position;
+        Quaternion rot = instances[i].rotation;
+        Vector3 scale = instances[i].scale;
+        Vector3 local = Vector3_A_minus_B(point, pos);
+        Quaternion invRot = (Quaternion){-rot.x, -rot.y, -rot.z, rot.w};
+        local = quat_rotate(invRot, local);
+        if (scale.x != 0.0f) local.x /= scale.x;
+        if (scale.y != 0.0f) local.y /= scale.y;
+        if (scale.z != 0.0f) local.z /= scale.z;
+        Vector3 center;
+        float radius, distSq;
+        switch (instances[i].collider) {
+            case COLLIDER_TYPE_BOX:
+                center = instances[i].colliderCenter;
+                Vector3 size   = instances[i].colliderSize; // full extents
+                Vector3 half = (Vector3){ size.x * 0.5f, size.y * 0.5f, size.z * 0.5f };
+                Vector3 min = Vector3_A_minus_B(center, half);
+                Vector3 max = Vector3_A_plus_B(center, half);
+                if (local.x >= min.x && local.x <= max.x && local.y >= min.y && local.y <= max.y && local.z >= min.z && local.z <= max.z) return i;
+                break;
+            case COLLIDER_TYPE_SPHERE:
+                center = instances[i].colliderCenter;
+                radius = instances[i].colliderSize.x;
+                Vector3 offset = Vector3_A_minus_B(local, center);
+                distSq = dot_vector3(offset, offset);
+                if (distSq <= radius * radius) return i;
+                break;
+            case COLLIDER_TYPE_CAPSULE:
+                center = instances[i].colliderCenter;
+                radius = instances[i].colliderSize.x;
+                float height = instances[i].colliderSize.y; // full cylinder height
+                int axis = (int)instances[i].colliderSize.z; // 0=X, 1=Y, 2=Z
+                Vector3 axisDir = {0.0f, 1.0f, 0.0f};
+                if (axis == 0) axisDir = (Vector3){1.0f, 0.0f, 0.0f};
+                else if (axis == 2) axisDir = (Vector3){0.0f, 0.0f, 1.0f};
+                Vector3 halfHeightVec = scale_vector3(axisDir, height * 0.5f);
+                Vector3 p1 = Vector3_A_minus_B(center, halfHeightVec);
+                Vector3 p2 = Vector3_A_plus_B(center, halfHeightVec);
+                Vector3 p1_to_point = Vector3_A_minus_B(local, p1);
+                Vector3 p1_to_p2     = Vector3_A_minus_B(p2, p1);
+                float segLenSq = dot_vector3(p1_to_p2, p1_to_p2);
+                float t = (segLenSq > 0.0f) ? dot_vector3(p1_to_point, p1_to_p2) / segLenSq : 0.0f;
+                t = vclamp(t, 0.0f, 1.0f);
+                Vector3 closest = Vector3_A_plus_B(p1, scale_vector3(p1_to_p2, t));
+                Vector3 toClosest = Vector3_A_minus_B(local, closest);
+                distSq = dot_vector3(toClosest, toClosest);
+                if (distSq <= radius * radius) return i;
+                break;
+            case COLLIDER_TYPE_CONVEXMESH: break;
+        }
+    }
+
+    return UINT16_MAX;
+}
+
+RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uint32_t layerMask) {
+    RaycastHit result = {
+        .hit = false,
+        .distance = maxDist,
+        .point = {0.0f, 0.0f, 0.0f},
+        .normal = {0.0f, 0.0f, 0.0f},
+        .hitInstanceIndex = INSTANCE_COUNT
+    };
+    
+    uint16_t hitObjectIndex = UINT16_MAX;
+    for (float curDist=0.0f;curDist<maxDist;curDist+=0.02f) { // 4.9 / 0.04 = 245 tries worst case empty air
+        Vector3 checkPoint = Vector3_A_plus_B(origin, scale_vector3(dir,curDist));
+        hitObjectIndex = PointInSolid(checkPoint, layerMask);
+        if (hitObjectIndex < loadedInstances) {
+            result.hit = true;
+            result.point = checkPoint;
+            result.distance = curDist; // TODO refine the raymarch a little?  nah 0.02 good enough for effects, will apply offset along normal for bullet holes and such anyways.
+            result.normal = Vector3_A_minus_B(checkPoint,origin);
+            result.hitInstanceIndex = hitObjectIndex;
+            return result;
+        }
+    }
+    
     return result;
 }
 
