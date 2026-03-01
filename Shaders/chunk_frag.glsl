@@ -3,7 +3,6 @@
 #version 430 core
 #extension GL_ARB_shading_language_packing : require
 #extension GL_ARB_shader_image_load_store : enable
-layout(early_fragment_tests) in;
 
 in vec2 TexCoord;
 in vec3 Normal;
