@@ -730,6 +730,7 @@ typedef struct {
 	GLuint inputWorldPosID;
 	GLuint inputSpecID;
 	GLuint inputNormalID;
+	GLuint inputImageLastID;
 	GLuint gBufferFBO;
 	GLuint outputImageID;
 	GLuint chunkShaderProgram; // Generic lit and unlit raster shader forward+
@@ -1506,10 +1507,6 @@ extern bool lightDirty[LIGHT_COUNT];
 extern int32_t cursorPosition_x, cursorPosition_y;
 extern float cam_yaw, cam_pitch, cam_roll;
 extern uint16_t loadedModelsMaxIndex;
-extern float aspect3D;
-extern float rasterPerspectiveProjection[16];
-extern float shadowmapsPerspectiveProjection[16];
-extern float uiOrthoProjection[16];
 extern bool enteringPlayerName;
 void Screenshot(void);
 void ToggleConsole(void);
