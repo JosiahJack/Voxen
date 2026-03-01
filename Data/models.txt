@@ -564,7 +564,7 @@ index: 286
 index: 287
 #Models/med2_5.fbx
 index: 288
-#Models/med2_6.fbx
+#Models/med2_6.obj
 index: 289
 #Models/med2_7.fbx
 index: 290

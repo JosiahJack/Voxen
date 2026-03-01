@@ -40,10 +40,6 @@ public class HardwareButton : MonoBehaviour {
 	private const float lanternVersion1Brightness = 2.5f;
 	private const float lanternVersion2Brightness = 4;
 	private const float lanternVersion3Brightness = 5;
-	private Grayscale gsc;
-	private Grayscale gscSensaCenter;
-	private Grayscale gscSensaLH;
-	private Grayscale gscSensaRH;
 
 	void Awake () {
 		SFX = GetComponent<AudioSource>();
@@ -51,17 +47,6 @@ public class HardwareButton : MonoBehaviour {
 		gscSensaCenter = sensaroundCenterCamera.GetComponent<Grayscale>();
 		gscSensaLH = sensaroundLHCamera.GetComponent<Grayscale>();
 		gscSensaRH = sensaroundRHCamera.GetComponent<Grayscale>();
-	}
-
-	public void ListenForHardwareHotkeys () {
-		if (inventoryPlayer1.hasHardware[2] && GetInput.a.Email())      EReaderAction();
-		if (inventoryPlayer1.hasHardware[3] && GetInput.a.Sensaround()) SensaroundAction();
-		if (inventoryPlayer1.hasHardware[5] && GetInput.a.Shield())     ShieldAction();
-		if (inventoryPlayer1.hasHardware[6] && GetInput.a.Biomonitor()) BioAction();
-		if (inventoryPlayer1.hasHardware[7] && GetInput.a.Lantern())    LanternAction();
-		if (inventoryPlayer1.hasHardware[9] && GetInput.a.Booster())    BoosterAction();
-		if (inventoryPlayer1.hasHardware[10]&& GetInput.a.Jumpjets())   JumpJetsAction();
-		if (inventoryPlayer1.hasHardware[11]&& GetInput.a.Infrared())   InfraredAction();
 	}
 
 	// 0 = bio, 1 = sen, 2 = lan, 3 = shi, 4 = nig, 5 = ere, 6 = boo, 7 = jum

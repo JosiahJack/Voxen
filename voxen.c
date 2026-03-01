@@ -49,6 +49,9 @@ float lightIntervalSteps[LIGHT_COUNT][30];
 uint8_t lightIntervalStepIsLerpingLength[LIGHT_COUNT];
 float intervalStepisLerping[LIGHT_COUNT][30];
 bool lightCastsShadows[LIGHT_COUNT];
+uint16_t headmountedLanternLight;
+Vector3 lanternPos;
+float lanternVersionBrightness[3] = { 0.875f, 1.4f, 1.75f };
 uint16_t useableItemsFrobIcons[94];
 bool boosterActive;
 uint16_t selfIdx;
@@ -170,6 +173,28 @@ Quaternion cubemapOrientationQuaternion[6] = {
 bool lightInPVS[LIGHT_COUNT];
 Vector3 lightsNewPosition[LIGHT_COUNT];
 bool UpdateLights(bool* voxelsNeedUpdated) {
+    // Update headmounted lantern
+    int32_t lant = headmountedLanternLight * LIGHT_DATA_SIZE;
+    if (/*(inventoryPlayer1.hasHardware & HW_LAN) && */(inventoryPlayer1.hardwareIsActive & HW_LAN)) {
+        lanternPos = instances[PLAYER1].position;
+        lanternPos.y -= 0.24f;
+        lanternPos.x += 0.04f;
+        lanternPos.z += 0.04f;
+        lightsNewPosition[headmountedLanternLight] = lanternPos;
+        lights[lant + LIGHT_DATA_OFFSET_POSX] = lanternPos.x;
+        lights[lant + LIGHT_DATA_OFFSET_POSY] = lanternPos.y;
+        lights[lant + LIGHT_DATA_OFFSET_POSZ] = lanternPos.z;
+        lights[lant + LIGHT_DATA_OFFSET_INTENSITY] = lightMaxIntensity[headmountedLanternLight] = lanternVersionBrightness[inventoryPlayer1.hardwareVersionSetting[7]];
+        lightOn[headmountedLanternLight] = true;
+        lightDirty[headmountedLanternLight] = true;
+        lightCastsShadows[headmountedLanternLight] = true;
+        lightInPVS[headmountedLanternLight] = true;
+    } else { 
+        lightOn[headmountedLanternLight] = false; 
+        lightDirty[headmountedLanternLight] = false; 
+        lights[lant + LIGHT_DATA_OFFSET_INTENSITY] = 0.0f;
+    }
+    
     for (uint16_t lightIdx = 0; lightIdx < loadedLights; ++lightIdx) { 
         uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
         lights[litIdx + LIGHT_DATA_OFFSET_POSX] = lightsNewPosition[lightIdx].x;
@@ -191,7 +216,7 @@ bool UpdateLights(bool* voxelsNeedUpdated) {
         int lightCellIdx = (cellZ * WORLDX) + cellX;
         float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
         int r = vceil(range * (1.0f / WORLDCELL_WIDTH_F));
-        lightInPVS[lightIdx] = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
+        lightInPVS[lightIdx] = (gridCellStates[lightCellIdx] & CELL_VISIBLE) || (lightIdx == headmountedLanternLight);
         if (!lightInPVS[lightIdx]) {
             for (int ix = cellX - r; ix <= (int)cellX + r; ++ix) {
                 for (int iz = cellZ - r; iz <= (int)cellZ + r; ++iz) {
@@ -736,10 +761,10 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void RenderSha
         
         float range =  lights[litIdx + LIGHT_DATA_OFFSET_RANGE] * 0.99f; // Discard 1% more lights/meshes for performance.
         float luminosity = (intensity / (range * range));
-        if (luminosity < 0.015f && (range < 8.0f || intensity < 0.5f)) continue;
-        if (!lightInPVS[i]) continue;
+        if (luminosity < 0.015f && (range < 8.0f || intensity < 0.5f) && i != headmountedLanternLight) continue;
+        if (!lightInPVS[i] && i != headmountedLanternLight) continue;
         
-        float dx = lightPos.x - playerPos.x;    float dy = lightPos.y - playerPos.y;    float dz = lightPos.z - playerPos.z;
+        float dx = lightPos.x - playerPos.x; float dy = lightPos.y - playerPos.y; float dz = lightPos.z - playerPos.z;
         float distSqrdToPlayer = dx*dx + dy*dy + dz*dz;
         float dotResult = (dx*pfx + dy*pfy + dz*pfz);
         if (dotResult < 0.0f && distSqrdToPlayer > (range * range)) continue;
@@ -762,9 +787,6 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void RenderSha
     }
 
     uint32_t numLightsShadowmapsToRender = vmin(voxen_Shadow_System.numShadowsCouldRender, MAX_SHADOWMAPS);
-    bool foundDirtyLight = true || Sys_Render.shadowmapsNeedUpdated;
-    for (uint32_t i=0;i<numLightsShadowmapsToRender;++i) { if (lightDirty[candidates[i].index]) foundDirtyLight = true; }
-    numLightsShadowmapsToRender = foundDirtyLight ? numLightsShadowmapsToRender : 0;
     if (numLightsShadowmapsToRender > 0) { // Added since there is now work between here and the for loop so this is beneficial to check.
         glUseProgram(Sys_Render.shadowmapsClearShaderProgram); // Clear shadowmaps.  One might think that this would be less performant than standard shadowmap FBO with gl clears and textures but in fact this is faster on all but the oldest hardware (e.g. 10yrs old is fine, 13yrs suffers a small hit).
         for (uint32_t c=0;c<numLightsShadowmapsToRender;++c) {
@@ -792,7 +814,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void RenderSha
         uint16_t numShadowingLightsHandled = 0, currentModelType = 0, currentTexIndex = 0;
         bool currentIsTransparent = 0;
         for (uint32_t c = 0; c < numLightsShadowmapsToRender; ++c) { // Render top MAX_SHADOWMAPS candidates
-            uint16_t lightIdx = candidates[c].index;            
+            uint16_t lightIdx = candidates[c].index;
             float effectiveRadius = vmin(candidates[c].radius, 15.36f);
             Vector3 lightPos = candidates[c].position;
             uint16_t nearbyMeshCount = 0;
@@ -943,6 +965,8 @@ static inline __attribute__((always_inline)) double RenderUI(void) {
     if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, FONT_NORMAL,1.0f, "Test Entity %s Index: %u, Shadow cpu ms: %.3f", entities[instances[editModeSelection].index].path, editModeTestEntityDefinition, voxen_Shadow_System.shadowTime * 1000);
     if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, FONT_NORMAL,1.0f, "Player cell: %u, floor: %.3f, ceil: %.3f", instances[PLAYER1].cellIndex, (double)gridCellFloorHeight[instances[PLAYER1].cellIndex], (double)gridCellCeilingHeight[instances[PLAYER1].cellIndex]);
     RenderFormattedText(16, debugTextStartY + (lineSpacing * 5), TEXT_WHITE, FONT_NORMAL,1.0f, "Cursor: %d, %d   dx: %d dy: %d", cursorPosition_x, cursorPosition_y, Sys_Input.currentMouse_dx, Sys_Input.currentMouse_dy);
+    int32_t lant = headmountedLanternLight * LIGHT_DATA_SIZE;
+    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16, debugTextStartY + (lineSpacing * 6), TEXT_WHITE, FONT_NORMAL,1.0f, "Lantern: %.4f %.4f %.4f, on: %u, brite %.2f, rng %.2f, vis: %u",(double)lanternPos.x,(double)lanternPos.y,(double)lanternPos.z,lightOn[headmountedLanternLight],(double)lights[lant + LIGHT_DATA_OFFSET_INTENSITY],(double)lights[lant + LIGHT_DATA_OFFSET_RANGE],lightInPVS[headmountedLanternLight]);
     if (Sys_Cheats.consoleActive) RenderFormattedText(16, 0, TEXT_WHITE, FONT_NORMAL,1.0f, "] %s",consoleEntryText);
     if (Sys_Global.statusTextDecayFinished > Sys_Global.current_time) RenderFormattedText(479,114,TEXT_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
     if (!Sys_Global.menuActive && !Sys_Global.gamePaused) {
@@ -1232,7 +1256,9 @@ int32_t main(void) {
         }
         
         UpdateAnims();
-        if (likely(!Sys_Global.gamePaused && !Sys_Global.menuActive)) UpdateMusic();
+        if (likely(!Sys_Global.gamePaused && !Sys_Global.menuActive)) {
+            UpdateMusic();
+        }
         if (likely(!Sys_Global.gamePaused || Sys_Global.menuActive)) UpdateVoxelsAndInstances();
         Render();
         Sys_Dx.globalFrameNum++;

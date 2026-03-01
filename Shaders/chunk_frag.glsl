@@ -230,7 +230,7 @@ void main() {
         float shadowFactor = 1.0;
         uint shadowIndex = shadowMapsIndirection[lightIdxInPVS];
         if (shadowsEnabled > 0 && shadowIndex < 1600) {
-            float smearness = distOverRangeSqd * 24.0 + intensity; // was + 10.0 instead of intensity, thought this'd be nice.
+            float smearness = distOverRangeSqd * 24.0 + range + intensity; // was + 10.0 instead of intensity, thought this'd be nice.
             vec3 a = abs(toLight);
             float mx = step(a.y, a.x) * step(a.z, a.x);
             float my = step(a.x, a.y) * step(a.z, a.y);

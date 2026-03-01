@@ -11,7 +11,7 @@
 	uint16_t[] ressurectionBayDoor;
 	Vector3[] elevatorTargetDestinations;
 
-	public void CyborgConversionToggleForCurrentLevel() {	    
+	void CyborgConversionToggleForCurrentLevel() {	    
 		if (Sys_Global.currentLevel == 6) {
 			if (ressurectionActive[Sys_Global.currentLevel]) {
 				ressurectionActive[Sys_Global.currentLevel] = false;
@@ -29,7 +29,7 @@
 		}
 	}
 
-	public bool RessurectPlayer() {
+	bool RessurectPlayer() {
 		if (!ressurectionActive[Sys_Global.currentLevel]) return false;
 
 		if (Sys_Global.currentLevel == 10 || Sys_Global.currentLevel == 11 || Sys_Global.currentLevel == 12) {
@@ -51,7 +51,7 @@
 	// 20 cameras
 	// 100% = 4x + 20y
 	// Assuming that a good camera percentage is 2-3%, CPU % would be about 10-15 each
-	public void ReduceCurrentLevelSecurity(SecurityType stype) {
+	void ReduceCurrentLevelSecurity(SecurityType stype) {
 		float camScore = 4;
 		float nodeSmallScore = 10;
 		float nodeLargeScore = 27;

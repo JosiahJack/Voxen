@@ -359,7 +359,7 @@ void RenderMenu(void) {
         } else if (currentMenuTab == 1) {
             menuItemCount = 49; // Input
         } else {
-            bool overMasterVolume = false;
+            bool overMasterVolume = false, overMusicSlider = false;
             menuItemCount = 10; // Audio / Lang
             // Master Volume Slider
             RenderUIImage(426,240, 128,16, 1079); // Slider background
@@ -387,14 +387,14 @@ void RenderMenu(void) {
             // Music Volume Slider
             RenderUIImage(426,270, 128,16, 1079); // Slider background
             RenderUIImage(426 + ((Sys_Settings.VolumeMusic / 100.0f) * 112),270, 16,16, 1078); // Slider handle [45, 150]
-            if (UI_Slider(200,286, 328,16, &overMasterVolume, 1)) masterVolumeSliderActive = true;
-            if (masterVolumeSliderActive && Sys_Input.currentMouse_dx != 0) {
+            if (UI_Slider(200,286, 328,16, &overMusicSlider, 1)) musicVolumeSliderActive = true;
+            if (musicVolumeSliderActive && Sys_Input.currentMouse_dx != 0) {
                 int32_t new = (int32_t)Sys_Settings.VolumeMusic + vmin(vmax(Sys_Input.currentMouse_dx,-1),1); Sys_Settings.VolumeMusic = (uint8_t)vmin(vmax(new,0),100); set_music_volume();
             }
             
             if (!Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].down && !Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].down) {
-                if (masterVolumeSliderActive) SaveConfig();
-                masterVolumeSliderActive = false;
+                if (musicVolumeSliderActive) SaveConfig();
+                musicVolumeSliderActive = false;
             }
             
             if (MenuEnter() && currentMenuItem == 1) {
@@ -404,8 +404,8 @@ void RenderMenu(void) {
                 SaveConfig();
             }
             
-            overMasterVolume = overMasterVolume || currentMenuItem == 1;
-            RenderFormattedText(200,270,overMasterVolume ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"MUSIC VOLUME %u", Sys_Settings.VolumeMusic);
+            overMusicSlider = overMusicSlider || currentMenuItem == 1;
+            RenderFormattedText(200,270,overMusicSlider ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"MUSIC VOLUME %u", Sys_Settings.VolumeMusic);
         }
         
         RenderUIImage(1087,723, 84,36, 1252); // Back Button background

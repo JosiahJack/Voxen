@@ -593,20 +593,18 @@ void MenuGoBack(void);
 #define GLOBAL_SHAKE_DISTANCE 0.3f
 #define GLOBAL_SHAKE_FORCE    1.0f
 #define HW_COUNT 14
-#define HW_SYS  0 // System Analyzer
-#define HW_NAV  1 // Navigation Unit
-#define HW_ERD  2 // Datareader/EReader
-#define HW_SNS  3 // Sensaround
-#define HW_TID  4 // Target Identifier
-#define HW_SHD  5 // Energy Shield
-#define HW_BIO  6 // Biomonitor
-#define HW_LAN  7 // Head Mounted Lantern
-#define HW_ENV  8 // Envirosuit
-#define HW_BST  9 // Turbo Motion Booster
-#define HW_JET 10 // Jump Jet Boots
-#define HW_INF 11 // Infrared Night Sight Enhancement
-#define HW_TRC 12 // Tractor Beam
-#define HW_SAL 13 // Fry Salter
+#define HW_SYS    1 // System Analyzer
+#define HW_NAV    2 // Navigation Unit
+#define HW_ERD    4 // Datareader/EReader
+#define HW_SNS    8 // Sensaround
+#define HW_TID   16 // Target Identifier
+#define HW_SHD   32 // Energy Shield
+#define HW_BIO   64 // Biomonitor
+#define HW_LAN  128 // Head Mounted Lantern
+#define HW_ENV  256 // Envirosuit
+#define HW_BST  512 // Turbo Motion Booster
+#define HW_JET 1024 // Jump Jet Boots
+#define HW_INF 2048 // Infrared Night Sight Enhancement
 
 #define SW_DRILL  0
 #define SW_PULSER 1
@@ -665,6 +663,8 @@ typedef struct {
     bool currentCyberItem;
     bool isPulserNotDrill;
     int globalLookupIndex;
+    int weaponInventoryIndices[7];
+    int weaponInventoryAmmoIndices[7];
 } InventorySystem;
 extern InventorySystem inventoryPlayer1;
 extern InventorySystem inventoryPlayer2;
@@ -848,10 +848,6 @@ typedef struct {
 } NPCTable;
 extern NPCTable npcTable[NUM_AI_TYPES];
 
-extern uint16_t selfIdx;
-extern uint16_t activatorIdx;
-#define SELF instances[selfIdx]
-#define ACTIVATOR instances[activatorIdx]
 #define TARGET_ID_LENGTH 32 // Max needed 22 + 5 for ID + 1 for space between them = 28
 #define MAX_WAYPOINTS 32
 #define MAX_CHILD_COUNT 4

@@ -544,5 +544,16 @@ void ProcessInput(void) {
         cursorPosition_y = Sys_Settings.ScreenHeight / 2;
     }
     
+    // Hardware hotkeys TODO
+    if (Lantern()) inventoryPlayer1.hardwareIsActive ^= HW_LAN;
+//     if ((inventoryPlayer1.hasHardware & HW_ERD) && GetInput.a.Email())      EReaderAction();
+//     if ((inventoryPlayer1.hasHardware & HW_SNS) && GetInput.a.Sensaround()) SensaroundAction();
+//     if ((inventoryPlayer1.hasHardware & HW_SHD) && GetInput.a.Shield())     ShieldAction();
+//     if ((inventoryPlayer1.hasHardware & HW_BIO) && GetInput.a.Biomonitor()) BioAction();
+//     if ((inventoryPlayer1.hasHardware & HW_LAN) && GetInput.a.Lantern())    LanternAction();
+//     if ((inventoryPlayer1.hasHardware & HW_BST) && GetInput.a.Booster())    BoosterAction();
+//     if ((inventoryPlayer1.hasHardware & HW_JET) && GetInput.a.Jumpjets())   JumpJetsAction();
+//     if ((inventoryPlayer1.hasHardware & HW_INF) && GetInput.a.Infrared())   InfraredAction();
+    
     ApplyPlayerMovements();
 }

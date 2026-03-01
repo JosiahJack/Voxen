@@ -1,6 +1,7 @@
 #include "os.h"
 #include "voxen.h"
-
+extern uint16_t headmountedLanternLight;
+extern Vector3 lanternPos;
 void InitializeAIAfterLoad(uint16_t i);
 void AddInstance(uint16_t entIdx, uint16_t i) {
     if (entIdx >= entityCount) { DualLogError("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d\n",entIdx,entityCount); OS_Exit(1); }
@@ -435,6 +436,29 @@ void LoadLevel(uint8_t curlevel) {
         instances[instanceIdx].rotation = (Quaternion){ 0.0f, 0.0f, 0.0f, 1.0f }; // -90 180 -45
         instanceIdx++;
     }
+    
+    // Add player headmounted lantern light
+    loadedLights++;
+    lightsIdx++;
+    if (lightsIdx >= LIGHT_COUNT) { DualLogError("Too many lights %u in level%d.txt!\n",lightsIdx,curlevel); OS_Exit(1); }
+
+    int32_t litIdx = lightsIdx * LIGHT_DATA_SIZE;
+    headmountedLanternLight = lightsIdx;
+    DualLog("headmountedLanternLight: %u, loadedLights: %u\n",headmountedLanternLight, loadedLights);
+    lightOn[lightsIdx] = false;
+    lightMaxIntensity[lightsIdx] = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
+    lightMinIntensity[lightsIdx] = 0.0f;
+    lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = 0.0f; // Force to not be a spot light (it's a lantern not a flashlight!)
+    lights[litIdx + LIGHT_DATA_OFFSET_RANGE] = 5.5f;
+    lights[litIdx + LIGHT_DATA_OFFSET_R] = 1.0f;
+    lights[litIdx + LIGHT_DATA_OFFSET_G] = 1.0f;
+    lights[litIdx + LIGHT_DATA_OFFSET_B] = 1.0f;
+    lanternPos = instances[PLAYER1].position;
+    lights[litIdx + LIGHT_DATA_OFFSET_POSX] = lanternPos.x;
+    lights[litIdx + LIGHT_DATA_OFFSET_POSY] = lanternPos.y;
+    lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = lanternPos.z;
+    lightCastsShadows[lightsIdx] = true;
+    lightDirty[lightsIdx] = true;
     
     // Set Fog
     switch(curlevel) {

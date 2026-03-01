@@ -206,13 +206,12 @@ void ResetLevelAudio(void) {
     loadedAmbients = 0;
     __builtin_memset(ambientRegistry, 0, loadedAmbients * sizeof(uint16_t));
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i<loadedInstances;++i) {
-        uint16_t entIdx = instances[i].index;
-        if (ConstIndexIsAmbient(entIdx)) {
+        if (ConstIndexIsAmbient(instances[i].index)) {
             ambientRegistry[loadedAmbients] = i;
             loadedAmbients++;
             if (loadedAmbients >= MAX_AMBIENT_NOISES) { DualLogError("%u exceeded max number of ambient noises %u!\n",loadedAmbients,MAX_AMBIENT_NOISES); OS_Exit(1); }
             
-            instances[i].volume = entities[entIdx].volume * 0.5f;
+            instances[i].volume = entities[instances[i].index].volume * 0.5f;
         }
     }
     
@@ -298,20 +297,20 @@ void MusicTriggerEnter(uint16_t self, uint16_t other) {
             MusicNotifyZone(instances[self].trackType);
         }
         
-        instances[self].tickFinished = Sys_Global.pauseRelativeTime + 0.1f;
+        instances[self].tickFinished = Sys_Global.pauseRelativeTime + 0.1;
     }
 }
 
 void MusicTriggerExit(uint16_t other) {
-    if (other == PLAYER1 || other == PLAYER2) mp3_clear(); Sys_Music.inZone = Sys_Music.elevator = Sys_Music.distortion = false; // return to normal upon leaving the trigger
+    if (other == PLAYER1 || other == PLAYER2) { mp3_clear(); Sys_Music.inZone = Sys_Music.elevator = Sys_Music.distortion = false; } // return to normal upon leaving the trigger
 }
 
 void UpdateMusic(void) {
     ma_sound* curr = mp3_slot ? &mp3_sounds[1] : &mp3_sounds[0];
     bool currentIsPlaying = ma_sound_is_playing(curr);
     if (currentIsPlaying) {
-        uint64_t currentFrame = ma_sound_get_time_in_pcm_frames(curr);
-        uint64_t pcmFramesLength = 0;
+        ma_uint64 currentFrame = ma_sound_get_time_in_pcm_frames(curr);
+        ma_uint64 pcmFramesLength = 0;
         ma_sound_get_length_in_pcm_frames(curr,&pcmFramesLength);
         uint64_t deltaFrames = pcmFramesLength - currentFrame;
         float remaining = deltaFrames != 0 ? (float)deltaFrames / (float)ma_engine_get_sample_rate(&audio_engine) : 0.0f;
@@ -332,8 +331,8 @@ void UpdateMusic(void) {
     
     if (Sys_Settings.DynamicMusic) {
         if (currentIsPlaying) {
-            uint64_t currentFrame = ma_sound_get_time_in_pcm_frames(curr);
-            uint64_t pcmFramesLength = 0;
+            ma_uint64 currentFrame = ma_sound_get_time_in_pcm_frames(curr);
+            ma_uint64 pcmFramesLength = 0;
             ma_sound_get_length_in_pcm_frames(curr,&pcmFramesLength);
             uint64_t deltaFrames = pcmFramesLength - currentFrame;
             float remaining = deltaFrames != 0 ? (float)deltaFrames / (float)ma_engine_get_sample_rate(&audio_engine) : 0.0f;

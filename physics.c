@@ -209,6 +209,7 @@ Vector3 quat_rotate(Quaternion q, Vector3 v) {
 
 uint16_t PointInSolid(Vector3 point, uint32_t layerMask) {
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
+        if (!(layerMask & instances[i].layer)) continue;
         if (instances[i].collider == COLLIDER_TYPE_NONE || instances[i].collider == COLLIDER_TYPE_MESH) continue;
 
         Vector3 pos = instances[i].position;
@@ -264,6 +265,27 @@ uint16_t PointInSolid(Vector3 point, uint32_t layerMask) {
     }
 
     return UINT16_MAX;
+}
+
+RaycastHit RayTriangle(Vector3 origin, Vector3 dir, Vector3 posA, Vector3 posB, Vector3 posC,
+                       Vector3 normA, Vector3 normB, Vector3 normC) {
+    Vector3 edgeAB = Vector3_A_minus_B(posB,posA);
+    Vector3 edgeAC = Vector3_A_minus_B(posC,posA);
+    Vector3 normalVector = cross_vector3(edgeAB,edgeAC);
+    Vector3 ao = Vector3_A_minus_B(origin,posA);
+    Vector3 dao = cross_vector3(ao,dir);
+    float determinant = -dot_vector3(dir, normalVector);
+    float invDet = 1.0f / determinant;
+    float dst = dot_vector3(ao, normalVector) * invDet;
+    float u = dot_vector3(edgeAC, dao) * invDet;
+    float v = -dot_vector3(edgeAB, dao) * invDet;
+    float w = 1.0f - u - v;
+    RaycastHit hitInfo;
+    hitInfo.hit = determinant >= 1E-8f && dst >= 0.0f && u >= 0.0f && v >= 0.0f && w >= 0.0f;
+    hitInfo.point = Vector3_A_plus_B(origin,scale_vector3(dir,dst));
+    hitInfo.normal = normalize_vector3(Vector3_A_plus_B(Vector3_A_plus_B(scale_vector3(normA,w),scale_vector3(normB,u)),scale_vector3(normC,v)));
+    hitInfo.distance = dst;
+    return hitInfo;
 }
 
 RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uint32_t layerMask) {

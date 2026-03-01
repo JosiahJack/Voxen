@@ -250,19 +250,19 @@ void BioMonitorUpdate(void) {
     bioMonitor.bpmText = 529;
     bioMonitor.fatigueDetailText = 531;
     bioMonitor.fatigue = 534; // Low
-         if (SELF.fatigue >= 80.0f)                                       bioMonitor.fatigue = 532; // High!
-    else if (SELF.fatigue <  80.0f && SELF.fatigue > 30.0f) bioMonitor.fatigue = 533; // Moderate
+         if (instances[PLAYER1].fatigue >= 80.0f)                                       bioMonitor.fatigue = 532; // High!
+    else if (instances[PLAYER1].fatigue <  80.0f && instances[PLAYER1].fatigue > 30.0f) bioMonitor.fatigue = 533; // Moderate
 
-    if (bioMonitor.beatFinished < Sys_Global.pauseRelativeTime) bioMonitor.heartRate = vfloor((70.0f +((SELF.fatigue / 100.0f) * 110.0f)) * random_range(0.95f,1.05f));
-    if (inventoryPlayer1.hardwareVersion[HW_BIO] > 1 && (SELF.patchActive & 127)) {
+    if (bioMonitor.beatFinished < Sys_Global.pauseRelativeTime) bioMonitor.heartRate = vfloor((70.0f +((instances[PLAYER1].fatigue / 100.0f) * 110.0f)) * random_range(0.95f,1.05f));
+    if (inventoryPlayer1.hardwareVersion[HW_BIO] > 1 && (instances[PLAYER1].patchActive & 127)) {
 //         bioMonitor.patchesActiveText = Sys_Text.stringTable[528]; // TODO actually render text
-//         if (SELF.patchActive & PATCH_MEDI))     { tempStr.Append(Sys_Text.stringTable[520]); tempStr.Append(" "); }
-//         if (SELF.patchActive & PATCH_STAMINUP)) { tempStr.Append(Sys_Text.stringTable[521]); tempStr.Append(" "); }
-//         if (SELF.patchActive & PATCH_SIGHT))    { tempStr.Append(Sys_Text.stringTable[522]); tempStr.Append(" "); }
-//         if (SELF.patchActive & PATCH_GENIUS))   { tempStr.Append(Sys_Text.stringTable[523]); tempStr.Append(" "); }
-//         if (SELF.patchActive & PATCH_BERSERK))  { tempStr.Append(Sys_Text.stringTable[524]); tempStr.Append(" "); }
-//         if (SELF.patchActive & PATCH_REFLEX))   { tempStr.Append(Sys_Text.stringTable[525]); tempStr.Append(" "); }
-//         if (SELF.patchActive & PATCH_DETOX))    { tempStr.Append(Sys_Text.stringTable[530]); }
+//         if (instances[PLAYER1].patchActive & PATCH_MEDI))     { tempStr.Append(Sys_Text.stringTable[520]); tempStr.Append(" "); }
+//         if (instances[PLAYER1].patchActive & PATCH_STAMINUP)) { tempStr.Append(Sys_Text.stringTable[521]); tempStr.Append(" "); }
+//         if (instances[PLAYER1].patchActive & PATCH_SIGHT))    { tempStr.Append(Sys_Text.stringTable[522]); tempStr.Append(" "); }
+//         if (instances[PLAYER1].patchActive & PATCH_GENIUS))   { tempStr.Append(Sys_Text.stringTable[523]); tempStr.Append(" "); }
+//         if (instances[PLAYER1].patchActive & PATCH_BERSERK))  { tempStr.Append(Sys_Text.stringTable[524]); tempStr.Append(" "); }
+//         if (instances[PLAYER1].patchActive & PATCH_REFLEX))   { tempStr.Append(Sys_Text.stringTable[525]); tempStr.Append(" "); }
+//         if (instances[PLAYER1].patchActive & PATCH_DETOX))    { tempStr.Append(Sys_Text.stringTable[530]); }
 //         patchEffects.text = tempStr.ToString();
 //         if (!Sys_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, FONT_NORMAL,1.0f,"Player cell: %u, floor: %.3f, ceil: %.3f", instances[PLAYER1].cellIndex, (double)gridCellFloorHeight[instances[PLAYER1].cellIndex], (double)gridCellCeilingHeight[instances[PLAYER1].cellIndex]); TODO
     }

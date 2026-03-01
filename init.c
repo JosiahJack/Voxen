@@ -1,28 +1,28 @@
 // init.c - Entity Initialization
 #include "voxen.h"
 #define FLT_MAX 3.402823466e+38F
-void ButtonSwitchInit(void) {
-    SELF.delayFinished = 0.0f; // prevent using targets on awake
-    if (SELF.entflags & ENTFLAG_ACTIVE) SELF.tickFinished = Sys_Global.pauseRelativeTime + 1.5 + (double)random_range(0.0f,1.0f);
+void ButtonSwitchInit(uint16_t self) {
+    instances[self].delayFinished = 0.0f; // prevent using targets on awake
+    if (instances[self].entflags & ENTFLAG_ACTIVE) instances[self].tickFinished = Sys_Global.pauseRelativeTime + 1.5 + (double)random_range(0.0f,1.0f);
 }
 
-void ForceBridgeInit(void) {    
-    SELF.tickFinished = Sys_Global.pauseRelativeTime + SELF.tickTime + (double)random_range(0.0f,1.0f);
-    SELF.lerping = true;
-    if (SELF.activatedScale.x <= 0.02f) SELF.activatedScale.x = 2.56f;
-    if (SELF.activatedScale.y <= 0.02f) SELF.activatedScale.y = 0.08f;
-    if (SELF.activatedScale.z <= 0.02f) SELF.activatedScale.z = 2.56f;
-    if (!(SELF.entflags & ENTFLAG_ACTIVATED)) {
-        flag_set(&SELF.entflags,ENTFLAG_VISIBLE,false);
-        SELF.collider = COLLIDER_TYPE_NONE;
+void ForceBridgeInit(uint16_t self) {    
+    instances[self].tickFinished = Sys_Global.pauseRelativeTime + instances[self].tickTime + (double)random_range(0.0f,1.0f);
+    instances[self].lerping = true;
+    if (instances[self].activatedScale.x <= 0.02f) instances[self].activatedScale.x = 2.56f;
+    if (instances[self].activatedScale.y <= 0.02f) instances[self].activatedScale.y = 0.08f;
+    if (instances[self].activatedScale.z <= 0.02f) instances[self].activatedScale.z = 2.56f;
+    if (!(instances[self].entflags & ENTFLAG_ACTIVATED)) {
+        flag_set(&instances[self].entflags,ENTFLAG_VISIBLE,false);
+        instances[self].collider = COLLIDER_TYPE_NONE;
     }
     
-    switch (SELF.fieldColor) {
-        case ForceFieldColor_Red:      SELF.texIndex = 38; break;
-        case ForceFieldColor_Green:    SELF.texIndex = 40; break;
-        case ForceFieldColor_Blue:     SELF.texIndex = 39; break;
-        case ForceFieldColor_Purple:   SELF.texIndex = 41; break;
-        case ForceFieldColor_RedFaint: SELF.texIndex = 198; break;
+    switch (instances[self].fieldColor) {
+        case ForceFieldColor_Red:      instances[self].texIndex = 38; break;
+        case ForceFieldColor_Green:    instances[self].texIndex = 40; break;
+        case ForceFieldColor_Blue:     instances[self].texIndex = 39; break;
+        case ForceFieldColor_Purple:   instances[self].texIndex = 41; break;
+        case ForceFieldColor_RedFaint: instances[self].texIndex = 198; break;
     }
 }
 /*
@@ -37,13 +37,13 @@ float startFade = 1.0f;
 float endFade = 0.0f;
 float tickFinished;
 
-void DriftUpdInit() {
-    SELF..position = (Vector3){instances[i].position.x,startY,instances[i].position.z};
+void DriftUpdInit(uint16_t self) {
+    instances[self]..position = (Vector3){instances[i].position.x,startY,instances[i].position.z};
     if (fadeImage && img != null) {
         img.color = new Color(img.color.r,img.color.g,img.color.b,startFade);
     }
 
-    SELF.tickFinished = Sys_Global.pauseRelativeTime;
+    instances[self].tickFinished = Sys_Global.pauseRelativeTime;
 }*/
 
 //=============================================================================
@@ -77,35 +77,37 @@ void InitializeEntity(Entity* entry) { // Blank entity, no index yet, for initia
 void ResetLevelAudio(void);
 void InitAfterLoad(void) { // Init entities after level load and after already having generic entity type fields set.
     for (int i=0;i<ARRSIZE;++i) { gridCellFloorHeight[i] = -FLT_MAX; gridCellCeilingHeight[i] = FLT_MAX;}
-    for (int i=PLAYER1;i<loadedInstances;++i) {
-        selfIdx = i;
+    for (int i=PLAYER1;i<loadedInstances;++i) {        
+        int32_t cellIdx = PosGetCellCoords(instances[i].position.x, instances[i].position.z);
+        instances[i].cellIndex = cellIdx;
+        if (i == PLAYER1 || i == PLAYER2 || ConstIndexIsDynamicObject(instances[i].index)) instances[i].gravity = 1.0f; // Normal gravity
+        else instances[i].gravity = 0.0f;
         
-        int32_t cellIdx = PosGetCellCoords(SELF.position.x, SELF.position.z);
-        SELF.cellIndex = cellIdx;
-        if (i == PLAYER1 || i == PLAYER2 || ConstIndexIsDynamicObject(SELF.index)) SELF.gravity = 1.0f; // Normal gravity
-        else SELF.gravity = 0.0f;
-        
-        if (SELF.index < MAX_ENTITIES) flag_set(&SELF.entflags,ENTFLAG_ANIMATED,entities[SELF.index].entflags & ENTFLAG_ANIMATED);
-        if (SELF.entflags & ENTFLAG_HAS_CAMERA_VIEW) AddCameraPosition(i);
-
-        if (SELF.collider == COLLIDER_TYPE_BOX) {
-            Quaternion quat = SELF.rotation;
+        if (instances[i].index < MAX_ENTITIES) flag_set(&instances[i].entflags,ENTFLAG_ANIMATED,entities[instances[i].index].entflags & ENTFLAG_ANIMATED);
+        if (instances[i].entflags & ENTFLAG_HAS_CAMERA_VIEW) AddCameraPosition(i);
+        if (instances[i].collider == COLLIDER_TYPE_BOX) {
+            Quaternion quat = instances[i].rotation;
             Quaternion upQuat = {0.0f, 0.0f, 0.0f, 1.0f};
             float floorangle = quat_angle_deg(quat,upQuat); // Get angle in degrees relative to up vector (floor normal)
             Quaternion downQuat = {0.0f, 0.0f, 0.0f, -1.0f};
             float ceilangle = quat_angle_deg(quat,downQuat); // Get angle in degrees relative to down vector (ceiling normal)
-            float floorHeight = (floorangle <= 30.0f) ? SELF.position.y - 1.28f : -FLT_MAX; // World cells are 2.56x2.56x2.56 with modular chunk origins at center, so offset by half cell size to get actual positions.
+            float floorHeight = (floorangle <= 30.0f) ? instances[i].position.y - 1.28f : -FLT_MAX; // World cells are 2.56x2.56x2.56 with modular chunk origins at center, so offset by half cell size to get actual positions.
             if (floorHeight > -FLT_MAX && floorHeight > gridCellFloorHeight[cellIdx]) gridCellFloorHeight[cellIdx] = floorHeight; // Raise floor up until highest one is selected.
-            float ceilHeight = (ceilangle <= 30.0f) ? SELF.position.y + 1.28f : FLT_MAX;
+            float ceilHeight = (ceilangle <= 30.0f) ? instances[i].position.y + 1.28f : FLT_MAX;
             if (ceilHeight < FLT_MAX && ceilHeight < gridCellCeilingHeight[cellIdx]) gridCellCeilingHeight[cellIdx] = ceilHeight; // Raise floor up until highest one is selected.
         }
         
         // Entity Specific Inits
-        if (ConstIndexIsButtonSwitch(SELF.index)) ButtonSwitchInit();
-        if (!StringIsEmpty(SELF.targetname) && (SELF.ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE) && !(SELF.entflags & TARG_IOFLAGS_DISABLD_ONCE_4EVER)) flag_set(&SELF.entflags,ENTFLAG_ACTIVE,false);
-        if (SELF.index == 700) { // logic_branch
-            if ((SELF.ioflags & TARG_IOFLAGS_START_ON_SECOND) || (SELF.ioflags & TARG_IOFLAGS_ON_SECOND)) { StringCopyInto_A_From_B(SELF.currenttarget,SELF.target,TARGET_STRING_LENGTH); flag_set(&SELF.ioflags,TARG_IOFLAGS_ON_SECOND,false); }
-            else { StringCopyInto_A_From_B(SELF.currenttarget,SELF.target2,TARGET_STRING_LENGTH); flag_set(&SELF.ioflags,TARG_IOFLAGS_ON_SECOND,true); }
+        if (ConstIndexIsGeometry(instances[i].index)) instances[i].layer = PhysicsLayer_Geometry;
+        if (ConstIndexIsDoor(instances[i].index)) instances[i].layer = PhysicsLayer_Door;
+        if (ConstIndexIsNPC(instances[i].index)) instances[i].layer = PhysicsLayer_NPC;
+        if (ConstIndexIsButtonSwitch(instances[i].index)) ButtonSwitchInit(i);
+        if (!StringIsEmpty(instances[i].targetname) && (instances[i].ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE) && !(instances[i].entflags & TARG_IOFLAGS_DISABLD_ONCE_4EVER)) flag_set(&instances[i].entflags,ENTFLAG_ACTIVE,false);
+        if (instances[i].index == 700) { // logic_branch
+            if ((instances[i].ioflags & TARG_IOFLAGS_START_ON_SECOND) || (instances[i].ioflags & TARG_IOFLAGS_ON_SECOND)) {
+                StringCopyInto_A_From_B(instances[i].currenttarget,instances[i].target,TARGET_STRING_LENGTH);
+                flag_set(&instances[i].ioflags,TARG_IOFLAGS_ON_SECOND,false);
+            } else { StringCopyInto_A_From_B(instances[i].currenttarget,instances[i].target2,TARGET_STRING_LENGTH); flag_set(&instances[i].ioflags,TARG_IOFLAGS_ON_SECOND,true); }
         }
     }
 
@@ -150,7 +152,10 @@ void InventoryInit(void) {
     for (int i = 0; i < 14; i++) {
         if (i != 0) inventoryPlayer1.generalInventoryIndexRef[i] = -1;
     }
-
+    
+    for (int i=0;i<HW_COUNT;++i) inventoryPlayer1.hardwareVersion[i] = 0;
+    for (int i=0;i<HW_COUNT;++i) inventoryPlayer1.hardwareVersionSetting[i] = 0;
+    for (int i=0;i<HW_COUNT;++i) inventoryPlayer1.hardwareInvReferenceIndex[i] = 0;
     inventoryPlayer1.generalInventoryIndexRef[0] = 81;
     inventoryPlayer1.nitroTimeSetting = NITRO_DEFAULT_TIME;
     inventoryPlayer1.earthShakerTimeSetting = EARTH_SHAKER_DEFAULT_TIME;
@@ -159,8 +164,8 @@ void InventoryInit(void) {
     inventoryPlayer1.hasNewNotes = true;
     inventoryPlayer1.currentCyberItem = -1;
     inventoryPlayer1.isPulserNotDrill = true;
-/*    inventoryPlayer1.weaponInventoryIndices = {-1,-1,-1,-1,-1,-1,-1};
-    inventoryPlayer1.weaponInventoryAmmoIndices = {-1,-1,-1,-1,-1,-1,-1};*/	
+    for (int i=0;i<7;++i) inventoryPlayer1.weaponInventoryIndices[i]     = -1;
+    for (int i=0;i<7;++i) inventoryPlayer1.weaponInventoryAmmoIndices[i] = -1;
     inventoryPlayer1.globalLookupIndex = -1;
 }
 

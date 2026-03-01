@@ -11,7 +11,7 @@ public class CyberItem : MonoBehaviour {
 	void Start() {
 		if (Sys_Global.difficultyMission == 0) {
 			// Disable data objects when Mission difficulty is 0.
-			if (type == SoftwareType.Data) this.flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
+			if (type == SoftwareType.Data) this.flag_set(&instances[i].entflags, ENTFLAG_ACTIVE, false);
 		}
 	}
 
@@ -32,7 +32,7 @@ public class CyberItem : MonoBehaviour {
 			}
 
 			// We've been picked up, quick hide like you were.
-			this.flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
+			this.flag_set(&instances[i].entflags, ENTFLAG_ACTIVE, false);
 		}
 	}
 }

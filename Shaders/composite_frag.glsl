@@ -38,7 +38,6 @@ const float staticScrollSpeed = 200.0;
 const float WORLDCELL_WIDTH_F = 2.56;
 const float VOXEL_SIZE = 0.32;
 const float PI = 3.14159265359;
-const float aaThreshold = 0.2;
 
 // Simplex noise
 vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
@@ -230,6 +229,39 @@ vec3 applyBerserk(vec3 worldPos, vec3 base) {
     return mix(berserkColor, inverted * berserkColor * 1.5, invertFade);
 }
 
+const float AA_REDUCE_MIN = 1.0/128.0;
+const float AA_REDUCE_MUL = 1.0/8.0;
+const float AA_SPAN_MAX   = 64.0;
+const float aaThreshold = 0.05;
+vec3 applyAA(vec2 texCoord, vec2 pixelSize) {
+    vec3 rgbNW = texture(tex, texCoord + vec2(-1.0, -1.0) * pixelSize).rgb;
+    vec3 rgbNE = texture(tex, texCoord + vec2( 1.0, -1.0) * pixelSize).rgb;
+    vec3 rgbSW = texture(tex, texCoord + vec2(-1.0,  1.0) * pixelSize).rgb;
+    vec3 rgbSE = texture(tex, texCoord + vec2( 1.0,  1.0) * pixelSize).rgb;
+    vec3 rgbM  = texture(tex, texCoord).rgb;
+    float lumaNW = dot(rgbNW, vec3(0.299, 0.587, 0.114));
+    float lumaNE = dot(rgbNE, vec3(0.299, 0.587, 0.114));
+    float lumaSW = dot(rgbSW, vec3(0.299, 0.587, 0.114));
+    float lumaSE = dot(rgbSE, vec3(0.299, 0.587, 0.114));
+    float lumaM  = dot(rgbM,  vec3(0.299, 0.587, 0.114));
+    float lumaMin = min(lumaM, min(min(lumaNW, lumaNE), min(lumaSW, lumaSE)));
+    float lumaMax = max(lumaM, max(max(lumaNW, lumaNE), max(lumaSW, lumaSE)));
+    if ((lumaMax - lumaMin) < max(aaThreshold, lumaMax * 0.125)) return rgbM;
+
+    vec2 dir;
+    dir.x = -((lumaNW + lumaNE) - (lumaSW + lumaSE));
+    dir.y =  ((lumaNW + lumaSW) - (lumaNE + lumaSE));
+    float dirReduce = max((lumaNW + lumaNE + lumaSW + lumaSE) * (0.25 * AA_REDUCE_MUL), AA_REDUCE_MIN);
+    float rcpDirMin = 1.0 / (min(abs(dir.x), abs(dir.y)) + dirReduce);
+    dir = min(vec2(AA_SPAN_MAX), max(vec2(-AA_SPAN_MAX), dir * rcpDirMin)) * pixelSize;
+    vec3 rgbA = 0.5 * (texture(tex, texCoord + dir * (1.0/3.0 - 0.5)).rgb + texture(tex, texCoord + dir * (2.0/3.0 - 0.5)).rgb);
+    vec3 rgbB = rgbA * 0.5 + 0.25 * (texture(tex, texCoord + dir * (0.0/3.0 - 0.5)).rgb + texture(tex, texCoord + dir * (3.0/3.0 - 0.5)).rgb);
+    float lumaB = dot(rgbB, vec3(0.299, 0.587, 0.114));
+    if ((lumaB < lumaMin) || (lumaB > lumaMax)) return rgbA;
+    return rgbB;
+}
+
+
 void main() {
     vec2 texCoordUsed = TexCoord;
     if (empEffectActive > 0u) texCoordUsed.y += timeVal * 15.0;
@@ -402,51 +434,68 @@ void main() {
         color.rgb += reflectionColor.rgb;
     }
 
-    vec3 aaColor = color.rgb; // Default to chromatic aberration result
-    if (aaEnabled > 0) {
-        // SMAA-Inspired Edge-Directed Antialiasing
-        // Compute luminance for edge detection
+    vec3 aaColor = color.rgb;
+    if (aaEnabled > 0.0) {
         vec2 pixelSize = vec2(1.0 / float(screenWidth), 1.0 / float(screenHeight));
-        vec3 centerColor = texture(tex, texCoordUsed).rgb;
-        float lumaCenter = dot(centerColor, vec3(0.299, 0.587, 0.114)); // Luminance (Rec. 601)
-        vec3 dx = texture(tex, texCoordUsed + vec2(pixelSize.x, 0.0)).rgb - texture(tex, texCoordUsed - vec2(pixelSize.x, 0.0)).rgb;
-        vec3 dy = texture(tex, texCoordUsed + vec2(0.0, pixelSize.y)).rgb - texture(tex, texCoordUsed - vec2(0.0, pixelSize.y)).rgb;
-        float lumaDx = dot(abs(dx), vec3(0.299, 0.587, 0.114));
-        float lumaDy = dot(abs(dy), vec3(0.299, 0.587, 0.114));
-        float gradientMag = lumaDx + lumaDy; // Luminance-based gradient magnitude
-        if (gradientMag > aaThreshold) {
-            // Determine edge direction
-            vec2 edgeDir = vec2(lumaDx, lumaDy);
-            edgeDir = normalize(edgeDir + 1e-6); // Avoid division by zero
-            vec2 orthoDir = vec2(-edgeDir.y, edgeDir.x); // Perpendicular to edge
-
-            // Sample along the edge (up to ±5 pixels)
-            vec3 sampleColor = vec3(0.0);
-            float aaWeightSum = 0.0;
-            const int sampleCount = 10; // Samples per side (total 11 samples: -5 to +5)
-            for (int i = -sampleCount; i <= sampleCount; i++) {
-                float t = float(i) / float(sampleCount); // Normalized position [-1, 1]
-                float dist = t * 2.0; // Distance along edge
-                float weight = exp(-abs(t) * 2.0); // Gaussian weight (sigma = 0.5)
-                vec2 sampleUV = texCoordUsed + orthoDir * dist * pixelSize;
-                sampleColor += texture(tex, sampleUV).rgb * weight;
-                aaWeightSum += weight;
-            }
-            sampleColor /= aaWeightSum;
-
-            // Dynamic blending based on edge contrast
-            float blendFactor = clamp(gradientMag * 0.5, 2.0, 4.0); // Adjust blend based on edge strength
-            aaColor = mix(color.rgb, sampleColor, blendFactor);
-        }
+        aaColor = applyAA(texCoordUsed,pixelSize);
     }
+//         vec3 centerColor = texture(tex, texCoordUsed).rgb;
+//         float lumaCenter = dot(centerColor, vec3(0.299, 0.587, 0.114));
+//         vec3 cLeft  = texture(tex, texCoordUsed + vec2(-pixelSize.x,  0.0)).rgb;
+//         vec3 cRight = texture(tex, texCoordUsed + vec2( pixelSize.x,  0.0)).rgb;
+//         vec3 cUp    = texture(tex, texCoordUsed + vec2( 0.0, -pixelSize.y)).rgb;
+//         vec3 cDown  = texture(tex, texCoordUsed + vec2( 0.0,  pixelSize.y)).rgb;
+//         float lumaLeft  = dot(cLeft,  vec3(0.299, 0.587, 0.114));
+//         float lumaRight = dot(cRight, vec3(0.299, 0.587, 0.114));
+//         float lumaUp    = dot(cUp,    vec3(0.299, 0.587, 0.114));
+//         float lumaDown  = dot(cDown,  vec3(0.299, 0.587, 0.114));
+//         float lumaDx = abs(lumaRight - lumaLeft);
+//         float lumaDy = abs(lumaDown  - lumaUp);
+//         float gradientMag = max(lumaDx, lumaDy);
+//         if (gradientMag > aaThreshold) {
+//             vec2 blurDir;
+//             float axisStrength;
+//             if (lumaDx > lumaDy) {
+//                 // Horizontal edge → blur vertically
+//                 blurDir = vec2(0.0, 1.0);
+//                 axisStrength = lumaDx;
+//             } else {
+//                 // Vertical edge → blur horizontally
+//                 blurDir = vec2(1.0, 0.0);
+//                 axisStrength = lumaDy;
+//             }
+// 
+//             vec3 accum = vec3(0.0);
+//             float wSum = 0.0;
+//             const int   nSamples = 64;
+//             const float radiusPx = 64.0;
+//             for (int i = -nSamples; i <= nSamples; ++i) {
+//                 if (i == 0) continue;
+// 
+//                 float fi = float(i);
+//                 float dist = fi * (radiusPx / float(nSamples));
+//                 float weight = exp( - (dist * dist) / (2.0 * 4.5 * 4.5) );
+//                 vec2 offset = blurDir * dist * pixelSize;
+//                 vec3 col    = texture(tex, texCoordUsed + offset).rgb;
+//                 accum += col * weight;
+//                 wSum  += weight;
+//             }
+// 
+//             if (wSum > 0.0001) {
+//                 vec3 blurred = accum / wSum;
+//                 float normalizedGrad = axisStrength / max(0.0001, gradientMag + 0.0001);
+//                 float strength = axisStrength * mix(32.0, 128.0, normalizedGrad);  // stronger on pure axis
+//                 float blend = clamp(strength, 0.0, 0.88);
+//                 aaColor = mix(aaColor, blurred, blend);
+//             }
+//         }
+//     }
 
     // VHS Blur
     const float r = vhsRadiusMax * vhsBlurAmount;
     vec2 px = 1.0 / vec2(screenWidth, screenHeight);
     vec3 acc = vec3(0.0);
     float wsum = 0.0;
-
-    // 7-tap horizontal (same weights as original)
     const float w[7] = float[](0.05,0.12,0.20,0.26,0.20,0.12,0.05);
     for (int i=0;i<7;i++) {
         float o = (i-3) * (r/3.0);
@@ -455,8 +504,6 @@ void main() {
         wsum += w[i];
     }
     acc /= wsum;
-
-    // 3-tap vertical (same as original)
     acc += texture(tex, texCoordUsed + vec2(0.0,-px.y)).rgb * 0.25;
     acc += texture(tex, texCoordUsed + vec2(0.0, px.y)).rgb * 0.25;
     vec3 vhsBlur = acc * (1.0/1.5); // renormalize

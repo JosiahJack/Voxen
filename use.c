@@ -34,7 +34,6 @@ void FuncWallUse (UseData ud) {
     if (SELF.currentState == FuncStates_Start || SELF.currentState == FuncStates_MovingStart || SELF.currentState == FuncStates_AjarMovingTarget) SELF.currentState = FuncStates_MovingTarget;
     else SELF.currentState = FuncStates_MovingStart;
     
-    flag_set(&SELF.entflags,ENTFLAG_STOPSOUND_PLAYED,false);
     startTime = Sys_Global.pauseRelativeTime + 10.0f;
     play_wav(sounds[76]); // doorwall_move
     flag_set(&SELF.entflags,ENTFLAG_STOPSOUND_PLAYED,false);
@@ -139,20 +138,20 @@ void ActivatePatch(int index) { // Expects the usableItems index
 void ButtonSwitchUseTargets () { // TODO
 //     UseData ud = new UseData();
 //     UseTargets(gameObject,ud,target);
-       bool active = SELF.entflags & ENTFLAG_ACTIVE;
+       bool active = instances[i].entflags & ENTFLAG_ACTIVE;
        active = !active;
-       flag_set(&SELF.entflags,ENTFLAG_ACTIVE,active);
-       SELF.alternateOn = active;
-//     if (SELF.entflags & ENTFLAG_CHANGE_TEX_ON_ACTIVE) {
-//         if (SELF.entflags & ENTFLAG_BLINK_TEX_ON_ACTIVE) {
+       flag_set(&instances[i].entflags,ENTFLAG_ACTIVE,active);
+       instances[i].alternateOn = active;
+//     if (instances[i].entflags & ENTFLAG_CHANGE_TEX_ON_ACTIVE) {
+//         if (instances[i].entflags & ENTFLAG_BLINK_TEX_ON_ACTIVE) {
 //             ToggleMaterial();
-//             if (SELF.entflags & ENTFLAG_ACTIVE)
-//                 SELF.tickFinished = Sys_Global.pauseRelativeTime + tickTime;
+//             if (instances[i].entflags & ENTFLAG_ACTIVE)
+//                 instances[i].tickFinished = Sys_Global.pauseRelativeTime + tickTime;
 //         } else {
 //             ToggleMaterial(); TODO
 //         }
 //     }
-//     if (SELF.entflags & ENTFLAG_ANIMATED) {
+//     if (instances[i].entflags & ENTFLAG_ANIMATED) {
 //         if (active) { // UH OH TODO TODO Fix the overlap here with gameObject.active
 //             anim.Play("Activating");
 //         } else {
@@ -161,24 +160,24 @@ void ButtonSwitchUseTargets () { // TODO
 //     }
 }
 
-void ButtonSwitchUse (UseData ud) {
+void ButtonSwitchUse(uint16_t i, UseData ud) {
     if (Sys_Cheats.superoverride || Sys_Global.difficultyMission == 0) {
-        SELF.locked = false; // SHODAN can go anywhere!  Full security override!
-    } else if (GetCurrentLevelSecurity() > SELF.securityThreshhold) {
-//         BlockedBySecurity(SELF.position); TODO
+        instances[i].locked = false; // SHODAN can go anywhere!  Full security override!
+    } else if (GetCurrentLevelSecurity() > instances[i].securityThreshhold) {
+//         BlockedBySecurity(instances[i].position); TODO
         return;
     }
 
-    if (SELF.locked) {
-        CenterStatusPrint("%s",Sys_Text.stringTable[SELF.lockedMessageLingdex]);
-        if (SELF.SFXLockedIndex >= 0 && SELF.SFXLockedIndex < SOUNDS_COUNT) play_wav(sounds[SELF.SFXLockedIndex],1.0f,SELF.position,true);
+    if (instances[i].locked) {
+        CenterStatusPrint("%s",Sys_Text.stringTable[instances[i].lockedMessageLingdex]);
+        if (instances[i].SFXLockedIndex >= 0 && instances[i].SFXLockedIndex < SOUNDS_COUNT) play_wav(sounds[SELF.SFXLockedIndex],1.0f,SELF.position,true);
         return;
     }
 
     // Set playerCamera to owner of the input (always should be the camera)
     Utils.PlayOneShotSavable(SFXSource,sounds[SFXIndex]);
     CenterStatusPrint("%s",Sys_Text.stringTable[messageIndex]);
-    if (SELF.delay > 0.0f) SELF.delayFinished = Sys_Global.pauseRelativeTime + SELF.delay;
+    if (instances[i].delay > 0.0f) instances[i].delayFinished = Sys_Global.pauseRelativeTime + instances[i].delay;
     else ButtonSwitchUseTargets();
 }
 
@@ -302,7 +301,7 @@ void DoorUse (UseData ud) {
 void CyberAccessUse (uint16_t activator, uint16_t cybAcc) {
     selfIdx = cybAcc;
     activatorIdx = activator;
-    UseTargets(gameObject,ud,SELF.target);
+    UseTargets(gameObject,ud,instances[i].target);
     CenterStatusPrint("%s", Sys_Text.stringTable[441]); // Entering Cyberspace!
     Vector3 entryPosition = (Vector3){ 195.42000f, -13.44000f,  33.28000f};
     switch(LevelManager.a.currentLevel) {

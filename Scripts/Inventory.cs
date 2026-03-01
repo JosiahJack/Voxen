@@ -15,8 +15,6 @@
 	int[] softVersions;
 	bool[] hasSoft;
 	bool[] hasMinigame;
-	int[] weaponInventoryIndices;
-    int[] weaponInventoryAmmoIndices;
 	int numweapons;
 	int[] wepAmmo;
 	int[] wepAmmoSecondary;
