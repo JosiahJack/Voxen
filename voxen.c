@@ -177,6 +177,7 @@ bool UpdateLights(bool* voxelsNeedUpdated) {
     // Update headmounted lantern
     int32_t lant = headmountedLanternLight * LIGHT_DATA_SIZE;
     if (/*(inventoryPlayer1.hasHardware & HW_LAN) && */(inventoryPlayer1.hardwareIsActive & HW_LAN)) {
+        Vector3 lanternPosLast = lanternPos;
         lanternPos = instances[PLAYER1].position;
         lanternPos.y -= 0.24f;
         lanternPos.x += 0.04f;
@@ -186,8 +187,8 @@ bool UpdateLights(bool* voxelsNeedUpdated) {
         lights[lant + LIGHT_DATA_OFFSET_POSY] = lanternPos.y;
         lights[lant + LIGHT_DATA_OFFSET_POSZ] = lanternPos.z;
         lights[lant + LIGHT_DATA_OFFSET_INTENSITY] = lightMaxIntensity[headmountedLanternLight] = lanternVersionBrightness[inventoryPlayer1.hardwareVersionSetting[7]];
+        lightDirty[headmountedLanternLight] = !lightOn[headmountedLanternLight] || (vabs(lanternPosLast.x - lanternPos.x) + vabs(lanternPosLast.y - lanternPos.y) + vabs(lanternPosLast.z - lanternPos.z)) > 0.001f;
         lightOn[headmountedLanternLight] = true;
-        lightDirty[headmountedLanternLight] = true;
         lightCastsShadows[headmountedLanternLight] = true;
         lightInPVS[headmountedLanternLight] = true;
     } else { 
@@ -1348,7 +1349,7 @@ bool UpdatedPlayerCell(void);
 static inline __attribute__((always_inline)) void UpdateVoxelsAndInstances(void) {
     Sys_Render.shadowmapsNeedUpdated = UpdatedPlayerCell();
     Sys_Render.shadowmapsNeedUpdated = UpdateLights(&Sys_Render.shadowmapsNeedUpdated);
-    if (Sys_Render.shadowmapsNeedUpdated) CullCore(); // 1. Culling
+    CullCore();
     bool uploadInstances = false;
     for (uint32_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; i++) {
         if (dirtyInstances[i]) {
@@ -1419,9 +1420,7 @@ int32_t main(void) {
         }
         
         UpdateAnims();
-        if (likely(!Sys_Global.gamePaused && !Sys_Global.menuActive)) {
-            UpdateMusic();
-        }
+        if (likely(!Sys_Global.gamePaused && !Sys_Global.menuActive)) UpdateMusic();
         if (likely(!Sys_Global.gamePaused || Sys_Global.menuActive)) UpdateVoxelsAndInstances();
         Render();
         Sys_Dx.globalFrameNum++;
