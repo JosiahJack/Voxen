@@ -1249,7 +1249,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
     glEnable(GL_CULL_FACE); glEnable(GL_DEPTH_TEST); glDisable(GL_BLEND); // Opaques
     
-    // Depth Prepass
+    // Depth Prepass - Eliminates some overdraw for ~6.1% performance improvement in spite of added draw calls since these are relatively cheap and avoid the heavy fragment work in main pass.
     glUseProgram(Sys_Render.depthPrepassShaderProgram);
     glUniformMatrix4fv(2, 1, GL_FALSE, viewProj);
     glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);

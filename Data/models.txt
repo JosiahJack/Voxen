@@ -50,7 +50,7 @@ index: 14
 index: 15
 #Models/bed1.fbx
 index: 16
-#Models/bed_neurosurgery.fbx
+#Models/bed_neurosurgery.obj
 index: 17
 #Models/beverage.fbx
 index: 18
