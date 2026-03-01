@@ -110,6 +110,7 @@ static inline __attribute__((always_inline)) GLuint LinkProgram(GLuint* s, int32
 GLuint CompileStandardShader(const char* vsrc, const char* fsrc, const char* name) { GLuint vertShader = CompileShader(GL_VERTEX_SHADER, vsrc, name); GLuint fragShader = CompileShader(GL_FRAGMENT_SHADER, fsrc, name); return LinkProgram((GLuint[]){vertShader, fragShader}, 2, name); }
 GLuint CompileComputeShader(const char* src, const char* name) { GLuint computeShader = CompileShader(GL_COMPUTE_SHADER, src, name); return LinkProgram((GLuint[]){computeShader}, 1, name); }
 void CompileShaders(void) {
+    Sys_Render.depthPrepassShaderProgram       = CompileStandardShader(depthPrepassVertSrc, depthPrepassFragSrc, "Depth Prepass");
     Sys_Render.chunkShaderProgram       = CompileStandardShader(vertSrc, fragSrc, "Main");
     Sys_Render.debugUnlitShaderProgram  = CompileStandardShader(debugUnlitVertSrc, debugUnlitFragSrc, "Debug Unlit");
     Sys_Render.shadowmapsShaderProgram  = CompileStandardShader(shadowmapVertSrc, shadowmapFragSrc, "Shadowmaps");
@@ -1145,6 +1146,76 @@ static inline __attribute__((always_inline)) void RenderInstances(Vector3 player
     }
 }
 
+static inline __attribute__((always_inline)) void RenderInstancesDepthOnly(Vector3 playerPos) {
+    uint16_t visibleCount = 0, currentModelType = 0;
+    bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX);
+    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
+        if (!(instances[i].entflags & ENTFLAG_ACTIVE)) continue;
+        if (instances[i].index >= MAX_ENTITIES || instances[i].modelIndex >= MODEL_IDX_MAX || instances[i].texIndex >= MAX_VALID_TEXTURE) continue;
+        if (transparentTexture[instances[i].texIndex]) continue;
+        
+        Vector3 objPos = instances[i].position;
+        uint16_t instCellIdx = PosGetCellCoords(objPos.x, objPos.z);
+        Vector3 delta = Vector3_A_minus_B(objPos, playerPos);
+        float distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
+        if (distSqrd >= FAR_PLANE_SQUARED && (instances[i].index != 754 || !skyVisible)) continue;
+
+        if (EntityIndexIsPortalBlockingDoor(instances[i].index)) { // Extra checks only needed for opaque portal blocking doors.
+            bool inPVS = (gridCellStates[instCellIdx] & CELL_VISIBLE);
+            if (!inPVS) {
+                uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((objPos.x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+                uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((objPos.z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+                int r = vfloor(5.12f * (1.0f / WORLDCELL_WIDTH_F));
+                for (int ix = cellX - r; ix <= (int)cellX + r && !inPVS; ++ix) {
+                    for (int iz = cellZ - r; iz <= (int)cellZ + r; ++iz) {
+                        if (!XZPairInBounds(ix, iz)) continue;
+
+                        int subIdx = iz * WORLDX + ix;
+                        if (get_cull_bit(precomputedVisibleCellsFromHere, instCellIdx * ARRSIZE + subIdx) && (gridCellStates[subIdx] & CELL_VISIBLE)) {
+                            inPVS = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (!inPVS) continue;
+        } else {
+            if (!(Sys_Global.currentLevel == 1 && (instances[i].index == 309 ||  instances[i].index == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
+                if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (instances[i].index != 754 || !skyVisible)) continue; // For some shelves that are inset away from cells, need to still draw their items by checking && CELL_OPEN here, unfortunately this means they don't ever get culled :(
+            }
+            
+            if (!(gridCellStates[instCellIdx] & CELL_OPEN) && distSqrd >= 943.7184f && (instances[i].index != 754 || !skyVisible)) continue; // 30.72 * 30.72, 12 cells
+        }
+
+        float dotResult = dot_vector3(delta, instances[PLAYER1].forward);
+        float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
+        if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
+        
+        visibleInstances[visibleCount].index = i;
+        visibleInstances[visibleCount].depth = distSqrd;
+        visibleCount++;
+    }
+    
+    if (visibleCount > 1) qsort(visibleInstances, visibleCount, sizeof(DepthSort), compareDepthSortInverted); // Sort by depth (ascending for front-to-back)
+    for (uint16_t visibleIndex = 0; visibleIndex < visibleCount; ++visibleIndex) {
+        uint16_t i = visibleInstances[visibleIndex].index;
+        if (doubleSidedTexture[instances[i].texIndex] || instances[i].scale.x < 0.0f || instances[i].scale.y < 0.0f || instances[i].scale.z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided
+        else { glEnable(GL_CULL_FACE); glEnable(GL_DEPTH_TEST); glDisable(GL_BLEND); } // Opaque
+
+        glUniform1ui(0, i);
+        int32_t modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
+        if (currentModelType != modelType) {
+            currentModelType = modelType;
+            glBindVertexBuffer(0, Sys_Render.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Sys_Render.tbos[currentModelType]);
+        }
+        
+        uint32_t vertCount = modelTriangleCounts[currentModelType] * 3;
+        glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0);
+        drawCallsRenderedThisFrame++; verticesRenderedThisFrame += vertCount;
+    }
+}
+
 static inline __attribute__((always_inline)) __attribute__((hot)) void Render(void) {
     drawCallsRenderedThisFrame = textDrawCallsRenderedThisFrame = uiImageDrawCallsRenderedThisFrame = shadowDrawCallsRenderedThisFrame = verticesRenderedThisFrame = 0; // Reset per frame
     
@@ -1177,12 +1248,32 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
     glBindFramebuffer(GL_FRAMEBUFFER, Sys_Render.gBufferFBO);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
     glEnable(GL_CULL_FACE); glEnable(GL_DEPTH_TEST); glDisable(GL_BLEND); // Opaques
+    
+    // Depth Prepass
+    glUseProgram(Sys_Render.depthPrepassShaderProgram);
+    glUniformMatrix4fv(2, 1, GL_FALSE, viewProj);
+    glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+    glDepthMask(GL_TRUE);
+    glDepthFunc(GL_LESS);
+    glEnable(GL_DEPTH_TEST);
+    RenderInstancesDepthOnly(playerPos); // opaques only   
+    
+    // Main Pass
     glUseProgram(Sys_Render.chunkShaderProgram);
     glUniformMatrix4fv(2, 1, GL_FALSE, viewProj);
     glUniform1ui(3, 0u); // isUI false
     glUniform1ui(14, Sys_Settings.Reflections);   glUniform1ui(15, Sys_Settings.Shadows);
     glUniform1f(8, worldMin_x);   glUniform1f(9, worldMin_z);    glUniform3f(10, playerPos.x, playerPos.y, playerPos.z);
-    RenderInstances(playerPos, false); RenderInstances(playerPos, true); // opaque, then transparents
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    glDepthMask(GL_FALSE);
+    glDepthFunc(GL_EQUAL);
+    RenderInstances(playerPos, false);
+    glDepthMask(GL_TRUE);
+    glDepthFunc(GL_LESS);
+    glEnable(GL_DEPTH_TEST);
+    RenderInstances(playerPos, true); // opaque, then transparents
+    
+    // Draw Debug Lines
     if (unlikely(Sys_Dx.debugLineVertCount > 1)) DrawDebugLines(viewProj);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     if (likely(Sys_Settings.Reflections > 0u)) { // Screen Space Reflections

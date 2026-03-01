@@ -733,6 +733,7 @@ typedef struct {
 	GLuint inputImageLastID;
 	GLuint gBufferFBO;
 	GLuint outputImageID;
+    GLuint depthPrepassShaderProgram;
 	GLuint chunkShaderProgram; // Generic lit and unlit raster shader forward+
 	GLuint debugUnlitShaderProgram;
 	GLuint vao_chunk; // Vertex Array Object

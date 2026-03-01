@@ -87,6 +87,8 @@ gen_header() {
 gen_header ./Shaders/ssr.compute                ssrComputeSrc
 gen_header ./Shaders/voxels.compute             voxelUpdateComputeSrc
 gen_header ./Shaders/shadowmaps_clear.compute   shadowmapsClearComputeSrc
+gen_header ./Shaders/depth_prepass_vert.glsl    depthPrepassVertSrc
+gen_header ./Shaders/depth_prepass.glsl         depthPrepassFragSrc
 gen_header ./Shaders/debugunlit_vert.glsl       debugUnlitVertSrc
 gen_header ./Shaders/debugunlit_frag.glsl       debugUnlitFragSrc
 gen_header ./Shaders/chunk_vert.glsl            vertSrc
@@ -101,6 +103,8 @@ cat > Shaders/shaders.h <<'EOF'
 #pragma once
 #include "text_vert.glsl.h"
 #include "text_frag.glsl.h"
+#include "depth_prepass_vert.glsl.h"
+#include "depth_prepass.glsl.h"
 #include "debugunlit_vert.glsl.h"
 #include "debugunlit_frag.glsl.h"
 #include "chunk_vert.glsl.h"
