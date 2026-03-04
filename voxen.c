@@ -31,7 +31,6 @@ static float lightView[LIGHT_COUNT][6][4][4]; // Array of Array of 6 Arrays of 1
 static float lightViewProj[LIGHT_COUNT][6][16]; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightViewProj[i][face][0 ... 15]
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6]; // Array of Array of 6 Arrays of FrustumPlane structs (four floats).  lightFrustumPlanes[i][face][.nx,.ny,, .nz, .d]
 uint16_t loadedLights, editModeSelection = 682, editModeTestEntityDefinition = 0; // Test instance and its model index
-FrustumPlane playerFrustumPlanes[6];
 float voxelMinCenterX, voxelMinCenterZ;
 VoxenShadowSystem voxen_Shadow_System;
 float lightMinIntensity[LIGHT_COUNT];
@@ -861,6 +860,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void RenderSha
     uint32_t numLightsShadowmapsToRender = vmin(voxen_Shadow_System.numShadowsCouldRender, MAX_SHADOWMAPS);
     if (numLightsShadowmapsToRender > 0) { // Added since there is now work between here and the for loop so this is beneficial to check.
         glUseProgram(Sys_Render.shadowmapsClearShaderProgram); // Clear shadowmaps.  One might think that this would be less performant than standard shadowmap FBO with gl clears and textures but in fact this is faster on all but the oldest hardware (e.g. 10yrs old is fine, 13yrs suffers a small hit).
+        glUniform1ui(1, SHADOW_MAP_SIZE);
         for (uint32_t c=0;c<numLightsShadowmapsToRender;++c) {
             glUniform1ui(0, c);
             GLuint groupX_shadClear = ((SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) + 31) / 32;
@@ -871,6 +871,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void RenderSha
         __builtin_memset(voxen_Shadow_System.shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t)); // Set to invalid values for all
         glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
         glUseProgram(Sys_Render.shadowmapsShaderProgram);
+        glUniform1ui(9, SHADOW_MAP_SIZE);
         uint32_t shadowmapOffsetHead = 0U;
         uint16_t shadowCasterIndices[SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS];
         uint16_t numShadowCasters = 0;
@@ -913,7 +914,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void RenderSha
             for (uint8_t face = 0; face < 6; face++) {                                            
                 glUniform1ui(2, face);
                 glUniformMatrix4fv(1, 1, GL_FALSE, (float*)lightViewProj[lightIdx][face]);
-                glUniform1ui(7, shadowmapOffsetHead + (face * 36864));
+                glUniform1ui(7, shadowmapOffsetHead + (face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE));
                 shadowDrawCallsRenderedThisFrame++;
                 for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
                     int i = shadows_nearMeshes[j].index;            
@@ -1021,6 +1022,7 @@ void RenderCredits(void) {
 
 void RenderMenu(void);
 void RenderPausedUI(void);
+extern float shadBiasMin;
 static inline __attribute__((always_inline)) double RenderUI(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     drawCallsNormal = drawCallsRenderedThisFrame;
@@ -1035,7 +1037,7 @@ static inline __attribute__((always_inline)) double RenderUI(void) {
     if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, FONT_NORMAL,1.0f, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u", Sys_Global.timeSinceLastPhysicsTick, voxen_Shadow_System.numShadowsCouldRender, playerCellIdx, numCellsVisible);
     if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, FONT_NORMAL,1.0f, "Player velocity: %.2f, %.2f, %.2f", (double)instances[PLAYER1].velocity.x, (double)instances[PLAYER1].velocity.y, (double)instances[PLAYER1].velocity.z);
     if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, FONT_NORMAL,1.0f, "Test Entity %s Index: %u, Shadow cpu ms: %.3f", entities[instances[editModeSelection].index].path, editModeTestEntityDefinition, voxen_Shadow_System.shadowTime * 1000);
-    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, FONT_NORMAL,1.0f, "Player cell: %u, floor: %.3f, ceil: %.3f", instances[PLAYER1].cellIndex, (double)gridCellFloorHeight[instances[PLAYER1].cellIndex], (double)gridCellCeilingHeight[instances[PLAYER1].cellIndex]);
+    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, FONT_NORMAL,1.0f, "Player cell: %u, floor: %.3f, ceil: %.3f, shadBiasMin: %.6f", instances[PLAYER1].cellIndex, (double)gridCellFloorHeight[instances[PLAYER1].cellIndex], (double)gridCellCeilingHeight[instances[PLAYER1].cellIndex],(double)shadBiasMin);
     RenderFormattedText(16, debugTextStartY + (lineSpacing * 5), TEXT_WHITE, FONT_NORMAL,1.0f, "Cursor: %d, %d   dx: %d dy: %d", cursorPosition_x, cursorPosition_y, Sys_Input.currentMouse_dx, Sys_Input.currentMouse_dy);
     int32_t lant = headmountedLanternLight * LIGHT_DATA_SIZE;
     if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16, debugTextStartY + (lineSpacing * 6), TEXT_WHITE, FONT_NORMAL,1.0f, "Lantern: %.4f %.4f %.4f, on: %u, brite %.2f, rng %.2f, vis: %u",(double)lanternPos.x,(double)lanternPos.y,(double)lanternPos.z,lightOn[headmountedLanternLight],(double)lights[lant + LIGHT_DATA_OFFSET_INTENSITY],(double)lights[lant + LIGHT_DATA_OFFSET_RANGE],lightInPVS[headmountedLanternLight]);
@@ -1241,7 +1243,6 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
     float viewProj[16]; // view-projection matrix
     mul_mat4(viewProj, rasterPerspectiveProjection, view);
     float invViewRot[9] = { view[0], view[4], view[8],    view[1], view[5], view[9],    view[2], view[6], view[10] };
-    ExtractFrustumPlanes(viewProj, playerFrustumPlanes);
     glBindVertexArray(Sys_Render.vao_chunk); // Common vao for RenderShadowmaps and Rasterized Geometry
     if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps();
     __builtin_memset(    lightDirty,0    ,LIGHT_COUNT * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
@@ -1265,6 +1266,10 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
     glUniform1ui(3, 0u); // isUI false
     glUniform1ui(14, Sys_Settings.Reflections);   glUniform1ui(15, Sys_Settings.Shadows);
     glUniform1f(8, worldMin_x);   glUniform1f(9, worldMin_z);    glUniform3f(10, playerPos.x, playerPos.y, playerPos.z);
+    glUniform1ui(21, SHADOW_MAP_SIZE);
+    glUniform1f(22, (float)SHADOW_MAP_SIZE);
+    glUniform1f(23,shadBiasMin);
+    glUniform1ui(24, LIGHT_COUNT);
     glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
     glDepthMask(GL_FALSE);
     glDepthFunc(GL_EQUAL);

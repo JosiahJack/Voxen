@@ -4,13 +4,13 @@
 layout(local_size_x = 32, local_size_y = 1) in;
 
 layout(location = 0) uniform uint lightIdx;
+layout(location = 1) uniform uint shadowMapSize;
 layout(std430,  binding = 5) buffer ShadowMaps { uint depthData[]; };
-
-const uint FACE_SIZE = 192 * 192;
 
 void main() {
     uint pixel = gl_GlobalInvocationID.x;
-    if (pixel >= FACE_SIZE) return;
+    uint faceSize = shadowMapSize * shadowMapSize;
+    if (pixel >= faceSize) return;
     
-    depthData[(lightIdx * FACE_SIZE * 6) + (gl_WorkGroupID.y * FACE_SIZE) + pixel] = 0xFFFFFFFFu;
+    depthData[(lightIdx * faceSize * 6) + (gl_WorkGroupID.y * faceSize) + pixel] = 0xFFFFFFFFu;
 }

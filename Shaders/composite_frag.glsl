@@ -29,7 +29,9 @@ layout(location = 25) uniform mat3 invViewRot;
 layout(location = 26) uniform int SSR_RES;
 layout(location = 27) uniform sampler2D tex;
 layout(location = 28) uniform float staticIntensity;
+layout(location = 29) uniform int aaSamples;
 layout(location = 30) uniform float skyRotateSpeed;
+layout(location = 31) uniform float aaRad;
 
 const float vhsBlurAmount = 0.5; // Cannot be overstated just how magical and impactful this setting is.  DO NOT EVER TURN OFF EVER!!  I recant my former statement about avoiding blur at all costs in all scenarios.
 const float vhsRadiusMax = 3.0; // in pixels
@@ -418,39 +420,52 @@ void main() {
         float lumaDx = abs(lumaRight - lumaLeft);
         float lumaDy = abs(lumaDown  - lumaUp);
         float gradientMag = max(lumaDx, lumaDy);
-        if (gradientMag > aaThreshold) {
-            vec2 blurDir;
-            float axisStrength;
-            if (lumaDx > lumaDy) {
-                // Horizontal edge → blur vertically
-                blurDir = vec2(0.0, 1.0);
-                axisStrength = lumaDx;
-            } else {
-                // Vertical edge → blur horizontally
-                blurDir = vec2(1.0, 0.0);
-                axisStrength = lumaDy;
-            }
+        if (gradientMag > 0.08) {
+            const int   nSamples = 2;
+            const float radiusPx = 3.5;
+            float xStrength = 0.25;
+            float yStrength = 0.25;
+            if (lumaDx > lumaDy) xStrength = 1.0;
+            else yStrength = 1.0;
 
+            // dx Blur
             vec3 accum = vec3(0.0);
             float wSum = 0.0;
-            const int   nSamples = 64;
-            const float radiusPx = 64.0;
             for (int i = -nSamples; i <= nSamples; ++i) {
                 if (i == 0) continue;
 
                 float fi = float(i);
-                float dist = fi * (radiusPx / float(nSamples));
-                float weight = exp( - (dist * dist) / (2.0 * 4.5 * 4.5) );
-                vec2 offset = blurDir * dist * pixelSize;
+                float dist = fi * (radiusPx * xStrength / float(nSamples));
+                vec2 offset = vec2(0.0, 1.0) * dist * pixelSize;
                 vec3 col    = texture(tex, texCoordUsed + offset).rgb;
-                accum += col * weight;
-                wSum  += weight;
+                accum += col;
+                wSum  += 1.0;
             }
 
             if (wSum > 0.0001) {
                 vec3 blurred = accum / wSum;
-                float normalizedGrad = axisStrength / max(0.0001, gradientMag + 0.0001);
-                float strength = axisStrength * mix(32.0, 128.0, normalizedGrad);  // stronger on pure axis
+                float strength = lumaDx * 128.0;  // stronger on pure axis
+                float blend = clamp(strength, 0.0, 0.88);
+                aaColor = mix(aaColor, blurred, blend);
+            }
+
+            // dy Blurr
+            accum = vec3(0.0);
+            wSum = 0.0;
+            for (int i = -nSamples; i <= nSamples; ++i) {
+                if (i == 0) continue;
+
+                float fi = float(i);
+                float dist = fi * (radiusPx * yStrength / float(nSamples));
+                vec2 offset = vec2(1.0, 0.0) * dist * pixelSize;
+                vec3 col    = texture(tex, texCoordUsed + offset).rgb;
+                accum += col;
+                wSum  += 1.0;
+            }
+
+            if (wSum > 0.0001) {
+                vec3 blurred = accum / wSum;
+                float strength = lumaDy * 128.0;  // stronger on pure axis
                 float blend = clamp(strength, 0.0, 0.88);
                 aaColor = mix(aaColor, blurred, blend);
             }

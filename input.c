@@ -435,7 +435,8 @@ bool TakeScreenshot(void) {  return GetKeyPressed(41); }
 //     }
 // }
 
-// void MenuInput(void); TODO
+// int32_t aaSamples = 4;
+float shadBiasMin = 0.005f;
 void ProcessInput(void) {
     Input_PollJoysticks();
     Input_PollGamepad();
@@ -449,6 +450,18 @@ void ProcessInput(void) {
         Screenshot();
         Sys_Global.screenshotTimeout = Sys_Global.current_time + 1.0; // Prevent saving more than 1 per second for sanity purposes.
     }
+    
+    if (Sys_Input.keyStates[GLFW_KEY_1].pressed) shadBiasMin += 0.0001f;
+    else if (Sys_Input.keyStates[GLFW_KEY_2].pressed) shadBiasMin -= 0.0001f;
+    
+    if (shadBiasMin < 0.0f) shadBiasMin = 0.0f;
+    if (shadBiasMin > 0.50f) shadBiasMin = 0.5f;
+    
+//     if (Sys_Input.keyStates[GLFW_KEY_3].pressed) aaRad += 0.5f;
+//     else if (Sys_Input.keyStates[GLFW_KEY_4].pressed) aaRad -= 0.5f;
+//     
+//     if (aaRad < 0.0f) aaRad = 0.0f;
+//     if (aaRad > 256.0f) aaRad = 256.0f;
     
     if (Menu() && !Sys_Global.menuActive) { Sys_Global.gamePaused = !Sys_Global.gamePaused; return; }
     if (Menu() && Sys_Global.menuActive) { MenuGoBack(); return; }

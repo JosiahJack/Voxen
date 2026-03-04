@@ -24,6 +24,10 @@ layout(location = 17) uniform uint unlit;
 layout(location = 18) uniform uint texIndex;
 layout(location = 19) uniform uint glowIndex;
 layout(location = 20) uniform uint specIndex;
+layout(location = 21) uniform uint shadowMapSize;
+layout(location = 22) uniform float shadowMapSizeF;
+layout(location = 23) uniform float shadBiasMin;
+layout(location = 24) uniform uint lightCount;
 
 layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
@@ -67,21 +71,18 @@ uint GetVoxelIndex(vec3 worldPos) {
     return (voxelZ * 512) + voxelX;
 }
 
-const int PCF_SAMPLES = 12;
+const int PCF_SAMPLES = 16;
 const float invSamples = 1.0 / float(PCF_SAMPLES);
 const vec2 poissonDisk[PCF_SAMPLES] = vec2[](
-    vec2(0.0),
-    vec2( 0.0248, -0.0983),
-    vec2( 0.0946, -0.0657),
-    vec2( 0.1337, -0.0042),
-    vec2( 0.1065,  0.0591),
-    vec2( 0.0389,  0.1048),
-    vec2(-0.0378,  0.1035),
-    vec2(-0.1032,  0.0739),
-    vec2(-0.1316,  0.0114),
-    vec2(-0.1024, -0.0518),
-    vec2(-0.0471, -0.0693),
-    vec2( 0.0087, -0.0445));
+    vec2( 0.0000,  0.0000), vec2( 0.0321,  0.1254),
+    vec2(-0.0712,  0.1051), vec2(-0.1281,  0.0124),
+    vec2(-0.0952, -0.0821), vec2(-0.0152, -0.1291),
+    vec2( 0.0781, -0.1012), vec2( 0.1265, -0.0214),
+    vec2( 0.1051,  0.0652), vec2( 0.0412, -0.0412),
+    vec2(-0.0521, -0.0312), vec2(-0.0412,  0.0512),
+    vec2( 0.0125,  0.0612), vec2( 0.0651,  0.0125),
+    vec2(-0.0125, -0.0812), vec2( 0.0821,  0.1012)
+);
 
 vec3 quat_rotate(vec4 q, vec3 v) {
     float x2 = q.x + q.x;
@@ -187,7 +188,7 @@ void main() {
     float intensityTotal = 0.0;
     for (uint i = 0u; i < count; i++) {
         uint lightIdxInPVS = uniqueLightLists[(voxelIdx * 24) + i];
-        if (lightIdxInPVS >= 1600) continue;
+        if (lightIdxInPVS >= lightCount) continue;
 
         uint lightIdx = lightIdxInPVS * uint(LIGHT_DATA_SIZE);
         vec3 lightPos = vec3(lights[lightIdx], lights[lightIdx + LIGHT_DATA_OFFSET_POSY], lights[lightIdx + LIGHT_DATA_OFFSET_POSZ]);
@@ -228,8 +229,8 @@ void main() {
 
         float shadowFactor = 1.0;
         uint shadowIndex = shadowMapsIndirection[lightIdxInPVS];
-        if (shadowsEnabled > 0 && shadowIndex < 1600) {
-            float smearness = distOverRangeSqd * 24.0 + range + intensity; // was + 10.0 instead of intensity, thought this'd be nice.
+        if (shadowsEnabled > 0 && shadowIndex < lightCount) {
+            float smearness = distOverRangeSqd * 24.0 + range + intensity + 4.51; // was + 10.0 instead of intensity, thought this'd be nice.
             vec3 a = abs(toLight);
             float mx = step(a.y, a.x) * step(a.z, a.x);
             float my = step(a.x, a.y) * step(a.z, a.y);
@@ -245,26 +246,34 @@ void main() {
             vec2 uv = mxyz.x * uvx + mxyz.y * uvy + mxyz.z * uvz;
             uv = uv * 0.5 + 0.5;
 
-            uint faceOff = (shadowIndex * 221184) + (face * 36864); // Shadowmap size 192 so 192*192*6 and 192*192 for these.
-            vec2 tc = uv * 192.0;
-            float slopeBias = 0.451 * (1.0 - NdotL);
-            slopeBias = min(slopeBias, 0.18);
+            uint faceOff = (shadowIndex * shadowMapSize * shadowMapSize * 6) + (face * shadowMapSize * shadowMapSize);
+            vec2 tc = uv * shadowMapSizeF;
+            float slopeBias = 0.2 * (1.0 - NdotL);
+            slopeBias = max(slopeBias,0.035);
             float bias = slopeBias * distOverRange;
-            bias = clamp(bias, 0.0, 0.22);
-            bias += 0.04 * pow(0.25, 0.65);
+            bias = max(bias,0.0);
+            bias += 0.005; // Account for glancing angle acne
 
             // Pseudo-Stochastic PCF sampling
             float sum = 0.0;
+            float shadSizeMaxUV = shadowMapSizeF - 1.0;
             for (int si = 0; si < PCF_SAMPLES; ++si) {
                 vec2 off = poissonDisk[si] * smearness;
                 vec2 t = tc + off;
-                t = clamp(t, 0.0, 191.0);
-                uint ssbo_index = faceOff + uint(t.y) * 192 + uint(t.x);
-                uint distInt = shadowMaps[ssbo_index];
-                float d = (float(distInt) * 0.00001);
-                float depthDiff = (dist) - d - bias;
-                float shadowContrib = clamp(1.0 - depthDiff / 0.005, 0.0, 1.0);
-                sum += shadowContrib;
+                vec2 st = fract(t - 0.5);
+                vec2 base = floor(t - 0.5);
+                float samples[4];
+                for(int i=0; i<2; ++i) {
+                    for(int j=0; j<2; ++j) {
+                        vec2 coord = clamp(base + vec2(i, j), 0.0, shadSizeMaxUV);
+                        uint ssbo_idx = faceOff + uint(coord.y) * shadowMapSize + uint(coord.x);
+                        float d = float(shadowMaps[ssbo_idx]) * 0.00001;
+                        samples[i + j*2] = dist <= (d + bias) ? 1.0 : 0.0;
+                    }
+                }
+
+                float res = mix(mix(samples[0], samples[1], st.x), mix(samples[2], samples[3], st.x), st.y); // Manual bilinear shadowmap filter
+                sum += res;
             }
 
             shadowFactor = sum * invSamples;
