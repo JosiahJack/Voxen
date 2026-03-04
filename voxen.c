@@ -737,6 +737,9 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     __builtin_memcpy(&modelMatrices[0],mat,16 * sizeof(float)); // Null instance matrix used for UI
     Sys_Render.cellVisibleDataID       = SetupSSBO(&Sys_Render.cellVisibleDataID,        4, ARRSIZE * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     Sys_Render.shadowMapSSBO           = SetupSSBO(&Sys_Render.shadowMapSSBO,            5, TOTAL_SHADOWMAP_PIXELS * sizeof(uint32_t), NULL, GL_STATIC_DRAW);    
+    glUseProgram(Sys_Render.shadowmapsShaderProgram); glUniform1ui(9,         SHADOW_MAP_SIZE);
+    glUseProgram(Sys_Render.chunkShaderProgram);      glUniform1ui(21,        SHADOW_MAP_SIZE);
+                                                      glUniform1f (22, (float)SHADOW_MAP_SIZE); glUniform1ui(23, LIGHT_COUNT);
     Sys_Render.voxelLightListCountsID  = SetupSSBO(&Sys_Render.voxelLightListCountsID,   6, VOXEL_COUNT * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     Sys_Render.shadowMapsIndirectionID = SetupSSBO(&Sys_Render.shadowMapsIndirectionID,  8, LIGHT_COUNT * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     Sys_Render.matricesBufferID        = SetupSSBO(&Sys_Render.matricesBufferID,        11, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices, GL_STATIC_DRAW);
@@ -815,7 +818,8 @@ typedef struct {
 
 static inline __attribute__((always_inline)) __attribute__((hot)) void RenderShadowmaps(void) {    
     double shadowStartTime = get_time();
-    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_POLYGON_OFFSET_FILL);
+    glPolygonOffset(1.0f, 4.0f);
     LightCandidate candidates[MAX_SHADOWMAPS];
     uint16_t numberFoundLightCandidatesForShadows = 0;
     float bestScores[MAX_SHADOWMAPS];
@@ -871,7 +875,6 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void RenderSha
         __builtin_memset(voxen_Shadow_System.shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t)); // Set to invalid values for all
         glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
         glUseProgram(Sys_Render.shadowmapsShaderProgram);
-        glUniform1ui(9, SHADOW_MAP_SIZE);
         uint32_t shadowmapOffsetHead = 0U;
         uint16_t shadowCasterIndices[SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS];
         uint16_t numShadowCasters = 0;
@@ -946,6 +949,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void RenderSha
     }
     
     Sys_Render.shadowmapsNeedUpdated = false;
+    glDisable(GL_POLYGON_OFFSET_FILL);
     voxen_Shadow_System.shadowTime = get_time() - shadowStartTime;
 }
 
@@ -1129,7 +1133,7 @@ static inline __attribute__((always_inline)) void RenderInstances(Vector3 player
         uint16_t i = visibleInstances[visibleIndex].index;
         if (transparentTexture[instances[i].texIndex] && transparents) { glEnable(GL_CULL_FACE); glEnable(GL_BLEND); } // Transparents (with sort)
         else if (doubleSidedTexture[instances[i].texIndex] || instances[i].scale.x < 0.0f || instances[i].scale.y < 0.0f || instances[i].scale.z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided
-        else { glEnable(GL_CULL_FACE); glEnable(GL_DEPTH_TEST); glDisable(GL_BLEND); } // Opaque
+        else { glEnable(GL_CULL_FACE); glDisable(GL_BLEND); } // Opaque
 
         glUniform1ui(0, i);    glUniform1ui(17, instances[i].texIndex == 316 ? 1u : 0u);
         if (currentNormIndex != (uint32_t)instances[i].normIndex || instances[i].normIndex == 0) { currentNormIndex = (uint32_t)instances[i].normIndex; glUniform1ui(1, currentNormIndex); }
@@ -1191,7 +1195,7 @@ static inline __attribute__((always_inline)) void RenderInstancesDepthOnly(Vecto
         }
 
         float dotResult = dot_vector3(delta, instances[PLAYER1].forward);
-        float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
+        float radius = vmax(modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f,2.56f);
         if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
         
         visibleInstances[visibleCount].index = i;
@@ -1203,7 +1207,7 @@ static inline __attribute__((always_inline)) void RenderInstancesDepthOnly(Vecto
     for (uint16_t visibleIndex = 0; visibleIndex < visibleCount; ++visibleIndex) {
         uint16_t i = visibleInstances[visibleIndex].index;
         if (doubleSidedTexture[instances[i].texIndex] || instances[i].scale.x < 0.0f || instances[i].scale.y < 0.0f || instances[i].scale.z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided
-        else { glEnable(GL_CULL_FACE); glEnable(GL_DEPTH_TEST); glDisable(GL_BLEND); } // Opaque
+        else { glEnable(GL_CULL_FACE); glDisable(GL_BLEND); } // Opaque
 
         glUniform1ui(0, i);
         int32_t modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
@@ -1244,12 +1248,13 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
     mul_mat4(viewProj, rasterPerspectiveProjection, view);
     float invViewRot[9] = { view[0], view[4], view[8],    view[1], view[5], view[9],    view[2], view[6], view[10] };
     glBindVertexArray(Sys_Render.vao_chunk); // Common vao for RenderShadowmaps and Rasterized Geometry
+    glEnable(GL_DEPTH_TEST);
     if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps();
     __builtin_memset(    lightDirty,0    ,LIGHT_COUNT * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
     __builtin_memset(dirtyInstances,0,loadedInstances * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
     glBindFramebuffer(GL_FRAMEBUFFER, Sys_Render.gBufferFBO);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
-    glEnable(GL_CULL_FACE); glEnable(GL_DEPTH_TEST); glDisable(GL_BLEND); // Opaques
+    glEnable(GL_CULL_FACE); glDisable(GL_BLEND); // Opaques
     
     // Depth Prepass - Eliminates some overdraw for ~6.1% performance improvement in spite of added draw calls since these are relatively cheap and avoid the heavy fragment work in main pass.
     glUseProgram(Sys_Render.depthPrepassShaderProgram);
@@ -1257,8 +1262,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
     glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
     glDepthMask(GL_TRUE);
     glDepthFunc(GL_LESS);
-    glEnable(GL_DEPTH_TEST);
-    RenderInstancesDepthOnly(playerPos); // opaques only   
+    RenderInstancesDepthOnly(playerPos); // opaques only
     
     // Main Pass
     glUseProgram(Sys_Render.chunkShaderProgram);
@@ -1266,17 +1270,12 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
     glUniform1ui(3, 0u); // isUI false
     glUniform1ui(14, Sys_Settings.Reflections);   glUniform1ui(15, Sys_Settings.Shadows);
     glUniform1f(8, worldMin_x);   glUniform1f(9, worldMin_z);    glUniform3f(10, playerPos.x, playerPos.y, playerPos.z);
-    glUniform1ui(21, SHADOW_MAP_SIZE);
-    glUniform1f(22, (float)SHADOW_MAP_SIZE);
-    glUniform1f(23,shadBiasMin);
-    glUniform1ui(24, LIGHT_COUNT);
     glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
     glDepthMask(GL_FALSE);
     glDepthFunc(GL_EQUAL);
     RenderInstances(playerPos, false);
     glDepthMask(GL_TRUE);
     glDepthFunc(GL_LESS);
-    glEnable(GL_DEPTH_TEST);
     RenderInstances(playerPos, true); // opaque, then transparents
     
     // Draw Debug Lines
@@ -1325,7 +1324,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
     glUniform1i(27, 0); // Texture 0 for the rendered geometry color buffer
     glUniform1f(28, GetPainStatic());
     glBindVertexArray(Sys_Render.quadVAO);
-    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_DEPTH_TEST); // Reenabled later after all UI just up there before RenderShadowmaps call
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
     drawCallsRenderedThisFrame++; verticesRenderedThisFrame += 4;
 

@@ -26,8 +26,7 @@ layout(location = 19) uniform uint glowIndex;
 layout(location = 20) uniform uint specIndex;
 layout(location = 21) uniform uint shadowMapSize;
 layout(location = 22) uniform float shadowMapSizeF;
-layout(location = 23) uniform float shadBiasMin;
-layout(location = 24) uniform uint lightCount;
+layout(location = 23) uniform uint lightCount;
 
 layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
@@ -71,17 +70,15 @@ uint GetVoxelIndex(vec3 worldPos) {
     return (voxelZ * 512) + voxelX;
 }
 
-const int PCF_SAMPLES = 16;
+const int PCF_SAMPLES = 12;
 const float invSamples = 1.0 / float(PCF_SAMPLES);
 const vec2 poissonDisk[PCF_SAMPLES] = vec2[](
-    vec2( 0.0000,  0.0000), vec2( 0.0321,  0.1254),
-    vec2(-0.0712,  0.1051), vec2(-0.1281,  0.0124),
-    vec2(-0.0952, -0.0821), vec2(-0.0152, -0.1291),
-    vec2( 0.0781, -0.1012), vec2( 0.1265, -0.0214),
-    vec2( 0.1051,  0.0652), vec2( 0.0412, -0.0412),
-    vec2(-0.0521, -0.0312), vec2(-0.0412,  0.0512),
-    vec2( 0.0125,  0.0612), vec2( 0.0651,  0.0125),
-    vec2(-0.0125, -0.0812), vec2( 0.0821,  0.1012)
+    vec2( 0.0000,  0.0000), vec2( 0.0812,  0.0941),
+    vec2(-0.0451,  0.1192), vec2(-0.1221,  0.0321),
+    vec2(-0.0914, -0.0882), vec2( 0.0021, -0.1275),
+    vec2( 0.1023, -0.0621), vec2( 0.0452,  0.0325),
+    vec2(-0.0512,  0.0421), vec2(-0.0215, -0.0612),
+    vec2( 0.0581, -0.0214), vec2( 0.1215,  0.0112)
 );
 
 vec3 quat_rotate(vec4 q, vec3 v) {
@@ -252,7 +249,7 @@ void main() {
             slopeBias = max(slopeBias,0.035);
             float bias = slopeBias * distOverRange;
             bias = max(bias,0.0);
-            bias += 0.005; // Account for glancing angle acne
+            bias += 0.025; // Account for glancing angle acne
 
             // Pseudo-Stochastic PCF sampling
             float sum = 0.0;

@@ -5,7 +5,7 @@
 #extension GL_ARB_shader_image_load_store : enable
 
 layout(location = 0) uniform uint instanceIndex;
-layout(location = 1) uniform uint texIndex;
 layout(location = 2) uniform mat4 viewProjection;
+layout(location = 17) uniform uint unlit;
 
 void main() {}
