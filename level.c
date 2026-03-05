@@ -2,12 +2,72 @@
 #include "voxen.h"
 extern uint16_t headmountedLanternLight;
 extern Vector3 lanternPos;
-void InitializeAIAfterLoad(uint16_t i);
+uint16_t npcCountInWorldPerType[NUM_AI_TYPES];
+extern uint16_t editModeSelection;
+bool EntNotVisible(uint16_t i, bool otherCondition);
+void SetHuntFinished(uint16_t i) {
+    uint16_t npcID = instances[i].index - 419;
+    instances[i].huntFinished = Sys_Global.pauseRelativeTime;
+    int diff = Sys_Global.difficultyCombat;
+    if (npcTable[npcID].type == NPCType_Cyber) diff = Sys_Global.difficultyCyber;
+    if (diff <= 1) { // More forgetful on easy.
+        instances[i].huntFinished += vmax((npcTable[npcID].huntTime * 0.75),60.0);
+    } else if (diff >= 3) { // Good memory on hard.
+        instances[i].huntFinished += vmax((npcTable[npcID].huntTime * 2.00),60.0); 
+    } else {
+        instances[i].huntFinished += vmax(npcTable[npcID].huntTime, 60.0);
+    }
+}
+
+void InitializeAIAfterLoad(uint16_t i) {
+    instances[i].layer = PhysicsLayer_NPC;
+    uint16_t npcID = instances[i].index - 419;
+    instances[i].idleTime = Sys_Global.pauseRelativeTime + random_rangedub(npcTable[npcID].timeIdleSFXMin, npcTable[npcID].timeIdleSFXMax);
+    instances[i].attack1SoundTime = instances[i].attack2SoundTime = instances[i].attack3SoundTime = Sys_Global.pauseRelativeTime;
+    instances[i].timeTillEnemyChangeFinished = Sys_Global.pauseRelativeTime;
+    SetHuntFinished(i);
+    instances[i].attackFinished = Sys_Global.pauseRelativeTime;
+    instances[i].attack2Finished = Sys_Global.pauseRelativeTime;
+    instances[i].attack3Finished = Sys_Global.pauseRelativeTime;
+    instances[i].timeTillPainFinished = Sys_Global.pauseRelativeTime;
+    instances[i].timeTillDeadFinished = Sys_Global.pauseRelativeTime;
+    instances[i].meleeDamageFinished = Sys_Global.pauseRelativeTime;
+    instances[i].gracePeriodFinished = Sys_Global.pauseRelativeTime;
+    instances[i].randomWaitForNextAttack1Finished = Sys_Global.pauseRelativeTime;
+    instances[i].randomWaitForNextAttack2Finished = Sys_Global.pauseRelativeTime;
+    instances[i].randomWaitForNextAttack3Finished = Sys_Global.pauseRelativeTime;
+    instances[i].tranquilizeFinished = Sys_Global.pauseRelativeTime;
+    instances[i].deathBurstFinished = Sys_Global.pauseRelativeTime;
+    instances[i].wanderFinished = Sys_Global.pauseRelativeTime;
+    instances[i].posCheckFinished = Sys_Global.pauseRelativeTime;
+    instances[i].lastPosition = instances[i].position;
+    instances[i].timeSinceMovedEnough = 0.0;
+    if (instances[i].walkWaypointsLength > 0 && (instances[i].entflags & ENTFLAG_WALK_PATH_ON_START) && !(instances[i].entflags & ENTFLAG_ASLEEP)) {
+        instances[i].currentDestination = instances[i].walkWaypoints[instances[i].currentWaypoint];
+        instances[i].currentState = AIState_Walk; // If waypoints are set, start walking
+    } else {
+        instances[i].currentState = AIState_Idle; // No waypoints, stay put
+    }
+
+    if ((instances[i].entflags & ENTFLAG_WANDERING) && (random_range(0.0f,1.0f) < 0.5f)) instances[i].currentState = AIState_Walk;
+    else flag_set(&instances[i].entflags, ENTFLAG_WANDERING, false);
+
+    if (instances[i].entflags & ENTFLAG_ASLEEP) {
+        instances[i].currentState = AIState_Idle;
+//         flag_set(&instances[instances[i].sleepingCables].entflags, ENTFLAG_ACTIVE, true); // TODO
+    }
+
+    instances[i].attackFinished = Sys_Global.pauseRelativeTime + 1.0;
+    instances[i].idealTransformForward = instances[i].forward;
+    StringCopyInto_A_From_B(instances[i].targetID, npcTable[npcID].name, TARGET_ID_LENGTH);
+//     instances[i].targetID = snprintf(instances[i].targetID, TARGET_ID_LENGTH * sizeof(char), "%s %05u", npcTable[npcID].name,npcCountInWorldPerType[npcID]++);
+}
+
 void AddInstance(uint16_t entIdx, uint16_t i) {
     if (entIdx >= entityCount) { DualLogError("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d\n",entIdx,entityCount); OS_Exit(1); }
         
     instances[i].index = entIdx;
-//     if (ConstIndexIsNPC(entIdx)) InitializeAIAfterLoad(i); TODO
+    if (ConstIndexIsNPC(entIdx)) InitializeAIAfterLoad(i);
     bool isCardChunk = (entities[entIdx].entflags & ENTFLAG_CARDCHUNK);
     instances[i].modelIndex = entities[entIdx].modelIndex;
     instances[i].colliderMeshIndex = entities[entIdx].colliderMeshIndex;
@@ -347,6 +407,7 @@ void LoadLevel(uint8_t curlevel) {
             }
 
             if (lightMaxIntensity[lightsIdx] < 0.16f || lights[litIdx + LIGHT_DATA_OFFSET_RANGE] < 0.32f) { lightsIdx--; loadedLights--; }
+            lightCastsShadows[lightsIdx] = (lights[litIdx + LIGHT_DATA_OFFSET_RANGE] >= 0.32f) && (lightType == 0);
             if (lightType == 1) {
                 if (lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] < 5.0f) DualLogWarn("Spotlight %d on line %d loaded with spotAngle less than 5deg\n",lightsIdx,lineNum+1);
             } else if (lightType == 2) {
@@ -355,10 +416,14 @@ void LoadLevel(uint8_t curlevel) {
                 lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = 0.0f; // Force to not be a spot light
             }
             
-            lightCastsShadows[lightsIdx] = (lights[litIdx + LIGHT_DATA_OFFSET_RANGE] >= 0.32f);
         } else {
             uint16_t parent = instanceIdx; // Needed as adding children moves the instanceIdx.
             uint16_t entIdx = instances[parent].index;
+            if (instances[parent].index == 766) {
+                editModeSelection = parent;
+                flag_set(&instances[editModeSelection].entflags,ENTFLAG_ACTIVE,true);
+                //instances[editModeSelection].scale = (Vector3){1.0f,1.0f,1.0f};
+            }
             AddInstance(entIdx, parent);
             if (!activeStateRead) flag_set(&instances[parent].entflags, ENTFLAG_ACTIVE, true);
             if (EntityIndexIsPortalBlockingDoor(entIdx)) {
@@ -419,6 +484,7 @@ void LoadLevel(uint8_t curlevel) {
 
     // Add instances for shield generators
     if (curlevel == 1 || curlevel == 2 || curlevel == 5 || curlevel == 6 || curlevel == 7) {
+        instanceIdx++;
         AddInstance(754, instanceIdx);
         instances[instanceIdx].position = (Vector3){ -51.30664f, -47.42f, 56.42651f };
         instances[instanceIdx].rotation = (Quaternion){ 0.0f, 0.0f, 0.0f, 1.0f }; // -90 0 45
@@ -436,7 +502,7 @@ void LoadLevel(uint8_t curlevel) {
         instances[instanceIdx].rotation = (Quaternion){ 0.0f, 0.0f, 0.0f, 1.0f }; // -90 180 -45
         instanceIdx++;
     }
-    
+        
     // Add player headmounted lantern light
     loadedLights++;
     lightsIdx++;
@@ -444,7 +510,6 @@ void LoadLevel(uint8_t curlevel) {
 
     int32_t litIdx = lightsIdx * LIGHT_DATA_SIZE;
     headmountedLanternLight = lightsIdx;
-    DualLog("headmountedLanternLight: %u, loadedLights: %u\n",headmountedLanternLight, loadedLights);
     lightOn[lightsIdx] = false;
     lightMaxIntensity[lightsIdx] = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
     lightMinIntensity[lightsIdx] = 0.0f;

@@ -836,7 +836,7 @@ typedef struct {
 	bool hasLaserOnAttack3;
 	bool explodeOnAttack3;
 	bool preactivateMeleeColliders;
-	float huntTime;
+	double huntTime;
 	float flightHeight;
 	bool flightHeightIsPercentage;
 	bool switchMaterialOnDeath;
@@ -1148,10 +1148,10 @@ typedef /*FAT*/ struct {
     float rangeToEnemy;
     int currentWaypoint;
     Vector3 currentDestination;
-    float idleTime;
-    float attack1SoundTime;
-    float attack2SoundTime;
-    float attack3SoundTime;
+    double idleTime;
+    double attack1SoundTime;
+    double attack2SoundTime;
+    double attack3SoundTime;
     double timeTillEnemyChangeFinished;
     double timeTillDeadFinished;
     double timeTillPainFinished;
@@ -1177,7 +1177,7 @@ typedef /*FAT*/ struct {
     char path[128];
     // phew what a porker of a struct, it's been a eatin!
 } Entity;
-extern Entity entities[MAX_ENTITIES]; // Global array of entity definitions
+extern Entity entities[MAX_ENTITIES]; // Global array of entity definitions (e.g. prefabs)
 extern Entity instances[INSTANCE_COUNT];
 extern bool instanceIsLODArray[INSTANCE_COUNT];
 extern float modelMatrices[INSTANCE_COUNT * 16];
@@ -1428,7 +1428,6 @@ RaycastHit CapsuleCast(Vector3 start, Vector3 end, float capsuleRadius, float ca
 void ApplyPlayerMovements(void);
 // ----------------------------------------------------------------------------
 // Input
-void CycleToNextMonitor(GLFWwindow* window);
 void Input_Init(GLFWwindow* window);
 void Input_MouselookApply(void);
 int32_t Input_KeyDown(int32_t scancode);
@@ -1563,6 +1562,7 @@ uint8_t random_range_u8(uint8_t a, uint8_t b);
 uint32_t random_range_u32(uint32_t a, uint32_t b);
 int32_t random_range_i32(int32_t a, int32_t b);
 float random_range(float a, float b);
+double random_rangedub(double a, double b);
 float lerp(float min, float max, float val);
 float inverse_lerp(float min, float max, float val);
 char* data_parser_trim(char* s);
@@ -1690,16 +1690,8 @@ void cmd_shake(void);
 float GetPainStatic(void);
 Color GetPainStaticColor(void);
 extern int currentMonitorIndex;
-void CycleToNextMonitor(GLFWwindow* window);
-
-typedef struct {
-	uint64_t magicNumber;
-	double thisRunTime;
-	bool isLoading;
-	int missionSplitID;
-} AutoSplitterData;
+typedef struct { uint64_t magicNumber; double thisRunTime; bool isLoading; int missionSplitID; } AutoSplitterData;
 extern AutoSplitterData autoSplitter;
-
 void UpdateWhileNotPaused(uint16_t i);
 void ScreenShake (float force, double duration);
 void Shake(float force);

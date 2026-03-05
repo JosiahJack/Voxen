@@ -126,7 +126,7 @@ MAC_CC="gcc"
 COMMON_CFLAGS="-ffreestanding -fno-stack-protector -fno-builtin -I./External/ -pipe -fno-ident \
                -fdata-sections -ffunction-sections -ffast-math -g1 -std=c11 -Wall -Wextra \
                -fno-omit-frame-pointer -fstrict-aliasing -fno-common -Walloca -Wstack-usage=262144 \
-               -Wdouble-promotion -Wformat=2 -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings \
+               -Wformat=2 -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings \
                -Werror=implicit-function-declaration -Og"
 
 if [ "$PLATFORM" = "windows" ]; then

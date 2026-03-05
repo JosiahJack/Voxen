@@ -156,11 +156,9 @@ bool parse_data_file(DataParser *parser, uint16_t maxSize, const char *filename)
                 while (val_end > trimmed_value && CharacterIsEmpty(*val_end)) *val_end-- = '\0';
                      if (StringsAreEqual(trimmed_key, "index"))             entry.index = parse_numberu16(trimmed_value, start, lineNum);
                 else if (StringsAreEqual(trimmed_key, "persistent"))        flag_set(&entry.entflags,ENTFLAG_TEST_PERSISTENT,parse_bool(trimmed_value, start, lineNum));
-                
                 else if (StringsAreEqual(trimmed_key, "model"))             entry.modelIndex = parse_numberu16(trimmed_value, start, lineNum);
                 else if (StringsAreEqual(trimmed_key, "animationNum")) {    entry.animationNum = parse_numberu16(trimmed_value, start, lineNum); entry.entflags |= ENTFLAG_ANIMATED; }
                 else if (StringsAreEqual(trimmed_key, "animated"))          flag_set(&entry.entflags,ENTFLAG_ANIMATED,parse_numberu8(trimmed_value, start, lineNum));
-
                 else if (StringsAreEqual(trimmed_key, "texture"))           entry.texIndex = parse_numberu16(trimmed_value, start, lineNum);
                 else if (StringsAreEqual(trimmed_key, "alttexture"))        entry.altTexIndex = parse_numberu16(trimmed_value, start, lineNum);
                 else if (StringsAreEqual(trimmed_key, "glowtexture"))       entry.glowIndex = parse_numberu16(trimmed_value, start, lineNum);
@@ -170,7 +168,6 @@ bool parse_data_file(DataParser *parser, uint16_t maxSize, const char *filename)
                 else if (StringsAreEqual(trimmed_key, "doublesided"))       flag_set(&entry.entflags,ENTFLAG_DOUBLESIDED,parse_bool(trimmed_value, start, lineNum));
                 else if (StringsAreEqual(trimmed_key, "transparent"))       flag_set(&entry.entflags,ENTFLAG_TRANSPARENT,parse_bool(trimmed_value, start, lineNum));
                 else if (StringsAreEqual(trimmed_key, "cardchunk"))         flag_set(&entry.entflags,ENTFLAG_CARDCHUNK,  parse_bool(trimmed_value, start, lineNum));
-
                 else if (StringsAreEqual(trimmed_key, "collider"))          entry.collider = parse_numberu8(trimmed_value, start, lineNum);
                 else if (StringsAreEqual(trimmed_key, "collider_centerx"))  entry.colliderCenter.x = parse_float(trimmed_value, start, lineNum);
                 else if (StringsAreEqual(trimmed_key, "collider_centery"))  entry.colliderCenter.x = parse_float(trimmed_value, start, lineNum);
@@ -192,9 +189,7 @@ bool parse_data_file(DataParser *parser, uint16_t maxSize, const char *filename)
                 else if (StringsAreEqual(trimmed_key, "changeMatOnActive")) flag_set(&entry.entflags,ENTFLAG_CHANGE_TEX_ON_ACTIVE,parse_bool(trimmed_value, start, lineNum));
                 else if (StringsAreEqual(trimmed_key, "blinkWhenActive"))   flag_set(&entry.entflags,ENTFLAG_BLINK_TEX_ON_ACTIVE,parse_bool(trimmed_value, start, lineNum));
                 else if (StringsAreEqual(trimmed_key, "noshadows"))         flag_set(&entry.entflags,ENTFLAG_NO_SHADOWS,parse_bool(trimmed_value, start, lineNum));
-
                 else if (StringsAreEqual(trimmed_key, "volume"))            entry.volume = parse_float(trimmed_value, start, lineNum);
-                
                 else if (StringsAreEqual(trimmed_key, "##child")) {
                     ++currentChild;
                     if (currentChild >= MAX_CHILD_COUNT) { DualLogError("Too many children %u! Minivan is full!!\n", currentChild); OS_Exit(1); }

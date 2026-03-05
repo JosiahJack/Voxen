@@ -25,7 +25,7 @@
 index: 0
 model: 178
 cardchunk: 1
-texture: 41
+texture:0
 collider: 1
 collider_centerx: 0.0
 collider_centery: 1.44
@@ -5321,6 +5321,8 @@ index: 756
 index: 757
 #ef_particle_graytationburst
 index: 758
+#test_ent
+index: 766
 #player
 index: 767
 

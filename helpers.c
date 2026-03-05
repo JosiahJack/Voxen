@@ -233,12 +233,16 @@ bool ConstIndexIsStaticObjectImmutable(int constdex) {
 			|| (constdex >= 737 && constdex < 739) || constdex == 746 || constdex == 747 || (constdex >= 750 && constdex <= 759 && constdex != 755));
 }
 
+bool TakeScreenshot(void);
 void Screenshot(void) {
+    if (!TakeScreenshot() || Sys_Global.current_time <= Sys_Global.screenshotTimeout) return;
+    
+    Sys_Global.screenshotTimeout = Sys_Global.current_time + 1.0; // Prevent saving more than 1 per second for sanity purposes.
     OS_MakeFolder("Screenshots");
     unsigned char* pixels = OS_AllocateRAM(NULL, Sys_Settings.ScreenWidth * Sys_Settings.ScreenHeight * 4 * sizeof(char), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, OS_INVALID_HANDLE);//malloc(Sys_Settings.ScreenWidth * Sys_Settings.ScreenHeight * 4 * sizeof(char));
     glReadPixels(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
     char filename[96];
-    snprintf(filename, sizeof(filename), "Screenshots/%f_x%.2f_y%.2f_z%.2f.bmp", get_time(), (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z);
+    snprintf(filename, sizeof(filename), "Screenshots/%.2f_x%.1f_y%.1f_z%.1f.bmp", get_time(), (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z);
     if (!stbi_write_bmp(filename, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, 4, pixels)) DualLogError("Failed to save screenshot\n"); else DualLog("Saved screenshot %s\n", filename);
     OS_DeallocateRAM(pixels, Sys_Settings.ScreenWidth * Sys_Settings.ScreenHeight * 4 * sizeof(char));
 }
@@ -268,6 +272,7 @@ int32_t random_range_i32(int32_t a, int32_t b) {
 }
 
 float random_range(float a, float b) { return a + (b - a) * ((float)(xs32() >> 8) * (1.0f / (1U << 24))); }
+double random_rangedub(double a, double b) { return a + (b - a) * ((double)(xs32() >> 8) * (1.0 / (1U << 24))); }
 
 float lerp(float min, float max, float val) { return min + (max - min) * vclamp(val,0.0f,1.0f); }
 float inverse_lerp(float min, float max, float val) { return (min == max) ? 0.0f : vclamp((val - min) / (max - min),0.0f,1.0f); }

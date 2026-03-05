@@ -420,49 +420,15 @@ bool SwimDn(void) {      return GetKey(39); }
 bool Console(void) {     return Sys_Input.keyStates[GLFW_KEY_GRAVE_ACCENT].pressed; }
 bool TakeScreenshot(void) {  return GetKeyPressed(41); }
 
-// #include <unistd.h>
-// void play_sound(const char* wav_path, float volume) {
-//     if (volume <= 0.01f) return;
-// 
-//     char vol_str[16];
-//     snprintf(vol_str, sizeof(vol_str), "%.3f", (double)volume);
-//     pid_t pid = fork();
-//     if (pid == -1) return;
-//     
-//     if (pid == 0) {
-//         execlp("sox", "sox", "-q", wav_path, "-t", "alsa", "default", "vol", vol_str, "dither","-s", (char*)NULL);
-//         _exit(127);
-//     }
-// }
-
-// int32_t aaSamples = 4;
-float shadBiasMin = 0.005f;
 void ProcessInput(void) {
     Input_PollJoysticks();
     Input_PollGamepad();
-//     if (Sys_Input.keyStates[GLFW_KEY_E].pressed) play_sound("./Audio/music/THM1-19_medicalstart.mp3",0.1f); //play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f,(Vector3){},false);
+    if (Sys_Input.keyStates[GLFW_KEY_E].pressed) play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f,(Vector3){},false);
     if (!Sys_Input.window_has_focus) return;
     
     if (Sys_Input.keyStates[GLFW_KEY_CAPS_LOCK].pressed) Sys_Input.isCapsLockOn = !Sys_Input.isCapsLockOn; // Change capslock state to match keyboard having toggled.  Must always happen regardless of paused/menu.
     if (Console()) ToggleConsole();
-    
-    if (TakeScreenshot() && Sys_Global.current_time > Sys_Global.screenshotTimeout) {
-        Screenshot();
-        Sys_Global.screenshotTimeout = Sys_Global.current_time + 1.0; // Prevent saving more than 1 per second for sanity purposes.
-    }
-    
-    if (Sys_Input.keyStates[GLFW_KEY_1].pressed) shadBiasMin += 0.0001f;
-    else if (Sys_Input.keyStates[GLFW_KEY_2].pressed) shadBiasMin -= 0.0001f;
-    
-    if (shadBiasMin < 0.0f) shadBiasMin = 0.0f;
-    if (shadBiasMin > 0.50f) shadBiasMin = 0.5f;
-    
-//     if (Sys_Input.keyStates[GLFW_KEY_3].pressed) aaRad += 0.5f;
-//     else if (Sys_Input.keyStates[GLFW_KEY_4].pressed) aaRad -= 0.5f;
-//     
-//     if (aaRad < 0.0f) aaRad = 0.0f;
-//     if (aaRad > 256.0f) aaRad = 256.0f;
-    
+    Screenshot();
     if (Menu() && !Sys_Global.menuActive) { Sys_Global.gamePaused = !Sys_Global.gamePaused; return; }
     if (Menu() && Sys_Global.menuActive) { MenuGoBack(); return; }
     if (Sys_Global.gamePaused || Sys_Global.menuActive || Sys_Cheats.consoleActive) return; // =========== PAUSE BARRIER ==================
@@ -478,6 +444,7 @@ void ProcessInput(void) {
         instances[editModeSelection].position = oldPos;
         instances[editModeSelection].rotation = oldRot;
         instances[editModeSelection].scale = oldScale;
+        flag_set(&instances[editModeSelection].entflags,ENTFLAG_ACTIVE,true);
     }
         
     if (ToggleMode()) {

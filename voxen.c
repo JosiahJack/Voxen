@@ -30,7 +30,7 @@ bool lightDirty[LIGHT_COUNT];
 static float lightView[LIGHT_COUNT][6][4][4]; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightView[i][face][0 ... 15]
 static float lightViewProj[LIGHT_COUNT][6][16]; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightViewProj[i][face][0 ... 15]
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6]; // Array of Array of 6 Arrays of FrustumPlane structs (four floats).  lightFrustumPlanes[i][face][.nx,.ny,, .nz, .d]
-uint16_t loadedLights, editModeSelection = 682, editModeTestEntityDefinition = 0; // Test instance and its model index
+uint16_t loadedLights, editModeSelection, editModeTestEntityDefinition = 0; // Test instance and its model index
 float voxelMinCenterX, voxelMinCenterZ;
 VoxenShadowSystem voxen_Shadow_System;
 float lightMinIntensity[LIGHT_COUNT];
@@ -632,6 +632,7 @@ void UpdateScreenSize(GLFWwindow* window, int32_t width, int32_t height) {
 }
 
 void InitializeAudio(void);
+void CycleToNextMonitor(GLFWwindow* window);
 extern unsigned char *stbi_load_from_memory(const uint8_t* buffer, int32_t len, int32_t *x, int32_t *y);
 extern int32_t stbi_arena_size;
 extern uint8_t*  stbi__arena_base;
@@ -816,6 +817,13 @@ typedef struct {
     Vector3 position;
 } LightCandidate;
 
+bool EntNotVisible(uint16_t i, bool otherCondition) {
+    if (!(instances[i].entflags & ENTFLAG_ACTIVE)) return true;
+    if (instances[i].index >= MAX_ENTITIES || instances[i].modelIndex >= MODEL_IDX_MAX || instances[i].texIndex >= MAX_VALID_TEXTURE) return true;
+    if (otherCondition) return true;
+    return false;
+}
+
 static inline __attribute__((always_inline)) __attribute__((hot)) void RenderShadowmaps(void) {    
     double shadowStartTime = get_time();
     glEnable(GL_POLYGON_OFFSET_FILL);
@@ -879,8 +887,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void RenderSha
         uint16_t shadowCasterIndices[SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS];
         uint16_t numShadowCasters = 0;
         for (int i=START_INDEX_LEVEL_INSTANCES;i<INSTANCE_COUNT;++i) {
-            if (instances[i].modelIndex >= MODEL_IDX_MAX || instances[i].texIndex >= MAX_VALID_TEXTURE) continue;
-            if (!(instances[i].entflags & ENTFLAG_ACTIVE) || (instances[i].entflags & ENTFLAG_NO_SHADOWS)) continue;
+            if (EntNotVisible(i,(instances[i].entflags & ENTFLAG_NO_SHADOWS))) continue;
 
             shadowCasterIndices[numShadowCasters] = i;
             numShadowCasters++;
@@ -894,7 +901,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void RenderSha
             float effectiveRadius = vmin(candidates[c].radius, 15.36f);
             Vector3 lightPos = candidates[c].position;
             uint16_t nearbyMeshCount = 0;
-            for (uint16_t shadowCasterInstanceIdx = 0; shadowCasterInstanceIdx < numShadowCasters; shadowCasterInstanceIdx++) { // Skip player indices and start at 3
+            for (uint16_t shadowCasterInstanceIdx = 0; shadowCasterInstanceIdx < numShadowCasters; shadowCasterInstanceIdx++) {
                 uint16_t j = shadowCasterIndices[shadowCasterInstanceIdx];
                 shadows_nearMeshRadii[nearbyMeshCount] = modelBounds[(instances[j].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 0.99f;
                 Vector3 d = Vector3_A_minus_B(instances[j].position, lightPos);
@@ -1036,15 +1043,13 @@ static inline __attribute__((always_inline)) double RenderUI(void) {
     
     // Diagnostics / Debugging
     int16_t debugTextStartY = 58;
-    if (Sys_Cheats.showLocation && !Sys_Global.menuActive) RenderFormattedText(16, debugTextStartY, TEXT_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f", (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z, (double)instances[PLAYER1].rotation.x, (double)instances[PLAYER1].rotation.y, (double)instances[PLAYER1].rotation.z, (double)instances[PLAYER1].rotation.w);
+    if (Sys_Cheats.showLocation && !Sys_Global.menuActive) RenderFormattedText(16, debugTextStartY, TEXT_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f",instances[PLAYER1].position.x,instances[PLAYER1].position.y,instances[PLAYER1].position.z,instances[PLAYER1].rotation.x,instances[PLAYER1].rotation.y,instances[PLAYER1].rotation.z,instances[PLAYER1].rotation.w);
     int16_t lineSpacing = 18;
-    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, FONT_NORMAL,1.0f, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u", Sys_Global.timeSinceLastPhysicsTick, voxen_Shadow_System.numShadowsCouldRender, playerCellIdx, numCellsVisible);
-    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, FONT_NORMAL,1.0f, "Player velocity: %.2f, %.2f, %.2f", (double)instances[PLAYER1].velocity.x, (double)instances[PLAYER1].velocity.y, (double)instances[PLAYER1].velocity.z);
-    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, FONT_NORMAL,1.0f, "Test Entity %s Index: %u, Shadow cpu ms: %.3f", entities[instances[editModeSelection].index].path, editModeTestEntityDefinition, voxen_Shadow_System.shadowTime * 1000);
-    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, FONT_NORMAL,1.0f, "Player cell: %u, floor: %.3f, ceil: %.3f, shadBiasMin: %.6f", instances[PLAYER1].cellIndex, (double)gridCellFloorHeight[instances[PLAYER1].cellIndex], (double)gridCellCeilingHeight[instances[PLAYER1].cellIndex],(double)shadBiasMin);
-    RenderFormattedText(16, debugTextStartY + (lineSpacing * 5), TEXT_WHITE, FONT_NORMAL,1.0f, "Cursor: %d, %d   dx: %d dy: %d", cursorPosition_x, cursorPosition_y, Sys_Input.currentMouse_dx, Sys_Input.currentMouse_dy);
-    int32_t lant = headmountedLanternLight * LIGHT_DATA_SIZE;
-    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16, debugTextStartY + (lineSpacing * 6), TEXT_WHITE, FONT_NORMAL,1.0f, "Lantern: %.4f %.4f %.4f, on: %u, brite %.2f, rng %.2f, vis: %u",(double)lanternPos.x,(double)lanternPos.y,(double)lanternPos.z,lightOn[headmountedLanternLight],(double)lights[lant + LIGHT_DATA_OFFSET_INTENSITY],(double)lights[lant + LIGHT_DATA_OFFSET_RANGE],lightInPVS[headmountedLanternLight]);
+    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 1),TEXT_WHITE,FONT_NORMAL,1.0f,"timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u",Sys_Global.timeSinceLastPhysicsTick, voxen_Shadow_System.numShadowsCouldRender,playerCellIdx,numCellsVisible);
+    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 2),TEXT_WHITE,FONT_NORMAL,1.0f,"Player velocity: %.2f, %.2f, %.2f",instances[PLAYER1].velocity.x,instances[PLAYER1].velocity.y,instances[PLAYER1].velocity.z);
+    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 3),TEXT_WHITE,FONT_NORMAL,1.0f,"Test Entity[%u] %s Index: %u, Shadow cpu ms: %.3f",editModeSelection,entities[instances[editModeSelection].index].path,editModeTestEntityDefinition,voxen_Shadow_System.shadowTime * 1000);
+    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 4),TEXT_WHITE,FONT_NORMAL,1.0f,"Player cell: %u, floor: %.3f, ceil: %.3f",instances[PLAYER1].cellIndex,gridCellFloorHeight[instances[PLAYER1].cellIndex],gridCellCeilingHeight[instances[PLAYER1].cellIndex]);
+    RenderFormattedText(16,debugTextStartY + (lineSpacing * 5),TEXT_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d   dx: %d dy: %d",cursorPosition_x,cursorPosition_y,Sys_Input.currentMouse_dx,Sys_Input.currentMouse_dy);
     if (Sys_Cheats.consoleActive) RenderFormattedText(16, 0, TEXT_WHITE, FONT_NORMAL,1.0f, "] %s",consoleEntryText);
     if (Sys_Global.statusTextDecayFinished > Sys_Global.current_time) RenderFormattedText(479,114,TEXT_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
     if (!Sys_Global.menuActive && !Sys_Global.gamePaused) {
@@ -1082,15 +1087,13 @@ static inline __attribute__((always_inline)) void RenderInstances(Vector3 player
     uint16_t visibleCount = 0, currentTexIndex = 0, currentNormIndex = 0, currentGlowIndex = 0, currentSpecIndex = 0, currentModelType = 0;
     bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX);
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
-        if (!(instances[i].entflags & ENTFLAG_ACTIVE)) continue;
-        if (instances[i].index >= MAX_ENTITIES || instances[i].modelIndex >= MODEL_IDX_MAX || instances[i].texIndex >= MAX_VALID_TEXTURE) continue;
-        if (transparentTexture[instances[i].texIndex] ^ transparents) continue; // must be transparent && transparents or neither
+        if (EntNotVisible(i,(transparentTexture[instances[i].texIndex] ^ transparents))) continue; // must be transparent && transparents or neither
         
         Vector3 objPos = instances[i].position;
         uint16_t instCellIdx = PosGetCellCoords(objPos.x, objPos.z);
         Vector3 delta = Vector3_A_minus_B(objPos, playerPos);
         float distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
-        if (distSqrd >= FAR_PLANE_SQUARED && (instances[i].index != 754 || !skyVisible)) continue;
+        if (distSqrd >= FAR_PLANE_SQUARED && (instances[i].index != 754 || !skyVisible) && i != editModeSelection) continue;
 
         if (EntityIndexIsPortalBlockingDoor(instances[i].index)) { // Extra checks only needed for opaque portal blocking doors.
             bool inPVS = (gridCellStates[instCellIdx] & CELL_VISIBLE);
@@ -1121,7 +1124,7 @@ static inline __attribute__((always_inline)) void RenderInstances(Vector3 player
 
         float dotResult = dot_vector3(delta, instances[PLAYER1].forward);
         float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
-        if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
+        if (dotResult < 0.0f && distSqrd > (radius * radius) && i != editModeSelection) continue;
         
         visibleInstances[visibleCount].index = i;
         visibleInstances[visibleCount].depth = distSqrd;
@@ -1157,9 +1160,7 @@ static inline __attribute__((always_inline)) void RenderInstancesDepthOnly(Vecto
     uint16_t visibleCount = 0, currentModelType = 0;
     bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX);
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
-        if (!(instances[i].entflags & ENTFLAG_ACTIVE)) continue;
-        if (instances[i].index >= MAX_ENTITIES || instances[i].modelIndex >= MODEL_IDX_MAX || instances[i].texIndex >= MAX_VALID_TEXTURE) continue;
-        if (transparentTexture[instances[i].texIndex]) continue;
+        if (EntNotVisible(i,transparentTexture[instances[i].texIndex])) continue; // must be transparent && transparents or neither
         
         Vector3 objPos = instances[i].position;
         uint16_t instCellIdx = PosGetCellCoords(objPos.x, objPos.z);
@@ -1350,36 +1351,6 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
 }
 
 bool UpdatedPlayerCell(void);
-static inline __attribute__((always_inline)) void UpdateVoxelsAndInstances(void) {
-    Sys_Render.shadowmapsNeedUpdated = UpdatedPlayerCell();
-    Sys_Render.shadowmapsNeedUpdated = UpdateLights(&Sys_Render.shadowmapsNeedUpdated);
-    CullCore();
-    bool uploadInstances = false;
-    for (uint32_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; i++) {
-        if (dirtyInstances[i]) {
-            if (instances[i].modelIndex >= loadedModelsMaxIndex || modelVertexCounts[instances[i].modelIndex] < 1) { dirtyInstances[i] = false; continue; } // No model or empty model
-
-            uploadInstances = true;    Sys_Render.shadowmapsNeedUpdated = true;
-            float x = instances[i].rotation.x, y = instances[i].rotation.y, z = instances[i].rotation.z, w = instances[i].rotation.w;
-            float x2 = x * x,   y2 = y * y,   z2 = z * z,   xy = x * y,   xz = x * z,   yz = y * z,   wx = w * x,   wy = w * y,   wz = w * z;
-            float sclx = instances[i].scale.x; float scly = instances[i].scale.y; float sclz = instances[i].scale.z;
-            modelMatrices[(i * 16) + 0] = (1.0f - 2.0f * (y2 + z2)) * -sclx; // Right X, Necessary -x for blender right to left handed coordinate conversion.
-            modelMatrices[(i * 16) + 1]  = (2.0f * (xy + wz)) * -sclx; // Right Y
-            modelMatrices[(i * 16) + 2]  = (2.0f * (xz - wy)) * -sclx; // Right Z
-            modelMatrices[(i * 16) + 3] = modelMatrices[(i * 16) + 7] = modelMatrices[(i * 16) + 11] = 0.0f;
-            modelMatrices[(i * 16) + 4]  = (2.0f * (xy - wz)) * scly; // Up X
-            modelMatrices[(i * 16) + 5]  = (1.0f - 2.0f * (x2 + z2)) * scly; // Up Y
-            modelMatrices[(i * 16) + 6]  = (2.0f * (yz + wx)) * scly; // Up Z
-            modelMatrices[(i * 16) + 8]  = (2.0f * (xz + wy)) * sclz; // Forward X
-            modelMatrices[(i * 16) + 9]  = (2.0f * (yz - wx)) * sclz; // Forward Y
-            modelMatrices[(i * 16) + 10] = (1.0f - 2.0f * (x2 + y2)) * sclz; // Forward Z
-            modelMatrices[(i * 16) + 12] = instances[i].position.x;   modelMatrices[(i * 16) + 13] = instances[i].position.y;   modelMatrices[(i * 16) + 14] = instances[i].position.z;
-            modelMatrices[(i * 16) + 15]= 1.0f;
-        }
-    }
-    if (uploadInstances) glNamedBufferData(Sys_Render.matricesBufferID, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
-}
-
 void UpdateAnims(void); void UpdateAmbientSounds(void);
 int32_t main(void) {
     double game_start_time = get_time();
@@ -1413,6 +1384,9 @@ int32_t main(void) {
             if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].released) Frob(instances[PLAYER1].position, instances[PLAYER1].forward, instances[PLAYER1].right);
             if (Sys_Global.current_time < Sys_Dx.debugLineFinished && (Sys_Dx.debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Sys_Dx.debugLine_start, Sys_Dx.debugLine_end);
 //             for (uint16_t i=START_INDEX_LEVEL_INSTANCES;i<loadedInstances;++i) UpdateWhileNotPaused(i); // TODO Get new states prior to updating animations, physics event, or rendering
+            instances[editModeSelection].index = editModeTestEntityDefinition;
+            instances[editModeSelection].modelIndex = entities[editModeTestEntityDefinition].modelIndex;
+            instances[editModeSelection].texIndex = entities[editModeTestEntityDefinition].modelIndex;
             UpdateAmbientSounds();
         }
 
@@ -1425,7 +1399,36 @@ int32_t main(void) {
         
         UpdateAnims();
         if (likely(!Sys_Global.gamePaused && !Sys_Global.menuActive)) UpdateMusic();
-        if (likely(!Sys_Global.gamePaused || Sys_Global.menuActive)) UpdateVoxelsAndInstances();
+        if (likely(!Sys_Global.gamePaused || Sys_Global.menuActive)) {
+            Sys_Render.shadowmapsNeedUpdated = UpdatedPlayerCell();
+            Sys_Render.shadowmapsNeedUpdated = UpdateLights(&Sys_Render.shadowmapsNeedUpdated);
+            CullCore();
+            bool uploadInstances = false;
+            for (uint32_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; i++) {
+                if (dirtyInstances[i]) {
+                    if (instances[i].modelIndex >= loadedModelsMaxIndex || modelVertexCounts[instances[i].modelIndex] < 1) { dirtyInstances[i] = false; continue; } // No model or empty model
+
+                    uploadInstances = true;    Sys_Render.shadowmapsNeedUpdated = true;
+                    float x = instances[i].rotation.x, y = instances[i].rotation.y, z = instances[i].rotation.z, w = instances[i].rotation.w;
+                    float x2 = x * x,   y2 = y * y,   z2 = z * z,   xy = x * y,   xz = x * z,   yz = y * z,   wx = w * x,   wy = w * y,   wz = w * z;
+                    float sclx = instances[i].scale.x; float scly = instances[i].scale.y; float sclz = instances[i].scale.z;
+                    modelMatrices[(i * 16) + 0] = (1.0f - 2.0f * (y2 + z2)) * -sclx; // Right X, Necessary -x for blender right to left handed coordinate conversion.
+                    modelMatrices[(i * 16) + 1]  = (2.0f * (xy + wz)) * -sclx; // Right Y
+                    modelMatrices[(i * 16) + 2]  = (2.0f * (xz - wy)) * -sclx; // Right Z
+                    modelMatrices[(i * 16) + 3] = modelMatrices[(i * 16) + 7] = modelMatrices[(i * 16) + 11] = 0.0f;
+                    modelMatrices[(i * 16) + 4]  = (2.0f * (xy - wz)) * scly; // Up X
+                    modelMatrices[(i * 16) + 5]  = (1.0f - 2.0f * (x2 + z2)) * scly; // Up Y
+                    modelMatrices[(i * 16) + 6]  = (2.0f * (yz + wx)) * scly; // Up Z
+                    modelMatrices[(i * 16) + 8]  = (2.0f * (xz + wy)) * sclz; // Forward X
+                    modelMatrices[(i * 16) + 9]  = (2.0f * (yz - wx)) * sclz; // Forward Y
+                    modelMatrices[(i * 16) + 10] = (1.0f - 2.0f * (x2 + y2)) * sclz; // Forward Z
+                    modelMatrices[(i * 16) + 12] = instances[i].position.x;   modelMatrices[(i * 16) + 13] = instances[i].position.y;   modelMatrices[(i * 16) + 14] = instances[i].position.z;
+                    modelMatrices[(i * 16) + 15]= 1.0f;
+                }
+            }
+            if (uploadInstances) glNamedBufferData(Sys_Render.matricesBufferID, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
+        }
+        
         Render();
         Sys_Dx.globalFrameNum++;
         InputClearRisingAndFallingEdges();
