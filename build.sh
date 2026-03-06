@@ -127,13 +127,13 @@ COMMON_CFLAGS="-ffreestanding -fno-stack-protector -fno-builtin -I./External/ -p
                -fdata-sections -ffunction-sections -ffast-math -g1 -std=c11 -Wall -Wextra \
                -fno-omit-frame-pointer -fstrict-aliasing -fno-common -Walloca -Wstack-usage=262144 \
                -Wformat=2 -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings \
-               -Werror=implicit-function-declaration -Og"
+               -Werror=implicit-function-declaration -Og  -fopenmp"
 
 if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
     LINKER=$CC
     CFLAGS="-D_WIN32 $COMMON_CFLAGS -fno-ident -fno-asynchronous-unwind-tables -mno-stack-arg-probe"
-    LDFLAGS="-L./ -L./External/ -L./External/Windows -l:assimp-vc143-mt.dll -lopengl32 -lm -l:glfw3.dll \
+    LDFLAGS="-L./ -L./External/ -L./External/Windows -lopengl32 -lm -l:glfw3.dll \
              -l:libminiaudio.dll.a -static-libgcc -flto=auto"
     OBJ_DIR="./External/Windows"
     GLAD_OBJ="${OBJ_DIR}/glad.o"
@@ -142,7 +142,7 @@ elif [ "$PLATFORM" = "mac" ]; then
     CC=$LINUX_CC
     LINKER=$LINUX_CC
     CFLAGS="-D__APPLE__ $COMMON_CFLAGS"
-    LDFLAGS="-L./External/ -L./External/Mac -lassimp -lm -l:libglfw3.a -l:libminiaudio.0.11.22.a -lGL"
+    LDFLAGS="-L./External/ -L./External/Mac -lm -l:libglfw3.a -l:libminiaudio.0.11.22.a -lGL"
     OBJ_DIR="./External/Mac"
     GLAD_OBJ="${OBJ_DIR}/glad.o"
     BINARY_NAME="voxen_mac"
@@ -158,7 +158,7 @@ else
     CC=$LINUX_CC
     LINKER="mold -run gcc"
     CFLAGS="-march=haswell -mtune=haswell $COMMON_CFLAGS"
-    LDFLAGS="-flto -Wl,--gc-sections -L./External/Linux -lassimp -lm -l:libglfw3.5.a -l:libminiaudio.0.11.22.a -lGL"
+    LDFLAGS="-flto -Wl,--gc-sections -fopenmp -L./External/Linux -lm -lglfw -l:libminiaudio.0.11.22.a -lGL"
     OBJ_DIR="./External/Linux"
     GLAD_OBJ="${OBJ_DIR}/glad/glad.o"
     BINARY_NAME="voxen"

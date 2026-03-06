@@ -1249,7 +1249,7 @@ void play_wav(const char* path, float volume, Vector3 pos, bool positional);
 #define MAX_VALID_TEXTURE 2048
 #define MAX_TEXTURE_DIMENSION 2048
 #define MAX_PALETTE_SIZE 256
-#define MAX_TOTAL_PIXELS 26400000u
+#define MAX_TOTAL_PIXELS 26800000u
 #define MAX_UNIQUE_COLORS 80000u
 #define VERTEX_ATTRIBUTES_COUNT 8 // x,y,z,nx,ny,nz,u,v
 #define BOUNDS_ATTRIBUTES_COUNT 7
@@ -1575,11 +1575,6 @@ bool StringsAreEqualLimitedBy(const char* a, const char* b, size_t limit);
 void StringCopyInto_A_From_B(char* a, const char* b, size_t bufferSize);
 void StringCopyInto_A_SubstringFrom_B(char* a, size_t substringSize, const char* b, size_t bufferSize);
 void StringConcatenate(char* a, const char* b, size_t bufferSize);
-uint32_t parse_numberu32(const char* str, const char* line, uint32_t lineNum);
-uint16_t parse_numberu16(const char* str, const char* line, uint32_t lineNum);
-uint8_t parse_numberu8(const char* str, const char* line, uint32_t lineNum);
-bool parse_bool(const char* str, const char* line, uint32_t lineNum);
-float parse_float(const char* str, const char* line, uint32_t lineNum);
 bool ConstIndexInBounds(int constdex);
 bool ConstIndexIsGeometry(int constdex);
 bool ConstIndexIsDynamicObject(uint16_t constIndex);
@@ -1721,3 +1716,73 @@ extern bool transparentTexture[MAX_VALID_TEXTURE];
 void UpdateMusic(void);
 void PlayMenuMusic(void);
 void PlayGameMusic(void);
+
+static inline __attribute__((always_inline)) uint32_t parse_numberu32(const char* str, const char* line, uint32_t lineNum) {
+    if (str == 0 || *str == '\0') { DualLogError("Invalid blank string from line[%d]: %s\n", lineNum+1, line); return 0; }
+    while (CharacterIsEmpty((char)*str)) str++;
+    while (CharacterIsEmpty(*str)) str++;
+    if (*str == '+') str++;
+    if (*str == '-') { DualLogError("Invalid input, negative not allowed (%s)\n      from line[%d]: %s\n", str, lineNum+1, line); return 0; }
+    unsigned long result = 0;
+    while (*str >= '0' && *str <= '9') {
+        int digit = *str - '0';
+        result = result * 10uL + (unsigned long)digit;
+        str++;
+    }
+
+    return (uint32_t)result;
+}
+
+static inline __attribute__((always_inline)) uint16_t parse_numberu16(const char* str, const char* line, uint32_t lineNum) {
+    uint32_t retval = parse_numberu32(str, line, lineNum);
+    if (retval > UINT16_MAX) { DualLogError("Value %u out of range for uint16_t from line[%d]: %s\n", retval, lineNum+1, line); return 0; }
+    return (uint16_t)retval;
+}
+
+static inline __attribute__((always_inline)) uint8_t parse_numberu8(const char* str, const char* line, uint32_t lineNum) {
+    uint32_t retval = parse_numberu32(str, line, lineNum);
+    if (retval > UINT8_MAX) { DualLogError("Value %u out of range for uint8_t from line[%d]: %s\n", retval, lineNum+1, line); return 0; }
+    return (uint8_t)retval;
+}
+
+static inline __attribute__((always_inline)) bool parse_bool(const char* str, const char* line, uint32_t lineNum) {
+    uint32_t parseval = parse_numberu32(str, line, lineNum);
+    if (parseval > 1) DualLogWarn("Loaded %u but expected boolean from line[%u]: %s\n",parseval, lineNum+1, line);
+    return parseval > 0 ? true : false;
+}
+
+static inline __attribute__((always_inline)) float parse_float(const char* str, const char* line, uint32_t lineNum) {
+    if (str == 0 || *str == '\0') { DualLogError("Invalid blank string from line[%d]: %s\n", lineNum+1, line); return 0.0f; }
+    
+    while (CharacterIsEmpty(*str)) str++;
+    bool negative = false;
+    if (*str == '-') { negative = true; str++; }
+    else if (*str == '+') { str++; }
+
+    double value = 0.0;
+    bool has_digit = false;
+    while (*str >= '0' && *str <= '9') { // Integer part
+        value = value * 10.0 + (*str - '0');
+        str++;
+        has_digit = true;
+    }
+
+    if (*str == '.') { // Decimal part
+        str++;
+        double frac = 0.0;
+        double place = 0.1;
+        while (*str >= '0' && *str <= '9') {
+            frac += (*str - '0') * place;
+            place *= 0.1;
+            str++;
+            has_digit = true;
+        }
+
+        value += frac;
+    }
+
+    if (!has_digit) return 0.0f;
+
+    if (negative) value = -value;
+    return (float)value;
+}

@@ -1,191 +1,294 @@
-// data_models.c - Load 3D Models from .vmdl caches or .fbx via Assimp if cache invalid
-#include "./External/assimp/cimport.h"
-#include "./External/assimp/scene.h"
+// data_models.c - Load 3D Models
 #include "os.h" // Operating System calls shim layer.
+#include <omp.h>
 #include "voxen.h"
 float** modelVertices = NULL;
 uint32_t** modelTriangles = NULL;
-uint32_t modelVertexCounts[MODEL_IDX_MAX] = {0}; // 4kb
-uint32_t modelTriangleCounts[MODEL_IDX_MAX] = {0}; // 4kb
-bool modelHasAnimation[MODEL_IDX_MAX] = {0}; // 1kb
-float modelBounds[MODEL_IDX_MAX * BOUNDS_ATTRIBUTES_COUNT] = {0}; // 1024 * 7 * 4 = 28.6kb
+uint32_t modelVertexCounts[MODEL_IDX_MAX] = {0};
+uint32_t modelTriangleCounts[MODEL_IDX_MAX] = {0};
+bool modelHasAnimation[MODEL_IDX_MAX] = {0};
+float modelBounds[MODEL_IDX_MAX * BOUNDS_ATTRIBUTES_COUNT] = {0};
 uint16_t loadedModelsMaxIndex = 0;
-
 GLuint SetupSSBO(GLuint* id, GLuint bindingIndex, GLsizeiptr size, const void* data, GLenum usage);
-struct aiPropertyStore* props;
 
-static bool LoadVMDL(const char *vmdl_path, uint64_t fbx_stamp, float **out_verts, uint32_t *out_vcount, uint32_t **out_idx, uint32_t *out_icount) {
-    OsFileHandle fd; int st_size; uint8_t* map = OS_OpenAndAllocateFileBufferReadonly(vmdl_path, &fd, &st_size);
-    if ((size_t)st_size < sizeof(uint64_t) + 4 + 4) return false;
+static inline __attribute__((always_inline)) uint32_t parse_numberu32_pure(const char* str) {
+    if (str == 0 || *str == '\0') return 0;
     
-    uint64_t file_stamp_on_disk;
-    __builtin_memcpy(&file_stamp_on_disk, map, sizeof(uint64_t));
-    if (file_stamp_on_disk != fbx_stamp) { OS_DeallocateRAM(map, (size_t)st_size); return false; }
+    while (CharacterIsEmpty((char)*str)) str++;
+    while (CharacterIsEmpty(*str)) str++;
+    if (*str == '+') str++;
+    if (*str == '-') return 0;
+    
+    unsigned long result = 0;
+    while (*str >= '0' && *str <= '9') {
+        int digit = *str - '0';
+        result = result * 10uL + (unsigned long)digit;
+        str++;
+    }
 
-    const uint8_t *p = map + sizeof(uint64_t);
-    uint32_t vcnt = *(uint32_t*)p; p += 4; *out_vcount = vcnt;
-    uint32_t icnt = *(uint32_t*)p; p += 4; *out_icount = icnt;
-    size_t vert_bytes = vcnt * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
-    size_t idx_bytes  = icnt * 3 * sizeof(uint32_t);
-    size_t expected   = sizeof(uint64_t) + 4 + vert_bytes + 4 + idx_bytes;
-    if (expected != (size_t)st_size) { DualLogError("vmdl corrupted: size %zu, expected %zu from vertex count %u and tri count %u\n", st_size, expected, vcnt, icnt); OS_DeallocateRAM(map, (size_t)st_size); return false; }
-    if (p + vert_bytes + idx_bytes > map + (size_t)st_size) { DualLogError("vmdl data overflow\n"); OS_DeallocateRAM(map, (size_t)st_size); return false; }
-
-    *out_verts  = (float*)p;
-    p += vert_bytes;
-    *out_idx    = (uint32_t*)p;
-    return true;
+    return (uint32_t)result;
 }
 
-void LoadModel(bool fromCache, uint16_t i, const char* fbx_path, const char* vmdl_path, uint64_t fbx_stamp, float* cached_verts, uint32_t cached_vcnt, uint32_t* cached_idx, uint32_t cached_icnt) {
-    const struct aiScene* scene = NULL;
-    if (!fromCache) {
-        DualLog("No vmdl found or .fbx model was updated so needs refresh from .fbx source, loading %s with Assimp...\n", fbx_path);
-        scene = aiImportFileExWithProperties(fbx_path, /*aiProcess_Triangulate*/ 0x8 | 0x800/*aiProcess_ImproveCacheLocality*/ | /*aiProcess_JoinIdenticalVertices*/ 0x2, NULL, props); // aiProcess vars from https://github.com/assimp/assimp/blob/672594c230832252f94bc90c19ca9ee9917be563/include/assimp/postprocess.h#L170
-        if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) { DualLogError("Assimp failed %s: %s\n", fbx_path, aiGetErrorString()); return; }
-    } // else use existing .vmdl binary RAM blob (aka a cache hit was successful)
-
-    uint32_t vertexCount = 0, triCount = 0;
-    if (fromCache) { vertexCount = cached_vcnt; triCount = cached_icnt;
-    } else {  for (uint32_t m = 0; m < scene->mNumMeshes; ++m) { vertexCount += scene->mMeshes[m]->mNumVertices;  triCount += scene->mMeshes[m]->mNumFaces; }  }
+static inline __attribute__((always_inline)) float parse_float_pure(const char* str) {
+    if (str == 0 || *str == '\0') return 0.0f;
     
-    modelVertexCounts[i]   = vertexCount;
-    modelTriangleCounts[i] = triCount;
-    modelVertices[i]  = fromCache ? (float*)cached_verts : OS_AllocateRAM(NULL, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-    modelTriangles[i] =  fromCache ? (uint32_t*)cached_idx : OS_AllocateRAM(NULL, triCount * 3 * sizeof(uint32_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-    uint32_t vertexIndex = 0, triangleIndex = 0, globalVertexOffset = 0;
-    float minx = 1E9f, miny = 1E9f, minz = 1E9f; float maxx = -1E9f, maxy = -1E9f, maxz = -1E9f;
-    if (fromCache) {
-        for (uint32_t vert = 0; vert < cached_vcnt; ++vert) {
-            float x = cached_verts[(vert * VERTEX_ATTRIBUTES_COUNT) + 0];
-            float y = cached_verts[(vert * VERTEX_ATTRIBUTES_COUNT) + 1];
-            float z = cached_verts[(vert * VERTEX_ATTRIBUTES_COUNT) + 2];
-            minx = vmin(minx, x); maxx = vmax(maxx, x);
-            miny = vmin(miny, y); maxy = vmax(maxy, y);
-            minz = vmin(minz, z); maxz = vmax(maxz, z);
-        }
-    } else {
-        for (uint32_t m = 0; m < scene->mNumMeshes; ++m) {
-            struct aiMesh *mesh = scene->mMeshes[m];
-            for (uint32_t vert = 0; vert < mesh->mNumVertices; ++vert) {
-                modelVertices[i][vertexIndex++] = mesh->mVertices[vert].x; modelVertices[i][vertexIndex++] = mesh->mVertices[vert].y; modelVertices[i][vertexIndex++] = mesh->mVertices[vert].z;
-                modelVertices[i][vertexIndex++] = mesh->mNormals[vert].x; modelVertices[i][vertexIndex++] = mesh->mNormals[vert].y;  modelVertices[i][vertexIndex++] = mesh->mNormals[vert].z;
-                float u = (mesh->mTextureCoords[0] && mesh->mNumUVComponents[0] > 0) ? mesh->mTextureCoords[0][vert].x : 0.0f;
-                float v = (mesh->mTextureCoords[0] && mesh->mNumUVComponents[0] > 0) ? mesh->mTextureCoords[0][vert].y : 0.0f;
-                modelVertices[i][vertexIndex++] = u; modelVertices[i][vertexIndex++] = v;
-                minx = vmin(minx, mesh->mVertices[vert].x); maxx = vmax(maxx, mesh->mVertices[vert].x);
-                miny = vmin(miny, mesh->mVertices[vert].y); maxy = vmax(maxy, mesh->mVertices[vert].y);
-                minz = vmin(minz, mesh->mVertices[vert].z); maxz = vmax(maxz, mesh->mVertices[vert].z);
-            }
+    while (CharacterIsEmpty(*str)) str++;
+    bool negative = false;
+    if (*str == '-') { negative = true; str++; }
+    else if (*str == '+') { str++; }
 
-            for (uint32_t f = 0; f < mesh->mNumFaces; ++f) {
-                struct aiFace *face = &mesh->mFaces[f]; if (face->mNumIndices != 3) { DualLogError("Non-tri face in %s\n", fbx_path); continue; }
-                
-                uint32_t a = face->mIndices[0] + globalVertexOffset; uint32_t b = face->mIndices[1] + globalVertexOffset; uint32_t c = face->mIndices[2] + globalVertexOffset;
-                modelTriangles[i][triangleIndex++] = a; modelTriangles[i][triangleIndex++] = b; modelTriangles[i][triangleIndex++] = c;
-            }
-            
-            globalVertexOffset += mesh->mNumVertices;
-        }
+    double value = 0.0;
+    bool has_digit = false;
+    while (*str >= '0' && *str <= '9') { // Integer part
+        value = value * 10.0 + (*str - '0');
+        str++;
+        has_digit = true;
     }
 
-    uint32_t base = i * BOUNDS_ATTRIBUTES_COUNT;
-    modelBounds[base + BOUNDS_DATA_OFFSET_MINX] = minx;
-    modelBounds[base + BOUNDS_DATA_OFFSET_MINY] = miny;
-    modelBounds[base + BOUNDS_DATA_OFFSET_MINZ] = minz;
-    modelBounds[base + BOUNDS_DATA_OFFSET_MAXX] = maxx;
-    modelBounds[base + BOUNDS_DATA_OFFSET_MAXY] = maxy;
-    modelBounds[base + BOUNDS_DATA_OFFSET_MAXZ] = maxz;
-    float r = 0.0f;
-    r = vmax(r, vabs(minx)); r = vmax(r, vabs(miny)); r = vmax(r, vabs(minz));
-    r = vmax(r, maxx);       r = vmax(r, maxy);       r = vmax(r, maxz);
-    modelBounds[base + BOUNDS_DATA_OFFSET_RADIUS] = r;
-    if (!fromCache) {
-        aiReleaseImport(scene);
-        OsFileHandle fd = OS_OpenWriteonly(vmdl_path);
-        size_t total = sizeof(uint64_t) + 4 + vertexCount*VERTEX_ATTRIBUTES_COUNT*sizeof(float) + 4 + triCount*3*sizeof(uint32_t);
-        uint8_t *buf = OS_AllocateRAM(NULL, total, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, OS_INVALID_HANDLE);
-        if (!buf) { OS_Close(fd); return; }
+    if (*str == '.') { // Decimal part
+        str++;
+        double frac = 0.0;
+        double place = 0.1;
+        while (*str >= '0' && *str <= '9') {
+            frac += (*str - '0') * place;
+            place *= 0.1;
+            str++;
+            has_digit = true;
+        }
 
-        uint8_t *p = buf;
-        *(uint64_t *)p = fbx_stamp;
-        p += sizeof(uint64_t);
-        *(uint32_t*)p = vertexCount; p += 4;
-        *(uint32_t*)p = triCount; p += 4;
-        __builtin_memcpy(p, modelVertices[i], vertexCount*VERTEX_ATTRIBUTES_COUNT*sizeof(float)); p += vertexCount*VERTEX_ATTRIBUTES_COUNT*sizeof(float);
-        __builtin_memcpy(p, modelTriangles[i], triCount*3*sizeof(uint32_t));
-        OS_Write(fd, buf, total, vmdl_path);
-        OS_DeallocateRAM(buf,total);
-        OS_Close(fd);
+        value += frac;
     }
+
+    if (!has_digit) return 0.0f;
+
+    if (negative) value = -value;
+    return (float)value;
+}
+
+bool LoadOBJ(const char* filepath, float** out_vertices, uint32_t* out_vertex_count, uint32_t** out_triangles, uint32_t* out_triangle_count, float* out_minx, float* out_miny, float* out_minz, float* out_maxx, float* out_maxy, float* out_maxz) {
+    *out_vertices = NULL;
+    *out_triangles = NULL;
+    *out_vertex_count = 0;
+    *out_triangle_count = 0;
+    OsFileHandle dummy_fd;
+    int file_size = 0;
+    const char* data = (const char*)OS_OpenAndAllocateFileBufferReadonly(filepath, &dummy_fd, &file_size);
+    if (!data || file_size <= 0) return false;
+
+    // Pass 1: count
+    uint32_t vcount = 0, vtcount = 0, vncount = 0, fcount = 0;
+    const char* p = data;
+    while (p < data + file_size) {
+        const char* line_start = p;
+        while (p < data + file_size && *p != '\n' && *p != '\r') ++p;
+        uint32_t len = (uint32_t)(p - line_start);
+        if (len > 2) {
+            if (line_start[0] == 'v') {
+                if (line_start[1] == ' ')      vcount++;
+                else if (line_start[1] == 't') vtcount++;
+                else if (line_start[1] == 'n') vncount++;
+            }
+            else if (line_start[0] == 'f') fcount++;
+        }
+        
+        if (p < data + file_size && *p == '\r') ++p;
+        if (p < data + file_size && *p == '\n') ++p;
+    }
+
+    if (vcount == 0) { OS_DeallocateRAM((void*)data, (size_t)file_size); return false; }
+
+    if (!vtcount) vtcount = vcount;
+    if (!vncount) vncount = vcount;
+    float* temp_pos = (float*)OS_AllocateRAM(NULL, vcount * 3 * sizeof(float), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+    float* temp_nrm = (float*)OS_AllocateRAM(NULL, vncount * 3 * sizeof(float), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+    float* temp_uv  = (float*)OS_AllocateRAM(NULL, vtcount * 2 * sizeof(float), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+
+    // Pass 2: vertices
+    uint32_t vi = 0, ni = 0, ui = 0;
+    uint32_t current_line = 0;
+    p = data;
+    while (p < data + file_size) {
+        const char* line_start = p;
+        while (p < data + file_size && *p != '\n' && *p != '\r') ++p;
+        uint32_t len = (uint32_t)(p - line_start);
+
+        if (len > 2 && line_start[0] == 'v') {
+            const char* num = line_start + 2;
+            if (line_start[1] == ' ') {
+                temp_pos[vi*3+0] = parse_float_pure(num);
+                while (*num && *num != ' ' && *num != '\t') ++num;
+                ++num;
+                temp_pos[vi*3+1] = parse_float_pure(num);
+                while (*num && *num != ' ' && *num != '\t') ++num;
+                ++num;
+                temp_pos[vi*3+2] = parse_float_pure(num);
+                vi++;
+            } else if (line_start[1] == 'n' && ni < vncount) {
+                num = line_start + 3;
+                temp_nrm[ni*3+0] = parse_float_pure(num);
+                while (*num && *num != ' ' && *num != '\t') ++num;
+                ++num;
+                temp_nrm[ni*3+1] = parse_float_pure(num);
+                while (*num && *num != ' ' && *num != '\t') ++num;
+                ++num;
+                temp_nrm[ni*3+2] = parse_float_pure(num);
+                ni++;
+            } else if (line_start[1] == 't' && ui < vtcount) {
+                num = line_start + 3;
+                temp_uv[ui*2+0] = parse_float_pure(num);
+                while (*num && *num != ' ' && *num != '\t') ++num;
+                ++num;
+                temp_uv[ui*2+1] = parse_float_pure(num);
+                ui++;
+            }
+        }
+        if (p < data + file_size && *p == '\r') ++p;
+        if (p < data + file_size && *p == '\n') ++p;
+        current_line++;
+    }
+
+    // Pass 3: faces
+    size_t max_verts = (size_t)fcount * 3;
+    float* final_verts = (float*)OS_AllocateRAM(NULL, max_verts * 8 * sizeof(float), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+    uint32_t* final_tris = (uint32_t*)OS_AllocateRAM(NULL, (size_t)fcount * 3 * sizeof(uint32_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+
+    uint32_t vert_idx = 0, tri_idx = 0;
+    float minx = 1e9f, miny = 1e9f, minz = 1e9f;
+    float maxx = -1e9f, maxy = -1e9f, maxz = -1e9f;
+
+    current_line = 0;
+    p = data;
+    while (p < data + file_size) {
+        const char* line_start = p;
+        while (p < data + file_size && *p != '\n' && *p != '\r') ++p;
+        uint32_t len = (uint32_t)(p - line_start);
+
+        if (len > 2 && line_start[0] == 'f') {
+            const char* num = line_start + 2;
+            while (*num == ' ' || *num == '\t') ++num;
+
+            uint32_t v[3] = {0}, vt[3] = {0}, vn[3] = {0};
+            uint32_t idx_count = 0;
+
+            for (int i = 0; i < 3 && idx_count < 3; ++i) {
+                if (*num < '0' || (*num > '9' && *num != '-')) break;
+
+                v[i] = parse_numberu32_pure(num);
+                while (*num && *num != ' ' && *num != '\t' && *num != '/') ++num;
+                if (*num == '/') {
+                    ++num;
+                    if (*num == '/') { ++num; vn[i] = parse_numberu32_pure(num); }
+                    else {
+                        vt[i] = parse_numberu32_pure(num);
+                        while (*num && *num != ' ' && *num != '\t' && *num != '/') ++num;
+                        if (*num == '/') { ++num; vn[i] = parse_numberu32_pure(num); }
+                    }
+                }
+                while (*num && *num != ' ' && *num != '\t') ++num;
+                while (*num == ' ' || *num == '\t') ++num;
+                idx_count++;
+            }
+
+            if (idx_count != 3) goto next_line; // skip quads/ngons
+
+            for (int i = 0; i < 3; ++i) {
+                uint32_t vi_idx = v[i] - 1;
+                uint32_t ti_idx = (vt[i] > 0 && vt[i] <= ui) ? vt[i]-1 : 0;
+                uint32_t ni_idx = (vn[i] > 0 && vn[i] <= ni) ? vn[i]-1 : 0;
+                float* dst = final_verts + vert_idx * 8;
+                dst[0] = temp_pos[vi_idx*3];   dst[1] = temp_pos[vi_idx*3+1];   dst[2] = temp_pos[vi_idx*3+2];
+                dst[3] = (ni_idx < ni) ? temp_nrm[ni_idx*3]   : 0.0f;
+                dst[4] = (ni_idx < ni) ? temp_nrm[ni_idx*3+1] : 0.0f;
+                dst[5] = (ni_idx < ni) ? temp_nrm[ni_idx*3+2] : 0.0f;
+                dst[6] = (ti_idx < ui) ? temp_uv[ti_idx*2]    : 0.0f;
+                dst[7] = (ti_idx < ui) ? temp_uv[ti_idx*2+1]  : 0.0f;
+                float x = dst[0], y = dst[1], z = dst[2];
+                if (x < minx) minx = x;
+                if (x > maxx) maxx = x;
+                if (y < miny) miny = y;
+                if (y > maxy) maxy = y;
+                if (z < minz) minz = z;
+                if (z > maxz) maxz = z;
+                final_tris[tri_idx*3 + i] = vert_idx;
+                vert_idx++;
+            }
+            tri_idx++;
+        }
+
+    next_line:
+        if (p < data + file_size && *p == '\r') ++p;
+        if (p < data + file_size && *p == '\n') ++p;
+        current_line++;
+    }
+
+    OS_DeallocateRAM((void*)data, (size_t)file_size);
+    OS_DeallocateRAM(temp_pos, vcount * 3 * sizeof(float));
+    OS_DeallocateRAM(temp_nrm, vncount * 3 * sizeof(float));
+    OS_DeallocateRAM(temp_uv,  vtcount * 2 * sizeof(float));
+    *out_vertices      = final_verts;
+    *out_vertex_count  = vert_idx;
+    *out_triangles     = final_tris;
+    *out_triangle_count = tri_idx;
+    *out_minx = minx; *out_miny = miny; *out_minz = minz;
+    *out_maxx = maxx; *out_maxy = maxy; *out_maxz = maxz;
+    return true;
 }
 
 void LoadModels(void) {
     if (loadedModelsMaxIndex > 0) return;
-
-    DebugRAM("start of LoadModels");
-    double start_time = get_time();        
-    DataParser model_parser;
-    if (!parse_data_file(&model_parser, MODEL_IDX_MAX, "./Data/models.txt")) { DualLogError("Could not parse ./Data/models.txt!\n"); OS_Exit(1); }
+    double start_time = get_time();
+    DataParser mpars;
+    if (!parse_data_file(&mpars, MODEL_IDX_MAX, "./Data/models.txt")) { DualLogError("Could not parse ./Data/models.txt!\n"); OS_Exit(1); }
 
     int32_t maxIndex = -1;
-    for (uint32_t k = 0; k < model_parser.count; k++) {
-        if (model_parser.entries[k].index > maxIndex && model_parser.entries[k].index != UINT16_MAX) maxIndex = model_parser.entries[k].index;
-    }
-
-    loadedModelsMaxIndex = (uint16_t)maxIndex + 1U;
-    DualLog("Loading   models( %d/%d) with max index  %d ...", loadedModelsMaxIndex, model_parser.count, maxIndex);
-    modelVertices  = OS_AllocateRAM(NULL, loadedModelsMaxIndex * sizeof(float*),    PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-    modelTriangles = OS_AllocateRAM(NULL, loadedModelsMaxIndex * sizeof(uint32_t*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-    DebugRAM("after main OS_AllocateRAM block");
-    size_t indexToParser_size = loadedModelsMaxIndex * sizeof(int32_t);
-    int32_t* indexToParser = OS_AllocateRAM(NULL, indexToParser_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, OS_INVALID_HANDLE);
-    for (uint32_t k = 0; k < model_parser.count; k++) {
-        if (model_parser.entries[k].index != UINT16_MAX) indexToParser[model_parser.entries[k].index] = (int32_t)k;
+    for (uint32_t k = 0; k < mpars.count; k++) {
+        if (mpars.entries[k].index > maxIndex && mpars.entries[k].index != UINT16_MAX) maxIndex = mpars.entries[k].index;
     }
     
-    props = aiCreatePropertyStore();
-    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_ANIMATIONS, 1); aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_MATERIALS, 0);
-    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_TEXTURES, 0);   aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_LIGHTS, 0);
-    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_CAMERAS, 0);    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_OPTIMIZE_EMPTY_ANIMATION_CURVES, 1);
-    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_NO_SKELETON_MESHES, 0);  aiSetImportPropertyInteger(props, AI_CONFIG_PP_RVC_FLAGS, aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS);
-    aiSetImportPropertyInteger(props, AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_LINE | aiPrimitiveType_POINT);
-    aiSetImportPropertyInteger(props, AI_CONFIG_PP_ICL_PTCACHE_SIZE, 16);       aiSetImportPropertyInteger(props, AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4);
-    aiSetImportPropertyInteger(props, AI_CONFIG_PP_FD_REMOVE, 1);               aiSetImportPropertyInteger(props, AI_CONFIG_PP_PTV_KEEP_HIERARCHY, 0);
-    DebugRAM("prior to model load loop");
-    for (uint32_t i = 0; i < loadedModelsMaxIndex; ++i) {
-        int32_t parserIdx = indexToParser[i];
-        modelHasAnimation[i] = (model_parser.entries[parserIdx].entflags & ENTFLAG_ANIMATED);
-        const char *fbx_path = model_parser.entries[parserIdx].path;
-        if (!fbx_path || !fbx_path[0]) continue;
-
-        char vmdl_path[256];
-        size_t fbx_path_sz = GetStringLength(fbx_path);
-        StringCopyInto_A_SubstringFrom_B(vmdl_path, fbx_path_sz - 3, fbx_path, 256); // Chop off "fbx" or "obj" and then manually add "vmdl" terminating with \0 within the temp buffer.
-        if (StringIsEmpty(vmdl_path)) { DualLogError("Invalid vmdl_path for %s: '%s'\n", fbx_path, vmdl_path); OS_Exit(1); }
-        
-        StringConcatenate(vmdl_path, "vmdl", 256); // Extension . separator was preserved above, so just add the letters part.
-        FileFingerprint fp;
-        if (!OS_GetFileFingerprint(fbx_path, &fp)) { DualLogError("File change detection failed for %s (%s)\n", fbx_path, vmdl_path); continue; }
-        
-        uint64_t fbx_stamp = OS_GetFilestamp(&fp);
-        float *cached_verts = NULL; uint32_t cached_vcnt = 0, cached_icnt = 0; uint32_t *cached_idx = NULL; 
-        bool cache_hit = LoadVMDL(vmdl_path, fbx_stamp, &cached_verts, &cached_vcnt, &cached_idx, &cached_icnt);
-        LoadModel(cache_hit, i, fbx_path, vmdl_path, fbx_stamp, cached_verts, cached_vcnt, cached_idx, cached_icnt);        
+    loadedModelsMaxIndex = (uint16_t)maxIndex + 1U;
+    DualLog("Loading models( %d/%d) with max index %d ...", loadedModelsMaxIndex, mpars.count, maxIndex);
+    modelVertices = OS_AllocateRAM(NULL, loadedModelsMaxIndex * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+    modelTriangles = OS_AllocateRAM(NULL, loadedModelsMaxIndex * sizeof(uint32_t*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+    size_t indexToParser_size = loadedModelsMaxIndex * sizeof(int32_t);
+    int32_t* indexToParser = OS_AllocateRAM(NULL, indexToParser_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, OS_INVALID_HANDLE);
+    __builtin_memset(indexToParser, -1, indexToParser_size);
+    for (uint32_t k = 0; k < mpars.count; k++) {
+        if (mpars.entries[k].index != UINT16_MAX) indexToParser[mpars.entries[k].index] = (int32_t)k;
     }
 
-    DebugRAM("after model load loop");
-    OS_DeallocateRAM(indexToParser,indexToParser_size);
-    aiReleasePropertyStore(props);
+//     #pragma omp parallel for schedule(dynamic)
+    for (uint32_t i = 0; i < loadedModelsMaxIndex; ++i) {
+        int32_t parserIdx = indexToParser[i];
+        if (parserIdx < 0 || parserIdx >= (int32_t)mpars.count) continue;
+        
+        modelHasAnimation[i] = (mpars.entries[parserIdx].entflags & ENTFLAG_ANIMATED);
+        const char* base = mpars.entries[parserIdx].path;
+        float minx, miny, minz, maxx, maxy, maxz;
+        if (!LoadOBJ(base, &modelVertices[i], &modelVertexCounts[i], &modelTriangles[i], &modelTriangleCounts[i], &minx, &miny, &minz, &maxx, &maxy, &maxz)) continue;
+        
+        uint32_t base_idx = i * BOUNDS_ATTRIBUTES_COUNT;
+        modelBounds[base_idx + BOUNDS_DATA_OFFSET_MINX] = minx;
+        modelBounds[base_idx + BOUNDS_DATA_OFFSET_MINY] = miny;
+        modelBounds[base_idx + BOUNDS_DATA_OFFSET_MINZ] = minz;
+        modelBounds[base_idx + BOUNDS_DATA_OFFSET_MAXX] = maxx;
+        modelBounds[base_idx + BOUNDS_DATA_OFFSET_MAXY] = maxy;
+        modelBounds[base_idx + BOUNDS_DATA_OFFSET_MAXZ] = maxz;
+        float r = vmax(0.0f, vabs(minx)); r = vmax(r, vabs(miny)); r = vmax(r, vabs(minz));
+        r = vmax(r, maxx); r = vmax(r, maxy); r = vmax(r, maxz);
+        modelBounds[base_idx + BOUNDS_DATA_OFFSET_RADIUS] = r;
+
+    }
+
+    OS_DeallocateRAM(indexToParser, indexToParser_size);
+    OS_DeallocateRAM(mpars.entries, mpars.count * sizeof(Entity));
     glGenBuffers(loadedModelsMaxIndex, Sys_Render.vbos);
     glGenBuffers(loadedModelsMaxIndex, Sys_Render.tbos);
     uint32_t totalVertices = 0, totalTris = 0;
     for (int i = 0; i < loadedModelsMaxIndex; ++i) {
         if (modelVertexCounts[i] == 0) continue;
-
         size_t vertSize = modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
         totalVertices += modelVertexCounts[i];
-        size_t triSize  = modelTriangleCounts[i] * 3 * sizeof(uint32_t);
+        size_t triSize = modelTriangleCounts[i] * 3 * sizeof(uint32_t);
         totalTris += (uint32_t)triSize;
         glBindBuffer(GL_ARRAY_BUFFER, Sys_Render.vbos[i]);
         glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)vertSize, NULL, GL_STATIC_DRAW);
@@ -197,14 +300,11 @@ void LoadModels(void) {
         ptr = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, (GLsizeiptr)triSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
         __builtin_memcpy(ptr, modelTriangles[i], triSize);
         glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
-        glFlush(); glFinish(); // Surprisingly also causes the LoadTextures OpenGL driver in Linux to drop its CPU side RAM duplicates earlier
+        glFlush(); glFinish();
     }
-    
-    DebugRAM("after to model to gpu transfer");
+
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glFlush(); glFinish();
-    OS_DeallocateRAM(model_parser.entries,model_parser.count * sizeof(Entity));
     DualLog(" total vertices: %u, total tris: %u, took %f secs\n", totalVertices, totalTris, get_time() - start_time);
-    DebugRAM("After Load Models");
 }

@@ -42,6 +42,7 @@ void InitializeAIAfterLoad(uint16_t i) {
     instances[i].posCheckFinished = Sys_Global.pauseRelativeTime;
     instances[i].lastPosition = instances[i].position;
     instances[i].timeSinceMovedEnough = 0.0;
+    if (instances[i].index == 434) instances[i].position.y -= 0.98f;
     if (instances[i].walkWaypointsLength > 0 && (instances[i].entflags & ENTFLAG_WALK_PATH_ON_START) && !(instances[i].entflags & ENTFLAG_ASLEEP)) {
         instances[i].currentDestination = instances[i].walkWaypoints[instances[i].currentWaypoint];
         instances[i].currentState = AIState_Walk; // If waypoints are set, start walking

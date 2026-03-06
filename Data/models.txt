@@ -2,8 +2,8 @@
 // Defines each model used by the game or mod
 // Format:
 // # Indicates start of an entry followed by the file path.  ./ is assumed
-// example: Models/my_super_awesome_image.fbx
-// Acceptable file formats: .fbx
+// example: Models/my_super_awesome_model.obj
+// Acceptable file formats: .obj
 // The path must include the file extension
 // 
 // Next are key:value pairs separated by : and whitespace ignored
@@ -12,1035 +12,1031 @@
 // All other systems reference what model to use by index (e.g. entity 
 // definition for a pickup item will specify model by index)
 // example: index: 451
-//
-// To automate generation of this file, run the following command after cd ./Models
-// ls *.fbx | sort | awk '{print "#Models/"$0"\nindex: "NR-1}'
-//
-#Models/access_card.fbx
+#Models/access_card.obj
 index: 0
-#Models/a_hornet.fbx
+#Models/a_hornet.obj
 index: 1
-#Models/a_magcart.fbx
+#Models/a_magcart.obj
 index: 2
-#Models/a_magnum.fbx
+#Models/a_magnum.obj
 index: 3
-#Models/a_needle.fbx
+#Models/a_needle.obj
 index: 4
-#Models/a_pistol.fbx
+#Models/a_pistol.obj
 index: 5
-#Models/a_rail.fbx
+#Models/a_rail.obj
 index: 6
-#Models/arm.fbx
+#Models/arm.obj
 index: 7
-#Models/a_rubber.fbx
+#Models/a_rubber.obj
 index: 8
-#Models/a_slag.fbx
+#Models/a_slag.obj
 index: 9
-#Models/a_slaglarge.fbx
+#Models/a_slaglarge.obj
 index: 10
-#Models/audiolog.fbx
+#Models/audiolog.obj
 index: 11
-#Models/barrel_toxic.fbx
+#Models/barrel_toxic.obj
 index: 12
-#Models/battery.fbx
+#Models/battery.obj
 index: 13
-#Models/beaker.fbx
+#Models/beaker.obj
 index: 14
-#Models/beaker_holder.fbx
+#Models/beaker_holder.obj
 index: 15
-#Models/bed1.fbx
+#Models/bed1.obj
 index: 16
 #Models/bed_neurosurgery.obj
 index: 17
-#Models/beverage.fbx
+#Models/beverage.obj
 index: 18
-#Models/bonepile1.fbx
+#Models/bonepile1.obj
 index: 19
-#Models/bridg1_3.fbx
+#Models/bridg1_3.obj
 index: 20
-#Models/bridg1_3slice45.fbx
+#Models/bridg1_3slice45.obj
 index: 21
-#Models/bridg1_4.fbx
+#Models/bridg1_4.obj
 index: 22
-#Models/bridg1_4_slice32.fbx
+#Models/bridg1_4_slice32.obj
 index: 23
-#Models/bridg1_4_slice32flipx.fbx
+#Models/bridg1_4_slice32flipx.obj
 index: 24
-#Models/bridg1_5.fbx
+#Models/bridg1_5.obj
 index: 25
-#Models/bridg2_2.fbx
+#Models/bridg2_2.obj
 index: 26
-#Models/bridg2_3.fbx
+#Models/bridg2_3.obj
 index: 27
-#Models/bridg2_4.fbx
+#Models/bridg2_4.obj
 index: 28
-#Models/bridg2_5.fbx
+#Models/bridg2_5.obj
 index: 29
-#Models/bridg2_6.fbx
+#Models/bridg2_6.obj
 index: 30
-#Models/bridg2_8.fbx
+#Models/bridg2_8.obj
 index: 31
-#Models/bridg2_9.fbx
+#Models/bridg2_9.obj
 index: 32
-#Models/bridgewall1.fbx
+#Models/bridgewall1.obj
 index: 33
-#Models/briefcase.fbx
+#Models/briefcase.obj
 index: 34
-#Models/briefcase_gib1.fbx
+#Models/briefcase_gib1.obj
 index: 35
-#Models/briefcase_gib2.fbx
+#Models/briefcase_gib2.obj
 index: 36
-#Models/briefcase_gib3.fbx
+#Models/briefcase_gib3.obj
 index: 37
-#Models/broken_clock.fbx
+#Models/broken_clock.obj
 index: 38
-#Models/cabinet.fbx
+#Models/cabinet.obj
 index: 39
-#Models/cart1.fbx
+#Models/cart1.obj
 index: 40
-#Models/chair01.fbx
+#Models/chair01.obj
 index: 41
-#Models/chair02.fbx
+#Models/chair02.obj
 index: 42
-#Models/chair03.fbx
+#Models/chair03.obj
 index: 43
-#Models/charge_station.fbx
+#Models/charge_station.obj
 index: 44
-#Models/chipset.fbx
+#Models/chipset.obj
 index: 45
-#Models/chipset_isolinear.fbx
+#Models/chipset_isolinear.obj
 index: 46
-#Models/clothes.fbx
+#Models/clothes.obj
 index: 47
-#Models/computer.fbx
+#Models/computer.obj
 index: 48
-#Models/console01.fbx
+#Models/console01.obj
 index: 49
-#Models/console02.fbx
+#Models/console02.obj
 index: 50
-#Models/corpse_blueshirt.fbx
+#Models/corpse_blueshirt.obj
 index: 51
-#Models/corpse_brownshirt.fbx
+#Models/corpse_brownshirt.obj
 index: 52
-#Models/corpse_eaten.fbx
+#Models/corpse_eaten.obj
 index: 53
-#Models/corpse_humanoid_base.fbx
+#Models/corpse_humanoid_base.obj
 index: 54
-#Models/corpse_labcoat.fbx
+#Models/corpse_labcoat.obj
 index: 55
-#Models/corpse_security.fbx
+#Models/corpse_security.obj
 index: 56
-#Models/corpse_tan.fbx
+#Models/corpse_tan.obj
 index: 57
-#Models/corpse_torso.fbx
+#Models/corpse_torso.obj
 index: 58
-#Models/couch.fbx
+#Models/couch.obj
 index: 59
-#Models/crate1.fbx
+#Models/crate1.obj
 index: 60
-#Models/crate_impenetrable.fbx
+#Models/crate_impenetrable.obj
 index: 61
-#Models/cyber_access_port.fbx
+#Models/cyber_access_port.obj
 index: 62
-#Models/cyber_bullet_dog.fbx
+#Models/cyber_bullet_dog.obj
 index: 63
-#Models/cyber_bullet.fbx
+#Models/cyber_bullet.obj
 index: 64
-#Models/cyber_data.fbx
+#Models/cyber_data.obj
 index: 65
-#Models/cyber_datafrag.fbx
+#Models/cyber_datafrag.obj
 index: 66
-#Models/cyber_exit.fbx
+#Models/cyber_exit.obj
 index: 67
-#Models/cyber_ice.fbx
+#Models/cyber_ice.obj
 index: 68
-#Models/cyber_integrity.fbx
+#Models/cyber_integrity.obj
 index: 69
-#Models/cyber_item.fbx
+#Models/cyber_item.obj
 index: 70
-#Models/cyber_mine.fbx
+#Models/cyber_mine.obj
 index: 71
-#Models/cyberplayer.fbx
+#Models/cyberplayer.obj
 index: 72
-#Models/cyber_switch.fbx
+#Models/cyber_switch.obj
 index: 73
-#Models/desk01.fbx
+#Models/desk01.obj
 index: 74
-#Models/desk02.fbx
+#Models/desk02.obj
 index: 75
-#Models/dexmissile.fbx
+#Models/dexmissile.obj
 index: 76
-#Models/d_logo.fbx
+#Models/d_logo.obj
 index: 77
-#Models/cube.fbx
+#Models/cube.obj
 index: 78
-#Models/us_retinalscanner_pnl14.fbx
+#Models/us_retinalscanner_pnl14.obj
 index: 79
 
-#Models/eng1_1d.fbx
+#Models/eng1_1d.obj
 index: 95
-#Models/eng1_1.fbx
+#Models/eng1_1.obj
 index: 96
-#Models/eng1_2d.fbx
+#Models/eng1_2d.obj
 index: 97
-#Models/eng1_2.fbx
+#Models/eng1_2.obj
 index: 98
-#Models/eng1_3d.fbx
+#Models/eng1_3d.obj
 index: 99
-#Models/eng1_3.fbx
+#Models/eng1_3.obj
 index: 100
-#Models/eng1_4.fbx
+#Models/eng1_4.obj
 index: 101
-#Models/eng1_5d.fbx
+#Models/eng1_5d.obj
 index: 102
-#Models/eng1_5.fbx
+#Models/eng1_5.obj
 index: 103
-#Models/eng1_5_slice45.fbx
+#Models/eng1_5_slice45.obj
 index: 104
-#Models/eng1_5_slice45rh.fbx
+#Models/eng1_5_slice45rh.obj
 index: 105
-#Models/eng1_6d.fbx
+#Models/eng1_6d.obj
 index: 106
-#Models/eng1_6.fbx
+#Models/eng1_6.obj
 index: 107
-#Models/eng1_7.fbx
+#Models/eng1_7.obj
 index: 108
-#Models/eng1_8.fbx
+#Models/eng1_8.obj
 index: 109
-#Models/eng1_9d.fbx
+#Models/eng1_9d.obj
 index: 110
-#Models/eng1_9.fbx
+#Models/eng1_9.obj
 index: 111
-#Models/eng2_1d.fbx
+#Models/eng2_1d.obj
 index: 112
-#Models/eng2_1.fbx
+#Models/eng2_1.obj
 index: 113
-#Models/eng2_1_slice384high.fbx
+#Models/eng2_1_slice384high.obj
 index: 114
-#Models/eng2_1_slice384highrh.fbx
+#Models/eng2_1_slice384highrh.obj
 index: 115
-#Models/eng2_1_slice45.fbx
+#Models/eng2_1_slice45.obj
 index: 116
-#Models/eng2_2.fbx
+#Models/eng2_2.obj
 index: 117
-#Models/eng2_3d.fbx
+#Models/eng2_3d.obj
 index: 118
-#Models/eng2_3.fbx
+#Models/eng2_3.obj
 index: 119
-#Models/eng2_5.fbx
+#Models/eng2_5.obj
 index: 120
-#Models/eng2_5_slice45.fbx
+#Models/eng2_5_slice45.obj
 index: 121
 
-#Models/exec1_1d.fbx
+#Models/exec1_1d.obj
 index: 123
-#Models/exec1_1.fbx
+#Models/exec1_1.obj
 index: 124
-#Models/exec1_2d.fbx
+#Models/exec1_2d.obj
 index: 125
-#Models/exec1_2.fbx
+#Models/exec1_2.obj
 index: 126
-#Models/exec2_1.fbx
+#Models/exec2_1.obj
 index: 127
-#Models/exec2_2d.fbx
+#Models/exec2_2d.obj
 index: 128
-#Models/exec2_2.fbx
+#Models/exec2_2.obj
 index: 129
-#Models/exec2_3.fbx
+#Models/exec2_3.obj
 index: 130
-#Models/exec2_4.fbx
+#Models/exec2_4.obj
 index: 131
-#Models/exec2_4_slice45.fbx
+#Models/exec2_4_slice45.obj
 index: 132
-#Models/exec2_5.fbx
+#Models/exec2_5.obj
 index: 133
-#Models/exec2_6.fbx
+#Models/exec2_6.obj
 index: 134
-#Models/exec3_1d.fbx
+#Models/exec3_1d.obj
 index: 135
-#Models/exec4_1.fbx
+#Models/exec4_1.obj
 index: 136
-#Models/exec4_2.fbx
+#Models/exec4_2.obj
 index: 137
-#Models/exec4_3.fbx
+#Models/exec4_3.obj
 index: 138
-#Models/exec4_4.fbx
+#Models/exec4_4.obj
 index: 139
-#Models/exec4_5.fbx
+#Models/exec4_5.obj
 index: 140
-#Models/exec4_6.fbx
+#Models/exec4_6.obj
 index: 141
-#Models/exec6_1.fbx
+#Models/exec6_1.obj
 index: 142
-#Models/exterior_shieldgenerator.fbx
+#Models/exterior_shieldgenerator.obj
 index: 143
-#Models/fireextinguisher.fbx
+#Models/fireextinguisher.obj
 index: 144
-#Models/flask.fbx
+#Models/flask.obj
 index: 145
-#Models/flight1_1.fbx
+#Models/flight1_1.obj
 index: 146
-#Models/flight1_2.fbx
+#Models/flight1_2.obj
 index: 147
-#Models/flight1_2_slice45lh.fbx
+#Models/flight1_2_slice45lh.obj
 index: 148
-#Models/flight1_2_slice45rh.fbx
+#Models/flight1_2_slice45rh.obj
 index: 149
-#Models/flight1_3.fbx
+#Models/flight1_3.obj
 index: 150
-#Models/flight1_4.fbx
+#Models/flight1_4.obj
 index: 151
-#Models/flight1_6.fbx
+#Models/flight1_6.obj
 index: 152
-#Models/flight2_1.fbx
+#Models/flight2_1.obj
 index: 153
-#Models/flight2_2.fbx
+#Models/flight2_2.obj
 index: 154
-#Models/flight2_2_slice45.fbx
+#Models/flight2_2_slice45.obj
 index: 155
-#Models/flight2_3.fbx
+#Models/flight2_3.obj
 index: 156
-#Models/decal_bloodsplat2.fbx
+#Models/decal_bloodsplat2.obj
 index: 157
-#Models/flightpods_exterior.fbx
+#Models/flightpods_exterior.obj
 index: 158
-#Models/foliage_fernblueflower.fbx
+#Models/foliage_fernblueflower.obj
 index: 159
-#Models/foliage_fern.fbx
+#Models/foliage_fern.obj
 index: 160
-#Models/foliage_grass1.fbx
+#Models/foliage_grass1.obj
 index: 161
-#Models/foliage_grass2.fbx
+#Models/foliage_grass2.obj
 index: 162
-#Models/foliage_grass3.fbx
+#Models/foliage_grass3.obj
 index: 163
-#Models/foliage_grass4.fbx
+#Models/foliage_grass4.obj
 index: 164
-#Models/g_conc.fbx
+#Models/g_conc.obj
 index: 165
-#Models/gear_large.fbx
+#Models/gear_large.obj
 index: 166
-#Models/gear_small.fbx
+#Models/gear_small.obj
 index: 167
-#Models/g_emp.fbx
+#Models/g_emp.obj
 index: 168
-#Models/g_energmine.fbx
+#Models/g_energmine.obj
 index: 169
-#Models/genericLOD3card_112ofs.fbx
+#Models/genericLOD3card_112ofs.obj
 index: 170
-#Models/genericLOD3card_128ofs.fbx
+#Models/genericLOD3card_128ofs.obj
 index: 171
-#Models/genericLOD3card_144s.fbx
+#Models/genericLOD3card_144s.obj
 index: 172
-#Models/genericLOD3card_192ofs.fbx
+#Models/genericLOD3card_192ofs.obj
 index: 173
-#Models/genericLOD3card_256ofs.fbx
+#Models/genericLOD3card_256ofs.obj
 index: 174
-#Models/genericLOD3card_32ofs.fbx
+#Models/genericLOD3card_32ofs.obj
 index: 175
-#Models/genericLOD3card_64ofs.fbx
+#Models/genericLOD3card_64ofs.obj
 index: 176
-#Models/genericLOD3card_96ofs.fbx
+#Models/genericLOD3card_96ofs.obj
 index: 177
-#Models/genericLOD3card.fbx
+#Models/genericLOD3card.obj
 index: 178
-#Models/genericLOD3card_ofs128.fbx
+#Models/genericLOD3card_ofs128.obj
 index: 179
-#Models/genericLOD3card_slice45.fbx
+#Models/genericLOD3card_slice45.obj
 index: 180
-#Models/g_eshaker.fbx
+#Models/g_eshaker.obj
 index: 181
-#Models/g_frag.fbx
+#Models/g_frag.obj
 index: 182
-#Models/g_gas.fbx
+#Models/g_gas.obj
 index: 183
-#Models/g_mine.fbx
+#Models/g_mine.obj
 index: 184
-#Models/g_nitro.fbx
+#Models/g_nitro.obj
 index: 185
-#Models/grate1_1.fbx
+#Models/grate1_1.obj
 index: 186
-#Models/grate1_2.fbx
+#Models/grate1_2.obj
 index: 187
-#Models/grate1_3.fbx
+#Models/grate1_3.obj
 index: 188
-#Models/grove1_1.fbx
+#Models/grove1_1.obj
 index: 189
-#Models/grove2_1.fbx
+#Models/grove2_1.obj
 index: 190
-#Models/grove2_3.fbx
+#Models/grove2_3.obj
 index: 191
-#Models/grove2_5.fbx
+#Models/grove2_5.obj
 index: 192
-#Models/head_female.fbx
+#Models/head_female.obj
 index: 193
-#Models/head_male.fbx
+#Models/head_male.obj
 index: 194
-#Models/healingbed.fbx
+#Models/healingbed.obj
 index: 195
-#Models/healthkit.fbx
+#Models/healthkit.obj
 index: 196
-#Models/hw_bio.fbx
+#Models/hw_bio.obj
 index: 197
-#Models/hw_booster.fbx
+#Models/hw_booster.obj
 index: 198
-#Models/hw_enviro.fbx
+#Models/hw_enviro.obj
 index: 199
-#Models/hw_ereader.fbx
+#Models/hw_ereader.obj
 index: 200
-#Models/hw_infrared.fbx
+#Models/hw_infrared.obj
 index: 201
-#Models/hw_jumpjets.fbx
+#Models/hw_jumpjets.obj
 index: 202
-#Models/hw_lantern.fbx
+#Models/hw_lantern.obj
 index: 203
 #Models/hw_navunit.obj
 index: 204
-#Models/hw_sensaround.fbx
+#Models/hw_sensaround.obj
 index: 205
-#Models/hw_shield.fbx
+#Models/hw_shield.obj
 index: 206
-#Models/hw_system.fbx
+#Models/hw_system.obj
 index: 207
-#Models/hw_targetid.fbx
+#Models/hw_targetid.obj
 index: 208
-#Models/isotopex22.fbx
+#Models/isotopex22.obj
 index: 209
-#Models/keypad1.fbx
+#Models/keypad1.obj
 index: 210
-#Models/keypad2.fbx
+#Models/keypad2.obj
 index: 211
-#Models/lamp.fbx
+#Models/lamp.obj
 index: 212
-#Models/lift1.fbx
+#Models/lift1.obj
 index: 213
-#Models/lift1_lod2.fbx
+#Models/lift1_lod2.obj
 index: 214
-#Models/lift2.fbx
+#Models/lift2.obj
 index: 215
-#Models/light_emergsignal.fbx
+#Models/light_emergsignal.obj
 index: 216
-#Models/logic_probe.fbx
+#Models/logic_probe.obj
 index: 217
-#Models/maint1_1.fbx
+#Models/maint1_1.obj
 index: 218
-#Models/maint1_2d.fbx
+#Models/maint1_2d.obj
 index: 219
-#Models/maint1_2.fbx
+#Models/maint1_2.obj
 index: 220
-#Models/maint1_3b.fbx
+#Models/maint1_3b.obj
 index: 221
-#Models/maint1_3.fbx
+#Models/maint1_3.obj
 index: 222
-#Models/maint1_4d.fbx
+#Models/maint1_4d.obj
 index: 223
-#Models/maint1_4.fbx
+#Models/maint1_4.obj
 index: 224
-#Models/maint1_5.fbx
+#Models/maint1_5.obj
 index: 225
-#Models/maint1_6.fbx
+#Models/maint1_6.obj
 index: 226
-#Models/maint1_7.fbx
+#Models/maint1_7.obj
 index: 227
-#Models/maint2_1b.fbx
+#Models/maint2_1b.obj
 index: 228
-#Models/maint2_1d.fbx
+#Models/maint2_1d.obj
 index: 229
-#Models/maint2_2.fbx
+#Models/maint2_2.obj
 index: 230
-#Models/maint2_3d.fbx
+#Models/maint2_3d.obj
 index: 231
-#Models/maint2_3.fbx
+#Models/maint2_3.obj
 index: 232
-#Models/maint2_4.fbx
+#Models/maint2_4.obj
 index: 233
-#Models/maint2_5d.fbx
+#Models/maint2_5d.obj
 index: 234
-#Models/maint2_5.fbx
+#Models/maint2_5.obj
 index: 235
-#Models/maint2_6.fbx
+#Models/maint2_6.obj
 index: 236
-#Models/maint2_7d.fbx
+#Models/maint2_7d.obj
 index: 237
-#Models/maint2_7.fbx
+#Models/maint2_7.obj
 index: 238
-#Models/maint2_8.fbx
+#Models/maint2_8.obj
 index: 239
-#Models/maint2_9.fbx
+#Models/maint2_9.obj
 index: 240
-#Models/maint2_9_slice128_top.fbx
+#Models/maint2_9_slice128_top.obj
 index: 241
-#Models/maint2_9_slice45_rh.fbx
+#Models/maint2_9_slice45_rh.obj
 index: 242
-#Models/maint3_1d.fbx
+#Models/maint3_1d.obj
 index: 243
-#Models/maint3_1.fbx
+#Models/maint3_1.obj
 index: 244
-#Models/maint3_1_slice32.fbx
+#Models/maint3_1_slice32.obj
 index: 245
-#Models/maint3_1_slice32lh.fbx
+#Models/maint3_1_slice32lh.obj
 index: 246
-#Models/maint3_1_slice45.fbx
+#Models/maint3_1_slice45.obj
 index: 247
-#Models/med1_1d.fbx
+#Models/med1_1d.obj
 index: 248
-#Models/med1_1.fbx
+#Models/med1_1.obj
 index: 249
-#Models/med1_1_half.fbx
+#Models/med1_1_half.obj
 index: 250
-#Models/med1_1_slice128high.fbx
+#Models/med1_1_slice128high.obj
 index: 251
-#Models/med1_1_slice192_rh.fbx
+#Models/med1_1_slice192_rh.obj
 index: 252
-#Models/med1_1_slice256.fbx
+#Models/med1_1_slice256.obj
 index: 253
-#Models/med1_2d.fbx
+#Models/med1_2d.obj
 index: 254
-#Models/med1_2.fbx
+#Models/med1_2.obj
 index: 255
-#Models/med1_3d.fbx
+#Models/med1_3d.obj
 index: 256
-#Models/med1_3.fbx
+#Models/med1_3.obj
 index: 257
-#Models/med1_4.fbx
+#Models/med1_4.obj
 index: 258
-#Models/med1_6.fbx
+#Models/med1_6.obj
 index: 259
-#Models/med1_7d.fbx
+#Models/med1_7d.obj
 index: 260
-#Models/med1_7d_slice128.fbx
+#Models/med1_7d_slice128.obj
 index: 261
-#Models/med1_7.fbx
+#Models/med1_7.obj
 index: 262
-#Models/med1_7_slice14_64.fbx
+#Models/med1_7_slice14_64.obj
 index: 263
-#Models/med1_7_slice45_320.fbx
+#Models/med1_7_slice45_320.obj
 index: 264
-#Models/med1_7_slice45_320rh.fbx
+#Models/med1_7_slice45_320rh.obj
 index: 265
-#Models/med1_7_slice96high.fbx
+#Models/med1_7_slice96high.obj
 index: 266
-#Models/med1_8d.fbx
+#Models/med1_8d.obj
 index: 267
-#Models/med1_8.fbx
+#Models/med1_8.obj
 index: 268
-#Models/med1_9d.fbx
+#Models/med1_9d.obj
 index: 269
-#Models/med1_9d_ofs112_90.fbx
+#Models/med1_9d_ofs112_90.obj
 index: 270
-#Models/med1_9d_ofs128_90.fbx
+#Models/med1_9d_ofs128_90.obj
 index: 271
-#Models/med1_9d_ofs144_90.fbx
+#Models/med1_9d_ofs144_90.obj
 index: 272
-#Models/med1_9d_ofs192_90.fbx
+#Models/med1_9d_ofs192_90.obj
 index: 273
-#Models/med1_9d_ofs32_90.fbx
+#Models/med1_9d_ofs32_90.obj
 index: 274
-#Models/med1_9d_ofs48_90.fbx
+#Models/med1_9d_ofs48_90.obj
 index: 275
-#Models/med1_9d_ofs64_90.fbx
+#Models/med1_9d_ofs64_90.obj
 index: 276
-#Models/med1_9d_ofs96_90.fbx
+#Models/med1_9d_ofs96_90.obj
 index: 277
-#Models/med1_9.fbx
+#Models/med1_9.obj
 index: 278
-#Models/med2_1d.fbx
+#Models/med2_1d.obj
 index: 279
 #Models/med2_1.obj
 index: 280
-#Models/med2_1_slice32RH.fbx
+#Models/med2_1_slice32RH.obj
 index: 281
-#Models/med2_2d.fbx
+#Models/med2_2d.obj
 index: 282
-#Models/med2_2.fbx
+#Models/med2_2.obj
 index: 283
-#Models/med2_2_half_bottom.fbx
+#Models/med2_2_half_bottom.obj
 index: 284
-#Models/med2_3d.fbx
+#Models/med2_3d.obj
 index: 285
-#Models/med2_3.fbx
+#Models/med2_3.obj
 index: 286
-#Models/med2_4.fbx
+#Models/med2_4.obj
 index: 287
-#Models/med2_5.fbx
+#Models/med2_5.obj
 index: 288
 #Models/med2_6.obj
 index: 289
-#Models/med2_7.fbx
+#Models/med2_7.obj
 index: 290
-#Models/med2_8.fbx
+#Models/med2_8.obj
 index: 291
-#Models/med2_8_half_top.fbx
+#Models/med2_8_half_top.obj
 index: 292
-#Models/med2_8_slice32RH.fbx
+#Models/med2_8_slice32RH.obj
 index: 293
-#Models/med2_8_slice45.fbx
+#Models/med2_8_slice45.obj
 index: 294
-#Models/med2_9d.fbx
+#Models/med2_9d.obj
 index: 295
-#Models/med2_9.fbx
+#Models/med2_9.obj
 index: 296
-#Models/med3_1.fbx
+#Models/med3_1.obj
 index: 297
-#Models/microscope.fbx
+#Models/microscope.obj
 index: 298
-#Models/npc_autobomb.fbx
+#Models/npc_autobomb.obj
 index: 299
 
-#Models/npc_bot_cortex_reaver_gibs.fbx
+#Models/npc_bot_cortex_reaver_gibs.obj
 index: 301
-#Models/npc_cyberdog.fbx
+#Models/npc_cyberdog.obj
 index: 302
-#Models/npc_cyberguard1.fbx
+#Models/npc_cyberguard1.obj
 index: 303
-#Models/npc_cyberram.fbx
+#Models/npc_cyberram.obj
 index: 304
-#Models/npc_cyberreaver.fbx
+#Models/npc_cyberreaver.obj
 index: 305
 
-#Models/npc_cyborgassassin_throwingstar.fbx
+#Models/npc_cyborgassassin_throwingstar.obj
 index: 307
 
 #Models/npc_cyborg_diegoteleportfx.obj
 index: 311
 
-#Models/npc_execbot_gibs.fbx
+#Models/npc_execbot_gibs.obj
 index: 317
 
-#Models/npc_flierbot_gibs.fbx
+#Models/npc_flierbot_gibs.obj
 index: 319
 
-#Models/npc_maintenancebot_gibs.fbx
+#Models/npc_maintenancebot_gibs.obj
 index: 326
 
-#Models/npc_repairbot_gibs.fbx
+#Models/npc_repairbot_gibs.obj
 index: 332
 
-#Models/npc_sec1bot_gibs.fbx
+#Models/npc_sec1bot_gibs.obj
 index: 334
 
-#Models/npc_sec2botgibs.fbx
+#Models/npc_sec2botgibs.obj
 index: 336
 
-#Models/npc_servbot_gibs.fbx
+#Models/npc_servbot_gibs.obj
 index: 338
-#Models/reac1_1_slice45.fbx
+#Models/reac1_1_slice45.obj
 index: 339
-#Models/reac2_4_slice128lower.fbx
+#Models/reac2_4_slice128lower.obj
 index: 340
-#Models/grove2_4.fbx
+#Models/grove2_4.obj
 index: 341
-#Models/reac1_7.fbx
+#Models/reac1_7.obj
 index: 342
 
-#Models/papers01.fbx
+#Models/papers01.obj
 index: 484
-#Models/papers02.fbx
+#Models/papers02.obj
 index: 485
-#Models/papers03.fbx
+#Models/papers03.obj
 index: 486
-#Models/paper_wad.fbx
+#Models/paper_wad.obj
 index: 487
-#Models/patch.fbx
+#Models/patch.obj
 index: 488
-#Models/pinetreem.fbx
+#Models/pinetreem.obj
 index: 489
-#Models/pipe128.fbx
+#Models/pipe128.obj
 index: 490
-#Models/plane_generic.fbx
+#Models/plane_generic.obj
 index: 491
-#Models/plastique.fbx
+#Models/plastique.obj
 index: 492
-#Models/poisonbush1.fbx
+#Models/poisonbush1.obj
 index: 493
-#Models/pot.fbx
+#Models/pot.obj
 index: 494
-#Models/prop_bush.fbx
+#Models/prop_bush.obj
 index: 495
-#Models/prop_chandelier.fbx
+#Models/prop_chandelier.obj
 index: 496
-#Models/pumpkin.fbx
+#Models/pumpkin.obj
 index: 497
 
-#Models/rad1_1.fbx
+#Models/rad1_1.obj
 index: 501
-#Models/reac1_1.fbx
+#Models/reac1_1.obj
 index: 502
-#Models/reac1_2.fbx
+#Models/reac1_2.obj
 index: 503
-#Models/reac1_3.fbx
+#Models/reac1_3.obj
 index: 504
-#Models/reac1_4.fbx
+#Models/reac1_4.obj
 index: 505
-#Models/reac1_5.fbx
+#Models/reac1_5.obj
 index: 506
-#Models/reac1_6.fbx
+#Models/reac1_6.obj
 index: 507
-#Models/reac1_8.fbx
+#Models/reac1_8.obj
 index: 508
-#Models/reac1_9.fbx
+#Models/reac1_9.obj
 index: 509
-#Models/reac2_1b.fbx
+#Models/reac2_1b.obj
 index: 510
-#Models/reac2_1bmirror.fbx
+#Models/reac2_1bmirror.obj
 index: 511
-#Models/reac2_1.fbx
+#Models/reac2_1.obj
 index: 512
-#Models/reac2_1_mirror.fbx
+#Models/reac2_1_mirror.obj
 index: 513
-#Models/reac2_1slice45lh.fbx
+#Models/reac2_1slice45lh.obj
 index: 514
-#Models/reac2_1slice45lh_up.fbx
+#Models/reac2_1slice45lh_up.obj
 index: 515
-#Models/reac2_1slice45rh.fbx
+#Models/reac2_1slice45rh.obj
 index: 516
-#Models/reac2_1slice45rh_up.fbx
+#Models/reac2_1slice45rh_up.obj
 index: 517
-#Models/reac2_2.fbx
+#Models/reac2_2.obj
 index: 518
-#Models/reac2_4.fbx
+#Models/reac2_4.obj
 index: 519
-#Models/reac2_5.fbx
+#Models/reac2_5.obj
 index: 520
-#Models/reac2_6.fbx
+#Models/reac2_6.obj
 index: 521
-#Models/reac2_7.fbx
+#Models/reac2_7.obj
 index: 522
-#Models/reac2_8.fbx
+#Models/reac2_8.obj
 index: 523
-#Models/reac2_9.fbx
+#Models/reac2_9.obj
 index: 524
-#Models/reac3_1.fbx
+#Models/reac3_1.obj
 index: 525
-#Models/reac3_2.fbx
+#Models/reac3_2.obj
 index: 526
-#Models/reac3_3.fbx
+#Models/reac3_3.obj
 index: 527
-#Models/reac3_4.fbx
+#Models/reac3_4.obj
 index: 528
-#Models/reac3_5.fbx
+#Models/reac3_5.obj
 index: 529
-#Models/reac3_6.fbx
+#Models/reac3_6.obj
 index: 530
-#Models/reac3_7.fbx
+#Models/reac3_7.obj
 index: 531
-#Models/reac4_1.fbx
+#Models/reac4_1.obj
 index: 532
-#Models/reac4_1_slice45lh.fbx
+#Models/reac4_1_slice45lh.obj
 index: 533
-#Models/reac4_2.fbx
+#Models/reac4_2.obj
 index: 534
-#Models/reac5_1.fbx
+#Models/reac5_1.obj
 index: 535
-#Models/reac5_2.fbx
+#Models/reac5_2.obj
 index: 536
-#Models/reac5_3.fbx
+#Models/reac5_3.obj
 index: 537
-#Models/reac6_1.fbx
+#Models/reac6_1.obj
 index: 538
-#Models/reac6_3.fbx
+#Models/reac6_3.obj
 index: 539
 
-#Models/sci1_1d.fbx
+#Models/sci1_1d.obj
 index: 541
-#Models/sci1_1_slice45_top_lh.fbx
+#Models/sci1_1_slice45_top_lh.obj
 index: 542
-#Models/sci1_1_slice45_top_rh.fbx
+#Models/sci1_1_slice45_top_rh.obj
 index: 543
-#Models/sci1_2d.fbx
+#Models/sci1_2d.obj
 index: 544
-#Models/sci1_2.fbx
+#Models/sci1_2.obj
 index: 545
-#Models/sci1_2_slice45_lh.fbx
+#Models/sci1_2_slice45_lh.obj
 index: 546
-#Models/sci1_2_slice45lh_up.fbx
+#Models/sci1_2_slice45lh_up.obj
 index: 547
-#Models/sci1_2_slice45_rh.fbx
+#Models/sci1_2_slice45_rh.obj
 index: 548
-#Models/sci1_2_slice45rh_up.fbx
+#Models/sci1_2_slice45rh_up.obj
 index: 549
-#Models/sci1_3.fbx
+#Models/sci1_3.obj
 index: 550
-#Models/sci1_5.fbx
+#Models/sci1_5.obj
 index: 551
-#Models/sci1_6.fbx
+#Models/sci1_6.obj
 index: 552
-#Models/sci1_6_slice45.fbx
+#Models/sci1_6_slice45.obj
 index: 553
-#Models/sci1_7d.fbx
+#Models/sci1_7d.obj
 index: 554
-#Models/sci1_7.fbx
+#Models/sci1_7.obj
 index: 555
-#Models/sci1_8d.fbx
+#Models/sci1_8d.obj
 index: 556
-#Models/sci1_8.fbx
+#Models/sci1_8.obj
 index: 557
-#Models/sci1_9d.fbx
+#Models/sci1_9d.obj
 index: 558
-#Models/sci1_9.fbx
+#Models/sci1_9.obj
 index: 559
-#Models/sci2_1d.fbx
+#Models/sci2_1d.obj
 index: 560
-#Models/sci2_1.fbx
+#Models/sci2_1.obj
 index: 561
-#Models/sci2_1_slice45rh.fbx
+#Models/sci2_1_slice45rh.obj
 index: 562
-#Models/sci2_1_slicelh.fbx
+#Models/sci2_1_slicelh.obj
 index: 563
-#Models/sci2_2d.fbx
+#Models/sci2_2d.obj
 index: 564
-#Models/sci2_2.fbx
+#Models/sci2_2.obj
 index: 565
-#Models/sci2_3.fbx
+#Models/sci2_3.obj
 index: 566
-#Models/sci2_4.fbx
+#Models/sci2_4.obj
 index: 567
-#Models/sci2_5d.fbx
+#Models/sci2_5d.obj
 index: 568
-#Models/sci2_5.fbx
+#Models/sci2_5.obj
 index: 569
-#Models/sci3_1d.fbx
+#Models/sci3_1d.obj
 index: 570
-#Models/sci3_1.fbx
+#Models/sci3_1.obj
 index: 571
-#Models/sci3_2.fbx
+#Models/sci3_2.obj
 index: 572
-#Models/sci3_3.fbx
+#Models/sci3_3.obj
 index: 573
-#Models/sci3_4.fbx
+#Models/sci3_4.obj
 index: 574
-#Models/sci3_5.fbx
+#Models/sci3_5.obj
 index: 575
-#Models/sci3_6.fbx
+#Models/sci3_6.obj
 index: 576
-#Models/sec1_1c.fbx
+#Models/sec1_1c.obj
 index: 577
-#Models/sec1_1c_slice320high.fbx
+#Models/sec1_1c_slice320high.obj
 index: 578
-#Models/sec1_1c_slice320highrh.fbx
+#Models/sec1_1c_slice320highrh.obj
 index: 579
-#Models/sec1_1c_slice45.fbx
+#Models/sec1_1c_slice45.obj
 index: 580
-#Models/sec1_1c_slice64high.fbx
+#Models/sec1_1c_slice64high.obj
 index: 581
-#Models/sec1_1c_slice64highrh.fbx
+#Models/sec1_1c_slice64highrh.obj
 index: 582
-#Models/sec1_2b.fbx
+#Models/sec1_2b.obj
 index: 583
-#Models/sec1_2.fbx
+#Models/sec1_2.obj
 index: 584
-#Models/sec1_3.fbx
+#Models/sec1_3.obj
 index: 585
-#Models/sec1_3_slice45.fbx
+#Models/sec1_3_slice45.obj
 index: 586
-#Models/sec_cpunode.fbx
+#Models/sec_cpunode.obj
 index: 587
-#Models/sec_cpunode_small.fbx
+#Models/sec_cpunode_small.obj
 index: 588
-#Models/security_camera.fbx
+#Models/security_camera.obj
 index: 589
-#Models/severedhead.fbx
+#Models/severedhead.obj
 index: 590
-#Models/shelves.fbx
+#Models/shelves.obj
 index: 591
 #Models/skeleton.obj
 index: 592
-#Models/skull.fbx
+#Models/skull.obj
 index: 593
 
-#Models/sleeping_cables.fbx
+#Models/sleeping_cables.obj
 index: 595
 
-#Models/stor1_1.fbx
+#Models/stor1_1.obj
 index: 597
-#Models/stor1_3.fbx
+#Models/stor1_3.obj
 index: 598
-#Models/stor1_4.fbx
+#Models/stor1_4.obj
 index: 599
-#Models/stor1_5.fbx
+#Models/stor1_5.obj
 index: 600
-#Models/stor1_6.fbx
+#Models/stor1_6.obj
 index: 601
-#Models/stor1_6_slice128_up_lh.fbx
+#Models/stor1_6_slice128_up_lh.obj
 index: 602
-#Models/stor1_6_slice128_up_rh.fbx
+#Models/stor1_6_slice128_up_rh.obj
 index: 603
-#Models/stor1_6_slice192lh.fbx
+#Models/stor1_6_slice192lh.obj
 index: 604
-#Models/stor1_6_slice192rh.fbx
+#Models/stor1_6_slice192rh.obj
 index: 605
-#Models/stor1_7.fbx
+#Models/stor1_7.obj
 index: 606
-#Models/stor1_7_slice45.fbx
+#Models/stor1_7_slice45.obj
 index: 607
-#Models/surgery_table.fbx
+#Models/surgery_table.obj
 index: 608
-#Models/switch1.fbx
+#Models/switch1.obj
 index: 609
 #Models/switch2.obj
 index: 610
-#Models/switch3.fbx
+#Models/switch3.obj
 index: 611
 
-#Models/switch5_broken.fbx
+#Models/switch5_broken.obj
 index: 613
-#Models/vending2_1.fbx
+#Models/vending2_1.obj
 index: 614
-#Models/switch6.fbx
+#Models/switch6.obj
 index: 615
-#Models/switch8.fbx
+#Models/switch8.obj
 index: 616
-#Models/switch_broken1.fbx
+#Models/switch_broken1.obj
 index: 617
-#Models/switch_elev3.fbx
+#Models/switch_elev3.obj
 index: 618
-#Models/table.fbx
+#Models/table.obj
 index: 619
-#Models/stor1_7d.fbx
+#Models/stor1_7d.obj
 index: 620
-#Models/vending2_2.fbx
+#Models/vending2_2.obj
 index: 621
-#Models/testtube.fbx
+#Models/testtube.obj
 index: 622
-#Models/thermos.fbx
+#Models/thermos.obj
 index: 623
-#Models/toolcart.fbx
+#Models/toolcart.obj
 index: 624
-#Models/tv_on_a_post.fbx
+#Models/tv_on_a_post.obj
 index: 625
-#Models/v_dartgun.fbx
+#Models/v_dartgun.obj
 index: 626
-#Models/vending1_1.fbx
+#Models/vending1_1.obj
 index: 627
-#Models/vending1_2.fbx
+#Models/vending1_2.obj
 index: 628
-#Models/vending1_3.fbx
+#Models/vending1_3.obj
 index: 629
-#Models/v_flechette.fbx
+#Models/v_flechette.obj
 index: 630
-#Models/v_magnum.fbx
+#Models/v_magnum.obj
 index: 631
-#Models/v_magpulse.fbx
+#Models/v_magpulse.obj
 index: 632
 
-#Models/v_pistol.fbx
+#Models/v_pistol.obj
 index: 634
-#Models/v_plasma.fbx
+#Models/v_plasma.obj
 index: 635
 
-#Models/warecasing.fbx
+#Models/warecasing.obj
 index: 637
-#Models/w_blaster.fbx
+#Models/w_blaster.obj
 index: 638
-#Models/w_brokengun.fbx
+#Models/w_brokengun.obj
 index: 639
-#Models/w_dartgun.fbx
+#Models/w_dartgun.obj
 index: 640
-#Models/weapon_rack.fbx
+#Models/weapon_rack.obj
 index: 641
-#Models/w_flechette.fbx
+#Models/w_flechette.obj
 index: 642
-#Models/w_ionrifle.fbx
+#Models/w_ionrifle.obj
 index: 643
-#Models/w_magnum.fbx
+#Models/w_magnum.obj
 index: 644
-#Models/w_magpulse.fbx
+#Models/w_magpulse.obj
 index: 645
-#Models/w_mk3.fbx
+#Models/w_mk3.obj
 index: 646
 
-#Models/workerhelmet.fbx
+#Models/workerhelmet.obj
 index: 648
-#Models/w_pipe.fbx
+#Models/w_pipe.obj
 index: 649
-#Models/w_pistol.fbx
+#Models/w_pistol.obj
 index: 650
-#Models/w_plasma.fbx
+#Models/w_plasma.obj
 index: 651
-#Models/w_railgun.fbx
+#Models/w_railgun.obj
 index: 652
-#Models/w_rapier.fbx
+#Models/w_rapier.obj
 index: 653
-#Models/w_riotgun.fbx
+#Models/w_riotgun.obj
 index: 654
-#Models/w_skorpion.fbx
+#Models/w_skorpion.obj
 index: 655
-#Models/w_sparqbeam.fbx
+#Models/w_sparqbeam.obj
 index: 656
-#Models/w_stungun.fbx
+#Models/w_stungun.obj
 index: 657
 
-#Models/xray_machine.fbx
+#Models/xray_machine.obj
 index: 660
-#Models/bridg1_1.fbx
+#Models/bridg1_1.obj
 index: 661
-#Models/bridg1_2.fbx
+#Models/bridg1_2.obj
 index: 662
-#Models/bridg1_3_flipx.fbx
+#Models/bridg1_3_flipx.obj
 index: 663
-#Models/bridg2_7.fbx
+#Models/bridg2_7.obj
 index: 664
-#Models/eng1_7d.fbx
+#Models/eng1_7d.obj
 index: 665
-#Models/eng2_2d.fbx
+#Models/eng2_2d.obj
 index: 666
-#Models/bridg1_1_flipx.fbx
+#Models/bridg1_1_flipx.obj
 index: 667
-#Models/chunk_block.fbx
+#Models/chunk_block.obj
 index: 668
-#Models/med1_5.fbx
+#Models/med1_5.obj
 index: 669
 
-#Models/access_card_collider.fbx
+#Models/access_card_collider.obj
 index: 672
 #Models/a_hornet_collider.obj
 index: 673
-#Models/a_magcart_collider.fbx
+#Models/a_magcart_collider.obj
 index: 674
-#Models/a_rail_collider.fbx
+#Models/a_rail_collider.obj
 index: 675
-#Models/a_rubber_collider.fbx
+#Models/a_rubber_collider.obj
 index: 676
-#Models/a_slaglarge_collider.fbx
+#Models/a_slaglarge_collider.obj
 index: 677
-#Models/arm_collider.fbx
+#Models/arm_collider.obj
 index: 678
-#Models/audiolog_collider.fbx
+#Models/audiolog_collider.obj
 index: 679
-#Models/battery_collider.fbx
+#Models/battery_collider.obj
 index: 680
 
-#Models/beaker_collider.fbx
+#Models/beaker_collider.obj
 index: 682
-#Models/beverage_collider.fbx
+#Models/beverage_collider.obj
 index: 683
-#Models/fireextinguisher_collider.fbx
+#Models/fireextinguisher_collider.obj
 index: 684
-#Models/flask_collider.fbx
+#Models/flask_collider.obj
 index: 685
-#Models/head_female_collider.fbx
+#Models/head_female_collider.obj
 index: 686
-#Models/head_male_collider.fbx
+#Models/head_male_collider.obj
 index: 687
-#Models/healthkit_collider.fbx
+#Models/healthkit_collider.obj
 index: 688
-#Models/hw_bio_collider.fbx
+#Models/hw_bio_collider.obj
 index: 689
-#Models/hw_booster_collider.fbx
+#Models/hw_booster_collider.obj
 index: 690
-#Models/hw_enviro_collider.fbx
+#Models/hw_enviro_collider.obj
 index: 691
-#Models/hw_ereader_collider.fbx
+#Models/hw_ereader_collider.obj
 index: 692
-#Models/hw_infrared_collider.fbx
+#Models/hw_infrared_collider.obj
 index: 693
-#Models/hw_jumpjets_collider.fbx
+#Models/hw_jumpjets_collider.obj
 index: 694
-#Models/hw_lantern_collider.fbx
+#Models/hw_lantern_collider.obj
 index: 695
 #Models/hw_navunit_collider.obj
 index: 696
-#Models/hw_sensaround_collider.fbx
+#Models/hw_sensaround_collider.obj
 index: 697
 
 #Models/door2_000002.obj

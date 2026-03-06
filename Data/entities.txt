@@ -3865,7 +3865,7 @@ bounceCombine: 0
 #prop_phys_cart
 index: 461
 model: 40
-texture: 105
+texture: 416
 mass: 2.5
 linearDrag: 0.0
 angularDrag: 0.05
@@ -4463,7 +4463,7 @@ texture: 36
 #prop_bed
 index: 533
 model: 16
-texture: 537
+texture: 246
 #prop_bed_hospital
 index: 534
 model: 608
@@ -4638,8 +4638,11 @@ index: 589
 index: 590
 model: 641
 texture: 113
+glowtexture: 233
 #prop_xray
 index: 591
+model: 660
+texture: 153
 #text_decal
 index: 592
 #text_decalStopDSS1

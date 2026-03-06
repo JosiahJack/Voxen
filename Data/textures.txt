@@ -551,7 +551,8 @@ transparent: 1
 #Textures/d_scorchtiny.png
 index: 232
 transparent: 1
-
+#Textures/cyber_glow.png
+index: 233
 #Textures/d_splat2.png
 index: 234
 transparent: 1
@@ -586,7 +587,8 @@ transparent: 1
 #Textures/ef_shard.png
 index: 245
 transparent: 1
-
+#Textures/bed.png
+index: 246
 #Textures/elev1_up.png
 index: 247
 
@@ -932,6 +934,8 @@ index: 413
 index: 414
 #Textures/keypad2.png
 index: 415
+#Textures/cart.png
+index: 416
 
 #Textures/lamp.png
 index: 423
