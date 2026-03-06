@@ -99,6 +99,46 @@ void AddInstance(uint16_t entIdx, uint16_t i) {
         instances[i].child_scale[c] = isCardChunk ? entities[entIdx].child_scale[c] : (Vector3){ 1.0f, 1.0f, 1.0f };
     }
     
+    if (entIdx == 525) { // prop_console01
+        loadedLights++;
+        if (loadedLights >= LIGHT_COUNT) { DualLogError("Too many lights %u in level%d.txt!\n",loadedLights,Sys_Global.currentLevel); OS_Exit(1); }
+
+        int32_t litIdx = loadedLights * LIGHT_DATA_SIZE;
+        lightOn[loadedLights] = true;
+        lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = 0.7f;
+        lightMaxIntensity[loadedLights] = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
+        lightMinIntensity[loadedLights] = 0.0f;
+        lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = 0.0f; // Force to not be a spot light (it's a lantern not a flashlight!)
+        lights[litIdx + LIGHT_DATA_OFFSET_RANGE] = 1.85f;
+        lights[litIdx + LIGHT_DATA_OFFSET_R] = 0.3531f;
+        lights[litIdx + LIGHT_DATA_OFFSET_G] = 0.4837f;
+        lights[litIdx + LIGHT_DATA_OFFSET_B] = 0.6509f;
+        lights[litIdx + LIGHT_DATA_OFFSET_POSX] = instances[i].position.x + 0.23f; // TODO Multiply against forward/right!  Only good on first one in medical!
+        lights[litIdx + LIGHT_DATA_OFFSET_POSY] = instances[i].position.y + 0.24f;
+        lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = instances[i].position.z;
+        lightCastsShadows[loadedLights] = true;
+        lightDirty[loadedLights] = true;
+        
+        loadedLights++;
+        if (loadedLights >= LIGHT_COUNT) { DualLogError("Too many lights %u in level%d.txt!\n",loadedLights,Sys_Global.currentLevel); OS_Exit(1); }
+
+        litIdx = loadedLights * LIGHT_DATA_SIZE;
+        lightOn[loadedLights] = true;
+        lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = 1.1165f;
+        lightMaxIntensity[loadedLights] = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
+        lightMinIntensity[loadedLights] = 0.0f;
+        lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = 0.0f; // Force to not be a spot light (it's a lantern not a flashlight!)
+        lights[litIdx + LIGHT_DATA_OFFSET_RANGE] = 2.0f;
+        lights[litIdx + LIGHT_DATA_OFFSET_R] = 0.3561f;
+        lights[litIdx + LIGHT_DATA_OFFSET_G] = 0.3561f;
+        lights[litIdx + LIGHT_DATA_OFFSET_B] = 0.8970f;
+        lights[litIdx + LIGHT_DATA_OFFSET_POSX] = instances[i].position.x - 0.48f;
+        lights[litIdx + LIGHT_DATA_OFFSET_POSY] = instances[i].position.y - 0.64f;
+        lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = instances[i].position.z;
+        lightCastsShadows[loadedLights] = true;
+        lightDirty[loadedLights] = true;
+    }
+    
     instances[i].lockedMessageLingdex = entities[entIdx].lockedMessageLingdex;
     dirtyInstances[i] = true;
     loadedInstances++;
@@ -415,7 +455,6 @@ void LoadLevel(uint8_t curlevel) {
             } else {
                 lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = 0.0f; // Force to not be a spot light
             }
-            
         } else {
             uint16_t parent = instanceIdx; // Needed as adding children moves the instanceIdx.
             uint16_t entIdx = instances[parent].index;
@@ -506,6 +545,7 @@ void LoadLevel(uint8_t curlevel) {
     // Add player headmounted lantern light
     loadedLights++;
     lightsIdx++;
+    DualLog("lightsIdx %u vs loadedLights %u\n",lightsIdx,loadedLights);
     if (lightsIdx >= LIGHT_COUNT) { DualLogError("Too many lights %u in level%d.txt!\n",lightsIdx,curlevel); OS_Exit(1); }
 
     int32_t litIdx = lightsIdx * LIGHT_DATA_SIZE;
