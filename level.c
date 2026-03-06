@@ -419,11 +419,11 @@ void LoadLevel(uint8_t curlevel) {
         } else {
             uint16_t parent = instanceIdx; // Needed as adding children moves the instanceIdx.
             uint16_t entIdx = instances[parent].index;
-            if (instances[parent].index == 766) {
-                editModeSelection = parent;
-                flag_set(&instances[editModeSelection].entflags,ENTFLAG_ACTIVE,true);
-                //instances[editModeSelection].scale = (Vector3){1.0f,1.0f,1.0f};
-            }
+//             if (instances[parent].index == 766) {
+//                 editModeSelection = parent;
+//                 flag_set(&instances[editModeSelection].entflags,ENTFLAG_ACTIVE,true);
+//                 //instances[editModeSelection].scale = (Vector3){1.0f,1.0f,1.0f};
+//             }
             AddInstance(entIdx, parent);
             if (!activeStateRead) flag_set(&instances[parent].entflags, ENTFLAG_ACTIVE, true);
             if (EntityIndexIsPortalBlockingDoor(entIdx)) {
@@ -514,7 +514,7 @@ void LoadLevel(uint8_t curlevel) {
     lightMaxIntensity[lightsIdx] = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
     lightMinIntensity[lightsIdx] = 0.0f;
     lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = 0.0f; // Force to not be a spot light (it's a lantern not a flashlight!)
-    lights[litIdx + LIGHT_DATA_OFFSET_RANGE] = 5.5f;
+    lights[litIdx + LIGHT_DATA_OFFSET_RANGE] = 11.52f;
     lights[litIdx + LIGHT_DATA_OFFSET_R] = 1.0f;
     lights[litIdx + LIGHT_DATA_OFFSET_G] = 1.0f;
     lights[litIdx + LIGHT_DATA_OFFSET_B] = 1.0f;

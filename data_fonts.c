@@ -138,7 +138,7 @@ void InitFontAtlasses(void) {
     if (!stbtt_InitFont_internal(&fontInfo[1], fontData[1], 0)) { DualLogError("%s font init failed\n", fontPaths[1]); OS_Exit(1); }
 
     // Check if either the primary font or secondary font .vfnt cache file is out of date prompting an atlas rebuild.
-    FileFingerprint fp1, fp2;
+    FileFingerprint fp1 = {0}, fp2 = {0};
     if (!OS_GetFileFingerprint(fontPaths[0], &fp1)) DualLogError("File change detection failed for %s\n", fontPaths[0]);
     if (!OS_GetFileFingerprint(fontPaths[1], &fp2)) DualLogError("File change detection failed for %s\n", fontPaths[1]);
     uint64_t fbx_stamp1 = OS_GetFilestamp(&fp1);

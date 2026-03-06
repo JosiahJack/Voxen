@@ -4607,6 +4607,9 @@ glowtexture: 0
 altglowtexture: 424
 #prop_microscope
 index: 577
+model: 298
+texture: 645
+spectexture: 1241
 #prop_pipe
 index: 578
 #prop_puddle

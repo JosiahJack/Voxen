@@ -1384,9 +1384,9 @@ int32_t main(void) {
             if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].released) Frob(instances[PLAYER1].position, instances[PLAYER1].forward, instances[PLAYER1].right);
             if (Sys_Global.current_time < Sys_Dx.debugLineFinished && (Sys_Dx.debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Sys_Dx.debugLine_start, Sys_Dx.debugLine_end);
 //             for (uint16_t i=START_INDEX_LEVEL_INSTANCES;i<loadedInstances;++i) UpdateWhileNotPaused(i); // TODO Get new states prior to updating animations, physics event, or rendering
-            instances[editModeSelection].index = editModeTestEntityDefinition;
-            instances[editModeSelection].modelIndex = entities[editModeTestEntityDefinition].modelIndex;
-            instances[editModeSelection].texIndex = entities[editModeTestEntityDefinition].modelIndex;
+//             instances[editModeSelection].index = editModeTestEntityDefinition;
+//             instances[editModeSelection].modelIndex = entities[editModeTestEntityDefinition].modelIndex;
+//             instances[editModeSelection].texIndex = entities[editModeTestEntityDefinition].modelIndex;
             UpdateAmbientSounds();
         }
 

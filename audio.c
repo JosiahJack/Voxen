@@ -251,8 +251,8 @@ const char* GetCorrespondingLevelClip(TrackType ttype) {
         if (ttype == TrackType_Combat) return executiveMusic[random_range_u8(9,13)];
         return executiveMusic[random_range_u8(0,10)];
     } else if (Sys_Global.currentLevel == 10 || Sys_Global.currentLevel == 11 || Sys_Global.currentLevel == 12) { // 10, 12 GROVES
-        if (Sys_Music.levelEntry)      return executiveMusic[19];
-        if (ttype == TrackType_Combat) return executiveMusic[random_range_u8(0,9)];
+        if (Sys_Music.levelEntry)      return groveMusic[19];
+        if (ttype == TrackType_Combat) return groveMusic[random_range_u8(0,9)];
         return executiveMusic[random_range_u8(9,24)];
     } else if (Sys_Global.currentLevel == 13) { // 13 CYBERSPACE
         if (Sys_Music.levelEntry)           return cyberMusic[0];

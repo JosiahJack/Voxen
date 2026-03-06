@@ -434,18 +434,18 @@ void ProcessInput(void) {
     if (Sys_Global.gamePaused || Sys_Global.menuActive || Sys_Cheats.consoleActive) return; // =========== PAUSE BARRIER ==================
     
     // Debug test entity for confirming model+texture setup + collisions TODO: Remove after combing through entity types.
-    if (Sys_Input.keyStates[GLFW_KEY_I].pressed) {
-        editModeTestEntityDefinition++;
-        if (editModeTestEntityDefinition >= entityCount) editModeTestEntityDefinition = 0u;
-        Vector3 oldPos = instances[editModeSelection].position;
-        Quaternion oldRot = instances[editModeSelection].rotation;
-        Vector3 oldScale = instances[editModeSelection].scale;
-        instances[editModeSelection] = entities[editModeTestEntityDefinition];
-        instances[editModeSelection].position = oldPos;
-        instances[editModeSelection].rotation = oldRot;
-        instances[editModeSelection].scale = oldScale;
-        flag_set(&instances[editModeSelection].entflags,ENTFLAG_ACTIVE,true);
-    }
+//     if (Sys_Input.keyStates[GLFW_KEY_I].pressed) {
+//         editModeTestEntityDefinition++;
+//         if (editModeTestEntityDefinition >= entityCount) editModeTestEntityDefinition = 0u;
+//         Vector3 oldPos = instances[editModeSelection].position;
+//         Quaternion oldRot = instances[editModeSelection].rotation;
+//         Vector3 oldScale = instances[editModeSelection].scale;
+//         instances[editModeSelection] = entities[editModeTestEntityDefinition];
+//         instances[editModeSelection].position = oldPos;
+//         instances[editModeSelection].rotation = oldRot;
+//         instances[editModeSelection].scale = oldScale;
+//         flag_set(&instances[editModeSelection].entflags,ENTFLAG_ACTIVE,true);
+//     }
         
     if (ToggleMode()) {
         Sys_Input.ignore_next_mouse_delta = true;

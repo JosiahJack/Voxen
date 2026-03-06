@@ -46,16 +46,11 @@ static inline __attribute__((always_inline)) float parse_float_pure(const char* 
     return negative ? -value : value;
 }
 
-static bool ParseOBJ(const char* data, int file_size, float** out_vertices, uint32_t* out_vertex_count,
-                     uint32_t** out_triangles, uint32_t* out_triangle_count,
-                     float* out_minx, float* out_miny, float* out_minz,
-                     float* out_maxx, float* out_maxy, float* out_maxz) {
-
+static __attribute__((hot)) bool ParseOBJ(const char* data, int file_size, float** out_vertices, uint32_t* out_vertex_count, uint32_t** out_triangles, uint32_t* out_triangle_count, float* out_minx, float* out_miny, float* out_minz, float* out_maxx, float* out_maxy, float* out_maxz) {
     *out_vertices = NULL; *out_triangles = NULL;
     *out_vertex_count = *out_triangle_count = 0;
     if (!data || file_size <= 0) return false;
-
-    // Pass 1: count (extremely tight)
+    
     uint32_t vcount = 0, vtcount = 0, vncount = 0, fcount = 0;
     const char* p = data;
     while (p < data + file_size) {
@@ -69,11 +64,13 @@ static bool ParseOBJ(const char* data, int file_size, float** out_vertices, uint
                 else if (line[1] == 'n') ++vncount;
             } else if (line[0] == 'f') ++fcount;
         }
+        
         if (p < data + file_size && *p == '\r') ++p;
         if (p < data + file_size && *p == '\n') ++p;
     }
 
     if (vcount == 0) return false;
+    
     if (!vtcount) vtcount = vcount;
     if (!vncount) vncount = vcount;
     float* temp_pos = (float*)OS_AllocateRAM(NULL, vcount * 3 * sizeof(float), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
@@ -86,7 +83,6 @@ static bool ParseOBJ(const char* data, int file_size, float** out_vertices, uint
     while (p < data + file_size) {
         const char* line = p;
         while (p < data + file_size && *p != '\n' && *p != '\r') ++p;
-
         if ((p - line) > 2 && line[0] == 'v') {
             const char* num = line + 2;
             if (line[1] == ' ') {
@@ -120,23 +116,18 @@ static bool ParseOBJ(const char* data, int file_size, float** out_vertices, uint
     size_t max_verts = (size_t)fcount * 3;
     float* final_verts = (float*)OS_AllocateRAM(NULL, max_verts * 8 * sizeof(float), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
     uint32_t* final_tris = (uint32_t*)OS_AllocateRAM(NULL, (size_t)fcount * 3 * sizeof(uint32_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-
     uint32_t vert_idx = 0, tri_idx = 0;
     float minx = 1e9f, miny = 1e9f, minz = 1e9f;
     float maxx = -1e9f, maxy = -1e9f, maxz = -1e9f;
-
     p = data;
     while (p < data + file_size) {
         const char* line = p;
         while (p < data + file_size && *p != '\n' && *p != '\r') ++p;
-
         if ((p - line) > 2 && line[0] == 'f') {
             const char* num = line + 2;
             while (*num == ' ' || *num == '\t') ++num;
-
             uint32_t v[3] = {0}, vt[3] = {0}, vn[3] = {0};
             uint32_t idx_count = 0;
-
             for (int i = 0; i < 3 && idx_count < 3; ++i) {
                 if (*num < '0' || (*num > '9' && *num != '-')) break;
                 v[i] = parse_numberu32_pure(num);
@@ -155,7 +146,7 @@ static bool ParseOBJ(const char* data, int file_size, float** out_vertices, uint
                 ++idx_count;
             }
 
-            if (idx_count != 3) goto next_line;  // still fastest for skipping quads/ngons
+            if (idx_count != 3) goto next_line;  // skip quads/ngons
 
             for (int i = 0; i < 3; ++i) {
                 uint32_t vi_idx = v[i] - 1;
@@ -177,9 +168,11 @@ static bool ParseOBJ(const char* data, int file_size, float** out_vertices, uint
                 if (z > maxz) maxz = z;
                 final_tris[tri_idx*3 + i] = vert_idx++;
             }
+            
             ++tri_idx;
         }
-    next_line:
+        
+        next_line:
         if (p < data + file_size && *p == '\r') ++p;
         if (p < data + file_size && *p == '\n') ++p;
     }
@@ -187,7 +180,6 @@ static bool ParseOBJ(const char* data, int file_size, float** out_vertices, uint
     OS_DeallocateRAM(temp_pos, vcount * 3 * sizeof(float));
     OS_DeallocateRAM(temp_nrm, vncount * 3 * sizeof(float));
     OS_DeallocateRAM(temp_uv,  vtcount * 2 * sizeof(float));
-
     *out_vertices       = final_verts;
     *out_vertex_count   = vert_idx;
     *out_triangles      = final_tris;
@@ -207,21 +199,15 @@ void LoadModels(void) {
         OS_Exit(1);
     }
 
-    // Find max index
     int32_t maxIndex = -1;
     for (uint32_t k = 0; k < mpars.count; k++) {
-        if (mpars.entries[k].index > maxIndex && mpars.entries[k].index != UINT16_MAX)
-            maxIndex = mpars.entries[k].index;
+        if (mpars.entries[k].index > maxIndex && mpars.entries[k].index != UINT16_MAX) maxIndex = mpars.entries[k].index;
     }
 
     loadedModelsMaxIndex = (uint16_t)maxIndex + 1U;
     DualLog("Loading models (%d/%d) with max index %d ...", loadedModelsMaxIndex, mpars.count, maxIndex);
-
-    // Allocate output arrays
     modelVertices   = OS_AllocateRAM(NULL, loadedModelsMaxIndex * sizeof(float*),    PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
     modelTriangles  = OS_AllocateRAM(NULL, loadedModelsMaxIndex * sizeof(uint32_t*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-
-    // Build index→parser map
     size_t indexToParser_size = loadedModelsMaxIndex * sizeof(int32_t);
     int32_t* indexToParser = OS_AllocateRAM(NULL, indexToParser_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, OS_INVALID_HANDLE);
     __builtin_memset(indexToParser, -1, indexToParser_size);
@@ -234,6 +220,7 @@ void LoadModels(void) {
     RawOBJ* rawModels = OS_AllocateRAM(NULL, loadedModelsMaxIndex * sizeof(RawOBJ), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
     __builtin_memset(rawModels, 0, loadedModelsMaxIndex * sizeof(RawOBJ));
 
+    #pragma omp parallel for schedule(dynamic)
     for (uint32_t i = 0; i < loadedModelsMaxIndex; ++i) {
         int32_t parserIdx = indexToParser[i];
         if (parserIdx < 0 || parserIdx >= (int32_t)mpars.count) continue;
@@ -246,7 +233,7 @@ void LoadModels(void) {
     }
 
 
-#pragma omp parallel for schedule(dynamic)
+    #pragma omp parallel for schedule(dynamic)
     for (uint32_t i = 0; i < loadedModelsMaxIndex; ++i) {
         int32_t parserIdx = indexToParser[i];
         if (parserIdx < 0 || parserIdx >= (int32_t)mpars.count) continue;
@@ -299,7 +286,6 @@ void LoadModels(void) {
         ptr = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, (GLsizeiptr)triSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
         __builtin_memcpy(ptr, modelTriangles[i], triSize);
         glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
-        glFlush(); glFinish(); // Surprisingly also causes the LoadTextures OpenGL driver in Linux to drop its CPU side RAM duplicates earlier
     }
     
     DebugRAM("after to model to gpu transfer");
