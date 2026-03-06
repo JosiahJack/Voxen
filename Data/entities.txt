@@ -4301,6 +4301,7 @@ model: 0
 numclips: 4
 animationNum: 11
 texture: 193
+glowtexture: 194
 #doorH
 index: 503
 model: 0
@@ -4638,7 +4639,6 @@ index: 589
 index: 590
 model: 641
 texture: 113
-glowtexture: 233
 #prop_xray
 index: 591
 model: 660

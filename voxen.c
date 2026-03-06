@@ -1396,9 +1396,8 @@ int32_t main(void) {
             Sys_Global.last_physics_time = Sys_Global.pauseRelativeTime;
             Physics();
         }
-        
-        UpdateAnims();
-        if (likely(!Sys_Global.gamePaused && !Sys_Global.menuActive)) UpdateMusic();
+
+        if (likely(!Sys_Global.gamePaused && !Sys_Global.menuActive)) { UpdateAnims(); UpdateMusic(); }
         if (likely(!Sys_Global.gamePaused || Sys_Global.menuActive)) {
             Sys_Render.shadowmapsNeedUpdated = UpdatedPlayerCell();
             Sys_Render.shadowmapsNeedUpdated = UpdateLights(&Sys_Render.shadowmapsNeedUpdated);

@@ -465,10 +465,9 @@ transparent: 1
 index: 192
 #Textures/door1_7.png
 index: 193
-#Textures/door7_lamp_glow.png
+#Textures/door1_7_glow.png
 index: 194
-#Textures/door7_lamp.png
-index: 195
+
 #Textures/door_bulk1.png
 index: 196
 #Textures/door_bulk1_glow.png
@@ -1283,11 +1282,8 @@ index: 601
 
 #Textures/pnl12_on.png
 index: 603
-#Textures/pnl13_cl.png
+#Textures/pnl13.png
 index: 604
-
-#Textures/pnl13_on.png
-index: 606
 
 #Textures/pnl1_cl.png
 index: 611

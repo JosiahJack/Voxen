@@ -249,7 +249,7 @@ void main() {
             slopeBias = max(slopeBias,0.035);
             float bias = slopeBias * distOverRange;
             bias = max(bias,0.0);
-            bias += 0.025; // Account for glancing angle acne
+            bias += 0.03; // Account for glancing angle acne
 
             // Pseudo-Stochastic PCF sampling
             float sum = 0.0;
