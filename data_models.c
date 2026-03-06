@@ -11,11 +11,15 @@ bool modelHasAnimation[MODEL_IDX_MAX] = {0};
 float modelBounds[MODEL_IDX_MAX * BOUNDS_ATTRIBUTES_COUNT] = {0};
 uint16_t loadedModelsMaxIndex = 0;
 GLuint SetupSSBO(GLuint* id, GLuint bindingIndex, GLsizeiptr size, const void* data, GLenum usage);
-#define MAX_VERT_ELEMENT_SIZE 7000 // From max verts for a model: 6135, Max normals: 3774, Max UVS: 6962
-static float** thread_temp_pos = NULL;
-static float** thread_temp_nrm = NULL;
-static float** thread_temp_uv  = NULL;
-static int     num_parse_threads = 0;
+#define MAX_VERT_ELEMENT_SIZE 7000  // From max verts for a model: 6135, Max normals: 3774, Max UVS: 6962
+#define MAX_OUTPUT_VERTS      24000 // 7000 faces * 3 + safety margin (way more than needed)
+#define MAX_OUTPUT_TRIS       16000
+static float**    thread_temp_pos   = NULL;
+static float**    thread_temp_nrm   = NULL;
+static float**    thread_temp_uv    = NULL;
+static float**    thread_out_verts  = NULL;
+static uint32_t** thread_out_tris   = NULL;
+static int        num_parse_threads = 0;
 
 static inline __attribute__((always_inline)) uint32_t parse_numberu32_pure(const char* str) {
     uint32_t result = 0;
@@ -40,125 +44,128 @@ static inline __attribute__((always_inline)) float parse_float_pure(const char* 
     return sign * value;
 }
 
-static __attribute__((hot)) bool ParseOBJ(const char* data, int file_size, float* temp_pos, float* temp_nrm, float* temp_uv, float** out_vertices, uint32_t* out_vertex_count, uint32_t** out_triangles, uint32_t* out_triangle_count, float* out_minx, float* out_miny, float* out_minz, float* out_maxx, float* out_maxy, float* out_maxz) {
+static __attribute__((hot)) bool ParseOBJ(const char* data, int file_size,
+    float* temp_pos, float* temp_nrm, float* temp_uv,
+    float* scratch_verts, uint32_t* scratch_tris,
+    float** out_vertices, uint32_t* out_vertex_count,
+    uint32_t** out_triangles, uint32_t* out_triangle_count,
+    float* out_minx, float* out_miny, float* out_minz,
+    float* out_maxx, float* out_maxy, float* out_maxz)
+{
     *out_vertices = NULL; *out_triangles = NULL;
     *out_vertex_count = *out_triangle_count = 0;
     if (!data || file_size <= 0) return false;
 
-    // Pass 1: face counts
-    uint32_t fcount = 0;
-    const char* p = data;
-    while (p < data + file_size) {
-        const char* line = p;
-        while (p < data + file_size && *p != '\n' && *p != '\r') ++p;
-        uint32_t len = (uint32_t)(p - line);
-        if (len > 2) {
-            if (line[0] == 'f') ++fcount;
-        }
-        if (p < data + file_size && *p == '\r') ++p;
-        if (p < data + file_size && *p == '\n') ++p;
-    }
-
-    // Pass 2: vertices
     uint32_t vi = 0, ni = 0, ui = 0;
-    p = data;
-    while (p < data + file_size) {
-        const char* line = p;
-        while (p < data + file_size && *p != '\n' && *p != '\r') ++p;
-        if ((p - line) > 2 && line[0] == 'v') {
-            const char* num = line + 2;
-            if (line[1] == ' ') {
-                temp_pos[vi*3+0] = parse_float_pure(num); while (*num && *num != ' ' && *num != '\t') ++num; ++num;
-                temp_pos[vi*3+1] = parse_float_pure(num); while (*num && *num != ' ' && *num != '\t') ++num; ++num;
-                temp_pos[vi*3+2] = parse_float_pure(num);
-                ++vi;
-            } else if (line[1] == 'n') {
-                num = line + 3;
-                temp_nrm[ni*3+0] = parse_float_pure(num); while (*num && *num != ' ' && *num != '\t') ++num; ++num;
-                temp_nrm[ni*3+1] = parse_float_pure(num); while (*num && *num != ' ' && *num != '\t') ++num; ++num;
-                temp_nrm[ni*3+2] = parse_float_pure(num);
-                ++ni;
-            } else if (line[1] == 't') {
-                num = line + 3;
-                temp_uv[ui*2+0] = parse_float_pure(num); while (*num && *num != ' ' && *num != '\t') ++num; ++num;
-                temp_uv[ui*2+1] = parse_float_pure(num);
-                ++ui;
-            }
-        }
-        if (p < data + file_size && *p == '\r') ++p;
-        if (p < data + file_size && *p == '\n') ++p;
-    }
+    uint32_t vert_idx = 0;
 
-    // Pass 3: faces + final vertex buffer + bounds
-    size_t max_verts = (size_t)fcount * 3;
-    float* final_verts = (float*)OS_AllocateRAM(NULL, max_verts * 8 * sizeof(float), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-    uint32_t* final_tris = (uint32_t*)OS_AllocateRAM(NULL, (size_t)fcount * 3 * sizeof(uint32_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-    uint32_t vert_idx = 0, tri_idx = 0;
     float minx = 1e9f, miny = 1e9f, minz = 1e9f;
     float maxx = -1e9f, maxy = -1e9f, maxz = -1e9f;
-    p = data;
-    while (p < data + file_size) {
-        const char* line = p;
-        while (p < data + file_size && *p != '\n' && *p != '\r') ++p;
-        if ((p - line) > 2 && line[0] == 'f') {
-            const char* num = line + 2;
-            while (*num == ' ' || *num == '\t') ++num;
-            uint32_t v[3] = {0}, vt[3] = {0}, vn[3] = {0};
-            uint32_t idx_count = 0;
-            for (int i = 0; i < 3 && idx_count < 3; ++i) {
-                if (*num < '0' || (*num > '9' && *num != '-')) break;
-                v[i] = parse_numberu32_pure(num);
-                while (*num && *num != ' ' && *num != '\t' && *num != '/') ++num;
-                if (*num == '/') {
-                    ++num;
-                    if (*num == '/') { ++num; vn[i] = parse_numberu32_pure(num); }
-                    else {
-                        vt[i] = parse_numberu32_pure(num);
-                        while (*num && *num != ' ' && *num != '\t' && *num != '/') ++num;
-                        if (*num == '/') { ++num; vn[i] = parse_numberu32_pure(num); }
-                    }
-                }
-                
-                while (*num && *num != ' ' && *num != '\t') ++num;
-                while (*num == ' ' || *num == '\t') ++num;
-                ++idx_count;
-            }
-            
-            if (idx_count != 3) goto next_line;
 
-            for (int i = 0; i < 3; ++i) {
-                uint32_t vi_idx = v[i] - 1;
-                uint32_t ti_idx = (vt[i] && vt[i] <= ui) ? vt[i]-1 : 0;
-                uint32_t ni_idx = (vn[i] && vn[i] <= ni) ? vn[i]-1 : 0;
-                float* dst = final_verts + vert_idx * 8;
-                dst[0] = temp_pos[vi_idx*3];   dst[1] = temp_pos[vi_idx*3+1];   dst[2] = temp_pos[vi_idx*3+2];
-                dst[3] = (ni_idx < ni) ? temp_nrm[ni_idx*3]   : 0.0f;
-                dst[4] = (ni_idx < ni) ? temp_nrm[ni_idx*3+1] : 0.0f;
-                dst[5] = (ni_idx < ni) ? temp_nrm[ni_idx*3+2] : 0.0f;
-                dst[6] = (ti_idx < ui) ? temp_uv[ti_idx*2]    : 0.0f;
-                dst[7] = (ti_idx < ui) ? temp_uv[ti_idx*2+1]  : 0.0f;
-                float x = dst[0], y = dst[1], z = dst[2];
-                if (x < minx) minx = x;
-                if (x > maxx) maxx = x;
-                if (y < miny) miny = y;
-                if (y > maxy) maxy = y;
-                if (z < minz) minz = z;
-                if (z > maxz) maxz = z;
-                final_tris[tri_idx*3 + i] = vert_idx++;
+    const char* p = data;
+    const char* end = data + file_size;
+
+    while (p < end) {
+        const char* line = p;
+        while (p < end && *p != '\n' && *p != '\r') ++p;
+
+        if ((p - line) > 2) {
+            if (line[0] == 'v') {
+                const char* num = line + 2;
+                if (line[1] == ' ') {
+                    temp_pos[vi*3+0] = parse_float_pure(num); while (*num && *num != ' ' && *num != '\t') ++num;
+                    ++num;
+                    temp_pos[vi*3+1] = parse_float_pure(num); while (*num && *num != ' ' && *num != '\t') ++num;
+                    ++num;
+                    temp_pos[vi*3+2] = parse_float_pure(num);
+                    ++vi;
+                } else if (line[1] == 'n') {
+                    num = line + 3;
+                    temp_nrm[ni*3+0] = parse_float_pure(num); while (*num && *num != ' ' && *num != '\t') ++num;
+                    ++num;
+                    temp_nrm[ni*3+1] = parse_float_pure(num); while (*num && *num != ' ' && *num != '\t') ++num;
+                    ++num;
+                    temp_nrm[ni*3+2] = parse_float_pure(num);
+                    ++ni;
+                } else if (line[1] == 't') {
+                    num = line + 3;
+                    temp_uv[ui*2+0] = parse_float_pure(num); while (*num && *num != ' ' && *num != '\t') ++num;
+                    ++num;
+                    temp_uv[ui*2+1] = parse_float_pure(num);
+                    ++ui;
+                }
             }
-            
-            ++tri_idx;
+            else if (line[0] == 'f') {
+                const char* num = line + 2;
+                while (*num == ' ' || *num == '\t') ++num;
+
+                uint32_t v[3] = {0}, vt[3] = {0}, vn[3] = {0};
+                uint32_t idx_count = 0;
+                for (int i = 0; i < 3 && idx_count < 3; ++i) {
+                    if (*num < '0' && *num != '-') break;
+                    v[i] = parse_numberu32_pure(num);
+                    while (*num && *num != ' ' && *num != '\t' && *num != '/') ++num;
+                    if (*num == '/') {
+                        ++num;
+                        if (*num == '/') { ++num; vn[i] = parse_numberu32_pure(num); }
+                        else {
+                            vt[i] = parse_numberu32_pure(num);
+                            while (*num && *num != ' ' && *num != '\t' && *num != '/') ++num;
+                            if (*num == '/') { ++num; vn[i] = parse_numberu32_pure(num); }
+                        }
+                    }
+                    while (*num && *num != ' ' && *num != '\t') ++num;
+                    while (*num == ' ' || *num == '\t') ++num;
+                    ++idx_count;
+                }
+                if (idx_count != 3) goto next_line;   // skip quads/ngons (exact same logic as before)
+
+                for (int i = 0; i < 3; ++i) {
+                    uint32_t vi_idx = v[i] - 1;
+                    uint32_t ti_idx = (vt[i] && vt[i] <= ui) ? vt[i]-1 : 0;
+                    uint32_t ni_idx = (vn[i] && vn[i] <= ni) ? vn[i]-1 : 0;
+
+                    float* dst = scratch_verts + vert_idx * 8;
+                    dst[0] = temp_pos[vi_idx*3];   dst[1] = temp_pos[vi_idx*3+1];   dst[2] = temp_pos[vi_idx*3+2];
+                    dst[3] = (ni_idx < ni) ? temp_nrm[ni_idx*3]   : 0.0f;
+                    dst[4] = (ni_idx < ni) ? temp_nrm[ni_idx*3+1] : 0.0f;
+                    dst[5] = (ni_idx < ni) ? temp_nrm[ni_idx*3+2] : 0.0f;
+                    dst[6] = (ti_idx < ui) ? temp_uv[ti_idx*2]    : 0.0f;
+                    dst[7] = (ti_idx < ui) ? temp_uv[ti_idx*2+1]  : 0.0f;
+
+                    float x = dst[0], y = dst[1], z = dst[2];
+                    if (x < minx) minx = x;
+                    if (x > maxx) maxx = x;
+                    if (y < miny) miny = y;
+                    if (y > maxy) maxy = y;
+                    if (z < minz) minz = z;
+                    if (z > maxz) maxz = z;
+
+                    scratch_tris[vert_idx] = vert_idx;   // non-indexed, just sequential
+                    ++vert_idx;
+                }
+            }
         }
-        
-        next_line:
-        if (p < data + file_size && *p == '\r') ++p;
-        if (p < data + file_size && *p == '\n') ++p;
+    next_line:
+        if (p < end && *p == '\r') ++p;
+        if (p < end && *p == '\n') ++p;
     }
 
-    *out_vertices = final_verts;
-    *out_vertex_count = vert_idx;
-    *out_triangles = final_tris;
-    *out_triangle_count = tri_idx;
+    if (vert_idx == 0) return false;
+
+    // Exact final allocation + fast memcpy (this is the ONLY allocation left per model)
+    size_t vbytes = (size_t)vert_idx * 8 * sizeof(float);
+    float* final_verts = (float*)OS_AllocateRAM(NULL, vbytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+    __builtin_memcpy(final_verts, scratch_verts, vbytes);
+
+    size_t ibytes = (size_t)vert_idx * sizeof(uint32_t);
+    uint32_t* final_tris = (uint32_t*)OS_AllocateRAM(NULL, ibytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+    __builtin_memcpy(final_tris, scratch_tris, ibytes);
+
+    *out_vertices      = final_verts;
+    *out_vertex_count  = vert_idx;
+    *out_triangles     = final_tris;
+    *out_triangle_count= vert_idx / 3;
     *out_minx = minx; *out_miny = miny; *out_minz = minz;
     *out_maxx = maxx; *out_maxy = maxy; *out_maxz = maxz;
     return true;
@@ -206,39 +213,34 @@ void LoadModels(void) {
     }
 
     double timeAtStartOfSecondLoop = get_time();
-    DualLog(" took %f secs for first parallel loop...",timeAtStartOfSecondLoop - start_time);
     num_parse_threads = omp_get_max_threads();
     if (num_parse_threads < 1) num_parse_threads = 1;
-    thread_temp_pos = (float**)OS_AllocateRAM(NULL,(size_t)num_parse_threads * sizeof(float*),PROT_READ | PROT_WRITE,MAP_PRIVATE | MAP_ANONYMOUS,OS_INVALID_HANDLE);
-    thread_temp_nrm = (float**)OS_AllocateRAM(NULL,(size_t)num_parse_threads * sizeof(float*),PROT_READ | PROT_WRITE,MAP_PRIVATE | MAP_ANONYMOUS,OS_INVALID_HANDLE);
-    thread_temp_uv  = (float**)OS_AllocateRAM(NULL,(size_t)num_parse_threads * sizeof(float*),PROT_READ | PROT_WRITE,MAP_PRIVATE | MAP_ANONYMOUS,OS_INVALID_HANDLE);
+    thread_temp_pos  = (float**)OS_AllocateRAM(NULL, (size_t)num_parse_threads * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+    thread_temp_nrm  = (float**)OS_AllocateRAM(NULL, (size_t)num_parse_threads * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+    thread_temp_uv   = (float**)OS_AllocateRAM(NULL, (size_t)num_parse_threads * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+    thread_out_verts = (float**)OS_AllocateRAM(NULL, (size_t)num_parse_threads * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+    thread_out_tris  = (uint32_t**)OS_AllocateRAM(NULL, (size_t)num_parse_threads * sizeof(uint32_t*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
     for (int t = 0; t < num_parse_threads; ++t) {
-        thread_temp_pos[t] = (float*)OS_AllocateRAM(NULL,MAX_VERT_ELEMENT_SIZE * 3 * sizeof(float),PROT_READ | PROT_WRITE,MAP_PRIVATE | MAP_ANONYMOUS,OS_INVALID_HANDLE);
-        thread_temp_nrm[t] = (float*)OS_AllocateRAM(NULL,MAX_VERT_ELEMENT_SIZE * 3 * sizeof(float),PROT_READ | PROT_WRITE,MAP_PRIVATE | MAP_ANONYMOUS,OS_INVALID_HANDLE);
-        thread_temp_uv[t]  = (float*)OS_AllocateRAM(NULL,MAX_VERT_ELEMENT_SIZE * 2 * sizeof(float),PROT_READ | PROT_WRITE,MAP_PRIVATE | MAP_ANONYMOUS,OS_INVALID_HANDLE);
+        thread_temp_pos[t]  = (float*)OS_AllocateRAM(NULL, MAX_VERT_ELEMENT_SIZE * 3 * sizeof(float), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+        thread_temp_nrm[t]  = (float*)OS_AllocateRAM(NULL, MAX_VERT_ELEMENT_SIZE * 3 * sizeof(float), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+        thread_temp_uv[t]   = (float*)OS_AllocateRAM(NULL, MAX_VERT_ELEMENT_SIZE * 2 * sizeof(float), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+        thread_out_verts[t] = (float*)OS_AllocateRAM(NULL, MAX_OUTPUT_VERTS * 8 * sizeof(float), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+        thread_out_tris[t]  = (uint32_t*)OS_AllocateRAM(NULL, MAX_OUTPUT_VERTS * sizeof(uint32_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
     }
+    
     #pragma omp parallel for schedule(dynamic)
     for (uint32_t i = 0; i < loadedModelsMaxIndex; ++i) {
         int32_t parserIdx = indexToParser[i];
         if (parserIdx < 0 || parserIdx >= (int32_t)mpars.count) continue;
 
         modelHasAnimation[i] = (mpars.entries[parserIdx].entflags & ENTFLAG_ANIMATED);
-
         const char* data = rawModels[i].data;
         int file_size = rawModels[i].size;
         if (!data || file_size <= 0) continue;
 
-        // Get this thread's fixed temp buffers
         int tid = omp_get_thread_num();
-        float* temp_pos = thread_temp_pos[tid];
-        float* temp_nrm = thread_temp_nrm[tid];
-        float* temp_uv  = thread_temp_uv[tid];
-
         float minx, miny, minz, maxx, maxy, maxz;
-        if (!ParseOBJ(data, file_size, temp_pos, temp_nrm, temp_uv,
-                      &modelVertices[i], &modelVertexCounts[i],
-                      &modelTriangles[i], &modelTriangleCounts[i],
-                      &minx, &miny, &minz, &maxx, &maxy, &maxz)) continue;
+        if (!ParseOBJ(data, file_size, thread_temp_pos[tid], thread_temp_nrm[tid], thread_temp_uv[tid], thread_out_verts[tid], thread_out_tris[tid], &modelVertices[i], &modelVertexCounts[i], &modelTriangles[i], &modelTriangleCounts[i], &minx, &miny, &minz, &maxx, &maxy, &maxz)) continue;
 
         uint32_t base_idx = i * BOUNDS_ATTRIBUTES_COUNT;
         modelBounds[base_idx + BOUNDS_DATA_OFFSET_MINX] = minx;
@@ -255,13 +257,17 @@ void LoadModels(void) {
 
     DualLog(" took %f secs for second parallel loop...",get_time() - timeAtStartOfSecondLoop);
     for (int t = 0; t < num_parse_threads; ++t) {
-        OS_DeallocateRAM(thread_temp_pos[t], MAX_VERT_ELEMENT_SIZE * 3 * sizeof(float));
-        OS_DeallocateRAM(thread_temp_nrm[t], MAX_VERT_ELEMENT_SIZE * 3 * sizeof(float));
-        OS_DeallocateRAM(thread_temp_uv[t],  MAX_VERT_ELEMENT_SIZE * 2 * sizeof(float));
+        OS_DeallocateRAM(thread_temp_pos[t],  MAX_VERT_ELEMENT_SIZE * 3 * sizeof(float));
+        OS_DeallocateRAM(thread_temp_nrm[t],  MAX_VERT_ELEMENT_SIZE * 3 * sizeof(float));
+        OS_DeallocateRAM(thread_temp_uv[t],   MAX_VERT_ELEMENT_SIZE * 2 * sizeof(float));
+        OS_DeallocateRAM(thread_out_verts[t], MAX_OUTPUT_VERTS * 8 * sizeof(float));
+        OS_DeallocateRAM(thread_out_tris[t],  MAX_OUTPUT_VERTS * sizeof(uint32_t));
     }
-    OS_DeallocateRAM(thread_temp_pos, (size_t)num_parse_threads * sizeof(float*));
-    OS_DeallocateRAM(thread_temp_nrm, (size_t)num_parse_threads * sizeof(float*));
-    OS_DeallocateRAM(thread_temp_uv,  (size_t)num_parse_threads * sizeof(float*));
+    OS_DeallocateRAM(thread_temp_pos,  (size_t)num_parse_threads * sizeof(float*));
+    OS_DeallocateRAM(thread_temp_nrm,  (size_t)num_parse_threads * sizeof(float*));
+    OS_DeallocateRAM(thread_temp_uv,   (size_t)num_parse_threads * sizeof(float*));
+    OS_DeallocateRAM(thread_out_verts, (size_t)num_parse_threads * sizeof(float*));
+    OS_DeallocateRAM(thread_out_tris,  (size_t)num_parse_threads * sizeof(uint32_t*));
     for (uint32_t i = 0; i < loadedModelsMaxIndex; ++i) {
         if (rawModels[i].data) OS_DeallocateRAM((void*)rawModels[i].data, (size_t)rawModels[i].size);
     }
@@ -289,7 +295,6 @@ void LoadModels(void) {
         __builtin_memcpy(ptr, modelTriangles[i], triSize);
         glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
     }
-    
 
     DebugRAM("after to model to gpu transfer");
     glBindBuffer(GL_ARRAY_BUFFER, 0);
