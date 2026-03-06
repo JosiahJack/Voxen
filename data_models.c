@@ -44,27 +44,16 @@ static inline __attribute__((always_inline)) float parse_float_pure(const char* 
     return sign * value;
 }
 
-static __attribute__((hot)) bool ParseOBJ(const char* data, int file_size,
-    float* temp_pos, float* temp_nrm, float* temp_uv,
-    float* scratch_verts, uint32_t* scratch_tris,
-    float** out_vertices, uint32_t* out_vertex_count,
-    uint32_t** out_triangles, uint32_t* out_triangle_count,
-    float* out_minx, float* out_miny, float* out_minz,
-    float* out_maxx, float* out_maxy, float* out_maxz)
-{
+static __attribute__((hot)) bool ParseOBJ(const char* data, int file_size, float* temp_pos, float* temp_nrm, float* temp_uv, float* scratch_verts, uint32_t* scratch_tris, float** out_vertices, uint32_t* out_vertex_count, uint32_t** out_triangles, uint32_t* out_triangle_count, float* out_minx, float* out_miny, float* out_minz, float* out_maxx, float* out_maxy, float* out_maxz) {
     *out_vertices = NULL; *out_triangles = NULL;
     *out_vertex_count = *out_triangle_count = 0;
     if (!data || file_size <= 0) return false;
 
     uint32_t vi = 0, ni = 0, ui = 0;
     uint32_t vert_idx = 0;
-
-    float minx = 1e9f, miny = 1e9f, minz = 1e9f;
-    float maxx = -1e9f, maxy = -1e9f, maxz = -1e9f;
-
+    float minx = 1e9f, miny = 1e9f, minz = 1e9f, maxx = -1e9f, maxy = -1e9f, maxz = -1e9f;
     const char* p = data;
     const char* end = data + file_size;
-
     while (p < end) {
         const char* line = p;
         while (p < end && *p != '\n' && *p != '\r') ++p;
@@ -101,6 +90,7 @@ static __attribute__((hot)) bool ParseOBJ(const char* data, int file_size,
 
                 uint32_t v[3] = {0}, vt[3] = {0}, vn[3] = {0};
                 uint32_t idx_count = 0;
+                #pragma GCC unroll 3
                 for (int i = 0; i < 3 && idx_count < 3; ++i) {
                     if (*num < '0' && *num != '-') break;
                     v[i] = parse_numberu32_pure(num);
@@ -120,11 +110,11 @@ static __attribute__((hot)) bool ParseOBJ(const char* data, int file_size,
                 }
                 if (idx_count != 3) goto next_line;   // skip quads/ngons (exact same logic as before)
 
+                #pragma GCC unroll 3
                 for (int i = 0; i < 3; ++i) {
                     uint32_t vi_idx = v[i] - 1;
                     uint32_t ti_idx = (vt[i] && vt[i] <= ui) ? vt[i]-1 : 0;
                     uint32_t ni_idx = (vn[i] && vn[i] <= ni) ? vn[i]-1 : 0;
-
                     float* dst = scratch_verts + vert_idx * 8;
                     dst[0] = temp_pos[vi_idx*3];   dst[1] = temp_pos[vi_idx*3+1];   dst[2] = temp_pos[vi_idx*3+2];
                     dst[3] = (ni_idx < ni) ? temp_nrm[ni_idx*3]   : 0.0f;
@@ -132,7 +122,6 @@ static __attribute__((hot)) bool ParseOBJ(const char* data, int file_size,
                     dst[5] = (ni_idx < ni) ? temp_nrm[ni_idx*3+2] : 0.0f;
                     dst[6] = (ti_idx < ui) ? temp_uv[ti_idx*2]    : 0.0f;
                     dst[7] = (ti_idx < ui) ? temp_uv[ti_idx*2+1]  : 0.0f;
-
                     float x = dst[0], y = dst[1], z = dst[2];
                     if (x < minx) minx = x;
                     if (x > maxx) maxx = x;
@@ -140,7 +129,6 @@ static __attribute__((hot)) bool ParseOBJ(const char* data, int file_size,
                     if (y > maxy) maxy = y;
                     if (z < minz) minz = z;
                     if (z > maxz) maxz = z;
-
                     scratch_tris[vert_idx] = vert_idx;   // non-indexed, just sequential
                     ++vert_idx;
                 }
@@ -172,14 +160,11 @@ static __attribute__((hot)) bool ParseOBJ(const char* data, int file_size,
 }
 
 void LoadModels(void) {
-    if (loadedModelsMaxIndex > 0) return;
+    if (unlikely(loadedModelsMaxIndex > 0)) return;
 
     double start_time = get_time();
     DataParser mpars;
-    if (!parse_data_file(&mpars, MODEL_IDX_MAX, "./Data/models.txt")) {
-        DualLogError("Could not parse ./Data/models.txt!\n");
-        OS_Exit(1);
-    }
+    if (unlikely(!parse_data_file(&mpars, MODEL_IDX_MAX, "./Data/models.txt"))) { DualLogError("Could not parse ./Data/models.txt!\n"); OS_Exit(1); }
 
     int32_t maxIndex = -1;
     for (uint32_t k = 0; k < mpars.count; k++) {
@@ -194,8 +179,7 @@ void LoadModels(void) {
     int32_t* indexToParser = OS_AllocateRAM(NULL, indexToParser_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, OS_INVALID_HANDLE);
     __builtin_memset(indexToParser, -1, indexToParser_size);
     for (uint32_t k = 0; k < mpars.count; k++) {
-        if (mpars.entries[k].index != UINT16_MAX)
-            indexToParser[mpars.entries[k].index] = (int32_t)k;
+        if (likely(mpars.entries[k].index != UINT16_MAX)) indexToParser[mpars.entries[k].index] = (int32_t)k;
     }
 
     typedef struct { const char* data; int size; } RawOBJ;
@@ -203,7 +187,7 @@ void LoadModels(void) {
     __builtin_memset(rawModels, 0, loadedModelsMaxIndex * sizeof(RawOBJ));
     for (uint32_t i = 0; i < loadedModelsMaxIndex; ++i) {
         int32_t parserIdx = indexToParser[i];
-        if (parserIdx < 0 || parserIdx >= (int32_t)mpars.count) continue;
+        if (unlikely(parserIdx < 0 || parserIdx >= (int32_t)mpars.count)) continue;
 
         const char* path = mpars.entries[parserIdx].path;
         OsFileHandle dummy_fd;
@@ -214,7 +198,7 @@ void LoadModels(void) {
 
     double timeAtStartOfSecondLoop = get_time();
     num_parse_threads = omp_get_max_threads();
-    if (num_parse_threads < 1) num_parse_threads = 1;
+    if (unlikely(num_parse_threads < 1)) num_parse_threads = 1;
     thread_temp_pos  = (float**)OS_AllocateRAM(NULL, (size_t)num_parse_threads * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
     thread_temp_nrm  = (float**)OS_AllocateRAM(NULL, (size_t)num_parse_threads * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
     thread_temp_uv   = (float**)OS_AllocateRAM(NULL, (size_t)num_parse_threads * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
@@ -231,16 +215,16 @@ void LoadModels(void) {
     #pragma omp parallel for schedule(dynamic)
     for (uint32_t i = 0; i < loadedModelsMaxIndex; ++i) {
         int32_t parserIdx = indexToParser[i];
-        if (parserIdx < 0 || parserIdx >= (int32_t)mpars.count) continue;
+        if (unlikely(parserIdx < 0 || parserIdx >= (int32_t)mpars.count)) continue;
 
         modelHasAnimation[i] = (mpars.entries[parserIdx].entflags & ENTFLAG_ANIMATED);
         const char* data = rawModels[i].data;
         int file_size = rawModels[i].size;
-        if (!data || file_size <= 0) continue;
+        if (unlikely(!data || file_size <= 0)) continue;
 
         int tid = omp_get_thread_num();
         float minx, miny, minz, maxx, maxy, maxz;
-        if (!ParseOBJ(data, file_size, thread_temp_pos[tid], thread_temp_nrm[tid], thread_temp_uv[tid], thread_out_verts[tid], thread_out_tris[tid], &modelVertices[i], &modelVertexCounts[i], &modelTriangles[i], &modelTriangleCounts[i], &minx, &miny, &minz, &maxx, &maxy, &maxz)) continue;
+        if (unlikely(!ParseOBJ(data, file_size, thread_temp_pos[tid], thread_temp_nrm[tid], thread_temp_uv[tid], thread_out_verts[tid], thread_out_tris[tid], &modelVertices[i], &modelVertexCounts[i], &modelTriangles[i], &modelTriangleCounts[i], &minx, &miny, &minz, &maxx, &maxy, &maxz))) continue;
 
         uint32_t base_idx = i * BOUNDS_ATTRIBUTES_COUNT;
         modelBounds[base_idx + BOUNDS_DATA_OFFSET_MINX] = minx;
@@ -278,7 +262,7 @@ void LoadModels(void) {
     glGenBuffers(loadedModelsMaxIndex, Sys_Render.tbos);
     uint32_t totalVertices = 0, totalTris = 0;
     for (int i = 0; i < loadedModelsMaxIndex; ++i) {
-        if (modelVertexCounts[i] == 0) continue;
+        if (unlikely(modelVertexCounts[i] == 0)) continue;
 
         size_t vertSize = modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
         totalVertices += modelVertexCounts[i];

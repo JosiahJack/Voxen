@@ -458,7 +458,7 @@ cardchunk: 1
 texture: 311
 #chunk_exec4_5
 index: 75
-model: 140
+model: 178
 cardchunk: 1
 texture: 312
 #chunk_exec4_6
@@ -4494,6 +4494,7 @@ model: 639
 texture: 878
 #prop_chair01
 index: 540
+texture: 195
 model: 41
 #prop_chair02
 index: 541

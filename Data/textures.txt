@@ -467,7 +467,8 @@ index: 192
 index: 193
 #Textures/door1_7_glow.png
 index: 194
-
+#Textures/chair1.png
+index: 195
 #Textures/door_bulk1.png
 index: 196
 #Textures/door_bulk1_glow.png

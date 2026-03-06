@@ -262,8 +262,7 @@ index: 137
 index: 138
 #Models/exec4_4.obj
 index: 139
-#Models/exec4_5.obj
-index: 140
+
 #Models/exec4_6.obj
 index: 141
 #Models/exec6_1.obj
@@ -322,28 +321,8 @@ index: 167
 index: 168
 #Models/g_energmine.obj
 index: 169
-#Models/genericLOD3card_112ofs.obj
-index: 170
-#Models/genericLOD3card_128ofs.obj
-index: 171
-#Models/genericLOD3card_144s.obj
-index: 172
-#Models/genericLOD3card_192ofs.obj
-index: 173
-#Models/genericLOD3card_256ofs.obj
-index: 174
-#Models/genericLOD3card_32ofs.obj
-index: 175
-#Models/genericLOD3card_64ofs.obj
-index: 176
-#Models/genericLOD3card_96ofs.obj
-index: 177
 #Models/genericLOD3card.obj
 index: 178
-#Models/genericLOD3card_ofs128.obj
-index: 179
-#Models/genericLOD3card_slice45.obj
-index: 180
 #Models/g_eshaker.obj
 index: 181
 #Models/g_frag.obj
@@ -583,8 +562,7 @@ index: 298
 #Models/npc_autobomb.obj
 index: 299
 
-#Models/npc_bot_cortex_reaver_gibs.obj
-index: 301
+
 #Models/npc_cyberdog.obj
 index: 302
 #Models/npc_cyberguard1.obj
@@ -600,26 +578,6 @@ index: 307
 #Models/npc_cyborg_diegoteleportfx.obj
 index: 311
 
-#Models/npc_execbot_gibs.obj
-index: 317
-
-#Models/npc_flierbot_gibs.obj
-index: 319
-
-#Models/npc_maintenancebot_gibs.obj
-index: 326
-
-#Models/npc_repairbot_gibs.obj
-index: 332
-
-#Models/npc_sec1bot_gibs.obj
-index: 334
-
-#Models/npc_sec2botgibs.obj
-index: 336
-
-#Models/npc_servbot_gibs.obj
-index: 338
 #Models/reac1_1_slice45.obj
 index: 339
 #Models/reac2_4_slice128lower.obj
