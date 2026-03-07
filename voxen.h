@@ -159,7 +159,7 @@ typedef struct {
 } DiagnosticsSystem;
 extern DiagnosticsSystem Sys_Dx;
 
-#define LIGHT_COUNT 1600 // MAX CITADEL LIGHT COUNT is 1561 for Level 7, leaves room for dynamic lights from projectiles
+#define LIGHT_COUNT 2048 // MAX CITADEL LIGHT COUNT is 1561 for Level 7, leaves room for dynamic lights from projectiles
 #define MAX_SHADOWMAPS 80u
 #define SHADOW_MAP_SIZE 192u
 #define TOTAL_SHADOWMAP_PIXELS (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U))

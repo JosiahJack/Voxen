@@ -940,8 +940,7 @@ index: 665
 index: 666
 #Models/bridg1_1_flipx.obj
 index: 667
-#Models/chunk_block.obj
-index: 668
+
 #Models/med1_5.obj
 index: 669
 

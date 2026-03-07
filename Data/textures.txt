@@ -1333,6 +1333,7 @@ index: 637
 index: 638
 #Textures/poisonweeds.png
 index: 639
+transparent: 1
 #Textures/potted_plant.png
 index: 640
 #Textures/p_reflex.png
