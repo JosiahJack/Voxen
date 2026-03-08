@@ -846,7 +846,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void RenderSha
         
         float range =  lights[litIdx + LIGHT_DATA_OFFSET_RANGE] * 0.99f; // Discard 1% more lights/meshes for performance.
         float luminosity = (intensity / (range * range));
-        if (luminosity < 0.015f && (range < 8.0f || intensity < 0.5f) && i != headmountedLanternLight) continue;
+        if (luminosity < 0.008f && (range < 8.0f || intensity < 0.5f) && i != headmountedLanternLight) continue;
         if (!lightInPVS[i] && i != headmountedLanternLight) continue;
         
         float dx = lightPos.x - playerPos.x; float dy = lightPos.y - playerPos.y; float dz = lightPos.z - playerPos.z;
@@ -887,7 +887,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void RenderSha
         glUseProgram(Sys_Render.shadowmapsShaderProgram);
         uint32_t shadowmapOffsetHead = 0U;
         uint16_t shadowCasterIndices[SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS];
-        uint16_t numShadowCasters = 0;
+        uint32_t numShadowCasters = 0;
         for (int i=START_INDEX_LEVEL_INSTANCES;i<INSTANCE_COUNT;++i) {
             if (EntNotVisible(i,(instances[i].entflags & ENTFLAG_NO_SHADOWS))) continue;
 

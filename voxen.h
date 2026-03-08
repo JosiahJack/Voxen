@@ -160,7 +160,7 @@ typedef struct {
 extern DiagnosticsSystem Sys_Dx;
 
 #define LIGHT_COUNT 2048 // MAX CITADEL LIGHT COUNT is 1561 for Level 7, leaves room for dynamic lights from projectiles
-#define MAX_SHADOWMAPS 80u
+#define MAX_SHADOWMAPS 128u
 #define SHADOW_MAP_SIZE 128u
 #define TOTAL_SHADOWMAP_PIXELS (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U))
 typedef struct {
@@ -1333,7 +1333,7 @@ void UpdateScreenSize(GLFWwindow* window, int32_t width, int32_t height);
 #define VOXEL_SIZE 0.32f
 #define VOXEL_HALF (VOXEL_SIZE * 0.5f)
 #define CELL_SIZE 2.56f // Each cell is 2.56x2.56
-#define MAX_LIGHTS_PER_VOXEL 56 // Cap to prevent overflow
+#define MAX_LIGHTS_PER_VOXEL 64 // Cap to prevent overflow
 #define CELL_VISIBLE       1u
 #define CELL_OPEN          2u
 #define CELL_CLOSEDNORTH   4u

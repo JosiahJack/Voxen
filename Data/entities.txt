@@ -2504,6 +2504,7 @@ bounceCombine: 0
 #item_logic_probe
 index: 361
 model: 217
+texture: 427
 mass: 0.15
 linearDrag: 0.0
 angularDrag: 0.05
@@ -4577,8 +4578,12 @@ index: 564
 index: 565
 #prop_gear_large
 index: 566
+model: 166
+texture: 335
 #prop_gear_small
 index: 567
+model: 167
+texture: 336
 #prop_grass1
 index: 568
 #prop_grass2
