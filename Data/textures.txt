@@ -101,12 +101,16 @@ transparent: 1
 index: 37
 #Textures/col3_forcefield.png
 index: 38
+transparent: 1
 #Textures/col4_forcefield.png
 index: 39
+transparent: 1
 #Textures/col5_forcefield.png
 index: 40
+transparent: 1
 #Textures/col7_forcefield.png
 index: 41
+transparent: 1
 #Textures/blood_core.png
 index: 42
 transparent: 1
@@ -116,7 +120,7 @@ index: 43
 index: 44
 #Textures/bridg1_2.png
 index: 45
-#Textures/pnl14_y.png
+#Textures/pnl14_g.png
 index: 46
 #Textures/bridg1_3.png
 index: 47
@@ -475,6 +479,7 @@ index: 196
 index: 197
 #Textures/col3_forcefield_faint.png
 index: 198
+transparent: 1
 #Textures/door_bulk3_glow.png
 index: 199
 #Textures/door_bulk3.png
@@ -577,7 +582,8 @@ transparent: 1
 #Textures/d_words7.png
 index: 241
 transparent: 1
-
+#Textures/cpu_node.png
+index: 242
 #Textures/ef_cyber0.png
 index: 243
 transparent: 1
@@ -591,7 +597,8 @@ transparent: 1
 index: 246
 #Textures/elev1_up.png
 index: 247
-
+#Textures/cpu_node_glow.png
+index: 248
 #Textures/elev2_up.png
 index: 249
 #Textures/elev3_dn.png
@@ -1571,6 +1578,8 @@ index: 756
 index: 757
 #Textures/sci3_6.png
 index: 758
+#Textures/surgery_table.png
+index: 759
 
 #Textures/screencode0.png
 index: 768

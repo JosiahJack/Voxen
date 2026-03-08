@@ -120,8 +120,7 @@ index: 51
 index: 52
 #Models/corpse_eaten.obj
 index: 53
-#Models/corpse_humanoid_base.obj
-index: 54
+
 #Models/corpse_labcoat.obj
 index: 55
 #Models/corpse_security.obj
@@ -142,24 +141,15 @@ index: 62
 index: 63
 #Models/cyber_bullet.obj
 index: 64
-#Models/cyber_data.obj
-index: 65
-#Models/cyber_datafrag.obj
-index: 66
-#Models/cyber_exit.obj
-index: 67
-#Models/cyber_ice.obj
-index: 68
+
 #Models/cyber_integrity.obj
 index: 69
-#Models/cyber_item.obj
-index: 70
+
 #Models/cyber_mine.obj
 index: 71
 #Models/cyberplayer.obj
 index: 72
-#Models/cyber_switch.obj
-index: 73
+
 #Models/desk01.obj
 index: 74
 #Models/desk02.obj
@@ -389,8 +379,7 @@ index: 211
 index: 212
 #Models/lift1.obj
 index: 213
-#Models/lift1_lod2.obj
-index: 214
+
 #Models/lift2.obj
 index: 215
 #Models/light_emergsignal.obj
@@ -861,25 +850,13 @@ index: 623
 index: 624
 #Models/tv_on_a_post.obj
 index: 625
-#Models/v_dartgun.obj
-index: 626
+
 #Models/vending1_1.obj
 index: 627
 #Models/vending1_2.obj
 index: 628
 #Models/vending1_3.obj
 index: 629
-#Models/v_flechette.obj
-index: 630
-#Models/v_magnum.obj
-index: 631
-#Models/v_magpulse.obj
-index: 632
-
-#Models/v_pistol.obj
-index: 634
-#Models/v_plasma.obj
-index: 635
 
 #Models/warecasing.obj
 index: 637

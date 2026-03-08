@@ -4061,8 +4061,8 @@ glowtexture: 72
 #sec_cpunode
 index: 478
 model: 587
-texture: 85
-glowtexture: 84
+texture: 242
+glowtexture: 248
 #sec_cpunode_small
 index: 479
 model: 588
@@ -4468,7 +4468,7 @@ texture: 246
 #prop_bed_hospital
 index: 534
 model: 608
-texture: 113
+texture: 759
 #prop_bed_neurosurgery
 index: 535
 texture: 18
@@ -5329,7 +5329,6 @@ index: 757
 #ef_particle_graytationburst
 index: 758
 #test_ent
-index: 766
 #player
 index: 767
 

@@ -27,6 +27,8 @@ layout(location = 20) uniform uint specIndex;
 layout(location = 21) uniform uint shadowMapSize;
 layout(location = 22) uniform float shadowMapSizeF;
 layout(location = 23) uniform uint lightCount;
+layout(location = 24) uniform uint maxLightsPerVoxel;
+
 
 layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
@@ -184,7 +186,7 @@ void main() {
     uint listoffset = 0;
     float intensityTotal = 0.0;
     for (uint i = 0u; i < count; i++) {
-        uint lightIdxInPVS = uniqueLightLists[(voxelIdx * 24) + i];
+        uint lightIdxInPVS = uniqueLightLists[(voxelIdx * maxLightsPerVoxel) + i];
         if (lightIdxInPVS >= lightCount) continue;
 
         uint lightIdx = lightIdxInPVS * uint(LIGHT_DATA_SIZE);

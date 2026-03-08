@@ -15,9 +15,9 @@ layout(location = 3) uniform float worldMin_x;
 layout(location = 4) uniform float worldMin_z;
 layout(location = 5) uniform vec3 camPos;
 layout(location = 6) uniform vec3 camForward;
+layout(location = 7) uniform uint maxLightsPerVoxel;
 
 const int WORLD_X_VOXELCOUNT = 512;
-const int MAX_LIGHTS_PER_VOXEL = 24;
 const int LIGHT_DATA_SIZE = 13;
 const int LIGHT_DATA_OFFSET_POSX = 0;
 const int LIGHT_DATA_OFFSET_POSY = 1;
@@ -68,11 +68,11 @@ void main() {
         vec3 lightPos = vec3(lights[litIdx], 0.0, lights[litIdx + LIGHT_DATA_OFFSET_POSZ]);
         float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
         if (length(lightPos - voxelPos) < range) {
-            uniqueLightLists[(voxelIndex * MAX_LIGHTS_PER_VOXEL) + voxelLightListCounts[voxelIndex]] = lightIdx;
+            uniqueLightLists[(voxelIndex * maxLightsPerVoxel) + voxelLightListCounts[voxelIndex]] = lightIdx;
             voxelLightListCounts[voxelIndex]++;
-            if (voxelLightListCounts[voxelIndex] >= MAX_LIGHTS_PER_VOXEL) return;
+            if (voxelLightListCounts[voxelIndex] >= maxLightsPerVoxel) return;
         }
     }
     
-    for (uint i = voxelLightListCounts[voxelIndex]; i < MAX_LIGHTS_PER_VOXEL; i++) uniqueLightLists[voxelIndex * MAX_LIGHTS_PER_VOXEL + i] = 0xFFFFFFFFu;
+    for (uint i = voxelLightListCounts[voxelIndex]; i < maxLightsPerVoxel; i++) uniqueLightLists[voxelIndex * maxLightsPerVoxel + i] = 0xFFFFFFFFu;
 }

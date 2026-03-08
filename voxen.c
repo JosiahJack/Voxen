@@ -269,6 +269,7 @@ bool UpdateLights(bool* voxelsNeedUpdated) {
         glUseProgram(Sys_Render.voxelUpdateShaderProgram);
         glUniform3f(5, px, py, pz);
         glUniform3f(6, fx, fy, fz);
+        glUniform1ui(7, (uint32_t)MAX_LIGHTS_PER_VOXEL);
         GLuint groupX_voxels = (512 + 31) / 32;
         GLuint groupZ_voxels = (512 + 31) / 32; // Actually just a local size y, but for z axis voxels
         glDispatchCompute(groupX_voxels,groupZ_voxels, 1);
@@ -741,6 +742,7 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     glUseProgram(Sys_Render.shadowmapsShaderProgram); glUniform1ui(9,         SHADOW_MAP_SIZE);
     glUseProgram(Sys_Render.chunkShaderProgram);      glUniform1ui(21,        SHADOW_MAP_SIZE);
                                                       glUniform1f (22, (float)SHADOW_MAP_SIZE); glUniform1ui(23, LIGHT_COUNT);
+                                                      glUniform1ui(24, (uint32_t)MAX_LIGHTS_PER_VOXEL);
     Sys_Render.voxelLightListCountsID  = SetupSSBO(&Sys_Render.voxelLightListCountsID,   6, VOXEL_COUNT * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     Sys_Render.shadowMapsIndirectionID = SetupSSBO(&Sys_Render.shadowMapsIndirectionID,  8, LIGHT_COUNT * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     Sys_Render.matricesBufferID        = SetupSSBO(&Sys_Render.matricesBufferID,        11, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices, GL_STATIC_DRAW);
@@ -805,7 +807,7 @@ static inline __attribute__((always_inline)) void Frob(Vector3 pos, Vector3 forw
     Sys_Dx.debugLineFinished = Sys_Global.current_time + 3.0;
 }
 
-#define SHADOW_NEARMESH_MAX 384 // 350 was too low for light 712 on security atrium
+#define SHADOW_NEARMESH_MAX 512 // 350 was too low for light 712 on security atrium
 DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX]; // Found that this is typically around 172
 float shadows_nearMeshRadii[SHADOW_NEARMESH_MAX];
 

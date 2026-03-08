@@ -161,7 +161,7 @@ extern DiagnosticsSystem Sys_Dx;
 
 #define LIGHT_COUNT 2048 // MAX CITADEL LIGHT COUNT is 1561 for Level 7, leaves room for dynamic lights from projectiles
 #define MAX_SHADOWMAPS 80u
-#define SHADOW_MAP_SIZE 192u
+#define SHADOW_MAP_SIZE 128u
 #define TOTAL_SHADOWMAP_PIXELS (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U))
 typedef struct {
     double shadowTime;
@@ -1249,7 +1249,7 @@ void play_wav(const char* path, float volume, Vector3 pos, bool positional);
 #define MAX_VALID_TEXTURE 2048
 #define MAX_TEXTURE_DIMENSION 2048
 #define MAX_PALETTE_SIZE 256
-#define MAX_TOTAL_PIXELS 26800000u
+#define MAX_TOTAL_PIXELS 27800000u
 #define MAX_UNIQUE_COLORS 80000u
 #define VERTEX_ATTRIBUTES_COUNT 8 // x,y,z,nx,ny,nz,u,v
 #define BOUNDS_ATTRIBUTES_COUNT 7
@@ -1333,7 +1333,7 @@ void UpdateScreenSize(GLFWwindow* window, int32_t width, int32_t height);
 #define VOXEL_SIZE 0.32f
 #define VOXEL_HALF (VOXEL_SIZE * 0.5f)
 #define CELL_SIZE 2.56f // Each cell is 2.56x2.56
-#define MAX_LIGHTS_PER_VOXEL 24 // Cap to prevent overflow
+#define MAX_LIGHTS_PER_VOXEL 56 // Cap to prevent overflow
 #define CELL_VISIBLE       1u
 #define CELL_OPEN          2u
 #define CELL_CLOSEDNORTH   4u
