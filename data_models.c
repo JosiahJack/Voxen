@@ -11,9 +11,8 @@ bool modelHasAnimation[MODEL_IDX_MAX] = {0};
 float modelBounds[MODEL_IDX_MAX * BOUNDS_ATTRIBUTES_COUNT] = {0};
 uint16_t loadedModelsMaxIndex = 0;
 GLuint SetupSSBO(GLuint* id, GLuint bindingIndex, GLsizeiptr size, const void* data, GLenum usage);
-#define MAX_VERT_ELEMENT_SIZE 7000  // From max verts for a model: 6135, Max normals: 3774, Max UVS: 6962
-#define MAX_OUTPUT_VERTS      24000 // 7000 faces * 3 + safety margin (way more than needed)
-#define MAX_OUTPUT_TRIS       16000
+#define MAX_VERT_ELEMENT_SIZE 6964  // From max verts for a model: 6135, Max normals: 3774, Max UVS: 6962
+#define MAX_OUTPUT_VERTS      20892 // 6964 faces * 3
 static float**    thread_temp_pos   = NULL;
 static float**    thread_temp_nrm   = NULL;
 static float**    thread_temp_uv    = NULL;
@@ -44,116 +43,147 @@ static inline __attribute__((always_inline)) float parse_float_pure(const char* 
     return sign * value;
 }
 
-static __attribute__((hot)) bool ParseOBJ(const char* data, int file_size, float* temp_pos, float* temp_nrm, float* temp_uv, float* scratch_verts, uint32_t* scratch_tris, float** out_vertices, uint32_t* out_vertex_count, uint32_t** out_triangles, uint32_t* out_triangle_count, float* out_minx, float* out_miny, float* out_minz, float* out_maxx, float* out_maxy, float* out_maxz) {
+static __attribute__((hot)) __attribute__((optimize("O3"))) __attribute__((flatten)) bool ParseOBJ(const char* __restrict data, int file_size,
+              float* __restrict temp_pos,
+              float* __restrict temp_nrm,
+              float* __restrict temp_uv,
+              float* __restrict scratch_verts,
+              uint32_t* __restrict scratch_tris, float** out_vertices, uint32_t* out_vertex_count, uint32_t** out_triangles, uint32_t* out_triangle_count, float* out_minx, float* out_miny, float* out_minz, float* out_maxx, float* out_maxy, float* out_maxz) {
     *out_vertices = NULL; *out_triangles = NULL;
     *out_vertex_count = *out_triangle_count = 0;
-    if (!data || file_size <= 0) return false;
+    if (unlikely(!data || file_size <= 0)) return false;
 
     uint32_t vi = 0, ni = 0, ui = 0;
     uint32_t vert_idx = 0;
-    float minx = 1e9f, miny = 1e9f, minz = 1e9f, maxx = -1e9f, maxy = -1e9f, maxz = -1e9f;
+
+    float minx = 1e9f, miny = 1e9f, minz = 1e9f;
+    float maxx = -1e9f, maxy = -1e9f, maxz = -1e9f;
+
     const char* p = data;
-    const char* end = data + file_size;
-    while (p < end) {
-        const char* line = p;
-        while (p < end && *p != '\n' && *p != '\r') ++p;
+    const char* const end = data + file_size;
 
-        if ((p - line) > 2) {
-            if (line[0] == 'v') {
-                const char* num = line + 2;
-                if (line[1] == ' ') {
-                    temp_pos[vi*3+0] = parse_float_pure(num); while (*num && *num != ' ' && *num != '\t') ++num;
-                    ++num;
-                    temp_pos[vi*3+1] = parse_float_pure(num); while (*num && *num != ' ' && *num != '\t') ++num;
-                    ++num;
-                    temp_pos[vi*3+2] = parse_float_pure(num);
-                    ++vi;
-                } else if (line[1] == 'n') {
-                    num = line + 3;
-                    temp_nrm[ni*3+0] = parse_float_pure(num); while (*num && *num != ' ' && *num != '\t') ++num;
-                    ++num;
-                    temp_nrm[ni*3+1] = parse_float_pure(num); while (*num && *num != ' ' && *num != '\t') ++num;
-                    ++num;
-                    temp_nrm[ni*3+2] = parse_float_pure(num);
-                    ++ni;
-                } else if (line[1] == 't') {
-                    num = line + 3;
-                    temp_uv[ui*2+0] = parse_float_pure(num); while (*num && *num != ' ' && *num != '\t') ++num;
-                    ++num;
-                    temp_uv[ui*2+1] = parse_float_pure(num);
-                    ++ui;
-                }
+    while (likely(p < end)) {
+        const char c = *p;
+        if (likely(c == 'v')) {
+            if (p[1] == ' ') {
+                if (unlikely(vi >= MAX_VERT_ELEMENT_SIZE)) return false;
+                const char* num = p + 2;
+                temp_pos[vi*3]   = parse_float_pure(num); while (*num && *num != ' ' && *num != '\t') { ++num; } ++num;
+                temp_pos[vi*3+1] = parse_float_pure(num); while (*num && *num != ' ' && *num != '\t') { ++num; } ++num;
+                temp_pos[vi*3+2] = parse_float_pure(num);
+                ++vi;
+            } else if (p[1] == 'n' && p[2] == ' ') {
+                if (unlikely(ni >= MAX_VERT_ELEMENT_SIZE)) return false;
+                const char* num = p + 3;
+                temp_nrm[ni*3]   = parse_float_pure(num); while (*num && *num != ' ' && *num != '\t') { ++num; } ++num;
+                temp_nrm[ni*3+1] = parse_float_pure(num); while (*num && *num != ' ' && *num != '\t') { ++num; } ++num;
+                temp_nrm[ni*3+2] = parse_float_pure(num);
+                ++ni;
+            } else if (p[1] == 't' && p[2] == ' ') {
+                if (unlikely(ui >= MAX_VERT_ELEMENT_SIZE)) return false;
+                const char* num = p + 3;
+                temp_uv[ui*2]   = parse_float_pure(num); while (*num && *num != ' ' && *num != '\t') { ++num; } ++num;
+                temp_uv[ui*2+1] = parse_float_pure(num);
+                ++ui;
             }
-            else if (line[0] == 'f') {
-                const char* num = line + 2;
-                while (*num == ' ' || *num == '\t') ++num;
+        } else if (likely(c == 'f' && p[1] == ' ')) {
+            const char* num = p + 2;
+            while (*num == ' ' || *num == '\t') ++num;
+            uint32_t v0=0, v1=0, v2=0, vt0=0, vt1=0, vt2=0, vn0=0, vn1=0, vn2=0;
+            #define PARSE_IDX(I) do { \
+                int32_t raw = 0; \
+                if (*num == '-') { ++num; raw = -(int32_t)parse_numberu32_pure(num); } \
+                else raw = (int32_t)parse_numberu32_pure(num); \
+                if (raw > 0) I = (uint32_t)raw; \
+                else if (raw < 0) I = (uint32_t)((int32_t)vi + raw); /* relative */ \
+                else I = 0; \
+                while (*num && *num != '/' && *num != ' ' && *num != '\t') ++num; \
+            } while(0)
+            PARSE_IDX(v0); if (*num == '/') { ++num; if (*num != '/') { PARSE_IDX(vt0); } if (*num == '/') { ++num; PARSE_IDX(vn0); } }
+            while (*num && *num != ' ' && *num != '\t') ++num;
+            while (*num == ' ' || *num == '\t') ++num;
+            PARSE_IDX(v1); if (*num == '/') { ++num; if (*num != '/') { PARSE_IDX(vt1); } if (*num == '/') { ++num; PARSE_IDX(vn1); } }
+            while (*num && *num != ' ' && *num != '\t') ++num;
+            while (*num == ' ' || *num == '\t') ++num;
+            PARSE_IDX(v2); if (*num == '/') { ++num; if (*num != '/') { PARSE_IDX(vt2); } if (*num == '/') { ++num; PARSE_IDX(vn2); } }
+            #undef PARSE_IDX
+            if (likely(v0 && v1 && v2)) {
+                if (unlikely(vert_idx + 3 > MAX_OUTPUT_VERTS)) return false;
 
-                uint32_t v[3] = {0}, vt[3] = {0}, vn[3] = {0};
-                uint32_t idx_count = 0;
-                #pragma GCC unroll 3
-                for (int i = 0; i < 3 && idx_count < 3; ++i) {
-                    if (*num < '0' && *num != '-') break;
-                    v[i] = parse_numberu32_pure(num);
-                    while (*num && *num != ' ' && *num != '\t' && *num != '/') ++num;
-                    if (*num == '/') {
-                        ++num;
-                        if (*num == '/') { ++num; vn[i] = parse_numberu32_pure(num); }
-                        else {
-                            vt[i] = parse_numberu32_pure(num);
-                            while (*num && *num != ' ' && *num != '\t' && *num != '/') ++num;
-                            if (*num == '/') { ++num; vn[i] = parse_numberu32_pure(num); }
-                        }
-                    }
-                    while (*num && *num != ' ' && *num != '\t') ++num;
-                    while (*num == ' ' || *num == '\t') ++num;
-                    ++idx_count;
-                }
-                if (idx_count != 3) goto next_line;   // skip quads/ngons (exact same logic as before)
+                #define EMIT(V, VT, VN) do { \
+                    uint32_t vi_idx = (V)-1; \
+                    uint32_t ti_idx = ((VT) && (VT) <= ui) ? (VT)-1 : 0; \
+                    uint32_t ni_idx = ((VN) && (VN) <= ni) ? (VN)-1 : 0; \
+                    float* dst = scratch_verts + (vert_idx << 3); \
+                    dst[0] = temp_pos[vi_idx*3]; dst[1] = temp_pos[vi_idx*3+1]; dst[2] = temp_pos[vi_idx*3+2]; \
+                    dst[3] = (ni_idx < ni) ? temp_nrm[ni_idx*3]   : 0.0f; \
+                    dst[4] = (ni_idx < ni) ? temp_nrm[ni_idx*3+1] : 0.0f; \
+                    dst[5] = (ni_idx < ni) ? temp_nrm[ni_idx*3+2] : 0.0f; \
+                    dst[6] = (ti_idx < ui) ? temp_uv[ti_idx*2]    : 0.0f; \
+                    dst[7] = (ti_idx < ui) ? temp_uv[ti_idx*2+1]  : 0.0f; \
+                    float x = dst[0], y = dst[1], z = dst[2]; \
+                    minx = x < minx ? x : minx; maxx = x > maxx ? x : maxx; \
+                    miny = y < miny ? y : miny; maxy = y > maxy ? y : maxy; \
+                    minz = z < minz ? z : minz; maxz = z > maxz ? z : maxz; \
+                    scratch_tris[vert_idx] = vert_idx; \
+                    ++vert_idx; \
+                } while(0)
 
-                #pragma GCC unroll 3
-                for (int i = 0; i < 3; ++i) {
-                    uint32_t vi_idx = v[i] - 1;
-                    uint32_t ti_idx = (vt[i] && vt[i] <= ui) ? vt[i]-1 : 0;
-                    uint32_t ni_idx = (vn[i] && vn[i] <= ni) ? vn[i]-1 : 0;
-                    float* dst = scratch_verts + vert_idx * 8;
-                    dst[0] = temp_pos[vi_idx*3];   dst[1] = temp_pos[vi_idx*3+1];   dst[2] = temp_pos[vi_idx*3+2];
-                    dst[3] = (ni_idx < ni) ? temp_nrm[ni_idx*3]   : 0.0f;
-                    dst[4] = (ni_idx < ni) ? temp_nrm[ni_idx*3+1] : 0.0f;
-                    dst[5] = (ni_idx < ni) ? temp_nrm[ni_idx*3+2] : 0.0f;
-                    dst[6] = (ti_idx < ui) ? temp_uv[ti_idx*2]    : 0.0f;
-                    dst[7] = (ti_idx < ui) ? temp_uv[ti_idx*2+1]  : 0.0f;
-                    float x = dst[0], y = dst[1], z = dst[2];
-                    if (x < minx) minx = x;
-                    if (x > maxx) maxx = x;
-                    if (y < miny) miny = y;
-                    if (y > maxy) maxy = y;
-                    if (z < minz) minz = z;
-                    if (z > maxz) maxz = z;
-                    scratch_tris[vert_idx] = vert_idx;   // non-indexed, just sequential
-                    ++vert_idx;
-                }
+                EMIT(v0, vt0, vn0);
+                EMIT(v1, vt1, vn1);
+                EMIT(v2, vt2, vn2);
+                #undef EMIT
             }
         }
-    next_line:
+
+        p = (const char*)__builtin_memchr(p, '\n', (size_t)(end - p));
+        if (unlikely(!p)) break;
+        
+        ++p;
         if (p < end && *p == '\r') ++p;
-        if (p < end && *p == '\n') ++p;
     }
 
-    if (vert_idx == 0) return false;
+    if (unlikely(vert_idx == 0)) return false;
+    
+    #define HASH_SIZE 32768
+    uint32_t hash_table[HASH_SIZE];
+    __builtin_memset(hash_table, 0xFF, sizeof(hash_table)); // 0xFFFFFFFF = empty
 
-    // Exact final allocation + fast memcpy (this is the ONLY allocation left per model)
-    size_t vbytes = (size_t)vert_idx * 8 * sizeof(float);
+    float* unique_verts = scratch_verts;  // reuse scratch
+    uint32_t* remap      = (uint32_t*)scratch_tris; // reuse scratch for remap
+    uint32_t unique_cnt  = 0;
+
+    for (uint32_t i = 0; i < vert_idx; ++i) {
+        const float* v = scratch_verts + (i << 3);
+        uint64_t h = *(uint64_t*)(v+0) ^ *(uint64_t*)(v+2) ^ *(uint64_t*)(v+4) ^ *(uint64_t*)(v+6);
+        uint32_t slot = (uint32_t)(h ^ (h >> 32)) & (HASH_SIZE-1);
+
+        while (hash_table[slot] != 0xFFFFFFFF) {
+            const float* candidate = unique_verts + (hash_table[slot] << 3);
+            if (__builtin_memcmp(candidate, v, 32) == 0) { // exact match
+                remap[i] = hash_table[slot];
+                goto next_vertex;
+            }
+            slot = (slot + 1) & (HASH_SIZE-1);
+        }
+
+        hash_table[slot] = unique_cnt;
+        remap[i] = unique_cnt;
+        __builtin_memcpy(unique_verts + (unique_cnt << 3), v, 32);
+        ++unique_cnt;
+    next_vertex:;
+    }
+
+    size_t vbytes = (size_t)unique_cnt * 8 * sizeof(float);
     float* final_verts = (float*)OS_AllocateRAM(NULL, vbytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-    __builtin_memcpy(final_verts, scratch_verts, vbytes);
-
-    size_t ibytes = (size_t)vert_idx * sizeof(uint32_t);
+    __builtin_memcpy(final_verts, unique_verts, vbytes);
+    size_t ibytes = (size_t)vert_idx * sizeof(uint32_t); // still need full index list
     uint32_t* final_tris = (uint32_t*)OS_AllocateRAM(NULL, ibytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-    __builtin_memcpy(final_tris, scratch_tris, ibytes);
-
-    *out_vertices      = final_verts;
-    *out_vertex_count  = vert_idx;
-    *out_triangles     = final_tris;
-    *out_triangle_count= vert_idx / 3;
+    for (uint32_t i = 0; i < vert_idx; ++i) final_tris[i] = remap[i];
+    *out_vertices       = final_verts;
+    *out_vertex_count   = unique_cnt;
+    *out_triangles      = final_tris;
+    *out_triangle_count = vert_idx / 3;
     *out_minx = minx; *out_miny = miny; *out_minz = minz;
     *out_maxx = maxx; *out_maxy = maxy; *out_maxz = maxz;
     return true;

@@ -1404,7 +1404,7 @@ texture: 716
 #chunk_reac6_2
 index: 239
 cardchunk: 1
-model: 538
+model: 539
 texture: 717
 #chunk_reac6_3
 index: 240

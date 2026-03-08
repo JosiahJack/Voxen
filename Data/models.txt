@@ -601,8 +601,7 @@ index: 488
 index: 489
 #Models/pipe128.obj
 index: 490
-#Models/plane_generic.obj
-index: 491
+
 #Models/plastique.obj
 index: 492
 #Models/poisonbush1.obj

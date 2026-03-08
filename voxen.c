@@ -658,7 +658,7 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     glfwMakeContextCurrent(Sys_Global.window);
     if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress)) { DualLogError("Failed to initialize GLAD\n"); OS_Exit(1); }
     
-    CycleToNextMonitor(Sys_Global.window);
+//     CycleToNextMonitor(Sys_Global.window);
     glfwSetInputMode(Sys_Global.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     Input_Init(Sys_Global.window);
     glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
