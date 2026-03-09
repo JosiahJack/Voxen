@@ -1,4 +1,5 @@
 #include "os.h"
+#include "gl.h"
 #include "voxen.h"
 
 // Custom stb_image stripped to barebones just .png just rgb/rgba, no variants, no fluff.

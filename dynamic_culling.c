@@ -1,4 +1,5 @@
 #include "os.h"
+#include "gl.h"
 #include "voxen.h"
 
 uint8_t *stbi_load_from_memory(const uint8_t* buffer, int32_t len, int32_t* x, int32_t* y);

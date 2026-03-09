@@ -1,10 +1,13 @@
 #include "os.h" // Operating System calls shim layer.
+#include "gl.h"
 #include "voxen.h"
+#include "glfw_defines.h"
 InputSystem Sys_Input;
 extern uint16_t editModeTestEntityDefinition;
 extern uint16_t editModeSelection;
 bool mouseMovementThisFrame;
-
+void Input_PollGamepad(void);
+void Input_PollJoysticks(void);
 SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on first run for potatoes (e.g. won't crash for out of VRAM, or won't take 5min to init).
     .InputCodeSettings = {
         5,   /* Forward    = F */          0, /* Strafe Left = A */          18, /* Backpedal  = S */         3, /* Strafe Right = D */
@@ -118,156 +121,6 @@ void SaveConfig(void) {
 
     fclose(f);
     DualLog("Saved settings to ./Data/Config.ini!\n");
-}
-
-void SetSkyRotateSpeed(void) {
-    static const float speeds[] = { 0.05f, 1.0f, 2.5f, 3.75f, 6.25f };
-    float skyRotateSpeed = speeds[Sys_Cheats.dizzyLevel];
-    glUseProgram(Sys_Render.imageBlitShaderProgram);
-    glUniform1f(30, skyRotateSpeed);
-}
-
-int fogFac;
-void SetFog(void) {
-    glUseProgram(Sys_Render.chunkShaderProgram);
-    float f = fogBaseDensityForLevel + (float)(fogFac / 255u);
-    glUniform3f(4, fogColorR * f, fogColorG * f, fogColorB * f);
-}
-
-void SetVSync(void) { glfwSwapInterval((int32_t)Sys_Settings.Vsync); }
-
-void SetGI(void) {
-    if (Sys_Settings.GI) {
-        // TODO: Set needed Voxel GI uniforms
-    }
-}
-
-void SetSpeakerMode(void) {
-    switch (Sys_Settings.SpeakerMode) {
-        case 0: break;//targetMode = AudioSpeakerMode.Mono; break; // TODO
-        case 1: break;//targetMode = AudioSpeakerMode.Stereo; break;
-        case 2: break;//targetMode = AudioSpeakerMode.Quad; break;
-        case 3: break;//targetMode = AudioSpeakerMode.Surround; break;
-        case 4: break;//targetMode = AudioSpeakerMode.Mode5point1; break;
-        case 5: break;//targetMode = AudioSpeakerMode.Mode7point1; break;
-        case 6: break;//targetMode = AudioSpeakerMode.Prologic; break;
-    }
-}
-
-void SetLanguage(void) { LoadTextForLanguage(Sys_Settings.Language); LoadLogTextForLanguage(Sys_Settings.Language); }
-
-void ApplySettings(void) {
-    UpdateScreenSize(Sys_Global.window, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
-    SetSkyRotateSpeed();
-    SetVSync();
-    SetFog();
-    SetGI();
-    SetSpeakerMode();
-    SetLanguage();
-}
-
-bool IsNonRepeatingKey(int32_t key) { return key == GLFW_KEY_KP_ENTER || key == GLFW_KEY_ENTER || key == GLFW_KEY_TAB || key == GLFW_KEY_ESCAPE; }
-
-// GLFW Callbacks
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-static void key_callback(GLFWwindow* window, int32_t key, int32_t scancode, int32_t action, int32_t mods) {
-    if (key == GLFW_KEY_F10 && action) OS_Exit(0);
-    if (Sys_Global.menuActive && !returnToPause) {
-        if ((key == GLFW_KEY_RIGHT_ALT || key == GLFW_KEY_LEFT_ALT) && action && Sys_Input.keyStates[GLFW_KEY_ENTER].down)                    GoIntoGame();
-        if (key == GLFW_KEY_ENTER && action && (Sys_Input.keyStates[GLFW_KEY_LEFT_ALT].down || Sys_Input.keyStates[GLFW_KEY_RIGHT_ALT].down)) GoIntoGame();
-    }
-
-    if (action == GLFW_PRESS || (action == GLFW_REPEAT && !IsNonRepeatingKey(key))) Input_KeyDown(key);
-    else if (action == GLFW_RELEASE)                                                Input_KeyUp(key);
-}
-
-void Input_PollJoysticks(void) {
-    for (int jid = GLFW_JOYSTICK_1; jid <= GLFW_JOYSTICK_LAST; ++jid) {
-        if (!glfwJoystickPresent(jid)) continue;
-
-        int buttonCount;
-        const unsigned char* buttons = glfwGetJoystickButtons(jid, &buttonCount);
-        for (int i = 0; i < buttonCount && i < MAX_JOYSTICK_BUTTONS; ++i) {
-            KeyState* k = &Sys_Input.joystickButtons[GLFW_JOYSTICK_1][i];
-            bool down = buttons[i] == GLFW_PRESS;
-
-            k->pressed  = down && !k->down;
-            k->released = !down && k->down;
-            k->down     = down;
-        }
-
-        int hatCount;
-        const unsigned char* hats = glfwGetJoystickHats(jid, &hatCount);
-        for (int i = 0; i < hatCount && i < MAX_JOYSTICK_HATS; ++i) Sys_Input.joystickHats[i].down = hats[i];
-    }
-}
-
-void Input_PollGamepad(void) {
-    GLFWgamepadstate s;
-    if (!glfwGetGamepadState(GLFW_JOYSTICK_1, &s)) return;
-
-    for (int i = 0; i < GLFW_GAMEPAD_BUTTON_LAST + 1; ++i) {
-        KeyState* k = &Sys_Input.gamepadButtons[i];
-        bool down = s.buttons[i] == GLFW_PRESS;
-
-        k->pressed  = down && !k->down;
-        k->released = !down && k->down;
-        k->down     = down;
-    }
-}
-
-static void joystick_callback(int32_t jid, int32_t event) {
-    if (jid > GLFW_JOYSTICK_LAST) return;
-    
-    if (event == GLFW_CONNECTED) {
-        __builtin_memset(&Sys_Input.joystickPresent[jid], 1, sizeof(bool));
-    } else if (event == GLFW_DISCONNECTED) {
-        __builtin_memset(&Sys_Input.joystickPresent[jid], 0, sizeof(bool));
-        __builtin_memset(Sys_Input.joystickButtons, 0, sizeof(Sys_Input.joystickButtons));
-        __builtin_memset(Sys_Input.joystickHats, 0, sizeof(Sys_Input.joystickHats));
-    }
-}
-
-static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
-    if (Sys_Input.window_has_focus) {
-        Sys_Input.currentMouse_dx = (int32_t)(xpos - Sys_Input.last_mouse_x);
-        Sys_Input.currentMouse_dy = (int32_t)(ypos - Sys_Input.last_mouse_y);
-        Sys_Input.last_mouse_x = xpos;
-        Sys_Input.last_mouse_y = ypos;
-        if (Sys_Input.ignore_next_mouse_delta) { Sys_Input.ignore_next_mouse_delta = false; return; }
-        
-        if (Sys_Dx.globalFrameNum > 1) Input_MouseMove(Sys_Input.currentMouse_dx,Sys_Input.currentMouse_dy);
-    }
-}
-
-static void window_focus_callback(GLFWwindow* window, int32_t focused) {
-    Sys_Input.window_has_focus = focused != 0;
-    Sys_Input.ignore_next_mouse_delta = true;
-    glfwSetInputMode(window, GLFW_CURSOR, Sys_Input.window_has_focus ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
-}
-
-static void mouse_button_callback(GLFWwindow* window, int32_t button, int32_t action, int32_t mods) {
-//     DualLog("Mouse button callback entry with button %d, action %d, mods %d\n",button,action,mods);
-    if (action == GLFW_PRESS) {
-        Sys_Input.mouseButtons[button].down = true;
-        Sys_Input.mouseButtons[button].pressed = true;
-    } else if (action == GLFW_RELEASE) {
-        Sys_Input.mouseButtons[button].down = false;
-        Sys_Input.mouseButtons[button].released = true;
-    }
-}
-
-static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) { Sys_Input.scrollDelta += yoffset; }
-#pragma GCC diagnostic pop
-
-void Input_Init(GLFWwindow* window) {
-    glfwSetKeyCallback(window, key_callback);
-    glfwSetJoystickCallback(joystick_callback);
-    glfwSetCursorPosCallback(window, cursor_pos_callback);
-    glfwSetWindowFocusCallback(window, window_focus_callback);
-    glfwSetMouseButtonCallback(window, mouse_button_callback);
-    glfwSetScrollCallback(window, scroll_callback);
 }
 
 int32_t Input_KeyDown(int32_t keycode) {

@@ -229,7 +229,7 @@ void main() {
         float shadowFactor = 1.0;
         uint shadowIndex = shadowMapsIndirection[lightIdxInPVS];
         if (shadowsEnabled > 0 && shadowIndex < lightCount) {
-            float smearness = distOverRangeSqd * 24.0 + range + intensity + 4.51; // was + 10.0 instead of intensity, thought this'd be nice.
+            float smearness = distOverRangeSqd * 24.0 + range + intensity + 4.51;
             vec3 a = abs(toLight);
             float mx = step(a.y, a.x) * step(a.z, a.x);
             float my = step(a.x, a.y) * step(a.z, a.y);
@@ -247,7 +247,7 @@ void main() {
 
             uint faceOff = (shadowIndex * shadowMapSize * shadowMapSize * 6) + (face * shadowMapSize * shadowMapSize);
             vec2 tc = uv * shadowMapSizeF;
-            float slopeBias = 0.2 * (1.0 - NdotL);
+            float slopeBias = 0.24 * (1.0 - NdotL);
             slopeBias = max(slopeBias,0.035);
             float bias = slopeBias * distOverRange;
             bias = max(bias,0.0);

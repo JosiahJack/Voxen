@@ -3,9 +3,6 @@
 #if !defined(__GNUC__) || defined(__clang__) || !defined(__GNUC_MINOR__)
 #error This project is only intended to be compiled with GCC (not Clang, MSVC, etc.)
 #endif
-#define bool _Bool
-#define true 1
-#define false 0
 typedef __INT16_TYPE__ int16_t;
 typedef __INT32_TYPE__ int32_t;
 typedef __UINT8_TYPE__ uint8_t;
@@ -13,6 +10,10 @@ typedef __UINT16_TYPE__ uint16_t;
 typedef __UINT32_TYPE__ uint32_t;
 typedef __INT64_TYPE__ int64_t;
 typedef __UINT64_TYPE__ uint64_t;
+typedef uint64_t size_t;
+#define bool _Bool
+#define true 1
+#define false 0
 #define likely(x)   __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 #define PROT_READ  0x1 // From mman.h
@@ -225,6 +226,7 @@ static inline __attribute__((always_inline)) bool OS_GetFileFingerprint(const ch
     return true;
 }
 
+#ifndef _WIN32
 void* __stack_chk_guard = (void*)0xdeadbeefcafebabeULL;
-__attribute__((noreturn))
-void __stack_chk_fail(void) { DualLogError("Stack protector: canary corrupted - possible stack smash!"); while(1); }
+__attribute__((noreturn)) void __stack_chk_fail(void) { DualLogError("Stack protector: canary corrupted - possible stack smash!"); while(1); }
+#endif

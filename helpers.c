@@ -1,7 +1,6 @@
 // helpers.c - Helper Functions for various things
 #include "os.h"
 #include "voxen.h"
-#include <stdarg.h>
 #define STBIW_UCHAR(x) (unsigned char)((x) & 0xff)
 
 typedef void stbi_write_func(void *context, void *data, int size);
@@ -17,20 +16,21 @@ static void stbi__stdio_write(void *context, void *data, int size) {
    fwrite(data,1,size,(FILE*) context);
 }
 
+typedef __builtin_va_list va_list;
 static void stbiw__writefv(stbi__write_context *s, const char *fmt, va_list v) {
    while (*fmt) {
       switch (*fmt++) {
          case ' ': break;
-         case '1': { unsigned char x = STBIW_UCHAR(va_arg(v, int));
+         case '1': { unsigned char x = STBIW_UCHAR(__builtin_va_arg(v, int));
                      s->func(s->context,&x,1);
                      break; }
-         case '2': { int x = va_arg(v,int);
+         case '2': { int x = __builtin_va_arg(v,int);
                      unsigned char b[2];
                      b[0] = STBIW_UCHAR(x);
                      b[1] = STBIW_UCHAR(x>>8);
                      s->func(s->context,b,2);
                      break; }
-         case '4': { uint32_t x = va_arg(v,int);
+         case '4': { uint32_t x = __builtin_va_arg(v,int);
                      unsigned char b[4];
                      b[0]=STBIW_UCHAR(x);
                      b[1]=STBIW_UCHAR(x>>8);
@@ -120,9 +120,9 @@ static int stbiw__outfile(stbi__write_context *s, int rgb_dir, int vdir, int x, 
    if (y < 0 || x < 0) return 0;
 
    va_list v;
-   va_start(v, fmt);
+   __builtin_va_start(v, fmt);
    stbiw__writefv(s, fmt, v);
-   va_end(v);
+   __builtin_va_end(v);
    stbiw__write_pixels(s,rgb_dir,vdir,x,y,comp,data,alpha,pad, expand_mono);
    return 1;
 }
@@ -146,7 +146,7 @@ static int stbi_write_bmp_core(stbi__write_context *s, int x, int y, int comp, c
    }
 }
 
-static int stbi_write_bmp(char const *filename, int x, int y, int comp, const void *data) {
+int stbi_write_bmp(char const *filename, int x, int y, int comp, const void *data) {
     stbi__write_context s = { 0 };
 //     OsFileHandle fd = OS_OpenWriteonly(filename);
     FILE *f = fopen(filename, "wb");
@@ -234,13 +234,15 @@ bool ConstIndexIsStaticObjectImmutable(int constdex) {
 }
 
 bool TakeScreenshot(void);
+typedef void(*PFNGLREADPIXELSPROC)(int32_t x, int32_t y, int32_t width, int32_t height, uint32_t format, uint32_t type, void* pixels);
+extern PFNGLREADPIXELSPROC glad_glReadPixels;
 void Screenshot(void) {
     if (!TakeScreenshot() || Sys_Global.current_time <= Sys_Global.screenshotTimeout) return;
     
     Sys_Global.screenshotTimeout = Sys_Global.current_time + 1.0; // Prevent saving more than 1 per second for sanity purposes.
     OS_MakeFolder("Screenshots");
     unsigned char* pixels = OS_AllocateRAM(NULL, Sys_Settings.ScreenWidth * Sys_Settings.ScreenHeight * 4 * sizeof(char), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, OS_INVALID_HANDLE);//malloc(Sys_Settings.ScreenWidth * Sys_Settings.ScreenHeight * 4 * sizeof(char));
-    glReadPixels(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+    glad_glReadPixels(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, /*GL_RGBA*/ 0x1908, /*GL_UNSIGNED_BYTE*/ 0x1401, pixels);
     char filename[96];
     snprintf(filename, sizeof(filename), "Screenshots/%.2f_x%.1f_y%.1f_z%.1f.bmp", get_time(), (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z);
     if (!stbi_write_bmp(filename, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, 4, pixels)) DualLogError("Failed to save screenshot\n"); else DualLog("Saved screenshot %s\n", filename);

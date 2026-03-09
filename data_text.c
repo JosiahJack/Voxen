@@ -1,12 +1,11 @@
 #include "os.h"
 #include "voxen.h"
-#include <malloc.h>
 
 Voxen_Text Sys_Text;
-char** audiologNames = NULL;
-char** audiologSubjects = NULL;
-char** audiologSenders = NULL;
-char** audioLogSpeech2Text = NULL;
+char audiologNames[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
+char audiologSubjects[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
+char audiologSenders[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
+char audioLogSpeech2Text[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
 uint16_t logImages = 1272; // Start index of first index 0 logImages[0] which is blank1.png
 
 size_t utf16le_to_utf8(const uint8_t* src, size_t src_len, char* dst, size_t dst_len) {
@@ -129,29 +128,11 @@ void LoadTextForLanguage(uint8_t lang) {
     }
 }
 
-void LoadLogTextForLanguage(uint8_t lang) {    
-    // Unload language for when changing languages at runtime from settings.
-    #define FREE_ARRAY(ptr, count) do { \
-        if (ptr) { \
-            for (int i = 0; i < (count); ++i) { \
-                if ((ptr)[i]) { free((ptr)[i]); (ptr)[i] = NULL; } \
-            } \
-            free(ptr); ptr = NULL; \
-        } \
-    } while (0)
-
-    FREE_ARRAY(audiologNames,       TEXT_LOGS_COUNT);
-    FREE_ARRAY(audiologSenders,     TEXT_LOGS_COUNT);
-    FREE_ARRAY(audiologSubjects,    TEXT_LOGS_COUNT);
-    FREE_ARRAY(audioLogSpeech2Text, TEXT_LOGS_COUNT);
+void LoadLogTextForLanguage(uint8_t lang) { // Unload and load language for when changing languages at runtime from settings.
     __builtin_memset(Sys_Text.audioLogImagesRefIndicesLH,0,TEXT_LOGS_COUNT * sizeof(uint16_t));
     __builtin_memset(Sys_Text.audioLogImagesRefIndicesRH,0,TEXT_LOGS_COUNT * sizeof(uint16_t));
     __builtin_memset(Sys_Text.audioLogType,0,TEXT_LOGS_COUNT * sizeof(uint8_t));
     __builtin_memset(Sys_Text.audioLogLevelFound,0,TEXT_LOGS_COUNT * sizeof(uint8_t));
-    audiologNames       = calloc(TEXT_LOGS_COUNT, sizeof(char*));
-    audiologSenders     = calloc(TEXT_LOGS_COUNT, sizeof(char*));
-    audiologSubjects    = calloc(TEXT_LOGS_COUNT, sizeof(char*));
-    audioLogSpeech2Text = calloc(TEXT_LOGS_COUNT, sizeof(char*));
     char textFile[256] = {0};
     switch (lang) {
         case 1:  StringCopyInto_A_From_B(textFile, "./Data/logs_text_espanol.txt", 256); break;
@@ -187,6 +168,7 @@ void LoadLogTextForLanguage(uint8_t lang) {
 
     int lineNum = 0, totalLines = 0;
     char utf8_line[TEXT_LOCALIZATION_MAX_LENGTH];
+    size_t slen;
     while (data_pos < (size_t)file_size) {
         ++totalLines;
         size_t line_start = data_pos;
@@ -265,18 +247,10 @@ void LoadLogTextForLanguage(uint8_t lang) {
             Sys_Text.audioLogImagesRefIndicesRH[readIndexOfLog] = (uint16_t)readLogImageRHIndex;
             Sys_Text.audioLogType[readIndexOfLog]               = (uint8_t)readLogType;
             Sys_Text.audioLogLevelFound[readIndexOfLog]         = (uint8_t)readLogLevelFound;
-            #define REPLACE_STR(dst, src) do { \
-                if ((dst)[readIndexOfLog]) free((dst)[readIndexOfLog]); \
-                size_t slen = GetStringLength(src); \
-                (dst)[readIndexOfLog] = malloc(slen + 1); \
-                if ((dst)[readIndexOfLog]) StringCopyInto_A_From_B((dst)[readIndexOfLog], src, slen + 1); \
-                else (dst)[readIndexOfLog] = NULL; \
-            } while (0)
-
-            REPLACE_STR(audiologNames,       readLogName);
-            REPLACE_STR(audiologSenders,     readLogSender);
-            REPLACE_STR(audiologSubjects,    readLogSubject);
-            REPLACE_STR(audioLogSpeech2Text, readLogText);
+            slen = GetStringLength(readLogName);    StringCopyInto_A_From_B(audiologNames[readIndexOfLog], readLogName, slen + 1);
+            slen = GetStringLength(readLogSender);  StringCopyInto_A_From_B(audiologSenders[readIndexOfLog], readLogSender, slen + 1);
+            slen = GetStringLength(readLogSubject); StringCopyInto_A_From_B(audiologSubjects[readIndexOfLog], readLogSubject, slen + 1);
+            slen = GetStringLength(readLogText);    StringCopyInto_A_From_B(audioLogSpeech2Text[readIndexOfLog], readLogText, slen + 1);
             ++lineNum;
         }
     }

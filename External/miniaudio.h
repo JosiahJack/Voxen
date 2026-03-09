@@ -6153,7 +6153,7 @@ MA_API ma_result ma_log_postf(ma_log* pLog, ma_uint32 level, const char* pFormat
     va_list args;
     if (pLog == NULL || pFormat == NULL) return MA_INVALID_ARGS;
 
-    va_start(args, pFormat);
+    __builtin_va_start(args, pFormat);
     {
         result = ma_log_postv(pLog, level, pFormat, args);
     }

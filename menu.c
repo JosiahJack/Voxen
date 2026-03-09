@@ -1,6 +1,7 @@
 // menu.c - The main menu and pause menu
 #include "os.h"
 #include "voxen.h"
+#include "glfw_defines.h"
 float RelX(int16_t x); float RelY(int16_t y);
 __attribute__((pure)) bool CursorIsOverBounds(float startX, float endX, float startY, float endY);
 
@@ -102,55 +103,7 @@ void UI_HeaderText(int16_t x, const char* text) {
     RenderFormattedText(x,48,TEXT_GREEN_MENU,FONT_STOPD,1.75f,text);
 }
 
-double monitorSwitchTime;
-int currentMonitorIndex = 1; // Start on primary after first cycle, puts it a 0.
-void CycleToNextMonitor(GLFWwindow* window) {
-    if (get_time() < monitorSwitchTime) return;
-    
-    monitorSwitchTime = get_time() + 0.5; // Prevent toggling rapidly on accident
-    int monitorCount;
-    GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
-    if (!monitors || monitorCount < 2) return;
-
-    currentMonitorIndex = (currentMonitorIndex + 1) % monitorCount;
-    GLFWmonitor* next = monitors[currentMonitorIndex];
-
-    int mx, my;
-    glfwGetMonitorPos(next, &mx, &my);
-    const GLFWvidmode* mode = glfwGetVideoMode(next);
-    int xpos = mx + (mode->width - Sys_Settings.ScreenWidth) / 2;
-    int ypos = my + (mode->height - Sys_Settings.ScreenHeight) / 2;
-    glfwSetWindowPos(window, xpos, ypos);
-    Sys_Input.ignore_next_mouse_delta = true;
-    DualLog("Window moved to monitor %d: %s at x: %d, y: %d\n", currentMonitorIndex, glfwGetMonitorName(next), xpos, ypos);
-}
-
-GLFWmonitor* GetCurrentMonitor(GLFWwindow* window) {
-    int wx, wy, ww, wh;
-    glfwGetWindowPos(window, &wx, &wy);
-    glfwGetWindowSize(window, &ww, &wh);
-    int bestArea = 0;
-    GLFWmonitor* bestMonitor = glfwGetPrimaryMonitor();
-    int monitorCount;
-    GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
-    for (int i = 0; i < monitorCount; i++) {
-        int mx, my;
-        glfwGetMonitorPos(monitors[i], &mx, &my);
-        const GLFWvidmode* mode = glfwGetVideoMode(monitors[i]);
-        int mw = mode->width;
-        int mh = mode->height;
-        int left   = vmax(wx, mx);
-        int right  = vmin(wx + ww, mx + mw);
-        int top    = vmax(wy, my);
-        int bottom = vmin(wy + wh, my + mh);
-        int area = (right > left && bottom > top) ? (right - left) * (bottom - top) : 0;
-        if (area > bestArea) {
-            bestArea = area;
-            bestMonitor = monitors[i];
-        }
-    }
-    return bestMonitor;
-}
+void CycleToNextMonitor(void);
 
 void MenuGoBack(void) {
     if (returnToPause) { returnToPause = false; Sys_Global.gamePaused = true; Sys_Global.menuActive = false; PlayGameMusic(); }
@@ -160,6 +113,8 @@ void MenuGoBack(void) {
 
 void ChangeMenuPage(MenuPages pg) { currentMenuPage = pg; currentMenuItem = currentMenuTab = 0; }
 
+void ChangeFullScreenWindowed(void);
+void ChangeResolution(void);
 void RenderMenu(void) {
     if (Sys_Input.gamepadButtons[GLFW_GAMEPAD_BUTTON_B].pressed && currentMenuPage != MenuPages_FrontPage) { MenuGoBack(); return; } // TODO Android Back button
     
@@ -288,30 +243,7 @@ void RenderMenu(void) {
             
             // Resolution
             if (UI_Button(220,726, 280,16, &overRes, 7) || (MenuEnter() && currentMenuItem == 7)) {
-//                 int monitorCount;
-//                 GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
-//                 GLFWmonitor* monitor = GetCurrentMonitor(Sys_Global.window);
-//                 int modeCount;
-//                 const GLFWvidmode* modes = glfwGetVideoModes(monitor, &modeCount);
-//                 int currentIdx = -1;
-//                 int curw = 0, curh = 0;
-//                 for (int i = 0; i < modeCount; i++) {
-//                     if (curw == modes[i].width && curh == modes[i].height) continue;
-//                     
-//                     curw = modes[i].width; curh = modes[i].height;
-//                     DualLog("glfw reported resolution: %u x %u\n", modes[i].width, modes[i].height);
-//                     if (modes[i].width  == Sys_Settings.ScreenWidth && modes[i].height == Sys_Settings.ScreenHeight) {
-//                         currentIdx = i;
-//                         break;
-//                     }
-//                 }
-// 
-//                 int nextIdx = (currentIdx + 1);
-//                 if (nextIdx >= modeCount) nextIdx = 0;
-//                 Sys_Settings.ScreenWidth  = modes[nextIdx].width;
-//                 Sys_Settings.ScreenHeight = modes[nextIdx].height;
-//                 UpdateScreenSize(Sys_Global.window, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
-//                 Sys_Input.ignore_next_mouse_delta = true;
+                ChangeResolution();
 //                 SaveConfig();
             }
             
@@ -322,29 +254,7 @@ void RenderMenu(void) {
             RenderUIImage(200,740, 16,16, 910); // Checkbox background
             if (UI_Button(200,756, 210,16, &overFull, 8) || (MenuEnter() && currentMenuItem == 8)) {
                 Sys_Settings.Fullscreen = Sys_Settings.Fullscreen == 1u ? 0u : 1u;
-                int monitorCount;
-                GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
-                GLFWmonitor* next = monitors[currentMonitorIndex];
-                if (Sys_Settings.Fullscreen) {
-                    int xpos, ypos, width, height;
-                    glfwGetMonitorWorkarea(next, &xpos, &ypos, &width, &height);
-                    Sys_Settings.ScreenWidth = width; Sys_Settings.ScreenHeight = height;
-                    glfwSetWindowSize(Sys_Global.window, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
-                    glfwSetWindowPos(Sys_Global.window, xpos, ypos-18);
-                } else {
-                    int monitorCount;
-                    GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
-                    GLFWmonitor* next = monitors[currentMonitorIndex];
-                    int mx, my;
-                    glfwGetMonitorPos(next, &mx, &my);
-                    const GLFWvidmode* mode = glfwGetVideoMode(next);
-                    int xpos = mx + (mode->width - Sys_Settings.ScreenWidth) / 2;
-                    int ypos = my + (mode->height - Sys_Settings.ScreenHeight) / 2;
-                    glfwSetWindowPos(Sys_Global.window, xpos, ypos);
-                }
-                
-                UpdateScreenSize(Sys_Global.window, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
-                Sys_Input.ignore_next_mouse_delta = true;
+                ChangeFullScreenWindowed();
                 SaveConfig();
             }
             
@@ -353,7 +263,7 @@ void RenderMenu(void) {
             RenderFormattedText(220,740,overFull ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"FULLSCREEN");
             
             RenderUIImage(588,730, 210,30, 1079); // Toggle monitor button background
-            if (UI_Button(588,760, 210,30, &overChgM, 9) || (MenuEnter() && currentMenuItem == 9)) { CycleToNextMonitor(Sys_Global.window); }
+            if (UI_Button(588,760, 210,30, &overChgM, 9) || (MenuEnter() && currentMenuItem == 9)) { CycleToNextMonitor(); }
             overChgM = overChgM || currentMenuItem == 9;
             RenderFormattedText(602,735,overChgM ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"CHANGE MONITOR");
         } else if (currentMenuTab == 1) {
@@ -524,7 +434,7 @@ void RenderPausedUI(void) {
     overQuitMenu = overQuitMenu || currentMenuItem == 4;
     RenderFormattedText(546,538,overQuitMenu ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"QUIT TO MENU");
     RenderUIImage(519,672,328,42,1252); // Pause Quit Game background
-    if (UI_Button(522,672, 322,42, &overQuit, 5) || (MenuEnter() && currentMenuItem == 5)) OS_Exit(0);
+    if (UI_Button(522,714, 322,42, &overQuit, 5) || (MenuEnter() && currentMenuItem == 5)) OS_Exit(0);
     overQuit = overQuit || currentMenuItem == 5;
     RenderFormattedText(572,690,overQuit ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"QUIT GAME");
     if (Sys_Input.keyStates[GLFW_KEY_DOWN].pressed) currentMenuItem = (currentMenuItem + 1) >= menuItemCount ? 0 : (currentMenuItem + 1);

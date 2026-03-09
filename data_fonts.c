@@ -1,14 +1,11 @@
 // data_fonts.c - Load Font Atlasses
 #include "os.h"
-#include <fcntl.h>
-#include <unistd.h>
-#include <malloc.h>
-#include "./External/glad/gl.h"
-#include "./External/glfw3.h"
+#include "gl.h"
 #include "voxen.h"
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "External/stb_truetype.h"
 
+// MAX_GLYPHS is 4096 as is FONT_ATLAS_SIZE which is more than twice as large as needed without hiragana/katakana present
 int numPackedGlyphs = 0;
 int numPackedGlyphsStopD = 0;
 GLuint fontAtlasTex;
@@ -66,9 +63,12 @@ __attribute__((pure)) int32_t CodepointToPackedIndex(int32_t codepoint, int font
     OS_Exit(1);
 }
 
-static LoadedFont LoadFallbackFont(const char *path, int fontInfoIdx) {
+static LoadedFont LoadFallbackFont(const char *path, int fontInfoIdx, int collection_index) {
     OsFileHandle fd; int fontFileSize; fontData[fontInfoIdx] = OS_OpenAndAllocateFileBufferReadonly(path, &fd, &fontFileSize);
-    (void)stbtt_InitFont_internal(&fontInfo[fontInfoIdx], fontData[fontInfoIdx], 0);
+    int offset = stbtt_GetFontOffsetForIndex(fontData[fontInfoIdx], collection_index);
+    if (offset < 0) { DualLogError("Invalid collection index %d for font %s\n", collection_index, path); OS_Exit(1); }
+    if (!stbtt_InitFont_internal(&fontInfo[fontInfoIdx], fontData[fontInfoIdx], offset)) { DualLogError("Failed to init font at index %d in %s\n", collection_index, path); OS_Exit(1); }
+    
     return (LoadedFont){ .path = (char*)path, .data = fontData[fontInfoIdx], .size = fontFileSize, .info = fontInfo[fontInfoIdx] };
 }
 
@@ -129,77 +129,101 @@ static bool load_font_cache(const char *path, int32_t expected_glyphs, const uin
     return true;
 }
 
+int stbi_write_bmp(char const *filename, int x, int y, int comp, const void *data);
+static void dump_atlas_bmp(const char *bmp_path, const unsigned char *atlas_data) {
+    // stbi_write_bmp expects RGB data, so expand R8 -> RGB24
+    unsigned char *rgb = OS_AllocateRAM(NULL, FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * 3, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+    for (int i = 0; i < FONT_ATLAS_SIZE * FONT_ATLAS_SIZE; ++i) {
+        unsigned char v = atlas_data[i];
+        rgb[i*3+0] = v;
+        rgb[i*3+1] = v;
+        rgb[i*3+2] = v;
+    }
+    stbi_write_bmp(bmp_path, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 3, rgb);
+    OS_DeallocateRAM(rgb, FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * 3);
+}
+
 void InitFontAtlasses(void) {
     double t0 = get_time();
     DualLog("Loading    5 fonts...");
-    OsFileHandle fd1; int sz1; fontData[0] = OS_OpenAndAllocateFileBufferReadonly(fontPaths[0], &fd1, &sz1);
-    OsFileHandle fd2; int sz2; fontData[1] = OS_OpenAndAllocateFileBufferReadonly(fontPaths[1], &fd2, &sz2);
-    if (!stbtt_InitFont_internal(&fontInfo[0], fontData[0], 0)) { DualLogError("%s font init failed\n", fontPaths[0]); OS_Exit(1); }
-    if (!stbtt_InitFont_internal(&fontInfo[1], fontData[1], 0)) { DualLogError("%s font init failed\n", fontPaths[1]); OS_Exit(1); }
+    OsFileHandle fd1; int sz1; fontData[0] = OS_OpenAndAllocateFileBufferReadonly(fontPaths[0],&fd1,&sz1);
+    OsFileHandle fd2; int sz2; fontData[1] = OS_OpenAndAllocateFileBufferReadonly(fontPaths[1],&fd2,&sz2);
+    if (!stbtt_InitFont_internal(&fontInfo[0],fontData[0],0)) { DualLogError("%s font init failed\n",fontPaths[0]); OS_Exit(1); }
+    if (!stbtt_InitFont_internal(&fontInfo[1],fontData[1],0)) { DualLogError("%s font init failed\n",fontPaths[1]); OS_Exit(1); }
 
     // Check if either the primary font or secondary font .vfnt cache file is out of date prompting an atlas rebuild.
     FileFingerprint fp1 = {0}, fp2 = {0};
-    if (!OS_GetFileFingerprint(fontPaths[0], &fp1)) DualLogError("File change detection failed for %s\n", fontPaths[0]);
-    if (!OS_GetFileFingerprint(fontPaths[1], &fp2)) DualLogError("File change detection failed for %s\n", fontPaths[1]);
+    if (!OS_GetFileFingerprint(fontPaths[0], &fp1)) DualLogError("File change detection failed for %s\n",fontPaths[0]);
+    if (!OS_GetFileFingerprint(fontPaths[1], &fp2)) DualLogError("File change detection failed for %s\n",fontPaths[1]);
     uint64_t fbx_stamp1 = OS_GetFilestamp(&fp1);
     uint64_t fbx_stamp2 = OS_GetFilestamp(&fp2);
     int32_t pri_expected = 0, sec_expected = 0;
     for (int i = 0; i < numFontRanges; i++) { pri_expected += fontRanges[i].count; sec_expected += fontRangesStopD[i].count; }
     const char *pri_cache = "./Fonts/SystemShockText.vfnt";
     const char *sec_cache = "./Fonts/StopD.vfnt";
-    bool pri_hit = load_font_cache(pri_cache, pri_expected, fbx_stamp1, fontPackedChar, &numPackedGlyphs, &fixedNumberAdvanceWidth, &fontAtlasTex);
-    bool sec_hit = load_font_cache(sec_cache, sec_expected, fbx_stamp2, fontPackedCharStopD, &numPackedGlyphsStopD, &fixedNumberAdvanceWidthStopD, &fontAtlasTexStopD);
+    bool pri_hit = load_font_cache(pri_cache,pri_expected,fbx_stamp1,fontPackedChar,&numPackedGlyphs,&fixedNumberAdvanceWidth,&fontAtlasTex);
+    bool sec_hit = load_font_cache(sec_cache,sec_expected,fbx_stamp2,fontPackedCharStopD,&numPackedGlyphsStopD,&fixedNumberAdvanceWidthStopD,&fontAtlasTexStopD);
     if (pri_hit && sec_hit) { DualLog("took %f secs\n", get_time() - t0); return; }
 
-    fallbackFonts[0] = LoadFallbackFont(fallbackFontPaths[0], 2); // Preload known fallback fonts for Cyrillic, Kanji, etc.
-    fallbackFonts[1] = LoadFallbackFont(fallbackFontPaths[1], 3);
-    fallbackFonts[2] = LoadFallbackFont(fallbackFontPaths[2], 4);
+    fallbackFonts[0] = LoadFallbackFont(fallbackFontPaths[0],2,0); // Preload known fallback fonts for Cyrillic, Kanji, etc.
+    fallbackFonts[1] = LoadFallbackFont(fallbackFontPaths[1],3,0);
+    fallbackFonts[2] = LoadFallbackFont(fallbackFontPaths[2],4,2); // Index 2 for Japanese in NotoSansCJK-Bold.ttc
     DualLog("Font ranges changed or .vfnt files not present – regenerating...");
 
     // Primary
-    unsigned char *bmp = OS_AllocateRAM(NULL, FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * sizeof(unsigned char), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+    unsigned char *bmp = OS_AllocateRAM(NULL,FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * sizeof(unsigned char),PROT_READ | PROT_WRITE,MAP_PRIVATE | MAP_ANONYMOUS,OS_INVALID_HANDLE);
     stbtt_pack_context pc;
-    stbtt_PackBegin(&pc, bmp, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 16, NULL);
-    pc.h_oversample = 8; // STBTT_MAX_OVERSAMPLE = 8 for chunky 2pixel black outline support for readability and to follow System Shock.
-    pc.v_oversample = 8;
+    stbtt_PackBegin(&pc,bmp,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0,16,NULL);
+    pc.h_oversample = 4; // STBTT_MAX_OVERSAMPLE = 8 for chunky 2pixel black outline support for readability and to follow System Shock.
+    pc.v_oversample = 4;
+    pc.skip_missing = 1;
     numPackedGlyphs = 0;
-    float h = (0.025f * (float)Sys_Settings.ScreenHeight);
+    float h = 20.0f;
     for (int r = 0; r < numFontRanges; r++) {
         fontRanges[r].startIndex = numPackedGlyphs;
         for (int i = 0; i < fontRanges[r].count; i++) {
             if (numPackedGlyphs >= MAX_GLYPHS) break;
-            uint32_t cp = fontRanges[r].first + i;
-            stbtt_fontinfo *font = NULL;
-            int g = GetGlyphAndFont(cp, &font, FONT_NORMAL);
-            if (!g) continue;
             
-            unsigned char *data = (font == &fontInfo[0]) ? fontData[0] : ((LoadedFont*)((char*)font - offsetof(LoadedFont, info)))->data;
+            uint32_t cp = fontRanges[r].first + i;
+            int g = stbtt_FindGlyphIndex(&fontInfo[0], cp);
+            stbtt_fontinfo *font = &fontInfo[0];
+            unsigned char *data = fontData[0];
+            if (!g) {
+                g = GetGlyphAndFont(cp, &font, FONT_NORMAL);
+                if (!g) continue;
+                
+                
+                data = (font == &fontInfo[0]) ? fontData[0] : ((LoadedFont*)((char*)font - __builtin_offsetof(LoadedFont, info)))->data;
+            }
+            
             float height = h;
             if (font != &fontInfo[0]) height *= 1.2f;
-            stbtt_PackFontRange(&pc, data, 0, height, cp, 1, &fontPackedChar[numPackedGlyphs]);
+            stbtt_PackFontRange(&pc,data,0,height,cp,1,&fontPackedChar[numPackedGlyphs]);
             int idx = numPackedGlyphs++;
             if (cp >= '0' && cp <= '9') fixedNumberAdvanceWidth = vmax(fixedNumberAdvanceWidth, fontPackedChar[idx].xadvance);
         }
     }
     
     free(pc.pack_info);
-    glCreateTextures(GL_TEXTURE_2D, 1, &fontAtlasTex);
-    glTextureStorage2D(fontAtlasTex, 1, GL_R8, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE);
-    glTextureSubImage2D(fontAtlasTex, 0, 0, 0, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, GL_RED, GL_UNSIGNED_BYTE, bmp);
-    glTextureParameteri(fontAtlasTex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTextureParameteri(fontAtlasTex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTextureParameteri(fontAtlasTex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTextureParameteri(fontAtlasTex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    write_font_cache(pri_cache, pri_expected, fbx_stamp1, fontPackedChar, numPackedGlyphs,fixedNumberAdvanceWidth, bmp);
+    glCreateTextures(GL_TEXTURE_2D,1,&fontAtlasTex);
+    glTextureStorage2D(fontAtlasTex,1,GL_R8,FONT_ATLAS_SIZE, FONT_ATLAS_SIZE);
+    glTextureSubImage2D(fontAtlasTex,0,0,0,FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, GL_RED, GL_UNSIGNED_BYTE, bmp);
+    glTextureParameteri(fontAtlasTex,GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTextureParameteri(fontAtlasTex,GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTextureParameteri(fontAtlasTex,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
+    glTextureParameteri(fontAtlasTex,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+    write_font_cache(pri_cache,pri_expected,fbx_stamp1,fontPackedChar, numPackedGlyphs,fixedNumberAdvanceWidth, bmp);
+    dump_atlas_bmp("./Fonts/SystemShockText_atlas.bmp", bmp);
 
     // Secondary
     __builtin_memset(bmp,0,FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * sizeof(unsigned char));
     stbtt_pack_context pc2;
     stbtt_PackBegin(&pc2, bmp, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 16, NULL);
-    pc2.h_oversample = 8; // STBTT_MAX_OVERSAMPLE = 8
-    pc2.v_oversample = 8;
+    pc2.h_oversample = 4; // STBTT_MAX_OVERSAMPLE = 8
+    pc2.v_oversample = 4;
+    pc2.skip_missing = 1;
     numPackedGlyphsStopD = 0;
-    float h2 = (0.07f * (float)Sys_Settings.ScreenHeight);
+    float h2 = 54.0f;
     for (int r = 0; r < numFontRanges; r++) {
         fontRangesStopD[r].startIndex = numPackedGlyphsStopD;
         for (int i = 0; i < fontRangesStopD[r].count; i++) {
@@ -212,7 +236,7 @@ void InitFontAtlasses(void) {
                 g = GetGlyphAndFont(cp, &font, FONT_STOPD);
                 if (!g) continue;
                 
-                data = (font == &fontInfo[0]) ? fontData[0] : ((LoadedFont*)((char*)font - offsetof(LoadedFont, info)))->data;
+                data = (font == &fontInfo[0]) ? fontData[0] : ((LoadedFont*)((char*)font - __builtin_offsetof(LoadedFont, info)))->data;
             }
             
             float height = h2;
@@ -232,6 +256,7 @@ void InitFontAtlasses(void) {
     glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     write_font_cache(sec_cache, sec_expected, fbx_stamp2, fontPackedCharStopD, numPackedGlyphsStopD, fixedNumberAdvanceWidthStopD, bmp);
+    dump_atlas_bmp("./Fonts/StopD_atlas.bmp", bmp);
     OS_DeallocateRAM(bmp,FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * sizeof(unsigned char));
     DualLog(" took %f s\n", get_time() - t0);
 }

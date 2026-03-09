@@ -34,14 +34,6 @@ if ! $IS_CI; then
     clear
 fi
 
-need_rebuild() {
-    local src="$1"
-    local obj="$2"
-    [[ ! -f "$obj" ]] && return 0
-    [[ "$src" -nt "$obj" ]] && return 0
-    return 1
-}
-
 TEMP_DIR=temp_build
 export TMPDIR=/dev/shm
 mkdir -p $TEMP_DIR
@@ -126,56 +118,43 @@ MAC_CC="gcc"
 COMMON_CFLAGS="-ffreestanding -fno-exceptions -fno-stack-protector -fno-builtin -I./External/ -pipe -fno-ident \
                -fdata-sections -ffunction-sections -ffast-math -g1 -std=c11 -Wall -Wextra \
                -fno-omit-frame-pointer -fstrict-aliasing -fno-common -Walloca -Wstack-usage=262144 \
-               -Wformat=2 -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings \
-               -Werror=implicit-function-declaration -Og -fopenmp"
+               -Wformat=2 -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings -static-libgcc \
+               -Werror=implicit-function-declaration -Og"
 
 if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
     LINKER=$CC
-    CFLAGS="-D_WIN32 $COMMON_CFLAGS -fno-ident -fno-asynchronous-unwind-tables -mno-stack-arg-probe"
-    LDFLAGS="-L./ -L./External/ -L./External/Windows -lopengl32 -lm -l:glfw3.dll \
-             -l:libminiaudio.dll.a -static-libgcc -flto=auto"
+    CFLAGS="-D_WIN32 $COMMON_CFLAGS -fno-asynchronous-unwind-tables -mno-stack-arg-probe"
+    LDFLAGS="-L./ -L./External/Windows -lopengl32 -l:glfw3.dll -l:libminiaudio.dll.a -static-libgcc -flto=auto"
     OBJ_DIR="./External/Windows"
-    GLAD_OBJ="${OBJ_DIR}/glad.o"
     BINARY_NAME="voxen.exe"
 elif [ "$PLATFORM" = "mac" ]; then
     CC=$LINUX_CC
     LINKER=$LINUX_CC
     CFLAGS="-D__APPLE__ $COMMON_CFLAGS"
-    LDFLAGS="-L./External/ -L./External/Mac -lm -l:libglfw3.a -l:libminiaudio.0.11.22.a -lGL"
+    LDFLAGS="-L./External/Mac -l:libglfw3.a -l:libminiaudio.0.11.22.a -lGL"
     OBJ_DIR="./External/Mac"
-    GLAD_OBJ="${OBJ_DIR}/glad.o"
-    BINARY_NAME="voxen_mac"
+    BINARY_NAME="voxen.app"
 elif [ "$PLATFORM" = "android" ]; then
     CC=$ANDROID_CC
     LINKER=$CC
     CFLAGS="-D__ANDROID__ -fPIC $COMMON_CFLAGS"
-    LDFLAGS="-L./External/ -L./External/Android -landroid -llog -lGLESv3 -lEGL -lm"
+    LDFLAGS="-L./External/Android -landroid -llog -lGLESv3 -lEGL -lm"
     OBJ_DIR="./External/Android"
-    GLAD_OBJ="${OBJ_DIR}/glad.o"
     BINARY_NAME="voxen_android"
 else
     CC=$LINUX_CC
     LINKER="mold -run gcc"
     CFLAGS="-march=haswell -mtune=haswell $COMMON_CFLAGS"
-    LDFLAGS="-flto -Wl,--gc-sections -fopenmp -L./External/Linux -lm -l:libglfw3.5.a -l:libminiaudio.0.11.22.a -lGL"
+    LDFLAGS="-flto -Wl,--gc-sections -L./External/Linux -l:libglfw3.5.a -l:libminiaudio.0.11.22.a -lGL"
     OBJ_DIR="./External/Linux"
-    GLAD_OBJ="${OBJ_DIR}/glad/glad.o"
     BINARY_NAME="voxen"
 fi
 
-# Build infrequent fliers
-if need_rebuild "./External/glad/glad.c" "$GLAD_OBJ"; then
-    echo "Rebuilding glad.o for ${PLATFORM}..."
-    mkdir -p "$(dirname "$GLAD_OBJ")"
-    $CC -c "./External/glad/glad.c" $CFLAGS -o "$GLAD_OBJ"
-fi
-
-cp $GLAD_OBJ "$TEMP_DIR/glad.o"
 export CC=$CC
 export CFLAGS=$CFLAGS
 SOURCES="voxen.c physics.c helpers.c init.c menu.c audio.c animation.c console.c biomonitor.c level.c data_parser.c \
-         data_text.c data_fonts.c data_models.c dynamic_culling.c todo.c input.c data_textures.c"
+         data_text.c data_fonts.c data_models.c dynamic_culling.c todo.c input.c data_textures.c glad.c"
 export TEMP_DIR=temp_build
 printf "%s\n" $SOURCES | xargs -P12 -I{} $CC -c {} $CFLAGS -o "$TEMP_DIR"/{}.o
 # $CC -c data_textures.c $CFLAGS -fsanitize=address -o "$TEMP_DIR"/data_textures.o

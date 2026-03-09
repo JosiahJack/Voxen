@@ -1,12 +1,20 @@
 #pragma once
 // #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
-#include "./External/glad/gl.h"
-#include "./External/glfw3.h"
-typedef __INT16_TYPE__ int16_t;
-typedef __INT32_TYPE__ int32_t;
-typedef __UINT8_TYPE__ uint8_t;
+typedef __INT8_TYPE__     int8_t;
+typedef __UINT8_TYPE__   uint8_t;
+typedef __INT16_TYPE__   int16_t;
 typedef __UINT16_TYPE__ uint16_t;
+typedef __INT32_TYPE__   int32_t;
 typedef __UINT32_TYPE__ uint32_t;
+typedef __INT64_TYPE__   int64_t;
+typedef __UINT64_TYPE__ uint64_t;
+typedef uint64_t size_t;
+#ifndef UINT8_MAX
+    #define UINT8_MAX 255
+#endif
+#ifndef UINT16_MAX
+    #define UINT16_MAX 65535
+#endif
 #define bool _Bool
 #define true 1
 #define false 0
@@ -24,7 +32,6 @@ typedef uint16_t Text;
 #define SAVE_REMINDER_TIME 7.0f // 7secs ~is human short-term memory length
 #define CREDITS_PAGES 22
 typedef struct {
-    GLFWwindow* window;
 	bool inventoryMode;
 	double last_time;
 	double last_topframe_time;
@@ -130,8 +137,8 @@ typedef struct {
 	KeyState keyStates[MAX_KEYS];
 	KeyState mouseButtons[MAX_MOUSE_BUTTONS];
 	KeyState gamepadButtons[MAX_GAMEPAD_BUTTONS];
-	bool joystickPresent[GLFW_JOYSTICK_LAST + 1];
-	KeyState joystickButtons[GLFW_JOYSTICK_LAST + 1][MAX_JOYSTICK_BUTTONS];
+	bool joystickPresent[16];
+	KeyState joystickButtons[16][MAX_JOYSTICK_BUTTONS];
 	KeyState joystickHats[MAX_JOYSTICK_HATS]; // What can I say, I'm a man of many hats. ^^D
 	bool window_has_focus;
 	double last_mouse_x, last_mouse_y;
@@ -724,6 +731,7 @@ typedef struct {
 extern SystemUI Sys_UI;
 
 #define MODEL_IDX_MAX 6805
+typedef uint32_t GLuint;
 typedef struct {
 	GLuint inputImageID;
 	GLuint inputDepthID;
@@ -1317,7 +1325,6 @@ extern float intervalStepisLerping[LIGHT_COUNT][30];
 extern float lightMinIntensity[LIGHT_COUNT];
 extern float lightMaxIntensity[LIGHT_COUNT];
 void RenderLoadingProgress(int32_t offset, const char* text);
-void UpdateScreenSize(GLFWwindow* window, int32_t width, int32_t height);
 
 #define LEVEL_CYBERSPACE 13
 #define WORLDX 64
@@ -1428,7 +1435,6 @@ RaycastHit CapsuleCast(Vector3 start, Vector3 end, float capsuleRadius, float ca
 void ApplyPlayerMovements(void);
 // ----------------------------------------------------------------------------
 // Input
-void Input_Init(GLFWwindow* window);
 void Input_MouselookApply(void);
 int32_t Input_KeyDown(int32_t scancode);
 int32_t Input_KeyUp(int32_t scancode);
@@ -1484,7 +1490,6 @@ bool MouseWheelUp(void);
 bool MouseWheelDn(void);
 void LoadConfig(void);
 void SaveConfig(void);
-void ApplySettings(void);
 // ----------------------------------------------------------------------------
 // Rendering
 #define DEBUG_OPENGL
@@ -1515,8 +1520,8 @@ void SetSkyRotateSpeed(void);
 // ----------------------------------------------------------------------------
 // UI
 #define TEXT_BUFFER_SIZE 1024
-#define FONT_ATLAS_SIZE 3072
-#define MAX_GLYPHS 639
+#define FONT_ATLAS_SIZE 4672
+#define MAX_GLYPHS 4096
 #define FONT_NORMAL 0
 #define FONT_STOPD  1
 #define TEXT_WHITE                0
@@ -1533,10 +1538,10 @@ void SetSkyRotateSpeed(void);
 #define TEXT_GREEN_MENU_GLOW     11
 #define TEXT_RED_MENU            12
 extern bool returnToPause;
-extern char** audiologNames;
-extern char** audiologSubjects;
-extern char** audiologSenders;
-extern char** audioLogSpeech2Text;
+extern char audiologNames[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
+extern char audiologSubjects[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
+extern char audiologSenders[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
+extern char audioLogSpeech2Text[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
 extern GLuint fontAtlasTex;
 extern GLuint fontAtlasTexStopD;
 extern float fixedNumberAdvanceWidth;

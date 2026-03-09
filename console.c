@@ -1,6 +1,9 @@
 // console.c - Console Emulator
 #include "voxen.h"
-#define NULL 0
+#include "glfw_defines.h"
+#ifndef NULL
+    #define NULL 0
+#endif
 #define MAX_HISTORY 7
 static int32_t currentEntryLength = 0;
 char consoleEntryText[TEXT_BUFFER_SIZE] = "Enter a command...";

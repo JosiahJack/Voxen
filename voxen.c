@@ -1,5 +1,8 @@
 // voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake
 #include "os.h" // Operating System calls shim layer.
+#include "gl.h"
+#include "glfw3.h"
+GLFWwindow* window;
 #include "voxen.h"
 #include "Shaders/shaders.h"
 #include "credits.h"
@@ -79,12 +82,8 @@ void stbtt_GetPackedQuad(const stbtt_packedchar *chardata, int pw, int ph, int c
 
 // Logs both to log file and console, usage same as printf
 typedef __builtin_va_list va_list;
-#define va_start(ap, last) __builtin_va_start(ap, last)
-#define va_end(ap)         __builtin_va_end(ap)
-#define va_copy(dest, src) __builtin_va_copy(dest, src)
-#define va_arg(ap, type)   __builtin_va_arg(ap, type)
 void DualLogMain(FILE *stream, const char *prefix, const char *fmt, va_list args) {
-    va_list copy; va_copy(copy, args);
+    va_list copy; __builtin_va_copy(copy, args);
     #ifdef WINDOWS
         if (prefix) fprintf(stream, "%s", prefix);
         vfprintf(stream, fmt, args);
@@ -96,12 +95,12 @@ void DualLogMain(FILE *stream, const char *prefix, const char *fmt, va_list args
     #endif
     if (prefix) fprintf(console_log_file, "%s ", prefix);
     vfprintf(console_log_file, fmt, copy); fflush(console_log_file);
-    va_end(copy);
+    __builtin_va_end(copy);
 }
 
-void DualLog(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, NULL, fmt, args); va_end(args); }
-void DualLogWarn(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, "\033[1;38;5;208mWARN:", fmt, args); va_end(args); }
-void DualLogError(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stderr, "\033[1;31mERROR:", fmt, args); va_end(args); }
+void DualLog(const char* fmt, ...) { va_list args; __builtin_va_start(args, fmt); DualLogMain(stdout, NULL, fmt, args); __builtin_va_end(args); }
+void DualLogWarn(const char* fmt, ...) { va_list args; __builtin_va_start(args, fmt); DualLogMain(stdout, "\033[1;38;5;208mWARN:", fmt, args); __builtin_va_end(args); }
+void DualLogError(const char* fmt, ...) { va_list args; __builtin_va_start(args, fmt); DualLogMain(stderr, "\033[1;31mERROR:", fmt, args); __builtin_va_end(args); }
 
 static inline __attribute__((always_inline)) void LogShaderError(GLuint s, const char* name) { char er[512]; glGetShaderInfoLog(s, 512, NULL, er); DualLogError("%s Compilation Failed: %s\n", name, er); OS_Exit(1); }
 static inline __attribute__((always_inline)) GLuint CompileShader(GLenum type, const char* source, const char* name) { GLuint s = glCreateShader(type); glShaderSource(s, 1, &source, NULL); glCompileShader(s); GLint ok; glGetShaderiv(s, GL_COMPILE_STATUS, &ok); if (!ok) LogShaderError(s, name); return s; }
@@ -355,7 +354,7 @@ extern stbtt_packedchar fontPackedCharStopD[MAX_GLYPHS];
 void RenderFormattedText(int16_t x, int16_t y, uint32_t color, uint8_t fontID, float scaleInput, const char * restrict format, ...) {
     float scale = scaleInput;// * UIY(Sys_Settings.ScreenHeight);
     va_list args;
-    va_start(args, format); vsnprintf(uiTextBuffer, TEXT_BUFFER_SIZE, format, args); va_end(args);
+    __builtin_va_start(args, format); vsnprintf(uiTextBuffer, TEXT_BUFFER_SIZE, format, args); __builtin_va_end(args);
     glUseProgram(Sys_Render.textShaderProgram);
     glUniformMatrix4fv(0, 1, GL_FALSE, uiOrthoProjection);
     glUniform4f(3, textColors[color].r, textColors[color].g, textColors[color].b, textColors[color].a);
@@ -438,15 +437,15 @@ void RenderFormattedText(int16_t x, int16_t y, uint32_t color, uint8_t fontID, f
 void RenderLoadingProgress(int32_t offset, const char * restrict text) { // Only adds 0.01secs to game startup time.
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     RenderFormattedText(Sys_Settings.ScreenWidth / 2 - offset, Sys_Settings.ScreenHeight / 2 - 5, TEXT_WHITE, FONT_NORMAL,1.0f,text);
-    glfwSwapBuffers(Sys_Global.window);
+    glfwSwapBuffers(window);
 }
 
 char statusText[TEXT_BUFFER_SIZE];
 void CenterStatusPrint(const char * restrict fmt, ...) {
     va_list args;
-    va_start(args, fmt);
+    __builtin_va_start(args, fmt);
     (void)vsnprintf(statusText, TEXT_BUFFER_SIZE, fmt, args);
-    va_end(args);
+    __builtin_va_end(args);
     DualLog("%s\n",statusText);
     Sys_Global.statusTextDecayFinished = get_time() + 2.5; // 2.5 second decay time before text dissappears.
 }
@@ -587,8 +586,8 @@ void UpdateProjectionMatrices(void) {
     voxen_Shadow_System.shadDotThresh = 1.0f / vsqrtf(1.0f + vtan((float)Sys_Settings.FOV * PI / 360.0f) * (1.0f + aspect3D * aspect3D));
 }
 
-void UpdateScreenSize(GLFWwindow* window, int32_t width, int32_t height) {
-    (void)window;
+void UpdateScreenSize(GLFWwindow* unused, int32_t width, int32_t height) {
+    (void)unused; // Appease glfwSetFramebufferSizeCallback pointer type
     Sys_Settings.ScreenWidth = vmax(vmin((uint16_t)width, 7680), 320u); Sys_Settings.ScreenHeight = vmax(vmin((uint16_t)height, 4320), 200u); // Cap at minimum Quake 1 resolution and maximum 8k.
     Sys_Settings.ScreenCenterX = (float)Sys_Settings.ScreenWidth * 0.5f; Sys_Settings.ScreenCenterY = (float)Sys_Settings.ScreenHeight * 0.5f;
     DualLog("Screen size updated to %u x %u from input values %d x %d\n", Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, width, height);
@@ -632,8 +631,251 @@ void UpdateScreenSize(GLFWwindow* window, int32_t width, int32_t height) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
+// GLFW Callbacks
+void SetVSync(void) { glfwSwapInterval((int32_t)Sys_Settings.Vsync); }
+bool IsNonRepeatingKey(int32_t key) { return key == GLFW_KEY_KP_ENTER || key == GLFW_KEY_ENTER || key == GLFW_KEY_TAB || key == GLFW_KEY_ESCAPE; }
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+static void key_callback(GLFWwindow* window, int32_t key, int32_t scancode, int32_t action, int32_t mods) {
+    if (key == GLFW_KEY_F10 && action) OS_Exit(0);
+    if (Sys_Global.menuActive && !returnToPause) {
+        if ((key == GLFW_KEY_RIGHT_ALT || key == GLFW_KEY_LEFT_ALT) && action && Sys_Input.keyStates[GLFW_KEY_ENTER].down)                    GoIntoGame();
+        if (key == GLFW_KEY_ENTER && action && (Sys_Input.keyStates[GLFW_KEY_LEFT_ALT].down || Sys_Input.keyStates[GLFW_KEY_RIGHT_ALT].down)) GoIntoGame();
+    }
+
+    if (action == GLFW_PRESS || (action == GLFW_REPEAT && !IsNonRepeatingKey(key))) Input_KeyDown(key);
+    else if (action == GLFW_RELEASE)                                                Input_KeyUp(key);
+}
+
+void Input_PollJoysticks(void) {
+    for (int jid = GLFW_JOYSTICK_1; jid <= GLFW_JOYSTICK_LAST; ++jid) {
+        if (!glfwJoystickPresent(jid)) continue;
+
+        int buttonCount;
+        const unsigned char* buttons = glfwGetJoystickButtons(jid, &buttonCount);
+        for (int i = 0; i < buttonCount && i < MAX_JOYSTICK_BUTTONS; ++i) {
+            KeyState* k = &Sys_Input.joystickButtons[GLFW_JOYSTICK_1][i];
+            bool down = buttons[i] == GLFW_PRESS;
+
+            k->pressed  = down && !k->down;
+            k->released = !down && k->down;
+            k->down     = down;
+        }
+
+        int hatCount;
+        const unsigned char* hats = glfwGetJoystickHats(jid, &hatCount);
+        for (int i = 0; i < hatCount && i < MAX_JOYSTICK_HATS; ++i) Sys_Input.joystickHats[i].down = hats[i];
+    }
+}
+
+void Input_PollGamepad(void) {
+    GLFWgamepadstate s;
+    if (!glfwGetGamepadState(GLFW_JOYSTICK_1, &s)) return;
+
+    for (int i = 0; i < GLFW_GAMEPAD_BUTTON_LAST + 1; ++i) {
+        KeyState* k = &Sys_Input.gamepadButtons[i];
+        bool down = s.buttons[i] == GLFW_PRESS;
+
+        k->pressed  = down && !k->down;
+        k->released = !down && k->down;
+        k->down     = down;
+    }
+}
+
+static void joystick_callback(int32_t jid, int32_t event) {
+    if (jid > GLFW_JOYSTICK_LAST) return;
+    
+    if (event == GLFW_CONNECTED) {
+        __builtin_memset(&Sys_Input.joystickPresent[jid], 1, sizeof(bool));
+    } else if (event == GLFW_DISCONNECTED) {
+        __builtin_memset(&Sys_Input.joystickPresent[jid], 0, sizeof(bool));
+        __builtin_memset(Sys_Input.joystickButtons, 0, sizeof(Sys_Input.joystickButtons));
+        __builtin_memset(Sys_Input.joystickHats, 0, sizeof(Sys_Input.joystickHats));
+    }
+}
+
+static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
+    if (Sys_Input.window_has_focus) {
+        Sys_Input.currentMouse_dx = (int32_t)(xpos - Sys_Input.last_mouse_x);
+        Sys_Input.currentMouse_dy = (int32_t)(ypos - Sys_Input.last_mouse_y);
+        Sys_Input.last_mouse_x = xpos;
+        Sys_Input.last_mouse_y = ypos;
+        if (Sys_Input.ignore_next_mouse_delta) { Sys_Input.ignore_next_mouse_delta = false; return; }
+        
+        if (Sys_Dx.globalFrameNum > 1) Input_MouseMove(Sys_Input.currentMouse_dx,Sys_Input.currentMouse_dy);
+    }
+}
+
+static void window_focus_callback(GLFWwindow* window, int32_t focused) {
+    Sys_Input.window_has_focus = focused != 0;
+    Sys_Input.ignore_next_mouse_delta = true;
+    glfwSetInputMode(window, GLFW_CURSOR, Sys_Input.window_has_focus ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+}
+
+static void mouse_button_callback(GLFWwindow* window, int32_t button, int32_t action, int32_t mods) {
+    if (action == GLFW_PRESS) {
+        Sys_Input.mouseButtons[button].down = true;
+        Sys_Input.mouseButtons[button].pressed = true;
+    } else if (action == GLFW_RELEASE) {
+        Sys_Input.mouseButtons[button].down = false;
+        Sys_Input.mouseButtons[button].released = true;
+    }
+}
+
+static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) { Sys_Input.scrollDelta += yoffset; }
+#pragma GCC diagnostic pop
+
+double monitorSwitchTime;
+int currentMonitorIndex = 1; // Start on primary after first cycle, puts it a 0.
+void CycleToNextMonitor(void) {
+    if (get_time() < monitorSwitchTime) return;
+    
+    monitorSwitchTime = get_time() + 0.5; // Prevent toggling rapidly on accident
+    int monitorCount;
+    GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
+    if (!monitors || monitorCount < 2) return;
+
+    currentMonitorIndex = (currentMonitorIndex + 1) % monitorCount;
+    GLFWmonitor* next = monitors[currentMonitorIndex];
+
+    int mx, my;
+    glfwGetMonitorPos(next, &mx, &my);
+    const GLFWvidmode* mode = glfwGetVideoMode(next);
+    int xpos = mx + (mode->width - Sys_Settings.ScreenWidth) / 2;
+    int ypos = my + (mode->height - Sys_Settings.ScreenHeight) / 2;
+    glfwSetWindowPos(window, xpos, ypos);
+    Sys_Input.ignore_next_mouse_delta = true;
+    DualLog("Window moved to monitor %d: %s at x: %d, y: %d\n", currentMonitorIndex, glfwGetMonitorName(next), xpos, ypos);
+}
+
+GLFWmonitor* GetCurrentMonitor(void) {
+    int wx, wy, ww, wh;
+    glfwGetWindowPos(window, &wx, &wy);
+    glfwGetWindowSize(window, &ww, &wh);
+    int bestArea = 0;
+    GLFWmonitor* bestMonitor = glfwGetPrimaryMonitor();
+    int monitorCount;
+    GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
+    for (int i = 0; i < monitorCount; i++) {
+        int mx, my;
+        glfwGetMonitorPos(monitors[i], &mx, &my);
+        const GLFWvidmode* mode = glfwGetVideoMode(monitors[i]);
+        int mw = mode->width;
+        int mh = mode->height;
+        int left   = vmax(wx, mx);
+        int right  = vmin(wx + ww, mx + mw);
+        int top    = vmax(wy, my);
+        int bottom = vmin(wy + wh, my + mh);
+        int area = (right > left && bottom > top) ? (right - left) * (bottom - top) : 0;
+        if (area > bestArea) {
+            bestArea = area;
+            bestMonitor = monitors[i];
+        }
+    }
+    return bestMonitor;
+}
+
+void ChangeResolution(void) {
+//                 int monitorCount;
+//                 GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
+//                 GLFWmonitor* monitor = GetCurrentMonitor();
+//                 int modeCount;
+//                 const GLFWvidmode* modes = glfwGetVideoModes(monitor, &modeCount);
+//                 int currentIdx = -1;
+//                 int curw = 0, curh = 0;
+//                 for (int i = 0; i < modeCount; i++) {
+//                     if (curw == modes[i].width && curh == modes[i].height) continue;
+//                     
+//                     curw = modes[i].width; curh = modes[i].height;
+//                     DualLog("glfw reported resolution: %u x %u\n", modes[i].width, modes[i].height);
+//                     if (modes[i].width  == Sys_Settings.ScreenWidth && modes[i].height == Sys_Settings.ScreenHeight) {
+//                         currentIdx = i;
+//                         break;
+//                     }
+//                 }
+// 
+//                 int nextIdx = (currentIdx + 1);
+//                 if (nextIdx >= modeCount) nextIdx = 0;
+//                 Sys_Settings.ScreenWidth  = modes[nextIdx].width;
+//                 Sys_Settings.ScreenHeight = modes[nextIdx].height;
+//                 UpdateScreenSize(NULL, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
+//                 Sys_Input.ignore_next_mouse_delta = true;
+}
+
+void ChangeFullScreenWindowed(void) {
+    int monitorCount;
+    GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
+    GLFWmonitor* next = monitors[currentMonitorIndex];
+    if (Sys_Settings.Fullscreen) {
+        int xpos, ypos, width, height;
+        glfwGetMonitorWorkarea(next, &xpos, &ypos, &width, &height);
+        Sys_Settings.ScreenWidth = width; Sys_Settings.ScreenHeight = height;
+        glfwSetWindowSize(window, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
+        glfwSetWindowPos(window, xpos, ypos-18);
+    } else {
+        int monitorCount;
+        GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
+        GLFWmonitor* next = monitors[currentMonitorIndex];
+        int mx, my;
+        glfwGetMonitorPos(next, &mx, &my);
+        const GLFWvidmode* mode = glfwGetVideoMode(next);
+        int xpos = mx + (mode->width - Sys_Settings.ScreenWidth) / 2;
+        int ypos = my + (mode->height - Sys_Settings.ScreenHeight) / 2;
+        glfwSetWindowPos(window, xpos, ypos);
+    }
+    
+    UpdateScreenSize(NULL, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
+    Sys_Input.ignore_next_mouse_delta = true;
+}
+
+void SetSkyRotateSpeed(void) {
+    static const float speeds[] = { 0.05f, 1.0f, 2.5f, 3.75f, 6.25f };
+    float skyRotateSpeed = speeds[Sys_Cheats.dizzyLevel];
+    glUseProgram(Sys_Render.imageBlitShaderProgram);
+    glUniform1f(30, skyRotateSpeed);
+}
+
+int fogFac;
+void SetFog(void) {
+    glUseProgram(Sys_Render.chunkShaderProgram);
+    float f = fogBaseDensityForLevel + (float)(fogFac / 255u);
+    glUniform3f(4, fogColorR * f, fogColorG * f, fogColorB * f);
+}
+
+void SetVSync(void);
+
+void SetGI(void) {
+    if (Sys_Settings.GI) {
+        // TODO: Set needed Voxel GI uniforms
+    }
+}
+
+void SetSpeakerMode(void) {
+    switch (Sys_Settings.SpeakerMode) {
+        case 0: break;//targetMode = AudioSpeakerMode.Mono; break; // TODO
+        case 1: break;//targetMode = AudioSpeakerMode.Stereo; break;
+        case 2: break;//targetMode = AudioSpeakerMode.Quad; break;
+        case 3: break;//targetMode = AudioSpeakerMode.Surround; break;
+        case 4: break;//targetMode = AudioSpeakerMode.Mode5point1; break;
+        case 5: break;//targetMode = AudioSpeakerMode.Mode7point1; break;
+        case 6: break;//targetMode = AudioSpeakerMode.Prologic; break;
+    }
+}
+
+void SetLanguage(void) { LoadTextForLanguage(Sys_Settings.Language); LoadLogTextForLanguage(Sys_Settings.Language); }
+
+void ApplySettings(void) {
+    UpdateScreenSize(NULL, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
+    SetSkyRotateSpeed();
+    SetVSync();
+    SetFog();
+    SetGI();
+    SetSpeakerMode();
+    SetLanguage();
+}
+
 void InitializeAudio(void);
-void CycleToNextMonitor(GLFWwindow* window);
 extern unsigned char *stbi_load_from_memory(const uint8_t* buffer, int32_t len, int32_t *x, int32_t *y);
 extern int32_t stbi_arena_size;
 extern uint8_t*  stbi__arena_base;
@@ -652,16 +894,21 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     glfwWindowHint(GLFW_SRGB_CAPABLE, 0);
     glfwWindowHint(GLFW_RESIZABLE, 1);
     LoadConfig(); // Get settings before setting window size.
-    Sys_Global.window = glfwCreateWindow(Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, "Voxen", NULL, NULL);
-    glfwSetFramebufferSizeCallback(Sys_Global.window, UpdateScreenSize);
-    if (!Sys_Global.window) { DualLogError("glfwCreateWindow failed\n"); OS_Exit(1); }
+    window = glfwCreateWindow(Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, "Voxen", NULL, NULL);
+    glfwSetFramebufferSizeCallback(window, UpdateScreenSize);
+    if (!window) { DualLogError("glfwCreateWindow failed\n"); OS_Exit(1); }
 
-    glfwMakeContextCurrent(Sys_Global.window);
+    glfwMakeContextCurrent(window);
     if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress)) { DualLogError("Failed to initialize GLAD\n"); OS_Exit(1); }
     
-//     CycleToNextMonitor(Sys_Global.window);
-    glfwSetInputMode(Sys_Global.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    Input_Init(Sys_Global.window);
+//     CycleToNextMonitor();
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetKeyCallback(window, key_callback);
+    glfwSetJoystickCallback(joystick_callback);
+    glfwSetCursorPosCallback(window, cursor_pos_callback);
+    glfwSetWindowFocusCallback(window, window_focus_callback);
+    glfwSetMouseButtonCallback(window, mouse_button_callback);
+    glfwSetScrollCallback(window, scroll_callback);
     glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Globally same alpha blending
     CompileShaders();
@@ -714,7 +961,7 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     if (status != GL_FRAMEBUFFER_COMPLETE) DualLogError("Framebuffer incomplete: Error code %d\n", status);
     glBindFramebuffer(GL_FRAMEBUFFER, 0); // Needed to render loading progress.
     glDepthMask(GL_TRUE); // Always true, set just once ever.
-    glfwSetWindowTitle(Sys_Global.window, Sys_Global.global_modname);
+    glfwSetWindowTitle(window, Sys_Global.global_modname);
     OsFileHandle fp = OS_OpenReadonly("./Textures/UI/menudot1.png");
     if (fp) {
         int windowIconFileSize = OS_FileSize(fp);
@@ -728,7 +975,7 @@ __attribute__((cold)) void InitializeEnvironment(void) {
         if (!pixels) { DualLogError("Failed to load icon: ./Textures/UI/menudot1.png\n"); OS_Exit(1); }
         
         GLFWimage image; image.width  = w; image.height = h; image.pixels = pixels;
-        glfwSetWindowIcon(Sys_Global.window, 1, &image);
+        glfwSetWindowIcon(window, 1, &image);
         OS_DeallocateRAM(file_buffer, windowIconFileSize);
         OS_DeallocateRAM(stbi__arena_base, STBI_ARENA_SIZE); stbi__arena_base = NULL;
     }
@@ -1348,7 +1595,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
     }
     
     Sys_Dx.cpuTime = get_time() - Sys_Global.current_time; // Measure time over everything this frame before GPU swap buffers
-    glfwSwapBuffers(Sys_Global.window); // Present frame
+    glfwSwapBuffers(window); // Present frame
     CHECK_GL_ERROR();
 }
 
@@ -1369,7 +1616,7 @@ int32_t main(void) {
     Sys_Global.absoluteTime = Sys_Global.last_topframe_time = Sys_Global.current_time = get_time();
     Sys_Global.pauseRelativeTime = Sys_Global.last_physics_time = 0.0;
     while(1) { // Main Loop
-        if (glfwWindowShouldClose(Sys_Global.window)) OS_Exit(0);
+        if (glfwWindowShouldClose(window)) OS_Exit(0);
         if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad); queuedLevelToLoad = 255u; continue; }
 
         Sys_Global.current_time = get_time(); // Update Time
@@ -1449,3 +1696,12 @@ void _start(void) {
     main();
     __asm__ __volatile__("mov $60, %%rax; xor %%rdi, %%rdi; syscall");
 }
+
+// Suppress -lm need for libglfw3.5.a:
+extern float fmaxf(float a, float b);
+extern float fminf(float a, float b);
+extern float powf(float val, float exp);
+float fmaxf(float a, float b) { return vmax(a,b); }
+float fminf(float a, float b) { return vmin(a,b); }
+float powf(float val, float exp) { return vpow(val,exp); }
+float round(float val) { int64_t valint = (int64_t)val; return val - (float)valint >= 0.5f ? (float)(valint + 1) : (float)valint; }
