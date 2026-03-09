@@ -2,7 +2,7 @@
 #version 430 core
 in vec2 TexCoord;
 out vec4 FragColor;
-layout(rgba16f, binding = 1) readonly uniform image2D inputWorldPos;
+layout(rgba32f, binding = 1) readonly uniform image2D inputWorldPos;
 
 layout(location =  2) uniform uint screenWidth;
 layout(location =  3) uniform uint screenHeight;
@@ -379,17 +379,18 @@ void main() {
     ivec2 uv = ivec2(gl_FragCoord.xy);                // pixel centre
     vec4 fog = vec4(0.0,0.0,0.0,0.0);
     if (!isSky) color.rgb = mix(color.rgb, fog.rgb, fog.a);
-    ivec2 pixel = ivec2(texCoordUsed * vec2(screenWidth/SSR_RES, screenHeight/SSR_RES));
+    vec2 ssRatio = vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
+    ivec2 pixel = ivec2(texCoordUsed * ssRatio);
     if (reflectionsEnabled > 0) {
-        vec2 sampleUV = (vec2(pixel)) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
-        vec2 lowResSize = vec2(screenWidth / SSR_RES, screenHeight / SSR_RES);
+        vec2 sampleUV = (vec2(pixel)) / ssRatio;
+        vec2 lowResSize = ssRatio;
         vec2 pixelLow = floor(vec2(pixel)) + 0.5;  // Center of the current low-res pixel
         vec2 sampleUVBase = pixelLow / lowResSize;
         vec4 reflectionColor = vec4(0.0);
         reflectionColor.rgb += texture(outputImage, sampleUV).rgb;
-        float weightSum = 0.0;
-        for (int x = -2; x <= 2; ++x) {
-            for (int y = -2; y <= 2; ++y) {
+        float weightSum = 1.0;
+        for (int x = -4; x <= 4; ++x) {
+            for (int y = -4; y <= 4; ++y) {
                 vec2 offset = vec2(float(x), float(y));
                 vec2 sampleUV = (pixelLow + offset) / lowResSize;
                 vec3 samp = texture(outputImage, sampleUV).rgb;

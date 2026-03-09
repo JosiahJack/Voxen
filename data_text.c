@@ -6,7 +6,7 @@ char audiologNames[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
 char audiologSubjects[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
 char audiologSenders[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
 char audioLogSpeech2Text[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
-uint16_t logImages = 1272; // Start index of first index 0 logImages[0] which is blank1.png
+uint16_t logImages = 1272; // Start index of first index 0 logImages[0] is blank1.png
 
 size_t utf16le_to_utf8(const uint8_t* src, size_t src_len, char* dst, size_t dst_len) {
     size_t dst_pos = 0; size_t src_pos = 0;
@@ -47,18 +47,18 @@ void LoadTextForLanguage(uint8_t lang) {
     size_t data_pos = 0;
     int is_utf16le = 0;
     int is_utf8    = 0;
-    if (file_size >= 2 && Sys_Text.file_data[0] == 0xFF && Sys_Text.file_data[1] == 0xFE) {          // UTF-16-LE BOM
+    if (file_size >= 2 && Sys_Text.file_data[0] == 0xFF && Sys_Text.file_data[1] == 0xFE) {
         data_pos = 2;
         is_utf16le = 1;
     } else if (file_size >= 3 && Sys_Text.file_data[0] == 0xEF && Sys_Text.file_data[1] == 0xBB && Sys_Text.file_data[2] == 0xBF) {
         data_pos = 3;
         is_utf8 = 1;
-    } else {                                   // No BOM → heuristic
+    } else {
         size_t null_bytes = 0;
         for (size_t i = 1; i < (size_t)file_size && i < 1024; i += 2) {
             if (Sys_Text.file_data[i] == 0) ++null_bytes;
         }
-        if (null_bytes * 3 > file_size) {      // >33% null bytes → UTF-16-LE
+        if (null_bytes * 3 > file_size) {
             is_utf16le = 1;
         } else {
             is_utf8 = 1;
@@ -69,7 +69,7 @@ void LoadTextForLanguage(uint8_t lang) {
     char utf8_line[TEXT_LOCALIZATION_MAX_LENGTH];
     while (data_pos < (size_t)file_size) {
         ++totalLines; size_t line_start = data_pos;
-        if (is_utf8) {                         // ----- UTF-8 path -----
+        if (is_utf8) {
             while (data_pos < (size_t)file_size) {
                 uint8_t c = Sys_Text.file_data[data_pos];
                 if (c == '\r') {
@@ -82,7 +82,7 @@ void LoadTextForLanguage(uint8_t lang) {
                 ++data_pos;
             }
             size_t len = data_pos - line_start;
-            if (len == 0) {                         // blank line
+            if (len == 0) {
                 if (lineNum < TEXT_STRING_COUNT) Sys_Text.stringTable[lineNum][0] = '\0';                
                 ++lineNum;
                 continue;
@@ -90,7 +90,7 @@ void LoadTextForLanguage(uint8_t lang) {
             if (len >= sizeof(utf8_line)) len = sizeof(utf8_line) - 1;
             __builtin_memcpy(utf8_line, &Sys_Text.file_data[line_start], len);
             utf8_line[len] = '\0';
-        } else if (is_utf16le) {                               // ----- UTF-16-LE path -----
+        } else if (is_utf16le) {
             while (data_pos + 1 < (size_t)file_size) {
                 uint16_t code = (uint16_t)Sys_Text.file_data[data_pos + 1] << 8 | Sys_Text.file_data[data_pos];
                 data_pos += 2;

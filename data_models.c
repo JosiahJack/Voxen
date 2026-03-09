@@ -2,7 +2,6 @@
 #include "os.h"
 #include "gl.h"
 #include "voxen.h"
-// #include <omp.h>
 
 float** modelVertices = NULL;
 uint32_t** modelTriangles = NULL;
@@ -224,8 +223,6 @@ void LoadModels(void) {
     }
 
     double timeAtStartOfSecondLoop = get_time();
-//     num_parse_threads = omp_get_max_threads();
-//     if (unlikely(num_parse_threads < 1)) num_parse_threads = 1;
     thread_temp_pos  = (float**)OS_AllocateRAM(NULL, (size_t)num_parse_threads * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
     thread_temp_nrm  = (float**)OS_AllocateRAM(NULL, (size_t)num_parse_threads * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
     thread_temp_uv   = (float**)OS_AllocateRAM(NULL, (size_t)num_parse_threads * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
@@ -239,7 +236,6 @@ void LoadModels(void) {
         thread_out_tris[t]  = (uint32_t*)OS_AllocateRAM(NULL, MAX_OUTPUT_VERTS * sizeof(uint32_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
     }
     
-//     #pragma omp parallel for schedule(dynamic)
     for (uint32_t i = 0; i < loadedModelsMaxIndex; ++i) {
         int32_t parserIdx = indexToParser[i];
         if (unlikely(parserIdx < 0 || parserIdx >= (int32_t)mpars.count)) continue;
@@ -249,7 +245,7 @@ void LoadModels(void) {
         int file_size = rawModels[i].size;
         if (unlikely(!data || file_size <= 0)) continue;
 
-        int tid = 0;//omp_get_thread_num();
+        int tid = 0;
         float minx, miny, minz, maxx, maxy, maxz;
         if (unlikely(!ParseOBJ(data, file_size, thread_temp_pos[tid], thread_temp_nrm[tid], thread_temp_uv[tid], thread_out_verts[tid], thread_out_tris[tid], &modelVertices[i], &modelVertexCounts[i], &modelTriangles[i], &modelTriangleCounts[i], &minx, &miny, &minz, &maxx, &maxy, &maxz))) continue;
 

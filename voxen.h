@@ -1,5 +1,7 @@
 #pragma once
-// #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
+#if defined(LINUX)
+//     #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
+#endif
 typedef __INT8_TYPE__     int8_t;
 typedef __UINT8_TYPE__   uint8_t;
 typedef __INT16_TYPE__   int16_t;
@@ -14,6 +16,9 @@ typedef uint64_t size_t;
 #endif
 #ifndef UINT16_MAX
     #define UINT16_MAX 65535
+#endif
+#ifndef UINT32_MAX
+    #define UINT32_MAX 4294967295
 #endif
 #define bool _Bool
 #define true 1

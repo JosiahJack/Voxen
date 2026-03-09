@@ -20,7 +20,7 @@ void* stbi__arena_alloc(size_t size) {
     if (!stbi__arena_base) { DualLogError("stbi__arena_base was invalid\n"); return NULL; }
 
     uint8_t* aligned = stbi__arena_cursor;
-    if (aligned + size > stbi__arena_end) { DualLogError("stbi__arena_alloc failed buffer overflowed with %u vs %u\n",aligned + size,stbi__arena_end); return NULL; } // out of arena → stb_image will fall back or fail
+    if (aligned + size > stbi__arena_end) { DualLogError("stbi__arena_alloc failed buffer overflowed with %u vs %u\n",aligned + size,stbi__arena_end); return NULL; }
 
     stbi__arena_cursor = aligned + size;
     return aligned;

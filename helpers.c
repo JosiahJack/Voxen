@@ -6,15 +6,10 @@
 typedef void stbi_write_func(void *context, void *data, int size);
 
 typedef struct {
-   stbi_write_func *func;
    void *context;
    unsigned char buffer[64];
    int buf_used;
 } stbi__write_context;
-
-static void stbi__stdio_write(void *context, void *data, int size) {
-   fwrite(data,1,size,(FILE*) context);
-}
 
 typedef __builtin_va_list va_list;
 static void stbiw__writefv(stbi__write_context *s, const char *fmt, va_list v) {
@@ -22,13 +17,13 @@ static void stbiw__writefv(stbi__write_context *s, const char *fmt, va_list v) {
       switch (*fmt++) {
          case ' ': break;
          case '1': { unsigned char x = STBIW_UCHAR(__builtin_va_arg(v, int));
-                     s->func(s->context,&x,1);
+                     fwrite(&x,1,1,s->context);
                      break; }
          case '2': { int x = __builtin_va_arg(v,int);
                      unsigned char b[2];
                      b[0] = STBIW_UCHAR(x);
                      b[1] = STBIW_UCHAR(x>>8);
-                     s->func(s->context,b,2);
+                     fwrite(b,1,2,s->context);
                      break; }
          case '4': { uint32_t x = __builtin_va_arg(v,int);
                      unsigned char b[4];
@@ -36,7 +31,7 @@ static void stbiw__writefv(stbi__write_context *s, const char *fmt, va_list v) {
                      b[1]=STBIW_UCHAR(x>>8);
                      b[2]=STBIW_UCHAR(x>>16);
                      b[3]=STBIW_UCHAR(x>>24);
-                     s->func(s->context,b,4);
+                     fwrite(b,1,4,s->context);
                      break; }
          default: return;
       }
@@ -45,7 +40,7 @@ static void stbiw__writefv(stbi__write_context *s, const char *fmt, va_list v) {
 
 static void stbiw__write_flush(stbi__write_context *s) {
    if (s->buf_used) {
-      s->func(s->context, &s->buffer, s->buf_used);
+      fwrite(&s->buffer,1,s->buf_used,s->context);
       s->buf_used = 0;
    }
 }
@@ -72,16 +67,13 @@ static void stbiw__write_pixel(stbi__write_context *s, int rgb_dir, int comp, in
    switch (comp) {
       case 2: // 2 pixels = mono + alpha, alpha is written separately, so same as 1-channel case
       case 1:
-         if (expand_mono)
-            stbiw__write3(s, d[0], d[0], d[0]); // monochrome bmp
-         else
-            stbiw__write1(s, d[0]);  // monochrome TGA
+         if (expand_mono) stbiw__write3(s, d[0], d[0], d[0]); // monochrome bmp
+         else             stbiw__write1(s, d[0]);  // monochrome TGA
          break;
       case 4:
          if (!write_alpha) {
             // composite against pink background
-            for (k = 0; k < 3; ++k)
-               px[k] = bg[k] + ((d[k] - bg[k]) * d[3]) / 255;
+            for (k = 0; k < 3; ++k) px[k] = bg[k] + ((d[k] - bg[k]) * d[3]) / 255;
             stbiw__write3(s, px[1 - rgb_dir], px[1], px[1 + rgb_dir]);
             break;
          }
@@ -90,8 +82,8 @@ static void stbiw__write_pixel(stbi__write_context *s, int rgb_dir, int comp, in
          stbiw__write3(s, d[1 - rgb_dir], d[1], d[1 + rgb_dir]);
          break;
    }
-   if (write_alpha > 0)
-      stbiw__write1(s, d[comp - 1]);
+   
+   if (write_alpha > 0) stbiw__write1(s, d[comp - 1]);
 }
 
 static void stbiw__write_pixels(stbi__write_context *s, int rgb_dir, int vdir, int x, int y, int comp, void *data, int write_alpha, int scanline_pad, int expand_mono) {
@@ -112,7 +104,7 @@ static void stbiw__write_pixels(stbi__write_context *s, int rgb_dir, int vdir, i
          stbiw__write_pixel(s, rgb_dir, comp, write_alpha, expand_mono, d);
       }
       stbiw__write_flush(s);
-      s->func(s->context, &zero, scanline_pad);
+      fwrite(&zero,1,scanline_pad,s->context);
    }
 }
 
@@ -150,7 +142,6 @@ int stbi_write_bmp(char const *filename, int x, int y, int comp, const void *dat
     stbi__write_context s = { 0 };
 //     OsFileHandle fd = OS_OpenWriteonly(filename);
     FILE *f = fopen(filename, "wb");
-    s.func = stbi__stdio_write;
     s.context = (void*)f;
     int r = stbi_write_bmp_core(&s,x,y,comp,data);
 //     OS_Close(fd);
@@ -176,29 +167,47 @@ double get_time(void) {
 }
 
 // Get USS aka the total RAM uniquely allocated for the process (btop shows RSS so pulls in shared libs and double counts shared RAM).
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
 void DebugRAM(const char *context) {
 #ifdef DEBUG_RAM_OUTPUT
-    struct mallinfo2 info = mallinfo2();
+    static void* heap_start = (void*)-1;
+    if (heap_start == (void*)-1) heap_start = OS_Brk(NULL);
+    void* current_brk = OS_Brk(NULL);
+    size_t heap_bytes = (size_t)((char*)current_brk - (char*)heap_start);
     size_t uss_bytes = 0;
-    FILE *fp = fopen("/proc/self/smaps_rollup", "r");
-    if (fp) {
-        char line[256];
-        size_t val;
-        while (fgets(line, sizeof(line), fp)) {
-            if (sscanf(line, "Private_Clean: %zu kB", &val) == 1)      uss_bytes += val * 1024;
-            else if (sscanf(line, "Private_Dirty: %zu kB", &val) == 1) uss_bytes += val * 1024;
-        }
-        fclose(fp);
-    } else DualLogError("Failed to open /proc/self/smaps_rollup\n");
+    long fd = OS_OpenReadonly("/proc/self/smaps_rollup");
+    if (fd == OS_INVALID_HANDLE) { DualLogError("Failed to open /proc/self/smaps_rollup\n"); goto print_only_heap; }
 
-    DualLog("Memory at %s: Heap usage %zu bytes (%zu KB | %.2f MB), USS %zu bytes (%zu KB | %.2f MB)\n",
-            context, info.uordblks, info.uordblks / 1024, info.uordblks / 1024.0 / 1024.0,
-            uss_bytes, uss_bytes / 1024, uss_bytes / 1024.0 / 1024.0);
+    char buf[4096];
+    long bytes_read = OS_Read(fd, buf, sizeof(buf)-1);
+    if (bytes_read > 0) { buf[bytes_read] = '\0'; } else buf[0] = '\0';
+    OS_Close(fd);
+    char* p = buf;
+    while (*p) {
+        if (p[0]=='P' && p[1]=='r' && p[2]=='i' && p[3]=='v' && p[4]=='a' && p[5]=='t' && p[6]=='e' && p[7]=='_') {
+            p += 8;
+            size_t val = 0;
+            if (p[0]=='C' && p[1]=='l' && p[2]=='e' && p[3]=='a' && p[4]=='n') { /* Clean */ }
+            else if (p[0]=='D' && p[1]=='i' && p[2]=='r' && p[3]=='t' && p[4]=='y') { /* Dirty */ }
+            else { p++; continue; }
+
+            while (*p && *p != ':') p++;
+            if (*p != ':') { p++; continue; }
+            
+            p++;
+            while (*p == ' ' || *p == '\t') p++;
+            while (*p >= '0' && *p <= '9') { val = val * 10 + (*p - '0'); p++; }
+            uss_bytes += val * 1024;
+        }
+        
+        p++;
+    }
+
+    print_only_heap:
+    DualLog("Memory at %s: Heap %zu bytes (%zu KB | %.2f MB), USS %zu bytes (%zu KB | %.2f MB)\n",context,heap_bytes,heap_bytes / 1024,heap_bytes / 1024.0 / 1024.0,uss_bytes,uss_bytes / 1024,uss_bytes / 1024.0 / 1024.0);
+#else
+    (void)context;
 #endif
 }
-#pragma GCC diagnostic pop
 
 void print_bytes_no_newline(int32_t count) { DualLog("%d bytes | %f kb | %f Mb",count,(double)count / 1000.0,(double)count / 1000000.0); }
 

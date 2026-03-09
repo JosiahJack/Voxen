@@ -28,7 +28,7 @@ SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on f
     .VolumeMaster = 100u, .VolumeMusic = 25u, .VolumeMessage = 75u, .VolumeEffects = 100u,
     .Language = 0u, .DynamicMusic = 1u, .Footsteps = 1u, .InvertLook = 0u,
     .InvertCyberspaceLook = 0u, .QuickItemPickup = 0u, .QuickReloadWeapons = 0u,
-    .MouseSensitivity = 10u, .NoShootMode = 0u, .HeadBob = 1u, .SSR_RES = 2u // Ratio is (1 / SSR_RES) * render resolution.
+    .MouseSensitivity = 10u, .NoShootMode = 0u, .HeadBob = 1u, .SSR_RES = 8u // Ratio is (1 / SSR_RES) * render resolution.
 };
 
 typedef struct { const char* name; int value; } InputElement;

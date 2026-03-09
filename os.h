@@ -22,7 +22,6 @@ typedef uint64_t size_t;
 #define MAP_ANONYMOUS 0x20
 #define MAP_POPULATE 0x08000
 #include <stdio.h>
-#include <fcntl.h>
 void DualLog(const char* fmt, ...);
 void DualLogWarn(const char* fmt, ...);
 void DualLogError(const char* fmt, ...);
@@ -46,7 +45,7 @@ typedef struct {
     #define OS_MakeFolder(path) _mkdir(path)
     static inline __attribute__((always_inline)) void OS_Close(OsFileHandle fileDescriptor) { CloseHandle(fileDescriptor); }
     
-    static inline __attribute__((always_inline)) void* OS_AllocateRAM(void* addr, size_t length, int prot, int flags, OsFileHandle fd) {
+    static inline __attribute__((always_inline)) void* OS_AllocateRAM(void* addr, size_t length, int32_t prot, int32_t flags, OsFileHandle fd) {
         (void)flags;
         bool writable = (prot & PROT_WRITE);
         if (fd == INVALID_HANDLE_VALUE) {
@@ -66,6 +65,21 @@ typedef struct {
 #else
     #if defined(__linux__) && !defined(__ANDROID__)
         #define LINUX
+        static inline void* OS_Brk(void* addr) {
+            register long rax __asm__("rax") = 12;
+            register void* rdi __asm__("rdi") = addr;
+            __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi) : "rcx", "r11", "memory");
+            return (void*)rax;
+        }
+        
+        static inline long OS_Read(long fd, void* buf, size_t count) {
+            register long rax __asm__("rax") = 0;           // sys_read
+            register long rdi __asm__("rdi") = fd;
+            register void* rsi __asm__("rsi") = buf;
+            register size_t rdx __asm__("rdx") = count;
+            __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi), "r"(rsi), "r"(rdx) : "rcx", "r11", "memory");
+            return rax;
+        }
     #endif
 
     #if defined(__ANDROID__)
@@ -83,38 +97,52 @@ typedef struct {
     #include <fcntl.h>
     #include <unistd.h>    
     #define OS_MakeFolder(path) mkdir(path, 0755)
-    static inline __attribute__((always_inline)) void OS_Close(OsFileHandle fileDescriptor) { close(fileDescriptor); }
+    static inline __attribute__((always_inline)) void OS_Close(OsFileHandle fileDescriptor) {
+        register long rax __asm__("rax") = 3;
+        register long rdi __asm__("rdi") = fileDescriptor;
+        __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi) : "rcx", "r11", "memory");
+        //return rax; don't care
+    }
 
-    static inline __attribute__((always_inline)) void* OS_AllocateRAM(void* addr, size_t length, int prot, int flags, OsFileHandle fd) {
+    static inline __attribute__((always_inline)) void* OS_AllocateRAM(void* addr, size_t length, int32_t prot, int32_t flags, OsFileHandle fd) {
         void* ptr = mmap(addr,length,prot,flags,fd,0);
         if (ptr == MAP_FAILED || ptr == NULL) { DualLogError("Failed to allocate RAM\n"); OS_Exit(1); }
         return ptr;
     }
 #endif
 
-static inline __attribute__((always_inline)) int64_t OS_RawWrite(OsFileHandle fd, const void* buf, size_t count, const char* filePath) {
+static inline __attribute__((always_inline)) int64_t OS_RawWrite(OsFileHandle fd, const void* buf, size_t count) {
     #ifdef WINDOWS
         DWORD written = 0;
         if (WriteFile((HANDLE)fd, buf, (DWORD)count, &written, NULL)) return (int64_t)written;
-        DualLogError("Write failed for %s (error: %lu)\n", filePath, GetLastError()); return -1;
+        return -1;
     #else // Linux, Mac, Android
         register int64_t     rax __asm__("rax") = 1; // sys_write
-        register int         rdi __asm__("rdi") = fd;
+        register int32_t     rdi __asm__("rdi") = fd;
         register const void* rsi __asm__("rsi") = buf;
         register size_t      rdx __asm__("rdx") = count;
         __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi), "r"(rsi), "r"(rdx) : "rcx", "r11", "memory");
-        if (rax >= 0) return rax;
-        DualLogError("Write error when attempting write to %s: %s (code: %d)\n", filePath, rax, (int)(-rax)); return -1;
+        return rax;
     #endif
 }
 
 static inline __attribute__((always_inline)) void OS_Write(OsFileHandle fd, const void* buffer, size_t size, const char* filePath) {
     size_t total = 0;
     while (total < size) {
-        int64_t written = OS_RawWrite(fd, (const char*)buffer + total, size - total, filePath);
-        if (written <= 0) return;
-        else total += (size_t)written;
+        int64_t written = OS_RawWrite(fd,(const char*)buffer + total,size - total);
+        if (written < 0) { DualLogError("Write error when attempting write to %s: %s (code: %d)\n",filePath,written,(int32_t)(-written)); OS_Exit(1); }
+
+        total += (size_t)written;
     }
+}
+
+static inline __attribute__((always_inline)) long OS_Open(const char* path, int32_t flags, int32_t mode) {
+    register long rax __asm__("rax") = 2;           // sys_open
+    register const char* rdi __asm__("rdi") = path;
+    register long rsi __asm__("rsi") = flags;
+    register long rdx __asm__("rdx") = mode;
+    __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi), "r"(rsi), "r"(rdx) : "rcx", "r11", "memory");
+    return rax;
 }
 
 static inline __attribute__((always_inline)) OsFileHandle OS_OpenReadonly(const char* filePath) {
@@ -122,7 +150,7 @@ static inline __attribute__((always_inline)) OsFileHandle OS_OpenReadonly(const 
         HANDLE fp = CreateFileA(filePath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
         if (fp == OS_INVALID_HANDLE) { DualLog("Could not open file %s\n", filePath); return OS_INVALID_HANDLE; }
     #else // Linux, Mac, Android
-        OsFileHandle fp = open(filePath, O_RDONLY);
+        OsFileHandle fp = OS_Open(filePath,O_RDONLY,0);
         if (fp < 0) { DualLog("Could not open file %s\n", filePath); return OS_INVALID_HANDLE; }
     #endif
     return fp;
@@ -133,7 +161,7 @@ static inline __attribute__((always_inline)) OsFileHandle OS_OpenWriteonly(const
         OsFileHandle h = CreateFileA(filePath, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
         return (h == OS_INVALID_HANDLE) ? (DualLogError("Failed to open %s\n", filePath), OS_Exit(1), OS_INVALID_HANDLE) : h;
     #else // Linux, Mac, Android
-        OsFileHandle h = open(filePath, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        OsFileHandle h = OS_Open(filePath,O_WRONLY | O_CREAT | O_TRUNC,0644);
         return (h < 0) ? (DualLogError("Failed to open %s\n", filePath), OS_Exit(1), OS_INVALID_HANDLE) : h;
     #endif
 }
