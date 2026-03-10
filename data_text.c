@@ -1,6 +1,5 @@
 #include "os.h"
 #include "voxen.h"
-
 Voxen_Text Sys_Text;
 char audiologNames[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
 char audiologSubjects[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
@@ -40,10 +39,11 @@ void LoadTextForLanguage(uint8_t lang) {
         default: StringCopyInto_A_From_B(textFile, "./Data/text_english.txt", 256); break;
     }
 
-    FILE* fp = fopen(textFile, "rb"); if (!fp) { DualLog("Failed to open text file: %s\n", textFile); return; }
-    fseek(fp, 0, SEEK_END); size_t file_size = (size_t)ftell(fp); fseek(fp, 0, SEEK_SET);
-    if (fread(Sys_Text.file_data, 1, file_size, fp) != file_size) { DualLogError("Failed to read %s?\n",textFile); OS_Exit(1); }
-    fclose(fp);
+    
+    OsFileHandle fp = OS_OpenReadonly(textFile);
+    OS_Seek(fp, 0, SEEK_END); size_t file_size = (size_t)OS_Tell(fp); OS_Seek(fp, 0, SEEK_SET);
+    if (OS_Read(fp, Sys_Text.file_data, file_size) != (long)file_size) { DualLogError("Failed to read %s?\n",textFile); OS_Close(fp); OS_Exit(1); }
+    OS_Close(fp);
     size_t data_pos = 0;
     int is_utf16le = 0;
     int is_utf8    = 0;
@@ -145,14 +145,10 @@ void LoadLogTextForLanguage(uint8_t lang) { // Unload and load language for when
         default: StringCopyInto_A_From_B(textFile, "./Data/logs_text_english.txt", 256); break;
     }
 
-    FILE *fp = fopen(textFile, "rb");
-    if (!fp) { DualLog("Failed to open logs text file: %s\n", textFile); OS_Exit(1); }
-
-    fseek(fp, 0, SEEK_END);
-    long file_size = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
-    if (fread(Sys_Text.file_data, 1, (size_t)file_size, fp) != (size_t)file_size) { DualLogError("Failed to read %s\n", textFile); fclose(fp); OS_Exit(1); return; } // Suppress -fanalyzer warning about double free by including unnecessary `return;` here.
-    fclose(fp);
+    OsFileHandle fp = OS_OpenReadonly(textFile);
+    OS_Seek(fp, 0, SEEK_END); long file_size = OS_Tell(fp); OS_Seek(fp, 0, SEEK_SET);
+    if (OS_Read(fp,Sys_Text.file_data,(size_t)file_size) != (long)file_size) { DualLogError("Failed to read %s\n", textFile); OS_Close(fp); OS_Exit(1); return; } // Suppress -fanalyzer warning about double free by including unnecessary `return;` here.
+    OS_Close(fp);
     size_t data_pos = 0;
     int is_utf16le = 0, is_utf8 = 0;
 

@@ -1,7 +1,6 @@
 #include "os.h"
 #include "gl.h"
 #include "voxen.h"
-
 uint8_t *stbi_load_from_memory(const uint8_t* buffer, int32_t len, int32_t* x, int32_t* y);
 extern void stbi__arena_init(void);
 extern uint8_t*  stbi__arena_base;
@@ -34,20 +33,14 @@ static inline __attribute__((always_inline)) void set_cull_bit(uint32_t* arr, in
 }
 
 static unsigned char* LoadCullPNG(const char* name, int level) {
-    char path[256];
-    sprintf(path, "./Data/%s_%d.png", name, level);
-    FILE* fp = fopen(path, "rb");
-    if (!fp) { DualLogError("Failed to open %s\n", path); OS_Exit(1); }
-
-    fseek(fp, 0, SEEK_END);
-    size_t size = ftell(fp);
+    char path[256]; StringFormat(path, sizeof(path),"./Data/%s_%d.png",name,level);
+    OsFileHandle fp = OS_OpenReadonly(path);
+    OS_Seek(fp, 0, SEEK_END); size_t size = OS_Tell(fp);
     if (size > MAX_CULL_FILESIZE) { DualLogError("PNG too large: %s\n", path); OS_Exit(1); }
-    fseek(fp, 0, SEEK_SET);
-
-    size_t read_size = fread(cullingFileBuffer, 1, size, fp);
-    fclose(fp);
+    OS_Seek(fp, 0, SEEK_SET);
+    size_t read_size = OS_Read(fp,cullingFileBuffer,size);
+    OS_Close(fp);
     if (read_size != size) { DualLogError("Failed to read %s\n", path); OS_Exit(1); }
-
     int w, h;
     unsigned char* pixels = stbi_load_from_memory(cullingFileBuffer, size, &w, &h);
     if (!pixels) { DualLogError("STB failed: %s\n", path); OS_Exit(1); }

@@ -21,7 +21,10 @@ typedef uint64_t size_t;
 #define MAP_PRIVATE 0x02
 #define MAP_ANONYMOUS 0x20
 #define MAP_POPULATE 0x08000
-#include <stdio.h>
+#define SEEK_SET 0
+#define SEEK_CUR 1
+#define SEEK_END 2
+// #include <stdio.h>
 void DualLog(const char* fmt, ...);
 void DualLogWarn(const char* fmt, ...);
 void DualLogError(const char* fmt, ...);
@@ -34,7 +37,20 @@ typedef struct {
     uint64_t dev;
 } FileFingerprint;
 
-#define OS_Exit(x) _exit( (x) )
+static inline __attribute__((always_inline, noreturn)) void OS_Exit(int64_t exitCode) {
+    #ifdef WINDOWS
+        register uint64_t rax __asm__("rax") = 0x2C;
+        register HANDLE   rcx __asm__("rcx") = (HANDLE)-1;
+        register NTSTATUS rdx __asm__("rdx") = (NTSTATUS)exitCode;
+        __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rcx), "r"(rdx) : "r8", "r9", "r10", "r11", "memory");
+    #else
+        register int64_t rax __asm__("rax") = 231;
+        register int64_t rdi __asm__("rdi") = exitCode;
+        __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi) : "rcx", "r11", "memory");
+    #endif
+    __builtin_unreachable();
+}
+
 #if defined(_WIN32) || defined(_WIN64)
     #define WINDOWS
     #define WIN32_LEAN_AND_MEAN // Let 'er rip, tater chip
@@ -62,18 +78,35 @@ typedef struct {
         CloseHandle(hMap);
         return ptr;
     }
+    
+    static inline __attribute__((always_inline)) long OS_Read(long fd, void* buf, size_t count) {
+        // NtReadFile — direct syscall, zero library involvement
+        // syscall number is stable at 0x0003 on all modern Windows 10/11 (including 26H1)
+        register uint64_t rax __asm__("rax") = 0x0003;
+        register HANDLE   rcx __asm__("rcx") = (HANDLE)fd;
+        register void*    rdx __asm__("rdx") = NULL;
+        register void*    r8  __asm__("r8")  = buf;
+        register size_t   r9  __asm__("r9")  = count;
+        long bytesRead = -1;
+        __asm__ __volatile__(
+            "xor %%r10, %%r10\n\t"
+            "movq $0, 8(%%rsp)\n\t"
+            "syscall" : "+r"(rax) : "r"(rcx), "r"(rdx), "r"(r8), "r"(r9) : "r10", "r11", "memory");
+
+        return (rax == 0) ? (long)count : (long)rax;
+    }
 #else
     #if defined(__linux__) && !defined(__ANDROID__)
         #define LINUX
-        static inline void* OS_Brk(void* addr) {
+        static inline __attribute__((always_inline)) void* OS_Brk(void* addr) {
             register long rax __asm__("rax") = 12;
             register void* rdi __asm__("rdi") = addr;
             __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi) : "rcx", "r11", "memory");
             return (void*)rax;
         }
         
-        static inline long OS_Read(long fd, void* buf, size_t count) {
-            register long rax __asm__("rax") = 0;           // sys_read
+        static inline __attribute__((always_inline)) long OS_Read(long fd, void* buf, size_t count) {
+            register long rax __asm__("rax") = 0;
             register long rdi __asm__("rdi") = fd;
             register void* rsi __asm__("rsi") = buf;
             register size_t rdx __asm__("rdx") = count;
@@ -258,3 +291,69 @@ static inline __attribute__((always_inline)) bool OS_GetFileFingerprint(const ch
 void* __stack_chk_guard = (void*)0xdeadbeefcafebabeULL;
 __attribute__((noreturn)) void __stack_chk_fail(void) { DualLogError("Stack protector: canary corrupted - possible stack smash!"); while(1); }
 #endif
+
+static inline __attribute__((always_inline)) int64_t OS_Seek(OsFileHandle fd, int64_t offset, int whence) { // forth and forsooth pray tell
+    #ifdef WINDOWS
+        // Use NtSetInformationFile with FilePositionInformation (class 14)
+        // This is the direct syscall path (no kernel32).
+        struct {
+            LARGE_INTEGER CurrentByteOffset;
+        } pos_info;
+
+        pos_info.CurrentByteOffset.QuadPart = offset;
+
+        // NtSetInformationFile syscall number = 0x24 (stable on Windows 10/11 25H2/26H1)
+        register uint64_t rax __asm__("rax") = 0x24;
+        register HANDLE   rcx __asm__("rcx") = (HANDLE)fd;
+        register void*    rdx __asm__("rdx") = NULL;                    // IoStatusBlock (we ignore)
+        register void*    r8  __asm__("r8")  = &pos_info;
+        register uint32_t r9  __asm__("r9")  = 14;                      // FilePositionInformation
+        register uint64_t r10 __asm__("r10") = 8;                       // Length of FILE_POSITION_INFORMATION
+        __asm__ __volatile__(
+            "xor %%r11, %%r11\n\t"          // Event = NULL
+            "syscall" : "+r"(rax) : "r"(rcx), "r"(rdx), "r"(r8), "r"(r9), "r"(r10) : "r11", "memory");
+
+        if (rax != 0) return -1;
+        return offset;
+    #else
+        // Linux / macOS / Android
+        register int64_t rax __asm__("rax") = 8;
+        register int64_t rdi __asm__("rdi") = fd;
+        register int64_t rsi __asm__("rsi") = offset;
+        register int64_t rdx __asm__("rdx") = whence;
+        __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi), "r"(rsi), "r"(rdx) : "rcx", "r11", "memory");
+        return rax;
+    #endif
+}
+
+static inline __attribute__((always_inline)) int64_t OS_Tell(OsFileHandle fd) {
+#ifdef WINDOWS
+    // NtQueryInformationFile with FilePositionInformation (class 14)
+    struct {
+        LARGE_INTEGER CurrentByteOffset;
+    } pos_info;
+
+    // NtQueryInformationFile syscall number = 0x23 (stable on Windows 10/11)
+    register uint64_t rax __asm__("rax") = 0x23;
+    register HANDLE   rcx __asm__("rcx") = (HANDLE)fd;
+    register void*    rdx __asm__("rdx") = NULL;
+    register void*    r8  __asm__("r8")  = &pos_info;
+    register uint32_t r9  __asm__("r9")  = 14;             // FilePositionInformation
+    register uint64_t r10 __asm__("r10") = 8;              // Length of FILE_POSITION_INFORMATION
+    __asm__ __volatile__(
+        "xor %%r11, %%r11\n\t"
+        "syscall" : "+r"(rax) : "r"(rcx), "r"(rdx), "r"(r8), "r"(r9), "r"(r10) : "r11", "memory");
+
+    if (rax != 0) return -1;
+    return pos_info.CurrentByteOffset.QuadPart;
+
+#else
+    // Linux / macOS / Android
+    register int64_t rax __asm__("rax") = 8;      // sys_lseek
+    register int64_t rdi __asm__("rdi") = fd;
+    register int64_t rsi __asm__("rsi") = 0;
+    register int64_t rdx __asm__("rdx") = 1;      // SEEK_CUR
+    __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi), "r"(rsi), "r"(rdx) : "rcx", "r11", "memory");
+    return rax;
+#endif
+}

@@ -60,7 +60,7 @@ void InitializeAIAfterLoad(uint16_t i) {
     instances[i].attackFinished = Sys_Global.pauseRelativeTime + 1.0;
     instances[i].idealTransformForward = instances[i].forward;
     StringCopyInto_A_From_B(instances[i].targetID, npcTable[npcID].name, TARGET_ID_LENGTH);
-//     instances[i].targetID = snprintf(instances[i].targetID, TARGET_ID_LENGTH * sizeof(char), "%s %05u", npcTable[npcID].name,npcCountInWorldPerType[npcID]++);
+    StringFormat(instances[i].targetID, TARGET_ID_LENGTH * sizeof(char), "%s %05u", npcTable[npcID].name,npcCountInWorldPerType[npcID]++);
 }
 
 void AddInstance(uint16_t entIdx, uint16_t i) {
@@ -266,10 +266,8 @@ void LoadLevel(uint8_t curlevel) {
     for (uint16_t idx = START_INDEX_LEVEL_INSTANCES;idx<INSTANCE_COUNT;idx++) { InitializeEntity(&instances[idx]); dirtyInstances[idx] = true; } // Start AFTER player indices and NULLENT
     __builtin_memset(modelMatrices, 0, INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
     char filename[20]; // Minimum size for 0 through 13.
-    snprintf(filename, sizeof(filename), "./Data/level%d.txt", curlevel);
-    FILE *file = fopen(filename, "r");
-    if (!file) { DualLogError("Cannot open %s\n", filename); OS_Exit(1); }
-
+    StringFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel);
+    OsFileHandle fd = OS_OpenReadonly(filename);
     uint32_t lineNum = 0;
     int32_t instanceIdx = PLAYER2;
     int32_t lightsIdx = -1; // Start at 0 on first loop iteration, -1 here due to ++ positioning, as it needs to iterate before each blank or commented line skip
@@ -277,12 +275,12 @@ void LoadLevel(uint8_t curlevel) {
     char* line = &lineSpace[0];
     char firstKeyCheck[11];
     char initialLine[LINE_LEN_MAX];
-    while (fgets(lineSpace, LINE_LEN_MAX, file)) {
+    while (GetNextStringUpToNewlineOrEOF(lineSpace,LINE_LEN_MAX,fd)) {
         size_t len = GetStringLength(lineSpace);
         while (len && (lineSpace[len - 1] == '\n' || lineSpace[len - 1] == '\r'))
         lineSpace[--len] = '\0';
         line = lineSpace;
-        snprintf(initialLine, sizeof(initialLine), "%s", line);
+        StringFormat(initialLine, sizeof(initialLine), "%s", line);
         __builtin_memcpy(firstKeyCheck,line,10); firstKeyCheck[10] = '\0';
         lineNum++;
         bool isLight = true;
@@ -321,8 +319,8 @@ void LoadLevel(uint8_t curlevel) {
 
             char trimmed_key[64];
             char trimmed_value[256];
-            snprintf(trimmed_key, sizeof(trimmed_key), "%s", key);
-            snprintf(trimmed_value, sizeof(trimmed_value), "%s", value);
+            StringFormat(trimmed_key, sizeof(trimmed_key), "%s", key);
+            StringFormat(trimmed_value, sizeof(trimmed_value), "%s", value);
             trimmed_key[sizeof(trimmed_key) - 1] = '\0';
             trimmed_value[sizeof(trimmed_value) - 1] = '\0';
             if (isLight) {
@@ -519,7 +517,7 @@ void LoadLevel(uint8_t curlevel) {
         }
     }
     
-    fclose(file);
+    OS_Close(fd);
 
     // Add instances for shield generators
     if (curlevel == 1 || curlevel == 2 || curlevel == 5 || curlevel == 6 || curlevel == 7) {

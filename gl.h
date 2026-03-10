@@ -76,19 +76,6 @@
   #endif
 #endif
 
-#ifndef GLAD_PLATFORM_UWP
-  #ifdef GLAD_INTERNAL_HAVE_WINAPIFAMILY
-    #include <winapifamily.h>
-    #if !WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP) && WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_APP)
-      #define GLAD_PLATFORM_UWP 1
-    #endif
-  #endif
-
-  #ifndef GLAD_PLATFORM_UWP
-    #define GLAD_PLATFORM_UWP 0
-  #endif
-#endif
-
 #define GLAD_GNUC_EXTENSION __extension__
 #define GLAD_UNUSED(x) (void)(x)
 
@@ -3417,19 +3404,12 @@ GLAD_API_CALL PFNGLVIEWPORTINDEXEDFVPROC glad_glViewportIndexedfv;
 GLAD_API_CALL PFNGLWAITSYNCPROC glad_glWaitSync;
 #define glWaitSync glad_glWaitSync
 
-
-
-
-
 GLAD_API_CALL int gladLoadGLUserPtr( GLADuserptrloadfunc load, void *userptr);
 GLAD_API_CALL int gladLoadGL( GLADloadfunc load);
 
-
 #ifdef GLAD_GL
-
 GLAD_API_CALL int gladLoaderLoadGL(void);
 GLAD_API_CALL void gladLoaderUnloadGL(void);
-
 #endif
 
 #endif

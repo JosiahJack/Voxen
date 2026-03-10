@@ -2,6 +2,7 @@
 #include "gl.h"
 #include "voxen.h"
 #include "glfw_defines.h"
+#include <stdio.h>
 InputSystem Sys_Input;
 extern uint16_t editModeTestEntityDefinition;
 extern uint16_t editModeSelection;
@@ -82,11 +83,9 @@ static inline __attribute__((always_inline)) int32_t GetGLFWIndirectionIndexForA
 }
 
 void LoadConfig(void) {
-    FILE* f = fopen("./Data/Config.ini", "r");
-    if (!f) return;
-
+    OsFileHandle f = OS_OpenReadonly("./Data/Config.ini");
     char line[512];
-    while (fgets(line, sizeof(line), f)) {
+    while (GetNextStringUpToNewlineOrEOF(line, sizeof(line), f)) {
         char* s = data_parser_trim(line);
         if (*s == 0 || (s[0] == '/' && s[1] == '/')) continue;
 
@@ -106,7 +105,7 @@ void LoadConfig(void) {
         }
     }
 
-    fclose(f);
+    OS_Close(f);
 }
 
 void SaveConfig(void) {

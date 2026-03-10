@@ -6,24 +6,24 @@
 typedef void stbi_write_func(void *context, void *data, int size);
 
 typedef struct {
-   void *context;
+   OsFileHandle context;
+   const char *filePath;
    unsigned char buffer[64];
    int buf_used;
 } stbi__write_context;
 
-typedef __builtin_va_list va_list;
 static void stbiw__writefv(stbi__write_context *s, const char *fmt, va_list v) {
    while (*fmt) {
       switch (*fmt++) {
          case ' ': break;
          case '1': { unsigned char x = STBIW_UCHAR(__builtin_va_arg(v, int));
-                     fwrite(&x,1,1,s->context);
+                     OS_Write(s->context, &x, 1, s->filePath);
                      break; }
          case '2': { int x = __builtin_va_arg(v,int);
                      unsigned char b[2];
                      b[0] = STBIW_UCHAR(x);
                      b[1] = STBIW_UCHAR(x>>8);
-                     fwrite(b,1,2,s->context);
+                     OS_Write(s->context, b, 2, s->filePath);
                      break; }
          case '4': { uint32_t x = __builtin_va_arg(v,int);
                      unsigned char b[4];
@@ -31,7 +31,7 @@ static void stbiw__writefv(stbi__write_context *s, const char *fmt, va_list v) {
                      b[1]=STBIW_UCHAR(x>>8);
                      b[2]=STBIW_UCHAR(x>>16);
                      b[3]=STBIW_UCHAR(x>>24);
-                     fwrite(b,1,4,s->context);
+                     OS_Write(s->context, b, 4, s->filePath);
                      break; }
          default: return;
       }
@@ -40,7 +40,7 @@ static void stbiw__writefv(stbi__write_context *s, const char *fmt, va_list v) {
 
 static void stbiw__write_flush(stbi__write_context *s) {
    if (s->buf_used) {
-      fwrite(&s->buffer,1,s->buf_used,s->context);
+      OS_Write(s->context, &s->buffer, s->buf_used, s->filePath);
       s->buf_used = 0;
    }
 }
@@ -104,7 +104,7 @@ static void stbiw__write_pixels(stbi__write_context *s, int rgb_dir, int vdir, i
          stbiw__write_pixel(s, rgb_dir, comp, write_alpha, expand_mono, d);
       }
       stbiw__write_flush(s);
-      fwrite(&zero,1,scanline_pad,s->context);
+      OS_Write(s->context, &zero, scanline_pad, s->filePath);
    }
 }
 
@@ -140,12 +140,13 @@ static int stbi_write_bmp_core(stbi__write_context *s, int x, int y, int comp, c
 
 int stbi_write_bmp(char const *filename, int x, int y, int comp, const void *data) {
     stbi__write_context s = { 0 };
-//     OsFileHandle fd = OS_OpenWriteonly(filename);
-    FILE *f = fopen(filename, "wb");
-    s.context = (void*)f;
+    OsFileHandle f = OS_OpenWriteonly(filename);
+//     FILE *f = fopen(filename, "wb");
+    s.context = f;
+    s.filePath = filename;
     int r = stbi_write_bmp_core(&s,x,y,comp,data);
-//     OS_Close(fd);
-    fclose(f);
+    OS_Close(f);
+//     fclose(f);
     return r;
 }
 
@@ -252,8 +253,7 @@ void Screenshot(void) {
     OS_MakeFolder("Screenshots");
     unsigned char* pixels = OS_AllocateRAM(NULL, Sys_Settings.ScreenWidth * Sys_Settings.ScreenHeight * 4 * sizeof(char), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, OS_INVALID_HANDLE);//malloc(Sys_Settings.ScreenWidth * Sys_Settings.ScreenHeight * 4 * sizeof(char));
     glad_glReadPixels(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, /*GL_RGBA*/ 0x1908, /*GL_UNSIGNED_BYTE*/ 0x1401, pixels);
-    char filename[96];
-    snprintf(filename, sizeof(filename), "Screenshots/%.2f_x%.1f_y%.1f_z%.1f.bmp", get_time(), (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z);
+    char filename[96]; StringFormat(filename, sizeof(filename), "Screenshots/%.2f_x%.1f_y%.1f_z%.1f.bmp", get_time(), (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z);
     if (!stbi_write_bmp(filename, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, 4, pixels)) DualLogError("Failed to save screenshot\n"); else DualLog("Saved screenshot %s\n", filename);
     OS_DeallocateRAM(pixels, Sys_Settings.ScreenWidth * Sys_Settings.ScreenHeight * 4 * sizeof(char));
 }
@@ -487,6 +487,173 @@ char* StringReturnUpToDelimiterAndLopOffAndShiftOriginal(char* str, const char d
     }
 
     return token;
+}
+
+void DoubleToStringFixed(char* dest, double value, int decimalPlaces, size_t bufferSize) {
+    if (decimalPlaces < 0 || decimalPlaces > 9) { DualLogError("DoubleToStringFixed: decimalPlaces out of range\n"); OS_Exit(1); }
+
+    if (value < 0.0) {
+        if (bufferSize < 2) OS_Exit(1);
+        
+        *dest++ = '-';
+        bufferSize--;
+        value = -value;
+    }
+
+    uint64_t intPart = (uint64_t)value;
+    char temp[32];
+    size_t len = 0;
+    if (intPart == 0) temp[len++] = '0';
+    else {
+        while (intPart > 0) {
+            temp[len++] = '0' + (intPart % 10);
+            intPart /= 10;
+        }
+    }
+
+    if (len >= bufferSize) OS_Exit(1);
+    for (size_t i = 0; i < len; ++i) dest[i] = temp[len - 1 - i];
+    dest += len;
+    bufferSize -= len;
+    if (decimalPlaces == 0) { *dest = '\0'; return; }
+    if (bufferSize < 1) OS_Exit(1);
+    
+    *dest++ = '.';
+    bufferSize--;
+    double frac = value - (uint64_t)value;
+    double scale = 1.0;
+    for (int i = 0; i < decimalPlaces; ++i) scale *= 10.0;
+    uint64_t fracPart = (uint64_t)(frac * scale + 0.5);
+    for (int i = decimalPlaces - 1; i >= 0; --i) {
+        if (bufferSize < 1) OS_Exit(1);
+        dest[i] = '0' + (fracPart % 10);
+        fracPart /= 10;
+    }
+
+    dest[decimalPlaces] = '\0';
+}
+
+void StringAppendLiteral(char* dest, const char* literal, size_t bufferSize) {
+    size_t curLen = GetStringLength(dest);
+    size_t litLen = GetStringLength(literal);
+    if (curLen + litLen >= bufferSize) { DualLogError("StringAppendLiteral overflow\n"); OS_Exit(1); }
+    
+    for (size_t i = 0; i < litLen; ++i) dest[curLen + i] = literal[i];
+    dest[curLen + litLen] = '\0';
+}
+
+int StringFormatV(char* buffer, size_t bufferSize, const char* format, va_list args) { // vsnprintf replacement
+    if (bufferSize == 0) return 0;
+
+    size_t pos = 0;
+    const char* f = format;
+    while (*f && pos < bufferSize - 1) {
+        if (*f != '%') { buffer[pos++] = *f++; continue; } else f++; // skip the '%'
+        int decimals = 9;
+        if (*f == '.') {
+            f++;
+            if (*f == '1') { decimals = 1; f++; }
+            else if (*f == '2') { decimals = 2; f++; }
+            else if (*f == '3') { decimals = 3; f++; }
+            else if (*f == '4') { decimals = 4; f++; }
+            else if (*f == '5') { decimals = 5; f++; }
+            else if (*f == '6') { decimals = 6; f++; }
+        }
+
+        switch (*f) {
+        case 's':
+            {
+                const char* s = __builtin_va_arg(args, const char*);
+                size_t len = GetStringLength(s);
+                if (pos + len >= bufferSize) len = bufferSize - pos - 1;
+                for (size_t i = 0; i < len; ++i) buffer[pos++] = s[i];
+            }
+            break;
+        case 'd':
+        case 'i':
+            {
+                int val = __builtin_va_arg(args, int);
+                if (val < 0) {
+                    if (pos < bufferSize - 1) buffer[pos++] = '-';
+                    val = -val;
+                }
+                char num[32];
+                int i = 0;
+                do { num[i++] = '0' + (val % 10); val /= 10; } while (val);
+                while (i-- > 0 && pos < bufferSize - 1) buffer[pos++] = num[i];
+            }
+            break;
+        case 'u':
+            {
+                unsigned int val = __builtin_va_arg(args, unsigned int);
+                char num[32];
+                int i = 0;
+                do { num[i++] = '0' + (val % 10); val /= 10; } while (val);
+                while (i-- > 0 && pos < bufferSize - 1) buffer[pos++] = num[i];
+            }
+            break;
+        case 'f':
+            {
+                double val = __builtin_va_arg(args, double);
+                char num[64];
+                DoubleToStringFixed(num, val, decimals, sizeof(num));
+                size_t len = GetStringLength(num);
+                if (pos + len >= bufferSize) len = bufferSize - pos - 1;
+                for (size_t i = 0; i < len; ++i) buffer[pos++] = num[i];
+            }
+            break;
+        case '%':
+            if (pos < bufferSize - 1) buffer[pos++] = '%';
+            break;
+        default:
+            if (pos < bufferSize - 1) buffer[pos++] = '%';
+            if (pos < bufferSize - 1) buffer[pos++] = *f;
+            break;
+        }
+        f++;
+    }
+
+    buffer[pos] = '\0';
+    return (int)pos;
+}
+
+int StringFormat(char* buffer, size_t bufferSize, const char* format, ...) { // snprintf replacement
+    va_list args;
+    __builtin_va_start(args, format);
+    int ret = StringFormatV(buffer, bufferSize, format, args);
+    __builtin_va_end(args);
+    return ret;
+}
+
+char* GetNextStringUpToNewlineOrEOF(char* buf, int size, long fd) { // fgets replacement, not thread safe but we don't do multithreading
+    if (size <= 1 || buf == NULL) return NULL;
+
+    char* p = buf;
+    int remaining = size - 1;
+    static int pos = 0;
+    static int end = 0;
+    static char buffer[4096];
+    while (remaining > 0) {
+        if (pos >= end) {
+            long n = OS_Read(fd, buffer, sizeof(buffer));
+            if (n <= 0 && p == buf) return NULL;
+
+            pos = 0;
+            end = (int)n;
+        }
+
+        while (remaining > 0 && pos < end) {
+            char c = buffer[pos++];
+            *p++ = c;
+            remaining--;
+
+            if (c == '\n') goto done;
+        }
+    }
+
+    done:
+    *p = '\0';
+    return buf;
 }
 
 uint8_t GetCurrentLevelSecurity() { return (Sys_Global.difficultyMission < 1 || Sys_Cheats.superoverride) ? 0u : Sys_Global.levelSecurity[Sys_Global.currentLevel]; }

@@ -11,7 +11,7 @@ DiagnosticsSystem Sys_Dx = { .worstFPS = UINT32_MAX };
 CheatsSystem Sys_Cheats = { .god = false, .noclip = true, .showLocation = true, .showFPS = true, .editMode = true };
 RenderSystem Sys_Render;
 SystemUI Sys_UI;
-FILE* console_log_file = NULL;
+OsFileHandle console_log_file = 0;
 InventorySystem inventoryPlayer1;
 InventorySystem inventoryPlayer2;
 AutoSplitterData autoSplitter = { 0x1337133713371337, 0, false, 0 }; // Fore use with LiveSplit or other future speedrunner utilities for doing speedruns
@@ -81,26 +81,47 @@ typedef struct {
 void stbtt_GetPackedQuad(const stbtt_packedchar *chardata, int pw, int ph, int char_index, float *xpos, float *ypos, stbtt_aligned_quad *q, int align_to_integer);
 
 // Logs both to log file and console, usage same as printf
-typedef __builtin_va_list va_list;
-void DualLogMain(FILE *stream, const char *prefix, const char *fmt, va_list args) {
-    va_list copy; __builtin_va_copy(copy, args);
-    #ifdef WINDOWS
-        if (prefix) fprintf(stream, "%s", prefix);
-        vfprintf(stream, fmt, args);
-        fflush(stream);
-    #else
-        if (prefix) fprintf(stream, "%s\033[0m", prefix);
-        vfprintf(stream, fmt, args);
-        fprintf(stream, "\033[0m"); fflush(stream);        
-    #endif
-    if (prefix) fprintf(console_log_file, "%s ", prefix);
-    vfprintf(console_log_file, fmt, copy); fflush(console_log_file);
+static void DualLogMain(const char *prefix, const char *fmt, va_list args) {
+    char buf[2048];
+    va_list copy;
+    __builtin_va_copy(copy, args);
+    StringFormatV(buf, sizeof(buf), fmt, copy);
     __builtin_va_end(copy);
+
+    // Write to console (stdout / stderr)
+    #ifdef WINDOWS
+        OsFileHandle out = 1;
+        if (prefix) {
+            OS_RawWrite(out,prefix,GetStringLength(prefix));
+            OS_RawWrite(out," ", 1,);
+        }
+        
+        OS_RawWrite(out, buf, GetStringLength(buf));
+    #else
+        // Linux/macOS/Android - write to stdout (fd 1) or stderr (fd 2)
+        OsFileHandle out = (prefix && prefix[0] == '\033') ? 2 : 1;  // use stderr for colored warnings/errors
+        if (prefix) {
+            OS_RawWrite(out, prefix, GetStringLength(prefix));
+            OS_RawWrite(out, "\033[0m", 4);
+        }
+        
+        OS_RawWrite(out, buf, GetStringLength(buf));
+    #endif
+
+    // Write to console_log_file
+    if (console_log_file != OS_INVALID_HANDLE) {
+        if (prefix) {
+            OS_Write(console_log_file, prefix, GetStringLength(prefix), "console.log");
+            OS_Write(console_log_file, " ", 1, "console.log");
+        }
+        
+        OS_Write(console_log_file, buf, GetStringLength(buf), "console.log");
+    }
 }
 
-void DualLog(const char* fmt, ...) { va_list args; __builtin_va_start(args, fmt); DualLogMain(stdout, NULL, fmt, args); __builtin_va_end(args); }
-void DualLogWarn(const char* fmt, ...) { va_list args; __builtin_va_start(args, fmt); DualLogMain(stdout, "\033[1;38;5;208mWARN:", fmt, args); __builtin_va_end(args); }
-void DualLogError(const char* fmt, ...) { va_list args; __builtin_va_start(args, fmt); DualLogMain(stderr, "\033[1;31mERROR:", fmt, args); __builtin_va_end(args); }
+void DualLog(const char* fmt, ...) { va_list args; __builtin_va_start(args, fmt); DualLogMain(NULL, fmt, args); __builtin_va_end(args); }
+void DualLogWarn(const char* fmt, ...) { va_list args; __builtin_va_start(args, fmt); DualLogMain("\033[1;38;5;208mWARN:", fmt, args); __builtin_va_end(args); }
+void DualLogError(const char* fmt, ...) { va_list args; __builtin_va_start(args, fmt); DualLogMain("\033[1;31mERROR:", fmt, args); __builtin_va_end(args); }
 
 static inline __attribute__((always_inline)) void LogShaderError(GLuint s, const char* name) { char er[512]; glGetShaderInfoLog(s, 512, NULL, er); DualLogError("%s Compilation Failed: %s\n", name, er); OS_Exit(1); }
 static inline __attribute__((always_inline)) GLuint CompileShader(GLenum type, const char* source, const char* name) { GLuint s = glCreateShader(type); glShaderSource(s, 1, &source, NULL); glCompileShader(s); GLint ok; glGetShaderiv(s, GL_COMPILE_STATUS, &ok); if (!ok) LogShaderError(s, name); return s; }
@@ -354,7 +375,7 @@ extern stbtt_packedchar fontPackedCharStopD[MAX_GLYPHS];
 void RenderFormattedText(int16_t x, int16_t y, uint32_t color, uint8_t fontID, float scaleInput, const char * restrict format, ...) {
     float scale = scaleInput;// * UIY(Sys_Settings.ScreenHeight);
     va_list args;
-    __builtin_va_start(args, format); vsnprintf(uiTextBuffer, TEXT_BUFFER_SIZE, format, args); __builtin_va_end(args);
+    __builtin_va_start(args, format); StringFormatV(uiTextBuffer,TEXT_BUFFER_SIZE,format,args); __builtin_va_end(args);
     glUseProgram(Sys_Render.textShaderProgram);
     glUniformMatrix4fv(0, 1, GL_FALSE, uiOrthoProjection);
     glUniform4f(3, textColors[color].r, textColors[color].g, textColors[color].b, textColors[color].a);
@@ -444,7 +465,7 @@ char statusText[TEXT_BUFFER_SIZE];
 void CenterStatusPrint(const char * restrict fmt, ...) {
     va_list args;
     __builtin_va_start(args, fmt);
-    (void)vsnprintf(statusText, TEXT_BUFFER_SIZE, fmt, args);
+    StringFormat(statusText,TEXT_BUFFER_SIZE,fmt,args);
     __builtin_va_end(args);
     DualLog("%s\n",statusText);
     Sys_Global.statusTextDecayFinished = get_time() + 2.5; // 2.5 second decay time before text dissappears.
@@ -1235,8 +1256,8 @@ static inline __attribute__((always_inline)) float GetScore(float stupid, bool i
 
 static inline __attribute__((always_inline)) void CreditsStats(void) {
     size_t off = 0;
-    off += snprintf(creditStats + off, sizeof(creditStats), "================================================================================\nCITADEL\n");
-    off += snprintf(creditStats + off, sizeof(creditStats), "================================================================================\nCONGRATULATIONS %s\n", Sys_Global.playerName);
+    off += StringFormat(creditStats + off, sizeof(creditStats), "================================================================================\nCITADEL\n");
+    off += StringFormat(creditStats + off, sizeof(creditStats), "================================================================================\nCONGRATULATIONS %s\n", Sys_Global.playerName);
     uint32_t hours, minutes; double secs;
     double t = Sys_Global.pauseRelativeTime;
     double tb = (vfloor(t/3600.0));
@@ -1245,7 +1266,7 @@ static inline __attribute__((always_inline)) void CreditsStats(void) {
     tb = vfloor(t / 60.0);
     minutes = (uint32_t)tb;
     secs = t - (tb * 60.0);
-    off += snprintf(creditStats + off, sizeof(creditStats), "Straight Time: %uh %um %.3fs\n", hours, minutes, secs);
+    off += StringFormat(creditStats + off, sizeof(creditStats), "Straight Time: %uh %um %.3fs\n", hours, minutes, secs);
     t = Sys_Global.absoluteTime;
     tb = vfloor(t/3600.0);
     hours = (uint32_t)tb;
@@ -1253,19 +1274,19 @@ static inline __attribute__((always_inline)) void CreditsStats(void) {
     tb = vfloor(t / 60.0);
     minutes = (uint32_t)tb;
     secs = t - (tb * 60.0);
-    off += snprintf(creditStats + off, sizeof(creditStats), "Total Time (with reload from deaths): %uh %um %.3fs\n", hours, minutes, secs);
+    off += StringFormat(creditStats + off, sizeof(creditStats), "Total Time (with reload from deaths): %uh %um %.3fs\n", hours, minutes, secs);
     float stupid = 0.0f;
     stupid += (float)(Sys_Global.difficultyCombat * Sys_Global.difficultyCombat);
     stupid += (float)(Sys_Global.difficultyPuzzle * Sys_Global.difficultyPuzzle);
     stupid += (float)(Sys_Global.difficultyMission * Sys_Global.difficultyMission);
     stupid += (float)(Sys_Global.difficultyCyber * Sys_Global.difficultyCyber);
     uint32_t finalSubscore = GetScore(stupid, false);
-    off += snprintf(creditStats + off, sizeof(creditStats), "Kills: %u\nKills in Cyberspace: %u\nScoreSubtotal: %u\nDeaths: %u\nRessurections: %u\n", Sys_Global.kills, Sys_Global.cyberkills, (uint32_t)finalSubscore, Sys_Global.deaths, Sys_Global.ressurections);
-    off += snprintf(creditStats + off, sizeof(creditStats), "Combat: %u | Puzzle: %u | Mission: %u | Cyber: %u\n", Sys_Global.difficultyCombat, Sys_Global.difficultyPuzzle, Sys_Global.difficultyMission, Sys_Global.difficultyCyber);
+    off += StringFormat(creditStats + off, sizeof(creditStats), "Kills: %u\nKills in Cyberspace: %u\nScoreSubtotal: %u\nDeaths: %u\nRessurections: %u\n", Sys_Global.kills, Sys_Global.cyberkills, (uint32_t)finalSubscore, Sys_Global.deaths, Sys_Global.ressurections);
+    off += StringFormat(creditStats + off, sizeof(creditStats), "Combat: %u | Puzzle: %u | Mission: %u | Cyber: %u\n", Sys_Global.difficultyCombat, Sys_Global.difficultyPuzzle, Sys_Global.difficultyMission, Sys_Global.difficultyCyber);
     uint32_t finalScore = (uint32_t)GetScore(stupid, true);
-    off += snprintf(creditStats + off, sizeof(creditStats), "Difficulty Index: %.2f\nFinal Score: %u\n\n", (double)stupid, finalScore);
-    off += snprintf(creditStats + off, sizeof(creditStats), "Shots Fired: %u\nGrenades Thrown: %u\n", Sys_Global.shotsFired, Sys_Global.grenadesThrown);
-    off += snprintf(creditStats + off, sizeof(creditStats), "Damage Dealt: %f\nDamage Received: %f\nSaves Scummed: %u\n\nClick to continue...\n", (double)Sys_Global.damageDealt, (double)Sys_Global.damageReceived, Sys_Global.savesScummed);
+    off += StringFormat(creditStats + off, sizeof(creditStats), "Difficulty Index: %.2f\nFinal Score: %u\n\n", (double)stupid, finalScore);
+    off += StringFormat(creditStats + off, sizeof(creditStats), "Shots Fired: %u\nGrenades Thrown: %u\n", Sys_Global.shotsFired, Sys_Global.grenadesThrown);
+    off += StringFormat(creditStats + off, sizeof(creditStats), "Damage Dealt: %f\nDamage Received: %f\nSaves Scummed: %u\n\nClick to continue...\n", (double)Sys_Global.damageDealt, (double)Sys_Global.damageReceived, Sys_Global.savesScummed);
 }
 
 void RenderCredits(void) {
@@ -1604,8 +1625,7 @@ void UpdateAnims(void); void UpdateAmbientSounds(void);
 int32_t main(void) {
     double game_start_time = get_time();
     random_range_rng = (uint32_t)game_start_time; // Seed global rand uniquely with time since system boot.
-    console_log_file = fopen("voxen.log", "w"); // Initialize log system for all prints to go to both stdout and voxen.log file
-    if (!console_log_file) DualLogError("Failed to open log file voxen.log\n");
+    console_log_file = OS_OpenWriteonly("./voxen.log"); // Initialize log system for all prints to go to both stdout and voxen.log file
     DebugRAM("program start");
     #ifdef WINDOWS
         SetDllDirectory("External\\Windows");

@@ -169,7 +169,7 @@ void UpdateAmbientSounds(void) {
         if (in_range) {
             if (!slot->loaded) {
                 char path[512];
-                snprintf(path, sizeof(path), "./Audio/ambient/%s", def->filename);
+                StringFormat(path, sizeof(path), "./Audio/ambient/%s", def->filename);
                 ma_sound_uninit(&slot->sound);
                 ma_result r = ma_sound_init_from_file(&audio_engine, path, MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_NO_SPATIALIZATION, NULL, NULL, &slot->sound);
                 if (r != MA_SUCCESS) continue;

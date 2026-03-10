@@ -1796,3 +1796,8 @@ static inline __attribute__((always_inline)) float parse_float(const char* str, 
     if (negative) value = -value;
     return (float)value;
 }
+
+typedef __builtin_va_list va_list;
+int StringFormatV(char* buffer, size_t bufferSize, const char* format, va_list args);
+int StringFormat(char* buffer, size_t bufferSize, const char* format, ...);
+char* GetNextStringUpToNewlineOrEOF(char* buf, int size, long fd);
