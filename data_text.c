@@ -88,7 +88,7 @@ void LoadTextForLanguage(uint8_t lang) {
                 continue;
             }
             if (len >= sizeof(utf8_line)) len = sizeof(utf8_line) - 1;
-            __builtin_memcpy(utf8_line, &Sys_Text.file_data[line_start], len);
+            CopyMemoryFromBtoAForNBytes(utf8_line, &Sys_Text.file_data[line_start], len);
             utf8_line[len] = '\0';
         } else if (is_utf16le) {
             while (data_pos + 1 < (size_t)file_size) {
@@ -121,7 +121,7 @@ void LoadTextForLanguage(uint8_t lang) {
         }
 
         if (lineNum < TEXT_STRING_COUNT) {
-            __builtin_memcpy(Sys_Text.stringTable[lineNum], utf8_line, len);
+            CopyMemoryFromBtoAForNBytes(Sys_Text.stringTable[lineNum], utf8_line, len);
             Sys_Text.stringTable[lineNum][len] = '\0';
             ++lineNum;
         }
@@ -129,10 +129,10 @@ void LoadTextForLanguage(uint8_t lang) {
 }
 
 void LoadLogTextForLanguage(uint8_t lang) { // Unload and load language for when changing languages at runtime from settings.
-    __builtin_memset(Sys_Text.audioLogImagesRefIndicesLH,0,TEXT_LOGS_COUNT * sizeof(uint16_t));
-    __builtin_memset(Sys_Text.audioLogImagesRefIndicesRH,0,TEXT_LOGS_COUNT * sizeof(uint16_t));
-    __builtin_memset(Sys_Text.audioLogType,0,TEXT_LOGS_COUNT * sizeof(uint8_t));
-    __builtin_memset(Sys_Text.audioLogLevelFound,0,TEXT_LOGS_COUNT * sizeof(uint8_t));
+    SetMemoryToValueForNBytes(Sys_Text.audioLogImagesRefIndicesLH,0,TEXT_LOGS_COUNT * sizeof(uint16_t));
+    SetMemoryToValueForNBytes(Sys_Text.audioLogImagesRefIndicesRH,0,TEXT_LOGS_COUNT * sizeof(uint16_t));
+    SetMemoryToValueForNBytes(Sys_Text.audioLogType,0,TEXT_LOGS_COUNT * sizeof(uint8_t));
+    SetMemoryToValueForNBytes(Sys_Text.audioLogLevelFound,0,TEXT_LOGS_COUNT * sizeof(uint8_t));
     char textFile[256] = {0};
     switch (lang) {
         case 1:  StringCopyInto_A_From_B(textFile, "./Data/logs_text_espanol.txt", 256); break;
@@ -179,7 +179,7 @@ void LoadLogTextForLanguage(uint8_t lang) { // Unload and load language for when
             if (len == 0) continue;
             
             if (len >= sizeof(utf8_line)) len = sizeof(utf8_line) - 1;
-            __builtin_memcpy(utf8_line, &Sys_Text.file_data[line_start], len);
+            CopyMemoryFromBtoAForNBytes(utf8_line, &Sys_Text.file_data[line_start], len);
             utf8_line[len] = '\0';
         } else if (is_utf16le) {
             while (data_pos + 1 < (size_t)file_size) {
@@ -205,7 +205,7 @@ void LoadLogTextForLanguage(uint8_t lang) { // Unload and load language for when
         if (len == 0) { ++lineNum; continue; }   /* blank line -> skip */
 
         char logline[TEXT_LOCALIZATION_MAX_LENGTH];
-        __builtin_memcpy(logline, utf8_line, len - 1);
+        CopyMemoryFromBtoAForNBytes(logline, utf8_line, len - 1);
         logline[len] = '\0';
         char fields[32][TEXT_LOCALIZATION_MAX_LENGTH];
         int  num_fields = 0;
@@ -215,7 +215,7 @@ void LoadLogTextForLanguage(uint8_t lang) { // Unload and load language for when
             if (token[0] == '"') ++token;
             size_t tlen = GetStringLength(token);
             if (tlen && token[tlen - 1] == '"') token[--tlen] = '\0';
-            __builtin_memcpy(fields[num_fields], token, sizeof(fields[0]) - 1);
+            CopyMemoryFromBtoAForNBytes(fields[num_fields], token, sizeof(fields[0]) - 1);
             fields[num_fields][sizeof(fields[0]) - 1] = '\0';
             ++num_fields;
             token = StringReturnUpToDelimiterAndLopOffAndShiftOriginal(NULL, ',', &saveptr);
@@ -230,9 +230,9 @@ void LoadLogTextForLanguage(uint8_t lang) { // Unload and load language for when
         char readLogText[TEXT_LOCALIZATION_MAX_LENGTH * 4] = {0};
         int  readLogType         = (num_fields > 6) ? StringToInt(fields[6]) : 0;
         int  readLogLevelFound   = (num_fields > 7) ? StringToInt(fields[7]) : 0;
-        if (num_fields > 3) __builtin_memcpy(readLogName,    fields[3], sizeof(readLogName) - 1);
-        if (num_fields > 4) __builtin_memcpy(readLogSender,  fields[4], sizeof(readLogSender) - 1);
-        if (num_fields > 5) __builtin_memcpy(readLogSubject, fields[5], sizeof(readLogSubject) - 1);
+        if (num_fields > 3) CopyMemoryFromBtoAForNBytes(readLogName,    fields[3], sizeof(readLogName) - 1);
+        if (num_fields > 4) CopyMemoryFromBtoAForNBytes(readLogSender,  fields[4], sizeof(readLogSender) - 1);
+        if (num_fields > 5) CopyMemoryFromBtoAForNBytes(readLogSubject, fields[5], sizeof(readLogSubject) - 1);
         for (int f = 8; f < num_fields; ++f) {
             if (f > 8) StringConcatenate(readLogText, ",", TEXT_LOCALIZATION_MAX_LENGTH * 4);
             StringConcatenate(readLogText, fields[f], TEXT_LOCALIZATION_MAX_LENGTH * 4);

@@ -1425,8 +1425,39 @@ typedef void (*GLADpostcallback)(void *ret, const char *name, GLADapiproc apipro
 #define GL_XOR 0x1506
 #define GL_ZERO 0
 
+#if defined(__SIZEOF_LONG__) && defined(__SIZEOF_POINTER__)
+    #if __SIZEOF_POINTER__ > __SIZEOF_LONG__
+        #define KHRONOS_USE_INTPTR_T
+    #endif
+#endif
+#ifdef KHRONOS_USE_INTPTR_T
+typedef intptr_t               khronos_intptr_t;
+typedef uintptr_t              khronos_uintptr_t;
+#elif defined(_WIN64)
+typedef signed   long long int khronos_intptr_t;
+typedef unsigned long long int khronos_uintptr_t;
+#else
+typedef signed   long  int     khronos_intptr_t;
+typedef unsigned long  int     khronos_uintptr_t;
+#endif
 
-#include "khrplatform.h"
+typedef __INT32_TYPE__         khronos_int32_t;
+typedef __UINT32_TYPE__        khronos_uint32_t;
+typedef __INT64_TYPE__         khronos_int64_t;
+typedef __UINT64_TYPE__        khronos_uint64_t;
+typedef signed   char          khronos_int8_t;
+typedef unsigned char          khronos_uint8_t;
+typedef signed   short int     khronos_int16_t;
+typedef unsigned short int     khronos_uint16_t;
+typedef          float         khronos_float_t;
+#if defined(WINDOWS)
+typedef signed   long long int khronos_ssize_t;
+// typedef unsigned long long int khronos_usize_t;
+#else
+typedef signed   long  int     khronos_ssize_t;
+// typedef unsigned long  int     khronos_usize_t;
+#endif
+
 typedef unsigned int GLenum;
 typedef unsigned char GLboolean;
 typedef unsigned int GLbitfield;

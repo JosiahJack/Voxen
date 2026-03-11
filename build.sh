@@ -1,43 +1,19 @@
 #!/bin/bash
-set -euo pipefail
-PLATFORM="linux"
-IS_CI=false
+set -euo pipefail; PLATFORM="linux"; IS_CI=false
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        win|windows)
-            PLATFORM="windows"
-            shift
-            ;;
-        mac|macintosh)
-            PLATFORM="mac"
-            shift
-            ;;
-        android)
-            PLATFORM="android"
-            shift
-            ;;
-        ci)
-            IS_CI=true
-            shift
-            ;;
-        *)
-            echo "Unknown argument: $1" >&2
-            echo "Usage: $0 [platform] [ci]"
-            echo "  platform: linux (default), win/windows, mac, android"
-            echo "  ci:       suppress clear & auto-run"
-            exit 1
-            ;;
+        win|windows) PLATFORM="windows" ;;
+        mac|macintosh) PLATFORM="mac" ;;
+        android) PLATFORM="android" ;;
+        ci) IS_CI=true ;;
+        *) echo "Unknown: $1" >&2; exit 1 ;;
     esac
+    shift
 done
-
-if ! $IS_CI; then
-    clear
-fi
-
+$IS_CI || clear
 TEMP_DIR=temp_build
 export TMPDIR=/dev/shm
 mkdir -p $TEMP_DIR
-
 now_ms() { date +%s%3N; }
 shader_start=$(now_ms)
 if [ $# -eq 0 ] || [ "${1:-}" != "ci" ]; then
@@ -116,38 +92,33 @@ WINDOWS_CC="x86_64-w64-mingw32-gcc"
 ANDROID_CC="aarch64-linux-android24-clang"
 MAC_CC="gcc"
 COMMON_CFLAGS="-ffreestanding -fno-exceptions -fno-stack-protector -fno-builtin -I./External/ -pipe -fno-ident \
-               -fdata-sections -ffunction-sections -ffast-math -g1 -std=c11 -Wall -Wextra \
+               -fdata-sections -ffunction-sections -ffast-math -g1 -std=c11 -Wall -Wextra -Wno-implicit-fallthrough \
                -fno-omit-frame-pointer -fstrict-aliasing -fno-common -Walloca -Wstack-usage=262144 \
-               -Wformat=2 -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings -static-libgcc \
-               -Werror=implicit-function-declaration -Og"
+               -Wformat=2 -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings -Og"
 
 if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
     LINKER=$CC
     CFLAGS="-D_WIN32 $COMMON_CFLAGS -fno-asynchronous-unwind-tables -mno-stack-arg-probe"
-    LDFLAGS="-L./ -L./External/Windows -lopengl32 -l:glfw3.dll -l:libminiaudio.dll.a -static-libgcc -flto=auto"
-    OBJ_DIR="./External/Windows"
+    LDFLAGS="-L./ -L./External/Windows -lopengl32 -l:glfw3.dll -flto=auto"
     BINARY_NAME="voxen.exe"
 elif [ "$PLATFORM" = "mac" ]; then
     CC=$LINUX_CC
     LINKER=$LINUX_CC
     CFLAGS="-D__APPLE__ $COMMON_CFLAGS"
-    LDFLAGS="-L./External/Mac -l:libglfw3.a -l:libminiaudio.0.11.22.a -lGL"
-    OBJ_DIR="./External/Mac"
+    LDFLAGS="-L./External/Mac -l:libglfw3.a -lGL"
     BINARY_NAME="voxen.app"
 elif [ "$PLATFORM" = "android" ]; then
     CC=$ANDROID_CC
     LINKER=$CC
     CFLAGS="-D__ANDROID__ -fPIC $COMMON_CFLAGS"
     LDFLAGS="-L./External/Android -landroid -llog -lGLESv3 -lEGL -lm"
-    OBJ_DIR="./External/Android"
     BINARY_NAME="voxen_android"
 else
     CC=$LINUX_CC
     LINKER="mold -run gcc"
     CFLAGS="-march=haswell -mtune=haswell $COMMON_CFLAGS"
     LDFLAGS="-flto -Wl,--gc-sections -L./External/Linux -l:libglfw3.5.a -l:libminiaudio.0.11.22.a -lGL"
-    OBJ_DIR="./External/Linux"
     BINARY_NAME="voxen"
 fi
 
@@ -173,8 +144,7 @@ if ! $IS_CI; then
         windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; WINEPATH="External/Windows" wine ./voxen.exe ;;
         mac)      ./voxen.app ;;
         android)  java -jar bundletool.jar build-apks --bundle=voxen.aab --output=voxen.app;;
-#         *)        strip --strip-all voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
-        *)        ./voxen ;;   # linux
+        *)        strip --strip-all voxen; ./voxen ;;   # linux
     esac
     rm -f "$TEMP_DIR"/*.o ./Shaders/*.h "$TEMP_DIR"/*.cpp #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.
 fi

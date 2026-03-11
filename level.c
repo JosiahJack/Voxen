@@ -220,7 +220,7 @@ void LoadLevel(uint8_t curlevel) {
     Sys_Global.levelCurrentlyLoading = true;
     queuedLevelToLoad = 255u; // Reset any loading state that got us here.
     RenderLoadingProgress(100,"Loading level...");
-    if (!Sys_Global.levelCurrentlyLoading) __builtin_memset(instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
+    if (!Sys_Global.levelCurrentlyLoading) SetMemoryToValueForNBytes(instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
     Sys_Global.levelCurrentlyLoading = true;
     Sys_Global.currentLevel = curlevel;
     loadedInstances = 3; // 0 == NULL, 1 == Player1, 2 == Player2
@@ -246,25 +246,25 @@ void LoadLevel(uint8_t curlevel) {
     worldMin_z -= CELL_SIZE;
     voxelMinCenterX = worldMin_x + VOXEL_HALF;
     voxelMinCenterZ = worldMin_z + VOXEL_HALF;
-    __builtin_memset(lightMinIntensity,0,LIGHT_COUNT * sizeof(float));
-    __builtin_memset(lightMaxIntensity,0,LIGHT_COUNT * sizeof(float));
-    __builtin_memset(lightOn,1,LIGHT_COUNT * sizeof(bool)); // Default all on, only off if level data specifies
-    __builtin_memset(lightCastsShadows,1,LIGHT_COUNT * sizeof(bool)); // Default all on, only off if level data specifies
-    __builtin_memset(lightLerpOn,0,LIGHT_COUNT * sizeof(bool));
-    __builtin_memset(lightLerpUp,0,LIGHT_COUNT * sizeof(bool));
-    __builtin_memset(lightCurrentStep,0,LIGHT_COUNT * sizeof(uint8_t));
-    __builtin_memset(lightLerpValue,0,LIGHT_COUNT * sizeof(float));
-    __builtin_memset(lightLerpTime,0,LIGHT_COUNT * sizeof(float));
-    __builtin_memset(lightLerpStepTime,0,LIGHT_COUNT * sizeof(float));
-    __builtin_memset(lightLerpStartTime,0,LIGHT_COUNT * sizeof(float));
-    __builtin_memset(lightIntervalStepsLength,0,LIGHT_COUNT * sizeof(uint8_t));
-    __builtin_memset(lightIntervalSteps,0,LIGHT_COUNT * 30 * sizeof(float));
-    __builtin_memset(lightIntervalStepIsLerpingLength,0,LIGHT_COUNT * sizeof(uint8_t));
-    __builtin_memset(intervalStepisLerping,0,LIGHT_COUNT * 30 * sizeof(float));
+    SetMemoryToValueForNBytes(lightMinIntensity,0,LIGHT_COUNT * sizeof(float));
+    SetMemoryToValueForNBytes(lightMaxIntensity,0,LIGHT_COUNT * sizeof(float));
+    SetMemoryToValueForNBytes(lightOn,1,LIGHT_COUNT * sizeof(bool)); // Default all on, only off if level data specifies
+    SetMemoryToValueForNBytes(lightCastsShadows,1,LIGHT_COUNT * sizeof(bool)); // Default all on, only off if level data specifies
+    SetMemoryToValueForNBytes(lightLerpOn,0,LIGHT_COUNT * sizeof(bool));
+    SetMemoryToValueForNBytes(lightLerpUp,0,LIGHT_COUNT * sizeof(bool));
+    SetMemoryToValueForNBytes(lightCurrentStep,0,LIGHT_COUNT * sizeof(uint8_t));
+    SetMemoryToValueForNBytes(lightLerpValue,0,LIGHT_COUNT * sizeof(float));
+    SetMemoryToValueForNBytes(lightLerpTime,0,LIGHT_COUNT * sizeof(float));
+    SetMemoryToValueForNBytes(lightLerpStepTime,0,LIGHT_COUNT * sizeof(float));
+    SetMemoryToValueForNBytes(lightLerpStartTime,0,LIGHT_COUNT * sizeof(float));
+    SetMemoryToValueForNBytes(lightIntervalStepsLength,0,LIGHT_COUNT * sizeof(uint8_t));
+    SetMemoryToValueForNBytes(lightIntervalSteps,0,LIGHT_COUNT * 30 * sizeof(float));
+    SetMemoryToValueForNBytes(lightIntervalStepIsLerpingLength,0,LIGHT_COUNT * sizeof(uint8_t));
+    SetMemoryToValueForNBytes(intervalStepisLerping,0,LIGHT_COUNT * 30 * sizeof(float));
     if (curlevel >= Sys_Global.numLevels) { DualLogError("Cannot load world geometry, level number %d out of bounds 0 to %d\n", curlevel, Sys_Global.numLevels - 1); OS_Exit(1); }
     
     for (uint16_t idx = START_INDEX_LEVEL_INSTANCES;idx<INSTANCE_COUNT;idx++) { InitializeEntity(&instances[idx]); dirtyInstances[idx] = true; } // Start AFTER player indices and NULLENT
-    __builtin_memset(modelMatrices, 0, INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
+    SetMemoryToValueForNBytes(modelMatrices, 0, INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
     char filename[20]; // Minimum size for 0 through 13.
     StringFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel);
     OsFileHandle fd = OS_OpenReadonly(filename);
@@ -281,7 +281,7 @@ void LoadLevel(uint8_t curlevel) {
         lineSpace[--len] = '\0';
         line = lineSpace;
         StringFormat(initialLine, sizeof(initialLine), "%s", line);
-        __builtin_memcpy(firstKeyCheck,line,10); firstKeyCheck[10] = '\0';
+        CopyMemoryFromBtoAForNBytes(firstKeyCheck,line,10); firstKeyCheck[10] = '\0';
         lineNum++;
         bool isLight = true;
         if (StringsAreEqual(firstKeyCheck, "constIndex")) isLight = false;  // constIndex specified indicating this is a real entity?
@@ -600,7 +600,7 @@ void LoadLevel(uint8_t curlevel) {
         lightsNewPosition[i] = (Vector3){ lights[litIdx + LIGHT_DATA_OFFSET_POSX], lights[litIdx + LIGHT_DATA_OFFSET_POSY], lights[litIdx + LIGHT_DATA_OFFSET_POSZ] };
         lightInPVS[i] = false;
     }
-    __builtin_memset(voxen_Shadow_System.shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t)); // Set to invalid values for all
+    SetMemoryToValueForNBytes(voxen_Shadow_System.shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t)); // Set to invalid values for all
     Sys_Global.levelCurrentlyLoading = false;
 }
 #pragma GCC diagnostic pop

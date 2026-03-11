@@ -12,7 +12,6 @@
 
    typedef char stbtt__check_size32[sizeof(stbtt_int32)==4 ? 1 : -1];
    typedef char stbtt__check_size16[sizeof(stbtt_int16)==2 ? 1 : -1];
-   #include <stdlib.h>
 #endif
 
 #ifndef __STB_INCLUDE_STB_TRUETYPE_H__
@@ -23,7 +22,10 @@
 #else
    #define STBTT_DEF extern
 #endif
-
+   
+#define STBTT_malloc(size)  OS_AllocateRAM(NULL, (size), PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1)
+#define STBTT_free(ptr)     OS_DeallocateRAM((ptr),0)
+   
 typedef struct {
    unsigned char *data;
    int cursor;
@@ -690,7 +692,7 @@ static int stbtt__GetGlyphShapeTT(const stbtt_fontinfo *info, int glyph_index, s
       n = 1+ttUSHORT(endPtsOfContours + numberOfContours*2-2);
 
       m = n + 2*numberOfContours;  // a loose bound on how many vertices we might need
-      vertices = (stbtt_vertex*)malloc(m * sizeof(vertices[0]));
+      vertices = (stbtt_vertex*)STBTT_malloc(m * sizeof(vertices[0]));
       if (vertices == 0) return 0;
 
       next_move = 0;
@@ -848,17 +850,17 @@ static int stbtt__GetGlyphShapeTT(const stbtt_fontinfo *info, int glyph_index, s
                v->cy = (stbtt_vertex_type)(n * (mtx[1]*x + mtx[3]*y + mtx[5]));
             }
             // Append vertices.
-            tmp = (stbtt_vertex*)malloc((num_vertices+comp_num_verts)*sizeof(stbtt_vertex));
+            tmp = (stbtt_vertex*)STBTT_malloc((num_vertices+comp_num_verts)*sizeof(stbtt_vertex));
             if (!tmp) {
-               if (vertices) free(vertices);
-               if (comp_verts) free(comp_verts);
+               if (vertices) STBTT_free(vertices);
+               if (comp_verts) STBTT_free(comp_verts);
                return 0;
             }
-            if (num_vertices > 0 && vertices) __builtin_memcpy(tmp, vertices, num_vertices*sizeof(stbtt_vertex));
-            __builtin_memcpy(tmp+num_vertices, comp_verts, comp_num_verts*sizeof(stbtt_vertex));
-            if (vertices) free(vertices);
+            if (num_vertices > 0 && vertices) CopyMemoryFromBtoAForNBytes(tmp, vertices, num_vertices*sizeof(stbtt_vertex));
+            CopyMemoryFromBtoAForNBytes(tmp+num_vertices, comp_verts, comp_num_verts*sizeof(stbtt_vertex));
+            if (vertices) STBTT_free(vertices);
             vertices = tmp;
-            free(comp_verts);
+            STBTT_free(comp_verts);
             num_vertices += comp_num_verts;
          }
          // More components ?
@@ -1240,7 +1242,7 @@ static int stbtt__GetGlyphShapeT2(const stbtt_fontinfo *info, int glyph_index, s
    stbtt__csctx count_ctx = STBTT__CSCTX_INIT(1);
    stbtt__csctx output_ctx = STBTT__CSCTX_INIT(0);
    if (stbtt__run_charstring(info, glyph_index, &count_ctx)) {
-      *pvertices = (stbtt_vertex*)malloc(count_ctx.num_vertices*sizeof(stbtt_vertex));
+      *pvertices = (stbtt_vertex*)STBTT_malloc(count_ctx.num_vertices*sizeof(stbtt_vertex));
       output_ctx.pvertices = *pvertices;
       if (stbtt__run_charstring(info, glyph_index, &output_ctx)) return output_ctx.num_vertices;
    }
@@ -1599,7 +1601,7 @@ static void *stbtt__hheap_alloc(stbtt__hheap *hh, size_t size) {
    } else {
       if (hh->num_remaining_in_head_chunk == 0) {
          int count = (size < 32 ? 2000 : size < 128 ? 800 : 100);
-         stbtt__hheap_chunk* c = (stbtt__hheap_chunk*)malloc(sizeof(stbtt__hheap_chunk) + size * count);
+         stbtt__hheap_chunk* c = (stbtt__hheap_chunk*)STBTT_malloc(sizeof(stbtt__hheap_chunk) + size * count);
          if (c == NULL) return NULL;
          
          c->next = hh->head;
@@ -1620,7 +1622,7 @@ static void stbtt__hheap_cleanup(stbtt__hheap *hh) {
    stbtt__hheap_chunk *c = hh->head;
    while (c) {
       stbtt__hheap_chunk *n = c->next;
-      free(c);
+      STBTT_free(c);
       c = n;
    }
 }
@@ -1820,7 +1822,7 @@ static void stbtt__rasterize_sorted_edges(stbtt__bitmap *result, stbtt__edge *e,
    STBTT__NOTUSED(vsubsample);
 
    if (result->w > 64)
-      scanline = (float*)malloc((size_t)(result->w*2+1) * sizeof(float));
+      scanline = (float*)STBTT_malloc((size_t)(result->w*2+1) * sizeof(float));
    else
       scanline = scanline_data;
 
@@ -1834,8 +1836,8 @@ static void stbtt__rasterize_sorted_edges(stbtt__bitmap *result, stbtt__edge *e,
       float scan_y_top    = (float)y + 0.0f;
       float scan_y_bottom = (float)y + 1.0f;
       stbtt__active_edge **step = &active;
-      __builtin_memset(scanline , 0, (size_t)result->w*sizeof(scanline[0]));
-      __builtin_memset(scanline2, 0, ((size_t)result->w+1)*sizeof(scanline[0]));
+      SetMemoryToValueForNBytes(scanline , 0, (size_t)result->w*sizeof(scanline[0]));
+      SetMemoryToValueForNBytes(scanline2, 0, ((size_t)result->w+1)*sizeof(scanline[0]));
 
       // update all active edges;
       // remove all active edges that terminate before the top of this scanline
@@ -1899,7 +1901,7 @@ static void stbtt__rasterize_sorted_edges(stbtt__bitmap *result, stbtt__edge *e,
    }
 
    stbtt__hheap_cleanup(&hh);
-   if (scanline != scanline_data) free(scanline);
+   if (scanline != scanline_data) STBTT_free(scanline);
 }
 
 #define STBTT__COMPARE(a,b)  ((a)->y0 < (b)->y0)
@@ -2002,7 +2004,7 @@ static void stbtt__rasterize(stbtt__bitmap *result, stbtt__point *pts, int *wcou
    int vsubsample = 1;
    n = 0;
    for (i=0; i < windings; ++i) n += wcount[i];
-   e = (stbtt__edge*)malloc(sizeof(*e) * ((size_t)n+1)); // add an extra one as a sentinel
+   e = (stbtt__edge*)STBTT_malloc(sizeof(*e) * ((size_t)n+1)); // add an extra one as a sentinel
    if (e == 0) return;
    
    n = 0;
@@ -2030,7 +2032,7 @@ static void stbtt__rasterize(stbtt__bitmap *result, stbtt__point *pts, int *wcou
 
    stbtt__sort_edges(e, n);
    stbtt__rasterize_sorted_edges(result, e, n, vsubsample, off_x, off_y);
-   free(e);
+   STBTT_free(e);
 }
 
 static void stbtt__add_point(stbtt__point *points, int n, float x, float y)
@@ -2110,13 +2112,13 @@ static stbtt__point *stbtt_FlattenCurves(stbtt_vertex *vertices, int num_verts, 
    *num_contours = n;
    if (n == 0) return 0;
 
-   *contour_lengths = (int*)malloc(sizeof(**contour_lengths) * (size_t)n);
+   *contour_lengths = (int*)STBTT_malloc(sizeof(**contour_lengths) * (size_t)n);
    if (*contour_lengths == 0) { *num_contours = 0; return 0; }
 
    for (pass=0; pass < 2; ++pass) {
       float x=0,y=0;
       if (pass == 1) {
-         points = (stbtt__point*)malloc((size_t)num_points * sizeof(points[0]));
+         points = (stbtt__point*)STBTT_malloc((size_t)num_points * sizeof(points[0]));
          if (points == NULL) goto error;
       }
       
@@ -2159,8 +2161,8 @@ static stbtt__point *stbtt_FlattenCurves(stbtt_vertex *vertices, int num_verts, 
    return points;
    
 error:
-   free(points);
-   free(*contour_lengths);
+   STBTT_free(points);
+   STBTT_free(*contour_lengths);
    *contour_lengths = 0;
    *num_contours = 0;
    return NULL;
@@ -2173,8 +2175,8 @@ STBTT_DEF void stbtt_Rasterize(stbtt__bitmap *result, float flatness_in_pixels, 
    stbtt__point *windings = stbtt_FlattenCurves(vertices, num_verts, flatness_in_pixels / scale, &winding_lengths, &winding_count);
    if (windings) {
       stbtt__rasterize(result, windings, winding_lengths, winding_count, scale_x, scale_y, shift_x, shift_y, x_off, y_off, invert);
-      free(winding_lengths);
-      free(windings);
+      STBTT_free(winding_lengths);
+      STBTT_free(windings);
    }
 }
 
@@ -2185,7 +2187,7 @@ STBTT_DEF unsigned char *stbtt_GetGlyphBitmapSubpixel(const stbtt_fontinfo *info
    int num_verts = stbtt_GetGlyphShape(info, glyph, &vertices);
    if (scale_x <= 0.000001f) scale_x = scale_y;
    if (scale_y <= 0.000001f) {
-      if (scale_x <= 0.000001f) { free(vertices); return NULL; }
+      if (scale_x <= 0.000001f) { STBTT_free(vertices); return NULL; }
       
       scale_y = scale_x;
    }
@@ -2201,14 +2203,14 @@ STBTT_DEF unsigned char *stbtt_GetGlyphBitmapSubpixel(const stbtt_fontinfo *info
    if (xoff  ) *xoff   = ix0;
    if (yoff  ) *yoff   = iy0;
    if (gbm.w && gbm.h) {
-      gbm.pixels = (unsigned char*)malloc((size_t)(gbm.w * gbm.h));
+      gbm.pixels = (unsigned char*)STBTT_malloc((size_t)(gbm.w * gbm.h));
       if (gbm.pixels) {
          gbm.stride = gbm.w;
          stbtt_Rasterize(&gbm, 0.35f, vertices, num_verts, scale_x, scale_y, shift_x, shift_y, ix0, iy0, 1);
       }
    }
    
-   free(vertices);
+   STBTT_free(vertices);
    return gbm.pixels;
 }
 
@@ -2228,7 +2230,7 @@ STBTT_DEF void stbtt_MakeGlyphBitmapSubpixel(const stbtt_fontinfo *info, unsigne
    gbm.h = out_h;
    gbm.stride = out_stride;
    if (gbm.w && gbm.h) stbtt_Rasterize(&gbm, 0.35f, vertices, num_verts, scale_x, scale_y, shift_x, shift_y, ix0,iy0, 1);
-   free(vertices);
+   STBTT_free(vertices);
 }
 
 STBTT_DEF void stbtt_MakeGlyphBitmap(const stbtt_fontinfo *info, unsigned char *output, int out_w, int out_h, int out_stride, float scale_x, float scale_y, int glyph)
@@ -2275,7 +2277,7 @@ static void stbrp_pack_rects(stbrp_context *con, stbrp_rect *rects, int num_rect
 #endif
 
 STBTT_DEF int stbtt_PackBegin(stbtt_pack_context *spc, unsigned char *pixels, int pw, int ph, int stride_in_bytes, int padding, void *alloc_context) {
-   stbrp_context* context = (stbrp_context*)malloc(sizeof(*context));
+   stbrp_context* context = (stbrp_context*)STBTT_malloc(sizeof(*context));
    spc->user_allocator_context = alloc_context;
    spc->width = pw;
    spc->height = ph;
@@ -2290,7 +2292,7 @@ STBTT_DEF int stbtt_PackBegin(stbtt_pack_context *spc, unsigned char *pixels, in
    context->height = ph-padding;
    context->x = 0; context->y = 0;
    context->bottom_y = 0;
-   if (pixels) __builtin_memset(pixels, 0, (size_t)(pw*ph)); // background of 0 around pixels
+   if (pixels) SetMemoryToValueForNBytes(pixels, 0, (size_t)(pw*ph)); // background of 0 around pixels
    return 1;
 }
 
@@ -2300,11 +2302,11 @@ static void stbtt__h_prefilter(unsigned char *pixels, int w, int h, int stride_i
    unsigned char buffer[STBTT_MAX_OVERSAMPLE];
    int safe_w = w - (int)kernel_width;
    int j;
-   __builtin_memset(buffer, 0, STBTT_MAX_OVERSAMPLE); // suppress bogus warning from VS2013 -analyze
+   SetMemoryToValueForNBytes(buffer, 0, STBTT_MAX_OVERSAMPLE); // suppress bogus warning from VS2013 -analyze
    for (j=0; j < h; ++j) {
       int i;
       unsigned int total;
-      __builtin_memset(buffer, 0, kernel_width);
+      SetMemoryToValueForNBytes(buffer, 0, kernel_width);
       total = 0;
 
       // make kernel_width a constant in common cases so compiler can optimize out the divide
@@ -2359,11 +2361,11 @@ static void stbtt__v_prefilter(unsigned char *pixels, int w, int h, int stride_i
    unsigned char buffer[STBTT_MAX_OVERSAMPLE];
    int safe_h = h - (int)kernel_width;
    int j;
-   __builtin_memset(buffer, 0, STBTT_MAX_OVERSAMPLE); // suppress bogus warning from VS2013 -analyze
+   SetMemoryToValueForNBytes(buffer, 0, STBTT_MAX_OVERSAMPLE); // suppress bogus warning from VS2013 -analyze
    for (j=0; j < w; ++j) {
       int i;
       unsigned int total;
-      __builtin_memset(buffer, 0, kernel_width);
+      SetMemoryToValueForNBytes(buffer, 0, kernel_width);
       total = 0;
 
       // make kernel_width a constant in common cases so compiler can optimize out the divide
@@ -2553,14 +2555,14 @@ STBTT_DEF int stbtt_PackFontRanges(stbtt_pack_context *spc, const unsigned char 
 
    n = 0;
    for (i=0; i < num_ranges; ++i) n += ranges[i].num_chars;
-   rects = (stbrp_rect*)malloc(sizeof(*rects) * (size_t)n);
+   rects = (stbrp_rect*)STBTT_malloc(sizeof(*rects) * (size_t)n);
    if (rects == NULL) return 0;
    info.userdata = spc->user_allocator_context;
    stbtt_InitFont_internal(&info, (unsigned char *) fontdata, stbtt_GetFontOffsetForIndex(fontdata,font_index));
    n = stbtt_PackFontRangesGatherRects(spc, &info, ranges, num_ranges, rects);
    stbrp_pack_rects(spc->pack_info, rects, n);
    return_value = stbtt_PackFontRangesRenderIntoRects(spc, &info, ranges, num_ranges, rects);
-   free(rects);
+   STBTT_free(rects);
    return return_value;
 }
 

@@ -1,7 +1,20 @@
 // audio.c
-#include "os.h"
 #include "voxen.h"
 #include "tables_audio.h"
+static inline __attribute__((always_inline, noreturn)) void OS_Exit(int64_t exitCode) {
+    #ifdef WINDOWS
+        register uint64_t rax __asm__("rax") = 0x2C;
+        register HANDLE   rcx __asm__("rcx") = (HANDLE)-1;
+        register NTSTATUS rdx __asm__("rdx") = (NTSTATUS)exitCode;
+        __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rcx), "r"(rdx) : "r8", "r9", "r10", "r11", "memory");
+    #else
+        register int64_t rax __asm__("rax") = 231;
+        register int64_t rdi __asm__("rdi") = exitCode;
+        __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi) : "rcx", "r11", "memory");
+    #endif
+    __builtin_unreachable();
+}
+
 #include "./External/miniaudio.h"
 #define BUFFER_MS 50
 #define AUD_BUFFER_T 0.25f

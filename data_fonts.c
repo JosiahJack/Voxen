@@ -3,8 +3,7 @@
 #include "gl.h"
 #include "voxen.h"
 #define STB_TRUETYPE_IMPLEMENTATION
-#include "External/stb_truetype.h"
-
+#include "./External/stb_truetype.h"
 // MAX_GLYPHS is 4096 as is FONT_ATLAS_SIZE which is more than twice as large as needed without hiragana/katakana present
 int numPackedGlyphs = 0;
 int numPackedGlyphsStopD = 0;
@@ -105,7 +104,7 @@ static bool load_font_cache(const char *path, int32_t expected_glyphs, const uin
     if (file_expected != expected_glyphs) { DualLogWarn("range mismatch %s (file:%u exp:%u)\n", path, file_expected, expected_glyphs); OS_DeallocateRAM(map, fontFileSize); return false; }
 
     uint64_t file_stamp_on_disk;
-    __builtin_memcpy(&file_stamp_on_disk, p, sizeof(uint64_t));
+    CopyMemoryFromBtoAForNBytes(&file_stamp_on_disk, p, sizeof(uint64_t));
     p += sizeof(uint64_t);
     if (file_stamp_on_disk != file_stamp) { OS_DeallocateRAM(map, fontFileSize); DualLogWarn("Filestamp mismatch %s\n", path); return false; }
 
@@ -113,7 +112,7 @@ static bool load_font_cache(const char *path, int32_t expected_glyphs, const uin
     if (actual_packed > MAX_GLYPHS) { OS_DeallocateRAM(map, fontFileSize); return false; }
 
     float fixed_advance = *(float*)p;       p += 4;
-    __builtin_memcpy(out_packed, p, sizeof(stbtt_packedchar) * actual_packed);
+    CopyMemoryFromBtoAForNBytes(out_packed, p, sizeof(stbtt_packedchar) * actual_packed);
     *out_num = (int32_t)actual_packed;
     *out_fixed_advance = fixed_advance;
     p += sizeof(stbtt_packedchar) * actual_packed;
@@ -204,7 +203,7 @@ void InitFontAtlasses(void) {
         }
     }
     
-    free(pc.pack_info);
+    OS_DeallocateRAM(pc.pack_info,0);
     glCreateTextures(GL_TEXTURE_2D,1,&fontAtlasTex);
     glTextureStorage2D(fontAtlasTex,1,GL_R8,FONT_ATLAS_SIZE, FONT_ATLAS_SIZE);
     glTextureSubImage2D(fontAtlasTex,0,0,0,FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, GL_RED, GL_UNSIGNED_BYTE, bmp);
@@ -216,7 +215,7 @@ void InitFontAtlasses(void) {
     dump_atlas_bmp("./Fonts/SystemShockText_atlas.bmp", bmp);
 
     // Secondary
-    __builtin_memset(bmp,0,FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * sizeof(unsigned char));
+    SetMemoryToValueForNBytes(bmp,0,FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * sizeof(unsigned char));
     stbtt_pack_context pc2;
     stbtt_PackBegin(&pc2, bmp, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 16, NULL);
     pc2.h_oversample = 4; // STBTT_MAX_OVERSAMPLE = 8
@@ -247,7 +246,7 @@ void InitFontAtlasses(void) {
         }
     }
     
-    free(pc2.pack_info);
+    OS_DeallocateRAM(pc2.pack_info,0);
     glCreateTextures(GL_TEXTURE_2D, 1, &fontAtlasTexStopD);
     glTextureStorage2D(fontAtlasTexStopD, 1, GL_R8, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE);
     glTextureSubImage2D(fontAtlasTexStopD, 0, 0, 0, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, GL_RED, GL_UNSIGNED_BYTE, bmp);

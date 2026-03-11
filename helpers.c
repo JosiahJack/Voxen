@@ -3,6 +3,24 @@
 #include "voxen.h"
 #define STBIW_UCHAR(x) (unsigned char)((x) & 0xff)
 
+void* SetMemoryToValueForNBytes(void *dst, int c, size_t n) { // memset replacement
+    unsigned char *p = (unsigned char *)dst;
+    unsigned char v = (unsigned char)c;
+    while (n--) *p++ = v;
+    return dst;
+}
+// void* memset(void *dst, int c, size_t n) { return SetMemoryToValueForNBytes(dst,c,n); }
+
+
+void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n) { // memcpy replacement
+    unsigned char *d = (unsigned char *)dst;
+    const unsigned char *s = (const unsigned char *)src;
+    while (n--) *d++ = *s++;
+    return dst;
+}
+// void* memcpy(void *dst, const void *src, size_t n) { return CopyMemoryFromBtoAForNBytes(dst,src,n); }
+
+
 typedef void stbi_write_func(void *context, void *data, int size);
 
 typedef struct {
@@ -307,13 +325,14 @@ float smooth_damp(float current, float target, float *current_velocity, float sm
     return output;
 }
 
-size_t GetStringLength(const char *s) {
+size_t GetStringLength(const char* s) {
     if (s == NULL) return 0;
     
     const char *p = s;
     while (*(p++));
     return (size_t)(p - s - 1);
 }
+// size_t strlen(const char* s) { return GetStringLength(s); }
 
 char* data_parser_trim(char* s) {
     while (CharacterIsEmpty((unsigned char)*s)) s++;
@@ -367,6 +386,7 @@ bool StringsAreEqual(const char* a, const char* b) { // !strcmp replacement (hat
     
     return true;
 }
+// int strcmp(const char *s1, const char *s2) { return !StringsAreEqual(s1,s2); }
 
 bool StringsAreEqualLimitedBy(const char* a, const char* b, size_t limit) {
     if (limit == 0) return false;
@@ -654,6 +674,16 @@ char* GetNextStringUpToNewlineOrEOF(char* buf, int size, long fd) { // fgets rep
     done:
     *p = '\0';
     return buf;
+}
+
+void FilePrintString(OsFileHandle f, const char* fmt, ...) {
+    va_list args; __builtin_va_start(args,fmt);
+    char buf[128]; va_list copy;
+    __builtin_va_copy(copy,args);
+    StringFormatV(buf,sizeof(buf),fmt,copy);
+    __builtin_va_end(copy);
+    OS_RawWrite(f,buf,GetStringLength(buf));
+    __builtin_va_end(args);
 }
 
 uint8_t GetCurrentLevelSecurity() { return (Sys_Global.difficultyMission < 1 || Sys_Cheats.superoverride) ? 0u : Sys_Global.levelSecurity[Sys_Global.currentLevel]; }

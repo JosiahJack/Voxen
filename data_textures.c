@@ -82,8 +82,8 @@ inline static int32_t stbi__bit_reverse(int32_t n, int32_t bits) {
 static int32_t stbi__zbuild_huffman(stbi__zhuffman *z, const uint8_t* sizelist, int32_t num) {
    int32_t i,k=0;
    int32_t next_code[16], sizes[17];
-   __builtin_memset(sizes, 0, sizeof(sizes));
-   __builtin_memset(z->fast, 0, sizeof(z->fast));
+   SetMemoryToValueForNBytes(sizes, 0, sizeof(sizes));
+   SetMemoryToValueForNBytes(z->fast, 0, sizeof(z->fast));
    if (num != 32) {
       for (i=0; i < num; ++i) ++sizes[sizelist[i]];      
    }
@@ -210,7 +210,7 @@ static int stbi__compute_huffman_codes(stbi__zbuf *a) {
    uint32_t hdist = stbi__zreceive(a,5) + 1;
    uint32_t hclen = stbi__zreceive(a,4) + 4;
    uint32_t ntot  = hlit + hdist;
-   __builtin_memset(codelength_sizes, 0, sizeof(codelength_sizes));
+   SetMemoryToValueForNBytes(codelength_sizes, 0, sizeof(codelength_sizes));
    for (uint32_t i=0; i < hclen; ++i) {
       uint32_t s = stbi__zreceive(a,3);
       codelength_sizes[length_dezigzag[i]] = (uint8_t)s;
@@ -233,7 +233,7 @@ static int stbi__compute_huffman_codes(stbi__zbuf *a) {
             c = stbi__zreceive(a,7)+11;
          } else return 0;
          
-         __builtin_memset(lencodes+n, fill, c);
+         SetMemoryToValueForNBytes(lencodes+n, fill, c);
          n += c;
       }
    }
@@ -259,7 +259,7 @@ static int stbi__parse_uncompressed_block(stbi__zbuf *a) {
    if (k <= 2) header[2] = *a->zbuffer++;
    if (k <= 3) header[3] = *a->zbuffer++;
    int32_t len = header[1] * 256 + header[0];
-   __builtin_memcpy(a->zout, a->zbuffer, len);
+   CopyMemoryFromBtoAForNBytes(a->zout, a->zbuffer, len);
    a->zbuffer += len;
    a->zout += len;
    return 1;
@@ -416,7 +416,7 @@ extern uint8_t* stbi_load_from_memory(const uint8_t* buffer, int len, int *x, in
                ioff = 0;
             }
             
-            __builtin_memcpy(z.idata + ioff, s.img_buffer, length);
+            CopyMemoryFromBtoAForNBytes(z.idata + ioff, s.img_buffer, length);
             s.img_buffer += length;
             ioff += length;
             break;
@@ -476,8 +476,8 @@ void LoadTextures(void) {
     DualLog("Loading textures( %u/%u), using stb_image version: 2.28, ", loadedTexturesMaxIndex, loadedTexturesMaxIndex);    
     totalPixels = 0U;
     totalPaletteColors = 0U;
-    int32_t widths[MAX_VALID_TEXTURE]; __builtin_memset(widths,0,MAX_VALID_TEXTURE * sizeof(int32_t));
-    int32_t heights[MAX_VALID_TEXTURE]; __builtin_memset(heights,0,MAX_VALID_TEXTURE * sizeof(int32_t));    
+    int32_t widths[MAX_VALID_TEXTURE]; SetMemoryToValueForNBytes(widths,0,MAX_VALID_TEXTURE * sizeof(int32_t));
+    int32_t heights[MAX_VALID_TEXTURE]; SetMemoryToValueForNBytes(heights,0,MAX_VALID_TEXTURE * sizeof(int32_t));    
     size_t offsets_size          = loadedTexturesMaxIndex * sizeof(uint32_t);
     size_t sizes_size            = loadedTexturesMaxIndex * 2 * sizeof(int32_t);
     size_t palette_offsets_size  = loadedTexturesMaxIndex * sizeof(uint32_t);
@@ -544,7 +544,7 @@ void LoadTextures(void) {
         texturePaletteOffsets[currentIndex] = color_base;
         textureSizes[currentIndex * 2]      = widths[currentIndex];
         textureSizes[currentIndex * 2 + 1]  = heights[currentIndex];
-        __builtin_memcpy(texturePalettes + color_base, palette, pal_size * sizeof(uint32_t));
+        CopyMemoryFromBtoAForNBytes(texturePalettes + color_base, palette, pal_size * sizeof(uint32_t));
         pixel_base += numPixels; if (pixel_base > MAX_TOTAL_PIXELS) { DualLogError("Overflowed unique pixels buffer with %u, max size allowed: %u\n", pixel_base, MAX_TOTAL_PIXELS); OS_Exit(1); }
         color_base += pal_size;  if (color_base > MAX_UNIQUE_COLORS) { DualLogError("Overflowed palette buffer with %u, max size allowed: %u\n", color_base, MAX_UNIQUE_COLORS); OS_Exit(1); }
     }
@@ -554,7 +554,7 @@ void LoadTextures(void) {
     int32_t packed_size = ((int32_t)totalPixels + 3) / 4 * sizeof(uint32_t);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, Sys_Render.colorBufferID);
     void* dst = glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, packed_size, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
-    __builtin_memcpy(dst,all_indices,packed_size);
+    CopyMemoryFromBtoAForNBytes(dst,all_indices,packed_size);
     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, Sys_Render.texturePalettesID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, totalPaletteColors * sizeof(uint32_t), texturePalettes, GL_STATIC_DRAW);

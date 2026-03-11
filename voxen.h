@@ -2,6 +2,9 @@
 #if defined(LINUX)
 //     #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
 #endif
+
+#define SetMemoryToValueForNBytes __builtin_memset
+#define CopyMemoryFromBtoAForNBytes __builtin_memcpy
 typedef __INT8_TYPE__     int8_t;
 typedef __UINT8_TYPE__   uint8_t;
 typedef __INT16_TYPE__   int16_t;
@@ -24,7 +27,6 @@ typedef uint64_t size_t;
 #define true 1
 #define false 0
 #define INSTANCE_COUNT 10240 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
-
 typedef uint64_t size_t;
 typedef struct { float r,g,b,a; } Color;
 typedef struct { float x,y; } Vector2;
@@ -33,7 +35,6 @@ typedef struct { float x,y,z,w; } Quaternion;
 typedef uint8_t PhysCombineType;
 typedef uint8_t ColliderType;
 typedef uint16_t Text;
-
 #define SAVE_REMINDER_TIME 7.0f // 7secs ~is human short-term memory length
 #define CREDITS_PAGES 22
 typedef struct {
@@ -52,7 +53,7 @@ typedef struct {
 	bool levelCurrentlyLoading;
     double shakeFinished;
 	char global_modname[256];
-	bool global_modIsCitadel;
+    bool global_modIsCitadel;
     bool introNotPlayed;
     uint8_t levelSecurity[14];
 	uint8_t startLevel;
@@ -1801,3 +1802,5 @@ typedef __builtin_va_list va_list;
 int StringFormatV(char* buffer, size_t bufferSize, const char* format, va_list args);
 int StringFormat(char* buffer, size_t bufferSize, const char* format, ...);
 char* GetNextStringUpToNewlineOrEOF(char* buf, int size, long fd);
+void* SetMemoryToValueForNBytes(void *dst, int c, size_t n);
+void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n);

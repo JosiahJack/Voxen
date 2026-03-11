@@ -43,6 +43,13 @@ static inline __attribute__((always_inline)) float parse_float_pure(const char* 
     return sign * value;
 }
 
+static inline __attribute__((always_inline)) void* memchr(const void* s, int c, size_t n) {
+    const unsigned char* p = (const unsigned char*)s;
+    unsigned char v = (unsigned char)c;
+    while (n--) if (*p == v) return (void*)p; else p++;
+    return NULL;
+}
+
 static __attribute__((hot)) __attribute__((optimize("O3"))) __attribute__((flatten))
 bool ParseOBJ(const char* __restrict data, int file_size, float* __restrict temp_pos, float* __restrict temp_nrm, float* __restrict temp_uv, float* __restrict scratch_verts, uint32_t* __restrict scratch_tris, float** out_vertices, uint32_t* out_vertex_count, uint32_t** out_triangles, uint32_t* out_triangle_count, float* out_minx, float* out_miny, float* out_minz, float* out_maxx, float* out_maxy, float* out_maxz) {
     *out_vertices = NULL; *out_triangles = NULL;
@@ -132,7 +139,7 @@ bool ParseOBJ(const char* __restrict data, int file_size, float* __restrict temp
             }
         }
 
-        p = (const char*)__builtin_memchr(p, '\n', (size_t)(end - p));
+        p = (const char*)memchr(p, '\n', (size_t)(end - p));
         if (unlikely(!p)) break;
         
         ++p;
@@ -143,7 +150,7 @@ bool ParseOBJ(const char* __restrict data, int file_size, float* __restrict temp
     
     #define HASH_SIZE 32768
     uint32_t hash_table[HASH_SIZE];
-    __builtin_memset(hash_table, 0xFF, sizeof(hash_table)); // 0xFFFFFFFF = empty
+    SetMemoryToValueForNBytes(hash_table, 0xFF, sizeof(hash_table)); // 0xFFFFFFFF = empty
 
     float* unique_verts = scratch_verts;  // reuse scratch
     uint32_t* remap      = (uint32_t*)scratch_tris; // reuse scratch for remap
@@ -165,14 +172,14 @@ bool ParseOBJ(const char* __restrict data, int file_size, float* __restrict temp
 
         hash_table[slot] = unique_cnt;
         remap[i] = unique_cnt;
-        __builtin_memcpy(unique_verts + (unique_cnt << 3), v, 32);
+        CopyMemoryFromBtoAForNBytes(unique_verts + (unique_cnt << 3), v, 32);
         ++unique_cnt;
     next_vertex:;
     }
 
     size_t vbytes = (size_t)unique_cnt * 8 * sizeof(float);
     float* final_verts = (float*)OS_AllocateRAM(NULL, vbytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-    __builtin_memcpy(final_verts, unique_verts, vbytes);
+    CopyMemoryFromBtoAForNBytes(final_verts, unique_verts, vbytes);
     size_t ibytes = (size_t)vert_idx * sizeof(uint32_t); // still need full index list
     uint32_t* final_tris = (uint32_t*)OS_AllocateRAM(NULL, ibytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
     for (uint32_t i = 0; i < vert_idx; ++i) final_tris[i] = remap[i];
@@ -203,14 +210,14 @@ void LoadModels(void) {
     modelTriangles  = OS_AllocateRAM(NULL, loadedModelsMaxIndex * sizeof(uint32_t*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
     size_t indexToParser_size = loadedModelsMaxIndex * sizeof(int32_t);
     int32_t* indexToParser = OS_AllocateRAM(NULL, indexToParser_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, OS_INVALID_HANDLE);
-    __builtin_memset(indexToParser, -1, indexToParser_size);
+    SetMemoryToValueForNBytes(indexToParser, -1, indexToParser_size);
     for (uint32_t k = 0; k < mpars.count; k++) {
         if (likely(mpars.entries[k].index != UINT16_MAX)) indexToParser[mpars.entries[k].index] = (int32_t)k;
     }
 
     typedef struct { const char* data; int size; } RawOBJ;
     RawOBJ* rawModels = OS_AllocateRAM(NULL, loadedModelsMaxIndex * sizeof(RawOBJ), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-    __builtin_memset(rawModels, 0, loadedModelsMaxIndex * sizeof(RawOBJ));
+    SetMemoryToValueForNBytes(rawModels, 0, loadedModelsMaxIndex * sizeof(RawOBJ));
     for (uint32_t i = 0; i < loadedModelsMaxIndex; ++i) {
         int32_t parserIdx = indexToParser[i];
         if (unlikely(parserIdx < 0 || parserIdx >= (int32_t)mpars.count)) continue;
@@ -294,12 +301,12 @@ void LoadModels(void) {
         glBindBuffer(GL_ARRAY_BUFFER, Sys_Render.vbos[i]);
         glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)vertSize, NULL, GL_STATIC_DRAW);
         void* ptr = glMapBufferRange(GL_ARRAY_BUFFER, 0, (GLsizeiptr)vertSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
-        __builtin_memcpy(ptr, modelVertices[i], vertSize);
+        CopyMemoryFromBtoAForNBytes(ptr, modelVertices[i], vertSize);
         glUnmapBuffer(GL_ARRAY_BUFFER);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Sys_Render.tbos[i]);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)triSize, NULL, GL_STATIC_DRAW);
         ptr = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, (GLsizeiptr)triSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
-        __builtin_memcpy(ptr, modelTriangles[i], triSize);
+        CopyMemoryFromBtoAForNBytes(ptr, modelTriangles[i], triSize);
         glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
     }
 

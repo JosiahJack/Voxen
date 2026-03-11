@@ -1,16 +1,7 @@
-/**
- * SPDX-License-Identifier: (WTFPL OR CC0-1.0) AND Apache-2.0
- */
-#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include "os.h"
+#include "voxen.h"
 #include "gl.h"
-
-#ifndef GLAD_IMPL_UTIL_C_
-    #define GLAD_IMPL_UTIL_C_
-    #define GLAD_IMPL_UTIL_SSCANF sscanf
-#endif /* GLAD_IMPL_UTIL_C_ */
-
 int GLAD_GL_VERSION_1_0 = 0;
 int GLAD_GL_VERSION_1_1 = 0;
 int GLAD_GL_VERSION_1_2 = 0;
@@ -1359,43 +1350,40 @@ static void glad_gl_free_extensions(char **exts_i) {
     }
 }
 
-static int glad_gl_get_extensions( const char **out_exts, char ***out_exts_i) {
+static int glad_gl_get_extensions( const char** out_exts, char*** out_exts_i) {
 #if defined(GL_ES_VERSION_3_0) || defined(GL_VERSION_3_0)
     if (glad_glGetStringi != NULL && glad_glGetIntegerv != NULL) {
         unsigned int index = 0;
         unsigned int num_exts_i = 0;
         char **exts_i = NULL;
-        glad_glGetIntegerv(GL_NUM_EXTENSIONS, (int*) &num_exts_i);
-        exts_i = (char **) malloc((num_exts_i + 1) * (sizeof *exts_i));
-        if (exts_i == NULL) {
-            return 0;
-        }
+        glad_glGetIntegerv(GL_NUM_EXTENSIONS,(int*)&num_exts_i);
+        exts_i = (char **)malloc((num_exts_i + 1) * (sizeof *exts_i));
+        if (exts_i == NULL) return 0;
+
         for(index = 0; index < num_exts_i; index++) {
             const char *gl_str_tmp = (const char*) glad_glGetStringi(GL_EXTENSIONS, index);
-            size_t len = strlen(gl_str_tmp) + 1;
+            size_t len = GetStringLength(gl_str_tmp) + 1;
 
-            char *local_str = (char*) malloc(len * sizeof(char));
+            char *local_str = (char*)malloc(len * sizeof(char));
             if(local_str == NULL) {
                 exts_i[index] = NULL;
                 glad_gl_free_extensions(exts_i);
                 return 0;
             }
 
-            memcpy(local_str, gl_str_tmp, len * sizeof(char));
+            CopyMemoryFromBtoAForNBytes(local_str,gl_str_tmp,len * sizeof(char));
             exts_i[index] = local_str;
         }
+        
         exts_i[index] = NULL;
-
         *out_exts_i = exts_i;
-
         return 1;
     }
 #else
     GLAD_UNUSED(out_exts_i);
 #endif
-    if (glad_glGetString == NULL) {
-        return 0;
-    }
+    if (glad_glGetString == NULL) return 0;
+
     *out_exts = (const char *)glad_glGetString(GL_EXTENSIONS);
     return 1;
 }
@@ -1405,31 +1393,26 @@ __attribute__((pure)) static int glad_gl_has_extension(const char *exts, char **
         unsigned int index;
         for(index = 0; exts_i[index]; index++) {
             const char *e = exts_i[index];
-            if(strcmp(e, ext) == 0) {
-                return 1;
-            }
+            if(StringsAreEqual(e, ext)) return 1;
         }
     } else {
         const char *extensions;
         const char *loc;
         const char *terminator;
         extensions = exts;
-        if(extensions == NULL || ext == NULL) {
-            return 0;
-        }
+        if(extensions == NULL || ext == NULL) return 0;
+
         while(1) {
-            loc = strstr(extensions, ext);
-            if(loc == NULL) {
-                return 0;
-            }
-            terminator = loc + strlen(ext);
-            if((loc == extensions || *(loc - 1) == ' ') &&
-                (*terminator == ' ' || *terminator == '\0')) {
-                return 1;
-            }
+            loc = StringFindSubstring(extensions, ext);
+            if(loc == NULL) return 0;
+
+            terminator = loc + GetStringLength(ext);
+            if((loc == extensions || *(loc - 1) == ' ') && (*terminator == ' ' || *terminator == '\0')) return 1;
+
             extensions = terminator;
         }
     }
+    
     return 0;
 }
 
@@ -1468,15 +1451,13 @@ static int glad_gl_find_core_gl(void) {
     version = (const char*) glad_glGetString(GL_VERSION);
     if (!version) return 0;
     for (i = 0;  prefixes[i];  i++) {
-        const size_t length = strlen(prefixes[i]);
-        if (strncmp(version, prefixes[i], length) == 0) {
-            version += length;
-            break;
-        }
+        const size_t length = GetStringLength(prefixes[i]);
+        if (StringCompareUpToLength(version, prefixes[i], length)) { version += length; break; }
     }
 
-    GLAD_IMPL_UTIL_SSCANF(version, "%d.%d", &major, &minor);
-
+//     sscanf(version, "%d.%d", &major, &minor);
+    major = 4;
+    minor = 3;
     GLAD_GL_VERSION_1_0 = (major == 1 && minor >= 0) || major > 1;
     GLAD_GL_VERSION_1_1 = (major == 1 && minor >= 1) || major > 1;
     GLAD_GL_VERSION_1_2 = (major == 1 && minor >= 2) || major > 1;
@@ -1493,7 +1474,6 @@ static int glad_gl_find_core_gl(void) {
     GLAD_GL_VERSION_4_1 = (major == 4 && minor >= 1) || major > 4;
     GLAD_GL_VERSION_4_2 = (major == 4 && minor >= 2) || major > 4;
     GLAD_GL_VERSION_4_3 = (major == 4 && minor >= 3) || major > 4;
-
     return GLAD_MAKE_VERSION(major, minor);
 }
 
@@ -1502,8 +1482,8 @@ int gladLoadGLUserPtr( GLADuserptrloadfunc load, void *userptr) {
 
     glad_glGetString = (PFNGLGETSTRINGPROC) load(userptr, "glGetString");
     if(glad_glGetString == NULL) return 0;
+    
     version = glad_gl_find_core_gl();
-
     glad_gl_load_GL_VERSION_1_0(load, userptr);
     glad_gl_load_GL_VERSION_1_1(load, userptr);
     glad_gl_load_GL_VERSION_1_2(load, userptr);
@@ -1541,9 +1521,6 @@ int gladLoadGL( GLADloadfunc load) {
 #ifndef GLAD_LOADER_LIBRARY_C_
 #define GLAD_LOADER_LIBRARY_C_
 
-#include <stddef.h>
-#include <stdlib.h>
-
 #if GLAD_PLATFORM_WIN32
 #include <windows.h>
 #else
@@ -1558,14 +1535,12 @@ static void* glad_get_dlopen_handle(const char *lib_names[], int length) {
     for (i = 0; i < length; ++i) {
 #if GLAD_PLATFORM_WIN32
   #if GLAD_PLATFORM_UWP
-        size_t buffer_size = (strlen(lib_names[i]) + 1) * sizeof(WCHAR);
+        size_t buffer_size = (GetStringLength(lib_names[i]) + 1) * sizeof(WCHAR);
         LPWSTR buffer = (LPWSTR) malloc(buffer_size);
         if (buffer != NULL) {
             int ret = MultiByteToWideChar(CP_ACP, 0, lib_names[i], -1, buffer, buffer_size);
-            if (ret != 0) {
-                handle = (void*) LoadPackagedLibrary(buffer, 0);
-            }
-            free((void*) buffer);
+            if (ret != 0) handle = (void*)LoadPackagedLibrary(buffer,0);
+            free((void*)buffer);
         }
   #else
         handle = (void*) LoadLibraryA(lib_names[i]);
@@ -1573,9 +1548,7 @@ static void* glad_get_dlopen_handle(const char *lib_names[], int length) {
 #else
         handle = dlopen(lib_names[i], RTLD_LAZY | RTLD_LOCAL);
 #endif
-        if (handle != NULL) {
-            return handle;
-        }
+        if (handle != NULL) return handle;
     }
 
     return NULL;
@@ -1676,17 +1649,12 @@ int gladLoaderLoadGL(void) {
     void *handle;
     int did_load = 0;
     struct _glad_gl_userptr userptr;
-
     did_load = _glad_GL_loader_handle == NULL;
     handle = glad_gl_dlopen_handle();
     if (handle) {
         userptr = glad_gl_build_userptr(handle);
-
         version = gladLoadGLUserPtr(glad_gl_get_proc, &userptr);
-
-        if (did_load) {
-            gladLoaderUnloadGL();
-        }
+        if (did_load) gladLoaderUnloadGL();
     }
 
     return version;

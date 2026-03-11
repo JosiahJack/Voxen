@@ -61,7 +61,7 @@ bool parse_data_file(DataParser *parser, uint16_t maxSize, const char *filename)
             if (lineend > start) {
                 size_t actualLen = lineend - (start + 1) + 1;
                 if (actualLen >= sizeof(entry.path)) actualLen = sizeof(entry.path) - 1;
-                __builtin_memcpy(entry.path, start + 1, actualLen);
+                CopyMemoryFromBtoAForNBytes(entry.path, start + 1, actualLen);
                 entry.path[actualLen] = '\0';
             }
             continue;

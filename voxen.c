@@ -82,39 +82,24 @@ void stbtt_GetPackedQuad(const stbtt_packedchar *chardata, int pw, int ph, int c
 
 // Logs both to log file and console, usage same as printf
 static void DualLogMain(const char *prefix, const char *fmt, va_list args) {
-    char buf[2048];
-    va_list copy;
+    char buf[2048]; va_list copy;
     __builtin_va_copy(copy, args);
     StringFormatV(buf, sizeof(buf), fmt, copy);
     __builtin_va_end(copy);
-
     // Write to console (stdout / stderr)
     #ifdef WINDOWS
         OsFileHandle out = 1;
-        if (prefix) {
-            OS_RawWrite(out,prefix,GetStringLength(prefix));
-            OS_RawWrite(out," ", 1,);
-        }
-        
+        if (prefix) OS_RawWrite(out,prefix,GetStringLength(prefix));
         OS_RawWrite(out, buf, GetStringLength(buf));
     #else
         // Linux/macOS/Android - write to stdout (fd 1) or stderr (fd 2)
         OsFileHandle out = (prefix && prefix[0] == '\033') ? 2 : 1;  // use stderr for colored warnings/errors
-        if (prefix) {
-            OS_RawWrite(out, prefix, GetStringLength(prefix));
-            OS_RawWrite(out, "\033[0m", 4);
-        }
-        
+        if (prefix) { OS_RawWrite(out, prefix, GetStringLength(prefix)); OS_RawWrite(out,"\033[0m ", 5); }
         OS_RawWrite(out, buf, GetStringLength(buf));
     #endif
-
     // Write to console_log_file
     if (console_log_file != OS_INVALID_HANDLE) {
-        if (prefix) {
-            OS_Write(console_log_file, prefix, GetStringLength(prefix), "console.log");
-            OS_Write(console_log_file, " ", 1, "console.log");
-        }
-        
+        if (prefix) { OS_Write(console_log_file, prefix, GetStringLength(prefix), "console.log"); OS_Write(console_log_file,"\033[0m ",5,"console.log"); }
         OS_Write(console_log_file, buf, GetStringLength(buf), "console.log");
     }
 }
@@ -440,7 +425,7 @@ void RenderFormattedText(int16_t x, int16_t y, uint32_t color, uint8_t fontID, f
         float t1 = (q.t1) + (paddingUV);
         float z = 0.0f;
         float textVertices[30] = { vx0, vy0, z, s0, t0, vx1, vy1, z, s1, t1, vx1, vy0, z, s1, t0, vx0, vy0, z, s0, t0, vx0, vy1, z, s0, t1, vx1, vy1, z, s1, t1 };
-        __builtin_memcpy(textVertexData + vertexCount * 30, textVertices, sizeof(textVertices));
+        CopyMemoryFromBtoAForNBytes(textVertexData + vertexCount * 30, textVertices, sizeof(textVertices));
         vertexCount++;
         if (codepoint >= '0' && codepoint <= '9') {
             if (fontID == FONT_STOPD) xpos = q.x0 + fixedNumberAdvanceWidthStopD;
@@ -480,7 +465,7 @@ __attribute__((cold)) void NewGame(void) { // Reset World States
     instances[WORLD].lev4SecCode = random_range_u8(0u,9u);
     instances[WORLD].lev5SecCode = random_range_u8(0u,9u);
     instances[WORLD].lev6SecCode = random_range_u8(0u,9u);
-    __builtin_memset(instances,0,INSTANCE_COUNT * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
+    SetMemoryToValueForNBytes(instances,0,INSTANCE_COUNT * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
     PlayerInit(PLAYER1); PlayerInit(PLAYER2);
     cam_yaw = 90.0f; cam_pitch = 0.0f; cam_roll = 0.0f;
     Sys_Global.inventoryMode = Sys_Settings.NoShootMode;
@@ -556,7 +541,7 @@ __attribute__((cold)) void LoadEntities(void) {
     if (entityCount > MAX_ENTITIES) { DualLogError("Too many entities in parser count %d, greater than %d!\n", entityCount, MAX_ENTITIES); OS_Exit(1); }
     if (entityCount == 0) { DualLogError("No entities found in entities.txt\n"); OS_Exit(1); }
 
-    __builtin_memset(entities,0,MAX_ENTITIES * sizeof(Entity));
+    SetMemoryToValueForNBytes(entities,0,MAX_ENTITIES * sizeof(Entity));
     for (int32_t i = 0; i < entityCount; i++) {
         if (entity_parser.entries[i].index == UINT16_MAX) continue;
 
@@ -708,11 +693,11 @@ static void joystick_callback(int32_t jid, int32_t event) {
     if (jid > GLFW_JOYSTICK_LAST) return;
     
     if (event == GLFW_CONNECTED) {
-        __builtin_memset(&Sys_Input.joystickPresent[jid], 1, sizeof(bool));
+        SetMemoryToValueForNBytes(&Sys_Input.joystickPresent[jid], 1, sizeof(bool));
     } else if (event == GLFW_DISCONNECTED) {
-        __builtin_memset(&Sys_Input.joystickPresent[jid], 0, sizeof(bool));
-        __builtin_memset(Sys_Input.joystickButtons, 0, sizeof(Sys_Input.joystickButtons));
-        __builtin_memset(Sys_Input.joystickHats, 0, sizeof(Sys_Input.joystickHats));
+        SetMemoryToValueForNBytes(&Sys_Input.joystickPresent[jid], 0, sizeof(bool));
+        SetMemoryToValueForNBytes(Sys_Input.joystickButtons, 0, sizeof(Sys_Input.joystickButtons));
+        SetMemoryToValueForNBytes(Sys_Input.joystickHats, 0, sizeof(Sys_Input.joystickHats));
     }
 }
 
@@ -915,6 +900,7 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     glfwWindowHint(GLFW_SRGB_CAPABLE, 0);
     glfwWindowHint(GLFW_RESIZABLE, 1);
     LoadConfig(); // Get settings before setting window size.
+    DualLog("Loaded Config.ini with resolution %u x %u\n",Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
     window = glfwCreateWindow(Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, "Voxen", NULL, NULL);
     glfwSetFramebufferSizeCallback(window, UpdateScreenSize);
     if (!window) { DualLogError("glfwCreateWindow failed\n"); OS_Exit(1); }
@@ -1004,7 +990,7 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     DebugRAM("after freeing window bar icon");
     DualLog("GL buffers, FBO, fonts, audio, localization, and window init took %f secs\n", get_time() - init_start_time);
     float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
-    __builtin_memcpy(&modelMatrices[0],mat,16 * sizeof(float)); // Null instance matrix used for UI
+    CopyMemoryFromBtoAForNBytes(&modelMatrices[0],mat,16 * sizeof(float)); // Null instance matrix used for UI
     Sys_Render.cellVisibleDataID       = SetupSSBO(&Sys_Render.cellVisibleDataID,        4, ARRSIZE * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     Sys_Render.shadowMapSSBO           = SetupSSBO(&Sys_Render.shadowMapSSBO,            5, TOTAL_SHADOWMAP_PIXELS * sizeof(uint32_t), NULL, GL_STATIC_DRAW);    
     glUseProgram(Sys_Render.shadowmapsShaderProgram); glUniform1ui(9,         SHADOW_MAP_SIZE);
@@ -1150,7 +1136,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void RenderSha
         }
 
         shadowDrawCallsRenderedThisFrame = 0;
-        __builtin_memset(voxen_Shadow_System.shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t)); // Set to invalid values for all
+        SetMemoryToValueForNBytes(voxen_Shadow_System.shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t)); // Set to invalid values for all
         glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
         glUseProgram(Sys_Render.shadowmapsShaderProgram);
         uint32_t shadowmapOffsetHead = 0U;
@@ -1352,7 +1338,109 @@ static inline __attribute__((always_inline)) double RenderUI(void) {
 }
 
 DepthSort visibleInstances[INSTANCE_COUNT];
-void qsort(void* aa, size_t n, size_t es, int (*cmp)(const void*, const void*));
+static inline void swap(char *a, char *b, size_t sz) { while (sz--) { char t=*a; *a++=*b; *b++=t; } }
+
+static void heapsort(char *base, size_t n, size_t sz, int (*cmp)(const void*, const void*)) {
+    if (n < 2) return;
+
+    size_t i, j, k;
+    char *a = base;  // just for readability
+
+    // build heap
+    for (i = n / 2; i-- > 0; ) {
+        j = i;
+        for (;;) {
+            k = 2 * j + 1;
+            if (k >= n) break;               // ← crucial
+            if (k + 1 < n && cmp(a + (k + 1) * sz, a + k * sz) > 0)
+                k++;
+            if (cmp(a + j * sz, a + k * sz) >= 0) break;
+            swap(a + j * sz, a + k * sz, sz);
+            j = k;
+        }
+    }
+
+    // extract
+    while (n > 1) {
+        swap(a, a + (n - 1) * sz, sz);
+        n--;
+
+        j = 0;
+        for (;;) {
+            k = 2 * j + 1;
+            if (k >= n) break;               // ← crucial
+            if (k + 1 < n && cmp(a + (k + 1) * sz, a + k * sz) > 0)
+                k++;
+            if (cmp(a + j * sz, a + k * sz) >= 0) break;
+            swap(a + j * sz, a + k * sz, sz);
+            j = k;
+        }
+    }
+}
+
+void qsort(void *base, size_t nmemb, size_t size, int (*cmp)(const void*, const void*)) {
+    if (nmemb < 2) return;
+
+    char *b = (char*)base;
+    size_t stack[64], sp = 0, n = nmemb, depth = 0;
+
+    while (1) {
+        if (n > 32) {
+            if (++depth > 64) {
+                heapsort(b, n, size, cmp);
+                goto pop;
+            }
+
+            // median-of-3 pivot selection (your original, but safer)
+            char *lo = b;
+            char *hi = b + (n-1)*size;
+            char *p  = b + (n/2)*size;
+
+            // simple median-of-3 swap to front
+            if (cmp(lo, p) > 0) swap(lo, p, size);
+            if (cmp(lo, hi) > 0) swap(lo, hi, size);
+            if (cmp(p, hi) > 0) swap(p, hi, size);
+            swap(lo, p, size);          // pivot now at b
+            p = b;
+
+            // Lomuto partition (your loop, unchanged)
+            for (lo = b + size; lo <= hi; lo += size) {
+                if (cmp(lo, p) < 0) {
+                    p += size;
+                    if (p != lo) swap(p, lo, size);
+                }
+            }
+            swap(b, p, size);           // final pivot position
+
+            // === FIXED stack push + recurse on smaller first ===
+            size_t left  = (p - b) / size;        // elements < pivot
+            size_t right = (b + n*size - p - size) / size;  // elements > pivot
+
+            if (left > right) {                       // push larger first (smaller on top)
+                stack[sp++] = right; stack[sp++] = (p - b)/size + 1;  // right subarray start offset
+                n = left;
+            } else {
+                stack[sp++] = left;  stack[sp++] = 0;                 // left subarray
+                n = right;
+                b = p + size;
+            }
+            continue;
+        }
+
+        // insertion sort (unchanged, safe)
+        for (char *lo = b + size; lo < b + n*size; lo += size) {
+            for (char *p = lo; p > b && cmp(p - size, p) > 0; p -= size) {
+                swap(p - size, p, size);
+            }
+        }
+
+pop:
+        if (sp == 0) return;
+        n = stack[--sp];
+        b = (char*)base + stack[--sp] * size;
+    }
+}
+
 static inline __attribute__((always_inline)) void RenderInstances(Vector3 playerPos, bool transparents) {
     uint16_t visibleCount = 0, currentTexIndex = 0, currentNormIndex = 0, currentGlowIndex = 0, currentSpecIndex = 0, currentModelType = 0;
     bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX);
@@ -1521,8 +1609,8 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
     glBindVertexArray(Sys_Render.vao_chunk); // Common vao for RenderShadowmaps and Rasterized Geometry
     glEnable(GL_DEPTH_TEST);
     if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps();
-    __builtin_memset(    lightDirty,0    ,LIGHT_COUNT * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
-    __builtin_memset(dirtyInstances,0,loadedInstances * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
+    SetMemoryToValueForNBytes(    lightDirty,0    ,LIGHT_COUNT * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
+    SetMemoryToValueForNBytes(dirtyInstances,0,loadedInstances * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
     glBindFramebuffer(GL_FRAMEBUFFER, Sys_Render.gBufferFBO);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
     glEnable(GL_CULL_FACE); glDisable(GL_BLEND); // Opaques

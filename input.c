@@ -2,7 +2,6 @@
 #include "gl.h"
 #include "voxen.h"
 #include "glfw_defines.h"
-#include <stdio.h>
 InputSystem Sys_Input;
 extern uint16_t editModeTestEntityDefinition;
 extern uint16_t editModeSelection;
@@ -108,17 +107,16 @@ void LoadConfig(void) {
     OS_Close(f);
 }
 
+void FilePrintString(OsFileHandle f, const char* fmt, ...);
 void SaveConfig(void) {
-    FILE* f = fopen("./Data/Config.ini", "w");
-    if (!f) { DualLogError("Unable to save ./Data/Config.ini!\n"); return; }
-
-    for (int i = 0; i < configTableSize; i++) {
-        if (configTable[i].type == SETTING_U8)         fprintf(f, "%s = %u\n", configTable[i].name, *(uint8_t*)configTable[i].ptr);
-        else if (configTable[i].type == SETTING_U16)   fprintf(f, "%s = %u\n", configTable[i].name, *(uint16_t*)configTable[i].ptr);
-        else if (configTable[i].type == SETTING_INPUT) fprintf(f, "%s = %s\n", configTable[i].name, inputElements[*(uint16_t*)configTable[i].ptr].name);
+    OsFileHandle f = OS_OpenWriteonly("./Data/Config.ini");
+    for (int i=0;i<configTableSize;++i) {
+        if (configTable[i].type == SETTING_U8)         FilePrintString(f,"%s = %u\n",configTable[i].name,*(uint8_t*)configTable[i].ptr);
+        else if (configTable[i].type == SETTING_U16)   FilePrintString(f,"%s = %u\n",configTable[i].name,*(uint16_t*)configTable[i].ptr);
+        else if (configTable[i].type == SETTING_INPUT) FilePrintString(f,"%s = %s\n",configTable[i].name,inputElements[*(uint16_t*)configTable[i].ptr].name);
     }
 
-    fclose(f);
+    OS_Close(f);
     DualLog("Saved settings to ./Data/Config.ini!\n");
 }
 
