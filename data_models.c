@@ -2,6 +2,7 @@
 #include "os.h"
 #include "gl.h"
 #include "voxen.h"
+#include <string.h>
 
 float** modelVertices = NULL;
 uint32_t** modelTriangles = NULL;
@@ -18,7 +19,7 @@ static float**    thread_temp_nrm   = NULL;
 static float**    thread_temp_uv    = NULL;
 static float**    thread_out_verts  = NULL;
 static uint32_t** thread_out_tris   = NULL;
-static int        num_parse_threads = 1;
+static int        num_parse_threads = 0;
 
 static inline __attribute__((always_inline)) uint32_t parse_numberu32_pure(const char* str) {
     uint32_t result = 0;
@@ -43,28 +44,17 @@ static inline __attribute__((always_inline)) float parse_float_pure(const char* 
     return sign * value;
 }
 
-static inline __attribute__((always_inline)) void* memchr(const void* s, int c, size_t n) {
-    const unsigned char* p = (const unsigned char*)s;
-    unsigned char v = (unsigned char)c;
-    while (n--) if (*p == v) return (void*)p; else p++;
-    return NULL;
-}
-
-static __attribute__((hot)) __attribute__((optimize("O3"))) __attribute__((flatten))
-bool ParseOBJ(const char* __restrict data, int file_size, float* __restrict temp_pos, float* __restrict temp_nrm, float* __restrict temp_uv, float* __restrict scratch_verts, uint32_t* __restrict scratch_tris, float** out_vertices, uint32_t* out_vertex_count, uint32_t** out_triangles, uint32_t* out_triangle_count, float* out_minx, float* out_miny, float* out_minz, float* out_maxx, float* out_maxy, float* out_maxz) {
+static __attribute__((hot)) __attribute__((optimize("O3"))) __attribute__((flatten)) bool ParseOBJ(const char* __restrict data, int file_size, float* __restrict temp_pos, float* __restrict temp_nrm, float* __restrict temp_uv, float* __restrict scratch_verts, uint32_t* __restrict scratch_tris, float** out_vertices, uint32_t* out_vertex_count, uint32_t** out_triangles, uint32_t* out_triangle_count, float* out_minx, float* out_miny, float* out_minz, float* out_maxx, float* out_maxy, float* out_maxz) {
     *out_vertices = NULL; *out_triangles = NULL;
     *out_vertex_count = *out_triangle_count = 0;
     if (unlikely(!data || file_size <= 0)) return false;
 
     uint32_t vi = 0, ni = 0, ui = 0;
     uint32_t vert_idx = 0;
-
     float minx = 1e9f, miny = 1e9f, minz = 1e9f;
     float maxx = -1e9f, maxy = -1e9f, maxz = -1e9f;
-
     const char* p = data;
     const char* const end = data + file_size;
-
     while (likely(p < end)) {
         const char c = *p;
         if (likely(c == 'v')) {
@@ -151,16 +141,13 @@ bool ParseOBJ(const char* __restrict data, int file_size, float* __restrict temp
     #define HASH_SIZE 32768
     uint32_t hash_table[HASH_SIZE];
     SetMemoryToValueForNBytes(hash_table, 0xFF, sizeof(hash_table)); // 0xFFFFFFFF = empty
-
     float* unique_verts = scratch_verts;  // reuse scratch
     uint32_t* remap      = (uint32_t*)scratch_tris; // reuse scratch for remap
     uint32_t unique_cnt  = 0;
-
     for (uint32_t i = 0; i < vert_idx; ++i) {
         const float* v = scratch_verts + (i << 3);
         uint64_t h = *(uint64_t*)(v+0) ^ *(uint64_t*)(v+2) ^ *(uint64_t*)(v+4) ^ *(uint64_t*)(v+6);
         uint32_t slot = (uint32_t)(h ^ (h >> 32)) & (HASH_SIZE-1);
-
         while (hash_table[slot] != 0xFFFFFFFF) {
             const float* candidate = unique_verts + (hash_table[slot] << 3);
             if (__builtin_memcmp(candidate, v, 32) == 0) { // exact match
@@ -172,14 +159,14 @@ bool ParseOBJ(const char* __restrict data, int file_size, float* __restrict temp
 
         hash_table[slot] = unique_cnt;
         remap[i] = unique_cnt;
-        CopyMemoryFromBtoAForNBytes(unique_verts + (unique_cnt << 3), v, 32);
+        __builtin_memcpy(unique_verts + (unique_cnt << 3), v, 32);
         ++unique_cnt;
     next_vertex:;
     }
 
     size_t vbytes = (size_t)unique_cnt * 8 * sizeof(float);
     float* final_verts = (float*)OS_AllocateRAM(NULL, vbytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-    CopyMemoryFromBtoAForNBytes(final_verts, unique_verts, vbytes);
+    __builtin_memcpy(final_verts, unique_verts, vbytes);
     size_t ibytes = (size_t)vert_idx * sizeof(uint32_t); // still need full index list
     uint32_t* final_tris = (uint32_t*)OS_AllocateRAM(NULL, ibytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
     for (uint32_t i = 0; i < vert_idx; ++i) final_tris[i] = remap[i];
@@ -218,6 +205,7 @@ void LoadModels(void) {
     typedef struct { const char* data; int size; } RawOBJ;
     RawOBJ* rawModels = OS_AllocateRAM(NULL, loadedModelsMaxIndex * sizeof(RawOBJ), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
     SetMemoryToValueForNBytes(rawModels, 0, loadedModelsMaxIndex * sizeof(RawOBJ));
+    #pragma omp parallel for schedule(dynamic)
     for (uint32_t i = 0; i < loadedModelsMaxIndex; ++i) {
         int32_t parserIdx = indexToParser[i];
         if (unlikely(parserIdx < 0 || parserIdx >= (int32_t)mpars.count)) continue;
@@ -230,6 +218,8 @@ void LoadModels(void) {
     }
 
     double timeAtStartOfSecondLoop = get_time();
+    num_parse_threads = omp_get_max_threads();
+    if (unlikely(num_parse_threads < 1)) num_parse_threads = 1;
     thread_temp_pos  = (float**)OS_AllocateRAM(NULL, (size_t)num_parse_threads * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
     thread_temp_nrm  = (float**)OS_AllocateRAM(NULL, (size_t)num_parse_threads * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
     thread_temp_uv   = (float**)OS_AllocateRAM(NULL, (size_t)num_parse_threads * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
@@ -243,6 +233,7 @@ void LoadModels(void) {
         thread_out_tris[t]  = (uint32_t*)OS_AllocateRAM(NULL, MAX_OUTPUT_VERTS * sizeof(uint32_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
     }
     
+    #pragma omp parallel for schedule(dynamic)
     for (uint32_t i = 0; i < loadedModelsMaxIndex; ++i) {
         int32_t parserIdx = indexToParser[i];
         if (unlikely(parserIdx < 0 || parserIdx >= (int32_t)mpars.count)) continue;
@@ -252,7 +243,7 @@ void LoadModels(void) {
         int file_size = rawModels[i].size;
         if (unlikely(!data || file_size <= 0)) continue;
 
-        int tid = 0;
+        int tid = omp_get_thread_num();
         float minx, miny, minz, maxx, maxy, maxz;
         if (unlikely(!ParseOBJ(data, file_size, thread_temp_pos[tid], thread_temp_nrm[tid], thread_temp_uv[tid], thread_out_verts[tid], thread_out_tris[tid], &modelVertices[i], &modelVertexCounts[i], &modelTriangles[i], &modelTriangleCounts[i], &minx, &miny, &minz, &maxx, &maxy, &maxz))) continue;
 
@@ -301,12 +292,12 @@ void LoadModels(void) {
         glBindBuffer(GL_ARRAY_BUFFER, Sys_Render.vbos[i]);
         glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)vertSize, NULL, GL_STATIC_DRAW);
         void* ptr = glMapBufferRange(GL_ARRAY_BUFFER, 0, (GLsizeiptr)vertSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
-        CopyMemoryFromBtoAForNBytes(ptr, modelVertices[i], vertSize);
+        __builtin_memcpy(ptr, modelVertices[i], vertSize);
         glUnmapBuffer(GL_ARRAY_BUFFER);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Sys_Render.tbos[i]);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)triSize, NULL, GL_STATIC_DRAW);
         ptr = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, (GLsizeiptr)triSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
-        CopyMemoryFromBtoAForNBytes(ptr, modelTriangles[i], triSize);
+        __builtin_memcpy(ptr, modelTriangles[i], triSize);
         glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
     }
 

@@ -2,25 +2,6 @@
 #include "os.h"
 #include "voxen.h"
 #define STBIW_UCHAR(x) (unsigned char)((x) & 0xff)
-
-void* SetMemoryToValueForNBytes(void *dst, int c, size_t n) { // memset replacement
-    unsigned char *p = (unsigned char *)dst;
-    unsigned char v = (unsigned char)c;
-    while (n--) *p++ = v;
-    return dst;
-}
-// void* memset(void *dst, int c, size_t n) { return SetMemoryToValueForNBytes(dst,c,n); }
-
-
-void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n) { // memcpy replacement
-    unsigned char *d = (unsigned char *)dst;
-    const unsigned char *s = (const unsigned char *)src;
-    while (n--) *d++ = *s++;
-    return dst;
-}
-// void* memcpy(void *dst, const void *src, size_t n) { return CopyMemoryFromBtoAForNBytes(dst,src,n); }
-
-
 typedef void stbi_write_func(void *context, void *data, int size);
 
 typedef struct {

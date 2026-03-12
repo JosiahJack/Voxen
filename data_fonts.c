@@ -2,6 +2,7 @@
 #include "os.h"
 #include "gl.h"
 #include "voxen.h"
+// #define DUMP_FONT_BITMAPS
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "./External/stb_truetype.h"
 // MAX_GLYPHS is 4096 as is FONT_ATLAS_SIZE which is more than twice as large as needed without hiragana/katakana present
@@ -128,19 +129,21 @@ static bool load_font_cache(const char *path, int32_t expected_glyphs, const uin
     return true;
 }
 
-int stbi_write_bmp(char const *filename, int x, int y, int comp, const void *data);
-static void dump_atlas_bmp(const char *bmp_path, const unsigned char *atlas_data) {
-    // stbi_write_bmp expects RGB data, so expand R8 -> RGB24
-    unsigned char *rgb = OS_AllocateRAM(NULL, FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * 3, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-    for (int i = 0; i < FONT_ATLAS_SIZE * FONT_ATLAS_SIZE; ++i) {
-        unsigned char v = atlas_data[i];
-        rgb[i*3+0] = v;
-        rgb[i*3+1] = v;
-        rgb[i*3+2] = v;
+#ifdef DUMP_FONT_BITMAPS
+    int stbi_write_bmp(char const *filename, int x, int y, int comp, const void *data);
+    static void dump_atlas_bmp(const char *bmp_path, const unsigned char *atlas_data) {
+        // stbi_write_bmp expects RGB data, so expand R8 -> RGB24
+        unsigned char *rgb = OS_AllocateRAM(NULL, FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * 3, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+        for (int i = 0; i < FONT_ATLAS_SIZE * FONT_ATLAS_SIZE; ++i) {
+            unsigned char v = atlas_data[i];
+            rgb[i*3+0] = v;
+            rgb[i*3+1] = v;
+            rgb[i*3+2] = v;
+        }
+        stbi_write_bmp(bmp_path, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 3, rgb);
+        OS_DeallocateRAM(rgb, FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * 3);
     }
-    stbi_write_bmp(bmp_path, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 3, rgb);
-    OS_DeallocateRAM(rgb, FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * 3);
-}
+#endif
 
 void InitFontAtlasses(void) {
     double t0 = get_time();
@@ -212,8 +215,10 @@ void InitFontAtlasses(void) {
     glTextureParameteri(fontAtlasTex,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
     glTextureParameteri(fontAtlasTex,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
     write_font_cache(pri_cache,pri_expected,fbx_stamp1,fontPackedChar, numPackedGlyphs,fixedNumberAdvanceWidth, bmp);
-    dump_atlas_bmp("./Fonts/SystemShockText_atlas.bmp", bmp);
-
+    #ifdef DUMP_FONT_BITMAPS
+        dump_atlas_bmp("./Fonts/SystemShockText_atlas.bmp", bmp);
+    #endif
+        
     // Secondary
     SetMemoryToValueForNBytes(bmp,0,FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * sizeof(unsigned char));
     stbtt_pack_context pc2;
@@ -255,7 +260,9 @@ void InitFontAtlasses(void) {
     glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     write_font_cache(sec_cache, sec_expected, fbx_stamp2, fontPackedCharStopD, numPackedGlyphsStopD, fixedNumberAdvanceWidthStopD, bmp);
-    dump_atlas_bmp("./Fonts/StopD_atlas.bmp", bmp);
+    #ifdef DUMP_FONT_BITMAPS
+        dump_atlas_bmp("./Fonts/StopD_atlas.bmp", bmp);
+    #endif
     OS_DeallocateRAM(bmp,FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * sizeof(unsigned char));
     DualLog(" took %f s\n", get_time() - t0);
 }

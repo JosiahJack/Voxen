@@ -94,7 +94,7 @@ MAC_CC="gcc"
 COMMON_CFLAGS="-fno-exceptions -fno-stack-protector -fno-asynchronous-unwind-tables -fno-unwind-tables \
                -U_FORTIFY_SOURCE -fvisibility=hidden -I./External/ -pipe -fno-ident -fdata-sections \
                -ffunction-sections -ffast-math -g1 -std=c11 -Wall -Wextra -Wno-implicit-fallthrough \
-               -fomit-frame-pointer -fstrict-aliasing -fno-common -Walloca -Wstack-usage=262144 \
+               -fomit-frame-pointer -fstrict-aliasing -fno-common -Walloca -Wstack-usage=262144 -fopenmp \
                -Wformat=2 -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings -fno-math-errno \
                -fno-plt -fno-semantic-interposition -fno-trapping-math -fmerge-all-constants -m64 -Og"
 
@@ -120,7 +120,7 @@ else
     CC=$LINUX_CC
     LINKER="mold -run gcc"
     CFLAGS="-march=x86-64 -mtune=generic $COMMON_CFLAGS"
-    LDFLAGS="-Wl,--gc-sections -Wl,--sort-common -Wl,-O1 -L./External/Linux -lglfw -lm -l:libminiaudio.0.11.22.a -lGL -Wl,--as-needed -Wl,-z,now -Wl,-z,relro -s"
+    LDFLAGS="-Wl,--gc-sections -fopenmp -Wl,--sort-common -Wl,-O1 -L./External/Linux -lglfw -lm -l:libminiaudio.0.11.22.a -lGL -Wl,--as-needed -Wl,-z,now -Wl,-z,relro -s"
     BINARY_NAME="voxen"
 fi
 

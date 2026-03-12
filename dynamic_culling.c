@@ -564,6 +564,7 @@ void CullInit(void) {
     (void)UpdatedPlayerCell();
     int32_t cellToCellIdx = playerCellIdx * ARRSIZE;
     int32_t numFoundVisibleCellsForPlayerStart = 0;
+    #pragma omp parallel for collapse(2)
     for (int32_t z=0;z<WORLDZ;++z) {
         for (int32_t x=0;x<WORLDX;++x) {
             int32_t cellIdx = (z * WORLDX) + x;

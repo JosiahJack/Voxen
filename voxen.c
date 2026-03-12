@@ -542,6 +542,7 @@ __attribute__((cold)) void LoadEntities(void) {
     if (entityCount == 0) { DualLogError("No entities found in entities.txt\n"); OS_Exit(1); }
 
     SetMemoryToValueForNBytes(entities,0,MAX_ENTITIES * sizeof(Entity));
+    #pragma omp parallel for
     for (int32_t i = 0; i < entityCount; i++) {
         if (entity_parser.entries[i].index == UINT16_MAX) continue;
 
@@ -894,21 +895,24 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     DualLog("Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed\n");
     if (!glfwInit()) { DualLogError("GLFW initialization failed\n"); OS_Exit(1); }
     
+    double initMarker2 = get_time();
+    DualLog("GLFW init took %f secs\n",initMarker2 - init_start_time);
     glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_SRGB_CAPABLE, 0);
     glfwWindowHint(GLFW_RESIZABLE, 1);
     LoadConfig(); // Get settings before setting window size.
-    DualLog("Loaded Config.ini with resolution %u x %u\n",Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
     window = glfwCreateWindow(Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, "Voxen", NULL, NULL);
     glfwSetFramebufferSizeCallback(window, UpdateScreenSize);
     if (!window) { DualLogError("glfwCreateWindow failed\n"); OS_Exit(1); }
 
     glfwMakeContextCurrent(window);
+    DualLog("Load Config.ini, glfw create window and GL context took %f secs\n",get_time() - initMarker2);
     if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress)) { DualLogError("Failed to initialize GLAD\n"); OS_Exit(1); }
     
-//     CycleToNextMonitor();
+    double initMarker3 = get_time();
+    CycleToNextMonitor();
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSetKeyCallback(window, key_callback);
     glfwSetJoystickCallback(joystick_callback);
@@ -919,6 +923,8 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Globally same alpha blending
     CompileShaders();
+    double initMarker4 = get_time();
+    DualLog("Set monitor, Set GLFW callbacks, Compile shaders took %f secs\n",initMarker4 - initMarker3);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
     GLuint vaos[4]; GLuint vbos[4];
     glCreateVertexArrays(4, vaos);
@@ -948,16 +954,18 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     glEnableVertexArrayAttrib(Sys_Render.debugLinesVAO, 0);
     glVertexArrayAttribBinding(Sys_Render.debugLinesVAO, 0, 0);
     glVertexArrayVertexBuffer(Sys_Render.debugLinesVAO, 0, Sys_Render.debugLinesVBO, 0, 3 * sizeof(float));
-    InitializeAudio(); // Audio
     float* m = shadowmapsPerspectiveProjection;
     m[0] = 1.0f; m[1] = 0.0f; m[2] =                                                                  0.0f; m[3] =  0.0f;
     m[4] = 0.0f; m[5] = 1.0f; m[6] =                                                                  0.0f; m[7] =  0.0f;
     m[8] = 0.0f; m[9] = 0.0f; m[10]=      -(LIGHT_RANGE_MAX + NEAR_PLANE) / (LIGHT_RANGE_MAX - NEAR_PLANE); m[11]= -1.0f;
     m[12]= 0.0f; m[13]= 0.0f; m[14]= -2.0f * LIGHT_RANGE_MAX * NEAR_PLANE / (LIGHT_RANGE_MAX - NEAR_PLANE); m[15]=  0.0f;
+    DualLog("GL buffer definitions took %f secs\n", get_time() - initMarker4);
+    InitializeAudio(); // Audio
     LoadGameModDefinition();
     LoadEntities();
-    BioMonitorInit();
     InitFontAtlasses();
+    double nextInitTimeSection = get_time();
+    BioMonitorInit();
     RenderLoadingProgress(80,"Loading...");
     glGenFramebuffers(1, &Sys_Render.gBufferFBO);
     ApplySettings(); // After loading of text and game data.
@@ -988,7 +996,6 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     }
 
     DebugRAM("after freeing window bar icon");
-    DualLog("GL buffers, FBO, fonts, audio, localization, and window init took %f secs\n", get_time() - init_start_time);
     float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     CopyMemoryFromBtoAForNBytes(&modelMatrices[0],mat,16 * sizeof(float)); // Null instance matrix used for UI
     Sys_Render.cellVisibleDataID       = SetupSSBO(&Sys_Render.cellVisibleDataID,        4, ARRSIZE * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
@@ -1008,6 +1015,7 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     Sys_Render.texturePaletteOffsetsID = SetupSSBO(&Sys_Render.texturePaletteOffsetsID, 17, MAX_VALID_TEXTURE * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     Sys_Render.lightsID                = SetupSSBO(&Sys_Render.lightsID,                19, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_STATIC_DRAW);
     Sys_Render.uniqueLightListsID      = SetupSSBO(&Sys_Render.uniqueLightListsID,      27, VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+    DualLog("GL SSBOs and Settings Apply... took %f secs\n",get_time() - nextInitTimeSection);
     if (Sys_Global.introNotPlayed) {} // TODO: Play intro
     NewGame();
     play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500);
@@ -1798,9 +1806,4 @@ int32_t main(void) {
         #endif
     }
     return 0;
-}
-
-void _start(void) {
-    main();
-    __asm__ __volatile__("mov $60, %%rax; xor %%rdi, %%rdi; syscall");
 }

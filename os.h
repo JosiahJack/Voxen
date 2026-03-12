@@ -14,6 +14,7 @@ typedef __SIZE_TYPE__ size_t;
 typedef __UINTPTR_TYPE__ uintptr_t;
 typedef __INTPTR_TYPE__ intptr_t;
 #include <stdio.h>
+#include <omp.h>
 #define bool _Bool
 #define true 1
 #define false 0

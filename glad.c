@@ -1477,6 +1477,7 @@ static int glad_gl_find_core_gl(void) {
 }
 
 int gladLoadGLUserPtr( GLADuserptrloadfunc load, void *userptr) {
+    double startTime = get_time();
     int version;
 
     glad_glGetString = (PFNGLGETSTRINGPROC) load(userptr, "glGetString");
@@ -1508,6 +1509,7 @@ int gladLoadGLUserPtr( GLADuserptrloadfunc load, void *userptr) {
     glad_gl_load_GL_ARB_shader_storage_buffer_object(load, userptr);
     glad_gl_load_GL_ARB_texture_storage(load, userptr);
     glad_gl_load_GL_ARB_texture_view(load, userptr);
+    DualLog("GL function loading took %f secs\n",get_time() - startTime);
     return version;
 }
 

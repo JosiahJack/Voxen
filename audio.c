@@ -31,11 +31,13 @@ MusicSystem Sys_Music;
 // Usage: play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f); WORKED!
 
 void InitializeAudio(void) {
+    double startTime = get_time();
     ma_result result;
     ma_engine_config engine_config = ma_engine_config_init();
     engine_config.channels = 2; // Stereo output, adjust if needed
     result = ma_engine_init(&engine_config, &audio_engine);
-    if (result != MA_SUCCESS) { DualLog("ERROR: Failed to initialize miniaudio engine: %d\n", result); return; }
+    if (result != MA_SUCCESS) DualLog("ERROR: Failed to initialize miniaudio engine: %d\n", result);
+    DualLog("Initialize Audio took %f secs\n",get_time() - startTime);
 }
 
 void mp3_clear(void) {

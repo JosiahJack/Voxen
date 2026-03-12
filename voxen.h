@@ -1802,5 +1802,3 @@ typedef __builtin_va_list va_list;
 int StringFormatV(char* buffer, size_t bufferSize, const char* format, va_list args);
 int StringFormat(char* buffer, size_t bufferSize, const char* format, ...);
 char* GetNextStringUpToNewlineOrEOF(char* buf, int size, long fd);
-void* SetMemoryToValueForNBytes(void *dst, int c, size_t n);
-void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n);

@@ -29,14 +29,14 @@ size_t utf16le_to_utf8(const uint8_t* src, size_t src_len, char* dst, size_t dst
 void LoadTextForLanguage(uint8_t lang) {
     char textFile[256];
     switch (lang) {
-        case 1:  StringCopyInto_A_From_B(textFile, "./Data/text_espanol.txt", 256); break;
-        case 2:  StringCopyInto_A_From_B(textFile, "./Data/text_deutsch.txt", 256); break;
-        case 3:  StringCopyInto_A_From_B(textFile, "./Data/text_francais.txt", 256); break;
-        case 4:  StringCopyInto_A_From_B(textFile, "./Data/text_nihongo.txt", 256); break;
-        case 5:  StringCopyInto_A_From_B(textFile, "./Data/text_russkiy.txt", 256); break;
-        case 6:  StringCopyInto_A_From_B(textFile, "./Data/text_italiano.txt", 256); break;
-        case 7:  StringCopyInto_A_From_B(textFile, "./Data/text_portugues.txt", 256); break;
-        default: StringCopyInto_A_From_B(textFile, "./Data/text_english.txt", 256); break;
+        case 1:  strncpy(textFile, "./Data/text_espanol.txt", 256); break;
+        case 2:  strncpy(textFile, "./Data/text_deutsch.txt", 256); break;
+        case 3:  strncpy(textFile, "./Data/text_francais.txt", 256); break;
+        case 4:  strncpy(textFile, "./Data/text_nihongo.txt", 256); break;
+        case 5:  strncpy(textFile, "./Data/text_russkiy.txt", 256); break;
+        case 6:  strncpy(textFile, "./Data/text_italiano.txt", 256); break;
+        case 7:  strncpy(textFile, "./Data/text_portugues.txt", 256); break;
+        default: strncpy(textFile, "./Data/text_english.txt", 256); break;
     }
 
     
