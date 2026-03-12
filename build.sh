@@ -91,34 +91,36 @@ LINUX_CC="gcc"
 WINDOWS_CC="x86_64-w64-mingw32-gcc"
 ANDROID_CC="aarch64-linux-android24-clang"
 MAC_CC="gcc"
-COMMON_CFLAGS="-ffreestanding -fno-exceptions -fno-stack-protector -fno-builtin -I./External/ -pipe -fno-ident \
-               -fdata-sections -ffunction-sections -ffast-math -g1 -std=c11 -Wall -Wextra -Wno-implicit-fallthrough \
-               -fno-omit-frame-pointer -fstrict-aliasing -fno-common -Walloca -Wstack-usage=262144 \
-               -Wformat=2 -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings -Og"
+COMMON_CFLAGS="-fno-exceptions -fno-stack-protector -fno-asynchronous-unwind-tables -fno-unwind-tables \
+               -U_FORTIFY_SOURCE -fvisibility=hidden -I./External/ -pipe -fno-ident -fdata-sections \
+               -ffunction-sections -ffast-math -g1 -std=c11 -Wall -Wextra -Wno-implicit-fallthrough \
+               -fomit-frame-pointer -fstrict-aliasing -fno-common -Walloca -Wstack-usage=262144 \
+               -Wformat=2 -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings -fno-math-errno \
+               -fno-plt -fno-semantic-interposition -fno-trapping-math -fmerge-all-constants -m64 -Og"
 
 if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
     LINKER=$CC
-    CFLAGS="-D_WIN32 $COMMON_CFLAGS -fno-asynchronous-unwind-tables -mno-stack-arg-probe"
-    LDFLAGS="-L./ -L./External/Windows -lopengl32 -l:glfw3.dll -flto=auto"
+    CFLAGS="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe"
+    LDFLAGS=""
     BINARY_NAME="voxen.exe"
 elif [ "$PLATFORM" = "mac" ]; then
     CC=$LINUX_CC
     LINKER=$LINUX_CC
     CFLAGS="-D__APPLE__ $COMMON_CFLAGS"
-    LDFLAGS="-L./External/Mac -l:libglfw3.a -lGL"
+    LDFLAGS="-L./External/Mac -l:libglfw3.a"
     BINARY_NAME="voxen.app"
 elif [ "$PLATFORM" = "android" ]; then
     CC=$ANDROID_CC
     LINKER=$CC
     CFLAGS="-D__ANDROID__ -fPIC $COMMON_CFLAGS"
-    LDFLAGS="-L./External/Android -landroid -llog -lGLESv3 -lEGL -lm"
+    LDFLAGS="-L./External/Android -landroid -llog"
     BINARY_NAME="voxen_android"
 else
     CC=$LINUX_CC
     LINKER="mold -run gcc"
-    CFLAGS="-march=haswell -mtune=haswell $COMMON_CFLAGS"
-    LDFLAGS="-flto -Wl,--gc-sections -L./External/Linux -l:libglfw3.5.a -l:libminiaudio.0.11.22.a -lGL"
+    CFLAGS="-march=x86-64 -mtune=generic $COMMON_CFLAGS"
+    LDFLAGS="-Wl,--gc-sections -Wl,--sort-common -Wl,-O1 -L./External/Linux -lglfw -lm -l:libminiaudio.0.11.22.a -lGL -Wl,--as-needed -Wl,-z,now -Wl,-z,relro -s"
     BINARY_NAME="voxen"
 fi
 
@@ -126,6 +128,7 @@ export CC=$CC
 export CFLAGS=$CFLAGS
 SOURCES="voxen.c physics.c helpers.c init.c menu.c audio.c animation.c console.c biomonitor.c level.c data_parser.c \
          data_text.c data_fonts.c data_models.c dynamic_culling.c todo.c input.c data_textures.c glad.c"
+
 export TEMP_DIR=temp_build
 printf "%s\n" $SOURCES | xargs -P12 -I{} $CC -c {} $CFLAGS -o "$TEMP_DIR"/{}.o
 # $CC -c data_textures.c $CFLAGS -fsanitize=address -o "$TEMP_DIR"/data_textures.o
@@ -144,7 +147,8 @@ if ! $IS_CI; then
         windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; WINEPATH="External/Windows" wine ./voxen.exe ;;
         mac)      ./voxen.app ;;
         android)  java -jar bundletool.jar build-apks --bundle=voxen.aab --output=voxen.app;;
-        *)        strip --strip-all voxen; ./voxen ;;   # linux
+        *)        strip --strip-all voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
+#         *)        ./voxen ;;   # linux
     esac
     rm -f "$TEMP_DIR"/*.o ./Shaders/*.h "$TEMP_DIR"/*.cpp #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.
 fi

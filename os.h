@@ -13,6 +13,7 @@ typedef __UINT64_TYPE__ uint64_t;
 typedef __SIZE_TYPE__ size_t;
 typedef __UINTPTR_TYPE__ uintptr_t;
 typedef __INTPTR_TYPE__ intptr_t;
+#include <stdio.h>
 #define bool _Bool
 #define true 1
 #define false 0
@@ -445,3 +446,5 @@ static inline __attribute__((always_inline)) int64_t OS_Tell(OsFileHandle fd) {
     return rax;
 #endif
 }
+
+#include "underversion_libc.h"

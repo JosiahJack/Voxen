@@ -856,8 +856,8 @@ static int stbtt__GetGlyphShapeTT(const stbtt_fontinfo *info, int glyph_index, s
                if (comp_verts) STBTT_free(comp_verts);
                return 0;
             }
-            if (num_vertices > 0 && vertices) CopyMemoryFromBtoAForNBytes(tmp, vertices, num_vertices*sizeof(stbtt_vertex));
-            CopyMemoryFromBtoAForNBytes(tmp+num_vertices, comp_verts, comp_num_verts*sizeof(stbtt_vertex));
+            if (num_vertices > 0 && vertices) __builtin_memcpy(tmp, vertices, num_vertices*sizeof(stbtt_vertex));
+            __builtin_memcpy(tmp+num_vertices, comp_verts, comp_num_verts*sizeof(stbtt_vertex));
             if (vertices) STBTT_free(vertices);
             vertices = tmp;
             STBTT_free(comp_verts);
@@ -1836,8 +1836,8 @@ static void stbtt__rasterize_sorted_edges(stbtt__bitmap *result, stbtt__edge *e,
       float scan_y_top    = (float)y + 0.0f;
       float scan_y_bottom = (float)y + 1.0f;
       stbtt__active_edge **step = &active;
-      SetMemoryToValueForNBytes(scanline , 0, (size_t)result->w*sizeof(scanline[0]));
-      SetMemoryToValueForNBytes(scanline2, 0, ((size_t)result->w+1)*sizeof(scanline[0]));
+      __builtin_memset(scanline , 0, (size_t)result->w*sizeof(scanline[0]));
+      __builtin_memset(scanline2, 0, ((size_t)result->w+1)*sizeof(scanline[0]));
 
       // update all active edges;
       // remove all active edges that terminate before the top of this scanline
@@ -2292,7 +2292,7 @@ STBTT_DEF int stbtt_PackBegin(stbtt_pack_context *spc, unsigned char *pixels, in
    context->height = ph-padding;
    context->x = 0; context->y = 0;
    context->bottom_y = 0;
-   if (pixels) SetMemoryToValueForNBytes(pixels, 0, (size_t)(pw*ph)); // background of 0 around pixels
+   if (pixels) __builtin_memset(pixels, 0, (size_t)(pw*ph)); // background of 0 around pixels
    return 1;
 }
 
@@ -2302,11 +2302,11 @@ static void stbtt__h_prefilter(unsigned char *pixels, int w, int h, int stride_i
    unsigned char buffer[STBTT_MAX_OVERSAMPLE];
    int safe_w = w - (int)kernel_width;
    int j;
-   SetMemoryToValueForNBytes(buffer, 0, STBTT_MAX_OVERSAMPLE); // suppress bogus warning from VS2013 -analyze
+   __builtin_memset(buffer, 0, STBTT_MAX_OVERSAMPLE); // suppress bogus warning from VS2013 -analyze
    for (j=0; j < h; ++j) {
       int i;
       unsigned int total;
-      SetMemoryToValueForNBytes(buffer, 0, kernel_width);
+      __builtin_memset(buffer, 0, kernel_width);
       total = 0;
 
       // make kernel_width a constant in common cases so compiler can optimize out the divide
@@ -2361,11 +2361,11 @@ static void stbtt__v_prefilter(unsigned char *pixels, int w, int h, int stride_i
    unsigned char buffer[STBTT_MAX_OVERSAMPLE];
    int safe_h = h - (int)kernel_width;
    int j;
-   SetMemoryToValueForNBytes(buffer, 0, STBTT_MAX_OVERSAMPLE); // suppress bogus warning from VS2013 -analyze
+   __builtin_memset(buffer, 0, STBTT_MAX_OVERSAMPLE); // suppress bogus warning from VS2013 -analyze
    for (j=0; j < w; ++j) {
       int i;
       unsigned int total;
-      SetMemoryToValueForNBytes(buffer, 0, kernel_width);
+      __builtin_memset(buffer, 0, kernel_width);
       total = 0;
 
       // make kernel_width a constant in common cases so compiler can optimize out the divide

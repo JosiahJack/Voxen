@@ -125,33 +125,33 @@ void RenderMenu(void) {
     if (currentMenuPage == MenuPages_FrontPage) {
         menuItemCount = 4; menuTabCount = 1;
         RenderUIImage(282,46, 800,128, 1031); // Title CITADEL with strikethrough effect
-        if (UI_MenuButton(408,340,0,574,84, 304,188,"SINGLEPLAYER",413,276)) ChangeMenuPage(MenuPages_Singleplayer);
-        if (UI_MenuButton(408,458,1,574,84, 304,268,"MULTIPLAYER", 413,396)) ChangeMenuPage(MenuPages_Multiplayer);
-        if (UI_MenuButton(408,582,2,574,84, 304,350,"OPTIONS",     413,520)) ChangeMenuPage(MenuPages_Options);
-        if (UI_MenuButton(408,702,3,574,84, 304,430,"QUIT",        413,638)) OS_Exit(0);
+        if (UI_MenuButton(408,340,0,574,84, 304,188,/*"SINGLEPLAYER"*/Sys_Text.stringTable[719],413,276)) ChangeMenuPage(MenuPages_Singleplayer);
+        if (UI_MenuButton(408,458,1,574,84, 304,268,/*"MULTIPLAYER"*/Sys_Text.stringTable[720], 413,396)) ChangeMenuPage(MenuPages_Multiplayer);
+        if (UI_MenuButton(408,582,2,574,84, 304,350,/*"OPTIONS"*/Sys_Text.stringTable[721],     413,520)) ChangeMenuPage(MenuPages_Options);
+        if (UI_MenuButton(408,702,3,574,84, 304,430,/*"QUIT"*/Sys_Text.stringTable[722],        413,638)) OS_Exit(0);
     } else if (currentMenuPage == MenuPages_Singleplayer) {
         menuItemCount = 5; menuTabCount = 1;
-        UI_HeaderText(250,"SINGLEPLAYER");
-        if (UI_MenuButton(408,340,0,574,84, 304,188,"CONTINUE",    413,276)) ChangeMenuPage(MenuPages_Load);
-        if (UI_MenuButton(408,458,1,574,84, 304,268,"NEW GAME",    413,396)) ChangeMenuPage(MenuPages_NewGame);
-        if (UI_MenuButton(408,582,2,574,84, 304,350,"PLAY INTRO",  413,520)) ChangeMenuPage(MenuPages_IntroVideo);
-        if (UI_MenuButton(408,702,3,574,84, 304,430,"PLAY CREDITS",413,638)) ChangeMenuPage(MenuPages_CreditsVideo);
+        UI_HeaderText(250,/*"SINGLEPLAYER"*/Sys_Text.stringTable[719]);
+        if (UI_MenuButton(408,340,0,574,84, 304,188,/*"CONTINUE"*/Sys_Text.stringTable[723],    413,276)) ChangeMenuPage(MenuPages_Load);
+        if (UI_MenuButton(408,458,1,574,84, 304,268,/*"NEW GAME"*/Sys_Text.stringTable[741],    413,396)) ChangeMenuPage(MenuPages_NewGame);
+        if (UI_MenuButton(408,582,2,574,84, 304,350,/*"PLAY INTRO"*/Sys_Text.stringTable[742],  413,520)) ChangeMenuPage(MenuPages_IntroVideo);
+        if (UI_MenuButton(408,702,3,574,84, 304,430,/*"PLAY CREDITS"*/Sys_Text.stringTable[743],413,638)) ChangeMenuPage(MenuPages_CreditsVideo);
         RenderUIImage(1060,724, 84,36, 1252); // Back Button background
         bool overBack = false;        
         if (UI_Button(1060,758, 84,32, &overBack, 4) || (MenuEnter() && currentMenuItem == 4)) MenuGoBack();
         overBack = overBack || currentMenuItem == 4;
-        RenderFormattedText(1076,732,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_RED_MENU,FONT_NORMAL,1.0f,"BACK");
+        RenderFormattedText(1076,732,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_RED_MENU,FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]);
     } else if (currentMenuPage == MenuPages_Multiplayer) {
         menuItemCount = 1; menuTabCount = 1;
-        UI_HeaderText(266,"MULTIPLAYER");
+        UI_HeaderText(266,/*"MULTIPLAYER"*/Sys_Text.stringTable[720]);
         RenderUIImage(1060,724, 84,36, 1252); // Back Button background
         bool overBack = false;
         if (UI_Button(1060,758, 84,32, &overBack, 0) || (MenuEnter() && currentMenuItem == 0)) MenuGoBack();
         overBack = overBack || currentMenuItem == 0;
-        RenderFormattedText(1076,732,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_RED_MENU,FONT_NORMAL,1.0f,"BACK");
+        RenderFormattedText(1076,732,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_RED_MENU,FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]);
     } else if (currentMenuPage == MenuPages_Options) {
         menuTabCount = 3;
-        UI_HeaderText(238,"CONFIGURATION");
+        UI_HeaderText(238,/*"CONFIGURATION"*/Sys_Text.stringTable[745]);
         if (currentMenuTab != 0) RenderUIImage(179,220, 1001,548, 1030); // Config background
         if (currentMenuTab == 0) RenderUIImage(179,220, 1001,548, 1033); // Config background graphics (empty alpha center)
         RenderUIImage(520,196, 160,30, currentMenuTab == 2 ? 920 : 921); // Config tab unhighlighted
@@ -217,7 +217,7 @@ void RenderMenu(void) {
             }
             
             overFOV = overFOV || currentMenuItem == 5;
-            RenderFormattedText(200,650,overFOV ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"FIELD OF VIEW %u", Sys_Settings.FOV);
+            RenderFormattedText(200,650,overFOV ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"%s %u",/*Field of View*/Sys_Text.stringTable[775],Sys_Settings.FOV);
             
             // Brightness Slider
             RenderUIImage(400,680, 128,16, 1079); // Slider background
@@ -239,7 +239,7 @@ void RenderMenu(void) {
             }
             
             overBrightness = overBrightness || currentMenuItem == 6;
-            RenderFormattedText(200,680,overBrightness ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"BRIGHTNESS %u", Sys_Settings.Brightness);
+            RenderFormattedText(200,680,overBrightness ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"%s %u",/*Brightness*/Sys_Text.stringTable[771],Sys_Settings.Brightness);
             
             // Resolution
             if (UI_Button(220,726, 280,16, &overRes, 7) || (MenuEnter() && currentMenuItem == 7)) {
@@ -249,7 +249,7 @@ void RenderMenu(void) {
             
             overRes = overRes || currentMenuItem == 7;
             RenderUIImage(476,712, 16,16, overRes ? 1119 : 1077); // Dropdown caret
-            RenderFormattedText(200,710,overRes ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"RESOLUTION %u x %u", Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);            
+            RenderFormattedText(200,710,overRes ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"%s %u x %u",/*Resolution*/Sys_Text.stringTable[771],Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);            
             
             RenderUIImage(200,740, 16,16, 910); // Checkbox background
             if (UI_Button(200,756, 210,16, &overFull, 8) || (MenuEnter() && currentMenuItem == 8)) {
@@ -260,12 +260,12 @@ void RenderMenu(void) {
             
             overFull = overFull || currentMenuItem == 8;
             if (Sys_Settings.Fullscreen) RenderUIImage(202,742, 12,12, 912); // Checkbox check
-            RenderFormattedText(220,740,overFull ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"FULLSCREEN");
+            RenderFormattedText(220,740,overFull ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,/*"Fullscreen"*/Sys_Text.stringTable[773]);
             
             RenderUIImage(588,730, 210,30, 1079); // Toggle monitor button background
             if (UI_Button(588,760, 210,30, &overChgM, 9) || (MenuEnter() && currentMenuItem == 9)) { CycleToNextMonitor(); }
             overChgM = overChgM || currentMenuItem == 9;
-            RenderFormattedText(602,735,overChgM ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"CHANGE MONITOR");
+            RenderFormattedText(602,735,overChgM ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,/*"CHANGE MONITOR"*/Sys_Text.stringTable[1025]);
         } else if (currentMenuTab == 1) {
             menuItemCount = 49; // Input
         } else {
@@ -292,7 +292,7 @@ void RenderMenu(void) {
             }
             
             overMasterVolume = overMasterVolume || currentMenuItem == 0;
-            RenderFormattedText(200,240,overMasterVolume ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"MASTER VOLUME %u", Sys_Settings.VolumeMaster);
+            RenderFormattedText(200,240,overMasterVolume ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"%s %u",/*Master Volume*/Sys_Text.stringTable[802],Sys_Settings.VolumeMaster);
             
             // Music Volume Slider
             RenderUIImage(426,270, 128,16, 1079); // Slider background
@@ -315,7 +315,7 @@ void RenderMenu(void) {
             }
             
             overMusicSlider = overMusicSlider || currentMenuItem == 1;
-            RenderFormattedText(200,270,overMusicSlider ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"MUSIC VOLUME %u", Sys_Settings.VolumeMusic);
+            RenderFormattedText(200,270,overMusicSlider ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"%s %u",/*Music Volume*/Sys_Text.stringTable[803],Sys_Settings.VolumeMusic);
         }
         
         RenderUIImage(1087,723, 84,36, 1252); // Back Button background
@@ -323,42 +323,42 @@ void RenderMenu(void) {
         bool overBack = false;
         if (UI_Button(1087,757, 84,32, &overBack, lastItem) || (MenuEnter() && currentMenuItem == lastItem)) MenuGoBack();
         overBack = overBack || currentMenuItem == lastItem;
-        RenderFormattedText(1103,731,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_RED_MENU,FONT_NORMAL,1.0f,"BACK");
+        RenderFormattedText(1103,731,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_RED_MENU,FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]);
     } else if (currentMenuPage == MenuPages_Load) {
         menuItemCount = 9; menuTabCount = 1;
-        UI_HeaderText(280,"LOAD GAME");
+        UI_HeaderText(280,/*"LOAD"*/Sys_Text.stringTable[726]);
         RenderUIImage(400,214, 586,500, 1037); // Load/Save table background
         RenderUIImage(1060,724, 84,36, 1252); // Back Button background
         bool overBack = false;
         if (UI_Button(1060,758, 84,32, &overBack, 0) || (MenuEnter() && currentMenuItem == 0)) MenuGoBack();
         overBack = overBack || currentMenuItem == 0;
-        RenderFormattedText(1076,732,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_RED_MENU,FONT_NORMAL,1.0f,"BACK");
+        RenderFormattedText(1076,732,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_RED_MENU,FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]);
     } else if (currentMenuPage == MenuPages_Save) {
         menuItemCount = 9; menuTabCount = 1;
-        UI_HeaderText(284,"SAVE GAME");
+        UI_HeaderText(284,/*"SAVE GAME"*/Sys_Text.stringTable[769]);
         RenderUIImage(400,214, 586,500, 1037); // Load/Save table background
         RenderUIImage(1060,724, 84,36, 1252); // Back Button background
         bool overBack = false;
         if (UI_Button(1060,758, 84,32, &overBack, 0) || (MenuEnter() && currentMenuItem == 0)) MenuGoBack();
         overBack = overBack || currentMenuItem == 0;
-        RenderFormattedText(1076,732,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_RED_MENU,FONT_NORMAL,1.0f,"BACK");
+        RenderFormattedText(1076,732,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_RED_MENU,FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]);
     } else if (currentMenuPage == MenuPages_NewGame) {
         menuItemCount = 7;
         menuTabCount = (currentMenuItem > 0 && currentMenuItem <= 16) ? 2 : 1;
-        UI_HeaderText(290,"NEW GAME");
+        UI_HeaderText(290,/*"NEW GAME"*/Sys_Text.stringTable[741]);
         RenderUIImage(136,196,1088,558,1048); // Newgame inset
         RenderUIImage(136,196,1088,558,1049); // Newgame background
-        if (UI_MenuButton(276,270,0,795,74, 226,146,"NAME",299,214)) { /* Just for highlight */ }
+        if (UI_MenuButton(276,270,0,795,74, 226,146,/*"NAME:"*/Sys_Text.stringTable[746],299,214)) { /* Just for highlight */ }
         enteringPlayerName = (currentMenuItem == 0);
-        if (Sys_Global.playerName[0] == '\0') RenderFormattedText(642,232,TEXT_RED_MENU,FONT_STOPD,1.0f,"ENTER NAME...");
+        if (Sys_Global.playerName[0] == '\0') RenderFormattedText(642,232,TEXT_RED_MENU,FONT_STOPD,1.0f,/*"ENTER NAME..."*/Sys_Text.stringTable[748]);
         else                                  RenderFormattedText(518,232,enteringPlayerName ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,Sys_Global.playerName);
 
-        if (UI_MenuButton(174,377,1,496,95, 148,202,"COMBAT",185,299)) { Sys_Global.difficultyCombat = Sys_Global.difficultyCombat >= 3 ? 0 : Sys_Global.difficultyCombat + 1; }  if (UI_MenuButton(704,377,3,496,95, 510,202,"MISSION",726,299)) { Sys_Global.difficultyMission = Sys_Global.difficultyMission >= 3 ? 0 : Sys_Global.difficultyMission + 1; }
+        if (UI_MenuButton(174,377,1,496,95, 148,202,/*"COMBAT"*/Sys_Text.stringTable[748],185,299)) { Sys_Global.difficultyCombat = Sys_Global.difficultyCombat >= 3 ? 0 : Sys_Global.difficultyCombat + 1; }  if (UI_MenuButton(704,377,3,496,95, 510,202,/*"MISSION"*/Sys_Text.stringTable[749],726,299)) { Sys_Global.difficultyMission = Sys_Global.difficultyMission >= 3 ? 0 : Sys_Global.difficultyMission + 1; }
         RenderFormattedText(162,270,Sys_Global.difficultyCombat == 0 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"0");    RenderFormattedText(513,270,Sys_Global.difficultyMission == 0 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"0");
         RenderFormattedText(233,270,Sys_Global.difficultyCombat == 1 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"1");    RenderFormattedText(584,270,Sys_Global.difficultyMission == 1 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"1");
         RenderFormattedText(307,270,Sys_Global.difficultyCombat == 2 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"2");    RenderFormattedText(658,270,Sys_Global.difficultyMission == 2 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"2");
         RenderFormattedText(379,270,Sys_Global.difficultyCombat == 3 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"3");    RenderFormattedText(730,270,Sys_Global.difficultyMission == 3 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"3");
-        if (UI_MenuButton(174,568,2,496,92, 149,330,"PUZZLE",185,490)) { Sys_Global.difficultyPuzzle = Sys_Global.difficultyPuzzle >= 3 ? 0 : Sys_Global.difficultyPuzzle + 1; }  if (UI_MenuButton(704,568,4,496,92, 509,330,"CYBERSPACE",726,490)) { Sys_Global.difficultyCyber = Sys_Global.difficultyCyber >= 3 ? 0 : Sys_Global.difficultyCyber + 1; }
+        if (UI_MenuButton(174,568,2,496,92, 149,330,/*"PUZZLE"*/Sys_Text.stringTable[751],185,490)) { Sys_Global.difficultyPuzzle = Sys_Global.difficultyPuzzle >= 3 ? 0 : Sys_Global.difficultyPuzzle + 1; }  if (UI_MenuButton(704,568,4,496,92, 509,330,/*"CYBERSPACE"*/Sys_Text.stringTable[750],726,490)) { Sys_Global.difficultyCyber = Sys_Global.difficultyCyber >= 3 ? 0 : Sys_Global.difficultyCyber + 1; }
         RenderFormattedText(162,399,Sys_Global.difficultyPuzzle == 0 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"0");    RenderFormattedText(513,399,Sys_Global.difficultyCyber == 0 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"0");
         RenderFormattedText(233,399,Sys_Global.difficultyPuzzle == 1 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"1");    RenderFormattedText(584,399,Sys_Global.difficultyCyber == 1 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"1");
         RenderFormattedText(307,399,Sys_Global.difficultyPuzzle == 2 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"2");    RenderFormattedText(658,399,Sys_Global.difficultyCyber == 2 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"2");
@@ -370,12 +370,12 @@ void RenderMenu(void) {
         bool overBack = false, overStart = false;
         if (UI_Button(544,747, 282,68, &overStart, 5) || (MenuEnter() && currentMenuItem == 5)) GoIntoGame(); // TODO reload game.
         overStart = overStart || currentMenuItem == 5;
-        RenderFormattedText(400,464,overStart ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"START");
+        RenderFormattedText(400,464,overStart ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,/*"START"*/Sys_Text.stringTable[886]);
         
         if (UI_Button(1060,758, 84,32, &overBack, 6) || (MenuEnter() && currentMenuItem == 6)) MenuGoBack();
         overBack = overBack || currentMenuItem == 6;
         RenderUIImage(1060,724,84,36,1252); // Back Button background
-        RenderFormattedText(1076,732,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_RED_MENU,FONT_NORMAL,1.0f,"BACK");
+        RenderFormattedText(1076,732,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_RED_MENU,FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]);
     } else if (currentMenuPage == MenuPages_IntroVideo) {
         menuItemCount = 1; menuTabCount = 1;
         if (MenuEnter()) MenuGoBack();
@@ -417,26 +417,26 @@ void RenderPausedUI(void) {
     bool overResume = false, overLoad /* ;) */ = false, overSave = false, overOptions = false, overQuitMenu = false, overQuit = false;
     RenderUIImage(519,276,328,300,1025); // Pause Menu background
     RenderUIImage(519,276,328,300,1080); // Pause Menu background outline
-    RenderFormattedText(610,210,TEXT_STOPD_RED_PAUSETITLE,FONT_STOPD,1.0f,"PAUSED");
+    RenderFormattedText(610,210,TEXT_STOPD_RED_PAUSETITLE,FONT_STOPD,1.0f,/*"PAUSED"*/Sys_Text.stringTable[724]);
     if (UI_Button(522,330, 322,52, &overResume, 0) || (MenuEnter() && currentMenuItem == 0)) Sys_Global.gamePaused = false;
     overResume = overResume || currentMenuItem == 0;
-    RenderFormattedText(610,306,overResume ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"RESUME");
+    RenderFormattedText(610,306,overResume ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,/*"RESUME"*/Sys_Text.stringTable[725]);
     if (UI_Button(522,390, 322,52, &overLoad, 1) || (MenuEnter() && currentMenuItem == 1)) { currentMenuPage = MenuPages_Load; PlayMenuMusic(); Sys_Global.menuActive = true; returnToPause = true; }
     overLoad = overLoad || currentMenuItem == 1;
-    RenderFormattedText(630,364, overLoad ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"LOAD");
+    RenderFormattedText(630,364, overLoad ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,/*"LOAD"*/Sys_Text.stringTable[726]);
     if (UI_Button(522,450, 322,60, &overSave, 2) || (MenuEnter() && currentMenuItem == 2)) { currentMenuPage = MenuPages_Save; PlayMenuMusic(); Sys_Global.menuActive = true; returnToPause = true; }
     overSave = overSave || currentMenuItem == 2;
-    RenderFormattedText(635,422,overSave ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"SAVE");
+    RenderFormattedText(635,422,overSave ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,/*"SAVE"*/Sys_Text.stringTable[727]);
     if (UI_Button(522,510, 322,60, &overOptions, 3) || (MenuEnter() && currentMenuItem == 3)) { currentMenuPage = MenuPages_Options; PlayMenuMusic(); Sys_Global.menuActive = true; returnToPause = true; }
     overOptions = overOptions || currentMenuItem == 3;
-    RenderFormattedText(599,480,overOptions ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"OPTIONS");
+    RenderFormattedText(599,480,overOptions ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,/*"OPTIONS"*/Sys_Text.stringTable[721]);
     if (UI_Button(522,570, 322,60, &overQuitMenu, 4) || (MenuEnter() && currentMenuItem == 4)) { PlayMenuMusic(); Sys_Global.menuActive = true; currentMenuPage = MenuPages_FrontPage; }
     overQuitMenu = overQuitMenu || currentMenuItem == 4;
-    RenderFormattedText(546,538,overQuitMenu ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"QUIT TO MENU");
+    RenderFormattedText(546,538,overQuitMenu ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,/*"QUIT TO MENU"*/Sys_Text.stringTable[728]);
     RenderUIImage(519,672,328,42,1252); // Pause Quit Game background
     if (UI_Button(522,714, 322,42, &overQuit, 5) || (MenuEnter() && currentMenuItem == 5)) OS_Exit(0);
     overQuit = overQuit || currentMenuItem == 5;
-    RenderFormattedText(572,690,overQuit ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"QUIT GAME");
+    RenderFormattedText(572,690,overQuit ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,/*"QUIT GAME"*/Sys_Text.stringTable[729]);
     if (Sys_Input.keyStates[GLFW_KEY_DOWN].pressed) currentMenuItem = (currentMenuItem + 1) >= menuItemCount ? 0 : (currentMenuItem + 1);
     if (Sys_Input.keyStates[GLFW_KEY_UP].pressed) currentMenuItem = (currentMenuItem - 1) < 0 ? (menuItemCount - 1) : (currentMenuItem - 1);
 }

@@ -1804,12 +1804,3 @@ void _start(void) {
     main();
     __asm__ __volatile__("mov $60, %%rax; xor %%rdi, %%rdi; syscall");
 }
-
-// Suppress -lm need for libglfw3.5.a:
-extern float fmaxf(float a, float b);
-extern float fminf(float a, float b);
-extern float powf(float val, float exp);
-float fmaxf(float a, float b) { return vmax(a,b); }
-float fminf(float a, float b) { return vmin(a,b); }
-float powf(float val, float exp) { return vpow(val,exp); }
-float round(float val) { int64_t valint = (int64_t)val; return val - (float)valint >= 0.5f ? (float)(valint + 1) : (float)valint; }

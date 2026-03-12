@@ -1371,7 +1371,7 @@ static int glad_gl_get_extensions( const char** out_exts, char*** out_exts_i) {
                 return 0;
             }
 
-            CopyMemoryFromBtoAForNBytes(local_str,gl_str_tmp,len * sizeof(char));
+            __builtin_memcpy(local_str,gl_str_tmp,len * sizeof(char));
             exts_i[index] = local_str;
         }
         
@@ -1436,6 +1436,7 @@ static int glad_gl_find_extensions_gl(void) {
     return 1;
 }
 
+int sscanf(const char *str, const char *format, ...);
 static int glad_gl_find_core_gl(void) {
     int i;
     const char* version;
@@ -1455,9 +1456,7 @@ static int glad_gl_find_core_gl(void) {
         if (StringCompareUpToLength(version, prefixes[i], length)) { version += length; break; }
     }
 
-//     sscanf(version, "%d.%d", &major, &minor);
-    major = 4;
-    minor = 3;
+    sscanf(version, "%d.%d", &major, &minor);
     GLAD_GL_VERSION_1_0 = (major == 1 && minor >= 0) || major > 1;
     GLAD_GL_VERSION_1_1 = (major == 1 && minor >= 1) || major > 1;
     GLAD_GL_VERSION_1_2 = (major == 1 && minor >= 2) || major > 1;
