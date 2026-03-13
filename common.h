@@ -846,6 +846,8 @@ typedef struct {
     bool decoyActive;
 	char playerName[27];
     bool boosterActive;
+    bool (*GetKey)(int settingIndex);
+    bool (*GetKeyPressed)(int settingIndex);
     Entity instances[INSTANCE_COUNT];
 } GlobalContext;
 

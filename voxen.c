@@ -900,6 +900,8 @@ void ApplySettings(void) {
 #endif
 
 void* mod_handle = NULL;
+bool GetKey(int settingIndex);
+bool GetKeyPressed(int settingIndex);
 void LoadModFunctions(void) {
     // Clear previous handle if reloading
     if (mod_handle) {
@@ -935,6 +937,8 @@ void LoadModFunctions(void) {
     ModInit         = (void (*)(GlobalContext*,CheatsSystem*))  PLATFORM_DLSYM(mod_handle, "ModInit");
     if (!ModInit) { DualLogError("Failed to load ModInit function pointer from mod data\n"); OS_Exit(1); }
     ModInit(&Sys_Global,&Sys_Cheats);
+    Sys_Global.GetKey = GetKey;
+    Sys_Global.GetKeyPressed = GetKeyPressed;
     Forward         = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Forward");        if (!Forward) { DualLogError("Failed to load Forward function pointer from mod data\n"); OS_Exit(1); }
     Backpedal       = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Backpedal");      if (!Backpedal) { DualLogError("Failed to load Backpedal function pointer from mod data\n"); OS_Exit(1); }
     StrafeLeft      = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "StrafeLeft");     if (!StrafeLeft) { DualLogError("Failed to load StrafeLeft function pointer from mod data\n"); OS_Exit(1); }
