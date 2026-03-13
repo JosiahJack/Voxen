@@ -85,37 +85,37 @@ void PortalCulling(void);
 void UpdateAnims(void) {
     bool portalsNeedUpdated = false;
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
-        if (instances[i].modelIndex >= MODEL_IDX_MAX) continue;
-        if (!(instances[i].entflags & ENTFLAG_ACTIVE)) continue;
+        if (Sys_Global.instances[i].modelIndex >= MODEL_IDX_MAX) continue;
+        if (!(Sys_Global.instances[i].entflags & ENTFLAG_ACTIVE)) continue;
         
-        uint16_t animNum = instances[i].animationNum;
+        uint16_t animNum = Sys_Global.instances[i].animationNum;
         if (animNum >= MAX_ANIMATED_MODELS) continue; // Invalid animated model index
-        if (instances[i].numclips >= MAX_ANIMATION_CLIPS_PER_MODEL) continue; // Invalid animation clip index
-        if (instances[i].numclips == 0) continue; // Invalid animation clip index
-        if (!(instances[i].entflags & ENTFLAG_ANIMATED)) continue;
+        if (Sys_Global.instances[i].numclips >= MAX_ANIMATION_CLIPS_PER_MODEL) continue; // Invalid animation clip index
+        if (Sys_Global.instances[i].numclips == 0) continue; // Invalid animation clip index
+        if (!(Sys_Global.instances[i].entflags & ENTFLAG_ANIMATED)) continue;
         
-        AnimationClip currentClip = modelAnimationClips[animNum][instances[i].clip];
-        if (instances[i].currentFrameFinished >= Sys_Global.current_time) continue;
+        AnimationClip currentClip = modelAnimationClips[animNum][Sys_Global.instances[i].clip];
+        if (Sys_Global.instances[i].currentFrameFinished >= Sys_Global.current_time) continue;
         
-        instances[i].currentFrameFinished = Sys_Global.current_time + ((1.0/(double)currentClip.speed) * (1.0 / (double)currentClip.framerate));
-        instances[i].frame++;
-        if (instances[i].frame > currentClip.frameEnd) instances[i].frame = currentClip.frameStart;
-        else if (instances[i].frame < currentClip.frameStart) instances[i].frame = currentClip.frameEnd;
+        Sys_Global.instances[i].currentFrameFinished = Sys_Global.current_time + ((1.0/(double)currentClip.speed) * (1.0 / (double)currentClip.framerate));
+        Sys_Global.instances[i].frame++;
+        if (Sys_Global.instances[i].frame > currentClip.frameEnd) Sys_Global.instances[i].frame = currentClip.frameStart;
+        else if (Sys_Global.instances[i].frame < currentClip.frameStart) Sys_Global.instances[i].frame = currentClip.frameEnd;
 
-        instances[i].modelIndex = (currentClip.frameStartModelIndex + (instances[i].frame - currentClip.frameStart));
+        Sys_Global.instances[i].modelIndex = (currentClip.frameStartModelIndex + (Sys_Global.instances[i].frame - currentClip.frameStart));
         dirtyInstances[i] = true;
-        if (!EntityIndexIsPortalBlockingDoor(instances[i].index)) continue;
+        if (!EntityIndexIsPortalBlockingDoor(Sys_Global.instances[i].index)) continue;
         
-        uint8_t portalIdx = instances[i].portalIndex;
+        uint8_t portalIdx = Sys_Global.instances[i].portalIndex;
         if (portalIdx >= MAX_PORTALS) continue;
         
         uint16_t closedModelIndex = modelAnimationClips[animNum][ANIM_IDLE_CLOSED].frameStartModelIndex;                    
         bool currentState = activePortals[portalIdx].open;
-        if (instances[i].modelIndex == closedModelIndex && currentState) {
+        if (Sys_Global.instances[i].modelIndex == closedModelIndex && currentState) {
             activePortals[portalIdx].open = false;
             activePortals[portalIdx].dirty = true;
             portalsNeedUpdated = true;
-        } else if (instances[i].modelIndex != closedModelIndex && !currentState) {
+        } else if (Sys_Global.instances[i].modelIndex != closedModelIndex && !currentState) {
             activePortals[portalIdx].open = true;
             activePortals[portalIdx].dirty = true;
             portalsNeedUpdated = true;
@@ -206,8 +206,8 @@ void UpdateAnims(void) {
 		if (lightContainer != null) {
 			lit = lightContainer.GetComponent<Light>();
 			if (lit != null) {
-				if ((instances[i].scale.x < 1.0f) || (instances[i].scale.y < 1.0f) || (instances[i].scale.z < 1.0f)) {
-					float factor = vmin(instances[i].scale.x, instances[i].scale.y, instances[i].scale.z);
+				if ((Sys_Global.instances[i].scale.x < 1.0f) || (Sys_Global.instances[i].scale.y < 1.0f) || (Sys_Global.instances[i].scale.z < 1.0f)) {
+					float factor = vmin(Sys_Global.instances[i].scale.x, Sys_Global.instances[i].scale.y, Sys_Global.instances[i].scale.z);
 					lit.range *= factor;
 					if (lit.range < 2.0f) lit.range = 2.0f;
 				}

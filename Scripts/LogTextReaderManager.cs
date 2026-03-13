@@ -12,7 +12,7 @@ public class LogTextReaderManager : MonoBehaviour {
 	public int refIndex = -1;
 	
 	void Update() {
-		if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
+		if (!Eng_Global->gamePaused && !Eng_Global->menuActive) {
 			if (logTextOutput.GetComponent<Text>().text.Length > 568) {
 				moreButtonText.text = Sys_Text.stringTable[26];
 				if (backButton.activeSelf) backButton.SetActive(false);

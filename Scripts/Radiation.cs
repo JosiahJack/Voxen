@@ -10,34 +10,34 @@ public class Radiation : MonoBehaviour {
 	private static StringBuilder s1 = new StringBuilder();
 
 	void Start() {
-		radFinished = Sys_Global.pauseRelativeTime + (intervalTime * 2);
+		radFinished = Eng_Global->pauseRelativeTime + (intervalTime * 2);
 	}
 
 	void OnTriggerEnter (Collider col) {
 		if (col.gameObject.CompareTag("Player")) {
-			if (instances[PLAYER1].health > 0f) {
+			if (Eng_Global->instances[PLAYER1].health > 0f) {
 				PlayerHealth.a.radiationArea = true;
 				PlayerHealth.a.GiveRadiation(radiationAmount);
-				radFinished = Sys_Global.pauseRelativeTime + (intervalTime*random_range(1f,1.5f));
+				radFinished = Eng_Global->pauseRelativeTime + (intervalTime*random_range(1f,1.5f));
 			}
 		}
 	}
 
 	void  OnTriggerStay (Collider col) {
 		if (col.gameObject.CompareTag("Player")) {
-			if (instances[PLAYER1].health > 0f && (radFinished < Sys_Global.pauseRelativeTime)) {
+			if (Eng_Global->instances[PLAYER1].health > 0f && (radFinished < Eng_Global->pauseRelativeTime)) {
 				PlayerHealth.a.radiationArea = true;
 				PlayerHealth.a.GiveRadiation(radiationAmount);
-				radFinished = Sys_Global.pauseRelativeTime + (intervalTime*random_range(1f,1.5f));
+				radFinished = Eng_Global->pauseRelativeTime + (intervalTime*random_range(1f,1.5f));
 			}
 		}
 	}
 
 	void OnTriggerExit (Collider col) {
 		if (col.gameObject.CompareTag("Player")) { 
-			if (instances[PLAYER1].health > 0f) {
+			if (Eng_Global->instances[PLAYER1].health > 0f) {
 				PlayerHealth.a.radiationArea = false;
-				radFinished = Sys_Global.pauseRelativeTime;  // reset so re-triggering is instant
+				radFinished = Eng_Global->pauseRelativeTime;  // reset so re-triggering is instant
 			}
 		}
 	}

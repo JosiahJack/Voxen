@@ -18,7 +18,7 @@ public class PlaySoundTriggered : MonoBehaviour {
 
     void Start() {
 		if (SFXClip > 0) SFX.clip = sounds[SFXClip];
-		else DualLog("Unassigned clip index on PlaySoundTriggered at " + instances[i].position.ToString() + " for " + gameObject.name);
+		else DualLog("Unassigned clip index on PlaySoundTriggered at " + Eng_Global->instances[i].position.ToString() + " for " + gameObject.name);
 		if (playEverywhere) {
 			SFX.spatialBlend = 0.0f;
 		} else {
@@ -51,7 +51,7 @@ public class PlaySoundTriggered : MonoBehaviour {
 
 	void Update() {
 		if (currentlyPlaying) {
-			if (Sys_Global.gamePaused || Sys_Global.menuActive) {
+			if (Eng_Global->gamePaused || Eng_Global->menuActive) {
 				if (SFX != null) SFX.Pause();
 				justPaused = true;
 			} else {
@@ -62,7 +62,7 @@ public class PlaySoundTriggered : MonoBehaviour {
 			}
 		}
 
-		if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
+		if (!Eng_Global->gamePaused && !Eng_Global->menuActive) {
 			if (playSoundOnParticleEmit){
 				int count = psys.particleCount;
 				if (count > numparticles && (count == burstemittcnt1 || count == burstemittcnt2)) {

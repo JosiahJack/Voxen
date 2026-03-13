@@ -22,8 +22,8 @@ public class NPC_Hopper_Death : MonoBehaviour {
 		smr = GetComponent<SkinnedMeshRenderer>();
 		redTint = 0f;
 		rimPower = 255f;
-		tick2Finished = Sys_Global.pauseRelativeTime + blendRimColorTickSecs;
-		tickFinished = Sys_Global.pauseRelativeTime + blendShapeTickSecs;
+		tick2Finished = Eng_Global->pauseRelativeTime + blendRimColorTickSecs;
+		tickFinished = Eng_Global->pauseRelativeTime + blendShapeTickSecs;
 		blendStep1 = -1;
 		blendStep2 = 0;
 		blendAmountPerTick = 18f;
@@ -32,16 +32,16 @@ public class NPC_Hopper_Death : MonoBehaviour {
 	}
 
 	void Update() {
-		if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
-			if (tick2Finished < Sys_Global.pauseRelativeTime) {
+		if (!Eng_Global->gamePaused && !Eng_Global->menuActive) {
+			if (tick2Finished < Eng_Global->pauseRelativeTime) {
 				rimPower = smr.material.GetColor("_RimColor").r;
 				rimPower -= rimPowerShiftPerTick;
 				if (rimPower < 0) rimPower = 0;
 				smr.material.SetColor("_RimColor",new Color(rimPower,0,(rimPower*0.75f),0));
-				tick2Finished = Sys_Global.pauseRelativeTime + blendRimColorTickSecs;
+				tick2Finished = Eng_Global->pauseRelativeTime + blendRimColorTickSecs;
 			}
 
-			if (tickFinished < Sys_Global.pauseRelativeTime && blendStep2 < 6) {
+			if (tickFinished < Eng_Global->pauseRelativeTime && blendStep2 < 6) {
 				blendAmount1 -= blendAmountPerTick;
 				blendAmount2 += blendAmountPerTick;
 				if (blendStep2 >= 3) {
@@ -73,7 +73,7 @@ public class NPC_Hopper_Death : MonoBehaviour {
 				if (redTint < 0) redTint = 0; //floor
 				if (redTint > 10) redTint = 10; // ceil
 				smr.material.SetColor("_HSVAAdjust",new Color(redTint,0,0,0));
-				tickFinished = Sys_Global.pauseRelativeTime + blendShapeTickSecs;
+				tickFinished = Eng_Global->pauseRelativeTime + blendShapeTickSecs;
 			}
 		}
 	}

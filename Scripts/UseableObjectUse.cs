@@ -12,7 +12,7 @@ public class UseableObjectUse : MonoBehaviour {
 
 	void Awake() {
 		// 33% chance of not spawning logic probes on Puzzle difficulty of 3
-		if (Sys_Global.difficultyPuzzle == 3) {
+		if (Eng_Global->difficultyPuzzle == 3) {
 			if (useableItemIndex == 54) {
 				if (random_range(0,1f) < 0.33f) {
 					Utils.SafeDestroy(gameObject);
@@ -21,14 +21,14 @@ public class UseableObjectUse : MonoBehaviour {
 		}
 
 		// Remove access cards on Mission difficulty 1 or 0
-		if (Sys_Global.difficultyMission <= 1) {
+		if (Eng_Global->difficultyMission <= 1) {
 			if (useableItemIndex >= 81 && useableItemIndex <= 91) {
 				Utils.SafeDestroy(gameObject);
 			}
 		}
 
 		// Remove audiologs on Mission difficulty 0
-		if (Sys_Global.difficultyMission == 0) {
+		if (Eng_Global->difficultyMission == 0) {
 			if (useableItemIndex == 6) Utils.SafeDestroy(gameObject);
 		}
 	}
@@ -42,7 +42,7 @@ public class UseableObjectUse : MonoBehaviour {
 	    
 		if (useableItemIndex < 0) DualLog("BUG: Useable index less than 0!");
 		MouseLookScript.a.holdingObject = true;
-		MouseLookScript.a.heldObjectIndex = useableItemIndex;
+		inventoryPlayer1.holdingObjectIndex = useableItemIndex;
 		MouseLookScript.a.heldObjectCustomIndex = customIndex;
 		MouseLookScript.a.heldObjectAmmo = ammo;
 		MouseLookScript.a.heldObjectAmmo2 = ammo2;

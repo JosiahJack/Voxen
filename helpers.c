@@ -242,7 +242,6 @@ bool ConstIndexIsStaticObjectImmutable(int constdex) {
 			|| (constdex >= 737 && constdex < 739) || constdex == 746 || constdex == 747 || (constdex >= 750 && constdex <= 759 && constdex != 755));
 }
 
-bool TakeScreenshot(void);
 typedef void(*PFNGLREADPIXELSPROC)(int32_t x, int32_t y, int32_t width, int32_t height, uint32_t format, uint32_t type, void* pixels);
 extern PFNGLREADPIXELSPROC glad_glReadPixels;
 void Screenshot(void) {
@@ -252,7 +251,7 @@ void Screenshot(void) {
     OS_MakeFolder("Screenshots");
     unsigned char* pixels = OS_AllocateRAM(NULL, Sys_Settings.ScreenWidth * Sys_Settings.ScreenHeight * 4 * sizeof(char), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, OS_INVALID_HANDLE);//malloc(Sys_Settings.ScreenWidth * Sys_Settings.ScreenHeight * 4 * sizeof(char));
     glad_glReadPixels(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, /*GL_RGBA*/ 0x1908, /*GL_UNSIGNED_BYTE*/ 0x1401, pixels);
-    char filename[96]; StringFormat(filename, sizeof(filename), "Screenshots/%.2f_x%.1f_y%.1f_z%.1f.bmp", get_time(), (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z);
+    char filename[96]; StringFormat(filename, sizeof(filename), "Screenshots/%.2f_x%.1f_y%.1f_z%.1f.bmp", get_time(), (double)Sys_Global.instances[PLAYER1].position.x, (double)Sys_Global.instances[PLAYER1].position.y, (double)Sys_Global.instances[PLAYER1].position.z);
     if (!stbi_write_bmp(filename, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, 4, pixels)) DualLogError("Failed to save screenshot\n"); else DualLog("Saved screenshot %s\n", filename);
     OS_DeallocateRAM(pixels, Sys_Settings.ScreenWidth * Sys_Settings.ScreenHeight * 4 * sizeof(char));
 }
@@ -670,7 +669,7 @@ void FilePrintString(OsFileHandle f, const char* fmt, ...) {
 uint8_t GetCurrentLevelSecurity() { return (Sys_Global.difficultyMission < 1 || Sys_Cheats.superoverride) ? 0u : Sys_Global.levelSecurity[Sys_Global.currentLevel]; }
 
 uint16_t GetImpactType(uint16_t instanceIdx) {
-    switch (instances[instanceIdx].bloodType) {
+    switch (Sys_Global.instances[instanceIdx].bloodType) {
         case BloodType_None:         return 729; // SparksSmall
         case BloodType_Red:          return 724; // BloodSpurtSmall
         case BloodType_Yellow:       return 723; // BloodSpurtSmallYellow

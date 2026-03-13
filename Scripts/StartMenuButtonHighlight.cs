@@ -60,7 +60,7 @@ public class StartMenuButtonHighlight : MonoBehaviour {
 
 	void OnEnable() {
 		pointerEntered = false;
-		if (darkenInCyberspace && instances[PLAYER1].inCyberSpace) {
+		if (darkenInCyberspace && Eng_Global->instances[PLAYER1].inCyberSpace) {
 			if (textshadow != null) {
 				textshadow.effectColor = darkenedshadow;
 			}
@@ -83,7 +83,7 @@ public class StartMenuButtonHighlight : MonoBehaviour {
 	}
 
 	public void DeHighlight() {
-		if (darkenInCyberspace && instances[PLAYER1].inCyberSpace) return;
+		if (darkenInCyberspace && Eng_Global->instances[PLAYER1].inCyberSpace) return;
 
 		if (textshadow != null) {
 			textshadow.effectColor = darkshadow;
@@ -93,7 +93,7 @@ public class StartMenuButtonHighlight : MonoBehaviour {
 	}
 
 	public void Highlight () {
-		if (darkenInCyberspace && instances[PLAYER1].inCyberSpace) return;
+		if (darkenInCyberspace && Eng_Global->instances[PLAYER1].inCyberSpace) return;
 
 		if (textshadow != null) {
 			textshadow.effectColor = litshadow;
@@ -103,7 +103,7 @@ public class StartMenuButtonHighlight : MonoBehaviour {
 	}
 
 	public void CursorHighlight () {
-		if (darkenInCyberspace && instances[PLAYER1].inCyberSpace) return;
+		if (darkenInCyberspace && Eng_Global->instances[PLAYER1].inCyberSpace) return;
 		if (pointerEntered) return;
 
 		Highlight();
@@ -112,7 +112,7 @@ public class StartMenuButtonHighlight : MonoBehaviour {
 	}
 
 	public void CursorDeHighlight () {
-		if (darkenInCyberspace && instances[PLAYER1].inCyberSpace) return;
+		if (darkenInCyberspace && Eng_Global->instances[PLAYER1].inCyberSpace) return;
 		if (!pointerEntered) return;
 
 		DeHighlight();

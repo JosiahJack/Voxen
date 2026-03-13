@@ -83,9 +83,9 @@ public class PauseScript : MonoBehaviour {
 			if (ambientRegistry[i] == null) continue;
 
 			hitCount = RaycastNonAlloc(
-						MouseLookScript.a.instances[i].position,
-						ambientRegistry[i].instances[i].position
-						- MouseLookScript.a.instances[i].position,
+						MouseLookScript.a.Eng_Global->instances[i].position,
+						ambientRegistry[i].Eng_Global->instances[i].position
+						- MouseLookScript.a.Eng_Global->instances[i].position,
 						results,32f,Const.a.layerMaskPlayerFrob,
 						QueryTriggerInteraction.UseGlobal);
 
@@ -223,20 +223,20 @@ public class PauseScript : MonoBehaviour {
 		}
 
 		UnpauseAmbients();
-		instances[PLAYER1].ConsoleDisable();
+		Eng_Global->instances[PLAYER1].ConsoleDisable();
 	}
 
 	public void OpenSaveDialog() {
 		if (onSaveDialog) return;
 
-		if (instances[PLAYER1].inCyberSpace) {
+		if (Eng_Global->instances[PLAYER1].inCyberSpace) {
 			CenterStatusPrint("%s", Sys_Text.stringTable[602]); // Cannot save in cyberspace
 			OpenSaveDialogHard();
 			return;
 		}
 
 		DisablePauseUI();
-		if (Sys_Global.justSavedTimeStamp < Time.time) {
+		if (Eng_Global->justSavedTimeStamp < Time.time) {
 			onSaveDialog = true;
 			saveDialog.SetActive(true);
 		}
@@ -246,7 +246,7 @@ public class PauseScript : MonoBehaviour {
 		if (onSaveDialog) return;
 
 		DisablePauseUI();
-		if (Sys_Global.justSavedTimeStamp < Time.time) {
+		if (Eng_Global->justSavedTimeStamp < Time.time) {
 			onSaveDialog = true;
 			hardSaveDialog.SetActive(true);
 		}
@@ -260,7 +260,7 @@ public class PauseScript : MonoBehaviour {
 	}
 
 	public void SavePause() {
-		if (instances[PLAYER1].inCyberSpace) {
+		if (Eng_Global->instances[PLAYER1].inCyberSpace) {
 			CenterStatusPrint("%s", Sys_Text.stringTable[602]); // Cannot save in cyberspace
 			return;
 		}
@@ -321,7 +321,7 @@ public class PauseScript : MonoBehaviour {
 
 			if (smbh != null) {
 				smbh.DeHighlight(); // Prevent persisted states.
-				if (i == 3 && instances[PLAYER1].inCyberSpace) { // Save button
+				if (i == 3 && Eng_Global->instances[PLAYER1].inCyberSpace) { // Save button
 					smbh.enabled = false;
 				} else {
 					smbh.enabled = true;

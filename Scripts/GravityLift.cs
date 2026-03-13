@@ -22,19 +22,19 @@ public class GravityLift : MonoBehaviour {
 
 	void OnTriggerExit(Collider other) {
 		if (other.gameObject.GetComponent<PlayerMovement>() != null) {
-			instances[PLAYER1].gravliftState = false;
+			Eng_Global->instances[PLAYER1].gravliftState = false;
 		}
 	}
 
 	void OnForce(Collider other, bool initial) {
 		if (other.gameObject.layer == 12) { // Player
 			if (other.gameObject.GetComponent<PlayerMovement>() != null) {
-				instances[PLAYER1].gravliftState = true;
+				Eng_Global->instances[PLAYER1].gravliftState = true;
 			}
 		}
 
-		float topY = instances[i].position.y + (boxcol.size.y/2f);
-		float dist = topY - other.gameObject.instances[i].position.y + 0.48f;
+		float topY = Eng_Global->instances[i].position.y + (boxcol.size.y/2f);
+		float dist = topY - other.gameObject.Eng_Global->instances[i].position.y + 0.48f;
 		float velY = otherRbody.velocity.y;
 		if (otherRbody.velocity.y < 0f) velY = 0f; // Saturate at bottom end.
 
@@ -47,7 +47,7 @@ public class GravityLift : MonoBehaviour {
 								- otherRbody.velocity.y);
 
 				if (initial
-					|| initialBurstFinished > Sys_Global.pauseRelativeTime) {
+					|| initialBurstFinished > Eng_Global->pauseRelativeTime) {
 
 					yForce *= 2f;
 				}
@@ -61,13 +61,13 @@ public class GravityLift : MonoBehaviour {
 		// Apply weak force for inactive state - applies some force for gentle
 		// descent, never really off completely.
 		if (other.gameObject.GetComponent<PlayerMovement>() != null) {
-			instances[PLAYER1].gravliftState = true;
+			Eng_Global->instances[PLAYER1].gravliftState = true;
 		}
 
 		if (otherRbody.velocity.y < offStrengthFactor) {
 			float yForce = ((offStrengthFactor)-otherRbody.velocity.y);
 			if (initial
-				|| initialBurstFinished > Sys_Global.pauseRelativeTime) {
+				|| initialBurstFinished > Eng_Global->pauseRelativeTime) {
 
 				yForce *= 2f;
 			}
@@ -80,7 +80,7 @@ public class GravityLift : MonoBehaviour {
 		otherRbody = other.gameObject.GetComponent<Rigidbody>();
 		if (otherRbody == null) return; // Not a physical object.
 
-		initialBurstFinished = Sys_Global.pauseRelativeTime + 1.0f;
+		initialBurstFinished = Eng_Global->pauseRelativeTime + 1.0f;
 		if (active) OnForce(other,true);
 		else OffForce(other,true);
 	}

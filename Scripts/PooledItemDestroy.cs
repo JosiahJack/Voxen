@@ -8,13 +8,13 @@ public class PooledItemDestroy : MonoBehaviour {
 	private float timerFinished = 9999999f;
 
 	void OnEnable () {
-		timerFinished = Sys_Global.pauseRelativeTime + itemLifeTime;
+		timerFinished = Eng_Global->pauseRelativeTime + itemLifeTime;
 	}
 
 	void Update() {
 		if (onlyOnce && doneYet) return;
 
-		if (timerFinished < Sys_Global.pauseRelativeTime) {
+		if (timerFinished < Eng_Global->pauseRelativeTime) {
 			timerFinished = 9999999f;
 			if (onlyOnce) doneYet = true;
 			flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);

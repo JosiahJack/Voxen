@@ -6,19 +6,19 @@
 
 	void ToggleMaterial() {
 		if (mRenderer == null) mRenderer = GetComponent<MeshRenderer>();
-		if (alternateOn) instances[i].texture = alternateSwitchMaterial;
-		else             instances[i].texture = mainSwitchMaterial;
+		if (alternateOn) Eng_Global->instances[i].texture = alternateSwitchMaterial;
+		else             Eng_Global->instances[i].texture = mainSwitchMaterial;
 	}
 
 	void SetMaterialToAlternate() {
 		if (!blinkWhenActive) return;
 
-		instances[i].texture = alternateSwitchMaterial;
+		Eng_Global->instances[i].texture = alternateSwitchMaterial;
 	}
 
 	void SetMaterialToNormal() {
 		if (!blinkWhenActive) return;
         
-		instances[i].texture = mainSwitchMaterial;
+		Eng_Global->instances[i].texture = mainSwitchMaterial;
 	}
 }

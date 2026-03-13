@@ -45,7 +45,7 @@ public class ElevatorButton : MonoBehaviour {
 		}
 
 		bool dC = Sys_UI.linkedElevatorDoor.doorOpen == DoorState_Closed;
-		Vector3 plyPos = instances[PLAYER1].position;
+		Vector3 plyPos = Eng_Global->instances[PLAYER1].position;
 		float dist = distance_vector3(Sys_UI.objectInUsePos,plyPos);
 		if (dist > ELEVATOR_PAD_TETHER_DIST && !dC) {
 			CenterStatusPrint("%s", Sys_Text.stringTable[6]); // Too far away from that.
@@ -61,7 +61,7 @@ public class ElevatorButton : MonoBehaviour {
 			if (targetDestination == null) {
 				LevelManager.a.LoadLevel(levelIndex,Vector3.zero);
 			} else {
-				LevelManager.a.LoadLevel(levelIndex,targetDestination.instances[i].position);
+				LevelManager.a.LoadLevel(levelIndex,targetDestination.Eng_Global->instances[i].position);
 			}
 		} else {
 			CenterStatusPrint("%s", Sys_Text.stringTable[8]);

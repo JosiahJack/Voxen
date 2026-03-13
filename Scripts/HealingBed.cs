@@ -25,7 +25,7 @@ public class HealingBed : MonoBehaviour {
 				CenterStatusPrint("%s", Sys_Text.stringTable[24],ud.owner);
 			}
 		} else {
-			Sys_UI.BlockedBySecurity(instances[i].position);
+			Sys_UI.BlockedBySecurity(Eng_Global->instances[i].position);
 		}
 	}
 }

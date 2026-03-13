@@ -137,7 +137,7 @@ public class MouseCursor : MonoBehaviour {
 	}
 	
 	private void EnableTooltips() {
-		if (toolTipHasText && !Sys_Global.gamePaused && !Sys_Global.menuActive && (MouseLookScript.a.inventoryMode || liveGrenade)) {
+		if (toolTipHasText && !Eng_Global->gamePaused && !Eng_Global->menuActive && (MouseLookScript.a.inventoryMode || liveGrenade)) {
 			switch(toolTipType) {
 				case Handedness.LH:
 					tooltipLeft.SetActive(true);
@@ -195,7 +195,7 @@ public class MouseCursor : MonoBehaviour {
 		UpdateInventoryAddHelper();
 
 		// Maintain cursor mode.
-		if (Sys_Global.gamePaused || Sys_Global.menuActive) {
+		if (Eng_Global->gamePaused || Eng_Global->menuActive) {
 			Cursor.lockState = CursorLockMode.None;
 		} else if (MouseLookScript.a.inventoryMode) {
 // 			#if UNITY_EDITOR
@@ -217,7 +217,7 @@ public class MouseCursor : MonoBehaviour {
 			if (MinigameCursor.a.mouseOverPanel) hideCursorForMinigame = true;
 		}
 
-		if (Sys_Global.gamePaused || Sys_Global.menuActive) {
+		if (Eng_Global->gamePaused || Eng_Global->menuActive) {
             // Pause / Menu Cursor
  			SetCursorPositionMovable();
 			DisableTooltips();
@@ -258,14 +258,14 @@ public class MouseCursor : MonoBehaviour {
 			} else {
 				if (MouseLookScript.a.vmailActive) {
 					cursorImage = Const.a.useableItemsFrobIcons[108]; // vmail
-				} else if (GUIState.a.isBlocking && !MouseLookScript.a.holdingObject) {
+				} else if (GUIState.a.isBlocking && !inventoryPlayer1.holdingObject) {
 					if (toolTipHasText) {
 						cursorImage = tooltipTexture;
 					} else {						
 						cursorImage = cursorGUI;
 					}
-				} else if (MouseLookScript.a.holdingObject && MouseLookScript.a.heldObjectIndex >= 0) {
-					cursorImage = Const.a.useableItemsFrobIcons[MouseLookScript.a.heldObjectIndex];
+				} else if (inventoryPlayer1.holdingObject && inventoryPlayer1.holdingObjectIndex >= 0) {
+					cursorImage = Const.a.useableItemsFrobIcons[inventoryPlayer1.holdingObjectIndex];
 				} else {
 					cursorImage = GetWeaponCursor();
 				}
@@ -281,8 +281,8 @@ public class MouseCursor : MonoBehaviour {
 				cursorImage = cyberspaceCursor;
 				DisableLiveGrenadeTooltip();
 			} else {
-				if (MouseLookScript.a.holdingObject && MouseLookScript.a.heldObjectIndex >= 0) {
-					cursorImage = Const.a.useableItemsFrobIcons[MouseLookScript.a.heldObjectIndex];
+				if (inventoryPlayer1.holdingObject && inventoryPlayer1.holdingObjectIndex >= 0) {
+					cursorImage = Const.a.useableItemsFrobIcons[inventoryPlayer1.holdingObjectIndex];
 				} else {
 					cursorImage = GetWeaponCursor();
 				}
@@ -294,7 +294,7 @@ public class MouseCursor : MonoBehaviour {
 	}
 	
 	private Texture2D GetWeaponCursor() {
-		switch(WeaponCurrent.a.weaponIndex) {
+		switch(inventoryPlayer1.weaponIndex) {
 			case 36: return Const.a.useableItemsFrobIcons[102]; // red
 			case 37: return Const.a.useableItemsFrobIcons[107]; // blue
 			case 38: return Const.a.useableItemsFrobIcons[102]; // red
@@ -316,8 +316,8 @@ public class MouseCursor : MonoBehaviour {
 	}
 
 	void UpdateSafeZone() {
-		if (Sys_Global.gamePaused) return;
-		if (Sys_Global.menuActive) return;
+		if (Eng_Global->gamePaused) return;
+		if (Eng_Global->menuActive) return;
 
 		if (cursorPosition.x < (0.96925f * Screen.width) && cursorPosition.x > (0.029282f * Screen.width)
 			&& cursorPosition.y > (0.13541f * Screen.height) && cursorPosition.y < (0.70703f * Screen.height)) {
@@ -326,8 +326,8 @@ public class MouseCursor : MonoBehaviour {
 	}
 
 	void UpdateEventSystemPointerStatus() {
-		if (Sys_Global.gamePaused) return;
-		if (Sys_Global.menuActive) return;
+		if (Eng_Global->gamePaused) return;
+		if (Eng_Global->menuActive) return;
 
 		pev.position = cursorPosition;
 		graphicCastResults.Clear();
@@ -358,8 +358,8 @@ public class MouseCursor : MonoBehaviour {
 	}
 
 	void CheckIfOutOfScreenBounds() {
-		if (Sys_Global.menuActive) return;
-		if (Sys_Global.gamePaused) return;
+		if (Eng_Global->menuActive) return;
+		if (Eng_Global->gamePaused) return;
 
 		if (cursorPosition.y > Screen.height || cursorPosition.y < 0
 			|| cursorPosition.x < 0 || cursorPosition.x > Screen.width) {
@@ -368,8 +368,8 @@ public class MouseCursor : MonoBehaviour {
 	}
 
 	void UpdateInventoryAddHelper() {
-		if (Sys_Global.gamePaused) return;
-		if (Sys_Global.menuActive) return;
+		if (Eng_Global->gamePaused) return;
+		if (Eng_Global->menuActive) return;
 
 		if (cursorPosition.y > (0.13541f*Screen.height)
 			&& cursorPosition.y < (0.70703f*Screen.height)
@@ -378,7 +378,7 @@ public class MouseCursor : MonoBehaviour {
 			GUIState.a.isBlocking = false; // in the safe zone!
 		}
 
-		if (MouseLookScript.a.inventoryMode && MouseLookScript.a.holdingObject) {
+		if (MouseLookScript.a.inventoryMode && inventoryPlayer1.holdingObject) {
 			// Be sure to pass the camera to the 3rd parameter if using
 			// "Screen Space - Camera" on the Canvas, otherwise use "null"
 			if (RectTransformUtility.RectangleContainsScreenPoint(centerMFDPanel,cursorPosition,uiCameraCam)) {

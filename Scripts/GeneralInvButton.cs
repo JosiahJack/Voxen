@@ -72,13 +72,13 @@ public class GeneralInvButton : MonoBehaviour {
 	}
 
 	void ApplyHealthkit() {
-		if (instances[PLAYER1].health >= instances[PLAYER1].maxhealth) {
+		if (Eng_Global->instances[PLAYER1].health >= Eng_Global->instances[PLAYER1].maxhealth) {
 			CenterStatusPrint("%s", Sys_Text.stringTable[304]);
 			reduce = false;
 			return;
 		}
 
-		instances[PLAYER1].health = instances[PLAYER1].maxhealth;
+		Eng_Global->instances[PLAYER1].health = Eng_Global->instances[PLAYER1].maxhealth;
 		Sys_UI.DrawTicks(true);
 		reduce = true;
 	}

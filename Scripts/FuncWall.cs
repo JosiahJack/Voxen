@@ -16,7 +16,7 @@ void InitializeFromLoad() {
     rbody = GetComponent<Rigidbody>();
     SFXSource = GetComponent<AudioSource>();
     rbody.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
-    Vector3 tempVec = Vector3_A_minus_B(instances[i].position, targetPosition);
+    Vector3 tempVec = Vector3_A_minus_B(Eng_Global->instances[i].position, targetPosition);
     float distTotal = distance_vector3(startPosition, targetPosition);
     tempVec = -tempVec.normalized;
     if (currentState == FuncStates_AjarMovingTarget)     tempVec *= (distTotal * percentAjar);
@@ -27,6 +27,6 @@ void InitializeFromLoad() {
     tempVec.x = vclamp(tempVec.x,-10000.0f,10000.0f);
     tempVec.y = vclamp(tempVec.y,-10000.0f,10000.0f);
     tempVec.z = vclamp(tempVec.z,-10000.0f,10000.0f);
-    tempVec += instances[i].position;
-    instances[i].position = tempVec;
+    tempVec += Eng_Global->instances[i].position;
+    Eng_Global->instances[i].position = tempVec;
 }

@@ -22,18 +22,18 @@ public class SpawnManager : MonoBehaviour {
 	private static StringBuilder s1 = new StringBuilder();
 
 	void Start() {
-		delayFinished = Sys_Global.pauseRelativeTime;
-		if (Sys_Global.difficultyCombat == 1) {
+		delayFinished = Eng_Global->pauseRelativeTime;
+		if (Eng_Global->difficultyCombat == 1) {
 			numberToSpawn = (int) vfloor(numberToSpawn*0.5f);
 			if (numberToSpawn < 1) numberToSpawn = 1;
 		}
 
-		if (Sys_Global.difficultyCombat == 3) {
+		if (Eng_Global->difficultyCombat == 3) {
 			numberToSpawn = (int) vfloor(numberToSpawn*1.5f);
 			if (numberToSpawn < 1) numberToSpawn = 1;
 		}
 
-		if (Sys_Global.difficultyCombat > 3) {
+		if (Eng_Global->difficultyCombat > 3) {
 			numberToSpawn = (int) vfloor(numberToSpawn*5f); // Hehe :)
 		}
 	}
@@ -41,12 +41,12 @@ public class SpawnManager : MonoBehaviour {
 	public void Activate(bool alertEnemies) {
 		alertEnemiesOnAwake = alertEnemies;
 		active = true;
-		delayFinished = Sys_Global.pauseRelativeTime;
+		delayFinished = Eng_Global->pauseRelativeTime;
 	}
 
 	void Update() {
-		if (Sys_Global.gamePaused) return;
-		if (Sys_Global.menuActive) return;
+		if (Eng_Global->gamePaused) return;
+		if (Eng_Global->menuActive) return;
 		if (!active) return;
 
 		if (LevelManager.a.npcsm[LevelManager.a.currentLevel] == null) return;
@@ -68,21 +68,21 @@ public class SpawnManager : MonoBehaviour {
 		if (numberActive != count) numberActive = count;
 
 		if (numberActive >= numberToSpawn) return;
-		if (delayFinished >= Sys_Global.pauseRelativeTime) return; // Not yet.
+		if (delayFinished >= Eng_Global->pauseRelativeTime) return; // Not yet.
 
-		delayFinished = Sys_Global.pauseRelativeTime
+		delayFinished = Eng_Global->pauseRelativeTime
 						+ random_range(minDelayBetweenSpawns,
 									   maxDelayBetweenSpawns);
 
 		Spawn(index); // spawn then wait randomized amount of time
 		count++;
 		if (count >= numberToSpawn) {
-			delayFinished = Sys_Global.pauseRelativeTime + allSpawnedResetDelay;
+			delayFinished = Eng_Global->pauseRelativeTime + allSpawnedResetDelay;
 		}
 	}
 
 	void Spawn(int index) {
-		if (Sys_Global.difficultyCombat == 0) return; // Not on combat diff 0
+		if (Eng_Global->difficultyCombat == 0) return; // Not on combat diff 0
 
 		DualLog("Spawning new enemy " + index.ToString());
 		dynamicObjectsContainer = LevelManager.a.GetCurrentDynamicContainer();
@@ -96,7 +96,7 @@ public class SpawnManager : MonoBehaviour {
 		if (instGO == null) {
 			DualLog("BUG: Could not spawn NPC index " + index.ToString());
 		} else {
-			instGO.instances[i].position = spot;
+			instGO.Eng_Global->instances[i].position = spot;
 			AIController aic = instGO.GetComponent<AIController>();
 			if (aic == null) return;
 
@@ -132,7 +132,7 @@ public class SpawnManager : MonoBehaviour {
 	}
 
 	bool AreaHidden(Vector3 spot) {
-		Vector3 plyPos = Const.a.player1Capsule.instances[i].position;
+		Vector3 plyPos = Const.a.player1Capsule.Eng_Global->instances[i].position;
 		float range = 50f;
 		if (distance_vector3(plyPos,spot) > range) return true;
 

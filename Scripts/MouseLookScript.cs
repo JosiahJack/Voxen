@@ -1,35 +1,5 @@
-﻿using System;
-using UnityEngine;
-using UnityEngine.UI;
-using UnityEngine.Networking;
-using System.Collections;
-using System.Runtime.InteropServices;
-using System.Text;
-
-public class MouseLookScript : MonoBehaviour {
-    // External references
-	public GameObject player;
-	public GameObject canvasContainer;
-	public GameObject compassContainer;
-	public GameObject automapContainerLH;
-	public GameObject automapContainerRH;
-	public GameObject compassMidpoints;
-	public GameObject compassLargeTicks;
-	public GameObject compassSmallTicks;
-    [Tooltip("Game object that houses the MFD tabs")] public GameObject tabControl;
-	[Tooltip("Text in the data tab in the MFD that displays when searching an object containing no items")] public Text dataTabNoItemsText;
-	public LogContentsButtonsManager logContentsManager;
-	public GameObject[] hardwareButtons;
-	public PuzzleWire puzzleWire;
-	public PuzzleGrid puzzleGrid;
-	public GameObject shootModeButton;
-	public HealthManager hm;
-	public GameObject playerRadiationTreatmentFlash;
+﻿
 	public Vector2 lastMousePos;
-	
-    // Internal references
-    bool inventoryMode;
-	public bool holdingObject;
     Vector2 cursorHotspot;
     Vector3 cameraFocusPoint;
 	GameObject currentButton;
@@ -128,7 +98,7 @@ public class MouseLookScript : MonoBehaviour {
 		firstTimePickup = true;
 		firstTimeSearch = true;
 		inCyberSpace = false;
-		shakeFinished = Sys_Global.pauseRelativeTime;
+		shakeFinished = Eng_Global->pauseRelativeTime;
 		returnFromCyberspaceFinished = 0;
 		dropFinished = 0;
 
@@ -137,9 +107,9 @@ public class MouseLookScript : MonoBehaviour {
         // -> -> MainCamera: MouseLookScript component.
 		playerCapsuleTransform = transform.parent.transform.parent.transform;
 
-		randomShakeFinished = Sys_Global.pauseRelativeTime;
-		randomKlaxonFinished = Sys_Global.pauseRelativeTime;
-		headBobShiftFinished = Sys_Global.pauseRelativeTime;
+		randomShakeFinished = Eng_Global->pauseRelativeTime;
+		randomKlaxonFinished = Eng_Global->pauseRelativeTime;
+		headBobShiftFinished = Eng_Global->pauseRelativeTime;
 		bobTarget = 0.3f;
     }
     
@@ -158,7 +128,7 @@ public class MouseLookScript : MonoBehaviour {
 			MainMenuHandler.a.LoadGame(7);
 		}
 
-        if (Sys_Global.menuActive) {
+        if (Eng_Global->menuActive) {
 			// Ignore mouselook and turn off camera when main menu is up.
 			if (!MainMenuHandler.a.fileBrowserOpen) Cursor.visible = false;
 			else Cursor.visible = true;
@@ -167,8 +137,8 @@ public class MouseLookScript : MonoBehaviour {
 			return;
 		}
 
-		if (Sys_Global.gamePaused) return;
-		if (instances[PLAYER1].ressurectingFinished > Sys_Global.pauseRelativeTime) return;
+		if (Eng_Global->gamePaused) return;
+		if (Eng_Global->instances[PLAYER1].ressurectingFinished > Eng_Global->pauseRelativeTime) return;
 
 		Utils.EnableCamera(playerCamera);
 
@@ -188,14 +158,14 @@ public class MouseLookScript : MonoBehaviour {
 		}
 
 		if(GetInput.a.ToggleMode()) ToggleInventoryMode(); // Toggle inventory mode<->shoot mode
-		if (Sys_Global.SelfDestructActivated && Sys_Global.currentLevel != 13 && Sys_Global.currentLevel != 9) { // Not Cyberspace, Not the bridge, separated
-			if (randomShakeFinished < Sys_Global.pauseRelativeTime) {
-				randomShakeFinished = Sys_Global.pauseRelativeTime + random_range(5f,20f);
+		if (Eng_Global->SelfDestructActivated && Eng_Global->currentLevel != 13 && Eng_Global->currentLevel != 9) { // Not Cyberspace, Not the bridge, separated
+			if (randomShakeFinished < Eng_Global->pauseRelativeTime) {
+				randomShakeFinished = Eng_Global->pauseRelativeTime + random_range(5f,20f);
 				ScreenShake(3.0f,2.0f);
 			}
 			
-			if (randomKlaxonFinished < Sys_Global.pauseRelativeTime) {
-				randomKlaxonFinished = Sys_Global.pauseRelativeTime + random_range(10f,20f);
+			if (randomKlaxonFinished < Eng_Global->pauseRelativeTime) {
+				randomKlaxonFinished = Eng_Global->pauseRelativeTime + random_range(10f,20f);
 				Utils.PlayUIOneShotSavable(104); // klaxon
 			}
 		}
@@ -208,7 +178,7 @@ public class MouseLookScript : MonoBehaviour {
 		if (inCyberSpace) { // Barrel roll!
 			if (GetInput.a.LeanLeft()) {
 				playerCapsuleTransform.RotateAround(
-					playerCapsuleTransform.instances[i].position,
+					playerCapsuleTransform.Eng_Global->instances[i].position,
 					playerCapsuleTransform.transform.forward,
 					cyberSpinSensitivity * Time.deltaTime * 100f
 				);
@@ -216,7 +186,7 @@ public class MouseLookScript : MonoBehaviour {
 
 			if (GetInput.a.LeanRight()) {
 				playerCapsuleTransform.RotateAround(
-					playerCapsuleTransform.instances[i].position,
+					playerCapsuleTransform.Eng_Global->instances[i].position,
 					playerCapsuleTransform.transform.forward,
 					cyberSpinSensitivity * Time.deltaTime * -1f * 100f
 				);
@@ -224,7 +194,7 @@ public class MouseLookScript : MonoBehaviour {
 		} else {
 			if (compassContainer.activeInHierarchy) {
 				// Update automap player icon orientation.
-				compassContainer.instances[i].rotation =
+				compassContainer.Eng_Global->instances[i].rotation =
 					Quaternion.Euler(0f, -yRotation + 180f, 0f);
 			}
 		}
@@ -242,13 +212,13 @@ public class MouseLookScript : MonoBehaviour {
 		if (!GUIState.a.isBlocking && !inCyberSpace) {
 			if (dropFinished < Time.time) {
 				currentButton = null; // Force this to reset.
-				if (holdingObject) {
+				if (inventoryPlayer1.holdingObject) {
 					if (!FrobWithHeldObject()) DropHeldItem();
 				} else FrobEmptyHanded();
 			}
 		} else {
 			//We are holding cursor over the GUI
-			if (holdingObject && !inCyberSpace) {
+			if (inventoryPlayer1.holdingObject && !inCyberSpace) {
 				AddItemToInventory(heldObjectIndex,heldObjectCustomIndex);
 				MouseCursor.a.liveGrenade = false;
 				ResetHeldItem();
@@ -329,12 +299,12 @@ public class MouseLookScript : MonoBehaviour {
 			xRotation = Clamp0360(xRotation); // Limit up/down to within 360°.
 			yRotation = angX;
 			playerCapsuleTransform.RotateAround(
-				playerCapsuleTransform.instances[i].position,
+				playerCapsuleTransform.Eng_Global->instances[i].position,
 				playerCapsuleTransform.transform.up,yRotation
 			);
 
 			playerCapsuleTransform.RotateAround(
-				playerCapsuleTransform.instances[i].position,
+				playerCapsuleTransform.Eng_Global->instances[i].position,
 				playerCapsuleTransform.transform.right,-xRotation
 			);
 		} else {
@@ -352,7 +322,7 @@ public class MouseLookScript : MonoBehaviour {
 
 			// Up down component only applied to camera.  Must be 0 for others
 			// or else movement will go in wrong direction!
-			instances[i].rotation = Quaternion.Euler(xRotation,0f,0f);
+			Eng_Global->instances[i].rotation = Quaternion.Euler(xRotation,0f,0f);
 			float xCenter = (float)Screen.width * 0.5f;
 			float yCenter = (float)Screen.height * 0.5f;
 			float xOffset = ((float)Input.mousePosition.x - xCenter);
@@ -366,14 +336,14 @@ public class MouseLookScript : MonoBehaviour {
 	public void EnterCyberspace(Vector3 entryPoint) {
 		cyberspaceRecallPoint = entryPoint;
 		playerRadiationTreatmentFlash.SetActive(true);
-		cyberspaceReturnPoint = instances[PLAYER1].instances[i].position;
-		cyberspaceReturnCameraLocalRotation = instances[i].rotation.eulerAngles;
+		cyberspaceReturnPoint = Eng_Global->instances[PLAYER1].Eng_Global->instances[i].position;
+		cyberspaceReturnCameraLocalRotation = Eng_Global->instances[i].rotation.eulerAngles;
 		cyberspaceReturnPlayerCapsuleLocalRotation = playerCapsuleTransform.localRotation.eulerAngles;
 		cyberspaceReturnLevel = LevelManager.a.currentLevel;
 		Sys_UI.EnterCyberspace();
 		LevelManager.a.LoadLevel(13,cyberspaceRecallPoint);
-		instances[PLAYER1].inCyberSpace = true;
-		instances[PLAYER1].leanCapsuleCollider.enabled = false;
+		Eng_Global->instances[PLAYER1].inCyberSpace = true;
+		Eng_Global->instances[PLAYER1].leanCapsuleCollider.enabled = false;
 		hm.inCyberSpace = true;
 		inCyberSpace = true;
 		playerCamera.useOcclusionCulling = false;
@@ -391,7 +361,7 @@ public class MouseLookScript : MonoBehaviour {
 		playerCapsuleTransform.localRotation = Quaternion.Euler(0f,
 			cyberspaceReturnPlayerCapsuleLocalRotation.y,0f);
 
-		instances[i].rotation = // Up down component applied to camera
+		Eng_Global->instances[i].rotation = // Up down component applied to camera
 			Quaternion.Euler(cyberspaceReturnCameraLocalRotation.x,
 							 cyberspaceReturnCameraLocalRotation.y,
 							 cyberspaceReturnCameraLocalRotation.z);
@@ -401,9 +371,9 @@ public class MouseLookScript : MonoBehaviour {
 
 		returnFromCyberspaceFinished = Time.time + 0.1f; // Prevent mouselook
 														 // messing it up.
-		instances[PLAYER1].inCyberSpace = false;
-		instances[PLAYER1].rbody.velocity = (Vector3){0.0f,0.0f,0.0f};
-		instances[PLAYER1].leanCapsuleCollider.enabled = true;
+		Eng_Global->instances[PLAYER1].inCyberSpace = false;
+		Eng_Global->instances[PLAYER1].rbody.velocity = (Vector3){0.0f,0.0f,0.0f};
+		Eng_Global->instances[PLAYER1].leanCapsuleCollider.enabled = true;
 		hm.inCyberSpace = false;
 		inCyberSpace = false;
 		playerCamera.useOcclusionCulling = true;
@@ -459,8 +429,8 @@ public class MouseLookScript : MonoBehaviour {
 				xRotation += keyboardTurnSpeed;
 
 			if (!inCyberSpace) xRotation = vclamp(xRotation, -90f, 90f);  // Limit up and down angle.
-			instances[i].rotation = Quaternion.Euler(xRotation,0f,
-													   instances[i].rotation.z);
+			Eng_Global->instances[i].rotation = Quaternion.Euler(xRotation,0f,
+													   Eng_Global->instances[i].rotation.z);
 		} else if (rightTouchstick.y > 0f) {
 			if ((inCyberSpace && Const.a.InputInvertCyberspaceLook) || (!inCyberSpace && Const.a.InputInvertLook))
 				xRotation += keyboardTurnSpeed * rightTouchstick.y;
@@ -468,8 +438,8 @@ public class MouseLookScript : MonoBehaviour {
 				xRotation -= keyboardTurnSpeed * rightTouchstick.y;
 
 			if (!inCyberSpace) xRotation = vclamp(xRotation, -90f, 90f);  // Limit up and down angle.
-			instances[i].rotation = Quaternion.Euler(xRotation, 0f,
-													   instances[i].rotation.z);
+			Eng_Global->instances[i].rotation = Quaternion.Euler(xRotation, 0f,
+													   Eng_Global->instances[i].rotation.z);
 		}
 	}
 
@@ -481,14 +451,14 @@ public class MouseLookScript : MonoBehaviour {
 				angX = -keyboardTurnSpeed * 18f * ((Const.a.GraphicsFOV / 2f) / Screen.width / 2f);
 				yRotation = angX;
 				playerCapsuleTransform.RotateAround(
-					playerCapsuleTransform.instances[i].position,
+					playerCapsuleTransform.Eng_Global->instances[i].position,
 					playerCapsuleTransform.transform.up,yRotation
 				);
 			} else if (GetInput.a.TurnRight()) {
 				angX = keyboardTurnSpeed * 18f * ((Const.a.GraphicsFOV / 2f) / Screen.width / 2f);
 				yRotation = angX;
 				playerCapsuleTransform.RotateAround(
-					playerCapsuleTransform.instances[i].position,
+					playerCapsuleTransform.Eng_Global->instances[i].position,
 					playerCapsuleTransform.transform.up,yRotation
 				);
 			}
@@ -516,7 +486,7 @@ public class MouseLookScript : MonoBehaviour {
 			
 				xRotation = Clamp0360(xRotation); // Limit up/down to within 360°.
 				playerCapsuleTransform.RotateAround(
-					playerCapsuleTransform.instances[i].position,
+					playerCapsuleTransform.Eng_Global->instances[i].position,
 					playerCapsuleTransform.transform.right,-xRotation
 				);
 			} else if (GetInput.a.LookUp()) {
@@ -526,7 +496,7 @@ public class MouseLookScript : MonoBehaviour {
 			
 				xRotation = Clamp0360(xRotation); // Limit up/down to within 360°.
 					playerCapsuleTransform.RotateAround(
-					playerCapsuleTransform.instances[i].position,
+					playerCapsuleTransform.Eng_Global->instances[i].position,
 					playerCapsuleTransform.transform.right,-xRotation
 				);
 			}
@@ -539,8 +509,8 @@ public class MouseLookScript : MonoBehaviour {
 					xRotation += keyboardTurnSpeed;
 
 				if (!inCyberSpace) xRotation = vclamp(xRotation, -90f, 90f);  // Limit up and down angle.
-				instances[i].rotation = Quaternion.Euler(xRotation,0f,
-														instances[i].rotation.z);
+				Eng_Global->instances[i].rotation = Quaternion.Euler(xRotation,0f,
+														Eng_Global->instances[i].rotation.z);
 			} else if (GetInput.a.LookUp()) {
 				if ((inCyberSpace && Const.a.InputInvertCyberspaceLook) || (!inCyberSpace && Const.a.InputInvertLook))
 					xRotation += keyboardTurnSpeed;
@@ -548,8 +518,8 @@ public class MouseLookScript : MonoBehaviour {
 					xRotation -= keyboardTurnSpeed;
 
 				if (!inCyberSpace) xRotation = vclamp(xRotation, -90f, 90f);  // Limit up and down angle.
-				instances[i].rotation = Quaternion.Euler(xRotation, 0f,
-														instances[i].rotation.z);
+				Eng_Global->instances[i].rotation = Quaternion.Euler(xRotation, 0f,
+														Eng_Global->instances[i].rotation.z);
 			}
 		}
 	}
@@ -616,7 +586,7 @@ public class MouseLookScript : MonoBehaviour {
 
 		if (Application.platform == RuntimePlatform.Android) {
 			// Cyber handled just above, normal fire condition only here.
-			int constDex = WeaponCurrent.a.weaponIndex;
+			int constDex = inventoryPlayer1.weaponIndex;
 			int wepdex = WeaponFire.Get16WeaponIndexFromConstIndex(constDex);
 			WeaponFire.a.StartNormalAttack(wepdex);
 			return true;
@@ -630,7 +600,7 @@ public class MouseLookScript : MonoBehaviour {
 	}
 
 	void FrobEmptyHanded() {
-		if (holdingObject) return;
+		if (inventoryPlayer1.holdingObject) return;
 
 		RaycastHit firstHit;
 		float offset = Screen.height * 0.02f;
@@ -808,7 +778,7 @@ public class MouseLookScript : MonoBehaviour {
 						 int ammo2, bool loadedAlt, bool fromButton) {
 		if (useableConstdex < 0) return;
 
-		holdingObject = true;
+		inventoryPlayer1.holdingObject = true;
 		heldObjectIndex = useableConstdex;
 		heldObjectCustomIndex = customIndex;
 		heldObjectAmmo = ammo1;
@@ -823,27 +793,27 @@ public class MouseLookScript : MonoBehaviour {
 		// other strings I need to CTRL+F my way to this buggy code!
 		WeaponButton wepbut = currentButton.GetComponent<WeaponButton>();
 		int indexPriorToRemoval = wepbut.useableItemIndex;
-		int am1 = WeaponCurrent.a.currentMagazineAmount[wepbut.WepButtonIndex];
-		WeaponCurrent.a.currentMagazineAmount[wepbut.WepButtonIndex] = 0;
-		int am2 = WeaponCurrent.a.currentMagazineAmount2[wepbut.WepButtonIndex];
-		WeaponCurrent.a.currentMagazineAmount2[wepbut.WepButtonIndex] = 0;
+		int am1 = inventoryPlayer1.currentMagazineAmount[wepbut.WepButtonIndex];
+		inventoryPlayer1.currentMagazineAmount[wepbut.WepButtonIndex] = 0;
+		int am2 = inventoryPlayer1.currentMagazineAmount2[wepbut.WepButtonIndex];
+		inventoryPlayer1.currentMagazineAmount2[wepbut.WepButtonIndex] = 0;
 		bool loadAlt = false;
 		if (am2 > 0) loadAlt = true;
 		PutObjectInHand(indexPriorToRemoval,-1,am1,am2,loadAlt,true);
-		WeaponCurrent.a.RemoveWeapon(wepbut.WepButtonIndex);
+		inventoryPlayer1.RemoveWeapon(wepbut.WepButtonIndex);
 		inventoryPlayer1.RemoveWeapon(wepbut.WepButtonIndex);
 		Sys_UI.SetAmmoIcons(-1,false) ; // Clear the ammo icons.
 		Sys_UI.HideAmmoAndEnergyItems();
 		wepbut.useableItemIndex = -1;
 		wepbut = Sys_UI.wepbutMan.wepButtonsScripts[0];
-		WeaponCurrent.a.WeaponChange(wepbut.useableItemIndex,
+		inventoryPlayer1.WeaponChange(wepbut.useableItemIndex,
 									 wepbut.WepButtonIndex);
 	}
 
 	// Because Unity does not see fit for their Button class to support right
 	// click behavior...or any other reasonable mouse button interaction.
 	void InventoryButtonUse() {
-		if (holdingObject) return;
+		if (inventoryPlayer1.holdingObject) return;
 		if (!GUIState.a.overButton) return;
 		if (GUIState.a.overButtonType == ButtonType.None) return;
 		if (currentButton == null) return;
@@ -962,16 +932,16 @@ public class MouseLookScript : MonoBehaviour {
 	}
 	
 	public void SearchButtonClick(int index, SearchButton sebut) {
-		holdingObject = true;
-		heldObjectIndex = sebut.contents[index];
+		inventoryPlayer1.holdingObject = true;
+		heldObjectIndex = sebut.contEng_Global->instances[index];
 		heldObjectCustomIndex = sebut.customIndex[index];
 		if (currentSearchItem != null) {
 			SearchableItem sitem = currentSearchItem.GetComponent<SearchableItem>();
-			sitem.contents[index] = -1;
+			sitem.contEng_Global->instances[index] = -1;
 			sitem.customIndex[index] = -1;
 		}
 		
-		sebut.contents[index] = -1;
+		sebut.contEng_Global->instances[index] = -1;
 		sebut.customIndex[index] = -1;
 		Sys_UI.DisableSearchItemImage(index);
 		sebut.CheckForEmpty();
@@ -986,36 +956,36 @@ public class MouseLookScript : MonoBehaviour {
 	}
 
 	void RecoilAndRest() {
-		float targetY = Const.a.playerCameraOffsetY * instances[PLAYER1].currentCrouchRatio;
+		float targetY = Const.a.playerCameraOffsetY * Eng_Global->instances[PLAYER1].currentCrouchRatio;
 		float targetX = 0f;
-		if (instances[PLAYER1].relSideways > 0) targetX += 0.12f;
-		if (instances[PLAYER1].relSideways < 0) targetX -= 0.12f;
-		if (instances[PLAYER1].relForward != 0) targetY -= 0.08f;
-		if (shakeFinished > Sys_Global.pauseRelativeTime) {
-			headBobX = instances[PLAYER1].position.x + random_range(shakeForce * -0.17f, shakeForce * 0.17f);
-			headBobY = instances[PLAYER1].position.y + random_range(shakeForce * -0.08f, shakeForce * 0.08f);
-			headBobZ = instances[PLAYER1].position.z + random_range(shakeForce * -0.17f, shakeForce * 0.17f);
+		if (Eng_Global->instances[PLAYER1].relSideways > 0) targetX += 0.12f;
+		if (Eng_Global->instances[PLAYER1].relSideways < 0) targetX -= 0.12f;
+		if (Eng_Global->instances[PLAYER1].relForward != 0) targetY -= 0.08f;
+		if (shakeFinished > Eng_Global->pauseRelativeTime) {
+			headBobX = Eng_Global->instances[PLAYER1].position.x + random_range(shakeForce * -0.17f, shakeForce * 0.17f);
+			headBobY = Eng_Global->instances[PLAYER1].position.y + random_range(shakeForce * -0.08f, shakeForce * 0.08f);
+			headBobZ = Eng_Global->instances[PLAYER1].position.z + random_range(shakeForce * -0.17f, shakeForce * 0.17f);
 		} else {
 			headBobZ = 0f;
-			Vector3 vel = instances[PLAYER1].rbody.velocity;
+			Vector3 vel = Eng_Global->instances[PLAYER1].rbody.velocity;
 			vel.y = 0f;
-			if (instances[PLAYER1].relForward + instances[PLAYER1].relSideways != 0 && Sys_Settings.HeadBob) {
-				if (instances[PLAYER1].headBobShiftFinished < Sys_Global.pauseRelativeTime) {
-					instances[PLAYER1].headBobShiftFinished = Sys_Global.pauseRelativeTime + 0.2f;
-					if (!instances[PLAYER1].isSprinting) instances[PLAYER1].headBobShiftFinished += 0.1f;
+			if (Eng_Global->instances[PLAYER1].relForward + Eng_Global->instances[PLAYER1].relSideways != 0 && Sys_Settings.HeadBob) {
+				if (Eng_Global->instances[PLAYER1].headBobShiftFinished < Eng_Global->pauseRelativeTime) {
+					Eng_Global->instances[PLAYER1].headBobShiftFinished = Eng_Global->pauseRelativeTime + 0.2f;
+					if (!Eng_Global->instances[PLAYER1].isSprinting) Eng_Global->instances[PLAYER1].headBobShiftFinished += 0.1f;
 					bobTarget = HeadBobAmount * -1f * vsign(bobTarget);
 				}
 
-				if (instances[PLAYER1].rbody.velocity.magnitude > 0.1f) headBobY = smooth_damp(headBobY,targetY + bobTarget,ref headBobYVel,Const.HeadBobRate);
+				if (Eng_Global->instances[PLAYER1].rbody.velocity.magnitude > 0.1f) headBobY = smooth_damp(headBobY,targetY + bobTarget,ref headBobYVel,Const.HeadBobRate);
 				headBobX = smooth_damp(headBobX,targetX,ref headBobXVel,Const.HeadBobRate);
 			} else {
 				headBobX = smooth_damp(headBobX,0f,ref headBobXVel,Const.HeadBobRate);
-				headBobY = smooth_damp(headBobY,Const.a.playerCameraOffsetY * instances[PLAYER1].currentCrouchRatio,ref headBobYVel,Const.HeadBobRate);
+				headBobY = smooth_damp(headBobY,Const.a.playerCameraOffsetY * Eng_Global->instances[PLAYER1].currentCrouchRatio,ref headBobYVel,Const.HeadBobRate);
 			}
 		}
 		
 		if (inCyberSpace) headBobX = headBobY = headBobZ = 0f;
-		instances[PLAYER1].position = (Vector3){ headBobX, headBobY, headBobZ };
+		Eng_Global->instances[PLAYER1].position = (Vector3){ headBobX, headBobY, headBobZ };
 	}
 
 	void AddItemFail(int index) { // Expects usableItem index
@@ -1102,8 +1072,8 @@ public class MouseLookScript : MonoBehaviour {
 			if (curSearchScript != null) {
 				int[] resultContents = {-1,-1,-1,-1};  // create blanked container for search results
 				for (int i=3;i>=0;i--) {
-					resultContents[i] = curSearchScript.contents[i];
-					if (resultContents[i] > -1) numberFoundContents++; // if something was found, add 1 to count
+					resultContEng_Global->instances[i] = curSearchScript.contEng_Global->instances[i];
+					if (resultContEng_Global->instances[i] > -1) numberFoundContents++; // if something was found, add 1 to count
 				}
 			}
 	    	if (numberFoundContents == 0) {
@@ -1155,11 +1125,11 @@ public class MouseLookScript : MonoBehaviour {
 					ResetHeldItem();
 					return;
 				} else {
-					tossObject.instances[i].position = (instances[i].position + (transform.forward * tossOffset));
+					tossObject.Eng_Global->instances[i].position = (Eng_Global->instances[i].position + (transform.forward * tossOffset));
 				}
 			} else {
 				// DualLog("WARNING: Failed to get freeObjectInPool for object " + heldObject.ToString() + "being dropped! MouseLookScript DropHeldItem.",player);
-				tossObject = Instantiate(heldObject,(instances[i].position + (transform.forward * tossOffset)),Const.a.quaternionIdentity) as GameObject;  //effect
+				tossObject = Instantiate(heldObject,(Eng_Global->instances[i].position + (transform.forward * tossOffset)),Const.a.quaternionIdentity) as GameObject;  //effect
 				if (tossObject == null) {
 					CenterStatusPrint("BUG: Failed to instantiate object being dropped!",player);
 					ResetHeldItem();
@@ -1189,7 +1159,7 @@ public class MouseLookScript : MonoBehaviour {
 			// Throw an active grenade
 			grenadeActive = false;
 			Sys_UI.mouseClickHeldOverGUI = true; // Prevent shooting it.
-			tossObject = Instantiate(heldObject,(instances[i].position + (transform.forward * tossOffset)),Const.a.quaternionIdentity) as GameObject;  //effect
+			tossObject = Instantiate(heldObject,(Eng_Global->instances[i].position + (transform.forward * tossOffset)),Const.a.quaternionIdentity) as GameObject;  //effect
 			if (tossObject == null) {
 				CenterStatusPrint("BUG: Failed to instantiate object being dropped!",player);
 				ResetHeldItem();
@@ -1222,7 +1192,7 @@ public class MouseLookScript : MonoBehaviour {
 		heldObjectAmmo = 0;
 		heldObjectAmmo2 = 0;
 		heldObjectLoadedAlternate = false;
-		holdingObject = false;
+		inventoryPlayer1.holdingObject = false;
 		grenadeActive = false;
 		MouseCursor.a.justDroppedItemInHelper = true;
 	}
@@ -1257,7 +1227,7 @@ public class MouseLookScript : MonoBehaviour {
 		if (inventoryMode) return;
 
 		
-		if (Sys_Global.menuActive || Sys_Global.gamePaused) {
+		if (Eng_Global->menuActive || Eng_Global->gamePaused) {
 			Cursor.lockState = CursorLockMode.None;
 		} else {
 			#if UNITY_EDITOR
@@ -1284,13 +1254,13 @@ public class MouseLookScript : MonoBehaviour {
 		SearchableItem curSearchScript = currentSearchItem.GetComponent<SearchableItem>();
 		if (curSearchScript.searchableInUse) {
 			for (int i=0;i<4;i++) {
-				if (curSearchScript.contents[i] >= 0) {
-					MouseCursor.a.GetComponent<MouseCursor>().cursorImage = Const.a.useableItemsFrobIcons[curSearchScript.contents[i]];
-					heldObjectIndex = curSearchScript.contents[i];
+				if (curSearchScript.contEng_Global->instances[i] >= 0) {
+					MouseCursor.a.GetComponent<MouseCursor>().cursorImage = Const.a.useableItemsFrobIcons[curSearchScript.contEng_Global->instances[i]];
+					heldObjectIndex = curSearchScript.contEng_Global->instances[i];
 					heldObjectCustomIndex = curSearchScript.customIndex[i];
-					curSearchScript.contents[i] = -1;
+					curSearchScript.contEng_Global->instances[i] = -1;
 					curSearchScript.customIndex[i] = -1;
-					if (heldObjectIndex != -1) holdingObject = true;
+					if (heldObjectIndex != -1) inventoryPlayer1.holdingObject = true;
 					CenterStatusPrint("%s", Sys_Text.stringTable[heldObjectIndex + 326]
 								 + Sys_Text.stringTable[319],player); // picked up
 
@@ -1310,10 +1280,10 @@ public class MouseLookScript : MonoBehaviour {
 		int[] resultContents = {-1,-1,-1,-1};  // create blanked container for search results
 		int[] resultCustomIndex = {-1,-1,-1,-1};  // create blanked container for search results custom indices
 		for (int i=3;i>=0;i--) {
-			resultContents[i] = curSearchScript.contents[i];
+			resultContEng_Global->instances[i] = curSearchScript.contEng_Global->instances[i];
 			resultCustomIndex[i] = curSearchScript.customIndex[i];
 			// If something was found, add 1 to count.
-			if (resultContents[i] > -1) numberFoundContents++;
+			if (resultContEng_Global->instances[i] > -1) numberFoundContents++;
 		}
 
 		if (firstTimeSearch) {
@@ -1323,13 +1293,13 @@ public class MouseLookScript : MonoBehaviour {
 		Sys_UI.SendSearchToDataTab(curSearchScript.objectName,
 										 numberFoundContents,resultContents,
 										 resultCustomIndex,
-										 currentSearchItem.instances[i].position,
+										 currentSearchItem.Eng_Global->instances[i].position,
 										 curSearchScript, useFX);
 		ForceInventoryMode();
 	}
 
 	public void UseGrenade (int index) {
-		if (holdingObject) { CenterStatusPrint("%s", Sys_Text.stringTable[311],player); return; } // Can't use grenade, hands full
+		if (inventoryPlayer1.holdingObject) { CenterStatusPrint("%s", Sys_Text.stringTable[311],player); return; } // Can't use grenade, hands full
 		if (index < 7 || index > 13) { DualLog("BUG: index outside of 7 to 13 passed to UseGrenade() in MouseLookScript.cs"); return; }
 
 		ForceInventoryMode();  // Inventory mode is turned on when picking something up.

@@ -71,7 +71,7 @@
 					if (maxhealth == -1) maxhealth = Const.a.healthForNPC[index]; // set maxhealth to default healthForNPC, possible to set higher, e.g. for cyborg assassins on level 9 whose health is 3 times normal
 				}
 
-				if (Sys_Global.difficultyCombat == 0) {
+				if (Eng_Global->difficultyCombat == 0) {
 					maxhealth = 1;
 					health = maxhealth;
 				}
@@ -234,7 +234,7 @@
 
 		// Object is dead exceptions.
 		if (tempFloat <= 0) {
-			if (gibOnDeath || isIce || isPlayer || isGrenade || instances[selfIdx].index == 279 || isSecCamera || teleportOnDeath) return 0;
+			if (gibOnDeath || isIce || isPlayer || isGrenade || Eng_Global->instances[selfIdx].index == 279 || isSecCamera || teleportOnDeath) return 0;
 		}
 
 		take = dd.damage;
@@ -305,7 +305,7 @@
 					pstatic.Flash(intensityOfPainFlash);
 				}
 
-				if (dd.ownerIsNPC) justHurtByEnemy = Sys_Global.pauseRelativeTime;
+				if (dd.ownerIsNPC) justHurtByEnemy = Eng_Global->pauseRelativeTime;
 			}
 		}
 
@@ -394,7 +394,7 @@
 			if (isIce) Utils.DisableCollision(gameObject);
 			if (vaporizeCorpse && !isSecCamera && !isGrenade) VaporizeCorpse(energyVaporized);
 			else if (isObject) ObjectDeath();
-			else if (instances[selfIdx].index == 279) ScreenDeath();
+			else if (Eng_Global->instances[selfIdx].index == 279) ScreenDeath();
 			else if (teleportOnDeath) TeleportAway();
 			else if (isGrenade) GrenadeDeath();
 
@@ -441,12 +441,12 @@
         
         teleportDone = true;
         Utils.Activate(teleportEffect);
-        instances[i].collider = COLLIDER_TYPE_NONE; // Deactivate collisions.
-        instances[i].think = NULL;
-        instances[i].animationNum = MAX_ANIMATED_MODELS + 1;
-        instances[i].gravity = 0.0f;
-        instances[i].velocity = instances[i].angularVelocity = (Vector3){ 0.0f, 0.0f, 0.0f };
-        instances[i].modelIdx = UINT16_MAX; // Removed from rendering.
+        Eng_Global->instances[i].collider = COLLIDER_TYPE_NONE; // Deactivate collisions.
+        Eng_Global->instances[i].think = NULL;
+        Eng_Global->instances[i].animationNum = MAX_ANIMATED_MODELS + 1;
+        Eng_Global->instances[i].gravity = 0.0f;
+        Eng_Global->instances[i].velocity = Eng_Global->instances[i].angularVelocity = (Vector3){ 0.0f, 0.0f, 0.0f };
+        Eng_Global->instances[i].modelIdx = UINT16_MAX; // Removed from rendering.
 	}
 
 	void NPCDeath(uint16_t i) {
@@ -454,7 +454,7 @@
 
 		deathDone = true; // Mark it so we only die once.
 		CreateDeathEffects(deathFX);
-		if (NPCID == 0 && !instances[i].actAsCorpseOnly) play_wav(sounds[64], 1.0f, instances[i].position, true); // npc_autobomb: explosion1
+		if (NPCID == 0 && !Eng_Global->instances[i].actAsCorpseOnly) play_wav(sounds[64], 1.0f, Eng_Global->instances[i].position, true); // npc_autobomb: explosion1
 
 		if (aic == null) {
 			if (transform.parent != null) {
@@ -521,7 +521,7 @@
 			case 526: soundex = 68; break; // prop_console02: hit3
 		}
 		
-		play_wav(sounds[soundex],1.0f,instances[i].position,true);
+		play_wav(sounds[soundex],1.0f,Eng_Global->instances[i].position,true);
 		if (deathFX != PoolType.None) HideSelf();
 	}
 
@@ -547,7 +547,7 @@
 		}
 
 		DropSearchables();
-		if (instances[selfIdx].index != 279) Utils.DisableCollision(gameObject);
+		if (Eng_Global->instances[selfIdx].index != 279) Utils.DisableCollision(gameObject);
 		AIController aic = GetComponent<AIController>();
 		if (aic != null) {
 			if (aic.healthManager.gibOnDeath) { // We are a corpse here.
@@ -566,11 +566,11 @@
 		Sys_UI.NotifySearchThatSearchableWasDestroyed();
 		GameObject levelDynamicContainer = LevelManager.a.GetCurrentDynamicContainer();
 		for (int i=0;i<4;i++) {
-			if (searchableItem.contents[i] < 0) continue;
+			if (searchableItem.contEng_Global->instances[i] < 0) continue;
 
 			GameObject tossObject =
-				Instantiate(Const.a.GetPrefab(searchableItem.contents[i] + 307),
-							instances[i].position,Const.a.quaternionIdentity)
+				Instantiate(Const.a.GetPrefab(searchableItem.contEng_Global->instances[i] + 307),
+							Eng_Global->instances[i].position,Const.a.quaternionIdentity)
 								as GameObject;
 
 			if (tossObject != null) {
@@ -581,7 +581,7 @@
 			} else {
 				CenterStatusPrint("BUG: Failed to instantiate object being dropped on gib.");
 			}
-			searchableItem.contents[i] = -1;
+			searchableItem.contEng_Global->instances[i] = -1;
 			searchableItem.customIndex[i] = -1;
 		}
 	}
@@ -595,7 +595,7 @@
 		if (deathDone) return;
 
 		deathDone = true; // Screens maintain collisions, so not disabling here; also maintain visible mesh, don't turn it off
-		play_wav(sounds[69],1.0f,instances[i].position,true);
+		play_wav(sounds[69],1.0f,Eng_Global->instances[i].position,true);
 		ImageSequenceTextureArray ista = GetComponent<ImageSequenceTextureArray>();
 		ista.Destroy(); // ista deada nowa
 		if (gibOnDeath) Gib();
@@ -607,7 +607,7 @@
 		GameObject explosionEffect = Const.a.GetObjectFromPool(fx);
 		if (explosionEffect == null) return;
 
-		Vector3 pos = instances[i].position;
+		Vector3 pos = Eng_Global->instances[i].position;
 		BoxCollider boxCol = GetComponent<BoxCollider>();
 		if (boxCol != null) pos = transform.TransformPoint(boxCol.center);
 
@@ -621,11 +621,11 @@
 
  		// Enable death effects (e.g. explosion particle effect)
 		explosionEffect.SetActive(true);
-		explosionEffect.instances[i].position = pos;
+		explosionEffect.Eng_Global->instances[i].position = pos;
 	}
 
 	void HideSelf() {
-		if (instances[selfIdx].index == 279) return;
+		if (Eng_Global->instances[selfIdx].index == 279) return;
 
 		if (isSecCamera) {
 			PrefabIdentifier pid = transform.parent.gameObject.GetComponent<PrefabIdentifier>();
@@ -703,7 +703,7 @@
 		}
 
 		// Handle screens
-		if (instances[selfIdx].index == 279) {
+		if (Eng_Global->instances[selfIdx].index == 279) {
 			if (health > 0) {
 				ImageSequenceTextureArray ista = GetComponent<ImageSequenceTextureArray>();
 				if (ista != null) {

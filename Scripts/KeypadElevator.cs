@@ -26,17 +26,17 @@ public class KeypadElevator : MonoBehaviour {
 		padInUse = false;
 		if (linkedDoor == null) {
 			DualLog("BUG: no linked Door for KeypadElevator at location: "
-					  + instances[i].position.ToString());
+					  + Eng_Global->instances[i].position.ToString());
 		}
 	}
 
 	public void Use (UseData ud) {
 		if (GetCurrentLevelSecurity() > securityThreshhold) {
-			Sys_UI.BlockedBySecurity(instances[i].position);
+			Sys_UI.BlockedBySecurity(Eng_Global->instances[i].position);
 			return;
 		}
 
-		if (Sys_Cheats.superoverride || Sys_Global.difficultyMission == 0) {
+		if (Eng_Cheats->superoverride || Eng_Global->difficultyMission == 0) {
 			// SHODAN can go anywhere!  Full security override!
 			locked = false;
 		}
@@ -54,7 +54,7 @@ public class KeypadElevator : MonoBehaviour {
 		Sys_UI.SendElevatorKeypadToDataTab(this,buttonsEnabled,
 												 buttonsDarkened,buttonText,
 												 targetDestination,
-												 instances[i].position,linkedDoor,
+												 Eng_Global->instances[i].position,linkedDoor,
 												 currentFloor);
 	}
 

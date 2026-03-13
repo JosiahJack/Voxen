@@ -112,7 +112,7 @@ static const float camMaxAmount = 0.2548032f
 // 
 // 	void Start() {
 // 		automapExplored = new bool[4096];
-// 		automapUpdateFinished = Sys_Global.pauseRelativeTime;
+// 		automapUpdateFinished = Eng_Global->pauseRelativeTime;
 // 		AutomapZoomAdjust();
 // 		icoZAdj = 0f;
 // 		automapCameraTransform = automapCamera.transform;
@@ -204,7 +204,7 @@ static const float camMaxAmount = 0.2548032f
 // 			Utils.Activate(poolContainerAutomapMutantOverlays);
 // 		}
 // 
-// // 		if (automapUpdateFinished < Sys_Global.pauseRelativeTime) {
+// // 		if (automapUpdateFinished < Eng_Global->pauseRelativeTime) {
 // 			Utils.EnableImage(automapBaseImage);
 // 			if (LevelManager.a.currentLevel >= 0) {
 // 				Utils.AssignImageOverride(automapBaseImage,
@@ -292,7 +292,7 @@ static const float camMaxAmount = 0.2548032f
 // 				// since it updates it anyways.
 // 			}
 // 
-// 			if (automapUpdateFinished < Sys_Global.pauseRelativeTime) {
+// 			if (automapUpdateFinished < Eng_Global->pauseRelativeTime) {
 // 				float radiusSquared = automapFoWRadius * automapFoWRadius;
 // 				Vector2 plyrPos = tempVec2b;
 // 				// Update explored tiles
@@ -321,9 +321,9 @@ static const float camMaxAmount = 0.2548032f
 // 						}
 // 					//}
 // 				}
-// 				automapUpdateFinished = Sys_Global.pauseRelativeTime + updateTime;
+// 				automapUpdateFinished = Eng_Global->pauseRelativeTime + updateTime;
 // 			}
-// // 			automapUpdateFinished = Sys_Global.pauseRelativeTime + updateTime;
+// // 			automapUpdateFinished = Eng_Global->pauseRelativeTime + updateTime;
 // // 		}
 // 
 // 		SetAutomapActiveState();
@@ -468,8 +468,8 @@ static const float camMaxAmount = 0.2548032f
 // 		}
 // 
 // 		Vector3 scaleVec = (Vector3){zoom,zoom,zoom);
-// 		automapContainerLH.instances[i].scale = scaleVec;
-// 		automapContainerRH.instances[i].scale = scaleVec;
+// 		automapContainerLH.Eng_Global->instances[i].scale = scaleVec;
+// 		automapContainerRH.Eng_Global->instances[i].scale = scaleVec;
 // 	}
 // 
 // 	public void ToggleSideTop() {
@@ -510,14 +510,14 @@ static const float camMaxAmount = 0.2548032f
 // 		automapSideRH.SetActive(false);
 // 	}
 // 
-// 	public void AutomapGoFull() {
-// 		if (inSideView) {
+// 	public void AutomapGoFull(uint16_t playerIdx, SystemUI* ui) {
+// 		if (ui->inSideView) {
 // 			AutomapGoTop();
-// 			UpdateAutomap(PlayerMovement.a.instances[i].position);
+// 			UpdateAutomap(Eng_Global->instances[playerIdx].position);
 // 		}
-// 		Utils.Activate(automapFull);
-// 		inFullMap = true;
-// 		Sys_UI.AutomapGoFull();
+// 		Utils.Activate(automapFull); TODO
+// 		ui->inFullMap = true;
+// 		AutomapGoFull(ui);
 // 	}
 // 
 // 	public void CloseFullmap() {
@@ -579,7 +579,7 @@ static const float camMaxAmount = 0.2548032f
 // 			if (parGo != null) scr = parGo.GetComponent<SecurityCameraRotate>();
 // 		}
 // 
-// 		if (scr != null) worldPos = scr.instances[i].position;
+// 		if (scr != null) worldPos = scr.Eng_Global->instances[i].position;
 // 		over.rectTransform.anchoredPosition = GetMapPos(worldPos);
 // 	}
 // }

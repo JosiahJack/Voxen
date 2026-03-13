@@ -44,8 +44,8 @@ public class GrenadeActivate : MonoBehaviour {
 	}
 
 	void Update() {
-		if (Sys_Global.gamePaused) return;
-		if (Sys_Global.menuActive) return;
+		if (Eng_Global->gamePaused) return;
+		if (Eng_Global->menuActive) return;
 		if (!active) return;
 
 		// Plastique or other explosive device:
@@ -55,7 +55,7 @@ public class GrenadeActivate : MonoBehaviour {
 		}
 
 		// Standard grenade explode route:
-		if ((useTimer && timeFinished < Sys_Global.pauseRelativeTime)
+		if ((useTimer && timeFinished < Eng_Global->pauseRelativeTime)
 			|| (useProx && proxSensed)) {
 
 			Explode();
@@ -68,10 +68,10 @@ public class GrenadeActivate : MonoBehaviour {
 			case 7: explodeOnContact = true; break; // Fragmentation Grenade
 			case 8: explodeOnContact = true; break; // Concussion Grenade
 			case 9: explodeOnContact = true; break; // EMP Grenade
-			case 10: timeFinished = Sys_Global.pauseRelativeTime + inventoryPlayer1.earthShakerTimeSetting;
+			case 10: timeFinished = Eng_Global->pauseRelativeTime + inventoryPlayer1.earthShakerTimeSetting;
 					 useTimer = true; break;        // Earthshaker Bomb
 			case 11: useProx = true; explodeOnContact = false; break; // Land Mine
-			case 12: timeFinished = Sys_Global.pauseRelativeTime + inventoryPlayer1.nitroTimeSetting; 
+			case 12: timeFinished = Eng_Global->pauseRelativeTime + inventoryPlayer1.nitroTimeSetting; 
 					 useTimer = true; break;        // Nitropack Explosive
 			case 13: explodeOnContact = true; break; // Gas Grenade
 			default: return;
@@ -100,26 +100,26 @@ public class GrenadeActivate : MonoBehaviour {
 		if (!IsNPCMine()) {
 			dd.owner = Const.a.player1Capsule;
 			PlayerHealth.a.makingNoise = true;
-			PlayerHealth.a.noiseFinished = Sys_Global.pauseRelativeTime + 2f;
+			PlayerHealth.a.noiseFinished = Eng_Global->pauseRelativeTime + 2f;
 		}
 		
-		Utils.ApplyImpactForceSphere(dd,instances[i].position,nearradius,1.0f);
+		Utils.ApplyImpactForceSphere(dd,Eng_Global->instances[i].position,nearradius,1.0f);
 		GameObject explosionEffect = Const.a.GetObjectFromPool(explosionType);
 		if (explosionEffect != null) {
 			explosionEffect.SetActive(true);
-			explosionEffect.instances[i].position = instances[i].position;
+			explosionEffect.Eng_Global->instances[i].position = Eng_Global->instances[i].position;
 			int soundIndex = 60; // attack1_explode
 			switch(constIndex) {
-				case 7:  soundIndex = 64; WeaponFire.a.fogFac += 5; break; // frag, explosion1
-				case 8:  soundIndex = 60; WeaponFire.a.fogFac += 7; break; // conc, attack1_explode
+				case 7:  soundIndex = 64; fogFac += 5; break; // frag, explosion1
+				case 8:  soundIndex = 60; fogFac += 7; break; // conc, attack1_explode
 				case 9:  soundIndex = 67; break; // emp, hit2
-				case 10: soundIndex = 60; WeaponFire.a.fogFac += 7; break; // earth, attack1_explode
-				case 11: soundIndex = 64; WeaponFire.a.fogFac += 5; break; // mine, explosion1
-				case 12: soundIndex = 60; WeaponFire.a.fogFac += 6; break; // nitro, attack1_explode
-				case 13: soundIndex = 63; WeaponFire.a.fogFac += 10; break; // gas, explode_minor
+				case 10: soundIndex = 60; fogFac += 7; break; // earth, attack1_explode
+				case 11: soundIndex = 64; fogFac += 5; break; // mine, explosion1
+				case 12: soundIndex = 60; fogFac += 6; break; // nitro, attack1_explode
+				case 13: soundIndex = 63; fogFac += 10; break; // gas, explode_minor
 			}
 			
-			play_wav(sounds[soundIndex],1.0f,instances[i].position,true);
+			play_wav(sounds[soundIndex],1.0f,Eng_Global->instances[i].position,true);
 		}
 
 		Shake(-1,-1);

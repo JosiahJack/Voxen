@@ -1,25 +1,125 @@
 // ai.c - AI logic control for NPC's enemies in the game.
-#include "voxen.h"
+#include "mod.h"
 const float stopDistance = 1.28f; // Constant
 const float positionCheckDelay = 2.0f;
 const float searchTime = 5.0f;
-Vector3 targetOffset = (Vector3){0.0f, 0.24f, 0.0f);
+Vector3 targetOffset = (Vector3){0.0f, 0.24f, 0.0f};
+uint16_t npcCountInWorldPerType[NUM_AI_TYPES];
+// Name,AtkTyp1,2,3,Dmg1,2,3,Range1,2,3,Health,CybHealth,Percp,Disrp,Armr,Def,Movtyp,Yawspd,FOV,FOVAtk,FOVStartMov,DistToSeeBehind,SightRange,WalkSpd,RunSpd,AtkSpd1,2,3,AtkForce3,AtkRad3,TtPain,TbwPain,TtDead,TtActualAtk1,2,3,TbwAtk1,2,3,TEnemChg,TIdleSFXMin,TIdleSFXMax,TAtk1WaitMin,TAtk1WaitMax,TAtk1WaitChnc,TAtk2WaitMin,TAtk2WaitMax,TAtk2WaitChnc,TAtk3WaitMin,TAtk3WaitMax,TAtk3WaitChnc,ProjType1,2,3,ProjSpd1,2,3,HasLaser1,2,3,ExplodeOn3,PreActMeleCols,THunt,FlightHeight,FlightHeightIsPerc,SwitchMatOnDie,RangeHear,TTranq,Hops,NPCType,AtkProj1,2,3
+NPCTable npcTable[NUM_AI_TYPES] = {
+ { "AUTOBOMB"              ,0,0,1,  0,  0,200, 0,0,2.4,50,0,1,0.5,40,1,1,300,180,120,55,3.84,50,2.5,2.5,0,0,0,100,6,0,0,0.1,0,0,0,0,0,0,3,5,12,0.5,1,0.1,1,3,0.5,0,0,0,0,0,0,0,0,0,0,0,0,1,0,20,0,0,0,10,3,0,2,0,0,0 },
+ { "CYBORG ASSASSIN"       ,0,4,7, 30, 50, 35, 3.3,10,20,65,0,2,0.6,5,4,1,180,180,80,15,3.2,50,2,2,0,0,0,0,0,0.45,5,2.083,0,0.25,0.2,0.91,0.91,1.58,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,3,0,0,0,0,0,60,0,0,0,10,3,0,3,0,0,489 },
+ { "AVIAN MUTANT"          ,1,0,0, 40, 40,  0, 3.3,10,20,125,0,1,0.25,0,2,2,180,180,80,15,5.12,50,2,2,3.5,0,0,0,0,2,5,1,0.1,0,0,1,0,0,3,5,12,0.5,1,0.1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,60,0.65,1,0,10,3,0,1,0,0,0 },
+ { "EXEC-BOT"              ,0,4,0, 30, 35,  0, 3.3,10,20,225,0,1,0.2,40,2,1,200,180,15,30,4.12,50,1.5,1.5,0,0,0,0,0,0.45,7,0.15,0,0.2,0,0,1.5,0,3,5,12,0,0,0,0.97,2,0.3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,180,0,0,0,10,3,0,2,0,0,0 },
+ { "CYBORG DRONE"          ,0,4,0, 20, 20, 20, 3.3,25,50,60,0,1,0.3,0,2,1,65,180,80,15,3.2,50,1.6,2.2,0,0,0,0,0,0.542,15,0.958,0,0.1,0,0,1,0,3,20,45,0,0,0,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,60,0,0,0,10,3,0,3,0,0,0 },
+ { "CORTEX REAVER"         ,0,4,7, 80,325,125, 3.3,20,30,580,0,1,0.1,40,2,1,180,180,80,15,3.84,50,2,2,0,0,0,0,0,0.583,5,0.333,0,0.35244,0.324,0,1,1,3,15,30,0,0,0,0.2,1,0.5,8,15,1,0,0,0,0,0,10,0,0,0,0,0,600,0,0,0,10,3,0,2,0,0,372 },
+ { "CYBORG WARRIOR"        ,0,4,7, 35, 35,150, 3.3,20,20,120,0,1,0.1,5,4,1,180,180,30,15,3.2,50,2.4,2.4,0,0,0,0,0,0.5,5,2.2,0,0.339,0.201,0,0.83,0.542,3,15,30,0,0,0,1,2,0.5,10,20,1,0,0,0,0,0,10,0,0,0,0,0,180,0,0,0,10,3,0,3,0,0,370 },
+ { "CYBORG ENFORCER"       ,1,4,7, 60, 60, 80, 3.3,15,30,285,0,1,0.1,30,5,1,180,180,80,15,3.2,50,2.8,2.8,2.8,0,0.3,0,0,2,5,1.5,0.23471,0.393738,0.313266,0.958,0.958,0.958,5,15,30,0.1,0.3,0.1,0.1,0.5,0.5,10,25,1,0,0,0,0,0,10,0,0,0,0,0,600,0,0,0,10,3,0,4,0,0,387 },
+ { "CYBORG ELITE GUARD"    ,1,7,4, 70, 75,  0, 3.3,10,50,380,0,1,0.05,50,6,1,180,180,80,15,3.2,50,3,3,1.5,0,0,0,0,0.4665,5,1.5,0.5,0.2653,0.117045,0.733,0.7,0.867,5,15,30,0.05,0.2,0.1,0.5,2,0.8,2,3,0.5,0,0,0,0,2,0,0,1,0,0,0,600,0,0,0,15,3,0,4,0,490,0 },
+ { "CYBORG OF EDWARD DIEGO",1,7,0, 80, 95,  0, 3.3,40,50,900,0,2,0,55,6,1,180,180,80,15,3.2,50,2.8,2.8,0,0,0,0,0,0,0,0,0.28,0.363188,0.2,1.4,0.833,3,5,15,30,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,2.5,0,0,0,0,0,1,600,0,0,0,15,3,0,4,0,490,0 },
+ { "SECURITY-1 ROBOT"      ,0,4,0, 35, 35,  0, 3.3,10,20,170,0,1,0.15,40,4,2,180,180,80,15,4.12,50,2.5,2.5,1.5,0,0,0,0,2,5,0.05,0.5,0.1,0.2,1.2,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,600,1.28,0,0,10,3,0,2,0,0,0 },
+ { "SECURITY-2 ROBOT"      ,0,4,4, 65, 65, 15, 3.3,5,35,300,0,2,0.05,50,5,1,180,180,60,25,4.12,50,1.5,1.5,1.5,0,0,0,0,0.75,5,0.25,0.5,0.39,0.1,1.2,1,1.5,3,5,12,0.5,1,0.1,3,3.5,1,2.5,3.5,1,0,0,0,0,0,0,0,0,0,0,0,600,0,0,0,10,3,0,2,0,0,0 },
+ { "MAINTENANCE ROBOT"     ,1,0,0, 25, 25,  0, 3.3,3.3,20,75,0,1,0.3,40,3,1,180,180,80,15,3.84,50,2.2,2.6,0.02,0.02,0,0,0,0,0,1.6,3,0.7,0.2,2,1.3,3,3,5,12,0.5,1,0.1,1,2,0.3,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,180,0,0,0,10,3,0,2,0,0,0 },
+ { "MUTANT CYBORG"         ,1,7,0, 35, 75, 50, 2,30,49,340,0,1,0.2,15,6,1,180,180,60,15,3.2,50,1.5,1.5,0,0,0,0,0,0.583,3.5,3.41,0.265,0.285,0.2,0.625,0.75,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,2.8,0,0,0,0,0,0,180,0,0,0,10,3,0,5,0,491,0 },
+ { "HOPPER"                ,0,4,0, 35, 35,  0, 0,17.92,17.92,150,0,1,0.25,35,4,1,180,160,80,15,3.84,50,7,7,0,0,0,0,0,0.708,5,0,0.5,0.1,0.5,0.5,0.5,0.5,3,5,12,0.5,1,0.1,0.5,1,0.5,1,2,0.5,0,0,0,0,0,0,0,1,0,0,0,180,0,0,0,10,3,1,2,0,0,0 },
+ { "HUMANOID MUTANT"       ,1,0,0, 12, 12,  0, 3.3,10,20,50,0,0,0.4,0,3,1,60,180,80,15,2.56,50,1.4,2,0.5,0,0,0,0,0.42,5,0.967,0.5,0.1,0.2,1.2,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,20,0,0,0,10,3,0,0,0,0,0 },
+ { "INVISIBLE MUTANT"      ,0,7,0, 10, 35,  0, 3.3,20,20,350,0,1,0.05,0,2,2,180,180,80,15,2.56,50,0.7,0.7,1.5,0.7,0.7,0,0,0.875,5,1.125,0.875,0.4,0.2,1.2,0.875,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,2,0,0,0,0,0,0,60,0.32,0,1,10,3,0,0,0,486,0 },
+ { "VIRUS MUTANT"          ,0,7,0, 45, 30,  0, 3.3,20,20,140,0,0,0.1,0,3,1,180,180,80,15,2.56,50,2.5,2.5,2.5,0.3,0,0,0,0.542,3,1.792,0.2874,0.2874,0.2874,0.958,0.958,0.958,3,5,12,0.5,1,0.1,0.5,0,0.5,1,2,0.5,0,0,0,0,1.75,0,0,0,0,0,0,20,0,0,0,10,3,0,1,0,481,0 },
+ { "SERV-BOT"              ,1,0,0,  8,  0,  0, 3.3,10,20,20,0,1,0.5,20,2,1,180,180,80,15,3.84,50,2,2,1.2,0,0,0,0,1.125,2,0.98,0.2,0.1,0.2,0.834,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,180,0,0,0,10,3,0,2,0,0,0 },
+ { "FLIER BOT"             ,0,4,7, 30,150,  0, 3.3,35,40,75,0,1,0.3,30,2,2,180,180,80,15,5.12,50,1.5,1.5,1.5,0,0,0,0,1.375,5,0.6,0.1,0.1,0.2,1,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,10,12,1,0,0,0,0,0,10,0,0,0,0,0,180,0.85,1,0,10,3,0,2,0,0,404 },
+ { "ZERO-G MUTANT"         ,0,7,0, 20, 20,  0, 3.3,20,20,90,0,1,0.5,0,2,2,180,180,80,15,2.56,50,0.8,1.4,0,0.8,0,0,0,0.1,0,0.1,0.5,0.05,0.2,1.2,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,2,0,0,0,0,0,0,60,1.96,0,0,10,3,0,0,0,488,0 },
+ { "GORILLA TIGER MUTANT"  ,1,0,0, 60, 60,  0, 3.3,3.84,20,200,0,1,0.1,0,3,1,180,180,80,15,2.56,50,3,3.5,1,2,0,0,0,0.667,5,1.625,0.5,0.1,0.2,0.958,1.042,3,3,15,30,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,60,0,0,0,10,3,0,1,0,0,0 },
+ { "REPAIR BOT"            ,0,4,0, 12, 12,  0, 3.3,3.3,20,65,0,1,0.4,25,3,1,180,180,80,15,3.84,50,2.25,3,0.5,0,0,0,0,0,0,0.05,0.2,0.1,0.2,1.25,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,180,0,0,0,10,3,0,2,0,0,0 },
+ { "PLANT MUTANT"          ,0,7,0, 35, 25,  0, 3.3,20,20,115,0,1,0.3,0,1,1,180,180,80,15,2.56,50,0.8,1.2,0.1,0,0,0,0,0.375,2,2.208,0.89,0.82,0.2,1.91,1.027,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,3.5,0,0,0,0,0,0,20,0,0,0,10,3,0,0,0,487,0 },
+ { "CYBER DOG"             ,0,7,0,  0, 25,  0, 0,20,0,0,20,1,0.5,0,1,4,250,240,50,15,20.48,25.6,2,2,0,0,0,0,0,0.1,0,0.5,0,0,0,0,0.3,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1.5,0,0,0,0,0,0,500,0.75,0,0,10,0,0,6,0,493,0 },
+ { "CYBER GUARD"           ,0,7,0,  0, 25,  0, 0,20,0,0,35,1,0.4,0,1,4,250,240,50,15,20.48,25.6,2,2,0,0,0,0,0,0.1,0,0.5,0,0,0,0,0.2,0,2,998,999,0,0,0,0,0,0,0,0,0,0,0,0,0,0.8,0,0,0,0,0,0,500,0.75,0,0,10,0,0,6,0,493,0 },
+ { "CYBER RAM"             ,0,7,0,  0, 35,  0, 0,20,0,0,40,1,0.25,0,1,4,80,240,50,15,20.48,25.6,4,4,0,0,0,0,0,0.1,0,0.5,0,0,0,0,0.2,0,2,998,999,0,0,0,0,0,0,0,0,0,0,0,0,0,1.2,0,0,0,0,0,0,500,0.75,0,0,10,0,0,6,0,494,0 },
+ { "CYBER CORTEX REAVER"   ,0,7,0,  0, 45,  0, 0,20,0,0,80,1,0.1,0,1,4,80,240,50,15,20.48,25.6,4,4,0,0,0,0,0,0.1,0,0.5,0,0,0,0,0.2,0,2,998,999,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,500,0.75,0,0,10,0,0,6,0,494,0 },
+ { "SHODAN"                ,0,7,0,  0, 55,  0, 0,20,0,0,500,2,0,0,1,4,360,280,280,15,20.48,25.6,0,0,0,0,0,0,0,0.1,0,0.5,0,0,0,0,0.05,0,2,998,999,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,500,0.75,0,0,10,0,0,6,0,494,0 }
+};
+//                             NPC Sounds       0,   1,   2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28
+int sfxIdle[NUM_AI_TYPES] =           {  -1,  -1,  -1, -1, 58, -1, 59, -1, 59, 52, -1, -1, -1, -1, -1, -1,121, -1, -1, -1,121,118, -1, -1, -1, -1, -1, -1, -1};
+int sfxSightSound[NUM_AI_TYPES] =     {  -1,  -1, 111,150, 58,150, 59,152,152, -1,150,150,151,152,150, -1,121, -1,151,150,121,119,151, -1, -1, -1, -1, -1, -1};
+int sfxAttack1[NUM_AI_TYPES] =        {  -1,  -1, 108, -1, -1,146, -1,146,252,247, -1, -1, -1, -1, -1,122, -1,108,146, -1, -1,118, -1,125,258,258,258,258,258};
+int sfxAttack2[NUM_AI_TYPES] =        {  -1, 256,  -1,148, 50, 50, 50, 50, 50,250, 50, 50,146,259,148, -1,121, -1, -1,147, -1, -1,146, -1,258,258,258,258,258};
+int sfxAttack3[NUM_AI_TYPES] =        {  -1,  -1,  -1, -1, -1,244,244,244,245, -1, -1,149, -1, -1, -1, -1, -1, -1, -1,244, -1, -1, -1, -1,258,258,258,258,258};
+int sfxDeath[NUM_AI_TYPES] =          {  -1,  48, 110,143, 48,145, 48, 51, 47, 47,142,143,144, 47,162,123,120,134,144,144,120,117,144,124, -1, -1, -1, -1, -1};
+float deathBurstTimer[NUM_AI_TYPES] = {0.0f,0.0f, 0.1f,0.0f,0.1f,0.1f,0.2f,0.1f,0.1f,0.1f,0.0f,0.45f,0.75f,0.1f,0.0f,0.0f,0.1f,0.224f,0.9f,0.0f,0.1f,0.1f,0.1f,0.2f,0.1f,0.1f,0.1f,0.1f,0.1f};
 
+void SetHuntFinished(uint16_t i) {
+    uint16_t npcID = Eng_Global->instances[i].index - 419;
+    Eng_Global->instances[i].huntFinished = Eng_Global->pauseRelativeTime;
+    int diff = Eng_Global->difficultyCombat;
+    if (npcTable[npcID].type == NPCType_Cyber) diff = Eng_Global->difficultyCyber;
+    if (diff <= 1) { // More forgetful on easy.
+        Eng_Global->instances[i].huntFinished += vmax((npcTable[npcID].huntTime * 0.75),60.0);
+    } else if (diff >= 3) { // Good memory on hard.
+        Eng_Global->instances[i].huntFinished += vmax((npcTable[npcID].huntTime * 2.00),60.0); 
+    } else {
+        Eng_Global->instances[i].huntFinished += vmax(npcTable[npcID].huntTime, 60.0);
+    }
+}
+
+MOD_TO_ENGINE void InitializeAIAfterLoad(uint16_t i) {
+    Eng_Global->instances[i].layer = PhysicsLayer_NPC;
+//     uint16_t npcID = Eng_Global->instances[i].index - 419;
+//     Eng_Global->instances[i].idleTime = Eng_Global->pauseRelativeTime + random_rangedub(npcTable[npcID].timeIdleSFXMin, npcTable[npcID].timeIdleSFXMax); TODO random_range
+    Eng_Global->instances[i].attack1SoundTime = Eng_Global->instances[i].attack2SoundTime = Eng_Global->instances[i].attack3SoundTime = Eng_Global->pauseRelativeTime;
+    Eng_Global->instances[i].timeTillEnemyChangeFinished = Eng_Global->pauseRelativeTime;
+    SetHuntFinished(i);
+    Eng_Global->instances[i].attackFinished = Eng_Global->pauseRelativeTime;
+    Eng_Global->instances[i].attack2Finished = Eng_Global->pauseRelativeTime;
+    Eng_Global->instances[i].attack3Finished = Eng_Global->pauseRelativeTime;
+    Eng_Global->instances[i].timeTillPainFinished = Eng_Global->pauseRelativeTime;
+    Eng_Global->instances[i].timeTillDeadFinished = Eng_Global->pauseRelativeTime;
+    Eng_Global->instances[i].meleeDamageFinished = Eng_Global->pauseRelativeTime;
+    Eng_Global->instances[i].gracePeriodFinished = Eng_Global->pauseRelativeTime;
+    Eng_Global->instances[i].randomWaitForNextAttack1Finished = Eng_Global->pauseRelativeTime;
+    Eng_Global->instances[i].randomWaitForNextAttack2Finished = Eng_Global->pauseRelativeTime;
+    Eng_Global->instances[i].randomWaitForNextAttack3Finished = Eng_Global->pauseRelativeTime;
+    Eng_Global->instances[i].tranquilizeFinished = Eng_Global->pauseRelativeTime;
+    Eng_Global->instances[i].deathBurstFinished = Eng_Global->pauseRelativeTime;
+    Eng_Global->instances[i].wanderFinished = Eng_Global->pauseRelativeTime;
+    Eng_Global->instances[i].posCheckFinished = Eng_Global->pauseRelativeTime;
+    Eng_Global->instances[i].lastPosition = Eng_Global->instances[i].position;
+    Eng_Global->instances[i].timeSinceMovedEnough = 0.0;
+    if (Eng_Global->instances[i].walkWaypointsLength > 0 && (Eng_Global->instances[i].entflags & ENTFLAG_WALK_PATH_ON_START) && !(Eng_Global->instances[i].entflags & ENTFLAG_ASLEEP)) {
+        Eng_Global->instances[i].currentDestination = Eng_Global->instances[i].walkWaypoints[Eng_Global->instances[i].currentWaypoint];
+        Eng_Global->instances[i].currentState = AIState_Walk; // If waypoints are set, start walking
+    } else {
+        Eng_Global->instances[i].currentState = AIState_Idle; // No waypoints, stay put
+    }
+
+//     if ((Eng_Global->instances[i].entflags & ENTFLAG_WANDERING) && (random_range(0.0f,1.0f) < 0.5f)) Eng_Global->instances[i].currentState = AIState_Walk; // TODO random_range
+//     else flag_set(&Eng_Global->instances[i].entflags, ENTFLAG_WANDERING, false);
+
+    if (Eng_Global->instances[i].entflags & ENTFLAG_ASLEEP) {
+        Eng_Global->instances[i].currentState = AIState_Idle;
+//         flag_set(&Eng_Global->instances[Eng_Global->instances[i].sleepingCables].entflags, ENTFLAG_ACTIVE, true); // TODO
+    }
+
+    Eng_Global->instances[i].attackFinished = Eng_Global->pauseRelativeTime + 1.0;
+    Eng_Global->instances[i].idealTransformForward = Eng_Global->instances[i].forward;
+//     StringCopyInto_A_From_B(Eng_Global->instances[i].targetID, npcTable[npcID].name, TARGET_ID_LENGTH); TODO
+//     StringFormat(Eng_Global->instances[i].targetID, TARGET_ID_LENGTH * sizeof(char), "%s %05u", npcTable[npcID].name,npcCountInWorldPerType[npcID]++);
+}
+    
 float Tranquilize(uint16_t i, float amount, bool energy) {
-    if (npcTable[NPCID].type == NPCType_Robot && !energy) return 0.0f;
+    uint16_t npcID = Eng_Global->instances[i].index - 419;
+    if (npcTable[npcID].type == NPCType_Robot && !energy) return 0.0f;
 
-    float tranqSecs = (amount < 3.0f) ? npcTable[NPCID].timeForTranquilization : amount; // If we're going to tranq, at least do it for 3 secs.
-    instances[i].tranquilizeFinished = vmax(Sys_Global.pauseRelativeTime + tranqSecs, SELF.tranquilizeFinished + tranqSecs);
+    float tranqSecs = (amount < 3.0f) ? npcTable[npcID].timeForTranquilization : amount; // If we're going to tranq, at least do it for 3 secs.
+    Eng_Global->instances[i].tranquilizeFinished = vmax(Eng_Global->pauseRelativeTime + tranqSecs, Eng_Global->instances[i].tranquilizeFinished + tranqSecs);
     return tranqSecs;
 }
 
-static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable[NPCID].type == NPCType_Cyber; }
-
+static inline __attribute__((always_inline)) bool IsCyberNPC(uint16_t i) { uint16_t npcID = Eng_Global->instances[i].index - 419; return npcTable[npcID].type == NPCType_Cyber; }
+/*
 	void AI_Face(uint16_t i, Vector3 goalLocation) {
-		if (instances[i].asleep) return;
+		if (Eng_Global->instances[i].asleep) return;
 
-        uint16_t npcID = instances[i].index - 419;
-		faceVec = goalLocation - instances[i].position;
+        uint16_t npcID = Eng_Global->instances[i].index - 419;
+		faceVec = goalLocation - Eng_Global->instances[i].position;
 		if (!npcTable[npcID].type == NPCType_Cyber) faceVec.y = 0.0f;
 		if (Vector3.Dot(faceVec,Vector3.up) > 0.99f && !npcTable[npcID].type == NPCType_Cyber) return; // Up results in no Y rotation.
 
@@ -27,33 +127,33 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 		Vector3 up = Vector3.up;
 		if (npcTable[npcID].type == NPCType_Cyber && enemy != null) {
 			up = enemy.transform.up;
-			instances[i].rotation = enemy.rotation;
+			Eng_Global->instances[i].rotation = enemy.rotation;
 			return;
 		}
 		
-		if (goalLocation == instances[i].position) {
-			if (enemy != null) faceVec = enemy.instances[i].position - instances[i].position;
+		if (goalLocation == Eng_Global->instances[i].position) {
+			if (enemy != null) faceVec = enemy.Eng_Global->instances[i].position - Eng_Global->instances[i].position;
 			else faceVec.x += 0.001f;
 		}
 		
 		lookRot = Quaternion.LookRotation(faceVec,up);
-		instances[i].rotation = Quaternion.Slerp(instances[i].rotation,lookRot,Const.aiTickTime * npcTable[index].yawSpeed * Time.deltaTime);
+		Eng_Global->instances[i].rotation = Quaternion.Slerp(Eng_Global->instances[i].rotation,lookRot,Const.aiTickTime * npcTable[index].yawSpeed * Time.deltaTime);
 	}
 
 	bool HasHealth(uint16_t i) {
-		if (IsCyberNPC(i)) return (instances[i].cyberHealth > 0.0f);
-		return (instances[i].health > 0.0f);
+		if (IsCyberNPC(i)) return (Eng_Global->instances[i].cyberHealth > 0.0f);
+		return (Eng_Global->instances[i].health > 0.0f);
 	}
 
 	void Update() {
 		if (!startInitialized) return;
 
-		if (Sys_Global.gamePaused || Sys_Global.menuActive) return;
+		if (Eng_Global->gamePaused || Eng_Global->menuActive) return;
 
 		rbody.isKinematic = false;
-		if (raycastingTickFinished >= Sys_Global.pauseRelativeTime) return;
+		if (raycastingTickFinished >= Eng_Global->pauseRelativeTime) return;
 
-		raycastingTickFinished = Sys_Global.pauseRelativeTime + Const.raycastTick;
+		raycastingTickFinished = Eng_Global->pauseRelativeTime + Const.raycastTick;
 		EnableAutomapOverlay();
 		inSight = CheckIfPlayerInSight();
 		if (enemy != null && HasHealth(healthManager)) {
@@ -67,23 +167,23 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 					} else {
 						// Enemy is dead, let's wander around aimlessly now
 						wandering = true;
-						wanderFinished = Sys_Global.pauseRelativeTime + random_range(3f,8f);
+						wanderFinished = Eng_Global->pauseRelativeTime + random_range(3f,8f);
 						currentState = AIState_Walk;
 					}
 					
 					enemy = null; // Forget the enemy.
 					DualLog("enemy forgotten");
 					enemyHM = null;
-					posCheckFinished = Sys_Global.pauseRelativeTime;
-					lastPosition = instances[i].position;
+					posCheckFinished = Eng_Global->pauseRelativeTime;
+					lastPosition = Eng_Global->instances[i].position;
 				}
 			}
 
 			// Enemy still has health
 			if (enemy != null) {
 				enemyInFrontChecks(enemy);
-				rangeToEnemy = (enemy.instances[i].position
-							- Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset)).sqrMagnitude;
+				rangeToEnemy = (enemy.Eng_Global->instances[i].position
+							- Vector3_A_plus_B(Eng_Global->instances[i].position + Eng_Global->instances[i].sightPointOffset)).sqrMagnitude;
 			}
 		} else {
 			infront = false;
@@ -94,7 +194,7 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 	}
 
 	void FixedUpdate(uint16_t i) {
-		if (Sys_Global.gamePaused || Sys_Global.menuActive) return;
+		if (Eng_Global->gamePaused || Eng_Global->menuActive) return;
 
         Think();
         if (healthManager.linkedOverlay != null) {
@@ -114,16 +214,16 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
         if (currentState != AIState_Dead) {
             if (currentState != AIState_Idle) {
 				if (actAsTurret && enemy != null) {
-					currentDestination = enemy.instances[i].position;
-					currentDestination.y = enemy.instances[i].position.y + 0.24f;
+					currentDestination = enemy.Eng_Global->instances[i].position;
+					currentDestination.y = enemy.Eng_Global->instances[i].position.y + 0.24f;
 				}
 
 				if (IsCyberNPC() && enemy != null) {
-					currentDestination = enemy.instances[i].position;
+					currentDestination = enemy.Eng_Global->instances[i].position;
 				}
 
                 idealTransformForward = currentDestination
-										- Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset);
+										- Vector3_A_plus_B(Eng_Global->instances[i].position + Eng_Global->instances[i].sightPointOffset);
 
                 if (!IsCyberNPC()) idealTransformForward.y = 0;
 				idealTransformForward = idealTransformForward.normalized;
@@ -138,7 +238,7 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 
 	void Think() {
 		if (!DynamicCulling.a.cullEnabled) withinPVS = true;
-		if (dyingSetup && deathBurstFinished < Sys_Global.pauseRelativeTime
+		if (dyingSetup && deathBurstFinished < Eng_Global->pauseRelativeTime
 			&& !deathBurstDone) { // Activate any death effects
 			
 			if (deathBurst != null) deathBurst.SetActive(true);
@@ -182,7 +282,7 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 		}
 
 		if (npcTable[index].moveType[index] == AIMoveType.Fly
-			&& tranquilizeFinished < Sys_Global.pauseRelativeTime) {
+			&& tranquilizeFinished < Eng_Global->pauseRelativeTime) {
 			FlierMoveToHoverHeight();
 		}
 	}
@@ -195,38 +295,38 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 		Vector3 floorPoint = (Vector3){);
 		floorPoint = Const.a.vectorZero;
 		if (enemy != null) {
-		    idealPos = instances[i].position; // Where it's at
-		    idealPos.y = enemy.instances[i].position.y + 0.24f; // Player eye height.
+		    idealPos = Eng_Global->instances[i].position; // Where it's at
+		    idealPos.y = enemy.Eng_Global->instances[i].position.y + 0.24f; // Player eye height.
 		} else {
-			if (Raycast(Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset), sightPoint.transform.up * -1,out tempHit, Const.a.sightRange[index], Const.a.layerMaskNPCSight)) {
-				distDn = distance_vector3(Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset), tempHit.point);
+			if (Raycast(Vector3_A_plus_B(Eng_Global->instances[i].position + Eng_Global->instances[i].sightPointOffset), sightPoint.transform.up * -1,out tempHit, Const.a.sightRange[index], Const.a.layerMaskNPCSight)) {
+				distDn = distance_vector3(Vector3_A_plus_B(Eng_Global->instances[i].position + Eng_Global->instances[i].sightPointOffset), tempHit.point);
 				floorPoint = tempHit.point;
 			}
 
-			if (Raycast(Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset), sightPoint.transform.up,out tempHit, Const.a.sightRange[index], Const.a.layerMaskNPCSight)) distUp = distance_vector3(Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset), tempHit.point);
+			if (Raycast(Vector3_A_plus_B(Eng_Global->instances[i].position + Eng_Global->instances[i].sightPointOffset), sightPoint.transform.up,out tempHit, Const.a.sightRange[index], Const.a.layerMaskNPCSight)) distUp = distance_vector3(Vector3_A_plus_B(Eng_Global->instances[i].position + Eng_Global->instances[i].sightPointOffset), tempHit.point);
 			float distT = (distUp + distDn);
 			float yHeight = Const.a.flightHeight[index];
 			if (Const.a.flightHeightIsPercentage[index]) yHeight *= distT;
 			idealPos = floorPoint + (Vector3){0,yHeight, 0);
 		}
 
-		float dist = vabs(idealPos.y - instances[i].position.y);
+		float dist = vabs(idealPos.y - Eng_Global->instances[i].position.y);
 		if (dist < 0.16f) return; // Close enuff
 
 		float spd = Const.a.runSpeed[index] * Time.deltaTime;
-		instances[i].position = Vector3.MoveTowards(instances[i].position,idealPos,spd);
+		Eng_Global->instances[i].position = Vector3.MoveTowards(Eng_Global->instances[i].position,idealPos,spd);
 	}
 
 	public bool CheckPain(uint16_t i) {
 		if (IsCyberNPC(i)) return false;
-		if (instances[i].asleep) return false;
+		if (Eng_Global->instances[i].asleep) return false;
 		if (npcTable[index].timeBetweenPain <= 0) return false;
 
-		if (goIntoPain && timeTillPainFinished < Sys_Global.pauseRelativeTime) {
+		if (goIntoPain && timeTillPainFinished < Eng_Global->pauseRelativeTime) {
 			currentState = AIState_Pain;
 			if (attacker != null) {
-				if (timeTillEnemyChangeFinished < Sys_Global.pauseRelativeTime) {
-					timeTillEnemyChangeFinished = Sys_Global.pauseRelativeTime + Const.a.timeToChangeEnemy[index];
+				if (timeTillEnemyChangeFinished < Eng_Global->pauseRelativeTime) {
+					timeTillEnemyChangeFinished = Eng_Global->pauseRelativeTime + Const.a.timeToChangeEnemy[index];
 					AIController attackerAIC = attacker.GetComponent<AIController>();
 					if (attackerAIC != null && attacker.layer != 12) { // Attacker is an NPC and not the player.
 						NPCType myType = npcTable[NPCID].type;
@@ -251,19 +351,19 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 					} else {
 						enemy = attacker; // Attacker is the player, set enemy to player.
 					}
-					posCheckFinished = Sys_Global.pauseRelativeTime + positionCheckDelay;
+					posCheckFinished = Eng_Global->pauseRelativeTime + positionCheckDelay;
 					wandering = false;
-					wanderFinished = Sys_Global.pauseRelativeTime;
-					lastPosition = instances[i].position;
+					wanderFinished = Eng_Global->pauseRelativeTime;
+					lastPosition = Eng_Global->instances[i].position;
 					if (enemy != null) {
 						enemyHM = Utils.GetMainHealthManager(enemy);
-						lastKnownEnemyPos = enemy.instances[i].position;
-						currentDestination = enemy.instances[i].position;
+						lastKnownEnemyPos = enemy.Eng_Global->instances[i].position;
+						currentDestination = enemy.Eng_Global->instances[i].position;
 					}
 				}
 			}
 			goIntoPain = false;
-			timeTillPainFinished = Sys_Global.pauseRelativeTime
+			timeTillPainFinished = Eng_Global->pauseRelativeTime
 								   + Const.a.timeToPain[index];
 			return true;
 		}
@@ -274,12 +374,12 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 	void Idle() {
 		if (enemy != null && HasHealth(healthManager)) { currentState = AIState_Run; return; }
 
-		if (idleTime < Sys_Global.pauseRelativeTime) {
+		if (idleTime < Eng_Global->pauseRelativeTime) {
 			if (random_range(0,1f) < 0.5f) { // 50% Chance of idle.
 				SFXIndex = Const.a.sfxIdle[index];
 				Utils.PlayOneShotSavable(SFX,SFXIndex);
 			}
-			idleTime = Sys_Global.pauseRelativeTime
+			idleTime = Eng_Global->pauseRelativeTime
 					   + random_range(Const.a.timeIdleSFXMin[index],
 									  Const.a.timeIdleSFXMax[index]);
 		}
@@ -297,10 +397,10 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 	}
 
 	Vector3 GetWanderPoint() {
-		float newX = instances[i].position.x + random_range(-79f,79f);
-		float newZ = instances[i].position.z + random_range(-79f,79f);
+		float newX = Eng_Global->instances[i].position.x + random_range(-79f,79f);
+		float newZ = Eng_Global->instances[i].position.z + random_range(-79f,79f);
 		float newY = 0f;
-		if (IsCyberNPC()) newY = instances[i].position.y + random_range(-79f,79f);
+		if (IsCyberNPC()) newY = Eng_Global->instances[i].position.y + random_range(-79f,79f);
 		return (Vector3){newX,newY,newZ);
 	}
 
@@ -310,13 +410,13 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
         if (inSight || enemy != null) { currentState = AIState_Run; return; }
         if (actAsTurret) { currentState = AIState_Idle; return; }
         if (npcTable[index].moveType[index] == AIMoveType.None) return;
-		if (tranquilizeFinished >= Sys_Global.pauseRelativeTime) return;
+		if (tranquilizeFinished >= Eng_Global->pauseRelativeTime) return;
 		if (!withinPVS && DynamicCulling.a.cullEnabled) return;
 		
-		float dist = distance_vector3(Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset),currentDestination);
+		float dist = distance_vector3(Vector3_A_plus_B(Eng_Global->instances[i].position + Eng_Global->instances[i].sightPointOffset),currentDestination);
 		if (wandering) {
-			if (wanderFinished < Sys_Global.pauseRelativeTime || (dist < (stopDistance * 0.5f))) {
-				wanderFinished = Sys_Global.pauseRelativeTime + random_range(3f,8f);
+			if (wanderFinished < Eng_Global->pauseRelativeTime || (dist < (stopDistance * 0.5f))) {
+				wanderFinished = Eng_Global->pauseRelativeTime + random_range(3f,8f);
 				currentDestination = GetWanderPoint();
 			}
 		}
@@ -348,7 +448,7 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 							   * Const.a.walkSpeed[index]);
 
 					if (npcTable[index].moveType[index] != AIMoveType.Fly) {
-						Vector3 checkPos = Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset) + (tempVec.normalized * 0.48f);
+						Vector3 checkPos = Vector3_A_plus_B(Eng_Global->instances[i].position + Eng_Global->instances[i].sightPointOffset) + (tempVec.normalized * 0.48f);
 						int mk = Const.a.layerMaskNPCCollision;
 						if (!Raycast(checkPos,Vector3.down,2.56f,mk)) {
 							tempVec.x = 0f;
@@ -393,7 +493,7 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 		if (walkWaypoints.Length < 1) return;
 		if (walkWaypoints[currentWaypoint] == null) return; // No gaps allowed.
 
-		currentDestination = walkWaypoints[currentWaypoint].instances[i].position;
+		currentDestination = walkWaypoints[currentWaypoint].Eng_Global->instances[i].position;
 	}
 
 	bool CanAttack1(float dist) {
@@ -401,7 +501,7 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 		if (npcTable[index].attackType[index] == AttackType.None) return false;
 		if (IsCyberNPC()) return true;
 		if (!infront) return false;
-		if (randomWaitForNextAttack1Finished >= Sys_Global.pauseRelativeTime) {
+		if (randomWaitForNextAttack1Finished >= Eng_Global->pauseRelativeTime) {
 			return false;
 		}
 
@@ -414,7 +514,7 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 		if (IsCyberNPC()) return true;
 		if (!infront) return false;
 		if (!inProjFOV) return false;
-		if (randomWaitForNextAttack2Finished >= Sys_Global.pauseRelativeTime) {
+		if (randomWaitForNextAttack2Finished >= Eng_Global->pauseRelativeTime) {
 			return false;
 		}
 
@@ -431,7 +531,7 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 		if (IsCyberNPC()) return true;
 		if (!infront) return false;
 		if (!inProjFOV) return false;
-		if (randomWaitForNextAttack3Finished >= Sys_Global.pauseRelativeTime) {
+		if (randomWaitForNextAttack3Finished >= Eng_Global->pauseRelativeTime) {
 			return false;
 		}
 
@@ -448,23 +548,23 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 
 	void StartAttack1() {
 		BrakingMovement();
-		attackFinished = Sys_Global.pauseRelativeTime + npcTable[index].timeBetweenAttack1 + npcTable[index].timeToActualAttack1;
-		gracePeriodFinished = Sys_Global.pauseRelativeTime + npcTable[index].timeToActualAttack1;
+		attackFinished = Eng_Global->pauseRelativeTime + npcTable[index].timeBetweenAttack1 + npcTable[index].timeToActualAttack1;
+		gracePeriodFinished = Eng_Global->pauseRelativeTime + npcTable[index].timeToActualAttack1;
 		currentState = AIState_Attack1;
-		if (npcTable[index].preactivateMeleeColliders) flag_set(&instances[i].entflags, ENTFLAG_TOUCHING_HURTS, true);;
+		if (npcTable[index].preactivateMeleeColliders) flag_set(&Eng_Global->instances[i].entflags, ENTFLAG_TOUCHING_HURTS, true);;
 	}
 
 	void StartAttack2() {
 		BrakingMovement();
-		attackFinished = Sys_Global.pauseRelativeTime + npcTable[index].timeBetweenAttack2 + npcTable[index].timeToActualAttack2;
-		gracePeriodFinished = Sys_Global.pauseRelativeTime + Const.a.timeToActualAttack2[index];
+		attackFinished = Eng_Global->pauseRelativeTime + npcTable[index].timeBetweenAttack2 + npcTable[index].timeToActualAttack2;
+		gracePeriodFinished = Eng_Global->pauseRelativeTime + Const.a.timeToActualAttack2[index];
 		currentState = AIState_Attack2;
 	}
 
 	void StartAttack3() {
 		BrakingMovement();
-		attackFinished = Sys_Global.pauseRelativeTime + npcTable[index].timeBetweenAttack3 + npcTable[index].timeToActualAttack3;
-		gracePeriodFinished = Sys_Global.pauseRelativeTime + Const.a.timeToActualAttack3[index];
+		attackFinished = Eng_Global->pauseRelativeTime + npcTable[index].timeBetweenAttack3 + npcTable[index].timeToActualAttack3;
+		gracePeriodFinished = Eng_Global->pauseRelativeTime + Const.a.timeToActualAttack3[index];
 		currentState = AIState_Attack3;
 	}
 
@@ -499,17 +599,17 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 	Vector3 GetAStarPoint() {
 		if (DynamicCulling.a == null) return GetWanderPoint();
 		
-		Vector2Int currentCell = DynamicCulling.a.PosToCellCoords(instances[i].position);
+		Vector2Int currentCell = DynamicCulling.a.PosToCellCoords(Eng_Global->instances[i].position);
 		if (!DynamicCulling.a.XYPairInBounds(currentCell.x,currentCell.y)) return GetWanderPoint();
 			
 		bool clearNorth = false;
 		bool clearSouth = false;
 		bool clearEast = false;
 		bool clearWest = false;
-		Vector3 northPoint = instances[i].position + (Vector3){0f,0f,2.56f);
-		Vector3 southPoint = instances[i].position + (Vector3){0f,0f,-2.56f);
-		Vector3 eastPoint = instances[i].position + (Vector3){2.56f,0f,0f);
-		Vector3 westPoint = instances[i].position + (Vector3){-2.56f,0f,0f);
+		Vector3 northPoint = Eng_Global->instances[i].position + (Vector3){0f,0f,2.56f);
+		Vector3 southPoint = Eng_Global->instances[i].position + (Vector3){0f,0f,-2.56f);
+		Vector3 eastPoint = Eng_Global->instances[i].position + (Vector3){2.56f,0f,0f);
+		Vector3 westPoint = Eng_Global->instances[i].position + (Vector3){-2.56f,0f,0f);
 		List<Vector3> availablePositions = new List<Vector3>();
 		if (DynamicCulling.a.XYPairInBounds(currentCell.x,currentCell.y + 1)) {
 			clearNorth = (DynamicCulling.a.gridCells[currentCell.x,currentCell.y + 1].open && !DynamicCulling.a.gridCells[currentCell.x,currentCell.y].closedNorth);
@@ -534,7 +634,7 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 		// Randomly select point but only from available choices
 		int nearest = 0;		
 		for (int i=0;i<availablePositions.Count;i++) {
-			if (distance_vector3(enemy.instances[i].position,availablePositions[i]) < distance_vector3(enemy.instances[i].position,availablePositions[nearest])) nearest = i;
+			if (distance_vector3(enemy.Eng_Global->instances[i].position,availablePositions[i]) < distance_vector3(enemy.Eng_Global->instances[i].position,availablePositions[nearest])) nearest = i;
 		}
 		
 		return availablePositions[nearest];
@@ -560,18 +660,18 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 		if (asleep) return;
 		if (enemy == null) { currentState = AIState_Idle; return; }
 
-		if (tranquilizeFinished >= Sys_Global.pauseRelativeTime
+		if (tranquilizeFinished >= Eng_Global->pauseRelativeTime
 			&& !IsCyberNPC()) {
 			return;
 		}
 
-		if (posCheckFinished <= Sys_Global.pauseRelativeTime && !IsCyberNPC()) {
-			posCheckFinished = Sys_Global.pauseRelativeTime + positionCheckDelay;
-			float distToEnem = distance_vector3(Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset),enemy.instances[i].position);
-			distToLastPos = distance_vector3(instances[i].position,lastPosition);
-			lastPosition = instances[i].position;
+		if (posCheckFinished <= Eng_Global->pauseRelativeTime && !IsCyberNPC()) {
+			posCheckFinished = Eng_Global->pauseRelativeTime + positionCheckDelay;
+			float distToEnem = distance_vector3(Vector3_A_plus_B(Eng_Global->instances[i].position + Eng_Global->instances[i].sightPointOffset),enemy.Eng_Global->instances[i].position);
+			distToLastPos = distance_vector3(Eng_Global->instances[i].position,lastPosition);
+			lastPosition = Eng_Global->instances[i].position;
 			if (distToLastPos < 0.48f && distToEnem > stopDistance && !wandering) {
-				wanderFinished = Sys_Global.pauseRelativeTime + searchTime;
+				wanderFinished = Eng_Global->pauseRelativeTime + searchTime;
 				wandering = true;
 				currentDestination = GetSearchPoint(false);
 			} else {
@@ -580,21 +680,21 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 		}
 
         if (!inSight) {
-            if (huntFinished > Sys_Global.pauseRelativeTime) {
+            if (huntFinished > Eng_Global->pauseRelativeTime) {
                 Hunt();
             } else {
 				DualLog("enemy hunt ended");
                 enemy = null;
 				enemyHM = null;
 				wandering = true; // Sometimes look like we are still searching
-				wanderFinished = Sys_Global.pauseRelativeTime + 1f;
+				wanderFinished = Eng_Global->pauseRelativeTime + 1f;
                 currentState = AIState_Walk;
             }
             return;
         }
         
 		if (enemy != null && !wandering) {
-			targettingPosition = enemy.instances[i].position + targetOffset;
+			targettingPosition = enemy.Eng_Global->instances[i].position + targetOffset;
 			currentDestination = targettingPosition;
 			lastKnownEnemyPos = targettingPosition;
 		}
@@ -622,7 +722,7 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 				if (Const.a.hopsOnMove[index]) HopMove();
 				else                                 RunMove(); // <<<<<RUN
 			} else {
-				if (Sys_Global.difficultyCombat >= 2) {
+				if (Eng_Global->difficultyCombat >= 2) {
 					if (random_range(0f,1f) < 0.5f) AI_Face(currentDestination);
 				}
 			}
@@ -632,10 +732,10 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 
     void Hunt() {
 		if (IsCyberNPC()) {
-			currentDestination = enemy.instances[i].position; // See through walls
+			currentDestination = enemy.Eng_Global->instances[i].position; // See through walls
 		} else {
 			// UPDATE: A* Pathfinding with world grid.
-			currentDestination = GetSearchPoint(true); //enemy.instances[i].position;//lastKnownEnemyPos;
+			currentDestination = GetSearchPoint(true); //enemy.Eng_Global->instances[i].position;//lastKnownEnemyPos;
 		}
 
 		// Destination is still far enough away and within angle, then move.
@@ -659,17 +759,17 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 		if (enemy == null) return;
 
 		if (actAsTurret) {
-			currentDestination = Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset);
+			currentDestination = Vector3_A_plus_B(Eng_Global->instances[i].position + Eng_Global->instances[i].sightPointOffset);
 			return;
 		}
 
 		if (speedToApply <= 0) return;
-		if (tranquilizeFinished >= Sys_Global.pauseRelativeTime) return;
+		if (tranquilizeFinished >= Eng_Global->pauseRelativeTime) return;
 
 		// Attack3 used targettingPosition but it is so rare I decided to use
 		// the known working method from Attack1 and Attack2.
-        currentDestination = enemy.instances[i].position;
-		Vector3 eyePos = Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset);
+        currentDestination = enemy.Eng_Global->instances[i].position;
+		Vector3 eyePos = Vector3_A_plus_B(Eng_Global->instances[i].position + Eng_Global->instances[i].sightPointOffset);
 		float sqrDist = (eyePos - currentDestination).sqrMagnitude;
 		if (sqrDist <= (stopDistance * stopDistance)) return; // At stop point.
 		if (!WithinAngleToTarget()) return; // Still turning to face.
@@ -680,11 +780,11 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 	// attackNum corresponds to attack used so right lookup tables can be used.
 	// attackNum of 1 = Attack1, 2 = Attack2, 3 = Attack3
 	void Transition_AttackToRun(uint16_t i, int attackNum) {
-        flag_set(&instances[i].entflags, ENTFLAG_TOUCHING_HURTS, false);
+        flag_set(&Eng_Global->instances[i].entflags, ENTFLAG_TOUCHING_HURTS, false);
 		goIntoPain = false; // Prevent doing pain immediately after attack.
 		currentState = AIState_Run; // Done with attack.
 		if (attackNum < 1 || attackNum > 3) attackNum = 1;
-		float now = Sys_Global.pauseRelativeTime;
+		float now = Eng_Global->pauseRelativeTime;
 		switch (attackNum) {
 			case 1: // Attack1
 				float perc1Chance = Const.a.timeAttack1WaitChance[index];
@@ -728,7 +828,7 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 
 		Quaternion lookRot = Quaternion.LookRotation(idealTransformForward);
 		float fovMov = Const.a.fovStartMovement[index];
-		float ang = Quaternion.Angle(instances[i].rotation,lookRot);
+		float ang = Quaternion.Angle(Eng_Global->instances[i].rotation,lookRot);
 		if (ang < fovMov) return true;
 		if (ang < (fovMov * 1.5f)) {
 			if (random_range(0f,1f) < 0.5f) return true;
@@ -738,20 +838,20 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 
 	Vector3 GetAttackStartPoint(uint16_t i, int attackNum) {
 		if (attackNum < 1 || attackNum > 3) attackNum = 1;
-		Vector3 startPos = instances[i].position;
+		Vector3 startPos = Eng_Global->instances[i].position;
 		switch (attackNum) {
 			case 2:
 				if (gunPoint != null) {
-					startPos = gunPoint.instances[i].position;
+					startPos = gunPoint.Eng_Global->instances[i].position;
 				} else if (gunPoint2 != null) {
-					startPos = gunPoint2.instances[i].position;
+					startPos = gunPoint2.Eng_Global->instances[i].position;
 				}
 				break;
 			case 3:
 				if (gunPoint2 != null) {
-					startPos = gunPoint2.instances[i].position;
+					startPos = gunPoint2.Eng_Global->instances[i].position;
 				} else if (gunPoint != null) {
-					startPos = gunPoint.instances[i].position;
+					startPos = gunPoint.Eng_Global->instances[i].position;
 				}
 				break;
 		}
@@ -793,8 +893,8 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 
 		if (impact == null) return;
 
-		impact.instances[i].position = tempHit.point + (tempHit.normal * offset);
-		impact.instances[i].rotation = Quaternion.FromToRotation(Vector3.up,
+		impact.Eng_Global->instances[i].position = tempHit.point + (tempHit.normal * offset);
+		impact.Eng_Global->instances[i].rotation = Quaternion.FromToRotation(Vector3.up,
 															  tempHit.normal);
 		impact.SetActive(true);
     }
@@ -842,7 +942,7 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 
 		if (!hasLaser) return;
 
-		GameObject laz = Instantiate(Const.a.GetPrefab(408),instances[i].position,
+		GameObject laz = Instantiate(Const.a.GetPrefab(408),Eng_Global->instances[i].position,
 									 Const.a.quaternionIdentity) as GameObject;
 
 		if (laz == null) return; // No laser!
@@ -850,7 +950,7 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 		GameObject dCont = LevelManager.a.GetCurrentDynamicContainer();
 		laz.transform.SetParent(dCont.transform,true);
 		LaserDrawing ldraw = laz.GetComponent<LaserDrawing>();
-		ldraw.startPoint = Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset);
+		ldraw.startPoint = Vector3_A_plus_B(Eng_Global->instances[i].position + Eng_Global->instances[i].sightPointOffset);
 		ldraw.endPoint = tempHit.point;
 		Utils.Activate(laz);
 	}
@@ -860,8 +960,8 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 		if (!laserLightning.enabled) return;
 
 		Vector3[] pts = new Vector3[] {
-			Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset),
-			enemy.instances[i].position
+			Vector3_A_plus_B(Eng_Global->instances[i].position + Eng_Global->instances[i].sightPointOffset),
+			enemy.Eng_Global->instances[i].position
 		};
 
 		laserLightning.SetPositions(pts);
@@ -972,7 +1072,7 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 			pei.dd = damageData;
 			pei.host = gameObject;
 		}
-		beachball.instances[i].position = startPos;
+		beachball.Eng_Global->instances[i].position = startPos;
 		beachball.transform.forward = tempVec.normalized;
 		Utils.Activate(beachball);
 		GrenadeActivate ga = beachball.GetComponent<GrenadeActivate>();
@@ -1006,7 +1106,7 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 		float take = DamageData.GetDamageTakeAmount(dd);
 		dd.other = gameObject;
 		dd.damage = take;
-		Utils.ApplyImpactForceSphere(dd,Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset),
+		Utils.ApplyImpactForceSphere(dd,Vector3_A_plus_B(Eng_Global->instances[i].position + Eng_Global->instances[i].sightPointOffset),
 									 Const.a.attack3Radius[index],1.5f);
 
 		healthManager.TakeDamage(dd); // Self destruct.
@@ -1021,28 +1121,28 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 
 		switch (att_type) {
 			case AttackType.Melee:				ProjectileRaycast(ind); break;
-			case AttackType.Projectile:			ProjectileRaycast(ind); WeaponFire.a.fogFac += 1; break;
-			case AttackType.ProjectileLaunched:	ProjectileLaunched(ind); WeaponFire.a.fogFac += 1; break;
+			case AttackType.Projectile:			ProjectileRaycast(ind); fogFac += 1; break;
+			case AttackType.ProjectileLaunched:	ProjectileLaunched(ind); fogFac += 1; break;
 		}
 	}
 
 	// Typically used for melee.
 	void Attack1() {
 		ApplyAttackMovement(Const.a.attack1Speed[index]);
-		if (gracePeriodFinished < Sys_Global.pauseRelativeTime) {
+		if (gracePeriodFinished < Eng_Global->pauseRelativeTime) {
 			if (!shotFired) {
 				shotFired = true;
-				if (attack1SoundTime < Sys_Global.pauseRelativeTime) {
+				if (attack1SoundTime < Eng_Global->pauseRelativeTime) {
 					SFXIndex = Const.a.sfxAttack1[index];
 					Utils.PlayOneShotSavable(SFX,SFXIndex);
-					attack1SoundTime = Sys_Global.pauseRelativeTime
+					attack1SoundTime = Eng_Global->pauseRelativeTime
 						+ Const.a.timeBetweenAttack1[index];
 				}
 				AIAttack(npcTable[index].attackType[index],1);
 			}
         }
 
-        if (attackFinished < Sys_Global.pauseRelativeTime) {
+        if (attackFinished < Eng_Global->pauseRelativeTime) {
 			Transition_AttackToRun(1);  // Handle exiting this state.
 		}
 	}
@@ -1050,20 +1150,20 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 	// Typically used for normal projectile attack
     void Attack2() {
 		ApplyAttackMovement(Const.a.attack2Speed[index]);
-        if (gracePeriodFinished < Sys_Global.pauseRelativeTime) {
+        if (gracePeriodFinished < Eng_Global->pauseRelativeTime) {
             if (!shotFired) {
                 shotFired = true; 
-                if (attack2SoundTime < Sys_Global.pauseRelativeTime) {
+                if (attack2SoundTime < Eng_Global->pauseRelativeTime) {
 					SFXIndex = Const.a.sfxAttack2[index];
 					Utils.PlayOneShotSavable(SFX,SFXIndex);
-                    attack2SoundTime = Sys_Global.pauseRelativeTime
+                    attack2SoundTime = Eng_Global->pauseRelativeTime
 						+ Const.a.timeBetweenAttack2[index];
                 }
 				AIAttack(npcTable[index].attackType2[index],2);
             }
         }
 
-        if (attackFinished < Sys_Global.pauseRelativeTime) {
+        if (attackFinished < Eng_Global->pauseRelativeTime) {
 			Transition_AttackToRun(2); // Handle exiting this state.
 		}
 	}
@@ -1071,20 +1171,20 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 	// Typically used for secondary projectile or grenade attack
 	void Attack3() {
 		if (Const.a.explodeOnAttack3[index]) {
-			WeaponFire.a.fogFac += 5;
+			fogFac += 5;
 			ExplodeAttack(3);
 			return;  // No time check, this is only done once without delay.
 					 // We are dead now so exit on out.
 		}
 
 		ApplyAttackMovement(Const.a.attack3Speed[index]);
-        if (gracePeriodFinished < Sys_Global.pauseRelativeTime) {
+        if (gracePeriodFinished < Eng_Global->pauseRelativeTime) {
             if (!shotFired) {
                 shotFired = true;
-				if (attack3SoundTime < Sys_Global.pauseRelativeTime) {
+				if (attack3SoundTime < Eng_Global->pauseRelativeTime) {
 					SFXIndex = Const.a.sfxAttack3[index];
 					Utils.PlayOneShotSavable(SFX,SFXIndex);
-					attack3SoundTime = Sys_Global.pauseRelativeTime
+					attack3SoundTime = Eng_Global->pauseRelativeTime
 						+ Const.a.timeBetweenAttack3[index];
 				}
 				AIAttack(npcTable[index].attackType3[index],3);
@@ -1093,24 +1193,24 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 
 		PositionTargettingLaser();
 
-        if (attackFinished < Sys_Global.pauseRelativeTime) {
+        if (attackFinished < Eng_Global->pauseRelativeTime) {
 			Transition_AttackToRun(3); // Handle exiting this state.
 		}
 	}
 
 	void Pain() {
-		if (timeTillPainFinished < Sys_Global.pauseRelativeTime) {
+		if (timeTillPainFinished < Eng_Global->pauseRelativeTime) {
 			currentState = AIState_Run; // Go into run after we get hurt
 			goIntoPain = false;
-			timeTillPainFinished = Sys_Global.pauseRelativeTime
+			timeTillPainFinished = Eng_Global->pauseRelativeTime
 				+ Const.a.timeBetweenPain[index];
 		}
 	}
 
 	void DyingSetup(uint16_t i) {
-		instances[i].enemy = 0; // Reset for loading from saves
+		Eng_Global->instances[i].enemy = 0; // Reset for loading from saves
 		if (Const.a.deathBurstTimer[index] > 0) {
-			deathBurstFinished = Sys_Global.pauseRelativeTime + Const.a.deathBurstTimer[index];
+			deathBurstFinished = Eng_Global->pauseRelativeTime + Const.a.deathBurstTimer[index];
 		} else {
 			if (!deathBurstDone) {
 				Utils.Activate(deathBurst); // Activate death effects
@@ -1118,8 +1218,8 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 			}
 		}
 
-        flag_set(&instances[i].entflags, ENTFLAG_TOUCHING_HURTS, false);
-        if (!(instances[i].entflags & ENTFLAG_ACT_AS_CORPSE_ONLY) && !!(instances[i].entflags & ENTFLAG_TELEPORT_ON_DEATH)) {
+        flag_set(&Eng_Global->instances[i].entflags, ENTFLAG_TOUCHING_HURTS, false);
+        if (!(Eng_Global->instances[i].entflags & ENTFLAG_ACT_AS_CORPSE_ONLY) && !!(Eng_Global->instances[i].entflags & ENTFLAG_TELEPORT_ON_DEATH)) {
             Utils.Deactivate(healthManager.linkedOverlay.gameObject);
             SFXIndex = Const.a.sfxDeath[index];
             Utils.PlayOneShotSavable(SFX,SFXIndex);
@@ -1150,14 +1250,14 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 		gameObject.layer = 13; // Change to Corpse layer
 
 		// Bump it up a hair to prevent corpse falling through the floor
-		//instances[i].position = (Vector3){instances[i].position.x,
-		//								 instances[i].position.y + 0.04f,
-		//								 instances[i].position.z);
+		//Eng_Global->instances[i].position = (Vector3){Eng_Global->instances[i].position.x,
+		//								 Eng_Global->instances[i].position.y + 0.04f,
+		//								 Eng_Global->instances[i].position.z);
 
 		firstSighting = true;
 
 		// Timer for wait until death animation finishes before Dead().
-		timeTillDeadFinished = Sys_Global.pauseRelativeTime;
+		timeTillDeadFinished = Eng_Global->pauseRelativeTime;
 		timeTillDeadFinished += Const.a.timeTillDead[index];
 		if (Const.a.switchMaterialOnDeath[index]
 			&& deathMaterial != null && actualSMR != null) {
@@ -1183,7 +1283,7 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 		if (!dyingSetup) DyingSetup();
 
 		// Check if timer for dying animation is finished letting it play.
-		if (timeTillDeadFinished < Sys_Global.pauseRelativeTime) {
+		if (timeTillDeadFinished < Eng_Global->pauseRelativeTime) {
 			ai_dead = true;
 // 			DualLog("NPC " + gameObject.name + " has now died");
 			ai_dying = false;
@@ -1256,9 +1356,9 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 		if (!HasHealth(healthManager)) return false;
 		
 		bool enemyIsNPC = enemy.layer == 10;
-	    int diff = Sys_Global.difficultyCombat;
+	    int diff = Eng_Global->difficultyCombat;
 		if (IsCyberNPC()) {
-			diff = SSys_Global.difficultyCyber;
+			diff = SEng_Global->difficultyCyber;
 		} else {
 			if ((!withinPVS && !enemyIsNPC) && DynamicCulling.a.cullEnabled) return false;
 		}
@@ -1267,8 +1367,8 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 
 		if (PlayerMovement.a.Notarget && !enemyIsNPC) {
 			enemy = null; // Force forget when using Notarget cheat.
-			posCheckFinished = Sys_Global.pauseRelativeTime + positionCheckDelay;
-			lastPosition = instances[i].position;
+			posCheckFinished = Eng_Global->pauseRelativeTime + positionCheckDelay;
+			lastPosition = Eng_Global->instances[i].position;
 			LOSpossible = false;
 			return false;
 		}
@@ -1280,14 +1380,14 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 		}
 
 		// Get distance between enemy and found player
-		float dist = distance_vector3(enemy.instances[i].position, Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset));
+		float dist = distance_vector3(enemy.Eng_Global->instances[i].position, Vector3_A_plus_B(Eng_Global->instances[i].position + Eng_Global->instances[i].sightPointOffset));
 		if (dist > Const.a.sightRange[index]) return false;
 		if (IsCyberNPC() || enemyIsNPC) return true;
 
 		// Get vector line made from enemy to found player
-		Vector3 line = enemy.instances[i].position - Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset);
+		Vector3 line = enemy.Eng_Global->instances[i].position - Vector3_A_plus_B(Eng_Global->instances[i].position + Eng_Global->instances[i].sightPointOffset);
         RaycastHit tempHit;
-        if (Raycast(Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset),line.normalized, out tempHit, Const.a.sightRange[index], Const.a.layerMaskNPCSight)) {
+        if (Raycast(Vector3_A_plus_B(Eng_Global->instances[i].position + Eng_Global->instances[i].sightPointOffset),line.normalized, out tempHit, Const.a.sightRange[index], Const.a.layerMaskNPCSight)) {
 			Const.a.numberOfRaycastsThisFrame++;
 			GameObject hitObj = tempHit.collider.gameObject;
             if (hitObj == enemy) {
@@ -1295,7 +1395,7 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
                 return true;
 			} else {
 				// If we are a smart cookie, open doors if we see a door while trying to look at player.
-				if (hitObj != null && (distance_vector3(tempHit.point,Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset)) < 2.0f)
+				if (hitObj != null && (distance_vector3(tempHit.point,Vector3_A_plus_B(Eng_Global->instances[i].position + Eng_Global->instances[i].sightPointOffset)) < 2.0f)
 					&& npcTable[NPCID].type[index] != NPCType_Mutant && npcTable[NPCID].type[index] != NPCType_Supermutant && npcTable[NPCID].type[index] != NPCType_Cyber) {
 
 					Door dr = hitObj.GetComponent<Door>();
@@ -1307,7 +1407,7 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 					}
 
 					if (dr != null) {
-						if ((dr.doorOpen == DoorState_Closed || (dr.doorOpen == DoorState_Closing && Sys_Global.difficultyCombat > 2))
+						if ((dr.doorOpen == DoorState_Closed || (dr.doorOpen == DoorState_Closing && Eng_Global->difficultyCombat > 2))
 							&& !dr.locked && (LevelManager.a.GetCurrentLevelSecurity() <= dr.securityThreshhold)
 							&& (dr.requiredAccessCard == AccessCardType_None || dr.accessCardUsedByPlayer || inventoryPlayer1.HasAccessCard(dr.requiredAccessCard))) {
 						
@@ -1325,9 +1425,9 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 	}
 
 	bool CheckIfPlayerInSight() {
-	    int diff = Sys_Global.difficultyCombat;
+	    int diff = Eng_Global->difficultyCombat;
 		if (IsCyberNPC()) {
-			diff = SSys_Global.difficultyCyber;
+			diff = SEng_Global->difficultyCyber;
 		} else {
 			if (!withinPVS && DynamicCulling.a.cullEnabled) return false;
 		}
@@ -1347,10 +1447,10 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 		// Can't see him, he's on notarget.
 		if (PlayerMovement.a.Notarget) return false;
 
-		tempVec = Const.a.player1Capsule.instances[i].position;
+		tempVec = Const.a.player1Capsule.Eng_Global->instances[i].position;
 
 		// Get distance between enemy and found player
-		float dist = distance_vector3(tempVec,Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset));
+		float dist = distance_vector3(tempVec,Vector3_A_plus_B(Eng_Global->instances[i].position + Eng_Global->instances[i].sightPointOffset));
 
 		// Don't waste time raycasting if we won't be able to see them anyway.
 		if (dist > Const.a.sightRange[index]) return false;
@@ -1362,11 +1462,11 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 		}
 
 		// Get vector line made from enemy to found player
-		Vector3 checkline = tempVec - Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset);
+		Vector3 checkline = tempVec - Vector3_A_plus_B(Eng_Global->instances[i].position + Eng_Global->instances[i].sightPointOffset);
 		float angle = Vector3.Angle(checkline,sightPoint.transform.forward);
 		if (angle < (Const.a.fov[index] * 0.5f)) {
 			// Changed from using sight range to dist to minimize checkdistance.
-			if (Raycast(Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset), checkline.normalized,out tempHit, (dist + 0.1f),Const.a.layerMaskNPCSight)) {
+			if (Raycast(Vector3_A_plus_B(Eng_Global->instances[i].position + Eng_Global->instances[i].sightPointOffset), checkline.normalized,out tempHit, (dist + 0.1f),Const.a.layerMaskNPCSight)) {
 				if (tempHit.collider.gameObject == Const.a.player1Capsule) {
 					LOSpossible = true;  // Clear path from enemy to found player
 					SetEnemy(Const.a.player1Capsule,Const.a.player1TargettingPos);
@@ -1388,7 +1488,7 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 				// walls in the ways still due to the angles.  Changed from
 				// using sight range to dist to minimize checkdistance; added
 				// slight amount to it though to avoid quantization inaccuracies.
-				if (Raycast(Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset), checkline.normalized, out tempHit, (dist + 0.1f),Const.a.layerMaskNPCSight)) {
+				if (Raycast(Vector3_A_plus_B(Eng_Global->instances[i].position + Eng_Global->instances[i].sightPointOffset), checkline.normalized, out tempHit, (dist + 0.1f),Const.a.layerMaskNPCSight)) {
 					if (tempHit.collider.gameObject == Const.a.player1Capsule) {
 						LOSpossible = true; // Clear path from enemy to player.
 						SetEnemy(Const.a.player1Capsule,Const.a.player1TargettingPos);
@@ -1413,12 +1513,12 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 		if (enemSent == null) return;
 
 		enemy = enemSent;
-		posCheckFinished = Sys_Global.pauseRelativeTime + positionCheckDelay;
+		posCheckFinished = Eng_Global->pauseRelativeTime + positionCheckDelay;
 		wandering = false;
-		wanderFinished = Sys_Global.pauseRelativeTime;
-		lastPosition = instances[i].position;
+		wanderFinished = Eng_Global->pauseRelativeTime;
+		lastPosition = Eng_Global->instances[i].position;
 		enemyHM = Utils.GetMainHealthManager(enemSent);
-		lastKnownEnemyPos = enemy.instances[i].position;
+		lastKnownEnemyPos = enemy.Eng_Global->instances[i].position;
 		targettingPosition = targettingPosSent.position;
 		SetHuntFinished();
 	}
@@ -1446,9 +1546,9 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 	        return;
 	    }
 
-        infrontVec = target.instances[i].position;
-		infrontVec.y = Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset).y; // Ignore height delta.
-		infrontVec = Vector3.Normalize(infrontVec - Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset));
+        infrontVec = target.Eng_Global->instances[i].position;
+		infrontVec.y = Vector3_A_plus_B(Eng_Global->instances[i].position + Eng_Global->instances[i].sightPointOffset).y; // Ignore height delta.
+		infrontVec = Vector3.Normalize(infrontVec - Vector3_A_plus_B(Eng_Global->instances[i].position + Eng_Global->instances[i].sightPointOffset));
 		inProjFOV = false;
 		infront = false;
         dotResult = Vector3.Dot(infrontVec,sightPoint.transform.forward);
@@ -1462,10 +1562,10 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
     }
 
 	void Alert() {
-		if (Sys_Global.difficultyCombat == 0) return;
+		if (Eng_Global->difficultyCombat == 0) return;
 
 		SetEnemy(Const.a.player1Capsule,Const.a.player1Capsule.transform);
-		currentDestination = enemy.instances[i].position;
+		currentDestination = enemy.Eng_Global->instances[i].position;
 		inSight = false;
 	}
 
@@ -1475,7 +1575,7 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 		Alert();
 	}
 }
-
+*/
 // public class AIAnimationController : MonoBehaviour {
 // 	// External manually assigned references, unsaved, depends on prefab
 // 	public AIController aic;
@@ -1510,7 +1610,7 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 // 	public void Start () {
 // 	    if (initialized) return;
 // 	    
-// 	    animSwapFinished = Sys_Global.pauseRelativeTime;
+// 	    animSwapFinished = Eng_Global->pauseRelativeTime;
 // 		anim = GetComponent<Animator>();
 // 		smR = GetComponentInChildren<SkinnedMeshRenderer>(true);
 // 		if (smR != null) checkVisWithSMR = true;
@@ -1541,7 +1641,7 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 // 	}
 // 
 // 	void Update() {
-// 		if (Sys_Global.gamePaused || Sys_Global.menuActive) {
+// 		if (Eng_Global->gamePaused || Eng_Global->menuActive) {
 // 			if (!pauseStateUpdated) {
 // 				if (anim.speed != 0) anim.speed = 0;
 // 				pauseStateUpdated = true;
@@ -1568,7 +1668,7 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 // 			return;
 // 		}
 // 		
-// 		if (aic.currentState == AIState_Run && aic.tranquilizeFinished >= Sys_Global.pauseRelativeTime) {
+// 		if (aic.currentState == AIState_Run && aic.tranquilizeFinished >= Eng_Global->pauseRelativeTime) {
 // 			Idle();
 // 			return;
 // 		}
@@ -1588,7 +1688,7 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 // 	}
 // 
 // 	void Idle () {
-// 		if (aic.asleep || aic.tranquilizeFinished >= Sys_Global.pauseRelativeTime) {
+// 		if (aic.asleep || aic.tranquilizeFinished >= Eng_Global->pauseRelativeTime) {
 // 			if (anim.speed > 0) anim.speed = 0;
 // 		} else {
 // 			if (anim.speed != 1f) anim.speed = 1f;
@@ -1623,8 +1723,8 @@ static inline __attribute__((always_inline)) bool IsCyberNPC() { return npcTable
 // 			}
 // 		} else {
 // 			 // Prevent flickering by using a delay timer.
-// 			if (animSwapFinished < Sys_Global.pauseRelativeTime) {
-// 				animSwapFinished = Sys_Global.pauseRelativeTime + 0.5f;
+// 			if (animSwapFinished < Eng_Global->pauseRelativeTime) {
+// 				animSwapFinished = Eng_Global->pauseRelativeTime + 0.5f;
 // 				anim.Play("Idle");
 // 				clipName = "Idle";
 // 			}

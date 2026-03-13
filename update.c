@@ -36,12 +36,12 @@ void CodeScreenUpdate() {
     SELF.tickFinished = Sys_Global.pauseRelativeTime + 0.3f;
     uint8_t matIndex = 0;
     switch (level) {
-        case 1: matIndex = (instances[WORLD].ioflags & QUESTBIT_LEV1_CODE_LOCKED) ? instances[WORLD].lev1SecCode : (uint8_t)clamp(random_range(0.0f,10.0f),0.0f,9.0f); break;
-        case 2: matIndex = (instances[WORLD].ioflags & QUESTBIT_LEV2_CODE_LOCKED) ? instances[WORLD].lev2SecCode : (uint8_t)clamp(random_range(0.0f,10.0f),0.0f,9.0f); break;
-        case 3: matIndex = (instances[WORLD].ioflags & QUESTBIT_LEV3_CODE_LOCKED) ? instances[WORLD].lev3SecCode : (uint8_t)clamp(random_range(0.0f,10.0f),0.0f,9.0f); break;
-        case 4: matIndex = (instances[WORLD].ioflags & QUESTBIT_LEV4_CODE_LOCKED) ? instances[WORLD].lev4SecCode : (uint8_t)clamp(random_range(0.0f,10.0f),0.0f,9.0f); break;
-        case 5: matIndex = (instances[WORLD].ioflags & QUESTBIT_LEV5_CODE_LOCKED) ? instances[WORLD].lev5SecCode : (uint8_t)clamp(random_range(0.0f,10.0f),0.0f,9.0f); break;
-        case 6: matIndex = (instances[WORLD].ioflags & QUESTBIT_LEV6_CODE_LOCKED) ? instances[WORLD].lev6SecCode : (uint8_t)clamp(random_range(0.0f,10.0f),0.0f,9.0f); break;
+        case 1: matIndex = (Eng_Global->instances[WORLD].ioflags & QUESTBIT_LEV1_CODE_LOCKED) ? Eng_Global->instances[WORLD].lev1SecCode : (uint8_t)clamp(random_range(0.0f,10.0f),0.0f,9.0f); break;
+        case 2: matIndex = (Eng_Global->instances[WORLD].ioflags & QUESTBIT_LEV2_CODE_LOCKED) ? Eng_Global->instances[WORLD].lev2SecCode : (uint8_t)clamp(random_range(0.0f,10.0f),0.0f,9.0f); break;
+        case 3: matIndex = (Eng_Global->instances[WORLD].ioflags & QUESTBIT_LEV3_CODE_LOCKED) ? Eng_Global->instances[WORLD].lev3SecCode : (uint8_t)clamp(random_range(0.0f,10.0f),0.0f,9.0f); break;
+        case 4: matIndex = (Eng_Global->instances[WORLD].ioflags & QUESTBIT_LEV4_CODE_LOCKED) ? Eng_Global->instances[WORLD].lev4SecCode : (uint8_t)clamp(random_range(0.0f,10.0f),0.0f,9.0f); break;
+        case 5: matIndex = (Eng_Global->instances[WORLD].ioflags & QUESTBIT_LEV5_CODE_LOCKED) ? Eng_Global->instances[WORLD].lev5SecCode : (uint8_t)clamp(random_range(0.0f,10.0f),0.0f,9.0f); break;
+        case 6: matIndex = (Eng_Global->instances[WORLD].ioflags & QUESTBIT_LEV6_CODE_LOCKED) ? Eng_Global->instances[WORLD].lev6SecCode : (uint8_t)clamp(random_range(0.0f,10.0f),0.0f,9.0f); break;
     }
     
     SELF.texture = min(768 + matIndex,777);
@@ -50,10 +50,10 @@ void CodeScreenUpdate() {
 void FuncWallMoveToPosition(Vector3 goalPosition, FuncStates newState) {
 //     rbody.WakeUp(); TODO
     float dist = speed * Sys_Global.deltaTime;
-    tempVec = (instances[i].position - goalPosition).normalized; // Relative
-    tempVec = (tempVec * dist * -1) + instances[i].position; // Absolute
+    tempVec = (Eng_Global->instances[i].position - goalPosition).normalized; // Relative
+    tempVec = (tempVec * dist * -1) + Eng_Global->instances[i].position; // Absolute
     rbody.MovePosition(tempVec);
-    float distanceLeft; = distance_vector3(instances[i].position, goalPosition);
+    float distanceLeft; = distance_vector3(Eng_Global->instances[i].position, goalPosition);
     float distTotal = vabs(targetPositionY);
     percentMoved = (distTotal - distanceLeft) / distTotal;
     if (float.IsNaN(percentMoved)) percentMoved = 0f;
@@ -75,18 +75,18 @@ void FuncWallMoveToPosition(Vector3 goalPosition, FuncStates newState) {
 void FuncWallUpdate() {
     switch (currentState) {
         case FuncStates.Start:
-            instances[i].position = startPosition;
-            if (instances[i].velocity.sqrMagnitude > 0) instances[i].velocity = (Vector3){0.0f,0.0f,0.0f};
+            Eng_Global->instances[i].position = startPosition;
+            if (Eng_Global->instances[i].velocity.sqrMagnitude > 0) Eng_Global->instances[i].velocity = (Vector3){0.0f,0.0f,0.0f};
             break;
         case FuncStates.Target:
-            instances[i].position = instances[i].targetPosition;
+            Eng_Global->instances[i].position = Eng_Global->instances[i].targetPosition;
             if (rbody.velocity.sqrMagnitude > 0) rbody.velocity = (Vector3){0.0f,0.0f,0.0f};
             break;
         case FuncStates.MovingStart:
             FuncWallMoveToPosition(startPosition, FuncStates.Start);
             break;
         case FuncStates.MovingTarget:
-            FuncWallMoveToPosition(instances[i].targetPosition, FuncStates.Target);
+            FuncWallMoveToPosition(Eng_Global->instances[i].targetPosition, FuncStates.Target);
             break;
     }
 }
@@ -94,11 +94,11 @@ void FuncWallUpdate() {
 void TargetIdentifierSenseTargets() {
     int lev = Sys_Global.currentLevel;    
     for (int i=0;i<loadedInstances;i++) {
-        if (!ConstIndexIsNPC(instances[i])) continue; // Only get NPCs.
-        if (instances[i].health <= 0.0f) continue; // It's dead, ignore.
-        if (instances[i].entflags & ENTFLAG_TARGID_ATTACHED) continue; // Already has a Target ID on it.
+        if (!ConstIndexIsNPC(Eng_Global->instances[i])) continue; // Only get NPCs.
+        if (Eng_Global->instances[i].health <= 0.0f) continue; // It's dead, ignore.
+        if (Eng_Global->instances[i].entflags & ENTFLAG_TARGID_ATTACHED) continue; // Already has a Target ID on it.
 
-        float far = distance_vector3(instances[i].position, instances[i].position);
+        float far = distance_vector3(Eng_Global->instances[i].position, Eng_Global->instances[i].position);
         if (far > TargetID.GetTargetIDSensingRange(false)) continue;
         
         CreateTargetIDInstance(-1.0f,i,-1.0f);
@@ -124,7 +124,7 @@ void DeactivateHardwareOnEnergyDepleted() {
 void TakeEnergy(float drain) {
     float was = energy;
     if (energy <= 0.0f || drain <= 0.0f) return;
-    if (WeaponCurrent.a.redbull) return; // No energy drain!
+    if (inventoryPlayer1.redbull) return; // No energy drain!
 
     energy -= drain;
     if (energy <= 0.0f) {
@@ -145,7 +145,7 @@ void GiveEnergy(float give, EnergyType type) {
 void PlayerEnergyUpdate() {
     float drain = 1.0f;
     bool activeEnergyDrainers = false;
-    if (instances[PLAYER1].energyDrainTickFinished < Sys_Global.pauseRelativeTime) {
+    if (Eng_Global->instances[PLAYER1].energyDrainTickFinished < Sys_Global.pauseRelativeTime) {
         uint16_t drainJPM = 0u;
         if (inventoryPlayer1.hardwareIsActive[HW_SNS]) {
             switch (inventoryPlayer1.hardwareVersion[HW_SNS]) {
@@ -211,17 +211,17 @@ void PlayerEnergyUpdate() {
             TakeEnergy(tempF);
         }
         
-        instances[PLAYER1].energyDrainTickFinished = Sys_Global.pauseRelativeTime + 0.1f;
+        Eng_Global->instances[PLAYER1].energyDrainTickFinished = Sys_Global.pauseRelativeTime + 0.1f;
     }
     
     // Turn everything off when we are out of energy
-    if (activeEnergyDrainers && instances[PLAYER1].energy <= 0.0f) {
+    if (activeEnergyDrainers && Eng_Global->instances[PLAYER1].energy <= 0.0f) {
         DeactivateHardwareOnEnergyDepleted();
         activeEnergyDrainers = false;
-        instances[PLAYER1].energy = 0.0f;
-        instances[PLAYER1].drainJPM = 0;
+        Eng_Global->instances[PLAYER1].energy = 0.0f;
+        Eng_Global->instances[PLAYER1].drainJPM = 0;
     } else {
-        instances[PLAYER1].drainJPM = drainJPM;
+        Eng_Global->instances[PLAYER1].drainJPM = drainJPM;
     }
 
     drainJPM = 50;
@@ -291,11 +291,11 @@ void MFDUpdate() {
     CenterTabBlink();
     if (lastEnergy != PlayerEnergy.a.energy) DrawTicks(false);
     SELF.lastEnergy = SELF.energy;
-    if (lastHealth != instances[PLAYER1].health) DrawTicks(true);
-    lastHealth = instances[PLAYER1].health;
+    if (lastHealth != Eng_Global->instances[PLAYER1].health) DrawTicks(true);
+    lastHealth = Eng_Global->instances[PLAYER1].health;
     WeaponButtonsManagerUpdate();
     UpdateAmmoAndLoadButtons();
-    switch (WeaponCurrent.a.weaponCurrent) {
+    switch (inventoryPlayer1.weaponCurrent) {
         case 37: ShowEnergyItems(); break;
         case 40: ShowEnergyItems(); break;
         case 46: ShowEnergyItems(); break;
@@ -356,7 +356,7 @@ void MFDUpdate() {
 
     // Handle severing connection with in use keypads, puzzles, etc. when player drifts too far away
     if (Sys_UI.usingObject) {
-        if (distance_vector3(instances[PLAYER1].position, objectInUsePos) > (Const.frobDistance + 0.16f)) {
+        if (distance_vector3(Eng_Global->instances[PLAYER1].position, objectInUsePos) > (Const.frobDistance + 0.16f)) {
             if (tetheredPGP != null) {
                 ClosePuzzleGrid();
                 tetheredPGP = null;
@@ -390,11 +390,11 @@ void MFDUpdate() {
     }
 
     // Update the weapon icon
-//     wep16index = WeaponFire.Get16WeaponIndexFromConstIndex(WeaponCurrent.a.weaponIndex); TODO
+//     wep16index = WeaponFire.Get16WeaponIndexFromConstIndex(inventoryPlayer1.weaponIndex); TODO
 //     if (wep16index >=0 && wep16index < 16) {
 //         if (leftTC.TabManager.WeaponTab.activeInHierarchy) {
 //             iconLH.overrideSprite = wepIcons[wep16index];
-//             if (inventoryPlayer1.numweapons <= 0 || WeaponCurrent.a.weaponCurrentPending >= 0) {
+//             if (inventoryPlayer1.numweapons <= 0 || inventoryPlayer1.weaponCurrentPending >= 0) {
 //                 Utils.DisableImage(iconLH);
 //             } else {
 //                 Utils.EnableImage(iconLH);
@@ -403,7 +403,7 @@ void MFDUpdate() {
 // 
 //         if (rightTC.TabManager.WeaponTab.activeInHierarchy) {
 //             iconRH.overrideSprite = wepIcons[wep16index];
-//             if (inventoryPlayer1.numweapons <= 0 || WeaponCurrent.a.weaponCurrentPending >= 0) {
+//             if (inventoryPlayer1.numweapons <= 0 || inventoryPlayer1.weaponCurrentPending >= 0) {
 //                 Utils.DisableImage(iconRH);
 //             } else {
 //                 Utils.EnableImage(iconRH);
@@ -422,7 +422,7 @@ void PlayerRessurect() {
 //     radiated = 0;
 //     playerDead = false;
 //     PlayerPatch.a.DisableAllPatches();
-//     instances[PLAYER1].fatigue = 0f;
+//     Eng_Global->instances[PLAYER1].fatigue = 0f;
 }
 
 void PlayerDeathToMenu() {
@@ -556,10 +556,10 @@ void ForceBridgeUpdate() {
 // 
 //     float delta = (1f / 60f);
 //     tickFinished = Sys_Global.pauseRelativeTime + delta;
-//     float drift = instances[i].position.y;
+//     float drift = Eng_Global->instances[i].position.y;
 //     drift += rate;
 //     if (drift > endY) drift = endY;
-//     instances[i].position = (Vector3){instances[i].position.x,drift,instances[i].position.z};
+//     Eng_Global->instances[i].position = (Vector3){Eng_Global->instances[i].position.x,drift,Eng_Global->instances[i].position.z};
 //     drift = img.color.a;
 //     drift -= fadeRate;
 //     if (drift < endFade) drift = endFade;

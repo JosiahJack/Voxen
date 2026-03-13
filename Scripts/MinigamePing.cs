@@ -81,21 +81,21 @@ public class MinigamePing : MonoBehaviour {
         ball.localPosition = (Vector3){0f,0f,0f);
         computerPaddle.localPosition = (Vector3){0f,100f,0f);
         ballDir = GetNewBallDirection();
-        ballResetFinished = Sys_Global.pauseRelativeTime + 2.5f;
+        ballResetFinished = Eng_Global->pauseRelativeTime + 2.5f;
     }
 
     void Update() {
-        if (Sys_Global.gamePaused) return;
-		if (Sys_Global.menuActive) return;
-        if (frameFinished >= Sys_Global.pauseRelativeTime) return;
+        if (Eng_Global->gamePaused) return;
+		if (Eng_Global->menuActive) return;
+        if (frameFinished >= Eng_Global->pauseRelativeTime) return;
         if (gameOver.activeInHierarchy) return;
 
-        frameFinished = Sys_Global.pauseRelativeTime + (1f/30f); // 30fps, it's a potato.
+        frameFinished = Eng_Global->pauseRelativeTime + (1f/30f); // 30fps, it's a potato.
         PlayerPaddleUpdate();
-        if (ballResetFinished >= Sys_Global.pauseRelativeTime + 1f) return;
+        if (ballResetFinished >= Eng_Global->pauseRelativeTime + 1f) return;
 
         ComputerPaddleUpdate();
-        if (ballResetFinished >= Sys_Global.pauseRelativeTime) return;
+        if (ballResetFinished >= Eng_Global->pauseRelativeTime) return;
 
         BallUpdate();
     }

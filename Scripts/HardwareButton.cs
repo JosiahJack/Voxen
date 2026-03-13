@@ -84,7 +84,7 @@ public class HardwareButton : MonoBehaviour {
 
 	public void BioAction() {
 		if (inventoryPlayer1.BioMonitorVersion() == 0 && PlayerEnergy.a.energy <= 0) {
-			CenterStatusPrint("%s", Sys_Text.stringTable[314],WeaponCurrent.a.owner);
+			CenterStatusPrint("%s", Sys_Text.stringTable[314],inventoryPlayer1.owner);
 			return;
 		}
 
@@ -101,7 +101,7 @@ public class HardwareButton : MonoBehaviour {
 		inventoryPlayer1.hardwareIsActive[6] = false;
 		SetVersionIconForButton(inventoryPlayer1.hardwareIsActive[6],inventoryPlayer1.hardwareVersionSetting[6],0);
 		
-		if (Sys_Cheats.showFPS) return;
+		if (Eng_Cheats->showFPS) return;
 		if (BiomonitorGraphSystem.a != null) {
 			BiomonitorGraphSystem.a.ClearGraphs();
 		}
@@ -171,7 +171,7 @@ public class HardwareButton : MonoBehaviour {
 	}
 
 	public void SensaroundAction() {
-		if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Sys_Text.stringTable[314],WeaponCurrent.a.owner); return; }
+		if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Sys_Text.stringTable[314],inventoryPlayer1.owner); return; }
 
 		if (inventoryPlayer1.hardwareIsActive[3]) {
 			Utils.PlayUIOneShotSavable(82);
@@ -205,7 +205,7 @@ public class HardwareButton : MonoBehaviour {
 	}
 
 	public void ShieldAction() {
-		if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Sys_Text.stringTable[314],WeaponCurrent.a.owner); return; }
+		if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Sys_Text.stringTable[314],inventoryPlayer1.owner); return; }
 		if (inventoryPlayer1.hardwareIsActive[5]) {
 			Utils.PlayUIOneShotSavable(95);
 			ShieldOffWithEffects();
@@ -231,7 +231,7 @@ public class HardwareButton : MonoBehaviour {
 	}
 
 	public void LanternAction() {
-		if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Sys_Text.stringTable[314],WeaponCurrent.a.owner); return; }
+		if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Sys_Text.stringTable[314],inventoryPlayer1.owner); return; }
 		Utils.PlayUIOneShotSavable(78);
 		if (inventoryPlayer1.hardwareIsActive[7]) {
 			LanternOff();
@@ -270,7 +270,7 @@ public class HardwareButton : MonoBehaviour {
 	}
 
 	public void InfraredAction() {
-		if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Sys_Text.stringTable[314],WeaponCurrent.a.owner); return; }
+		if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Sys_Text.stringTable[314],inventoryPlayer1.owner); return; }
 		if (inventoryPlayer1.hardwareIsActive[11]) {
 			Utils.PlayUIOneShotSavable(82);
 		} else {
@@ -327,7 +327,7 @@ public class HardwareButton : MonoBehaviour {
 
 	public void BoosterAction() {
 		if (inventoryPlayer1.BoosterSetToBoost() && PlayerEnergy.a.energy <= 0) {
-			CenterStatusPrint("%s", Sys_Text.stringTable[314],WeaponCurrent.a.owner);
+			CenterStatusPrint("%s", Sys_Text.stringTable[314],inventoryPlayer1.owner);
 			return;
 		}
 
@@ -357,7 +357,7 @@ public class HardwareButton : MonoBehaviour {
 
 	public void JumpJetsAction() {
 		if (PlayerEnergy.a.energy <= 0) {
-			CenterStatusPrint("%s", Sys_Text.stringTable[314],WeaponCurrent.a.owner);
+			CenterStatusPrint("%s", Sys_Text.stringTable[314],inventoryPlayer1.owner);
 			return;
 		}
 

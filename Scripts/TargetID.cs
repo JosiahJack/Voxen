@@ -33,7 +33,7 @@ public class TargetID : MonoBehaviour {
     }
 
 	void FixedUpdate() {
-		if (parent != null) instances[i].position = parent.position;
+		if (parent != null) Eng_Global->instances[i].position = parent.position;
 	}
 	
 	public void SendDamageReceive(float damage, DamageData dd) {
@@ -41,7 +41,7 @@ public class TargetID : MonoBehaviour {
 
 		if (dd.attackType == AttackType.Tranq) {
 			currentText = Sys_Text.stringTable[536]; // STUNNED
-			damageTimeFinished = Sys_Global.pauseRelativeTime - 1f; // Expire damage text, Update handles "STUNNED"
+			damageTimeFinished = Eng_Global->pauseRelativeTime - 1f; // Expire damage text, Update handles "STUNNED"
 		} else {
 			if (damage > linkedHM.maxhealth * 0.75f) {
 				currentText = Sys_Text.stringTable[514]; // SEVERE DAMAGE
@@ -55,7 +55,7 @@ public class TargetID : MonoBehaviour {
 				currentText = Sys_Text.stringTable[511]; // NO DAMAGE
 			}
 			damageTime = (damage == 0f) ? 1f : 2.5f;
-			damageTimeFinished = Sys_Global.pauseRelativeTime + damageTime;
+			damageTimeFinished = Eng_Global->pauseRelativeTime + damageTime;
 			text.text = currentText;
 		}
 	}
@@ -81,7 +81,7 @@ public class TargetID : MonoBehaviour {
 			}
 
 			if (linkedHM.isNPC && linkedHM.aic != null) {
-				if (linkedHM.aic.tranquilizeFinished > Sys_Global.pauseRelativeTime) {
+				if (linkedHM.aic.tranquilizeFinished > Eng_Global->pauseRelativeTime) {
 					stunned = true;
 				} else {
 					stunned = false;
@@ -98,14 +98,14 @@ public class TargetID : MonoBehaviour {
 			return;
 		}
 
-		if ((distance_vector3(instances[i].position,
-							  instances[PLAYER1].position)
+		if ((distance_vector3(Eng_Global->instances[i].position,
+							  Eng_Global->instances[PLAYER1].position)
 			> playerLinkDistance)) {
 			Deactivate();
 			return;
 		}
 
-		if (lifetimeFinished < Sys_Global.pauseRelativeTime) {
+		if (lifetimeFinished < Eng_Global->pauseRelativeTime) {
 			Deactivate();
 			return;
 		}
@@ -123,8 +123,8 @@ public class TargetID : MonoBehaviour {
 		}
 
 		if (displayRange && linkedHM != null) {
-			float range = distance_vector3(instances[PLAYER1].position,
-										   linkedHM.instances[i].position);
+			float range = distance_vector3(Eng_Global->instances[PLAYER1].position,
+										   linkedHM.Eng_Global->instances[i].position);
 
 			if (displayHealth) secondaryDisplayString += comma;
 			secondaryDisplayString += (range.ToString("0.0") + rangeMetersM);
@@ -152,11 +152,11 @@ public class TargetID : MonoBehaviour {
 		if (currentText != System.String.Empty) {
 			if (linkedHM != null) {
 				if (linkedHM.aic != null) {
-					if (linkedHM.aic.tranquilizeFinished > Sys_Global.pauseRelativeTime
-						&& damageTimeFinished < Sys_Global.pauseRelativeTime) {
+					if (linkedHM.aic.tranquilizeFinished > Eng_Global->pauseRelativeTime
+						&& damageTimeFinished < Eng_Global->pauseRelativeTime) {
 						currentText = Sys_Text.stringTable[536]; // STUNNED
 					} else {
-						if (damageTimeFinished < Sys_Global.pauseRelativeTime) {
+						if (damageTimeFinished < Eng_Global->pauseRelativeTime) {
 							currentText = "";
 							if (!inventoryPlayer1.hasHardware[4]
 								&& (currentText != Sys_Text.stringTable[511])) {

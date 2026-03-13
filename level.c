@@ -2,101 +2,70 @@
 #include "voxen.h"
 extern uint16_t headmountedLanternLight;
 extern Vector3 lanternPos;
-uint16_t npcCountInWorldPerType[NUM_AI_TYPES];
 extern uint16_t editModeSelection;
 bool EntNotVisible(uint16_t i, bool otherCondition);
-void SetHuntFinished(uint16_t i) {
-    uint16_t npcID = instances[i].index - 419;
-    instances[i].huntFinished = Sys_Global.pauseRelativeTime;
-    int diff = Sys_Global.difficultyCombat;
-    if (npcTable[npcID].type == NPCType_Cyber) diff = Sys_Global.difficultyCyber;
-    if (diff <= 1) { // More forgetful on easy.
-        instances[i].huntFinished += vmax((npcTable[npcID].huntTime * 0.75),60.0);
-    } else if (diff >= 3) { // Good memory on hard.
-        instances[i].huntFinished += vmax((npcTable[npcID].huntTime * 2.00),60.0); 
-    } else {
-        instances[i].huntFinished += vmax(npcTable[npcID].huntTime, 60.0);
+
+void InitializeEntity(Entity* entry) { // Blank entity, no index yet, for initial list population or temporary Entity.
+    entry->index = UINT16_MAX; // memset here would be harmful as only a handful of fields are the same.
+    entry->entflags = ENTFLAG_KINEMATIC; // Zeroes the rest out.
+    entry->modelIndex = MODEL_IDX_MAX;
+    entry->layer = PhysicsLayer_Default;
+    flag_set(&entry->entflags, ENTFLAG_ANIMATED, false);
+    entry->texIndex = entry->glowIndex = entry->specIndex = entry->normIndex = MAX_VALID_TEXTURE;
+    entry->lodIndex  = MODEL_IDX_MAX;
+    entry->rotation.x = entry->rotation.y = entry->rotation.z = 0.0f; entry->rotation.w = 1.0f; // Quaternion identity
+    entry->scale.x = entry->scale.y = entry->scale.z = 1.0f;
+    entry->collider = COLLIDER_TYPE_NONE;
+    entry->colliderMeshIndex = MODEL_IDX_MAX;
+    entry->mass = 1.0f;
+    entry->angularDrag = 0.05f;
+    entry->dynamicFriction = entry->staticFriction = 0.6f;
+    entry->frictionCombine = entry->bounceCombine = PHYS_COMBINE_AVG;
+    entry->volume = 1.0f;
+    flag_set(&entry->entflags, ENTFLAG_TEST_PERSISTENT, false);
+    for (int i=0;i<MAX_CHILD_COUNT;++i) {
+        entry->child[i] = UINT16_MAX;
+        entry->child_offset[i].x = entry->child_offset[i].y = entry->child_offset[i].z = 0.0f;
+        entry->child_rotation[i].x = entry->child_rotation[i].y = entry->child_rotation[i].z = 0.0f; entry->child_rotation[i].w = 1.0f;
+        entry->child_scale[i].x = entry->child_scale[i].y = entry->child_scale[i].z = 1.0f;
     }
-}
-
-void InitializeAIAfterLoad(uint16_t i) {
-    instances[i].layer = PhysicsLayer_NPC;
-    uint16_t npcID = instances[i].index - 419;
-    instances[i].idleTime = Sys_Global.pauseRelativeTime + random_rangedub(npcTable[npcID].timeIdleSFXMin, npcTable[npcID].timeIdleSFXMax);
-    instances[i].attack1SoundTime = instances[i].attack2SoundTime = instances[i].attack3SoundTime = Sys_Global.pauseRelativeTime;
-    instances[i].timeTillEnemyChangeFinished = Sys_Global.pauseRelativeTime;
-    SetHuntFinished(i);
-    instances[i].attackFinished = Sys_Global.pauseRelativeTime;
-    instances[i].attack2Finished = Sys_Global.pauseRelativeTime;
-    instances[i].attack3Finished = Sys_Global.pauseRelativeTime;
-    instances[i].timeTillPainFinished = Sys_Global.pauseRelativeTime;
-    instances[i].timeTillDeadFinished = Sys_Global.pauseRelativeTime;
-    instances[i].meleeDamageFinished = Sys_Global.pauseRelativeTime;
-    instances[i].gracePeriodFinished = Sys_Global.pauseRelativeTime;
-    instances[i].randomWaitForNextAttack1Finished = Sys_Global.pauseRelativeTime;
-    instances[i].randomWaitForNextAttack2Finished = Sys_Global.pauseRelativeTime;
-    instances[i].randomWaitForNextAttack3Finished = Sys_Global.pauseRelativeTime;
-    instances[i].tranquilizeFinished = Sys_Global.pauseRelativeTime;
-    instances[i].deathBurstFinished = Sys_Global.pauseRelativeTime;
-    instances[i].wanderFinished = Sys_Global.pauseRelativeTime;
-    instances[i].posCheckFinished = Sys_Global.pauseRelativeTime;
-    instances[i].lastPosition = instances[i].position;
-    instances[i].timeSinceMovedEnough = 0.0;
-    if (instances[i].walkWaypointsLength > 0 && (instances[i].entflags & ENTFLAG_WALK_PATH_ON_START) && !(instances[i].entflags & ENTFLAG_ASLEEP)) {
-        instances[i].currentDestination = instances[i].walkWaypoints[instances[i].currentWaypoint];
-        instances[i].currentState = AIState_Walk; // If waypoints are set, start walking
-    } else {
-        instances[i].currentState = AIState_Idle; // No waypoints, stay put
-    }
-
-    if ((instances[i].entflags & ENTFLAG_WANDERING) && (random_range(0.0f,1.0f) < 0.5f)) instances[i].currentState = AIState_Walk;
-    else flag_set(&instances[i].entflags, ENTFLAG_WANDERING, false);
-
-    if (instances[i].entflags & ENTFLAG_ASLEEP) {
-        instances[i].currentState = AIState_Idle;
-//         flag_set(&instances[instances[i].sleepingCables].entflags, ENTFLAG_ACTIVE, true); // TODO
-    }
-
-    instances[i].attackFinished = Sys_Global.pauseRelativeTime + 1.0;
-    instances[i].idealTransformForward = instances[i].forward;
-    StringCopyInto_A_From_B(instances[i].targetID, npcTable[npcID].name, TARGET_ID_LENGTH);
-    StringFormat(instances[i].targetID, TARGET_ID_LENGTH * sizeof(char), "%s %05u", npcTable[npcID].name,npcCountInWorldPerType[npcID]++);
+    entry->path[0] = '\0';    
 }
 
 void AddInstance(uint16_t entIdx, uint16_t i) {
     if (entIdx >= entityCount) { DualLogError("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d\n",entIdx,entityCount); OS_Exit(1); }
         
-    instances[i].index = entIdx;
+    Sys_Global.instances[i].index = entIdx;
     if (ConstIndexIsNPC(entIdx)) InitializeAIAfterLoad(i);
     bool isCardChunk = (entities[entIdx].entflags & ENTFLAG_CARDCHUNK);
-    instances[i].modelIndex = entities[entIdx].modelIndex;
-    instances[i].colliderMeshIndex = entities[entIdx].colliderMeshIndex;
-    instances[i].numclips = entities[entIdx].numclips;
-    instances[i].animationNum = entities[entIdx].animationNum;
-    instances[i].texIndex = entities[entIdx].texIndex;
-    instances[i].glowIndex = entities[entIdx].glowIndex;
-    if (instances[i].glowIndex >= MAX_VALID_TEXTURE) instances[i].glowIndex = 0;
-    instances[i].specIndex = entities[entIdx].specIndex;
-    if (instances[i].specIndex >= MAX_VALID_TEXTURE) instances[i].specIndex = 0;
-    instances[i].normIndex = entities[entIdx].normIndex;
-    if (instances[i].normIndex >= MAX_VALID_TEXTURE) instances[i].normIndex = 0;
-    instances[i].lodIndex = entities[entIdx].lodIndex;
-    flag_set(&instances[i].entflags, ENTFLAG_CARDCHUNK,  isCardChunk);
-    flag_set(&instances[i].entflags, ENTFLAG_USEGRAVITY,  entities[entIdx].entflags & ENTFLAG_USEGRAVITY);
-    flag_set(&instances[i].entflags, ENTFLAG_KINEMATIC,  entities[entIdx].entflags & ENTFLAG_KINEMATIC);
-    flag_set(&instances[i].entflags, ENTFLAG_RIGIDBODY,  entities[entIdx].entflags & ENTFLAG_RIGIDBODY);
-    flag_set(&instances[i].entflags, ENTFLAG_NO_SHADOWS,  entities[entIdx].entflags & ENTFLAG_NO_SHADOWS);
-    instances[i].collider = entities[entIdx].collider;
-    instances[i].colliderCenter = entities[entIdx].colliderCenter;
-    instances[i].colliderSize = entities[entIdx].colliderSize;
-    instances[i].mass = entities[entIdx].mass > 0.0f ? entities[entIdx].mass : 1.0f; // Nonzero fallback.
-    instances[i].linearDrag = entities[entIdx].linearDrag > 0.0f ? entities[entIdx].linearDrag : 0.0f;
-    instances[i].angularDrag = entities[entIdx].angularDrag > 0.0f ? entities[entIdx].angularDrag : 0.05f;
+    Sys_Global.instances[i].modelIndex = entities[entIdx].modelIndex;
+    Sys_Global.instances[i].colliderMeshIndex = entities[entIdx].colliderMeshIndex;
+    Sys_Global.instances[i].numclips = entities[entIdx].numclips;
+    Sys_Global.instances[i].animationNum = entities[entIdx].animationNum;
+    Sys_Global.instances[i].texIndex = entities[entIdx].texIndex;
+    Sys_Global.instances[i].glowIndex = entities[entIdx].glowIndex;
+    if (Sys_Global.instances[i].glowIndex >= MAX_VALID_TEXTURE) Sys_Global.instances[i].glowIndex = 0;
+    Sys_Global.instances[i].specIndex = entities[entIdx].specIndex;
+    if (Sys_Global.instances[i].specIndex >= MAX_VALID_TEXTURE) Sys_Global.instances[i].specIndex = 0;
+    Sys_Global.instances[i].normIndex = entities[entIdx].normIndex;
+    if (Sys_Global.instances[i].normIndex >= MAX_VALID_TEXTURE) Sys_Global.instances[i].normIndex = 0;
+    Sys_Global.instances[i].lodIndex = entities[entIdx].lodIndex;
+    flag_set(&Sys_Global.instances[i].entflags, ENTFLAG_CARDCHUNK,  isCardChunk);
+    flag_set(&Sys_Global.instances[i].entflags, ENTFLAG_USEGRAVITY,  entities[entIdx].entflags & ENTFLAG_USEGRAVITY);
+    flag_set(&Sys_Global.instances[i].entflags, ENTFLAG_KINEMATIC,  entities[entIdx].entflags & ENTFLAG_KINEMATIC);
+    flag_set(&Sys_Global.instances[i].entflags, ENTFLAG_RIGIDBODY,  entities[entIdx].entflags & ENTFLAG_RIGIDBODY);
+    flag_set(&Sys_Global.instances[i].entflags, ENTFLAG_NO_SHADOWS,  entities[entIdx].entflags & ENTFLAG_NO_SHADOWS);
+    Sys_Global.instances[i].collider = entities[entIdx].collider;
+    Sys_Global.instances[i].colliderCenter = entities[entIdx].colliderCenter;
+    Sys_Global.instances[i].colliderSize = entities[entIdx].colliderSize;
+    Sys_Global.instances[i].mass = entities[entIdx].mass > 0.0f ? entities[entIdx].mass : 1.0f; // Nonzero fallback.
+    Sys_Global.instances[i].linearDrag = entities[entIdx].linearDrag > 0.0f ? entities[entIdx].linearDrag : 0.0f;
+    Sys_Global.instances[i].angularDrag = entities[entIdx].angularDrag > 0.0f ? entities[entIdx].angularDrag : 0.05f;
     for (int c=0;c<MAX_CHILD_COUNT;++c) {
-        instances[i].child[c] = entities[entIdx].child[c];
-        instances[i].child_offset[c] = entities[entIdx].child_offset[c];
-        instances[i].child_rotation[c] = entities[entIdx].child_rotation[c];
-        instances[i].child_scale[c] = isCardChunk ? entities[entIdx].child_scale[c] : (Vector3){ 1.0f, 1.0f, 1.0f };
+        Sys_Global.instances[i].child[c] = entities[entIdx].child[c];
+        Sys_Global.instances[i].child_offset[c] = entities[entIdx].child_offset[c];
+        Sys_Global.instances[i].child_rotation[c] = entities[entIdx].child_rotation[c];
+        Sys_Global.instances[i].child_scale[c] = isCardChunk ? entities[entIdx].child_scale[c] : (Vector3){ 1.0f, 1.0f, 1.0f };
     }
     
     if (entIdx == 525) { // prop_console01
@@ -113,9 +82,9 @@ void AddInstance(uint16_t entIdx, uint16_t i) {
         lights[litIdx + LIGHT_DATA_OFFSET_R] = 0.3531f;
         lights[litIdx + LIGHT_DATA_OFFSET_G] = 0.4837f;
         lights[litIdx + LIGHT_DATA_OFFSET_B] = 0.6509f;
-        lights[litIdx + LIGHT_DATA_OFFSET_POSX] = instances[i].position.x + 0.23f; // TODO Multiply against forward/right!  Only good on first one in medical!
-        lights[litIdx + LIGHT_DATA_OFFSET_POSY] = instances[i].position.y + 0.24f;
-        lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = instances[i].position.z;
+        lights[litIdx + LIGHT_DATA_OFFSET_POSX] = Sys_Global.instances[i].position.x + 0.23f; // TODO Multiply against forward/right!  Only good on first one in medical!
+        lights[litIdx + LIGHT_DATA_OFFSET_POSY] = Sys_Global.instances[i].position.y + 0.24f;
+        lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = Sys_Global.instances[i].position.z;
         lightCastsShadows[loadedLights] = true;
         lightDirty[loadedLights] = true;
         
@@ -132,14 +101,14 @@ void AddInstance(uint16_t entIdx, uint16_t i) {
         lights[litIdx + LIGHT_DATA_OFFSET_R] = 0.3561f;
         lights[litIdx + LIGHT_DATA_OFFSET_G] = 0.3561f;
         lights[litIdx + LIGHT_DATA_OFFSET_B] = 0.8970f;
-        lights[litIdx + LIGHT_DATA_OFFSET_POSX] = instances[i].position.x - 0.48f;
-        lights[litIdx + LIGHT_DATA_OFFSET_POSY] = instances[i].position.y - 0.64f;
-        lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = instances[i].position.z;
+        lights[litIdx + LIGHT_DATA_OFFSET_POSX] = Sys_Global.instances[i].position.x - 0.48f;
+        lights[litIdx + LIGHT_DATA_OFFSET_POSY] = Sys_Global.instances[i].position.y - 0.64f;
+        lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = Sys_Global.instances[i].position.z;
         lightCastsShadows[loadedLights] = true;
         lightDirty[loadedLights] = true;
     }
     
-    instances[i].lockedMessageLingdex = entities[entIdx].lockedMessageLingdex;
+    Sys_Global.instances[i].lockedMessageLingdex = entities[entIdx].lockedMessageLingdex;
     dirtyInstances[i] = true;
     loadedInstances++;
 }
@@ -147,53 +116,11 @@ void AddInstance(uint16_t entIdx, uint16_t i) {
 void DeleteInstance(uint16_t i) {
     if (i <= PLAYER2 || i >= loadedInstances) return; // Don't delete null ent, player 1, nor player 2 or already empty slots.
     
-    if (instances[i].entflags & ENTFLAG_HAS_CAMERA_VIEW) RemoveCameraPosition(i);
+    if (Sys_Global.instances[i].entflags & ENTFLAG_HAS_CAMERA_VIEW) RemoveCameraPosition(i);
     uint16_t endInstance = vmax(vmin(INSTANCE_COUNT - 1, loadedInstances - 1),START_INDEX_LEVEL_INSTANCES);
-    for (;i<endInstance;++i) instances[i] = instances[i + 1]; // Shift the entire list down, overwriting the entity we're deleting at starting i
+    for (;i<endInstance;++i) Sys_Global.instances[i] = Sys_Global.instances[i + 1]; // Shift the entire list down, overwriting the entity we're deleting at starting i
     --loadedInstances; // Shift final marker.  It's history!
 }
-
-// Name,AtkTyp1,2,3,Dmg1,2,3,Range1,2,3,Health,CybHealth,Percp,Disrp,Armr,Def,Movtyp,Yawspd,FOV,FOVAtk,FOVStartMov,DistToSeeBehind,SightRange,WalkSpd,RunSpd,AtkSpd1,2,3,AtkForce3,AtkRad3,TtPain,TbwPain,TtDead,TtActualAtk1,2,3,TbwAtk1,2,3,TEnemChg,TIdleSFXMin,TIdleSFXMax,TAtk1WaitMin,TAtk1WaitMax,TAtk1WaitChnc,TAtk2WaitMin,TAtk2WaitMax,TAtk2WaitChnc,TAtk3WaitMin,TAtk3WaitMax,TAtk3WaitChnc,ProjType1,2,3,ProjSpd1,2,3,HasLaser1,2,3,ExplodeOn3,PreActMeleCols,THunt,FlightHeight,FlightHeightIsPerc,SwitchMatOnDie,RangeHear,TTranq,Hops,NPCType,AtkProj1,2,3
-NPCTable npcTable[NUM_AI_TYPES] = {
- { "AUTOBOMB"              ,0,0,1,  0,  0,200, 0,0,2.4,50,0,1,0.5,40,1,1,300,180,120,55,3.84,50,2.5,2.5,0,0,0,100,6,0,0,0.1,0,0,0,0,0,0,3,5,12,0.5,1,0.1,1,3,0.5,0,0,0,0,0,0,0,0,0,0,0,0,1,0,20,0,0,0,10,3,0,2,0,0,0 },
- { "CYBORG ASSASSIN"       ,0,4,7, 30, 50, 35, 3.3,10,20,65,0,2,0.6,5,4,1,180,180,80,15,3.2,50,2,2,0,0,0,0,0,0.45,5,2.083,0,0.25,0.2,0.91,0.91,1.58,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,3,0,0,0,0,0,60,0,0,0,10,3,0,3,0,0,489 },
- { "AVIAN MUTANT"          ,1,0,0, 40, 40,  0, 3.3,10,20,125,0,1,0.25,0,2,2,180,180,80,15,5.12,50,2,2,3.5,0,0,0,0,2,5,1,0.1,0,0,1,0,0,3,5,12,0.5,1,0.1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,60,0.65,1,0,10,3,0,1,0,0,0 },
- { "EXEC-BOT"              ,0,4,0, 30, 35,  0, 3.3,10,20,225,0,1,0.2,40,2,1,200,180,15,30,4.12,50,1.5,1.5,0,0,0,0,0,0.45,7,0.15,0,0.2,0,0,1.5,0,3,5,12,0,0,0,0.97,2,0.3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,180,0,0,0,10,3,0,2,0,0,0 },
- { "CYBORG DRONE"          ,0,4,0, 20, 20, 20, 3.3,25,50,60,0,1,0.3,0,2,1,65,180,80,15,3.2,50,1.6,2.2,0,0,0,0,0,0.542,15,0.958,0,0.1,0,0,1,0,3,20,45,0,0,0,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,60,0,0,0,10,3,0,3,0,0,0 },
- { "CORTEX REAVER"         ,0,4,7, 80,325,125, 3.3,20,30,580,0,1,0.1,40,2,1,180,180,80,15,3.84,50,2,2,0,0,0,0,0,0.583,5,0.333,0,0.35244,0.324,0,1,1,3,15,30,0,0,0,0.2,1,0.5,8,15,1,0,0,0,0,0,10,0,0,0,0,0,600,0,0,0,10,3,0,2,0,0,372 },
- { "CYBORG WARRIOR"        ,0,4,7, 35, 35,150, 3.3,20,20,120,0,1,0.1,5,4,1,180,180,30,15,3.2,50,2.4,2.4,0,0,0,0,0,0.5,5,2.2,0,0.339,0.201,0,0.83,0.542,3,15,30,0,0,0,1,2,0.5,10,20,1,0,0,0,0,0,10,0,0,0,0,0,180,0,0,0,10,3,0,3,0,0,370 },
- { "CYBORG ENFORCER"       ,1,4,7, 60, 60, 80, 3.3,15,30,285,0,1,0.1,30,5,1,180,180,80,15,3.2,50,2.8,2.8,2.8,0,0.3,0,0,2,5,1.5,0.23471,0.393738,0.313266,0.958,0.958,0.958,5,15,30,0.1,0.3,0.1,0.1,0.5,0.5,10,25,1,0,0,0,0,0,10,0,0,0,0,0,600,0,0,0,10,3,0,4,0,0,387 },
- { "CYBORG ELITE GUARD"    ,1,7,4, 70, 75,  0, 3.3,10,50,380,0,1,0.05,50,6,1,180,180,80,15,3.2,50,3,3,1.5,0,0,0,0,0.4665,5,1.5,0.5,0.2653,0.117045,0.733,0.7,0.867,5,15,30,0.05,0.2,0.1,0.5,2,0.8,2,3,0.5,0,0,0,0,2,0,0,1,0,0,0,600,0,0,0,15,3,0,4,0,490,0 },
- { "CYBORG OF EDWARD DIEGO",1,7,0, 80, 95,  0, 3.3,40,50,900,0,2,0,55,6,1,180,180,80,15,3.2,50,2.8,2.8,0,0,0,0,0,0,0,0,0.28,0.363188,0.2,1.4,0.833,3,5,15,30,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,2.5,0,0,0,0,0,1,600,0,0,0,15,3,0,4,0,490,0 },
- { "SECURITY-1 ROBOT"      ,0,4,0, 35, 35,  0, 3.3,10,20,170,0,1,0.15,40,4,2,180,180,80,15,4.12,50,2.5,2.5,1.5,0,0,0,0,2,5,0.05,0.5,0.1,0.2,1.2,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,600,1.28,0,0,10,3,0,2,0,0,0 },
- { "SECURITY-2 ROBOT"      ,0,4,4, 65, 65, 15, 3.3,5,35,300,0,2,0.05,50,5,1,180,180,60,25,4.12,50,1.5,1.5,1.5,0,0,0,0,0.75,5,0.25,0.5,0.39,0.1,1.2,1,1.5,3,5,12,0.5,1,0.1,3,3.5,1,2.5,3.5,1,0,0,0,0,0,0,0,0,0,0,0,600,0,0,0,10,3,0,2,0,0,0 },
- { "MAINTENANCE ROBOT"     ,1,0,0, 25, 25,  0, 3.3,3.3,20,75,0,1,0.3,40,3,1,180,180,80,15,3.84,50,2.2,2.6,0.02,0.02,0,0,0,0,0,1.6,3,0.7,0.2,2,1.3,3,3,5,12,0.5,1,0.1,1,2,0.3,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,180,0,0,0,10,3,0,2,0,0,0 },
- { "MUTANT CYBORG"         ,1,7,0, 35, 75, 50, 2,30,49,340,0,1,0.2,15,6,1,180,180,60,15,3.2,50,1.5,1.5,0,0,0,0,0,0.583,3.5,3.41,0.265,0.285,0.2,0.625,0.75,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,2.8,0,0,0,0,0,0,180,0,0,0,10,3,0,5,0,491,0 },
- { "HOPPER"                ,0,4,0, 35, 35,  0, 0,17.92,17.92,150,0,1,0.25,35,4,1,180,160,80,15,3.84,50,7,7,0,0,0,0,0,0.708,5,0,0.5,0.1,0.5,0.5,0.5,0.5,3,5,12,0.5,1,0.1,0.5,1,0.5,1,2,0.5,0,0,0,0,0,0,0,1,0,0,0,180,0,0,0,10,3,1,2,0,0,0 },
- { "HUMANOID MUTANT"       ,1,0,0, 12, 12,  0, 3.3,10,20,50,0,0,0.4,0,3,1,60,180,80,15,2.56,50,1.4,2,0.5,0,0,0,0,0.42,5,0.967,0.5,0.1,0.2,1.2,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,20,0,0,0,10,3,0,0,0,0,0 },
- { "INVISIBLE MUTANT"      ,0,7,0, 10, 35,  0, 3.3,20,20,350,0,1,0.05,0,2,2,180,180,80,15,2.56,50,0.7,0.7,1.5,0.7,0.7,0,0,0.875,5,1.125,0.875,0.4,0.2,1.2,0.875,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,2,0,0,0,0,0,0,60,0.32,0,1,10,3,0,0,0,486,0 },
- { "VIRUS MUTANT"          ,0,7,0, 45, 30,  0, 3.3,20,20,140,0,0,0.1,0,3,1,180,180,80,15,2.56,50,2.5,2.5,2.5,0.3,0,0,0,0.542,3,1.792,0.2874,0.2874,0.2874,0.958,0.958,0.958,3,5,12,0.5,1,0.1,0.5,0,0.5,1,2,0.5,0,0,0,0,1.75,0,0,0,0,0,0,20,0,0,0,10,3,0,1,0,481,0 },
- { "SERV-BOT"              ,1,0,0,  8,  0,  0, 3.3,10,20,20,0,1,0.5,20,2,1,180,180,80,15,3.84,50,2,2,1.2,0,0,0,0,1.125,2,0.98,0.2,0.1,0.2,0.834,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,180,0,0,0,10,3,0,2,0,0,0 },
- { "FLIER BOT"             ,0,4,7, 30,150,  0, 3.3,35,40,75,0,1,0.3,30,2,2,180,180,80,15,5.12,50,1.5,1.5,1.5,0,0,0,0,1.375,5,0.6,0.1,0.1,0.2,1,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,10,12,1,0,0,0,0,0,10,0,0,0,0,0,180,0.85,1,0,10,3,0,2,0,0,404 },
- { "ZERO-G MUTANT"         ,0,7,0, 20, 20,  0, 3.3,20,20,90,0,1,0.5,0,2,2,180,180,80,15,2.56,50,0.8,1.4,0,0.8,0,0,0,0.1,0,0.1,0.5,0.05,0.2,1.2,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,2,0,0,0,0,0,0,60,1.96,0,0,10,3,0,0,0,488,0 },
- { "GORILLA TIGER MUTANT"  ,1,0,0, 60, 60,  0, 3.3,3.84,20,200,0,1,0.1,0,3,1,180,180,80,15,2.56,50,3,3.5,1,2,0,0,0,0.667,5,1.625,0.5,0.1,0.2,0.958,1.042,3,3,15,30,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,60,0,0,0,10,3,0,1,0,0,0 },
- { "REPAIR BOT"            ,0,4,0, 12, 12,  0, 3.3,3.3,20,65,0,1,0.4,25,3,1,180,180,80,15,3.84,50,2.25,3,0.5,0,0,0,0,0,0,0.05,0.2,0.1,0.2,1.25,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,180,0,0,0,10,3,0,2,0,0,0 },
- { "PLANT MUTANT"          ,0,7,0, 35, 25,  0, 3.3,20,20,115,0,1,0.3,0,1,1,180,180,80,15,2.56,50,0.8,1.2,0.1,0,0,0,0,0.375,2,2.208,0.89,0.82,0.2,1.91,1.027,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,3.5,0,0,0,0,0,0,20,0,0,0,10,3,0,0,0,487,0 },
- { "CYBER DOG"             ,0,7,0,  0, 25,  0, 0,20,0,0,20,1,0.5,0,1,4,250,240,50,15,20.48,25.6,2,2,0,0,0,0,0,0.1,0,0.5,0,0,0,0,0.3,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1.5,0,0,0,0,0,0,500,0.75,0,0,10,0,0,6,0,493,0 },
- { "CYBER GUARD"           ,0,7,0,  0, 25,  0, 0,20,0,0,35,1,0.4,0,1,4,250,240,50,15,20.48,25.6,2,2,0,0,0,0,0,0.1,0,0.5,0,0,0,0,0.2,0,2,998,999,0,0,0,0,0,0,0,0,0,0,0,0,0,0.8,0,0,0,0,0,0,500,0.75,0,0,10,0,0,6,0,493,0 },
- { "CYBER RAM"             ,0,7,0,  0, 35,  0, 0,20,0,0,40,1,0.25,0,1,4,80,240,50,15,20.48,25.6,4,4,0,0,0,0,0,0.1,0,0.5,0,0,0,0,0.2,0,2,998,999,0,0,0,0,0,0,0,0,0,0,0,0,0,1.2,0,0,0,0,0,0,500,0.75,0,0,10,0,0,6,0,494,0 },
- { "CYBER CORTEX REAVER"   ,0,7,0,  0, 45,  0, 0,20,0,0,80,1,0.1,0,1,4,80,240,50,15,20.48,25.6,4,4,0,0,0,0,0,0.1,0,0.5,0,0,0,0,0.2,0,2,998,999,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,500,0.75,0,0,10,0,0,6,0,494,0 },
- { "SHODAN"                ,0,7,0,  0, 55,  0, 0,20,0,0,500,2,0,0,1,4,360,280,280,15,20.48,25.6,0,0,0,0,0,0,0,0.1,0,0.5,0,0,0,0,0.05,0,2,998,999,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,500,0.75,0,0,10,0,0,6,0,494,0 }
-};
-
-//                             NPC Sounds       0,   1,   2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28
-int sfxIdle[NUM_AI_TYPES] =           {  -1,  -1,  -1, -1, 58, -1, 59, -1, 59, 52, -1, -1, -1, -1, -1, -1,121, -1, -1, -1,121,118, -1, -1, -1, -1, -1, -1, -1};
-int sfxSightSound[NUM_AI_TYPES] =     {  -1,  -1, 111,150, 58,150, 59,152,152, -1,150,150,151,152,150, -1,121, -1,151,150,121,119,151, -1, -1, -1, -1, -1, -1};
-int sfxAttack1[NUM_AI_TYPES] =        {  -1,  -1, 108, -1, -1,146, -1,146,252,247, -1, -1, -1, -1, -1,122, -1,108,146, -1, -1,118, -1,125,258,258,258,258,258};
-int sfxAttack2[NUM_AI_TYPES] =        {  -1, 256,  -1,148, 50, 50, 50, 50, 50,250, 50, 50,146,259,148, -1,121, -1, -1,147, -1, -1,146, -1,258,258,258,258,258};
-int sfxAttack3[NUM_AI_TYPES] =        {  -1,  -1,  -1, -1, -1,244,244,244,245, -1, -1,149, -1, -1, -1, -1, -1, -1, -1,244, -1, -1, -1, -1,258,258,258,258,258};
-int sfxDeath[NUM_AI_TYPES] =          {  -1,  48, 110,143, 48,145, 48, 51, 47, 47,142,143,144, 47,162,123,120,134,144,144,120,117,144,124, -1, -1, -1, -1, -1};
-float deathBurstTimer[NUM_AI_TYPES] = {0.0f,0.0f, 0.1f,0.0f,0.1f,0.1f,0.2f,0.1f,0.1f,0.1f,0.0f,0.45f,0.75f,0.1f,0.0f,0.0f,0.1f,0.224f,0.9f,0.0f,0.1f,0.1f,0.1f,0.2f,0.1f,0.1f,0.1f,0.1f,0.1f};
 
 void CopyInstanceRegion(uint16_t head, uint16_t* instanceTypeArray, Entity* tempInstances, uint16_t* targetIndex, uint16_t nextRegionStart) {
     for (uint16_t modelIdx = 0; modelIdx < MODEL_IDX_MAX; modelIdx++) {
@@ -202,7 +129,7 @@ void CopyInstanceRegion(uint16_t head, uint16_t* instanceTypeArray, Entity* temp
             if (tempInstances[i].modelIndex == modelIdx) {
                 if (*targetIndex >= nextRegionStart) { DualLogError("Instance overflow at modelIdx %u, index %u, targetIdx %u\n", modelIdx, i, *targetIndex); OS_Exit(1); }
                 
-                instances[*targetIndex] = tempInstances[i];
+                Sys_Global.instances[*targetIndex] = tempInstances[i];
                 (*targetIndex) += 1;
             }
         }
@@ -220,7 +147,7 @@ void LoadLevel(uint8_t curlevel) {
     Sys_Global.levelCurrentlyLoading = true;
     queuedLevelToLoad = 255u; // Reset any loading state that got us here.
     RenderLoadingProgress(100,"Loading level...");
-    if (!Sys_Global.levelCurrentlyLoading) SetMemoryToValueForNBytes(instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
+    if (!Sys_Global.levelCurrentlyLoading) SetMemoryToValueForNBytes(Sys_Global.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
     Sys_Global.levelCurrentlyLoading = true;
     Sys_Global.currentLevel = curlevel;
     loadedInstances = 3; // 0 == NULL, 1 == Player1, 2 == Player2
@@ -263,7 +190,7 @@ void LoadLevel(uint8_t curlevel) {
     SetMemoryToValueForNBytes(intervalStepisLerping,0,LIGHT_COUNT * 30 * sizeof(float));
     if (curlevel >= Sys_Global.numLevels) { DualLogError("Cannot load world geometry, level number %d out of bounds 0 to %d\n", curlevel, Sys_Global.numLevels - 1); OS_Exit(1); }
     
-    for (uint16_t idx = START_INDEX_LEVEL_INSTANCES;idx<INSTANCE_COUNT;idx++) { InitializeEntity(&instances[idx]); dirtyInstances[idx] = true; } // Start AFTER player indices and NULLENT
+    for (uint16_t idx = START_INDEX_LEVEL_INSTANCES;idx<INSTANCE_COUNT;idx++) { InitializeEntity(&Sys_Global.instances[idx]); dirtyInstances[idx] = true; } // Start AFTER player indices and NULLENT
     SetMemoryToValueForNBytes(modelMatrices, 0, INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
     char filename[20]; // Minimum size for 0 through 13.
     StringFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel);
@@ -410,25 +337,25 @@ void LoadLevel(uint8_t curlevel) {
                 else if (StringsAreEqual(trimmed_key,"minIntensity"))    lightMinIntensity[lightsIdx] = parse_float(trimmed_value, initialLine, lineNum);
                 else if (StringsAreEqual(trimmed_key,"maxIntensity"))    lightMaxIntensity[lightsIdx] = parse_float(trimmed_value, initialLine, lineNum);
             } else {
-                     if (StringsAreEqual(trimmed_key,"constIndex"))      instances[instanceIdx].index = parse_numberu16(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"localPosition.x")) instances[instanceIdx].position.x = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"localPosition.y")) instances[instanceIdx].position.y = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"localPosition.z")) instances[instanceIdx].position.z = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"localRotation.x")) instances[instanceIdx].rotation.x = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"localRotation.y")) instances[instanceIdx].rotation.y = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"localRotation.z")) instances[instanceIdx].rotation.z = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"localRotation.w")) instances[instanceIdx].rotation.w = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"localScale.x"))    instances[instanceIdx].scale.x = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"localScale.y"))    instances[instanceIdx].scale.y = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"localScale.z"))    instances[instanceIdx].scale.z = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"go.activeSelf")) { activeStateRead = true ; flag_set(&instances[instanceIdx].entflags, ENTFLAG_ACTIVE, parse_bool(trimmed_value, initialLine, lineNum)); }
-                else if (StringsAreEqual(trimmed_key,"requireReset"))    flag_set(&instances[instanceIdx].entflags, ENTFLAG_REQUIRE_RESET, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"amount"))          instances[instanceIdx].amount = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"resetTime"))       instances[instanceIdx].resetTime = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"minSecurityLevel"))instances[instanceIdx].minSecurityLevel = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"damageOnUse"))     flag_set(&instances[instanceIdx].entflags, ENTFLAG_DAMAGE_ON_USE, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"target"))          StringCopyInto_A_From_B(instances[instanceIdx].target,trimmed_value,TARGET_STRING_LENGTH);
-                else if (StringsAreEqual(trimmed_key,"targetname"))      StringCopyInto_A_From_B(instances[instanceIdx].targetname,trimmed_value,TARGET_STRING_LENGTH);
+                     if (StringsAreEqual(trimmed_key,"constIndex"))      Sys_Global.instances[instanceIdx].index = parse_numberu16(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"localPosition.x")) Sys_Global.instances[instanceIdx].position.x = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"localPosition.y")) Sys_Global.instances[instanceIdx].position.y = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"localPosition.z")) Sys_Global.instances[instanceIdx].position.z = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"localRotation.x")) Sys_Global.instances[instanceIdx].rotation.x = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"localRotation.y")) Sys_Global.instances[instanceIdx].rotation.y = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"localRotation.z")) Sys_Global.instances[instanceIdx].rotation.z = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"localRotation.w")) Sys_Global.instances[instanceIdx].rotation.w = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"localScale.x"))    Sys_Global.instances[instanceIdx].scale.x = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"localScale.y"))    Sys_Global.instances[instanceIdx].scale.y = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"localScale.z"))    Sys_Global.instances[instanceIdx].scale.z = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"go.activeSelf")) { activeStateRead = true ; flag_set(&Sys_Global.instances[instanceIdx].entflags, ENTFLAG_ACTIVE, parse_bool(trimmed_value, initialLine, lineNum)); }
+                else if (StringsAreEqual(trimmed_key,"requireReset"))    flag_set(&Sys_Global.instances[instanceIdx].entflags, ENTFLAG_REQUIRE_RESET, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"amount"))          Sys_Global.instances[instanceIdx].amount = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"resetTime"))       Sys_Global.instances[instanceIdx].resetTime = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"minSecurityLevel"))Sys_Global.instances[instanceIdx].minSecurityLevel = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"damageOnUse"))     flag_set(&Sys_Global.instances[instanceIdx].entflags, ENTFLAG_DAMAGE_ON_USE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"target"))          StringCopyInto_A_From_B(Sys_Global.instances[instanceIdx].target,trimmed_value,TARGET_STRING_LENGTH);
+                else if (StringsAreEqual(trimmed_key,"targetname"))      StringCopyInto_A_From_B(Sys_Global.instances[instanceIdx].targetname,trimmed_value,TARGET_STRING_LENGTH);
             }
         }
         
@@ -455,20 +382,20 @@ void LoadLevel(uint8_t curlevel) {
             }
         } else {
             uint16_t parent = instanceIdx; // Needed as adding children moves the instanceIdx.
-            uint16_t entIdx = instances[parent].index;
-//             if (instances[parent].index == 766) {
+            uint16_t entIdx = Sys_Global.instances[parent].index;
+//             if (Sys_Global.instances[parent].index == 766) {
 //                 editModeSelection = parent;
-//                 flag_set(&instances[editModeSelection].entflags,ENTFLAG_ACTIVE,true);
-//                 //instances[editModeSelection].scale = (Vector3){1.0f,1.0f,1.0f};
+//                 flag_set(&Sys_Global.instances[editModeSelection].entflags,ENTFLAG_ACTIVE,true);
+//                 //Sys_Global.instances[editModeSelection].scale = (Vector3){1.0f,1.0f,1.0f};
 //             }
             AddInstance(entIdx, parent);
-            if (!activeStateRead) flag_set(&instances[parent].entflags, ENTFLAG_ACTIVE, true);
+            if (!activeStateRead) flag_set(&Sys_Global.instances[parent].entflags, ENTFLAG_ACTIVE, true);
             if (EntityIndexIsPortalBlockingDoor(entIdx)) {
                 float nudgeAmount = entIdx == 499 || entIdx == 509 ? 3.84f : 0.32f; // Bulkhead and giant elevator door need to nudge further to be sure.
-                instances[parent].portalIndex = numActivePortals;
-                bool isOpen = (instances[parent].doorState != DoorState_Closed); // Allows for any of DoorState_Open, DoorState_Opening, or DoorState_Closing to be considered open as far as portals are concerned so we can draw objects between the door panels.
-                float obj_x = instances[parent].position.x;
-                float obj_z = instances[parent].position.z;
+                Sys_Global.instances[parent].portalIndex = numActivePortals;
+                bool isOpen = (Sys_Global.instances[parent].doorState != DoorState_Closed); // Allows for any of DoorState_Open, DoorState_Opening, or DoorState_Closing to be considered open as far as portals are concerned so we can draw objects between the door panels.
+                float obj_x = Sys_Global.instances[parent].position.x;
+                float obj_z = Sys_Global.instances[parent].position.z;
                 uint16_t cellIndexCurrentX = PosGetCellCoordX(obj_x);
                 uint16_t cellIndexCurrentZ = PosGetCellCoordZ(obj_z);
                 uint16_t cellCurrent = (cellIndexCurrentZ * WORLDX) + cellIndexCurrentX;
@@ -500,17 +427,17 @@ void LoadLevel(uint8_t curlevel) {
             }
             
             for (int i=0;i<MAX_CHILD_COUNT;++i) {
-                if (instances[parent].child[i] < entityCount) {
+                if (Sys_Global.instances[parent].child[i] < entityCount) {
                     if (entities[entIdx].child[i] != UINT16_MAX) { // Add child
                         instanceIdx++; // Increment head of the list an extra time for the child entity.
                         AddInstance(entities[entIdx].child[i], instanceIdx);
-                        instances[instanceIdx].index = entities[entIdx].child[i];
-                        instances[instanceIdx].position.x = instances[parent].position.x + entities[entIdx].child_offset[i].x;
-                        instances[instanceIdx].position.y = instances[parent].position.y + entities[entIdx].child_offset[i].y;
-                        instances[instanceIdx].position.z = instances[parent].position.z + entities[entIdx].child_offset[i].z;
-                        instances[instanceIdx].scale.x = instances[parent].scale.x * entities[entIdx].child_scale[i].x;
-                        instances[instanceIdx].scale.y = instances[parent].scale.y * entities[entIdx].child_scale[i].y;
-                        instances[instanceIdx].scale.z = instances[parent].scale.z * entities[entIdx].child_scale[i].z;
+                        Sys_Global.instances[instanceIdx].index = entities[entIdx].child[i];
+                        Sys_Global.instances[instanceIdx].position.x = Sys_Global.instances[parent].position.x + entities[entIdx].child_offset[i].x;
+                        Sys_Global.instances[instanceIdx].position.y = Sys_Global.instances[parent].position.y + entities[entIdx].child_offset[i].y;
+                        Sys_Global.instances[instanceIdx].position.z = Sys_Global.instances[parent].position.z + entities[entIdx].child_offset[i].z;
+                        Sys_Global.instances[instanceIdx].scale.x = Sys_Global.instances[parent].scale.x * entities[entIdx].child_scale[i].x;
+                        Sys_Global.instances[instanceIdx].scale.y = Sys_Global.instances[parent].scale.y * entities[entIdx].child_scale[i].y;
+                        Sys_Global.instances[instanceIdx].scale.z = Sys_Global.instances[parent].scale.z * entities[entIdx].child_scale[i].z;
                     }
                 }
             }
@@ -523,20 +450,20 @@ void LoadLevel(uint8_t curlevel) {
     if (curlevel == 1 || curlevel == 2 || curlevel == 5 || curlevel == 6 || curlevel == 7) {
         instanceIdx++;
         AddInstance(754, instanceIdx);
-        instances[instanceIdx].position = (Vector3){ -51.30664f, -47.42f, 56.42651f };
-        instances[instanceIdx].rotation = (Quaternion){ 0.0f, 0.0f, 0.0f, 1.0f }; // -90 0 45
+        Sys_Global.instances[instanceIdx].position = (Vector3){ -51.30664f, -47.42f, 56.42651f };
+        Sys_Global.instances[instanceIdx].rotation = (Quaternion){ 0.0f, 0.0f, 0.0f, 1.0f }; // -90 0 45
         instanceIdx++;
         AddInstance(754, instanceIdx);
-        instances[instanceIdx].position = (Vector3){ 71.5f, -47.42f, -66.6f };
-        instances[instanceIdx].rotation = (Quaternion){ 0.0f, 0.0f, 0.0f, 1.0f }; // -90 180 45
+        Sys_Global.instances[instanceIdx].position = (Vector3){ 71.5f, -47.42f, -66.6f };
+        Sys_Global.instances[instanceIdx].rotation = (Quaternion){ 0.0f, 0.0f, 0.0f, 1.0f }; // -90 180 45
         instanceIdx++;
         AddInstance(754, instanceIdx);
-        instances[instanceIdx].position = (Vector3){ -51.306650f, -47.42f, -66.66652f };
-        instances[instanceIdx].rotation = (Quaternion){ 0.0f, 0.0f, 0.0f, 1.0f }; // -90 0 -45
+        Sys_Global.instances[instanceIdx].position = (Vector3){ -51.306650f, -47.42f, -66.66652f };
+        Sys_Global.instances[instanceIdx].rotation = (Quaternion){ 0.0f, 0.0f, 0.0f, 1.0f }; // -90 0 -45
         instanceIdx++;
         AddInstance(754, instanceIdx);
-        instances[instanceIdx].position = (Vector3){ 71.78664f, -47.42f, 56.42651f };
-        instances[instanceIdx].rotation = (Quaternion){ 0.0f, 0.0f, 0.0f, 1.0f }; // -90 180 -45
+        Sys_Global.instances[instanceIdx].position = (Vector3){ 71.78664f, -47.42f, 56.42651f };
+        Sys_Global.instances[instanceIdx].rotation = (Quaternion){ 0.0f, 0.0f, 0.0f, 1.0f }; // -90 180 -45
         instanceIdx++;
     }
         
@@ -556,7 +483,7 @@ void LoadLevel(uint8_t curlevel) {
     lights[litIdx + LIGHT_DATA_OFFSET_R] = 1.0f;
     lights[litIdx + LIGHT_DATA_OFFSET_G] = 1.0f;
     lights[litIdx + LIGHT_DATA_OFFSET_B] = 1.0f;
-    lanternPos = instances[PLAYER1].position;
+    lanternPos = Sys_Global.instances[PLAYER1].position;
     lights[litIdx + LIGHT_DATA_OFFSET_POSX] = lanternPos.x;
     lights[litIdx + LIGHT_DATA_OFFSET_POSY] = lanternPos.y;
     lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = lanternPos.z;
@@ -582,7 +509,6 @@ void LoadLevel(uint8_t curlevel) {
     }
 
     fogBaseDensityForLevel *= 3.8f; // Global modifier to tweak it.
-    SetFog();
     DualLog("Loaded %d entities, %u static lights, %u doors for Level %d... took %f secs\n", loadedInstances, loadedLights, numActivePortals, curlevel, get_time() - start_time);
     DebugRAM("end of LoadLevel instances");
     RenderLoadingProgress(110,"Loading models...");

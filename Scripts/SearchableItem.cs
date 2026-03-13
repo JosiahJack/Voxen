@@ -26,7 +26,7 @@ public class SearchableItem : MonoBehaviour {
 				tempInt = random_range(0,100); // generate even distribution random value from 0 to 100, e.g. 35
 				if (randomItemDropChance[i] <= 0) continue; // next!
 				if (tempInt <= randomItemDropChance[i]) {
-					contents[numRandomGeneratedItems] = randomItem[i]; // ok item is now present
+					contEng_Global->instances[numRandomGeneratedItems] = randomItem[i]; // ok item is now present
 					numRandomGeneratedItems++;
 					if (numRandomGeneratedItems>maxRandomItems) break; // all done we have all our contents
 				}
@@ -38,10 +38,10 @@ public class SearchableItem : MonoBehaviour {
 	public void ResetSearchable(bool wipeContents) {
 		searchableInUse = false;
 		if (wipeContents) {
-			contents[0] = -1;
-			contents[1] = -1;
-			contents[2] = -1;
-			contents[3] = -1;
+			contEng_Global->instances[0] = -1;
+			contEng_Global->instances[1] = -1;
+			contEng_Global->instances[2] = -1;
+			contEng_Global->instances[3] = -1;
 			customIndex[0] = -1;
 			customIndex[1] = -1;
 			customIndex[2] = -1;
@@ -64,13 +64,13 @@ public class SearchableItem : MonoBehaviour {
 		s1.Append(Utils.splitChar);
 		s1.Append(Utils.BoolToString(se.generationDone,"generationDone"));
 		s1.Append(Utils.splitChar);
-		s1.Append(Utils.UintToString(se.contents[0],"contents[0]")); // int main lookup index
+		s1.Append(Utils.UintToString(se.contEng_Global->instances[0],"contEng_Global->instances[0]")); // int main lookup index
 		s1.Append(Utils.splitChar);
-		s1.Append(Utils.UintToString(se.contents[1],"contents[1]")); // int main lookup index
+		s1.Append(Utils.UintToString(se.contEng_Global->instances[1],"contEng_Global->instances[1]")); // int main lookup index
 		s1.Append(Utils.splitChar);
-		s1.Append(Utils.UintToString(se.contents[2],"contents[2]")); // int main lookup index
+		s1.Append(Utils.UintToString(se.contEng_Global->instances[2],"contEng_Global->instances[2]")); // int main lookup index
 		s1.Append(Utils.splitChar);
-		s1.Append(Utils.UintToString(se.contents[3],"contents[3]")); // int main lookup index
+		s1.Append(Utils.UintToString(se.contEng_Global->instances[3],"contEng_Global->instances[3]")); // int main lookup index
 		s1.Append(Utils.splitChar);
 		s1.Append(Utils.UintToString(se.customIndex[0],"customIndex[0]")); // int custom index
 		s1.Append(Utils.splitChar);
@@ -138,10 +138,10 @@ public class SearchableItem : MonoBehaviour {
 		se.maxRandomItems = Utils.GetIntFromString(entries[index],"maxRandomItems"); index++;
 		se.generateContents = Utils.GetBoolFromString(entries[index],"generateContents"); index++;
 		se.generationDone = Utils.GetBoolFromString(entries[index],"generationDone"); index++;
-		se.contents[0] = Utils.GetIntFromString(entries[index],"contents[0]"); index++; // int main lookup index
-		se.contents[1] = Utils.GetIntFromString(entries[index],"contents[1]"); index++; // int main lookup index
-		se.contents[2] = Utils.GetIntFromString(entries[index],"contents[2]"); index++; // int main lookup index
-		se.contents[3] = Utils.GetIntFromString(entries[index],"contents[3]"); index++; // int main lookup index
+		se.contEng_Global->instances[0] = Utils.GetIntFromString(entries[index],"contEng_Global->instances[0]"); index++; // int main lookup index
+		se.contEng_Global->instances[1] = Utils.GetIntFromString(entries[index],"contEng_Global->instances[1]"); index++; // int main lookup index
+		se.contEng_Global->instances[2] = Utils.GetIntFromString(entries[index],"contEng_Global->instances[2]"); index++; // int main lookup index
+		se.contEng_Global->instances[3] = Utils.GetIntFromString(entries[index],"contEng_Global->instances[3]"); index++; // int main lookup index
 		se.customIndex[0] = Utils.GetIntFromString(entries[index],"customIndex[0]"); index++; // int custom index
 		se.customIndex[1] = Utils.GetIntFromString(entries[index],"customIndex[1]"); index++; // int custom index
 		se.customIndex[2] = Utils.GetIntFromString(entries[index],"customIndex[2]"); index++; // int custom index
@@ -172,7 +172,7 @@ public class SearchableItem : MonoBehaviour {
 			int numberFoundContents = 0;
 			for (int i=3;i>=0;i--) {
 				// If something was found, add 1 to count.
-				if (se.contents[i] > -1) numberFoundContents++;
+				if (se.contEng_Global->instances[i] > -1) numberFoundContents++;
 			}
 
 			if (Sys_UI.tetheredSearchable != se) {
@@ -182,7 +182,7 @@ public class SearchableItem : MonoBehaviour {
 				}
 			}
 			Sys_UI.tetheredSearchable = se;
-			Sys_UI.objectInUsePos = se.gameObject.instances[i].position;
+			Sys_UI.objectInUsePos = se.gameObject.Eng_Global->instances[i].position;
 			Sys_UI.usingObject = true;
 		}
 		return index;

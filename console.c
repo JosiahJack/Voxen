@@ -88,9 +88,61 @@ static void cmd_noclip(void) {
     Sys_Cheats.noclip = !Sys_Cheats.noclip;
     if (Sys_Cheats.noclip) {
         CenterStatusPrint("noclip: %s", Sys_Text.stringTable[1000]); // "ACTIVATED"
-        instances[PLAYER1].velocity = (Vector3){ 0.0f, 0.0f, 0.0f };
+        Sys_Global.instances[PLAYER1].velocity = (Vector3){ 0.0f, 0.0f, 0.0f };
     } else CenterStatusPrint("noclip: %s", Sys_Text.stringTable[717]); // "DISABLED"
 }
+
+void EnableCheatArsenal(uint8_t level) {
+    switch(level) {
+        default: break;
+    }
+}
+
+uint16_t SpawnDynamicObject(int val, bool cheat) {
+    if (!ConstIndexInBounds(val)) { DualLogError("Const index out of bounds: %u", val); return NULLENT; } // Checked in cmd_summon but used elsewhere so guard here too.
+    
+    if (cheat) DualLog("Cheat spawn constIndex %u, level: %u, from cheat: %u, name: ", val, Sys_Global.currentLevel, cheat);
+//     Vector3 spawnPos = (Vector3){0.0,0.0,0.0};
+//     if (cheat) spawnPos = (Vector3){Sys_Global.instances[PLAYER1].position.x,Sys_Global.instances[PLAYER1].position.y,Sys_Global.instances[PLAYER1].position.z};
+    if (ConstIndexIsGeometry(val)/* && !Sys_Cheats.editMode*/) { CenterStatusPrint("Indices 0 through 306 (level geometry chunks) not possible when not on edit mode!"); return NULLENT; }
+    
+    uint16_t entityIndexInInstanceTable = NULLENT;//MonoBehaviour.Instantiate(Const.a.GetPrefab(val),spawnPos, Const.a.quaternionIdentity) as Entity;
+    if (cheat && ConstIndexIsHardware(val)) { // Hardware
+//         UseableObjectUse uo = go.GetComponent<UseableObjectUse>();
+//         int dex14 = hardware14fromConstdex(uo.useableItemIndex);
+//         if (inventoryPlayer1.hasHardware[dex14]) uo.customIndex = (inventoryPlayer1.hardwareVersion[dex14] + 1);
+    }
+
+    return entityIndexInInstanceTable;
+}
+
+void cmd_kill(void) {
+    CenterStatusPrint("%s", Sys_Text.stringTable[1011]); // "Player decides to become a cyborg."
+    // TakeDamage(...)
+}
+
+void cmd_undo(void) {
+    if (Sys_Cheats.editMode) {
+        // Utils.SafeDestroy(lastSpawnedGO); lastSpawnedGO = NULL;
+        CenterStatusPrint("Last spawned object removed");
+    } else {
+        CenterStatusPrint("Cannot undo when not in Edit Mode");
+    }
+}
+
+void ScreenShake(float force, double duration) {
+    Sys_Global.shakeFinished = Sys_Global.pauseRelativeTime + duration;
+    float shakeForce = (force < 0.48f) ? force : 0.48f;
+    (void)shakeForce;
+    // TODO actually shake
+}
+
+void Shake(float force) {
+    float forc = (force <= 0.0f) ? 1.0f : force;
+    ScreenShake(forc,1.0); // The whole station is a shakin' and a movin'!
+}
+
+void cmd_shake(void) { Shake(-1); CenterStatusPrint("SHAKIN LIKE A LEAF!"); }
 
 static void cmd_edit(void) {
     Sys_Cheats.editMode = !Sys_Cheats.editMode;
@@ -169,7 +221,7 @@ static void cmd_loadlevel(const char* arg) {
         CenterStatusPrint("Loading level %u", level);
         queuedLevelToLoad = level;
         LoadLevel(level);
-        instances[PLAYER1].position = level == LEVEL_CYBERSPACE ? cyberSpaceEntryLocations[1] : ressurectionLocations[level];
+        Sys_Global.instances[PLAYER1].position = level == LEVEL_CYBERSPACE ? cyberSpaceEntryLocations[1] : ressurectionLocations[level];
     }
 }
 
@@ -281,7 +333,7 @@ static void cmd_staminup(void) {
     Sys_Cheats.fatigueCheat = !Sys_Cheats.fatigueCheat;
     if (Sys_Cheats.fatigueCheat) {
         CenterStatusPrint("Stamin-Up! %s", Sys_Text.stringTable[1013]);
-        instances[PLAYER1].fatigue = 0.0f;
+        Sys_Global.instances[PLAYER1].fatigue = 0.0f;
     } else {
         CenterStatusPrint("%s", Sys_Text.stringTable[1012]);
     }

@@ -21,7 +21,7 @@ public class SecurityCameraRotate : MonoBehaviour {
 	private static StringBuilder s1 = new StringBuilder();
 
 	void Start () {
-		waitingFinished = Sys_Global.pauseRelativeTime;
+		waitingFinished = Eng_Global->pauseRelativeTime;
 		rotatePositive = true;
 		if (this.enabled) active = true;
 		else active = false;
@@ -32,7 +32,7 @@ public class SecurityCameraRotate : MonoBehaviour {
 	}
 
 	void Update() {
-		if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
+		if (!Eng_Global->gamePaused && !Eng_Global->menuActive) {
 			if (mR != null) {
 				if (!mR.isVisible || !mR.enabled) return;
 			} else {
@@ -40,7 +40,7 @@ public class SecurityCameraRotate : MonoBehaviour {
 				return;
 			}
 
-			if (waitingFinished < Sys_Global.pauseRelativeTime) {
+			if (waitingFinished < Eng_Global->pauseRelativeTime) {
 				if (rotatePositive) RotatePositive();
 				else                RotateNegative();
 			}
@@ -48,10 +48,10 @@ public class SecurityCameraRotate : MonoBehaviour {
 	}
 
 	void RotatePositive () {
-		if (((instances[i].rotation.eulerAngles.y + 1f) >= endYAngle)
-			&& ((instances[i].rotation.eulerAngles.y - 1f) <= endYAngle)) {
+		if (((Eng_Global->instances[i].rotation.eulerAngles.y + 1f) >= endYAngle)
+			&& ((Eng_Global->instances[i].rotation.eulerAngles.y - 1f) <= endYAngle)) {
 			rotatePositive = false;
-			waitingFinished = Sys_Global.pauseRelativeTime + waitTime;
+			waitingFinished = Eng_Global->pauseRelativeTime + waitTime;
 			return;
 		}
 		
@@ -60,10 +60,10 @@ public class SecurityCameraRotate : MonoBehaviour {
 	}
 
 	void RotateNegative () {
-		if (((instances[i].rotation.eulerAngles.y + 1f) >= startYAngle)
-			&& ((instances[i].rotation.eulerAngles.y - 1f) <= startYAngle)) {
+		if (((Eng_Global->instances[i].rotation.eulerAngles.y + 1f) >= startYAngle)
+			&& ((Eng_Global->instances[i].rotation.eulerAngles.y - 1f) <= startYAngle)) {
 			rotatePositive = true;
-			waitingFinished = Sys_Global.pauseRelativeTime + waitTime;
+			waitingFinished = Eng_Global->pauseRelativeTime + waitTime;
 			return;
 		}
 		

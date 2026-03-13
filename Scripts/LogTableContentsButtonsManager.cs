@@ -6,7 +6,7 @@ public class LogTableContentsButtonsManager : MonoBehaviour {
 	public GameObject[] LogButtons;
 
 	void Update() {
-		if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
+		if (!Eng_Global->gamePaused && !Eng_Global->menuActive) {
 			for (int i=0; i<10; i++) {
 				// Only show category buttons for levels we have logs from
 				if (inventoryPlayer1.numLogsFromLevel[i] > 0) {

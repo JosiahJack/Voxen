@@ -55,7 +55,7 @@ public class Door : MonoBehaviour {
 		}
 		
 		SFX = GetComponent<AudioSource>();		
-		useFinished = Sys_Global.pauseRelativeTime;
+		useFinished = Eng_Global->pauseRelativeTime;
 		if (startOpen) {
 			stayOpen = true;
 			OpenDoor();
@@ -88,7 +88,7 @@ public class Door : MonoBehaviour {
 			delayFrame = true;
 		} else if (doorOpen == DoorState_Closing) {
 			doorOpen = DoorState_Opening;
-			waitBeforeClose = Sys_Global.pauseRelativeTime + delay;
+			waitBeforeClose = Eng_Global->pauseRelativeTime + delay;
 			anim.Play(openClipName,0,topTime - animatorPlaybackTime);
 			Utils.PlayOneShotSavable(SFX,sounds[SFXIndex]);
 			delayFrame = true;
@@ -138,7 +138,7 @@ public class Door : MonoBehaviour {
 		if (anim == null) anim = GetComponent<Animator>();
 		if (anim != null) anim.speed = defaultSpeed;
 		doorOpen = DoorState_Opening;
-		waitBeforeClose = Sys_Global.pauseRelativeTime + delay;
+		waitBeforeClose = Eng_Global->pauseRelativeTime + delay;
 		if (anim != null) anim.Play(openClipName,0,0f);
 		Utils.PlayOneShotSavable(SFX,sounds[SFXIndex]);
 		SetCollisionLayer(19); // InterDebris
@@ -158,8 +158,8 @@ public class Door : MonoBehaviour {
 		GameObject childGO;
 		for (i=0;i<dynamicObjectsContainer.transform.childCount;i++) {
 			childGO = dynamicObjectsContainer.transform.GetChild(i).gameObject;
-			objPos = childGO.instances[i].position;
-			if (distance_vector3(instances[i].position,objPos) < 5) {
+			objPos = childGO.Eng_Global->instances[i].position;
+			if (distance_vector3(Eng_Global->instances[i].position,objPos) < 5) {
 				Rigidbody childRbody = childGO.GetComponent<Rigidbody>();
 				if (childRbody != null) childRbody.WakeUp(); // No ghosting!
 			}
@@ -196,8 +196,8 @@ public class Door : MonoBehaviour {
 	}
 
 	void Update() {
-		if (Sys_Global.gamePaused) { anim.speed = speedZero; return; }
-		if (Sys_Global.menuActive) { anim.speed = speedZero; return; }
+		if (Eng_Global->gamePaused) { anim.speed = speedZero; return; }
+		if (Eng_Global->menuActive) { anim.speed = speedZero; return; }
 		if (firstUpdateAfterLoad) { SetAnimAfterLoad(); return; }
 		if (ajar) { SetAjar(); return; }
 			
@@ -216,7 +216,7 @@ public class Door : MonoBehaviour {
 			}
 		}
 
-		if (Sys_Global.pauseRelativeTime > waitBeforeClose) {
+		if (Eng_Global->pauseRelativeTime > waitBeforeClose) {
 			if ((doorOpen == DoorState_Open) && (!stayOpen) && (!startOpen) && !delayFrame) {
 				DualLog("Close Door, stayOpen: " + stayOpen.ToString());
 				CloseDoor();

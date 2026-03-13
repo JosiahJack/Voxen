@@ -18,7 +18,7 @@ public class TextureStaticNoise : MonoBehaviour {
 		texture.name = "ProceduralStatic";
 		GetComponent<MeshRenderer>().material.mainTexture = texture;
 		FillTexture();
-		updateTime = Sys_Global.pauseRelativeTime + interval;
+		updateTime = Eng_Global->pauseRelativeTime + interval;
 	}
 
 	void FillTexture () {
@@ -33,9 +33,9 @@ public class TextureStaticNoise : MonoBehaviour {
 	}
 
 	void Update() {
-		if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
-			if (updateTime < Sys_Global.pauseRelativeTime) {
-				updateTime = (Sys_Global.pauseRelativeTime + interval);
+		if (!Eng_Global->gamePaused && !Eng_Global->menuActive) {
+			if (updateTime < Eng_Global->pauseRelativeTime) {
+				updateTime = (Eng_Global->pauseRelativeTime + interval);
 				FillTexture();
 			}
 		}

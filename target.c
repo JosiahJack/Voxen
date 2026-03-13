@@ -4,17 +4,17 @@ void ButtonSwitchTargetted(UseData ud) {
 }
 
 void DoorTargetted (uint16_t doorIdx, UseData ud) {
-    if (instances[doorIdx].locked) {
-        instances[doorIdx].locked = false;
+    if (Eng_Global->instances[doorIdx].locked) {
+        Eng_Global->instances[doorIdx].locked = false;
 //         NotifyDoorUnlock(this); // TODO
     }
 
-    if (!instances[doorIdx].targettingOnlyUnlocks) DoorUse(ud);
+    if (!Eng_Global->instances[doorIdx].targettingOnlyUnlocks) DoorUse(ud);
 }
 
 void FlipTrackSwitch(uint16_t i) { // Swap targets
-    instances[i].currenttarget = instances[i].onSecond) ? instances[i].target : instances[i].target2;
-    instances[i].onSecond = !instances[i].onSecond;
+    Eng_Global->instances[i].currenttarget = Eng_Global->instances[i].onSecond) ? Eng_Global->instances[i].target : Eng_Global->instances[i].target2;
+    Eng_Global->instances[i].onSecond = !Eng_Global->instances[i].onSecond;
 }
 
 void LogicBranchRunTargets(UseData ud, uint16_t i) {
@@ -25,9 +25,9 @@ void LogicBranchRunTargets(UseData ud, uint16_t i) {
 }
 
 void LogicBranchTargetted (UseData ud, uint16_t i) {
-    if (!(instances[i].entflags & ENTFLAG_ENABLED)) return;
+    if (!(Eng_Global->instances[i].entflags & ENTFLAG_ENABLED)) return;
 
-    if (instances[i].delay <=0.0f) {
+    if (Eng_Global->instances[i].delay <=0.0f) {
         LogicBranchRunTargets(ud);
     } else {
         StartCoroutine(DelayedTarget(ud));
@@ -43,7 +43,7 @@ void GameEnd() {
 }
 
 void TriggerTargetted (UseData ud, uint16_t i) {
-    if (instances[i].ignoreSecondaryTriggers) recentMostActivator = ud.owner;
+    if (Eng_Global->instances[i].ignoreSecondaryTriggers) recentMostActivator = ud.owner;
     //TriggerTripped (Collider col, bool initialEntry);
 }
 
@@ -68,8 +68,8 @@ void TriggerCounterTargetted (uint16_t activator, uint16_t i) {
         if (delay <=0) {
             Target (ud);
         } else {
-            instances[i].tickFinished = Sys_Global.pauseRelativeTime + instances[i].delay;
-            instances[i].activator = activator;
+            Eng_Global->instances[i].tickFinished = Sys_Global.pauseRelativeTime + Eng_Global->instances[i].delay;
+            Eng_Global->instances[i].activator = activator;
         }
 
         //!dontReset == reset, bleh double negatives why'd I do that
@@ -86,17 +86,17 @@ void Targetted(uint16_t activator, uint16_t other) {
 		else TriggerRelayDelayedTarget(ud);
     }
 
-    if (instances[i].index == 708) GameEnd(); // info_gameend
-    if (!ud.branchFlipOnly && instances[i].index == 700 && (instances[i].entflags & ENTFLAG_ENABLED)) LogicBranchTargetted(ud);
-    if (ud.branchFlip || ud.branchFlipOnly && instances[i].index == 700) FlipTrackSwitch();
-    if ((ACTIVATOR.ioflags & TARG_IOFLAGS_TRIPTRIGGER) && (instances[i].index == 598 || instances[i].index == 600)) TriggerTargetted(ud);
-    if ((ACTIVATOR.ioflags & TARG_IOFLAGS_TRIPTRIGGER) && instances[i].index == 594) TriggerCounterTargetted(ud);
-    if (ud.lockCodeToScreenMaterialChanger && Sys_Global.currentLevel == 1) flag_set(&instances[WORLD].ioflags,QUESTBIT_LEV1_CODE_LOCKED,true);
-    if (ud.lockCodeToScreenMaterialChanger && Sys_Global.currentLevel == 2) flag_set(&instances[WORLD].ioflags,QUESTBIT_LEV1_CODE_LOCKED,true);
-    if (ud.lockCodeToScreenMaterialChanger && Sys_Global.currentLevel == 3) flag_set(&instances[WORLD].ioflags,QUESTBIT_LEV1_CODE_LOCKED,true);
-    if (ud.lockCodeToScreenMaterialChanger && Sys_Global.currentLevel == 4) flag_set(&instances[WORLD].ioflags,QUESTBIT_LEV1_CODE_LOCKED,true);
-    if (ud.lockCodeToScreenMaterialChanger && Sys_Global.currentLevel == 5) flag_set(&instances[WORLD].ioflags,QUESTBIT_LEV1_CODE_LOCKED,true);
-    if (ud.lockCodeToScreenMaterialChanger && Sys_Global.currentLevel == 6) flag_set(&instances[WORLD].ioflags,QUESTBIT_LEV1_CODE_LOCKED,true);
+    if (Eng_Global->instances[i].index == 708) GameEnd(); // info_gameend
+    if (!ud.branchFlipOnly && Eng_Global->instances[i].index == 700 && (Eng_Global->instances[i].entflags & ENTFLAG_ENABLED)) LogicBranchTargetted(ud);
+    if (ud.branchFlip || ud.branchFlipOnly && Eng_Global->instances[i].index == 700) FlipTrackSwitch();
+    if ((ACTIVATOR.ioflags & TARG_IOFLAGS_TRIPTRIGGER) && (Eng_Global->instances[i].index == 598 || Eng_Global->instances[i].index == 600)) TriggerTargetted(ud);
+    if ((ACTIVATOR.ioflags & TARG_IOFLAGS_TRIPTRIGGER) && Eng_Global->instances[i].index == 594) TriggerCounterTargetted(ud);
+    if (ud.lockCodeToScreenMaterialChanger && Sys_Global.currentLevel == 1) flag_set(&Eng_Global->instances[WORLD].ioflags,QUESTBIT_LEV1_CODE_LOCKED,true);
+    if (ud.lockCodeToScreenMaterialChanger && Sys_Global.currentLevel == 2) flag_set(&Eng_Global->instances[WORLD].ioflags,QUESTBIT_LEV1_CODE_LOCKED,true);
+    if (ud.lockCodeToScreenMaterialChanger && Sys_Global.currentLevel == 3) flag_set(&Eng_Global->instances[WORLD].ioflags,QUESTBIT_LEV1_CODE_LOCKED,true);
+    if (ud.lockCodeToScreenMaterialChanger && Sys_Global.currentLevel == 4) flag_set(&Eng_Global->instances[WORLD].ioflags,QUESTBIT_LEV1_CODE_LOCKED,true);
+    if (ud.lockCodeToScreenMaterialChanger && Sys_Global.currentLevel == 5) flag_set(&Eng_Global->instances[WORLD].ioflags,QUESTBIT_LEV1_CODE_LOCKED,true);
+    if (ud.lockCodeToScreenMaterialChanger && Sys_Global.currentLevel == 6) flag_set(&Eng_Global->instances[WORLD].ioflags,QUESTBIT_LEV1_CODE_LOCKED,true);
 
     if ((ACTIVATOR.ioflags & TARG_IOFLAGS_DOORUNLOCK)) {
         Door dr = GetComponent<Door>();
@@ -336,9 +336,9 @@ void Targetted(uint16_t activator, uint16_t other) {
     }
 
     if (ud.awakeSleepingEnemy) {
-        if (ConstIndexIsNPC(instances[i].index)) {
-            instances[i].asleep = false;
-            uint16_t cables = instances[i].sleepingCables;
+        if (ConstIndexIsNPC(Eng_Global->instances[i].index)) {
+            Eng_Global->instances[i].asleep = false;
+            uint16_t cables = Eng_Global->instances[i].sleepingCables;
             if (cables != UINT16_MAX && cables != PLAYER1 && cables != PLAYER2) DeleteInstance(cables);
     }
 
@@ -354,13 +354,13 @@ void UseTargets(UseData ud, const char* targetname) {
     float numtargetsfound = 0;
     bool succeeded = false;
     for (int i=START_INDEX_LEVEL_INSTANCES;i<loadedInstances;i++) { // Find each gameobject with matching targetname in the register, then call Use for each.
-        if (!StringEquals(instances[i].targetname,targetname)) continue;
+        if (!StringEquals(Eng_Global->instances[i].targetname,targetname)) continue;
 
         numtargetsfound++;
         DualLog("Running targets for %s (found %u so far)\n", targetname, numtargetsfound);
-        if (ud.GOSetActive && !(instances[i].entflags & ENTFLAG_ACTIVE)) flag_set(&instances[i].entflags,ENTFLAG_ACTIVE,true); // Added activeSelf bit to keep from spamming SetActive when running targets through a trigger_multiple
-        if (ud.GOSetDeactive && (instances[i].entflags & ENTFLAG_ACTIVE)) flag_set(&instances[i].entflags,ENTFLAG_ACTIVE,false); // Diddo for activeSelf to prevent spamming SetActive.
-        if (ud.GOToggleActive) flag_set(&instances[i].entflags,ENTFLAG_ACTIVE,!(instances[i].entflags & ENTFLAG_ACTIVE)); // If I abuse this with a trigger_multiple someone should shoot me.
+        if (ud.GOSetActive && !(Eng_Global->instances[i].entflags & ENTFLAG_ACTIVE)) flag_set(&Eng_Global->instances[i].entflags,ENTFLAG_ACTIVE,true); // Added activeSelf bit to keep from spamming SetActive when running targets through a trigger_multiple
+        if (ud.GOSetDeactive && (Eng_Global->instances[i].entflags & ENTFLAG_ACTIVE)) flag_set(&Eng_Global->instances[i].entflags,ENTFLAG_ACTIVE,false); // Diddo for activeSelf to prevent spamming SetActive.
+        if (ud.GOToggleActive) flag_set(&Eng_Global->instances[i].entflags,ENTFLAG_ACTIVE,!(Eng_Global->instances[i].entflags & ENTFLAG_ACTIVE)); // If I abuse this with a trigger_multiple someone should shoot me.
         Targetted(ud);
     }
 

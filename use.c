@@ -13,13 +13,13 @@ void ChargStationUse (UseData ud) {
 
         if (damageOnUse > 0f) {
             DamageData dd;
-            dd.damage = vmin(damageOnUse,instances[PLAYER1].health - 1);  // Don't ever kill the player from this, way too cheap.
+            dd.damage = vmin(damageOnUse,Eng_Global->instances[PLAYER1].health - 1);  // Don't ever kill the player from this, way too cheap.
 
             // No impact force here, it's a zap.  Ouch, it zapped me...that
             // really hurt Chargie, that hurt my finger, owhow, OW! ow,
             // hahahow ow! OWW!  Chargie zapped my finger (it helps if you
             // use a British accent and refer to Charlie Bit My Finger).
-            if (dd.damage > 0) instances[PLAYER1].TakeDamage(dd);
+            if (dd.damage > 0) Eng_Global->instances[PLAYER1].TakeDamage(dd);
         }
 
         CenterStatusPrint("%s",Sys_Text.stringTable[0]);
@@ -46,7 +46,7 @@ void ActivatePatch(int index) { // Expects the usableItems index
         // Berserk Patch
         inventoryPlayer1.patchCounts[2]--;
         if (inventoryPlayer1.patchCounts[2] <= 0) depleted = true;
-        if (!(instances[PLAYER1].patchActive & PATCH_BERSERK)) instances[PLAYER1].patchActive |= PATCH_BERSERK;
+        if (!(Eng_Global->instances[PLAYER1].patchActive & PATCH_BERSERK)) Eng_Global->instances[PLAYER1].patchActive |= PATCH_BERSERK;
         berserkFinishedTime = Sys_Global.pauseRelativeTime + BERSERK_TIME;
         float berserkIncrementTime = BERSERK_TIME / 5.0f;
         if (berserkIncrementFinishedTime > Sys_Global.pauseRelativeTime) berserkIncrementFinishedTime += berserkIncrementTime; // berserk effect stacks
@@ -57,14 +57,14 @@ void ActivatePatch(int index) { // Expects the usableItems index
         inventoryPlayer1.patchCounts[6]--;
         if (inventoryPlayer1.patchCounts[6] <= 0) depleted = true;
         DisableAllPatches(); // remove all other effects, even medipatch
-        instances[PLAYER1].patchActive = PATCH_DETOX; // overwrite all other active patches
+        Eng_Global->instances[PLAYER1].patchActive = PATCH_DETOX; // overwrite all other active patches
         detoxFinishedTime = Sys_Global.pauseRelativeTime + DETOX_TIME; // detox doesn't stack, it cancels itself lol
         break;
     case 16:
         // Genius Patch
         inventoryPlayer1.patchCounts[5]--;
         if (inventoryPlayer1.patchCounts[5] <= 0) depleted = true;
-        if (!(instances[PLAYER1].patchActive & PATCH_GENIUS)) instances[PLAYER1].patchActive |= PATCH_GENIUS;
+        if (!(Eng_Global->instances[PLAYER1].patchActive & PATCH_GENIUS)) Eng_Global->instances[PLAYER1].patchActive |= PATCH_GENIUS;
         if (geniusFinishedTime > Sys_Global.pauseRelativeTime) {
             geniusFinishedTime += GENIUS_TIME; // genius effect stacks
         } else {
@@ -79,7 +79,7 @@ void ActivatePatch(int index) { // Expects the usableItems index
         }
         inventoryPlayer1.patchCounts[3]--;
         if (inventoryPlayer1.patchCounts[3] <= 0) depleted = true;
-        if (!(instances[PLAYER1].patchActive & PATCH_MEDI)) instances[PLAYER1].patchActive |= PATCH_MEDI;
+        if (!(Eng_Global->instances[PLAYER1].patchActive & PATCH_MEDI)) Eng_Global->instances[PLAYER1].patchActive |= PATCH_MEDI;
         PlayerHealth.a.mediPatchPulseCount = 0;
         if (mediFinishedTime > Sys_Global.pauseRelativeTime) {
             mediFinishedTime += MEDI_TIME; // medipatch effect stacks
@@ -92,7 +92,7 @@ void ActivatePatch(int index) { // Expects the usableItems index
         inventoryPlayer1.patchCounts[4]--;
         if (inventoryPlayer1.patchCounts[4] <= 0) depleted = true;
         Time.timeScale = REFLEX_TIME_SCALE;
-        if (!(instances[PLAYER1].patchActive & PATCH_REFLEX)) instances[PLAYER1].patchActive |= PATCH_REFLEX;
+        if (!(Eng_Global->instances[PLAYER1].patchActive & PATCH_REFLEX)) Eng_Global->instances[PLAYER1].patchActive |= PATCH_REFLEX;
         if (reflexFinishedTime > Time.realtimeSinceStartup ) {
             reflexFinishedTime += REFLEX_TIME; // reflex effect stacks
         } else {
@@ -106,7 +106,7 @@ void ActivatePatch(int index) { // Expects the usableItems index
         sightLight.enabled = true; // enable vision enhancement
         sightSideEffectFinishedTime = -1.0f;  // reset side effect timer from previous patch
         sightDimming.enabled = false; // deactivate side effect from previous patch
-        if (!(instances[PLAYER1].patchActive & PATCH_SIGHT)) instances[PLAYER1].patchActive |= PATCH_SIGHT;
+        if (!(Eng_Global->instances[PLAYER1].patchActive & PATCH_SIGHT)) Eng_Global->instances[PLAYER1].patchActive |= PATCH_SIGHT;
         if (sightFinishedTime > Sys_Global.pauseRelativeTime) sightFinishedTime += SIGHT_TIME; // sight effect stacks
         else                                                  sightFinishedTime = Sys_Global.pauseRelativeTime + SIGHT_TIME;
         break;
@@ -114,8 +114,8 @@ void ActivatePatch(int index) { // Expects the usableItems index
         // Staminup Patch
         inventoryPlayer1.patchCounts[0]--;
         if (inventoryPlayer1.patchCounts[0] <= 0) depleted = true;
-        instances[PLAYER1].staminupActive = true;
-        if (!(instances[PLAYER1].patchActive & PATCH_STAMINUP)) instances[PLAYER1].patchActive |= PATCH_STAMINUP;
+        Eng_Global->instances[PLAYER1].staminupActive = true;
+        if (!(Eng_Global->instances[PLAYER1].patchActive & PATCH_STAMINUP)) Eng_Global->instances[PLAYER1].patchActive |= PATCH_STAMINUP;
         if (staminupFinishedTime > Sys_Global.pauseRelativeTime) {
             staminupFinishedTime += STAMINUP_TIME; // staminup effect stacks
         } else {
@@ -138,20 +138,20 @@ void ActivatePatch(int index) { // Expects the usableItems index
 void ButtonSwitchUseTargets () { // TODO
 //     UseData ud = new UseData();
 //     UseTargets(gameObject,ud,target);
-       bool active = instances[i].entflags & ENTFLAG_ACTIVE;
+       bool active = Eng_Global->instances[i].entflags & ENTFLAG_ACTIVE;
        active = !active;
-       flag_set(&instances[i].entflags,ENTFLAG_ACTIVE,active);
-       instances[i].alternateOn = active;
-//     if (instances[i].entflags & ENTFLAG_CHANGE_TEX_ON_ACTIVE) {
-//         if (instances[i].entflags & ENTFLAG_BLINK_TEX_ON_ACTIVE) {
+       flag_set(&Eng_Global->instances[i].entflags,ENTFLAG_ACTIVE,active);
+       Eng_Global->instances[i].alternateOn = active;
+//     if (Eng_Global->instances[i].entflags & ENTFLAG_CHANGE_TEX_ON_ACTIVE) {
+//         if (Eng_Global->instances[i].entflags & ENTFLAG_BLINK_TEX_ON_ACTIVE) {
 //             ToggleMaterial();
-//             if (instances[i].entflags & ENTFLAG_ACTIVE)
-//                 instances[i].tickFinished = Sys_Global.pauseRelativeTime + tickTime;
+//             if (Eng_Global->instances[i].entflags & ENTFLAG_ACTIVE)
+//                 Eng_Global->instances[i].tickFinished = Sys_Global.pauseRelativeTime + tickTime;
 //         } else {
 //             ToggleMaterial(); TODO
 //         }
 //     }
-//     if (instances[i].entflags & ENTFLAG_ANIMATED) {
+//     if (Eng_Global->instances[i].entflags & ENTFLAG_ANIMATED) {
 //         if (active) { // UH OH TODO TODO Fix the overlap here with gameObject.active
 //             anim.Play("Activating");
 //         } else {
@@ -161,23 +161,23 @@ void ButtonSwitchUseTargets () { // TODO
 }
 
 void ButtonSwitchUse(uint16_t i, UseData ud) {
-    if (Sys_Cheats.superoverride || Sys_Global.difficultyMission == 0) {
-        instances[i].locked = false; // SHODAN can go anywhere!  Full security override!
-    } else if (GetCurrentLevelSecurity() > instances[i].securityThreshhold) {
-//         BlockedBySecurity(instances[i].position); TODO
+    if (Eng_Cheats->superoverride || Sys_Global.difficultyMission == 0) {
+        Eng_Global->instances[i].locked = false; // SHODAN can go anywhere!  Full security override!
+    } else if (GetCurrentLevelSecurity() > Eng_Global->instances[i].securityThreshhold) {
+//         BlockedBySecurity(Eng_Global->instances[i].position); TODO
         return;
     }
 
-    if (instances[i].locked) {
-        CenterStatusPrint("%s",Sys_Text.stringTable[instances[i].lockedMessageLingdex]);
-        if (instances[i].SFXLockedIndex >= 0 && instances[i].SFXLockedIndex < SOUNDS_COUNT) play_wav(sounds[SELF.SFXLockedIndex],1.0f,SELF.position,true);
+    if (Eng_Global->instances[i].locked) {
+        CenterStatusPrint("%s",Sys_Text.stringTable[Eng_Global->instances[i].lockedMessageLingdex]);
+        if (Eng_Global->instances[i].SFXLockedIndex >= 0 && Eng_Global->instances[i].SFXLockedIndex < SOUNDS_COUNT) play_wav(sounds[SELF.SFXLockedIndex],1.0f,SELF.position,true);
         return;
     }
 
     // Set playerCamera to owner of the input (always should be the camera)
     Utils.PlayOneShotSavable(SFXSource,sounds[SFXIndex]);
     CenterStatusPrint("%s",Sys_Text.stringTable[messageIndex]);
-    if (instances[i].delay > 0.0f) instances[i].delayFinished = Sys_Global.pauseRelativeTime + instances[i].delay;
+    if (Eng_Global->instances[i].delay > 0.0f) Eng_Global->instances[i].delayFinished = Sys_Global.pauseRelativeTime + Eng_Global->instances[i].delay;
     else ButtonSwitchUseTargets();
 }
 
@@ -209,7 +209,7 @@ bool EnvirosuitApply() {
 
     // Suit absorbs some radiation, say it.
     // Envirosuit absorbed ##LBP, Radiation poisoning ##LBP
-    instances[PLAYER1].twm.SendWarning((Sys_Text.stringTable[280]
+    Eng_Global->instances[PLAYER1].twm.SendWarning((Sys_Text.stringTable[280]
                                         + radAdjust.ToString()
                                         + Sys_Text.stringTable[281]
                                         + Sys_Text.stringTable[185]
@@ -224,21 +224,21 @@ bool EnvirosuitApply() {
 }
 
 void GiveRadiation(float rad) {
-    if (instances[PLAYER1].health <= 0.0f) return;
+    if (Eng_Global->instances[PLAYER1].health <= 0.0f) return;
 
-    if (instances[PLAYER1].radiated < rad) instances[PLAYER1].radiated = rad;
+    if (Eng_Global->instances[PLAYER1].radiated < rad) Eng_Global->instances[PLAYER1].radiated = rad;
     else return;
 
 //     EnvirosuitApply(); TODO
-    instances[PLAYER1].initialRadiation = radiated;
+    Eng_Global->instances[PLAYER1].initialRadiation = radiated;
 }
 
 void DoorUse (UseData ud) {
     if (ud == null) return;
     if (ud.owner == null) return;
-    if (GetCurrentLevelSecurity() > securityThreshhold) { Sys_UI.BlockedBySecurity(instances[i].position); return; }
+    if (GetCurrentLevelSecurity() > securityThreshhold) { Sys_UI.BlockedBySecurity(Eng_Global->instances[i].position); return; }
 
-    if (Sys_Cheats.superoverride || Sys_Global.difficultyMission <= 0) { // SHODAN can go anywhere!  Full security override!
+    if (Eng_Cheats->superoverride || Sys_Global.difficultyMission <= 0) { // SHODAN can go anywhere!  Full security override!
         locked = false;
         requiredAccessCard = AccessCardType_None;
         accessCardUsedByPlayer = true;
@@ -301,7 +301,7 @@ void DoorUse (UseData ud) {
 void CyberAccessUse (uint16_t activator, uint16_t cybAcc) {
     selfIdx = cybAcc;
     activatorIdx = activator;
-    UseTargets(gameObject,ud,instances[i].target);
+    UseTargets(gameObject,ud,Eng_Global->instances[i].target);
     CenterStatusPrint("%s", Sys_Text.stringTable[441]); // Entering Cyberspace!
     Vector3 entryPosition = (Vector3){ 195.42000f, -13.44000f,  33.28000f};
     switch(LevelManager.a.currentLevel) {

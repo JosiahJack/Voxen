@@ -58,9 +58,9 @@ public class DamageData {
 		if (NPCindex < 0 || NPCindex > 28) {
 			NPCindex = 0;
 			DualLog("BUG: NPCindex incorrect on NPC.  Not 0 to 28 on NPC at: "
-					  + ownedBy.instances[i].position.x.ToString() + ", "
-					  + ownedBy.instances[i].position.y.ToString() + ", "
-					  + ownedBy.instances[i].position.z + ".");
+					  + ownedBy.Eng_Global->instances[i].position.x.ToString() + ", "
+					  + ownedBy.Eng_Global->instances[i].position.y.ToString() + ", "
+					  + ownedBy.Eng_Global->instances[i].position.z + ".");
 		}
 
 		if (attackNum < 1 || attackNum > 3) attackNum = 1;

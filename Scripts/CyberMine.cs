@@ -7,17 +7,17 @@ public class CyberMine : MonoBehaviour {
 
     void Start() {
 		dmg = 55f;
-        if (Sys_Global.difficultyCyber < 3) {
+        if (Eng_Global->difficultyCyber < 3) {
 			if (random_range(0.0f,1.0f) < 0.2f) flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false); // 20% chance of not spawning on normal
 			dmg = 33f;
 		}
 
-        if (Sys_Global.difficultyCyber < 2) {
+        if (Eng_Global->difficultyCyber < 2) {
 			if (random_range(0.0f,1.0f) < 0.33f) flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false); // 33% chance of not spawning on easy
 			dmg = 22f;
 		}
 
-        if (Sys_Global.difficultyCyber < 1) {
+        if (Eng_Global->difficultyCyber < 1) {
 			if (random_range(0.0f,1.0f) < 0.50f) flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false); // 50% chance of not spawning on grandma
 			dmg = 11f;
 		}
@@ -30,12 +30,12 @@ public class CyberMine : MonoBehaviour {
 				DamageData damageData;
 				damageData.other = gameObject;
 				damageData.isOtherNPC = false;
-				damageData.attacknormal = (instances[i].position - col.instances[i].position);
+				damageData.attacknormal = (Eng_Global->instances[i].position - col.Eng_Global->instances[i].position);
 				damageData.owner = gameObject;
 				damageData.attackType = AttackType.None;
 				damageData.damage = dmg;
 				// No impact force in cyberspace.
-				instances[PLAYER1].TakeDamage(damageData);
+				Eng_Global->instances[PLAYER1].TakeDamage(damageData);
 				Utils.PlayUIOneShotSavable(67);
 				flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
 			}

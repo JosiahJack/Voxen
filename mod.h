@@ -1,0 +1,90 @@
+// mod.h - Header only used by gamecode files
+#if defined(_WIN32) || defined(__CYGWIN__)
+    #define MOD_TO_ENGINE __declspec(dllexport)
+#else
+    #define MOD_TO_ENGINE __attribute__((visibility("default")))
+#endif
+
+#include "common.h"
+extern GlobalContext* Eng_Global; extern CheatsSystem* Eng_Cheats;
+#define NUM_AI_TYPES 29
+typedef struct {
+	const char* name;
+	AttackType attackType;
+	AttackType attackType2;
+	AttackType attackType3;
+	float damage;
+	float damage2;
+	float damage3;
+	float range;
+	float range2;
+	float range3;
+	float health;
+	float healthForCyberNPC;
+	PerceptionLevel perception;
+	float disruptability;
+	float armorvalue;
+	float defense;
+	AIMoveType moveType;
+	float yawSpeed;
+	float fov;
+	float fovAttack;
+	float fovStartMovement;
+	float distToSeeBehind;
+	float sightRange;
+	float walkSpeed;
+	float runSpeed;
+	float attack1Speed;
+	float attack2Speed;
+	float attack3Speed;
+	float attack3Force;
+	float attack3Radius;
+	float timeToPain;
+	float timeBetweenPain;
+	float timeTillDead;
+	float timeToActualAttack1;
+	float timeToActualAttack2;
+	float timeToActualAttack3;
+	float timeBetweenAttack1;
+	float timeBetweenAttack2;
+	float timeBetweenAttack3;
+	float timeToChangeEnemy;
+	float timeIdleSFXMin;
+	float timeIdleSFXMax;
+	float timeAttack1WaitMin;
+	float timeAttack1WaitMax;
+	float timeAttack1WaitChance;
+	float timeAttack2WaitMin;
+	float timeAttack2WaitMax;
+	float timeAttack2WaitChance;
+	float timeAttack3WaitMin;
+	float timeAttack3WaitMax;
+	float timeAttack3WaitChance;
+	int attack1ProjectileLaunchedType; // Unused
+	int attack2ProjectileLaunchedType; // Unused
+	int attack3ProjectileLaunchedType; // Unused
+	float projectileSpeedAttack1;
+	float projectileSpeedAttack2;
+	float projectileSpeedAttack3;
+	bool hasLaserOnAttack1;
+	bool hasLaserOnAttack2;
+	bool hasLaserOnAttack3;
+	bool explodeOnAttack3;
+	bool preactivateMeleeColliders;
+	double huntTime;
+	float flightHeight;
+	bool flightHeightIsPercentage;
+	bool switchMaterialOnDeath;
+	float hearingRange;
+	float timeForTranquilization;
+	bool hopsOnMove;
+	NPCType type;
+	int projectile1Prefab;
+	int projectile2Prefab;
+	int projectile3Prefab;
+} NPCTable;
+extern NPCTable npcTable[NUM_AI_TYPES];
+
+MOD_TO_ENGINE bool Sprint(void);
+
+extern uint16_t useableItemsFrobIcons[94];

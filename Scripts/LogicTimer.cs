@@ -11,17 +11,17 @@ public class LogicTimer : MonoBehaviour {
 	string target;
 
 	void Start() {
-		intervalFinished = Sys_Global.pauseRelativeTime + (useRandomTimes ? random_range(randomMin,randomMax) : timeInterval);
+		intervalFinished = Eng_Global->pauseRelativeTime + (useRandomTimes ? random_range(randomMin,randomMax) : timeInterval);
 	}
 
 	void Update() {
-		if (!Sys_Global.gamePaused && !Sys_Global.menuActive && active) {
-			if (intervalFinished < Sys_Global.pauseRelativeTime) {
+		if (!Eng_Global->gamePaused && !Eng_Global->menuActive && active) {
+			if (intervalFinished < Eng_Global->pauseRelativeTime) {
 				if (useRandomTimes) {
-					intervalFinished = Sys_Global.pauseRelativeTime
+					intervalFinished = Eng_Global->pauseRelativeTime
 									   + random_range(randomMin,randomMax);
 				} else {
-					intervalFinished = Sys_Global.pauseRelativeTime
+					intervalFinished = Eng_Global->pauseRelativeTime
 									   + timeInterval;
 				}
 				UseTargets();

@@ -119,7 +119,7 @@ void DetermineClosedEdges(void) {
 
 bool UpdatedPlayerCell(void) {
     uint16_t lastCell = playerCellIdx;
-    playerCellIdx = PosGetCellCoords(instances[PLAYER1].position.x, instances[PLAYER1].position.z);
+    playerCellIdx = PosGetCellCoords(Sys_Global.instances[PLAYER1].position.x, Sys_Global.instances[PLAYER1].position.z);
     return (playerCellIdx != lastCell);
 }
 
@@ -564,7 +564,6 @@ void CullInit(void) {
     (void)UpdatedPlayerCell();
     int32_t cellToCellIdx = playerCellIdx * ARRSIZE;
     int32_t numFoundVisibleCellsForPlayerStart = 0;
-    #pragma omp parallel for collapse(2)
     for (int32_t z=0;z<WORLDZ;++z) {
         for (int32_t x=0;x<WORLDX;++x) {
             int32_t cellIdx = (z * WORLDX) + x;
@@ -619,7 +618,7 @@ void CameraViewUnculling(void) {
         uint16_t camInstanceIdx = uncullingCameras[i];
         if (camInstanceIdx == UINT16_MAX) continue;
 
-        uint32_t camCellIdx = PosGetCellCoords(instances[camInstanceIdx].position.x, instances[camInstanceIdx].position.z);
+        uint32_t camCellIdx = PosGetCellCoords(Sys_Global.instances[camInstanceIdx].position.x, Sys_Global.instances[camInstanceIdx].position.z);
         gridCellStates[camCellIdx] |= CELL_VISIBLE;
         uint32_t cellToCellIdx = camCellIdx * ARRSIZE;
         for (int32_t z=0;z<WORLDZ;++z) {
@@ -633,8 +632,8 @@ void CameraViewUnculling(void) {
 }
 
 void PortalCulling(void) { // Called just once at end of animation loop for the frame after each frame perfect change to door models becoming either closed or not closed.
-    uint16_t playerCellX = PosGetCellCoordX(instances[PLAYER1].position.x);
-    uint16_t playerCellZ = PosGetCellCoordZ(instances[PLAYER1].position.z);
+    uint16_t playerCellX = PosGetCellCoordX(Sys_Global.instances[PLAYER1].position.x);
+    uint16_t playerCellZ = PosGetCellCoordZ(Sys_Global.instances[PLAYER1].position.z);
     PortalCell cellA, cellB;
     for (uint8_t portalIdx=0;portalIdx<MAX_PORTALS;++portalIdx) {
         if (!activePortals[portalIdx].dirty) continue;
@@ -675,11 +674,11 @@ bool CullCore(void) {
 
     numCellsVisible = 0;
     float pos_x, pos_z;
-    uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((instances[PLAYER1].position.x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
-	uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((instances[PLAYER1].position.z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+    uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((Sys_Global.instances[PLAYER1].position.x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+	uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((Sys_Global.instances[PLAYER1].position.z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
     CellCoordsToPos(cellX,cellZ, &pos_x,&pos_z);
     for (int i=0;i<loadedInstances;++i) {
-        float distSqrd = squareDistance2D(instances[i].position.x, instances[i].position.z, pos_x, pos_z);
+        float distSqrd = squareDistance2D(Sys_Global.instances[i].position.x, Sys_Global.instances[i].position.z, pos_x, pos_z);
         instanceIsLODArray[i] = (distSqrd >= 655.36f); // 25.6f * 25.6f
     }
     

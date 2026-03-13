@@ -94,45 +94,94 @@ MAC_CC="gcc"
 COMMON_CFLAGS="-fno-exceptions -fno-stack-protector -fno-asynchronous-unwind-tables -fno-unwind-tables \
                -U_FORTIFY_SOURCE -fvisibility=hidden -I./External/ -pipe -fno-ident -fdata-sections \
                -ffunction-sections -ffast-math -g1 -std=c11 -Wall -Wextra -Wno-implicit-fallthrough \
-               -fomit-frame-pointer -fstrict-aliasing -fno-common -Walloca -Wstack-usage=262144 -fopenmp \
+               -fomit-frame-pointer -fstrict-aliasing -fno-common -Walloca -Wstack-usage=262144 \
                -Wformat=2 -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings -fno-math-errno \
                -fno-plt -fno-semantic-interposition -fno-trapping-math -fmerge-all-constants -m64 -Og"
+COMMON_LFLAGS="-Wl,--gc-sections -Wl,--sort-common -Wl,-O1 -lglfw -lm -lGL -Wl,-z,now -Wl,-z,relro -s"
 
+# Game Code Build
+if [ "$PLATFORM" = "windows" ]; then
+    CC=$WINDOWS_CC
+    LINKERGC=$CC
+    CFLAGSGC="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe"
+    LDFLAGSGC="$COMMON_LFLAGS"
+    BINARY_NAMEGC="Citadel.dll"
+    SONAME="$BINARY_NAMEGC"
+elif [ "$PLATFORM" = "mac" ]; then
+    CC=$MAC_CC
+    LINKERGC=$MAC_CC
+    CFLAGSGC="-D__APPLE__ $COMMON_CFLAGS"
+    LDFLAGSGC="$COMMON_LFLAGS -L./External/Mac -lglfw"
+    BINARY_NAMEGC="Citadel.dylib"
+    SONAME="$BINARY_NAMEGC"
+elif [ "$PLATFORM" = "android" ]; then
+    CC=$ANDROID_CC
+    LINKEGC=$CC
+    CFLAGSGC="-D__ANDROID__ -fPIC $COMMON_CFLAGS"
+    LDFLAGSGC="$COMMON_LFLAGS -L./External/Android -landroid -llog"
+    BINARY_NAMEGC="Citadel.so"
+    SONAME="$BINARY_NAMEGC"
+else
+    CC=$LINUX_CC
+    LINKERGC="mold -run gcc"
+    CFLAGSGC="-march=x86-64 -mtune=generic $COMMON_CFLAGS"
+    LDFLAGSGC="$COMMON_LFLAGS -L./External/Linux -l:libminiaudio.0.11.22.a"
+    BINARY_NAMEGC="Citadel.so"
+    SONAME="$BINARY_NAMEGC"
+fi
+
+export CCGC=$CC
+export CFLAGSGC=$CFLAGSGC
+SOURCES="g_input.c g_physics.c g_ai.c" #g_init.c g_biomonitor.c g_weapons.c"
+export TEMP_DIRGC=temp_build_gc
+VERSION_SCRIPT="gamecode.sym"
+printf "%s\n" $SOURCES | xargs -P12 -I{} $CCGC -c {} $CFLAGSGC -nostdinc -fPIC -ffreestanding -fno-builtin -Wshadow -o "$TEMP_DIRGC"/{}.o
+$LINKERGC "$TEMP_DIRGC"/*.o $LDFLAGSGC -Wl,-soname,$SONAME -shared -nostdlib -Wl,--version-script=$VERSION_SCRIPT -o $BINARY_NAMEGC
+link_status=$?
+if [ $link_status -ne 0 ]; then
+    echo "ERROR: Linking failed."
+    exit 1
+else
+    echo "Built mod gamecode successfully."
+fi
+
+# Engine Build
 if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
     LINKER=$CC
     CFLAGS="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe"
-    LDFLAGS=""
+    LDFLAGS="$COMMON_LFLAGS"
     BINARY_NAME="voxen.exe"
 elif [ "$PLATFORM" = "mac" ]; then
-    CC=$LINUX_CC
-    LINKER=$LINUX_CC
+    CC=$MAC_CC
+    LINKER=$MAC_CC
     CFLAGS="-D__APPLE__ $COMMON_CFLAGS"
-    LDFLAGS="-L./External/Mac -l:libglfw3.a"
+    LDFLAGS="$COMMON_LFLAGS -L./External/Mac -lglfw"
     BINARY_NAME="voxen.app"
 elif [ "$PLATFORM" = "android" ]; then
     CC=$ANDROID_CC
     LINKER=$CC
     CFLAGS="-D__ANDROID__ -fPIC $COMMON_CFLAGS"
-    LDFLAGS="-L./External/Android -landroid -llog"
+    LDFLAGS="$COMMON_LFLAGS -L./External/Android -landroid -llog"
     BINARY_NAME="voxen_android"
 else
     CC=$LINUX_CC
     LINKER="mold -run gcc"
     CFLAGS="-march=x86-64 -mtune=generic $COMMON_CFLAGS"
-    LDFLAGS="-Wl,--gc-sections -fopenmp -Wl,--sort-common -Wl,-O1 -L./External/Linux -lglfw -lm -l:libminiaudio.0.11.22.a -lGL -Wl,--as-needed -Wl,-z,now -Wl,-z,relro -s"
+    LDFLAGS="$COMMON_LFLAGS -L./External/Linux -l:libminiaudio.0.11.22.a"
     BINARY_NAME="voxen"
 fi
 
 export CC=$CC
 export CFLAGS=$CFLAGS
-SOURCES="voxen.c physics.c helpers.c init.c menu.c audio.c animation.c console.c biomonitor.c level.c data_parser.c \
-         data_text.c data_fonts.c data_models.c dynamic_culling.c todo.c input.c data_textures.c glad.c"
+SOURCES="voxen.c physics.c helpers.c audio.c animation.c console.c level.c data_parser.c \
+         data_text.c data_fonts.c data_models.c dynamic_culling.c data_textures.c glad.c \
+         input.c \
+         g_menu.c g_init.c g_biomonitor.c g_weapons.c" #TODO move to gamecode!
 
 export TEMP_DIR=temp_build
-printf "%s\n" $SOURCES | xargs -P12 -I{} $CC -c {} $CFLAGS -o "$TEMP_DIR"/{}.o
-# $CC -c data_textures.c $CFLAGS -fsanitize=address -o "$TEMP_DIR"/data_textures.o
-$LINKER "$TEMP_DIR"/*.o $LDFLAGS -o $BINARY_NAME $LDFLAGS
+printf "%s\n" $SOURCES | xargs -P12 -I{} $CC -c {} $CFLAGS -fopenmp -o "$TEMP_DIR"/{}.o
+$LINKER "$TEMP_DIR"/*.o $LDFLAGS -fopenmp -o $BINARY_NAME $LDFLAGS
 link_status=$?
 if [ $link_status -ne 0 ]; then
     echo "ERROR: Linking failed."
@@ -141,14 +190,14 @@ fi
 
 build_end=$(now_ms)
 total_build_time=$((build_end - shader_start))
-echo "Build completed in ${total_build_time} ms"
+echo "Built engine and mod in ${total_build_time} ms"
 if ! $IS_CI; then
     case "$PLATFORM" in
         windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; WINEPATH="External/Windows" wine ./voxen.exe ;;
         mac)      ./voxen.app ;;
         android)  java -jar bundletool.jar build-apks --bundle=voxen.aab --output=voxen.app;;
-        *)        strip --strip-all voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
-#         *)        ./voxen ;;   # linux
+#         *)        strip --strip-all voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
+        *)        ./voxen ;;   # linux
     esac
-    rm -f "$TEMP_DIR"/*.o ./Shaders/*.h "$TEMP_DIR"/*.cpp #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.
+    rm -f "$TEMP_DIR"/*.o ./Shaders/*.h "$TEMP_DIRGC"/*.o #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.
 fi

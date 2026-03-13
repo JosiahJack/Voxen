@@ -58,7 +58,7 @@ public void BioClick() {
 
 public void BioAction() {
     if (inventoryPlayer1.BioMonitorVersion() == 0 && PlayerEnergy.a.energy <= 0) {
-        CenterStatusPrint("%s", Sys_Text.stringTable[314],WeaponCurrent.a.owner);
+        CenterStatusPrint("%s", Sys_Text.stringTable[314],inventoryPlayer1.owner);
         return;
     }
 
@@ -145,7 +145,7 @@ public void SensaroundClick() {
 }
 
 public void SensaroundAction() {
-    if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Sys_Text.stringTable[314],WeaponCurrent.a.owner); return; }
+    if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Sys_Text.stringTable[314],inventoryPlayer1.owner); return; }
 
     if (inventoryPlayer1.hardwareIsActive[3]) {
         Utils.PlayUIOneShotSavable(82);
@@ -179,7 +179,7 @@ public void ShieldOn() {
 }
 
 public void ShieldAction() {
-    if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Sys_Text.stringTable[314],WeaponCurrent.a.owner); return; }
+    if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Sys_Text.stringTable[314],inventoryPlayer1.owner); return; }
     if (inventoryPlayer1.hardwareIsActive[5]) {
         Utils.PlayUIOneShotSavable(95);
         ShieldOffWithEffects();
@@ -205,7 +205,7 @@ void LanternClick() {
 }
 
 void LanternAction() {
-    if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Sys_Text.stringTable[314],WeaponCurrent.a.owner); return; }
+    if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Sys_Text.stringTable[314],inventoryPlayer1.owner); return; }
     Utils.PlayUIOneShotSavable(78);
     if (inventoryPlayer1.hardwareIsActive[7]) {
         LanternOff();
@@ -244,7 +244,7 @@ void InfraredClick() {
 }
 
 void InfraredAction() {
-    if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Sys_Text.stringTable[314],WeaponCurrent.a.owner); return; }
+    if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Sys_Text.stringTable[314],inventoryPlayer1.owner); return; }
     if (inventoryPlayer1.hardwareIsActive[11]) {
         Utils.PlayUIOneShotSavable(82);
     } else {
@@ -301,7 +301,7 @@ void BoosterClick() {
 
 void BoosterAction() {
     if (inventoryPlayer1.BoosterSetToBoost() && PlayerEnergy.a.energy <= 0) {
-        CenterStatusPrint("%s", Sys_Text.stringTable[314],WeaponCurrent.a.owner);
+        CenterStatusPrint("%s", Sys_Text.stringTable[314],inventoryPlayer1.owner);
         return;
     }
 
@@ -331,7 +331,7 @@ void JumpJetsClick() {
 
 void JumpJetsAction() {
     if (PlayerEnergy.a.energy <= 0) {
-        CenterStatusPrint("%s", Sys_Text.stringTable[314],WeaponCurrent.a.owner);
+        CenterStatusPrint("%s", Sys_Text.stringTable[314],inventoryPlayer1.owner);
         return;
     }
 

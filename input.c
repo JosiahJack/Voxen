@@ -139,10 +139,10 @@ void InputClearRisingAndFallingEdges(void) { // Clear keypress rising and fallin
 }
 
 void UpdatePlayerFacingAngles(void) {
-    Quaternion rot = instances[PLAYER1].rotation;
+    Quaternion rot = Sys_Global.instances[PLAYER1].rotation;
     float y2 = rot.y * rot.y;  float xz = rot.x * rot.z;  float wy = rot.w * rot.y;
-    instances[PLAYER1].forward = normalize_vector3((Vector3){ 2.0f * (xz + wy), 2.0f * (rot.y * rot.z - rot.w * rot.x), 1.0f - 2.0f * (rot.x * rot.x + y2) });
-    instances[PLAYER1].right = normalize_vector3((Vector3){ 1.0f - 2.0f * (y2 + rot.z * rot.z), 2.0f * (rot.x * rot.y + rot.w * rot.z), 2.0f * (xz - wy) });
+    Sys_Global.instances[PLAYER1].forward = normalize_vector3((Vector3){ 2.0f * (xz + wy), 2.0f * (rot.y * rot.z - rot.w * rot.x), 1.0f - 2.0f * (rot.x * rot.x + y2) });
+    Sys_Global.instances[PLAYER1].right = normalize_vector3((Vector3){ 1.0f - 2.0f * (y2 + rot.z * rot.z), 2.0f * (rot.x * rot.y + rot.w * rot.z), 2.0f * (xz - wy) });
 }
 
 // Create a quaternion from yaw (around Y), pitch (around X), and roll (around Z) in degrees
@@ -163,8 +163,8 @@ void quat_from_yaw_pitch_roll(Quaternion* q, float yaw_deg, float pitch_deg, flo
 } // Skipping quat normalization, not needed
 
 void Input_MouselookApply(void) {
-    if (Sys_Global.currentLevel == LEVEL_CYBERSPACE) quat_from_yaw_pitch_roll(&instances[PLAYER1].rotation,cam_yaw,cam_pitch,cam_roll);
-    else               quat_from_yaw_pitch_roll(&instances[PLAYER1].rotation,cam_yaw,cam_pitch,    0.0f);
+    if (Sys_Global.currentLevel == LEVEL_CYBERSPACE) quat_from_yaw_pitch_roll(&Sys_Global.instances[PLAYER1].rotation,cam_yaw,cam_pitch,cam_roll);
+    else               quat_from_yaw_pitch_roll(&Sys_Global.instances[PLAYER1].rotation,cam_yaw,cam_pitch,    0.0f);
     
     UpdatePlayerFacingAngles();
 }
@@ -223,52 +223,8 @@ bool GetKeyRiseEdgeOrHeld(int settingIndex, bool risingEdge) {
     return retval;
 }
 
-bool GetKey(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,false); }  // True while held down.
-bool GetKeyPressed(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,true); } // True 1st frame down.
-
-bool Forward(void) {     return GetKey(0); }
-bool StrafeLeft(void) {  return GetKey(1); }
-bool Backpedal(void) {   return GetKey(2); }
-bool StrafeRight(void) { return GetKey(3); }
-bool Jump(void) {        return GetKey(4); }
-bool JumpDown(void) {    return GetKeyPressed(4); }
-bool Crouch(void) {      return GetKeyPressed(5); }
-bool Prone(void) {       return GetKeyPressed(6); }
-bool LeanLeft(void) {    return GetKey(7); }
-bool LeanRight(void) {   return GetKey(8); }
-bool Sprint(void) {      return GetKey(9); } // Toggle Sprint unused
-bool TurnLeft(void) {    return GetKey(10); }
-bool TurnRight(void) {   return GetKey(11); }
-bool LookUp(void) {      return GetKey(12); }
-bool LookDown(void) {    return GetKey(13); }
-bool RecentLog(void) {   return GetKeyPressed(14); }
-bool Biomonitor(void) {  return GetKeyPressed(15); }
-bool Sensaround(void) {  return GetKeyPressed(16); }
-bool Lantern(void) {     return GetKeyPressed(17); }
-bool Shield(void) {      return GetKeyPressed(18); }
-bool Infrared(void) {    return GetKeyPressed(19); }
-bool Email(void) {       return GetKeyPressed(20); }
-bool Booster(void) {     return GetKeyPressed(21); }
-bool Jumpjets(void) {    return GetKeyPressed(22); }
-bool Attack(void) {      return GetKeyPressed(23); }
-bool Use(void) {         return GetKeyPressed(24); }
-bool Menu(void) {        return GetKeyPressed(25); }
-bool ToggleMode(void) {  return GetKeyPressed(26); }
-bool Reload(void) {      return GetKeyPressed(27); }
-bool WeaponCycUp(void) { return GetKeyPressed(28); }
-bool WeaponCycDown(void){return GetKeyPressed(29); }
-bool Grenade(void) {     return GetKeyPressed(30); }
-bool GrenadeCycUp(void) {return GetKeyPressed(31); }
-bool GrenadeCycDown(void){return GetKeyPressed(32); }
-bool ChangeAmmoType(void){return GetKeyPressed(33); }
-bool Patch(void) {       return GetKeyPressed(34); }
-bool PatchCycUp(void) {  return GetKeyPressed(35); }
-bool PatchCycDown(void) {return GetKeyPressed(36); }
-bool Map(void) {         return GetKeyPressed(37); }
-bool SwimUp(void) {      return GetKey(38); }
-bool SwimDn(void) {      return GetKey(39); }
-bool Console(void) {     return Sys_Input.keyStates[GLFW_KEY_GRAVE_ACCENT].pressed; }
-bool TakeScreenshot(void) {  return GetKeyPressed(41); }
+ENGINE_TO_MOD bool GetKey(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,false); }  // True while held down.
+ENGINE_TO_MOD bool GetKeyPressed(int settingIndex) { return (settingIndex < 0) ? Sys_Input.keyStates[GLFW_KEY_GRAVE_ACCENT].pressed : GetKeyRiseEdgeOrHeld(settingIndex,true); } // True 1st frame down.
 
 void ProcessInput(void) {
     Input_PollJoysticks();
@@ -277,35 +233,21 @@ void ProcessInput(void) {
     if (!Sys_Input.window_has_focus) return;
     
     if (Sys_Input.keyStates[GLFW_KEY_CAPS_LOCK].pressed) Sys_Input.isCapsLockOn = !Sys_Input.isCapsLockOn; // Change capslock state to match keyboard having toggled.  Must always happen regardless of paused/menu.
-    if (Console()) ToggleConsole();
-    Screenshot();
-    if (Menu() && !Sys_Global.menuActive) { Sys_Global.gamePaused = !Sys_Global.gamePaused; return; }
-    if (Menu() && Sys_Global.menuActive) { MenuGoBack(); return; }
+//     if (Console()) ToggleConsole();
+//     Screenshot();
+//     if (Menu() && !Sys_Global.menuActive) { Sys_Global.gamePaused = !Sys_Global.gamePaused; return; }
+//     if (Menu() && Sys_Global.menuActive) { MenuGoBack(); return; }
     if (Sys_Global.gamePaused || Sys_Global.menuActive || Sys_Cheats.consoleActive) return; // =========== PAUSE BARRIER ==================
-    
-    // Debug test entity for confirming model+texture setup + collisions TODO: Remove after combing through entity types.
-//     if (Sys_Input.keyStates[GLFW_KEY_I].pressed) {
-//         editModeTestEntityDefinition++;
-//         if (editModeTestEntityDefinition >= entityCount) editModeTestEntityDefinition = 0u;
-//         Vector3 oldPos = instances[editModeSelection].position;
-//         Quaternion oldRot = instances[editModeSelection].rotation;
-//         Vector3 oldScale = instances[editModeSelection].scale;
-//         instances[editModeSelection] = entities[editModeTestEntityDefinition];
-//         instances[editModeSelection].position = oldPos;
-//         instances[editModeSelection].rotation = oldRot;
-//         instances[editModeSelection].scale = oldScale;
-//         flag_set(&instances[editModeSelection].entflags,ENTFLAG_ACTIVE,true);
+
+//     if (ToggleMode()) {
+//         Sys_Input.ignore_next_mouse_delta = true;
+//         Sys_Global.inventoryMode = !Sys_Global.inventoryMode;
+//         cursorPosition_x = Sys_Settings.ScreenWidth / 2;
+//         cursorPosition_y = Sys_Settings.ScreenHeight / 2;
 //     }
-        
-    if (ToggleMode()) {
-        Sys_Input.ignore_next_mouse_delta = true;
-        Sys_Global.inventoryMode = !Sys_Global.inventoryMode;
-        cursorPosition_x = Sys_Settings.ScreenWidth / 2;
-        cursorPosition_y = Sys_Settings.ScreenHeight / 2;
-    }
     
     // Hardware hotkeys TODO
-    if (Lantern()) inventoryPlayer1.hardwareIsActive ^= HW_LAN;
+//     if (Lantern()) inventoryPlayer1.hardwareIsActive ^= HW_LAN;
 //     if ((inventoryPlayer1.hasHardware & HW_ERD) && GetInput.a.Email())      EReaderAction();
 //     if ((inventoryPlayer1.hasHardware & HW_SNS) && GetInput.a.Sensaround()) SensaroundAction();
 //     if ((inventoryPlayer1.hasHardware & HW_SHD) && GetInput.a.Shield())     ShieldAction();
@@ -314,6 +256,5 @@ void ProcessInput(void) {
 //     if ((inventoryPlayer1.hasHardware & HW_BST) && GetInput.a.Booster())    BoosterAction();
 //     if ((inventoryPlayer1.hasHardware & HW_JET) && GetInput.a.Jumpjets())   JumpJetsAction();
 //     if ((inventoryPlayer1.hasHardware & HW_INF) && GetInput.a.Infrared())   InfraredAction();
-    
     ApplyPlayerMovements();
 }

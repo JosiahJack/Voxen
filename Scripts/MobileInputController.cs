@@ -47,7 +47,7 @@ public class MobileInputController : MonoBehaviour,IBeginDragHandler,
         if (xpos < -1f) xpos = -1f;
         PointPosition = new Vector2(xpos,ypos);
 
-        Knob.instances[i].position = new Vector2(eventData.position.x,eventData.position.y);
+        Knob.Eng_Global->instances[i].position = new Vector2(eventData.position.x,eventData.position.y);
 //(PointPosition.x 
 //            *((Background.rect.size.x-Knob.rect.size.x)/2)*offset)
 //            + Background.position.x, (PointPosition.y
@@ -59,7 +59,7 @@ public class MobileInputController : MonoBehaviour,IBeginDragHandler,
 
     public void OnEndDrag(PointerEventData eventData) {
         PointPosition = new Vector2(0f,0f);
-        Knob.instances[i].position = Background.position;
+        Knob.Eng_Global->instances[i].position = Background.position;
     }
 
     public void OnPointerDown(PointerEventData eventData) {

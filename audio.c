@@ -1,20 +1,6 @@
 // audio.c
 #include "voxen.h"
 #include "tables_audio.h"
-static inline __attribute__((always_inline, noreturn)) void OS_Exit(int64_t exitCode) {
-    #ifdef WINDOWS
-        register uint64_t rax __asm__("rax") = 0x2C;
-        register HANDLE   rcx __asm__("rcx") = (HANDLE)-1;
-        register NTSTATUS rdx __asm__("rdx") = (NTSTATUS)exitCode;
-        __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rcx), "r"(rdx) : "r8", "r9", "r10", "r11", "memory");
-    #else
-        register int64_t rax __asm__("rax") = 231;
-        register int64_t rdi __asm__("rdi") = exitCode;
-        __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi) : "rcx", "r11", "memory");
-    #endif
-    __builtin_unreachable();
-}
-
 #include "./External/miniaudio.h"
 #define BUFFER_MS 50
 #define AUD_BUFFER_T 0.25f
@@ -163,12 +149,12 @@ static const AmbientDef* ambient_def_by_index(uint16_t idx) {
 }
 
 void UpdateAmbientSounds(void) {
-    const Vector3* player = &instances[PLAYER1].position;
+    const Vector3* player = &Sys_Global.instances[PLAYER1].position;
     const float max_range = 7.68f;
     const float max_range_sq = max_range * max_range;
     for (uint16_t i = 0; i < loadedAmbients; ++i) {
         const uint16_t ent_idx = ambientRegistry[i];
-        const Entity* ent = &instances[ent_idx];
+        const Entity* ent = &Sys_Global.instances[ent_idx];
         const AmbientDef* def = ambient_def_by_index(ent->index);
         if (!def) { DualLogError("  [SKIP] Entity %u has unknown index %u\n", ent_idx, ent->index); continue; }
 
@@ -221,12 +207,12 @@ void ResetLevelAudio(void) {
     loadedAmbients = 0;
     __builtin_memset(ambientRegistry, 0, loadedAmbients * sizeof(uint16_t));
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i<loadedInstances;++i) {
-        if (ConstIndexIsAmbient(instances[i].index)) {
+        if (ConstIndexIsAmbient(Sys_Global.instances[i].index)) {
             ambientRegistry[loadedAmbients] = i;
             loadedAmbients++;
-            if (loadedAmbients >= MAX_AMBIENT_NOISES) { DualLogError("%u exceeded max number of ambient noises %u!\n",loadedAmbients,MAX_AMBIENT_NOISES); OS_Exit(1); }
+            if (loadedAmbients >= MAX_AMBIENT_NOISES) { DualLogError("%u exceeded max number of ambient noises %u!\n",loadedAmbients,MAX_AMBIENT_NOISES); break; }
             
-            instances[i].volume = entities[instances[i].index].volume * 0.5f;
+            Sys_Global.instances[i].volume = entities[Sys_Global.instances[i].index].volume * 0.5f;
         }
     }
     
@@ -306,13 +292,13 @@ void MusicNotifyZone(TrackType tt) {
 }
 
 void MusicTriggerEnter(uint16_t self, uint16_t other) {
-    if (instances[self].tickFinished < Sys_Global.pauseRelativeTime) { // Prevent flickering retrigger when player slides along glancing angle of trigger volume.
+    if (Sys_Global.instances[self].tickFinished < Sys_Global.pauseRelativeTime) { // Prevent flickering retrigger when player slides along glancing angle of trigger volume.
         if (other == PLAYER1 || other == PLAYER2) {
-            PlayTrack(instances[self].trackType,instances[self].musicType);
-            MusicNotifyZone(instances[self].trackType);
+            PlayTrack(Sys_Global.instances[self].trackType,Sys_Global.instances[self].musicType);
+            MusicNotifyZone(Sys_Global.instances[self].trackType);
         }
         
-        instances[self].tickFinished = Sys_Global.pauseRelativeTime + 0.1;
+        Sys_Global.instances[self].tickFinished = Sys_Global.pauseRelativeTime + 0.1;
     }
 }
 

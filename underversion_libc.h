@@ -1,5 +1,6 @@
 // underversion_libc.h - Underversioning for libc symbols to ensure maximum compatibility with all libc versions
 #pragma once
+ typedef struct __sFILE FILE;
 __asm__(".symver dlopen,dlopen@GLIBC_2.2.5");
 __asm__(".symver dlerror,dlerror@GLIBC_2.2.5");
 __asm__(".symver dlsym,dlsym@GLIBC_2.2.5");

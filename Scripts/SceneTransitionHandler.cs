@@ -22,11 +22,11 @@ public class SceneTransitionHandler : MonoBehaviour {
             if (mainScene != null) SceneManager.SetActiveScene(mainScene);
             DualLog("Reinit FULL const tables");
             Const.a.Awake();
-            Sys_Global.difficultyCombat = diffCombatCarryover;
-            Sys_Global.difficultyMission = diffMissionCarryover;
-            Sys_Global.difficultyPuzzle = diffPuzzleCarryover;
-            Sys_Global.difficultyCyber = diffCyberCarryover;
-            DualLog("Sys_Global.difficultyCombat " + Sys_Global.difficultyCombat.ToString());
+            Eng_Global->difficultyCombat = diffCombatCarryover;
+            Eng_Global->difficultyMission = diffMissionCarryover;
+            Eng_Global->difficultyPuzzle = diffPuzzleCarryover;
+            Eng_Global->difficultyCyber = diffCyberCarryover;
+            DualLog("Eng_Global->difficultyCombat " + Eng_Global->difficultyCombat.ToString());
             // Must delay by 1 frame.
             Scene loadScene = SceneManager.GetSceneByName("LoadScene");
             DualLog("Unloading LoadScene");

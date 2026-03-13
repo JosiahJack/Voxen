@@ -24,10 +24,10 @@ public class KeypadKeycode : MonoBehaviour {
 	}
 
 	public void Use (UseData ud) {
-	    if (Sys_Cheats.superoverride || Sys_Global.difficultyMission == 0) {
+	    if (Eng_Cheats->superoverride || Eng_Global->difficultyMission == 0) {
 	        locked = false; // SHODAN can go anywhere!  Full security override!
 		} else if (GetCurrentLevelSecurity() > securityThreshhold) {
-		    Sys_UI.BlockedBySecurity(instances[i].position);
+		    Sys_UI.BlockedBySecurity(Eng_Global->instances[i].position);
 		    return;
 		}
 
@@ -81,7 +81,7 @@ public class KeypadKeycode : MonoBehaviour {
 		padInUse = true;
 		Utils.PlayUIOneShotSavable(91);
 		MouseLookScript.a.ForceInventoryMode();
-		Sys_UI.SendKeypadKeycodeToDataTab(keycode,instances[i].position,
+		Sys_UI.SendKeypadKeycodeToDataTab(keycode,Eng_Global->instances[i].position,
 		                                        this,solved);
 	}
 

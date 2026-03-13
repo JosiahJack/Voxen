@@ -34,8 +34,8 @@
 		// Most already was when launched by AIController or WeaponFire.
 		dd.damage = DamageData.GetDamageTakeAmount(dd);
 		if (impactType == PoolType.RailgunImpacts) {
-			Utils.ApplyImpactForceSphere(dd,instances[i].position,3.2f,1f);
-			WeaponFire.a.fogFac += 4;
+			Utils.ApplyImpactForceSphere(dd,Eng_Global->instances[i].position,3.2f,1f);
+			fogFac += 4;
 		}
 
 		GameObject hitGO = other.contacts[0].otherCollider.gameObject;
@@ -45,7 +45,7 @@
 			GameObject impact = Const.a.GetObjectFromPool(impactType); 
 			Vector3 hitPos = other.contacts[0].point; 
 			if (impact != null) {
-				impact.instances[i].position = hitPos;
+				impact.Eng_Global->instances[i].position = hitPos;
 				impact.SetActive(true); // Enable the impact effect
 			}
 
@@ -91,7 +91,7 @@
 			GameObject impact = Const.a.GetObjectFromPool(impactType); 
 			Vector3 hitPos = other.contacts[0].point; 
 			if (impact != null) {
-				impact.instances[i].position = hitPos;
+				impact.Eng_Global->instances[i].position = hitPos;
 				impact.SetActive(true); // Enable the impact effect
 			}
 

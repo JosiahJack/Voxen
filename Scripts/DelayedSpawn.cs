@@ -9,7 +9,7 @@ public class DelayedSpawn : MonoBehaviour {
 	bool active;
 
 	void OnEnable() {
-		if (PauseScript.a != null) timerFinished = Sys_Global.pauseRelativeTime + delay;
+		if (PauseScript.a != null) timerFinished = Eng_Global->pauseRelativeTime + delay;
         else timerFinished = delay;
 
 		active = true;
@@ -17,14 +17,14 @@ public class DelayedSpawn : MonoBehaviour {
 
 	void DelayedSpawnUpdate() {
 		if (!active) return;
-		if (timerFinished >= Sys_Global.pauseRelativeTime) return;
+		if (timerFinished >= Eng_Global->pauseRelativeTime) return;
 
 		active = false; // Once only, unless we do self after the list.
 		for (int i=0;i<objectsToSpawn.Length;i++) {
 			if (despawnInstead) {
-				if (objectsToSpawn[i] != null) flag_set(&instances[objectsToSpawn[i]].entflags, ENTFLAG_ACTIVE, false);
+				if (objectsToSpawn[i] != null) flag_set(&Eng_Global->instances[objectsToSpawn[i]].entflags, ENTFLAG_ACTIVE, false);
 			} else {
-				if (objectsToSpawn[i] != null) flag_set(&instances[objectsToSpawn[i]].entflags, ENTFLAG_ACTIVE, true);
+				if (objectsToSpawn[i] != null) flag_set(&Eng_Global->instances[objectsToSpawn[i]].entflags, ENTFLAG_ACTIVE, true);
 			}
 		}
 

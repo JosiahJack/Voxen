@@ -12,37 +12,37 @@
 	Vector3[] elevatorTargetDestinations;
 
 	void CyborgConversionToggleForCurrentLevel() {	    
-		if (Sys_Global.currentLevel == 6) {
-			if (ressurectionActive[Sys_Global.currentLevel]) {
-				ressurectionActive[Sys_Global.currentLevel] = false;
+		if (Eng_Global->currentLevel == 6) {
+			if (ressurectionActive[Eng_Global->currentLevel]) {
+				ressurectionActive[Eng_Global->currentLevel] = false;
 				ressurectionActive[10] = false;
 				ressurectionActive[11] = false;
 				ressurectionActive[12] = false;
 			} else {
-				ressurectionActive[Sys_Global.currentLevel] = true;
+				ressurectionActive[Eng_Global->currentLevel] = true;
 				ressurectionActive[10] = true;
 				ressurectionActive[11] = true;
 				ressurectionActive[12] = true;
 			}
 		} else {
-			ressurectionActive[Sys_Global.currentLevel] = !ressurectionActive[Sys_Global.currentLevel]; // Toggle current level.
+			ressurectionActive[Eng_Global->currentLevel] = !ressurectionActive[Eng_Global->currentLevel]; // Toggle current level.
 		}
 	}
 
 	bool RessurectPlayer() {
-		if (!ressurectionActive[Sys_Global.currentLevel]) return false;
+		if (!ressurectionActive[Eng_Global->currentLevel]) return false;
 
-		if (Sys_Global.currentLevel == 10 || Sys_Global.currentLevel == 11 || Sys_Global.currentLevel == 12) {
+		if (Eng_Global->currentLevel == 10 || Eng_Global->currentLevel == 11 || Eng_Global->currentLevel == 12) {
 			LoadLevel(6,ressurectionLocation[currentLevel].position);
 			ressurectionBayDoor[6].ForceClose();
 		} else {
-			if (Sys_Global.currentLevel >= 0 || Sys_Global.currentLevel < 13) instances[PLAYER1].position = ressurectionLocation[Sys_Global.currentLevel];
+			if (Eng_Global->currentLevel >= 0 || Eng_Global->currentLevel < 13) Eng_Global->instances[PLAYER1].position = ressurectionLocation[Eng_Global->currentLevel];
 		}
 
 		// Activate death screen and readouts for "BRAIN ACTIVITY SATISFACTORY..." ya debatable right etc. etc.
 // 		PlayerReferenceManager.a.playerDeathRessurectEffect.SetActive(true); // TODO
 		PlayTrack(TrackType_Revive,MusicType_Override);
-		instances[PLAYER1].ressurectingFinished = Sys_Global.pauseRelativeTime + 3f;
+		Eng_Global->instances[PLAYER1].ressurectingFinished = Eng_Global->pauseRelativeTime + 3f;
 		return true;
 	}
 	

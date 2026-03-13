@@ -250,34 +250,34 @@ void BioMonitorUpdate(void) {
     bioMonitor.bpmText = 529;
     bioMonitor.fatigueDetailText = 531;
     bioMonitor.fatigue = 534; // Low
-         if (instances[PLAYER1].fatigue >= 80.0f)                                       bioMonitor.fatigue = 532; // High!
-    else if (instances[PLAYER1].fatigue <  80.0f && instances[PLAYER1].fatigue > 30.0f) bioMonitor.fatigue = 533; // Moderate
+         if (Sys_Global.instances[PLAYER1].fatigue >= 80.0f)                                       bioMonitor.fatigue = 532; // High!
+    else if (Sys_Global.instances[PLAYER1].fatigue <  80.0f && Sys_Global.instances[PLAYER1].fatigue > 30.0f) bioMonitor.fatigue = 533; // Moderate
 
-    if (bioMonitor.beatFinished < Sys_Global.pauseRelativeTime) bioMonitor.heartRate = vfloor((70.0f +((instances[PLAYER1].fatigue / 100.0f) * 110.0f)) * random_range(0.95f,1.05f));
-    if (inventoryPlayer1.hardwareVersion[HW_BIO] > 1 && (instances[PLAYER1].patchActive & 127)) {
+    if (bioMonitor.beatFinished < Sys_Global.pauseRelativeTime) bioMonitor.heartRate = vfloor((70.0f +((Sys_Global.instances[PLAYER1].fatigue / 100.0f) * 110.0f)) * random_range(0.95f,1.05f));
+    if (inventoryPlayer1.hardwareVersion[HW_BIO] > 1 && (Sys_Global.instances[PLAYER1].patchActive & 127)) {
 //         bioMonitor.patchesActiveText = Sys_Text.stringTable[528]; // TODO actually render text
-//         if (instances[PLAYER1].patchActive & PATCH_MEDI))     { tempStr.Append(Sys_Text.stringTable[520]); tempStr.Append(" "); }
-//         if (instances[PLAYER1].patchActive & PATCH_STAMINUP)) { tempStr.Append(Sys_Text.stringTable[521]); tempStr.Append(" "); }
-//         if (instances[PLAYER1].patchActive & PATCH_SIGHT))    { tempStr.Append(Sys_Text.stringTable[522]); tempStr.Append(" "); }
-//         if (instances[PLAYER1].patchActive & PATCH_GENIUS))   { tempStr.Append(Sys_Text.stringTable[523]); tempStr.Append(" "); }
-//         if (instances[PLAYER1].patchActive & PATCH_BERSERK))  { tempStr.Append(Sys_Text.stringTable[524]); tempStr.Append(" "); }
-//         if (instances[PLAYER1].patchActive & PATCH_REFLEX))   { tempStr.Append(Sys_Text.stringTable[525]); tempStr.Append(" "); }
-//         if (instances[PLAYER1].patchActive & PATCH_DETOX))    { tempStr.Append(Sys_Text.stringTable[530]); }
+//         if (Sys_Global.instances[PLAYER1].patchActive & PATCH_MEDI))     { tempStr.Append(Sys_Text.stringTable[520]); tempStr.Append(" "); }
+//         if (Sys_Global.instances[PLAYER1].patchActive & PATCH_STAMINUP)) { tempStr.Append(Sys_Text.stringTable[521]); tempStr.Append(" "); }
+//         if (Sys_Global.instances[PLAYER1].patchActive & PATCH_SIGHT))    { tempStr.Append(Sys_Text.stringTable[522]); tempStr.Append(" "); }
+//         if (Sys_Global.instances[PLAYER1].patchActive & PATCH_GENIUS))   { tempStr.Append(Sys_Text.stringTable[523]); tempStr.Append(" "); }
+//         if (Sys_Global.instances[PLAYER1].patchActive & PATCH_BERSERK))  { tempStr.Append(Sys_Text.stringTable[524]); tempStr.Append(" "); }
+//         if (Sys_Global.instances[PLAYER1].patchActive & PATCH_REFLEX))   { tempStr.Append(Sys_Text.stringTable[525]); tempStr.Append(" "); }
+//         if (Sys_Global.instances[PLAYER1].patchActive & PATCH_DETOX))    { tempStr.Append(Sys_Text.stringTable[530]); }
 //         patchEffects.text = tempStr.ToString();
-//         if (!Sys_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, FONT_NORMAL,1.0f,"Player cell: %u, floor: %.3f, ceil: %.3f", instances[PLAYER1].cellIndex, (double)gridCellFloorHeight[instances[PLAYER1].cellIndex], (double)gridCellCeilingHeight[instances[PLAYER1].cellIndex]); TODO
+//         if (!Sys_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, FONT_NORMAL,1.0f,"Player cell: %u, floor: %.3f, ceil: %.3f", Sys_Global.instances[PLAYER1].cellIndex, (double)gridCellFloorHeight[Sys_Global.instances[PLAYER1].cellIndex], (double)gridCellCeilingHeight[Sys_Global.instances[PLAYER1].cellIndex]); TODO
     }
 
     static const float beatThresh = 0.1f;
     static const float beatVariation = 0.05f;
 
     // Energy Usage
-    bioMonitor.ergValue = (instances[PLAYER1].drainJPM / 255.0f);
+    bioMonitor.ergValue = (Sys_Global.instances[PLAYER1].drainJPM / 255.0f);
     if (bioMonitor.ergValue < 0.0f) bioMonitor.ergValue = 0.0f;
     if (bioMonitor.ergValue > 1.0f) bioMonitor.ergValue = 1.0f;
 
     // Chi Brain Waves
     float brainFactor = 0.15f;
-    if (instances[PLAYER1].geniusFinishedTime > Sys_Global.pauseRelativeTime) {
+    if (Sys_Global.instances[PLAYER1].geniusFinishedTime > Sys_Global.pauseRelativeTime) {
         brainFactor = 0.35f + random_range(-0.3f,0.3f);
     }
 
@@ -286,7 +286,7 @@ void BioMonitorUpdate(void) {
 
     // ECG: Create shifted sine wave for heart beat.
     // Apply percent fatigued to 200bpm max heart rate with baseline 50bpm.
-    float fatigueFactor = ((instances[PLAYER1].fatigue / 100.0f) * 120.0f) + 20.0f;
+    float fatigueFactor = ((Sys_Global.instances[PLAYER1].fatigue / 100.0f) * 120.0f) + 20.0f;
     fatigueFactor = fatigueFactor / 60.0f;
     if (bioMonitor.beatFinished < Sys_Global.pauseRelativeTime) {
         bioMonitor.beatFinished = Sys_Global.pauseRelativeTime + (1.0 / (double)fatigueFactor);

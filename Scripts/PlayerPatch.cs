@@ -33,32 +33,32 @@
 	}
 
 	void Update() {
-		if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
+		if (!Eng_Global->gamePaused && !Eng_Global->menuActive) {
 			// ================================== DETOX PATCH =========================
-			if (instances[PLAYER1].patchActive & PATCH_DETOX) {
+			if (Eng_Global->instances[PLAYER1].patchActive & PATCH_DETOX) {
 				// ---Disable Patch---
-				if (detoxFinishedTime < Sys_Global.pauseRelativeTime) {
-					instances[PLAYER1].patchActive -= PATCH_DETOX; // Back to full force radiation effects, if present.  All normal.
+				if (detoxFinishedTime < Eng_Global->pauseRelativeTime) {
+					Eng_Global->instances[PLAYER1].patchActive -= PATCH_DETOX; // Back to full force radiation effects, if present.  All normal.
 				} else {
 					// ***Patch Effect***
-					instances[PLAYER1].patchActive = PATCH_DETOX; // Lets health script know to ameliorate the effects of radiation.
+					Eng_Global->instances[PLAYER1].patchActive = PATCH_DETOX; // Lets health script know to ameliorate the effects of radiation.
 				}
 			}
 
 			// ================================== MEDI PATCH =========================
-			if (instances[PLAYER1].patchActive & PATCH_MEDI) {
+			if (Eng_Global->instances[PLAYER1].patchActive & PATCH_MEDI) {
 				// ---Disable Patch---
-				if (mediFinishedTime < Sys_Global.pauseRelativeTime && mediFinishedTime != -1) {
-					instances[PLAYER1].patchActive -= PATCH_MEDI;
+				if (mediFinishedTime < Eng_Global->pauseRelativeTime && mediFinishedTime != -1) {
+					Eng_Global->instances[PLAYER1].patchActive -= PATCH_MEDI;
 					mediFinishedTime = -1;
 				}
 			}
 
 			// ================================== REFLEX PATCH =======================
-			if (instances[PLAYER1].patchActive & PATCH_REFLEX) {
+			if (Eng_Global->instances[PLAYER1].patchActive & PATCH_REFLEX) {
 				// ---Disable Patch---
 				if (reflexFinishedTime < Time.realtimeSinceStartup && reflexFinishedTime != -1) {
-					instances[PLAYER1].patchActive -= PATCH_REFLEX;
+					Eng_Global->instances[PLAYER1].patchActive -= PATCH_REFLEX;
 					Time.timeScale = Const.defaultTimeScale;
 					reflexFinishedTime = -1;
 				} else {
@@ -70,16 +70,16 @@
 			}
 
 			// ================================== BERSERK PATCH =======================
-			if (instances[PLAYER1].patchActive & PATCH_BERSERK) {
+			if (Eng_Global->instances[PLAYER1].patchActive & PATCH_BERSERK) {
 				// ---Disable Patch---
-				if (berserkFinishedTime < Sys_Global.pauseRelativeTime) {
+				if (berserkFinishedTime < Eng_Global->pauseRelativeTime) {
 					berserkIncrement = 0;
-					instances[PLAYER1].patchActive -= PATCH_BERSERK;
+					Eng_Global->instances[PLAYER1].patchActive -= PATCH_BERSERK;
 					BerserkDisable();
 				} else {
 					// ***Patch Effect***
 					BerserkEnable();
-					if (berserkIncrementFinishedTime < Sys_Global.pauseRelativeTime) {
+					if (berserkIncrementFinishedTime < Eng_Global->pauseRelativeTime) {
 						berserkIncrement++;
 						switch (berserkIncrement) {
 							case 0: berserk.swapTexture = b1; break;
@@ -93,17 +93,17 @@
 						//gunCamBerserk.swapTexture = berserk.swapTexture;
 						//gunCamBerserk.effectStrength = berserk.effectStrength;
 						float berserkIncrementTime = Const.berserkTime/5f;
-						berserkIncrementFinishedTime = Sys_Global.pauseRelativeTime + berserkIncrementTime;
+						berserkIncrementFinishedTime = Eng_Global->pauseRelativeTime + berserkIncrementTime;
 					}
 				}
 			}
 
 			// ================================== GENIUS PATCH ========================
-			if (instances[PLAYER1].patchActive & PATCH_GENIUS) {
+			if (Eng_Global->instances[PLAYER1].patchActive & PATCH_GENIUS) {
 				// ---Disable Patch---
-				if (geniusFinishedTime < Sys_Global.pauseRelativeTime) {
+				if (geniusFinishedTime < Eng_Global->pauseRelativeTime) {
 					MouseLookScript.a.geniusActive = false;
-					instances[PLAYER1].patchActive -= PATCH_GENIUS;
+					Eng_Global->instances[PLAYER1].patchActive -= PATCH_GENIUS;
 					wirePuzzle.geniusActive = false;
 				} else {
 					// ***Patch Effect***
@@ -113,36 +113,36 @@
 			}
 
 			// ================================== SIGHT PATCH =========================
-			if (instances[PLAYER1].patchActive & PATCH_SIGHT) {
+			if (Eng_Global->instances[PLAYER1].patchActive & PATCH_SIGHT) {
 				// [[[Enable Side Effect]]]
-				if (sightFinishedTime < Sys_Global.pauseRelativeTime && sightFinishedTime != -1f) {
+				if (sightFinishedTime < Eng_Global->pauseRelativeTime && sightFinishedTime != -1f) {
 					sightFinishedTime = -1f;
-					sightSideEffectFinishedTime = Sys_Global.pauseRelativeTime + Const.sightSideEffectTime;
+					sightSideEffectFinishedTime = Eng_Global->pauseRelativeTime + Const.sightSideEffectTime;
 					sightLight.enabled = false;
 					sightDimming.enabled = true;
 				}
 
 				// ---Disable Patch---
-				if (sightSideEffectFinishedTime < Sys_Global.pauseRelativeTime && sightSideEffectFinishedTime != -1f) {
+				if (sightSideEffectFinishedTime < Eng_Global->pauseRelativeTime && sightSideEffectFinishedTime != -1f) {
 					sightSideEffectFinishedTime = -1f;
 					sightFinishedTime = -1f;
 					sightDimming.enabled = false;
 					sightLight.enabled = false;
-					instances[PLAYER1].patchActive -= PATCH_SIGHT;
+					Eng_Global->instances[PLAYER1].patchActive -= PATCH_SIGHT;
 				}
 			}
 
 			// ================================== STAMINUP PATCH ======================
-			if (instances[PLAYER1].patchActive & PATCH_STAMINUP) {
+			if (Eng_Global->instances[PLAYER1].patchActive & PATCH_STAMINUP) {
 				// ---Disable Patch---
-				if (staminupFinishedTime < Sys_Global.pauseRelativeTime) {
-					instances[PLAYER1].staminupActive = false;
-					instances[PLAYER1].fatigue = 100f;  // side effect
-					instances[PLAYER1].patchActive -= PATCH_STAMINUP;
+				if (staminupFinishedTime < Eng_Global->pauseRelativeTime) {
+					Eng_Global->instances[PLAYER1].staminupActive = false;
+					Eng_Global->instances[PLAYER1].fatigue = 100f;  // side effect
+					Eng_Global->instances[PLAYER1].patchActive -= PATCH_STAMINUP;
 				} else {
 					// ***Patch Effect***
-					instances[PLAYER1].fatigue = 0f;
-					instances[PLAYER1].staminupActive = true;
+					Eng_Global->instances[PLAYER1].fatigue = 0f;
+					Eng_Global->instances[PLAYER1].staminupActive = true;
 				}
 			}
 		}
@@ -183,7 +183,7 @@
 		sightDimming.enabled = false;
 		sightLight.enabled = false;
 		staminupFinishedTime =  -1f;
-		instances[PLAYER1].staminupActive = false;
-		instances[PLAYER1].patchActive = 0;
+		Eng_Global->instances[PLAYER1].staminupActive = false;
+		Eng_Global->instances[PLAYER1].patchActive = 0;
 	}
 }

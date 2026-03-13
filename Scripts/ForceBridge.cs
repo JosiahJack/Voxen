@@ -28,7 +28,7 @@ void ForceBridgeActivate(bool isSilent) {
     if (x) sx = 0.1f;
     if (y) sy = 0.1f;
     if (z) sz = 0.1f;
-    instances[i].scale = (Vector3){sx,sy,sz);
+    Eng_Global->instances[i].scale = (Vector3){sx,sy,sz);
 }
 
 void ForceBridgeDeactivate(bool isSilent) {

@@ -12,25 +12,25 @@ void TargetOnGatePassed(bool bitToCheck, bool passIfTrue, UseData ud, string tar
 }
 
 void EnableBits(uint16_t i) {
-    instances[WORLD].ioflags |= instances[i].ioflags;
+    Eng_Global->instances[WORLD].ioflags |= Eng_Global->instances[i].ioflags;
     
-    if (instances[i].ioflags & QUESTBIT_ROBOT_SPAWN_DEACTIVATED) DualLog("QUESTBIT_ROBOT_SPAWN_DEACTIVATED: 1");
-    if (instances[i].ioflags & QUESTBIT_ISOTOPE_INSTALLED) DualLog("QUESTBIT_ISOTOPE_INSTALLED: 1");
-    if (instances[i].ioflags & QUESTBIT_SHIELD_ACTIVATED) {
+    if (Eng_Global->instances[i].ioflags & QUESTBIT_ROBOT_SPAWN_DEACTIVATED) DualLog("QUESTBIT_ROBOT_SPAWN_DEACTIVATED: 1");
+    if (Eng_Global->instances[i].ioflags & QUESTBIT_ISOTOPE_INSTALLED) DualLog("QUESTBIT_ISOTOPE_INSTALLED: 1");
+    if (Eng_Global->instances[i].ioflags & QUESTBIT_SHIELD_ACTIVATED) {
         DualLog("QUESTBIT_SHIELD_ACTIVATED: 1");
         QuestLogNotesManager.a.notes[8].SetActive(true);
         QuestLogNotesManager.a.checkBoxes[8].isOn = Const.a.questData.ShieldActivated;
         QuestLogNotesManager.a.labels[8].text = Sys_Text.stringTable[560];
     }
     
-    if (instances[i].ioflags & QUESTBIT_LASER_SAFETY_OVERRIDEN) {
+    if (Eng_Global->instances[i].ioflags & QUESTBIT_LASER_SAFETY_OVERRIDEN) {
         DualLog("QUESTBIT_LASER_SAFETY_OVERRIDEN: 1");
         QuestLogNotesManager.a.notes[7].SetActive(true);
         QuestLogNotesManager.a.checkBoxes[7].isOn = Const.a.questData.LaserSafetyOverriden;
         QuestLogNotesManager.a.labels[7].text = Sys_Text.stringTable[559];
     }
     
-    if (instances[i].ioflags & QUESTBIT_LASER_DESTROYED) {
+    if (Eng_Global->instances[i].ioflags & QUESTBIT_LASER_DESTROYED) {
         DualLog("QUESTBIT_LASER_DESTROYED: 1");
         if (AutoSplitterData.missionSplitID == 1) AutoSplitterData.missionSplitID++;
         QuestLogNotesManager.a.notes[9].SetActive(true);
@@ -38,27 +38,27 @@ void EnableBits(uint16_t i) {
         QuestLogNotesManager.a.labels[9].text = Sys_Text.stringTable[561];
     }
     
-    if (instances[i].ioflags & QUESTBIT_BETA_GROVE_CYBER_UNLOCKED) {
+    if (Eng_Global->instances[i].ioflags & QUESTBIT_BETA_GROVE_CYBER_UNLOCKED) {
         DualLog("QUESTBIT_BETA_GROVE_CYBER_UNLOCKED: 1");
         QuestLogNotesManager.a.notes[12].SetActive(true);
     }
     
-    if (instances[i].ioflags & QUESTBIT_GROVE_ALPHA_JETTISON_ENABLED) {
+    if (Eng_Global->instances[i].ioflags & QUESTBIT_GROVE_ALPHA_JETTISON_ENABLED) {
         DualLog("QUESTBIT_GROVE_ALPHA_JETTISON_ENABLED: 1");
         QuestLogNotesManager.a.notes[12].SetActive(true);
     }
     
-    if (instances[i].ioflags & QUESTBIT_GROVE_BETA_JETTISON_ENABLED) {
+    if (Eng_Global->instances[i].ioflags & QUESTBIT_GROVE_BETA_JETTISON_ENABLED) {
         DualLog("QUESTBIT_GROVE_BETA_JETTISON_ENABLED: 1");
         QuestLogNotesManager.a.notes[12].SetActive(true);
     }
     
-    if (instances[i].ioflags & QUESTBIT_GROVE_DELTA_JETTISON_ENABLED) {
+    if (Eng_Global->instances[i].ioflags & QUESTBIT_GROVE_DELTA_JETTISON_ENABLED) {
         DualLog("QUESTBIT_GROVE_DELTA_JETTISON_ENABLED: 1");
         QuestLogNotesManager.a.notes[12].SetActive(true);
     }
     
-    if (instances[i].ioflags & QUESTBIT_MASTER_JETTISON_BROKEN) {
+    if (Eng_Global->instances[i].ioflags & QUESTBIT_MASTER_JETTISON_BROKEN) {
         DualLog("QUESTBIT_MASTER_JETTISON_BROKEN: 1");
         if (AutoSplitterData.missionSplitID == 2) AutoSplitterData.missionSplitID++;
         QuestLogNotesManager.a.notes[12].SetActive(true);
@@ -66,7 +66,7 @@ void EnableBits(uint16_t i) {
         QuestLogNotesManager.a.labels[11].text = Sys_Text.stringTable[563]; // Set:Diagnose and repair broken relay
     }
     
-    if (instances[i].ioflags & QUESTBIT_RELAY_428_FIXED) {
+    if (Eng_Global->instances[i].ioflags & QUESTBIT_RELAY_428_FIXED) {
         DualLog("QUESTBIT_RELAY_428_FIXED: 1");
         QuestLogNotesManager.a.notes[11].SetActive(true);
         QuestLogNotesManager.a.checkBoxes[11].isOn = Const.a.questData.Relay428Fixed;
@@ -74,7 +74,7 @@ void EnableBits(uint16_t i) {
         QuestLogNotesManager.a.labels[11].text += Sys_Text.stringTable[564]; // Add:: 428.
     }
     
-    if (instances[i].ioflags & QUESTBIT_MASTER_JETTISON_ENABLED) {
+    if (Eng_Global->instances[i].ioflags & QUESTBIT_MASTER_JETTISON_ENABLED) {
         DualLog("QUESTBIT_MASTER_JETTISON_ENABLED: 1");
         if (AutoSplitterData.missionSplitID == 3) AutoSplitterData.missionSplitID++;
         QuestLogNotesManager.a.notes[10].SetActive(true);
@@ -82,7 +82,7 @@ void EnableBits(uint16_t i) {
         QuestLogNotesManager.a.labels[10].text = Sys_Text.stringTable[562];
     }
     
-    if (instances[i].ioflags & QUESTBIT_BETA_GROVE_JETTISONED) {
+    if (Eng_Global->instances[i].ioflags & QUESTBIT_BETA_GROVE_JETTISONED) {
         DualLog("QUESTBIT_BETA_GROVE_JETTISONED: 1");
         if (AutoSplitterData.missionSplitID == 4) AutoSplitterData.missionSplitID++;
         QuestLogNotesManager.a.notes[12].SetActive(true);
@@ -92,27 +92,27 @@ void EnableBits(uint16_t i) {
         QuestLogNotesManager.a.labels[13].text = Sys_Text.stringTable[566];
     }
     
-    if (instances[i].ioflags & QUESTBIT_ANTENNA_NORTH_DESTROYED) {
+    if (Eng_Global->instances[i].ioflags & QUESTBIT_ANTENNA_NORTH_DESTROYED) {
         DualLog("QUESTBIT_ANTENNA_NORTH_DESTROYED: 1");
         QuestLogNotesManager.a.notes[13].SetActive(true);
     }
     
-    if (instances[i].ioflags & QUESTBIT_ANTENNA_SOUTH_DESTROYED) {
+    if (Eng_Global->instances[i].ioflags & QUESTBIT_ANTENNA_SOUTH_DESTROYED) {
         DualLog("QUESTBIT_ANTENNA_SOUTH_DESTROYED: 1");
         QuestLogNotesManager.a.notes[13].SetActive(true);
     }
     
-    if (instances[i].ioflags & QUESTBIT_ANTENNA_EAST_DESTROYED) {
+    if (Eng_Global->instances[i].ioflags & QUESTBIT_ANTENNA_EAST_DESTROYED) {
         DualLog("QUESTBIT_ANTENNA_EAST_DESTROYED: 1");
         QuestLogNotesManager.a.notes[13].SetActive(true);
     }
     
-    if (instances[i].ioflags & QUESTBIT_ANTENNA_WEST_DESTROYED) {
+    if (Eng_Global->instances[i].ioflags & QUESTBIT_ANTENNA_WEST_DESTROYED) {
         DualLog("QUESTBIT_ANTENNA_WEST_DESTROYED: 1");
         QuestLogNotesManager.a.notes[13].SetActive(true);
     }
     
-    if (instances[i].ioflags & QUESTBIT_SELF_DESTRUCT_ACTIVATED) {
+    if (Eng_Global->instances[i].ioflags & QUESTBIT_SELF_DESTRUCT_ACTIVATED) {
         DualLog("QUESTBIT_SELF_DESTRUCT_ACTIVATED: 1");
         QuestLogNotesManager.a.notes[0].SetActive(true);
         QuestLogNotesManager.a.notes[1].SetActive(true);
@@ -136,7 +136,7 @@ void EnableBits(uint16_t i) {
         QuestLogNotesManager.a.labels[15].text = Sys_Text.stringTable[568]; // Set:Escape on escape pod.
     }
     
-    if (instances[i].ioflags & QUESTBIT_BRIDGE_SEPARATED) {
+    if (Eng_Global->instances[i].ioflags & QUESTBIT_BRIDGE_SEPARATED) {
         DualLog("QUESTBIT_BRIDGE_SEPARATED: 1");
         QuestLogNotesManager.a.notes[0].SetActive(true);
         QuestLogNotesManager.a.notes[1].SetActive(true);
@@ -162,7 +162,7 @@ void EnableBits(uint16_t i) {
         QuestLogNotesManager.a.labels[17].text = Sys_Text.stringTable[570]; // Set:Destroy SHODAN.
     }
     
-    if (instances[i].ioflags & QUESTBIT_ISOLINEAR_CHIPSET_INSTALLED) DualLog("QUESTBIT_ISOLINEAR_CHIPSET_INSTALLED: 1");
+    if (Eng_Global->instances[i].ioflags & QUESTBIT_ISOLINEAR_CHIPSET_INSTALLED) DualLog("QUESTBIT_ISOLINEAR_CHIPSET_INSTALLED: 1");
 }
 
 void DisableBits() {

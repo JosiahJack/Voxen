@@ -26,7 +26,7 @@ public class CyberWall : MonoBehaviour {
 	}
 
 	void Update() {
-		if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
+		if (!Eng_Global->gamePaused && !Eng_Global->menuActive) {
 			if (tickFinished < Time.time) {
 				if (centerAlphaCurrent > centerAlphaMinimum) {
 					centerAlphaCurrent -= 0.05f;
@@ -42,7 +42,7 @@ public class CyberWall : MonoBehaviour {
 					//See if we were just touched and the conway timer is up so that touch material is active for conwayTime seconds
 					// if (wasTouching && conwayFinished < Time.time) {
 						// wasTouching = false; // reset bit so we don't spam Conway's Game of Life
-						// Const.a.ConwayGameEntry(this,instances[i].position); // keep spreading life!
+						// Const.a.ConwayGameEntry(this,Eng_Global->instances[i].position); // keep spreading life!
 					// }
 					// if (mr.material != cyberwall) mr.material = cyberwall;
 				// }

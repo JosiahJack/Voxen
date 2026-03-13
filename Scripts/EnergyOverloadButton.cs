@@ -35,7 +35,7 @@ public class EnergyOverloadButton : MonoBehaviour {
         if (clickFinished >= Time.time) return;
 
         clickFinished = Time.time + 0.4f;
-        if (inventoryPlayer1.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] > 25f) {
+        if (inventoryPlayer1.currentEnergyWeaponHeat[inventoryPlayer1.weaponCurrent] > 25f) {
             CenterStatusPrint("%s", Sys_Text.stringTable[12]);
             return;
         }

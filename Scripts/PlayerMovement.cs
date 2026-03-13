@@ -180,9 +180,9 @@ public class PlayerMovement : MonoBehaviour {
 		bodyState = BodyState_Standing;
 		cyberDesetup = false;
 		oldBodyState = bodyState;
-		fatigueFinished = Sys_Global.pauseRelativeTime;
-		fatigueFinished2 = Sys_Global.pauseRelativeTime;
-		ladderSFXFinished = Sys_Global.pauseRelativeTime;
+		fatigueFinished = Eng_Global->pauseRelativeTime;
+		fatigueFinished2 = Eng_Global->pauseRelativeTime;
+		ladderSFXFinished = Eng_Global->pauseRelativeTime;
 		rbody = GetComponent<Rigidbody>();
 		oldVelocity = rbody.velocity;
 		capsuleCollider = GetComponent<CapsuleCollider>();
@@ -192,21 +192,21 @@ public class PlayerMovement : MonoBehaviour {
 		staminupActive = false;
 		cyberCollider = GetComponent<SphereCollider>();
 		consoleActivated = false;
-		jumpLandSoundFinished = Sys_Global.pauseRelativeTime;
+		jumpLandSoundFinished = Eng_Global->pauseRelativeTime;
 		justJumped = false;
-		jumpSFXFinished = Sys_Global.pauseRelativeTime;
+		jumpSFXFinished = Eng_Global->pauseRelativeTime;
 		fatigueWarned = false;
-		jumpJetEnergySuckTickFinished = Sys_Global.pauseRelativeTime;
-		instances[PLAYER1].ressurectingFinished = Sys_Global.pauseRelativeTime;
+		jumpJetEnergySuckTickFinished = Eng_Global->pauseRelativeTime;
+		Eng_Global->instances[PLAYER1].ressurectingFinished = Eng_Global->pauseRelativeTime;
 		tempInt = -1;
-		doubleJumpFinished = Sys_Global.pauseRelativeTime;
+		doubleJumpFinished = Eng_Global->pauseRelativeTime;
 		doubleJumpTicks = 0;
-		turboFinished = Sys_Global.pauseRelativeTime;
-		playerHome = instances[i].position;
+		turboFinished = Eng_Global->pauseRelativeTime;
+		playerHome = Eng_Global->instances[i].position;
 		ConsoleEmulator.lastCommand = new string[7];
 		ConsoleEmulator.consoleMemdex = consoleMemdex = 0;
-		stepFinished = Sys_Global.pauseRelativeTime;
-		rustleFinished = Sys_Global.pauseRelativeTime;
+		stepFinished = Eng_Global->pauseRelativeTime;
+		rustleFinished = Eng_Global->pauseRelativeTime;
 		bodyLerpGravityOffDelayFinished = 0;
 		contactsCache = new ContactPoint[16];
     }
@@ -226,9 +226,9 @@ public class PlayerMovement : MonoBehaviour {
 		// Bug Hunter feedback (puts it into their screenshots for me)
 		if (locationIndicator.activeInHierarchy) {
 			locationText.text = Sys_Text.stringTable[738] // "location: "
-								+ (instances[i].position.x.ToString("00.00")
-								+ " " + instances[i].position.y.ToString("00.00")
-								+ " " + instances[i].position.z.ToString("00.00"));
+								+ (Eng_Global->instances[i].position.x.ToString("00.00")
+								+ " " + Eng_Global->instances[i].position.y.ToString("00.00")
+								+ " " + Eng_Global->instances[i].position.z.ToString("00.00"));
 		}
 
 		// Prevent falling or movement while menu is up. Force it here in case
@@ -239,8 +239,8 @@ public class PlayerMovement : MonoBehaviour {
 			return;
 		}
 
-		if (Sys_Global.gamePaused
-			|| (ressurectingFinished >= Sys_Global.pauseRelativeTime)) {
+		if (Eng_Global->gamePaused
+			|| (ressurectingFinished >= Eng_Global->pauseRelativeTime)) {
 			return;
 		}
 		
@@ -267,7 +267,7 @@ public class PlayerMovement : MonoBehaviour {
 			CyberDestupOrNoclipMaintain();
 		} else {
 			PlayerHealth.a.makingNoise = true; // Cyber enemies more aware.
-			PlayerHealth.a.noiseFinished = Sys_Global.pauseRelativeTime + 0.5f;
+			PlayerHealth.a.noiseFinished = Eng_Global->pauseRelativeTime + 0.5f;
 		}
 
 		isSprinting = GetSprintInputState();
@@ -275,7 +275,7 @@ public class PlayerMovement : MonoBehaviour {
 		Prone();
 		EndCrouchProneTransition();
 		FatigueApply(); // Here fatigue me out, except in cyberspace
-		Automap.a.UpdateAutomap(instances[i].position); // Update the map.
+		Automap.a.UpdateAutomap(Eng_Global->instances[i].position); // Update the map.
 	}
 
 	void FixedUpdate() {
@@ -285,8 +285,8 @@ public class PlayerMovement : MonoBehaviour {
 		Vector2 hz = new Vector2(rbody.velocity.x, rbody.velocity.z);
 		playerSpeedHorizontalActual = hz.magnitude;
 
-		if (Sys_Global.gamePaused || Sys_Global.menuActive) return;
-		if (ressurectingFinished > Sys_Global.pauseRelativeTime) return;
+		if (Eng_Global->gamePaused || Eng_Global->menuActive) return;
+		if (ressurectingFinished > Eng_Global->pauseRelativeTime) return;
 		if (consoleActivated) return;
 
 		// Crouch/Prone by shrinking the capsule height.
@@ -347,7 +347,7 @@ public class PlayerMovement : MonoBehaviour {
 		if (inCyberSpace) return;
 
 		// Using value of 1.06 = (player capsule height / 2) + 0.06 = 1 + 0.06;
-		bool successfulRay = Raycast(instances[i].position, Vector3.down,
+		bool successfulRay = Raycast(Eng_Global->instances[i].position, Vector3.down,
 											 out tempHit,1.1f,
 											 Const.a.layerMaskPlayerFeet);
 
@@ -378,22 +378,22 @@ public class PlayerMovement : MonoBehaviour {
 		if (rbody.velocity.sqrMagnitude <= 0.05f) SFXClothes.Stop();
 		if ((vabs(relForward) + vabs(relSideways)) == 0) return;
 
-		if (rustleFinished < Sys_Global.pauseRelativeTime) {
-			rustleFinished = Sys_Global.pauseRelativeTime + (isSprinting ? random_range(0.4f,0.6f) : random_range(0.8f,1.2f));
+		if (rustleFinished < Eng_Global->pauseRelativeTime) {
+			rustleFinished = Eng_Global->pauseRelativeTime + (isSprinting ? random_range(0.4f,0.6f) : random_range(0.8f,1.2f));
 			AudioClip rustle = sounds[random_range_u32(459,465 + 1)];
 			Utils.PlayOneShotSavable(SFXClothes,rustle,random_range(0.3f,0.5f));
 		}
 
 		if (!grounded) return;
 
-		successfulRay = Raycast(instances[i].position, Vector3.down,out tempHit,feetRayLength,Const.a.layerMaskPlayerFeet);
+		successfulRay = Raycast(Eng_Global->instances[i].position, Vector3.down,out tempHit,feetRayLength,Const.a.layerMaskPlayerFeet);
 		if (tempHit.collider == null) return;
 		other = tempHit.collider.transform.gameObject;
 
 		// Footsteps
-		if (stepFinished < Sys_Global.pauseRelativeTime) {
-			stepFinished = Sys_Global.pauseRelativeTime + (isSprinting ? random_range(0.2f,0.3f) : random_range(0.35f,0.65f));
-			FootStepType fstep = GetFootstepTypeForPrefab(instances[other].constIndex);
+		if (stepFinished < Eng_Global->pauseRelativeTime) {
+			stepFinished = Eng_Global->pauseRelativeTime + (isSprinting ? random_range(0.2f,0.3f) : random_range(0.35f,0.65f));
+			FootStepType fstep = GetFootstepTypeForPrefab(Eng_Global->instances[other].constIndex);
 			AudioClip stcp = FootStepSound(fstep);
 			Utils.PlayOneShotSavable(SFXFootsteps,stcp,random_range(0.4f,0.55f));
 		}
@@ -419,7 +419,7 @@ public class PlayerMovement : MonoBehaviour {
 		}
 
 		if ((isSprinting || inventoryPlayer1.BoosterActive()) && running) {
-			if (instances[PLAYER1].fatigue > 80f && !inventoryPlayer1.BoosterActive()) {
+			if (Eng_Global->instances[PLAYER1].fatigue > 80f && !inventoryPlayer1.BoosterActive()) {
 				retval = maxSprintSpeedFatigued;
 			} else {
 				retval = maxSprintSpeed;
@@ -453,7 +453,7 @@ public class PlayerMovement : MonoBehaviour {
 		case BodyState_StandingUp:
 			lastCrouchRatio = currentCrouchRatio;
 			currentCrouchRatio = smooth_damp(currentCrouchRatio,1.01f, ref crouchingVelocity, transitionToCrouchSec);
-			LocalPositionSetY(transform,(((currentCrouchRatio - lastCrouchRatio) * capsuleHeight) / 2) + instances[i].position.y);
+			LocalPositionSetY(transform,(((currentCrouchRatio - lastCrouchRatio) * capsuleHeight) / 2) + Eng_Global->instances[i].position.y);
 			break;
 		case BodyState_ProningDown:
 			currentCrouchRatio = smooth_damp(currentCrouchRatio,-0.01f, ref crouchingVelocity, transitionToCrouchSec);
@@ -461,7 +461,7 @@ public class PlayerMovement : MonoBehaviour {
 		case BodyState_ProningUp: // Prone to crouch
 			lastCrouchRatio = currentCrouchRatio;
 			currentCrouchRatio = smooth_damp(currentCrouchRatio,1.01f, ref crouchingVelocity, (transitionToCrouchSec + transitionToProneAdd));
-			LocalPositionSetY(transform,(((currentCrouchRatio - lastCrouchRatio) * capsuleHeight) / 2) + instances[i].position.y);
+			LocalPositionSetY(transform,(((currentCrouchRatio - lastCrouchRatio) * capsuleHeight) / 2) + Eng_Global->instances[i].position.y);
 			break;
 		}
 	}
@@ -528,8 +528,8 @@ public class PlayerMovement : MonoBehaviour {
 	}
 
 	void ApplyGravity() {
-// 		if (gravFinished < Sys_Global.pauseRelativeTime) {
-// 			gravFinished = Sys_Global.pauseRelativeTime + 0.01f;
+// 		if (gravFinished < Eng_Global->pauseRelativeTime) {
+// 			gravFinished = Eng_Global->pauseRelativeTime + 0.01f;
 // 			rbody.AddRelativeForce(Vector3.down * 9.83f * 9.83f);
 // 		}
 	}
@@ -626,10 +626,10 @@ public class PlayerMovement : MonoBehaviour {
 			return true;
 		} else {
 			if (bodyLerpGravityOffDelayFinished == 0) {
-				bodyLerpGravityOffDelayFinished = Sys_Global.pauseRelativeTime + 0.25f;
+				bodyLerpGravityOffDelayFinished = Eng_Global->pauseRelativeTime + 0.25f;
 			}
 
-			if (bodyLerpGravityOffDelayFinished > Sys_Global.pauseRelativeTime) {
+			if (bodyLerpGravityOffDelayFinished > Eng_Global->pauseRelativeTime) {
 				return true;
 			}
 		}
@@ -646,7 +646,7 @@ public class PlayerMovement : MonoBehaviour {
 	void Jump() {
 		if (CheatNoclip && !inventoryPlayer1.JumpJetsActive()) return;
 
-		if (doubleJumpFinished < Sys_Global.pauseRelativeTime) {
+		if (doubleJumpFinished < Eng_Global->pauseRelativeTime) {
 			doubleJumpTicks--;
 			if (doubleJumpTicks < 0) doubleJumpTicks = 0;
 		}
@@ -656,16 +656,16 @@ public class PlayerMovement : MonoBehaviour {
 			if (!justJumped) {
 				if (grounded || gravliftState || inventoryPlayer1.JumpJetsActive()) {
 					jumpTime = jumpImpulseTime;
-					doubleJumpFinished = Sys_Global.pauseRelativeTime + Const.doubleClickTime;
+					doubleJumpFinished = Eng_Global->pauseRelativeTime + Const.doubleClickTime;
 					doubleJumpTicks++;
 					justJumped = true;
-					if (!inventoryPlayer1.JumpJetsActive() && !inventoryPlayer1.BoosterActive()) instances[PLAYER1].fatigue += jumpFatigue;
+					if (!inventoryPlayer1.JumpJetsActive() && !inventoryPlayer1.BoosterActive()) Eng_Global->instances[PLAYER1].fatigue += jumpFatigue;
 				} else {
 					if (ladderState > 1) {
 						jumpTime = jumpImpulseTime;
 						justJumped = true;
 						if (!inventoryPlayer1.JumpJetsActive() && !inventoryPlayer1.BoosterActive()) {
-							instances[PLAYER1].fatigue += jumpFatigue;
+							Eng_Global->instances[PLAYER1].fatigue += jumpFatigue;
 						}
 					}
 				}
@@ -676,7 +676,7 @@ public class PlayerMovement : MonoBehaviour {
 					// Booster thrust
 					rbody.AddForce((Vector3){transform.forward.x * burstForce, transform.forward.y * burstForce, transform.forward.z * burstForce), ForceMode.Impulse);
 					PlayerHealth.a.makingNoise = true;
-					PlayerHealth.a.noiseFinished = Sys_Global.pauseRelativeTime + 0.5f;
+					PlayerHealth.a.noiseFinished = Eng_Global->pauseRelativeTime + 0.5f;
 					TakeEnergy(22f);
 					if (BiomonitorGraphSystem.a != null) {
 						BiomonitorEnergyPulse(22f);
@@ -687,12 +687,12 @@ public class PlayerMovement : MonoBehaviour {
 					doubleJumpTicks = 0;
 
 					// Make sure we can't do it again right away.
-					doubleJumpFinished = Sys_Global.pauseRelativeTime - 1f;
+					doubleJumpFinished = Eng_Global->pauseRelativeTime - 1f;
 				}
 			}
 		}
 
-		if (staminupActive || FatigueCheat) instances[PLAYER1].fatigue = 0.0f;
+		if (staminupActive || FatigueCheat) Eng_Global->instances[PLAYER1].fatigue = 0.0f;
 		
 		// Perform Jump
 		float jumpVelocityApply = jumpVelocity * rbody.mass;
@@ -702,7 +702,7 @@ public class PlayerMovement : MonoBehaviour {
 		while (jumpTimeMod > 0) { // Why is this a `while` instead of an `if`??
 							   // Because otherwise it don't work, duh!
 			jumpTimeMod -= Time.smoothDeltaTime;
-			if (instances[PLAYER1].fatigue > 80.0f && !inventoryPlayer1.JumpJetsActive()) {
+			if (Eng_Global->instances[PLAYER1].fatigue > 80.0f && !inventoryPlayer1.JumpJetsActive()) {
 				jumpVelocityApply = jumpVelocityFatigued * rbody.mass;
 				jumpVel.y = jumpVelocityApply;
 			}
@@ -719,8 +719,8 @@ public class PlayerMovement : MonoBehaviour {
 
 				if (PlayerEnergy.a.energy >= energysuck) {
 					rbody.AddForce(jumpVel,ForceMode.Force);  // huhnh!
-					if (jumpJetEnergySuckTickFinished < Sys_Global.pauseRelativeTime) {
-						jumpJetEnergySuckTickFinished = Sys_Global.pauseRelativeTime + jumpJetEnergySuckTick;
+					if (jumpJetEnergySuckTickFinished < Eng_Global->pauseRelativeTime) {
+						jumpJetEnergySuckTickFinished = Eng_Global->pauseRelativeTime + jumpJetEnergySuckTick;
 						TakeEnergy(energysuck);
 						if (BiomonitorGraphSystem.a != null) {
 							BiomonitorEnergyPulse(energysuck);
@@ -741,15 +741,15 @@ public class PlayerMovement : MonoBehaviour {
 
 		if (justJumped && !inventoryPlayer1.JumpJetsActive()) {
 			// Play jump sound
-			if (jumpSFXFinished < Sys_Global.pauseRelativeTime) {
-				jumpSFXFinished = Sys_Global.pauseRelativeTime + jumpSFXIntervalTime;
+			if (jumpSFXFinished < Eng_Global->pauseRelativeTime) {
+				jumpSFXFinished = Eng_Global->pauseRelativeTime + jumpSFXIntervalTime;
 				SFX.pitch = 1f;
 				float jumpSFXVolume = 1.0f;
-				if (instances[PLAYER1].fatigue > 80.0f) jumpSFXVolume = 0.5f; // Quietly, we tired.
+				if (Eng_Global->instances[PLAYER1].fatigue > 80.0f) jumpSFXVolume = 0.5f; // Quietly, we tired.
 				
 				PlayerHealth.a.makingNoise = true;
-				PlayerHealth.a.noiseFinished = Sys_Global.pauseRelativeTime + 0.5f;
-				Raycast(instances[i].position, Vector3.down,
+				PlayerHealth.a.noiseFinished = Eng_Global->pauseRelativeTime + 0.5f;
+				Raycast(Eng_Global->instances[i].position, Vector3.down,
 								out tempHit,feetRayLength,
 								Const.a.layerMaskPlayerFeet);
 				
@@ -764,7 +764,7 @@ public class PlayerMovement : MonoBehaviour {
 				if (prefID == null) { Utils.PlayOneShotSavable(SFX,SFXJump,jumpSFXVolume); return; }
 				
 				FootStepType fstep = GetFootstepTypeForPrefab(prefID.constIndex);
-				play_wav(sounds[JumpSound(fstep)],jumpSFXVolume,Vector3_A_minus_B(instances[i].position,feetOffset),true);
+				play_wav(sounds[JumpSound(fstep)],jumpSFXVolume,Vector3_A_minus_B(Eng_Global->instances[i].position,feetOffset),true);
 			}
 			justJumped = false;
 		}
@@ -794,12 +794,12 @@ public class PlayerMovement : MonoBehaviour {
 			rbody.AddRelativeForce(sidForce,upForce,forForce);
 		} else {
 			// Climbing off the ground
-			if (ladderSFXFinished < Sys_Global.pauseRelativeTime
+			if (ladderSFXFinished < Eng_Global->pauseRelativeTime
 				&& rbody.velocity.y > ladderSpeed * 0.5f) {
 
 				SFX.pitch = (random_range(0.8f,1.2f));
 				Utils.PlayOneShotSavable(SFX,SFXLadder,0.2f);
-				ladderSFXFinished = Sys_Global.pauseRelativeTime
+				ladderSFXFinished = Eng_Global->pauseRelativeTime
 									+ ladderSFXIntervalTime;
 			}
 
@@ -864,11 +864,11 @@ public class PlayerMovement : MonoBehaviour {
 			movDir.y = 0;
 			if (floorDot > 0.9f) rbody.velocity = movDir;
 			movDir = movDir.normalized;
-			if (fatigueFinished2 < Sys_Global.pauseRelativeTime && movDir.sqrMagnitude > 0f && grounded && (relForward != 0 || relSideways != 0)) {
-				fatigueFinished2 = Sys_Global.pauseRelativeTime + fatigueWaneTickSecs;
+			if (fatigueFinished2 < Eng_Global->pauseRelativeTime && movDir.sqrMagnitude > 0f && grounded && (relForward != 0 || relSideways != 0)) {
+				fatigueFinished2 = Eng_Global->pauseRelativeTime + fatigueWaneTickSecs;
 				if (!inventoryPlayer1.BoosterActive()) {
-					if (isSprinting) instances[PLAYER1].fatigue += fatiguePerSprintTick;
-					else instances[PLAYER1].fatigue += fatiguePerWalkTick;
+					if (isSprinting) Eng_Global->instances[PLAYER1].fatigue += fatiguePerSprintTick;
+					else Eng_Global->instances[PLAYER1].fatigue += fatiguePerWalkTick;
 				}
 			}
 		} else {
@@ -905,7 +905,7 @@ public class PlayerMovement : MonoBehaviour {
 		}
 		
 		if (velChange >= 3f) {
-			Raycast(instances[i].position, Vector3.down,out tempHit,feetRayLength,Const.a.layerMaskPlayerFeet);
+			Raycast(Eng_Global->instances[i].position, Vector3.down,out tempHit,feetRayLength,Const.a.layerMaskPlayerFeet);
 			if (tempHit.collider == null) return;
 			
 			GameObject hitGO = tempHit.collider.transform.gameObject;
@@ -919,7 +919,7 @@ public class PlayerMovement : MonoBehaviour {
 			
 			FootStepType fstep = GetFootstepTypeForPrefab(prefID.constIndex);
 			float vol = vmax(vmin(1f - ((fallDamageSpeed - velChange) / fallDamageSpeed),1f),0.5f);
-			play_wav(sounds[JumpLandSound(fstep)],vol,Vector3_A_minus_B(instances[i].position,feetOffset),true);
+			play_wav(sounds[JumpLandSound(fstep)],vol,Vector3_A_minus_B(Eng_Global->instances[i].position,feetOffset),true);
 		}
 	}
 
@@ -937,7 +937,7 @@ public class PlayerMovement : MonoBehaviour {
 		inputtingMovement = false;
 
 		if (GetInput.a.Forward()) {
-			if (turboFinished > Sys_Global.pauseRelativeTime) {
+			if (turboFinished > Eng_Global->pauseRelativeTime) {
 				if (Vector3.Project(rbody.velocity, (cameraObject.transform.forward)).magnitude < playerSpeed * 2f)
 					rbody.AddForce(cameraObject.transform.forward * walkAcceleration * 1.3f * 2f * Time.deltaTime,ForceMode.Acceleration); // double speed with turbo on
 			} else {
@@ -948,7 +948,7 @@ public class PlayerMovement : MonoBehaviour {
 		}
 
 		if (GetInput.a.Backpedal()) {
-			if (turboFinished > Sys_Global.pauseRelativeTime) {
+			if (turboFinished > Eng_Global->pauseRelativeTime) {
 				if (Vector3.Project(rbody.velocity, (cameraObject.transform.forward * -1f)).magnitude < playerSpeed * 2f)
 				rbody.AddForce(cameraObject.transform.forward * walkAcceleration * 1.3f * 2f * Time.deltaTime * -1f,ForceMode.Acceleration); // double speed with turbo on
 			} else {
@@ -959,7 +959,7 @@ public class PlayerMovement : MonoBehaviour {
 		}
 
 		if (GetInput.a.StrafeLeft()) {
-			if (turboFinished > Sys_Global.pauseRelativeTime) {
+			if (turboFinished > Eng_Global->pauseRelativeTime) {
 				if (Vector3.Project(rbody.velocity, (cameraObject.transform.right * -1f)).magnitude < playerSpeed * 2f)
 				rbody.AddForce(cameraObject.transform.right * walkAcceleration * 1.3f * 2f * Time.deltaTime * -1f,ForceMode.Acceleration); // double speed with turbo on
 			} else {
@@ -970,7 +970,7 @@ public class PlayerMovement : MonoBehaviour {
 		}
 
 		if (GetInput.a.StrafeRight()) {
-			if (turboFinished > Sys_Global.pauseRelativeTime) {
+			if (turboFinished > Eng_Global->pauseRelativeTime) {
 				if (Vector3.Project(rbody.velocity, cameraObject.transform.right).magnitude < playerSpeed * 2f)
 				rbody.AddForce(cameraObject.transform.right * walkAcceleration * 1.3f * 2f * Time.deltaTime,ForceMode.Acceleration); // double speed with turbo on
 			} else {
@@ -980,7 +980,7 @@ public class PlayerMovement : MonoBehaviour {
 			inputtingMovement = true;
 		}
 
-		if (Sys_Global.difficultyCyber > 1) {
+		if (Eng_Global->difficultyCyber > 1) {
 			if (rbody.velocity.magnitude < walkAcceleration * 0.05f) {
 				tempVec = MouseCursor.a.GetCursorScreenPointForRay();
 				tempVec = MouseLookScript.a.playerCamera.ScreenPointToRay(tempVec).direction;
@@ -1016,28 +1016,28 @@ public class PlayerMovement : MonoBehaviour {
 	}
 
 	void FatigueApply() {
-		if (instances[PLAYER1].fatigue > 100.0f) instances[PLAYER1].fatigue = 100.0f; // Clamp at 100% maximum
-		if (instances[PLAYER1].fatigue <   0.0f) instances[PLAYER1].fatigue =   0.0f; // Clamp at   0% minimum.
-		if (instances[PLAYER1].fatigue > 80.0f && !fatigueWarned && !inCyberSpace) {
+		if (Eng_Global->instances[PLAYER1].fatigue > 100.0f) Eng_Global->instances[PLAYER1].fatigue = 100.0f; // Clamp at 100% maximum
+		if (Eng_Global->instances[PLAYER1].fatigue <   0.0f) Eng_Global->instances[PLAYER1].fatigue =   0.0f; // Clamp at   0% minimum.
+		if (Eng_Global->instances[PLAYER1].fatigue > 80.0f && !fatigueWarned && !inCyberSpace) {
 			twm.SendWarning(Sys_Text.stringTable[868],0.1f,0,HUDColor.White,324);
 			fatigueWarned = true;
 		} else fatigueWarned = false;
 
 		if (inCyberSpace) return;
-		if (CheatNoclip || FatigueCheat) { instances[PLAYER1].fatigue = 0.0f; return; }
-		if (fatigueFinished >= Sys_Global.pauseRelativeTime) return;
+		if (CheatNoclip || FatigueCheat) { Eng_Global->instances[PLAYER1].fatigue = 0.0f; return; }
+		if (fatigueFinished >= Eng_Global->pauseRelativeTime) return;
 
-		fatigueFinished = Sys_Global.pauseRelativeTime + fatigueWaneTickSecs;
+		fatigueFinished = Eng_Global->pauseRelativeTime + fatigueWaneTickSecs;
 		switch (bodyState) {
-			case BodyState_Standing:    instances[PLAYER1].fatigue -= fatigueWanePerTick; break;
-			case BodyState_Crouch:      instances[PLAYER1].fatigue -= fatigueWanePerTickCrouched; break;
-			case BodyState_StandingUp:  instances[PLAYER1].fatigue -= fatigueWanePerTickCrouched; break;
-			case BodyState_ProningDown: instances[PLAYER1].fatigue -= fatigueWanePerTickCrouched; break;
-			case BodyState_Prone:       instances[PLAYER1].fatigue -= fatigueWanePerTickProne; break;
-			case BodyState_ProningUp:   instances[PLAYER1].fatigue -= fatigueWanePerTickProne; break;
-			default:                    instances[PLAYER1].fatigue -= fatigueWanePerTick; break;
+			case BodyState_Standing:    Eng_Global->instances[PLAYER1].fatigue -= fatigueWanePerTick; break;
+			case BodyState_Crouch:      Eng_Global->instances[PLAYER1].fatigue -= fatigueWanePerTickCrouched; break;
+			case BodyState_StandingUp:  Eng_Global->instances[PLAYER1].fatigue -= fatigueWanePerTickCrouched; break;
+			case BodyState_ProningDown: Eng_Global->instances[PLAYER1].fatigue -= fatigueWanePerTickCrouched; break;
+			case BodyState_Prone:       Eng_Global->instances[PLAYER1].fatigue -= fatigueWanePerTickProne; break;
+			case BodyState_ProningUp:   Eng_Global->instances[PLAYER1].fatigue -= fatigueWanePerTickProne; break;
+			default:                    Eng_Global->instances[PLAYER1].fatigue -= fatigueWanePerTick; break;
 		}
-		if (instances[PLAYER1].fatigue < 0) instances[PLAYER1].fatigue = 0; // Clamp at 0% minimum.
+		if (Eng_Global->instances[PLAYER1].fatigue < 0) Eng_Global->instances[PLAYER1].fatigue = 0; // Clamp at 0% minimum.
 	}
 
 	void EndCrouchProneTransition() {
@@ -1107,14 +1107,14 @@ public class PlayerMovement : MonoBehaviour {
 					 + ((1f - currentCrouchRatio) * 1.6f)); // Crouch/Prone add
 
 		Vector3 ofs = (Vector3){0f,ofsY,0f);
-		return Physics.CheckCapsule(cameraObject.instances[i].position,
-									cameraObject.instances[i].position + ofs,
+		return Physics.CheckCapsule(cameraObject.Eng_Global->instances[i].position,
+									cameraObject.Eng_Global->instances[i].position + ofs,
 									capsuleRadius,layerMask);
 	}
 
 	bool CantCrouch() {
-		return Physics.CheckCapsule(cameraObject.instances[i].position,
-									cameraObject.instances[i].position
+		return Physics.CheckCapsule(cameraObject.Eng_Global->instances[i].position,
+									cameraObject.Eng_Global->instances[i].position
 									+ (Vector3){0f,0.2f,0f),
 									capsuleRadius,layerMask);
 	}
@@ -1248,7 +1248,7 @@ public class PlayerMovement : MonoBehaviour {
 
 	// Reset grounded to false when player is mid-air
 	void OnCollisionExit (){
-		if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
+		if (!Eng_Global->gamePaused && !Eng_Global->menuActive) {
 			// Automatically set grounded to false to prevent ability to climb any wall (Cheat!)
 			if (!CheatWallSticky) {
 				grounded = false;
@@ -1260,7 +1260,7 @@ public class PlayerMovement : MonoBehaviour {
 
 	// Sets grounded based on normal angle of the impact point (NOTE: This is not the surface normal!)
 	void OnCollisionStay(Collision collision) {
-		if (Sys_Global.gamePaused || inCyberSpace) return;
+		if (Eng_Global->gamePaused || inCyberSpace) return;
 		
 		int contactCount = collision.contactCount;
 		float maxSlope = 0.35f;
@@ -1270,7 +1270,7 @@ public class PlayerMovement : MonoBehaviour {
 			floorAng = contactPoint.normal;
 			floorDot = Vector3.Dot(floorAng,Vector3.up);
 			if (floorDot <= 1f && floorDot >= maxSlope) {
-				if (!grounded) stepFinished = Sys_Global.pauseRelativeTime;
+				if (!grounded) stepFinished = Eng_Global->pauseRelativeTime;
 				grounded = true;
 				return;
 			}
@@ -1295,7 +1295,7 @@ public class PlayerMovement : MonoBehaviour {
 			case 12: arsenal = cheatL6arsenal; break;
 			default: arsenal = cheatL1arsenal; break;
 		}
-		GameObject cheatArsenal = Instantiate(arsenal,instances[i].position,
+		GameObject cheatArsenal = Instantiate(arsenal,Eng_Global->instances[i].position,
 								    Const.a.quaternionIdentity) as GameObject;
 									
 		if (cheatArsenal == null) return; // Failed!

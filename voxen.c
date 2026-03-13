@@ -1,4 +1,16 @@
 // voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake
+// TODO: Multiview renders for sensaround
+// TODO: Multiview renders for camera views
+// TODO: Add camera view entities
+// TODO: Proper physics
+// TODO: Particle system
+// TODO: Raycasts
+// TODO: Voxel GI
+// TODO: Save/Load system
+// TODO: Directional lights for cyberspace
+// TODO: Directional light for sunlight
+// TODO: Directional light shadowmapping just for sunlight
+// TODO: TARGET ID: Type-LevelNum(0#)EnemyNum(###),Example: Mutant-06003, EXCEPTIONS: Cyborg-00001 is Edward Diego
 #include "os.h" // Operating System calls shim layer.
 #include "gl.h"
 #include "glfw3.h"
@@ -10,7 +22,8 @@ GlobalContext Sys_Global = { .menuActive = true, .screenshotTimeout = 1.0, .cred
 DiagnosticsSystem Sys_Dx = { .worstFPS = UINT32_MAX };
 CheatsSystem Sys_Cheats = { .god = false, .noclip = true, .showLocation = true, .showFPS = true, .editMode = true };
 RenderSystem Sys_Render;
-SystemUI Sys_UI;
+SystemUI Sys_UIPlayer1;
+SystemUI Sys_UIPlayer2;
 OsFileHandle console_log_file = 0;
 InventorySystem inventoryPlayer1;
 InventorySystem inventoryPlayer2;
@@ -18,7 +31,6 @@ AutoSplitterData autoSplitter = { 0x1337133713371337, 0, false, 0 }; // Fore use
 uint8_t queuedLevelToLoad = 255u;
 Entity entities[MAX_ENTITIES]; // Global array of entity definitions
 uint16_t entityCount; // Number of entities loaded
-Entity instances[INSTANCE_COUNT];
 float modelMatrices[INSTANCE_COUNT * 16];
 uint8_t dirtyInstances[INSTANCE_COUNT];
 double berserkFinished;
@@ -55,7 +67,6 @@ uint16_t headmountedLanternLight;
 Vector3 lanternPos;
 float lanternVersionBrightness[3] = { 0.875f, 1.4f, 1.75f };
 uint16_t useableItemsFrobIcons[94];
-bool boosterActive;
 uint16_t selfIdx;
 uint32_t totalPixels;
 uint32_t totalPaletteColors;
@@ -68,6 +79,7 @@ uint32_t uiImageDrawCallsRenderedThisFrame;
 uint32_t shadowDrawCallsRenderedThisFrame;
 uint32_t verticesRenderedThisFrame;
 uint32_t drawCallsNormal;
+int fogFac;
 typedef struct {
    unsigned short x0,y0,x1,y1; // coordinates of bbox in bitmap
    float xoff,yoff,xadvance;
@@ -182,7 +194,7 @@ bool UpdateLights(bool* voxelsNeedUpdated) {
     int32_t lant = headmountedLanternLight * LIGHT_DATA_SIZE;
     if (/*(inventoryPlayer1.hasHardware & HW_LAN) && */(inventoryPlayer1.hardwareIsActive & HW_LAN)) {
         Vector3 lanternPosLast = lanternPos;
-        lanternPos = instances[PLAYER1].position;
+        lanternPos = Sys_Global.instances[PLAYER1].position;
         lanternPos.y -= 0.24f;
         lanternPos.x += 0.04f;
         lanternPos.z += 0.04f;
@@ -269,8 +281,8 @@ bool UpdateLights(bool* voxelsNeedUpdated) {
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, Sys_Render.lightsID); glBufferData(GL_SHADER_STORAGE_BUFFER, loadedLights * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
     if (*voxelsNeedUpdated) {
-        float px = instances[PLAYER1].position.x; float py = instances[PLAYER1].position.y; float pz = instances[PLAYER1].position.z;
-        float fx = instances[PLAYER1].forward.x;  float fy = instances[PLAYER1].forward.y;  float fz = instances[PLAYER1].forward.z;
+        float px = Sys_Global.instances[PLAYER1].position.x; float py = Sys_Global.instances[PLAYER1].position.y; float pz = Sys_Global.instances[PLAYER1].position.z;
+        float fx = Sys_Global.instances[PLAYER1].forward.x;  float fy = Sys_Global.instances[PLAYER1].forward.y;  float fz = Sys_Global.instances[PLAYER1].forward.z;
         glUseProgram(Sys_Render.voxelUpdateShaderProgram);
         glUniform3f(5, px, py, pz);
         glUniform3f(6, fx, fy, fz);
@@ -458,14 +470,14 @@ void CenterStatusPrint(const char * restrict fmt, ...) {
 
 __attribute__((cold)) void NewGame(void) { // Reset World States
     RenderLoadingProgress(100,"Loading new game...");
-    instances[WORLD].ioflags = 0u;
-    instances[WORLD].lev1SecCode = random_range_u8(0u,9u); // Must do rand's repeatedly to prevent
-    instances[WORLD].lev2SecCode = random_range_u8(0u,9u); // these all being the same number.
-    instances[WORLD].lev3SecCode = random_range_u8(0u,9u);
-    instances[WORLD].lev4SecCode = random_range_u8(0u,9u);
-    instances[WORLD].lev5SecCode = random_range_u8(0u,9u);
-    instances[WORLD].lev6SecCode = random_range_u8(0u,9u);
-    SetMemoryToValueForNBytes(instances,0,INSTANCE_COUNT * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
+    Sys_Global.instances[WORLD].ioflags = 0u;
+    Sys_Global.instances[WORLD].lev1SecCode = random_range_u8(0u,9u); // Must do rand's repeatedly to prevent
+    Sys_Global.instances[WORLD].lev2SecCode = random_range_u8(0u,9u); // these all being the same number.
+    Sys_Global.instances[WORLD].lev3SecCode = random_range_u8(0u,9u);
+    Sys_Global.instances[WORLD].lev4SecCode = random_range_u8(0u,9u);
+    Sys_Global.instances[WORLD].lev5SecCode = random_range_u8(0u,9u);
+    Sys_Global.instances[WORLD].lev6SecCode = random_range_u8(0u,9u);
+    SetMemoryToValueForNBytes(Sys_Global.instances,0,INSTANCE_COUNT * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
     PlayerInit(PLAYER1); PlayerInit(PLAYER2);
     cam_yaw = 90.0f; cam_pitch = 0.0f; cam_roll = 0.0f;
     Sys_Global.inventoryMode = Sys_Settings.NoShootMode;
@@ -843,12 +855,6 @@ void SetSkyRotateSpeed(void) {
     glUniform1f(30, skyRotateSpeed);
 }
 
-int fogFac;
-void SetFog(void) {
-    glUseProgram(Sys_Render.chunkShaderProgram);
-    float f = fogBaseDensityForLevel + (float)(fogFac / 255u);
-    glUniform3f(4, fogColorR * f, fogColorG * f, fogColorB * f);
-}
 
 void SetVSync(void);
 
@@ -876,10 +882,106 @@ void ApplySettings(void) {
     UpdateScreenSize(NULL, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
     SetSkyRotateSpeed();
     SetVSync();
-    SetFog();
     SetGI();
     SetSpeakerMode();
     SetLanguage();
+}
+
+#if defined(_WIN32) || defined(__CYGWIN__)
+    #include <windows.h>
+    #define PLATFORM_DLOPEN(path)    LoadLibraryA(path)
+    #define PLATFORM_DLSYM(handle, name)  GetProcAddress((handle), (name))
+    #define PLATFORM_DLCLOSE(handle) FreeLibrary((handle))
+#else
+    #include <dlfcn.h>
+    #define PLATFORM_DLOPEN(path)    dlopen((path), RTLD_NOW)
+    #define PLATFORM_DLSYM(handle, name)  dlsym((handle), (name))
+    #define PLATFORM_DLCLOSE(handle) dlclose((handle))
+#endif
+
+void* mod_handle = NULL;
+void LoadModFunctions(void) {
+    // Clear previous handle if reloading
+    if (mod_handle) {
+        PLATFORM_DLCLOSE(mod_handle);
+        mod_handle = NULL;
+    }
+
+    DualLog("Reloading mod code...");
+    char mod_path[256];
+    StringCopyInto_A_From_B(mod_path, "./", 256);
+    StringConcatenate(mod_path, Sys_Global.global_modname, 256);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
+    #if defined(_WIN32) || defined(__CYGWIN__)
+        StringConcatenate(mod_path,".dll",256); // e.g. Citadel.dll
+    #else
+        StringConcatenate(mod_path,".so",256); // e.g. Citadel.so
+    #endif
+#pragma GCC diagnostic pop
+
+    DualLog("dlopen-ing...");
+    mod_handle = PLATFORM_DLOPEN(mod_path);
+    if (!mod_handle) {
+        const char* err = dlerror();
+        if (err && *err) {
+            DualLogError("dlopen of %s failed: %s",mod_path,err);
+        } else {
+            DualLogError("dlopen of %s failed: no detailed error from dlerror() — common with unresolved symbols or format issues",mod_path);
+        }
+        OS_Exit(1);
+    }
+    
+    ModInit         = (void (*)(GlobalContext*,CheatsSystem*))  PLATFORM_DLSYM(mod_handle, "ModInit");
+    if (!ModInit) { DualLogError("Failed to load ModInit function pointer from mod data\n"); OS_Exit(1); }
+    ModInit(&Sys_Global,&Sys_Cheats);
+    Forward         = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Forward");        if (!Forward) { DualLogError("Failed to load Forward function pointer from mod data\n"); OS_Exit(1); }
+    Backpedal       = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Backpedal");      if (!Backpedal) { DualLogError("Failed to load Backpedal function pointer from mod data\n"); OS_Exit(1); }
+    StrafeLeft      = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "StrafeLeft");     if (!StrafeLeft) { DualLogError("Failed to load StrafeLeft function pointer from mod data\n"); OS_Exit(1); }
+    StrafeRight     = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "StrafeRight");    if (!StrafeRight) { DualLogError("Failed to load StrafeRight function pointer from mod data\n"); OS_Exit(1); }
+    Jump            = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Jump");           if (!Jump) { DualLogError("Failed to load Jump function pointer from mod data\n"); OS_Exit(1); }
+    JumpDown        = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "JumpDown");       if (!JumpDown) { DualLogError("Failed to load JumpDown function pointer from mod data\n"); OS_Exit(1); }
+    Crouch          = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Crouch");         if (!Crouch) { DualLogError("Failed to load Crouch function pointer from mod data\n"); OS_Exit(1); }
+    Prone           = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Prone");          if (!Prone) { DualLogError("Failed to load Prone function pointer from mod data\n"); OS_Exit(1); }
+    LeanLeft        = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "LeanLeft");       if (!LeanLeft) { DualLogError("Failed to load LeanLeft function pointer from mod data\n"); OS_Exit(1); }
+    LeanRight       = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "LeanRight");      if (!LeanRight) { DualLogError("Failed to load LeanRight function pointer from mod data\n"); OS_Exit(1); }
+    Sprint          = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Sprint");         if (!Sprint) { DualLogError("Failed to load Sprint function pointer from mod data\n"); OS_Exit(1); }
+    TurnLeft        = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "TurnLeft");       if (!TurnLeft) { DualLogError("Failed to load TurnLeft function pointer from mod data\n"); OS_Exit(1); }
+    TurnRight       = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "TurnRight");      if (!TurnRight) { DualLogError("Failed to load TurnRight function pointer from mod data\n"); OS_Exit(1); }
+    LookUp          = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "LookUp");         if (!LookUp) { DualLogError("Failed to load LookUp function pointer from mod data\n"); OS_Exit(1); }
+    LookDown        = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "LookDown");       if (!LookDown) { DualLogError("Failed to load LookDown function pointer from mod data\n"); OS_Exit(1); }
+    RecentLog       = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "RecentLog");      if (!RecentLog) { DualLogError("Failed to load RecentLog function pointer from mod data\n"); OS_Exit(1); }
+    Biomonitor      = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Biomonitor");     if (!Biomonitor) { DualLogError("Failed to load Biomonitor function pointer from mod data\n"); OS_Exit(1); }
+    Sensaround      = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Sensaround");     if (!StrafeLeft) { DualLogError("Failed to load StrafeLeft function pointer from mod data\n"); OS_Exit(1); }
+    Lantern         = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Lantern");        if (!Lantern) { DualLogError("Failed to load Lantern function pointer from mod data\n"); OS_Exit(1); }
+    Shield          = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Shield");         if (!Shield) { DualLogError("Failed to load Shield function pointer from mod data\n"); OS_Exit(1); }
+    Infrared        = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Infrared");       if (!Infrared) { DualLogError("Failed to load Infrared function pointer from mod data\n"); OS_Exit(1); }
+    Email           = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Email");          if (!Email) { DualLogError("Failed to load Email function pointer from mod data\n"); OS_Exit(1); }
+    Booster         = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Booster");        if (!Booster) { DualLogError("Failed to load Booster function pointer from mod data\n"); OS_Exit(1); }
+    Jumpjets        = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Jumpjets");       if (!Jumpjets) { DualLogError("Failed to load Jumpjets function pointer from mod data\n"); OS_Exit(1); }
+    Attack          = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Attack");         if (!Attack) { DualLogError("Failed to load Attack function pointer from mod data\n"); OS_Exit(1); }
+    Use             = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Use");            if (!Use) { DualLogError("Failed to load Use function pointer from mod data\n"); OS_Exit(1); }
+    Menu            = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Menu");           if (!Menu) { DualLogError("Failed to load Menu function pointer from mod data\n"); OS_Exit(1); }
+    ToggleMode      = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "ToggleMode");     if (!ToggleMode) { DualLogError("Failed to load ToggleMode function pointer from mod data\n"); OS_Exit(1); }
+    Reload          = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Reload");         if (!Reload) { DualLogError("Failed to load Reload function pointer from mod data\n"); OS_Exit(1); }
+    WeaponCycUp     = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "WeaponCycUp");    if (!WeaponCycUp) { DualLogError("Failed to load WeaponCycUp function pointer from mod data\n"); OS_Exit(1); }
+    WeaponCycDown   = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "WeaponCycDown");  if (!WeaponCycDown) { DualLogError("Failed to load WeaponCycDown function pointer from mod data\n"); OS_Exit(1); }
+    Grenade         = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Grenade");        if (!Grenade) { DualLogError("Failed to load Grenade function pointer from mod data\n"); OS_Exit(1); }
+    GrenadeCycUp    = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "GrenadeCycUp");   if (!GrenadeCycUp) { DualLogError("Failed to load GrenadeCycUp function pointer from mod data\n"); OS_Exit(1); }
+    GrenadeCycDown  = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "GrenadeCycDown"); if (!GrenadeCycDown) { DualLogError("Failed to load GrenadeCycDown function pointer from mod data\n"); OS_Exit(1); }
+    ChangeAmmoType  = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "ChangeAmmoType"); if (!ChangeAmmoType) { DualLogError("Failed to load ChangeAmmoType function pointer from mod data\n"); OS_Exit(1); }
+    Patch           = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Patch");          if (!Patch) { DualLogError("Failed to load Patch function pointer from mod data\n"); OS_Exit(1); }
+    PatchCycUp      = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "PatchCycUp");     if (!PatchCycUp) { DualLogError("Failed to load PatchCycUp function pointer from mod data\n"); OS_Exit(1); }
+    PatchCycDown    = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "PatchCycDown");   if (!PatchCycDown) { DualLogError("Failed to load PatchCycDown function pointer from mod data\n"); OS_Exit(1); }
+    Map             = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Map");            if (!Map) { DualLogError("Failed to load Map function pointer from mod data\n"); OS_Exit(1); }
+    SwimUp          = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "SwimUp");         if (!SwimUp) { DualLogError("Failed to load SwimUp function pointer from mod data\n"); OS_Exit(1); }
+    SwimDn          = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "SwimDn");         if (!SwimDn) { DualLogError("Failed to load SwimDn function pointer from mod data\n"); OS_Exit(1); }
+    ChangeAmmoType    = (bool (*)(void))         PLATFORM_DLSYM(mod_handle, "ChangeAmmoType"); if (!ChangeAmmoType) { DualLogError("Failed to load ChangeAmmoType function pointer from mod data\n"); OS_Exit(1); }
+    GetBasePlayerSpeed = (float (*)(bool))       PLATFORM_DLSYM(mod_handle, "GetBasePlayerSpeed");    if (!GetBasePlayerSpeed) { DualLogError("Failed to load GetBasePlayerSpeed function pointer from mod data\n"); OS_Exit(1); }
+    InitializeAIAfterLoad = (void (*)(uint16_t)) PLATFORM_DLSYM(mod_handle, "InitializeAIAfterLoad"); if (!InitializeAIAfterLoad) { DualLogError("Failed to load InitializeAIAfterLoad function pointer from mod data\n"); OS_Exit(1); }
+    TakeScreenshot  = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "TakeScreenshot"); if (!TakeScreenshot) { DualLogError("Failed to load TakeScreenshot function pointer from mod data\n"); OS_Exit(1); }
+    Console         = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Console");        if (!Console) { DualLogError("Failed to load Console function pointer from mod data\n"); OS_Exit(1); }
+    DualLog("done!\n");
 }
 
 void InitializeAudio(void);
@@ -962,6 +1064,7 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     DualLog("GL buffer definitions took %f secs\n", get_time() - initMarker4);
     InitializeAudio(); // Audio
     LoadGameModDefinition();
+    LoadModFunctions();
     LoadEntities();
     InitFontAtlasses();
     double nextInitTimeSection = get_time();
@@ -1063,7 +1166,7 @@ static inline __attribute__((always_inline)) void Frob(Vector3 pos, Vector3 forw
     RaycastHit tempHit = Raycast(pos, dir, FROB_DISTANCE, LAYER_MASK_PLAYER_FROB);
     if (tempHit.hit) {
         Sys_Dx.debugLine_end = tempHit.point;
-        DualLog("Raycast hit!  Hit object %u named of entity type %s(%u) at hit point %f %f %f\n", tempHit.hitInstanceIndex, entities[instances[tempHit.hitInstanceIndex].index].path, instances[tempHit.hitInstanceIndex].index, (double)tempHit.point.x, (double)tempHit.point.y, (double)tempHit.point.z);
+        DualLog("Raycast hit!  Hit object %u named of entity type %s(%u) at hit point %f %f %f\n", tempHit.hitInstanceIndex, entities[Sys_Global.instances[tempHit.hitInstanceIndex].index].path, Sys_Global.instances[tempHit.hitInstanceIndex].index, (double)tempHit.point.x, (double)tempHit.point.y, (double)tempHit.point.z);
     }
     
     Sys_Dx.debugLineFinished = Sys_Global.current_time + 3.0;
@@ -1082,8 +1185,8 @@ typedef struct {
 } LightCandidate;
 
 bool EntNotVisible(uint16_t i, bool otherCondition) {
-    if (!(instances[i].entflags & ENTFLAG_ACTIVE)) return true;
-    if (instances[i].index >= MAX_ENTITIES || instances[i].modelIndex >= MODEL_IDX_MAX || instances[i].texIndex >= MAX_VALID_TEXTURE) return true;
+    if (!(Sys_Global.instances[i].entflags & ENTFLAG_ACTIVE)) return true;
+    if (Sys_Global.instances[i].index >= MAX_ENTITIES || Sys_Global.instances[i].modelIndex >= MODEL_IDX_MAX || Sys_Global.instances[i].texIndex >= MAX_VALID_TEXTURE) return true;
     if (otherCondition) return true;
     return false;
 }
@@ -1096,8 +1199,8 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void RenderSha
     uint16_t numberFoundLightCandidatesForShadows = 0;
     float bestScores[MAX_SHADOWMAPS];
     voxen_Shadow_System.numShadowsCouldRender = 0;
-    Vector3 playerPos = instances[PLAYER1].position;
-    float pfx = instances[PLAYER1].forward.x;    float pfy = instances[PLAYER1].forward.y;    float pfz = instances[PLAYER1].forward.z;
+    Vector3 playerPos = Sys_Global.instances[PLAYER1].position;
+    float pfx = Sys_Global.instances[PLAYER1].forward.x;    float pfy = Sys_Global.instances[PLAYER1].forward.y;    float pfz = Sys_Global.instances[PLAYER1].forward.z;
     for (uint16_t i = 0; i < loadedLights; ++i) { // Collect candidates: only lights that are enabled, within FAR_PLANE, and in PVS
         if ((!lightCastsShadows[i])) continue;
 
@@ -1151,7 +1254,8 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void RenderSha
         uint16_t shadowCasterIndices[SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS];
         uint32_t numShadowCasters = 0;
         for (int i=START_INDEX_LEVEL_INSTANCES;i<INSTANCE_COUNT;++i) {
-            if (EntNotVisible(i,(instances[i].entflags & ENTFLAG_NO_SHADOWS))) continue;
+            if (EntNotVisible(i,(Sys_Global.instances[i].entflags & ENTFLAG_NO_SHADOWS))) continue;
+//             if (ConstIndexIsNPC(Sys_Global.instances[i].index)) continue;
 
             shadowCasterIndices[numShadowCasters] = i;
             numShadowCasters++;
@@ -1167,8 +1271,8 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void RenderSha
             uint16_t nearbyMeshCount = 0;
             for (uint16_t shadowCasterInstanceIdx = 0; shadowCasterInstanceIdx < numShadowCasters; shadowCasterInstanceIdx++) {
                 uint16_t j = shadowCasterIndices[shadowCasterInstanceIdx];
-                shadows_nearMeshRadii[nearbyMeshCount] = modelBounds[(instances[j].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 0.99f;
-                Vector3 d = Vector3_A_minus_B(instances[j].position, lightPos);
+                shadows_nearMeshRadii[nearbyMeshCount] = modelBounds[(Sys_Global.instances[j].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 0.99f;
+                Vector3 d = Vector3_A_minus_B(Sys_Global.instances[j].position, lightPos);
                 float distToLightSqrd = dot_vector3(d, d);
                 float radSum = (effectiveRadius + shadows_nearMeshRadii[nearbyMeshCount]);
                 if (distToLightSqrd >= radSum * radSum) continue;
@@ -1192,9 +1296,9 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void RenderSha
                 shadowDrawCallsRenderedThisFrame++;
                 for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
                     int i = shadows_nearMeshes[j].index;            
-                    if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face], instances[i].position, shadows_nearMeshRadii[j] * 1.41f)) continue;
+                    if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face], Sys_Global.instances[i].position, shadows_nearMeshRadii[j] * 1.41f)) continue;
 
-                    int32_t modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
+                    int32_t modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && Sys_Global.instances[i].lodIndex < loadedModelsMaxIndex ? Sys_Global.instances[i].lodIndex : Sys_Global.instances[i].modelIndex;
                     if (currentModelType != modelType) {
                         currentModelType = modelType;
                         glBindVertexBuffer(0, Sys_Render.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
@@ -1202,8 +1306,8 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void RenderSha
                     }
                     
                     glUniform1ui(0, i);
-                    if (currentTexIndex != instances[i].texIndex) { currentTexIndex = instances[i].texIndex; glUniform1ui(6, instances[i].texIndex); }
-                    if (currentIsTransparent != transparentTexture[instances[i].texIndex]) { currentIsTransparent = transparentTexture[instances[i].texIndex]; glUniform1ui(8, transparentTexture[instances[i].texIndex] ? 1u : 0u); }
+                    if (currentTexIndex != Sys_Global.instances[i].texIndex) { currentTexIndex = Sys_Global.instances[i].texIndex; glUniform1ui(6, Sys_Global.instances[i].texIndex); }
+                    if (currentIsTransparent != transparentTexture[Sys_Global.instances[i].texIndex]) { currentIsTransparent = transparentTexture[Sys_Global.instances[i].texIndex]; glUniform1ui(8, transparentTexture[Sys_Global.instances[i].texIndex] ? 1u : 0u); }
                     glDrawElements(GL_TRIANGLES, modelTriangleCounts[currentModelType] * 3, GL_UNSIGNED_INT, 0);
                     drawCallsRenderedThisFrame++; verticesRenderedThisFrame += modelTriangleCounts[currentModelType] * 3;
                 }
@@ -1307,12 +1411,12 @@ static inline __attribute__((always_inline)) double RenderUI(void) {
     
     // Diagnostics / Debugging
     int16_t debugTextStartY = 58;
-    if (Sys_Cheats.showLocation && !Sys_Global.menuActive) RenderFormattedText(16, debugTextStartY, TEXT_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f",instances[PLAYER1].position.x,instances[PLAYER1].position.y,instances[PLAYER1].position.z,instances[PLAYER1].rotation.x,instances[PLAYER1].rotation.y,instances[PLAYER1].rotation.z,instances[PLAYER1].rotation.w);
+    if (Sys_Cheats.showLocation && !Sys_Global.menuActive) RenderFormattedText(16, debugTextStartY, TEXT_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f",Sys_Global.instances[PLAYER1].position.x,Sys_Global.instances[PLAYER1].position.y,Sys_Global.instances[PLAYER1].position.z,Sys_Global.instances[PLAYER1].rotation.x,Sys_Global.instances[PLAYER1].rotation.y,Sys_Global.instances[PLAYER1].rotation.z,Sys_Global.instances[PLAYER1].rotation.w);
     int16_t lineSpacing = 18;
     if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 1),TEXT_WHITE,FONT_NORMAL,1.0f,"timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u",Sys_Global.timeSinceLastPhysicsTick, voxen_Shadow_System.numShadowsCouldRender,playerCellIdx,numCellsVisible);
-    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 2),TEXT_WHITE,FONT_NORMAL,1.0f,"Player velocity: %.2f, %.2f, %.2f",instances[PLAYER1].velocity.x,instances[PLAYER1].velocity.y,instances[PLAYER1].velocity.z);
-    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 3),TEXT_WHITE,FONT_NORMAL,1.0f,"Test Entity[%u] %s Index: %u, Shadow cpu ms: %.3f",editModeSelection,entities[instances[editModeSelection].index].path,editModeTestEntityDefinition,voxen_Shadow_System.shadowTime * 1000);
-    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 4),TEXT_WHITE,FONT_NORMAL,1.0f,"Player cell: %u, floor: %.3f, ceil: %.3f",instances[PLAYER1].cellIndex,gridCellFloorHeight[instances[PLAYER1].cellIndex],gridCellCeilingHeight[instances[PLAYER1].cellIndex]);
+    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 2),TEXT_WHITE,FONT_NORMAL,1.0f,"Player velocity: %.2f, %.2f, %.2f",Sys_Global.instances[PLAYER1].velocity.x,Sys_Global.instances[PLAYER1].velocity.y,Sys_Global.instances[PLAYER1].velocity.z);
+    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 3),TEXT_WHITE,FONT_NORMAL,1.0f,"Test Entity[%u] %s Index: %u, Shadow cpu ms: %.3f",editModeSelection,entities[Sys_Global.instances[editModeSelection].index].path,editModeTestEntityDefinition,voxen_Shadow_System.shadowTime * 1000);
+    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 4),TEXT_WHITE,FONT_NORMAL,1.0f,"Player cell: %u, floor: %.3f, ceil: %.3f",Sys_Global.instances[PLAYER1].cellIndex,gridCellFloorHeight[Sys_Global.instances[PLAYER1].cellIndex],gridCellCeilingHeight[Sys_Global.instances[PLAYER1].cellIndex]);
     RenderFormattedText(16,debugTextStartY + (lineSpacing * 5),TEXT_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d   dx: %d dy: %d",cursorPosition_x,cursorPosition_y,Sys_Input.currentMouse_dx,Sys_Input.currentMouse_dy);
     if (Sys_Cheats.consoleActive) RenderFormattedText(16, 0, TEXT_WHITE, FONT_NORMAL,1.0f, "] %s",consoleEntryText);
     if (Sys_Global.statusTextDecayFinished > Sys_Global.current_time) RenderFormattedText(479,114,TEXT_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
@@ -1453,15 +1557,15 @@ static inline __attribute__((always_inline)) void RenderInstances(Vector3 player
     uint16_t visibleCount = 0, currentTexIndex = 0, currentNormIndex = 0, currentGlowIndex = 0, currentSpecIndex = 0, currentModelType = 0;
     bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX);
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
-        if (EntNotVisible(i,(transparentTexture[instances[i].texIndex] ^ transparents))) continue; // must be transparent && transparents or neither
+        if (EntNotVisible(i,(transparentTexture[Sys_Global.instances[i].texIndex] ^ transparents))) continue; // must be transparent && transparents or neither
         
-        Vector3 objPos = instances[i].position;
+        Vector3 objPos = Sys_Global.instances[i].position;
         uint16_t instCellIdx = PosGetCellCoords(objPos.x, objPos.z);
         Vector3 delta = Vector3_A_minus_B(objPos, playerPos);
         float distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
-        if (distSqrd >= FAR_PLANE_SQUARED && (instances[i].index != 754 || !skyVisible) && i != editModeSelection) continue;
+        if (distSqrd >= FAR_PLANE_SQUARED && (Sys_Global.instances[i].index != 754 || !skyVisible) && i != editModeSelection) continue;
 
-        if (EntityIndexIsPortalBlockingDoor(instances[i].index)) { // Extra checks only needed for opaque portal blocking doors.
+        if (EntityIndexIsPortalBlockingDoor(Sys_Global.instances[i].index)) { // Extra checks only needed for opaque portal blocking doors.
             bool inPVS = (gridCellStates[instCellIdx] & CELL_VISIBLE);
             if (!inPVS) {
                 uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((objPos.x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
@@ -1481,15 +1585,15 @@ static inline __attribute__((always_inline)) void RenderInstances(Vector3 player
             }
             if (!inPVS) continue;
         } else {
-            if (!(Sys_Global.currentLevel == 1 && (instances[i].index == 309 ||  instances[i].index == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
-                if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (instances[i].index != 754 || !skyVisible)) continue; // For some shelves that are inset away from cells, need to still draw their items by checking && CELL_OPEN here, unfortunately this means they don't ever get culled :(
+            if (!(Sys_Global.currentLevel == 1 && (Sys_Global.instances[i].index == 309 ||  Sys_Global.instances[i].index == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
+                if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (Sys_Global.instances[i].index != 754 || !skyVisible)) continue; // For some shelves that are inset away from cells, need to still draw their items by checking && CELL_OPEN here, unfortunately this means they don't ever get culled :(
             }
             
-            if (!(gridCellStates[instCellIdx] & CELL_OPEN) && distSqrd >= 943.7184f && (instances[i].index != 754 || !skyVisible)) continue; // 30.72 * 30.72, 12 cells
+            if (!(gridCellStates[instCellIdx] & CELL_OPEN) && distSqrd >= 943.7184f && (Sys_Global.instances[i].index != 754 || !skyVisible)) continue; // 30.72 * 30.72, 12 cells
         }
 
-        float dotResult = dot_vector3(delta, instances[PLAYER1].forward);
-        float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
+        float dotResult = dot_vector3(delta, Sys_Global.instances[PLAYER1].forward);
+        float radius = modelBounds[(Sys_Global.instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
         if (dotResult < 0.0f && distSqrd > (radius * radius) && i != editModeSelection) continue;
         
         visibleInstances[visibleCount].index = i;
@@ -1500,16 +1604,16 @@ static inline __attribute__((always_inline)) void RenderInstances(Vector3 player
     if (visibleCount > 1) qsort(visibleInstances, visibleCount, sizeof(DepthSort), transparents ? compareDepthSort : compareDepthSortInverted); // Sort by depth (ascending for front-to-back)
     for (uint16_t visibleIndex = 0; visibleIndex < visibleCount; ++visibleIndex) {
         uint16_t i = visibleInstances[visibleIndex].index;
-        if (transparentTexture[instances[i].texIndex] && transparents) { glEnable(GL_CULL_FACE); glEnable(GL_BLEND); } // Transparents (with sort)
-        else if (doubleSidedTexture[instances[i].texIndex] || instances[i].scale.x < 0.0f || instances[i].scale.y < 0.0f || instances[i].scale.z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided
+        if (transparentTexture[Sys_Global.instances[i].texIndex] && transparents) { glEnable(GL_CULL_FACE); glEnable(GL_BLEND); } // Transparents (with sort)
+        else if (doubleSidedTexture[Sys_Global.instances[i].texIndex] || Sys_Global.instances[i].scale.x < 0.0f || Sys_Global.instances[i].scale.y < 0.0f || Sys_Global.instances[i].scale.z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided
         else { glEnable(GL_CULL_FACE); glDisable(GL_BLEND); } // Opaque
 
-        glUniform1ui(0, i);    glUniform1ui(17, instances[i].texIndex == 316 ? 1u : 0u);
-        if (currentNormIndex != (uint32_t)instances[i].normIndex || instances[i].normIndex == 0) { currentNormIndex = (uint32_t)instances[i].normIndex; glUniform1ui(1, currentNormIndex); }
-        if (currentTexIndex  != (uint32_t)instances[i].texIndex)  { currentTexIndex  =  (uint32_t)instances[i].texIndex; glUniform1ui(18, currentTexIndex); }
-        if (currentGlowIndex != (uint32_t)instances[i].glowIndex || instances[i].glowIndex == 0) { currentGlowIndex = (uint32_t)instances[i].glowIndex; glUniform1ui(19, currentGlowIndex); }
-        if (currentSpecIndex != (uint32_t)instances[i].specIndex || instances[i].specIndex == 0) { currentSpecIndex = (uint32_t)instances[i].specIndex; glUniform1ui(20, currentSpecIndex); }
-        int32_t modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
+        glUniform1ui(0, i);    glUniform1ui(17, Sys_Global.instances[i].texIndex == 316 ? 1u : 0u);
+        if (currentNormIndex != (uint32_t)Sys_Global.instances[i].normIndex || Sys_Global.instances[i].normIndex == 0) { currentNormIndex = (uint32_t)Sys_Global.instances[i].normIndex; glUniform1ui(1, currentNormIndex); }
+        if (currentTexIndex  != (uint32_t)Sys_Global.instances[i].texIndex)  { currentTexIndex  =  (uint32_t)Sys_Global.instances[i].texIndex; glUniform1ui(18, currentTexIndex); }
+        if (currentGlowIndex != (uint32_t)Sys_Global.instances[i].glowIndex || Sys_Global.instances[i].glowIndex == 0) { currentGlowIndex = (uint32_t)Sys_Global.instances[i].glowIndex; glUniform1ui(19, currentGlowIndex); }
+        if (currentSpecIndex != (uint32_t)Sys_Global.instances[i].specIndex || Sys_Global.instances[i].specIndex == 0) { currentSpecIndex = (uint32_t)Sys_Global.instances[i].specIndex; glUniform1ui(20, currentSpecIndex); }
+        int32_t modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && Sys_Global.instances[i].lodIndex < loadedModelsMaxIndex ? Sys_Global.instances[i].lodIndex : Sys_Global.instances[i].modelIndex;
         if (currentModelType != modelType) {
             currentModelType = modelType;
             glBindVertexBuffer(0, Sys_Render.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
@@ -1526,15 +1630,15 @@ static inline __attribute__((always_inline)) void RenderInstancesDepthOnly(Vecto
     uint16_t visibleCount = 0, currentModelType = 0;
     bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX);
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
-        if (EntNotVisible(i,transparentTexture[instances[i].texIndex])) continue; // must be transparent && transparents or neither
+        if (EntNotVisible(i,transparentTexture[Sys_Global.instances[i].texIndex])) continue; // must be transparent && transparents or neither
         
-        Vector3 objPos = instances[i].position;
+        Vector3 objPos = Sys_Global.instances[i].position;
         uint16_t instCellIdx = PosGetCellCoords(objPos.x, objPos.z);
         Vector3 delta = Vector3_A_minus_B(objPos, playerPos);
         float distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
-        if (distSqrd >= FAR_PLANE_SQUARED && (instances[i].index != 754 || !skyVisible)) continue;
+        if (distSqrd >= FAR_PLANE_SQUARED && (Sys_Global.instances[i].index != 754 || !skyVisible)) continue;
 
-        if (EntityIndexIsPortalBlockingDoor(instances[i].index)) { // Extra checks only needed for opaque portal blocking doors.
+        if (EntityIndexIsPortalBlockingDoor(Sys_Global.instances[i].index)) { // Extra checks only needed for opaque portal blocking doors.
             bool inPVS = (gridCellStates[instCellIdx] & CELL_VISIBLE);
             if (!inPVS) {
                 uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((objPos.x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
@@ -1554,15 +1658,15 @@ static inline __attribute__((always_inline)) void RenderInstancesDepthOnly(Vecto
             }
             if (!inPVS) continue;
         } else {
-            if (!(Sys_Global.currentLevel == 1 && (instances[i].index == 309 ||  instances[i].index == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
-                if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (instances[i].index != 754 || !skyVisible)) continue; // For some shelves that are inset away from cells, need to still draw their items by checking && CELL_OPEN here, unfortunately this means they don't ever get culled :(
+            if (!(Sys_Global.currentLevel == 1 && (Sys_Global.instances[i].index == 309 ||  Sys_Global.instances[i].index == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
+                if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (Sys_Global.instances[i].index != 754 || !skyVisible)) continue; // For some shelves that are inset away from cells, need to still draw their items by checking && CELL_OPEN here, unfortunately this means they don't ever get culled :(
             }
             
-            if (!(gridCellStates[instCellIdx] & CELL_OPEN) && distSqrd >= 943.7184f && (instances[i].index != 754 || !skyVisible)) continue; // 30.72 * 30.72, 12 cells
+            if (!(gridCellStates[instCellIdx] & CELL_OPEN) && distSqrd >= 943.7184f && (Sys_Global.instances[i].index != 754 || !skyVisible)) continue; // 30.72 * 30.72, 12 cells
         }
 
-        float dotResult = dot_vector3(delta, instances[PLAYER1].forward);
-        float radius = vmax(modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f,2.56f);
+        float dotResult = dot_vector3(delta, Sys_Global.instances[PLAYER1].forward);
+        float radius = vmax(modelBounds[(Sys_Global.instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f,2.56f);
         if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
         
         visibleInstances[visibleCount].index = i;
@@ -1573,11 +1677,11 @@ static inline __attribute__((always_inline)) void RenderInstancesDepthOnly(Vecto
     if (visibleCount > 1) qsort(visibleInstances, visibleCount, sizeof(DepthSort), compareDepthSortInverted); // Sort by depth (ascending for front-to-back)
     for (uint16_t visibleIndex = 0; visibleIndex < visibleCount; ++visibleIndex) {
         uint16_t i = visibleInstances[visibleIndex].index;
-        if (doubleSidedTexture[instances[i].texIndex] || instances[i].scale.x < 0.0f || instances[i].scale.y < 0.0f || instances[i].scale.z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided
+        if (doubleSidedTexture[Sys_Global.instances[i].texIndex] || Sys_Global.instances[i].scale.x < 0.0f || Sys_Global.instances[i].scale.y < 0.0f || Sys_Global.instances[i].scale.z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided
         else { glEnable(GL_CULL_FACE); glDisable(GL_BLEND); } // Opaque
 
         glUniform1ui(0, i);
-        int32_t modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
+        int32_t modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && Sys_Global.instances[i].lodIndex < loadedModelsMaxIndex ? Sys_Global.instances[i].lodIndex : Sys_Global.instances[i].modelIndex;
         if (currentModelType != modelType) {
             currentModelType = modelType;
             glBindVertexBuffer(0, Sys_Render.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
@@ -1590,15 +1694,18 @@ static inline __attribute__((always_inline)) void RenderInstancesDepthOnly(Vecto
     }
 }
 
+float GetPainStatic(void) { return 0.0f; } // TODO: Hook into pain/health management and shield impact effect
+Color GetPainStaticColor(void) { return (Color){1.0f,0.0f,0.0f,1.0f}; } // TODO: Hook staticColor up to red or blue for pain or shield impact.
+
 static inline __attribute__((always_inline)) __attribute__((hot)) void Render(void) {
     drawCallsRenderedThisFrame = textDrawCallsRenderedThisFrame = uiImageDrawCallsRenderedThisFrame = shadowDrawCallsRenderedThisFrame = verticesRenderedThisFrame = 0; // Reset per frame
     
     // Frame prep, View Matrix, and Projection Matrix
     float view[16]; // Also known as view matrix
-    Vector3 playerPos = instances[PLAYER1].position;
+    Vector3 playerPos = Sys_Global.instances[PLAYER1].position;
     float px = playerPos.x, py = playerPos.y, pz = playerPos.z;
-    {// mat4_lookat_from(view,&instances[PLAYER1].rotation, playerPos); Manually inlined for performance
-        float x = instances[PLAYER1].rotation.x, y = instances[PLAYER1].rotation.y, z = instances[PLAYER1].rotation.z, w = instances[PLAYER1].rotation.w;
+    {// mat4_lookat_from(view,&Sys_Global.instances[PLAYER1].rotation, playerPos); Manually inlined for performance
+        float x = Sys_Global.instances[PLAYER1].rotation.x, y = Sys_Global.instances[PLAYER1].rotation.y, z = Sys_Global.instances[PLAYER1].rotation.z, w = Sys_Global.instances[PLAYER1].rotation.w;
         float x2 = x * x, y2 = y * y, z2 = z * z;
         float xy = x * y, xz = x * z, yz = y * z;
         float wx = w * x, wy = w * y, wz = w * z;
@@ -1635,6 +1742,8 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
     glUseProgram(Sys_Render.chunkShaderProgram);
     glUniformMatrix4fv(2, 1, GL_FALSE, viewProj);
     glUniform1ui(3, 0u); // isUI false
+    float fogActual = fogBaseDensityForLevel + (float)(fogFac / 255u);
+    glUniform3f(4, fogColorR * fogActual, fogColorG * fogActual, fogColorB * fogActual); // Fog Color(which is density)
     glUniform1ui(14, Sys_Settings.Reflections);   glUniform1ui(15, Sys_Settings.Shadows);
     glUniform1f(8, worldMin_x);   glUniform1f(9, worldMin_z);    glUniform3f(10, playerPos.x, playerPos.y, playerPos.z);
     glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
@@ -1678,7 +1787,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
     glUniform1ui(18, (gridCellStates[playerCellIdx] & CELL_SEES_SUN) && Sys_Global.currentLevel != LEVEL_CYBERSPACE);
     glUniform1ui(19, ((Sys_Global.currentLevel >= 10 && Sys_Global.currentLevel < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
     uint32_t shieldOnType = 0u; // No shield green tint.
-    if (instances[WORLD].ioflags & QUESTBIT_SHIELD_ACTIVATED) {
+    if (Sys_Global.instances[WORLD].ioflags & QUESTBIT_SHIELD_ACTIVATED) {
         if (Sys_Global.currentLevel == 6 || Sys_Global.currentLevel == 7) shieldOnType = 2u; // Shielding only below player for lower levels.
         else if (Sys_Global.currentLevel <= 5) shieldOnType = 1u; // Shielding everywhere as levels fully within shield.
     }
@@ -1746,13 +1855,14 @@ int32_t main(void) {
         glfwPollEvents();
         ProcessInput(); // Calls ApplyPlayerMovements(), needs called without checking paused state for menus handling.
         if (likely(!Sys_Global.gamePaused && !Sys_Global.menuActive)) { // Update Gameplay
-            if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].released) Frob(instances[PLAYER1].position, instances[PLAYER1].forward, instances[PLAYER1].right);
+            if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].released) Frob(Sys_Global.instances[PLAYER1].position, Sys_Global.instances[PLAYER1].forward, Sys_Global.instances[PLAYER1].right);
             if (Sys_Global.current_time < Sys_Dx.debugLineFinished && (Sys_Dx.debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Sys_Dx.debugLine_start, Sys_Dx.debugLine_end);
 //             for (uint16_t i=START_INDEX_LEVEL_INSTANCES;i<loadedInstances;++i) UpdateWhileNotPaused(i); // TODO Get new states prior to updating animations, physics event, or rendering
-//             instances[editModeSelection].index = editModeTestEntityDefinition;
-//             instances[editModeSelection].modelIndex = entities[editModeTestEntityDefinition].modelIndex;
-//             instances[editModeSelection].texIndex = entities[editModeTestEntityDefinition].modelIndex;
+//             Sys_Global.instances[editModeSelection].index = editModeTestEntityDefinition;
+//             Sys_Global.instances[editModeSelection].modelIndex = entities[editModeTestEntityDefinition].modelIndex;
+//             Sys_Global.instances[editModeSelection].texIndex = entities[editModeTestEntityDefinition].modelIndex;
             UpdateAmbientSounds();
+            WeaponsUpdate();
         }
 
         if (!Sys_Global.gamePaused && !Sys_Global.menuActive) UpdatePlayerFacingAngles();
@@ -1770,12 +1880,12 @@ int32_t main(void) {
             bool uploadInstances = false;
             for (uint32_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; i++) {
                 if (dirtyInstances[i]) {
-                    if (instances[i].modelIndex >= loadedModelsMaxIndex || modelVertexCounts[instances[i].modelIndex] < 1) { dirtyInstances[i] = false; continue; } // No model or empty model
+                    if (Sys_Global.instances[i].modelIndex >= loadedModelsMaxIndex || modelVertexCounts[Sys_Global.instances[i].modelIndex] < 1) { dirtyInstances[i] = false; continue; } // No model or empty model
 
                     uploadInstances = true;    Sys_Render.shadowmapsNeedUpdated = true;
-                    float x = instances[i].rotation.x, y = instances[i].rotation.y, z = instances[i].rotation.z, w = instances[i].rotation.w;
+                    float x = Sys_Global.instances[i].rotation.x, y = Sys_Global.instances[i].rotation.y, z = Sys_Global.instances[i].rotation.z, w = Sys_Global.instances[i].rotation.w;
                     float x2 = x * x,   y2 = y * y,   z2 = z * z,   xy = x * y,   xz = x * z,   yz = y * z,   wx = w * x,   wy = w * y,   wz = w * z;
-                    float sclx = instances[i].scale.x; float scly = instances[i].scale.y; float sclz = instances[i].scale.z;
+                    float sclx = Sys_Global.instances[i].scale.x; float scly = Sys_Global.instances[i].scale.y; float sclz = Sys_Global.instances[i].scale.z;
                     modelMatrices[(i * 16) + 0] = (1.0f - 2.0f * (y2 + z2)) * -sclx; // Right X, Necessary -x for blender right to left handed coordinate conversion.
                     modelMatrices[(i * 16) + 1]  = (2.0f * (xy + wz)) * -sclx; // Right Y
                     modelMatrices[(i * 16) + 2]  = (2.0f * (xz - wy)) * -sclx; // Right Z
@@ -1786,7 +1896,7 @@ int32_t main(void) {
                     modelMatrices[(i * 16) + 8]  = (2.0f * (xz + wy)) * sclz; // Forward X
                     modelMatrices[(i * 16) + 9]  = (2.0f * (yz - wx)) * sclz; // Forward Y
                     modelMatrices[(i * 16) + 10] = (1.0f - 2.0f * (x2 + y2)) * sclz; // Forward Z
-                    modelMatrices[(i * 16) + 12] = instances[i].position.x;   modelMatrices[(i * 16) + 13] = instances[i].position.y;   modelMatrices[(i * 16) + 14] = instances[i].position.z;
+                    modelMatrices[(i * 16) + 12] = Sys_Global.instances[i].position.x;   modelMatrices[(i * 16) + 13] = Sys_Global.instances[i].position.y;   modelMatrices[(i * 16) + 14] = Sys_Global.instances[i].position.z;
                     modelMatrices[(i * 16) + 15]= 1.0f;
                 }
             }

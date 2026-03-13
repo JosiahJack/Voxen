@@ -343,7 +343,7 @@ void Load(uint8_t slot) {
 // 				bool includeInactive = true;
 // 				for (i=0;i<allParents.Count;i++) {
 // 					Component[] compArray =
-// 						allParents[i].GetComponentsInChildren(
+// 						allParEng_Global->instances[i].GetComponentsInChildren(
 // 							typeof(HealthManager),includeInactive);
 // 
 // 					// Add all gameObject with a HealthManager components.
@@ -367,7 +367,7 @@ void Load(uint8_t slot) {
 // 		loadPercentText.text = "Re-register targets...";
 // 		yield return null;
 // 		for (i=0;i<allParents.Count;i++) {
-// 			Component[] compArray = allParents[i].GetComponentsInChildren(typeof(TargetIO),true); // find all SaveObject components, including inactive (hence the true here at the end)
+// 			Component[] compArray = allParEng_Global->instances[i].GetComponentsInChildren(typeof(TargetIO),true); // find all SaveObject components, including inactive (hence the true here at the end)
 // 			for (k=0;k<compArray.Length;k++) {
 // 				TargetIO tio = compArray[k].gameObject.GetComponent<TargetIO>();
 // 				if (tio != null) {

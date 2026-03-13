@@ -50,7 +50,7 @@ public class Minigame15 : MonoBehaviour {
         // TODO: Pick image, set size, hide numbers if using image.
         for (int i=1;i<=16;i++) { curNum[i] = i; sliding[i] = false; }
         int sixteenIndex = 16;
-        int shuffleIter = Sys_Global.difficultyPuzzle * 5;
+        int shuffleIter = Eng_Global->difficultyPuzzle * 5;
         while (shuffleIter > 0) {
             int randIter = 32;
             while (randIter > 0) { // Find cell next to empty slot
@@ -90,7 +90,7 @@ public class Minigame15 : MonoBehaviour {
                 (Vector3){position[i].x,position[i].y,0f);
         }
 
-        slideTickFinished = Sys_Global.pauseRelativeTime;
+        slideTickFinished = Eng_Global->pauseRelativeTime;
     }
 
     private void SetAlignments() {
@@ -121,8 +121,8 @@ public class Minigame15 : MonoBehaviour {
     }
 
     void Update() {
-        if (Sys_Global.gamePaused) return;
-        if (Sys_Global.menuActive) return;
+        if (Eng_Global->gamePaused) return;
+        if (Eng_Global->menuActive) return;
 
         if      (AABBCursorCheck(col1Left,col1Right,row1Up,row1Dn)) BtnCheck(1);
         else if (AABBCursorCheck(col2Left,col2Right,row1Up,row1Dn)) BtnCheck(2);
@@ -153,11 +153,11 @@ public class Minigame15 : MonoBehaviour {
             }
         }
 
-        if (slideTickFinished < Sys_Global.pauseRelativeTime) {
-            float tdiff = Sys_Global.pauseRelativeTime - slideTickFinished;
+        if (slideTickFinished < Eng_Global->pauseRelativeTime) {
+            float tdiff = Eng_Global->pauseRelativeTime - slideTickFinished;
             float tickCount = tdiff / 0.04f;
             float shift = tickCount * 12f;
-            slideTickFinished = Sys_Global.pauseRelativeTime + 0.04f;
+            slideTickFinished = Eng_Global->pauseRelativeTime + 0.04f;
             for (int i=1;i<=16;i++) {
                 if (!sliding[i]) continue;
 
@@ -211,7 +211,7 @@ public class Minigame15 : MonoBehaviour {
             ydiff = vabs(ydiff) > 2f ? ydiff : 0f;
             Vector2 sliddirBefore = new Vector2(xdiff,ydiff);
             slideDir[to] = new Vector2(Utils.Sign(xdiff),Utils.Sign(ydiff));
-            slideTickFinished = Sys_Global.pauseRelativeTime + 0.1f;
+            slideTickFinished = Eng_Global->pauseRelativeTime + 0.1f;
         }
 
         curNum[to] = fromNum;

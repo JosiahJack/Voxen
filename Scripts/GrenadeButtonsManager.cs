@@ -7,7 +7,7 @@ public class GrenadeButtonsManager : MonoBehaviour {
 	public GameObject[] grenCountsText;
 
 	void Update() {
-		if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
+		if (!Eng_Global->gamePaused && !Eng_Global->menuActive) {
 			for (int i=0; i<7; i++) {
 				if (inventoryPlayer1.grenAmmo[i] > 0) {
 					if (!grenButtons[i].activeInHierarchy) grenButtons[i].SetActive(true);

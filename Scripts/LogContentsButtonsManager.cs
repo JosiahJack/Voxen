@@ -23,7 +23,7 @@ public class LogContentsButtonsManager : MonoBehaviour {
 	}
 
 	void Update() {
-		if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
+		if (!Eng_Global->gamePaused && !Eng_Global->menuActive) {
 			for (int i=0; i<15; i++) {
 				LogButtonsText[i].text = logNames[i];
 				logRefButtons[i].logReferenceIndex = retrievedIndices[i];

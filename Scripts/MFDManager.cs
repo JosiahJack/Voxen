@@ -68,7 +68,7 @@
 		hardwareButtonsContainer.SetActive(false);
 		viewWeaponsContainer.SetActive(false);
 		CyberTimer ct = cyberTimer.GetComponent<CyberTimer>();
-		if (ct != null) ct.Reset(Sys_Global.difficultyCyber);
+		if (ct != null) ct.Reset(Eng_Global->difficultyCyber);
 		CenterTabButtonClickSilent(3,true);
 		
 	}
@@ -195,9 +195,9 @@
 		float checkVal = 0;
 		if (health) {
 			if (MouseLookScript.a.inCyberSpace) {
-				checkVal = instances[PLAYER1].cyberHealth;
+				checkVal = Eng_Global->instances[PLAYER1].cyberHealth;
 			} else {
-				checkVal = instances[PLAYER1].health;
+				checkVal = Eng_Global->instances[PLAYER1].health;
 			}
 		} else {
 			checkVal = PlayerEnergy.a.energy;
@@ -407,12 +407,12 @@
 				return;
 			}
 			for (int i=0;i<4;i++) {
-				if (contents[i] > -1) {
+				if (contEng_Global->instances[i] > -1) {
 					searchCloseButtonRH.SetActive(true);
 					searchItemImagesRH[i].SetActive(true);
 					searchItemImagesRH[i].GetComponent<Image>().overrideSprite = null;
-					searchItemImagesRH[i].GetComponent<Image>().overrideSprite = Const.a.GetSpriteFromTexture(contents[i]);
-					searchContainerRH.contents[i] = contents[i];
+					searchItemImagesRH[i].GetComponent<Image>().overrideSprite = Const.a.GetSpriteFromTexture(contEng_Global->instances[i]);
+					searchContainerRH.contEng_Global->instances[i] = contEng_Global->instances[i];
 					searchContainerRH.customIndex[i] = customIndex[i];
 				}
 			}
@@ -427,12 +427,12 @@
 				return;
 			}
 			for (int i=0;i<4;i++) {
-				if (contents[i] > -1) {
+				if (contEng_Global->instances[i] > -1) {
 					searchCloseButtonLH.SetActive(true);
 					searchItemImagesLH[i].SetActive(true);
 					searchItemImagesLH[i].GetComponent<Image>().overrideSprite = null;
-					searchItemImagesLH[i].GetComponent<Image>().overrideSprite = Const.a.GetSpriteFromTexture(contents[i]);
-					searchContainerLH.contents[i] = contents[i];
+					searchItemImagesLH[i].GetComponent<Image>().overrideSprite = Const.a.GetSpriteFromTexture(contEng_Global->instances[i]);
+					searchContainerLH.contEng_Global->instances[i] = contEng_Global->instances[i];
 					searchContainerLH.customIndex[i] = customIndex[i];
 				}
 			}
@@ -617,7 +617,7 @@
 		logReaderContainer.GetComponent<LogTextReaderManager>().SendTextToReader(index);
 		logTable.SetActive(false);
 		logLevelsFolder.SetActive(false);
-		if (Const.a.audioLogs[index] != null) logFinished = Sys_Global.pauseRelativeTime + Const.a.audioLogs[index].length + 0.1f; //add slight delay after log is finished playing to make sure we don't cut off audio in case there's a frame delay for audio start
+		if (Const.a.audioLogs[index] != null) logFinished = Eng_Global->pauseRelativeTime + Const.a.audioLogs[index].length + 0.1f; //add slight delay after log is finished playing to make sure we don't cut off audio in case there's a frame delay for audio start
 		logActive = true;
 		logType = Const.a.audioLogType[index];
 	}
@@ -717,7 +717,7 @@
 			kkb.keycode = keycode;
 			kkb.keypad = keypad;
 			kkb.ResetEntry();
-			if (Sys_Global.difficultyMission <= 1) {
+			if (Eng_Global->difficultyMission <= 1) {
 				kkb.currentEntry = keycode;
 			}
 		} else {
@@ -728,7 +728,7 @@
 			kkb.keycode = keycode;
 			kkb.keypad = keypad;
 			kkb.ResetEntry();
-			if (Sys_Global.difficultyMission <= 1) {
+			if (Eng_Global->difficultyMission <= 1) {
 				kkb.currentEntry = keycode;
 			}
 		}
@@ -815,7 +815,7 @@
 					searchItemImagesRH[i].SetActive(false);
 					searchItemImagesRH[i].GetComponent<Image>().overrideSprite = null;
 					searchItemImagesRH[i].GetComponent<Image>().overrideSprite = Const.a.GetSpriteFromTexture(101);
-					searchContainerRH.contents[i] = -1;
+					searchContainerRH.contEng_Global->instances[i] = -1;
 					searchContainerRH.customIndex[i] = -1;
 				}
 			}
@@ -831,7 +831,7 @@
 					searchItemImagesLH[i].SetActive(false);
 					searchItemImagesLH[i].GetComponent<Image>().overrideSprite = null;
 					searchItemImagesLH[i].GetComponent<Image>().overrideSprite = Const.a.GetSpriteFromTexture(101);
-					searchContainerLH.contents[i] = -1;
+					searchContainerLH.contEng_Global->instances[i] = -1;
 					searchContainerLH.customIndex[i] = -1;
 				}
 			}
@@ -961,7 +961,7 @@
 		}
 
 		int wep16index = WeaponFire.Get16WeaponIndexFromConstIndex(
-							WeaponCurrent.a.weaponIndex);
+							inventoryPlayer1.weaponIndex);
 
 		if (wep16index == 1 || wep16index == 4 || wep16index == 10
 			|| wep16index == 14 || wep16index == 15) {
@@ -971,18 +971,18 @@
 
 		Image norm = loadNormalAmmoButton.GetComponent<Image>();
 		Image anorm = loadAlternateAmmoButton.GetComponent<Image>();
-		if (inventoryPlayer1.wepLoadedWithAlternate[WeaponCurrent.a.weaponCurrent]) {
-			SetAmmoIcons(WeaponCurrent.a.weaponIndex,true);
+		if (inventoryPlayer1.wepLoadedWithAlternate[inventoryPlayer1.weaponCurrent]) {
+			SetAmmoIcons(inventoryPlayer1.weaponIndex,true);
 			norm.overrideSprite = ammoButtonDeHighlighted;
-			if (WeaponCurrent.a.currentMagazineAmount2[WeaponCurrent.a.weaponCurrent] > 0) {
+			if (inventoryPlayer1.currentMagazineAmount2[inventoryPlayer1.weaponCurrent] > 0) {
 				anorm.overrideSprite = ammoButtonHighlighted;
 			} else {
 				anorm.overrideSprite = ammoButtonDeHighlighted;
 			}
 		} else {
-			SetAmmoIcons(WeaponCurrent.a.weaponIndex,false);
+			SetAmmoIcons(inventoryPlayer1.weaponIndex,false);
 			anorm.overrideSprite = ammoButtonDeHighlighted;
-			if (WeaponCurrent.a.currentMagazineAmount[WeaponCurrent.a.weaponCurrent] > 0) {
+			if (inventoryPlayer1.currentMagazineAmount[inventoryPlayer1.weaponCurrent] > 0) {
 				norm.overrideSprite = ammoButtonHighlighted;
 			} else {
 				norm.overrideSprite = ammoButtonDeHighlighted;
@@ -991,18 +991,18 @@
 	}
 
 	public void UpdateHUDAmmoCountsEither() {
-		if (WeaponCurrent.a.weaponCurrent >= 0) {
-			if (inventoryPlayer1.wepLoadedWithAlternate[WeaponCurrent.a.weaponCurrent]) {
-				UpdateHUDAmmoCounts(WeaponCurrent.a.currentMagazineAmount2[WeaponCurrent.a.weaponCurrent]);
+		if (inventoryPlayer1.weaponCurrent >= 0) {
+			if (inventoryPlayer1.wepLoadedWithAlternate[inventoryPlayer1.weaponCurrent]) {
+				UpdateHUDAmmoCounts(inventoryPlayer1.currentMagazineAmount2[inventoryPlayer1.weaponCurrent]);
 			} else {
-				UpdateHUDAmmoCounts(WeaponCurrent.a.currentMagazineAmount[WeaponCurrent.a.weaponCurrent]);
+				UpdateHUDAmmoCounts(inventoryPlayer1.currentMagazineAmount[inventoryPlayer1.weaponCurrent]);
 			}
 		}
 	}
 
 	void UpdateAmmoAndLoadButtons() {
-		if (WeaponCurrent.a.weaponCurrent < 0
-			|| WeaponCurrent.a.weaponCurrentPending >= 0) {
+		if (inventoryPlayer1.weaponCurrent < 0
+			|| inventoryPlayer1.weaponCurrentPending >= 0) {
 
 			return;
 		}
@@ -1090,7 +1090,7 @@
 
 	public void NotifyToCenterTab(int tabNum) {
 		tabNotified[tabNum] = true;
-		centerTabsTickFinished = Sys_Global.pauseRelativeTime + centerTabsTickTime;
+		centerTabsTickFinished = Eng_Global->pauseRelativeTime + centerTabsTickTime;
 		ToggleHighlightOnCenterTabButton(tabNum);
 	}
 

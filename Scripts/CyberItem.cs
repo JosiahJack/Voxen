@@ -9,9 +9,9 @@ public class CyberItem : MonoBehaviour {
 	private GameObject explosionEffect;
 
 	void Start() {
-		if (Sys_Global.difficultyMission == 0) {
+		if (Eng_Global->difficultyMission == 0) {
 			// Disable data objects when Mission difficulty is 0.
-			if (type == SoftwareType.Data) this.flag_set(&instances[i].entflags, ENTFLAG_ACTIVE, false);
+			if (type == SoftwareType.Data) this.flag_set(&Eng_Global->instances[i].entflags, ENTFLAG_ACTIVE, false);
 		}
 	}
 
@@ -28,11 +28,11 @@ public class CyberItem : MonoBehaviour {
 				explosionEffect.SetActive(true);
 
 				// Put vaporization effect at raycast center.
-				explosionEffect.instances[i].position = instances[i].position; 
+				explosionEffect.Eng_Global->instances[i].position = Eng_Global->instances[i].position; 
 			}
 
 			// We've been picked up, quick hide like you were.
-			this.flag_set(&instances[i].entflags, ENTFLAG_ACTIVE, false);
+			this.flag_set(&Eng_Global->instances[i].entflags, ENTFLAG_ACTIVE, false);
 		}
 	}
 }

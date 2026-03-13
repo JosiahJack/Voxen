@@ -94,7 +94,7 @@
 
 	void Update() {
 		// Logs pause exceptions.
-		if ((Sys_Global.gamePaused || Sys_Global.menuActive)
+		if ((Eng_Global->gamePaused || Eng_Global->menuActive)
 			&& !logPaused) {
 			logPaused = true;
 			if (SFXSource == null) SFXSource = GetComponent<AudioSource>();
@@ -104,29 +104,29 @@
 		}
 		//--- End Logs ---
 	
-		if (Sys_Global.gamePaused) return;
-		if (Sys_Global.menuActive) return;
+		if (Eng_Global->gamePaused) return;
+		if (Eng_Global->menuActive) return;
 
 		// Update Senaraound camera positions to match player camer height.
 		Vector3 camPos =
-		  hardwareButtonManager.sensaroundCenterCamera.instances[i].position;
+		  hardwareButtonManager.sensaroundCenterCamera.Eng_Global->instances[i].position;
 
-		camPos.y = MouseLookScript.a.instances[i].position.y;
-		hardwareButtonManager.sensaroundCenterCamera.instances[i].position =
+		camPos.y = MouseLookScript.a.Eng_Global->instances[i].position.y;
+		hardwareButtonManager.sensaroundCenterCamera.Eng_Global->instances[i].position =
 			camPos;
 
 		camPos =
-		  hardwareButtonManager.sensaroundCenterCamera.instances[i].position;
+		  hardwareButtonManager.sensaroundCenterCamera.Eng_Global->instances[i].position;
 
-		camPos.y = MouseLookScript.a.instances[i].position.y;
-		hardwareButtonManager.sensaroundLHCamera.instances[i].position =
+		camPos.y = MouseLookScript.a.Eng_Global->instances[i].position.y;
+		hardwareButtonManager.sensaroundLHCamera.Eng_Global->instances[i].position =
 			camPos;
 
 		camPos =
-		  hardwareButtonManager.sensaroundCenterCamera.instances[i].position;
+		  hardwareButtonManager.sensaroundCenterCamera.Eng_Global->instances[i].position;
 
-		camPos.y = MouseLookScript.a.instances[i].position.y;
-		hardwareButtonManager.sensaroundRHCamera.instances[i].position =
+		camPos.y = MouseLookScript.a.Eng_Global->instances[i].position.y;
+		hardwareButtonManager.sensaroundRHCamera.Eng_Global->instances[i].position =
 			camPos;
 
 		// General
@@ -284,10 +284,10 @@
 		// Weapons
 		if (Sys_UI.MainTab.activeInHierarchy) {
 			UpdateAmmoText();
-			int yellowWep = WeaponCurrent.a.weaponCurrent;
+			int yellowWep = inventoryPlayer1.weaponCurrent;
 			int dullYellowWep = -1;
-			if (WeaponCurrent.a.weaponCurrentPending >= 0) {
-				dullYellowWep = WeaponCurrent.a.weaponCurrentPending; // Next
+			if (inventoryPlayer1.weaponCurrentPending >= 0) {
+				dullYellowWep = inventoryPlayer1.weaponCurrentPending; // Next
 				yellowWep = -1; // Last wep
 			}
 
@@ -507,7 +507,7 @@
 				List<GameObject> hmGOs = new List<GameObject>();
 				List<GameObject> allParents = SceneManager.GetActiveScene().GetRootGameObjects().ToList();
 				for (i=0;i<allParents.Count;i++) {
-					Component[] compArray = allParents[i].GetComponentsInChildren(typeof(HealthManager),true); // find all HealthManager components, including inactive (hence the true here at the end)
+					Component[] compArray = allParEng_Global->instances[i].GetComponentsInChildren(typeof(HealthManager),true); // find all HealthManager components, including inactive (hence the true here at the end)
 					for (k=0;k<compArray.Length;k++) {
 						hmGOs.Add(compArray[k].gameObject); //add the gameObject associated with all HealthManager components in the scene
 					}
@@ -622,7 +622,7 @@
 	public void HideBioMonitor() {
 		if (hardwareButtonManager == null) return;
 		if (hardwareButtonManager.bioMonitorContainer == null) return;
-		if (Sys_Cheats.showFPS) return;
+		if (Eng_Cheats->showFPS) return;
 		
 		hardwareButtonManager.bioMonitorContainer.SetActive(false);
 	}
@@ -1061,10 +1061,10 @@
 			hasSoft[3] = false;
 			softs[3].SetActive(false); // turn the button off now that we are out
 		}
-		if (instances[PLAYER1].turboFinished > Sys_Global.pauseRelativeTime) {
-			instances[PLAYER1].turboFinished += instances[PLAYER1].turboCyberTime; // effect stacks
+		if (Eng_Global->instances[PLAYER1].turboFinished > Eng_Global->pauseRelativeTime) {
+			Eng_Global->instances[PLAYER1].turboFinished += Eng_Global->instances[PLAYER1].turboCyberTime; // effect stacks
 		} else {
-			instances[PLAYER1].turboFinished = instances[PLAYER1].turboCyberTime + Sys_Global.pauseRelativeTime;
+			Eng_Global->instances[PLAYER1].turboFinished = Eng_Global->instances[PLAYER1].turboCyberTime + Eng_Global->pauseRelativeTime;
 		}
 	}
 
@@ -1082,7 +1082,7 @@
 			hasSoft[4] = false;
 			softs[4].SetActive(false); // turn the button off now that we are out
 		}
-		GameObject decoyObj = Instantiate(decoyPrefab,instances[PLAYER1].position,instances[PLAYER1].rotation) as GameObject;
+		GameObject decoyObj = Instantiate(decoyPrefab,Eng_Global->instances[PLAYER1].position,Eng_Global->instances[PLAYER1].rotation) as GameObject;
 	}
 
 	public void UseRecall() {
@@ -1090,7 +1090,7 @@
 
 		softVersions[5]--; // reduce number of recalls we have left to use
 		if (softVersions[5] <= 0) inventoryPlayer1.hasSoft[5] = false;
-		instances[PLAYER1].instances[i].position = MouseLookScript.a.cyberspaceRecallPoint; // pop back to cyber section start
+		Eng_Global->instances[PLAYER1].Eng_Global->instances[i].position = MouseLookScript.a.cyberspaceRecallPoint; // pop back to cyber section start
 	}
 
 	public bool AddSoftwareItem(SoftwareType type, int vers) {
@@ -1242,11 +1242,11 @@
 		if (slot6 != -1) numweapons++;
 		if (slot7 != -1) numweapons++;
 
-		if (WeaponCurrent.a.weaponCurrent < 0) return;
-		if (WeaponCurrent.a.weaponCurrent > 7) return;
+		if (inventoryPlayer1.weaponCurrent < 0) return;
+		if (inventoryPlayer1.weaponCurrent > 7) return;
 
-		Sys_UI.SetAmmoIcons(WeaponCurrent.a.weaponIndex,
-						wepLoadedWithAlternate[WeaponCurrent.a.weaponCurrent]); 
+		Sys_UI.SetAmmoIcons(inventoryPlayer1.weaponIndex,
+						wepLoadedWithAlternate[inventoryPlayer1.weaponCurrent]); 
 	}
 
 	public string GetTextForWeaponAmmo(int index) {
@@ -1256,9 +1256,9 @@
 		case 36:
 			//Mark3 Assault Rifle
 			if (wepLoadedWithAlternate[index]) {
-				retval = WeaponCurrent.a.currentMagazineAmount2[index].ToString() + "pn | ";
+				retval = inventoryPlayer1.currentMagazineAmount2[index].ToString() + "pn | ";
 			} else {
-				retval = WeaponCurrent.a.currentMagazineAmount[index].ToString() + "mg | ";
+				retval = inventoryPlayer1.currentMagazineAmount[index].ToString() + "mg | ";
 			}
 
 			retval += wepAmmo[0].ToString() + "mg, " + wepAmmoSecondary[0].ToString() + "pn";
@@ -1274,9 +1274,9 @@
 		case 38:
 			//SV-23 Dartgun
 			if (wepLoadedWithAlternate[index]) {
-				retval = WeaponCurrent.a.currentMagazineAmount2[index].ToString() + "tq | ";
+				retval = inventoryPlayer1.currentMagazineAmount2[index].ToString() + "tq | ";
 			} else {
-				retval = WeaponCurrent.a.currentMagazineAmount[index].ToString() + "nd | ";
+				retval = inventoryPlayer1.currentMagazineAmount[index].ToString() + "nd | ";
 			}
 
 			retval += wepAmmo[2].ToString() + "nd, " + wepAmmoSecondary[2].ToString() + "tq";
@@ -1284,9 +1284,9 @@
 		case 39:
 			//AM-27 Flechette
 			if (wepLoadedWithAlternate[index]) {
-				retval = WeaponCurrent.a.currentMagazineAmount2[index].ToString() + "sp | ";
+				retval = inventoryPlayer1.currentMagazineAmount2[index].ToString() + "sp | ";
 			} else {
-				retval = WeaponCurrent.a.currentMagazineAmount[index].ToString() + "hn | ";
+				retval = inventoryPlayer1.currentMagazineAmount[index].ToString() + "hn | ";
 			}
 
 			retval += wepAmmo[3].ToString() + "hn, " + wepAmmoSecondary[3].ToString() + "sp";
@@ -1310,9 +1310,9 @@
 		case 43:
 			//Magnum 2100
 			if (wepLoadedWithAlternate[index]) {
-				retval = WeaponCurrent.a.currentMagazineAmount2[index].ToString() + "sg | ";
+				retval = inventoryPlayer1.currentMagazineAmount2[index].ToString() + "sg | ";
 			} else {
-				retval = WeaponCurrent.a.currentMagazineAmount[index].ToString() + "hw | ";
+				retval = inventoryPlayer1.currentMagazineAmount[index].ToString() + "hw | ";
 			}
 
 			retval += wepAmmo[7].ToString() + "hw, " + wepAmmoSecondary[7].ToString() + "sg";
@@ -1320,9 +1320,9 @@
 		case 44:
 			//SB-20 Magpulse
 			if (wepLoadedWithAlternate[index]) {
-				retval = WeaponCurrent.a.currentMagazineAmount2[index].ToString() + "su | ";
+				retval = inventoryPlayer1.currentMagazineAmount2[index].ToString() + "su | ";
 			} else {
-				retval = WeaponCurrent.a.currentMagazineAmount[index].ToString() + "cr | ";
+				retval = inventoryPlayer1.currentMagazineAmount[index].ToString() + "cr | ";
 			}
 
 			retval += wepAmmo[8].ToString() + "cr, " + wepAmmoSecondary[8].ToString() + "su";
@@ -1330,9 +1330,9 @@
 		case 45:
 			//ML-41 Pistol
 			if (wepLoadedWithAlternate[index]) {
-				retval = WeaponCurrent.a.currentMagazineAmount2[index].ToString() + "tf | ";
+				retval = inventoryPlayer1.currentMagazineAmount2[index].ToString() + "tf | ";
 			} else {
-				retval = WeaponCurrent.a.currentMagazineAmount[index].ToString() + "st | ";
+				retval = inventoryPlayer1.currentMagazineAmount[index].ToString() + "st | ";
 			}
 
 			retval += wepAmmo[9].ToString() + "st, " + wepAmmoSecondary[9].ToString() + "tf";
@@ -1347,20 +1347,20 @@
 			break;
 		case 47:
 			//MM-76 Railgun
-			retval = WeaponCurrent.a.currentMagazineAmount[index].ToString() + "rl | ";
+			retval = inventoryPlayer1.currentMagazineAmount[index].ToString() + "rl | ";
 			retval += wepAmmo[11].ToString() + "rl";
 			break;
 		case 48:
 			//DC-05 Riotgun
-			retval = WeaponCurrent.a.currentMagazineAmount[index].ToString() + "rb | ";
+			retval = inventoryPlayer1.currentMagazineAmount[index].ToString() + "rb | ";
 			retval += wepAmmo[12].ToString() + "rb";
 			break;
 		case 49:
 			//RF-07 Skorpion
 			if (wepLoadedWithAlternate[index]) {
-				retval = WeaponCurrent.a.currentMagazineAmount2[index].ToString() + "lg" + " | ";
+				retval = inventoryPlayer1.currentMagazineAmount2[index].ToString() + "lg" + " | ";
 			} else {
-				retval = WeaponCurrent.a.currentMagazineAmount[index].ToString() + "sm, " + " | ";
+				retval = inventoryPlayer1.currentMagazineAmount[index].ToString() + "sm, " + " | ";
 			}
 
 			retval = wepAmmo[13].ToString() + "sm, " + wepAmmoSecondary[13].ToString() + "lg";
@@ -1425,17 +1425,17 @@
 			WeaponButton wepBut = Sys_UI.wepbutMan.wepButtonsScripts[i];
 			wepBut.useableItemIndex = index;
 			float egSet = GetDefaultEnergySettingForWeaponFrom16Index(index16);
-			WeaponCurrent.a.weaponEnergySetting[i] = egSet;
+			inventoryPlayer1.weaponEnergySetting[i] = egSet;
 			if (i == 0) {
-				WeaponCurrent.a.weaponCurrentPending = i;
-				WeaponCurrent.a.weaponIndexPending = index;
+				inventoryPlayer1.weaponCurrentPending = i;
+				inventoryPlayer1.weaponIndexPending = index;
 				WeaponFire.a.StartWeaponDip(0.5f);
 
 				// Pop it back to start to be sure
 				WeaponFire.a.reloadContainer.localPosition =
 					WeaponFire.a.reloadContainerHome;
 
-				WeaponCurrent.a.justChangedWeap = true;
+				inventoryPlayer1.justChangedWeap = true;
 				Sys_UI.SendInfoToItemTab(index); // Notify item tab we
 				Sys_UI.SendInfoToItemTab(index); // clicked on a weapon.
 				Sys_UI.UpdateHUDAmmoCountsEither();
@@ -1443,11 +1443,11 @@
 			}
 
 			if (loadedAlt && ammo2 > 0) {
-				WeaponCurrent.a.currentMagazineAmount2[i] = ammo2;
+				inventoryPlayer1.currentMagazineAmount2[i] = ammo2;
 				if (ammo1 > 0) wepAmmo[index16] += ammo1;
 				wepLoadedWithAlternate[i] = true;
 			} else {
-				WeaponCurrent.a.currentMagazineAmount[i] = ammo1;
+				inventoryPlayer1.currentMagazineAmount[i] = ammo1;
 				if (ammo2 > 0) wepAmmoSecondary[index16] += ammo2;
 				wepLoadedWithAlternate[i] = false;
 
