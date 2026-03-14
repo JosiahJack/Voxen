@@ -15,6 +15,7 @@
 #include "gl.h"
 #include "glfw3.h"
 GLFWwindow* window;
+#define MOD_INTEROP
 #include "voxen.h"
 #include "Shaders/shaders.h"
 #include "credits.h"
@@ -80,55 +81,6 @@ uint32_t shadowDrawCallsRenderedThisFrame;
 uint32_t verticesRenderedThisFrame;
 uint32_t drawCallsNormal;
 int fogFac;
-
-// Interop - From Mod
-void (*ModInit)(GlobalContext*,CheatsSystem*);
-bool (*Forward)(void);
-bool (*StrafeLeft)(void);
-bool (*Backpedal)(void);
-bool (*StrafeRight)(void);
-bool (*Jump)(void);
-bool (*JumpDown)(void);
-bool (*Crouch)(void);
-bool (*Prone)(void);
-bool (*LeanLeft)(void);
-bool (*LeanRight)(void);
-bool (*Sprint)(void);
-bool (*TurnLeft)(void);
-bool (*TurnRight)(void);
-bool (*LookUp)(void);
-bool (*LookDown)(void);
-bool (*RecentLog)(void);
-bool (*Biomonitor)(void);
-bool (*Sensaround)(void);
-bool (*Lantern)(void);
-bool (*Shield)(void);
-bool (*Infrared)(void);
-bool (*Email)(void);
-bool (*Booster)(void);
-bool (*Jumpjets)(void);
-bool (*Attack)(void);
-bool (*Use)(void);
-bool (*Menu)(void);
-bool (*ToggleMode)(void);
-bool (*Reload)(void);
-bool (*WeaponCycUp)(void);
-bool (*WeaponCycDown)(void);
-bool (*Grenade)(void);
-bool (*GrenadeCycUp)(void);
-bool (*GrenadeCycDown)(void);
-bool (*ChangeAmmoType)(void);
-bool (*Patch)(void);
-bool (*PatchCycUp)(void);
-bool (*PatchCycDown)(void);
-bool (*Map)(void);
-bool (*SwimUp)(void);
-bool (*SwimDn)(void);
-bool (*ChangeAmmoType)(void);
-bool (*Console)(void);
-float (*GetBasePlayerSpeed)(bool running);
-void (*InitializeAIAfterLoad)(uint16_t i);
-bool (*TakeScreenshot)(void);
 
 typedef struct {
    unsigned short x0,y0,x1,y1; // coordinates of bbox in bitmap
@@ -984,12 +936,13 @@ void LoadModFunctions(void) {
         OS_Exit(1);
     }
     
-    ModInit         = (void (*)(GlobalContext*,CheatsSystem*))  PLATFORM_DLSYM(mod_handle, "ModInit");
-    if (!ModInit) { DualLogError("Failed to load ModInit function pointer from mod data\n"); OS_Exit(1); }
+    ModInit         = (void (*)(GlobalContext*,CheatsSystem*)) PLATFORM_DLSYM(mod_handle,"ModInit"); if (!ModInit) { DualLogError("Failed to load ModInit function pointer from mod data\n"); OS_Exit(1); }
     ModInit(&Sys_Global,&Sys_Cheats);
     Sys_Global.GetKey = GetKey;
     Sys_Global.GetKeyPressed = GetKeyPressed;
-    Forward         = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Forward");        if (!Forward) { DualLogError("Failed to load Forward function pointer from mod data\n"); OS_Exit(1); }
+#define LINK_MOD_SYMBOL(name,ptr) PLATFORM_DLSYM(mod_handle,(name)); if (!(ptr)) { DualLogError("Failed to load %s function pointer from mod data\n", (name)); OS_Exit(1); }
+    ModUpdate       = (void (*)(void))           LINK_MOD_SYMBOL("ModUpdate",ModUpdate);
+    Forward         = (bool (*)(void))           LINK_MOD_SYMBOL("Forward",Forward);
     Backpedal       = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Backpedal");      if (!Backpedal) { DualLogError("Failed to load Backpedal function pointer from mod data\n"); OS_Exit(1); }
     StrafeLeft      = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "StrafeLeft");     if (!StrafeLeft) { DualLogError("Failed to load StrafeLeft function pointer from mod data\n"); OS_Exit(1); }
     StrafeRight     = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "StrafeRight");    if (!StrafeRight) { DualLogError("Failed to load StrafeRight function pointer from mod data\n"); OS_Exit(1); }
@@ -1127,7 +1080,7 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     LoadEntities();
     InitFontAtlasses();
     double nextInitTimeSection = get_time();
-    BioMonitorInit();
+//     BioMonitorInit(); TODO
     RenderLoadingProgress(80,"Loading...");
     glGenFramebuffers(1, &Sys_Render.gBufferFBO);
     ApplySettings(); // After loading of text and game data.
@@ -1911,6 +1864,7 @@ int32_t main(void) {
         glfwPollEvents();
         ProcessInput(); // Calls ApplyPlayerMovements(), needs called without checking paused state for menus handling.
         if (likely(!Sys_Global.gamePaused && !Sys_Global.menuActive)) { // Update Gameplay
+            ModUpdate();
             if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].released) Frob(Sys_Global.instances[PLAYER1].position, Sys_Global.instances[PLAYER1].forward, Sys_Global.instances[PLAYER1].right);
             if (Sys_Global.current_time < Sys_Dx.debugLineFinished && (Sys_Dx.debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Sys_Dx.debugLine_start, Sys_Dx.debugLine_end);
 //             for (uint16_t i=START_INDEX_LEVEL_INSTANCES;i<loadedInstances;++i) UpdateWhileNotPaused(i); // TODO Get new states prior to updating animations, physics event, or rendering

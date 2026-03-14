@@ -1,6 +1,7 @@
 {
     global:
         ModInit;
+        ModUpdate;
         Forward;
         Backpedal;
         StrafeLeft;

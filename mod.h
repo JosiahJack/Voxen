@@ -85,6 +85,11 @@ typedef struct {
 } NPCTable;
 extern NPCTable npcTable[NUM_AI_TYPES];
 
+extern uint16_t useableItemsFrobIcons[94];
+
 MOD_TO_ENGINE bool Sprint(void);
 
-extern uint16_t useableItemsFrobIcons[94];
+// Engine functions available to Mod
+extern void DualLog(const char* fmt, ...);
+extern void DualLogWarn(const char* fmt, ...);
+extern void DualLogError(const char* fmt, ...);

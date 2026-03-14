@@ -2,6 +2,9 @@
 // From Engine
 GlobalContext* Eng_Global = 0; CheatsSystem* Eng_Cheats;
 MOD_TO_ENGINE void ModInit(GlobalContext* globals, CheatsSystem* cheats) { Eng_Global = globals; Eng_Cheats = cheats; }
+MOD_TO_ENGINE void ModUpdate(void) {
+    DualLog("Mod updating!\n");
+}
 MOD_TO_ENGINE bool Forward(void) {     return Eng_Global->GetKey(0); }
 MOD_TO_ENGINE bool StrafeLeft(void) {  return Eng_Global->GetKey(1); }
 MOD_TO_ENGINE bool Backpedal(void) {   return Eng_Global->GetKey(2); }

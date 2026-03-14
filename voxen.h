@@ -4,11 +4,9 @@
 #endif
 
 #if defined(_WIN32) || defined(__CYGWIN__)
-    #define ENGINE_TO_MOD __declspec(dllimport)
-#elif defined(__APPLE__) || defined(__linux__) || defined(__ANDROID__)
-    #define ENGINE_TO_MOD __attribute__((visibility("default")))
+    #define ENGINE_TO_MOD __declspec(dllexport)
 #else
-    #define ENGINE_TO_MOD     // fallback — may need manual .def / version script
+    #define ENGINE_TO_MOD __attribute__((visibility("default")))
 #endif
 
 #include "common.h"
@@ -380,9 +378,9 @@ typedef struct {
     uint32_t capacity;
 } DataParser;
 
-void DualLog(const char* fmt, ...);
-void DualLogWarn(const char* fmt, ...);
-void DualLogError(const char* fmt, ...);
+ENGINE_TO_MOD void DualLog(const char* fmt, ...);
+ENGINE_TO_MOD void DualLogWarn(const char* fmt, ...);
+ENGINE_TO_MOD void DualLogError(const char* fmt, ...);
 extern const char* sounds[670];
 extern const char* audioLogs[134];
 void play_mp3(const char* path, int32_t fade_in_ms);
@@ -836,50 +834,56 @@ void WeaponsUpdate(void);
 extern bool vmailActive;
 
 // Interop - From Mod
-extern void (*ModInit)(GlobalContext*,CheatsSystem*);
-extern bool (*Forward)(void);
-extern bool (*StrafeLeft)(void);
-extern bool (*Backpedal)(void);
-extern bool (*StrafeRight)(void);
-extern bool (*Jump)(void);
-extern bool (*JumpDown)(void);
-extern bool (*Crouch)(void);
-extern bool (*Prone)(void);
-extern bool (*LeanLeft)(void);
-extern bool (*LeanRight)(void);
-extern bool (*Sprint)(void);
-extern bool (*TurnLeft)(void);
-extern bool (*TurnRight)(void);
-extern bool (*LookUp)(void);
-extern bool (*LookDown)(void);
-extern bool (*RecentLog)(void);
-extern bool (*Biomonitor)(void);
-extern bool (*Sensaround)(void);
-extern bool (*Lantern)(void);
-extern bool (*Shield)(void);
-extern bool (*Infrared)(void);
-extern bool (*Email)(void);
-extern bool (*Booster)(void);
-extern bool (*Jumpjets)(void);
-extern bool (*Attack)(void);
-extern bool (*Use)(void);
-extern bool (*Menu)(void);
-extern bool (*ToggleMode)(void);
-extern bool (*Reload)(void);
-extern bool (*WeaponCycUp)(void);
-extern bool (*WeaponCycDown)(void);
-extern bool (*Grenade)(void);
-extern bool (*GrenadeCycUp)(void);
-extern bool (*GrenadeCycDown)(void);
-extern bool (*ChangeAmmoType)(void);
-extern bool (*Patch)(void);
-extern bool (*PatchCycUp)(void);
-extern bool (*PatchCycDown)(void);
-extern bool (*Map)(void);
-extern bool (*SwimUp)(void);
-extern bool (*SwimDn)(void);
-extern bool (*ChangeAmmoType)(void);
-extern bool (*Console)(void);
-extern float (*GetBasePlayerSpeed)(bool running);
-extern void (*InitializeAIAfterLoad)(uint16_t i);
-extern bool (*TakeScreenshot)(void);
+#ifdef MOD_INTEROP
+    #define MOD_FUNC // This is the definition
+#else
+    #define MOD_FUNC extern // Shared declaration
+#endif
+MOD_FUNC void (*ModInit)(GlobalContext*,CheatsSystem*);
+MOD_FUNC void (*ModUpdate)(void);
+MOD_FUNC bool (*Forward)(void);
+MOD_FUNC bool (*StrafeLeft)(void);
+MOD_FUNC bool (*Backpedal)(void);
+MOD_FUNC bool (*StrafeRight)(void);
+MOD_FUNC bool (*Jump)(void);
+MOD_FUNC bool (*JumpDown)(void);
+MOD_FUNC bool (*Crouch)(void);
+MOD_FUNC bool (*Prone)(void);
+MOD_FUNC bool (*LeanLeft)(void);
+MOD_FUNC bool (*LeanRight)(void);
+MOD_FUNC bool (*Sprint)(void);
+MOD_FUNC bool (*TurnLeft)(void);
+MOD_FUNC bool (*TurnRight)(void);
+MOD_FUNC bool (*LookUp)(void);
+MOD_FUNC bool (*LookDown)(void);
+MOD_FUNC bool (*RecentLog)(void);
+MOD_FUNC bool (*Biomonitor)(void);
+MOD_FUNC bool (*Sensaround)(void);
+MOD_FUNC bool (*Lantern)(void);
+MOD_FUNC bool (*Shield)(void);
+MOD_FUNC bool (*Infrared)(void);
+MOD_FUNC bool (*Email)(void);
+MOD_FUNC bool (*Booster)(void);
+MOD_FUNC bool (*Jumpjets)(void);
+MOD_FUNC bool (*Attack)(void);
+MOD_FUNC bool (*Use)(void);
+MOD_FUNC bool (*Menu)(void);
+MOD_FUNC bool (*ToggleMode)(void);
+MOD_FUNC bool (*Reload)(void);
+MOD_FUNC bool (*WeaponCycUp)(void);
+MOD_FUNC bool (*WeaponCycDown)(void);
+MOD_FUNC bool (*Grenade)(void);
+MOD_FUNC bool (*GrenadeCycUp)(void);
+MOD_FUNC bool (*GrenadeCycDown)(void);
+MOD_FUNC bool (*ChangeAmmoType)(void);
+MOD_FUNC bool (*Patch)(void);
+MOD_FUNC bool (*PatchCycUp)(void);
+MOD_FUNC bool (*PatchCycDown)(void);
+MOD_FUNC bool (*Map)(void);
+MOD_FUNC bool (*SwimUp)(void);
+MOD_FUNC bool (*SwimDn)(void);
+MOD_FUNC bool (*ChangeAmmoType)(void);
+MOD_FUNC bool (*Console)(void);
+MOD_FUNC float (*GetBasePlayerSpeed)(bool running);
+MOD_FUNC void (*InitializeAIAfterLoad)(uint16_t i);
+MOD_FUNC bool (*TakeScreenshot)(void);
