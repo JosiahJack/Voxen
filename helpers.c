@@ -666,7 +666,7 @@ void FilePrintString(OsFileHandle f, const char* fmt, ...) {
     __builtin_va_end(args);
 }
 
-uint8_t GetCurrentLevelSecurity() { return (Sys_Global.difficultyMission < 1 || Sys_Cheats.superoverride) ? 0u : Sys_Global.levelSecurity[Sys_Global.currentLevel]; }
+uint8_t GetCurrentLevelSecurity(void) { return (Sys_Global.difficultyMission < 1 || Sys_Cheats.superoverride) ? 0u : Sys_Global.levelSecurity[Sys_Global.currentLevel]; }
 
 uint16_t GetImpactType(uint16_t instanceIdx) {
     switch (Sys_Global.instances[instanceIdx].bloodType) {

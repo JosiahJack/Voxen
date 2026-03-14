@@ -147,8 +147,8 @@ void PlayerEnergyUpdate() {
     bool activeEnergyDrainers = false;
     if (Eng_Global->instances[PLAYER1].energyDrainTickFinished < Sys_Global.pauseRelativeTime) {
         uint16_t drainJPM = 0u;
-        if (inventoryPlayer1.hardwareIsActive[HW_SNS]) {
-            switch (inventoryPlayer1.hardwareVersion[HW_SNS]) {
+        if (inventoryPlayer1.hardwareIsActive & HW_SNS) {
+            switch (inventoryPlayer1.hardwareVersion[HW_SNS_IDX]) {
                 case 0: drain = 0.01535f; drainJPM += 9; break; // takes about 300s to drain full energy
                 case 1: drain = 0.03413f; drainJPM += 20; break; // takes about 300s to drain full energy
                 case 2: drain = 0.02559f; drainJPM += 15; break; // takes about 240s to drain full energy
@@ -157,9 +157,9 @@ void PlayerEnergyUpdate() {
             TakeEnergy(drain);
         }
 
-        if (inventoryPlayer1.hasHardware[HW_TID]) TargetIdentifierSenseTargets();
-        if (inventoryPlayer1.hardwareIsActive[HW_SHD]) {
-            switch (inventoryPlayer1.hardwareVersionSetting[HW_SHD]) {
+        if (inventoryPlayer1.hasHardware & HW_TID) TargetIdentifierSenseTargets();
+        if (inventoryPlayer1.hardwareIsActive & HW_SHd) {
+            switch (inventoryPlayer1.hardwareVersionSetting[HW_SHD_IDX]) {
                 case 0: drain = 0.04096f; drainJPM += 24; break;
                 case 1: drain = 0.10239f; drainJPM += 60; break;
                 case 2: drain = 0.17919f; drainJPM += 105; break;
@@ -170,7 +170,7 @@ void PlayerEnergyUpdate() {
         }
 
        
-        if (inventoryPlayer1.hardwareIsActive[HW_BIO]) {
+        if (inventoryPlayer1.hardwareIsActive & HW_BIO) {
             switch (inventoryPlayer1.hardwareVersionSetting[HW_BIO]) {
                 case 0: drain = 0.001706f; drainJPM += 1;  activeEnergyDrainers = true; break;
                 case 1: drain = 0; break; // doesn't take energy
@@ -179,8 +179,8 @@ void PlayerEnergyUpdate() {
         }
 
         // 7 = Head Mounted Lantern
-        if (inventoryPlayer1.hardwareIsActive[7]) {
-            switch (inventoryPlayer1.hardwareVersionSetting[7]) {
+        if (inventoryPlayer1.hardwareIsActive & HW_LAN) {
+            switch (inventoryPlayer1.hardwareVersionSetting[HW_LAN_IDX]) {
                 case 0: tempF = 0.02559f; drainJPM += 15; break;// takes about 180s to drain full energy
                 case 1: tempF = 0.04266f; drainJPM += 25; break; // takes about 120s to drain full energy
                 case 2: tempF = 0.05119f; drainJPM += 30; break; // takes about 90s to drain full energy
@@ -192,8 +192,8 @@ void PlayerEnergyUpdate() {
         // 8 Envirosuit - handled by HealthManager for radiation checks
 
         // 9 = Turbo Motion Booster - done in PlayerMovement since we only use energy on boost, no drain with skates
-        if (inventoryPlayer1.hardwareIsActive[9]) {
-            switch (inventoryPlayer1.hardwareVersionSetting[9]) {
+        if (inventoryPlayer1.hardwareIsActive & HW_BST) {
+            switch (inventoryPlayer1.hardwareVersionSetting[HW_BST_IDX]) {
                 case 0: tempF = 0f; break;
                 case 1: tempF = 0.02f; drainJPM += 16; break; // takes about 120s to drain full energy
                 case 2: tempF = 0.015f; drainJPM += 12; break; // takes about 90s to drain full energy
@@ -205,7 +205,7 @@ void PlayerEnergyUpdate() {
         // 10 Jump Jet Boots - done in PlayerMovement since we only drain while jumping
 
         // 11 Drain nightsight
-        if (inventoryPlayer1.hardwareIsActive [11]) {
+        if (inventoryPlayer1.hardwareIsActive & HW_INF) {
             tempF = 0.08533f; drainJPM += 50; // takes about 120s to drain full energy
             activeEnergyDrainers = true;
             TakeEnergy(tempF);

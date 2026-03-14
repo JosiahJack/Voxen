@@ -283,7 +283,7 @@ int32_t CastStraightX(int32_t px, int32_t pz, int32_t signx) {
     if (signx > 0 && px >= (WORLDX - 1)) return px; // Nowwhere to step to if right by edge, hence WORLDX - 1 here.
     if (signx < 0 && px <= 0) return px;
     if (!XZPairInBounds(px,pz)) return px;
-    if (!gridCellStates[(pz * WORLDX) + px] & CELL_VISIBLE) return px;
+    if (!(gridCellStates[(pz * WORLDX) + px] & CELL_VISIBLE)) return px;
 
     int32_t x = px + signx;
     int32_t z = pz;
@@ -516,12 +516,12 @@ void DetermineVisibleCells(int32_t startX, int32_t startZ) {
         }
     }
     
-    int32_t numVisible = 0;
-    for (int32_t x=0;x<WORLDX;++x) {
-        for (int32_t z=0;z<WORLDZ;++z) {
-            if (gridCellStates[(z * WORLDX) + x] & CELL_VISIBLE) numVisible++;
-        }
-    }
+//     int32_t numVisible = 0;
+//     for (int32_t x=0;x<WORLDX;++x) {
+//         for (int32_t z=0;z<WORLDZ;++z) {
+//             if (gridCellStates[(z * WORLDX) + x] & CELL_VISIBLE) numVisible++;
+//         }
+//     }
 }
 
 void CullInit(void) {
@@ -536,7 +536,7 @@ void CullInit(void) {
     // Then store the visibility of gridCellStates into the table of all visible cells for that cell
     // at the appropriate offset for looking up later when actually re-assigning gridCellStates
     // from this precalculated visibility state for the particular cell.
-    int32_t numPrecomputedVisibleCells = 0;
+//     int32_t numPrecomputedVisibleCells = 0;
     for (int32_t z=0;z<WORLDZ;z++) {
         for (int32_t x=0;x<WORLDX;x++) {
             DetermineVisibleCells(x,z);
@@ -547,7 +547,7 @@ void CullInit(void) {
                     size_t flat_idx = (size_t)(cellIdx * ARRSIZE) + subCellIdx;
                     bool is_visible = (gridCellStates[subCellIdx] & CELL_VISIBLE);
                     set_cull_bit(precomputedVisibleCellsFromHere,flat_idx,is_visible);
-                    if (is_visible) numPrecomputedVisibleCells++;
+//                     if (is_visible) numPrecomputedVisibleCells++;
                 }
             }
             
@@ -555,7 +555,7 @@ void CullInit(void) {
                 if ((x == 15 || x == 16) && z == 23) { // Fix up problem cells at odd angle where ddx doesn't work.
                     size_t flat_idx = (size_t)(cellIdx * ARRSIZE) + ((11 * WORLDX) + 12);
                     set_cull_bit(precomputedVisibleCellsFromHere,flat_idx,true);
-                    numPrecomputedVisibleCells++;
+//                     numPrecomputedVisibleCells++;
                 }
             }
         }
@@ -563,13 +563,13 @@ void CullInit(void) {
     
     (void)UpdatedPlayerCell();
     int32_t cellToCellIdx = playerCellIdx * ARRSIZE;
-    int32_t numFoundVisibleCellsForPlayerStart = 0;
+//     int32_t numFoundVisibleCellsForPlayerStart = 0;
     for (int32_t z=0;z<WORLDZ;++z) {
         for (int32_t x=0;x<WORLDX;++x) {
             int32_t cellIdx = (z * WORLDX) + x;
             size_t flat_idx = (size_t)(cellToCellIdx + cellIdx);
             if (get_cull_bit(precomputedVisibleCellsFromHere,flat_idx)) {
-                numFoundVisibleCellsForPlayerStart++;
+//                 numFoundVisibleCellsForPlayerStart++;
                 gridCellStates[cellIdx] |= CELL_VISIBLE; // Get visible before putting meshes into their cells so we can nudge them a little.
             }
         }

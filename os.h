@@ -1,8 +1,5 @@
 // os.h - starts most translation units and defines the shim layer between Voxen and the OS as well as defining project wide OS defines.
 #pragma once
-#if !defined(__GNUC__) || defined(__clang__) || !defined(__GNUC_MINOR__)
-#error This project is only intended to be compiled with GCC (not Clang, MSVC, etc.)
-#endif
 typedef __INT16_TYPE__ int16_t;
 typedef __INT32_TYPE__ int32_t;
 typedef __UINT8_TYPE__ uint8_t;
@@ -375,11 +372,6 @@ static inline __attribute__((always_inline)) bool OS_GetFileFingerprint(const ch
     return true;
 }
 
-#ifndef _WIN32
-void* __stack_chk_guard = (void*)0xdeadbeefcafebabeULL;
-__attribute__((noreturn)) void __stack_chk_fail(void) { DualLogError("Stack protector: canary corrupted - possible stack smash!"); while(1); }
-#endif
-
 static inline __attribute__((always_inline)) int64_t OS_Seek(OsFileHandle fd, int64_t offset, int whence) { // forth and forsooth pray tell
     #ifdef WINDOWS
         // Use NtSetInformationFile with FilePositionInformation (class 14)
@@ -445,5 +437,3 @@ static inline __attribute__((always_inline)) int64_t OS_Tell(OsFileHandle fd) {
     return rax;
 #endif
 }
-
-#include "underversion_libc.h"

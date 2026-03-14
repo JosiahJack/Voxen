@@ -189,7 +189,8 @@ typedef void (*GLADpostcallback)(void *ret, const char *name, GLADapiproc apipro
 #define GL_UNSIGNED_INT 0x1405
 #define GL_VERSION 0x1F02
 #define GL_VERTEX_SHADER 0x8B31
-
+#define GL_MAJOR_VERSION 0x821B
+#define GL_MINOR_VERSION 0x821C
 #if defined(__SIZEOF_LONG__) && defined(__SIZEOF_POINTER__)
     #if __SIZEOF_POINTER__ > __SIZEOF_LONG__
         #define KHRONOS_USE_INTPTR_T
@@ -1310,6 +1311,8 @@ GLAD_API_CALL PFNGLVERTEXARRAYVERTEXBUFFERPROC glad_glVertexArrayVertexBuffer;
 #define glVertexArrayVertexBuffer glad_glVertexArrayVertexBuffer
 GLAD_API_CALL PFNGLVIEWPORTPROC glad_glViewport;
 #define glViewport glad_glViewport
+GLAD_API_CALL PFNGLGETINTEGERVPROC glad_glGetIntegerv;
+#define glGetIntegerv glad_glGetIntegerv
 
 GLAD_API_CALL int gladLoadGLUserPtr( GLADuserptrloadfunc load, void *userptr);
 GLAD_API_CALL int gladLoadGL( GLADloadfunc load);

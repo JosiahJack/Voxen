@@ -171,6 +171,18 @@ void MenuGoBack(void);
 #define HW_BST  512 // Turbo Motion Booster
 #define HW_JET 1024 // Jump Jet Boots
 #define HW_INF 2048 // Infrared Night Sight Enhancement
+#define HW_SYS_IDX    0 // System Analyzer
+#define HW_NAV_IDX    1 // Navigation Unit
+#define HW_ERD_IDX    2 // Datareader/EReader
+#define HW_SNS_IDX    3 // Sensaround
+#define HW_TID_IDX    4 // Target Identifier
+#define HW_SHD_IDX    5 // Energy Shield
+#define HW_BIO_IDX    6 // Biomonitor
+#define HW_LAN_IDX    7 // Head Mounted Lantern
+#define HW_ENV_IDX    8 // Envirosuit
+#define HW_BST_IDX    9 // Turbo Motion Booster
+#define HW_JET_IDX   10 // Jump Jet Boots
+#define HW_INF_IDX   11 // Infrared Night Sight Enhancement
 
 #define SW_DRILL  0
 #define SW_PULSER 1
@@ -824,50 +836,50 @@ void WeaponsUpdate(void);
 extern bool vmailActive;
 
 // Interop - From Mod
-void (*ModInit)(GlobalContext*,CheatsSystem*);
-bool (*Forward)(void);
-bool (*StrafeLeft)(void);
-bool (*Backpedal)(void);
-bool (*StrafeRight)(void);
-bool (*Jump)(void);
-bool (*JumpDown)(void);
-bool (*Crouch)(void);
-bool (*Prone)(void);
-bool (*LeanLeft)(void);
-bool (*LeanRight)(void);
-bool (*Sprint)(void);
-bool (*TurnLeft)(void);
-bool (*TurnRight)(void);
-bool (*LookUp)(void);
-bool (*LookDown)(void);
-bool (*RecentLog)(void);
-bool (*Biomonitor)(void);
-bool (*Sensaround)(void);
-bool (*Lantern)(void);
-bool (*Shield)(void);
-bool (*Infrared)(void);
-bool (*Email)(void);
-bool (*Booster)(void);
-bool (*Jumpjets)(void);
-bool (*Attack)(void);
-bool (*Use)(void);
-bool (*Menu)(void);
-bool (*ToggleMode)(void);
-bool (*Reload)(void);
-bool (*WeaponCycUp)(void);
-bool (*WeaponCycDown)(void);
-bool (*Grenade)(void);
-bool (*GrenadeCycUp)(void);
-bool (*GrenadeCycDown)(void);
-bool (*ChangeAmmoType)(void);
-bool (*Patch)(void);
-bool (*PatchCycUp)(void);
-bool (*PatchCycDown)(void);
-bool (*Map)(void);
-bool (*SwimUp)(void);
-bool (*SwimDn)(void);
-bool (*ChangeAmmoType)(void);
-bool (*Console)(void);
-float (*GetBasePlayerSpeed)(bool running);
-void (*InitializeAIAfterLoad)(uint16_t i);
-bool (*TakeScreenshot)(void);
+extern void (*ModInit)(GlobalContext*,CheatsSystem*);
+extern bool (*Forward)(void);
+extern bool (*StrafeLeft)(void);
+extern bool (*Backpedal)(void);
+extern bool (*StrafeRight)(void);
+extern bool (*Jump)(void);
+extern bool (*JumpDown)(void);
+extern bool (*Crouch)(void);
+extern bool (*Prone)(void);
+extern bool (*LeanLeft)(void);
+extern bool (*LeanRight)(void);
+extern bool (*Sprint)(void);
+extern bool (*TurnLeft)(void);
+extern bool (*TurnRight)(void);
+extern bool (*LookUp)(void);
+extern bool (*LookDown)(void);
+extern bool (*RecentLog)(void);
+extern bool (*Biomonitor)(void);
+extern bool (*Sensaround)(void);
+extern bool (*Lantern)(void);
+extern bool (*Shield)(void);
+extern bool (*Infrared)(void);
+extern bool (*Email)(void);
+extern bool (*Booster)(void);
+extern bool (*Jumpjets)(void);
+extern bool (*Attack)(void);
+extern bool (*Use)(void);
+extern bool (*Menu)(void);
+extern bool (*ToggleMode)(void);
+extern bool (*Reload)(void);
+extern bool (*WeaponCycUp)(void);
+extern bool (*WeaponCycDown)(void);
+extern bool (*Grenade)(void);
+extern bool (*GrenadeCycUp)(void);
+extern bool (*GrenadeCycDown)(void);
+extern bool (*ChangeAmmoType)(void);
+extern bool (*Patch)(void);
+extern bool (*PatchCycUp)(void);
+extern bool (*PatchCycDown)(void);
+extern bool (*Map)(void);
+extern bool (*SwimUp)(void);
+extern bool (*SwimDn)(void);
+extern bool (*ChangeAmmoType)(void);
+extern bool (*Console)(void);
+extern float (*GetBasePlayerSpeed)(bool running);
+extern void (*InitializeAIAfterLoad)(uint16_t i);
+extern bool (*TakeScreenshot)(void);

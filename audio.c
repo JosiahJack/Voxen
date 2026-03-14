@@ -1,7 +1,7 @@
 // audio.c
 #include "voxen.h"
 #include "tables_audio.h"
-#include "./External/miniaudio.h"
+#include "miniaudio.h"
 #define BUFFER_MS 50
 #define AUD_BUFFER_T 0.25f
 #define MAX_CHANNELS 16

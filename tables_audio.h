@@ -47,7 +47,7 @@ const char* levelMusicDistortion[14] = {"./Audio/music/THM6-49_securitydistorted
                                         "./Audio/music/THM2-46_executivedistorted.mp3","./Audio/music/THM1-48_medicaldistorted.mp3","./Audio/music/THM6-49_securitydistorted.mp3",
                                         "./Audio/music/THM1-48_medicaldistorted.mp3","./Audio/music/THM1-48_medicaldistorted.mp3","./Audio/music/THM1-48_medicaldistorted.mp3",
                                         "./Audio/music/THM1-48_medicaldistorted.mp3","./Audio/music/THM10-41_cyberdistorted.mp3"};
-const char* levelMusicDeath[14] = {"./Audio/music/THM0-17_death.mp3","./Audio/music/THM1-17_death.mp3","./Audio/music/THM3-18_death.mp3","./Audio/music/THM0-17_death.mp3"
+const char* levelMusicDeath[14] = {"./Audio/music/THM0-17_death.mp3","./Audio/music/THM1-17_death.mp3","./Audio/music/THM3-18_death.mp3","./Audio/music/THM0-17_death.mp3",
                                    "./Audio/music/THM3-18_death.mp3","./Audio/music/THM0-17_death.mp3","./Audio/music/THM2-17_death.mp3","./Audio/music/THM0-17_death.mp3",
                                    "./Audio/music/THM6-21_death.mp3","./Audio/music/THM0-17_death.mp3","./Audio/music/THM5-17_death.mp3","./Audio/music/THM5-17_death.mp3",
                                    "./Audio/music/THM5-17_death.mp3","./Audio/music/THM10-16_death.mp3"};

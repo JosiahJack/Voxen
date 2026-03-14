@@ -495,7 +495,7 @@ void LoadTextures(void) {
     for (uint16_t i = 0; i < loadedTexturesMaxIndex; ++i) {
         int32_t currentIndex = matchedParserIdxes[i];
         if (currentIndex < 0 || currentIndex > MAX_VALID_TEXTURE) continue;
-        if (!texture_parser.entries[currentIndex].path || texture_parser.entries[currentIndex].path[0] == '\0') continue;
+        if (texture_parser.entries[currentIndex].path[0] == '\0') continue;
         
         doubleSidedTexture[currentIndex] = (texture_parser.entries[currentIndex].entflags & ENTFLAG_DOUBLESIDED) > 0 ? 1 : 0;
         transparentTexture[currentIndex] = (texture_parser.entries[currentIndex].entflags & ENTFLAG_TRANSPARENT) > 0 ? 1 : 0;

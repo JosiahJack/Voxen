@@ -254,7 +254,7 @@ void BioMonitorUpdate(void) {
     else if (Sys_Global.instances[PLAYER1].fatigue <  80.0f && Sys_Global.instances[PLAYER1].fatigue > 30.0f) bioMonitor.fatigue = 533; // Moderate
 
     if (bioMonitor.beatFinished < Sys_Global.pauseRelativeTime) bioMonitor.heartRate = vfloor((70.0f +((Sys_Global.instances[PLAYER1].fatigue / 100.0f) * 110.0f)) * random_range(0.95f,1.05f));
-    if (inventoryPlayer1.hardwareVersion[HW_BIO] > 1 && (Sys_Global.instances[PLAYER1].patchActive & 127)) {
+    if (inventoryPlayer1.hardwareVersion[HW_BIO_IDX] > 1 && (Sys_Global.instances[PLAYER1].patchActive & 127)) {
 //         bioMonitor.patchesActiveText = Sys_Text.stringTable[528]; // TODO actually render text
 //         if (Sys_Global.instances[PLAYER1].patchActive & PATCH_MEDI))     { tempStr.Append(Sys_Text.stringTable[520]); tempStr.Append(" "); }
 //         if (Sys_Global.instances[PLAYER1].patchActive & PATCH_STAMINUP)) { tempStr.Append(Sys_Text.stringTable[521]); tempStr.Append(" "); }

@@ -233,21 +233,21 @@ void ProcessInput(void) {
     if (!Sys_Input.window_has_focus) return;
     
     if (Sys_Input.keyStates[GLFW_KEY_CAPS_LOCK].pressed) Sys_Input.isCapsLockOn = !Sys_Input.isCapsLockOn; // Change capslock state to match keyboard having toggled.  Must always happen regardless of paused/menu.
-//     if (Console()) ToggleConsole();
-//     Screenshot();
-//     if (Menu() && !Sys_Global.menuActive) { Sys_Global.gamePaused = !Sys_Global.gamePaused; return; }
-//     if (Menu() && Sys_Global.menuActive) { MenuGoBack(); return; }
+    if (Console()) ToggleConsole();
+    Screenshot();
+    if (Menu() && !Sys_Global.menuActive) { Sys_Global.gamePaused = !Sys_Global.gamePaused; return; }
+    if (Menu() && Sys_Global.menuActive) { MenuGoBack(); return; }
     if (Sys_Global.gamePaused || Sys_Global.menuActive || Sys_Cheats.consoleActive) return; // =========== PAUSE BARRIER ==================
 
-//     if (ToggleMode()) {
-//         Sys_Input.ignore_next_mouse_delta = true;
-//         Sys_Global.inventoryMode = !Sys_Global.inventoryMode;
-//         cursorPosition_x = Sys_Settings.ScreenWidth / 2;
-//         cursorPosition_y = Sys_Settings.ScreenHeight / 2;
-//     }
+    if (ToggleMode()) {
+        Sys_Input.ignore_next_mouse_delta = true;
+        Sys_Global.inventoryMode = !Sys_Global.inventoryMode;
+        cursorPosition_x = Sys_Settings.ScreenWidth / 2;
+        cursorPosition_y = Sys_Settings.ScreenHeight / 2;
+    }
     
     // Hardware hotkeys TODO
-//     if (Lantern()) inventoryPlayer1.hardwareIsActive ^= HW_LAN;
+    if (Lantern()) inventoryPlayer1.hardwareIsActive ^= HW_LAN;
 //     if ((inventoryPlayer1.hasHardware & HW_ERD) && GetInput.a.Email())      EReaderAction();
 //     if ((inventoryPlayer1.hasHardware & HW_SNS) && GetInput.a.Sensaround()) SensaroundAction();
 //     if ((inventoryPlayer1.hasHardware & HW_SHD) && GetInput.a.Shield())     ShieldAction();

@@ -80,6 +80,56 @@ uint32_t shadowDrawCallsRenderedThisFrame;
 uint32_t verticesRenderedThisFrame;
 uint32_t drawCallsNormal;
 int fogFac;
+
+// Interop - From Mod
+void (*ModInit)(GlobalContext*,CheatsSystem*);
+bool (*Forward)(void);
+bool (*StrafeLeft)(void);
+bool (*Backpedal)(void);
+bool (*StrafeRight)(void);
+bool (*Jump)(void);
+bool (*JumpDown)(void);
+bool (*Crouch)(void);
+bool (*Prone)(void);
+bool (*LeanLeft)(void);
+bool (*LeanRight)(void);
+bool (*Sprint)(void);
+bool (*TurnLeft)(void);
+bool (*TurnRight)(void);
+bool (*LookUp)(void);
+bool (*LookDown)(void);
+bool (*RecentLog)(void);
+bool (*Biomonitor)(void);
+bool (*Sensaround)(void);
+bool (*Lantern)(void);
+bool (*Shield)(void);
+bool (*Infrared)(void);
+bool (*Email)(void);
+bool (*Booster)(void);
+bool (*Jumpjets)(void);
+bool (*Attack)(void);
+bool (*Use)(void);
+bool (*Menu)(void);
+bool (*ToggleMode)(void);
+bool (*Reload)(void);
+bool (*WeaponCycUp)(void);
+bool (*WeaponCycDown)(void);
+bool (*Grenade)(void);
+bool (*GrenadeCycUp)(void);
+bool (*GrenadeCycDown)(void);
+bool (*ChangeAmmoType)(void);
+bool (*Patch)(void);
+bool (*PatchCycUp)(void);
+bool (*PatchCycDown)(void);
+bool (*Map)(void);
+bool (*SwimUp)(void);
+bool (*SwimDn)(void);
+bool (*ChangeAmmoType)(void);
+bool (*Console)(void);
+float (*GetBasePlayerSpeed)(bool running);
+void (*InitializeAIAfterLoad)(uint16_t i);
+bool (*TakeScreenshot)(void);
+
 typedef struct {
    unsigned short x0,y0,x1,y1; // coordinates of bbox in bitmap
    float xoff,yoff,xadvance;
@@ -554,7 +604,7 @@ __attribute__((cold)) void LoadEntities(void) {
     if (entityCount == 0) { DualLogError("No entities found in entities.txt\n"); OS_Exit(1); }
 
     SetMemoryToValueForNBytes(entities,0,MAX_ENTITIES * sizeof(Entity));
-    #pragma omp parallel for
+//     #pragma omp parallel for
     for (int32_t i = 0; i < entityCount; i++) {
         if (entity_parser.entries[i].index == UINT16_MAX) continue;
 
@@ -1004,8 +1054,9 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     double initMarker2 = get_time();
     DualLog("GLFW init took %f secs\n",initMarker2 - init_start_time);
     glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_SRGB_CAPABLE, 0);
     glfwWindowHint(GLFW_RESIZABLE, 1);
     LoadConfig(); // Get settings before setting window size.
@@ -1017,6 +1068,10 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     DualLog("Load Config.ini, glfw create window and GL context took %f secs\n",get_time() - initMarker2);
     if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress)) { DualLogError("Failed to initialize GLAD\n"); OS_Exit(1); }
     
+    GLint major = 0, minor = 0;
+    glGetIntegerv(GL_MAJOR_VERSION, &major);
+    glGetIntegerv(GL_MINOR_VERSION, &minor);
+    if (major < 4 || (major == 4 && minor < 3)) { DualLogError("Need OpenGL >= 4.3, got %d.%d\n", major, minor); OS_Exit(1); }
     double initMarker3 = get_time();
     CycleToNextMonitor();
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -1291,7 +1346,6 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void RenderSha
 
             glUniform3f(3, lightPos.x, lightPos.y, lightPos.z);
             voxen_Shadow_System.shadowmapIndirectionList[lightIdx] = numShadowingLightsHandled;
-            uint8_t numFacesRendered = 0;
             #pragma GCC unroll 6
             for (uint8_t face = 0; face < 6; face++) {                                            
                 glUniform1ui(2, face);
@@ -1315,8 +1369,6 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void RenderSha
                     glDrawElements(GL_TRIANGLES, modelTriangleCounts[currentModelType] * 3, GL_UNSIGNED_INT, 0);
                     drawCallsRenderedThisFrame++; verticesRenderedThisFrame += modelTriangleCounts[currentModelType] * 3;
                 }
-                
-                numFacesRendered++;
             }
             
             shadowmapOffsetHead += (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) * 6;

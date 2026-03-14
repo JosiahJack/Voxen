@@ -139,12 +139,12 @@ static inline __attribute__((always_inline)) bool IsCyberNPC(uint16_t i) { uint1
 		lookRot = Quaternion.LookRotation(faceVec,up);
 		Eng_Global->instances[i].rotation = Quaternion.Slerp(Eng_Global->instances[i].rotation,lookRot,Const.aiTickTime * npcTable[index].yawSpeed * Time.deltaTime);
 	}
-
-	bool HasHealth(uint16_t i) {
-		if (IsCyberNPC(i)) return (Eng_Global->instances[i].cyberHealth > 0.0f);
-		return (Eng_Global->instances[i].health > 0.0f);
-	}
-
+*/
+bool HasHealth(uint16_t i) {
+    if (IsCyberNPC(i)) return (Eng_Global->instances[i].cyberHealth > 0.0f);
+    return (Eng_Global->instances[i].health > 0.0f);
+}
+/*
 	void Update() {
 		if (!startInitialized) return;
 

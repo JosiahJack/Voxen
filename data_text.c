@@ -1,5 +1,6 @@
 #include "os.h"
 #include "voxen.h"
+char *strncpy(char *dest, const char *src, size_t n);
 Voxen_Text Sys_Text;
 char audiologNames[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
 char audiologSubjects[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
@@ -65,10 +66,10 @@ void LoadTextForLanguage(uint8_t lang) {
         }
     }
 
-    int lineNum = 0, totalLines = 0;
+    int lineNum = 0;
     char utf8_line[TEXT_LOCALIZATION_MAX_LENGTH];
     while (data_pos < (size_t)file_size) {
-        ++totalLines; size_t line_start = data_pos;
+        size_t line_start = data_pos;
         if (is_utf8) {
             while (data_pos < (size_t)file_size) {
                 uint8_t c = Sys_Text.file_data[data_pos];
@@ -162,11 +163,9 @@ void LoadLogTextForLanguage(uint8_t lang) { // Unload and load language for when
         else                               is_utf8    = 1;
     }
 
-    int lineNum = 0, totalLines = 0;
     char utf8_line[TEXT_LOCALIZATION_MAX_LENGTH];
     size_t slen;
     while (data_pos < (size_t)file_size) {
-        ++totalLines;
         size_t line_start = data_pos;
         if (is_utf8) {
             while (data_pos < (size_t)file_size) {
@@ -202,7 +201,7 @@ void LoadLogTextForLanguage(uint8_t lang) { // Unload and load language for when
 
         size_t len = GetStringLength(utf8_line);
         while (len > 0 && (utf8_line[len - 1] == '\n' || utf8_line[len - 1] == '\r')) utf8_line[--len] = '\0';
-        if (len == 0) { ++lineNum; continue; }   /* blank line -> skip */
+        if (len == 0) continue; /* blank line -> skip */
 
         char logline[TEXT_LOCALIZATION_MAX_LENGTH];
         CopyMemoryFromBtoAForNBytes(logline, utf8_line, len - 1);
@@ -247,7 +246,6 @@ void LoadLogTextForLanguage(uint8_t lang) { // Unload and load language for when
             slen = GetStringLength(readLogSender);  StringCopyInto_A_From_B(audiologSenders[readIndexOfLog], readLogSender, slen + 1);
             slen = GetStringLength(readLogSubject); StringCopyInto_A_From_B(audiologSubjects[readIndexOfLog], readLogSubject, slen + 1);
             slen = GetStringLength(readLogText);    StringCopyInto_A_From_B(audioLogSpeech2Text[readIndexOfLog], readLogText, slen + 1);
-            ++lineNum;
         }
     }
 }
