@@ -910,65 +910,15 @@ void LoadModFunctions(void) {
         OS_Exit(1);
     }
     
-    ModInit         = (void (*)(GlobalContext*,CheatsSystem*,SettingsSystem*)) PLATFORM_DLSYM(mod_handle,"ModInit"); if (!ModInit) { DualLogError("Failed to load ModInit function pointer from mod data\n"); OS_Exit(1); }
+    #define X(ret, name, params) \
+        name = (ret (*) params)dlsym(mod_handle, #name); \
+        if(!name) DualLogError("Failed to load mod function: %s", #name);
+
+    MOD_FUNCTION_LIST(X)
+    #undef X
     ModInit(&Sys_Global,&Sys_Cheats,&Sys_Settings);
     Sys_Global.GetKey = GetKey;
     Sys_Global.GetKeyPressed = GetKeyPressed;
-#define LINK_MOD_SYMBOL(name,ptr) PLATFORM_DLSYM(mod_handle,(name)); if (!(ptr)) { DualLogError("Failed to load %s function pointer from mod data\n", (name)); OS_Exit(1); }
-    ModUpdate       = (void (*)(void))           LINK_MOD_SYMBOL("ModUpdate",ModUpdate);
-    Forward         = (bool (*)(void))           LINK_MOD_SYMBOL("Forward",Forward);
-    Backpedal       = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Backpedal");      if (!Backpedal) { DualLogError("Failed to load Backpedal function pointer from mod data\n"); OS_Exit(1); }
-    StrafeLeft      = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "StrafeLeft");     if (!StrafeLeft) { DualLogError("Failed to load StrafeLeft function pointer from mod data\n"); OS_Exit(1); }
-    StrafeRight     = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "StrafeRight");    if (!StrafeRight) { DualLogError("Failed to load StrafeRight function pointer from mod data\n"); OS_Exit(1); }
-    Jump            = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Jump");           if (!Jump) { DualLogError("Failed to load Jump function pointer from mod data\n"); OS_Exit(1); }
-    JumpDown        = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "JumpDown");       if (!JumpDown) { DualLogError("Failed to load JumpDown function pointer from mod data\n"); OS_Exit(1); }
-    Crouch          = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Crouch");         if (!Crouch) { DualLogError("Failed to load Crouch function pointer from mod data\n"); OS_Exit(1); }
-    Prone           = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Prone");          if (!Prone) { DualLogError("Failed to load Prone function pointer from mod data\n"); OS_Exit(1); }
-    LeanLeft        = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "LeanLeft");       if (!LeanLeft) { DualLogError("Failed to load LeanLeft function pointer from mod data\n"); OS_Exit(1); }
-    LeanRight       = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "LeanRight");      if (!LeanRight) { DualLogError("Failed to load LeanRight function pointer from mod data\n"); OS_Exit(1); }
-    Sprint          = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Sprint");         if (!Sprint) { DualLogError("Failed to load Sprint function pointer from mod data\n"); OS_Exit(1); }
-    TurnLeft        = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "TurnLeft");       if (!TurnLeft) { DualLogError("Failed to load TurnLeft function pointer from mod data\n"); OS_Exit(1); }
-    TurnRight       = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "TurnRight");      if (!TurnRight) { DualLogError("Failed to load TurnRight function pointer from mod data\n"); OS_Exit(1); }
-    LookUp          = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "LookUp");         if (!LookUp) { DualLogError("Failed to load LookUp function pointer from mod data\n"); OS_Exit(1); }
-    LookDown        = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "LookDown");       if (!LookDown) { DualLogError("Failed to load LookDown function pointer from mod data\n"); OS_Exit(1); }
-    RecentLog       = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "RecentLog");      if (!RecentLog) { DualLogError("Failed to load RecentLog function pointer from mod data\n"); OS_Exit(1); }
-    Biomonitor      = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Biomonitor");     if (!Biomonitor) { DualLogError("Failed to load Biomonitor function pointer from mod data\n"); OS_Exit(1); }
-    Sensaround      = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Sensaround");     if (!StrafeLeft) { DualLogError("Failed to load StrafeLeft function pointer from mod data\n"); OS_Exit(1); }
-    Lantern         = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Lantern");        if (!Lantern) { DualLogError("Failed to load Lantern function pointer from mod data\n"); OS_Exit(1); }
-    Shield          = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Shield");         if (!Shield) { DualLogError("Failed to load Shield function pointer from mod data\n"); OS_Exit(1); }
-    Infrared        = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Infrared");       if (!Infrared) { DualLogError("Failed to load Infrared function pointer from mod data\n"); OS_Exit(1); }
-    Email           = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Email");          if (!Email) { DualLogError("Failed to load Email function pointer from mod data\n"); OS_Exit(1); }
-    Booster         = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Booster");        if (!Booster) { DualLogError("Failed to load Booster function pointer from mod data\n"); OS_Exit(1); }
-    Jumpjets        = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Jumpjets");       if (!Jumpjets) { DualLogError("Failed to load Jumpjets function pointer from mod data\n"); OS_Exit(1); }
-    Attack          = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Attack");         if (!Attack) { DualLogError("Failed to load Attack function pointer from mod data\n"); OS_Exit(1); }
-    Use             = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Use");            if (!Use) { DualLogError("Failed to load Use function pointer from mod data\n"); OS_Exit(1); }
-    Menu            = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Menu");           if (!Menu) { DualLogError("Failed to load Menu function pointer from mod data\n"); OS_Exit(1); }
-    ToggleMode      = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "ToggleMode");     if (!ToggleMode) { DualLogError("Failed to load ToggleMode function pointer from mod data\n"); OS_Exit(1); }
-    Reload          = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Reload");         if (!Reload) { DualLogError("Failed to load Reload function pointer from mod data\n"); OS_Exit(1); }
-    WeaponCycUp     = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "WeaponCycUp");    if (!WeaponCycUp) { DualLogError("Failed to load WeaponCycUp function pointer from mod data\n"); OS_Exit(1); }
-    WeaponCycDown   = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "WeaponCycDown");  if (!WeaponCycDown) { DualLogError("Failed to load WeaponCycDown function pointer from mod data\n"); OS_Exit(1); }
-    Grenade         = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Grenade");        if (!Grenade) { DualLogError("Failed to load Grenade function pointer from mod data\n"); OS_Exit(1); }
-    GrenadeCycUp    = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "GrenadeCycUp");   if (!GrenadeCycUp) { DualLogError("Failed to load GrenadeCycUp function pointer from mod data\n"); OS_Exit(1); }
-    GrenadeCycDown  = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "GrenadeCycDown"); if (!GrenadeCycDown) { DualLogError("Failed to load GrenadeCycDown function pointer from mod data\n"); OS_Exit(1); }
-    ChangeAmmoType  = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "ChangeAmmoType"); if (!ChangeAmmoType) { DualLogError("Failed to load ChangeAmmoType function pointer from mod data\n"); OS_Exit(1); }
-    Patch           = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Patch");          if (!Patch) { DualLogError("Failed to load Patch function pointer from mod data\n"); OS_Exit(1); }
-    PatchCycUp      = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "PatchCycUp");     if (!PatchCycUp) { DualLogError("Failed to load PatchCycUp function pointer from mod data\n"); OS_Exit(1); }
-    PatchCycDown    = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "PatchCycDown");   if (!PatchCycDown) { DualLogError("Failed to load PatchCycDown function pointer from mod data\n"); OS_Exit(1); }
-    Map             = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Map");            if (!Map) { DualLogError("Failed to load Map function pointer from mod data\n"); OS_Exit(1); }
-    SwimUp          = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "SwimUp");         if (!SwimUp) { DualLogError("Failed to load SwimUp function pointer from mod data\n"); OS_Exit(1); }
-    SwimDn          = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "SwimDn");         if (!SwimDn) { DualLogError("Failed to load SwimDn function pointer from mod data\n"); OS_Exit(1); }
-    ChangeAmmoType    = (bool (*)(void))         PLATFORM_DLSYM(mod_handle, "ChangeAmmoType"); if (!ChangeAmmoType) { DualLogError("Failed to load ChangeAmmoType function pointer from mod data\n"); OS_Exit(1); }
-    GetBasePlayerSpeed = (float (*)(bool))       PLATFORM_DLSYM(mod_handle, "GetBasePlayerSpeed");    if (!GetBasePlayerSpeed) { DualLogError("Failed to load GetBasePlayerSpeed function pointer from mod data\n"); OS_Exit(1); }
-    InitializeAIAfterLoad = (void (*)(uint16_t)) PLATFORM_DLSYM(mod_handle, "InitializeAIAfterLoad"); if (!InitializeAIAfterLoad) { DualLogError("Failed to load InitializeAIAfterLoad function pointer from mod data\n"); OS_Exit(1); }
-    TakeScreenshot  = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "TakeScreenshot"); if (!TakeScreenshot) { DualLogError("Failed to load TakeScreenshot function pointer from mod data\n"); OS_Exit(1); }
-    Console         = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Console");        if (!Console) { DualLogError("Failed to load Console function pointer from mod data\n"); OS_Exit(1); }
-    UpdateMusic     = (void (*)(void))           LINK_MOD_SYMBOL("UpdateMusic",UpdateMusic);
-    PlayMenuMusic   = (void (*)(void))           LINK_MOD_SYMBOL("PlayMenuMusic",PlayMenuMusic);
-    PlayGameMusic   = (void (*)(void))           LINK_MOD_SYMBOL("PlayGameMusic",PlayGameMusic);
-    ResetLevelMusic = (void (*)(void))           LINK_MOD_SYMBOL("ResetLevelMusic",ResetLevelMusic);
-    ModInitAfterLoad= (void (*)(void))           LINK_MOD_SYMBOL("ModInitAfterLoad",ModInitAfterLoad);
-    ModEntityDefinitionsInitAfterLoad = (void (*)(DataParser*)) LINK_MOD_SYMBOL("ModEntityDefinitionsInitAfterLoad",ModEntityDefinitionsInitAfterLoad);
-    PlayerInit      = (void (*)(uint16_t))       LINK_MOD_SYMBOL("PlayerInit",PlayerInit);
     DualLog("done!\n");
 }
 

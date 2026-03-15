@@ -131,11 +131,11 @@ fi
 
 export CCGC=$CC
 export CFLAGSGC=$CFLAGSGC
-SOURCES="g_input.c g_physics.c g_ai.c g_biomonitor.c g_weapons.c g_music.c g_init.c"
+SOURCESGC="init.c modinput.c modphysics.c ai.c biomonitor.c weapons.c music.c"
 export TEMP_DIRGC=temp_build_gc
-VERSION_SCRIPT="gamecode.sym"
-printf "%s\n" $SOURCES | xargs -P12 -I{} $CCGC -c {} $CFLAGSGC -nostdinc -fPIC -ffreestanding -fno-builtin -Wshadow -o "$TEMP_DIRGC"/{}.o
-$LINKERGC "$TEMP_DIRGC"/*.o $LDFLAGSGC -s -OReleaseSmall -Wl,-soname,$BINARY_NAMEGC -shared -nostdlib -Wl,--version-script=$VERSION_SCRIPT -o $BINARY_NAMEGC
+export SCRIPT_DIR="./Scripts"
+printf "%s\n" $SOURCESGC | xargs -P12 -I{} $CCGC -c $SCRIPT_DIR/{} $CFLAGSGC -I. -nostdinc -fPIC -ffreestanding -fno-builtin -Wshadow -o "$TEMP_DIRGC"/{}.o
+$LINKERGC "$TEMP_DIRGC"/*.o $LDFLAGSGC -s -OReleaseSmall -Wl,-soname,$BINARY_NAMEGC -shared -nostdlib -o $BINARY_NAMEGC
 link_status=$?
 if [ $link_status -ne 0 ]; then
     echo "ERROR: Linking failed."
@@ -175,8 +175,7 @@ export CC=$CC
 export CFLAGS=$CFLAGS
 SOURCES="voxen.c physics.c helpers.c audio.c animation.c console.c level.c data_parser.c \
          data_text.c data_fonts.c data_models.c dynamic_culling.c data_textures.c glad.c \
-         input.c miniaudio.c \
-         g_menu.c" #TODO move to gamecode!
+         input.c miniaudio.c menu.c"
 
 export TEMP_DIR=temp_build
 printf "%s\n" $SOURCES | xargs -P12 -I{} $CC -c {} $CFLAGS -fopenmp -o "$TEMP_DIR"/{}.o

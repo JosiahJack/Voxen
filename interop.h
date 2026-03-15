@@ -1,3 +1,60 @@
+// Mod/Gamecode Functions::
+#define MOD_FUNCTION_LIST(X) \
+    X(void, ModInit, (GlobalContext* ctx, CheatsSystem* cheats, SettingsSystem* settings)) \
+    X(void, ModUpdate, (void)) \
+    X(bool, Forward, (void)) \
+    X(bool, StrafeLeft, (void)) \
+    X(bool, Backpedal, (void)) \
+    X(bool, StrafeRight, (void)) \
+    X(bool, Jump, (void)) \
+    X(bool, JumpDown, (void)) \
+    X(bool, Crouch, (void)) \
+    X(bool, Prone, (void)) \
+    X(bool, LeanLeft, (void)) \
+    X(bool, LeanRight, (void)) \
+    X(bool, Sprint, (void)) \
+    X(bool, TurnLeft, (void)) \
+    X(bool, TurnRight, (void)) \
+    X(bool, LookUp, (void)) \
+    X(bool, LookDown, (void)) \
+    X(bool, RecentLog, (void)) \
+    X(bool, Biomonitor, (void)) \
+    X(bool, Sensaround, (void)) \
+    X(bool, Lantern, (void)) \
+    X(bool, Shield, (void)) \
+    X(bool, Infrared, (void)) \
+    X(bool, Email, (void)) \
+    X(bool, Booster, (void)) \
+    X(bool, Jumpjets, (void)) \
+    X(bool, Attack, (void)) \
+    X(bool, Use, (void)) \
+    X(bool, Menu, (void)) \
+    X(bool, ToggleMode, (void)) \
+    X(bool, Reload, (void)) \
+    X(bool, WeaponCycUp, (void)) \
+    X(bool, WeaponCycDown, (void)) \
+    X(bool, Grenade, (void)) \
+    X(bool, GrenadeCycUp, (void)) \
+    X(bool, GrenadeCycDown, (void)) \
+    X(bool, ChangeAmmoType, (void)) \
+    X(bool, Patch, (void)) \
+    X(bool, PatchCycUp, (void)) \
+    X(bool, PatchCycDown, (void)) \
+    X(bool, Map, (void)) \
+    X(bool, SwimUp, (void)) \
+    X(bool, SwimDn, (void)) \
+    X(bool, Console, (void)) \
+    X(float,GetBasePlayerSpeed, (bool isSprinting)) \
+    X(void, InitializeAIAfterLoad, (uint16_t entityIdx)) \
+    X(bool, TakeScreenshot, (void)) \
+    X(void, UpdateMusic, (void)) \
+    X(void, PlayMenuMusic, (void)) \
+    X(void, PlayGameMusic, (void)) \
+    X(void, ResetLevelMusic, (void)) \
+    X(void, ModInitAfterLoad, (void)) \
+    X(void, ModEntityDefinitionsInitAfterLoad, (DataParser* parser)) \
+    X(void, PlayerInit, (uint16_t playerIdx))
+
 #ifdef MOD_INTEROP_IMPLEMENTATION  // mod.h usage:
     // Interop - To Engine
     #if defined(_WIN32) || defined(__CYGWIN__)
@@ -5,15 +62,9 @@
     #else
         #define MOD_TO_ENGINE __attribute__((visibility("default")))
     #endif
-    MOD_TO_ENGINE bool Sprint(void);
-    MOD_TO_ENGINE bool Attack(void);
-    MOD_TO_ENGINE void UpdateMusic(void);
-    MOD_TO_ENGINE void PlayMenuMusic(void);
-    MOD_TO_ENGINE void PlayGameMusic(void);
-    MOD_TO_ENGINE void ResetLevelMusic(void);
-    MOD_TO_ENGINE void ModInitAfterLoad(void);
-    MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(DataParser* entity_parser);
-    MOD_TO_ENGINE void PlayerInit(uint16_t i);
+    #define X(ret, name, params) MOD_TO_ENGINE ret name params;
+    MOD_FUNCTION_LIST(X)
+    #undef X
 #else                              // voxen.h usage:
     // Interop - From Mod
     #ifdef MOD_INTEROP
@@ -21,63 +72,13 @@
     #else
         #define MOD_TO_ENGINE extern // Shared declaration
     #endif
-    MOD_TO_ENGINE void (*ModInit)(GlobalContext*,CheatsSystem*,SettingsSystem*);
-    MOD_TO_ENGINE void (*ModUpdate)(void);
-    MOD_TO_ENGINE bool (*Forward)(void);
-    MOD_TO_ENGINE bool (*StrafeLeft)(void);
-    MOD_TO_ENGINE bool (*Backpedal)(void);
-    MOD_TO_ENGINE bool (*StrafeRight)(void);
-    MOD_TO_ENGINE bool (*Jump)(void);
-    MOD_TO_ENGINE bool (*JumpDown)(void);
-    MOD_TO_ENGINE bool (*Crouch)(void);
-    MOD_TO_ENGINE bool (*Prone)(void);
-    MOD_TO_ENGINE bool (*LeanLeft)(void);
-    MOD_TO_ENGINE bool (*LeanRight)(void);
-    MOD_TO_ENGINE bool (*Sprint)(void);
-    MOD_TO_ENGINE bool (*TurnLeft)(void);
-    MOD_TO_ENGINE bool (*TurnRight)(void);
-    MOD_TO_ENGINE bool (*LookUp)(void);
-    MOD_TO_ENGINE bool (*LookDown)(void);
-    MOD_TO_ENGINE bool (*RecentLog)(void);
-    MOD_TO_ENGINE bool (*Biomonitor)(void);
-    MOD_TO_ENGINE bool (*Sensaround)(void);
-    MOD_TO_ENGINE bool (*Lantern)(void);
-    MOD_TO_ENGINE bool (*Shield)(void);
-    MOD_TO_ENGINE bool (*Infrared)(void);
-    MOD_TO_ENGINE bool (*Email)(void);
-    MOD_TO_ENGINE bool (*Booster)(void);
-    MOD_TO_ENGINE bool (*Jumpjets)(void);
-    MOD_TO_ENGINE bool (*Attack)(void);
-    MOD_TO_ENGINE bool (*Use)(void);
-    MOD_TO_ENGINE bool (*Menu)(void);
-    MOD_TO_ENGINE bool (*ToggleMode)(void);
-    MOD_TO_ENGINE bool (*Reload)(void);
-    MOD_TO_ENGINE bool (*WeaponCycUp)(void);
-    MOD_TO_ENGINE bool (*WeaponCycDown)(void);
-    MOD_TO_ENGINE bool (*Grenade)(void);
-    MOD_TO_ENGINE bool (*GrenadeCycUp)(void);
-    MOD_TO_ENGINE bool (*GrenadeCycDown)(void);
-    MOD_TO_ENGINE bool (*ChangeAmmoType)(void);
-    MOD_TO_ENGINE bool (*Patch)(void);
-    MOD_TO_ENGINE bool (*PatchCycUp)(void);
-    MOD_TO_ENGINE bool (*PatchCycDown)(void);
-    MOD_TO_ENGINE bool (*Map)(void);
-    MOD_TO_ENGINE bool (*SwimUp)(void);
-    MOD_TO_ENGINE bool (*SwimDn)(void);
-    MOD_TO_ENGINE bool (*Console)(void);
-    MOD_TO_ENGINE float (*GetBasePlayerSpeed)(bool);
-    MOD_TO_ENGINE void (*InitializeAIAfterLoad)(uint16_t);
-    MOD_TO_ENGINE bool (*TakeScreenshot)(void);
-    MOD_TO_ENGINE void (*UpdateMusic)(void);
-    MOD_TO_ENGINE void (*PlayMenuMusic)(void);
-    MOD_TO_ENGINE void (*PlayGameMusic)(void);
-    MOD_TO_ENGINE void (*ResetLevelMusic)(void);
-    MOD_TO_ENGINE void (*ModInitAfterLoad)(void);
-    MOD_TO_ENGINE void (*ModEntityDefinitionsInitAfterLoad)(DataParser*);
-    MOD_TO_ENGINE void (*PlayerInit)(uint16_t);
+    #define X(ret, name, params) MOD_TO_ENGINE ret (*name) params;
+    MOD_FUNCTION_LIST(X)
+    #undef X
 #endif
-
-
+    
+// ----------------------------------------------------------------------------
+// Engine Functions::
 #ifdef MOD_INTEROP_IMPLEMENTATION // mod.h usage:
     // Interop - To Engine
     #define ENGINE_TO_MOD extern
