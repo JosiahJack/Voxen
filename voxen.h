@@ -9,7 +9,7 @@
     #define ENGINE_TO_MOD __attribute__((visibility("default")))
 #endif
 
-#include "common.h"
+#include "common.h" // Types needed first
 #include "interop.h"
 #define SetMemoryToValueForNBytes __builtin_memset
 #define CopyMemoryFromBtoAForNBytes __builtin_memcpy
@@ -19,7 +19,6 @@
 #define MAX_JOYSTICK_HATS 5
 #define MAX_GAMEPAD_BUTTONS 20
 extern GlobalContext Sys_Global;
-extern Entity entities[MAX_ENTITIES]; // Global array of entity definitions (e.g. prefabs)
 typedef struct { bool down; bool pressed; bool released; } KeyState;
 typedef struct {
 	KeyState keyStates[MAX_KEYS];
@@ -109,7 +108,6 @@ static const uint8_t MenuPages_Save = 6;
 static const uint8_t MenuPages_IntroVideo = 7;
 static const uint8_t MenuPages_CreditsVideo = 8;
 void MenuGoBack(void);
-void PlayerInit(uint16_t i);
 void TakeEnergy(float drain);
 void GiveEnergy(float give, EnergyType type);
 void BioMonitorInit(void);
@@ -215,13 +213,6 @@ typedef struct {
 extern bool instanceIsLODArray[INSTANCE_COUNT];
 extern float modelMatrices[INSTANCE_COUNT * 16];
 extern uint8_t dirtyInstances[INSTANCE_COUNT];
-
-typedef struct {
-    Entity* entries;
-    uint32_t count;
-    uint32_t capacity;
-} DataParser;
-
 extern const char* sounds[670];
 extern const char* audioLogs[134];
 void play_mp3(const char* path, int32_t fade_in_ms);
@@ -325,8 +316,6 @@ extern uint8_t queuedLevelToLoad;
 extern uint16_t playerCellIdx;
 extern uint16_t numCellsVisible;
 extern uint32_t gridCellStates[ARRSIZE];
-extern float gridCellFloorHeight[ARRSIZE];
-extern float gridCellCeilingHeight[ARRSIZE];
 extern Portal activePortals[MAX_PORTALS];
 extern uint8_t numActivePortals;
 extern uint32_t precomputedVisibleCellsFromHere[524288];
@@ -343,24 +332,7 @@ void CreditsScroll(void);
 void RenderFormattedText(int16_t x, int16_t y, uint32_t color, uint8_t fontID, float scale, const char * restrict format, ...);
 // ----------------------------------------------------------------------------
 // Physics
-#define MAX_DYNAMIC_ENTITIES 512
-#define TERMINAL_VELOCITY 10.0f
-#define PHYS_FLOAT_TO_INT_SCALEF 100.0f
-#define PHYS_COMBINE_AVG 0 // All the same for both frictionCombine and bounceCombine
-#define PHYS_COMBINE_MIN 1
-#define PHYS_COMBINE_MUL 2
-#define PHYS_COMBINE_MAX 3
-#define COLLIDER_TYPE_NONE 0
-#define COLLIDER_TYPE_BOX 1
-#define COLLIDER_TYPE_SPHERE 2
-#define COLLIDER_TYPE_CAPSULE 3
-#define COLLIDER_TYPE_CONVEXMESH 4
-#define COLLIDER_TYPE_MESH 5
-#define COLLIDER_CAPSULE_DIRECTION_X_F 0.0f // X-Axis
-#define COLLIDER_CAPSULE_DIRECTION_Y_F 1.0f // Y-Axis
-#define COLLIDER_CAPSULE_DIRECTION_Z_F 2.0f // Z-Axis
 extern uint16_t testPointInSolid;
-
 void AddForce(uint16_t idx, Vector3 force, bool isImpulse);
 int32_t Physics(void); // Main event tick
 RaycastHit Raycast(Vector3 origin, Vector3 dir, float distance, uint32_t layerMask);
@@ -445,52 +417,7 @@ bool StringsAreEqualLimitedBy(const char* a, const char* b, size_t limit);
 void StringCopyInto_A_From_B(char* a, const char* b, size_t bufferSize);
 void StringCopyInto_A_SubstringFrom_B(char* a, size_t substringSize, const char* b, size_t bufferSize);
 void StringConcatenate(char* a, const char* b, size_t bufferSize);
-bool ConstIndexInBounds(int constdex);
-bool ConstIndexIsGeometry(int constdex);
-bool ConstIndexIsDynamicObject(uint16_t constIndex);
-bool ConstIndexIsDoor(int constdex);
-bool ConstIndexIsLightStaticSaveable(int constdex);
-bool ConstIndexIsGenericTransform(int constdex);
-bool ConstIndexIsStaticObjectImmutable(int constdex);
-bool ConstIndexIsStaticObjectSaveable(int constdex);
-bool ConstIndexIsNPC(int constdex);
-bool ConstIndexIsHardware(int constdex);
-bool ConstIndexIsAmbient(int constdex);
-bool ConstIndexIsButtonSwitch(int constdex);
-uint8_t GetCurrentLevelSecurity(void);
-uint16_t GetImpactType(uint16_t instanceIdx);
-int hardware14fromConstdex(int constdex);
-const char* GetPrefabNameFromIndex(int constIndex);
-static inline __attribute__((always_inline)) void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* pos_z) {
-    *pos_x = worldMin_x + (x * WORLDCELL_WIDTH_F);
-    *pos_z = worldMin_z + (z * WORLDCELL_WIDTH_F);
-}
-
-static inline __attribute__((always_inline)) int32_t clamp(int32_t val, int32_t min, int32_t max) { return (val > max) ? max : ((val < min) ? min : val); }
-static inline __attribute__((always_inline)) int32_t PosGetCellCoordX(float pos_x) { return (uint16_t)clamp((int32_t)vfloor((pos_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED); }
-static inline __attribute__((always_inline)) int32_t PosGetCellCoordZ(float pos_z) { return (uint16_t)clamp((int32_t)vfloor((pos_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED); }
-static inline __attribute__((always_inline)) int32_t PosGetCellCoords(float pos_x, float pos_z) { return (PosGetCellCoordZ(pos_z) * WORLDX) + PosGetCellCoordX(pos_x); } // Clamped just above.
-static inline __attribute__((always_inline)) bool XZPairInBounds(int32_t x, int32_t z) { return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0); }
-
 extern RenderSystem Sys_Render; // Added last to make use of all defines for sizes.
-
-// Math, Vectors, Quaternions
-static inline __attribute__((always_inline)) Vector3 Vector3_A_plus_B(Vector3 a, Vector3 b) { return (Vector3){a.x + b.x, a.y + b.y, a.z + b.z}; }
-static inline __attribute__((always_inline)) Vector3 Vector3_A_minus_B(Vector3 a, Vector3 b) { return (Vector3){a.x - b.x, a.y - b.y, a.z - b.z}; }
-static inline __attribute__((always_inline)) Vector3 scale_vector3(Vector3 v, float s) { Vector3 res = {v.x * s, v.y * s, v.z * s}; return res; }
-static inline __attribute__((always_inline)) float dot(float x1, float y1, float z1, float x2, float y2, float z2) { return x1*x2 + y1*y2 + z1*z2; }
-static inline __attribute__((always_inline)) float dot_vector3(Vector3 a, Vector3 b) { return dot(a.x,a.y,a.z, b.x,b.y,b.z); }
-static inline __attribute__((always_inline)) float quat_dot(Quaternion a, Quaternion b) { return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w; }
-static inline __attribute__((always_inline)) float magnitude_vector3(const Vector3 v) { return vsqrtf(dot_vector3(v, v)); }
-static inline __attribute__((always_inline)) Vector3 min_vector3(Vector3 a, Vector3 b) { return (Vector3){ a.x<b.x ? a.x : b.x, a.y<b.y ? a.y : b.y, a.z<b.z ? a.z : b.z }; }
-static inline __attribute__((always_inline)) Vector3 max_vector3(Vector3 a, Vector3 b) { return (Vector3){ a.x>b.x ? a.x : b.x, a.y>b.y ? a.y : b.y, a.z>b.z ? a.z : b.z }; }
-static inline __attribute__((always_inline)) float dist_sq_vector3(Vector3 a, Vector3 b) { Vector3 d = Vector3_A_minus_B(a, b); return dot_vector3(d, d); }
-static inline __attribute__((always_inline)) float distance_vector3(Vector3 a, Vector3 b) { return magnitude_vector3(Vector3_A_minus_B(a, b)); }
-static inline __attribute__((always_inline)) Vector3 cross_vector3(Vector3 a, Vector3 b) { return (Vector3){a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x}; }
-static inline __attribute__((always_inline)) void normalize_vector(float* x, float* y, float* z) { float len = vsqrtf(*x * *x + *y * *y + *z * *z); if (len > 1e-6f) { *x /= len; *y /= len; *z /= len; } }
-static inline __attribute__((always_inline)) Vector3 normalize_vector3(Vector3 v) { float len = magnitude_vector3(v); return len > 0.000001f ? (Vector3){v.x / len, v.y / len, v.z / len} : v; }
-static inline __attribute__((always_inline)) float squareDistance2D(float x1, float z1, float x2, float z2) { float dx = x2 - x1; float dz = z2 - z1; return dx * dx + dz * dz; }
-static inline __attribute__((always_inline)) float squareDistance3D(float x1, float y1, float z1, float x2, float y2, float z2) { float dx = x2 - x1; float dy = y2 - y1; float dz = z2 - z1; return dx * dx + dy * dy + dz * dz; }
 uint16_t PointInSolid(Vector3 point, uint32_t layerMask);
 bool EntityIsAnimated(uint16_t entIdx);
 
@@ -537,16 +464,12 @@ static inline __attribute__((always_inline)) void mul_mat4(float *out, const flo
 bool parse_data_file(DataParser *parser, uint16_t maxSize, const char *filename);
 
 extern uint16_t invalidModelIndexCount;
-extern uint16_t entityCount;
-extern uint16_t loadedInstances;
 extern uint16_t startOfDoubleSidedInstances;
 extern uint16_t startOfTransparentInstances;
 extern uint16_t endOfModels;
 void InitializeEntity(Entity* entry);
 void LoadEntities(void);
 void LoadLevel(uint8_t curlevel);
-
-#define GEOMETRY_LOD_CARD_MODEL_IDX 178 // Need to specify in gamedata.txt
 void EnableCheatArsenal(uint8_t level);
 uint16_t SpawnDynamicObject(int val, bool cheat);
 void cmd_kill(void);
@@ -660,3 +583,13 @@ int StringFormat(char* buffer, size_t bufferSize, const char* format, ...);
 char* GetNextStringUpToNewlineOrEOF(char* buf, int size, long fd);
 void WeaponsUpdate(void);
 extern bool vmailActive;
+
+static inline __attribute__((always_inline)) void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* pos_z) {
+    *pos_x = worldMin_x + (x * WORLDCELL_WIDTH_F);
+    *pos_z = worldMin_z + (z * WORLDCELL_WIDTH_F);
+}
+
+static inline __attribute__((always_inline)) int32_t PosGetCellCoordX(float pos_x) { return (uint16_t)clamp((int32_t)vfloor((pos_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED); }
+static inline __attribute__((always_inline)) int32_t PosGetCellCoordZ(float pos_z) { return (uint16_t)clamp((int32_t)vfloor((pos_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED); }
+static inline __attribute__((always_inline)) int32_t PosGetCellCoords(float pos_x, float pos_z) { return (PosGetCellCoordZ(pos_z) * WORLDX) + PosGetCellCoordX(pos_x); } // Clamped just above.
+static inline __attribute__((always_inline)) bool XZPairInBounds(int32_t x, int32_t z) { return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0); }

@@ -214,6 +214,22 @@ typedef uint16_t Text;
 #define TEXT_STRING_COUNT 1100
 #define TEXT_LOCALIZATION_MAX_LENGTH 1280
 #define TEXT_LOGS_COUNT 134
+#define MAX_DYNAMIC_ENTITIES 512
+#define TERMINAL_VELOCITY 10.0f
+#define PHYS_FLOAT_TO_INT_SCALEF 100.0f
+#define PHYS_COMBINE_AVG 0 // All the same for both frictionCombine and bounceCombine
+#define PHYS_COMBINE_MIN 1
+#define PHYS_COMBINE_MUL 2
+#define PHYS_COMBINE_MAX 3
+#define COLLIDER_TYPE_NONE 0
+#define COLLIDER_TYPE_BOX 1
+#define COLLIDER_TYPE_SPHERE 2
+#define COLLIDER_TYPE_CAPSULE 3
+#define COLLIDER_TYPE_CONVEXMESH 4
+#define COLLIDER_TYPE_MESH 5
+#define COLLIDER_CAPSULE_DIRECTION_X_F 0.0f // X-Axis
+#define COLLIDER_CAPSULE_DIRECTION_Y_F 1.0f // Y-Axis
+#define COLLIDER_CAPSULE_DIRECTION_Z_F 2.0f // Z-Axis
 
 #define LAYER_MASK_PLAYER_COLLIDESWITH ((1u << PhysicsLayer_Clip) | (1u << PhysicsLayer_NPCBullet) | (1u << PhysicsLayer_Player2) | (1u << PhysicsLayer_Door) \
 										| (1u << PhysicsLayer_Trigger) | (1u << PhysicsLayer_PlayerTriggerOnly) | (1u << PhysicsLayer_Default) | (1u << PhysicsLayer_TransparentFX) \
@@ -927,9 +943,17 @@ typedef /*FAT*/ struct {
     // phew what a porker of a struct, it's been a eatin!
 } Entity;
 
+typedef struct {
+    Entity* entries;
+    uint32_t count;
+    uint32_t capacity;
+} DataParser;
+
 #include "miniaudio.h"
 typedef struct {
     uint32_t globalFrameNum;
+    uint16_t entityCount; // Number of entity definitions loaded (similar to Prefabs)
+    uint16_t loadedInstances; // Number of instances of entities loaded (always for just the current level)
 	double cpuTime;
     double thisFrameTime;
     double cpuFrameTime;
@@ -993,6 +1017,7 @@ typedef struct {
     ma_engine audio_engine;
     ma_sound mp3_sounds[2]; // Two for crossfading
     int32_t mp3_slot;
+    Entity entities[MAX_ENTITIES]; // Global array of entity definitions (similar in concept to Prefabs)
     Entity instances[INSTANCE_COUNT];
 } GlobalContext;
 
@@ -1048,3 +1073,55 @@ static inline __attribute__((always_inline)) float vexp2f(float x) {
 
 static inline __attribute__((always_inline)) float vexp(float x) { return vexp2f(x * 1.4426950409f); } // 1/ln(2)
 static inline __attribute__((always_inline)) float vpow(float a, float b) { return vexp(b * vlog(a)); }
+static inline __attribute__((always_inline)) int32_t clamp(int32_t val, int32_t min, int32_t max) { return (val > max) ? max : ((val < min) ? min : val); }
+
+// Math, Vectors, Quaternions
+static inline __attribute__((always_inline)) Vector3 Vector3_A_plus_B(Vector3 a, Vector3 b) { return (Vector3){a.x + b.x, a.y + b.y, a.z + b.z}; }
+static inline __attribute__((always_inline)) Vector3 Vector3_A_minus_B(Vector3 a, Vector3 b) { return (Vector3){a.x - b.x, a.y - b.y, a.z - b.z}; }
+static inline __attribute__((always_inline)) Vector3 scale_vector3(Vector3 v, float s) { Vector3 res = {v.x * s, v.y * s, v.z * s}; return res; }
+static inline __attribute__((always_inline)) float dot(float x1, float y1, float z1, float x2, float y2, float z2) { return x1*x2 + y1*y2 + z1*z2; }
+static inline __attribute__((always_inline)) float dot_vector3(Vector3 a, Vector3 b) { return dot(a.x,a.y,a.z, b.x,b.y,b.z); }
+static inline __attribute__((always_inline)) float quat_dot(Quaternion a, Quaternion b) { return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w; }
+static inline __attribute__((always_inline)) float magnitude_vector3(const Vector3 v) { return vsqrtf(dot_vector3(v, v)); }
+static inline __attribute__((always_inline)) Vector3 min_vector3(Vector3 a, Vector3 b) { return (Vector3){ a.x<b.x ? a.x : b.x, a.y<b.y ? a.y : b.y, a.z<b.z ? a.z : b.z }; }
+static inline __attribute__((always_inline)) Vector3 max_vector3(Vector3 a, Vector3 b) { return (Vector3){ a.x>b.x ? a.x : b.x, a.y>b.y ? a.y : b.y, a.z>b.z ? a.z : b.z }; }
+static inline __attribute__((always_inline)) float dist_sq_vector3(Vector3 a, Vector3 b) { Vector3 d = Vector3_A_minus_B(a, b); return dot_vector3(d, d); }
+static inline __attribute__((always_inline)) float distance_vector3(Vector3 a, Vector3 b) { return magnitude_vector3(Vector3_A_minus_B(a, b)); }
+static inline __attribute__((always_inline)) Vector3 cross_vector3(Vector3 a, Vector3 b) { return (Vector3){a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x}; }
+static inline __attribute__((always_inline)) void normalize_vector(float* x, float* y, float* z) { float len = vsqrtf(*x * *x + *y * *y + *z * *z); if (len > 1e-6f) { *x /= len; *y /= len; *z /= len; } }
+static inline __attribute__((always_inline)) Vector3 normalize_vector3(Vector3 v) { float len = magnitude_vector3(v); return len > 0.000001f ? (Vector3){v.x / len, v.y / len, v.z / len} : v; }
+static inline __attribute__((always_inline)) float squareDistance2D(float x1, float z1, float x2, float z2) { float dx = x2 - x1; float dz = z2 - z1; return dx * dx + dz * dz; }
+static inline __attribute__((always_inline)) float squareDistance3D(float x1, float y1, float z1, float x2, float y2, float z2) { float dx = x2 - x1; float dy = y2 - y1; float dz = z2 - z1; return dx * dx + dy * dy + dz * dz; }
+
+static inline __attribute__((always_inline)) bool ConstIndexInBounds(int constdex) { return (constdex >= 0 && constdex <= 760); }
+static inline __attribute__((always_inline)) bool ConstIndexIsGeometry(int constdex) { return (constdex >= 0 && constdex <= 306 && constdex != 112 && constdex != 279) || constdex == 760; }
+static inline __attribute__((always_inline)) bool ConstIndexIsDoor(int constdex) { return (constdex >= 496 && constdex < 515); }
+static inline __attribute__((always_inline)) bool ConstIndexIsLightStaticSaveable(int constdex) { return constdex == 748; }
+static inline __attribute__((always_inline)) bool ConstIndexIsGenericTransform(int constdex) { return constdex == 749; }
+static inline __attribute__((always_inline)) bool ConstIndexIsNPC(int constdex) { return (constdex >= 419 && constdex < 448); }
+static inline __attribute__((always_inline)) bool ConstIndexIsHardware(int constdex) { return (constdex >= 328) && (constdex <= 339); }
+static inline __attribute__((always_inline)) bool ConstIndexIsAmbient(int constdex) { return (constdex >= 621 && constdex <= 655); }
+static inline __attribute__((always_inline)) bool ConstIndexIsButtonSwitch(int constdex) { return ((constdex >= 688 && constdex <= 692) || constdex == 694 || constdex == 695); }
+static inline __attribute__((always_inline)) bool ConstIndexIsDynamicObject(uint16_t constIndex) {
+    return     (constIndex >= 307 && constIndex <= 404) ||  constIndex == 417 || (constIndex >= 419 && constIndex <= 428)
+            || (constIndex >= 430 && constIndex <= 437) || (constIndex >= 440 && constIndex <= 442)
+            || (constIndex >= 458 && constIndex <= 463) || (constIndex >= 465 && constIndex <= 476);
+}
+
+static inline __attribute__((always_inline)) bool ConstIndexIsStaticObjectSaveable(int constdex) {
+	return (constdex == 112 || constdex == 279 || (constdex >= 448 && constdex < 458) || constdex == 480 || constdex == 516
+			|| (constdex >= 518 && constdex <= 526) || constdex == 530 || constdex == 531 || constdex == 546
+			|| constdex == 555 || constdex == 594 || constdex == 596 || constdex == 598 || (constdex >= 600 && constdex < 603)
+			|| (constdex >= 604 && constdex < 616) || (constdex >= 688 && constdex < 693) || constdex == 694 || constdex == 695
+			|| (constdex >= 699 && constdex < 704) || (constdex >= 741 && constdex < 746));
+}
+
+static inline __attribute__((always_inline)) bool ConstIndexIsStaticObjectImmutable(int constdex) {
+	return ((constdex >= 527 && constdex < 530) || (constdex >= 532 && constdex < 546) || (constdex >= 547 && constdex < 553)
+			|| constdex == 554 || (constdex >= 556 && constdex < 594) || constdex == 595 || constdex == 597 || constdex == 599
+			|| constdex == 601 || constdex == 603 || (constdex >= 616 && constdex < 688) || constdex == 693 || constdex == 696 || constdex == 697
+			|| constdex == 698 || (constdex >= 704 && constdex < 717) || constdex == 720 || (constdex >= 733 && constdex < 736)
+			|| (constdex >= 737 && constdex < 739) || constdex == 746 || constdex == 747 || (constdex >= 750 && constdex <= 759 && constdex != 755));
+}
+
+static inline __attribute__((always_inline)) uint8_t hardware14fromConstdex(uint16_t constdex) { return clamp(constdex - 21,0,14); }

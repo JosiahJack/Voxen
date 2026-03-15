@@ -93,7 +93,7 @@ void FuncWallUpdate() {
 
 void TargetIdentifierSenseTargets() {
     int lev = Eng_Global->currentLevel;    
-    for (int i=0;i<loadedInstances;i++) {
+    for (int i=0;i<Sys_Global.loadedInstances;i++) {
         if (!ConstIndexIsNPC(Eng_Global->instances[i])) continue; // Only get NPCs.
         if (Eng_Global->instances[i].health <= 0.0f) continue; // It's dead, ignore.
         if (Eng_Global->instances[i].entflags & ENTFLAG_TARGID_ATTACHED) continue; // Already has a Target ID on it.

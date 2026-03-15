@@ -265,7 +265,6 @@ void BioMonitorUpdate(void) {
 //         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_REFLEX))   { tempStr.Append(Sys_Text.stringTable[525]); tempStr.Append(" "); }
 //         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_DETOX))    { tempStr.Append(Sys_Text.stringTable[530]); }
 //         patchEffects.text = tempStr.ToString();
-//         if (!Sys_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, FONT_NORMAL,1.0f,"Player cell: %u, floor: %.3f, ceil: %.3f", Eng_Global->instances[PLAYER1].cellIndex, (double)gridCellFloorHeight[Eng_Global->instances[PLAYER1].cellIndex], (double)gridCellCeilingHeight[Eng_Global->instances[PLAYER1].cellIndex]); TODO
     }
 
     static const float beatThresh = 0.1f;

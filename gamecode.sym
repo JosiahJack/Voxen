@@ -52,5 +52,9 @@
         PlayMenuMusic;
         PlayGameMusic;
         ResetLevelMusic;
+
+        ModInitAfterLoad;
+        ModEntityDefinitionsInitAfterLoad;
+        PlayerInit;
     local: *;
 };

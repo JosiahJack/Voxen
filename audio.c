@@ -213,13 +213,13 @@ void UpdateAmbientSounds(void) {
 void ResetLevelAudio(void) {
     loadedAmbients = 0;
     __builtin_memset(ambientRegistry, 0, loadedAmbients * sizeof(uint16_t));
-    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i<loadedInstances;++i) {
+    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i<Sys_Global.loadedInstances;++i) {
         if (ConstIndexIsAmbient(Sys_Global.instances[i].index)) {
             ambientRegistry[loadedAmbients] = i;
             loadedAmbients++;
             if (loadedAmbients >= MAX_AMBIENT_NOISES) { DualLogError("%u exceeded max number of ambient noises %u!\n",loadedAmbients,MAX_AMBIENT_NOISES); break; }
             
-            Sys_Global.instances[i].volume = entities[Sys_Global.instances[i].index].volume * 0.5f;
+            Sys_Global.instances[i].volume = Sys_Global.entities[Sys_Global.instances[i].index].volume * 0.5f;
         }
     }
 }

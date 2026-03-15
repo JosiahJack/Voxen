@@ -6,8 +6,6 @@ extern void stbi__arena_init(void);
 extern uint8_t*  stbi__arena_base;
 #define STBI_ARENA_SIZE 16 * 1024 * 1024
 uint32_t gridCellStates[ARRSIZE];
-float gridCellFloorHeight[ARRSIZE];
-float gridCellCeilingHeight[ARRSIZE];
 uint32_t precomputedVisibleCellsFromHere[PRECOMPUTED_VISIBILITY_SIZE];
 uint16_t playerCellIdx = 0u;
 uint16_t numCellsVisible = 0u;
@@ -677,7 +675,7 @@ bool CullCore(void) {
     uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((Sys_Global.instances[PLAYER1].position.x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
 	uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((Sys_Global.instances[PLAYER1].position.z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
     CellCoordsToPos(cellX,cellZ, &pos_x,&pos_z);
-    for (int i=0;i<loadedInstances;++i) {
+    for (int i=0;i<Sys_Global.loadedInstances;++i) {
         float distSqrd = squareDistance2D(Sys_Global.instances[i].position.x, Sys_Global.instances[i].position.z, pos_x, pos_z);
         instanceIsLODArray[i] = (distSqrd >= 655.36f); // 25.6f * 25.6f
     }

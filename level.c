@@ -1,5 +1,6 @@
 #include "os.h"
 #include "voxen.h"
+#define FLT_MAX 3.402823466e+38F
 extern uint16_t headmountedLanternLight;
 extern Vector3 lanternPos;
 extern uint16_t editModeSelection;
@@ -32,40 +33,53 @@ void InitializeEntity(Entity* entry) { // Blank entity, no index yet, for initia
     entry->path[0] = '\0';    
 }
 
+void ResetLevelAudio(void);
+void InitAfterLoad(void) { // Init entities after level load and after already having generic entity type fields set.
+    for (int i=PLAYER1;i<Sys_Global.loadedInstances;++i) {        
+        int32_t cellIdx = PosGetCellCoords(Sys_Global.instances[i].position.x,Sys_Global.instances[i].position.z);
+        Sys_Global.instances[i].cellIndex = cellIdx;
+    }
+    
+    ModInitAfterLoad();
+    ResetLevelAudio();
+    ResetLevelMusic();
+    DualLog("Entity instances initialized after load\n");
+}
+
 void AddInstance(uint16_t entIdx, uint16_t i) {
-    if (entIdx >= entityCount) { DualLogError("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d\n",entIdx,entityCount); OS_Exit(1); }
+    if (entIdx >= Sys_Global.entityCount) { DualLogError("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d\n",entIdx,Sys_Global.entityCount); OS_Exit(1); }
         
     Sys_Global.instances[i].index = entIdx;
     if (ConstIndexIsNPC(entIdx)) InitializeAIAfterLoad(i);
-    bool isCardChunk = (entities[entIdx].entflags & ENTFLAG_CARDCHUNK);
-    Sys_Global.instances[i].modelIndex = entities[entIdx].modelIndex;
-    Sys_Global.instances[i].colliderMeshIndex = entities[entIdx].colliderMeshIndex;
-    Sys_Global.instances[i].numclips = entities[entIdx].numclips;
-    Sys_Global.instances[i].animationNum = entities[entIdx].animationNum;
-    Sys_Global.instances[i].texIndex = entities[entIdx].texIndex;
-    Sys_Global.instances[i].glowIndex = entities[entIdx].glowIndex;
+    bool isCardChunk = (Sys_Global.entities[entIdx].entflags & ENTFLAG_CARDCHUNK);
+    Sys_Global.instances[i].modelIndex = Sys_Global.entities[entIdx].modelIndex;
+    Sys_Global.instances[i].colliderMeshIndex = Sys_Global.entities[entIdx].colliderMeshIndex;
+    Sys_Global.instances[i].numclips = Sys_Global.entities[entIdx].numclips;
+    Sys_Global.instances[i].animationNum = Sys_Global.entities[entIdx].animationNum;
+    Sys_Global.instances[i].texIndex = Sys_Global.entities[entIdx].texIndex;
+    Sys_Global.instances[i].glowIndex = Sys_Global.entities[entIdx].glowIndex;
     if (Sys_Global.instances[i].glowIndex >= MAX_VALID_TEXTURE) Sys_Global.instances[i].glowIndex = 0;
-    Sys_Global.instances[i].specIndex = entities[entIdx].specIndex;
+    Sys_Global.instances[i].specIndex = Sys_Global.entities[entIdx].specIndex;
     if (Sys_Global.instances[i].specIndex >= MAX_VALID_TEXTURE) Sys_Global.instances[i].specIndex = 0;
-    Sys_Global.instances[i].normIndex = entities[entIdx].normIndex;
+    Sys_Global.instances[i].normIndex = Sys_Global.entities[entIdx].normIndex;
     if (Sys_Global.instances[i].normIndex >= MAX_VALID_TEXTURE) Sys_Global.instances[i].normIndex = 0;
-    Sys_Global.instances[i].lodIndex = entities[entIdx].lodIndex;
+    Sys_Global.instances[i].lodIndex = Sys_Global.entities[entIdx].lodIndex;
     flag_set(&Sys_Global.instances[i].entflags, ENTFLAG_CARDCHUNK,  isCardChunk);
-    flag_set(&Sys_Global.instances[i].entflags, ENTFLAG_USEGRAVITY,  entities[entIdx].entflags & ENTFLAG_USEGRAVITY);
-    flag_set(&Sys_Global.instances[i].entflags, ENTFLAG_KINEMATIC,  entities[entIdx].entflags & ENTFLAG_KINEMATIC);
-    flag_set(&Sys_Global.instances[i].entflags, ENTFLAG_RIGIDBODY,  entities[entIdx].entflags & ENTFLAG_RIGIDBODY);
-    flag_set(&Sys_Global.instances[i].entflags, ENTFLAG_NO_SHADOWS,  entities[entIdx].entflags & ENTFLAG_NO_SHADOWS);
-    Sys_Global.instances[i].collider = entities[entIdx].collider;
-    Sys_Global.instances[i].colliderCenter = entities[entIdx].colliderCenter;
-    Sys_Global.instances[i].colliderSize = entities[entIdx].colliderSize;
-    Sys_Global.instances[i].mass = entities[entIdx].mass > 0.0f ? entities[entIdx].mass : 1.0f; // Nonzero fallback.
-    Sys_Global.instances[i].linearDrag = entities[entIdx].linearDrag > 0.0f ? entities[entIdx].linearDrag : 0.0f;
-    Sys_Global.instances[i].angularDrag = entities[entIdx].angularDrag > 0.0f ? entities[entIdx].angularDrag : 0.05f;
+    flag_set(&Sys_Global.instances[i].entflags, ENTFLAG_USEGRAVITY,  Sys_Global.entities[entIdx].entflags & ENTFLAG_USEGRAVITY);
+    flag_set(&Sys_Global.instances[i].entflags, ENTFLAG_KINEMATIC,  Sys_Global.entities[entIdx].entflags & ENTFLAG_KINEMATIC);
+    flag_set(&Sys_Global.instances[i].entflags, ENTFLAG_RIGIDBODY,  Sys_Global.entities[entIdx].entflags & ENTFLAG_RIGIDBODY);
+    flag_set(&Sys_Global.instances[i].entflags, ENTFLAG_NO_SHADOWS,  Sys_Global.entities[entIdx].entflags & ENTFLAG_NO_SHADOWS);
+    Sys_Global.instances[i].collider = Sys_Global.entities[entIdx].collider;
+    Sys_Global.instances[i].colliderCenter = Sys_Global.entities[entIdx].colliderCenter;
+    Sys_Global.instances[i].colliderSize = Sys_Global.entities[entIdx].colliderSize;
+    Sys_Global.instances[i].mass = Sys_Global.entities[entIdx].mass > 0.0f ? Sys_Global.entities[entIdx].mass : 1.0f; // Nonzero fallback.
+    Sys_Global.instances[i].linearDrag = Sys_Global.entities[entIdx].linearDrag > 0.0f ? Sys_Global.entities[entIdx].linearDrag : 0.0f;
+    Sys_Global.instances[i].angularDrag = Sys_Global.entities[entIdx].angularDrag > 0.0f ? Sys_Global.entities[entIdx].angularDrag : 0.05f;
     for (int c=0;c<MAX_CHILD_COUNT;++c) {
-        Sys_Global.instances[i].child[c] = entities[entIdx].child[c];
-        Sys_Global.instances[i].child_offset[c] = entities[entIdx].child_offset[c];
-        Sys_Global.instances[i].child_rotation[c] = entities[entIdx].child_rotation[c];
-        Sys_Global.instances[i].child_scale[c] = isCardChunk ? entities[entIdx].child_scale[c] : (Vector3){ 1.0f, 1.0f, 1.0f };
+        Sys_Global.instances[i].child[c] = Sys_Global.entities[entIdx].child[c];
+        Sys_Global.instances[i].child_offset[c] = Sys_Global.entities[entIdx].child_offset[c];
+        Sys_Global.instances[i].child_rotation[c] = Sys_Global.entities[entIdx].child_rotation[c];
+        Sys_Global.instances[i].child_scale[c] = isCardChunk ? Sys_Global.entities[entIdx].child_scale[c] : (Vector3){ 1.0f, 1.0f, 1.0f };
     }
     
     if (entIdx == 525) { // prop_console01
@@ -108,18 +122,18 @@ void AddInstance(uint16_t entIdx, uint16_t i) {
         lightDirty[loadedLights] = true;
     }
     
-    Sys_Global.instances[i].lockedMessageLingdex = entities[entIdx].lockedMessageLingdex;
+    Sys_Global.instances[i].lockedMessageLingdex = Sys_Global.entities[entIdx].lockedMessageLingdex;
     dirtyInstances[i] = true;
-    loadedInstances++;
+    Sys_Global.loadedInstances++;
 }
 
 void DeleteInstance(uint16_t i) {
-    if (i <= PLAYER2 || i >= loadedInstances) return; // Don't delete null ent, player 1, nor player 2 or already empty slots.
+    if (i <= PLAYER2 || i >= Sys_Global.loadedInstances) return; // Don't delete null ent, player 1, nor player 2 or already empty slots.
     
     if (Sys_Global.instances[i].entflags & ENTFLAG_HAS_CAMERA_VIEW) RemoveCameraPosition(i);
-    uint16_t endInstance = vmax(vmin(INSTANCE_COUNT - 1, loadedInstances - 1),START_INDEX_LEVEL_INSTANCES);
+    uint16_t endInstance = vmax(vmin(INSTANCE_COUNT - 1, Sys_Global.loadedInstances - 1),START_INDEX_LEVEL_INSTANCES);
     for (;i<endInstance;++i) Sys_Global.instances[i] = Sys_Global.instances[i + 1]; // Shift the entire list down, overwriting the entity we're deleting at starting i
-    --loadedInstances; // Shift final marker.  It's history!
+    --Sys_Global.loadedInstances; // Shift final marker.  It's history!
 }
 
 void CopyInstanceRegion(uint16_t head, uint16_t* instanceTypeArray, Entity* tempInstances, uint16_t* targetIndex, uint16_t nextRegionStart) {
@@ -139,7 +153,6 @@ void CopyInstanceRegion(uint16_t head, uint16_t* instanceTypeArray, Entity* temp
 #define LINE_LEN_MAX 81920
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
-uint16_t loadedInstances;
 void LoadTextures(void); void LoadModels(void);
 void LoadLevel(uint8_t curlevel) {
     double start_time = get_time();
@@ -150,7 +163,7 @@ void LoadLevel(uint8_t curlevel) {
     if (!Sys_Global.levelCurrentlyLoading) SetMemoryToValueForNBytes(Sys_Global.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
     Sys_Global.levelCurrentlyLoading = true;
     Sys_Global.currentLevel = curlevel;
-    loadedInstances = 3; // 0 == NULL, 1 == Player1, 2 == Player2
+    Sys_Global.loadedInstances = 3; // 0 == NULL, 1 == Player1, 2 == Player2
     loadedLights = 0;
     switch(curlevel) { // Setting these as early as possible. TODO: These are Citadel specific offsets.  Ideally we just determine these from modelBounds of each instance we load later on...
         case 0: worldMin_x = -38.40f + ( 0.00000f +    3.6000f); worldMin_z = -51.20f + (0.0f + 1.0f); break;
@@ -427,17 +440,17 @@ void LoadLevel(uint8_t curlevel) {
             }
             
             for (int i=0;i<MAX_CHILD_COUNT;++i) {
-                if (Sys_Global.instances[parent].child[i] < entityCount) {
-                    if (entities[entIdx].child[i] != UINT16_MAX) { // Add child
+                if (Sys_Global.instances[parent].child[i] < Sys_Global.entityCount) {
+                    if (Sys_Global.entities[entIdx].child[i] != UINT16_MAX) { // Add child
                         instanceIdx++; // Increment head of the list an extra time for the child entity.
-                        AddInstance(entities[entIdx].child[i], instanceIdx);
-                        Sys_Global.instances[instanceIdx].index = entities[entIdx].child[i];
-                        Sys_Global.instances[instanceIdx].position.x = Sys_Global.instances[parent].position.x + entities[entIdx].child_offset[i].x;
-                        Sys_Global.instances[instanceIdx].position.y = Sys_Global.instances[parent].position.y + entities[entIdx].child_offset[i].y;
-                        Sys_Global.instances[instanceIdx].position.z = Sys_Global.instances[parent].position.z + entities[entIdx].child_offset[i].z;
-                        Sys_Global.instances[instanceIdx].scale.x = Sys_Global.instances[parent].scale.x * entities[entIdx].child_scale[i].x;
-                        Sys_Global.instances[instanceIdx].scale.y = Sys_Global.instances[parent].scale.y * entities[entIdx].child_scale[i].y;
-                        Sys_Global.instances[instanceIdx].scale.z = Sys_Global.instances[parent].scale.z * entities[entIdx].child_scale[i].z;
+                        AddInstance(Sys_Global.entities[entIdx].child[i], instanceIdx);
+                        Sys_Global.instances[instanceIdx].index = Sys_Global.entities[entIdx].child[i];
+                        Sys_Global.instances[instanceIdx].position.x = Sys_Global.instances[parent].position.x + Sys_Global.entities[entIdx].child_offset[i].x;
+                        Sys_Global.instances[instanceIdx].position.y = Sys_Global.instances[parent].position.y + Sys_Global.entities[entIdx].child_offset[i].y;
+                        Sys_Global.instances[instanceIdx].position.z = Sys_Global.instances[parent].position.z + Sys_Global.entities[entIdx].child_offset[i].z;
+                        Sys_Global.instances[instanceIdx].scale.x = Sys_Global.instances[parent].scale.x * Sys_Global.entities[entIdx].child_scale[i].x;
+                        Sys_Global.instances[instanceIdx].scale.y = Sys_Global.instances[parent].scale.y * Sys_Global.entities[entIdx].child_scale[i].y;
+                        Sys_Global.instances[instanceIdx].scale.z = Sys_Global.instances[parent].scale.z * Sys_Global.entities[entIdx].child_scale[i].z;
                     }
                 }
             }
@@ -509,7 +522,7 @@ void LoadLevel(uint8_t curlevel) {
     }
 
     fogBaseDensityForLevel *= 3.8f; // Global modifier to tweak it.
-    DualLog("Loaded %d entities, %u static lights, %u doors for Level %d... took %f secs\n", loadedInstances, loadedLights, numActivePortals, curlevel, get_time() - start_time);
+    DualLog("Loaded %d entities, %u static lights, %u doors for Level %d... took %f secs\n", Sys_Global.loadedInstances, loadedLights, numActivePortals, curlevel, get_time() - start_time);
     DebugRAM("end of LoadLevel instances");
     RenderLoadingProgress(110,"Loading models...");
     LoadModels();
@@ -520,7 +533,7 @@ void LoadLevel(uint8_t curlevel) {
     RenderLoadingProgress(110,"Loading cull system...");
     CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
     RenderLoadingProgress(120,"Loading voxel lighting data...");
-    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; i++) dirtyInstances[i] = true;
+    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < Sys_Global.loadedInstances; i++) dirtyInstances[i] = true;
     for (uint16_t i = 0; i < loadedLights; i++) {
         uint32_t litIdx = i * LIGHT_DATA_SIZE; // lightDirty[i] = true is already done in PortalCulling, leaving commented out here for confirmation.
         lightsNewPosition[i] = (Vector3){ lights[litIdx + LIGHT_DATA_OFFSET_POSX], lights[litIdx + LIGHT_DATA_OFFSET_POSY], lights[litIdx + LIGHT_DATA_OFFSET_POSZ] };

@@ -353,7 +353,7 @@ void UseTargets(UseData ud, const char* targetname) {
 
     float numtargetsfound = 0;
     bool succeeded = false;
-    for (int i=START_INDEX_LEVEL_INSTANCES;i<loadedInstances;i++) { // Find each gameobject with matching targetname in the register, then call Use for each.
+    for (int i=START_INDEX_LEVEL_INSTANCES;i<Sys_Global.loadedInstances;i++) { // Find each gameobject with matching targetname in the register, then call Use for each.
         if (!StringEquals(Eng_Global->instances[i].targetname,targetname)) continue;
 
         numtargetsfound++;

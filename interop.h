@@ -11,6 +11,9 @@
     MOD_TO_ENGINE void PlayMenuMusic(void);
     MOD_TO_ENGINE void PlayGameMusic(void);
     MOD_TO_ENGINE void ResetLevelMusic(void);
+    MOD_TO_ENGINE void ModInitAfterLoad(void);
+    MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(DataParser* entity_parser);
+    MOD_TO_ENGINE void PlayerInit(uint16_t i);
 #else                              // voxen.h usage:
     // Interop - From Mod
     #ifdef MOD_INTEROP
@@ -62,13 +65,16 @@
     MOD_TO_ENGINE bool (*SwimUp)(void);
     MOD_TO_ENGINE bool (*SwimDn)(void);
     MOD_TO_ENGINE bool (*Console)(void);
-    MOD_TO_ENGINE float (*GetBasePlayerSpeed)(bool running);
-    MOD_TO_ENGINE void (*InitializeAIAfterLoad)(uint16_t i);
+    MOD_TO_ENGINE float (*GetBasePlayerSpeed)(bool);
+    MOD_TO_ENGINE void (*InitializeAIAfterLoad)(uint16_t);
     MOD_TO_ENGINE bool (*TakeScreenshot)(void);
     MOD_TO_ENGINE void (*UpdateMusic)(void);
     MOD_TO_ENGINE void (*PlayMenuMusic)(void);
     MOD_TO_ENGINE void (*PlayGameMusic)(void);
     MOD_TO_ENGINE void (*ResetLevelMusic)(void);
+    MOD_TO_ENGINE void (*ModInitAfterLoad)(void);
+    MOD_TO_ENGINE void (*ModEntityDefinitionsInitAfterLoad)(DataParser*);
+    MOD_TO_ENGINE void (*PlayerInit)(uint16_t);
 #endif
 
 
@@ -98,3 +104,6 @@ ENGINE_TO_MOD void mp3_clear(void);
 ENGINE_TO_MOD void play_mp3(const char* path, int32_t fade_in_ms);
 ENGINE_TO_MOD bool GetSoundIsPlaying(ma_sound* sound);
 ENGINE_TO_MOD float GetSoundRemainingTime(ma_sound* pSound);
+ENGINE_TO_MOD void AddCameraPosition(uint16_t camIdx);
+ENGINE_TO_MOD bool StringIsEmpty(const char* a);
+ENGINE_TO_MOD void StringCopyInto_A_From_B(char* a, const char* b, size_t bufferSize);

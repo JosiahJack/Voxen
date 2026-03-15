@@ -1,5 +1,5 @@
 // mod.h - Header only used by gamecode files
-#include "common.h"
+#include "common.h" // Types needed first
 #define MOD_INTEROP_IMPLEMENTATION
 #include "interop.h"
 extern GlobalContext* Eng_Global; extern CheatsSystem* Eng_Cheats; extern SettingsSystem* Eng_Settings;
@@ -95,3 +95,7 @@ typedef struct {
     bool levelEntry;
 } MusicSystem;
 extern MusicSystem Sys_Music;
+
+uint8_t GetCurrentLevelSecurity(void);
+uint16_t GetImpactType(uint16_t instanceIdx);
+const char* GetPrefabNameFromIndex(int constIndex);

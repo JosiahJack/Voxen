@@ -27,8 +27,6 @@ SystemUI Sys_UIPlayer2;
 OsFileHandle console_log_file = 0;
 AutoSplitterData autoSplitter = { 0x1337133713371337, 0, false, 0 }; // Fore use with LiveSplit or other future speedrunner utilities for doing speedruns
 uint8_t queuedLevelToLoad = 255u;
-Entity entities[MAX_ENTITIES]; // Global array of entity definitions
-uint16_t entityCount; // Number of entities loaded
 float modelMatrices[INSTANCE_COUNT * 16];
 uint8_t dirtyInstances[INSTANCE_COUNT];
 double berserkFinished;
@@ -542,37 +540,17 @@ __attribute__((cold)) void LoadGameModDefinition(void) { // Unique set separate 
 
 __attribute__((cold)) void LoadEntities(void) {
     double start_time = get_time();
-    entityCount = 0;
+    Sys_Global.entityCount = 0;
     DataParser entity_parser;
     if (!parse_data_file(&entity_parser, MAX_ENTITIES, "./Data/entities.txt")) { DualLogError("Could not parse ./Data/entities.txt!\n"); OS_Exit(1); }
     
-    entityCount = (uint16_t)entity_parser.count;
-    DualLog("Loading  %d entities...", entityCount);
-    if (entityCount > MAX_ENTITIES) { DualLogError("Too many entities in parser count %d, greater than %d!\n", entityCount, MAX_ENTITIES); OS_Exit(1); }
-    if (entityCount == 0) { DualLogError("No entities found in entities.txt\n"); OS_Exit(1); }
+    Sys_Global.entityCount = (uint16_t)entity_parser.count;
+    DualLog("Loading  %d entities...", Sys_Global.entityCount);
+    if (Sys_Global.entityCount > MAX_ENTITIES) { DualLogError("Too many entities in parser count %d, greater than %d!\n", Sys_Global.entityCount, MAX_ENTITIES); OS_Exit(1); }
+    if (Sys_Global.entityCount == 0) { DualLogError("No entities found in entities.txt\n"); OS_Exit(1); }
 
-    SetMemoryToValueForNBytes(entities,0,MAX_ENTITIES * sizeof(Entity));
-//     #pragma omp parallel for
-    for (int32_t i = 0; i < entityCount; i++) {
-        if (entity_parser.entries[i].index == UINT16_MAX) continue;
-
-        entities[i] = entity_parser.entries[i];
-        flag_set(&entities[i].entflags, ENTFLAG_ACTIVE, true);
-        flag_set(&entities[i].entflags, ENTFLAG_GROUNDED, false);
-        flag_set(&entities[i].entflags, ENTFLAG_RIGIDBODY, ConstIndexIsDynamicObject(entities[i].index));
-        if (entity_parser.entries[i].entflags & ENTFLAG_CARDCHUNK) {
-            entities[i].lodIndex = GEOMETRY_LOD_CARD_MODEL_IDX; // Generic LOD card
-            entities[i].collider = COLLIDER_TYPE_BOX;
-            entities[i].colliderCenter = (Vector3){ .x = 0.0f, .y = 1.44f, .z = 0.0f };
-            entities[i].colliderSize = (Vector3){ .x = 2.56f, .y = 0.32f, .z = 2.56f };
-        }
-        
-        if (ConstIndexIsButtonSwitch(entities[i].index)) {
-            entities[i].lockedMessageLingdex = 193; // ButtonSwitch
-            entities[i].tickTime = 1.5;
-        }
-    }
-
+    SetMemoryToValueForNBytes(Sys_Global.entities,0,MAX_ENTITIES * sizeof(Entity));
+    ModEntityDefinitionsInitAfterLoad(&entity_parser);
     OS_DeallocateRAM(entity_parser.entries,entity_parser.count * sizeof(Entity));
     DualLog(" took %f secs\n", get_time() - start_time);
     DebugRAM("after loading all entities");
@@ -897,9 +875,9 @@ void ApplySettings(void) {
     #define PLATFORM_DLCLOSE(handle) dlclose((handle))
 #endif
 
-void* mod_handle = NULL;
 bool GetKey(int settingIndex);
 bool GetKeyPressed(int settingIndex);
+void* mod_handle = NULL;
 void LoadModFunctions(void) {
     // Clear previous handle if reloading
     if (mod_handle) {
@@ -987,7 +965,10 @@ void LoadModFunctions(void) {
     UpdateMusic     = (void (*)(void))           LINK_MOD_SYMBOL("UpdateMusic",UpdateMusic);
     PlayMenuMusic   = (void (*)(void))           LINK_MOD_SYMBOL("PlayMenuMusic",PlayMenuMusic);
     PlayGameMusic   = (void (*)(void))           LINK_MOD_SYMBOL("PlayGameMusic",PlayGameMusic);
-    ResetLevelMusic   = (void (*)(void))         LINK_MOD_SYMBOL("ResetLevelMusic",ResetLevelMusic);
+    ResetLevelMusic = (void (*)(void))           LINK_MOD_SYMBOL("ResetLevelMusic",ResetLevelMusic);
+    ModInitAfterLoad= (void (*)(void))           LINK_MOD_SYMBOL("ModInitAfterLoad",ModInitAfterLoad);
+    ModEntityDefinitionsInitAfterLoad = (void (*)(DataParser*)) LINK_MOD_SYMBOL("ModEntityDefinitionsInitAfterLoad",ModEntityDefinitionsInitAfterLoad);
+    PlayerInit      = (void (*)(uint16_t))       LINK_MOD_SYMBOL("PlayerInit",PlayerInit);
     DualLog("done!\n");
 }
 
@@ -1178,7 +1159,7 @@ static inline __attribute__((always_inline)) void Frob(Vector3 pos, Vector3 forw
     RaycastHit tempHit = Raycast(pos, dir, FROB_DISTANCE, LAYER_MASK_PLAYER_FROB);
     if (tempHit.hit) {
         Sys_Global.debugLine_end = tempHit.point;
-        DualLog("Raycast hit!  Hit object %u named of entity type %s(%u) at hit point %f %f %f\n", tempHit.hitInstanceIndex, entities[Sys_Global.instances[tempHit.hitInstanceIndex].index].path, Sys_Global.instances[tempHit.hitInstanceIndex].index, (double)tempHit.point.x, (double)tempHit.point.y, (double)tempHit.point.z);
+        DualLog("Raycast hit!  Hit object %u named of entity type %s(%u) at hit point %f %f %f\n", tempHit.hitInstanceIndex, Sys_Global.entities[Sys_Global.instances[tempHit.hitInstanceIndex].index].path, Sys_Global.instances[tempHit.hitInstanceIndex].index, (double)tempHit.point.x, (double)tempHit.point.y, (double)tempHit.point.z);
     }
     
     Sys_Global.debugLineFinished = Sys_Global.current_time + 3.0;
@@ -1424,8 +1405,8 @@ static inline __attribute__((always_inline)) double RenderUI(void) {
     int16_t lineSpacing = 18;
     if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 1),TEXT_WHITE,FONT_NORMAL,1.0f,"timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u",Sys_Global.timeSinceLastPhysicsTick, voxen_Shadow_System.numShadowsCouldRender,playerCellIdx,numCellsVisible);
     if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 2),TEXT_WHITE,FONT_NORMAL,1.0f,"Player velocity: %.2f, %.2f, %.2f",Sys_Global.instances[PLAYER1].velocity.x,Sys_Global.instances[PLAYER1].velocity.y,Sys_Global.instances[PLAYER1].velocity.z);
-    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 3),TEXT_WHITE,FONT_NORMAL,1.0f,"Test Entity[%u] %s Index: %u, Shadow cpu ms: %.3f",editModeSelection,entities[Sys_Global.instances[editModeSelection].index].path,editModeTestEntityDefinition,voxen_Shadow_System.shadowTime * 1000);
-    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 4),TEXT_WHITE,FONT_NORMAL,1.0f,"Player cell: %u, floor: %.3f, ceil: %.3f",Sys_Global.instances[PLAYER1].cellIndex,gridCellFloorHeight[Sys_Global.instances[PLAYER1].cellIndex],gridCellCeilingHeight[Sys_Global.instances[PLAYER1].cellIndex]);
+    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 3),TEXT_WHITE,FONT_NORMAL,1.0f,"Test Entity[%u] %s Index: %u, Shadow cpu ms: %.3f",editModeSelection,Sys_Global.entities[Sys_Global.instances[editModeSelection].index].path,editModeTestEntityDefinition,voxen_Shadow_System.shadowTime * 1000);
+    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 4),TEXT_WHITE,FONT_NORMAL,1.0f,"Player cell: %u",Sys_Global.instances[PLAYER1].cellIndex);
     RenderFormattedText(16,debugTextStartY + (lineSpacing * 5),TEXT_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d   dx: %d dy: %d",cursorPosition_x,cursorPosition_y,Sys_Input.currentMouse_dx,Sys_Input.currentMouse_dy);
     if (Sys_Cheats.consoleActive) RenderFormattedText(16, 0, TEXT_WHITE, FONT_NORMAL,1.0f, "] %s",consoleEntryText);
     if (Sys_Global.statusTextDecayFinished > Sys_Global.current_time) RenderFormattedText(479,114,TEXT_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
@@ -1734,7 +1715,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
     glEnable(GL_DEPTH_TEST);
     if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps();
     SetMemoryToValueForNBytes(    lightDirty,0    ,LIGHT_COUNT * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
-    SetMemoryToValueForNBytes(dirtyInstances,0,loadedInstances * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
+    SetMemoryToValueForNBytes(dirtyInstances,0,Sys_Global.loadedInstances * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
     glBindFramebuffer(GL_FRAMEBUFFER, Sys_Render.gBufferFBO);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
     glEnable(GL_CULL_FACE); glDisable(GL_BLEND); // Opaques
@@ -1867,10 +1848,10 @@ int32_t main(void) {
             ModUpdate();
             if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].released) Frob(Sys_Global.instances[PLAYER1].position, Sys_Global.instances[PLAYER1].forward, Sys_Global.instances[PLAYER1].right);
             if (Sys_Global.current_time < Sys_Global.debugLineFinished && (Sys_Global.debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Sys_Global.debugLine_start, Sys_Global.debugLine_end);
-//             for (uint16_t i=START_INDEX_LEVEL_INSTANCES;i<loadedInstances;++i) UpdateWhileNotPaused(i); // TODO Get new states prior to updating animations, physics event, or rendering
+//             for (uint16_t i=START_INDEX_LEVEL_INSTANCES;i<Sys_Global.loadedInstances;++i) UpdateWhileNotPaused(i); // TODO Get new states prior to updating animations, physics event, or rendering
 //             Sys_Global.instances[editModeSelection].index = editModeTestEntityDefinition;
-//             Sys_Global.instances[editModeSelection].modelIndex = entities[editModeTestEntityDefinition].modelIndex;
-//             Sys_Global.instances[editModeSelection].texIndex = entities[editModeTestEntityDefinition].modelIndex;
+//             Sys_Global.instances[editModeSelection].modelIndex = Sys_Global.entities[editModeTestEntityDefinition].modelIndex;
+//             Sys_Global.instances[editModeSelection].texIndex = Sys_Global.entities[editModeTestEntityDefinition].modelIndex;
             UpdateAmbientSounds();
         }
 
@@ -1887,7 +1868,7 @@ int32_t main(void) {
             Sys_Render.shadowmapsNeedUpdated = UpdateLights(&Sys_Render.shadowmapsNeedUpdated);
             CullCore();
             bool uploadInstances = false;
-            for (uint32_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; i++) {
+            for (uint32_t i = START_INDEX_LEVEL_INSTANCES; i < Sys_Global.loadedInstances; i++) {
                 if (dirtyInstances[i]) {
                     if (Sys_Global.instances[i].modelIndex >= loadedModelsMaxIndex || modelVertexCounts[Sys_Global.instances[i].modelIndex] < 1) { dirtyInstances[i] = false; continue; } // No model or empty model
 
@@ -1909,7 +1890,7 @@ int32_t main(void) {
                     modelMatrices[(i * 16) + 15]= 1.0f;
                 }
             }
-            if (uploadInstances) glNamedBufferData(Sys_Render.matricesBufferID, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
+            if (uploadInstances) glNamedBufferData(Sys_Render.matricesBufferID, Sys_Global.loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
         }
         
         Render();

@@ -1,4 +1,4 @@
-// helpers.c - Helper Functions for various things
+// helpers.c - Helper Functions for various things, mostly libc avoidance
 #include "os.h"
 #include "voxen.h"
 #define STBIW_UCHAR(x) (unsigned char)((x) & 0xff)
@@ -210,37 +210,6 @@ void DebugRAM(const char *context) {
 }
 
 void print_bytes_no_newline(int32_t count) { DualLog("%d bytes | %f kb | %f Mb",count,(double)count / 1000.0,(double)count / 1000000.0); }
-
-bool ConstIndexInBounds(int constdex) { return (constdex >= 0 && constdex <= 760); }
-bool ConstIndexIsGeometry(int constdex) { return (constdex >= 0 && constdex <= 306 && constdex != 112 && constdex != 279) || constdex == 760; }
-bool ConstIndexIsDoor(int constdex) { return (constdex >= 496 && constdex < 515); }
-bool ConstIndexIsLightStaticSaveable(int constdex) { return constdex == 748; }
-bool ConstIndexIsGenericTransform(int constdex) { return constdex == 749; }
-bool ConstIndexIsNPC(int constdex) { return (constdex >= 419 && constdex < 448); }
-bool ConstIndexIsHardware(int constdex) { return (constdex >= 328) && (constdex <= 339); }
-bool ConstIndexIsAmbient(int constdex) { return (constdex >= 621 && constdex <= 655); }
-bool ConstIndexIsButtonSwitch(int constdex) { return ((constdex >= 688 && constdex <= 692) || constdex == 694 || constdex == 695); }
-bool ConstIndexIsDynamicObject(uint16_t constIndex) {
-    return     (constIndex >= 307 && constIndex <= 404) ||  constIndex == 417 || (constIndex >= 419 && constIndex <= 428)
-            || (constIndex >= 430 && constIndex <= 437) || (constIndex >= 440 && constIndex <= 442)
-            || (constIndex >= 458 && constIndex <= 463) || (constIndex >= 465 && constIndex <= 476);
-}
-
-bool ConstIndexIsStaticObjectSaveable(int constdex) {
-	return (constdex == 112 || constdex == 279 || (constdex >= 448 && constdex < 458) || constdex == 480 || constdex == 516
-			|| (constdex >= 518 && constdex <= 526) || constdex == 530 || constdex == 531 || constdex == 546
-			|| constdex == 555 || constdex == 594 || constdex == 596 || constdex == 598 || (constdex >= 600 && constdex < 603)
-			|| (constdex >= 604 && constdex < 616) || (constdex >= 688 && constdex < 693) || constdex == 694 || constdex == 695
-			|| (constdex >= 699 && constdex < 704) || (constdex >= 741 && constdex < 746));
-}
-
-bool ConstIndexIsStaticObjectImmutable(int constdex) {
-	return ((constdex >= 527 && constdex < 530) || (constdex >= 532 && constdex < 546) || (constdex >= 547 && constdex < 553)
-			|| constdex == 554 || (constdex >= 556 && constdex < 594) || constdex == 595 || constdex == 597 || constdex == 599
-			|| constdex == 601 || constdex == 603 || (constdex >= 616 && constdex < 688) || constdex == 693 || constdex == 696 || constdex == 697
-			|| constdex == 698 || (constdex >= 704 && constdex < 717) || constdex == 720 || (constdex >= 733 && constdex < 736)
-			|| (constdex >= 737 && constdex < 739) || constdex == 746 || constdex == 747 || (constdex >= 750 && constdex <= 759 && constdex != 755));
-}
 
 typedef void(*PFNGLREADPIXELSPROC)(int32_t x, int32_t y, int32_t width, int32_t height, uint32_t format, uint32_t type, void* pixels);
 extern PFNGLREADPIXELSPROC glad_glReadPixels;
@@ -665,22 +634,3 @@ void FilePrintString(OsFileHandle f, const char* fmt, ...) {
     OS_RawWrite(f,buf,GetStringLength(buf));
     __builtin_va_end(args);
 }
-
-uint8_t GetCurrentLevelSecurity(void) { return (Sys_Global.difficultyMission < 1 || Sys_Cheats.superoverride) ? 0u : Sys_Global.levelSecurity[Sys_Global.currentLevel]; }
-
-uint16_t GetImpactType(uint16_t instanceIdx) {
-    switch (Sys_Global.instances[instanceIdx].bloodType) {
-        case BloodType_None:         return 729; // SparksSmall
-        case BloodType_Red:          return 724; // BloodSpurtSmall
-        case BloodType_Yellow:       return 723; // BloodSpurtSmallYellow
-        case BloodType_Green:        return 722; // BloodSpurtSmallGreen
-        case BloodType_Robot:        return 730; // SparksSmallBlue
-        case BloodType_Leaf:         return 756; // LeafBurst
-        case BloodType_Mutation:     return 757; // MutationBurst
-        case BloodType_GrayMutation: return 758; // GraytationBurst
-    }
-
-    return 729; // SparksSmall
-}
-
-int hardware14fromConstdex(int constdex) { return clamp(constdex - 21,0,14); }

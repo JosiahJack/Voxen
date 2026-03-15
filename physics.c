@@ -65,8 +65,8 @@ void ApplyPlayerMovements(void) {
 const Vector3 gravityVelocity = { 0.0f, -9.81f, 0.0f };
 
 void UpdateVelocityFromGravity(void) {
-    for (int32_t i=PLAYER1;i<loadedInstances;++i) {
-        if (i > loadedInstances) return;
+    for (int32_t i=PLAYER1;i<Sys_Global.loadedInstances;++i) {
+        if (i > Sys_Global.loadedInstances) return;
         if (Sys_Global.instances[i].gravity < 0.01f && Sys_Global.instances[i].gravity > -0.01f) continue;
         if (i <= (int32_t)PLAYER2 && Sys_Cheats.noclip) continue;
         
@@ -80,8 +80,8 @@ void ApplyVelocityUntilCollision(uint16_t i) {
     Vector3 currentPosition = Sys_Global.instances[i].position;
     Sys_Global.instances[i].cellIndex = PosGetCellCoords(currentPosition.x, currentPosition.z);
     float mag = magnitude_vector3(Sys_Global.instances[i].velocity);
-    if (i > PLAYER1/*loadedInstances*/) return;
-    if (!(Sys_Global.instances[i].index != PLAYER1 || ConstIndexIsDynamicObject(Sys_Global.instances[i].index))) return;
+    if (i > PLAYER1/*Sys_Global.loadedInstances*/) return;
+    if (!(Sys_Global.instances[i].index != PLAYER1 || (Sys_Global.instances[i].entflags & ENTFLAG_RIGIDBODY))) return;
     if (mag < 0.05f) return;
     
     Vector3 dir = normalize_vector3(Sys_Global.instances[i].velocity);
@@ -105,8 +105,6 @@ void ApplyVelocityUntilCollision(uint16_t i) {
     if (cellCoordsZ < cellCoordsCurrentZ && (gridCellStates[cellCoordsCurrent] & CELL_CLOSEDSOUTH)) { Sys_Global.instances[i].velocity.z = reboundVelocity; return; } // blocked south
     if (cellCoordsX > cellCoordsCurrentX && (gridCellStates[cellCoordsCurrent] & CELL_CLOSEDEAST)) { Sys_Global.instances[i].velocity.x = -reboundVelocity; return; } // blocked east
     if (cellCoordsX < cellCoordsCurrentX && (gridCellStates[cellCoordsCurrent] & CELL_CLOSEDWEST)) { Sys_Global.instances[i].velocity.x = reboundVelocity; return; } // blocked west
-    if (newHitPos.y < gridCellFloorHeight[cellCoords]) { Sys_Global.instances[i].velocity.y = reboundVelocity; return; } // floor blocked
-    if (newHitPos.y > gridCellCeilingHeight[cellCoords]) { Sys_Global.instances[i].velocity.y = -reboundVelocity; return; } // ceiling blocked
     if (!(gridCellStates[cellCoords] & CELL_OPEN)) { Sys_Global.instances[i].velocity = scale_vector3(dir,-reboundVelocity); return; } // void blocked
         
     Sys_Global.instances[i].position = newPosition; // It moves! It lives!!
@@ -122,11 +120,11 @@ void ApplyCorpseFriction(uint16_t instanceIdx) {
 }
 
 void UpdatePositions(void) {
-    for (int32_t i=PLAYER1;i<loadedInstances;++i) ApplyVelocityUntilCollision(i);
+    for (int32_t i=PLAYER1;i<Sys_Global.loadedInstances;++i) ApplyVelocityUntilCollision(i);
 }
 
 void ClampVelocity(void) {
-    for (int32_t i=START_INDEX_LEVEL_INSTANCES;i<loadedInstances;++i) {
+    for (int32_t i=START_INDEX_LEVEL_INSTANCES;i<Sys_Global.loadedInstances;++i) {
         Vector3 curvel = Sys_Global.instances[i].velocity;
         if (magnitude_vector3(curvel) > TERMINAL_VELOCITY) {
             Vector3 dir = normalize_vector3(curvel);
@@ -261,7 +259,7 @@ RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uint32_t layerMas
     for (float curDist=0.0f;curDist<maxDist;curDist+=0.02f) { // 4.9 / 0.04 = 245 tries worst case empty air
         Vector3 checkPoint = Vector3_A_plus_B(origin, scale_vector3(dir,curDist));
         hitObjectIndex = PointInSolid(checkPoint, layerMask);
-        if (hitObjectIndex < loadedInstances) {
+        if (hitObjectIndex < Sys_Global.loadedInstances) {
             result.hit = true;
             result.point = checkPoint;
             result.distance = curDist; // TODO refine the raymarch a little?  nah 0.02 good enough for effects, will apply offset along normal for bullet holes and such anyways.
