@@ -1,9 +1,11 @@
 #include "mod.h"
+void WeaponsUpdate(void);
+
 // From Engine
-GlobalContext* Eng_Global = 0; CheatsSystem* Eng_Cheats;
-MOD_TO_ENGINE void ModInit(GlobalContext* globals, CheatsSystem* cheats) { Eng_Global = globals; Eng_Cheats = cheats; }
+GlobalContext* Eng_Global = 0; CheatsSystem* Eng_Cheats; SettingsSystem* Eng_Settings;
+MOD_TO_ENGINE void ModInit(GlobalContext* globals, CheatsSystem* cheats, SettingsSystem* settings) { Eng_Global = globals; Eng_Cheats = cheats; Eng_Settings = settings; }
 MOD_TO_ENGINE void ModUpdate(void) {
-    DualLog("Mod updating!\n");
+    WeaponsUpdate();
 }
 MOD_TO_ENGINE bool Forward(void) {     return Eng_Global->GetKey(0); }
 MOD_TO_ENGINE bool StrafeLeft(void) {  return Eng_Global->GetKey(1); }

@@ -69,7 +69,7 @@ public class GrenadeButton : MonoBehaviour {
 
 	public void GrenadeInvSelect() {
 		Sys_UI.SendInfoToItemTab(useableItemIndex);
-		inventoryPlayer1.grenadeCurrent = GrenButtonIndex; // Set current
+		Eng_Global->inventoryPlayer1.grenadeCurrent = GrenButtonIndex; // Set current
 		Utils.PlayUIOneShotSavable(80); //changeweapon
 	}
 

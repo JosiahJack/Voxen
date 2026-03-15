@@ -36,7 +36,7 @@ void LogicBranchTargetted (UseData ud, uint16_t i) {
 
 void GameEnd() {
     DualLog("Game finished!");
-    Sys_Global.gameFinished = true; // YAY WE DID IT!!!!
+    Eng_Global->gameFinished = true; // YAY WE DID IT!!!!
 /*    PauseEnable(); // Pauses game, no more to do TODO
     NoSavePauseQuit(); // quit to and enable main menu (exits the game to menu)
     PlayCredits(); // */Play credits and set page in menu handler
@@ -57,7 +57,7 @@ void LogicRelayRunTargets(UseData ud) {
 }
 
 void LogicUpdate() {
-    if (SELF.tickFinished >= Sys_Global.pauseRelativeTime) return;
+    if (SELF.tickFinished >= Eng_Global->pauseRelativeTime) return;
     
     LogicRelayRunTargets(ud);
 }
@@ -68,7 +68,7 @@ void TriggerCounterTargetted (uint16_t activator, uint16_t i) {
         if (delay <=0) {
             Target (ud);
         } else {
-            Eng_Global->instances[i].tickFinished = Sys_Global.pauseRelativeTime + Eng_Global->instances[i].delay;
+            Eng_Global->instances[i].tickFinished = Eng_Global->pauseRelativeTime + Eng_Global->instances[i].delay;
             Eng_Global->instances[i].activator = activator;
         }
 
@@ -91,12 +91,12 @@ void Targetted(uint16_t activator, uint16_t other) {
     if (ud.branchFlip || ud.branchFlipOnly && Eng_Global->instances[i].index == 700) FlipTrackSwitch();
     if ((ACTIVATOR.ioflags & TARG_IOFLAGS_TRIPTRIGGER) && (Eng_Global->instances[i].index == 598 || Eng_Global->instances[i].index == 600)) TriggerTargetted(ud);
     if ((ACTIVATOR.ioflags & TARG_IOFLAGS_TRIPTRIGGER) && Eng_Global->instances[i].index == 594) TriggerCounterTargetted(ud);
-    if (ud.lockCodeToScreenMaterialChanger && Sys_Global.currentLevel == 1) flag_set(&Eng_Global->instances[WORLD].ioflags,QUESTBIT_LEV1_CODE_LOCKED,true);
-    if (ud.lockCodeToScreenMaterialChanger && Sys_Global.currentLevel == 2) flag_set(&Eng_Global->instances[WORLD].ioflags,QUESTBIT_LEV1_CODE_LOCKED,true);
-    if (ud.lockCodeToScreenMaterialChanger && Sys_Global.currentLevel == 3) flag_set(&Eng_Global->instances[WORLD].ioflags,QUESTBIT_LEV1_CODE_LOCKED,true);
-    if (ud.lockCodeToScreenMaterialChanger && Sys_Global.currentLevel == 4) flag_set(&Eng_Global->instances[WORLD].ioflags,QUESTBIT_LEV1_CODE_LOCKED,true);
-    if (ud.lockCodeToScreenMaterialChanger && Sys_Global.currentLevel == 5) flag_set(&Eng_Global->instances[WORLD].ioflags,QUESTBIT_LEV1_CODE_LOCKED,true);
-    if (ud.lockCodeToScreenMaterialChanger && Sys_Global.currentLevel == 6) flag_set(&Eng_Global->instances[WORLD].ioflags,QUESTBIT_LEV1_CODE_LOCKED,true);
+    if (ud.lockCodeToScreenMaterialChanger && Eng_Global->currentLevel == 1) flag_set(&Eng_Global->instances[WORLD].ioflags,QUESTBIT_LEV1_CODE_LOCKED,true);
+    if (ud.lockCodeToScreenMaterialChanger && Eng_Global->currentLevel == 2) flag_set(&Eng_Global->instances[WORLD].ioflags,QUESTBIT_LEV1_CODE_LOCKED,true);
+    if (ud.lockCodeToScreenMaterialChanger && Eng_Global->currentLevel == 3) flag_set(&Eng_Global->instances[WORLD].ioflags,QUESTBIT_LEV1_CODE_LOCKED,true);
+    if (ud.lockCodeToScreenMaterialChanger && Eng_Global->currentLevel == 4) flag_set(&Eng_Global->instances[WORLD].ioflags,QUESTBIT_LEV1_CODE_LOCKED,true);
+    if (ud.lockCodeToScreenMaterialChanger && Eng_Global->currentLevel == 5) flag_set(&Eng_Global->instances[WORLD].ioflags,QUESTBIT_LEV1_CODE_LOCKED,true);
+    if (ud.lockCodeToScreenMaterialChanger && Eng_Global->currentLevel == 6) flag_set(&Eng_Global->instances[WORLD].ioflags,QUESTBIT_LEV1_CODE_LOCKED,true);
 
     if ((ACTIVATOR.ioflags & TARG_IOFLAGS_DOORUNLOCK)) {
         Door dr = GetComponent<Door>();
@@ -119,7 +119,7 @@ void Targetted(uint16_t activator, uint16_t other) {
             if (!dr.locked
                 && (dr.requiredAccessCard == AccessCardType_None
                     || dr.accessCardUsedByPlayer
-                    || inventoryPlayer1.HasAccessCard(dr.requiredAccessCard))) {
+                    || Eng_Global->inventoryPlayer1.HasAccessCard(dr.requiredAccessCard))) {
                 
                 dr.ForceOpen();
             }

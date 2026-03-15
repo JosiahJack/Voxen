@@ -1,12 +1,8 @@
 // mod.h - Header only used by gamecode files
-#if defined(_WIN32) || defined(__CYGWIN__)
-    #define MOD_TO_ENGINE __declspec(dllexport)
-#else
-    #define MOD_TO_ENGINE __attribute__((visibility("default")))
-#endif
-
 #include "common.h"
-extern GlobalContext* Eng_Global; extern CheatsSystem* Eng_Cheats;
+#define MOD_INTEROP_IMPLEMENTATION
+#include "interop.h"
+extern GlobalContext* Eng_Global; extern CheatsSystem* Eng_Cheats; extern SettingsSystem* Eng_Settings;
 #define NUM_AI_TYPES 29
 typedef struct {
 	const char* name;
@@ -87,9 +83,15 @@ extern NPCTable npcTable[NUM_AI_TYPES];
 
 extern uint16_t useableItemsFrobIcons[94];
 
-MOD_TO_ENGINE bool Sprint(void);
-
-// Engine functions available to Mod
-extern void DualLog(const char* fmt, ...);
-extern void DualLogWarn(const char* fmt, ...);
-extern void DualLogError(const char* fmt, ...);
+typedef struct {
+    bool inCombat;
+    bool inZone;
+    bool twoPlaying;
+    double clipFinished;
+    double combatImpulseFinished;
+    bool distortion;
+    bool cyberTube;
+    bool elevator;
+    bool levelEntry;
+} MusicSystem;
+extern MusicSystem Sys_Music;

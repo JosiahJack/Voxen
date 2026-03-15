@@ -407,7 +407,7 @@ public class PlayerMovement : MonoBehaviour {
 
 		float retval = maxWalkSpeed;
 		bonus = 0f;
-		if (inventoryPlayer1.BoosterActive()) bonus = boosterSpeedBoost;
+		if (Eng_Global->inventoryPlayer1.BoosterActive()) bonus = boosterSpeedBoost;
 		switch (bodyState) {
 			case BodyState_Standing: 		retval = maxWalkSpeed;   break;
 			case BodyState_Crouch: 			retval = maxCrouchSpeed; break;
@@ -418,8 +418,8 @@ public class PlayerMovement : MonoBehaviour {
 			case BodyState_ProningUp: 		retval = maxProneSpeed;  break;
 		}
 
-		if ((isSprinting || inventoryPlayer1.BoosterActive()) && running) {
-			if (Eng_Global->instances[PLAYER1].fatigue > 80f && !inventoryPlayer1.BoosterActive()) {
+		if ((isSprinting || Eng_Global->inventoryPlayer1.BoosterActive()) && running) {
+			if (Eng_Global->instances[PLAYER1].fatigue > 80f && !Eng_Global->inventoryPlayer1.BoosterActive()) {
 				retval = maxSprintSpeedFatigued;
 			} else {
 				retval = maxSprintSpeed;
@@ -562,7 +562,7 @@ public class PlayerMovement : MonoBehaviour {
 											  deceleration);
 			if (isSprinting && running) return;
 		} else {
-			if (inventoryPlayer1.BoosterActive()) {
+			if (Eng_Global->inventoryPlayer1.BoosterActive()) {
 				deceleration = walkDeaccelerationBooster;
 			}
 
@@ -644,7 +644,7 @@ public class PlayerMovement : MonoBehaviour {
 	// Get input for Jump and set impulse time, removed
 	// "&& (ladderState == 0)" since I want to be able to jump off a ladder
 	void Jump() {
-		if (CheatNoclip && !inventoryPlayer1.JumpJetsActive()) return;
+		if (CheatNoclip && !Eng_Global->inventoryPlayer1.JumpJetsActive()) return;
 
 		if (doubleJumpFinished < Eng_Global->pauseRelativeTime) {
 			doubleJumpTicks--;
@@ -654,24 +654,24 @@ public class PlayerMovement : MonoBehaviour {
 		if ((!gravliftState && GetInput.a.Jump()) || gravliftState && GetInput.a.JumpDown()) {
 
 			if (!justJumped) {
-				if (grounded || gravliftState || inventoryPlayer1.JumpJetsActive()) {
+				if (grounded || gravliftState || Eng_Global->inventoryPlayer1.JumpJetsActive()) {
 					jumpTime = jumpImpulseTime;
 					doubleJumpFinished = Eng_Global->pauseRelativeTime + Const.doubleClickTime;
 					doubleJumpTicks++;
 					justJumped = true;
-					if (!inventoryPlayer1.JumpJetsActive() && !inventoryPlayer1.BoosterActive()) Eng_Global->instances[PLAYER1].fatigue += jumpFatigue;
+					if (!Eng_Global->inventoryPlayer1.JumpJetsActive() && !Eng_Global->inventoryPlayer1.BoosterActive()) Eng_Global->instances[PLAYER1].fatigue += jumpFatigue;
 				} else {
 					if (ladderState > 1) {
 						jumpTime = jumpImpulseTime;
 						justJumped = true;
-						if (!inventoryPlayer1.JumpJetsActive() && !inventoryPlayer1.BoosterActive()) {
+						if (!Eng_Global->inventoryPlayer1.JumpJetsActive() && !Eng_Global->inventoryPlayer1.BoosterActive()) {
 							Eng_Global->instances[PLAYER1].fatigue += jumpFatigue;
 						}
 					}
 				}
 			}
 
-			if (inventoryPlayer1.BoosterActive() && inventoryPlayer1.BoosterSetToBoost()) {
+			if (Eng_Global->inventoryPlayer1.BoosterActive() && Eng_Global->inventoryPlayer1.BoosterSetToBoost()) {
 				if (justJumped && doubleJumpTicks == 2) {
 					// Booster thrust
 					rbody.AddForce((Vector3){transform.forward.x * burstForce, transform.forward.y * burstForce, transform.forward.z * burstForce), ForceMode.Impulse);
@@ -702,16 +702,16 @@ public class PlayerMovement : MonoBehaviour {
 		while (jumpTimeMod > 0) { // Why is this a `while` instead of an `if`??
 							   // Because otherwise it don't work, duh!
 			jumpTimeMod -= Time.smoothDeltaTime;
-			if (Eng_Global->instances[PLAYER1].fatigue > 80.0f && !inventoryPlayer1.JumpJetsActive()) {
+			if (Eng_Global->instances[PLAYER1].fatigue > 80.0f && !Eng_Global->inventoryPlayer1.JumpJetsActive()) {
 				jumpVelocityApply = jumpVelocityFatigued * rbody.mass;
 				jumpVel.y = jumpVelocityApply;
 			}
 
-			if (inventoryPlayer1.JumpJetsActive()) {
+			if (Eng_Global->inventoryPlayer1.JumpJetsActive()) {
 				float energysuck = 25f;
 				jumpVelocityApply = jumpVelocityBoots * rbody.mass;
 				jumpVel.y = jumpVelocityApply;
-				switch (inventoryPlayer1.hardwareVersionSetting[10]) {
+				switch (Eng_Global->inventoryPlayer1.hardwareVersionSetting[10]) {
 					case 0: energysuck = 11f; break;
 					case 1: energysuck = 26f; break;
 					case 2: energysuck = 22f; break;
@@ -739,7 +739,7 @@ public class PlayerMovement : MonoBehaviour {
 			}
 		}
 
-		if (justJumped && !inventoryPlayer1.JumpJetsActive()) {
+		if (justJumped && !Eng_Global->inventoryPlayer1.JumpJetsActive()) {
 			// Play jump sound
 			if (jumpSFXFinished < Eng_Global->pauseRelativeTime) {
 				jumpSFXFinished = Eng_Global->pauseRelativeTime + jumpSFXIntervalTime;
@@ -780,10 +780,10 @@ public class PlayerMovement : MonoBehaviour {
 		float sidForce = 0f;
 		float forForce = 0f;
 		float upForce = 0f;
-		if (grounded || inventoryPlayer1.JumpJetsActive()) {
+		if (grounded || Eng_Global->inventoryPlayer1.JumpJetsActive()) {
 			// Ladder climb, allow while grounded
 			float bonus = 1f;
-			if (inventoryPlayer1.JumpJetsActive()) bonus = 2f;
+			if (Eng_Global->inventoryPlayer1.JumpJetsActive()) bonus = 2f;
 
 			sidForce = relSideways * walkAcceleration * Time.deltaTime;
 			forForce = relForward * walkAcceleration * Time.deltaTime;
@@ -814,7 +814,7 @@ public class PlayerMovement : MonoBehaviour {
 			rbody.AddRelativeForce(sidForce,upForce,forForce);
 		}
 
-		if (inventoryPlayer1.BoosterActive() && inventoryPlayer1.BoosterSetToSkates()) {
+		if (Eng_Global->inventoryPlayer1.BoosterActive() && Eng_Global->inventoryPlayer1.BoosterSetToSkates()) {
 			deceleration = walkDeaccelerationBooster;
 		} else {
 			deceleration = walkDeacceleration;
@@ -850,11 +850,11 @@ public class PlayerMovement : MonoBehaviour {
 		movDir = movDir.normalized;
 		if (floorDot < 0.98f) {
 			if (Vector3.Dot(movDir,floorAng) < 0f) {
-				if (inventoryPlayer1.BoosterActive()) forForce *= 2f;
+				if (Eng_Global->inventoryPlayer1.BoosterActive()) forForce *= 2f;
 			}
 		}
 
-		if (grounded || inventoryPlayer1.JumpJetsActive()) {
+		if (grounded || Eng_Global->inventoryPlayer1.JumpJetsActive()) {
 			// Normal walking
 			runTime += Time.deltaTime;
 			if (relForward == 0 && relSideways == 0) runTime = 0;
@@ -866,7 +866,7 @@ public class PlayerMovement : MonoBehaviour {
 			movDir = movDir.normalized;
 			if (fatigueFinished2 < Eng_Global->pauseRelativeTime && movDir.sqrMagnitude > 0f && grounded && (relForward != 0 || relSideways != 0)) {
 				fatigueFinished2 = Eng_Global->pauseRelativeTime + fatigueWaneTickSecs;
-				if (!inventoryPlayer1.BoosterActive()) {
+				if (!Eng_Global->inventoryPlayer1.BoosterActive()) {
 					if (isSprinting) Eng_Global->instances[PLAYER1].fatigue += fatiguePerSprintTick;
 					else Eng_Global->instances[PLAYER1].fatigue += fatiguePerWalkTick;
 				}
@@ -1264,7 +1264,7 @@ public class PlayerMovement : MonoBehaviour {
 		
 		int contactCount = collision.contactCount;
 		float maxSlope = 0.35f;
-		if (inventoryPlayer1.BoosterActive()) maxSlope = 0.7f;
+		if (Eng_Global->inventoryPlayer1.BoosterActive()) maxSlope = 0.7f;
 		for(tempInt=0;tempInt<collision.contactCount;tempInt++) {
 			contactPoint = collision.GetContact(tempInt);;
 			floorAng = contactPoint.normal;

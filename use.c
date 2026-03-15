@@ -2,7 +2,7 @@
 void ChargStationUse (UseData ud) {
     if (GetCurrentLevelSecurity() > minSecurityLevel) { Sys_UI.BlockedBySecurity(SELF.position); return; }
     
-    if (SELF.tickTime < Sys_Global.pauseRelativeTime) {
+    if (SELF.tickTime < Eng_Global->pauseRelativeTime) {
         if (PlayerEnergy.a.energy >= PlayerEnergy.a.maxenergy) {
             CenterStatusPrint("%s",Sys_Text.stringTable[303]);
             return;
@@ -23,7 +23,7 @@ void ChargStationUse (UseData ud) {
         }
 
         CenterStatusPrint("%s",Sys_Text.stringTable[0]);
-        if (SELF.entflags & ENTFLAG_REQUIRE_RESET) SELF.tickTime = Sys_Global.pauseRelativeTime + resetTime;
+        if (SELF.entflags & ENTFLAG_REQUIRE_RESET) SELF.tickTime = Eng_Global->pauseRelativeTime + resetTime;
         UseTargets(gameObject,ud,target);
     } else {
         CenterStatusPrint("%s",Sys_Text.stringTable[1]);
@@ -34,7 +34,7 @@ void FuncWallUse (UseData ud) {
     if (SELF.currentState == FuncStates_Start || SELF.currentState == FuncStates_MovingStart || SELF.currentState == FuncStates_AjarMovingTarget) SELF.currentState = FuncStates_MovingTarget;
     else SELF.currentState = FuncStates_MovingStart;
     
-    startTime = Sys_Global.pauseRelativeTime + 10.0f;
+    startTime = Eng_Global->pauseRelativeTime + 10.0f;
     play_wav(sounds[76]); // doorwall_move
     flag_set(&SELF.entflags,ENTFLAG_STOPSOUND_PLAYED,false);
 }
@@ -44,31 +44,31 @@ void ActivatePatch(int index) { // Expects the usableItems index
     switch (index) {
     case 14:
         // Berserk Patch
-        inventoryPlayer1.patchCounts[2]--;
-        if (inventoryPlayer1.patchCounts[2] <= 0) depleted = true;
+        Eng_Global->inventoryPlayer1.patchCounts[2]--;
+        if (Eng_Global->inventoryPlayer1.patchCounts[2] <= 0) depleted = true;
         if (!(Eng_Global->instances[PLAYER1].patchActive & PATCH_BERSERK)) Eng_Global->instances[PLAYER1].patchActive |= PATCH_BERSERK;
-        berserkFinishedTime = Sys_Global.pauseRelativeTime + BERSERK_TIME;
+        berserkFinishedTime = Eng_Global->pauseRelativeTime + BERSERK_TIME;
         float berserkIncrementTime = BERSERK_TIME / 5.0f;
-        if (berserkIncrementFinishedTime > Sys_Global.pauseRelativeTime) berserkIncrementFinishedTime += berserkIncrementTime; // berserk effect stacks
-        else                                                             berserkIncrementFinishedTime = Sys_Global.pauseRelativeTime + berserkIncrementTime;
+        if (berserkIncrementFinishedTime > Eng_Global->pauseRelativeTime) berserkIncrementFinishedTime += berserkIncrementTime; // berserk effect stacks
+        else                                                             berserkIncrementFinishedTime = Eng_Global->pauseRelativeTime + berserkIncrementTime;
         break;
     case 15:
         // Detox Patch
-        inventoryPlayer1.patchCounts[6]--;
-        if (inventoryPlayer1.patchCounts[6] <= 0) depleted = true;
+        Eng_Global->inventoryPlayer1.patchCounts[6]--;
+        if (Eng_Global->inventoryPlayer1.patchCounts[6] <= 0) depleted = true;
         DisableAllPatches(); // remove all other effects, even medipatch
         Eng_Global->instances[PLAYER1].patchActive = PATCH_DETOX; // overwrite all other active patches
-        detoxFinishedTime = Sys_Global.pauseRelativeTime + DETOX_TIME; // detox doesn't stack, it cancels itself lol
+        detoxFinishedTime = Eng_Global->pauseRelativeTime + DETOX_TIME; // detox doesn't stack, it cancels itself lol
         break;
     case 16:
         // Genius Patch
-        inventoryPlayer1.patchCounts[5]--;
-        if (inventoryPlayer1.patchCounts[5] <= 0) depleted = true;
+        Eng_Global->inventoryPlayer1.patchCounts[5]--;
+        if (Eng_Global->inventoryPlayer1.patchCounts[5] <= 0) depleted = true;
         if (!(Eng_Global->instances[PLAYER1].patchActive & PATCH_GENIUS)) Eng_Global->instances[PLAYER1].patchActive |= PATCH_GENIUS;
-        if (geniusFinishedTime > Sys_Global.pauseRelativeTime) {
+        if (geniusFinishedTime > Eng_Global->pauseRelativeTime) {
             geniusFinishedTime += GENIUS_TIME; // genius effect stacks
         } else {
-            geniusFinishedTime = Sys_Global.pauseRelativeTime + GENIUS_TIME;
+            geniusFinishedTime = Eng_Global->pauseRelativeTime + GENIUS_TIME;
         }
         break;
     case 17:
@@ -77,20 +77,20 @@ void ActivatePatch(int index) { // Expects the usableItems index
             CenterStatusPrint("%s", Sys_Text.stringTable[304],MouseLookScript.a.player);
             return;
         }
-        inventoryPlayer1.patchCounts[3]--;
-        if (inventoryPlayer1.patchCounts[3] <= 0) depleted = true;
+        Eng_Global->inventoryPlayer1.patchCounts[3]--;
+        if (Eng_Global->inventoryPlayer1.patchCounts[3] <= 0) depleted = true;
         if (!(Eng_Global->instances[PLAYER1].patchActive & PATCH_MEDI)) Eng_Global->instances[PLAYER1].patchActive |= PATCH_MEDI;
         PlayerHealth.a.mediPatchPulseCount = 0;
-        if (mediFinishedTime > Sys_Global.pauseRelativeTime) {
+        if (mediFinishedTime > Eng_Global->pauseRelativeTime) {
             mediFinishedTime += MEDI_TIME; // medipatch effect stacks
         } else {
-            mediFinishedTime = Sys_Global.pauseRelativeTime + MEDI_TIME;
+            mediFinishedTime = Eng_Global->pauseRelativeTime + MEDI_TIME;
         }
         break;
     case 18:
         // Reflex Patch
-        inventoryPlayer1.patchCounts[4]--;
-        if (inventoryPlayer1.patchCounts[4] <= 0) depleted = true;
+        Eng_Global->inventoryPlayer1.patchCounts[4]--;
+        if (Eng_Global->inventoryPlayer1.patchCounts[4] <= 0) depleted = true;
         Time.timeScale = REFLEX_TIME_SCALE;
         if (!(Eng_Global->instances[PLAYER1].patchActive & PATCH_REFLEX)) Eng_Global->instances[PLAYER1].patchActive |= PATCH_REFLEX;
         if (reflexFinishedTime > Time.realtimeSinceStartup ) {
@@ -101,32 +101,32 @@ void ActivatePatch(int index) { // Expects the usableItems index
         break;
     case 19:
         // Sight Patch
-        inventoryPlayer1.patchCounts[1]--;
-        if (inventoryPlayer1.patchCounts[1] <= 0) depleted = true;
+        Eng_Global->inventoryPlayer1.patchCounts[1]--;
+        if (Eng_Global->inventoryPlayer1.patchCounts[1] <= 0) depleted = true;
         sightLight.enabled = true; // enable vision enhancement
         sightSideEffectFinishedTime = -1.0f;  // reset side effect timer from previous patch
         sightDimming.enabled = false; // deactivate side effect from previous patch
         if (!(Eng_Global->instances[PLAYER1].patchActive & PATCH_SIGHT)) Eng_Global->instances[PLAYER1].patchActive |= PATCH_SIGHT;
-        if (sightFinishedTime > Sys_Global.pauseRelativeTime) sightFinishedTime += SIGHT_TIME; // sight effect stacks
-        else                                                  sightFinishedTime = Sys_Global.pauseRelativeTime + SIGHT_TIME;
+        if (sightFinishedTime > Eng_Global->pauseRelativeTime) sightFinishedTime += SIGHT_TIME; // sight effect stacks
+        else                                                  sightFinishedTime = Eng_Global->pauseRelativeTime + SIGHT_TIME;
         break;
     case 20:
         // Staminup Patch
-        inventoryPlayer1.patchCounts[0]--;
-        if (inventoryPlayer1.patchCounts[0] <= 0) depleted = true;
+        Eng_Global->inventoryPlayer1.patchCounts[0]--;
+        if (Eng_Global->inventoryPlayer1.patchCounts[0] <= 0) depleted = true;
         Eng_Global->instances[PLAYER1].staminupActive = true;
         if (!(Eng_Global->instances[PLAYER1].patchActive & PATCH_STAMINUP)) Eng_Global->instances[PLAYER1].patchActive |= PATCH_STAMINUP;
-        if (staminupFinishedTime > Sys_Global.pauseRelativeTime) {
+        if (staminupFinishedTime > Eng_Global->pauseRelativeTime) {
             staminupFinishedTime += STAMINUP_TIME; // staminup effect stacks
         } else {
-            staminupFinishedTime = Sys_Global.pauseRelativeTime + STAMINUP_TIME;
+            staminupFinishedTime = Eng_Global->pauseRelativeTime + STAMINUP_TIME;
         }
 
         break;
     }
 
     if (depleted) {
-        inventoryPlayer1.PatchCycleDown(false);
+        Eng_Global->inventoryPlayer1.PatchCycleDown(false);
         CenterStatusPrint("%s%s%s",Sys_Text.stringTable[590],Sys_Text.stringTable[index + 326],Sys_Text.stringTable[589]);
     } else {
         CenterStatusPrint("%s%s",Sys_Text.stringTable[index + 326],Sys_Text.stringTable[589]);
@@ -146,7 +146,7 @@ void ButtonSwitchUseTargets () { // TODO
 //         if (Eng_Global->instances[i].entflags & ENTFLAG_BLINK_TEX_ON_ACTIVE) {
 //             ToggleMaterial();
 //             if (Eng_Global->instances[i].entflags & ENTFLAG_ACTIVE)
-//                 Eng_Global->instances[i].tickFinished = Sys_Global.pauseRelativeTime + tickTime;
+//                 Eng_Global->instances[i].tickFinished = Eng_Global->pauseRelativeTime + tickTime;
 //         } else {
 //             ToggleMaterial(); TODO
 //         }
@@ -161,7 +161,7 @@ void ButtonSwitchUseTargets () { // TODO
 }
 
 void ButtonSwitchUse(uint16_t i, UseData ud) {
-    if (Eng_Cheats->superoverride || Sys_Global.difficultyMission == 0) {
+    if (Eng_Cheats->superoverride || Eng_Global->difficultyMission == 0) {
         Eng_Global->instances[i].locked = false; // SHODAN can go anywhere!  Full security override!
     } else if (GetCurrentLevelSecurity() > Eng_Global->instances[i].securityThreshhold) {
 //         BlockedBySecurity(Eng_Global->instances[i].position); TODO
@@ -177,20 +177,20 @@ void ButtonSwitchUse(uint16_t i, UseData ud) {
     // Set playerCamera to owner of the input (always should be the camera)
     Utils.PlayOneShotSavable(SFXSource,sounds[SFXIndex]);
     CenterStatusPrint("%s",Sys_Text.stringTable[messageIndex]);
-    if (Eng_Global->instances[i].delay > 0.0f) Eng_Global->instances[i].delayFinished = Sys_Global.pauseRelativeTime + Eng_Global->instances[i].delay;
+    if (Eng_Global->instances[i].delay > 0.0f) Eng_Global->instances[i].delayFinished = Eng_Global->pauseRelativeTime + Eng_Global->instances[i].delay;
     else ButtonSwitchUseTargets();
 }
 
 // Check for envirosuit and apply reduction based on version
 bool EnvirosuitApply() {
     radAdjust = 0.0f;
-    if (!inventoryPlayer1.hasHardware[8]) return false;
+    if (!Eng_Global->inventoryPlayer1.hasHardware[8]) return false;
     if (PlayerEnergy.a.energy <= 0) return false;
 
     float enerTake = 0.0f;
     float frac = 0.12f;
     float energCost = 0.11f;
-    switch (inventoryPlayer1.hardwareVersion[8]) {
+    switch (Eng_Global->inventoryPlayer1.hardwareVersion[8]) {
         case 1: frac = 0.17f; energCost = 0.25f; break;
         case 2: frac = 0.15f; energCost = 0.16f; break;
         case 3: frac = 0.12f; energCost = 0.11f; break;
@@ -238,18 +238,18 @@ void DoorUse (UseData ud) {
     if (ud.owner == null) return;
     if (GetCurrentLevelSecurity() > securityThreshhold) { Sys_UI.BlockedBySecurity(Eng_Global->instances[i].position); return; }
 
-    if (Eng_Cheats->superoverride || Sys_Global.difficultyMission <= 0) { // SHODAN can go anywhere!  Full security override!
+    if (Eng_Cheats->superoverride || Eng_Global->difficultyMission <= 0) { // SHODAN can go anywhere!  Full security override!
         locked = false;
         requiredAccessCard = AccessCardType_None;
         accessCardUsedByPlayer = true;
     }
 
-    if (Sys_Global.difficultyMission <= 1) { requiredAccessCard = AccessCardType_None; accessCardUsedByPlayer = true; }
-    if (useFinished >= Sys_Global.pauseRelativeTime) return;
+    if (Eng_Global->difficultyMission <= 1) { requiredAccessCard = AccessCardType_None; accessCardUsedByPlayer = true; }
+    if (useFinished >= Eng_Global->pauseRelativeTime) return;
 
-    useFinished = Sys_Global.pauseRelativeTime + useTimeDelay;	
+    useFinished = Eng_Global->pauseRelativeTime + useTimeDelay;	
     if (requiredAccessCard == AccessCardType_None
-        || inventoryPlayer1.HasAccessCard(requiredAccessCard)
+        || Eng_Global->inventoryPlayer1.HasAccessCard(requiredAccessCard)
         || accessCardUsedByPlayer) {
 
         if (!locked) {

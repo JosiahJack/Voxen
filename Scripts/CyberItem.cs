@@ -20,7 +20,7 @@ public class CyberItem : MonoBehaviour {
 			PlayerMovement pm = other.gameObject.GetComponent<PlayerMovement>();
 			if (pm == null) return;
 
-			if (!inventoryPlayer1.AddSoftwareItem(type,version)) return;
+			if (!Eng_Global->inventoryPlayer1.AddSoftwareItem(type,version)) return;
 
 			explosionEffect = null;
 			explosionEffect = Const.a.GetObjectFromPool(PoolType.CyberDissolve);

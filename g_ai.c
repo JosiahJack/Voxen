@@ -200,8 +200,8 @@ bool HasHealth(uint16_t i) {
         if (healthManager.linkedOverlay != null) {
             if (!IsCyberNPC()
                 //&& healthManager.health > 0 // Only health, not cyber.
-                && inventoryPlayer1.hasHardware[1]
-                && inventoryPlayer1.NavUnitVersion() > 1) {
+                && Eng_Global->inventoryPlayer1.hasHardware[1]
+                && Eng_Global->inventoryPlayer1.NavUnitVersion() > 1) {
 
                 healthManager.UpdateLinkedOverlay();
             } else {
@@ -1121,8 +1121,8 @@ bool HasHealth(uint16_t i) {
 
 		switch (att_type) {
 			case AttackType.Melee:				ProjectileRaycast(ind); break;
-			case AttackType.Projectile:			ProjectileRaycast(ind); fogFac += 1; break;
-			case AttackType.ProjectileLaunched:	ProjectileLaunched(ind); fogFac += 1; break;
+			case AttackType.Projectile:			ProjectileRaycast(ind); Eng_Global->fogFac += 1; break;
+			case AttackType.ProjectileLaunched:	ProjectileLaunched(ind); Eng_Global->fogFac += 1; break;
 		}
 	}
 
@@ -1171,7 +1171,7 @@ bool HasHealth(uint16_t i) {
 	// Typically used for secondary projectile or grenade attack
 	void Attack3() {
 		if (Const.a.explodeOnAttack3[index]) {
-			fogFac += 5;
+			Eng_Global->fogFac += 5;
 			ExplodeAttack(3);
 			return;  // No time check, this is only done once without delay.
 					 // We are dead now so exit on out.
@@ -1409,7 +1409,7 @@ bool HasHealth(uint16_t i) {
 					if (dr != null) {
 						if ((dr.doorOpen == DoorState_Closed || (dr.doorOpen == DoorState_Closing && Eng_Global->difficultyCombat > 2))
 							&& !dr.locked && (LevelManager.a.GetCurrentLevelSecurity() <= dr.securityThreshhold)
-							&& (dr.requiredAccessCard == AccessCardType_None || dr.accessCardUsedByPlayer || inventoryPlayer1.HasAccessCard(dr.requiredAccessCard))) {
+							&& (dr.requiredAccessCard == AccessCardType_None || dr.accessCardUsedByPlayer || Eng_Global->inventoryPlayer1.HasAccessCard(dr.requiredAccessCard))) {
 						
 							dr.DoorActuate();
 						}

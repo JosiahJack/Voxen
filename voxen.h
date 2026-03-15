@@ -10,6 +10,7 @@
 #endif
 
 #include "common.h"
+#include "interop.h"
 #define SetMemoryToValueForNBytes __builtin_memset
 #define CopyMemoryFromBtoAForNBytes __builtin_memcpy
 #define MAX_KEYS 512
@@ -37,22 +38,6 @@ typedef struct {
 } InputSystem;
 extern InputSystem Sys_Input;
 
-typedef struct {
-	uint32_t globalFrameNum;
-	double cpuTime;
-    double thisFrameTime;
-    double cpuFrameTime;
-	double lastFrameSecCountTime;
-	uint32_t lastFrameSecCount;
-	uint32_t framesPerLastSecond;
-	uint32_t worstFPS;
-	Vector3 debugLine_start;
-	Vector3 debugLine_end;
-	double debugLineFinished;
-	uint32_t debugLineVertCount;
-} DiagnosticsSystem;
-extern DiagnosticsSystem Sys_Dx;
-
 #define LIGHT_COUNT 2048 // MAX CITADEL LIGHT COUNT is 1561 for Level 7, leaves room for dynamic lights from projectiles
 #define MAX_SHADOWMAPS 128u
 #define SHADOW_MAP_SIZE 128u
@@ -67,11 +52,6 @@ typedef struct {
 } VoxenShadowSystem;
 extern VoxenShadowSystem voxen_Shadow_System;
 
-#define SOUNDS_COUNT 670
-#define TEXT_DATA_FILEBUFFER_SIZE 65536 // 16 pages
-#define TEXT_STRING_COUNT 1100
-#define TEXT_LOCALIZATION_MAX_LENGTH 1280
-#define TEXT_LOGS_COUNT 134
 typedef struct {	
 	uint8_t file_data[TEXT_DATA_FILEBUFFER_SIZE]; // Found that only 59430 were needed at one point, padded for safety and typo fixes
 	char stringTable[TEXT_STRING_COUNT][TEXT_LOCALIZATION_MAX_LENGTH]; // Hefty table for localization support.
@@ -129,141 +109,6 @@ static const uint8_t MenuPages_Save = 6;
 static const uint8_t MenuPages_IntroVideo = 7;
 static const uint8_t MenuPages_CreditsVideo = 8;
 void MenuGoBack(void);
-
-#define PATCH_BERSERK   1
-#define PATCH_DETOX     2
-#define PATCH_GENIUS    4
-#define PATCH_MEDI      8
-#define PATCH_REFLEX   16
-#define PATCH_SIGHT    32
-#define PATCH_STAMINUP 64
-#define BERSERK_TIME  20.0
-#define DETOX_TIME    60.0
-#define GENIUS_TIME  180.0
-#define MEDI_TIME     35.0
-#define REFLEX_TIME  155.0
-#define SIGHT_TIME    40.0
-#define STAMINUP_TIME 60.0
-#define SIGHT_SIDE_EFFECT_TIME 17.0
-#define REFLEX_TIME_SCALE 0.25
-#define DEFAULT_TIME_SCALE 1.0
-#define BERSERK_DAMAGE_MULTIPLIER 4.0f // Quad Damage!
-#define NITRO_MIN_TIME     1.0
-#define NITRO_MAX_TIME    60.0
-#define NITRO_DEFAULT_TIME 7.0
-#define EARTH_SHAKER_MIN_TIME      4.0
-#define EARTH_SHAKER_MAX_TIME     60.0
-#define EARTH_SHAKER_DEFAULT_TIME 10.0
-#define GLOBAL_SHAKE_DISTANCE 0.3f
-#define GLOBAL_SHAKE_FORCE    1.0f
-#define HW_COUNT 14
-#define HW_SYS    1 // System Analyzer
-#define HW_NAV    2 // Navigation Unit
-#define HW_ERD    4 // Datareader/EReader
-#define HW_SNS    8 // Sensaround
-#define HW_TID   16 // Target Identifier
-#define HW_SHD   32 // Energy Shield
-#define HW_BIO   64 // Biomonitor
-#define HW_LAN  128 // Head Mounted Lantern
-#define HW_ENV  256 // Envirosuit
-#define HW_BST  512 // Turbo Motion Booster
-#define HW_JET 1024 // Jump Jet Boots
-#define HW_INF 2048 // Infrared Night Sight Enhancement
-#define HW_SYS_IDX    0 // System Analyzer
-#define HW_NAV_IDX    1 // Navigation Unit
-#define HW_ERD_IDX    2 // Datareader/EReader
-#define HW_SNS_IDX    3 // Sensaround
-#define HW_TID_IDX    4 // Target Identifier
-#define HW_SHD_IDX    5 // Energy Shield
-#define HW_BIO_IDX    6 // Biomonitor
-#define HW_LAN_IDX    7 // Head Mounted Lantern
-#define HW_ENV_IDX    8 // Envirosuit
-#define HW_BST_IDX    9 // Turbo Motion Booster
-#define HW_JET_IDX   10 // Jump Jet Boots
-#define HW_INF_IDX   11 // Infrared Night Sight Enhancement
-
-#define SW_DRILL  0
-#define SW_PULSER 1
-#define SW_SHIELD 2
-#define SW_TURBO  3
-#define SW_DECOY  4
-#define SW_RECALL 5
-#define SW_GAMES  6
-
-#define MINIGAME_PING        1
-#define MINIGAME_15          2
-#define MINIGAME_WING0       4
-#define MINIGAME_BOTBOUNCE   8
-#define MINIGAME_EEL_ZAPPER 16
-#define MINIGAME_ROAD       32
-#define MINIGAME_TRIOPTOE   64
-
-// Hw referenceIndex, ref14Index
-// Sys 21,0
-// Nav 22,1
-// Ere 23,2
-// Sen 24,3
-// Trg 25,4
-// Shi 26,5
-// Bio 27,6
-// Lan 28,7
-// Env 29,8
-// Boo 30,9
-// Jum 31,10
-// Nig 32,11
-typedef struct {
-    uint32_t accessCardOwned;
-    uint8_t hasSoft;
-    uint8_t softVersions[7];
-    bool hasLog[134];
-    bool readLog[134];
-    uint16_t numLogsFromLevel[10];
-    int lastAddedIndex;
-	bool beepDone;
-	bool logPaused;
-    bool hasNewEmail;
-    bool hasNewNotes;
-	int emailCurrent;
-	int emailIndex;
-    uint8_t hasMinigame;
-    uint16_t hasHardware;
-    uint16_t hardwareIsActive;
-    uint8_t hardwareVersion[HW_COUNT];
-    uint8_t hardwareVersionSetting[HW_COUNT];
-    uint16_t hardwareInvReferenceIndex[HW_COUNT];
-    int hardwareInvCurrent; // Current slot in the general inventory (14 slots).
-	int hardwareInvIndex; // Current index to the item look-up table.
-	int generalInventoryIndexRef[14];
-    double nitroTimeSetting;
-    double earthShakerTimeSetting;
-    bool currentCyberItem;
-    bool isPulserNotDrill;
-    int globalLookupIndex;
-    int weaponInventoryIndices[7];
-    int weaponInventoryAmmoIndices[7];
-    double waitTilNextFire;
-    bool overloadEnabled;
-    double reloadFinished;
-    double lerpStartTime;
-    float reloadLerpValue;
-    float sparqSetting;
-    float ionSetting;
-    float blasterSetting;
-    float plasmaSetting;
-    float stungunSetting;
-    bool recoiling;
-    uint8_t lerpUp;
-    double justFired;
-	float energySliderClickedTime;
-	float cyberWeaponAttackFinished;
-	float targetY;
-    uint16_t heldObjectIndex;
-    bool holdingObject;
-    uint16_t weaponIndex;
-} InventorySystem;
-extern InventorySystem inventoryPlayer1;
-extern InventorySystem inventoryPlayer2;
-
 void PlayerInit(uint16_t i);
 void TakeEnergy(float drain);
 void GiveEnergy(float give, EnergyType type);
@@ -300,7 +145,6 @@ typedef struct {
 	int applyButtonReferenceIndex;
 	int curCenterTab;
     bool isBlocking;
-	bool mouseClickHeldOverGUI;
 	bool isRH;
 	int wep16index;
 	int tempSpriteIndex;
@@ -378,9 +222,6 @@ typedef struct {
     uint32_t capacity;
 } DataParser;
 
-ENGINE_TO_MOD void DualLog(const char* fmt, ...);
-ENGINE_TO_MOD void DualLogWarn(const char* fmt, ...);
-ENGINE_TO_MOD void DualLogError(const char* fmt, ...);
 extern const char* sounds[670];
 extern const char* audioLogs[134];
 void play_mp3(const char* path, int32_t fade_in_ms);
@@ -552,7 +393,6 @@ void SaveConfig(void);
 #define NEAR_PLANE (0.02f)
 #define FAR_PLANE_SQUARED (FAR_PLANE * FAR_PLANE)
 #define MAX_DEBUG_LINE_VERTS 8
-extern int fogFac;
 extern float fogColorR, fogColorG, fogColorB, fogBaseDensityForLevel;
 extern bool lightDirty[LIGHT_COUNT];
 #define VOXEL_COUNT 262144 // 64 * 64 * 8 * 8
@@ -588,7 +428,6 @@ void InitFontAtlasses(void);
 // ----------------------------------------------------------------------------
 // Helper Functions
 #define DOUBLE_CLICK_TIME 0.5f
-double get_time(void);
 void Screenshot(void);
 void CenterStatusPrint(const char* fmt, ...);
 void DebugRAM(const char *context);
@@ -596,13 +435,6 @@ extern uint32_t random_range_rng;
 double get_time(void);
 void AddInstance(uint16_t entIdx, uint16_t instanceIdx);
 uint32_t xs32(void);
-uint8_t random_range_u8(uint8_t a, uint8_t b);
-uint32_t random_range_u32(uint32_t a, uint32_t b);
-int32_t random_range_i32(int32_t a, int32_t b);
-float random_range(float a, float b);
-double random_rangedub(double a, double b);
-float lerp(float min, float max, float val);
-float inverse_lerp(float min, float max, float val);
 char* data_parser_trim(char* s);
 int32_t StringToInt(const char *str);
 size_t GetStringLength(const char *s);
@@ -751,9 +583,6 @@ extern uint32_t totalPaletteColors;
 extern uint16_t loadedTexturesMaxIndex;
 extern bool doubleSidedTexture[MAX_VALID_TEXTURE];
 extern bool transparentTexture[MAX_VALID_TEXTURE];
-void UpdateMusic(void);
-void PlayMenuMusic(void);
-void PlayGameMusic(void);
 
 static inline __attribute__((always_inline)) uint32_t parse_numberu32(const char* str, const char* line, uint32_t lineNum) {
     if (str == 0 || *str == '\0') { DualLogError("Invalid blank string from line[%d]: %s\n", lineNum+1, line); return 0; }
@@ -830,60 +659,4 @@ int StringFormatV(char* buffer, size_t bufferSize, const char* format, va_list a
 int StringFormat(char* buffer, size_t bufferSize, const char* format, ...);
 char* GetNextStringUpToNewlineOrEOF(char* buf, int size, long fd);
 void WeaponsUpdate(void);
-
 extern bool vmailActive;
-
-// Interop - From Mod
-#ifdef MOD_INTEROP
-    #define MOD_FUNC // This is the definition
-#else
-    #define MOD_FUNC extern // Shared declaration
-#endif
-MOD_FUNC void (*ModInit)(GlobalContext*,CheatsSystem*);
-MOD_FUNC void (*ModUpdate)(void);
-MOD_FUNC bool (*Forward)(void);
-MOD_FUNC bool (*StrafeLeft)(void);
-MOD_FUNC bool (*Backpedal)(void);
-MOD_FUNC bool (*StrafeRight)(void);
-MOD_FUNC bool (*Jump)(void);
-MOD_FUNC bool (*JumpDown)(void);
-MOD_FUNC bool (*Crouch)(void);
-MOD_FUNC bool (*Prone)(void);
-MOD_FUNC bool (*LeanLeft)(void);
-MOD_FUNC bool (*LeanRight)(void);
-MOD_FUNC bool (*Sprint)(void);
-MOD_FUNC bool (*TurnLeft)(void);
-MOD_FUNC bool (*TurnRight)(void);
-MOD_FUNC bool (*LookUp)(void);
-MOD_FUNC bool (*LookDown)(void);
-MOD_FUNC bool (*RecentLog)(void);
-MOD_FUNC bool (*Biomonitor)(void);
-MOD_FUNC bool (*Sensaround)(void);
-MOD_FUNC bool (*Lantern)(void);
-MOD_FUNC bool (*Shield)(void);
-MOD_FUNC bool (*Infrared)(void);
-MOD_FUNC bool (*Email)(void);
-MOD_FUNC bool (*Booster)(void);
-MOD_FUNC bool (*Jumpjets)(void);
-MOD_FUNC bool (*Attack)(void);
-MOD_FUNC bool (*Use)(void);
-MOD_FUNC bool (*Menu)(void);
-MOD_FUNC bool (*ToggleMode)(void);
-MOD_FUNC bool (*Reload)(void);
-MOD_FUNC bool (*WeaponCycUp)(void);
-MOD_FUNC bool (*WeaponCycDown)(void);
-MOD_FUNC bool (*Grenade)(void);
-MOD_FUNC bool (*GrenadeCycUp)(void);
-MOD_FUNC bool (*GrenadeCycDown)(void);
-MOD_FUNC bool (*ChangeAmmoType)(void);
-MOD_FUNC bool (*Patch)(void);
-MOD_FUNC bool (*PatchCycUp)(void);
-MOD_FUNC bool (*PatchCycDown)(void);
-MOD_FUNC bool (*Map)(void);
-MOD_FUNC bool (*SwimUp)(void);
-MOD_FUNC bool (*SwimDn)(void);
-MOD_FUNC bool (*ChangeAmmoType)(void);
-MOD_FUNC bool (*Console)(void);
-MOD_FUNC float (*GetBasePlayerSpeed)(bool running);
-MOD_FUNC void (*InitializeAIAfterLoad)(uint16_t i);
-MOD_FUNC bool (*TakeScreenshot)(void);

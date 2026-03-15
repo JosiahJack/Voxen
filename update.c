@@ -2,19 +2,19 @@
 #include "voxen.h"
 
 void ButtonSwitchUpdate(void) {
-    if ((SELF.delayFinished < Sys_Global.pauseRelativeTime) && SELF.delayFinished != 0) {
+    if ((SELF.delayFinished < Eng_Global->pauseRelativeTime) && SELF.delayFinished != 0) {
         SELF.delayFinished = 0;
 //         UseTargets(); TODO
     }
 
     if (SELF.entflags & ENTFLAG_BLINK_TEX_ON_ACTIVE) {
         if (SELF.entflags & ENTFLAG_ACTIVE) {
-            if (SELF.tickFinished < Sys_Global.pauseRelativeTime) {
+            if (SELF.tickFinished < Eng_Global->pauseRelativeTime) {
 //                 if (alternateOn) SetMaterialToAlternate(); TODO
 //                 else SetMaterialToNormal();
                 
                 SELF.alternateOn = !SELF.alternateOn;
-                SELF.tickFinished = Sys_Global.pauseRelativeTime + SELF.tickTime;
+                SELF.tickFinished = Eng_Global->pauseRelativeTime + SELF.tickTime;
             }
         }
     }
@@ -24,16 +24,16 @@ void CameraViewUpdate() {
     uint16_t instCellIdx = PosGetCellCoords(SELF.position.x, SELF.position.z);
     if (!(gridCellStates[instCellIdx] & CELL_VISIBLE)) return;
 
-    if (SELF.tickFinished < Sys_Global.current_time) {
-        SELF.tickFinished = Sys_Global.current_time + SELF.tickTime;
+    if (SELF.tickFinished < Eng_Global->current_time) {
+        SELF.tickFinished = Eng_Global->current_time + SELF.tickTime;
 //         cam.Render(); TODO
     }
 }
 
 void CodeScreenUpdate() {
-    if (SELF.tickFinished > Sys_Global.pauseRelativeTime) return;
+    if (SELF.tickFinished > Eng_Global->pauseRelativeTime) return;
     
-    SELF.tickFinished = Sys_Global.pauseRelativeTime + 0.3f;
+    SELF.tickFinished = Eng_Global->pauseRelativeTime + 0.3f;
     uint8_t matIndex = 0;
     switch (level) {
         case 1: matIndex = (Eng_Global->instances[WORLD].ioflags & QUESTBIT_LEV1_CODE_LOCKED) ? Eng_Global->instances[WORLD].lev1SecCode : (uint8_t)clamp(random_range(0.0f,10.0f),0.0f,9.0f); break;
@@ -49,7 +49,7 @@ void CodeScreenUpdate() {
 
 void FuncWallMoveToPosition(Vector3 goalPosition, FuncStates newState) {
 //     rbody.WakeUp(); TODO
-    float dist = speed * Sys_Global.deltaTime;
+    float dist = speed * Eng_Global->deltaTime;
     tempVec = (Eng_Global->instances[i].position - goalPosition).normalized; // Relative
     tempVec = (tempVec * dist * -1) + Eng_Global->instances[i].position; // Absolute
     rbody.MovePosition(tempVec);
@@ -59,7 +59,7 @@ void FuncWallMoveToPosition(Vector3 goalPosition, FuncStates newState) {
     if (float.IsNaN(percentMoved)) percentMoved = 0f;
     if (percentMoved > 1.0f) percentMoved = 1.0f;
     if (percentMoved < 0f) percentMoved = 0f;
-    if (distanceLeft <= 0.04f || startTime < Sys_Global.pauseRelativeTime) {
+    if (distanceLeft <= 0.04f || startTime < Eng_Global->pauseRelativeTime) {
         currentState = newState;
         if (SFXSource != null) {
             SFXSource.Stop ();
@@ -92,7 +92,7 @@ void FuncWallUpdate() {
 }
 
 void TargetIdentifierSenseTargets() {
-    int lev = Sys_Global.currentLevel;    
+    int lev = Eng_Global->currentLevel;    
     for (int i=0;i<loadedInstances;i++) {
         if (!ConstIndexIsNPC(Eng_Global->instances[i])) continue; // Only get NPCs.
         if (Eng_Global->instances[i].health <= 0.0f) continue; // It's dead, ignore.
@@ -106,25 +106,25 @@ void TargetIdentifierSenseTargets() {
 }
 
 void DeactivateHardwareOnEnergyDepleted() {
-    flag_set(&inventoryPlayer1.hardwareIsActive, HW_SNS, false);
-    flag_set(&inventoryPlayer1.hardwareIsActive, HW_BIO, false);
-    flag_set(&inventoryPlayer1.hardwareIsActive, HW_SHD, false);
-    flag_set(&inventoryPlayer1.hardwareIsActive, HW_LAN, false);
-    flag_set(&inventoryPlayer1.hardwareIsActive, HW_BST, false);
-    flag_set(&inventoryPlayer1.hardwareIsActive, HW_INF, false);
-    flag_set(&inventoryPlayer1.hardwareIsActive, HW_TRC, false);
-//     inventoryPlayer1.hardwareButtonManager.SensaroundOff(); //sensaround TODO
-//     if (inventoryPlayer1.hardwareIsActive [HW_BIO] && inventoryPlayer1.hardwareVersionSetting[HW_BIO] == 0) inventoryPlayer1.hardwareButtonManager.BioOff(); // biomonitor, but only on v1, v2 doesn't use power
-//     if (inventoryPlayer1.hardwareIsActive [HW_SHD]) inventoryPlayer1.hardwareButtonManager.ShieldOffWithEffects(); // shield
-//     if (inventoryPlayer1.hardwareIsActive [HW_LAN]) inventoryPlayer1.hardwareButtonManager.LanternOff(); // lantern
-//     if (inventoryPlayer1.hardwareIsActive [HW_BST]) inventoryPlayer1.hardwareButtonManager.BoosterOff(); // turbo motion booster
-//     if (inventoryPlayer1.hardwareIsActive [HW_INF]) inventoryPlayer1.hardwareButtonManager.InfraredOff(); // infrared
+    flag_set(&Eng_Global->inventoryPlayer1.hardwareIsActive, HW_SNS, false);
+    flag_set(&Eng_Global->inventoryPlayer1.hardwareIsActive, HW_BIO, false);
+    flag_set(&Eng_Global->inventoryPlayer1.hardwareIsActive, HW_SHD, false);
+    flag_set(&Eng_Global->inventoryPlayer1.hardwareIsActive, HW_LAN, false);
+    flag_set(&Eng_Global->inventoryPlayer1.hardwareIsActive, HW_BST, false);
+    flag_set(&Eng_Global->inventoryPlayer1.hardwareIsActive, HW_INF, false);
+    flag_set(&Eng_Global->inventoryPlayer1.hardwareIsActive, HW_TRC, false);
+//     Eng_Global->inventoryPlayer1.hardwareButtonManager.SensaroundOff(); //sensaround TODO
+//     if (Eng_Global->inventoryPlayer1.hardwareIsActive [HW_BIO] && Eng_Global->inventoryPlayer1.hardwareVersionSetting[HW_BIO] == 0) Eng_Global->inventoryPlayer1.hardwareButtonManager.BioOff(); // biomonitor, but only on v1, v2 doesn't use power
+//     if (Eng_Global->inventoryPlayer1.hardwareIsActive [HW_SHD]) Eng_Global->inventoryPlayer1.hardwareButtonManager.ShieldOffWithEffects(); // shield
+//     if (Eng_Global->inventoryPlayer1.hardwareIsActive [HW_LAN]) Eng_Global->inventoryPlayer1.hardwareButtonManager.LanternOff(); // lantern
+//     if (Eng_Global->inventoryPlayer1.hardwareIsActive [HW_BST]) Eng_Global->inventoryPlayer1.hardwareButtonManager.BoosterOff(); // turbo motion booster
+//     if (Eng_Global->inventoryPlayer1.hardwareIsActive [HW_INF]) Eng_Global->inventoryPlayer1.hardwareButtonManager.InfraredOff(); // infrared
 }
 
 void TakeEnergy(float drain) {
     float was = energy;
     if (energy <= 0.0f || drain <= 0.0f) return;
-    if (inventoryPlayer1.redbull) return; // No energy drain!
+    if (Eng_Global->inventoryPlayer1.redbull) return; // No energy drain!
 
     energy -= drain;
     if (energy <= 0.0f) {
@@ -145,10 +145,10 @@ void GiveEnergy(float give, EnergyType type) {
 void PlayerEnergyUpdate() {
     float drain = 1.0f;
     bool activeEnergyDrainers = false;
-    if (Eng_Global->instances[PLAYER1].energyDrainTickFinished < Sys_Global.pauseRelativeTime) {
+    if (Eng_Global->instances[PLAYER1].energyDrainTickFinished < Eng_Global->pauseRelativeTime) {
         uint16_t drainJPM = 0u;
-        if (inventoryPlayer1.hardwareIsActive & HW_SNS) {
-            switch (inventoryPlayer1.hardwareVersion[HW_SNS_IDX]) {
+        if (Eng_Global->inventoryPlayer1.hardwareIsActive & HW_SNS) {
+            switch (Eng_Global->inventoryPlayer1.hardwareVersion[HW_SNS_IDX]) {
                 case 0: drain = 0.01535f; drainJPM += 9; break; // takes about 300s to drain full energy
                 case 1: drain = 0.03413f; drainJPM += 20; break; // takes about 300s to drain full energy
                 case 2: drain = 0.02559f; drainJPM += 15; break; // takes about 240s to drain full energy
@@ -157,9 +157,9 @@ void PlayerEnergyUpdate() {
             TakeEnergy(drain);
         }
 
-        if (inventoryPlayer1.hasHardware & HW_TID) TargetIdentifierSenseTargets();
-        if (inventoryPlayer1.hardwareIsActive & HW_SHd) {
-            switch (inventoryPlayer1.hardwareVersionSetting[HW_SHD_IDX]) {
+        if (Eng_Global->inventoryPlayer1.hasHardware & HW_TID) TargetIdentifierSenseTargets();
+        if (Eng_Global->inventoryPlayer1.hardwareIsActive & HW_SHd) {
+            switch (Eng_Global->inventoryPlayer1.hardwareVersionSetting[HW_SHD_IDX]) {
                 case 0: drain = 0.04096f; drainJPM += 24; break;
                 case 1: drain = 0.10239f; drainJPM += 60; break;
                 case 2: drain = 0.17919f; drainJPM += 105; break;
@@ -170,8 +170,8 @@ void PlayerEnergyUpdate() {
         }
 
        
-        if (inventoryPlayer1.hardwareIsActive & HW_BIO) {
-            switch (inventoryPlayer1.hardwareVersionSetting[HW_BIO]) {
+        if (Eng_Global->inventoryPlayer1.hardwareIsActive & HW_BIO) {
+            switch (Eng_Global->inventoryPlayer1.hardwareVersionSetting[HW_BIO]) {
                 case 0: drain = 0.001706f; drainJPM += 1;  activeEnergyDrainers = true; break;
                 case 1: drain = 0; break; // doesn't take energy
             }
@@ -179,8 +179,8 @@ void PlayerEnergyUpdate() {
         }
 
         // 7 = Head Mounted Lantern
-        if (inventoryPlayer1.hardwareIsActive & HW_LAN) {
-            switch (inventoryPlayer1.hardwareVersionSetting[HW_LAN_IDX]) {
+        if (Eng_Global->inventoryPlayer1.hardwareIsActive & HW_LAN) {
+            switch (Eng_Global->inventoryPlayer1.hardwareVersionSetting[HW_LAN_IDX]) {
                 case 0: tempF = 0.02559f; drainJPM += 15; break;// takes about 180s to drain full energy
                 case 1: tempF = 0.04266f; drainJPM += 25; break; // takes about 120s to drain full energy
                 case 2: tempF = 0.05119f; drainJPM += 30; break; // takes about 90s to drain full energy
@@ -192,8 +192,8 @@ void PlayerEnergyUpdate() {
         // 8 Envirosuit - handled by HealthManager for radiation checks
 
         // 9 = Turbo Motion Booster - done in PlayerMovement since we only use energy on boost, no drain with skates
-        if (inventoryPlayer1.hardwareIsActive & HW_BST) {
-            switch (inventoryPlayer1.hardwareVersionSetting[HW_BST_IDX]) {
+        if (Eng_Global->inventoryPlayer1.hardwareIsActive & HW_BST) {
+            switch (Eng_Global->inventoryPlayer1.hardwareVersionSetting[HW_BST_IDX]) {
                 case 0: tempF = 0f; break;
                 case 1: tempF = 0.02f; drainJPM += 16; break; // takes about 120s to drain full energy
                 case 2: tempF = 0.015f; drainJPM += 12; break; // takes about 90s to drain full energy
@@ -205,13 +205,13 @@ void PlayerEnergyUpdate() {
         // 10 Jump Jet Boots - done in PlayerMovement since we only drain while jumping
 
         // 11 Drain nightsight
-        if (inventoryPlayer1.hardwareIsActive & HW_INF) {
+        if (Eng_Global->inventoryPlayer1.hardwareIsActive & HW_INF) {
             tempF = 0.08533f; drainJPM += 50; // takes about 120s to drain full energy
             activeEnergyDrainers = true;
             TakeEnergy(tempF);
         }
         
-        Eng_Global->instances[PLAYER1].energyDrainTickFinished = Sys_Global.pauseRelativeTime + 0.1f;
+        Eng_Global->instances[PLAYER1].energyDrainTickFinished = Eng_Global->pauseRelativeTime + 0.1f;
     }
     
     // Turn everything off when we are out of energy
@@ -237,24 +237,24 @@ void HardwareButtonsUpdate() { // TODO
 //     if (hwb.buttons[5].gameObject.activeSelf) {
 //         bool foundsome = false;
 //         for (int i=0;i<hwb.ecbm.mmLBs.Length;i++) {
-//             if (inventoryPlayer1.hasLog[hwb.ecbm.mmLBs[i].logReferenceIndex] && !inventoryPlayer1.readLog[hwb.ecbm.mmLBs[i].logReferenceIndex]) foundsome = true;
+//             if (Eng_Global->inventoryPlayer1.hasLog[hwb.ecbm.mmLBs[i].logReferenceIndex] && !Eng_Global->inventoryPlayer1.readLog[hwb.ecbm.mmLBs[i].logReferenceIndex]) foundsome = true;
 //         }
 // 
 //         if (foundsome) {
 //             // You've got mail!
-//             if (blinkFinished < Sys_Global.pauseRelativeTime) {
-//                 blinkFinished = 1.0f + Sys_Global.pauseRelativeTime;
-//                 inventoryPlayer1.hardwareIsActive[2] = !inventoryPlayer1.hardwareIsActive[2];
-//                 if (inventoryPlayer1.hardwareIsActive[2]) {
+//             if (blinkFinished < Eng_Global->pauseRelativeTime) {
+//                 blinkFinished = 1.0f + Eng_Global->pauseRelativeTime;
+//                 Eng_Global->inventoryPlayer1.hardwareIsActive[2] = !Eng_Global->inventoryPlayer1.hardwareIsActive[2];
+//                 if (Eng_Global->inventoryPlayer1.hardwareIsActive[2]) {
 //                     hwb.buttons[5].image.overrideSprite = hwb.buttonActive1[5];
 //                 } else {
 //                     hwb.buttons[5].image.overrideSprite = hwb.buttonDeactive[5];
 //                 }
 //             }
-//             if (beepFinished < Sys_Global.pauseRelativeTime && inventoryPlayer1.beepDone) {
-//                 beepFinished = 3.0f + Sys_Global.pauseRelativeTime;
+//             if (beepFinished < Eng_Global->pauseRelativeTime && Eng_Global->inventoryPlayer1.beepDone) {
+//                 beepFinished = 3.0f + Eng_Global->pauseRelativeTime;
 //                 beepCount++;
-//                 if (beepCount >= 3) { inventoryPlayer1.beepDone = false; beepCount = 0; } // Reset beeping, notification done.
+//                 if (beepCount >= 3) { Eng_Global->inventoryPlayer1.beepDone = false; beepCount = 0; } // Reset beeping, notification done.
 //                 Utils.PlayOneShotSavable(hwb.SFX,sounds[83]); // emailalert, GO active handled by guard clause.
 //             }
 //         } else {
@@ -265,7 +265,7 @@ void HardwareButtonsUpdate() { // TODO
 
 void LogReaderUpdate() {
     if (!Sys_UI.logActive) return;
-    if (Sys_UI.logFinished >= Sys_Global.pauseRelativeTime) return;
+    if (Sys_UI.logFinished >= Eng_Global->pauseRelativeTime) return;
     if (Sys_UI.logType == AudioLogType.Papers) return;
     if (Sys_UI.logType == AudioLogType.TextOnly) return;
     if (Sys_UI.logType == AudioLogType.Vmail) return;
@@ -295,7 +295,7 @@ void MFDUpdate() {
     lastHealth = Eng_Global->instances[PLAYER1].health;
     WeaponButtonsManagerUpdate();
     UpdateAmmoAndLoadButtons();
-    switch (inventoryPlayer1.weaponCurrent) {
+    switch (Eng_Global->inventoryPlayer1.weaponCurrent) {
         case 37: ShowEnergyItems(); break;
         case 40: ShowEnergyItems(); break;
         case 46: ShowEnergyItems(); break;
@@ -321,7 +321,7 @@ void MFDUpdate() {
             ResetMultiMediaTabs();
             Utils.PlayUIOneShotSavable(97);
             CenterTabButtonClickSilent(0,true);
-            if (inventoryPlayer1.hardwareIsActive[3]) {
+            if (Eng_Global->inventoryPlayer1.hardwareIsActive[3]) {
                 hwb.SensaroundOff();
                 Utils.PlayUIOneShotSavable(82); // deactivate
             }
@@ -340,7 +340,7 @@ void MFDUpdate() {
             ResetMultiMediaTabs();
             Utils.PlayUIOneShotSavable(97);
             CenterTabButtonClickSilent(0,true);
-            if (inventoryPlayer1.hardwareIsActive[3]) {
+            if (Eng_Global->inventoryPlayer1.hardwareIsActive[3]) {
                 hwb.SensaroundOff();
                 Utils.PlayUIOneShotSavable(82); // deactivate
             }
@@ -390,11 +390,11 @@ void MFDUpdate() {
     }
 
     // Update the weapon icon
-//     wep16index = WeaponFire.Get16WeaponIndexFromConstIndex(inventoryPlayer1.weaponIndex); TODO
+//     wep16index = WeaponFire.Get16WeaponIndexFromConstIndex(Eng_Global->inventoryPlayer1.weaponIndex); TODO
 //     if (wep16index >=0 && wep16index < 16) {
 //         if (leftTC.TabManager.WeaponTab.activeInHierarchy) {
 //             iconLH.overrideSprite = wepIcons[wep16index];
-//             if (inventoryPlayer1.numweapons <= 0 || inventoryPlayer1.weaponCurrentPending >= 0) {
+//             if (Eng_Global->inventoryPlayer1.numweapons <= 0 || Eng_Global->inventoryPlayer1.weaponCurrentPending >= 0) {
 //                 Utils.DisableImage(iconLH);
 //             } else {
 //                 Utils.EnableImage(iconLH);
@@ -403,7 +403,7 @@ void MFDUpdate() {
 // 
 //         if (rightTC.TabManager.WeaponTab.activeInHierarchy) {
 //             iconRH.overrideSprite = wepIcons[wep16index];
-//             if (inventoryPlayer1.numweapons <= 0 || inventoryPlayer1.weaponCurrentPending >= 0) {
+//             if (Eng_Global->inventoryPlayer1.numweapons <= 0 || Eng_Global->inventoryPlayer1.weaponCurrentPending >= 0) {
 //                 Utils.DisableImage(iconRH);
 //             } else {
 //                 Utils.EnableImage(iconRH);
@@ -426,7 +426,7 @@ void PlayerRessurect() {
 }
 
 void PlayerDeathToMenu() {
-    Sys_Global.mainMenu = true;
+    Eng_Global->mainMenu = true;
 //     returnToPause = false;
 //     MainMenuGoToFrontPage(); TODO
 //     MainMenuPlayDeathVideo(); TODO
@@ -444,12 +444,12 @@ void PlayerDead() {
     if (SELF.heldObjectIndex != -1) { DropHeldItem(); ForceInventoryMode(); }	
 
 //     hm.ClearOverlays(); TODO
-//     if (LevelManager.a.ressurectionActive[Sys_Global.currentLevel]) PlayerRessurect(); // Ressurection TODO
+//     if (LevelManager.a.ressurectionActive[Eng_Global->currentLevel]) PlayerRessurect(); // Ressurection TODO
 //     else                                                            PlayerDeathToMenu(); // Game Over TODO
 }
 
 void PlayerHealthUpdate() {
-    if (noiseFinished < Sys_Global.pauseRelativeTime) makingNoise = false;
+    if (noiseFinished < Eng_Global->pauseRelativeTime) makingNoise = false;
     if (SELF.health <= 0.0f) {
         if (!SELF.playerDead) PlayerDying();
         else PlayerDead();
@@ -458,10 +458,10 @@ void PlayerHealthUpdate() {
 
     if (SELF.patchActive & PATCH_MEDI) {
         if (SELF.mediPatchPulseFinished == 0) SELF.mediPatchPulseCount = 0;
-        if (SELF.mediPatchPulseFinished < Sys_Global.pauseRelativeTime) {
+        if (SELF.mediPatchPulseFinished < Eng_Global->pauseRelativeTime) {
 //             hm.HealingBed(8.0f,false); TODO
 //             Sys_UI.DrawTicks(true); TODO
-            SELF.mediPatchPulseFinished = Sys_Global.pauseRelativeTime + (0.5f + (mediPatchPulseCount * 0.5f));
+            SELF.mediPatchPulseFinished = Eng_Global->pauseRelativeTime + (0.5f + (mediPatchPulseCount * 0.5f));
             SELF.mediPatchPulseCount++;
         }
     } else {
@@ -472,35 +472,35 @@ void PlayerHealthUpdate() {
     if (radiated > 1.0f) {
         if (radiationArea) SELF.twm.SendWarning((Sys_Text.stringTable[184]),0.1f,-2,HUDColor.White,322); // radiationAreaWarningID
         if (!EnvirosuitApply()) SELF.twm.SendWarning((Sys_Text.stringTable[185] + radiated.ToString() +Sys_Text.stringTable[186]), 0.1f,-2,HUDColor.Red, 323); // radiationAmountWarningID Radiation poisoning ##LBP
-        if (radFXFinished < Sys_Global.pauseRelativeTime) {
+        if (radFXFinished < Eng_Global->pauseRelativeTime) {
             radiationEffect.SetActive(true);
             float minT = 0.5f;
             if (radiated > 50.0f) minT = 0.25f;
-            radFXFinished = Sys_Global.pauseRelativeTime + random_range(minT,1.0f);
+            radFXFinished = Eng_Global->pauseRelativeTime + random_range(minT,1.0f);
         }
     } else {
         radiationArea = false;
         if (radiated < 0) radiated = 0;
     }
 
-    if (radiationBleedOffFinished < Sys_Global.pauseRelativeTime) {
+    if (radiationBleedOffFinished < Eng_Global->pauseRelativeTime) {
         if (!radiationArea) radiated -= 1.0f;  // Bleed off the radiation over time.
         if (radiated < 0) radiated = 0;
-        radiationBleedOffFinished = Sys_Global.pauseRelativeTime + 1.8f;
+        radiationBleedOffFinished = Eng_Global->pauseRelativeTime + 1.8f;
         if (radiated > 0) {
             if (!hm.god) {
                 hm.health -= radiated * 0.1f; // Apply health at rate of bleedoff time.
                 Sys_UI.DrawTicks(true);
             }
-            if (radSoundFinished < Sys_Global.pauseRelativeTime) {
-                radSoundFinished = Sys_Global.pauseRelativeTime + random_range(1f,3f);
+            if (radSoundFinished < Eng_Global->pauseRelativeTime) {
+                radSoundFinished = Eng_Global->pauseRelativeTime + random_range(1f,3f);
                 Utils.PlayUIOneShotSavable(90);
             }
         }
     }
     if (lastHealth > hm.health) { // Did we lose health?
-        if (painSoundFinished < Sys_Global.pauseRelativeTime && !(radSoundFinished < Sys_Global.pauseRelativeTime)) {
-            painSoundFinished = Sys_Global.pauseRelativeTime + random_range(0.25f,3f); // Don't spam pain sounds
+        if (painSoundFinished < Eng_Global->pauseRelativeTime && !(radSoundFinished < Eng_Global->pauseRelativeTime)) {
+            painSoundFinished = Eng_Global->pauseRelativeTime + random_range(0.25f,3f); // Don't spam pain sounds
             Utils.PlayUIOneShotSavable(140);
             PlayerHealth.a.makingNoise = true;
         }
@@ -510,11 +510,11 @@ void PlayerHealthUpdate() {
 }
 
 void ForceBridgeUpdate() {
-    if (Sys_Global.gamePaused) return;
-    if (Sys_Global.menuActive) return;
-    if (SELF.tickFinished >= Sys_Global.pauseRelativeTime) return;
+    if (Eng_Global->gamePaused) return;
+    if (Eng_Global->menuActive) return;
+    if (SELF.tickFinished >= Eng_Global->pauseRelativeTime) return;
 
-    SELF.tickFinished = Sys_Global.pauseRelativeTime + SELF.tickTime;
+    SELF.tickFinished = Eng_Global->pauseRelativeTime + SELF.tickTime;
     if (SELF.entflags & ENTFLAG_ACTIVATED) {
         if (SELF.lerping) {
             float sx = SELF.scale.x;
@@ -552,10 +552,10 @@ void ForceBridgeUpdate() {
 
 // playerPizzazz on minigames - TODO
 // void DriftUpUpdate() {
-//     if (tickFinished >= Sys_Global.pauseRelativeTime) return;
+//     if (tickFinished >= Eng_Global->pauseRelativeTime) return;
 // 
 //     float delta = (1f / 60f);
-//     tickFinished = Sys_Global.pauseRelativeTime + delta;
+//     tickFinished = Eng_Global->pauseRelativeTime + delta;
 //     float drift = Eng_Global->instances[i].position.y;
 //     drift += rate;
 //     if (drift > endY) drift = endY;

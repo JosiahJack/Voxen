@@ -209,6 +209,11 @@ typedef uint16_t Text;
 #define CREDITS_PAGES 22
 #define MAX_WAYPOINTS 32
 #define TARGET_ID_LENGTH 32 // Max needed 22 + 5 for ID + 1 for space between them = 28
+#define SOUNDS_COUNT 670
+#define TEXT_DATA_FILEBUFFER_SIZE 65536 // 16 pages
+#define TEXT_STRING_COUNT 1100
+#define TEXT_LOCALIZATION_MAX_LENGTH 1280
+#define TEXT_LOGS_COUNT 134
 
 #define LAYER_MASK_PLAYER_COLLIDESWITH ((1u << PhysicsLayer_Clip) | (1u << PhysicsLayer_NPCBullet) | (1u << PhysicsLayer_Player2) | (1u << PhysicsLayer_Door) \
 										| (1u << PhysicsLayer_Trigger) | (1u << PhysicsLayer_PlayerTriggerOnly) | (1u << PhysicsLayer_Default) | (1u << PhysicsLayer_TransparentFX) \
@@ -606,18 +611,137 @@ typedef struct {
 } CheatsSystem;
 extern CheatsSystem Sys_Cheats;
 
+#define PATCH_BERSERK   1
+#define PATCH_DETOX     2
+#define PATCH_GENIUS    4
+#define PATCH_MEDI      8
+#define PATCH_REFLEX   16
+#define PATCH_SIGHT    32
+#define PATCH_STAMINUP 64
+#define BERSERK_TIME  20.0
+#define DETOX_TIME    60.0
+#define GENIUS_TIME  180.0
+#define MEDI_TIME     35.0
+#define REFLEX_TIME  155.0
+#define SIGHT_TIME    40.0
+#define STAMINUP_TIME 60.0
+#define SIGHT_SIDE_EFFECT_TIME 17.0
+#define REFLEX_TIME_SCALE 0.25
+#define DEFAULT_TIME_SCALE 1.0
+#define BERSERK_DAMAGE_MULTIPLIER 4.0f // Quad Damage!
+#define NITRO_MIN_TIME     1.0
+#define NITRO_MAX_TIME    60.0
+#define NITRO_DEFAULT_TIME 7.0
+#define EARTH_SHAKER_MIN_TIME      4.0
+#define EARTH_SHAKER_MAX_TIME     60.0
+#define EARTH_SHAKER_DEFAULT_TIME 10.0
+#define GLOBAL_SHAKE_DISTANCE 0.3f
+#define GLOBAL_SHAKE_FORCE    1.0f
+#define HW_COUNT 14
+#define HW_SYS    1 // System Analyzer
+#define HW_NAV    2 // Navigation Unit
+#define HW_ERD    4 // Datareader/EReader
+#define HW_SNS    8 // Sensaround
+#define HW_TID   16 // Target Identifier
+#define HW_SHD   32 // Energy Shield
+#define HW_BIO   64 // Biomonitor
+#define HW_LAN  128 // Head Mounted Lantern
+#define HW_ENV  256 // Envirosuit
+#define HW_BST  512 // Turbo Motion Booster
+#define HW_JET 1024 // Jump Jet Boots
+#define HW_INF 2048 // Infrared Night Sight Enhancement
+#define HW_SYS_IDX    0 // System Analyzer
+#define HW_NAV_IDX    1 // Navigation Unit
+#define HW_ERD_IDX    2 // Datareader/EReader
+#define HW_SNS_IDX    3 // Sensaround
+#define HW_TID_IDX    4 // Target Identifier
+#define HW_SHD_IDX    5 // Energy Shield
+#define HW_BIO_IDX    6 // Biomonitor
+#define HW_LAN_IDX    7 // Head Mounted Lantern
+#define HW_ENV_IDX    8 // Envirosuit
+#define HW_BST_IDX    9 // Turbo Motion Booster
+#define HW_JET_IDX   10 // Jump Jet Boots
+#define HW_INF_IDX   11 // Infrared Night Sight Enhancement
+
+#define SW_DRILL  0
+#define SW_PULSER 1
+#define SW_SHIELD 2
+#define SW_TURBO  3
+#define SW_DECOY  4
+#define SW_RECALL 5
+#define SW_GAMES  6
+
+#define MINIGAME_PING        1
+#define MINIGAME_15          2
+#define MINIGAME_WING0       4
+#define MINIGAME_BOTBOUNCE   8
+#define MINIGAME_EEL_ZAPPER 16
+#define MINIGAME_ROAD       32
+#define MINIGAME_TRIOPTOE   64
+
+// Hw referenceIndex, ref14Index
+// Sys 21,0
+// Nav 22,1
+// Ere 23,2
+// Sen 24,3
+// Trg 25,4
+// Shi 26,5
+// Bio 27,6
+// Lan 28,7
+// Env 29,8
+// Boo 30,9
+// Jum 31,10
+// Nig 32,11
 typedef struct {
-    bool inCombat;
-    bool inZone;
-    bool twoPlaying;
-    double clipFinished;
-    double combatImpulseFinished;
-    bool distortion;
-    bool cyberTube;
-    bool elevator;
-    bool levelEntry;
-} MusicSystem;
-extern MusicSystem Sys_Music;
+    uint32_t accessCardOwned;
+    uint8_t hasSoft;
+    uint8_t softVersions[7];
+    bool hasLog[134];
+    bool readLog[134];
+    uint16_t numLogsFromLevel[10];
+    int lastAddedIndex;
+	bool beepDone;
+	bool logPaused;
+    bool hasNewEmail;
+    bool hasNewNotes;
+	int emailCurrent;
+	int emailIndex;
+    uint8_t hasMinigame;
+    uint16_t hasHardware;
+    uint16_t hardwareIsActive;
+    uint8_t hardwareVersion[HW_COUNT];
+    uint8_t hardwareVersionSetting[HW_COUNT];
+    uint16_t hardwareInvReferenceIndex[HW_COUNT];
+    int hardwareInvCurrent; // Current slot in the general inventory (14 slots).
+	int hardwareInvIndex; // Current index to the item look-up table.
+	int generalInventoryIndexRef[14];
+    double nitroTimeSetting;
+    double earthShakerTimeSetting;
+    bool currentCyberItem;
+    bool isPulserNotDrill;
+    int globalLookupIndex;
+    int weaponInventoryIndices[7];
+    int weaponInventoryAmmoIndices[7];
+    double waitTilNextFire;
+    bool overloadEnabled;
+    double reloadFinished;
+    double lerpStartTime;
+    float reloadLerpValue;
+    float sparqSetting;
+    float ionSetting;
+    float blasterSetting;
+    float plasmaSetting;
+    float stungunSetting;
+    bool recoiling;
+    uint8_t lerpUp;
+    double justFired;
+	float energySliderClickedTime;
+	float cyberWeaponAttackFinished;
+	float targetY;
+    uint16_t heldObjectIndex;
+    bool holdingObject;
+    uint16_t weaponIndex;
+} InventorySystem;
 
 typedef /*FAT*/ struct {
     uint64_t entflags;
@@ -803,7 +927,20 @@ typedef /*FAT*/ struct {
     // phew what a porker of a struct, it's been a eatin!
 } Entity;
 
+#include "miniaudio.h"
 typedef struct {
+    uint32_t globalFrameNum;
+	double cpuTime;
+    double thisFrameTime;
+    double cpuFrameTime;
+	double lastFrameSecCountTime;
+	uint32_t lastFrameSecCount;
+	uint32_t framesPerLastSecond;
+	uint32_t worstFPS;
+	Vector3 debugLine_start;
+	Vector3 debugLine_end;
+	double debugLineFinished;
+	uint32_t debugLineVertCount;
 	bool inventoryMode;
 	double last_time;
 	double last_topframe_time;
@@ -846,8 +983,16 @@ typedef struct {
     bool decoyActive;
 	char playerName[27];
     bool boosterActive;
+    int fogFac;
+    bool uiIsBlocking;
+   	bool mouseClickHeldOverGUI;
     bool (*GetKey)(int settingIndex);
     bool (*GetKeyPressed)(int settingIndex);
+    InventorySystem inventoryPlayer1;
+    InventorySystem inventoryPlayer2;
+    ma_engine audio_engine;
+    ma_sound mp3_sounds[2]; // Two for crossfading
+    int32_t mp3_slot;
     Entity instances[INSTANCE_COUNT];
 } GlobalContext;
 

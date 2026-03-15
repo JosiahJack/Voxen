@@ -258,14 +258,14 @@ public class MouseCursor : MonoBehaviour {
 			} else {
 				if (MouseLookScript.a.vmailActive) {
 					cursorImage = Const.a.useableItemsFrobIcons[108]; // vmail
-				} else if (GUIState.a.isBlocking && !inventoryPlayer1.holdingObject) {
+				} else if (GUIState.a.isBlocking && !Eng_Global->inventoryPlayer1.holdingObject) {
 					if (toolTipHasText) {
 						cursorImage = tooltipTexture;
 					} else {						
 						cursorImage = cursorGUI;
 					}
-				} else if (inventoryPlayer1.holdingObject && inventoryPlayer1.holdingObjectIndex >= 0) {
-					cursorImage = Const.a.useableItemsFrobIcons[inventoryPlayer1.holdingObjectIndex];
+				} else if (Eng_Global->inventoryPlayer1.holdingObject && Eng_Global->inventoryPlayer1.holdingObjectIndex >= 0) {
+					cursorImage = Const.a.useableItemsFrobIcons[Eng_Global->inventoryPlayer1.holdingObjectIndex];
 				} else {
 					cursorImage = GetWeaponCursor();
 				}
@@ -281,8 +281,8 @@ public class MouseCursor : MonoBehaviour {
 				cursorImage = cyberspaceCursor;
 				DisableLiveGrenadeTooltip();
 			} else {
-				if (inventoryPlayer1.holdingObject && inventoryPlayer1.holdingObjectIndex >= 0) {
-					cursorImage = Const.a.useableItemsFrobIcons[inventoryPlayer1.holdingObjectIndex];
+				if (Eng_Global->inventoryPlayer1.holdingObject && Eng_Global->inventoryPlayer1.holdingObjectIndex >= 0) {
+					cursorImage = Const.a.useableItemsFrobIcons[Eng_Global->inventoryPlayer1.holdingObjectIndex];
 				} else {
 					cursorImage = GetWeaponCursor();
 				}
@@ -294,7 +294,7 @@ public class MouseCursor : MonoBehaviour {
 	}
 	
 	private Texture2D GetWeaponCursor() {
-		switch(inventoryPlayer1.weaponIndex) {
+		switch(Eng_Global->inventoryPlayer1.weaponIndex) {
 			case 36: return Const.a.useableItemsFrobIcons[102]; // red
 			case 37: return Const.a.useableItemsFrobIcons[107]; // blue
 			case 38: return Const.a.useableItemsFrobIcons[102]; // red
@@ -378,7 +378,7 @@ public class MouseCursor : MonoBehaviour {
 			GUIState.a.isBlocking = false; // in the safe zone!
 		}
 
-		if (MouseLookScript.a.inventoryMode && inventoryPlayer1.holdingObject) {
+		if (MouseLookScript.a.inventoryMode && Eng_Global->inventoryPlayer1.holdingObject) {
 			// Be sure to pass the camera to the 3rd parameter if using
 			// "Screen Space - Camera" on the Canvas, otherwise use "null"
 			if (RectTransformUtility.RectangleContainsScreenPoint(centerMFDPanel,cursorPosition,uiCameraCam)) {

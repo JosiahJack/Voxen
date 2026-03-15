@@ -105,7 +105,7 @@ void Load(uint8_t slot) {
 // 			
 // 			// The global time from which everything checks it's
 // 			// somethingerotherFinished timer states.
-// 			Sys_Global.pauseRelativeTime = Utils.GetFloatFromString(entries[index],"GameTime"); index++;
+// 			Eng_Global->pauseRelativeTime = Utils.GetFloatFromString(entries[index],"GameTime"); index++;
 // 			PauseScript.a.absoluteTime = Utils.GetFloatFromString(entries[index],"TotalPlayTime"); index++;
 // 			kills = Utils.GetIntFromString(entries[index],"kills"); index++;
 // 			cyberkills = Utils.GetIntFromString(entries[index],"cyberkills"); index++;
@@ -334,7 +334,7 @@ void Load(uint8_t slot) {
 // 				LevelManager.a.npcsm[i].RepopulateChildList();
 // 			}
 // 			
-// 			if (inventoryPlayer1.hasHardware[1]) {
+// 			if (Eng_Global->inventoryPlayer1.hasHardware[1]) {
 // 				// Go through all HealthManagers in the game and initialize the
 // 				// linked overlays now for Automap.  Done after instantiation.
 // 				List<GameObject> hmGOs = new List<GameObject>();

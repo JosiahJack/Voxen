@@ -97,6 +97,8 @@ void InitAfterLoad(void) { // Init entities after level load and after already h
     }
     
     ResetLevelAudio();
+    ResetLevelMusic();
+    DualLog("Entity instances initialized after load\n");
 }
 
 void MFDInit(SystemUI* ui) {
@@ -176,6 +178,6 @@ void PlayerInit(uint16_t i) {
     Sys_Global.instances[i].noiseFinished = Sys_Global.pauseRelativeTime;
     if (i == PLAYER1) MFDInit(&Sys_UIPlayer1);
     else if (i == PLAYER2) MFDInit(&Sys_UIPlayer2);
-    if (i == PLAYER1) InventoryInit(&inventoryPlayer1);
-    else if (i == PLAYER2) InventoryInit(&inventoryPlayer2);
+    if (i == PLAYER1) InventoryInit(&Sys_Global.inventoryPlayer1);
+    else if (i == PLAYER2) InventoryInit(&Sys_Global.inventoryPlayer2);
 }

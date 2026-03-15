@@ -35,7 +35,7 @@
 		dd.damage = DamageData.GetDamageTakeAmount(dd);
 		if (impactType == PoolType.RailgunImpacts) {
 			Utils.ApplyImpactForceSphere(dd,Eng_Global->instances[i].position,3.2f,1f);
-			fogFac += 4;
+			Eng_Global->fogFac += 4;
 		}
 
 		GameObject hitGO = other.contacts[0].otherCollider.gameObject;

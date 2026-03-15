@@ -42,7 +42,7 @@ public class UseableObjectUse : MonoBehaviour {
 	    
 		if (useableItemIndex < 0) DualLog("BUG: Useable index less than 0!");
 		MouseLookScript.a.holdingObject = true;
-		inventoryPlayer1.holdingObjectIndex = useableItemIndex;
+		Eng_Global->inventoryPlayer1.holdingObjectIndex = useableItemIndex;
 		MouseLookScript.a.heldObjectCustomIndex = customIndex;
 		MouseLookScript.a.heldObjectAmmo = ammo;
 		MouseLookScript.a.heldObjectAmmo2 = ammo2;

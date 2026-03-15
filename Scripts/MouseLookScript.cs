@@ -205,20 +205,20 @@
 
 	public void Frob() {
 		if (vmailActive && !inCyberSpace) {
-			inventoryPlayer1.DeactivateVMail(); vmailActive = false;
+			Eng_Global->inventoryPlayer1.DeactivateVMail(); vmailActive = false;
 			return;
 		}
 
 		if (!GUIState.a.isBlocking && !inCyberSpace) {
 			if (dropFinished < Time.time) {
 				currentButton = null; // Force this to reset.
-				if (inventoryPlayer1.holdingObject) {
+				if (Eng_Global->inventoryPlayer1.holdingObject) {
 					if (!FrobWithHeldObject()) DropHeldItem();
 				} else FrobEmptyHanded();
 			}
 		} else {
 			//We are holding cursor over the GUI
-			if (inventoryPlayer1.holdingObject && !inCyberSpace) {
+			if (Eng_Global->inventoryPlayer1.holdingObject && !inCyberSpace) {
 				AddItemToInventory(heldObjectIndex,heldObjectCustomIndex);
 				MouseCursor.a.liveGrenade = false;
 				ResetHeldItem();
@@ -575,7 +575,7 @@
 			}
 		}
 
-		if (inventoryPlayer1.hasHardware[4] && inventoryPlayer1.hardwareVersion[4] > 1) {
+		if (Eng_Global->inventoryPlayer1.hasHardware[4] && Eng_Global->inventoryPlayer1.hardwareVersion[4] > 1) {
 			if (!aic.hasTargetIDAttached) {
 				WeaponFire.a.CreateTargetIDInstance(-1f,aic.healthManager,-1f);
 				if (Application.platform != RuntimePlatform.Android) {
@@ -586,7 +586,7 @@
 
 		if (Application.platform == RuntimePlatform.Android) {
 			// Cyber handled just above, normal fire condition only here.
-			int constDex = inventoryPlayer1.weaponIndex;
+			int constDex = Eng_Global->inventoryPlayer1.weaponIndex;
 			int wepdex = WeaponFire.Get16WeaponIndexFromConstIndex(constDex);
 			WeaponFire.a.StartNormalAttack(wepdex);
 			return true;
@@ -600,7 +600,7 @@
 	}
 
 	void FrobEmptyHanded() {
-		if (inventoryPlayer1.holdingObject) return;
+		if (Eng_Global->inventoryPlayer1.holdingObject) return;
 
 		RaycastHit firstHit;
 		float offset = Screen.height * 0.02f;
@@ -778,7 +778,7 @@
 						 int ammo2, bool loadedAlt, bool fromButton) {
 		if (useableConstdex < 0) return;
 
-		inventoryPlayer1.holdingObject = true;
+		Eng_Global->inventoryPlayer1.holdingObject = true;
 		heldObjectIndex = useableConstdex;
 		heldObjectCustomIndex = customIndex;
 		heldObjectAmmo = ammo1;
@@ -793,27 +793,27 @@
 		// other strings I need to CTRL+F my way to this buggy code!
 		WeaponButton wepbut = currentButton.GetComponent<WeaponButton>();
 		int indexPriorToRemoval = wepbut.useableItemIndex;
-		int am1 = inventoryPlayer1.currentMagazineAmount[wepbut.WepButtonIndex];
-		inventoryPlayer1.currentMagazineAmount[wepbut.WepButtonIndex] = 0;
-		int am2 = inventoryPlayer1.currentMagazineAmount2[wepbut.WepButtonIndex];
-		inventoryPlayer1.currentMagazineAmount2[wepbut.WepButtonIndex] = 0;
+		int am1 = Eng_Global->inventoryPlayer1.currentMagazineAmount[wepbut.WepButtonIndex];
+		Eng_Global->inventoryPlayer1.currentMagazineAmount[wepbut.WepButtonIndex] = 0;
+		int am2 = Eng_Global->inventoryPlayer1.currentMagazineAmount2[wepbut.WepButtonIndex];
+		Eng_Global->inventoryPlayer1.currentMagazineAmount2[wepbut.WepButtonIndex] = 0;
 		bool loadAlt = false;
 		if (am2 > 0) loadAlt = true;
 		PutObjectInHand(indexPriorToRemoval,-1,am1,am2,loadAlt,true);
-		inventoryPlayer1.RemoveWeapon(wepbut.WepButtonIndex);
-		inventoryPlayer1.RemoveWeapon(wepbut.WepButtonIndex);
+		Eng_Global->inventoryPlayer1.RemoveWeapon(wepbut.WepButtonIndex);
+		Eng_Global->inventoryPlayer1.RemoveWeapon(wepbut.WepButtonIndex);
 		Sys_UI.SetAmmoIcons(-1,false) ; // Clear the ammo icons.
 		Sys_UI.HideAmmoAndEnergyItems();
 		wepbut.useableItemIndex = -1;
 		wepbut = Sys_UI.wepbutMan.wepButtonsScripts[0];
-		inventoryPlayer1.WeaponChange(wepbut.useableItemIndex,
+		Eng_Global->inventoryPlayer1.WeaponChange(wepbut.useableItemIndex,
 									 wepbut.WepButtonIndex);
 	}
 
 	// Because Unity does not see fit for their Button class to support right
 	// click behavior...or any other reasonable mouse button interaction.
 	void InventoryButtonUse() {
-		if (inventoryPlayer1.holdingObject) return;
+		if (Eng_Global->inventoryPlayer1.holdingObject) return;
 		if (!GUIState.a.overButton) return;
 		if (GUIState.a.overButtonType == ButtonType.None) return;
 		if (currentButton == null) return;
@@ -825,21 +825,21 @@
 			case ButtonType.Grenade:
 				GrenadeButton grenbut = currentButton.GetComponent<GrenadeButton>();
 				indexPriorToRemoval = grenbut.useableItemIndex;
-				inventoryPlayer1.grenAmmo[grenbut.GrenButtonIndex]--;
-				inventoryPlayer1.GrenadeCycleDown();
-				//inventoryPlayer1.grenadeCurrent = -1; This was up here, and seemed fine.  Might need to revert line 473 add.
-				if (inventoryPlayer1.grenAmmo[grenbut.GrenButtonIndex] <= 0) {
-					inventoryPlayer1.grenAmmo[grenbut.GrenButtonIndex] = 0;
-					inventoryPlayer1.grenadeCurrent = -1;
+				Eng_Global->inventoryPlayer1.grenAmmo[grenbut.GrenButtonIndex]--;
+				Eng_Global->inventoryPlayer1.GrenadeCycleDown();
+				//Eng_Global->inventoryPlayer1.grenadeCurrent = -1; This was up here, and seemed fine.  Might need to revert line 473 add.
+				if (Eng_Global->inventoryPlayer1.grenAmmo[grenbut.GrenButtonIndex] <= 0) {
+					Eng_Global->inventoryPlayer1.grenAmmo[grenbut.GrenButtonIndex] = 0;
+					Eng_Global->inventoryPlayer1.grenadeCurrent = -1;
 					for (int i = 0; i < 7; i++) {
-						if (inventoryPlayer1.grenAmmo[i] > 0) {
-							inventoryPlayer1.grenadeCurrent = i;
+						if (Eng_Global->inventoryPlayer1.grenAmmo[i] > 0) {
+							Eng_Global->inventoryPlayer1.grenadeCurrent = i;
 						}
 					}
 
-					Sys_UI.SendInfoToItemTab(inventoryPlayer1.grenadeCurrent);
-					if (inventoryPlayer1.grenadeCurrent < 0) {
-						inventoryPlayer1.grenadeCurrent = 0;
+					Sys_UI.SendInfoToItemTab(Eng_Global->inventoryPlayer1.grenadeCurrent);
+					if (Eng_Global->inventoryPlayer1.grenadeCurrent < 0) {
+						Eng_Global->inventoryPlayer1.grenadeCurrent = 0;
 					}
 				}
 
@@ -849,17 +849,17 @@
 			case ButtonType.Patch:
 				PatchButton patbut = currentButton.GetComponent<PatchButton>();
 				indexPriorToRemoval = patbut.useableItemIndex;
-				inventoryPlayer1.patchCounts[patbut.PatchButtonIndex]--;
-				if (inventoryPlayer1.patchCounts[patbut.PatchButtonIndex] <= 0) {
-					inventoryPlayer1.patchCounts[patbut.PatchButtonIndex] = 0;
-					inventoryPlayer1.patchCurrent = -1;
+				Eng_Global->inventoryPlayer1.patchCounts[patbut.PatchButtonIndex]--;
+				if (Eng_Global->inventoryPlayer1.patchCounts[patbut.PatchButtonIndex] <= 0) {
+					Eng_Global->inventoryPlayer1.patchCounts[patbut.PatchButtonIndex] = 0;
+					Eng_Global->inventoryPlayer1.patchCurrent = -1;
 					
 					for (int i = 0; i < 7; i++) {
-						if (inventoryPlayer1.patchCounts[i] > 0) inventoryPlayer1.patchCurrent = i;
+						if (Eng_Global->inventoryPlayer1.patchCounts[i] > 0) Eng_Global->inventoryPlayer1.patchCurrent = i;
 					}
-					Sys_UI.SendInfoToItemTab(inventoryPlayer1.patchCurrent);
-					if (inventoryPlayer1.patchCurrent < 0) {
-						inventoryPlayer1.patchCurrent = 0;
+					Sys_UI.SendInfoToItemTab(Eng_Global->inventoryPlayer1.patchCurrent);
+					if (Eng_Global->inventoryPlayer1.patchCurrent < 0) {
+						Eng_Global->inventoryPlayer1.patchCurrent = 0;
 					}
 				}
 				PutObjectInHand(indexPriorToRemoval,-1,0,0,false,true);
@@ -877,16 +877,16 @@
 
 				indexPriorToRemoval = genbut.useableItemIndex;
 				customIndexPrior = genbut.customIndex;
-				inventoryPlayer1.generalInventoryIndexRef[genbut.GeneralInvButtonIndex] = -1;
-				inventoryPlayer1.generalInvCurrent = -1;
+				Eng_Global->inventoryPlayer1.generalInventoryIndexRef[genbut.GeneralInvButtonIndex] = -1;
+				Eng_Global->inventoryPlayer1.generalInvCurrent = -1;
 				for (int i = 0; i < 7; i++) {
-					if (inventoryPlayer1.generalInventoryIndexRef[i] >= 0) {
-						inventoryPlayer1.generalInvCurrent = i;
+					if (Eng_Global->inventoryPlayer1.generalInventoryIndexRef[i] >= 0) {
+						Eng_Global->inventoryPlayer1.generalInvCurrent = i;
 					}
 				}
 				int referenceIndex = -1;
-				if (inventoryPlayer1.generalInvCurrent >= 0) {
-					referenceIndex = inventoryPlayer1.genButtons[inventoryPlayer1.generalInvCurrent].transform.GetComponent<GeneralInvButton>().useableItemIndex;
+				if (Eng_Global->inventoryPlayer1.generalInvCurrent >= 0) {
+					referenceIndex = Eng_Global->inventoryPlayer1.genButtons[Eng_Global->inventoryPlayer1.generalInvCurrent].transform.GetComponent<GeneralInvButton>().useableItemIndex;
 				}
 
 				if (referenceIndex < 0 || referenceIndex > 110) {
@@ -932,7 +932,7 @@
 	}
 	
 	public void SearchButtonClick(int index, SearchButton sebut) {
-		inventoryPlayer1.holdingObject = true;
+		Eng_Global->inventoryPlayer1.holdingObject = true;
 		heldObjectIndex = sebut.contEng_Global->instances[index];
 		heldObjectCustomIndex = sebut.customIndex[index];
 		if (currentSearchItem != null) {
@@ -969,7 +969,7 @@
 			headBobZ = 0f;
 			Vector3 vel = Eng_Global->instances[PLAYER1].rbody.velocity;
 			vel.y = 0f;
-			if (Eng_Global->instances[PLAYER1].relForward + Eng_Global->instances[PLAYER1].relSideways != 0 && Sys_Settings.HeadBob) {
+			if (Eng_Global->instances[PLAYER1].relForward + Eng_Global->instances[PLAYER1].relSideways != 0 && Eng_Settings->HeadBob) {
 				if (Eng_Global->instances[PLAYER1].headBobShiftFinished < Eng_Global->pauseRelativeTime) {
 					Eng_Global->instances[PLAYER1].headBobShiftFinished = Eng_Global->pauseRelativeTime + 0.2f;
 					if (!Eng_Global->instances[PLAYER1].isSprinting) Eng_Global->instances[PLAYER1].headBobShiftFinished += 0.1f;
@@ -1004,64 +1004,64 @@
              || (index >= 52 && index < 59)
              || (index >= 61 && index <= 64)
              || (index >= 92 && index <= 101)) {
-			if (!inventoryPlayer1.AddGeneralObjectToInventory(index,customIndex)) {
+			if (!Eng_Global->inventoryPlayer1.AddGeneralObjectToInventory(index,customIndex)) {
 				AddItemFail(index);
 			}
 		} else if (index == 6) {
-			inventoryPlayer1.AddAudioLogToInventory(heldObjectCustomIndex);
+			Eng_Global->inventoryPlayer1.AddAudioLogToInventory(heldObjectCustomIndex);
 		} else if (index >= 36 && index <= 51) {
-			if (!inventoryPlayer1.AddWeaponToInventory(index,heldObjectAmmo,
+			if (!Eng_Global->inventoryPlayer1.AddWeaponToInventory(index,heldObjectAmmo,
 												  heldObjectAmmo2,
 												  heldObjectLoadedAlternate)) {
 				AddItemFail(index);
 			}
 		} else if (index == 34 || index == 81 || (index >= 83 && index <= 91) || index == 110) {
-			inventoryPlayer1.AddAccessCardToInventory(index);
+			Eng_Global->inventoryPlayer1.AddAccessCardToInventory(index);
 		} else {
 			switch (index) {
-				case 7:  inventoryPlayer1.AddGrenadeToInventory(0,index); break; // Frag
-				case 8:  inventoryPlayer1.AddGrenadeToInventory(3,index); break; // Concussion
-				case 9:  inventoryPlayer1.AddGrenadeToInventory(1,index); break; // EMP
-				case 10: inventoryPlayer1.AddGrenadeToInventory(6,index); break; // Earth Shaker
-				case 11: inventoryPlayer1.AddGrenadeToInventory(4,index); break; // Land Mine
-				case 12: inventoryPlayer1.AddGrenadeToInventory(5,index); break; // Nitropak
-				case 13: inventoryPlayer1.AddGrenadeToInventory(2,index); break; // Gas
-				case 14: inventoryPlayer1.AddPatchToInventory(2,index); break;
-				case 15: inventoryPlayer1.AddPatchToInventory(6,index); break;
-				case 16: inventoryPlayer1.AddPatchToInventory(5,index); break;
-				case 17: inventoryPlayer1.AddPatchToInventory(3,index); break;
-				case 18: inventoryPlayer1.AddPatchToInventory(4,index); break;
-				case 19: inventoryPlayer1.AddPatchToInventory(1,index); break;
-				case 20: inventoryPlayer1.AddPatchToInventory(0,index); break;
-				case 21: inventoryPlayer1.AddHardwareToInventory(0,index,customIndex,true); break;
-				case 22: inventoryPlayer1.AddHardwareToInventory(1,index,customIndex,true); break;
-				case 23: inventoryPlayer1.AddHardwareToInventory(2,index,customIndex,true); break;
-				case 24: inventoryPlayer1.AddHardwareToInventory(3,index,customIndex,true); break;
-				case 25: inventoryPlayer1.AddHardwareToInventory(4,index,customIndex,true); break;
-				case 26: inventoryPlayer1.AddHardwareToInventory(5,index,customIndex,true); break;
-				case 27: inventoryPlayer1.AddHardwareToInventory(6,index,customIndex,true); break;
-				case 28: inventoryPlayer1.AddHardwareToInventory(7,index,customIndex,true); break;
-				case 29: inventoryPlayer1.AddHardwareToInventory(8,index,customIndex,true); break;
-				case 30: inventoryPlayer1.AddHardwareToInventory(9,index,customIndex,true); break;
-				case 31: inventoryPlayer1.AddHardwareToInventory(10,index,customIndex,true); break;
-				case 32: inventoryPlayer1.AddHardwareToInventory(11,index,customIndex,true); break;
-				case 60: inventoryPlayer1.AddAmmoToInventory(12,index, Const.a.magazinePitchCountForWeapon[12], false); break; // rubber slugs
-				case 65: inventoryPlayer1.AddAmmoToInventory(8,index, Const.a.magazinePitchCountForWeapon2[8], true); break; // magpulse cartridge super
-				case 66: inventoryPlayer1.AddAmmoToInventory(2,index, Const.a.magazinePitchCountForWeapon[2], false); break; // needle darts
-				case 67: inventoryPlayer1.AddAmmoToInventory(2,index, Const.a.magazinePitchCountForWeapon2[2], true); break; // tranquilizer darts
-				case 68: inventoryPlayer1.AddAmmoToInventory(9,index, Const.a.magazinePitchCountForWeapon[9], false); break; // standard bullets
-				case 69: inventoryPlayer1.AddAmmoToInventory(9,index, Const.a.magazinePitchCountForWeapon2[9], true); break; // teflon bullets
-				case 70: inventoryPlayer1.AddAmmoToInventory(7,index, Const.a.magazinePitchCountForWeapon[7], false); break; // hollow point rounds
-				case 71: inventoryPlayer1.AddAmmoToInventory(7,index, Const.a.magazinePitchCountForWeapon2[7], true); break; // slug rounds
-				case 72: inventoryPlayer1.AddAmmoToInventory(0,index, Const.a.magazinePitchCountForWeapon[0], false); break; // magnesium tipped slugs
-				case 73: inventoryPlayer1.AddAmmoToInventory(0,index, Const.a.magazinePitchCountForWeapon2[0], true); break; // penetrator slugs
-				case 74: inventoryPlayer1.AddAmmoToInventory(3,index, Const.a.magazinePitchCountForWeapon[3], false); break; // hornet clip
-				case 75: inventoryPlayer1.AddAmmoToInventory(3,index, Const.a.magazinePitchCountForWeapon2[3], true); break; // splinter clip
-				case 76: inventoryPlayer1.AddAmmoToInventory(11,index, Const.a.magazinePitchCountForWeapon[11], false); break; // rail rounds
-				case 77: inventoryPlayer1.AddAmmoToInventory(13,index, Const.a.magazinePitchCountForWeapon[13], false); break; // slag magazine
-				case 78: inventoryPlayer1.AddAmmoToInventory(13,index, Const.a.magazinePitchCountForWeapon2[13], true); break; // large slag magazine
-				case 79: inventoryPlayer1.AddAmmoToInventory(8,index, Const.a.magazinePitchCountForWeapon[8], false); break; // magpulse cartridges
-				case 80: inventoryPlayer1.AddAmmoToInventory(8,index, Const.a.magazinePitchCountForWeapon2[8], false); break; // small magpulse cartridges
+				case 7:  Eng_Global->inventoryPlayer1.AddGrenadeToInventory(0,index); break; // Frag
+				case 8:  Eng_Global->inventoryPlayer1.AddGrenadeToInventory(3,index); break; // Concussion
+				case 9:  Eng_Global->inventoryPlayer1.AddGrenadeToInventory(1,index); break; // EMP
+				case 10: Eng_Global->inventoryPlayer1.AddGrenadeToInventory(6,index); break; // Earth Shaker
+				case 11: Eng_Global->inventoryPlayer1.AddGrenadeToInventory(4,index); break; // Land Mine
+				case 12: Eng_Global->inventoryPlayer1.AddGrenadeToInventory(5,index); break; // Nitropak
+				case 13: Eng_Global->inventoryPlayer1.AddGrenadeToInventory(2,index); break; // Gas
+				case 14: Eng_Global->inventoryPlayer1.AddPatchToInventory(2,index); break;
+				case 15: Eng_Global->inventoryPlayer1.AddPatchToInventory(6,index); break;
+				case 16: Eng_Global->inventoryPlayer1.AddPatchToInventory(5,index); break;
+				case 17: Eng_Global->inventoryPlayer1.AddPatchToInventory(3,index); break;
+				case 18: Eng_Global->inventoryPlayer1.AddPatchToInventory(4,index); break;
+				case 19: Eng_Global->inventoryPlayer1.AddPatchToInventory(1,index); break;
+				case 20: Eng_Global->inventoryPlayer1.AddPatchToInventory(0,index); break;
+				case 21: Eng_Global->inventoryPlayer1.AddHardwareToInventory(0,index,customIndex,true); break;
+				case 22: Eng_Global->inventoryPlayer1.AddHardwareToInventory(1,index,customIndex,true); break;
+				case 23: Eng_Global->inventoryPlayer1.AddHardwareToInventory(2,index,customIndex,true); break;
+				case 24: Eng_Global->inventoryPlayer1.AddHardwareToInventory(3,index,customIndex,true); break;
+				case 25: Eng_Global->inventoryPlayer1.AddHardwareToInventory(4,index,customIndex,true); break;
+				case 26: Eng_Global->inventoryPlayer1.AddHardwareToInventory(5,index,customIndex,true); break;
+				case 27: Eng_Global->inventoryPlayer1.AddHardwareToInventory(6,index,customIndex,true); break;
+				case 28: Eng_Global->inventoryPlayer1.AddHardwareToInventory(7,index,customIndex,true); break;
+				case 29: Eng_Global->inventoryPlayer1.AddHardwareToInventory(8,index,customIndex,true); break;
+				case 30: Eng_Global->inventoryPlayer1.AddHardwareToInventory(9,index,customIndex,true); break;
+				case 31: Eng_Global->inventoryPlayer1.AddHardwareToInventory(10,index,customIndex,true); break;
+				case 32: Eng_Global->inventoryPlayer1.AddHardwareToInventory(11,index,customIndex,true); break;
+				case 60: Eng_Global->inventoryPlayer1.AddAmmoToInventory(12,index, Const.a.magazinePitchCountForWeapon[12], false); break; // rubber slugs
+				case 65: Eng_Global->inventoryPlayer1.AddAmmoToInventory(8,index, Const.a.magazinePitchCountForWeapon2[8], true); break; // magpulse cartridge super
+				case 66: Eng_Global->inventoryPlayer1.AddAmmoToInventory(2,index, Const.a.magazinePitchCountForWeapon[2], false); break; // needle darts
+				case 67: Eng_Global->inventoryPlayer1.AddAmmoToInventory(2,index, Const.a.magazinePitchCountForWeapon2[2], true); break; // tranquilizer darts
+				case 68: Eng_Global->inventoryPlayer1.AddAmmoToInventory(9,index, Const.a.magazinePitchCountForWeapon[9], false); break; // standard bullets
+				case 69: Eng_Global->inventoryPlayer1.AddAmmoToInventory(9,index, Const.a.magazinePitchCountForWeapon2[9], true); break; // teflon bullets
+				case 70: Eng_Global->inventoryPlayer1.AddAmmoToInventory(7,index, Const.a.magazinePitchCountForWeapon[7], false); break; // hollow point rounds
+				case 71: Eng_Global->inventoryPlayer1.AddAmmoToInventory(7,index, Const.a.magazinePitchCountForWeapon2[7], true); break; // slug rounds
+				case 72: Eng_Global->inventoryPlayer1.AddAmmoToInventory(0,index, Const.a.magazinePitchCountForWeapon[0], false); break; // magnesium tipped slugs
+				case 73: Eng_Global->inventoryPlayer1.AddAmmoToInventory(0,index, Const.a.magazinePitchCountForWeapon2[0], true); break; // penetrator slugs
+				case 74: Eng_Global->inventoryPlayer1.AddAmmoToInventory(3,index, Const.a.magazinePitchCountForWeapon[3], false); break; // hornet clip
+				case 75: Eng_Global->inventoryPlayer1.AddAmmoToInventory(3,index, Const.a.magazinePitchCountForWeapon2[3], true); break; // splinter clip
+				case 76: Eng_Global->inventoryPlayer1.AddAmmoToInventory(11,index, Const.a.magazinePitchCountForWeapon[11], false); break; // rail rounds
+				case 77: Eng_Global->inventoryPlayer1.AddAmmoToInventory(13,index, Const.a.magazinePitchCountForWeapon[13], false); break; // slag magazine
+				case 78: Eng_Global->inventoryPlayer1.AddAmmoToInventory(13,index, Const.a.magazinePitchCountForWeapon2[13], true); break; // large slag magazine
+				case 79: Eng_Global->inventoryPlayer1.AddAmmoToInventory(8,index, Const.a.magazinePitchCountForWeapon[8], false); break; // magpulse cartridges
+				case 80: Eng_Global->inventoryPlayer1.AddAmmoToInventory(8,index, Const.a.magazinePitchCountForWeapon2[8], false); break; // small magpulse cartridges
 			}
 		}
 
@@ -1192,7 +1192,7 @@
 		heldObjectAmmo = 0;
 		heldObjectAmmo2 = 0;
 		heldObjectLoadedAlternate = false;
-		inventoryPlayer1.holdingObject = false;
+		Eng_Global->inventoryPlayer1.holdingObject = false;
 		grenadeActive = false;
 		MouseCursor.a.justDroppedItemInHelper = true;
 	}
@@ -1218,7 +1218,7 @@
 		}
 
 		if (vmailActive) {
-			inventoryPlayer1.DeactivateVMail();
+			Eng_Global->inventoryPlayer1.DeactivateVMail();
 			vmailActive = false;
 		}
 	}
@@ -1260,7 +1260,7 @@
 					heldObjectCustomIndex = curSearchScript.customIndex[i];
 					curSearchScript.contEng_Global->instances[i] = -1;
 					curSearchScript.customIndex[i] = -1;
-					if (heldObjectIndex != -1) inventoryPlayer1.holdingObject = true;
+					if (heldObjectIndex != -1) Eng_Global->inventoryPlayer1.holdingObject = true;
 					CenterStatusPrint("%s", Sys_Text.stringTable[heldObjectIndex + 326]
 								 + Sys_Text.stringTable[319],player); // picked up
 
@@ -1299,7 +1299,7 @@
 	}
 
 	public void UseGrenade (int index) {
-		if (inventoryPlayer1.holdingObject) { CenterStatusPrint("%s", Sys_Text.stringTable[311],player); return; } // Can't use grenade, hands full
+		if (Eng_Global->inventoryPlayer1.holdingObject) { CenterStatusPrint("%s", Sys_Text.stringTable[311],player); return; } // Can't use grenade, hands full
 		if (index < 7 || index > 13) { DualLog("BUG: index outside of 7 to 13 passed to UseGrenade() in MouseLookScript.cs"); return; }
 
 		ForceInventoryMode();  // Inventory mode is turned on when picking something up.
@@ -1310,13 +1310,13 @@
 					 + Sys_Text.stringTable[320],player); // activated, grenade is LIVE!
 
 		switch(index) { // Subtract one from the correct grenade inventory
-			case 7:  heldObject = Const.a.GetPrefab(370); inventoryPlayer1.RemoveGrenade(0); break; // Frag
-			case 8:  heldObject = Const.a.GetPrefab(372); inventoryPlayer1.RemoveGrenade(3); break; // Concussion
-			case 9:  heldObject = Const.a.GetPrefab(387); inventoryPlayer1.RemoveGrenade(1); break; // EMP
-			case 10: heldObject = Const.a.GetPrefab(389); inventoryPlayer1.RemoveGrenade(6); break; // Earth Shaker
-			case 11: heldObject = Const.a.GetPrefab(402); inventoryPlayer1.RemoveGrenade(4); break; // Land Mine
-			case 12: heldObject = Const.a.GetPrefab(403); inventoryPlayer1.RemoveGrenade(5); break; // Nitropak
-			case 13: heldObject = Const.a.GetPrefab(404); inventoryPlayer1.RemoveGrenade(2); break; // Gas
+			case 7:  heldObject = Const.a.GetPrefab(370); Eng_Global->inventoryPlayer1.RemoveGrenade(0); break; // Frag
+			case 8:  heldObject = Const.a.GetPrefab(372); Eng_Global->inventoryPlayer1.RemoveGrenade(3); break; // Concussion
+			case 9:  heldObject = Const.a.GetPrefab(387); Eng_Global->inventoryPlayer1.RemoveGrenade(1); break; // EMP
+			case 10: heldObject = Const.a.GetPrefab(389); Eng_Global->inventoryPlayer1.RemoveGrenade(6); break; // Earth Shaker
+			case 11: heldObject = Const.a.GetPrefab(402); Eng_Global->inventoryPlayer1.RemoveGrenade(4); break; // Land Mine
+			case 12: heldObject = Const.a.GetPrefab(403); Eng_Global->inventoryPlayer1.RemoveGrenade(5); break; // Nitropak
+			case 13: heldObject = Const.a.GetPrefab(404); Eng_Global->inventoryPlayer1.RemoveGrenade(2); break; // Gas
 		}
 		Sys_UI.ResetItemTab();
 		PutObjectInHand(index,-1,0,0,false,true);

@@ -134,6 +134,7 @@ static inline __attribute__((always_inline, noreturn)) void OS_Exit(int64_t exit
         #define MAC
         #include <sys/types.h>
     #else
+        #include <time.h>
         typedef int OsFileHandle;
         typedef uint64_t dev_t;
         typedef uint64_t ino_t;
@@ -144,12 +145,7 @@ static inline __attribute__((always_inline, noreturn)) void OS_Exit(int64_t exit
         typedef int64_t off_t;
         typedef int64_t blksize_t;
         typedef int64_t blkcnt_t;
-        typedef int64_t time_t;
-        struct timespec {
-            time_t tv_sec;
-            long tv_nsec;
-        };
-        
+        typedef int64_t time_t;        
         struct stat {
             dev_t     st_dev;
             ino_t     st_ino;

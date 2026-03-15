@@ -194,7 +194,7 @@ void RenderMenu(void) {
             if (UI_Button(200,636, 210,16, &overVsync, 4) || (MenuEnter() && currentMenuItem == 4)) { Sys_Settings.Vsync = Sys_Settings.Vsync == 1u ? 0u : 1u; SetVSync(); SaveConfig(); }
             overVsync = overVsync || currentMenuItem == 4;
             if (Sys_Settings.Vsync) RenderUIImage(202,622, 12,12, 912); // Checkbox check
-            RenderFormattedText(220,620,overVsync ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"VSYNC (FPS: %d)", Sys_Dx.framesPerLastSecond);
+            RenderFormattedText(220,620,overVsync ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"VSYNC (FPS: %d)", Sys_Global.framesPerLastSecond);
             
             // FOV Slider
             RenderUIImage(400,650, 128,16, 1079); // Slider background

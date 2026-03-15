@@ -43,10 +43,14 @@
         Map;
         SwimUp;
         SwimDn;
-        ChangeAmmoType;
         TakeScreenshot;
         GetBasePlayerSpeed;
         InitializeAIAfterLoad;
         Console;
+
+        UpdateMusic;
+        PlayMenuMusic;
+        PlayGameMusic;
+        ResetLevelMusic;
     local: *;
 };

@@ -19,15 +19,12 @@ GLFWwindow* window;
 #include "voxen.h"
 #include "Shaders/shaders.h"
 #include "credits.h"
-GlobalContext Sys_Global = { .menuActive = true, .screenshotTimeout = 1.0, .creditsPageIndex = 1, .difficultyCombat = 2, .difficultyCyber = 2, .difficultyPuzzle = 2, .difficultyMission = 2, .deaths = 0 };
-DiagnosticsSystem Sys_Dx = { .worstFPS = UINT32_MAX };
+GlobalContext Sys_Global = { .menuActive = true, .screenshotTimeout = 1.0, .creditsPageIndex = 1, .difficultyCombat = 2, .difficultyCyber = 2, .difficultyPuzzle = 2, .difficultyMission = 2, .deaths = 0, .worstFPS = UINT32_MAX };
 CheatsSystem Sys_Cheats = { .god = false, .noclip = true, .showLocation = true, .showFPS = true, .editMode = true };
 RenderSystem Sys_Render;
 SystemUI Sys_UIPlayer1;
 SystemUI Sys_UIPlayer2;
 OsFileHandle console_log_file = 0;
-InventorySystem inventoryPlayer1;
-InventorySystem inventoryPlayer2;
 AutoSplitterData autoSplitter = { 0x1337133713371337, 0, false, 0 }; // Fore use with LiveSplit or other future speedrunner utilities for doing speedruns
 uint8_t queuedLevelToLoad = 255u;
 Entity entities[MAX_ENTITIES]; // Global array of entity definitions
@@ -80,7 +77,6 @@ uint32_t uiImageDrawCallsRenderedThisFrame;
 uint32_t shadowDrawCallsRenderedThisFrame;
 uint32_t verticesRenderedThisFrame;
 uint32_t drawCallsNormal;
-int fogFac;
 
 typedef struct {
    unsigned short x0,y0,x1,y1; // coordinates of bbox in bitmap
@@ -194,7 +190,7 @@ Vector3 lightsNewPosition[LIGHT_COUNT];
 bool UpdateLights(bool* voxelsNeedUpdated) {
     // Update headmounted lantern
     int32_t lant = headmountedLanternLight * LIGHT_DATA_SIZE;
-    if (/*(inventoryPlayer1.hasHardware & HW_LAN) && */(inventoryPlayer1.hardwareIsActive & HW_LAN)) {
+    if (/*(Sys_Global.inventoryPlayer1.hasHardware & HW_LAN) && */(Sys_Global.inventoryPlayer1.hardwareIsActive & HW_LAN)) {
         Vector3 lanternPosLast = lanternPos;
         lanternPos = Sys_Global.instances[PLAYER1].position;
         lanternPos.y -= 0.24f;
@@ -204,7 +200,7 @@ bool UpdateLights(bool* voxelsNeedUpdated) {
         lights[lant + LIGHT_DATA_OFFSET_POSX] = lanternPos.x;
         lights[lant + LIGHT_DATA_OFFSET_POSY] = lanternPos.y;
         lights[lant + LIGHT_DATA_OFFSET_POSZ] = lanternPos.z;
-        lights[lant + LIGHT_DATA_OFFSET_INTENSITY] = lightMaxIntensity[headmountedLanternLight] = lanternVersionBrightness[inventoryPlayer1.hardwareVersionSetting[7]];
+        lights[lant + LIGHT_DATA_OFFSET_INTENSITY] = lightMaxIntensity[headmountedLanternLight] = lanternVersionBrightness[Sys_Global.inventoryPlayer1.hardwareVersionSetting[7]];
         lightDirty[headmountedLanternLight] = !lightOn[headmountedLanternLight] || (vabs(lanternPosLast.x - lanternPos.x) + vabs(lanternPosLast.y - lanternPos.y) + vabs(lanternPosLast.z - lanternPos.z)) > 0.001f;
         lightOn[headmountedLanternLight] = true;
         lightCastsShadows[headmountedLanternLight] = true;
@@ -724,7 +720,7 @@ static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
         Sys_Input.last_mouse_y = ypos;
         if (Sys_Input.ignore_next_mouse_delta) { Sys_Input.ignore_next_mouse_delta = false; return; }
         
-        if (Sys_Dx.globalFrameNum > 1) Input_MouseMove(Sys_Input.currentMouse_dx,Sys_Input.currentMouse_dy);
+        if (Sys_Global.globalFrameNum > 1) Input_MouseMove(Sys_Input.currentMouse_dx,Sys_Input.currentMouse_dy);
     }
 }
 
@@ -936,8 +932,8 @@ void LoadModFunctions(void) {
         OS_Exit(1);
     }
     
-    ModInit         = (void (*)(GlobalContext*,CheatsSystem*)) PLATFORM_DLSYM(mod_handle,"ModInit"); if (!ModInit) { DualLogError("Failed to load ModInit function pointer from mod data\n"); OS_Exit(1); }
-    ModInit(&Sys_Global,&Sys_Cheats);
+    ModInit         = (void (*)(GlobalContext*,CheatsSystem*,SettingsSystem*)) PLATFORM_DLSYM(mod_handle,"ModInit"); if (!ModInit) { DualLogError("Failed to load ModInit function pointer from mod data\n"); OS_Exit(1); }
+    ModInit(&Sys_Global,&Sys_Cheats,&Sys_Settings);
     Sys_Global.GetKey = GetKey;
     Sys_Global.GetKeyPressed = GetKeyPressed;
 #define LINK_MOD_SYMBOL(name,ptr) PLATFORM_DLSYM(mod_handle,(name)); if (!(ptr)) { DualLogError("Failed to load %s function pointer from mod data\n", (name)); OS_Exit(1); }
@@ -988,6 +984,10 @@ void LoadModFunctions(void) {
     InitializeAIAfterLoad = (void (*)(uint16_t)) PLATFORM_DLSYM(mod_handle, "InitializeAIAfterLoad"); if (!InitializeAIAfterLoad) { DualLogError("Failed to load InitializeAIAfterLoad function pointer from mod data\n"); OS_Exit(1); }
     TakeScreenshot  = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "TakeScreenshot"); if (!TakeScreenshot) { DualLogError("Failed to load TakeScreenshot function pointer from mod data\n"); OS_Exit(1); }
     Console         = (bool (*)(void))           PLATFORM_DLSYM(mod_handle, "Console");        if (!Console) { DualLogError("Failed to load Console function pointer from mod data\n"); OS_Exit(1); }
+    UpdateMusic     = (void (*)(void))           LINK_MOD_SYMBOL("UpdateMusic",UpdateMusic);
+    PlayMenuMusic   = (void (*)(void))           LINK_MOD_SYMBOL("PlayMenuMusic",PlayMenuMusic);
+    PlayGameMusic   = (void (*)(void))           LINK_MOD_SYMBOL("PlayGameMusic",PlayGameMusic);
+    ResetLevelMusic   = (void (*)(void))         LINK_MOD_SYMBOL("ResetLevelMusic",ResetLevelMusic);
     DualLog("done!\n");
 }
 
@@ -999,7 +999,7 @@ extern void stbi__arena_init(void);
 #define STBI_ARENA_SIZE 16 * 1024 * 1024
 __attribute__((cold)) void InitializeEnvironment(void) {
     double init_start_time = get_time();
-    Sys_Dx.globalFrameNum = 0;
+    Sys_Global.globalFrameNum = 0;
     DebugRAM("InitializeEnvironment start");
     DualLog("Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed\n");
     if (!glfwInit()) { DualLogError("GLFW initialization failed\n"); OS_Exit(1); }
@@ -1139,23 +1139,23 @@ __attribute__((cold)) void InitializeEnvironment(void) {
 
 float debugLineBuffer[MAX_DEBUG_LINE_VERTS * 3]; // xyz only
 static inline __attribute__((always_inline)) void DrawDebugLines(float* viewProj) {    
-    glNamedBufferSubData(Sys_Render.debugLinesVBO, 0, Sys_Dx.debugLineVertCount * sizeof(float), debugLineBuffer);
+    glNamedBufferSubData(Sys_Render.debugLinesVBO, 0, Sys_Global.debugLineVertCount * sizeof(float), debugLineBuffer);
     glUseProgram(Sys_Render.debugUnlitShaderProgram);
     glUniformMatrix4fv(0, 1, GL_FALSE, viewProj);
     glLineWidth(10.0f);
     glDisable(GL_DEPTH_TEST);
     glBindVertexArray(Sys_Render.debugLinesVAO);
-    glDrawArrays(GL_LINES, 0, Sys_Dx.debugLineVertCount / 3);
+    glDrawArrays(GL_LINES, 0, Sys_Global.debugLineVertCount / 3);
     glEnable(GL_DEPTH_TEST);
-    drawCallsRenderedThisFrame++; verticesRenderedThisFrame += Sys_Dx.debugLineVertCount / 3;
-    Sys_Dx.debugLineVertCount = 0;
+    drawCallsRenderedThisFrame++; verticesRenderedThisFrame += Sys_Global.debugLineVertCount / 3;
+    Sys_Global.debugLineVertCount = 0;
 }
 
 static inline __attribute__((always_inline)) void AddDebugLine(Vector3 start, Vector3 end) {
-    int32_t i = Sys_Dx.debugLineVertCount;
+    int32_t i = Sys_Global.debugLineVertCount;
     debugLineBuffer[i++] = start.x; debugLineBuffer[i++] = start.y; debugLineBuffer[i++] = start.z;
     debugLineBuffer[i++] =   end.x; debugLineBuffer[i++] =   end.y; debugLineBuffer[i++] =   end.z;
-    Sys_Dx.debugLineVertCount = i;
+    Sys_Global.debugLineVertCount = i;
 }
 
 #define FROB_DISTANCE 4.9f
@@ -1173,15 +1173,15 @@ static inline __attribute__((always_inline)) void Frob(Vector3 pos, Vector3 forw
                              view.x * right.y + view.y * up.y + view.z * (flipForward.y),
                              view.x * right.z + view.y * up.z + view.z * (flipForward.z) };
                              
-    Sys_Dx.debugLine_start = pos;
-    Sys_Dx.debugLine_end   = (Vector3){ dir.x * FROB_DISTANCE + pos.x, dir.y * FROB_DISTANCE + pos.y, dir.z * FROB_DISTANCE + pos.z };
+    Sys_Global.debugLine_start = pos;
+    Sys_Global.debugLine_end   = (Vector3){ dir.x * FROB_DISTANCE + pos.x, dir.y * FROB_DISTANCE + pos.y, dir.z * FROB_DISTANCE + pos.z };
     RaycastHit tempHit = Raycast(pos, dir, FROB_DISTANCE, LAYER_MASK_PLAYER_FROB);
     if (tempHit.hit) {
-        Sys_Dx.debugLine_end = tempHit.point;
+        Sys_Global.debugLine_end = tempHit.point;
         DualLog("Raycast hit!  Hit object %u named of entity type %s(%u) at hit point %f %f %f\n", tempHit.hitInstanceIndex, entities[Sys_Global.instances[tempHit.hitInstanceIndex].index].path, Sys_Global.instances[tempHit.hitInstanceIndex].index, (double)tempHit.point.x, (double)tempHit.point.y, (double)tempHit.point.z);
     }
     
-    Sys_Dx.debugLineFinished = Sys_Global.current_time + 3.0;
+    Sys_Global.debugLineFinished = Sys_Global.current_time + 3.0;
 }
 
 #define SHADOW_NEARMESH_MAX 512 // 350 was too low for light 712 on security atrium
@@ -1445,14 +1445,14 @@ static inline __attribute__((always_inline)) double RenderUI(void) {
     
     double time_now = get_time();
     if (Sys_Cheats.showFPS) {
-        Sys_Dx.thisFrameTime = (time_now - Sys_Global.last_time) * 1000.0;
-        Sys_Dx.cpuFrameTime = Sys_Dx.cpuTime * 1000.0;
+        Sys_Global.thisFrameTime = (time_now - Sys_Global.last_time) * 1000.0;
+        Sys_Global.cpuFrameTime = Sys_Global.cpuTime * 1000.0;
         uint8_t timingColor = TEXT_WHITE;
-        if (vabs(Sys_Dx.thisFrameTime - Sys_Dx.cpuFrameTime) < 0.451) timingColor = TEXT_GREEN;
-        if (Sys_Dx.thisFrameTime > 6.944444) timingColor = TEXT_RED;
+        if (vabs(Sys_Global.thisFrameTime - Sys_Global.cpuFrameTime) < 0.451) timingColor = TEXT_GREEN;
+        if (Sys_Global.thisFrameTime > 6.944444) timingColor = TEXT_RED;
         drawCallsRenderedThisFrame += 2; textDrawCallsRenderedThisFrame += 2; // Add two more for this text render ;)
-        RenderFormattedText(16, debugTextStartY - lineSpacing, timingColor, FONT_NORMAL,1.0f, "ms: %.2f, CPU %.2f", Sys_Dx.thisFrameTime,Sys_Dx.cpuFrameTime);
-        RenderFormattedText(16 + 230.0f, debugTextStartY - lineSpacing, TEXT_WHITE, FONT_NORMAL,1.0f, "(FPS: %d, Worst: %d), Drwclls: %d [G %d UI %d Txt %d Shd %d] Vrts: %d E:%u|M:%u|P:%u|T:%.5f",Sys_Dx.framesPerLastSecond,Sys_Dx.worstFPS,drawCallsRenderedThisFrame,drawCallsNormal,uiImageDrawCallsRenderedThisFrame,textDrawCallsRenderedThisFrame,shadowDrawCallsRenderedThisFrame,verticesRenderedThisFrame,Sys_Cheats.editMode,Sys_Global.menuActive,Sys_Global.gamePaused,Sys_Global.pauseRelativeTime);
+        RenderFormattedText(16, debugTextStartY - lineSpacing, timingColor, FONT_NORMAL,1.0f, "ms: %.2f, CPU %.2f", Sys_Global.thisFrameTime,Sys_Global.cpuFrameTime);
+        RenderFormattedText(16 + 230.0f, debugTextStartY - lineSpacing, TEXT_WHITE, FONT_NORMAL,1.0f, "(FPS: %d, Worst: %d), Drwclls: %d [G %d UI %d Txt %d Shd %d] Vrts: %d E:%u|M:%u|P:%u|T:%.5f",Sys_Global.framesPerLastSecond,Sys_Global.worstFPS,drawCallsRenderedThisFrame,drawCallsNormal,uiImageDrawCallsRenderedThisFrame,textDrawCallsRenderedThisFrame,shadowDrawCallsRenderedThisFrame,verticesRenderedThisFrame,Sys_Cheats.editMode,Sys_Global.menuActive,Sys_Global.gamePaused,Sys_Global.pauseRelativeTime);
     }
     
     return time_now;
@@ -1751,7 +1751,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
     glUseProgram(Sys_Render.chunkShaderProgram);
     glUniformMatrix4fv(2, 1, GL_FALSE, viewProj);
     glUniform1ui(3, 0u); // isUI false
-    float fogActual = fogBaseDensityForLevel + (float)(fogFac / 255u);
+    float fogActual = fogBaseDensityForLevel + (float)(Sys_Global.fogFac / 255u);
     glUniform3f(4, fogColorR * fogActual, fogColorG * fogActual, fogColorB * fogActual); // Fog Color(which is density)
     glUniform1ui(14, Sys_Settings.Reflections);   glUniform1ui(15, Sys_Settings.Shadows);
     glUniform1f(8, worldMin_x);   glUniform1f(9, worldMin_z);    glUniform3f(10, playerPos.x, playerPos.y, playerPos.z);
@@ -1764,7 +1764,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
     RenderInstances(playerPos, true); // opaque, then transparents
     
     // Draw Debug Lines
-    if (unlikely(Sys_Dx.debugLineVertCount > 1)) DrawDebugLines(viewProj);
+    if (unlikely(Sys_Global.debugLineVertCount > 1)) DrawDebugLines(viewProj);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     if (likely(Sys_Settings.Reflections > 0u)) { // Screen Space Reflections
         glUseProgram(Sys_Render.ssrShaderProgram);
@@ -1822,14 +1822,14 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
     if ((Sys_Global.inventoryMode && !Sys_Cheats.noHUD) || Sys_Global.menuActive || Sys_Global.gamePaused) RenderUIImage((int16_t)(cursorPosition_x) - 20, (int16_t)(cursorPosition_y) - 20, 40,40, cursorTexture);
     else RenderUIImage(683-20,371, 40,40, cursorTexture);
     
-    if ((Sys_Global.last_time - Sys_Dx.lastFrameSecCountTime) >= 1.00) { // Update Diagnostic Poll
-        Sys_Dx.lastFrameSecCountTime = Sys_Global.last_time;
-        Sys_Dx.framesPerLastSecond = Sys_Dx.globalFrameNum - Sys_Dx.lastFrameSecCount;
-        if (Sys_Dx.framesPerLastSecond < Sys_Dx.worstFPS && Sys_Dx.globalFrameNum > 2000) Sys_Dx.worstFPS = Sys_Dx.framesPerLastSecond; // After startup, keep track of worst framerate seen.
-        Sys_Dx.lastFrameSecCount = Sys_Dx.globalFrameNum;
+    if ((Sys_Global.last_time - Sys_Global.lastFrameSecCountTime) >= 1.00) { // Update Diagnostic Poll
+        Sys_Global.lastFrameSecCountTime = Sys_Global.last_time;
+        Sys_Global.framesPerLastSecond = Sys_Global.globalFrameNum - Sys_Global.lastFrameSecCount;
+        if (Sys_Global.framesPerLastSecond < Sys_Global.worstFPS && Sys_Global.globalFrameNum > 2000) Sys_Global.worstFPS = Sys_Global.framesPerLastSecond; // After startup, keep track of worst framerate seen.
+        Sys_Global.lastFrameSecCount = Sys_Global.globalFrameNum;
     }
     
-    Sys_Dx.cpuTime = get_time() - Sys_Global.current_time; // Measure time over everything this frame before GPU swap buffers
+    Sys_Global.cpuTime = get_time() - Sys_Global.current_time; // Measure time over everything this frame before GPU swap buffers
     glfwSwapBuffers(window); // Present frame
     CHECK_GL_ERROR();
 }
@@ -1866,13 +1866,12 @@ int32_t main(void) {
         if (likely(!Sys_Global.gamePaused && !Sys_Global.menuActive)) { // Update Gameplay
             ModUpdate();
             if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].released) Frob(Sys_Global.instances[PLAYER1].position, Sys_Global.instances[PLAYER1].forward, Sys_Global.instances[PLAYER1].right);
-            if (Sys_Global.current_time < Sys_Dx.debugLineFinished && (Sys_Dx.debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Sys_Dx.debugLine_start, Sys_Dx.debugLine_end);
+            if (Sys_Global.current_time < Sys_Global.debugLineFinished && (Sys_Global.debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Sys_Global.debugLine_start, Sys_Global.debugLine_end);
 //             for (uint16_t i=START_INDEX_LEVEL_INSTANCES;i<loadedInstances;++i) UpdateWhileNotPaused(i); // TODO Get new states prior to updating animations, physics event, or rendering
 //             Sys_Global.instances[editModeSelection].index = editModeTestEntityDefinition;
 //             Sys_Global.instances[editModeSelection].modelIndex = entities[editModeTestEntityDefinition].modelIndex;
 //             Sys_Global.instances[editModeSelection].texIndex = entities[editModeTestEntityDefinition].modelIndex;
             UpdateAmbientSounds();
-            WeaponsUpdate();
         }
 
         if (!Sys_Global.gamePaused && !Sys_Global.menuActive) UpdatePlayerFacingAngles();
@@ -1914,15 +1913,15 @@ int32_t main(void) {
         }
         
         Render();
-        Sys_Dx.globalFrameNum++;
+        Sys_Global.globalFrameNum++;
         InputClearRisingAndFallingEdges();
         Sys_Input.currentMouse_dx = Sys_Input.currentMouse_dy = 0;
         #ifdef DEBUG_RAM_OUTPUT
-            if (Sys_Dx.globalFrameNum == 4) { DebugRAM("after 4 frames of running"); }
-            else if (Sys_Dx.globalFrameNum == 100) { DebugRAM("after 100 frames of running"); }
-            else if (Sys_Dx.globalFrameNum == 200) DebugRAM("after 200 frames of running");
-            else if (Sys_Dx.globalFrameNum == 500) DebugRAM("after 500 frames of running");
-            else if (Sys_Dx.globalFrameNum == 1000) DebugRAM("after 1000 frames of running");
+            if (Sys_Global.globalFrameNum == 4) { DebugRAM("after 4 frames of running"); }
+            else if (Sys_Global.globalFrameNum == 100) { DebugRAM("after 100 frames of running"); }
+            else if (Sys_Global.globalFrameNum == 200) DebugRAM("after 200 frames of running");
+            else if (Sys_Global.globalFrameNum == 500) DebugRAM("after 500 frames of running");
+            else if (Sys_Global.globalFrameNum == 1000) DebugRAM("after 1000 frames of running");
         #endif
     }
     return 0;

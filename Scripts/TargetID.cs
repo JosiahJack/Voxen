@@ -158,7 +158,7 @@ public class TargetID : MonoBehaviour {
 					} else {
 						if (damageTimeFinished < Eng_Global->pauseRelativeTime) {
 							currentText = "";
-							if (!inventoryPlayer1.hasHardware[4]
+							if (!Eng_Global->inventoryPlayer1.hasHardware[4]
 								&& (currentText != Sys_Text.stringTable[511])) {
 
 								Deactivate();
@@ -176,7 +176,7 @@ public class TargetID : MonoBehaviour {
 		float sensingRange = 12f;
 		if (manual) {
 			// Get manual lockon distance for frob raytrace.  Less than tether.
-			switch (inventoryPlayer1.hardwareVersion[4]) {
+			switch (Eng_Global->inventoryPlayer1.hardwareVersion[4]) {
 				case 1: sensingRange = 13f; break;
 				case 2: sensingRange = 13f; break;
 				case 3: sensingRange = 13f; break;
@@ -184,7 +184,7 @@ public class TargetID : MonoBehaviour {
 			}
 		} else {
 			// Get auto-lock distance.  Less than tether.
-			switch (inventoryPlayer1.hardwareVersion[4]) {
+			switch (Eng_Global->inventoryPlayer1.hardwareVersion[4]) {
 				case 1: sensingRange = 0f; break; // No auto-lock on v1
 				case 2: sensingRange = 0f; break; // No auto-lock on v2
 				case 3: sensingRange = 13f; break;
@@ -197,7 +197,7 @@ public class TargetID : MonoBehaviour {
 	// Set to higher than the auto-lock distances above.
 	public static float GetTargetIDTetherRange() {
 		float dist = 15f;
-		switch (inventoryPlayer1.hardwareVersion[4]) {
+		switch (Eng_Global->inventoryPlayer1.hardwareVersion[4]) {
 			case 1: dist = 15f; break; // Set higher than manual lockons.
 			case 2: dist = 15f; break; // Set higher than manual lockons.
 			case 3: dist = 15f; break;

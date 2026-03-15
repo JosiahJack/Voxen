@@ -68,10 +68,10 @@ public class GrenadeActivate : MonoBehaviour {
 			case 7: explodeOnContact = true; break; // Fragmentation Grenade
 			case 8: explodeOnContact = true; break; // Concussion Grenade
 			case 9: explodeOnContact = true; break; // EMP Grenade
-			case 10: timeFinished = Eng_Global->pauseRelativeTime + inventoryPlayer1.earthShakerTimeSetting;
+			case 10: timeFinished = Eng_Global->pauseRelativeTime + Eng_Global->inventoryPlayer1.earthShakerTimeSetting;
 					 useTimer = true; break;        // Earthshaker Bomb
 			case 11: useProx = true; explodeOnContact = false; break; // Land Mine
-			case 12: timeFinished = Eng_Global->pauseRelativeTime + inventoryPlayer1.nitroTimeSetting; 
+			case 12: timeFinished = Eng_Global->pauseRelativeTime + Eng_Global->inventoryPlayer1.nitroTimeSetting; 
 					 useTimer = true; break;        // Nitropack Explosive
 			case 13: explodeOnContact = true; break; // Gas Grenade
 			default: return;
@@ -110,13 +110,13 @@ public class GrenadeActivate : MonoBehaviour {
 			explosionEffect.Eng_Global->instances[i].position = Eng_Global->instances[i].position;
 			int soundIndex = 60; // attack1_explode
 			switch(constIndex) {
-				case 7:  soundIndex = 64; fogFac += 5; break; // frag, explosion1
-				case 8:  soundIndex = 60; fogFac += 7; break; // conc, attack1_explode
+				case 7:  soundIndex = 64; Eng_Global->fogFac += 5; break; // frag, explosion1
+				case 8:  soundIndex = 60; Eng_Global->fogFac += 7; break; // conc, attack1_explode
 				case 9:  soundIndex = 67; break; // emp, hit2
-				case 10: soundIndex = 60; fogFac += 7; break; // earth, attack1_explode
-				case 11: soundIndex = 64; fogFac += 5; break; // mine, explosion1
-				case 12: soundIndex = 60; fogFac += 6; break; // nitro, attack1_explode
-				case 13: soundIndex = 63; fogFac += 10; break; // gas, explode_minor
+				case 10: soundIndex = 60; Eng_Global->fogFac += 7; break; // earth, attack1_explode
+				case 11: soundIndex = 64; Eng_Global->fogFac += 5; break; // mine, explosion1
+				case 12: soundIndex = 60; Eng_Global->fogFac += 6; break; // nitro, attack1_explode
+				case 13: soundIndex = 63; Eng_Global->fogFac += 10; break; // gas, explode_minor
 			}
 			
 			play_wav(sounds[soundIndex],1.0f,Eng_Global->instances[i].position,true);

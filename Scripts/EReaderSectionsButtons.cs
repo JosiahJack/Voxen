@@ -16,11 +16,11 @@ public class EReaderSectionsButtons : MonoBehaviour {
 	}
 
 	public void HighlightOthers() {
-		inventoryPlayer1.CheckForUnreadLogs();
-		if (inventoryPlayer1.hasNewEmail) ersbh0.HighlightButton();
-		if (inventoryPlayer1.hasNewLogs) ersbh1.HighlightButton();
-		if (inventoryPlayer1.hasNewData) ersbh2.HighlightButton();
-		if (inventoryPlayer1.hasNewNotes) ersbh3.HighlightButton();
+		Eng_Global->inventoryPlayer1.CheckForUnreadLogs();
+		if (Eng_Global->inventoryPlayer1.hasNewEmail) ersbh0.HighlightButton();
+		if (Eng_Global->inventoryPlayer1.hasNewLogs) ersbh1.HighlightButton();
+		if (Eng_Global->inventoryPlayer1.hasNewData) ersbh2.HighlightButton();
+		if (Eng_Global->inventoryPlayer1.hasNewNotes) ersbh3.HighlightButton();
 	}
 
 	public void OnClick(int index) {

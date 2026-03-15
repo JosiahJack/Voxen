@@ -241,8 +241,8 @@
 		if (isPlayer) {
 			float absorb = 0;
 			if (inCyberSpace) {
-				if (inventoryPlayer1.hasSoft[2]) {
-					switch(inventoryPlayer1.softVersions[2]) {
+				if (Eng_Global->inventoryPlayer1.hasSoft[2]) {
+					switch(Eng_Global->inventoryPlayer1.softVersions[2]) {
 						case 0: absorb = 0.00f; break;
 						case 1: absorb = 0.10f; break;
 						case 2: absorb = 0.15f; break;
@@ -269,11 +269,11 @@
 					}
 				}
 
-				if (inventoryPlayer1.hardwareIsActive[5] && inventoryPlayer1.hasHardware[5]) {
+				if (Eng_Global->inventoryPlayer1.hardwareIsActive[5] && Eng_Global->inventoryPlayer1.hasHardware[5]) {
 					// Versions of shield protect against 20, 40, 75, 75%'s
 					// Versions of shield thresholds are 0, 10, 15, 30...ooh what's this hang on now...Huh, turns out it absorbs all damage below the thresshold!  Cool!
 					float thresh = 0;
-					switch(inventoryPlayer1.hardwareVersion[5]) {
+					switch(Eng_Global->inventoryPlayer1.hardwareVersion[5]) {
 						case 0: absorb = 0.2f;   thresh = 0f; break;
 						case 1: absorb = 0.4f;  thresh = 10f; break;
 						case 2: absorb = 0.75f; thresh = 15f; break;

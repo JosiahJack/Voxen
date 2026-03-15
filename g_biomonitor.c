@@ -1,5 +1,6 @@
 // biomonotor.c - Biomonitor Graph and Text displays.
-#include "voxen.h"
+#include "mod.h"
+
 #define BIOM_ERG 0
 #define BIOM_CHI 1
 #define BIOM_ECG 2
@@ -60,11 +61,11 @@ void BioMonitorClearGraphs(void) {
 //     }
     for (int y=0;y<BIOM_GRAPH_H;y++) bioMonitor.currentColors[y] = bioMonitor.backgroundColor;
     bioMonitor.ymax = (BIOM_GRAPH_H - 1);
-    bioMonitor.beatFinished  = Sys_Global.pauseRelativeTime;
-    bioMonitor.tick0Finished = Sys_Global.pauseRelativeTime + bioMonitor.tick0;
-    bioMonitor.tick1Finished = Sys_Global.pauseRelativeTime + bioMonitor.tick1;
-    bioMonitor.tick2Finished = Sys_Global.pauseRelativeTime + bioMonitor.tick2;
-    bioMonitor.tickFinished  = Sys_Global.pauseRelativeTime + bioMonitor.tick;
+    bioMonitor.beatFinished  = Eng_Global->pauseRelativeTime;
+    bioMonitor.tick0Finished = Eng_Global->pauseRelativeTime + bioMonitor.tick0;
+    bioMonitor.tick1Finished = Eng_Global->pauseRelativeTime + bioMonitor.tick1;
+    bioMonitor.tick2Finished = Eng_Global->pauseRelativeTime + bioMonitor.tick2;
+    bioMonitor.tickFinished  = Eng_Global->pauseRelativeTime + bioMonitor.tick;
     bioMonitor.currentIndex0 = (int)(BIOM_GRAPH_W * random_range(0.0f,1.0f));
     bioMonitor.currentIndex1 = (int)(BIOM_GRAPH_W * random_range(0.0f,1.0f));
     bioMonitor.currentIndex2 = (int)(BIOM_GRAPH_W * random_range(0.0f,1.0f));
@@ -90,24 +91,24 @@ void BioMonitorInit(void) {
 }
 
 static void IncrementERG(void) {
-    if (Sys_Global.gamePaused) return;
-    if (Sys_Global.menuActive) return;
+    if (Eng_Global->gamePaused) return;
+    if (Eng_Global->menuActive) return;
 
     bioMonitor.currentIndex0++;
     if (bioMonitor.currentIndex0 >= BIOM_GRAPH_W) bioMonitor.currentIndex0 = 0;
 }
 
 static void IncrementCHI(void) {
-    if (Sys_Global.gamePaused) return;
-    if (Sys_Global.menuActive) return;
+    if (Eng_Global->gamePaused) return;
+    if (Eng_Global->menuActive) return;
 
     bioMonitor.currentIndex1++;
     if (bioMonitor.currentIndex1 >= BIOM_GRAPH_W) bioMonitor.currentIndex1 = 0;
 }
 
 static void IncrementECG(void) {
-    if (Sys_Global.gamePaused) return;
-    if (Sys_Global.menuActive) return;
+    if (Eng_Global->gamePaused) return;
+    if (Eng_Global->menuActive) return;
 
     bioMonitor.currentIndex2++;
     if (bioMonitor.currentIndex2 >= BIOM_GRAPH_W) bioMonitor.currentIndex2 = 0;
@@ -243,71 +244,71 @@ static void BiomonitorEnergyPulse(float take) {
 #pragma GCC diagnostic pop
 
 void BioMonitorUpdate(void) {
-    if (!(inventoryPlayer1.hasHardware & HW_BIO) || !(inventoryPlayer1.hardwareIsActive & HW_BIO)) return;
+    if (!(Eng_Global->inventoryPlayer1.hasHardware & HW_BIO) || !(Eng_Global->inventoryPlayer1.hardwareIsActive & HW_BIO)) return;
 
     bioMonitor.header = 526;
     bioMonitor.heartRateText = 527;
     bioMonitor.bpmText = 529;
     bioMonitor.fatigueDetailText = 531;
     bioMonitor.fatigue = 534; // Low
-         if (Sys_Global.instances[PLAYER1].fatigue >= 80.0f)                                       bioMonitor.fatigue = 532; // High!
-    else if (Sys_Global.instances[PLAYER1].fatigue <  80.0f && Sys_Global.instances[PLAYER1].fatigue > 30.0f) bioMonitor.fatigue = 533; // Moderate
+         if (Eng_Global->instances[PLAYER1].fatigue >= 80.0f)                                       bioMonitor.fatigue = 532; // High!
+    else if (Eng_Global->instances[PLAYER1].fatigue <  80.0f && Eng_Global->instances[PLAYER1].fatigue > 30.0f) bioMonitor.fatigue = 533; // Moderate
 
-    if (bioMonitor.beatFinished < Sys_Global.pauseRelativeTime) bioMonitor.heartRate = vfloor((70.0f +((Sys_Global.instances[PLAYER1].fatigue / 100.0f) * 110.0f)) * random_range(0.95f,1.05f));
-    if (inventoryPlayer1.hardwareVersion[HW_BIO_IDX] > 1 && (Sys_Global.instances[PLAYER1].patchActive & 127)) {
+    if (bioMonitor.beatFinished < Eng_Global->pauseRelativeTime) bioMonitor.heartRate = vfloor((70.0f +((Eng_Global->instances[PLAYER1].fatigue / 100.0f) * 110.0f)) * random_range(0.95f,1.05f));
+    if (Eng_Global->inventoryPlayer1.hardwareVersion[HW_BIO_IDX] > 1 && (Eng_Global->instances[PLAYER1].patchActive & 127)) {
 //         bioMonitor.patchesActiveText = Sys_Text.stringTable[528]; // TODO actually render text
-//         if (Sys_Global.instances[PLAYER1].patchActive & PATCH_MEDI))     { tempStr.Append(Sys_Text.stringTable[520]); tempStr.Append(" "); }
-//         if (Sys_Global.instances[PLAYER1].patchActive & PATCH_STAMINUP)) { tempStr.Append(Sys_Text.stringTable[521]); tempStr.Append(" "); }
-//         if (Sys_Global.instances[PLAYER1].patchActive & PATCH_SIGHT))    { tempStr.Append(Sys_Text.stringTable[522]); tempStr.Append(" "); }
-//         if (Sys_Global.instances[PLAYER1].patchActive & PATCH_GENIUS))   { tempStr.Append(Sys_Text.stringTable[523]); tempStr.Append(" "); }
-//         if (Sys_Global.instances[PLAYER1].patchActive & PATCH_BERSERK))  { tempStr.Append(Sys_Text.stringTable[524]); tempStr.Append(" "); }
-//         if (Sys_Global.instances[PLAYER1].patchActive & PATCH_REFLEX))   { tempStr.Append(Sys_Text.stringTable[525]); tempStr.Append(" "); }
-//         if (Sys_Global.instances[PLAYER1].patchActive & PATCH_DETOX))    { tempStr.Append(Sys_Text.stringTable[530]); }
+//         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_MEDI))     { tempStr.Append(Sys_Text.stringTable[520]); tempStr.Append(" "); }
+//         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_STAMINUP)) { tempStr.Append(Sys_Text.stringTable[521]); tempStr.Append(" "); }
+//         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_SIGHT))    { tempStr.Append(Sys_Text.stringTable[522]); tempStr.Append(" "); }
+//         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_GENIUS))   { tempStr.Append(Sys_Text.stringTable[523]); tempStr.Append(" "); }
+//         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_BERSERK))  { tempStr.Append(Sys_Text.stringTable[524]); tempStr.Append(" "); }
+//         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_REFLEX))   { tempStr.Append(Sys_Text.stringTable[525]); tempStr.Append(" "); }
+//         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_DETOX))    { tempStr.Append(Sys_Text.stringTable[530]); }
 //         patchEffects.text = tempStr.ToString();
-//         if (!Sys_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, FONT_NORMAL,1.0f,"Player cell: %u, floor: %.3f, ceil: %.3f", Sys_Global.instances[PLAYER1].cellIndex, (double)gridCellFloorHeight[Sys_Global.instances[PLAYER1].cellIndex], (double)gridCellCeilingHeight[Sys_Global.instances[PLAYER1].cellIndex]); TODO
+//         if (!Sys_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, FONT_NORMAL,1.0f,"Player cell: %u, floor: %.3f, ceil: %.3f", Eng_Global->instances[PLAYER1].cellIndex, (double)gridCellFloorHeight[Eng_Global->instances[PLAYER1].cellIndex], (double)gridCellCeilingHeight[Eng_Global->instances[PLAYER1].cellIndex]); TODO
     }
 
     static const float beatThresh = 0.1f;
     static const float beatVariation = 0.05f;
 
     // Energy Usage
-    bioMonitor.ergValue = (Sys_Global.instances[PLAYER1].drainJPM / 255.0f);
+    bioMonitor.ergValue = (Eng_Global->instances[PLAYER1].drainJPM / 255.0f);
     if (bioMonitor.ergValue < 0.0f) bioMonitor.ergValue = 0.0f;
     if (bioMonitor.ergValue > 1.0f) bioMonitor.ergValue = 1.0f;
 
     // Chi Brain Waves
     float brainFactor = 0.15f;
-    if (Sys_Global.instances[PLAYER1].geniusFinishedTime > Sys_Global.pauseRelativeTime) {
+    if (Eng_Global->instances[PLAYER1].geniusFinishedTime > Eng_Global->pauseRelativeTime) {
         brainFactor = 0.35f + random_range(-0.3f,0.3f);
     }
 
-    if (Sys_Cheats.showFPS) bioMonitor.chiValue = (((float)Sys_Dx.thisFrameTime/16.0f) * 0.5f) - 2.0f;
-    else                    bioMonitor.chiValue = (float)(vsinf(Sys_Global.pauseRelativeTime * 10.0 * (double)brainFactor));
+    if (Sys_Cheats.showFPS) bioMonitor.chiValue = (((float)Eng_Global->thisFrameTime/16.0f) * 0.5f) - 2.0f;
+    else                    bioMonitor.chiValue = (float)(vsinf(Eng_Global->pauseRelativeTime * 10.0 * (double)brainFactor));
 
     // ECG: Create shifted sine wave for heart beat.
     // Apply percent fatigued to 200bpm max heart rate with baseline 50bpm.
-    float fatigueFactor = ((Sys_Global.instances[PLAYER1].fatigue / 100.0f) * 120.0f) + 20.0f;
+    float fatigueFactor = ((Eng_Global->instances[PLAYER1].fatigue / 100.0f) * 120.0f) + 20.0f;
     fatigueFactor = fatigueFactor / 60.0f;
-    if (bioMonitor.beatFinished < Sys_Global.pauseRelativeTime) {
-        bioMonitor.beatFinished = Sys_Global.pauseRelativeTime + (1.0 / (double)fatigueFactor);
+    if (bioMonitor.beatFinished < Eng_Global->pauseRelativeTime) {
+        bioMonitor.beatFinished = Eng_Global->pauseRelativeTime + (1.0 / (double)fatigueFactor);
     }
 
-    bioMonitor.beatShift = (bioMonitor.beatFinished - Sys_Global.pauseRelativeTime) / (1.0 / (double)fatigueFactor);
+    bioMonitor.beatShift = (bioMonitor.beatFinished - Eng_Global->pauseRelativeTime) / (1.0 / (double)fatigueFactor);
     if (bioMonitor.beatShift > 0.94f) bioMonitor.ecgValue = vsinf(bioMonitor.beatShift * 35.0f);
     else bioMonitor.ecgValue = 0.0f;
 
         // Inject variation when beating
     if (bioMonitor.ecgValue > beatThresh || bioMonitor.ecgValue < (beatThresh * -1.0f)) bioMonitor.ecgValue += random_range_i32(-beatVariation,beatVariation);
-    if (bioMonitor.tick0Finished < Sys_Global.pauseRelativeTime) {
-        bioMonitor.tick0Finished = Sys_Global.pauseRelativeTime + bioMonitor.tick0;
+    if (bioMonitor.tick0Finished < Eng_Global->pauseRelativeTime) {
+        bioMonitor.tick0Finished = Eng_Global->pauseRelativeTime + bioMonitor.tick0;
         Push(0,bioMonitor.ergValue); IncrementERG();
         Push(0,bioMonitor.ergValue); IncrementERG();
         Push(0,bioMonitor.ergValue);
     }
 
-    if (bioMonitor.tick1Finished < Sys_Global.pauseRelativeTime) {
-        if (Sys_Cheats.showFPS) bioMonitor.tick1Finished = Sys_Global.pauseRelativeTime + bioMonitor.tick2;
-        else                                    bioMonitor.tick1Finished = Sys_Global.pauseRelativeTime + bioMonitor.tick1;
+    if (bioMonitor.tick1Finished < Eng_Global->pauseRelativeTime) {
+        if (Sys_Cheats.showFPS) bioMonitor.tick1Finished = Eng_Global->pauseRelativeTime + bioMonitor.tick2;
+        else                                    bioMonitor.tick1Finished = Eng_Global->pauseRelativeTime + bioMonitor.tick1;
 
         Push(1,bioMonitor.chiValue); IncrementCHI();
         Push(1,bioMonitor.chiValue); IncrementCHI();
@@ -315,8 +316,8 @@ void BioMonitorUpdate(void) {
         Push(1,bioMonitor.chiValue);
     }
 
-    if (bioMonitor.tick2Finished < Sys_Global.pauseRelativeTime) {
-        bioMonitor.tick2Finished = Sys_Global.pauseRelativeTime + bioMonitor.tick2;
+    if (bioMonitor.tick2Finished < Eng_Global->pauseRelativeTime) {
+        bioMonitor.tick2Finished = Eng_Global->pauseRelativeTime + bioMonitor.tick2;
         Push(2,bioMonitor.ecgValue); IncrementECG();
         Push(2,bioMonitor.ecgValue);
     }
@@ -373,8 +374,8 @@ void BioMonitorUpdate(void) {
         }
     }
 
-    if (bioMonitor.tickFinished < Sys_Global.pauseRelativeTime) {
-        bioMonitor.tickFinished = Sys_Global.pauseRelativeTime + bioMonitor.tick;
+    if (bioMonitor.tickFinished < Eng_Global->pauseRelativeTime) {
+        bioMonitor.tickFinished = Eng_Global->pauseRelativeTime + bioMonitor.tick;
         IncrementERG(); IncrementCHI(); IncrementECG();
     }
     

@@ -144,12 +144,12 @@ public class PauseScript : MonoBehaviour {
 			MouseLookScript.a.ToggleInventoryMode();
 		}
 		
-		if (inventoryPlayer1.vmailbetajet.activeInHierarchy) inventoryPlayer1.vmailbetajetVideo.Pause();
-		if (inventoryPlayer1.vmailbridgesep.activeInHierarchy) inventoryPlayer1.vmailbridgesepVideo.Pause();
-		if (inventoryPlayer1.vmailcitadestruct.activeInHierarchy) inventoryPlayer1.vmailcitadestructVideo.Pause();
-		if (inventoryPlayer1.vmailgenstatus.activeInHierarchy) inventoryPlayer1.vmailgenstatusVideo.Pause();
-		if (inventoryPlayer1.vmaillaserdest.activeInHierarchy) inventoryPlayer1.vmaillaserdestVideo.Pause();
-		if (inventoryPlayer1.vmailshieldsup.activeInHierarchy) inventoryPlayer1.vmailshieldsupVideo.Pause();
+		if (Eng_Global->inventoryPlayer1.vmailbetajet.activeInHierarchy) Eng_Global->inventoryPlayer1.vmailbetajetVideo.Pause();
+		if (Eng_Global->inventoryPlayer1.vmailbridgesep.activeInHierarchy) Eng_Global->inventoryPlayer1.vmailbridgesepVideo.Pause();
+		if (Eng_Global->inventoryPlayer1.vmailcitadestruct.activeInHierarchy) Eng_Global->inventoryPlayer1.vmailcitadestructVideo.Pause();
+		if (Eng_Global->inventoryPlayer1.vmailgenstatus.activeInHierarchy) Eng_Global->inventoryPlayer1.vmailgenstatusVideo.Pause();
+		if (Eng_Global->inventoryPlayer1.vmaillaserdest.activeInHierarchy) Eng_Global->inventoryPlayer1.vmaillaserdestVideo.Pause();
+		if (Eng_Global->inventoryPlayer1.vmailshieldsup.activeInHierarchy) Eng_Global->inventoryPlayer1.vmailshieldsupVideo.Pause();
 		EnablePauseUI();
 		pauseText.SetActive(true);
 	}
@@ -162,12 +162,12 @@ public class PauseScript : MonoBehaviour {
 			MouseLookScript.a.SetCameraCullDistances();
 		}
 		DisablePauseUI();
-		if (inventoryPlayer1.vmailbetajet.activeInHierarchy) inventoryPlayer1.vmailbetajetVideo.Play();
-		if (inventoryPlayer1.vmailbridgesep.activeInHierarchy) inventoryPlayer1.vmailbridgesepVideo.Play();
-		if (inventoryPlayer1.vmailcitadestruct.activeInHierarchy) inventoryPlayer1.vmailcitadestructVideo.Play();
-		if (inventoryPlayer1.vmailgenstatus.activeInHierarchy) inventoryPlayer1.vmailgenstatusVideo.Play();
-		if (inventoryPlayer1.vmaillaserdest.activeInHierarchy) inventoryPlayer1.vmaillaserdestVideo.Play();
-		if (inventoryPlayer1.vmailshieldsup.activeInHierarchy) inventoryPlayer1.vmailshieldsupVideo.Play();
+		if (Eng_Global->inventoryPlayer1.vmailbetajet.activeInHierarchy) Eng_Global->inventoryPlayer1.vmailbetajetVideo.Play();
+		if (Eng_Global->inventoryPlayer1.vmailbridgesep.activeInHierarchy) Eng_Global->inventoryPlayer1.vmailbridgesepVideo.Play();
+		if (Eng_Global->inventoryPlayer1.vmailcitadestruct.activeInHierarchy) Eng_Global->inventoryPlayer1.vmailcitadestructVideo.Play();
+		if (Eng_Global->inventoryPlayer1.vmailgenstatus.activeInHierarchy) Eng_Global->inventoryPlayer1.vmailgenstatusVideo.Play();
+		if (Eng_Global->inventoryPlayer1.vmaillaserdest.activeInHierarchy) Eng_Global->inventoryPlayer1.vmaillaserdestVideo.Play();
+		if (Eng_Global->inventoryPlayer1.vmailshieldsup.activeInHierarchy) Eng_Global->inventoryPlayer1.vmailshieldsupVideo.Play();
 		pauseText.SetActive(false);
 	}
 

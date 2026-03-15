@@ -50,7 +50,7 @@ public class HardwareButton : MonoBehaviour {
 	}
 
 	// 0 = bio, 1 = sen, 2 = lan, 3 = shi, 4 = nig, 5 = ere, 6 = boo, 7 = jum
-	// verz must come from inventoryPlayer1.hardwareVersionSetting[] as this value has already subtracted 1 since the version number on prefabs is 1 based but the one needed for images is 0 based.
+	// verz must come from Eng_Global->inventoryPlayer1.hardwareVersionSetting[] as this value has already subtracted 1 since the version number on prefabs is 1 based but the one needed for images is 0 based.
 	public void SetVersionIconForButton(bool isOn, int verz, int button8Index) {
 // 		DualLog("SetVersionIconForButton with version " + verz.ToString() + ", and button8Index of " + button8Index.ToString());
 		if (button8Index < 0 || button8Index > 7) button8Index = 0;
@@ -83,13 +83,13 @@ public class HardwareButton : MonoBehaviour {
 	}
 
 	public void BioAction() {
-		if (inventoryPlayer1.BioMonitorVersion() == 0 && PlayerEnergy.a.energy <= 0) {
-			CenterStatusPrint("%s", Sys_Text.stringTable[314],inventoryPlayer1.owner);
+		if (Eng_Global->inventoryPlayer1.BioMonitorVersion() == 0 && PlayerEnergy.a.energy <= 0) {
+			CenterStatusPrint("%s", Sys_Text.stringTable[314],Eng_Global->inventoryPlayer1.owner);
 			return;
 		}
 
 		Utils.PlayUIOneShotSavable(78);
-		if (inventoryPlayer1.BioMonitorActive()) {
+		if (Eng_Global->inventoryPlayer1.BioMonitorActive()) {
 			BioOff();
 		} else {
 			BioOn();
@@ -98,8 +98,8 @@ public class HardwareButton : MonoBehaviour {
 
 	// Called by PlayerEnergy when exhausted energy to 0 so mustn't play sound.
 	public void BioOff() {
-		inventoryPlayer1.hardwareIsActive[6] = false;
-		SetVersionIconForButton(inventoryPlayer1.hardwareIsActive[6],inventoryPlayer1.hardwareVersionSetting[6],0);
+		Eng_Global->inventoryPlayer1.hardwareIsActive[6] = false;
+		SetVersionIconForButton(Eng_Global->inventoryPlayer1.hardwareIsActive[6],Eng_Global->inventoryPlayer1.hardwareVersionSetting[6],0);
 		
 		if (Eng_Cheats->showFPS) return;
 		if (BiomonitorGraphSystem.a != null) {
@@ -110,8 +110,8 @@ public class HardwareButton : MonoBehaviour {
 	}
 
 	public void BioOn() {
-		inventoryPlayer1.hardwareIsActive[6] = true;
-		SetVersionIconForButton(inventoryPlayer1.BioMonitorActive(),inventoryPlayer1.hardwareVersionSetting[6],0);
+		Eng_Global->inventoryPlayer1.hardwareIsActive[6] = true;
+		SetVersionIconForButton(Eng_Global->inventoryPlayer1.BioMonitorActive(),Eng_Global->inventoryPlayer1.hardwareVersionSetting[6],0);
 		Utils.Activate(bioMonitorContainer);
 	}
 
@@ -140,9 +140,9 @@ public class HardwareButton : MonoBehaviour {
 	}
 	
 	public void UnhideSensaround() {
-		if (!inventoryPlayer1.hardwareIsActive[3]) return;
+		if (!Eng_Global->inventoryPlayer1.hardwareIsActive[3]) return;
 		
-		if (inventoryPlayer1.hardwareVersion[3] == 1) {
+		if (Eng_Global->inventoryPlayer1.hardwareVersion[3] == 1) {
 			ActivateSensaroundCenter(); // Only center on version 1.
 		} else {
 			ActivateSensaroundCenter();
@@ -160,8 +160,8 @@ public class HardwareButton : MonoBehaviour {
 	}
 
 	public void SensaroundOn() {
-		inventoryPlayer1.hardwareIsActive[3] = true;
-		SetVersionIconForButton(inventoryPlayer1.hardwareIsActive[3], inventoryPlayer1.hardwareVersionSetting[3],1);
+		Eng_Global->inventoryPlayer1.hardwareIsActive[3] = true;
+		SetVersionIconForButton(Eng_Global->inventoryPlayer1.hardwareIsActive[3], Eng_Global->inventoryPlayer1.hardwareVersionSetting[3],1);
 		UnhideSensaround();
 	}
 
@@ -171,9 +171,9 @@ public class HardwareButton : MonoBehaviour {
 	}
 
 	public void SensaroundAction() {
-		if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Sys_Text.stringTable[314],inventoryPlayer1.owner); return; }
+		if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Sys_Text.stringTable[314],Eng_Global->inventoryPlayer1.owner); return; }
 
-		if (inventoryPlayer1.hardwareIsActive[3]) {
+		if (Eng_Global->inventoryPlayer1.hardwareIsActive[3]) {
 			Utils.PlayUIOneShotSavable(82);
 			SensaroundOff();
 		} else {
@@ -184,8 +184,8 @@ public class HardwareButton : MonoBehaviour {
 
 	// called by PlayerEnergy when exhausted energy to 0
 	public void SensaroundOff() {
-		inventoryPlayer1.hardwareIsActive[3] = false;
-		SetVersionIconForButton(inventoryPlayer1.hardwareIsActive[3],inventoryPlayer1.hardwareVersionSetting[3],1);
+		Eng_Global->inventoryPlayer1.hardwareIsActive[3] = false;
+		SetVersionIconForButton(Eng_Global->inventoryPlayer1.hardwareIsActive[3],Eng_Global->inventoryPlayer1.hardwareVersionSetting[3],1);
 		DeactivateSensaroundCameras();
 	}
 
@@ -195,18 +195,18 @@ public class HardwareButton : MonoBehaviour {
 	}
 	
 	public void ShieldOff() {
-		inventoryPlayer1.hardwareIsActive[5] = false;
-		SetVersionIconForButton(inventoryPlayer1.hardwareIsActive[5],inventoryPlayer1.hardwareVersionSetting[5],3);
+		Eng_Global->inventoryPlayer1.hardwareIsActive[5] = false;
+		SetVersionIconForButton(Eng_Global->inventoryPlayer1.hardwareIsActive[5],Eng_Global->inventoryPlayer1.hardwareVersionSetting[5],3);
 	}
 	
 	public void ShieldOn() {
-		inventoryPlayer1.hardwareIsActive[5] = true;
-		SetVersionIconForButton(inventoryPlayer1.hardwareIsActive[5],inventoryPlayer1.hardwareVersionSetting[5],3);
+		Eng_Global->inventoryPlayer1.hardwareIsActive[5] = true;
+		SetVersionIconForButton(Eng_Global->inventoryPlayer1.hardwareIsActive[5],Eng_Global->inventoryPlayer1.hardwareVersionSetting[5],3);
 	}
 
 	public void ShieldAction() {
-		if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Sys_Text.stringTable[314],inventoryPlayer1.owner); return; }
-		if (inventoryPlayer1.hardwareIsActive[5]) {
+		if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Sys_Text.stringTable[314],Eng_Global->inventoryPlayer1.owner); return; }
+		if (Eng_Global->inventoryPlayer1.hardwareIsActive[5]) {
 			Utils.PlayUIOneShotSavable(95);
 			ShieldOffWithEffects();
 		} else {
@@ -231,9 +231,9 @@ public class HardwareButton : MonoBehaviour {
 	}
 
 	public void LanternAction() {
-		if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Sys_Text.stringTable[314],inventoryPlayer1.owner); return; }
+		if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Sys_Text.stringTable[314],Eng_Global->inventoryPlayer1.owner); return; }
 		Utils.PlayUIOneShotSavable(78);
-		if (inventoryPlayer1.hardwareIsActive[7]) {
+		if (Eng_Global->inventoryPlayer1.hardwareIsActive[7]) {
 			LanternOff();
 		} else {
 			LanternOn();
@@ -241,11 +241,11 @@ public class HardwareButton : MonoBehaviour {
 	}
 
 	public void LanternOn() {
-		inventoryPlayer1.hardwareIsActive[7] = true;
-		SetVersionIconForButton(inventoryPlayer1.LanternActive(), inventoryPlayer1.hardwareVersionSetting[7],2);
+		Eng_Global->inventoryPlayer1.hardwareIsActive[7] = true;
+		SetVersionIconForButton(Eng_Global->inventoryPlayer1.LanternActive(), Eng_Global->inventoryPlayer1.hardwareVersionSetting[7],2);
 
 		// Figure out which brightness setting to use depending on version.
-		switch(inventoryPlayer1.hardwareVersionSetting[7]) {
+		switch(Eng_Global->inventoryPlayer1.hardwareVersionSetting[7]) {
 			case 0: brightness = lanternVersion1Brightness; break;
 			case 1: brightness = lanternVersion2Brightness; break;
 			case 2: brightness = lanternVersion3Brightness; break;
@@ -258,8 +258,8 @@ public class HardwareButton : MonoBehaviour {
 	
 	// Called by PlayerEnergy when exhausted energy to 0.
 	public void LanternOff() {
-		inventoryPlayer1.hardwareIsActive[7] = false;
-		SetVersionIconForButton(inventoryPlayer1.LanternActive(), inventoryPlayer1.hardwareVersionSetting[7],2);
+		Eng_Global->inventoryPlayer1.hardwareIsActive[7] = false;
+		SetVersionIconForButton(Eng_Global->inventoryPlayer1.LanternActive(), Eng_Global->inventoryPlayer1.hardwareVersionSetting[7],2);
 		Utils.DisableLight(headlight);
 		headlight.intensity = defaultZero; // Turn the light off.
 	}
@@ -270,15 +270,15 @@ public class HardwareButton : MonoBehaviour {
 	}
 
 	public void InfraredAction() {
-		if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Sys_Text.stringTable[314],inventoryPlayer1.owner); return; }
-		if (inventoryPlayer1.hardwareIsActive[11]) {
+		if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Sys_Text.stringTable[314],Eng_Global->inventoryPlayer1.owner); return; }
+		if (Eng_Global->inventoryPlayer1.hardwareIsActive[11]) {
 			Utils.PlayUIOneShotSavable(82);
 		} else {
 			Utils.PlayUIOneShotSavable(98);
 		}
-		inventoryPlayer1.hardwareIsActive[11] = !inventoryPlayer1.hardwareIsActive[11];
-		SetVersionIconForButton(inventoryPlayer1.hardwareIsActive[11], inventoryPlayer1.hardwareVersionSetting[11],4);
-		if (inventoryPlayer1.hardwareIsActive[11]) {
+		Eng_Global->inventoryPlayer1.hardwareIsActive[11] = !Eng_Global->inventoryPlayer1.hardwareIsActive[11];
+		SetVersionIconForButton(Eng_Global->inventoryPlayer1.hardwareIsActive[11], Eng_Global->inventoryPlayer1.hardwareVersionSetting[11],4);
+		if (Eng_Global->inventoryPlayer1.hardwareIsActive[11]) {
 			InfraredOn();
 		} else {
 			InfraredOff();
@@ -295,13 +295,13 @@ public class HardwareButton : MonoBehaviour {
 
 	// called by PlayerMovement when exhausted energy to < 11f
 	public void InfraredOff() {
-		inventoryPlayer1.hardwareIsActive[11] = false;
+		Eng_Global->inventoryPlayer1.hardwareIsActive[11] = false;
 		Utils.DisableLight(infraredLight);
 		Utils.DisableGrayscale(gsc);
 		Utils.DisableGrayscale(gscSensaCenter);
 		Utils.DisableGrayscale(gscSensaLH);
 		Utils.DisableGrayscale(gscSensaRH);
-		SetVersionIconForButton(false,inventoryPlayer1.hardwareVersionSetting[11],4);
+		SetVersionIconForButton(false,Eng_Global->inventoryPlayer1.hardwareVersionSetting[11],4);
 	}
 
 	public void EReaderClick () {
@@ -310,7 +310,7 @@ public class HardwareButton : MonoBehaviour {
 	}
 	
 	public void EReaderOn() {
-		inventoryPlayer1.hardwareIsActive[2] = true;
+		Eng_Global->inventoryPlayer1.hardwareIsActive[2] = true;
 		Sys_UI.OpenEReaderInItemsTab();
 	}
 
@@ -326,13 +326,13 @@ public class HardwareButton : MonoBehaviour {
 	}
 
 	public void BoosterAction() {
-		if (inventoryPlayer1.BoosterSetToBoost() && PlayerEnergy.a.energy <= 0) {
-			CenterStatusPrint("%s", Sys_Text.stringTable[314],inventoryPlayer1.owner);
+		if (Eng_Global->inventoryPlayer1.BoosterSetToBoost() && PlayerEnergy.a.energy <= 0) {
+			CenterStatusPrint("%s", Sys_Text.stringTable[314],Eng_Global->inventoryPlayer1.owner);
 			return;
 		}
 
 		Utils.PlayUIOneShotSavable(78);
-		if (inventoryPlayer1.hardwareIsActive[9]) {
+		if (Eng_Global->inventoryPlayer1.hardwareIsActive[9]) {
 			BoosterOff();
 		} else {
 			BoosterOn();
@@ -340,14 +340,14 @@ public class HardwareButton : MonoBehaviour {
 	}
 	
 	public void BoosterOn() {
-		inventoryPlayer1.hardwareIsActive[9] = true;
-		SetVersionIconForButton(inventoryPlayer1.hardwareIsActive[9],inventoryPlayer1.hardwareVersionSetting[9],6);
+		Eng_Global->inventoryPlayer1.hardwareIsActive[9] = true;
+		SetVersionIconForButton(Eng_Global->inventoryPlayer1.hardwareIsActive[9],Eng_Global->inventoryPlayer1.hardwareVersionSetting[9],6);
 	}
 
 	// called by PlayerMovement when exhausted energy to < 11f
 	public void BoosterOff() {
-		inventoryPlayer1.hardwareIsActive[9] = false;
-		SetVersionIconForButton(inventoryPlayer1.hardwareIsActive[9],inventoryPlayer1.hardwareVersionSetting[9],6);
+		Eng_Global->inventoryPlayer1.hardwareIsActive[9] = false;
+		SetVersionIconForButton(Eng_Global->inventoryPlayer1.hardwareIsActive[9],Eng_Global->inventoryPlayer1.hardwareVersionSetting[9],6);
 	}
 
 	public void JumpJetsClick() {
@@ -357,13 +357,13 @@ public class HardwareButton : MonoBehaviour {
 
 	public void JumpJetsAction() {
 		if (PlayerEnergy.a.energy <= 0) {
-			CenterStatusPrint("%s", Sys_Text.stringTable[314],inventoryPlayer1.owner);
+			CenterStatusPrint("%s", Sys_Text.stringTable[314],Eng_Global->inventoryPlayer1.owner);
 			return;
 		}
 
 		Utils.PlayUIOneShotSavable(78);
-		inventoryPlayer1.JumpJetsToggle();
-		if (inventoryPlayer1.JumpJetsActive()) {
+		Eng_Global->inventoryPlayer1.JumpJetsToggle();
+		if (Eng_Global->inventoryPlayer1.JumpJetsActive()) {
 			JumpJetsOn();
 		} else {
 			JumpJetsOff();
@@ -371,13 +371,13 @@ public class HardwareButton : MonoBehaviour {
 	}
 	
 	public void JumpJetsOn() {
-		inventoryPlayer1.hardwareIsActive[10] = true;
-		SetVersionIconForButton(inventoryPlayer1.JumpJetsActive(),inventoryPlayer1.hardwareVersionSetting[10],7);
+		Eng_Global->inventoryPlayer1.hardwareIsActive[10] = true;
+		SetVersionIconForButton(Eng_Global->inventoryPlayer1.JumpJetsActive(),Eng_Global->inventoryPlayer1.hardwareVersionSetting[10],7);
 	}
 
 	// called by PlayerMovement when exhausted energy to < 11f
 	public void JumpJetsOff() {
-		inventoryPlayer1.hardwareIsActive[10] = false;
-		SetVersionIconForButton(inventoryPlayer1.JumpJetsActive(),inventoryPlayer1.hardwareVersionSetting[10],7);
+		Eng_Global->inventoryPlayer1.hardwareIsActive[10] = false;
+		SetVersionIconForButton(Eng_Global->inventoryPlayer1.JumpJetsActive(),Eng_Global->inventoryPlayer1.hardwareVersionSetting[10],7);
 	}
 }

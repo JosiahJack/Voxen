@@ -11,9 +11,9 @@ public class EnergySlider : MonoBehaviour {
 	}
 /*
 	void Update () {
-		if (inventoryPlayer1.weaponCurrent != -1) {
+		if (Eng_Global->inventoryPlayer1.weaponCurrent != -1) {
 			slideS.value =
-			  inventoryPlayer1.weaponEnergySetting[inventoryPlayer1.weaponCurrent];
+			  Eng_Global->inventoryPlayer1.weaponEnergySetting[Eng_Global->inventoryPlayer1.weaponCurrent];
 		} else {
 			slideS.value = 0;
 		}
@@ -21,8 +21,8 @@ public class EnergySlider : MonoBehaviour {
 
 
     public void SetValue(float val) {
-		if (inventoryPlayer1.weaponCurrent < 0
-			|| inventoryPlayer1.weaponCurrent > 6) {
+		if (Eng_Global->inventoryPlayer1.weaponCurrent < 0
+			|| Eng_Global->inventoryPlayer1.weaponCurrent > 6) {
 			return;
 		}
 
@@ -33,7 +33,7 @@ public class EnergySlider : MonoBehaviour {
 		slideS.value = val;
 		DualLog("Set energy slider value to " + slideS.value.ToString()
 				  + ", from " + val.ToString());
-        inventoryPlayer1.weaponEnergySetting[inventoryPlayer1.weaponCurrent] =
+        Eng_Global->inventoryPlayer1.weaponEnergySetting[Eng_Global->inventoryPlayer1.weaponCurrent] =
 			slideS.value;
     }
 }

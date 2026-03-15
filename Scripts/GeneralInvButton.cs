@@ -22,9 +22,9 @@ public class GeneralInvButton : MonoBehaviour {
 	}
 
 	public void GeneralInvUse() {
-        inventoryPlayer1.generalInvCurrent = GeneralInvButtonIndex; //Set current
+        Eng_Global->inventoryPlayer1.generalInvCurrent = GeneralInvButtonIndex; //Set current
 		useableItemIndex =
-			inventoryPlayer1.generalInventoryIndexRef[GeneralInvButtonIndex];
+			Eng_Global->inventoryPlayer1.generalInventoryIndexRef[GeneralInvButtonIndex];
 
 		// Access Cards
 		if (GeneralInvButtonIndex == 0) {
@@ -45,7 +45,7 @@ public class GeneralInvButton : MonoBehaviour {
     }
 
     public void DoubleClick() {
-        inventoryPlayer1.generalInvCurrent = GeneralInvButtonIndex; //Set current
+        Eng_Global->inventoryPlayer1.generalInvCurrent = GeneralInvButtonIndex; //Set current
 		Sys_UI.mouseClickHeldOverGUI = true;
 		GeneralInvApply();
 	}
@@ -94,7 +94,7 @@ public class GeneralInvButton : MonoBehaviour {
 
         reduce = false;
 		useableItemIndex =
-			inventoryPlayer1.generalInventoryIndexRef[GeneralInvButtonIndex];
+			Eng_Global->inventoryPlayer1.generalInventoryIndexRef[GeneralInvButtonIndex];
 		switch (useableItemIndex) {
 			case 52: ApplyBattery(); break;
 			case 53: ApplyIcadBattery(); break;
@@ -105,12 +105,12 @@ public class GeneralInvButton : MonoBehaviour {
 									 Handedness.LH);
 
 				// Set current.
-				inventoryPlayer1.generalInvCurrent = GeneralInvButtonIndex;
+				Eng_Global->inventoryPlayer1.generalInvCurrent = GeneralInvButtonIndex;
 				break;
 		}
 
 		if (reduce)  {
-			inventoryPlayer1.generalInventoryIndexRef[GeneralInvButtonIndex] = -1;
+			Eng_Global->inventoryPlayer1.generalInventoryIndexRef[GeneralInvButtonIndex] = -1;
 			
 		}
 	}

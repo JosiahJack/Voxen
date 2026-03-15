@@ -15,16 +15,16 @@ public class SoftwareInvButton : MonoBehaviour {
 		switch(index) {
 			case 0:
 					// Drill
-					inventoryPlayer1.pulserButtonText.Select(false);
-					inventoryPlayer1.drillButtonText.Select(true);
-					inventoryPlayer1.isPulserNotDrill = false;
+					Eng_Global->inventoryPlayer1.pulserButtonText.Select(false);
+					Eng_Global->inventoryPlayer1.drillButtonText.Select(true);
+					Eng_Global->inventoryPlayer1.isPulserNotDrill = false;
 					Utils.PlayUIOneShotSavable(80); // changeweapon
 					break;
 			case 1:
 					// Pulser
-					inventoryPlayer1.pulserButtonText.Select(true);
-					inventoryPlayer1.drillButtonText.Select(false);
-					inventoryPlayer1.isPulserNotDrill = true;
+					Eng_Global->inventoryPlayer1.pulserButtonText.Select(true);
+					Eng_Global->inventoryPlayer1.drillButtonText.Select(false);
+					Eng_Global->inventoryPlayer1.isPulserNotDrill = true;
 					Utils.PlayUIOneShotSavable(80); // changeweapon
 					break;
 			case 2:
@@ -38,7 +38,7 @@ public class SoftwareInvButton : MonoBehaviour {
 			case 3:
 					// Turbo
 					if (MouseLookScript.a.inCyberSpace) {
-						inventoryPlayer1.UseTurbo();
+						Eng_Global->inventoryPlayer1.UseTurbo();
 						
 					} else {
 						CenterStatusPrint("%s", Sys_Text.stringTable[460],Const.a.player1);
@@ -47,7 +47,7 @@ public class SoftwareInvButton : MonoBehaviour {
 			case 4:
 					// Decoy
 					if (MouseLookScript.a.inCyberSpace) {
-						inventoryPlayer1.UseDecoy();
+						Eng_Global->inventoryPlayer1.UseDecoy();
 						
 					} else {
 						CenterStatusPrint("%s", Sys_Text.stringTable[460],Const.a.player1);
@@ -56,7 +56,7 @@ public class SoftwareInvButton : MonoBehaviour {
 			case 5:
 					// Recall
 					if (MouseLookScript.a.inCyberSpace) {
-						inventoryPlayer1.UseRecall();
+						Eng_Global->inventoryPlayer1.UseRecall();
 						
 					} else {
 						CenterStatusPrint("%s", Sys_Text.stringTable[460],Const.a.player1);
