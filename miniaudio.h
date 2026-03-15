@@ -16082,6 +16082,8 @@ MA_API ma_bool32 ma_is_loopback_supported(ma_backend backend)
 #define MA_DSERR_OBJECTNOTFOUND                   ((HRESULT)0x88781161)
 #define MA_DSERR_FXUNAVAILABLE                    ((HRESULT)0x887800DC)
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
 static ma_result ma_result_from_HRESULT(HRESULT hr)
 {
     switch (hr)
@@ -16172,6 +16174,7 @@ static ma_result ma_result_from_HRESULT(HRESULT hr)
         default:                                        return MA_ERROR;
     }
 }
+#pragma GCC diagnostic pop
 
 /* PROPVARIANT */
 #define MA_VT_LPWSTR    31
@@ -17856,6 +17859,8 @@ static DWORD ma_channel_id_to_win32(DWORD id)
 }
 
 /* Converts a channel mapping to a Win32-style channel mask. */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
 static DWORD ma_channel_map_to_channel_mask__win32(const ma_channel* pChannelMap, ma_uint32 channels)
 {
     DWORD dwChannelMask = 0;
@@ -17867,8 +17872,11 @@ static DWORD ma_channel_map_to_channel_mask__win32(const ma_channel* pChannelMap
 
     return dwChannelMask;
 }
+#pragma GCC diagnostic pop
 
 /* Converts a Win32-style channel mask to a miniaudio channel map. */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
 static void ma_channel_mask_to_channel_map__win32(DWORD dwChannelMask, ma_uint32 channels, ma_channel* pChannelMap)
 {
     /* If the channel mask is set to 0, just assume a default Win32 channel map. */
@@ -17893,6 +17901,7 @@ static void ma_channel_mask_to_channel_map__win32(DWORD dwChannelMask, ma_uint32
         }
     }
 }
+#pragma GCC diagnostic pop
 
 #ifdef __cplusplus
 static ma_bool32 ma_is_guid_equal(const void* a, const void* b)
@@ -17909,6 +17918,8 @@ static MA_INLINE ma_bool32 ma_is_guid_null(const void* guid)
     return ma_is_guid_equal(guid, &nullguid);
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
 static ma_format ma_format_from_WAVEFORMATEX(const MA_WAVEFORMATEX* pWF)
 {
     MA_ASSERT(pWF != NULL);
@@ -17971,6 +17982,7 @@ static ma_format ma_format_from_WAVEFORMATEX(const MA_WAVEFORMATEX* pWF)
 
     return ma_format_unknown;
 }
+#pragma GCC diagnostic pop
 #endif
 
 

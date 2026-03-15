@@ -35,9 +35,24 @@ typedef __INTPTR_TYPE__ intptr_t;
 #define O_CREAT 00000100
 #define O_TRUNC 00001000
 #define O_CLOEXEC 02000000
-void DualLog(const char* fmt, ...);
-void DualLogWarn(const char* fmt, ...);
-void DualLogError(const char* fmt, ...);
+
+// ----------------------------------------------------------------------------
+// Engine Functions::
+#ifdef MOD_INTEROP_IMPLEMENTATION // mod.h usage:
+    // Interop - To Engine
+    #define ENGINE_TO_MOD extern
+#else                             // voxen.h usage:
+    // Interop - To Mod
+    #if defined(_WIN32) || defined(__CYGWIN__)
+        #define ENGINE_TO_MOD __declspec(dllexport)
+    #else
+        #define ENGINE_TO_MOD __attribute__((visibility("default")))
+    #endif
+#endif
+ENGINE_TO_MOD void DualLog(const char* fmt, ...);
+ENGINE_TO_MOD void DualLogWarn(const char* fmt, ...);
+ENGINE_TO_MOD void DualLogError(const char* fmt, ...);
+
 char* StringFindSubstring(const char* haystack, const char* needle);
 char* StringFindFirstCharWithin(const char *s, char c);
 typedef struct {
@@ -47,28 +62,23 @@ typedef struct {
     uint64_t dev;
 } FileFingerprint;
 
-static inline __attribute__((always_inline, noreturn)) void OS_Exit(int64_t exitCode) {
-    #ifdef WINDOWS
-        register uint64_t rax __asm__("rax") = 0x2C;
-        register HANDLE   rcx __asm__("rcx") = (HANDLE)-1;
-        register NTSTATUS rdx __asm__("rdx") = (NTSTATUS)exitCode;
-        __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rcx), "r"(rdx) : "r8", "r9", "r10", "r11", "memory");
-    #else
-        register int64_t rax __asm__("rax") = 231;
-        register int64_t rdi __asm__("rdi") = exitCode;
-        __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi) : "rcx", "r11", "memory");
-    #endif
-    __builtin_unreachable();
-}
-
 #if defined(_WIN32) || defined(_WIN64)
     #define WINDOWS
     #define WIN32_LEAN_AND_MEAN // Let 'er rip, tater chip
     #include <windows.h> // The things I do for my players, yeesh
     #include <direct.h>
+    #include <winternl.h>
+    #include <ntstatus.h>
     typedef HANDLE OsFileHandle;
     #define OS_INVALID_HANDLE INVALID_HANDLE_VALUE
     #define OS_MakeFolder(path) _mkdir(path)
+    static inline __attribute__((always_inline, noreturn)) void OS_Exit(int64_t exitCode) {
+        register uint64_t rax __asm__("rax") = 0x2C;
+        register HANDLE   rcx __asm__("rcx") = (HANDLE)-1;
+        register NTSTATUS rdx __asm__("rdx") = (NTSTATUS)exitCode;
+        __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rcx), "r"(rdx) : "r8", "r9", "r10", "r11", "memory");
+        __builtin_unreachable();
+    }
     static inline __attribute__((always_inline)) void OS_Close(OsFileHandle fileDescriptor) { CloseHandle(fileDescriptor); }
     
     static inline __attribute__((always_inline)) void* OS_AllocateRAM(void* addr, size_t length, int32_t prot, int32_t flags, OsFileHandle fd) {
@@ -89,7 +99,7 @@ static inline __attribute__((always_inline, noreturn)) void OS_Exit(int64_t exit
         return ptr;
     }
     
-    static inline __attribute__((always_inline)) long OS_Read(long fd, void* buf, size_t count) {
+    static inline __attribute__((always_inline)) long OS_Read(OsFileHandle fd, void* buf, size_t count) {
         // NtReadFile — direct syscall, zero library involvement
         // syscall number is stable at 0x0003 on all modern Windows 10/11 (including 26H1)
         register uint64_t rax __asm__("rax") = 0x0003;
@@ -97,7 +107,6 @@ static inline __attribute__((always_inline, noreturn)) void OS_Exit(int64_t exit
         register void*    rdx __asm__("rdx") = NULL;
         register void*    r8  __asm__("r8")  = buf;
         register size_t   r9  __asm__("r9")  = count;
-        long bytesRead = -1;
         __asm__ __volatile__(
             "xor %%r10, %%r10\n\t"
             "movq $0, 8(%%rsp)\n\t"
@@ -106,6 +115,7 @@ static inline __attribute__((always_inline, noreturn)) void OS_Exit(int64_t exit
         return (rax == 0) ? (long)count : (long)rax;
     }
 #else
+    typedef int OsFileHandle;
     #if defined(__linux__) && !defined(__ANDROID__)
         #define LINUX
         static inline __attribute__((always_inline)) void* OS_Brk(void* addr) {
@@ -115,15 +125,22 @@ static inline __attribute__((always_inline, noreturn)) void OS_Exit(int64_t exit
             return (void*)rax;
         }
         
-        static inline __attribute__((always_inline)) long OS_Read(long fd, void* buf, size_t count) {
+        static inline __attribute__((always_inline)) OsFileHandle OS_Read(OsFileHandle fd, void* buf, size_t count) {
             register long rax __asm__("rax") = 0;
-            register long rdi __asm__("rdi") = fd;
+            register long rdi __asm__("rdi") = (long)fd;
             register void* rsi __asm__("rsi") = buf;
             register size_t rdx __asm__("rdx") = count;
             __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi), "r"(rsi), "r"(rdx) : "rcx", "r11", "memory");
             return rax;
         }
     #endif
+    
+    static inline __attribute__((always_inline, noreturn)) void OS_Exit(int64_t exitCode) {
+        register int64_t rax __asm__("rax") = 231;
+        register int64_t rdi __asm__("rdi") = exitCode;
+        __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi) : "rcx", "r11", "memory");
+        __builtin_unreachable();
+    }
 
     #if defined(__ANDROID__)
         #define ANDROID
@@ -135,7 +152,6 @@ static inline __attribute__((always_inline, noreturn)) void OS_Exit(int64_t exit
         #include <sys/types.h>
     #else
         #include <time.h>
-        typedef int OsFileHandle;
         typedef uint64_t dev_t;
         typedef uint64_t ino_t;
         typedef uint32_t mode_t;
@@ -370,6 +386,7 @@ static inline __attribute__((always_inline)) bool OS_GetFileFingerprint(const ch
 
 static inline __attribute__((always_inline)) int64_t OS_Seek(OsFileHandle fd, int64_t offset, int whence) { // forth and forsooth pray tell
     #ifdef WINDOWS
+        (void)whence;
         // Use NtSetInformationFile with FilePositionInformation (class 14)
         // This is the direct syscall path (no kernel32).
         struct {

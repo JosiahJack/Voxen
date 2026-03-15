@@ -89,43 +89,43 @@ cat > Shaders/shaders.h <<'EOF'
 #include "bluenoise64.cginc"
 EOF
 
-LINUX_CC="zig cc"
 ZIG_LIBS="-L/usr/lib/x86_64-linux-gnu -L/usr/lib64"
-WINDOWS_CC="x86_64-w64-mingw32-gcc"
+LINUX_CC="zig cc -target x86_64-linux-gnu.2.7"
+WINDOWS_CC="zig cc -target x86_64-windows-gnu"
 ANDROID_CC="aarch64-linux-android24-clang"
-MAC_CC="gcc"
+MAC_CC="zig cc -target x86_64-linux-gnu.2.7"
 COMMON_CFLAGS="-fno-exceptions -fno-stack-protector -fno-asynchronous-unwind-tables -fno-unwind-tables -Wno-format-nonliteral \
-               -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -fvisibility=hidden -pipe -fno-ident -fdata-sections \
-               -ffunction-sections -ffast-math -std=c11 -Wall -Wextra -Wno-implicit-fallthrough \
+               -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -fvisibility=hidden -pipe -fno-ident -fdata-sections -Wno-int-to-void-pointer-cast \
+               -ffunction-sections -ffast-math -std=c11 -Wall -Wextra -Wno-implicit-fallthrough -fdeclspec \
                -fomit-frame-pointer -fstrict-aliasing -fcommon -Walloca -DMA_USE_STDINT -Wl,--strip-all \
                -Wformat=2 -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings -fno-math-errno -fno-sanitize=undefined \
-               -fno-plt -fno-semantic-interposition -fno-trapping-math -fmerge-all-constants -m64 -Os -target x86_64-linux-gnu.2.7 -march=haswell"
-COMMON_LFLAGS="-Wl,--gc-sections -Wl,--sort-common -Wl,-z,now -Wl,-z,relro -s -target x86_64-linux-gnu.2.7 $ZIG_LIBS"
+               -fno-trapping-math -fmerge-all-constants -m64 -Os -march=haswell"
+COMMON_LFLAGS="-Wl,--gc-sections -Wl,--sort-common -Wl,-z,now -Wl,-z,relro -s $ZIG_LIBS"
 
 # Game Code Build 14.4kb
 if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
     LINKERGC=$CC
     CFLAGSGC="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe"
-    LDFLAGSGC="$COMMON_LFLAGS"
+    LDFLAGSGC="$COMMON_LFLAGS -Wl,--allow-shlib-undefined -Wl,--entry,DllMainCRTStartup -Wl,--subsystem,windows -Wl,--no-entry"
     BINARY_NAMEGC="Citadel.dll"
 elif [ "$PLATFORM" = "mac" ]; then
     CC=$MAC_CC
     LINKERGC=$MAC_CC
-    CFLAGSGC="-D__APPLE__ $COMMON_CFLAGS"
-    LDFLAGSGC="$COMMON_LFLAGS"
+    CFLAGSGC="-D__APPLE__ $COMMON_CFLAGS -fno-plt -fno-semantic-interposition"
+    LDFLAGSGC="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -nostdlib"
     BINARY_NAMEGC="Citadel.dylib"
 elif [ "$PLATFORM" = "android" ]; then
     CC=$ANDROID_CC
     LINKEGC=$CC
-    CFLAGSGC="-D__ANDROID__ -fPIC $COMMON_CFLAGS"
-    LDFLAGSGC="$COMMON_LFLAGS"
+    CFLAGSGC="-D__ANDROID__ -fPIC $COMMON_CFLAGS -fno-plt -fno-semantic-interposition"
+    LDFLAGSGC="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -nostdlib"
     BINARY_NAMEGC="Citadel.so"
 else
     CC=$LINUX_CC
     LINKERGC=$CC
-    CFLAGSGC="$COMMON_CFLAGS"
-    LDFLAGSGC="$COMMON_LFLAGS"
+    CFLAGSGC="$COMMON_CFLAGS -fno-plt -fno-semantic-interposition"
+    LDFLAGSGC="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -nostdlib"
     BINARY_NAMEGC="Citadel.so"
 fi
 
@@ -135,7 +135,7 @@ SOURCESGC="init.c modinput.c modphysics.c ai.c biomonitor.c weapons.c music.c"
 export TEMP_DIRGC=temp_build_gc
 export SCRIPT_DIR="./Scripts"
 printf "%s\n" $SOURCESGC | xargs -P12 -I{} $CCGC -c $SCRIPT_DIR/{} $CFLAGSGC -I. -nostdinc -fPIC -ffreestanding -fno-builtin -Wshadow -o "$TEMP_DIRGC"/{}.o
-$LINKERGC "$TEMP_DIRGC"/*.o $LDFLAGSGC -s -OReleaseSmall -Wl,-soname,$BINARY_NAMEGC -shared -nostdlib -o $BINARY_NAMEGC
+$LINKERGC "$TEMP_DIRGC"/*.o $LDFLAGSGC -s -OReleaseSmall -Wl,-soname,$BINARY_NAMEGC -shared -o $BINARY_NAMEGC
 link_status=$?
 if [ $link_status -ne 0 ]; then
     echo "ERROR: Linking failed."
@@ -149,25 +149,25 @@ if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
     LINKER=$CC
     CFLAGS="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe"
-    LDFLAGS="$COMMON_LFLAGS"
+    LDFLAGS="$COMMON_LFLAGS -L. -lopengl32 -lglfw3"
     BINARY_NAME="voxen.exe"
 elif [ "$PLATFORM" = "mac" ]; then
     CC=$MAC_CC
     LINKER=$MAC_CC
-    CFLAGS="-D__APPLE__ $COMMON_CFLAGS"
-    LDFLAGS="$COMMON_LFLAGS"
+    CFLAGS="-D__APPLE__ $COMMON_CFLAGS -fno-plt -fno-semantic-interposition"
+    LDFLAGS="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -lglfw -lGL" # Ehhh....metal much?
     BINARY_NAME="voxen.app"
 elif [ "$PLATFORM" = "android" ]; then
     CC=$ANDROID_CC
     LINKER=$CC
-    CFLAGS="-D__ANDROID__ -fPIC $COMMON_CFLAGS"
-    LDFLAGS="$COMMON_LFLAGS -landroid -llog"
+    CFLAGS="-D__ANDROID__ -fPIC $COMMON_CFLAGS -fno-plt -fno-semantic-interposition"
+    LDFLAGS="$COMMON_LFLAGS -landroid -llog -lglfw -lGL"
     BINARY_NAME="voxen_android"
 else
     CC=$LINUX_CC
     LINKER=$CC
-    CFLAGS="$COMMON_CFLAGS"
-    LDFLAGS="$COMMON_LFLAGS -pthread"
+    CFLAGS="$COMMON_CFLAGS -fno-plt -fno-semantic-interposition"
+    LDFLAGS="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -pthread -lglfw -lGL "
     BINARY_NAME="voxen"
 fi
 
@@ -179,7 +179,7 @@ SOURCES="voxen.c physics.c helpers.c audio.c animation.c console.c level.c data_
 
 export TEMP_DIR=temp_build
 printf "%s\n" $SOURCES | xargs -P12 -I{} $CC -c {} $CFLAGS -fopenmp -o "$TEMP_DIR"/{}.o
-$LINKER "$TEMP_DIR"/*.o $LDFLAGS -s -rdynamic -OReleaseSmall -lglfw -lm -lGL -fopenmp -o $BINARY_NAME
+$LINKER "$TEMP_DIR"/*.o $LDFLAGS -s -rdynamic -OReleaseSmall -lm -fopenmp -o $BINARY_NAME
 link_status=$?
 if [ $link_status -ne 0 ]; then
     echo "ERROR: Linking failed."
@@ -191,11 +191,10 @@ total_build_time=$((build_end - shader_start))
 echo "Built engine and mod in ${total_build_time} ms"
 if ! $IS_CI; then
     case "$PLATFORM" in
-        windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; WINEPATH="External/Windows" wine ./voxen.exe ;;
+        windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; wine ./voxen.exe ;;
         mac)      ./voxen.app ;;
         android)  java -jar bundletool.jar build-apks --bundle=voxen.aab --output=voxen.app;;
         *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
-#         *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen;   # linux
 #         *)        ./voxen ;;   # linux
     esac
     rm -f "$TEMP_DIR"/*.o ./Shaders/*.h "$TEMP_DIRGC"/*.o #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.

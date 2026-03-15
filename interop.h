@@ -1,4 +1,5 @@
 // Mod/Gamecode Functions::
+#pragma once
 #define MOD_FUNCTION_LIST(X) \
     X(void, ModInit, (GlobalContext* ctx, CheatsSystem* cheats, SettingsSystem* settings)) \
     X(void, ModUpdate, (void)) \

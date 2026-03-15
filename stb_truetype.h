@@ -23,7 +23,7 @@
    #define STBTT_DEF extern
 #endif
    
-#define STBTT_malloc(size)  OS_AllocateRAM(NULL, (size), PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1)
+#define STBTT_malloc(size)  OS_AllocateRAM(NULL, (size), PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, (OsFileHandle)-1)
 #define STBTT_free(ptr)     OS_DeallocateRAM((ptr),0)
    
 typedef struct {

@@ -9,9 +9,9 @@
 #define MA_NO_AAUDIO
 #define MA_NO_COREAUDIO
 #define MA_NO_JACK
-#define MA_NO_WINMM
-#define MA_NO_DSOUND
-#define MA_NO_WASAPI
+// #define MA_NO_WINMM
+// #define MA_NO_DSOUND
+// #define MA_NO_WASAPI
 #define MA_NO_OPENSL
 #define MA_NO_AVX2
 #define MA_NO_NEON

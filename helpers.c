@@ -594,7 +594,7 @@ int StringFormat(char* buffer, size_t bufferSize, const char* format, ...) { // 
     return ret;
 }
 
-char* GetNextStringUpToNewlineOrEOF(char* buf, int size, long fd) { // fgets replacement, not thread safe but we don't do multithreading
+char* GetNextStringUpToNewlineOrEOF(char* buf, int size, OsFileHandle fd) { // fgets replacement, not thread safe but we don't do multithreading
     if (size <= 1 || buf == NULL) return NULL;
 
     char* p = buf;
@@ -604,7 +604,7 @@ char* GetNextStringUpToNewlineOrEOF(char* buf, int size, long fd) { // fgets rep
     static char buffer[4096];
     while (remaining > 0) {
         if (pos >= end) {
-            long n = OS_Read(fd, buffer, sizeof(buffer));
+            long n = OS_Read(fd,buffer,sizeof(buffer));
             if (n <= 0 && p == buf) return NULL;
 
             pos = 0;

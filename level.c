@@ -154,6 +154,7 @@ void CopyInstanceRegion(uint16_t head, uint16_t* instanceTypeArray, Entity* temp
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
 void LoadTextures(void); void LoadModels(void);
+char* GetNextStringUpToNewlineOrEOF(char* buf, int size, OsFileHandle fd);
 void LoadLevel(uint8_t curlevel) {
     double start_time = get_time();
     DebugRAM("start of LoadLevel");

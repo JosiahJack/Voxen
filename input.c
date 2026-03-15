@@ -81,10 +81,11 @@ static inline __attribute__((always_inline)) int32_t GetGLFWIndirectionIndexForA
     return 148;
 }
 
+char* GetNextStringUpToNewlineOrEOF(char* buf, int size, OsFileHandle fd);
 void LoadConfig(void) {
     OsFileHandle f = OS_OpenReadonly("./Data/Config.ini");
     char line[512];
-    while (GetNextStringUpToNewlineOrEOF(line, sizeof(line), f)) {
+    while (GetNextStringUpToNewlineOrEOF(line,sizeof(line),f)) {
         char* s = data_parser_trim(line);
         if (*s == 0 || (s[0] == '/' && s[1] == '/')) continue;
 
