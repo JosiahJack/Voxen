@@ -97,10 +97,10 @@ MAC_CC="zig cc -target x86_64-linux-gnu.2.7"
 COMMON_CFLAGS="-fno-exceptions -fno-stack-protector -fno-asynchronous-unwind-tables -fno-unwind-tables -Wno-format-nonliteral \
                -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -fvisibility=hidden -pipe -fno-ident -fdata-sections -Wno-int-to-void-pointer-cast \
                -ffunction-sections -ffast-math -std=c11 -Wall -Wextra -Wno-implicit-fallthrough -fdeclspec \
-               -fomit-frame-pointer -fstrict-aliasing -fcommon -Walloca -DMA_USE_STDINT -Wl,--strip-all \
-               -Wformat=2 -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings -fno-math-errno -fno-sanitize=undefined \
-               -fno-trapping-math -fmerge-all-constants -m64 -Os -march=haswell"
-COMMON_LFLAGS="-Wl,--gc-sections -Wl,--sort-common -Wl,-z,now -Wl,-z,relro -s $ZIG_LIBS"
+               -fomit-frame-pointer -g1 -fstrict-aliasing -fcommon -Walloca -DMA_USE_STDINT \
+               -Wformat=2 -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings -fno-math-errno -fno-sanitize=all \
+               -fno-trapping-math -fmerge-all-constants -m64 -Og -march=haswell"
+COMMON_LFLAGS="-Wl,--sort-common -Wl,-z,now -Wl,-z,relro $ZIG_LIBS"
 
 # Game Code Build 14.4kb
 if [ "$PLATFORM" = "windows" ]; then
@@ -135,7 +135,7 @@ SOURCESGC="init.c modinput.c modphysics.c ai.c biomonitor.c weapons.c music.c"
 export TEMP_DIRGC=temp_build_gc
 export SCRIPT_DIR="./Scripts"
 printf "%s\n" $SOURCESGC | xargs -P12 -I{} $CCGC -c $SCRIPT_DIR/{} $CFLAGSGC -I. -nostdinc -fPIC -ffreestanding -fno-builtin -Wshadow -o "$TEMP_DIRGC"/{}.o
-$LINKERGC "$TEMP_DIRGC"/*.o $LDFLAGSGC -s -OReleaseSmall -Wl,-soname,$BINARY_NAMEGC -shared -o $BINARY_NAMEGC
+$LINKERGC "$TEMP_DIRGC"/*.o $LDFLAGSGC -Wl,-soname,$BINARY_NAMEGC -shared -o $BINARY_NAMEGC
 link_status=$?
 if [ $link_status -ne 0 ]; then
     echo "ERROR: Linking failed."
@@ -179,7 +179,7 @@ SOURCES="voxen.c physics.c helpers.c audio.c animation.c console.c level.c data_
 
 export TEMP_DIR=temp_build
 printf "%s\n" $SOURCES | xargs -P12 -I{} $CC -c {} $CFLAGS -fopenmp -o "$TEMP_DIR"/{}.o
-$LINKER "$TEMP_DIR"/*.o $LDFLAGS -s -rdynamic -OReleaseSmall -lm -fopenmp -o $BINARY_NAME
+$LINKER "$TEMP_DIR"/*.o $LDFLAGS -rdynamic -lm -fopenmp -o $BINARY_NAME
 link_status=$?
 if [ $link_status -ne 0 ]; then
     echo "ERROR: Linking failed."
@@ -194,8 +194,8 @@ if ! $IS_CI; then
         windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; wine ./voxen.exe ;;
         mac)      ./voxen.app ;;
         android)  java -jar bundletool.jar build-apks --bundle=voxen.aab --output=voxen.app;;
-        *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
-#         *)        ./voxen ;;   # linux
+#         *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
+        *)        ./voxen ;;   # linux
     esac
     rm -f "$TEMP_DIR"/*.o ./Shaders/*.h "$TEMP_DIRGC"/*.o #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.
 fi

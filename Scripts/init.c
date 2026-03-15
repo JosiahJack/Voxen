@@ -1,6 +1,6 @@
 // init.c - Entity Initialization
 #include "mod.h"
-uint8_t GetCurrentLevelSecurity(void) { return (Eng_Global->difficultyMission < 1 || Sys_Cheats.superoverride) ? 0u : Eng_Global->levelSecurity[Eng_Global->currentLevel]; }
+uint8_t GetCurrentLevelSecurity(void) { return (Eng_Global->difficultyMission < 1 || Eng_Cheats->superoverride) ? 0u : Eng_Global->levelSecurity[Eng_Global->currentLevel]; }
 uint16_t GetImpactType(uint16_t instanceIdx) {
     switch (Eng_Global->instances[instanceIdx].bloodType) {
         case BloodType_None:         return 729; // SparksSmall

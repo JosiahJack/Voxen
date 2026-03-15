@@ -4,7 +4,6 @@
 extern uint16_t headmountedLanternLight;
 extern Vector3 lanternPos;
 extern uint16_t editModeSelection;
-bool EntNotVisible(uint16_t i, bool otherCondition);
 
 void InitializeEntity(Entity* entry) { // Blank entity, no index yet, for initial list population or temporary Entity.
     entry->index = UINT16_MAX; // memset here would be harmful as only a handful of fields are the same.

@@ -972,7 +972,7 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     glGetIntegerv(GL_MINOR_VERSION, &minor);
     if (major < 4 || (major == 4 && minor < 3)) { DualLogError("Need OpenGL >= 4.3, got %d.%d\n", major, minor); OS_Exit(1); }
     double initMarker3 = get_time();
-    CycleToNextMonitor();
+//     CycleToNextMonitor();
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSetKeyCallback(window, key_callback);
     glfwSetJoystickCallback(joystick_callback);
@@ -1144,6 +1144,7 @@ typedef struct {
 } LightCandidate;
 
 bool EntNotVisible(uint16_t i, bool otherCondition) {
+    if (Sys_Global.instances[i].texIndex > loadedTexturesMaxIndex) return true;
     if (!(Sys_Global.instances[i].entflags & ENTFLAG_ACTIVE)) return true;
     if (Sys_Global.instances[i].index >= MAX_ENTITIES || Sys_Global.instances[i].modelIndex >= MODEL_IDX_MAX || Sys_Global.instances[i].texIndex >= MAX_VALID_TEXTURE) return true;
     if (otherCondition) return true;
@@ -1566,11 +1567,11 @@ static inline __attribute__((always_inline)) void RenderInstances(Vector3 player
 
         glUniform1ui(0, i);    glUniform1ui(17, Sys_Global.instances[i].texIndex == 316 ? 1u : 0u);
         if (currentNormIndex != (uint32_t)Sys_Global.instances[i].normIndex || Sys_Global.instances[i].normIndex == 0) { currentNormIndex = (uint32_t)Sys_Global.instances[i].normIndex; glUniform1ui(1, currentNormIndex); }
-        if (currentTexIndex  != (uint32_t)Sys_Global.instances[i].texIndex)  { currentTexIndex  =  (uint32_t)Sys_Global.instances[i].texIndex; glUniform1ui(18, currentTexIndex); }
+        if (currentTexIndex  != (uint32_t)Sys_Global.instances[i].texIndex  || Sys_Global.instances[i].texIndex == 0)  { currentTexIndex  =  (uint32_t)Sys_Global.instances[i].texIndex; glUniform1ui(18, currentTexIndex); }
         if (currentGlowIndex != (uint32_t)Sys_Global.instances[i].glowIndex || Sys_Global.instances[i].glowIndex == 0) { currentGlowIndex = (uint32_t)Sys_Global.instances[i].glowIndex; glUniform1ui(19, currentGlowIndex); }
         if (currentSpecIndex != (uint32_t)Sys_Global.instances[i].specIndex || Sys_Global.instances[i].specIndex == 0) { currentSpecIndex = (uint32_t)Sys_Global.instances[i].specIndex; glUniform1ui(20, currentSpecIndex); }
         int32_t modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && Sys_Global.instances[i].lodIndex < loadedModelsMaxIndex ? Sys_Global.instances[i].lodIndex : Sys_Global.instances[i].modelIndex;
-        if (currentModelType != modelType) {
+        if (currentModelType != modelType || currentModelType == 0) {
             currentModelType = modelType;
             glBindVertexBuffer(0, Sys_Render.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Sys_Render.tbos[currentModelType]);
@@ -1628,6 +1629,7 @@ static inline __attribute__((always_inline)) void RenderInstancesDepthOnly(Vecto
         visibleInstances[visibleCount].index = i;
         visibleInstances[visibleCount].depth = distSqrd;
         visibleCount++;
+        if (visibleCount >= INSTANCE_COUNT) break; // Feels unnecessary given the loop bounds?
     }
     
     if (visibleCount > 1) qsort(visibleInstances, visibleCount, sizeof(DepthSort), compareDepthSortInverted); // Sort by depth (ascending for front-to-back)
@@ -1638,13 +1640,15 @@ static inline __attribute__((always_inline)) void RenderInstancesDepthOnly(Vecto
 
         glUniform1ui(0, i);
         int32_t modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && Sys_Global.instances[i].lodIndex < loadedModelsMaxIndex ? Sys_Global.instances[i].lodIndex : Sys_Global.instances[i].modelIndex;
-        if (currentModelType != modelType) {
+        if ((currentModelType != modelType || currentModelType == 0)) {
             currentModelType = modelType;
             glBindVertexBuffer(0, Sys_Render.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Sys_Render.tbos[currentModelType]);
         }
-        
+
         uint32_t vertCount = modelTriangleCounts[currentModelType] * 3;
+        if (vertCount < 3 || currentModelType >= loadedModelsMaxIndex) continue;
+        
         glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0);
         drawCallsRenderedThisFrame++; verticesRenderedThisFrame += vertCount;
     }

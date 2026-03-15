@@ -281,7 +281,7 @@ void BioMonitorUpdate(void) {
         brainFactor = 0.35f + random_range(-0.3f,0.3f);
     }
 
-    if (Sys_Cheats.showFPS) bioMonitor.chiValue = (((float)Eng_Global->thisFrameTime/16.0f) * 0.5f) - 2.0f;
+    if (Eng_Cheats->showFPS) bioMonitor.chiValue = (((float)Eng_Global->thisFrameTime/16.0f) * 0.5f) - 2.0f;
     else                    bioMonitor.chiValue = (float)(vsinf(Eng_Global->pauseRelativeTime * 10.0 * (double)brainFactor));
 
     // ECG: Create shifted sine wave for heart beat.
@@ -306,7 +306,7 @@ void BioMonitorUpdate(void) {
     }
 
     if (bioMonitor.tick1Finished < Eng_Global->pauseRelativeTime) {
-        if (Sys_Cheats.showFPS) bioMonitor.tick1Finished = Eng_Global->pauseRelativeTime + bioMonitor.tick2;
+        if (Eng_Cheats->showFPS) bioMonitor.tick1Finished = Eng_Global->pauseRelativeTime + bioMonitor.tick2;
         else                                    bioMonitor.tick1Finished = Eng_Global->pauseRelativeTime + bioMonitor.tick1;
 
         Push(1,bioMonitor.chiValue); IncrementCHI();

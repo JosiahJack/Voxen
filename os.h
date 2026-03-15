@@ -15,27 +15,9 @@ typedef __INTPTR_TYPE__ intptr_t;
 #define false 0
 #define likely(x)   __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
-#define PROT_READ  0x1 // From mman.h
-#define PROT_WRITE 0x2
-#define PROT_EXEC  0x4
-#define MAP_PRIVATE 0x02
-#define MAP_FIXED	0x10
-#define MAP_ANONYMOUS 0x20
-#define MAP_POPULATE 0x08000
-#define MAP_FAILED   ((void *)-1)
-#define SEEK_SET 0
-#define SEEK_CUR 1
-#define SEEK_END 2
 #ifndef NULL
     #define NULL 0
 #endif
-#define O_RDONLY 00000000
-#define O_WRONLY 00000001
-#define O_RDWR 00000002
-#define O_CREAT 00000100
-#define O_TRUNC 00001000
-#define O_CLOEXEC 02000000
-
 // ----------------------------------------------------------------------------
 // Engine Functions::
 #ifdef MOD_INTEROP_IMPLEMENTATION // mod.h usage:
@@ -49,10 +31,8 @@ typedef __INTPTR_TYPE__ intptr_t;
         #define ENGINE_TO_MOD __attribute__((visibility("default")))
     #endif
 #endif
-ENGINE_TO_MOD void DualLog(const char* fmt, ...);
-ENGINE_TO_MOD void DualLogWarn(const char* fmt, ...);
-ENGINE_TO_MOD void DualLogError(const char* fmt, ...);
 
+ENGINE_TO_MOD void DualLogError(const char* fmt, ...);
 char* StringFindSubstring(const char* haystack, const char* needle);
 char* StringFindFirstCharWithin(const char *s, char c);
 typedef struct {
@@ -151,75 +131,12 @@ typedef struct {
         #define MAC
         #include <sys/types.h>
     #else
+        #include <sys/mman.h>
+        #include <sys/stat.h>
+        #include <fcntl.h>
         #include <time.h>
-        typedef uint64_t dev_t;
-        typedef uint64_t ino_t;
-        typedef uint32_t mode_t;
-        typedef long unsigned int nlink_t;
-        typedef uint32_t uid_t;
-        typedef uint32_t gid_t;
-        typedef int64_t off_t;
-        typedef int64_t blksize_t;
-        typedef int64_t blkcnt_t;
-        typedef int64_t time_t;        
-        struct stat {
-            dev_t     st_dev;
-            ino_t     st_ino;
-            nlink_t   st_nlink;
-            mode_t    st_mode;
-            uid_t     st_uid;
-            gid_t     st_gid;
-            int       __pad0;
-            dev_t     st_rdev;
-            off_t     st_size;
-            blksize_t st_blksize;
-            blkcnt_t  st_blocks;
-            struct timespec st_atim;
-            struct timespec st_mtim;
-            struct timespec st_ctim;
-            long __unused[3];
-        };
+        #include <stdio.h>
     #endif
-    
-    static inline __attribute__((always_inline)) void* mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset) {
-        register long rax __asm__("rax") = 9;
-        register void* rdi __asm__("rdi") = addr;
-        register size_t rsi __asm__("rsi") = length;
-        register int rdx __asm__("rdx") = prot;
-        register int r10 __asm__("r10") = flags;
-        register int r8 __asm__("r8") = fd;
-        register off_t r9 __asm__("r9") = offset;
-        __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi), "r"(rsi), "r"(rdx), "r"(r10), "r"(r8), "r"(r9) : "rcx", "r11", "memory");
-        return (void*)rax;
-    }
-
-    static inline __attribute__((always_inline)) int munmap(void* addr, size_t length) {
-        register long rax __asm__("rax") = 11;
-        register void* rdi __asm__("rdi") = addr;
-        register size_t rsi __asm__("rsi") = length;
-        __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi), "r"(rsi) : "rcx", "r11", "memory");
-        return (int)rax;
-    }
-
-    static inline __attribute__((always_inline)) int stat(const char *path, struct stat *st) {
-        register long rax __asm__("rax") = 262;           // __NR_newfstatat
-        register int  rdi __asm__("rdi") = -100;          // AT_FDCWD
-        register const char *rsi __asm__("rsi") = path;
-        register struct stat *rdx __asm__("rdx") = st;
-        register int  r10 __asm__("r10") = 0;             // flags = 0 (follow symlinks)
-        __asm__ __volatile__("syscall" : "+r"(rax)
-            : "r"(rdi), "r"(rsi), "r"(rdx), "r"(r10)
-            : "rcx", "r11", "memory");
-        return (int)rax;
-    }
-
-    static inline __attribute__((always_inline)) int fstat(int fd, struct stat *st) {
-        register long rax __asm__("rax") = 5;
-        register int rdi __asm__("rdi") = fd;
-        register struct stat *rsi __asm__("rsi") = st;
-        __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi), "r"(rsi) : "rcx", "r11", "memory");
-        return (int)rax;
-    }
 
     static inline __attribute__((always_inline)) int OS_MakeFolder(const char *path) {
         register long rax __asm__("rax") = 83;
@@ -279,10 +196,10 @@ static inline __attribute__((always_inline)) long OS_Open(const char* path, int3
 static inline __attribute__((always_inline)) OsFileHandle OS_OpenReadonly(const char* filePath) {
     #ifdef WINDOWS
         HANDLE fp = CreateFileA(filePath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
-        if (fp == OS_INVALID_HANDLE) { DualLog("Could not open file %s for reading\n", filePath); return OS_INVALID_HANDLE; }
+        if (fp == OS_INVALID_HANDLE) { DualLogError("Could not open file %s for reading\n", filePath); return OS_INVALID_HANDLE; }
     #else // Linux, Mac, Android
         OsFileHandle fp = OS_Open(filePath,O_RDONLY,0);
-        if (fp < 0) { DualLog("Could not open file %s for reading\n", filePath); return OS_INVALID_HANDLE; }
+        if (fp < 0) { DualLogError("Could not open file %s for reading\n", filePath); return OS_INVALID_HANDLE; }
     #endif
     return fp;
 }
@@ -330,10 +247,10 @@ static inline __attribute__((always_inline)) void* OS_AllocateFileBackedRAMReado
 
 static inline __attribute__((always_inline)) void* OS_OpenAndAllocateFileBufferReadonly(const char* filePath, OsFileHandle* fileDescriptor, int* size) {
     *fileDescriptor = OS_OpenReadonly(filePath);
-    if (*fileDescriptor == OS_INVALID_HANDLE) { *size = 0; return NULL; } // NULL not exit, since this is the path for re-importing instead of using the cache files.
+    if (*fileDescriptor == OS_INVALID_HANDLE) { *size = 0; OS_Exit(1); }
     
     *size = (int)OS_FileSize(*fileDescriptor);
-    if (*size <= 0) { DualLogWarn("Warning: File %s is empty, skipping allocation.\n", filePath); OS_Close(*fileDescriptor); return NULL; }
+    if (*size <= 0) { DualLogError("Warning: File %s is empty, skipping allocation.\n", filePath); OS_Close(*fileDescriptor); OS_Exit(1); }
     
     void* ramSpacePointer = OS_AllocateFileBackedRAMReadonly(*size, *fileDescriptor, (char*)filePath);
     OS_Close(*fileDescriptor);

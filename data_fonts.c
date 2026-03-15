@@ -51,6 +51,7 @@ GlyphRange fontRangesStopD[] = {
 int32_t numFontRanges = sizeof(fontRanges)/sizeof(fontRanges[0]);
 
 __attribute__((pure)) int32_t CodepointToPackedIndex(int32_t codepoint, int fontID) {
+    if (codepoint < 32) codepoint = 32;
     const GlyphRange* ranges = (fontID == FONT_STOPD) ? fontRangesStopD : fontRanges;
     int32_t total_packed = (fontID == FONT_STOPD) ? numPackedGlyphsStopD : numPackedGlyphs;
     for (int32_t i = 0; i < numFontRanges; i++) {
