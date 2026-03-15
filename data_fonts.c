@@ -4,7 +4,7 @@
 #include "voxen.h"
 // #define DUMP_FONT_BITMAPS
 #define STB_TRUETYPE_IMPLEMENTATION
-#include "./External/stb_truetype.h"
+#include "stb_truetype.h"
 // MAX_GLYPHS is 4096 as is FONT_ATLAS_SIZE which is more than twice as large as needed without hiragana/katakana present
 int numPackedGlyphs = 0;
 int numPackedGlyphsStopD = 0;

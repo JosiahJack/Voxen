@@ -95,7 +95,7 @@ WINDOWS_CC="x86_64-w64-mingw32-gcc"
 ANDROID_CC="aarch64-linux-android24-clang"
 MAC_CC="gcc"
 COMMON_CFLAGS="-fno-exceptions -fno-stack-protector -fno-asynchronous-unwind-tables -fno-unwind-tables -Wno-format-nonliteral \
-               -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -fvisibility=hidden -I./External/ -pipe -fno-ident -fdata-sections \
+               -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -fvisibility=hidden -pipe -fno-ident -fdata-sections \
                -ffunction-sections -ffast-math -std=c11 -Wall -Wextra -Wno-implicit-fallthrough \
                -fomit-frame-pointer -fstrict-aliasing -fcommon -Walloca -DMA_USE_STDINT -Wl,--strip-all \
                -Wformat=2 -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings -fno-math-errno -fno-sanitize=undefined \
@@ -113,13 +113,13 @@ elif [ "$PLATFORM" = "mac" ]; then
     CC=$MAC_CC
     LINKERGC=$MAC_CC
     CFLAGSGC="-D__APPLE__ $COMMON_CFLAGS"
-    LDFLAGSGC="$COMMON_LFLAGS -L./External/Mac -lglfw"
+    LDFLAGSGC="$COMMON_LFLAGS"
     BINARY_NAMEGC="Citadel.dylib"
 elif [ "$PLATFORM" = "android" ]; then
     CC=$ANDROID_CC
     LINKEGC=$CC
     CFLAGSGC="-D__ANDROID__ -fPIC $COMMON_CFLAGS"
-    LDFLAGSGC="$COMMON_LFLAGS -L./External/Android -landroid -llog"
+    LDFLAGSGC="$COMMON_LFLAGS"
     BINARY_NAMEGC="Citadel.so"
 else
     CC=$LINUX_CC
@@ -155,13 +155,13 @@ elif [ "$PLATFORM" = "mac" ]; then
     CC=$MAC_CC
     LINKER=$MAC_CC
     CFLAGS="-D__APPLE__ $COMMON_CFLAGS"
-    LDFLAGS="$COMMON_LFLAGS -L./External/Mac -lglfw"
+    LDFLAGS="$COMMON_LFLAGS"
     BINARY_NAME="voxen.app"
 elif [ "$PLATFORM" = "android" ]; then
     CC=$ANDROID_CC
     LINKER=$CC
     CFLAGS="-D__ANDROID__ -fPIC $COMMON_CFLAGS"
-    LDFLAGS="$COMMON_LFLAGS -L./External/Android -landroid -llog"
+    LDFLAGS="$COMMON_LFLAGS -landroid -llog"
     BINARY_NAME="voxen_android"
 else
     CC=$LINUX_CC
