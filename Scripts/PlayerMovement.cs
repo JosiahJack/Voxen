@@ -1324,9 +1324,6 @@ public class PlayerMovement : MonoBehaviour {
 	void ConsoleEnable() {
 		consoleActivated = true;
 		consoleplaceholderText.SetActive(true);
-		if (Application.platform == RuntimePlatform.Android) {
-			consoleEntryButton.SetActive(true);
-		}
 		consoleTitle.SetActive(true);
 		consoleinpFd.enabled = true;
 		consoleinpFd.ActivateInputField();

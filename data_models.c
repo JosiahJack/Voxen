@@ -3,8 +3,6 @@
 #include "gl.h"
 #include "voxen.h"
 #include <string.h>
-// #include <omp.h>
-
 float** modelVertices = NULL;
 uint32_t** modelTriangles = NULL;
 uint32_t modelVertexCounts[MODEL_IDX_MAX] = {0};

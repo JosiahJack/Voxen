@@ -174,16 +174,16 @@ void Input_MouselookApply(void) {
 // static const float HeadBobAmount = 0.08f; TODO
 int32_t Input_MouseMove(int32_t xrel, int32_t yrel) {
     if ((Sys_Global.inventoryMode && !Sys_Cheats.noHUD) || Sys_Global.menuActive || Sys_Global.gamePaused) {
-        int32_t newX = cursorPosition_x + xrel;
+        int32_t newX = Sys_Global.cursorPosition_x + xrel;
         if (newX > Sys_Settings.ScreenWidth) newX = Sys_Settings.ScreenWidth;
         if (newX < 0) newX = 0;
-        if (newX != cursorPosition_x) mouseMovementThisFrame = true;
-        cursorPosition_x = newX;
-        int32_t newY = cursorPosition_y + yrel;
+        if (newX != Sys_Global.cursorPosition_x) mouseMovementThisFrame = true;
+        Sys_Global.cursorPosition_x = newX;
+        int32_t newY = Sys_Global.cursorPosition_y + yrel;
         if (newY > Sys_Settings.ScreenHeight) newY = Sys_Settings.ScreenHeight;
         if (newY < 0) newY = 0;
-        if (newY != cursorPosition_y) mouseMovementThisFrame = true;
-        cursorPosition_y = newY;
+        if (newY != Sys_Global.cursorPosition_y) mouseMovementThisFrame = true;
+        Sys_Global.cursorPosition_y = newY;
     }
     
     if (Sys_Global.gamePaused || Sys_Global.menuActive || Sys_Global.inventoryMode) return 0;
@@ -243,8 +243,8 @@ void ProcessInput(void) {
     if (ToggleMode()) {
         Sys_Input.ignore_next_mouse_delta = true;
         Sys_Global.inventoryMode = !Sys_Global.inventoryMode;
-        cursorPosition_x = Sys_Settings.ScreenWidth / 2;
-        cursorPosition_y = Sys_Settings.ScreenHeight / 2;
+        Sys_Global.cursorPosition_x = Sys_Settings.ScreenWidth / 2;
+        Sys_Global.cursorPosition_y = Sys_Settings.ScreenHeight / 2;
     }
     
     // Hardware hotkeys TODO

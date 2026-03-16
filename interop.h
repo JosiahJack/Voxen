@@ -1,7 +1,7 @@
 // Mod/Gamecode Functions::
 #pragma once
 #define MOD_FUNCTION_LIST(X) \
-    X(void, ModInit, (GlobalContext* ctx, CheatsSystem* cheats, SettingsSystem* settings)) \
+    X(void, ModLink, (GlobalContext* ctx, CheatsSystem* cheats, SettingsSystem* settings)) \
     X(void, ModUpdate, (void)) \
     X(bool, Forward, (void)) \
     X(bool, StrafeLeft, (void)) \
@@ -49,9 +49,11 @@
     X(void, InitializeAIAfterLoad, (uint16_t entityIdx)) \
     X(bool, TakeScreenshot, (void)) \
     X(void, UpdateMusic, (void)) \
+    X(void, UpdateAmbientSounds, (void)) \
     X(void, PlayMenuMusic, (void)) \
     X(void, PlayGameMusic, (void)) \
     X(void, ResetLevelMusic, (void)) \
+    X(void, ResetLevelAudio, (void)) \
     X(void, ModInitAfterLoad, (void)) \
     X(void, ModEntityDefinitionsInitAfterLoad, (DataParser* parser)) \
     X(void, PlayerInit, (uint16_t playerIdx))
@@ -109,3 +111,18 @@ ENGINE_TO_MOD float GetSoundRemainingTime(ma_sound* pSound);
 ENGINE_TO_MOD void AddCameraPosition(uint16_t camIdx);
 ENGINE_TO_MOD bool StringIsEmpty(const char* a);
 ENGINE_TO_MOD void StringCopyInto_A_From_B(char* a, const char* b, size_t bufferSize);
+ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uint32_t layerMask);
+ENGINE_TO_MOD void AddDebugLine(Vector3 start, Vector3 end);
+ENGINE_TO_MOD int32_t PosGetCellCoords(float pos_x, float pos_z);
+ENGINE_TO_MOD int StringFormatV(char* buffer, size_t bufferSize, const char* format, va_list args); // vsnprintf replacement
+ENGINE_TO_MOD int StringFormat(char* buffer, size_t bufferSize, const char* format, ...); // snprintf replacement
+ENGINE_TO_MOD bool PositionVisibleFromPlayerCell(float x, float z);
+ENGINE_TO_MOD void SoundUninit(ma_sound* snd);
+ENGINE_TO_MOD ma_result SoundInit(const char* path, ma_uint32 flags, ma_sound_group* pGroup, ma_fence* pDoneFence, ma_sound* pSound);
+ENGINE_TO_MOD void SoundSetLooping(ma_sound* pSound, ma_bool32 isLooping);
+ENGINE_TO_MOD void SoundSetVolume(ma_sound* pSound, float volume);
+ENGINE_TO_MOD ma_result SoundStart(ma_sound* pSound);
+ENGINE_TO_MOD ma_result SoundStop(ma_sound* pSound);
+ENGINE_TO_MOD float SoundGetLength(ma_sound* pSound);
+ENGINE_TO_MOD ma_result SoundGetCurrentFrameCursor(const ma_sound* pSound, ma_uint64* pCursor);
+

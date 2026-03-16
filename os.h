@@ -31,7 +31,17 @@ typedef __INTPTR_TYPE__ intptr_t;
         #define ENGINE_TO_MOD __attribute__((visibility("default")))
     #endif
 #endif
-
+#define PROT_READ  0x1 // From mman.h
+#define PROT_WRITE 0x2
+#define PROT_EXEC  0x4
+#define MAP_PRIVATE 0x02
+#define MAP_FIXED	0x10
+#define MAP_ANONYMOUS 0x20
+#define MAP_POPULATE 0x08000
+#define MAP_FAILED   ((void *)-1)
+#define SEEK_SET 0
+#define SEEK_CUR 1
+#define SEEK_END 2
 ENGINE_TO_MOD void DualLogError(const char* fmt, ...);
 char* StringFindSubstring(const char* haystack, const char* needle);
 char* StringFindFirstCharWithin(const char *s, char c);
@@ -49,18 +59,12 @@ typedef struct {
     #include <direct.h>
     #include <winternl.h>
     #include <ntstatus.h>
+    #include <io.h>
     typedef HANDLE OsFileHandle;
     #define OS_INVALID_HANDLE INVALID_HANDLE_VALUE
     #define OS_MakeFolder(path) _mkdir(path)
-    static inline __attribute__((always_inline, noreturn)) void OS_Exit(int64_t exitCode) {
-        register uint64_t rax __asm__("rax") = 0x2C;
-        register HANDLE   rcx __asm__("rcx") = (HANDLE)-1;
-        register NTSTATUS rdx __asm__("rdx") = (NTSTATUS)exitCode;
-        __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rcx), "r"(rdx) : "r8", "r9", "r10", "r11", "memory");
-        __builtin_unreachable();
-    }
+    static inline __attribute__((always_inline, noreturn)) void OS_Exit(int64_t exitCode) { ExitProcess((UINT)exitCode); }
     static inline __attribute__((always_inline)) void OS_Close(OsFileHandle fileDescriptor) { CloseHandle(fileDescriptor); }
-    
     static inline __attribute__((always_inline)) void* OS_AllocateRAM(void* addr, size_t length, int32_t prot, int32_t flags, OsFileHandle fd) {
         (void)flags;
         bool writable = (prot & PROT_WRITE);
@@ -79,79 +83,23 @@ typedef struct {
         return ptr;
     }
     
-    static inline __attribute__((always_inline)) long OS_Read(OsFileHandle fd, void* buf, size_t count) {
-        // NtReadFile — direct syscall, zero library involvement
-        // syscall number is stable at 0x0003 on all modern Windows 10/11 (including 26H1)
-        register uint64_t rax __asm__("rax") = 0x0003;
-        register HANDLE   rcx __asm__("rcx") = (HANDLE)fd;
-        register void*    rdx __asm__("rdx") = NULL;
-        register void*    r8  __asm__("r8")  = buf;
-        register size_t   r9  __asm__("r9")  = count;
-        __asm__ __volatile__(
-            "xor %%r10, %%r10\n\t"
-            "movq $0, 8(%%rsp)\n\t"
-            "syscall" : "+r"(rax) : "r"(rcx), "r"(rdx), "r"(r8), "r"(r9) : "r10", "r11", "memory");
-
-        return (rax == 0) ? (long)count : (long)rax;
-    }
+    static inline __attribute__((always_inline)) long OS_Read(OsFileHandle fd, void* buf, size_t count) { DWORD bytesRead = 0; if (ReadFile((HANDLE)fd,buf,(DWORD)count,&bytesRead,NULL)) ? (long)bytesRead : return (long)-1; }
 #else
+    #define LINUX
+    #include <sys/mman.h>
+    #include <sys/stat.h>
+    #include <fcntl.h>
+    #include <time.h>
+    #include <stdio.h>
+    #include <unistd.h>
     typedef int OsFileHandle;
-    #if defined(__linux__) && !defined(__ANDROID__)
-        #define LINUX
-        static inline __attribute__((always_inline)) void* OS_Brk(void* addr) {
-            register long rax __asm__("rax") = 12;
-            register void* rdi __asm__("rdi") = addr;
-            __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi) : "rcx", "r11", "memory");
-            return (void*)rax;
-        }
-        
-        static inline __attribute__((always_inline)) OsFileHandle OS_Read(OsFileHandle fd, void* buf, size_t count) {
-            register long rax __asm__("rax") = 0;
-            register long rdi __asm__("rdi") = (long)fd;
-            register void* rsi __asm__("rsi") = buf;
-            register size_t rdx __asm__("rdx") = count;
-            __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi), "r"(rsi), "r"(rdx) : "rcx", "r11", "memory");
-            return rax;
-        }
-    #endif
-    
-    static inline __attribute__((always_inline, noreturn)) void OS_Exit(int64_t exitCode) {
-        register int64_t rax __asm__("rax") = 231;
-        register int64_t rdi __asm__("rdi") = exitCode;
-        __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi) : "rcx", "r11", "memory");
-        __builtin_unreachable();
-    }
-
-    #if defined(__ANDROID__)
-        #define ANDROID
-    #endif
-    
     #define OS_INVALID_HANDLE -1
-    #if defined(__APPLE__)
-        #define MAC
-        #include <sys/types.h>
-    #else
-        #include <sys/mman.h>
-        #include <sys/stat.h>
-        #include <fcntl.h>
-        #include <time.h>
-        #include <stdio.h>
-    #endif
-
-    static inline __attribute__((always_inline)) int OS_MakeFolder(const char *path) {
-        register long rax __asm__("rax") = 83;
-        register const char *rdi __asm__("rdi") = path;
-        register mode_t rsi __asm__("rsi") = 0755;
-        __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi), "r"(rsi) : "rcx", "r11", "memory");
-        return (int)rax;
-    }
-
-    static inline __attribute__((always_inline)) void OS_Close(OsFileHandle fileDescriptor) {
-        register long rax __asm__("rax") = 3;
-        register long rdi __asm__("rdi") = fileDescriptor;
-        __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi) : "rcx", "r11", "memory");
-    }
-
+    int brk(void *addr); void *sbrk(intptr_t increment);
+    static inline __attribute__((always_inline)) void* OS_Brk(void* addr) { brk(addr); return (void*)sbrk(0); }
+    static inline __attribute__((always_inline)) OsFileHandle OS_Read(OsFileHandle fd, void* buf, size_t count) { ssize_t res = read(fd, buf, count); return (long)res; }
+    static inline __attribute__((always_inline, noreturn)) void OS_Exit(int64_t exitCode) { _exit(exitCode); }
+    static inline __attribute__((always_inline)) int OS_MakeFolder(const char *path) { return mkdir(path, 0755); }
+    static inline __attribute__((always_inline)) void OS_Close(OsFileHandle fileDescriptor) { close(fileDescriptor); }
     static inline __attribute__((always_inline)) void* OS_AllocateRAM(void* addr, size_t length, int32_t prot, int32_t flags, OsFileHandle fd) {
         void* ptr = mmap(addr,length,prot,flags,fd,0);
         if (ptr == MAP_FAILED || ptr == NULL) { DualLogError("Failed to allocate RAM\n"); OS_Exit(1); }
@@ -164,7 +112,7 @@ static inline __attribute__((always_inline)) int64_t OS_RawWrite(OsFileHandle fd
         DWORD written = 0;
         if (WriteFile((HANDLE)fd, buf, (DWORD)count, &written, NULL)) return (int64_t)written;
         return -1;
-    #else // Linux, Mac, Android
+    #else // Linux
         register int64_t     rax __asm__("rax") = 1; // sys_write
         register int32_t     rdi __asm__("rdi") = fd;
         register const void* rsi __asm__("rsi") = buf;
@@ -197,7 +145,7 @@ static inline __attribute__((always_inline)) OsFileHandle OS_OpenReadonly(const 
     #ifdef WINDOWS
         HANDLE fp = CreateFileA(filePath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
         if (fp == OS_INVALID_HANDLE) { DualLogError("Could not open file %s for reading\n", filePath); return OS_INVALID_HANDLE; }
-    #else // Linux, Mac, Android
+    #else // Linux
         OsFileHandle fp = OS_Open(filePath,O_RDONLY,0);
         if (fp < 0) { DualLogError("Could not open file %s for reading\n", filePath); return OS_INVALID_HANDLE; }
     #endif
@@ -208,7 +156,7 @@ static inline __attribute__((always_inline)) OsFileHandle OS_OpenWriteonly(const
     #ifdef WINDOWS
         OsFileHandle h = CreateFileA(filePath, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
         return (h == OS_INVALID_HANDLE) ? (DualLogError("Failed to open %s for writing\n", filePath), OS_Exit(1), OS_INVALID_HANDLE) : h;
-    #else // Linux, Mac, Android
+    #else // Linux
         OsFileHandle h = OS_Open(filePath,O_WRONLY | O_CREAT | O_TRUNC,0644);
         return (h < 0) ? (DualLogError("Failed to open %s for writing\n", filePath), OS_Exit(1), OS_INVALID_HANDLE) : h;
     #endif
@@ -221,7 +169,7 @@ static inline __attribute__((always_inline)) int OS_FileSize(OsFileHandle fileDe
         LARGE_INTEGER size;
         if (!GetFileSizeEx(fileDescriptor, &size)) return -1;
         return size.QuadPart;
-    #else // Linux, Mac, Android
+    #else // Linux
         struct stat fileStatisticsStruct;
         fstat(fileDescriptor, &fileStatisticsStruct);
         return fileStatisticsStruct.st_size;
@@ -238,7 +186,7 @@ static inline __attribute__((always_inline)) void* OS_AllocateFileBackedRAMReado
         void* ramSpacePointer = MapViewOfFile(hMapping, FILE_MAP_READ, 0, 0, size);
         CloseHandle(hMapping);  // view keeps reference alive
         if (ramSpacePointer == NULL) { DualLogError("Failed to allocate %s (err %lu)\n", filePath, GetLastError()); return NULL; }
-    #else // Linux, Mac, Android
+    #else // Linux
         void* ramSpacePointer = OS_AllocateRAM(NULL, size, PROT_READ, MAP_PRIVATE, fileDescriptor);
         if (ramSpacePointer == MAP_FAILED) { DualLogError("Failed to allocate %s\n", filePath); return NULL; }
     #endif
@@ -263,7 +211,7 @@ static inline __attribute__((always_inline)) void OS_DeallocateRAM(void* ramSpac
         if (!ramSpacePointer) { DualLogError("Attempting to double free!\n"); OS_Exit(1); }
         
         if (!UnmapViewOfFile(ramSpacePointer)) { if (VirtualFree(ramSpacePointer, 0 /* dwSize (must be 0 with MEM_RELEASE) */, MEM_RELEASE) == 0) DualLogError("VirtualFree failed\n"); }
-    #else // Linux, Mac, Android
+    #else // Linux
         if (!ramSpacePointer || ramSpacePointer == MAP_FAILED) { DualLogError("Attempting to double free!\n"); OS_Exit(1); }
         
         if ((void *)(int64_t)munmap(ramSpacePointer, size) == MAP_FAILED) DualLogError("munmap failed\n");
@@ -292,7 +240,7 @@ static inline __attribute__((always_inline)) bool OS_GetFileFingerprint(const ch
 
         fp->size     = ((uint64_t)bhfi.nFileSizeHigh << 32) | bhfi.nFileSizeLow;
         CloseHandle(hFile);
-    #else // Linux, Mac, Android
+    #else // Linux
         struct stat st;
         if (stat(path, &st) != 0) { DualLogError("Failed to stat \"%s\"\n", path); return false; }
 
@@ -303,36 +251,21 @@ static inline __attribute__((always_inline)) bool OS_GetFileFingerprint(const ch
 
 static inline __attribute__((always_inline)) int64_t OS_Seek(OsFileHandle fd, int64_t offset, int whence) { // forth and forsooth pray tell
     #ifdef WINDOWS
-        (void)whence;
-        // Use NtSetInformationFile with FilePositionInformation (class 14)
-        // This is the direct syscall path (no kernel32).
-        struct {
-            LARGE_INTEGER CurrentByteOffset;
-        } pos_info;
+        LARGE_INTEGER liDistanceToMove;
+        LARGE_INTEGER liNewFilePointer;
+        liDistanceToMove.QuadPart = offset;
+        DWORD dwMoveMethod;
+        switch (whence) {
+            case SEEK_SET: dwMoveMethod = FILE_BEGIN;   break;
+            case SEEK_CUR: dwMoveMethod = FILE_CURRENT; break;
+            case SEEK_END: dwMoveMethod = FILE_END;     break;
+            default: return -1;
+        }
 
-        pos_info.CurrentByteOffset.QuadPart = offset;
-
-        // NtSetInformationFile syscall number = 0x24 (stable on Windows 10/11 25H2/26H1)
-        register uint64_t rax __asm__("rax") = 0x24;
-        register HANDLE   rcx __asm__("rcx") = (HANDLE)fd;
-        register void*    rdx __asm__("rdx") = NULL;                    // IoStatusBlock (we ignore)
-        register void*    r8  __asm__("r8")  = &pos_info;
-        register uint32_t r9  __asm__("r9")  = 14;                      // FilePositionInformation
-        register uint64_t r10 __asm__("r10") = 8;                       // Length of FILE_POSITION_INFORMATION
-        __asm__ __volatile__(
-            "xor %%r11, %%r11\n\t"          // Event = NULL
-            "syscall" : "+r"(rax) : "r"(rcx), "r"(rdx), "r"(r8), "r"(r9), "r"(r10) : "r11", "memory");
-
-        if (rax != 0) return -1;
-        return offset;
-    #else
-        // Linux / macOS / Android
-        register int64_t rax __asm__("rax") = 8;
-        register int64_t rdi __asm__("rdi") = fd;
-        register int64_t rsi __asm__("rsi") = offset;
-        register int64_t rdx __asm__("rdx") = whence;
-        __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi), "r"(rsi), "r"(rdx) : "rcx", "r11", "memory");
-        return rax;
+        if (!SetFilePointerEx(fd, liDistanceToMove, &liNewFilePointer, dwMoveMethod)) return -1;
+        return liNewFilePointer.QuadPart;
+    #else // Linux
+        off_t res = lseek(fd, (off_t)offset, whence); return (int64_t)res;
     #endif
 }
 
@@ -358,7 +291,7 @@ static inline __attribute__((always_inline)) int64_t OS_Tell(OsFileHandle fd) {
     return pos_info.CurrentByteOffset.QuadPart;
 
 #else
-    // Linux / macOS / Android
+    // Linux
     register int64_t rax __asm__("rax") = 8;      // sys_lseek
     register int64_t rdi __asm__("rdi") = fd;
     register int64_t rsi __asm__("rsi") = 0;

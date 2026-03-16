@@ -32,19 +32,6 @@ void InitializeEntity(Entity* entry) { // Blank entity, no index yet, for initia
     entry->path[0] = '\0';    
 }
 
-void ResetLevelAudio(void);
-void InitAfterLoad(void) { // Init entities after level load and after already having generic entity type fields set.
-    for (int i=PLAYER1;i<Sys_Global.loadedInstances;++i) {        
-        int32_t cellIdx = PosGetCellCoords(Sys_Global.instances[i].position.x,Sys_Global.instances[i].position.z);
-        Sys_Global.instances[i].cellIndex = cellIdx;
-    }
-    
-    ModInitAfterLoad();
-    ResetLevelAudio();
-    ResetLevelMusic();
-    DualLog("Entity instances initialized after load\n");
-}
-
 void AddInstance(uint16_t entIdx, uint16_t i) {
     if (entIdx >= Sys_Global.entityCount) { DualLogError("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d\n",entIdx,Sys_Global.entityCount); OS_Exit(1); }
         
@@ -529,7 +516,15 @@ void LoadLevel(uint8_t curlevel) {
     RenderLoadingProgress(110,"Loading textures...");
     LoadTextures();
     RenderLoadingProgress(110,"Initialize entities...");
-    InitAfterLoad();
+    for (int i=PLAYER1;i<Sys_Global.loadedInstances;++i) {        
+        int32_t cellIdx = PosGetCellCoords(Sys_Global.instances[i].position.x,Sys_Global.instances[i].position.z);
+        Sys_Global.instances[i].cellIndex = cellIdx;
+    }
+    
+    ModInitAfterLoad();
+    ResetLevelAudio();
+    ResetLevelMusic();
+    DualLog("Entity instances initialized after load\n");
     RenderLoadingProgress(110,"Loading cull system...");
     CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
     RenderLoadingProgress(120,"Loading voxel lighting data...");

@@ -19,7 +19,7 @@ GLFWwindow* window;
 #include "voxen.h"
 #include "Shaders/shaders.h"
 #include "credits.h"
-GlobalContext Sys_Global = { .menuActive = true, .screenshotTimeout = 1.0, .creditsPageIndex = 1, .difficultyCombat = 2, .difficultyCyber = 2, .difficultyPuzzle = 2, .difficultyMission = 2, .deaths = 0, .worstFPS = UINT32_MAX };
+GlobalContext Sys_Global = { .menuActive = true, .screenshotTimeout = 1.0, .creditsPageIndex = 1, .difficultyCombat = 2, .difficultyCyber = 2, .difficultyPuzzle = 2, .difficultyMission = 2, .deaths = 0, .worstFPS = UINT32_MAX, .cursorPosition_x = 680, .cursorPosition_y = 384, .aspect3D = 1.0f };
 CheatsSystem Sys_Cheats = { .god = false, .noclip = true, .showLocation = true, .showFPS = true, .editMode = true };
 RenderSystem Sys_Render;
 SystemUI Sys_UIPlayer1;
@@ -30,10 +30,9 @@ uint8_t queuedLevelToLoad = 255u;
 float modelMatrices[INSTANCE_COUNT * 16];
 uint8_t dirtyInstances[INSTANCE_COUNT];
 double berserkFinished;
-float berserkSeedTime, aspect3D = 1.0f, cam_pitch, cam_yaw = 90.0f, cam_roll, fogColorR, fogColorG, fogColorB, fogBaseDensityForLevel;
+float berserkSeedTime, cam_pitch, cam_yaw = 90.0f, cam_roll, fogColorR, fogColorG, fogColorB, fogBaseDensityForLevel;
 float rasterPerspectiveProjection[16];
 float shadowmapsPerspectiveProjection[16];
-int32_t cursorPosition_x = 680, cursorPosition_y = 384; // Separate internal cursor from system cursor.  This gets relatively pushed around by real cursor movement to give consistent platform behavior.
 char uiTextBuffer[TEXT_BUFFER_SIZE];
 float uiOrthoProjection[16];
 float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
@@ -100,7 +99,7 @@ static void DualLogMain(const char *prefix, const char *fmt, va_list args) {
         if (prefix) OS_RawWrite(out, prefix, GetStringLength(prefix));
         OS_RawWrite(out, buf, GetStringLength(buf));
     #else
-        // Linux/macOS/Android - write to stdout (fd 1) or stderr (fd 2)
+        // Linux - write to stdout (fd 1) or stderr (fd 2)
         OsFileHandle out = (prefix && prefix[0] == '\033') ? 2 : 1;  // use stderr for colored warnings/errors
         if (prefix) { OS_RawWrite(out, prefix, GetStringLength(prefix)); OS_RawWrite(out,"\033[0m ", 5); }
         OS_RawWrite(out, buf, GetStringLength(buf));
@@ -174,6 +173,8 @@ void ExtractFrustumPlanes(float* m, FrustumPlane* planes) {
     }
 }
 
+ENGINE_TO_MOD int32_t PosGetCellCoords(float pos_x, float pos_z) { return (PosGetCellCoordZ(pos_z) * WORLDX) + PosGetCellCoordX(pos_x); } // Clamped just above.
+
 Quaternion cubemapOrientationQuaternion[6] = {
     {0.0f, 0.707106781f, 0.0f, 0.707106781f},  // +X: Right
     {0.0f, -0.707106781f, 0.0f, 0.707106781f}, // -X: Left
@@ -190,10 +191,7 @@ bool UpdateLights(bool* voxelsNeedUpdated) {
     int32_t lant = headmountedLanternLight * LIGHT_DATA_SIZE;
     if (/*(Sys_Global.inventoryPlayer1.hasHardware & HW_LAN) && */(Sys_Global.inventoryPlayer1.hardwareIsActive & HW_LAN)) {
         Vector3 lanternPosLast = lanternPos;
-        lanternPos = Sys_Global.instances[PLAYER1].position;
-        lanternPos.y -= 0.24f;
-        lanternPos.x += 0.04f;
-        lanternPos.z += 0.04f;
+        lanternPos = (Vector3){Sys_Global.instances[PLAYER1].position.x + 0.04f, Sys_Global.instances[PLAYER1].position.y + 0.24f, Sys_Global.instances[PLAYER1].position.z + 0.04f};
         lightsNewPosition[headmountedLanternLight] = lanternPos;
         lights[lant + LIGHT_DATA_OFFSET_POSX] = lanternPos.x;
         lights[lant + LIGHT_DATA_OFFSET_POSY] = lanternPos.y;
@@ -278,11 +276,9 @@ bool UpdateLights(bool* voxelsNeedUpdated) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, Sys_Render.lightsID); glBufferData(GL_SHADER_STORAGE_BUFFER, loadedLights * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
     if (*voxelsNeedUpdated) {
         float px = Sys_Global.instances[PLAYER1].position.x; float py = Sys_Global.instances[PLAYER1].position.y; float pz = Sys_Global.instances[PLAYER1].position.z;
-        float fx = Sys_Global.instances[PLAYER1].forward.x;  float fy = Sys_Global.instances[PLAYER1].forward.y;  float fz = Sys_Global.instances[PLAYER1].forward.z;
         glUseProgram(Sys_Render.voxelUpdateShaderProgram);
         glUniform3f(5, px, py, pz);
-        glUniform3f(6, fx, fy, fz);
-        glUniform1ui(7, (uint32_t)MAX_LIGHTS_PER_VOXEL);
+        glUniform1ui(6, (uint32_t)MAX_LIGHTS_PER_VOXEL);
         GLuint groupX_voxels = (512 + 31) / 32;
         GLuint groupZ_voxels = (512 + 31) / 32; // Actually just a local size y, but for z axis voxels
         glDispatchCompute(groupX_voxels,groupZ_voxels, 1);
@@ -343,7 +339,8 @@ void RenderUIImage(int16_t x, int16_t y, int16_t width, int16_t height, uint32_t
 }
 
 __attribute__((pure)) bool CursorIsOverBounds(float startX, float endX, float startY, float endY) {
-    return (cursorPosition_x >= startX && cursorPosition_x <= endX /* 0 == left */ && cursorPosition_y >= endY && cursorPosition_y <= startY); /* 0 == top */
+    return   (Sys_Global.cursorPosition_x >= startX && Sys_Global.cursorPosition_x <= endX   /* 0 == left */
+           && Sys_Global.cursorPosition_y >= endY && Sys_Global.cursorPosition_y <= startY); /* 0 == top */
 }
 
 Color textColors[] = {
@@ -365,6 +362,7 @@ Color textColors[] = {
 float textVertexData[8192]; // Reusable buffer for text vertices.  Most text only needs ~3000
 extern stbtt_packedchar fontPackedChar[MAX_GLYPHS];
 extern stbtt_packedchar fontPackedCharStopD[MAX_GLYPHS];
+__attribute__((pure)) int32_t CodepointToPackedIndex(int32_t codepoint, int fontID);
 void RenderFormattedText(int16_t x, int16_t y, uint32_t color, uint8_t fontID, float scaleInput, const char * restrict format, ...) {
     float scale = scaleInput;// * UIY(Sys_Settings.ScreenHeight);
     va_list args;
@@ -385,7 +383,7 @@ void RenderFormattedText(int16_t x, int16_t y, uint32_t color, uint8_t fontID, f
     float lineSpacing = RelY(22) * scale;
     stbtt_aligned_quad q;
     int characterCount = 0;
-    float paddingUV = (12.0f / (float)FONT_ATLAS_SIZE); // This is for the black outline around all text for readability.
+    float paddingUV = (10.0f / (float)FONT_ATLAS_SIZE); // This is for the black outline around all text for readability. (2.0f makes an interesting bold effect)
     float borderWidthPixels = 2.0f;
     while (*p) {
         // Decode UTF8
@@ -419,7 +417,7 @@ void RenderFormattedText(int16_t x, int16_t y, uint32_t color, uint8_t fontID, f
             characterCount = 0;
             continue;
         }
-
+        
         int idx = CodepointToPackedIndex(codepoint, fontID);
         if (fontID == FONT_STOPD) stbtt_GetPackedQuad(fontPackedCharStopD, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, idx, &xpos, &ypos, &q, 1);
         else stbtt_GetPackedQuad(fontPackedChar, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, idx, &xpos, &ypos, &q, 1);
@@ -456,10 +454,7 @@ void RenderLoadingProgress(int32_t offset, const char * restrict text) { // Only
 
 char statusText[TEXT_BUFFER_SIZE];
 void CenterStatusPrint(const char * restrict fmt, ...) {
-    va_list args;
-    __builtin_va_start(args, fmt);
-    StringFormat(statusText,TEXT_BUFFER_SIZE,fmt,args);
-    __builtin_va_end(args);
+    va_list args; __builtin_va_start(args, fmt); StringFormatV(statusText,TEXT_BUFFER_SIZE,fmt,args); __builtin_va_end(args);
     DualLog("%s\n",statusText);
     Sys_Global.statusTextDecayFinished = get_time() + 2.5; // 2.5 second decay time before text dissappears.
 }
@@ -534,7 +529,6 @@ __attribute__((cold)) void LoadGameModDefinition(void) { // Unique set separate 
         line[lineLength] = fb[i]; lineLength++; // Keep filling up the current line.
     }
 
-    if (StringsAreEqual(Sys_Global.global_modname, "Citadel")) Sys_Global.global_modIsCitadel = true;
     DualLog(" %s:: num levels: %d, start level: %d... took %f secs\n",Sys_Global.global_modname, Sys_Global.numLevels, Sys_Global.startLevel, get_time() - start_time);
 }
 
@@ -571,14 +565,14 @@ void UpdateProjectionMatrices(void) {
     m[8] =                                   0.0f; m[9] =                                       0.0f; m[10]= -1.0f; m[11]= 0.0f;
     m[12]=                                  -1.0f; m[13]=                                       1.0f; m[14]=  0.0f; m[15]= 1.0f;
     
-    aspect3D = (float)Sys_Settings.ScreenWidth / (float)Sys_Settings.ScreenHeight;
+    Sys_Global.aspect3D = (float)Sys_Settings.ScreenWidth / (float)Sys_Settings.ScreenHeight;
     float f = vcot((float)Sys_Settings.FOV * PI / 360.0f);
     m = rasterPerspectiveProjection;
-    m[0] = f / aspect3D; m[1] = 0.0f; m[2] =                                                      0.0f; m[3] =  0.0f;
+    m[0] = f / Sys_Global.aspect3D; m[1] = 0.0f; m[2] =                                           0.0f; m[3] =  0.0f;
     m[4] =         0.0f; m[5] =    f; m[6] =                                                      0.0f; m[7] =  0.0f;
     m[8] =         0.0f; m[9] = 0.0f; m[10]=      -(FAR_PLANE + NEAR_PLANE) / (FAR_PLANE - NEAR_PLANE); m[11]= -1.0f;
     m[12]=         0.0f; m[13]= 0.0f; m[14]= -2.0f * FAR_PLANE * NEAR_PLANE / (FAR_PLANE - NEAR_PLANE); m[15]=  0.0f;
-    voxen_Shadow_System.shadDotThresh = 1.0f / vsqrtf(1.0f + vtan((float)Sys_Settings.FOV * PI / 360.0f) * (1.0f + aspect3D * aspect3D));
+    voxen_Shadow_System.shadDotThresh = 1.0f / vsqrtf(1.0f + vtan((float)Sys_Settings.FOV * PI / 360.0f) * (1.0f + Sys_Global.aspect3D * Sys_Global.aspect3D));
 }
 
 void UpdateScreenSize(GLFWwindow* unused, int32_t width, int32_t height) {
@@ -931,7 +925,7 @@ void LoadModFunctions(void) {
 
     MOD_FUNCTION_LIST(X)
     #undef X
-    ModInit(&Sys_Global,&Sys_Cheats,&Sys_Settings);
+    ModLink(&Sys_Global,&Sys_Cheats,&Sys_Settings);
     Sys_Global.GetKey = GetKey;
     Sys_Global.GetKeyPressed = GetKeyPressed;
     DualLog("done!\n");
@@ -973,7 +967,6 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     if (major < 4 || (major == 4 && minor < 3)) { DualLogError("Need OpenGL >= 4.3, got %d.%d\n", major, minor); OS_Exit(1); }
     double initMarker3 = get_time();
 //     CycleToNextMonitor();
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSetKeyCallback(window, key_callback);
     glfwSetJoystickCallback(joystick_callback);
     glfwSetCursorPosCallback(window, cursor_pos_callback);
@@ -1081,6 +1074,7 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     if (Sys_Global.introNotPlayed) {} // TODO: Play intro
     NewGame();
     play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     DebugRAM("InitializeEnvironment end");
 }
 
@@ -1098,37 +1092,11 @@ static inline __attribute__((always_inline)) void DrawDebugLines(float* viewProj
     Sys_Global.debugLineVertCount = 0;
 }
 
-static inline __attribute__((always_inline)) void AddDebugLine(Vector3 start, Vector3 end) {
+ENGINE_TO_MOD void AddDebugLine(Vector3 start, Vector3 end) {
     int32_t i = Sys_Global.debugLineVertCount;
     debugLineBuffer[i++] = start.x; debugLineBuffer[i++] = start.y; debugLineBuffer[i++] = start.z;
     debugLineBuffer[i++] =   end.x; debugLineBuffer[i++] =   end.y; debugLineBuffer[i++] =   end.z;
     Sys_Global.debugLineVertCount = i;
-}
-
-#define FROB_DISTANCE 4.9f
-static inline __attribute__((always_inline)) void Frob(Vector3 pos, Vector3 forward, Vector3 right) {
-    float offsetX = cursorPosition_x - (Sys_Settings.ScreenWidth * 0.5f);
-    float offsetY = cursorPosition_y - (Sys_Settings.ScreenHeight * 0.5f);
-    float ndcX = offsetX / (Sys_Settings.ScreenWidth * 0.5f);
-    float ndcY = -offsetY / (Sys_Settings.ScreenHeight * 0.5f);  // flip Y
-    float tanFov = vtan((float)Sys_Settings.FOV * 0.5f * PI / 180.0f);
-    Vector3 view = (Vector3){ ndcX * tanFov * aspect3D, ndcY * tanFov, -1.0f };
-    view = normalize_vector3(view);
-    Vector3 flipForward = (Vector3){ -forward.x, -forward.y, -forward.z};
-    Vector3 up = normalize_vector3( cross_vector3(right, flipForward) );
-    Vector3 dir = (Vector3){ view.x * right.x + view.y * up.x + view.z * (flipForward.x),
-                             view.x * right.y + view.y * up.y + view.z * (flipForward.y),
-                             view.x * right.z + view.y * up.z + view.z * (flipForward.z) };
-                             
-    Sys_Global.debugLine_start = pos;
-    Sys_Global.debugLine_end   = (Vector3){ dir.x * FROB_DISTANCE + pos.x, dir.y * FROB_DISTANCE + pos.y, dir.z * FROB_DISTANCE + pos.z };
-    RaycastHit tempHit = Raycast(pos, dir, FROB_DISTANCE, LAYER_MASK_PLAYER_FROB);
-    if (tempHit.hit) {
-        Sys_Global.debugLine_end = tempHit.point;
-        DualLog("Raycast hit!  Hit object %u named of entity type %s(%u) at hit point %f %f %f\n", tempHit.hitInstanceIndex, Sys_Global.entities[Sys_Global.instances[tempHit.hitInstanceIndex].index].path, Sys_Global.instances[tempHit.hitInstanceIndex].index, (double)tempHit.point.x, (double)tempHit.point.y, (double)tempHit.point.z);
-    }
-    
-    Sys_Global.debugLineFinished = Sys_Global.current_time + 3.0;
 }
 
 #define SHADOW_NEARMESH_MAX 512 // 350 was too low for light 712 on security atrium
@@ -1215,7 +1183,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void RenderSha
         uint32_t numShadowCasters = 0;
         for (int i=START_INDEX_LEVEL_INSTANCES;i<INSTANCE_COUNT;++i) {
             if (EntNotVisible(i,(Sys_Global.instances[i].entflags & ENTFLAG_NO_SHADOWS))) continue;
-//             if (ConstIndexIsNPC(Sys_Global.instances[i].index)) continue;
+            if (ConstIndexIsNPC(Sys_Global.instances[i].index)) continue;
 
             shadowCasterIndices[numShadowCasters] = i;
             numShadowCasters++;
@@ -1374,7 +1342,7 @@ static inline __attribute__((always_inline)) double RenderUI(void) {
     if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 2),TEXT_WHITE,FONT_NORMAL,1.0f,"Player velocity: %.2f, %.2f, %.2f",Sys_Global.instances[PLAYER1].velocity.x,Sys_Global.instances[PLAYER1].velocity.y,Sys_Global.instances[PLAYER1].velocity.z);
     if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 3),TEXT_WHITE,FONT_NORMAL,1.0f,"Test Entity[%u] %s Index: %u, Shadow cpu ms: %.3f",editModeSelection,Sys_Global.entities[Sys_Global.instances[editModeSelection].index].path,editModeTestEntityDefinition,voxen_Shadow_System.shadowTime * 1000);
     if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 4),TEXT_WHITE,FONT_NORMAL,1.0f,"Player cell: %u",Sys_Global.instances[PLAYER1].cellIndex);
-    RenderFormattedText(16,debugTextStartY + (lineSpacing * 5),TEXT_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d   dx: %d dy: %d",cursorPosition_x,cursorPosition_y,Sys_Input.currentMouse_dx,Sys_Input.currentMouse_dy);
+    RenderFormattedText(16,debugTextStartY + (lineSpacing * 5),TEXT_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d   dx: %d dy: %d",Sys_Global.cursorPosition_x,Sys_Global.cursorPosition_y,Sys_Input.currentMouse_dx,Sys_Input.currentMouse_dy);
     if (Sys_Cheats.consoleActive) RenderFormattedText(16, 0, TEXT_WHITE, FONT_NORMAL,1.0f, "] %s",consoleEntryText);
     if (Sys_Global.statusTextDecayFinished > Sys_Global.current_time) RenderFormattedText(479,114,TEXT_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
     if (!Sys_Global.menuActive && !Sys_Global.gamePaused) {
@@ -1384,8 +1352,8 @@ static inline __attribute__((always_inline)) double RenderUI(void) {
             if (CursorIsOverBounds(672,694,22,0)) {
                 if (mouseReleased) {
                     Sys_Global.inventoryMode = false;
-                    cursorPosition_x = Sys_Settings.ScreenWidth / 2;
-                    cursorPosition_y = Sys_Settings.ScreenHeight / 2;
+                    Sys_Global.cursorPosition_x = Sys_Settings.ScreenWidth / 2;
+                    Sys_Global.cursorPosition_y = Sys_Settings.ScreenHeight / 2;
                 }
             }
         }
@@ -1407,109 +1375,7 @@ static inline __attribute__((always_inline)) double RenderUI(void) {
 }
 
 DepthSort visibleInstances[INSTANCE_COUNT];
-static inline void swap(char *a, char *b, size_t sz) { while (sz--) { char t=*a; *a++=*b; *b++=t; } }
-
-static void heapsort(char *base, size_t n, size_t sz, int (*cmp)(const void*, const void*)) {
-    if (n < 2) return;
-
-    size_t i, j, k;
-    char *a = base;  // just for readability
-
-    // build heap
-    for (i = n / 2; i-- > 0; ) {
-        j = i;
-        for (;;) {
-            k = 2 * j + 1;
-            if (k >= n) break;               // ← crucial
-            if (k + 1 < n && cmp(a + (k + 1) * sz, a + k * sz) > 0)
-                k++;
-            if (cmp(a + j * sz, a + k * sz) >= 0) break;
-            swap(a + j * sz, a + k * sz, sz);
-            j = k;
-        }
-    }
-
-    // extract
-    while (n > 1) {
-        swap(a, a + (n - 1) * sz, sz);
-        n--;
-
-        j = 0;
-        for (;;) {
-            k = 2 * j + 1;
-            if (k >= n) break;               // ← crucial
-            if (k + 1 < n && cmp(a + (k + 1) * sz, a + k * sz) > 0)
-                k++;
-            if (cmp(a + j * sz, a + k * sz) >= 0) break;
-            swap(a + j * sz, a + k * sz, sz);
-            j = k;
-        }
-    }
-}
-
-void qsort(void *base, size_t nmemb, size_t size, int (*cmp)(const void*, const void*)) {
-    if (nmemb < 2) return;
-
-    char *b = (char*)base;
-    size_t stack[64], sp = 0, n = nmemb, depth = 0;
-
-    while (1) {
-        if (n > 32) {
-            if (++depth > 64) {
-                heapsort(b, n, size, cmp);
-                goto pop;
-            }
-
-            // median-of-3 pivot selection (your original, but safer)
-            char *lo = b;
-            char *hi = b + (n-1)*size;
-            char *p  = b + (n/2)*size;
-
-            // simple median-of-3 swap to front
-            if (cmp(lo, p) > 0) swap(lo, p, size);
-            if (cmp(lo, hi) > 0) swap(lo, hi, size);
-            if (cmp(p, hi) > 0) swap(p, hi, size);
-            swap(lo, p, size);          // pivot now at b
-            p = b;
-
-            // Lomuto partition (your loop, unchanged)
-            for (lo = b + size; lo <= hi; lo += size) {
-                if (cmp(lo, p) < 0) {
-                    p += size;
-                    if (p != lo) swap(p, lo, size);
-                }
-            }
-            swap(b, p, size);           // final pivot position
-
-            // === FIXED stack push + recurse on smaller first ===
-            size_t left  = (p - b) / size;        // elements < pivot
-            size_t right = (b + n*size - p - size) / size;  // elements > pivot
-
-            if (left > right) {                       // push larger first (smaller on top)
-                stack[sp++] = right; stack[sp++] = (p - b)/size + 1;  // right subarray start offset
-                n = left;
-            } else {
-                stack[sp++] = left;  stack[sp++] = 0;                 // left subarray
-                n = right;
-                b = p + size;
-            }
-            continue;
-        }
-
-        // insertion sort (unchanged, safe)
-        for (char *lo = b + size; lo < b + n*size; lo += size) {
-            for (char *p = lo; p > b && cmp(p - size, p) > 0; p -= size) {
-                swap(p - size, p, size);
-            }
-        }
-
-pop:
-        if (sp == 0) return;
-        n = stack[--sp];
-        b = (char*)base + stack[--sp] * size;
-    }
-}
-
+void qsort(void *base, size_t nmemb, size_t size, int (*cmp)(const void*, const void*));
 static inline __attribute__((always_inline)) void RenderInstances(Vector3 playerPos, bool transparents) {
     uint16_t visibleCount = 0, currentTexIndex = 0, currentNormIndex = 0, currentGlowIndex = 0, currentSpecIndex = 0, currentModelType = 0;
     bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX);
@@ -1766,11 +1632,11 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
 
     // UI
     Sys_Global.last_time = RenderUI();
-    
+
     // Cursor [ /// VERY LAST DRAWN OVER EVERYTHING ELSE! /// ]
     bool menuOrInventoryCursorStyle = (Sys_Global.gamePaused || Sys_Global.menuActive);
     uint16_t cursorTexture = menuOrInventoryCursorStyle ? 1261 : 1260;
-    if ((Sys_Global.inventoryMode && !Sys_Cheats.noHUD) || Sys_Global.menuActive || Sys_Global.gamePaused) RenderUIImage((int16_t)(cursorPosition_x) - 20, (int16_t)(cursorPosition_y) - 20, 40,40, cursorTexture);
+    if ((Sys_Global.inventoryMode && !Sys_Cheats.noHUD) || Sys_Global.menuActive || Sys_Global.gamePaused) RenderUIImage((int16_t)(Sys_Global.cursorPosition_x) - 20, (int16_t)(Sys_Global.cursorPosition_y) - 20, 40,40, cursorTexture);
     else RenderUIImage(683-20,371, 40,40, cursorTexture);
     
     if ((Sys_Global.last_time - Sys_Global.lastFrameSecCountTime) >= 1.00) { // Update Diagnostic Poll
@@ -1786,7 +1652,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
 }
 
 bool UpdatedPlayerCell(void);
-void UpdateAnims(void); void UpdateAmbientSounds(void);
+void UpdateAnims(void);
 int32_t main(void) {
     double game_start_time = get_time();
     random_range_rng = (uint32_t)game_start_time; // Seed global rand uniquely with time since system boot.
@@ -1814,25 +1680,16 @@ int32_t main(void) {
         mouseMovementThisFrame = false;
         glfwPollEvents();
         ProcessInput(); // Calls ApplyPlayerMovements(), needs called without checking paused state for menus handling.
-        if (likely(!Sys_Global.gamePaused && !Sys_Global.menuActive)) { // Update Gameplay
-            ModUpdate();
-            if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].released) Frob(Sys_Global.instances[PLAYER1].position, Sys_Global.instances[PLAYER1].forward, Sys_Global.instances[PLAYER1].right);
-            if (Sys_Global.current_time < Sys_Global.debugLineFinished && (Sys_Global.debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Sys_Global.debugLine_start, Sys_Global.debugLine_end);
-//             for (uint16_t i=START_INDEX_LEVEL_INSTANCES;i<Sys_Global.loadedInstances;++i) UpdateWhileNotPaused(i); // TODO Get new states prior to updating animations, physics event, or rendering
-//             Sys_Global.instances[editModeSelection].index = editModeTestEntityDefinition;
-//             Sys_Global.instances[editModeSelection].modelIndex = Sys_Global.entities[editModeTestEntityDefinition].modelIndex;
-//             Sys_Global.instances[editModeSelection].texIndex = Sys_Global.entities[editModeTestEntityDefinition].modelIndex;
-            UpdateAmbientSounds();
-        }
-
-        if (!Sys_Global.gamePaused && !Sys_Global.menuActive) UpdatePlayerFacingAngles();
         Sys_Global.timeSinceLastPhysicsTick = Sys_Global.pauseRelativeTime - Sys_Global.last_physics_time;
-        if (!Sys_Global.gamePaused && !Sys_Global.menuActive && Sys_Global.timeSinceLastPhysicsTick > (1.0 / 144.0)) {
-            Sys_Global.last_physics_time = Sys_Global.pauseRelativeTime;
-            Physics();
+        if (likely(!Sys_Global.gamePaused && !Sys_Global.menuActive)) { // Update Gameplay
+            UpdateAnims(); // Changes collision positions
+            if (Sys_Global.timeSinceLastPhysicsTick > (1.0 / 144.0)) { Sys_Global.last_physics_time = Sys_Global.pauseRelativeTime; Physics(); }
+            ModUpdate();
+            UpdatePlayerFacingAngles();
+            UpdateAmbientSounds();
+            UpdateMusic();
         }
 
-        if (likely(!Sys_Global.gamePaused && !Sys_Global.menuActive)) { UpdateAnims(); UpdateMusic(); }
         if (likely(!Sys_Global.gamePaused || Sys_Global.menuActive)) {
             Sys_Render.shadowmapsNeedUpdated = UpdatedPlayerCell();
             Sys_Render.shadowmapsNeedUpdated = UpdateLights(&Sys_Render.shadowmapsNeedUpdated);

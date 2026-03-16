@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdint.h>
 #include "os.h"
 #include "voxen.h"
 #include "gl.h"
@@ -1366,14 +1367,7 @@ static GLADapiproc glad_gl_get_proc(void *vuserptr, const char *name) {
 static void* _glad_GL_loader_handle = NULL;
 
 static void* glad_gl_dlopen_handle(void) {
-#if GLAD_PLATFORM_APPLE
-    static const char *NAMES[] = {
-        "../Frameworks/OpenGL.framework/OpenGL",
-        "/Library/Frameworks/OpenGL.framework/OpenGL",
-        "/System/Library/Frameworks/OpenGL.framework/OpenGL",
-        "/System/Library/Frameworks/OpenGL.framework/Versions/Current/OpenGL"
-    };
-#elif GLAD_PLATFORM_WIN32
+#if GLAD_PLATFORM_WIN32
     static const char *NAMES[] = {"opengl32.dll"};
 #else
     static const char *NAMES[] = {
@@ -1396,16 +1390,11 @@ static struct _glad_gl_userptr glad_gl_build_userptr(void *handle) {
     struct _glad_gl_userptr userptr;
 
     userptr.handle = handle;
-#if GLAD_PLATFORM_APPLE || defined(__HAIKU__)
-    userptr.gl_get_proc_address_ptr = NULL;
-#elif GLAD_PLATFORM_WIN32
-    userptr.gl_get_proc_address_ptr =
-        (GLADglprocaddrfunc) glad_dlsym_handle(handle, "wglGetProcAddress");
+#if GLAD_PLATFORM_WIN32
+    userptr.gl_get_proc_address_ptr = (GLADglprocaddrfunc) glad_dlsym_handle(handle, "wglGetProcAddress");
 #else
-    userptr.gl_get_proc_address_ptr =
-        (GLADglprocaddrfunc) glad_dlsym_handle(handle, "glXGetProcAddressARB");
+    userptr.gl_get_proc_address_ptr = (GLADglprocaddrfunc) glad_dlsym_handle(handle, "glXGetProcAddressARB");
 #endif
-
     return userptr;
 }
 

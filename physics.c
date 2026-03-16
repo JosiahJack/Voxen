@@ -246,7 +246,7 @@ RaycastHit RayTriangle(Vector3 origin, Vector3 dir, Vector3 posA, Vector3 posB, 
     return hitInfo;
 }
 
-RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uint32_t layerMask) {
+ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uint32_t layerMask) {
     RaycastHit result = {
         .hit = false,
         .distance = maxDist,

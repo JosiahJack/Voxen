@@ -81,13 +81,7 @@
 		ResetHeldItem();
 		Cursor.lockState = CursorLockMode.None;
 		inventoryMode = false; // Start with inventory mode turned off.
-		if (Application.platform == RuntimePlatform.Android) {
-			ForceInventoryMode();
-			shootModeButton.SetActive(true);
-		} else {
-			shootModeButton.SetActive(false);
-		}
-
+        shootModeButton.SetActive(false);
 		cameraDistances = new float[32];
 		SetCameraCullDistances();
 		playerCamera.depthTextureMode = DepthTextureMode.Depth;
@@ -537,13 +531,6 @@
 	}
 
 	bool TargetIDFrob(Vector3 cP) {
-		if (Application.platform == RuntimePlatform.Android) {
-			if (MouseLookScript.a.inCyberSpace) {
-				WeaponFire.a.FireCyberWeapon();
-				return true;
-			}
-		}
-
 		if (inCyberSpace) return false;
 
 		float dist = TargetID.GetTargetIDSensingRange(true);
@@ -576,26 +563,10 @@
 		}
 
 		if (Eng_Global->inventoryPlayer1.hasHardware[4] && Eng_Global->inventoryPlayer1.hardwareVersion[4] > 1) {
-			if (!aic.hasTargetIDAttached) {
-				WeaponFire.a.CreateTargetIDInstance(-1f,aic.healthManager,-1f);
-				if (Application.platform != RuntimePlatform.Android) {
-					return true;
-				}
-			}
+			if (!aic.hasTargetIDAttached) { WeaponFire.a.CreateTargetIDInstance(-1f,aic.healthManager,-1f); return true; }
 		}
 
-		if (Application.platform == RuntimePlatform.Android) {
-			// Cyber handled just above, normal fire condition only here.
-			int constDex = Eng_Global->inventoryPlayer1.weaponIndex;
-			int wepdex = WeaponFire.Get16WeaponIndexFromConstIndex(constDex);
-			WeaponFire.a.StartNormalAttack(wepdex);
-			return true;
-		}
-
-		// "Can't use <enemy>"
-		CenterStatusPrint("%s", Sys_Text.stringTable[29] + Const.a.nameForNPC[aic.index],
-					 player);
-
+		CenterStatusPrint("%s",Sys_Text.stringTable[29] + Const.a.nameForNPC[aic.index],player); // "Can't use <enemy>"
 		return true;
 	}
 
@@ -1205,28 +1176,18 @@
 	public void ForceShootMode() {
 		if (Const.a.NoShootMode) return; // We are being like the original now!
 
-		
 		Sys_UI.mouseClickHeldOverGUI = false;
 		Automap.a.CloseFullmap();
 		Cursor.lockState = CursorLockMode.Locked;
 		Cursor.visible = false;
 		inventoryMode = false;
-		if (Application.platform == RuntimePlatform.Android) {
-			shootModeButton.SetActive(true);
-		} else {
-			shootModeButton.SetActive(false);
-		}
-
-		if (vmailActive) {
-			Eng_Global->inventoryPlayer1.DeactivateVMail();
-			vmailActive = false;
-		}
+        shootModeButton.SetActive(false);
+		if (vmailActive) { Eng_Global->inventoryPlayer1.DeactivateVMail(); vmailActive = false; }
 	}
 
 	public void ForceInventoryMode() {
 		if (inventoryMode) return;
 
-		
 		if (Eng_Global->menuActive || Eng_Global->gamePaused) {
 			Cursor.lockState = CursorLockMode.None;
 		} else {

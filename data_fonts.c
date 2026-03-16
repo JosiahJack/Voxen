@@ -52,16 +52,17 @@ int32_t numFontRanges = sizeof(fontRanges)/sizeof(fontRanges[0]);
 
 __attribute__((pure)) int32_t CodepointToPackedIndex(int32_t codepoint, int fontID) {
     if (codepoint < 32) codepoint = 32;
+    if (codepoint >= 447) codepoint = 446;
     const GlyphRange* ranges = (fontID == FONT_STOPD) ? fontRangesStopD : fontRanges;
     int32_t total_packed = (fontID == FONT_STOPD) ? numPackedGlyphsStopD : numPackedGlyphs;
     for (int32_t i = 0; i < numFontRanges; i++) {
         if (codepoint >= ranges[i].first && codepoint < ranges[i].first + ranges[i].count) {
-            int32_t idx = ranges[i].startIndex + (codepoint - ranges[i].first);
+            int32_t idx = ranges[i].startIndex + vmax((codepoint - ranges[i].first),0);
             if (idx < total_packed) return idx;
         }
     }
-    DualLogError("Could not find codepoint for codepoint %d for fontID: %d\n",codepoint,fontID);
-    OS_Exit(1);
+    
+    return 0;
 }
 
 static LoadedFont LoadFallbackFont(const char *path, int fontInfoIdx, int collection_index) {

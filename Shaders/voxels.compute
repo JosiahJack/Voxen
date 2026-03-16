@@ -14,8 +14,7 @@ layout(location = 2) uniform uint loadedLights;
 layout(location = 3) uniform float worldMin_x;
 layout(location = 4) uniform float worldMin_z;
 layout(location = 5) uniform vec3 camPos;
-layout(location = 6) uniform vec3 camForward;
-layout(location = 7) uniform uint maxLightsPerVoxel;
+layout(location = 6) uniform uint maxLightsPerVoxel;
 
 const int WORLD_X_VOXELCOUNT = 512;
 const int LIGHT_DATA_SIZE = 13;
@@ -24,31 +23,7 @@ const int LIGHT_DATA_OFFSET_POSY = 1;
 const int LIGHT_DATA_OFFSET_POSZ = 2;
 const int LIGHT_DATA_OFFSET_INTENSITY = 3;
 const int LIGHT_DATA_OFFSET_RANGE = 4;
-const int LIGHT_DATA_OFFSET_SPOTANG = 5;
-const int LIGHT_DATA_OFFSET_SPOTDIRX = 6;
-const int LIGHT_DATA_OFFSET_SPOTDIRY = 7;
-const int LIGHT_DATA_OFFSET_SPOTDIRZ = 8;
-const int LIGHT_DATA_OFFSET_SPOTDIRW = 9;
-const int LIGHT_DATA_OFFSET_R = 10;
-const int LIGHT_DATA_OFFSET_G = 11;
-const int LIGHT_DATA_OFFSET_B = 12;
 const float VOXEL_SIZE = 0.32;
-const float WORLDCELL_WIDTH_F = 2.56;
-const float CELLXHALF = 1.28;
-const uint WORLDX = 64;
-const uint WORLDX_0BASED = 63;
-const uint CELL_VISIBLE = 1u;
-const uint CELL_OPEN = 2u;
-
-uint PosGetCellCoords(vec3 pos) {
-	uint cellX = uint(uint(floor((pos.x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F)));
-	uint cellZ = uint(uint(floor((pos.z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F)));
-    if (cellX > WORLDX_0BASED) cellX = WORLDX_0BASED;
-    if (cellX < 0) cellX = 0;
-    if (cellZ > WORLDX_0BASED) cellZ = WORLDX_0BASED;
-    if (cellZ < 0) cellZ = 0;
-	return (cellZ * WORLDX) + cellX;
-}
 
 void main() {    
     if (gl_GlobalInvocationID.x >= WORLD_X_VOXELCOUNT || gl_GlobalInvocationID.y >= WORLD_X_VOXELCOUNT) return;
@@ -56,23 +31,36 @@ void main() {
     uint voxelX = gl_GlobalInvocationID.x;
     uint voxelZ = gl_GlobalInvocationID.y;
     uint voxelIndex = (voxelZ * WORLD_X_VOXELCOUNT) + voxelX;
+    uint baseOffset = voxelIndex * maxLightsPerVoxel;
     voxelLightListCounts[voxelIndex] = 0u;
     vec3 voxelPos = vec3(voxelMinCenterX + (voxelX * VOXEL_SIZE), 0.0, voxelMinCenterZ + (voxelZ * VOXEL_SIZE));
     vec3 cam = vec3(camPos.x, 0.0, camPos.z);
-    vec3 toCam = voxelPos - cam;
-    float distToVox = length(toCam);
-    if (distToVox > 71.68) return;
-
+    if (length(voxelPos - cam) > 71.68) return;
+    
+    uint count = 0;
     for (uint lightIdx = 0; lightIdx < loadedLights; ++lightIdx) {
         uint litIdx = lightIdx * LIGHT_DATA_SIZE;
-        vec3 lightPos = vec3(lights[litIdx], 0.0, lights[litIdx + LIGHT_DATA_OFFSET_POSZ]);
+        vec3 lightPos = vec3(lights[litIdx + LIGHT_DATA_OFFSET_POSX], 0.0, lights[litIdx + LIGHT_DATA_OFFSET_POSZ]);
         float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-        if (length(lightPos - voxelPos) < range) {
-            uniqueLightLists[(voxelIndex * maxLightsPerVoxel) + voxelLightListCounts[voxelIndex]] = lightIdx;
-            voxelLightListCounts[voxelIndex]++;
-            if (voxelLightListCounts[voxelIndex] >= maxLightsPerVoxel) return;
+        float intensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
+        if (distance(lightPos, voxelPos) < range) {
+            uint insertPos = count;
+            for (uint i = 0; i < count; i++) {
+                uint existingIdx = uniqueLightLists[baseOffset + i];
+                float existingIntensity = lights[existingIdx * LIGHT_DATA_SIZE + LIGHT_DATA_OFFSET_INTENSITY];
+                if (intensity > existingIntensity) { insertPos = i; break; }
+            }
+
+            // If we have room or this light is stronger than the weakest currently in the list
+            if (insertPos < maxLightsPerVoxel) {
+                uint moveCount = min(count, maxLightsPerVoxel - 1);
+                for (uint j = moveCount; j > insertPos; j--) uniqueLightLists[baseOffset + j] = uniqueLightLists[baseOffset + j - 1];
+                uniqueLightLists[baseOffset + insertPos] = lightIdx;
+                if (count < maxLightsPerVoxel) count++;
+            }
         }
     }
     
-    for (uint i = voxelLightListCounts[voxelIndex]; i < maxLightsPerVoxel; i++) uniqueLightLists[voxelIndex * maxLightsPerVoxel + i] = 0xFFFFFFFFu;
+    voxelLightListCounts[voxelIndex] = count;
+    for (uint i = count; i < maxLightsPerVoxel; i++) uniqueLightLists[baseOffset + i] = 0xFFFFFFFFu;
 }

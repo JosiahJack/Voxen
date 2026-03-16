@@ -534,7 +534,6 @@ void CullInit(void) {
     // Then store the visibility of gridCellStates into the table of all visible cells for that cell
     // at the appropriate offset for looking up later when actually re-assigning gridCellStates
     // from this precalculated visibility state for the particular cell.
-//     int32_t numPrecomputedVisibleCells = 0;
     for (int32_t z=0;z<WORLDZ;z++) {
         for (int32_t x=0;x<WORLDX;x++) {
             DetermineVisibleCells(x,z);
@@ -545,7 +544,6 @@ void CullInit(void) {
                     size_t flat_idx = (size_t)(cellIdx * ARRSIZE) + subCellIdx;
                     bool is_visible = (gridCellStates[subCellIdx] & CELL_VISIBLE);
                     set_cull_bit(precomputedVisibleCellsFromHere,flat_idx,is_visible);
-//                     if (is_visible) numPrecomputedVisibleCells++;
                 }
             }
             
@@ -553,7 +551,6 @@ void CullInit(void) {
                 if ((x == 15 || x == 16) && z == 23) { // Fix up problem cells at odd angle where ddx doesn't work.
                     size_t flat_idx = (size_t)(cellIdx * ARRSIZE) + ((11 * WORLDX) + 12);
                     set_cull_bit(precomputedVisibleCellsFromHere,flat_idx,true);
-//                     numPrecomputedVisibleCells++;
                 }
             }
         }
@@ -561,13 +558,11 @@ void CullInit(void) {
     
     (void)UpdatedPlayerCell();
     int32_t cellToCellIdx = playerCellIdx * ARRSIZE;
-//     int32_t numFoundVisibleCellsForPlayerStart = 0;
     for (int32_t z=0;z<WORLDZ;++z) {
         for (int32_t x=0;x<WORLDX;++x) {
             int32_t cellIdx = (z * WORLDX) + x;
             size_t flat_idx = (size_t)(cellToCellIdx + cellIdx);
             if (get_cull_bit(precomputedVisibleCellsFromHere,flat_idx)) {
-//                 numFoundVisibleCellsForPlayerStart++;
                 gridCellStates[cellIdx] |= CELL_VISIBLE; // Get visible before putting meshes into their cells so we can nudge them a little.
             }
         }

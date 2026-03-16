@@ -18,8 +18,8 @@ void ToggleConsole(void) {
     if (Sys_Cheats.consoleActive) Sys_Global.inventoryMode = true;
     else if (!inventoryModeWasActivePriorToConsole && Sys_Global.inventoryMode) {
         Sys_Global.inventoryMode = false;
-        cursorPosition_x = (int32_t)((float)Sys_Settings.ScreenWidth * 0.5f);
-        cursorPosition_y = (int32_t)((float)Sys_Settings.ScreenHeight * 0.5f);
+        Sys_Global.cursorPosition_x = (int32_t)((float)Sys_Settings.ScreenWidth * 0.5f);
+        Sys_Global.cursorPosition_y = (int32_t)((float)Sys_Settings.ScreenHeight * 0.5f);
     }
 }
 
@@ -438,10 +438,11 @@ void ProcessConsoleCommand(const char* command) {
     while (*arg_start && CharacterIsEmpty((unsigned char)*arg_start)) arg_start++;
     AddToHistory(command);
     bool commandProcessed = false;
-    for (const ConsoleCommand* cmd = g_ConsoleCommands; cmd->name; ++cmd) {
+    for (uint16_t i = 0; g_ConsoleCommands[i].name != NULL; ++i) {
+        const ConsoleCommand* cmd = &g_ConsoleCommands[i];
         if (CommandMatch(command_trimmed, cmd->name)) {
             if (cmd->type == CMD_NOARG) {      cmd->func.noArg();                              commandProcessed = true;
-            } else if (cmd->type == CMD_STR) { cmd->func.withStr(*arg_start ? arg_start : ""); commandProcessed = true;
+            } else if (cmd->type == CMD_STR && *arg_start) { cmd->func.withStr(*arg_start ? arg_start : ""); commandProcessed = true;
             } else { // CMD_INT
                 if (!*arg_start) {
                     CenterStatusPrint("Missing argument, usage: %s <number>", cmd->name);
@@ -452,7 +453,7 @@ void ProcessConsoleCommand(const char* command) {
         }
     }
 
-    if (!commandProcessed) CenterStatusPrint("%s%s", Sys_Text.stringTable[1014], command_trimmed); // "Unknown command or function: "
+    if (!commandProcessed) CenterStatusPrint("%s%s",Sys_Text.stringTable[1014],command_trimmed); // "Unknown command or function: "
     consoleEntryText[0] = '\0';
     currentEntryLength = 0;
     historyPos = numHistory; // Position beyond newest for empty
@@ -460,8 +461,8 @@ void ProcessConsoleCommand(const char* command) {
 }
 
 void ConsoleEmulator(int32_t keycode) {
-    if (keycode == GLFW_KEY_UP) RecallHistory(1);
-    else if (keycode == GLFW_KEY_DOWN) RecallHistory(-1);
+    if (keycode == GLFW_KEY_UP) { RecallHistory(1); return; }
+    else if (keycode == GLFW_KEY_DOWN) { RecallHistory(-1); return; }
     
     if (keycode == GLFW_KEY_U && Sys_Input.keyStates[GLFW_KEY_LEFT_CONTROL].down) {
         consoleEntryText[0] = '\0'; // Clear the input

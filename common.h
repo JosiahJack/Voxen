@@ -9,13 +9,6 @@ typedef __INT64_TYPE__   int64_t;
 typedef __UINT64_TYPE__ uint64_t;
 typedef uint64_t size_t;
 typedef uint64_t size_t;
-typedef struct { float r,g,b,a; } Color;
-typedef struct { float x,y; } Vector2;
-typedef struct { float x,y,z; } Vector3;
-typedef struct { float x,y,z,w; } Quaternion;
-typedef uint8_t PhysCombineType;
-typedef uint8_t ColliderType;
-typedef uint16_t Text;
 #ifndef UINT8_MAX
     #define UINT8_MAX 255
 #endif
@@ -28,7 +21,23 @@ typedef uint16_t Text;
 #define bool _Bool
 #define true 1
 #define false 0
+typedef struct { float r,g,b,a; } Color;
+typedef struct { float x,y; } Vector2;
+typedef struct { float x,y,z; } Vector3;
+typedef struct { float x,y,z,w; } Quaternion;
+typedef uint8_t PhysCombineType;
+typedef uint8_t ColliderType;
+typedef uint16_t Text;
+typedef struct { Vector3 point; Vector3 normal; float distance; uint16_t hitInstanceIndex; bool hit; } RaycastHit;
 #define INSTANCE_COUNT 10240 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
+#define LIGHT_COUNT 2048
+#define MODEL_IDX_MAX 6805
+#define MAX_VALID_TEXTURE 2048
+#define MAX_TOTAL_PIXELS 27800000u
+#define MAX_UNIQUE_COLORS 80000u
+#define MAX_ANIMATED_MODELS 64
+#define MAX_DEBUG_LINE_VERTS 8
+#define DOUBLE_CLICK_TIME 0.5f
 #define PLAYER_MAX_WALK_SPEED 3.2f
 #define PLAYER_MAX_SPRINT_SPEED 8.8f
 #define PLAYER_MAX_CYBER_SPEED 5.0f
@@ -954,33 +963,19 @@ typedef struct {
     uint32_t globalFrameNum;
     uint16_t entityCount; // Number of entity definitions loaded (similar to Prefabs)
     uint16_t loadedInstances; // Number of instances of entities loaded (always for just the current level)
-	double cpuTime;
-    double thisFrameTime;
-    double cpuFrameTime;
-	double lastFrameSecCountTime;
-	uint32_t lastFrameSecCount;
-	uint32_t framesPerLastSecond;
-	uint32_t worstFPS;
+	double cpuTime, thisFrameTime, cpuFrameTime, lastFrameSecCountTime;
+	uint32_t lastFrameSecCount, framesPerLastSecond, worstFPS;
+    int32_t cursorPosition_x, cursorPosition_y; // Separate internal cursor from system cursor.  This gets relatively pushed around by real cursor movement to give consistent platform behavior.
 	Vector3 debugLine_start;
 	Vector3 debugLine_end;
 	double debugLineFinished;
 	uint32_t debugLineVertCount;
 	bool inventoryMode;
-	double last_time;
-	double last_topframe_time;
-	double last_physics_time;
-    double deltaTime;
-	double current_time;
-	double timeSinceLastPhysicsTick;
-	double screenshotTimeout;
-	double pauseRelativeTime;
-	double absoluteTime;
-	double statusTextDecayFinished;
-    double justSavedTimeStamp;
+	double last_time, last_topframe_time, last_physics_time, deltaTime, current_time, timeSinceLastPhysicsTick;
+	double screenshotTimeout, pauseRelativeTime, absoluteTime, statusTextDecayFinished, justSavedTimeStamp;
 	bool levelCurrentlyLoading;
     double shakeFinished;
 	char global_modname[256];
-    bool global_modIsCitadel;
     bool introNotPlayed;
     uint8_t levelSecurity[14];
 	uint8_t startLevel;
@@ -1001,6 +996,7 @@ typedef struct {
 	uint32_t grenadesThrown;
 	float damageDealt;
 	float damageReceived;
+    float aspect3D;
 	uint32_t savesScummed;
 	uint8_t creditsPageIndex;
 	bool creditsActive;

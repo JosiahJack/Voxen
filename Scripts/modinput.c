@@ -3,9 +3,39 @@ void WeaponsUpdate(void);
 
 // From Engine
 GlobalContext* Eng_Global = 0; CheatsSystem* Eng_Cheats; SettingsSystem* Eng_Settings;
-MOD_TO_ENGINE void ModInit(GlobalContext* globals, CheatsSystem* cheats, SettingsSystem* settings) { Eng_Global = globals; Eng_Cheats = cheats; Eng_Settings = settings; }
+MOD_TO_ENGINE void ModLink(GlobalContext* globals, CheatsSystem* cheats, SettingsSystem* settings) { Eng_Global = globals; Eng_Cheats = cheats; Eng_Settings = settings; }
+
+#define FROB_DISTANCE 4.9f
+static inline __attribute__((always_inline)) void Frob(Vector3 pos, Vector3 forward, Vector3 right) {
+    float offsetX = Eng_Global->cursorPosition_x - (Eng_Settings->ScreenWidth * 0.5f);
+    float offsetY = Eng_Global->cursorPosition_y - (Eng_Settings->ScreenHeight * 0.5f);
+    float ndcX = offsetX / (Eng_Settings->ScreenWidth * 0.5f);
+    float ndcY = -offsetY / (Eng_Settings->ScreenHeight * 0.5f);  // flip Y
+    float tanFov = vtan((float)Eng_Settings->FOV * 0.5f * PI / 180.0f);
+    Vector3 view = (Vector3){ ndcX * tanFov * Eng_Global->aspect3D, ndcY * tanFov, -1.0f };
+    view = normalize_vector3(view);
+    Vector3 flipForward = (Vector3){ -forward.x, -forward.y, -forward.z};
+    Vector3 up = normalize_vector3( cross_vector3(right, flipForward) );
+    Vector3 dir = (Vector3){ view.x * right.x + view.y * up.x + view.z * (flipForward.x), view.x * right.y + view.y * up.y + view.z * (flipForward.y), view.x * right.z + view.y * up.z + view.z * (flipForward.z) };
+    Eng_Global->debugLine_start = pos;
+    Eng_Global->debugLine_end   = (Vector3){ dir.x * FROB_DISTANCE + pos.x, dir.y * FROB_DISTANCE + pos.y, dir.z * FROB_DISTANCE + pos.z };
+    RaycastHit tempHit = Raycast(pos, dir, FROB_DISTANCE, LAYER_MASK_PLAYER_FROB);
+    if (tempHit.hit) {
+        Eng_Global->debugLine_end = tempHit.point;
+        DualLog("Raycast hit!  Hit object %u named of entity type %s(%u) at hit point %f %f %f\n",tempHit.hitInstanceIndex,Eng_Global->entities[Eng_Global->instances[tempHit.hitInstanceIndex].index].path,Eng_Global->instances[tempHit.hitInstanceIndex].index,tempHit.point.x,tempHit.point.y,tempHit.point.z);
+    }
+    
+    Eng_Global->debugLineFinished = Eng_Global->pauseRelativeTime + 3.0;
+}
+
 MOD_TO_ENGINE void ModUpdate(void) {
     WeaponsUpdate();
+    if (Use()) Frob(Eng_Global->instances[PLAYER1].position,Eng_Global->instances[PLAYER1].forward,Eng_Global->instances[PLAYER1].right);
+    if (Eng_Global->pauseRelativeTime < Eng_Global->debugLineFinished && (Eng_Global->debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Eng_Global->debugLine_start,Eng_Global->debugLine_end);
+    // Main entity loop
+    for (uint16_t i=START_INDEX_LEVEL_INSTANCES;i<Eng_Global->loadedInstances;++i) {
+        
+    }
 }
 MOD_TO_ENGINE bool Forward(void) {     return Eng_Global->GetKey(0); }
 MOD_TO_ENGINE bool StrafeLeft(void) {  return Eng_Global->GetKey(1); }

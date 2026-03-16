@@ -16,5 +16,6 @@
 #define MA_NO_AVX2
 #define MA_NO_NEON
 #define MA_NO_ENCODING
+#include <stdint.h>
 #include "voxen.h"
 #include "miniaudio.h"

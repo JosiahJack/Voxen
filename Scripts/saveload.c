@@ -27,7 +27,6 @@ void Load(uint8_t slot) {
 // 	//    c. Load to static saveable objects.
 // 	//    d. Iterate over dynamic object containers instantiating from save.
 // 	public void Load(int saveFileIndex, bool actual) {
-// 	    if (Application.platform == RuntimePlatform.Android) return;
 // 		ShowLoading();
 // 		GameObject freshGame = GameObject.Find("GameNotYetStarted");
 // 		if (freshGame != null) Utils.SafeDestroy(freshGame);

@@ -32,19 +32,11 @@
 #endif
 
 #ifndef GLAD_PLATFORM_APPLE
-  #ifdef __APPLE__
-    #define GLAD_PLATFORM_APPLE 1
-  #else
     #define GLAD_PLATFORM_APPLE 0
-  #endif
 #endif
 
 #ifndef GLAD_PLATFORM_EMSCRIPTEN
-  #ifdef __EMSCRIPTEN__
-    #define GLAD_PLATFORM_EMSCRIPTEN 1
-  #else
     #define GLAD_PLATFORM_EMSCRIPTEN 0
-  #endif
 #endif
 
 #define GLAD_GNUC_EXTENSION __extension__
@@ -197,14 +189,14 @@ typedef void (*GLADpostcallback)(void *ret, const char *name, GLADapiproc apipro
     #endif
 #endif
 #ifdef KHRONOS_USE_INTPTR_T
-typedef intptr_t               khronos_intptr_t;
-typedef uintptr_t              khronos_uintptr_t;
+    typedef intptr_t               khronos_intptr_t;
+    typedef uintptr_t              khronos_uintptr_t;
 #elif defined(_WIN64)
-typedef signed   long long int khronos_intptr_t;
-typedef unsigned long long int khronos_uintptr_t;
+    typedef signed   long long int khronos_intptr_t;
+    typedef unsigned long long int khronos_uintptr_t;
 #else
-typedef signed   long  int     khronos_intptr_t;
-typedef unsigned long  int     khronos_uintptr_t;
+    typedef signed   long  int     khronos_intptr_t;
+    typedef unsigned long  int     khronos_uintptr_t;
 #endif
 
 typedef __INT32_TYPE__         khronos_int32_t;
@@ -217,9 +209,9 @@ typedef signed   short int     khronos_int16_t;
 typedef unsigned short int     khronos_uint16_t;
 typedef          float         khronos_float_t;
 #if defined(WINDOWS)
-typedef signed   long long int khronos_ssize_t;
+    typedef signed   long long int khronos_ssize_t;
 #else
-typedef signed   long  int     khronos_ssize_t;
+    typedef signed   long  int     khronos_ssize_t;
 #endif
 
 typedef unsigned int GLenum;
@@ -242,34 +234,14 @@ typedef void *GLeglClientBufferEXT;
 typedef void *GLeglImageOES;
 typedef char GLchar;
 typedef char GLcharARB;
-#ifdef __APPLE__
-typedef void *GLhandleARB;
-#else
 typedef unsigned int GLhandleARB;
-#endif
 typedef khronos_uint16_t GLhalf;
 typedef khronos_uint16_t GLhalfARB;
 typedef khronos_int32_t GLfixed;
-#if defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) && (__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ > 1060)
 typedef khronos_intptr_t GLintptr;
-#else
-typedef khronos_intptr_t GLintptr;
-#endif
-#if defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) && (__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ > 1060)
 typedef khronos_intptr_t GLintptrARB;
-#else
-typedef khronos_intptr_t GLintptrARB;
-#endif
-#if defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) && (__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ > 1060)
 typedef khronos_ssize_t GLsizeiptr;
-#else
-typedef khronos_ssize_t GLsizeiptr;
-#endif
-#if defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) && (__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ > 1060)
 typedef khronos_ssize_t GLsizeiptrARB;
-#else
-typedef khronos_ssize_t GLsizeiptrARB;
-#endif
 typedef khronos_int64_t GLint64;
 typedef khronos_int64_t GLint64EXT;
 typedef khronos_uint64_t GLuint64;

@@ -123,8 +123,8 @@ public class PauseScript : MonoBehaviour {
 	}
 
 	void CheckForSuperWinCmdKey() {
-		if (   Input.GetKeyDown(KeyCode.LeftCommand)     // Apple / Linux
-			|| Input.GetKeyDown(KeyCode.RightCommand)    // Apple / Linux
+		if (   Input.GetKeyDown(KeyCode.LeftCommand)     // Linux
+			|| Input.GetKeyDown(KeyCode.RightCommand)    // Linux
 			|| Input.GetKeyDown(KeyCode.LeftWindows)     // Windows
 			|| Input.GetKeyDown(KeyCode.RightWindows)) { // Windows
 			PauseEnable();

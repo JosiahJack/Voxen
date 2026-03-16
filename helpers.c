@@ -511,7 +511,7 @@ void StringAppendLiteral(char* dest, const char* literal, size_t bufferSize) {
     dest[curLen + litLen] = '\0';
 }
 
-int StringFormatV(char* buffer, size_t bufferSize, const char* format, va_list args) { // vsnprintf replacement
+ENGINE_TO_MOD int StringFormatV(char* buffer, size_t bufferSize, const char* format, va_list args) { // vsnprintf replacement
     if (bufferSize == 0) return 0;
 
     size_t pos = 0;
@@ -586,12 +586,19 @@ int StringFormatV(char* buffer, size_t bufferSize, const char* format, va_list a
     return (int)pos;
 }
 
-int StringFormat(char* buffer, size_t bufferSize, const char* format, ...) { // snprintf replacement
+ENGINE_TO_MOD int StringFormat(char* buffer, size_t bufferSize, const char* format, ...) { // snprintf replacement
     va_list args;
     __builtin_va_start(args, format);
     int ret = StringFormatV(buffer, bufferSize, format, args);
     __builtin_va_end(args);
     return ret;
+}
+
+ENGINE_TO_MOD bool PositionVisibleFromPlayerCell(float x, float z) {
+    int32_t subIdx = PosGetCellCoords(x,z);
+    int cellIdx = (playerCellIdx * ARRSIZE);
+    int flat_idx = cellIdx + subIdx;
+    return (get_cull_bit(precomputedVisibleCellsFromHere,flat_idx));
 }
 
 char* GetNextStringUpToNewlineOrEOF(char* buf, int size, OsFileHandle fd) { // fgets replacement, not thread safe but we don't do multithreading

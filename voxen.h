@@ -37,8 +37,7 @@ typedef struct {
 } InputSystem;
 extern InputSystem Sys_Input;
 
-#define LIGHT_COUNT 2048 // MAX CITADEL LIGHT COUNT is 1561 for Level 7, leaves room for dynamic lights from projectiles
-#define MAX_SHADOWMAPS 128u
+#define MAX_SHADOWMAPS 96u
 #define SHADOW_MAP_SIZE 128u
 #define TOTAL_SHADOWMAP_PIXELS (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U))
 typedef struct {
@@ -85,18 +84,7 @@ typedef struct {
 
 typedef struct { float speed; uint16_t frameStart; uint16_t frameEnd; uint16_t frameStartModelIndex; uint8_t framerate; } AnimationClip;
 
-typedef struct {
-    Vector3 point;
-    Vector3 normal;
-    float distance;
-    uint16_t hitInstanceIndex;
-    bool hit;
-} RaycastHit;
-
-
-
 #define MAX_SAVENAME_LENGTH 24
-#define MENU_ITEMS_MAX 52 // Input page has 40 for the input codes, plus back button plus 10 other widgets
 typedef uint8_t MenuPages;
 static const uint8_t MenuPages_FrontPage = 0;
 static const uint8_t MenuPages_Singleplayer = 1;
@@ -162,7 +150,6 @@ typedef struct {
 extern SystemUI Sys_UIPlayer1;
 extern SystemUI Sys_UIPlayer2;
 
-#define MODEL_IDX_MAX 6805
 typedef uint32_t GLuint;
 typedef struct {
 	GLuint inputImageID;
@@ -217,11 +204,8 @@ extern const char* sounds[670];
 extern const char* audioLogs[134];
 void play_mp3(const char* path, int32_t fade_in_ms);
 void play_wav(const char* path, float volume, Vector3 pos, bool positional);
-#define MAX_VALID_TEXTURE 2048
-#define MAX_TEXTURE_DIMENSION 2048
 #define MAX_PALETTE_SIZE 256
-#define MAX_TOTAL_PIXELS 27800000u
-#define MAX_UNIQUE_COLORS 80000u
+#define MAX_TEXTURE_DIMENSION 2048
 #define VERTEX_ATTRIBUTES_COUNT 8 // x,y,z,nx,ny,nz,u,v
 #define BOUNDS_ATTRIBUTES_COUNT 7
 #define BOUNDS_DATA_OFFSET_MINX 0
@@ -231,6 +215,8 @@ void play_wav(const char* path, float volume, Vector3 pos, bool positional);
 #define BOUNDS_DATA_OFFSET_MAXY 4
 #define BOUNDS_DATA_OFFSET_MAXZ 5
 #define BOUNDS_DATA_OFFSET_RADIUS 6
+#define MAX_ANIMATION_CLIPS_PER_MODEL 32
+
 extern float modelBounds[MODEL_IDX_MAX * BOUNDS_ATTRIBUTES_COUNT];
 extern float** modelVertices;
 extern uint32_t** modelTriangles;
@@ -242,15 +228,12 @@ extern uint16_t gameObjectCount;
 extern uint32_t modelVertexCounts[MODEL_IDX_MAX];
 extern uint32_t modelTriangleCounts[MODEL_IDX_MAX];
 extern bool modelHasAnimation[MODEL_IDX_MAX];
-#define MAX_ANIMATED_MODELS 64
-#define MAX_ANIMATION_CLIPS_PER_MODEL 32
 extern const AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS_PER_MODEL];
 
 // Lights
                            //    0     1     2          3       4        5         6         7         8         9 10 11 12
 #define LIGHT_DATA_SIZE 13 // posx, posy, posz, intensity, radius, spotAng, spotDirx, spotDiry, spotDirz, spotDirw, r, g, b
       // Make sure this^^^^ matches in chunk.glsl shader!
-
 #define LIGHT_DATA_OFFSET_POSX 0
 #define LIGHT_DATA_OFFSET_POSY 1
 #define LIGHT_DATA_OFFSET_POSZ 2
@@ -265,11 +248,9 @@ extern const AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATIO
 #define LIGHT_DATA_OFFSET_G 11
 #define LIGHT_DATA_OFFSET_B 12
 // Make sure these match in chunk.glsl shader!
-
 #define LIGHT_MAX_INTENSITY 8.0f
 #define LIGHT_RANGE_MAX 15.36f
 #define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
-
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 extern bool lightOn[LIGHT_COUNT];
 extern bool lightInPVS[LIGHT_COUNT];
@@ -302,7 +283,7 @@ void RenderLoadingProgress(int32_t offset, const char* text);
 #define VOXEL_SIZE 0.32f
 #define VOXEL_HALF (VOXEL_SIZE * 0.5f)
 #define CELL_SIZE 2.56f // Each cell is 2.56x2.56
-#define MAX_LIGHTS_PER_VOXEL 64 // Cap to prevent overflow
+#define MAX_LIGHTS_PER_VOXEL 32 // Cap to prevent overflow
 #define CELL_VISIBLE       1u
 #define CELL_OPEN          2u
 #define CELL_CLOSEDNORTH   4u
@@ -364,12 +345,10 @@ void SaveConfig(void);
 #define FAR_PLANE (71.68f) // Max player view, level 6 crawlway 28 cells
 #define NEAR_PLANE (0.02f)
 #define FAR_PLANE_SQUARED (FAR_PLANE * FAR_PLANE)
-#define MAX_DEBUG_LINE_VERTS 8
 extern float fogColorR, fogColorG, fogColorB, fogBaseDensityForLevel;
 extern bool lightDirty[LIGHT_COUNT];
 #define VOXEL_COUNT 262144 // 64 * 64 * 8 * 8
 #define VOXEL_LIGHT_IDX_CLEAR_VALUE 0xFFFFFFFFu
-extern int32_t cursorPosition_x, cursorPosition_y;
 extern float cam_yaw, cam_pitch, cam_roll;
 extern uint16_t loadedModelsMaxIndex;
 extern bool enteringPlayerName;
@@ -395,11 +374,9 @@ extern bool mouseMovementThisFrame;
 extern char consoleEntryText[TEXT_BUFFER_SIZE];
 void LoadTextForLanguage(uint8_t lang);
 void LoadLogTextForLanguage(uint8_t lang);
-int32_t CodepointToPackedIndex(int32_t codepoint, int32_t fontID);
 void InitFontAtlasses(void);
 // ----------------------------------------------------------------------------
 // Helper Functions
-#define DOUBLE_CLICK_TIME 0.5f
 void Screenshot(void);
 void CenterStatusPrint(const char* fmt, ...);
 void DebugRAM(const char *context);
@@ -480,8 +457,7 @@ Color GetPainStaticColor(void);
 extern int currentMonitorIndex;
 typedef struct { uint64_t magicNumber; double thisRunTime; bool isLoading; int missionSplitID; } AutoSplitterData;
 extern AutoSplitterData autoSplitter;
-void UpdateWhileNotPaused(uint16_t i);
-void ScreenShake (float force, double duration);
+void ScreenShake(float force, double duration);
 void Shake(float force);
 void InitAfterLoad(void);
 void SetVSync(void);
@@ -590,5 +566,4 @@ static inline __attribute__((always_inline)) void CellCoordsToPos(uint16_t x, ui
 
 static inline __attribute__((always_inline)) int32_t PosGetCellCoordX(float pos_x) { return (uint16_t)clamp((int32_t)vfloor((pos_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED); }
 static inline __attribute__((always_inline)) int32_t PosGetCellCoordZ(float pos_z) { return (uint16_t)clamp((int32_t)vfloor((pos_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED); }
-static inline __attribute__((always_inline)) int32_t PosGetCellCoords(float pos_x, float pos_z) { return (PosGetCellCoordZ(pos_z) * WORLDX) + PosGetCellCoordX(pos_x); } // Clamped just above.
 static inline __attribute__((always_inline)) bool XZPairInBounds(int32_t x, int32_t z) { return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0); }
