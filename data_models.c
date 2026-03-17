@@ -257,8 +257,7 @@ void LoadModels(void) {
         raw_models[i].size = size;
     }
 
-    double time_at_start_of_parse = get_time();
-    num_parse_threads = (int)sysconf(_SC_NPROCESSORS_ONLN);
+    num_parse_threads = OS_GetNumThreads();
     if (num_parse_threads < 1) num_parse_threads = 1;
     if (num_parse_threads > 32) num_parse_threads = 32; // Cap to the task size (avoids vla)
     thread_temp_pos  = (float**)OS_AllocateRAM(NULL, (size_t)num_parse_threads * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);

@@ -755,10 +755,9 @@ void LoadTextures(void) {
         rawTextures[i].size = size;
     }
 
-    num_parse_threads = (int)sysconf(_SC_NPROCESSORS_ONLN);
+    num_parse_threads = OS_GetNumThreads();
     if (num_parse_threads < 1) num_parse_threads = 1;
     if (num_parse_threads > 32) num_parse_threads = 32;
-
     thread_stbi_arenas = (StbiArena*)OS_AllocateRAM(NULL, (size_t)num_parse_threads * sizeof(StbiArena), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
     for (int t = 0; t < num_parse_threads; ++t) {
         thread_stbi_arenas[t].base = NULL;

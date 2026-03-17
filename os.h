@@ -83,7 +83,13 @@ typedef struct {
         return ptr;
     }
     
-    static inline __attribute__((always_inline)) long OS_Read(OsFileHandle fd, void* buf, size_t count) { DWORD bytesRead = 0; if (ReadFile((HANDLE)fd,buf,(DWORD)count,&bytesRead,NULL)) ? (long)bytesRead : return (long)-1; }
+    static inline __attribute__((always_inline)) long OS_Read(OsFileHandle fd, void* buf, size_t count) {
+        DWORD bytesRead = 0;
+        if (ReadFile((HANDLE)fd, buf, (DWORD)count, &bytesRead, NULL)) {
+            return (long)bytesRead;
+        }
+        return (long)-1;
+    }
 #else
     #define LINUX
     #include <sys/mman.h>
@@ -298,5 +304,15 @@ static inline __attribute__((always_inline)) int64_t OS_Tell(OsFileHandle fd) {
     register int64_t rdx __asm__("rdx") = 1;      // SEEK_CUR
     __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi), "r"(rsi), "r"(rdx) : "rcx", "r11", "memory");
     return rax;
+#endif
+}
+
+static inline __attribute__((always_inline)) int OS_GetNumThreads(void) {
+#ifdef WINDOWS
+    SYSTEM_INFO si;
+    GetSystemInfo(&si);
+    return (int)si.dwNumberOfProcessors;
+#else
+    return (int)sysconf(_SC_NPROCESSORS_ONLN);
 #endif
 }

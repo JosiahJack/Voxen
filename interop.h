@@ -84,7 +84,7 @@
 // Engine Functions::
 #ifdef MOD_INTEROP_IMPLEMENTATION // mod.h usage:
     // Interop - To Engine
-    #define ENGINE_TO_MOD extern
+    #define ENGINE_TO_MOD extern __attribute__((weak))
 #else                             // voxen.h usage:
     // Interop - To Mod
     #if defined(_WIN32) || defined(__CYGWIN__)

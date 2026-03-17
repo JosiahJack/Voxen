@@ -1,5 +1,10 @@
 *.o
-*.dem
-log_dump.txt
-voxen.log
+*.log
 *.diff
+*.pdb
+*.dll.lib
+*.lib
+perf.data
+temp_build/*
+temp_build_gc/*
+Shaders/*.h
