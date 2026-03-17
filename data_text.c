@@ -1,7 +1,7 @@
 #include "os.h"
 #include "voxen.h"
 char *strncpy(char *dest, const char *src, size_t n);
-Voxen_Text Sys_Text;
+Voxen_Text Sys_Text = { .file_data = NULL };
 char audiologNames[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
 char audiologSubjects[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
 char audiologSenders[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
@@ -27,29 +27,60 @@ size_t utf16le_to_utf8(const uint8_t* src, size_t src_len, char* dst, size_t dst
     dst[dst_pos] = '\0'; return dst_pos;
 }
 
-void LoadTextForLanguage(uint8_t lang){
-    char textFile[256]={0};
-    switch(lang){case 1:strncpy(textFile,"./Data/text_espanol.txt",256);break;case 2:strncpy(textFile,"./Data/text_deutsch.txt",256);break;case 3:strncpy(textFile,"./Data/text_francais.txt",256);break;case 4:strncpy(textFile,"./Data/text_nihongo.txt",256);break;case 5:strncpy(textFile,"./Data/text_russkiy.txt",256);break;case 6:strncpy(textFile,"./Data/text_italiano.txt",256);break;case 7:strncpy(textFile,"./Data/text_portugues.txt",256);break;default:strncpy(textFile,"./Data/text_english.txt",256);break;}
-    OsFileHandle fp=OS_OpenReadonly(textFile);if(fp==OS_INVALID_HANDLE){DualLogError("Cannot open %s\n",textFile);return;}
-    OS_Seek(fp,0,SEEK_END);size_t file_size=(size_t)OS_Tell(fp);OS_Seek(fp,0,SEEK_SET);
-    if(OS_Read(fp,Sys_Text.file_data,file_size)!=(long)file_size){DualLogError("Failed to read %s\n",textFile);OS_Close(fp);OS_Exit(1);}
-    OS_Close(fp);
+void LoadTextForLanguage(uint8_t lang) {
+    char textFile[256] = {0};
+    const char* filename;
+
+    switch (lang) {
+        case 1: filename = "./Data/text_espanol.txt";   break;
+        case 2: filename = "./Data/text_deutsch.txt";   break;
+        case 3: filename = "./Data/text_francais.txt";  break;
+        case 4: filename = "./Data/text_nihongo.txt";   break;
+        case 5: filename = "./Data/text_russkiy.txt";   break;
+        case 6: filename = "./Data/text_italiano.txt";  break;
+        case 7: filename = "./Data/text_portugues.txt"; break;
+        default:filename = "./Data/text_english.txt";   break;
+    }
+    strncpy(textFile, filename, sizeof(textFile) - 1);
+    textFile[sizeof(textFile) - 1] = '\0';
+
+    OsFileHandle dummy_fd = OS_INVALID_HANDLE;
+    int alloc_size = 0;
+
+    // Free previous allocation if any (important when changing language)
+    if (Sys_Text.file_data) {
+        OS_DeallocateRAM(Sys_Text.file_data, Sys_Text.file_size);
+        Sys_Text.file_data = NULL;
+        Sys_Text.file_size = 0;
+    }
+
+    Sys_Text.file_data = (uint8_t*) OS_OpenAndAllocateFileBufferReadonly(
+        textFile, &dummy_fd, &alloc_size);
+
+    if (!Sys_Text.file_data || alloc_size <= 0) {
+        DualLogError("Failed to load text file: %s\n", textFile);
+        Sys_Text.file_data = NULL;
+        Sys_Text.file_size = 0;
+        return;
+    }
+
+    Sys_Text.file_size = (size_t)alloc_size;
     size_t data_pos=0;int is_utf16le=0;
-    if(file_size>=2&&Sys_Text.file_data[0]==0xFF&&Sys_Text.file_data[1]==0xFE){data_pos=2;is_utf16le=1;}
-    else if(file_size>=3&&Sys_Text.file_data[0]==0xEF&&Sys_Text.file_data[1]==0xBB&&Sys_Text.file_data[2]==0xBF){data_pos=3;}
-    else{size_t nulls=0;for(size_t i=1;i<file_size&&i<1024;i+=2)if(Sys_Text.file_data[i]==0)nulls++;if(nulls*3>file_size)is_utf16le=1;}
+    if(Sys_Text.file_size>=2&&Sys_Text.file_data[0]==0xFF&&Sys_Text.file_data[1]==0xFE){data_pos=2;is_utf16le=1;}
+    else if(Sys_Text.file_size>=3&&Sys_Text.file_data[0]==0xEF&&Sys_Text.file_data[1]==0xBB&&Sys_Text.file_data[2]==0xBF){data_pos=3;}
+    else{size_t nulls=0;for(size_t i=1;i<Sys_Text.file_size&&i<1024;i+=2)if(Sys_Text.file_data[i]==0)nulls++;if(nulls*3>Sys_Text.file_size)is_utf16le=1;}
     char utf8_line[TEXT_LOCALIZATION_MAX_LENGTH];int lineNum=0;
-    while(data_pos<file_size){
+    while(data_pos<Sys_Text.file_size){
         size_t line_start=data_pos;
         if(is_utf16le){
-            while(data_pos+1<file_size){
+            while(data_pos+1<Sys_Text.file_size){
                 uint16_t ch=Sys_Text.file_data[data_pos]|(Sys_Text.file_data[data_pos+1]<<8);data_pos+=2;
-                if(ch=='\r'||ch=='\n'){if(ch=='\r'&&data_pos+1<file_size){uint16_t n=Sys_Text.file_data[data_pos]|(Sys_Text.file_data[data_pos+1]<<8);if(n=='\n')data_pos+=2;}break;}
+                if(ch=='\r'||ch=='\n'){if(ch=='\r'&&data_pos+1<Sys_Text.file_size){uint16_t n=Sys_Text.file_data[data_pos]|(Sys_Text.file_data[data_pos+1]<<8);if(n=='\n')data_pos+=2;}break;}
             }
         }else{
-            while(data_pos<file_size){
+            while(data_pos<Sys_Text.file_size){
                 uint8_t c=Sys_Text.file_data[data_pos];
-                if(c=='\r'||c=='\n'){if(c=='\r'&&data_pos+1<file_size&&Sys_Text.file_data[data_pos+1]=='\n')++data_pos;++data_pos;break;}
+                if(c=='\r'||c=='\n'){if(c=='\r'&&data_pos+1<Sys_Text.file_size&&Sys_Text.file_data[data_pos+1]=='\n')++data_pos;++data_pos;break;}
                 ++data_pos;
             }
         }
@@ -78,52 +109,71 @@ static inline __attribute__((always_inline)) int StringToIntLen(const char *str,
     return value;
 }
 
-void LoadLogTextForLanguage(uint8_t lang){
-    __builtin_memset(Sys_Text.audioLogImagesRefIndicesLH,0,TEXT_LOGS_COUNT*sizeof(uint16_t));
-    __builtin_memset(Sys_Text.audioLogImagesRefIndicesRH,0,TEXT_LOGS_COUNT*sizeof(uint16_t));
-    __builtin_memset(Sys_Text.audioLogType,0,TEXT_LOGS_COUNT*sizeof(uint8_t));
-    __builtin_memset(Sys_Text.audioLogLevelFound,0,TEXT_LOGS_COUNT*sizeof(uint8_t));
-    char textFile[256]={0};
-    switch(lang){
-        case 1:StringCopyInto_A_From_B(textFile,"./Data/logs_text_espanol.txt",256);break;
-        case 2:StringCopyInto_A_From_B(textFile,"./Data/logs_text_deutsch.txt",256);break;
-        case 3:StringCopyInto_A_From_B(textFile,"./Data/logs_text_francais.txt",256);break;
-        case 4:StringCopyInto_A_From_B(textFile,"./Data/logs_text_nihongo.txt",256);break;
-        case 5:StringCopyInto_A_From_B(textFile,"./Data/logs_text_russkiy.txt",256);break;
-        case 6:StringCopyInto_A_From_B(textFile,"./Data/logs_text_italiano.txt",256);break;
-        case 7:StringCopyInto_A_From_B(textFile,"./Data/logs_text_portugues.txt",256);break;
-        default:StringCopyInto_A_From_B(textFile,"./Data/logs_text_english.txt",256);break;
+void LoadLogTextForLanguage(uint8_t lang) {
+    __builtin_memset(Sys_Text.audioLogImagesRefIndicesLH, 0, TEXT_LOGS_COUNT * sizeof(uint16_t));
+    __builtin_memset(Sys_Text.audioLogImagesRefIndicesRH, 0, TEXT_LOGS_COUNT * sizeof(uint16_t));
+    __builtin_memset(Sys_Text.audioLogType,               0, TEXT_LOGS_COUNT * sizeof(uint8_t));
+    __builtin_memset(Sys_Text.audioLogLevelFound,         0, TEXT_LOGS_COUNT * sizeof(uint8_t));
+
+    char textFile[256] = {0};
+    const char* filename;
+
+    switch (lang) {
+        case 1: filename = "./Data/logs_text_espanol.txt";   break;
+        case 2: filename = "./Data/logs_text_deutsch.txt";   break;
+        case 3: filename = "./Data/logs_text_francais.txt";  break;
+        case 4: filename = "./Data/logs_text_nihongo.txt";   break;
+        case 5: filename = "./Data/logs_text_russkiy.txt";   break;
+        case 6: filename = "./Data/logs_text_italiano.txt";  break;
+        case 7: filename = "./Data/logs_text_portugues.txt"; break;
+        default:filename = "./Data/logs_text_english.txt";   break;
     }
-    
-    OsFileHandle fp=OS_OpenReadonly(textFile);
-    if(!fp) { DualLogError("Cannot open %s\n",textFile); return; }
-    
-    OS_Seek(fp,0,SEEK_END);long file_size=OS_Tell(fp);OS_Seek(fp,0,SEEK_SET);
-    if(OS_Read(fp,Sys_Text.file_data,(size_t)file_size)!=file_size){ DualLogError("Failed to read %s\n",textFile); OS_Close(fp); OS_Exit(1); }
-    
-    OS_Close(fp);
+    strncpy(textFile, filename, sizeof(textFile) - 1);
+    textFile[sizeof(textFile) - 1] = '\0';
+
+    OsFileHandle dummy_fd = OS_INVALID_HANDLE;
+    int alloc_size = 0;
+
+    // Free previous allocation if any
+    if (Sys_Text.filelog_data) {
+        OS_DeallocateRAM(Sys_Text.filelog_data, Sys_Text.filelog_size);
+        Sys_Text.filelog_data = NULL;
+        Sys_Text.filelog_size = 0;
+    }
+
+    Sys_Text.filelog_data = (uint8_t*) OS_OpenAndAllocateFileBufferReadonly(
+        textFile, &dummy_fd, &alloc_size);
+
+    if (!Sys_Text.filelog_data || alloc_size <= 0) {
+        DualLogError("Failed to load log text file: %s\n", textFile);
+        Sys_Text.filelog_data = NULL;
+        Sys_Text.filelog_size = 0;
+        return;
+    }
+
+    Sys_Text.filelog_size = (size_t)alloc_size;
     size_t data_pos=0;int is_utf16le=0;
-    if(file_size>=2&&Sys_Text.file_data[0]==0xFF&&Sys_Text.file_data[1]==0xFE){data_pos=2;is_utf16le=1;}
-    else if(file_size>=3&&Sys_Text.file_data[0]==0xEF&&Sys_Text.file_data[1]==0xBB&&Sys_Text.file_data[2]==0xBF){data_pos=3;}
-    else{int nulls=0;for(size_t i=1;i<(size_t)file_size&&i<2048;i+=2)if(Sys_Text.file_data[i]==0)nulls++;if(nulls>(int)(file_size/5))is_utf16le=1;}
+    if(Sys_Text.filelog_size>=2&&Sys_Text.filelog_data[0]==0xFF&&Sys_Text.filelog_data[1]==0xFE){data_pos=2;is_utf16le=1;}
+    else if(Sys_Text.filelog_size>=3&&Sys_Text.filelog_data[0]==0xEF&&Sys_Text.filelog_data[1]==0xBB&&Sys_Text.filelog_data[2]==0xBF){data_pos=3;}
+    else{int nulls=0;for(size_t i=1;i<(size_t)Sys_Text.filelog_size&&i<2048;i+=2)if(Sys_Text.filelog_data[i]==0)nulls++;if(nulls>(int)(Sys_Text.filelog_size/5))is_utf16le=1;}
     char utf8_line[1024];
-    while(data_pos<(size_t)file_size){
+    while(data_pos<(size_t)Sys_Text.filelog_size){
         size_t line_start=data_pos;
         if(is_utf16le){
-            while(data_pos+1<(size_t)file_size){
-                uint16_t ch=Sys_Text.file_data[data_pos]|(Sys_Text.file_data[data_pos+1]<<8);data_pos+=2;
-                if(ch=='\r'||ch=='\n'){if(ch=='\r'&&data_pos+1<(size_t)file_size){uint16_t next=Sys_Text.file_data[data_pos]|(Sys_Text.file_data[data_pos+1]<<8);if(next=='\n')data_pos+=2;}break;}
+            while(data_pos+1<(size_t)Sys_Text.filelog_size){
+                uint16_t ch=Sys_Text.filelog_data[data_pos]|(Sys_Text.filelog_data[data_pos+1]<<8);data_pos+=2;
+                if(ch=='\r'||ch=='\n'){if(ch=='\r'&&data_pos+1<(size_t)Sys_Text.filelog_size){uint16_t next=Sys_Text.filelog_data[data_pos]|(Sys_Text.filelog_data[data_pos+1]<<8);if(next=='\n')data_pos+=2;}break;}
             }
         }else{
-            while(data_pos<(size_t)file_size){
-                uint8_t c=Sys_Text.file_data[data_pos];
-                if(c=='\r'||c=='\n'){if(c=='\r'&&data_pos+1<(size_t)file_size&&Sys_Text.file_data[data_pos+1]=='\n')++data_pos;++data_pos;break;}
+            while(data_pos<(size_t)Sys_Text.filelog_size){
+                uint8_t c=Sys_Text.filelog_data[data_pos];
+                if(c=='\r'||c=='\n'){if(c=='\r'&&data_pos+1<(size_t)Sys_Text.filelog_size&&Sys_Text.filelog_data[data_pos+1]=='\n')++data_pos;++data_pos;break;}
                 ++data_pos;
             }
         }
         size_t line_len=data_pos-line_start;if(line_len==0)continue;
-        if(is_utf16le){utf16le_to_utf8(&Sys_Text.file_data[line_start],line_len,utf8_line,sizeof(utf8_line));}
-        else{if(line_len>=sizeof(utf8_line))line_len=sizeof(utf8_line)-1;__builtin_memcpy(utf8_line,&Sys_Text.file_data[line_start],line_len);utf8_line[line_len]='\0';}
+        if(is_utf16le){utf16le_to_utf8(&Sys_Text.filelog_data[line_start],line_len,utf8_line,sizeof(utf8_line));}
+        else{if(line_len>=sizeof(utf8_line))line_len=sizeof(utf8_line)-1;__builtin_memcpy(utf8_line,&Sys_Text.filelog_data[line_start],line_len);utf8_line[line_len]='\0';}
         size_t slen=GetStringLength(utf8_line);while(slen>0&&(utf8_line[slen-1]=='\r'||utf8_line[slen-1]=='\n'))utf8_line[--slen]='\0';if(slen==0)continue;
         int log_index=-1,img_lh=-1,img_rh=-1,log_type=0,level_found=0;char*pos=utf8_line;int field_idx=0;
         while(*pos&&field_idx<32){

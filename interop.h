@@ -56,7 +56,8 @@
     X(void, ResetLevelAudio, (void)) \
     X(void, ModInitAfterLoad, (void)) \
     X(void, ModEntityDefinitionsInitAfterLoad, (DataParser* parser)) \
-    X(void, PlayerInit, (uint16_t playerIdx))
+    X(void, PlayerInit, (uint16_t playerIdx)) \
+    X(void, ProcessInput, (void))
 
 #ifdef MOD_INTEROP_IMPLEMENTATION  // mod.h usage:
     // Interop - To Engine
@@ -70,21 +71,29 @@
     #undef X
 #else                              // voxen.h usage:
     // Interop - From Mod
-    #ifdef MOD_INTEROP
-        #define MOD_TO_ENGINE // This is the definition
+    #if defined(_WIN32) || defined(__CYGWIN__)
+        #define MOD_TO_ENGINE
+        #define CALL_CONV     __cdecl
+        #define X(ret, name, params) MOD_TO_ENGINE ret (CALL_CONV *name) params;
+        MOD_FUNCTION_LIST(X)
+        #undef X
     #else
-        #define MOD_TO_ENGINE extern // Shared declaration
+        #ifdef MOD_INTEROP // voxen.c imported this for the actual dlopen/dlsym
+            #define MOD_TO_ENGINE // This is the definition
+        #else
+            #define MOD_TO_ENGINE extern // Shared declaration
+        #endif
+        #define X(ret, name, params) MOD_TO_ENGINE ret (*name) params;
+        MOD_FUNCTION_LIST(X)
+        #undef X
     #endif
-    #define X(ret, name, params) MOD_TO_ENGINE ret (*name) params;
-    MOD_FUNCTION_LIST(X)
-    #undef X
 #endif
     
 // ----------------------------------------------------------------------------
 // Engine Functions::
 #ifdef MOD_INTEROP_IMPLEMENTATION // mod.h usage:
     // Interop - To Engine
-    #define ENGINE_TO_MOD extern __attribute__((weak))
+    #define ENGINE_TO_MOD extern
 #else                             // voxen.h usage:
     // Interop - To Mod
     #if defined(_WIN32) || defined(__CYGWIN__)
@@ -125,4 +134,8 @@ ENGINE_TO_MOD ma_result SoundStart(ma_sound* pSound);
 ENGINE_TO_MOD ma_result SoundStop(ma_sound* pSound);
 ENGINE_TO_MOD float SoundGetLength(ma_sound* pSound);
 ENGINE_TO_MOD ma_result SoundGetCurrentFrameCursor(const ma_sound* pSound, ma_uint64* pCursor);
-
+ENGINE_TO_MOD void Screenshot(void);
+ENGINE_TO_MOD void ToggleConsole(void);
+ENGINE_TO_MOD void MenuGoBack(void);
+ENGINE_TO_MOD void IgnoreNextMouseDelta(void);
+ENGINE_TO_MOD void ApplyPlayerMovements(void);

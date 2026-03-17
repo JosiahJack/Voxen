@@ -99,3 +99,7 @@ extern MusicSystem Sys_Music;
 uint8_t GetCurrentLevelSecurity(void);
 uint16_t GetImpactType(uint16_t instanceIdx);
 const char* GetPrefabNameFromIndex(int constIndex);
+void TakeEnergy(float drain);
+void GiveEnergy(float give, EnergyType type);
+void BioMonitorInit(void);
+void BioMonitorUpdate(void);

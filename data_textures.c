@@ -4,22 +4,12 @@
 #include <string.h>
 #include <pthread.h>
 #include <unistd.h>
-
 #define STBI_ARENA_SIZE 16*1024*1024
-
 uint8_t* stbi__arena_base = NULL;
 uint8_t* stbi__arena_cursor = NULL;
 uint8_t* stbi__arena_end = NULL;
 static int num_parse_threads = 0;
-
 uint8_t* stbi_load_from_memory(const uint8_t* buffer, int32_t len, int32_t* x, int32_t* y);
-
-typedef struct StbiArena {
-    uint8_t* base;
-    uint8_t* cursor;
-    uint8_t* end;
-} StbiArena;
-
 static StbiArena* thread_stbi_arenas = NULL;
 
 void stbi__arena_init(void) {

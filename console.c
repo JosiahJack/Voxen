@@ -1,4 +1,5 @@
 // console.c - Console Emulator
+#include "os.h"
 #include "voxen.h"
 #include "glfw_defines.h"
 #ifndef NULL
@@ -11,7 +12,7 @@ char history[MAX_HISTORY][TEXT_BUFFER_SIZE] = {0};
 static int numHistory = 0;
 static int historyPos = 0;
 
-void ToggleConsole(void) {
+ENGINE_TO_MOD void ToggleConsole(void) {
     static bool inventoryModeWasActivePriorToConsole = false;
     if (!Sys_Cheats.consoleActive) inventoryModeWasActivePriorToConsole = Sys_Global.inventoryMode;
     Sys_Cheats.consoleActive = !Sys_Cheats.consoleActive; // Tilde
@@ -316,7 +317,7 @@ static void cmd_git(const char* arg) {
 }
 
 static void cmd_restart(void)        { CenterStatusPrint("Yeah...better not"); }
-static void cmd_quit(void)           { CenterStatusPrint("Use the Pause Menu by hitting Escape and using the QUIT option via mouse or arrow keys + ENTER"); }
+static void cmd_quit(void)           { OS_Exit(0); }
 static void cmd_cd(void)             { CenterStatusPrint("Attempting to access directory... already at root"); }
 
 static void cmd_justinbailey(void)   { CenterStatusPrint("Well, you don't have a suit already so..."); }

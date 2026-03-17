@@ -38,7 +38,7 @@ static uint32_t GetCollisionMask(uint8_t layer) {
 }
 #pragma GCC diagnostic pop
 
-void ApplyPlayerMovements(void) {
+ENGINE_TO_MOD void ApplyPlayerMovements(void) {
     Vector3 forward = Sys_Global.instances[PLAYER1].forward;
     Vector3 right = Sys_Global.instances[PLAYER1].right;
     Vector3 input = {0};    

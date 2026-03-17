@@ -75,7 +75,7 @@ public void BioOff() {
     Eng_Global->inventoryPlayer1.hardwareIsActive[6] = false;
     SetVersionIconForButton(Eng_Global->inventoryPlayer1.hardwareIsActive[6],Eng_Global->inventoryPlayer1.hardwareVersionSetting[6],0);
     
-    if (Sys_Cheats.showFPS) return;
+    if (Eng_Cheats->showFPS) return;
     if (BiomonitorGraphSystem.a != null) {
         BiomonitorGraphSystem.a.ClearGraphs();
     }

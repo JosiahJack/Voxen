@@ -213,7 +213,7 @@ void print_bytes_no_newline(int32_t count) { DualLog("%d bytes | %f kb | %f Mb",
 
 typedef void(*PFNGLREADPIXELSPROC)(int32_t x, int32_t y, int32_t width, int32_t height, uint32_t format, uint32_t type, void* pixels);
 extern PFNGLREADPIXELSPROC glad_glReadPixels;
-void Screenshot(void) {
+ENGINE_TO_MOD void Screenshot(void) {
     if (!TakeScreenshot() || Sys_Global.current_time <= Sys_Global.screenshotTimeout) return;
     
     Sys_Global.screenshotTimeout = Sys_Global.current_time + 1.0; // Prevent saving more than 1 per second for sanity purposes.

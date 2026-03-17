@@ -2,13 +2,6 @@
 #if defined(LINUX)
 //     #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
 #endif
-
-#if defined(_WIN32) || defined(__CYGWIN__)
-    #define ENGINE_TO_MOD __declspec(dllexport)
-#else
-    #define ENGINE_TO_MOD __attribute__((visibility("default")))
-#endif
-
 #include "common.h" // Types needed first
 #include "interop.h"
 #define MAX_KEYS 512
@@ -49,12 +42,15 @@ typedef struct {
 extern VoxenShadowSystem voxen_Shadow_System;
 
 typedef struct {	
-	uint8_t file_data[TEXT_DATA_FILEBUFFER_SIZE]; // Found that only 59430 were needed at one point, padded for safety and typo fixes
 	char stringTable[TEXT_STRING_COUNT][TEXT_LOCALIZATION_MAX_LENGTH]; // Hefty table for localization support.
 	uint16_t audioLogImagesRefIndicesLH[TEXT_LOGS_COUNT];
 	uint16_t audioLogImagesRefIndicesRH[TEXT_LOGS_COUNT];
 	uint8_t audioLogType[TEXT_LOGS_COUNT];
 	uint8_t audioLogLevelFound[TEXT_LOGS_COUNT];
+	size_t file_size;
+	size_t filelog_size;
+	uint8_t* file_data;
+	uint8_t* filelog_data;
 } Voxen_Text;
 extern Voxen_Text Sys_Text;
 
@@ -80,6 +76,12 @@ typedef struct {
     bool     dirty;
 } Portal;
 
+typedef struct StbiArena {
+    uint8_t* base;
+    uint8_t* cursor;
+    uint8_t* end;
+} StbiArena;
+
 typedef struct { float speed; uint16_t frameStart; uint16_t frameEnd; uint16_t frameStartModelIndex; uint8_t framerate; } AnimationClip;
 
 #define MAX_SAVENAME_LENGTH 24
@@ -93,12 +95,6 @@ static const uint8_t MenuPages_Options = 5;
 static const uint8_t MenuPages_Save = 6;
 static const uint8_t MenuPages_IntroVideo = 7;
 static const uint8_t MenuPages_CreditsVideo = 8;
-void MenuGoBack(void);
-void TakeEnergy(float drain);
-void GiveEnergy(float give, EnergyType type);
-void BioMonitorInit(void);
-void BioMonitorUpdate(void);
-
 #define MULTI_MEDIA_TAB_EMAIL_TABLE 0
 #define MULTI_MEDIA_TAB_LOG_TABLE   1
 #define MULTI_MEDIA_TAB_DATA_TABLE  2
@@ -325,7 +321,6 @@ void Input_MouselookApply(void);
 int32_t Input_KeyDown(int32_t scancode);
 int32_t Input_KeyUp(int32_t scancode);
 int32_t Input_MouseMove(int32_t xrel, int32_t yrel);
-void ProcessInput(void);
 bool MouseWheelBoundAndRolled(int setCode);
 void UpdatePlayerFacingAngles(void);
 void InputClearRisingAndFallingEdges(void);
@@ -350,8 +345,6 @@ extern bool lightDirty[LIGHT_COUNT];
 extern float cam_yaw, cam_pitch, cam_roll;
 extern uint16_t loadedModelsMaxIndex;
 extern bool enteringPlayerName;
-void Screenshot(void);
-void ToggleConsole(void);
 void ConsoleEmulator(int32_t keycode);
 void SetSkyRotateSpeed(void);
 // ----------------------------------------------------------------------------

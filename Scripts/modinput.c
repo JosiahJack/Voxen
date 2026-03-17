@@ -1,10 +1,6 @@
 #include "mod.h"
 void WeaponsUpdate(void);
 
-// From Engine
-GlobalContext* Eng_Global = 0; CheatsSystem* Eng_Cheats; SettingsSystem* Eng_Settings;
-MOD_TO_ENGINE void ModLink(GlobalContext* globals, CheatsSystem* cheats, SettingsSystem* settings) { Eng_Global = globals; Eng_Cheats = cheats; Eng_Settings = settings; }
-
 #define FROB_DISTANCE 4.9f
 static inline __attribute__((always_inline)) void Frob(Vector3 pos, Vector3 forward, Vector3 right) {
     float offsetX = Eng_Global->cursorPosition_x - (Eng_Settings->ScreenWidth * 0.5f);
@@ -80,3 +76,30 @@ MOD_TO_ENGINE bool SwimUp(void) {      return Eng_Global->GetKey(38); }
 MOD_TO_ENGINE bool SwimDn(void) {      return Eng_Global->GetKey(39); }
 MOD_TO_ENGINE bool Console(void) {     return Eng_Global->GetKeyPressed(-1); }
 MOD_TO_ENGINE bool TakeScreenshot(void) {  return Eng_Global->GetKeyPressed(41); }
+
+MOD_TO_ENGINE void ProcessInput(void) {
+    if (Console()) ToggleConsole();
+    if (TakeScreenshot() && Eng_Global->current_time > Eng_Global->screenshotTimeout) Screenshot();
+    if (Menu() && !Eng_Global->menuActive) { Eng_Global->gamePaused = !Eng_Global->gamePaused; return; }
+    if (Menu() && Eng_Global->menuActive) { MenuGoBack(); return; }
+    if (Eng_Global->gamePaused || Eng_Global->menuActive || Eng_Cheats->consoleActive) return; // =========== PAUSE BARRIER ==================
+
+    if (ToggleMode()) {
+        IgnoreNextMouseDelta();
+        Eng_Global->inventoryMode = !Eng_Global->inventoryMode;
+        Eng_Global->cursorPosition_x = Eng_Settings->ScreenWidth / 2;
+        Eng_Global->cursorPosition_y = Eng_Settings->ScreenHeight / 2;
+    }
+    
+    // Hardware hotkeys TODO
+    if (Lantern()) Eng_Global->inventoryPlayer1.hardwareIsActive ^= HW_LAN;
+//     if ((Eng_Global->inventoryPlayer1.hasHardware & HW_ERD) && GetInput.a.Email())      EReaderAction();
+//     if ((Eng_Global->inventoryPlayer1.hasHardware & HW_SNS) && GetInput.a.Sensaround()) SensaroundAction();
+//     if ((Eng_Global->inventoryPlayer1.hasHardware & HW_SHD) && GetInput.a.Shield())     ShieldAction();
+//     if ((Eng_Global->inventoryPlayer1.hasHardware & HW_BIO) && GetInput.a.Biomonitor()) BioAction();
+//     if ((Eng_Global->inventoryPlayer1.hasHardware & HW_LAN) && GetInput.a.Lantern())    LanternAction();
+//     if ((Eng_Global->inventoryPlayer1.hasHardware & HW_BST) && GetInput.a.Booster())    BoosterAction();
+//     if ((Eng_Global->inventoryPlayer1.hasHardware & HW_JET) && GetInput.a.Jumpjets())   JumpJetsAction();
+//     if ((Eng_Global->inventoryPlayer1.hasHardware & HW_INF) && GetInput.a.Infrared())   InfraredAction();
+    ApplyPlayerMovements();
+}

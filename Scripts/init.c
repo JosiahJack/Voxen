@@ -1,5 +1,9 @@
 // init.c - Entity Initialization
 #include "mod.h"
+// From Engine
+GlobalContext* Eng_Global = 0; CheatsSystem* Eng_Cheats; SettingsSystem* Eng_Settings;
+MOD_TO_ENGINE void ModLink(GlobalContext* globals, CheatsSystem* cheats, SettingsSystem* settings) {Eng_Global = globals; Eng_Cheats = cheats; Eng_Settings = settings; }
+
 uint8_t GetCurrentLevelSecurity(void) { return (Eng_Global->difficultyMission < 1 || Eng_Cheats->superoverride) ? 0u : Eng_Global->levelSecurity[Eng_Global->currentLevel]; }
 uint16_t GetImpactType(uint16_t instanceIdx) {
     switch (Eng_Global->instances[instanceIdx].bloodType) {
@@ -86,14 +90,10 @@ void InventoryInit(InventorySystem* inv) {
     inv->hardwareInvReferenceIndex[11] = 32;
     inv->hardwareInvReferenceIndex[12] =  0;
     inv->hardwareInvReferenceIndex[13] =  0;
-    for (int i = 0; i < 14; i++) {
-        if (i != 0) inv->generalInventoryIndexRef[i] = -1;
-    }
-    
+    inv->generalInventoryIndexRef[0] = 81;
+    for (int i = 1; i < HW_COUNT; i++) inv->generalInventoryIndexRef[i] = -1;
     for (int i=0;i<HW_COUNT;++i) inv->hardwareVersion[i] = 0;
     for (int i=0;i<HW_COUNT;++i) inv->hardwareVersionSetting[i] = 0;
-    for (int i=0;i<HW_COUNT;++i) inv->hardwareInvReferenceIndex[i] = 0;
-    inv->generalInventoryIndexRef[0] = 81;
     inv->nitroTimeSetting = NITRO_DEFAULT_TIME;
     inv->earthShakerTimeSetting = EARTH_SHAKER_DEFAULT_TIME;
     inv->lastAddedIndex = -1;
@@ -113,6 +113,7 @@ void InventoryInit(InventorySystem* inv) {
 }
 
 MOD_TO_ENGINE void PlayerInit(uint16_t i) {
+    DualLog("Entered mod function PlayerInit()\n");
     Eng_Global->instances[i].index = 767;
     Eng_Global->instances[i].layer = 12; // PhysicsLayer_Player
     Eng_Global->instances[i].position = (Vector3) { .x = 10.52f, .y = -43.792f + 0.84f, .z = 20.2908f}; // Start Actual: Puts player on Medical Level in actual game start position.  Added 0.84f y for cam offset from center
@@ -123,6 +124,7 @@ MOD_TO_ENGINE void PlayerInit(uint16_t i) {
     Eng_Global->instances[i].colliderCenter.y = 0.84f;
     Eng_Global->instances[i].colliderSize = (Vector3){.x = 0.48f, .y = 2.0f, .z = 1.0f}; // Radius, Overall height including end radii (Unity convention, blech), Direction, 1.0 == Y-Axis
     Eng_Global->instances[i].mass = 1.0f;
+    return;
     Eng_Global->instances[i].linearDrag = 8.0f;
     Eng_Global->instances[i].velocity = (Vector3){0.0f,0.0f,0.0f};
     Eng_Global->instances[i].dynamicFriction = 0.6f;
@@ -140,6 +142,7 @@ MOD_TO_ENGINE void PlayerInit(uint16_t i) {
     Eng_Global->instances[i].noiseFinished = Eng_Global->pauseRelativeTime;
 //     if (i == PLAYER1) MFDInit(&Sys_UIPlayer1);
 //     else if (i == PLAYER2) MFDInit(&Sys_UIPlayer2);
+    
     if (i == PLAYER1) InventoryInit(&Eng_Global->inventoryPlayer1);
     else if (i == PLAYER2) InventoryInit(&Eng_Global->inventoryPlayer2);
 }
@@ -168,7 +171,7 @@ MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(DataParser* entity_parser) 
 }
 
 MOD_TO_ENGINE void ModInitAfterLoad(void) {
-    for (int i=PLAYER1;i<Eng_Global->loadedInstances;++i) {        
+    for (int i=PLAYER1;i<(Eng_Global->loadedInstances);++i) {        
         if (i == PLAYER1 || i == PLAYER2 || ConstIndexIsDynamicObject(Eng_Global->instances[i].index)) Eng_Global->instances[i].gravity = 1.0f; // Normal gravity
         else Eng_Global->instances[i].gravity = 0.0f;
         

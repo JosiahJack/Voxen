@@ -1,3 +1,4 @@
+// dynamic_culling.c - Culling functions for x,z grid based culling system ala System Shock 1 / Underworld style
 #include "os.h"
 #include "gl.h"
 #include "voxen.h"

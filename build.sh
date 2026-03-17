@@ -98,12 +98,44 @@ COMMON_CFLAGS="-fno-exceptions -fno-stack-protector -fno-asynchronous-unwind-tab
                -fno-trapping-math -fmerge-all-constants -m64 -O3 -march=haswell -fstack-usage"
 COMMON_LFLAGS="-Wl,--sort-common -Wl,-z,now -Wl,-z,relro $ZIG_LIBS"
 
+# Engine Build 214.5kb
+if [ "$PLATFORM" = "windows" ]; then
+    CC=$WINDOWS_CC
+    LINKER=$CC
+    CFLAGS="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe"
+    LDFLAGS="$COMMON_LFLAGS -L. -lopengl32 -lglfw3 -Wl,--out-implib=voxen.lib"
+    BINARY_NAME="voxen.exe"
+else
+    CC=$LINUX_CC
+    LINKER=$CC
+    CFLAGS="$COMMON_CFLAGS -fno-plt -fno-semantic-interposition"
+    LDFLAGS="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -pthread -lglfw -lGL "
+    BINARY_NAME="voxen"
+fi
+
+export CC=$CC
+export CFLAGS=$CFLAGS
+SOURCES="voxen.c physics.c helpers.c animation.c console.c level.c data_parser.c \
+         data_text.c data_fonts.c data_models.c dynamic_culling.c data_textures.c glad.c \
+         input.c miniaudio.c menu.c"
+
+export TEMP_DIR=temp_build
+printf "%s\n" $SOURCES | xargs -P12 -I{} $CC -c {} $CFLAGS -o "$TEMP_DIR"/{}.o
+$LINKER "$TEMP_DIR"/*.o $LDFLAGS -rdynamic -lm -o $BINARY_NAME
+link_status=$?
+if [ $link_status -ne 0 ]; then
+    echo "ERROR: Linking failed."
+    exit 1
+else
+    echo "Built engine successfully."
+fi
+
 # Game Code Build 14.4kb
 if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
     LINKERGC=$CC
     CFLAGSGC="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe"
-    LDFLAGSGC="$COMMON_LFLAGS -Wl,--allow-shlib-undefined -Wl,--entry,DllMainCRTStartup -Wl,--subsystem,windows -Wl,--no-entry"
+    LDFLAGSGC="$COMMON_LFLAGS -Wl,--allow-shlib-undefined -Wl,--entry,DllMainCRTStartup -Wl,--subsystem,windows -Wl,--no-entry -L. -lvoxen"
     BINARY_NAMEGC="Citadel.dll"
 else
     CC=$LINUX_CC
@@ -115,7 +147,7 @@ fi
 
 export CCGC=$CC
 export CFLAGSGC=$CFLAGSGC
-SOURCESGC="init.c modinput.c modphysics.c ai.c biomonitor.c weapons.c music.c modaudio.c"
+SOURCESGC="init.c modinput.c modphysics.c ai.c biomonitor.c weapons.c music.c audio.c"
 export TEMP_DIRGC=temp_build_gc
 export SCRIPT_DIR="./Scripts"
 printf "%s\n" $SOURCESGC | xargs -P12 -I{} $CCGC -c $SCRIPT_DIR/{} $CFLAGSGC -I. -nostdinc -fPIC -ffreestanding -fno-builtin -Wshadow -o "$TEMP_DIRGC"/{}.o
@@ -128,44 +160,14 @@ else
     echo "Built mod gamecode successfully."
 fi
 
-# Engine Build 214.5kb
-if [ "$PLATFORM" = "windows" ]; then
-    CC=$WINDOWS_CC
-    LINKER=$CC
-    CFLAGS="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe"
-    LDFLAGS="$COMMON_LFLAGS -L. -lopengl32 -lglfw3"
-    BINARY_NAME="voxen.exe"
-else
-    CC=$LINUX_CC
-    LINKER=$CC
-    CFLAGS="$COMMON_CFLAGS -fno-plt -fno-semantic-interposition"
-    LDFLAGS="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -pthread -lglfw -lGL "
-    BINARY_NAME="voxen"
-fi
-
-export CC=$CC
-export CFLAGS=$CFLAGS
-SOURCES="voxen.c physics.c helpers.c audio.c animation.c console.c level.c data_parser.c \
-         data_text.c data_fonts.c data_models.c dynamic_culling.c data_textures.c glad.c \
-         input.c miniaudio.c menu.c"
-
-export TEMP_DIR=temp_build
-printf "%s\n" $SOURCES | xargs -P12 -I{} $CC -c {} $CFLAGS -o "$TEMP_DIR"/{}.o
-$LINKER "$TEMP_DIR"/*.o $LDFLAGS -rdynamic -lm -o $BINARY_NAME
-link_status=$?
-if [ $link_status -ne 0 ]; then
-    echo "ERROR: Linking failed."
-    exit 1
-fi
-
 build_end=$(now_ms)
 total_build_time=$((build_end - shader_start))
 echo "Built engine and mod in ${total_build_time} ms"
 if ! $IS_CI; then
     case "$PLATFORM" in
         windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; wine ./voxen.exe ;;
-#         *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
-        *)        ./voxen ;;   # linux
+        *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
+#         *)        ./voxen ;;   # linux
     esac
     rm -f "$TEMP_DIR"/*.o ./Shaders/*.h "$TEMP_DIRGC"/*.o #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.
 fi

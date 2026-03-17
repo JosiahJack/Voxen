@@ -6,8 +6,6 @@ InputSystem Sys_Input;
 extern uint16_t editModeTestEntityDefinition;
 extern uint16_t editModeSelection;
 bool mouseMovementThisFrame;
-void Input_PollGamepad(void);
-void Input_PollJoysticks(void);
 SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on first run for potatoes (e.g. won't crash for out of VRAM, or won't take 5min to init).
     .InputCodeSettings = {
         5,   /* Forward    = F */          0, /* Strafe Left = A */          18, /* Backpedal  = S */         3, /* Strafe Right = D */
@@ -226,36 +224,4 @@ bool GetKeyRiseEdgeOrHeld(int settingIndex, bool risingEdge) {
 
 ENGINE_TO_MOD bool GetKey(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,false); }  // True while held down.
 ENGINE_TO_MOD bool GetKeyPressed(int settingIndex) { return (settingIndex < 0) ? Sys_Input.keyStates[GLFW_KEY_GRAVE_ACCENT].pressed : GetKeyRiseEdgeOrHeld(settingIndex,true); } // True 1st frame down.
-
-void ProcessInput(void) {
-    Input_PollJoysticks();
-    Input_PollGamepad();
-    if (Sys_Input.keyStates[GLFW_KEY_E].pressed) play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f,(Vector3){},false);
-    if (!Sys_Input.window_has_focus) return;
-    
-    if (Sys_Input.keyStates[GLFW_KEY_CAPS_LOCK].pressed) Sys_Input.isCapsLockOn = !Sys_Input.isCapsLockOn; // Change capslock state to match keyboard having toggled.  Must always happen regardless of paused/menu.
-    if (Console()) ToggleConsole();
-    Screenshot();
-    if (Menu() && !Sys_Global.menuActive) { Sys_Global.gamePaused = !Sys_Global.gamePaused; return; }
-    if (Menu() && Sys_Global.menuActive) { MenuGoBack(); return; }
-    if (Sys_Global.gamePaused || Sys_Global.menuActive || Sys_Cheats.consoleActive) return; // =========== PAUSE BARRIER ==================
-
-    if (ToggleMode()) {
-        Sys_Input.ignore_next_mouse_delta = true;
-        Sys_Global.inventoryMode = !Sys_Global.inventoryMode;
-        Sys_Global.cursorPosition_x = Sys_Settings.ScreenWidth / 2;
-        Sys_Global.cursorPosition_y = Sys_Settings.ScreenHeight / 2;
-    }
-    
-    // Hardware hotkeys TODO
-    if (Lantern()) Sys_Global.inventoryPlayer1.hardwareIsActive ^= HW_LAN;
-//     if ((Sys_Global.inventoryPlayer1.hasHardware & HW_ERD) && GetInput.a.Email())      EReaderAction();
-//     if ((Sys_Global.inventoryPlayer1.hasHardware & HW_SNS) && GetInput.a.Sensaround()) SensaroundAction();
-//     if ((Sys_Global.inventoryPlayer1.hasHardware & HW_SHD) && GetInput.a.Shield())     ShieldAction();
-//     if ((Sys_Global.inventoryPlayer1.hasHardware & HW_BIO) && GetInput.a.Biomonitor()) BioAction();
-//     if ((Sys_Global.inventoryPlayer1.hasHardware & HW_LAN) && GetInput.a.Lantern())    LanternAction();
-//     if ((Sys_Global.inventoryPlayer1.hasHardware & HW_BST) && GetInput.a.Booster())    BoosterAction();
-//     if ((Sys_Global.inventoryPlayer1.hasHardware & HW_JET) && GetInput.a.Jumpjets())   JumpJetsAction();
-//     if ((Sys_Global.inventoryPlayer1.hasHardware & HW_INF) && GetInput.a.Infrared())   InfraredAction();
-    ApplyPlayerMovements();
-}
+ENGINE_TO_MOD void IgnoreNextMouseDelta(void) { Sys_Input.ignore_next_mouse_delta = true; }
