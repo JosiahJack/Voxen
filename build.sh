@@ -95,7 +95,7 @@ COMMON_CFLAGS="-fno-exceptions -fno-stack-protector -fno-asynchronous-unwind-tab
                -ffunction-sections -ffast-math -std=c11 -Wall -Wextra -Wno-implicit-fallthrough -fdeclspec \
                -fomit-frame-pointer -g1 -fstrict-aliasing -fcommon -Walloca -DMA_USE_STDINT \
                -Wformat=2 -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings -fno-math-errno -fno-sanitize=all \
-               -fno-trapping-math -fmerge-all-constants -m64 -Og -march=haswell -fstack-usage"
+               -fno-trapping-math -fmerge-all-constants -m64 -O3 -march=haswell -fstack-usage"
 COMMON_LFLAGS="-Wl,--sort-common -Wl,-z,now -Wl,-z,relro $ZIG_LIBS"
 
 # Game Code Build 14.4kb

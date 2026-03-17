@@ -56,11 +56,11 @@ void LoadTextForLanguage(uint8_t lang){
         }
         size_t len=data_pos-line_start;if(len==0){if(lineNum<TEXT_STRING_COUNT)Sys_Text.stringTable[lineNum][0]='\0';++lineNum;continue;}
         if(is_utf16le){utf16le_to_utf8(&Sys_Text.file_data[line_start],len,utf8_line,sizeof(utf8_line));}
-        else{if(len>=sizeof(utf8_line))len=sizeof(utf8_line)-1;CopyMemoryFromBtoAForNBytes(utf8_line,&Sys_Text.file_data[line_start],len);utf8_line[len]='\0';}
+        else{if(len>=sizeof(utf8_line))len=sizeof(utf8_line)-1;__builtin_memcpy(utf8_line,&Sys_Text.file_data[line_start],len);utf8_line[len]='\0';}
         len=GetStringLength(utf8_line);while(len>0&&(utf8_line[len-1]=='\r'||utf8_line[len-1]=='\n'))utf8_line[--len]='\0';
         if(len==0){if(lineNum<TEXT_STRING_COUNT)Sys_Text.stringTable[lineNum][0]='\0';++lineNum;continue;}
         if(lineNum<TEXT_STRING_COUNT){
-            CopyMemoryFromBtoAForNBytes(Sys_Text.stringTable[lineNum],utf8_line,len);
+            __builtin_memcpy(Sys_Text.stringTable[lineNum],utf8_line,len);
             Sys_Text.stringTable[lineNum][len]='\0';++lineNum;
         }
     }
@@ -82,10 +82,10 @@ static inline __attribute__((always_inline)) int StringToIntLen(const char *str,
 
 void LoadLogTextForLanguage(uint8_t lang){
     DualLog("Loading log text for language...\n");
-    SetMemoryToValueForNBytes(Sys_Text.audioLogImagesRefIndicesLH,0,TEXT_LOGS_COUNT*sizeof(uint16_t));
-    SetMemoryToValueForNBytes(Sys_Text.audioLogImagesRefIndicesRH,0,TEXT_LOGS_COUNT*sizeof(uint16_t));
-    SetMemoryToValueForNBytes(Sys_Text.audioLogType,0,TEXT_LOGS_COUNT*sizeof(uint8_t));
-    SetMemoryToValueForNBytes(Sys_Text.audioLogLevelFound,0,TEXT_LOGS_COUNT*sizeof(uint8_t));
+    __builtin_memset(Sys_Text.audioLogImagesRefIndicesLH,0,TEXT_LOGS_COUNT*sizeof(uint16_t));
+    __builtin_memset(Sys_Text.audioLogImagesRefIndicesRH,0,TEXT_LOGS_COUNT*sizeof(uint16_t));
+    __builtin_memset(Sys_Text.audioLogType,0,TEXT_LOGS_COUNT*sizeof(uint8_t));
+    __builtin_memset(Sys_Text.audioLogLevelFound,0,TEXT_LOGS_COUNT*sizeof(uint8_t));
     char textFile[256]={0};
     switch(lang){
         case 1:StringCopyInto_A_From_B(textFile,"./Data/logs_text_espanol.txt",256);break;
@@ -126,7 +126,7 @@ void LoadLogTextForLanguage(uint8_t lang){
         }
         size_t line_len=data_pos-line_start;if(line_len==0)continue;
         if(is_utf16le){utf16le_to_utf8(&Sys_Text.file_data[line_start],line_len,utf8_line,sizeof(utf8_line));}
-        else{if(line_len>=sizeof(utf8_line))line_len=sizeof(utf8_line)-1;CopyMemoryFromBtoAForNBytes(utf8_line,&Sys_Text.file_data[line_start],line_len);utf8_line[line_len]='\0';}
+        else{if(line_len>=sizeof(utf8_line))line_len=sizeof(utf8_line)-1;__builtin_memcpy(utf8_line,&Sys_Text.file_data[line_start],line_len);utf8_line[line_len]='\0';}
         size_t slen=GetStringLength(utf8_line);while(slen>0&&(utf8_line[slen-1]=='\r'||utf8_line[slen-1]=='\n'))utf8_line[--slen]='\0';if(slen==0)continue;
         int log_index=-1,img_lh=-1,img_rh=-1,log_type=0,level_found=0;char*pos=utf8_line;int field_idx=0;
         while(*pos&&field_idx<32){

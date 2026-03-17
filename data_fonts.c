@@ -107,7 +107,7 @@ static bool load_font_cache(const char *path, int32_t expected_glyphs, const uin
     if (file_expected != expected_glyphs) { DualLogWarn("range mismatch %s (file:%u exp:%u)\n", path, file_expected, expected_glyphs); OS_DeallocateRAM(map, fontFileSize); return false; }
 
     uint64_t file_stamp_on_disk;
-    CopyMemoryFromBtoAForNBytes(&file_stamp_on_disk, p, sizeof(uint64_t));
+    __builtin_memcpy(&file_stamp_on_disk, p, sizeof(uint64_t));
     p += sizeof(uint64_t);
     if (file_stamp_on_disk != file_stamp) { OS_DeallocateRAM(map, fontFileSize); DualLogWarn("Filestamp mismatch %s\n", path); return false; }
 
@@ -115,7 +115,7 @@ static bool load_font_cache(const char *path, int32_t expected_glyphs, const uin
     if (actual_packed > MAX_GLYPHS) { OS_DeallocateRAM(map, fontFileSize); return false; }
 
     float fixed_advance = *(float*)p;       p += 4;
-    CopyMemoryFromBtoAForNBytes(out_packed, p, sizeof(stbtt_packedchar) * actual_packed);
+    __builtin_memcpy(out_packed, p, sizeof(stbtt_packedchar) * actual_packed);
     *out_num = (int32_t)actual_packed;
     *out_fixed_advance = fixed_advance;
     p += sizeof(stbtt_packedchar) * actual_packed;
@@ -222,7 +222,7 @@ void InitFontAtlasses(void) {
     #endif
         
     // Secondary
-    SetMemoryToValueForNBytes(bmp,0,FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * sizeof(unsigned char));
+    __builtin_memset(bmp,0,FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * sizeof(unsigned char));
     stbtt_pack_context pc2;
     stbtt_PackBegin(&pc2, bmp, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 16, NULL);
     pc2.h_oversample = 4; // STBTT_MAX_OVERSAMPLE = 8

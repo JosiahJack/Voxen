@@ -11,8 +11,6 @@
 
 #include "common.h" // Types needed first
 #include "interop.h"
-#define SetMemoryToValueForNBytes __builtin_memset
-#define CopyMemoryFromBtoAForNBytes __builtin_memcpy
 #define MAX_KEYS 512
 #define MAX_MOUSE_BUTTONS 8
 #define MAX_JOYSTICK_BUTTONS 16

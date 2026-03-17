@@ -431,7 +431,7 @@ void RenderFormattedText(int16_t x, int16_t y, uint32_t color, uint8_t fontID, f
         float t1 = (q.t1) + (paddingUV);
         float z = 0.0f;
         float textVertices[30] = { vx0, vy0, z, s0, t0, vx1, vy1, z, s1, t1, vx1, vy0, z, s1, t0, vx0, vy0, z, s0, t0, vx0, vy1, z, s0, t1, vx1, vy1, z, s1, t1 };
-        CopyMemoryFromBtoAForNBytes(textVertexData + vertexCount * 30, textVertices, sizeof(textVertices));
+        __builtin_memcpy(textVertexData + vertexCount * 30, textVertices, sizeof(textVertices));
         vertexCount++;
         if (codepoint >= '0' && codepoint <= '9') {
             if (fontID == FONT_STOPD) xpos = q.x0 + fixedNumberAdvanceWidthStopD;
@@ -468,7 +468,7 @@ __attribute__((cold)) void NewGame(void) { // Reset World States
     Sys_Global.instances[WORLD].lev4SecCode = random_range_u8(0u,9u);
     Sys_Global.instances[WORLD].lev5SecCode = random_range_u8(0u,9u);
     Sys_Global.instances[WORLD].lev6SecCode = random_range_u8(0u,9u);
-    SetMemoryToValueForNBytes(Sys_Global.instances,0,INSTANCE_COUNT * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
+    __builtin_memset(Sys_Global.instances,0,INSTANCE_COUNT * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
     PlayerInit(PLAYER1); PlayerInit(PLAYER2);
     cam_yaw = 90.0f; cam_pitch = 0.0f; cam_roll = 0.0f;
     Sys_Global.inventoryMode = Sys_Settings.NoShootMode;
@@ -543,7 +543,7 @@ __attribute__((cold)) void LoadEntities(void) {
     if (Sys_Global.entityCount > MAX_ENTITIES) { DualLogError("Too many entities in parser count %d, greater than %d!\n", Sys_Global.entityCount, MAX_ENTITIES); OS_Exit(1); }
     if (Sys_Global.entityCount == 0) { DualLogError("No entities found in entities.txt\n"); OS_Exit(1); }
 
-    SetMemoryToValueForNBytes(Sys_Global.entities,0,MAX_ENTITIES * sizeof(Entity));
+    __builtin_memset(Sys_Global.entities,0,MAX_ENTITIES * sizeof(Entity));
     ModEntityDefinitionsInitAfterLoad(&entity_parser);
     OS_DeallocateRAM(entity_parser.entries,entity_parser.count * sizeof(Entity));
     DualLog(" took %f secs\n", get_time() - start_time);
@@ -681,11 +681,11 @@ static void joystick_callback(int32_t jid, int32_t event) {
     if (jid > GLFW_JOYSTICK_LAST) return;
     
     if (event == GLFW_CONNECTED) {
-        SetMemoryToValueForNBytes(&Sys_Input.joystickPresent[jid], 1, sizeof(bool));
+        __builtin_memset(&Sys_Input.joystickPresent[jid], 1, sizeof(bool));
     } else if (event == GLFW_DISCONNECTED) {
-        SetMemoryToValueForNBytes(&Sys_Input.joystickPresent[jid], 0, sizeof(bool));
-        SetMemoryToValueForNBytes(Sys_Input.joystickButtons, 0, sizeof(Sys_Input.joystickButtons));
-        SetMemoryToValueForNBytes(Sys_Input.joystickHats, 0, sizeof(Sys_Input.joystickHats));
+        __builtin_memset(&Sys_Input.joystickPresent[jid], 0, sizeof(bool));
+        __builtin_memset(Sys_Input.joystickButtons, 0, sizeof(Sys_Input.joystickButtons));
+        __builtin_memset(Sys_Input.joystickHats, 0, sizeof(Sys_Input.joystickHats));
     }
 }
 
@@ -1052,7 +1052,7 @@ __attribute__((cold)) void InitializeEnvironment(void) {
 
     DebugRAM("after freeing window bar icon");
     float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
-    CopyMemoryFromBtoAForNBytes(&modelMatrices[0],mat,16 * sizeof(float)); // Null instance matrix used for UI
+    __builtin_memcpy(&modelMatrices[0],mat,16 * sizeof(float)); // Null instance matrix used for UI
     Sys_Render.cellVisibleDataID       = SetupSSBO(&Sys_Render.cellVisibleDataID,        4, ARRSIZE * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     Sys_Render.shadowMapSSBO           = SetupSSBO(&Sys_Render.shadowMapSSBO,            5, TOTAL_SHADOWMAP_PIXELS * sizeof(uint32_t), NULL, GL_STATIC_DRAW);    
     glUseProgram(Sys_Render.shadowmapsShaderProgram); glUniform1ui(9,         SHADOW_MAP_SIZE);
@@ -1175,7 +1175,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void RenderSha
         }
 
         shadowDrawCallsRenderedThisFrame = 0;
-        SetMemoryToValueForNBytes(voxen_Shadow_System.shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t)); // Set to invalid values for all
+        __builtin_memset(voxen_Shadow_System.shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t)); // Set to invalid values for all
         glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
         glUseProgram(Sys_Render.shadowmapsShaderProgram);
         uint32_t shadowmapOffsetHead = 0U;
@@ -1550,8 +1550,8 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
     glBindVertexArray(Sys_Render.vao_chunk); // Common vao for RenderShadowmaps and Rasterized Geometry
     glEnable(GL_DEPTH_TEST);
     if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps();
-    SetMemoryToValueForNBytes(    lightDirty,0    ,LIGHT_COUNT * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
-    SetMemoryToValueForNBytes(dirtyInstances,0,Sys_Global.loadedInstances * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
+    __builtin_memset(    lightDirty,0    ,LIGHT_COUNT * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
+    __builtin_memset(dirtyInstances,0,Sys_Global.loadedInstances * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
     glBindFramebuffer(GL_FRAMEBUFFER, Sys_Render.gBufferFBO);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
     glEnable(GL_CULL_FACE); glDisable(GL_BLEND); // Opaques
