@@ -383,11 +383,6 @@ void LoadLevel(uint8_t curlevel) {
         } else {
             uint16_t parent = instanceIdx; // Needed as adding children moves the instanceIdx.
             uint16_t entIdx = Sys_Global.instances[parent].index;
-//             if (Sys_Global.instances[parent].index == 766) {
-//                 editModeSelection = parent;
-//                 flag_set(&Sys_Global.instances[editModeSelection].entflags,ENTFLAG_ACTIVE,true);
-//                 //Sys_Global.instances[editModeSelection].scale = (Vector3){1.0f,1.0f,1.0f};
-//             }
             AddInstance(entIdx, parent);
             if (!activeStateRead) flag_set(&Sys_Global.instances[parent].entflags, ENTFLAG_ACTIVE, true);
             if (EntityIndexIsPortalBlockingDoor(entIdx)) {
@@ -470,7 +465,6 @@ void LoadLevel(uint8_t curlevel) {
     // Add player headmounted lantern light
     loadedLights++;
     lightsIdx++;
-    DualLog("lightsIdx %u vs loadedLights %u\n",lightsIdx,loadedLights);
     if (lightsIdx >= LIGHT_COUNT) { DualLogError("Too many lights %u in level%d.txt!\n",lightsIdx,curlevel); OS_Exit(1); }
 
     int32_t litIdx = lightsIdx * LIGHT_DATA_SIZE;

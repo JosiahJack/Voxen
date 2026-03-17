@@ -579,12 +579,8 @@ void UpdateScreenSize(GLFWwindow* unused, int32_t width, int32_t height) {
     (void)unused; // Appease glfwSetFramebufferSizeCallback pointer type
     Sys_Settings.ScreenWidth = vmax(vmin((uint16_t)width, 7680), 320u); Sys_Settings.ScreenHeight = vmax(vmin((uint16_t)height, 4320), 200u); // Cap at minimum Quake 1 resolution and maximum 8k.
     Sys_Settings.ScreenCenterX = (float)Sys_Settings.ScreenWidth * 0.5f; Sys_Settings.ScreenCenterY = (float)Sys_Settings.ScreenHeight * 0.5f;
-    DualLog("Screen size updated to %u x %u from input values %d x %d\n", Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, width, height);
-    DualLog("Setting up viewport\n");
     glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
-    DualLog("Updating projection matrices\n");
     UpdateProjectionMatrices();
-    DualLog("Passing static uniforms into shaders\n");
     glUseProgram(Sys_Render.imageBlitShaderProgram);
     glUniform1ui(2, Sys_Settings.ScreenWidth);
     glUniform1ui(3, Sys_Settings.ScreenHeight);
@@ -596,7 +592,6 @@ void UpdateScreenSize(GLFWwindow* unused, int32_t width, int32_t height) {
     glUniform1ui(0, Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES);
     glUniform1ui(1, Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES);       
     glUniform1i(2, Sys_Settings.SSR_RES);
-    DualLog("Generating textures and main framebuffer object\n");
     GenerateAndBindTexture(&Sys_Render.inputImageID,             GL_RGBA8, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Lit Raster
     GenerateAndBindTexture(&Sys_Render.inputWorldPosID,        GL_RGBA32F, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight,            GL_RGBA,         GL_FLOAT, GL_TEXTURE_2D); // Raster World Positions
     GenerateAndBindTexture(&Sys_Render.inputDepthID, GL_DEPTH_COMPONENT32, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, GL_DEPTH_COMPONENT,         GL_FLOAT, GL_TEXTURE_2D); // Raster Depth
@@ -622,7 +617,6 @@ void UpdateScreenSize(GLFWwindow* unused, int32_t width, int32_t height) {
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_2D, Sys_Render.outputImageID);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    DualLog("UpdateScreenSize complete with all render targets!\n");
 }
 
 // GLFW Callbacks
@@ -1023,7 +1017,6 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     RenderLoadingProgress(80,"Loading...");
     glGenFramebuffers(1, &Sys_Render.gBufferFBO);
     ApplySettings(); // After loading of text and game data.
-    DualLog("Setting up framebuffer\n");
     glBindFramebuffer(GL_FRAMEBUFFER, Sys_Render.gBufferFBO);
     GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3 };
     glDrawBuffers(4, drawBuffers);

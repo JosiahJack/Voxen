@@ -28,7 +28,6 @@ size_t utf16le_to_utf8(const uint8_t* src, size_t src_len, char* dst, size_t dst
 }
 
 void LoadTextForLanguage(uint8_t lang){
-    DualLog("Loading text for language...\n");
     char textFile[256]={0};
     switch(lang){case 1:strncpy(textFile,"./Data/text_espanol.txt",256);break;case 2:strncpy(textFile,"./Data/text_deutsch.txt",256);break;case 3:strncpy(textFile,"./Data/text_francais.txt",256);break;case 4:strncpy(textFile,"./Data/text_nihongo.txt",256);break;case 5:strncpy(textFile,"./Data/text_russkiy.txt",256);break;case 6:strncpy(textFile,"./Data/text_italiano.txt",256);break;case 7:strncpy(textFile,"./Data/text_portugues.txt",256);break;default:strncpy(textFile,"./Data/text_english.txt",256);break;}
     OsFileHandle fp=OS_OpenReadonly(textFile);if(fp==OS_INVALID_HANDLE){DualLogError("Cannot open %s\n",textFile);return;}
@@ -64,7 +63,6 @@ void LoadTextForLanguage(uint8_t lang){
             Sys_Text.stringTable[lineNum][len]='\0';++lineNum;
         }
     }
-    DualLog("Text loaded!\n");
 }
 
 static inline __attribute__((always_inline)) int StringToIntLen(const char *str, size_t len) {
@@ -81,7 +79,6 @@ static inline __attribute__((always_inline)) int StringToIntLen(const char *str,
 }
 
 void LoadLogTextForLanguage(uint8_t lang){
-    DualLog("Loading log text for language...\n");
     __builtin_memset(Sys_Text.audioLogImagesRefIndicesLH,0,TEXT_LOGS_COUNT*sizeof(uint16_t));
     __builtin_memset(Sys_Text.audioLogImagesRefIndicesRH,0,TEXT_LOGS_COUNT*sizeof(uint16_t));
     __builtin_memset(Sys_Text.audioLogType,0,TEXT_LOGS_COUNT*sizeof(uint8_t));
@@ -154,5 +151,4 @@ void LoadLogTextForLanguage(uint8_t lang){
         }
     next_line:continue;
     }
-    DualLog("Log text loaded!\n");
 }
