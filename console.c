@@ -99,24 +99,6 @@ void EnableCheatArsenal(uint8_t level) {
     }
 }
 
-uint16_t SpawnDynamicObject(int val, bool cheat) {
-    if (!ConstIndexInBounds(val)) { DualLogError("Const index out of bounds: %u", val); return NULLENT; } // Checked in cmd_summon but used elsewhere so guard here too.
-    
-    if (cheat) DualLog("Cheat spawn constIndex %u, level: %u, from cheat: %u, name: ", val, Sys_Global.currentLevel, cheat);
-//     Vector3 spawnPos = (Vector3){0.0,0.0,0.0};
-//     if (cheat) spawnPos = (Vector3){Sys_Global.instances[PLAYER1].position.x,Sys_Global.instances[PLAYER1].position.y,Sys_Global.instances[PLAYER1].position.z};
-    if (ConstIndexIsGeometry(val)/* && !Sys_Cheats.editMode*/) { CenterStatusPrint("Indices 0 through 306 (level geometry chunks) not possible when not on edit mode!"); return NULLENT; }
-    
-    uint16_t entityIndexInInstanceTable = NULLENT;//MonoBehaviour.Instantiate(Const.a.GetPrefab(val),spawnPos, Const.a.quaternionIdentity) as Entity;
-    if (cheat && ConstIndexIsHardware(val)) { // Hardware
-//         UseableObjectUse uo = go.GetComponent<UseableObjectUse>();
-//         int dex14 = hardware14fromConstdex(uo.useableItemIndex);
-//         if (inventoryPlayer1.hasHardware[dex14]) uo.customIndex = (inventoryPlayer1.hardwareVersion[dex14] + 1);
-    }
-
-    return entityIndexInInstanceTable;
-}
-
 void cmd_kill(void) {
     CenterStatusPrint("%s", Sys_Text.stringTable[1011]); // "Player decides to become a cyborg."
     // TakeDamage(...)

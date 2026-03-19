@@ -523,6 +523,7 @@ void DetermineVisibleCells(int32_t startX, int32_t startZ) {
 //     }
 }
 
+bool CullCore(void);
 void CullInit(void) {
     double start_time = get_time();    
     DualLog("Culling...");
@@ -663,6 +664,11 @@ void PortalCulling(void) { // Called just once at end of animation loop for the 
     for (uint16_t i = 0; i < loadedLights; i++) lightDirty[i] = true;
 }
 
+static inline __attribute__((always_inline)) void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* pos_z) {
+    *pos_x = worldMin_x + (x * WORLDCELL_WIDTH_F);
+    *pos_z = worldMin_z + (z * WORLDCELL_WIDTH_F);
+}
+
 bool CullCore(void) {    
     if (Sys_Global.currentLevel >= LEVEL_CYBERSPACE) return false;
 
@@ -680,4 +686,3 @@ bool CullCore(void) {
     glNamedBufferData(Sys_Render.cellVisibleDataID,ARRSIZE * sizeof(uint32_t), gridCellStates, GL_DYNAMIC_DRAW);
     return true;
 }
-

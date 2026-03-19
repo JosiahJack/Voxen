@@ -54,6 +54,7 @@
     X(void, PlayGameMusic, (void)) \
     X(void, ResetLevelMusic, (void)) \
     X(void, ResetLevelAudio, (void)) \
+    X(uint16_t, SpawnDynamicObject, (int, bool)) \
     X(void, ModInitAfterLoad, (void)) \
     X(void, ModEntityDefinitionsInitAfterLoad, (DataParser* parser)) \
     X(void, PlayerInit, (uint16_t playerIdx)) \
@@ -139,3 +140,4 @@ ENGINE_TO_MOD void ToggleConsole(void);
 ENGINE_TO_MOD void MenuGoBack(void);
 ENGINE_TO_MOD void IgnoreNextMouseDelta(void);
 ENGINE_TO_MOD void ApplyPlayerMovements(void);
+ENGINE_TO_MOD void CenterStatusPrint(const char* fmt, ...);

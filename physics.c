@@ -159,74 +159,73 @@ Vector3 quat_rotate(Quaternion q, Vector3 v) {
     float wy2 = q.w * y2;
     float wz2 = q.w * z2;
     return (Vector3){
-        v.x * (1.0f - yy2 - zz2) + v.y * (xy2 - wz2) + v.z * (xz2 + wy2),
-        v.x * (xy2 + wz2) + v.y * (1.0f - xx2 - zz2) + v.z * (yz2 - wx2),
-        v.x * (xz2 - wy2) + v.y * (yz2 + wx2) + v.z * (1.0f - xx2 - yy2)
+        v.x * (1.0f - yy2 - zz2) + v.y * (xy2 + wz2) + v.z * (xz2 - wy2),
+        v.x * (xy2 - wz2) + v.y * (1.0f - xx2 - zz2) + v.z * (yz2 + wx2),
+        v.x * (xz2 + wy2) + v.y * (yz2 - wx2) + v.z * (1.0f - xx2 - yy2)
     };
 }
 
-uint16_t PointInSolid(Vector3 point, uint32_t layerMask) {
-    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
-        if (!(layerMask & Sys_Global.instances[i].layer)) continue;
-        if (Sys_Global.instances[i].collider == COLLIDER_TYPE_NONE || Sys_Global.instances[i].collider == COLLIDER_TYPE_MESH) continue;
+// uint16_t PointInSolid(Vector3 point, uint32_t layerMask) {
+//     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
+//         if (!(layerMask & Sys_Global.instances[i].layer)) continue;
+//         if (Sys_Global.instances[i].collider == COLLIDER_TYPE_NONE || Sys_Global.instances[i].collider == COLLIDER_TYPE_MESH) continue;
+// 
+//         Vector3 pos = Sys_Global.instances[i].position;
+//         Quaternion rot = Sys_Global.instances[i].rotation;
+//         Vector3 scale = Sys_Global.instances[i].scale;
+//         Vector3 local = Vector3_A_minus_B(point, pos);
+//         Quaternion invRot = (Quaternion){-rot.x, -rot.y, -rot.z, rot.w};
+//         local = quat_rotate(invRot, local);
+//         if (scale.x != 0.0f) local.x /= scale.x;
+//         if (scale.y != 0.0f) local.y /= scale.y;
+//         if (scale.z != 0.0f) local.z /= scale.z;
+//         Vector3 center;
+//         float radius, distSq;
+//         switch (Sys_Global.instances[i].collider) {
+//             case COLLIDER_TYPE_BOX:
+//                 center = Sys_Global.instances[i].colliderCenter;
+//                 Vector3 size   = Sys_Global.instances[i].colliderSize; // full extents
+//                 Vector3 half = (Vector3){ size.x * 0.5f, size.y * 0.5f, size.z * 0.5f };
+//                 Vector3 min = Vector3_A_minus_B(center, half);
+//                 Vector3 max = Vector3_A_plus_B(center, half);
+//                 if (local.x >= min.x && local.x <= max.x && local.y >= min.y && local.y <= max.y && local.z >= min.z && local.z <= max.z) return i;
+//                 break;
+//             case COLLIDER_TYPE_SPHERE:
+//                 center = Sys_Global.instances[i].colliderCenter;
+//                 radius = Sys_Global.instances[i].colliderSize.x;
+//                 Vector3 offset = Vector3_A_minus_B(local, center);
+//                 distSq = dot_vector3(offset, offset);
+//                 if (distSq <= radius * radius) return i;
+//                 break;
+//             case COLLIDER_TYPE_CAPSULE:
+//                 center = Sys_Global.instances[i].colliderCenter;
+//                 radius = Sys_Global.instances[i].colliderSize.x;
+//                 float height = Sys_Global.instances[i].colliderSize.y; // full cylinder height
+//                 int axis = (int)Sys_Global.instances[i].colliderSize.z; // 0=X, 1=Y, 2=Z
+//                 Vector3 axisDir = {0.0f, 1.0f, 0.0f};
+//                 if (axis == 0) axisDir = (Vector3){1.0f, 0.0f, 0.0f};
+//                 else if (axis == 2) axisDir = (Vector3){0.0f, 0.0f, 1.0f};
+//                 Vector3 halfHeightVec = scale_vector3(axisDir, height * 0.5f);
+//                 Vector3 p1 = Vector3_A_minus_B(center, halfHeightVec);
+//                 Vector3 p2 = Vector3_A_plus_B(center, halfHeightVec);
+//                 Vector3 p1_to_point = Vector3_A_minus_B(local, p1);
+//                 Vector3 p1_to_p2     = Vector3_A_minus_B(p2, p1);
+//                 float segLenSq = dot_vector3(p1_to_p2, p1_to_p2);
+//                 float t = (segLenSq > 0.0f) ? dot_vector3(p1_to_point, p1_to_p2) / segLenSq : 0.0f;
+//                 t = vclamp(t, 0.0f, 1.0f);
+//                 Vector3 closest = Vector3_A_plus_B(p1, scale_vector3(p1_to_p2, t));
+//                 Vector3 toClosest = Vector3_A_minus_B(local, closest);
+//                 distSq = dot_vector3(toClosest, toClosest);
+//                 if (distSq <= radius * radius) return i;
+//                 break;
+//             case COLLIDER_TYPE_CONVEXMESH: break;
+//         }
+//     }
+// 
+//     return UINT16_MAX;
+// }
 
-        Vector3 pos = Sys_Global.instances[i].position;
-        Quaternion rot = Sys_Global.instances[i].rotation;
-        Vector3 scale = Sys_Global.instances[i].scale;
-        Vector3 local = Vector3_A_minus_B(point, pos);
-        Quaternion invRot = (Quaternion){-rot.x, -rot.y, -rot.z, rot.w};
-        local = quat_rotate(invRot, local);
-        if (scale.x != 0.0f) local.x /= scale.x;
-        if (scale.y != 0.0f) local.y /= scale.y;
-        if (scale.z != 0.0f) local.z /= scale.z;
-        Vector3 center;
-        float radius, distSq;
-        switch (Sys_Global.instances[i].collider) {
-            case COLLIDER_TYPE_BOX:
-                center = Sys_Global.instances[i].colliderCenter;
-                Vector3 size   = Sys_Global.instances[i].colliderSize; // full extents
-                Vector3 half = (Vector3){ size.x * 0.5f, size.y * 0.5f, size.z * 0.5f };
-                Vector3 min = Vector3_A_minus_B(center, half);
-                Vector3 max = Vector3_A_plus_B(center, half);
-                if (local.x >= min.x && local.x <= max.x && local.y >= min.y && local.y <= max.y && local.z >= min.z && local.z <= max.z) return i;
-                break;
-            case COLLIDER_TYPE_SPHERE:
-                center = Sys_Global.instances[i].colliderCenter;
-                radius = Sys_Global.instances[i].colliderSize.x;
-                Vector3 offset = Vector3_A_minus_B(local, center);
-                distSq = dot_vector3(offset, offset);
-                if (distSq <= radius * radius) return i;
-                break;
-            case COLLIDER_TYPE_CAPSULE:
-                center = Sys_Global.instances[i].colliderCenter;
-                radius = Sys_Global.instances[i].colliderSize.x;
-                float height = Sys_Global.instances[i].colliderSize.y; // full cylinder height
-                int axis = (int)Sys_Global.instances[i].colliderSize.z; // 0=X, 1=Y, 2=Z
-                Vector3 axisDir = {0.0f, 1.0f, 0.0f};
-                if (axis == 0) axisDir = (Vector3){1.0f, 0.0f, 0.0f};
-                else if (axis == 2) axisDir = (Vector3){0.0f, 0.0f, 1.0f};
-                Vector3 halfHeightVec = scale_vector3(axisDir, height * 0.5f);
-                Vector3 p1 = Vector3_A_minus_B(center, halfHeightVec);
-                Vector3 p2 = Vector3_A_plus_B(center, halfHeightVec);
-                Vector3 p1_to_point = Vector3_A_minus_B(local, p1);
-                Vector3 p1_to_p2     = Vector3_A_minus_B(p2, p1);
-                float segLenSq = dot_vector3(p1_to_p2, p1_to_p2);
-                float t = (segLenSq > 0.0f) ? dot_vector3(p1_to_point, p1_to_p2) / segLenSq : 0.0f;
-                t = vclamp(t, 0.0f, 1.0f);
-                Vector3 closest = Vector3_A_plus_B(p1, scale_vector3(p1_to_p2, t));
-                Vector3 toClosest = Vector3_A_minus_B(local, closest);
-                distSq = dot_vector3(toClosest, toClosest);
-                if (distSq <= radius * radius) return i;
-                break;
-            case COLLIDER_TYPE_CONVEXMESH: break;
-        }
-    }
-
-    return UINT16_MAX;
-}
-
-RaycastHit RayTriangle(Vector3 origin, Vector3 dir, Vector3 posA, Vector3 posB, Vector3 posC,
-                       Vector3 normA, Vector3 normB, Vector3 normC) {
+RaycastHit RayTriangle(Vector3 origin, Vector3 dir, Vector3 posA, Vector3 posB, Vector3 posC, Vector3 normA, Vector3 normB, Vector3 normC) {
     Vector3 edgeAB = Vector3_A_minus_B(posB,posA);
     Vector3 edgeAC = Vector3_A_minus_B(posC,posA);
     Vector3 normalVector = cross_vector3(edgeAB,edgeAC);
@@ -239,7 +238,7 @@ RaycastHit RayTriangle(Vector3 origin, Vector3 dir, Vector3 posA, Vector3 posB, 
     float v = -dot_vector3(edgeAB, dao) * invDet;
     float w = 1.0f - u - v;
     RaycastHit hitInfo;
-    hitInfo.hit = determinant >= 1E-8f && dst >= 0.0f && u >= 0.0f && v >= 0.0f && w >= 0.0f;
+    hitInfo.hit = vabs(determinant) >= 1E-8f && dst >= 0.0f && u >= 0.0f && v >= 0.0f && w >= 0.0f;
     hitInfo.point = Vector3_A_plus_B(origin,scale_vector3(dir,dst));
     hitInfo.normal = normalize_vector3(Vector3_A_plus_B(Vector3_A_plus_B(scale_vector3(normA,w),scale_vector3(normB,u)),scale_vector3(normC,v)));
     hitInfo.distance = dst;
@@ -247,28 +246,94 @@ RaycastHit RayTriangle(Vector3 origin, Vector3 dir, Vector3 posA, Vector3 posB, 
 }
 
 ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uint32_t layerMask) {
-    RaycastHit result = {
-        .hit = false,
-        .distance = maxDist,
-        .point = {0.0f, 0.0f, 0.0f},
-        .normal = {0.0f, 0.0f, 0.0f},
-        .hitInstanceIndex = INSTANCE_COUNT
-    };
-    
-    uint16_t hitObjectIndex = UINT16_MAX;
-    for (float curDist=0.0f;curDist<maxDist;curDist+=0.02f) { // 4.9 / 0.04 = 245 tries worst case empty air
-        Vector3 checkPoint = Vector3_A_plus_B(origin, scale_vector3(dir,curDist));
-        hitObjectIndex = PointInSolid(checkPoint, layerMask);
-        if (hitObjectIndex < Sys_Global.loadedInstances) {
-            result.hit = true;
-            result.point = checkPoint;
-            result.distance = curDist; // TODO refine the raymarch a little?  nah 0.02 good enough for effects, will apply offset along normal for bullet holes and such anyways.
-            result.normal = Vector3_A_minus_B(checkPoint,origin);
-            result.hitInstanceIndex = hitObjectIndex;
-            return result;
+    uint32_t numMeshesCheckedForRaycast = 0, numTrisCastAgainst = 0;
+    bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX);
+    RaycastHit result = { .hit = false, .distance = maxDist, .point = {0.0f, 0.0f, 0.0f}, .normal = {0.0f, 0.0f, 0.0f}, .hitInstanceIndex = INSTANCE_COUNT };
+    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
+//         if (Sys_Global.instances[i].collider == COLLIDER_TYPE_NONE) continue;
+        uint16_t mindex = Sys_Global.instances[i].modelIndex;
+        if (mindex >= loadedModelsMaxIndex) continue;
+        
+        Vector3 objPos = Sys_Global.instances[i].position;
+        uint16_t instCellIdx = PosGetCellCoords(objPos.x,objPos.z);
+        Vector3 delta = Vector3_A_minus_B(objPos,origin);
+        float distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
+        float radBounds = vmax(modelBounds[(mindex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS], 1.81f); // 1.28x1.28 corner of modular chunk
+        float maxDistToObj = vmax(maxDist - radBounds,maxDist);
+        if (distSqrd >= (maxDistToObj * maxDistToObj)) continue;
+
+        uint16_t constIndex = Sys_Global.instances[i].index;
+        if (!(Sys_Global.currentLevel == 1 && (constIndex == 309 || constIndex == 532)) && !EntityIndexIsPortalBlockingDoor(constIndex)) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
+            if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (constIndex != 754 || !skyVisible)) continue; // For some shelves that are inset away from cells, need to still draw their items by checking && CELL_OPEN here, unfortunately this means they don't ever get culled :(
+        }
+        
+        uint32_t triCount = modelTriangleCounts[mindex];
+        if (triCount < 1) continue;
+
+        float M[16];
+        __builtin_memcpy(M,&modelMatrices[i * 16],16 * sizeof(float));
+        float m00=M[0], m10=M[1], m20=M[2];  // col 0
+        float m01=M[4], m11=M[5], m21=M[6];  // col 1
+        float m02=M[8], m12=M[9], m22=M[10]; // col 2
+        float tx=M[12], ty=M[13], tz=M[14];  // translation
+
+        // InverseTransformPoint: subtract translation, multiply by transpose of rotation part
+        // (transpose = inverse for orthonormal, scale factors cancel if we also divide)
+        float scl_x = vsqrtf(m00*m00 + m10*m10 + m20*m20); // = sclx
+        float scl_y = vsqrtf(m01*m01 + m11*m11 + m21*m21); // = scly
+        float scl_z = vsqrtf(m02*m02 + m12*m12 + m22*m22); // = sclz
+        Vector3 rel = {origin.x - tx, origin.y - ty, origin.z - tz};
+        Vector3 localOrigin = { // Multiply by transpose of rotation, divide out scale
+            (rel.x*m00 + rel.y*m10 + rel.z*m20) / (scl_x * scl_x),
+            (rel.x*m01 + rel.y*m11 + rel.z*m21) / (scl_y * scl_y),
+            (rel.x*m02 + rel.y*m12 + rel.z*m22) / (scl_z * scl_z)
+        };
+        Vector3 localDir = {
+            (dir.x*m00 + dir.y*m10 + dir.z*m20) / (scl_x * scl_x),
+            (dir.x*m01 + dir.y*m11 + dir.z*m21) / (scl_y * scl_y),
+            (dir.x*m02 + dir.y*m12 + dir.z*m22) / (scl_z * scl_z)
+        };
+        localDir = normalize_vector3(localDir);
+        numMeshesCheckedForRaycast++;
+        for (uint32_t j=0;j<triCount;++j) {
+            uint32_t bA = modelTriangles[mindex][j * 3] * VERTEX_ATTRIBUTES_COUNT, bB = modelTriangles[mindex][(j * 3) + 1] * VERTEX_ATTRIBUTES_COUNT, bC = modelTriangles[mindex][(j * 3) + 2] * VERTEX_ATTRIBUTES_COUNT;
+            Vector3 posA = (Vector3){modelVertices[mindex][bA + 0],modelVertices[mindex][bA + 1],modelVertices[mindex][bA + 2]};
+            Vector3 normA =(Vector3){modelVertices[mindex][bA + 3],modelVertices[mindex][bA + 4],modelVertices[mindex][bA + 5]};
+            Vector3 posB = (Vector3){modelVertices[mindex][bB + 0],modelVertices[mindex][bB + 1],modelVertices[mindex][bB + 2]};
+            Vector3 normB =(Vector3){modelVertices[mindex][bB + 3],modelVertices[mindex][bB + 4],modelVertices[mindex][bB + 5]};
+            Vector3 posC = (Vector3){modelVertices[mindex][bC + 0],modelVertices[mindex][bC + 1],modelVertices[mindex][bC + 2]};
+            Vector3 normC =(Vector3){modelVertices[mindex][bC + 3],modelVertices[mindex][bC + 4],modelVertices[mindex][bC + 5]};
+            RaycastHit tryTri = RayTriangle(localOrigin,localDir,posA,posB,posC,normA,normB,normC);
+            numTrisCastAgainst++;
+            if (!tryTri.hit) continue;
+
+            // Transform hit point back: multiply by rotation columns, add translation
+            Vector3 worldPoint = {
+                m00*tryTri.point.x + m01*tryTri.point.y + m02*tryTri.point.z + tx,
+                m10*tryTri.point.x + m11*tryTri.point.y + m12*tryTri.point.z + ty,
+                m20*tryTri.point.x + m21*tryTri.point.y + m22*tryTri.point.z + tz
+            };
+            
+            Vector3 toHit = Vector3_A_minus_B(worldPoint, origin);
+            float worldDist = vsqrtf(toHit.x*toHit.x + toHit.y*toHit.y + toHit.z*toHit.z);
+            if (worldDist >= result.distance) continue;
+
+            Vector3 worldNormal = {
+                (m00/scl_x)*tryTri.normal.x + (m01/scl_y)*tryTri.normal.y + (m02/scl_z)*tryTri.normal.z,
+                (m10/scl_x)*tryTri.normal.x + (m11/scl_y)*tryTri.normal.y + (m12/scl_z)*tryTri.normal.z,
+                (m20/scl_x)*tryTri.normal.x + (m21/scl_y)*tryTri.normal.y + (m22/scl_z)*tryTri.normal.z
+            };
+            worldNormal = normalize_vector3(worldNormal);
+            result.hit              = true;
+            result.point            = worldPoint;
+            result.normal           = normalize_vector3(worldNormal);
+            result.distance         = worldDist;
+            result.hitInstanceIndex = i;
         }
     }
     
+    if (result.hit) DualLog("[HIT] Raycast with org %f %f %f and dir %f %f %f, range %f, mask %u, tested against %u instances, tris %u, hit %u\n",origin.x,origin.y,origin.z,dir.x,dir.y,dir.z,maxDist,layerMask,numMeshesCheckedForRaycast,numTrisCastAgainst,result.hitInstanceIndex);
+    else            DualLog("[MISS] Raycast with org %f %f %f and dir %f %f %f, range %f, mask %u, tested against %u instances, tris %u\n",origin.x,origin.y,origin.z,dir.x,dir.y,dir.z,maxDist,layerMask,numMeshesCheckedForRaycast,numTrisCastAgainst);
     return result;
 }
 

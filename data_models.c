@@ -119,8 +119,8 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(const char* _
                     uint32_t ti_idx = (tex_ids[k] && tex_ids[k] <= uv_count) ? tex_ids[k] - 1 : 0;
                     uint32_t ni_idx = (norm_ids[k] && norm_ids[k] <= norm_count) ? norm_ids[k] - 1 : 0;
                     float* dst = scratch_verts + (expanded_count << 3);
-                    dst[0] = temp_pos[vi_idx*3];   dst[1] = temp_pos[vi_idx*3+1];   dst[2] = temp_pos[vi_idx*3+2];
-                    dst[3] = (ni_idx < norm_count) ? temp_nrm[ni_idx*3]   : 0.0f;
+                    dst[0] = -temp_pos[vi_idx*3];   dst[1] = temp_pos[vi_idx*3+1];   dst[2] = temp_pos[vi_idx*3+2];
+                    dst[3] = (ni_idx < norm_count) ? -temp_nrm[ni_idx*3]   : 0.0f;
                     dst[4] = (ni_idx < norm_count) ? temp_nrm[ni_idx*3+1] : 0.0f;
                     dst[5] = (ni_idx < norm_count) ? temp_nrm[ni_idx*3+2] : 0.0f;
                     dst[6] = (ti_idx < uv_count)   ? temp_uv[ti_idx*2]    : 0.0f;
@@ -202,7 +202,7 @@ static void* ModelParsingWorker(void* argument) {
 
         int tid = task->thread_id;
         float min_x, min_y, min_z, max_x, max_y, max_z;
-        if (unlikely(!ParseOBJ(model_data, model_file_size, thread_temp_pos[tid], thread_temp_nrm[tid], thread_temp_uv[tid], thread_out_verts[tid], thread_out_tris[tid], &modelVertices[current_model], &modelVertexCounts[current_model], &modelTriangles[current_model], &modelTriangleCounts[current_model], &min_x, &min_y, &min_z, &max_x, &max_y, &max_z))) continue;
+        if (unlikely(!ParseOBJ(model_data,model_file_size,thread_temp_pos[tid],thread_temp_nrm[tid],thread_temp_uv[tid],thread_out_verts[tid],thread_out_tris[tid],&modelVertices[current_model],&modelVertexCounts[current_model],&modelTriangles[current_model],&modelTriangleCounts[current_model],&min_x,&min_y,&min_z,&max_x,&max_y,&max_z))) continue;
 
         uint32_t bounds_base = current_model * BOUNDS_ATTRIBUTES_COUNT;
         modelBounds[bounds_base + BOUNDS_DATA_OFFSET_MINX] = min_x;

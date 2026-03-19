@@ -113,6 +113,7 @@ void AddInstance(uint16_t entIdx, uint16_t i) {
     Sys_Global.loadedInstances++;
 }
 
+void RemoveCameraPosition(uint16_t i);
 void DeleteInstance(uint16_t i) {
     if (i <= PLAYER2 || i >= Sys_Global.loadedInstances) return; // Don't delete null ent, player 1, nor player 2 or already empty slots.
     
@@ -141,6 +142,8 @@ void CopyInstanceRegion(uint16_t head, uint16_t* instanceTypeArray, Entity* temp
 #pragma GCC diagnostic ignored "-Wformat-truncation"
 void LoadTextures(void); void LoadModels(void);
 char* GetNextStringUpToNewlineOrEOF(char* buf, int size, OsFileHandle fd);
+void CullInit(void);
+void RenderLoadingProgress(int32_t offset, const char* text);
 void LoadLevel(uint8_t curlevel) {
     double start_time = get_time();
     DebugRAM("start of LoadLevel");

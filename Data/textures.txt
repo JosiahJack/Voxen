@@ -2100,6 +2100,7 @@ index: 1031
 persistent: 1
 #Textures/UI/menu_background_config.png
 index: 1032
+transparent: 1
 persistent: 1
 #Textures/UI/menu_config_graphics.png
 index: 1033

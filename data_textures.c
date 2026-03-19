@@ -4,6 +4,8 @@
 #include <string.h>
 #include <pthread.h>
 #include <unistd.h>
+uint32_t totalPixels;
+uint32_t totalPaletteColors;
 #define STBI_ARENA_SIZE 16*1024*1024
 uint8_t* stbi__arena_base = NULL;
 uint8_t* stbi__arena_cursor = NULL;
@@ -685,7 +687,24 @@ static void* TextureParsingWorker(void* argument) {
                 }
                 slot = (slot + 1) & 1023;
             }
-            if (pal_size >= 256) break;
+            if (pal_size >= 256) {
+                // Find closest existing palette entry instead of breaking
+                uint32_t bestIdx = 0;
+                uint32_t bestDist = UINT32_MAX;
+                uint8_t r1 = color & 0xFF, g1 = (color>>8) & 0xFF;
+                uint8_t b1 = (color>>16) & 0xFF, a1 = color>>24;
+                for (uint32_t k = 0; k < pal_size; k++) {
+                    int32_t dr = (int32_t)(palette[k] & 0xFF) - r1;
+                    int32_t dg = (int32_t)((palette[k]>>8) & 0xFF) - g1;
+                    int32_t db = (int32_t)((palette[k]>>16) & 0xFF) - b1;
+                    int32_t da = (int32_t)(palette[k]>>24) - a1;
+                    uint32_t dist = dr*dr + dg*dg + db*db + da*da;
+                    if (dist < bestDist) { bestDist = dist; bestIdx = k; }
+                }
+                indices[p] = bestIdx;
+                continue;
+            }
+            
             palette[pal_size] = color;
             indices[p] = pal_size;
             color_hash[slot] = (uint8_t)(pal_size + 1);

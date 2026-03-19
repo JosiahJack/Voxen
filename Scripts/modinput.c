@@ -10,12 +10,12 @@ static inline __attribute__((always_inline)) void Frob(Vector3 pos, Vector3 forw
     float tanFov = vtan((float)Eng_Settings->FOV * 0.5f * PI / 180.0f);
     Vector3 view = (Vector3){ ndcX * tanFov * Eng_Global->aspect3D, ndcY * tanFov, -1.0f };
     view = normalize_vector3(view);
-    Vector3 flipForward = (Vector3){ -forward.x, -forward.y, -forward.z};
-    Vector3 up = normalize_vector3( cross_vector3(right, flipForward) );
+    Vector3 flipForward = (Vector3){-forward.x,-forward.y,-forward.z};
+    Vector3 up = normalize_vector3(cross_vector3(right,flipForward));
     Vector3 dir = (Vector3){ view.x * right.x + view.y * up.x + view.z * (flipForward.x), view.x * right.y + view.y * up.y + view.z * (flipForward.y), view.x * right.z + view.y * up.z + view.z * (flipForward.z) };
     Eng_Global->debugLine_start = pos;
     Eng_Global->debugLine_end   = (Vector3){ dir.x * FROB_DISTANCE + pos.x, dir.y * FROB_DISTANCE + pos.y, dir.z * FROB_DISTANCE + pos.z };
-    RaycastHit tempHit = Raycast(pos, dir, FROB_DISTANCE, LAYER_MASK_PLAYER_FROB);
+    RaycastHit tempHit = Raycast(pos,dir,FROB_DISTANCE,LAYER_MASK_PLAYER_FROB);
     if (tempHit.hit) {
         Eng_Global->debugLine_end = tempHit.point;
         DualLog("Raycast hit!  Hit object %u named of entity type %s(%u) at hit point %f %f %f\n",tempHit.hitInstanceIndex,Eng_Global->entities[Eng_Global->instances[tempHit.hitInstanceIndex].index].path,Eng_Global->instances[tempHit.hitInstanceIndex].index,tempHit.point.x,tempHit.point.y,tempHit.point.z);
@@ -102,4 +102,22 @@ MOD_TO_ENGINE void ProcessInput(void) {
 //     if ((Eng_Global->inventoryPlayer1.hasHardware & HW_JET) && GetInput.a.Jumpjets())   JumpJetsAction();
 //     if ((Eng_Global->inventoryPlayer1.hasHardware & HW_INF) && GetInput.a.Infrared())   InfraredAction();
     ApplyPlayerMovements();
+}
+
+MOD_TO_ENGINE uint16_t SpawnDynamicObject(int val, bool cheat) {
+    if (!ConstIndexInBounds(val)) { DualLogError("Const index out of bounds: %u", val); return NULLENT; } // Checked in cmd_summon but used elsewhere so guard here too.
+    
+    if (cheat) DualLog("Cheat spawn constIndex %u, level: %u, from cheat: %u, name: ", val, Eng_Global->currentLevel, cheat);
+//     Vector3 spawnPos = (Vector3){0.0,0.0,0.0};
+//     if (cheat) spawnPos = (Vector3){Eng_Global->instances[PLAYER1].position.x,Eng_Global->instances[PLAYER1].position.y,Eng_Global->instances[PLAYER1].position.z};
+    if (ConstIndexIsGeometry(val) && !Eng_Cheats->editMode) { CenterStatusPrint("Indices 0 through 306 (level geometry chunks) not possible when not on edit mode!"); return NULLENT; }
+    
+    uint16_t entityIndexInInstanceTable = NULLENT;//MonoBehaviour.Instantiate(Const.a.GetPrefab(val),spawnPos, Const.a.quaternionIdentity) as Entity;
+    if (cheat && ConstIndexIsHardware(val)) { // Hardware
+//         UseableObjectUse uo = go.GetComponent<UseableObjectUse>();
+//         int dex14 = hardware14fromConstdex(uo.useableItemIndex);
+//         if (inventoryPlayer1.hasHardware[dex14]) uo.customIndex = (inventoryPlayer1.hardwareVersion[dex14] + 1);
+    }
+
+    return entityIndexInInstanceTable;
 }

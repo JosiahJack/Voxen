@@ -773,6 +773,16 @@ typedef /*FAT*/ struct {
     uint64_t ioflags;
     uint16_t index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
     
+    // Rendering
+    uint16_t modelIndex;
+    uint16_t texIndex;
+    uint16_t altTexIndex;
+    uint16_t glowIndex;
+    uint16_t altGlowIndex;
+    uint16_t specIndex;
+    uint16_t normIndex;
+    uint16_t lodIndex;
+    
     // Logic and I/O
     char targetname[TARGET_STRING_LENGTH];
     char target[TARGET_STRING_LENGTH];
@@ -837,16 +847,6 @@ typedef /*FAT*/ struct {
     float initialRadiation;
     int32_t heldObjectIndex;
     bool playerDead;
-
-    // Rendering
-    uint16_t modelIndex;
-    uint16_t texIndex;
-    uint16_t altTexIndex;
-    uint16_t glowIndex;
-    uint16_t altGlowIndex;
-    uint16_t specIndex;
-    uint16_t normIndex;
-    uint16_t lodIndex;
 
     // Animation
     uint8_t clip;
@@ -1018,6 +1018,7 @@ typedef struct {
 } GlobalContext;
 
 static inline __attribute__((always_inline)) void flag_set(uint64_t *flags, uint64_t bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
+static inline __attribute__((always_inline)) bool EntityIndexIsPortalBlockingDoor(uint16_t entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }// All doors except see-through doors.
 
 // Math
 #define vabs(x) ((x) < 0 ? -(x) : (x))

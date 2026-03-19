@@ -103,3 +103,4 @@ void TakeEnergy(float drain);
 void GiveEnergy(float give, EnergyType type);
 void BioMonitorInit(void);
 void BioMonitorUpdate(void);
+extern bool vmailActive;
