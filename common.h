@@ -769,6 +769,7 @@ typedef struct {
 	float targetY;
     uint16_t heldObjectIndex;
     bool holdingObject;
+    double dropFinished;
     uint16_t weaponIndex;
 } InventorySystem;
 
@@ -850,7 +851,6 @@ typedef /*FAT*/ struct {
     double radFXFinished;
     float radAdjust;
     float initialRadiation;
-    int32_t heldObjectIndex;
     bool playerDead;
 
     // Animation

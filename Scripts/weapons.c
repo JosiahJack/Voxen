@@ -300,7 +300,7 @@ bool vmailActive;
 
 		int wepdex = Get16WeaponIndexFromConstIndex(Eng_Global->inventoryPlayer1.weaponIndex);
 		if (wepdex == -1) return; // No weapon.
-// 		if (GUIState.a.isBlocking) return;
+// 		if (Eng_Global->uiIsBlocking) return;
 		if (Eng_Global->inventoryPlayer1.holdingObject) return;
 		if (Eng_Global->mouseClickHeldOverGUI) return;
 
@@ -335,7 +335,7 @@ void WeaponsUpdate(void) {
 // 	IEnumerator CheckUIStateAndAttack(int wepdex) {
 // 		yield return null; // Ensure next frame
 // 
-// 		if (GUIState.a.isBlocking) yield break;
+// 		if (Eng_Global->uiIsBlocking) yield break;
 // 		if (Eng_Global->inventoryPlayer1.holdingObject) yield break;
 // 		if (Sys_UI.mouseClickHeldOverGUI) yield break;
 // 		if (reloadFinished >= Eng_Global->pauseRelativeTime) yield break;

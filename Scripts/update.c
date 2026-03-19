@@ -441,7 +441,7 @@ void PlayerDying() {
 }
 
 void PlayerDead() {
-    if (SELF.heldObjectIndex != -1) { DropHeldItem(); ForceInventoryMode(); }	
+    if (Eng_Global->inventoryPlayer1.heldObjectIndex != -1) { DropHeldItem(); ForceInventoryMode(); }	
 
 //     hm.ClearOverlays(); TODO
 //     if (LevelManager.a.ressurectionActive[Eng_Global->currentLevel]) PlayerRessurect(); // Ressurection TODO

@@ -198,12 +198,7 @@
 	}
 
 	public void Frob() {
-		if (vmailActive && !inCyberSpace) {
-			Eng_Global->inventoryPlayer1.DeactivateVMail(); vmailActive = false;
-			return;
-		}
-
-		if (!GUIState.a.isBlocking && !inCyberSpace) {
+		if (!Eng_Global->uiIsBlocking && !inCyberSpace) {
 			if (dropFinished < Time.time) {
 				currentButton = null; // Force this to reset.
 				if (Eng_Global->inventoryPlayer1.holdingObject) {
@@ -212,8 +207,8 @@
 			}
 		} else {
 			//We are holding cursor over the GUI
-			if (Eng_Global->inventoryPlayer1.holdingObject && !inCyberSpace) {
-				AddItemToInventory(heldObjectIndex,heldObjectCustomIndex);
+			if ( && !inCyberSpace) {
+				AddItemToInventory(Eng_Global->inventoryPlayer1.heldObjectIndex,heldObjectCustomIndex);
 				MouseCursor.a.liveGrenade = false;
 				ResetHeldItem();
 			} else InventoryButtonUse();
@@ -693,16 +688,16 @@
 	}
 
 	bool FrobWithHeldObject() {
-		if (heldObjectIndex < 0) {
+		if (Eng_Global->inventoryPlayer1.heldObjectIndex < 0) {
 			DualLog("BUG: Attempting to frob with held object, but "
-					  + "heldObjectIndex < 0.");
+					  + "Eng_Global->inventoryPlayer1.heldObjectIndex < 0.");
 			return false; // Invalid item will be dropped, wasn't used up.
 		}
 
-		bool frobUser = (heldObjectIndex == 54 || heldObjectIndex == 56
-						 || heldObjectIndex == 57 || heldObjectIndex == 61
-						 || heldObjectIndex == 64 || heldObjectIndex == 92
-						 || heldObjectIndex == 93 || heldObjectIndex == 94);
+		bool frobUser = (Eng_Global->inventoryPlayer1.heldObjectIndex == 54 || Eng_Global->inventoryPlayer1.heldObjectIndex == 56
+						 || Eng_Global->inventoryPlayer1.heldObjectIndex == 57 || Eng_Global->inventoryPlayer1.heldObjectIndex == 61
+						 || Eng_Global->inventoryPlayer1.heldObjectIndex == 64 || Eng_Global->inventoryPlayer1.heldObjectIndex == 92
+						 || Eng_Global->inventoryPlayer1.heldObjectIndex == 93 || Eng_Global->inventoryPlayer1.heldObjectIndex == 94);
 
 		if (!frobUser) return false;
 
@@ -720,7 +715,7 @@
 
 		UseData ud = new UseData();
 		ud.owner = player;
-		ud.mainIndex = heldObjectIndex;
+		ud.mainIndex = Eng_Global->inventoryPlayer1.heldObjectIndex;
 		ud.customIndex = heldObjectCustomIndex;
 		UseHandler uh = go.GetComponent<UseHandler>();
 		bool playedSound = false;
@@ -750,7 +745,7 @@
 		if (useableConstdex < 0) return;
 
 		Eng_Global->inventoryPlayer1.holdingObject = true;
-		heldObjectIndex = useableConstdex;
+		Eng_Global->inventoryPlayer1.heldObjectIndex = useableConstdex;
 		heldObjectCustomIndex = customIndex;
 		heldObjectAmmo = ammo1;
 		heldObjectAmmo2 = ammo2;
@@ -904,7 +899,7 @@
 	
 	public void SearchButtonClick(int index, SearchButton sebut) {
 		Eng_Global->inventoryPlayer1.holdingObject = true;
-		heldObjectIndex = sebut.contEng_Global->instances[index];
+		Eng_Global->inventoryPlayer1.heldObjectIndex = sebut.contEng_Global->instances[index];
 		heldObjectCustomIndex = sebut.customIndex[index];
 		if (currentSearchItem != null) {
 			SearchableItem sitem = currentSearchItem.GetComponent<SearchableItem>();
@@ -918,10 +913,10 @@
 		sebut.CheckForEmpty();
 		
 		if (Const.a.InputQuickItemPickup) {
-			AddItemToInventory(heldObjectIndex,heldObjectCustomIndex);
+			AddItemToInventory(Eng_Global->inventoryPlayer1.heldObjectIndex,heldObjectCustomIndex);
 			ResetHeldItem();
 		} else {
-			CenterStatusPrint("%s", Sys_Text.stringTable[heldObjectIndex + 326] + Sys_Text.stringTable[319],player);
+			CenterStatusPrint("%s", Sys_Text.stringTable[Eng_Global->inventoryPlayer1.heldObjectIndex + 326] + Sys_Text.stringTable[319],player);
 			ForceInventoryMode();
 		}	
 	}
@@ -1057,15 +1052,15 @@
 
 	public void DropHeldItem() {
 		dropFinished = Time.time + 0.2f; // Prevent immediate regrab at high fps
-		if (heldObjectIndex < 0 || heldObjectIndex > 110) { 
-			DualLog("BUG: Attempted to DropHeldItem with index out of bounds (<0 or >110) and heldObjectIndex = " + heldObjectIndex.ToString(),player);
+		if (Eng_Global->inventoryPlayer1.heldObjectIndex < 0 || Eng_Global->inventoryPlayer1.heldObjectIndex > 110) { 
+			DualLog("BUG: Attempted to DropHeldItem with index out of bounds (<0 or >110) and Eng_Global->inventoryPlayer1.heldObjectIndex = " + Eng_Global->inventoryPlayer1.heldObjectIndex.ToString(),player);
 			ResetHeldItem();
 			return;
 		}
 
-		if (!grenadeActive) heldObject = Const.a.GetPrefab(heldObjectIndex + 307); // heldObject is set by UseGrenade() so don't override here.
+		if (!grenadeActive) heldObject = Const.a.GetPrefab(Eng_Global->inventoryPlayer1.heldObjectIndex + 307); // heldObject is set by UseGrenade() so don't override here.
 		if (heldObject == null) {
-			CenterStatusPrint("BUG: Object "+heldObjectIndex.ToString()+" not assigned, vaporized.",player);
+			CenterStatusPrint("BUG: Object "+Eng_Global->inventoryPlayer1.heldObjectIndex.ToString()+" not assigned, vaporized.",player);
 			ResetHeldItem();
 			return;
 		}
@@ -1081,7 +1076,7 @@
 				GameObject go = tr.gameObject;
 				UseableObjectUse reference = go.GetComponent<UseableObjectUse>();
 				if (reference != null) {
-					if (reference.useableItemIndex == heldObjectIndex && go.activeSelf == false) {
+					if (reference.useableItemIndex == Eng_Global->inventoryPlayer1.heldObjectIndex && go.activeSelf == false) {
 						reference.customIndex = heldObjectCustomIndex;
 						tossObject = go;
 						freeObjectInPoolFound = true;
@@ -1158,7 +1153,7 @@
 	}
 
 	public void ResetHeldItem() {
-		heldObjectIndex = -1;
+		Eng_Global->inventoryPlayer1.heldObjectIndex = -1;
 		heldObjectCustomIndex = -1;
 		heldObjectAmmo = 0;
 		heldObjectAmmo2 = 0;
@@ -1217,12 +1212,12 @@
 			for (int i=0;i<4;i++) {
 				if (curSearchScript.contEng_Global->instances[i] >= 0) {
 					MouseCursor.a.GetComponent<MouseCursor>().cursorImage = Const.a.useableItemsFrobIcons[curSearchScript.contEng_Global->instances[i]];
-					heldObjectIndex = curSearchScript.contEng_Global->instances[i];
+					Eng_Global->inventoryPlayer1.heldObjectIndex = curSearchScript.contEng_Global->instances[i];
 					heldObjectCustomIndex = curSearchScript.customIndex[i];
 					curSearchScript.contEng_Global->instances[i] = -1;
 					curSearchScript.customIndex[i] = -1;
-					if (heldObjectIndex != -1) Eng_Global->inventoryPlayer1.holdingObject = true;
-					CenterStatusPrint("%s", Sys_Text.stringTable[heldObjectIndex + 326]
+					if (Eng_Global->inventoryPlayer1.heldObjectIndex != -1) Eng_Global->inventoryPlayer1.holdingObject = true;
+					CenterStatusPrint("%s", Sys_Text.stringTable[Eng_Global->inventoryPlayer1.heldObjectIndex + 326]
 								 + Sys_Text.stringTable[319],player); // picked up
 
 					Sys_UI.DisableSearchItemImage(i);

@@ -1,8 +1,23 @@
 #include "mod.h"
 void WeaponsUpdate(void);
 
+void DeactivateVMail(void) { } // TODO
+
+void UseEntity(uint16_t i) {
+    Entity* ent = &Eng_Global->instances[i];
+    if (ConstIndexIsDoor(ent->index)) DualLog("Used door\n");
+    if (ConstIndexIsNPC(ent->index)) DualLog("Can't use NPC\n");
+    if (ConstIndexIsButtonSwitch(ent->index)) DualLog("Uses button switch\n");
+    if (ConstIndexIsGeometry(ent->index)) DualLog("Can't use modular geometry\n");
+    if (ConstIndexIsGenericTransform(ent->index)) DualLog("Can't use inky blackness\n");
+    if (ConstIndexIsDynamicObject(ent->index)) DualLog("Using a dynamic object\n");
+}
+
 #define FROB_DISTANCE 4.9f
 static inline __attribute__((always_inline)) void Frob(Vector3 pos, Vector3 forward, Vector3 right) {
+    if (vmailActive) { DeactivateVMail(); vmailActive = false; return; }
+    if (Eng_Global->uiIsBlocking) return;
+
     float offsetX = Eng_Global->cursorPosition_x - (Eng_Settings->ScreenWidth * 0.5f);
     float offsetY = Eng_Global->cursorPosition_y - (Eng_Settings->ScreenHeight * 0.5f);
     float ndcX = offsetX / (Eng_Settings->ScreenWidth * 0.5f);
@@ -16,17 +31,48 @@ static inline __attribute__((always_inline)) void Frob(Vector3 pos, Vector3 forw
     Eng_Global->debugLine_start = pos;
     Eng_Global->debugLine_end   = (Vector3){ dir.x * FROB_DISTANCE + pos.x, dir.y * FROB_DISTANCE + pos.y, dir.z * FROB_DISTANCE + pos.z };
     RaycastHit tempHit = Raycast(pos,dir,FROB_DISTANCE,LAYER_MASK_PLAYER_FROB);
-    if (tempHit.hit) {
-        Eng_Global->debugLine_end = tempHit.point;
-        DualLog("Raycast hit!  Hit object %u named of entity type %s(%u) at hit point %f %f %f\n",tempHit.hitInstanceIndex,Eng_Global->entities[Eng_Global->instances[tempHit.hitInstanceIndex].index].path,Eng_Global->instances[tempHit.hitInstanceIndex].index,tempHit.point.x,tempHit.point.y,tempHit.point.z);
-    }
-    
     Eng_Global->debugLineFinished = Eng_Global->pauseRelativeTime + 3.0;
+    if (!tempHit.hit) return;
+    
+    Eng_Global->debugLine_end = tempHit.point;
+    DualLog("Raycast hit!  Hit object %u named of entity type %s(%u) at hit point %f %f %f\n",tempHit.hitInstanceIndex,Eng_Global->entities[Eng_Global->instances[tempHit.hitInstanceIndex].index].path,Eng_Global->instances[tempHit.hitInstanceIndex].index,tempHit.point.x,tempHit.point.y,tempHit.point.z);
+    UseEntity(tempHit.hitInstanceIndex);
+}
+
+bool FrobWithHeldObject(void) {
+//     bool frobUser = (Eng_Global->inventoryPlayer1.heldObjectIndex == 54 || Eng_Global->inventoryPlayer1.heldObjectIndex == 56
+//                   || Eng_Global->inventoryPlayer1.heldObjectIndex == 57 || Eng_Global->inventoryPlayer1.heldObjectIndex == 61
+//                   || Eng_Global->inventoryPlayer1.heldObjectIndex == 64 || Eng_Global->inventoryPlayer1.heldObjectIndex == 92
+//                   || Eng_Global->inventoryPlayer1.heldObjectIndex == 93 || Eng_Global->inventoryPlayer1.heldObjectIndex == 94);
+//     if (!frobUser) return false;
+// 
+//     cursorPoint = MouseCursor.a.GetCursorScreenPointForRay();
+//     RaycastHit ray = Raycast(playerCamera.ScreenPointToRay(cursorPoint), out tempHit, Const.frobDistance)) {
+//     if (!ray.hit) return false; // Can't use it on something, go ahead and drop it.
+// 
+//     Utils.PlayUIOneShotSavable(91); // searchsound
+//     UseEntity(ray.hitInstanceIndex);
+    return false;
+    return true; // Item can get absorbed, not dropped.
 }
 
 MOD_TO_ENGINE void ModUpdate(void) {
     WeaponsUpdate();
-    if (Use()) Frob(Eng_Global->instances[PLAYER1].position,Eng_Global->instances[PLAYER1].forward,Eng_Global->instances[PLAYER1].right);
+    if (Use()) {
+        if (Eng_Global->uiIsBlocking) {
+//             if (Eng_Global->inventoryPlayer1.holdingObject && Eng_Global->currentLevel != LEVEL_CYBERSPACE) {
+//                 AddItemToInventory(Eng_Global->inventoryPlayer1.heldObjectIndex,heldObjectCustomIndex);
+//                 MouseCursor.a.liveGrenade = false;
+// 				ResetHeldItem();
+//             }
+        } else if (Eng_Global->currentLevel != LEVEL_CYBERSPACE) {
+            if (Eng_Global->inventoryPlayer1.dropFinished < Eng_Global->pauseRelativeTime) {
+				if (Eng_Global->inventoryPlayer1.holdingObject) {
+// 					if (!FrobWithHeldObject()) DropHeldItem();
+				} else Frob(Eng_Global->instances[PLAYER1].position,Eng_Global->instances[PLAYER1].forward,Eng_Global->instances[PLAYER1].right);
+			}
+        }
+    }
     if (Eng_Global->pauseRelativeTime < Eng_Global->debugLineFinished && (Eng_Global->debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Eng_Global->debugLine_start,Eng_Global->debugLine_end);
     // Main entity loop
     for (uint16_t i=START_INDEX_LEVEL_INSTANCES;i<Eng_Global->loadedInstances;++i) {

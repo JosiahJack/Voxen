@@ -205,11 +205,11 @@ public class MouseCursor : MonoBehaviour {
 // 			#endif
 
 			if (GUIState.a.overButton || GUIState.a.overButtonType != ButtonType.None) {
-				GUIState.a.isBlocking = true;
+				Eng_Global->uiIsBlocking = true;
 			}
 		} else {
 			Cursor.lockState = CursorLockMode.Locked;
-			GUIState.a.isBlocking = false;
+			Eng_Global->uiIsBlocking = false;
 		}
 		
 		bool hideCursorForMinigame = false;
@@ -237,14 +237,14 @@ public class MouseCursor : MonoBehaviour {
 		if (MouseLookScript.a.inventoryMode) {
             // Inventory Mode Cursor
  			SetCursorPositionMovable();
-			if (toolTipHasText && GUIState.a.isBlocking) EnableTooltips();
+			if (toolTipHasText && Eng_Global->uiIsBlocking) EnableTooltips();
 			else                                         DisableTooltips();
 			
 			if (liveGrenade) EnableLiveGrenadeTooltip();
 			else             DisableLiveGrenadeTooltip();
 			
 			if (MouseLookScript.a.inCyberSpace) {
-				if (GUIState.a.isBlocking) {
+				if (Eng_Global->uiIsBlocking) {
 					if (toolTipHasText) {
 						cursorImage = tooltipTexture;
 					} else {						
@@ -258,7 +258,7 @@ public class MouseCursor : MonoBehaviour {
 			} else {
 				if (MouseLookScript.a.vmailActive) {
 					cursorImage = Const.a.useableItemsFrobIcons[108]; // vmail
-				} else if (GUIState.a.isBlocking && !Eng_Global->inventoryPlayer1.holdingObject) {
+				} else if (Eng_Global->uiIsBlocking && !Eng_Global->inventoryPlayer1.holdingObject) {
 					if (toolTipHasText) {
 						cursorImage = tooltipTexture;
 					} else {						
@@ -321,7 +321,7 @@ public class MouseCursor : MonoBehaviour {
 
 		if (cursorPosition.x < (0.96925f * Screen.width) && cursorPosition.x > (0.029282f * Screen.width)
 			&& cursorPosition.y > (0.13541f * Screen.height) && cursorPosition.y < (0.70703f * Screen.height)) {
-			GUIState.a.isBlocking = false; // in the safe zone!
+			Eng_Global->uiIsBlocking = false; // in the safe zone!
 		}
 	}
 
@@ -335,7 +335,7 @@ public class MouseCursor : MonoBehaviour {
 		
 		raycaster.Raycast(pev, graphicCastResults);
 		if (graphicCastResults.Count > 0) {
-			GUIState.a.isBlocking = true;
+			Eng_Global->uiIsBlocking = true;
 			EventSystem.current.SetSelectedGameObject(graphicCastResults[0].gameObject);
 			EventTrigger evt = graphicCastResults[0].gameObject.GetComponent<EventTrigger>();
 			if (evt != null) {
@@ -352,7 +352,7 @@ public class MouseCursor : MonoBehaviour {
 				ExecuteEvents.Execute(graphicCastResults[0].gameObject, pev, ExecuteEvents.submitHandler);
 			}
 		} else {
-			GUIState.a.isBlocking = false;
+			Eng_Global->uiIsBlocking = false;
 			EventSystem.current.SetSelectedGameObject(null);
 		}
 	}
@@ -363,7 +363,7 @@ public class MouseCursor : MonoBehaviour {
 
 		if (cursorPosition.y > Screen.height || cursorPosition.y < 0
 			|| cursorPosition.x < 0 || cursorPosition.x > Screen.width) {
-			GUIState.a.isBlocking = true; // outside the screen, don't shoot we're innocent!
+			Eng_Global->uiIsBlocking = true; // outside the screen, don't shoot we're innocent!
 		}
 	}
 
@@ -375,7 +375,7 @@ public class MouseCursor : MonoBehaviour {
 			&& cursorPosition.y < (0.70703f*Screen.height)
 			&& cursorPosition.x < (0.96925f*Screen.width)
 			&& cursorPosition.x > (0.029282f*Screen.width)) {
-			GUIState.a.isBlocking = false; // in the safe zone!
+			Eng_Global->uiIsBlocking = false; // in the safe zone!
 		}
 
 		if (MouseLookScript.a.inventoryMode && Eng_Global->inventoryPlayer1.holdingObject) {
@@ -383,7 +383,7 @@ public class MouseCursor : MonoBehaviour {
 			// "Screen Space - Camera" on the Canvas, otherwise use "null"
 			if (RectTransformUtility.RectangleContainsScreenPoint(centerMFDPanel,cursorPosition,uiCameraCam)) {
 				if (!inventoryAddHelper.activeInHierarchy) inventoryAddHelper.SetActive(true);
-				GUIState.a.isBlocking = true;
+				Eng_Global->uiIsBlocking = true;
 			} else {
 				if (inventoryAddHelper.activeInHierarchy) inventoryAddHelper.SetActive(false);
 				if (justDroppedItemInHelper) {

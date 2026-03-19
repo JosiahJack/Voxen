@@ -233,7 +233,7 @@ void GiveRadiation(float rad) {
     Eng_Global->instances[PLAYER1].initialRadiation = radiated;
 }
 
-void DoorUse (UseData ud) {
+void DoorUse(UseData ud) {
     if (ud == null) return;
     if (ud.owner == null) return;
     if (GetCurrentLevelSecurity() > securityThreshhold) { Sys_UI.BlockedBySecurity(Eng_Global->instances[i].position); return; }
@@ -298,7 +298,7 @@ void DoorUse (UseData ud) {
 // 	L6 177.612 3.294942 108.7725
 // 	L8 244.735 41.99257 -19.695
 // 	L9 185.161 84.502 -46.04246
-void CyberAccessUse (uint16_t activator, uint16_t cybAcc) {
+void CyberAccessUse(uint16_t activator, uint16_t cybAcc) {
     selfIdx = cybAcc;
     activatorIdx = activator;
     UseTargets(gameObject,ud,Eng_Global->instances[i].target);
