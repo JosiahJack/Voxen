@@ -3,38 +3,37 @@
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
-static uint32_t GetCollisionMask(uint8_t layer) {
+static uint32_t GetCollisionMask(uint32_t layer) {
     switch (layer) {
-        case PhysicsLayer_Default:           return 0x217efe07u;
-        case PhysicsLayer_TransparentFX:     return 0x7c1e07u;
-        case PhysicsLayer_IgnoreRaycast:     return 0x7c3e07u;
-        case PhysicsLayer_Water:             return 0x0u;
-        case PhysicsLayer_UI:                return 0x0u;
-        case PhysicsLayer_GunViewModel:      return 0x0u;
-        case PhysicsLayer_Geometry:          return 0x178fc07u;
-        case PhysicsLayer_NPC:               return 0x6f61e07u;
-        case PhysicsLayer_PlayerBullets:     return 0x217e6607u;
-        case PhysicsLayer_Player:            return 0x5770607u;
-        case PhysicsLayer_Corpse:            return 0x10c4a05u;
-        case PhysicsLayer_PhysObjects:       return 0x17e6a01u;
-        case PhysicsLayer_Sky:               return 0x201u;
-        case PhysicsLayer_PlayerTriggerOnly: return 0x701000u;
-        case PhysicsLayer_Trigger:           return 0x1785c01u;
-        case PhysicsLayer_Door:              return 0x1707c07u;
-        case PhysicsLayer_InterDebris:       return 0xa6a07u;
-        case PhysicsLayer_Player2:           return 0x5675e07u;
-        case PhysicsLayer_Player3:           return 0x5575e07u;
-        case PhysicsLayer_Player4:           return 0x5375e07u;
-        case PhysicsLayer_NPCTrigger:        return 0x400u;
-        case PhysicsLayer_NPCBullet:         return 0x20767a01u;
-        case PhysicsLayer_NPCClip:           return 0x400u;
-        case PhysicsLayer_Clip:              return 0x701400u;
-        case PhysicsLayer_Automap:           return 0x0u;
-        case PhysicsLayer_Culling:           return 0x0u;
-        case PhysicsLayer_CorpseSearchable:  return 0x1000801u;
+        case PhysicsLayer_Default:           return PhysicsLayer_Default | PhysicsLayer_TransparentFX | PhysicsLayer_IgnoreRaycast | PhysicsLayer_Geometry | PhysicsLayer_NPC | PhysicsLayer_PlayerBullets | PhysicsLayer_Player | PhysicsLayer_Corpse | PhysicsLayer_PhysObjects | PhysicsLayer_Sky | PhysicsLayer_Trigger | PhysicsLayer_Door | PhysicsLayer_InterDebris | PhysicsLayer_Player2 | PhysicsLayer_Player3 | PhysicsLayer_Player4 | PhysicsLayer_NPCBullet | PhysicsLayer_Clip | PhysicsLayer_CorpseSearchable;
+        case PhysicsLayer_TransparentFX:     return PhysicsLayer_Default | PhysicsLayer_TransparentFX | PhysicsLayer_IgnoreRaycast | PhysicsLayer_Geometry | PhysicsLayer_NPC | PhysicsLayer_PlayerBullets | PhysicsLayer_Player | PhysicsLayer_PhysObjects | PhysicsLayer_Trigger | PhysicsLayer_Door | PhysicsLayer_InterDebris | PhysicsLayer_Player2 | PhysicsLayer_NPCBullet | PhysicsLayer_Clip;
+        case PhysicsLayer_IgnoreRaycast:     return PhysicsLayer_Default | PhysicsLayer_TransparentFX | PhysicsLayer_IgnoreRaycast | PhysicsLayer_Geometry | PhysicsLayer_NPC | PhysicsLayer_PlayerBullets | PhysicsLayer_Player | PhysicsLayer_PhysObjects | PhysicsLayer_Trigger | PhysicsLayer_Door | PhysicsLayer_InterDebris | PhysicsLayer_Player2 | PhysicsLayer_NPCBullet | PhysicsLayer_Clip;
+        case PhysicsLayer_Water:             return 0u;
+        case PhysicsLayer_UI:                return 0u;
+        case PhysicsLayer_GunViewModel:      return 0u;
+        case PhysicsLayer_Geometry:          return PhysicsLayer_Default | PhysicsLayer_TransparentFX | PhysicsLayer_IgnoreRaycast | PhysicsLayer_Geometry | PhysicsLayer_NPC | PhysicsLayer_PlayerBullets | PhysicsLayer_Player | PhysicsLayer_PhysObjects | PhysicsLayer_Trigger | PhysicsLayer_Door | PhysicsLayer_InterDebris | PhysicsLayer_Player2 | PhysicsLayer_Clip;
+        case PhysicsLayer_NPC:               return PhysicsLayer_Default | PhysicsLayer_TransparentFX | PhysicsLayer_IgnoreRaycast | PhysicsLayer_Geometry | PhysicsLayer_NPC | PhysicsLayer_PlayerBullets | PhysicsLayer_Player | PhysicsLayer_PhysObjects | PhysicsLayer_Trigger | PhysicsLayer_NPCTrigger | PhysicsLayer_Door | PhysicsLayer_InterDebris | PhysicsLayer_Player2 | PhysicsLayer_NPCBullet | PhysicsLayer_NPCClip | PhysicsLayer_Clip;
+        case PhysicsLayer_PlayerBullets:     return PhysicsLayer_Default | PhysicsLayer_TransparentFX | PhysicsLayer_IgnoreRaycast | PhysicsLayer_Geometry | PhysicsLayer_NPC | PhysicsLayer_PlayerBullets | PhysicsLayer_Player | PhysicsLayer_Corpse | PhysicsLayer_PhysObjects | PhysicsLayer_Door | PhysicsLayer_InterDebris | PhysicsLayer_Player2 | PhysicsLayer_NPCBullet | PhysicsLayer_Clip | PhysicsLayer_CorpseSearchable;
+        case PhysicsLayer_Player:            return PhysicsLayer_Default | PhysicsLayer_TransparentFX | PhysicsLayer_IgnoreRaycast | PhysicsLayer_Geometry | PhysicsLayer_NPC | PhysicsLayer_PhysObjects | PhysicsLayer_PlayerTriggerOnly | PhysicsLayer_Trigger | PhysicsLayer_Door | PhysicsLayer_Player2 | PhysicsLayer_NPCBullet | PhysicsLayer_Clip;
+        case PhysicsLayer_Corpse:            return PhysicsLayer_Default | PhysicsLayer_Geometry | PhysicsLayer_PlayerBullets | PhysicsLayer_PhysObjects | PhysicsLayer_Door | PhysicsLayer_NPCBullet | PhysicsLayer_Clip;
+        case PhysicsLayer_PhysObjects:       return PhysicsLayer_Default | PhysicsLayer_TransparentFX | PhysicsLayer_IgnoreRaycast | PhysicsLayer_Geometry | PhysicsLayer_NPC | PhysicsLayer_PlayerBullets | PhysicsLayer_Player | PhysicsLayer_Corpse | PhysicsLayer_PhysObjects | PhysicsLayer_Door | PhysicsLayer_InterDebris | PhysicsLayer_NPCBullet | PhysicsLayer_Clip;
+        case PhysicsLayer_Sky:               return PhysicsLayer_Default | PhysicsLayer_Player;
+        case PhysicsLayer_PlayerTriggerOnly: return PhysicsLayer_Player | PhysicsLayer_Player2 | PhysicsLayer_Player3;
+        case PhysicsLayer_Trigger:           return PhysicsLayer_Default | PhysicsLayer_Geometry | PhysicsLayer_NPC | PhysicsLayer_PlayerBullets | PhysicsLayer_Player | PhysicsLayer_PhysObjects | PhysicsLayer_Door | PhysicsLayer_InterDebris | PhysicsLayer_Clip;
+        case PhysicsLayer_Door:              return PhysicsLayer_Default | PhysicsLayer_TransparentFX | PhysicsLayer_IgnoreRaycast | PhysicsLayer_Geometry | PhysicsLayer_NPC | PhysicsLayer_PlayerBullets | PhysicsLayer_Player | PhysicsLayer_Corpse | PhysicsLayer_PhysObjects | PhysicsLayer_Trigger | PhysicsLayer_Door | PhysicsLayer_InterDebris | PhysicsLayer_Player2 | PhysicsLayer_NPCBullet | PhysicsLayer_Clip;
+        case PhysicsLayer_InterDebris:       return PhysicsLayer_Default | PhysicsLayer_Geometry | PhysicsLayer_NPC | PhysicsLayer_PlayerBullets | PhysicsLayer_PhysObjects | PhysicsLayer_Trigger | PhysicsLayer_Door | PhysicsLayer_NPCBullet | PhysicsLayer_Clip;
+        case PhysicsLayer_Player2:           return PhysicsLayer_Default | PhysicsLayer_TransparentFX | PhysicsLayer_IgnoreRaycast | PhysicsLayer_Geometry | PhysicsLayer_NPC | PhysicsLayer_PlayerBullets | PhysicsLayer_Player | PhysicsLayer_PhysObjects | PhysicsLayer_PlayerTriggerOnly | PhysicsLayer_Trigger | PhysicsLayer_Door | PhysicsLayer_InterDebris | PhysicsLayer_Player2 | PhysicsLayer_NPCBullet | PhysicsLayer_Clip;
+        case PhysicsLayer_Player3:           return PhysicsLayer_Default | PhysicsLayer_TransparentFX | PhysicsLayer_IgnoreRaycast | PhysicsLayer_Geometry | PhysicsLayer_NPC | PhysicsLayer_PlayerBullets | PhysicsLayer_Player | PhysicsLayer_PhysObjects | PhysicsLayer_PlayerTriggerOnly | PhysicsLayer_Trigger | PhysicsLayer_Door | PhysicsLayer_InterDebris | PhysicsLayer_Player3 | PhysicsLayer_NPCBullet | PhysicsLayer_Clip;
+        case PhysicsLayer_Player4:           return PhysicsLayer_Default | PhysicsLayer_TransparentFX | PhysicsLayer_IgnoreRaycast | PhysicsLayer_Geometry | PhysicsLayer_NPC | PhysicsLayer_PlayerBullets | PhysicsLayer_Player | PhysicsLayer_PhysObjects | PhysicsLayer_PlayerTriggerOnly | PhysicsLayer_Trigger | PhysicsLayer_Door | PhysicsLayer_InterDebris | PhysicsLayer_Player4 | PhysicsLayer_NPCBullet | PhysicsLayer_Clip;
+        case PhysicsLayer_NPCTrigger:        return PhysicsLayer_NPC;
+        case PhysicsLayer_NPCBullet:         return PhysicsLayer_Default | PhysicsLayer_TransparentFX | PhysicsLayer_IgnoreRaycast | PhysicsLayer_Geometry | PhysicsLayer_PlayerBullets | PhysicsLayer_Player | PhysicsLayer_Corpse | PhysicsLayer_PhysObjects | PhysicsLayer_Door | PhysicsLayer_InterDebris | PhysicsLayer_Player2 | PhysicsLayer_Clip | PhysicsLayer_CorpseSearchable;
+        case PhysicsLayer_NPCClip:           return PhysicsLayer_NPC;
+        case PhysicsLayer_Clip:              return PhysicsLayer_Player | PhysicsLayer_Player2 | PhysicsLayer_Player3 | PhysicsLayer_Player4 | PhysicsLayer_NPC;
+        case PhysicsLayer_Automap:           return 0u;
+        case PhysicsLayer_Culling:           return 0u;
+        case PhysicsLayer_CorpseSearchable:  return PhysicsLayer_Default | PhysicsLayer_PlayerBullets;
+        default:                             return 0u;
     }
-    
-    return 0;
 }
 #pragma GCC diagnostic pop
 
@@ -145,86 +144,6 @@ int32_t Physics(void) {
     return 0; // Ok.
 }
 
-Vector3 quat_rotate(Quaternion q, Vector3 v) {
-    float x2 = q.x + q.x;
-    float y2 = q.y + q.y;
-    float z2 = q.z + q.z;
-    float xx2 = q.x * x2;
-    float yy2 = q.y * y2;
-    float zz2 = q.z * z2;
-    float xy2 = q.x * y2;
-    float xz2 = q.x * z2;
-    float yz2 = q.y * z2;
-    float wx2 = q.w * x2;
-    float wy2 = q.w * y2;
-    float wz2 = q.w * z2;
-    return (Vector3){
-        v.x * (1.0f - yy2 - zz2) + v.y * (xy2 + wz2) + v.z * (xz2 - wy2),
-        v.x * (xy2 - wz2) + v.y * (1.0f - xx2 - zz2) + v.z * (yz2 + wx2),
-        v.x * (xz2 + wy2) + v.y * (yz2 - wx2) + v.z * (1.0f - xx2 - yy2)
-    };
-}
-
-// uint16_t PointInSolid(Vector3 point, uint32_t layerMask) {
-//     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
-//         if (!(layerMask & Sys_Global.instances[i].layer)) continue;
-//         if (Sys_Global.instances[i].collider == COLLIDER_TYPE_NONE || Sys_Global.instances[i].collider == COLLIDER_TYPE_MESH) continue;
-// 
-//         Vector3 pos = Sys_Global.instances[i].position;
-//         Quaternion rot = Sys_Global.instances[i].rotation;
-//         Vector3 scale = Sys_Global.instances[i].scale;
-//         Vector3 local = Vector3_A_minus_B(point, pos);
-//         Quaternion invRot = (Quaternion){-rot.x, -rot.y, -rot.z, rot.w};
-//         local = quat_rotate(invRot, local);
-//         if (scale.x != 0.0f) local.x /= scale.x;
-//         if (scale.y != 0.0f) local.y /= scale.y;
-//         if (scale.z != 0.0f) local.z /= scale.z;
-//         Vector3 center;
-//         float radius, distSq;
-//         switch (Sys_Global.instances[i].collider) {
-//             case COLLIDER_TYPE_BOX:
-//                 center = Sys_Global.instances[i].colliderCenter;
-//                 Vector3 size   = Sys_Global.instances[i].colliderSize; // full extents
-//                 Vector3 half = (Vector3){ size.x * 0.5f, size.y * 0.5f, size.z * 0.5f };
-//                 Vector3 min = Vector3_A_minus_B(center, half);
-//                 Vector3 max = Vector3_A_plus_B(center, half);
-//                 if (local.x >= min.x && local.x <= max.x && local.y >= min.y && local.y <= max.y && local.z >= min.z && local.z <= max.z) return i;
-//                 break;
-//             case COLLIDER_TYPE_SPHERE:
-//                 center = Sys_Global.instances[i].colliderCenter;
-//                 radius = Sys_Global.instances[i].colliderSize.x;
-//                 Vector3 offset = Vector3_A_minus_B(local, center);
-//                 distSq = dot_vector3(offset, offset);
-//                 if (distSq <= radius * radius) return i;
-//                 break;
-//             case COLLIDER_TYPE_CAPSULE:
-//                 center = Sys_Global.instances[i].colliderCenter;
-//                 radius = Sys_Global.instances[i].colliderSize.x;
-//                 float height = Sys_Global.instances[i].colliderSize.y; // full cylinder height
-//                 int axis = (int)Sys_Global.instances[i].colliderSize.z; // 0=X, 1=Y, 2=Z
-//                 Vector3 axisDir = {0.0f, 1.0f, 0.0f};
-//                 if (axis == 0) axisDir = (Vector3){1.0f, 0.0f, 0.0f};
-//                 else if (axis == 2) axisDir = (Vector3){0.0f, 0.0f, 1.0f};
-//                 Vector3 halfHeightVec = scale_vector3(axisDir, height * 0.5f);
-//                 Vector3 p1 = Vector3_A_minus_B(center, halfHeightVec);
-//                 Vector3 p2 = Vector3_A_plus_B(center, halfHeightVec);
-//                 Vector3 p1_to_point = Vector3_A_minus_B(local, p1);
-//                 Vector3 p1_to_p2     = Vector3_A_minus_B(p2, p1);
-//                 float segLenSq = dot_vector3(p1_to_p2, p1_to_p2);
-//                 float t = (segLenSq > 0.0f) ? dot_vector3(p1_to_point, p1_to_p2) / segLenSq : 0.0f;
-//                 t = vclamp(t, 0.0f, 1.0f);
-//                 Vector3 closest = Vector3_A_plus_B(p1, scale_vector3(p1_to_p2, t));
-//                 Vector3 toClosest = Vector3_A_minus_B(local, closest);
-//                 distSq = dot_vector3(toClosest, toClosest);
-//                 if (distSq <= radius * radius) return i;
-//                 break;
-//             case COLLIDER_TYPE_CONVEXMESH: break;
-//         }
-//     }
-// 
-//     return UINT16_MAX;
-// }
-
 RaycastHit RayTriangle(Vector3 origin, Vector3 dir, Vector3 posA, Vector3 posB, Vector3 posC, Vector3 normA, Vector3 normB, Vector3 normC) {
     Vector3 edgeAB = Vector3_A_minus_B(posB,posA);
     Vector3 edgeAC = Vector3_A_minus_B(posC,posA);
@@ -250,7 +169,8 @@ ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uin
     bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX);
     RaycastHit result = { .hit = false, .distance = maxDist, .point = {0.0f, 0.0f, 0.0f}, .normal = {0.0f, 0.0f, 0.0f}, .hitInstanceIndex = INSTANCE_COUNT };
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
-//         if (Sys_Global.instances[i].collider == COLLIDER_TYPE_NONE) continue;
+        if (!(layerMask & Sys_Global.instances[i].layer)) continue;
+        
         uint16_t mindex = Sys_Global.instances[i].modelIndex;
         if (mindex >= loadedModelsMaxIndex) continue;
         
@@ -271,7 +191,7 @@ ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uin
         if (triCount < 1) continue;
 
         float M[16];
-        __builtin_memcpy(M,&modelMatrices[i * 16],16 * sizeof(float));
+        __builtin_memcpy(M,&modelMatrices[i * 16],16 * sizeof(float)); // Copy values to prevent modifying it inadvertently.
         float m00=M[0], m10=M[1], m20=M[2];  // col 0
         float m01=M[4], m11=M[5], m21=M[6];  // col 1
         float m02=M[8], m12=M[9], m22=M[10]; // col 2
@@ -332,7 +252,7 @@ ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uin
         }
     }
     
-    if (result.hit) DualLog("[HIT] Raycast with org %f %f %f and dir %f %f %f, range %f, mask %u, tested against %u instances, tris %u, hit %u\n",origin.x,origin.y,origin.z,dir.x,dir.y,dir.z,maxDist,layerMask,numMeshesCheckedForRaycast,numTrisCastAgainst,result.hitInstanceIndex);
+    if (result.hit) DualLog("[HIT] Raycast with org %f %f %f and dir %f %f %f, range %f, mask %u, tested against %u instances, tris %u, hit %u, layer %u\n",origin.x,origin.y,origin.z,dir.x,dir.y,dir.z,maxDist,layerMask,numMeshesCheckedForRaycast,numTrisCastAgainst,result.hitInstanceIndex,Sys_Global.instances[result.hitInstanceIndex].layer);
     else            DualLog("[MISS] Raycast with org %f %f %f and dir %f %f %f, range %f, mask %u, tested against %u instances, tris %u\n",origin.x,origin.y,origin.z,dir.x,dir.y,dir.z,maxDist,layerMask,numMeshesCheckedForRaycast,numTrisCastAgainst);
     return result;
 }

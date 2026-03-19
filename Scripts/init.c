@@ -115,7 +115,7 @@ void InventoryInit(InventorySystem* inv) {
 MOD_TO_ENGINE void PlayerInit(uint16_t i) {
     DualLog("Entered mod function PlayerInit()\n");
     Eng_Global->instances[i].index = 767;
-    Eng_Global->instances[i].layer = 12; // PhysicsLayer_Player
+    Eng_Global->instances[i].layer = PhysicsLayer_Player;
     Eng_Global->instances[i].position = (Vector3) { .x = 10.52f, .y = -43.792f + 0.84f, .z = 20.2908f}; // Start Actual: Puts player on Medical Level in actual game start position.  Added 0.84f y for cam offset from center
     Eng_Global->instances[i].scale = (Vector3) { 1.0f, 1.0f, 1.0f };
     Eng_Global->instances[i].rotation = (Quaternion){ .x = 0.0f, .y = 0.7071f, .z = 0.0f, .w = 0.7071f }; // 90deg rotation CW about Y axis as viewed from the top looking down onto player
