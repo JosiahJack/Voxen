@@ -287,13 +287,11 @@ bool UpdateLights(bool* voxelsNeedUpdated) {
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, Sys_Render.lightsID); glBufferData(GL_SHADER_STORAGE_BUFFER, loadedLights * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
     if (*voxelsNeedUpdated) {
-        float px = Sys_Global.instances[PLAYER1].position.x; float py = Sys_Global.instances[PLAYER1].position.y; float pz = Sys_Global.instances[PLAYER1].position.z;
+        Vector3 p = Sys_Global.instances[PLAYER1].position;
         glUseProgram(Sys_Render.voxelUpdateShaderProgram);
-        glUniform3f(5, px, py, pz);
-        glUniform1ui(6, (uint32_t)MAX_LIGHTS_PER_VOXEL);
-        GLuint groupX_voxels = (512 + 31) / 32;
-        GLuint groupZ_voxels = (512 + 31) / 32; // Actually just a local size y, but for z axis voxels
-        glDispatchCompute(groupX_voxels,groupZ_voxels, 1);
+        glUniform3f(5,p.x,p.y,p.z);
+        glUniform1ui(6,(uint32_t)MAX_LIGHTS_PER_VOXEL);
+        glDispatchCompute((512+31)/32,(512+31)/32,1);
     }
     
     return *voxelsNeedUpdated;
@@ -633,7 +631,6 @@ void UpdateScreenSize(GLFWwindow* unused, int32_t width, int32_t height) {
 }
 
 // GLFW Callbacks
-void SetVSync(void) { glfwSwapInterval((int32_t)Sys_Settings.Vsync); }
 bool IsNonRepeatingKey(int32_t key) { return key == GLFW_KEY_KP_ENTER || key == GLFW_KEY_ENTER || key == GLFW_KEY_TAB || key == GLFW_KEY_ESCAPE; }
 
 #pragma GCC diagnostic push
@@ -658,7 +655,6 @@ void Input_PollJoysticks(void) {
         for (int i = 0; i < buttonCount && i < MAX_JOYSTICK_BUTTONS; ++i) {
             KeyState* k = &Sys_Input.joystickButtons[GLFW_JOYSTICK_1][i];
             bool down = buttons[i] == GLFW_PRESS;
-
             k->pressed  = down && !k->down;
             k->released = !down && k->down;
             k->down     = down;
@@ -677,7 +673,6 @@ void Input_PollGamepad(void) {
     for (int i = 0; i < GLFW_GAMEPAD_BUTTON_LAST + 1; ++i) {
         KeyState* k = &Sys_Input.gamepadButtons[i];
         bool down = s.buttons[i] == GLFW_PRESS;
-
         k->pressed  = down && !k->down;
         k->released = !down && k->down;
         k->down     = down;
@@ -686,14 +681,9 @@ void Input_PollGamepad(void) {
 
 static void joystick_callback(int32_t jid, int32_t event) {
     if (jid > GLFW_JOYSTICK_LAST) return;
-    
-    if (event == GLFW_CONNECTED) {
-        __builtin_memset(&Sys_Input.joystickPresent[jid], 1, sizeof(bool));
-    } else if (event == GLFW_DISCONNECTED) {
-        __builtin_memset(&Sys_Input.joystickPresent[jid], 0, sizeof(bool));
-        __builtin_memset(Sys_Input.joystickButtons, 0, sizeof(Sys_Input.joystickButtons));
-        __builtin_memset(Sys_Input.joystickHats, 0, sizeof(Sys_Input.joystickHats));
-    }
+    bool connected = event == GLFW_CONNECTED;
+    Sys_Input.joystickPresent[jid] = connected;
+    if (!connected) { __builtin_memset(Sys_Input.joystickButtons,0,sizeof(Sys_Input.joystickButtons)); __builtin_memset(Sys_Input.joystickHats,0,sizeof(Sys_Input.joystickHats)); } // Clear
 }
 
 static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
@@ -715,13 +705,8 @@ static void window_focus_callback(GLFWwindow* window, int32_t focused) {
 }
 
 static void mouse_button_callback(GLFWwindow* window, int32_t button, int32_t action, int32_t mods) {
-    if (action == GLFW_PRESS) {
-        Sys_Input.mouseButtons[button].down = true;
-        Sys_Input.mouseButtons[button].pressed = true;
-    } else if (action == GLFW_RELEASE) {
-        Sys_Input.mouseButtons[button].down = false;
-        Sys_Input.mouseButtons[button].released = true;
-    }
+    Sys_Input.mouseButtons[button].down = Sys_Input.mouseButtons[button].pressed = (action == GLFW_PRESS);
+    Sys_Input.mouseButtons[button].released = (action == GLFW_RELEASE);
 }
 
 static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) { Sys_Input.scrollDelta += yoffset; }
@@ -788,48 +773,22 @@ void GoIntoGame(void) {
 
 void GatherResolutionModes(void) {
     resDropdownCount = 0;
-    GLFWmonitor* monitor = GetCurrentMonitor();
-    if (!monitor) monitor = glfwGetPrimaryMonitor();
-    int modeCount;
-    const GLFWvidmode* modes = glfwGetVideoModes(monitor, &modeCount);
+    GLFWmonitor* monitor = GetCurrentMonitor();    if (!monitor) monitor = glfwGetPrimaryMonitor();
+    int modeCount; const GLFWvidmode* modes = glfwGetVideoModes(monitor, &modeCount);
     if (!modes || modeCount < 1) return;
-
-    typedef struct { int w, h, maxHz; } UniqueRes;
-    UniqueRes seen[64];
-    int seenCount = 0;
-    for (int i = modeCount - 1; i >= 0 && seenCount < 64; --i) {
+    for (int i = modeCount - 1; i >= 0 && resDropdownCount < 8; --i) {
         int w = modes[i].width, h = modes[i].height, hz = modes[i].refreshRate;
-        bool found = false;
-        for (int j = 0; j < seenCount; ++j) {
-            if (seen[j].w == w && seen[j].h == h) {
-                if (hz > seen[j].maxHz) seen[j].maxHz = hz;
-                found = true;
-                break;
-            }
+        int j = 0;
+        for (; j < resDropdownCount; ++j) {
+            if (resModes[j].w == w && resModes[j].h == h) { if (hz > resModes[j].hz) resModes[j].hz = hz; break; }
         }
         
-        if (!found) {
-            seen[seenCount].w = w;
-            seen[seenCount].h = h;
-            seen[seenCount].maxHz = hz;
-            seenCount++;
-        }
+        if (j == resDropdownCount) { resModes[resDropdownCount++] = (ResMode){w, h, hz}; }
     }
-
-    resDropdownCount = vmin(seenCount, 8);
-    for (int i = 0; i < resDropdownCount; ++i) {
-        resModes[i].w  = seen[i].w;
-        resModes[i].h  = seen[i].h;
-        resModes[i].hz = seen[i].maxHz;
-    }
-
+    
     resSelectedIdx = 0;
     for (int i = 0; i < resDropdownCount; ++i) {
-        if (resModes[i].w == (int)Sys_Settings.ScreenWidth &&
-            resModes[i].h == (int)Sys_Settings.ScreenHeight) {
-            resSelectedIdx = i;
-            break;
-        }
+        if (resModes[i].w == (int)Sys_Settings.ScreenWidth && resModes[i].h == (int)Sys_Settings.ScreenHeight) { resSelectedIdx = i; break; }
     }
 }
 
@@ -838,11 +797,9 @@ void ChangeResolution(void) {
     resSelectedIdx = (resSelectedIdx + 1) % resDropdownCount;
     Sys_Settings.ScreenWidth  = (uint32_t)resModes[resSelectedIdx].w;
     Sys_Settings.ScreenHeight = (uint32_t)resModes[resSelectedIdx].h;
-
     GLFWmonitor* monitor = GetCurrentMonitor();
     if (!monitor) monitor = glfwGetPrimaryMonitor();
-    int mx, my;
-    glfwGetMonitorPos(monitor, &mx, &my);
+    int mx,my; glfwGetMonitorPos(monitor, &mx, &my);
     const GLFWvidmode* mode = glfwGetVideoMode(monitor);
     int xpos = mx + (mode->width  - (int)Sys_Settings.ScreenWidth)  / 2;
     int ypos = my + (mode->height - (int)Sys_Settings.ScreenHeight) / 2;
@@ -856,27 +813,22 @@ void ChangeResolution(void) {
 
 void ChangeFullScreenWindowed(void) {
     int monitorCount;
-    GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
-    GLFWmonitor* next = monitors[currentMonitorIndex];
+    GLFWmonitor* next = glfwGetMonitors(&monitorCount)[currentMonitorIndex];
     if (Sys_Settings.Fullscreen) {
         int xpos, ypos, width, height;
-        glfwGetMonitorWorkarea(next, &xpos, &ypos, &width, &height);
+        glfwGetMonitorWorkarea(next,&xpos,&ypos,&width,&height);
         Sys_Settings.ScreenWidth = width; Sys_Settings.ScreenHeight = height;
-        glfwSetWindowSize(window, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
-        glfwSetWindowPos(window, xpos, ypos-18);
+        glfwSetWindowSize(window,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
+        glfwSetWindowPos(window,xpos,ypos - 18);
     } else {
-        int monitorCount;
-        GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
-        GLFWmonitor* next = monitors[currentMonitorIndex];
-        int mx, my;
-        glfwGetMonitorPos(next, &mx, &my);
+        int mx,my; glfwGetMonitorPos(next, &mx, &my);
         const GLFWvidmode* mode = glfwGetVideoMode(next);
-        int xpos = mx + (mode->width - Sys_Settings.ScreenWidth) / 2;
-        int ypos = my + (mode->height - Sys_Settings.ScreenHeight) / 2;
-        glfwSetWindowPos(window, xpos, ypos);
+        int xpos = mx + (mode->width-Sys_Settings.ScreenWidth) / 2;
+        int ypos = my + (mode->height-Sys_Settings.ScreenHeight) / 2;
+        glfwSetWindowPos(window,xpos,ypos);
     }
     
-    UpdateScreenSize(NULL, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
+    UpdateScreenSize(NULL,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
     Sys_Input.ignore_next_mouse_delta = true;
 }
 
@@ -887,24 +839,19 @@ void SetSkyRotateSpeed(void) {
     glUniform1f(30, skyRotateSpeed);
 }
 
-
-void SetVSync(void);
-
-void SetGI(void) {
-    if (Sys_Settings.GI) {
-        // TODO: Set needed Voxel GI uniforms
-    }
-}
-
+void SetVSync(void) { glfwSwapInterval((int32_t)Sys_Settings.Vsync); }
+void SetGI(void) { }// TODO: Set needed Voxel GI uniforms from Sys_Settings.GI
 void SetSpeakerMode(void) {
+    ma_device_config config = ma_device_config_init(ma_device_type_playback);
     switch (Sys_Settings.SpeakerMode) {
-        case 0: break;//targetMode = AudioSpeakerMode.Mono; break; // TODO
-        case 1: break;//targetMode = AudioSpeakerMode.Stereo; break;
-        case 2: break;//targetMode = AudioSpeakerMode.Quad; break;
-        case 3: break;//targetMode = AudioSpeakerMode.Surround; break;
-        case 4: break;//targetMode = AudioSpeakerMode.Mode5point1; break;
-        case 5: break;//targetMode = AudioSpeakerMode.Mode7point1; break;
-        case 6: break;//targetMode = AudioSpeakerMode.Prologic; break;
+        case 0: config.playback.channels = 1; break;  // Mono
+        case 1: config.playback.channels = 2; break;  // Stereo
+        case 2: config.playback.channels = 4; break;  // Quad (4.0)
+        case 3: config.playback.channels = 4; break;  // Surround (often 4.0)
+        case 4: config.playback.channels = 6; break;  // 5.1
+        case 5: config.playback.channels = 8; break;  // 7.1
+        case 6: config.playback.channels = 2; break;  // Prologic → usually handled as stereo + decoder
+        default: config.playback.channels = 0; break; // Let device decide
     }
 }
 
@@ -921,9 +868,9 @@ void ApplySettings(void) {
 
 #if defined(_WIN32) || defined(__CYGWIN__)
     #include <windows.h>
-    #define PLATFORM_DLOPEN(path)    LoadLibraryA(path)
-    #define PLATFORM_DLSYM(handle, name)  GetProcAddress((handle), (name))
-    #define PLATFORM_DLCLOSE(handle) FreeLibrary((handle))
+    #define PLATFORM_DLOPEN(path)        LoadLibraryA(path)
+    #define PLATFORM_DLSYM(handle, name) GetProcAddress((handle), (name))
+    #define PLATFORM_DLCLOSE(handle)     FreeLibrary((handle))
     static char win_err_buf[512];
     static const char* PLATFORM_DLERROR(void) {
         DWORD err = GetLastError();
@@ -933,10 +880,10 @@ void ApplySettings(void) {
     }
 #else
     #include <dlfcn.h>
-    #define PLATFORM_DLOPEN(path)    dlopen((path), RTLD_NOW)
-    #define PLATFORM_DLSYM(handle, name)  dlsym((handle), (name))
-    #define PLATFORM_DLCLOSE(handle) dlclose((handle))
-    #define PLATFORM_DLERROR()            dlerror()
+    #define PLATFORM_DLOPEN(path)        dlopen((path), RTLD_NOW)
+    #define PLATFORM_DLSYM(handle, name) dlsym((handle), (name))
+    #define PLATFORM_DLCLOSE(handle)     dlclose((handle))
+    #define PLATFORM_DLERROR()           dlerror()
 #endif
 
 bool GetKey(int settingIndex);
@@ -1232,40 +1179,15 @@ ENGINE_TO_MOD float SoundGetLength(ma_sound* pSound) {
 
 ENGINE_TO_MOD ma_result SoundGetCurrentFrameCursor(const ma_sound* pSound, ma_uint64* pCursor) { return ma_sound_get_cursor_in_pcm_frames(pSound,pCursor); }
 
-void TextEntry(int32_t keycode) {    
-    if (keycode == GLFW_KEY_U && Sys_Input.keyStates[GLFW_KEY_LEFT_CONTROL].down) { Sys_Global.playerName[0] = '\0'; currentPlayerNameLength = 0; return; } // Clear the input from CTRL+u
-
-    if (keycode >= GLFW_KEY_A && keycode <= GLFW_KEY_Z) { // Handle alphabet keys
-        if (currentPlayerNameLength < (27 - 1)) { // Ensure we don't overflow the buffer
-            char c = 'a' + (keycode - GLFW_KEY_A); // Map keycode to lowercase character
-            Sys_Global.playerName[currentPlayerNameLength] = c;
-            Sys_Global.playerName[currentPlayerNameLength + 1] = '\0'; // Null-terminate
-            currentPlayerNameLength++;
-        }
-    } else if (keycode >= GLFW_KEY_1 && keycode <= GLFW_KEY_9) { // Handle number keys 1-9
-        if (currentPlayerNameLength < (27 - 1)) {
-            char c = '1' + (keycode - GLFW_KEY_1); // Map to '1'-'9'
-
-            Sys_Global.playerName[currentPlayerNameLength] = c;
-            Sys_Global.playerName[currentPlayerNameLength + 1] = '\0'; // Null-terminate
-            currentPlayerNameLength++;
-        }
-    } else if (keycode == GLFW_KEY_0) { // Handle '0'
-        if (currentPlayerNameLength < (27 - 1)) {
-            Sys_Global.playerName[currentPlayerNameLength] = '0';
-            Sys_Global.playerName[currentPlayerNameLength + 1] = '\0'; // Null-terminate
-            currentPlayerNameLength++;
-        }
-    } else if (keycode == GLFW_KEY_BACKSPACE && currentPlayerNameLength > 0) { // Handle backspace
-        currentPlayerNameLength--;
-        Sys_Global.playerName[currentPlayerNameLength] = '\0'; // Null-terminate
-    } else if (keycode == GLFW_KEY_SPACE) { // Handle space
-        if (currentPlayerNameLength < (27 - 1)) {
-            Sys_Global.playerName[currentPlayerNameLength] = ' ';
-            Sys_Global.playerName[currentPlayerNameLength + 1] = '\0';
-            currentPlayerNameLength++;
-        }
-    } else if (keycode == GLFW_KEY_ENTER || keycode == GLFW_KEY_KP_ENTER) currentMenuItem++;
+void TextEntry(int32_t k) {
+    if (k == GLFW_KEY_U && Sys_Input.keyStates[GLFW_KEY_LEFT_CONTROL].down) { Sys_Global.playerName[0] = '\0'; currentPlayerNameLength = 0; return; }
+    if (k == GLFW_KEY_ENTER || k == GLFW_KEY_KP_ENTER) { currentMenuItem++; return; }
+    if (k == GLFW_KEY_BACKSPACE && currentPlayerNameLength > 0) { Sys_Global.playerName[--currentPlayerNameLength] = '\0'; return; }
+    if (currentPlayerNameLength >= 26) return;
+    char c = (k >= GLFW_KEY_A && k <= GLFW_KEY_Z) ? 'a' + (k - GLFW_KEY_A) :
+             (k >= GLFW_KEY_1 && k <= GLFW_KEY_9) ? '1' + (k - GLFW_KEY_1) :
+             (k == GLFW_KEY_0)                    ? '0' : (k == GLFW_KEY_SPACE) ? ' ' : 0;
+    if (c) { Sys_Global.playerName[currentPlayerNameLength] = c; Sys_Global.playerName[++currentPlayerNameLength] = '\0'; }
 }
 
 uint8_t UI_Button(int16_t x, int16_t y, float w, float h, bool* cursorOver, int8_t this) {
@@ -1619,24 +1541,16 @@ void RenderMenu(void) {
         if (UI_Button(1087,757, 84,32, &overBack, lastItem) || (MenuEnter() && currentMenuItem == lastItem)) MenuGoBack();
         overBack = overBack || currentMenuItem == lastItem;
         RenderFormattedText(1103,731,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_RED_MENU,FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]);
-    } else if (currentMenuPage == MenuPages_Load) {
+    } else if (currentMenuPage == MenuPages_Load || currentMenuPage == MenuPages_Save) {
         menuItemCount = 9; menuTabCount = 1;
-        UI_HeaderText(280,/*"LOAD"*/Sys_Text.stringTable[726]);
+        bool isSave = currentMenuPage == MenuPages_Save;
+        UI_HeaderText(isSave ? 284 : 340, isSave ? /*"SAVE GAME"*/Sys_Text.stringTable[769] : /*"LOAD"*/Sys_Text.stringTable[726]);
         RenderUIImage(400,214, 586,500, 1037); // Load/Save table background
         RenderUIImage(1060,724, 84,36, 1252); // Back Button background
         bool overBack = false;
         if (UI_Button(1060,758, 84,32, &overBack, 0) || (MenuEnter() && currentMenuItem == 0)) MenuGoBack();
         overBack = overBack || currentMenuItem == 0;
-        RenderFormattedText(1076,732,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_RED_MENU,FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]);
-    } else if (currentMenuPage == MenuPages_Save) {
-        menuItemCount = 9; menuTabCount = 1;
-        UI_HeaderText(284,/*"SAVE GAME"*/Sys_Text.stringTable[769]);
-        RenderUIImage(400,214, 586,500, 1037); // Load/Save table background
-        RenderUIImage(1060,724, 84,36, 1252); // Back Button background
-        bool overBack = false;
-        if (UI_Button(1060,758, 84,32, &overBack, 0) || (MenuEnter() && currentMenuItem == 0)) MenuGoBack();
-        overBack = overBack || currentMenuItem == 0;
-        RenderFormattedText(1076,732,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_RED_MENU,FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]);
+        RenderFormattedText(1076,732, overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_RED_MENU, FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]);
     } else if (currentMenuPage == MenuPages_NewGame) {
         menuItemCount = 7;
         menuTabCount = (currentMenuItem > 0 && currentMenuItem <= 16) ? 2 : 1;
@@ -1681,29 +1595,11 @@ void RenderMenu(void) {
     
     if (menuTabCount <= currentMenuTab) currentMenuTab = 0;
     if (menuItemCount <= currentMenuItem) currentMenuItem = 0;
-    if (Sys_Input.keyStates[GLFW_KEY_DOWN].pressed) currentMenuItem = (currentMenuItem + 1) >= menuItemCount ? 0 : (currentMenuItem + 1);
-    if (Sys_Input.keyStates[GLFW_KEY_UP].pressed) currentMenuItem = (currentMenuItem - 1) < 0 ? (menuItemCount - 1) : (currentMenuItem - 1);
-    if (Sys_Input.keyStates[GLFW_KEY_RIGHT].pressed) {
-        currentMenuTab = (currentMenuTab + 1) >= menuTabCount ? 0 : (currentMenuTab + 1);
-        if (currentMenuPage == MenuPages_NewGame) {
-                 if (currentMenuItem == 1) currentMenuItem = 3;
-            else if (currentMenuItem == 3) currentMenuItem = 1;
-            else if (currentMenuItem == 2) currentMenuItem = 4;
-            else if (currentMenuItem == 4) currentMenuItem = 2;
-            else if (currentMenuItem == 5) currentMenuItem = 6;
-            else if (currentMenuItem == 6) currentMenuItem = 5;
-        }
-    }
-    if (Sys_Input.keyStates[GLFW_KEY_LEFT].pressed) {
-        currentMenuTab =  (currentMenuTab - 1) < 0 ? (menuTabCount - 1) : (currentMenuTab - 1);
-        if (currentMenuPage == MenuPages_NewGame) {
-                 if (currentMenuItem == 1) currentMenuItem = 3;
-            else if (currentMenuItem == 3) currentMenuItem = 1;
-            else if (currentMenuItem == 2) currentMenuItem = 4;
-            else if (currentMenuItem == 4) currentMenuItem = 2;
-            else if (currentMenuItem == 5) currentMenuItem = 6;
-            else if (currentMenuItem == 6) currentMenuItem = 5;
-        }
+    static const int8_t ngSwap[7] = {0, 3, 4, 1, 2, 6, 5};
+    if (Sys_Input.keyStates[GLFW_KEY_RIGHT].pressed || Sys_Input.keyStates[GLFW_KEY_LEFT].pressed) {
+        int dir = Sys_Input.keyStates[GLFW_KEY_RIGHT].pressed ? 1 : -1;
+        currentMenuTab = (currentMenuTab + menuTabCount + dir) % menuTabCount;
+        if (currentMenuPage == MenuPages_NewGame && currentMenuItem < 7) currentMenuItem = ngSwap[currentMenuItem];
     }
 }
 
@@ -1732,8 +1628,6 @@ void RenderPausedUI(void) {
     if (UI_Button(522,714, 322,42, &overQuit, 5) || (MenuEnter() && currentMenuItem == 5)) OS_Exit(0);
     overQuit = overQuit || currentMenuItem == 5;
     RenderFormattedText(572,690,overQuit ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,/*"QUIT GAME"*/Sys_Text.stringTable[729]);
-    if (Sys_Input.keyStates[GLFW_KEY_DOWN].pressed) currentMenuItem = (currentMenuItem + 1) >= menuItemCount ? 0 : (currentMenuItem + 1);
-    if (Sys_Input.keyStates[GLFW_KEY_UP].pressed) currentMenuItem = (currentMenuItem - 1) < 0 ? (menuItemCount - 1) : (currentMenuItem - 1);
 }
 
 float debugLineBuffer[MAX_DEBUG_LINE_VERTS * 3]; // xyz only
@@ -1761,42 +1655,28 @@ ENGINE_TO_MOD void AddDebugLine(Vector3 start, Vector3 end) {
 char creditStats[4096];
 static inline __attribute__((always_inline)) float GetScore(float stupid, bool isFinal) {
     float victories = (float)(Sys_Global.kills + Sys_Global.cyberkills);
-    float secs = vfloor((float)Sys_Global.pauseRelativeTime / 3600.0f);
-    if (!isFinal) { // Report score if no deaths.
-        float score = victories * 10000.0f;
-        score -= vmin(score * 0.666f,secs * 100.0f);
-        score *= ((stupid + 1.0f) / 37.0f);
-        if (stupid > 35.0f) score += 2222222.0f; // secret kevin bonus
-        return vfloor(score); // Score Subtotal
-    }
+    if (isFinal) victories -= vmin(Sys_Global.ressurections * 10.0f, victories * 0.666f);
+    float secs  = vfloor((float)Sys_Global.pauseRelativeTime / 3600.0f);
+    float score = victories * 10000.0f;
+    score -= vmin(score * 0.666f, secs * 100.0f);
+    score *= (stupid + 1.0f) / 37.0f;
+    if (stupid > 35.0f) score += 2222222.0f;
+    return vfloor(score);
+}
 
-    float deathPenalty = Sys_Global.ressurections * 10.0f; // Death is 10 anti-kills, but you always keep at least a third of your kills.
-    float score = (victories - vmin(deathPenalty,victories * 0.666f)) * 10000.0f;
-    score -= vmin(score * 0.666f,secs * 100.0f);
-    score *= ((stupid + 1.0f) / 37.0f); // 9 * 4 + 1 is best difficulty factor
-    if (stupid > 35.0f) score += 2222222.0f; // secret kevin bonus
-    return vfloor(score); // Final Score
+static inline void DecomposeTime(double t, uint32_t* h, uint32_t* m, double* s) {
+    double tb = vfloor(t / 3600.0); *h = (uint32_t)tb; t -= tb * 3600.0;
+    tb = vfloor(t / 60.0);          *m = (uint32_t)tb; *s = t - tb * 60.0;
 }
 
 static inline __attribute__((always_inline)) void CreditsStats(void) {
     size_t off = 0;
-    off += StringFormat(creditStats + off,sizeof(creditStats),"================================================================================\nCITADEL\n");
-    off += StringFormat(creditStats + off,sizeof(creditStats),"================================================================================\nCONGRATULATIONS %s\n",Sys_Global.playerName);
-    uint32_t hours, minutes; double secs;
-    double tb = (vfloor(Sys_Global.pauseRelativeTime/3600.0));
-    hours = (uint32_t)tb;
-    double t = Sys_Global.pauseRelativeTime - (tb * 3600.0);
-    tb = vfloor(t / 60.0);
-    minutes = (uint32_t)tb;
-    secs = t - (tb * 60.0);
-    off += StringFormat(creditStats + off,sizeof(creditStats),"Straight Time: %uh %um %.3fs\n",hours,minutes,secs);
-    tb = vfloor(Sys_Global.absoluteTime/3600.0);
-    hours = (uint32_t)tb;
-    t = Sys_Global.absoluteTime - (tb * 3600.0);
-    tb = vfloor(t / 60.0);
-    minutes = (uint32_t)tb;
-    secs = t - (tb * 60.0);
-    off += StringFormat(creditStats + off,sizeof(creditStats),"Total Time (with reload from deaths): %uh %um %.3fs\n",hours,minutes,secs);
+    off += StringFormat(creditStats + off, sizeof(creditStats),"================================================================================\nCITADEL\n================================================================================\nCONGRATULATIONS %s\n",Sys_Global.playerName);
+    uint32_t h,m; double s;
+    DecomposeTime(Sys_Global.pauseRelativeTime,&h,&m,&s);
+    off += StringFormat(creditStats + off, sizeof(creditStats),"Straight Time: %uh %um %.3fs\n",h,m,s);
+    DecomposeTime(Sys_Global.absoluteTime,&h,&m,&s);
+    off += StringFormat(creditStats + off,sizeof(creditStats),"Total Time (with reload from deaths): %uh %um %.3fs\n",h,m,s);
     float stupid = ((float)(Sys_Global.difficultyCombat * Sys_Global.difficultyCombat)) + ((float)(Sys_Global.difficultyPuzzle * Sys_Global.difficultyPuzzle)) + ((float)(Sys_Global.difficultyMission * Sys_Global.difficultyMission)) + ((float)(Sys_Global.difficultyCyber * Sys_Global.difficultyCyber));
     uint32_t finalSubscore = GetScore(stupid,false);
     off += StringFormat(creditStats + off,sizeof(creditStats),"Kills: %u\nKills in Cyberspace: %u\nScoreSubtotal: %u\nDeaths: %u\nRessurections: %u\n",Sys_Global.kills,Sys_Global.cyberkills,(uint32_t)finalSubscore,Sys_Global.deaths,Sys_Global.ressurections);
@@ -1828,6 +1708,8 @@ static inline __attribute__((always_inline)) double RenderUI(void) {
     if (Sys_Global.creditsActive) { RenderCredits(); return get_time(); }
     if (Sys_Global.menuActive) RenderMenu();
     else if (Sys_Global.gamePaused) RenderPausedUI();
+    if ((Sys_Global.menuActive || Sys_Global.gamePaused) && Sys_Input.keyStates[GLFW_KEY_DOWN].pressed) currentMenuItem = (currentMenuItem + 1) >= menuItemCount ? 0 : (currentMenuItem + 1);
+    if ((Sys_Global.menuActive || Sys_Global.gamePaused) && Sys_Input.keyStates[GLFW_KEY_UP].pressed) currentMenuItem = (currentMenuItem - 1) < 0 ? (menuItemCount - 1) : (currentMenuItem - 1);
     
     // Diagnostics / Debugging
     int16_t debugTextStartY = 58;
@@ -1881,13 +1763,7 @@ typedef struct {
     Vector3 position;
 } LightCandidate;
 
-bool EntNotVisible(uint16_t i, bool otherCondition) {
-    if (Sys_Global.instances[i].texIndex > loadedTexturesMaxIndex) return true;
-    if (!(Sys_Global.instances[i].entflags & ENTFLAG_ACTIVE)) return true;
-    if (Sys_Global.instances[i].index >= MAX_ENTITIES || Sys_Global.instances[i].modelIndex >= MODEL_IDX_MAX || Sys_Global.instances[i].texIndex >= MAX_VALID_TEXTURE) return true;
-    if (otherCondition) return true;
-    return false;
-}
+static inline __attribute__((always_inline)) bool EntNotVisible(uint16_t i, bool otherCondition) { Entity* e = &Sys_Global.instances[i]; return e->texIndex > loadedTexturesMaxIndex || !(e->entflags & ENTFLAG_ACTIVE) || e->index >= MAX_ENTITIES || e->modelIndex >= MODEL_IDX_MAX || e->texIndex >= MAX_VALID_TEXTURE || otherCondition; }
 
 static inline __attribute__((always_inline,hot)) uint16_t GetAndBindModel(uint16_t i, uint16_t currentModelType) {
     glUniform1ui(0,i);
@@ -2342,11 +2218,9 @@ int32_t main(void) {
         InputClearRisingAndFallingEdges();
         Sys_Input.currentMouse_dx = Sys_Input.currentMouse_dy = 0;
         #ifdef DEBUG_RAM_OUTPUT
-            if (Sys_Global.globalFrameNum == 4) { DebugRAM("after 4 frames of running"); }
-            else if (Sys_Global.globalFrameNum == 100) { DebugRAM("after 100 frames of running"); }
-            else if (Sys_Global.globalFrameNum == 200) DebugRAM("after 200 frames of running");
-            else if (Sys_Global.globalFrameNum == 500) DebugRAM("after 500 frames of running");
-            else if (Sys_Global.globalFrameNum == 1000) DebugRAM("after 1000 frames of running");
+            static const uint32_t dbgFrames[] = {4,100,200,500,1000};
+            static const char*    dbgLabels[] = {"after 4 frames","after 100 frames","after 200 frames","after 500 frames","after 1000 frames"};
+            for (int _d=0;_d<5;_d++) if (Sys_Global.globalFrameNum == dbgFrames[_d]) { DebugRAM(dbgLabels[_d]); break; }
         #endif
     }
     return 0;
