@@ -247,6 +247,15 @@ void BuildPlayerCapsule(uint16_t playerIdx, Vector3 *start, Vector3 *end) {
     end->x   = eye.x; end->y   = centreY + innerSpine * 0.5f; end->z   = eye.z;
 }
 
+ENGINE_TO_MOD void AddForce(uint16_t idx, Vector3 force, bool isImpulse) {
+    if (idx >= INSTANCE_COUNT) return;
+    Entity* e = &Sys_Global.instances[idx];
+    float mass = e->mass > 0.0001f ? e->mass : 1.0f;
+    e->accumulatedForce = Vector3_A_plus_B(e->accumulatedForce, force);
+    if (isImpulse) e->velocity = Vector3_A_plus_B(e->velocity, scale_vector3(force,1.0f / mass));
+    else e->velocity = Vector3_A_plus_B(e->velocity, scale_vector3(force,((float)Sys_Global.timeSinceLastPhysicsTick) / mass));
+}
+
 ENGINE_TO_MOD void ApplyPlayerMovements(void) {
     Vector3 forward = Sys_Global.instances[PLAYER1].forward;
     Vector3 right = Sys_Global.instances[PLAYER1].right;
@@ -443,7 +452,7 @@ void ApplyVelocityUntilCollision(uint16_t i) {
     vel = Sys_Global.instances[i].velocity;
     if (magnitude_vector3(vel) < 0.05f) return;
     Sys_Global.instances[i].position = Vector3_A_plus_B(pos, scale_vector3(vel, dt));
-    dirtyInstances[i] = true;
+    Sys_Global.dirtyInstances[i] = true;
 }
 
 void ApplyCorpseFriction(uint16_t instanceIdx) {

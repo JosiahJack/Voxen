@@ -108,5 +108,68 @@ void GiveEnergy(float give, EnergyType type);
 void BioMonitorInit(void);
 void BioMonitorUpdate(void);
 extern bool vmailActive;
-
+extern const AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS_PER_MODEL];
 extern const char* sounds[SOUNDS_COUNT];
+
+typedef struct {
+    uint16_t owner;
+    const char* argvalue;
+} TargetArgs;
+
+static inline bool EntityLocked(const Entity* e) { return (e->entflags & ENTFLAG_LOCKED) != 0; }
+static inline void EntitySetLocked(Entity* e, bool locked) { flag_set(&e->entflags,ENTFLAG_LOCKED,locked); }
+static inline const char* EntityDefName(uint16_t self) { return Eng_Global->entities[Eng_Global->instances[self].index].path; }
+static inline bool EntityDefIs(uint16_t self, const char* name) { return StringsAreEqual(EntityDefName(self),name); }
+static inline void UIBlockedBySecurity(Vector3 tetherPoint) { (void)tetherPoint; CenterStatusPrint("%s",Eng_Text->stringTable[25]); }
+static inline void UICyberSprint(uint16_t textIndex) { CenterStatusPrint("%s",Eng_Text->stringTable[textIndex]); }
+static inline void UIExitCyberspace(void) { CenterStatusPrint("%s",Eng_Text->stringTable[601]); }
+static inline bool InventoryAddSoftwareItem(SoftwareType type, int16_t version) { (void)type; (void)version; return true; } // TODO Convert Inventory.cs.
+static inline void HealthManagerHealingBed(uint16_t playerIdx, float amount, bool flashBed) { (void)flashBed; Entity* p = &Eng_Global->instances[playerIdx]; p->health = vmin(255.0f,p->health + amount); }
+static inline void PlayerTakeDamage(uint16_t playerIdx, float damage) { Entity* p = &Eng_Global->instances[playerIdx]; p->health -= damage; if (p->health < 0.0f) p->health = 0.0f; }
+
+void UseTargets(uint16_t activator, const char* argvalue, const char* targetname);
+void Targetted(uint16_t activator, uint16_t self, const char* argvalue);
+void ButtonSwitchTargetted(uint16_t self, uint16_t activator, const char* argvalue);
+void ButtonSwitchUse(uint16_t self, uint16_t activator, const char* argvalue);
+void DoorUse(uint16_t self, uint16_t activator, const char* argvalue);
+void DoorTargetted(uint16_t self, uint16_t activator, const char* argvalue);
+void DoorActuate(uint16_t self);
+void DoorForceOpen(uint16_t self);
+void DoorForceClose(uint16_t self);
+void DoorLock(uint16_t self);
+void DoorUnlock(uint16_t self);
+void DoorToggleLocked(uint16_t self);
+void DoorToggleAccessCardOverride(uint16_t self);
+void TriggerTargetted(uint16_t self, uint16_t activator);
+void TriggerCounterTargetted(uint16_t self, uint16_t activator, const char* argvalue);
+void FuncWallTargetted(uint16_t self, uint16_t activator, const char* argvalue);
+void ButtonSwitchInitAfterLoad(uint16_t self);
+void DoorInitAfterLoad(uint16_t self);
+void FuncWallInitAfterLoad(uint16_t self);
+void ButtonSwitchToggleLocked(uint16_t self);
+void ForceBridgeInitBeforeLoad(uint16_t self);
+void ForceBridgeInitAfterLoad(uint16_t self);
+void GravityLiftInitAfterLoad(uint16_t self);
+void LogicTimerInitBeforeLoad(uint16_t self);
+void TeleportTouchInitAfterLoad(uint16_t self);
+void TextureChangerInitAfterLoad(uint16_t self);
+void CyberItemInitBeforeLoad(uint16_t self);
+void CyberMineInitBeforeLoad(uint16_t self);
+void CyberTimerInitAfterLoad(uint16_t self);
+void CyberSwitchInitAfterLoad(uint16_t self);
+void ExplosionLifeInitAfterLoad(uint16_t self);
+void ExplosionLifeUpdate(uint16_t self);
+void EmailTargetted(uint16_t self, uint16_t activator, const char* argvalue);
+void ForceBridgeActivate(uint16_t self, bool isSilent);
+void ForceBridgeDeactivate(uint16_t self, bool isSilent);
+void ForceBridgeToggle(uint16_t self);
+void GravityLiftToggle(uint16_t self);
+void TextureChangerToggle(uint16_t self);
+void ButtonSwitchUpdate(uint16_t self);
+void DoorUpdate(uint16_t self);
+void ForceBridgeUpdate(uint16_t self);
+void FuncWallUpdate(uint16_t self);
+void LogicTimerUpdate(uint16_t self);
+void DelayedSpawnUpdate(uint16_t self);
+void SearchFXResetUpdate(uint16_t self);
+void CyberTimerUpdate(uint16_t self);

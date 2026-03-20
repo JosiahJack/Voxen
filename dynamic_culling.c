@@ -14,7 +14,6 @@ float worldMin_x, worldMin_z;
 bool instanceIsLODArray[INSTANCE_COUNT];
 #define MAX_CULL_FILESIZE 500000
 uint8_t cullingFileBuffer[MAX_CULL_FILESIZE];
-Portal activePortals[MAX_PORTALS];
 uint8_t numActivePortals = 0;
 uint16_t uncullingCameras[5];
 
@@ -626,20 +625,20 @@ void CameraViewUnculling(void) {
     }
 }
 
-void PortalCulling(void) { // Called just once at end of animation loop for the frame after each frame perfect change to door models becoming either closed or not closed.
+ENGINE_TO_MOD void PortalCulling(void) { // Called just once at end of animation loop for the frame after each frame perfect change to door models becoming either closed or not closed.
     uint16_t playerCellX = PosGetCellCoordX(Sys_Global.instances[PLAYER1].position.x);
     uint16_t playerCellZ = PosGetCellCoordZ(Sys_Global.instances[PLAYER1].position.z);
     PortalCell cellA, cellB;
     for (uint8_t portalIdx=0;portalIdx<MAX_PORTALS;++portalIdx) {
-        if (!activePortals[portalIdx].dirty) continue;
+        if (!Sys_Global.activePortals[portalIdx].dirty) continue;
         
-        activePortals[portalIdx].dirty = false;
-        cellA = activePortals[portalIdx].cellA; // Guaranteed order at level load.  A = N or E, B = S or W
-        cellB = activePortals[portalIdx].cellB;
-        bool isNS = activePortals[portalIdx].portalNS;
+        Sys_Global.activePortals[portalIdx].dirty = false;
+        cellA = Sys_Global.activePortals[portalIdx].cellA; // Guaranteed order at level load.  A = N or E, B = S or W
+        cellB = Sys_Global.activePortals[portalIdx].cellB;
+        bool isNS = Sys_Global.activePortals[portalIdx].portalNS;
         uint16_t cellIdxA = (cellA.z * WORLDX) + cellA.x;
         uint16_t cellIdxB = (cellB.z * WORLDX) + cellB.x;
-        if (activePortals[portalIdx].open) { // Open the edges up
+        if (Sys_Global.activePortals[portalIdx].open) { // Open the edges up
             if (isNS) {
                 gridCellStates[cellIdxA] &= ~(CELL_CLOSEDSOUTH);
                 gridCellStates[cellIdxB] &= ~(CELL_CLOSEDNORTH);

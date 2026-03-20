@@ -109,7 +109,7 @@ void AddInstance(uint16_t entIdx, uint16_t i) {
     }
     
     Sys_Global.instances[i].lockedMessageLingdex = Sys_Global.entities[entIdx].lockedMessageLingdex;
-    dirtyInstances[i] = true;
+    Sys_Global.dirtyInstances[i] = true;
     Sys_Global.loadedInstances++;
 }
 
@@ -193,7 +193,7 @@ void LoadLevel(uint8_t curlevel) {
     __builtin_memset(intervalStepisLerping,0,LIGHT_COUNT * 30 * sizeof(float));
     if (curlevel >= Sys_Global.numLevels) { DualLogError("Cannot load world geometry, level number %d out of bounds 0 to %d\n", curlevel, Sys_Global.numLevels - 1); OS_Exit(1); }
     
-    for (uint16_t idx = START_INDEX_LEVEL_INSTANCES;idx<INSTANCE_COUNT;idx++) { InitializeEntity(&Sys_Global.instances[idx]); dirtyInstances[idx] = true; } // Start AFTER player indices and NULLENT
+    for (uint16_t idx = START_INDEX_LEVEL_INSTANCES;idx<INSTANCE_COUNT;idx++) { InitializeEntity(&Sys_Global.instances[idx]); Sys_Global.dirtyInstances[idx] = true; } // Start AFTER player indices and NULLENT
     __builtin_memset(modelMatrices, 0, INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
     char filename[20]; // Minimum size for 0 through 13.
     StringFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel);
@@ -358,7 +358,82 @@ void LoadLevel(uint8_t curlevel) {
                 else if (StringsAreEqual(trimmed_key,"minSecurityLevel"))Sys_Global.instances[instanceIdx].minSecurityLevel = parse_float(trimmed_value, initialLine, lineNum);
                 else if (StringsAreEqual(trimmed_key,"damageOnUse"))     flag_set(&Sys_Global.instances[instanceIdx].entflags, ENTFLAG_DAMAGE_ON_USE, parse_bool(trimmed_value, initialLine, lineNum));
                 else if (StringsAreEqual(trimmed_key,"target"))          StringCopyInto_A_From_B(Sys_Global.instances[instanceIdx].target,trimmed_value,TARGET_STRING_LENGTH);
+                else if (StringsAreEqual(trimmed_key,"argvalue"))        StringCopyInto_A_From_B(Sys_Global.instances[instanceIdx].argvalue,trimmed_value,TARGET_STRING_LENGTH);
                 else if (StringsAreEqual(trimmed_key,"targetname"))      StringCopyInto_A_From_B(Sys_Global.instances[instanceIdx].targetname,trimmed_value,TARGET_STRING_LENGTH);
+//                 else if (StringsAreEqual(trimmed_key,"securityThreshhold") || StringsAreEqual(trimmed_key,"securityThreshold")) Sys_Global.instances[instanceIdx].securityThreshold = parse_numberu8(trimmed_value, initialLine, lineNum);
+//                 else if (StringsAreEqual(trimmed_key,"messageIndex"))    Sys_Global.instances[instanceIdx].messageIndex = parse_numberu16(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"delay"))           Sys_Global.instances[instanceIdx].delay = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"locked"))          flag_set(&Sys_Global.instances[instanceIdx].entflags, ENTFLAG_LOCKED, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"active"))          Sys_Global.instances[instanceIdx].active = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"alternateOn"))     Sys_Global.instances[instanceIdx].alternateOn = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"onlyTargetOnce"))  Sys_Global.instances[instanceIdx].onlyOnce = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"targetAlreadyDone")) Sys_Global.instances[instanceIdx].targetAlreadyDone = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"stayOpen"))        Sys_Global.instances[instanceIdx].stayOpen = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"startOpen"))       Sys_Global.instances[instanceIdx].startOpen = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"ajar"))            Sys_Global.instances[instanceIdx].ajar = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"ajarPercentage"))  Sys_Global.instances[instanceIdx].ajarPercentage = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"useTimeDelay"))    Sys_Global.instances[instanceIdx].useTimeDelay = parse_float(trimmed_value, initialLine, lineNum);
+//                 else if (StringsAreEqual(trimmed_key,"lockedMessageLingdex")) Sys_Global.instances[instanceIdx].lockedMessageLingdex = parse_numberu16(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"blocked"))         Sys_Global.instances[instanceIdx].blocked = parse_bool(trimmed_value, initialLine, lineNum);
+//                 else if (StringsAreEqual(trimmed_key,"SFXIndex"))        Sys_Global.instances[instanceIdx].SFXIndex = (int16_t)parse_numberu16(trimmed_value, initialLine, lineNum);
+//                 else if (StringsAreEqual(trimmed_key,"requiredAccessCard")) Sys_Global.instances[instanceIdx].requiredAccessCard = parse_numberu8(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"accessCardUsedByPlayer")) Sys_Global.instances[instanceIdx].accessCardUsedByPlayer = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"timeBeforeLasersOn")) Sys_Global.instances[instanceIdx].timeBeforeLasersOn = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"toggleLasers"))    Sys_Global.instances[instanceIdx].toggleLasers = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"targettingOnlyUnlocks")) Sys_Global.instances[instanceIdx].targettingOnlyUnlocks = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"changeLayerOnOpenClose")) Sys_Global.instances[instanceIdx].changeLayerOnOpenClose = parse_bool(trimmed_value, initialLine, lineNum);
+//                 else if (StringsAreEqual(trimmed_key,"doorOpenState"))   Sys_Global.instances[instanceIdx].doorOpen = parse_numberu8(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"animatorPlaybackTime") || StringsAreEqual(trimmed_key,"asi.normalizedTime")) Sys_Global.instances[instanceIdx].animatorPlaybackTime = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"useFinished"))     Sys_Global.instances[instanceIdx].useFinished = parse_float(trimmed_value, initialLine, lineNum) + Sys_Global.pauseRelativeTime;
+                else if (StringsAreEqual(trimmed_key,"waitBeforeClose")) Sys_Global.instances[instanceIdx].waitBeforeClose = parse_float(trimmed_value, initialLine, lineNum) + Sys_Global.pauseRelativeTime;
+                else if (StringsAreEqual(trimmed_key,"lasersFinished"))  Sys_Global.instances[instanceIdx].lasersFinished = parse_float(trimmed_value, initialLine, lineNum) + Sys_Global.pauseRelativeTime;
+                else if (StringsAreEqual(trimmed_key,"changeMatOnActive")) flag_set(&Sys_Global.instances[instanceIdx].entflags, ENTFLAG_CHANGE_TEX_ON_ACTIVE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"blinkWhenActive")) flag_set(&Sys_Global.instances[instanceIdx].entflags, ENTFLAG_BLINK_TEX_ON_ACTIVE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"doorOpen"))        flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_DOOROPEN, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"doorOpenIfUnlocked")) flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_DOOROPENIFUNLOCKED, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"doorClose"))       flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_DOORCLOSE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"doorLock"))        flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_DOORLOCK, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"doorUnlock"))      flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_DOORUNLOCK, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"switchTrigger"))   flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_SWITCHTRIGGER, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"tripTrigger"))     flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_TRIPTRIGGER, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"forceBridgeActivate")) flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_FBRIDGE_ACTIVATE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"forceBridgeDeactivate")) flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_FBRIDGE_DEACTIVATE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"forceBridgeToggle")) flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_FBRIDGE_TOGGLE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"gravityLiftToggle")) flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_GRAVLIFT_TOGGLE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"textureChangeToggle")) flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_TEXTURE_CHG_TOGGLE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"lightOn"))         flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_LIGHT_ON, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"lightOff"))        flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_LIGHT_OFF, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"lightToggle"))     flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_LIGHT_TOGGLE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"funcwallMove"))    flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_FUNCWALL_MOVE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"missionBitOn"))    flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_MISSION_BIT_ON, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"missionBitOff"))   flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_MISSION_BIT_OFF, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"missionBitToggle")) flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_MISSION_BIT_TOGGLE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"sendEmail"))       flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_SEND_EMAIL, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"switchLockToggle")) flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_SWITCH_LOCK_TOGGLE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"spawnerActivate")) flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_SPAWNER_ACTIVATE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"spawnerActivateAlerted")) flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_SPAWNER_ACTALERTED, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"cyborgConversionToggle")) flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_CYBORG_CONV_TOGGLE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"GOSetActive"))     flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_INST_ACTIVATE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"GOSetDeactive"))   flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_INST_DEACTIVATE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"GOToggleActive"))  flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_INST_TOGGLE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"disableThisGOOnAwake")) flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_DISABLE_ON_AWAKE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"playSoundOnce"))   flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_PLAY_SOUND_ONCE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"stopSound"))       flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_STOP_SOUND, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"sendSprintMessage")) flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_SEND_CENTERPRINT, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"radiationTreatment")) flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_RADIATION_TREATMNT, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"startFlashingMaterials")) flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_START_FLASHING_TEX, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"stopFlashingMaterials")) flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_STOP_FLASHING_TEX, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"unlockElevatorPad")) flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_UNLOCK_ELEVATORPAD, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"unlockKeycodePad")) flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_UNLOCK_KEYPAD, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"unlockPuzzlePad")) flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_UNLOCK_PUZPAD, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"screenShake"))     flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_SCREENSHAKE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"awakeSleepingEnemy")) flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_AWAKE_SLEEPING_NPC, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"branchFlip"))      flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_BRANCH_FLIP, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"branchFlipOnly"))  flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_BRANCH_FLIPONLY, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"doorAccessCardOverrideToggle")) flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_TOG_DORACESOVERIDE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"unlockSwitch"))    flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_UNLOCK_SWITCH, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"lockElevatorPad")) flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_LOCK_ELEVATORPAD, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"doorToggle"))      flag_set(&Sys_Global.instances[instanceIdx].ioflags, TARG_IOFLAGS_DOOR_TOGGLE, parse_bool(trimmed_value, initialLine, lineNum));
             }
         }
         
@@ -412,13 +487,13 @@ void LoadLevel(uint8_t curlevel) {
                     cellN.x = cellS.x = PosGetCellCoordX(obj_x);
                     cellN.z = (cellN_idx != cellCurrent) ? cellIndexUp : cellIndexCurrentZ; // Ensure that cellA is always the north cell of the pair
                     cellS.z = (cellS_idx != cellCurrent) ? cellIndexDn : cellIndexCurrentZ;
-                    activePortals[numActivePortals] = (Portal){ .cellA = cellN, .cellB = cellS, .portalNS = true, .open = isOpen, .dirty = true };
+                    Sys_Global.activePortals[numActivePortals] = (Portal){ .cellA = cellN, .cellB = cellS, .portalNS = true, .open = isOpen, .dirty = true };
                 } else { // Portal is an East-West pair
                     PortalCell cellE, cellW;
                     cellE.z = cellW.z = PosGetCellCoordZ(obj_z);
                     cellE.x = (cellE_idx != cellCurrent) ? cellIndexRight : cellIndexCurrentX; // Ensure that cellA is always the east cell of the pair
                     cellW.x = (cellW_idx != cellCurrent) ? cellIndexLeft : cellIndexCurrentX;
-                    activePortals[numActivePortals] = (Portal){ .cellA = cellE, .cellB = cellW, .portalNS = false, .open = isOpen, .dirty = true };
+                    Sys_Global.activePortals[numActivePortals] = (Portal){ .cellA = cellE, .cellB = cellW, .portalNS = false, .open = isOpen, .dirty = true };
                 }
                 
                 numActivePortals++;
@@ -525,7 +600,7 @@ void LoadLevel(uint8_t curlevel) {
     RenderLoadingProgress(110,"Loading cull system...");
     CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
     RenderLoadingProgress(120,"Loading voxel lighting data...");
-    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < Sys_Global.loadedInstances; i++) dirtyInstances[i] = true;
+    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < Sys_Global.loadedInstances; i++) Sys_Global.dirtyInstances[i] = true;
     for (uint16_t i = 0; i < loadedLights; i++) {
         uint32_t litIdx = i * LIGHT_DATA_SIZE; // lightDirty[i] = true is already done in PortalCulling, leaving commented out here for confirmation.
         lightsNewPosition[i] = (Vector3){ lights[litIdx + LIGHT_DATA_OFFSET_POSX], lights[litIdx + LIGHT_DATA_OFFSET_POSY], lights[litIdx + LIGHT_DATA_OFFSET_POSZ] };

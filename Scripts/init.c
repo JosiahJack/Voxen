@@ -14,56 +14,22 @@ uint16_t GetImpactType(uint16_t instanceIdx) {
         case BloodType_Mutation:     return 757; // MutationBurst
         case BloodType_GrayMutation: return 758; // GraytationBurst
     }
-
     return 729; // SparksSmall
 }
 
-void ButtonSwitchInit(uint16_t self) {
-    Eng_Global->instances[self].delayFinished = 0.0f; // prevent using targets on awake
-    if (Eng_Global->instances[self].entflags & ENTFLAG_ACTIVE) Eng_Global->instances[self].tickFinished = Eng_Global->pauseRelativeTime + 1.5 + (double)random_range(0.0f,1.0f);
+static void InitConvertedEntity(uint16_t i) {
+    if (EntityDefIs(i,"func_forcebridge")) { ForceBridgeInitBeforeLoad(i); ForceBridgeInitAfterLoad(i); return; }
+    if (EntityDefIs(i,"func_wall")) { FuncWallInitAfterLoad(i); return; }
+    if (EntityDefIs(i,"trigger_gravitylift")) { GravityLiftInitAfterLoad(i); return; }
+    if (EntityDefIs(i,"logic_timer")) { LogicTimerInitBeforeLoad(i); return; }
+    if (EntityDefIs(i,"prop_cyberport")) { TeleportTouchInitAfterLoad(i); return; }
+    if (EntityDefIs(i,"prop_cyber_switch")) { CyberSwitchInitAfterLoad(i); return; }
+    if (EntityDefIs(i,"ef_fragexplosion")) { ExplosionLifeInitAfterLoad(i); return; }
+    if (ConstIndexIsDoor(Eng_Global->instances[i].index)) { DoorInitAfterLoad(i); return; }
+    if (ConstIndexIsButtonSwitch(Eng_Global->instances[i].index)) { ButtonSwitchInitAfterLoad(i); return; }
+    if (EntityDefIs(i,"item_cyber_data") || EntityDefIs(i,"item_cyber_decoy") || EntityDefIs(i,"item_cyber_drill") || EntityDefIs(i,"item_cyber_game") || EntityDefIs(i,"item_cyber_integrity") || EntityDefIs(i,"item_cyber_keycard") || EntityDefIs(i,"item_cyber_pulser") || EntityDefIs(i,"item_cyber_recall") || EntityDefIs(i,"item_cyber_shield") || EntityDefIs(i,"item_cyber_turbo")) { CyberItemInitBeforeLoad(i); return; }
+    if (EntityDefIs(i,"weapon_cyber_mine")) CyberMineInitBeforeLoad(i);
 }
-
-void ForceBridgeInit(uint16_t self) {    
-    Eng_Global->instances[self].tickFinished = Eng_Global->pauseRelativeTime + Eng_Global->instances[self].tickTime + (double)random_range(0.0f,1.0f);
-    Eng_Global->instances[self].lerping = true;
-    if (Eng_Global->instances[self].activatedScale.x <= 0.02f) Eng_Global->instances[self].activatedScale.x = 2.56f;
-    if (Eng_Global->instances[self].activatedScale.y <= 0.02f) Eng_Global->instances[self].activatedScale.y = 0.08f;
-    if (Eng_Global->instances[self].activatedScale.z <= 0.02f) Eng_Global->instances[self].activatedScale.z = 2.56f;
-    if (!(Eng_Global->instances[self].entflags & ENTFLAG_ACTIVATED)) {
-        flag_set(&Eng_Global->instances[self].entflags,ENTFLAG_VISIBLE,false);
-        Eng_Global->instances[self].collider = COLLIDER_TYPE_NONE;
-    }
-    
-    switch (Eng_Global->instances[self].fieldColor) {
-        case ForceFieldColor_Red:      Eng_Global->instances[self].texIndex = 38; break;
-        case ForceFieldColor_Green:    Eng_Global->instances[self].texIndex = 40; break;
-        case ForceFieldColor_Blue:     Eng_Global->instances[self].texIndex = 39; break;
-        case ForceFieldColor_Purple:   Eng_Global->instances[self].texIndex = 41; break;
-        case ForceFieldColor_RedFaint: Eng_Global->instances[self].texIndex = 198; break;
-    }
-}
-/*
-// DriftUp for playerPizzaz on minigames TODO
-float startY;
-float endY;
-float rate = 0.5f;
-float fadeRate = 0.1f;
-bool fadeImage;
-Image img;
-float startFade = 1.0f;
-float endFade = 0.0f;
-float tickFinished;
-
-void DriftUpdInit(uint16_t self) {
-    Eng_Global->instances[self]..position = (Vector3){Eng_Global->instances[i].position.x,startY,Eng_Global->instances[i].position.z};
-    if (fadeImage && img != null) {
-        img.color = new Color(img.color.r,img.color.g,img.color.b,startFade);
-    }
-
-    Eng_Global->instances[self].tickFinished = Eng_Global->pauseRelativeTime;
-}*/
-
-//=============================================================================
 
 void MFDInit(SystemUI* ui) {
     ui->lastMultiMediaTabOpened = MULTI_MEDIA_TAB_EMAIL_TABLE;
@@ -114,8 +80,8 @@ MOD_TO_ENGINE void PlayerInit(uint16_t i) {
     DualLog("Entered mod function PlayerInit()\n");
     Eng_Global->instances[i].index = 767;
     Eng_Global->instances[i].layer = PhysicsLayer_Player;
-    Eng_Global->instances[i].position = (Vector3) { .x = 10.52f, .y = -43.792f + 0.84f, .z = 20.2908f}; // Start Actual: Puts player on Medical Level in actual game start position.  Added 0.84f y for cam offset from center
-    Eng_Global->instances[i].scale = (Vector3) { 1.0f, 1.0f, 1.0f };
+    Eng_Global->instances[i].position = (Vector3){ .x = 10.52f, .y = -43.792f + 0.84f, .z = 20.2908f}; // Start Actual: Puts player on Medical Level in actual game start position.  Added 0.84f
+    Eng_Global->instances[i].scale = (Vector3){1.0f,1.0f,1.0f};
     Eng_Global->instances[i].rotation = (Quaternion){ .x = 0.0f, .y = 0.7071f, .z = 0.0f, .w = 0.7071f }; // 90deg rotation CW about Y axis as viewed from the top looking down onto player
     Eng_Global->instances[i].entflags = ENTFLAG_ACTIVE | ENTFLAG_USEGRAVITY | ENTFLAG_RIGIDBODY;
     Eng_Global->instances[i].collider = COLLIDER_TYPE_CAPSULE;
@@ -138,7 +104,6 @@ MOD_TO_ENGINE void PlayerInit(uint16_t i) {
     Eng_Global->instances[i].radSoundFinished = Eng_Global->pauseRelativeTime;
     Eng_Global->instances[i].radFXFinished = Eng_Global->pauseRelativeTime;
     Eng_Global->instances[i].noiseFinished = Eng_Global->pauseRelativeTime;
-//     MFDInit(&Sys_UI);
     if (i == PLAYER1) InventoryInit(&Eng_Global->inventoryPlayer1);
     else if (i == PLAYER2) InventoryInit(&Eng_Global->inventoryPlayer2);
 }
@@ -147,18 +112,16 @@ MOD_TO_ENGINE void PlayerInit(uint16_t i) {
 MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(DataParser* entity_parser) {
     for (int32_t i = 0; i < Eng_Global->entityCount; i++) {
         if (entity_parser->entries[i].index == UINT16_MAX) continue;
-
         Eng_Global->entities[i] = entity_parser->entries[i];
-        flag_set(&Eng_Global->entities[i].entflags, ENTFLAG_ACTIVE, true);
-        flag_set(&Eng_Global->entities[i].entflags, ENTFLAG_GROUNDED, false);
-        flag_set(&Eng_Global->entities[i].entflags, ENTFLAG_RIGIDBODY, ConstIndexIsDynamicObject(Eng_Global->entities[i].index));
+        flag_set(&Eng_Global->entities[i].entflags,ENTFLAG_ACTIVE,true);
+        flag_set(&Eng_Global->entities[i].entflags,ENTFLAG_GROUNDED,false);
+        flag_set(&Eng_Global->entities[i].entflags,ENTFLAG_RIGIDBODY,ConstIndexIsDynamicObject(Eng_Global->entities[i].index));
         if (entity_parser->entries[i].entflags & ENTFLAG_CARDCHUNK) {
-            Eng_Global->entities[i].lodIndex = GEOMETRY_LOD_CARD_MODEL_IDX; // Generic LOD card
+            Eng_Global->entities[i].lodIndex = GEOMETRY_LOD_CARD_MODEL_IDX;
             Eng_Global->entities[i].collider = COLLIDER_TYPE_BOX;
             Eng_Global->entities[i].colliderCenter = (Vector3){ .x = 0.0f, .y = 1.44f, .z = 0.0f };
             Eng_Global->entities[i].colliderSize = (Vector3){ .x = 2.56f, .y = 0.32f, .z = 2.56f };
         }
-        
         if (ConstIndexIsButtonSwitch(Eng_Global->entities[i].index)) {
             Eng_Global->entities[i].lockedMessageLingdex = 193; // ButtonSwitch
             Eng_Global->entities[i].tickTime = 1.5;
@@ -167,24 +130,24 @@ MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(DataParser* entity_parser) 
 }
 
 MOD_TO_ENGINE void ModInitAfterLoad(void) {
-    for (int i=PLAYER1;i<(Eng_Global->loadedInstances);++i) {        
-        if (i == PLAYER1 || i == PLAYER2 || ConstIndexIsDynamicObject(Eng_Global->instances[i].index)) Eng_Global->instances[i].gravity = 1.0f; // Normal gravity
+    for (int i=PLAYER1;i<Eng_Global->loadedInstances;++i) {
+        if (i == PLAYER1 || i == PLAYER2 || ConstIndexIsDynamicObject(Eng_Global->instances[i].index)) Eng_Global->instances[i].gravity = 1.0f;
         else Eng_Global->instances[i].gravity = 0.0f;
-        
         if (Eng_Global->instances[i].index < MAX_ENTITIES) flag_set(&Eng_Global->instances[i].entflags,ENTFLAG_ANIMATED,Eng_Global->entities[Eng_Global->instances[i].index].entflags & ENTFLAG_ANIMATED);
         if (Eng_Global->instances[i].entflags & ENTFLAG_HAS_CAMERA_VIEW) AddCameraPosition(i);
-        
-        // Entity Specific Inits
         if (ConstIndexIsGeometry(Eng_Global->instances[i].index)) Eng_Global->instances[i].layer = PhysicsLayer_Geometry;
         if (ConstIndexIsDoor(Eng_Global->instances[i].index)) Eng_Global->instances[i].layer = PhysicsLayer_Door;
         if (ConstIndexIsNPC(Eng_Global->instances[i].index)) Eng_Global->instances[i].layer = PhysicsLayer_NPC;
-        if (ConstIndexIsButtonSwitch(Eng_Global->instances[i].index)) ButtonSwitchInit(i);
+        InitConvertedEntity(i);
         if (!StringIsEmpty(Eng_Global->instances[i].targetname) && (Eng_Global->instances[i].ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE) && !(Eng_Global->instances[i].entflags & TARG_IOFLAGS_DISABLD_ONCE_4EVER)) flag_set(&Eng_Global->instances[i].entflags,ENTFLAG_ACTIVE,false);
-        if (Eng_Global->instances[i].index == 700) { // logic_branch
+        if (Eng_Global->instances[i].index == 700) {
             if ((Eng_Global->instances[i].ioflags & TARG_IOFLAGS_START_ON_SECOND) || (Eng_Global->instances[i].ioflags & TARG_IOFLAGS_ON_SECOND)) {
                 StringCopyInto_A_From_B(Eng_Global->instances[i].currenttarget,Eng_Global->instances[i].target,TARGET_STRING_LENGTH);
                 flag_set(&Eng_Global->instances[i].ioflags,TARG_IOFLAGS_ON_SECOND,false);
-            } else { StringCopyInto_A_From_B(Eng_Global->instances[i].currenttarget,Eng_Global->instances[i].target2,TARGET_STRING_LENGTH); flag_set(&Eng_Global->instances[i].ioflags,TARG_IOFLAGS_ON_SECOND,true); }
+            } else {
+                StringCopyInto_A_From_B(Eng_Global->instances[i].currenttarget,Eng_Global->instances[i].target2,TARGET_STRING_LENGTH);
+                flag_set(&Eng_Global->instances[i].ioflags,TARG_IOFLAGS_ON_SECOND,true);
+            }
         }
     }
 }
@@ -193,36 +156,17 @@ void SearchableInit(uint16_t i, bool beforeLoad) {
     if (beforeLoad) {
         int numRandomGeneratedItems = 0;
         if (Eng_Global->instances[i].generateContents && !Eng_Global->instances[i].generationDone) {
-            // Generate random contents once
             for(int j=0;j<4;j++) {
-                if (Eng_Global->instances[i].randomItemDropChance[j] <= 0.0f) continue; // next!
-                
-                uint8_t tempInt = random_range_u8(0,100); // generate even distribution random value from 0 to 100, e.g. 35
+                if (Eng_Global->instances[i].randomItemDropChance[j] <= 0.0f) continue;
+                uint8_t tempInt = random_range_u8(0,100);
                 if (((float)tempInt / 100.0f) <= Eng_Global->instances[i].randomItemDropChance[j]) {
-                    Eng_Global->instances[i].contents[numRandomGeneratedItems] = Eng_Global->instances[i].randomItem[j]; // ok item is now present
+                    Eng_Global->instances[i].contents[numRandomGeneratedItems] = Eng_Global->instances[i].randomItem[j];
                     numRandomGeneratedItems++;
-                    if (numRandomGeneratedItems > Eng_Global->instances[i].maxRandomItems) break; // all done we have all our contents
+                    if (numRandomGeneratedItems > Eng_Global->instances[i].maxRandomItems) break;
                 }
             }
-            
             Eng_Global->instances[i].generationDone = true;
         }
     } else {
-        
     }
 }
-
-// void (uint16_t i) {
-//     
-// }
-
-// void InitBaseEntityBeforeLoad(uint16_t i) {
-//     switch(i) {
-//         case 464: se_briefcase(); break;
-//         case 464: #se_corpse_blueshirt(); break;
-//         case 464: #se_corpse_brownshirt(); break;
-//         case 464: #se_corpse_eaten(); break;
-//         case 464: #se_corpse_labcoat(); break;
-//         case 464: #se_corpse_security(); break;
-//     }
-// }

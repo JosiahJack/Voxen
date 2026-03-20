@@ -27,7 +27,6 @@ OsFileHandle console_log_file = 0;
 AutoSplitterData autoSplitter = { 0x1337133713371337, 0, false, 0 }; // Fore use with LiveSplit or other future speedrunner utilities for doing speedruns
 uint8_t queuedLevelToLoad = 255u;
 float modelMatrices[INSTANCE_COUNT * 16];
-uint8_t dirtyInstances[INSTANCE_COUNT];
 double berserkFinished;
 float berserkSeedTime, cam_pitch, cam_yaw = 90.0f, cam_roll, fogColorR, fogColorG, fogColorB, fogBaseDensityForLevel;
 float rasterPerspectiveProjection[16];
@@ -482,7 +481,7 @@ __attribute__((cold)) void NewGame(void) { // Reset World States
     PlayerInit(PLAYER1); PlayerInit(PLAYER2);
     cam_yaw = 90.0f; cam_pitch = 0.0f; cam_roll = 0.0f;
     Sys_Global.inventoryMode = Sys_Settings.NoShootMode;
-    DualLog("Calling LoadLevel...\n");
+    DualLog("Calling LoadLevel with %u...\n",Sys_Global.startLevel);
     LoadLevel(Sys_Global.startLevel); // Must be after entities!
     Sys_Global.pauseRelativeTime =  Sys_Global.last_physics_time = 0.0;
     Sys_Global.last_topframe_time = Sys_Global.last_physics_time - 0.05;
@@ -937,6 +936,7 @@ extern unsigned char *stbi_load_from_memory(const uint8_t* buffer, int32_t len, 
 extern int32_t stbi_arena_size;
 extern uint8_t*  stbi__arena_base;
 extern void stbi__arena_init(void);
+void LoadTextures(void); void LoadModels(void);
 #define STBI_ARENA_SIZE 16 * 1024 * 1024
 __attribute__((cold)) void InitializeEnvironment(void) {
     double init_start_time = get_time();
@@ -1074,8 +1074,12 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     Sys_Render.lightsID                = SetupSSBO(&Sys_Render.lightsID,                19, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_STATIC_DRAW);
     Sys_Render.uniqueLightListsID      = SetupSSBO(&Sys_Render.uniqueLightListsID,      27, VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     DualLog("GL SSBOs and Settings Apply... took %f secs\n",get_time() - nextInitTimeSection);
+    RenderLoadingProgress(110,"Loading models...");
+    LoadModels();
+    RenderLoadingProgress(110,"Loading textures...");
+    LoadTextures();
     if (Sys_Global.introNotPlayed) {} // TODO: Play intro
-    NewGame();
+//     NewGame();
     play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     DebugRAM("InitializeEnvironment end");
@@ -2031,7 +2035,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
     glEnable(GL_DEPTH_TEST);
     if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps();
     __builtin_memset(    lightDirty,0    ,LIGHT_COUNT * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
-    __builtin_memset(dirtyInstances,0,Sys_Global.loadedInstances * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
+    __builtin_memset(Sys_Global.dirtyInstances,0,Sys_Global.loadedInstances * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
     glBindFramebuffer(GL_FRAMEBUFFER, Sys_Render.gBufferFBO);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
     glEnable(GL_CULL_FACE); glDisable(GL_BLEND); // Opaques
@@ -2137,7 +2141,6 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
 }
 
 bool UpdatedPlayerCell(void);
-void UpdateAnims(void);
 bool CullCore(void);
 int32_t main(void) {
     double game_start_time = get_time();
@@ -2189,8 +2192,8 @@ int32_t main(void) {
             CullCore();
             bool uploadInstances = false;
             for (uint32_t i = START_INDEX_LEVEL_INSTANCES; i < Sys_Global.loadedInstances; i++) {
-                if (dirtyInstances[i]) {
-                    if (Sys_Global.instances[i].modelIndex >= loadedModelsMaxIndex || modelVertexCounts[Sys_Global.instances[i].modelIndex] < 1) { dirtyInstances[i] = false; continue; } // No model or empty model
+                if (Sys_Global.dirtyInstances[i]) {
+                    if (Sys_Global.instances[i].modelIndex >= loadedModelsMaxIndex || modelVertexCounts[Sys_Global.instances[i].modelIndex] < 1) { Sys_Global.dirtyInstances[i] = false; continue; } // No model or empty model
 
                     uploadInstances = true;    Sys_Render.shadowmapsNeedUpdated = true;
                     float x = Sys_Global.instances[i].rotation.x, y = Sys_Global.instances[i].rotation.y, z = Sys_Global.instances[i].rotation.z, w = Sys_Global.instances[i].rotation.w;

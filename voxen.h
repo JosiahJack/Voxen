@@ -25,7 +25,6 @@
 #define BOUNDS_DATA_OFFSET_MAXY 4
 #define BOUNDS_DATA_OFFSET_MAXZ 5
 #define BOUNDS_DATA_OFFSET_RADIUS 6
-#define MAX_ANIMATION_CLIPS_PER_MODEL 32
 
 // Lights
                            //    0     1     2          3       4        5         6         7         8         9 10 11 12
@@ -71,7 +70,6 @@
 #define CELL_CLOSEDWEST   32u
 #define CELL_SEES_SUN     64u
 #define CELL_SEES_SKYBOX 128u
-#define MAX_PORTALS 64 // Max is 49 on Citadel level 7
 #define DEBUG_OPENGL
 #ifdef DEBUG_OPENGL
 	#define CHECK_GL_ERROR() do { GLenum err = glGetError(); if (err != GL_NO_ERROR) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
@@ -127,23 +125,12 @@ typedef struct {
 } Event;
 
 typedef struct { Vector3 normal; float d; } FrustumPlane;
-typedef struct { uint16_t x,z; } PortalCell;
-
-typedef struct {
-    PortalCell cellA;    // one side (usually the cell the door happened to just barely floating point rounding error start in)
-    PortalCell cellB;    // tother side
-    bool     portalNS; // true when the two cells share N or S edge, else they share E and W edges.
-    bool     open;     // door is open
-    bool     dirty;
-} Portal;
 
 typedef struct StbiArena {
     uint8_t* base;
     uint8_t* cursor;
     uint8_t* end;
 } StbiArena;
-
-typedef struct { float speed; uint16_t frameStart; uint16_t frameEnd; uint16_t frameStartModelIndex; uint8_t framerate; } AnimationClip;
 
 typedef uint32_t GLuint;
 typedef struct {
@@ -194,7 +181,6 @@ typedef struct {
 
 extern bool instanceIsLODArray[INSTANCE_COUNT];
 extern float modelMatrices[INSTANCE_COUNT * 16];
-extern uint8_t dirtyInstances[INSTANCE_COUNT];
 extern const char* sounds[670];
 extern const char* audioLogs[134];
 void play_mp3(const char* path, int32_t fade_in_ms);
@@ -209,7 +195,6 @@ extern Vector3 lightsNewPosition[LIGHT_COUNT];
 extern uint32_t modelVertexCounts[MODEL_IDX_MAX];
 extern uint32_t modelTriangleCounts[MODEL_IDX_MAX];
 extern bool modelHasAnimation[MODEL_IDX_MAX];
-extern const AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS_PER_MODEL];
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 extern bool lightOn[LIGHT_COUNT];
 extern bool lightInPVS[LIGHT_COUNT];
@@ -231,7 +216,6 @@ extern uint8_t queuedLevelToLoad;
 extern uint16_t playerCellIdx;
 extern uint16_t numCellsVisible;
 extern uint32_t gridCellStates[ARRSIZE];
-extern Portal activePortals[MAX_PORTALS];
 extern uint8_t numActivePortals;
 extern uint32_t precomputedVisibleCellsFromHere[524288];
 extern float worldMin_x, worldMin_z, voxelMinCenterX, voxelMinCenterZ;

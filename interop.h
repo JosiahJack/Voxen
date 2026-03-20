@@ -53,6 +53,7 @@
     X(void, PlayGameMusic, (void)) \
     X(void, ResetLevelMusic, (void)) \
     X(void, ResetLevelAudio, (void)) \
+    X(void, UpdateAnims, (void)) \
     X(uint16_t, SpawnDynamicObject, (int, bool)) \
     X(void, ModInitAfterLoad, (void)) \
     X(void, ModEntityDefinitionsInitAfterLoad, (DataParser* parser)) \
@@ -119,6 +120,7 @@ ENGINE_TO_MOD bool GetSoundIsPlaying(ma_sound* sound);
 ENGINE_TO_MOD float GetSoundRemainingTime(ma_sound* pSound);
 ENGINE_TO_MOD void AddCameraPosition(uint16_t camIdx);
 ENGINE_TO_MOD bool StringIsEmpty(const char* a);
+ENGINE_TO_MOD bool StringsAreEqual(const char* a, const char* b);
 ENGINE_TO_MOD void StringCopyInto_A_From_B(char* a, const char* b, size_t bufferSize);
 ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uint32_t layerMask);
 ENGINE_TO_MOD void AddDebugLine(Vector3 start, Vector3 end);
@@ -139,5 +141,8 @@ ENGINE_TO_MOD void ToggleConsole(void);
 ENGINE_TO_MOD void MenuGoBack(void);
 ENGINE_TO_MOD void IgnoreNextMouseDelta(void);
 ENGINE_TO_MOD void ApplyPlayerMovements(void);
+ENGINE_TO_MOD void AddForce(uint16_t idx, Vector3 force, bool isImpulse);
+ENGINE_TO_MOD void DeleteInstance(uint16_t i);
 ENGINE_TO_MOD void CenterStatusPrint(const char* fmt, ...);
 ENGINE_TO_MOD void play_wav(const char* path, float volume, Vector3 pos, bool positional);
+ENGINE_TO_MOD void PortalCulling(void);

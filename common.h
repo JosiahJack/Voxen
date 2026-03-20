@@ -29,6 +29,16 @@ typedef uint8_t PhysCombineType;
 typedef uint8_t ColliderType;
 typedef uint16_t Text;
 typedef struct { Vector3 point; Vector3 normal; float distance; uint16_t hitInstanceIndex; bool hit; } RaycastHit;
+typedef struct { float speed; uint16_t frameStart; uint16_t frameEnd; uint16_t frameStartModelIndex; uint8_t framerate; } AnimationClip;
+typedef struct { uint16_t x,z; } PortalCell;
+typedef struct {
+    PortalCell cellA;    // one side (usually the cell the door happened to just barely floating point rounding error start in)
+    PortalCell cellB;    // tother side
+    bool     portalNS; // true when the two cells share N or S edge, else they share E and W edges.
+    bool     open;     // door is open
+    bool     dirty;
+} Portal;
+
 #define INSTANCE_COUNT 10240 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
 #define LIGHT_COUNT 2048
 #define MODEL_IDX_MAX 6805
@@ -36,7 +46,9 @@ typedef struct { Vector3 point; Vector3 normal; float distance; uint16_t hitInst
 #define MAX_TOTAL_PIXELS 27800000u
 #define MAX_UNIQUE_COLORS 80000u
 #define MAX_ANIMATED_MODELS 64
+#define MAX_ANIMATION_CLIPS_PER_MODEL 32
 #define MAX_DEBUG_LINE_VERTS 8
+#define MAX_PORTALS 64 // Max is 49 on Citadel level 7
 #define DOUBLE_CLICK_TIME 0.5f
 #define PLAYER_MAX_WALK_SPEED 3.2f
 #define PLAYER_MAX_SPRINT_SPEED 8.8f
@@ -862,12 +874,61 @@ typedef /*FAT*/ struct {
     char target2[TARGET_STRING_LENGTH];
     char currenttarget[TARGET_STRING_LENGTH];
     char targetIfFalse[TARGET_STRING_LENGTH];
+    char argvalue[TARGET_STRING_LENGTH];
     uint8_t securityThreshold;
     uint16_t messageIndex;
+    int16_t textIndex;
+    SoftwareType type;
+    int16_t version;
+    uint16_t teleportID;
+    uint16_t targetDestinationID;
+    int16_t SFXIndex;
+    int16_t SFXLockedIndex;
     float delay;
+    float damage;
+    float itemLifeTime;
+    float minutes;
+    float seconds;
+    float timeInterval;
+    float randomMin;
+    float randomMax;
+    double intervalFinished;
+    double delayFireFinished;
+    double delayResetFinished;
     bool searchableInUse;
     bool generateContents;
     bool generationDone;
+    bool dontReset;
+    bool onlyOnce;
+    bool ignoreSecondaryTriggers;
+    bool allDone;
+    bool currentTexture;
+    bool useRandomTimes;
+    bool active;
+    bool touchEnabled;
+    bool broken;
+    bool stayOpen;
+    bool startOpen;
+    bool ajar;
+    bool blocked;
+    bool targetAlreadyDone;
+    bool accessCardUsedByPlayer;
+    bool toggleLasers;
+    bool targettingOnlyUnlocks;
+    bool changeLayerOnOpenClose;
+    bool despawnInstead;
+    bool doSelfAfterList;
+    bool destroyAfterListInsteadOfDeactivate;
+    bool iceActive;
+    bool isDoor;
+    bool forceFieldDirectionX;
+    bool forceFieldDirectionY;
+    bool forceFieldDirectionZ;
+    float cyberTimer;
+    int16_t numPlayers;
+    uint16_t recentMostActivator;
+    uint16_t countToTrigger;
+    uint16_t counter;
     uint8_t maxRandomItems; // [0 4]
     uint16_t lookUpIndex; // For randomly generating items
     uint16_t contents[4];
@@ -890,18 +951,34 @@ typedef /*FAT*/ struct {
     float energy;
     float maxEnergy;
     uint16_t lockedMessageLingdex;
+    AccessCardType requiredAccessCard;
     double delayFinished;
     double tickFinished;
     double tickTime;
+    double useFinished;
+    double waitBeforeClose;
+    double lasersFinished;
     float amount;
     float resetTime;
     float minSecurityLevel;
+    float ajarPercentage;
+    float useTimeDelay;
+    float animatorPlaybackTime;
+    float timeBeforeLasersOn;
+    float force;
+    float strength;
+    float offStrengthFactor;
+    float distancePaddingToTopPoint;
+    double initialBurstFinished;
+    double justUsed;
+    double timerFinished;
     BloodType bloodType;
     DoorState doorOpen;
     ForceFieldColor fieldColor;
     bool lerping;
     TrackType trackType;
     MusicType musicType;
+    bool onlyTargetOnce;
     
     // Player
     float radiated;
@@ -929,6 +1006,8 @@ typedef /*FAT*/ struct {
     float radAdjust;
     float initialRadiation;
     bool playerDead;
+    int16_t ladderState;
+    bool inCyberTube;
 
     // Animation
     uint8_t clip;
@@ -944,6 +1023,7 @@ typedef /*FAT*/ struct {
     bool alternateOn;
     uint16_t mainSwitchMaterial;
     uint16_t alternateSwitchMaterial;
+    char currentClipName[32];
 
     // Physics
     Vector3 position;
@@ -960,7 +1040,17 @@ typedef /*FAT*/ struct {
     Vector3 colliderCenter; // Offset relative to .position's global worldspace xyz location
     Vector3 colliderSize; // x,y,z for Box, x for Sphere radius, else x, y, z for Capsule radius, height, and direction (0.0f = X-Axis, 1.0f = Y-Axis, 2.0f = Z-Axis respectively, default 1.0f)
     uint16_t colliderMeshIndex;
+    Vector3 topPoint;
+    Vector3 targetPosition;
+    Vector3 startPosition;
     Vector3 activatedScale;
+    Vector3 direction;
+    float targetPositionY;
+    float speed;
+    float percentAjar;
+    float percentMoved;
+    FuncStates startState;
+    FuncStates funcState;
     float mass;
     float linearDrag;
     float angularDrag;
@@ -1096,6 +1186,8 @@ typedef struct {
     int32_t mp3_slot;
     Entity entities[MAX_ENTITIES]; // Global array of entity definitions (similar in concept to Prefabs)
     Entity instances[INSTANCE_COUNT];
+    uint8_t dirtyInstances[INSTANCE_COUNT];
+    Portal activePortals[MAX_PORTALS];
 } GlobalContext;
 
 static inline __attribute__((always_inline)) void flag_set(uint64_t *flags, uint64_t bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
