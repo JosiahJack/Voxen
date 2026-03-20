@@ -28,24 +28,24 @@ public class SystemAnalyzer : MonoBehaviour {
 	public Text delta;
 
 	public void Close() {
-		Sys_UI.sysAnalyzerLH.SetActive(false);
-		Sys_UI.sysAnalyzerRH.SetActive(false);
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->sysAnalyzerLH.SetActive(false);
+		Eng_UI->sysAnalyzerRH.SetActive(false);
+		Eng_UI->mouseClickHeldOverGUI = true;
 		
 	}
     // Start is called before the first frame update
     void Update() {
-		descSecurity.text = Sys_Text.stringTable[474];
-		security.text = LevelManager.a.levelSecurity[LevelManager.a.currentLevel] + Sys_Text.stringTable[307];
-		descLaser.text = Sys_Text.stringTable[475];
-		laser.text = Const.a.questData.LaserDestroyed ? Sys_Text.stringTable[486] : Sys_Text.stringTable[485];
-		descLifepod.text = Sys_Text.stringTable[476];
-		lifepod.text = Const.a.questData.SelfDestructActivated ? Sys_Text.stringTable[488] : Sys_Text.stringTable[487];
-		descShield.text = Sys_Text.stringTable[477];
-		shield.text = Const.a.questData.ShieldActivated ? Sys_Text.stringTable[490] : Sys_Text.stringTable[489];
-		descReactor.text = Sys_Text.stringTable[478];
-		reactor.text = Const.a.questData.SelfDestructActivated ? Sys_Text.stringTable[491] : Sys_Text.stringTable[492];
-		descProcessor.text = Sys_Text.stringTable[479];
+		descSecurity.text = Eng_Text->stringTable[474];
+		security.text = LevelManager.a.levelSecurity[LevelManager.a.currentLevel] + Eng_Text->stringTable[307];
+		descLaser.text = Eng_Text->stringTable[475];
+		laser.text = Const.a.questData.LaserDestroyed ? Eng_Text->stringTable[486] : Eng_Text->stringTable[485];
+		descLifepod.text = Eng_Text->stringTable[476];
+		lifepod.text = Const.a.questData.SelfDestructActivated ? Eng_Text->stringTable[488] : Eng_Text->stringTable[487];
+		descShield.text = Eng_Text->stringTable[477];
+		shield.text = Const.a.questData.ShieldActivated ? Eng_Text->stringTable[490] : Eng_Text->stringTable[489];
+		descReactor.text = Eng_Text->stringTable[478];
+		reactor.text = Const.a.questData.SelfDestructActivated ? Eng_Text->stringTable[491] : Eng_Text->stringTable[492];
+		descProcessor.text = Eng_Text->stringTable[479];
 		int nodeCount = 0;
 		for (int i=0;i<14;i++) {
 			nodeCount += LevelManager.a.levelSmallNodeCount[i];
@@ -54,31 +54,31 @@ public class SystemAnalyzer : MonoBehaviour {
 			nodeCount -= LevelManager.a.levelLargeNodeDestroyedCount[i];
 		}
 		processor.text = nodeCount.ToString();
-		descProgram.text = Sys_Text.stringTable[480];
+		descProgram.text = Eng_Text->stringTable[480];
 		if (!Const.a.questData.LaserDestroyed) {
-			program.text = Sys_Text.stringTable[494];
+			program.text = Eng_Text->stringTable[494];
 		} else {
 			if (!Const.a.questData.BetaGroveJettisoned) {
-				program.text = Sys_Text.stringTable[495];
+				program.text = Eng_Text->stringTable[495];
 			} else {
 				if (!(Const.a.questData.AntennaNorthDestroyed && Const.a.questData.AntennaSouthDestroyed && Const.a.questData.AntennaWestDestroyed && Const.a.questData.AntennaEastDestroyed)) {
-					program.text = Sys_Text.stringTable[496];
+					program.text = Eng_Text->stringTable[496];
 				} else {
 					if (!Const.a.questData.BridgeSeparated) {
-						program.text = Sys_Text.stringTable[497];
+						program.text = Eng_Text->stringTable[497];
 					} else {
-						program.text = Sys_Text.stringTable[498];
+						program.text = Eng_Text->stringTable[498];
 					}
 				}
 			}
 		}
-		descAlpha.text = Sys_Text.stringTable[481];
-		alpha.text = Sys_Text.stringTable[492];
-		descBeta.text = Sys_Text.stringTable[482];
-		beta.text = Const.a.questData.BetaGroveJettisoned ? Sys_Text.stringTable[493] : Sys_Text.stringTable[492];
-		descGamma.text = Sys_Text.stringTable[483];
-		gamma.text = Sys_Text.stringTable[493];
-		descDelta.text = Sys_Text.stringTable[484];
-		delta.text = Sys_Text.stringTable[492];
+		descAlpha.text = Eng_Text->stringTable[481];
+		alpha.text = Eng_Text->stringTable[492];
+		descBeta.text = Eng_Text->stringTable[482];
+		beta.text = Const.a.questData.BetaGroveJettisoned ? Eng_Text->stringTable[493] : Eng_Text->stringTable[492];
+		descGamma.text = Eng_Text->stringTable[483];
+		gamma.text = Eng_Text->stringTable[493];
+		descDelta.text = Eng_Text->stringTable[484];
+		delta.text = Eng_Text->stringTable[492];
 	}
 }

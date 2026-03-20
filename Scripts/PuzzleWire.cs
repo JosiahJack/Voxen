@@ -391,7 +391,7 @@ public class PuzzleWire : MonoBehaviour {
 	}
 
 	public void ClickLHNode(int spot) {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 		if (Solved) return;
 
 		if (selectedWireLH) {
@@ -407,7 +407,7 @@ public class PuzzleWire : MonoBehaviour {
 	}
 
 	public void ClickRHNode(int spot) {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 		if (Solved) return;
 
 		if (!selectedWireLH) {

@@ -19,13 +19,13 @@ public class HealingBed : MonoBehaviour {
 				PlayerReferenceManager.a.playerCapsule.GetComponent<HealthManager>().HealingBed(amount,true);
 				PlayerHealth.a.radiationArea = false;
 				PlayerHealth.a.radiated = 0f;
-				CenterStatusPrint("%s", Sys_Text.stringTable[23],ud.owner);
+				CenterStatusPrint("%s", Eng_Text->stringTable[23],ud.owner);
 				Utils.PlayOneShotSavable(SFXSource,sounds[103]);
 			} else {
-				CenterStatusPrint("%s", Sys_Text.stringTable[24],ud.owner);
+				CenterStatusPrint("%s", Eng_Text->stringTable[24],ud.owner);
 			}
 		} else {
-			Sys_UI.BlockedBySecurity(Eng_Global->instances[i].position);
+			Eng_UI->BlockedBySecurity(Eng_Global->instances[i].position);
 		}
 	}
 }

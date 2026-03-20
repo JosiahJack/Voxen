@@ -9,7 +9,7 @@ public class CyberDataFragment : MonoBehaviour {
 		if (col.gameObject.CompareTag("Player")) {
 			PlayerMovement pm = col.gameObject.GetComponent<PlayerMovement>();
 			if (pm != null) {
-				Sys_UI.CyberSprint(Sys_Text.stringTable[textIndex]);
+				Eng_UI->CyberSprint(Eng_Text->stringTable[textIndex]);
 			}
 		}
 	}

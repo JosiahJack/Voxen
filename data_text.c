@@ -1,7 +1,7 @@
 #include "os.h"
 #include "voxen.h"
 char *strncpy(char *dest, const char *src, size_t n);
-Voxen_Text Sys_Text = { .file_data = NULL };
+TextSystem Sys_Text = { .file_data = NULL };
 char audiologNames[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
 char audiologSubjects[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
 char audiologSenders[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];

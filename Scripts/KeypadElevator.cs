@@ -32,7 +32,7 @@ public class KeypadElevator : MonoBehaviour {
 
 	public void Use (UseData ud) {
 		if (GetCurrentLevelSecurity() > securityThreshhold) {
-			Sys_UI.BlockedBySecurity(Eng_Global->instances[i].position);
+			Eng_UI->BlockedBySecurity(Eng_Global->instances[i].position);
 			return;
 		}
 
@@ -51,7 +51,7 @@ public class KeypadElevator : MonoBehaviour {
 
 		padInUse = true;
 		Utils.PlayUIOneShotSavable(91);
-		Sys_UI.SendElevatorKeypadToDataTab(this,buttonsEnabled,
+		Eng_UI->SendElevatorKeypadToDataTab(this,buttonsEnabled,
 												 buttonsDarkened,buttonText,
 												 targetDestination,
 												 Eng_Global->instances[i].position,linkedDoor,

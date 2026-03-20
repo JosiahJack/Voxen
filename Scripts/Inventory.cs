@@ -44,7 +44,7 @@
 				if (referenceIndex > -1) {
 					if (i != 0) { // Access Cards text set in Awake the once.
 						genButtonsText[i].text =
-							Sys_Text.stringTable[referenceIndex + 326];
+							Eng_Text->stringTable[referenceIndex + 326];
 					}
 				} else {
 					genButtonsText[i].text = string.Empty;
@@ -130,7 +130,7 @@
 			camPos;
 
 		// General
-		if (Sys_UI.GeneralTab.activeInHierarchy) {
+		if (Eng_UI->GeneralTab.activeInHierarchy) {
 			UpdateGeneralInventory();
 		}
 
@@ -152,10 +152,10 @@
 							grenButtons[grenadeCurrent].useableItemIndex
 						);
 					} else {
-						CenterStatusPrint("%s", Sys_Text.stringTable[322] ); // Out of grenades.
+						CenterStatusPrint("%s", Eng_Text->stringTable[322] ); // Out of grenades.
 					}
 				} else {
-					CenterStatusPrint("%s", Sys_Text.stringTable[322] ); // Out of grenades.
+					CenterStatusPrint("%s", Eng_Text->stringTable[322] ); // Out of grenades.
 				}
 			}
 		}
@@ -176,7 +176,7 @@
 			}
 		}
 
-		if (Sys_UI.MainTab.activeInHierarchy) {
+		if (Eng_UI->MainTab.activeInHierarchy) {
 			for (int i=0;i<grenCountsText.Length;i++) {
 				if (grenButtons[i].gameObject.activeInHierarchy) {
 					if (grenCountsLastCount[i] != grenAmmo[i]) {
@@ -197,11 +197,11 @@
 		//--- End Grenades ---
 
 		// Hardware
-		if (Sys_UI.HardwareTab.activeInHierarchy) {
+		if (Eng_UI->HardwareTab.activeInHierarchy) {
 			for (int i=0;i<hardwareInvText.Length;i++) {
 				if (hardwareInvText[i].gameObject.activeInHierarchy) {
 					hardwareInvText[i].text = 
-					  Sys_Text.stringTable[hardwareInvReferenceIndex[i] + 326]
+					  Eng_Text->stringTable[hardwareInvReferenceIndex[i] + 326]
 					  + " v" + hardwareVersion[i].ToString();
 					if (i == hardwareInvCurrent) {
 						hardwareInvText[i].color = Const.a.ssYellowText; // Yellow
@@ -235,7 +235,7 @@
 				lastAddedIndex = FindNextUnreadLog();
 				if (lastAddedIndex == tempRefIndex) lastAddedIndex = -1;
 				CheckForUnreadLogs();
-				CenterStatusPrint("%s", Sys_Text.stringTable[1019]); // "Log playback stopped"
+				CenterStatusPrint("%s", Eng_Text->stringTable[1019]); // "Log playback stopped"
 			}
 		}
 		//--- End Logs ---
@@ -246,14 +246,14 @@
 				if (patchCounts[patchCurrent] > 0) {
 					patchButtonScripts[patchCurrent].PatchUse();
 				} else {
-					CenterStatusPrint("%s", Sys_Text.stringTable[324] ); // Out of patches.
+					CenterStatusPrint("%s", Eng_Text->stringTable[324] ); // Out of patches.
 				}
 			}
 			if (GetInput.a.PatchCycUp())   PatchCycleUp(true);
 			if (GetInput.a.PatchCycDown()) PatchCycleDown(true);
 		}
 
-		if (Sys_UI.MainTab.activeInHierarchy) {
+		if (Eng_UI->MainTab.activeInHierarchy) {
 			for (int i = 0; i < patchLastCount.Length; i++) {
 				// Toggle patch button visibility.  Turn on if we have patches of that type.
 				if (patchCounts[i] > 0) {
@@ -282,7 +282,7 @@
 		//--- End Patches ---
 
 		// Weapons
-		if (Sys_UI.MainTab.activeInHierarchy) {
+		if (Eng_UI->MainTab.activeInHierarchy) {
 			UpdateAmmoText();
 			int yellowWep = Eng_Global->inventoryPlayer1.weaponCurrent;
 			int dullYellowWep = -1;
@@ -294,7 +294,7 @@
 			for (int i=0;i<weaponShotsInventory.Length;i++) {
 				if (weaponButtonText[i].gameObject.activeInHierarchy) {
 					weaponButtonText[i].text =
-						Sys_Text.stringTable[326 + weaponInventoryIndices[i]];
+						Eng_Text->stringTable[326 + weaponInventoryIndices[i]];
 
 					weaponShotsInventory[i].text = weaponShotsInventoryText[i];
 					if (i == yellowWep) {
@@ -374,7 +374,7 @@
 	}
 
 	public void AddAccessCardToInventory (int index) {
-		if (MouseLookScript.a.firstTimePickup) Sys_UI.CenterTabButtonClickSilent(2,true);
+		if (MouseLookScript.a.firstTimePickup) Eng_UI->CenterTabButtonClickSilent(2,true);
         AccessCardType doorAccessTypeAcquired;
 		switch (index) {
 			case 34: doorAccessTypeAcquired = AccessCardType_Admin; break;	  // Green Rim, Turquoise Inner with Yellow Cross (card_group5)
@@ -400,7 +400,7 @@
 			  && HasAccessCard(AccessCardType_Storage) // If Command, only give
 			  && HasAccessCard(AccessCardType_Security)//    message if missing
 			  && HasAccessCard(AccessCardType_Maintenance))) { //        all 3
-			CenterStatusPrint("%s", Sys_Text.stringTable[44] + AccessCardCodeForType(doorAccessTypeAcquired)); // Already have access: ##
+			CenterStatusPrint("%s", Eng_Text->stringTable[44] + AccessCardCodeForType(doorAccessTypeAcquired)); // Already have access: ##
 		} else {
 			bool added = false;
 			if (index == 87) {
@@ -432,7 +432,7 @@
 			if (added) {
 				if (index == 87) {
 					// New accesses gained STO MTN SEC
-					CenterStatusPrint("%s", Sys_Text.stringTable[45] 
+					CenterStatusPrint("%s", Eng_Text->stringTable[45] 
 						+ AccessCardCodeForType(AccessCardType_Storage)
 						+ ", "
 						+ AccessCardCodeForType(AccessCardType_Security)
@@ -440,19 +440,19 @@
 						+ AccessCardCodeForType(AccessCardType_Maintenance)); 
 				} else {
 					 // New accesses gained ##
-					CenterStatusPrint("%s", Sys_Text.stringTable[45]
+					CenterStatusPrint("%s", Eng_Text->stringTable[45]
 						+ AccessCardCodeForType(doorAccessTypeAcquired));
 				}
 
-				Sys_UI.SendInfoToItemTab(index);
-				Sys_UI.NotifyToCenterTab(2);
+				Eng_UI->SendInfoToItemTab(index);
+				Eng_UI->NotifyToCenterTab(2);
 				if (MouseLookScript.a.firstTimePickup) {
-					Sys_UI.CenterTabButtonClickSilent(2,true);
+					Eng_UI->CenterTabButtonClickSilent(2,true);
 					MouseLookScript.a.firstTimePickup = false;
 				}
 			} else {
 				CenterStatusPrint("BUG: Something went wrong when trying to add that access card.");
-				Sys_UI.ResetItemTab();
+				Eng_UI->ResetItemTab();
 			}
 		}
 	}
@@ -471,10 +471,10 @@
 			hwversion = 0;
 		}
 
-		if (overt) Sys_UI.SendInfoToItemTab(constIndex);
+		if (overt) Eng_UI->SendInfoToItemTab(constIndex);
 		if (hwversion < 0) hwversion = 0;
 		if (hwversion <= hardwareVersion[index] && hwversion > 0) {
-		    if (overt) CenterStatusPrint("%s", Sys_Text.stringTable[46]); // "THAT WARE IS OBSOLETE. DISCARDED."
+		    if (overt) CenterStatusPrint("%s", Eng_Text->stringTable[46]); // "THAT WARE IS OBSOLETE. DISCARDED."
 		    return;
 		}
 
@@ -498,7 +498,7 @@
 				}
 				
 				if (overt) {
-				    Sys_UI.OpenTab(2,true,TabMSG.None,0,Sys_UI.lastAutomapSideRH ? Handedness.RH : Handedness.LH);
+				    Eng_UI->OpenTab(2,true,TabMSG.None,0,Eng_UI->lastAutomapSideRH ? Handedness.RH : Handedness.LH);
 				}
 
 				// Go through all HealthManagers in the game and initialize the
@@ -557,13 +557,13 @@
 			hardwareButtonManager.buttons[button8Index].gameObject.SetActive(true);
 		}
 
-		if (overt) CenterStatusPrint("%s", Sys_Text.stringTable[textIndex + 326] + " v" + hwversion.ToString() );
+		if (overt) CenterStatusPrint("%s", Eng_Text->stringTable[textIndex + 326] + " v" + hwversion.ToString() );
 		if (MouseLookScript.a.firstTimePickup && overt) {
-			Sys_UI.CenterTabButtonClickSilent(1,true);
+			Eng_UI->CenterTabButtonClickSilent(1,true);
 		}
 
 		ActivateHardwareButton(index);
-		if (overt) Sys_UI.NotifyToCenterTab(1);
+		if (overt) Eng_UI->NotifyToCenterTab(1);
 	}
 
 	// The following utility functions make the code more explicit by removing
@@ -652,8 +652,8 @@
 			generalInventoryIndexRef[i] = index;
 
 			// Item added to general inventory
-			CenterStatusPrint("%s", Sys_Text.stringTable[index + 326]
-						 + Sys_Text.stringTable[31]);
+			CenterStatusPrint("%s", Eng_Text->stringTable[index + 326]
+						 + Eng_Text->stringTable[31]);
 
 			GeneralInvButton gv = genButtons[i].GetComponent<GeneralInvButton>();
 			if (gv != null) {
@@ -662,12 +662,12 @@
 			}
 
 			if (Eng_Global->inventoryPlayer1.generalInvCurrent == i) { // Only if current.
-				Sys_UI.SendInfoToItemTab(index,customIndex);
+				Eng_UI->SendInfoToItemTab(index,customIndex);
 			}
 
-			Sys_UI.NotifyToCenterTab(2);
+			Eng_UI->NotifyToCenterTab(2);
 			if (MouseLookScript.a.firstTimePickup) {
-				Sys_UI.CenterTabButtonClickSilent(2,true);
+				Eng_UI->CenterTabButtonClickSilent(2,true);
 				MouseLookScript.a.firstTimePickup = false;
 			}
 
@@ -705,16 +705,16 @@
 		}
 		if (lastDex == nextIndex) return; // Don't do anything if we don't have more grenades.
 
-		Sys_UI.CenterTabButtonClickSilent(0,true);
+		Eng_UI->CenterTabButtonClickSilent(0,true);
 		grenButtons[nextIndex].GrenadeInvSelect();
 		switch(grenadeCurrent) {
-			case 0: CenterStatusPrint("%s", Sys_Text.stringTable[579]); break;
-			case 1: CenterStatusPrint("%s", Sys_Text.stringTable[580]); break;
-			case 2: CenterStatusPrint("%s", Sys_Text.stringTable[581]); break;
-			case 3: CenterStatusPrint("%s", Sys_Text.stringTable[582]); break;
-			case 4: CenterStatusPrint("%s", Sys_Text.stringTable[583]); break;
-			case 5: CenterStatusPrint("%s", Sys_Text.stringTable[584]); break;
-			case 6: CenterStatusPrint("%s", Sys_Text.stringTable[585]); break;
+			case 0: CenterStatusPrint("%s", Eng_Text->stringTable[579]); break;
+			case 1: CenterStatusPrint("%s", Eng_Text->stringTable[580]); break;
+			case 2: CenterStatusPrint("%s", Eng_Text->stringTable[581]); break;
+			case 3: CenterStatusPrint("%s", Eng_Text->stringTable[582]); break;
+			case 4: CenterStatusPrint("%s", Eng_Text->stringTable[583]); break;
+			case 5: CenterStatusPrint("%s", Eng_Text->stringTable[584]); break;
+			case 6: CenterStatusPrint("%s", Eng_Text->stringTable[585]); break;
 		}
 	}
 
@@ -734,16 +734,16 @@
 		}
 		if (lastDex == nextIndex) return; // Don't do anything if we don't have more grenades.
 
-		Sys_UI.CenterTabButtonClickSilent(0,true);
+		Eng_UI->CenterTabButtonClickSilent(0,true);
 		grenButtons[nextIndex].GrenadeInvSelect();
 		switch(grenadeCurrent) {
-			case 0: CenterStatusPrint("%s", Sys_Text.stringTable[579]); break;
-			case 1: CenterStatusPrint("%s", Sys_Text.stringTable[580]); break;
-			case 2: CenterStatusPrint("%s", Sys_Text.stringTable[581]); break;
-			case 3: CenterStatusPrint("%s", Sys_Text.stringTable[582]); break;
-			case 4: CenterStatusPrint("%s", Sys_Text.stringTable[583]); break;
-			case 5: CenterStatusPrint("%s", Sys_Text.stringTable[584]); break;
-			case 6: CenterStatusPrint("%s", Sys_Text.stringTable[585]); break;
+			case 0: CenterStatusPrint("%s", Eng_Text->stringTable[579]); break;
+			case 1: CenterStatusPrint("%s", Eng_Text->stringTable[580]); break;
+			case 2: CenterStatusPrint("%s", Eng_Text->stringTable[581]); break;
+			case 3: CenterStatusPrint("%s", Eng_Text->stringTable[582]); break;
+			case 4: CenterStatusPrint("%s", Eng_Text->stringTable[583]); break;
+			case 5: CenterStatusPrint("%s", Eng_Text->stringTable[584]); break;
+			case 6: CenterStatusPrint("%s", Eng_Text->stringTable[585]); break;
 		}
 	}
 
@@ -753,7 +753,7 @@
 		if (index < 0) return;
 
 		if (MouseLookScript.a.firstTimePickup) {
-			Sys_UI.CenterTabButtonClickSilent(0,true);
+			Eng_UI->CenterTabButtonClickSilent(0,true);
 		}
 
 		if (grenAmmo[0] == 0 && grenAmmo[1] == 0 && grenAmmo[2] == 0
@@ -764,9 +764,9 @@
 		}
 
 		grenAmmo[index]++;
-		CenterStatusPrint("%s%s", Sys_Text.stringTable[useableIndex + 326], Sys_Text.stringTable[34]);
-		Sys_UI.NotifyToCenterTab(0);
-		Sys_UI.SendInfoToItemTab(useableIndex);
+		CenterStatusPrint("%s%s", Eng_Text->stringTable[useableIndex + 326], Eng_Text->stringTable[34]);
+		Eng_UI->NotifyToCenterTab(0);
+		Eng_UI->SendInfoToItemTab(useableIndex);
     }
 
 	public void RemoveGrenade(int index) {
@@ -865,8 +865,8 @@
 					break;
 			}
 		}
-		CenterStatusPrint("%s", Sys_Text.stringTable[1020] + Const.a.audiologNames[logIndex]); // "Playing "
-		Sys_UI.SendAudioLogToDataTab(logIndex);
+		CenterStatusPrint("%s", Eng_Text->stringTable[1020] + Const.a.audiologNames[logIndex]); // "Playing "
+		Eng_UI->SendAudioLogToDataTab(logIndex);
 	}
 
 	public void PlayLastAddedLog(int logIndex) {
@@ -884,7 +884,7 @@
 
 		if (index == 128) {
 			// Trioptimum Funpack Module, don't play on company time!
-			CenterStatusPrint("%s", Sys_Text.stringTable[309]);
+			CenterStatusPrint("%s", Eng_Text->stringTable[309]);
 			return;
 		}
 
@@ -892,7 +892,7 @@
 		lastAddedIndex = index;
 		numLogsFromLevel[Const.a.audioLogLevelFound[index]]++;
 		MouseLookScript.a.logContentsManager.InitializeLogsFromLevelIntoFolder();
-		Sys_UI.SendInfoToItemTab(6);
+		Eng_UI->SendInfoToItemTab(6);
 		if (Const.a.audioLogType[index] == AudioLogType.Email) {
 			hasNewEmail = true;
 		} else if (Const.a.audioLogType[index] == AudioLogType.Normal) {
@@ -901,14 +901,14 @@
 
 		if (hasHardware[2] == true) {
 			// Audio log ## picked up.  Press '##' to play back.
-			CenterStatusPrint("%s", Sys_Text.stringTable[36] + Const.a.audiologNames[index]
-						 + Sys_Text.stringTable[37]
+			CenterStatusPrint("%s", Eng_Text->stringTable[36] + Const.a.audiologNames[index]
+						 + Eng_Text->stringTable[37]
 						 + Const.a.InputValues[Const.a.InputCodeSettings[15]]
-						 + Sys_Text.stringTable[38]);
+						 + Eng_Text->stringTable[38]);
 		} else {
 			// Audio log ## picked up.  Proper hardware not detected to play.
-			CenterStatusPrint("%s", Sys_Text.stringTable[36] + Const.a.audiologNames[index]
-						 + Sys_Text.stringTable[310]);
+			CenterStatusPrint("%s", Eng_Text->stringTable[36] + Const.a.audiologNames[index]
+						 + Eng_Text->stringTable[310]);
 		}
 	}
 	//--- End Logs ---
@@ -927,7 +927,7 @@
 			if (nextIndex < 0) nextIndex = 6;
 			noPatches = (patchCounts[nextIndex] <= 0);
 		}
-		Sys_UI.CenterTabButtonClickSilent(0,true);
+		Eng_UI->CenterTabButtonClickSilent(0,true);
 		patchButtonScripts[nextIndex].PatchSelect(useSound);
 	}
 
@@ -944,7 +944,7 @@
 			if (nextIndex > 6) nextIndex = 0;
 			noPatches = (patchCounts[nextIndex] <= 0);
 		}
-		Sys_UI.CenterTabButtonClickSilent(0,true);
+		Eng_UI->CenterTabButtonClickSilent(0,true);
 		patchButtonScripts[nextIndex].PatchSelect(useSound);
 	}
 
@@ -952,7 +952,7 @@
 	public void AddPatchToInventory (int index,int constIndex) {
 		if (index < 0) return;
 
-		if (MouseLookScript.a.firstTimePickup) Sys_UI.CenterTabButtonClickSilent(0,true);
+		if (MouseLookScript.a.firstTimePickup) Eng_UI->CenterTabButtonClickSilent(0,true);
 		patchCounts[index]++;
 		if (patchCounts[patchCurrent] == 0) patchCurrent = index;
 
@@ -962,10 +962,10 @@
 			if (i == index) patchCountTextObjects[i].color = Const.a.ssYellowText; // Yellow
 			else  patchCountTextObjects[i].color = Const.a.ssGreenText; // Green
 		}
-		Sys_UI.SendInfoToItemTab(constIndex);
-		Sys_UI.NotifyToCenterTab(0);
-		CenterStatusPrint("%s", Sys_Text.stringTable[constIndex + 326]
-					 + Sys_Text.stringTable[35]); //  added to patch inventory
+		Eng_UI->SendInfoToItemTab(constIndex);
+		Eng_UI->NotifyToCenterTab(0);
+		CenterStatusPrint("%s", Eng_Text->stringTable[constIndex + 326]
+					 + Eng_Text->stringTable[35]); //  added to patch inventory
     }
 	//--- End Patches ---
 
@@ -974,7 +974,7 @@
 		if (currentCyberItem <= 0) {
 			currentCyberItem = GetExistingCyberItemIndex(); // try one more time to be sure
 			if (currentCyberItem <= 0) {
-				CenterStatusPrint("%s", Sys_Text.stringTable[473],Const.a.player1); // Out of expendable softwares.
+				CenterStatusPrint("%s", Eng_Text->stringTable[473],Const.a.player1); // Out of expendable softwares.
 				return;
 			}
 			// oh it was good, ok then moving on down...
@@ -1070,7 +1070,7 @@
 
 	public void UseDecoy() {
 		if (Const.a.decoyActive) {
-			CenterStatusPrint("%s", Sys_Text.stringTable[537],Const.a.player1);
+			CenterStatusPrint("%s", Eng_Text->stringTable[537],Const.a.player1);
 			return;
 		}
 		if (softVersions[4] <= 0) {
@@ -1103,11 +1103,11 @@
 					isPulserNotDrill = false; // equip drill if we don't already have pulser
 				}
 				if (vers > softVersions[0]) softVersions[0] = vers;
-				else CenterStatusPrint("%s", Sys_Text.stringTable[46],Const.a.player1);
+				else CenterStatusPrint("%s", Eng_Text->stringTable[46],Const.a.player1);
 				drillVersionText.text = softVersions[0].ToString();
 				hasSoft[0] = true;
 				Utils.PlayUIOneShotSavable(86); // frob_hardware
-				CenterStatusPrint("%s", Sys_Text.stringTable[444] + softVersions[0].ToString() + Sys_Text.stringTable[458],Const.a.player1);
+				CenterStatusPrint("%s", Eng_Text->stringTable[444] + softVersions[0].ToString() + Eng_Text->stringTable[458],Const.a.player1);
 				return true;
 			case SoftwareType.Pulser:	
 				softs[1].SetActive(true);
@@ -1117,20 +1117,20 @@
 					isPulserNotDrill = true; // always equip pulser when first picking it up
 				}
 				if (vers > softVersions[1]) softVersions[1] = vers;
-				else CenterStatusPrint("%s", Sys_Text.stringTable[46],Const.a.player1);
+				else CenterStatusPrint("%s", Eng_Text->stringTable[46],Const.a.player1);
 				pulserVersionText.text = softVersions[1].ToString();
 				hasSoft[1] = true;
 				Utils.PlayUIOneShotSavable(86); // frob_hardware
-				CenterStatusPrint("%s", Sys_Text.stringTable[445] + softVersions[1].ToString() + Sys_Text.stringTable[458],Const.a.player1);
+				CenterStatusPrint("%s", Eng_Text->stringTable[445] + softVersions[1].ToString() + Eng_Text->stringTable[458],Const.a.player1);
 				return true;
 			case SoftwareType.CShield:	
 				softs[2].SetActive(true);
 				if (vers > softVersions[2]) softVersions[2] = vers;
-				else CenterStatusPrint("%s", Sys_Text.stringTable[46],Const.a.player1);
+				else CenterStatusPrint("%s", Eng_Text->stringTable[46],Const.a.player1);
 				cshieldVersionText.text = softVersions[2].ToString();
 				hasSoft[2] = true;
 				Utils.PlayUIOneShotSavable(86); // frob_hardware
-				CenterStatusPrint("%s", Sys_Text.stringTable[446] + softVersions[2].ToString() + Sys_Text.stringTable[458],Const.a.player1);
+				CenterStatusPrint("%s", Eng_Text->stringTable[446] + softVersions[2].ToString() + Eng_Text->stringTable[458],Const.a.player1);
 				return true;
 			case SoftwareType.Turbo:
 				if (currentCyberItem == -1f) currentCyberItem = 0;
@@ -1139,7 +1139,7 @@
 				turboCountText.text = softVersions[3].ToString();
 				hasSoft[3] = true;
 				Utils.PlayUIOneShotSavable(86); // frob_hardware
-				CenterStatusPrint("%s", Sys_Text.stringTable[447],Const.a.player1);
+				CenterStatusPrint("%s", Eng_Text->stringTable[447],Const.a.player1);
 				return true;
 			case SoftwareType.Decoy:	
 				if (currentCyberItem == -1f) currentCyberItem = 1;
@@ -1148,7 +1148,7 @@
 				decoyCountText.text = softVersions[4].ToString();
 				hasSoft[4] = true;
 				Utils.PlayUIOneShotSavable(86); // frob_hardware
-				CenterStatusPrint("%s", Sys_Text.stringTable[448],Const.a.player1);
+				CenterStatusPrint("%s", Eng_Text->stringTable[448],Const.a.player1);
 				return true;
 			case SoftwareType.Recall:	
 				if (currentCyberItem == -1f) currentCyberItem = 2;
@@ -1157,7 +1157,7 @@
 				recallCountText.text = softVersions[5].ToString();
 				hasSoft[5] = true;
 				Utils.PlayUIOneShotSavable(86); // frob_hardware
-				CenterStatusPrint("%s", Sys_Text.stringTable[449],Const.a.player1);
+				CenterStatusPrint("%s", Eng_Text->stringTable[449],Const.a.player1);
 				return true;
 			case SoftwareType.Game:		
 				softs[6].SetActive(true);
@@ -1166,25 +1166,25 @@
 				miniGameButton[vers].SetActive(true);
 				switch(vers) {
 					case 0: // Ping
-							CenterStatusPrint("%s", Sys_Text.stringTable[450],Const.a.player1);
+							CenterStatusPrint("%s", Eng_Text->stringTable[450],Const.a.player1);
 							break;
 					case 1: // 15
-							CenterStatusPrint("%s", Sys_Text.stringTable[451],Const.a.player1);
+							CenterStatusPrint("%s", Eng_Text->stringTable[451],Const.a.player1);
 							break;
 					case 2: // Wing 0
-							CenterStatusPrint("%s", Sys_Text.stringTable[452],Const.a.player1);
+							CenterStatusPrint("%s", Eng_Text->stringTable[452],Const.a.player1);
 							break;
 					case 3: // Botbounce
-							CenterStatusPrint("%s", Sys_Text.stringTable[453],Const.a.player1);
+							CenterStatusPrint("%s", Eng_Text->stringTable[453],Const.a.player1);
 							break;
 					case 4: // Eel Zapper
-							CenterStatusPrint("%s", Sys_Text.stringTable[454],Const.a.player1);
+							CenterStatusPrint("%s", Eng_Text->stringTable[454],Const.a.player1);
 							break;
 					case 5: // Road
-							CenterStatusPrint("%s", Sys_Text.stringTable[455],Const.a.player1);
+							CenterStatusPrint("%s", Eng_Text->stringTable[455],Const.a.player1);
 							break;
 					case 6: // TriopToe
-							CenterStatusPrint("%s", Sys_Text.stringTable[456],Const.a.player1);
+							CenterStatusPrint("%s", Eng_Text->stringTable[456],Const.a.player1);
 							break;
 				}
 				Utils.PlayUIOneShotSavable(86); // frob_hardware
@@ -1193,7 +1193,7 @@
 			case SoftwareType.Data:
 				hasNewData = true;
 				Utils.PlayUIOneShotSavable(87); // frob_item
-				CenterStatusPrint("%s", Sys_Text.stringTable[457],Const.a.player1);
+				CenterStatusPrint("%s", Eng_Text->stringTable[457],Const.a.player1);
 				hasLog[vers] = true;
 				return true;
 			case SoftwareType.Integrity:
@@ -1202,8 +1202,8 @@
 				Utils.PlayUIOneShotSavable(86); // frob_hardware
 				hm.cyberHealth += 77f;
 				if (hm.cyberHealth > 255f) hm.cyberHealth = 255f;
-				Sys_UI.DrawTicks(true);
-				CenterStatusPrint("%s", Sys_Text.stringTable[459],Const.a.player1);
+				Eng_UI->DrawTicks(true);
+				CenterStatusPrint("%s", Eng_Text->stringTable[459],Const.a.player1);
 				return true;
 			case SoftwareType.Keycard:
 				hasNewData = true;
@@ -1245,7 +1245,7 @@
 		if (Eng_Global->inventoryPlayer1.weaponCurrent < 0) return;
 		if (Eng_Global->inventoryPlayer1.weaponCurrent > 7) return;
 
-		Sys_UI.SetAmmoIcons(Eng_Global->inventoryPlayer1.weaponIndex,
+		Eng_UI->SetAmmoIcons(Eng_Global->inventoryPlayer1.weaponIndex,
 						wepLoadedWithAlternate[Eng_Global->inventoryPlayer1.weaponCurrent]); 
 	}
 
@@ -1266,9 +1266,9 @@
 		case 37:
 			//ER-90 Blaster
 			if (currentEnergyWeaponHeat[index] > 80f) {
-				retval = Sys_Text.stringTable[14]; // OVERHEATED
+				retval = Eng_Text->stringTable[14]; // OVERHEATED
 			} else {
-				retval = Sys_Text.stringTable[15]; // READY
+				retval = Eng_Text->stringTable[15]; // READY
 			}
 			break;
 		case 38:
@@ -1294,9 +1294,9 @@
 		case 40:
 			//RW-45 Ion Beam
 			if (currentEnergyWeaponHeat[index] > 80f) {
-				retval = Sys_Text.stringTable[14]; // OVERHEATED
+				retval = Eng_Text->stringTable[14]; // OVERHEATED
 			} else {
-				retval = Sys_Text.stringTable[15]; // READY
+				retval = Eng_Text->stringTable[15]; // READY
 			}
 			break;
 		case 41:
@@ -1340,9 +1340,9 @@
 		case 46:
 			//LG-XX Plasma Rifle
 			if (currentEnergyWeaponHeat[index] > 80f) {
-				retval = Sys_Text.stringTable[14]; // OVERHEATED
+				retval = Eng_Text->stringTable[14]; // OVERHEATED
 			} else {
-				retval = Sys_Text.stringTable[15]; // READY
+				retval = Eng_Text->stringTable[15]; // READY
 			}
 			break;
 		case 47:
@@ -1368,17 +1368,17 @@
 		case 50:
 			//Sparq Beam
 			if (currentEnergyWeaponHeat[index] > 80f) {
-				retval = Sys_Text.stringTable[14]; // OVERHEATED
+				retval = Eng_Text->stringTable[14]; // OVERHEATED
 			} else {
-				retval = Sys_Text.stringTable[15]; // READY
+				retval = Eng_Text->stringTable[15]; // READY
 			}
 			break;
 		case 51:
 			//DH-07 Stungun
 			if (currentEnergyWeaponHeat[index] > 80f) {
-				retval = Sys_Text.stringTable[14]; // OVERHEATED
+				retval = Eng_Text->stringTable[14]; // OVERHEATED
 			} else {
-				retval = Sys_Text.stringTable[15]; // READY
+				retval = Eng_Text->stringTable[15]; // READY
 			}
 			break;
 		}
@@ -1399,30 +1399,30 @@
 	public void AddAmmoToInventory (int index, int constIndex, int amount, bool isSecondary) {
 		if (index < 0) return;
 
-		if (MouseLookScript.a.firstTimePickup) Sys_UI.CenterTabButtonClickSilent (0,true);
+		if (MouseLookScript.a.firstTimePickup) Eng_UI->CenterTabButtonClickSilent (0,true);
 		if (isSecondary) wepAmmoSecondary[index] += amount;
 		else			 wepAmmo[index]          += amount;
 
-		CenterStatusPrint("%s", Sys_Text.stringTable[constIndex + 326]
-					 + Sys_Text.stringTable[630]); // Item added to ammo
+		CenterStatusPrint("%s", Eng_Text->stringTable[constIndex + 326]
+					 + Eng_Text->stringTable[630]); // Item added to ammo
 
-		Sys_UI.NotifyToCenterTab(0);
-		Sys_UI.SendInfoToItemTab(constIndex);
+		Eng_UI->NotifyToCenterTab(0);
+		Eng_UI->SendInfoToItemTab(constIndex);
 	}
 
     public bool AddWeaponToInventory(int index, int ammo1, int ammo2,
 									 bool loadedAlt) { // index = usableItem index
 		if (index < 0) return false;
 
-		Sys_UI.OpenTab(0, true, TabMSG.Weapon, 0,Handedness.LH);
-		Sys_UI.CenterTabButtonClickSilent (0,true); // Weapons are so important we always switch it.
+		Eng_UI->OpenTab(0, true, TabMSG.Weapon, 0,Handedness.LH);
+		Eng_UI->CenterTabButtonClickSilent (0,true); // Weapons are so important we always switch it.
         for (int i=0;i<7;i++) {
             if (weaponInventoryIndices[i] >= 0) continue;
 
 			weaponInventoryIndices[i] = index;
-			weaponButtonText[i].text = Sys_Text.stringTable[326 + index];
+			weaponButtonText[i].text = Eng_Text->stringTable[326 + index];
 			int index16 = WeaponFire.Get16WeaponIndexFromConstIndex(index);
-			WeaponButton wepBut = Sys_UI.wepbutMan.wepButtonsScripts[i];
+			WeaponButton wepBut = Eng_UI->wepbutMan.wepButtonsScripts[i];
 			wepBut.useableItemIndex = index;
 			float egSet = GetDefaultEnergySettingForWeaponFrom16Index(index16);
 			Eng_Global->inventoryPlayer1.weaponEnergySetting[i] = egSet;
@@ -1436,9 +1436,9 @@
 					WeaponFire.a.reloadContainerHome;
 
 				Eng_Global->inventoryPlayer1.justChangedWeap = true;
-				Sys_UI.SendInfoToItemTab(index); // Notify item tab we
-				Sys_UI.SendInfoToItemTab(index); // clicked on a weapon.
-				Sys_UI.UpdateHUDAmmoCountsEither();
+				Eng_UI->SendInfoToItemTab(index); // Notify item tab we
+				Eng_UI->SendInfoToItemTab(index); // clicked on a weapon.
+				Eng_UI->UpdateHUDAmmoCountsEither();
 				WeaponFire.a.CompleteWeaponChange();
 			}
 
@@ -1453,10 +1453,10 @@
 
 			}
 
-			CenterStatusPrint("%s", Sys_Text.stringTable[index + 326]
-						 + Sys_Text.stringTable[33]);
+			CenterStatusPrint("%s", Eng_Text->stringTable[index + 326]
+						 + Eng_Text->stringTable[33]);
 
-			Sys_UI.NotifyToCenterTab(0);
+			Eng_UI->NotifyToCenterTab(0);
 			return true;
         }
 		return false;
@@ -1546,7 +1546,7 @@
 			int dex = inv.weaponInventoryIndices[i];
 			if (dex < 0) continue;
 
-			inv.weaponButtonText[i].text = Sys_Text.stringTable[dex + 326];
+			inv.weaponButtonText[i].text = Eng_Text->stringTable[dex + 326];
 		}
 
 		inv.grenadeCurrent = Utils.GetIntFromString(entries[index],"grenadeCurrent"); index++;
@@ -1677,7 +1677,7 @@
 			int referenceIndex = genbut.useableItemIndex;
 			if (inv.generalInventoryIndexRef[i] > -1) {
 				inv.genButtonsText[i].text =
-					Sys_Text.stringTable[inv.generalInventoryIndexRef[i] + 326];
+					Eng_Text->stringTable[inv.generalInventoryIndexRef[i] + 326];
 			} else {
 				inv.genButtonsText[i].text = string.Empty;
 			}

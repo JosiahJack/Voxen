@@ -46,29 +46,29 @@ public class TabButtons : MonoBehaviour {
 		SetCurrentAsLast();
 		switch (tabNum) {
 			case 0: // Weapon
-				Sys_UI.lastWeaponSideRH = isRH;
+				Eng_UI->lastWeaponSideRH = isRH;
 				break;
 			case 1: // Item
-				Sys_UI.lastItemSideRH = isRH;
+				Eng_UI->lastItemSideRH = isRH;
 				break;
 			case 2: // Automap
-				Sys_UI.lastAutomapSideRH = isRH;
+				Eng_UI->lastAutomapSideRH = isRH;
 				break;
 			case 3: // Target
-				Sys_UI.lastTargetSideRH = isRH;
+				Eng_UI->lastTargetSideRH = isRH;
 				break;
 			case 4: // Data
-				if (Sys_UI.tetheredSearchable != null) {
-					if (isRH) Sys_UI.lastSearchSideRH = true;
-					else Sys_UI.lastSearchSideRH = false;
+				if (Eng_UI->tetheredSearchable != null) {
+					if (isRH) Eng_UI->lastSearchSideRH = true;
+					else Eng_UI->lastSearchSideRH = false;
 				}
-				Sys_UI.lastDataSideRH = isRH;
+				Eng_UI->lastDataSideRH = isRH;
 				break;
 		}
 	}
 
 	public void TabButtonClick(int tabNum) { // For click events.
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 		TabButtonAction(tabNum);
 		SetMFDLasts(tabNum);
 	}

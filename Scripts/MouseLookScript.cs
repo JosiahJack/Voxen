@@ -115,7 +115,7 @@
 		// Allow quick load straight from the menu or pause.
 		if (Input.GetKeyUp(f9)) {
 			if (inCyberSpace) {
-				CenterStatusPrint("%s", Sys_Text.stringTable[1023]); // "Cannot load in cyberspace"
+				CenterStatusPrint("%s", Eng_Text->stringTable[1023]); // "Cannot load in cyberspace"
 				return;
 			}
 
@@ -140,7 +140,7 @@
 		// ====================================================================
 		if (Input.GetKeyUp(f6)) {
 			if (inCyberSpace) {
-				CenterStatusPrint("%s", Sys_Text.stringTable[602]); // Cannot save in cyberspace
+				CenterStatusPrint("%s", Eng_Text->stringTable[602]); // Cannot save in cyberspace
 				return;
 			}
 			
@@ -329,21 +329,21 @@
 		cyberspaceReturnCameraLocalRotation = Eng_Global->instances[i].rotation.eulerAngles;
 		cyberspaceReturnPlayerCapsuleLocalRotation = playerCapsuleTransform.localRotation.eulerAngles;
 		cyberspaceReturnLevel = LevelManager.a.currentLevel;
-		Sys_UI.EnterCyberspace();
+		Eng_UI->EnterCyberspace();
 		LevelManager.a.LoadLevel(13,cyberspaceRecallPoint);
 		Eng_Global->instances[PLAYER1].inCyberSpace = true;
 		Eng_Global->instances[PLAYER1].leanCapsuleCollider.enabled = false;
 		hm.inCyberSpace = true;
 		inCyberSpace = true;
 		playerCamera.useOcclusionCulling = false;
-		Sys_UI.DrawTicks(true);
+		Eng_UI->DrawTicks(true);
 		SetCameraCullDistances();
 		Utils.PlayUIOneShotSavable(81); // cyber
 	}
 
 	public void ExitCyberspace() {
 		playerRadiationTreatmentFlash.SetActive(true);
-		Sys_UI.ExitCyberspace();
+		Eng_UI->ExitCyberspace();
 		LevelManager.a.LoadLevel(cyberspaceReturnLevel,cyberspaceReturnPoint);
 
 		// Left/right component applied to capsule.
@@ -367,7 +367,7 @@
 		inCyberSpace = false;
 		playerCamera.useOcclusionCulling = true;
 		Const.a.decoyActive = false;
-		Sys_UI.DrawTicks(true);
+		Eng_UI->DrawTicks(true);
 		Utils.PlayUIOneShotSavable(81); // cyber
 		SetCameraCullDistances();
 	}
@@ -561,130 +561,8 @@
 			if (!aic.hasTargetIDAttached) { WeaponFire.a.CreateTargetIDInstance(-1f,aic.healthManager,-1f); return true; }
 		}
 
-		CenterStatusPrint("%s",Sys_Text.stringTable[29] + Const.a.nameForNPC[aic.index],player); // "Can't use <enemy>"
+		CenterStatusPrint("%s",Eng_Text->stringTable[29] + Const.a.nameForNPC[aic.index],player); // "Can't use <enemy>"
 		return true;
-	}
-
-	void FrobEmptyHanded() {
-		if (Eng_Global->inventoryPlayer1.holdingObject) return;
-
-		RaycastHit firstHit;
-		float offset = Screen.height * 0.02f;
-		cursorPoint = MouseCursor.a.GetCursorScreenPointForRay();
-		if (TargetIDFrob(cursorPoint)) return;
-
-		Ray castDir = playerCamera.ScreenPointToRay(cursorPoint);
-		bool successfulRay = Raycast(castDir, out tempHit, Const.frobDistance, Const.a.layerMaskPlayerFrob);
-		firstHit = tempHit;
-		// Success here means hit a useable something.
-		// If a ray hits a wall or other unusable something,
-		// that's not success and print "Can't use <something>".
-		if (successfulRay) {
-			successfulRay = (tempHit.collider != null);
-			if (successfulRay) {
-				successfulRay = (tempHit.collider.CompareTag("Usable")
-								 || tempHit.collider.CompareTag("Searchable"));
-			}
-		}
-
-		// Shoot rays in a pattern like this
-		// * * *
-		// * + *
-		// * * *
-
-		// In an order like this:
-		// 8 3 6
-		// 5 1 4
-		// 7 2 9
-		// To kind of walk around the center point to hopefully minimize rays
-		// we try and tighten our lug nuts properly so the wheels don't fall 
-		// off this thing.
-
-		if (!successfulRay) { // Try down
-			cursorPoint.y -= offset;
-			successfulRay = RayOffset();
-			cursorPoint.y += offset;
-		}
-		if (!successfulRay) { // Try up
-			cursorPoint.y += offset;
-			successfulRay = RayOffset();
-			cursorPoint.y -= offset;
-		}
-		if (!successfulRay) { // Try to the right
-			cursorPoint.x += offset;
-			successfulRay = RayOffset();
-			cursorPoint.x -= offset;
-		}
-		if (!successfulRay) { // Try to the left
-			cursorPoint.x -= offset;
-			successfulRay = RayOffset();
-			cursorPoint.x += offset;
-		}
-		if (!successfulRay) { // Try up and to the right
-			cursorPoint.x += offset;
-			cursorPoint.y += offset;
-			successfulRay = RayOffset();
-			cursorPoint.x -= offset;
-			cursorPoint.y -= offset;
-		}
-		if (!successfulRay) { // Try down and to the left
-			cursorPoint.x -= offset;
-			cursorPoint.y -= offset;
-			successfulRay = RayOffset();
-			cursorPoint.x += offset;
-			cursorPoint.y += offset;
-		}
-		if (!successfulRay) { // Try up and to the left, cupid shuffle
-			cursorPoint.x -= offset;
-			cursorPoint.y += offset;
-			successfulRay = RayOffset();
-			cursorPoint.x += offset;
-			cursorPoint.y -= offset;
-		}
-		if (!successfulRay) { // Try down and to the right
-			cursorPoint.x += offset;
-			cursorPoint.y -= offset;
-			successfulRay = RayOffset();
-			cursorPoint.x -= offset;
-			cursorPoint.y += offset;
-		}
-
-		if (!successfulRay) tempHit = firstHit;
-
-		// Okay we've checked first center, then in a box patter of 8, surely
-		// we've hit something the player was reasonably aiming at by now.
-		if (successfulRay) {
-			if (tempHit.collider.CompareTag("Usable")) { // Use
-				UseData ud = new UseData ();
-				ud.owner = player;
-				UseHandler uh = tempHit.collider.gameObject.GetComponent<UseHandler>();
-				if (uh != null) {
-					uh.Use(ud);
-				} else {
-					UseHandlerRelay uhr = tempHit.collider.gameObject.GetComponent<UseHandlerRelay>();
-					if (uhr != null) {
-						if (uhr.referenceUseHandler != null) {
-							uhr.referenceUseHandler.Use(ud);
-						}
-					} else {
-						DualLog("BUG: Attempting to use a useable without a UseHandler or UseHandlerRelay!");
-					}
-				}
-			} else if (tempHit.collider.CompareTag("Searchable")) { // Search
-				currentSearchItem = tempHit.collider.gameObject;
-				SearchObject(currentSearchItem.GetComponent<SearchableItem>().lookUpIndex);
-			} else {
-				CenterStatusPrint(29); // "Can't use "
-			}
-		} else { // Frobbed into empty space, so whatever it is is too far.
-			if (tempHit.collider != null) {
-				// Can't use <something>
-				UseName.UseNameSprint(tempHit.collider.gameObject);
-			} else {
-				// You are too far away from that
-				CenterStatusPrint("%s", Sys_Text.stringTable[30],player);
-			}
-		}
 	}
 
 	bool FrobWithHeldObject() {
@@ -768,10 +646,10 @@
 		PutObjectInHand(indexPriorToRemoval,-1,am1,am2,loadAlt,true);
 		Eng_Global->inventoryPlayer1.RemoveWeapon(wepbut.WepButtonIndex);
 		Eng_Global->inventoryPlayer1.RemoveWeapon(wepbut.WepButtonIndex);
-		Sys_UI.SetAmmoIcons(-1,false) ; // Clear the ammo icons.
-		Sys_UI.HideAmmoAndEnergyItems();
+		Eng_UI->SetAmmoIcons(-1,false) ; // Clear the ammo icons.
+		Eng_UI->HideAmmoAndEnergyItems();
 		wepbut.useableItemIndex = -1;
-		wepbut = Sys_UI.wepbutMan.wepButtonsScripts[0];
+		wepbut = Eng_UI->wepbutMan.wepButtonsScripts[0];
 		Eng_Global->inventoryPlayer1.WeaponChange(wepbut.useableItemIndex,
 									 wepbut.WepButtonIndex);
 	}
@@ -803,7 +681,7 @@
 						}
 					}
 
-					Sys_UI.SendInfoToItemTab(Eng_Global->inventoryPlayer1.grenadeCurrent);
+					Eng_UI->SendInfoToItemTab(Eng_Global->inventoryPlayer1.grenadeCurrent);
 					if (Eng_Global->inventoryPlayer1.grenadeCurrent < 0) {
 						Eng_Global->inventoryPlayer1.grenadeCurrent = 0;
 					}
@@ -823,7 +701,7 @@
 					for (int i = 0; i < 7; i++) {
 						if (Eng_Global->inventoryPlayer1.patchCounts[i] > 0) Eng_Global->inventoryPlayer1.patchCurrent = i;
 					}
-					Sys_UI.SendInfoToItemTab(Eng_Global->inventoryPlayer1.patchCurrent);
+					Eng_UI->SendInfoToItemTab(Eng_Global->inventoryPlayer1.patchCurrent);
 					if (Eng_Global->inventoryPlayer1.patchCurrent < 0) {
 						Eng_Global->inventoryPlayer1.patchCurrent = 0;
 					}
@@ -836,8 +714,8 @@
 
 				// Access Cards button
 				if (genbut.GeneralInvButtonIndex == 0) {
-					Sys_UI.OpenLastItemSide();
-					Sys_UI.SendInfoToItemTab(81);
+					Eng_UI->OpenLastItemSide();
+					Eng_UI->SendInfoToItemTab(81);
 					return;
 				}
 
@@ -856,9 +734,9 @@
 				}
 
 				if (referenceIndex < 0 || referenceIndex > 110) {
-					Sys_UI.ResetItemTab();
+					Eng_UI->ResetItemTab();
 				} else {
-					Sys_UI.SendInfoToItemTab(referenceIndex,genbut.customIndex);
+					Eng_UI->SendInfoToItemTab(referenceIndex,genbut.customIndex);
 				}
 				PutObjectInHand(indexPriorToRemoval,customIndexPrior,0,0,false,true);
 				break;
@@ -909,14 +787,14 @@
 		
 		sebut.contEng_Global->instances[index] = -1;
 		sebut.customIndex[index] = -1;
-		Sys_UI.DisableSearchItemImage(index);
+		Eng_UI->DisableSearchItemImage(index);
 		sebut.CheckForEmpty();
 		
 		if (Const.a.InputQuickItemPickup) {
 			AddItemToInventory(Eng_Global->inventoryPlayer1.heldObjectIndex,heldObjectCustomIndex);
 			ResetHeldItem();
 		} else {
-			CenterStatusPrint("%s", Sys_Text.stringTable[Eng_Global->inventoryPlayer1.heldObjectIndex + 326] + Sys_Text.stringTable[319],player);
+			CenterStatusPrint("%s", Eng_Text->stringTable[Eng_Global->inventoryPlayer1.heldObjectIndex + 326] + Eng_Text->stringTable[319],player);
 			ForceInventoryMode();
 		}	
 	}
@@ -956,12 +834,12 @@
 
 	void AddItemFail(int index) { // Expects usableItem index
 		DropHeldItem();
-		CenterStatusPrint("%s", Sys_Text.stringTable[32] + Sys_Text.stringTable[index + 326]
-					 + Sys_Text.stringTable[318],player); // Inventory full.
+		CenterStatusPrint("%s", Eng_Text->stringTable[32] + Eng_Text->stringTable[index + 326]
+					 + Eng_Text->stringTable[318],player); // Inventory full.
 	}
 
 	public void AddItemToInventory(int index, int customIndex) {
-		Sys_UI.mouseClickHeldOverGUI = true; // Prevent gun shooting.
+		Eng_UI->mouseClickHeldOverGUI = true; // Prevent gun shooting.
 		if (index < 0) index = 0; // Good check on paper.
 		if (index > 110) index = 94; // Way to get a head.
 		if ((index >= 0 && index <= 5)
@@ -1044,7 +922,7 @@
 			}
 	    	if (numberFoundContents == 0) {
 				currentSearchItem = null;
-				Sys_UI.ReturnTabsFromSearch();
+				Eng_UI->ReturnTabsFromSearch();
 			}
 		}
 		firstTimePickup = false;
@@ -1124,7 +1002,7 @@
 		} else {
 			// Throw an active grenade
 			grenadeActive = false;
-			Sys_UI.mouseClickHeldOverGUI = true; // Prevent shooting it.
+			Eng_UI->mouseClickHeldOverGUI = true; // Prevent shooting it.
 			tossObject = Instantiate(heldObject,(Eng_Global->instances[i].position + (transform.forward * tossOffset)),Const.a.quaternionIdentity) as GameObject;  //effect
 			if (tossObject == null) {
 				CenterStatusPrint("BUG: Failed to instantiate object being dropped!",player);
@@ -1171,7 +1049,7 @@
 	public void ForceShootMode() {
 		if (Const.a.NoShootMode) return; // We are being like the original now!
 
-		Sys_UI.mouseClickHeldOverGUI = false;
+		Eng_UI->mouseClickHeldOverGUI = false;
 		Automap.a.CloseFullmap();
 		Cursor.lockState = CursorLockMode.Locked;
 		Cursor.visible = false;
@@ -1203,67 +1081,16 @@
 		else shootModeButton.SetActive(false);
 	}
 
-	void SearchObject (int index){
-		if (currentSearchItem == null) { DualLog("BUG: Early exit from SearchObject, currentSearchItem was null!"); return;}
-
-		bool useFX = true;
-		SearchableItem curSearchScript = currentSearchItem.GetComponent<SearchableItem>();
-		if (curSearchScript.searchableInUse) {
-			for (int i=0;i<4;i++) {
-				if (curSearchScript.contEng_Global->instances[i] >= 0) {
-					MouseCursor.a.GetComponent<MouseCursor>().cursorImage = Const.a.useableItemsFrobIcons[curSearchScript.contEng_Global->instances[i]];
-					Eng_Global->inventoryPlayer1.heldObjectIndex = curSearchScript.contEng_Global->instances[i];
-					heldObjectCustomIndex = curSearchScript.customIndex[i];
-					curSearchScript.contEng_Global->instances[i] = -1;
-					curSearchScript.customIndex[i] = -1;
-					if (Eng_Global->inventoryPlayer1.heldObjectIndex != -1) Eng_Global->inventoryPlayer1.holdingObject = true;
-					CenterStatusPrint("%s", Sys_Text.stringTable[Eng_Global->inventoryPlayer1.heldObjectIndex + 326]
-								 + Sys_Text.stringTable[319],player); // picked up
-
-					Sys_UI.DisableSearchItemImage(i);
-					useFX = false;
-					break;
-				}
-			}
-		} else {
-			Utils.PlayUIOneShotSavable(91); // searchsound
-		}
-
-		curSearchScript.searchableInUse = true;
-
-		// Search through array to see if any items are in the container
-		int numberFoundContents = 0;
-		int[] resultContents = {-1,-1,-1,-1};  // create blanked container for search results
-		int[] resultCustomIndex = {-1,-1,-1,-1};  // create blanked container for search results custom indices
-		for (int i=3;i>=0;i--) {
-			resultContEng_Global->instances[i] = curSearchScript.contEng_Global->instances[i];
-			resultCustomIndex[i] = curSearchScript.customIndex[i];
-			// If something was found, add 1 to count.
-			if (resultContEng_Global->instances[i] > -1) numberFoundContents++;
-		}
-
-		if (firstTimeSearch) {
-			firstTimeSearch = false;
-			Sys_UI.OpenTab (4, true, TabMSG.Search, -1,Handedness.LH);
-		}
-		Sys_UI.SendSearchToDataTab(curSearchScript.objectName,
-										 numberFoundContents,resultContents,
-										 resultCustomIndex,
-										 currentSearchItem.Eng_Global->instances[i].position,
-										 curSearchScript, useFX);
-		ForceInventoryMode();
-	}
-
 	public void UseGrenade (int index) {
-		if (Eng_Global->inventoryPlayer1.holdingObject) { CenterStatusPrint("%s", Sys_Text.stringTable[311],player); return; } // Can't use grenade, hands full
+		if (Eng_Global->inventoryPlayer1.holdingObject) { CenterStatusPrint("%s", Eng_Text->stringTable[311],player); return; } // Can't use grenade, hands full
 		if (index < 7 || index > 13) { DualLog("BUG: index outside of 7 to 13 passed to UseGrenade() in MouseLookScript.cs"); return; }
 
 		ForceInventoryMode();  // Inventory mode is turned on when picking something up.
 		ResetHeldItem();
 		MouseCursor.a.liveGrenade = true;
 		grenadeActive = true;
-		CenterStatusPrint("%s", Sys_Text.stringTable[index + 326]
-					 + Sys_Text.stringTable[320],player); // activated, grenade is LIVE!
+		CenterStatusPrint("%s", Eng_Text->stringTable[index + 326]
+					 + Eng_Text->stringTable[320],player); // activated, grenade is LIVE!
 
 		switch(index) { // Subtract one from the correct grenade inventory
 			case 7:  heldObject = Const.a.GetPrefab(370); Eng_Global->inventoryPlayer1.RemoveGrenade(0); break; // Frag
@@ -1274,6 +1101,6 @@
 			case 12: heldObject = Const.a.GetPrefab(403); Eng_Global->inventoryPlayer1.RemoveGrenade(5); break; // Nitropak
 			case 13: heldObject = Const.a.GetPrefab(404); Eng_Global->inventoryPlayer1.RemoveGrenade(2); break; // Gas
 		}
-		Sys_UI.ResetItemTab();
+		Eng_UI->ResetItemTab();
 		PutObjectInHand(index,-1,0,0,false,true);
 	}

@@ -256,14 +256,14 @@ void BioMonitorUpdate(void) {
 
     if (bioMonitor.beatFinished < Eng_Global->pauseRelativeTime) bioMonitor.heartRate = vfloor((70.0f +((Eng_Global->instances[PLAYER1].fatigue / 100.0f) * 110.0f)) * random_range(0.95f,1.05f));
     if (Eng_Global->inventoryPlayer1.hardwareVersion[HW_BIO_IDX] > 1 && (Eng_Global->instances[PLAYER1].patchActive & 127)) {
-//         bioMonitor.patchesActiveText = Sys_Text.stringTable[528]; // TODO actually render text
-//         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_MEDI))     { tempStr.Append(Sys_Text.stringTable[520]); tempStr.Append(" "); }
-//         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_STAMINUP)) { tempStr.Append(Sys_Text.stringTable[521]); tempStr.Append(" "); }
-//         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_SIGHT))    { tempStr.Append(Sys_Text.stringTable[522]); tempStr.Append(" "); }
-//         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_GENIUS))   { tempStr.Append(Sys_Text.stringTable[523]); tempStr.Append(" "); }
-//         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_BERSERK))  { tempStr.Append(Sys_Text.stringTable[524]); tempStr.Append(" "); }
-//         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_REFLEX))   { tempStr.Append(Sys_Text.stringTable[525]); tempStr.Append(" "); }
-//         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_DETOX))    { tempStr.Append(Sys_Text.stringTable[530]); }
+//         bioMonitor.patchesActiveText = Eng_Text->stringTable[528]; // TODO actually render text
+//         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_MEDI))     { tempStr.Append(Eng_Text->stringTable[520]); tempStr.Append(" "); }
+//         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_STAMINUP)) { tempStr.Append(Eng_Text->stringTable[521]); tempStr.Append(" "); }
+//         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_SIGHT))    { tempStr.Append(Eng_Text->stringTable[522]); tempStr.Append(" "); }
+//         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_GENIUS))   { tempStr.Append(Eng_Text->stringTable[523]); tempStr.Append(" "); }
+//         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_BERSERK))  { tempStr.Append(Eng_Text->stringTable[524]); tempStr.Append(" "); }
+//         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_REFLEX))   { tempStr.Append(Eng_Text->stringTable[525]); tempStr.Append(" "); }
+//         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_DETOX))    { tempStr.Append(Eng_Text->stringTable[530]); }
 //         patchEffects.text = tempStr.ToString();
     }
 

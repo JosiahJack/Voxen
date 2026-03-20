@@ -26,7 +26,7 @@ public class GrenadeTimerSlider : MonoBehaviour {
     public void SetValue() {
 		if (Eng_Global->inventoryPlayer1.grenadeCurrent != 5 && Eng_Global->inventoryPlayer1.grenadeCurrent != 6) return;
 
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 		float val = actualSlider.value;
 		if (val >= 60f) val = 60f;
 		if (Eng_Global->inventoryPlayer1.grenadeCurrent == 5) {
@@ -39,8 +39,8 @@ public class GrenadeTimerSlider : MonoBehaviour {
 
 		slideS.value = val;
 		valueText.text = slideS.value.ToString("0.0");
-		Slider slidLH = Sys_UI.itemTabLH.grenadeTimerSliderSlider.GetComponent<Slider>();
-		Slider slidRH = Sys_UI.itemTabRH.grenadeTimerSliderSlider.GetComponent<Slider>();
+		Slider slidLH = Eng_UI->itemTabLH.grenadeTimerSliderSlider.GetComponent<Slider>();
+		Slider slidRH = Eng_UI->itemTabRH.grenadeTimerSliderSlider.GetComponent<Slider>();
 		if (Eng_Global->inventoryPlayer1.grenadeCurrent == 5) {
 			if (slidLH != actualSlider) slidLH.value = Eng_Global->inventoryPlayer1.nitroTimeSetting;
 			if (slidRH != actualSlider) slidRH.value = Eng_Global->inventoryPlayer1.nitroTimeSetting;

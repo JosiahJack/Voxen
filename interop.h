@@ -1,7 +1,7 @@
-// Mod/Gamecode Functions::
+// interop.h - Mod/Gamecode Functions::
 #pragma once
 #define MOD_FUNCTION_LIST(X) \
-    X(void, ModLink, (GlobalContext* ctx, CheatsSystem* cheats, SettingsSystem* settings)) \
+    X(void, ModLink, (GlobalContext* ctx, CheatsSystem* cheats, SettingsSystem* settings, TextSystem* text, SystemUI* ui)) \
     X(void, ModUpdate, (void)) \
     X(bool, Forward, (void)) \
     X(bool, StrafeLeft, (void)) \
@@ -24,7 +24,6 @@
     X(bool, Lantern, (void)) \
     X(bool, Shield, (void)) \
     X(bool, Infrared, (void)) \
-    X(bool, Email, (void)) \
     X(bool, Booster, (void)) \
     X(bool, Jumpjets, (void)) \
     X(bool, Attack, (void)) \
@@ -141,3 +140,4 @@ ENGINE_TO_MOD void MenuGoBack(void);
 ENGINE_TO_MOD void IgnoreNextMouseDelta(void);
 ENGINE_TO_MOD void ApplyPlayerMovements(void);
 ENGINE_TO_MOD void CenterStatusPrint(const char* fmt, ...);
+ENGINE_TO_MOD void play_wav(const char* path, float volume, Vector3 pos, bool positional);

@@ -1,3 +1,4 @@
+// voxen.h - Engine specific shared values
 #pragma once
 #if defined(LINUX)
 //     #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
@@ -13,10 +14,6 @@
 #define SHADOW_MAP_SIZE 128u
 #define TOTAL_SHADOWMAP_PIXELS (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U))
 #define MAX_SAVENAME_LENGTH 24
-#define MULTI_MEDIA_TAB_EMAIL_TABLE 0
-#define MULTI_MEDIA_TAB_LOG_TABLE   1
-#define MULTI_MEDIA_TAB_DATA_TABLE  2
-#define MULTI_MEDIA_TAB_NOTES       3
 #define MAX_PALETTE_SIZE 256
 #define MAX_TEXTURE_DIMENSION 2048
 #define VERTEX_ATTRIBUTES_COUNT 8 // x,y,z,nx,ny,nz,u,v
@@ -89,6 +86,7 @@
 #define FONT_ATLAS_SIZE 4672
 #define MAX_GLYPHS 4096
 extern GlobalContext Sys_Global;
+extern SystemUI Sys_UI;
 typedef struct { bool down; bool pressed; bool released; } KeyState;
 typedef struct {
 	KeyState keyStates[MAX_KEYS];
@@ -116,19 +114,6 @@ typedef struct {
     float shadDotThresh;
 } VoxenShadowSystem;
 extern VoxenShadowSystem voxen_Shadow_System;
-
-typedef struct {	
-	char stringTable[TEXT_STRING_COUNT][TEXT_LOCALIZATION_MAX_LENGTH]; // Hefty table for localization support.
-	uint16_t audioLogImagesRefIndicesLH[TEXT_LOGS_COUNT];
-	uint16_t audioLogImagesRefIndicesRH[TEXT_LOGS_COUNT];
-	uint8_t audioLogType[TEXT_LOGS_COUNT];
-	uint8_t audioLogLevelFound[TEXT_LOGS_COUNT];
-	size_t file_size;
-	size_t filelog_size;
-	uint8_t* file_data;
-	uint8_t* filelog_data;
-} Voxen_Text;
-extern Voxen_Text Sys_Text;
 
 typedef struct {
     double timestamp;
@@ -159,61 +144,6 @@ typedef struct StbiArena {
 } StbiArena;
 
 typedef struct { float speed; uint16_t frameStart; uint16_t frameEnd; uint16_t frameStartModelIndex; uint8_t framerate; } AnimationClip;
-
-typedef uint8_t MenuPages;
-static const uint8_t MenuPages_FrontPage = 0;
-static const uint8_t MenuPages_Singleplayer = 1;
-static const uint8_t MenuPages_Multiplayer = 2;
-static const uint8_t MenuPages_NewGame = 3;
-static const uint8_t MenuPages_Load = 4;
-static const uint8_t MenuPages_Options = 5;
-static const uint8_t MenuPages_Save = 6;
-static const uint8_t MenuPages_IntroVideo = 7;
-static const uint8_t MenuPages_CreditsVideo = 8;
-typedef struct {
-	int lastMultiMediaTabOpened;
-	bool lastWeaponSideRH;
-	bool lastItemSideRH;
-	bool lastAutomapSideRH;
-	bool lastTargetSideRH;
-	bool lastDataSideRH;
-	bool lastSearchSideRH;
-	bool lastLogSideRH;
-	bool lastLogSecondarySideRH;
-	bool lastMinigameSideRH;
-	double logFinished;
-	bool logActive;
-	AudioLogType logType;
-	uint16_t linkedElevatorDoor;
-	Vector3 objectInUsePos;
-	uint16_t tetheredPGP;
-	uint16_t tetheredPWP;
-	uint16_t tetheredSearchable;
-	uint16_t tetheredKeypadElevator;
-	uint16_t tetheredKeypadKeycode;
-	bool paperLogInUse;
-	bool usingObject;
-	int applyButtonReferenceIndex;
-	int curCenterTab;
-    bool isBlocking;
-	bool isRH;
-	int wep16index;
-	int tempSpriteIndex;
-	float lastEnergy;
-	float lastHealth;
-	double tickFinished; // Visual only, Time.time controlled
-	int count;
-	bool centerTabNotified[4];
-	double centerTabsTickFinished; // Visual only, Time.time controlled
-	bool highlightStatus[4];
-	uint8_t highlightTickCount[4];
-	double blinkFinished;
-	double beepFinished;
-	uint8_t beepCount;
-	bool audPaused;
-} SystemUI;
-extern SystemUI Sys_UIPlayer1;
-extern SystemUI Sys_UIPlayer2;
 
 typedef uint32_t GLuint;
 typedef struct {

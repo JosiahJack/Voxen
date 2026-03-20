@@ -3909,7 +3909,7 @@ bounceCombine: 0
 #se_briefcase
 index: 464
 model: 34
-texture: 66
+texture: 66c
 glowtexture: 65
 #se_corpse_blueshirt
 index: 465

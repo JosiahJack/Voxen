@@ -2,7 +2,11 @@
 #include "common.h" // Types needed first
 #define MOD_INTEROP_IMPLEMENTATION
 #include "interop.h"
-extern GlobalContext* Eng_Global; extern CheatsSystem* Eng_Cheats; extern SettingsSystem* Eng_Settings;
+extern GlobalContext* Eng_Global; extern CheatsSystem* Eng_Cheats; extern SettingsSystem* Eng_Settings; extern TextSystem* Eng_Text; extern SystemUI* Eng_UI;
+#define MULTI_MEDIA_TAB_EMAIL_TABLE 0
+#define MULTI_MEDIA_TAB_LOG_TABLE   1
+#define MULTI_MEDIA_TAB_DATA_TABLE  2
+#define MULTI_MEDIA_TAB_NOTES       3
 #define NUM_AI_TYPES 29
 typedef struct {
 	const char* name;
@@ -104,3 +108,5 @@ void GiveEnergy(float give, EnergyType type);
 void BioMonitorInit(void);
 void BioMonitorUpdate(void);
 extern bool vmailActive;
+
+extern const char* sounds[SOUNDS_COUNT];

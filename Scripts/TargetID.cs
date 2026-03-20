@@ -40,19 +40,19 @@ public class TargetID : MonoBehaviour {
 		if (linkedHM == null) return;
 
 		if (dd.attackType == AttackType.Tranq) {
-			currentText = Sys_Text.stringTable[536]; // STUNNED
+			currentText = Eng_Text->stringTable[536]; // STUNNED
 			damageTimeFinished = Eng_Global->pauseRelativeTime - 1f; // Expire damage text, Update handles "STUNNED"
 		} else {
 			if (damage > linkedHM.maxhealth * 0.75f) {
-				currentText = Sys_Text.stringTable[514]; // SEVERE DAMAGE
+				currentText = Eng_Text->stringTable[514]; // SEVERE DAMAGE
 			} else if (damage > linkedHM.maxhealth * 0.50f) {
-				currentText = Sys_Text.stringTable[515]; // MAJOR DAMAGE
+				currentText = Eng_Text->stringTable[515]; // MAJOR DAMAGE
 			} else if (damage > linkedHM.maxhealth * 0.25f) {
-				currentText = Sys_Text.stringTable[513]; // NORMAL DAMAGE
+				currentText = Eng_Text->stringTable[513]; // NORMAL DAMAGE
 			} else if (damage > 0f) {
-				currentText = Sys_Text.stringTable[512]; // MINOR DAMAGE
+				currentText = Eng_Text->stringTable[512]; // MINOR DAMAGE
 			} else {
-				currentText = Sys_Text.stringTable[511]; // NO DAMAGE
+				currentText = Eng_Text->stringTable[511]; // NO DAMAGE
 			}
 			damageTime = (damage == 0f) ? 1f : 2.5f;
 			damageTimeFinished = Eng_Global->pauseRelativeTime + damageTime;
@@ -133,18 +133,18 @@ public class TargetID : MonoBehaviour {
 		if (displayAttitude && linkedHM != null) {
 			if (displayRange || displayHealth) secondaryDisplayString += comma;
 			if (linkedHM.aic.asleep) {
-				secondaryDisplayString = (secondaryDisplayString + Sys_Text.stringTable[519]); // Asleep
+				secondaryDisplayString = (secondaryDisplayString + Eng_Text->stringTable[519]); // Asleep
 			} else {
 				switch (linkedHM.aic.currentState) {
-					case AIState_Walk: secondaryDisplayString = (secondaryDisplayString + Sys_Text.stringTable[517]); break; // Cautious
-					case AIState_Inspect: secondaryDisplayString = (secondaryDisplayString + Sys_Text.stringTable[517]); break; // Cautious
-					case AIState_Interacting: secondaryDisplayString = (secondaryDisplayString + Sys_Text.stringTable[517]); break; // Cautious
-					case AIState_Run: secondaryDisplayString = (secondaryDisplayString + Sys_Text.stringTable[518]); break; // Hostile
-					case AIState_Attack1: secondaryDisplayString = (secondaryDisplayString + Sys_Text.stringTable[518]); break; // Hostile
-					case AIState_Attack2: secondaryDisplayString = (secondaryDisplayString + Sys_Text.stringTable[518]); break; // Hostile
-					case AIState_Attack3: secondaryDisplayString = (secondaryDisplayString + Sys_Text.stringTable[518]); break; // Hostile
-					case AIState_Pain: secondaryDisplayString = (secondaryDisplayString + Sys_Text.stringTable[518]); break; // Hostile
-					default: secondaryDisplayString = (secondaryDisplayString + Sys_Text.stringTable[516]); break; // Idle
+					case AIState_Walk: secondaryDisplayString = (secondaryDisplayString + Eng_Text->stringTable[517]); break; // Cautious
+					case AIState_Inspect: secondaryDisplayString = (secondaryDisplayString + Eng_Text->stringTable[517]); break; // Cautious
+					case AIState_Interacting: secondaryDisplayString = (secondaryDisplayString + Eng_Text->stringTable[517]); break; // Cautious
+					case AIState_Run: secondaryDisplayString = (secondaryDisplayString + Eng_Text->stringTable[518]); break; // Hostile
+					case AIState_Attack1: secondaryDisplayString = (secondaryDisplayString + Eng_Text->stringTable[518]); break; // Hostile
+					case AIState_Attack2: secondaryDisplayString = (secondaryDisplayString + Eng_Text->stringTable[518]); break; // Hostile
+					case AIState_Attack3: secondaryDisplayString = (secondaryDisplayString + Eng_Text->stringTable[518]); break; // Hostile
+					case AIState_Pain: secondaryDisplayString = (secondaryDisplayString + Eng_Text->stringTable[518]); break; // Hostile
+					default: secondaryDisplayString = (secondaryDisplayString + Eng_Text->stringTable[516]); break; // Idle
 				}
 			}
 		}
@@ -154,12 +154,12 @@ public class TargetID : MonoBehaviour {
 				if (linkedHM.aic != null) {
 					if (linkedHM.aic.tranquilizeFinished > Eng_Global->pauseRelativeTime
 						&& damageTimeFinished < Eng_Global->pauseRelativeTime) {
-						currentText = Sys_Text.stringTable[536]; // STUNNED
+						currentText = Eng_Text->stringTable[536]; // STUNNED
 					} else {
 						if (damageTimeFinished < Eng_Global->pauseRelativeTime) {
 							currentText = "";
 							if (!Eng_Global->inventoryPlayer1.hasHardware[4]
-								&& (currentText != Sys_Text.stringTable[511])) {
+								&& (currentText != Eng_Text->stringTable[511])) {
 
 								Deactivate();
 								return;

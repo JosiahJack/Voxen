@@ -27,7 +27,7 @@ public class EnergyOverloadButton : MonoBehaviour {
     }
 
     public void OverloadEnergyClick() {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
         OverloadButtonAction();
     }
 
@@ -36,24 +36,24 @@ public class EnergyOverloadButton : MonoBehaviour {
 
         clickFinished = Time.time + 0.4f;
         if (Eng_Global->inventoryPlayer1.currentEnergyWeaponHeat[Eng_Global->inventoryPlayer1.weaponCurrent] > 25f) {
-            CenterStatusPrint("%s", Sys_Text.stringTable[12]);
+            CenterStatusPrint("%s", Eng_Text->stringTable[12]);
             return;
         }
 
         if (WeaponFire.a.overloadEnabled) {
-            CenterStatusPrint("%s", Sys_Text.stringTable[13]);
+            CenterStatusPrint("%s", Eng_Text->stringTable[13]);
             WeaponFire.a.overloadEnabled = false;
             buttonSprite.overrideSprite = normalButtonSprite;
             buttonText.color = textClickableColor;
             energySettingText.color = textEnergySetting;
-            energySettingText.text = Sys_Text.stringTable[16];
+            energySettingText.text = Eng_Text->stringTable[16];
         } else { 
-            CenterStatusPrint("%s", Sys_Text.stringTable[17]);
+            CenterStatusPrint("%s", Eng_Text->stringTable[17]);
             WeaponFire.a.overloadEnabled = true;
             buttonSprite.overrideSprite = overloadButtonSprite;
             buttonText.color = textOverloadColor;
             energySettingText.color = textEnergyOverloaded;
-            energySettingText.text = Sys_Text.stringTable[18];
+            energySettingText.text = Eng_Text->stringTable[18];
         }
     }
 

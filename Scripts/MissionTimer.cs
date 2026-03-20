@@ -22,7 +22,7 @@ public class MissionTimer : MonoBehaviour {
 		a = this;
 		a.t = 6000f;
 		a.timerFinished = Eng_Global->pauseRelativeTime + 1f;
-		a.currentMission = Sys_Text.stringTable[504];
+		a.currentMission = Eng_Text->stringTable[504];
 		a.currentMissionIndex = 0;
 		a.timesUP = false;
 	}
@@ -41,7 +41,7 @@ public class MissionTimer : MonoBehaviour {
 		if (Eng_Global->difficultyMission < 3) return; // Don't update timer on lower skill settings.
 		t = newTimerAmount;
 		currentMissionIndex = nextMissionIndex;
-		currentMission = Sys_Text.stringTable[misTextIndex];
+		currentMission = Eng_Text->stringTable[misTextIndex];
 		if (currentMissionIndex == 4) lastTimer = true; // No gameover for last timer.
     }
 
@@ -61,8 +61,8 @@ public class MissionTimer : MonoBehaviour {
 
 		if (t <= 0) {
 			if (lastTimer) {
-				text.text = Sys_Text.stringTable[869];
-				timerTypeText.text = Sys_Text.stringTable[509];
+				text.text = Eng_Text->stringTable[869];
+				timerTypeText.text = Eng_Text->stringTable[509];
 				timesUP = true;
 				return;
 			} else {

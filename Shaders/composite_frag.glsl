@@ -29,9 +29,8 @@ layout(location = 25) uniform mat3 invViewRot;
 layout(location = 26) uniform int SSR_RES;
 layout(location = 27) uniform sampler2D tex;
 layout(location = 28) uniform float staticIntensity;
-layout(location = 29) uniform int aaSamples;
+layout(location = 29) uniform uint grayscaleEnabled;
 layout(location = 30) uniform float skyRotateSpeed;
-layout(location = 31) uniform float aaRad;
 
 const float vhsBlurAmount = 0.5; // Cannot be overstated just how magical and impactful this setting is.  DO NOT EVER TURN OFF EVER!!  I recant my former statement about avoiding blur at all costs in all scenarios.
 const float vhsRadiusMax = 3.0; // in pixels
@@ -232,10 +231,22 @@ vec3 applyBerserk(vec3 worldPos, vec3 base) {
     return mix(berserkColor, inverted * berserkColor * 1.5, invertFade);
 }
 
+vec3 Grayscale(vec3 currentColor) {
+        float lum = max(max(currentColor.r, currentColor.g), currentColor.b);
+        lum = pow(lum, 0.7);
+        lum = 1.0 - exp(-lum); lum = lum * 1.1;
+        float low = 0.2, high = 0.85;
+        lum = clamp((lum - low) / (high - low), 0.0, 1.0);
+        float n = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898,78.233))) * 43758.5453);
+        lum += (n - 0.5) * 0.01;
+        return vec3(lum);
+}
+
 void main() {
     vec2 texCoordUsed = TexCoord;
     if (empEffectActive > 0u) texCoordUsed.y += timeVal * 15.0;
     vec4 color = texture(tex, texCoordUsed).rgba;
+    vec4 worldPosPacked;
     bool isSky = false;
     if (skyVisible > 0) {
         isSky = ((color.a > 0.0 && color.a < 0.21) || color.a < 0.001); // Sky hack alpha (alpha of 0 for when noclipping) (the extra color.a < 0.001 check for noclip has no discernible quality impact, leaving)
@@ -372,11 +383,11 @@ void main() {
                 skyColor += sunColor * (sunMask * 3.0 + corona * 1.5);
             }
 
+            if (grayscaleEnabled > 0) skyColor = Grayscale(skyColor);
             FragColor = vec4((color.rgb * max(0.1,color.a)) + skyColor, 1.0); // Add window alpha weighted color tint
         }
     }
 
-    ivec2 uv = ivec2(gl_FragCoord.xy);                // pixel centre
     vec4 fog = vec4(0.0,0.0,0.0,0.0);
     if (!isSky) color.rgb = mix(color.rgb, fog.rgb, fog.a);
     vec2 ssRatio = vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
@@ -493,7 +504,8 @@ void main() {
 
     if (staticIntensity > 0.0) aaColor += bandedStatic(texCoordUsed); // Banded Static (pain, emp effects, etc.)
     aaColor.rgb = pow(aaColor.rgb, vec3(1.0 / (float(brightnessSetting + 50) / 100.0))); // Brightness Adjustment Setting
-    if (berserkTimeRemaining > 0.0) aaColor = applyBerserk(imageLoad(inputWorldPos, uv).xyz, aaColor); // Berserk last as it's a brain effect not an eye effect
-
+    ivec2 uv = ivec2(gl_FragCoord.xy);                // pixel centre
+    if (berserkTimeRemaining > 0.0) aaColor = applyBerserk(imageLoad(inputWorldPos,uv).xyz, aaColor); // Berserk last as it's a brain effect not an eye effect
+    if (grayscaleEnabled > 0) aaColor = Grayscale(aaColor);
     FragColor = vec4(aaColor, 1.0); // Output final composited color
 }

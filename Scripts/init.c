@@ -1,9 +1,7 @@
 // init.c - Entity Initialization
 #include "mod.h"
-// From Engine
-GlobalContext* Eng_Global = 0; CheatsSystem* Eng_Cheats; SettingsSystem* Eng_Settings;
-MOD_TO_ENGINE void ModLink(GlobalContext* globals, CheatsSystem* cheats, SettingsSystem* settings) {Eng_Global = globals; Eng_Cheats = cheats; Eng_Settings = settings; }
-
+GlobalContext* Eng_Global; CheatsSystem* Eng_Cheats; SettingsSystem* Eng_Settings; TextSystem* Eng_Text; SystemUI* Eng_UI; // From Engine
+MOD_TO_ENGINE void ModLink(GlobalContext* g,CheatsSystem* c,SettingsSystem* s,TextSystem* t,SystemUI* ui){Eng_Global=g;Eng_Cheats=c;Eng_Settings=s;Eng_Text=t;Eng_UI=ui;}
 uint8_t GetCurrentLevelSecurity(void) { return (Eng_Global->difficultyMission < 1 || Eng_Cheats->superoverride) ? 0u : Eng_Global->levelSecurity[Eng_Global->currentLevel]; }
 uint16_t GetImpactType(uint16_t instanceIdx) {
     switch (Eng_Global->instances[instanceIdx].bloodType) {
@@ -67,13 +65,13 @@ void DriftUpdInit(uint16_t self) {
 
 //=============================================================================
 
-// void MFDInit(SystemUI* ui) {
-//     ui->lastMultiMediaTabOpened = MULTI_MEDIA_TAB_EMAIL_TABLE;
-//     ui->logFinished = Eng_Global->pauseRelativeTime;
-//     ui->tickFinished = ui->centerTabsTickFinished = Eng_Global->current_time + 0.1 + (double)random_range(0.0f,1.0f);
-//     ui->blinkFinished = 1.0 + Eng_Global->pauseRelativeTime;
-//     ui->beepFinished = 3.0 + Eng_Global->pauseRelativeTime;
-// }
+void MFDInit(SystemUI* ui) {
+    ui->lastMultiMediaTabOpened = MULTI_MEDIA_TAB_EMAIL_TABLE;
+    ui->logFinished = Eng_Global->pauseRelativeTime;
+    ui->tickFinished = ui->centerTabsTickFinished = Eng_Global->current_time + 0.1 + (double)random_range(0.0f,1.0f);
+    ui->blinkFinished = 1.0 + Eng_Global->pauseRelativeTime;
+    ui->beepFinished = 3.0 + Eng_Global->pauseRelativeTime;
+}
 
 void InventoryInit(InventorySystem* inv) {
     inv->hardwareInvReferenceIndex[0]  = 21; // Hardcoded lookup indices into the Const main table.
@@ -140,9 +138,7 @@ MOD_TO_ENGINE void PlayerInit(uint16_t i) {
     Eng_Global->instances[i].radSoundFinished = Eng_Global->pauseRelativeTime;
     Eng_Global->instances[i].radFXFinished = Eng_Global->pauseRelativeTime;
     Eng_Global->instances[i].noiseFinished = Eng_Global->pauseRelativeTime;
-//     if (i == PLAYER1) MFDInit(&Sys_UIPlayer1);
-//     else if (i == PLAYER2) MFDInit(&Sys_UIPlayer2);
-    
+//     MFDInit(&Sys_UI);
     if (i == PLAYER1) InventoryInit(&Eng_Global->inventoryPlayer1);
     else if (i == PLAYER2) InventoryInit(&Eng_Global->inventoryPlayer2);
 }
@@ -192,3 +188,41 @@ MOD_TO_ENGINE void ModInitAfterLoad(void) {
         }
     }
 }
+
+void SearchableInit(uint16_t i, bool beforeLoad) {
+    if (beforeLoad) {
+        int numRandomGeneratedItems = 0;
+        if (Eng_Global->instances[i].generateContents && !Eng_Global->instances[i].generationDone) {
+            // Generate random contents once
+            for(int j=0;j<4;j++) {
+                if (Eng_Global->instances[i].randomItemDropChance[j] <= 0.0f) continue; // next!
+                
+                uint8_t tempInt = random_range_u8(0,100); // generate even distribution random value from 0 to 100, e.g. 35
+                if (((float)tempInt / 100.0f) <= Eng_Global->instances[i].randomItemDropChance[j]) {
+                    Eng_Global->instances[i].contents[numRandomGeneratedItems] = Eng_Global->instances[i].randomItem[j]; // ok item is now present
+                    numRandomGeneratedItems++;
+                    if (numRandomGeneratedItems > Eng_Global->instances[i].maxRandomItems) break; // all done we have all our contents
+                }
+            }
+            
+            Eng_Global->instances[i].generationDone = true;
+        }
+    } else {
+        
+    }
+}
+
+// void (uint16_t i) {
+//     
+// }
+
+// void InitBaseEntityBeforeLoad(uint16_t i) {
+//     switch(i) {
+//         case 464: se_briefcase(); break;
+//         case 464: #se_corpse_blueshirt(); break;
+//         case 464: #se_corpse_brownshirt(); break;
+//         case 464: #se_corpse_eaten(); break;
+//         case 464: #se_corpse_labcoat(); break;
+//         case 464: #se_corpse_security(); break;
+//     }
+// }

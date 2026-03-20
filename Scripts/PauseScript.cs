@@ -230,7 +230,7 @@ public class PauseScript : MonoBehaviour {
 		if (onSaveDialog) return;
 
 		if (Eng_Global->instances[PLAYER1].inCyberSpace) {
-			CenterStatusPrint("%s", Sys_Text.stringTable[602]); // Cannot save in cyberspace
+			CenterStatusPrint("%s", Eng_Text->stringTable[602]); // Cannot save in cyberspace
 			OpenSaveDialogHard();
 			return;
 		}
@@ -261,7 +261,7 @@ public class PauseScript : MonoBehaviour {
 
 	public void SavePause() {
 		if (Eng_Global->instances[PLAYER1].inCyberSpace) {
-			CenterStatusPrint("%s", Sys_Text.stringTable[602]); // Cannot save in cyberspace
+			CenterStatusPrint("%s", Eng_Text->stringTable[602]); // Cannot save in cyberspace
 			return;
 		}
 		if (onSaveDialog) return;
@@ -361,7 +361,7 @@ public class PauseScript : MonoBehaviour {
 	// Let screenshot save without putting text in it.
 	public IEnumerator ScreenshotSprint(string sname) {
 		yield return new WaitForSeconds(0.1f);
-		CenterStatusPrint("%s", Sys_Text.stringTable[1024] + sname); // "Wrote screenshot "
+		CenterStatusPrint("%s", Eng_Text->stringTable[1024] + sname); // "Wrote screenshot "
 
 	}
 

@@ -425,7 +425,7 @@ static const float camMaxAmount = 0.2548032f
 // 	void AutomapZoomOut() {
 // 		if (Eng_Global->inventoryPlayer1.NavUnitVersion() < 2) {
 // 			// Map hardware version doesn't support zoom.
-// 			CenterStatusPrint("%s", Sys_Text.stringTable[465]);
+// 			CenterStatusPrint("%s", Eng_Text->stringTable[465]);
 // 			return;
 // 		}
 // 
@@ -434,7 +434,7 @@ static const float camMaxAmount = 0.2548032f
 // 			currentAutomapZoomLevel = 2;
 // 
 // 			// zoom at max
-// 			CenterStatusPrint("%s", Sys_Text.stringTable[316],Const.a.player1);
+// 			CenterStatusPrint("%s", Eng_Text->stringTable[316],Const.a.player1);
 // 			return;
 // 		}
 // 		AutomapZoomAdjust();
@@ -443,7 +443,7 @@ static const float camMaxAmount = 0.2548032f
 // 	public void AutomapZoomIn() {
 // 		if (Eng_Global->inventoryPlayer1.NavUnitVersion() < 2) {
 // 			// Map hardware version doesn't support zoom.
-// 			CenterStatusPrint("%s", Sys_Text.stringTable[465],Const.a.player1);
+// 			CenterStatusPrint("%s", Eng_Text->stringTable[465],Const.a.player1);
 // 			return;
 // 		}
 // 
@@ -452,7 +452,7 @@ static const float camMaxAmount = 0.2548032f
 // 			currentAutomapZoomLevel = 0;
 // 
 // 			// zoom at min
-// 			CenterStatusPrint("%s", Sys_Text.stringTable[317],Const.a.player1);
+// 			CenterStatusPrint("%s", Eng_Text->stringTable[317],Const.a.player1);
 // 			return;
 // 		}
 // 		AutomapZoomAdjust();
@@ -479,8 +479,8 @@ static const float camMaxAmount = 0.2548032f
 // 	}
 // 
 // 	public void AutomapGoSide() {
-// 		automapSideButtonTextLH.text = Sys_Text.stringTable[887];
-// 		automapSideButtonTextRH.text = Sys_Text.stringTable[887];
+// 		automapSideButtonTextLH.text = Eng_Text->stringTable[887];
+// 		automapSideButtonTextRH.text = Eng_Text->stringTable[887];
 // 		automapInnerCircleLH.flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
 // 		automapInnerCircleRH.flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
 // 		automapOuterCircleLH.flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
@@ -496,8 +496,8 @@ static const float camMaxAmount = 0.2548032f
 // 	}
 // 
 // 	public void AutomapGoTop() {
-// 		automapSideButtonTextLH.text = Sys_Text.stringTable[888];
-// 		automapSideButtonTextRH.text = Sys_Text.stringTable[888];
+// 		automapSideButtonTextLH.text = Eng_Text->stringTable[888];
+// 		automapSideButtonTextRH.text = Eng_Text->stringTable[888];
 // 		automapInnerCircleLH.gameObject.SetActive(true);
 // 		automapInnerCircleRH.gameObject.SetActive(true);
 // 		automapOuterCircleLH.gameObject.SetActive(true);
@@ -521,7 +521,7 @@ static const float camMaxAmount = 0.2548032f
 // 	}
 // 
 // 	public void CloseFullmap() {
-// 		if (automapFull.activeInHierarchy) Sys_UI.CloseFullmap();
+// 		if (automapFull.activeInHierarchy) Eng_UI->CloseFullmap();
 // 		Utils.Deactivate(automapFull);
 // 		inFullMap = false;
 // 		if (inSideView) AutomapGoSide();

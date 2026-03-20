@@ -225,7 +225,7 @@ public class PlayerMovement : MonoBehaviour {
 
 		// Bug Hunter feedback (puts it into their screenshots for me)
 		if (locationIndicator.activeInHierarchy) {
-			locationText.text = Sys_Text.stringTable[738] // "location: "
+			locationText.text = Eng_Text->stringTable[738] // "location: "
 								+ (Eng_Global->instances[i].position.x.ToString("00.00")
 								+ " " + Eng_Global->instances[i].position.y.ToString("00.00")
 								+ " " + Eng_Global->instances[i].position.z.ToString("00.00"));
@@ -1019,7 +1019,7 @@ public class PlayerMovement : MonoBehaviour {
 		if (Eng_Global->instances[PLAYER1].fatigue > 100.0f) Eng_Global->instances[PLAYER1].fatigue = 100.0f; // Clamp at 100% maximum
 		if (Eng_Global->instances[PLAYER1].fatigue <   0.0f) Eng_Global->instances[PLAYER1].fatigue =   0.0f; // Clamp at   0% minimum.
 		if (Eng_Global->instances[PLAYER1].fatigue > 80.0f && !fatigueWarned && !inCyberSpace) {
-			twm.SendWarning(Sys_Text.stringTable[868],0.1f,0,HUDColor.White,324);
+			twm.SendWarning(Eng_Text->stringTable[868],0.1f,0,HUDColor.White,324);
 			fatigueWarned = true;
 		} else fatigueWarned = false;
 
@@ -1083,7 +1083,7 @@ public class PlayerMovement : MonoBehaviour {
 			if (bodyState == BodyState_Prone || bodyState == BodyState_ProningDown) {
 				if (CantStand()) {
 					if (CantCrouch()) {
-						CenterStatusPrint("%s", Sys_Text.stringTable[188]);
+						CenterStatusPrint("%s", Eng_Text->stringTable[188]);
 						return; // Can't crouch here
 					} else bodyState = BodyState_ProningUp; // Can't stand, but can crouch here
 
@@ -1126,14 +1126,14 @@ public class PlayerMovement : MonoBehaviour {
 		if (!GetInput.a.Crouch()) return;
 
 		if ((bodyState == BodyState_Crouch) || (bodyState == BodyState_CrouchingDown)) {
-			if (CantStand()) CenterStatusPrint("%s", Sys_Text.stringTable[187]); // Can't stand here
+			if (CantStand()) CenterStatusPrint("%s", Eng_Text->stringTable[187]); // Can't stand here
 			else bodyState = BodyState_StandingUp; // Start standing up
 		} else {
 			if ((bodyState == BodyState_Standing) || (bodyState == BodyState_StandingUp)) {
 				bodyState = BodyState_CrouchingDown; // Start crouching down
 			} else {
 				if ((bodyState == BodyState_Prone) || (bodyState == BodyState_ProningDown)) {
-					if ((CantCrouch())) { CenterStatusPrint("%s", Sys_Text.stringTable[188]); return; } // Can't crouch here
+					if ((CantCrouch())) { CenterStatusPrint("%s", Eng_Text->stringTable[188]); return; } // Can't crouch here
 					
 					bodyState = BodyState_ProningUp; // Start getting up to crouch
 				}

@@ -16,12 +16,12 @@ public class SearchButton : MonoBehaviour {
 
 	public void CheckForEmpty () {
 		if (contEng_Global->instances[0] == -1 && contEng_Global->instances[1] == -1 && contEng_Global->instances[2] == -1 && contEng_Global->instances[3] == -1) {
-			Sys_UI.ReturnToLastTab(isRH);
+			Eng_UI->ReturnToLastTab(isRH);
 		}
 	}
 
 	public void SearchButtonClick (int buttonIndex) {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 		MouseLookScript.a.SearchButtonClick(buttonIndex,this);
 		
 	}

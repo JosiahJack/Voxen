@@ -288,7 +288,7 @@
 						PlayerHealth.a.shieldEffect.SetActive(true); // Activate shield screen effect to indicate damage was absorbed, effect intensity determined by absorb amount
 						Utils.PlayUIOneShotSavable(94); // Play shield absorb sound
 						int abs = (int)(absorb * 100f); //  for int display of absorbption percent
-						CenterStatusPrint("%s", Sys_Text.stringTable[208] + abs.ToString() + Sys_Text.stringTable[209],dd.other);  // Shield absorbs x% damage
+						CenterStatusPrint("%s", Eng_Text->stringTable[208] + abs.ToString() + Eng_Text->stringTable[209],dd.other);  // Shield absorbs x% damage
 					}
 				}
 				if (take > 0 && ((absorb <0.4f) || random_range(0.0f,1.0f) < 0.5f)) {
@@ -315,7 +315,7 @@
 			cyberHealth -= take;
 			if (isPlayer) {
 			    Const.a.damageReceived += take;
-				Sys_UI.DrawTicks(true);
+				Eng_UI->DrawTicks(true);
 				if (cyberHealth <= 0) {
 					MouseLookScript.a.ExitCyberspace();
 					return 0f;
@@ -347,7 +347,7 @@
 			health -= take;
 			if (isPlayer) {
 			    Const.a.damageReceived += take;
-				Sys_UI.DrawTicks(true);
+				Eng_UI->DrawTicks(true);
 				Music.a.inCombat = true;
 			}
 			
@@ -563,7 +563,7 @@
 	void DropSearchables() {
 		if (searchableItem == null) return;
 
-		Sys_UI.NotifySearchThatSearchableWasDestroyed();
+		Eng_UI->NotifySearchThatSearchableWasDestroyed();
 		GameObject levelDynamicContainer = LevelManager.a.GetCurrentDynamicContainer();
 		for (int i=0;i<4;i++) {
 			if (searchableItem.contEng_Global->instances[i] < 0) continue;
@@ -646,7 +646,7 @@
 	public void HealingBed(float amount,bool flashBed) {
 		health += amount;
 		if (health > 255) health = 255;
-		if (isPlayer) Sys_UI.DrawTicks(true);
+		if (isPlayer) Eng_UI->DrawTicks(true);
 		if (flashBed && healingFXFlash != null) healingFXFlash.SetActive(true);
 	}
 

@@ -1,11 +1,11 @@
 // physics.cpp - Full Jolt Physics integration for Voxen
 #include "voxen.h"
-#define GROUND_PROBE_DIST 0.16f
+#define GROUND_PROBE_DIST 0.02f
 #define SNAP_STEP 0.005f
 #define SNAP_MAX  0.25f
 #define SLOPE_WALK_MAX_DEG   45.0f
 #define SLOPE_CLIMB_MAX_DEG  55.0f
-#define SLOPE_SLIDE_ACCEL        4.0f
+#define SLOPE_SLIDE_ACCEL        8.0f
 #define SLOPE_SLIDE_ACCEL_BOOST 14.0f
 #define SLOPE_FRICTION_ACCEL        1.0f
 #define SLOPE_FRICTION_ACCEL_BOOST  0.3f
@@ -259,7 +259,7 @@ ENGINE_TO_MOD void ApplyPlayerMovements(void) {
     if (SwimUp()/* && Sys_Cheats.noclip*/) input.y += 1.0f;
     input = normalize_vector3(input);
     float intent = magnitude_vector3(input);
-    float speed = GetBasePlayerSpeed(intent > 0.1f);
+    float speed = GetBasePlayerSpeed(intent > 0.1f) * 1.75f; // Friction compensation term
     Vector3 wishVel = scale_vector3(input, speed);
     Vector3 currentVel = Sys_Global.instances[PLAYER1].velocity;
     float accel = Sys_Global.boosterActive ? 1.0f : 3.0f;
@@ -271,7 +271,7 @@ ENGINE_TO_MOD void ApplyPlayerMovements(void) {
     Sys_Global.instances[PLAYER1].velocity = appliedVel; // Gravity applied elsewhere same as everything else.
 }
 
-const Vector3 gravityVelocity = { 0.0f, -9.81f, 0.0f };
+const Vector3 gravityVelocity = { 0.0f, -9.81f * 2.5f, 0.0f };
 
 void UpdateVelocityFromGravity(void) {
     for (int32_t i=PLAYER1;i<Sys_Global.loadedInstances;++i) {

@@ -52,13 +52,13 @@ public void SetVersionIconForButton(bool isOn, int verz, int button8Index) {
 }
 
 public void BioClick() {
-    Sys_UI.mouseClickHeldOverGUI = true;
+    Eng_UI->mouseClickHeldOverGUI = true;
     BioAction();
 }
 
 public void BioAction() {
     if (Eng_Global->inventoryPlayer1.BioMonitorVersion() == 0 && PlayerEnergy.a.energy <= 0) {
-        CenterStatusPrint("%s", Sys_Text.stringTable[314],Eng_Global->inventoryPlayer1.owner);
+        CenterStatusPrint("%s", Eng_Text->stringTable[314],Eng_Global->inventoryPlayer1.owner);
         return;
     }
 
@@ -90,14 +90,14 @@ public void BioOn() {
 }
 
 public void ActivateSensaroundCenter() {
-    Sys_UI.DisableAllCenterTabs();
+    Eng_UI->DisableAllCenterTabs();
     Utils.Activate(sensaroundCenterCamera);
     Utils.Activate(sensaroundCenter);
 }
 
 public void ActivateSensaroundSides() {
-    Sys_UI.TabReset(true); // right
-    Sys_UI.TabReset(false); // left
+    Eng_UI->TabReset(true); // right
+    Eng_UI->TabReset(false); // left
     if (sensaroundLHCamera != null) sensaroundLHCamera.SetActive (true);
     if (sensaroundLH != null) sensaroundLH.SetActive (true);
     if (sensaroundRHCamera != null) sensaroundRHCamera.SetActive (true);
@@ -126,11 +126,11 @@ public void UnhideSensaround() {
 
 public void DeactivateSensaroundCameras() {
     HideSensaround();
-    Sys_UI.CenterTabButtonClickSilent(Sys_UI.curCenterTab,true);
-    Sys_UI.TabReset(true); // right
-    Sys_UI.TabReset(false); // left
-    Sys_UI.ReturnToLastTab(true);
-    Sys_UI.ReturnToLastTab(false);
+    Eng_UI->CenterTabButtonClickSilent(Eng_UI->curCenterTab,true);
+    Eng_UI->TabReset(true); // right
+    Eng_UI->TabReset(false); // left
+    Eng_UI->ReturnToLastTab(true);
+    Eng_UI->ReturnToLastTab(false);
 }
 
 public void SensaroundOn() {
@@ -140,12 +140,12 @@ public void SensaroundOn() {
 }
 
 public void SensaroundClick() {
-    Sys_UI.mouseClickHeldOverGUI = true;
+    Eng_UI->mouseClickHeldOverGUI = true;
     SensaroundAction();
 }
 
 public void SensaroundAction() {
-    if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Sys_Text.stringTable[314],Eng_Global->inventoryPlayer1.owner); return; }
+    if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Eng_Text->stringTable[314],Eng_Global->inventoryPlayer1.owner); return; }
 
     if (Eng_Global->inventoryPlayer1.hardwareIsActive[3]) {
         Utils.PlayUIOneShotSavable(82);
@@ -164,7 +164,7 @@ public void SensaroundOff() {
 }
 
 public void ShieldClick() {
-    Sys_UI.mouseClickHeldOverGUI = true;
+    Eng_UI->mouseClickHeldOverGUI = true;
     ShieldAction();
 }
 
@@ -179,7 +179,7 @@ public void ShieldOn() {
 }
 
 public void ShieldAction() {
-    if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Sys_Text.stringTable[314],Eng_Global->inventoryPlayer1.owner); return; }
+    if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Eng_Text->stringTable[314],Eng_Global->inventoryPlayer1.owner); return; }
     if (Eng_Global->inventoryPlayer1.hardwareIsActive[5]) {
         Utils.PlayUIOneShotSavable(95);
         ShieldOffWithEffects();
@@ -200,12 +200,12 @@ public void ShieldOffWithEffects() {
 }
 
 void LanternClick() {
-    Sys_UI.mouseClickHeldOverGUI = true;
+    Eng_UI->mouseClickHeldOverGUI = true;
     LanternAction();
 }
 
 void LanternAction() {
-    if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Sys_Text.stringTable[314],Eng_Global->inventoryPlayer1.owner); return; }
+    if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Eng_Text->stringTable[314],Eng_Global->inventoryPlayer1.owner); return; }
     Utils.PlayUIOneShotSavable(78);
     if (Eng_Global->inventoryPlayer1.hardwareIsActive[7]) {
         LanternOff();
@@ -239,12 +239,12 @@ void LanternOff() {
 }
 
 void InfraredClick() {
-    Sys_UI.mouseClickHeldOverGUI = true;
+    Eng_UI->mouseClickHeldOverGUI = true;
     InfraredAction();
 }
 
 void InfraredAction() {
-    if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Sys_Text.stringTable[314],Eng_Global->inventoryPlayer1.owner); return; }
+    if (PlayerEnergy.a.energy <=0) { CenterStatusPrint("%s", Eng_Text->stringTable[314],Eng_Global->inventoryPlayer1.owner); return; }
     if (Eng_Global->inventoryPlayer1.hardwareIsActive[11]) {
         Utils.PlayUIOneShotSavable(82);
     } else {
@@ -279,13 +279,13 @@ void InfraredOff() {
 }
 
 void EReaderClick () {
-    Sys_UI.mouseClickHeldOverGUI = true;
+    Eng_UI->mouseClickHeldOverGUI = true;
     EReaderAction();
 }
 
 void EReaderOn() {
     Eng_Global->inventoryPlayer1.hardwareIsActive[2] = true;
-    Sys_UI.OpenEReaderInItemsTab();
+    Eng_UI->OpenEReaderInItemsTab();
 }
 
 void EReaderAction() {
@@ -295,13 +295,13 @@ void EReaderAction() {
 
 
 void BoosterClick() {
-    Sys_UI.mouseClickHeldOverGUI = true;
+    Eng_UI->mouseClickHeldOverGUI = true;
     BoosterAction();
 }
 
 void BoosterAction() {
     if (Eng_Global->inventoryPlayer1.BoosterSetToBoost() && PlayerEnergy.a.energy <= 0) {
-        CenterStatusPrint("%s", Sys_Text.stringTable[314],Eng_Global->inventoryPlayer1.owner);
+        CenterStatusPrint("%s", Eng_Text->stringTable[314],Eng_Global->inventoryPlayer1.owner);
         return;
     }
 
@@ -325,13 +325,13 @@ void BoosterOff() {
 }
 
 void JumpJetsClick() {
-    Sys_UI.mouseClickHeldOverGUI = true;
+    Eng_UI->mouseClickHeldOverGUI = true;
     JumpJetsAction();
 }
 
 void JumpJetsAction() {
     if (PlayerEnergy.a.energy <= 0) {
-        CenterStatusPrint("%s", Sys_Text.stringTable[314],Eng_Global->inventoryPlayer1.owner);
+        CenterStatusPrint("%s", Eng_Text->stringTable[314],Eng_Global->inventoryPlayer1.owner);
         return;
     }
 

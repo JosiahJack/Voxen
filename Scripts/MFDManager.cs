@@ -9,7 +9,7 @@
 
 	// Called by Automap.cs.  This handles the UI changes to make room.
 	public void AutomapGoFull() {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 		
 		ctbButtonMain.SetActive(false);
 		ctbButtonHardware.SetActive(false);
@@ -26,7 +26,7 @@
 
 	// Handles returning UI back to how it was before clearing the board.
 	public void CloseFullmap() {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 		if (!Const.a.noHUD) {
 			Utils.Activate(ctbButtonMain);
 			Utils.Activate(ctbButtonHardware);
@@ -45,7 +45,7 @@
 
 	// Called by MouseLookScript.cs
 	public void EnterCyberspace() {
-		Sys_UI.hwb.HideSensaround();
+		Eng_UI->hwb.HideSensaround();
 		TabReset(true); // right
 		TabReset(false); // left
 		rightTC.TurnAllTabsOff();
@@ -82,7 +82,7 @@
 		ctbButtonMain.SetActive(true);
 		ctbButtonHardware.SetActive(true);
 		ctbButtonGeneral.SetActive(true);
-		if (Eng_Global->inventoryPlayer1.hardwareIsActive[3]) Sys_UI.hwb.UnhideSensaround();
+		if (Eng_Global->inventoryPlayer1.hardwareIsActive[3]) Eng_UI->hwb.UnhideSensaround();
 		tabButtonsLHButtons.SetActive(true);
 		tabButtonsRHButtons.SetActive(true);
 		Config.SetSEGI(); // Turn it back on if setting is on.
@@ -118,7 +118,7 @@
 	}
 
 	public void ClosePuzzleGrid() {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 		PuzzleGrid pg = puzzleGridLH.GetComponent<PuzzleGrid>();
 		PuzzleGrid pgr = puzzleGridRH.GetComponent<PuzzleGrid>();
 		tetheredPGP.SendDataBackToPanel(pg);
@@ -130,7 +130,7 @@
 	}
 
 	public void ClosePuzzleWire() {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 		PuzzleWire pw = puzzleWireLH.GetComponent<PuzzleWire>();
 		PuzzleWire pwr = puzzleWireRH.GetComponent<PuzzleWire>();
 		tetheredPWP.SendDataBackToPanel(pw,false);
@@ -142,7 +142,7 @@
 	}
 
 	public void CloseElevatorPad() {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 		tetheredKeypadElevator.SendDataBackToPanel();
 		
 		TurnOffElevatorPad();
@@ -152,7 +152,7 @@
 	}
 
 	public void CloseKeycodePad() {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 		TurnOffKeypad();
 		
 		tetheredKeypadKeycode = null;
@@ -160,7 +160,7 @@
 	}
 
 	public void CloseSearch() {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 		
 		if (tetheredSearchable != null) tetheredSearchable.ResetSearchable(false);
 		tetheredSearchable = null;
@@ -185,7 +185,7 @@
 	}
 
 	public void ClosePaperLog() {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 		
 		CenterTabButtonClickSilent(curCenterTab,false);
 	}
@@ -363,7 +363,7 @@
 
 	// Clicking [Apply] button on left or right MFD's Item Tab to apply current patch or general inventory item.
 	public void ApplyButtonClicked() {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 		itemTabLH.applyButton.SetActive(false);
 		itemTabRH.applyButton.SetActive(false);
 		if (applyButtonReferenceIndex < 0) return;
@@ -445,21 +445,21 @@
 		string headerName = name;
 		if (pid != null) {
 			switch(pid.constIndex) {
-				case 464: headerName = Sys_Text.stringTable[895]; break;
-				case 465: headerName = Sys_Text.stringTable[897]; break;
-				case 530: headerName = Sys_Text.stringTable[898]; break;
-				case 466: headerName = Sys_Text.stringTable[897]; break;
-				case 467: headerName = Sys_Text.stringTable[897]; break;
-				case 468: headerName = Sys_Text.stringTable[897]; break;
-				case 469: headerName = Sys_Text.stringTable[897]; break;
-				case 470: headerName = Sys_Text.stringTable[897]; break;
-				case 471: headerName = Sys_Text.stringTable[897]; break;
-				case 472: headerName = Sys_Text.stringTable[899]; break;
-				case 473: headerName = Sys_Text.stringTable[899]; break;
-				case 474: headerName = Sys_Text.stringTable[899]; break;
-				case 475: headerName = Sys_Text.stringTable[899]; break;
-				case 476: headerName = Sys_Text.stringTable[899]; break;
-				case 531: headerName = Sys_Text.stringTable[896]; break;
+				case 464: headerName = Eng_Text->stringTable[895]; break;
+				case 465: headerName = Eng_Text->stringTable[897]; break;
+				case 530: headerName = Eng_Text->stringTable[898]; break;
+				case 466: headerName = Eng_Text->stringTable[897]; break;
+				case 467: headerName = Eng_Text->stringTable[897]; break;
+				case 468: headerName = Eng_Text->stringTable[897]; break;
+				case 469: headerName = Eng_Text->stringTable[897]; break;
+				case 470: headerName = Eng_Text->stringTable[897]; break;
+				case 471: headerName = Eng_Text->stringTable[897]; break;
+				case 472: headerName = Eng_Text->stringTable[899]; break;
+				case 473: headerName = Eng_Text->stringTable[899]; break;
+				case 474: headerName = Eng_Text->stringTable[899]; break;
+				case 475: headerName = Eng_Text->stringTable[899]; break;
+				case 476: headerName = Eng_Text->stringTable[899]; break;
+				case 531: headerName = Eng_Text->stringTable[896]; break;
 			}
 		}
 
@@ -858,16 +858,16 @@
 		Utils.Deactivate(energyHeatTicksLH);
 		Utils.Deactivate(overloadButtonLH);
 		if (loadNormalAmmoButtonTextLH != null) {
-			if (normdex > 0 && normdex < Sys_Text.stringTable.Length) {
-				loadNormalAmmoButtonTextLH.text = Sys_Text.stringTable[normdex];
+			if (normdex > 0 && normdex < Eng_Text->stringTable.Length) {
+				loadNormalAmmoButtonTextLH.text = Eng_Text->stringTable[normdex];
 			} else {
 				loadNormalAmmoButtonTextLH.text = "";
 			}
 		}
 
 		if (loadAlternateAmmoButtonTextLH != null) {
-			if (altdex > 0 && altdex < Sys_Text.stringTable.Length) {
-				loadAlternateAmmoButtonTextLH.text = Sys_Text.stringTable[altdex];
+			if (altdex > 0 && altdex < Eng_Text->stringTable.Length) {
+				loadAlternateAmmoButtonTextLH.text = Eng_Text->stringTable[altdex];
 			} else {
 				loadAlternateAmmoButtonTextLH.text = "";
 			}
@@ -883,16 +883,16 @@
 		Utils.Deactivate(energyHeatTicksRH);
 		Utils.Deactivate(overloadButtonRH);
 		if (loadNormalAmmoButtonTextRH != null) {
-			if (normdex > 0 && normdex < Sys_Text.stringTable.Length) {
-				loadNormalAmmoButtonTextRH.text = Sys_Text.stringTable[normdex];
+			if (normdex > 0 && normdex < Eng_Text->stringTable.Length) {
+				loadNormalAmmoButtonTextRH.text = Eng_Text->stringTable[normdex];
 			} else {
 				loadNormalAmmoButtonTextRH.text = "";
 			}
 		}
 
 		if (loadAlternateAmmoButtonTextRH != null) {
-			if (altdex > 0 && altdex < Sys_Text.stringTable.Length) {
-				loadAlternateAmmoButtonTextRH.text = Sys_Text.stringTable[altdex];
+			if (altdex > 0 && altdex < Eng_Text->stringTable.Length) {
+				loadAlternateAmmoButtonTextRH.text = Eng_Text->stringTable[altdex];
 			} else {
 				loadAlternateAmmoButtonTextRH.text = "";
 			}
@@ -1014,7 +1014,7 @@
 
 	public void SetWepInfo(int index) { // Expects usableItem index.
 		if (index >= 0) {
-			weptextRH.text = weptextLH.text = Sys_Text.stringTable[index + 326];
+			weptextRH.text = weptextLH.text = Eng_Text->stringTable[index + 326];
 			iconRH.overrideSprite = iconLH.overrideSprite = Const.a.useableItemsIcons[index];
 		} else {
 			weptextRH.text = weptextLH.text = "";
@@ -1095,7 +1095,7 @@
 	}
 
 	public void CenterTabButtonClick(int tabNum) {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 		CenterTabButtonAction(tabNum);
 	}
 
@@ -1229,7 +1229,7 @@
 	public void OpenLogTableContents() {
 		DisableAllCenterTabs();
 		DataReaderContentTab.SetActive(true);
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 		ResetMultiMediaTabs();
 		startingSubTab.SetActive(true);
 		multiMediaHeaderLabel.text = "LOGS";
@@ -1241,7 +1241,7 @@
 	public void OpenLogsLevelFolder(int curlevel) {
 		DisableAllCenterTabs();
 		DataReaderContentTab.SetActive(true);
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 		ResetMultiMediaTabs();
 		secondaryTab1.SetActive(true);
 		multiMediaHeaderLabel.text = "Level " + curlevel.ToString() + " Logs";
@@ -1252,7 +1252,7 @@
 	public void OpenLogTextReader() {
 		DisableAllCenterTabs();
 		DataReaderContentTab.SetActive(true);
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 		ResetMultiMediaTabs();
 		secondaryTab2.SetActive(true);
 	}
@@ -1260,7 +1260,7 @@
 	public void OpenEmailTableContents() {
 		DisableAllCenterTabs();
 		DataReaderContentTab.SetActive(true);
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 		ResetMultiMediaTabs();
 		emailTab.SetActive(true);
 		multiMediaHeaderLabel.text = "EMAIL";
@@ -1272,7 +1272,7 @@
 	public void OpenDataTableContents() {
 		DisableAllCenterTabs();
 		DataReaderContentTab.SetActive(true);
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 		ResetMultiMediaTabs();
 		dataTab.SetActive(true);
 		Eng_Global->inventoryPlayer1.hasNewData = false;
@@ -1285,7 +1285,7 @@
 	public void OpenNotesTableContents() {
 		DisableAllCenterTabs();
 		DataReaderContentTab.SetActive(true);
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 		ResetMultiMediaTabs();
 		notesTab.SetActive(true);
 		Eng_Global->inventoryPlayer1.hasNewNotes = false;
@@ -1320,7 +1320,7 @@
 	}
 
 	public void MinigameStart_Ping() {
-		CenterStatusPrint("%s", Sys_Text.stringTable[1021] + " PING");
+		CenterStatusPrint("%s", Eng_Text->stringTable[1021] + " PING");
 		minigameButtonsContainer.SetActive(false);
 		minigameViewContainer.SetActive(true);
 		minigamePingSpaceContainer.SetActive(true);
@@ -1329,7 +1329,7 @@
 	}
 
 	public void MinigameStart_15() {
-		CenterStatusPrint("%s", Sys_Text.stringTable[1021] + " 15");
+		CenterStatusPrint("%s", Eng_Text->stringTable[1021] + " 15");
 		minigameButtonsContainer.SetActive(false);
 		minigameViewContainer.SetActive(true);
 		minigame15SpaceContainer.SetActive(true);
@@ -1338,7 +1338,7 @@
 	}
 
 	public void MinigameStart_Wing0() {
-		CenterStatusPrint("%s", Sys_Text.stringTable[1021] + " WING-0");
+		CenterStatusPrint("%s", Eng_Text->stringTable[1021] + " WING-0");
 		minigameButtonsContainer.SetActive(false);
 		minigameViewContainer.SetActive(true);
 		minigameWing0SpaceContainer.SetActive(true);
@@ -1347,7 +1347,7 @@
 	}
 
 	public void MinigameStart_Botbounce() {
-		CenterStatusPrint("%s", Sys_Text.stringTable[1021] + " BOTBOUNCE");
+		CenterStatusPrint("%s", Eng_Text->stringTable[1021] + " BOTBOUNCE");
 		minigameButtonsContainer.SetActive(false);
 		minigameViewContainer.SetActive(true);
 		minigameBotbounceSpaceContainer.SetActive(true);
@@ -1356,7 +1356,7 @@
 	}
 
 	public void MinigameStart_EelZapper() {
-		CenterStatusPrint("%s", Sys_Text.stringTable[1021] + " EEL ZAPPER");
+		CenterStatusPrint("%s", Eng_Text->stringTable[1021] + " EEL ZAPPER");
 		minigameButtonsContainer.SetActive(false);
 		minigameViewContainer.SetActive(true);
 		minigameEelZapperSpaceContainer.SetActive(true);
@@ -1365,7 +1365,7 @@
 	}
 
 	public void MinigameStart_Road() {
-		CenterStatusPrint("%s", Sys_Text.stringTable[1021] + " ROAD");
+		CenterStatusPrint("%s", Eng_Text->stringTable[1021] + " ROAD");
 		minigameButtonsContainer.SetActive(false);
 		minigameViewContainer.SetActive(true);
 		minigameRoadSpaceContainer.SetActive(true);
@@ -1374,7 +1374,7 @@
 	}
 
 	public void MinigameStart_TriopToe() {
-		CenterStatusPrint("%s", Sys_Text.stringTable[1021] + " TRIOPTOE");
+		CenterStatusPrint("%s", Eng_Text->stringTable[1021] + " TRIOPTOE");
 		minigameButtonsContainer.SetActive(false);
 		minigameViewContainer.SetActive(true);
 		minigameTriopToeSpaceContainer.SetActive(true);
@@ -1385,7 +1385,7 @@
 	// The original seemed to have planned for 9 minigames.  Maybe I'll make my
 	// own new ones someday.
 	public void MinigameStart_CorporateConquer() {
-		CenterStatusPrint("%s", Sys_Text.stringTable[1021] + " CORP CONQ");
+		CenterStatusPrint("%s", Eng_Text->stringTable[1021] + " CORP CONQ");
 		minigameButtonsContainer.SetActive(false);
 		minigameViewContainer.SetActive(true);
 		minigameCorpConqSpaceContainer.SetActive(true);
@@ -1394,7 +1394,7 @@
 	}
 
 	public void MinigameStart_Chess() {
-		CenterStatusPrint("%s", Sys_Text.stringTable[1021] + " Chess");
+		CenterStatusPrint("%s", Eng_Text->stringTable[1021] + " Chess");
 		minigameButtonsContainer.SetActive(false);
 		minigameViewContainer.SetActive(true);
 		minigameChessSpaceContainer.SetActive(true);

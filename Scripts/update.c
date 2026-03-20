@@ -264,25 +264,25 @@ void HardwareButtonsUpdate() { // TODO
 }
 
 void LogReaderUpdate() {
-    if (!Sys_UI.logActive) return;
-    if (Sys_UI.logFinished >= Eng_Global->pauseRelativeTime) return;
-    if (Sys_UI.logType == AudioLogType.Papers) return;
-    if (Sys_UI.logType == AudioLogType.TextOnly) return;
-    if (Sys_UI.logType == AudioLogType.Vmail) return;
+    if (!Eng_UI->logActive) return;
+    if (Eng_UI->logFinished >= Eng_Global->pauseRelativeTime) return;
+    if (Eng_UI->logType == AudioLogType.Papers) return;
+    if (Eng_UI->logType == AudioLogType.TextOnly) return;
+    if (Eng_UI->logType == AudioLogType.Vmail) return;
 
-    Sys_UI.logActive = false;
+    Eng_UI->logActive = false;
 //     if (itemTabLH.eReaderSectionsContainer.activeInHierarchy) ReturnToLastTab(true); TODO
 //     if (itemTabRH.eReaderSectionsContainer.activeInHierarchy) ReturnToLastTab(false);
 //     if (DataReaderContentTab.activeInHierarchy) CenterTabButtonClickSilent(0,true);
 }
 
 void CenterTabBlink() {
-    if (Sys_UI.centerTabsTickFinished >= Time.time) return;
+    if (Eng_UI->centerTabsTickFinished >= Time.time) return;
 
     for (int i=0;i<4;i++) {
-        if (Sys_UI.centerTabNotified[i]) ToggleHighlightOnCenterTabButton(i);
+        if (Eng_UI->centerTabNotified[i]) ToggleHighlightOnCenterTabButton(i);
     }
-    Sys_UI.centerTabsTickFinished = Time.time + 0.5f;
+    Eng_UI->centerTabsTickFinished = Time.time + 0.5f;
 }
 
 void MFDUpdate() {
@@ -355,7 +355,7 @@ void MFDUpdate() {
     }
 
     // Handle severing connection with in use keypads, puzzles, etc. when player drifts too far away
-    if (Sys_UI.usingObject) {
+    if (Eng_UI->usingObject) {
         if (distance_vector3(Eng_Global->instances[PLAYER1].position, objectInUsePos) > (Const.frobDistance + 0.16f)) {
             if (tetheredPGP != null) {
                 ClosePuzzleGrid();
@@ -417,7 +417,7 @@ void PlayerRessurect() {
 //     if (!ressurected) DualLog("ERROR: failed to ressurect player!");
 //     ressurections++;
 //     hm.health = 211f;
-//     Sys_UI.DrawTicks(true);
+//     Eng_UI->DrawTicks(true);
 //     radiationArea = false;
 //     radiated = 0;
 //     playerDead = false;
@@ -460,7 +460,7 @@ void PlayerHealthUpdate() {
         if (SELF.mediPatchPulseFinished == 0) SELF.mediPatchPulseCount = 0;
         if (SELF.mediPatchPulseFinished < Eng_Global->pauseRelativeTime) {
 //             hm.HealingBed(8.0f,false); TODO
-//             Sys_UI.DrawTicks(true); TODO
+//             Eng_UI->DrawTicks(true); TODO
             SELF.mediPatchPulseFinished = Eng_Global->pauseRelativeTime + (0.5f + (mediPatchPulseCount * 0.5f));
             SELF.mediPatchPulseCount++;
         }
@@ -470,8 +470,8 @@ void PlayerHealthUpdate() {
     }
     if (SELF.patchActive & PATCH_DETOX) radiated = 0.0f;
     if (radiated > 1.0f) {
-        if (radiationArea) SELF.twm.SendWarning((Sys_Text.stringTable[184]),0.1f,-2,HUDColor.White,322); // radiationAreaWarningID
-        if (!EnvirosuitApply()) SELF.twm.SendWarning((Sys_Text.stringTable[185] + radiated.ToString() +Sys_Text.stringTable[186]), 0.1f,-2,HUDColor.Red, 323); // radiationAmountWarningID Radiation poisoning ##LBP
+        if (radiationArea) SELF.twm.SendWarning((Eng_Text->stringTable[184]),0.1f,-2,HUDColor.White,322); // radiationAreaWarningID
+        if (!EnvirosuitApply()) SELF.twm.SendWarning((Eng_Text->stringTable[185] + radiated.ToString() +Eng_Text->stringTable[186]), 0.1f,-2,HUDColor.Red, 323); // radiationAmountWarningID Radiation poisoning ##LBP
         if (radFXFinished < Eng_Global->pauseRelativeTime) {
             radiationEffect.SetActive(true);
             float minT = 0.5f;
@@ -490,7 +490,7 @@ void PlayerHealthUpdate() {
         if (radiated > 0) {
             if (!hm.god) {
                 hm.health -= radiated * 0.1f; // Apply health at rate of bleedoff time.
-                Sys_UI.DrawTicks(true);
+                Eng_UI->DrawTicks(true);
             }
             if (radSoundFinished < Eng_Global->pauseRelativeTime) {
                 radSoundFinished = Eng_Global->pauseRelativeTime + random_range(1f,3f);

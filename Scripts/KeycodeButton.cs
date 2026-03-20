@@ -54,7 +54,7 @@ public class KeycodeButton : MonoBehaviour {
 	}
 
 	public void KeycodeButtonClick () {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 		KeycodeButtonUse();
 	}
 

@@ -14,10 +14,10 @@ public class CyborgConversionToggle : MonoBehaviour {
 		int lindex = LevelManager.a.currentLevel != -1 ? LevelManager.a.currentLevel : 0;
 		if (LevelManager.a.ressurectionActive[lindex]) {
 			Utils.PlayOneShotSavable(SFX,sounds[183]); // "vox_cybconvcancelled"
-			CenterStatusPrint("%s", Sys_Text.stringTable[591]); // "Cyborg conversion cancelled.  Healing normal."
+			CenterStatusPrint("%s", Eng_Text->stringTable[591]); // "Cyborg conversion cancelled.  Healing normal."
 		} else {
 			Utils.PlayOneShotSavable(SFX,sounds[184]); // "vox_cybconvenabled"
-			CenterStatusPrint("%s", Sys_Text.stringTable[592]); // "Cyborg conversion reactivated."
+			CenterStatusPrint("%s", Eng_Text->stringTable[592]); // "Cyborg conversion reactivated."
 		}
 	}
 }

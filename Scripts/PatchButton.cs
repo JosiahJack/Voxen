@@ -8,7 +8,7 @@ public class PatchButton: MonoBehaviour {
 	public int useableItemIndex;
 
 	public void DoubleClick() {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 		PatchUse();
 	}
 
@@ -17,12 +17,12 @@ public class PatchButton: MonoBehaviour {
 	}
 
 	public void PatchInvClick (bool useSound) {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 		PatchSelect(useSound);
 	}
 
 	public void PatchSelect(bool useSound) {
-		Sys_UI.SendInfoToItemTab(useableItemIndex);
+		Eng_UI->SendInfoToItemTab(useableItemIndex);
 		Eng_Global->inventoryPlayer1.patchCurrent = PatchButtonIndex; // Set current.
 		for (int i = 0; i < 7; i++) {
 			Eng_Global->inventoryPlayer1.patchCountTextObjects [i].color = Const.a.ssGreenText;

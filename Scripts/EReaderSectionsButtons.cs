@@ -24,14 +24,14 @@ public class EReaderSectionsButtons : MonoBehaviour {
 	}
 
 	public void OnClick(int index) {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 
 		SetEReaderSectionsButtonsHighlights(index);
 		switch (index) {
-			case 0: Sys_UI.OpenEmailTableContents(); break;
-			case 1: Sys_UI.OpenLogTableContents(); break;
-			case 2: Sys_UI.OpenDataTableContents(); break;
-			case 3: Sys_UI.OpenNotesTableContents(); break;
+			case 0: Eng_UI->OpenEmailTableContents(); break;
+			case 1: Eng_UI->OpenLogTableContents(); break;
+			case 2: Eng_UI->OpenDataTableContents(); break;
+			case 3: Eng_UI->OpenNotesTableContents(); break;
 		}
 	}
 

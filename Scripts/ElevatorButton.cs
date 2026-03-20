@@ -37,23 +37,23 @@ public class ElevatorButton : MonoBehaviour {
 	}
 
 	public void ElevButtonClick () {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 
-		if (Sys_UI.linkedElevatorDoor == null) {
-			CenterStatusPrint("%s", Sys_Text.stringTable[6]); // Too far away from that.
+		if (Eng_UI->linkedElevatorDoor == null) {
+			CenterStatusPrint("%s", Eng_Text->stringTable[6]); // Too far away from that.
 			return;
 		}
 
-		bool dC = Sys_UI.linkedElevatorDoor.doorOpen == DoorState_Closed;
+		bool dC = Eng_UI->linkedElevatorDoor.doorOpen == DoorState_Closed;
 		Vector3 plyPos = Eng_Global->instances[PLAYER1].position;
-		float dist = distance_vector3(Sys_UI.objectInUsePos,plyPos);
+		float dist = distance_vector3(Eng_UI->objectInUsePos,plyPos);
 		if (dist > ELEVATOR_PAD_TETHER_DIST && !dC) {
-			CenterStatusPrint("%s", Sys_Text.stringTable[6]); // Too far away from that.
+			CenterStatusPrint("%s", Eng_Text->stringTable[6]); // Too far away from that.
 			return;
 		}
 
 		if (!dC) {
-			CenterStatusPrint("%s", Sys_Text.stringTable[7]); // Door not closed.
+			CenterStatusPrint("%s", Eng_Text->stringTable[7]); // Door not closed.
 			return;
 		}
 
@@ -64,7 +64,7 @@ public class ElevatorButton : MonoBehaviour {
 				LevelManager.a.LoadLevel(levelIndex,targetDestination.Eng_Global->instances[i].position);
 			}
 		} else {
-			CenterStatusPrint("%s", Sys_Text.stringTable[8]);
+			CenterStatusPrint("%s", Eng_Text->stringTable[8]);
 		}
 	}
 

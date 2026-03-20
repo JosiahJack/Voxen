@@ -31,7 +31,6 @@ void main() {
     vec4 worldPosPack = imageLoad(inputWorldPos, ivec2(pixel * SSR_RES));
     vec3 worldPos = worldPosPack.xyz;
     vec4 specColor = imageLoad(inputSpecular, ivec2(pixel * SSR_RES));
-    uint packedNormal = floatBitsToUint(imageLoad(inputNormal, ivec2(pixel * SSR_RES)).r);
     vec2 normalPack = imageLoad(inputNormal, ivec2(pixel * SSR_RES)).rg;
     vec3 normal = DecodeOctahedral(normalPack);
     vec3 viewDir = normalize(camPos - worldPos);

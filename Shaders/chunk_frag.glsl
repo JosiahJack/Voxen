@@ -28,6 +28,8 @@ layout(location = 21) uniform uint shadowMapSize;
 layout(location = 22) uniform float shadowMapSizeF;
 layout(location = 23) uniform uint lightCount;
 layout(location = 24) uniform uint maxLightsPerVoxel;
+layout(location = 25) uniform uint constIndex;
+layout(location = 26) uniform uint grayscaleEnabled;
 
 
 layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
@@ -135,6 +137,15 @@ void main() {
     vec4 albedoColor = getTextureColor(texIndex,texUV);
     if (albedoColor.a < 0.05) discard; // Alpha cutout threshold
 
+    float heat = 0.0;
+    if (grayscaleEnabled > 0) {
+        if (constIndex >= 419 && constIndex <= 448) { // NPC's are hot!
+            heat = 4.0;
+            if (constIndex == 419 || constIndex == 422 || constIndex == 424 || constIndex == 429 || constIndex == 430
+            || constIndex == 431 || constIndex == 433 || constIndex == 437 || constIndex == 438 || constIndex == 441)
+                heat = 1.5;
+        }
+    }
     vec3 adjustedNormal = Normal;
     if (normInstanceIndex != 0) { //  && distToPixel < 10.24 only has 0.073ms savings, leaving off for better quality of visuals
         vec3 dp1 = dFdx(FragPos);
@@ -174,8 +185,7 @@ void main() {
     specColor = getTextureColor(specIndex,texUVSpec);
     if (reflectionsEnabled > 0 && isUI == 0) {
         outSpecular = specColor;
-        vec4 worldPosPack = vec4(FragPos.xyz, 0.0);
-        outWorldPos = worldPosPack;
+        outWorldPos.xyz = FragPos.xyz;
         outNormal = EncodeOctahedral(adjustedNormal) * 0.5 + 0.5;  // Map to [0,1]
     }
 
@@ -292,6 +302,11 @@ void main() {
     float rim = 1.0 - max(dot(adjustedNormal, viewDir), 0.0);
     lighting += clamp(pow(rim, 4.0) * 0.25 * clamp(intensityTotal,0.0,1.0) * specColor.rgb,0.0,1.0); // Specular "rim" fresnel (tested and performance impact is essentially zero)
     lighting = (unlit > 0) ? albedoColor.rgb : lighting + glowColor.rgb;
+    if (heat > 0.0) {
+        lighting += albedoColor.rgb * heat;
+        lighting = pow(lighting, vec3(1.2));
+        lighting += clamp(pow(rim, 3.0) * 0.5 * specColor.rgb, 0.0, 1.0);
+    }
 
     // Blue Noise Dither for banding (0.03ms performance cost, leaving in for quality)
     ivec2 sp = ivec2(gl_FragCoord.xy);

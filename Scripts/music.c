@@ -1,6 +1,5 @@
 // g_music.c - Music System
 #include "mod.h"
-#include "tables_audio.h"
 #include "miniaudio.h"
 #define BUFFER_MS 50
 #define AUD_BUFFER_T 0.25f

@@ -8,9 +8,9 @@ public class MultiMediaLogTableButton : MonoBehaviour {
 
 	void LogTableButtonClick() {
 		Eng_Global->inventoryPlayer1.hardwareIsActive[2] = true;
-		Sys_UI.OpenEReaderInItemsTab();
-		Sys_UI.mouseClickHeldOverGUI = true;
-		Sys_UI.OpenLogsLevelFolder(logTableButtonIndex);
+		Eng_UI->OpenEReaderInItemsTab();
+		Eng_UI->mouseClickHeldOverGUI = true;
+		Eng_UI->OpenLogsLevelFolder(logTableButtonIndex);
 	}
 
 	void Start() {

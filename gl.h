@@ -110,10 +110,13 @@ typedef void (*GLADpostcallback)(void *ret, const char *name, GLADapiproc apipro
 #define GL_EQUAL 0x0202
 #define GL_EXTENSIONS 0x1F03
 #define GL_FALSE 0
+#define GL_ZERO 0
+#define GL_ONE 1
 #define GL_FLOAT 0x1406
 #define GL_FRAGMENT_SHADER 0x8B30
 #define GL_FRAMEBUFFER 0x8D40
 #define GL_FRAMEBUFFER_COMPLETE 0x8CD5
+#define GL_LEQUAL 0x0203
 #define GL_LESS 0x0201
 #define GL_LINEAR 0x2601
 #define GL_LINES 0x0001
@@ -130,7 +133,10 @@ typedef void (*GLADpostcallback)(void *ret, const char *name, GLADapiproc apipro
 #define GL_READ_WRITE 0x88BA
 #define GL_RED 0x1903
 #define GL_RG 0x8227
+#define GL_RGB 0x1907
 #define GL_RG16F 0x822F
+#define GL_RGB16F 0x881B
+#define GL_RGBA16F 0x881A
 #define GL_RGBA 0x1908
 #define GL_RGBA32F 0x8814
 #define GL_RGBA8 0x8058
@@ -939,6 +945,8 @@ GLAD_API_CALL PFNGLBINDVERTEXBUFFERPROC glad_glBindVertexBuffer;
 #define glBindVertexBuffer glad_glBindVertexBuffer
 GLAD_API_CALL PFNGLBLENDFUNCPROC glad_glBlendFunc;
 #define glBlendFunc glad_glBlendFunc
+GLAD_API_CALL PFNGLBLENDFUNCSEPARATEPROC glad_glBlendFuncSeparate;
+#define glBlendFuncSeparate glad_glBlendFuncSeparate
 GLAD_API_CALL PFNGLBUFFERDATAPROC glad_glBufferData;
 #define glBufferData glad_glBufferData
 GLAD_API_CALL PFNGLCHECKFRAMEBUFFERSTATUSPROC glad_glCheckFramebufferStatus;

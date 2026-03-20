@@ -60,7 +60,7 @@ public class PuzzleWirePuzzle : MonoBehaviour {
 		}
 
 		if (GetCurrentLevelSecurity() > securityThreshhold) {
-			Sys_UI.BlockedBySecurity(Eng_Global->instances[i].position);
+			Eng_UI->BlockedBySecurity(Eng_Global->instances[i].position);
 			return;
 		}
 
@@ -85,7 +85,7 @@ public class PuzzleWirePuzzle : MonoBehaviour {
 
 		CenterStatusPrint(190); //Puzzle accessed
 		inUse = true;
-		Sys_UI.SendWirePuzzleToDataTab(wiresOn,rowsActive,
+		Eng_UI->SendWirePuzzleToDataTab(wiresOn,rowsActive,
 											 currentPositionsLeft,
 											 currentPositionsRight,
 											 solutionPositionsLeft,

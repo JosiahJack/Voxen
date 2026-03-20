@@ -22,9 +22,7 @@ GLFWwindow* window;
 #include "credits.h"
 GlobalContext Sys_Global = { .menuActive = true, .screenshotTimeout = 1.0, .creditsPageIndex = 1, .difficultyCombat = 2, .difficultyCyber = 2, .difficultyPuzzle = 2, .difficultyMission = 2, .deaths = 0, .worstFPS = UINT32_MAX, .cursorPosition_x = 680, .cursorPosition_y = 384, .aspect3D = 1.0f };
 CheatsSystem Sys_Cheats = { .god = false, .noclip = true, .showLocation = true, .showFPS = true, .editMode = true };
-RenderSystem Sys_Render;
-SystemUI Sys_UIPlayer1;
-SystemUI Sys_UIPlayer2;
+RenderSystem Sys_Render; SystemUI Sys_UI;
 OsFileHandle console_log_file = 0;
 AutoSplitterData autoSplitter = { 0x1337133713371337, 0, false, 0 }; // Fore use with LiveSplit or other future speedrunner utilities for doing speedruns
 uint8_t queuedLevelToLoad = 255u;
@@ -41,6 +39,7 @@ bool lightDirty[LIGHT_COUNT];
 static float lightView[LIGHT_COUNT][6][4][4]; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightView[i][face][0 ... 15]
 static float lightViewProj[LIGHT_COUNT][6][16]; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightViewProj[i][face][0 ... 15]
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6]; // Array of Array of 6 Arrays of FrustumPlane structs (four floats).  lightFrustumPlanes[i][face][.nx,.ny,, .nz, .d]
+FrustumPlane playerFrustumPlanes[6];
 uint16_t loadedLights, editModeSelection, editModeTestEntityDefinition = 0; // Test instance and its model index
 float voxelMinCenterX, voxelMinCenterZ;
 VoxenShadowSystem voxen_Shadow_System;
@@ -169,10 +168,7 @@ void mat4_lookat_from(float* m, Quaternion* camRotation, Vector3 eye) { // Kept 
     m[12] = -dot_vector3(right, eye); m[13] = -dot_vector3(up, eye); m[14] = dot_vector3(forward, eye); m[15] = 1.0f;
 }
 
-__attribute__((pure)) bool SphereInFrustum(FrustumPlane* planes, Vector3 c, float radius) {
-    for (int i=0;i<6;++i) { if ((planes[i].normal.x * c.x + planes[i].normal.y * c.y + planes[i].normal.z * c.z + planes[i].d) < -radius) return false; }
-    return true;
-}
+__attribute__((pure,always_inline)) bool SphereInFrustum(FrustumPlane* planes, Vector3 c, float radius) { for (int i=0;i<6;++i) { if ((dot_vector3(planes[i].normal,c) + planes[i].d) < -radius) return false; } return true; }
 
 void ExtractFrustumPlanes(float* m, FrustumPlane* planes) {
     planes[0].normal.x = m[3]  + m[0];  planes[0].normal.y = m[7]  + m[4];  planes[0].normal.z = m[11] + m[8];  planes[0].d = m[15] + m[12]; // Left
@@ -182,10 +178,7 @@ void ExtractFrustumPlanes(float* m, FrustumPlane* planes) {
     planes[4].normal.x = m[3]  + m[2];  planes[4].normal.y = m[7]  + m[6];  planes[4].normal.z = m[11] + m[10]; planes[4].d = m[15] + m[14]; // Near
     planes[5].normal.x = m[3]  - m[2];  planes[5].normal.y = m[7]  - m[6];  planes[5].normal.z = m[11] - m[10]; planes[5].d = m[15] - m[14]; // Far
     for (int i = 0; i < 6; i++) {
-        float len = vsqrtf(planes[i].normal.x*planes[i].normal.x + planes[i].normal.y*planes[i].normal.y + planes[i].normal.z*planes[i].normal.z);
-        if (len > 0.0f) {
-            planes[i].normal.x /= len; planes[i].normal.y /= len; planes[i].normal.z /= len; planes[i].d /= len; // Normalize
-        }
+        float len = magnitude_vector3(planes[i].normal); if (len > 1e-6f) { planes[i].normal.x /= len; planes[i].normal.y /= len; planes[i].normal.z /= len; planes[i].d /= len; } // Normalize (could use normalize_vector3 but need len for d term of FrustumPlane).
     }
 }
 
@@ -205,14 +198,18 @@ Vector3 lightsNewPosition[LIGHT_COUNT];
 bool UpdateLights(bool* voxelsNeedUpdated) {
     // Update headmounted lantern
     int32_t lant = headmountedLanternLight * LIGHT_DATA_SIZE;
-    if (/*(Sys_Global.inventoryPlayer1.hasHardware & HW_LAN) && */(Sys_Global.inventoryPlayer1.hardwareIsActive & HW_LAN)) {
+    bool infraredOn = /*(Sys_Global.inventoryPlayer1.hasHardware & HW_INF) && */(Sys_Global.inventoryPlayer1.hardwareIsActive & HW_INF);
+    bool lanternOn = /*(Sys_Global.inventoryPlayer1.hasHardware & HW_LAN) && */(Sys_Global.inventoryPlayer1.hardwareIsActive & HW_LAN);
+    if (lanternOn || infraredOn) {
         Vector3 lanternPosLast = lanternPos;
         lanternPos = (Vector3){Sys_Global.instances[PLAYER1].position.x + 0.04f, Sys_Global.instances[PLAYER1].position.y + 0.24f, Sys_Global.instances[PLAYER1].position.z + 0.04f};
         lightsNewPosition[headmountedLanternLight] = lanternPos;
         lights[lant + LIGHT_DATA_OFFSET_POSX] = lanternPos.x;
         lights[lant + LIGHT_DATA_OFFSET_POSY] = lanternPos.y;
         lights[lant + LIGHT_DATA_OFFSET_POSZ] = lanternPos.z;
-        lights[lant + LIGHT_DATA_OFFSET_INTENSITY] = lightMaxIntensity[headmountedLanternLight] = lanternVersionBrightness[Sys_Global.inventoryPlayer1.hardwareVersionSetting[7]];
+        lights[lant + LIGHT_DATA_OFFSET_RANGE] = infraredOn ? 50.36f : 11.52f;
+        lights[lant + LIGHT_DATA_OFFSET_INTENSITY] = lightMaxIntensity[headmountedLanternLight] = infraredOn ? 0.8f : lanternVersionBrightness[Sys_Global.inventoryPlayer1.hardwareVersionSetting[7]];
+        lightCastsShadows[headmountedLanternLight] = !infraredOn;
         lightDirty[headmountedLanternLight] = !lightOn[headmountedLanternLight] || (vabs(lanternPosLast.x - lanternPos.x) + vabs(lanternPosLast.y - lanternPos.y) + vabs(lanternPosLast.z - lanternPos.z)) > 0.001f;
         lightOn[headmountedLanternLight] = true;
         lightCastsShadows[headmountedLanternLight] = true;
@@ -267,7 +264,6 @@ bool UpdateLights(bool* voxelsNeedUpdated) {
             int litIdx = i * LIGHT_DATA_SIZE;
             if (!lightOn[i]) { lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightMinIntensity[i]; continue; }
 
-            float differenceInIntensity = (lightMaxIntensity[i] - lightMinIntensity[i]);
             if (lightLerpTime[i] < (float)Sys_Global.pauseRelativeTime) {
                 lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightLerpUp[i] ? lightMaxIntensity[i] : lightMinIntensity[i]; // Pick target to lerp towards
                 lightLerpUp[i] = !lightLerpUp[i];
@@ -281,7 +277,7 @@ bool UpdateLights(bool* voxelsNeedUpdated) {
                     if (intervalStepisLerping[i][lightCurrentStep[i]]) {
                         lightLerpValue[i] = ((float)Sys_Global.pauseRelativeTime - lightLerpStartTime[i])/(lightLerpTime[i] - lightLerpStartTime[i]); // percent towards goal time
                         float lerpVal = lightLerpUp[i] ? (lightLerpValue[i]) : (1.0f - lightLerpValue[i]);
-                        lightLerpValue[i] = lightMinIntensity[i] + (differenceInIntensity * lerpVal);
+                        lightLerpValue[i] = lightMinIntensity[i] + ((lightMaxIntensity[i] - lightMinIntensity[i]) * lerpVal);
                         lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightLerpValue[i];
                     }
                 }
@@ -480,12 +476,9 @@ __attribute__((cold)) void NewGame(void) { // Reset World States
     RenderLoadingProgress(100,"Loading new game...");
     DualLog("Rendered screen saying \"Loading new game...\"\n");
     Sys_Global.instances[WORLD].ioflags = 0u;
-    Sys_Global.instances[WORLD].lev1SecCode = random_range_u8(0u,9u); // Must do rand's repeatedly to prevent
-    Sys_Global.instances[WORLD].lev2SecCode = random_range_u8(0u,9u); // these all being the same number.
-    Sys_Global.instances[WORLD].lev3SecCode = random_range_u8(0u,9u);
-    Sys_Global.instances[WORLD].lev4SecCode = random_range_u8(0u,9u);
-    Sys_Global.instances[WORLD].lev5SecCode = random_range_u8(0u,9u);
-    Sys_Global.instances[WORLD].lev6SecCode = random_range_u8(0u,9u);
+    Sys_Global.instances[WORLD].lev1SecCode = random_range_u8(0u,9u); Sys_Global.instances[WORLD].lev2SecCode = random_range_u8(0u,9u);
+    Sys_Global.instances[WORLD].lev3SecCode = random_range_u8(0u,9u); Sys_Global.instances[WORLD].lev4SecCode = random_range_u8(0u,9u);
+    Sys_Global.instances[WORLD].lev5SecCode = random_range_u8(0u,9u); Sys_Global.instances[WORLD].lev6SecCode = random_range_u8(0u,9u); // Must do rand's repeatedly to prevent these all being the same number.
     __builtin_memset(Sys_Global.instances,0,INSTANCE_COUNT * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
     DualLog("Calling PlayerInits...\n");
     PlayerInit(PLAYER1); PlayerInit(PLAYER2);
@@ -597,45 +590,45 @@ void UpdateProjectionMatrices(void) {
 
 void UpdateScreenSize(GLFWwindow* unused, int32_t width, int32_t height) {
     (void)unused; // Appease glfwSetFramebufferSizeCallback pointer type
-    Sys_Settings.ScreenWidth = vmax(vmin((uint16_t)width, 7680), 320u); Sys_Settings.ScreenHeight = vmax(vmin((uint16_t)height, 4320), 200u); // Cap at minimum Quake 1 resolution and maximum 8k.
+    Sys_Settings.ScreenWidth = vmax(vmin((uint16_t)width,7680u),320u); Sys_Settings.ScreenHeight = vmax(vmin((uint16_t)height,4320u),200u); // Cap at minimum Quake 1 resolution and maximum 8k.
     Sys_Settings.ScreenCenterX = (float)Sys_Settings.ScreenWidth * 0.5f; Sys_Settings.ScreenCenterY = (float)Sys_Settings.ScreenHeight * 0.5f;
-    glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
+    glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
     UpdateProjectionMatrices();
     glUseProgram(Sys_Render.imageBlitShaderProgram);
-    glUniform1ui(2, Sys_Settings.ScreenWidth);
-    glUniform1ui(3, Sys_Settings.ScreenHeight);
-    glUniform1i(26, Sys_Settings.SSR_RES);
+    glUniform1ui(2,Sys_Settings.ScreenWidth);
+    glUniform1ui(3,Sys_Settings.ScreenHeight);
+    glUniform1i(26,Sys_Settings.SSR_RES);
     glUseProgram(Sys_Render.chunkShaderProgram);
-    glUniform1ui(6, Sys_Settings.ScreenWidth);
-    glUniform1ui(7, Sys_Settings.ScreenHeight);
+    glUniform1ui(6,Sys_Settings.ScreenWidth);
+    glUniform1ui(7,Sys_Settings.ScreenHeight);
     glUseProgram(Sys_Render.ssrShaderProgram);
-    glUniform1ui(0, Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES);
-    glUniform1ui(1, Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES);       
-    glUniform1i(2, Sys_Settings.SSR_RES);
-    GenerateAndBindTexture(&Sys_Render.inputImageID,             GL_RGBA8, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Lit Raster
-    GenerateAndBindTexture(&Sys_Render.inputWorldPosID,        GL_RGBA32F, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight,            GL_RGBA,         GL_FLOAT, GL_TEXTURE_2D); // Raster World Positions
-    GenerateAndBindTexture(&Sys_Render.inputDepthID, GL_DEPTH_COMPONENT32, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, GL_DEPTH_COMPONENT,         GL_FLOAT, GL_TEXTURE_2D); // Raster Depth
-    GenerateAndBindTexture(&Sys_Render.inputSpecID,              GL_RGBA8, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Specular Colors
-    GenerateAndBindTexture(&Sys_Render.inputNormalID,            GL_RG16F, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight,              GL_RG,         GL_FLOAT, GL_TEXTURE_2D); // Normal XYZ
-    glGenTextures(1, &Sys_Render.outputImageID);
-    glBindTexture(GL_TEXTURE_2D, Sys_Render.outputImageID);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,  Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES,  Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glBindTexture(GL_TEXTURE_2D, 0);
+    glUniform1ui(0,Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES);
+    glUniform1ui(1,Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES);       
+    glUniform1i(2,Sys_Settings.SSR_RES);
+    GenerateAndBindTexture(&Sys_Render.inputImageID,            GL_RGBA8,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight,           GL_RGBA,GL_UNSIGNED_BYTE,GL_TEXTURE_2D); // Lit Raster
+    GenerateAndBindTexture(&Sys_Render.inputWorldPosID,       GL_RGBA32F,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight,           GL_RGBA,        GL_FLOAT,GL_TEXTURE_2D); // Raster World Positions
+    GenerateAndBindTexture(&Sys_Render.inputDepthID,GL_DEPTH_COMPONENT32,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight,GL_DEPTH_COMPONENT,        GL_FLOAT,GL_TEXTURE_2D); // Raster Depth
+    GenerateAndBindTexture(&Sys_Render.inputSpecID,             GL_RGBA8,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight,           GL_RGBA,GL_UNSIGNED_BYTE,GL_TEXTURE_2D); // Specular Colors
+    GenerateAndBindTexture(&Sys_Render.inputNormalID,           GL_RG16F,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight,            GL_RGB,        GL_FLOAT,GL_TEXTURE_2D); // Normal XYZ
+    glGenTextures(1,&Sys_Render.outputImageID);
+    glBindTexture(GL_TEXTURE_2D,Sys_Render.outputImageID);
+    glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA8,Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES,Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES,0,GL_RGBA,GL_UNSIGNED_BYTE,NULL);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D,0);
     glBindFramebuffer(GL_FRAMEBUFFER, Sys_Render.gBufferFBO);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, Sys_Render.inputImageID, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, Sys_Render.inputWorldPosID, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, Sys_Render.inputSpecID, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, Sys_Render.inputNormalID, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, Sys_Render.inputDepthID, 0);
-    glBindImageTexture(0, Sys_Render.inputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // Main Rendered Color
-    glBindImageTexture(1, Sys_Render.inputWorldPosID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F); // World Position XYZ
-    glBindImageTexture(2, Sys_Render.inputSpecID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // Specular
-    glBindImageTexture(4, Sys_Render.outputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // SSR result
-    glBindImageTexture(5, Sys_Render.inputNormalID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RG16F); // Normal XYZ
+    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,Sys_Render.inputImageID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT1,GL_TEXTURE_2D,Sys_Render.inputWorldPosID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT2,GL_TEXTURE_2D,Sys_Render.inputSpecID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT3,GL_TEXTURE_2D,Sys_Render.inputNormalID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_TEXTURE_2D,Sys_Render.inputDepthID, 0);
+    glBindImageTexture(0,Sys_Render.inputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8); // Main Rendered Color
+    glBindImageTexture(1,Sys_Render.inputWorldPosID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA32F); // World Position XYZ
+    glBindImageTexture(2,Sys_Render.inputSpecID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8); // Specular
+    glBindImageTexture(4,Sys_Render.outputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8); // SSR result
+    glBindImageTexture(5,Sys_Render.inputNormalID,0,GL_FALSE,0,GL_READ_WRITE,GL_RG16F); // Normal XYZ
     glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_2D, Sys_Render.outputImageID);
+    glBindTexture(GL_TEXTURE_2D,Sys_Render.outputImageID);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
@@ -987,7 +980,7 @@ void LoadModFunctions(void) {
 
     MOD_FUNCTION_LIST(X)
     #undef X
-    ModLink(&Sys_Global,&Sys_Cheats,&Sys_Settings);
+    ModLink(&Sys_Global,&Sys_Cheats,&Sys_Settings,&Sys_Text,&Sys_UI);
     Sys_Global.GetKey = GetKey;
     Sys_Global.GetKeyPressed = GetKeyPressed;
     DualLog("done!\n");
@@ -1035,7 +1028,8 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     glfwSetMouseButtonCallback(window, mouse_button_callback);
     glfwSetScrollCallback(window, scroll_callback);
     glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Globally same alpha blending
+//     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Globally same alpha blending
+    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE);
     CompileShaders();
     double initMarker4 = get_time();
     DualLog("Set monitor, Set GLFW callbacks, Compile shaders took %f secs\n",initMarker4 - initMarker3);
@@ -1183,7 +1177,7 @@ void play_mp3(const char* path, int32_t fade_in_ms) {
     Sys_Global.mp3_slot = next_slot;
 }
 
-void play_wav(const char* path, float volume, Vector3 pos, bool positional) {
+ENGINE_TO_MOD void play_wav(const char* path, float volume, Vector3 pos, bool positional) {
     int32_t slot = -1;
     for (int32_t i = 0; i < wav_count; i++) { // Try to find a free slot (either unused or finished)
         if (!ma_sound_is_playing(&wav_sounds[i]) && ma_sound_at_end(&wav_sounds[i])) {
@@ -1763,7 +1757,119 @@ ENGINE_TO_MOD void AddDebugLine(Vector3 start, Vector3 end) {
     Sys_Global.debugLineVertCount = i;
 }
 
-#define SHADOW_NEARMESH_MAX 512 // 350 was too low for light 712 on security atrium
+
+char creditStats[4096];
+static inline __attribute__((always_inline)) float GetScore(float stupid, bool isFinal) {
+    float victories = (float)(Sys_Global.kills + Sys_Global.cyberkills);
+    float secs = vfloor((float)Sys_Global.pauseRelativeTime / 3600.0f);
+    if (!isFinal) { // Report score if no deaths.
+        float score = victories * 10000.0f;
+        score -= vmin(score * 0.666f,secs * 100.0f);
+        score *= ((stupid + 1.0f) / 37.0f);
+        if (stupid > 35.0f) score += 2222222.0f; // secret kevin bonus
+        return vfloor(score); // Score Subtotal
+    }
+
+    float deathPenalty = Sys_Global.ressurections * 10.0f; // Death is 10 anti-kills, but you always keep at least a third of your kills.
+    float score = (victories - vmin(deathPenalty,victories * 0.666f)) * 10000.0f;
+    score -= vmin(score * 0.666f,secs * 100.0f);
+    score *= ((stupid + 1.0f) / 37.0f); // 9 * 4 + 1 is best difficulty factor
+    if (stupid > 35.0f) score += 2222222.0f; // secret kevin bonus
+    return vfloor(score); // Final Score
+}
+
+static inline __attribute__((always_inline)) void CreditsStats(void) {
+    size_t off = 0;
+    off += StringFormat(creditStats + off,sizeof(creditStats),"================================================================================\nCITADEL\n");
+    off += StringFormat(creditStats + off,sizeof(creditStats),"================================================================================\nCONGRATULATIONS %s\n",Sys_Global.playerName);
+    uint32_t hours, minutes; double secs;
+    double tb = (vfloor(Sys_Global.pauseRelativeTime/3600.0));
+    hours = (uint32_t)tb;
+    double t = Sys_Global.pauseRelativeTime - (tb * 3600.0);
+    tb = vfloor(t / 60.0);
+    minutes = (uint32_t)tb;
+    secs = t - (tb * 60.0);
+    off += StringFormat(creditStats + off,sizeof(creditStats),"Straight Time: %uh %um %.3fs\n",hours,minutes,secs);
+    tb = vfloor(Sys_Global.absoluteTime/3600.0);
+    hours = (uint32_t)tb;
+    t = Sys_Global.absoluteTime - (tb * 3600.0);
+    tb = vfloor(t / 60.0);
+    minutes = (uint32_t)tb;
+    secs = t - (tb * 60.0);
+    off += StringFormat(creditStats + off,sizeof(creditStats),"Total Time (with reload from deaths): %uh %um %.3fs\n",hours,minutes,secs);
+    float stupid = ((float)(Sys_Global.difficultyCombat * Sys_Global.difficultyCombat)) + ((float)(Sys_Global.difficultyPuzzle * Sys_Global.difficultyPuzzle)) + ((float)(Sys_Global.difficultyMission * Sys_Global.difficultyMission)) + ((float)(Sys_Global.difficultyCyber * Sys_Global.difficultyCyber));
+    uint32_t finalSubscore = GetScore(stupid,false);
+    off += StringFormat(creditStats + off,sizeof(creditStats),"Kills: %u\nKills in Cyberspace: %u\nScoreSubtotal: %u\nDeaths: %u\nRessurections: %u\n",Sys_Global.kills,Sys_Global.cyberkills,(uint32_t)finalSubscore,Sys_Global.deaths,Sys_Global.ressurections);
+    off += StringFormat(creditStats + off,sizeof(creditStats),"Combat: %u | Puzzle: %u | Mission: %u | Cyber: %u\n",Sys_Global.difficultyCombat,Sys_Global.difficultyPuzzle,Sys_Global.difficultyMission,Sys_Global.difficultyCyber);
+    uint32_t finalScore = (uint32_t)GetScore(stupid,true);
+    off += StringFormat(creditStats + off,sizeof(creditStats),"Difficulty Index: %.2f\nFinal Score: %u\n\n",stupid,finalScore);
+    off += StringFormat(creditStats + off,sizeof(creditStats),"Shots Fired: %u\nGrenades Thrown: %u\n",Sys_Global.shotsFired,Sys_Global.grenadesThrown);
+    off += StringFormat(creditStats + off,sizeof(creditStats),"Damage Dealt: %f\nDamage Received: %f\nSaves Scummed: %u\n\nClick to continue...\n",Sys_Global.damageDealt,Sys_Global.damageReceived,Sys_Global.savesScummed);
+}
+
+void RenderCredits(void) {
+    if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].pressed) {
+        ++Sys_Global.creditsPageIndex;
+        if (Sys_Global.creditsPageIndex > CREDITS_PAGES) {Sys_Global.creditsActive = false; return; }
+    }
+
+    if (Sys_Global.creditsPageIndex == 1) {
+        CreditsStats();
+        RenderFormattedText(300,10,TEXT_WHITE,FONT_NORMAL,1.0f,(const char*)&creditStats);
+    } else RenderFormattedText(300,10,TEXT_WHITE,FONT_NORMAL,1.0f,creditPages[Sys_Global.creditsPageIndex]);
+}
+
+void RenderMenu(void);
+void RenderPausedUI(void);
+extern float shadBiasMin;
+static inline __attribute__((always_inline)) double RenderUI(void) {
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    drawCallsNormal = drawCallsRenderedThisFrame;
+    if (Sys_Global.creditsActive) { RenderCredits(); return get_time(); }
+    if (Sys_Global.menuActive) RenderMenu();
+    else if (Sys_Global.gamePaused) RenderPausedUI();
+    
+    // Diagnostics / Debugging
+    int16_t debugTextStartY = 58;
+    if (Sys_Cheats.showLocation && !Sys_Global.menuActive) RenderFormattedText(16, debugTextStartY, TEXT_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f",Sys_Global.instances[PLAYER1].position.x,Sys_Global.instances[PLAYER1].position.y,Sys_Global.instances[PLAYER1].position.z,Sys_Global.instances[PLAYER1].rotation.x,Sys_Global.instances[PLAYER1].rotation.y,Sys_Global.instances[PLAYER1].rotation.z,Sys_Global.instances[PLAYER1].rotation.w);
+    int16_t lineSpacing = 18;
+    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 1),TEXT_WHITE,FONT_NORMAL,1.0f,"timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u",Sys_Global.timeSinceLastPhysicsTick, voxen_Shadow_System.numShadowsCouldRender,playerCellIdx,numCellsVisible);
+    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 2),TEXT_WHITE,FONT_NORMAL,1.0f,"Player velocity: %.2f, %.2f, %.2f",Sys_Global.instances[PLAYER1].velocity.x,Sys_Global.instances[PLAYER1].velocity.y,Sys_Global.instances[PLAYER1].velocity.z);
+    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 3),TEXT_WHITE,FONT_NORMAL,1.0f,"Test Entity[%u] %s Index: %u, Shadow cpu ms: %.3f",editModeSelection,Sys_Global.entities[Sys_Global.instances[editModeSelection].index].path,editModeTestEntityDefinition,voxen_Shadow_System.shadowTime * 1000);
+    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 4),TEXT_WHITE,FONT_NORMAL,1.0f,"Player cell: %u",Sys_Global.instances[PLAYER1].cellIndex);
+    RenderFormattedText(16,debugTextStartY + (lineSpacing * 5),TEXT_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d   dx: %d dy: %d",Sys_Global.cursorPosition_x,Sys_Global.cursorPosition_y,Sys_Input.currentMouse_dx,Sys_Input.currentMouse_dy);
+    if (Sys_Cheats.consoleActive) RenderFormattedText(16, 0, TEXT_WHITE, FONT_NORMAL,1.0f, "] %s",consoleEntryText);
+    if (Sys_Global.statusTextDecayFinished > Sys_Global.current_time) RenderFormattedText(479,114,TEXT_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
+    if (!Sys_Global.menuActive && !Sys_Global.gamePaused) {
+        if (!Sys_Global.gamePaused && !Sys_Cheats.noHUD) RenderUIImage(672,0,22,22,1020); // Shoot mode button
+        bool mouseReleased = Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].pressed;
+        if (Sys_Global.inventoryMode) {
+            if (CursorIsOverBounds(672,694,22,0)) {
+                if (mouseReleased) {
+                    Sys_Global.inventoryMode = false;
+                    Sys_Global.cursorPosition_x = Sys_Settings.ScreenWidth / 2;
+                    Sys_Global.cursorPosition_y = Sys_Settings.ScreenHeight / 2;
+                }
+            }
+        }
+    }
+    
+    double time_now = get_time();
+    if (Sys_Cheats.showFPS) {
+        Sys_Global.thisFrameTime = (time_now - Sys_Global.last_time) * 1000.0;
+        Sys_Global.cpuFrameTime = Sys_Global.cpuTime * 1000.0;
+        uint8_t timingColor = TEXT_WHITE;
+        if (vabs(Sys_Global.thisFrameTime - Sys_Global.cpuFrameTime) < 0.451) timingColor = TEXT_GREEN;
+        if (Sys_Global.thisFrameTime > 6.944444) timingColor = TEXT_RED;
+        drawCallsRenderedThisFrame += 2; textDrawCallsRenderedThisFrame += 2; // Add two more for this text render ;)
+        RenderFormattedText(16, debugTextStartY - lineSpacing, timingColor, FONT_NORMAL,1.0f, "ms: %.2f, CPU %.2f", Sys_Global.thisFrameTime,Sys_Global.cpuFrameTime);
+        RenderFormattedText(16 + 230.0f, debugTextStartY - lineSpacing, TEXT_WHITE, FONT_NORMAL,1.0f, "(FPS: %d, Worst: %d), Drwclls: %d [G %d UI %d Txt %d Shd %d] Vrts: %d E:%u|M:%u|P:%u|T:%.5f",Sys_Global.framesPerLastSecond,Sys_Global.worstFPS,drawCallsRenderedThisFrame,drawCallsNormal,uiImageDrawCallsRenderedThisFrame,textDrawCallsRenderedThisFrame,shadowDrawCallsRenderedThisFrame,verticesRenderedThisFrame,Sys_Cheats.editMode,Sys_Global.menuActive,Sys_Global.gamePaused,Sys_Global.pauseRelativeTime);
+    }
+    
+    return time_now;
+}
+
+#define SHADOW_NEARMESH_MAX 768 // 350 was too low for light 712 on security atrium
 DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX]; // Found that this is typically around 172
 float shadows_nearMeshRadii[SHADOW_NEARMESH_MAX];
 
@@ -1783,7 +1889,17 @@ bool EntNotVisible(uint16_t i, bool otherCondition) {
     return false;
 }
 
-static inline __attribute__((always_inline)) __attribute__((hot)) void RenderShadowmaps(void) {    
+static inline __attribute__((always_inline,hot)) uint16_t GetAndBindModel(uint16_t i, uint16_t currentModelType) {
+    glUniform1ui(0,i);
+    uint16_t modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && Sys_Global.instances[i].lodIndex < loadedModelsMaxIndex ? Sys_Global.instances[i].lodIndex : Sys_Global.instances[i].modelIndex;
+    if (currentModelType == modelType && currentModelType != 0) return currentModelType;
+    
+    glBindVertexBuffer(0,Sys_Render.vbos[modelType],0,VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,Sys_Render.tbos[modelType]);
+    return modelType;
+}
+
+static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {    
     double shadowStartTime = get_time();
     glEnable(GL_POLYGON_OFFSET_FILL);
     glPolygonOffset(1.0f, 4.0f);
@@ -1886,25 +2002,17 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void RenderSha
             #pragma GCC unroll 6
             for (uint8_t face = 0; face < 6; face++) {                                            
                 glUniform1ui(2, face);
-                glUniformMatrix4fv(1, 1, GL_FALSE, (float*)lightViewProj[lightIdx][face]);
+                glUniformMatrix4fv(1,1,GL_FALSE,(float*)lightViewProj[lightIdx][face]);
                 glUniform1ui(7, shadowmapOffsetHead + (face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE));
                 shadowDrawCallsRenderedThisFrame++;
                 for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
                     int i = shadows_nearMeshes[j].index;            
                     if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face], Sys_Global.instances[i].position, shadows_nearMeshRadii[j] * 1.41f)) continue;
 
-                    int32_t modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && Sys_Global.instances[i].lodIndex < loadedModelsMaxIndex ? Sys_Global.instances[i].lodIndex : Sys_Global.instances[i].modelIndex;
-                    if (currentModelType != modelType) {
-                        currentModelType = modelType;
-                        glBindVertexBuffer(0, Sys_Render.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-                        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Sys_Render.tbos[currentModelType]);
-                    }
-                    
-                    glUniform1ui(0, i);
+                    currentModelType = GetAndBindModel(i,currentModelType);
                     if (currentTexIndex != Sys_Global.instances[i].texIndex) { currentTexIndex = Sys_Global.instances[i].texIndex; glUniform1ui(6, Sys_Global.instances[i].texIndex); }
                     if (currentIsTransparent != transparentTexture[Sys_Global.instances[i].texIndex]) { currentIsTransparent = transparentTexture[Sys_Global.instances[i].texIndex]; glUniform1ui(8, transparentTexture[Sys_Global.instances[i].texIndex] ? 1u : 0u); }
-                    glDrawElements(GL_TRIANGLES, modelTriangleCounts[currentModelType] * 3, GL_UNSIGNED_INT, 0);
-                    drawCallsRenderedThisFrame++; verticesRenderedThisFrame += modelTriangleCounts[currentModelType] * 3;
+                    glDrawElements(GL_TRIANGLES,modelTriangleCounts[currentModelType]*3,GL_UNSIGNED_INT,0); drawCallsRenderedThisFrame++; verticesRenderedThisFrame += modelTriangleCounts[currentModelType] * 3;
                 }
             }
             
@@ -1921,172 +2029,51 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void RenderSha
     voxen_Shadow_System.shadowTime = get_time() - shadowStartTime;
 }
 
-char creditStats[4096];
-static inline __attribute__((always_inline)) float GetScore(float stupid, bool isFinal) {
-    float score = 0.0f;
-    float victories = (float)(Sys_Global.kills + Sys_Global.cyberkills);
-    float secs = 0.0f;
-    secs = vfloor((float)Sys_Global.pauseRelativeTime / 3600.0f);
-    if (!isFinal) { // Report score if no deaths.
-        score = victories * 10000.0f;
-        score -= vmin(score * 0.666f,secs * 100.0f);
-        score *= ((stupid + 1.0f) / 37.0f);
-        if (stupid > 35.0f) score += 2222222.0f; // secret kevin bonus
-        return vfloor(score);
-    }
-
-    // Death is 10 anti-kills, but you always keep at least a third of your kills.
-    float deathPenalty = Sys_Global.ressurections * 10.0f;
-    score = victories - vmin(deathPenalty,victories * 0.666f);
-    score *= 10000.0f;
-    score -= vmin(score * 0.666f,secs * 100.0f);
-    score *= ((stupid + 1.0f) / 37.0f); // 9 * 4 + 1 is best difficulty factor
-    if (stupid > 35.0f) score += 2222222.0f; // secret kevin bonus
-    return vfloor(score);
-}
-
-static inline __attribute__((always_inline)) void CreditsStats(void) {
-    size_t off = 0;
-    off += StringFormat(creditStats + off, sizeof(creditStats), "================================================================================\nCITADEL\n");
-    off += StringFormat(creditStats + off, sizeof(creditStats), "================================================================================\nCONGRATULATIONS %s\n", Sys_Global.playerName);
-    uint32_t hours, minutes; double secs;
-    double t = Sys_Global.pauseRelativeTime;
-    double tb = (vfloor(t/3600.0));
-    hours = (uint32_t)tb;
-    t = t - (tb * 3600.0);
-    tb = vfloor(t / 60.0);
-    minutes = (uint32_t)tb;
-    secs = t - (tb * 60.0);
-    off += StringFormat(creditStats + off, sizeof(creditStats), "Straight Time: %uh %um %.3fs\n", hours, minutes, secs);
-    t = Sys_Global.absoluteTime;
-    tb = vfloor(t/3600.0);
-    hours = (uint32_t)tb;
-    t = t - (tb * 3600.0);
-    tb = vfloor(t / 60.0);
-    minutes = (uint32_t)tb;
-    secs = t - (tb * 60.0);
-    off += StringFormat(creditStats + off, sizeof(creditStats), "Total Time (with reload from deaths): %uh %um %.3fs\n", hours, minutes, secs);
-    float stupid = 0.0f;
-    stupid += (float)(Sys_Global.difficultyCombat * Sys_Global.difficultyCombat);
-    stupid += (float)(Sys_Global.difficultyPuzzle * Sys_Global.difficultyPuzzle);
-    stupid += (float)(Sys_Global.difficultyMission * Sys_Global.difficultyMission);
-    stupid += (float)(Sys_Global.difficultyCyber * Sys_Global.difficultyCyber);
-    uint32_t finalSubscore = GetScore(stupid, false);
-    off += StringFormat(creditStats + off, sizeof(creditStats), "Kills: %u\nKills in Cyberspace: %u\nScoreSubtotal: %u\nDeaths: %u\nRessurections: %u\n", Sys_Global.kills, Sys_Global.cyberkills, (uint32_t)finalSubscore, Sys_Global.deaths, Sys_Global.ressurections);
-    off += StringFormat(creditStats + off, sizeof(creditStats), "Combat: %u | Puzzle: %u | Mission: %u | Cyber: %u\n", Sys_Global.difficultyCombat, Sys_Global.difficultyPuzzle, Sys_Global.difficultyMission, Sys_Global.difficultyCyber);
-    uint32_t finalScore = (uint32_t)GetScore(stupid, true);
-    off += StringFormat(creditStats + off, sizeof(creditStats), "Difficulty Index: %.2f\nFinal Score: %u\n\n", (double)stupid, finalScore);
-    off += StringFormat(creditStats + off, sizeof(creditStats), "Shots Fired: %u\nGrenades Thrown: %u\n", Sys_Global.shotsFired, Sys_Global.grenadesThrown);
-    off += StringFormat(creditStats + off, sizeof(creditStats), "Damage Dealt: %f\nDamage Received: %f\nSaves Scummed: %u\n\nClick to continue...\n", (double)Sys_Global.damageDealt, (double)Sys_Global.damageReceived, Sys_Global.savesScummed);
-}
-
-void RenderCredits(void) {
-    if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].pressed) {
-        ++Sys_Global.creditsPageIndex;
-        if (Sys_Global.creditsPageIndex > CREDITS_PAGES) {Sys_Global.creditsActive = false; return; }
-    }
-
-    if (Sys_Global.creditsPageIndex == 1) {
-        CreditsStats();
-        RenderFormattedText(300,10,TEXT_WHITE,FONT_NORMAL,1.0f,(const char*)&creditStats);
-    } else RenderFormattedText(300,10,TEXT_WHITE,FONT_NORMAL,1.0f,creditPages[Sys_Global.creditsPageIndex]);
-}
-
-void RenderMenu(void);
-void RenderPausedUI(void);
-extern float shadBiasMin;
-static inline __attribute__((always_inline)) double RenderUI(void) {
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    drawCallsNormal = drawCallsRenderedThisFrame;
-    if (Sys_Global.creditsActive) { RenderCredits(); return get_time(); }
-    if (Sys_Global.menuActive) RenderMenu();
-    else if (Sys_Global.gamePaused) RenderPausedUI();
+DepthSort visibleInstances[INSTANCE_COUNT];
+static inline __attribute__((always_inline)) bool DetermineIfInstanceVisible(uint16_t i, bool otherCondition, bool skyVisible, Vector3 playerPos, float* distSqrd) {
+    if (EntNotVisible(i,otherCondition)) return false; // must be transparent && transparents or neither
+        
+    Vector3 objPos = Sys_Global.instances[i].position;
+    uint16_t instCellIdx = PosGetCellCoords(objPos.x, objPos.z);
+    Vector3 delta = Vector3_A_minus_B(objPos, playerPos);
+    *distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
+    float radius = modelBounds[(Sys_Global.instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
+    if (!SphereInFrustum(playerFrustumPlanes,objPos,radius) && (Sys_Global.instances[i].index != 754 || !skyVisible) && i != editModeSelection) return false;
     
-    // Diagnostics / Debugging
-    int16_t debugTextStartY = 58;
-    if (Sys_Cheats.showLocation && !Sys_Global.menuActive) RenderFormattedText(16, debugTextStartY, TEXT_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f",Sys_Global.instances[PLAYER1].position.x,Sys_Global.instances[PLAYER1].position.y,Sys_Global.instances[PLAYER1].position.z,Sys_Global.instances[PLAYER1].rotation.x,Sys_Global.instances[PLAYER1].rotation.y,Sys_Global.instances[PLAYER1].rotation.z,Sys_Global.instances[PLAYER1].rotation.w);
-    int16_t lineSpacing = 18;
-    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 1),TEXT_WHITE,FONT_NORMAL,1.0f,"timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u",Sys_Global.timeSinceLastPhysicsTick, voxen_Shadow_System.numShadowsCouldRender,playerCellIdx,numCellsVisible);
-    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 2),TEXT_WHITE,FONT_NORMAL,1.0f,"Player velocity: %.2f, %.2f, %.2f",Sys_Global.instances[PLAYER1].velocity.x,Sys_Global.instances[PLAYER1].velocity.y,Sys_Global.instances[PLAYER1].velocity.z);
-    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 3),TEXT_WHITE,FONT_NORMAL,1.0f,"Test Entity[%u] %s Index: %u, Shadow cpu ms: %.3f",editModeSelection,Sys_Global.entities[Sys_Global.instances[editModeSelection].index].path,editModeTestEntityDefinition,voxen_Shadow_System.shadowTime * 1000);
-    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 4),TEXT_WHITE,FONT_NORMAL,1.0f,"Player cell: %u",Sys_Global.instances[PLAYER1].cellIndex);
-    RenderFormattedText(16,debugTextStartY + (lineSpacing * 5),TEXT_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d   dx: %d dy: %d",Sys_Global.cursorPosition_x,Sys_Global.cursorPosition_y,Sys_Input.currentMouse_dx,Sys_Input.currentMouse_dy);
-    if (Sys_Cheats.consoleActive) RenderFormattedText(16, 0, TEXT_WHITE, FONT_NORMAL,1.0f, "] %s",consoleEntryText);
-    if (Sys_Global.statusTextDecayFinished > Sys_Global.current_time) RenderFormattedText(479,114,TEXT_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
-    if (!Sys_Global.menuActive && !Sys_Global.gamePaused) {
-        if (!Sys_Global.gamePaused && !Sys_Cheats.noHUD) RenderUIImage(672,0,22,22,1020); // Shoot mode button
-        bool mouseReleased = Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].pressed;
-        if (Sys_Global.inventoryMode) {
-            if (CursorIsOverBounds(672,694,22,0)) {
-                if (mouseReleased) {
-                    Sys_Global.inventoryMode = false;
-                    Sys_Global.cursorPosition_x = Sys_Settings.ScreenWidth / 2;
-                    Sys_Global.cursorPosition_y = Sys_Settings.ScreenHeight / 2;
+    if (EntityIndexIsPortalBlockingDoor(Sys_Global.instances[i].index)) { // Extra checks only needed for opaque portal blocking doors.
+        bool inPVS = (gridCellStates[instCellIdx] & CELL_VISIBLE);
+        if (!inPVS) {
+            uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((objPos.x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+            uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((objPos.z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+            for (int ix = cellX - 2; ix <= (int)cellX + 2 && !inPVS; ++ix) {
+                for (int iz = cellZ - 2; iz <= (int)cellZ + 2; ++iz) {
+                    if (!XZPairInBounds(ix, iz)) return false;
+
+                    int subIdx = iz * WORLDX + ix;
+                    if (get_cull_bit(precomputedVisibleCellsFromHere, instCellIdx * ARRSIZE + subIdx) && (gridCellStates[subIdx] & CELL_VISIBLE)) { inPVS = true; break; }
                 }
             }
         }
+        if (!inPVS) return false;
+    } else {
+        if (!(Sys_Global.currentLevel == 1 && (Sys_Global.instances[i].index == 309 ||  Sys_Global.instances[i].index == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
+            if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (Sys_Global.instances[i].index != 754 || !skyVisible)) return false; // For some shelves that are inset away from cells, need to still draw their items by checking && CELL_OPEN here, unfortunately this means they don't ever get culled :(
+        }
+        
+        if (!(gridCellStates[instCellIdx] & CELL_OPEN) && *distSqrd >= 943.7184f && (Sys_Global.instances[i].index != 754 || !skyVisible)) return false; // 30.72 * 30.72, 12 cells
     }
     
-    double time_now = get_time();
-    if (Sys_Cheats.showFPS) {
-        Sys_Global.thisFrameTime = (time_now - Sys_Global.last_time) * 1000.0;
-        Sys_Global.cpuFrameTime = Sys_Global.cpuTime * 1000.0;
-        uint8_t timingColor = TEXT_WHITE;
-        if (vabs(Sys_Global.thisFrameTime - Sys_Global.cpuFrameTime) < 0.451) timingColor = TEXT_GREEN;
-        if (Sys_Global.thisFrameTime > 6.944444) timingColor = TEXT_RED;
-        drawCallsRenderedThisFrame += 2; textDrawCallsRenderedThisFrame += 2; // Add two more for this text render ;)
-        RenderFormattedText(16, debugTextStartY - lineSpacing, timingColor, FONT_NORMAL,1.0f, "ms: %.2f, CPU %.2f", Sys_Global.thisFrameTime,Sys_Global.cpuFrameTime);
-        RenderFormattedText(16 + 230.0f, debugTextStartY - lineSpacing, TEXT_WHITE, FONT_NORMAL,1.0f, "(FPS: %d, Worst: %d), Drwclls: %d [G %d UI %d Txt %d Shd %d] Vrts: %d E:%u|M:%u|P:%u|T:%.5f",Sys_Global.framesPerLastSecond,Sys_Global.worstFPS,drawCallsRenderedThisFrame,drawCallsNormal,uiImageDrawCallsRenderedThisFrame,textDrawCallsRenderedThisFrame,shadowDrawCallsRenderedThisFrame,verticesRenderedThisFrame,Sys_Cheats.editMode,Sys_Global.menuActive,Sys_Global.gamePaused,Sys_Global.pauseRelativeTime);
-    }
-    
-    return time_now;
+    return true;
 }
 
-DepthSort visibleInstances[INSTANCE_COUNT];
-void qsort(void *base, size_t nmemb, size_t size, int (*cmp)(const void*, const void*));
+void qsort(void* base, size_t nmemb, size_t size, int (*cmp)(const void*, const void*));
 static inline __attribute__((always_inline)) void RenderInstances(Vector3 playerPos, bool transparents) {
     uint16_t visibleCount = 0, currentTexIndex = 0, currentNormIndex = 0, currentGlowIndex = 0, currentSpecIndex = 0, currentModelType = 0;
     bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX);
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
-        if (EntNotVisible(i,(transparentTexture[Sys_Global.instances[i].texIndex] ^ transparents))) continue; // must be transparent && transparents or neither
-        
-        Vector3 objPos = Sys_Global.instances[i].position;
-        uint16_t instCellIdx = PosGetCellCoords(objPos.x, objPos.z);
-        Vector3 delta = Vector3_A_minus_B(objPos, playerPos);
-        float distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
-        if (distSqrd >= FAR_PLANE_SQUARED && (Sys_Global.instances[i].index != 754 || !skyVisible) && i != editModeSelection) continue;
+        float distSqrd = FAR_PLANE * FAR_PLANE;
+        if (!DetermineIfInstanceVisible(i,(transparentTexture[Sys_Global.instances[i].texIndex] ^ transparents),skyVisible,playerPos,&distSqrd)) continue;
 
-        if (EntityIndexIsPortalBlockingDoor(Sys_Global.instances[i].index)) { // Extra checks only needed for opaque portal blocking doors.
-            bool inPVS = (gridCellStates[instCellIdx] & CELL_VISIBLE);
-            if (!inPVS) {
-                uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((objPos.x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
-                uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((objPos.z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
-                int r = vfloor(5.12f * (1.0f / WORLDCELL_WIDTH_F));
-                for (int ix = cellX - r; ix <= (int)cellX + r && !inPVS; ++ix) {
-                    for (int iz = cellZ - r; iz <= (int)cellZ + r; ++iz) {
-                        if (!XZPairInBounds(ix, iz)) continue;
-
-                        int subIdx = iz * WORLDX + ix;
-                        if (get_cull_bit(precomputedVisibleCellsFromHere, instCellIdx * ARRSIZE + subIdx) && (gridCellStates[subIdx] & CELL_VISIBLE)) {
-                            inPVS = true;
-                            break;
-                        }
-                    }
-                }
-            }
-            if (!inPVS) continue;
-        } else {
-            if (!(Sys_Global.currentLevel == 1 && (Sys_Global.instances[i].index == 309 ||  Sys_Global.instances[i].index == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
-                if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (Sys_Global.instances[i].index != 754 || !skyVisible)) continue; // For some shelves that are inset away from cells, need to still draw their items by checking && CELL_OPEN here, unfortunately this means they don't ever get culled :(
-            }
-            
-            if (!(gridCellStates[instCellIdx] & CELL_OPEN) && distSqrd >= 943.7184f && (Sys_Global.instances[i].index != 754 || !skyVisible)) continue; // 30.72 * 30.72, 12 cells
-        }
-
-        float dotResult = dot_vector3(delta, Sys_Global.instances[PLAYER1].forward);
-        float radius = modelBounds[(Sys_Global.instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
-        if (dotResult < 0.0f && distSqrd > (radius * radius) && i != editModeSelection) continue;
-        
         visibleInstances[visibleCount].index = i;
         visibleInstances[visibleCount].depth = distSqrd;
         visibleCount++;
@@ -2099,21 +2086,15 @@ static inline __attribute__((always_inline)) void RenderInstances(Vector3 player
         else if (doubleSidedTexture[Sys_Global.instances[i].texIndex] || Sys_Global.instances[i].scale.x < 0.0f || Sys_Global.instances[i].scale.y < 0.0f || Sys_Global.instances[i].scale.z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided
         else { glEnable(GL_CULL_FACE); glDisable(GL_BLEND); } // Opaque
 
-        glUniform1ui(0, i);    glUniform1ui(17, Sys_Global.instances[i].texIndex == 316 ? 1u : 0u);
+        glUniform1ui(17, Sys_Global.instances[i].texIndex == 316 ? 1u : 0u);
+        glUniform1ui(25,(uint32_t)Sys_Global.instances[i].index); // constIndex
         if (currentNormIndex != (uint32_t)Sys_Global.instances[i].normIndex || Sys_Global.instances[i].normIndex == 0) { currentNormIndex = (uint32_t)Sys_Global.instances[i].normIndex; glUniform1ui(1, currentNormIndex); }
         if (currentTexIndex  != (uint32_t)Sys_Global.instances[i].texIndex  || Sys_Global.instances[i].texIndex == 0)  { currentTexIndex  =  (uint32_t)Sys_Global.instances[i].texIndex; glUniform1ui(18, currentTexIndex); }
         if (currentGlowIndex != (uint32_t)Sys_Global.instances[i].glowIndex || Sys_Global.instances[i].glowIndex == 0) { currentGlowIndex = (uint32_t)Sys_Global.instances[i].glowIndex; glUniform1ui(19, currentGlowIndex); }
         if (currentSpecIndex != (uint32_t)Sys_Global.instances[i].specIndex || Sys_Global.instances[i].specIndex == 0) { currentSpecIndex = (uint32_t)Sys_Global.instances[i].specIndex; glUniform1ui(20, currentSpecIndex); }
-        int32_t modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && Sys_Global.instances[i].lodIndex < loadedModelsMaxIndex ? Sys_Global.instances[i].lodIndex : Sys_Global.instances[i].modelIndex;
-        if (currentModelType != modelType || currentModelType == 0) {
-            currentModelType = modelType;
-            glBindVertexBuffer(0, Sys_Render.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Sys_Render.tbos[currentModelType]);
-        }
-        
+        currentModelType = GetAndBindModel(i,currentModelType);
         uint32_t vertCount = modelTriangleCounts[currentModelType] * 3;
-        glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0);
-        drawCallsRenderedThisFrame++; verticesRenderedThisFrame += vertCount;
+        glDrawElements(GL_TRIANGLES,vertCount,GL_UNSIGNED_INT,0); drawCallsRenderedThisFrame++; verticesRenderedThisFrame += vertCount;
     }
 }
 
@@ -2121,44 +2102,8 @@ static inline __attribute__((always_inline)) void RenderInstancesDepthOnly(Vecto
     uint16_t visibleCount = 0, currentModelType = 0;
     bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX);
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
-        if (EntNotVisible(i,transparentTexture[Sys_Global.instances[i].texIndex])) continue; // must be transparent && transparents or neither
-        
-        Vector3 objPos = Sys_Global.instances[i].position;
-        uint16_t instCellIdx = PosGetCellCoords(objPos.x, objPos.z);
-        Vector3 delta = Vector3_A_minus_B(objPos, playerPos);
-        float distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
-        if (distSqrd >= FAR_PLANE_SQUARED && (Sys_Global.instances[i].index != 754 || !skyVisible)) continue;
-
-        if (EntityIndexIsPortalBlockingDoor(Sys_Global.instances[i].index)) { // Extra checks only needed for opaque portal blocking doors.
-            bool inPVS = (gridCellStates[instCellIdx] & CELL_VISIBLE);
-            if (!inPVS) {
-                uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((objPos.x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
-                uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((objPos.z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
-                int r = vfloor(5.12f * (1.0f / WORLDCELL_WIDTH_F));
-                for (int ix = cellX - r; ix <= (int)cellX + r && !inPVS; ++ix) {
-                    for (int iz = cellZ - r; iz <= (int)cellZ + r; ++iz) {
-                        if (!XZPairInBounds(ix, iz)) continue;
-
-                        int subIdx = iz * WORLDX + ix;
-                        if (get_cull_bit(precomputedVisibleCellsFromHere, instCellIdx * ARRSIZE + subIdx) && (gridCellStates[subIdx] & CELL_VISIBLE)) {
-                            inPVS = true;
-                            break;
-                        }
-                    }
-                }
-            }
-            if (!inPVS) continue;
-        } else {
-            if (!(Sys_Global.currentLevel == 1 && (Sys_Global.instances[i].index == 309 ||  Sys_Global.instances[i].index == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
-                if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (Sys_Global.instances[i].index != 754 || !skyVisible)) continue; // For some shelves that are inset away from cells, need to still draw their items by checking && CELL_OPEN here, unfortunately this means they don't ever get culled :(
-            }
-            
-            if (!(gridCellStates[instCellIdx] & CELL_OPEN) && distSqrd >= 943.7184f && (Sys_Global.instances[i].index != 754 || !skyVisible)) continue; // 30.72 * 30.72, 12 cells
-        }
-
-        float dotResult = dot_vector3(delta, Sys_Global.instances[PLAYER1].forward);
-        float radius = vmax(modelBounds[(Sys_Global.instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f,2.56f);
-        if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
+        float distSqrd = FAR_PLANE * FAR_PLANE;
+        if (!DetermineIfInstanceVisible(i,transparentTexture[Sys_Global.instances[i].texIndex],skyVisible,playerPos,&distSqrd)) continue;
         
         visibleInstances[visibleCount].index = i;
         visibleInstances[visibleCount].depth = distSqrd;
@@ -2172,19 +2117,9 @@ static inline __attribute__((always_inline)) void RenderInstancesDepthOnly(Vecto
         if (doubleSidedTexture[Sys_Global.instances[i].texIndex] || Sys_Global.instances[i].scale.x < 0.0f || Sys_Global.instances[i].scale.y < 0.0f || Sys_Global.instances[i].scale.z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided
         else { glEnable(GL_CULL_FACE); glDisable(GL_BLEND); } // Opaque
 
-        glUniform1ui(0, i);
-        int32_t modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && Sys_Global.instances[i].lodIndex < loadedModelsMaxIndex ? Sys_Global.instances[i].lodIndex : Sys_Global.instances[i].modelIndex;
-        if ((currentModelType != modelType || currentModelType == 0)) {
-            currentModelType = modelType;
-            glBindVertexBuffer(0, Sys_Render.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Sys_Render.tbos[currentModelType]);
-        }
-
+        currentModelType = GetAndBindModel(i,currentModelType);
         uint32_t vertCount = modelTriangleCounts[currentModelType] * 3;
-        if (vertCount < 3 || currentModelType >= loadedModelsMaxIndex) continue;
-        
-        glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0);
-        drawCallsRenderedThisFrame++; verticesRenderedThisFrame += vertCount;
+        glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0); drawCallsRenderedThisFrame++; verticesRenderedThisFrame += vertCount;
     }
 }
 
@@ -2213,8 +2148,9 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
     }
     
     float viewProj[16]; // view-projection matrix
-    mul_mat4(viewProj, rasterPerspectiveProjection, view);
-    float invViewRot[9] = { view[0], view[4], view[8],    view[1], view[5], view[9],    view[2], view[6], view[10] };
+    mul_mat4(viewProj,rasterPerspectiveProjection,view);
+    float invViewRot[9] = {view[0],view[4],view[8], view[1],view[5],view[9], view[2],view[6],view[10]};
+    ExtractFrustumPlanes(viewProj,playerFrustumPlanes);
     glBindVertexArray(Sys_Render.vao_chunk); // Common vao for RenderShadowmaps and Rasterized Geometry
     glEnable(GL_DEPTH_TEST);
     if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps();
@@ -2226,60 +2162,64 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
     
     // Depth Prepass - Eliminates some overdraw for ~6.1% performance improvement in spite of added draw calls since these are relatively cheap and avoid the heavy fragment work in main pass.
     glUseProgram(Sys_Render.depthPrepassShaderProgram);
-    glUniformMatrix4fv(2, 1, GL_FALSE, viewProj);
-    glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+    glUniformMatrix4fv(2,1,GL_FALSE,viewProj);
+    glColorMask(GL_FALSE,GL_FALSE,GL_FALSE,GL_FALSE);
     glDepthMask(GL_TRUE);
     glDepthFunc(GL_LESS);
     RenderInstancesDepthOnly(playerPos); // opaques only
     
     // Main Pass
     glUseProgram(Sys_Render.chunkShaderProgram);
-    glUniformMatrix4fv(2, 1, GL_FALSE, viewProj);
-    glUniform1ui(3, 0u); // isUI false
+    glUniformMatrix4fv(2,1,GL_FALSE,viewProj);
+    glUniform1ui(25,0u); // default constIndex
+    uint32_t grayscaleOn = (uint32_t)(/*(Sys_Global.inventoryPlayer1.hasHardware & HW_INF) && */(Sys_Global.inventoryPlayer1.hardwareIsActive & HW_INF));
+    glUniform1ui(26,grayscaleOn);
+    glUniform1ui(3,0u); // isUI false
     float fogActual = fogBaseDensityForLevel + (float)(Sys_Global.fogFac / 255u);
-    glUniform3f(4, fogColorR * fogActual, fogColorG * fogActual, fogColorB * fogActual); // Fog Color(which is density)
-    glUniform1ui(14, Sys_Settings.Reflections);   glUniform1ui(15, Sys_Settings.Shadows);
-    glUniform1f(8, worldMin_x);   glUniform1f(9, worldMin_z);    glUniform3f(10, playerPos.x, playerPos.y, playerPos.z);
-    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    glUniform3f(4,fogColorR * fogActual,fogColorG * fogActual,fogColorB * fogActual); // Fog Color(which is density)
+    glUniform1ui(14,Sys_Settings.Reflections);   glUniform1ui(15,Sys_Settings.Shadows);
+    glUniform1f(8,worldMin_x);   glUniform1f(9,worldMin_z);    glUniform3f(10,playerPos.x,playerPos.y,playerPos.z);
+    glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE);
     glDepthMask(GL_FALSE);
-    glDepthFunc(GL_EQUAL);
-    RenderInstances(playerPos, false);
+    glDepthFunc(GL_LEQUAL);
+    RenderInstances(playerPos,false);
     glDepthMask(GL_TRUE);
     glDepthFunc(GL_LESS);
-    RenderInstances(playerPos, true); // opaque, then transparents
-    
+    RenderInstances(playerPos,true); // opaque, then transparents
+    glUniform1ui(25,0u); // reset constIndex
+
     // Draw Debug Lines
     if (unlikely(Sys_Global.debugLineVertCount > 1)) DrawDebugLines(viewProj);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     if (likely(Sys_Settings.Reflections > 0u)) { // Screen Space Reflections
         glUseProgram(Sys_Render.ssrShaderProgram);
-        glUniformMatrix4fv(4, 1, GL_FALSE, viewProj);
-        glUniform3f(3, playerPos.x, playerPos.y, playerPos.z);
+        glUniformMatrix4fv(4,1,GL_FALSE,viewProj);
+        glUniform3f(3,playerPos.x,playerPos.y,playerPos.z);
         GLuint groupX_ssr = ((Sys_Settings.ScreenWidth  / Sys_Settings.SSR_RES) + 31) / 32;
         GLuint groupY_ssr = ((Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES) + 31) / 32;
-        glDispatchCompute(groupX_ssr, groupY_ssr, 1);
+        glDispatchCompute(groupX_ssr,groupY_ssr,1);
     }
 
     glUseProgram(Sys_Render.imageBlitShaderProgram);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, Sys_Render.inputImageID);
-    glUniform1i(4, 4); // outputImage texture sampler2D
+    glBindTexture(GL_TEXTURE_2D,Sys_Render.inputImageID);
+    glUniform1i(4,4); // outputImage texture sampler2D
     double berserkTimeRemainingNormalized = berserkFinished > 0.0001 ? (berserkFinished - Sys_Global.pauseRelativeTime) / BERSERK_TIME : 0.0;
     if (berserkFinished < Sys_Global.pauseRelativeTime && berserkFinished > 0.0001) berserkFinished = berserkTimeRemainingNormalized = 0.0;
-    glUniform1ui(5, Sys_Settings.Reflections);
-    glUniform1ui(6, Sys_Settings.AntiAliasing);
-    glUniform1f(14, Sys_Settings.FOV);
-    glUniform1f(16, (float)Sys_Settings.ScreenWidth / (float)Sys_Settings.ScreenHeight);
-    glUniform1ui(22, Sys_Settings.Shadows);
-    glUniform1f(9, (float)berserkTimeRemainingNormalized);
-    glUniform1f(10, berserkSeedTime);
-    glUniform1ui(11, Sys_Settings.Brightness);
-    glUniform3f(12, deg2rad(cam_yaw), deg2rad(cam_pitch), deg2rad(cam_roll));
-    glUniform3f(13, px, py, pz);
-    glUniform1f(15, (float)Sys_Global.pauseRelativeTime * 0.1f);
-    glUniform1ui(17, (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || Sys_Global.currentLevel == LEVEL_CYBERSPACE);
-    glUniform1ui(18, (gridCellStates[playerCellIdx] & CELL_SEES_SUN) && Sys_Global.currentLevel != LEVEL_CYBERSPACE);
-    glUniform1ui(19, ((Sys_Global.currentLevel >= 10 && Sys_Global.currentLevel < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
+    glUniform1ui(5,Sys_Settings.Reflections);
+    glUniform1ui(6,Sys_Settings.AntiAliasing);
+    glUniform1f(14,Sys_Settings.FOV);
+    glUniform1f(16,(float)Sys_Settings.ScreenWidth / (float)Sys_Settings.ScreenHeight);
+    glUniform1ui(22,Sys_Settings.Shadows);
+    glUniform1f(9,(float)berserkTimeRemainingNormalized);
+    glUniform1f(10,berserkSeedTime);
+    glUniform1ui(11,Sys_Settings.Brightness);
+    glUniform3f(12,deg2rad(cam_yaw), deg2rad(cam_pitch), deg2rad(cam_roll));
+    glUniform3f(13,px, py, pz);
+    glUniform1f(15,(float)Sys_Global.pauseRelativeTime * 0.1f);
+    glUniform1ui(17,(gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || Sys_Global.currentLevel == LEVEL_CYBERSPACE);
+    glUniform1ui(18,(gridCellStates[playerCellIdx] & CELL_SEES_SUN) && Sys_Global.currentLevel != LEVEL_CYBERSPACE);
+    glUniform1ui(19,((Sys_Global.currentLevel >= 10 && Sys_Global.currentLevel < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
     uint32_t shieldOnType = 0u; // No shield green tint.
     if (Sys_Global.instances[WORLD].ioflags & QUESTBIT_SHIELD_ACTIVATED) {
         if (Sys_Global.currentLevel == 6 || Sys_Global.currentLevel == 7) shieldOnType = 2u; // Shielding only below player for lower levels.
@@ -2293,6 +2233,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
     glUniformMatrix3fv(25, 1, GL_FALSE, invViewRot);
     glUniform1i(27, 0); // Texture 0 for the rendered geometry color buffer
     glUniform1f(28, GetPainStatic());
+    glUniform1ui(29,grayscaleOn); // Grayscale
     glBindVertexArray(Sys_Render.quadVAO);
     glDisable(GL_DEPTH_TEST); // Reenabled later after all UI just up there before RenderShadowmaps call
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);

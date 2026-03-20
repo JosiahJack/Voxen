@@ -55,7 +55,7 @@ public class PuzzleGridPuzzle : MonoBehaviour {
 		}
 
 		if (GetCurrentLevelSecurity() > securityThreshhold) {
-			Sys_UI.BlockedBySecurity(Eng_Global->instances[i].position);
+			Eng_UI->BlockedBySecurity(Eng_Global->instances[i].position);
 			return;
 		}
 
@@ -78,14 +78,14 @@ public class PuzzleGridPuzzle : MonoBehaviour {
 					  + "without parameters!");
 		}
 
-		CenterStatusPrint("%s", Sys_Text.stringTable[190],ud.owner); // Puzzle accessed
+		CenterStatusPrint("%s", Eng_Text->stringTable[190],ud.owner); // Puzzle accessed
 		inUse = true;
 		if (animate && anim != null && !alreadyOpen) {
 			anim.Play("Open");
 			alreadyOpen = true;
 		}
 
-		Sys_UI.SendGridPuzzleToDataTab(grid,cellType,gridType,
+		Eng_UI->SendGridPuzzleToDataTab(grid,cellType,gridType,
 											 sourceIndex,outputIndex,width,
 											 height,theme,target,ud,
 											 Eng_Global->instances[i].position,this);

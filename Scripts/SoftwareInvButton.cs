@@ -6,12 +6,12 @@ public class SoftwareInvButton : MonoBehaviour {
 	public int index = 0;
 
 	public void DoubleClick() {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 		SoftInvClick();
 	}
 
     public void SoftInvClick() {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 		switch(index) {
 			case 0:
 					// Drill
@@ -30,9 +30,9 @@ public class SoftwareInvButton : MonoBehaviour {
 			case 2:
 					// CyberShield
 					if (MouseLookScript.a.inCyberSpace) {
-						CenterStatusPrint("%s", Sys_Text.stringTable[461],Const.a.player1);
+						CenterStatusPrint("%s", Eng_Text->stringTable[461],Const.a.player1);
 					} else {
-						CenterStatusPrint("%s", Sys_Text.stringTable[460],Const.a.player1);
+						CenterStatusPrint("%s", Eng_Text->stringTable[460],Const.a.player1);
 					}
 					break;
 			case 3:
@@ -41,7 +41,7 @@ public class SoftwareInvButton : MonoBehaviour {
 						Eng_Global->inventoryPlayer1.UseTurbo();
 						
 					} else {
-						CenterStatusPrint("%s", Sys_Text.stringTable[460],Const.a.player1);
+						CenterStatusPrint("%s", Eng_Text->stringTable[460],Const.a.player1);
 					}
 					break;
 			case 4:
@@ -50,7 +50,7 @@ public class SoftwareInvButton : MonoBehaviour {
 						Eng_Global->inventoryPlayer1.UseDecoy();
 						
 					} else {
-						CenterStatusPrint("%s", Sys_Text.stringTable[460],Const.a.player1);
+						CenterStatusPrint("%s", Eng_Text->stringTable[460],Const.a.player1);
 					}
 					break;
 			case 5:
@@ -59,16 +59,16 @@ public class SoftwareInvButton : MonoBehaviour {
 						Eng_Global->inventoryPlayer1.UseRecall();
 						
 					} else {
-						CenterStatusPrint("%s", Sys_Text.stringTable[460],Const.a.player1);
+						CenterStatusPrint("%s", Eng_Text->stringTable[460],Const.a.player1);
 					}
 					break;
 			case 6:
 					// Games
 					if (MouseLookScript.a.inCyberSpace) {
-						CenterStatusPrint("%s", Sys_Text.stringTable[443],Const.a.player1);
+						CenterStatusPrint("%s", Eng_Text->stringTable[443],Const.a.player1);
 					} else {
-						Sys_UI.OpenMinigames();
-						CenterStatusPrint("%s", Sys_Text.stringTable[309],Const.a.player1); // Trioptimum Funpack Module, don't play on company time!
+						Eng_UI->OpenMinigames();
+						CenterStatusPrint("%s", Eng_Text->stringTable[309],Const.a.player1); // Trioptimum Funpack Module, don't play on company time!
 					}
 					break;
 		}

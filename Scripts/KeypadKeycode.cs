@@ -27,7 +27,7 @@ public class KeypadKeycode : MonoBehaviour {
 	    if (Eng_Cheats->superoverride || Eng_Global->difficultyMission == 0) {
 	        locked = false; // SHODAN can go anywhere!  Full security override!
 		} else if (GetCurrentLevelSecurity() > securityThreshhold) {
-		    Sys_UI.BlockedBySecurity(Eng_Global->instances[i].position);
+		    Eng_UI->BlockedBySecurity(Eng_Global->instances[i].position);
 		    return;
 		}
 
@@ -81,7 +81,7 @@ public class KeypadKeycode : MonoBehaviour {
 		padInUse = true;
 		Utils.PlayUIOneShotSavable(91);
 		MouseLookScript.a.ForceInventoryMode();
-		Sys_UI.SendKeypadKeycodeToDataTab(keycode,Eng_Global->instances[i].position,
+		Eng_UI->SendKeypadKeycodeToDataTab(keycode,Eng_Global->instances[i].position,
 		                                        this,solved);
 	}
 

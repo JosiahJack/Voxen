@@ -26,7 +26,7 @@ public class TeleportTouch : MonoBehaviour {
 			HealthManager hm = Utils.GetMainHealthManager(col.gameObject);
 			if (hm != null) {
 				if (hm.health > 0f && justUsed < Eng_Global->pauseRelativeTime) {
-					Sys_UI.teleportFX.SetActive(true);
+					Eng_UI->teleportFX.SetActive(true);
 					TeleportTouch tt = allTeleportTouches[targetDestinationID];
 					if (tt != null) {
 						col.Eng_Global->instances[i].position = tt.Eng_Global->instances[i].position; // Do it!

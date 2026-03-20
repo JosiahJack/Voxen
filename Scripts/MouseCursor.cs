@@ -172,7 +172,7 @@ public class MouseCursor : MonoBehaviour {
 	
 	private void EnableLiveGrenadeTooltip() {
 		tooltipLiveGrenade.SetActive(true); // Display "live" next to cursor
-		tooltipLiveGrenadeText.text = Sys_Text.stringTable[586];
+		tooltipLiveGrenadeText.text = Eng_Text->stringTable[586];
 	}
 
 	void Update() {

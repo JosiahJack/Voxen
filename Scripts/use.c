@@ -1,14 +1,14 @@
 // use.c - Use Functions (e.g. door open, switch activate, charge station draw energy, etc.)
 void ChargStationUse (UseData ud) {
-    if (GetCurrentLevelSecurity() > minSecurityLevel) { Sys_UI.BlockedBySecurity(SELF.position); return; }
+    if (GetCurrentLevelSecurity() > minSecurityLevel) { Eng_UI->BlockedBySecurity(SELF.position); return; }
     
     if (SELF.tickTime < Eng_Global->pauseRelativeTime) {
         if (PlayerEnergy.a.energy >= PlayerEnergy.a.maxenergy) {
-            CenterStatusPrint("%s",Sys_Text.stringTable[303]);
+            CenterStatusPrint("%s",Eng_Text->stringTable[303]);
             return;
         } else {
             GiveEnergy(amount, EnergyType_ChargeStation);
-//             Sys_UI.energySurge.SetActive(true); TODO
+//             Eng_UI->energySurge.SetActive(true); TODO
         }
 
         if (damageOnUse > 0f) {
@@ -22,11 +22,11 @@ void ChargStationUse (UseData ud) {
             if (dd.damage > 0) Eng_Global->instances[PLAYER1].TakeDamage(dd);
         }
 
-        CenterStatusPrint("%s",Sys_Text.stringTable[0]);
+        CenterStatusPrint("%s",Eng_Text->stringTable[0]);
         if (SELF.entflags & ENTFLAG_REQUIRE_RESET) SELF.tickTime = Eng_Global->pauseRelativeTime + resetTime;
         UseTargets(gameObject,ud,target);
     } else {
-        CenterStatusPrint("%s",Sys_Text.stringTable[1]);
+        CenterStatusPrint("%s",Eng_Text->stringTable[1]);
     }
 }
 
@@ -74,7 +74,7 @@ void ActivatePatch(int index) { // Expects the usableItems index
     case 17:
         // Medi Patch
         if (hm.health >=255) {
-            CenterStatusPrint("%s", Sys_Text.stringTable[304],MouseLookScript.a.player);
+            CenterStatusPrint("%s", Eng_Text->stringTable[304],MouseLookScript.a.player);
             return;
         }
         Eng_Global->inventoryPlayer1.patchCounts[3]--;
@@ -127,9 +127,9 @@ void ActivatePatch(int index) { // Expects the usableItems index
 
     if (depleted) {
         Eng_Global->inventoryPlayer1.PatchCycleDown(false);
-        CenterStatusPrint("%s%s%s",Sys_Text.stringTable[590],Sys_Text.stringTable[index + 326],Sys_Text.stringTable[589]);
+        CenterStatusPrint("%s%s%s",Eng_Text->stringTable[590],Eng_Text->stringTable[index + 326],Eng_Text->stringTable[589]);
     } else {
-        CenterStatusPrint("%s%s",Sys_Text.stringTable[index + 326],Sys_Text.stringTable[589]);
+        CenterStatusPrint("%s%s",Eng_Text->stringTable[index + 326],Eng_Text->stringTable[589]);
     }
 
     Utils.PlayUIOneShotSavable(89);
@@ -169,14 +169,14 @@ void ButtonSwitchUse(uint16_t i, UseData ud) {
     }
 
     if (Eng_Global->instances[i].locked) {
-        CenterStatusPrint("%s",Sys_Text.stringTable[Eng_Global->instances[i].lockedMessageLingdex]);
-        if (Eng_Global->instances[i].SFXLockedIndex >= 0 && Eng_Global->instances[i].SFXLockedIndex < SOUNDS_COUNT) play_wav(sounds[SELF.SFXLockedIndex],1.0f,SELF.position,true);
+        CenterStatusPrint("%s",Eng_Text->stringTable[Eng_Global->instances[i].lockedMessageLingdex]);
+        if (Eng_Global->instances[i].SFXLockedIndex >= 0 && Eng_Global->instances[i].SFXLockedIndex < SOUNDS_COUNT) play_wav(sounds[Eng_Global->instances[i].SFXLockedIndex],1.0f,Eng_Global->instances[i].position,true);
         return;
     }
 
     // Set playerCamera to owner of the input (always should be the camera)
     Utils.PlayOneShotSavable(SFXSource,sounds[SFXIndex]);
-    CenterStatusPrint("%s",Sys_Text.stringTable[messageIndex]);
+    CenterStatusPrint("%s",Eng_Text->stringTable[messageIndex]);
     if (Eng_Global->instances[i].delay > 0.0f) Eng_Global->instances[i].delayFinished = Eng_Global->pauseRelativeTime + Eng_Global->instances[i].delay;
     else ButtonSwitchUseTargets();
 }
@@ -209,12 +209,12 @@ bool EnvirosuitApply() {
 
     // Suit absorbs some radiation, say it.
     // Envirosuit absorbed ##LBP, Radiation poisoning ##LBP
-    Eng_Global->instances[PLAYER1].twm.SendWarning((Sys_Text.stringTable[280]
+    Eng_Global->instances[PLAYER1].twm.SendWarning((Eng_Text->stringTable[280]
                                         + radAdjust.ToString()
-                                        + Sys_Text.stringTable[281]
-                                        + Sys_Text.stringTable[185]
+                                        + Eng_Text->stringTable[281]
+                                        + Eng_Text->stringTable[185]
                                         + radiated.ToString()
-                                        + Sys_Text.stringTable[186]),
+                                        + Eng_Text->stringTable[186]),
                                         0.1f,-2,HUDColor.Red,
                                         radiationAmountWarningID);
 
@@ -236,7 +236,7 @@ void GiveRadiation(float rad) {
 void DoorUse(UseData ud) {
     if (ud == null) return;
     if (ud.owner == null) return;
-    if (GetCurrentLevelSecurity() > securityThreshhold) { Sys_UI.BlockedBySecurity(Eng_Global->instances[i].position); return; }
+    if (GetCurrentLevelSecurity() > securityThreshhold) { Eng_UI->BlockedBySecurity(Eng_Global->instances[i].position); return; }
 
     if (Eng_Cheats->superoverride || Eng_Global->difficultyMission <= 0) { // SHODAN can go anywhere!  Full security override!
         locked = false;
@@ -255,7 +255,7 @@ void DoorUse(UseData ud) {
         if (!locked) {
             if (requiredAccessCard != AccessCardType_None) {
                 // State that we just used a keycard and access was granted
-                CenterStatusPrint(Inventory.AccessCardCodeForType(requiredAccessCard) + Sys_Text.stringTable[4]);
+                CenterStatusPrint(Inventory.AccessCardCodeForType(requiredAccessCard) + Eng_Text->stringTable[4]);
                 accessCardUsedByPlayer = true;
             }
 
@@ -273,7 +273,7 @@ void DoorUse(UseData ud) {
         } else {
             // Use access card
             if (requiredAccessCard != AccessCardType_None) {
-                CenterStatusPrint(requiredAccessCard.ToString() + Sys_Text.stringTable[4] + Sys_Text.stringTable[5]);
+                CenterStatusPrint(requiredAccessCard.ToString() + Eng_Text->stringTable[4] + Eng_Text->stringTable[5]);
                 accessCardUsedByPlayer = true;
             } else {
                 CenterStatusPrint(lockedMessageLingdex); 
@@ -285,7 +285,7 @@ void DoorUse(UseData ud) {
         }
     } else {
         // Tell owner of the Use command that an access card is needed.
-        CenterStatusPrint(requiredAccessCard.ToString() + Sys_Text.stringTable[2]);
+        CenterStatusPrint(requiredAccessCard.ToString() + Eng_Text->stringTable[2]);
         Utils.PlayOneShotSavable(SFX,sounds[466],0.7f);
     }
 }
@@ -302,7 +302,7 @@ void CyberAccessUse(uint16_t activator, uint16_t cybAcc) {
     selfIdx = cybAcc;
     activatorIdx = activator;
     UseTargets(gameObject,ud,Eng_Global->instances[i].target);
-    CenterStatusPrint("%s", Sys_Text.stringTable[441]); // Entering Cyberspace!
+    CenterStatusPrint("%s", Eng_Text->stringTable[441]); // Entering Cyberspace!
     Vector3 entryPosition = (Vector3){ 195.42000f, -13.44000f,  33.28000f};
     switch(LevelManager.a.currentLevel) {
         case 0: entryPosition = (Vector3){ 210.68340f,   2.81200f, -24.37800f}; break;

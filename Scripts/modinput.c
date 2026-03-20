@@ -3,14 +3,60 @@ void WeaponsUpdate(void);
 
 void DeactivateVMail(void) { } // TODO
 
+void SearchObject (int searchable){
+//     bool useFX = true;
+    if (Eng_Global->instances[searchable].searchableInUse) {
+        for (int i=0;i<4;i++) {
+            if (Eng_Global->instances[searchable].contents[i] >= 0) {
+//                 MouseCursor.a.GetComponent<MouseCursor>().cursorImage = Const.a.useableItemsFrobIcons[contentsSearchable[i]];
+//                 Eng_Global->inventoryPlayer1.heldObjectIndex = curSearchScript.contEng_Global->instances[i];
+//                 heldObjectCustomIndex = curSearchScript.customIndex[i];
+//                 curSearchScript.contEng_Global->instances[i] = -1;
+//                 curSearchScript.customIndex[i] = -1;
+//                 if (Eng_Global->inventoryPlayer1.heldObjectIndex != -1) Eng_Global->inventoryPlayer1.holdingObject = true;
+//                 CenterStatusPrint("%s%s",Eng_Text->stringTable[Eng_Global->inventoryPlayer1.heldObjectIndex + 326],Eng_Text->stringTable[319]); // picked up
+//                 Eng_UI->DisableSearchItemImage(i);
+//                 useFX = false;
+                break;
+            }
+        }
+    } else play_wav(sounds[91],0.75f,(Vector3){},false); // searchsound
+
+//     curSearchScript.searchableInUse = true;
+//     int numberFoundContents = 0;
+//     int[] resultContents = {-1,-1,-1,-1};  // create blanked container for search results
+//     int[] resultCustomIndex = {-1,-1,-1,-1};  // create blanked container for search results custom indices
+//     for (int i=3;i>=0;i--) { // Search through array to see if any items are in the container
+//         resultContEng_Global->instances[i] = curSearchScript.contEng_Global->instances[i];
+//         resultCustomIndex[i] = curSearchScript.customIndex[i];
+//         // If something was found, add 1 to count.
+//         if (resultContEng_Global->instances[i] > -1) numberFoundContents++;
+//     }
+// 
+//     static const bool firstTimeSearch = true;
+//     if (firstTimeSearch) {
+//         firstTimeSearch = false;
+//         Eng_UI->OpenTab(4,true,TabMSG.Search,-1,Handedness.LH);
+//     }
+//     
+//     Eng_UI->SendSearchToDataTab(curSearchScript.objectName,numberFoundContents,resultContents,resultCustomIndex,currentSearchItem.Eng_Global->instances[i].position,curSearchScript, useFX);
+//     ForceInventoryMode();
+}
+
 void UseEntity(uint16_t i) {
     Entity* ent = &Eng_Global->instances[i];
-    if (ConstIndexIsDoor(ent->index)) DualLog("Used door\n");
-    if (ConstIndexIsNPC(ent->index)) DualLog("Can't use NPC\n");
-    if (ConstIndexIsButtonSwitch(ent->index)) DualLog("Uses button switch\n");
-    if (ConstIndexIsGeometry(ent->index)) DualLog("Can't use modular geometry\n");
-    if (ConstIndexIsGenericTransform(ent->index)) DualLog("Can't use inky blackness\n");
-    if (ConstIndexIsDynamicObject(ent->index)) DualLog("Using a dynamic object\n");
+    
+    if (ConstIndexIsSearchable(ent->index)) {
+        Eng_Global->inventoryPlayer1.currentSearchItem = i;
+        SearchObject(i);
+        DualLog("Search\n");
+    }
+    else if (ConstIndexIsDoor(ent->index)) DualLog("Used door\n");
+    else if (ConstIndexIsNPC(ent->index)) DualLog("Can't use NPC\n");
+    else if (ConstIndexIsButtonSwitch(ent->index)) DualLog("Uses button switch\n");
+    else if (ConstIndexIsGeometry(ent->index)) DualLog("Can't use modular geometry\n");
+    else if (ConstIndexIsDynamicObject(ent->index)) DualLog("Using a dynamic object\n");
+    else CenterStatusPrint("%s%s",Eng_Text->stringTable[29],"name"); // "Can't use "
 }
 
 #define FROB_DISTANCE 4.9f
@@ -32,7 +78,7 @@ static inline __attribute__((always_inline)) void Frob(Vector3 pos, Vector3 forw
     Eng_Global->debugLine_end   = (Vector3){ dir.x * FROB_DISTANCE + pos.x, dir.y * FROB_DISTANCE + pos.y, dir.z * FROB_DISTANCE + pos.z };
     RaycastHit tempHit = Raycast(pos,dir,FROB_DISTANCE,LAYER_MASK_PLAYER_FROB);
     Eng_Global->debugLineFinished = Eng_Global->pauseRelativeTime + 3.0;
-    if (!tempHit.hit) return;
+    if (!tempHit.hit) { CenterStatusPrint("%s",Eng_Text->stringTable[30]); return; } // You are too far away from that
     
     Eng_Global->debugLine_end = tempHit.point;
     DualLog("Raycast hit!  Hit object %u named of entity type %s(%u) at hit point %f %f %f\n",tempHit.hitInstanceIndex,Eng_Global->entities[Eng_Global->instances[tempHit.hitInstanceIndex].index].path,Eng_Global->instances[tempHit.hitInstanceIndex].index,tempHit.point.x,tempHit.point.y,tempHit.point.z);
@@ -139,6 +185,7 @@ MOD_TO_ENGINE void ProcessInput(void) {
     
     // Hardware hotkeys TODO
     if (Lantern()) Eng_Global->inventoryPlayer1.hardwareIsActive ^= HW_LAN;
+    if (Infrared()) Eng_Global->inventoryPlayer1.hardwareIsActive ^= HW_INF;
 //     if ((Eng_Global->inventoryPlayer1.hasHardware & HW_ERD) && GetInput.a.Email())      EReaderAction();
 //     if ((Eng_Global->inventoryPlayer1.hasHardware & HW_SNS) && GetInput.a.Sensaround()) SensaroundAction();
 //     if ((Eng_Global->inventoryPlayer1.hasHardware & HW_SHD) && GetInput.a.Shield())     ShieldAction();

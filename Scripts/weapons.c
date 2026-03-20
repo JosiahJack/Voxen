@@ -252,8 +252,8 @@ static int Get16WeaponIndexFromConstIndex(int index) {
 // 		int ind = Eng_Global->inventoryPlayer1.weaponIndex;
 // 		bool alt = false;
 // 		if (ind >= 0 && ind < 16) alt = Eng_Global->inventoryPlayer1.wepLoadedWithAlternate[ind];
-// 		Sys_UI.SetAmmoIcons(ind,alt);
-// 		Sys_UI.SetWepInfo(Eng_Global->inventoryPlayer1.weaponIndex);
+// 		Eng_UI->SetAmmoIcons(ind,alt);
+// 		Eng_UI->SetWepInfo(Eng_Global->inventoryPlayer1.weaponIndex);
 // 		Eng_Global->inventoryPlayer1.UpdateWeaponViewModels();
 // 	}
 // 
@@ -337,7 +337,7 @@ void WeaponsUpdate(void) {
 // 
 // 		if (Eng_Global->uiIsBlocking) yield break;
 // 		if (Eng_Global->inventoryPlayer1.holdingObject) yield break;
-// 		if (Sys_UI.mouseClickHeldOverGUI) yield break;
+// 		if (Eng_UI->mouseClickHeldOverGUI) yield break;
 // 		if (reloadFinished >= Eng_Global->pauseRelativeTime) yield break;
 // 		if (waitTilNextFire >= Eng_Global->pauseRelativeTime) yield break;
 // 		if (wepdex < 0 || wepdex > 15) yield break;
@@ -869,7 +869,7 @@ void WeaponsUpdate(void) {
 // 		hm.linkedTargetID = tid;
 // 
 // 		if (!Eng_Global->inventoryPlayer1.hasHardware[4] || tranq > 0f || dmgFinal == 0f) {
-// 			tid.currentText = tranq > 0f ? Sys_Text.stringTable[536] : (dmgFinal == 0f ? Sys_Text.stringTable[511] : "");
+// 			tid.currentText = tranq > 0f ? Eng_Text->stringTable[536] : (dmgFinal == 0f ? Eng_Text->stringTable[511] : "");
 // 			tid.lifetime += tranq;
 // 			tid.damageTimeFinished = vmax(Eng_Global->pauseRelativeTime + tranq,tid.damageTimeFinished + tranq);
 // 			tid.lifetimeFinished = Eng_Global->pauseRelativeTime + tid.lifetime;
@@ -1420,23 +1420,23 @@ void WeaponsUpdate(void) {
 // 		Utils.Deactivate(ViewModelSkorpion);
 // 		Utils.Deactivate(ViewModelSparq);
 // 		Utils.Deactivate(ViewModelStungun);
-// 		Utils.Deactivate(Sys_UI.energySliderLH);
-// 		Utils.Deactivate(Sys_UI.energyHeatTicksLH);
-// 		Utils.Deactivate(Sys_UI.overloadButtonLH);
-// 		Utils.Deactivate(Sys_UI.unloadButtonLH);
-// 		Utils.Deactivate(Sys_UI.loadNormalAmmoButtonLH);
-// 		Utils.Deactivate(Sys_UI.loadAlternateAmmoButtonLH);
+// 		Utils.Deactivate(Eng_UI->energySliderLH);
+// 		Utils.Deactivate(Eng_UI->energyHeatTicksLH);
+// 		Utils.Deactivate(Eng_UI->overloadButtonLH);
+// 		Utils.Deactivate(Eng_UI->unloadButtonLH);
+// 		Utils.Deactivate(Eng_UI->loadNormalAmmoButtonLH);
+// 		Utils.Deactivate(Eng_UI->loadAlternateAmmoButtonLH);
 // 
-// 		Utils.Deactivate(Sys_UI.energySliderRH);
-// 		Utils.Deactivate(Sys_UI.energyHeatTicksRH);
-// 		Utils.Deactivate(Sys_UI.overloadButtonRH);
-// 		Utils.Deactivate(Sys_UI.unloadButtonRH);
-// 		Utils.Deactivate(Sys_UI.loadNormalAmmoButtonRH);
-// 		Utils.Deactivate(Sys_UI.loadAlternateAmmoButtonRH);
+// 		Utils.Deactivate(Eng_UI->energySliderRH);
+// 		Utils.Deactivate(Eng_UI->energyHeatTicksRH);
+// 		Utils.Deactivate(Eng_UI->overloadButtonRH);
+// 		Utils.Deactivate(Eng_UI->unloadButtonRH);
+// 		Utils.Deactivate(Eng_UI->loadNormalAmmoButtonRH);
+// 		Utils.Deactivate(Eng_UI->loadAlternateAmmoButtonRH);
 // 	}
 // 
 // 	public void RemoveWeapon(int weaponButton7Index) {
-// 		WeaponButtonsManager wepbutMan = Sys_UI.wepbutMan;
+// 		WeaponButtonsManager wepbutMan = Eng_UI->wepbutMan;
 // 		WeaponButton wepbut = wepbutMan.wepButtonsScripts[0];
 // 		if (weaponButton7Index != weaponCurrent) {
 // 			if (weaponButton7Index > weaponCurrent) return; // No list shift.
@@ -1483,15 +1483,15 @@ void WeaponsUpdate(void) {
 // 		WeaponFire.a.StartWeaponDip(0);
 // 		currentMagazineAmount[weaponButton7Index] = 0; // Zero out ammo
 // 		currentMagazineAmount2[weaponButton7Index] = 0;
-// 		Sys_UI.UpdateHUDAmmoCountsEither();
-// 		Sys_UI.SetWepInfo(-1);
-// 		Sys_UI.OpenTab(0, true, TabMSG.Weapon, 0,Handedness.LH);
+// 		Eng_UI->UpdateHUDAmmoCountsEither();
+// 		Eng_UI->SetWepInfo(-1);
+// 		Eng_UI->OpenTab(0, true, TabMSG.Weapon, 0,Handedness.LH);
 // 	}
 // 
 // 	public void WeaponChange(int useableItemIndex, int buttonIndex) {
 // 		if (WeaponFire.a.reloadFinished > Eng_Global->pauseRelativeTime) return;
 // 		if (useableItemIndex == -1 || buttonIndex > 6 || buttonIndex < 0) {
-// 			Sys_UI.SetAmmoIcons(-1,false); // Clear the ammo icons.
+// 			Eng_UI->SetAmmoIcons(-1,false); // Clear the ammo icons.
 // 			//DualLog("Early exit on WeaponChange() in WeaponCurrent.cs!");
 // 			return;
 // 		}
@@ -1505,8 +1505,8 @@ void WeaponsUpdate(void) {
 // 		WeaponFire.a.StartWeaponDip(Const.a.reloadTime[wep16index]);
 // 		weaponCurrentPending = buttonIndex;
 // 		weaponIndexPending = useableItemIndex;
-// 		Sys_UI.SetWepInfo(-1);
-// 		Sys_UI.UpdateHUDAmmoCountsEither();
+// 		Eng_UI->SetWepInfo(-1);
+// 		Eng_UI->UpdateHUDAmmoCountsEither();
 // 	}
 // 
 // 	void Update() {
@@ -1515,7 +1515,7 @@ void WeaponsUpdate(void) {
 // 
 // 		if (justChangedWeap) {
 // 			justChangedWeap = false;
-// 			Sys_UI.SetAmmoIcons(-1,false); // Clear it.
+// 			Eng_UI->SetAmmoIcons(-1,false); // Clear it.
 // 			UpdateWeaponViewModels();
 // 		}
 // 
@@ -1534,27 +1534,27 @@ void WeaponsUpdate(void) {
 // 			useableIndex = -1;
 // 		}
 // 
-// 		Sys_UI.HideAmmoAndEnergyItems();
+// 		Eng_UI->HideAmmoAndEnergyItems();
 // 		SetAllViewModelsDeactive();
 // 		switch (setWep) {
 // 			case 36: // "LOAD MAGNESIUM", "LOAD PENETRATOR"
-// 				Sys_UI.ShowAmmoItems(539,540);
+// 				Eng_UI->ShowAmmoItems(539,540);
 // 				Utils.Activate(ViewModelAssault);
 // 				break;
 // 			case 37:
-// 				Sys_UI.ShowEnergyItems();
+// 				Eng_UI->ShowEnergyItems();
 // 				Utils.Activate(ViewModelBlaster);
 // 				break;
 // 			case 38: // "LOAD NEEDLE", "LOAD TRANQ"
-// 				Sys_UI.ShowAmmoItems(541,542);
+// 				Eng_UI->ShowAmmoItems(541,542);
 // 				Utils.Activate(ViewModelDartgun);
 // 				break;
 // 			case 39: // "LOAD HORNET", "LOAD SPLINTER"
-// 				Sys_UI.ShowAmmoItems(543,544);
+// 				Eng_UI->ShowAmmoItems(543,544);
 // 				Utils.Activate(ViewModelFlechette);
 // 				break;
 // 			case 40:
-// 				Sys_UI.ShowEnergyItems();
+// 				Eng_UI->ShowEnergyItems();
 // 				Utils.Activate(ViewModelIon);
 // 				break;
 // 			case 41:
@@ -1564,42 +1564,42 @@ void WeaponsUpdate(void) {
 // 				Utils.Activate(ViewModelPipe);
 // 				break;
 // 			case 43: // "LOAD HOLLOW TIP", "LOAD HEAVY SLUG"
-// 				Sys_UI.ShowAmmoItems(545,546);
+// 				Eng_UI->ShowAmmoItems(545,546);
 // 				Utils.Activate(ViewModelMagnum);
 // 				break;
 // 			case 44: // "LOAD CARTRIDGE"
-// 				Sys_UI.ShowAmmoItems(547,-1);
+// 				Eng_UI->ShowAmmoItems(547,-1);
 // 				Utils.Activate(ViewModelMagpulse);
-// 				Sys_UI.HideAlternateAmmoButton();
+// 				Eng_UI->HideAlternateAmmoButton();
 // 				break;
 // 			case 45: // "LOAD STANDARD", "LOAD TEFLON"
-// 				Sys_UI.ShowAmmoItems(548,549);
+// 				Eng_UI->ShowAmmoItems(548,549);
 // 				Utils.Activate(ViewModelPistol);
 // 				break;
 // 			case 46:
-// 				Sys_UI.ShowEnergyItems();
+// 				Eng_UI->ShowEnergyItems();
 // 				Utils.Activate(ViewModelPlasma);
 // 				break;
 // 			case 47: // "LOAD RAIL CLIP"
-// 				Sys_UI.ShowAmmoItems(550,-1);
+// 				Eng_UI->ShowAmmoItems(550,-1);
 // 				Utils.Activate(ViewModelRailgun);
-// 				Sys_UI.HideAlternateAmmoButton();
+// 				Eng_UI->HideAlternateAmmoButton();
 // 				break;
 // 			case 48:  // "LOAD RUBBER SLUG"
-// 				Sys_UI.ShowAmmoItems(551,-1);
+// 				Eng_UI->ShowAmmoItems(551,-1);
 // 				Utils.Activate(ViewModelRiotgun);
-// 				Sys_UI.HideAlternateAmmoButton();
+// 				Eng_UI->HideAlternateAmmoButton();
 // 				break;
 // 			case 49: // "LOAD SLAG", "LOAD LARGE SLAG"
-// 				Sys_UI.ShowAmmoItems(552,553);
+// 				Eng_UI->ShowAmmoItems(552,553);
 // 				Utils.Activate(ViewModelSkorpion);
 // 				break;
 // 			case 50:
-// 				Sys_UI.ShowEnergyItems();
+// 				Eng_UI->ShowEnergyItems();
 // 				Utils.Activate(ViewModelSparq);
 // 				break;
 // 			case 51:
-// 				Sys_UI.ShowEnergyItems();
+// 				Eng_UI->ShowEnergyItems();
 // 				Utils.Activate(ViewModelStungun);
 // 				break;
 // 		}
@@ -1614,12 +1614,12 @@ void WeaponsUpdate(void) {
 // 		}
 // 
 // 		if (wep16index == 1 || wep16index == 4 || wep16index == 10 || wep16index == 14 || wep16index == 15) {
-// 			if (Sys_UI.overloadButtonLH.activeInHierarchy) {
-// 				Sys_UI.overloadButtonLH.GetComponent<EnergyOverloadButton>().OverloadButtonAction();
+// 			if (Eng_UI->overloadButtonLH.activeInHierarchy) {
+// 				Eng_UI->overloadButtonLH.GetComponent<EnergyOverloadButton>().OverloadButtonAction();
 // 			}
 // 
-// 			if (Sys_UI.overloadButtonRH.activeInHierarchy) {
-// 				Sys_UI.overloadButtonRH.GetComponent<EnergyOverloadButton>().OverloadButtonAction();
+// 			if (Eng_UI->overloadButtonRH.activeInHierarchy) {
+// 				Eng_UI->overloadButtonRH.GetComponent<EnergyOverloadButton>().OverloadButtonAction();
 // 			}
 // 		} else {
 // 			if (Eng_Global->inventoryPlayer1.wepLoadedWithAlternate[weaponCurrent]) {
@@ -1681,7 +1681,7 @@ void WeaponsUpdate(void) {
 // 		}
 // 
 // 		// Update the counter on the HUD
-// 		Sys_UI.UpdateHUDAmmoCounts(currentMagazineAmount[weaponCurrent]);
+// 		Eng_UI->UpdateHUDAmmoCounts(currentMagazineAmount[weaponCurrent]);
 // 		WeaponFire.a.StartWeaponDip(Const.a.reloadTime[wep16index]);
 // 
 // 		// Pop it back to start to be sure
@@ -1725,7 +1725,7 @@ void WeaponsUpdate(void) {
 // 		}
 // 
 // 		// Update the counter on the HUD
-// 		Sys_UI.UpdateHUDAmmoCounts(currentMagazineAmount2[weaponCurrent]);
+// 		Eng_UI->UpdateHUDAmmoCounts(currentMagazineAmount2[weaponCurrent]);
 // 		WeaponFire.a.StartWeaponDip(Const.a.reloadTime[wep16index]);
 // 
 // 		// Pop it back to start to be sure
@@ -1748,13 +1748,13 @@ void WeaponsUpdate(void) {
 // 			currentMagazineAmount2[weaponCurrent] = 0;
 // 
 // 			// Update the counter on the HUD
-// 			Sys_UI.UpdateHUDAmmoCounts(currentMagazineAmount2[weaponCurrent]);
+// 			Eng_UI->UpdateHUDAmmoCounts(currentMagazineAmount2[weaponCurrent]);
 // 		} else {
 // 			Eng_Global->inventoryPlayer1.wepAmmo[wep16index] += currentMagazineAmount[weaponCurrent];
 // 			currentMagazineAmount[weaponCurrent] = 0;
 // 
 // 			// Update the counter on the HUD
-// 			Sys_UI.UpdateHUDAmmoCounts(currentMagazineAmount[weaponCurrent]);
+// 			Eng_UI->UpdateHUDAmmoCounts(currentMagazineAmount[weaponCurrent]);
 // 		}
 // 		if (!isSilent) Utils.PlayUIOneShotSavable(260); // wreload
 // 	}

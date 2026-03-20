@@ -1,4 +1,4 @@
-// common.h - Shared includes between engine and gamecode (e.g. enums)
+// common.h - Shared items between engine and gamecode (e.g. enums)
 typedef __INT8_TYPE__     int8_t;
 typedef __UINT8_TYPE__   uint8_t;
 typedef __INT16_TYPE__   int16_t;
@@ -640,6 +640,72 @@ typedef struct {
 } CheatsSystem;
 extern CheatsSystem Sys_Cheats;
 
+typedef uint8_t MenuPages;
+static const uint8_t MenuPages_FrontPage = 0;
+static const uint8_t MenuPages_Singleplayer = 1;
+static const uint8_t MenuPages_Multiplayer = 2;
+static const uint8_t MenuPages_NewGame = 3;
+static const uint8_t MenuPages_Load = 4;
+static const uint8_t MenuPages_Options = 5;
+static const uint8_t MenuPages_Save = 6;
+static const uint8_t MenuPages_IntroVideo = 7;
+static const uint8_t MenuPages_CreditsVideo = 8;
+typedef struct {
+	int lastMultiMediaTabOpened;
+	bool lastWeaponSideRH;
+	bool lastItemSideRH;
+	bool lastAutomapSideRH;
+	bool lastTargetSideRH;
+	bool lastDataSideRH;
+	bool lastSearchSideRH;
+	bool lastLogSideRH;
+	bool lastLogSecondarySideRH;
+	bool lastMinigameSideRH;
+	double logFinished;
+	bool logActive;
+	AudioLogType logType;
+	uint16_t linkedElevatorDoor;
+	Vector3 objectInUsePos;
+	uint16_t tetheredPGP;
+	uint16_t tetheredPWP;
+	uint16_t tetheredSearchable;
+	uint16_t tetheredKeypadElevator;
+	uint16_t tetheredKeypadKeycode;
+	bool paperLogInUse;
+	bool usingObject;
+	int applyButtonReferenceIndex;
+	int curCenterTab;
+    bool isBlocking;
+	bool isRH;
+	int wep16index;
+	int tempSpriteIndex;
+	float lastEnergy;
+	float lastHealth;
+	double tickFinished; // Visual only, Time.time controlled
+	int count;
+	bool centerTabNotified[4];
+	double centerTabsTickFinished; // Visual only, Time.time controlled
+	bool highlightStatus[4];
+	uint8_t highlightTickCount[4];
+	double blinkFinished;
+	double beepFinished;
+	uint8_t beepCount;
+	bool audPaused;
+} SystemUI;
+
+typedef struct {	
+	char stringTable[TEXT_STRING_COUNT][TEXT_LOCALIZATION_MAX_LENGTH]; // Hefty table for localization support.
+	uint16_t audioLogImagesRefIndicesLH[TEXT_LOGS_COUNT];
+	uint16_t audioLogImagesRefIndicesRH[TEXT_LOGS_COUNT];
+	uint8_t audioLogType[TEXT_LOGS_COUNT];
+	uint8_t audioLogLevelFound[TEXT_LOGS_COUNT];
+	size_t file_size;
+	size_t filelog_size;
+	uint8_t* file_data;
+	uint8_t* filelog_data;
+} TextSystem;
+extern TextSystem Sys_Text;
+
 #define PATCH_BERSERK   1
 #define PATCH_DETOX     2
 #define PATCH_GENIUS    4
@@ -771,6 +837,7 @@ typedef struct {
     bool holdingObject;
     double dropFinished;
     uint16_t weaponIndex;
+    uint16_t currentSearchItem;
 } InventorySystem;
 
 typedef /*FAT*/ struct {
@@ -798,6 +865,16 @@ typedef /*FAT*/ struct {
     uint8_t securityThreshold;
     uint16_t messageIndex;
     float delay;
+    bool searchableInUse;
+    bool generateContents;
+    bool generationDone;
+    uint8_t maxRandomItems; // [0 4]
+    uint16_t lookUpIndex; // For randomly generating items
+    uint16_t contents[4];
+    uint16_t customIndex[4];
+    uint16_t randomItem[4];
+    uint16_t randomItemCustomIndex[4];
+    float randomItemDropChance[4];
     
     uint16_t activateSFX;
     uint16_t lockedSFX;
@@ -1103,6 +1180,7 @@ static inline __attribute__((always_inline)) bool ConstIndexIsNPC(int constdex) 
 static inline __attribute__((always_inline)) bool ConstIndexIsHardware(int constdex) { return (constdex >= 328) && (constdex <= 339); }
 static inline __attribute__((always_inline)) bool ConstIndexIsAmbient(int constdex) { return (constdex >= 621 && constdex <= 655); }
 static inline __attribute__((always_inline)) bool ConstIndexIsButtonSwitch(int constdex) { return ((constdex >= 688 && constdex <= 692) || constdex == 694 || constdex == 695); }
+static inline __attribute__((always_inline)) bool ConstIndexIsSearchable(int constdex) { return ((constdex >= 464 && constdex <= 476) || constdex == 530 || constdex == 531); }
 static inline __attribute__((always_inline)) bool ConstIndexIsDynamicObject(uint16_t constIndex) {
     return     (constIndex >= 307 && constIndex <= 404) ||  constIndex == 417 || (constIndex >= 419 && constIndex <= 428)
             || (constIndex >= 430 && constIndex <= 437) || (constIndex >= 440 && constIndex <= 442)

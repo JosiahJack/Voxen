@@ -17,7 +17,7 @@ public class GeneralInvButton : MonoBehaviour {
     }
 
     void GeneralInvClick() {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 		GeneralInvUse();
 	}
 
@@ -28,31 +28,31 @@ public class GeneralInvButton : MonoBehaviour {
 
 		// Access Cards
 		if (GeneralInvButtonIndex == 0) {
-			Sys_UI.SendInfoToItemTab(81);
-			if (Sys_UI.lastItemSideRH) {
-				Sys_UI.rightTC.SetCurrentAsLast();
+			Eng_UI->SendInfoToItemTab(81);
+			if (Eng_UI->lastItemSideRH) {
+				Eng_UI->rightTC.SetCurrentAsLast();
 			} else {
-				Sys_UI.leftTC.SetCurrentAsLast();
+				Eng_UI->leftTC.SetCurrentAsLast();
 			}
 		} else {
-			Sys_UI.SendInfoToItemTab(useableItemIndex,customIndex);
-			if (Sys_UI.lastItemSideRH) {
-				Sys_UI.rightTC.SetCurrentAsLast();
+			Eng_UI->SendInfoToItemTab(useableItemIndex,customIndex);
+			if (Eng_UI->lastItemSideRH) {
+				Eng_UI->rightTC.SetCurrentAsLast();
 			} else {
-				Sys_UI.leftTC.SetCurrentAsLast();
+				Eng_UI->leftTC.SetCurrentAsLast();
 			}
 		}
     }
 
     public void DoubleClick() {
         Eng_Global->inventoryPlayer1.generalInvCurrent = GeneralInvButtonIndex; //Set current
-		Sys_UI.mouseClickHeldOverGUI = true;
+		Eng_UI->mouseClickHeldOverGUI = true;
 		GeneralInvApply();
 	}
 
 	void ApplyBattery() {
 		if (PlayerEnergy.a.energy >= 255f) {
-			CenterStatusPrint("%s", Sys_Text.stringTable[303]);
+			CenterStatusPrint("%s", Eng_Text->stringTable[303]);
 			reduce = false;
 		}
 
@@ -62,7 +62,7 @@ public class GeneralInvButton : MonoBehaviour {
 
 	void ApplyIcadBattery() {
 		if (PlayerEnergy.a.energy >= 255f) {
-			CenterStatusPrint("%s", Sys_Text.stringTable[303]);
+			CenterStatusPrint("%s", Eng_Text->stringTable[303]);
 			reduce = false;
 			return;
 		}
@@ -73,21 +73,21 @@ public class GeneralInvButton : MonoBehaviour {
 
 	void ApplyHealthkit() {
 		if (Eng_Global->instances[PLAYER1].health >= Eng_Global->instances[PLAYER1].maxhealth) {
-			CenterStatusPrint("%s", Sys_Text.stringTable[304]);
+			CenterStatusPrint("%s", Eng_Text->stringTable[304]);
 			reduce = false;
 			return;
 		}
 
 		Eng_Global->instances[PLAYER1].health = Eng_Global->instances[PLAYER1].maxhealth;
-		Sys_UI.DrawTicks(true);
+		Eng_UI->DrawTicks(true);
 		reduce = true;
 	}
 
 	public void GeneralInvApply() {
 		// Access Cards button
 		if (GeneralInvButtonIndex == 0) {
-			Sys_UI.SendInfoToItemTab(81);
-			Sys_UI.OpenTab(1,true,TabMSG.None, useableItemIndex,
+			Eng_UI->SendInfoToItemTab(81);
+			Eng_UI->OpenTab(1,true,TabMSG.None, useableItemIndex,
 								 Handedness.LH);
 			return;
 		}
@@ -100,8 +100,8 @@ public class GeneralInvButton : MonoBehaviour {
 			case 53: ApplyIcadBattery(); break;
 			case 55: ApplyHealthkit(); break;
 			default:
-				Sys_UI.SendInfoToItemTab(useableItemIndex,customIndex);
-				Sys_UI.OpenTab(1,true,TabMSG.None, useableItemIndex,
+				Eng_UI->SendInfoToItemTab(useableItemIndex,customIndex);
+				Eng_UI->OpenTab(1,true,TabMSG.None, useableItemIndex,
 									 Handedness.LH);
 
 				// Set current.

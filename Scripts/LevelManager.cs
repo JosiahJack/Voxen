@@ -68,7 +68,7 @@
 		if ((levelLargeNodeDestroyedCount[currentLevel] == levelLargeNodeCount[currentLevel]) && (levelSmallNodeDestroyedCount[currentLevel] == levelSmallNodeCount[currentLevel]) && (levelCameraDestroyedCount[currentLevel] == levelCameraCount[currentLevel])) {
 			levelSecurity[currentLevel] = 0;
 		}
-		CenterStatusPrint("%s", Sys_Text.stringTable[306] + levelSecurity[currentLevel].ToString() + Sys_Text.stringTable[307]);
+		CenterStatusPrint("%s", Eng_Text->stringTable[306] + levelSecurity[currentLevel].ToString() + Eng_Text->stringTable[307]);
 
 		// Notify quest log if all nodes were destroyed
 		if (levelLargeNodeDestroyedCount[currentLevel] == levelLargeNodeCount[currentLevel]) {

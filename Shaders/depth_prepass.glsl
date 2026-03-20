@@ -1,5 +1,4 @@
-// chunk.glsl: Generic shader for unlit textured surfaces (all world geometry, items,
-// enemies, doors, etc., without transparency for first pass prior to lighting.
+// depth_prepass.glsl: Renders all opaque objects prior to main forward+ pass
 #version 430 core
 #extension GL_ARB_shading_language_packing : require
 #extension GL_ARB_shader_image_load_store : enable
