@@ -145,7 +145,8 @@ fi
 
 export CCGC=$CC
 export CFLAGSGC=$CFLAGSGC
-SOURCESGC="init.c modinput.c animation.c modphysics.c ai.c biomonitor.c weapons.c music.c audio.c target.c citadel.c buttonswitch.c cyberdoor.c door.c cyberitem.c cybermine.c cyberpush.c cyberswitch.c cybertimer.c delayedspawn.c forcebridge.c funcwall.c gravitylift.c healingbed.c logictimer.c teleporttouch.c texturechanger.c trigger.c triggercounter.c"
+SOURCESGC="init.c modinput.c animation.c modphysics.c ai.c biomonitor.c weapons.c \
+           music.c audio.c citadel.c door.c"
 export TEMP_DIRGC=temp_build_gc
 export SCRIPT_DIR="./Scripts"
 printf "%s\n" $SOURCESGC | xargs -P12 -I{} $CCGC -c $SCRIPT_DIR/{} $CFLAGSGC -I. -nostdinc -fPIC -ffreestanding -fno-builtin -Wshadow -o "$TEMP_DIRGC"/{}.o

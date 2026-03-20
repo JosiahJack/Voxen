@@ -324,9 +324,6 @@ float RelY(int16_t y) { return UIY(y) * (float)Sys_Settings.ScreenHeight; }
 
 void RenderUIImage(int16_t x, int16_t y, int16_t width, int16_t height, uint32_t texIndex) {
     float xpos = RelX(x); float ypos = RelY(y);
-    glEnable(GL_BLEND);
-    glClear(GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!  2nd Clear needed or UI dissappears/flickers!!
-    glDisable(GL_CULL_FACE);
     glUseProgram(Sys_Render.chunkShaderProgram);
     glBindVertexArray(Sys_Render.textVAO);
     glUniform1ui(1,0);
@@ -1208,7 +1205,6 @@ uint8_t UI_Button(int16_t x, int16_t y, float w, float h, bool* cursorOver, int8
     return 0u;
 }
 
-void RenderUIImage(int16_t x, int16_t y, int16_t width, int16_t height, uint32_t texIndex);
 bool MenuEnter(void) { return (Sys_Input.keyStates[GLFW_KEY_KP_ENTER].pressed || Sys_Input.keyStates[GLFW_KEY_ENTER].pressed || Sys_Input.gamepadButtons[GLFW_GAMEPAD_BUTTON_A].pressed); }
 uint8_t UI_MenuButton(int16_t bX, int16_t bY, uint8_t menuItem, int16_t bW, int16_t bH,  int16_t tX, int16_t tY, const char* text, int16_t pX, int16_t pY) {
     bool over = false; uint8_t retvalue = 0u;
@@ -2120,6 +2116,9 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
     drawCallsRenderedThisFrame++; verticesRenderedThisFrame += 4;
 
     // UI
+    glEnable(GL_BLEND);
+    glClear(GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!  2nd Clear needed or UI dissappears/flickers!!
+    glDisable(GL_CULL_FACE);
     Sys_Global.last_time = RenderUI();
 
     // Cursor [ /// VERY LAST DRAWN OVER EVERYTHING ELSE! /// ]
