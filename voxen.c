@@ -181,8 +181,6 @@ void ExtractFrustumPlanes(float* m, FrustumPlane* planes) {
     }
 }
 
-ENGINE_TO_MOD int32_t PosGetCellCoords(float pos_x, float pos_z) { return (PosGetCellCoordZ(pos_z) * WORLDX) + PosGetCellCoordX(pos_x); } // Clamped just above.
-
 Quaternion cubemapOrientationQuaternion[6] = {
     {0.0f, 0.707106781f, 0.0f, 0.707106781f},  // +X: Right
     {0.0f, -0.707106781f, 0.0f, 0.707106781f}, // -X: Left
@@ -1910,7 +1908,8 @@ static inline __attribute__((always_inline)) bool DetermineIfInstanceVisible(uin
     if (EntNotVisible(i,otherCondition)) return false; // must be transparent && transparents or neither
         
     Vector3 objPos = Sys_Global.instances[i].position;
-    uint16_t instCellIdx = PosGetCellCoords(objPos.x, objPos.z);
+    uint16_t cellX = PosGetCellCoordX(objPos.x); uint16_t cellZ = PosGetCellCoordZ(objPos.z);
+    uint16_t instCellIdx = (cellZ * WORLDX) + cellX;
     Vector3 delta = Vector3_A_minus_B(objPos, playerPos);
     *distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
     float radius = modelBounds[(Sys_Global.instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
@@ -1919,8 +1918,6 @@ static inline __attribute__((always_inline)) bool DetermineIfInstanceVisible(uin
     if (EntityIndexIsPortalBlockingDoor(Sys_Global.instances[i].index)) { // Extra checks only needed for opaque portal blocking doors.
         bool inPVS = (gridCellStates[instCellIdx] & CELL_VISIBLE);
         if (!inPVS) {
-            uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((objPos.x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
-            uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((objPos.z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
             for (int ix = cellX - 2; ix <= (int)cellX + 2 && !inPVS; ++ix) {
                 for (int iz = cellZ - 2; iz <= (int)cellZ + 2; ++iz) {
                     if (!XZPairInBounds(ix, iz)) return false;

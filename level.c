@@ -140,6 +140,7 @@ void CopyInstanceRegion(uint16_t head, uint16_t* instanceTypeArray, Entity* temp
 #define LINE_LEN_MAX 81920
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
+ENGINE_TO_MOD int32_t PosGetCellCoords(float pos_x, float pos_z) { return (PosGetCellCoordZ(pos_z) * WORLDX) + PosGetCellCoordX(pos_x); } // Clamped just above.
 void LoadTextures(void); void LoadModels(void);
 char* GetNextStringUpToNewlineOrEOF(char* buf, int size, OsFileHandle fd);
 void CullInit(void);
