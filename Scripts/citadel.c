@@ -1,20 +1,25 @@
+// citadel.c - Gamelogic.  Most functionality is trivial so put it here.
 #include "mod.h"
-
+//=============================================================================
+// CyberDecoy
 void CyberDecoyEnable(uint16_t self) { (void)self; Eng_Global->decoyActive = true; }
 void CyberDecoyDisable(uint16_t self) { (void)self; Eng_Global->decoyActive = false; }
-
+//=============================================================================
+// CyberExit
 void CyberExitOnTriggerEnter(uint16_t self, uint16_t other) {
     (void)self;
     if (other != PLAYER1) return;
     UIExitCyberspace();
 }
-
+//=============================================================================
+// CyberDataFragment
 void CyberDataFragmentOnTriggerEnter(uint16_t self, uint16_t other) {
     Entity* e = &Eng_Global->instances[self];
     if (other != PLAYER1) return;
     UICyberSprint((uint16_t)e->textIndex);
 }
-
+//=============================================================================
+// CyberItem
 void CyberItemInitBeforeLoad(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
     if (Eng_Global->difficultyMission == 0 && e->type == SoftwareType_Data) flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
@@ -23,10 +28,11 @@ void CyberItemInitBeforeLoad(uint16_t self) {
 void CyberItemOnTriggerEnter(uint16_t self, uint16_t other) {
     Entity* e = &Eng_Global->instances[self];
     if (other != PLAYER1) return;
-    if (!InventoryAddSoftwareItem(e->type,e->version)) return;
+    if (!InventoryAddSoftwareItem(PLAYER1,e->type,e->version)) return;
     flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
 }
-
+//=============================================================================
+// CyberIce
 void CyberIceOnTriggerEnter(uint16_t self, uint16_t other) {
     (void)self;
     Entity* e = &Eng_Global->instances[other];
@@ -34,7 +40,8 @@ void CyberIceOnTriggerEnter(uint16_t self, uint16_t other) {
     e->layer = 24;
     e->velocity = scale_vector3(e->velocity,-1.0f);
 }
-
+//=============================================================================
+// CyberMine
 void CyberMineInitBeforeLoad(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
     e->damage = 55.0f;
@@ -50,8 +57,8 @@ void CyberMineOnTriggerEnter(uint16_t self, uint16_t other) {
     play_wav(sounds[67],1.0f,e->position,false);
     flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
 }
-
-
+//=============================================================================
+// CyberPush
 void CyberPushOnTriggerStay(uint16_t self, uint16_t other) {
     Entity* e = &Eng_Global->instances[self];
     Entity* player = &Eng_Global->instances[PLAYER1];
@@ -67,14 +74,15 @@ void CyberPushOnTriggerExit(uint16_t self, uint16_t other) {
     Eng_Global->instances[PLAYER1].inCyberTube = false;
     Sys_Music.cyberTube = false;
 }
-
+//=============================================================================
+// CyberDoor
 void CyberDoorOnCollisionEnter(uint16_t self, uint16_t other) {
     Entity* e = &Eng_Global->instances[self];
     if (!e->isDoor || (other != PLAYER1 && other != PLAYER2)) return;
     CenterStatusPrint("%s  %s",Eng_Text->stringTable[e->messageIndex],Eng_Text->stringTable[601]);
 }
-
-
+//=============================================================================
+// CyberSwitch
 void CyberSwitchInitAfterLoad(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->iceActive) flag_set(&e->entflags,ENTFLAG_ACTIVE,true); // TODO Visual subobject parity removed with hierarchy removal.
@@ -87,7 +95,8 @@ void CyberSwitchOnTriggerEnter(uint16_t self, uint16_t other) {
     e->active = true;
     UseTargets(other,e->argvalue,e->target);
 }
-
+//=============================================================================
+// CyberTimer
 void CyberTimerInitAfterLoad(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
     e->cyberTimer = 600.0f;
@@ -116,6 +125,8 @@ void CyberTimerUpdate(uint16_t self) {
     e->timerFinished = Eng_Global->pauseRelativeTime + 1.0;
 }
 
+//=============================================================================
+// Ladder
 void LadderOnTriggerEnter(uint16_t self, uint16_t other) {
     (void)self;
     Entity* player = &Eng_Global->instances[PLAYER1];
@@ -131,7 +142,8 @@ void LadderOnTriggerExit(uint16_t self, uint16_t other) {
     player->ladderState--;
     if (player->ladderState < 0) player->ladderState = 0;
 }
-
+//=============================================================================
+// SearchFX
 void SearchFXResetEnable(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->itemLifeTime <= 0.0f) e->itemLifeTime = 3.0f;
@@ -143,7 +155,8 @@ void SearchFXResetUpdate(uint16_t self) {
     if (e->delayFinished >= Eng_Global->pauseRelativeTime) return;
     flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
 }
-
+//=============================================================================
+// ExplosionLife
 void ExplosionLifeInitAfterLoad(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->tickTime <= 0.0f) e->tickTime = 0.05f;
@@ -157,20 +170,8 @@ void ExplosionLifeUpdate(uint16_t self) {
     if (e->dontReset) flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
     else DeleteInstance(self);
 }
-
-void EmailTargetted(uint16_t self, uint16_t activator, const char* argvalue) {
-    (void)activator; (void)argvalue;
-    Entity* e = &Eng_Global->instances[self];
-    int idx = e->textIndex;
-    if (idx < 0 || idx >= TEXT_LOGS_COUNT) return;
-    if (Eng_Global->inventoryPlayer1.hasLog[idx]) return;
-    Eng_Global->inventoryPlayer1.hasLog[idx] = true;
-    Eng_Global->inventoryPlayer1.hasNewEmail = true;
-    Eng_Global->inventoryPlayer1.lastAddedIndex = idx;
-    if (Eng_Text->audioLogType[idx] == AudioLogType_Email) Eng_Global->inventoryPlayer1.beepDone = true;
-    if (e->active) { } // TODO autoplay email/log playback path.
-}
-
+//=============================================================================
+// DelayedSpawn
 void DelayedSpawnEnable(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
     e->timerFinished = Eng_Global->pauseRelativeTime + e->delay;
@@ -192,7 +193,8 @@ void DelayedSpawnUpdate(uint16_t self) {
         else flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
     } else flag_set(&e->entflags,ENTFLAG_ACTIVE,true);
 }
-
+//=============================================================================
+// FuncWall
 void FuncWallInitAfterLoad(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
     Vector3 tempVec = Vector3_A_minus_B(e->position,e->targetPosition);
@@ -238,7 +240,8 @@ void FuncWallUpdate(uint16_t self) {
     if (distanceLeft > 0.0001f) e->position = Vector3_A_plus_B(e->position,scale_vector3(normalize_vector3(delta),dist));
     if (total > 0.0001f) e->percentMoved = distance_vector3(e->startPosition,e->position) / total;
 }
-
+//=============================================================================
+// ForceBridge
 void ForceBridgeInitBeforeLoad(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
     e->tickTime = 0.05f;
@@ -308,6 +311,8 @@ void ForceBridgeUpdate(uint16_t self) {
     }
 }
 
+//=============================================================================
+// TeleportTouch
 static uint16_t TeleportTouch_allTeleportTouches[8];
 static bool TeleportTouch_initialized;
 void TeleportTouchInitAfterLoad(uint16_t self) {
@@ -329,6 +334,8 @@ void TeleportTouchOnTriggerEnter(uint16_t self, uint16_t other) {
     play_wav(sounds[106],1.0f,Eng_Global->instances[dest].position,false);
 }
 
+//=============================================================================
+// Trigger
 void TriggerUseTargets(uint16_t self, uint16_t activator) { UseTargets(activator,Eng_Global->instances[self].argvalue,Eng_Global->instances[self].target); }
 void TriggerDelayedTarget(uint16_t self, uint16_t activator) { Eng_Global->instances[self].delayFireFinished = Eng_Global->pauseRelativeTime + Eng_Global->instances[self].delay; TriggerUseTargets(self,activator); }
 
@@ -346,7 +353,8 @@ void TriggerOnTriggerEnter(uint16_t self, uint16_t other) { if (!Eng_Global->ins
 void TriggerOnTriggerStay(uint16_t self, uint16_t other) { if (!Eng_Global->instances[self].allDone) TriggerTriggerTripped(self,other,false); }
 void TriggerOnTriggerExit(uint16_t self, uint16_t other) { if (!Eng_Global->instances[self].allDone && (other == PLAYER1 || other == PLAYER2)) Eng_Global->instances[self].numPlayers--; }
 void TriggerTargetted(uint16_t self, uint16_t activator) { if (Eng_Global->instances[self].ignoreSecondaryTriggers) Eng_Global->instances[self].recentMostActivator = activator; }
-
+//=============================================================================
+// TriggerCounter
 void TriggerCounterTarget(uint16_t self, uint16_t activator, const char* argvalue) { (void)argvalue; UseTargets(activator,Eng_Global->instances[self].argvalue,Eng_Global->instances[self].target); }
 void TriggerCounterDelayedTarget(uint16_t self, uint16_t activator, const char* argvalue) { Eng_Global->instances[self].delayFinished = Eng_Global->pauseRelativeTime + Eng_Global->instances[self].delay; TriggerCounterTarget(self,activator,argvalue); }
 
@@ -357,7 +365,8 @@ void TriggerCounterTargetted(uint16_t self, uint16_t activator, const char* argv
     if (e->delay <= 0.0f) TriggerCounterTarget(self,activator,argvalue); else TriggerCounterDelayedTarget(self,activator,argvalue);
     if (!e->dontReset) e->counter = 0;
 }
-
+//=============================================================================
+// TextureChanger
 void TextureChangerInitAfterLoad(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
     if (!e->currentTexture) return;
@@ -377,6 +386,8 @@ void TextureChangerToggle(uint16_t self) {
     e->currentTexture = !e->currentTexture;
 }
 
+//=============================================================================
+// GravityLift
 void GravityLiftInitAfterLoad(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->strength <= 0.0f) e->strength = 12.0f;
@@ -429,6 +440,8 @@ void GravityLiftOnTriggerStay(uint16_t self, uint16_t other) {
 
 void GravityLiftToggle(uint16_t self) { Eng_Global->instances[self].active = !Eng_Global->instances[self].active; }
 
+//=============================================================================
+// LogicTimer
 void LogicTimerInitBeforeLoad(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->timeInterval <= 0.0f) e->timeInterval = 0.35f;
@@ -448,6 +461,8 @@ void LogicTimerUpdate(uint16_t self) {
 
 void LogicTimerTargetted(uint16_t self, uint16_t activator, const char* argvalue) { (void)activator; (void)argvalue; Eng_Global->instances[self].active = !Eng_Global->instances[self].active; }
 
+//=============================================================================
+// ButtonSwitch
 void ButtonSwitchInitAfterLoad(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
     e->delayFinished = 0.0f;
@@ -496,7 +511,8 @@ void ButtonSwitchUpdate(uint16_t self) {
 }
 
 void ButtonSwitchTargetted(uint16_t self, uint16_t activator, const char* argvalue) { ButtonSwitchUse(self,activator,argvalue); }
-
+//=============================================================================
+// HealingBed
 void HealingBedUse(uint16_t self, uint16_t owner) {
     Entity* e = &Eng_Global->instances[self];
     if (GetCurrentLevelSecurity() <= (uint8_t)e->minSecurityLevel) {
@@ -507,7 +523,8 @@ void HealingBedUse(uint16_t self, uint16_t owner) {
         } else CenterStatusPrint("%s",Eng_Text->stringTable[24],owner);
     } else UIBlockedBySecurity(e->position);
 }
-
+//=============================================================================
+// TargetIO
 void UseTargets(uint16_t activator, const char* argvalue, const char* targetname) {
     bool succeeded = false;
     if (StringIsEmpty(targetname)) return;
@@ -549,7 +566,8 @@ void Targetted(uint16_t activator, uint16_t self, const char* argvalue) {
     if (a->ioflags & TARG_IOFLAGS_INST_DEACTIVATE) flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
     if (a->ioflags & TARG_IOFLAGS_INST_TOGGLE) flag_set(&e->entflags,ENTFLAG_ACTIVE,!(e->entflags & ENTFLAG_ACTIVE));
 }
-
+//=============================================================================
+// VaporizeButton
 void VaporizeClick(void) { // TODO
 //     Eng_UI->mouseClickHeldOverGUI = true;
 //     if (Eng_Global->inventoryPlayer1.generalInvCurrent == 0) return; // Access Cards index.
@@ -586,4 +604,2510 @@ void VaporizeClick(void) { // TODO
 //         GeneralInvButton genbut = Eng_Global->inventoryPlayer1.genButtons[cur].GetComponent<GeneralInvButton>();
 //         Eng_UI->SendInfoToItemTab(indexRef,genbut.customIndex);
 //     }
+}
+//=============================================================================
+// AmmoIconManager
+#define AMMO_ICON_NONE    -1
+#define AMMO_ICON_ENERGY  -2
+
+typedef struct { int8_t norm; int8_t alt; } AmmoIconEntry;
+static const AmmoIconEntry ammoIconTable[51] = {
+    [36-36] = { 7,  8  }, // MK3 Magnesium / Penetrator
+    [37-36] = {AMMO_ICON_ENERGY, AMMO_ICON_ENERGY},
+    [38-36] = { 0,  1  }, // Dartgun Needle / Tranq
+    [39-36] = { 9,  10 }, // Flechetter Hornette / Splinter
+    [40-36] = {AMMO_ICON_ENERGY, AMMO_ICON_ENERGY},
+    [41-36] = {AMMO_ICON_NONE, AMMO_ICON_NONE},  // Rapier, no ammo
+    [42-36] = {AMMO_ICON_NONE, AMMO_ICON_NONE},  // Pipe, no ammo
+    [43-36] = { 5,  6  }, // Magnum Hollow / Slug
+    [44-36] = { 11, AMMO_ICON_NONE }, // Magpulse Magcart
+    [45-36] = { 2,  3  }, // Pistol Standard / Teflon
+    [46-36] = {AMMO_ICON_ENERGY, AMMO_ICON_ENERGY},
+    [47-36] = { 14, AMMO_ICON_NONE }, // Railgun Rail Round
+    [48-36] = { 4,  AMMO_ICON_NONE }, // Riotgun Rubber
+    [49-36] = { 12, 13 }, // Skorpion Slag / Large Slag
+    [50-36] = {AMMO_ICON_ENERGY, AMMO_ICON_ENERGY},
+    [51-36] = {AMMO_ICON_ENERGY, AMMO_ICON_ENERGY},
+};
+
+// Returns the ammo icon sprite index for the current weapon slot.
+// AMMO_ICON_ENERGY = render energy bar UI instead of icon/border.
+// AMMO_ICON_NONE   = render nothing (no ammo type for this weapon).
+// >= 0             = index into ammIcons sprite array for UI renderer.
+int8_t AmmoIconGet(int index,bool alt) {
+    if (index < 36 || index > 51) return AMMO_ICON_NONE;
+    const AmmoIconEntry* e = &ammoIconTable[index - 36];
+    return alt ? e->alt : e->norm;
+    // TODO: trigger immediate-mode UI redraw of weapon pane border,
+    // icon visibility, energySlider, energyHeatTicks, energyOverloadButton
+    // based on return value (engine-side UI rendering concern).
+}
+//=============================================================================
+// AnimatorDelayedStop
+void AnimatorDelayedStopInitAfterLoad(uint16_t self) {
+    Entity* e = &Eng_Global->instances[self];
+    e->animSwapFinished = Eng_Global->pauseRelativeTime + e->delay;
+}
+
+void AnimatorDelayedStopUpdate(uint16_t self) {
+    Entity* e = &Eng_Global->instances[self];
+    if (e->animSwapFinished > 0.0 && Eng_Global->pauseRelativeTime >= e->animSwapFinished) {
+        e->animatorPlaybackTime = 0.0f; // TODO: confirm engine reads animatorPlaybackTime as playback speed multiplier, freeze anim
+        e->animSwapFinished = 0.0;
+    }
+}
+//=============================================================================
+// CreditsScroll
+// Video text phases: 0=text1 visible, 1=text2 visible, 2=text3 visible, 3=all hidden
+static double creditsVidStartTime = 0.0;
+static double creditsVidFinished  = 0.0;
+static uint8_t creditsVidPhase    = 0;
+
+void CreditsOnEnable(void) {
+    Eng_Global->creditsActive    = true;
+    Eng_Global->creditsPageIndex = 0;
+    creditsVidStartTime          = Eng_Global->absoluteTime;
+    creditsVidFinished           = Eng_Global->absoluteTime + 37.2;
+    creditsVidPhase              = 0;
+    // TODO: start outro.webm video playback via engine video player
+    // TODO: render Eng_Text->stringTable[610] as endVideoText1 (phase 0)
+    // TODO: render Eng_Text->stringTable[611] as endVideoText2 (phase 1)
+    // TODO: render Eng_Text->stringTable[612] as endVideoText3 (phase 2)
+}
+
+void CreditsUpdate(void) {
+    if (!Eng_Global->creditsActive) return;
+    double elapsed = Eng_Global->absoluteTime - creditsVidStartTime;
+
+    // Drive video text phase transitions
+    if (creditsVidFinished > 0.0) {
+        if (elapsed >  7.0 && creditsVidPhase == 0) creditsVidPhase = 1; // TODO: swap text1->text2 visibility
+        if (elapsed > 11.0 && creditsVidPhase == 1) creditsVidPhase = 2; // TODO: swap text2->text3 visibility
+        if (elapsed > 14.0 && creditsVidPhase == 2) creditsVidPhase = 3; // TODO: hide text3
+        if (Eng_Global->absoluteTime >= creditsVidFinished) {
+            creditsVidFinished = 0.0;
+            creditsVidPhase    = 3;
+            // TODO: deactivate exitVideo overlay and all text phases
+        }
+    }
+
+    if (Menu()) { // Escape
+        if (creditsVidFinished > 0.0) { creditsVidFinished = 0.0; return; } // skip video
+        MenuGoBack();
+        return;
+    }
+
+    if (creditsVidFinished > 0.0) return; // absorb all click input while video playing
+
+    if (Attack()) { // left click — advance
+        if (!(Eng_Global->creditsPageIndex >= CREDITS_PAGES)) {
+            ++Eng_Global->creditsPageIndex;
+            if (!Eng_Global->gameFinished && Eng_Global->creditsPageIndex == 1) ++Eng_Global->creditsPageIndex; // skip stats page when not finishing game
+            if (Eng_Global->creditsPageIndex >= CREDITS_PAGES) Eng_Global->creditsPageIndex = CREDITS_PAGES; // bottom
+        } else {
+            Eng_Global->creditsActive = false;
+            MenuGoBack();
+        }
+        return;
+    }
+
+    if (ToggleMode()) { // right click — go back a page
+        if (Eng_Global->creditsPageIndex > 0) --Eng_Global->creditsPageIndex;
+        // RenderCredits() in voxen.c picks up creditsPageIndex automatically
+    }
+}
+//=============================================================================
+// CyberWall
+#define CYBERWALL_TICK          0.05
+#define CYBERWALL_CONWAY_TIME   0.5
+#define CYBERWALL_ALPHA_MIN     0.02f
+#define CYBERWALL_ALPHA_MAX     1.0f
+#define CYBERWALL_ALPHA_STEP    0.05f
+#define CYBERWALL_INIT_DELAY    2.0
+// volume  = centerAlphaCurrent
+// tickFinished    = next alpha decay tick (already on Entity)
+// animSwapFinished = conwayFinished (already on Entity)
+void CyberWallInitAfterLoad(uint16_t self) {
+    Entity* e = &Eng_Global->instances[self];
+    e->volume        = CYBERWALL_ALPHA_MIN;
+    e->tickFinished  = Eng_Global->pauseRelativeTime + CYBERWALL_INIT_DELAY;
+    e->animSwapFinished = 0.0;
+    // TODO: push e->volume to chunk_frag.glsl as _CenterAlpha uniform or
+    // per-instance draw param for this geometry instance's material slot
+}
+
+void CyberWallUpdate(uint16_t self) {
+    Entity* e = &Eng_Global->instances[self];
+    if (Eng_Global->gamePaused || Eng_Global->menuActive) return;
+    if (Eng_Global->pauseRelativeTime < e->tickFinished) return;
+    if (e->volume > CYBERWALL_ALPHA_MIN) {
+        e->volume -= CYBERWALL_ALPHA_STEP;
+        if (e->volume < CYBERWALL_ALPHA_MIN) e->volume = CYBERWALL_ALPHA_MIN;
+    }
+    e->tickFinished = Eng_Global->pauseRelativeTime + CYBERWALL_TICK;
+}
+
+void CyberWallHit(uint16_t self) { // Called by projectile hit, collision, or ConwaySignal propagation from adjacent wall
+    Entity* e = &Eng_Global->instances[self];
+    e->volume = CYBERWALL_ALPHA_MAX;
+    // TODO: push e->volume to renderer as _CenterAlpha for this instance
+}
+
+void CyberWallConwaySignal(uint16_t self) { // Called when a conway propagation signal arrives from a neighbour TODO Conway's game of life propagation on world x,z plane
+    Eng_Global->instances[self].animSwapFinished = Eng_Global->pauseRelativeTime + CYBERWALL_CONWAY_TIME;
+}
+//=============================================================================
+// CyborgConversionToggle
+void CyborgConversionToggleTargetted(uint16_t activator, const char* argvalue) {
+    (void)activator; (void)argvalue;
+    uint8_t lev = Eng_Global->currentLevel;
+    bool active = (Eng_Global->ressurectionActiveLevels >> lev) & 1u;
+    flag_set((uint64_t*)&Eng_Global->ressurectionActiveLevels,(uint64_t)(1u << lev),!active);
+//     if (Eng_Global->currentLevel == 6) { TODO, set the ones for 10, 11, 12 when 6 gets toggled as they don't have their own switch
+//         if (ressurectionActive[Eng_Global->currentLevel]) {
+//             ressurectionActive[Eng_Global->currentLevel] = false;
+//             ressurectionActive[10] = false;
+//             ressurectionActive[11] = false;
+//             ressurectionActive[12] = false;
+//         } else {
+//             ressurectionActive[Eng_Global->currentLevel] = true;
+//             ressurectionActive[10] = true;
+//             ressurectionActive[11] = true;
+//             ressurectionActive[12] = true;
+//         }
+//     } else {
+//         ressurectionActive[Eng_Global->currentLevel] = !ressurectionActive[Eng_Global->currentLevel]; // Toggle current level.
+//     }
+    if (active) {
+        play_wav(sounds[183],Eng_Settings->VolumeMessage,(Vector3){},false); // "vox_cybconvcancelled"
+        CenterStatusPrint("%s",Eng_Text->stringTable[591]);
+    } else {
+        play_wav(sounds[184],Eng_Settings->VolumeMessage,(Vector3){},false); // "vox_cybconvenabled"
+        CenterStatusPrint("%s",Eng_Text->stringTable[592]);
+    }
+}
+//=============================================================================
+// ElevatorButton
+// static const char* elevFloorLabels[14] = {"R","1","2","3","4","5","6","7","8","9","G1","G2","G4","C"};
+void ElevatorButtonClick(uint16_t self) {
+    Entity* e = &Eng_Global->instances[self];
+    Eng_UI->mouseClickHeldOverGUI = true;
+    if (Eng_UI->linkedElevatorDoor == UINT16_MAX) {
+        CenterStatusPrint("%s",Eng_Text->stringTable[6]); // Too far away from that.
+        return;
+    }
+    Entity* door = &Eng_Global->instances[Eng_UI->linkedElevatorDoor];
+    bool doorClosed = door->doorOpen == DoorState_Closed;
+    float dist = distance_vector3(Eng_UI->objectInUsePos,Eng_Global->instances[PLAYER1].position);
+    if (dist > ELEVATOR_PAD_TETHER_DIST && !doorClosed) {
+        CenterStatusPrint("%s",Eng_Text->stringTable[6]); // Too far away from that.
+        return;
+    }
+    if (!doorClosed) {
+        CenterStatusPrint("%s",Eng_Text->stringTable[7]); // Door not closed.
+        return;
+    }
+    if (!(e->entflags & ENTFLAG_ACTIVE)) {
+        CenterStatusPrint("%s",Eng_Text->stringTable[8]); // Floor not accessible.
+        return;
+    }
+    // TODO: call engine LoadLevel(e->teleportID, spawnPos) — destination spawn
+    // position comes from instance[e->targetDestinationID].position if set
+    // (targetDestinationID != UINT16_MAX), else Vector3 zero.
+    // LoadLevel is engine-side level transition, not yet in interop.h.
+//     if (floorAccessible) { // floorAccessible set from the us_puz_elevatorkeypad, us_puz_elevatorkeypad2, us_puz_elevatorkeypad3, or us_puz_elevatorkeypad4 entity
+//         LoadLevel(levelIndex,targetDestination.Eng_Global->instances[i].position);
+//     } else {
+//         CenterStatusPrint("%s", Eng_Text->stringTable[8]);
+//     }
+}
+
+// Elevator pad UI — layout for 1366x768, scaled by engine to actual res.
+// Called from RenderUI when TabMSG_Elevator is the active tab.
+void RenderElevatorPadUI(uint16_t padIdx) {
+    // TODO: full button grid layout once UI primitive set is confirmed.
+    // Expected layout: 14 floor buttons in a vertical or 2-col grid,
+    // each ~84x32, labeled R/1-9/G1/G2/G4/C, greyed out if !floorAccessible.
+    // Active floor highlighted. Click calls ElevatorButtonClick(buttonIdx)
+    // where buttonIdx is the instance index of that floor's elevator button entity.
+    // linkedElevatorDoor and objectInUsePos already set by elevator pad Use() frob.
+    (void)padIdx;
+}
+//=============================================================================
+// ElevatorKeypad
+// All state lives in SystemUI — valid only while TabMSG_Elevator is active.
+// buttonsEnabled[i]     — button exists and should be drawn
+// buttonsDarkened[i]    — button exists but floor is inaccessible
+// elevButtonLevelIdx[i] — destination level index for button i (was teleportID)
+// elevButtonSpawnIdx[i] — destination spawn instance index (was targetDestinationID)
+// elevCurrentFloor      — current floor index 0-10 for indicator sprite
+// tetheredKeypadElevator, linkedElevatorDoor, objectInUsePos already on SystemUI
+
+void SendElevatorKeypadToDataTab(uint16_t padIdx,uint16_t linkedDoor,Vector3 tetherPoint,bool isRH) {
+    Entity* pad = &Eng_Global->instances[padIdx];
+    for (int i = 0; i < 8; i++) {
+        // Each button slot on the pad entity is encoded in contents[]/customIndex[]
+        // for up to 4 directly, remainder via children — TODO: confirm slot encoding
+        // with level data format.  For now map contents[i] as level index and
+        // customIndex[i] as spawn point instance index, active flag as accessible.
+        Eng_UI->elevButtonLevelIdx[i]  = pad->contents[i < 4 ? i : 0];     // TODO: slots 4-7
+        Eng_UI->elevButtonSpawnIdx[i]  = pad->customIndex[i < 4 ? i : 0];  // TODO: slots 4-7
+        Eng_UI->buttonsEnabled[i]      = pad->contents[i < 4 ? i : 0] != UINT16_MAX;
+        Eng_UI->buttonsDarkened[i]     = (Eng_Global->levelSecurity[Eng_UI->elevButtonLevelIdx[i]]
+                                          > GetCurrentLevelSecurity());
+    }
+    Eng_UI->elevCurrentFloor       = pad->numPlayers; // numPlayers reused as currentFloor index
+    Eng_UI->tetheredKeypadElevator = padIdx;
+    Eng_UI->linkedElevatorDoor     = linkedDoor;
+    Eng_UI->objectInUsePos         = tetherPoint;
+    Eng_UI->usingObject            = true;
+    Eng_UI->lastDataSideRH         = isRH;
+//     OpenTab(4,true,TabMSG_Elevator,0,isRH ? Handedness_RH : Handedness_LH); TODO
+}
+
+// Called from RenderElevatorPadUI per frame while TabMSG_Elevator active.
+// elevFloorLabels defined in ElevatorButton section.
+void RenderElevatorKeypadUI(void) {
+    // Current floor indicator — sprite index = elevCurrentFloor, 0-10
+    // TODO: RenderUIImage for indicator at appropriate position using
+    // indicatorSprites[Eng_UI->elevCurrentFloor]
+
+    for (int i = 0; i < 8; i++) {
+        if (!Eng_UI->buttonsEnabled[i]) continue;
+//         bool dark = Eng_UI->buttonsDarkened[i];
+        // TODO: RenderUIImage — dark ? buttonDarkened sprite : buttonNormal sprite
+        // TODO: RenderFormattedText — label elevFloorLabels[Eng_UI->elevButtonLevelIdx[i]]
+        //       color: dark ? textDarkenedColor : textEnabledColor
+//         bool over = false;
+//         if (!dark && UI_Button(/*x,y,w,h — TODO layout*/0,0,84,32,&over,0)) {
+//             // Construct a temporary elevator button entity context on the stack
+//             // and call ElevatorButtonClick with the tethered pad acting as self,
+//             // overriding teleportID and targetDestinationID for this slot.
+//             Entity tmp = Eng_Global->instances[Eng_UI->tetheredKeypadElevator];
+//             tmp.teleportID         = Eng_UI->elevButtonLevelIdx[i];
+//             tmp.targetDestinationID = Eng_UI->elevButtonSpawnIdx[i];
+//             flag_set(&tmp.entflags,ENTFLAG_ACTIVE,true);
+//             // Push tmp index into a scratch instance slot — TODO: confirm scratch slot
+//             // convention, or refactor ElevatorButtonClick to take level+spawn directly.
+//             ElevatorButtonClick(Eng_UI->tetheredKeypadElevator); // TODO: pass slot params
+//         }
+    }
+}
+//=============================================================================
+// Email
+void EmailTargetted(uint16_t self,uint16_t activator,const char* argvalue) {
+    (void)activator; (void)argvalue;
+    Entity* e = &Eng_Global->instances[self];
+    uint16_t idx = e->emailIndex;
+    InventorySystem* inv = &Eng_Global->inventoryPlayer1;
+    if (inv->hasLog[idx]) return;
+    inv->hasLog[idx]      = true;
+    inv->hasNewEmail      = true;
+    inv->lastAddedIndex   = idx;
+    if (Eng_Text->audioLogType[idx] == AudioLogType_Email) inv->beepDone = true;
+    if (e->autoPlayEmail) (void)0; // TODO: PlayLastAddedLog(idx) — trigger auto-play of log audio
+}
+//=============================================================================
+// EnergyOverloadButton
+#define OVERLOAD_CLICK_DEBOUNCE 0.4
+#define OVERLOAD_HEAT_THRESHOLD 25.0f
+static double overloadClickFinished = 0.0;
+
+void OverloadButtonAction(void) {
+    if (overloadClickFinished >= Eng_Global->pauseRelativeTime) return;
+    overloadClickFinished = Eng_Global->pauseRelativeTime + OVERLOAD_CLICK_DEBOUNCE;
+    InventorySystem* inv = &Eng_Global->inventoryPlayer1;
+    if (inv->currentEnergyWeaponHeat[inv->weaponIndex] > OVERLOAD_HEAT_THRESHOLD) {
+        CenterStatusPrint("%s",Eng_Text->stringTable[12]); // Weapon too hot
+        return;
+    }
+    if (inv->overloadEnabled) {
+        CenterStatusPrint("%s",Eng_Text->stringTable[13]); // Overload disabled
+        inv->overloadEnabled = false;
+        // Render-time: normalButtonSprite, textClickableColor, stringTable[16]
+    } else {
+        CenterStatusPrint("%s",Eng_Text->stringTable[17]); // Overload enabled
+        inv->overloadEnabled = true;
+        // Render-time: overloadButtonSprite, textOverloadColor, stringTable[18]
+    }
+}
+
+void OverloadEnergyClick(void) {
+    Eng_UI->mouseClickHeldOverGUI = true;
+    OverloadButtonAction();
+}
+
+// Called by weapon fire system after overload shot discharges
+void OverloadFired(void) {
+    Eng_Global->inventoryPlayer1.overloadEnabled = false;
+    // Render-time: normalButtonSprite, textDisabledColor
+}
+
+// Called from weapon pane render — returns visual state for renderer to act on
+// 0 = normal+clickable, 1 = overloaded, 2 = disabled (post-fire/too hot)
+uint8_t OverloadButtonVisualState(void) {
+    InventorySystem* inv = &Eng_Global->inventoryPlayer1;
+    if (inv->currentEnergyWeaponHeat[inv->weaponIndex] > OVERLOAD_HEAT_THRESHOLD) return 2;
+    if (inv->overloadEnabled) return 1;
+    return 0;
+}
+//=============================================================================
+// FireWorkThang
+#define FIREWORK_PHASE_GROWING   0
+#define FIREWORK_PHASE_WAIT_FULL 1
+#define FIREWORK_PHASE_WAIT_MIN  2
+
+void FireWorkThangOnEnable(uint16_t self) {
+    Entity* e = &Eng_Global->instances[self];
+    if (e->randomMin >= e->randomMax) {
+        e->randomMin = 0.0f;
+        e->randomMax = 1.0f;
+        DualLogWarn("FireWorkThang maxScale not set higher than min");
+    }
+    
+    if (e->speed < 0.001f) e->speed = 0.5f;
+    e->percentMoved  = random_range(e->randomMin,e->randomMax); // curScale
+    e->lerpUp        = FIREWORK_PHASE_GROWING;
+    e->tickFinished  = Eng_Global->pauseRelativeTime;
+}
+
+void FireWorkThangUpdate(uint16_t self) {
+    Entity* e = &Eng_Global->instances[self];
+    if (Eng_Global->gamePaused || Eng_Global->menuActive) return;
+    if (e->tickFinished >= Eng_Global->pauseRelativeTime) return;
+    e->tickFinished = Eng_Global->pauseRelativeTime + (1.0/60.0);
+    switch (e->lerpUp) {
+        case FIREWORK_PHASE_WAIT_FULL:
+            e->percentMoved = e->randomMin; // snap to min
+            e->lerpUp       = FIREWORK_PHASE_WAIT_MIN;
+            e->tickFinished = Eng_Global->pauseRelativeTime + random_range(e->fireworkWaitMinMin,e->waitBeforeClose);
+            break;
+        case FIREWORK_PHASE_WAIT_MIN:
+            e->percentMoved += (e->randomMax - e->randomMin) * 0.333f;
+            e->lerpUp        = FIREWORK_PHASE_GROWING;
+            break;
+        default: // FIREWORK_PHASE_GROWING
+            e->percentMoved += (e->speed * (e->randomMax - e->randomMin)) / 60.0f;
+            break;
+    }
+    
+    if (e->percentMoved > e->randomMax) {
+        e->percentMoved = e->randomMax;
+        e->lerpUp       = FIREWORK_PHASE_WAIT_FULL;
+        e->tickFinished = Eng_Global->pauseRelativeTime + e->waitBeforeClose;
+    }
+    
+    float s = e->percentMoved;
+    e->scale = (Vector3){s,s,s};
+}
+//=============================================================================
+// GeneralInventory
+static void ApplyBattery(void) {
+    if (Eng_Global->instances[PLAYER1].energy >= 255.0f) {
+        CenterStatusPrint("%s",Eng_Text->stringTable[303]); // Energy full
+        return;
+    }
+    GiveEnergy(83.0f,EnergyType_Battery);
+    Eng_Global->inventoryPlayer1.generalInventoryIndexRef[Eng_Global->inventoryPlayer1.hardwareInvCurrent] = -1;
+}
+
+static void ApplyIcadBattery(void) {
+    if (Eng_Global->instances[PLAYER1].energy >= 255.0f) {
+        CenterStatusPrint("%s",Eng_Text->stringTable[303]); // Energy full
+        return;
+    }
+    GiveEnergy(255.0f,EnergyType_Battery);
+    Eng_Global->inventoryPlayer1.generalInventoryIndexRef[Eng_Global->inventoryPlayer1.hardwareInvCurrent] = -1;
+}
+
+static void ApplyHealthkit(void) {
+    Entity* p = &Eng_Global->instances[PLAYER1];
+    if (p->health >= 255.0f) {
+        CenterStatusPrint("%s",Eng_Text->stringTable[304]); // Health full
+        return;
+    }
+    p->health = 255.0f;
+    // TODO: Eng_UI->DrawTicks(true) — HUD health tick refresh, MFDManager
+    Eng_Global->inventoryPlayer1.generalInventoryIndexRef[Eng_Global->inventoryPlayer1.hardwareInvCurrent] = -1;
+}
+
+void GeneralInvUse(int buttonIdx,int customIdx) {
+    InventorySystem* inv = &Eng_Global->inventoryPlayer1;
+    inv->hardwareInvCurrent = buttonIdx;
+    int itemIdx = inv->generalInventoryIndexRef[buttonIdx];
+    if (buttonIdx == 0) {
+        // TODO: Eng_UI->SendInfoToItemTab(81) — access cards display, MFDManager
+        // TODO: SetCurrentAsLast for active side panel, MFDManager
+        return;
+    }
+    // TODO: Eng_UI->SendInfoToItemTab(itemIdx,customIdx) — MFDManager
+    // TODO: SetCurrentAsLast for active side panel, MFDManager
+    (void)customIdx;
+    (void)itemIdx;
+}
+
+void GeneralInvApply(int buttonIdx,int customIdx) {
+    InventorySystem* inv = &Eng_Global->inventoryPlayer1;
+    if (buttonIdx == 0) {
+        // TODO: Eng_UI->SendInfoToItemTab(81), OpenTab access cards — MFDManager
+        return;
+    }
+    inv->hardwareInvCurrent = buttonIdx;
+    int itemIdx = inv->generalInventoryIndexRef[buttonIdx];
+    switch (itemIdx) {
+        case 52: ApplyBattery();     break;
+        case 53: ApplyIcadBattery(); break;
+        case 55: ApplyHealthkit();   break;
+        default:
+            inv->hardwareInvCurrent = buttonIdx;
+            // TODO: Eng_UI->SendInfoToItemTab(itemIdx,customIdx), OpenTab — MFDManager
+            (void)customIdx;
+            break;
+    }
+}
+
+void GeneralInvClick(int buttonIdx,int customIdx) {
+    Eng_UI->mouseClickHeldOverGUI = true;
+    GeneralInvUse(buttonIdx,customIdx);
+}
+
+void GeneralInvDoubleClick(int buttonIdx,int customIdx) {
+    Eng_UI->mouseClickHeldOverGUI = true;
+    GeneralInvApply(buttonIdx,customIdx);
+}
+//=============================================================================
+// TargetID
+#define TARGETID_LINK_DIST       10.0f
+#define TARGETID_DAMAGE_TIME_HIT  2.5f
+#define TARGETID_DAMAGE_TIME_MISS 1.0f
+
+// Display flags packed into ioflags (upper bits unused by I/O system on dynamic objs)
+#define TARGID_DISPLAY_HEALTH  (1ull << 60)
+#define TARGID_DISPLAY_RANGE   (1ull << 61)
+#define TARGID_DISPLAY_ATTITUD (1ull << 62)
+#define TARGID_DISPLAY_NAME    (1ull << 63)
+
+float TargetIDGetSensingRange(bool manual) {
+    uint8_t ver = Eng_Global->inventoryPlayer1.hardwareVersion[HW_TID_IDX];
+    if (manual) {
+        return (ver >= 4) ? 18.0f : 13.0f;
+    } else {
+        if (ver <= 2) return 0.0f;
+        return (ver == 3) ? 13.0f : 20.0f;
+    }
+}
+
+float TargetIDGetTetherRange(void) {
+    return (Eng_Global->inventoryPlayer1.hardwareVersion[HW_TID_IDX] >= 4) ? 22.0f : 15.0f;
+}
+
+static void TargetIDDeactivate(uint16_t self) {
+    Entity* e = &Eng_Global->instances[self];
+    if (e->enemey != NULLENT) {
+        Entity* npc = &Eng_Global->instances[e->enemey];
+        flag_set(&npc->entflags,ENTFLAG_TARGID_ATTACHED,false);
+        e->enemey = NULLENT;
+    }
+    e->textIndex  = -1;
+    flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
+}
+
+void TargetIDSendDamageReceive(uint16_t self,float damage,AttackType attackType) {
+    Entity* e   = &Eng_Global->instances[self];
+    if (e->enemey == NULLENT) return;
+    Entity* npc = &Eng_Global->instances[e->enemey];
+    if (attackType == AttackType_Tranq) {
+        e->textIndex         = 536; // STUNNED
+        e->animSwapFinished  = Eng_Global->pauseRelativeTime - 1.0; // expire damage text
+    } else {
+        float mh = npcTable[npc->npcIndex].health;
+        if      (damage > mh * 0.75f) e->textIndex = 514; // SEVERE DAMAGE
+        else if (damage > mh * 0.50f) e->textIndex = 515; // MAJOR DAMAGE
+        else if (damage > mh * 0.25f) e->textIndex = 513; // NORMAL DAMAGE
+        else if (damage > 0.0f)       e->textIndex = 512; // MINOR DAMAGE
+        else                          e->textIndex = 511; // NO DAMAGE
+        e->animSwapFinished = Eng_Global->pauseRelativeTime
+                              + ((damage == 0.0f) ? TARGETID_DAMAGE_TIME_MISS
+                                                  : TARGETID_DAMAGE_TIME_HIT);
+    }
+}
+
+void TargetIDUpdate(uint16_t self) {
+    Entity* e = &Eng_Global->instances[self];
+    if (!(e->entflags & ENTFLAG_ACTIVE)) return;
+
+    // Deactivation checks
+    if (e->enemey == NULLENT)                                          { TargetIDDeactivate(self); return; }
+    Entity* npc = &Eng_Global->instances[e->enemey];
+    if (npc->health <= 0.0f)                                           { TargetIDDeactivate(self); return; }
+    if (distance_vector3(e->position,Eng_Global->instances[PLAYER1].position)
+        > TARGETID_LINK_DIST)                                          { TargetIDDeactivate(self); return; }
+    if (e->tickFinished < Eng_Global->pauseRelativeTime)               { TargetIDDeactivate(self); return; }
+
+    // Track parent NPC position
+    e->position = npc->position;
+
+    // Stunned state
+    bool stunned = npc->tranquilizeFinished > Eng_Global->pauseRelativeTime;
+    flag_set(&e->entflags,ENTFLAG_ASLEEP,stunned);
+
+    // Damage text expiry / stunned override
+    if (e->textIndex >= 0) {
+        if (stunned && e->animSwapFinished < Eng_Global->pauseRelativeTime) {
+            e->textIndex = 536; // STUNNED
+        } else if (e->animSwapFinished < Eng_Global->pauseRelativeTime) {
+            e->textIndex = -1;
+            if (!(Eng_Global->inventoryPlayer1.hasHardware & HW_TID)) {
+                TargetIDDeactivate(self); return;
+            }
+        }
+    }
+
+    // Secondary display string — built at render time from flags + npc state
+    // TODO: render TargetID billboard text using e->textIndex, e->enemey,
+    // e->ioflags TARGID_DISPLAY_* flags — pass to HUD/world-space text renderer:
+    //   TARGID_DISPLAY_NAME    → npc->targetID string
+    //   TARGID_DISPLAY_HEALTH  → vfloor(npc->health)
+    //   TARGID_DISPLAY_RANGE   → distance_vector3(PLAYER1.pos, npc->pos)
+    //   TARGID_DISPLAY_ATTITUD → map npc->currentState to stringTable indices:
+    //     ENTFLAG_ASLEEP                             → 519 Asleep
+    //     Run/Attack1/Attack2/Attack3/Pain           → 518 Hostile
+    //     Walk/Inspect/Interacting                   → 517 Cautious
+    //     default                                    → 516 Idle
+}
+
+void TargetIDInitAfterLoad(uint16_t self) {
+    Entity* e        = &Eng_Global->instances[self];
+    e->textIndex     = -1;
+    e->enemey        = NULLENT;
+    e->tickFinished  = 0.0;
+    e->animSwapFinished = 0.0;
+    flag_set(&e->entflags,ENTFLAG_ACTIVE,false); // starts pooled
+}
+//=============================================================================
+// PlayerEnergy
+#define ENERGY_TICK 0.1
+
+static const float hwDrain[12][4] = {
+    [3]  = { 0.01535f, 0.03413f, 0.02559f, 0.0f    },
+    [5]  = { 0.04096f, 0.10239f, 0.17919f, 0.05119f},
+    [6]  = { 0.001706f,0.0f,     0.0f,     0.0f    },
+    [7]  = { 0.02559f, 0.04266f, 0.05119f, 0.0f    },
+    [9]  = { 0.0f,     0.02f,    0.015f,   0.0f    },
+    [11] = { 0.08533f, 0.0f,     0.0f,     0.0f    },
+};
+static const uint16_t hwDrainJPM[12][4] = {
+    [3]  = {  9, 20, 15,   0},
+    [5]  = { 24, 60,105,  30},
+    [6]  = {  1,  0,  0,   0},
+    [7]  = { 15, 25, 30,   0},
+    [9]  = {  0, 16, 12,   0},
+    [11] = { 50,  0,  0,   0},
+};
+
+static void TargetIdentifierSenseTargets(void) {
+    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < Eng_Global->loadedInstances; i++) {
+        Entity* e = &Eng_Global->instances[i];
+        if (!(e->entflags & ENTFLAG_ACTIVE))         continue;
+        if (!ConstIndexIsNPC(e->index))              continue;
+        if (e->entflags & ENTFLAG_DEAD)              continue;
+        if (e->entflags & ENTFLAG_TARGID_ATTACHED)   continue;
+        if (distance_vector3(e->position,Eng_Global->instances[PLAYER1].position) > TargetIDGetSensingRange(false))        continue;
+        // TODO: CreateTargetIDInstance — weapon/targetting system
+    }
+}
+
+static void DeactivateHardwareOnEnergyDepleted(void) {
+    InventorySystem* inv = &Eng_Global->inventoryPlayer1;
+    uint16_t* active = &inv->hardwareIsActive;
+    flag_set((uint64_t*)active, HW_SNS, false);
+    // TODO: SensaroundOff() — hardware button manager effects
+    if ((*active & HW_BIO) && inv->hardwareVersionSetting[HW_BIO_IDX] == 0) {
+        flag_set((uint64_t*)active, HW_BIO, false);
+        // TODO: BioOff()
+    }
+    if (*active & HW_SHD) {
+        flag_set((uint64_t*)active, HW_SHD, false);
+        // TODO: ShieldOffWithEffects()
+    }
+    if (*active & HW_LAN) {
+        flag_set((uint64_t*)active, HW_LAN, false);
+        // TODO: LanternOff()
+    }
+    if (*active & HW_BST) {
+        flag_set((uint64_t*)active, HW_BST, false);
+        // TODO: BoosterOff()
+    }
+    if (*active & HW_INF) {
+        flag_set((uint64_t*)active, HW_INF, false);
+        // TODO: InfraredOff()
+    }
+}
+
+void TakeEnergy(float take) {
+    Entity* p = &Eng_Global->instances[PLAYER1];
+    if (p->energy <= 0.0f)          return;
+    if (Eng_Cheats->redbull)        return;
+    p->energy -= take;
+    if (p->energy <= 0.0f) {
+        p->energy = 0.0f;
+        play_wav(sounds[84],Eng_Settings->VolumeEffects,(Vector3){},false); // energy_gone
+        CenterStatusPrint("%s",Eng_Text->stringTable[314]); // Power supply exhausted.
+        DeactivateHardwareOnEnergyDepleted();
+    }
+}
+
+void GiveEnergy(float give,EnergyType type) {
+    Entity* p = &Eng_Global->instances[PLAYER1];
+    p->energy += give;
+    if (p->energy > 255.0f) p->energy = 255.0f;
+    if (type == EnergyType_Battery)       play_wav(sounds[79], Eng_Settings->VolumeEffects,(Vector3){},false); // batteryuse
+    if (type == EnergyType_ChargeStation) play_wav(sounds[100],Eng_Settings->VolumeEffects,(Vector3){},false); // chargingstation
+}
+
+void PlayerEnergyInit(void) {
+    Entity* p        = &Eng_Global->instances[PLAYER1];
+    p->energy        = 54.0f;
+    p->energyDrainTickFinished = Eng_Global->pauseRelativeTime + ENERGY_TICK
+                                 + random_range(0.0f,1.0f);
+    Eng_Global->inventoryPlayer1.drainJPM = 0;
+}
+
+void PlayerEnergyUpdate(void) {
+    if (Eng_Global->gamePaused || Eng_Global->menuActive) return;
+    Entity* p        = &Eng_Global->instances[PLAYER1];
+    InventorySystem* inv = &Eng_Global->inventoryPlayer1;
+    if (inv->hasHardware & HW_TID) TargetIdentifierSenseTargets();
+    if (p->energyDrainTickFinished > Eng_Global->pauseRelativeTime) return;
+    p->energyDrainTickFinished = Eng_Global->pauseRelativeTime + ENERGY_TICK;
+    bool anyDrain = false;
+    inv->drainJPM = 0;
+    uint8_t ver;
+    for (int hw = 3; hw <= 11; hw++) {
+        uint16_t bit = (uint16_t)(1u << hw);
+        if (!(inv->hardwareIsActive & bit)) continue;
+        // hw indices with no per-tick drain or handled elsewhere
+        if (hw == 4 || hw == 8 || hw == 10) continue;
+        ver = inv->hardwareVersionSetting[hw];
+        float drain = hwDrain[hw][ver];
+        inv->drainJPM += hwDrainJPM[hw][ver];
+        if (drain > 0.0f) { TakeEnergy(drain); anyDrain = true; }
+    }
+    if (anyDrain && p->energy <= 0.0f) {
+        DeactivateHardwareOnEnergyDepleted();
+        inv->drainJPM = 0;
+    }
+    // TODO: push inv->drainJPM to HUD drain text display — render side
+}
+//=============================================================================
+// GrenadeActivate
+#define GREN_FLAG_EXPLODE_CONTACT (1ull << 59)
+#define GREN_FLAG_USE_TIMER       (1ull << 58)
+#define GREN_FLAG_USE_PROX        (1ull << 57)
+
+static bool GrenadeIsNPCMine(uint16_t self) {
+    return Eng_Global->instances[self].layer != PhysicsLayer_PlayerBullets;
+}
+
+void GrenadeExplode(uint16_t self) {
+    DualLog("Grenade exploded");
+    Entity* e = &Eng_Global->instances[self];
+    flag_set(&e->entflags,ENTFLAG_ENABLED,false);
+    // TODO: DisableCollision(self)
+    // TODO: DamageData + ApplyImpactForceSphere(damage,attackType,penetration,
+    //       offense,damage*1.5f,e->position,e->strength,1.0f)
+    if (!GrenadeIsNPCMine(self)) {
+        Entity* p = &Eng_Global->instances[PLAYER1];
+        flag_set(&p->entflags,ENTFLAG_MAKING_NOISE,true);
+        p->noiseFinished = Eng_Global->pauseRelativeTime + 2.0;
+    }
+    int16_t idx = (int16_t)e->index;
+    int soundIndex = 60;
+    switch (idx) {
+        case 7:  soundIndex = 64; Eng_Global->fogFac += 5;  break; // frag
+        case 8:  soundIndex = 60; Eng_Global->fogFac += 7;  break; // conc
+        case 9:  soundIndex = 67;                           break; // emp
+        case 10: soundIndex = 60; Eng_Global->fogFac += 7;  break; // earth
+        case 11: soundIndex = 64; Eng_Global->fogFac += 5;  break; // mine
+        case 12: soundIndex = 60; Eng_Global->fogFac += 6;  break; // nitro
+        case 13: soundIndex = 63; Eng_Global->fogFac += 10; break; // gas
+    }
+    play_wav(sounds[soundIndex],1.0f,e->position,true);
+    // TODO: SpawnExplosionEffect(e->position, explosionType) from object pool
+    // TODO: Shake(-1,-1) — screen shake system
+}
+
+void GrenadeActivate(uint16_t self) {
+    Entity* e = &Eng_Global->instances[self];
+    int16_t idx = (int16_t)e->index;
+    switch (idx) {
+        case 7:  flag_set(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
+        case 8:  flag_set(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
+        case 9:  flag_set(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
+        case 10: e->timerFinished = Eng_Global->pauseRelativeTime
+                                    + Eng_Global->inventoryPlayer1.earthShakerTimeSetting;
+                 flag_set(&e->ioflags,GREN_FLAG_USE_TIMER,true);       break;
+        case 11: flag_set(&e->ioflags,GREN_FLAG_USE_PROX,true);
+                 flag_set(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,false);break;
+        case 12: e->timerFinished = Eng_Global->pauseRelativeTime
+                                    + Eng_Global->inventoryPlayer1.nitroTimeSetting;
+                 flag_set(&e->ioflags,GREN_FLAG_USE_TIMER,true);       break;
+        case 13: flag_set(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
+        default: return;
+    }
+    flag_set(&e->entflags,ENTFLAG_ENABLED,true);
+}
+
+void GrenadeUpdate(uint16_t self) {
+    Entity* e = &Eng_Global->instances[self];
+    if (Eng_Global->gamePaused || Eng_Global->menuActive)  return;
+    if (!(e->entflags & ENTFLAG_ENABLED))                  return;
+    if ((int16_t)e->index == 14) { GrenadeExplode(self);   return; } // Plastique
+    bool timerDone = (e->ioflags & GREN_FLAG_USE_TIMER)
+                     && e->timerFinished < Eng_Global->pauseRelativeTime;
+    bool proxDone  = (e->ioflags & GREN_FLAG_USE_PROX)
+                     && (e->entflags & ENTFLAG_MAKING_NOISE); // proxSensed reuses MAKING_NOISE
+    if (timerDone || proxDone) GrenadeExplode(self);
+}
+
+// Called by physics collision callback when grenade touches anything
+void GrenadeOnCollision(uint16_t self) {
+    if (Eng_Global->instances[self].ioflags & GREN_FLAG_EXPLODE_CONTACT) GrenadeExplode(self);
+}
+//=============================================================================
+// ProjectileEffectImpact
+// TODO: GetDamageTakeAmount(DamageData* dd) — weapon/armor calculation system
+// TODO: TakeDamage(uint16_t target, DamageData* dd) -> float — health manager
+// TODO: Tranquilize(uint16_t target, float amount, bool fromProjectile) -> float
+// TODO: ApplyImpactForceSphere — needs OverlapSphere from physics, engine-side
+// TODO: ApplyImpactForce(uint16_t target, float vel, Vector3 normal, Vector3 pt)
+// TODO: SpawnImpactEffect(uint16_t impactType, Vector3 pos) — object pool
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+static void ProjectileEffectImpactOnCollision(uint16_t self,uint16_t hitIdx, Vector3 hitPos,Vector3 hitNormal) {
+    Entity* e   = &Eng_Global->instances[self];
+    if (hitIdx == e->recentMostActivator) return; // hit own host, ignore
+    e->counter++;
+    DamageData dd = {
+        .damage        = e->damage,
+        .penetration   = e->strength,
+        .offense       = e->speed,
+        .armorvalue    = 0.0f,
+        .defense       = 0.0f,
+        .impactVelocity= e->damage * 1.5f,
+        .attacknormal  = hitNormal,
+        .hitpoint      = hitPos,
+        .attackType    = e->attackType,
+        .owner         = e->recentMostActivator,
+        .hitIdx        = hitIdx,
+        .isOtherNPC    = ConstIndexIsNPC(Eng_Global->instances[hitIdx].index),
+        .berserkActive = (Eng_Global->inventoryPlayer1.patchActive & PATCH_BERSERK) != 0,
+    };
+
+    // Railgun sphere impact
+    if (e->lookUpIndex == 5) { // TODO: replace magic with named PoolType enum
+        // TODO: ApplyImpactForceSphere(dd, e->position, 3.2f, 1.0f)
+        Eng_Global->fogFac += 4;
+    }
+
+    Entity* hit = &Eng_Global->instances[hitIdx];
+    if (hit->health > 0.0f || hit->cyberHealth > 0.0f) {
+        // TODO: dd.damage = GetDamageTakeAmount(&dd)
+        if (e->counter < e->countToTrigger) dd.damage *= 0.85f; // per-hit falloff
+        dd.impactVelocity = dd.damage * 1.5f;
+        if (e->counter > 0) dd.impactVelocity /= 3.0f;
+        if (Eng_Global->currentLevel != LEVEL_CYBERSPACE
+            && e->recentMostActivator == PLAYER1) {
+            // TODO: ApplyImpactForce(hitIdx, dd.impactVelocity, dd.attacknormal, hitPos)
+        }
+        // TODO: float dmgFinal = TakeDamage(hitIdx, &dd)
+        float dmgFinal  = 0.0f; // placeholder until TakeDamage implemented
+//         float tranq     = -1.0f;
+        if (dd.isOtherNPC) {
+            if (!(hit->entflags & ENTFLAG_ASLEEP)) Sys_Music.inCombat = true;
+            if (dd.attackType == AttackType_Tranq) {
+//                 float stunAmount = vclamp(3.0f + (Eng_Global->inventoryPlayer1.stungunSetting
+//                                           / 100.0f) * 7.0f, 3.0f, 10.0f);
+                // TODO: tranq = Tranquilize(hitIdx, stunAmount, true)
+            }
+        }
+        if (dmgFinal < 0.0f) dmgFinal = 0.0f;
+        // TODO: CreateTargetIDInstance(dmgFinal, hitIdx, tranq)
+        // TODO: SpawnImpactEffect(e->lookUpIndex, hitPos)
+    }
+
+    if (e->counter >= e->countToTrigger) {
+        // TODO: SpawnImpactEffect(e->lookUpIndex, hitPos)
+        if (e->despawnInstead) DeleteInstance(self);
+        else flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
+    }
+}
+#pragma GCC diagnostic pop
+
+void ProjectileEffectImpactInitAfterLoad(uint16_t self) {
+    Entity* e       = &Eng_Global->instances[self];
+    e->counter      = 0;
+    if (e->countToTrigger < 1) e->countToTrigger = 1;
+}
+//=============================================================================
+// HealthManager
+
+// Attack type damage multiplier table [NPCType][AttackType]
+// 1.0f = no change, 0.0f = immune, other = multiplier
+static const float attackTypeMult[7][12] = {
+    // None  Melee  MelEn  EnBm   Mag    Proj   Needle ProjEB ProjLn Gas    Tranq  Drill
+    [NPCType_Mutant]      = {1,1,1,1,0,  1,2,1,1,2,1,1},
+    [NPCType_Supermutant] = {1,1,1,1,0,  1,1,1,1,1.5,1,1},
+    [NPCType_Robot]       = {1,1,1,1,4,  1,0,1,1,0,1,1},
+    [NPCType_Cyborg]      = {1,1,1,1,2,  1,1,1,1,1,1,1},
+    [NPCType_Supercyborg] = {1,1,1,1,2,  1,0,1,1,0,1,1},
+    [NPCType_MutantCyborg]= {1,1,1,1,0.5,1,2,1,1,2,1.5,1},
+    [NPCType_Cyber]       = {1,1,1,1,1,  1,1,1,1,1,1,0},
+};
+
+// Object death sound table indexed by constIndex
+static const int16_t objectDeathSound[] = {
+    [458]=63,[459]=66,[460]=66,
+    [464]=62,[465]=532,[466]=532,[467]=532,[468]=532,[469]=532,[470]=532,[471]=532,
+    [472]=62,[473]=62,[474]=62,[475]=62,[476]=62,
+    [477]=61,[478]=65,[479]=69,
+    [525]=68,[526]=68,
+};
+
+static bool IsCyberEntity(uint16_t self) {
+    if (Eng_Global->currentLevel == LEVEL_CYBERSPACE) return true;
+    Entity* e = &Eng_Global->instances[self];
+    if (self != PLAYER1 && e->cyberHealth > 0.0f) return true;
+    return (ConstIndexIsNPC(e->index) && e->npcIndex > 23); // 24-28 are cyber enemies
+}
+
+static float ApplyAttackTypeAdjustments(uint16_t self,float take,AttackType at) {
+    Entity* e = &Eng_Global->instances[self];
+    if (!ConstIndexIsNPC(e->index) || e->health <= 0.0f) return take;
+    NPCType t = npcTable[e->npcIndex].type;
+    if (at >= 12) return take;
+    return take * attackTypeMult[t][at];
+}
+
+static void UseDeathTargets(uint16_t self) {
+    if (self == PLAYER1 || self == PLAYER2) return;
+    Entity* e = &Eng_Global->instances[self];
+    if (!StringIsEmpty(e->target)) UseTargets(self,NULL,e->target);
+}
+
+static void TeleportAway(uint16_t self) {
+    Entity* e = &Eng_Global->instances[self];
+    if (e->entflags & ENTFLAG_TELEPORT_ON_DEATH) return; // already done, flag reused as teleportDone
+    flag_set(&e->entflags,ENTFLAG_TELEPORT_ON_DEATH,true);
+    e->collider        = COLLIDER_TYPE_NONE;
+    e->gravity         = 0.0f;
+    e->velocity        = (Vector3){0,0,0};
+    e->angularVelocity = (Vector3){0,0,0};
+    e->modelIndex      = UINT16_MAX; // remove from rendering
+    // TODO: activate teleport effect particle instance at e->position
+}
+
+static void DropSearchables(uint16_t self) {
+    Entity* e = &Eng_Global->instances[self];
+    // TODO: NotifySearchThatSearchableWasDestroyed()
+    for (int i = 0; i < 4; i++) {
+        if (e->contents[i] == UINT16_MAX) continue;
+        uint16_t spawned = SpawnDynamicObject(e->contents[i] + 307,true);
+        if (spawned != UINT16_MAX) {
+            Eng_Global->instances[spawned].position   = e->position;
+            Eng_Global->instances[spawned].customIndex[0] = e->customIndex[i];
+        } else {
+            CenterStatusPrint("BUG: Failed to instantiate object being dropped on gib.");
+        }
+        e->contents[i]   = UINT16_MAX;
+        e->customIndex[i] = UINT16_MAX;
+    }
+}
+
+static void CreateDeathEffects(uint16_t self,uint16_t fxPoolType) {
+    if (fxPoolType == 0) return; // PoolType_None
+    Entity* e = &Eng_Global->instances[self];
+    Vector3 pos = e->position;
+    // Use collider center offset if present
+    if (e->collider != COLLIDER_TYPE_NONE) {
+        pos = Vector3_A_plus_B(pos,e->colliderCenter);
+    }
+    // TODO: SpawnEffectFromPool(fxPoolType, pos)
+}
+
+static void HideSelf(uint16_t self) {
+    Entity* e = &Eng_Global->instances[self];
+    if (e->index == 279) return; // screens keep mesh
+    flag_set(&e->entflags,ENTFLAG_VISIBLE,false);
+    e->gravity = 0.0f;
+}
+
+static void NPCDeath(uint16_t self) {
+    Entity* e = &Eng_Global->instances[self];
+    if (e->entflags & ENTFLAG_DEAD_CHECKS_DONE) return;
+    flag_set(&e->entflags,ENTFLAG_DEAD_CHECKS_DONE,true);
+    CreateDeathEffects(self,e->deathBurst);
+    if (e->npcIndex == 0 && !(e->entflags & ENTFLAG_ACT_AS_CORPSE_ONLY))
+        play_wav(sounds[64],1.0f,e->position,true); // npc_autobomb: explosion1
+    if (npcTable[e->npcIndex].type == NPCType_Cyber) DeleteInstance(self);
+    // else: keep collider alive to prevent falling through floor (Unity physics note preserved)
+}
+
+static void ObjectDeath(uint16_t self) {
+    Entity* e = &Eng_Global->instances[self];
+    if (e->entflags & ENTFLAG_DEAD_CHECKS_DONE) return;
+    if (e->entflags & ENTFLAG_DEATH_BURST_DONE) { // gibOnDeath reuses DEATH_BURST_DONE
+        // Gib path
+        CreateDeathEffects(self,e->deathBurst);
+        for (int i = 0; i < MAX_CHILD_COUNT; i++) {
+            if (e->child[i] == NULLENT) continue;
+            flag_set(&Eng_Global->instances[e->child[i]].entflags,ENTFLAG_ACTIVE,true);
+            if (e->entflags & ENTFLAG_GROUNDED) { // gibsGetVelocity reuses GROUNDED on objects
+                AddForce(e->child[i],e->direction,true); // gibVelocityBoost stored in direction
+            }
+        }
+        DropSearchables(self);
+        if (e->index != 279) e->collider = COLLIDER_TYPE_NONE;
+        HideSelf(self);
+    } else {
+        e->collider = COLLIDER_TYPE_NONE;
+        DropSearchables(self);
+        CreateDeathEffects(self,e->deathBurst);
+    }
+    flag_set(&e->entflags,ENTFLAG_DEAD_CHECKS_DONE,true);
+    // TODO: disable automap overlay for this instance
+    if (e->securityThreshold > 0) {
+        // TODO: ReduceCurrentLevelSecurity(e->securityThreshold) — security system
+    }
+    uint16_t idx = e->index;
+    int16_t soundex = 62; // default: crate_break
+    if (idx < 527 && objectDeathSound[idx] != 0) soundex = objectDeathSound[idx];
+    play_wav(sounds[soundex],1.0f,e->position,true);
+    if (e->deathBurst != 0) HideSelf(self);
+}
+
+static void ScreenDeath(uint16_t self) {
+    Entity* e = &Eng_Global->instances[self];
+    if (e->entflags & ENTFLAG_DEAD_CHECKS_DONE) return;
+    flag_set(&e->entflags,ENTFLAG_DEAD_CHECKS_DONE,true);
+    play_wav(sounds[69],1.0f,e->position,true); // screen_destroy
+    // TODO: stop ImageSequenceTextureArray animation for this instance
+    if (e->entflags & ENTFLAG_DEATH_BURST_DONE) ObjectDeath(self); // gib path
+}
+
+static void VaporizeCorpse(uint16_t self,bool energyVaporized) {
+    Entity* e = &Eng_Global->instances[self];
+    flag_set(&e->entflags,ENTFLAG_DEAD_CHECKS_DONE,true);
+    DropSearchables(self);
+    uint16_t fx = e->deathBurst;
+    if (fx == 0) fx = 1; // PoolType_CorpseHit fallback
+    if (energyVaporized) fx = 2; // PoolType_Vaporize
+    flag_set(&e->entflags,ENTFLAG_VISIBLE,false);
+    bool isNPC = ConstIndexIsNPC(e->index);
+    bool isSearchable = ConstIndexIsSearchable(e->index);
+    if (isNPC || isSearchable) DeleteInstance(self);
+    CreateDeathEffects(self,fx);
+}
+
+static void Death(uint16_t self,bool energyVaporized) {
+    Entity* e = &Eng_Global->instances[self];
+    if (e->entflags & ENTFLAG_DEAD_CHECKS_DONE) return;
+    UseDeathTargets(self);
+    bool isNPC = ConstIndexIsNPC(e->index);
+    bool isObj = ConstIndexIsDynamicObject(e->index);
+    if (e->entflags & ENTFLAG_ACT_AS_CORPSE_ONLY) { e->entflags |= ENTFLAG_DEAD_CHECKS_DONE; return; }
+//     bool gib        = (e->entflags & ENTFLAG_DEATH_BURST_DONE) != 0;
+    bool vaporize   = (e->entflags & ENTFLAG_VISIBLE) != 0; // vaporizeCorpse maps to VISIBLE being set
+    bool isScreen   = (e->index == 279);
+    bool isGrenade  = (e->entflags & ENTFLAG_CARDCHUNK) != 0; // CARDCHUNK reused as isGrenade flag
+    bool isCam      = (e->index == 477);
+    bool doTeleport = (e->entflags & ENTFLAG_REQUIRE_RESET) != 0; // REQUIRE_RESET reused as teleportOnDeath
+    if (e->iceActive) e->collider = COLLIDER_TYPE_NONE;
+    if (vaporize && !isCam && !isGrenade) VaporizeCorpse(self,energyVaporized);
+    else if (isObj)    ObjectDeath(self);
+    else if (isScreen) ScreenDeath(self);
+    else if (doTeleport) TeleportAway(self);
+    else if (isGrenade) GrenadeExplode(self);
+    if (isNPC && !doTeleport) NPCDeath(self);
+    else if (self == PLAYER1 || self == PLAYER2) Eng_Global->deaths++;
+    flag_set(&e->entflags,ENTFLAG_DEAD_CHECKS_DONE,true);
+}
+
+float TakeDamage(uint16_t self,DamageData dd) {
+    Entity* e = &Eng_Global->instances[self];
+    if (Eng_Cheats->god && (self == PLAYER1 || self == PLAYER2)) return 0.0f;
+    bool isCyber = IsCyberEntity(self);
+    float* hp    = isCyber ? &e->cyberHealth : &e->health;
+    bool isNPC   = ConstIndexIsNPC(e->index);
+    bool isPlayer = (self == PLAYER1 || self == PLAYER2);
+//     bool isObj   = ConstIndexIsDynamicObject(e->index);
+    bool isGrenade = (e->entflags & ENTFLAG_CARDCHUNK) != 0;
+//     bool isScreen  = (e->index == 279);
+    bool isCam     = (e->index == 477);
+
+    if (isCyber) {
+        if (dd.attackType == AttackType_Drill && isNPC) return 0.0f;
+        if (dd.attackType != AttackType_Drill && e->iceActive) return 0.0f;
+    }
+    // Dead exceptions — still allow damage to gibs, ice, player, grenades, screens, cameras, teleporters
+    if (*hp <= 0.0f) {
+        bool allowPost = (e->entflags & ENTFLAG_DEATH_BURST_DONE) || e->iceActive
+                        || isPlayer || isGrenade || e->index == 279 || isCam
+                        || (e->entflags & ENTFLAG_REQUIRE_RESET);
+        if (!allowPost) return 0.0f;
+    }
+
+    float take = dd.damage;
+    if (isPlayer) {
+        float absorb = 0.0f;
+        if (isCyber) {
+            // Cyber C-Shield software absorption
+            if (Eng_Global->inventoryPlayer1.hasSoft & (1 << SW_SHIELD)) {
+                uint8_t sv = Eng_Global->inventoryPlayer1.softVersions[SW_SHIELD];
+                absorb = (sv <= 9) ? sv * 0.05f : 0.0f;
+                take *= (1.0f - absorb);
+                if (take <= 0.0f) return 0.0f;
+            }
+        } else {
+            if (dd.attackType == AttackType_Magnetic) {
+                take = 0.0f;
+                // TODO: empstatic.Flash(2), BiomonitorEnergyPulse(11f) — FX systems
+                TakeEnergy(11.0f);
+            }
+            InventorySystem* inv = &Eng_Global->inventoryPlayer1;
+            if ((inv->hardwareIsActive & HW_SHD) && (inv->hasHardware & HW_SHD)) {
+                float thresh = 0.0f;
+                switch (inv->hardwareVersion[HW_SHD_IDX]) {
+                    case 0: absorb = 0.20f; thresh =  0.0f; break;
+                    case 1: absorb = 0.40f; thresh = 10.0f; break;
+                    case 2: absorb = 0.75f; thresh = 15.0f; break;
+                    case 3: absorb = 0.75f; thresh = 30.0f; break;
+                }
+                if (take < thresh) absorb = 1.0f;
+                if (absorb > 0.0f) {
+                    if (absorb < 1.0f) absorb = vclamp(absorb + random_range(-0.08f,0.08f),0.0f,1.0f);
+                    take *= (1.0f - absorb);
+                    play_wav(sounds[94],Eng_Settings->VolumeEffects,(Vector3){},false); // shield absorb
+                    int abs = (int)(absorb * 100.0f);
+                    CenterStatusPrint("%s%d%s",Eng_Text->stringTable[208],abs,Eng_Text->stringTable[209]);
+                    // TODO: shield screen flash effect
+                }
+            }
+            if (take > 0.0f && (absorb < 0.4f || random_range(0.0f,1.0f) < 0.5f)) {
+                play_wav(sounds[140],Eng_Settings->VolumeEffects,(Vector3){},false); // player pain
+                // TODO: pstatic.Flash(take>15?2:take>10?1:0) — pain flash FX
+            }
+            if (dd.owner != NULLENT && ConstIndexIsNPC(Eng_Global->instances[dd.owner].index))
+                e->noiseFinished = Eng_Global->pauseRelativeTime; // justHurtByEnemy for music system
+        }
+    }
+
+    if (isCyber) {
+        e->cyberHealth -= take;
+        if (isPlayer) {
+            Eng_Global->damageReceived += take;
+            // TODO: DrawTicks(true)
+            if (e->cyberHealth <= 0.0f) {
+                // TODO: ExitCyberspace()
+                return 0.0f;
+            }
+        }
+        if (dd.owner == PLAYER1 || dd.owner == PLAYER2) Eng_Global->damageDealt += take;
+    } else {
+        // Camera constIndex 477 gets one-shot by tranq
+        if (e->index == 477 && dd.attackType == AttackType_Tranq) take = e->health + 1.0f;
+        take = ApplyAttackTypeAdjustments(self,take,dd.attackType);
+        e->health -= take;
+        if (isPlayer) {
+            Eng_Global->damageReceived += take;
+            Sys_Music.inCombat = true;
+            // TODO: DrawTicks(true)
+        }
+        if (dd.owner == PLAYER1 || dd.owner == PLAYER2) Eng_Global->damageDealt += take;
+    }
+
+    if (isNPC && (e->health > 0.0f || (isCyber && e->cyberHealth > 0.0f))) {
+        if (npcTable[e->npcIndex].timeBetweenPain > 0.0f)
+            flag_set(&e->entflags,ENTFLAG_GO_INTO_PAIN,true);
+        // attacker stored in recentMostActivator
+        e->recentMostActivator = dd.owner;
+        TargetIDSendDamageReceive(self,take,dd.attackType);
+        // TODO: CheckPain(self) — AI pain state transition
+    }
+
+    if (isCyber) {
+        if (e->cyberHealth <= 0.0f) {
+            if (!e->iceActive && isNPC) Eng_Global->cyberkills++;
+            Death(self,false);
+        }
+    } else {
+        if (e->health <= 0.0f) {
+            if (isNPC) Eng_Global->kills++;
+            Death(self,dd.attackType == AttackType_EnergyBeam);
+        }
+    }
+    return take;
+}
+
+void HealthManagerInitAfterLoad(uint16_t self) {
+    Entity* e = &Eng_Global->instances[self];
+    bool isPlayer = (self == PLAYER1 || self == PLAYER2);
+    bool isNPC    = ConstIndexIsNPC(e->index);
+    if (isPlayer) {
+        e->health      = 211.0f;
+        e->cyberHealth = 255.0f;
+        e->noiseFinished = Eng_Global->pauseRelativeTime - 31.0; // guarantee no combat music on start
+        return;
+    }
+    if (isNPC) {
+        if (IsCyberEntity(self)) {
+            if (e->cyberHealth < 0.0f) e->cyberHealth = npcTable[e->npcIndex].healthForCyberNPC;
+        } else {
+            if (e->health < 0.0f) e->health = npcTable[e->npcIndex].health;
+        }
+        if (Eng_Global->difficultyCombat == 0) { e->health = 1.0f; }
+        if (e->entflags & ENTFLAG_ACT_AS_CORPSE_ONLY) {
+            e->health = 0.0f; e->cyberHealth = 0.0f;
+            UseDeathTargets(self);
+            if (e->entflags & ENTFLAG_TELEPORT_ON_DEATH) TeleportAway(self);
+            else NPCDeath(self);
+        }
+    }
+}
+//=============================================================================
+// Grenades
+void UseGrenade(uint16_t playerIndex, int index) { // TODO
+    (void)playerIndex; (void)index;
+//     if (Eng_Global->inventoryPlayer1.holdingObject) { CenterStatusPrint("%s", Eng_Text->stringTable[311],player); return; } // Can't use grenade, hands full
+//     if (index < 7 || index > 13) { DualLog("BUG: index outside of 7 to 13 passed to UseGrenade() in MouseLookScript.cs"); return; }
+// 
+//     ForceInventoryMode();  // Inventory mode is turned on when picking something up.
+//     ResetHeldItem();
+//     MouseCursor.a.liveGrenade = true;
+//     grenadeActive = true;
+//     CenterStatusPrint("%s", Eng_Text->stringTable[index + 326]
+//                     + Eng_Text->stringTable[320],player); // activated, grenade is LIVE!
+// 
+//     switch(index) { // Subtract one from the correct grenade inventory
+//         case 7:  heldObject = Const.a.GetPrefab(370); Eng_Global->inventoryPlayer1.RemoveGrenade(0); break; // Frag
+//         case 8:  heldObject = Const.a.GetPrefab(372); Eng_Global->inventoryPlayer1.RemoveGrenade(3); break; // Concussion
+//         case 9:  heldObject = Const.a.GetPrefab(387); Eng_Global->inventoryPlayer1.RemoveGrenade(1); break; // EMP
+//         case 10: heldObject = Const.a.GetPrefab(389); Eng_Global->inventoryPlayer1.RemoveGrenade(6); break; // Earth Shaker
+//         case 11: heldObject = Const.a.GetPrefab(402); Eng_Global->inventoryPlayer1.RemoveGrenade(4); break; // Land Mine
+//         case 12: heldObject = Const.a.GetPrefab(403); Eng_Global->inventoryPlayer1.RemoveGrenade(5); break; // Nitropak
+//         case 13: heldObject = Const.a.GetPrefab(404); Eng_Global->inventoryPlayer1.RemoveGrenade(2); break; // Gas
+//     }
+//     Eng_UI->ResetItemTab();
+//     PutObjectInHand(index,-1,0,0,false,true);
+}
+//================================================================================
+// Hardware
+static inline Entity* PE(uint16_t p) { return &Eng_Global->instances[p]; }
+static inline float SfxVol(void) { return (float)Eng_Settings->VolumeEffects / 100.0f; }
+
+void HardwareBioOff(void) {
+    Eng_Global->inventoryPlayer1.hardwareIsActive &= ~HW_BIO;
+    if (Eng_Cheats->showFPS) return;
+    // TODO: BiomonitorClearGraphs() — engine-side graph reset
+    // TODO: deactivate bioMonitorContainer — engine reads InventoryBioMonitorActive()
+}
+void HardwareBioOn(void) {
+    Eng_Global->inventoryPlayer1.hardwareIsActive |= HW_BIO;
+    // TODO: activate bioMonitorContainer — engine reads InventoryBioMonitorActive()
+}
+void HardwareBioAction(void) {
+    if (Eng_Global->inventoryPlayer1.hardwareVersionSetting[HW_BIO_IDX] == 0 && PE(PLAYER1)->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
+    play_wav(sounds[78],SfxVol(),(Vector3){},false);
+    if (InventoryBioMonitorActive(PLAYER1)) HardwareBioOff(); else HardwareBioOn();
+}
+void HardwareBioClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareBioAction(); }
+
+void HardwareSensaroundOn(void) {
+    Eng_Global->inventoryPlayer1.hardwareIsActive |= HW_SNS;
+    // TODO: activate sensaround cameras/overlays — engine reads hardwareIsActive & HW_SNS + version
+}
+void HardwareSensaroundOff(void) {
+    Eng_Global->inventoryPlayer1.hardwareIsActive &= ~HW_SNS;
+    // TODO: deactivate sensaround cameras, restore tabs — engine reads hardwareIsActive & HW_SNS
+}
+void HardwareSensaroundAction(void) {
+    if (PE(PLAYER1)->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
+    if (Eng_Global->inventoryPlayer1.hardwareIsActive & HW_SNS) {
+        play_wav(sounds[82],SfxVol(),(Vector3){},false); HardwareSensaroundOff();
+    } else {
+        play_wav(sounds[93],SfxVol(),(Vector3){},false); HardwareSensaroundOn();
+    }
+}
+void HardwareSensaroundClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareSensaroundAction(); }
+
+void HardwareShieldOn(void) {
+    Eng_Global->inventoryPlayer1.hardwareIsActive |= HW_SHD;
+    // TODO: ShieldActivateFX — engine reads hardwareIsActive & HW_SHD
+}
+void HardwareShieldOff(void) { Eng_Global->inventoryPlayer1.hardwareIsActive &= ~HW_SHD; }
+void HardwareShieldOffWithEffects(void) {
+    HardwareShieldOff();
+    // TODO: ShieldDeactivateFX — engine reads hardwareIsActive & HW_SHD
+}
+void HardwareShieldAction(void) {
+    if (PE(PLAYER1)->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
+    if (Eng_Global->inventoryPlayer1.hardwareIsActive & HW_SHD) {
+        play_wav(sounds[95],SfxVol(),(Vector3){},false); HardwareShieldOffWithEffects();
+    } else {
+        play_wav(sounds[96],SfxVol(),(Vector3){},false); HardwareShieldOn();
+    }
+}
+void HardwareShieldClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareShieldAction(); }
+
+void HardwareLanternOn(void) {
+    Eng_Global->inventoryPlayer1.hardwareIsActive |= HW_LAN;
+    // TODO: enable headlight at lanternBrightness[hardwareVersionSetting[HW_LAN_IDX]] — engine reads bitmask + version
+}
+void HardwareLanternOff(void) {
+    Eng_Global->inventoryPlayer1.hardwareIsActive &= ~HW_LAN;
+    // TODO: disable headlight — engine reads hardwareIsActive & HW_LAN
+}
+void HardwareLanternAction(void) {
+    if (PE(PLAYER1)->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
+    play_wav(sounds[78],SfxVol(),(Vector3){},false);
+    if (Eng_Global->inventoryPlayer1.hardwareIsActive & HW_LAN) HardwareLanternOff(); else HardwareLanternOn();
+}
+void HardwareLanternClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareLanternAction(); }
+
+void HardwareInfraredOn(void) {
+    Eng_Global->inventoryPlayer1.hardwareIsActive |= HW_INF;
+    // TODO: enable infrared light + grayscale on player/sensaround cameras — engine reads bitmask
+}
+void HardwareInfraredOff(void) {
+    Eng_Global->inventoryPlayer1.hardwareIsActive &= ~HW_INF;
+    // TODO: disable infrared light + grayscale — engine reads bitmask
+}
+void HardwareInfraredAction(void) {
+    if (PE(PLAYER1)->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
+    bool wasOn = (Eng_Global->inventoryPlayer1.hardwareIsActive & HW_INF) != 0;
+    play_wav(wasOn ? sounds[82] : sounds[98],SfxVol(),(Vector3){},false);
+    if (wasOn) HardwareInfraredOff(); else HardwareInfraredOn();
+}
+void HardwareInfraredClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareInfraredAction(); }
+
+void HardwareEReaderAction(void) {
+    play_wav(sounds[97],SfxVol(),(Vector3){},false);
+    Eng_Global->inventoryPlayer1.hardwareIsActive |= HW_ERD;
+    // TODO: OpenEReaderInItemsTab() — engine-side tab open
+}
+void HardwareEReaderClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareEReaderAction(); }
+
+void HardwareBoosterOn(void)  { Eng_Global->inventoryPlayer1.hardwareIsActive |=  HW_BST; }
+void HardwareBoosterOff(void) { Eng_Global->inventoryPlayer1.hardwareIsActive &= ~HW_BST; }
+void HardwareBoosterAction(void) {
+    if (InventoryBoosterSetToBoost(PLAYER1) && PE(PLAYER1)->energy <= 0.0f) {
+        CenterStatusPrint("%s",Eng_Text->stringTable[314]); return;
+    }
+    play_wav(sounds[78],SfxVol(),(Vector3){},false);
+    if (Eng_Global->inventoryPlayer1.hardwareIsActive & HW_BST) HardwareBoosterOff(); else HardwareBoosterOn();
+}
+void HardwareBoosterClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareBoosterAction(); }
+
+void HardwareJumpJetsOn(void)  { Eng_Global->inventoryPlayer1.hardwareIsActive |=  HW_JET; }
+void HardwareJumpJetsOff(void) { Eng_Global->inventoryPlayer1.hardwareIsActive &= ~HW_JET; }
+void HardwareJumpJetsAction(void) {
+    if (PE(PLAYER1)->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
+    play_wav(sounds[78],SfxVol(),(Vector3){},false);
+    InventoryJumpJetsToggle(PLAYER1);
+    if (InventoryJumpJetsActive(PLAYER1)) HardwareJumpJetsOn(); else HardwareJumpJetsOff();
+}
+void HardwareJumpJetsClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareJumpJetsAction(); }
+//================================================================================
+// Patches
+void PatchInit(void) {
+    Entity* p               = &Eng_Global->instances[PLAYER1];
+    p->mediFinishedTime     = -1.0;
+    p->reflexFinishedTime   = -1.0;
+    p->sightFinishedTime    = -1.0;
+    p->berserkIncrement     = 0;
+    p->patchActive          = 0;
+    p->staminupActive       = false;
+    Eng_Global->timeScale   = DEFAULT_TIME_SCALE;
+    Eng_Global->geniusActive = false;
+    // TODO: sightLight disabled, sightDimming disabled — engine reads patchActive & PATCH_SIGHT + sightFinishedTime
+    // TODO: BerserkFX disabled — engine reads patchActive & PATCH_BERSERK + berserkIncrement
+}
+
+void PatchUpdate(void) {
+    if (Eng_Global->gamePaused || Eng_Global->menuActive) return;
+    Entity* p = &Eng_Global->instances[PLAYER1];
+
+    // Detox
+    if (p->patchActive & PATCH_DETOX) {
+        if (p->detoxFinishedTime < Eng_Global->pauseRelativeTime) p->patchActive -= PATCH_DETOX;
+        // effect: engine reads PATCH_DETOX bit to ameliorate radiation — no gamecode action needed
+    }
+
+    // Medi
+    if (p->patchActive & PATCH_MEDI) {
+        if (p->mediFinishedTime < Eng_Global->pauseRelativeTime && p->mediFinishedTime != -1.0)
+            { p->patchActive -= PATCH_MEDI; p->mediFinishedTime = -1.0; }
+    }
+
+    // Reflex — uses absoluteTime (wall clock) so timescale doesn't affect own expiry
+    if (p->patchActive & PATCH_REFLEX) {
+        if (p->reflexFinishedTime < Eng_Global->absoluteTime && p->reflexFinishedTime != -1.0) {
+            p->patchActive       -= PATCH_REFLEX;
+            p->reflexFinishedTime = -1.0;
+            Eng_Global->timeScale = DEFAULT_TIME_SCALE;
+        } else {
+            Eng_Global->timeScale = REFLEX_TIME_SCALE;
+        }
+    } else {
+        if (Eng_Global->timeScale != DEFAULT_TIME_SCALE) Eng_Global->timeScale = DEFAULT_TIME_SCALE;
+    }
+
+    // Berserk
+    if (p->patchActive & PATCH_BERSERK) {
+        if (p->berserkFinishedTime < Eng_Global->pauseRelativeTime) {
+            p->berserkIncrement = 0;
+            p->patchActive -= PATCH_BERSERK;
+            // TODO: BerserkFX disable + reset — engine reads patchActive & PATCH_BERSERK
+        } else {
+            // TODO: BerserkFX enable — engine reads patchActive & PATCH_BERSERK
+            if (p->berserkIncrementFinishedTime < Eng_Global->pauseRelativeTime) {
+                p->berserkIncrement++;
+                if (p->berserkIncrement > 6) p->berserkIncrement = 6;
+                p->berserkIncrementFinishedTime = Eng_Global->pauseRelativeTime + (BERSERK_TIME / 5.0f);
+                // TODO: engine reads berserkIncrement for texture swap + strength increment
+            }
+        }
+    }
+
+    // Genius
+    if (p->patchActive & PATCH_GENIUS) {
+        if (p->geniusFinishedTime < Eng_Global->pauseRelativeTime) {
+            p->patchActive          -= PATCH_GENIUS;
+            Eng_Global->geniusActive = false;
+        } else {
+            Eng_Global->geniusActive = true;
+        }
+    }
+
+    // Sight
+    if (p->patchActive & PATCH_SIGHT) {
+        if (p->sightFinishedTime < Eng_Global->pauseRelativeTime && p->sightFinishedTime != -1.0) {
+            p->sightFinishedTime          = -1.0;
+            p->sightSideEffectFinishedTime = Eng_Global->pauseRelativeTime + SIGHT_SIDE_EFFECT_TIME;
+            // TODO: sightLight disable, sightDimming enable — engine reads sightFinishedTime == -1 + side effect active
+        }
+        if (p->sightSideEffectFinishedTime < Eng_Global->pauseRelativeTime && p->sightSideEffectFinishedTime != -1.0) {
+            p->sightSideEffectFinishedTime = -1.0;
+            p->sightFinishedTime           = -1.0;
+            p->patchActive                -= PATCH_SIGHT;
+            // TODO: sightDimming disable, sightLight disable — engine reads patchActive & PATCH_SIGHT
+        }
+    }
+
+    // Staminup
+    if (p->patchActive & PATCH_STAMINUP) {
+        if (p->staminupFinishedTime < Eng_Global->pauseRelativeTime) {
+            p->staminupActive  = false;
+            p->fatigue         = 100.0f; // side effect on expiry
+            p->patchActive    -= PATCH_STAMINUP;
+        } else {
+            p->fatigue        = 0.0f;
+            p->staminupActive = true;
+        }
+    }
+}
+
+void PatchDisableAll(void) {
+    Entity* p = &Eng_Global->instances[PLAYER1];
+    p->berserkFinishedTime          = -1.0;
+    p->berserkIncrementFinishedTime = -1.0;
+    p->berserkIncrement             = 0;
+    p->detoxFinishedTime            = -1.0;
+    p->geniusFinishedTime           = -1.0;
+    p->mediFinishedTime             = -1.0;
+    p->reflexFinishedTime           = -1.0;
+    p->sightFinishedTime            = -1.0;
+    p->sightSideEffectFinishedTime  = -1.0;
+    p->staminupFinishedTime         = -1.0;
+    p->staminupActive               = false;
+    p->fatigue                      = 0.0f;
+    p->patchActive                  = 0;
+    Eng_Global->timeScale           = DEFAULT_TIME_SCALE;
+    Eng_Global->geniusActive        = false;
+    // TODO: sightLight/sightDimming disable — engine reads patchActive == 0
+    // TODO: BerserkFX disable + reset — engine reads patchActive & PATCH_BERSERK
+}
+//================================================================================
+// TODO hopper death needs to tint red halfway through its death animation, then fade back to normal.
+//================================================================================
+// Security
+/*
+	int[] levelSecurity;
+	int[] levelCameraCount;
+	int[] levelLargeNodeCount;
+	int[] levelSmallNodeCount;
+	int[] levelCameraDestroyedCount;
+	int[] levelSmallNodeDestroyedCount;
+	int[] levelLargeNodeDestroyedCount;
+	Vector3[] ressurectionLocation;
+	bool[] ressurectionActive;
+	uint16_t[] ressurectionBayDoor;
+	Vector3[] elevatorTargetDestinations;
+    
+	bool RessurectPlayer() {
+		if (!ressurectionActive[Eng_Global->currentLevel]) return false;
+
+		if (Eng_Global->currentLevel == 10 || Eng_Global->currentLevel == 11 || Eng_Global->currentLevel == 12) {
+			LoadLevel(6,ressurectionLocation[currentLevel].position);
+			ressurectionBayDoor[6].ForceClose();
+		} else {
+			if (Eng_Global->currentLevel >= 0 || Eng_Global->currentLevel < 13) Eng_Global->instances[PLAYER1].position = ressurectionLocation[Eng_Global->currentLevel];
+		}
+
+		// Activate death screen and readouts for "BRAIN ACTIVITY SATISFACTORY..." ya debatable right etc. etc.
+// 		PlayerReferenceManager.a.playerDeathRessurectEffect.SetActive(true); // TODO
+		PlayTrack(TrackType_Revive,MusicType_Override);
+		Eng_Global->instances[PLAYER1].ressurectingFinished = Eng_Global->pauseRelativeTime + 3f;
+		return true;
+	}
+	
+	// Typical level
+	// 4 CPU nodes
+	// 20 cameras
+	// 100% = 4x + 20y
+	// Assuming that a good camera percentage is 2-3%, CPU % would be about 10-15 each
+	void ReduceCurrentLevelSecurity(SecurityType stype) {
+		float camScore = 4;
+		float nodeSmallScore = 10;
+		float nodeLargeScore = 27;
+		float secscoreTotal = (levelCameraCount[currentLevel] * camScore) + (levelSmallNodeCount[currentLevel] * nodeSmallScore) + (levelLargeNodeCount[currentLevel] * nodeLargeScore);
+		float secDrop = camScore; // default to camScore
+		switch (stype) {
+			case SecurityType_None: return;
+			case SecurityType_Camera: secDrop = ((camScore/secscoreTotal) * 100); levelCameraDestroyedCount[currentLevel]++; break; // 1 camera divided by the total, so 2/ say (40+60) = 2/100 = 0.02, or 2% using the example numbers above
+			case SecurityType_NodeSmall: secDrop = ((nodeSmallScore/secscoreTotal) * 100); levelSmallNodeDestroyedCount[currentLevel]++; break;
+			case SecurityType_NodeLarge: secDrop = ((nodeLargeScore/secscoreTotal) * 100); levelLargeNodeDestroyedCount[currentLevel]++; break;
+		}
+		levelSecurity[currentLevel] -= (int)secDrop;
+		if (levelSecurity [currentLevel] < 0) levelSecurity [currentLevel] = 0;
+		if ((levelLargeNodeDestroyedCount[currentLevel] == levelLargeNodeCount[currentLevel]) && (levelSmallNodeDestroyedCount[currentLevel] == levelSmallNodeCount[currentLevel]) && (levelCameraDestroyedCount[currentLevel] == levelCameraCount[currentLevel])) {
+			levelSecurity[currentLevel] = 0;
+		}
+		CenterStatusPrint("%s", Eng_Text->stringTable[306] + levelSecurity[currentLevel].ToString() + Eng_Text->stringTable[307]);
+
+		// Notify quest log if all nodes were destroyed
+		if (levelLargeNodeDestroyedCount[currentLevel] == levelLargeNodeCount[currentLevel]) {
+			if (QuestLogNotesManager.a != null) QuestLogNotesManager.a.NodesDestroyed(currentLevel);
+		}
+	}
+}*/
+//================================================================================
+// Inventory
+void PatchUse(uint16_t playerIdx,int patchSlot) { (void)playerIdx; (void)patchSlot; } // TODO
+void WeaponFireStartWeaponDip(float t) { (void)t; } // TODO
+void WeaponFireCompleteWeaponChange(void) { } // TODO
+
+static inline InventorySystem* Inv(uint16_t p) {
+    return p == PLAYER1 ? &Eng_Global->inventoryPlayer1 : &Eng_Global->inventoryPlayer2;
+}
+
+bool InventoryHasAccessCard(uint16_t p,AccessCardType card) { return (Inv(p)->accessCardOwned & (1u << card)) != 0; }
+bool InventoryHasAnyAccessCards(uint16_t p) { return Inv(p)->accessCardOwned != 0; }
+
+const char* AccessCardCodeForType(AccessCardType a) { // Called by ItemTabManager
+    switch(a) {
+        case AccessCardType_Standard:    return "STD";
+        case AccessCardType_Medical:     return "MED";
+        case AccessCardType_Science:     return "SCI";
+        case AccessCardType_Admin:       return "ADM";
+        case AccessCardType_Group1:      return "Group-1";
+        case AccessCardType_Group2:      return "Group-2";
+        case AccessCardType_Group3:      return "Group-3";
+        case AccessCardType_Group4:      return "Group-4";
+        case AccessCardType_GroupA:      return "Group-A";
+        case AccessCardType_GroupB:      return "Group-B";
+        case AccessCardType_Storage:     return "STO";
+        case AccessCardType_Engineering: return "ENG";
+        case AccessCardType_Maintenance: return "MTN";
+        case AccessCardType_Security:    return "SEC";
+        case AccessCardType_Per1:        return "PER-1";
+        case AccessCardType_Per2:        return "PER-2";
+        case AccessCardType_Per3:        return "PER-3";
+        case AccessCardType_Per4:        return "PER-4";
+        case AccessCardType_Per5:        return "PER-5";
+        default:                         return "Group-2";
+    }
+}
+
+void InventoryAddAccessCardToInventory(uint16_t p,int index) {
+    AccessCardType card;
+    switch(index) {
+        case  34: card = AccessCardType_Admin;       break;
+        case  81: card = AccessCardType_Standard;    break;
+        case  83: card = AccessCardType_Group1;      break;
+        case  84: card = AccessCardType_Science;     break;
+        case  85: card = AccessCardType_Engineering; break;
+        case  86: card = AccessCardType_GroupB;      break;
+        case  87: card = AccessCardType_Security;    break;
+        case  88: card = AccessCardType_Per5;        break;
+        case  89: card = AccessCardType_Medical;     break;
+        case  90: card = AccessCardType_Group3;      break;
+        case  91: card = AccessCardType_Group4;      break;
+        case 110: card = AccessCardType_Per1;        break;
+        default:
+            CenterStatusPrint("BUG: Unmarked access card, defaulting to STD.");
+            card = AccessCardType_Standard;
+            break;
+    }
+    if (index == 87) { // Command card = STO + SEC + MTN
+        if (InventoryHasAccessCard(p,AccessCardType_Storage) &&
+            InventoryHasAccessCard(p,AccessCardType_Security) &&
+            InventoryHasAccessCard(p,AccessCardType_Maintenance)) {
+            CenterStatusPrint("%s%s",Eng_Text->stringTable[44],AccessCardCodeForType(card));
+            return;
+        }
+        Inv(p)->accessCardOwned |= (1u<<AccessCardType_Storage)|(1u<<AccessCardType_Security)|(1u<<AccessCardType_Maintenance);
+        CenterStatusPrint("%s%s, %s, %s",Eng_Text->stringTable[45],AccessCardCodeForType(AccessCardType_Storage),AccessCardCodeForType(AccessCardType_Security),AccessCardCodeForType(AccessCardType_Maintenance));
+        return;
+    }
+    if (InventoryHasAccessCard(p,card)) { CenterStatusPrint("%s%s",Eng_Text->stringTable[44],AccessCardCodeForType(card)); return; }
+    Inv(p)->accessCardOwned |= (1u << card);
+    CenterStatusPrint("%s%s",Eng_Text->stringTable[45],AccessCardCodeForType(card));
+}
+
+void InventoryAddHardwareToInventory(uint16_t p,int index,int constIndex,int hwversion,bool overt) {
+    (void)constIndex;
+    if (index < 0) return;
+    InventorySystem* inv = Inv(p);
+    if (hwversion < 0) { CenterStatusPrint("BUG: Hardware added with version < 0, using 0."); hwversion = 0; }
+    if (hwversion > 0 && hwversion <= (int)inv->hardwareVersion[index]) {
+        if (overt) CenterStatusPrint("%s",Eng_Text->stringTable[46]); // THAT WARE IS OBSOLETE. DISCARDED.
+        return;
+    }
+    static const uint8_t textIdx[12] = {21,22,23,24,25,26,27,28,29,30,31,32};
+    inv->hardwareInvIndex             = index;
+    inv->hasHardware                 |= (uint16_t)(1u << index);
+    inv->hardwareVersion[index]       = (uint8_t)hwversion;
+    inv->hardwareVersionSetting[index]= hwversion > 0 ? (uint8_t)(hwversion - 1) : 0;
+    // TODO: engine enables HUD hardware buttons from hasHardware bitmask on render
+    // TODO: nav unit (index 1): compass/automap HUD visibility from hasHardware & HW_NAV + version
+    if (overt) CenterStatusPrint("%s v%d",Eng_Text->stringTable[textIdx[index] + 326],hwversion);
+}
+
+int  InventoryNavUnitVersion(uint16_t p)     { return Inv(p)->hardwareVersion[HW_NAV_IDX]; }
+int  InventoryBioMonitorVersion(uint16_t p)  { return Inv(p)->hardwareVersion[HW_BIO_IDX]; }
+bool InventoryBioMonitorActive(uint16_t p)   { InventorySystem* i=Inv(p); return (i->hasHardware & HW_BIO) && (i->hardwareIsActive & HW_BIO); }
+bool InventoryLanternActive(uint16_t p)      { InventorySystem* i=Inv(p); return (i->hasHardware & HW_LAN) && (i->hardwareIsActive & HW_LAN); }
+int  InventoryEnvirosuitVersion(uint16_t p)  { return Inv(p)->hardwareVersion[HW_ENV_IDX]; }
+bool InventoryBoosterSetToSkates(uint16_t p) { return Inv(p)->hardwareVersionSetting[HW_BST_IDX] == 0; }
+bool InventoryBoosterSetToBoost(uint16_t p)  { return Inv(p)->hardwareVersionSetting[HW_BST_IDX] >= 1; }
+bool InventoryBoosterActive(uint16_t p)      { InventorySystem* i=Inv(p); return (i->hasHardware & HW_BST) && (i->hardwareIsActive & HW_BST); }
+void InventoryJumpJetsToggle(uint16_t p)     { Inv(p)->hardwareIsActive ^= HW_JET; }
+int  InventoryJumpJetsVersion(uint16_t p)    { return Inv(p)->hardwareVersion[HW_JET_IDX]; }
+bool InventoryJumpJetsActive(uint16_t p)     { InventorySystem* i=Inv(p); return (i->hasHardware & HW_JET) && (i->hardwareIsActive & HW_JET); }
+// HideBioMonitor / UnHideBioMonitor: engine reads InventoryBioMonitorActive() for HUD visibility, no gamecode needed
+
+bool InventoryAddGeneralObjectToInventory(uint16_t p,int index,int customIndex) {
+    if (index < 0) return false;
+    InventorySystem* inv = Inv(p);
+    for (int i = 1; i < 14; i++) {
+        if (inv->generalInventoryIndexRef[i] != -1) continue;
+        if (!InventoryHasAnyAccessCards(p) && inv->generalInvCurrent == 0) inv->generalInvCurrent = (int8_t)i;
+        inv->generalInventoryIndexRef[i] = index;
+        inv->generalInvCustomIndex[i]    = (int16_t)customIndex;
+        CenterStatusPrint("%s%s",Eng_Text->stringTable[index + 326],Eng_Text->stringTable[31]);
+        return true;
+    }
+    return false;
+}
+
+void InventoryGeneralInventoryActivate(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    int cur = inv->generalInvCurrent;
+    if (cur < 0 || cur >= 14) { DualLog("BUG: generalInvCurrent out of range at %d",cur); return; }
+    GeneralInvApply(cur,inv->generalInvCustomIndex[cur]);
+    if (cur != 0) inv->generalInventoryIndexRef[cur] = -1;
+}
+
+void InventoryGrenadeCycleDown(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    int last = inv->grenadeCurrent, next = last - 1;
+    if (next < 0) next = 6;
+    for (int c = 0; c <= 13; c++) {
+        if (inv->grenAmmo[next] > 0) break;
+        if (c == 13) return;
+        if (--next < 0) next = 6;
+    }
+    if (last == next) return;
+    inv->grenadeCurrent = (int8_t)next;
+    static const uint16_t msg[7] = {579,580,581,582,583,584,585};
+    CenterStatusPrint("%s",Eng_Text->stringTable[msg[next]]);
+}
+
+void InventoryGrenadeCycleUp(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    int last = inv->grenadeCurrent, next = last + 1;
+    if (next > 6) next = 0;
+    for (int c = 0; c <= 13; c++) {
+        if (inv->grenAmmo[next] > 0) break;
+        if (c == 13) return;
+        if (++next > 6) next = 0;
+    }
+    if (last == next) return;
+    inv->grenadeCurrent = (int8_t)next;
+    static const uint16_t msg[7] = {579,580,581,582,583,584,585};
+    CenterStatusPrint("%s",Eng_Text->stringTable[msg[next]]);
+}
+
+void InventoryAddGrenadeToInventory(uint16_t p,int index,int useableIndex) {
+    if (index < 0) return;
+    InventorySystem* inv = Inv(p);
+    bool anyGren = false;
+    for (int i = 0; i < 7; i++) if (inv->grenAmmo[i]) { anyGren = true; break; }
+    if (!anyGren) inv->grenadeCurrent = (int8_t)index;
+    inv->grenAmmo[index]++;
+    inv->grenConstIndex[index] = (int16_t)useableIndex;
+    CenterStatusPrint("%s%s",Eng_Text->stringTable[useableIndex + 326],Eng_Text->stringTable[34]);
+}
+
+void InventoryRemoveGrenade(uint16_t p,int index) {
+    InventorySystem* inv = Inv(p);
+    if (inv->grenAmmo[index] > 0) inv->grenAmmo[index]--;
+    if (!inv->grenAmmo[index]) InventoryGrenadeCycleDown(p);
+}
+
+void InventoryCheckForUnreadLogs(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    int em = 0, lg = 0;
+    for (int i = TEXT_LOGS_COUNT-1; i >= 0; i--) {
+        if (inv->hasLog[i] && !inv->readLog[i]) {
+            if (Eng_Text->audioLogType[i] == AudioLogType_Email) em++; else lg++;
+        }
+    }
+    if (!em) inv->hasNewEmail = false;
+    if (!lg) inv->hasNewLogs  = false;
+}
+
+static int FindNextUnreadLog(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    for (int i = TEXT_LOGS_COUNT-1; i >= 0; i--) {
+        if (inv->hasLog[i] && !inv->readLog[i]) return i;
+    }
+    return -1;
+}
+
+static void InvPlayLog(uint16_t p,int logIndex) {
+    if (logIndex < 0) return;
+    InventorySystem* inv = Inv(p);
+    if (!(inv->hasHardware & HW_ERD)) return;
+//     if (inv->logSoundInited) { SoundStop(&inv->logSound); SoundUninit(&inv->logSound); inv->logSoundInited = false; }
+//     if (!SoundInit(sounds[Eng_Text->audioLogSoundIndex[logIndex]],0,NULL,NULL,&inv->logSound)) {
+//         SoundSetVolume(&inv->logSound,(float)Eng_Settings->VolumeMessage / 100.0f);
+//         SoundStart(&inv->logSound);
+//         inv->logSoundInited = true;
+//     }
+//     inv->readLog[logIndex] = true;
+//     if (Eng_Text->audioLogType[logIndex] == AudioLogType_Vmail) {
+//         vmailActive        = true;
+//         inv->vmailLogIndex = (int16_t)logIndex; // engine reads to select which .webm to play
+//         switch (logIndex) { // TODO
+//             case 119:
+//                 vmailbetajet.SetActive(true);
+//                 fileName = "betajet.webm";
+//                 Utils.ConfirmExistsMakeIfNot(basePath,fileName);
+//                 urlPath = Utils.SafePathCombine(basePath,fileName);
+//                 vmailbetajetVideo.url = urlPath;
+//                 vmailbetajetVideo.Play();
+//                 break;
+//             case 116:
+//                 vmailbridgesep.SetActive(true);
+//                 fileName = "bridgesep.webm";
+//                 Utils.ConfirmExistsMakeIfNot(basePath,fileName);
+//                 urlPath = Utils.SafePathCombine(basePath,fileName);
+//                 vmailbridgesepVideo.url = urlPath;
+//                 vmailbridgesepVideo.Play();
+//                 break;
+//             case 117:
+//                 vmailcitadestruct.SetActive(true);
+//                 fileName = "citadestruct.webm";
+//                 Utils.ConfirmExistsMakeIfNot(basePath,fileName);
+//                 urlPath = Utils.SafePathCombine(basePath,fileName);
+//                 vmailcitadestructVideo.url = urlPath;
+//                 vmailcitadestructVideo.Play();
+//                 break;
+//             case 110:
+//                 vmailgenstatus.SetActive(true);
+//                 fileName = "genstatus.webm";
+//                 Utils.ConfirmExistsMakeIfNot(basePath,fileName);
+//                 urlPath = Utils.SafePathCombine(basePath,fileName);
+//                 vmailgenstatusVideo.url = urlPath;
+//                 vmailgenstatusVideo.Play();
+//                 break;
+//             case 114:
+//                 vmaillaserdest.SetActive(true);
+//                 fileName = "laserdest.webm";
+//                 Utils.ConfirmExistsMakeIfNot(basePath,fileName);
+//                 urlPath = Utils.SafePathCombine(basePath,fileName);
+//                 vmaillaserdestVideo.url = urlPath;
+//                 vmaillaserdestVideo.Play();
+//                 break;
+//             case 120:
+//                 vmailshieldsup.SetActive(true);
+//                 fileName = "shieldsup.webm";
+//                 Utils.ConfirmExistsMakeIfNot(basePath,fileName);
+//                 urlPath = Utils.SafePathCombine(basePath,fileName);
+//                 vmailshieldsupVideo.url = urlPath;
+//                 vmailshieldsupVideo.Play();
+//                 break;
+//         }
+//    }
+    CenterStatusPrint("%s%s",Eng_Text->stringTable[1020],Eng_Global->audiologNames[logIndex]); // "Playing <name>"
+    // TODO: SendAudioLogToDataTab(logIndex) — engine-side data tab notification
+}
+
+void InventoryPlayLastAddedLog(uint16_t p,int logIndex) {
+    if (logIndex < 0) return;
+    InvPlayLog(p,logIndex);
+    Inv(p)->lastAddedIndex = -1;
+}
+
+void InventoryAddAudioLogToInventory(uint16_t p,int index) {
+    if (index < 0) { DualLog("BUG: Audio log picked up has no assigned index (-1)"); return; }
+    if (index == 128) { CenterStatusPrint("%s",Eng_Text->stringTable[309]); return; } // Trioptimum Funpack
+    InventorySystem* inv = Inv(p);
+    inv->hasLog[index]  = true;
+    inv->lastAddedIndex = index;
+    inv->numLogsFromLevel[Eng_Text->audioLogLevelFound[index]]++;
+    if      (Eng_Text->audioLogType[index] == AudioLogType_Email)  inv->hasNewEmail = true;
+    else if (Eng_Text->audioLogType[index] == AudioLogType_Normal) inv->hasNewLogs  = true;
+    if (inv->hasHardware & HW_ERD) {
+        // "Audio log <name> picked up. Press <key> to play." — TODO: key binding name interp
+        CenterStatusPrint("%s%s%s",Eng_Text->stringTable[36],Eng_Global->audiologNames[index],Eng_Text->stringTable[38]);
+    } else {
+        CenterStatusPrint("%s%s%s",Eng_Text->stringTable[36],Eng_Global->audiologNames[index],Eng_Text->stringTable[310]);
+    }
+}
+
+void InventoryPatchCycleDown(uint16_t p,bool useSound) {
+    (void)useSound; // engine plays patch select sound on patchCurrent change
+    InventorySystem* inv = Inv(p);
+    int next = inv->patchCurrent - 1;
+    if (next < 0) next = 6;
+    inv->patchCurrent = (int8_t)next;
+    for (int c = 0; c <= 13; c++) {
+        if (inv->patchCounts[next] > 0) break;
+        if (c == 13) return;
+        if (--next < 0) next = 6;
+    }
+    inv->patchCurrent = (int8_t)next;
+}
+
+void InventoryPatchCycleUp(uint16_t p,bool useSound) {
+    (void)useSound;
+    InventorySystem* inv = Inv(p);
+    int next = inv->patchCurrent + 1;
+    if (next > 6) next = 0;
+    inv->patchCurrent = (int8_t)next;
+    for (int c = 0; c <= 13; c++) {
+        if (inv->patchCounts[next] > 0) break;
+        if (c == 13) return;
+        if (++next > 6) next = 0;
+    }
+    inv->patchCurrent = (int8_t)next;
+}
+
+void InventoryAddPatchToInventory(uint16_t p,int index,int constIndex) {
+    if (index < 0) return;
+    InventorySystem* inv = Inv(p);
+    inv->patchCounts[index]++;
+    if (!inv->patchCounts[inv->patchCurrent]) inv->patchCurrent = (int8_t)index;
+    CenterStatusPrint("%s%s",Eng_Text->stringTable[constIndex + 326],Eng_Text->stringTable[35]);
+}
+
+static int8_t GetExistingCyberItemIndex(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    if (inv->softVersions[SW_TURBO]  > 0) return 0;
+    if (inv->softVersions[SW_DECOY]  > 0) return 1;
+    if (inv->softVersions[SW_RECALL] > 0) return 2;
+    return -1;
+}
+
+static void UseTurbo(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    if (inv->softVersions[SW_TURBO] <= 0) { inv->hasSoft &= (uint8_t)~(1u << SW_TURBO); return; }
+    if (--inv->softVersions[SW_TURBO] == 0) inv->hasSoft &= (uint8_t)~(1u << SW_TURBO);
+    Entity* player = PE(p);
+    if (player->turboFinished > Eng_Global->pauseRelativeTime)
+        player->turboFinished += player->turboCyberTime;
+    else
+        player->turboFinished = player->turboCyberTime + Eng_Global->pauseRelativeTime;
+}
+
+static void UseDecoy(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    if (Eng_Global->decoyActive) { CenterStatusPrint("%s",Eng_Text->stringTable[537]); return; }
+    if (inv->softVersions[SW_DECOY] <= 0) { inv->hasSoft &= (uint8_t)~(1u << SW_DECOY); return; }
+    if (--inv->softVersions[SW_DECOY] == 0) inv->hasSoft &= (uint8_t)~(1u << SW_DECOY);
+    uint16_t decoyIdx = SpawnDynamicObject(417,true); // 417 = CyberDecoy constIndex
+    if (decoyIdx != UINT16_MAX) Eng_Global->instances[decoyIdx].position = PE(p)->position;
+}
+
+static void UseRecall(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    if (inv->softVersions[SW_RECALL] <= 0) return;
+    if (--inv->softVersions[SW_RECALL] == 0) inv->hasSoft &= (uint8_t)~(1u << SW_RECALL);
+    PE(p)->position = Eng_Global->cyberspaceRecallPoint;
+}
+
+void InventoryUseCyberspaceItem(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    if (inv->cyberItemIndex <= 0) {
+        inv->cyberItemIndex = GetExistingCyberItemIndex(p);
+        if (inv->cyberItemIndex < 0) { CenterStatusPrint("%s",Eng_Text->stringTable[473]); return; }
+    }
+    switch(inv->cyberItemIndex) {
+        case 0: if (!inv->softVersions[SW_TURBO])  { inv->cyberItemIndex = GetExistingCyberItemIndex(p); return; } UseTurbo(p);  break;
+        case 1: if (!inv->softVersions[SW_DECOY])  { inv->cyberItemIndex = GetExistingCyberItemIndex(p); return; } UseDecoy(p);  break;
+        case 2: if (!inv->softVersions[SW_RECALL]) { inv->cyberItemIndex = GetExistingCyberItemIndex(p); return; } UseRecall(p); break;
+    }
+}
+
+void InventoryCycleCyberSpaceItemUp(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    int next = inv->cyberItemIndex + 1;
+    if (next > 2) next = 0;
+    for (int c = 0; c <= 7; c++) {
+        if (!(inv->hasSoft & (1u << next))) { inv->cyberItemIndex = (int8_t)next; return; }
+        if (c == 7) { inv->cyberItemIndex = -1; return; }
+        if (++next > 2) next = 0;
+    }
+}
+
+void InventoryCycleCyberSpaceItemDn(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    int next = inv->cyberItemIndex - 1;
+    if (next < 0) next = 2;
+    for (int c = 0; c <= 7; c++) {
+        if (inv->hasSoft & (1u << next)) { inv->cyberItemIndex = (int8_t)next; return; }
+        if (c == 7) { inv->cyberItemIndex = -1; return; }
+        if (--next < 0) next = 2;
+    }
+}
+
+bool InventoryAddSoftwareItem(uint16_t p,SoftwareType type,int vers) {
+    InventorySystem* inv = Inv(p);
+    Entity* player       = PE(p);
+    float sfxVol         = (float)Eng_Settings->VolumeEffects / 100.0f;
+    switch(type) {
+        case SoftwareType_Drill:
+            if (inv->isPulserNotDrill && !(inv->hasSoft & (1u << SW_PULSER))) inv->isPulserNotDrill = false;
+            if (vers > inv->softVersions[SW_DRILL]) inv->softVersions[SW_DRILL] = (uint8_t)vers;
+            else CenterStatusPrint("%s",Eng_Text->stringTable[46]);
+            inv->hasSoft |= (1u << SW_DRILL);
+            play_wav(sounds[86],sfxVol,(Vector3){},false);
+            CenterStatusPrint("%s%d%s",Eng_Text->stringTable[444],inv->softVersions[SW_DRILL],Eng_Text->stringTable[458]);
+            return true;
+        case SoftwareType_Pulser:
+            if (!inv->isPulserNotDrill && !(inv->hasSoft & (1u << SW_PULSER))) inv->isPulserNotDrill = true;
+            if (vers > inv->softVersions[SW_PULSER]) inv->softVersions[SW_PULSER] = (uint8_t)vers;
+            else CenterStatusPrint("%s",Eng_Text->stringTable[46]);
+            inv->hasSoft |= (1u << SW_PULSER);
+            play_wav(sounds[86],sfxVol,(Vector3){},false);
+            CenterStatusPrint("%s%d%s",Eng_Text->stringTable[445],inv->softVersions[SW_PULSER],Eng_Text->stringTable[458]);
+            return true;
+        case SoftwareType_CShield:
+            if (vers > inv->softVersions[SW_SHIELD]) inv->softVersions[SW_SHIELD] = (uint8_t)vers;
+            else CenterStatusPrint("%s",Eng_Text->stringTable[46]);
+            inv->hasSoft |= (1u << SW_SHIELD);
+            play_wav(sounds[86],sfxVol,(Vector3){},false);
+            CenterStatusPrint("%s%d%s",Eng_Text->stringTable[446],inv->softVersions[SW_SHIELD],Eng_Text->stringTable[458]);
+            return true;
+        case SoftwareType_Turbo:
+            if (inv->cyberItemIndex < 0) inv->cyberItemIndex = 0;
+            inv->softVersions[SW_TURBO]++;
+            inv->hasSoft |= (1u << SW_TURBO);
+            play_wav(sounds[86],sfxVol,(Vector3){},false);
+            CenterStatusPrint("%s",Eng_Text->stringTable[447]);
+            return true;
+        case SoftwareType_Decoy:
+            if (inv->cyberItemIndex < 0) inv->cyberItemIndex = 1;
+            inv->softVersions[SW_DECOY]++;
+            inv->hasSoft |= (1u << SW_DECOY);
+            play_wav(sounds[86],sfxVol,(Vector3){},false);
+            CenterStatusPrint("%s",Eng_Text->stringTable[448]);
+            return true;
+        case SoftwareType_Recall:
+            if (inv->cyberItemIndex < 0) inv->cyberItemIndex = 2;
+            inv->softVersions[SW_RECALL]++;
+            inv->hasSoft |= (1u << SW_RECALL);
+            play_wav(sounds[86],sfxVol,(Vector3){},false);
+            CenterStatusPrint("%s",Eng_Text->stringTable[449]);
+            return true;
+        case SoftwareType_Game: {
+            if (vers < 0 || vers >= 7) return false;
+            inv->hasNewData  = true;
+            inv->hasMinigame |= (uint8_t)(1u << vers);
+            static const uint16_t gameMsg[7] = {450,451,452,453,454,455,456};
+            play_wav(sounds[86],sfxVol,(Vector3){},false);
+            CenterStatusPrint("%s",Eng_Text->stringTable[gameMsg[vers]]);
+            return true;
+        }
+        case SoftwareType_Data:
+            inv->hasNewData = true;
+            if (vers >= 0 && vers < TEXT_LOGS_COUNT) inv->hasLog[vers] = true;
+            play_wav(sounds[87],sfxVol,(Vector3){},false);
+            CenterStatusPrint("%s",Eng_Text->stringTable[457]);
+            return true;
+        case SoftwareType_Integrity:
+            if (player->cyberHealth >= 255.0f) return false;
+            play_wav(sounds[86],sfxVol,(Vector3){},false);
+            player->cyberHealth += 77.0f;
+            if (player->cyberHealth > 255.0f) player->cyberHealth = 255.0f;
+            // TODO: DrawTicks(true) — HUD cyber health tick refresh
+            CenterStatusPrint("%s",Eng_Text->stringTable[459]);
+            return true;
+        case SoftwareType_Keycard:
+            inv->hasNewData = true;
+            if (vers < 0 || vers > 110) vers = 81;
+            InventoryAddAccessCardToInventory(p,vers);
+            return true;
+        default: break;
+    }
+    return false;
+}
+
+void InventoryRemoveWeapon(uint16_t p,int slot) {
+    InventorySystem* inv = Inv(p);
+    inv->weaponInventoryIndices[slot]    = -1;
+    inv->weaponInventoryAmmoIndices[slot] = -1;
+}
+
+static float DefaultEnergySettingForWeapon(int wep16Index) {
+    switch(wep16Index) {
+        case  1: return  3.0f;
+        case  4: return  5.0f;
+        case 10: return 13.0f;
+        case 14: return  2.0f;
+        case 15: return  3.0f;
+        default: return  3.0f;
+    }
+}
+
+void InventoryUpdateAmmoCount(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    inv->numweapons = 0;
+    for (int i = 0; i < 7; i++) if (inv->weaponInventoryIndices[i] >= 0) inv->numweapons++;
+}
+
+// Returns ammo display string for slot. Writes to caller-provided buffer.
+// Engine calls this per-frame for HUD weapon pane text.
+void InventoryGetWeaponAmmoText(uint16_t p,int slot,char* buf,size_t bufSize) {
+    InventorySystem* inv = Inv(p);
+    buf[0] = '\0';
+    int wepIdx = inv->weaponInventoryIndices[slot];
+    bool alt   = inv->wepLoadedWithAlternate[slot];
+    uint8_t mag  = alt ? inv->currentMagazineAmount2[slot] : inv->currentMagazineAmount[slot];
+    float heat   = inv->currentEnergyWeaponHeat[slot];
+    switch(wepIdx) {
+        case 36: // MK3 Assault Rifle
+            if (alt) StringFormat(buf,bufSize,"%upn | %umg, %upn",mag,inv->wepAmmo[0],inv->wepAmmoSecondary[0]);
+            else     StringFormat(buf,bufSize,"%umg | %umg, %upn",mag,inv->wepAmmo[0],inv->wepAmmoSecondary[0]);
+            break;
+        case 37: case 40: case 46: case 50: case 51: // Energy weapons
+            StringCopyInto_A_From_B(buf,heat > 80.0f ? Eng_Text->stringTable[14] : Eng_Text->stringTable[15],bufSize);
+            break;
+        case 38: // SV-23 Dartgun
+            if (alt) StringFormat(buf,bufSize,"%utq | %und, %utq",mag,inv->wepAmmo[2],inv->wepAmmoSecondary[2]);
+            else     StringFormat(buf,bufSize,"%und | %und, %utq",mag,inv->wepAmmo[2],inv->wepAmmoSecondary[2]);
+            break;
+        case 39: // AM-27 Flechette
+            if (alt) StringFormat(buf,bufSize,"%usp | %uhn, %usp",mag,inv->wepAmmo[3],inv->wepAmmoSecondary[3]);
+            else     StringFormat(buf,bufSize,"%uhn | %uhn, %usp",mag,inv->wepAmmo[3],inv->wepAmmoSecondary[3]);
+            break;
+        case 41: case 42: break; // Laser Rapier / Lead Pipe: no ammo
+        case 43: // Magnum 2100
+            if (alt) StringFormat(buf,bufSize,"%usg | %uhw, %usg",mag,inv->wepAmmo[7],inv->wepAmmoSecondary[7]);
+            else     StringFormat(buf,bufSize,"%uhw | %uhw, %usg",mag,inv->wepAmmo[7],inv->wepAmmoSecondary[7]);
+            break;
+        case 44: // SB-20 Magpulse
+            if (alt) StringFormat(buf,bufSize,"%usu | %ucr, %usu",mag,inv->wepAmmo[8],inv->wepAmmoSecondary[8]);
+            else     StringFormat(buf,bufSize,"%ucr | %ucr, %usu",mag,inv->wepAmmo[8],inv->wepAmmoSecondary[8]);
+            break;
+        case 45: // ML-41 Pistol
+            if (alt) StringFormat(buf,bufSize,"%utf | %ust, %utf",mag,inv->wepAmmo[9],inv->wepAmmoSecondary[9]);
+            else     StringFormat(buf,bufSize,"%ust | %ust, %utf",mag,inv->wepAmmo[9],inv->wepAmmoSecondary[9]);
+            break;
+        case 47: StringFormat(buf,bufSize,"%url | %url",inv->currentMagazineAmount[slot],inv->wepAmmo[11]); break; // MM-76 Railgun
+        case 48: StringFormat(buf,bufSize,"%urb | %urb",inv->currentMagazineAmount[slot],inv->wepAmmo[12]); break; // DC-05 Riotgun
+        case 49: // RF-07 Skorpion
+            if (alt) StringFormat(buf,bufSize,"%ulg | %usm, %ulg",mag,inv->wepAmmo[13],inv->wepAmmoSecondary[13]);
+            else     StringFormat(buf,bufSize,"%usm | %usm, %ulg",mag,inv->wepAmmo[13],inv->wepAmmoSecondary[13]);
+            break;
+        default: break;
+    }
+}
+
+void InventoryAddAmmoToInventory(uint16_t p,int index,int constIndex,int amount,bool isSecondary) {
+    if (index < 0) return;
+    InventorySystem* inv = Inv(p);
+    if (isSecondary) inv->wepAmmoSecondary[index] += (uint16_t)amount;
+    else             inv->wepAmmo[index]          += (uint16_t)amount;
+    CenterStatusPrint("%s%s",Eng_Text->stringTable[constIndex + 326],Eng_Text->stringTable[630]);
+}
+
+bool InventoryAddWeaponToInventory(uint16_t p,int index,int ammo1,int ammo2,bool loadedAlt) {
+    if (index < 0) return false;
+    InventorySystem* inv = Inv(p);
+    for (int i = 0; i < 7; i++) {
+        if (inv->weaponInventoryIndices[i] >= 0) continue;
+        inv->weaponInventoryIndices[i] = index;
+        int index16 = (int)Get16WeaponIndexFromConstIndex(index);
+        inv->weaponEnergySetting[i] = DefaultEnergySettingForWeapon(index16);
+        if (i == 0) {
+            inv->weaponCurrentPending = 0;
+            inv->weaponIndexPending   = (uint16_t)index;
+            inv->justChangedWeap      = true;
+            WeaponFireStartWeaponDip(0.5f);
+            WeaponFireCompleteWeaponChange();
+        }
+        if (loadedAlt && ammo2 > 0) {
+            inv->currentMagazineAmount2[i] = (uint8_t)ammo2;
+            if (ammo1 > 0) inv->wepAmmo[index16] += (uint16_t)ammo1;
+            inv->wepLoadedWithAlternate[i] = true;
+        } else {
+            inv->currentMagazineAmount[i] = (uint8_t)ammo1;
+            if (ammo2 > 0) inv->wepAmmoSecondary[index16] += (uint16_t)ammo2;
+            inv->wepLoadedWithAlternate[i] = false;
+        }
+        CenterStatusPrint("%s%s",Eng_Text->stringTable[index + 326],Eng_Text->stringTable[33]);
+        InventoryUpdateAmmoCount(p);
+        return true;
+    }
+    return false;
+}
+
+void InventoryUpdate(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+
+    // Log audio pause / resume around game pause
+    if (Eng_Global->gamePaused || Eng_Global->menuActive) {
+        if (!inv->logPaused && false/*GetSoundIsPlaying(&inv->logSound)*/) { // TODO
+//             SoundStop(&inv->logSound); // ma_sound_stop preserves cursor position TODO
+            inv->logPaused = true;
+        }
+        return;
+    }
+    if (inv->logPaused) {
+//         SoundStart(&inv->logSound); TODO
+        inv->logPaused = false;
+    }
+
+    // Bounds checks
+    if (inv->generalInvIndex < 0 || inv->generalInvIndex >= 14)
+        { DualLog("generalInvIndex OOB %d, reset",inv->generalInvIndex); inv->generalInvIndex = 0; }
+    if (inv->hardwareInvIndex < 0 || inv->hardwareInvIndex >= 14)
+        { DualLog("hardwareInvIndex OOB %d, reset",inv->hardwareInvIndex); inv->hardwareInvIndex = 0; }
+
+    // Grenades / cyberspace items
+    if (Grenade()) {
+        if (PE(p)->inCyberTube) {
+            InventoryUseCyberspaceItem(p);
+        } else if (inv->grenadeCurrent >= 0 && inv->grenadeCurrent < 7 && inv->grenAmmo[inv->grenadeCurrent] > 0) {
+            UseGrenade(p,inv->grenConstIndex[inv->grenadeCurrent]);
+        } else {
+            CenterStatusPrint("%s",Eng_Text->stringTable[322]); // Out of grenades.
+        }
+    }
+    if (GrenadeCycUp())  { if (PE(p)->inCyberTube) InventoryCycleCyberSpaceItemUp(p);  else InventoryGrenadeCycleUp(p); }
+    if (GrenadeCycDown()){ if (PE(p)->inCyberTube) InventoryCycleCyberSpaceItemDn(p); else InventoryGrenadeCycleDown(p); }
+
+    // Log playback
+    if (RecentLog() && (inv->hasHardware & HW_ERD)) {
+        bool playing = false;//GetSoundIsPlaying(&inv->logSound); TODO
+        if (inv->lastAddedIndex >= 0 && !playing) {
+            int temp = inv->lastAddedIndex;
+            InvPlayLog(p,temp);
+            inv->lastAddedIndex = FindNextUnreadLog(p);
+            if (inv->lastAddedIndex == temp) inv->lastAddedIndex = -1;
+            InventoryCheckForUnreadLogs(p);
+        } else {
+//             SoundStop(&inv->logSound); TODO
+            int temp = inv->lastAddedIndex;
+            inv->lastAddedIndex = FindNextUnreadLog(p);
+            if (inv->lastAddedIndex == temp) inv->lastAddedIndex = -1;
+            InventoryCheckForUnreadLogs(p);
+            CenterStatusPrint("%s",Eng_Text->stringTable[1019]); // Log playback stopped.
+        }
+    }
+
+    // Patches
+    if (Patch()) {
+        if (inv->patchCurrent >= 0 && inv->patchCurrent < 7 && inv->patchCounts[inv->patchCurrent] > 0)
+            PatchUse(p,inv->patchCurrent);
+        else
+            CenterStatusPrint("%s",Eng_Text->stringTable[324]); // Out of patches.
+    }
+    if (PatchCycUp())   InventoryPatchCycleUp(p,true);
+    if (PatchCycDown()) InventoryPatchCycleDown(p,true);
+}
+//================================================================================
+// Misc
+MOD_TO_ENGINE uint16_t SpawnDynamicObject(int val, bool cheat) {
+    if (!ConstIndexInBounds(val)) { DualLogError("Const index out of bounds: %u", val); return NULLENT; }
+    if (cheat) DualLog("Cheat spawn constIndex %u, level: %u, from cheat: %u, name: ", val, Eng_Global->currentLevel, cheat);
+    if (ConstIndexIsGeometry(val) && !Eng_Cheats->editMode) { CenterStatusPrint("Indices 0 through 306 (level geometry chunks) not possible when not on edit mode!"); return NULLENT; }
+    uint16_t entityIndexInInstanceTable = NULLENT;
+    return entityIndexInInstanceTable;
+}
+//================================================================================
+// Physics
+MOD_TO_ENGINE float GetBasePlayerSpeed(bool running) {
+    bool isSprinting = Sprint();
+    if (Eng_Cheats->noclip && isSprinting) return PLAYER_MAX_CYBER_SPEED * 2.5f;
+    if (Eng_Cheats->noclip) return PLAYER_MAX_CYBER_SPEED * 1.5f;
+    if (Eng_Global->currentLevel == LEVEL_CYBERSPACE) return PLAYER_MAX_CYBER_SPEED; //Cyber space speed
+
+    float retval = PLAYER_MAX_WALK_SPEED;
+    float bonus = 0.0f;
+    if (Eng_Global->boosterActive) bonus = PLAYER_BOOSTER_SPEED_BOOST;
+    BodyState bodyState = Eng_Global->instances[PLAYER1].bodyState;
+    switch (bodyState) {
+        case BodyState_Standing:      retval = PLAYER_MAX_WALK_SPEED;   break;
+        case BodyState_Crouch:        retval = PLAYER_MAX_CROUCH_SPEED; break;
+        case BodyState_CrouchingDown: retval = PLAYER_MAX_CROUCH_SPEED; break;
+        case BodyState_StandingUp:    retval = PLAYER_MAX_WALK_SPEED;   break;
+        case BodyState_Prone:         retval = PLAYER_MAX_PRONE_SPEED;  break;
+        case BodyState_ProningDown:   retval = PLAYER_MAX_PRONE_SPEED;  break;
+        case BodyState_ProningUp:     retval = PLAYER_MAX_PRONE_SPEED;  break;
+    }
+
+    if ((isSprinting || Eng_Global->boosterActive) && running) {
+        if (Eng_Global->instances[PLAYER1].fatigue > 80.0f && Eng_Global->boosterActive) retval = PLAYER_MAX_SPRINT_SPEED_FATIGUED;
+        else                                                                retval = PLAYER_MAX_SPRINT_SPEED;
+
+        if (bodyState == BodyState_Standing || bodyState == BodyState_Crouch || bodyState == BodyState_CrouchingDown) {
+            retval -= ((PLAYER_MAX_WALK_SPEED - PLAYER_MAX_CROUCH_SPEED) * 1.5f); // Subtract off the difference in speed between walking and crouching from the sprint speed
+        } else if (bodyState == BodyState_Prone || bodyState == BodyState_ProningDown || bodyState == BodyState_ProningUp) {
+            retval -= ((PLAYER_MAX_WALK_SPEED - PLAYER_MAX_PRONE_SPEED) * 2.0f); // Subtract off the difference in speed between walking and proning from the sprint speed.
+        }
+    }
+
+    return retval + bonus;
+}
+//================================================================================
+// Update
+static void UpdateConvertedEntity(uint16_t i) {
+    Entity* e = &Eng_Global->instances[i];
+    if (EntityDefIs(i,"ef_fragexplosion")) ExplosionLifeUpdate(i);
+    if (ConstIndexIsButtonSwitch(e->index)) ButtonSwitchUpdate(i);
+    if (ConstIndexIsDoor(e->index)) DoorUpdate(i);
+    if (EntityDefIs(i,"logic_timer")) LogicTimerUpdate(i);
+    if (e->doSelfAfterList || e->despawnInstead || e->destroyAfterListInsteadOfDeactivate) DelayedSpawnUpdate(i);
+    if (e->itemLifeTime > 0.0f) SearchFXResetUpdate(i);
+    if (Eng_Global->currentLevel == LEVEL_CYBERSPACE && e->cyberTimer > 0.0f) CyberTimerUpdate(i);
+    if (EntityDefIs(i,"func_forcebridge")) ForceBridgeUpdate(i);
+    if (EntityDefIs(i,"func_wall")) FuncWallUpdate(i);
+}
+
+void DeactivateVMail(void) { } // TODO
+
+void SearchObject(int searchable) {
+    if (Eng_Global->instances[searchable].searchableInUse) {
+        for (int i=0;i<4;i++) {
+            if (Eng_Global->instances[searchable].contents[i] >= 0) break;
+        }
+    } else play_wav(sounds[91],0.75f,(Vector3){},false);
+}
+
+void UseEntity(uint16_t i) {
+    Entity* ent = &Eng_Global->instances[i];
+    if (ConstIndexIsSearchable(ent->index)) {
+        Eng_Global->inventoryPlayer1.currentSearchItem = i;
+        SearchObject(i);
+        DualLog("Search\n");
+    }
+    else if (ConstIndexIsDoor(ent->index)) DoorUse(i,PLAYER1,ent->argvalue);
+    else if (ConstIndexIsNPC(ent->index)) DualLog("Can't use NPC\n");
+    else if (ConstIndexIsButtonSwitch(ent->index)) ButtonSwitchUse(i,PLAYER1,ent->argvalue);
+    else if (ConstIndexIsGeometry(ent->index)) DualLog("Can't use modular geometry\n");
+    else if (ConstIndexIsDynamicObject(ent->index)) DualLog("Using a dynamic object\n");
+    else CenterStatusPrint("%s%s",Eng_Text->stringTable[29],"name");
+}
+
+#define FROB_DISTANCE 4.9f
+static inline __attribute__((always_inline)) void Frob(Vector3 pos, Vector3 forward, Vector3 right) {
+    if (vmailActive) { DeactivateVMail(); vmailActive = false; return; }
+    if (Eng_Global->uiIsBlocking) return;
+    float offsetX = Eng_Global->cursorPosition_x - (Eng_Settings->ScreenWidth * 0.5f);
+    float offsetY = Eng_Global->cursorPosition_y - (Eng_Settings->ScreenHeight * 0.5f);
+    float ndcX = offsetX / (Eng_Settings->ScreenWidth * 0.5f);
+    float ndcY = -offsetY / (Eng_Settings->ScreenHeight * 0.5f);
+    float tanFov = vtan((float)Eng_Settings->FOV * 0.5f * PI / 180.0f);
+    Vector3 view = (Vector3){ndcX * tanFov * Eng_Global->aspect3D,ndcY * tanFov,-1.0f};
+    view = normalize_vector3(view);
+    Vector3 flipForward = (Vector3){-forward.x,-forward.y,-forward.z};
+    Vector3 up = normalize_vector3(cross_vector3(right,flipForward));
+    Vector3 dir = (Vector3){view.x * right.x + view.y * up.x + view.z * flipForward.x,view.x * right.y + view.y * up.y + view.z * flipForward.y,view.x * right.z + view.y * up.z + view.z * flipForward.z};
+    Eng_Global->debugLine_start = pos;
+    Eng_Global->debugLine_end = (Vector3){dir.x * FROB_DISTANCE + pos.x,dir.y * FROB_DISTANCE + pos.y,dir.z * FROB_DISTANCE + pos.z};
+    RaycastHit tempHit = Raycast(pos,dir,FROB_DISTANCE,LAYER_MASK_PLAYER_FROB);
+    Eng_Global->debugLineFinished = Eng_Global->pauseRelativeTime + 3.0;
+    if (!tempHit.hit) { CenterStatusPrint("%s",Eng_Text->stringTable[30]); return; }
+    Eng_Global->debugLine_end = tempHit.point;
+    DualLog("Raycast hit!  Hit object %u named of entity type %s(%u) at hit point %f %f %f\n",tempHit.hitInstanceIndex,Eng_Global->entities[Eng_Global->instances[tempHit.hitInstanceIndex].index].path,Eng_Global->instances[tempHit.hitInstanceIndex].index,tempHit.point.x,tempHit.point.y,tempHit.point.z);
+    UseEntity(tempHit.hitInstanceIndex);
+}
+
+bool FrobWithHeldObject(void) {
+    return false;
+    return true;
+}
+
+MOD_TO_ENGINE void ModUpdate(void) {
+    WeaponsUpdate();
+    if (Use()) {
+        if (Eng_Global->uiIsBlocking) {
+        } else if (Eng_Global->currentLevel != LEVEL_CYBERSPACE) {
+            if (Eng_Global->inventoryPlayer1.dropFinished < Eng_Global->pauseRelativeTime) {
+                if (Eng_Global->inventoryPlayer1.holdingObject) {
+                } else Frob(Eng_Global->instances[PLAYER1].position,Eng_Global->instances[PLAYER1].forward,Eng_Global->instances[PLAYER1].right);
+            }
+        }
+    }
+    if (Eng_Global->pauseRelativeTime < Eng_Global->debugLineFinished && (Eng_Global->debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Eng_Global->debugLine_start,Eng_Global->debugLine_end);
+    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < Eng_Global->loadedInstances; ++i) UpdateConvertedEntity(i);
+}
+//================================================================================
+// Input
+MOD_TO_ENGINE bool Forward(void) { return Eng_Global->GetKey(0); }
+MOD_TO_ENGINE bool StrafeLeft(void) { return Eng_Global->GetKey(1); }
+MOD_TO_ENGINE bool Backpedal(void) { return Eng_Global->GetKey(2); }
+MOD_TO_ENGINE bool StrafeRight(void) { return Eng_Global->GetKey(3); }
+MOD_TO_ENGINE bool Jump(void) { return Eng_Global->GetKey(4); }
+MOD_TO_ENGINE bool JumpDown(void) { return Eng_Global->GetKeyPressed(4); }
+MOD_TO_ENGINE bool Crouch(void) { return Eng_Global->GetKeyPressed(5); }
+MOD_TO_ENGINE bool Prone(void) { return Eng_Global->GetKeyPressed(6); }
+MOD_TO_ENGINE bool LeanLeft(void) { return Eng_Global->GetKey(7); }
+MOD_TO_ENGINE bool LeanRight(void) { return Eng_Global->GetKey(8); }
+MOD_TO_ENGINE bool Sprint(void) { return Eng_Global->GetKey(9); }
+MOD_TO_ENGINE bool TurnLeft(void) { return Eng_Global->GetKey(10); }
+MOD_TO_ENGINE bool TurnRight(void) { return Eng_Global->GetKey(11); }
+MOD_TO_ENGINE bool LookUp(void) { return Eng_Global->GetKey(12); }
+MOD_TO_ENGINE bool LookDown(void) { return Eng_Global->GetKey(13); }
+MOD_TO_ENGINE bool RecentLog(void) { return Eng_Global->GetKeyPressed(14); }
+MOD_TO_ENGINE bool Biomonitor(void) { return Eng_Global->GetKeyPressed(15); }
+MOD_TO_ENGINE bool Sensaround(void) { return Eng_Global->GetKeyPressed(16); }
+MOD_TO_ENGINE bool Lantern(void) { return Eng_Global->GetKeyPressed(17); }
+MOD_TO_ENGINE bool Shield(void) { return Eng_Global->GetKeyPressed(18); }
+MOD_TO_ENGINE bool Infrared(void) { return Eng_Global->GetKeyPressed(19); }
+MOD_TO_ENGINE bool Email(void) { return Eng_Global->GetKeyPressed(20); }
+MOD_TO_ENGINE bool Booster(void) { return Eng_Global->GetKeyPressed(21); }
+MOD_TO_ENGINE bool Jumpjets(void) { return Eng_Global->GetKeyPressed(22); }
+MOD_TO_ENGINE bool Attack(void) { return Eng_Global->GetKeyPressed(23); }
+MOD_TO_ENGINE bool Use(void) { return Eng_Global->GetKeyPressed(24); }
+MOD_TO_ENGINE bool Menu(void) { return Eng_Global->GetKeyPressed(25); }
+MOD_TO_ENGINE bool ToggleMode(void) { return Eng_Global->GetKeyPressed(26); }
+MOD_TO_ENGINE bool Reload(void) { return Eng_Global->GetKeyPressed(27); }
+MOD_TO_ENGINE bool WeaponCycUp(void) { return Eng_Global->GetKeyPressed(28); }
+MOD_TO_ENGINE bool WeaponCycDown(void) { return Eng_Global->GetKeyPressed(29); }
+MOD_TO_ENGINE bool Grenade(void) { return Eng_Global->GetKeyPressed(30); }
+MOD_TO_ENGINE bool GrenadeCycUp(void) { return Eng_Global->GetKeyPressed(31); }
+MOD_TO_ENGINE bool GrenadeCycDown(void) { return Eng_Global->GetKeyPressed(32); }
+MOD_TO_ENGINE bool ChangeAmmoType(void) { return Eng_Global->GetKeyPressed(33); }
+MOD_TO_ENGINE bool Patch(void) { return Eng_Global->GetKeyPressed(34); }
+MOD_TO_ENGINE bool PatchCycUp(void) { return Eng_Global->GetKeyPressed(35); }
+MOD_TO_ENGINE bool PatchCycDown(void) { return Eng_Global->GetKeyPressed(36); }
+MOD_TO_ENGINE bool Map(void) { return Eng_Global->GetKeyPressed(37); }
+MOD_TO_ENGINE bool SwimUp(void) { return Eng_Global->GetKey(38); }
+MOD_TO_ENGINE bool SwimDn(void) { return Eng_Global->GetKey(39); }
+MOD_TO_ENGINE bool Console(void) { return Eng_Global->GetKeyPressed(-1); }
+MOD_TO_ENGINE bool TakeScreenshot(void) { return Eng_Global->GetKeyPressed(41); }
+
+MOD_TO_ENGINE void ProcessInput(void) {
+    if (Console()) ToggleConsole();
+    if (TakeScreenshot() && Eng_Global->current_time > Eng_Global->screenshotTimeout) Screenshot();
+    if (Menu() && !Eng_Global->menuActive) { Eng_Global->gamePaused = !Eng_Global->gamePaused; return; }
+    if (Menu() && Eng_Global->menuActive) { MenuGoBack(); return; }
+    if (Eng_Global->gamePaused || Eng_Global->menuActive || Eng_Cheats->consoleActive) return;
+    if (ToggleMode()) {
+        IgnoreNextMouseDelta();
+        Eng_Global->inventoryMode = !Eng_Global->inventoryMode;
+        Eng_Global->cursorPosition_x = Eng_Settings->ScreenWidth / 2;
+        Eng_Global->cursorPosition_y = Eng_Settings->ScreenHeight / 2;
+    }
+    if (Lantern()) Eng_Global->inventoryPlayer1.hardwareIsActive ^= HW_LAN;
+    if (Infrared()) Eng_Global->inventoryPlayer1.hardwareIsActive ^= HW_INF;
+    ApplyPlayerMovements();
+}
+//================================================================================
+// Entity and Mod Initialization
+GlobalContext* Eng_Global; CheatsSystem* Eng_Cheats; SettingsSystem* Eng_Settings; TextSystem* Eng_Text; SystemUI* Eng_UI; // From Engine
+MOD_TO_ENGINE void ModLink(GlobalContext* g,CheatsSystem* c,SettingsSystem* s,TextSystem* t,SystemUI* ui){Eng_Global=g;Eng_Cheats=c;Eng_Settings=s;Eng_Text=t;Eng_UI=ui;}
+uint8_t GetCurrentLevelSecurity(void) { return (Eng_Global->difficultyMission < 1 || Eng_Cheats->superoverride) ? 0u : Eng_Global->levelSecurity[Eng_Global->currentLevel]; }
+uint16_t GetImpactType(uint16_t instanceIdx) {
+    switch (Eng_Global->instances[instanceIdx].bloodType) {
+        case BloodType_None:         return 729; // SparksSmall
+        case BloodType_Red:          return 724; // BloodSpurtSmall
+        case BloodType_Yellow:       return 723; // BloodSpurtSmallYellow
+        case BloodType_Green:        return 722; // BloodSpurtSmallGreen
+        case BloodType_Robot:        return 730; // SparksSmallBlue
+        case BloodType_Leaf:         return 756; // LeafBurst
+        case BloodType_Mutation:     return 757; // MutationBurst
+        case BloodType_GrayMutation: return 758; // GraytationBurst
+    }
+    return 729; // SparksSmall
+}
+
+static void InitConvertedEntity(uint16_t i) {
+    if (EntityDefIs(i,"func_forcebridge")) { ForceBridgeInitBeforeLoad(i); ForceBridgeInitAfterLoad(i); return; }
+    if (EntityDefIs(i,"func_wall")) { FuncWallInitAfterLoad(i); return; }
+    if (EntityDefIs(i,"trigger_gravitylift")) { GravityLiftInitAfterLoad(i); return; }
+    if (EntityDefIs(i,"logic_timer")) { LogicTimerInitBeforeLoad(i); return; }
+    if (EntityDefIs(i,"prop_cyberport")) { TeleportTouchInitAfterLoad(i); return; }
+    if (EntityDefIs(i,"prop_cyber_switch")) { CyberSwitchInitAfterLoad(i); return; }
+    if (EntityDefIs(i,"ef_fragexplosion")) { ExplosionLifeInitAfterLoad(i); return; }
+    if (ConstIndexIsDoor(Eng_Global->instances[i].index)) { DoorInitAfterLoad(i); return; }
+    if (ConstIndexIsButtonSwitch(Eng_Global->instances[i].index)) { ButtonSwitchInitAfterLoad(i); return; }
+    if (EntityDefIs(i,"item_cyber_data") || EntityDefIs(i,"item_cyber_decoy") || EntityDefIs(i,"item_cyber_drill") || EntityDefIs(i,"item_cyber_game") || EntityDefIs(i,"item_cyber_integrity") || EntityDefIs(i,"item_cyber_keycard") || EntityDefIs(i,"item_cyber_pulser") || EntityDefIs(i,"item_cyber_recall") || EntityDefIs(i,"item_cyber_shield") || EntityDefIs(i,"item_cyber_turbo")) { CyberItemInitBeforeLoad(i); return; }
+    if (EntityDefIs(i,"weapon_cyber_mine")) CyberMineInitBeforeLoad(i);
+}
+
+void MFDInit(SystemUI* ui) {
+    ui->lastMultiMediaTabOpened = MULTI_MEDIA_TAB_EMAIL_TABLE;
+    ui->logFinished = Eng_Global->pauseRelativeTime;
+    ui->tickFinished = ui->centerTabsTickFinished = Eng_Global->current_time + 0.1 + (double)random_range(0.0f,1.0f);
+    ui->blinkFinished = 1.0 + Eng_Global->pauseRelativeTime;
+    ui->beepFinished = 3.0 + Eng_Global->pauseRelativeTime;
+}
+
+void InventoryInit(InventorySystem* inv) {
+    inv->hardwareInvReferenceIndex[0]  = 21; // Hardcoded lookup indices into the Const main table.
+    inv->hardwareInvReferenceIndex[1]  = 22;
+    inv->hardwareInvReferenceIndex[2]  = 23;
+    inv->hardwareInvReferenceIndex[3]  = 24;
+    inv->hardwareInvReferenceIndex[4]  = 25;
+    inv->hardwareInvReferenceIndex[5]  = 26;
+    inv->hardwareInvReferenceIndex[6]  = 27;
+    inv->hardwareInvReferenceIndex[7]  = 28;
+    inv->hardwareInvReferenceIndex[8]  = 29;
+    inv->hardwareInvReferenceIndex[9]  = 30;
+    inv->hardwareInvReferenceIndex[10] = 31;
+    inv->hardwareInvReferenceIndex[11] = 32;
+    inv->hardwareInvReferenceIndex[12] =  0;
+    inv->hardwareInvReferenceIndex[13] =  0;
+    inv->generalInventoryIndexRef[0] = 81;
+    for (int i = 1; i < HW_COUNT; i++) inv->generalInventoryIndexRef[i] = -1;
+    for (int i=0;i<HW_COUNT;++i) inv->hardwareVersion[i] = 0;
+    for (int i=0;i<HW_COUNT;++i) inv->hardwareVersionSetting[i] = 0;
+    inv->nitroTimeSetting = NITRO_DEFAULT_TIME;
+    inv->earthShakerTimeSetting = EARTH_SHAKER_DEFAULT_TIME;
+    inv->lastAddedIndex = -1;
+    inv->hasNewEmail = true;
+    inv->hasNewNotes = true;
+    inv->currentCyberItem = -1;
+    inv->isPulserNotDrill = true;
+    for (int i=0;i<7;++i) inv->weaponInventoryIndices[i]     = -1;
+    for (int i=0;i<7;++i) inv->weaponInventoryAmmoIndices[i] = -1;
+    inv->globalLookupIndex = -1;
+    inv->sparqSetting = 50.0f;
+    inv->ionSetting = 100.0f;
+    inv->blasterSetting = 15.0f;
+    inv->plasmaSetting = 40.0f;
+    inv->stungunSetting = 20.0f;
+    inv->justFired = (Eng_Global->pauseRelativeTime - 31.0); // Set less than 30s before pauseRelativeTime so we don't immediately play action music.
+}
+
+MOD_TO_ENGINE void PlayerInit(uint16_t i) {
+    DualLog("Entered mod function PlayerInit()\n");
+    Eng_Global->instances[i].index = 767;
+    Eng_Global->instances[i].layer = PhysicsLayer_Player;
+    Eng_Global->instances[i].position = (Vector3){ .x = 10.52f, .y = -43.792f + 0.84f, .z = 20.2908f}; // Start Actual: Puts player on Medical Level in actual game start position.  Added 0.84f
+    Eng_Global->instances[i].scale = (Vector3){1.0f,1.0f,1.0f};
+    Eng_Global->instances[i].rotation = (Quaternion){ .x = 0.0f, .y = 0.7071f, .z = 0.0f, .w = 0.7071f }; // 90deg rotation CW about Y axis as viewed from the top looking down onto player
+    Eng_Global->instances[i].entflags = ENTFLAG_ACTIVE | ENTFLAG_USEGRAVITY | ENTFLAG_RIGIDBODY;
+    Eng_Global->instances[i].collider = COLLIDER_TYPE_CAPSULE;
+    Eng_Global->instances[i].colliderCenter.y = 0.84f;
+    Eng_Global->instances[i].colliderSize = (Vector3){.x = 0.48f, .y = 2.0f, .z = 1.0f}; // Radius, Overall height including end radii (Unity convention, blech), Direction, 1.0 == Y-Axis
+    Eng_Global->instances[i].mass = 1.0f;
+    return;
+    Eng_Global->instances[i].linearDrag = 8.0f;
+    Eng_Global->instances[i].velocity = (Vector3){0.0f,0.0f,0.0f};
+    Eng_Global->instances[i].dynamicFriction = 0.6f;
+    Eng_Global->instances[i].staticFriction = 0.8f;
+    Eng_Global->instances[i].frictionCombine = PHYS_COMBINE_MUL;
+    Eng_Global->instances[i].health = 200.0f;
+    Eng_Global->instances[i].lastHealth = Eng_Global->instances[i].health;
+    Eng_Global->instances[i].energyDrainTickFinished = Eng_Global->pauseRelativeTime + 0.1 + (double)random_range(0.5f, 1.0f);
+    Eng_Global->instances[i].energy = 54.0f;
+    Eng_Global->instances[i].maxEnergy = 255.0f;
+    Eng_Global->instances[i].resetAfterDeathTime = 0.5;
+    Eng_Global->instances[i].painSoundFinished = Eng_Global->pauseRelativeTime;
+    Eng_Global->instances[i].radSoundFinished = Eng_Global->pauseRelativeTime;
+    Eng_Global->instances[i].radFXFinished = Eng_Global->pauseRelativeTime;
+    Eng_Global->instances[i].noiseFinished = Eng_Global->pauseRelativeTime;
+    if (i == PLAYER1) InventoryInit(&Eng_Global->inventoryPlayer1);
+    else if (i == PLAYER2) InventoryInit(&Eng_Global->inventoryPlayer2);
+}
+
+#define GEOMETRY_LOD_CARD_MODEL_IDX 178
+MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(DataParser* entity_parser) {
+    for (int32_t i = 0; i < Eng_Global->entityCount; i++) {
+        if (entity_parser->entries[i].index == UINT16_MAX) continue;
+        Eng_Global->entities[i] = entity_parser->entries[i];
+        flag_set(&Eng_Global->entities[i].entflags,ENTFLAG_ACTIVE,true);
+        flag_set(&Eng_Global->entities[i].entflags,ENTFLAG_GROUNDED,false);
+        flag_set(&Eng_Global->entities[i].entflags,ENTFLAG_RIGIDBODY,ConstIndexIsDynamicObject(Eng_Global->entities[i].index));
+        if (entity_parser->entries[i].entflags & ENTFLAG_CARDCHUNK) {
+            Eng_Global->entities[i].lodIndex = GEOMETRY_LOD_CARD_MODEL_IDX;
+            Eng_Global->entities[i].collider = COLLIDER_TYPE_BOX;
+            Eng_Global->entities[i].colliderCenter = (Vector3){ .x = 0.0f, .y = 1.44f, .z = 0.0f };
+            Eng_Global->entities[i].colliderSize = (Vector3){ .x = 2.56f, .y = 0.32f, .z = 2.56f };
+        }
+        if (ConstIndexIsButtonSwitch(Eng_Global->entities[i].index)) {
+            Eng_Global->entities[i].lockedMessageLingdex = 193; // ButtonSwitch
+            Eng_Global->entities[i].tickTime = 1.5;
+        }
+    }
+}
+
+MOD_TO_ENGINE void ModInitAfterLoad(void) {
+    for (int i=PLAYER1;i<Eng_Global->loadedInstances;++i) {
+        if (i == PLAYER1 || i == PLAYER2 || ConstIndexIsDynamicObject(Eng_Global->instances[i].index)) Eng_Global->instances[i].gravity = 1.0f;
+        else Eng_Global->instances[i].gravity = 0.0f;
+        if (Eng_Global->instances[i].index < MAX_ENTITIES) flag_set(&Eng_Global->instances[i].entflags,ENTFLAG_ANIMATED,Eng_Global->entities[Eng_Global->instances[i].index].entflags & ENTFLAG_ANIMATED);
+        if (Eng_Global->instances[i].entflags & ENTFLAG_HAS_CAMERA_VIEW) AddCameraPosition(i);
+        if (ConstIndexIsGeometry(Eng_Global->instances[i].index)) Eng_Global->instances[i].layer = PhysicsLayer_Geometry;
+        if (ConstIndexIsDoor(Eng_Global->instances[i].index)) Eng_Global->instances[i].layer = PhysicsLayer_Door;
+        if (ConstIndexIsNPC(Eng_Global->instances[i].index)) Eng_Global->instances[i].layer = PhysicsLayer_NPC;
+        InitConvertedEntity(i);
+        if (!StringIsEmpty(Eng_Global->instances[i].targetname) && (Eng_Global->instances[i].ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE) && !(Eng_Global->instances[i].entflags & TARG_IOFLAGS_DISABLD_ONCE_4EVER)) flag_set(&Eng_Global->instances[i].entflags,ENTFLAG_ACTIVE,false);
+        if (Eng_Global->instances[i].index == 700) {
+            if ((Eng_Global->instances[i].ioflags & TARG_IOFLAGS_START_ON_SECOND) || (Eng_Global->instances[i].ioflags & TARG_IOFLAGS_ON_SECOND)) {
+                StringCopyInto_A_From_B(Eng_Global->instances[i].currenttarget,Eng_Global->instances[i].target,TARGET_STRING_LENGTH);
+                flag_set(&Eng_Global->instances[i].ioflags,TARG_IOFLAGS_ON_SECOND,false);
+            } else {
+                StringCopyInto_A_From_B(Eng_Global->instances[i].currenttarget,Eng_Global->instances[i].target2,TARGET_STRING_LENGTH);
+                flag_set(&Eng_Global->instances[i].ioflags,TARG_IOFLAGS_ON_SECOND,true);
+            }
+        }
+    }
+}
+
+void SearchableInit(uint16_t i, bool beforeLoad) {
+    if (beforeLoad) {
+        int numRandomGeneratedItems = 0;
+        if (Eng_Global->instances[i].generateContents && !Eng_Global->instances[i].generationDone) {
+            for(int j=0;j<4;j++) {
+                if (Eng_Global->instances[i].randomItemDropChance[j] <= 0.0f) continue;
+                uint8_t tempInt = random_range_u8(0,100);
+                if (((float)tempInt / 100.0f) <= Eng_Global->instances[i].randomItemDropChance[j]) {
+                    Eng_Global->instances[i].contents[numRandomGeneratedItems] = Eng_Global->instances[i].randomItem[j];
+                    numRandomGeneratedItems++;
+                    if (numRandomGeneratedItems > Eng_Global->instances[i].maxRandomItems) break;
+                }
+            }
+            Eng_Global->instances[i].generationDone = true;
+        }
+    } else {
+    }
 }

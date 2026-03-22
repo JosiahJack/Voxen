@@ -2,10 +2,6 @@
 #include "voxen.h"
 char *strncpy(char *dest, const char *src, size_t n);
 TextSystem Sys_Text = { .file_data = NULL };
-char audiologNames[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
-char audiologSubjects[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
-char audiologSenders[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
-char audioLogSpeech2Text[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
 uint16_t logImages = 1272; // Start index of first index 0 logImages[0] is blank1.png
 
 size_t utf16le_to_utf8(const uint8_t* src, size_t src_len, char* dst, size_t dst_len) {
@@ -185,12 +181,12 @@ void LoadLogTextForLanguage(uint8_t lang) {
                 case 0:log_index=StringToIntLen(start,tok_len);if(log_index<0||log_index>=TEXT_LOGS_COUNT)goto next_line;break;
                 case 1:img_lh=StringToIntLen(start,tok_len);break;
                 case 2:img_rh=StringToIntLen(start,tok_len);break;
-                case 3:if(log_index>=0&&log_index<TEXT_LOGS_COUNT)StringCopyInto_A_SubstringFrom_B(audiologNames[log_index],tok_len,start,sizeof(audiologNames[0]));break;
-                case 4:if(log_index>=0&&log_index<TEXT_LOGS_COUNT)StringCopyInto_A_SubstringFrom_B(audiologSenders[log_index],tok_len,start,sizeof(audiologSenders[0]));break;
-                case 5:if(log_index>=0&&log_index<TEXT_LOGS_COUNT)StringCopyInto_A_SubstringFrom_B(audiologSubjects[log_index],tok_len,start,sizeof(audiologSubjects[0]));break;
+                case 3:if(log_index>=0&&log_index<TEXT_LOGS_COUNT)StringCopyInto_A_SubstringFrom_B(Sys_Global.audiologNames[log_index],tok_len,start,sizeof(Sys_Global.audiologNames[0]));break;
+                case 4:if(log_index>=0&&log_index<TEXT_LOGS_COUNT)StringCopyInto_A_SubstringFrom_B(Sys_Global.audiologSenders[log_index],tok_len,start,sizeof(Sys_Global.audiologSenders[0]));break;
+                case 5:if(log_index>=0&&log_index<TEXT_LOGS_COUNT)StringCopyInto_A_SubstringFrom_B(Sys_Global.audiologSubjects[log_index],tok_len,start,sizeof(Sys_Global.audiologSubjects[0]));break;
                 case 6:log_type=StringToIntLen(start,tok_len);break;
                 case 7:level_found=StringToIntLen(start,tok_len);break;
-                default:if(log_index>=0&&log_index<TEXT_LOGS_COUNT){char*dst=audioLogSpeech2Text[log_index];size_t cur=GetStringLength(dst);if(cur>0&&cur<TEXT_LOCALIZATION_MAX_LENGTH*4-2){dst[cur++]=',';dst[cur]='\0';}size_t left=TEXT_LOCALIZATION_MAX_LENGTH*4-cur-1;if(left>0){size_t cl=tok_len;if(cl>left)cl=left;StringCopyInto_A_SubstringFrom_B(dst+cur,cl,start,left+1);}}break;
+                default:if(log_index>=0&&log_index<TEXT_LOGS_COUNT){char*dst=Sys_Global.audioLogSpeech2Text[log_index];size_t cur=GetStringLength(dst);if(cur>0&&cur<TEXT_LOCALIZATION_MAX_LENGTH*4-2){dst[cur++]=',';dst[cur]='\0';}size_t left=TEXT_LOCALIZATION_MAX_LENGTH*4-cur-1;if(left>0){size_t cl=tok_len;if(cl>left)cl=left;StringCopyInto_A_SubstringFrom_B(dst+cur,cl,start,left+1);}}break;
             }if(*pos==',')++pos;field_idx++;
         }
         if(log_index>=0&&log_index<TEXT_LOGS_COUNT){

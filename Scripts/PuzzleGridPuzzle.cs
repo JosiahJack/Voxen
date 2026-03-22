@@ -103,32 +103,4 @@ public class PuzzleGridPuzzle : MonoBehaviour {
 		UseTargets(gameObject,ud,target);
 		CenterStatusPrint(successMessageLingdex);
 	}
-
-	public static string Save(GameObject go) {
-		PuzzleGridPuzzle pgp = go.GetComponent<PuzzleGridPuzzle>();
-		s1.Clear();
-		s1.Append(Utils.BoolToString(pgp.puzzleSolved,"puzzleSolved"));
-		for (int i=0;i<35;i++) {
-			s1.Append(Utils.splitChar);
-			s1.Append(Utils.BoolToString(pgp.grid[i],"grid[" + i.ToString() + "]"));
-		}
-		
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(pgp.fired,"fired"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(pgp.locked,"locked"));
-		return s1.ToString();
-	}
-
-	public static int Load(GameObject go, ref string[] entries, int index) {
-		PuzzleGridPuzzle pgp = go.GetComponent<PuzzleGridPuzzle>();
-		pgp.puzzleSolved = Utils.GetBoolFromString(entries[index],"puzzleSolved"); index++;
-		for (int i=0;i<pgp.grid.Length;i++) {
-			pgp.grid[i] = Utils.GetBoolFromString(entries[index],"grid[" + i.ToString() + "]"); index++;
-		}
-
-		pgp.fired = Utils.GetBoolFromString(entries[index],"fired"); index++;
-		pgp.locked = Utils.GetBoolFromString(entries[index],"locked"); index++;
-		return index;
-	}
 }

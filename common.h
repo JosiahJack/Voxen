@@ -703,6 +703,12 @@ typedef struct {
 	double beepFinished;
 	uint8_t beepCount;
 	bool audPaused;
+    bool mouseClickHeldOverGUI;
+    uint8_t elevButtonLevelIdx[8];
+    uint16_t elevButtonSpawnIdx[8];
+    bool buttonsEnabled[8];
+    bool buttonsDarkened[8];
+    uint8_t elevCurrentFloor;
 } SystemUI;
 
 typedef struct {	
@@ -829,6 +835,16 @@ typedef struct {
     int globalLookupIndex;
     int weaponInventoryIndices[7];
     int weaponInventoryAmmoIndices[7];
+    uint8_t numweapons;
+    bool wepLoadedWithAlternate[7];
+    uint8_t currentMagazineAmount[7];
+    uint8_t currentMagazineAmount2[7];
+    uint32_t wepAmmo[16];
+    uint32_t wepAmmoSecondary[16];
+    float weaponEnergySetting[16];
+    bool justChangedWeap;
+    int16_t weaponCurrentPending;
+    int16_t weaponIndexPending;
     double waitTilNextFire;
     bool overloadEnabled;
     double reloadFinished;
@@ -850,7 +866,37 @@ typedef struct {
     double dropFinished;
     uint16_t weaponIndex;
     uint16_t currentSearchItem;
+    float currentEnergyWeaponHeat[7];
+    uint16_t drainJPM;
+    uint8_t patchActive;
+    uint8_t grenAmmo[7];
+    uint8_t grenConstIndex[7];
+    uint8_t grenadeCurrent;
+    uint8_t generalInvCurrent;
+    uint16_t generalInvIndex;
+    uint16_t generalInvCustomIndex[14];
+    bool hasNewLogs;
+    bool hasNewData;
+    uint8_t patchCurrent;
+    uint8_t patchCounts[7];
+    uint8_t cyberItemIndex;
 } InventorySystem;
+
+typedef struct {
+    float     damage;
+    float     penetration;
+    float     offense;
+    float     armorvalue;
+    float     defense;
+    float     impactVelocity;
+    Vector3   attacknormal;
+    Vector3   hitpoint;
+    AttackType attackType;
+    uint16_t  owner;      // instance index of shooter (player or NPC)
+    uint16_t  hitIdx;     // instance index of hit entity
+    bool      isOtherNPC;
+    bool      berserkActive;
+} DamageData;
 
 typedef /*FAT*/ struct {
     uint64_t entflags;
@@ -936,7 +982,11 @@ typedef /*FAT*/ struct {
     uint16_t randomItem[4];
     uint16_t randomItemCustomIndex[4];
     float randomItemDropChance[4];
-    
+    float fireworkWaitMinMin;
+    uint8_t lerpUp;
+    AttackType attackType;
+    bool staminupActive;
+
     uint16_t activateSFX;
     uint16_t lockedSFX;
     int lev1SecCode;
@@ -979,6 +1029,8 @@ typedef /*FAT*/ struct {
     TrackType trackType;
     MusicType musicType;
     bool onlyTargetOnce;
+    bool autoPlayEmail;
+    uint16_t emailIndex;
     
     // Player
     float radiated;
@@ -1179,15 +1231,23 @@ typedef struct {
    	bool mouseClickHeldOverGUI;
     bool (*GetKey)(int settingIndex);
     bool (*GetKeyPressed)(int settingIndex);
+    uint16_t ressurectionActiveLevels;
     InventorySystem inventoryPlayer1;
     InventorySystem inventoryPlayer2;
     ma_engine audio_engine;
     ma_sound mp3_sounds[2]; // Two for crossfading
     int32_t mp3_slot;
+    float timeScale;
+    bool  geniusActive;
+    Vector3 cyberspaceRecallPoint;
     Entity entities[MAX_ENTITIES]; // Global array of entity definitions (similar in concept to Prefabs)
     Entity instances[INSTANCE_COUNT];
     uint8_t dirtyInstances[INSTANCE_COUNT];
     Portal activePortals[MAX_PORTALS];
+    char audiologNames[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
+    char audiologSubjects[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
+    char audiologSenders[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
+    char audioLogSpeech2Text[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
 } GlobalContext;
 
 static inline __attribute__((always_inline)) void flag_set(uint64_t *flags, uint64_t bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }

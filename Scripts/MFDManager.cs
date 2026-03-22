@@ -738,53 +738,6 @@
 		usingObject = true;
 	}
 
-	public void SendElevatorKeypadToDataTab(KeypadElevator ke, bool[] buttonsEnabled, bool[] buttonsDarkened, string[] buttonText,GameObject[] targetDestination,Vector3 tetherPoint,Door linkedDoor,int currentFloor) {
-		TabReset(lastDataSideRH);
-		ElevatorKeypad elevatorKeypad;
-		if (lastDataSideRH) {
-			elevatorKeypad = elevatorUIControlRH.GetComponent<ElevatorKeypad>();
-		} else {
-			elevatorKeypad = elevatorUIControlLH.GetComponent<ElevatorKeypad>();
-		}
-		for (int i=0;i<8;i++) {
-			elevatorKeypad.buttonsEnabled[i] = buttonsEnabled[i];
-			elevatorKeypad.buttonsDarkened[i] = buttonsDarkened[i];
-			elevatorKeypad.buttonText[i] = buttonText[i];
-			elevatorKeypad.targetDestination[i] = targetDestination[i];
-
-			if (elevatorKeypad.buttonsEnabled[i]) {
-				if (!elevatorKeypad.buttons[i].activeSelf) elevatorKeypad.buttons[i].SetActive(true);
-				elevatorKeypad.buttonTextHolders[i].text = elevatorKeypad.buttonText[i];
-
-				if (elevatorKeypad.buttonsDarkened[i]) {
-					elevatorKeypad.buttonSprites[i].overrideSprite = elevatorKeypad.buttonDarkened;
-					elevatorKeypad.buttonTextHolders[i].color = elevatorKeypad.textDarkenedColor;
-					elevatorKeypad.buttonHandlers[i].GetComponent<ElevatorButton>().floorAccessible = false;
-				} else {
-					elevatorKeypad.buttonSprites[i].overrideSprite = elevatorKeypad.buttonNormal;
-					elevatorKeypad.buttonSprites[i].overrideSprite = elevatorKeypad.buttonNormal;
-					elevatorKeypad.buttonTextHolders[i].color = elevatorKeypad.textEnabledColor;
-					elevatorKeypad.buttonHandlers[i].GetComponent<ElevatorButton>().floorAccessible = true;
-					elevatorKeypad.buttonHandlers[i].GetComponent<ElevatorButton>().targetDestination = elevatorKeypad.targetDestination[i];
-				}
-			} else {
-				if (elevatorKeypad.buttons[i].activeSelf) elevatorKeypad.buttons[i].SetActive(false);
-			}
-		}
-		elevatorKeypad.currentFloor = currentFloor;
-		elevatorKeypad.activeKeypad = ke.gameObject;
-		elevatorKeypad.SetCurrentFloor();
-		if (lastDataSideRH) {
-			OpenTab(4,true,TabMSG.Elevator,0,Handedness.RH);
-		} else {
-			OpenTab(4,true,TabMSG.Elevator,0,Handedness.LH);
-		}
-		linkedElevatorDoor = linkedDoor;
-		objectInUsePos = tetherPoint;
-		tetheredKeypadElevator = ke;
-		usingObject = true;
-	}
-
 	public void UpdateHUDAmmoCounts(int amount) {
 		wepmagCounterLH.UpdateDigits(amount);
 		wepmagCounterRH.UpdateDigits(amount);
@@ -953,21 +906,11 @@
 		ammoIconManRH.SetAmmoIcon(index,alt);
 	}
 
-	void ChangeAmmoButtons(GameObject loadNormalAmmoButton,
-						   GameObject loadAlternateAmmoButton) {
+	void ChangeAmmoButtons(GameObject loadNormalAmmoButton, GameObject loadAlternateAmmoButton) {
+		if (loadNormalAmmoButton == null || loadAlternateAmmoButton == null) return;
 
-		if (loadNormalAmmoButton == null || loadAlternateAmmoButton == null) {
-			return;
-		}
-
-		int wep16index = WeaponFire.Get16WeaponIndexFromConstIndex(
-							Eng_Global->inventoryPlayer1.weaponIndex);
-
-		if (wep16index == 1 || wep16index == 4 || wep16index == 10
-			|| wep16index == 14 || wep16index == 15) {
-
-			return; // Already hidden.
-		}
+		int wep16index = Get16WeaponIndexFromConstIndex(Eng_Global->inventoryPlayer1.weaponIndex);
+		if (wep16index == 1 || wep16index == 4 || wep16index == 10 || wep16index == 14 || wep16index == 15) return; // Already hidden.
 
 		Image norm = loadNormalAmmoButton.GetComponent<Image>();
 		Image anorm = loadAlternateAmmoButton.GetComponent<Image>();

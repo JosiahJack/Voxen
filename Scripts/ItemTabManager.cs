@@ -86,7 +86,7 @@ public class ItemTabManager : MonoBehaviour {
 				acc = (AccessCardType)cardTypes.GetValue(i);
 				if (acc == AccessCardType_None) continue;
 
-				if (Eng_Global->inventoryPlayer1.HasAccessCard(acc)) s1.Append(" " + Inventory.AccessCardCodeForType(acc));
+				if (Eng_Global->inventoryPlayer1.HasAccessCard(acc)) s1.Append(" " + AccessCardCodeForType(acc));
 			}
 
 			accessCardListText.text = s1.ToString();

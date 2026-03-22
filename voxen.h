@@ -254,10 +254,6 @@ void SetSkyRotateSpeed(void);
 // ----------------------------------------------------------------------------
 // UI
 extern bool returnToPause;
-extern char audiologNames[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
-extern char audiologSubjects[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
-extern char audiologSenders[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
-extern char audioLogSpeech2Text[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
 extern GLuint fontAtlasTex;
 extern GLuint fontAtlasTexStopD;
 extern float fixedNumberAdvanceWidth;

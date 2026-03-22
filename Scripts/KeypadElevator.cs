@@ -61,45 +61,4 @@ public class KeypadElevator : MonoBehaviour {
 	public void SendDataBackToPanel() {
 		padInUse = false;
 	}
-
-	public static string Save(GameObject go) {
-		KeypadElevator ke = go.GetComponent<KeypadElevator>();
-		if (ke == null) {
-			DualLog("KeypadElevator missing on savetype of KeypadElevator! "
-					  + " GameObject.name: " + go.name);
-
-			return "0|0";
-		}
-
-		s1.Clear();
-		s1.Append(Utils.BoolToString(ke.padInUse,"KeypadElevator.padInUse"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(ke.locked,"locked"));
-		return s1.ToString();
-	}
-
-	public static int Load(GameObject go, ref string[] entries, int index) {
-		KeypadElevator ke = go.GetComponent<KeypadElevator>();
-		if (ke == null) {
-			DualLog("KeypadElevator.Load failure, ke == null");
-			return index + 2;
-		}
-
-		if (index < 0) {
-			DualLog("KeypadElevator.Load failure, index < 0");
-			return index + 2;
-		}
-
-		if (entries == null) {
-			DualLog("KeypadElevator.Load failure, entries == null");
-			return index + 2;
-		}
-
-		ke.padInUse = Utils.GetBoolFromString(entries[index],
-											  "KeypadElevator.padInUse");
-		index++;
-
-		ke.locked = Utils.GetBoolFromString(entries[index],"locked"); index++;
-		return index;
-	}
 }

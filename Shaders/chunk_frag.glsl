@@ -30,6 +30,7 @@ layout(location = 23) uniform uint lightCount;
 layout(location = 24) uniform uint maxLightsPerVoxel;
 layout(location = 25) uniform uint constIndex;
 layout(location = 26) uniform uint grayscaleEnabled;
+layout(location = 27) uniform float volume;
 
 
 layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
@@ -135,7 +136,7 @@ void main() {
     texUV.x = texUV.x % texSize.x;
     texUV.y = texUV.y % texSize.y;
     vec4 albedoColor = getTextureColor(texIndex,texUV);
-    if (albedoColor.a < 0.05) discard; // Alpha cutout threshold
+    if (albedoColor.a < 0.05 && volume < 0.05) discard; // Alpha cutout threshold
 
     float heat = 0.0;
     if (grayscaleEnabled > 0) {

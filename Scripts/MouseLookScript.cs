@@ -860,7 +860,7 @@
 				AddItemFail(index);
 			}
 		} else if (index == 34 || index == 81 || (index >= 83 && index <= 91) || index == 110) {
-			Eng_Global->inventoryPlayer1.AddAccessCardToInventory(index);
+			InventoryAddAccessCardToInventory(index);
 		} else {
 			switch (index) {
 				case 7:  Eng_Global->inventoryPlayer1.AddGrenadeToInventory(0,index); break; // Frag
@@ -1079,28 +1079,4 @@
 		inventoryMode = true;
 		if (!Const.a.noHUD) shootModeButton.SetActive(true);
 		else shootModeButton.SetActive(false);
-	}
-
-	public void UseGrenade (int index) {
-		if (Eng_Global->inventoryPlayer1.holdingObject) { CenterStatusPrint("%s", Eng_Text->stringTable[311],player); return; } // Can't use grenade, hands full
-		if (index < 7 || index > 13) { DualLog("BUG: index outside of 7 to 13 passed to UseGrenade() in MouseLookScript.cs"); return; }
-
-		ForceInventoryMode();  // Inventory mode is turned on when picking something up.
-		ResetHeldItem();
-		MouseCursor.a.liveGrenade = true;
-		grenadeActive = true;
-		CenterStatusPrint("%s", Eng_Text->stringTable[index + 326]
-					 + Eng_Text->stringTable[320],player); // activated, grenade is LIVE!
-
-		switch(index) { // Subtract one from the correct grenade inventory
-			case 7:  heldObject = Const.a.GetPrefab(370); Eng_Global->inventoryPlayer1.RemoveGrenade(0); break; // Frag
-			case 8:  heldObject = Const.a.GetPrefab(372); Eng_Global->inventoryPlayer1.RemoveGrenade(3); break; // Concussion
-			case 9:  heldObject = Const.a.GetPrefab(387); Eng_Global->inventoryPlayer1.RemoveGrenade(1); break; // EMP
-			case 10: heldObject = Const.a.GetPrefab(389); Eng_Global->inventoryPlayer1.RemoveGrenade(6); break; // Earth Shaker
-			case 11: heldObject = Const.a.GetPrefab(402); Eng_Global->inventoryPlayer1.RemoveGrenade(4); break; // Land Mine
-			case 12: heldObject = Const.a.GetPrefab(403); Eng_Global->inventoryPlayer1.RemoveGrenade(5); break; // Nitropak
-			case 13: heldObject = Const.a.GetPrefab(404); Eng_Global->inventoryPlayer1.RemoveGrenade(2); break; // Gas
-		}
-		Eng_UI->ResetItemTab();
-		PutObjectInHand(index,-1,0,0,false,true);
 	}

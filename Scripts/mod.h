@@ -123,10 +123,10 @@ static inline bool EntityDefIs(uint16_t self, const char* name) { return Strings
 static inline void UIBlockedBySecurity(Vector3 tetherPoint) { (void)tetherPoint; CenterStatusPrint("%s",Eng_Text->stringTable[25]); }
 static inline void UICyberSprint(uint16_t textIndex) { CenterStatusPrint("%s",Eng_Text->stringTable[textIndex]); }
 static inline void UIExitCyberspace(void) { CenterStatusPrint("%s",Eng_Text->stringTable[601]); }
-static inline bool InventoryAddSoftwareItem(SoftwareType type, int16_t version) { (void)type; (void)version; return true; } // TODO Convert Inventory.cs.
 static inline void HealthManagerHealingBed(uint16_t playerIdx, float amount, bool flashBed) { (void)flashBed; Entity* p = &Eng_Global->instances[playerIdx]; p->health = vmin(255.0f,p->health + amount); }
 static inline void PlayerTakeDamage(uint16_t playerIdx, float damage) { Entity* p = &Eng_Global->instances[playerIdx]; p->health -= damage; if (p->health < 0.0f) p->health = 0.0f; }
 
+void WeaponsUpdate(void);
 void UseTargets(uint16_t activator, const char* argvalue, const char* targetname);
 void Targetted(uint16_t activator, uint16_t self, const char* argvalue);
 void ButtonSwitchTargetted(uint16_t self, uint16_t activator, const char* argvalue);
@@ -173,3 +173,11 @@ void LogicTimerUpdate(uint16_t self);
 void DelayedSpawnUpdate(uint16_t self);
 void SearchFXResetUpdate(uint16_t self);
 void CyberTimerUpdate(uint16_t self);
+void GeneralInvApply(int buttonIdx,int customIdx);
+bool InventoryAddSoftwareItem(uint16_t p,SoftwareType type,int vers);
+int Get16WeaponIndexFromConstIndex(int index);
+void UseGrenade(uint16_t playerIndex, int index);
+bool InventoryBioMonitorActive(uint16_t p);
+bool InventoryBoosterSetToBoost(uint16_t p);
+void InventoryJumpJetsToggle(uint16_t p);
+bool InventoryJumpJetsActive(uint16_t p);

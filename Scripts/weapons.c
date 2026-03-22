@@ -95,7 +95,7 @@ AttackType attackTypeForWeapon[16]={
 //         damageData.berserkActive = (Utils.CheckFlags(Eng_Global->instances[PLAYER1].patchActive,PlayerPatch.PATCH_BERSERK));
 //     }
 
-static int Get16WeaponIndexFromConstIndex(int index) {
+int Get16WeaponIndexFromConstIndex(int index) {
     switch (index) {
         case 36: return 0; // Mark3 Assault Rifle
         case 37: return 1; // ER-90 Blaster
@@ -1606,7 +1606,7 @@ void WeaponsUpdate(void) {
 // 	}
 // 
 // 	public void ChangeAmmoType() {
-// 		int wep16index = WeaponFire.Get16WeaponIndexFromConstIndex(weaponIndex);
+// 		int wep16index = Get16WeaponIndexFromConstIndex(weaponIndex);
 // 		if (wep16index < 0) return;
 // 		if (wep16index == 5 || wep16index == 6) {
 // 			CenterStatusPrint(315);
@@ -1646,7 +1646,7 @@ void WeaponsUpdate(void) {
 // 	}
 // 
 // 	public void LoadPrimaryAmmoType(bool isSilent) {
-// 		int wep16index = WeaponFire.Get16WeaponIndexFromConstIndex(weaponIndex);
+// 		int wep16index = Get16WeaponIndexFromConstIndex(weaponIndex);
 // 		if (!Eng_Global->inventoryPlayer1.wepLoadedWithAlternate[weaponCurrent]) { // Already loaded with normal.
 // 			if (currentMagazineAmount[weaponCurrent] == Const.a.magazinePitchCountForWeapon[wep16index]) {
 // 				CenterStatusPrint(191); //Current weapon magazine already full.
@@ -1690,7 +1690,7 @@ void WeaponsUpdate(void) {
 // 	}
 // 
 // 	public void LoadSecondaryAmmoType(bool isSilent) {
-// 		int wep16index = WeaponFire.Get16WeaponIndexFromConstIndex(weaponIndex);
+// 		int wep16index = Get16WeaponIndexFromConstIndex(weaponIndex);
 // 		if (Eng_Global->inventoryPlayer1.wepLoadedWithAlternate[weaponCurrent]) { // Already loaded with alternate
 // 			if (currentMagazineAmount2[weaponCurrent] == Const.a.magazinePitchCountForWeapon2[wep16index]) {
 // 				CenterStatusPrint(191); //Current weapon magazine already full.
@@ -1735,7 +1735,7 @@ void WeaponsUpdate(void) {
 // 
 // 	public void Unload(bool isSilent) {
 // 		if (weaponIndex < 0) return;
-// 		int wep16index = WeaponFire.Get16WeaponIndexFromConstIndex (weaponIndex);
+// 		int wep16index = Get16WeaponIndexFromConstIndex (weaponIndex);
 // 		if (wep16index == 5 || wep16index == 6) {
 // 			return; // do nothing for pipe or rapier
 // 		}
@@ -1760,7 +1760,7 @@ void WeaponsUpdate(void) {
 // 	}
 // 
 // 	public void ReloadSecret(bool isSilent) {
-// 		int wep16index = WeaponFire.Get16WeaponIndexFromConstIndex(weaponIndex);
+// 		int wep16index = Get16WeaponIndexFromConstIndex(weaponIndex);
 // 		if (wep16index < 0) return;
 // 
 // 		if (wep16index == 5 || wep16index == 6) {

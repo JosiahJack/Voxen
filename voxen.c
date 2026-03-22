@@ -1649,7 +1649,6 @@ ENGINE_TO_MOD void AddDebugLine(Vector3 start, Vector3 end) {
     Sys_Global.debugLineVertCount = i;
 }
 
-
 char creditStats[4096];
 static inline __attribute__((always_inline)) float GetScore(float stupid, bool isFinal) {
     float victories = (float)(Sys_Global.kills + Sys_Global.cyberkills);
@@ -1968,6 +1967,7 @@ static inline __attribute__((always_inline)) void RenderInstances(Vector3 player
 
         glUniform1ui(17, Sys_Global.instances[i].texIndex == 316 ? 1u : 0u);
         glUniform1ui(25,(uint32_t)Sys_Global.instances[i].index); // constIndex
+        glUniform1f(27,Sys_Global.instances[i].volume); // CyberWall bump go alpha 1.0 then fade.
         if (currentNormIndex != (uint32_t)Sys_Global.instances[i].normIndex || Sys_Global.instances[i].normIndex == 0) { currentNormIndex = (uint32_t)Sys_Global.instances[i].normIndex; glUniform1ui(1, currentNormIndex); }
         if (currentTexIndex  != (uint32_t)Sys_Global.instances[i].texIndex  || Sys_Global.instances[i].texIndex == 0)  { currentTexIndex  =  (uint32_t)Sys_Global.instances[i].texIndex; glUniform1ui(18, currentTexIndex); }
         if (currentGlowIndex != (uint32_t)Sys_Global.instances[i].glowIndex || Sys_Global.instances[i].glowIndex == 0) { currentGlowIndex = (uint32_t)Sys_Global.instances[i].glowIndex; glUniform1ui(19, currentGlowIndex); }

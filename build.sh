@@ -145,8 +145,7 @@ fi
 
 export CCGC=$CC
 export CFLAGSGC=$CFLAGSGC
-SOURCESGC="init.c modinput.c animation.c modphysics.c ai.c biomonitor.c weapons.c \
-           music.c audio.c citadel.c door.c"
+SOURCESGC="animation.c ai.c biomonitor.c weapons.c music.c audio.c citadel.c door.c"
 export TEMP_DIRGC=temp_build_gc
 export SCRIPT_DIR="./Scripts"
 printf "%s\n" $SOURCESGC | xargs -P12 -I{} $CCGC -c $SCRIPT_DIR/{} $CFLAGSGC -I. -nostdinc -fPIC -ffreestanding -fno-builtin -Wshadow -o "$TEMP_DIRGC"/{}.o
