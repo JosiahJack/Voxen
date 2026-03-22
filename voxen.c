@@ -1885,7 +1885,14 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
 
                     currentModelType = GetAndBindModel(i,currentModelType);
                     if (currentTexIndex != Sys_Global.instances[i].texIndex) { currentTexIndex = Sys_Global.instances[i].texIndex; glUniform1ui(6, Sys_Global.instances[i].texIndex); }
-                    if (currentIsTransparent != transparentTexture[Sys_Global.instances[i].texIndex]) { currentIsTransparent = transparentTexture[Sys_Global.instances[i].texIndex]; glUniform1ui(8, transparentTexture[Sys_Global.instances[i].texIndex] ? 1u : 0u); }
+                    if (currentIsTransparent != transparentTexture[Sys_Global.instances[i].texIndex]) {
+                        currentIsTransparent = transparentTexture[Sys_Global.instances[i].texIndex];
+                        glUniform1ui(8, currentIsTransparent ? 1u : 0u);
+                        if (currentIsTransparent) {
+                            glUniform2i(10,textureSizes[currentTexIndex * 2],textureSizes[currentTexIndex * 2 + 1]);
+                            glUniform1ui(11,texturePaletteOffsets[currentTexIndex]);
+                        }
+                    }
                     glDrawElements(GL_TRIANGLES,modelTriangleCounts[currentModelType]*3,GL_UNSIGNED_INT,0); drawCallsRenderedThisFrame++; verticesRenderedThisFrame += modelTriangleCounts[currentModelType] * 3;
                 }
             }

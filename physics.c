@@ -465,6 +465,7 @@ void ApplyCorpseFriction(uint16_t instanceIdx) {
 
 void UpdatePositions(void) {
     for (int32_t i=PLAYER1;i<Sys_Global.loadedInstances;++i) ApplyVelocityUntilCollision(i);
+    ma_engine_listener_set_position(&Sys_Global.audio_engine,0,Sys_Global.instances[PLAYER1].position.x,Sys_Global.instances[PLAYER1].position.y,Sys_Global.instances[PLAYER1].position.z);
 }
 
 void ClampVelocity(void) {

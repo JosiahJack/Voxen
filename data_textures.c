@@ -6,6 +6,8 @@
 #include <unistd.h>
 uint32_t totalPixels;
 uint32_t totalPaletteColors;
+uint32_t* texturePaletteOffsets;
+int32_t* textureSizes;
 #define STBI_ARENA_SIZE 16*1024*1024
 uint8_t* stbi__arena_base = NULL;
 uint8_t* stbi__arena_cursor = NULL;
@@ -807,16 +809,14 @@ void LoadTextures(void) {
     }
 
     size_t offsets_size = loadedTexturesMaxIndex * sizeof(uint32_t);
-    size_t sizes_size = loadedTexturesMaxIndex * 2 * sizeof(int32_t);
-    size_t palette_offsets_size = loadedTexturesMaxIndex * sizeof(uint32_t);
     size_t palettes_size = totalPaletteColors * sizeof(uint32_t);
     size_t indices_size = totalPixels;
-    size_t arena_size = offsets_size + sizes_size + palette_offsets_size + palettes_size + indices_size;
+    size_t arena_size = offsets_size + palettes_size + indices_size;
     void* arena = OS_AllocateRAM(NULL, arena_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, OS_INVALID_HANDLE);
     uint8_t* cur = (uint8_t*)arena;
     uint32_t* textureOffsets = (uint32_t*)cur; cur += offsets_size;
-    int32_t* textureSizes = (int32_t*)cur; cur += sizes_size;
-    uint32_t* texturePaletteOffsets = (uint32_t*)cur; cur += palette_offsets_size;
+    textureSizes         = OS_AllocateRAM(NULL, loadedTexturesMaxIndex * 2 * sizeof(int32_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+    texturePaletteOffsets = OS_AllocateRAM(NULL, loadedTexturesMaxIndex * sizeof(uint32_t),   PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
     uint32_t* texturePalettes = (uint32_t*)cur; cur += palettes_size;
     uint8_t* all_indices = cur;
 

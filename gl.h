@@ -1049,6 +1049,8 @@ GLAD_API_CALL PFNGLPROGRAMUNIFORM2FVPROC glad_glProgramUniform2fv;
 #define glProgramUniform2fv glad_glProgramUniform2fv
 GLAD_API_CALL PFNGLPROGRAMUNIFORM2IPROC glad_glProgramUniform2i;
 #define glProgramUniform2i glad_glProgramUniform2i
+GLAD_API_CALL PFNGLUNIFORM2IPROC glad_glUniform2i;
+#define glUniform2i glad_glUniform2i
 GLAD_API_CALL PFNGLPROGRAMUNIFORM2IVPROC glad_glProgramUniform2iv;
 #define glProgramUniform2iv glad_glProgramUniform2iv
 GLAD_API_CALL PFNGLPROGRAMUNIFORM2UIPROC glad_glProgramUniform2ui;
