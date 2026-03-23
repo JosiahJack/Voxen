@@ -183,7 +183,9 @@ typedef void (*GLADpostcallback)(void *ret, const char *name, GLADapiproc apipro
 #define GL_TRIANGLES 0x0004
 #define GL_TRIANGLE_FAN 0x0006
 #define GL_TRUE 1
+#define GL_HALF_FLOAT 0x140B
 #define GL_UNSIGNED_BYTE 0x1401
+#define GL_UNSIGNED_SHORT 0x1403
 #define GL_UNSIGNED_INT 0x1405
 #define GL_VERSION 0x1F02
 #define GL_VERTEX_SHADER 0x8B31

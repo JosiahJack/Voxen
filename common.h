@@ -864,8 +864,13 @@ typedef struct {
 	float energySliderClickedTime;
 	float cyberWeaponAttackFinished;
 	float targetY;
-    uint16_t heldObjectIndex;
+    int16_t heldObjectIndex;
+    int16_t heldObjectCustomIndex;
+    int16_t heldObjectAmmo;
+    int16_t heldObjectAmmo2;
+    bool heldObjectLoadedAlternate;
     bool holdingObject;
+    bool grenadeActive;
     double dropFinished;
     uint16_t weaponIndex;
     uint16_t currentSearchItem;

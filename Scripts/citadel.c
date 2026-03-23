@@ -1756,31 +1756,121 @@ void HealthManagerInitAfterLoad(uint16_t self) {
         }
     }
 }
-//=============================================================================
-// Grenades
-void UseGrenade(uint16_t playerIndex, int index) { // TODO
-    (void)playerIndex; (void)index;
-//     if (Eng_Global->inventoryPlayer1.holdingObject) { CenterStatusPrint("%s", Eng_Text->stringTable[311],player); return; } // Can't use grenade, hands full
-//     if (index < 7 || index > 13) { DualLog("BUG: index outside of 7 to 13 passed to UseGrenade() in MouseLookScript.cs"); return; }
+//================================================================================
+// Inventory Mode
+void ResetHeldItem(void) {
+    Eng_Global->inventoryPlayer1.heldObjectIndex = -1;
+    Eng_Global->inventoryPlayer1.heldObjectCustomIndex = -1;
+    Eng_Global->inventoryPlayer1.heldObjectAmmo = 0;
+    Eng_Global->inventoryPlayer1.heldObjectAmmo2 = 0;
+    Eng_Global->inventoryPlayer1.heldObjectLoadedAlternate = false;
+    Eng_Global->inventoryPlayer1.holdingObject = false;
+    Eng_Global->inventoryPlayer1.grenadeActive = false;
+}
+
+void DropHeldItem(void) {
+    if (Eng_Global->inventoryPlayer1.heldObjectIndex >= Eng_Global->loadedInstances) { ResetHeldItem(); return; }
+    
+    Eng_Global->inventoryPlayer1.dropFinished = Eng_Global->current_time + 0.2; // Prevent immediate regrab at high fps
+    if (!Eng_Global->inventoryPlayer1.grenadeActive) {
+//         for (int i=0;i<levelDynamicContainer.transform.childCount;i++) {
+//             Transform tr = levelDynamicContainer.transform.GetChild(i);
+//             GameObject go = tr.gameObject;
+//             UseableObjectUse reference = go.GetComponent<UseableObjectUse>();
+//             if (reference != null) {
+//                 if (reference.useableItemIndex == Eng_Global->inventoryPlayer1.heldObjectIndex && go.activeSelf == false) {
+//                     reference.customIndex = heldObjectCustomIndex;
+//                     tossObject = go;
+//                     freeObjectInPoolFound = true;
+//                     break;
+//                 }
+//             }
+//         }
 // 
-//     ForceInventoryMode();  // Inventory mode is turned on when picking something up.
-//     ResetHeldItem();
-//     MouseCursor.a.liveGrenade = true;
-//     grenadeActive = true;
-//     CenterStatusPrint("%s", Eng_Text->stringTable[index + 326]
-//                     + Eng_Text->stringTable[320],player); // activated, grenade is LIVE!
+//         if (freeObjectInPoolFound) {
+//             if (tossObject == null) {
+//                 CenterStatusPrint("BUG: Failed to get freeObjectInPool for object being dropped!",player);
+//                 ResetHeldItem();
+//                 return;
+//             } else {
+//                 tossObject.Eng_Global->instances[i].position = (Eng_Global->instances[i].position + (transform.forward * tossOffset));
+//             }
+//         } else {
+//             // DualLog("WARNING: Failed to get freeObjectInPool for object " + heldObject.ToString() + "being dropped! MouseLookScript DropHeldItem.",player);
+//             tossObject = Instantiate(heldObject,(Eng_Global->instances[i].position + (transform.forward * tossOffset)),Const.a.quaternionIdentity) as GameObject;  //effect
+//             if (tossObject == null) {
+//                 CenterStatusPrint("BUG: Failed to instantiate object being dropped!",player);
+//                 ResetHeldItem();
+//                 return;
+//             }
+//         }
+//         if (tossObject.activeSelf != true) tossObject.SetActive(true);
+//         if (levelDynamicContainer != null) {
+//             tossObject.transform.SetParent(levelDynamicContainer.transform,true);
+//         }
 // 
-//     switch(index) { // Subtract one from the correct grenade inventory
-//         case 7:  heldObject = Const.a.GetPrefab(370); Eng_Global->inventoryPlayer1.RemoveGrenade(0); break; // Frag
-//         case 8:  heldObject = Const.a.GetPrefab(372); Eng_Global->inventoryPlayer1.RemoveGrenade(3); break; // Concussion
-//         case 9:  heldObject = Const.a.GetPrefab(387); Eng_Global->inventoryPlayer1.RemoveGrenade(1); break; // EMP
-//         case 10: heldObject = Const.a.GetPrefab(389); Eng_Global->inventoryPlayer1.RemoveGrenade(6); break; // Earth Shaker
-//         case 11: heldObject = Const.a.GetPrefab(402); Eng_Global->inventoryPlayer1.RemoveGrenade(4); break; // Land Mine
-//         case 12: heldObject = Const.a.GetPrefab(403); Eng_Global->inventoryPlayer1.RemoveGrenade(5); break; // Nitropak
-//         case 13: heldObject = Const.a.GetPrefab(404); Eng_Global->inventoryPlayer1.RemoveGrenade(2); break; // Gas
-//     }
-//     Eng_UI->ResetItemTab();
-//     PutObjectInHand(index,-1,0,0,false,true);
+//         Vector3 tossDir = MouseCursor.a.GetCursorScreenPointForRay();
+//         tossDir = playerCamera.ScreenPointToRay(tossDir).direction;
+//         Rigidbody rbody = tossObject.GetComponent<Rigidbody>();
+//         if (rbody != null) {
+//             rbody.isKinematic = false;
+//             rbody.useGravity = true;
+//             rbody.velocity = tossDir * tossForce;
+//         }
+// 
+//         UseableObjectUse uou = tossObject.GetComponent<UseableObjectUse>();
+//         uou.customIndex = heldObjectCustomIndex;
+//         uou.ammo = heldObjectAmmo;
+//         uou.ammo2 = heldObjectAmmo2;
+//         uou.heldObjectLoadedAlternate = heldObjectLoadedAlternate;
+    } else {
+        // Throw an active grenade
+//         grenadeActive = false;
+//         Eng_UI->mouseClickHeldOverGUI = true; // Prevent shooting it.
+//         tossObject = Instantiate(heldObject,(Eng_Global->instances[i].position + (transform.forward * tossOffset)),Const.a.quaternionIdentity) as GameObject;  //effect
+//         if (tossObject == null) {
+//             CenterStatusPrint("BUG: Failed to instantiate object being dropped!",player);
+//             ResetHeldItem();
+//             return;
+//         }
+// 
+//         Const.a.grenadesThrown++;
+//         if (levelDynamicContainer != null){
+//             tossObject.transform.SetParent(levelDynamicContainer.transform,true);
+//         }
+//         tossObject.layer = 11; // Set to player bullets layer to prevent collision and still be visible.
+//         Vector3 tossDir = MouseCursor.a.GetCursorScreenPointForRay();
+//         tossDir = playerCamera.ScreenPointToRay(tossDir).direction;
+//         Rigidbody rbody = tossObject.GetComponent<Rigidbody>();
+//         if (rbody != null) {
+//             rbody.isKinematic = false;
+//             rbody.useGravity = true;
+//             rbody.velocity = tossDir * tossForce;
+//         }
+//         GrenadeActivate ga = tossObject.GetComponent<GrenadeActivate>();
+//         if (ga != null) ga.Activate(); // Time to boom!
+//         MouseCursor.a.liveGrenade = false;
+    }
+    ResetHeldItem();
+}
+	
+void ForceShootMode(void) {
+    if (Eng_Settings->NoShootMode) return; // We are being like the original now!
+
+    Eng_UI->mouseClickHeldOverGUI = false;
+//     CloseFullmap(); // TODO
+    Eng_Global->inventoryMode = false;
+//     if (vmailActive) { Eng_Global->inventoryPlayer1.DeactivateVMail(); vmailActive = false; } // TODO
+}
+
+void ForceInventoryMode(void) { Eng_Global->inventoryMode = true; }
+void ToggleInventoryMode(void) {
+    if (Eng_Global->inventoryMode) ForceShootMode();
+    else                           ForceInventoryMode();
+    
+    IgnoreNextMouseDelta();    
+    Eng_Global->cursorPosition_x = Eng_Settings->ScreenWidth / 2;
+    Eng_Global->cursorPosition_y = Eng_Settings->ScreenHeight / 2;
 }
 //================================================================================
 // Hardware
@@ -2732,6 +2822,542 @@ void InventoryUpdate(uint16_t p) {
     if (PatchCycUp())   InventoryPatchCycleUp(p,true);
     if (PatchCycDown()) InventoryPatchCycleDown(p,true);
 }
+//=============================================================================
+// Grenades
+void UseGrenade(uint16_t playerIndex, int index) { // TODO
+    (void)playerIndex; (void)index;
+    if (Eng_Global->inventoryPlayer1.holdingObject) { CenterStatusPrint("%s",Eng_Text->stringTable[311]); return; } // Can't use grenade, hands full
+
+    ForceInventoryMode();  // Inventory mode is turned on when picking something up.
+    ResetHeldItem();
+    Eng_Global->inventoryPlayer1.grenadeActive = true;
+    CenterStatusPrint("%s%s",Eng_Text->stringTable[index + 326],Eng_Text->stringTable[320]); // activated, grenade is LIVE!
+//     switch(index) { // Subtract one from the correct grenade inventory TODO
+//         case 7:  Eng_Global->inventoryPlayer1.heldObject = Const.a.GetPrefab(370); RemoveGrenade(0); break; // Frag
+//         case 8:  Eng_Global->inventoryPlayer1.heldObject = Const.a.GetPrefab(372); RemoveGrenade(3); break; // Concussion
+//         case 9:  Eng_Global->inventoryPlayer1.heldObject = Const.a.GetPrefab(387); RemoveGrenade(1); break; // EMP
+//         case 10: Eng_Global->inventoryPlayer1.heldObject = Const.a.GetPrefab(389); RemoveGrenade(6); break; // Earth Shaker
+//         case 11: Eng_Global->inventoryPlayer1.heldObject = Const.a.GetPrefab(402); RemoveGrenade(4); break; // Land Mine
+//         case 12: Eng_Global->inventoryPlayer1.heldObject = Const.a.GetPrefab(403); RemoveGrenade(5); break; // Nitropak
+//         case 13: Eng_Global->inventoryPlayer1.heldObject = Const.a.GetPrefab(404); RemoveGrenade(2); break; // Gas
+//     }
+    
+//     PutObjectInHand(index,-1,0,0,false,true);
+}
+//================================================================================
+// Quest Bits / Mission I/O
+// void TargetOnGatePassed(bool bitToCheck, bool passIfTrue, UseData ud, string targ, string targOnFalse) {
+//     if (passIfTrue) {
+//         if (!bitToCheck) { UseTargets(ud,tio,targ); return; }
+//     } else {
+//         if (bitToCheck) { UseTargets(ud,tio,targOnFalse); return; }
+//     }
+// 
+//     UseTargets(targ);
+// }
+// 
+// void EnableBits(uint16_t i) {
+//     Eng_Global->instances[WORLD].ioflags |= Eng_Global->instances[i].ioflags;
+//     
+//     if (Eng_Global->instances[i].ioflags & QUESTBIT_ROBOT_SPAWN_DEACTIVATED) DualLog("QUESTBIT_ROBOT_SPAWN_DEACTIVATED: 1");
+//     if (Eng_Global->instances[i].ioflags & QUESTBIT_ISOTOPE_INSTALLED) DualLog("QUESTBIT_ISOTOPE_INSTALLED: 1");
+//     if (Eng_Global->instances[i].ioflags & QUESTBIT_SHIELD_ACTIVATED) {
+//         DualLog("QUESTBIT_SHIELD_ACTIVATED: 1");
+//         QuestLogNotesManager.a.notes[8].SetActive(true);
+//         QuestLogNotesManager.a.checkBoxes[8].isOn = Const.a.questData.ShieldActivated;
+//         QuestLogNotesManager.a.labels[8].text = Eng_Text->stringTable[560];
+//     }
+//     
+//     if (Eng_Global->instances[i].ioflags & QUESTBIT_LASER_SAFETY_OVERRIDEN) {
+//         DualLog("QUESTBIT_LASER_SAFETY_OVERRIDEN: 1");
+//         QuestLogNotesManager.a.notes[7].SetActive(true);
+//         QuestLogNotesManager.a.checkBoxes[7].isOn = Const.a.questData.LaserSafetyOverriden;
+//         QuestLogNotesManager.a.labels[7].text = Eng_Text->stringTable[559];
+//     }
+//     
+//     if (Eng_Global->instances[i].ioflags & QUESTBIT_LASER_DESTROYED) {
+//         DualLog("QUESTBIT_LASER_DESTROYED: 1");
+//         if (AutoSplitterData.missionSplitID == 1) AutoSplitterData.missionSplitID++;
+//         QuestLogNotesManager.a.notes[9].SetActive(true);
+//         QuestLogNotesManager.a.checkBoxes[9].isOn = Const.a.questData.LaserDestroyed;
+//         QuestLogNotesManager.a.labels[9].text = Eng_Text->stringTable[561];
+//     }
+//     
+//     if (Eng_Global->instances[i].ioflags & QUESTBIT_BETA_GROVE_CYBER_UNLOCKED) {
+//         DualLog("QUESTBIT_BETA_GROVE_CYBER_UNLOCKED: 1");
+//         QuestLogNotesManager.a.notes[12].SetActive(true);
+//     }
+//     
+//     if (Eng_Global->instances[i].ioflags & QUESTBIT_GROVE_ALPHA_JETTISON_ENABLED) {
+//         DualLog("QUESTBIT_GROVE_ALPHA_JETTISON_ENABLED: 1");
+//         QuestLogNotesManager.a.notes[12].SetActive(true);
+//     }
+//     
+//     if (Eng_Global->instances[i].ioflags & QUESTBIT_GROVE_BETA_JETTISON_ENABLED) {
+//         DualLog("QUESTBIT_GROVE_BETA_JETTISON_ENABLED: 1");
+//         QuestLogNotesManager.a.notes[12].SetActive(true);
+//     }
+//     
+//     if (Eng_Global->instances[i].ioflags & QUESTBIT_GROVE_DELTA_JETTISON_ENABLED) {
+//         DualLog("QUESTBIT_GROVE_DELTA_JETTISON_ENABLED: 1");
+//         QuestLogNotesManager.a.notes[12].SetActive(true);
+//     }
+//     
+//     if (Eng_Global->instances[i].ioflags & QUESTBIT_MASTER_JETTISON_BROKEN) {
+//         DualLog("QUESTBIT_MASTER_JETTISON_BROKEN: 1");
+//         if (AutoSplitterData.missionSplitID == 2) AutoSplitterData.missionSplitID++;
+//         QuestLogNotesManager.a.notes[12].SetActive(true);
+//         QuestLogNotesManager.a.notes[11].SetActive(true);
+//         QuestLogNotesManager.a.labels[11].text = Eng_Text->stringTable[563]; // Set:Diagnose and repair broken relay
+//     }
+//     
+//     if (Eng_Global->instances[i].ioflags & QUESTBIT_RELAY_428_FIXED) {
+//         DualLog("QUESTBIT_RELAY_428_FIXED: 1");
+//         QuestLogNotesManager.a.notes[11].SetActive(true);
+//         QuestLogNotesManager.a.checkBoxes[11].isOn = Const.a.questData.Relay428Fixed;
+//         QuestLogNotesManager.a.labels[11].text = Eng_Text->stringTable[563]; // Set:Diagnose and repair broken relay
+//         QuestLogNotesManager.a.labels[11].text += Eng_Text->stringTable[564]; // Add:: 428.
+//     }
+//     
+//     if (Eng_Global->instances[i].ioflags & QUESTBIT_MASTER_JETTISON_ENABLED) {
+//         DualLog("QUESTBIT_MASTER_JETTISON_ENABLED: 1");
+//         if (AutoSplitterData.missionSplitID == 3) AutoSplitterData.missionSplitID++;
+//         QuestLogNotesManager.a.notes[10].SetActive(true);
+//         QuestLogNotesManager.a.checkBoxes[10].isOn = Const.a.questData.MasterJettisonEnabled;
+//         QuestLogNotesManager.a.labels[10].text = Eng_Text->stringTable[562];
+//     }
+//     
+//     if (Eng_Global->instances[i].ioflags & QUESTBIT_BETA_GROVE_JETTISONED) {
+//         DualLog("QUESTBIT_BETA_GROVE_JETTISONED: 1");
+//         if (AutoSplitterData.missionSplitID == 4) AutoSplitterData.missionSplitID++;
+//         QuestLogNotesManager.a.notes[12].SetActive(true);
+//         QuestLogNotesManager.a.checkBoxes[12].isOn = Const.a.questData.BetaGroveJettisoned;
+//         QuestLogNotesManager.a.labels[12].text = Eng_Text->stringTable[565];
+//         QuestLogNotesManager.a.notes[13].SetActive(true);
+//         QuestLogNotesManager.a.labels[13].text = Eng_Text->stringTable[566];
+//     }
+//     
+//     if (Eng_Global->instances[i].ioflags & QUESTBIT_ANTENNA_NORTH_DESTROYED) {
+//         DualLog("QUESTBIT_ANTENNA_NORTH_DESTROYED: 1");
+//         QuestLogNotesManager.a.notes[13].SetActive(true);
+//     }
+//     
+//     if (Eng_Global->instances[i].ioflags & QUESTBIT_ANTENNA_SOUTH_DESTROYED) {
+//         DualLog("QUESTBIT_ANTENNA_SOUTH_DESTROYED: 1");
+//         QuestLogNotesManager.a.notes[13].SetActive(true);
+//     }
+//     
+//     if (Eng_Global->instances[i].ioflags & QUESTBIT_ANTENNA_EAST_DESTROYED) {
+//         DualLog("QUESTBIT_ANTENNA_EAST_DESTROYED: 1");
+//         QuestLogNotesManager.a.notes[13].SetActive(true);
+//     }
+//     
+//     if (Eng_Global->instances[i].ioflags & QUESTBIT_ANTENNA_WEST_DESTROYED) {
+//         DualLog("QUESTBIT_ANTENNA_WEST_DESTROYED: 1");
+//         QuestLogNotesManager.a.notes[13].SetActive(true);
+//     }
+//     
+//     if (Eng_Global->instances[i].ioflags & QUESTBIT_SELF_DESTRUCT_ACTIVATED) {
+//         DualLog("QUESTBIT_SELF_DESTRUCT_ACTIVATED: 1");
+//         QuestLogNotesManager.a.notes[0].SetActive(true);
+//         QuestLogNotesManager.a.notes[1].SetActive(true);
+//         QuestLogNotesManager.a.notes[2].SetActive(true);
+//         QuestLogNotesManager.a.notes[3].SetActive(true);
+//         QuestLogNotesManager.a.notes[4].SetActive(true);
+//         QuestLogNotesManager.a.notes[5].SetActive(true);
+//         QuestLogNotesManager.a.notes[6].SetActive(true);
+//         QuestLogNotesManager.a.notes[7].SetActive(true);
+//         QuestLogNotesManager.a.notes[8].SetActive(true);
+//         QuestLogNotesManager.a.notes[9].SetActive(true);
+//         QuestLogNotesManager.a.notes[10].SetActive(true);
+//         QuestLogNotesManager.a.notes[11].SetActive(true);
+//         QuestLogNotesManager.a.notes[12].SetActive(true);
+//         QuestLogNotesManager.a.notes[13].SetActive(true);
+//         QuestLogNotesManager.a.notes[14].SetActive(true); // Self destruct
+//         QuestLogNotesManager.a.notes[15].SetActive(true); // Escape pod
+//         QuestLogNotesManager.a.notes[16].SetActive(true); // Access the bridge
+//         QuestLogNotesManager.a.checkBoxes[14].isOn = Const.a.questData.SelfDestructActivated;
+//         QuestLogNotesManager.a.labels[14].text = Eng_Text->stringTable[567]; // Set:Engage reactor self-destruct.
+//         QuestLogNotesManager.a.labels[15].text = Eng_Text->stringTable[568]; // Set:Escape on escape pod.
+//     }
+//     
+//     if (Eng_Global->instances[i].ioflags & QUESTBIT_BRIDGE_SEPARATED) {
+//         DualLog("QUESTBIT_BRIDGE_SEPARATED: 1");
+//         QuestLogNotesManager.a.notes[0].SetActive(true);
+//         QuestLogNotesManager.a.notes[1].SetActive(true);
+//         QuestLogNotesManager.a.notes[2].SetActive(true);
+//         QuestLogNotesManager.a.notes[3].SetActive(true);
+//         QuestLogNotesManager.a.notes[4].SetActive(true);
+//         QuestLogNotesManager.a.notes[5].SetActive(true);
+//         QuestLogNotesManager.a.notes[6].SetActive(true);
+//         QuestLogNotesManager.a.notes[7].SetActive(true);
+//         QuestLogNotesManager.a.notes[8].SetActive(true);
+//         QuestLogNotesManager.a.notes[9].SetActive(true);
+//         QuestLogNotesManager.a.notes[10].SetActive(true);
+//         QuestLogNotesManager.a.notes[11].SetActive(true);
+//         QuestLogNotesManager.a.notes[12].SetActive(true);
+//         QuestLogNotesManager.a.notes[13].SetActive(true);
+//         QuestLogNotesManager.a.notes[14].SetActive(true); // Self destruct
+//         QuestLogNotesManager.a.checkBoxes[14].isOn = Const.a.questData.SelfDestructActivated;
+//         QuestLogNotesManager.a.labels[14].text = Eng_Text->stringTable[567]; // Set:Engage reactor self-destruct.
+//         QuestLogNotesManager.a.notes[16].SetActive(true);
+//         QuestLogNotesManager.a.notes[17].SetActive(true);
+//         QuestLogNotesManager.a.checkBoxes[16].isOn = true;
+//         QuestLogNotesManager.a.labels[16].text = Eng_Text->stringTable[569]; // Set:Access the bridge.
+//         QuestLogNotesManager.a.labels[17].text = Eng_Text->stringTable[570]; // Set:Destroy SHODAN.
+//     }
+//     
+//     if (Eng_Global->instances[i].ioflags & QUESTBIT_ISOLINEAR_CHIPSET_INSTALLED) DualLog("QUESTBIT_ISOLINEAR_CHIPSET_INSTALLED: 1");
+// }
+// 
+// void DisableBits() {
+//     if (RobotSpawnDeactivated) {
+//         Const.a.questData.RobotSpawnDeactivated = false;
+//     }
+// 
+//     if (IsotopeInstalled) Const.a.questData.IsotopeInstalled = false;
+//     if (ShieldActivated) {
+//         Const.a.questData.ShieldActivated = false;
+//         DualLog("Bit unset ShieldActivated: "
+//                     + Const.a.questData.ShieldActivated.ToString());
+// 
+//         QuestLogNotesManager.a.checkBoxes[8].isOn =
+//             Const.a.questData.ShieldActivated;
+//     }
+//     if (LaserSafetyOverriden) {
+//         Const.a.questData.LaserSafetyOverriden = false;
+//         QuestLogNotesManager.a.checkBoxes[7].isOn = Const.a.questData.LaserSafetyOverriden;
+//     }
+//     if (LaserDestroyed) {
+//         Const.a.questData.LaserDestroyed = false;
+//         QuestLogNotesManager.a.checkBoxes[9].isOn = Const.a.questData.LaserDestroyed;
+//     }
+//     if (BetaGroveCyberUnlocked) Const.a.questData.BetaGroveCyberUnlocked = false;
+//     if (GroveAlphaJettisonEnabled) Const.a.questData.GroveAlphaJettisonEnabled = false;
+//     if (GroveBetaJettisonEnabled) Const.a.questData.GroveBetaJettisonEnabled = false;
+//     if (GroveDeltaJettisonEnabled) Const.a.questData.GroveDeltaJettisonEnabled = false;
+//     if (MasterJettisonBroken) Const.a.questData.MasterJettisonBroken = false;
+//     if (Relay428Fixed) {
+//         Const.a.questData.Relay428Fixed = false;
+//         QuestLogNotesManager.a.checkBoxes[11].isOn = Const.a.questData.Relay428Fixed;
+//     }
+//     if (MasterJettisonEnabled) {
+//         Const.a.questData.MasterJettisonEnabled = false;
+//         QuestLogNotesManager.a.checkBoxes[10].isOn = Const.a.questData.MasterJettisonEnabled;
+//     }
+//     if (BetaGroveJettisoned) {
+//         Const.a.questData.BetaGroveJettisoned = false;
+//         QuestLogNotesManager.a.checkBoxes[12].isOn = Const.a.questData.BetaGroveJettisoned;
+//     }
+//     if (AntennaNorthDestroyed) Const.a.questData.AntennaNorthDestroyed = false;
+//     if (AntennaSouthDestroyed) Const.a.questData.AntennaSouthDestroyed = false;
+//     if (AntennaEastDestroyed) Const.a.questData.AntennaEastDestroyed = false;
+//     if (AntennaWestDestroyed) Const.a.questData.AntennaWestDestroyed = false;
+//     if (SelfDestructActivated) {
+//         Const.a.questData.SelfDestructActivated = false;
+//         QuestLogNotesManager.a.checkBoxes[14].isOn = Const.a.questData.SelfDestructActivated;
+//     }
+//     if (BridgeSeparated) Const.a.questData.BridgeSeparated = false;
+//     if (IsolinearChipsetInstalled) Const.a.questData.IsolinearChipsetInstalled = false;
+// }
+// 
+// void ToggleBits() {
+//     if (RobotSpawnDeactivated) Const.a.questData.RobotSpawnDeactivated = !Const.a.questData.RobotSpawnDeactivated;
+//     if (IsotopeInstalled) Const.a.questData.IsotopeInstalled = !Const.a.questData.IsotopeInstalled;
+//     if (ShieldActivated) {
+//         Const.a.questData.ShieldActivated = !Const.a.questData.ShieldActivated;
+//         QuestLogNotesManager.a.checkBoxes[8].isOn = Const.a.questData.ShieldActivated;
+//         if (Const.a.questData.ShieldActivated) {
+//             QuestLogNotesManager.a.notes[8].SetActive(true);
+//             QuestLogNotesManager.a.labels[8].text = Eng_Text->stringTable[560];
+//         }
+//     }
+//     if (LaserSafetyOverriden) {
+//         Const.a.questData.LaserSafetyOverriden = !Const.a.questData.LaserSafetyOverriden;
+//         QuestLogNotesManager.a.checkBoxes[7].isOn = Const.a.questData.LaserSafetyOverriden;
+//         if (Const.a.questData.LaserSafetyOverriden) {
+//             QuestLogNotesManager.a.notes[7].SetActive(true);
+//             QuestLogNotesManager.a.labels[7].text = Eng_Text->stringTable[559];
+//         }
+//     }
+//     if (LaserDestroyed) {
+//         Const.a.questData.LaserDestroyed = !Const.a.questData.LaserDestroyed;
+//         if (AutoSplitterData.missionSplitID == 1) { AutoSplitterData.missionSplitID++; }
+//         QuestLogNotesManager.a.checkBoxes[9].isOn = Const.a.questData.LaserDestroyed;
+//         if (Const.a.questData.LaserDestroyed) {
+//             QuestLogNotesManager.a.notes[9].SetActive(true);
+//             QuestLogNotesManager.a.labels[9].text = Eng_Text->stringTable[561];
+//         }
+//     }
+//     if (BetaGroveCyberUnlocked) Const.a.questData.BetaGroveCyberUnlocked = !Const.a.questData.BetaGroveCyberUnlocked;
+//     if (GroveAlphaJettisonEnabled) Const.a.questData.GroveAlphaJettisonEnabled = !Const.a.questData.GroveAlphaJettisonEnabled;
+//     if (GroveBetaJettisonEnabled) Const.a.questData.GroveBetaJettisonEnabled = !Const.a.questData.GroveBetaJettisonEnabled;
+//     if (GroveDeltaJettisonEnabled) Const.a.questData.GroveDeltaJettisonEnabled = !Const.a.questData.GroveDeltaJettisonEnabled;
+//     if (MasterJettisonBroken) {
+//         Const.a.questData.MasterJettisonBroken = !Const.a.questData.MasterJettisonBroken;
+//         if (Const.a.questData.MasterJettisonBroken) {
+//             QuestLogNotesManager.a.notes[11].SetActive(true); // Diagnose and repair broken relay
+//             QuestLogNotesManager.a.labels[11].text = Eng_Text->stringTable[563];// Set:Diagnose and repair broken relay
+//         }
+//     }
+//     if (Relay428Fixed) {
+//         Const.a.questData.Relay428Fixed = !Const.a.questData.Relay428Fixed;
+//         QuestLogNotesManager.a.checkBoxes[11].isOn = Const.a.questData.Relay428Fixed;
+//         if (Const.a.questData.Relay428Fixed) {
+//             QuestLogNotesManager.a.notes[11].SetActive(true);
+//             QuestLogNotesManager.a.labels[11].text = Eng_Text->stringTable[563]; // Set:Diagnose and repair broken relay
+//             QuestLogNotesManager.a.labels[11].text += Eng_Text->stringTable[564]; // Add:: 428.
+//         }
+//     }
+//     if (MasterJettisonEnabled) {
+//         Const.a.questData.MasterJettisonEnabled = !Const.a.questData.MasterJettisonEnabled;
+//         QuestLogNotesManager.a.checkBoxes[10].isOn = Const.a.questData.MasterJettisonEnabled;
+//         if (Const.a.questData.MasterJettisonEnabled) {
+//             QuestLogNotesManager.a.notes[10].SetActive(true);
+//             QuestLogNotesManager.a.labels[10].text = Eng_Text->stringTable[562];
+//         }
+//     }
+//     if (BetaGroveJettisoned) {
+//         Const.a.questData.BetaGroveJettisoned = !Const.a.questData.BetaGroveJettisoned;
+//         QuestLogNotesManager.a.checkBoxes[12].isOn = Const.a.questData.BetaGroveJettisoned;
+//         if (Const.a.questData.BetaGroveJettisoned ) {
+//             QuestLogNotesManager.a.notes[12].SetActive(true);
+//             QuestLogNotesManager.a.labels[12].text = Eng_Text->stringTable[565];
+//             QuestLogNotesManager.a.notes[13].SetActive(true);
+//             QuestLogNotesManager.a.labels[13].text = Eng_Text->stringTable[566];
+//         }
+//     }
+//     if (AntennaNorthDestroyed) Const.a.questData.AntennaNorthDestroyed = !Const.a.questData.AntennaNorthDestroyed;
+//     if (AntennaSouthDestroyed) Const.a.questData.AntennaSouthDestroyed = !Const.a.questData.AntennaSouthDestroyed;
+//     if (AntennaEastDestroyed) Const.a.questData.AntennaEastDestroyed = !Const.a.questData.AntennaEastDestroyed;
+//     if (AntennaWestDestroyed) Const.a.questData.AntennaWestDestroyed = !Const.a.questData.AntennaWestDestroyed;
+//     if (SelfDestructActivated) {
+//         Const.a.questData.SelfDestructActivated = !Const.a.questData.SelfDestructActivated;
+//         if (Const.a.questData.SelfDestructActivated) {
+//             QuestLogNotesManager.a.notes[14].SetActive(true);
+//             QuestLogNotesManager.a.notes[15].SetActive(true); // Escape pod
+//             QuestLogNotesManager.a.labels[14].text = Eng_Text->stringTable[567];// Set:Engage reactor self-destruct.
+//             QuestLogNotesManager.a.labels[15].text = Eng_Text->stringTable[568];// Set:Escape on escape pod.
+//         }
+//     }
+//     if (BridgeSeparated) {
+//         Const.a.questData.BridgeSeparated = !Const.a.questData.BridgeSeparated;
+//         if (Const.a.questData.BridgeSeparated) {
+//             QuestLogNotesManager.a.notes[16].SetActive(true);
+//             QuestLogNotesManager.a.notes[17].SetActive(true);
+//             QuestLogNotesManager.a.checkBoxes[16].isOn = true;
+//             QuestLogNotesManager.a.labels[16].text = Eng_Text->stringTable[569]; // Set:Access the bridge.
+//             QuestLogNotesManager.a.labels[17].text = Eng_Text->stringTable[570]; // Set:Destroy SHODAN.
+//         }
+//     }
+//     if (IsolinearChipsetInstalled) Const.a.questData.IsolinearChipsetInstalled = !Const.a.questData.IsolinearChipsetInstalled;
+// }
+// 
+// void TestBits(bool testIfTrue, UseData ud, TargetIO tio) {
+//     if (RobotSpawnDeactivated && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.RobotSpawnDeactivated, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (IsotopeInstalled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.IsotopeInstalled, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (ShieldActivated && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.ShieldActivated, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (LaserSafetyOverriden && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.LaserSafetyOverriden, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (LaserDestroyed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.LaserDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (BetaGroveCyberUnlocked && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.BetaGroveCyberUnlocked, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (GroveAlphaJettisonEnabled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.GroveAlphaJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (GroveBetaJettisonEnabled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.GroveBetaJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (GroveDeltaJettisonEnabled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.GroveDeltaJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (MasterJettisonBroken && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.MasterJettisonBroken, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (Relay428Fixed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.Relay428Fixed, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (MasterJettisonEnabled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.MasterJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (BetaGroveJettisoned && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.BetaGroveJettisoned, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (AntennaNorthDestroyed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.AntennaNorthDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (AntennaSouthDestroyed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.AntennaSouthDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (AntennaEastDestroyed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.AntennaEastDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (AntennaWestDestroyed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.AntennaWestDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (SelfDestructActivated && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.SelfDestructActivated, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (BridgeSeparated && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.BridgeSeparated, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (IsolinearChipsetInstalled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.IsolinearChipsetInstalled, testIfTrue, ud, tio, target, targetIfFalse);
+// }
+//================================================================================
+// Doors
+enum { DOOR_CLIP_IDLE_CLOSED = 0, DOOR_CLIP_OPENING = 1, DOOR_CLIP_IDLE_OPEN = 2, DOOR_CLIP_CLOSING = 3 };
+
+static AnimationClip DoorGetClip(const Entity* e, uint8_t clip) { return modelAnimationClips[e->animationNum][clip]; }
+static float DoorClamp01(float v) { if (v < 0.0f) return 0.0f; if (v > 1.0f) return 1.0f; return v; }
+static bool DoorInventoryHasAccessCard(AccessCardType card) { return card == AccessCardType_None || (Eng_Global->inventoryPlayer1.accessCardOwned & (1u << card)); }
+static bool DoorIsOpenish(const Entity* e) { return e->doorOpen == DoorState_Open || e->doorOpen == DoorState_Opening; }
+
+static float DoorGetProgress(const Entity* e, uint8_t clip) {
+    AnimationClip c = DoorGetClip(e,clip);
+    if (c.frameEnd <= c.frameStart) return 1.0f;
+    return DoorClamp01((float)(e->frame - c.frameStart) / (float)(c.frameEnd - c.frameStart));
+}
+
+static uint16_t DoorFrameFromProgress(AnimationClip c, float t) {
+    if (c.frameEnd <= c.frameStart) return c.frameStart;
+    uint16_t span = c.frameEnd - c.frameStart;
+    return (uint16_t)(c.frameStart + (uint16_t)(DoorClamp01(t) * (float)span));
+}
+
+static void DoorSetClipFrame(uint16_t self, uint8_t clip, uint16_t frame) {
+    Entity* e = &Eng_Global->instances[self];
+    AnimationClip c = DoorGetClip(e,clip);
+    if (c.framerate == 0) return;
+    if (frame < c.frameStart) frame = c.frameStart;
+    if (frame > c.frameEnd) frame = c.frameEnd;
+    e->clip = clip;
+    e->frame = frame;
+    e->modelIndex = c.frameStartModelIndex + (frame - c.frameStart);
+    e->currentFrameFinished = Eng_Global->current_time + ((1.0 / (double)c.speed) * (1.0 / (double)c.framerate));
+}
+
+static void DoorSyncLayer(uint16_t self) {
+    Entity* e = &Eng_Global->instances[self];
+    if (!e->changeLayerOnOpenClose) return;
+    e->layer = DoorIsOpenish(e) ? PhysicsLayer_InterDebris : PhysicsLayer_Door;
+}
+
+static void DoorOpen(uint16_t self) {
+    Entity* e = &Eng_Global->instances[self];
+    DoorSetClipFrame(self,DOOR_CLIP_OPENING,DoorGetClip(e,DOOR_CLIP_OPENING).frameStart);
+    e->doorOpen = e->doorState = DoorState_Opening;
+    e->waitBeforeClose = Eng_Global->pauseRelativeTime + e->delay;
+    DoorSyncLayer(self);
+    if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
+}
+
+static void DoorClose(uint16_t self) {
+    Entity* e = &Eng_Global->instances[self];
+    DoorSetClipFrame(self,DOOR_CLIP_CLOSING,DoorGetClip(e,DOOR_CLIP_CLOSING).frameStart);
+    e->doorOpen = e->doorState = DoorState_Closing;
+    DoorSyncLayer(self);
+    if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
+}
+
+void DoorLock(uint16_t self) { EntitySetLocked(&Eng_Global->instances[self],true); }
+void DoorUnlock(uint16_t self) { Entity* e = &Eng_Global->instances[self]; EntitySetLocked(e,false); e->accessCardUsedByPlayer = true; }
+void DoorToggleLocked(uint16_t self) { if (EntityLocked(&Eng_Global->instances[self])) DoorUnlock(self); else DoorLock(self); }
+void DoorToggleAccessCardOverride(uint16_t self) { Eng_Global->instances[self].accessCardUsedByPlayer = !Eng_Global->instances[self].accessCardUsedByPlayer; }
+
+void DoorForceOpen(uint16_t self) {
+    if (Eng_Global->instances[self].doorOpen == DoorState_Open) return;
+    DoorOpen(self);
+}
+
+void DoorForceClose(uint16_t self) {
+    if (Eng_Global->instances[self].doorOpen == DoorState_Closed) return;
+    DoorClose(self);
+}
+
+void DoorActuate(uint16_t self) {
+    Entity* e = &Eng_Global->instances[self];
+    if (e->doorOpen == DoorState_Open) { DoorClose(self); return; }
+    if (e->doorOpen == DoorState_Closed) { DoorOpen(self); return; }
+    if (e->doorOpen == DoorState_Opening) {
+        float t = DoorGetProgress(e,DOOR_CLIP_OPENING);
+        AnimationClip c = DoorGetClip(e,DOOR_CLIP_CLOSING);
+        DoorSetClipFrame(self,DOOR_CLIP_CLOSING,DoorFrameFromProgress(c,1.0f - t));
+        e->doorOpen = e->doorState = DoorState_Closing;
+        DoorSyncLayer(self);
+        if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
+        return;
+    }
+    if (e->doorOpen == DoorState_Closing) {
+        float t = DoorGetProgress(e,DOOR_CLIP_CLOSING);
+        AnimationClip c = DoorGetClip(e,DOOR_CLIP_OPENING);
+        DoorSetClipFrame(self,DOOR_CLIP_OPENING,DoorFrameFromProgress(c,1.0f - t));
+        e->doorOpen = e->doorState = DoorState_Opening;
+        e->waitBeforeClose = Eng_Global->pauseRelativeTime + e->delay;
+        DoorSyncLayer(self);
+        if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
+    }
+}
+
+void DoorInitAfterLoad(uint16_t self) {
+    Entity* e = &Eng_Global->instances[self];
+    if (e->requiredAccessCard == AccessCardType_None) e->accessCardUsedByPlayer = true;
+    if (e->startOpen) e->stayOpen = true;
+    if (e->useTimeDelay <= 0.0f) e->useTimeDelay = 0.15f;
+    if (e->lockedMessageLingdex <= 0) e->lockedMessageLingdex = 3;
+    if (e->SFXIndex < 0) e->SFXIndex = 75;
+    if (e->doorOpen > DoorState_Opening) e->doorOpen = e->startOpen ? DoorState_Open : DoorState_Closed;
+    e->doorState = e->doorOpen;
+    if (e->ajar) {
+        AnimationClip c = DoorGetClip(e,DOOR_CLIP_OPENING);
+        DoorSetClipFrame(self,DOOR_CLIP_OPENING,DoorFrameFromProgress(c,e->ajarPercentage));
+        e->doorOpen = e->doorState = DoorState_Opening;
+        DoorSyncLayer(self);
+        return;
+    }
+    switch (e->doorOpen) {
+        case DoorState_Open:    DoorSetClipFrame(self,DOOR_CLIP_IDLE_OPEN,DoorGetClip(e,DOOR_CLIP_IDLE_OPEN).frameStart); break;
+        case DoorState_Opening: DoorSetClipFrame(self,DOOR_CLIP_OPENING,DoorFrameFromProgress(DoorGetClip(e,DOOR_CLIP_OPENING),e->animatorPlaybackTime)); break;
+        case DoorState_Closing: DoorSetClipFrame(self,DOOR_CLIP_CLOSING,DoorFrameFromProgress(DoorGetClip(e,DOOR_CLIP_CLOSING),e->animatorPlaybackTime)); break;
+        default:                DoorSetClipFrame(self,DOOR_CLIP_IDLE_CLOSED,DoorGetClip(e,DOOR_CLIP_IDLE_CLOSED).frameStart); break;
+    }
+    DoorSyncLayer(self);
+}
+
+void DoorUse(uint16_t self, uint16_t activator, const char* argvalue) {
+    (void)argvalue;
+    Entity* e = &Eng_Global->instances[self];
+    if (activator == NULLENT) return;
+    if (GetCurrentLevelSecurity() > e->securityThreshold) { UIBlockedBySecurity(e->position); return; }
+    if (Eng_Cheats->superoverride || Eng_Global->difficultyMission <= 0) {
+        EntitySetLocked(e,false);
+        e->requiredAccessCard = AccessCardType_None;
+        e->accessCardUsedByPlayer = true;
+    }
+    if (Eng_Global->difficultyMission <= 1) {
+        e->requiredAccessCard = AccessCardType_None;
+        e->accessCardUsedByPlayer = true;
+    }
+    if (e->useFinished >= Eng_Global->pauseRelativeTime) return;
+    e->useFinished = Eng_Global->pauseRelativeTime + e->useTimeDelay;
+    if (e->requiredAccessCard != AccessCardType_None && !e->accessCardUsedByPlayer && !DoorInventoryHasAccessCard(e->requiredAccessCard)) {
+        CenterStatusPrint("%s",Eng_Text->stringTable[2]); // TODO Access-card-specific status text.
+        if (e->SFXLockedIndex >= 0 && e->SFXLockedIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXLockedIndex],0.7f,e->position,true);
+        return;
+    }
+    if (EntityLocked(e)) {
+        if (e->requiredAccessCard != AccessCardType_None && DoorInventoryHasAccessCard(e->requiredAccessCard)) {
+            e->accessCardUsedByPlayer = true; // TODO Access-card granted status text.
+            return;
+        }
+        CenterStatusPrint("%s",Eng_Text->stringTable[e->lockedMessageLingdex]);
+        if (e->SFXLockedIndex >= 0 && e->SFXLockedIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXLockedIndex],0.55f,e->position,true);
+        return;
+    }
+    if (e->requiredAccessCard != AccessCardType_None && DoorInventoryHasAccessCard(e->requiredAccessCard)) e->accessCardUsedByPlayer = true;
+    if ((e->onlyTargetOnce && !e->targetAlreadyDone) || !e->onlyTargetOnce) {
+        e->targetAlreadyDone = true;
+        UseTargets(activator,e->argvalue,e->target);
+    }
+    if (e->ajar) e->ajar = false;
+    DoorActuate(self);
+}
+
+void DoorTargetted(uint16_t self, uint16_t activator, const char* argvalue) {
+    (void)argvalue;
+    if (EntityLocked(&Eng_Global->instances[self])) DoorUnlock(self);
+    if (!Eng_Global->instances[self].targettingOnlyUnlocks) DoorUse(self,activator,argvalue);
+}
+
+void DoorUpdate(uint16_t self) {
+    Entity* e = &Eng_Global->instances[self];
+    if (Eng_Global->gamePaused || Eng_Global->menuActive) return;
+    if (e->blocked) return; // TODO frame-pause blocked doors instead of fully skipping.
+    if (e->ajar) return;
+    AnimationClip opening = DoorGetClip(e,DOOR_CLIP_OPENING);
+    AnimationClip closing = DoorGetClip(e,DOOR_CLIP_CLOSING);
+    if (e->doorOpen == DoorState_Opening && e->clip == DOOR_CLIP_OPENING && e->frame >= opening.frameEnd) {
+        e->doorOpen = e->doorState = DoorState_Open;
+        DoorSetClipFrame(self,DOOR_CLIP_IDLE_OPEN,DoorGetClip(e,DOOR_CLIP_IDLE_OPEN).frameStart);
+        DoorSyncLayer(self);
+    } else if (e->doorOpen == DoorState_Closing && e->clip == DOOR_CLIP_CLOSING && e->frame >= closing.frameEnd) {
+        e->doorOpen = e->doorState = DoorState_Closed;
+        DoorSetClipFrame(self,DOOR_CLIP_IDLE_CLOSED,DoorGetClip(e,DOOR_CLIP_IDLE_CLOSED).frameStart);
+        DoorSyncLayer(self);
+    }
+    if (Eng_Global->pauseRelativeTime > e->waitBeforeClose && e->doorOpen == DoorState_Open && !e->stayOpen && !e->startOpen) DoorClose(self);
+}
 //================================================================================
 // Misc
 MOD_TO_ENGINE uint16_t SpawnDynamicObject(int val, bool cheat) {
@@ -2741,6 +3367,8 @@ MOD_TO_ENGINE uint16_t SpawnDynamicObject(int val, bool cheat) {
     uint16_t entityIndexInInstanceTable = NULLENT;
     return entityIndexInInstanceTable;
 }
+
+void DeactivateVMail(void) { } // TODO
 //================================================================================
 // Physics
 MOD_TO_ENGINE float GetBasePlayerSpeed(bool running) {
@@ -2778,8 +3406,6 @@ MOD_TO_ENGINE float GetBasePlayerSpeed(bool running) {
 }
 //================================================================================
 // Frob/Use
-void DeactivateVMail(void) { } // TODO
-
 void SearchObject(int searchable) {
     if (Eng_Global->instances[searchable].searchableInUse) {
         for (int i=0;i<4;i++) {
@@ -2914,12 +3540,7 @@ MOD_TO_ENGINE void ProcessInput(void) {
     if (Menu() && !Eng_Global->menuActive) { Eng_Global->gamePaused = !Eng_Global->gamePaused; return; }
     if (Menu() && Eng_Global->menuActive) { MenuGoBack(); return; }
     if (Eng_Global->gamePaused || Eng_Global->menuActive || Eng_Cheats->consoleActive) return;
-    if (ToggleMode()) {
-        IgnoreNextMouseDelta();
-        Eng_Global->inventoryMode = !Eng_Global->inventoryMode;
-        Eng_Global->cursorPosition_x = Eng_Settings->ScreenWidth / 2;
-        Eng_Global->cursorPosition_y = Eng_Settings->ScreenHeight / 2;
-    }
+    if (ToggleMode()) ToggleInventoryMode();
     if (Lantern()) Eng_Global->inventoryPlayer1.hardwareIsActive ^= HW_LAN;
     if (Infrared()) Eng_Global->inventoryPlayer1.hardwareIsActive ^= HW_INF;
     ApplyPlayerMovements();

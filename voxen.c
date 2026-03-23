@@ -962,7 +962,7 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     glGetIntegerv(GL_MINOR_VERSION, &minor);
     if (major < 4 || (major == 4 && minor < 3)) { DualLogError("Need OpenGL >= 4.3, got %d.%d\n", major, minor); OS_Exit(1); }
     double initMarker3 = get_time();
-    CycleToNextMonitor();
+//     CycleToNextMonitor();
     glfwSetKeyCallback(window, key_callback);
     glfwSetJoystickCallback(joystick_callback);
     glfwSetCursorPosCallback(window, cursor_pos_callback);
@@ -984,26 +984,26 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     float quadBlit_vertices[] = { 1.0f, -1.0f, 1.0f, 0.0f,    1.0f, 1.0f, 1.0f, 1.0f,    -1.0f,1.0f, 0.0f, 1.0f,   -1.0f, -1.0f, 0.0f, 0.0f }; // 4 verts, 4 floats each pos.xy, uv.xy
     glNamedBufferData(Sys_Render.quadVBO, sizeof(quadBlit_vertices), quadBlit_vertices, GL_STATIC_DRAW);
 
-    glVertexArrayAttribFormat(Sys_Render.quadVAO, 0, 2, GL_FLOAT, GL_FALSE, 0); // DSA: Set position format
-    glVertexArrayAttribFormat(Sys_Render.quadVAO, 1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float)); // DSA: Set texcoord format
-    glVertexArrayVertexBuffer(Sys_Render.quadVAO, 0, Sys_Render.quadVBO, 0, 4 * sizeof(float)); // DSA: Link VBO to VAO
-    for (uint8_t i = 0; i < 2; i++) { glVertexArrayAttribBinding(Sys_Render.quadVAO, i, 0); glEnableVertexArrayAttrib(Sys_Render.quadVAO, i); }
+    glVertexArrayAttribFormat(Sys_Render.quadVAO,0,2,GL_FLOAT,GL_FALSE,0); // DSA: Set position format
+    glVertexArrayAttribFormat(Sys_Render.quadVAO,1,2,GL_FLOAT,GL_FALSE,2 * sizeof(float)); // DSA: Set texcoord format
+    glVertexArrayVertexBuffer(Sys_Render.quadVAO,0,Sys_Render.quadVBO,0,4 * sizeof(float)); // DSA: Link VBO to VAO
+    for (uint8_t i = 0; i < 2; i++) { glVertexArrayAttribBinding(Sys_Render.quadVAO,i,0); glEnableVertexArrayAttrib(Sys_Render.quadVAO,i); }
+
+    glVertexArrayAttribFormat(Sys_Render.vao_chunk,0,3,GL_HALF_FLOAT,GL_FALSE,0);      // pos xyz half-float @ offset 0
+    glVertexArrayAttribFormat(Sys_Render.vao_chunk,1,3,GL_HALF_FLOAT,GL_FALSE,6);      // normal xyz float   @ offset 6  (after 3×2 bytes)
+    glVertexArrayAttribFormat(Sys_Render.vao_chunk,2,2,GL_HALF_FLOAT,GL_FALSE,12);     // uv st float
+    for (uint8_t i = 0; i < 3; i++) { glVertexArrayAttribBinding(Sys_Render.vao_chunk,i,0); glEnableVertexArrayAttrib(Sys_Render.vao_chunk,i); }
     
-    glVertexArrayAttribFormat(Sys_Render.vao_chunk, 0, 3, GL_FLOAT, GL_FALSE, 0); // Position (vec3)
-    glVertexArrayAttribFormat(Sys_Render.vao_chunk, 1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float)); // Normal (vec3)
-    glVertexArrayAttribFormat(Sys_Render.vao_chunk, 2, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float)); // Tex Coord (vec2)
-    for (uint8_t i = 0; i < 3; i++) { glVertexArrayAttribBinding(Sys_Render.vao_chunk, i, 0); glEnableVertexArrayAttrib(Sys_Render.vao_chunk, i); }
+    glVertexArrayAttribFormat(Sys_Render.textVAO,0,3,GL_FLOAT,GL_FALSE,0);             // pos (x,y,z) 4 floats per vertex, stride = 4*sizeof(float)
+    glVertexArrayAttribFormat(Sys_Render.textVAO,1,2,GL_FLOAT,GL_FALSE,3 * sizeof(float));  // uv (s,t)
+    glVertexArrayVertexBuffer(Sys_Render.textVAO,0,Sys_Render.textVBO,0,5 * sizeof(float));
+    for (uint8_t i = 0; i < 2; i++) { glVertexArrayAttribBinding(Sys_Render.textVAO,i,0); glEnableVertexArrayAttrib(Sys_Render.textVAO,i); }
     
-    glVertexArrayAttribFormat(Sys_Render.textVAO, 0, 3, GL_FLOAT, GL_FALSE, 0); // pos (x,y,z) 4 floats per vertex, stride = 4*sizeof(float)
-    glVertexArrayAttribFormat(Sys_Render.textVAO, 1, 2, GL_FLOAT, GL_FALSE, 3 * sizeof(float));  // uv (s,t)
-    glVertexArrayVertexBuffer(Sys_Render.textVAO, 0, Sys_Render.textVBO, 0, 5 * sizeof(float));
-    for (uint8_t i = 0; i < 2; i++) { glVertexArrayAttribBinding(Sys_Render.textVAO, i, 0); glEnableVertexArrayAttrib(Sys_Render.textVAO, i); }
-    
-    glNamedBufferStorage(Sys_Render.debugLinesVBO, MAX_DEBUG_LINE_VERTS * 3 * sizeof(float), NULL, GL_DYNAMIC_STORAGE_BIT);  // persistent, client-writable
-    glVertexArrayAttribFormat(Sys_Render.debugLinesVAO, 0, 3, GL_FLOAT, GL_FALSE, 0);
-    glEnableVertexArrayAttrib(Sys_Render.debugLinesVAO, 0);
-    glVertexArrayAttribBinding(Sys_Render.debugLinesVAO, 0, 0);
-    glVertexArrayVertexBuffer(Sys_Render.debugLinesVAO, 0, Sys_Render.debugLinesVBO, 0, 3 * sizeof(float));
+    glNamedBufferStorage(Sys_Render.debugLinesVBO,MAX_DEBUG_LINE_VERTS * 3 * sizeof(float),NULL,GL_DYNAMIC_STORAGE_BIT);  // persistent, client-writable
+    glVertexArrayAttribFormat(Sys_Render.debugLinesVAO,0,3,GL_FLOAT,GL_FALSE,0);
+    glEnableVertexArrayAttrib(Sys_Render.debugLinesVAO,0);
+    glVertexArrayAttribBinding(Sys_Render.debugLinesVAO,0,0);
+    glVertexArrayVertexBuffer(Sys_Render.debugLinesVAO,0,Sys_Render.debugLinesVBO,0,3 * sizeof(float));
     float* m = shadowmapsPerspectiveProjection;
     m[0] = 1.0f; m[1] = 0.0f; m[2] =                                                                  0.0f; m[3] =  0.0f;
     m[4] = 0.0f; m[5] = 1.0f; m[6] =                                                                  0.0f; m[7] =  0.0f;
@@ -1767,7 +1767,7 @@ static inline __attribute__((always_inline,hot)) uint16_t GetAndBindModel(uint16
     uint16_t modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && Sys_Global.instances[i].lodIndex < loadedModelsMaxIndex ? Sys_Global.instances[i].lodIndex : Sys_Global.instances[i].modelIndex;
     if (currentModelType == modelType && currentModelType != 0) return currentModelType;
     
-    glBindVertexBuffer(0,Sys_Render.vbos[modelType],0,VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+    glBindVertexBuffer(0,Sys_Render.vbos[modelType],0,16);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,Sys_Render.tbos[modelType]);
     return modelType;
 }
@@ -1892,7 +1892,7 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
                             glUniform1ui(11,texturePaletteOffsets[currentTexIndex]);
                         }
                     }
-                    glDrawElements(GL_TRIANGLES,modelTriangleCounts[currentModelType]*3,GL_UNSIGNED_INT,0); drawCallsRenderedThisFrame++; verticesRenderedThisFrame += modelTriangleCounts[currentModelType] * 3;
+                    glDrawElements(GL_TRIANGLES,modelTriangleCounts[currentModelType]*3,GL_UNSIGNED_SHORT,0); drawCallsRenderedThisFrame++; verticesRenderedThisFrame += modelTriangleCounts[currentModelType] * 3;
                 }
             }
             
@@ -1974,7 +1974,7 @@ static inline __attribute__((always_inline)) void RenderInstances(Vector3 player
         if (currentSpecIndex != (uint32_t)Sys_Global.instances[i].specIndex || Sys_Global.instances[i].specIndex == 0) { currentSpecIndex = (uint32_t)Sys_Global.instances[i].specIndex; glUniform1ui(20, currentSpecIndex); }
         currentModelType = GetAndBindModel(i,currentModelType);
         uint32_t vertCount = modelTriangleCounts[currentModelType] * 3;
-        glDrawElements(GL_TRIANGLES,vertCount,GL_UNSIGNED_INT,0); drawCallsRenderedThisFrame++; verticesRenderedThisFrame += vertCount;
+        glDrawElements(GL_TRIANGLES,vertCount,GL_UNSIGNED_SHORT,0); drawCallsRenderedThisFrame++; verticesRenderedThisFrame += vertCount;
     }
 }
 
@@ -1999,7 +1999,7 @@ static inline __attribute__((always_inline)) void RenderInstancesDepthOnly(Vecto
 
         currentModelType = GetAndBindModel(i,currentModelType);
         uint32_t vertCount = modelTriangleCounts[currentModelType] * 3;
-        glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0); drawCallsRenderedThisFrame++; verticesRenderedThisFrame += vertCount;
+        glDrawElements(GL_TRIANGLES,vertCount,GL_UNSIGNED_SHORT,0); drawCallsRenderedThisFrame++; verticesRenderedThisFrame += vertCount;
     }
 }
 
