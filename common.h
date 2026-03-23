@@ -124,6 +124,9 @@ typedef struct {
 #define ENTFLAG_ENABLED              (1ull << 45) // Instance updates
 #define ENTFLAG_ACTIVATED            (1ull << 46) // E.g. forcebridge visible, switch is flipped
 #define ENTFLAG_VISIBLE              (1ull << 47) // Renders
+#define ENTFLAG_ANIM_DEAD_DONE       (1ull << 48)
+#define ENTFLAG_NO_DYING_ANIM        (1ull << 49)
+#define ENTFLAG_NO_DEATH_FREEZE      (1ull << 50)
 #define QUESTBIT_ROBOT_SPAWN_DEACTIVATED      (1ull <<  0)
 #define QUESTBIT_ISOTOPE_INSTALLED            (1ull <<  1)
 #define QUESTBIT_SHIELD_ACTIVATED             (1ull <<  2)
@@ -1126,7 +1129,6 @@ typedef /*FAT*/ struct {
     Vector3    child_scale[MAX_CHILD_COUNT];
 
     // NPC logic
-    uint8_t npcIndex;
     AIState currentState;
     double timeForTranquilization;
     Vector3 sightPointOffset;

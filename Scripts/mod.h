@@ -7,6 +7,29 @@ extern GlobalContext* Eng_Global; extern CheatsSystem* Eng_Cheats; extern Settin
 #define MULTI_MEDIA_TAB_LOG_TABLE   1
 #define MULTI_MEDIA_TAB_DATA_TABLE  2
 #define MULTI_MEDIA_TAB_NOTES       3
+#define ANIM_LOOP_ALL 0
+#define ANIM_IDLE_CLOSED 0
+#define ANIM_OPENING     1
+#define ANIM_IDLE_OPEN   2
+#define ANIM_CLOSING     3
+#define ANIM_INSTALL     4
+#define ANIM_INSTALLED   5
+#define ANIM_INACTIVE   0
+#define ANIM_ACTIVATE   1
+#define ANIM_ACTIVATED  2
+#define ANIM_DEACTIVATE 3
+#define ANIM_IDLE    0
+#define ANIM_WALK    1
+#define ANIM_RUN     2
+#define ANIM_ATTACK1 3
+#define ANIM_ATTACK2 4
+#define ANIM_ATTACK3 5
+#define ANIM_PAIN    6
+#define ANIM_PAIN2   7
+#define ANIM_PAIN3   8
+#define ANIM_DYING   9
+#define ANIM_ATTACK_MISS 1
+#define ANIM_ATTACK_HIT  2
 #define NUM_AI_TYPES 29
 typedef struct {
 	const char* name;
@@ -70,7 +93,7 @@ typedef struct {
 	bool hasLaserOnAttack2;
 	bool hasLaserOnAttack3;
 	bool explodeOnAttack3;
-	bool preactivateMeleeColliders;
+	bool preactivateMeleeColliders; // Unused
 	double huntTime;
 	float flightHeight;
 	bool flightHeightIsPercentage;
@@ -118,8 +141,6 @@ typedef struct {
 
 static inline bool EntityLocked(const Entity* e) { return (e->entflags & ENTFLAG_LOCKED) != 0; }
 static inline void EntitySetLocked(Entity* e, bool locked) { flag_set(&e->entflags,ENTFLAG_LOCKED,locked); }
-static inline const char* EntityDefName(uint16_t self) { return Eng_Global->entities[Eng_Global->instances[self].index].path; }
-static inline bool EntityDefIs(uint16_t self, const char* name) { return StringsAreEqual(EntityDefName(self),name); }
 static inline void UIBlockedBySecurity(Vector3 tetherPoint) { (void)tetherPoint; CenterStatusPrint("%s",Eng_Text->stringTable[25]); }
 static inline void UICyberSprint(uint16_t textIndex) { CenterStatusPrint("%s",Eng_Text->stringTable[textIndex]); }
 static inline void UIExitCyberspace(void) { CenterStatusPrint("%s",Eng_Text->stringTable[601]); }
@@ -181,3 +202,4 @@ bool InventoryBioMonitorActive(uint16_t p);
 bool InventoryBoosterSetToBoost(uint16_t p);
 void InventoryJumpJetsToggle(uint16_t p);
 bool InventoryJumpJetsActive(uint16_t p);
+bool AICheckPain(Entity* self);

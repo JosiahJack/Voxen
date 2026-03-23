@@ -541,7 +541,7 @@ void Targetted(uint16_t activator, uint16_t self, const char* argvalue) {
     Entity* a = &Eng_Global->instances[activator];
     if (argvalue && !StringIsEmpty(argvalue)) StringCopyInto_A_From_B(e->argvalue,argvalue,TARGET_STRING_LENGTH);
     if (e->index == 708) { Eng_Global->gameFinished = true; return; }
-    if ((a->ioflags & TARG_IOFLAGS_SEND_EMAIL) && EntityDefIs(self,"info_email")) EmailTargetted(self,activator,argvalue);
+    if ((a->ioflags & TARG_IOFLAGS_SEND_EMAIL) && e->index == 707 /*info_email*/) EmailTargetted(self,activator,argvalue);
     if (a->ioflags & TARG_IOFLAGS_TRIPTRIGGER) {
         if (e->index == 598 || e->index == 600) TriggerTargetted(self,activator);
         else if (e->index == 594) TriggerCounterTargetted(self,activator,argvalue);
@@ -643,20 +643,6 @@ int8_t AmmoIconGet(int index,bool alt) {
     // based on return value (engine-side UI rendering concern).
 }
 //=============================================================================
-// AnimatorDelayedStop
-void AnimatorDelayedStopInitAfterLoad(uint16_t self) {
-    Entity* e = &Eng_Global->instances[self];
-    e->animSwapFinished = Eng_Global->pauseRelativeTime + e->delay;
-}
-
-void AnimatorDelayedStopUpdate(uint16_t self) {
-    Entity* e = &Eng_Global->instances[self];
-    if (e->animSwapFinished > 0.0 && Eng_Global->pauseRelativeTime >= e->animSwapFinished) {
-        e->animatorPlaybackTime = 0.0f; // TODO: confirm engine reads animatorPlaybackTime as playback speed multiplier, freeze anim
-        e->animSwapFinished = 0.0;
-    }
-}
-//=============================================================================
 // CreditsScroll
 // Video text phases: 0=text1 visible, 1=text2 visible, 2=text3 visible, 3=all hidden
 static double creditsVidStartTime = 0.0;
@@ -713,7 +699,6 @@ void CreditsUpdate(void) {
 
     if (ToggleMode()) { // right click — go back a page
         if (Eng_Global->creditsPageIndex > 0) --Eng_Global->creditsPageIndex;
-        // RenderCredits() in voxen.c picks up creditsPageIndex automatically
     }
 }
 //=============================================================================
@@ -1120,7 +1105,7 @@ void TargetIDSendDamageReceive(uint16_t self,float damage,AttackType attackType)
         e->textIndex         = 536; // STUNNED
         e->animSwapFinished  = Eng_Global->pauseRelativeTime - 1.0; // expire damage text
     } else {
-        float mh = npcTable[npc->npcIndex].health;
+        float mh = npcTable[npc->index - 419].health;
         if      (damage > mh * 0.75f) e->textIndex = 514; // SEVERE DAMAGE
         else if (damage > mh * 0.50f) e->textIndex = 515; // MAJOR DAMAGE
         else if (damage > mh * 0.25f) e->textIndex = 513; // NORMAL DAMAGE
@@ -1478,13 +1463,13 @@ static bool IsCyberEntity(uint16_t self) {
     if (Eng_Global->currentLevel == LEVEL_CYBERSPACE) return true;
     Entity* e = &Eng_Global->instances[self];
     if (self != PLAYER1 && e->cyberHealth > 0.0f) return true;
-    return (ConstIndexIsNPC(e->index) && e->npcIndex > 23); // 24-28 are cyber enemies
+    return (ConstIndexIsNPC(e->index) && (e->index - 419) > 23); // 24-28 are cyber enemies
 }
 
 static float ApplyAttackTypeAdjustments(uint16_t self,float take,AttackType at) {
     Entity* e = &Eng_Global->instances[self];
     if (!ConstIndexIsNPC(e->index) || e->health <= 0.0f) return take;
-    NPCType t = npcTable[e->npcIndex].type;
+    NPCType t = npcTable[e->index - 419].type;
     if (at >= 12) return take;
     return take * attackTypeMult[t][at];
 }
@@ -1547,9 +1532,8 @@ static void NPCDeath(uint16_t self) {
     if (e->entflags & ENTFLAG_DEAD_CHECKS_DONE) return;
     flag_set(&e->entflags,ENTFLAG_DEAD_CHECKS_DONE,true);
     CreateDeathEffects(self,e->deathBurst);
-    if (e->npcIndex == 0 && !(e->entflags & ENTFLAG_ACT_AS_CORPSE_ONLY))
-        play_wav(sounds[64],1.0f,e->position,true); // npc_autobomb: explosion1
-    if (npcTable[e->npcIndex].type == NPCType_Cyber) DeleteInstance(self);
+    if (e->index == 419) play_wav(sounds[64],1.0f,e->position,true); // npc_autobomb: explosion1
+    if (npcTable[e->index - 419].type == NPCType_Cyber) DeleteInstance(self);
     // else: keep collider alive to prevent falling through floor (Unity physics note preserved)
 }
 
@@ -1727,12 +1711,10 @@ float TakeDamage(uint16_t self,DamageData dd) {
     }
 
     if (isNPC && (e->health > 0.0f || (isCyber && e->cyberHealth > 0.0f))) {
-        if (npcTable[e->npcIndex].timeBetweenPain > 0.0f)
-            flag_set(&e->entflags,ENTFLAG_GO_INTO_PAIN,true);
-        // attacker stored in recentMostActivator
-        e->recentMostActivator = dd.owner;
+        if (npcTable[e->index - 419].timeBetweenPain > 0.0f) flag_set(&e->entflags,ENTFLAG_GO_INTO_PAIN,true);
+        e->recentMostActivator = dd.owner; // Pass attacker to NPC
         TargetIDSendDamageReceive(self,take,dd.attackType);
-        // TODO: CheckPain(self) — AI pain state transition
+        AICheckPain(e); // setup enemy with NPC
     }
 
     if (isCyber) {
@@ -1761,9 +1743,9 @@ void HealthManagerInitAfterLoad(uint16_t self) {
     }
     if (isNPC) {
         if (IsCyberEntity(self)) {
-            if (e->cyberHealth < 0.0f) e->cyberHealth = npcTable[e->npcIndex].healthForCyberNPC;
+            if (e->cyberHealth < 0.0f) e->cyberHealth = npcTable[e->index - 419].healthForCyberNPC;
         } else {
-            if (e->health < 0.0f) e->health = npcTable[e->npcIndex].health;
+            if (e->health < 0.0f) e->health = npcTable[e->index - 419].health;
         }
         if (Eng_Global->difficultyCombat == 0) { e->health = 1.0f; }
         if (e->entflags & ENTFLAG_ACT_AS_CORPSE_ONLY) {
@@ -2795,20 +2777,7 @@ MOD_TO_ENGINE float GetBasePlayerSpeed(bool running) {
     return retval + bonus;
 }
 //================================================================================
-// Update
-static void UpdateConvertedEntity(uint16_t i) {
-    Entity* e = &Eng_Global->instances[i];
-    if (EntityDefIs(i,"ef_fragexplosion")) ExplosionLifeUpdate(i);
-    if (ConstIndexIsButtonSwitch(e->index)) ButtonSwitchUpdate(i);
-    if (ConstIndexIsDoor(e->index)) DoorUpdate(i);
-    if (EntityDefIs(i,"logic_timer")) LogicTimerUpdate(i);
-    if (e->doSelfAfterList || e->despawnInstead || e->destroyAfterListInsteadOfDeactivate) DelayedSpawnUpdate(i);
-    if (e->itemLifeTime > 0.0f) SearchFXResetUpdate(i);
-    if (Eng_Global->currentLevel == LEVEL_CYBERSPACE && e->cyberTimer > 0.0f) CyberTimerUpdate(i);
-    if (EntityDefIs(i,"func_forcebridge")) ForceBridgeUpdate(i);
-    if (EntityDefIs(i,"func_wall")) FuncWallUpdate(i);
-}
-
+// Frob/Use
 void DeactivateVMail(void) { } // TODO
 
 void SearchObject(int searchable) {
@@ -2862,7 +2831,8 @@ bool FrobWithHeldObject(void) {
     return false;
     return true;
 }
-
+//================================================================================
+// Update
 MOD_TO_ENGINE void ModUpdate(void) {
     WeaponsUpdate();
     if (Use()) {
@@ -2875,7 +2845,22 @@ MOD_TO_ENGINE void ModUpdate(void) {
         }
     }
     if (Eng_Global->pauseRelativeTime < Eng_Global->debugLineFinished && (Eng_Global->debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Eng_Global->debugLine_start,Eng_Global->debugLine_end);
-    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < Eng_Global->loadedInstances; ++i) UpdateConvertedEntity(i);
+    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < Eng_Global->loadedInstances; ++i) {
+        Entity* e = &Eng_Global->instances[i];
+        uint16_t constdex = e->index;
+        if (constdex == 718) ExplosionLifeUpdate(i);
+        if (ConstIndexIsButtonSwitch(constdex)) ButtonSwitchUpdate(i);
+        if (ConstIndexIsDoor(constdex)) DoorUpdate(i);
+        if (constdex == 701) LogicTimerUpdate(i);
+        if (e->doSelfAfterList || e->despawnInstead || e->destroyAfterListInsteadOfDeactivate) DelayedSpawnUpdate(i);
+        if (e->itemLifeTime > 0.0f) SearchFXResetUpdate(i);
+        if (Eng_Global->currentLevel == LEVEL_CYBERSPACE && e->cyberTimer > 0.0f) CyberTimerUpdate(i);
+        if (constdex == 515) ForceBridgeUpdate(i);
+        if (constdex == 517) FuncWallUpdate(i);
+        if (constdex == 21 || constdex == 22) CyberWallUpdate(i);
+        if (constdex == 736) TargetIDUpdate(i);
+//         if (constdex == 596) { GravityLiftOnTriggerStay(i,PLAYER1); } // TODO: Must hook into trigger system
+    }
 }
 //================================================================================
 // Input
@@ -2939,6 +2924,22 @@ MOD_TO_ENGINE void ProcessInput(void) {
     if (Infrared()) Eng_Global->inventoryPlayer1.hardwareIsActive ^= HW_INF;
     ApplyPlayerMovements();
 }
+
+void SearchableInit(uint16_t i) {
+    int numRandomGeneratedItems = 0;
+    if (Eng_Global->instances[i].generateContents && !Eng_Global->instances[i].generationDone) {
+        for(int j=0;j<4;j++) {
+            if (Eng_Global->instances[i].randomItemDropChance[j] <= 0.0f) continue;
+            uint8_t tempInt = random_range_u8(0,100);
+            if (((float)tempInt / 100.0f) <= Eng_Global->instances[i].randomItemDropChance[j]) {
+                Eng_Global->instances[i].contents[numRandomGeneratedItems] = Eng_Global->instances[i].randomItem[j];
+                numRandomGeneratedItems++;
+                if (numRandomGeneratedItems > Eng_Global->instances[i].maxRandomItems) break;
+            }
+        }
+        Eng_Global->instances[i].generationDone = true;
+    }
+}
 //================================================================================
 // Entity and Mod Initialization
 GlobalContext* Eng_Global; CheatsSystem* Eng_Cheats; SettingsSystem* Eng_Settings; TextSystem* Eng_Text; SystemUI* Eng_UI; // From Engine
@@ -2956,20 +2957,6 @@ uint16_t GetImpactType(uint16_t instanceIdx) {
         case BloodType_GrayMutation: return 758; // GraytationBurst
     }
     return 729; // SparksSmall
-}
-
-static void InitConvertedEntity(uint16_t i) {
-    if (EntityDefIs(i,"func_forcebridge")) { ForceBridgeInitBeforeLoad(i); ForceBridgeInitAfterLoad(i); return; }
-    if (EntityDefIs(i,"func_wall")) { FuncWallInitAfterLoad(i); return; }
-    if (EntityDefIs(i,"trigger_gravitylift")) { GravityLiftInitAfterLoad(i); return; }
-    if (EntityDefIs(i,"logic_timer")) { LogicTimerInitBeforeLoad(i); return; }
-    if (EntityDefIs(i,"prop_cyberport")) { TeleportTouchInitAfterLoad(i); return; }
-    if (EntityDefIs(i,"prop_cyber_switch")) { CyberSwitchInitAfterLoad(i); return; }
-    if (EntityDefIs(i,"ef_fragexplosion")) { ExplosionLifeInitAfterLoad(i); return; }
-    if (ConstIndexIsDoor(Eng_Global->instances[i].index)) { DoorInitAfterLoad(i); return; }
-    if (ConstIndexIsButtonSwitch(Eng_Global->instances[i].index)) { ButtonSwitchInitAfterLoad(i); return; }
-    if (EntityDefIs(i,"item_cyber_data") || EntityDefIs(i,"item_cyber_decoy") || EntityDefIs(i,"item_cyber_drill") || EntityDefIs(i,"item_cyber_game") || EntityDefIs(i,"item_cyber_integrity") || EntityDefIs(i,"item_cyber_keycard") || EntityDefIs(i,"item_cyber_pulser") || EntityDefIs(i,"item_cyber_recall") || EntityDefIs(i,"item_cyber_shield") || EntityDefIs(i,"item_cyber_turbo")) { CyberItemInitBeforeLoad(i); return; }
-    if (EntityDefIs(i,"weapon_cyber_mine")) CyberMineInitBeforeLoad(i);
 }
 
 void MFDInit(SystemUI* ui) {
@@ -3072,14 +3059,27 @@ MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(DataParser* entity_parser) 
 
 MOD_TO_ENGINE void ModInitAfterLoad(void) {
     for (int i=PLAYER1;i<Eng_Global->loadedInstances;++i) {
-        if (i == PLAYER1 || i == PLAYER2 || ConstIndexIsDynamicObject(Eng_Global->instances[i].index)) Eng_Global->instances[i].gravity = 1.0f;
+        uint16_t constIndex = Eng_Global->instances[i].index;
+        if (i == PLAYER1 || i == PLAYER2 || ConstIndexIsDynamicObject(constIndex)) Eng_Global->instances[i].gravity = 1.0f;
         else Eng_Global->instances[i].gravity = 0.0f;
-        if (Eng_Global->instances[i].index < MAX_ENTITIES) flag_set(&Eng_Global->instances[i].entflags,ENTFLAG_ANIMATED,Eng_Global->entities[Eng_Global->instances[i].index].entflags & ENTFLAG_ANIMATED);
+        if (constIndex < MAX_ENTITIES) flag_set(&Eng_Global->instances[i].entflags,ENTFLAG_ANIMATED,Eng_Global->entities[constIndex].entflags & ENTFLAG_ANIMATED);
         if (Eng_Global->instances[i].entflags & ENTFLAG_HAS_CAMERA_VIEW) AddCameraPosition(i);
-        if (ConstIndexIsGeometry(Eng_Global->instances[i].index)) Eng_Global->instances[i].layer = PhysicsLayer_Geometry;
-        if (ConstIndexIsDoor(Eng_Global->instances[i].index)) Eng_Global->instances[i].layer = PhysicsLayer_Door;
-        if (ConstIndexIsNPC(Eng_Global->instances[i].index)) Eng_Global->instances[i].layer = PhysicsLayer_NPC;
-        InitConvertedEntity(i);
+        if (ConstIndexIsGeometry(constIndex)) Eng_Global->instances[i].layer = PhysicsLayer_Geometry;
+        else if (ConstIndexIsDoor(constIndex)) Eng_Global->instances[i].layer = PhysicsLayer_Door;
+        else if (ConstIndexIsDoor(Eng_Global->instances[i].index)) DoorInitAfterLoad(i);
+        else if (ConstIndexIsNPC(constIndex)) { Eng_Global->instances[i].layer = PhysicsLayer_NPC; /* TODO AIInit funcion */ }
+        else if (ConstIndexIsSearchable(constIndex)) SearchableInit(i);
+        else if (constIndex == 515) { ForceBridgeInitBeforeLoad(i); ForceBridgeInitAfterLoad(i); }
+        else if (constIndex == 517) FuncWallInitAfterLoad(i);
+        else if (constIndex == 596) GravityLiftInitAfterLoad(i);
+        else if (constIndex == 701) LogicTimerInitBeforeLoad(i);
+        else if (constIndex == 556) TeleportTouchInitAfterLoad(i);
+        else if (constIndex == 555) CyberSwitchInitAfterLoad(i);
+        else if (constIndex == 21 || constIndex == 22) CyberWallInitAfterLoad(i); // chunk_cyberpanel or chunk_cyberpanel_slice45
+        else if (constIndex == 736) TargetIDInitAfterLoad(i);
+        else if (ConstIndexIsButtonSwitch(Eng_Global->instances[i].index)) ButtonSwitchInitAfterLoad(i);
+        else if (constIndex >= 448 && constIndex <= 457) CyberItemInitBeforeLoad(i);
+        else if (constIndex == 480) CyberMineInitBeforeLoad(i);
         if (!StringIsEmpty(Eng_Global->instances[i].targetname) && (Eng_Global->instances[i].ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE) && !(Eng_Global->instances[i].entflags & TARG_IOFLAGS_DISABLD_ONCE_4EVER)) flag_set(&Eng_Global->instances[i].entflags,ENTFLAG_ACTIVE,false);
         if (Eng_Global->instances[i].index == 700) {
             if ((Eng_Global->instances[i].ioflags & TARG_IOFLAGS_START_ON_SECOND) || (Eng_Global->instances[i].ioflags & TARG_IOFLAGS_ON_SECOND)) {
@@ -3090,24 +3090,5 @@ MOD_TO_ENGINE void ModInitAfterLoad(void) {
                 flag_set(&Eng_Global->instances[i].ioflags,TARG_IOFLAGS_ON_SECOND,true);
             }
         }
-    }
-}
-
-void SearchableInit(uint16_t i, bool beforeLoad) {
-    if (beforeLoad) {
-        int numRandomGeneratedItems = 0;
-        if (Eng_Global->instances[i].generateContents && !Eng_Global->instances[i].generationDone) {
-            for(int j=0;j<4;j++) {
-                if (Eng_Global->instances[i].randomItemDropChance[j] <= 0.0f) continue;
-                uint8_t tempInt = random_range_u8(0,100);
-                if (((float)tempInt / 100.0f) <= Eng_Global->instances[i].randomItemDropChance[j]) {
-                    Eng_Global->instances[i].contents[numRandomGeneratedItems] = Eng_Global->instances[i].randomItem[j];
-                    numRandomGeneratedItems++;
-                    if (numRandomGeneratedItems > Eng_Global->instances[i].maxRandomItems) break;
-                }
-            }
-            Eng_Global->instances[i].generationDone = true;
-        }
-    } else {
     }
 }

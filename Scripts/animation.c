@@ -1,28 +1,5 @@
 ﻿// animation.c - Animation System for both models and textures (in world and UI)
 #include "mod.h"
-#define ANIM_LOOP_ALL 0
-#define ANIM_IDLE_CLOSED 0
-#define ANIM_OPENING     1
-#define ANIM_IDLE_OPEN   2
-#define ANIM_CLOSING     3
-#define ANIM_INSTALL     4
-#define ANIM_INSTALLED   5
-#define ANIM_INACTIVE   0
-#define ANIM_ACTIVATE   1
-#define ANIM_ACTIVATED  2
-#define ANIM_DEACTIVATE 3
-#define ANIM_IDLE    0
-#define ANIM_WALK    1
-#define ANIM_RUN     2
-#define ANIM_ATTACK1 3
-#define ANIM_ATTACK2 4
-#define ANIM_ATTACK3 5
-#define ANIM_PAIN    6
-#define ANIM_PAIN2   7
-#define ANIM_PAIN3   8
-#define ANIM_DYING   9
-#define ANIM_ATTACK_MISS 1
-#define ANIM_ATTACK_HIT  2
 
 // static const float textureSequenceFrameDelay = 0.35f;
 // static const float textureSequenceFrameDelayVmail = 0.09f;
