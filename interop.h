@@ -44,8 +44,8 @@
     X(bool, SwimUp, (void)) \
     X(bool, SwimDn, (void)) \
     X(bool, Console, (void)) \
-    X(float,GetBasePlayerSpeed, (bool isSprinting)) \
-    X(void, InitializeAIAfterLoad, (uint16_t entityIdx)) \
+    X(float,GetBasePlayerSpeed, (uint16_t, bool)) \
+    X(void, InitializeAIAfterLoad, (uint16_t)) \
     X(bool, TakeScreenshot, (void)) \
     X(void, UpdateMusic, (void)) \
     X(void, UpdateAmbientSounds, (void)) \
@@ -56,8 +56,8 @@
     X(void, UpdateAnims, (void)) \
     X(uint16_t, SpawnDynamicObject, (int, bool)) \
     X(void, ModInitAfterLoad, (void)) \
-    X(void, ModEntityDefinitionsInitAfterLoad, (DataParser* parser)) \
-    X(void, PlayerInit, (uint16_t playerIdx)) \
+    X(void, ModEntityDefinitionsInitAfterLoad, (DataParser*)) \
+    X(void, PlayerInit, (uint16_t)) \
     X(void, ProcessInput, (void))
 
 #ifdef MOD_INTEROP_IMPLEMENTATION  // mod.h usage:

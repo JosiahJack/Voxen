@@ -129,7 +129,7 @@ const char* GetPrefabNameFromIndex(int constIndex);
 void TakeEnergy(float drain);
 void GiveEnergy(float give, EnergyType type);
 void BioMonitorInit(void);
-void BioMonitorUpdate(void);
+void BioMonitorUpdate(uint16_t p);
 extern bool vmailActive;
 extern const AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS_PER_MODEL];
 extern const char* sounds[SOUNDS_COUNT];
@@ -182,7 +182,6 @@ void ExplosionLifeInitAfterLoad(uint16_t self);
 void ExplosionLifeUpdate(uint16_t self);
 void EmailTargetted(uint16_t self, uint16_t activator, const char* argvalue);
 void ForceBridgeActivate(uint16_t self, bool isSilent);
-void ForceBridgeDeactivate(uint16_t self, bool isSilent);
 void ForceBridgeToggle(uint16_t self);
 void GravityLiftToggle(uint16_t self);
 void TextureChangerToggle(uint16_t self);
@@ -198,8 +197,10 @@ void GeneralInvApply(int buttonIdx,int customIdx);
 bool InventoryAddSoftwareItem(uint16_t p,SoftwareType type,int vers);
 int Get16WeaponIndexFromConstIndex(int index);
 void UseGrenade(uint16_t playerIndex, int index);
-bool InventoryBioMonitorActive(uint16_t p);
-bool InventoryBoosterSetToBoost(uint16_t p);
-void InventoryJumpJetsToggle(uint16_t p);
-bool InventoryJumpJetsActive(uint16_t p);
 bool AICheckPain(Entity* self);
+void ResetHeldItem(uint16_t p);
+void DropHeldItem(uint16_t p);
+void AddItemToInventory(uint16_t p, int index, int customIndex);
+static inline __attribute__((always_inline)) Entity* PE(uint16_t p) { return &Eng_Global->instances[p]; }
+static inline __attribute__((always_inline)) float SfxVol(void) { return (float)Eng_Settings->VolumeEffects / 100.0f; }
+static inline __attribute__((always_inline)) InventorySystem* Inv(uint16_t p) { return p == PLAYER1 ? &Eng_Global->inventoryPlayer1 : &Eng_Global->inventoryPlayer2; }

@@ -91,25 +91,16 @@ void BioMonitorInit(void) {
 }
 
 static void IncrementERG(void) {
-    if (Eng_Global->gamePaused) return;
-    if (Eng_Global->menuActive) return;
-
     bioMonitor.currentIndex0++;
     if (bioMonitor.currentIndex0 >= BIOM_GRAPH_W) bioMonitor.currentIndex0 = 0;
 }
 
 static void IncrementCHI(void) {
-    if (Eng_Global->gamePaused) return;
-    if (Eng_Global->menuActive) return;
-
     bioMonitor.currentIndex1++;
     if (bioMonitor.currentIndex1 >= BIOM_GRAPH_W) bioMonitor.currentIndex1 = 0;
 }
 
 static void IncrementECG(void) {
-    if (Eng_Global->gamePaused) return;
-    if (Eng_Global->menuActive) return;
-
     bioMonitor.currentIndex2++;
     if (bioMonitor.currentIndex2 >= BIOM_GRAPH_W) bioMonitor.currentIndex2 = 0;
 }
@@ -243,27 +234,28 @@ static void BiomonitorEnergyPulse(float take) {
 }
 #pragma GCC diagnostic pop
 
-void BioMonitorUpdate(void) {
-    if (!(Eng_Global->inventoryPlayer1.hasHardware & HW_BIO) || !(Eng_Global->inventoryPlayer1.hardwareIsActive & HW_BIO)) return;
+void BioMonitorUpdate(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    if (!(inv->hasHardware & HW_BIO) || !(inv->hardwareIsActive & HW_BIO)) return;
 
     bioMonitor.header = 526;
     bioMonitor.heartRateText = 527;
     bioMonitor.bpmText = 529;
     bioMonitor.fatigueDetailText = 531;
     bioMonitor.fatigue = 534; // Low
-         if (Eng_Global->instances[PLAYER1].fatigue >= 80.0f)                                       bioMonitor.fatigue = 532; // High!
-    else if (Eng_Global->instances[PLAYER1].fatigue <  80.0f && Eng_Global->instances[PLAYER1].fatigue > 30.0f) bioMonitor.fatigue = 533; // Moderate
+         if (inv->fatigue >= 80.0f)                         bioMonitor.fatigue = 532; // High!
+    else if (inv->fatigue <  80.0f && inv->fatigue > 30.0f) bioMonitor.fatigue = 533; // Moderate
 
-    if (bioMonitor.beatFinished < Eng_Global->pauseRelativeTime) bioMonitor.heartRate = vfloor((70.0f +((Eng_Global->instances[PLAYER1].fatigue / 100.0f) * 110.0f)) * random_range(0.95f,1.05f));
-    if (Eng_Global->inventoryPlayer1.hardwareVersion[HW_BIO_IDX] > 1 && (Eng_Global->instances[PLAYER1].patchActive & 127)) {
+    if (bioMonitor.beatFinished < Eng_Global->pauseRelativeTime) bioMonitor.heartRate = vfloor((70.0f + ((inv->fatigue / 100.0f) * 110.0f)) * random_range(0.95f,1.05f));
+    if (inv->hardwareVersion[HW_BIO_IDX] > 1 && (inv->patchActive & 127)) {
 //         bioMonitor.patchesActiveText = Eng_Text->stringTable[528]; // TODO actually render text
-//         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_MEDI))     { tempStr.Append(Eng_Text->stringTable[520]); tempStr.Append(" "); }
-//         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_STAMINUP)) { tempStr.Append(Eng_Text->stringTable[521]); tempStr.Append(" "); }
-//         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_SIGHT))    { tempStr.Append(Eng_Text->stringTable[522]); tempStr.Append(" "); }
-//         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_GENIUS))   { tempStr.Append(Eng_Text->stringTable[523]); tempStr.Append(" "); }
-//         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_BERSERK))  { tempStr.Append(Eng_Text->stringTable[524]); tempStr.Append(" "); }
-//         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_REFLEX))   { tempStr.Append(Eng_Text->stringTable[525]); tempStr.Append(" "); }
-//         if (Eng_Global->instances[PLAYER1].patchActive & PATCH_DETOX))    { tempStr.Append(Eng_Text->stringTable[530]); }
+//         if (inv->patchActive & PATCH_MEDI))     { tempStr.Append(Eng_Text->stringTable[520]); tempStr.Append(" "); }
+//         if (inv->patchActive & PATCH_STAMINUP)) { tempStr.Append(Eng_Text->stringTable[521]); tempStr.Append(" "); }
+//         if (inv->patchActive & PATCH_SIGHT))    { tempStr.Append(Eng_Text->stringTable[522]); tempStr.Append(" "); }
+//         if (inv->patchActive & PATCH_GENIUS))   { tempStr.Append(Eng_Text->stringTable[523]); tempStr.Append(" "); }
+//         if (inv->patchActive & PATCH_BERSERK))  { tempStr.Append(Eng_Text->stringTable[524]); tempStr.Append(" "); }
+//         if (inv->patchActive & PATCH_REFLEX))   { tempStr.Append(Eng_Text->stringTable[525]); tempStr.Append(" "); }
+//         if (inv->patchActive & PATCH_DETOX))    { tempStr.Append(Eng_Text->stringTable[530]); }
 //         patchEffects.text = tempStr.ToString();
     }
 
@@ -271,27 +263,21 @@ void BioMonitorUpdate(void) {
     static const float beatVariation = 0.05f;
 
     // Energy Usage
-    bioMonitor.ergValue = (Eng_Global->instances[PLAYER1].drainJPM / 255.0f);
+    bioMonitor.ergValue = (inv->drainJPM / 255.0f);
     if (bioMonitor.ergValue < 0.0f) bioMonitor.ergValue = 0.0f;
     if (bioMonitor.ergValue > 1.0f) bioMonitor.ergValue = 1.0f;
 
     // Chi Brain Waves
     float brainFactor = 0.15f;
-    if (Eng_Global->instances[PLAYER1].geniusFinishedTime > Eng_Global->pauseRelativeTime) {
-        brainFactor = 0.35f + random_range(-0.3f,0.3f);
-    }
-
+    if (inv->geniusFinishedTime > Eng_Global->pauseRelativeTime) brainFactor = 0.35f + random_range(-0.3f,0.3f);
     if (Eng_Cheats->showFPS) bioMonitor.chiValue = (((float)Eng_Global->thisFrameTime/16.0f) * 0.5f) - 2.0f;
-    else                    bioMonitor.chiValue = (float)(vsinf(Eng_Global->pauseRelativeTime * 10.0 * (double)brainFactor));
+    else                     bioMonitor.chiValue = (float)(vsinf(Eng_Global->pauseRelativeTime * 10.0 * (double)brainFactor));
 
     // ECG: Create shifted sine wave for heart beat.
     // Apply percent fatigued to 200bpm max heart rate with baseline 50bpm.
-    float fatigueFactor = ((Eng_Global->instances[PLAYER1].fatigue / 100.0f) * 120.0f) + 20.0f;
+    float fatigueFactor = ((inv->fatigue / 100.0f) * 120.0f) + 20.0f;
     fatigueFactor = fatigueFactor / 60.0f;
-    if (bioMonitor.beatFinished < Eng_Global->pauseRelativeTime) {
-        bioMonitor.beatFinished = Eng_Global->pauseRelativeTime + (1.0 / (double)fatigueFactor);
-    }
-
+    if (bioMonitor.beatFinished < Eng_Global->pauseRelativeTime) bioMonitor.beatFinished = Eng_Global->pauseRelativeTime + (1.0 / (double)fatigueFactor);
     bioMonitor.beatShift = (bioMonitor.beatFinished - Eng_Global->pauseRelativeTime) / (1.0 / (double)fatigueFactor);
     if (bioMonitor.beatShift > 0.94f) bioMonitor.ecgValue = vsinf(bioMonitor.beatShift * 35.0f);
     else bioMonitor.ecgValue = 0.0f;

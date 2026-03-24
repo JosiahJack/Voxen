@@ -316,7 +316,7 @@ static void cmd_staminup(void) {
     Sys_Cheats.fatigueCheat = !Sys_Cheats.fatigueCheat;
     if (Sys_Cheats.fatigueCheat) {
         CenterStatusPrint("Stamin-Up! %s", Sys_Text.stringTable[1013]);
-        Sys_Global.instances[PLAYER1].fatigue = 0.0f;
+        Sys_Global.inventoryPlayer1.fatigue = 0.0f;
     } else {
         CenterStatusPrint("%s", Sys_Text.stringTable[1012]);
     }

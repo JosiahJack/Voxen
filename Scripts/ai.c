@@ -409,10 +409,7 @@ static bool AICheckIfPlayerInSight(Entity* self) {
 static void AIEnableAutomapOverlay(Entity* self) {
     uint16_t ov = self->child[2];
     if (!ov || ov >= INSTANCE_COUNT) return;
-    bool show = ai_has_health(self) && (self->entflags & ENTFLAG_ACTIVE)
-                && !ai_is_cyber(self)
-                && (Eng_Global->inventoryPlayer1.hasHardware & HW_NAV)
-                && Eng_Global->inventoryPlayer1.hardwareVersion[HW_NAV_IDX] > 1;
+    bool show = ai_has_health(self) && (self->entflags & ENTFLAG_ACTIVE) && !ai_is_cyber(self);
     flag_set(&Eng_Global->instances[ov].entflags, ENTFLAG_VISIBLE, show);
 }
 
@@ -797,7 +794,8 @@ static void AIDying(Entity* self) {
     if (self->index == 439) self->layer = PhysicsLayer_Corpse | PhysicsLayer_CorpseSearchable; // Zero-G mutant enables search collider while still dying
 }
 
-static void AIDead(Entity* self) {
+static void AIDead(uint16_t idx) {
+    Entity* self = &Eng_Global->instances[idx];   
     flag_set(&self->entflags, ENTFLAG_ASLEEP,       false);
     flag_set(&self->entflags, ENTFLAG_DEAD,         true);
     flag_set(&self->entflags, ENTFLAG_DYING,        false);
@@ -811,12 +809,13 @@ static void AIDead(Entity* self) {
         self->gravity = 1.0f;
         flag_set(&self->entflags,ENTFLAG_USEGRAVITY,true);
         flag_set(&self->entflags,ENTFLAG_VISIBLE,false);
-        // TODO: TeleportAway(ai_self_idx(self))
+        // TODO: TeleportAway(ai_self_idx(self)), DeleteInstance(idx);
     } else if (ai_is_cyber(self)) {
         self->gravity = 0.0f;
         flag_set(&self->entflags, ENTFLAG_USEGRAVITY,false);
         flag_set(&self->entflags, ENTFLAG_VISIBLE,false);
-        // TODO: Gib(ai_self_idx(self)) — spawn gibs, DeleteInstance
+        // TODO: Gib(ai_self_idx(self)) — spawn gibs
+        DeleteInstance(idx);
     } else {
         // Enable search collider for non-gib corpses (Avian Mutant index 2 always searchable)
         self->layer = PhysicsLayer_Corpse | PhysicsLayer_CorpseSearchable;
@@ -1099,7 +1098,8 @@ void AIAwakeFromSleep(uint16_t idx) {
     AIAlert(idx);
 }
 
-static void AIThink(Entity* self) {
+static void AIThink(uint16_t idx) {
+    Entity* self = &Eng_Global->instances[idx];   
     if ((self->entflags & ENTFLAG_DYING_SETUP) && self->deathBurstFinished < Eng_Global->pauseRelativeTime && !(self->entflags & ENTFLAG_DEATH_BURST_DONE)) {
         // TODO activate death burst effect
         flag_set(&self->entflags, ENTFLAG_DEATH_BURST_DONE, true);
@@ -1125,7 +1125,7 @@ static void AIThink(Entity* self) {
         case AIState_Attack3: AIAttack3(self); break;
         case AIState_Pain:    AIPain(self);    break;
         case AIState_Dying:   AIDying(self);   break;
-        case AIState_Dead:    AIDead(self);    break;
+        case AIState_Dead:    AIDead(idx);    break;
         default:              AIIdle(self);    break;
     }
 
@@ -1134,8 +1134,7 @@ static void AIThink(Entity* self) {
 
 void AIControllerUpdate(uint16_t idx) {
     Entity* self = &Eng_Global->instances[idx];
-    if (!(self->entflags & ENTFLAG_ACTIVE))         return;
-    if (Eng_Global->gamePaused)                     return;
+    if (!(self->entflags & ENTFLAG_ACTIVE)) return;
 
     if (!ai_is_cyber(self) && npcTable[self->index - 419].moveType != AIMoveType_Fly
         && self->currentState != AIState_Dead && self->currentState != AIState_Dying
@@ -1174,7 +1173,7 @@ void AIControllerUpdate(uint16_t idx) {
         self->rangeToEnemy = sr * sr;
     }
 
-    if (self->tickFinished < Eng_Global->pauseRelativeTime) { self->tickFinished = Eng_Global->pauseRelativeTime + AI_TICK_TIME; AIThink(self); }
+    if (self->tickFinished < Eng_Global->pauseRelativeTime) { self->tickFinished = Eng_Global->pauseRelativeTime + AI_TICK_TIME; AIThink(idx); }
     if (self->currentState != AIState_Dead && self->currentState != AIState_Idle) {
         if ((self->entflags & ENTFLAG_ACT_AS_TURRET) && eidx) {
             Entity* en = &Eng_Global->instances[eidx];

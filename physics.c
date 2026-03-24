@@ -271,7 +271,7 @@ ENGINE_TO_MOD void ApplyPlayerMovements(void) {
     if (SwimUp()/* && Sys_Cheats.noclip*/) input.y += 1.0f;
     input = normalize_vector3(input);
     float intent = magnitude_vector3(input);
-    float speed = GetBasePlayerSpeed(intent > 0.1f) * 1.75f; // Friction compensation term
+    float speed = GetBasePlayerSpeed(PLAYER1,intent > 0.1f) * 1.75f; // Friction compensation term
     Vector3 wishVel = scale_vector3(input, speed);
     Vector3 currentVel = Sys_Global.instances[PLAYER1].velocity;
     float accel = Sys_Global.boosterActive ? 1.0f : 3.0f;

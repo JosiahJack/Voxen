@@ -1,6 +1,784 @@
 // citadel.c - Gamelogic.  Most functionality is trivial so put it here.
 #include "mod.h"
 //=============================================================================
+// Inventory
+void ResetHeldItem(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    inv->heldObjectIndex = inv->heldObjectCustomIndex = UINT16_MAX;
+    inv->heldObjectAmmo = inv->heldObjectAmmo2 = 0;
+    inv->heldObjectLoadedAlternate = inv->holdingObject = inv->grenadeActive = false;
+}
+
+void DropHeldItem(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    if (inv->heldObjectIndex >= Eng_Global->loadedInstances) { ResetHeldItem(p); return; }
+    
+    inv->dropFinished = Eng_Global->current_time + 0.2; // Prevent immediate regrab at high fps
+    if (!inv->grenadeActive) {
+//         for (int i=0;i<levelDynamicContainer.transform.childCount;i++) {
+//             Transform tr = levelDynamicContainer.transform.GetChild(i);
+//             GameObject go = tr.gameObject;
+//             UseableObjectUse reference = go.GetComponent<UseableObjectUse>();
+//             if (reference != null) {
+//                 if (reference.useableItemIndex == inv->heldObjectIndex && go.activeSelf == false) {
+//                     reference.customIndex = heldObjectCustomIndex;
+//                     tossObject = go;
+//                     freeObjectInPoolFound = true;
+//                     break;
+//                 }
+//             }
+//         }
+// 
+//         if (freeObjectInPoolFound) {
+//             if (tossObject == null) {
+//                 CenterStatusPrint("BUG: Failed to get freeObjectInPool for object being dropped!",player);
+//                 ResetHeldItem(p);
+//                 return;
+//             } else {
+//                 tossObject.Eng_Global->instances[i].position = (Eng_Global->instances[i].position + (transform.forward * tossOffset));
+//             }
+//         } else {
+//             // DualLog("WARNING: Failed to get freeObjectInPool for object " + heldObject.ToString() + "being dropped! DropHeldItem.",player);
+//             tossObject = Instantiate(heldObject,(Eng_Global->instances[i].position + (transform.forward * tossOffset)),Const.a.quaternionIdentity) as GameObject;  //effect
+//             if (tossObject == null) {
+//                 CenterStatusPrint("BUG: Failed to instantiate object being dropped!",player);
+//                 ResetHeldItem(p);
+//                 return;
+//             }
+//         }
+//         if (tossObject.activeSelf != true) tossObject.SetActive(true);
+//         if (levelDynamicContainer != null) {
+//             tossObject.transform.SetParent(levelDynamicContainer.transform,true);
+//         }
+// 
+//         Vector3 tossDir = MouseCursor.a.GetCursorScreenPointForRay();
+//         tossDir = playerCamera.ScreenPointToRay(tossDir).direction;
+//         Rigidbody rbody = tossObject.GetComponent<Rigidbody>();
+//         if (rbody != null) {
+//             rbody.isKinematic = false;
+//             rbody.useGravity = true;
+//             rbody.velocity = tossDir * tossForce;
+//         }
+// 
+//         UseableObjectUse uou = tossObject.GetComponent<UseableObjectUse>();
+//         uou.customIndex = heldObjectCustomIndex;
+//         uou.ammo = heldObjectAmmo;
+//         uou.ammo2 = heldObjectAmmo2;
+//         uou.heldObjectLoadedAlternate = heldObjectLoadedAlternate;
+    } else {
+        // Throw an active grenade
+//         grenadeActive = false;
+//         Eng_UI->mouseClickHeldOverGUI = true; // Prevent shooting it.
+//         tossObject = Instantiate(heldObject,(Eng_Global->instances[i].position + (transform.forward * tossOffset)),Const.a.quaternionIdentity) as GameObject;  //effect
+//         if (tossObject == null) {
+//             CenterStatusPrint("BUG: Failed to instantiate object being dropped!",player);
+//             ResetHeldItem(p);
+//             return;
+//         }
+// 
+//         Const.a.grenadesThrown++;
+//         if (levelDynamicContainer != null){
+//             tossObject.transform.SetParent(levelDynamicContainer.transform,true);
+//         }
+//         tossObject.layer = 11; // Set to player bullets layer to prevent collision and still be visible.
+//         Vector3 tossDir = MouseCursor.a.GetCursorScreenPointForRay();
+//         tossDir = playerCamera.ScreenPointToRay(tossDir).direction;
+//         Rigidbody rbody = tossObject.GetComponent<Rigidbody>();
+//         if (rbody != null) {
+//             rbody.isKinematic = false;
+//             rbody.useGravity = true;
+//             rbody.velocity = tossDir * tossForce;
+//         }
+//         GrenadeActivate ga = tossObject.GetComponent<GrenadeActivate>();
+//         if (ga != null) ga.Activate(); // Time to boom!
+//         MouseCursor.a.liveGrenade = false;
+    }
+    
+    ResetHeldItem(p);
+}
+
+void PatchUse(uint16_t playerIdx,int patchSlot) { (void)playerIdx; (void)patchSlot; } // TODO
+void WeaponFireStartWeaponDip(float t) { (void)t; } // TODO
+void WeaponFireCompleteWeaponChange(void) { } // TODO
+bool InventoryHasAccessCard(uint16_t p,AccessCardType card) { return (Inv(p)->accessCardOwned & (1u << card)) != 0; }
+bool InventoryHasAnyAccessCards(uint16_t p) { return Inv(p)->accessCardOwned != 0; }
+const char* AccessCardCodeForType(AccessCardType a) { // Called by ItemTabManager
+    switch(a) {
+        case AccessCardType_Standard:    return "STD";
+        case AccessCardType_Medical:     return "MED";
+        case AccessCardType_Science:     return "SCI";
+        case AccessCardType_Admin:       return "ADM";
+        case AccessCardType_Group1:      return "Group-1";
+        case AccessCardType_Group2:      return "Group-2";
+        case AccessCardType_Group3:      return "Group-3";
+        case AccessCardType_Group4:      return "Group-4";
+        case AccessCardType_GroupA:      return "Group-A";
+        case AccessCardType_GroupB:      return "Group-B";
+        case AccessCardType_Storage:     return "STO";
+        case AccessCardType_Engineering: return "ENG";
+        case AccessCardType_Maintenance: return "MTN";
+        case AccessCardType_Security:    return "SEC";
+        case AccessCardType_Per1:        return "PER-1";
+        case AccessCardType_Per2:        return "PER-2";
+        case AccessCardType_Per3:        return "PER-3";
+        case AccessCardType_Per4:        return "PER-4";
+        case AccessCardType_Per5:        return "PER-5";
+        default:                         return "Group-2";
+    }
+}
+
+void AddAccessCardToInventory(uint16_t p,int index) {
+    AccessCardType card;
+    switch(index) {
+        case  34: card = AccessCardType_Admin;       break;
+        case  81: card = AccessCardType_Standard;    break;
+        case  83: card = AccessCardType_Group1;      break;
+        case  84: card = AccessCardType_Science;     break;
+        case  85: card = AccessCardType_Engineering; break;
+        case  86: card = AccessCardType_GroupB;      break;
+        case  87: card = AccessCardType_Security;    break;
+        case  88: card = AccessCardType_Per5;        break;
+        case  89: card = AccessCardType_Medical;     break;
+        case  90: card = AccessCardType_Group3;      break;
+        case  91: card = AccessCardType_Group4;      break;
+        case 110: card = AccessCardType_Per1;        break;
+        default:
+            CenterStatusPrint("BUG: Unmarked access card, defaulting to STD.");
+            card = AccessCardType_Standard;
+            break;
+    }
+    if (index == 87) { // Command card = STO + SEC + MTN
+        if (InventoryHasAccessCard(p,AccessCardType_Storage) &&
+            InventoryHasAccessCard(p,AccessCardType_Security) &&
+            InventoryHasAccessCard(p,AccessCardType_Maintenance)) {
+            CenterStatusPrint("%s%s",Eng_Text->stringTable[44],AccessCardCodeForType(card));
+            return;
+        }
+        Inv(p)->accessCardOwned |= (1u<<AccessCardType_Storage)|(1u<<AccessCardType_Security)|(1u<<AccessCardType_Maintenance);
+        CenterStatusPrint("%s%s, %s, %s",Eng_Text->stringTable[45],AccessCardCodeForType(AccessCardType_Storage),AccessCardCodeForType(AccessCardType_Security),AccessCardCodeForType(AccessCardType_Maintenance));
+        return;
+    }
+    if (InventoryHasAccessCard(p,card)) { CenterStatusPrint("%s%s",Eng_Text->stringTable[44],AccessCardCodeForType(card)); return; }
+    Inv(p)->accessCardOwned |= (1u << card);
+    CenterStatusPrint("%s%s",Eng_Text->stringTable[45],AccessCardCodeForType(card));
+}
+
+void AddHardwareToInventory(uint16_t p,int index,int constIndex,int hwversion,bool overt) {
+    (void)constIndex;
+    if (index < 0) return;
+    InventorySystem* inv = Inv(p);
+    if (hwversion < 0) { CenterStatusPrint("BUG: Hardware added with version < 0, using 0."); hwversion = 0; }
+    if (hwversion > 0 && hwversion <= (int)inv->hardwareVersion[index]) {
+        if (overt) CenterStatusPrint("%s",Eng_Text->stringTable[46]); // THAT WARE IS OBSOLETE. DISCARDED.
+        return;
+    }
+    static const uint8_t textIdx[12] = {21,22,23,24,25,26,27,28,29,30,31,32};
+    inv->hardwareInvIndex             = index;
+    inv->hasHardware                 |= (uint16_t)(1u << index);
+    inv->hardwareVersion[index]       = (uint8_t)hwversion;
+    inv->hardwareVersionSetting[index]= hwversion > 0 ? (uint8_t)(hwversion - 1) : 0;
+    // TODO: engine enables HUD hardware buttons from hasHardware bitmask on render
+    // TODO: nav unit (index 1): compass/automap HUD visibility from hasHardware & HW_NAV + version
+    if (overt) CenterStatusPrint("%s v%d",Eng_Text->stringTable[textIdx[index] + 326],hwversion);
+}
+
+int  NavUnitVersion(uint16_t p)     { return Inv(p)->hardwareVersion[HW_NAV_IDX]; }
+int  BioMonitorVersion(uint16_t p)  { return Inv(p)->hardwareVersion[HW_BIO_IDX]; }
+bool BioMonitorActive(uint16_t p)   { InventorySystem* i=Inv(p); return (i->hasHardware & HW_BIO) && (i->hardwareIsActive & HW_BIO); }
+bool LanternActive(uint16_t p)      { InventorySystem* i=Inv(p); return (i->hasHardware & HW_LAN) && (i->hardwareIsActive & HW_LAN); }
+int  EnvirosuitVersion(uint16_t p)  { return Inv(p)->hardwareVersion[HW_ENV_IDX]; }
+bool BoosterSetToSkates(uint16_t p) { return Inv(p)->hardwareVersionSetting[HW_BST_IDX] == 0; }
+bool BoosterSetToBoost(uint16_t p)  { return Inv(p)->hardwareVersionSetting[HW_BST_IDX] >= 1; }
+bool BoosterActive(uint16_t p)      { InventorySystem* i=Inv(p); return (i->hasHardware & HW_BST) && (i->hardwareIsActive & HW_BST); }
+void JumpJetsToggle(uint16_t p)     { Inv(p)->hardwareIsActive ^= HW_JET; }
+int  JumpJetsVersion(uint16_t p)    { return Inv(p)->hardwareVersion[HW_JET_IDX]; }
+bool JumpJetsActive(uint16_t p)     { InventorySystem* i=Inv(p); return (i->hasHardware & HW_JET) && (i->hardwareIsActive & HW_JET); }
+// HideBioMonitor / UnHideBioMonitor: engine reads InventoryBioMonitorActive() for HUD visibility, no gamecode needed
+
+bool AddGeneralObjectToInventory(uint16_t p,int index,int customIndex) {
+    if (index < 0) return false;
+    InventorySystem* inv = Inv(p);
+    for (int i = 1; i < 14; i++) {
+        if (inv->generalInventoryIndexRef[i] != -1) continue;
+        if (!InventoryHasAnyAccessCards(p) && inv->generalInvCurrent == 0) inv->generalInvCurrent = (int8_t)i;
+        inv->generalInventoryIndexRef[i] = index;
+        inv->generalInvCustomIndex[i]    = (int16_t)customIndex;
+        CenterStatusPrint("%s%s",Eng_Text->stringTable[index + 326],Eng_Text->stringTable[31]);
+        return true;
+    }
+    return false;
+}
+
+void GeneralInventoryActivate(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    int cur = inv->generalInvCurrent;
+    if (cur < 0 || cur >= 14) { DualLog("BUG: generalInvCurrent out of range at %d",cur); return; }
+    GeneralInvApply(cur,inv->generalInvCustomIndex[cur]);
+    if (cur != 0) inv->generalInventoryIndexRef[cur] = -1;
+}
+
+void GrenadeCycleDown(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    int last = inv->grenadeCurrent, next = last - 1;
+    if (next < 0) next = 6;
+    for (int c = 0; c <= 13; c++) {
+        if (inv->grenAmmo[next] > 0) break;
+        if (c == 13) return;
+        if (--next < 0) next = 6;
+    }
+    if (last == next) return;
+    inv->grenadeCurrent = (int8_t)next;
+    static const uint16_t msg[7] = {579,580,581,582,583,584,585};
+    CenterStatusPrint("%s",Eng_Text->stringTable[msg[next]]);
+}
+
+void GrenadeCycleUp(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    int last = inv->grenadeCurrent, next = last + 1;
+    if (next > 6) next = 0;
+    for (int c = 0; c <= 13; c++) {
+        if (inv->grenAmmo[next] > 0) break;
+        if (c == 13) return;
+        if (++next > 6) next = 0;
+    }
+    if (last == next) return;
+    inv->grenadeCurrent = (int8_t)next;
+    static const uint16_t msg[7] = {579,580,581,582,583,584,585};
+    CenterStatusPrint("%s",Eng_Text->stringTable[msg[next]]);
+}
+
+void AddGrenadeToInventory(uint16_t p,int index,int useableIndex) {
+    if (index < 0) return;
+    InventorySystem* inv = Inv(p);
+    bool anyGren = false;
+    for (int i = 0; i < 7; i++) if (inv->grenAmmo[i]) { anyGren = true; break; }
+    if (!anyGren) inv->grenadeCurrent = (int8_t)index;
+    inv->grenAmmo[index]++;
+    inv->grenConstIndex[index] = (int16_t)useableIndex;
+    CenterStatusPrint("%s%s",Eng_Text->stringTable[useableIndex + 326],Eng_Text->stringTable[34]);
+}
+
+void RemoveGrenade(uint16_t p,int index) {
+    InventorySystem* inv = Inv(p);
+    if (inv->grenAmmo[index] > 0) inv->grenAmmo[index]--;
+    if (!inv->grenAmmo[index]) GrenadeCycleDown(p);
+}
+
+void CheckForUnreadLogs(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    int em = 0, lg = 0;
+    for (int i = TEXT_LOGS_COUNT-1; i >= 0; i--) {
+        if (inv->hasLog[i] && !inv->readLog[i]) {
+            if (Eng_Text->audioLogType[i] == AudioLogType_Email) em++; else lg++;
+        }
+    }
+    if (!em) inv->hasNewEmail = false;
+    if (!lg) inv->hasNewLogs  = false;
+}
+
+static int FindNextUnreadLog(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    for (int i = TEXT_LOGS_COUNT-1; i >= 0; i--) {
+        if (inv->hasLog[i] && !inv->readLog[i]) return i;
+    }
+    return -1;
+}
+
+static void PlayLog(uint16_t p,int logIndex) {
+    if (logIndex < 0) return;
+    InventorySystem* inv = Inv(p);
+    if (!(inv->hasHardware & HW_ERD)) return;
+//     if (inv->logSoundInited) { SoundStop(&inv->logSound); SoundUninit(&inv->logSound); inv->logSoundInited = false; }
+//     if (!SoundInit(sounds[Eng_Text->audioLogSoundIndex[logIndex]],0,NULL,NULL,&inv->logSound)) {
+//         SoundSetVolume(&inv->logSound,(float)Eng_Settings->VolumeMessage / 100.0f);
+//         SoundStart(&inv->logSound);
+//         inv->logSoundInited = true;
+//     }
+//     inv->readLog[logIndex] = true;
+//     if (Eng_Text->audioLogType[logIndex] == AudioLogType_Vmail) {
+//         vmailActive        = true;
+//         inv->vmailLogIndex = (int16_t)logIndex; // engine reads to select which .webm to play
+//         switch (logIndex) { // TODO
+//             case 119:
+//                 vmailbetajet.SetActive(true);
+//                 fileName = "betajet.webm";
+//                 Utils.ConfirmExistsMakeIfNot(basePath,fileName);
+//                 urlPath = Utils.SafePathCombine(basePath,fileName);
+//                 vmailbetajetVideo.url = urlPath;
+//                 vmailbetajetVideo.Play();
+//                 break;
+//             case 116:
+//                 vmailbridgesep.SetActive(true);
+//                 fileName = "bridgesep.webm";
+//                 Utils.ConfirmExistsMakeIfNot(basePath,fileName);
+//                 urlPath = Utils.SafePathCombine(basePath,fileName);
+//                 vmailbridgesepVideo.url = urlPath;
+//                 vmailbridgesepVideo.Play();
+//                 break;
+//             case 117:
+//                 vmailcitadestruct.SetActive(true);
+//                 fileName = "citadestruct.webm";
+//                 Utils.ConfirmExistsMakeIfNot(basePath,fileName);
+//                 urlPath = Utils.SafePathCombine(basePath,fileName);
+//                 vmailcitadestructVideo.url = urlPath;
+//                 vmailcitadestructVideo.Play();
+//                 break;
+//             case 110:
+//                 vmailgenstatus.SetActive(true);
+//                 fileName = "genstatus.webm";
+//                 Utils.ConfirmExistsMakeIfNot(basePath,fileName);
+//                 urlPath = Utils.SafePathCombine(basePath,fileName);
+//                 vmailgenstatusVideo.url = urlPath;
+//                 vmailgenstatusVideo.Play();
+//                 break;
+//             case 114:
+//                 vmaillaserdest.SetActive(true);
+//                 fileName = "laserdest.webm";
+//                 Utils.ConfirmExistsMakeIfNot(basePath,fileName);
+//                 urlPath = Utils.SafePathCombine(basePath,fileName);
+//                 vmaillaserdestVideo.url = urlPath;
+//                 vmaillaserdestVideo.Play();
+//                 break;
+//             case 120:
+//                 vmailshieldsup.SetActive(true);
+//                 fileName = "shieldsup.webm";
+//                 Utils.ConfirmExistsMakeIfNot(basePath,fileName);
+//                 urlPath = Utils.SafePathCombine(basePath,fileName);
+//                 vmailshieldsupVideo.url = urlPath;
+//                 vmailshieldsupVideo.Play();
+//                 break;
+//         }
+//    }
+    CenterStatusPrint("%s%s",Eng_Text->stringTable[1020],Eng_Global->audiologNames[logIndex]); // "Playing <name>"
+    // TODO: SendAudioLogToDataTab(logIndex) — engine-side data tab notification
+}
+
+void PlayLastAddedLog(uint16_t p,int logIndex) {
+    if (logIndex < 0) return;
+    PlayLog(p,logIndex);
+    Inv(p)->lastAddedIndex = -1;
+}
+
+void AddAudioLogToInventory(uint16_t p,int index) {
+    if (index < 0) { DualLog("BUG: Audio log picked up has no assigned index (-1)"); return; }
+    if (index == 128) { CenterStatusPrint("%s",Eng_Text->stringTable[309]); return; } // Trioptimum Funpack
+    InventorySystem* inv = Inv(p);
+    inv->hasLog[index]  = true;
+    inv->lastAddedIndex = index;
+    inv->numLogsFromLevel[Eng_Text->audioLogLevelFound[index]]++;
+    if      (Eng_Text->audioLogType[index] == AudioLogType_Email)  inv->hasNewEmail = true;
+    else if (Eng_Text->audioLogType[index] == AudioLogType_Normal) inv->hasNewLogs  = true;
+    if (inv->hasHardware & HW_ERD) {
+        // "Audio log <name> picked up. Press <key> to play." — TODO: key binding name interp
+        CenterStatusPrint("%s%s%s",Eng_Text->stringTable[36],Eng_Global->audiologNames[index],Eng_Text->stringTable[38]);
+    } else {
+        CenterStatusPrint("%s%s%s",Eng_Text->stringTable[36],Eng_Global->audiologNames[index],Eng_Text->stringTable[310]);
+    }
+}
+
+void PatchCycleDown(uint16_t p,bool useSound) {
+    (void)useSound; // engine plays patch select sound on patchCurrent change
+    InventorySystem* inv = Inv(p);
+    int next = inv->patchCurrent - 1;
+    if (next < 0) next = 6;
+    inv->patchCurrent = (int8_t)next;
+    for (int c = 0; c <= 13; c++) {
+        if (inv->patchCounts[next] > 0) break;
+        if (c == 13) return;
+        if (--next < 0) next = 6;
+    }
+    inv->patchCurrent = (int8_t)next;
+}
+
+void PatchCycleUp(uint16_t p,bool useSound) {
+    (void)useSound;
+    InventorySystem* inv = Inv(p);
+    int next = inv->patchCurrent + 1;
+    if (next > 6) next = 0;
+    inv->patchCurrent = (int8_t)next;
+    for (int c = 0; c <= 13; c++) {
+        if (inv->patchCounts[next] > 0) break;
+        if (c == 13) return;
+        if (++next > 6) next = 0;
+    }
+    inv->patchCurrent = (int8_t)next;
+}
+
+void AddPatchToInventory(uint16_t p,int index,int constIndex) {
+    if (index < 0) return;
+    InventorySystem* inv = Inv(p);
+    inv->patchCounts[index]++;
+    if (!inv->patchCounts[inv->patchCurrent]) inv->patchCurrent = (int8_t)index;
+    CenterStatusPrint("%s%s",Eng_Text->stringTable[constIndex + 326],Eng_Text->stringTable[35]);
+}
+
+static int8_t GetExistingCyberItemIndex(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    if (inv->softVersions[SW_TURBO]  > 0) return 0;
+    if (inv->softVersions[SW_DECOY]  > 0) return 1;
+    if (inv->softVersions[SW_RECALL] > 0) return 2;
+    return -1;
+}
+
+static void UseTurbo(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    if (inv->softVersions[SW_TURBO] <= 0) { inv->hasSoft &= (uint8_t)~(1u << SW_TURBO); return; }
+    if (--inv->softVersions[SW_TURBO] == 0) inv->hasSoft &= (uint8_t)~(1u << SW_TURBO);
+    if (inv->turboFinished > Eng_Global->pauseRelativeTime) inv->turboFinished += inv->turboCyberTime;
+    else                                                    inv->turboFinished = inv->turboCyberTime + Eng_Global->pauseRelativeTime;
+}
+
+static void UseDecoy(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    if (Eng_Global->decoyActive) { CenterStatusPrint("%s",Eng_Text->stringTable[537]); return; }
+    if (inv->softVersions[SW_DECOY] <= 0) { inv->hasSoft &= (uint8_t)~(1u << SW_DECOY); return; }
+    if (--inv->softVersions[SW_DECOY] == 0) inv->hasSoft &= (uint8_t)~(1u << SW_DECOY);
+    uint16_t decoyIdx = SpawnDynamicObject(417,true); // 417 = CyberDecoy constIndex
+    if (decoyIdx != UINT16_MAX) Eng_Global->instances[decoyIdx].position = PE(p)->position;
+}
+
+static void UseRecall(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    if (inv->softVersions[SW_RECALL] <= 0) return;
+    if (--inv->softVersions[SW_RECALL] == 0) inv->hasSoft &= (uint8_t)~(1u << SW_RECALL);
+    PE(p)->position = Eng_Global->cyberspaceRecallPoint;
+}
+
+void UseCyberspaceItem(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    if (inv->cyberItemIndex <= 0) {
+        inv->cyberItemIndex = GetExistingCyberItemIndex(p);
+        if (inv->cyberItemIndex < 0) { CenterStatusPrint("%s",Eng_Text->stringTable[473]); return; }
+    }
+    switch(inv->cyberItemIndex) {
+        case 0: if (!inv->softVersions[SW_TURBO])  { inv->cyberItemIndex = GetExistingCyberItemIndex(p); return; } UseTurbo(p);  break;
+        case 1: if (!inv->softVersions[SW_DECOY])  { inv->cyberItemIndex = GetExistingCyberItemIndex(p); return; } UseDecoy(p);  break;
+        case 2: if (!inv->softVersions[SW_RECALL]) { inv->cyberItemIndex = GetExistingCyberItemIndex(p); return; } UseRecall(p); break;
+    }
+}
+
+void CycleCyberSpaceItemUp(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    int next = inv->cyberItemIndex + 1;
+    if (next > 2) next = 0;
+    for (int c = 0; c <= 7; c++) {
+        if (!(inv->hasSoft & (1u << next))) { inv->cyberItemIndex = (int8_t)next; return; }
+        if (c == 7) { inv->cyberItemIndex = -1; return; }
+        if (++next > 2) next = 0;
+    }
+}
+
+void CycleCyberSpaceItemDn(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    int next = inv->cyberItemIndex - 1;
+    if (next < 0) next = 2;
+    for (int c = 0; c <= 7; c++) {
+        if (inv->hasSoft & (1u << next)) { inv->cyberItemIndex = (int8_t)next; return; }
+        if (c == 7) { inv->cyberItemIndex = -1; return; }
+        if (--next < 0) next = 2;
+    }
+}
+
+bool AddSoftwareItem(uint16_t p,SoftwareType type,int vers) {
+    InventorySystem* inv = Inv(p);
+    Entity* player       = PE(p);
+    float sfxVol         = (float)Eng_Settings->VolumeEffects / 100.0f;
+    switch(type) {
+        case SoftwareType_Drill:
+            if (inv->isPulserNotDrill && !(inv->hasSoft & (1u << SW_PULSER))) inv->isPulserNotDrill = false;
+            if (vers > inv->softVersions[SW_DRILL]) inv->softVersions[SW_DRILL] = (uint8_t)vers;
+            else CenterStatusPrint("%s",Eng_Text->stringTable[46]);
+            inv->hasSoft |= (1u << SW_DRILL);
+            play_wav(sounds[86],sfxVol,(Vector3){},false);
+            CenterStatusPrint("%s%d%s",Eng_Text->stringTable[444],inv->softVersions[SW_DRILL],Eng_Text->stringTable[458]);
+            return true;
+        case SoftwareType_Pulser:
+            if (!inv->isPulserNotDrill && !(inv->hasSoft & (1u << SW_PULSER))) inv->isPulserNotDrill = true;
+            if (vers > inv->softVersions[SW_PULSER]) inv->softVersions[SW_PULSER] = (uint8_t)vers;
+            else CenterStatusPrint("%s",Eng_Text->stringTable[46]);
+            inv->hasSoft |= (1u << SW_PULSER);
+            play_wav(sounds[86],sfxVol,(Vector3){},false);
+            CenterStatusPrint("%s%d%s",Eng_Text->stringTable[445],inv->softVersions[SW_PULSER],Eng_Text->stringTable[458]);
+            return true;
+        case SoftwareType_CShield:
+            if (vers > inv->softVersions[SW_SHIELD]) inv->softVersions[SW_SHIELD] = (uint8_t)vers;
+            else CenterStatusPrint("%s",Eng_Text->stringTable[46]);
+            inv->hasSoft |= (1u << SW_SHIELD);
+            play_wav(sounds[86],sfxVol,(Vector3){},false);
+            CenterStatusPrint("%s%d%s",Eng_Text->stringTable[446],inv->softVersions[SW_SHIELD],Eng_Text->stringTable[458]);
+            return true;
+        case SoftwareType_Turbo:
+            if (inv->cyberItemIndex < 0) inv->cyberItemIndex = 0;
+            inv->softVersions[SW_TURBO]++;
+            inv->hasSoft |= (1u << SW_TURBO);
+            play_wav(sounds[86],sfxVol,(Vector3){},false);
+            CenterStatusPrint("%s",Eng_Text->stringTable[447]);
+            return true;
+        case SoftwareType_Decoy:
+            if (inv->cyberItemIndex < 0) inv->cyberItemIndex = 1;
+            inv->softVersions[SW_DECOY]++;
+            inv->hasSoft |= (1u << SW_DECOY);
+            play_wav(sounds[86],sfxVol,(Vector3){},false);
+            CenterStatusPrint("%s",Eng_Text->stringTable[448]);
+            return true;
+        case SoftwareType_Recall:
+            if (inv->cyberItemIndex < 0) inv->cyberItemIndex = 2;
+            inv->softVersions[SW_RECALL]++;
+            inv->hasSoft |= (1u << SW_RECALL);
+            play_wav(sounds[86],sfxVol,(Vector3){},false);
+            CenterStatusPrint("%s",Eng_Text->stringTable[449]);
+            return true;
+        case SoftwareType_Game: {
+            if (vers < 0 || vers >= 7) return false;
+            inv->hasNewData  = true;
+            inv->hasMinigame |= (uint8_t)(1u << vers);
+            static const uint16_t gameMsg[7] = {450,451,452,453,454,455,456};
+            play_wav(sounds[86],sfxVol,(Vector3){},false);
+            CenterStatusPrint("%s",Eng_Text->stringTable[gameMsg[vers]]);
+            return true;
+        }
+        case SoftwareType_Data:
+            inv->hasNewData = true;
+            if (vers >= 0 && vers < TEXT_LOGS_COUNT) inv->hasLog[vers] = true;
+            play_wav(sounds[87],sfxVol,(Vector3){},false);
+            CenterStatusPrint("%s",Eng_Text->stringTable[457]);
+            return true;
+        case SoftwareType_Integrity:
+            if (player->cyberHealth >= 255.0f) return false;
+            play_wav(sounds[86],sfxVol,(Vector3){},false);
+            player->cyberHealth += 77.0f;
+            if (player->cyberHealth > 255.0f) player->cyberHealth = 255.0f;
+            // TODO: DrawTicks(true) — HUD cyber health tick refresh
+            CenterStatusPrint("%s",Eng_Text->stringTable[459]);
+            return true;
+        case SoftwareType_Keycard:
+            inv->hasNewData = true;
+            if (vers < 0 || vers > 110) vers = 81;
+            AddAccessCardToInventory(p,vers);
+            return true;
+        default: break;
+    }
+    return false;
+}
+
+void RemoveWeapon(uint16_t p,int slot) {
+    InventorySystem* inv = Inv(p);
+    inv->weaponInventoryIndices[slot]    = -1;
+    inv->weaponInventoryAmmoIndices[slot] = -1;
+}
+
+static float DefaultEnergySettingForWeapon(int wep16Index) {
+    switch(wep16Index) {
+        case  1: return  3.0f;
+        case  4: return  5.0f;
+        case 10: return 13.0f;
+        case 14: return  2.0f;
+        case 15: return  3.0f;
+        default: return  3.0f;
+    }
+}
+
+void UpdateAmmoCount(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    inv->numweapons = 0;
+    for (int i = 0; i < 7; i++) if (inv->weaponInventoryIndices[i] >= 0) inv->numweapons++;
+}
+
+// Returns ammo display string for slot. Writes to caller-provided buffer.
+// Engine calls this per-frame for HUD weapon pane text.
+void GetWeaponAmmoText(uint16_t p,int slot,char* buf,size_t bufSize) {
+    InventorySystem* inv = Inv(p);
+    buf[0] = '\0';
+    int wepIdx = inv->weaponInventoryIndices[slot];
+    bool alt   = inv->wepLoadedWithAlternate[slot];
+    uint8_t mag  = alt ? inv->currentMagazineAmount2[slot] : inv->currentMagazineAmount[slot];
+    float heat   = inv->currentEnergyWeaponHeat[slot];
+    switch(wepIdx) {
+        case 36: // MK3 Assault Rifle
+            if (alt) StringFormat(buf,bufSize,"%upn | %umg, %upn",mag,inv->wepAmmo[0],inv->wepAmmoSecondary[0]);
+            else     StringFormat(buf,bufSize,"%umg | %umg, %upn",mag,inv->wepAmmo[0],inv->wepAmmoSecondary[0]);
+            break;
+        case 37: case 40: case 46: case 50: case 51: // Energy weapons
+            StringCopyInto_A_From_B(buf,heat > 80.0f ? Eng_Text->stringTable[14] : Eng_Text->stringTable[15],bufSize);
+            break;
+        case 38: // SV-23 Dartgun
+            if (alt) StringFormat(buf,bufSize,"%utq | %und, %utq",mag,inv->wepAmmo[2],inv->wepAmmoSecondary[2]);
+            else     StringFormat(buf,bufSize,"%und | %und, %utq",mag,inv->wepAmmo[2],inv->wepAmmoSecondary[2]);
+            break;
+        case 39: // AM-27 Flechette
+            if (alt) StringFormat(buf,bufSize,"%usp | %uhn, %usp",mag,inv->wepAmmo[3],inv->wepAmmoSecondary[3]);
+            else     StringFormat(buf,bufSize,"%uhn | %uhn, %usp",mag,inv->wepAmmo[3],inv->wepAmmoSecondary[3]);
+            break;
+        case 41: case 42: break; // Laser Rapier / Lead Pipe: no ammo
+        case 43: // Magnum 2100
+            if (alt) StringFormat(buf,bufSize,"%usg | %uhw, %usg",mag,inv->wepAmmo[7],inv->wepAmmoSecondary[7]);
+            else     StringFormat(buf,bufSize,"%uhw | %uhw, %usg",mag,inv->wepAmmo[7],inv->wepAmmoSecondary[7]);
+            break;
+        case 44: // SB-20 Magpulse
+            if (alt) StringFormat(buf,bufSize,"%usu | %ucr, %usu",mag,inv->wepAmmo[8],inv->wepAmmoSecondary[8]);
+            else     StringFormat(buf,bufSize,"%ucr | %ucr, %usu",mag,inv->wepAmmo[8],inv->wepAmmoSecondary[8]);
+            break;
+        case 45: // ML-41 Pistol
+            if (alt) StringFormat(buf,bufSize,"%utf | %ust, %utf",mag,inv->wepAmmo[9],inv->wepAmmoSecondary[9]);
+            else     StringFormat(buf,bufSize,"%ust | %ust, %utf",mag,inv->wepAmmo[9],inv->wepAmmoSecondary[9]);
+            break;
+        case 47: StringFormat(buf,bufSize,"%url | %url",inv->currentMagazineAmount[slot],inv->wepAmmo[11]); break; // MM-76 Railgun
+        case 48: StringFormat(buf,bufSize,"%urb | %urb",inv->currentMagazineAmount[slot],inv->wepAmmo[12]); break; // DC-05 Riotgun
+        case 49: // RF-07 Skorpion
+            if (alt) StringFormat(buf,bufSize,"%ulg | %usm, %ulg",mag,inv->wepAmmo[13],inv->wepAmmoSecondary[13]);
+            else     StringFormat(buf,bufSize,"%usm | %usm, %ulg",mag,inv->wepAmmo[13],inv->wepAmmoSecondary[13]);
+            break;
+        default: break;
+    }
+}
+
+void AddAmmoToInventory(uint16_t p,int index,int constIndex,int amount,bool isSecondary) {
+    if (index < 0) return;
+    InventorySystem* inv = Inv(p);
+    if (isSecondary) inv->wepAmmoSecondary[index] += (uint16_t)amount;
+    else             inv->wepAmmo[index]          += (uint16_t)amount;
+    CenterStatusPrint("%s%s",Eng_Text->stringTable[constIndex + 326],Eng_Text->stringTable[630]);
+}
+
+bool AddWeaponToInventory(uint16_t p,int index,int ammo1,int ammo2,bool loadedAlt) {
+    if (index < 0) return false;
+    InventorySystem* inv = Inv(p);
+    for (int i = 0; i < 7; i++) {
+        if (inv->weaponInventoryIndices[i] >= 0) continue;
+        inv->weaponInventoryIndices[i] = index;
+        int index16 = (int)Get16WeaponIndexFromConstIndex(index);
+        inv->weaponEnergySetting[i] = DefaultEnergySettingForWeapon(index16);
+        if (i == 0) {
+            inv->weaponCurrentPending = 0;
+            inv->weaponIndexPending   = (uint16_t)index;
+            inv->justChangedWeap      = true;
+            WeaponFireStartWeaponDip(0.5f);
+            WeaponFireCompleteWeaponChange();
+        }
+        if (loadedAlt && ammo2 > 0) {
+            inv->currentMagazineAmount2[i] = (uint8_t)ammo2;
+            if (ammo1 > 0) inv->wepAmmo[index16] += (uint16_t)ammo1;
+            inv->wepLoadedWithAlternate[i] = true;
+        } else {
+            inv->currentMagazineAmount[i] = (uint8_t)ammo1;
+            if (ammo2 > 0) inv->wepAmmoSecondary[index16] += (uint16_t)ammo2;
+            inv->wepLoadedWithAlternate[i] = false;
+        }
+        CenterStatusPrint("%s%s",Eng_Text->stringTable[index + 326],Eng_Text->stringTable[33]);
+        UpdateAmmoCount(p);
+        return true;
+    }
+    return false;
+}
+
+void InventoryUpdate(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    if (Grenade()) {
+        if (PE(p)->inCyberTube) UseCyberspaceItem(p);
+        else if (inv->grenadeCurrent >= 0 && inv->grenadeCurrent < 7 && inv->grenAmmo[inv->grenadeCurrent] > 0) UseGrenade(p,inv->grenConstIndex[inv->grenadeCurrent]);
+        else CenterStatusPrint("%s",Eng_Text->stringTable[322]); // Out of grenades.
+    }
+    
+    if (GrenadeCycUp())  { if (PE(p)->inCyberTube) CycleCyberSpaceItemUp(p); else GrenadeCycleUp(p); }
+    if (GrenadeCycDown()){ if (PE(p)->inCyberTube) CycleCyberSpaceItemDn(p); else GrenadeCycleDown(p); }
+    if (RecentLog() && (inv->hasHardware & HW_ERD)) {
+        bool playing = false;//GetSoundIsPlaying(&inv->logSound); TODO
+        if (inv->lastAddedIndex >= 0 && !playing) {
+            int temp = inv->lastAddedIndex;
+            PlayLog(p,temp);
+            inv->lastAddedIndex = FindNextUnreadLog(p);
+            if (inv->lastAddedIndex == temp) inv->lastAddedIndex = -1;
+            CheckForUnreadLogs(p);
+        } else {
+//             SoundStop(&inv->logSound); TODO
+            int temp = inv->lastAddedIndex;
+            inv->lastAddedIndex = FindNextUnreadLog(p);
+            if (inv->lastAddedIndex == temp) inv->lastAddedIndex = -1;
+            CheckForUnreadLogs(p);
+            CenterStatusPrint("%s",Eng_Text->stringTable[1019]); // Log playback stopped.
+        }
+    }
+
+    if (Patch()) {
+        if (inv->patchCurrent >= 0 && inv->patchCurrent < 7 && inv->patchCounts[inv->patchCurrent] > 0)
+            PatchUse(p,inv->patchCurrent);
+        else
+            CenterStatusPrint("%s",Eng_Text->stringTable[324]); // Out of patches.
+    }
+    if (PatchCycUp()) PatchCycleUp(p,true);
+    if (PatchCycDown()) PatchCycleDown(p,true);
+}
+
+extern uint8_t magazinePitchCountForWeapon[16];
+extern uint8_t magazinePitchCountForWeapon2[16];
+static bool firstTimePickup = true;
+static bool firstTimeSearch = true;
+// Expects usableItem index
+void AddItemFail(uint16_t p, int index) { DropHeldItem(p); CenterStatusPrint("%s%s%s", Eng_Text->stringTable[32],Eng_Text->stringTable[index + 326],Eng_Text->stringTable[318]); } // Inventory full.
+void AddItemToInventory(uint16_t p, int index, int customIndex) {
+    InventorySystem* inv = Inv(p);
+    Eng_UI->mouseClickHeldOverGUI = true; // Prevent gun shooting.
+    if (index < 0) index = 0; // Good check on paper.
+    if (index > 110) index = 94; // Way to get a head.
+    if ((index >= 0 && index <= 5) || index == 33 || index == 35 || (index >= 52 && index < 59) || (index >= 61 && index <= 64) || (index >= 92 && index <= 101)) {
+        if (!AddGeneralObjectToInventory(p,index,customIndex)) AddItemFail(p,index);
+    } else if (index == 6) {
+        AddAudioLogToInventory(p,inv->heldObjectCustomIndex);
+    } else if (index >= 36 && index <= 51) {
+        if (!AddWeaponToInventory(p,index,inv->heldObjectAmmo,inv->heldObjectAmmo2,inv->heldObjectLoadedAlternate)) AddItemFail(p,index);
+    } else if (index == 34 || index == 81 || (index >= 83 && index <= 91) || index == 110) AddAccessCardToInventory(p,index);
+    else {
+        switch (index) {
+            case 7:  AddGrenadeToInventory(p,0,index); break; // Frag
+            case 8:  AddGrenadeToInventory(p,3,index); break; // Concussion
+            case 9:  AddGrenadeToInventory(p,1,index); break; // EMP
+            case 10: AddGrenadeToInventory(p,6,index); break; // Earth Shaker
+            case 11: AddGrenadeToInventory(p,4,index); break; // Land Mine
+            case 12: AddGrenadeToInventory(p,5,index); break; // Nitropak
+            case 13: AddGrenadeToInventory(p,2,index); break; // Gas
+            case 14: AddPatchToInventory(p,2,index); break;
+            case 15: AddPatchToInventory(p,6,index); break;
+            case 16: AddPatchToInventory(p,5,index); break;
+            case 17: AddPatchToInventory(p,3,index); break;
+            case 18: AddPatchToInventory(p,4,index); break;
+            case 19: AddPatchToInventory(p,1,index); break;
+            case 20: AddPatchToInventory(p,0,index); break;
+            case 21: AddHardwareToInventory(p,0,index,customIndex,true); break;
+            case 22: AddHardwareToInventory(p,1,index,customIndex,true); break;
+            case 23: AddHardwareToInventory(p,2,index,customIndex,true); break;
+            case 24: AddHardwareToInventory(p,3,index,customIndex,true); break;
+            case 25: AddHardwareToInventory(p,4,index,customIndex,true); break;
+            case 26: AddHardwareToInventory(p,5,index,customIndex,true); break;
+            case 27: AddHardwareToInventory(p,6,index,customIndex,true); break;
+            case 28: AddHardwareToInventory(p,7,index,customIndex,true); break;
+            case 29: AddHardwareToInventory(p,8,index,customIndex,true); break;
+            case 30: AddHardwareToInventory(p,9,index,customIndex,true); break;
+            case 31: AddHardwareToInventory(p,10,index,customIndex,true); break;
+            case 32: AddHardwareToInventory(p,11,index,customIndex,true); break;
+            case 60: AddAmmoToInventory(p,12,index,magazinePitchCountForWeapon[12],false); break; // rubber slugs
+            case 65: AddAmmoToInventory(p,8,index,magazinePitchCountForWeapon2[8],true); break; // magpulse cartridge super
+            case 66: AddAmmoToInventory(p,2,index,magazinePitchCountForWeapon[2],false); break; // needle darts
+            case 67: AddAmmoToInventory(p,2,index,magazinePitchCountForWeapon2[2],true); break; // tranquilizer darts
+            case 68: AddAmmoToInventory(p,9,index,magazinePitchCountForWeapon[9],false); break; // standard bullets
+            case 69: AddAmmoToInventory(p,9,index,magazinePitchCountForWeapon2[9],true); break; // teflon bullets
+            case 70: AddAmmoToInventory(p,7,index,magazinePitchCountForWeapon[7],false); break; // hollow point rounds
+            case 71: AddAmmoToInventory(p,7,index,magazinePitchCountForWeapon2[7],true); break; // slug rounds
+            case 72: AddAmmoToInventory(p,0,index,magazinePitchCountForWeapon[0],false); break; // magnesium tipped slugs
+            case 73: AddAmmoToInventory(p,0,index,magazinePitchCountForWeapon2[0],true); break; // penetrator slugs
+            case 74: AddAmmoToInventory(p,3,index,magazinePitchCountForWeapon[3],false); break; // hornet clip
+            case 75: AddAmmoToInventory(p,3,index,magazinePitchCountForWeapon2[3],true); break; // splinter clip
+            case 76: AddAmmoToInventory(p,11,index,magazinePitchCountForWeapon[11],false); break; // rail rounds
+            case 77: AddAmmoToInventory(p,13,index,magazinePitchCountForWeapon[13],false); break; // slag magazine
+            case 78: AddAmmoToInventory(p,13,index,magazinePitchCountForWeapon2[13],true); break; // large slag magazine
+            case 79: AddAmmoToInventory(p,8,index,magazinePitchCountForWeapon[8],false); break; // magpulse cartridges
+            case 80: AddAmmoToInventory(p,8,index,magazinePitchCountForWeapon2[8],false); break; // small magpulse cartridges
+        }
+    }
+
+//     Utils.PlayUIOneShotSavable(87); // frob_item    
+    firstTimePickup = false;
+}
+//=============================================================================
 // CyberDecoy
 void CyberDecoyEnable(uint16_t self) { (void)self; Eng_Global->decoyActive = true; }
 void CyberDecoyDisable(uint16_t self) { (void)self; Eng_Global->decoyActive = false; }
@@ -28,7 +806,7 @@ void CyberItemInitBeforeLoad(uint16_t self) {
 void CyberItemOnTriggerEnter(uint16_t self, uint16_t other) {
     Entity* e = &Eng_Global->instances[self];
     if (other != PLAYER1) return;
-    if (!InventoryAddSoftwareItem(PLAYER1,e->type,e->version)) return;
+    if (!AddSoftwareItem(PLAYER1,e->type,e->version)) return;
     flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
 }
 //=============================================================================
@@ -71,7 +849,8 @@ void CyberPushOnTriggerStay(uint16_t self, uint16_t other) {
 void CyberPushOnTriggerExit(uint16_t self, uint16_t other) {
     (void)self;
     if (other != PLAYER1) return;
-    Eng_Global->instances[PLAYER1].inCyberTube = false;
+    
+    Eng_Global->instances[other].inCyberTube = false;
     Sys_Music.cyberTube = false;
 }
 //=============================================================================
@@ -115,7 +894,6 @@ void CyberTimerReset(uint16_t self, int diff) {
 
 void CyberTimerUpdate(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
-    if (Eng_Global->gamePaused || Eng_Global->menuActive) return;
     if (e->cyberTimer <= 0.0f) { UIExitCyberspace(); return; }
     if (e->timerFinished >= Eng_Global->pauseRelativeTime) return;
     
@@ -129,18 +907,20 @@ void CyberTimerUpdate(uint16_t self) {
 // Ladder
 void LadderOnTriggerEnter(uint16_t self, uint16_t other) {
     (void)self;
-    Entity* player = &Eng_Global->instances[PLAYER1];
     if (other != PLAYER1) return;
-    player->ladderState++;
-    if (player->ladderState < 1) player->ladderState = 1;
+
+    InventorySystem* inv = Inv(PLAYER1);
+    inv->ladderState++;
+    if (inv->ladderState < 1) inv->ladderState = 1;
 }
 
 void LadderOnTriggerExit(uint16_t self, uint16_t other) {
     (void)self;
-    Entity* player = &Eng_Global->instances[PLAYER1];
     if (other != PLAYER1) return;
-    player->ladderState--;
-    if (player->ladderState < 0) player->ladderState = 0;
+    
+    InventorySystem* inv = Inv(PLAYER1);
+    inv->ladderState--;
+    if (inv->ladderState < 0) inv->ladderState = 0;
 }
 //=============================================================================
 // SearchFX
@@ -293,7 +1073,7 @@ void ForceBridgeToggle(uint16_t self) {
 
 void ForceBridgeUpdate(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
-    if (Eng_Global->gamePaused || Eng_Global->menuActive || e->tickFinished >= Eng_Global->pauseRelativeTime) return;
+    if (e->tickFinished >= Eng_Global->pauseRelativeTime) return;
     e->tickFinished = Eng_Global->pauseRelativeTime + e->tickTime;
     if (e->entflags & ENTFLAG_ACTIVATED) {
         if (!e->lerping) return;
@@ -454,7 +1234,7 @@ void LogicTimerUseTargets(uint16_t self) { UseTargets(self,Eng_Global->instances
 
 void LogicTimerUpdate(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
-    if (Eng_Global->gamePaused || Eng_Global->menuActive || !e->active || e->intervalFinished >= Eng_Global->pauseRelativeTime) return;
+    if (!e->active || e->intervalFinished >= Eng_Global->pauseRelativeTime) return;
     e->intervalFinished = Eng_Global->pauseRelativeTime + (e->useRandomTimes ? (double)random_range(e->randomMin,e->randomMax) : (double)e->timeInterval);
     LogicTimerUseTargets(self);
 }
@@ -723,7 +1503,6 @@ void CyberWallInitAfterLoad(uint16_t self) {
 
 void CyberWallUpdate(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
-    if (Eng_Global->gamePaused || Eng_Global->menuActive) return;
     if (Eng_Global->pauseRelativeTime < e->tickFinished) return;
     if (e->volume > CYBERWALL_ALPHA_MIN) {
         e->volume -= CYBERWALL_ALPHA_STEP;
@@ -958,7 +1737,6 @@ void FireWorkThangOnEnable(uint16_t self) {
 
 void FireWorkThangUpdate(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
-    if (Eng_Global->gamePaused || Eng_Global->menuActive) return;
     if (e->tickFinished >= Eng_Global->pauseRelativeTime) return;
     e->tickFinished = Eng_Global->pauseRelativeTime + (1.0/60.0);
     switch (e->lerpUp) {
@@ -988,36 +1766,32 @@ void FireWorkThangUpdate(uint16_t self) {
 //=============================================================================
 // GeneralInventory
 static void ApplyBattery(void) {
-    if (Eng_Global->instances[PLAYER1].energy >= 255.0f) {
-        CenterStatusPrint("%s",Eng_Text->stringTable[303]); // Energy full
-        return;
-    }
+    InventorySystem* inv = Inv(PLAYER1);
+    if (inv->energy >= 255.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[303]); return; } // Energy full
+    
     GiveEnergy(83.0f,EnergyType_Battery);
-    Eng_Global->inventoryPlayer1.generalInventoryIndexRef[Eng_Global->inventoryPlayer1.hardwareInvCurrent] = -1;
+    inv->generalInventoryIndexRef[inv->hardwareInvCurrent] = -1;
 }
 
 static void ApplyIcadBattery(void) {
-    if (Eng_Global->instances[PLAYER1].energy >= 255.0f) {
-        CenterStatusPrint("%s",Eng_Text->stringTable[303]); // Energy full
-        return;
-    }
+    InventorySystem* inv = Inv(PLAYER1);
+    if (inv->energy >= 255.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[303]); return; } // Energy full
+    
     GiveEnergy(255.0f,EnergyType_Battery);
-    Eng_Global->inventoryPlayer1.generalInventoryIndexRef[Eng_Global->inventoryPlayer1.hardwareInvCurrent] = -1;
+    inv->generalInventoryIndexRef[inv->hardwareInvCurrent] = -1;
 }
 
 static void ApplyHealthkit(void) {
-    Entity* p = &Eng_Global->instances[PLAYER1];
-    if (p->health >= 255.0f) {
-        CenterStatusPrint("%s",Eng_Text->stringTable[304]); // Health full
-        return;
-    }
-    p->health = 255.0f;
+    InventorySystem* inv = Inv(PLAYER1);
+    if (inv->energy >= 255.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[303]); return; } // Energy full
+    
+    Eng_Global->instances[PLAYER1].health = 255.0f;
     // TODO: Eng_UI->DrawTicks(true) — HUD health tick refresh, MFDManager
-    Eng_Global->inventoryPlayer1.generalInventoryIndexRef[Eng_Global->inventoryPlayer1.hardwareInvCurrent] = -1;
+    inv->generalInventoryIndexRef[inv->hardwareInvCurrent] = -1;
 }
 
 void GeneralInvUse(int buttonIdx,int customIdx) {
-    InventorySystem* inv = &Eng_Global->inventoryPlayer1;
+    InventorySystem* inv = Inv(PLAYER1);
     inv->hardwareInvCurrent = buttonIdx;
     int itemIdx = inv->generalInventoryIndexRef[buttonIdx];
     if (buttonIdx == 0) {
@@ -1032,34 +1806,26 @@ void GeneralInvUse(int buttonIdx,int customIdx) {
 }
 
 void GeneralInvApply(int buttonIdx,int customIdx) {
-    InventorySystem* inv = &Eng_Global->inventoryPlayer1;
     if (buttonIdx == 0) {
         // TODO: Eng_UI->SendInfoToItemTab(81), OpenTab access cards — MFDManager
         return;
     }
-    inv->hardwareInvCurrent = buttonIdx;
-    int itemIdx = inv->generalInventoryIndexRef[buttonIdx];
+    Eng_Global->inventoryPlayer1.hardwareInvCurrent = buttonIdx;
+    int itemIdx = Eng_Global->inventoryPlayer1.generalInventoryIndexRef[buttonIdx];
     switch (itemIdx) {
         case 52: ApplyBattery();     break;
         case 53: ApplyIcadBattery(); break;
         case 55: ApplyHealthkit();   break;
         default:
-            inv->hardwareInvCurrent = buttonIdx;
+            Eng_Global->inventoryPlayer1.hardwareInvCurrent = buttonIdx;
             // TODO: Eng_UI->SendInfoToItemTab(itemIdx,customIdx), OpenTab — MFDManager
             (void)customIdx;
             break;
     }
 }
 
-void GeneralInvClick(int buttonIdx,int customIdx) {
-    Eng_UI->mouseClickHeldOverGUI = true;
-    GeneralInvUse(buttonIdx,customIdx);
-}
-
-void GeneralInvDoubleClick(int buttonIdx,int customIdx) {
-    Eng_UI->mouseClickHeldOverGUI = true;
-    GeneralInvApply(buttonIdx,customIdx);
-}
+void GeneralInvClick(int buttonIdx,int customIdx) { Eng_UI->mouseClickHeldOverGUI = true; GeneralInvUse(buttonIdx,customIdx); }
+void GeneralInvDoubleClick(int buttonIdx,int customIdx) { Eng_UI->mouseClickHeldOverGUI = true; GeneralInvApply(buttonIdx,customIdx); }
 //=============================================================================
 // TargetID
 #define TARGETID_LINK_DIST       10.0f
@@ -1074,18 +1840,11 @@ void GeneralInvDoubleClick(int buttonIdx,int customIdx) {
 
 float TargetIDGetSensingRange(bool manual) {
     uint8_t ver = Eng_Global->inventoryPlayer1.hardwareVersion[HW_TID_IDX];
-    if (manual) {
-        return (ver >= 4) ? 18.0f : 13.0f;
-    } else {
-        if (ver <= 2) return 0.0f;
-        return (ver == 3) ? 13.0f : 20.0f;
-    }
+    if (manual) return (ver >= 4) ? 18.0f : 13.0f;
+    else return (ver <= 2) ? 0.0f : ((ver == 3) ? 13.0f : 20.0f);
 }
 
-float TargetIDGetTetherRange(void) {
-    return (Eng_Global->inventoryPlayer1.hardwareVersion[HW_TID_IDX] >= 4) ? 22.0f : 15.0f;
-}
-
+float TargetIDGetTetherRange(void) { return (Eng_Global->inventoryPlayer1.hardwareVersion[HW_TID_IDX] >= 4) ? 22.0f : 15.0f; }
 static void TargetIDDeactivate(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->enemey != NULLENT) {
@@ -1230,12 +1989,12 @@ static void DeactivateHardwareOnEnergyDepleted(void) {
 }
 
 void TakeEnergy(float take) {
-    Entity* p = &Eng_Global->instances[PLAYER1];
-    if (p->energy <= 0.0f)          return;
+    InventorySystem* inv = Inv(PLAYER1);
+    if (inv->energy <= 0.0f)          return;
     if (Eng_Cheats->redbull)        return;
-    p->energy -= take;
-    if (p->energy <= 0.0f) {
-        p->energy = 0.0f;
+    inv->energy -= take;
+    if (inv->energy <= 0.0f) {
+        inv->energy = 0.0f;
         play_wav(sounds[84],Eng_Settings->VolumeEffects,(Vector3){},false); // energy_gone
         CenterStatusPrint("%s",Eng_Text->stringTable[314]); // Power supply exhausted.
         DeactivateHardwareOnEnergyDepleted();
@@ -1243,46 +2002,39 @@ void TakeEnergy(float take) {
 }
 
 void GiveEnergy(float give,EnergyType type) {
-    Entity* p = &Eng_Global->instances[PLAYER1];
-    p->energy += give;
-    if (p->energy > 255.0f) p->energy = 255.0f;
+    InventorySystem* inv = Inv(PLAYER1);
+    inv->energy += give;
+    if (inv->energy > 255.0f) inv->energy = 255.0f;
     if (type == EnergyType_Battery)       play_wav(sounds[79], Eng_Settings->VolumeEffects,(Vector3){},false); // batteryuse
     if (type == EnergyType_ChargeStation) play_wav(sounds[100],Eng_Settings->VolumeEffects,(Vector3){},false); // chargingstation
 }
 
 void PlayerEnergyInit(void) {
-    Entity* p        = &Eng_Global->instances[PLAYER1];
-    p->energy        = 54.0f;
-    p->energyDrainTickFinished = Eng_Global->pauseRelativeTime + ENERGY_TICK
-                                 + random_range(0.0f,1.0f);
-    Eng_Global->inventoryPlayer1.drainJPM = 0;
+    InventorySystem* inv = Inv(PLAYER1);
+    inv->energy = 54.0f;
+    inv->energyDrainTickFinished = Eng_Global->pauseRelativeTime + ENERGY_TICK + random_range(0.0f,1.0f);
+    inv->drainJPM = 0;
 }
 
 void PlayerEnergyUpdate(void) {
-    if (Eng_Global->gamePaused || Eng_Global->menuActive) return;
-    Entity* p        = &Eng_Global->instances[PLAYER1];
     InventorySystem* inv = &Eng_Global->inventoryPlayer1;
     if (inv->hasHardware & HW_TID) TargetIdentifierSenseTargets();
-    if (p->energyDrainTickFinished > Eng_Global->pauseRelativeTime) return;
-    p->energyDrainTickFinished = Eng_Global->pauseRelativeTime + ENERGY_TICK;
-    bool anyDrain = false;
-    inv->drainJPM = 0;
-    uint8_t ver;
+    if (inv->energyDrainTickFinished > Eng_Global->pauseRelativeTime) return;
+    
+    inv->energyDrainTickFinished = Eng_Global->pauseRelativeTime + ENERGY_TICK;
+    bool anyDrain = false; uint8_t ver; inv->drainJPM = 0;
     for (int hw = 3; hw <= 11; hw++) {
         uint16_t bit = (uint16_t)(1u << hw);
         if (!(inv->hardwareIsActive & bit)) continue;
-        // hw indices with no per-tick drain or handled elsewhere
-        if (hw == 4 || hw == 8 || hw == 10) continue;
+        if (hw == 4 || hw == 8 || hw == 10) continue; // No energy usage
+        
         ver = inv->hardwareVersionSetting[hw];
         float drain = hwDrain[hw][ver];
         inv->drainJPM += hwDrainJPM[hw][ver];
         if (drain > 0.0f) { TakeEnergy(drain); anyDrain = true; }
     }
-    if (anyDrain && p->energy <= 0.0f) {
-        DeactivateHardwareOnEnergyDepleted();
-        inv->drainJPM = 0;
-    }
-    // TODO: push inv->drainJPM to HUD drain text display — render side
+    
+    if (anyDrain && inv->energy <= 0.0f) { DeactivateHardwareOnEnergyDepleted(); inv->drainJPM = 0; } // Depleted
 }
 //=============================================================================
 // GrenadeActivate
@@ -1345,7 +2097,6 @@ void GrenadeActivate(uint16_t self) {
 
 void GrenadeUpdate(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
-    if (Eng_Global->gamePaused || Eng_Global->menuActive)  return;
     if (!(e->entflags & ENTFLAG_ENABLED))                  return;
     if ((int16_t)e->index == 14) { GrenadeExplode(self);   return; } // Plastique
     bool timerDone = (e->ioflags & GREN_FLAG_USE_TIMER)
@@ -1758,102 +2509,6 @@ void HealthManagerInitAfterLoad(uint16_t self) {
 }
 //================================================================================
 // Inventory Mode
-void ResetHeldItem(void) {
-    Eng_Global->inventoryPlayer1.heldObjectIndex = -1;
-    Eng_Global->inventoryPlayer1.heldObjectCustomIndex = -1;
-    Eng_Global->inventoryPlayer1.heldObjectAmmo = 0;
-    Eng_Global->inventoryPlayer1.heldObjectAmmo2 = 0;
-    Eng_Global->inventoryPlayer1.heldObjectLoadedAlternate = false;
-    Eng_Global->inventoryPlayer1.holdingObject = false;
-    Eng_Global->inventoryPlayer1.grenadeActive = false;
-}
-
-void DropHeldItem(void) {
-    if (Eng_Global->inventoryPlayer1.heldObjectIndex >= Eng_Global->loadedInstances) { ResetHeldItem(); return; }
-    
-    Eng_Global->inventoryPlayer1.dropFinished = Eng_Global->current_time + 0.2; // Prevent immediate regrab at high fps
-    if (!Eng_Global->inventoryPlayer1.grenadeActive) {
-//         for (int i=0;i<levelDynamicContainer.transform.childCount;i++) {
-//             Transform tr = levelDynamicContainer.transform.GetChild(i);
-//             GameObject go = tr.gameObject;
-//             UseableObjectUse reference = go.GetComponent<UseableObjectUse>();
-//             if (reference != null) {
-//                 if (reference.useableItemIndex == Eng_Global->inventoryPlayer1.heldObjectIndex && go.activeSelf == false) {
-//                     reference.customIndex = heldObjectCustomIndex;
-//                     tossObject = go;
-//                     freeObjectInPoolFound = true;
-//                     break;
-//                 }
-//             }
-//         }
-// 
-//         if (freeObjectInPoolFound) {
-//             if (tossObject == null) {
-//                 CenterStatusPrint("BUG: Failed to get freeObjectInPool for object being dropped!",player);
-//                 ResetHeldItem();
-//                 return;
-//             } else {
-//                 tossObject.Eng_Global->instances[i].position = (Eng_Global->instances[i].position + (transform.forward * tossOffset));
-//             }
-//         } else {
-//             // DualLog("WARNING: Failed to get freeObjectInPool for object " + heldObject.ToString() + "being dropped! MouseLookScript DropHeldItem.",player);
-//             tossObject = Instantiate(heldObject,(Eng_Global->instances[i].position + (transform.forward * tossOffset)),Const.a.quaternionIdentity) as GameObject;  //effect
-//             if (tossObject == null) {
-//                 CenterStatusPrint("BUG: Failed to instantiate object being dropped!",player);
-//                 ResetHeldItem();
-//                 return;
-//             }
-//         }
-//         if (tossObject.activeSelf != true) tossObject.SetActive(true);
-//         if (levelDynamicContainer != null) {
-//             tossObject.transform.SetParent(levelDynamicContainer.transform,true);
-//         }
-// 
-//         Vector3 tossDir = MouseCursor.a.GetCursorScreenPointForRay();
-//         tossDir = playerCamera.ScreenPointToRay(tossDir).direction;
-//         Rigidbody rbody = tossObject.GetComponent<Rigidbody>();
-//         if (rbody != null) {
-//             rbody.isKinematic = false;
-//             rbody.useGravity = true;
-//             rbody.velocity = tossDir * tossForce;
-//         }
-// 
-//         UseableObjectUse uou = tossObject.GetComponent<UseableObjectUse>();
-//         uou.customIndex = heldObjectCustomIndex;
-//         uou.ammo = heldObjectAmmo;
-//         uou.ammo2 = heldObjectAmmo2;
-//         uou.heldObjectLoadedAlternate = heldObjectLoadedAlternate;
-    } else {
-        // Throw an active grenade
-//         grenadeActive = false;
-//         Eng_UI->mouseClickHeldOverGUI = true; // Prevent shooting it.
-//         tossObject = Instantiate(heldObject,(Eng_Global->instances[i].position + (transform.forward * tossOffset)),Const.a.quaternionIdentity) as GameObject;  //effect
-//         if (tossObject == null) {
-//             CenterStatusPrint("BUG: Failed to instantiate object being dropped!",player);
-//             ResetHeldItem();
-//             return;
-//         }
-// 
-//         Const.a.grenadesThrown++;
-//         if (levelDynamicContainer != null){
-//             tossObject.transform.SetParent(levelDynamicContainer.transform,true);
-//         }
-//         tossObject.layer = 11; // Set to player bullets layer to prevent collision and still be visible.
-//         Vector3 tossDir = MouseCursor.a.GetCursorScreenPointForRay();
-//         tossDir = playerCamera.ScreenPointToRay(tossDir).direction;
-//         Rigidbody rbody = tossObject.GetComponent<Rigidbody>();
-//         if (rbody != null) {
-//             rbody.isKinematic = false;
-//             rbody.useGravity = true;
-//             rbody.velocity = tossDir * tossForce;
-//         }
-//         GrenadeActivate ga = tossObject.GetComponent<GrenadeActivate>();
-//         if (ga != null) ga.Activate(); // Time to boom!
-//         MouseCursor.a.liveGrenade = false;
-    }
-    ResetHeldItem();
-}
-	
 void ForceShootMode(void) {
     if (Eng_Settings->NoShootMode) return; // We are being like the original now!
 
@@ -1874,23 +2529,22 @@ void ToggleInventoryMode(void) {
 }
 //================================================================================
 // Hardware
-static inline Entity* PE(uint16_t p) { return &Eng_Global->instances[p]; }
-static inline float SfxVol(void) { return (float)Eng_Settings->VolumeEffects / 100.0f; }
-
 void HardwareBioOff(void) {
     Eng_Global->inventoryPlayer1.hardwareIsActive &= ~HW_BIO;
     if (Eng_Cheats->showFPS) return;
     // TODO: BiomonitorClearGraphs() — engine-side graph reset
-    // TODO: deactivate bioMonitorContainer — engine reads InventoryBioMonitorActive()
+    // TODO: deactivate bioMonitorContainer — engine reads BioMonitorActive()
 }
 void HardwareBioOn(void) {
     Eng_Global->inventoryPlayer1.hardwareIsActive |= HW_BIO;
-    // TODO: activate bioMonitorContainer — engine reads InventoryBioMonitorActive()
+    // TODO: activate bioMonitorContainer — engine reads BioMonitorActive()
 }
 void HardwareBioAction(void) {
-    if (Eng_Global->inventoryPlayer1.hardwareVersionSetting[HW_BIO_IDX] == 0 && PE(PLAYER1)->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
+    InventorySystem* inv = Inv(PLAYER1);
+    if (Eng_Global->inventoryPlayer1.hardwareVersionSetting[HW_BIO_IDX] == 0 && inv->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
+    
     play_wav(sounds[78],SfxVol(),(Vector3){},false);
-    if (InventoryBioMonitorActive(PLAYER1)) HardwareBioOff(); else HardwareBioOn();
+    if (BioMonitorActive(PLAYER1)) HardwareBioOff(); else HardwareBioOn();
 }
 void HardwareBioClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareBioAction(); }
 
@@ -1903,32 +2557,40 @@ void HardwareSensaroundOff(void) {
     // TODO: deactivate sensaround cameras, restore tabs — engine reads hardwareIsActive & HW_SNS
 }
 void HardwareSensaroundAction(void) {
-    if (PE(PLAYER1)->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
-    if (Eng_Global->inventoryPlayer1.hardwareIsActive & HW_SNS) {
+    InventorySystem* inv = Inv(PLAYER1);
+    if (inv->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
+    
+    if (inv->hardwareIsActive & HW_SNS) {
         play_wav(sounds[82],SfxVol(),(Vector3){},false); HardwareSensaroundOff();
     } else {
         play_wav(sounds[93],SfxVol(),(Vector3){},false); HardwareSensaroundOn();
     }
 }
+
 void HardwareSensaroundClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareSensaroundAction(); }
 
 void HardwareShieldOn(void) {
     Eng_Global->inventoryPlayer1.hardwareIsActive |= HW_SHD;
     // TODO: ShieldActivateFX — engine reads hardwareIsActive & HW_SHD
 }
+
 void HardwareShieldOff(void) { Eng_Global->inventoryPlayer1.hardwareIsActive &= ~HW_SHD; }
 void HardwareShieldOffWithEffects(void) {
     HardwareShieldOff();
     // TODO: ShieldDeactivateFX — engine reads hardwareIsActive & HW_SHD
 }
+
 void HardwareShieldAction(void) {
-    if (PE(PLAYER1)->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
+    InventorySystem* inv = Inv(PLAYER1);
+    if (inv->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
+    
     if (Eng_Global->inventoryPlayer1.hardwareIsActive & HW_SHD) {
         play_wav(sounds[95],SfxVol(),(Vector3){},false); HardwareShieldOffWithEffects();
     } else {
         play_wav(sounds[96],SfxVol(),(Vector3){},false); HardwareShieldOn();
     }
 }
+
 void HardwareShieldClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareShieldAction(); }
 
 void HardwareLanternOn(void) {
@@ -1939,27 +2601,35 @@ void HardwareLanternOff(void) {
     Eng_Global->inventoryPlayer1.hardwareIsActive &= ~HW_LAN;
     // TODO: disable headlight — engine reads hardwareIsActive & HW_LAN
 }
+
 void HardwareLanternAction(void) {
-    if (PE(PLAYER1)->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
+    InventorySystem* inv = Inv(PLAYER1);
+    if (inv->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
+    
     play_wav(sounds[78],SfxVol(),(Vector3){},false);
     if (Eng_Global->inventoryPlayer1.hardwareIsActive & HW_LAN) HardwareLanternOff(); else HardwareLanternOn();
 }
+
 void HardwareLanternClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareLanternAction(); }
 
 void HardwareInfraredOn(void) {
     Eng_Global->inventoryPlayer1.hardwareIsActive |= HW_INF;
     // TODO: enable infrared light + grayscale on player/sensaround cameras — engine reads bitmask
 }
+
 void HardwareInfraredOff(void) {
     Eng_Global->inventoryPlayer1.hardwareIsActive &= ~HW_INF;
     // TODO: disable infrared light + grayscale — engine reads bitmask
 }
 void HardwareInfraredAction(void) {
-    if (PE(PLAYER1)->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
+    InventorySystem* inv = Inv(PLAYER1);
+    if (inv->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
+    
     bool wasOn = (Eng_Global->inventoryPlayer1.hardwareIsActive & HW_INF) != 0;
     play_wav(wasOn ? sounds[82] : sounds[98],SfxVol(),(Vector3){},false);
     if (wasOn) HardwareInfraredOff(); else HardwareInfraredOn();
 }
+
 void HardwareInfraredClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareInfraredAction(); }
 
 void HardwareEReaderAction(void) {
@@ -1967,65 +2637,66 @@ void HardwareEReaderAction(void) {
     Eng_Global->inventoryPlayer1.hardwareIsActive |= HW_ERD;
     // TODO: OpenEReaderInItemsTab() — engine-side tab open
 }
+
 void HardwareEReaderClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareEReaderAction(); }
 
 void HardwareBoosterOn(void)  { Eng_Global->inventoryPlayer1.hardwareIsActive |=  HW_BST; }
 void HardwareBoosterOff(void) { Eng_Global->inventoryPlayer1.hardwareIsActive &= ~HW_BST; }
 void HardwareBoosterAction(void) {
-    if (InventoryBoosterSetToBoost(PLAYER1) && PE(PLAYER1)->energy <= 0.0f) {
-        CenterStatusPrint("%s",Eng_Text->stringTable[314]); return;
-    }
+    InventorySystem* inv = Inv(PLAYER1);
+    if (BoosterSetToBoost(PLAYER1) && inv->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
+    
     play_wav(sounds[78],SfxVol(),(Vector3){},false);
     if (Eng_Global->inventoryPlayer1.hardwareIsActive & HW_BST) HardwareBoosterOff(); else HardwareBoosterOn();
 }
+
 void HardwareBoosterClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareBoosterAction(); }
 
 void HardwareJumpJetsOn(void)  { Eng_Global->inventoryPlayer1.hardwareIsActive |=  HW_JET; }
 void HardwareJumpJetsOff(void) { Eng_Global->inventoryPlayer1.hardwareIsActive &= ~HW_JET; }
 void HardwareJumpJetsAction(void) {
-    if (PE(PLAYER1)->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
+    InventorySystem* inv = Inv(PLAYER1);
+    if (inv->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
+    
     play_wav(sounds[78],SfxVol(),(Vector3){},false);
-    InventoryJumpJetsToggle(PLAYER1);
-    if (InventoryJumpJetsActive(PLAYER1)) HardwareJumpJetsOn(); else HardwareJumpJetsOff();
+    JumpJetsToggle(PLAYER1);
+    if (JumpJetsActive(PLAYER1)) HardwareJumpJetsOn(); else HardwareJumpJetsOff();
 }
+
 void HardwareJumpJetsClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareJumpJetsAction(); }
 //================================================================================
 // Patches
 void PatchInit(void) {
-    Entity* p               = &Eng_Global->instances[PLAYER1];
-    p->mediFinishedTime     = -1.0;
-    p->reflexFinishedTime   = -1.0;
-    p->sightFinishedTime    = -1.0;
-    p->berserkIncrement     = 0;
-    p->patchActive          = 0;
-    p->staminupActive       = false;
+    InventorySystem* inv = Inv(PLAYER1);
+    inv->mediFinishedTime     = -1.0;
+    inv->reflexFinishedTime   = -1.0;
+    inv->sightFinishedTime    = -1.0;
+    inv->berserkIncrement     = 0;
+    inv->patchActive          = 0;
+    inv->staminupActive       = false;
     Eng_Global->timeScale   = DEFAULT_TIME_SCALE;
     Eng_Global->geniusActive = false;
     // TODO: sightLight disabled, sightDimming disabled — engine reads patchActive & PATCH_SIGHT + sightFinishedTime
     // TODO: BerserkFX disabled — engine reads patchActive & PATCH_BERSERK + berserkIncrement
 }
 
-void PatchUpdate(void) {
-    if (Eng_Global->gamePaused || Eng_Global->menuActive) return;
-    Entity* p = &Eng_Global->instances[PLAYER1];
-
-    // Detox
-    if (p->patchActive & PATCH_DETOX) {
-        if (p->detoxFinishedTime < Eng_Global->pauseRelativeTime) p->patchActive -= PATCH_DETOX;
+void PatchUpdate(uint16_t playerIdx) {
+    InventorySystem* inv = Inv(playerIdx);
+    if (inv->patchActive & PATCH_DETOX) { // Detox
+        if (inv->detoxFinishedTime < Eng_Global->pauseRelativeTime) inv->patchActive -= PATCH_DETOX;
         // effect: engine reads PATCH_DETOX bit to ameliorate radiation — no gamecode action needed
     }
 
-    // Medi
-    if (p->patchActive & PATCH_MEDI) {
-        if (p->mediFinishedTime < Eng_Global->pauseRelativeTime && p->mediFinishedTime != -1.0)
-            { p->patchActive -= PATCH_MEDI; p->mediFinishedTime = -1.0; }
+    if (inv->patchActive & PATCH_MEDI) { // Medi
+        if (inv->mediFinishedTime < Eng_Global->pauseRelativeTime && inv->mediFinishedTime != -1.0)
+            { inv->patchActive -= PATCH_MEDI; inv->mediFinishedTime = -1.0; }
     }
 
     // Reflex — uses absoluteTime (wall clock) so timescale doesn't affect own expiry
-    if (p->patchActive & PATCH_REFLEX) {
-        if (p->reflexFinishedTime < Eng_Global->absoluteTime && p->reflexFinishedTime != -1.0) {
-            p->patchActive       -= PATCH_REFLEX;
-            p->reflexFinishedTime = -1.0;
+    if (inv->patchActive & PATCH_REFLEX) {
+        if (inv->reflexFinishedTime < Eng_Global->absoluteTime && inv->reflexFinishedTime != -1.0) {
+            inv->patchActive       -= PATCH_REFLEX;
+            inv->reflexFinishedTime = -1.0;
             Eng_Global->timeScale = DEFAULT_TIME_SCALE;
         } else {
             Eng_Global->timeScale = REFLEX_TIME_SCALE;
@@ -2033,77 +2704,73 @@ void PatchUpdate(void) {
     } else {
         if (Eng_Global->timeScale != DEFAULT_TIME_SCALE) Eng_Global->timeScale = DEFAULT_TIME_SCALE;
     }
-
-    // Berserk
-    if (p->patchActive & PATCH_BERSERK) {
-        if (p->berserkFinishedTime < Eng_Global->pauseRelativeTime) {
-            p->berserkIncrement = 0;
-            p->patchActive -= PATCH_BERSERK;
+   
+    if (inv->patchActive & PATCH_BERSERK) { // Berserk
+        if (inv->berserkFinishedTime < Eng_Global->pauseRelativeTime) {
+            inv->berserkIncrement = 0;
+            inv->patchActive -= PATCH_BERSERK;
             // TODO: BerserkFX disable + reset — engine reads patchActive & PATCH_BERSERK
         } else {
             // TODO: BerserkFX enable — engine reads patchActive & PATCH_BERSERK
-            if (p->berserkIncrementFinishedTime < Eng_Global->pauseRelativeTime) {
-                p->berserkIncrement++;
-                if (p->berserkIncrement > 6) p->berserkIncrement = 6;
-                p->berserkIncrementFinishedTime = Eng_Global->pauseRelativeTime + (BERSERK_TIME / 5.0f);
+            if (inv->berserkIncrementFinishedTime < Eng_Global->pauseRelativeTime) {
+                inv->berserkIncrement++;
+                if (inv->berserkIncrement > 6) inv->berserkIncrement = 6;
+                inv->berserkIncrementFinishedTime = Eng_Global->pauseRelativeTime + (BERSERK_TIME / 5.0f);
                 // TODO: engine reads berserkIncrement for texture swap + strength increment
             }
         }
     }
 
-    // Genius
-    if (p->patchActive & PATCH_GENIUS) {
-        if (p->geniusFinishedTime < Eng_Global->pauseRelativeTime) {
-            p->patchActive          -= PATCH_GENIUS;
+    if (inv->patchActive & PATCH_GENIUS) { // Genius
+        if (inv->geniusFinishedTime < Eng_Global->pauseRelativeTime) {
+            inv->patchActive          -= PATCH_GENIUS;
             Eng_Global->geniusActive = false;
         } else {
             Eng_Global->geniusActive = true;
         }
     }
 
-    // Sight
-    if (p->patchActive & PATCH_SIGHT) {
-        if (p->sightFinishedTime < Eng_Global->pauseRelativeTime && p->sightFinishedTime != -1.0) {
-            p->sightFinishedTime          = -1.0;
-            p->sightSideEffectFinishedTime = Eng_Global->pauseRelativeTime + SIGHT_SIDE_EFFECT_TIME;
+    if (inv->patchActive & PATCH_SIGHT) { // Sight
+        if (inv->sightFinishedTime < Eng_Global->pauseRelativeTime && inv->sightFinishedTime != -1.0) {
+            inv->sightFinishedTime          = -1.0;
+            inv->sightSideEffectFinishedTime = Eng_Global->pauseRelativeTime + SIGHT_SIDE_EFFECT_TIME;
             // TODO: sightLight disable, sightDimming enable — engine reads sightFinishedTime == -1 + side effect active
         }
-        if (p->sightSideEffectFinishedTime < Eng_Global->pauseRelativeTime && p->sightSideEffectFinishedTime != -1.0) {
-            p->sightSideEffectFinishedTime = -1.0;
-            p->sightFinishedTime           = -1.0;
-            p->patchActive                -= PATCH_SIGHT;
+        if (inv->sightSideEffectFinishedTime < Eng_Global->pauseRelativeTime && inv->sightSideEffectFinishedTime != -1.0) {
+            inv->sightSideEffectFinishedTime = -1.0;
+            inv->sightFinishedTime           = -1.0;
+            inv->patchActive                -= PATCH_SIGHT;
             // TODO: sightDimming disable, sightLight disable — engine reads patchActive & PATCH_SIGHT
         }
     }
 
-    // Staminup
-    if (p->patchActive & PATCH_STAMINUP) {
-        if (p->staminupFinishedTime < Eng_Global->pauseRelativeTime) {
-            p->staminupActive  = false;
-            p->fatigue         = 100.0f; // side effect on expiry
-            p->patchActive    -= PATCH_STAMINUP;
+    if (inv->patchActive & PATCH_STAMINUP) { // Staminup
+        if (inv->staminupFinishedTime < Eng_Global->pauseRelativeTime) {
+            inv->staminupActive  = false;
+            inv->fatigue         = 100.0f; // side effect on expiry
+            inv->patchActive    -= PATCH_STAMINUP;
         } else {
-            p->fatigue        = 0.0f;
-            p->staminupActive = true;
+            inv->fatigue        = 0.0f;
+            inv->staminupActive = true;
         }
     }
 }
 
 void PatchDisableAll(void) {
-    Entity* p = &Eng_Global->instances[PLAYER1];
-    p->berserkFinishedTime          = -1.0;
-    p->berserkIncrementFinishedTime = -1.0;
-    p->berserkIncrement             = 0;
-    p->detoxFinishedTime            = -1.0;
-    p->geniusFinishedTime           = -1.0;
-    p->mediFinishedTime             = -1.0;
-    p->reflexFinishedTime           = -1.0;
-    p->sightFinishedTime            = -1.0;
-    p->sightSideEffectFinishedTime  = -1.0;
-    p->staminupFinishedTime         = -1.0;
-    p->staminupActive               = false;
-    p->fatigue                      = 0.0f;
-    p->patchActive                  = 0;
+    InventorySystem* inv = Inv(PLAYER1);
+    inv->berserkFinishedTime          = -1.0;
+    inv->berserkIncrementFinishedTime = -1.0;
+    inv->berserkIncrement             = 0;
+    inv->detoxFinishedTime            = -1.0;
+    inv->geniusFinishedTime           = -1.0;
+    inv->mediFinishedTime             = -1.0;
+    inv->reflexFinishedTime           = -1.0;
+    inv->sightFinishedTime            = -1.0;
+    inv->sightSideEffectFinishedTime  = -1.0;
+    inv->staminupFinishedTime         = -1.0;
+    inv->staminupActive               = false;
+    inv->fatigue                      = 0.0f;
+    inv->patchActive                  = 0;
     Eng_Global->timeScale           = DEFAULT_TIME_SCALE;
     Eng_Global->geniusActive        = false;
     // TODO: sightLight/sightDimming disable — engine reads patchActive == 0
@@ -2173,655 +2840,6 @@ void PatchDisableAll(void) {
 		}
 	}
 }*/
-//================================================================================
-// Inventory
-void PatchUse(uint16_t playerIdx,int patchSlot) { (void)playerIdx; (void)patchSlot; } // TODO
-void WeaponFireStartWeaponDip(float t) { (void)t; } // TODO
-void WeaponFireCompleteWeaponChange(void) { } // TODO
-
-static inline InventorySystem* Inv(uint16_t p) {
-    return p == PLAYER1 ? &Eng_Global->inventoryPlayer1 : &Eng_Global->inventoryPlayer2;
-}
-
-bool InventoryHasAccessCard(uint16_t p,AccessCardType card) { return (Inv(p)->accessCardOwned & (1u << card)) != 0; }
-bool InventoryHasAnyAccessCards(uint16_t p) { return Inv(p)->accessCardOwned != 0; }
-
-const char* AccessCardCodeForType(AccessCardType a) { // Called by ItemTabManager
-    switch(a) {
-        case AccessCardType_Standard:    return "STD";
-        case AccessCardType_Medical:     return "MED";
-        case AccessCardType_Science:     return "SCI";
-        case AccessCardType_Admin:       return "ADM";
-        case AccessCardType_Group1:      return "Group-1";
-        case AccessCardType_Group2:      return "Group-2";
-        case AccessCardType_Group3:      return "Group-3";
-        case AccessCardType_Group4:      return "Group-4";
-        case AccessCardType_GroupA:      return "Group-A";
-        case AccessCardType_GroupB:      return "Group-B";
-        case AccessCardType_Storage:     return "STO";
-        case AccessCardType_Engineering: return "ENG";
-        case AccessCardType_Maintenance: return "MTN";
-        case AccessCardType_Security:    return "SEC";
-        case AccessCardType_Per1:        return "PER-1";
-        case AccessCardType_Per2:        return "PER-2";
-        case AccessCardType_Per3:        return "PER-3";
-        case AccessCardType_Per4:        return "PER-4";
-        case AccessCardType_Per5:        return "PER-5";
-        default:                         return "Group-2";
-    }
-}
-
-void InventoryAddAccessCardToInventory(uint16_t p,int index) {
-    AccessCardType card;
-    switch(index) {
-        case  34: card = AccessCardType_Admin;       break;
-        case  81: card = AccessCardType_Standard;    break;
-        case  83: card = AccessCardType_Group1;      break;
-        case  84: card = AccessCardType_Science;     break;
-        case  85: card = AccessCardType_Engineering; break;
-        case  86: card = AccessCardType_GroupB;      break;
-        case  87: card = AccessCardType_Security;    break;
-        case  88: card = AccessCardType_Per5;        break;
-        case  89: card = AccessCardType_Medical;     break;
-        case  90: card = AccessCardType_Group3;      break;
-        case  91: card = AccessCardType_Group4;      break;
-        case 110: card = AccessCardType_Per1;        break;
-        default:
-            CenterStatusPrint("BUG: Unmarked access card, defaulting to STD.");
-            card = AccessCardType_Standard;
-            break;
-    }
-    if (index == 87) { // Command card = STO + SEC + MTN
-        if (InventoryHasAccessCard(p,AccessCardType_Storage) &&
-            InventoryHasAccessCard(p,AccessCardType_Security) &&
-            InventoryHasAccessCard(p,AccessCardType_Maintenance)) {
-            CenterStatusPrint("%s%s",Eng_Text->stringTable[44],AccessCardCodeForType(card));
-            return;
-        }
-        Inv(p)->accessCardOwned |= (1u<<AccessCardType_Storage)|(1u<<AccessCardType_Security)|(1u<<AccessCardType_Maintenance);
-        CenterStatusPrint("%s%s, %s, %s",Eng_Text->stringTable[45],AccessCardCodeForType(AccessCardType_Storage),AccessCardCodeForType(AccessCardType_Security),AccessCardCodeForType(AccessCardType_Maintenance));
-        return;
-    }
-    if (InventoryHasAccessCard(p,card)) { CenterStatusPrint("%s%s",Eng_Text->stringTable[44],AccessCardCodeForType(card)); return; }
-    Inv(p)->accessCardOwned |= (1u << card);
-    CenterStatusPrint("%s%s",Eng_Text->stringTable[45],AccessCardCodeForType(card));
-}
-
-void InventoryAddHardwareToInventory(uint16_t p,int index,int constIndex,int hwversion,bool overt) {
-    (void)constIndex;
-    if (index < 0) return;
-    InventorySystem* inv = Inv(p);
-    if (hwversion < 0) { CenterStatusPrint("BUG: Hardware added with version < 0, using 0."); hwversion = 0; }
-    if (hwversion > 0 && hwversion <= (int)inv->hardwareVersion[index]) {
-        if (overt) CenterStatusPrint("%s",Eng_Text->stringTable[46]); // THAT WARE IS OBSOLETE. DISCARDED.
-        return;
-    }
-    static const uint8_t textIdx[12] = {21,22,23,24,25,26,27,28,29,30,31,32};
-    inv->hardwareInvIndex             = index;
-    inv->hasHardware                 |= (uint16_t)(1u << index);
-    inv->hardwareVersion[index]       = (uint8_t)hwversion;
-    inv->hardwareVersionSetting[index]= hwversion > 0 ? (uint8_t)(hwversion - 1) : 0;
-    // TODO: engine enables HUD hardware buttons from hasHardware bitmask on render
-    // TODO: nav unit (index 1): compass/automap HUD visibility from hasHardware & HW_NAV + version
-    if (overt) CenterStatusPrint("%s v%d",Eng_Text->stringTable[textIdx[index] + 326],hwversion);
-}
-
-int  InventoryNavUnitVersion(uint16_t p)     { return Inv(p)->hardwareVersion[HW_NAV_IDX]; }
-int  InventoryBioMonitorVersion(uint16_t p)  { return Inv(p)->hardwareVersion[HW_BIO_IDX]; }
-bool InventoryBioMonitorActive(uint16_t p)   { InventorySystem* i=Inv(p); return (i->hasHardware & HW_BIO) && (i->hardwareIsActive & HW_BIO); }
-bool InventoryLanternActive(uint16_t p)      { InventorySystem* i=Inv(p); return (i->hasHardware & HW_LAN) && (i->hardwareIsActive & HW_LAN); }
-int  InventoryEnvirosuitVersion(uint16_t p)  { return Inv(p)->hardwareVersion[HW_ENV_IDX]; }
-bool InventoryBoosterSetToSkates(uint16_t p) { return Inv(p)->hardwareVersionSetting[HW_BST_IDX] == 0; }
-bool InventoryBoosterSetToBoost(uint16_t p)  { return Inv(p)->hardwareVersionSetting[HW_BST_IDX] >= 1; }
-bool InventoryBoosterActive(uint16_t p)      { InventorySystem* i=Inv(p); return (i->hasHardware & HW_BST) && (i->hardwareIsActive & HW_BST); }
-void InventoryJumpJetsToggle(uint16_t p)     { Inv(p)->hardwareIsActive ^= HW_JET; }
-int  InventoryJumpJetsVersion(uint16_t p)    { return Inv(p)->hardwareVersion[HW_JET_IDX]; }
-bool InventoryJumpJetsActive(uint16_t p)     { InventorySystem* i=Inv(p); return (i->hasHardware & HW_JET) && (i->hardwareIsActive & HW_JET); }
-// HideBioMonitor / UnHideBioMonitor: engine reads InventoryBioMonitorActive() for HUD visibility, no gamecode needed
-
-bool InventoryAddGeneralObjectToInventory(uint16_t p,int index,int customIndex) {
-    if (index < 0) return false;
-    InventorySystem* inv = Inv(p);
-    for (int i = 1; i < 14; i++) {
-        if (inv->generalInventoryIndexRef[i] != -1) continue;
-        if (!InventoryHasAnyAccessCards(p) && inv->generalInvCurrent == 0) inv->generalInvCurrent = (int8_t)i;
-        inv->generalInventoryIndexRef[i] = index;
-        inv->generalInvCustomIndex[i]    = (int16_t)customIndex;
-        CenterStatusPrint("%s%s",Eng_Text->stringTable[index + 326],Eng_Text->stringTable[31]);
-        return true;
-    }
-    return false;
-}
-
-void InventoryGeneralInventoryActivate(uint16_t p) {
-    InventorySystem* inv = Inv(p);
-    int cur = inv->generalInvCurrent;
-    if (cur < 0 || cur >= 14) { DualLog("BUG: generalInvCurrent out of range at %d",cur); return; }
-    GeneralInvApply(cur,inv->generalInvCustomIndex[cur]);
-    if (cur != 0) inv->generalInventoryIndexRef[cur] = -1;
-}
-
-void InventoryGrenadeCycleDown(uint16_t p) {
-    InventorySystem* inv = Inv(p);
-    int last = inv->grenadeCurrent, next = last - 1;
-    if (next < 0) next = 6;
-    for (int c = 0; c <= 13; c++) {
-        if (inv->grenAmmo[next] > 0) break;
-        if (c == 13) return;
-        if (--next < 0) next = 6;
-    }
-    if (last == next) return;
-    inv->grenadeCurrent = (int8_t)next;
-    static const uint16_t msg[7] = {579,580,581,582,583,584,585};
-    CenterStatusPrint("%s",Eng_Text->stringTable[msg[next]]);
-}
-
-void InventoryGrenadeCycleUp(uint16_t p) {
-    InventorySystem* inv = Inv(p);
-    int last = inv->grenadeCurrent, next = last + 1;
-    if (next > 6) next = 0;
-    for (int c = 0; c <= 13; c++) {
-        if (inv->grenAmmo[next] > 0) break;
-        if (c == 13) return;
-        if (++next > 6) next = 0;
-    }
-    if (last == next) return;
-    inv->grenadeCurrent = (int8_t)next;
-    static const uint16_t msg[7] = {579,580,581,582,583,584,585};
-    CenterStatusPrint("%s",Eng_Text->stringTable[msg[next]]);
-}
-
-void InventoryAddGrenadeToInventory(uint16_t p,int index,int useableIndex) {
-    if (index < 0) return;
-    InventorySystem* inv = Inv(p);
-    bool anyGren = false;
-    for (int i = 0; i < 7; i++) if (inv->grenAmmo[i]) { anyGren = true; break; }
-    if (!anyGren) inv->grenadeCurrent = (int8_t)index;
-    inv->grenAmmo[index]++;
-    inv->grenConstIndex[index] = (int16_t)useableIndex;
-    CenterStatusPrint("%s%s",Eng_Text->stringTable[useableIndex + 326],Eng_Text->stringTable[34]);
-}
-
-void InventoryRemoveGrenade(uint16_t p,int index) {
-    InventorySystem* inv = Inv(p);
-    if (inv->grenAmmo[index] > 0) inv->grenAmmo[index]--;
-    if (!inv->grenAmmo[index]) InventoryGrenadeCycleDown(p);
-}
-
-void InventoryCheckForUnreadLogs(uint16_t p) {
-    InventorySystem* inv = Inv(p);
-    int em = 0, lg = 0;
-    for (int i = TEXT_LOGS_COUNT-1; i >= 0; i--) {
-        if (inv->hasLog[i] && !inv->readLog[i]) {
-            if (Eng_Text->audioLogType[i] == AudioLogType_Email) em++; else lg++;
-        }
-    }
-    if (!em) inv->hasNewEmail = false;
-    if (!lg) inv->hasNewLogs  = false;
-}
-
-static int FindNextUnreadLog(uint16_t p) {
-    InventorySystem* inv = Inv(p);
-    for (int i = TEXT_LOGS_COUNT-1; i >= 0; i--) {
-        if (inv->hasLog[i] && !inv->readLog[i]) return i;
-    }
-    return -1;
-}
-
-static void InvPlayLog(uint16_t p,int logIndex) {
-    if (logIndex < 0) return;
-    InventorySystem* inv = Inv(p);
-    if (!(inv->hasHardware & HW_ERD)) return;
-//     if (inv->logSoundInited) { SoundStop(&inv->logSound); SoundUninit(&inv->logSound); inv->logSoundInited = false; }
-//     if (!SoundInit(sounds[Eng_Text->audioLogSoundIndex[logIndex]],0,NULL,NULL,&inv->logSound)) {
-//         SoundSetVolume(&inv->logSound,(float)Eng_Settings->VolumeMessage / 100.0f);
-//         SoundStart(&inv->logSound);
-//         inv->logSoundInited = true;
-//     }
-//     inv->readLog[logIndex] = true;
-//     if (Eng_Text->audioLogType[logIndex] == AudioLogType_Vmail) {
-//         vmailActive        = true;
-//         inv->vmailLogIndex = (int16_t)logIndex; // engine reads to select which .webm to play
-//         switch (logIndex) { // TODO
-//             case 119:
-//                 vmailbetajet.SetActive(true);
-//                 fileName = "betajet.webm";
-//                 Utils.ConfirmExistsMakeIfNot(basePath,fileName);
-//                 urlPath = Utils.SafePathCombine(basePath,fileName);
-//                 vmailbetajetVideo.url = urlPath;
-//                 vmailbetajetVideo.Play();
-//                 break;
-//             case 116:
-//                 vmailbridgesep.SetActive(true);
-//                 fileName = "bridgesep.webm";
-//                 Utils.ConfirmExistsMakeIfNot(basePath,fileName);
-//                 urlPath = Utils.SafePathCombine(basePath,fileName);
-//                 vmailbridgesepVideo.url = urlPath;
-//                 vmailbridgesepVideo.Play();
-//                 break;
-//             case 117:
-//                 vmailcitadestruct.SetActive(true);
-//                 fileName = "citadestruct.webm";
-//                 Utils.ConfirmExistsMakeIfNot(basePath,fileName);
-//                 urlPath = Utils.SafePathCombine(basePath,fileName);
-//                 vmailcitadestructVideo.url = urlPath;
-//                 vmailcitadestructVideo.Play();
-//                 break;
-//             case 110:
-//                 vmailgenstatus.SetActive(true);
-//                 fileName = "genstatus.webm";
-//                 Utils.ConfirmExistsMakeIfNot(basePath,fileName);
-//                 urlPath = Utils.SafePathCombine(basePath,fileName);
-//                 vmailgenstatusVideo.url = urlPath;
-//                 vmailgenstatusVideo.Play();
-//                 break;
-//             case 114:
-//                 vmaillaserdest.SetActive(true);
-//                 fileName = "laserdest.webm";
-//                 Utils.ConfirmExistsMakeIfNot(basePath,fileName);
-//                 urlPath = Utils.SafePathCombine(basePath,fileName);
-//                 vmaillaserdestVideo.url = urlPath;
-//                 vmaillaserdestVideo.Play();
-//                 break;
-//             case 120:
-//                 vmailshieldsup.SetActive(true);
-//                 fileName = "shieldsup.webm";
-//                 Utils.ConfirmExistsMakeIfNot(basePath,fileName);
-//                 urlPath = Utils.SafePathCombine(basePath,fileName);
-//                 vmailshieldsupVideo.url = urlPath;
-//                 vmailshieldsupVideo.Play();
-//                 break;
-//         }
-//    }
-    CenterStatusPrint("%s%s",Eng_Text->stringTable[1020],Eng_Global->audiologNames[logIndex]); // "Playing <name>"
-    // TODO: SendAudioLogToDataTab(logIndex) — engine-side data tab notification
-}
-
-void InventoryPlayLastAddedLog(uint16_t p,int logIndex) {
-    if (logIndex < 0) return;
-    InvPlayLog(p,logIndex);
-    Inv(p)->lastAddedIndex = -1;
-}
-
-void InventoryAddAudioLogToInventory(uint16_t p,int index) {
-    if (index < 0) { DualLog("BUG: Audio log picked up has no assigned index (-1)"); return; }
-    if (index == 128) { CenterStatusPrint("%s",Eng_Text->stringTable[309]); return; } // Trioptimum Funpack
-    InventorySystem* inv = Inv(p);
-    inv->hasLog[index]  = true;
-    inv->lastAddedIndex = index;
-    inv->numLogsFromLevel[Eng_Text->audioLogLevelFound[index]]++;
-    if      (Eng_Text->audioLogType[index] == AudioLogType_Email)  inv->hasNewEmail = true;
-    else if (Eng_Text->audioLogType[index] == AudioLogType_Normal) inv->hasNewLogs  = true;
-    if (inv->hasHardware & HW_ERD) {
-        // "Audio log <name> picked up. Press <key> to play." — TODO: key binding name interp
-        CenterStatusPrint("%s%s%s",Eng_Text->stringTable[36],Eng_Global->audiologNames[index],Eng_Text->stringTable[38]);
-    } else {
-        CenterStatusPrint("%s%s%s",Eng_Text->stringTable[36],Eng_Global->audiologNames[index],Eng_Text->stringTable[310]);
-    }
-}
-
-void InventoryPatchCycleDown(uint16_t p,bool useSound) {
-    (void)useSound; // engine plays patch select sound on patchCurrent change
-    InventorySystem* inv = Inv(p);
-    int next = inv->patchCurrent - 1;
-    if (next < 0) next = 6;
-    inv->patchCurrent = (int8_t)next;
-    for (int c = 0; c <= 13; c++) {
-        if (inv->patchCounts[next] > 0) break;
-        if (c == 13) return;
-        if (--next < 0) next = 6;
-    }
-    inv->patchCurrent = (int8_t)next;
-}
-
-void InventoryPatchCycleUp(uint16_t p,bool useSound) {
-    (void)useSound;
-    InventorySystem* inv = Inv(p);
-    int next = inv->patchCurrent + 1;
-    if (next > 6) next = 0;
-    inv->patchCurrent = (int8_t)next;
-    for (int c = 0; c <= 13; c++) {
-        if (inv->patchCounts[next] > 0) break;
-        if (c == 13) return;
-        if (++next > 6) next = 0;
-    }
-    inv->patchCurrent = (int8_t)next;
-}
-
-void InventoryAddPatchToInventory(uint16_t p,int index,int constIndex) {
-    if (index < 0) return;
-    InventorySystem* inv = Inv(p);
-    inv->patchCounts[index]++;
-    if (!inv->patchCounts[inv->patchCurrent]) inv->patchCurrent = (int8_t)index;
-    CenterStatusPrint("%s%s",Eng_Text->stringTable[constIndex + 326],Eng_Text->stringTable[35]);
-}
-
-static int8_t GetExistingCyberItemIndex(uint16_t p) {
-    InventorySystem* inv = Inv(p);
-    if (inv->softVersions[SW_TURBO]  > 0) return 0;
-    if (inv->softVersions[SW_DECOY]  > 0) return 1;
-    if (inv->softVersions[SW_RECALL] > 0) return 2;
-    return -1;
-}
-
-static void UseTurbo(uint16_t p) {
-    InventorySystem* inv = Inv(p);
-    if (inv->softVersions[SW_TURBO] <= 0) { inv->hasSoft &= (uint8_t)~(1u << SW_TURBO); return; }
-    if (--inv->softVersions[SW_TURBO] == 0) inv->hasSoft &= (uint8_t)~(1u << SW_TURBO);
-    Entity* player = PE(p);
-    if (player->turboFinished > Eng_Global->pauseRelativeTime)
-        player->turboFinished += player->turboCyberTime;
-    else
-        player->turboFinished = player->turboCyberTime + Eng_Global->pauseRelativeTime;
-}
-
-static void UseDecoy(uint16_t p) {
-    InventorySystem* inv = Inv(p);
-    if (Eng_Global->decoyActive) { CenterStatusPrint("%s",Eng_Text->stringTable[537]); return; }
-    if (inv->softVersions[SW_DECOY] <= 0) { inv->hasSoft &= (uint8_t)~(1u << SW_DECOY); return; }
-    if (--inv->softVersions[SW_DECOY] == 0) inv->hasSoft &= (uint8_t)~(1u << SW_DECOY);
-    uint16_t decoyIdx = SpawnDynamicObject(417,true); // 417 = CyberDecoy constIndex
-    if (decoyIdx != UINT16_MAX) Eng_Global->instances[decoyIdx].position = PE(p)->position;
-}
-
-static void UseRecall(uint16_t p) {
-    InventorySystem* inv = Inv(p);
-    if (inv->softVersions[SW_RECALL] <= 0) return;
-    if (--inv->softVersions[SW_RECALL] == 0) inv->hasSoft &= (uint8_t)~(1u << SW_RECALL);
-    PE(p)->position = Eng_Global->cyberspaceRecallPoint;
-}
-
-void InventoryUseCyberspaceItem(uint16_t p) {
-    InventorySystem* inv = Inv(p);
-    if (inv->cyberItemIndex <= 0) {
-        inv->cyberItemIndex = GetExistingCyberItemIndex(p);
-        if (inv->cyberItemIndex < 0) { CenterStatusPrint("%s",Eng_Text->stringTable[473]); return; }
-    }
-    switch(inv->cyberItemIndex) {
-        case 0: if (!inv->softVersions[SW_TURBO])  { inv->cyberItemIndex = GetExistingCyberItemIndex(p); return; } UseTurbo(p);  break;
-        case 1: if (!inv->softVersions[SW_DECOY])  { inv->cyberItemIndex = GetExistingCyberItemIndex(p); return; } UseDecoy(p);  break;
-        case 2: if (!inv->softVersions[SW_RECALL]) { inv->cyberItemIndex = GetExistingCyberItemIndex(p); return; } UseRecall(p); break;
-    }
-}
-
-void InventoryCycleCyberSpaceItemUp(uint16_t p) {
-    InventorySystem* inv = Inv(p);
-    int next = inv->cyberItemIndex + 1;
-    if (next > 2) next = 0;
-    for (int c = 0; c <= 7; c++) {
-        if (!(inv->hasSoft & (1u << next))) { inv->cyberItemIndex = (int8_t)next; return; }
-        if (c == 7) { inv->cyberItemIndex = -1; return; }
-        if (++next > 2) next = 0;
-    }
-}
-
-void InventoryCycleCyberSpaceItemDn(uint16_t p) {
-    InventorySystem* inv = Inv(p);
-    int next = inv->cyberItemIndex - 1;
-    if (next < 0) next = 2;
-    for (int c = 0; c <= 7; c++) {
-        if (inv->hasSoft & (1u << next)) { inv->cyberItemIndex = (int8_t)next; return; }
-        if (c == 7) { inv->cyberItemIndex = -1; return; }
-        if (--next < 0) next = 2;
-    }
-}
-
-bool InventoryAddSoftwareItem(uint16_t p,SoftwareType type,int vers) {
-    InventorySystem* inv = Inv(p);
-    Entity* player       = PE(p);
-    float sfxVol         = (float)Eng_Settings->VolumeEffects / 100.0f;
-    switch(type) {
-        case SoftwareType_Drill:
-            if (inv->isPulserNotDrill && !(inv->hasSoft & (1u << SW_PULSER))) inv->isPulserNotDrill = false;
-            if (vers > inv->softVersions[SW_DRILL]) inv->softVersions[SW_DRILL] = (uint8_t)vers;
-            else CenterStatusPrint("%s",Eng_Text->stringTable[46]);
-            inv->hasSoft |= (1u << SW_DRILL);
-            play_wav(sounds[86],sfxVol,(Vector3){},false);
-            CenterStatusPrint("%s%d%s",Eng_Text->stringTable[444],inv->softVersions[SW_DRILL],Eng_Text->stringTable[458]);
-            return true;
-        case SoftwareType_Pulser:
-            if (!inv->isPulserNotDrill && !(inv->hasSoft & (1u << SW_PULSER))) inv->isPulserNotDrill = true;
-            if (vers > inv->softVersions[SW_PULSER]) inv->softVersions[SW_PULSER] = (uint8_t)vers;
-            else CenterStatusPrint("%s",Eng_Text->stringTable[46]);
-            inv->hasSoft |= (1u << SW_PULSER);
-            play_wav(sounds[86],sfxVol,(Vector3){},false);
-            CenterStatusPrint("%s%d%s",Eng_Text->stringTable[445],inv->softVersions[SW_PULSER],Eng_Text->stringTable[458]);
-            return true;
-        case SoftwareType_CShield:
-            if (vers > inv->softVersions[SW_SHIELD]) inv->softVersions[SW_SHIELD] = (uint8_t)vers;
-            else CenterStatusPrint("%s",Eng_Text->stringTable[46]);
-            inv->hasSoft |= (1u << SW_SHIELD);
-            play_wav(sounds[86],sfxVol,(Vector3){},false);
-            CenterStatusPrint("%s%d%s",Eng_Text->stringTable[446],inv->softVersions[SW_SHIELD],Eng_Text->stringTable[458]);
-            return true;
-        case SoftwareType_Turbo:
-            if (inv->cyberItemIndex < 0) inv->cyberItemIndex = 0;
-            inv->softVersions[SW_TURBO]++;
-            inv->hasSoft |= (1u << SW_TURBO);
-            play_wav(sounds[86],sfxVol,(Vector3){},false);
-            CenterStatusPrint("%s",Eng_Text->stringTable[447]);
-            return true;
-        case SoftwareType_Decoy:
-            if (inv->cyberItemIndex < 0) inv->cyberItemIndex = 1;
-            inv->softVersions[SW_DECOY]++;
-            inv->hasSoft |= (1u << SW_DECOY);
-            play_wav(sounds[86],sfxVol,(Vector3){},false);
-            CenterStatusPrint("%s",Eng_Text->stringTable[448]);
-            return true;
-        case SoftwareType_Recall:
-            if (inv->cyberItemIndex < 0) inv->cyberItemIndex = 2;
-            inv->softVersions[SW_RECALL]++;
-            inv->hasSoft |= (1u << SW_RECALL);
-            play_wav(sounds[86],sfxVol,(Vector3){},false);
-            CenterStatusPrint("%s",Eng_Text->stringTable[449]);
-            return true;
-        case SoftwareType_Game: {
-            if (vers < 0 || vers >= 7) return false;
-            inv->hasNewData  = true;
-            inv->hasMinigame |= (uint8_t)(1u << vers);
-            static const uint16_t gameMsg[7] = {450,451,452,453,454,455,456};
-            play_wav(sounds[86],sfxVol,(Vector3){},false);
-            CenterStatusPrint("%s",Eng_Text->stringTable[gameMsg[vers]]);
-            return true;
-        }
-        case SoftwareType_Data:
-            inv->hasNewData = true;
-            if (vers >= 0 && vers < TEXT_LOGS_COUNT) inv->hasLog[vers] = true;
-            play_wav(sounds[87],sfxVol,(Vector3){},false);
-            CenterStatusPrint("%s",Eng_Text->stringTable[457]);
-            return true;
-        case SoftwareType_Integrity:
-            if (player->cyberHealth >= 255.0f) return false;
-            play_wav(sounds[86],sfxVol,(Vector3){},false);
-            player->cyberHealth += 77.0f;
-            if (player->cyberHealth > 255.0f) player->cyberHealth = 255.0f;
-            // TODO: DrawTicks(true) — HUD cyber health tick refresh
-            CenterStatusPrint("%s",Eng_Text->stringTable[459]);
-            return true;
-        case SoftwareType_Keycard:
-            inv->hasNewData = true;
-            if (vers < 0 || vers > 110) vers = 81;
-            InventoryAddAccessCardToInventory(p,vers);
-            return true;
-        default: break;
-    }
-    return false;
-}
-
-void InventoryRemoveWeapon(uint16_t p,int slot) {
-    InventorySystem* inv = Inv(p);
-    inv->weaponInventoryIndices[slot]    = -1;
-    inv->weaponInventoryAmmoIndices[slot] = -1;
-}
-
-static float DefaultEnergySettingForWeapon(int wep16Index) {
-    switch(wep16Index) {
-        case  1: return  3.0f;
-        case  4: return  5.0f;
-        case 10: return 13.0f;
-        case 14: return  2.0f;
-        case 15: return  3.0f;
-        default: return  3.0f;
-    }
-}
-
-void InventoryUpdateAmmoCount(uint16_t p) {
-    InventorySystem* inv = Inv(p);
-    inv->numweapons = 0;
-    for (int i = 0; i < 7; i++) if (inv->weaponInventoryIndices[i] >= 0) inv->numweapons++;
-}
-
-// Returns ammo display string for slot. Writes to caller-provided buffer.
-// Engine calls this per-frame for HUD weapon pane text.
-void InventoryGetWeaponAmmoText(uint16_t p,int slot,char* buf,size_t bufSize) {
-    InventorySystem* inv = Inv(p);
-    buf[0] = '\0';
-    int wepIdx = inv->weaponInventoryIndices[slot];
-    bool alt   = inv->wepLoadedWithAlternate[slot];
-    uint8_t mag  = alt ? inv->currentMagazineAmount2[slot] : inv->currentMagazineAmount[slot];
-    float heat   = inv->currentEnergyWeaponHeat[slot];
-    switch(wepIdx) {
-        case 36: // MK3 Assault Rifle
-            if (alt) StringFormat(buf,bufSize,"%upn | %umg, %upn",mag,inv->wepAmmo[0],inv->wepAmmoSecondary[0]);
-            else     StringFormat(buf,bufSize,"%umg | %umg, %upn",mag,inv->wepAmmo[0],inv->wepAmmoSecondary[0]);
-            break;
-        case 37: case 40: case 46: case 50: case 51: // Energy weapons
-            StringCopyInto_A_From_B(buf,heat > 80.0f ? Eng_Text->stringTable[14] : Eng_Text->stringTable[15],bufSize);
-            break;
-        case 38: // SV-23 Dartgun
-            if (alt) StringFormat(buf,bufSize,"%utq | %und, %utq",mag,inv->wepAmmo[2],inv->wepAmmoSecondary[2]);
-            else     StringFormat(buf,bufSize,"%und | %und, %utq",mag,inv->wepAmmo[2],inv->wepAmmoSecondary[2]);
-            break;
-        case 39: // AM-27 Flechette
-            if (alt) StringFormat(buf,bufSize,"%usp | %uhn, %usp",mag,inv->wepAmmo[3],inv->wepAmmoSecondary[3]);
-            else     StringFormat(buf,bufSize,"%uhn | %uhn, %usp",mag,inv->wepAmmo[3],inv->wepAmmoSecondary[3]);
-            break;
-        case 41: case 42: break; // Laser Rapier / Lead Pipe: no ammo
-        case 43: // Magnum 2100
-            if (alt) StringFormat(buf,bufSize,"%usg | %uhw, %usg",mag,inv->wepAmmo[7],inv->wepAmmoSecondary[7]);
-            else     StringFormat(buf,bufSize,"%uhw | %uhw, %usg",mag,inv->wepAmmo[7],inv->wepAmmoSecondary[7]);
-            break;
-        case 44: // SB-20 Magpulse
-            if (alt) StringFormat(buf,bufSize,"%usu | %ucr, %usu",mag,inv->wepAmmo[8],inv->wepAmmoSecondary[8]);
-            else     StringFormat(buf,bufSize,"%ucr | %ucr, %usu",mag,inv->wepAmmo[8],inv->wepAmmoSecondary[8]);
-            break;
-        case 45: // ML-41 Pistol
-            if (alt) StringFormat(buf,bufSize,"%utf | %ust, %utf",mag,inv->wepAmmo[9],inv->wepAmmoSecondary[9]);
-            else     StringFormat(buf,bufSize,"%ust | %ust, %utf",mag,inv->wepAmmo[9],inv->wepAmmoSecondary[9]);
-            break;
-        case 47: StringFormat(buf,bufSize,"%url | %url",inv->currentMagazineAmount[slot],inv->wepAmmo[11]); break; // MM-76 Railgun
-        case 48: StringFormat(buf,bufSize,"%urb | %urb",inv->currentMagazineAmount[slot],inv->wepAmmo[12]); break; // DC-05 Riotgun
-        case 49: // RF-07 Skorpion
-            if (alt) StringFormat(buf,bufSize,"%ulg | %usm, %ulg",mag,inv->wepAmmo[13],inv->wepAmmoSecondary[13]);
-            else     StringFormat(buf,bufSize,"%usm | %usm, %ulg",mag,inv->wepAmmo[13],inv->wepAmmoSecondary[13]);
-            break;
-        default: break;
-    }
-}
-
-void InventoryAddAmmoToInventory(uint16_t p,int index,int constIndex,int amount,bool isSecondary) {
-    if (index < 0) return;
-    InventorySystem* inv = Inv(p);
-    if (isSecondary) inv->wepAmmoSecondary[index] += (uint16_t)amount;
-    else             inv->wepAmmo[index]          += (uint16_t)amount;
-    CenterStatusPrint("%s%s",Eng_Text->stringTable[constIndex + 326],Eng_Text->stringTable[630]);
-}
-
-bool InventoryAddWeaponToInventory(uint16_t p,int index,int ammo1,int ammo2,bool loadedAlt) {
-    if (index < 0) return false;
-    InventorySystem* inv = Inv(p);
-    for (int i = 0; i < 7; i++) {
-        if (inv->weaponInventoryIndices[i] >= 0) continue;
-        inv->weaponInventoryIndices[i] = index;
-        int index16 = (int)Get16WeaponIndexFromConstIndex(index);
-        inv->weaponEnergySetting[i] = DefaultEnergySettingForWeapon(index16);
-        if (i == 0) {
-            inv->weaponCurrentPending = 0;
-            inv->weaponIndexPending   = (uint16_t)index;
-            inv->justChangedWeap      = true;
-            WeaponFireStartWeaponDip(0.5f);
-            WeaponFireCompleteWeaponChange();
-        }
-        if (loadedAlt && ammo2 > 0) {
-            inv->currentMagazineAmount2[i] = (uint8_t)ammo2;
-            if (ammo1 > 0) inv->wepAmmo[index16] += (uint16_t)ammo1;
-            inv->wepLoadedWithAlternate[i] = true;
-        } else {
-            inv->currentMagazineAmount[i] = (uint8_t)ammo1;
-            if (ammo2 > 0) inv->wepAmmoSecondary[index16] += (uint16_t)ammo2;
-            inv->wepLoadedWithAlternate[i] = false;
-        }
-        CenterStatusPrint("%s%s",Eng_Text->stringTable[index + 326],Eng_Text->stringTable[33]);
-        InventoryUpdateAmmoCount(p);
-        return true;
-    }
-    return false;
-}
-
-void InventoryUpdate(uint16_t p) {
-    InventorySystem* inv = Inv(p);
-
-    // Log audio pause / resume around game pause
-    if (Eng_Global->gamePaused || Eng_Global->menuActive) {
-        if (!inv->logPaused && false/*GetSoundIsPlaying(&inv->logSound)*/) { // TODO
-//             SoundStop(&inv->logSound); // ma_sound_stop preserves cursor position TODO
-            inv->logPaused = true;
-        }
-        return;
-    }
-    if (inv->logPaused) {
-//         SoundStart(&inv->logSound); TODO
-        inv->logPaused = false;
-    }
-
-    // Bounds checks
-    if (inv->generalInvIndex < 0 || inv->generalInvIndex >= 14)
-        { DualLog("generalInvIndex OOB %d, reset",inv->generalInvIndex); inv->generalInvIndex = 0; }
-    if (inv->hardwareInvIndex < 0 || inv->hardwareInvIndex >= 14)
-        { DualLog("hardwareInvIndex OOB %d, reset",inv->hardwareInvIndex); inv->hardwareInvIndex = 0; }
-
-    // Grenades / cyberspace items
-    if (Grenade()) {
-        if (PE(p)->inCyberTube) {
-            InventoryUseCyberspaceItem(p);
-        } else if (inv->grenadeCurrent >= 0 && inv->grenadeCurrent < 7 && inv->grenAmmo[inv->grenadeCurrent] > 0) {
-            UseGrenade(p,inv->grenConstIndex[inv->grenadeCurrent]);
-        } else {
-            CenterStatusPrint("%s",Eng_Text->stringTable[322]); // Out of grenades.
-        }
-    }
-    if (GrenadeCycUp())  { if (PE(p)->inCyberTube) InventoryCycleCyberSpaceItemUp(p);  else InventoryGrenadeCycleUp(p); }
-    if (GrenadeCycDown()){ if (PE(p)->inCyberTube) InventoryCycleCyberSpaceItemDn(p); else InventoryGrenadeCycleDown(p); }
-
-    // Log playback
-    if (RecentLog() && (inv->hasHardware & HW_ERD)) {
-        bool playing = false;//GetSoundIsPlaying(&inv->logSound); TODO
-        if (inv->lastAddedIndex >= 0 && !playing) {
-            int temp = inv->lastAddedIndex;
-            InvPlayLog(p,temp);
-            inv->lastAddedIndex = FindNextUnreadLog(p);
-            if (inv->lastAddedIndex == temp) inv->lastAddedIndex = -1;
-            InventoryCheckForUnreadLogs(p);
-        } else {
-//             SoundStop(&inv->logSound); TODO
-            int temp = inv->lastAddedIndex;
-            inv->lastAddedIndex = FindNextUnreadLog(p);
-            if (inv->lastAddedIndex == temp) inv->lastAddedIndex = -1;
-            InventoryCheckForUnreadLogs(p);
-            CenterStatusPrint("%s",Eng_Text->stringTable[1019]); // Log playback stopped.
-        }
-    }
-
-    // Patches
-    if (Patch()) {
-        if (inv->patchCurrent >= 0 && inv->patchCurrent < 7 && inv->patchCounts[inv->patchCurrent] > 0)
-            PatchUse(p,inv->patchCurrent);
-        else
-            CenterStatusPrint("%s",Eng_Text->stringTable[324]); // Out of patches.
-    }
-    if (PatchCycUp())   InventoryPatchCycleUp(p,true);
-    if (PatchCycDown()) InventoryPatchCycleDown(p,true);
-}
 //=============================================================================
 // Grenades
 void UseGrenade(uint16_t playerIndex, int index) { // TODO
@@ -2829,7 +2847,7 @@ void UseGrenade(uint16_t playerIndex, int index) { // TODO
     if (Eng_Global->inventoryPlayer1.holdingObject) { CenterStatusPrint("%s",Eng_Text->stringTable[311]); return; } // Can't use grenade, hands full
 
     ForceInventoryMode();  // Inventory mode is turned on when picking something up.
-    ResetHeldItem();
+    ResetHeldItem(playerIndex);
     Eng_Global->inventoryPlayer1.grenadeActive = true;
     CenterStatusPrint("%s%s",Eng_Text->stringTable[index + 326],Eng_Text->stringTable[320]); // activated, grenade is LIVE!
 //     switch(index) { // Subtract one from the correct grenade inventory TODO
@@ -3342,7 +3360,6 @@ void DoorTargetted(uint16_t self, uint16_t activator, const char* argvalue) {
 
 void DoorUpdate(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
-    if (Eng_Global->gamePaused || Eng_Global->menuActive) return;
     if (e->blocked) return; // TODO frame-pause blocked doors instead of fully skipping.
     if (e->ajar) return;
     AnimationClip opening = DoorGetClip(e,DOOR_CLIP_OPENING);
@@ -3371,7 +3388,8 @@ MOD_TO_ENGINE uint16_t SpawnDynamicObject(int val, bool cheat) {
 void DeactivateVMail(void) { } // TODO
 //================================================================================
 // Physics
-MOD_TO_ENGINE float GetBasePlayerSpeed(bool running) {
+MOD_TO_ENGINE float GetBasePlayerSpeed(uint16_t p, bool running) {
+    InventorySystem* inv = Inv(p);
     bool isSprinting = Sprint();
     if (Eng_Cheats->noclip && isSprinting) return PLAYER_MAX_CYBER_SPEED * 2.5f;
     if (Eng_Cheats->noclip) return PLAYER_MAX_CYBER_SPEED * 1.5f;
@@ -3392,7 +3410,7 @@ MOD_TO_ENGINE float GetBasePlayerSpeed(bool running) {
     }
 
     if ((isSprinting || Eng_Global->boosterActive) && running) {
-        if (Eng_Global->instances[PLAYER1].fatigue > 80.0f && Eng_Global->boosterActive) retval = PLAYER_MAX_SPRINT_SPEED_FATIGUED;
+        if (inv->fatigue > 80.0f && Eng_Global->boosterActive) retval = PLAYER_MAX_SPRINT_SPEED_FATIGUED;
         else                                                                retval = PLAYER_MAX_SPRINT_SPEED;
 
         if (bodyState == BodyState_Standing || bodyState == BodyState_Crouch || bodyState == BodyState_CrouchingDown) {
@@ -3406,7 +3424,11 @@ MOD_TO_ENGINE float GetBasePlayerSpeed(bool running) {
 }
 //================================================================================
 // Frob/Use
-void SearchObject(int searchable) {
+void SearchObject(int searchable, bool first) {
+    if (first) {
+        // TODO highlight Item tab in mfd
+        firstTimeSearch = false;
+    }
     if (Eng_Global->instances[searchable].searchableInUse) {
         for (int i=0;i<4;i++) {
             if (Eng_Global->instances[searchable].contents[i] >= 0) break;
@@ -3414,19 +3436,37 @@ void SearchObject(int searchable) {
     } else play_wav(sounds[91],0.75f,(Vector3){},false);
 }
 
-void UseEntity(uint16_t i) {
+void UseEntity(uint16_t p, uint16_t i) {
+    InventorySystem* inv = Inv(p);
     Entity* ent = &Eng_Global->instances[i];
     if (ConstIndexIsSearchable(ent->index)) {
-        Eng_Global->inventoryPlayer1.currentSearchItem = i;
-        SearchObject(i);
+        inv->currentSearchItem = i;
+        SearchObject(i,firstTimeSearch);
         DualLog("Search\n");
     }
     else if (ConstIndexIsDoor(ent->index)) DoorUse(i,PLAYER1,ent->argvalue);
     else if (ConstIndexIsNPC(ent->index)) DualLog("Can't use NPC\n");
     else if (ConstIndexIsButtonSwitch(ent->index)) ButtonSwitchUse(i,PLAYER1,ent->argvalue);
     else if (ConstIndexIsGeometry(ent->index)) DualLog("Can't use modular geometry\n");
-    else if (ConstIndexIsDynamicObject(ent->index)) DualLog("Using a dynamic object\n");
-    else CenterStatusPrint("%s%s",Eng_Text->stringTable[29],"name");
+    else if (ConstIndexIsUsableObject(ent->index)) {
+        if (inv->holdingObject) { DropHeldItem(p); return; }
+
+        inv->holdingObject = true;
+        inv->heldObjectIndex = ent->index;
+        inv->heldObjectCustomIndex = ent->usableCustomIndex;
+        inv->heldObjectAmmo = ent->ammo;
+        inv->heldObjectAmmo2 = ent->ammo2;
+        inv->heldObjectLoadedAlternate = ent->heldObjectLoadedAlternate;
+        if (Eng_Settings->QuickItemPickup) {
+            AddItemToInventory(p,ent->index,ent->usableCustomIndex);
+            ResetHeldItem(p);
+		} else {
+            ForceInventoryMode(); // Inventory mode is turned on when picking something up
+            CenterStatusPrint("%s%s",Eng_Text->stringTable[ent->useableItemIndex + 326],Eng_Text->stringTable[319]); // picked up.
+		}
+		
+		DeleteInstance(i);
+    } else CenterStatusPrint("%s%s",Eng_Text->stringTable[29],"name");
 }
 
 #define FROB_DISTANCE 4.9f
@@ -3450,7 +3490,7 @@ static inline __attribute__((always_inline)) void Frob(Vector3 pos, Vector3 forw
     if (!tempHit.hit) { CenterStatusPrint("%s",Eng_Text->stringTable[30]); return; }
     Eng_Global->debugLine_end = tempHit.point;
     DualLog("Raycast hit!  Hit object %u named of entity type %s(%u) at hit point %f %f %f\n",tempHit.hitInstanceIndex,Eng_Global->entities[Eng_Global->instances[tempHit.hitInstanceIndex].index].path,Eng_Global->instances[tempHit.hitInstanceIndex].index,tempHit.point.x,tempHit.point.y,tempHit.point.z);
-    UseEntity(tempHit.hitInstanceIndex);
+    UseEntity(PLAYER1,tempHit.hitInstanceIndex);
 }
 
 bool FrobWithHeldObject(void) {
@@ -3461,6 +3501,7 @@ bool FrobWithHeldObject(void) {
 // Update
 MOD_TO_ENGINE void ModUpdate(void) {
     WeaponsUpdate();
+    PatchUpdate(PLAYER1);
     if (Use()) {
         if (Eng_Global->uiIsBlocking) {
         } else if (Eng_Global->currentLevel != LEVEL_CYBERSPACE) {
@@ -3470,6 +3511,7 @@ MOD_TO_ENGINE void ModUpdate(void) {
             }
         }
     }
+    
     if (Eng_Global->pauseRelativeTime < Eng_Global->debugLineFinished && (Eng_Global->debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Eng_Global->debugLine_start,Eng_Global->debugLine_end);
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < Eng_Global->loadedInstances; ++i) {
         Entity* e = &Eng_Global->instances[i];
@@ -3539,7 +3581,8 @@ MOD_TO_ENGINE void ProcessInput(void) {
     if (TakeScreenshot() && Eng_Global->current_time > Eng_Global->screenshotTimeout) Screenshot();
     if (Menu() && !Eng_Global->menuActive) { Eng_Global->gamePaused = !Eng_Global->gamePaused; return; }
     if (Menu() && Eng_Global->menuActive) { MenuGoBack(); return; }
-    if (Eng_Global->gamePaused || Eng_Global->menuActive || Eng_Cheats->consoleActive) return;
+    if (Eng_Global->gamePaused || Eng_Global->menuActive || Eng_Cheats->consoleActive) return; // Pause/Menu barrier <<<<<<<
+    
     if (ToggleMode()) ToggleInventoryMode();
     if (Lantern()) Eng_Global->inventoryPlayer1.hardwareIsActive ^= HW_LAN;
     if (Infrared()) Eng_Global->inventoryPlayer1.hardwareIsActive ^= HW_INF;
@@ -3580,6 +3623,13 @@ uint16_t GetImpactType(uint16_t instanceIdx) {
     return 729; // SparksSmall
 }
 
+void UsableInit(uint16_t i) {
+    Entity* e = &Eng_Global->instances[i];
+    if (Eng_Global->difficultyPuzzle == 3 && e->index == 361 && random_range(0.0f,1.0f) < 0.33f) DeleteInstance(i); // 33% chance of not spawning logic probes on Puzzle difficulty of 3
+    if (Eng_Global->difficultyMission <= 1 && ConstIndexIsAccessCard(e->index)) DeleteInstance(i); // Remove access cards on Mission difficulty 1 or 0
+    if (Eng_Global->difficultyMission == 0 && e->index == 313) DeleteInstance(i); // Remove audiologs on Mission difficulty 0
+}
+
 void MFDInit(SystemUI* ui) {
     ui->lastMultiMediaTabOpened = MULTI_MEDIA_TAB_EMAIL_TABLE;
     ui->logFinished = Eng_Global->pauseRelativeTime;
@@ -3604,9 +3654,8 @@ void InventoryInit(InventorySystem* inv) {
     inv->hardwareInvReferenceIndex[12] =  0;
     inv->hardwareInvReferenceIndex[13] =  0;
     inv->generalInventoryIndexRef[0] = 81;
-    for (int i = 1; i < HW_COUNT; i++) inv->generalInventoryIndexRef[i] = -1;
-    for (int i=0;i<HW_COUNT;++i) inv->hardwareVersion[i] = 0;
-    for (int i=0;i<HW_COUNT;++i) inv->hardwareVersionSetting[i] = 0;
+    for (int i=1;i<HW_COUNT;i++) inv->generalInventoryIndexRef[i] = -1; // Skips 0th index on purpose as it always holds access cards "item".
+    for (int i=0;i<HW_COUNT;++i) inv->hardwareVersion[i] = inv->hardwareVersionSetting[i] = 0;
     inv->nitroTimeSetting = NITRO_DEFAULT_TIME;
     inv->earthShakerTimeSetting = EARTH_SHAKER_DEFAULT_TIME;
     inv->lastAddedIndex = -1;
@@ -3614,30 +3663,35 @@ void InventoryInit(InventorySystem* inv) {
     inv->hasNewNotes = true;
     inv->currentCyberItem = -1;
     inv->isPulserNotDrill = true;
-    for (int i=0;i<7;++i) inv->weaponInventoryIndices[i]     = -1;
-    for (int i=0;i<7;++i) inv->weaponInventoryAmmoIndices[i] = -1;
+    for (int i=0;i<7;++i) inv->weaponInventoryIndices[i] = inv->weaponInventoryAmmoIndices[i] = -1;
     inv->globalLookupIndex = -1;
     inv->sparqSetting = 50.0f;
     inv->ionSetting = 100.0f;
     inv->blasterSetting = 15.0f;
     inv->plasmaSetting = 40.0f;
     inv->stungunSetting = 20.0f;
-    inv->justFired = (Eng_Global->pauseRelativeTime - 31.0); // Set less than 30s before pauseRelativeTime so we don't immediately play action music.
+    inv->justFired = (Eng_Global->pauseRelativeTime - 31.0); // Set >30s before pauseRelativeTime to not immediately play action music.
+    inv->energyDrainTickFinished = Eng_Global->pauseRelativeTime + 0.1 + (double)random_range(0.5f, 1.0f);
+    inv->energy = 54.0f;
+    inv->maxEnergy = 255.0f;
+    inv->resetAfterDeathTime = 0.5;
+    inv->painSoundFinished = Eng_Global->pauseRelativeTime;
+    inv->radSoundFinished = Eng_Global->pauseRelativeTime;
+    inv->radFXFinished = Eng_Global->pauseRelativeTime;
 }
 
 MOD_TO_ENGINE void PlayerInit(uint16_t i) {
     DualLog("Entered mod function PlayerInit()\n");
     Eng_Global->instances[i].index = 767;
     Eng_Global->instances[i].layer = PhysicsLayer_Player;
-    Eng_Global->instances[i].position = (Vector3){ .x = 10.52f, .y = -43.792f + 0.84f, .z = 20.2908f}; // Start Actual: Puts player on Medical Level in actual game start position.  Added 0.84f
+    Eng_Global->instances[i].position = (Vector3){10.52f,-43.792f + 0.84f,20.2908f}; // Start Actual: Puts player on Medical Level in actual game start position.  Added 0.84f
     Eng_Global->instances[i].scale = (Vector3){1.0f,1.0f,1.0f};
-    Eng_Global->instances[i].rotation = (Quaternion){ .x = 0.0f, .y = 0.7071f, .z = 0.0f, .w = 0.7071f }; // 90deg rotation CW about Y axis as viewed from the top looking down onto player
-    Eng_Global->instances[i].entflags = ENTFLAG_ACTIVE | ENTFLAG_USEGRAVITY | ENTFLAG_RIGIDBODY;
+    Eng_Global->instances[i].rotation = (Quaternion){0.0f,0.7071f,0.0f,0.7071f}; // 90deg rotation CW about Y axis as viewed from the top looking down onto player
+    Eng_Global->instances[i].entflags = ENTFLAG_ACTIVE|ENTFLAG_USEGRAVITY|ENTFLAG_RIGIDBODY;
     Eng_Global->instances[i].collider = COLLIDER_TYPE_CAPSULE;
     Eng_Global->instances[i].colliderCenter.y = 0.84f;
-    Eng_Global->instances[i].colliderSize = (Vector3){.x = 0.48f, .y = 2.0f, .z = 1.0f}; // Radius, Overall height including end radii (Unity convention, blech), Direction, 1.0 == Y-Axis
+    Eng_Global->instances[i].colliderSize = (Vector3){0.48f,2.0f,1.0f}; // Radius, Overall height including end radii (Unity convention, blech), Direction, 1.0 == Y-Axis
     Eng_Global->instances[i].mass = 1.0f;
-    return;
     Eng_Global->instances[i].linearDrag = 8.0f;
     Eng_Global->instances[i].velocity = (Vector3){0.0f,0.0f,0.0f};
     Eng_Global->instances[i].dynamicFriction = 0.6f;
@@ -3645,13 +3699,6 @@ MOD_TO_ENGINE void PlayerInit(uint16_t i) {
     Eng_Global->instances[i].frictionCombine = PHYS_COMBINE_MUL;
     Eng_Global->instances[i].health = 200.0f;
     Eng_Global->instances[i].lastHealth = Eng_Global->instances[i].health;
-    Eng_Global->instances[i].energyDrainTickFinished = Eng_Global->pauseRelativeTime + 0.1 + (double)random_range(0.5f, 1.0f);
-    Eng_Global->instances[i].energy = 54.0f;
-    Eng_Global->instances[i].maxEnergy = 255.0f;
-    Eng_Global->instances[i].resetAfterDeathTime = 0.5;
-    Eng_Global->instances[i].painSoundFinished = Eng_Global->pauseRelativeTime;
-    Eng_Global->instances[i].radSoundFinished = Eng_Global->pauseRelativeTime;
-    Eng_Global->instances[i].radFXFinished = Eng_Global->pauseRelativeTime;
     Eng_Global->instances[i].noiseFinished = Eng_Global->pauseRelativeTime;
     if (i == PLAYER1) InventoryInit(&Eng_Global->inventoryPlayer1);
     else if (i == PLAYER2) InventoryInit(&Eng_Global->inventoryPlayer2);
@@ -3687,6 +3734,7 @@ MOD_TO_ENGINE void ModInitAfterLoad(void) {
         if (Eng_Global->instances[i].entflags & ENTFLAG_HAS_CAMERA_VIEW) AddCameraPosition(i);
         if (ConstIndexIsGeometry(constIndex)) Eng_Global->instances[i].layer = PhysicsLayer_Geometry;
         else if (ConstIndexIsDoor(constIndex)) Eng_Global->instances[i].layer = PhysicsLayer_Door;
+        else if (ConstIndexIsUsableObject(constIndex)) UsableInit(i);
         else if (ConstIndexIsDoor(Eng_Global->instances[i].index)) DoorInitAfterLoad(i);
         else if (ConstIndexIsNPC(constIndex)) { Eng_Global->instances[i].layer = PhysicsLayer_NPC; /* TODO AIInit funcion */ }
         else if (ConstIndexIsSearchable(constIndex)) SearchableInit(i);

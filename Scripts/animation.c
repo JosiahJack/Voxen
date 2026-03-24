@@ -101,13 +101,18 @@ MOD_TO_ENGINE void UpdateAnims(void) {
     if (portalsNeedUpdated) PortalCulling();
 }
 
-// uint16_t sequenceTextures[302]={};
-/*scr_exp 01 - 06
- bridg1_1 001 - 004
- broken_clock 01 - 02
- broken_clock01_glow 01 - 02
- g_energmine 00 - 06
- g_energmine_glow 00 - 07 (yes different count, supported!)
+uint16_t sequenceTextures[302]={
+    1159,1160,881,1162,1163,1164, // scr_exp 01 - 06
+    1310,1311,1312,1313, // bridg1_1 001 - 004
+    1115,1116, // broken_clock01_glow 01 - 02
+    1117,1118, // broken_clock 01 - 02
+    1124,1125,1126,1127,1128,1129,1130, // g_energmine 00 - 06
+    1131,1132,1133,1134,1135,1136,1137,1138, // g_energmine_glow 00 - 07 (yes different count, supported!)
+    
+};
+/*
+
+
  scr_cita2 0 - 3
  scr_cita3 0 - 3
  scr_cita 0 - 7

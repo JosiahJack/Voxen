@@ -2665,3 +2665,11 @@ index: 1307
 index: 1308
 #Textures/UI/logimages/severed_head.png
 index: 1309
+#Textures/sequences/bridg1_1_001.png
+index: 1310
+#Textures/sequences/bridg1_1_002.png
+index: 1311
+#Textures/sequences/bridg1_1_003.png
+index: 1312
+#Textures/sequences/bridg1_1_004.png
+index: 1313

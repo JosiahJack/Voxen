@@ -812,8 +812,6 @@ typedef struct {
     uint32_t accessCardOwned;
     uint8_t hasSoft;
     uint8_t softVersions[7];
-    bool hasLog[134];
-    bool readLog[134];
     uint16_t numLogsFromLevel[10];
     int lastAddedIndex;
 	bool beepDone;
@@ -864,10 +862,10 @@ typedef struct {
 	float energySliderClickedTime;
 	float cyberWeaponAttackFinished;
 	float targetY;
-    int16_t heldObjectIndex;
-    int16_t heldObjectCustomIndex;
-    int16_t heldObjectAmmo;
-    int16_t heldObjectAmmo2;
+    uint16_t heldObjectIndex;
+    uint16_t heldObjectCustomIndex;
+    uint16_t heldObjectAmmo;
+    uint16_t heldObjectAmmo2;
     bool heldObjectLoadedAlternate;
     bool holdingObject;
     bool grenadeActive;
@@ -875,8 +873,6 @@ typedef struct {
     uint16_t weaponIndex;
     uint16_t currentSearchItem;
     float currentEnergyWeaponHeat[7];
-    uint16_t drainJPM;
-    uint8_t patchActive;
     uint8_t grenAmmo[7];
     uint8_t grenConstIndex[7];
     uint8_t grenadeCurrent;
@@ -888,6 +884,37 @@ typedef struct {
     uint8_t patchCurrent;
     uint8_t patchCounts[7];
     uint8_t cyberItemIndex;
+    float fatigue;
+    float radiated;
+    float resetAfterDeathTime;
+    float energy;
+    float maxEnergy;
+    float playerHealthTimer;
+    uint16_t patchActive;
+    uint16_t drainJPM;
+    double berserkFinishedTime;
+    double berserkIncrementFinishedTime;
+    double detoxFinishedTime;
+    double geniusFinishedTime;
+    double mediFinishedTime;
+    double reflexFinishedTime;
+    double sightFinishedTime;
+    double sightSideEffectFinishedTime;
+    double staminupFinishedTime;
+    int berserkIncrement;
+    double turboCyberTime;
+    double turboFinished;
+    double energyDrainTickFinished;
+    double painSoundFinished;
+    double radSoundFinished;
+    double radFXFinished;
+    float radAdjust;
+    float initialRadiation;
+    bool playerDead;
+    int16_t ladderState;
+    bool staminupActive;
+    bool hasLog[134];
+    bool readLog[134];
 } InventorySystem;
 
 typedef struct {
@@ -987,13 +1014,17 @@ typedef /*FAT*/ struct {
     uint16_t lookUpIndex; // For randomly generating items
     uint16_t contents[4];
     uint16_t customIndex[4];
+    uint16_t useableItemIndex;
+    uint16_t usableCustomIndex;
     uint16_t randomItem[4];
     uint16_t randomItemCustomIndex[4];
     float randomItemDropChance[4];
     float fireworkWaitMinMin;
     uint8_t lerpUp;
     AttackType attackType;
-    bool staminupActive;
+    int16_t ammo;
+    int16_t ammo2;
+    bool heldObjectLoadedAlternate;
 
     uint16_t activateSFX;
     uint16_t lockedSFX;
@@ -1006,8 +1037,6 @@ typedef /*FAT*/ struct {
     float health;
     float lastHealth;
     float cyberHealth;
-    float energy;
-    float maxEnergy;
     uint16_t lockedMessageLingdex;
     AccessCardType requiredAccessCard;
     double delayFinished;
@@ -1039,35 +1068,8 @@ typedef /*FAT*/ struct {
     bool onlyTargetOnce;
     bool autoPlayEmail;
     uint16_t emailIndex;
-    
-    // Player
-    float radiated;
-    float resetAfterDeathTime;
-    float playerHealthTimer;
-    uint16_t patchActive;
-    uint16_t drainJPM;
-    double berserkFinishedTime;
-    double berserkIncrementFinishedTime;
-    double detoxFinishedTime;
-    double geniusFinishedTime;
-    double mediFinishedTime;
-    double reflexFinishedTime;
-    double sightFinishedTime;
-    double sightSideEffectFinishedTime;
-    double staminupFinishedTime;
-    int berserkIncrement;
-    double turboCyberTime;
-    double turboFinished;
-    double energyDrainTickFinished;
-    double noiseFinished;
-    double painSoundFinished;
-    double radSoundFinished;
-    double radFXFinished;
-    float radAdjust;
-    float initialRadiation;
-    bool playerDead;
-    int16_t ladderState;
     bool inCyberTube;
+    double noiseFinished;
 
     // Animation
     uint8_t clip;
@@ -1115,7 +1117,6 @@ typedef /*FAT*/ struct {
     float linearDrag;
     float angularDrag;
     float inertia;
-    float fatigue;
     Vector3 accumulatedForce;
     Vector3 accumulatedTorque;
     float dynamicFriction;
@@ -1330,36 +1331,25 @@ static inline __attribute__((always_inline)) Vector3 normalize_vector3(Vector3 v
 static inline __attribute__((always_inline)) float squareDistance2D(float x1, float z1, float x2, float z2) { float dx = x2 - x1; float dz = z2 - z1; return dx * dx + dz * dz; }
 static inline __attribute__((always_inline)) float squareDistance3D(float x1, float y1, float z1, float x2, float y2, float z2) { float dx = x2 - x1; float dy = y2 - y1; float dz = z2 - z1; return dx * dx + dy * dy + dz * dz; }
 
-static inline __attribute__((always_inline)) bool ConstIndexInBounds(int constdex) { return (constdex >= 0 && constdex <= 760); }
-static inline __attribute__((always_inline)) bool ConstIndexIsGeometry(int constdex) { return (constdex >= 0 && constdex <= 306 && constdex != 112 && constdex != 279) || constdex == 760; }
-static inline __attribute__((always_inline)) bool ConstIndexIsDoor(int constdex) { return (constdex >= 496 && constdex < 515); }
-static inline __attribute__((always_inline)) bool ConstIndexIsLightStaticSaveable(int constdex) { return constdex == 748; }
-static inline __attribute__((always_inline)) bool ConstIndexIsGenericTransform(int constdex) { return constdex == 749; }
-static inline __attribute__((always_inline)) bool ConstIndexIsNPC(int constdex) { return (constdex >= 419 && constdex < 448); }
-static inline __attribute__((always_inline)) bool ConstIndexIsHardware(int constdex) { return (constdex >= 328) && (constdex <= 339); }
-static inline __attribute__((always_inline)) bool ConstIndexIsAmbient(int constdex) { return (constdex >= 621 && constdex <= 655); }
-static inline __attribute__((always_inline)) bool ConstIndexIsButtonSwitch(int constdex) { return ((constdex >= 688 && constdex <= 692) || constdex == 694 || constdex == 695); }
-static inline __attribute__((always_inline)) bool ConstIndexIsSearchable(int constdex) { return ((constdex >= 464 && constdex <= 476) || constdex == 530 || constdex == 531); }
-static inline __attribute__((always_inline)) bool ConstIndexIsDynamicObject(uint16_t constIndex) {
-    return     (constIndex >= 307 && constIndex <= 404) ||  constIndex == 417 || (constIndex >= 419 && constIndex <= 428)
-            || (constIndex >= 430 && constIndex <= 437) || (constIndex >= 440 && constIndex <= 442)
-            || (constIndex >= 458 && constIndex <= 463) || (constIndex >= 465 && constIndex <= 476);
+static inline __attribute__((always_inline)) uint8_t hardware14fromConstdex(uint16_t c) { return clamp(c - 21,0,14); }
+static inline __attribute__((always_inline)) bool ConstIndexInBounds(int c) { return (c >= 0 && c <= 760); }
+static inline __attribute__((always_inline)) bool ConstIndexIsGeometry(int c) { return (c >= 0 && c <= 306 && c != 112 && c != 279) || c == 760; }
+static inline __attribute__((always_inline)) bool ConstIndexIsDoor(int c) { return (c >= 496 && c < 515); }
+static inline __attribute__((always_inline)) bool ConstIndexIsLightStaticSaveable(int c) { return c == 748; }
+static inline __attribute__((always_inline)) bool ConstIndexIsGenericTransform(int c) { return c == 749; }
+static inline __attribute__((always_inline)) bool ConstIndexIsNPC(int c) { return (c >= 419 && c < 448); }
+static inline __attribute__((always_inline)) bool ConstIndexIsHardware(int c) { return (c >= 328) && (c <= 339); }
+static inline __attribute__((always_inline)) bool ConstIndexIsAmbient(int c) { return (c >= 621 && c <= 655); }
+static inline __attribute__((always_inline)) bool ConstIndexIsButtonSwitch(int c) { return ((c >= 688 && c <= 692) || c == 694 || c == 695); }
+static inline __attribute__((always_inline)) bool ConstIndexIsSearchable(int c) { return ((c >= 464 && c <= 476) || c == 530 || c == 531); }
+static inline __attribute__((always_inline)) bool ConstIndexIsUsableObject(uint16_t c) { return ((c >= 307 && c <= 404) || c == 417); }
+static inline __attribute__((always_inline)) bool ConstIndexIsAccessCard(uint16_t c) { return ((c >= 388 && c <= 398) || c == 417); }
+static inline __attribute__((always_inline)) bool ConstIndexIsDynamicObject(uint16_t c) { return (c >= 307 && c <= 404) ||  c == 417 || (c >= 419 && c <= 428) || (c >= 430 && c <= 437) || (c >= 440 && c <= 442) || (c >= 458 && c <= 463) || (c >= 465 && c <= 476); }
+static inline __attribute__((always_inline)) bool ConstIndexIsStaticObjectSaveable(int c) { return (c == 112 || c == 279 || (c >= 448 && c < 458) || c == 480 || c == 516 || (c >= 518 && c <= 526) || c == 530 || c == 531 || c == 546 || c == 555 || c == 594 || c == 596 || c == 598 || (c >= 600 && c < 603) || (c >= 604 && c < 616) || (c >= 688 && c < 693) || c == 694 || c == 695 || (c >= 699 && c < 704) || (c >= 741 && c < 746)); }
+static inline __attribute__((always_inline)) bool ConstIndexIsStaticObjectImmutable(int c) {
+	return ((c >= 527 && c < 530) || (c >= 532 && c < 546) || (c >= 547 && c < 553)
+			|| c == 554 || (c >= 556 && c < 594) || c == 595 || c == 597 || c == 599
+			|| c == 601 || c == 603 || (c >= 616 && c < 688) || c == 693 || c == 696 || c == 697
+			|| c == 698 || (c >= 704 && c < 717) || c == 720 || (c >= 733 && c < 736)
+			|| (c >= 737 && c < 739) || c == 746 || c == 747 || (c >= 750 && c <= 759 && c != 755));
 }
-
-static inline __attribute__((always_inline)) bool ConstIndexIsStaticObjectSaveable(int constdex) {
-	return (constdex == 112 || constdex == 279 || (constdex >= 448 && constdex < 458) || constdex == 480 || constdex == 516
-			|| (constdex >= 518 && constdex <= 526) || constdex == 530 || constdex == 531 || constdex == 546
-			|| constdex == 555 || constdex == 594 || constdex == 596 || constdex == 598 || (constdex >= 600 && constdex < 603)
-			|| (constdex >= 604 && constdex < 616) || (constdex >= 688 && constdex < 693) || constdex == 694 || constdex == 695
-			|| (constdex >= 699 && constdex < 704) || (constdex >= 741 && constdex < 746));
-}
-
-static inline __attribute__((always_inline)) bool ConstIndexIsStaticObjectImmutable(int constdex) {
-	return ((constdex >= 527 && constdex < 530) || (constdex >= 532 && constdex < 546) || (constdex >= 547 && constdex < 553)
-			|| constdex == 554 || (constdex >= 556 && constdex < 594) || constdex == 595 || constdex == 597 || constdex == 599
-			|| constdex == 601 || constdex == 603 || (constdex >= 616 && constdex < 688) || constdex == 693 || constdex == 696 || constdex == 697
-			|| constdex == 698 || (constdex >= 704 && constdex < 717) || constdex == 720 || (constdex >= 733 && constdex < 736)
-			|| (constdex >= 737 && constdex < 739) || constdex == 746 || constdex == 747 || (constdex >= 750 && constdex <= 759 && constdex != 755));
-}
-
-static inline __attribute__((always_inline)) uint8_t hardware14fromConstdex(uint16_t constdex) { return clamp(constdex - 21,0,14); }

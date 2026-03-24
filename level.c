@@ -114,7 +114,7 @@ void AddInstance(uint16_t entIdx, uint16_t i) {
 }
 
 void RemoveCameraPosition(uint16_t i);
-void DeleteInstance(uint16_t i) {
+ENGINE_TO_MOD void DeleteInstance(uint16_t i) {
     if (i <= PLAYER2 || i >= Sys_Global.loadedInstances) return; // Don't delete null ent, player 1, nor player 2 or already empty slots.
     
     if (Sys_Global.instances[i].entflags & ENTFLAG_HAS_CAMERA_VIEW) RemoveCameraPosition(i);

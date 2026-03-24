@@ -277,34 +277,35 @@ int Get16WeaponIndexFromConstIndex(int index) {
 // 
 
 bool vmailActive;
-	void CheckAttackInput(void) {
-		// Check for other things that must capture and override clicks
-		if (Attack()) {
-            DualLog("Mouse clicked!\n");
-			if (vmailActive) { vmailActive = false; Eng_Global->inventoryPlayer1.waitTilNextFire = Eng_Global->pauseRelativeTime + 0.8; return; }
-			if (Eng_Global->currentLevel == LEVEL_CYBERSPACE) { /*FireCyberWeapon();*/ return; }
+void CheckAttackInput(uint16_t p) {
+    InventorySystem* inv = Inv(p);
+    // Check for other things that must capture and override clicks
+    if (Attack()) {
+        DualLog("Mouse clicked!\n");
+        if (vmailActive) { vmailActive = false; inv->waitTilNextFire = Eng_Global->pauseRelativeTime + 0.8; return; }
+        if (Eng_Global->currentLevel == LEVEL_CYBERSPACE) { /*FireCyberWeapon();*/ return; }
 
-			if (Eng_Global->inventoryPlayer1.holdingObject && !Eng_Global->mouseClickHeldOverGUI) { // !Just clicked
-				if (!Eng_Global->uiIsBlocking) {
-					 
-// 					DropHeldItem(); // Drop it
-					return;
-				} else {
-// 					AddItemToInventory(Eng_Global->inventoryPlayer1.holdingObjectIndex,MouseLookScript.a.heldObjectCustomIndex);
-// 					ResetHeldItem();
-					return;
-				}
-			}
-		}
+        if (inv->holdingObject && !Eng_Global->mouseClickHeldOverGUI) { // !Just clicked
+            if (!Eng_Global->uiIsBlocking) {
+                    
+                DropHeldItem(p); // Drop it
+                return;
+            } else {
+                AddItemToInventory(p,inv->heldObjectIndex,inv->heldObjectCustomIndex);
+                ResetHeldItem(p);
+                return;
+            }
+        }
+    }
 
-		int wepdex = Get16WeaponIndexFromConstIndex(Eng_Global->inventoryPlayer1.weaponIndex);
-		if (wepdex == -1) return; // No weapon.
+    int wepdex = Get16WeaponIndexFromConstIndex(inv->weaponIndex);
+    if (wepdex == -1) return; // No weapon.
 // 		if (Eng_Global->uiIsBlocking) return;
-		if (Eng_Global->inventoryPlayer1.holdingObject) return;
-		if (Eng_Global->mouseClickHeldOverGUI) return;
+    if (inv->holdingObject) return;
+    if (Eng_Global->mouseClickHeldOverGUI) return;
 
 // 		StartNormalAttack(wepdex);
-	}
+}
 	
 void WeaponsUpdate(void) {
     // Slowly cool off any weapons that have been heated from firing
@@ -313,7 +314,7 @@ void WeaponsUpdate(void) {
 //     UpdateWeaponReloadDip();
 //     RotateViewWeapon();
 //     Recoiling();
-//     CheckAttackInput();
+//     CheckAttackInput(PLAYER1);
 //     CheckReloadInput();
 //     CheckAmmoChangeInput();
 }
@@ -1319,9 +1320,7 @@ void WeaponsUpdate(void) {
 // 		hunsIndicator.overrideSprite = indicatorSprites[tempis[0]];
 // 	}
 // 
-// 	void Update() {
-// 		if (Eng_Global->gamePaused || Eng_Global->menuActive) return;
-// 		
+// 	void WeaponsUpdate() {
 // 		int index = Eng_Global->inventoryPlayer1.weaponCurrent; // 0 to 6, 7 slots
 // 		// Changed from this:
 // 		// Get16WeaponIndexFromConstIndex(Eng_Global->inventoryPlayer1.weaponIndex); 0 to 15
@@ -1508,10 +1507,7 @@ void WeaponsUpdate(void) {
 // 		Eng_UI->UpdateHUDAmmoCountsEither();
 // 	}
 // 
-// 	void Update() {
-// 		if (Eng_Global->gamePaused) return;
-// 		if (Eng_Global->menuActive) return;
-// 
+// 	void WeaponChangeUpdate() {
 // 		if (justChangedWeap) {
 // 			justChangedWeap = false;
 // 			Eng_UI->SetAmmoIcons(-1,false); // Clear it.
@@ -1523,9 +1519,6 @@ void WeaponsUpdate(void) {
 // 	}
 // 
 // 	public void UpdateWeaponViewModels() {
-// 		if (Eng_Global->gamePaused) return;
-// 		if (Eng_Global->menuActive) return;
-// 
 // 		int useableIndex = weaponIndex;
 // 		int setWep = weaponIndex;
 // 		if (weaponIndexPending >= 0) {
