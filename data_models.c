@@ -172,21 +172,19 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(const char* _
 	next_vertex:;
 	}
 
-	size_t vbytes=(size_t)unique_cnt*16;
+	size_t vbytes=(size_t)unique_cnt*VERTEX_ATTRIBUTES_SIZE;
 	uint8_t* final_verts=(uint8_t*)OS_AllocateRAM(NULL,vbytes,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
 	uint8_t* dst=final_verts;
 	for(uint32_t i=0;i<unique_cnt;++i){
 		const float* src=unique_verts+(i<<3);
-		*(half*)dst=float_to_half(src[0]);dst+=2;
-		*(half*)dst=float_to_half(src[1]);dst+=2;
-		*(half*)dst=float_to_half(src[2]);dst+=2;
-// 		__builtin_memcpy(dst,src+3,12);dst+=12;
-        *(half*)dst=float_to_half(src[3]);dst+=2;
-		*(half*)dst=float_to_half(src[4]);dst+=2;
-		*(half*)dst=float_to_half(src[5]);dst+=2;
-        
-        *(half*)dst = float_to_half(src[6]); dst += 2;
-        *(half*)dst = float_to_half(src[7]); dst += 2;
+		*(half*)dst=float_to_half(src[0]);dst+=2; // x
+		*(half*)dst=float_to_half(src[1]);dst+=2; // y
+		*(half*)dst=float_to_half(src[2]);dst+=2; // z
+        *(half*)dst=float_to_half(src[3]);dst+=2; // nx
+		*(half*)dst=float_to_half(src[4]);dst+=2; // ny
+		*(half*)dst=float_to_half(src[5]);dst+=2; // nz
+        *(half*)dst = float_to_half(src[6]); dst += 2; // u
+        *(half*)dst = float_to_half(src[7]); dst += 2; // v
 	}
 
 	size_t ibytes=(size_t)expanded_count*sizeof(uint16_t);
@@ -329,7 +327,7 @@ void LoadModels(void){
 	uint32_t total_vertices=0,total_tris=0;
 	for(int i=0;i<loadedModelsMaxIndex;++i){
 		if(unlikely(modelVertexCounts[i]==0))continue;
-		size_t vert_size=(size_t)modelVertexCounts[i]*16;
+		size_t vert_size=(size_t)modelVertexCounts[i]*VERTEX_ATTRIBUTES_SIZE;
 		total_vertices+=modelVertexCounts[i];
 		size_t tri_size=(size_t)modelTriangleCounts[i]*3*sizeof(uint16_t);
 		total_tris+=(uint32_t)tri_size;

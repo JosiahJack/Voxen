@@ -1767,7 +1767,7 @@ static inline __attribute__((always_inline,hot)) uint16_t GetAndBindModel(uint16
     uint16_t modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && Sys_Global.instances[i].lodIndex < loadedModelsMaxIndex ? Sys_Global.instances[i].lodIndex : Sys_Global.instances[i].modelIndex;
     if (currentModelType == modelType && currentModelType != 0) return currentModelType;
     
-    glBindVertexBuffer(0,Sys_Render.vbos[modelType],0,16);
+    glBindVertexBuffer(0,Sys_Render.vbos[modelType],0,VERTEX_ATTRIBUTES_SIZE);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,Sys_Render.tbos[modelType]);
     return modelType;
 }

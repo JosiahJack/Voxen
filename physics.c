@@ -1,4 +1,4 @@
-// physics.cpp - Full Jolt Physics integration for Voxen
+// physics.cp - Physics
 #include "voxen.h"
 #define GROUND_PROBE_DIST 0.02f
 #define SNAP_STEP 0.005f
@@ -104,9 +104,39 @@ static inline Vector3 ClosestPointOnTriangle(Vector3 a, Vector3 b, Vector3 c, Ve
     return result;
 }
 
+typedef uint16_t half;
+static inline float half_to_float(half h){
+    uint32_t s = (h & 0x8000) << 16;
+    uint32_t e = (h & 0x7C00) >> 10;
+    uint32_t m = (h & 0x03FF);
+
+    uint32_t out;
+
+    if (e == 0){
+        if (m == 0){
+            out = s;
+        } else {
+            // normalize subnormal
+            e = 1;
+            while ((m & 0x0400) == 0) { m <<= 1; e--; }
+            m &= 0x03FF;
+            e = e + (127 - 15);
+            out = s | (e << 23) | (m << 13);
+        }
+    } else if (e == 31){
+        out = s | 0x7F800000 | (m << 13);
+    } else {
+        e = e + (127 - 15);
+        out = s | (e << 23) | (m << 13);
+    }
+
+    float f;
+    __builtin_memcpy(&f, &out, 4);
+    return f;
+}
+
 static CapsuleContact QueryCapsuleContact(Vector3 start, Vector3 end, float capsuleRadius, uint32_t layerMask) {
     CapsuleContact worst = NO_CONTACT;
- 
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
         if (!(layerMask & Sys_Global.instances[i].layer)) continue;
         uint16_t mindex = Sys_Global.instances[i].modelIndex;
@@ -134,61 +164,42 @@ static CapsuleContact QueryCapsuleContact(Vector3 start, Vector3 end, float caps
         float spineHalf = magnitude_vector3(spine) * 0.5f;
         float combinedRad = modelRad + spineHalf + capsuleRadius + 0.1f;
         if (distSqrd > combinedRad*combinedRad) continue;
- 
+
         Vector3 relS = { start.x-tx, start.y-ty, start.z-tz };
-        Vector3 localStart = {
-            (relS.x*m00 + relS.y*m10 + relS.z*m20) / (scl_x*scl_x),
-            (relS.x*m01 + relS.y*m11 + relS.z*m21) / (scl_y*scl_y),
-            (relS.x*m02 + relS.y*m12 + relS.z*m22) / (scl_z*scl_z)
-        };
-        Vector3 relE = { end.x-tx, end.y-ty, end.z-tz };
-        Vector3 localEnd = {
-            (relE.x*m00 + relE.y*m10 + relE.z*m20) / (scl_x*scl_x),
-            (relE.x*m01 + relE.y*m11 + relE.z*m21) / (scl_y*scl_y),
-            (relE.x*m02 + relE.y*m12 + relE.z*m22) / (scl_z*scl_z)
-        };
+        Vector3 localStart = { (relS.x*m00 + relS.y*m10 + relS.z*m20) / (scl_x*scl_x), (relS.x*m01 + relS.y*m11 + relS.z*m21) / (scl_y*scl_y), (relS.x*m02 + relS.y*m12 + relS.z*m22) / (scl_z*scl_z)};
+        Vector3 relE = {end.x-tx,end.y-ty,end.z-tz};
+        Vector3 localEnd = {(relE.x*m00 + relE.y*m10 + relE.z*m20) / (scl_x*scl_x), (relE.x*m01 + relE.y*m11 + relE.z*m21) / (scl_y*scl_y), (relE.x*m02 + relE.y*m12 + relE.z*m22) / (scl_z*scl_z)};
         float minScl = scl_x;
         if (scl_y < minScl) minScl = scl_y;
         if (scl_z < minScl) minScl = scl_z;
         float localRadius = capsuleRadius / minScl;
- 
-        for (uint32_t j = 0; j < triCount; ++j) {
-            uint32_t bA = modelTriangles[mindex][j*3  ] * VERTEX_ATTRIBUTES_COUNT;
-            uint32_t bB = modelTriangles[mindex][j*3+1] * VERTEX_ATTRIBUTES_COUNT;
-            uint32_t bC = modelTriangles[mindex][j*3+2] * VERTEX_ATTRIBUTES_COUNT;
-            Vector3 posA = { modelVertices[mindex][bA], modelVertices[mindex][bA+1], modelVertices[mindex][bA+2] };
-            Vector3 posB = { modelVertices[mindex][bB], modelVertices[mindex][bB+1], modelVertices[mindex][bB+2] };
-            Vector3 posC = { modelVertices[mindex][bC], modelVertices[mindex][bC+1], modelVertices[mindex][bC+2] };
- 
-            // Closest point on triangle to spine, then closest point on spine to that.
-            // This gives us the actual contact point and direction, winding-independent.
-            Vector3 cpP   = ClosestPointOnTriangle(posA, posB, posC, localStart);
-            Vector3 spP   = ClosestPointOnSegment(localStart, localEnd, cpP);
+        for (uint32_t j = 0; j < triCount; ++j) {            
+            uint32_t bA = (uint32_t)modelTriangles[mindex][j*3 + 0] * VERTEX_ATTRIBUTES_SIZE, bB = (uint32_t)modelTriangles[mindex][j*3 + 1] * VERTEX_ATTRIBUTES_SIZE, bC = (uint32_t)modelTriangles[mindex][j*3 + 2] * VERTEX_ATTRIBUTES_SIZE;
+            Vector3 posA = {half_to_float( *(half*)(modelVertices[mindex] + bA + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 4) )};
+            Vector3 posB = {half_to_float( *(half*)(modelVertices[mindex] + bB + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 4) )};
+            Vector3 posC = {half_to_float( *(half*)(modelVertices[mindex] + bC + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 4) )};
+            Vector3 cpP   = ClosestPointOnTriangle(posA, posB, posC, localStart); // Closest point on triangle to spine, then closest point on spine to that.
+            Vector3 spP   = ClosestPointOnSegment(localStart, localEnd, cpP);     // This gives actual contact point and direction, winding-independent.
             Vector3 cpP2  = ClosestPointOnTriangle(posA, posB, posC, spP);
             Vector3 cpQ   = ClosestPointOnTriangle(posA, posB, posC, localEnd);
             Vector3 spQ   = ClosestPointOnSegment(localStart, localEnd, cpQ);
             Vector3 cpQ2  = ClosestPointOnTriangle(posA, posB, posC, spQ);
- 
-            // Pick whichever contact point has the smallest distance (deepest penetration).
             Vector3 dP = Vector3_A_minus_B(spP, cpP2);
             Vector3 dQ = Vector3_A_minus_B(spQ, cpQ2);
             float distP = vsqrtf(dot_vector3(dP, dP));
             float distQ = vsqrtf(dot_vector3(dQ, dQ));
             float localDist; Vector3 localContactVec;
-            if (distP <= distQ) { localDist = distP; localContactVec = dP; }
+            if (distP <= distQ) { localDist = distP; localContactVec = dP; } // Pick whichever contact point has the smallest distance (deepest penetration).
             else                { localDist = distQ; localContactVec = dQ; }
  
             float localPen = localRadius - localDist;
             if (localPen <= 0.0f) continue; // no overlap
  
-            // Contact normal in local space: direction from triangle surface toward spine point.
-            // If the contact vector is near-zero (spine point IS on the triangle), use
-            // the face normal but orient it toward the capsule centre.
+            // Contact normal in local space: direction from triangle surface toward spine point. If the contact vector is near-zero (spine point IS on the triangle), use the face normal but orient it toward the capsule centre.
             Vector3 localNormal;
             if (localDist > 1e-6f) {
                 localNormal = (Vector3){ localContactVec.x / localDist, localContactVec.y / localDist, localContactVec.z / localDist };
-            } else {
-                // Degenerate: use face normal, pick orientation toward capsule mid
+            } else { // Degenerate: use face normal, pick orientation toward capsule mid
                 Vector3 eAB = Vector3_A_minus_B(posB, posA);
                 Vector3 eAC = Vector3_A_minus_B(posC, posA);
                 localNormal = normalize_vector3(cross_vector3(eAB, eAC));
@@ -196,18 +207,10 @@ static CapsuleContact QueryCapsuleContact(Vector3 start, Vector3 end, float caps
                 Vector3 toMid = Vector3_A_minus_B(spMid, posA);
                 if (dot_vector3(localNormal, toMid) < 0.0f) { localNormal.x=-localNormal.x; localNormal.y=-localNormal.y; localNormal.z=-localNormal.z; }
             }
- 
-            // Transform contact normal to world space (inverse-transpose = divide by scale, not scale²).
-            Vector3 worldNormal = {
-                (m00/scl_x)*localNormal.x + (m01/scl_y)*localNormal.y + (m02/scl_z)*localNormal.z,
-                (m10/scl_x)*localNormal.x + (m11/scl_y)*localNormal.y + (m12/scl_z)*localNormal.z,
-                (m20/scl_x)*localNormal.x + (m21/scl_y)*localNormal.y + (m22/scl_z)*localNormal.z
-            };
+
+            Vector3 worldNormal = {(m00/scl_x)*localNormal.x + (m01/scl_y)*localNormal.y + (m02/scl_z)*localNormal.z, (m10/scl_x)*localNormal.x + (m11/scl_y)*localNormal.y + (m12/scl_z)*localNormal.z, (m20/scl_x)*localNormal.x + (m21/scl_y)*localNormal.y + (m22/scl_z)*localNormal.z};
             worldNormal = normalize_vector3(worldNormal);
- 
-            // Convert local penetration depth to approximate world-space depth.
-            float worldPen = localPen * minScl;
- 
+            float worldPen = localPen * minScl; // Convert local penetration depth to approximate world-space depth.
             if (worldPen > worst.depth) { worst.depth = worldPen; worst.normal = worldNormal; }
         }
     }
@@ -545,30 +548,22 @@ ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uin
 
         // InverseTransformPoint: subtract translation, multiply by transpose of rotation part
         // (transpose = inverse for orthonormal, scale factors cancel if we also divide)
-        float scl_x = vsqrtf(m00*m00 + m10*m10 + m20*m20); // = sclx
-        float scl_y = vsqrtf(m01*m01 + m11*m11 + m21*m21); // = scly
-        float scl_z = vsqrtf(m02*m02 + m12*m12 + m22*m22); // = sclz
+        float sclx = vsqrtf(m00*m00 + m10*m10 + m20*m20); float sclx2 = sclx * sclx;
+        float scly = vsqrtf(m01*m01 + m11*m11 + m21*m21); float scly2 = scly * scly;
+        float sclz = vsqrtf(m02*m02 + m12*m12 + m22*m22); float sclz2 = sclz * sclz;
         Vector3 rel = {origin.x - tx, origin.y - ty, origin.z - tz};
-        Vector3 localOrigin = { // Multiply by transpose of rotation, divide out scale
-            (rel.x*m00 + rel.y*m10 + rel.z*m20) / (scl_x * scl_x),
-            (rel.x*m01 + rel.y*m11 + rel.z*m21) / (scl_y * scl_y),
-            (rel.x*m02 + rel.y*m12 + rel.z*m22) / (scl_z * scl_z)
-        };
-        Vector3 localDir = {
-            (dir.x*m00 + dir.y*m10 + dir.z*m20) / (scl_x * scl_x),
-            (dir.x*m01 + dir.y*m11 + dir.z*m21) / (scl_y * scl_y),
-            (dir.x*m02 + dir.y*m12 + dir.z*m22) / (scl_z * scl_z)
-        };
+        Vector3 localOrigin = {(rel.x*m00 + rel.y*m10 + rel.z*m20) / sclx2, (rel.x*m01 + rel.y*m11 + rel.z*m21) / scly2, (rel.x*m02 + rel.y*m12 + rel.z*m22) / sclz2}; // Multiply by transpose of rotation, divide out scale
+        Vector3 localDir =    {(dir.x*m00 + dir.y*m10 + dir.z*m20) / sclx2, (dir.x*m01 + dir.y*m11 + dir.z*m21) / scly2, (dir.x*m02 + dir.y*m12 + dir.z*m22) / sclz2};
         localDir = normalize_vector3(localDir);
         numMeshesCheckedForRaycast++;
         for (uint32_t j=0;j<triCount;++j) {
-            uint32_t bA = modelTriangles[mindex][j * 3] * VERTEX_ATTRIBUTES_COUNT, bB = modelTriangles[mindex][(j * 3) + 1] * VERTEX_ATTRIBUTES_COUNT, bC = modelTriangles[mindex][(j * 3) + 2] * VERTEX_ATTRIBUTES_COUNT;
-            Vector3 posA = (Vector3){modelVertices[mindex][bA + 0],modelVertices[mindex][bA + 1],modelVertices[mindex][bA + 2]};
-            Vector3 normA =(Vector3){modelVertices[mindex][bA + 3],modelVertices[mindex][bA + 4],modelVertices[mindex][bA + 5]};
-            Vector3 posB = (Vector3){modelVertices[mindex][bB + 0],modelVertices[mindex][bB + 1],modelVertices[mindex][bB + 2]};
-            Vector3 normB =(Vector3){modelVertices[mindex][bB + 3],modelVertices[mindex][bB + 4],modelVertices[mindex][bB + 5]};
-            Vector3 posC = (Vector3){modelVertices[mindex][bC + 0],modelVertices[mindex][bC + 1],modelVertices[mindex][bC + 2]};
-            Vector3 normC =(Vector3){modelVertices[mindex][bC + 3],modelVertices[mindex][bC + 4],modelVertices[mindex][bC + 5]};
+            uint32_t bA = (uint32_t)modelTriangles[mindex][j*3 + 0] * VERTEX_ATTRIBUTES_SIZE, bB = (uint32_t)modelTriangles[mindex][j*3 + 1] * VERTEX_ATTRIBUTES_SIZE, bC = (uint32_t)modelTriangles[mindex][j*3 + 2] * VERTEX_ATTRIBUTES_SIZE;
+            Vector3 posA = {half_to_float( *(half*)(modelVertices[mindex] + bA + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 4) )};
+            Vector3 posB = {half_to_float( *(half*)(modelVertices[mindex] + bB + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 4) )};
+            Vector3 posC = {half_to_float( *(half*)(modelVertices[mindex] + bC + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 4) )};
+            Vector3 normA ={half_to_float( *(half*)(modelVertices[mindex] + bA + 6) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 8) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 10) )};
+            Vector3 normB ={half_to_float( *(half*)(modelVertices[mindex] + bB + 6) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 8) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 10) )};
+            Vector3 normC ={half_to_float( *(half*)(modelVertices[mindex] + bC + 6) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 8) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 10) )};
             RaycastHit tryTri = RayTriangle(localOrigin,localDir,posA,posB,posC,normA,normB,normC);
             numTrisCastAgainst++;
             if (!tryTri.hit) continue;
@@ -585,9 +580,9 @@ ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uin
             if (worldDist >= result.distance) continue;
 
             Vector3 worldNormal = {
-                (m00/scl_x)*tryTri.normal.x + (m01/scl_y)*tryTri.normal.y + (m02/scl_z)*tryTri.normal.z,
-                (m10/scl_x)*tryTri.normal.x + (m11/scl_y)*tryTri.normal.y + (m12/scl_z)*tryTri.normal.z,
-                (m20/scl_x)*tryTri.normal.x + (m21/scl_y)*tryTri.normal.y + (m22/scl_z)*tryTri.normal.z
+                (m00/sclx)*tryTri.normal.x + (m01/scly)*tryTri.normal.y + (m02/sclz)*tryTri.normal.z,
+                (m10/sclx)*tryTri.normal.x + (m11/scly)*tryTri.normal.y + (m12/sclz)*tryTri.normal.z,
+                (m20/sclx)*tryTri.normal.x + (m21/scly)*tryTri.normal.y + (m22/sclz)*tryTri.normal.z
             };
             worldNormal = normalize_vector3(worldNormal);
             result.hit              = true;
