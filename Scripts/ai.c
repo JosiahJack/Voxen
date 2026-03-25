@@ -406,13 +406,6 @@ static bool AICheckIfPlayerInSight(Entity* self) {
     return false;
 }
 
-static void AIEnableAutomapOverlay(Entity* self) {
-    uint16_t ov = self->child[2];
-    if (!ov || ov >= INSTANCE_COUNT) return;
-    bool show = ai_has_health(self) && (self->entflags & ENTFLAG_ACTIVE) && !ai_is_cyber(self);
-    flag_set(&Eng_Global->instances[ov].entflags, ENTFLAG_VISIBLE, show);
-}
-
 static void AIEnemyInFrontChecks(Entity* self, uint16_t eidx) {
     if (!eidx) { flag_set(&self->entflags, ENTFLAG_ENEM_IN_FRONT|ENTFLAG_ENEM_IN_FOV, false); return; }
     if (ai_is_cyber(self)) { flag_set(&self->entflags, ENTFLAG_ENEM_IN_FRONT|ENTFLAG_ENEM_IN_FOV, true); return; }
@@ -1143,7 +1136,6 @@ void AIControllerUpdate(uint16_t idx) {
         flag_set(&self->entflags, ENTFLAG_USEGRAVITY, true);
     }
 
-    AIEnableAutomapOverlay(self);
     flag_set(&self->entflags, ENTFLAG_ENEM_IN_SIGHT, AICheckIfPlayerInSight(self));
     uint16_t eidx = self->enemey;
     if (eidx && ai_has_health(self)) {

@@ -9,91 +9,36 @@ void ResetHeldItem(uint16_t p) {
     inv->heldObjectLoadedAlternate = inv->holdingObject = inv->grenadeActive = false;
 }
 
+Vector3 ScreenPointToRay(Vector3 fwd, Vector3 rt) {
+    float offsetX = Eng_Global->cursorPosition_x - (Eng_Settings->ScreenWidth * 0.5f);
+    float offsetY = Eng_Global->cursorPosition_y - (Eng_Settings->ScreenHeight * 0.5f);
+    float ndcX = offsetX / (Eng_Settings->ScreenWidth * 0.5f);
+    float ndcY = -offsetY / (Eng_Settings->ScreenHeight * 0.5f);
+    float tanFov = vtan((float)Eng_Settings->FOV * 0.5f * PI / 180.0f);
+    Vector3 view = (Vector3){ndcX * tanFov * Eng_Global->aspect3D,ndcY * tanFov,-1.0f};
+    view = normalize_vector3(view);
+    Vector3 flipForward = (Vector3){-fwd.x,-fwd.y,-fwd.z};
+    Vector3 up = normalize_vector3(cross_vector3(rt,flipForward));
+    return (Vector3){view.x * rt.x + view.y * up.x + view.z * flipForward.x,view.x * rt.y + view.y * up.y + view.z * flipForward.y,view.x * rt.z + view.y * up.z + view.z * flipForward.z};
+}
+
 void DropHeldItem(uint16_t p) {
     InventorySystem* inv = Inv(p);
     if (inv->heldObjectIndex >= Eng_Global->loadedInstances) { ResetHeldItem(p); return; }
+    if (inv->dropFinished > Eng_Global->pauseRelativeTime) return;
     
-    inv->dropFinished = Eng_Global->current_time + 0.2; // Prevent immediate regrab at high fps
-    if (!inv->grenadeActive) {
-//         for (int i=0;i<levelDynamicContainer.transform.childCount;i++) {
-//             Transform tr = levelDynamicContainer.transform.GetChild(i);
-//             GameObject go = tr.gameObject;
-//             UseableObjectUse reference = go.GetComponent<UseableObjectUse>();
-//             if (reference != null) {
-//                 if (reference.useableItemIndex == inv->heldObjectIndex && go.activeSelf == false) {
-//                     reference.customIndex = heldObjectCustomIndex;
-//                     tossObject = go;
-//                     freeObjectInPoolFound = true;
-//                     break;
-//                 }
-//             }
-//         }
-// 
-//         if (freeObjectInPoolFound) {
-//             if (tossObject == null) {
-//                 CenterStatusPrint("BUG: Failed to get freeObjectInPool for object being dropped!",player);
-//                 ResetHeldItem(p);
-//                 return;
-//             } else {
-//                 tossObject.Eng_Global->instances[i].position = (Eng_Global->instances[i].position + (transform.forward * tossOffset));
-//             }
-//         } else {
-//             // DualLog("WARNING: Failed to get freeObjectInPool for object " + heldObject.ToString() + "being dropped! DropHeldItem.",player);
-//             tossObject = Instantiate(heldObject,(Eng_Global->instances[i].position + (transform.forward * tossOffset)),Const.a.quaternionIdentity) as GameObject;  //effect
-//             if (tossObject == null) {
-//                 CenterStatusPrint("BUG: Failed to instantiate object being dropped!",player);
-//                 ResetHeldItem(p);
-//                 return;
-//             }
-//         }
-//         if (tossObject.activeSelf != true) tossObject.SetActive(true);
-//         if (levelDynamicContainer != null) {
-//             tossObject.transform.SetParent(levelDynamicContainer.transform,true);
-//         }
-// 
-//         Vector3 tossDir = MouseCursor.a.GetCursorScreenPointForRay();
-//         tossDir = playerCamera.ScreenPointToRay(tossDir).direction;
-//         Rigidbody rbody = tossObject.GetComponent<Rigidbody>();
-//         if (rbody != null) {
-//             rbody.isKinematic = false;
-//             rbody.useGravity = true;
-//             rbody.velocity = tossDir * tossForce;
-//         }
-// 
-//         UseableObjectUse uou = tossObject.GetComponent<UseableObjectUse>();
-//         uou.customIndex = heldObjectCustomIndex;
-//         uou.ammo = heldObjectAmmo;
-//         uou.ammo2 = heldObjectAmmo2;
-//         uou.heldObjectLoadedAlternate = heldObjectLoadedAlternate;
-    } else {
-        // Throw an active grenade
-//         grenadeActive = false;
-//         Eng_UI->mouseClickHeldOverGUI = true; // Prevent shooting it.
-//         tossObject = Instantiate(heldObject,(Eng_Global->instances[i].position + (transform.forward * tossOffset)),Const.a.quaternionIdentity) as GameObject;  //effect
-//         if (tossObject == null) {
-//             CenterStatusPrint("BUG: Failed to instantiate object being dropped!",player);
-//             ResetHeldItem(p);
-//             return;
-//         }
-// 
-//         Const.a.grenadesThrown++;
-//         if (levelDynamicContainer != null){
-//             tossObject.transform.SetParent(levelDynamicContainer.transform,true);
-//         }
-//         tossObject.layer = 11; // Set to player bullets layer to prevent collision and still be visible.
-//         Vector3 tossDir = MouseCursor.a.GetCursorScreenPointForRay();
-//         tossDir = playerCamera.ScreenPointToRay(tossDir).direction;
-//         Rigidbody rbody = tossObject.GetComponent<Rigidbody>();
-//         if (rbody != null) {
-//             rbody.isKinematic = false;
-//             rbody.useGravity = true;
-//             rbody.velocity = tossDir * tossForce;
-//         }
-//         GrenadeActivate ga = tossObject.GetComponent<GrenadeActivate>();
-//         if (ga != null) ga.Activate(); // Time to boom!
-//         MouseCursor.a.liveGrenade = false;
-    }
-    
+    inv->dropFinished = Eng_Global->pauseRelativeTime + 0.2; // Prevent immediate regrab at high fps
+    uint16_t newent = Eng_Global->loadedInstances;
+    AddInstance(inv->heldObjectIndex,newent); Eng_Global->loadedInstances++;
+    Entity* tossObject = &Eng_Global->instances[newent];
+    tossObject->usableCustomIndex = inv->heldObjectCustomIndex;
+    tossObject->ammo = inv->heldObjectAmmo;
+    tossObject->ammo2 = inv->heldObjectAmmo2;
+    tossObject->heldObjectLoadedAlternate = inv->heldObjectLoadedAlternate;
+    tossObject->position = Eng_Global->instances[p].position;
+    Vector3 tossDir = ScreenPointToRay(Eng_Global->instances[p].forward,Eng_Global->instances[p].right);
+    tossObject->velocity = scale_vector3(tossDir,10.0f);
+    DualLog("Dropping held object type %u at pos %f %f %f, with force %f %f %f\n",tossObject->index,tossObject->position.x,tossObject->position.y,tossObject->position.z,tossObject->velocity.x,tossObject->velocity.y,tossObject->velocity.z);
     ResetHeldItem(p);
 }
 
@@ -1320,7 +1265,9 @@ void Targetted(uint16_t activator, uint16_t self, const char* argvalue) {
     Entity* e = &Eng_Global->instances[self];
     Entity* a = &Eng_Global->instances[activator];
     if (argvalue && !StringIsEmpty(argvalue)) StringCopyInto_A_From_B(e->argvalue,argvalue,TARGET_STRING_LENGTH);
+    if (e->index == 709) { CenterStatusPrint("%s",Eng_Text->stringTable[e->messageLingdex]); return; } // info_message
     if (e->index == 708) { Eng_Global->gameFinished = true; return; }
+    
     if ((a->ioflags & TARG_IOFLAGS_SEND_EMAIL) && e->index == 707 /*info_email*/) EmailTargetted(self,activator,argvalue);
     if (a->ioflags & TARG_IOFLAGS_TRIPTRIGGER) {
         if (e->index == 598 || e->index == 600) TriggerTargetted(self,activator);
@@ -3449,8 +3396,6 @@ void UseEntity(uint16_t p, uint16_t i) {
     else if (ConstIndexIsButtonSwitch(ent->index)) ButtonSwitchUse(i,PLAYER1,ent->argvalue);
     else if (ConstIndexIsGeometry(ent->index)) DualLog("Can't use modular geometry\n");
     else if (ConstIndexIsUsableObject(ent->index)) {
-        if (inv->holdingObject) { DropHeldItem(p); return; }
-
         inv->holdingObject = true;
         inv->heldObjectIndex = ent->index;
         inv->heldObjectCustomIndex = ent->usableCustomIndex;
@@ -3471,18 +3416,14 @@ void UseEntity(uint16_t p, uint16_t i) {
 
 #define FROB_DISTANCE 4.9f
 static inline __attribute__((always_inline)) void Frob(Vector3 pos, Vector3 forward, Vector3 right) {
+    if (Eng_Global->currentLevel == LEVEL_CYBERSPACE) return;
     if (vmailActive) { DeactivateVMail(); vmailActive = false; return; }
     if (Eng_Global->uiIsBlocking) return;
-    float offsetX = Eng_Global->cursorPosition_x - (Eng_Settings->ScreenWidth * 0.5f);
-    float offsetY = Eng_Global->cursorPosition_y - (Eng_Settings->ScreenHeight * 0.5f);
-    float ndcX = offsetX / (Eng_Settings->ScreenWidth * 0.5f);
-    float ndcY = -offsetY / (Eng_Settings->ScreenHeight * 0.5f);
-    float tanFov = vtan((float)Eng_Settings->FOV * 0.5f * PI / 180.0f);
-    Vector3 view = (Vector3){ndcX * tanFov * Eng_Global->aspect3D,ndcY * tanFov,-1.0f};
-    view = normalize_vector3(view);
-    Vector3 flipForward = (Vector3){-forward.x,-forward.y,-forward.z};
-    Vector3 up = normalize_vector3(cross_vector3(right,flipForward));
-    Vector3 dir = (Vector3){view.x * right.x + view.y * up.x + view.z * flipForward.x,view.x * right.y + view.y * up.y + view.z * flipForward.y,view.x * right.z + view.y * up.z + view.z * flipForward.z};
+    
+    InventorySystem* inv = Inv(PLAYER1);
+    if (inv->holdingObject) { DropHeldItem(PLAYER1); return; }
+
+    Vector3 dir = ScreenPointToRay(forward,right);
     Eng_Global->debugLine_start = pos;
     Eng_Global->debugLine_end = (Vector3){dir.x * FROB_DISTANCE + pos.x,dir.y * FROB_DISTANCE + pos.y,dir.z * FROB_DISTANCE + pos.z};
     RaycastHit tempHit = Raycast(pos,dir,FROB_DISTANCE,LAYER_MASK_PLAYER_FROB);
@@ -3502,16 +3443,7 @@ bool FrobWithHeldObject(void) {
 MOD_TO_ENGINE void ModUpdate(void) {
     WeaponsUpdate();
     PatchUpdate(PLAYER1);
-    if (Use()) {
-        if (Eng_Global->uiIsBlocking) {
-        } else if (Eng_Global->currentLevel != LEVEL_CYBERSPACE) {
-            if (Eng_Global->inventoryPlayer1.dropFinished < Eng_Global->pauseRelativeTime) {
-                if (Eng_Global->inventoryPlayer1.holdingObject) {
-                } else Frob(Eng_Global->instances[PLAYER1].position,Eng_Global->instances[PLAYER1].forward,Eng_Global->instances[PLAYER1].right);
-            }
-        }
-    }
-    
+    if (Use()) Frob(Eng_Global->instances[PLAYER1].position,Eng_Global->instances[PLAYER1].forward,Eng_Global->instances[PLAYER1].right);
     if (Eng_Global->pauseRelativeTime < Eng_Global->debugLineFinished && (Eng_Global->debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Eng_Global->debugLine_start,Eng_Global->debugLine_end);
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < Eng_Global->loadedInstances; ++i) {
         Entity* e = &Eng_Global->instances[i];
@@ -3579,7 +3511,6 @@ MOD_TO_ENGINE bool TakeScreenshot(void) { return Eng_Global->GetKeyPressed(41); 
 
 MOD_TO_ENGINE void ProcessInput(void) {
     if (Console()) ToggleConsole();
-    if (TakeScreenshot() && Eng_Global->current_time > Eng_Global->screenshotTimeout) Screenshot();
     if (Menu() && !Eng_Global->menuActive) { Eng_Global->gamePaused = !Eng_Global->gamePaused; return; }
     if (Menu() && Eng_Global->menuActive) { MenuGoBack(); return; }
     if (Eng_Global->gamePaused || Eng_Global->menuActive || Eng_Cheats->consoleActive) return; // Pause/Menu barrier <<<<<<<
@@ -3589,6 +3520,8 @@ MOD_TO_ENGINE void ProcessInput(void) {
     if (Infrared()) Eng_Global->inventoryPlayer1.hardwareIsActive ^= HW_INF;
     ApplyPlayerMovements();
 }
+
+MOD_TO_ENGINE void CheckAndTakeScreenshot(void) { if (TakeScreenshot() && Eng_Global->current_time > Eng_Global->screenshotTimeout) Screenshot(); }
 
 void SearchableInit(uint16_t i) {
     int numRandomGeneratedItems = 0;
@@ -3765,3 +3698,135 @@ MOD_TO_ENGINE void ModInitAfterLoad(void) {
         }
     }
 }
+
+uint16_t GetCrosshairTexture(void) {
+    switch(Eng_Global->inventoryPlayer1.weaponIndex) {
+        case 36: return 1121; // red
+        case 37: return 1253; // blue
+        case 38: return 1121; // red
+        case 39: return 1260; // green
+        case 40: return 1253; // blue
+        case 41: return 1166; // orange
+        case 42: return 1166; // orange
+        case 43: return 1121; // red
+        case 44: return 1122; // yellow
+        case 45: return 1121; // red
+        case 46: return 1161; // teal
+        case 47: return 1122; // yellow
+        case 48: return 1121; // red
+        case 49: return 1260; // green
+        case 50: return 1253; // blue
+        case 51: return 1161; // teal
+        default: return 1260; // green
+    }
+    
+    return 1260;
+}
+
+uint16_t GetCursorTexture(void) {
+    if (Eng_Global->gamePaused || Eng_Global->menuActive) return 1261; // Red standard cursor
+    if (!Eng_Global->inventoryPlayer1.holdingObject) return GetCrosshairTexture();
+    switch(Eng_Global->inventoryPlayer1.heldObjectIndex) {
+        case 307: return 1250; // item_paper_wad
+        case 308: return 838; // item_paper_wad
+        case 309: return 764; // item_beaker
+        case 310: return 767; // item_beverage
+        case 311: return 981; // item_skull
+        case 312: return 605; // item_arm
+        case 313: return 605; // item_audiolog
+        case 314: return 853; // weapon_grenadefrag
+        case 315: return 849; // weapon_grenadeconc
+        case 316: return 851; // weapon_grenadeemp
+        case 317: return 850; // weapon_grenadeearth
+        case 318: return 860; // weapon_grenademine
+        case 319: return 861; // weapon_grenadenitro
+        case 320: return 859; // weapon_grenadegas
+        case 321: return 974; // item_patch_berserk
+        case 322: return 975; // item_patch_detox
+        case 323: return 976; // item_patch_genius
+        case 324: return 977; // item_patch_medi
+        case 325: return 978; // tem_patch_reflex
+        case 326: return 979; // item_patch_sight
+        case 327: return 980; // item_patch_staminup
+        case 328: return 882; // item_hw_system
+        case 329: return 907; // item_hw_navunit
+        case 330: return 902; // item_hw_ereader
+        case 331: return 909; // item_hw_sensaround
+        case 332: return 935; // item_hw_targetid
+        case 333: return 911; // item_hw_shield
+        case 334: return 900; // item_hw_bio
+        case 335: return 906; // item_hw_lantern
+        case 336: return 903; // item_hw_envirosuit
+        case 337: return 901; // item_hw_booster
+        case 338: return 905; // item_hw_jumpjets
+        case 339: return 904; // item_hw_infrared
+        case 340: return 966; // item_fireextinguisher
+        case 341: return 626; // item_access_card_admin
+        case 342: return 845; // item_workerhelmet
+        case 343: return 988; // weapon_mk3
+        case 344: return 982; // weapon_blaster
+        case 345: return 983; // weapon_dartgun
+        case 346: return 984; // weapon_flechette
+        case 347: return 985; // weapon_ionrifle
+        case 348: return 1034; // weapon_rapier
+        case 349: return 990; // weapon_pipe
+        case 350: return 986; // weapon_magnum
+        case 351: return 987; // weapon_magpulse
+        case 352: return 1010; // weapon_pistol
+        case 353: return 1019; // weapon_plasma
+        case 354: return 1027; // weapon_railgun
+        case 355: return 1035; // weapon_riotgun
+        case 356: return 1036; // weapon_skorpion
+        case 357: return 1052; // weapon_sparqbeam
+        case 358: return 1065; // weapon_stungun
+        case 359: return 965; // item_battery
+        case 360: return 968; // item_battery_icad
+        case 361: return 972; // item_logic_probe
+        case 362: return 967; // item_healthkit
+        case 363: return 973; // item_plastique
+        case 364: return 969; // item_chipset_interfacedemod
+        case 365: return 766; // item_flask
+        case 366: return 969; // item_chipset_bitflag
+        case 367: return 549; // item_ammo_rubber
+        case 368: return 971; // item_isotopex22
+        case 369: return 765; // item_testtube
+        case 370: return 853; // weapon_grenadefrag_live
+        case 371: return 970; // item_chipset_isolinear
+        case 372: return 849; // weapon_grenadeconc_live
+        case 373: return 420; // item_ammo_needle
+        case 374: return 602; // item_ammo_tranq
+        case 375: return 593; // item_ammo_standard
+        case 376: return 597; // item_ammo_teflon
+        case 377: return 411; // item_ammo_hollow
+        case 378: return 561; // item_ammo_slug
+        case 379: return 419; // item_ammo_magnesium
+        case 380: return 421; // item_ammo_penetrator
+        case 381: return 417; // item_ammo_hornet
+        case 382: return 577; // item_ammo_splinter
+        case 383: return 422; // item_ammo_rail
+        case 384: return 551; // item_ammo_slag
+        case 385: return 552; // item_ammo_slaglarge
+        case 386: return 418; // item_ammo_magcart
+        case 387: return 851; // weapon_grenadeemp_live
+        case 388: return 762; // item_access_card_std
+        case 389: return 850; // weapon_grenadeearth_live
+        case 390: return 610; // item_access_card_group1
+        case 391: return 621; // item_access_card_science
+        case 392: return 609; // item_access_card_eng
+        case 393: return 610; // item_access_card_groupB
+        case 394: return 635; // item_access_card_security
+        case 395: return 761; // item_access_card_per5diego
+        case 396: return 632; // item_access_card_medi
+        case 397: return 610; // item_access_card_group3
+        case 398: return 624; // item_access_card_purple
+        case 399: return 872; // item_head_male
+        case 400: return 862; // item_head_female
+        case 401: return 872; // item_severedhead
+        case 402: return 860; // weapon_grenademine_live
+        case 403: return 861; // weapon_grenadenitro_live
+        case 404: return 859; // weapon_grenadegas_live
+        case 417: return 760; // item_access_card_perdarcy
+    }
+    
+    return 1250; // paper wad fallback to make issue obvious
+}//3903

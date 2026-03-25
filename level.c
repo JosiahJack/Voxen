@@ -33,7 +33,7 @@ void InitializeEntity(Entity* entry) { // Blank entity, no index yet, for initia
     entry->path[0] = '\0';    
 }
 
-void AddInstance(uint16_t entIdx, uint16_t i) {
+ENGINE_TO_MOD void AddInstance(uint16_t entIdx, uint16_t i) {
     if (entIdx >= Sys_Global.entityCount) { DualLogError("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d\n",entIdx,Sys_Global.entityCount); OS_Exit(1); }
         
     Sys_Global.instances[i].index = entIdx;
@@ -124,23 +124,7 @@ ENGINE_TO_MOD void DeleteInstance(uint16_t i) {
     --Sys_Global.loadedInstances; // Shift final marker.  It's history!
 }
 
-void CopyInstanceRegion(uint16_t head, uint16_t* instanceTypeArray, Entity* tempInstances, uint16_t* targetIndex, uint16_t nextRegionStart) {
-    for (uint16_t modelIdx = 0; modelIdx < MODEL_IDX_MAX; modelIdx++) {
-        for (uint16_t j = 0; j < head; j++) {
-            uint16_t i = instanceTypeArray[j];
-            if (tempInstances[i].modelIndex == modelIdx) {
-                if (*targetIndex >= nextRegionStart) { DualLogError("Instance overflow at modelIdx %u, index %u, targetIdx %u\n", modelIdx, i, *targetIndex); OS_Exit(1); }
-                
-                Sys_Global.instances[*targetIndex] = tempInstances[i];
-                (*targetIndex) += 1;
-            }
-        }
-    }
-}
-
 #define LINE_LEN_MAX 81920
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wformat-truncation"
 ENGINE_TO_MOD int32_t PosGetCellCoords(float pos_x, float pos_z) { return (PosGetCellCoordZ(pos_z) * WORLDX) + PosGetCellCoordX(pos_x); } // Clamped just above.
 void LoadTextures(void); void LoadModels(void);
 char* GetNextStringUpToNewlineOrEOF(char* buf, int size, OsFileHandle fd);
@@ -441,6 +425,7 @@ void LoadLevel(uint8_t curlevel) {
                 else if (StringsAreEqual(trimmed_key,"frameDelay")) inst->tickTime = (double)parse_float(trimmed_value,initialLine,lineNum);
                 else if (StringsAreEqual(trimmed_key,"randomFrame")) inst->texAnimRandom = parse_bool(trimmed_value,initialLine,lineNum);
                 else if (StringsAreEqual(trimmed_key,"reverseSequence")) inst->texAnimInReverse = parse_bool(trimmed_value,initialLine,lineNum);
+                else if (StringsAreEqual(trimmed_key,"messageLingdex")) inst->messageLingdex = parse_numberu16(trimmed_value,initialLine,lineNum);
             }
         }
         
@@ -616,4 +601,3 @@ void LoadLevel(uint8_t curlevel) {
     __builtin_memset(voxen_Shadow_System.shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t)); // Set to invalid values for all
     Sys_Global.levelCurrentlyLoading = false;
 }
-#pragma GCC diagnostic pop

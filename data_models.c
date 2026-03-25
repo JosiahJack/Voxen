@@ -59,6 +59,65 @@ static inline int32_t fast_atoi(const char** p){
 	return val*sign;
 }
 
+typedef struct { uint32_t idx; uint32_t key; } TriSort;   // renamed sumv → key for clarity
+int cmp(const void* a, const void* b) {
+    uint32_t ka = ((const TriSort*)a)->key;
+    uint32_t kb = ((const TriSort*)b)->key;
+    return (ka < kb) ? -1 : (ka > kb);
+}
+
+static void OptimizeVertexCache(uint16_t* indices, uint32_t indexCount, uint32_t vertexCount) {
+    if (indexCount < 3 || vertexCount == 0) return;
+    uint32_t triCount = indexCount / 3;
+    TriSort* tris = (TriSort*)OS_AllocateRAM(NULL, triCount * sizeof(TriSort), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+    for (uint32_t i = 0; i < triCount; ++i) {
+        uint16_t* t = indices + i * 3;
+        uint32_t v0 = t[0], v1 = t[1], v2 = t[2];
+        uint32_t minv = v0 < v1 ? v0 : v1;
+        minv = minv < v2 ? minv : v2;
+        tris[i].idx = i;
+        tris[i].key = minv;
+    }
+
+    qsort(tris, triCount, sizeof(TriSort), cmp);
+    uint16_t* newIndices = (uint16_t*)OS_AllocateRAM(NULL, indexCount * sizeof(uint16_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+    for (uint32_t i = 0; i < triCount; ++i) {
+        uint32_t old = tris[i].idx;
+        uint16_t* src = indices + old * 3;
+        uint16_t* dst = newIndices + i * 3;
+        dst[0] = src[0]; dst[1] = src[1]; dst[2] = src[2];
+    }
+
+    __builtin_memcpy(indices, newIndices, indexCount * sizeof(uint16_t));
+    OS_DeallocateRAM(newIndices, indexCount * sizeof(uint16_t));
+    OS_DeallocateRAM(tris, triCount * sizeof(TriSort));
+}
+
+static uint8_t* OptimizeVertexFetch(uint8_t* vertices, uint32_t* vertexCount, uint16_t* indices, uint32_t indexCount, size_t vertexStride) {
+    uint32_t oldCount = *vertexCount;
+    if (oldCount == 0 || indexCount == 0) return vertices;
+    uint32_t* remap = (uint32_t*)OS_AllocateRAM(NULL, oldCount * sizeof(uint32_t),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
+    __builtin_memset(remap, 0xFF, oldCount * sizeof(uint32_t));
+    uint32_t* firstUseOldId = (uint32_t*)OS_AllocateRAM(NULL, oldCount * sizeof(uint32_t),PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+    uint32_t newCount = 0;
+    for (uint32_t i = 0; i < indexCount; ++i) {
+        uint32_t v = indices[i];
+        if (v < oldCount && remap[v] == 0xFFFFFFFFU) {
+            remap[v] = newCount;
+            firstUseOldId[newCount] = v;
+            ++newCount;
+        }
+    }
+
+    uint8_t* newVertices = (uint8_t*)OS_AllocateRAM(NULL, newCount * vertexStride, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+    for (uint32_t i = 0; i < newCount; ++i) __builtin_memcpy(newVertices + i * vertexStride,vertices + firstUseOldId[i] * vertexStride, vertexStride);
+    for (uint32_t i = 0; i < indexCount; ++i) { uint32_t v = indices[i]; if (v < oldCount) { indices[i] = (uint16_t)remap[v]; } }
+    *vertexCount = newCount;
+    OS_DeallocateRAM(remap, oldCount * sizeof(uint32_t));
+    OS_DeallocateRAM(firstUseOldId, oldCount * sizeof(uint32_t));
+    return newVertices;
+}
+
 static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(const char* __restrict data,int file_size,float* __restrict temp_pos,float* __restrict temp_nrm,float* __restrict temp_uv,float* __restrict scratch_verts,uint16_t* __restrict scratch_tris,uint8_t** out_vertices,uint32_t* out_vertex_count,uint16_t** out_triangles,uint16_t* out_triangle_count,float* out_minx,float* out_miny,float* out_minz,float* out_maxx,float* out_maxy,float* out_maxz){
 	*out_vertices=NULL;*out_triangles=NULL;
 	*out_vertex_count=*out_triangle_count=0;
@@ -218,8 +277,11 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(const char* _
 	size_t ibytes=(size_t)expanded_count*sizeof(uint16_t);
 	uint16_t* final_tris=(uint16_t*)OS_AllocateRAM(NULL,ibytes,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
 	for(uint32_t i=0;i<expanded_count;++i)final_tris[i]=(uint16_t)remap[i];
-
-	*out_vertices=final_verts;
+    OptimizeVertexCache(final_tris,expanded_count,unique_cnt);
+    uint32_t oldVertexCount = unique_cnt;
+    uint8_t* optimizedVerts = OptimizeVertexFetch(final_verts,&unique_cnt,final_tris,expanded_count,VERTEX_ATTRIBUTES_SIZE);
+    OS_DeallocateRAM(final_verts,(size_t)oldVertexCount * VERTEX_ATTRIBUTES_SIZE);
+	*out_vertices=optimizedVerts;
 	*out_vertex_count=unique_cnt;
 	*out_triangles=final_tris;
 	*out_triangle_count=expanded_count/3;

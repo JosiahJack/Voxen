@@ -135,15 +135,10 @@ static bool load_font_cache(const char *path, int32_t expected_glyphs, const uin
     int stbi_write_bmp(char const *filename, int x, int y, int comp, const void *data);
     static void dump_atlas_bmp(const char *bmp_path, const unsigned char *atlas_data) {
         // stbi_write_bmp expects RGB data, so expand R8 -> RGB24
-        unsigned char *rgb = OS_AllocateRAM(NULL, FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * 3, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-        for (int i = 0; i < FONT_ATLAS_SIZE * FONT_ATLAS_SIZE; ++i) {
-            unsigned char v = atlas_data[i];
-            rgb[i*3+0] = v;
-            rgb[i*3+1] = v;
-            rgb[i*3+2] = v;
-        }
-        stbi_write_bmp(bmp_path, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 3, rgb);
-        OS_DeallocateRAM(rgb, FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * 3);
+        unsigned char *rgb = OS_AllocateRAM(NULL,FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * 4,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
+        for (int i=0;i<FONT_ATLAS_SIZE * FONT_ATLAS_SIZE;++i) { unsigned char v = atlas_data[i]; rgb[i*3+0] = v; rgb[i*3+1] = v; rgb[i*3+2] = v; rgb[i*3+3] = 255; }
+        stbi_write_bmp(bmp_path,FONT_ATLAS_SIZE, FONT_ATLAS_SIZE,4,rgb);
+        OS_DeallocateRAM(rgb,FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * 3);
     }
 #endif
 

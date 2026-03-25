@@ -19,8 +19,8 @@
 //
 // Unneeded fields do not need to be specified.
 // Index 0 is reserved for black, alpha 1.0 (fully opaque)!
-#Textures/med1_7.png
-index: 499
+#Textures/UI/ss1_original_palette_FULL.png
+index: 410
 #Textures/black.png
 index: 0
 persistent: 1
@@ -933,6 +933,12 @@ index: 407
 index: 408
 #Textures/isolinearchipset.png
 index: 409
+
+// 410 used for bugfix at top
+#Textures/UI/frobicons/amm_hollow.png
+index: 411
+transparent: 1
+persistent: 1
 #Textures/isotopex22_glow.png
 index: 412
 #Textures/isotopex22.png
@@ -943,7 +949,30 @@ index: 414
 index: 415
 #Textures/cart.png
 index: 416
-
+#Textures/UI/frobicons/amm_hornet.png
+index: 417
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/amm_magcart.png
+index: 418
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/amm_magnesium.png
+index: 419
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/amm_needle.png
+index: 420
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/amm_penetrator.png
+index: 421
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/amm_rail.png
+index: 422
+transparent: 1
+persistent: 1
 #Textures/lamp.png
 index: 423
 #Textures/lite1_1_glow.png
@@ -1094,7 +1123,8 @@ index: 496
 index: 497
 #Textures/med1_7_normal.png
 index: 498
-
+#Textures/med1_7.png
+index: 499
 #Textures/med1_8d_glow.png
 index: 500
 #Textures/med1_8d.png
@@ -1192,9 +1222,22 @@ index: 546
 index: 547
 #Textures/npc_cyborg_elite256.png
 index: 548
+#Textures/UI/frobicons/amm_rubber.png
+index: 549
+transparent: 1
+persistent: 1
 #Textures/npc_cyborg_enforcer256.png
 index: 550
-
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/amm_slag.png
+index: 551
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/amm_slaglarge.png
+index: 552
+transparent: 1
+persistent: 1
 #Textures/npc_sec3bot.png
 index: 553
 #Textures/npc_cyborgwarrior.png
@@ -1211,7 +1254,10 @@ index: 558
 index: 559
 #Textures/npc_gortiger.png
 index: 560
-
+#Textures/UI/frobicons/amm_slug.png
+index: 561
+transparent: 1
+persistent: 1
 #Textures/npc_hopper.png
 index: 562
 #Textures/npc_humanoidmutant.png
@@ -1242,7 +1288,10 @@ index: 574
 index: 575
 #Textures/npc_virusmutant.png
 index: 576
-
+#Textures/UI/frobicons/amm_splinter.png
+index: 577
+transparent: 1
+persistent: 1
 #Textures/onepixel_plain.png
 index: 578
 #Textures/onepixel.png
@@ -1271,14 +1320,20 @@ index: 590
 index: 591
 #Textures/p_genius.png
 index: 592
-
+#Textures/UI/frobicons/amm_standard.png
+index: 593
+transparent: 1
+persistent: 1
 #Textures/pinetreem.png
 index: 594
 #Textures/pipe1.png
 index: 595
 #Textures/pipe2.png
 index: 596
-
+#Textures/UI/frobicons/amm_teflon.png
+index: 597
+transparent: 1
+persistent: 1
 #Textures/pipe3.png
 index: 598
 #Textures/plastique.png
@@ -1287,12 +1342,38 @@ index: 599
 index: 600
 #Textures/pnl10_cl.png
 index: 601
-
+#Textures/UI/frobicons/amm_tranq.png
+index: 602
+transparent: 1
+persistent: 1
 #Textures/pnl12_on.png
 index: 603
 #Textures/pnl13.png
 index: 604
-
+#Textures/UI/frobicons/arm.png
+index: 605
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/audlog.png
+index: 606
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/blank.png
+index: 607
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/card_blue.png
+index: 608
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/card_eng.png
+index: 609
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/card_group1_actual.png
+index: 610
+transparent: 1
+persistent: 1
 #Textures/pnl1_cl.png
 index: 611
 #Textures/pnl1_off.png
@@ -1313,25 +1394,52 @@ index: 618
 index: 619
 #Textures/pnl3_on.png
 index: 620
-
+#Textures/UI/frobicons/card_group1.png
+index: 621
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/card_group2.png
+index: 622
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/card_group3.png
+index: 623
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/card_group4.png
+index: 624
+transparent: 1
+persistent: 1
 #Textures/pnl6_cl.png
 index: 625
-
+#Textures/UI/frobicons/card_group5.png
+index: 626
+transparent: 1
+persistent: 1
 #Textures/pnl6_on.png
 index: 627
 #Textures/pnl7_cl.png
 index: 628
-
+#Textures/UI/frobicons/card_group6.png
+index: 629
+transparent: 1
+persistent: 1
 #Textures/pnl7_on.png
 index: 630
 #Textures/pnl8_cl.png
 index: 631
-
+#Textures/UI/frobicons/card_medi.png
+index: 632
+transparent: 1
+persistent: 1
 #Textures/pnl8_on.png
 index: 633
 #Textures/pnl9_cl.png
 index: 634
-
+#Textures/UI/frobicons/card_per1.png
+index: 635
+transparent: 1
+persistent: 1
 #Textures/pnl9_on.png
 index: 636
 #Textures/pnl_ded.png
@@ -1580,7 +1688,38 @@ index: 757
 index: 758
 #Textures/surgery_table.png
 index: 759
-
+#Textures/UI/frobicons/card_per5.png
+index: 760
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/card_purple.png
+index: 761
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/card_std.png
+index: 762
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/chipset.png
+index: 763
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/deb_beaker.png
+index: 764
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/deb_flask.png
+index: 765
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/deb_flasklg.png
+index: 766
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/deb_sodapop.png
+index: 767
+transparent: 1
+persistent: 1
 #Textures/screencode0.png
 index: 768
 #Textures/screencode1.png
@@ -1715,10 +1854,16 @@ index: 833
 index: 834
 #Textures/stunshot.png
 index: 835
-
+#Textures/UI/frobicons/deb_wad.png
+index: 836
+transparent: 1
+persistent: 1
 #Textures/sw1_dn.png
 index: 837
-
+#Textures/UI/frobicons/deb_warecasing.png
+index: 838
+transparent: 1
+persistent: 1
 #Textures/sw2_dn.png
 index: 839
 #Textures/sw2_up_glow.png
@@ -1731,14 +1876,34 @@ index: 842
 index: 843
 #Textures/sw3_up.png
 index: 844
-
+#Textures/UI/frobicons/deb_workerhelmet.png
+index: 845
 #Textures/sw4_up.png
 index: 846
 #Textures/sw5_ded.png
 index: 847
 #Textures/sw5_dn.png
 index: 848
-
+#Textures/UI/frobicons/grenconc.png
+index: 849
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/grenearth.png
+index: 850
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/grenemp.png
+index: 851
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/grenenergdrain.png
+index: 852
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/grenfrag.png
+index: 853
+transparent: 1
+persistent: 1
 #Textures/sw7_up.png
 index: 854
 #Textures/sw8_dn_glow.png
@@ -1749,7 +1914,22 @@ index: 856
 index: 857
 #Textures/sw8_up.png
 index: 858
-
+#Textures/UI/frobicons/grengas.png
+index: 859
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/grenmine.png
+index: 860
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/grennitro.png
+index: 861
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/head_female.png
+index: 862
+transparent: 1
+persistent: 1
 #Textures/thermos.png
 index: 863
 #Textures/toolbox_wheeled_normal.png
@@ -1764,7 +1944,10 @@ index: 867
 index: 870
 #Textures/vending2.png
 index: 871
-
+#Textures/UI/frobicons/head_male.png
+index: 872
+transparent: 1
+persistent: 1
 #Textures/v_rapier.png
 index: 873
 #Textures/w_blaster_glow.png
@@ -1783,7 +1966,10 @@ index: 879
 index: 880
 #Textures/white.png
 index: 881
-
+#Textures/UI/frobicons/hw_analyzer.png
+index: 882
+transparent: 1
+persistent: 1
 #Textures/w_ion.png
 index: 883
 #Textures/w_magpulse.png
@@ -1821,13 +2007,51 @@ persistent: 1
 #Textures/UI/ammopane_red.png
 index: 899
 persistent: 1
-
+#Textures/UI/frobicons/hw_biomonitor.png
+index: 900
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/hw_booster.png
+index: 901
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/hw_datareader.png
+index: 902
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/hw_envirosuit.png
+index: 903
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/hw_infrared.png
+index: 904
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/hw_jumpboots.png
+index: 905
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/hw_lantern.png
+index: 906
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/hw_navunit.png
+index: 907
+transparent: 1
+persistent: 1
 #Textures/UI/buttonborder_orange.png
 index: 908
 persistent: 1
-
+#Textures/UI/frobicons/hw_sensaround.png
+index: 909
+transparent: 1
+persistent: 1
 #Textures/UI/checkbox.png
 index: 910
+persistent: 1
+#Textures/UI/frobicons/hw_shield.png
+index: 911
+transparent: 1
 persistent: 1
 #Textures/UI/checkmark.png
 index: 912
@@ -1895,7 +2119,10 @@ persistent: 1
 #Textures/UI/elnumg.png
 index: 934
 persistent: 1
-
+#Textures/UI/frobicons/hw_targetid.png
+index: 935
+transparent: 1
+persistent: 1
 #Textures/UI/elnumr.png
 index: 936
 persistent: 1
@@ -1983,9 +2210,108 @@ persistent: 1
 #Textures/UI/health_tickred.png
 index: 964
 persistent: 1
-
+#Textures/UI/frobicons/ob_battery.png
+index: 965
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/ob_firexguish.png
+index: 966
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/ob_healthkit.png
+index: 967
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/ob_icad.png
+index: 968
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/ob_interface_demod1.png
+index: 969
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/ob_isolinear_chipset.png
+index: 970
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/ob_isotopex22.png
+index: 971
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/ob_logic.png
+index: 972
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/ob_plastique.png
+index: 973
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/patch_berserk.png
+index: 974
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/patch_detox.png
+index: 975
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/patch_genius.png
+index: 976
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/patch_health.png
+index: 977
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/patch_reflex.png
+index: 978
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/patch_sight.png
+index: 979
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/patch_stamup.png
+index: 980
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/skull.png
+index: 981
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/w_blaster.png
+index: 982
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/w_dartgun.png
+index: 983
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/w_flechette.png
+index: 984
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/w_ion.png
+index: 985
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/w_magnum.png
+index: 986
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/w_magpulse.png
+index: 987
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/w_mk3.png
+index: 988
+transparent: 1
+persistent: 1
 #Textures/UI/hud_hwico_biostats_off.png
 index: 989
+persistent: 1
+#Textures/UI/frobicons/w_pipe.png
+index: 990
+transparent: 1
 persistent: 1
 #Textures/UI/hud_hwico_biostats_v1.png
 index: 991
@@ -2041,6 +2367,10 @@ persistent: 1
 #Textures/UI/hud_hwico_sensaround_off.png
 index: 1009
 persistent: 1
+#Textures/UI/frobicons/w_pistol.png
+index: 1010
+transparent: 1
+persistent: 1
 #Textures/UI/hud_hwico_sensaround_v1.png
 index: 1011
 persistent: 1
@@ -2065,6 +2395,10 @@ persistent: 1
 #Textures/UI/hud_hwico_shield_on_v4.png
 index: 1018
 persistent: 1
+#Textures/UI/frobicons/w_plasma.png
+index: 1019
+transparent: 1
+persistent: 1
 #Textures/UI/hud_shootmode.png
 index: 1020
 persistent: 1
@@ -2086,6 +2420,10 @@ persistent: 1
 #Textures/UI/menu_background_new.png
 index: 1026
 persistent: 1
+#Textures/UI/frobicons/w_railgun.png
+index: 1027
+transparent: 1
+persistent: 1
 #Textures/UI/menu_button_paddark.png
 index: 1028
 persistent: 1
@@ -2105,7 +2443,18 @@ persistent: 1
 #Textures/UI/menu_config_graphics.png
 index: 1033
 persistent: 1
-
+#Textures/UI/frobicons/w_rapier.png
+index: 1034
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/w_riotgun.png
+index: 1035
+transparent: 1
+persistent: 1
+#Textures/UI/frobicons/w_skorpion.png
+index: 1036
+transparent: 1
+persistent: 1
 #Textures/UI/menu_load.png
 index: 1037
 persistent: 1
@@ -2151,7 +2500,10 @@ persistent: 1
 #Textures/UI/nodamage.png
 index: 1051
 persistent: 1
-
+#Textures/UI/frobicons/w_sparq.png
+index: 1052
+transparent: 1
+persistent: 1
 #Textures/UI/num_0.png
 index: 1053
 persistent: 1
@@ -2188,6 +2540,14 @@ persistent: 1
 #Textures/UI/num_slash.png
 index: 1064
 persistent: 1
+#Textures/UI/frobicons/w_stungun.png
+index: 1065
+transparent: 1
+persistent: 1
+#Textures/UI/cursors/orangecrosshair.png
+index: 1066
+persistent: 1
+
 #Textures/UI/searchfx.png
 index: 1074
 persistent: 1
@@ -2283,7 +2643,12 @@ persistent: 1
 #Textures/UI/input_button_filled.png
 index: 1120
 persistent: 1
-
+#Textures/UI/cursors/redcrosshair.png
+index: 1121
+persistent: 1
+#Textures/UI/cursors/yellowcrosshair.png
+index: 1122
+persistent: 1
 #Textures/sequences/engscreen1_04.png
 index: 1123
 #Textures/sequences/g_energmine_00.png
@@ -2360,7 +2725,10 @@ index: 1158
 index: 1159
 #Textures/sequences/scr_exp02.png
 index: 1160
-// Use white.png for 3rd frame
+#Textures/UI/cursors/tealcrosshair.png
+index: 1161
+persistent: 1
+// Just using white.png for 3rd frame scr_exp03
 #Textures/sequences/scr_exp04.png
 index: 1162
 #Textures/sequences/scr_exp05.png
@@ -2545,7 +2913,9 @@ index: 1251
 #Textures/UI/quitbutton.png
 index: 1252
 persistent: 1
-
+#Textures/UI/cursors/bluecrosshair.png
+index: 1253
+persistent: 1
 #Textures/med2_1_spec.png
 index: 1254
 #Textures/med1_1_norm.png
@@ -2558,7 +2928,7 @@ index: 1257
 index: 1258
 #Textures/hw_navunit_glow.png
 index: 1259
-#Textures/UI/cursors/cursor.png
+#Textures/UI/cursors/greencrosshair_small.png
 index: 1260
 persistent: 1
 #Textures/UI/cursors/cursor_normal.png

@@ -1,5 +1,6 @@
 // helpers.c - Helper Functions for various things, mostly libc avoidance
 #include "os.h"
+#include "gl.h"
 #include "voxen.h"
 #define STBIW_UCHAR(x) (unsigned char)((x) & 0xff)
 typedef void stbi_write_func(void *context, void *data, int size);
@@ -53,100 +54,37 @@ static void stbiw__write3(stbi__write_context *s, unsigned char a, unsigned char
    int n;
    if ((size_t)s->buf_used + 3 > sizeof(s->buffer)) stbiw__write_flush(s);
    n = s->buf_used;
-   s->buf_used = n+3;
-   s->buffer[n+0] = a;
-   s->buffer[n+1] = b;
-   s->buffer[n+2] = c;
+   s->buf_used = n+3; s->buffer[n+0] = a; s->buffer[n+1] = b; s->buffer[n+2] = c;
 }
 
-static void stbiw__write_pixel(stbi__write_context *s, int rgb_dir, int comp, int write_alpha, int expand_mono, unsigned char *d) {
-   unsigned char bg[3] = { 255, 0, 255}, px[3];
-   int k;
-   if (write_alpha < 0) stbiw__write1(s, d[comp - 1]);
-   switch (comp) {
-      case 2: // 2 pixels = mono + alpha, alpha is written separately, so same as 1-channel case
-      case 1:
-         if (expand_mono) stbiw__write3(s, d[0], d[0], d[0]); // monochrome bmp
-         else             stbiw__write1(s, d[0]);  // monochrome TGA
-         break;
-      case 4:
-         if (!write_alpha) {
-            // composite against pink background
-            for (k = 0; k < 3; ++k) px[k] = bg[k] + ((d[k] - bg[k]) * d[3]) / 255;
-            stbiw__write3(s, px[1 - rgb_dir], px[1], px[1 + rgb_dir]);
-            break;
-         }
-         /* FALLTHROUGH */
-      case 3:
-         stbiw__write3(s, d[1 - rgb_dir], d[1], d[1 + rgb_dir]);
-         break;
-   }
-   
-   if (write_alpha > 0) stbiw__write1(s, d[comp - 1]);
-}
-
-static void stbiw__write_pixels(stbi__write_context *s, int rgb_dir, int vdir, int x, int y, int comp, void *data, int write_alpha, int scanline_pad, int expand_mono) {
+static void stbiw__write_pixels(stbi__write_context *s, int x, int y, void *data) {    
    uint32_t zero = 0;
-   int i,j, j_end;
-   if (y <= 0) return;
-
-   vdir *= -1;
-   if (vdir < 0) {
-      j_end = -1; j = y-1;
-   } else {
-      j_end =  y; j = 0;
-   }
-
-   for (; j != j_end; j += vdir) {
-      for (i=0; i < x; ++i) {
-         unsigned char *d = (unsigned char *) data + (j*x+i)*comp;
-         stbiw__write_pixel(s, rgb_dir, comp, write_alpha, expand_mono, d);
+   for (int j=0;j!=y;j+=1) {
+      for (int i=0; i < x; ++i) {
+         unsigned char *d = (unsigned char *) data + (j*x+i)*4;
+         stbiw__write3(s,d[2],d[1],d[0]);
+         stbiw__write1(s,255);
       }
+      
       stbiw__write_flush(s);
-      OS_Write(s->context, &zero, scanline_pad, s->filePath);
+      OS_Write(s->context,&zero,0,s->filePath);
    }
 }
 
-static int stbiw__outfile(stbi__write_context *s, int rgb_dir, int vdir, int x, int y, int comp, int expand_mono, void *data, int alpha, int pad, const char *fmt, ...) {
-   if (y < 0 || x < 0) return 0;
-
-   va_list v;
-   __builtin_va_start(v, fmt);
-   stbiw__writefv(s, fmt, v);
-   __builtin_va_end(v);
-   stbiw__write_pixels(s,rgb_dir,vdir,x,y,comp,data,alpha,pad, expand_mono);
+static int stbiw__outfile(stbi__write_context *s, int x, int y, void *data, const char *fmt, ...) {
+   va_list v; __builtin_va_start(v, fmt); stbiw__writefv(s,fmt,v); __builtin_va_end(v);
+   stbiw__write_pixels(s,x,y,data);
    return 1;
 }
 
-static int stbi_write_bmp_core(stbi__write_context *s, int x, int y, int comp, const void *data) {
-   if (comp != 4) {
-      // write RGB bitmap
-      int pad = (-x*3) & 3;
-      return stbiw__outfile(s,-1,-1,x,y,comp,1,(void *) data,0,pad,
-              "11 4 22 4" "4 44 22 444444",
-              'B', 'M', 14+40+(x*3+pad)*y, 0,0, 14+40,  // file header
-               40, x,y, 1,24, 0,0,0,0,0,0);             // bitmap header
-   } else {
-      // RGBA bitmaps need a v4 header
-      // use BI_BITFIELDS mode with 32bpp and alpha mask
-      // (straight BI_RGB with alpha mask doesn't work in most readers)
-      return stbiw__outfile(s,-1,-1,x,y,comp,1,(void *)data,1,0,
-         "11 4 22 4" "4 44 22 444444 4444 4 444 444 444 444",
-         'B', 'M', 14+108+x*y*4, 0, 0, 14+108, // file header
-         108, x,y, 1,32, 3,0,0,0,0,0, 0xff0000,0xff00,0xff,0xff000000u, 0, 0,0,0, 0,0,0, 0,0,0, 0,0,0); // bitmap V4 header
-   }
-}
-
-int stbi_write_bmp(char const *filename, int x, int y, int comp, const void *data) {
+int stbi_write_bmp(char const *filename, int x, int y, const void *data) {
     stbi__write_context s = { 0 };
     OsFileHandle f = OS_OpenWriteonly(filename);
-//     FILE *f = fopen(filename, "wb");
     s.context = f;
     s.filePath = filename;
-    int r = stbi_write_bmp_core(&s,x,y,comp,data);
+    stbiw__outfile(&s,x,y,(void *)data,"11 4 22 4" "4 44 22 444444 4444 4 444 444 444 444",'B','M',14+108+x*y*4,0,0,14+108,/*<<<fileheader*/108,x,y,1,32,3,0,0,0,0,0,0xff0000,0xff00,0xff,0xff000000u,0,0,0,0,0,0,0,0,0,0,0,0,0); // bitmap V4 header
     OS_Close(f);
-//     fclose(f);
-    return r;
+    return 1;
 }
 
 double get_time(void) {
@@ -175,7 +113,7 @@ void DebugRAM(const char *context) {
     size_t heap_bytes = (size_t)((char*)current_brk - (char*)heap_start);
     size_t uss_bytes = 0;
     long fd = OS_OpenReadonly("/proc/self/smaps_rollup");
-    if (fd == OS_INVALID_HANDLE) { DualLogError("Failed to open /proc/self/smaps_rollup\n"); goto print_only_heap; }
+    if (fd == OS_INVALID_HANDLE) { DualLogError("Failed to open /proc/self/smaps_rollup\n"); return; }
 
     char buf[4096];
     long bytes_read = OS_Read(fd, buf, sizeof(buf)-1);
@@ -183,11 +121,11 @@ void DebugRAM(const char *context) {
     OS_Close(fd);
     char* p = buf;
     while (*p) {
-        if (p[0]=='P' && p[1]=='r' && p[2]=='i' && p[3]=='v' && p[4]=='a' && p[5]=='t' && p[6]=='e' && p[7]=='_') {
+        if (p[0]=='P'&&p[1]=='r'&&p[2]=='i'&&p[3]=='v'&&p[4]=='a'&&p[5]=='t'&&p[6]=='e'&&p[7]=='_') {
             p += 8;
             size_t val = 0;
-            if (p[0]=='C' && p[1]=='l' && p[2]=='e' && p[3]=='a' && p[4]=='n') { /* Clean */ }
-            else if (p[0]=='D' && p[1]=='i' && p[2]=='r' && p[3]=='t' && p[4]=='y') { /* Dirty */ }
+            if (p[0]=='C'&&p[1]=='l'&&p[2]=='e'&&p[3]=='a'&&p[4]=='n') { /* Clean */ }
+            else if (p[0]=='D'&&p[1]=='i'&&p[2]=='r'&&p[3]=='t'&&p[4]=='y') { /* Dirty */ }
             else { p++; continue; }
 
             while (*p && *p != ':') p++;
@@ -202,7 +140,6 @@ void DebugRAM(const char *context) {
         p++;
     }
 
-    print_only_heap:
     DualLog("Memory at %s: Heap %zu bytes (%zu KB | %.2f MB), USS %zu bytes (%zu KB | %.2f MB)\n",context,heap_bytes,heap_bytes / 1024,heap_bytes / 1024.0 / 1024.0,uss_bytes,uss_bytes / 1024,uss_bytes / 1024.0 / 1024.0);
 #else
     (void)context;
@@ -211,18 +148,17 @@ void DebugRAM(const char *context) {
 
 void print_bytes_no_newline(int32_t count) { DualLog("%d bytes | %f kb | %f Mb",count,(double)count / 1000.0,(double)count / 1000000.0); }
 
-typedef void(*PFNGLREADPIXELSPROC)(int32_t x, int32_t y, int32_t width, int32_t height, uint32_t format, uint32_t type, void* pixels);
-extern PFNGLREADPIXELSPROC glad_glReadPixels;
 ENGINE_TO_MOD void Screenshot(void) {
     if (!TakeScreenshot() || Sys_Global.current_time <= Sys_Global.screenshotTimeout) return;
     
     Sys_Global.screenshotTimeout = Sys_Global.current_time + 1.0; // Prevent saving more than 1 per second for sanity purposes.
-    OS_MakeFolder("Screenshots");
-    unsigned char* pixels = OS_AllocateRAM(NULL, Sys_Settings.ScreenWidth * Sys_Settings.ScreenHeight * 4 * sizeof(char), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, OS_INVALID_HANDLE);//malloc(Sys_Settings.ScreenWidth * Sys_Settings.ScreenHeight * 4 * sizeof(char));
-    glad_glReadPixels(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, /*GL_RGBA*/ 0x1908, /*GL_UNSIGNED_BYTE*/ 0x1401, pixels);
-    char filename[96]; StringFormat(filename, sizeof(filename), "Screenshots/%.2f_x%.1f_y%.1f_z%.1f.bmp", get_time(), (double)Sys_Global.instances[PLAYER1].position.x, (double)Sys_Global.instances[PLAYER1].position.y, (double)Sys_Global.instances[PLAYER1].position.z);
-    if (!stbi_write_bmp(filename, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, 4, pixels)) DualLogError("Failed to save screenshot\n"); else DualLog("Saved screenshot %s\n", filename);
-    OS_DeallocateRAM(pixels, Sys_Settings.ScreenWidth * Sys_Settings.ScreenHeight * 4 * sizeof(char));
+    OS_MakeFolder("Screenshots"); uint16_t w = Sys_Settings.ScreenWidth, h = Sys_Settings.ScreenHeight;
+    unsigned char* pixels = OS_AllocateRAM(NULL,w * h * 4 * sizeof(char),PROT_READ|PROT_WRITE,MAP_ANONYMOUS|MAP_PRIVATE|MAP_POPULATE,OS_INVALID_HANDLE);
+    glad_glReadPixels(0,0,w,h,GL_RGBA,GL_UNSIGNED_BYTE,pixels);
+    Vector3 p = Sys_Global.instances[PLAYER1].position;
+    char filename[96]; StringFormat(filename,sizeof(filename),"Screenshots/%.2f_x%.1f_y%.1f_z%.1f.bmp",get_time(),p.x,p.y,p.z);
+    stbi_write_bmp(filename,w,h,pixels); DualLog("Saved screenshot %s\n",filename);
+    OS_DeallocateRAM(pixels,w * h * 4 * sizeof(char));
 }
 
 uint32_t random_range_rng = 0x12345678u;

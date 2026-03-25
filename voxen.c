@@ -2124,11 +2124,8 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
     Sys_Global.last_time = RenderUI();
 
     // Cursor [ /// VERY LAST DRAWN OVER EVERYTHING ELSE! /// ]
-    bool menuOrInventoryCursorStyle = (Sys_Global.gamePaused || Sys_Global.menuActive);
-    uint16_t cursorTexture = menuOrInventoryCursorStyle ? 1261 : 1260;
-    if ((Sys_Global.inventoryMode && !Sys_Cheats.noHUD) || Sys_Global.menuActive || Sys_Global.gamePaused) RenderUIImage((int16_t)(Sys_Global.cursorPosition_x) - 20, (int16_t)(Sys_Global.cursorPosition_y) - 20, 40,40, cursorTexture);
-    else RenderUIImage(683-20,371, 40,40, cursorTexture);
-    
+    if ((Sys_Global.inventoryMode && !Sys_Cheats.noHUD) || Sys_Global.menuActive || Sys_Global.gamePaused) RenderUIImage((int16_t)(Sys_Global.cursorPosition_x) - 20,(int16_t)(Sys_Global.cursorPosition_y) - 20,40,40,GetCursorTexture());
+    else RenderUIImage(683-20,371,40,40,GetCursorTexture());
     if ((Sys_Global.last_time - Sys_Global.lastFrameSecCountTime) >= 1.00) { // Update Diagnostic Poll
         Sys_Global.lastFrameSecCountTime = Sys_Global.last_time;
         Sys_Global.framesPerLastSecond = Sys_Global.globalFrameNum - Sys_Global.lastFrameSecCount;
@@ -2138,6 +2135,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
     
     Sys_Global.cpuTime = get_time() - Sys_Global.current_time; // Measure time over everything this frame before GPU swap buffers
     glfwSwapBuffers(window); // Present frame
+    CheckAndTakeScreenshot();
     CHECK_GL_ERROR();
 }
 

@@ -43,8 +43,8 @@ typedef struct {
 #define LIGHT_COUNT 2048
 #define MODEL_IDX_MAX 6805
 #define MAX_VALID_TEXTURE 2048
-#define MAX_TOTAL_PIXELS 29425664u
-#define MAX_UNIQUE_COLORS 97408u
+#define MAX_TOTAL_PIXELS 29800000u
+#define MAX_UNIQUE_COLORS 100000u
 #define MAX_ANIMATED_MODELS 64
 #define MAX_ANIMATION_CLIPS_PER_MODEL 32
 #define MAX_DEBUG_LINE_VERTS 8
@@ -74,7 +74,7 @@ typedef struct {
 #define WORLD   0u // Much like Quake, the world is entity 0.  Aand also like Quake, world is nullent and is 0.
 #define PLAYER1 1u
 #define PLAYER2 2u
-#define MAX_CHILD_COUNT 4
+#define MAX_CHILD_COUNT 2
 #define START_INDEX_LEVEL_INSTANCES 3
 #define ENTFLAG_ACTIVE               (1ull <<  0) // Instance renders and updates
 #define ENTFLAG_CARDCHUNK            (1ull <<  1)
@@ -212,7 +212,7 @@ typedef struct {
 #define TARG_IOFLAGS_AUTOFLIP_ON_TARGET (1ull << 56)
 #define TARG_IOFLAGS_DISABLE_ON_AWAKE   (1ull << 57)
 #define TARG_IOFLAGS_DISABLD_ONCE_4EVER (1ull << 58)
-#define TARGET_STRING_LENGTH 40
+#define TARGET_STRING_LENGTH 38
 #define CURSOR_SCREEN_PERCENTAGE 0.02f
 #define FONT_NORMAL 0
 #define FONT_STOPD  1
@@ -231,7 +231,7 @@ typedef struct {
 #define TEXT_RED_MENU            12
 #define SAVE_REMINDER_TIME 7.0f // 7secs ~is human short-term memory length
 #define CREDITS_PAGES 22
-#define MAX_WAYPOINTS 32
+#define MAX_WAYPOINTS 8
 #define TARGET_ID_LENGTH 32 // Max needed 22 + 5 for ID + 1 for space between them = 28
 #define SOUNDS_COUNT 670
 #define TEXT_DATA_FILEBUFFER_SIZE 65536 // 16 pages
@@ -1037,6 +1037,7 @@ typedef /*FAT*/ struct {
     float health;
     float lastHealth;
     float cyberHealth;
+    uint16_t messageLingdex;
     uint16_t lockedMessageLingdex;
     AccessCardType requiredAccessCard;
     double delayFinished;
@@ -1092,7 +1093,6 @@ typedef /*FAT*/ struct {
     bool alternateOn;
     uint16_t mainSwitchMaterial;
     uint16_t alternateSwitchMaterial;
-    char currentClipName[32];
 
     // Physics
     Vector3 position;

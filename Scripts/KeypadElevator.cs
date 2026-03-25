@@ -31,34 +31,19 @@ public class KeypadElevator : MonoBehaviour {
 	}
 
 	public void Use (UseData ud) {
-		if (GetCurrentLevelSecurity() > securityThreshhold) {
-			Eng_UI->BlockedBySecurity(Eng_Global->instances[i].position);
-			return;
-		}
+		if (GetCurrentLevelSecurity() > securityThreshhold) { BlockedBySecurity(Eng_Global->instances[i].position); return; }
 
-		if (Eng_Cheats->superoverride || Eng_Global->difficultyMission == 0) {
-			// SHODAN can go anywhere!  Full security override!
-			locked = false;
-		}
-
+		if (Eng_Cheats->superoverride || Eng_Global->difficultyMission == 0) locked = false; // SHODAN can go anywhere!  Full security override!
 		if (locked) {
-			// Target something because we are locked like an info_message to say
-			// hey we are locked, e.g. vox: "Non emergency life pods disabled."
-			CenterStatusPrint(lockedMessageIndex);
+			CenterStatusPrint(lockedMessageIndex); // Target something because we are locked like an info_message to say hey we are locked, e.g. vox: "Non emergency life pods disabled."
 			UseTargets(gameObject,ud,lockedTarget);
 			return;
 		}
 
 		padInUse = true;
 		Utils.PlayUIOneShotSavable(91);
-		Eng_UI->SendElevatorKeypadToDataTab(this,buttonsEnabled,
-												 buttonsDarkened,buttonText,
-												 targetDestination,
-												 Eng_Global->instances[i].position,linkedDoor,
-												 currentFloor);
+		Eng_UI->SendElevatorKeypadToDataTab(this,buttonsEnabled,buttonsDarkened,buttonText,targetDestination,Eng_Global->instances[i].position,linkedDoor,currentFloor);
 	}
 
-	public void SendDataBackToPanel() {
-		padInUse = false;
-	}
+	public void SendDataBackToPanel() { padInUse = false; }
 }

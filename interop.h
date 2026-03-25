@@ -59,7 +59,9 @@
     X(void, ModInitAfterLoad, (void)) \
     X(void, ModEntityDefinitionsInitAfterLoad, (DataParser*)) \
     X(void, PlayerInit, (uint16_t)) \
-    X(void, ProcessInput, (void))
+    X(void, ProcessInput, (void)) \
+    X(void, CheckAndTakeScreenshot, (void)) \
+    X(uint16_t, GetCursorTexture, (void))
 
 #ifdef MOD_INTEROP_IMPLEMENTATION  // mod.h usage:
     // Interop - To Engine
@@ -147,3 +149,4 @@ ENGINE_TO_MOD void DeleteInstance(uint16_t i);
 ENGINE_TO_MOD void CenterStatusPrint(const char* fmt, ...);
 ENGINE_TO_MOD void play_wav(const char* path, float volume, Vector3 pos, bool positional);
 ENGINE_TO_MOD void PortalCulling(void);
+ENGINE_TO_MOD void AddInstance(uint16_t entIdx, uint16_t i);

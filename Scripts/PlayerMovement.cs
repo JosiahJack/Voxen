@@ -212,52 +212,10 @@ public class PlayerMovement : MonoBehaviour {
     }
 
 	void Update() {
-		// Always allowed items, even when paused...
-		lastCommand0 = ConsoleEmulator.lastCommand[0];
-		lastCommand1 = ConsoleEmulator.lastCommand[1];
-		lastCommand2 = ConsoleEmulator.lastCommand[2];
-		lastCommand3 = ConsoleEmulator.lastCommand[3];
-		lastCommand4 = ConsoleEmulator.lastCommand[4];
-		lastCommand5 = ConsoleEmulator.lastCommand[5];
-		lastCommand6 = ConsoleEmulator.lastCommand[6];
-		consoleMemdex = ConsoleEmulator.consoleMemdex;
-		ConsoleEmulator.ConsoleUpdate();
-
-		// Bug Hunter feedback (puts it into their screenshots for me)
-		if (locationIndicator.activeInHierarchy) {
-			locationText.text = Eng_Text->stringTable[738] // "location: "
-								+ (Eng_Global->instances[i].position.x.ToString("00.00")
-								+ " " + Eng_Global->instances[i].position.y.ToString("00.00")
-								+ " " + Eng_Global->instances[i].position.z.ToString("00.00"));
-		}
-
-		// Prevent falling or movement while menu is up. Force it here in case
-		// PauseScript didn't catch it at startup.
-		if (PauseScript.a.mainMenu.activeSelf == true) {
-			rbody.useGravity = false;
-			rbody.Sleep();
-			return;
-		}
-
 		if (Eng_Global->gamePaused
 			|| (ressurectingFinished >= Eng_Global->pauseRelativeTime)) {
 			return;
 		}
-		
-// 		if (UnityEngine.Profiling.Profiler.enabled) {
-// 			Light[] lights = FindObjectsOfType<Light>();
-// 			int shadowCount = 0;
-// 			foreach (Light l in lights) {
-// 				if (l.shadows != LightShadows.None) shadowCount++;
-// 			}
-// 			var renderTextures = Resources.FindObjectsOfTypeAll<RenderTexture>();
-// 			int shadowMapCount = 0;
-// 			foreach (var rt in renderTextures) {
-// 				if (rt.name.Contains("Shadow") || rt.depth > 0) shadowMapCount++;
-// 			}
-// 			DualLog($"Lights: {shadowCount}, Shadow Maps: {shadowMapCount}, " +
-// 					$"Used RAM: {UnityEngine.Profiling.Profiler.GetTotalAllocatedMemoryLong() / 1024 / 1024} MB");
-// 		}
 
 		// Normal play when not paused...
 		if (rbody.isKinematic) rbody.isKinematic = false; // Allow physics.
