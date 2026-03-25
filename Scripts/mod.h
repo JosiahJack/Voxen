@@ -139,14 +139,19 @@ typedef struct {
     const char* argvalue;
 } TargetArgs;
 
-static inline bool EntityLocked(const Entity* e) { return (e->entflags & ENTFLAG_LOCKED) != 0; }
-static inline void EntitySetLocked(Entity* e, bool locked) { flag_set(&e->entflags,ENTFLAG_LOCKED,locked); }
-static inline void UIBlockedBySecurity(Vector3 tetherPoint) { (void)tetherPoint; CenterStatusPrint("%s",Eng_Text->stringTable[25]); }
-static inline void UICyberSprint(uint16_t textIndex) { CenterStatusPrint("%s",Eng_Text->stringTable[textIndex]); }
-static inline void UIExitCyberspace(void) { CenterStatusPrint("%s",Eng_Text->stringTable[601]); }
-static inline void HealthManagerHealingBed(uint16_t playerIdx, float amount, bool flashBed) { (void)flashBed; Entity* p = &Eng_Global->instances[playerIdx]; p->health = vmin(255.0f,p->health + amount); }
-static inline void PlayerTakeDamage(uint16_t playerIdx, float damage) { Entity* p = &Eng_Global->instances[playerIdx]; p->health -= damage; if (p->health < 0.0f) p->health = 0.0f; }
+// Mod Inlines
+static inline __attribute__((always_inline)) bool EntityLocked(const Entity* e) { return (e->entflags & ENTFLAG_LOCKED) != 0; }
+static inline __attribute__((always_inline)) void EntitySetLocked(Entity* e, bool locked) { flag_set(&e->entflags,ENTFLAG_LOCKED,locked); }
+static inline __attribute__((always_inline)) void UIBlockedBySecurity(Vector3 tetherPoint) { (void)tetherPoint; CenterStatusPrint("%s",Eng_Text->stringTable[25]); }
+static inline __attribute__((always_inline)) void UICyberSprint(uint16_t textIndex) { CenterStatusPrint("%s",Eng_Text->stringTable[textIndex]); }
+static inline __attribute__((always_inline)) void UIExitCyberspace(void) { CenterStatusPrint("%s",Eng_Text->stringTable[601]); }
+static inline __attribute__((always_inline)) void HealthManagerHealingBed(uint16_t playerIdx, float amount, bool flashBed) { (void)flashBed; Entity* p = &Eng_Global->instances[playerIdx]; p->health = vmin(255.0f,p->health + amount); }
+static inline __attribute__((always_inline)) void PlayerTakeDamage(uint16_t playerIdx, float damage) { Entity* p = &Eng_Global->instances[playerIdx]; p->health -= damage; if (p->health < 0.0f) p->health = 0.0f; }
+static inline __attribute__((always_inline)) Entity* PE(uint16_t p) { return &Eng_Global->instances[p]; }
+static inline __attribute__((always_inline)) float SfxVol(void) { return (float)Eng_Settings->VolumeEffects / 100.0f; }
+static inline __attribute__((always_inline)) InventorySystem* Inv(uint16_t p) { return p == PLAYER1 ? &Eng_Global->inventoryPlayer1 : &Eng_Global->inventoryPlayer2; }
 
+// Mod Shared Functions across TU's
 void WeaponsUpdate(void);
 void UseTargets(uint16_t activator, const char* argvalue, const char* targetname);
 void Targetted(uint16_t activator, uint16_t self, const char* argvalue);
@@ -201,6 +206,4 @@ bool AICheckPain(Entity* self);
 void ResetHeldItem(uint16_t p);
 void DropHeldItem(uint16_t p);
 void AddItemToInventory(uint16_t p, int index, int customIndex);
-static inline __attribute__((always_inline)) Entity* PE(uint16_t p) { return &Eng_Global->instances[p]; }
-static inline __attribute__((always_inline)) float SfxVol(void) { return (float)Eng_Settings->VolumeEffects / 100.0f; }
-static inline __attribute__((always_inline)) InventorySystem* Inv(uint16_t p) { return p == PLAYER1 ? &Eng_Global->inventoryPlayer1 : &Eng_Global->inventoryPlayer2; }
+void TextureSequenceUpdate(uint16_t self);

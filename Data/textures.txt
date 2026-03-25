@@ -2673,3 +2673,533 @@ index: 1311
 index: 1312
 #Textures/sequences/bridg1_1_004.png
 index: 1313
+#Textures/sequences/scr_cita2_0.png
+index: 1314
+#Textures/sequences/scr_cita2_1.png
+index: 1315
+#Textures/sequences/scr_cita2_2.png
+index: 1316
+#Textures/sequences/scr_cita2_3.png
+index: 1317
+#Textures/sequences/scr_cita3_0.png
+index: 1318
+#Textures/sequences/scr_cita3_1.png
+index: 1319
+#Textures/sequences/scr_cita3_2.png
+index: 1320
+#Textures/sequences/scr_cita3_3.png
+index: 1321
+#Textures/sequences/scr_cita_0.png
+index: 1322
+#Textures/sequences/scr_cita_1.png
+index: 1323
+#Textures/sequences/scr_cita_2.png
+index: 1324
+#Textures/sequences/scr_cita_3.png
+index: 1325
+#Textures/sequences/scr_cita_4.png
+index: 1326
+#Textures/sequences/scr_cita_5.png
+index: 1327
+#Textures/sequences/scr_cita_6.png
+index: 1328
+#Textures/sequences/scr_cita_7.png
+index: 1329
+#Textures/sequences/engscreen1_04.png
+index: 1330
+#Textures/sequences/scr_static2_1.png
+index: 1331
+#Textures/sequences/scr_static2_2.png
+index: 1332
+#Textures/sequences/scr_static2_3.png
+index: 1333
+#Textures/sequences/scr_static2_4.png
+index: 1334
+#Textures/sequences/scr_static2_5.png
+index: 1335
+#Textures/sequences/scr_static2_6.png
+index: 1336
+#Textures/sequences/scr_static2_a.png
+index: 1337
+#Textures/sequences/scr_static_0.png
+index: 1338
+#Textures/sequences/scr_static_1.png
+index: 1339
+#Textures/sequences/scr_static_2.png
+index: 1340
+#Textures/sequences/scr_static_3.png
+index: 1341
+#Textures/sequences/scr_static_4.png
+index: 1342
+#Textures/sequences/scr_static_5.png
+index: 1343
+#Textures/sequences/screen1_0.png
+index: 1344
+#Textures/sequences/screen1_1.png
+index: 1345
+#Textures/sequences/screen1_2.png
+index: 1346
+#Textures/sequences/screen1_3.png
+index: 1347
+#Textures/sequences/screen2_0.png
+index: 1348
+#Textures/sequences/screen2_1.png
+index: 1349
+#Textures/sequences/screen2_2.png
+index: 1350
+#Textures/sequences/screen2_3.png
+index: 1351
+#Textures/sequences/screen2_4.png
+index: 1352
+#Textures/sequences/screen3_0.png
+index: 1353
+#Textures/sequences/screen3_1.png
+index: 1354
+#Textures/sequences/screen3_2.png
+index: 1355
+#Textures/sequences/screen3_3.png
+index: 1356
+#Textures/sequences/screen4_0.png
+index: 1357
+#Textures/sequences/screen4_1.png
+index: 1358
+#Textures/sequences/screen4_2.png
+index: 1359
+#Textures/sequences/screen4_3.png
+index: 1360
+#Textures/sequences/screen4_4.png
+index: 1361
+#Textures/sequences/screen4_5.png
+index: 1362
+#Textures/sequences/screen5_0.png
+index: 1363
+#Textures/sequences/screen5_1.png
+index: 1364
+#Textures/sequences/screen5_2.png
+index: 1365
+#Textures/sequences/screen5_3.png
+index: 1366
+#Textures/sequences/triop1_0.png
+index: 1367
+#Textures/sequences/triop1_1.png
+index: 1368
+#Textures/sequences/triop1_2.png
+index: 1369
+#Textures/sequences/triop1_3.png
+index: 1370
+#Textures/sequences/triop2_0.png
+index: 1371
+#Textures/sequences/triop2_1.png
+index: 1372
+#Textures/sequences/triop2_2.png
+index: 1373
+#Textures/sequences/triop2_3.png
+index: 1374
+#Textures/sequences/triop2_4.png
+index: 1375
+#Textures/sequences/triop2_5.png
+index: 1376
+#Textures/sequences/triop2_6.png
+index: 1377
+#Textures/sequences/triop2_7.png
+index: 1378
+#Textures/sequences/triop2_8.png
+index: 1379
+#Textures/sequences/triop2_9.png
+index: 1380
+#Textures/sequences/triop3_0.png
+index: 1381
+#Textures/sequences/triop3_1.png
+index: 1382
+#Textures/sequences/triop3_2.png
+index: 1383
+#Textures/sequences/triop3_3.png
+index: 1384
+#Textures/sequences/triop3_4.png
+index: 1385
+#Textures/sequences/triop3_5.png
+index: 1386
+#Textures/sequences/triop3_6.png
+index: 1387
+#Textures/sequences/triop3_7.png
+index: 1388
+#Textures/sequences/triop4_8.png
+index: 1389
+#Textures/sequences/dna0.png
+index: 1390
+#Textures/sequences/dna1.png
+index: 1391
+#Textures/sequences/dna2.png
+index: 1392
+#Textures/sequences/dna3.png
+index: 1393
+#Textures/sequences/dna4.png
+index: 1394
+#Textures/sequences/dna5.png
+index: 1395
+#Textures/sequences/dna6.png
+index: 1396
+#Textures/sequences/dna7.png
+index: 1397
+#Textures/sequences/edcolor0.png
+index: 1398
+#Textures/sequences/edcolor1.png
+index: 1399
+#Textures/sequences/edcolor2.png
+index: 1400
+#Textures/sequences/edcolor3.png
+index: 1401
+#Textures/sequences/edgray0.png
+index: 1402
+#Textures/sequences/edgray1.png
+index: 1403
+#Textures/sequences/edgray2.png
+index: 1404
+#Textures/sequences/edgray3.png
+index: 1405
+#Textures/sequences/ammo_magcart_00.png
+index: 1406
+#Textures/sequences/ammo_magcart_01.png
+index: 1407
+#Textures/sequences/ammo_magcart_02.png
+index: 1408
+#Textures/sequences/ammo_magcart_03.png
+index: 1409
+#Textures/sequences/ammo_magcart_04.png
+index: 1410
+#Textures/sequences/ammo_magcart_05.png
+index: 1411
+#Textures/sequences/ammo_magcart_06.png
+index: 1412
+#Textures/sequences/ammo_magcart_07.png
+index: 1413
+#Textures/sequences/ammo_magcart_08.png
+index: 1414
+#Textures/sequences/ammo_magcart_09.png
+index: 1415
+#Textures/sequences/ammo_magcart_10.png
+index: 1416
+#Textures/sequences/ammo_magcart_glow_00.png
+index: 1417
+#Textures/sequences/ammo_magcart_glow_01.png
+index: 1418
+#Textures/sequences/ammo_magcart_glow_02.png
+index: 1419
+#Textures/sequences/ammo_magcart_glow_03.png
+index: 1420
+#Textures/sequences/ammo_magcart_glow_04.png
+index: 1421
+#Textures/sequences/ammo_magcart_glow_05.png
+index: 1422
+#Textures/sequences/ammo_magcart_glow_06.png
+index: 1423
+#Textures/sequences/ammo_magcart_glow_07.png
+index: 1424
+#Textures/sequences/ammo_magcart_glow_08.png
+index: 1425
+#Textures/sequences/ammo_magcart_glow_09.png
+index: 1426
+#Textures/sequences/ammo_magcart_glow_10.png
+index: 1427
+#Textures/sequences/medicalbed_00.png
+index: 1428
+#Textures/sequences/medicalbed_01.png
+index: 1429
+#Textures/sequences/medicalbed_02.png
+index: 1430
+#Textures/sequences/medicalbed_03.png
+index: 1431
+#Textures/sequences/medicalbed_04.png
+index: 1432
+#Textures/sequences/medicalbed_05.png
+index: 1433
+#Textures/sequences/medicalbed_06.png
+index: 1434
+#Textures/sequences/medicalbed_07.png
+index: 1435
+#Textures/sequences/medicalbed_08.png
+index: 1436
+#Textures/sequences/medicalbed_09.png
+index: 1437
+#Textures/sequences/rad1_1_00.png
+index: 1438
+#Textures/sequences/rad1_1_01.png
+index: 1439
+#Textures/sequences/rad1_1_02.png
+index: 1440
+#Textures/sequences/rad1_1_03.png
+index: 1441
+#Textures/sequences/rad1_1_04.png
+index: 1442
+#Textures/sequences/screencode0.png
+index: 1443
+#Textures/sequences/screencode1.png
+index: 1444
+#Textures/sequences/screencode2.png
+index: 1445
+#Textures/sequences/screencode3.png
+index: 1446
+#Textures/sequences/screencode4.png
+index: 1447
+#Textures/sequences/screencode5.png
+index: 1448
+#Textures/sequences/screencode6.png
+index: 1449
+#Textures/sequences/screencode7.png
+index: 1450
+#Textures/sequences/screencode8.png
+index: 1451
+#Textures/sequences/screencode9.png
+index: 1452
+#Textures/sequences/shodanstatic_00.png
+index: 1453
+#Textures/sequences/shodanstatic_01.png
+index: 1454
+#Textures/sequences/shodanstatic_02.png
+index: 1455
+#Textures/sequences/shodanstatic_03.png
+index: 1456
+#Textures/sequences/shodanstatic_04.png
+index: 1457
+#Textures/sequences/shodanstatic_05.png
+index: 1458
+#Textures/sequences/shodanstatic_06.png
+index: 1459
+#Textures/sequences/shodanstatic_07.png
+index: 1460
+#Textures/sequences/shodanstatic_08.png
+index: 1461
+#Textures/sequences/shodanstatic_09.png
+index: 1462
+#Textures/sequences/shodanstatic_10.png
+index: 1463
+#Textures/sequences/shodanstatic_11.png
+index: 1464
+#Textures/sequences/shodanstatic_12.png
+index: 1465
+#Textures/sequences/shodanstatic_13.png
+index: 1466
+#Textures/sequences/shodanstatic_14.png
+index: 1467
+#Textures/sequences/shodanstatic_15.png
+index: 1468
+#Textures/sequences/shodanstatic_16.png
+index: 1469
+#Textures/sequences/shodanstatic_17.png
+index: 1470
+#Textures/sequences/shodanstatic_18.png
+index: 1471
+#Textures/sequences/shodanstatic_19.png
+index: 1472
+#Textures/sequences/shodanstatic_20.png
+index: 1473
+#Textures/sequences/shodanstatic_21.png
+index: 1474
+#Textures/sequences/shodanstatic_22.png
+index: 1475
+#Textures/sequences/shodanstatic_23.png
+index: 1476
+#Textures/sequences/shodanstatic_24.png
+index: 1477
+#Textures/sequences/shodanstatic_25.png
+index: 1478
+#Textures/sequences/shodanstatic_26.png
+index: 1479
+#Textures/sequences/shodanstatic_27.png
+index: 1480
+#Textures/sequences/shodanstatic_28.png
+index: 1481
+#Textures/sequences/shodanstatic_29.png
+index: 1482
+#Textures/sequences/shodanstatic_30.png
+index: 1483
+#Textures/sequences/shodanstatic_31.png
+index: 1484
+#Textures/sequences/shodanstatic_32.png
+index: 1485
+#Textures/sequences/shodanstatic_33.png
+index: 1486
+#Textures/sequences/shodanstatic_34.png
+index: 1487
+#Textures/sequences/shodanstatic_35.png
+index: 1488
+#Textures/sequences/shodanstatic_36.png
+index: 1489
+#Textures/sequences/telepad_00.png
+index: 1490
+#Textures/sequences/telepad_01.png
+index: 1491
+#Textures/sequences/telepad_02.png
+index: 1492
+#Textures/sequences/telepad_03.png
+index: 1493
+#Textures/sequences/telepad_00_glow.png
+index: 1494
+#Textures/sequences/medscreen13_00.png
+index: 1495
+#Textures/sequences/medscreen13_01.png
+index: 1496
+#Textures/sequences/medscreen13_02.png
+index: 1497
+#Textures/sequences/medscreen13_03.png
+index: 1498
+#Textures/sequences/medscreen13_04.png
+index: 1499
+#Textures/sequences/medscreen13_05.png
+index: 1500
+#Textures/sequences/medscreen13_06.png
+index: 1501
+#Textures/sequences/medscreen13_07.png
+index: 1502
+#Textures/sequences/medscreen13_08.png
+index: 1503
+#Textures/sequences/medscreen13_09.png
+index: 1504
+#Textures/sequences/medscreen13_10.png
+index: 1505
+#Textures/sequences/medscreen13_11.png
+index: 1506
+#Textures/sequences/medscreen24_00.png
+index: 1507
+#Textures/sequences/medscreen24_01.png
+index: 1508
+#Textures/sequences/medscreen24_02.png
+index: 1509
+#Textures/sequences/medscreen24_03.png
+index: 1510
+#Textures/sequences/medscreen24_04.png
+index: 1511
+#Textures/sequences/medscreen24_05.png
+index: 1512
+#Textures/sequences/medscreen24_06.png
+index: 1513
+#Textures/sequences/medscreen24_07.png
+index: 1514
+#Textures/sequences/medscreen16_00.png
+index: 1515
+#Textures/sequences/medscreen16_01.png
+index: 1516
+#Textures/sequences/medscreen16_02.png
+index: 1517
+#Textures/sequences/medscreen16_03.png
+index: 1518
+#Textures/sequences/medscreen16_04.png
+index: 1519
+#Textures/sequences/medscreen16_05.png
+index: 1520
+#Textures/sequences/medscreen16_06.png
+index: 1521
+#Textures/sequences/medscreen16_07.png
+index: 1522
+#Textures/sequences/zerog00.png
+index: 1523
+#Textures/sequences/zerog01.png
+index: 1524
+#Textures/sequences/zerog02.png
+index: 1525
+#Textures/sequences/zerog03.png
+index: 1526
+#Textures/sequences/zerog04.png
+index: 1527
+#Textures/sequences/zerog05.png
+index: 1528
+#Textures/sequences/zerog06.png
+index: 1529
+#Textures/sequences/zerog07.png
+index: 1530
+#Textures/sequences/zerog08.png
+index: 1531
+#Textures/sequences/zerog09.png
+index: 1532
+#Textures/sequences/zerog10.png
+index: 1533
+#Textures/sequences/zerog11.png
+index: 1534
+#Textures/sequences/zerog12.png
+index: 1535
+#Textures/sequences/zerog13.png
+index: 1536
+#Textures/sequences/zerog14.png
+index: 1537
+#Textures/sequences/zerog15.png
+index: 1538
+#Textures/sequences/zerog16.png
+index: 1539
+#Textures/sequences/zerog17.png
+index: 1540
+#Textures/sequences/zerog18.png
+index: 1541
+#Textures/sequences/zerog19.png
+index: 1542
+#Textures/sequences/zerog20.png
+index: 1543
+#Textures/sequences/zerog21.png
+index: 1544
+#Textures/sequences/zerog22.png
+index: 1545
+#Textures/sequences/zerog23.png
+index: 1546
+#Textures/sequences/zerog24.png
+index: 1547
+#Textures/sequences/zerog25.png
+index: 1548
+#Textures/sequences/zerog26.png
+index: 1549
+#Textures/sequences/zerog27.png
+index: 1550
+#Textures/sequences/zerog28.png
+index: 1551
+#Textures/sequences/zerog29.png
+index: 1552
+#Textures/sequences/zerog30.png
+index: 1553
+#Textures/sequences/zerog31.png
+index: 1554
+#Textures/sequences/zerog32.png
+index: 1555
+#Textures/sequences/zerog33.png
+index: 1556
+#Textures/sequences/zerog34.png
+index: 1557
+#Textures/sequences/zerog35.png
+index: 1558
+#Textures/sequences/zerog36.png
+index: 1559
+#Textures/sequences/zerog37.png
+index: 1560
+#Textures/sequences/zerog38.png
+index: 1561
+#Textures/sequences/zerog39.png
+index: 1562
+#Textures/sequences/zerog40.png
+index: 1563
+#Textures/sequences/zerog41.png
+index: 1564
+#Textures/sequences/zerog42.png
+index: 1565
+#Textures/sequences/zerog43.png
+index: 1566
+#Textures/sequences/zerog44.png
+index: 1567
+#Textures/sequences/zerog45.png
+index: 1568
+#Textures/sequences/zerog46.png
+index: 1569
+#Textures/sequences/zerog47.png
+index: 1570
+#Textures/sequences/zerog48.png
+index: 1571
+#Textures/sequences/zerog49.png
+index: 1572
+#Textures/sequences/zerog50.png
+index: 1573
+#Textures/sequences/zerog51.png
+index: 1574
+#Textures/sequences/zerog52.png
+index: 1575
+#Textures/sequences/door_x1_01.png
+index: 1576
+#Textures/sequences/door_x1_02.png
+index: 1577
+#Textures/sequences/door_x1_03.png
+index: 1578

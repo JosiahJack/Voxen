@@ -71,7 +71,7 @@ uint32_t uiImageDrawCallsRenderedThisFrame;
 uint32_t shadowDrawCallsRenderedThisFrame;
 uint32_t verticesRenderedThisFrame;
 uint32_t drawCallsNormal;
-#define MAX_CHANNELS 16
+#define MAX_CHANNELS 256
 ma_sound wav_sounds[MAX_CHANNELS];
 float wav_volumes[MAX_CHANNELS]; // Setting independent base sfx volume (e.g. dropped physics object hard or lightly volume, independent of position).
 int32_t wav_count = 0;
@@ -127,8 +127,6 @@ static void DualLogMain(const char *prefix, const char *fmt, va_list args) {
 ENGINE_TO_MOD void DualLog(const char* fmt, ...) { va_list args; __builtin_va_start(args,fmt); DualLogMain(NULL,fmt,args); __builtin_va_end(args); }
 ENGINE_TO_MOD void DualLogWarn(const char* fmt, ...) { va_list args; __builtin_va_start(args,fmt); DualLogMain("\033[1;38;5;208mWARN:",fmt,args); __builtin_va_end(args); }
 ENGINE_TO_MOD void DualLogError(const char* fmt, ...) { va_list args; __builtin_va_start(args,fmt); DualLogMain("\033[1;31mERROR:",fmt,args); __builtin_va_end(args); }
-void DualLogErrorWrapper(const char* fmt, ...) { va_list args; __builtin_va_start(args,fmt); DualLogError("%s",fmt,args); __builtin_va_end(args); }
-
 static inline __attribute__((always_inline)) void LogShaderError(GLuint s, const char* name) { char er[512]; glGetShaderInfoLog(s, 512, NULL, er); DualLogError("%s Compilation Failed: %s\n", name, er); OS_Exit(1); }
 static inline __attribute__((always_inline)) GLuint CompileShader(GLenum type, const char* source, const char* name) { GLuint s = glCreateShader(type); glShaderSource(s, 1, &source, NULL); glCompileShader(s); GLint ok; glGetShaderiv(s, GL_COMPILE_STATUS, &ok); if (!ok) LogShaderError(s, name); return s; }
 static inline __attribute__((always_inline)) GLuint LinkProgram(GLuint* s, int32_t num, const char* name) { GLuint p = glCreateProgram(); for (int32_t i = 0; i < num; i++) { glAttachShader(p, s[i]); glDeleteShader(s[i]); } glLinkProgram(p); GLint ok; glGetProgramiv(p, GL_LINK_STATUS, &ok); if (!ok) LogShaderError(p, name); return p; }
@@ -1856,7 +1854,7 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
             uint16_t nearbyMeshCount = 0;
             for (uint16_t shadowCasterInstanceIdx = 0; shadowCasterInstanceIdx < numShadowCasters; shadowCasterInstanceIdx++) {
                 uint16_t j = shadowCasterIndices[shadowCasterInstanceIdx];
-                shadows_nearMeshRadii[nearbyMeshCount] = modelBounds[(Sys_Global.instances[j].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 0.99f;
+                shadows_nearMeshRadii[nearbyMeshCount] = modelBounds[(Sys_Global.instances[j].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 0.99f * vmax(vmax(Sys_Global.instances[j].scale.x,Sys_Global.instances[j].scale.y),Sys_Global.instances[j].scale.z);
                 Vector3 d = Vector3_A_minus_B(Sys_Global.instances[j].position, lightPos);
                 float distToLightSqrd = dot_vector3(d, d);
                 float radSum = (effectiveRadius + shadows_nearMeshRadii[nearbyMeshCount]);
@@ -1918,7 +1916,7 @@ static inline __attribute__((always_inline)) bool DetermineIfInstanceVisible(uin
     uint16_t instCellIdx = (cellZ * WORLDX) + cellX;
     Vector3 delta = Vector3_A_minus_B(objPos, playerPos);
     *distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
-    float radius = modelBounds[(Sys_Global.instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
+    float radius = modelBounds[(Sys_Global.instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f * vmax(vmax(Sys_Global.instances[i].scale.x,Sys_Global.instances[i].scale.y),Sys_Global.instances[i].scale.z);
     if (!SphereInFrustum(playerFrustumPlanes,objPos,radius) && (Sys_Global.instances[i].index != 754 || !skyVisible) && i != editModeSelection) return false;
     
     if (EntityIndexIsPortalBlockingDoor(Sys_Global.instances[i].index)) { // Extra checks only needed for opaque portal blocking doors.

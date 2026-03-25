@@ -10,7 +10,7 @@ const AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS
     [3]={[ANIM_IDLE]={1.0f,1,207,893,24},[ANIM_ATTACK1]={1.0f,219,239,1100,24},[ANIM_WALK]={1.0f,252,308,1121,24},[ANIM_RUN]={1.0f,252,308,1121,24},[ANIM_PAIN]={1.0f,321,330,1177,24},[ANIM_PAIN2]={1.0f,331,344,1187,24},[ANIM_DYING]={1.0f,345,369,1201,24}}, // npc_cyborg_drone 
     [4]={[ANIM_IDLE_CLOSED]={1.0f,2,2,1234,24},[ANIM_OPENING]={1.5f,2,44,1234,24},[ANIM_IDLE_OPEN]={1.0f,44,44,1276,24},[ANIM_CLOSING]={1.75f,46,96,1277,24}}, // doorD (door4, bulkhead 1)
     [5]={[ANIM_IDLE_CLOSED]={1.0f,2,2,1328,24},[ANIM_OPENING]={1.0f,2,25,1328,24},[ANIM_IDLE_OPEN]={1.0f,25,25,1351,24},[ANIM_CLOSING]={1.0f,27,44,1352,24}}, // doorC (door3)
-    [6]={[ANIM_IDLE_CLOSED]={1.0f,1,1,1444,24},[ANIM_OPENING]={1.2f,1,30,1444,24},[ANIM_IDLE_OPEN]={1.0f,30,30,1399,24},[ANIM_CLOSING]={1.2f,32,66,1400,24}}, // doorK (xdoor1)
+    [6]={[ANIM_IDLE_CLOSED]={1.0f,1,1,1370,24},[ANIM_OPENING]={1.2f,1,30,1370,24},[ANIM_IDLE_OPEN]={1.0f,30,30,1399,24},[ANIM_CLOSING]={1.2f,32,66,1400,24}}, // doorK (xdoor1)
     [7]={[ANIM_IDLE_CLOSED]={1.0f,3,3,1435,24},[ANIM_OPENING]={1.2f,3,24,1435,24},[ANIM_IDLE_OPEN]={1.0f,26,26,1457,24},[ANIM_CLOSING]={1.2f,27,49,1458,24}}, // doorJ (xdoor2)
     [8]={[ANIM_IDLE_CLOSED]={1.0f,3,3,1481,24},[ANIM_OPENING]={1.2f,3,27,1481,24},[ANIM_IDLE_OPEN]={1.0f,27,27,1505,24},[ANIM_CLOSING]={1.2f,30,51,1506,24}}, // doorL (door10)
     [9]={[ANIM_IDLE_CLOSED]={1.0f,3,3,1528,24},[ANIM_OPENING]={1.0f,3,15,1528,24},[ANIM_IDLE_OPEN]={1.0f,28,28,1541,24},[ANIM_CLOSING]={1.0f,28,39,1541,24}}, // doorE (door5)
@@ -101,6 +101,16 @@ MOD_TO_ENGINE void UpdateAnims(void) {
     if (portalsNeedUpdated) PortalCulling();
 }
 
+#define NUM_TEXTURE_CLIPS 48
+typedef struct {
+    const uint16_t *frames;     // pointer into sequenceTextures[]
+    uint8_t         length;     // how many frames (before wrapping / stopping)
+    bool            hasGlow;    // does this clip also animate the glow map?
+    const uint16_t *glowFrames; // can be NULL if !hasGlow
+    uint8_t         glowLength;
+    const char*     name;
+} TextureAnimClip;
+
 uint16_t sequenceTextures[302]={
     1159,1160,881,1162,1163,1164, // scr_exp 01 - 06
     1310,1311,1312,1313, // bridg1_1 001 - 004
@@ -108,47 +118,253 @@ uint16_t sequenceTextures[302]={
     1117,1118, // broken_clock 01 - 02
     1124,1125,1126,1127,1128,1129,1130, // g_energmine 00 - 06
     1131,1132,1133,1134,1135,1136,1137,1138, // g_energmine_glow 00 - 07 (yes different count, supported!)
-    
+    1314,1315,1316,1317, // scr_cita2_ 0 - 3
+    1318,1319,1320,1321, // scr_cita3_ 0 - 3
+    1322,1323,1324,1325,1326,1327,1328,1329, // scr_cita_ 0 - 7
+    1330, // engscreen1_04 // index 45
+    0,1331,1332,1333,1334,1335,1336,1337, // scr_static2 0 - 6, then scr_static2_a
+    1338,1339,1340,1341,1342,1343, // scr_static 0 - 5
+    1344,1345,1346,1347, // screen1 0 - 3
+    1348,1349,1350,1351,1352, // screen2 0 - 4
+    1353,1354,1355,1356, // screen3 0 - 3
+    1357,1358,1359,1360,1361,1362, // screen4 0 - 5
+    1363,1364,1365,1366, // screen5 0 - 3
+    1367,1368,1369,1370, // triop1 0 - 3
+    1371,1372,1373,1374,1375,1376,1377,1378,1379,1380, // triop2 0 - 9
+    1381,1382,1383,1384,1385,1386,1387,1388, // triop3 0 - 7
+    1389, // triop4_8 // index 105
+    1381, // triop3_0 // index 106
+    1390,1391,1392,1393,1394,1395,1396,1397, // dna 0 - 7
+    1398,1399,1400,1401, // edcolor 0 - 3
+    1402,1403,1404,1405, // edgray 0 - 3
+    1406,1407,1408,1409,1410,1411,1412,1413,1414,1415,1416, // ammo_magcart 00 - 10
+    1417,1418,1419,1420,1421,1422,1423,1424,1425,1426,1427, // ammo_magcart_glow 00 - 10
+    1428,1429,1430,1431,1432,1433,1434,1435,1436,1437, // medicalbed 00 - 9
+    1438,1439,1440,1441,1442, // rad1_1 00 - 04
+    1443,1444,1445,1446,1447,1448,1449,1450,1451,1452, // screencode 0 - 9
+    1453,1454,1455,1456,1457,1458,1459,1460,1461,1462,1463,1464,1465,1466,1467,1468,1469,1470,1471,1472,1473,1474,1475,1476,1477,1478,1479,1480,1481,1482,1483,1484,1485,1486,1487,1488,1489, // shodanstatic 00 - 36
+    1490,1491,1492,1493, // telepad 00 - 03
+    1494, // telepad_00_glow
+    0, // black // index 212
+    0, // black
+    0, // black
+    0, // black
+    0, // black
+    0, // black // index 217
+    1495,1496,1497,1498,1499,1500,1501,1502,1503,1504,1505,1506, // medscreen13 00 - 11
+    1507,1508,1509,1510,1511,1512,1513,1514, // medscreen24 00 - 07
+    1515,1516,1517,1518,1519,1520,1521,1522, // medscreen16 00 - 07
+    1523,1524,1525,1526,1527,1528,1529,1530,1531,1532,1533,1534,1535,1536,1537,1538,1539,1540,1541,1542,1543,1544,1545,1546,1547,1548,1549,1550,1551,1552,1553,1554,1555,1556,1557,1558,1559,1560,1561,1562,1563,1564,1565,1566,1567,1568,1569,1570,1571,1572,1573,1574, // zerog 00 - 52
+    1576,1577,1578 // door_x1 01 - 03 // ends at index 301
 };
-/*
 
+// All the original clips from your C# file, but now as compact data:
+static const TextureAnimClip textureAnimClips[NUM_TEXTURE_CLIPS] = {
+    // 0
+    { (uint16_t[]){6,7,8,9,9,8,7,6}, 8, false, NULL, 0, "Bridge11" },
 
- scr_cita2 0 - 3
- scr_cita3 0 - 3
- scr_cita 0 - 7
- engscreen1_04 // index 45
- scr_static2 0 - 6, then scr_static2_a
- scr_static 0 - 5
- screen1 0 - 3
- screen2 0 - 4
- screen3 0 - 3
- screen4 0 - 5
- screen5 0 - 3
- triop1 0 - 3
- triop2 0 - 9
- triop3 0 - 7
- triop4_8 // index 105
- triop3_0 // index 106
- dna 0 - 7
- edcolor 0 - 3
- edgray 0 - 3
- ammo_magcart 00 - 10
- ammo_magcart_glow 00 - 10
- medicalbed 00 - 9
- rad1_1 00 - 04
- screencode 0 - 9
- shodanstatic 00 - 36
- telepad 00 - 03
- telepad_00_glow
- black // index 212
- black
- black
- black
- black
- black // index 217
- medscreen13 00 - 11
- medscreen24 00 - 07
- medscreen16 00 - 07
- zerog 00 - 52
- door_x1 01 - 03 // ends at index 301
- */
+    // 1 - BrokenClock
+    { (uint16_t[]){10,11}, 2, true,
+      (uint16_t[]){12,13}, 2, "BrokenClock" },
+
+    // 2 - EnergMine
+    { (uint16_t[]){14,15,16,17,18,19,20}, 7, true,
+      (uint16_t[]){21,22,23,24,25,26,27,28}, 8, "EnergMine" },
+
+    // 3
+    { (uint16_t[]){29,30,31,32,45,45,45,29,30,31,32,29,30,31,32,
+                   29,30,31,32,29,45,45,45,29,30,31,32,29,30,31,32,
+                   29,30,31,32,29,30,31,32,29,45,45,45}, 43, false, NULL, 0, "EngScreen1" },
+
+    // 4
+    { (uint16_t[]){52,51,50,49,49,50,51,52}, 8, false, NULL, 0, "EngScreen2" },
+
+    // 5
+    { (uint16_t[]){29,30,31,32,45,29,30,31,45,29,30,31,45}, 13, false, NULL, 0, "ExecScreen1" },
+
+    // 6
+    { (uint16_t[]){83,84,85,86,83,83,86,85,84,83,103,83,84,85,86,
+                   83,83,86,85,84,83}, 21, false, NULL, 0, "ExecScreen2" },
+
+    // 7
+    { (uint16_t[]){115,115,117}, 3, false, NULL, 0, "ExecScreen3" },
+
+    // 8
+    { (uint16_t[]){115,115,115,115,116,117,118}, 7, false, NULL, 0, "ExecScreen4" },
+
+    // 9
+    { (uint16_t[]){123,124,125,126,127,128,129,130,131,132,133}, 11, true,
+      (uint16_t[]){134,135,136,137,138,139,140,141,142,143,144}, 11, "MagCartridge" },
+
+    // 10
+    { (uint16_t[]){29,30,31,32,37}, 5, false, NULL, 0, "MaintScreen1" },
+
+    // 11
+    { (uint16_t[]){33,34,35,36,32,29}, 6, false, NULL, 0, "MaintScreen2" },
+
+    // 12
+    { (uint16_t[]){145,146,147,148,149,150,151,152,153,154}, 10, false, NULL, 0, "MedicalBed" },
+
+    // 13
+    { (uint16_t[]){54,59,118,116,118,59}, 6, false, NULL, 0, "MedScreen1" },
+
+    // 14
+    { (uint16_t[]){79,80,81,82}, 4, false, NULL, 0, "MedScreen2" },
+
+    // 15
+    { (uint16_t[]){99,98,97,92}, 4, false, NULL, 0, "MedScreen3" },
+
+    // 16
+    { (uint16_t[]){29,30,31,36}, 4, false, NULL, 0, "MedScreen4" },
+
+    // 17
+    { (uint16_t[]){56,55,54,59,59,54,55,56}, 8, false, NULL, 0, "MedScreen5" },
+
+    // 18
+    { (uint16_t[]){61,61,62,62,61,61,212,213,214,215,216,217}, 12, false, NULL, 0, "MedScreen6" },
+
+    // 19
+    { (uint16_t[]){119,120,121,122}, 4, false, NULL, 0, "MedScreen7" },
+
+    // 20
+    { (uint16_t[]){59,54,55,56}, 4, false, NULL, 0, "MedScreen8" },
+
+    // 21
+    { (uint16_t[]){37,38,39,40,41,42,43,44}, 8, false, NULL, 0, "MedScreen9" },
+
+    // 22
+    { (uint16_t[]){83,84,85,86,83,83,86,85,84,83}, 10, false, NULL, 0, "MedScreen10" },
+
+    // 23
+    { (uint16_t[]){67,66,66,67,79,80,80,79}, 8, false, NULL, 0, "MedScreen11" },
+
+    // 24
+    { (uint16_t[]){218,219,220,221,222,223,224,225,226,227,228,229}, 12, false, NULL, 0, "MedScreen13" },
+
+    // 25
+    { (uint16_t[]){79,80,81,82,82,81,80,79}, 8, false, NULL, 0, "MedScreen16" },
+
+    // 26
+    { (uint16_t[]){73,74,75,76,77,78}, 6, false, NULL, 0, "MedScreen18" },
+
+    // 27
+    { (uint16_t[]){73,74,76,75,77,76,78,73}, 8, false, NULL, 0, "MedScreen22" },
+
+    // 28
+    { (uint16_t[]){29,30,31,32}, 4, false, NULL, 0, "MedScreen23" },
+
+    // 29
+    { (uint16_t[]){230,231,232,233,234,235,236,237}, 8, false, NULL, 0, "MedScreen24" },
+
+    // 30
+    { (uint16_t[]){92,93,94,95}, 4, false, NULL, 0, "MedScreen25" },
+
+    // 31
+    { (uint16_t[]){238,239,240,241,242,243,244,245}, 8, false, NULL, 0, "MedScreen27" },
+
+    // 32
+    { (uint16_t[]){64,65,66,67,68}, 5, false, NULL, 0, "MedScreen29" },
+
+    // 33
+    { (uint16_t[]){155,156,157,158,159}, 5, false, NULL, 0, "Rad1_1" },
+
+    // 34
+    { (uint16_t[]){61,61,62,62}, 4, false, NULL, 0, "ReacScreen4" },
+
+    // 35
+    { (uint16_t[]){62,61,60}, 3, false, NULL, 0, "SciScreen1" },
+
+    // 36
+    { (uint16_t[]){107,108,109,111,112,113,114}, 7, false, NULL, 0, "SciScreen2" },
+
+    // 37
+    { (uint16_t[]){33,34,35,36}, 4, false, NULL, 0, "SciScreen3" },
+
+    // 38
+    { (uint16_t[]){188,189,113,112}, 4, false, NULL, 0, "SciScreen4" },
+
+    // 39
+    { (uint16_t[]){79,80,80,79,73,74,76,77,75}, 9, false, NULL, 0, "SciScreen5" },
+
+    // 40 - ScreenDestroyed (used by HealthManager)
+    { (uint16_t[]){0,1,2,3,4,5}, 6, false, NULL, 0, "ScreenDestroyed" },
+
+    // 41
+    { (uint16_t[]){160,161,162,163,164,165,166,167,168,169}, 10, false, NULL, 0, "ScreenCodeRandom" },
+
+    // 42
+    { (uint16_t[]){29,30,31}, 3, false, NULL, 0, "SecScreen4" },
+
+    // 43 - ShodanStatic
+    { (uint16_t[]){170,171,172,173,174,175,176,177,178,179,
+                   180,181,182,183,184,185,186,187,188,189,
+                   190,191,192,193,194,195,196,197,198,199,
+                   200,201,202,203,204,205,206,203,204,205,
+                   206,205,203,204,206,205,204,203,206,205,
+                   203,204,205,206,203,206,205,203,204,203}, 60, false, NULL, 0, "ShodanStatic" },
+
+    // 44
+    { (uint16_t[]){203,204,205,206,203,206,205,203,204,205,
+                   206,203,206,205,203,204,203}, 17, false, NULL, 0, "Static" },
+
+    // 45 - Telepad
+    { (uint16_t[]){207,208,209,210}, 4, true,
+      (uint16_t[]){207,208,209,210}, 4, "Telepad" },
+
+    // 46
+    { (uint16_t[]){299,300,301}, 3, false, NULL, 0, "XDoor1" },
+
+    // 47 - ZeroGMutant (very long)
+    { (uint16_t[]){246,247,248,249,250,251,252,253,254,255,
+                   256,257,258,259,260,261,262,263,264,265,
+                   266,267,268,269,270,271,272,273,274,275,
+                   276,277,278,279,280,281,282,283,284,285,
+                   286,287,288,289,290,291,292,293,294,295,
+                   296,297,298}, 53, false, NULL, 0, "ZeroGMutant" },
+};
+
+void TextureSequenceInit(uint16_t self, char* trimmed_value) {
+    Entity* e = &Eng_Global->instances[self];
+    if (e->index == 526) return; // Skip prop_console02 for now, will need to split its screen off.
+    
+    e->textureAnimating = true; e->textureGlowAnimating = false;
+    e->texFrame = e->texGlowFrame = 0;
+    if (StringsAreEqual(trimmed_value,"ScreenDestroyed")) { e->texAnimClip = NUM_TEXTURE_CLIPS - 1; return; }
+    
+    for (int i = 0; i < NUM_TEXTURE_CLIPS; ++i) {
+        if (StringsAreEqual(trimmed_value,textureAnimClips[i].name)) { e->texAnimClip = i; e->textureGlowAnimating = textureAnimClips[i].hasGlow; return; }
+    }
+    
+    e->textureAnimating = false; // Couldn't find match, just don't animate.
+}
+
+void TextureSequenceUpdate(uint16_t self) {
+    Entity* e = &Eng_Global->instances[self];
+    if (!e->textureAnimating) return;
+    if (e->tickFinished >= Eng_Global->pauseRelativeTime) return;
+
+    e->tickFinished = Eng_Global->pauseRelativeTime + e->tickTime;
+    const TextureAnimClip* clip = &textureAnimClips[e->texAnimClip];
+    if (e->texAnimRandom && (!e->textureAnimationStopsAtDead || e->health > 0.0f)) {
+        e->texFrame = random_range_u32(0, clip->length - 1);
+        if (clip->hasGlow) e->texGlowFrame = random_range_u32(0, clip->glowLength - 1);
+    } else {
+        if (e->texAnimInReverse) {
+            if (e->texFrame == 0) e->texFrame = clip->length - 1;
+            else                  e->texFrame++;
+
+            if (clip->hasGlow) {
+                if (e->texGlowFrame == 0) e->texGlowFrame = clip->glowLength - 1;
+                else                      e->texGlowFrame--;
+            }
+        } else {
+            e->texFrame = (e->texFrame + 1) % clip->length;
+            if (clip->hasGlow) e->texGlowFrame = (e->texGlowFrame + 1) % clip->glowLength;
+        }
+    }
+
+    if (e->textureAnimationStopsAtDead && e->health <= 0.0f && e->texFrame >= clip->length - 1) e->textureAnimating = false;
+    e->texIndex = sequenceTextures[ clip->frames[e->texFrame] ];
+    if (clip->hasGlow && clip->glowFrames) e->glowIndex = sequenceTextures[ clip->glowFrames[e->texGlowFrame] ];
+    if (e->index == 279 && !clip->hasGlow) e->glowIndex = e->texIndex;
+}

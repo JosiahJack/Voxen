@@ -29,7 +29,13 @@ typedef __INTPTR_TYPE__ intptr_t;
 #define SEEK_SET 0
 #define SEEK_CUR 1
 #define SEEK_END 2
-void DualLogErrorWrapper(const char* fmt, ...);
+// Interop - To Mod (keep the same as interop.h!!)
+#if defined(_WIN32) || defined(__CYGWIN__)
+    #define ENGINE_TO_MOD __declspec(dllexport)
+#else
+    #define ENGINE_TO_MOD __attribute__((visibility("default")))
+#endif
+ENGINE_TO_MOD void DualLogError(const char* fmt, ...);
 char* StringFindSubstring(const char* haystack, const char* needle);
 char* StringFindFirstCharWithin(const char *s, char c);
 typedef struct {
@@ -57,13 +63,13 @@ typedef struct {
         bool writable = (prot & PROT_WRITE);
         if (fd == INVALID_HANDLE_VALUE) {
             void* ptr;
-            if ((ptr = (void*)VirtualAlloc(addr, length, MEM_RESERVE | MEM_COMMIT, writable ? PAGE_READWRITE : PAGE_READONLY)) == NULL) { DualLogErrorWrapper("Failed to allocate RAM\n"); OS_Exit(1); } // Handle standard memory allocations (MAP_ANONYMOUS)
+            if ((ptr = (void*)VirtualAlloc(addr, length, MEM_RESERVE | MEM_COMMIT, writable ? PAGE_READWRITE : PAGE_READONLY)) == NULL) { DualLogError("Failed to allocate RAM\n"); OS_Exit(1); } // Handle standard memory allocations (MAP_ANONYMOUS)
             return ptr;
         }
 
         // Handle File-Backed Memory
         HANDLE hMap = CreateFileMapping(fd, NULL, writable ? PAGE_READWRITE : PAGE_READONLY, (DWORD)((uint64_t)length >> 32), (DWORD)((uint64_t)length & 0xFFFFFFFF), NULL);
-        if (hMap == NULL) { DualLogErrorWrapper("Failed to allocate RAM\n"); OS_Exit(1); }
+        if (hMap == NULL) { DualLogError("Failed to allocate RAM\n"); OS_Exit(1); }
 
         void* ptr = MapViewOfFileEx(hMap, writable ? FILE_MAP_WRITE : FILE_MAP_READ, 0, 0, length, addr);
         CloseHandle(hMap);
@@ -95,7 +101,7 @@ typedef struct {
     static inline __attribute__((always_inline)) void OS_Close(OsFileHandle fileDescriptor) { close(fileDescriptor); }
     static inline __attribute__((always_inline)) void* OS_AllocateRAM(void* addr, size_t length, int32_t prot, int32_t flags, OsFileHandle fd) {
         void* ptr = mmap(addr,length,prot,flags,fd,0);
-        if (ptr == MAP_FAILED || ptr == NULL) { DualLogErrorWrapper("Failed to allocate RAM\n"); OS_Exit(1); }
+        if (ptr == MAP_FAILED || ptr == NULL) { DualLogError("Failed to allocate RAM\n"); OS_Exit(1); }
         return ptr;
     }
 #endif
@@ -119,7 +125,7 @@ static inline __attribute__((always_inline)) void OS_Write(OsFileHandle fd, cons
     size_t total = 0;
     while (total < size) {
         int64_t written = OS_RawWrite(fd,(const char*)buffer + total,size - total);
-        if (written < 0) { DualLogErrorWrapper("Write error when attempting write to %s: %s (code: %d)\n",filePath,written,(int32_t)(-written)); OS_Exit(1); }
+        if (written < 0) { DualLogError("Write error when attempting write to %s: %s (code: %d)\n",filePath,written,(int32_t)(-written)); OS_Exit(1); }
 
         total += (size_t)written;
     }
@@ -137,10 +143,10 @@ static inline __attribute__((always_inline)) long OS_Open(const char* path, int3
 static inline __attribute__((always_inline)) OsFileHandle OS_OpenReadonly(const char* filePath) {
     #ifdef WINDOWS
         HANDLE fp = CreateFileA(filePath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
-        if (fp == OS_INVALID_HANDLE) { DualLogErrorWrapper("Could not open file %s for reading\n", filePath); return OS_INVALID_HANDLE; }
+        if (fp == OS_INVALID_HANDLE) { DualLogError("Could not open file %s for reading\n",filePath); return OS_INVALID_HANDLE; }
     #else // Linux
         OsFileHandle fp = OS_Open(filePath,O_RDONLY,0);
-        if (fp < 0) { DualLogErrorWrapper("Could not open file %s for reading\n", filePath); return OS_INVALID_HANDLE; }
+        if (fp < 0) { DualLogError("Could not open file %s for reading\n",filePath); return OS_INVALID_HANDLE; }
     #endif
     return fp;
 }
@@ -148,10 +154,10 @@ static inline __attribute__((always_inline)) OsFileHandle OS_OpenReadonly(const 
 static inline __attribute__((always_inline)) OsFileHandle OS_OpenWriteonly(const char* filePath) {
     #ifdef WINDOWS
         OsFileHandle h = CreateFileA(filePath, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-        return (h == OS_INVALID_HANDLE) ? (DualLogErrorWrapper("Failed to open %s for writing\n", filePath), OS_Exit(1), OS_INVALID_HANDLE) : h;
+        return (h == OS_INVALID_HANDLE) ? (DualLogError("Failed to open %s for writing\n", filePath), OS_Exit(1), OS_INVALID_HANDLE) : h;
     #else // Linux
         OsFileHandle h = OS_Open(filePath,O_WRONLY | O_CREAT | O_TRUNC,0644);
-        return (h < 0) ? (DualLogErrorWrapper("Failed to open %s for writing\n", filePath), OS_Exit(1), OS_INVALID_HANDLE) : h;
+        return (h < 0) ? (DualLogError("Failed to open %s for writing\n", filePath), OS_Exit(1), OS_INVALID_HANDLE) : h;
     #endif
 }
 
@@ -174,14 +180,14 @@ static inline __attribute__((always_inline)) void* OS_AllocateFileBackedRAMReado
         if (fileDescriptor == OS_INVALID_HANDLE || size == 0) return NULL;
 
         HANDLE hMapping = CreateFileMappingA(fileDescriptor, NULL, PAGE_READONLY, 0, 0, NULL);
-        if (hMapping == NULL) { DualLogErrorWrapper("CreateFileMapping failed for %s (err %lu)\n", filePath, GetLastError()); return NULL; }
+        if (hMapping == NULL) { DualLogError("CreateFileMapping failed for %s (err %lu)\n", filePath, GetLastError()); return NULL; }
 
         void* ramSpacePointer = MapViewOfFile(hMapping, FILE_MAP_READ, 0, 0, size);
         CloseHandle(hMapping);  // view keeps reference alive
-        if (ramSpacePointer == NULL) { DualLogErrorWrapper("Failed to allocate %s (err %lu)\n", filePath, GetLastError()); return NULL; }
+        if (ramSpacePointer == NULL) { DualLogError("Failed to allocate %s (err %lu)\n", filePath, GetLastError()); return NULL; }
     #else // Linux
         void* ramSpacePointer = OS_AllocateRAM(NULL, size, PROT_READ, MAP_PRIVATE, fileDescriptor);
-        if (ramSpacePointer == MAP_FAILED) { DualLogErrorWrapper("Failed to allocate %s\n", filePath); return NULL; }
+        if (ramSpacePointer == MAP_FAILED) { DualLogError("Failed to allocate %s\n", filePath); return NULL; }
     #endif
     return ramSpacePointer;
 }
@@ -191,7 +197,7 @@ static inline __attribute__((always_inline)) void* OS_OpenAndAllocateFileBufferR
     if (*fileDescriptor == OS_INVALID_HANDLE) { *size = 0; OS_Exit(1); }
     
     *size = (int)OS_FileSize(*fileDescriptor);
-    if (*size <= 0) { DualLogErrorWrapper("Warning: File %s is empty, skipping allocation.\n", filePath); OS_Close(*fileDescriptor); OS_Exit(1); }
+    if (*size <= 0) { DualLogError("Warning: File %s is empty, skipping allocation.\n", filePath); OS_Close(*fileDescriptor); OS_Exit(1); }
     
     void* ramSpacePointer = OS_AllocateFileBackedRAMReadonly(*size, *fileDescriptor, (char*)filePath);
     OS_Close(*fileDescriptor);
@@ -201,13 +207,13 @@ static inline __attribute__((always_inline)) void* OS_OpenAndAllocateFileBufferR
 static inline __attribute__((always_inline)) void OS_DeallocateRAM(void* ramSpacePointer, size_t size) {    
     #ifdef WINDOWS
         (void)size;
-        if (!ramSpacePointer) { DualLogErrorWrapper("Attempting to double free!\n"); OS_Exit(1); }
+        if (!ramSpacePointer) { DualLogError("Attempting to double free!\n"); OS_Exit(1); }
         
-        if (!UnmapViewOfFile(ramSpacePointer)) { if (VirtualFree(ramSpacePointer, 0 /* dwSize (must be 0 with MEM_RELEASE) */, MEM_RELEASE) == 0) DualLogErrorWrapper("VirtualFree failed\n"); }
+        if (!UnmapViewOfFile(ramSpacePointer)) { if (VirtualFree(ramSpacePointer, 0 /* dwSize (must be 0 with MEM_RELEASE) */, MEM_RELEASE) == 0) DualLogError("VirtualFree failed\n"); }
     #else // Linux
-        if (!ramSpacePointer || ramSpacePointer == MAP_FAILED) { DualLogErrorWrapper("Attempting to double free!\n"); OS_Exit(1); }
+        if (!ramSpacePointer || ramSpacePointer == MAP_FAILED) { DualLogError("Attempting to double free!\n"); OS_Exit(1); }
         
-        if ((void *)(int64_t)munmap(ramSpacePointer, size) == MAP_FAILED) DualLogErrorWrapper("munmap failed\n");
+        if ((void *)(int64_t)munmap(ramSpacePointer, size) == MAP_FAILED) DualLogError("munmap failed\n");
     #endif
 }
 
@@ -235,7 +241,7 @@ static inline __attribute__((always_inline)) bool OS_GetFileFingerprint(const ch
         CloseHandle(hFile);
     #else // Linux
         struct stat st;
-        if (stat(path, &st) != 0) { DualLogErrorWrapper("Failed to stat \"%s\"\n", path); return false; }
+        if (stat(path, &st) != 0) { DualLogError("Failed to stat \"%s\"\n", path); return false; }
 
         fp->size  = (uint64_t)st.st_size;
     #endif

@@ -43,8 +43,8 @@ typedef struct {
 #define LIGHT_COUNT 2048
 #define MODEL_IDX_MAX 6805
 #define MAX_VALID_TEXTURE 2048
-#define MAX_TOTAL_PIXELS 27800000u
-#define MAX_UNIQUE_COLORS 80000u
+#define MAX_TOTAL_PIXELS 29425664u
+#define MAX_UNIQUE_COLORS 97408u
 #define MAX_ANIMATED_MODELS 64
 #define MAX_ANIMATION_CLIPS_PER_MODEL 32
 #define MAX_DEBUG_LINE_VERTS 8
@@ -1076,6 +1076,13 @@ typedef /*FAT*/ struct {
     uint8_t numclips;
     uint16_t animationNum; // Global animation identifier into short table of AnimationClip's
     uint16_t frame; // 0 based index into the delta tables, 0 skips delta read and just uses raw modelIndex base pos verts with no delta applied.
+    uint8_t  texAnimClip;
+    uint16_t texFrame, texGlowFrame;
+    bool textureAnimating;
+    bool textureGlowAnimating;
+    bool textureAnimationStopsAtDead;
+    bool texAnimInReverse;
+    bool texAnimRandom;
     int32_t cellIndex;
     uint8_t portalIndex; // If this is a door, index into portal array for toggling state.
     DoorState doorState;

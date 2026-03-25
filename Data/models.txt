@@ -2333,11 +2333,9 @@ index: 1368
 index: 1369
 
 #Models/xdoor1_000001.obj
-index: 1444
+index: 1370
 animated: 1
 animationNum: 6
-#Models/xdoor1_000001.obj
-index: 1370
 #Models/xdoor1_000002.obj
 index: 1371
 #Models/xdoor1_000003.obj
@@ -11735,3 +11733,6 @@ index: 5985
 index: 5986
 #Models/npc_mutant_cyborg_000243.obj
 index: 5987
+
+#Models/genericLOD3card_zero.obj
+index: 5988

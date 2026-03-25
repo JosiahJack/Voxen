@@ -3515,6 +3515,7 @@ MOD_TO_ENGINE void ModUpdate(void) {
     if (Eng_Global->pauseRelativeTime < Eng_Global->debugLineFinished && (Eng_Global->debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Eng_Global->debugLine_start,Eng_Global->debugLine_end);
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < Eng_Global->loadedInstances; ++i) {
         Entity* e = &Eng_Global->instances[i];
+        TextureSequenceUpdate(i);
         uint16_t constdex = e->index;
         if (constdex == 718) ExplosionLifeUpdate(i);
         if (ConstIndexIsButtonSwitch(constdex)) ButtonSwitchUpdate(i);
@@ -3727,16 +3728,19 @@ MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(DataParser* entity_parser) 
 
 MOD_TO_ENGINE void ModInitAfterLoad(void) {
     for (int i=PLAYER1;i<Eng_Global->loadedInstances;++i) {
-        uint16_t constIndex = Eng_Global->instances[i].index;
-        if (i == PLAYER1 || i == PLAYER2 || ConstIndexIsDynamicObject(constIndex)) Eng_Global->instances[i].gravity = 1.0f;
-        else Eng_Global->instances[i].gravity = 0.0f;
-        if (constIndex < MAX_ENTITIES) flag_set(&Eng_Global->instances[i].entflags,ENTFLAG_ANIMATED,Eng_Global->entities[constIndex].entflags & ENTFLAG_ANIMATED);
-        if (Eng_Global->instances[i].entflags & ENTFLAG_HAS_CAMERA_VIEW) AddCameraPosition(i);
-        if (ConstIndexIsGeometry(constIndex)) Eng_Global->instances[i].layer = PhysicsLayer_Geometry;
-        else if (ConstIndexIsDoor(constIndex)) Eng_Global->instances[i].layer = PhysicsLayer_Door;
+        Entity* e = &Eng_Global->instances[i];
+        uint16_t constIndex = e->index;
+        if (i == PLAYER1 || i == PLAYER2 || ConstIndexIsDynamicObject(constIndex)) e->gravity = 1.0f;
+        else e->gravity = 0.0f;
+        if (constIndex < MAX_ENTITIES) flag_set(&e->entflags,ENTFLAG_ANIMATED,Eng_Global->entities[constIndex].entflags & ENTFLAG_ANIMATED);
+        if (e->entflags & ENTFLAG_HAS_CAMERA_VIEW) AddCameraPosition(i);
+        if (e->index == 574) { e->textureAnimating = true; e->texAnimClip = 12; e->texFrame = 0; DualLog("Loaded anim for prop_healingbed\n"); }
+        if (e->index == 746) { e->textureAnimating = true; e->texAnimClip = 2; e->texFrame = 0; DualLog("Loaded anim for weapon_grenadeenergmine_live\n"); }
+        if (ConstIndexIsGeometry(constIndex)) e->layer = PhysicsLayer_Geometry;
+        else if (ConstIndexIsDoor(constIndex)) e->layer = PhysicsLayer_Door;
         else if (ConstIndexIsUsableObject(constIndex)) UsableInit(i);
-        else if (ConstIndexIsDoor(Eng_Global->instances[i].index)) DoorInitAfterLoad(i);
-        else if (ConstIndexIsNPC(constIndex)) { Eng_Global->instances[i].layer = PhysicsLayer_NPC; /* TODO AIInit funcion */ }
+        else if (ConstIndexIsDoor(e->index)) DoorInitAfterLoad(i);
+        else if (ConstIndexIsNPC(constIndex)) { e->layer = PhysicsLayer_NPC; /* TODO AIInit funcion */ }
         else if (ConstIndexIsSearchable(constIndex)) SearchableInit(i);
         else if (constIndex == 515) { ForceBridgeInitBeforeLoad(i); ForceBridgeInitAfterLoad(i); }
         else if (constIndex == 517) FuncWallInitAfterLoad(i);
@@ -3746,17 +3750,17 @@ MOD_TO_ENGINE void ModInitAfterLoad(void) {
         else if (constIndex == 555) CyberSwitchInitAfterLoad(i);
         else if (constIndex == 21 || constIndex == 22) CyberWallInitAfterLoad(i); // chunk_cyberpanel or chunk_cyberpanel_slice45
         else if (constIndex == 736) TargetIDInitAfterLoad(i);
-        else if (ConstIndexIsButtonSwitch(Eng_Global->instances[i].index)) ButtonSwitchInitAfterLoad(i);
+        else if (ConstIndexIsButtonSwitch(e->index)) ButtonSwitchInitAfterLoad(i);
         else if (constIndex >= 448 && constIndex <= 457) CyberItemInitBeforeLoad(i);
         else if (constIndex == 480) CyberMineInitBeforeLoad(i);
-        if (!StringIsEmpty(Eng_Global->instances[i].targetname) && (Eng_Global->instances[i].ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE) && !(Eng_Global->instances[i].entflags & TARG_IOFLAGS_DISABLD_ONCE_4EVER)) flag_set(&Eng_Global->instances[i].entflags,ENTFLAG_ACTIVE,false);
-        if (Eng_Global->instances[i].index == 700) {
-            if ((Eng_Global->instances[i].ioflags & TARG_IOFLAGS_START_ON_SECOND) || (Eng_Global->instances[i].ioflags & TARG_IOFLAGS_ON_SECOND)) {
-                StringCopyInto_A_From_B(Eng_Global->instances[i].currenttarget,Eng_Global->instances[i].target,TARGET_STRING_LENGTH);
-                flag_set(&Eng_Global->instances[i].ioflags,TARG_IOFLAGS_ON_SECOND,false);
+        if (!StringIsEmpty(e->targetname) && (e->ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE) && !(e->entflags & TARG_IOFLAGS_DISABLD_ONCE_4EVER)) flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
+        if (e->index == 700) {
+            if ((e->ioflags & TARG_IOFLAGS_START_ON_SECOND) || (e->ioflags & TARG_IOFLAGS_ON_SECOND)) {
+                StringCopyInto_A_From_B(e->currenttarget,e->target,TARGET_STRING_LENGTH);
+                flag_set(&e->ioflags,TARG_IOFLAGS_ON_SECOND,false);
             } else {
-                StringCopyInto_A_From_B(Eng_Global->instances[i].currenttarget,Eng_Global->instances[i].target2,TARGET_STRING_LENGTH);
-                flag_set(&Eng_Global->instances[i].ioflags,TARG_IOFLAGS_ON_SECOND,true);
+                StringCopyInto_A_From_B(e->currenttarget,e->target2,TARGET_STRING_LENGTH);
+                flag_set(&e->ioflags,TARG_IOFLAGS_ON_SECOND,true);
             }
         }
     }

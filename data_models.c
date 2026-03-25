@@ -98,50 +98,78 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(const char* _
 				temp_uv[uv_count*2+1]=fast_atof(&p);
 				++uv_count;
 			}
-		}else if(*p=='f'&&p[1]==' '){
-			p+=2;
-			uint32_t vert_ids[3]={0},tex_ids[3]={0},norm_ids[3]={0};
-			for(int k=0;k<3;++k){
-				long raw=fast_atoi(&p);
-				uint32_t vidx=(raw>0)?(uint32_t)raw:(raw<0)?(uint32_t)((int32_t)pos_count+raw):0;
-				vert_ids[k]=vidx;
-				if(*p=='/'){
-					++p;
-					if(*p!='/'){
-						raw=fast_atoi(&p);
-						uint32_t tidx=(raw>0)?(uint32_t)raw:(raw<0)?(uint32_t)((int32_t)uv_count+raw):0;
-						tex_ids[k]=tidx;
-					}
-					if(*p=='/'){
-						++p;
-						raw=fast_atoi(&p);
-						uint32_t nidx=(raw>0)?(uint32_t)raw:(raw<0)?(uint32_t)((int32_t)norm_count+raw):0;
-						norm_ids[k]=nidx;
-					}
-				}
-			}
-			if(likely(vert_ids[0]&&vert_ids[1]&&vert_ids[2])){
-				if(unlikely(expanded_count+3>MAX_OUTPUT_VERTS))return false;
-				for(int k=0;k<3;++k){
-					uint32_t vi_idx=vert_ids[k]-1;
-					uint32_t ti_idx=(tex_ids[k]&&tex_ids[k]<=uv_count)?tex_ids[k]-1:0;
-					uint32_t ni_idx=(norm_ids[k]&&norm_ids[k]<=norm_count)?norm_ids[k]-1:0;
-					float* dst=scratch_verts+(expanded_count<<3);
-					dst[0]=-temp_pos[vi_idx*3];dst[1]=temp_pos[vi_idx*3+1];dst[2]=temp_pos[vi_idx*3+2];
-					dst[3]=(ni_idx<norm_count)?-temp_nrm[ni_idx*3]:0.0f;
-					dst[4]=(ni_idx<norm_count)?temp_nrm[ni_idx*3+1]:0.0f;
-					dst[5]=(ni_idx<norm_count)?temp_nrm[ni_idx*3+2]:0.0f;
-					dst[6]=(ti_idx<uv_count)?temp_uv[ti_idx*2]:0.0f;
-					dst[7]=(ti_idx<uv_count)?temp_uv[ti_idx*2+1]:0.0f;
-					float x=dst[0],y=dst[1],z=dst[2];
-					minx=(x<minx)?x:minx;maxx=(x>maxx)?x:maxx;
-					miny=(y<miny)?y:miny;maxy=(y>maxy)?y:maxy;
-					minz=(z<minz)?z:minz;maxz=(z>maxz)?z:maxz;
-					scratch_tris[expanded_count]=(uint16_t)expanded_count;
-					++expanded_count;
-				}
-			}
-		}else{
+		}else if(*p=='f' && p[1]==' '){
+            p += 2;
+
+            // Collect up to 8 indices per face (enough for typical models)
+            uint32_t vert_ids[8] = {0}, tex_ids[8] = {0}, norm_ids[8] = {0};
+            int num_verts = 0;
+
+            while(num_verts < 8 && p < end && *p != '\n' && *p != '\r'){
+                while(*p == ' ' || *p == '\t') ++p;
+                if(*p == '\n' || *p == '\r' || *p == '#') break;
+
+                long raw = fast_atoi(&p);
+                uint32_t vidx = (raw > 0) ? (uint32_t)raw :
+                                (raw < 0) ? (uint32_t)((int32_t)pos_count + raw) : 0;
+                vert_ids[num_verts] = vidx;
+
+                if(*p == '/'){
+                    ++p;
+                    if(*p != '/'){
+                        raw = fast_atoi(&p);
+                        uint32_t tidx = (raw > 0) ? (uint32_t)raw :
+                                        (raw < 0) ? (uint32_t)((int32_t)uv_count + raw) : 0;
+                        tex_ids[num_verts] = tidx;
+                    }
+                    if(*p == '/'){
+                        ++p;
+                        raw = fast_atoi(&p);
+                        uint32_t nidx = (raw > 0) ? (uint32_t)raw :
+                                        (raw < 0) ? (uint32_t)((int32_t)norm_count + raw) : 0;
+                        norm_ids[num_verts] = nidx;
+                    }
+                }
+                ++num_verts;
+            }
+
+            if(num_verts < 3) goto skip_face;   // invalid face
+
+            // Triangulate: fan from first vertex (works well for convex faces)
+            for(int k = 1; k < num_verts-1; ++k){
+                if(unlikely(expanded_count + 3 > MAX_OUTPUT_VERTS)) return false;
+
+                uint32_t triangle[3] = {0, (uint32_t)k, (uint32_t)(k+1)};
+
+                for(int t = 0; t < 3; ++t){
+                    int idx = triangle[t];
+                    uint32_t vi_idx = vert_ids[idx] ? vert_ids[idx]-1 : 0;
+                    uint32_t ti_idx = (tex_ids[idx] && tex_ids[idx] <= uv_count) ? tex_ids[idx]-1 : 0;
+                    uint32_t ni_idx = (norm_ids[idx] && norm_ids[idx] <= norm_count) ? norm_ids[idx]-1 : 0;
+
+                    float* dst = scratch_verts + (expanded_count << 3);
+                    dst[0] = -temp_pos[vi_idx*3];
+                    dst[1] =  temp_pos[vi_idx*3+1];
+                    dst[2] =  temp_pos[vi_idx*3+2];
+                    dst[3] = (ni_idx < norm_count) ? -temp_nrm[ni_idx*3]   : 0.0f;
+                    dst[4] = (ni_idx < norm_count) ?  temp_nrm[ni_idx*3+1] : 0.0f;
+                    dst[5] = (ni_idx < norm_count) ?  temp_nrm[ni_idx*3+2] : 0.0f;
+                    dst[6] = (ti_idx < uv_count)   ?  temp_uv[ti_idx*2]    : 0.0f;
+                    dst[7] = (ti_idx < uv_count)   ?  temp_uv[ti_idx*2+1]  : 0.0f;
+
+                    // update bounds
+                    float x = dst[0], y = dst[1], z = dst[2];
+                    minx = (x < minx) ? x : minx; maxx = (x > maxx) ? x : maxx;
+                    miny = (y < miny) ? y : miny; maxy = (y > maxy) ? y : maxy;
+                    minz = (z < minz) ? z : minz; maxz = (z > maxz) ? z : maxz;
+
+                    scratch_tris[expanded_count] = (uint16_t)expanded_count;
+                    ++expanded_count;
+                }
+            }
+
+        skip_face:;
+        }else{
 			while(p<end&&*p!='\n')++p;
 		}
 	}

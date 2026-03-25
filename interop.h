@@ -55,6 +55,7 @@
     X(void, ResetLevelAudio, (void)) \
     X(void, UpdateAnims, (void)) \
     X(uint16_t, SpawnDynamicObject, (int, bool)) \
+    X(void, TextureSequenceInit, (uint16_t, char*)) \
     X(void, ModInitAfterLoad, (void)) \
     X(void, ModEntityDefinitionsInitAfterLoad, (DataParser*)) \
     X(void, PlayerInit, (uint16_t)) \

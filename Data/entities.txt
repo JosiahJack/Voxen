@@ -474,7 +474,7 @@ glowtexture: 314
 texture: 315
 #chunk_exteriorpanel1
 index: 78
-model: 141
+model: 131
 cardchunk: 1
 texture: 1228
 #chunk_fan1
@@ -1603,10 +1603,9 @@ texture: 758
 glowtexture: 757
 #chunk_screen
 index: 279
-model: 178
+model: 5988
 cardchunk: 1
 texture: 881
-glowtexture: 881
 #chunk_sec1_1
 index: 280
 model: 178
@@ -4351,14 +4350,14 @@ index: 510
 model: 0
 numclips: 4
 animationNum: 16
-texture: 204
+texture: 206
+glowtexture: 205
 #door_elevator4
 index: 511
 model: 0
 numclips: 4
 animationNum: 17
-texture: 206
-glowtexture: 205
+texture: 203
 #door_secret1
 index: 512
 model: 0
