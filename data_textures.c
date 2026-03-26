@@ -15,7 +15,15 @@ uint8_t* stbi__arena_end = NULL;
 static int num_parse_threads = 0;
 uint8_t* stbi_load_from_memory(const uint8_t* buffer, int32_t len, int32_t* x, int32_t* y);
 static StbiArena* thread_stbi_arenas = NULL;
-
+typedef struct { uint16_t index; bool transparent; bool doublesided; char path[128]; } TextureData;
+typedef struct { TextureData* entries; uint32_t count; uint32_t capacity; } TextureDataParser;
+typedef struct { const char* data; int size; } RawTexture;
+typedef struct TextureParseTask { uint32_t start_tex; uint32_t end_tex; RawTexture* raw_textures; int32_t* index_to_parser; const TextureDataParser* parser; int tid; } TextureParseTask;
+static uint8_t** textureIndexBuffers = NULL;
+static uint32_t** texturePaletteBuffers = NULL;
+static uint32_t* texturePaletteSizes = NULL;
+static int32_t* textureWidths = NULL;
+static int32_t* textureHeights = NULL;
 void stbi__arena_init(void) {
     if (!stbi__arena_base) {
         stbi__arena_base = OS_AllocateRAM(NULL, STBI_ARENA_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
@@ -512,9 +520,7 @@ uint8_t* stbi_load_from_memory_arena(const uint8_t* buffer, int len, int* x, int
     stbi__png z = {0};
     z.s = &s;
     uint32_t ioff = 0;
-    z.expanded = NULL;
-    z.idata = NULL;
-    z.out = NULL;
+    z.expanded = z.idata = z.out = NULL;
     s.img_buffer += 8;
     s.img_x = s.img_y = 1;
     for (;;) {
@@ -532,11 +538,7 @@ uint8_t* stbi_load_from_memory_arena(const uint8_t* buffer, int len, int* x, int
             }
 
             case 0x49444154: {
-                if (!z.idata) {
-                    z.idata = stbi__arena_alloc_thread(arena, len + 16);
-                    ioff = 0;
-                }
-
+                if (!z.idata) { z.idata = stbi__arena_alloc_thread(arena, len + 16); ioff = 0; }
                 __builtin_memcpy(z.idata + ioff, s.img_buffer, length);
                 s.img_buffer += length;
                 ioff += length;
@@ -561,7 +563,7 @@ uint8_t* stbi_load_from_memory_arena(const uint8_t* buffer, int len, int* x, int
         stbi__get32be(&s);
     }
 
-Label_parsesuccess:
+    Label_parsesuccess:
     result = z.out;
     z.out = NULL;
     *x = z.s->img_x;
@@ -579,9 +581,7 @@ extern uint8_t* stbi_load_from_memory(const uint8_t* buffer, int len, int* x, in
     stbi__png z = {0};
     z.s = &s;
     uint32_t ioff = 0;
-    z.expanded = NULL;
-    z.idata = NULL;
-    z.out = NULL;
+    z.expanded = z.idata = z.out = NULL;
     s.img_buffer += 8;
     s.img_x = s.img_y = 1;
     for (;;) {
@@ -599,11 +599,7 @@ extern uint8_t* stbi_load_from_memory(const uint8_t* buffer, int len, int* x, in
             }
 
             case 0x49444154: {
-                if (!z.idata) {
-                    z.idata = stbi__arena_alloc(len + 16);
-                    ioff = 0;
-                }
-
+                if (!z.idata) { z.idata = stbi__arena_alloc(len + 16); ioff = 0; }
                 __builtin_memcpy(z.idata + ioff, s.img_buffer, length);
                 s.img_buffer += length;
                 ioff += length;
@@ -628,7 +624,7 @@ extern uint8_t* stbi_load_from_memory(const uint8_t* buffer, int len, int* x, in
         stbi__get32be(&s);
     }
 
-Label_parsesuccess:
+    Label_parsesuccess:
     result = z.out;
     z.out = NULL;
     *x = z.s->img_x;
@@ -636,32 +632,14 @@ Label_parsesuccess:
     return (unsigned char*)result;
 }
 
-typedef struct { const char* data; int size; } RawTexture;
-
-typedef struct TextureParseTask {
-    uint32_t start_tex;
-    uint32_t end_tex;
-    RawTexture* raw_textures;
-    int32_t* index_to_parser;
-    const DataParser* parser;
-    int tid;
-} TextureParseTask;
-
-static uint8_t** textureIndexBuffers = NULL;
-static uint32_t** texturePaletteBuffers = NULL;
-static uint32_t* texturePaletteSizes = NULL;
-static int32_t* textureWidths = NULL;
-static int32_t* textureHeights = NULL;
-
 static void* TextureParsingWorker(void* argument) {
     TextureParseTask* task = (TextureParseTask*)argument;
     for (uint32_t i = task->start_tex; i < task->end_tex; ++i) {
         int32_t parserIdx = task->index_to_parser[i];
         if (unlikely(parserIdx < 0 || parserIdx >= (int32_t)task->parser->count)) continue;
 
-        doubleSidedTexture[i] = (task->parser->entries[parserIdx].entflags & ENTFLAG_DOUBLESIDED) ? 1 : 0;
-        transparentTexture[i] = (task->parser->entries[parserIdx].entflags & ENTFLAG_TRANSPARENT) ? 1 : 0;
-
+        doubleSidedTexture[i] = task->parser->entries[parserIdx].doublesided;
+        transparentTexture[i] = task->parser->entries[parserIdx].transparent;
         const char* data = task->raw_textures[i].data;
         int size = task->raw_textures[i].size;
         if (unlikely(!data || size <= 0)) continue;
@@ -725,14 +703,108 @@ static void* TextureParsingWorker(void* argument) {
     return NULL;
 }
 
+static bool ParseTextureData(TextureDataParser *parser, uint16_t maxSize, const char *filename) {
+    OsFileHandle fd; int st_size; char* data = OS_OpenAndAllocateFileBufferReadonly(filename,&fd,&st_size);
+    char* cursor = data; char* end = data + st_size;
+    uint32_t lineNum = 0, max_index = 0;
+    while (cursor < end) { // First pass: count entries and find max index
+        char* start = cursor;
+        while (cursor < end && *cursor != '\n' && *cursor != '\r') cursor++;
+        size_t lineLen = cursor - start;
+        lineNum++;
+        if (lineLen <= 0) { cursor++; continue; }
+
+        while (CharacterIsEmpty(*start)) start++; // Trim leading whitespace
+        char *lineend = start + lineLen - 1;
+        while (lineend > start && CharacterIsEmpty(*lineend)) lineend--; // Trim trailing whitespace
+        if (*start == '\0' || (start[0] == '/' && start[1] == '/')) continue; // Skip empty lines and commented lines
+        if (start[0] == '#') { continue; } // Skip entry start marker, only count ones with valid index thereafter in the key|value block lines
+
+        char *colon = StringFindFirstCharWithin(start, ':');
+        if (colon && StringCompareUpToLength(start, "index", colon - start) == 0) {
+            char *value = colon + 1;
+            while (CharacterIsEmpty(*value)) value++;
+            uint32_t idx = parse_numberu32(value, start, lineNum);
+            if (idx > max_index) max_index = idx;
+       }
+       
+       if (cursor < end && *cursor == '\r') cursor++;
+       if (cursor < end && *cursor == '\n') cursor++;
+    }
+    
+    if (max_index == 0) { DualLogWarn("No entries found in %s\n", filename); OS_DeallocateRAM(data,st_size); return true; }
+    if (max_index >= maxSize) { DualLogWarn("Too large of index found in %s, %u exceeds limit %u\n", filename, max_index, maxSize); OS_DeallocateRAM(data,st_size); return true; }
+
+    uint32_t entry_count = max_index + 1;
+    TextureData *new_entries = OS_AllocateRAM(NULL,entry_count * sizeof(TextureData),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);  
+    parser->entries = new_entries;
+    for (uint32_t i = 0; i < entry_count; ++i) { parser->entries[i] = (TextureData){ .index=UINT16_MAX, .transparent=false, .doublesided=false, .path={0} }; }
+    parser->capacity = entry_count;
+    parser->count = entry_count;
+    TextureData entry = (TextureData){ .index=UINT16_MAX, .transparent=false, .doublesided=false, .path={0} };
+    lineNum = 0;
+    cursor = data; end = data + st_size; // Rewind
+    while (cursor < end) {
+        char* start = cursor;
+        while (cursor < end && *cursor != '\n' && *cursor != '\r') cursor++;
+        size_t lineLen = cursor - start;
+        lineNum++;
+        if (lineLen < 3) { cursor++; continue; } // Must have at least k:v, skip if shorter
+
+        while (CharacterIsEmpty(*start)) start++; // Trim leading whitespace
+        char *lineend = start + lineLen - 1;
+        while (lineend > start && CharacterIsEmpty(*lineend)) lineend--; // Trim trailing whitespace
+        if (start[0] == '/' && start[1] == '/') continue; // Skip comment(ed out) line
+
+        if (*start == '#') {
+            if (entry.path[0] && entry.index != UINT16_MAX && entry.index < parser->capacity) parser->entries[entry.index] = entry;
+            entry = (TextureData){ .index=UINT16_MAX, .transparent=false, .doublesided=false, .path={0} };
+            if (lineend > start) {
+                size_t actualLen = lineend - (start + 1) + 1;
+                if (actualLen >= sizeof(entry.path)) actualLen = sizeof(entry.path) - 1;
+                __builtin_memcpy(entry.path, start + 1, actualLen);
+                entry.path[actualLen] = '\0';
+            }
+            continue;
+        }
+
+        // Handle key-value pair
+        char *colon = StringFindFirstCharWithin(start, ':');
+        if (colon) {
+            char *key = start;
+            char *value = colon + 1;
+            while (CharacterIsEmpty(*key) && key < colon) key++;
+            while (CharacterIsEmpty(*value) && value < lineend) value++;
+            size_t keylen = colon - key; size_t vallen = (lineend >= value) ? (lineend - value + 1) : 0;
+            if (keylen > 0 && vallen > 0) {
+                char trimmed_key[256];
+                char trimmed_value[256];
+                StringCopyInto_A_SubstringFrom_B(trimmed_key, keylen, key, 256);
+                StringCopyInto_A_SubstringFrom_B(trimmed_value, vallen, value, 256);
+                char *key_end = trimmed_key + GetStringLength(trimmed_key) - 1;
+                char *val_end = trimmed_value + GetStringLength(trimmed_value) - 1;
+                while (key_end > trimmed_key && CharacterIsEmpty(*key_end)) *key_end-- = '\0';
+                while (val_end > trimmed_value && CharacterIsEmpty(*val_end)) *val_end-- = '\0';
+                     if (StringsAreEqual(trimmed_key,"index"))       entry.index = parse_numberu16(trimmed_value,start,lineNum);
+                else if (StringsAreEqual(trimmed_key,"transparent")) entry.transparent = parse_bool(trimmed_value,start,lineNum);
+                else if (StringsAreEqual(trimmed_key,"doublesided")) entry.doublesided = parse_bool(trimmed_value,start,lineNum);
+            } else DualLogWarn("Invalid key-value pair at line %u: %s\n",lineNum,start);
+        } else DualLogWarn("No colon found in line %u: %s\n",lineNum,start);
+    }
+
+    if (entry.path[0] && entry.index != UINT16_MAX && entry.index < parser->capacity) parser->entries[entry.index] = entry; // Store last entry
+    OS_DeallocateRAM(data,st_size);
+    return true;
+}
+
 void LoadTextures(void) {
     if (unlikely(loadedTexturesMaxIndex > 0)) return;
 
     double start_time = get_time();
     DebugRAM("start of LoadTextures");
     loadedTexturesMaxIndex = totalPixels = totalPaletteColors = 0u;
-    DataParser texture_parser;
-    if (unlikely(!parse_data_file(&texture_parser, MAX_VALID_TEXTURE, "./Data/textures.txt"))) {
+    TextureDataParser texture_parser;
+    if (unlikely(!ParseTextureData(&texture_parser, MAX_VALID_TEXTURE, "./Data/textures.txt"))) {
         DualLogError("Could not parse ./Data/textures.txt!\n");
         OS_Exit(1);
     }
@@ -754,37 +826,37 @@ void LoadTextures(void) {
     }
 
     DualLog("Loading textures (%u) ... ", texture_parser.count);
-    RawTexture* rawTextures = OS_AllocateRAM(NULL, loadedTexturesMaxIndex * sizeof(RawTexture), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-    __builtin_memset(rawTextures, 0, loadedTexturesMaxIndex * sizeof(RawTexture));
+    RawTexture* rawTextures = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * sizeof(RawTexture),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
+    __builtin_memset(rawTextures,0,loadedTexturesMaxIndex * sizeof(RawTexture));
     for (uint32_t i = 0; i < loadedTexturesMaxIndex; ++i) {
         int32_t parserIdx = indexToParser[i];
         if (parserIdx < 0) continue;
         const char* path = texture_parser.entries[parserIdx].path;
         OsFileHandle dummy_fd;
         int size = 0;
-        rawTextures[i].data = (const char*)OS_OpenAndAllocateFileBufferReadonly(path, &dummy_fd, &size);
+        rawTextures[i].data = (const char*)OS_OpenAndAllocateFileBufferReadonly(path,&dummy_fd,&size);
         rawTextures[i].size = size;
     }
 
     num_parse_threads = OS_GetNumThreads();
     if (num_parse_threads < 1) num_parse_threads = 1;
     if (num_parse_threads > 32) num_parse_threads = 32;
-    thread_stbi_arenas = (StbiArena*)OS_AllocateRAM(NULL, (size_t)num_parse_threads * sizeof(StbiArena), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+    thread_stbi_arenas = (StbiArena*)OS_AllocateRAM(NULL,(size_t)num_parse_threads * sizeof(StbiArena),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
     for (int t = 0; t < num_parse_threads; ++t) {
         thread_stbi_arenas[t].base = NULL;
         stbi__arena_init_thread(&thread_stbi_arenas[t]);
     }
 
-    textureIndexBuffers = OS_AllocateRAM(NULL, loadedTexturesMaxIndex * sizeof(uint8_t*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-    texturePaletteBuffers = OS_AllocateRAM(NULL, loadedTexturesMaxIndex * sizeof(uint32_t*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-    texturePaletteSizes = OS_AllocateRAM(NULL, loadedTexturesMaxIndex * sizeof(uint32_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-    textureWidths = OS_AllocateRAM(NULL, loadedTexturesMaxIndex * sizeof(int32_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-    textureHeights = OS_AllocateRAM(NULL, loadedTexturesMaxIndex * sizeof(int32_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-    __builtin_memset(textureIndexBuffers, 0, loadedTexturesMaxIndex * sizeof(uint8_t*));
-    __builtin_memset(texturePaletteBuffers, 0, loadedTexturesMaxIndex * sizeof(uint32_t*));
-    __builtin_memset(texturePaletteSizes, 0, loadedTexturesMaxIndex * sizeof(uint32_t));
-    __builtin_memset(textureWidths, 0, loadedTexturesMaxIndex * sizeof(int32_t));
-    __builtin_memset(textureHeights, 0, loadedTexturesMaxIndex * sizeof(int32_t));
+    textureIndexBuffers = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * sizeof(uint8_t*),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
+    texturePaletteBuffers = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * sizeof(uint32_t*),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
+    texturePaletteSizes = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * sizeof(uint32_t),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
+    textureWidths = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * sizeof(int32_t),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
+    textureHeights = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * sizeof(int32_t),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
+    __builtin_memset(textureIndexBuffers,0,loadedTexturesMaxIndex * sizeof(uint8_t*));
+    __builtin_memset(texturePaletteBuffers,0,loadedTexturesMaxIndex * sizeof(uint32_t*));
+    __builtin_memset(texturePaletteSizes,0,loadedTexturesMaxIndex * sizeof(uint32_t));
+    __builtin_memset(textureWidths,0,loadedTexturesMaxIndex * sizeof(int32_t));
+    __builtin_memset(textureHeights,0,loadedTexturesMaxIndex * sizeof(int32_t));
     TextureParseTask tasks[32];
     uint32_t chunk = (loadedTexturesMaxIndex + (uint32_t)num_parse_threads - 1U) / (uint32_t)num_parse_threads;
     for (int t = 0; t < num_parse_threads; ++t) {
@@ -819,7 +891,6 @@ void LoadTextures(void) {
     texturePaletteOffsets = OS_AllocateRAM(NULL, loadedTexturesMaxIndex * sizeof(uint32_t),   PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
     uint32_t* texturePalettes = (uint32_t*)cur; cur += palettes_size;
     uint8_t* all_indices = cur;
-
     uint32_t pixel_base = 0, color_base = 0;
     for (uint16_t i = 0; i < loadedTexturesMaxIndex; ++i) {
         if (!textureIndexBuffers[i]) continue;
@@ -839,13 +910,11 @@ void LoadTextures(void) {
 
     DebugRAM("After loop for load textures");
     DualLog("total palette colors: %u, total pixels: %u...", totalPaletteColors, totalPixels);
-
     int32_t packed_size = ((int32_t)totalPixels + 3) / 4 * sizeof(uint32_t);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, Sys_Render.colorBufferID);
     void* dst = glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, packed_size, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
     __builtin_memcpy(dst, all_indices, packed_size);
     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
-
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, Sys_Render.texturePalettesID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, totalPaletteColors * sizeof(uint32_t), texturePalettes, GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, Sys_Render.textureOffsetsID);
@@ -857,8 +926,7 @@ void LoadTextures(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     glFlush();
     glFinish();
-
-    OS_DeallocateRAM(texture_parser.entries, texture_parser.count * sizeof(Entity));
+    OS_DeallocateRAM(texture_parser.entries, texture_parser.count * sizeof(TextureData));
     OS_DeallocateRAM(arena, arena_size);
     OS_DeallocateRAM(rawTextures, loadedTexturesMaxIndex * sizeof(RawTexture));
     OS_DeallocateRAM(indexToParser, loadedTexturesMaxIndex * sizeof(int32_t));
@@ -867,10 +935,8 @@ void LoadTextures(void) {
     OS_DeallocateRAM(texturePaletteSizes, loadedTexturesMaxIndex * sizeof(uint32_t));
     OS_DeallocateRAM(textureWidths, loadedTexturesMaxIndex * sizeof(int32_t));
     OS_DeallocateRAM(textureHeights, loadedTexturesMaxIndex * sizeof(int32_t));
-
     for (int t = 0; t < num_parse_threads; ++t) OS_DeallocateRAM(thread_stbi_arenas[t].base, STBI_ARENA_SIZE);
     OS_DeallocateRAM(thread_stbi_arenas, (size_t)num_parse_threads * sizeof(StbiArena));
-
     double end_time = get_time();
     DualLog(" took %.6f secs\n", end_time - start_time);
     DebugRAM("After LoadTextures and after deallocation");

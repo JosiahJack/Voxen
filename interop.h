@@ -56,6 +56,8 @@
     X(void, UpdateAnims, (void)) \
     X(uint16_t, SpawnDynamicObject, (int, bool)) \
     X(void, TextureSequenceInit, (uint16_t, char*)) \
+    X(void, LoadEntities, (void)) \
+    X(void, ModNewGame, (void)) \
     X(void, ModInitAfterLoad, (void)) \
     X(void, ModEntityDefinitionsInitAfterLoad, (DataParser*)) \
     X(void, PlayerInit, (uint16_t)) \
@@ -150,3 +152,5 @@ ENGINE_TO_MOD void CenterStatusPrint(const char* fmt, ...);
 ENGINE_TO_MOD void play_wav(const char* path, float volume, Vector3 pos, bool positional);
 ENGINE_TO_MOD void PortalCulling(void);
 ENGINE_TO_MOD void AddInstance(uint16_t entIdx, uint16_t i);
+ENGINE_TO_MOD bool parse_data_file(DataParser *parser, uint16_t maxSize, const char *filename);
+extern EntityField entityFields[NUM_ENTITY_FIELDS];

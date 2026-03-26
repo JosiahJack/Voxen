@@ -1,5 +1,23 @@
 // citadel.c - Gamelogic.  Most functionality is trivial so put it here.
 #include "mod.h"
+__attribute__((used)) AutoSplitterData autoSplitter = {0x1337133713371337,0,false,0}; // Fore use with LiveSplit or other future speedrunner utilities for doing speedruns
+//=============================================================================
+// Entity and Mod Initialization
+GlobalContext* Eng_Global; CheatsSystem*  Eng_Cheats; SettingsSystem* Eng_Settings; TextSystem* Eng_Text; SystemUI* Eng_UI; // From Engine
+MOD_TO_ENGINE void ModLink(GlobalContext* g,CheatsSystem* c,SettingsSystem* s,TextSystem* t,SystemUI* ui){Eng_Global=g;Eng_Cheats=c;Eng_Settings=s;Eng_Text=t;Eng_UI=ui; Eng_Global->entityFields = (EntityField*)&entityFields;}
+int lev1SecCode;
+int lev2SecCode;
+int lev3SecCode;
+int lev4SecCode;
+int lev5SecCode;
+int lev6SecCode;
+//=============================================================================
+// New Game
+MOD_TO_ENGINE void ModNewGame(void) {
+    lev1SecCode = random_range_u8(0u,9u); lev2SecCode = random_range_u8(0u,9u);
+    lev3SecCode = random_range_u8(0u,9u); lev4SecCode = random_range_u8(0u,9u);
+    lev5SecCode = random_range_u8(0u,9u); lev6SecCode = random_range_u8(0u,9u); // Must do rand's repeatedly to prevent these all being the same number.
+}
 //=============================================================================
 // Inventory
 void ResetHeldItem(uint16_t p) {
@@ -979,10 +997,7 @@ void ForceBridgeInitBeforeLoad(uint16_t self) {
 
 void ForceBridgeInitAfterLoad(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
-    if (!(e->entflags & ENTFLAG_ACTIVATED)) {
-        flag_set(&e->entflags,ENTFLAG_VISIBLE,false);
-        e->collider = COLLIDER_TYPE_NONE;
-    }
+    if (!e->active) { flag_set(&e->entflags,ENTFLAG_VISIBLE,false); e->collider = COLLIDER_TYPE_NONE; }
     switch (e->fieldColor) {
         case ForceFieldColor_Red:      e->texIndex = 38; break;
         case ForceFieldColor_Green:    e->texIndex = 40; break;
@@ -994,25 +1009,25 @@ void ForceBridgeInitAfterLoad(uint16_t self) {
 
 void ForceBridgeActivate(uint16_t self, bool isSilent) {
     Entity* e = &Eng_Global->instances[self];
-    if (e->entflags & ENTFLAG_ACTIVATED) return;
+    if (e->active) return;
+    
     if (!isSilent) play_wav(sounds[102],1.0f,e->position,true);
     flag_set(&e->entflags,ENTFLAG_VISIBLE,true);
-    flag_set(&e->entflags,ENTFLAG_ACTIVATED,true);
-    e->lerping = true;
+    e->active = e->lerping = true;
     e->collider = COLLIDER_TYPE_BOX;
     e->scale = (Vector3){ e->forceFieldDirectionX ? 0.1f : e->activatedScale.x, e->forceFieldDirectionY ? 0.1f : e->activatedScale.y, e->forceFieldDirectionZ ? 0.1f : e->activatedScale.z };
 }
 
 void ForceBridgeDeactivate(uint16_t self, bool isSilent) {
     Entity* e = &Eng_Global->instances[self];
-    if (!(e->entflags & ENTFLAG_ACTIVATED)) return;
+    if (!e->active) return;
+    
     if (!isSilent) play_wav(sounds[102],1.0f,e->position,true);
-    flag_set(&e->entflags,ENTFLAG_ACTIVATED,false);
-    e->lerping = true;
+    e->active = false; e->lerping = true;
 }
 
 void ForceBridgeToggle(uint16_t self) {
-    if (Eng_Global->instances[self].entflags & ENTFLAG_ACTIVATED) ForceBridgeDeactivate(self,false);
+    if (Eng_Global->instances[self].active) ForceBridgeDeactivate(self,false);
     else ForceBridgeActivate(self,false);
 }
 
@@ -1020,7 +1035,7 @@ void ForceBridgeUpdate(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->tickFinished >= Eng_Global->pauseRelativeTime) return;
     e->tickFinished = Eng_Global->pauseRelativeTime + e->tickTime;
-    if (e->entflags & ENTFLAG_ACTIVATED) {
+    if (e->active) {
         if (!e->lerping) return;
         float sx = e->forceFieldDirectionX ? lerp(e->scale.x,e->activatedScale.x,e->tickTime * 2.0f) : e->scale.x;
         float sy = e->forceFieldDirectionY ? lerp(e->scale.y,e->activatedScale.y,e->tickTime * 2.0f) : e->scale.y;
@@ -1988,18 +2003,11 @@ void PlayerEnergyUpdate(void) {
 #define GREN_FLAG_EXPLODE_CONTACT (1ull << 59)
 #define GREN_FLAG_USE_TIMER       (1ull << 58)
 #define GREN_FLAG_USE_PROX        (1ull << 57)
-
-static bool GrenadeIsNPCMine(uint16_t self) {
-    return Eng_Global->instances[self].layer != PhysicsLayer_PlayerBullets;
-}
-
+static bool GrenadeIsNPCMine(uint16_t self) { return Eng_Global->instances[self].layer != PhysicsLayer_PlayerBullets; }
 void GrenadeExplode(uint16_t self) {
     DualLog("Grenade exploded");
     Entity* e = &Eng_Global->instances[self];
-    flag_set(&e->entflags,ENTFLAG_ENABLED,false);
-    // TODO: DisableCollision(self)
-    // TODO: DamageData + ApplyImpactForceSphere(damage,attackType,penetration,
-    //       offense,damage*1.5f,e->position,e->strength,1.0f)
+    // TODO: DamageData + ApplyImpactForceSphere(damage,attackType,penetration,offense,damage*1.5f,e->position,e->strength,1.0f)
     if (!GrenadeIsNPCMine(self)) {
         Entity* p = &Eng_Global->instances[PLAYER1];
         flag_set(&p->entflags,ENTFLAG_MAKING_NOISE,true);
@@ -2017,8 +2025,9 @@ void GrenadeExplode(uint16_t self) {
         case 13: soundIndex = 63; Eng_Global->fogFac += 10; break; // gas
     }
     play_wav(sounds[soundIndex],1.0f,e->position,true);
-    // TODO: SpawnExplosionEffect(e->position, explosionType) from object pool
+    // TODO: SpawnExplosionEffect(e->position, explosionType)
     // TODO: Shake(-1,-1) — screen shake system
+    DeleteInstance(self);
 }
 
 void GrenadeActivate(uint16_t self) {
@@ -2028,29 +2037,19 @@ void GrenadeActivate(uint16_t self) {
         case 7:  flag_set(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
         case 8:  flag_set(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
         case 9:  flag_set(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
-        case 10: e->timerFinished = Eng_Global->pauseRelativeTime
-                                    + Eng_Global->inventoryPlayer1.earthShakerTimeSetting;
-                 flag_set(&e->ioflags,GREN_FLAG_USE_TIMER,true);       break;
-        case 11: flag_set(&e->ioflags,GREN_FLAG_USE_PROX,true);
-                 flag_set(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,false);break;
-        case 12: e->timerFinished = Eng_Global->pauseRelativeTime
-                                    + Eng_Global->inventoryPlayer1.nitroTimeSetting;
-                 flag_set(&e->ioflags,GREN_FLAG_USE_TIMER,true);       break;
+        case 10: e->timerFinished = Eng_Global->pauseRelativeTime + Eng_Global->inventoryPlayer1.earthShakerTimeSetting; flag_set(&e->ioflags,GREN_FLAG_USE_TIMER,true);       break;
+        case 11: flag_set(&e->ioflags,GREN_FLAG_USE_PROX,true); flag_set(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,false);break;
+        case 12: e->timerFinished = Eng_Global->pauseRelativeTime + Eng_Global->inventoryPlayer1.nitroTimeSetting; flag_set(&e->ioflags,GREN_FLAG_USE_TIMER,true);       break;
         case 13: flag_set(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
         default: return;
     }
-    flag_set(&e->entflags,ENTFLAG_ENABLED,true);
 }
 
 void GrenadeUpdate(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
-    if (!(e->entflags & ENTFLAG_ENABLED))                  return;
-    if ((int16_t)e->index == 14) { GrenadeExplode(self);   return; } // Plastique
-    bool timerDone = (e->ioflags & GREN_FLAG_USE_TIMER)
-                     && e->timerFinished < Eng_Global->pauseRelativeTime;
-    bool proxDone  = (e->ioflags & GREN_FLAG_USE_PROX)
-                     && (e->entflags & ENTFLAG_MAKING_NOISE); // proxSensed reuses MAKING_NOISE
-    if (timerDone || proxDone) GrenadeExplode(self);
+    if ((int16_t)e->index == 14) { GrenadeExplode(self); return; } // Plastique
+    
+    if (((e->ioflags & GREN_FLAG_USE_TIMER) && e->timerFinished < Eng_Global->pauseRelativeTime) || ((e->ioflags & GREN_FLAG_USE_PROX) && (e->entflags & ENTFLAG_MAKING_NOISE))) GrenadeExplode(self);
 }
 
 // Called by physics collision callback when grenade touches anything
@@ -3539,9 +3538,7 @@ void SearchableInit(uint16_t i) {
     }
 }
 //================================================================================
-// Entity and Mod Initialization
-GlobalContext* Eng_Global; CheatsSystem* Eng_Cheats; SettingsSystem* Eng_Settings; TextSystem* Eng_Text; SystemUI* Eng_UI; // From Engine
-MOD_TO_ENGINE void ModLink(GlobalContext* g,CheatsSystem* c,SettingsSystem* s,TextSystem* t,SystemUI* ui){Eng_Global=g;Eng_Cheats=c;Eng_Settings=s;Eng_Text=t;Eng_UI=ui;}
+// Entity Init
 uint8_t GetCurrentLevelSecurity(void) { return (Eng_Global->difficultyMission < 1 || Eng_Cheats->superoverride) ? 0u : Eng_Global->levelSecurity[Eng_Global->currentLevel]; }
 uint16_t GetImpactType(uint16_t instanceIdx) {
     switch (Eng_Global->instances[instanceIdx].bloodType) {
@@ -3621,13 +3618,14 @@ MOD_TO_ENGINE void PlayerInit(uint16_t i) {
     Eng_Global->instances[i].position = (Vector3){10.52f,-43.792f + 0.84f,20.2908f}; // Start Actual: Puts player on Medical Level in actual game start position.  Added 0.84f
     Eng_Global->instances[i].scale = (Vector3){1.0f,1.0f,1.0f};
     Eng_Global->instances[i].rotation = (Quaternion){0.0f,0.7071f,0.0f,0.7071f}; // 90deg rotation CW about Y axis as viewed from the top looking down onto player
-    Eng_Global->instances[i].entflags = ENTFLAG_ACTIVE|ENTFLAG_USEGRAVITY|ENTFLAG_RIGIDBODY;
+    Eng_Global->instances[i].entflags = ENTFLAG_ACTIVE|ENTFLAG_RIGIDBODY;
     Eng_Global->instances[i].collider = COLLIDER_TYPE_CAPSULE;
     Eng_Global->instances[i].colliderCenter.y = 0.84f;
     Eng_Global->instances[i].colliderSize = (Vector3){0.48f,2.0f,1.0f}; // Radius, Overall height including end radii (Unity convention, blech), Direction, 1.0 == Y-Axis
     Eng_Global->instances[i].mass = 1.0f;
     Eng_Global->instances[i].linearDrag = 8.0f;
     Eng_Global->instances[i].velocity = (Vector3){0.0f,0.0f,0.0f};
+    Eng_Global->instances[i].gravity = 1.0f;
     Eng_Global->instances[i].dynamicFriction = 0.6f;
     Eng_Global->instances[i].staticFriction = 0.8f;
     Eng_Global->instances[i].frictionCombine = PHYS_COMBINE_MUL;

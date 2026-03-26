@@ -76,57 +76,54 @@ typedef struct {
 #define PLAYER2 2u
 #define MAX_CHILD_COUNT 2
 #define START_INDEX_LEVEL_INSTANCES 3
+#define ENG_ACTIVE               (1ull <<  0) // Instance renders and updates
+#define ENG_GROUNDED             (1ull <<  1)
+#define ENG_RIGIDBODY            (1ull <<  2)
+
 #define ENTFLAG_ACTIVE               (1ull <<  0) // Instance renders and updates
 #define ENTFLAG_CARDCHUNK            (1ull <<  1)
 #define ENTFLAG_GROUNDED             (1ull <<  2)
-#define ENTFLAG_USEGRAVITY           (1ull <<  3)
-#define ENTFLAG_KINEMATIC            (1ull <<  4)
-#define ENTFLAG_RIGIDBODY            (1ull <<  5)
-#define ENTFLAG_DOUBLESIDED          (1ull <<  6)
-#define ENTFLAG_TRANSPARENT          (1ull <<  7)
-#define ENTFLAG_CHANGE_TEX_ON_ACTIVE (1ull <<  8)
-#define ENTFLAG_BLINK_TEX_ON_ACTIVE  (1ull <<  9)
-#define ENTFLAG_NO_SHADOWS           (1ull << 10)
-#define ENTFLAG_ANIMATED             (1ull << 11)
-#define ENTFLAG_ASLEEP               (1ull << 12) // Check if enemy starts out asleep such as the sleeping sec-2 bots on level 8 in the maintenance and recharge bays.
-#define ENTFLAG_WALK_PATH_ON_START   (1ull << 13)
-#define ENTFLAG_TEST_PERSISTENT      (1ull << 14)
-#define ENTFLAG_TEST_OVERRIDE_TEST   (1ull << 15)
-#define ENTFLAG_TOUCHING_HURTS       (1ull << 16)
-#define ENTFLAG_ACT_AS_CORPSE_ONLY   (1ull << 17)
-#define ENTFLAG_DYING                (1ull << 18)
-#define ENTFLAG_DEATH_BURST_DONE     (1ull << 19)
-#define ENTFLAG_DEAD                 (1ull << 20)
-#define ENTFLAG_TELEPORT_ON_DEATH    (1ull << 21)
-#define ENTFLAG_GO_INTO_PAIN         (1ull << 22)
-#define ENTFLAG_DONT_LOOP_WAYPTS     (1ull << 23)
-#define ENTFLAG_VISIT_WAYPTS_RND     (1ull << 24)
-#define ENTFLAG_WANDERING            (1ull << 25)
-#define ENTFLAG_ACT_AS_TURRET        (1ull << 26)
-#define ENTFLAG_TARGID_ATTACHED      (1ull << 27)
-#define ENTFLAG_ENEM_IN_SIGHT        (1ull << 28)
-#define ENTFLAG_ENEM_IN_FRONT        (1ull << 29)
-#define ENTFLAG_ENEM_IN_FOV          (1ull << 30)
-#define ENTFLAG_ENEM_IN_LOS          (1ull << 31)
-#define ENTFLAG_FIRST_SIGHTING       (1ull << 32)
-#define ENTFLAG_DYING_SETUP          (1ull << 33)
-#define ENTFLAG_HAD_ENEMY            (1ull << 34)
-#define ENTFLAG_SHOT_FIRED           (1ull << 35)
-#define ENTFLAG_DEAD_CHECKS_DONE     (1ull << 36)
-#define ENTFLAG_HOP_DONE             (1ull << 37)
-#define ENTFLAG_LOCKED               (1ull << 38)
-#define ENTFLAG_HAS_CAMERA_VIEW      (1ull << 39)
-#define ENTFLAG_REQUIRE_RESET        (1ull << 40)
-#define ENTFLAG_GRAV_LIFT_STATE      (1ull << 41)
-#define ENTFLAG_STOPSOUND_PLAYED     (1ull << 42)
-#define ENTFLAG_DAMAGE_ON_USE        (1ull << 43)
-#define ENTFLAG_MAKING_NOISE         (1ull << 44)
-#define ENTFLAG_ENABLED              (1ull << 45) // Instance updates
-#define ENTFLAG_ACTIVATED            (1ull << 46) // E.g. forcebridge visible, switch is flipped
-#define ENTFLAG_VISIBLE              (1ull << 47) // Renders
-#define ENTFLAG_ANIM_DEAD_DONE       (1ull << 48)
-#define ENTFLAG_NO_DYING_ANIM        (1ull << 49)
-#define ENTFLAG_NO_DEATH_FREEZE      (1ull << 50)
+#define ENTFLAG_KINEMATIC            (1ull <<  3)
+#define ENTFLAG_RIGIDBODY            (1ull <<  4)
+#define ENTFLAG_CHANGE_TEX_ON_ACTIVE (1ull <<  5)
+#define ENTFLAG_BLINK_TEX_ON_ACTIVE  (1ull <<  6)
+#define ENTFLAG_NO_SHADOWS           (1ull <<  7)
+#define ENTFLAG_ANIMATED             (1ull <<  8)
+#define ENTFLAG_ASLEEP               (1ull <<  9) // Check if enemy starts out asleep such as the sleeping sec-2 bots on level 8 in the maintenance and recharge bays.
+#define ENTFLAG_WALK_PATH_ON_START   (1ull << 10)
+#define ENTFLAG_TOUCHING_HURTS       (1ull << 11)
+#define ENTFLAG_ACT_AS_CORPSE_ONLY   (1ull << 12)
+#define ENTFLAG_DYING                (1ull << 13)
+#define ENTFLAG_DEATH_BURST_DONE     (1ull << 14)
+#define ENTFLAG_DEAD                 (1ull << 15)
+#define ENTFLAG_TELEPORT_ON_DEATH    (1ull << 16)
+#define ENTFLAG_GO_INTO_PAIN         (1ull << 17)
+#define ENTFLAG_DONT_LOOP_WAYPTS     (1ull << 18)
+#define ENTFLAG_VISIT_WAYPTS_RND     (1ull << 19)
+#define ENTFLAG_WANDERING            (1ull << 20)
+#define ENTFLAG_ACT_AS_TURRET        (1ull << 21)
+#define ENTFLAG_TARGID_ATTACHED      (1ull << 22)
+#define ENTFLAG_ENEM_IN_SIGHT        (1ull << 23)
+#define ENTFLAG_ENEM_IN_FRONT        (1ull << 24)
+#define ENTFLAG_ENEM_IN_FOV          (1ull << 25)
+#define ENTFLAG_ENEM_IN_LOS          (1ull << 26)
+#define ENTFLAG_FIRST_SIGHTING       (1ull << 27)
+#define ENTFLAG_DYING_SETUP          (1ull << 28)
+#define ENTFLAG_HAD_ENEMY            (1ull << 29)
+#define ENTFLAG_SHOT_FIRED           (1ull << 30)
+#define ENTFLAG_DEAD_CHECKS_DONE     (1ull << 31)
+#define ENTFLAG_HOP_DONE             (1ull << 32)
+#define ENTFLAG_LOCKED               (1ull << 33)
+#define ENTFLAG_HAS_CAMERA_VIEW      (1ull << 34)
+#define ENTFLAG_REQUIRE_RESET        (1ull << 35)
+#define ENTFLAG_GRAV_LIFT_STATE      (1ull << 36)
+#define ENTFLAG_STOPSOUND_PLAYED     (1ull << 37)
+#define ENTFLAG_DAMAGE_ON_USE        (1ull << 38)
+#define ENTFLAG_MAKING_NOISE         (1ull << 39)
+#define ENTFLAG_VISIBLE              (1ull << 40) // Renders
+#define ENTFLAG_ANIM_DEAD_DONE       (1ull << 41)
+#define ENTFLAG_NO_DYING_ANIM        (1ull << 42)
+#define ENTFLAG_NO_DEATH_FREEZE      (1ull << 43)
 #define QUESTBIT_ROBOT_SPAWN_DEACTIVATED      (1ull <<  0)
 #define QUESTBIT_ISOTOPE_INSTALLED            (1ull <<  1)
 #define QUESTBIT_SHIELD_ACTIVATED             (1ull <<  2)
@@ -933,7 +930,37 @@ typedef struct {
     bool      berserkActive;
 } DamageData;
 
-typedef /*FAT*/ struct {
+typedef struct {
+    uint16_t index;
+    uint16_t modelIndex;
+    uint16_t lodIndex;
+    uint16_t pad0;
+    uint32_t pad1;
+    uint32_t pad2; // Pad out to 16byte alignment
+    
+    Quaternion rotation;
+    
+    Vector3 position;
+    float volume;
+    
+    Vector3 scale;
+    int32_t cellIndex;
+    
+    Vector3 velocity;
+    uint32_t engflags;
+    
+    Vector3 forward;
+    uint16_t texIndex;
+    uint16_t glowIndex;
+    
+    Vector3 right;
+    uint16_t specIndex;
+    uint16_t normIndex;
+
+} EngineEnt;
+
+#define NUM_ENTITY_FIELDS 34
+typedef /*FAT*/ struct  {
     uint64_t entflags;
     uint64_t ioflags;
     uint16_t index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
@@ -948,6 +975,9 @@ typedef /*FAT*/ struct {
     uint16_t specIndex;
     uint16_t normIndex;
     uint16_t lodIndex;
+    bool cardchunk;
+    bool kinematic;
+    bool shadows;
     
     // Logic and I/O
     char targetname[TARGET_STRING_LENGTH];
@@ -1025,15 +1055,11 @@ typedef /*FAT*/ struct {
     int16_t ammo;
     int16_t ammo2;
     bool heldObjectLoadedAlternate;
+    bool changeTexOnActive;
+    bool blinkTexOnActive;
 
     uint16_t activateSFX;
     uint16_t lockedSFX;
-    int lev1SecCode;
-    int lev2SecCode;
-    int lev3SecCode;
-    int lev4SecCode;
-    int lev5SecCode;
-    int lev6SecCode;
     float health;
     float lastHealth;
     float cyberHealth;
@@ -1190,11 +1216,8 @@ typedef /*FAT*/ struct {
     // phew what a porker of a struct, it's been a eatin!
 } Entity;
 
-typedef struct {
-    Entity* entries;
-    uint32_t count;
-    uint32_t capacity;
-} DataParser;
+typedef struct { Entity* entries; uint32_t count; uint32_t capacity; } DataParser;
+typedef struct { uint8_t dataType; const char* fieldName; } EntityField;
 
 #include "miniaudio.h"
 typedef struct {
@@ -1263,6 +1286,7 @@ typedef struct {
     char audiologSubjects[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
     char audiologSenders[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
     char audioLogSpeech2Text[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
+    EntityField* entityFields;
 } GlobalContext;
 
 static inline __attribute__((always_inline)) void flag_set(uint64_t *flags, uint64_t bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }

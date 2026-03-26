@@ -24,7 +24,8 @@ static uint16_t** thread_out_tris   = NULL;
 static int        num_parse_threads = 0;
 typedef struct { const char* data; int size; } RawOBJ;
 typedef uint16_t half;
-
+typedef struct { uint16_t index; bool animated; uint8_t animationNum; char path[128]; } ModelData;
+typedef struct { ModelData* entries; uint32_t count; uint32_t capacity; } ModelDataParser;
 static inline half float_to_half(float f){
 	uint32_t x;__builtin_memcpy(&x,&f,4);
 	uint32_t s=x>>31;
@@ -290,14 +291,14 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(const char* _
 	return true;
 }
 
-typedef struct{uint32_t start_model;uint32_t end_model;RawOBJ* raw_models;int32_t* index_to_parser;const DataParser* data_parser;int thread_id;}ModelParseTask;
+typedef struct{uint32_t start_model;uint32_t end_model;RawOBJ* raw_models;int32_t* index_to_parser;const ModelDataParser* data_parser;int thread_id;}ModelParseTask;
 
 static void* ModelParsingWorker(void* argument){
 	ModelParseTask* task=(ModelParseTask*)argument;
 	for(uint32_t current_model=task->start_model;current_model<task->end_model;++current_model){
 		int32_t parser_index=task->index_to_parser[current_model];
 		if(unlikely(parser_index<0||parser_index>=(int32_t)task->data_parser->count))continue;
-		modelHasAnimation[current_model]=(task->data_parser->entries[parser_index].entflags&ENTFLAG_ANIMATED);
+		modelHasAnimation[current_model]=(task->data_parser->entries[parser_index].animationNum < 255);
 		const char* model_data=task->raw_models[current_model].data;
 		int model_file_size=task->raw_models[current_model].size;
 		if(unlikely(!model_data||model_file_size<=0))continue;
@@ -322,11 +323,106 @@ static void* ModelParsingWorker(void* argument){
 	return NULL;
 }
 
+bool ParseModelData(ModelDataParser *parser, uint16_t maxSize, const char *filename) {
+    OsFileHandle fd; int st_size; char* data = OS_OpenAndAllocateFileBufferReadonly(filename,&fd,&st_size);
+    char* cursor = data; char* end = data + st_size;
+    uint32_t lineNum = 0, max_index = 0;
+    while (cursor < end) { // First pass: count entries and find max index
+        char* start = cursor;
+        while (cursor < end && *cursor != '\n' && *cursor != '\r') cursor++;
+        size_t lineLen = cursor - start;
+        lineNum++;
+        if (lineLen <= 0) { cursor++; continue; }
+
+        while (CharacterIsEmpty(*start)) start++; // Trim leading whitespace
+        char *lineend = start + lineLen - 1;
+        while (lineend > start && CharacterIsEmpty(*lineend)) lineend--; // Trim trailing whitespace
+        if (*start == '\0' || (start[0] == '/' && start[1] == '/')) continue; // Skip empty lines and commented lines
+        if (start[0] == '#') { continue; } // Skip entry start marker, only count ones with valid index thereafter in the key|value block lines
+
+        char *colon = StringFindFirstCharWithin(start, ':');
+        if (colon && StringCompareUpToLength(start, "index", colon - start) == 0) {
+            char *value = colon + 1;
+            while (CharacterIsEmpty(*value)) value++;
+            uint32_t idx = parse_numberu32(value, start, lineNum);
+            if (idx > max_index) max_index = idx;
+       }
+       
+       if (cursor < end && *cursor == '\r') cursor++;
+       if (cursor < end && *cursor == '\n') cursor++;
+    }
+    
+    if (max_index == 0) { DualLogWarn("No entries found in %s\n", filename); OS_DeallocateRAM(data,st_size); return true; }
+    if (max_index >= maxSize) { DualLogWarn("Too large of index found in %s, %u exceeds limit %u\n", filename, max_index, maxSize); OS_DeallocateRAM(data,st_size); return true; }
+
+    uint32_t entry_count = max_index + 1;
+    ModelData *new_entries = OS_AllocateRAM(NULL,entry_count * sizeof(ModelData),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);  
+    parser->entries = new_entries;
+    for (uint32_t i = 0; i < entry_count; ++i) { parser->entries[i] = (ModelData){ .index=UINT16_MAX, .animated=false, .animationNum=255, .path={0} }; }
+    parser->capacity = entry_count;
+    parser->count = entry_count;
+    ModelData entry = (ModelData){ .index=UINT16_MAX, .animated=false, .animationNum=255, .path={0} };
+    lineNum = 0;
+    cursor = data; end = data + st_size; // Rewind
+    while (cursor < end) {
+        char* start = cursor;
+        while (cursor < end && *cursor != '\n' && *cursor != '\r') cursor++;
+        size_t lineLen = cursor - start;
+        lineNum++;
+        if (lineLen < 3) { cursor++; continue; } // Must have at least k:v, skip if shorter
+
+        while (CharacterIsEmpty(*start)) start++; // Trim leading whitespace
+        char *lineend = start + lineLen - 1;
+        while (lineend > start && CharacterIsEmpty(*lineend)) lineend--; // Trim trailing whitespace
+        if (start[0] == '/' && start[1] == '/') continue; // Skip comment(ed out) line
+
+        if (*start == '#') {
+            if (entry.path[0] && entry.index != UINT16_MAX && entry.index < parser->capacity) parser->entries[entry.index] = entry;
+            entry = (ModelData){ .index=UINT16_MAX, .animated=false, .animationNum=255, .path={0} };
+            if (lineend > start) {
+                size_t actualLen = lineend - (start + 1) + 1;
+                if (actualLen >= sizeof(entry.path)) actualLen = sizeof(entry.path) - 1;
+                __builtin_memcpy(entry.path, start + 1, actualLen);
+                entry.path[actualLen] = '\0';
+            }
+            continue;
+        }
+
+        // Handle key-value pair
+        char *colon = StringFindFirstCharWithin(start, ':');
+        if (colon) {
+            char *key = start;
+            char *value = colon + 1;
+            while (CharacterIsEmpty(*key) && key < colon) key++;
+            while (CharacterIsEmpty(*value) && value < lineend) value++;
+            size_t keylen = colon - key; size_t vallen = (lineend >= value) ? (lineend - value + 1) : 0;
+            if (keylen > 0 && vallen > 0) {
+                char trimmed_key[256];
+                char trimmed_value[256];
+                StringCopyInto_A_SubstringFrom_B(trimmed_key, keylen, key, 256);
+                StringCopyInto_A_SubstringFrom_B(trimmed_value, vallen, value, 256);
+                char *key_end = trimmed_key + GetStringLength(trimmed_key) - 1;
+                char *val_end = trimmed_value + GetStringLength(trimmed_value) - 1;
+                while (key_end > trimmed_key && CharacterIsEmpty(*key_end)) *key_end-- = '\0';
+                while (val_end > trimmed_value && CharacterIsEmpty(*val_end)) *val_end-- = '\0';
+                     if (StringsAreEqual(trimmed_key, "index"))        entry.index = parse_numberu16(trimmed_value, start, lineNum);
+                else if (StringsAreEqual(trimmed_key, "animationNum")) entry.animationNum = parse_numberu16(trimmed_value, start, lineNum);
+                else if (StringsAreEqual(trimmed_key, "animated"))     entry.animated = parse_numberu8(trimmed_value, start, lineNum);
+            } else DualLogWarn("Invalid key-value pair at line %u: %s\n", lineNum, start);
+        } else DualLogWarn("No colon found in line %u: %s\n", lineNum, start);
+    }
+
+    // Store last entry
+    if (entry.path[0] && entry.index != UINT16_MAX && entry.index < parser->capacity) parser->entries[entry.index] = entry;
+    OS_DeallocateRAM(data,st_size);
+    return true;
+}
+
 void LoadModels(void){
 	if(unlikely(loadedModelsMaxIndex>0))return;
 	double start_time=get_time();
-	DataParser mpars;
-	if(unlikely(!parse_data_file(&mpars,MODEL_IDX_MAX,"./Data/models.txt"))){DualLogError("Could not parse ./Data/models.txt!\n");OS_Exit(1);}
+	ModelDataParser mpars;
+	if(unlikely(!ParseModelData(&mpars,MODEL_IDX_MAX,"./Data/models.txt"))){DualLogError("Could not parse ./Data/models.txt!\n");OS_Exit(1);}
 	int32_t max_index=-1;
 	for(uint32_t k=0;k<mpars.count;++k){
 		if(mpars.entries[k].index>max_index&&mpars.entries[k].index!=UINT16_MAX)max_index=mpars.entries[k].index;
@@ -437,7 +533,7 @@ void LoadModels(void){
 	glBindBuffer(GL_ARRAY_BUFFER,0);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0);
 	glFlush();glFinish();
-	OS_DeallocateRAM(mpars.entries,mpars.count*sizeof(Entity));
+	OS_DeallocateRAM(mpars.entries,mpars.count*sizeof(ModelData));
 	DualLog(" total vertices: %u, total tris: %u, took %f secs\n",total_vertices,total_tris,get_time()-start_time);
 	DebugRAM("After Load Models");
 }

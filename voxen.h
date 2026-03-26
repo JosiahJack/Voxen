@@ -304,21 +304,16 @@ static inline __attribute__((always_inline)) void mul_mat4(float *out, const flo
 	out[15] = a[3] * b[12] + a[7] * b[13] + a[11]* b[14] + a[15] * b[15];
 }
 
-bool parse_data_file(DataParser *parser, uint16_t maxSize, const char *filename);
-
 extern uint16_t invalidModelIndexCount;
 extern uint16_t startOfDoubleSidedInstances;
 extern uint16_t startOfTransparentInstances;
 extern uint16_t endOfModels;
 void InitializeEntity(Entity* entry);
-void LoadEntities(void);
 void LoadLevel(uint8_t curlevel);
 void EnableCheatArsenal(uint8_t level);
 float GetPainStatic(void);
 Color GetPainStaticColor(void);
 extern int currentMonitorIndex;
-typedef struct { uint64_t magicNumber; double thisRunTime; bool isLoading; int missionSplitID; } AutoSplitterData;
-extern AutoSplitterData autoSplitter;
 void ScreenShake(float force, double duration);
 void Shake(float force);
 void InitAfterLoad(void);

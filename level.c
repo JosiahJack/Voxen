@@ -23,7 +23,6 @@ void InitializeEntity(Entity* entry) { // Blank entity, no index yet, for initia
     entry->dynamicFriction = entry->staticFriction = 0.6f;
     entry->frictionCombine = entry->bounceCombine = PHYS_COMBINE_AVG;
     entry->volume = 1.0f;
-    flag_set(&entry->entflags, ENTFLAG_TEST_PERSISTENT, false);
     for (int i=0;i<MAX_CHILD_COUNT;++i) {
         entry->child[i] = UINT16_MAX;
         entry->child_offset[i].x = entry->child_offset[i].y = entry->child_offset[i].z = 0.0f;
@@ -52,7 +51,7 @@ ENGINE_TO_MOD void AddInstance(uint16_t entIdx, uint16_t i) {
     if (Sys_Global.instances[i].normIndex >= MAX_VALID_TEXTURE) Sys_Global.instances[i].normIndex = 0;
     Sys_Global.instances[i].lodIndex = Sys_Global.entities[entIdx].lodIndex;
     flag_set(&Sys_Global.instances[i].entflags, ENTFLAG_CARDCHUNK,  isCardChunk);
-    flag_set(&Sys_Global.instances[i].entflags, ENTFLAG_USEGRAVITY,  Sys_Global.entities[entIdx].entflags & ENTFLAG_USEGRAVITY);
+    Sys_Global.instances[i].gravity = Sys_Global.entities[entIdx].gravity >= 0.0f ? Sys_Global.entities[entIdx].gravity : 0.0f; // No up falling.
     flag_set(&Sys_Global.instances[i].entflags, ENTFLAG_KINEMATIC,  Sys_Global.entities[entIdx].entflags & ENTFLAG_KINEMATIC);
     flag_set(&Sys_Global.instances[i].entflags, ENTFLAG_RIGIDBODY,  Sys_Global.entities[entIdx].entflags & ENTFLAG_RIGIDBODY);
     flag_set(&Sys_Global.instances[i].entflags, ENTFLAG_NO_SHADOWS,  Sys_Global.entities[entIdx].entflags & ENTFLAG_NO_SHADOWS);
@@ -120,7 +119,8 @@ ENGINE_TO_MOD void DeleteInstance(uint16_t i) {
     
     if (Sys_Global.instances[i].entflags & ENTFLAG_HAS_CAMERA_VIEW) RemoveCameraPosition(i);
     uint16_t endInstance = vmax(vmin(INSTANCE_COUNT - 1, Sys_Global.loadedInstances - 1),START_INDEX_LEVEL_INSTANCES);
-    for (;i<endInstance;++i) Sys_Global.instances[i] = Sys_Global.instances[i + 1]; // Shift the entire list down, overwriting the entity we're deleting at starting i
+//     for (;i<endInstance;++i) Sys_Global.instances[i] = Sys_Global.instances[i + 1]; // Shift the entire list down, overwriting the entity we're deleting at starting i
+    for (;i<endInstance;++i) __builtin_memcpy(&Sys_Global.instances[i], &Sys_Global.instances[i+1], sizeof(Entity));
     --Sys_Global.loadedInstances; // Shift final marker.  It's history!
 }
 

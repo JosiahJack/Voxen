@@ -3,6 +3,10 @@
 #define MOD_INTEROP_IMPLEMENTATION
 #include "interop.h"
 extern GlobalContext* Eng_Global; extern CheatsSystem* Eng_Cheats; extern SettingsSystem* Eng_Settings; extern TextSystem* Eng_Text; extern SystemUI* Eng_UI;
+// For use with LiveSplit or other future speedrunner utilities for doing speedruns
+typedef struct __attribute__((packed, aligned(8))) { uint64_t magicNumber; double thisRunTime; bool isLoading; int32_t missionSplitID; } AutoSplitterData;
+extern AutoSplitterData autoSplitter;
+
 #define MULTI_MEDIA_TAB_EMAIL_TABLE 0
 #define MULTI_MEDIA_TAB_LOG_TABLE   1
 #define MULTI_MEDIA_TAB_DATA_TABLE  2
@@ -107,9 +111,7 @@ typedef struct {
 	int projectile3Prefab;
 } NPCTable;
 extern NPCTable npcTable[NUM_AI_TYPES];
-
 extern uint16_t useableItemsFrobIcons[94];
-
 typedef struct {
     bool inCombat;
     bool inZone;
@@ -122,6 +124,12 @@ typedef struct {
     bool levelEntry;
 } MusicSystem;
 extern MusicSystem Sys_Music;
+extern int lev1SecCode;
+extern int lev2SecCode;
+extern int lev3SecCode;
+extern int lev4SecCode;
+extern int lev5SecCode;
+extern int lev6SecCode;
 
 uint8_t GetCurrentLevelSecurity(void);
 uint16_t GetImpactType(uint16_t instanceIdx);
@@ -130,6 +138,7 @@ void TakeEnergy(float drain);
 void GiveEnergy(float give, EnergyType type);
 void BioMonitorInit(void);
 void BioMonitorUpdate(uint16_t p);
+
 extern bool vmailActive;
 extern const AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS_PER_MODEL];
 extern const char* sounds[SOUNDS_COUNT];

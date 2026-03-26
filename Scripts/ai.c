@@ -607,7 +607,7 @@ static void AIRunMove(Entity* self) {
     float rs = npcTable[self->index - 419].runSpeed;
     self->velocity = (Vector3){
         self->forward.x * rs,
-        (self->entflags & ENTFLAG_USEGRAVITY) ? self->velocity.y : self->forward.y * rs,
+        (vabs(self->gravity) > 0.05f) ? self->velocity.y : self->forward.y * rs,
         self->forward.z * rs
     };
 }
@@ -758,10 +758,8 @@ static void AIDyingSetup(Entity* self) {
     // Physics for death
     if (ai_is_cyber(self)) {
         self->gravity = 0.0f;
-        flag_set(&self->entflags, ENTFLAG_USEGRAVITY, false);
     } else {
         self->gravity = 1.0f;
-        flag_set(&self->entflags, ENTFLAG_USEGRAVITY, true);
         flag_set(&self->entflags, ENTFLAG_KINEMATIC, true);
     }
 
@@ -800,12 +798,10 @@ static void AIDead(uint16_t idx) {
     self->layer = PhysicsLayer_Corpse;
     if (self->entflags & ENTFLAG_TELEPORT_ON_DEATH) {
         self->gravity = 1.0f;
-        flag_set(&self->entflags,ENTFLAG_USEGRAVITY,true);
         flag_set(&self->entflags,ENTFLAG_VISIBLE,false);
         // TODO: TeleportAway(ai_self_idx(self)), DeleteInstance(idx);
     } else if (ai_is_cyber(self)) {
         self->gravity = 0.0f;
-        flag_set(&self->entflags, ENTFLAG_USEGRAVITY,false);
         flag_set(&self->entflags, ENTFLAG_VISIBLE,false);
         // TODO: Gib(ai_self_idx(self)) — spawn gibs
         DeleteInstance(idx);
@@ -813,10 +809,7 @@ static void AIDead(uint16_t idx) {
         // Enable search collider for non-gib corpses (Avian Mutant index 2 always searchable)
         self->layer = PhysicsLayer_Corpse | PhysicsLayer_CorpseSearchable;
         self->velocity.x = 0.0f; self->velocity.z = 0.0f;
-        if (self->index != 433) { // Hopper deactivates itself
-            self->gravity = 1.0f;
-            flag_set(&self->entflags, ENTFLAG_USEGRAVITY, true);
-        }
+        if (self->index != 433) self->gravity = 1.0f;// Hopper deactivates itself
     }
 
     flag_set(&self->entflags, ENTFLAG_DEAD_CHECKS_DONE, true);
@@ -831,6 +824,7 @@ static DamageData SetNPCData(Entity* self, int n) {
         case 2: dd.damage = npc->damage2; dd.attackType = npc->attackType2; break;
         default: dd.damage = npc->damage3; dd.attackType = npc->attackType3; break;
     }
+    
     dd.penetration = 0;
     dd.defense = 0;
     return dd;
@@ -954,7 +948,7 @@ static void ProjectileLaunched(Entity* self, int n) {
     proj->forward  = dir;
     // TODO: store damage data into projectile entity fields for deferred impact
     Vector3 shove = scale_vector3(dir, launchSpd);
-    if (self->entflags & ENTFLAG_USEGRAVITY) { shove.x += self->velocity.x; shove.z += self->velocity.z; }
+    if (vabs(self->gravity) > 0.05f) { shove.x += self->velocity.x; shove.z += self->velocity.z; }
     proj->velocity = (Vector3){0,0,0};
     AddForce(bb, shove, true);
     flag_set(&proj->entflags, ENTFLAG_ACTIVE | ENTFLAG_VISIBLE | ENTFLAG_RIGIDBODY, true);
@@ -1129,13 +1123,7 @@ void AIControllerUpdate(uint16_t idx) {
     Entity* self = &Eng_Global->instances[idx];
     if (!(self->entflags & ENTFLAG_ACTIVE)) return;
 
-    if (!ai_is_cyber(self) && npcTable[self->index - 419].moveType != AIMoveType_Fly
-        && self->currentState != AIState_Dead && self->currentState != AIState_Dying
-        && !(self->entflags & ENTFLAG_USEGRAVITY)) {
-        self->gravity = 1.0f;
-        flag_set(&self->entflags, ENTFLAG_USEGRAVITY, true);
-    }
-
+    if (!ai_is_cyber(self) && npcTable[self->index - 419].moveType != AIMoveType_Fly && self->currentState != AIState_Dead && self->currentState != AIState_Dying) self->gravity = 1.0f;
     flag_set(&self->entflags, ENTFLAG_ENEM_IN_SIGHT, AICheckIfPlayerInSight(self));
     uint16_t eidx = self->enemey;
     if (eidx && ai_has_health(self)) {
