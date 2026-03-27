@@ -26,7 +26,7 @@ typedef struct { const char* data; int size; } RawOBJ;
 typedef uint16_t half;
 typedef struct { uint16_t index; bool animated; uint8_t animationNum; char path[128]; } ModelData;
 typedef struct { ModelData* entries; uint32_t count; uint32_t capacity; } ModelDataParser;
-static inline half float_to_half(float f){
+static inline __attribute__((always_inline)) half float_to_half(float f){
 	uint32_t x;__builtin_memcpy(&x,&f,4);
 	uint32_t s=x>>31;
 	uint32_t ue=(x>>23)&0xff;
@@ -43,7 +43,7 @@ static inline half float_to_half(float f){
 	return(half)((s<<15)|0x7c00);
 }
 
-static inline float fast_atof(const char** p){
+static inline __attribute__((always_inline)) float fast_atof(const char** p){
 	float value=0.0f,sign=1.0f;
 	while(**p==' '||**p=='\t')(*p)++;
 	if(**p=='-'){sign=-1.0f;(*p)++;}
@@ -52,7 +52,7 @@ static inline float fast_atof(const char** p){
 	return sign*value;
 }
 
-static inline int32_t fast_atoi(const char** p){
+static inline __attribute__((always_inline)) int32_t fast_atoi(const char** p){
 	int32_t val=0;int32_t sign=1;
 	while(**p==' '||**p=='\t')(*p)++;
 	if(**p=='-'){sign=-1;(*p)++;}
@@ -235,7 +235,7 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(const char* _
 	}
 	if(unlikely(expanded_count==0))return false;
 
-#define HASH_SIZE 32768
+    #define HASH_SIZE 32768
 	uint32_t hash_table[HASH_SIZE];
 	__builtin_memset(hash_table,0xFF,sizeof(hash_table));
 	float* unique_verts=scratch_verts;
@@ -427,12 +427,11 @@ void LoadModels(void){
 	for(uint32_t k=0;k<mpars.count;++k){
 		if(mpars.entries[k].index>max_index&&mpars.entries[k].index!=UINT16_MAX)max_index=mpars.entries[k].index;
 	}
+	
 	loadedModelsMaxIndex=(uint16_t)max_index+1U;
 	DualLog("Loading models (%d) ...",mpars.count);
-
 	modelVertices=OS_AllocateRAM(NULL,loadedModelsMaxIndex*sizeof(uint8_t*),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
 	modelTriangles=OS_AllocateRAM(NULL,loadedModelsMaxIndex*sizeof(uint16_t*),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
-
 	size_t index_map_size=loadedModelsMaxIndex*sizeof(int32_t);
 	int32_t* index_to_parser=OS_AllocateRAM(NULL,index_map_size,PROT_READ|PROT_WRITE,MAP_ANONYMOUS|MAP_PRIVATE|MAP_POPULATE,OS_INVALID_HANDLE);
 	__builtin_memset(index_to_parser,-1,index_map_size);
@@ -483,9 +482,13 @@ void LoadModels(void){
 	}
 
 	pthread_t worker_threads[32];
-	for(int t=0;t<num_parse_threads;++t)pthread_create(&worker_threads[t],NULL,ModelParsingWorker,&tasks[t]);
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_attr_setstacksize(&attr, 8 * 1024 * 1024);
+	for(int t=0;t<num_parse_threads;++t)pthread_create(&worker_threads[t],&attr,ModelParsingWorker,&tasks[t]);
 	for(int t=0;t<num_parse_threads;++t)pthread_join(worker_threads[t],NULL);
 
+    pthread_attr_destroy(&attr);
 	for(int t=0;t<num_parse_threads;++t){
 		OS_DeallocateRAM(thread_temp_nrm[t],MAX_VERT_ELEMENT_SIZE*3*sizeof(float));
 		OS_DeallocateRAM(thread_temp_uv[t],MAX_VERT_ELEMENT_SIZE*2*sizeof(float));

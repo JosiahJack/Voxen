@@ -206,6 +206,7 @@ ENGINE_TO_MOD void LoadFieldIntoLight(char* trimmed_key, char* trimmed_value, ch
     else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[29]"))    intervalStepisLerping[lightsIdx][29] = parse_bool(trimmed_value, initialLine, lineNum);
     else if (StringsAreEqual(trimmed_key,"minIntensity"))    lightMinIntensity[lightsIdx] = parse_float(trimmed_value, initialLine, lineNum);
     else if (StringsAreEqual(trimmed_key,"maxIntensity"))    lightMaxIntensity[lightsIdx] = parse_float(trimmed_value, initialLine, lineNum);
+//     else if (StringsAreEqual(trimmed_key,"shadows"))         lightCastsShadows[lightsIdx] = trimmed_value[0] != 'N';//'N'one
 }
 
 ENGINE_TO_MOD void AddLightFromLoad(bool lightOnRead, int32_t* lightsIdx, uint8_t lightType, uint32_t lineNum) { // Fields already read line by line using function above, so just set needed stuff from level load.
@@ -213,6 +214,7 @@ ENGINE_TO_MOD void AddLightFromLoad(bool lightOnRead, int32_t* lightsIdx, uint8_
     if (Sys_Global.loadedLights >= LIGHT_COUNT) { DualLogError("Too many lights %u in level%d.txt!\n",*lightsIdx,Sys_Global.currentLevel); OS_Exit(1); }
     
     int32_t litIdx = *lightsIdx * LIGHT_DATA_SIZE;
+    lightCastsShadows[*lightsIdx] = true;//(lights[litIdx + LIGHT_DATA_OFFSET_RANGE] >= 0.32f);
     if (!lightOnRead) {
         lightOn[*lightsIdx] = true;
         lightMaxIntensity[*lightsIdx] = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
@@ -223,7 +225,6 @@ ENGINE_TO_MOD void AddLightFromLoad(bool lightOnRead, int32_t* lightsIdx, uint8_
         lightLerpUp[*lightsIdx] = true;
     }
 
-    lightCastsShadows[*lightsIdx] = (lights[litIdx + LIGHT_DATA_OFFSET_RANGE] >= 0.32f);
     if (lightType == 1) {
         if (lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] < 5.0f) DualLogWarn("Spotlight %d on line %d loaded with spotAngle less than 5deg\n",*lightsIdx,lineNum+1);
     } else if (lightType == 2) {
@@ -231,7 +232,7 @@ ENGINE_TO_MOD void AddLightFromLoad(bool lightOnRead, int32_t* lightsIdx, uint8_
     } else {
         lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = 0.0f; // Force to not be a spot light
     }
-    if (lightMaxIntensity[*lightsIdx] < 0.16f || lights[litIdx + LIGHT_DATA_OFFSET_RANGE] < 0.32f) { *lightsIdx = *lightsIdx - 1; Sys_Global.loadedLights--; }
+//     if (lightMaxIntensity[*lightsIdx] < 0.16f || lights[litIdx + LIGHT_DATA_OFFSET_RANGE] < 0.32f) { *lightsIdx = *lightsIdx - 1; Sys_Global.loadedLights--; }
 }
 
 ENGINE_TO_MOD int32_t AddLight(Vector3 pos, Color col, float range, float intensity, float maxIntensity, float minIntensity, float spotAng, Quaternion spotDir, bool on, bool shadOn) {
@@ -254,19 +255,24 @@ ENGINE_TO_MOD int32_t AddLight(Vector3 pos, Color col, float range, float intens
     return lightsIdx;
 }
 
+#define IS_CHANGED(a, b) _Generic((a), float:(vabs((a) - (b)) > 0.0001f), default:((a) != (b)))
+#define CHECK_UPDATE(target, value) do { if (IS_CHANGED(target, value)) { (target) = (value); changed = true; }} while(0)
 ENGINE_TO_MOD void UpdateLight(uint16_t lightsIdx, Vector3 pos, Color col, float range, float intensity, float maxIntensity, float minIntensity, float spotAng, Quaternion spotDir, bool on, bool shadOn) {
     int32_t litIdx = lightsIdx * LIGHT_DATA_SIZE;
-    lightOn[lightsIdx] = on;
-    lightMinIntensity[lightsIdx] = minIntensity; lightMaxIntensity[lightsIdx] = maxIntensity;
+    bool changed = false;
+    CHECK_UPDATE(lightOn[lightsIdx],on);
+    lightCastsShadows[lightsIdx] = shadOn;
+    lightMinIntensity[lightsIdx] = minIntensity;
+    lightMaxIntensity[lightsIdx] = maxIntensity;
     lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = intensity;
     lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = spotAng;
-    lights[litIdx + LIGHT_DATA_OFFSET_RANGE] = range;
-    lights[litIdx + LIGHT_DATA_OFFSET_R] = col.r; lights[litIdx + LIGHT_DATA_OFFSET_G] = col.g; lights[litIdx + LIGHT_DATA_OFFSET_B] = col.b;
-    lights[litIdx + LIGHT_DATA_OFFSET_POSX] = pos.x; lights[litIdx + LIGHT_DATA_OFFSET_POSY] = pos.y; lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = pos.z;
-    lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRX] = spotDir.x; lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRY] = spotDir.y; lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRZ] = spotDir.z; lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRW] = spotDir.w;
-    lightsNewPosition[lightsIdx] = pos;
-    lightCastsShadows[lightsIdx] = shadOn;
-    lightDirty[lightsIdx] = true;
+    CHECK_UPDATE(lights[litIdx + LIGHT_DATA_OFFSET_RANGE], range);
+    lights[litIdx+LIGHT_DATA_OFFSET_R]=col.r; lights[litIdx+LIGHT_DATA_OFFSET_G]=col.g; lights[litIdx+LIGHT_DATA_OFFSET_B]=col.b;
+    CHECK_UPDATE(lights[litIdx + LIGHT_DATA_OFFSET_POSX], pos.x);
+    CHECK_UPDATE(lights[litIdx + LIGHT_DATA_OFFSET_POSY], pos.y);
+    CHECK_UPDATE(lights[litIdx + LIGHT_DATA_OFFSET_POSZ], pos.z);
+    lights[litIdx+LIGHT_DATA_OFFSET_SPOTDIRX]=spotDir.x; lights[litIdx+LIGHT_DATA_OFFSET_SPOTDIRY]=spotDir.y; lights[litIdx+LIGHT_DATA_OFFSET_SPOTDIRZ]=spotDir.z; lights[litIdx+LIGHT_DATA_OFFSET_SPOTDIRW]=spotDir.w;
+    if (changed) { lightsNewPosition[lightsIdx]=pos; lightDirty[lightsIdx]=true; }
 }
 
 ENGINE_TO_MOD int32_t PosGetCellCoords(float pos_x, float pos_z) { return (PosGetCellCoordZ(pos_z) * WORLDX) + PosGetCellCoordX(pos_x); } // Clamped just above.
@@ -304,6 +310,7 @@ void LoadLevel(uint8_t curlevel) {
     levelFileHandle = OS_OpenReadonly(filename);
     LoadLevelMod(curlevel);
     OS_Close(levelFileHandle);
+    for (int i=0;i<Sys_Global.loadedLights;++i) lightMaxIntensity[i] *= 2.0f;
     DualLog("Loaded %d entities, %u static lights for Level %d... took %f secs\n",Sys_Global.loadedInstances,Sys_Global.loadedLights,curlevel,get_time() - start_time);
     DebugRAM("end of LoadLevel instances");
     RenderLoadingProgress(110,"Loading models...");

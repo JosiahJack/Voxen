@@ -1028,7 +1028,7 @@ MOD_TO_ENGINE void LoadLevelMod(uint8_t curlevel) {
                 else if (StringsAreEqual(trimmed_key,"amount"))          inst->amount = parse_float(trimmed_value, initialLine, lineNum);
                 else if (StringsAreEqual(trimmed_key,"resetTime"))       inst->resetTime = parse_float(trimmed_value, initialLine, lineNum);
                 else if (StringsAreEqual(trimmed_key,"minSecurityLevel"))inst->minSecurityLevel = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"damageOnUse"))     flag_set(&inst->entflags, ENTFLAG_DAMAGE_ON_USE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"damageOnUse"))     inst->damage = parse_float(trimmed_value,initialLine,lineNum);
                 else if (StringsAreEqual(trimmed_key,"target"))          StringCopyInto_A_From_B(inst->target,trimmed_value,TARGET_STRING_LENGTH);
                 else if (StringsAreEqual(trimmed_key,"argvalue"))        StringCopyInto_A_From_B(inst->argvalue,trimmed_value,TARGET_STRING_LENGTH);
                 else if (StringsAreEqual(trimmed_key,"targetname"))      StringCopyInto_A_From_B(inst->targetname,trimmed_value,TARGET_STRING_LENGTH);

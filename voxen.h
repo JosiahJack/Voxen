@@ -325,7 +325,6 @@ void set_master_volume(void);
 char CharToLower(const char c);
 char* StringFindSubstring(const char* haystack, const char* needle);
 const char* StringFindLastChar(const char* str, const char c);
-char* StringFindFirstCharWithin(const char *s, char c);
 char* StringReturnUpToDelimiterAndLopOffAndShiftOriginal(char* str, const char delim, char** saveptr);
 int StringCompareUpToLength(const char* s1, const char* s2, size_t n);
 extern uint16_t loadedTexturesMaxIndex;

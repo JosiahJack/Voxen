@@ -37,7 +37,7 @@ typedef __INTPTR_TYPE__ intptr_t;
 #endif
 ENGINE_TO_MOD void DualLogError(const char* fmt, ...);
 char* StringFindSubstring(const char* haystack, const char* needle);
-char* StringFindFirstCharWithin(const char *s, char c);
+ENGINE_TO_MOD char* StringFindFirstCharWithin(const char *s, char c);
 typedef struct {
     uint64_t mtime_ns;
     uint64_t size;
@@ -282,7 +282,7 @@ static inline __attribute__((always_inline)) int OS_GetNumThreads(void) {
 #ifdef WINDOWS
     SYSTEM_INFO si;
     GetSystemInfo(&si);
-    return (int)si.dwNumberOfProcessors;
+    return (int)2;//si.dwNumberOfProcessors;
 #else
     return (int)sysconf(_SC_NPROCESSORS_ONLN);
 #endif

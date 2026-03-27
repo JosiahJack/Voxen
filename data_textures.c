@@ -26,7 +26,7 @@ static int32_t* textureWidths = NULL;
 static int32_t* textureHeights = NULL;
 void stbi__arena_init(void) {
     if (!stbi__arena_base) {
-        stbi__arena_base = OS_AllocateRAM(NULL, STBI_ARENA_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+        stbi__arena_base = OS_AllocateRAM(NULL,STBI_ARENA_SIZE,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
         stbi__arena_cursor = stbi__arena_base;
         stbi__arena_end = stbi__arena_base + STBI_ARENA_SIZE;
     }
@@ -34,7 +34,7 @@ void stbi__arena_init(void) {
 
 void stbi__arena_init_thread(StbiArena* arena) {
     if (!arena->base) {
-        arena->base = OS_AllocateRAM(NULL, STBI_ARENA_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+        arena->base = OS_AllocateRAM(NULL,STBI_ARENA_SIZE,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
         arena->cursor = arena->base;
         arena->end = arena->base + STBI_ARENA_SIZE;
     }
@@ -48,7 +48,7 @@ void* stbi__arena_alloc(size_t size) {
 
     uint8_t* aligned = stbi__arena_cursor;
     if (aligned + size > stbi__arena_end) {
-        DualLogError("stbi__arena_alloc failed buffer overflowed with %zu vs %zu\n", (size_t)aligned + size, (size_t)stbi__arena_end);
+        DualLogError("stbi__arena_alloc failed buffer overflowed with %zu vs %zu\n",(size_t)aligned + size,(size_t)stbi__arena_end);
         return NULL;
     }
 
