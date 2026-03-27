@@ -697,7 +697,7 @@ ENGINE_TO_MOD void PortalCulling(void) { // Called just once at end of animation
     
     DetermineVisibleCells(playerCellX,playerCellZ); // Recompute full PVS with new closed edges for all portal states.  So much for the precomputed set.
     CameraViewUnculling();
-    for (uint16_t i=0; i<Sys_Global.loadedLights;++i) lightDirty[i] = true;
+    for (uint16_t i=0; i<Sys_Global.loadedLights;++i) flag_setu32(&lights[i].lflags,LDIRTY,true);
 }
 
 static inline __attribute__((always_inline)) void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* pos_z) {

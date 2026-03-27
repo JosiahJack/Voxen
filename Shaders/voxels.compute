@@ -3,9 +3,21 @@
 #version 430 core
 layout(local_size_x = 32, local_size_y = 32) in;
 
+struct Light {
+    vec3  pos;
+    float intensity;
+    vec3  col;
+    uint  lflags;
+    float range;
+    float spotAng;
+    float maxIntensity;
+    float minIntensity;
+    vec4  spotDir; // Quaternion
+};
+
 layout(std430, binding = 6) buffer VoxelLightListCounts { uint voxelLightListCounts[]; };
 layout(std430, binding = 4) buffer CullingData { uint gridCellStates[]; };
-layout(std430, binding = 19) buffer LightIndices { float lights[]; };
+layout(std430, binding = 19) buffer LightIndices { Light lights[]; };
 layout(std430, binding = 27) buffer UniqueLightLists { uint uniqueLightLists[]; };
 
 layout(location = 0) uniform float voxelMinCenterX;
@@ -17,12 +29,6 @@ layout(location = 5) uniform vec3 camPos;
 layout(location = 6) uniform uint maxLightsPerVoxel;
 
 const int WORLD_X_VOXELCOUNT = 512;
-const int LIGHT_DATA_SIZE = 13;
-const int LIGHT_DATA_OFFSET_POSX = 0;
-const int LIGHT_DATA_OFFSET_POSY = 1;
-const int LIGHT_DATA_OFFSET_POSZ = 2;
-const int LIGHT_DATA_OFFSET_INTENSITY = 3;
-const int LIGHT_DATA_OFFSET_RANGE = 4;
 const float VOXEL_SIZE = 0.32;
 
 void main() {    
@@ -39,15 +45,14 @@ void main() {
     
     uint count = 0;
     for (uint lightIdx = 0; lightIdx < loadedLights; ++lightIdx) {
-        uint litIdx = lightIdx * LIGHT_DATA_SIZE;
-        vec3 lightPos = vec3(lights[litIdx + LIGHT_DATA_OFFSET_POSX], 0.0, lights[litIdx + LIGHT_DATA_OFFSET_POSZ]);
-        float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-        float intensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
+        vec3 lightPos = vec3(lights[lightIdx].pos.x, 0.0, lights[lightIdx].pos.z);
+        float range = lights[lightIdx].range;
+        float intensity = lights[lightIdx].intensity;
         if (distance(lightPos, voxelPos) < range) {
             uint insertPos = count;
             for (uint i = 0; i < count; i++) {
                 uint existingIdx = uniqueLightLists[baseOffset + i];
-                float existingIntensity = lights[existingIdx * LIGHT_DATA_SIZE + LIGHT_DATA_OFFSET_INTENSITY];
+                float existingIntensity = lights[existingIdx].intensity;
                 if (intensity > existingIntensity) { insertPos = i; break; }
             }
 

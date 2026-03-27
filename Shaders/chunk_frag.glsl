@@ -32,6 +32,17 @@ layout(location = 25) uniform uint constIndex;
 layout(location = 26) uniform uint grayscaleEnabled;
 layout(location = 27) uniform float volume;
 
+struct Light {
+    vec3  pos;
+    float intensity;
+    vec3  col;
+    uint  lflags;
+    float range;
+    float spotAng;
+    float maxIntensity;
+    float minIntensity;
+    vec4  spotDir; // Quaternions are vec4
+};
 
 layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
@@ -45,24 +56,10 @@ layout(std430, binding = 14) buffer TextureOffsets { uint textureOffsets[]; }; /
 layout(std430, binding = 15) buffer TextureSizes { ivec2 textureSizes[]; }; // x,y pairs for width and height of textures
 layout(std430, binding = 16) buffer TexturePalettes { uint texturePalettes[]; }; // Palette colors
 layout(std430, binding = 17) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; }; // Palette starting indices for each texture
-layout(std430, binding = 19) buffer LightIndices { float lights[]; };
+layout(std430, binding = 19) buffer LightIndices { Light lights[]; };
 layout(std430, binding = 6) buffer VoxelLightListCounts { uint voxelLightListCounts[]; };
 layout(std430, binding = 27) buffer UniqueLightLists { uint uniqueLightLists[]; };
 
-const int LIGHT_DATA_SIZE = 13;
-const int LIGHT_DATA_OFFSET_POSX = 0;
-const int LIGHT_DATA_OFFSET_POSY = 1;
-const int LIGHT_DATA_OFFSET_POSZ = 2;
-const int LIGHT_DATA_OFFSET_INTENSITY = 3;
-const int LIGHT_DATA_OFFSET_RANGE = 4;
-const int LIGHT_DATA_OFFSET_SPOTANG = 5;
-const int LIGHT_DATA_OFFSET_SPOTDIRX = 6;
-const int LIGHT_DATA_OFFSET_SPOTDIRY = 7;
-const int LIGHT_DATA_OFFSET_SPOTDIRZ = 8;
-const int LIGHT_DATA_OFFSET_SPOTDIRW = 9;
-const int LIGHT_DATA_OFFSET_R = 10;
-const int LIGHT_DATA_OFFSET_G = 11;
-const int LIGHT_DATA_OFFSET_B = 12;
 const float WORLDCELL_WIDTH_F = 2.56;
 const float VOXEL_SIZE = 0.32;
 const vec3 baseDir = vec3(0.0, 0.0, 1.0);
@@ -197,15 +194,14 @@ void main() {
     uint listoffset = 0;
     float intensityTotal = 0.0;
     for (uint i = 0u; i < count; i++) {
-        uint lightIdxInPVS = uniqueLightLists[(voxelIdx * maxLightsPerVoxel) + i];
-        if (lightIdxInPVS >= lightCount) continue;
+        uint lightIdx = uniqueLightLists[(voxelIdx * maxLightsPerVoxel) + i];
+        if (lightIdx >= lightCount) continue;
 
-        uint lightIdx = lightIdxInPVS * uint(LIGHT_DATA_SIZE);
-        vec3 lightPos = vec3(lights[lightIdx], lights[lightIdx + LIGHT_DATA_OFFSET_POSY], lights[lightIdx + LIGHT_DATA_OFFSET_POSZ]);
-        float intensity = lights[lightIdx + LIGHT_DATA_OFFSET_INTENSITY];
+        vec3 lightPos = lights[lightIdx].pos;
+        float intensity = lights[lightIdx].intensity;
         if (intensity < 0.1) continue;
 
-        float range = lights[lightIdx + LIGHT_DATA_OFFSET_RANGE];
+        float range = lights[lightIdx].range;
         vec3 toLight = lightPos - worldPos;
         float dist = length(toLight);
         if (dist > range) continue;
@@ -218,14 +214,10 @@ void main() {
         float attenuation = (1.0 - distOverRangeSqd) * lambertian;
         if (attenuation < 0.015) continue;
 
-        float spotAng = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTANG];
+        float spotAng = lights[lightIdx].spotAng;
         float spotFalloff = 1.0;
         if (spotAng > 0.0) { // Extremely rare, only ~15 spot lights in entire game out of several thousand lights.
-            float quat_x = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTDIRX];
-            float quat_y = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTDIRY];
-            float quat_z = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTDIRZ];
-            float quat_w = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTDIRW];
-            vec4 quat = vec4(quat_x, quat_y, quat_z, quat_w);
+            vec4 quat = lights[lightIdx].spotDir;
             vec3 spotDir = normalize(quat_rotate(quat, baseDir));
             float spotdot = dot(spotDir, -lightDir);
             float cosAngle = cos(radians(spotAng / 2.0));
@@ -238,7 +230,7 @@ void main() {
         }
 
         float shadowFactor = 1.0;
-        uint shadowIndex = shadowMapsIndirection[lightIdxInPVS];
+        uint shadowIndex = shadowMapsIndirection[lightIdx];
         if (shadowsEnabled > 0 && shadowIndex < lightCount) {
             float smearness = distOverRangeSqd * 24.0 + range + intensity + 4.51;
             vec3 a = abs(toLight);
@@ -289,7 +281,7 @@ void main() {
             shadowFactor = sum * invSamples;
         }
 
-        vec3 lightColor = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_R], lights[lightIdx + LIGHT_DATA_OFFSET_G], lights[lightIdx + LIGHT_DATA_OFFSET_B]);
+        vec3 lightColor = lights[lightIdx].col;
         vec3 baseLighting = albedoColor.rgb  * lightColor * intensity * pow(attenuation, 1.75);
         lighting = fma(baseLighting,vec3(spotFalloff * shadowFactor),lighting);
         intensityTotal = fma(intensity,attenuation * 1.5,intensityTotal);

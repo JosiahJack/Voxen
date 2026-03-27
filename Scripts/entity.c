@@ -793,11 +793,11 @@ static inline __attribute__((always_inline)) uint16_t parse_numberu16(const char
     return (uint16_t)retval;
 }
 
-// static inline __attribute__((always_inline)) uint8_t parse_numberu8(const char* str, const char* line, uint32_t lineNum) {
-//     uint32_t retval = parse_numberu32(str, line, lineNum);
-//     if (retval > UINT8_MAX) { DualLogError("Value %u out of range for uint8_t from line[%d]: %s\n", retval, lineNum+1, line); return 0; }
-//     return (uint8_t)retval;
-// }
+static inline __attribute__((always_inline)) uint8_t parse_numberu8(const char* str, const char* line, uint32_t lineNum) {
+    uint32_t retval = parse_numberu32(str, line, lineNum);
+    if (retval > UINT8_MAX) { DualLogError("Value %u out of range for uint8_t from line[%d]: %s\n", retval, lineNum+1, line); return 0; }
+    return (uint8_t)retval;
+}
 
 static inline __attribute__((always_inline)) bool parse_bool(const char* str, const char* line, uint32_t lineNum) {
     uint32_t parseval = parse_numberu32(str, line, lineNum);
@@ -962,6 +962,9 @@ MOD_TO_ENGINE void LoadLevelMod(uint8_t curlevel) {
     char* line = &lineSpace[0];
     char firstKeyCheck[11];
     char initialLine[LINE_LEN_MAX];
+    Light lightsFromFile[LIGHT_COUNT]; // 131072 bytes
+    LightAnimation lanimsFromFile[LIGHT_COUNT];
+    __builtin_memset(lightsFromFile,0,LIGHT_COUNT*sizeof(Light));    
     while(GetLevelFileNextStringUpToNewlineOrEOF(lineSpace,LINE_LEN_MAX)) {
         size_t len = GetStringLength(lineSpace);
         while (len && (lineSpace[len - 1] == '\n' || lineSpace[len - 1] == '\r'))
@@ -971,7 +974,7 @@ MOD_TO_ENGINE void LoadLevelMod(uint8_t curlevel) {
         __builtin_memcpy(firstKeyCheck,line,10); firstKeyCheck[10] = '\0';
         lineNum++;
         bool isLight = true;
-        if (StringsAreEqual(firstKeyCheck, "constIndex")) isLight = false;  // constIndex specified indicating this is a real entity?
+        if (StringsEqual(firstKeyCheck, "constIndex")) isLight = false;  // constIndex specified indicating this is a real entity?
         if (isLight) {
             lightsIdx++;
             if (lightsIdx >= LIGHT_COUNT) { DualLogError("Too many lights %u in level%d.txt!\n",lightsIdx,curlevel); return; }
@@ -979,9 +982,7 @@ MOD_TO_ENGINE void LoadLevelMod(uint8_t curlevel) {
             instanceIdx++;
             if (instanceIdx >= INSTANCE_COUNT) { DualLogError("Too many instances %u in level%d.txt!\n",instanceIdx,curlevel); return; }
         }
-        
-        uint8_t lightType = 0u; // Point
-        bool lightOnRead = false;
+
         bool activeStateRead = false;
         while(line[0] != '\0') { // Guaranteed no leading whitespaces,k comments, or blank lines, so don't bother
             char* pipe = StringFindFirstCharWithin(line,'|');
@@ -1009,113 +1010,112 @@ MOD_TO_ENGINE void LoadLevelMod(uint8_t curlevel) {
             StringFormat(trimmed_value, sizeof(trimmed_value), "%s", value);
             trimmed_key[sizeof(trimmed_key) - 1] = '\0';
             trimmed_value[sizeof(trimmed_value) - 1] = '\0';
-            if (isLight) LoadFieldIntoLight((char*)&trimmed_key,(char*)&trimmed_value,initialLine,lineNum,lightsIdx,&lightOnRead,&lightType);
+            if (isLight) LoadFieldIntoLight((char*)&trimmed_key,(char*)&trimmed_value,initialLine,lineNum,&lightsFromFile[lightsIdx],&lanimsFromFile[lightsIdx]);
             else {
                 Entity* inst = &Eng_Global->instances[instanceIdx];
-                     if (StringsAreEqual(trimmed_key,"constIndex"))      inst->index = parse_numberu16(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"localPosition.x")) inst->position.x = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"localPosition.y")) inst->position.y = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"localPosition.z")) inst->position.z = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"localRotation.x")) inst->rotation.x = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"localRotation.y")) inst->rotation.y = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"localRotation.z")) inst->rotation.z = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"localRotation.w")) inst->rotation.w = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"localScale.x"))    inst->scale.x = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"localScale.y"))    inst->scale.y = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"localScale.z"))    inst->scale.z = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"go.activeSelf")) { activeStateRead = true ; flag_set(&inst->entflags, ENTFLAG_ACTIVE, parse_bool(trimmed_value, initialLine, lineNum)); }
-                else if (StringsAreEqual(trimmed_key,"requireReset"))    flag_set(&inst->entflags, ENTFLAG_REQUIRE_RESET, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"amount"))          inst->amount = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"resetTime"))       inst->resetTime = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"minSecurityLevel"))inst->minSecurityLevel = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"damageOnUse"))     inst->damage = parse_float(trimmed_value,initialLine,lineNum);
-                else if (StringsAreEqual(trimmed_key,"target"))          StringCopyInto_A_From_B(inst->target,trimmed_value,TARGET_STRING_LENGTH);
-                else if (StringsAreEqual(trimmed_key,"argvalue"))        StringCopyInto_A_From_B(inst->argvalue,trimmed_value,TARGET_STRING_LENGTH);
-                else if (StringsAreEqual(trimmed_key,"targetname"))      StringCopyInto_A_From_B(inst->targetname,trimmed_value,TARGET_STRING_LENGTH);
-//                 else if (StringsAreEqual(trimmed_key,"securityThreshhold") || StringsAreEqual(trimmed_key,"securityThreshold")) inst->securityThreshold = parse_numberu8(trimmed_value, initialLine, lineNum);
-//                 else if (StringsAreEqual(trimmed_key,"messageIndex"))    inst->messageIndex = parse_numberu16(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"delay"))           inst->delay = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"locked"))          flag_set(&inst->entflags, ENTFLAG_LOCKED, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"active"))          inst->active = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"alternateOn"))     inst->alternateOn = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"onlyTargetOnce"))  inst->onlyOnce = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"targetAlreadyDone")) inst->targetAlreadyDone = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"stayOpen"))        inst->stayOpen = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"startOpen"))       inst->startOpen = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"ajar"))            inst->ajar = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"ajarPercentage"))  inst->ajarPercentage = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"useTimeDelay"))    inst->useTimeDelay = parse_float(trimmed_value, initialLine, lineNum);
-//                 else if (StringsAreEqual(trimmed_key,"lockedMessageLingdex")) inst->lockedMessageLingdex = parse_numberu16(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"blocked"))         inst->blocked = parse_bool(trimmed_value, initialLine, lineNum);
-//                 else if (StringsAreEqual(trimmed_key,"SFXIndex"))        inst->SFXIndex = (int16_t)parse_numberu16(trimmed_value, initialLine, lineNum);
-//                 else if (StringsAreEqual(trimmed_key,"requiredAccessCard")) inst->requiredAccessCard = parse_numberu8(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"accessCardUsedByPlayer")) inst->accessCardUsedByPlayer = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"timeBeforeLasersOn")) inst->timeBeforeLasersOn = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"toggleLasers"))    inst->toggleLasers = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"targettingOnlyUnlocks")) inst->targettingOnlyUnlocks = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"changeLayerOnOpenClose")) inst->changeLayerOnOpenClose = parse_bool(trimmed_value, initialLine, lineNum);
-//                 else if (StringsAreEqual(trimmed_key,"doorOpenState"))   inst->doorOpen = parse_numberu8(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"animatorPlaybackTime") || StringsAreEqual(trimmed_key,"asi.normalizedTime")) inst->animatorPlaybackTime = parse_float(trimmed_value, initialLine, lineNum);
-                else if (StringsAreEqual(trimmed_key,"useFinished"))     inst->useFinished = parse_float(trimmed_value, initialLine, lineNum) + Eng_Global->pauseRelativeTime;
-                else if (StringsAreEqual(trimmed_key,"waitBeforeClose")) inst->waitBeforeClose = parse_float(trimmed_value, initialLine, lineNum) + Eng_Global->pauseRelativeTime;
-                else if (StringsAreEqual(trimmed_key,"lasersFinished"))  inst->lasersFinished = parse_float(trimmed_value, initialLine, lineNum) + Eng_Global->pauseRelativeTime;
-                else if (StringsAreEqual(trimmed_key,"changeMatOnActive")) flag_set(&inst->entflags, ENTFLAG_CHANGE_TEX_ON_ACTIVE, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"blinkWhenActive")) flag_set(&inst->entflags, ENTFLAG_BLINK_TEX_ON_ACTIVE, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"doorOpen"))        flag_set(&inst->ioflags, TARG_IOFLAGS_DOOROPEN, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"doorOpenIfUnlocked")) flag_set(&inst->ioflags, TARG_IOFLAGS_DOOROPENIFUNLOCKED, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"doorClose"))       flag_set(&inst->ioflags, TARG_IOFLAGS_DOORCLOSE, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"doorLock"))        flag_set(&inst->ioflags, TARG_IOFLAGS_DOORLOCK, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"doorUnlock"))      flag_set(&inst->ioflags, TARG_IOFLAGS_DOORUNLOCK, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"switchTrigger"))   flag_set(&inst->ioflags, TARG_IOFLAGS_SWITCHTRIGGER, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"tripTrigger"))     flag_set(&inst->ioflags, TARG_IOFLAGS_TRIPTRIGGER, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"forceBridgeActivate")) flag_set(&inst->ioflags, TARG_IOFLAGS_FBRIDGE_ACTIVATE, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"forceBridgeDeactivate")) flag_set(&inst->ioflags, TARG_IOFLAGS_FBRIDGE_DEACTIVATE, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"forceBridgeToggle")) flag_set(&inst->ioflags, TARG_IOFLAGS_FBRIDGE_TOGGLE, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"gravityLiftToggle")) flag_set(&inst->ioflags, TARG_IOFLAGS_GRAVLIFT_TOGGLE, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"textureChangeToggle")) flag_set(&inst->ioflags, TARG_IOFLAGS_TEXTURE_CHG_TOGGLE, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"lightOn"))         flag_set(&inst->ioflags, TARG_IOFLAGS_LIGHT_ON, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"lightOff"))        flag_set(&inst->ioflags, TARG_IOFLAGS_LIGHT_OFF, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"lightToggle"))     flag_set(&inst->ioflags, TARG_IOFLAGS_LIGHT_TOGGLE, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"funcwallMove"))    flag_set(&inst->ioflags, TARG_IOFLAGS_FUNCWALL_MOVE, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"missionBitOn"))    flag_set(&inst->ioflags, TARG_IOFLAGS_MISSION_BIT_ON, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"missionBitOff"))   flag_set(&inst->ioflags, TARG_IOFLAGS_MISSION_BIT_OFF, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"missionBitToggle")) flag_set(&inst->ioflags, TARG_IOFLAGS_MISSION_BIT_TOGGLE, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"sendEmail"))       flag_set(&inst->ioflags, TARG_IOFLAGS_SEND_EMAIL, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"switchLockToggle")) flag_set(&inst->ioflags, TARG_IOFLAGS_SWITCH_LOCK_TOGGLE, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"spawnerActivate")) flag_set(&inst->ioflags, TARG_IOFLAGS_SPAWNER_ACTIVATE, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"spawnerActivateAlerted")) flag_set(&inst->ioflags, TARG_IOFLAGS_SPAWNER_ACTALERTED, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"cyborgConversionToggle")) flag_set(&inst->ioflags, TARG_IOFLAGS_CYBORG_CONV_TOGGLE, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"GOSetActive"))     flag_set(&inst->ioflags, TARG_IOFLAGS_INST_ACTIVATE, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"GOSetDeactive"))   flag_set(&inst->ioflags, TARG_IOFLAGS_INST_DEACTIVATE, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"GOToggleActive"))  flag_set(&inst->ioflags, TARG_IOFLAGS_INST_TOGGLE, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"disableThisGOOnAwake")) flag_set(&inst->ioflags, TARG_IOFLAGS_DISABLE_ON_AWAKE, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"playSoundOnce"))   flag_set(&inst->ioflags, TARG_IOFLAGS_PLAY_SOUND_ONCE, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"stopSound"))       flag_set(&inst->ioflags, TARG_IOFLAGS_STOP_SOUND, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"sendSprintMessage")) flag_set(&inst->ioflags, TARG_IOFLAGS_SEND_CENTERPRINT, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"radiationTreatment")) flag_set(&inst->ioflags, TARG_IOFLAGS_RADIATION_TREATMNT, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"startFlashingMaterials")) flag_set(&inst->ioflags, TARG_IOFLAGS_START_FLASHING_TEX, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"stopFlashingMaterials")) flag_set(&inst->ioflags, TARG_IOFLAGS_STOP_FLASHING_TEX, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"unlockElevatorPad")) flag_set(&inst->ioflags, TARG_IOFLAGS_UNLOCK_ELEVATORPAD, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"unlockKeycodePad")) flag_set(&inst->ioflags, TARG_IOFLAGS_UNLOCK_KEYPAD, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"unlockPuzzlePad")) flag_set(&inst->ioflags, TARG_IOFLAGS_UNLOCK_PUZPAD, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"screenShake"))     flag_set(&inst->ioflags, TARG_IOFLAGS_SCREENSHAKE, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"awakeSleepingEnemy")) flag_set(&inst->ioflags, TARG_IOFLAGS_AWAKE_SLEEPING_NPC, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"branchFlip"))      flag_set(&inst->ioflags, TARG_IOFLAGS_BRANCH_FLIP, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"branchFlipOnly"))  flag_set(&inst->ioflags, TARG_IOFLAGS_BRANCH_FLIPONLY, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"doorAccessCardOverrideToggle")) flag_set(&inst->ioflags, TARG_IOFLAGS_TOG_DORACESOVERIDE, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"unlockSwitch"))    flag_set(&inst->ioflags, TARG_IOFLAGS_UNLOCK_SWITCH, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"lockElevatorPad")) flag_set(&inst->ioflags, TARG_IOFLAGS_LOCK_ELEVATORPAD, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"doorToggle"))      flag_set(&inst->ioflags, TARG_IOFLAGS_DOOR_TOGGLE, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsAreEqual(trimmed_key,"resourceFolder") && *trimmed_value) TextureSequenceInit(instanceIdx,trimmed_value);
-                else if (StringsAreEqual(trimmed_key,"frameDelay")) inst->tickTime = (double)parse_float(trimmed_value,initialLine,lineNum);
-                else if (StringsAreEqual(trimmed_key,"randomFrame")) inst->texAnimRandom = parse_bool(trimmed_value,initialLine,lineNum);
-                else if (StringsAreEqual(trimmed_key,"reverseSequence")) inst->texAnimInReverse = parse_bool(trimmed_value,initialLine,lineNum);
-                else if (StringsAreEqual(trimmed_key,"messageLingdex")) inst->messageLingdex = parse_numberu16(trimmed_value,initialLine,lineNum);
+                     if (StringsEqual(trimmed_key,"constIndex"))      inst->index = parse_numberu16(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"localPosition.x")) inst->position.x = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"localPosition.y")) inst->position.y = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"localPosition.z")) inst->position.z = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"localRotation.x")) inst->rotation.x = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"localRotation.y")) inst->rotation.y = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"localRotation.z")) inst->rotation.z = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"localRotation.w")) inst->rotation.w = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"localScale.x"))    inst->scale.x = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"localScale.y"))    inst->scale.y = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"localScale.z"))    inst->scale.z = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"go.activeSelf")) { activeStateRead = true ; flag_set(&inst->entflags, ENTFLAG_ACTIVE, parse_bool(trimmed_value, initialLine, lineNum)); }
+                else if (StringsEqual(trimmed_key,"requireReset"))    flag_set(&inst->entflags, ENTFLAG_REQUIRE_RESET, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"amount"))          inst->amount = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"resetTime"))       inst->resetTime = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"minSecurityLevel"))inst->minSecurityLevel = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"damageOnUse"))     inst->damage = parse_float(trimmed_value,initialLine,lineNum);
+                else if (StringsEqual(trimmed_key,"target"))          StringCopyInto_A_From_B(inst->target,trimmed_value,TARGET_STRING_LENGTH);
+                else if (StringsEqual(trimmed_key,"argvalue"))        StringCopyInto_A_From_B(inst->argvalue,trimmed_value,TARGET_STRING_LENGTH);
+                else if (StringsEqual(trimmed_key,"targetname"))      StringCopyInto_A_From_B(inst->targetname,trimmed_value,TARGET_STRING_LENGTH);
+                else if (StringsEqual(trimmed_key,"securityThreshhold") || StringsEqual(trimmed_key,"securityThreshold")) inst->securityThreshold = parse_numberu8(trimmed_value, initialLine, lineNum);
+//                 else if (StringsEqual(trimmed_key,"messageIndex"))    inst->messageIndex = parse_numberu16(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"delay"))           inst->delay = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"locked"))          flag_set(&inst->entflags, ENTFLAG_LOCKED, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"active"))          inst->active = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"alternateOn"))     inst->alternateOn = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"onlyTargetOnce"))  inst->onlyOnce = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"targetAlreadyDone")) inst->targetAlreadyDone = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"stayOpen"))        inst->stayOpen = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"startOpen"))       inst->startOpen = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"ajar"))            inst->ajar = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"ajarPercentage"))  inst->ajarPercentage = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"useTimeDelay"))    inst->useTimeDelay = parse_float(trimmed_value, initialLine, lineNum);
+//                 else if (StringsEqual(trimmed_key,"lockedMessageLingdex")) inst->lockedMessageLingdex = parse_numberu16(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"blocked"))         inst->blocked = parse_bool(trimmed_value, initialLine, lineNum);
+//                 else if (StringsEqual(trimmed_key,"SFXIndex"))        inst->SFXIndex = (int16_t)parse_numberu16(trimmed_value, initialLine, lineNum);
+//                 else if (StringsEqual(trimmed_key,"requiredAccessCard")) inst->requiredAccessCard = parse_numberu8(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"accessCardUsedByPlayer")) inst->accessCardUsedByPlayer = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"timeBeforeLasersOn")) inst->timeBeforeLasersOn = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"toggleLasers"))    inst->toggleLasers = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"targettingOnlyUnlocks")) inst->targettingOnlyUnlocks = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"changeLayerOnOpenClose")) inst->changeLayerOnOpenClose = parse_bool(trimmed_value, initialLine, lineNum);
+//                 else if (StringsEqual(trimmed_key,"doorOpenState"))   inst->doorOpen = parse_numberu8(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"animatorPlaybackTime") || StringsEqual(trimmed_key,"asi.normalizedTime")) inst->animatorPlaybackTime = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"useFinished"))     inst->useFinished = parse_float(trimmed_value, initialLine, lineNum) + Eng_Global->pauseRelativeTime;
+                else if (StringsEqual(trimmed_key,"waitBeforeClose")) inst->waitBeforeClose = parse_float(trimmed_value, initialLine, lineNum) + Eng_Global->pauseRelativeTime;
+                else if (StringsEqual(trimmed_key,"lasersFinished"))  inst->lasersFinished = parse_float(trimmed_value, initialLine, lineNum) + Eng_Global->pauseRelativeTime;
+                else if (StringsEqual(trimmed_key,"changeMatOnActive")) flag_set(&inst->entflags, ENTFLAG_CHANGE_TEX_ON_ACTIVE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"blinkWhenActive")) flag_set(&inst->entflags, ENTFLAG_BLINK_TEX_ON_ACTIVE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"doorOpen"))        flag_set(&inst->ioflags, TARG_IOFLAGS_DOOROPEN, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"doorOpenIfUnlocked")) flag_set(&inst->ioflags, TARG_IOFLAGS_DOOROPENIFUNLOCKED, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"doorClose"))       flag_set(&inst->ioflags, TARG_IOFLAGS_DOORCLOSE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"doorLock"))        flag_set(&inst->ioflags, TARG_IOFLAGS_DOORLOCK, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"doorUnlock"))      flag_set(&inst->ioflags, TARG_IOFLAGS_DOORUNLOCK, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"switchTrigger"))   flag_set(&inst->ioflags, TARG_IOFLAGS_SWITCHTRIGGER, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"tripTrigger"))     flag_set(&inst->ioflags, TARG_IOFLAGS_TRIPTRIGGER, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"forceBridgeActivate")) flag_set(&inst->ioflags, TARG_IOFLAGS_FBRIDGE_ACTIVATE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"forceBridgeDeactivate")) flag_set(&inst->ioflags, TARG_IOFLAGS_FBRIDGE_DEACTIVATE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"forceBridgeToggle")) flag_set(&inst->ioflags, TARG_IOFLAGS_FBRIDGE_TOGGLE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"gravityLiftToggle")) flag_set(&inst->ioflags, TARG_IOFLAGS_GRAVLIFT_TOGGLE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"textureChangeToggle")) flag_set(&inst->ioflags, TARG_IOFLAGS_TEXTURE_CHG_TOGGLE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"lightOn"))         flag_set(&inst->ioflags, TARG_IOFLAGS_LIGHT_ON, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"lightOff"))        flag_set(&inst->ioflags, TARG_IOFLAGS_LIGHT_OFF, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"lightToggle"))     flag_set(&inst->ioflags, TARG_IOFLAGS_LIGHT_TOGGLE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"funcwallMove"))    flag_set(&inst->ioflags, TARG_IOFLAGS_FUNCWALL_MOVE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"missionBitOn"))    flag_set(&inst->ioflags, TARG_IOFLAGS_MISSION_BIT_ON, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"missionBitOff"))   flag_set(&inst->ioflags, TARG_IOFLAGS_MISSION_BIT_OFF, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"missionBitToggle")) flag_set(&inst->ioflags, TARG_IOFLAGS_MISSION_BIT_TOGGLE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"sendEmail"))       flag_set(&inst->ioflags, TARG_IOFLAGS_SEND_EMAIL, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"switchLockToggle")) flag_set(&inst->ioflags, TARG_IOFLAGS_SWITCH_LOCK_TOGGLE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"spawnerActivate")) flag_set(&inst->ioflags, TARG_IOFLAGS_SPAWNER_ACTIVATE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"spawnerActivateAlerted")) flag_set(&inst->ioflags, TARG_IOFLAGS_SPAWNER_ACTALERTED, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"cyborgConversionToggle")) flag_set(&inst->ioflags, TARG_IOFLAGS_CYBORG_CONV_TOGGLE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"GOSetActive"))     flag_set(&inst->ioflags, TARG_IOFLAGS_INST_ACTIVATE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"GOSetDeactive"))   flag_set(&inst->ioflags, TARG_IOFLAGS_INST_DEACTIVATE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"GOToggleActive"))  flag_set(&inst->ioflags, TARG_IOFLAGS_INST_TOGGLE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"disableThisGOOnAwake")) flag_set(&inst->ioflags, TARG_IOFLAGS_DISABLE_ON_AWAKE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"playSoundOnce"))   flag_set(&inst->ioflags, TARG_IOFLAGS_PLAY_SOUND_ONCE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"stopSound"))       flag_set(&inst->ioflags, TARG_IOFLAGS_STOP_SOUND, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"sendSprintMessage")) flag_set(&inst->ioflags, TARG_IOFLAGS_SEND_CENTERPRINT, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"radiationTreatment")) flag_set(&inst->ioflags, TARG_IOFLAGS_RADIATION_TREATMNT, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"startFlashingMaterials")) flag_set(&inst->ioflags, TARG_IOFLAGS_START_FLASHING_TEX, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"stopFlashingMaterials")) flag_set(&inst->ioflags, TARG_IOFLAGS_STOP_FLASHING_TEX, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"unlockElevatorPad")) flag_set(&inst->ioflags, TARG_IOFLAGS_UNLOCK_ELEVATORPAD, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"unlockKeycodePad")) flag_set(&inst->ioflags, TARG_IOFLAGS_UNLOCK_KEYPAD, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"unlockPuzzlePad")) flag_set(&inst->ioflags, TARG_IOFLAGS_UNLOCK_PUZPAD, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"screenShake"))     flag_set(&inst->ioflags, TARG_IOFLAGS_SCREENSHAKE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"awakeSleepingEnemy")) flag_set(&inst->ioflags, TARG_IOFLAGS_AWAKE_SLEEPING_NPC, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"branchFlip"))      flag_set(&inst->ioflags, TARG_IOFLAGS_BRANCH_FLIP, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"branchFlipOnly"))  flag_set(&inst->ioflags, TARG_IOFLAGS_BRANCH_FLIPONLY, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"doorAccessCardOverrideToggle")) flag_set(&inst->ioflags, TARG_IOFLAGS_TOG_DORACESOVERIDE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"unlockSwitch"))    flag_set(&inst->ioflags, TARG_IOFLAGS_UNLOCK_SWITCH, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"lockElevatorPad")) flag_set(&inst->ioflags, TARG_IOFLAGS_LOCK_ELEVATORPAD, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"doorToggle"))      flag_set(&inst->ioflags, TARG_IOFLAGS_DOOR_TOGGLE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"resourceFolder") && *trimmed_value) TextureSequenceInit(instanceIdx,trimmed_value);
+                else if (StringsEqual(trimmed_key,"frameDelay")) inst->tickTime = (double)parse_float(trimmed_value,initialLine,lineNum);
+                else if (StringsEqual(trimmed_key,"randomFrame")) inst->texAnimRandom = parse_bool(trimmed_value,initialLine,lineNum);
+                else if (StringsEqual(trimmed_key,"reverseSequence")) inst->texAnimInReverse = parse_bool(trimmed_value,initialLine,lineNum);
+                else if (StringsEqual(trimmed_key,"messageLingdex")) inst->messageLingdex = parse_numberu16(trimmed_value,initialLine,lineNum);
             }
         }
         
-        if (isLight) AddLightFromLoad(lightOnRead,&lightsIdx,lightType,lineNum);
-        else {
+        if (!isLight) {
             uint16_t parent = instanceIdx; // Needed as adding children moves the instanceIdx.
             uint16_t entIdx = Eng_Global->instances[parent].index;
             AddInstance(entIdx, parent);
@@ -1137,6 +1137,11 @@ MOD_TO_ENGINE void LoadLevelMod(uint8_t curlevel) {
                 }
             }
         }
+    }
+    
+    for (int i=0;i<lightsIdx;++i) {
+        if (!(lightsFromFile[i].lflags & LSPOT)) lightsFromFile[i].spotAng = 0.0f;
+        AddLight(&lightsFromFile[i],&lanimsFromFile[i]);
     }
 
     // Add instances for shield generators
@@ -1160,6 +1165,8 @@ MOD_TO_ENGINE void LoadLevelMod(uint8_t curlevel) {
         instanceIdx++;
     }
 
-    headmountedLanternLight = AddLight(Eng_Global->instances[PLAYER1].position,(Color){1.0f,1.0f,1.0f,1.0f},11.52f,0.0f,0.0f,0.0f/*intensity set later*/,0.0f/*point*/,(Quaternion){0.0f,0.0f,0.0f,0.0f},false,true); lightsIdx++; // Add player headmounted lantern light
+    Light hl = (Light){.pos=Eng_Global->instances[PLAYER1].position,.col=(Color3){1.0f,1.0f,1.0f},.range=11.52f,.lflags=LIGHT_AND_SHADOW_ON,.intensity=0.0f,.minIntensity=0.0f,.maxIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY};
+    LightAnimation lam={0};
+    headmountedLanternLight = AddLight(&hl,&lam); lightsIdx++; // Add player headmounted lantern light
     Color c = fogLUT[curlevel]; c.a *= 3.8f; /*Global modifier to tweak it.*/ Eng_Global->fogColor = c;
 }

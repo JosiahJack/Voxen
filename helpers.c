@@ -259,7 +259,7 @@ bool StringIsEmpty(const char* a) { // C# String.IsNullOrWhiteSpace replacement
     return true;
 }
 
-bool StringsAreEqual(const char* a, const char* b) { // !strcmp replacement (hated its inverted logic)
+bool StringsEqual(const char* a, const char* b) { // !strcmp replacement (hated its inverted logic)
     size_t size  = GetStringLength(a);
     size_t size2 = GetStringLength(b);
     if (size != size2) return false;
@@ -271,9 +271,9 @@ bool StringsAreEqual(const char* a, const char* b) { // !strcmp replacement (hat
     
     return true;
 }
-// int strcmp(const char *s1, const char *s2) { return !StringsAreEqual(s1,s2); }
+// int strcmp(const char *s1, const char *s2) { return !StringsEqual(s1,s2); }
 
-bool StringsAreEqualLimitedBy(const char* a, const char* b, size_t limit) {
+bool StringsEqualLimitedBy(const char* a, const char* b, size_t limit) {
     if (limit == 0) return false;
     
     size_t size  = GetStringLength(a);

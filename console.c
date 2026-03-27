@@ -26,7 +26,7 @@ ENGINE_TO_MOD void ToggleConsole(void) {
 
 static void AddToHistory(const char* entry) {
     if (GetStringLength(entry) == 0) return;
-    if (numHistory > 0 && StringsAreEqual(entry, history[numHistory - 1])) return;
+    if (numHistory > 0 && StringsEqual(entry, history[numHistory - 1])) return;
     
     if (numHistory < MAX_HISTORY) {
         StringCopyInto_A_From_B(history[numHistory], entry, TEXT_BUFFER_SIZE);
@@ -152,7 +152,7 @@ static int ParseLevelArg(const char* arg) {
     clean[j] = '\0';
 
     // Special cases
-    if (StringsAreEqual(clean, "r")      || StringFindSubstring(clean, "reactor")) return 0;
+    if (StringsEqual(clean, "r")      || StringFindSubstring(clean, "reactor")) return 0;
     if (StringFindSubstring(clean, "g1") || StringFindSubstring(clean, "10")) return 10;
     if (StringFindSubstring(clean, "g2") || StringFindSubstring(clean, "11")) return 11;
     if (StringFindSubstring(clean, "g4") || StringFindSubstring(clean, "12")) return 12;

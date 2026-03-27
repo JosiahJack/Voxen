@@ -785,9 +785,9 @@ static bool ParseTextureData(TextureDataParser *parser, uint16_t maxSize, const 
                 char *val_end = trimmed_value + GetStringLength(trimmed_value) - 1;
                 while (key_end > trimmed_key && CharacterIsEmpty(*key_end)) *key_end-- = '\0';
                 while (val_end > trimmed_value && CharacterIsEmpty(*val_end)) *val_end-- = '\0';
-                     if (StringsAreEqual(trimmed_key,"index"))       entry.index = parse_numberu16(trimmed_value,start,lineNum);
-                else if (StringsAreEqual(trimmed_key,"transparent")) entry.transparent = parse_bool(trimmed_value,start,lineNum);
-                else if (StringsAreEqual(trimmed_key,"doublesided")) entry.doublesided = parse_bool(trimmed_value,start,lineNum);
+                     if (StringsEqual(trimmed_key,"index"))       entry.index = parse_numberu16(trimmed_value,start,lineNum);
+                else if (StringsEqual(trimmed_key,"transparent")) entry.transparent = parse_bool(trimmed_value,start,lineNum);
+                else if (StringsEqual(trimmed_key,"doublesided")) entry.doublesided = parse_bool(trimmed_value,start,lineNum);
             } else DualLogWarn("Invalid key-value pair at line %u: %s\n",lineNum,start);
         } else DualLogWarn("No colon found in line %u: %s\n",lineNum,start);
     }

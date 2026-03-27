@@ -75,7 +75,7 @@ const Setting configTable[] = {
 const int configTableSize = sizeof(configTable) / sizeof(Setting);
 
 static inline __attribute__((always_inline)) int32_t GetGLFWIndirectionIndexForAnInput(const char* val) {
-    for (int i=0;i<149;++i) { if (StringsAreEqual(val,inputElements[i].name)) return i; }
+    for (int i=0;i<149;++i) { if (StringsEqual(val,inputElements[i].name)) return i; }
     return 148;
 }
 
@@ -94,7 +94,7 @@ void LoadConfig(void) {
         char* key = data_parser_trim(s);
         char* val = data_parser_trim(eq + 1);
         for (int i = 0; i < configTableSize; i++) {
-            if (StringsAreEqual(key,configTable[i].name)) {
+            if (StringsEqual(key,configTable[i].name)) {
                 if (configTable[i].type == SETTING_U8)         *( uint8_t*)configTable[i].ptr = (uint8_t)StringToInt(val);
                 else if (configTable[i].type == SETTING_U16)   *(uint16_t*)configTable[i].ptr = (uint16_t)StringToInt(val);
                 else if (configTable[i].type == SETTING_INPUT) *(uint16_t*)configTable[i].ptr = GetGLFWIndirectionIndexForAnInput(val);

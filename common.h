@@ -21,6 +21,7 @@ typedef uint64_t size_t;
 #define bool _Bool
 #define true 1
 #define false 0
+typedef struct { float r,g,b; } Color3;
 typedef struct { float r,g,b,a; } Color;
 typedef struct { float x,y; } Vector2;
 typedef struct { float x,y,z; } Vector3;
@@ -39,6 +40,48 @@ typedef struct {
     bool     open;     // door is open
     bool     dirty;
 } Portal;
+
+// Make sure these match in chunk.glsl shader!
+#define LIGHT_MAX_INTENSITY 8.0f
+#define LIGHT_RANGE_MAX 15.36f
+#define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
+#define LIGHTON 1
+#define SHADON  2
+#define LIGHT_AND_SHADOW_ON 3
+#define LSPOT   4
+#define LDIR    8
+#define LDIRTY 16
+#define LERPON 32
+typedef struct {
+    Vector3 pos;        // 12
+    float intensity;    // 4
+    
+    Color3 col;         // 12
+    uint32_t lflags;    // 4 - light on 1b, shadows on 1b, type 2b, dirty 1b, lerp on 1b
+
+    float range;        // 4
+    float spotAng;      // 4
+    float maxIntensity; // 4
+    float minIntensity; // 4
+    
+    Quaternion spotDir; // 16
+} Light; // 64bytes, one cache line, packed for GL transfer
+
+typedef struct {
+    float lerpValue;
+    float lerpStepTime;
+    float lerpStartTime;
+    float lerpTime;
+    
+    float intervalSteps[32];
+    
+    bool stepIsLerping[32];
+    
+    bool lerpUp;
+    uint8_t currentStep;
+    uint8_t numIntervalSteps;
+    uint8_t numLerpSteps;
+} LightAnimation; // Separate from main lights buffer struct since it's not used very often
 
 #define INSTANCE_COUNT 10240 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
 #define LIGHT_COUNT 2048
@@ -1296,6 +1339,7 @@ typedef struct {
     uint16_t loadedLights;
 } GlobalContext;
 
+static inline __attribute__((always_inline)) void flag_setu32(uint32_t *flags, uint32_t bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
 static inline __attribute__((always_inline)) void flag_set(uint64_t *flags, uint64_t bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
 static inline __attribute__((always_inline)) bool EntityIndexIsPortalBlockingDoor(uint16_t entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }// All doors except see-through doors.
 

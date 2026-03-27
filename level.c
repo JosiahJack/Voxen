@@ -27,80 +27,59 @@ ENGINE_TO_MOD void InitializeEntity(Entity* entry) { // Blank entity, no index y
     entry->path[0] = '\0';    
 }
 
+ENGINE_TO_MOD int32_t AddLight(Light* lit, LightAnimation* lanim) {
+    int32_t i = Sys_Global.loadedLights;
+    Sys_Global.loadedLights++;
+    if (Sys_Global.loadedLights >= LIGHT_COUNT) { DualLogError("Too many lights %u added in level %d!\n",i,Sys_Global.currentLevel); OS_Exit(1); }
+
+    __builtin_memcpy(&lights[i],lit,sizeof(Light));
+    __builtin_memcpy(&lanims[i],lanim,sizeof(LightAnimation));
+    lightsNewPosition[i] = lit->pos;
+    flag_setu32(&lights[i].lflags,LDIRTY,true);
+    return i;
+}
+
 ENGINE_TO_MOD void AddInstance(uint16_t entIdx, uint16_t i) {
     if (entIdx >= Sys_Global.entityCount) { DualLogError("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d\n",entIdx,Sys_Global.entityCount); OS_Exit(1); }
-        
-    Sys_Global.instances[i].index = entIdx;
+    
+    Entity* e = &Sys_Global.instances[i];
+    e->index = entIdx;
     if (ConstIndexIsNPC(entIdx)) InitializeAIAfterLoad(i);
     bool isCardChunk = (Sys_Global.entities[entIdx].entflags & ENTFLAG_CARDCHUNK);
-    Sys_Global.instances[i].modelIndex = Sys_Global.entities[entIdx].modelIndex;
-    Sys_Global.instances[i].colliderMeshIndex = Sys_Global.entities[entIdx].colliderMeshIndex;
-    Sys_Global.instances[i].numclips = Sys_Global.entities[entIdx].numclips;
-    Sys_Global.instances[i].animationNum = Sys_Global.entities[entIdx].animationNum;
-    Sys_Global.instances[i].texIndex = Sys_Global.entities[entIdx].texIndex;
-    Sys_Global.instances[i].glowIndex = Sys_Global.entities[entIdx].glowIndex;
-    if (Sys_Global.instances[i].glowIndex >= MAX_VALID_TEXTURE) Sys_Global.instances[i].glowIndex = 0;
-    Sys_Global.instances[i].specIndex = Sys_Global.entities[entIdx].specIndex;
-    if (Sys_Global.instances[i].specIndex >= MAX_VALID_TEXTURE) Sys_Global.instances[i].specIndex = 0;
-    Sys_Global.instances[i].normIndex = Sys_Global.entities[entIdx].normIndex;
-    if (Sys_Global.instances[i].normIndex >= MAX_VALID_TEXTURE) Sys_Global.instances[i].normIndex = 0;
-    Sys_Global.instances[i].lodIndex = Sys_Global.entities[entIdx].lodIndex;
-    flag_set(&Sys_Global.instances[i].entflags, ENTFLAG_CARDCHUNK,  isCardChunk);
-    Sys_Global.instances[i].gravity = Sys_Global.entities[entIdx].gravity >= 0.0f ? Sys_Global.entities[entIdx].gravity : 0.0f; // No up falling.
-    flag_set(&Sys_Global.instances[i].entflags, ENTFLAG_KINEMATIC,  Sys_Global.entities[entIdx].entflags & ENTFLAG_KINEMATIC);
-    flag_set(&Sys_Global.instances[i].entflags, ENTFLAG_RIGIDBODY,  Sys_Global.entities[entIdx].entflags & ENTFLAG_RIGIDBODY);
-    flag_set(&Sys_Global.instances[i].entflags, ENTFLAG_NO_SHADOWS,  Sys_Global.entities[entIdx].entflags & ENTFLAG_NO_SHADOWS);
-    Sys_Global.instances[i].collider = Sys_Global.entities[entIdx].collider;
-    Sys_Global.instances[i].colliderCenter = Sys_Global.entities[entIdx].colliderCenter;
-    Sys_Global.instances[i].colliderSize = Sys_Global.entities[entIdx].colliderSize;
-    Sys_Global.instances[i].mass = Sys_Global.entities[entIdx].mass > 0.0f ? Sys_Global.entities[entIdx].mass : 1.0f; // Nonzero fallback.
-    Sys_Global.instances[i].linearDrag = Sys_Global.entities[entIdx].linearDrag > 0.0f ? Sys_Global.entities[entIdx].linearDrag : 0.0f;
-    Sys_Global.instances[i].angularDrag = Sys_Global.entities[entIdx].angularDrag > 0.0f ? Sys_Global.entities[entIdx].angularDrag : 0.05f;
+    e->modelIndex = Sys_Global.entities[entIdx].modelIndex;
+    e->colliderMeshIndex = Sys_Global.entities[entIdx].colliderMeshIndex;
+    e->numclips = Sys_Global.entities[entIdx].numclips;
+    e->animationNum = Sys_Global.entities[entIdx].animationNum;
+    e->texIndex = Sys_Global.entities[entIdx].texIndex;
+    e->glowIndex = Sys_Global.entities[entIdx].glowIndex >= MAX_VALID_TEXTURE ? 0 : Sys_Global.entities[entIdx].glowIndex;
+    e->specIndex = Sys_Global.entities[entIdx].specIndex >= MAX_VALID_TEXTURE ? 0 : Sys_Global.entities[entIdx].specIndex;
+    e->normIndex = Sys_Global.entities[entIdx].normIndex >= MAX_VALID_TEXTURE ? 0 : Sys_Global.entities[entIdx].normIndex;
+    e->lodIndex = Sys_Global.entities[entIdx].lodIndex;
+    flag_set(&e->entflags,ENTFLAG_CARDCHUNK,isCardChunk);
+    e->gravity = Sys_Global.entities[entIdx].gravity >= 0.0f ? Sys_Global.entities[entIdx].gravity : 0.0f; // No up falling.
+    flag_set(&e->entflags,ENTFLAG_KINEMATIC,Sys_Global.entities[entIdx].entflags & ENTFLAG_KINEMATIC);
+    flag_set(&e->entflags,ENTFLAG_RIGIDBODY,Sys_Global.entities[entIdx].entflags & ENTFLAG_RIGIDBODY);
+    flag_set(&e->entflags,ENTFLAG_NO_SHADOWS, Sys_Global.entities[entIdx].entflags & ENTFLAG_NO_SHADOWS);
+    e->collider = Sys_Global.entities[entIdx].collider;
+    e->colliderCenter = Sys_Global.entities[entIdx].colliderCenter;
+    e->colliderSize = Sys_Global.entities[entIdx].colliderSize;
+    e->mass = Sys_Global.entities[entIdx].mass > 0.0f ? Sys_Global.entities[entIdx].mass : 1.0f; // Nonzero fallback.
+    e->linearDrag = Sys_Global.entities[entIdx].linearDrag > 0.0f ? Sys_Global.entities[entIdx].linearDrag : 0.0f;
+    e->angularDrag = Sys_Global.entities[entIdx].angularDrag > 0.0f ? Sys_Global.entities[entIdx].angularDrag : 0.05f;
     for (int c=0;c<MAX_CHILD_COUNT;++c) {
-        Sys_Global.instances[i].child[c] = Sys_Global.entities[entIdx].child[c];
-        Sys_Global.instances[i].child_offset[c] = Sys_Global.entities[entIdx].child_offset[c];
-        Sys_Global.instances[i].child_rotation[c] = Sys_Global.entities[entIdx].child_rotation[c];
-        Sys_Global.instances[i].child_scale[c] = isCardChunk ? Sys_Global.entities[entIdx].child_scale[c] : (Vector3){ 1.0f, 1.0f, 1.0f };
+        e->child[c] = Sys_Global.entities[entIdx].child[c];
+        e->child_offset[c] = Sys_Global.entities[entIdx].child_offset[c];
+        e->child_rotation[c] = Sys_Global.entities[entIdx].child_rotation[c];
+        e->child_scale[c] = isCardChunk ? Sys_Global.entities[entIdx].child_scale[c] : (Vector3){ 1.0f, 1.0f, 1.0f };
     }
     
     if (entIdx == 525) { // prop_console01
-        Sys_Global.loadedLights++;
-        if (Sys_Global.loadedLights >= LIGHT_COUNT) { DualLogError("Too many lights %u in level%d.txt!\n",Sys_Global.loadedLights,Sys_Global.currentLevel); OS_Exit(1); }
-
-        int32_t litIdx = Sys_Global.loadedLights * LIGHT_DATA_SIZE;
-        lightOn[Sys_Global.loadedLights] = true;
-        lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = 0.7f;
-        lightMaxIntensity[Sys_Global.loadedLights] = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
-        lightMinIntensity[Sys_Global.loadedLights] = 0.0f;
-        lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = 0.0f; // Force to not be a spot light (it's a lantern not a flashlight!)
-        lights[litIdx + LIGHT_DATA_OFFSET_RANGE] = 1.85f;
-        lights[litIdx + LIGHT_DATA_OFFSET_R] = 0.3531f;
-        lights[litIdx + LIGHT_DATA_OFFSET_G] = 0.4837f;
-        lights[litIdx + LIGHT_DATA_OFFSET_B] = 0.6509f;
-        lights[litIdx + LIGHT_DATA_OFFSET_POSX] = Sys_Global.instances[i].position.x + 0.23f; // TODO Multiply against forward/right!  Only good on first one in medical!
-        lights[litIdx + LIGHT_DATA_OFFSET_POSY] = Sys_Global.instances[i].position.y + 0.24f;
-        lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = Sys_Global.instances[i].position.z;
-        lightCastsShadows[Sys_Global.loadedLights] = true;
-        lightDirty[Sys_Global.loadedLights] = true;
-        
-        Sys_Global.loadedLights++;
-        if (Sys_Global.loadedLights >= LIGHT_COUNT) { DualLogError("Too many lights %u in level%d.txt!\n",Sys_Global.loadedLights,Sys_Global.currentLevel); OS_Exit(1); }
-
-        litIdx = Sys_Global.loadedLights * LIGHT_DATA_SIZE;
-        lightOn[Sys_Global.loadedLights] = true;
-        lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = 1.1165f;
-        lightMaxIntensity[Sys_Global.loadedLights] = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
-        lightMinIntensity[Sys_Global.loadedLights] = 0.0f;
-        lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = 0.0f; // Force to not be a spot light (it's a lantern not a flashlight!)
-        lights[litIdx + LIGHT_DATA_OFFSET_RANGE] = 2.0f;
-        lights[litIdx + LIGHT_DATA_OFFSET_R] = 0.3561f;
-        lights[litIdx + LIGHT_DATA_OFFSET_G] = 0.3561f;
-        lights[litIdx + LIGHT_DATA_OFFSET_B] = 0.8970f;
-        lights[litIdx + LIGHT_DATA_OFFSET_POSX] = Sys_Global.instances[i].position.x - 0.48f;
-        lights[litIdx + LIGHT_DATA_OFFSET_POSY] = Sys_Global.instances[i].position.y - 0.64f;
-        lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = Sys_Global.instances[i].position.z;
-        lightCastsShadows[Sys_Global.loadedLights] = true;
-        lightDirty[Sys_Global.loadedLights] = true;
+        // TODO position with forward/right taken into account
+        Light blueLight1 = (Light){.pos=(Vector3){e->position.x+0.23f,e->position.y+0.24f,e->position.z},.col=(Color3){0.3531f,0.4837f,0.6509f},.range=1.85f,.intensity=0.7f,.maxIntensity=0.7f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
+        Light blueLight2 = (Light){.pos=(Vector3){e->position.x-0.48f,e->position.y-0.64f,e->position.z},.col=(Color3){0.3561f,0.3561f,0.8970f},.range=2.0f,.intensity=1.1165f,.maxIntensity=1.1165f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
+        LightAnimation lam={0};
+        AddLight(&blueLight1,&lam);
+        AddLight(&blueLight2,&lam);
     }
     
     Sys_Global.instances[i].lockedMessageLingdex = Sys_Global.entities[entIdx].lockedMessageLingdex;
@@ -119,160 +98,63 @@ ENGINE_TO_MOD void DeleteInstance(uint16_t i) {
     --Sys_Global.loadedInstances; // Shift final marker.  It's history!
 }
 
-ENGINE_TO_MOD void LoadFieldIntoLight(char* trimmed_key, char* trimmed_value, char* initialLine, uint32_t lineNum, uint32_t lightsIdx, bool* lightOnRead, uint8_t* lightType) {
-    int32_t litIdx = lightsIdx * LIGHT_DATA_SIZE;
-     if (StringsAreEqual(trimmed_key,"localPosition.x")) lights[litIdx + LIGHT_DATA_OFFSET_POSX] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"localPosition.y")) lights[litIdx + LIGHT_DATA_OFFSET_POSY] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"localPosition.z")) lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"localRotation.x")) lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRX] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"localRotation.y")) lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRY] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"localRotation.z")) lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRZ] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"localRotation.w")) lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRW] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intensity"))       lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = parse_float(trimmed_value, initialLine, lineNum) * 0.35f;
-    else if (StringsAreEqual(trimmed_key,"range"))           lights[litIdx + LIGHT_DATA_OFFSET_RANGE] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"spotAngle"))       lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"type")) {
-             if (StringsAreEqual(trimmed_value,"Spot"))        *lightType = 1u;
-        else if (StringsAreEqual(trimmed_value,"Directional")) *lightType = 2u;
+ENGINE_TO_MOD void LoadFieldIntoLight(char* trimmed_key, char* trimmed_value, char* initialLine, uint32_t lineNum, Light* lit, LightAnimation* lam) {
+    char buffer[32];
+    for (int i=0;i <32;++i) {
+        StringFormat(buffer,sizeof(buffer),"intervalSteps[%d]",i);
+        if (StringsEqual(trimmed_key,buffer)) { lam->intervalSteps[i] = parse_float(trimmed_value,initialLine,lineNum); return; }
     }
-    else if (StringsAreEqual(trimmed_key,"color.r"))         lights[litIdx + LIGHT_DATA_OFFSET_R] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"color.g"))         lights[litIdx + LIGHT_DATA_OFFSET_G] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"color.b"))         lights[litIdx + LIGHT_DATA_OFFSET_B] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"lightOn") && !lightOnRead) { lightOn[lightsIdx] = parse_bool(trimmed_value,initialLine,lineNum); *lightOnRead = true; } // Check lightOnRead in if here since TargetIO also has same value lightOn, whoops!  But guaranteed to be 2nd so get the real one here
-    else if (StringsAreEqual(trimmed_key,"lerpOn"))          lightLerpOn[lightsIdx] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"currentStep"))     lightCurrentStep[lightsIdx] = parse_numberu8(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"lerpValue"))       lightLerpValue[lightsIdx] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps.Length")) lightIntervalStepsLength[lightsIdx] = parse_numberu8(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[0]"))     lightIntervalSteps[lightsIdx][0] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[1]"))     lightIntervalSteps[lightsIdx][1] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[2]"))     lightIntervalSteps[lightsIdx][2] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[3]"))     lightIntervalSteps[lightsIdx][3] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[4]"))     lightIntervalSteps[lightsIdx][4] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[5]"))     lightIntervalSteps[lightsIdx][5] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[6]"))     lightIntervalSteps[lightsIdx][6] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[7]"))     lightIntervalSteps[lightsIdx][7] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[8]"))     lightIntervalSteps[lightsIdx][8] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[9]"))     lightIntervalSteps[lightsIdx][9] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[10]"))    lightIntervalSteps[lightsIdx][10] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[11]"))    lightIntervalSteps[lightsIdx][11] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[12]"))    lightIntervalSteps[lightsIdx][12] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[13]"))    lightIntervalSteps[lightsIdx][13] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[14]"))    lightIntervalSteps[lightsIdx][14] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[15]"))    lightIntervalSteps[lightsIdx][15] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[16]"))    lightIntervalSteps[lightsIdx][16] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[17]"))    lightIntervalSteps[lightsIdx][17] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[18]"))    lightIntervalSteps[lightsIdx][18] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[19]"))    lightIntervalSteps[lightsIdx][19] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[20]"))    lightIntervalSteps[lightsIdx][20]= parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[21]"))    lightIntervalSteps[lightsIdx][21] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[22]"))    lightIntervalSteps[lightsIdx][22] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[23]"))    lightIntervalSteps[lightsIdx][23] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[24]"))    lightIntervalSteps[lightsIdx][24] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[25]"))    lightIntervalSteps[lightsIdx][25] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[26]"))    lightIntervalSteps[lightsIdx][26] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[27]"))    lightIntervalSteps[lightsIdx][27] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[28]"))    lightIntervalSteps[lightsIdx][28] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalSteps[29]"))    lightIntervalSteps[lightsIdx][29] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping.Length")) lightIntervalStepIsLerpingLength[lightsIdx] = parse_numberu8(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[0]"))     intervalStepisLerping[lightsIdx][0] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[1]"))     intervalStepisLerping[lightsIdx][1] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[2]"))     intervalStepisLerping[lightsIdx][2] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[3]"))     intervalStepisLerping[lightsIdx][3] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[4]"))     intervalStepisLerping[lightsIdx][4] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[5]"))     intervalStepisLerping[lightsIdx][5] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[6]"))     intervalStepisLerping[lightsIdx][6] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[7]"))     intervalStepisLerping[lightsIdx][7] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[8]"))     intervalStepisLerping[lightsIdx][8] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[9]"))     intervalStepisLerping[lightsIdx][9] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[10]"))    intervalStepisLerping[lightsIdx][10] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[11]"))    intervalStepisLerping[lightsIdx][11] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[12]"))    intervalStepisLerping[lightsIdx][12] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[13]"))    intervalStepisLerping[lightsIdx][13] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[14]"))    intervalStepisLerping[lightsIdx][14] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[15]"))    intervalStepisLerping[lightsIdx][15] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[16]"))    intervalStepisLerping[lightsIdx][16] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[17]"))    intervalStepisLerping[lightsIdx][17] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[18]"))    intervalStepisLerping[lightsIdx][18] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[19]"))    intervalStepisLerping[lightsIdx][19] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[20]"))    intervalStepisLerping[lightsIdx][20] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[21]"))    intervalStepisLerping[lightsIdx][21] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[22]"))    intervalStepisLerping[lightsIdx][22] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[23]"))    intervalStepisLerping[lightsIdx][23] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[24]"))    intervalStepisLerping[lightsIdx][24] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[25]"))    intervalStepisLerping[lightsIdx][25] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[26]"))    intervalStepisLerping[lightsIdx][26] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[27]"))    intervalStepisLerping[lightsIdx][27] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[28]"))    intervalStepisLerping[lightsIdx][28] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[29]"))    intervalStepisLerping[lightsIdx][29] = parse_bool(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"minIntensity"))    lightMinIntensity[lightsIdx] = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsAreEqual(trimmed_key,"maxIntensity"))    lightMaxIntensity[lightsIdx] = parse_float(trimmed_value, initialLine, lineNum);
-//     else if (StringsAreEqual(trimmed_key,"shadows"))         lightCastsShadows[lightsIdx] = trimmed_value[0] != 'N';//'N'one
-}
-
-ENGINE_TO_MOD void AddLightFromLoad(bool lightOnRead, int32_t* lightsIdx, uint8_t lightType, uint32_t lineNum) { // Fields already read line by line using function above, so just set needed stuff from level load.
-    Sys_Global.loadedLights++;
-    if (Sys_Global.loadedLights >= LIGHT_COUNT) { DualLogError("Too many lights %u in level%d.txt!\n",*lightsIdx,Sys_Global.currentLevel); OS_Exit(1); }
     
-    int32_t litIdx = *lightsIdx * LIGHT_DATA_SIZE;
-    lightCastsShadows[*lightsIdx] = true;//(lights[litIdx + LIGHT_DATA_OFFSET_RANGE] >= 0.32f);
-    if (!lightOnRead) {
-        lightOn[*lightsIdx] = true;
-        lightMaxIntensity[*lightsIdx] = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
-    } else {
-        // Dynamic Animated light
-        if (lightMinIntensity[*lightsIdx] < 0.01f) lightMinIntensity[*lightsIdx] = 0.01f;
-        lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightMinIntensity[*lightsIdx];
-        lightLerpUp[*lightsIdx] = true;
+    for (int i=0;i <32;++i) {
+        StringFormat(buffer,sizeof(buffer),"intervalStepisLerping[%d]",i);
+        if (StringsEqual(trimmed_key,buffer)) { lam->stepIsLerping[i] = parse_float(trimmed_value,initialLine,lineNum); return; }
     }
-
-    if (lightType == 1) {
-        if (lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] < 5.0f) DualLogWarn("Spotlight %d on line %d loaded with spotAngle less than 5deg\n",*lightsIdx,lineNum+1);
-    } else if (lightType == 2) {
-        lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = 180.0f; // Force to be a directional light
-    } else {
-        lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = 0.0f; // Force to not be a spot light
+    
+         if (StringsEqual(trimmed_key,"currentStep"))                  lam->currentStep = parse_numberu8(trimmed_value,initialLine,lineNum);
+    else if (StringsEqual(trimmed_key,"lerpValue"))                    lam->lerpValue = parse_float(trimmed_value, initialLine, lineNum);
+    else if (StringsEqual(trimmed_key,"intervalSteps.Length"))         lam->numIntervalSteps = parse_numberu8(trimmed_value, initialLine, lineNum);
+    else if (StringsEqual(trimmed_key,"intervalStepisLerping.Length")) lam->numLerpSteps = parse_numberu8(trimmed_value,initialLine,lineNum);
+    
+    else if (StringsEqual(trimmed_key,"localPosition.x")) lit->pos.x = parse_float(trimmed_value, initialLine, lineNum);
+    else if (StringsEqual(trimmed_key,"localPosition.y")) lit->pos.y = parse_float(trimmed_value, initialLine, lineNum);
+    else if (StringsEqual(trimmed_key,"localPosition.z")) lit->pos.z = parse_float(trimmed_value, initialLine, lineNum);
+    else if (StringsEqual(trimmed_key,"localRotation.x")) lit->spotDir.x = parse_float(trimmed_value, initialLine, lineNum);
+    else if (StringsEqual(trimmed_key,"localRotation.y")) lit->spotDir.y = parse_float(trimmed_value, initialLine, lineNum);
+    else if (StringsEqual(trimmed_key,"localRotation.z")) lit->spotDir.z = parse_float(trimmed_value, initialLine, lineNum);
+    else if (StringsEqual(trimmed_key,"localRotation.w")) lit->spotDir.w = parse_float(trimmed_value, initialLine, lineNum);
+    else if (StringsEqual(trimmed_key,"intensity"))    lit->intensity = lit->maxIntensity = parse_float(trimmed_value, initialLine, lineNum) * 0.35f;
+    else if (StringsEqual(trimmed_key,"range"))        lit->range = parse_float(trimmed_value, initialLine, lineNum);
+    else if (StringsEqual(trimmed_key,"spotAngle"))    lit->spotAng = parse_float(trimmed_value, initialLine, lineNum);
+    else if (StringsEqual(trimmed_key,"type")) {
+             if (StringsEqual(trimmed_value,"Spot"))        flag_setu32(&lit->lflags,LSPOT,true);
+        else if (StringsEqual(trimmed_value,"Directional")) flag_setu32(&lit->lflags,LDIR,true);
     }
-//     if (lightMaxIntensity[*lightsIdx] < 0.16f || lights[litIdx + LIGHT_DATA_OFFSET_RANGE] < 0.32f) { *lightsIdx = *lightsIdx - 1; Sys_Global.loadedLights--; }
-}
-
-ENGINE_TO_MOD int32_t AddLight(Vector3 pos, Color col, float range, float intensity, float maxIntensity, float minIntensity, float spotAng, Quaternion spotDir, bool on, bool shadOn) {
-    int32_t lightsIdx = Sys_Global.loadedLights;
-    Sys_Global.loadedLights++;
-    if (Sys_Global.loadedLights >= LIGHT_COUNT) { DualLogError("Too many lights %u added in level %d!\n",lightsIdx,Sys_Global.currentLevel); OS_Exit(1); }
-
-    int32_t litIdx = lightsIdx * LIGHT_DATA_SIZE;
-    lightOn[lightsIdx] = on;
-    lightMinIntensity[lightsIdx] = minIntensity; lightMaxIntensity[lightsIdx] = maxIntensity;
-    lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = intensity;
-    lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = spotAng;
-    lights[litIdx + LIGHT_DATA_OFFSET_RANGE] = range;
-    lights[litIdx + LIGHT_DATA_OFFSET_R] = col.r; lights[litIdx + LIGHT_DATA_OFFSET_G] = col.g; lights[litIdx + LIGHT_DATA_OFFSET_B] = col.b;
-    lights[litIdx + LIGHT_DATA_OFFSET_POSX] = pos.x; lights[litIdx + LIGHT_DATA_OFFSET_POSY] = pos.y; lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = pos.z;
-    lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRX] = spotDir.x; lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRY] = spotDir.y; lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRZ] = spotDir.z; lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRW] = spotDir.w;
-    lightsNewPosition[lightsIdx] = pos;
-    lightCastsShadows[lightsIdx] = shadOn;
-    lightDirty[lightsIdx] = true;
-    return lightsIdx;
+    else if (StringsEqual(trimmed_key,"minIntensity")) lit->minIntensity = parse_float(trimmed_value,initialLine,lineNum);
+    else if (StringsEqual(trimmed_key,"maxIntensity")) lit->maxIntensity = parse_float(trimmed_value,initialLine,lineNum);
+    else if (StringsEqual(trimmed_key,"color.r"))      lit->col.r = parse_float(trimmed_value, initialLine, lineNum);
+    else if (StringsEqual(trimmed_key,"color.g"))      lit->col.g = parse_float(trimmed_value, initialLine, lineNum);
+    else if (StringsEqual(trimmed_key,"color.b"))      lit->col.b = parse_float(trimmed_value, initialLine, lineNum);
+//     else if (StringsEqual(trimmed_key,"lightOn"))      flag_setu32(&lit->lflags,LIGHTON,parse_bool(trimmed_value,initialLine,lineNum));
+    else if (StringsEqual(trimmed_key,"lerpOn"))       flag_setu32(&lit->lflags,LERPON,parse_bool(trimmed_value,initialLine,lineNum));
+//  else if (StringsEqual(trimmed_key,"shadows"))      flag_setu32(&lit->lflags,SHADON,trimmed_value[0] != 'N'); // None
 }
 
 #define IS_CHANGED(a, b) _Generic((a), float:(vabs((a) - (b)) > 0.0001f), default:((a) != (b)))
 #define CHECK_UPDATE(target, value) do { if (IS_CHANGED(target, value)) { (target) = (value); changed = true; }} while(0)
-ENGINE_TO_MOD void UpdateLight(uint16_t lightsIdx, Vector3 pos, Color col, float range, float intensity, float maxIntensity, float minIntensity, float spotAng, Quaternion spotDir, bool on, bool shadOn) {
-    int32_t litIdx = lightsIdx * LIGHT_DATA_SIZE;
+ENGINE_TO_MOD void UpdateLight(uint16_t i, Vector3 pos, Color3 col, float range, float intensity, float maxIntensity, float minIntensity, float spotAng, Quaternion spotDir, bool on, bool shadOn) {
     bool changed = false;
-    CHECK_UPDATE(lightOn[lightsIdx],on);
-    lightCastsShadows[lightsIdx] = shadOn;
-    lightMinIntensity[lightsIdx] = minIntensity;
-    lightMaxIntensity[lightsIdx] = maxIntensity;
-    lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = intensity;
-    lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = spotAng;
-    CHECK_UPDATE(lights[litIdx + LIGHT_DATA_OFFSET_RANGE], range);
-    lights[litIdx+LIGHT_DATA_OFFSET_R]=col.r; lights[litIdx+LIGHT_DATA_OFFSET_G]=col.g; lights[litIdx+LIGHT_DATA_OFFSET_B]=col.b;
-    CHECK_UPDATE(lights[litIdx + LIGHT_DATA_OFFSET_POSX], pos.x);
-    CHECK_UPDATE(lights[litIdx + LIGHT_DATA_OFFSET_POSY], pos.y);
-    CHECK_UPDATE(lights[litIdx + LIGHT_DATA_OFFSET_POSZ], pos.z);
-    lights[litIdx+LIGHT_DATA_OFFSET_SPOTDIRX]=spotDir.x; lights[litIdx+LIGHT_DATA_OFFSET_SPOTDIRY]=spotDir.y; lights[litIdx+LIGHT_DATA_OFFSET_SPOTDIRZ]=spotDir.z; lights[litIdx+LIGHT_DATA_OFFSET_SPOTDIRW]=spotDir.w;
-    if (changed) { lightsNewPosition[lightsIdx]=pos; lightDirty[lightsIdx]=true; }
+    if ((lights[i].lflags & SHADON) - shadOn) changed = true;
+    if ((lights[i].lflags & LIGHTON) - on) changed = true;
+    flag_setu32(&lights[i].lflags,SHADON,shadOn);
+    flag_setu32(&lights[i].lflags,LIGHTON,on);
+    lights[i].intensity=intensity; lights[i].minIntensity=minIntensity; lights[i].maxIntensity=maxIntensity; lights[i].spotAng=spotAng;
+    CHECK_UPDATE(lights[i].range,range);
+    lights[i].col=col;
+    CHECK_UPDATE(lights[i].pos.x,pos.x);
+    CHECK_UPDATE(lights[i].pos.y,pos.y);
+    CHECK_UPDATE(lights[i].pos.z,pos.z);
+    lights[i].spotDir = spotDir;
+    if (changed) { lightsNewPosition[i]=pos; flag_setu32(&lights[i].lflags,LDIRTY,true); }
 }
 
 ENGINE_TO_MOD int32_t PosGetCellCoords(float pos_x, float pos_z) { return (PosGetCellCoordZ(pos_z) * WORLDX) + PosGetCellCoordX(pos_x); } // Clamped just above.
@@ -289,28 +171,15 @@ void LoadLevel(uint8_t curlevel) {
     Sys_Global.levelCurrentlyLoading = true;
     queuedLevelToLoad = 255u; // Reset any loading state that got us here.
     RenderLoadingProgress(100,"Loading level...");
-    __builtin_memset(lightMinIntensity,0,LIGHT_COUNT * sizeof(float));
-    __builtin_memset(lightMaxIntensity,0,LIGHT_COUNT * sizeof(float));
-    __builtin_memset(lightOn,1,LIGHT_COUNT * sizeof(bool)); // Default all on, only off if level data specifies
-    __builtin_memset(lightCastsShadows,1,LIGHT_COUNT * sizeof(bool)); // Default all on, only off if level data specifies
-    __builtin_memset(lightLerpOn,0,LIGHT_COUNT * sizeof(bool));
-    __builtin_memset(lightLerpUp,0,LIGHT_COUNT * sizeof(bool));
-    __builtin_memset(lightCurrentStep,0,LIGHT_COUNT * sizeof(uint8_t));
-    __builtin_memset(lightLerpValue,0,LIGHT_COUNT * sizeof(float));
-    __builtin_memset(lightLerpTime,0,LIGHT_COUNT * sizeof(float));
-    __builtin_memset(lightLerpStepTime,0,LIGHT_COUNT * sizeof(float));
-    __builtin_memset(lightLerpStartTime,0,LIGHT_COUNT * sizeof(float));
-    __builtin_memset(lightIntervalStepsLength,0,LIGHT_COUNT * sizeof(uint8_t));
-    __builtin_memset(lightIntervalSteps,0,LIGHT_COUNT * 30 * sizeof(float));
-    __builtin_memset(lightIntervalStepIsLerpingLength,0,LIGHT_COUNT * sizeof(uint8_t));
-    __builtin_memset(intervalStepisLerping,0,LIGHT_COUNT * 30 * sizeof(float));
+    __builtin_memset(lights,0,LIGHT_COUNT * sizeof(Light));
+    __builtin_memset(lanims,0,LIGHT_COUNT * sizeof(LightAnimation));
     __builtin_memset(modelMatrices, 0, INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
     char filename[20]; // Minimum size for 0 through 13.
     StringFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel);
     levelFileHandle = OS_OpenReadonly(filename);
     LoadLevelMod(curlevel);
     OS_Close(levelFileHandle);
-    for (int i=0;i<Sys_Global.loadedLights;++i) lightMaxIntensity[i] *= 2.0f;
+    for (int i=0;i<Sys_Global.loadedLights;++i) {/* lights[i].maxIntensity *= 2.0f; */lightsNewPosition[i]=lights[i].pos; }
     DualLog("Loaded %d entities, %u static lights for Level %d... took %f secs\n",Sys_Global.loadedInstances,Sys_Global.loadedLights,curlevel,get_time() - start_time);
     DebugRAM("end of LoadLevel instances");
     RenderLoadingProgress(110,"Loading models...");
@@ -331,11 +200,7 @@ void LoadLevel(uint8_t curlevel) {
     CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
     RenderLoadingProgress(120,"Loading voxel lighting data...");
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < Sys_Global.loadedInstances; i++) Sys_Global.dirtyInstances[i] = true;
-    for (uint16_t i = 0; i < Sys_Global.loadedLights; i++) {
-        uint32_t litIdx = i * LIGHT_DATA_SIZE; // lightDirty[i] = true is already done in PortalCulling, leaving commented out here for confirmation.
-        lightsNewPosition[i] = (Vector3){ lights[litIdx + LIGHT_DATA_OFFSET_POSX], lights[litIdx + LIGHT_DATA_OFFSET_POSY], lights[litIdx + LIGHT_DATA_OFFSET_POSZ] };
-        lightInPVS[i] = false;
-    }
+    for (uint16_t i = 0; i < Sys_Global.loadedLights; i++) { lightsNewPosition[i] = lights[i].pos; lightInPVS[i] = false; }
     __builtin_memset(voxen_Shadow_System.shadowmapIndirectionList, MAX_SHADOWMAPS + 1, Sys_Global.loadedLights * sizeof(uint32_t)); // Set to invalid values for all
     Sys_Global.levelCurrentlyLoading = false;
 }

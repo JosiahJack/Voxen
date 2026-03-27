@@ -27,30 +27,15 @@ uint8_t queuedLevelToLoad = 255u;
 float berserkSeedTime, cam_pitch, cam_yaw = 90.0f, cam_roll, rasterPerspectiveProjection[16], shadowmapsPerspectiveProjection[16], modelMatrices[INSTANCE_COUNT * 16];
 double berserkFinished;
 char uiTextBuffer[TEXT_BUFFER_SIZE];
-float uiOrthoProjection[16], lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
-bool lightDirty[LIGHT_COUNT];
+float uiOrthoProjection[16];
+Light lights[LIGHT_COUNT];
+LightAnimation lanims[LIGHT_COUNT];
 static float lightView[LIGHT_COUNT][6][4][4]; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightView[i][face][0 ... 15]
 static float lightViewProj[LIGHT_COUNT][6][16]; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightViewProj[i][face][0 ... 15]
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6]; // Array of Array of 6 Arrays of FrustumPlane structs (four floats).  lightFrustumPlanes[i][face][.nx,.ny,, .nz, .d]
 FrustumPlane playerFrustumPlanes[6];
 uint16_t editModeSelection, editModeTestEntityDefinition = 0; // Test instance and its model index
 VoxenShadowSystem voxen_Shadow_System;
-float lightMinIntensity[LIGHT_COUNT];
-float lightMaxIntensity[LIGHT_COUNT];
-bool lightOn[LIGHT_COUNT];
-bool lightLerpOn[LIGHT_COUNT];
-bool lightLerpUp[LIGHT_COUNT];
-uint8_t lightCurrentStep[LIGHT_COUNT];
-float lightLerpValue[LIGHT_COUNT];
-float lightLerpTime[LIGHT_COUNT];
-float lightLerpStepTime[LIGHT_COUNT];
-float lightLerpStartTime[LIGHT_COUNT];
-uint8_t lightIntervalStepsLength[LIGHT_COUNT];
-float lightIntervalSteps[LIGHT_COUNT][30];
-uint8_t lightIntervalStepIsLerpingLength[LIGHT_COUNT];
-float intervalStepisLerping[LIGHT_COUNT][30];
-bool lightCastsShadows[LIGHT_COUNT];
-uint16_t selfIdx;
 uint16_t loadedTexturesMaxIndex;
 bool doubleSidedTexture[MAX_VALID_TEXTURE];
 bool transparentTexture[MAX_VALID_TEXTURE];
@@ -181,12 +166,9 @@ bool lightInPVS[LIGHT_COUNT];
 Vector3 lightsNewPosition[LIGHT_COUNT];
 bool UpdateLights(bool* voxelsNeedUpdated) {    
     for (uint16_t lightIdx = 0; lightIdx < Sys_Global.loadedLights; ++lightIdx) { 
-        uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
-        lights[litIdx + LIGHT_DATA_OFFSET_POSX] = lightsNewPosition[lightIdx].x;
-        lights[litIdx + LIGHT_DATA_OFFSET_POSY] = lightsNewPosition[lightIdx].y;
-        lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = lightsNewPosition[lightIdx].z;
-        Vector3 lightPos = (Vector3){ lights[litIdx + LIGHT_DATA_OFFSET_POSX], lights[litIdx + LIGHT_DATA_OFFSET_POSY], lights[litIdx + LIGHT_DATA_OFFSET_POSZ] };
-        if (lightDirty[lightIdx]) { // Marked all as true at level load.
+        Vector3 lightPos = lightsNewPosition[lightIdx];
+        lights[lightIdx].pos = lightPos;
+        if (lights[lightIdx].lflags & LDIRTY) { // Marked all as true at level load.
             *voxelsNeedUpdated = true;
             #pragma GCC unroll 6
             for (int j=0;j<6;++j) { // Update to new position
@@ -199,7 +181,7 @@ bool UpdateLights(bool* voxelsNeedUpdated) {
         uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((lightPos.x - Sys_Global.worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
         uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((lightPos.z - Sys_Global.worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
         int lightCellIdx = (cellZ * WORLDX) + cellX;
-        float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
+        float range = lights[lightIdx].range;
         int r = vceil(range * (1.0f / WORLDCELL_WIDTH_F));
         lightInPVS[lightIdx] = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
         if (!lightInPVS[lightIdx]) {
@@ -219,33 +201,32 @@ bool UpdateLights(bool* voxelsNeedUpdated) {
     
     if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
         for (int i=0;i<Sys_Global.loadedLights;++i) { // Just lerps/flickers in intensity
-            if (lightIntervalStepsLength[i] < 1) continue;
-            
-            int litIdx = i * LIGHT_DATA_SIZE;
-            if (!lightOn[i]) { lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightMinIntensity[i]; continue; }
+            if (lanims[i].numIntervalSteps < 1) continue;
 
-            if (lightLerpTime[i] < (float)Sys_Global.pauseRelativeTime) {
-                lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightLerpUp[i] ? lightMaxIntensity[i] : lightMinIntensity[i]; // Pick target to lerp towards
-                lightLerpUp[i] = !lightLerpUp[i];
-                lightCurrentStep[i]++;
-                if (lightCurrentStep[i] >= lightIntervalStepsLength[i]) lightCurrentStep[i] = 0; // Wrap and start over continuous looping
-                lightLerpStepTime[i] = lightIntervalSteps[i][lightCurrentStep[i]];
-                lightLerpTime[i] = (float)Sys_Global.pauseRelativeTime + lightLerpStepTime[i];
-                lightLerpStartTime[i] = (float)Sys_Global.pauseRelativeTime;
-            } else if (lightLerpOn[i]) {
-                if (lightCurrentStep[i] < lightIntervalStepIsLerpingLength[i]) {
-                    if (intervalStepisLerping[i][lightCurrentStep[i]]) {
-                        lightLerpValue[i] = ((float)Sys_Global.pauseRelativeTime - lightLerpStartTime[i])/(lightLerpTime[i] - lightLerpStartTime[i]); // percent towards goal time
-                        float lerpVal = lightLerpUp[i] ? (lightLerpValue[i]) : (1.0f - lightLerpValue[i]);
-                        lightLerpValue[i] = lightMinIntensity[i] + ((lightMaxIntensity[i] - lightMinIntensity[i]) * lerpVal);
-                        lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightLerpValue[i];
+//             if (!(lights[i].lflags & LIGHTON)) { lights[i].intensity = 0.0f; continue; }
+
+            if (lanims[i].lerpTime < (float)Sys_Global.pauseRelativeTime) {
+                lights[i].intensity = lanims[i].lerpUp ? lights[i].maxIntensity : lights[i].minIntensity; // Pick target to lerp towards
+                lanims[i].lerpUp = !lanims[i].lerpUp;
+                lanims[i].currentStep++; if (lanims[i].currentStep >= lanims[i].numIntervalSteps) lanims[i].currentStep = 0; // Wrap and start over continuous looping
+                lanims[i].lerpStepTime = lanims[i].intervalSteps[lanims[i].currentStep];
+                lanims[i].lerpTime = (float)Sys_Global.pauseRelativeTime + lanims[i].lerpStepTime;
+                lanims[i].lerpStartTime = (float)Sys_Global.pauseRelativeTime;
+            } else if (lights[i].lflags & LERPON) {
+                if (lanims[i].currentStep < lanims[i].numLerpSteps) {
+                    if (lanims[i].stepIsLerping[lanims[i].currentStep]) {
+                        lanims[i].lerpValue = ((float)Sys_Global.pauseRelativeTime - lanims[i].lerpStartTime)/(lanims[i].lerpTime - lanims[i].lerpStartTime); // percent towards goal time
+                        float lerpVal = lanims[i].lerpUp ? lanims[i].lerpValue : (1.0f - lanims[i].lerpValue);
+                        lanims[i].lerpValue = lights[i].minIntensity + ((lights[i].maxIntensity - lights[i].minIntensity) * lerpVal);
+                        lights[i].intensity = lanims[i].lerpValue;
                     }
                 }
             }
         }
     }
 
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER,Sys_Render.lightsID); glBufferData(GL_SHADER_STORAGE_BUFFER,Sys_Global.loadedLights * LIGHT_DATA_SIZE * sizeof(float),lights,GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER,Sys_Render.lightsID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER,Sys_Global.loadedLights * sizeof(Light),lights,GL_DYNAMIC_DRAW);
     if (*voxelsNeedUpdated) {
         Vector3 p = Sys_Global.instances[PLAYER1].position;
         glUseProgram(Sys_Render.voxelUpdateShaderProgram);
@@ -476,9 +457,9 @@ __attribute__((cold)) void LoadGameModDefinition(void) { // Unique set separate 
 
             // Ok, process kv pair
             value[valueLength] = '\0'; line[lineLength] = '\0';
-                 if (StringsAreEqual(key, "modname"))    StringCopyInto_A_From_B(Sys_Global.global_modname,value,sizeof(Sys_Global.global_modname));
-            else if (StringsAreEqual(key, "levelcount")) Sys_Global.numLevels = parse_numberu8(value, line, lineNum);
-            else if (StringsAreEqual(key, "startlevel")) Sys_Global.startLevel = parse_numberu8(value, line, lineNum);
+                 if (StringsEqual(key, "modname"))    StringCopyInto_A_From_B(Sys_Global.global_modname,value,sizeof(Sys_Global.global_modname));
+            else if (StringsEqual(key, "levelcount")) Sys_Global.numLevels = parse_numberu8(value, line, lineNum);
+            else if (StringsEqual(key, "startlevel")) Sys_Global.startLevel = parse_numberu8(value, line, lineNum);
             
             is_comment = in_value = false; lineLength = keyLength = valueLength = 0; lineNum++;
             continue;
@@ -583,51 +564,51 @@ ENGINE_TO_MOD bool parse_data_file(DataParser *parser, uint16_t maxSize, const c
 //                 if (!Sys_Global.entityFields) DualLogError("Mod entity fields failed to link!\n"); // WORKED!
 //                 for (int field=0;field<NUM_ENTITY_FIELDS;++field) {
 //                     EntityField* ef = &Sys_Global.entityFields[field];
-//                     if (StringsAreEqual(trimmed_key,ef->fieldName)) {
+//                     if (StringsEqual(trimmed_key,ef->fieldName)) {
 //                         DualLog("Found matched entity field %s:%u\n",ef->fieldName,ef->dataType);
 //                     }
 //                 }
-                     if (StringsAreEqual(trimmed_key, "index"))             entry.index = parse_numberu16(trimmed_value, start, lineNum);
-                else if (StringsAreEqual(trimmed_key, "model"))             entry.modelIndex = parse_numberu16(trimmed_value, start, lineNum);
-                else if (StringsAreEqual(trimmed_key, "animationNum")) {    entry.animationNum = parse_numberu16(trimmed_value, start, lineNum); entry.entflags |= ENTFLAG_ANIMATED; }
-                else if (StringsAreEqual(trimmed_key, "animated"))          flag_set(&entry.entflags,ENTFLAG_ANIMATED,parse_numberu8(trimmed_value, start, lineNum));
-                else if (StringsAreEqual(trimmed_key, "texture"))           entry.texIndex = parse_numberu16(trimmed_value, start, lineNum);
-                else if (StringsAreEqual(trimmed_key, "alttexture"))        entry.altTexIndex = parse_numberu16(trimmed_value, start, lineNum);
-                else if (StringsAreEqual(trimmed_key, "glowtexture"))       entry.glowIndex = parse_numberu16(trimmed_value, start, lineNum);
-                else if (StringsAreEqual(trimmed_key, "altglowtexture"))    entry.altGlowIndex = parse_numberu16(trimmed_value, start, lineNum);
-                else if (StringsAreEqual(trimmed_key, "spectexture"))       entry.specIndex = parse_numberu16(trimmed_value, start, lineNum);
-                else if (StringsAreEqual(trimmed_key, "normtexture"))       entry.normIndex = parse_numberu16(trimmed_value, start, lineNum);
-                else if (StringsAreEqual(trimmed_key, "cardchunk"))         flag_set(&entry.entflags,ENTFLAG_CARDCHUNK,  parse_bool(trimmed_value, start, lineNum));
-                else if (StringsAreEqual(trimmed_key, "collider"))          entry.collider = parse_numberu8(trimmed_value, start, lineNum);
-                else if (StringsAreEqual(trimmed_key, "collider_centerx"))  entry.colliderCenter.x = parse_float(trimmed_value, start, lineNum);
-                else if (StringsAreEqual(trimmed_key, "collider_centery"))  entry.colliderCenter.x = parse_float(trimmed_value, start, lineNum);
-                else if (StringsAreEqual(trimmed_key, "collider_centerz"))  entry.colliderCenter.x = parse_float(trimmed_value, start, lineNum);
-                else if (StringsAreEqual(trimmed_key, "collider_sizex"))    entry.colliderSize.x = parse_float(trimmed_value, start, lineNum);
-                else if (StringsAreEqual(trimmed_key, "collider_sizey"))    entry.colliderSize.y = parse_float(trimmed_value, start, lineNum);
-                else if (StringsAreEqual(trimmed_key, "collider_sizez"))    entry.colliderSize.z = parse_float(trimmed_value, start, lineNum);
-                else if (StringsAreEqual(trimmed_key, "colliderMeshIndex")) entry.colliderMeshIndex = parse_numberu16(trimmed_value, start, lineNum);
-                else if (StringsAreEqual(trimmed_key, "mass"))              entry.mass = parse_float(trimmed_value, start, lineNum);
-                else if (StringsAreEqual(trimmed_key, "linearDrag"))        entry.linearDrag = parse_float(trimmed_value, start, lineNum);
-                else if (StringsAreEqual(trimmed_key, "angularDrag"))       entry.angularDrag = parse_float(trimmed_value, start, lineNum);
-                else if (StringsAreEqual(trimmed_key, "kinematic"))         flag_set(&entry.entflags,ENTFLAG_KINEMATIC, parse_bool(trimmed_value, start, lineNum));
-                else if (StringsAreEqual(trimmed_key, "useGravity"))        parse_bool(trimmed_value,start,lineNum) ? entry.gravity = 1.0f : 0.0f;
-                else if (StringsAreEqual(trimmed_key, "bounciness"))        entry.bounciness = parse_float(trimmed_value,start,lineNum);
-                else if (StringsAreEqual(trimmed_key, "dynamicFriction"))   entry.dynamicFriction = parse_float(trimmed_value,start,lineNum);
-                else if (StringsAreEqual(trimmed_key, "frictionCombine"))   entry.frictionCombine = parse_numberu8(trimmed_value,start,lineNum);
-                else if (StringsAreEqual(trimmed_key, "bounceCombine"))     entry.bounceCombine = parse_numberu8(trimmed_value,start,lineNum);
-                else if (StringsAreEqual(trimmed_key, "numclips"))          entry.numclips = parse_numberu8(trimmed_value,start,lineNum);
-                else if (StringsAreEqual(trimmed_key, "changeMatOnActive")) flag_set(&entry.entflags,ENTFLAG_CHANGE_TEX_ON_ACTIVE,parse_bool(trimmed_value,start,lineNum));
-                else if (StringsAreEqual(trimmed_key, "blinkWhenActive"))   flag_set(&entry.entflags,ENTFLAG_BLINK_TEX_ON_ACTIVE,parse_bool(trimmed_value,start,lineNum));
-                else if (StringsAreEqual(trimmed_key, "noshadows"))         flag_set(&entry.entflags,ENTFLAG_NO_SHADOWS,parse_bool(trimmed_value,start,lineNum));
-                else if (StringsAreEqual(trimmed_key, "volume"))            entry.volume = parse_float(trimmed_value,start,lineNum);
-                else if (StringsAreEqual(trimmed_key, "##child")) {
+                     if (StringsEqual(trimmed_key, "index"))             entry.index = parse_numberu16(trimmed_value, start, lineNum);
+                else if (StringsEqual(trimmed_key, "model"))             entry.modelIndex = parse_numberu16(trimmed_value, start, lineNum);
+                else if (StringsEqual(trimmed_key, "animationNum")) {    entry.animationNum = parse_numberu16(trimmed_value, start, lineNum); entry.entflags |= ENTFLAG_ANIMATED; }
+                else if (StringsEqual(trimmed_key, "animated"))          flag_set(&entry.entflags,ENTFLAG_ANIMATED,parse_numberu8(trimmed_value, start, lineNum));
+                else if (StringsEqual(trimmed_key, "texture"))           entry.texIndex = parse_numberu16(trimmed_value, start, lineNum);
+                else if (StringsEqual(trimmed_key, "alttexture"))        entry.altTexIndex = parse_numberu16(trimmed_value, start, lineNum);
+                else if (StringsEqual(trimmed_key, "glowtexture"))       entry.glowIndex = parse_numberu16(trimmed_value, start, lineNum);
+                else if (StringsEqual(trimmed_key, "altglowtexture"))    entry.altGlowIndex = parse_numberu16(trimmed_value, start, lineNum);
+                else if (StringsEqual(trimmed_key, "spectexture"))       entry.specIndex = parse_numberu16(trimmed_value, start, lineNum);
+                else if (StringsEqual(trimmed_key, "normtexture"))       entry.normIndex = parse_numberu16(trimmed_value, start, lineNum);
+                else if (StringsEqual(trimmed_key, "cardchunk"))         flag_set(&entry.entflags,ENTFLAG_CARDCHUNK,  parse_bool(trimmed_value, start, lineNum));
+                else if (StringsEqual(trimmed_key, "collider"))          entry.collider = parse_numberu8(trimmed_value, start, lineNum);
+                else if (StringsEqual(trimmed_key, "collider_centerx"))  entry.colliderCenter.x = parse_float(trimmed_value, start, lineNum);
+                else if (StringsEqual(trimmed_key, "collider_centery"))  entry.colliderCenter.x = parse_float(trimmed_value, start, lineNum);
+                else if (StringsEqual(trimmed_key, "collider_centerz"))  entry.colliderCenter.x = parse_float(trimmed_value, start, lineNum);
+                else if (StringsEqual(trimmed_key, "collider_sizex"))    entry.colliderSize.x = parse_float(trimmed_value, start, lineNum);
+                else if (StringsEqual(trimmed_key, "collider_sizey"))    entry.colliderSize.y = parse_float(trimmed_value, start, lineNum);
+                else if (StringsEqual(trimmed_key, "collider_sizez"))    entry.colliderSize.z = parse_float(trimmed_value, start, lineNum);
+                else if (StringsEqual(trimmed_key, "colliderMeshIndex")) entry.colliderMeshIndex = parse_numberu16(trimmed_value, start, lineNum);
+                else if (StringsEqual(trimmed_key, "mass"))              entry.mass = parse_float(trimmed_value, start, lineNum);
+                else if (StringsEqual(trimmed_key, "linearDrag"))        entry.linearDrag = parse_float(trimmed_value, start, lineNum);
+                else if (StringsEqual(trimmed_key, "angularDrag"))       entry.angularDrag = parse_float(trimmed_value, start, lineNum);
+                else if (StringsEqual(trimmed_key, "kinematic"))         flag_set(&entry.entflags,ENTFLAG_KINEMATIC, parse_bool(trimmed_value, start, lineNum));
+                else if (StringsEqual(trimmed_key, "useGravity"))        parse_bool(trimmed_value,start,lineNum) ? entry.gravity = 1.0f : 0.0f;
+                else if (StringsEqual(trimmed_key, "bounciness"))        entry.bounciness = parse_float(trimmed_value,start,lineNum);
+                else if (StringsEqual(trimmed_key, "dynamicFriction"))   entry.dynamicFriction = parse_float(trimmed_value,start,lineNum);
+                else if (StringsEqual(trimmed_key, "frictionCombine"))   entry.frictionCombine = parse_numberu8(trimmed_value,start,lineNum);
+                else if (StringsEqual(trimmed_key, "bounceCombine"))     entry.bounceCombine = parse_numberu8(trimmed_value,start,lineNum);
+                else if (StringsEqual(trimmed_key, "numclips"))          entry.numclips = parse_numberu8(trimmed_value,start,lineNum);
+                else if (StringsEqual(trimmed_key, "changeMatOnActive")) flag_set(&entry.entflags,ENTFLAG_CHANGE_TEX_ON_ACTIVE,parse_bool(trimmed_value,start,lineNum));
+                else if (StringsEqual(trimmed_key, "blinkWhenActive"))   flag_set(&entry.entflags,ENTFLAG_BLINK_TEX_ON_ACTIVE,parse_bool(trimmed_value,start,lineNum));
+                else if (StringsEqual(trimmed_key, "noshadows"))         flag_set(&entry.entflags,ENTFLAG_NO_SHADOWS,parse_bool(trimmed_value,start,lineNum));
+                else if (StringsEqual(trimmed_key, "volume"))            entry.volume = parse_float(trimmed_value,start,lineNum);
+                else if (StringsEqual(trimmed_key, "##child")) {
                     ++currentChild;
                     if (currentChild >= MAX_CHILD_COUNT) { DualLogError("Too many children %u! Minivan is full!!\n", currentChild); OS_Exit(1); }
                     
                     entry.child[currentChild] = parse_numberu16(trimmed_value, start, lineNum);
-                } else if (StringsAreEqual(trimmed_key, "child_offsetx"))    entry.child_offset[currentChild].x = parse_float(trimmed_value, start, lineNum);
-                else if (StringsAreEqual(trimmed_key, "child_offsety"))    entry.child_offset[currentChild].y = parse_float(trimmed_value, start, lineNum);
-                else if (StringsAreEqual(trimmed_key, "child_offsetz"))    entry.child_offset[currentChild].z = parse_float(trimmed_value, start, lineNum);
+                } else if (StringsEqual(trimmed_key, "child_offsetx"))    entry.child_offset[currentChild].x = parse_float(trimmed_value, start, lineNum);
+                else if (StringsEqual(trimmed_key, "child_offsety"))    entry.child_offset[currentChild].y = parse_float(trimmed_value, start, lineNum);
+                else if (StringsEqual(trimmed_key, "child_offsetz"))    entry.child_offset[currentChild].z = parse_float(trimmed_value, start, lineNum);
             } else DualLogWarn("Invalid key-value pair at line %u: %s\n", lineNum, start);
         } else DualLogWarn("No colon found in line %u: %s\n", lineNum, start);
     }
@@ -1150,7 +1131,7 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     Sys_Render.textureSizesID          = SetupSSBO(&Sys_Render.textureSizesID,          15, MAX_VALID_TEXTURE * 2 * sizeof(int32_t), NULL, GL_STATIC_DRAW);
     Sys_Render.texturePalettesID       = SetupSSBO(&Sys_Render.texturePalettesID,       16, MAX_UNIQUE_COLORS * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     Sys_Render.texturePaletteOffsetsID = SetupSSBO(&Sys_Render.texturePaletteOffsetsID, 17, MAX_VALID_TEXTURE * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-    Sys_Render.lightsID                = SetupSSBO(&Sys_Render.lightsID,                19, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_STATIC_DRAW);
+    Sys_Render.lightsID                = SetupSSBO(&Sys_Render.lightsID,                19, LIGHT_COUNT * sizeof(Light), NULL, GL_STATIC_DRAW);
     Sys_Render.uniqueLightListsID      = SetupSSBO(&Sys_Render.uniqueLightListsID,      27, VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     DualLog("GL SSBOs and Settings Apply... took %f secs\n",get_time() - nextInitTimeSection);
     RenderLoadingProgress(110,"Loading models...");
@@ -1867,14 +1848,13 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
     Vector3 playerPos = Sys_Global.instances[PLAYER1].position;
     float pfx = Sys_Global.instances[PLAYER1].forward.x;    float pfy = Sys_Global.instances[PLAYER1].forward.y;    float pfz = Sys_Global.instances[PLAYER1].forward.z;
     for (uint16_t i = 0; i < Sys_Global.loadedLights; ++i) { // Collect candidates: only lights that are enabled, within FAR_PLANE, and in PVS
-        if ((!lightCastsShadows[i])) continue;
+//         if (!(lights[i].lflags & SHADON)) continue;
 
-        uint32_t litIdx = i * LIGHT_DATA_SIZE;
-        Vector3 lightPos = (Vector3){ lights[litIdx], lights[litIdx + LIGHT_DATA_OFFSET_POSY], lights[litIdx + LIGHT_DATA_OFFSET_POSZ] };
-        float intensity = lightMaxIntensity[i];
+        Vector3 lightPos = lights[i].pos;
+        float intensity = lights[i].intensity;
         if ((intensity < 0.1f)) continue;
         
-        float range =  lights[litIdx + LIGHT_DATA_OFFSET_RANGE] * 0.99f; // Discard 1% more lights/meshes for performance.
+        float range =  lights[i].range;
         float luminosity = (intensity / (range * range));
         if (luminosity < 0.008f && (range < 8.0f || intensity < 0.5f)) continue;
         if (!lightInPVS[i]) continue;
@@ -2118,7 +2098,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
     glBindVertexArray(Sys_Render.vao_chunk); // Common vao for RenderShadowmaps and Rasterized Geometry
     glEnable(GL_DEPTH_TEST);
     if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps();
-    __builtin_memset(    lightDirty,0    ,LIGHT_COUNT * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
+    for (int i=0;i<LIGHT_COUNT;++i) flag_setu32(&lights[i].lflags,LDIRTY,false); // Clear dirty after shadowmaps for minimal shadowmap updating.
     __builtin_memset(Sys_Global.dirtyInstances,0,Sys_Global.loadedInstances * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
     glBindFramebuffer(GL_FRAMEBUFFER, Sys_Render.gBufferFBO);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into

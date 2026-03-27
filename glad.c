@@ -728,7 +728,7 @@ __attribute__((pure)) static int glad_gl_has_extension(const char *exts, char **
         unsigned int index;
         for(index = 0; exts_i[index]; index++) {
             const char *e = exts_i[index];
-            if(StringsAreEqual(e, ext)) return 1;
+            if(StringsEqual(e, ext)) return 1;
         }
     } else {
         const char *extensions;

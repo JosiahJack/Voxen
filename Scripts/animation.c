@@ -317,10 +317,10 @@ void TextureSequenceInit(uint16_t self, char* trimmed_value) {
     
     e->textureAnimating = true; e->textureGlowAnimating = false;
     e->texFrame = e->texGlowFrame = 0;
-    if (StringsAreEqual(trimmed_value,"ScreenDestroyed")) { e->texAnimClip = NUM_TEXTURE_CLIPS - 1; return; }
+    if (StringsEqual(trimmed_value,"ScreenDestroyed")) { e->texAnimClip = NUM_TEXTURE_CLIPS - 1; return; }
     
     for (int i = 0; i < NUM_TEXTURE_CLIPS; ++i) {
-        if (StringsAreEqual(trimmed_value,textureAnimClips[i].name)) { e->texAnimClip = i; e->textureGlowAnimating = textureAnimClips[i].hasGlow; return; }
+        if (StringsEqual(trimmed_value,textureAnimClips[i].name)) { e->texAnimClip = i; e->textureGlowAnimating = textureAnimClips[i].hasGlow; return; }
     }
     
     e->textureAnimating = false; // Couldn't find match, just don't animate.

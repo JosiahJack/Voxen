@@ -46,28 +46,6 @@
 #define CELL_CLOSEDWEST   32u
 #define CELL_SEES_SUN     64u
 #define CELL_SEES_SKYBOX 128u
-// Lights
-                           //    0     1     2          3       4        5         6         7         8         9 10 11 12
-#define LIGHT_DATA_SIZE 13 // posx, posy, posz, intensity, radius, spotAng, spotDirx, spotDiry, spotDirz, spotDirw, r, g, b
-      // Make sure this^^^^ matches in chunk.glsl shader!
-#define LIGHT_DATA_OFFSET_POSX 0
-#define LIGHT_DATA_OFFSET_POSY 1
-#define LIGHT_DATA_OFFSET_POSZ 2
-#define LIGHT_DATA_OFFSET_INTENSITY 3
-#define LIGHT_DATA_OFFSET_RANGE 4
-#define LIGHT_DATA_OFFSET_SPOTANG 5
-#define LIGHT_DATA_OFFSET_SPOTDIRX 6
-#define LIGHT_DATA_OFFSET_SPOTDIRY 7
-#define LIGHT_DATA_OFFSET_SPOTDIRZ 8
-#define LIGHT_DATA_OFFSET_SPOTDIRW 9
-#define LIGHT_DATA_OFFSET_R 10
-#define LIGHT_DATA_OFFSET_G 11
-#define LIGHT_DATA_OFFSET_B 12
-// Make sure these match in chunk.glsl shader!
-#define LIGHT_MAX_INTENSITY 8.0f
-#define LIGHT_RANGE_MAX 15.36f
-#define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
-
 #define DEBUG_OPENGL
 #ifdef DEBUG_OPENGL
 	#define CHECK_GL_ERROR() do { GLenum err = glGetError(); if (err != GL_NO_ERROR) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
@@ -193,23 +171,9 @@ extern Vector3 lightsNewPosition[LIGHT_COUNT];
 extern uint32_t modelVertexCounts[MODEL_IDX_MAX];
 extern uint16_t modelTriangleCounts[MODEL_IDX_MAX];
 extern bool modelHasAnimation[MODEL_IDX_MAX];
-extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
-extern bool lightOn[LIGHT_COUNT];
+extern Light lights[LIGHT_COUNT];
+LightAnimation lanims[LIGHT_COUNT];
 extern bool lightInPVS[LIGHT_COUNT];
-extern bool lightCastsShadows[LIGHT_COUNT];
-extern bool lightLerpOn[LIGHT_COUNT];
-extern bool lightLerpUp[LIGHT_COUNT];
-extern uint8_t lightCurrentStep[LIGHT_COUNT];
-extern float lightLerpValue[LIGHT_COUNT];
-extern float lightLerpTime[LIGHT_COUNT];
-extern float lightLerpStepTime[LIGHT_COUNT];
-extern float lightLerpStartTime[LIGHT_COUNT];
-extern uint8_t lightIntervalStepsLength[LIGHT_COUNT];
-extern float lightIntervalSteps[LIGHT_COUNT][30];
-extern uint8_t lightIntervalStepIsLerpingLength[LIGHT_COUNT];
-extern float intervalStepisLerping[LIGHT_COUNT][30];
-extern float lightMinIntensity[LIGHT_COUNT];
-extern float lightMaxIntensity[LIGHT_COUNT];
 extern uint8_t queuedLevelToLoad;
 extern uint16_t playerCellIdx;
 extern uint16_t numCellsVisible;
@@ -240,7 +204,6 @@ void LoadConfig(void);
 void SaveConfig(void);
 // ----------------------------------------------------------------------------
 // Rendering
-extern bool lightDirty[LIGHT_COUNT];
 extern float cam_yaw, cam_pitch, cam_roll;
 extern uint16_t loadedModelsMaxIndex;
 extern bool enteringPlayerName;
@@ -271,8 +234,8 @@ int32_t StringToInt(const char *str);
 size_t GetStringLength(const char *s);
 bool CharacterIsEmpty(const char c);
 bool StringIsEmpty(const char* c);
-bool StringsAreEqual(const char* c, const char* c2);
-bool StringsAreEqualLimitedBy(const char* a, const char* b, size_t limit);
+bool StringsEqual(const char* c, const char* c2);
+bool StringsEqualLimitedBy(const char* a, const char* b, size_t limit);
 void StringCopyInto_A_From_B(char* a, const char* b, size_t bufferSize);
 void StringCopyInto_A_SubstringFrom_B(char* a, size_t substringSize, const char* b, size_t bufferSize);
 void StringConcatenate(char* a, const char* b, size_t bufferSize);

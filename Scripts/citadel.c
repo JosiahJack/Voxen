@@ -1269,7 +1269,7 @@ void UseTargets(uint16_t activator, const char* argvalue, const char* targetname
     bool succeeded = false;
     if (StringIsEmpty(targetname)) return;
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < Eng_Global->loadedInstances; i++) {
-        if (!StringsAreEqual(Eng_Global->instances[i].targetname,targetname)) continue;
+        if (!StringsEqual(Eng_Global->instances[i].targetname,targetname)) continue;
         Targetted(activator,i,argvalue);
         succeeded = true;
     }
@@ -2613,7 +2613,7 @@ void HardwareJumpJetsClick(uint16_t p) { Eng_UI->mouseClickHeldOverGUI = true; H
 
 #define INFRARED_RANGE 50.35f
 #define LANTERN_RANGE 11.52f
-Color lantCol = (Color){1.0f,1.0f,1.0f,1.0f};
+Color3 lantCol = (Color3){1.0f,1.0f,1.0f};
 uint16_t headmountedLanternLight;
 Vector3 lanternPos;
 float lanternVersionBrightness[3] = {0.875f,1.4f,1.75f};

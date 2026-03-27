@@ -2,10 +2,7 @@
 #version 430 core
 in vec3 FragPos;
 in vec2 TexCoord;
-
 layout(std430,  binding = 5) buffer ShadowMaps { uint depthData[]; };
-layout(std430, binding = 19) buffer LightIndices { float lights[]; };
-
 layout(location = 2) uniform uint face;
 layout(location = 3) uniform vec3 lightPos;
 layout(location = 6) uniform uint texIndex;
@@ -14,7 +11,6 @@ layout(location = 8) uniform uint isTransparent;
 layout(location = 9) uniform uint shadowMapSize;
 layout(location = 10) uniform ivec2 texSize;
 layout(location = 11) uniform uint texPaletteOffset;
-
 layout(std430, binding = 12) buffer ColorBuffer { uint colors[]; }; // 1D color array (RGBA)
 layout(std430, binding = 14) buffer TextureOffsets { uint textureOffsets[]; }; // Starting index in colors for each texture
 layout(std430, binding = 16) buffer TexturePalettes { uint texturePalettes[]; }; // Palette colors

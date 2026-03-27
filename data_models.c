@@ -405,9 +405,9 @@ bool ParseModelData(ModelDataParser *parser, uint16_t maxSize, const char *filen
                 char *val_end = trimmed_value + GetStringLength(trimmed_value) - 1;
                 while (key_end > trimmed_key && CharacterIsEmpty(*key_end)) *key_end-- = '\0';
                 while (val_end > trimmed_value && CharacterIsEmpty(*val_end)) *val_end-- = '\0';
-                     if (StringsAreEqual(trimmed_key, "index"))        entry.index = parse_numberu16(trimmed_value, start, lineNum);
-                else if (StringsAreEqual(trimmed_key, "animationNum")) entry.animationNum = parse_numberu16(trimmed_value, start, lineNum);
-                else if (StringsAreEqual(trimmed_key, "animated"))     entry.animated = parse_numberu8(trimmed_value, start, lineNum);
+                     if (StringsEqual(trimmed_key, "index"))        entry.index = parse_numberu16(trimmed_value, start, lineNum);
+                else if (StringsEqual(trimmed_key, "animationNum")) entry.animationNum = parse_numberu16(trimmed_value, start, lineNum);
+                else if (StringsEqual(trimmed_key, "animated"))     entry.animated = parse_numberu8(trimmed_value, start, lineNum);
             } else DualLogWarn("Invalid key-value pair at line %u: %s\n", lineNum, start);
         } else DualLogWarn("No colon found in line %u: %s\n", lineNum, start);
     }
