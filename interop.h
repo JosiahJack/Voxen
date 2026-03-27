@@ -2,7 +2,7 @@
 #pragma once
 #define MOD_FUNCTION_LIST(X) \
     X(void, ModLink, (GlobalContext* ctx, CheatsSystem* cheats, SettingsSystem* settings, TextSystem* text, SystemUI* ui)) \
-    X(void, ModUpdate, (void)) \
+    X(void, ModUpdate, (bool)) \
     X(bool, Forward, (void)) \
     X(bool, StrafeLeft, (void)) \
     X(bool, Backpedal, (void)) \
@@ -63,7 +63,8 @@
     X(void, PlayerInit, (uint16_t)) \
     X(void, ProcessInput, (void)) \
     X(void, CheckAndTakeScreenshot, (void)) \
-    X(uint16_t, GetCursorTexture, (void))
+    X(uint16_t, GetCursorTexture, (void)) \
+    X(void, LoadLevelMod, (uint8_t))
 
 #ifdef MOD_INTEROP_IMPLEMENTATION  // mod.h usage:
     // Interop - To Engine
@@ -153,4 +154,15 @@ ENGINE_TO_MOD void play_wav(const char* path, float volume, Vector3 pos, bool po
 ENGINE_TO_MOD void PortalCulling(void);
 ENGINE_TO_MOD void AddInstance(uint16_t entIdx, uint16_t i);
 ENGINE_TO_MOD bool parse_data_file(DataParser *parser, uint16_t maxSize, const char *filename);
+ENGINE_TO_MOD char* GetLevelFileNextStringUpToNewlineOrEOF(char* buf, int size);
+ENGINE_TO_MOD void LoadFieldIntoLight(char* trimmed_key, char* trimmed_value, char* initialLine, uint32_t lineNum, uint32_t lightsIdx, bool* lightOnRead, uint8_t* lightType);
+ENGINE_TO_MOD void AddLightFromLoad(bool lightOnRead, int32_t* lightsIdx, uint8_t lightType, uint32_t lineNum);
+ENGINE_TO_MOD int32_t AddLight(Vector3 pos, Color col, float range, float intensity, float maxIntensity, float minIntensity, float spotAng, Quaternion spotDir, bool on, bool shadOn);
+ENGINE_TO_MOD void UpdateLight(uint16_t lightsIdx, Vector3 pos, Color col, float range, float intensity, float maxIntensity, float minIntensity, float spotAng, Quaternion spotDir, bool on, bool shadOn);
+ENGINE_TO_MOD void InitializeEntity(Entity* entry);
+ENGINE_TO_MOD size_t GetStringLength(const char* s);
+ENGINE_TO_MOD char* StringFindFirstCharWithin(const char *s, char c);
+ENGINE_TO_MOD bool CharacterIsEmpty(const char c);
+ENGINE_TO_MOD void AddDoorPortal(uint16_t entIdx, uint16_t parent);
+ENGINE_TO_MOD bool ToggleDoorPortal(uint8_t portalIdx, uint16_t doorIdx, uint16_t closedModelIndex);
 extern EntityField entityFields[NUM_ENTITY_FIELDS];

@@ -2600,8 +2600,8 @@ void HardwareBoosterClick(void) { Eng_UI->mouseClickHeldOverGUI = true; Hardware
 
 void HardwareJumpJetsOn(void)  { Eng_Global->inventoryPlayer1.hardwareIsActive |=  HW_JET; }
 void HardwareJumpJetsOff(void) { Eng_Global->inventoryPlayer1.hardwareIsActive &= ~HW_JET; }
-void HardwareJumpJetsAction(void) {
-    InventorySystem* inv = Inv(PLAYER1);
+void HardwareJumpJetsAction(uint16_t p) {
+    InventorySystem* inv = Inv(p);
     if (inv->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
     
     play_wav(sounds[78],SfxVol(),(Vector3){},false);
@@ -2609,11 +2609,29 @@ void HardwareJumpJetsAction(void) {
     if (JumpJetsActive(PLAYER1)) HardwareJumpJetsOn(); else HardwareJumpJetsOff();
 }
 
-void HardwareJumpJetsClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareJumpJetsAction(); }
+void HardwareJumpJetsClick(uint16_t p) { Eng_UI->mouseClickHeldOverGUI = true; HardwareJumpJetsAction(p); }
+
+#define INFRARED_RANGE 50.35f
+#define LANTERN_RANGE 11.52f
+Color lantCol = (Color){1.0f,1.0f,1.0f,1.0f};
+uint16_t headmountedLanternLight;
+Vector3 lanternPos;
+float lanternVersionBrightness[3] = {0.875f,1.4f,1.75f};
+void HardwareUpdate(uint16_t p, bool playerMoved) {
+    InventorySystem* inv = Inv(p); (void)playerMoved; // TODO: Only update light while on when player moves?
+    bool infraredOn = /*(inv->hasHardware & HW_INF) && */(inv->hardwareIsActive & HW_INF);
+    bool lanternOn = /*(inv->hasHardware & HW_LAN) && */(inv->hardwareIsActive & HW_LAN);
+    if (lanternOn || infraredOn) { // Update headmounted lantern/infrared's light (infrared overrides lantern brightness/range)
+        Vector3 ppos = Eng_Global->instances[p].position;
+        lanternPos = (Vector3){ppos.x + 0.04f,ppos.y + 0.24f,ppos.z + 0.04f};
+        float intensity = infraredOn ? 0.8f : lanternVersionBrightness[inv->hardwareVersionSetting[7]];
+        UpdateLight(headmountedLanternLight,lanternPos,lantCol,infraredOn ? INFRARED_RANGE : LANTERN_RANGE,intensity,intensity,0.0f,0.0f,QUAT_IDENTITY,true,!infraredOn);
+    } else UpdateLight(headmountedLanternLight,lanternPos,lantCol,11.52f,0.0f,0.0f,0.0f,0.0f,QUAT_IDENTITY,false,!infraredOn);
+}
 //================================================================================
 // Patches
-void PatchInit(void) {
-    InventorySystem* inv = Inv(PLAYER1);
+void PatchInit(uint16_t p) {
+    InventorySystem* inv = Inv(p);
     inv->mediFinishedTime     = -1.0;
     inv->reflexFinishedTime   = -1.0;
     inv->sightFinishedTime    = -1.0;
@@ -3439,9 +3457,10 @@ bool FrobWithHeldObject(void) {
 }
 //================================================================================
 // Update
-MOD_TO_ENGINE void ModUpdate(void) {
+MOD_TO_ENGINE void ModUpdate(bool player1Moved) {
     WeaponsUpdate();
     PatchUpdate(PLAYER1);
+    HardwareUpdate(PLAYER1,player1Moved);
     if (Use()) Frob(Eng_Global->instances[PLAYER1].position,Eng_Global->instances[PLAYER1].forward,Eng_Global->instances[PLAYER1].right);
     if (Eng_Global->pauseRelativeTime < Eng_Global->debugLineFinished && (Eng_Global->debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Eng_Global->debugLine_start,Eng_Global->debugLine_end);
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < Eng_Global->loadedInstances; ++i) {
@@ -3612,7 +3631,6 @@ void InventoryInit(InventorySystem* inv) {
 }
 
 MOD_TO_ENGINE void PlayerInit(uint16_t i) {
-    DualLog("Entered mod function PlayerInit()\n");
     Eng_Global->instances[i].index = 767;
     Eng_Global->instances[i].layer = PhysicsLayer_Player;
     Eng_Global->instances[i].position = (Vector3){10.52f,-43.792f + 0.84f,20.2908f}; // Start Actual: Puts player on Medical Level in actual game start position.  Added 0.84f

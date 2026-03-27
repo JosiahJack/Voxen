@@ -26,7 +26,26 @@
 #define BOUNDS_DATA_OFFSET_MAXY 4
 #define BOUNDS_DATA_OFFSET_MAXZ 5
 #define BOUNDS_DATA_OFFSET_RADIUS 6
-
+#define WORLDX 64
+#define WORLDZ WORLDX
+#define WORLDY 18 // Level 8 is only 17.5 cells tall!!  Could be 16 if I make the ceiling same height in last room as in original.
+#define WORLDX_0BASED (WORLDX - 1)
+#define WORLDZ_0BASED (WORLDZ - 1)
+#define TOTAL_WORLD_CELLS (WORLDX * WORLDY * WORLDZ)
+#define ARRSIZE (WORLDX * WORLDZ)
+#define WORLDCELL_WIDTH_F 2.56f
+#define CELLXHALF (WORLDCELL_WIDTH_F * 0.5f)
+#define PRECOMPUTED_VISIBILITY_SIZE 524288 // 4096 * 4096 / 32
+#define VOXEL_COUNT 262144 // 64 * 64 * 8 * 8
+#define MAX_LIGHTS_PER_VOXEL 32 // Cap to prevent overflow
+#define CELL_VISIBLE       1u
+#define CELL_OPEN          2u
+#define CELL_CLOSEDNORTH   4u
+#define CELL_CLOSEDEAST    8u
+#define CELL_CLOSEDSOUTH  16u
+#define CELL_CLOSEDWEST   32u
+#define CELL_SEES_SUN     64u
+#define CELL_SEES_SKYBOX 128u
 // Lights
                            //    0     1     2          3       4        5         6         7         8         9 10 11 12
 #define LIGHT_DATA_SIZE 13 // posx, posy, posz, intensity, radius, spotAng, spotDirx, spotDiry, spotDirz, spotDirw, r, g, b
@@ -48,29 +67,7 @@
 #define LIGHT_MAX_INTENSITY 8.0f
 #define LIGHT_RANGE_MAX 15.36f
 #define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
-#define WORLDX 64
-#define WORLDZ WORLDX
-#define WORLDY 18 // Level 8 is only 17.5 cells tall!!  Could be 16 if I make the ceiling same height in last room as in original.
-#define WORLDX_0BASED (WORLDX - 1)
-#define WORLDZ_0BASED (WORLDZ - 1)
-#define TOTAL_WORLD_CELLS (WORLDX * WORLDY * WORLDZ)
-#define ARRSIZE (WORLDX * WORLDZ)
-#define WORLDCELL_WIDTH_F 2.56f
-#define CELLXHALF (WORLDCELL_WIDTH_F * 0.5f)
-#define PRECOMPUTED_VISIBILITY_SIZE 524288 // 4096 * 4096 / 32
-#define VOXEL_SIZE 0.32f
-#define VOXEL_HALF (VOXEL_SIZE * 0.5f)
-#define VOXEL_COUNT 262144 // 64 * 64 * 8 * 8
-#define CELL_SIZE 2.56f // Each cell is 2.56x2.56
-#define MAX_LIGHTS_PER_VOXEL 32 // Cap to prevent overflow
-#define CELL_VISIBLE       1u
-#define CELL_OPEN          2u
-#define CELL_CLOSEDNORTH   4u
-#define CELL_CLOSEDEAST    8u
-#define CELL_CLOSEDSOUTH  16u
-#define CELL_CLOSEDWEST   32u
-#define CELL_SEES_SUN     64u
-#define CELL_SEES_SKYBOX 128u
+
 #define DEBUG_OPENGL
 #ifdef DEBUG_OPENGL
 	#define CHECK_GL_ERROR() do { GLenum err = glGetError(); if (err != GL_NO_ERROR) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
@@ -217,9 +214,7 @@ extern uint8_t queuedLevelToLoad;
 extern uint16_t playerCellIdx;
 extern uint16_t numCellsVisible;
 extern uint32_t gridCellStates[ARRSIZE];
-extern uint8_t numActivePortals;
 extern uint32_t precomputedVisibleCellsFromHere[524288];
-extern float worldMin_x, worldMin_z, voxelMinCenterX, voxelMinCenterZ;
 bool get_cull_bit(const uint32_t* arr, int idx);
 void RenderFormattedText(int16_t x, int16_t y, uint32_t color, uint8_t fontID, float scale, const char * restrict format, ...);
 // ----------------------------------------------------------------------------
@@ -245,7 +240,6 @@ void LoadConfig(void);
 void SaveConfig(void);
 // ----------------------------------------------------------------------------
 // Rendering
-extern float fogColorR, fogColorG, fogColorB, fogBaseDensityForLevel;
 extern bool lightDirty[LIGHT_COUNT];
 extern float cam_yaw, cam_pitch, cam_roll;
 extern uint16_t loadedModelsMaxIndex;
@@ -411,8 +405,8 @@ static inline __attribute__((always_inline)) float parse_float(const char* str, 
 typedef __builtin_va_list va_list;
 int StringFormatV(char* buffer, size_t bufferSize, const char* format, va_list args);
 int StringFormat(char* buffer, size_t bufferSize, const char* format, ...);
-static inline __attribute__((always_inline)) int32_t PosGetCellCoordX(float pos_x) { return (uint16_t)clamp((int32_t)vfloor((pos_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED); }
-static inline __attribute__((always_inline)) int32_t PosGetCellCoordZ(float pos_z) { return (uint16_t)clamp((int32_t)vfloor((pos_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED); }
+static inline __attribute__((always_inline)) int32_t PosGetCellCoordX(float pos_x) { return (uint16_t)clamp((int32_t)vfloor((pos_x - Sys_Global.worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED); }
+static inline __attribute__((always_inline)) int32_t PosGetCellCoordZ(float pos_z) { return (uint16_t)clamp((int32_t)vfloor((pos_z - Sys_Global.worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED); }
 static inline __attribute__((always_inline)) bool XZPairInBounds(int32_t x, int32_t z) { return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0); }
 
 extern uint32_t* texturePaletteOffsets;

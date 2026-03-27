@@ -61,41 +61,29 @@ const AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS
 MOD_TO_ENGINE void UpdateAnims(void) {
     bool portalsNeedUpdated = false;
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
-        if (Eng_Global->instances[i].modelIndex >= MODEL_IDX_MAX) continue;
-        if (!(Eng_Global->instances[i].entflags & ENTFLAG_ACTIVE)) continue;
+        Entity* e = &Eng_Global->instances[i];
+        if (e->modelIndex >= MODEL_IDX_MAX) continue;
+        if (!(e->entflags & ENTFLAG_ACTIVE)) continue;
         
-        uint16_t animNum = Eng_Global->instances[i].animationNum;
+        uint16_t animNum = e->animationNum;
         if (animNum >= MAX_ANIMATED_MODELS) continue; // Invalid animated model index
-        if (Eng_Global->instances[i].numclips >= MAX_ANIMATION_CLIPS_PER_MODEL) continue; // Invalid animation clip index
-        if (Eng_Global->instances[i].numclips == 0) continue; // Invalid animation clip index
-        if (!(Eng_Global->instances[i].entflags & ENTFLAG_ANIMATED)) continue;
+        if (e->numclips >= MAX_ANIMATION_CLIPS_PER_MODEL) continue; // Invalid animation clip index
+        if (e->numclips == 0) continue; // Invalid animation clip index
+        if (!(e->entflags & ENTFLAG_ANIMATED)) continue;
         
-        AnimationClip currentClip = modelAnimationClips[animNum][Eng_Global->instances[i].clip];
-        if (Eng_Global->instances[i].currentFrameFinished >= Eng_Global->current_time) continue;
+        AnimationClip currentClip = modelAnimationClips[animNum][e->clip];
+        if (e->currentFrameFinished >= Eng_Global->current_time) continue;
         
-        Eng_Global->instances[i].currentFrameFinished = Eng_Global->current_time + ((1.0/(double)currentClip.speed) * (1.0 / (double)currentClip.framerate));
-        Eng_Global->instances[i].frame++;
-        if (Eng_Global->instances[i].frame > currentClip.frameEnd) Eng_Global->instances[i].frame = currentClip.frameStart;
-        else if (Eng_Global->instances[i].frame < currentClip.frameStart) Eng_Global->instances[i].frame = currentClip.frameEnd;
+        e->currentFrameFinished = Eng_Global->current_time + ((1.0/(double)currentClip.speed) * (1.0 / (double)currentClip.framerate));
+        e->frame++;
+             if (e->frame > currentClip.frameEnd)   e->frame = currentClip.frameStart;
+        else if (e->frame < currentClip.frameStart) e->frame = currentClip.frameEnd;
 
-        Eng_Global->instances[i].modelIndex = (currentClip.frameStartModelIndex + (Eng_Global->instances[i].frame - currentClip.frameStart));
+        e->modelIndex = (currentClip.frameStartModelIndex + (e->frame - currentClip.frameStart));
         Eng_Global->dirtyInstances[i] = true;
-        if (!EntityIndexIsPortalBlockingDoor(Eng_Global->instances[i].index)) continue;
-        
-        uint8_t portalIdx = Eng_Global->instances[i].portalIndex;
-        if (portalIdx >= MAX_PORTALS) continue;
-        
-        uint16_t closedModelIndex = modelAnimationClips[animNum][ANIM_IDLE_CLOSED].frameStartModelIndex;                    
-        bool currentState = Eng_Global->activePortals[portalIdx].open;
-        if (Eng_Global->instances[i].modelIndex == closedModelIndex && currentState) {
-            Eng_Global->activePortals[portalIdx].open = false;
-            Eng_Global->activePortals[portalIdx].dirty = true;
-            portalsNeedUpdated = true;
-        } else if (Eng_Global->instances[i].modelIndex != closedModelIndex && !currentState) {
-            Eng_Global->activePortals[portalIdx].open = true;
-            Eng_Global->activePortals[portalIdx].dirty = true;
-            portalsNeedUpdated = true;
-        }
+        if (!EntityIndexIsPortalBlockingDoor(e->index)) continue;
+
+        if (ToggleDoorPortal(e->portalIndex,i,modelAnimationClips[animNum][ANIM_IDLE_CLOSED].frameStartModelIndex)) portalsNeedUpdated = true;
     }
     
     if (portalsNeedUpdated) PortalCulling();

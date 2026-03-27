@@ -24,21 +24,16 @@ CheatsSystem Sys_Cheats = {.god=false, .noclip=true, .showLocation=true, .showFP
 RenderSystem Sys_Render; SystemUI Sys_UI;
 OsFileHandle console_log_file = 0;
 uint8_t queuedLevelToLoad = 255u;
-float modelMatrices[INSTANCE_COUNT * 16];
+float berserkSeedTime, cam_pitch, cam_yaw = 90.0f, cam_roll, rasterPerspectiveProjection[16], shadowmapsPerspectiveProjection[16], modelMatrices[INSTANCE_COUNT * 16];
 double berserkFinished;
-float berserkSeedTime, cam_pitch, cam_yaw = 90.0f, cam_roll, fogColorR, fogColorG, fogColorB, fogBaseDensityForLevel;
-float rasterPerspectiveProjection[16];
-float shadowmapsPerspectiveProjection[16];
 char uiTextBuffer[TEXT_BUFFER_SIZE];
-float uiOrthoProjection[16];
-float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
+float uiOrthoProjection[16], lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 bool lightDirty[LIGHT_COUNT];
 static float lightView[LIGHT_COUNT][6][4][4]; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightView[i][face][0 ... 15]
 static float lightViewProj[LIGHT_COUNT][6][16]; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightViewProj[i][face][0 ... 15]
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6]; // Array of Array of 6 Arrays of FrustumPlane structs (four floats).  lightFrustumPlanes[i][face][.nx,.ny,, .nz, .d]
 FrustumPlane playerFrustumPlanes[6];
-uint16_t loadedLights, editModeSelection, editModeTestEntityDefinition = 0; // Test instance and its model index
-float voxelMinCenterX, voxelMinCenterZ;
+uint16_t editModeSelection, editModeTestEntityDefinition = 0; // Test instance and its model index
 VoxenShadowSystem voxen_Shadow_System;
 float lightMinIntensity[LIGHT_COUNT];
 float lightMaxIntensity[LIGHT_COUNT];
@@ -55,10 +50,6 @@ float lightIntervalSteps[LIGHT_COUNT][30];
 uint8_t lightIntervalStepIsLerpingLength[LIGHT_COUNT];
 float intervalStepisLerping[LIGHT_COUNT][30];
 bool lightCastsShadows[LIGHT_COUNT];
-uint16_t headmountedLanternLight;
-Vector3 lanternPos;
-float lanternVersionBrightness[3] = { 0.875f, 1.4f, 1.75f };
-uint16_t useableItemsFrobIcons[94];
 uint16_t selfIdx;
 uint16_t loadedTexturesMaxIndex;
 bool doubleSidedTexture[MAX_VALID_TEXTURE];
@@ -188,32 +179,8 @@ Quaternion cubemapOrientationQuaternion[6] = {
 
 bool lightInPVS[LIGHT_COUNT];
 Vector3 lightsNewPosition[LIGHT_COUNT];
-bool UpdateLights(bool* voxelsNeedUpdated) {
-    // Update headmounted lantern
-    int32_t lant = headmountedLanternLight * LIGHT_DATA_SIZE;
-    bool infraredOn = /*(Sys_Global.inventoryPlayer1.hasHardware & HW_INF) && */(Sys_Global.inventoryPlayer1.hardwareIsActive & HW_INF);
-    bool lanternOn = /*(Sys_Global.inventoryPlayer1.hasHardware & HW_LAN) && */(Sys_Global.inventoryPlayer1.hardwareIsActive & HW_LAN);
-    if (lanternOn || infraredOn) {
-        Vector3 lanternPosLast = lanternPos;
-        lanternPos = (Vector3){Sys_Global.instances[PLAYER1].position.x + 0.04f, Sys_Global.instances[PLAYER1].position.y + 0.24f, Sys_Global.instances[PLAYER1].position.z + 0.04f};
-        lightsNewPosition[headmountedLanternLight] = lanternPos;
-        lights[lant + LIGHT_DATA_OFFSET_POSX] = lanternPos.x;
-        lights[lant + LIGHT_DATA_OFFSET_POSY] = lanternPos.y;
-        lights[lant + LIGHT_DATA_OFFSET_POSZ] = lanternPos.z;
-        lights[lant + LIGHT_DATA_OFFSET_RANGE] = infraredOn ? 50.36f : 11.52f;
-        lights[lant + LIGHT_DATA_OFFSET_INTENSITY] = lightMaxIntensity[headmountedLanternLight] = infraredOn ? 0.8f : lanternVersionBrightness[Sys_Global.inventoryPlayer1.hardwareVersionSetting[7]];
-        lightCastsShadows[headmountedLanternLight] = !infraredOn;
-        lightDirty[headmountedLanternLight] = !lightOn[headmountedLanternLight] || (vabs(lanternPosLast.x - lanternPos.x) + vabs(lanternPosLast.y - lanternPos.y) + vabs(lanternPosLast.z - lanternPos.z)) > 0.001f;
-        lightOn[headmountedLanternLight] = true;
-        lightCastsShadows[headmountedLanternLight] = true;
-        lightInPVS[headmountedLanternLight] = true;
-    } else { 
-        lightOn[headmountedLanternLight] = false; 
-        lightDirty[headmountedLanternLight] = false; 
-        lights[lant + LIGHT_DATA_OFFSET_INTENSITY] = 0.0f;
-    }
-    
-    for (uint16_t lightIdx = 0; lightIdx < loadedLights; ++lightIdx) { 
+bool UpdateLights(bool* voxelsNeedUpdated) {    
+    for (uint16_t lightIdx = 0; lightIdx < Sys_Global.loadedLights; ++lightIdx) { 
         uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
         lights[litIdx + LIGHT_DATA_OFFSET_POSX] = lightsNewPosition[lightIdx].x;
         lights[litIdx + LIGHT_DATA_OFFSET_POSY] = lightsNewPosition[lightIdx].y;
@@ -229,12 +196,12 @@ bool UpdateLights(bool* voxelsNeedUpdated) {
             }
         }
         
-        uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((lightPos.x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
-        uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((lightPos.z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+        uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((lightPos.x - Sys_Global.worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+        uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((lightPos.z - Sys_Global.worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
         int lightCellIdx = (cellZ * WORLDX) + cellX;
         float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
         int r = vceil(range * (1.0f / WORLDCELL_WIDTH_F));
-        lightInPVS[lightIdx] = (gridCellStates[lightCellIdx] & CELL_VISIBLE) || (lightIdx == headmountedLanternLight);
+        lightInPVS[lightIdx] = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
         if (!lightInPVS[lightIdx]) {
             for (int ix = cellX - r; ix <= (int)cellX + r; ++ix) {
                 for (int iz = cellZ - r; iz <= (int)cellZ + r; ++iz) {
@@ -251,7 +218,7 @@ bool UpdateLights(bool* voxelsNeedUpdated) {
     }
     
     if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
-        for (int i=0;i<loadedLights;++i) { // Just lerps/flickers in intensity
+        for (int i=0;i<Sys_Global.loadedLights;++i) { // Just lerps/flickers in intensity
             if (lightIntervalStepsLength[i] < 1) continue;
             
             int litIdx = i * LIGHT_DATA_SIZE;
@@ -278,7 +245,7 @@ bool UpdateLights(bool* voxelsNeedUpdated) {
         }
     }
 
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, Sys_Render.lightsID); glBufferData(GL_SHADER_STORAGE_BUFFER, loadedLights * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER,Sys_Render.lightsID); glBufferData(GL_SHADER_STORAGE_BUFFER,Sys_Global.loadedLights * LIGHT_DATA_SIZE * sizeof(float),lights,GL_DYNAMIC_DRAW);
     if (*voxelsNeedUpdated) {
         Vector3 p = Sys_Global.instances[PLAYER1].position;
         glUseProgram(Sys_Render.voxelUpdateShaderProgram);
@@ -466,11 +433,9 @@ __attribute__((cold)) void NewGame(void) { // Reset World States
     Sys_Global.instances[WORLD].ioflags = 0u;
     ModNewGame();
     __builtin_memset(Sys_Global.instances,0,INSTANCE_COUNT * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
-    DualLog("Calling PlayerInits...\n");
     PlayerInit(PLAYER1); PlayerInit(PLAYER2);
     cam_yaw = 90.0f; cam_pitch = 0.0f; cam_roll = 0.0f;
     Sys_Global.inventoryMode = Sys_Settings.NoShootMode;
-    DualLog("Calling LoadLevel with %u...\n",Sys_Global.startLevel);
     LoadLevel(Sys_Global.startLevel); // Must be after entities!
     Sys_Global.pauseRelativeTime =  Sys_Global.last_physics_time = 0.0;
     Sys_Global.last_topframe_time = Sys_Global.last_physics_time - 0.05;
@@ -615,13 +580,13 @@ ENGINE_TO_MOD bool parse_data_file(DataParser *parser, uint16_t maxSize, const c
                 char *val_end = trimmed_value + GetStringLength(trimmed_value) - 1;
                 while (key_end > trimmed_key && CharacterIsEmpty(*key_end)) *key_end-- = '\0';
                 while (val_end > trimmed_value && CharacterIsEmpty(*val_end)) *val_end-- = '\0';
-                if (!Sys_Global.entityFields) DualLogError("Mod entity fields failed to link!\n");
-                for (int field=0;field<NUM_ENTITY_FIELDS;++field) {
-                    EntityField* ef = &Sys_Global.entityFields[field];
-                    if (StringsAreEqual(trimmed_key,ef->fieldName)) {
-                        DualLog("Found matched entity field %s:%u\n",ef->fieldName,ef->dataType);
-                    }
-                }
+//                 if (!Sys_Global.entityFields) DualLogError("Mod entity fields failed to link!\n"); // WORKED!
+//                 for (int field=0;field<NUM_ENTITY_FIELDS;++field) {
+//                     EntityField* ef = &Sys_Global.entityFields[field];
+//                     if (StringsAreEqual(trimmed_key,ef->fieldName)) {
+//                         DualLog("Found matched entity field %s:%u\n",ef->fieldName,ef->dataType);
+//                     }
+//                 }
                      if (StringsAreEqual(trimmed_key, "index"))             entry.index = parse_numberu16(trimmed_value, start, lineNum);
                 else if (StringsAreEqual(trimmed_key, "model"))             entry.modelIndex = parse_numberu16(trimmed_value, start, lineNum);
                 else if (StringsAreEqual(trimmed_key, "animationNum")) {    entry.animationNum = parse_numberu16(trimmed_value, start, lineNum); entry.entflags |= ENTFLAG_ANIMATED; }
@@ -1833,7 +1798,7 @@ static inline __attribute__((always_inline)) double RenderUI(void) {
     int16_t lineSpacing = 18;
     if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 1),TEXT_WHITE,FONT_NORMAL,1.0f,"timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u",Sys_Global.timeSinceLastPhysicsTick, voxen_Shadow_System.numShadowsCouldRender,playerCellIdx,numCellsVisible);
     if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 2),TEXT_WHITE,FONT_NORMAL,1.0f,"Player velocity: %.2f, %.2f, %.2f",Sys_Global.instances[PLAYER1].velocity.x,Sys_Global.instances[PLAYER1].velocity.y,Sys_Global.instances[PLAYER1].velocity.z);
-    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 3),TEXT_WHITE,FONT_NORMAL,1.0f,"Test Entity[%u] %s Index: %u, Shadow cpu ms: %.3f",editModeSelection,Sys_Global.entities[Sys_Global.instances[editModeSelection].index].path,editModeTestEntityDefinition,voxen_Shadow_System.shadowTime * 1000);
+    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 3),TEXT_WHITE,FONT_NORMAL,1.0f,"Test Entity[%u] %s Index: %u, Shadow cpu ms: %.3f",editModeSelection,Sys_Global.instances[editModeSelection].path,editModeTestEntityDefinition,voxen_Shadow_System.shadowTime * 1000);
     if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 4),TEXT_WHITE,FONT_NORMAL,1.0f,"Player cell: %u",Sys_Global.instances[PLAYER1].cellIndex);
     RenderFormattedText(16,debugTextStartY + (lineSpacing * 5),TEXT_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d   dx: %d dy: %d",Sys_Global.cursorPosition_x,Sys_Global.cursorPosition_y,Sys_Input.currentMouse_dx,Sys_Input.currentMouse_dy);
     if (Sys_Cheats.consoleActive) RenderFormattedText(16, 0, TEXT_WHITE, FONT_NORMAL,1.0f, "] %s",consoleEntryText);
@@ -1901,7 +1866,7 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
     voxen_Shadow_System.numShadowsCouldRender = 0;
     Vector3 playerPos = Sys_Global.instances[PLAYER1].position;
     float pfx = Sys_Global.instances[PLAYER1].forward.x;    float pfy = Sys_Global.instances[PLAYER1].forward.y;    float pfz = Sys_Global.instances[PLAYER1].forward.z;
-    for (uint16_t i = 0; i < loadedLights; ++i) { // Collect candidates: only lights that are enabled, within FAR_PLANE, and in PVS
+    for (uint16_t i = 0; i < Sys_Global.loadedLights; ++i) { // Collect candidates: only lights that are enabled, within FAR_PLANE, and in PVS
         if ((!lightCastsShadows[i])) continue;
 
         uint32_t litIdx = i * LIGHT_DATA_SIZE;
@@ -1911,8 +1876,8 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
         
         float range =  lights[litIdx + LIGHT_DATA_OFFSET_RANGE] * 0.99f; // Discard 1% more lights/meshes for performance.
         float luminosity = (intensity / (range * range));
-        if (luminosity < 0.008f && (range < 8.0f || intensity < 0.5f) && i != headmountedLanternLight) continue;
-        if (!lightInPVS[i] && i != headmountedLanternLight) continue;
+        if (luminosity < 0.008f && (range < 8.0f || intensity < 0.5f)) continue;
+        if (!lightInPVS[i]) continue;
         
         float dx = lightPos.x - playerPos.x; float dy = lightPos.y - playerPos.y; float dz = lightPos.z - playerPos.z;
         float distSqrdToPlayer = dx*dx + dy*dy + dz*dz;
@@ -1951,7 +1916,7 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
         }
 
         shadowDrawCallsRenderedThisFrame = 0;
-        __builtin_memset(voxen_Shadow_System.shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t)); // Set to invalid values for all
+        __builtin_memset(voxen_Shadow_System.shadowmapIndirectionList,MAX_SHADOWMAPS + 1,Sys_Global.loadedLights * sizeof(uint32_t)); // Set to invalid values for all
         glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
         glUseProgram(Sys_Render.shadowmapsShaderProgram);
         uint32_t shadowmapOffsetHead = 0U;
@@ -2020,7 +1985,7 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
         }
 
         glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
-        glNamedBufferData(Sys_Render.shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), voxen_Shadow_System.shadowmapIndirectionList, GL_DYNAMIC_DRAW);
+        glNamedBufferData(Sys_Render.shadowMapsIndirectionID,Sys_Global.loadedLights * sizeof(uint32_t),voxen_Shadow_System.shadowmapIndirectionList,GL_DYNAMIC_DRAW);
     }
     
     Sys_Render.shadowmapsNeedUpdated = false;
@@ -2174,10 +2139,10 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
     uint32_t grayscaleOn = (uint32_t)(/*(Sys_Global.inventoryPlayer1.hasHardware & HW_INF) && */(Sys_Global.inventoryPlayer1.hardwareIsActive & HW_INF));
     glUniform1ui(26,grayscaleOn);
     glUniform1ui(3,0u); // isUI false
-    float fogActual = fogBaseDensityForLevel + (float)(Sys_Global.fogFac / 255u);
-    glUniform3f(4,fogColorR * fogActual,fogColorG * fogActual,fogColorB * fogActual); // Fog Color(which is density)
+    float fogActual = Sys_Global.fogColor.a + (float)(Sys_Global.fogFac / 255u); // Alpha is base density for level.
+    glUniform3f(4,Sys_Global.fogColor.r * fogActual,Sys_Global.fogColor.g * fogActual,Sys_Global.fogColor.b * fogActual); // Fog Color(which is density)
     glUniform1ui(14,Sys_Settings.Reflections);   glUniform1ui(15,Sys_Settings.Shadows);
-    glUniform1f(8,worldMin_x);   glUniform1f(9,worldMin_z);    glUniform3f(10,playerPos.x,playerPos.y,playerPos.z);
+    glUniform1f(8,Sys_Global.worldMin_x); glUniform1f(9,Sys_Global.worldMin_z); glUniform3f(10,playerPos.x,playerPos.y,playerPos.z);
     glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE);
     glDepthMask(GL_FALSE);
     glDepthFunc(GL_LEQUAL);
@@ -2300,7 +2265,10 @@ int32_t main(void) {
         if (likely(!Sys_Global.gamePaused || Sys_Global.menuActive)) UpdateAnims(); // Changes collision positions
         if (likely(!Sys_Global.gamePaused && !Sys_Global.menuActive)) { // Update Gameplay
             if (Sys_Global.timeSinceLastPhysicsTick > (1.0 / 144.0)) { Sys_Global.last_physics_time = Sys_Global.pauseRelativeTime; Physics(); }
-            ModUpdate();
+            
+            Vector3 pDelta = Vector3_A_minus_B(Sys_Global.instances[PLAYER1].lastPosition,Sys_Global.instances[PLAYER1].position);
+            bool playerMoved = ((vabs(pDelta.x) + vabs(pDelta.y) + vabs(pDelta.z)) > 0.02f);
+            ModUpdate(playerMoved);
             UpdatePlayerFacingAngles();
             UpdateAmbientSounds();
             UpdateMusic();

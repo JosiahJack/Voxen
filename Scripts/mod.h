@@ -111,7 +111,6 @@ typedef struct {
 	int projectile3Prefab;
 } NPCTable;
 extern NPCTable npcTable[NUM_AI_TYPES];
-extern uint16_t useableItemsFrobIcons[94];
 typedef struct {
     bool inCombat;
     bool inZone;

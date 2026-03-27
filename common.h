@@ -25,6 +25,7 @@ typedef struct { float r,g,b,a; } Color;
 typedef struct { float x,y; } Vector2;
 typedef struct { float x,y,z; } Vector3;
 typedef struct { float x,y,z,w; } Quaternion;
+#define QUAT_IDENTITY ((Quaternion){0.0f,0.0f,0.0f,1.0f})
 typedef uint8_t PhysCombineType;
 typedef uint8_t ColliderType;
 typedef uint16_t Text;
@@ -76,6 +77,9 @@ typedef struct {
 #define PLAYER2 2u
 #define MAX_CHILD_COUNT 2
 #define START_INDEX_LEVEL_INSTANCES 3
+#define CELL_SIZE 2.56f // Each cell is 2.56x2.56
+#define VOXEL_SIZE 0.32f
+#define VOXEL_HALF (VOXEL_SIZE * 0.5f)
 #define ENG_ACTIVE               (1ull <<  0) // Instance renders and updates
 #define ENG_GROUNDED             (1ull <<  1)
 #define ENG_RIGIDBODY            (1ull <<  2)
@@ -1281,12 +1285,15 @@ typedef struct {
     Entity entities[MAX_ENTITIES]; // Global array of entity definitions (similar in concept to Prefabs)
     Entity instances[INSTANCE_COUNT];
     uint8_t dirtyInstances[INSTANCE_COUNT];
-    Portal activePortals[MAX_PORTALS];
+    Color fogColor;
     char audiologNames[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
     char audiologSubjects[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
     char audiologSenders[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
     char audioLogSpeech2Text[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
     EntityField* entityFields;
+    float worldMin_x, worldMin_z;
+    float voxelMinCenterX, voxelMinCenterZ;
+    uint16_t loadedLights;
 } GlobalContext;
 
 static inline __attribute__((always_inline)) void flag_set(uint64_t *flags, uint64_t bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }

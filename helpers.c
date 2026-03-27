@@ -210,7 +210,7 @@ float smooth_damp(float current, float target, float *current_velocity, float sm
     return output;
 }
 
-size_t GetStringLength(const char* s) {
+ENGINE_TO_MOD size_t GetStringLength(const char* s) {
     if (s == NULL) return 0;
     
     const char *p = s;
@@ -248,7 +248,7 @@ int32_t StringToInt(const char *str) { // atoi replacement
     return (int32_t)(sign * result);
 }
 
-bool CharacterIsEmpty(const char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r'; } // isspace replacement
+ENGINE_TO_MOD bool CharacterIsEmpty(const char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r'; } // isspace replacement
 bool StringIsEmpty(const char* a) { // C# String.IsNullOrWhiteSpace replacement
     size_t size = GetStringLength(a);
     for(size_t i=0;i < size;++i) {
@@ -360,7 +360,7 @@ const char* StringFindLastChar(const char* str, const char c) { // strrchr repla
     return lastSeen;
 }
 
-char* StringFindFirstCharWithin(const char *s, char c) { // strchr replacement
+ENGINE_TO_MOD char* StringFindFirstCharWithin(const char *s, char c) { // strchr replacement
     char* stringwalker = (char*)s;
     while (*stringwalker != c) {
         if (!*stringwalker) return NULL;

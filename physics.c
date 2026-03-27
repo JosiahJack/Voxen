@@ -454,6 +454,8 @@ void ApplyVelocityUntilCollision(uint16_t i) {
     // Step 6: integrate
     vel = Sys_Global.instances[i].velocity;
     if (magnitude_vector3(vel) < 0.05f) return;
+    
+    Sys_Global.instances[i].lastPosition = Sys_Global.instances[i].position;
     Sys_Global.instances[i].position = Vector3_A_plus_B(pos, scale_vector3(vel, dt));
     Sys_Global.dirtyInstances[i] = true;
 }
