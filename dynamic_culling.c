@@ -14,7 +14,6 @@ bool instanceIsLODArray[INSTANCE_COUNT];
 #define MAX_CULL_FILESIZE 500000
 uint8_t cullingFileBuffer[MAX_CULL_FILESIZE];
 Portal activePortals[MAX_PORTALS];
-uint16_t uncullingCameras[5];
 static uint8_t numActivePortals = 0;
 
 __attribute__((pure)) bool get_cull_bit(const uint32_t* arr, int idx) {
@@ -618,52 +617,8 @@ void CullInit(void) {
     glUniform1ui(2,Sys_Global.loadedLights);
     glUniform1f(3,Sys_Global.worldMin_x);
     glUniform1f(4,Sys_Global.worldMin_z);
-    uncullingCameras[0] = UINT16_MAX;
-    uncullingCameras[1] = UINT16_MAX;
-    uncullingCameras[2] = UINT16_MAX;
-    uncullingCameras[3] = UINT16_MAX;
-    uncullingCameras[4] = UINT16_MAX;
     DualLog(" took %f secs\n", get_time() - start_time);
     DebugRAM("end of Cull_Init");
-}
-
-void AddCameraPosition(uint16_t camIdx) {    
-    for (int i=0;i<5;++i) {
-        if (uncullingCameras[i] == UINT16_MAX) { uncullingCameras[i] = camIdx; return; } // Found empty slot to put it.
-    }
-
-    DualLogError("Ran out of slots for unculling cameras!\n");
-}
-
-void RemoveCameraPosition(uint16_t camIdx) {
-    for (int i=4;i>=0;--i) {
-        if (uncullingCameras[i] == camIdx) {
-            for (int j = i;j<5;++j) {
-                if (j == 4) { uncullingCameras[j] = UINT16_MAX; break; }
-                
-                uncullingCameras[j] = uncullingCameras[j + 1]; // Shift list to compact, overwriting slot we removed.
-            }
-            break;
-        }
-    }
-}
-
-void CameraViewUnculling(void) {
-    for (int i=0;i<5;++i) {
-        uint16_t camInstanceIdx = uncullingCameras[i];
-        if (camInstanceIdx == UINT16_MAX) continue;
-
-        uint32_t camCellIdx = PosGetCellCoords(Sys_Global.instances[camInstanceIdx].position.x, Sys_Global.instances[camInstanceIdx].position.z);
-        gridCellStates[camCellIdx] |= CELL_VISIBLE;
-        uint32_t cellToCellIdx = camCellIdx * ARRSIZE;
-        for (int32_t z=0;z<WORLDZ;++z) {
-            for (int32_t x=0;x<WORLDX;++x) {
-                int32_t cellIdx = (z * WORLDX) + x;
-                size_t flat_idx = (size_t)(cellToCellIdx + cellIdx);
-                if (get_cull_bit(precomputedVisibleCellsFromHere,flat_idx)) gridCellStates[cellIdx] |= CELL_VISIBLE;
-            }
-        }
-    }
 }
 
 ENGINE_TO_MOD void PortalCulling(void) { // Called just once at end of animation loop for the frame after each frame perfect change to door models becoming either closed or not closed.
@@ -696,7 +651,6 @@ ENGINE_TO_MOD void PortalCulling(void) { // Called just once at end of animation
     }
     
     DetermineVisibleCells(playerCellX,playerCellZ); // Recompute full PVS with new closed edges for all portal states.  So much for the precomputed set.
-    CameraViewUnculling();
     for (uint16_t i=0; i<Sys_Global.loadedLights;++i) flag_setu32(&lights[i].lflags,LDIRTY,true);
 }
 

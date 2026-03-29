@@ -130,14 +130,15 @@ void main() {
     vec3 viewDir = (camPos - worldPos);
     float distToPixel = length(viewDir);
     viewDir = normalize(viewDir);
-    ivec2 texSize = textureSizes[texIndex];
+    ivec2 texSize = useCamView > 0 ? ivec2(camViewSize) : textureSizes[texIndex];
     vec2 uv = (vec2(TexCoord.x, 1.0 - TexCoord.y)); // Invert V (aka Y), OpenGL convention vs import
     ivec2 texUV = ivec2(int(floor(uv.x * float(texSize.x))), int(floor(uv.y * float(texSize.y))));
     texUV.x = texUV.x % texSize.x;
     texUV.y = texUV.y % texSize.y;
     vec4 albedoColor;
     if (useCamView > 0) {
-        albedoColor = texture(camViewTex,texUV);
+        vec2 uv2 = (vec2(TexCoord.x,TexCoord.y));
+        albedoColor = texture(camViewTex,uv2);
     } else {
         albedoColor = getTextureColor(texIndex,texUV);
     }
@@ -198,7 +199,7 @@ void main() {
 
     uint voxelIdx = GetVoxelIndex(worldPos);
     uint count = voxelLightListCounts[voxelIdx];
-    if (unlit > 0) count = 0;
+    if (unlit > 0 || useCamView > 0) count = 0;
     vec3 lighting = vec3(0.0);
     uint listoffset = 0;
     float intensityTotal = 0.0;
@@ -303,7 +304,7 @@ void main() {
 
     float rim = 1.0 - max(dot(adjustedNormal, viewDir), 0.0);
     lighting += clamp(pow(rim, 4.0) * 0.25 * clamp(intensityTotal,0.0,1.0) * specColor.rgb,0.0,1.0); // Specular "rim" fresnel (tested and performance impact is essentially zero)
-    lighting = (unlit > 0) ? albedoColor.rgb : lighting + glowColor.rgb;
+    lighting = (unlit > 0 || useCamView > 0) ? albedoColor.rgb : lighting + glowColor.rgb;
     if (heat > 0.0) {
         lighting += albedoColor.rgb * heat;
         lighting = pow(lighting, vec3(1.2));

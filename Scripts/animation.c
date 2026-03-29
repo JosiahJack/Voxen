@@ -318,8 +318,8 @@ void TextureSequenceInit(uint16_t self, char* trimmed_value) {
     e->textureAnimating = true; e->textureGlowAnimating = false; e->texAnimLight = UINT16_MAX; e->texAnimLight2 = UINT16_MAX;
     e->texFrame = e->texGlowFrame = 0;
     if (StringsEqual(trimmed_value,"ScreenDestroyed")) { e->texAnimClip = NUM_TEXTURE_CLIPS - 1; return; }
-    if (StringsEqual(trimmed_value,"MedCamView1")) { e->textureAnimating = false; e->camView = 3; return; } // Sensaround occupies slots 0,1,2 for center, left, right respectively.
-    if (StringsEqual(trimmed_value,"MedCamView2")) { e->textureAnimating = false; e->camView = 4; return; }
+    if (StringsEqual(trimmed_value,"MedCamView1")) { e->textureAnimating = false; e->camView = 0; return; } // Sensaround occupies slots 0,1,2 for center, left, right respectively.
+    if (StringsEqual(trimmed_value,"MedCamView2")) { e->textureAnimating = false; e->camView = 1; return; }
     
     for (int i = 0; i < NUM_TEXTURE_CLIPS; ++i) {
         if (StringsEqual(trimmed_value,textureAnimClips[i].name)) { e->texAnimClip = i; e->textureGlowAnimating = textureAnimClips[i].hasGlow; return; }

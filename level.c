@@ -111,11 +111,9 @@ ENGINE_TO_MOD void AddInstance(uint16_t entIdx, uint16_t i) {
     Sys_Global.loadedInstances++;
 }
 
-void RemoveCameraPosition(uint16_t i);
 ENGINE_TO_MOD void DeleteInstance(uint16_t i) {
     if (i <= PLAYER2 || i >= Sys_Global.loadedInstances) return; // Don't delete null ent, player 1, nor player 2 or already empty slots.
     
-    if (Sys_Global.instances[i].entflags & ENTFLAG_HAS_CAMERA_VIEW) RemoveCameraPosition(i);
     uint16_t endInstance = vmax(vmin(INSTANCE_COUNT - 1, Sys_Global.loadedInstances - 1),START_INDEX_LEVEL_INSTANCES);
 //     for (;i<endInstance;++i) Sys_Global.instances[i] = Sys_Global.instances[i + 1]; // Shift the entire list down, overwriting the entity we're deleting at starting i
     for (;i<endInstance;++i) __builtin_memcpy(&Sys_Global.instances[i], &Sys_Global.instances[i+1], sizeof(Entity));

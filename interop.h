@@ -124,7 +124,6 @@ ENGINE_TO_MOD void mp3_clear(void);
 ENGINE_TO_MOD void play_mp3(const char* path, int32_t fade_in_ms);
 ENGINE_TO_MOD bool GetSoundIsPlaying(ma_sound* sound);
 ENGINE_TO_MOD float GetSoundRemainingTime(ma_sound* pSound);
-ENGINE_TO_MOD void AddCameraPosition(uint16_t camIdx);
 ENGINE_TO_MOD bool StringIsEmpty(const char* a);
 ENGINE_TO_MOD bool StringsEqual(const char* a, const char* b);
 ENGINE_TO_MOD void StringCopyInto_A_From_B(char* a, const char* b, size_t bufferSize);

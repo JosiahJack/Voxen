@@ -1,6 +1,4 @@
 // voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake
-// TODO: Multiview renders for sensaround
-// TODO: Multiview renders for camera views
 // TODO: Add camera view entities
 // TODO: Proper physics
 // TODO: Particle system
@@ -660,7 +658,6 @@ void UpdateScreenSize(GLFWwindow* unused, int32_t width, int32_t height) {
     glBindImageTexture(2,Sys_Render.inputSpecID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8); // Specular
     glBindImageTexture(4,Sys_Render.outputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8); // SSR result
     glBindImageTexture(5,Sys_Render.inputNormalID,0,GL_FALSE,0,GL_READ_WRITE,GL_RG16F); // Normal XYZ
-    
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_2D,Sys_Render.outputImageID);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -673,6 +670,7 @@ ENGINE_TO_MOD void AddCamView(Vector3 pos, Quaternion rot, uint8_t fov, uint16_t
     GenerateAndBindTexture(&camViewTextures[camViewCount],GL_RGBA8,width,height,GL_RGBA,GL_UNSIGNED_BYTE,GL_TEXTURE_2D); // Cam View Lit Raster
 //     glBindImageTexture(6 + camViewCount,camViewTextures[camViewCount],0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8); // Camer View RGB (e.g. sensaround, in-world security cam views)
     camViewCount++;
+    DualLog("Cam view added.  Count at %u\n",camViewCount);
     if (camViewCount >= MAX_CAMVIEWS) DualLogWarn("Too many camviews!\n");
 }
 
@@ -1850,7 +1848,7 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
         float range =  lights[i].range;
         float luminosity = (intensity / (range * range));
         if (luminosity < 0.008f && (range < 8.0f || intensity < 0.5f)) continue;
-        if (!lightInPVS[i]) continue;
+//         if (!lightInPVS[i]) continue;
         
         float dx = lightPos.x - playerPos.x; float dy = lightPos.y - playerPos.y; float dz = lightPos.z - playerPos.z;
         float distSqrdToPlayer = dx*dx + dy*dy + dz*dz;
@@ -2026,8 +2024,7 @@ static inline __attribute__((always_inline)) void RenderInstances(Vector3 player
         glUniform1ui(25,(uint32_t)Sys_Global.instances[i].index); // constIndex
         glUniform1f(27,Sys_Global.instances[i].volume); // CyberWall bump go alpha 1.0 then fade.
         uint8_t cmi = Sys_Global.instances[i].camView;
-        if (cmi < camViewCount) { 
-//             DualLog("Rendering a final in-world screen showing camview %u\n",cmi);
+        if (cmi < camViewCount) {
             glActiveTexture(GL_TEXTURE6);
             glBindTexture(GL_TEXTURE_2D,camViewTextures[cmi]);
             glUniform2ui(28,camViews[cmi].width,camViews[cmi].height);
@@ -2077,7 +2074,6 @@ float GetPainStatic(void) { return 0.0f; } // TODO: Hook into pain/health manage
 Color GetPainStaticColor(void) { return (Color){1.0f,0.0f,0.0f,1.0f}; } // TODO: Hook staticColor up to red or blue for pain or shield impact.
 
 static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bool camView, uint8_t camViewIdx, bool isSensaroundView) {
-//     if (camView) DualLog("Rendering camview %u\n",camViewIdx);
     uint16_t swidth = camView ? camViews[camViewIdx].width : Sys_Settings.ScreenWidth; uint16_t sheight = camView ? camViews[camViewIdx].height : Sys_Settings.ScreenHeight;
     float sfov = camView ? (float)camViews[camViewIdx].fov : (float)Sys_Settings.FOV;
     float snear = camView ? camViews[camViewIdx].near : NEAR_PLANE; float sfar = camView ? camViews[camViewIdx].far : FAR_PLANE;
@@ -2120,10 +2116,6 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
     for (int i=0;i<LIGHT_COUNT;++i) flag_setu32(&lights[i].lflags,LDIRTY,false); // Clear dirty after shadowmaps for minimal shadowmap updating.
     __builtin_memset(Sys_Global.dirtyInstances,0,Sys_Global.loadedInstances * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
     glBindFramebuffer(GL_FRAMEBUFFER,Sys_Render.gBufferFBO);
-    if (camView) {
-        GLenum drawBuf = GL_COLOR_ATTACHMENT0;
-        glDrawBuffers(1, &drawBuf);
-    }
     glViewport(0,0,swidth,sheight);
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
     glEnable(GL_CULL_FACE); glDisable(GL_BLEND); // Opaques
