@@ -947,6 +947,11 @@ MOD_TO_ENGINE void LoadLevelMod(uint8_t curlevel) {
         case 12:Eng_Global->worldMin_x = -34.53f + ( 0.00000f +   19.0400f); Eng_Global->worldMin_z = -123.74f + (0.0f + 95.8f); break;
     }
     
+    if (curlevel == 1) {
+        AddCamView((Vector3){-19.2301f,-42.6604f,-49.7453f},(Quaternion){0.2375f,0.0008f,-0.0002f,0.9713f},75u,256u,256u,2.21f,11.5f,false); // View of CPU room
+        AddCamView((Vector3){7.664583f,-44.88017f,-14.26742f},(Quaternion){0.0f,0.9999f,0.0129f,0.0f},60u,256u,256u,2.192f,20.6f,false); // View of X door
+    }
+    
     // worldMin_x and worldMin_z are the center points of the cells at furthest extents, thus correspond to minimum x or z positions in open cells the player can access.
     Eng_Global->worldMin_x -= CELL_SIZE; // Add one cell gap around edges, now they are floating in guaranteed closed cells instead of empty space
     Eng_Global->worldMin_z -= CELL_SIZE;

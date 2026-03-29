@@ -8,6 +8,7 @@ ENGINE_TO_MOD void InitializeEntity(Entity* entry) { // Blank entity, no index y
     flag_set(&entry->entflags, ENTFLAG_ANIMATED, false);
     entry->texIndex = entry->glowIndex = entry->specIndex = entry->normIndex = MAX_VALID_TEXTURE;
     entry->lodIndex  = MODEL_IDX_MAX;
+    entry->camView = 255;
     entry->rotation.x = entry->rotation.y = entry->rotation.z = 0.0f; entry->rotation.w = 1.0f; // Quaternion identity
     entry->scale.x = entry->scale.y = entry->scale.z = 1.0f;
     entry->collider = COLLIDER_TYPE_NONE;
@@ -37,6 +38,12 @@ ENGINE_TO_MOD int32_t AddLight(Light* lit, LightAnimation* lanim) {
     lightsNewPosition[i] = lit->pos;
     flag_setu32(&lights[i].lflags,LDIRTY,true);
     return i;
+}
+
+ENGINE_TO_MOD void TurnLightOff(uint16_t litIdx) {
+    if (litIdx >= Sys_Global.loadedLights) return;
+    
+    flag_setu32(&lights[litIdx].lflags,LIGHTON,false);
 }
 
 ENGINE_TO_MOD void AddInstance(uint16_t entIdx, uint16_t i) {
@@ -74,12 +81,29 @@ ENGINE_TO_MOD void AddInstance(uint16_t entIdx, uint16_t i) {
     }
     
     if (entIdx == 525) { // prop_console01
-        // TODO position with forward/right taken into account
-        Light blueLight1 = (Light){.pos=(Vector3){e->position.x+0.23f,e->position.y+0.24f,e->position.z},.col=(Color3){0.3531f,0.4837f,0.6509f},.range=1.85f,.intensity=0.7f,.maxIntensity=0.7f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
-        Light blueLight2 = (Light){.pos=(Vector3){e->position.x-0.48f,e->position.y-0.64f,e->position.z},.col=(Color3){0.3561f,0.3561f,0.8970f},.range=2.0f,.intensity=1.1165f,.maxIntensity=1.1165f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
+        Vector3 ofs1 = GetEntityLocalSpawnPointFromUnrotatedOffsetVector(e,(Vector3){5.81f,2.29f,38.05f-38.3552f});
+        Vector3 ofs2 = GetEntityLocalSpawnPointFromUnrotatedOffsetVector(e,(Vector3){-10.1f,0.9f,18.21f-38.3552f});
+        Light lit1 = (Light){.pos=ofs1,.col=(Color3){0.3531f,0.4837f,0.6509f},.range=1.85f,.intensity=0.7f,.maxIntensity=0.7f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
+        Light lit2 = (Light){.pos=ofs2,.col=(Color3){0.3561f,0.3561f,0.8970f},.range=2.0f,.intensity=1.12f,.maxIntensity=1.12f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
         LightAnimation lam={0};
-        AddLight(&blueLight1,&lam);
-        AddLight(&blueLight2,&lam);
+        e->texAnimLight  = AddLight(&lit1,&lam);
+        e->texAnimLight2 = AddLight(&lit2,&lam);
+    } else if (entIdx == 279) { // chunk_screen
+        Vector3 ofs1 = GetEntityLocalSpawnPointFromUnrotatedOffsetVector(e,(Vector3){0.0f,-0.08f,0.0f});
+        Light lit1 = (Light){.pos=ofs1,.col=(Color3){0.909803922f,0.929411765f,1.0f},.range=3.2f,.intensity=1.575f,.maxIntensity=1.575f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
+        LightAnimation lam={0};
+        e->texAnimLight = AddLight(&lit1,&lam);
+    } else if (e->index == 574) { // prop_healingbed
+        Vector3 ofs1 = GetEntityLocalSpawnPointFromUnrotatedOffsetVector(e,(Vector3){0.5292511f,0.065,0.915f});
+        Vector3 ofs2 = GetEntityLocalSpawnPointFromUnrotatedOffsetVector(e,(Vector3){-0.5317497f,0.065f,1.039f});
+        Light lit1 = (Light){.pos=ofs1,.col=(Color3){0.0f,0.925490196f,0.082352941f},.range=3.0f,.intensity=0.72f,.maxIntensity=0.72f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
+        Light lit2 = (Light){.pos=ofs2,.col=(Color3){0.0f,0.925490196f,0.082352941f},.range=3.0f,.intensity=0.72f,.maxIntensity=0.72f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
+        LightAnimation lam={0};
+        e->texAnimLight  = AddLight(&lit1,&lam);
+        e->texAnimLight2 = AddLight(&lit2,&lam);
+        e->textureAnimating = true; e->texAnimClip = 12; e->texFrame = 0;
+    } else if (e->index == 746) { // weapon_grenadeenergmine_live
+        e->textureAnimating = true; e->texAnimClip = 2; e->texFrame = 0;
     }
     
     Sys_Global.instances[i].lockedMessageLingdex = Sys_Global.entities[entIdx].lockedMessageLingdex;

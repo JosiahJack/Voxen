@@ -28,12 +28,14 @@ void ResetHeldItem(uint16_t p) {
 }
 
 Vector3 ScreenPointToRay(Vector3 fwd, Vector3 rt) {
-    float offsetX = Eng_Global->cursorPosition_x - (Eng_Settings->ScreenWidth * 0.5f);
-    float offsetY = Eng_Global->cursorPosition_y - (Eng_Settings->ScreenHeight * 0.5f);
-    float ndcX = offsetX / (Eng_Settings->ScreenWidth * 0.5f);
-    float ndcY = -offsetY / (Eng_Settings->ScreenHeight * 0.5f);
+    uint16_t swidth = Eng_Settings->ScreenWidth, sheight = Eng_Settings->ScreenHeight;
+    float offsetX = Eng_Global->cursorPosition_x - ((float)swidth * 0.5f);
+    float offsetY = Eng_Global->cursorPosition_y - ((float)sheight * 0.5f);
+    float ndcX = offsetX / ((float)swidth * 0.5f);
+    float ndcY = -offsetY / ((float)sheight * 0.5f);
     float tanFov = vtan((float)Eng_Settings->FOV * 0.5f * PI / 180.0f);
-    Vector3 view = (Vector3){ndcX * tanFov * Eng_Global->aspect3D,ndcY * tanFov,-1.0f};
+    float aspect3D = (float)swidth / (float)sheight;
+    Vector3 view = (Vector3){ndcX * tanFov * aspect3D,ndcY * tanFov,-1.0f};
     view = normalize_vector3(view);
     Vector3 flipForward = (Vector3){-fwd.x,-fwd.y,-fwd.z};
     Vector3 up = normalize_vector3(cross_vector3(rt,flipForward));
@@ -3683,8 +3685,6 @@ MOD_TO_ENGINE void ModInitAfterLoad(void) {
         else e->gravity = 0.0f;
         if (constIndex < MAX_ENTITIES) flag_set(&e->entflags,ENTFLAG_ANIMATED,Eng_Global->entities[constIndex].entflags & ENTFLAG_ANIMATED);
         if (e->entflags & ENTFLAG_HAS_CAMERA_VIEW) AddCameraPosition(i);
-        if (e->index == 574) { e->textureAnimating = true; e->texAnimClip = 12; e->texFrame = 0; DualLog("Loaded anim for prop_healingbed\n"); }
-        if (e->index == 746) { e->textureAnimating = true; e->texAnimClip = 2; e->texFrame = 0; DualLog("Loaded anim for weapon_grenadeenergmine_live\n"); }
         if (ConstIndexIsGeometry(constIndex)) e->layer = PhysicsLayer_Geometry;
         else if (ConstIndexIsDoor(constIndex)) e->layer = PhysicsLayer_Door;
         else if (ConstIndexIsUsableObject(constIndex)) UsableInit(i);

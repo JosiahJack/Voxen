@@ -315,9 +315,11 @@ void TextureSequenceInit(uint16_t self, char* trimmed_value) {
     Entity* e = &Eng_Global->instances[self];
     if (e->index == 526) return; // Skip prop_console02 for now, will need to split its screen off.
     
-    e->textureAnimating = true; e->textureGlowAnimating = false;
+    e->textureAnimating = true; e->textureGlowAnimating = false; e->texAnimLight = UINT16_MAX; e->texAnimLight2 = UINT16_MAX;
     e->texFrame = e->texGlowFrame = 0;
     if (StringsEqual(trimmed_value,"ScreenDestroyed")) { e->texAnimClip = NUM_TEXTURE_CLIPS - 1; return; }
+    if (StringsEqual(trimmed_value,"MedCamView1")) { e->textureAnimating = false; e->camView = 3; return; } // Sensaround occupies slots 0,1,2 for center, left, right respectively.
+    if (StringsEqual(trimmed_value,"MedCamView2")) { e->textureAnimating = false; e->camView = 4; return; }
     
     for (int i = 0; i < NUM_TEXTURE_CLIPS; ++i) {
         if (StringsEqual(trimmed_value,textureAnimClips[i].name)) { e->texAnimClip = i; e->textureGlowAnimating = textureAnimClips[i].hasGlow; return; }
@@ -351,7 +353,7 @@ void TextureSequenceUpdate(uint16_t self) {
         }
     }
 
-    if (e->textureAnimationStopsAtDead && e->health <= 0.0f && e->texFrame >= clip->length - 1) e->textureAnimating = false;
+    if (e->textureAnimationStopsAtDead && e->health <= 0.0f && e->texFrame >= clip->length - 1) { e->textureAnimating = false; TurnLightOff(e->texAnimLight); TurnLightOff(e->texAnimLight2); }
     e->texIndex = sequenceTextures[ clip->frames[e->texFrame] ];
     if (clip->hasGlow && clip->glowFrames) e->glowIndex = sequenceTextures[ clip->glowFrames[e->texGlowFrame] ];
     if (e->index == 279 && !clip->hasGlow) e->glowIndex = e->texIndex;

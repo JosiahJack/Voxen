@@ -191,6 +191,7 @@ typedef void (*GLADpostcallback)(void *ret, const char *name, GLADapiproc apipro
 #define GL_VERTEX_SHADER 0x8B31
 #define GL_MAJOR_VERSION 0x821B
 #define GL_MINOR_VERSION 0x821C
+#define GL_READ_FRAMEBUFFER 0x8CA8
 #if defined(__SIZEOF_LONG__) && defined(__SIZEOF_POINTER__)
     #if __SIZEOF_POINTER__ > __SIZEOF_LONG__
         #define KHRONOS_USE_INTPTR_T
@@ -1223,6 +1224,8 @@ GLAD_API_CALL PFNGLTEXSUBIMAGE3DPROC glad_glTexSubImage3D;
 #define glTexSubImage3D glad_glTexSubImage3D
 GLAD_API_CALL PFNGLTEXTUREBUFFERPROC glad_glTextureBuffer;
 #define glTextureBuffer glad_glTextureBuffer
+GLAD_API_CALL PFNGLCOPYTEXSUBIMAGE2DPROC glad_glCopyTexSubImage2D;
+#define glCopyTexSubImage2D glad_glCopyTexSubImage2D
 GLAD_API_CALL PFNGLTEXTUREBUFFERRANGEPROC glad_glTextureBufferRange;
 #define glTextureBufferRange glad_glTextureBufferRange
 GLAD_API_CALL PFNGLTEXTUREPARAMETERIIVPROC glad_glTextureParameterIiv;
@@ -1297,6 +1300,10 @@ GLAD_API_CALL PFNGLVIEWPORTPROC glad_glViewport;
 #define glViewport glad_glViewport
 GLAD_API_CALL PFNGLGETINTEGERVPROC glad_glGetIntegerv;
 #define glGetIntegerv glad_glGetIntegerv
+GLAD_API_CALL PFNGLUNIFORM2UIPROC glad_glUniform2ui;
+#define glUniform2ui glad_glUniform2ui
+GLAD_API_CALL PFNGLCLEARCOLORPROC glad_glClearColor;
+#define glClearColor glad_glClearColor
 
 GLAD_API_CALL int gladLoadGLUserPtr( GLADuserptrloadfunc load, void *userptr);
 GLAD_API_CALL int gladLoadGL( GLADloadfunc load);

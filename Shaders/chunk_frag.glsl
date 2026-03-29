@@ -31,6 +31,9 @@ layout(location = 24) uniform uint maxLightsPerVoxel;
 layout(location = 25) uniform uint constIndex;
 layout(location = 26) uniform uint grayscaleEnabled;
 layout(location = 27) uniform float volume;
+layout(location = 28) uniform uvec2 camViewSize;
+layout(location = 29) uniform sampler2D camViewTex;
+layout(location = 30) uniform uint useCamView;
 
 struct Light {
     vec3  pos;
@@ -132,7 +135,13 @@ void main() {
     ivec2 texUV = ivec2(int(floor(uv.x * float(texSize.x))), int(floor(uv.y * float(texSize.y))));
     texUV.x = texUV.x % texSize.x;
     texUV.y = texUV.y % texSize.y;
-    vec4 albedoColor = getTextureColor(texIndex,texUV);
+    vec4 albedoColor;
+    if (useCamView > 0) {
+        albedoColor = texture(camViewTex,texUV);
+    } else {
+        albedoColor = getTextureColor(texIndex,texUV);
+    }
+
     if (albedoColor.a < 0.05 && volume < 0.05) discard; // Alpha cutout threshold
 
     float heat = 0.0;

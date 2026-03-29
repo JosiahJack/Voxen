@@ -1025,6 +1025,7 @@ typedef /*FAT*/ struct  {
     bool cardchunk;
     bool kinematic;
     bool shadows;
+    uint8_t camView;
     
     // Logic and I/O
     char targetname[TARGET_STRING_LENGTH];
@@ -1157,6 +1158,8 @@ typedef /*FAT*/ struct  {
     bool textureAnimationStopsAtDead;
     bool texAnimInReverse;
     bool texAnimRandom;
+    uint16_t texAnimLight;
+    uint16_t texAnimLight2;
     int32_t cellIndex;
     uint8_t portalIndex; // If this is a door, index into portal array for toggling state.
     DoorState doorState;
@@ -1304,7 +1307,6 @@ typedef struct {
 	uint32_t grenadesThrown;
 	float damageDealt;
 	float damageReceived;
-    float aspect3D;
 	uint32_t savesScummed;
 	uint8_t creditsPageIndex;
 	bool creditsActive;
@@ -1398,7 +1400,8 @@ static inline __attribute__((always_inline)) int32_t clamp(int32_t val, int32_t 
 // Math, Vectors, Quaternions
 static inline __attribute__((always_inline)) Vector3 Vector3_A_plus_B(Vector3 a, Vector3 b) { return (Vector3){a.x + b.x, a.y + b.y, a.z + b.z}; }
 static inline __attribute__((always_inline)) Vector3 Vector3_A_minus_B(Vector3 a, Vector3 b) { return (Vector3){a.x - b.x, a.y - b.y, a.z - b.z}; }
-static inline __attribute__((always_inline)) Vector3 scale_vector3(Vector3 v, float s) { Vector3 res = {v.x * s, v.y * s, v.z * s}; return res; }
+static inline __attribute__((always_inline)) Vector3 scale_vector3(Vector3 v, float s) { return (Vector3){v.x * s, v.y * s, v.z * s}; }
+static inline __attribute__((always_inline)) Vector3 mul_v3_v3_elementwise(Vector3 v, Vector3 w) { return (Vector3){v.x * w.x, v.y * w.y, v.z * w.z}; }
 static inline __attribute__((always_inline)) float dot(float x1, float y1, float z1, float x2, float y2, float z2) { return x1*x2 + y1*y2 + z1*z2; }
 static inline __attribute__((always_inline)) float dot_vector3(Vector3 a, Vector3 b) { return dot(a.x,a.y,a.z, b.x,b.y,b.z); }
 static inline __attribute__((always_inline)) float quat_dot(Quaternion a, Quaternion b) { return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w; }
@@ -1412,7 +1415,8 @@ static inline __attribute__((always_inline)) void normalize_vector(float* x, flo
 static inline __attribute__((always_inline)) Vector3 normalize_vector3(Vector3 v) { float len = magnitude_vector3(v); return len > 0.000001f ? (Vector3){v.x / len, v.y / len, v.z / len} : v; }
 static inline __attribute__((always_inline)) float squareDistance2D(float x1, float z1, float x2, float z2) { float dx = x2 - x1; float dz = z2 - z1; return dx * dx + dz * dz; }
 static inline __attribute__((always_inline)) float squareDistance3D(float x1, float y1, float z1, float x2, float y2, float z2) { float dx = x2 - x1; float dy = y2 - y1; float dz = z2 - z1; return dx * dx + dy * dy + dz * dz; }
-
+static inline __attribute__((always_inline)) Quaternion quat_multiply(Quaternion q1, Quaternion q2) { return (Quaternion){(q1.w * q2.x + q1.x * q2.w + q1.y * q2.z - q1.z * q2.y),(q1.w * q2.y - q1.x * q2.z + q1.y * q2.w + q1.z * q2.x),(q1.w * q2.z + q1.x * q2.y - q1.y * q2.x + q1.z * q2.w),(q1.w * q2.w - q1.x * q2.x - q1.y * q2.y - q1.z * q2.z)}; } // Hamilton product, rotates q1 by q2
+static inline __attribute__((always_inline)) Vector3 quat_rotate_vector(Quaternion q, Vector3 v) { Quaternion r = quat_multiply((quat_multiply(q, (Quaternion){v.x,v.y,v.z,0.0f})),(Quaternion){-q.x,-q.y,-q.z,q.w}); return (Vector3){r.x,r.y,r.z}; } // Returns rotated input vector rotated by a quaternion.
 static inline __attribute__((always_inline)) uint8_t hardware14fromConstdex(uint16_t c) { return clamp(c - 21,0,14); }
 static inline __attribute__((always_inline)) bool ConstIndexInBounds(int c) { return (c >= 0 && c <= 760); }
 static inline __attribute__((always_inline)) bool ConstIndexIsGeometry(int c) { return (c >= 0 && c <= 306 && c != 112 && c != 279) || c == 760; }

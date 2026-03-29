@@ -55,7 +55,6 @@
     
 #define FAR_PLANE (71.68f) // Max player view, level 6 crawlway 28 cells
 #define NEAR_PLANE (0.02f)
-#define FAR_PLANE_SQUARED (FAR_PLANE * FAR_PLANE)
 #define TEXT_BUFFER_SIZE 1024
 #define FONT_ATLAS_SIZE 4672
 #define MAX_GLYPHS 4096
@@ -275,7 +274,6 @@ void ScreenShake(float force, double duration);
 void Shake(float force);
 void InitAfterLoad(void);
 void SetVSync(void);
-void UpdateProjectionMatrices(void);
 void TextEntry(int32_t keycode);
 void GoIntoGame(void);
 void NewGame(void);

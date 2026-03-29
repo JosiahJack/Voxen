@@ -577,3 +577,10 @@ void FilePrintString(OsFileHandle f, const char* fmt, ...) {
     OS_RawWrite(f,buf,GetStringLength(buf));
     __builtin_va_end(args);
 }
+
+ENGINE_TO_MOD Vector3 GetEntityLocalSpawnPointFromUnrotatedOffsetVector(Entity* originator, Vector3 offsetFromOriginator) {
+    Vector3 scaledOfs = mul_v3_v3_elementwise(offsetFromOriginator, originator->scale);
+    Vector3 rotatedOfs = quat_rotate_vector(originator->rotation, scaledOfs);
+    Vector3 result = Vector3_A_plus_B(originator->position, rotatedOfs);
+    return result;
+}

@@ -705,7 +705,7 @@ static inline __attribute__((always_inline)) void CellCoordsToPos(uint16_t x, ui
     *pos_z = Sys_Global.worldMin_z + (z * WORLDCELL_WIDTH_F);
 }
 
-bool CullCore(void) {    
+bool CullCore(void) {
     if (Sys_Global.currentLevel >= LEVEL_CYBERSPACE) return false;
 
     numCellsVisible = 0;

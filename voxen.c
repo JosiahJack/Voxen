@@ -19,7 +19,7 @@ GLFWwindow* window;
 #include "miniaudio.h"
 #include "Shaders/shaders.h"
 #include "credits.h"
-GlobalContext Sys_Global = {.menuActive=true, .screenshotTimeout=1.0, .creditsPageIndex=1, .difficultyCombat=2, .difficultyCyber=2, .difficultyPuzzle=2, .difficultyMission=2, .deaths=0, .worstFPS=UINT32_MAX, .cursorPosition_x=680, .cursorPosition_y=384, .aspect3D=1.0f};
+GlobalContext Sys_Global = {.menuActive=true, .screenshotTimeout=1.0, .creditsPageIndex=1, .difficultyCombat=2, .difficultyCyber=2, .difficultyPuzzle=2, .difficultyMission=2, .deaths=0, .worstFPS=UINT32_MAX, .cursorPosition_x=680, .cursorPosition_y=384};
 CheatsSystem Sys_Cheats = {.god=false, .noclip=true, .showLocation=true, .showFPS=true, .editMode=true};
 RenderSystem Sys_Render; SystemUI Sys_UI;
 OsFileHandle console_log_file = 0;
@@ -61,17 +61,13 @@ static int resDropdownCount = 0;
 typedef struct { int w, h, hz; } ResMode;
 static ResMode resModes[8];
 static int resSelectedIdx = 0;
-
-typedef struct {
-   unsigned short x0,y0,x1,y1; // coordinates of bbox in bitmap
-   float xoff,yoff,xadvance;
-   float xoff2,yoff2;
-} stbtt_packedchar;
-
-typedef struct {
-   float x0,y0,s0,t0; // top-left
-   float x1,y1,s1,t1; // bottom-right
-} stbtt_aligned_quad;
+#define MAX_CAMVIEWS 11
+typedef struct { Vector3 position; Quaternion rotation; uint8_t fov; uint16_t width; uint16_t height; float near; float far; float finished; bool sensaround; } CamView;
+CamView camViews[MAX_CAMVIEWS]; // Max is 8 camera views on level 8 + 3 sensaround views.  Populated at level load.
+GLuint camViewTextures[MAX_CAMVIEWS];
+uint8_t camViewCount = 0;
+typedef struct { unsigned short x0,y0,x1,y1; float xoff,yoff,xadvance; float xoff2,yoff2; } stbtt_packedchar; // x0,y0,x1,y1 are coordinates of bbox in bitmap
+typedef struct { float x0,y0,s0,t0; float x1,y1,s1,t1; } stbtt_aligned_quad; // 0 is top-left, 1 is bottom-right
 void stbtt_GetPackedQuad(const stbtt_packedchar *chardata, int pw, int ph, int char_index, float *xpos, float *ypos, stbtt_aligned_quad *q, int align_to_integer);
 
 // Logs both to log file and console, usage same as printf
@@ -626,30 +622,11 @@ void GenerateAndBindTexture(GLuint *id, GLint internalFormat, int32_t width, int
     glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);    glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 }
 
-void UpdateProjectionMatrices(void) {
-    float* m;
-    m = uiOrthoProjection;
-    m[0] = 2.0f / (float)Sys_Settings.ScreenWidth; m[1] =                                       0.0f; m[2] =  0.0f; m[3] = 0.0f;
-    m[4] =                                   0.0f; m[5] = -2.0f / ((float)Sys_Settings.ScreenHeight); m[6] =  0.0f; m[7] = 0.0f;
-    m[8] =                                   0.0f; m[9] =                                       0.0f; m[10]= -1.0f; m[11]= 0.0f;
-    m[12]=                                  -1.0f; m[13]=                                       1.0f; m[14]=  0.0f; m[15]= 1.0f;
-    
-    Sys_Global.aspect3D = (float)Sys_Settings.ScreenWidth / (float)Sys_Settings.ScreenHeight;
-    float f = vcot((float)Sys_Settings.FOV * PI / 360.0f);
-    m = rasterPerspectiveProjection;
-    m[0] = f / Sys_Global.aspect3D; m[1] = 0.0f; m[2] =                                           0.0f; m[3] =  0.0f;
-    m[4] =         0.0f; m[5] =    f; m[6] =                                                      0.0f; m[7] =  0.0f;
-    m[8] =         0.0f; m[9] = 0.0f; m[10]=      -(FAR_PLANE + NEAR_PLANE) / (FAR_PLANE - NEAR_PLANE); m[11]= -1.0f;
-    m[12]=         0.0f; m[13]= 0.0f; m[14]= -2.0f * FAR_PLANE * NEAR_PLANE / (FAR_PLANE - NEAR_PLANE); m[15]=  0.0f;
-    voxen_Shadow_System.shadDotThresh = 1.0f / vsqrtf(1.0f + vtan((float)Sys_Settings.FOV * PI / 360.0f) * (1.0f + Sys_Global.aspect3D * Sys_Global.aspect3D));
-}
-
 void UpdateScreenSize(GLFWwindow* unused, int32_t width, int32_t height) {
     (void)unused; // Appease glfwSetFramebufferSizeCallback pointer type
     Sys_Settings.ScreenWidth = vmax(vmin((uint16_t)width,7680u),320u); Sys_Settings.ScreenHeight = vmax(vmin((uint16_t)height,4320u),200u); // Cap at minimum Quake 1 resolution and maximum 8k.
     Sys_Settings.ScreenCenterX = (float)Sys_Settings.ScreenWidth * 0.5f; Sys_Settings.ScreenCenterY = (float)Sys_Settings.ScreenHeight * 0.5f;
     glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
-    UpdateProjectionMatrices();
     glUseProgram(Sys_Render.imageBlitShaderProgram);
     glUniform1ui(2,Sys_Settings.ScreenWidth);
     glUniform1ui(3,Sys_Settings.ScreenHeight);
@@ -683,9 +660,20 @@ void UpdateScreenSize(GLFWwindow* unused, int32_t width, int32_t height) {
     glBindImageTexture(2,Sys_Render.inputSpecID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8); // Specular
     glBindImageTexture(4,Sys_Render.outputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8); // SSR result
     glBindImageTexture(5,Sys_Render.inputNormalID,0,GL_FALSE,0,GL_READ_WRITE,GL_RG16F); // Normal XYZ
+    
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_2D,Sys_Render.outputImageID);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+ENGINE_TO_MOD void AddCamView(Vector3 pos, Quaternion rot, uint8_t fov, uint16_t width, uint16_t height, float near, float far, bool sensaround) {
+    if (camViewCount >= MAX_CAMVIEWS) { DualLogWarn("Too many camviews!\n"); return; }
+    
+    camViews[camViewCount] = (CamView){pos,rot,fov,width,height,near,far,Sys_Global.pauseRelativeTime + (camViewCount * 0.05f) + 0.5f,sensaround}; // Staggered starts so not all at once for performance.
+    GenerateAndBindTexture(&camViewTextures[camViewCount],GL_RGBA8,width,height,GL_RGBA,GL_UNSIGNED_BYTE,GL_TEXTURE_2D); // Cam View Lit Raster
+//     glBindImageTexture(6 + camViewCount,camViewTextures[camViewCount],0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8); // Camer View RGB (e.g. sensaround, in-world security cam views)
+    camViewCount++;
+    if (camViewCount >= MAX_CAMVIEWS) DualLogWarn("Too many camviews!\n");
 }
 
 // GLFW Callbacks
@@ -1394,7 +1382,6 @@ void RenderMenu(void) {
             if (UI_Slider(200,666, 328,16, &overFOV, 5)) fovSliderActive = true;
             if (fovSliderActive && Sys_Input.currentMouse_dx != 0) {
                 int32_t new = (int32_t)Sys_Settings.FOV + vmin(vmax(Sys_Input.currentMouse_dx,-1),1); Sys_Settings.FOV = (uint8_t)vmin(vmax(new,45),150);
-                UpdateProjectionMatrices();
             }
             
             if (!Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].down && !Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].down) {
@@ -1405,7 +1392,7 @@ void RenderMenu(void) {
             if (MenuEnter() && currentMenuItem == 5) {
                 if (shiftHeld) Sys_Settings.FOV = Sys_Settings.FOV <=  49 ? 150 : Sys_Settings.FOV - 5;
                 else           Sys_Settings.FOV = Sys_Settings.FOV >= 146 ?  45 : Sys_Settings.FOV + 5;
-                UpdateProjectionMatrices(); SaveConfig();
+                SaveConfig();
             }
             
             overFOV = overFOV || currentMenuItem == 5;
@@ -1765,6 +1752,12 @@ void RenderMenu(void);
 void RenderPausedUI(void);
 extern float shadBiasMin;
 static inline __attribute__((always_inline)) double RenderUI(void) {
+    float* m;
+    m = uiOrthoProjection;
+    m[0] = 2.0f / (float)Sys_Settings.ScreenWidth; m[1] =                                       0.0f; m[2] =  0.0f; m[3] = 0.0f;
+    m[4] =                                   0.0f; m[5] = -2.0f / ((float)Sys_Settings.ScreenHeight); m[6] =  0.0f; m[7] = 0.0f;
+    m[8] =                                   0.0f; m[9] =                                       0.0f; m[10]= -1.0f; m[11]= 0.0f;
+    m[12]=                                  -1.0f; m[13]=                                       1.0f; m[14]=  0.0f; m[15]= 1.0f;
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     drawCallsNormal = drawCallsRenderedThisFrame;
     if (Sys_Global.creditsActive) { RenderCredits(); return get_time(); }
@@ -2032,6 +2025,19 @@ static inline __attribute__((always_inline)) void RenderInstances(Vector3 player
         glUniform1ui(17, Sys_Global.instances[i].texIndex == 316 ? 1u : 0u);
         glUniform1ui(25,(uint32_t)Sys_Global.instances[i].index); // constIndex
         glUniform1f(27,Sys_Global.instances[i].volume); // CyberWall bump go alpha 1.0 then fade.
+        uint8_t cmi = Sys_Global.instances[i].camView;
+        if (cmi < camViewCount) { 
+//             DualLog("Rendering a final in-world screen showing camview %u\n",cmi);
+            glActiveTexture(GL_TEXTURE6);
+            glBindTexture(GL_TEXTURE_2D,camViewTextures[cmi]);
+            glUniform2ui(28,camViews[cmi].width,camViews[cmi].height);
+            glUniform1i(29,6); // Cam View put into Uniform
+            glUniform1ui(30,1u); // useCamView
+        } else {
+            glUniform1ui(30,0u); // Well... don't
+            glActiveTexture(GL_TEXTURE0);
+        }
+        
         if (currentNormIndex != (uint32_t)Sys_Global.instances[i].normIndex || Sys_Global.instances[i].normIndex == 0) { currentNormIndex = (uint32_t)Sys_Global.instances[i].normIndex; glUniform1ui(1, currentNormIndex); }
         if (currentTexIndex  != (uint32_t)Sys_Global.instances[i].texIndex  || Sys_Global.instances[i].texIndex == 0)  { currentTexIndex  =  (uint32_t)Sys_Global.instances[i].texIndex; glUniform1ui(18, currentTexIndex); }
         if (currentGlowIndex != (uint32_t)Sys_Global.instances[i].glowIndex || Sys_Global.instances[i].glowIndex == 0) { currentGlowIndex = (uint32_t)Sys_Global.instances[i].glowIndex; glUniform1ui(19, currentGlowIndex); }
@@ -2070,13 +2076,26 @@ static inline __attribute__((always_inline)) void RenderInstancesDepthOnly(Vecto
 float GetPainStatic(void) { return 0.0f; } // TODO: Hook into pain/health management and shield impact effect
 Color GetPainStaticColor(void) { return (Color){1.0f,0.0f,0.0f,1.0f}; } // TODO: Hook staticColor up to red or blue for pain or shield impact.
 
-static inline __attribute__((always_inline)) __attribute__((hot)) void Render(void) {
+static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bool camView, uint8_t camViewIdx, bool isSensaroundView) {
+//     if (camView) DualLog("Rendering camview %u\n",camViewIdx);
+    uint16_t swidth = camView ? camViews[camViewIdx].width : Sys_Settings.ScreenWidth; uint16_t sheight = camView ? camViews[camViewIdx].height : Sys_Settings.ScreenHeight;
+    float sfov = camView ? (float)camViews[camViewIdx].fov : (float)Sys_Settings.FOV;
+    float snear = camView ? camViews[camViewIdx].near : NEAR_PLANE; float sfar = camView ? camViews[camViewIdx].far : FAR_PLANE;
     drawCallsRenderedThisFrame = textDrawCallsRenderedThisFrame = uiImageDrawCallsRenderedThisFrame = shadowDrawCallsRenderedThisFrame = verticesRenderedThisFrame = 0; // Reset per frame
     
     // Frame prep, View Matrix, and Projection Matrix
     float view[16]; // Also known as view matrix
     Vector3 playerPos = Sys_Global.instances[PLAYER1].position;
     float px = playerPos.x, py = playerPos.y, pz = playerPos.z;
+    
+    float aspect3D = (float)swidth / (float)sheight;
+    float f = vcot(sfov * PI / 360.0f);
+    float* m = rasterPerspectiveProjection;
+    m[0] = f / aspect3D; m[1] = 0.0f; m[2] =                                           0.0f; m[3] =  0.0f;
+    m[4] =         0.0f; m[5] =    f; m[6] =                                                      0.0f; m[7] =  0.0f;
+    m[8] =         0.0f; m[9] = 0.0f; m[10]=      -(sfar + snear) / (sfar - snear); m[11]= -1.0f;
+    m[12]=         0.0f; m[13]= 0.0f; m[14]= -2.0f * sfar * snear / (sfar - snear); m[15]=  0.0f;
+    voxen_Shadow_System.shadDotThresh = 1.0f / vsqrtf(1.0f + vtan(sfov * PI / 360.0f) * (1.0f + aspect3D * aspect3D));
     {// mat4_lookat_from(view,&Sys_Global.instances[PLAYER1].rotation, playerPos); Manually inlined for performance
         float x = Sys_Global.instances[PLAYER1].rotation.x, y = Sys_Global.instances[PLAYER1].rotation.y, z = Sys_Global.instances[PLAYER1].rotation.z, w = Sys_Global.instances[PLAYER1].rotation.w;
         float x2 = x * x, y2 = y * y, z2 = z * z;
@@ -2097,11 +2116,16 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
     ExtractFrustumPlanes(viewProj,playerFrustumPlanes);
     glBindVertexArray(Sys_Render.vao_chunk); // Common vao for RenderShadowmaps and Rasterized Geometry
     glEnable(GL_DEPTH_TEST);
-    if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps();
+    if (likely(Sys_Settings.Shadows > 0u && (!camView || isSensaroundView))) RenderShadowmaps(); // No shadows on camviews for performance, except for sensaround that has to look right
     for (int i=0;i<LIGHT_COUNT;++i) flag_setu32(&lights[i].lflags,LDIRTY,false); // Clear dirty after shadowmaps for minimal shadowmap updating.
     __builtin_memset(Sys_Global.dirtyInstances,0,Sys_Global.loadedInstances * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
-    glBindFramebuffer(GL_FRAMEBUFFER, Sys_Render.gBufferFBO);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
+    glBindFramebuffer(GL_FRAMEBUFFER,Sys_Render.gBufferFBO);
+    if (camView) {
+        GLenum drawBuf = GL_COLOR_ATTACHMENT0;
+        glDrawBuffers(1, &drawBuf);
+    }
+    glViewport(0,0,swidth,sheight);
+    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
     glEnable(GL_CULL_FACE); glDisable(GL_BLEND); // Opaques
     
     // Depth Prepass - Eliminates some overdraw for ~6.1% performance improvement in spite of added draw calls since these are relatively cheap and avoid the heavy fragment work in main pass.
@@ -2131,10 +2155,18 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
     glDepthFunc(GL_LESS);
     RenderInstances(playerPos,true); // opaque, then transparents
     glUniform1ui(25,0u); // reset constIndex
-
+    if (camView) {
+        glBindFramebuffer(GL_READ_FRAMEBUFFER,Sys_Render.gBufferFBO);
+        glReadBuffer(GL_COLOR_ATTACHMENT0);
+        glBindTexture(GL_TEXTURE_2D,camViewTextures[camViewIdx]);
+        glCopyTexSubImage2D(GL_TEXTURE_2D,0,0,0,0,0,swidth,sheight);
+        glBindTexture(GL_TEXTURE_2D,0);
+        return; // After copying render result, skip SSR and composite for camviews <<<<<<<<<<<<< CAM VIEW BARRIER
+    }
+    
     // Draw Debug Lines
     if (unlikely(Sys_Global.debugLineVertCount > 1)) DrawDebugLines(viewProj);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER,0);
     if (likely(Sys_Settings.Reflections > 0u)) { // Screen Space Reflections
         glUseProgram(Sys_Render.ssrShaderProgram);
         glUniformMatrix4fv(4,1,GL_FALSE,viewProj);
@@ -2147,7 +2179,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(vo
     glUseProgram(Sys_Render.imageBlitShaderProgram);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D,Sys_Render.inputImageID);
-    glUniform1i(4,4); // outputImage texture sampler2D
+    glUniform1i(4,4); // outputImage texture sampler2D, don't remember why when active texture is texture 0.  meh.... oh maybe to not read and write same binding?
     double berserkTimeRemainingNormalized = berserkFinished > 0.0001 ? (berserkFinished - Sys_Global.pauseRelativeTime) / BERSERK_TIME : 0.0;
     if (berserkFinished < Sys_Global.pauseRelativeTime && berserkFinished > 0.0001) berserkFinished = berserkTimeRemainingNormalized = 0.0;
     glUniform1ui(5,Sys_Settings.Reflections);
@@ -2254,8 +2286,30 @@ int32_t main(void) {
             UpdateMusic();
         }
 
+        bool playerCellUpdated = false;
+        if (likely(!Sys_Global.gamePaused) && camViewCount > 0) { // Render in-world camera views.  Pops player elsewhere, renders to tiny fbo, pops player back, renders as normal below.
+            Vector3 tempPlayerPos = Sys_Global.instances[PLAYER1].position;
+            Quaternion tempPlayerRot = Sys_Global.instances[PLAYER1].rotation;
+            bool lastShadNeedUpdated = Sys_Render.shadowmapsNeedUpdated;
+            for (int cm=0;cm<camViewCount;++cm) {
+                if (camViews[cm].finished < Sys_Global.pauseRelativeTime) {
+                    camViews[cm].finished = Sys_Global.pauseRelativeTime + 0.5f;
+                    Sys_Global.instances[PLAYER1].position = camViews[cm].position;
+                    Sys_Global.instances[PLAYER1].rotation = camViews[cm].rotation;
+                    Sys_Render.shadowmapsNeedUpdated = playerCellUpdated = UpdatedPlayerCell();
+                    UpdateLights(&Sys_Render.shadowmapsNeedUpdated);
+                    CullCore();
+                    Render(true,cm,camViews[cm].sensaround); // Ok culling and light clusters (in voxels) have been updated, now render the view.
+                }
+            }
+            
+            Sys_Render.shadowmapsNeedUpdated = lastShadNeedUpdated; // Restore so we don't inadvertently render shadows if we don't actually have to.
+            Sys_Global.instances[PLAYER1].position = tempPlayerPos; // Restore player for normal render.
+            Sys_Global.instances[PLAYER1].rotation = tempPlayerRot;
+        }
+        
         if (likely(!Sys_Global.gamePaused || Sys_Global.menuActive)) {
-            Sys_Render.shadowmapsNeedUpdated = UpdatedPlayerCell();
+            Sys_Render.shadowmapsNeedUpdated = UpdatedPlayerCell() || playerCellUpdated;
             Sys_Render.shadowmapsNeedUpdated = UpdateLights(&Sys_Render.shadowmapsNeedUpdated);
             CullCore();
             bool uploadInstances = false;
@@ -2283,8 +2337,8 @@ int32_t main(void) {
             }
             if (uploadInstances) glNamedBufferData(Sys_Render.matricesBufferID, Sys_Global.loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
         }
-        
-        Render();
+                
+        Render(false,0u,false); // Not a cam view, no camview index, not sensaround.  This is the normal main render.
         Sys_Global.globalFrameNum++;
         InputClearRisingAndFallingEdges();
         Sys_Input.currentMouse_dx = Sys_Input.currentMouse_dy = 0;
