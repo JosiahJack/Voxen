@@ -270,8 +270,6 @@ static void aiac_dead(Entity* self) {
 void AIAnimationControllerUpdate(uint16_t idx) {
     Entity* self = &Eng_Global->instances[idx];
     if (!(self->entflags & ENTFLAG_ACTIVE))        return;
-    if (!(self->entflags & ENTFLAG_ANIMATED))       return;
-    if (!(self->entflags & ENTFLAG_VISIBLE))        return;
     if (self->animationNum >= MAX_ANIMATED_MODELS)  return;
     if (self->currentState == AIState_Dying) { aiac_dying(self); return; }
     if (self->currentState == AIState_Dead)  { aiac_dead(self);  return; }

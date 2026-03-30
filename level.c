@@ -5,7 +5,6 @@ ENGINE_TO_MOD void InitializeEntity(Entity* entry) { // Blank entity, no index y
     entry->entflags = ENTFLAG_KINEMATIC; // Zeroes the rest out.
     entry->modelIndex = MODEL_IDX_MAX;
     entry->layer = PhysicsLayer_Default;
-    flag_set(&entry->entflags, ENTFLAG_ANIMATED, false);
     entry->texIndex = entry->glowIndex = entry->specIndex = entry->normIndex = MAX_VALID_TEXTURE;
     entry->lodIndex  = MODEL_IDX_MAX;
     entry->camView = 255;
@@ -84,5 +83,5 @@ ENGINE_TO_MOD void LoadFieldIntoLight(char* trimmed_key, char* trimmed_value, ch
     else if (StringsEqual(trimmed_key,"color.b"))      lit->col.b = parse_float(trimmed_value,initialLine,lineNum);
     else if (StringsEqual(trimmed_key,"lightOn"))      flag_setu32(&lit->lflags,LIGHTON,parse_bool(trimmed_value,initialLine,lineNum));
     else if (StringsEqual(trimmed_key,"lerpOn"))       flag_setu32(&lit->lflags,LERPON,parse_bool(trimmed_value,initialLine,lineNum));
-    else if (StringsEqual(trimmed_key,"shadows"))      flag_setu32(&lit->lflags,SHADON,trimmed_value[0] != 'N'); // None
+//     else if (StringsEqual(trimmed_key,"shadows"))      flag_setu32(&lit->lflags,SHADON,trimmed_value[0] != 'N'); // None
 }

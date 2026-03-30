@@ -69,7 +69,6 @@ MOD_TO_ENGINE void UpdateAnims(void) {
         if (anim >= MAX_ANIMATED_MODELS) continue; // Invalid animated model index
         if (e->numclips >= MAX_ANIMATION_CLIPS_PER_MODEL) continue; // Invalid animation clip index
         if (e->numclips == 0) continue; // Invalid animation clip index
-        if (!(e->entflags & ENTFLAG_ANIMATED)) continue;
         
         AnimationClip currentClip = modelAnimationClips[anim][e->clip];
         if (e->currentFrameFinished >= Eng_Global->pauseRelativeTime) continue;

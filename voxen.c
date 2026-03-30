@@ -159,12 +159,10 @@ Quaternion cubemapOrientationQuaternion[6] = {
 bool lightInPVS[LIGHT_COUNT];
 Vector3 lightsNewPosition[LIGHT_COUNT];
 void UpdateLights(void) {
-    bool voxelsNeedUpdated = false;
     for (uint16_t lightIdx = 0; lightIdx < Sys_Global.loadedLights; ++lightIdx) { 
         Vector3 lightPos = lightsNewPosition[lightIdx];
         lights[lightIdx].pos = lightPos;
         if (lights[lightIdx].lflags & LDIRTY) { // Marked all as true at level load.
-            voxelsNeedUpdated = true;
             #pragma GCC unroll 6
             for (int j=0;j<6;++j) { // Update to new position
                 mat4_lookat_from((float*)lightView[lightIdx][j], &cubemapOrientationQuaternion[j], lightPos);
@@ -222,13 +220,11 @@ void UpdateLights(void) {
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER,Sys_Render.lightsID);
     glBufferData(GL_SHADER_STORAGE_BUFFER,Sys_Global.loadedLights * sizeof(Light),lights,GL_DYNAMIC_DRAW);
-    if (voxelsNeedUpdated) {
-        Vector3 p = Sys_Global.instances[PLAYER1].position;
-        glUseProgram(Sys_Render.voxelUpdateShaderProgram);
-        glUniform3f(5,p.x,p.y,p.z);
-        glUniform1ui(6,(uint32_t)MAX_LIGHTS_PER_VOXEL);
-        glDispatchCompute((512+31)/32,(512+31)/32,1);
-    }
+    Vector3 p = Sys_Global.instances[PLAYER1].position;
+    glUseProgram(Sys_Render.voxelUpdateShaderProgram);
+    glUniform3f(5,p.x,p.y,p.z);
+    glUniform1ui(6,(uint32_t)MAX_LIGHTS_PER_VOXEL);
+    glDispatchCompute((512+31)/32,(512+31)/32,1);
 }
 
 #define IS_CHANGED(a, b) _Generic((a), float:(vabs((a) - (b)) > 0.0001f), default:((a) != (b)))
@@ -1749,7 +1745,7 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
         float range =  lights[i].range;
         float luminosity = (intensity / (range * range));
         if (luminosity < 0.008f && (range < 8.0f || intensity < 0.5f)) continue;
-//         if (!lightInPVS[i]) continue;
+        if (!lightInPVS[i]) continue;
         
         float dx = lightPos.x - playerPos.x; float dy = lightPos.y - playerPos.y; float dz = lightPos.z - playerPos.z;
         float distSqrdToPlayer = dx*dx + dy*dy + dz*dz;
@@ -1975,7 +1971,7 @@ static inline __attribute__((always_inline)) void RenderInstancesDepthOnly(Vecto
 float GetPainStatic(void) { return 0.0f; } // TODO: Hook into pain/health management and shield impact effect
 Color GetPainStaticColor(void) { return (Color){1.0f,0.0f,0.0f,1.0f}; } // TODO: Hook staticColor up to red or blue for pain or shield impact.
 
-static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bool camView, uint8_t camViewIdx, bool isSensaroundView) {
+static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bool camView, uint8_t camViewIdx) {
     uint16_t swidth = camView ? camViews[camViewIdx].width : Sys_Settings.ScreenWidth; uint16_t sheight = camView ? camViews[camViewIdx].height : Sys_Settings.ScreenHeight;
     float sfov = camView ? (float)camViews[camViewIdx].fov : (float)Sys_Settings.FOV;
     float snear = camView ? camViews[camViewIdx].near : NEAR_PLANE; float sfar = camView ? camViews[camViewIdx].far : FAR_PLANE;
@@ -2014,7 +2010,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
     ExtractFrustumPlanes(viewProj,playerFrustumPlanes);
     glBindVertexArray(Sys_Render.vao_chunk); // Common vao for RenderShadowmaps and Rasterized Geometry
     glEnable(GL_DEPTH_TEST);
-    if (likely(Sys_Settings.Shadows > 0u && (!camView || isSensaroundView))) RenderShadowmaps(); // No shadows on camviews for performance, except for sensaround that has to look right
+    if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps(); // No shadows on camviews for performance, except for sensaround that has to look right
     for (int i=0;i<LIGHT_COUNT;++i) flag_setu32(&lights[i].lflags,LDIRTY,false); // Clear dirty after shadowmaps for minimal shadowmap updating.
     __builtin_memset(Sys_Global.dirtyInstances,0,Sys_Global.loadedInstances * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
     glBindFramebuffer(GL_FRAMEBUFFER,Sys_Render.gBufferFBO);
@@ -2190,7 +2186,7 @@ int32_t main(void) {
                     UpdatedPlayerCell();
                     UpdateLights();
                     CullCore();
-                    Render(true,cm,camViews[cm].sensaround); // Ok culling and light clusters (in voxels) have been updated, now render the view.
+                    Render(true,cm); // Ok culling and light clusters (in voxels) have been updated, now render the view.
                 }
             }
 
@@ -2228,7 +2224,7 @@ int32_t main(void) {
             if (uploadInstances) glNamedBufferData(Sys_Render.matricesBufferID, Sys_Global.loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
         }
                 
-        Render(false,0u,false); // Not a cam view, no camview index, not sensaround.  This is the normal main render.
+        Render(false,0u); // Not a cam view, no camview index.  This is the normal main render.
         Sys_Global.globalFrameNum++;
         InputClearRisingAndFallingEdges();
         Sys_Input.currentMouse_dx = Sys_Input.currentMouse_dy = 0;

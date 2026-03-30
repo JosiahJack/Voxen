@@ -3657,7 +3657,6 @@ MOD_TO_ENGINE void ModInitAfterLoad(void) {
         uint16_t constIndex = e->index;
         if (i == PLAYER1 || i == PLAYER2 || ConstIndexIsDynamicObject(constIndex)) e->gravity = 1.0f;
         else e->gravity = 0.0f;
-        if (constIndex < MAX_ENTITIES) flag_set(&e->entflags,ENTFLAG_ANIMATED,EntityDefinitions[constIndex].entflags & ENTFLAG_ANIMATED);
         if (ConstIndexIsGeometry(constIndex)) e->layer = PhysicsLayer_Geometry;
         else if (ConstIndexIsDoor(constIndex)) e->layer = PhysicsLayer_Door;
         else if (ConstIndexIsUsableObject(constIndex)) UsableInit(i);
