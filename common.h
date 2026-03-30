@@ -55,15 +55,12 @@ typedef struct {
 typedef struct {
     Vector3 pos;        // 12
     float intensity;    // 4
-    
     Color3 col;         // 12
     uint32_t lflags;    // 4 - light on 1b, shadows on 1b, type 2b, dirty 1b, lerp on 1b
-
     float range;        // 4
     float spotAng;      // 4
     float maxIntensity; // 4
     float minIntensity; // 4
-    
     Quaternion spotDir; // 16
 } Light; // 64bytes, one cache line, packed for GL transfer
 
@@ -72,11 +69,8 @@ typedef struct {
     float lerpStepTime;
     float lerpStartTime;
     float lerpTime;
-    
     float intervalSteps[32];
-    
     bool stepIsLerping[32];
-    
     bool lerpUp;
     uint8_t currentStep;
     uint8_t numIntervalSteps;
@@ -1318,8 +1312,8 @@ typedef struct {
     bool (*GetKey)(int settingIndex);
     bool (*GetKeyPressed)(int settingIndex);
     uint16_t ressurectionActiveLevels;
-    InventorySystem inventoryPlayer1;
-    InventorySystem inventoryPlayer2;
+    InventorySystem invP1;
+    InventorySystem invP2;
     ma_engine audio_engine;
     ma_sound mp3_sounds[2]; // Two for crossfading
     int32_t mp3_slot;

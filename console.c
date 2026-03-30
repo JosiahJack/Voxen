@@ -301,7 +301,6 @@ static void cmd_git(const char* arg) {
 static void cmd_restart(void)        { CenterStatusPrint("Yeah...better not"); }
 static void cmd_quit(void)           { OS_Exit(0); }
 static void cmd_cd(void)             { CenterStatusPrint("Attempting to access directory... already at root"); }
-
 static void cmd_justinbailey(void)   { CenterStatusPrint("Well, you don't have a suit already so..."); }
 static void cmd_woodstock(void)      { CenterStatusPrint("How much wood could a woodchuck chuck...there's no wood in SPACE!"); }
 static void cmd_quarry(void)         { CenterStatusPrint("There's obsidian on levels 6 and 8 if you want to feel decadent, otherwise we are lacking in the stone department."); }
@@ -311,15 +310,9 @@ static void cmd_iamironman(void)     { CenterStatusPrint("That's nice dear."); }
 static void cmd_idkfa(void)          { CenterStatusPrint("I can only hold 7 weapons!! Nice try dearies!"); }
 static void cmd_ai(void)             { CenterStatusPrint("Only AI allowed around here is SHODAN"); }
 static void cmd_aireal(void)         { CenterStatusPrint("In my magnificence, I shape clay, crafting new lifeforms..."); }
-
 static void cmd_staminup(void) {
     Sys_Cheats.fatigueCheat = !Sys_Cheats.fatigueCheat;
-    if (Sys_Cheats.fatigueCheat) {
-        CenterStatusPrint("Stamin-Up! %s", Sys_Text.stringTable[1013]);
-        Sys_Global.inventoryPlayer1.fatigue = 0.0f;
-    } else {
-        CenterStatusPrint("%s", Sys_Text.stringTable[1012]);
-    }
+    if (Sys_Cheats.fatigueCheat) { CenterStatusPrint("Stamin-Up! %s",Sys_Text.stringTable[1013]); SetModFatigue(0.0f); } else CenterStatusPrint("%s",Sys_Text.stringTable[1012]);
 }
 
 static const ConsoleCommand g_ConsoleCommands[] = {

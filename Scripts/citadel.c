@@ -1284,7 +1284,7 @@ void Targetted(uint16_t activator, uint16_t self, const char* argvalue) {
     }
     if ((a->ioflags & TARG_IOFLAGS_SWITCHTRIGGER) && ConstIndexIsButtonSwitch(e->index)) ButtonSwitchTargetted(self,activator,argvalue);
     if ((a->ioflags & TARG_IOFLAGS_DOOROPEN) && ConstIndexIsDoor(e->index)) DoorForceOpen(self);
-    if ((a->ioflags & TARG_IOFLAGS_DOOROPENIFUNLOCKED) && ConstIndexIsDoor(e->index) && !EntityLocked(e) && (e->requiredAccessCard == AccessCardType_None || e->accessCardUsedByPlayer || (Eng_Global->inventoryPlayer1.accessCardOwned & (1u << e->requiredAccessCard)))) DoorForceOpen(self);
+    if ((a->ioflags & TARG_IOFLAGS_DOOROPENIFUNLOCKED) && ConstIndexIsDoor(e->index) && !EntityLocked(e) && (e->requiredAccessCard == AccessCardType_None || e->accessCardUsedByPlayer || (Eng_Global->invP1.accessCardOwned & (1u << e->requiredAccessCard)))) DoorForceOpen(self);
     if ((a->ioflags & TARG_IOFLAGS_DOOR_TOGGLE) && ConstIndexIsDoor(e->index)) DoorActuate(self);
     if ((a->ioflags & TARG_IOFLAGS_DOORCLOSE) && ConstIndexIsDoor(e->index)) DoorForceClose(self);
     if ((a->ioflags & TARG_IOFLAGS_DOORLOCK) && ConstIndexIsDoor(e->index)) DoorLock(self);
@@ -1306,30 +1306,30 @@ void Targetted(uint16_t activator, uint16_t self, const char* argvalue) {
 // VaporizeButton
 void VaporizeClick(void) { // TODO
 //     Eng_UI->mouseClickHeldOverGUI = true;
-//     if (Eng_Global->inventoryPlayer1.generalInvCurrent == 0) return; // Access Cards index.
+//     if (Eng_Global->invP1.generalInvCurrent == 0) return; // Access Cards index.
 // 
-//     int cur = Eng_Global->inventoryPlayer1.generalInvCurrent;
-//     Eng_Global->inventoryPlayer1.generalInventoryIndexRef[cur] = -1; // Remove item
-//     Eng_Global->inventoryPlayer1.generalInvCurrent -= 1;
-//     if (Eng_Global->inventoryPlayer1.generalInvCurrent < 0) {
-//         Eng_Global->inventoryPlayer1.generalInvCurrent = 0; // Bound to lowest, but only
+//     int cur = Eng_Global->invP1.generalInvCurrent;
+//     Eng_Global->invP1.generalInventoryIndexRef[cur] = -1; // Remove item
+//     Eng_Global->invP1.generalInvCurrent -= 1;
+//     if (Eng_Global->invP1.generalInvCurrent < 0) {
+//         Eng_Global->invP1.generalInvCurrent = 0; // Bound to lowest, but only
 //     }									   // since it is Access Cards.
 // 
 // 
-//     cur = Eng_Global->inventoryPlayer1.generalInvCurrent;
-//     if (Eng_Global->inventoryPlayer1.generalInventoryIndexRef[cur] < 0) {
+//     cur = Eng_Global->invP1.generalInvCurrent;
+//     if (Eng_Global->invP1.generalInventoryIndexRef[cur] < 0) {
 //         for (int i=13; i >= 0; i--) {
-//             if (Eng_Global->inventoryPlayer1.generalInventoryIndexRef[i] >= 0) {
-//                 Eng_Global->inventoryPlayer1.generalInvCurrent = i;
+//             if (Eng_Global->invP1.generalInventoryIndexRef[i] >= 0) {
+//                 Eng_Global->invP1.generalInvCurrent = i;
 //                 break; // Found last item in inventory.
 //             }
 //         }
 //     }
 // 
-//     cur = Eng_Global->inventoryPlayer1.generalInvCurrent;
-//     int indexRef = Eng_Global->inventoryPlayer1.generalInventoryIndexRef[cur];
-//     if (Eng_Global->inventoryPlayer1.generalInvCurrent == 0) {
-//         if (Eng_Global->inventoryPlayer1.HasAnyAccessCards()) {
+//     cur = Eng_Global->invP1.generalInvCurrent;
+//     int indexRef = Eng_Global->invP1.generalInventoryIndexRef[cur];
+//     if (Eng_Global->invP1.generalInvCurrent == 0) {
+//         if (Eng_Global->invP1.HasAnyAccessCards()) {
 //             Eng_UI->SendInfoToItemTab(indexRef);
 //         } else {
 //             // If no access cards, reset item tab to show nothing.
@@ -1337,7 +1337,7 @@ void VaporizeClick(void) { // TODO
 //             PtrExit();
 //         }
 //     } else {
-//         GeneralInvButton genbut = Eng_Global->inventoryPlayer1.genButtons[cur].GetComponent<GeneralInvButton>();
+//         GeneralInvButton genbut = Eng_Global->invP1.genButtons[cur].GetComponent<GeneralInvButton>();
 //         Eng_UI->SendInfoToItemTab(indexRef,genbut.customIndex);
 //     }
 }
@@ -1619,7 +1619,7 @@ void EmailTargetted(uint16_t self,uint16_t activator,const char* argvalue) {
     (void)activator; (void)argvalue;
     Entity* e = &Eng_Global->instances[self];
     uint16_t idx = e->emailIndex;
-    InventorySystem* inv = &Eng_Global->inventoryPlayer1;
+    InventorySystem* inv = &Eng_Global->invP1;
     if (inv->hasLog[idx]) return;
     inv->hasLog[idx]      = true;
     inv->hasNewEmail      = true;
@@ -1636,7 +1636,7 @@ static double overloadClickFinished = 0.0;
 void OverloadButtonAction(void) {
     if (overloadClickFinished >= Eng_Global->pauseRelativeTime) return;
     overloadClickFinished = Eng_Global->pauseRelativeTime + OVERLOAD_CLICK_DEBOUNCE;
-    InventorySystem* inv = &Eng_Global->inventoryPlayer1;
+    InventorySystem* inv = &Eng_Global->invP1;
     if (inv->currentEnergyWeaponHeat[inv->weaponIndex] > OVERLOAD_HEAT_THRESHOLD) {
         CenterStatusPrint("%s",Eng_Text->stringTable[12]); // Weapon too hot
         return;
@@ -1659,14 +1659,14 @@ void OverloadEnergyClick(void) {
 
 // Called by weapon fire system after overload shot discharges
 void OverloadFired(void) {
-    Eng_Global->inventoryPlayer1.overloadEnabled = false;
+    Eng_Global->invP1.overloadEnabled = false;
     // Render-time: normalButtonSprite, textDisabledColor
 }
 
 // Called from weapon pane render — returns visual state for renderer to act on
 // 0 = normal+clickable, 1 = overloaded, 2 = disabled (post-fire/too hot)
 uint8_t OverloadButtonVisualState(void) {
-    InventorySystem* inv = &Eng_Global->inventoryPlayer1;
+    InventorySystem* inv = &Eng_Global->invP1;
     if (inv->currentEnergyWeaponHeat[inv->weaponIndex] > OVERLOAD_HEAT_THRESHOLD) return 2;
     if (inv->overloadEnabled) return 1;
     return 0;
@@ -1766,14 +1766,14 @@ void GeneralInvApply(int buttonIdx,int customIdx) {
         // TODO: Eng_UI->SendInfoToItemTab(81), OpenTab access cards — MFDManager
         return;
     }
-    Eng_Global->inventoryPlayer1.hardwareInvCurrent = buttonIdx;
-    int itemIdx = Eng_Global->inventoryPlayer1.generalInventoryIndexRef[buttonIdx];
+    Eng_Global->invP1.hardwareInvCurrent = buttonIdx;
+    int itemIdx = Eng_Global->invP1.generalInventoryIndexRef[buttonIdx];
     switch (itemIdx) {
         case 52: ApplyBattery();     break;
         case 53: ApplyIcadBattery(); break;
         case 55: ApplyHealthkit();   break;
         default:
-            Eng_Global->inventoryPlayer1.hardwareInvCurrent = buttonIdx;
+            Eng_Global->invP1.hardwareInvCurrent = buttonIdx;
             // TODO: Eng_UI->SendInfoToItemTab(itemIdx,customIdx), OpenTab — MFDManager
             (void)customIdx;
             break;
@@ -1795,12 +1795,12 @@ void GeneralInvDoubleClick(int buttonIdx,int customIdx) { Eng_UI->mouseClickHeld
 #define TARGID_DISPLAY_NAME    (1ull << 63)
 
 float TargetIDGetSensingRange(bool manual) {
-    uint8_t ver = Eng_Global->inventoryPlayer1.hardwareVersion[HW_TID_IDX];
+    uint8_t ver = Eng_Global->invP1.hardwareVersion[HW_TID_IDX];
     if (manual) return (ver >= 4) ? 18.0f : 13.0f;
     else return (ver <= 2) ? 0.0f : ((ver == 3) ? 13.0f : 20.0f);
 }
 
-float TargetIDGetTetherRange(void) { return (Eng_Global->inventoryPlayer1.hardwareVersion[HW_TID_IDX] >= 4) ? 22.0f : 15.0f; }
+float TargetIDGetTetherRange(void) { return (Eng_Global->invP1.hardwareVersion[HW_TID_IDX] >= 4) ? 22.0f : 15.0f; }
 static void TargetIDDeactivate(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->enemey != NULLENT) {
@@ -1857,7 +1857,7 @@ void TargetIDUpdate(uint16_t self) {
             e->textIndex = 536; // STUNNED
         } else if (e->animSwapFinished < Eng_Global->pauseRelativeTime) {
             e->textIndex = -1;
-            if (!(Eng_Global->inventoryPlayer1.hasHardware & HW_TID)) {
+            if (!(Eng_Global->invP1.hasHardware & HW_TID)) {
                 TargetIDDeactivate(self); return;
             }
         }
@@ -1917,8 +1917,11 @@ static void TargetIdentifierSenseTargets(void) {
     }
 }
 
+MOD_TO_ENGINE void SetModFatigue(float val) { Eng_Global->invP1.fatigue = val; }
+MOD_TO_ENGINE bool ModRequestsGrayscale(void) {return (/*(Eng_Global->invP1.hasHardware & HW_INF) && */(Eng_Global->invP1.hardwareIsActive & HW_INF)); }
+
 static void DeactivateHardwareOnEnergyDepleted(void) {
-    InventorySystem* inv = &Eng_Global->inventoryPlayer1;
+    InventorySystem* inv = &Eng_Global->invP1;
     uint16_t* active = &inv->hardwareIsActive;
     flag_set((uint64_t*)active, HW_SNS, false);
     // TODO: SensaroundOff() — hardware button manager effects
@@ -1973,7 +1976,7 @@ void PlayerEnergyInit(void) {
 }
 
 void PlayerEnergyUpdate(void) {
-    InventorySystem* inv = &Eng_Global->inventoryPlayer1;
+    InventorySystem* inv = &Eng_Global->invP1;
     if (inv->hasHardware & HW_TID) TargetIdentifierSenseTargets();
     if (inv->energyDrainTickFinished > Eng_Global->pauseRelativeTime) return;
     
@@ -2031,9 +2034,9 @@ void GrenadeActivate(uint16_t self) {
         case 7:  flag_set(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
         case 8:  flag_set(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
         case 9:  flag_set(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
-        case 10: e->timerFinished = Eng_Global->pauseRelativeTime + Eng_Global->inventoryPlayer1.earthShakerTimeSetting; flag_set(&e->ioflags,GREN_FLAG_USE_TIMER,true);       break;
+        case 10: e->timerFinished = Eng_Global->pauseRelativeTime + Eng_Global->invP1.earthShakerTimeSetting; flag_set(&e->ioflags,GREN_FLAG_USE_TIMER,true);       break;
         case 11: flag_set(&e->ioflags,GREN_FLAG_USE_PROX,true); flag_set(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,false);break;
-        case 12: e->timerFinished = Eng_Global->pauseRelativeTime + Eng_Global->inventoryPlayer1.nitroTimeSetting; flag_set(&e->ioflags,GREN_FLAG_USE_TIMER,true);       break;
+        case 12: e->timerFinished = Eng_Global->pauseRelativeTime + Eng_Global->invP1.nitroTimeSetting; flag_set(&e->ioflags,GREN_FLAG_USE_TIMER,true);       break;
         case 13: flag_set(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
         default: return;
     }
@@ -2077,7 +2080,7 @@ static void ProjectileEffectImpactOnCollision(uint16_t self,uint16_t hitIdx, Vec
         .owner         = e->recentMostActivator,
         .hitIdx        = hitIdx,
         .isOtherNPC    = ConstIndexIsNPC(Eng_Global->instances[hitIdx].index),
-        .berserkActive = (Eng_Global->inventoryPlayer1.patchActive & PATCH_BERSERK) != 0,
+        .berserkActive = (Eng_Global->invP1.patchActive & PATCH_BERSERK) != 0,
     };
 
     // Railgun sphere impact
@@ -2102,7 +2105,7 @@ static void ProjectileEffectImpactOnCollision(uint16_t self,uint16_t hitIdx, Vec
         if (dd.isOtherNPC) {
             if (!(hit->entflags & ENTFLAG_ASLEEP)) Sys_Music.inCombat = true;
             if (dd.attackType == AttackType_Tranq) {
-//                 float stunAmount = vclamp(3.0f + (Eng_Global->inventoryPlayer1.stungunSetting
+//                 float stunAmount = vclamp(3.0f + (Eng_Global->invP1.stungunSetting
 //                                           / 100.0f) * 7.0f, 3.0f, 10.0f);
                 // TODO: tranq = Tranquilize(hitIdx, stunAmount, true)
             }
@@ -2337,8 +2340,8 @@ float TakeDamage(uint16_t self,DamageData dd) {
         float absorb = 0.0f;
         if (isCyber) {
             // Cyber C-Shield software absorption
-            if (Eng_Global->inventoryPlayer1.hasSoft & (1 << SW_SHIELD)) {
-                uint8_t sv = Eng_Global->inventoryPlayer1.softVersions[SW_SHIELD];
+            if (Eng_Global->invP1.hasSoft & (1 << SW_SHIELD)) {
+                uint8_t sv = Eng_Global->invP1.softVersions[SW_SHIELD];
                 absorb = (sv <= 9) ? sv * 0.05f : 0.0f;
                 take *= (1.0f - absorb);
                 if (take <= 0.0f) return 0.0f;
@@ -2349,7 +2352,7 @@ float TakeDamage(uint16_t self,DamageData dd) {
                 // TODO: empstatic.Flash(2), BiomonitorEnergyPulse(11f) — FX systems
                 TakeEnergy(11.0f);
             }
-            InventorySystem* inv = &Eng_Global->inventoryPlayer1;
+            InventorySystem* inv = &Eng_Global->invP1;
             if ((inv->hardwareIsActive & HW_SHD) && (inv->hasHardware & HW_SHD)) {
                 float thresh = 0.0f;
                 switch (inv->hardwareVersion[HW_SHD_IDX]) {
@@ -2455,7 +2458,7 @@ void ForceShootMode(void) {
     Eng_UI->mouseClickHeldOverGUI = false;
 //     CloseFullmap(); // TODO
     Eng_Global->inventoryMode = false;
-//     if (vmailActive) { Eng_Global->inventoryPlayer1.DeactivateVMail(); vmailActive = false; } // TODO
+//     if (vmailActive) { Eng_Global->invP1.DeactivateVMail(); vmailActive = false; } // TODO
 }
 
 void ForceInventoryMode(void) { Eng_Global->inventoryMode = true; }
@@ -2470,18 +2473,18 @@ void ToggleInventoryMode(void) {
 //================================================================================
 // Hardware
 void HardwareBioOff(void) {
-    Eng_Global->inventoryPlayer1.hardwareIsActive &= ~HW_BIO;
+    Eng_Global->invP1.hardwareIsActive &= ~HW_BIO;
     if (Eng_Cheats->showFPS) return;
     // TODO: BiomonitorClearGraphs() — engine-side graph reset
     // TODO: deactivate bioMonitorContainer — engine reads BioMonitorActive()
 }
 void HardwareBioOn(void) {
-    Eng_Global->inventoryPlayer1.hardwareIsActive |= HW_BIO;
+    Eng_Global->invP1.hardwareIsActive |= HW_BIO;
     // TODO: activate bioMonitorContainer — engine reads BioMonitorActive()
 }
 void HardwareBioAction(void) {
     InventorySystem* inv = Inv(PLAYER1);
-    if (Eng_Global->inventoryPlayer1.hardwareVersionSetting[HW_BIO_IDX] == 0 && inv->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
+    if (Eng_Global->invP1.hardwareVersionSetting[HW_BIO_IDX] == 0 && inv->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
     
     play_wav(sounds[78],SfxVol(),(Vector3){},false);
     if (BioMonitorActive(PLAYER1)) HardwareBioOff(); else HardwareBioOn();
@@ -2489,11 +2492,11 @@ void HardwareBioAction(void) {
 void HardwareBioClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareBioAction(); }
 
 void HardwareSensaroundOn(void) {
-    Eng_Global->inventoryPlayer1.hardwareIsActive |= HW_SNS;
+    Eng_Global->invP1.hardwareIsActive |= HW_SNS;
     // TODO: activate sensaround cameras/overlays — engine reads hardwareIsActive & HW_SNS + version
 }
 void HardwareSensaroundOff(void) {
-    Eng_Global->inventoryPlayer1.hardwareIsActive &= ~HW_SNS;
+    Eng_Global->invP1.hardwareIsActive &= ~HW_SNS;
     // TODO: deactivate sensaround cameras, restore tabs — engine reads hardwareIsActive & HW_SNS
 }
 void HardwareSensaroundAction(void) {
@@ -2510,11 +2513,11 @@ void HardwareSensaroundAction(void) {
 void HardwareSensaroundClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareSensaroundAction(); }
 
 void HardwareShieldOn(void) {
-    Eng_Global->inventoryPlayer1.hardwareIsActive |= HW_SHD;
+    Eng_Global->invP1.hardwareIsActive |= HW_SHD;
     // TODO: ShieldActivateFX — engine reads hardwareIsActive & HW_SHD
 }
 
-void HardwareShieldOff(void) { Eng_Global->inventoryPlayer1.hardwareIsActive &= ~HW_SHD; }
+void HardwareShieldOff(void) { Eng_Global->invP1.hardwareIsActive &= ~HW_SHD; }
 void HardwareShieldOffWithEffects(void) {
     HardwareShieldOff();
     // TODO: ShieldDeactivateFX — engine reads hardwareIsActive & HW_SHD
@@ -2524,7 +2527,7 @@ void HardwareShieldAction(void) {
     InventorySystem* inv = Inv(PLAYER1);
     if (inv->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
     
-    if (Eng_Global->inventoryPlayer1.hardwareIsActive & HW_SHD) {
+    if (Eng_Global->invP1.hardwareIsActive & HW_SHD) {
         play_wav(sounds[95],SfxVol(),(Vector3){},false); HardwareShieldOffWithEffects();
     } else {
         play_wav(sounds[96],SfxVol(),(Vector3){},false); HardwareShieldOn();
@@ -2534,11 +2537,11 @@ void HardwareShieldAction(void) {
 void HardwareShieldClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareShieldAction(); }
 
 void HardwareLanternOn(void) {
-    Eng_Global->inventoryPlayer1.hardwareIsActive |= HW_LAN;
+    Eng_Global->invP1.hardwareIsActive |= HW_LAN;
     // TODO: enable headlight at lanternBrightness[hardwareVersionSetting[HW_LAN_IDX]] — engine reads bitmask + version
 }
 void HardwareLanternOff(void) {
-    Eng_Global->inventoryPlayer1.hardwareIsActive &= ~HW_LAN;
+    Eng_Global->invP1.hardwareIsActive &= ~HW_LAN;
     // TODO: disable headlight — engine reads hardwareIsActive & HW_LAN
 }
 
@@ -2547,25 +2550,25 @@ void HardwareLanternAction(void) {
     if (inv->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
     
     play_wav(sounds[78],SfxVol(),(Vector3){},false);
-    if (Eng_Global->inventoryPlayer1.hardwareIsActive & HW_LAN) HardwareLanternOff(); else HardwareLanternOn();
+    if (Eng_Global->invP1.hardwareIsActive & HW_LAN) HardwareLanternOff(); else HardwareLanternOn();
 }
 
 void HardwareLanternClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareLanternAction(); }
 
 void HardwareInfraredOn(void) {
-    Eng_Global->inventoryPlayer1.hardwareIsActive |= HW_INF;
+    Eng_Global->invP1.hardwareIsActive |= HW_INF;
     // TODO: enable infrared light + grayscale on player/sensaround cameras — engine reads bitmask
 }
 
 void HardwareInfraredOff(void) {
-    Eng_Global->inventoryPlayer1.hardwareIsActive &= ~HW_INF;
+    Eng_Global->invP1.hardwareIsActive &= ~HW_INF;
     // TODO: disable infrared light + grayscale — engine reads bitmask
 }
 void HardwareInfraredAction(void) {
     InventorySystem* inv = Inv(PLAYER1);
     if (inv->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
     
-    bool wasOn = (Eng_Global->inventoryPlayer1.hardwareIsActive & HW_INF) != 0;
+    bool wasOn = (Eng_Global->invP1.hardwareIsActive & HW_INF) != 0;
     play_wav(wasOn ? sounds[82] : sounds[98],SfxVol(),(Vector3){},false);
     if (wasOn) HardwareInfraredOff(); else HardwareInfraredOn();
 }
@@ -2574,26 +2577,26 @@ void HardwareInfraredClick(void) { Eng_UI->mouseClickHeldOverGUI = true; Hardwar
 
 void HardwareEReaderAction(void) {
     play_wav(sounds[97],SfxVol(),(Vector3){},false);
-    Eng_Global->inventoryPlayer1.hardwareIsActive |= HW_ERD;
+    Eng_Global->invP1.hardwareIsActive |= HW_ERD;
     // TODO: OpenEReaderInItemsTab() — engine-side tab open
 }
 
 void HardwareEReaderClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareEReaderAction(); }
 
-void HardwareBoosterOn(void)  { Eng_Global->inventoryPlayer1.hardwareIsActive |=  HW_BST; }
-void HardwareBoosterOff(void) { Eng_Global->inventoryPlayer1.hardwareIsActive &= ~HW_BST; }
+void HardwareBoosterOn(void)  { Eng_Global->invP1.hardwareIsActive |=  HW_BST; }
+void HardwareBoosterOff(void) { Eng_Global->invP1.hardwareIsActive &= ~HW_BST; }
 void HardwareBoosterAction(void) {
     InventorySystem* inv = Inv(PLAYER1);
     if (BoosterSetToBoost(PLAYER1) && inv->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
     
     play_wav(sounds[78],SfxVol(),(Vector3){},false);
-    if (Eng_Global->inventoryPlayer1.hardwareIsActive & HW_BST) HardwareBoosterOff(); else HardwareBoosterOn();
+    if (Eng_Global->invP1.hardwareIsActive & HW_BST) HardwareBoosterOff(); else HardwareBoosterOn();
 }
 
 void HardwareBoosterClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareBoosterAction(); }
 
-void HardwareJumpJetsOn(void)  { Eng_Global->inventoryPlayer1.hardwareIsActive |=  HW_JET; }
-void HardwareJumpJetsOff(void) { Eng_Global->inventoryPlayer1.hardwareIsActive &= ~HW_JET; }
+void HardwareJumpJetsOn(void)  { Eng_Global->invP1.hardwareIsActive |=  HW_JET; }
+void HardwareJumpJetsOff(void) { Eng_Global->invP1.hardwareIsActive &= ~HW_JET; }
 void HardwareJumpJetsAction(uint16_t p) {
     InventorySystem* inv = Inv(p);
     if (inv->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
@@ -2619,8 +2622,8 @@ void HardwareUpdate(uint16_t p, bool playerMoved) {
         Vector3 ppos = Eng_Global->instances[p].position;
         lanternPos = (Vector3){ppos.x + 0.04f,ppos.y + 0.24f,ppos.z + 0.04f};
         float intensity = infraredOn ? 0.8f : lanternVersionBrightness[inv->hardwareVersionSetting[7]];
-        UpdateLight(headmountedLanternLight,lanternPos,lantCol,infraredOn ? INFRARED_RANGE : LANTERN_RANGE,intensity,intensity,0.0f,0.0f,QUAT_IDENTITY,true,!infraredOn);
-    } else UpdateLight(headmountedLanternLight,lanternPos,lantCol,11.52f,0.0f,0.0f,0.0f,0.0f,QUAT_IDENTITY,false,!infraredOn);
+        UpdateLight(headmountedLanternLight,lanternPos,lantCol,infraredOn ? INFRARED_RANGE : LANTERN_RANGE,intensity,intensity,0.0f,0.0f,QUAT_IDENTITY,true,false);
+    } else UpdateLight(headmountedLanternLight,lanternPos,lantCol,11.52f,0.0f,0.0f,0.0f,0.0f,QUAT_IDENTITY,false,false);
 }
 //================================================================================
 // Patches
@@ -2802,20 +2805,20 @@ void PatchDisableAll(void) {
 // Grenades
 void UseGrenade(uint16_t playerIndex, int index) { // TODO
     (void)playerIndex; (void)index;
-    if (Eng_Global->inventoryPlayer1.holdingObject) { CenterStatusPrint("%s",Eng_Text->stringTable[311]); return; } // Can't use grenade, hands full
+    if (Eng_Global->invP1.holdingObject) { CenterStatusPrint("%s",Eng_Text->stringTable[311]); return; } // Can't use grenade, hands full
 
     ForceInventoryMode();  // Inventory mode is turned on when picking something up.
     ResetHeldItem(playerIndex);
-    Eng_Global->inventoryPlayer1.grenadeActive = true;
+    Eng_Global->invP1.grenadeActive = true;
     CenterStatusPrint("%s%s",Eng_Text->stringTable[index + 326],Eng_Text->stringTable[320]); // activated, grenade is LIVE!
 //     switch(index) { // Subtract one from the correct grenade inventory TODO
-//         case 7:  Eng_Global->inventoryPlayer1.heldObject = Const.a.GetPrefab(370); RemoveGrenade(0); break; // Frag
-//         case 8:  Eng_Global->inventoryPlayer1.heldObject = Const.a.GetPrefab(372); RemoveGrenade(3); break; // Concussion
-//         case 9:  Eng_Global->inventoryPlayer1.heldObject = Const.a.GetPrefab(387); RemoveGrenade(1); break; // EMP
-//         case 10: Eng_Global->inventoryPlayer1.heldObject = Const.a.GetPrefab(389); RemoveGrenade(6); break; // Earth Shaker
-//         case 11: Eng_Global->inventoryPlayer1.heldObject = Const.a.GetPrefab(402); RemoveGrenade(4); break; // Land Mine
-//         case 12: Eng_Global->inventoryPlayer1.heldObject = Const.a.GetPrefab(403); RemoveGrenade(5); break; // Nitropak
-//         case 13: Eng_Global->inventoryPlayer1.heldObject = Const.a.GetPrefab(404); RemoveGrenade(2); break; // Gas
+//         case 7:  Eng_Global->invP1.heldObject = Const.a.GetPrefab(370); RemoveGrenade(0); break; // Frag
+//         case 8:  Eng_Global->invP1.heldObject = Const.a.GetPrefab(372); RemoveGrenade(3); break; // Concussion
+//         case 9:  Eng_Global->invP1.heldObject = Const.a.GetPrefab(387); RemoveGrenade(1); break; // EMP
+//         case 10: Eng_Global->invP1.heldObject = Const.a.GetPrefab(389); RemoveGrenade(6); break; // Earth Shaker
+//         case 11: Eng_Global->invP1.heldObject = Const.a.GetPrefab(402); RemoveGrenade(4); break; // Land Mine
+//         case 12: Eng_Global->invP1.heldObject = Const.a.GetPrefab(403); RemoveGrenade(5); break; // Nitropak
+//         case 13: Eng_Global->invP1.heldObject = Const.a.GetPrefab(404); RemoveGrenade(2); break; // Gas
 //     }
     
 //     PutObjectInHand(index,-1,0,0,false,true);
@@ -3157,7 +3160,7 @@ enum { DOOR_CLIP_IDLE_CLOSED = 0, DOOR_CLIP_OPENING = 1, DOOR_CLIP_IDLE_OPEN = 2
 
 static AnimationClip DoorGetClip(const Entity* e, uint8_t clip) { return modelAnimationClips[e->animationNum][clip]; }
 static float DoorClamp01(float v) { if (v < 0.0f) return 0.0f; if (v > 1.0f) return 1.0f; return v; }
-static bool DoorInventoryHasAccessCard(AccessCardType card) { return card == AccessCardType_None || (Eng_Global->inventoryPlayer1.accessCardOwned & (1u << card)); }
+static bool DoorInventoryHasAccessCard(AccessCardType card) { return card == AccessCardType_None || (Eng_Global->invP1.accessCardOwned & (1u << card)); }
 static bool DoorIsOpenish(const Entity* e) { return e->doorOpen == DoorState_Open || e->doorOpen == DoorState_Opening; }
 
 static float DoorGetProgress(const Entity* e, uint8_t clip) {
@@ -3528,8 +3531,8 @@ MOD_TO_ENGINE void ProcessInput(void) {
     if (Eng_Global->gamePaused || Eng_Global->menuActive || Eng_Cheats->consoleActive) return; // Pause/Menu barrier <<<<<<<
     
     if (ToggleMode()) ToggleInventoryMode();
-    if (Lantern()) Eng_Global->inventoryPlayer1.hardwareIsActive ^= HW_LAN;
-    if (Infrared()) Eng_Global->inventoryPlayer1.hardwareIsActive ^= HW_INF;
+    if (Lantern()) Eng_Global->invP1.hardwareIsActive ^= HW_LAN;
+    if (Infrared()) Eng_Global->invP1.hardwareIsActive ^= HW_INF;
     ApplyPlayerMovements();
 }
 
@@ -3644,8 +3647,8 @@ MOD_TO_ENGINE void PlayerInit(uint16_t i) {
     Eng_Global->instances[i].health = 200.0f;
     Eng_Global->instances[i].lastHealth = Eng_Global->instances[i].health;
     Eng_Global->instances[i].noiseFinished = Eng_Global->pauseRelativeTime;
-    if (i == PLAYER1) InventoryInit(&Eng_Global->inventoryPlayer1);
-    else if (i == PLAYER2) InventoryInit(&Eng_Global->inventoryPlayer2);
+    if (i == PLAYER1) InventoryInit(&Eng_Global->invP1);
+    else if (i == PLAYER2) InventoryInit(&Eng_Global->invP2);
 }
 
 MOD_TO_ENGINE void ModInitAfterLoad(void) {
@@ -3686,7 +3689,7 @@ MOD_TO_ENGINE void ModInitAfterLoad(void) {
 }
 
 uint16_t GetCrosshairTexture(void) {
-    switch(Eng_Global->inventoryPlayer1.weaponIndex) {
+    switch(Eng_Global->invP1.weaponIndex) {
         case 36: return 1121; // red
         case 37: return 1253; // blue
         case 38: return 1121; // red
@@ -3711,8 +3714,8 @@ uint16_t GetCrosshairTexture(void) {
 
 uint16_t GetCursorTexture(void) {
     if (Eng_Global->gamePaused || Eng_Global->menuActive) return 1261; // Red standard cursor
-    if (!Eng_Global->inventoryPlayer1.holdingObject) return GetCrosshairTexture();
-    switch(Eng_Global->inventoryPlayer1.heldObjectIndex) {
+    if (!Eng_Global->invP1.holdingObject) return GetCrosshairTexture();
+    switch(Eng_Global->invP1.heldObjectIndex) {
         case 307: return 1250; // item_paper_wad
         case 308: return 838; // item_paper_wad
         case 309: return 764; // item_beaker

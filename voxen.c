@@ -12,7 +12,7 @@
 #include "gl.h"
 #include "glfw3.h"
 GLFWwindow* window;
-#define MOD_INTEROP
+#define MOD_INTEROP_ENGINE
 #include "voxen.h"
 #include "miniaudio.h"
 #include "Shaders/shaders.h"
@@ -158,12 +158,13 @@ Quaternion cubemapOrientationQuaternion[6] = {
 
 bool lightInPVS[LIGHT_COUNT];
 Vector3 lightsNewPosition[LIGHT_COUNT];
-bool UpdateLights(bool* voxelsNeedUpdated) {    
+void UpdateLights(void) {
+    bool voxelsNeedUpdated = false;
     for (uint16_t lightIdx = 0; lightIdx < Sys_Global.loadedLights; ++lightIdx) { 
         Vector3 lightPos = lightsNewPosition[lightIdx];
         lights[lightIdx].pos = lightPos;
         if (lights[lightIdx].lflags & LDIRTY) { // Marked all as true at level load.
-            *voxelsNeedUpdated = true;
+            voxelsNeedUpdated = true;
             #pragma GCC unroll 6
             for (int j=0;j<6;++j) { // Update to new position
                 mat4_lookat_from((float*)lightView[lightIdx][j], &cubemapOrientationQuaternion[j], lightPos);
@@ -221,15 +222,13 @@ bool UpdateLights(bool* voxelsNeedUpdated) {
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER,Sys_Render.lightsID);
     glBufferData(GL_SHADER_STORAGE_BUFFER,Sys_Global.loadedLights * sizeof(Light),lights,GL_DYNAMIC_DRAW);
-    if (*voxelsNeedUpdated) {
+    if (voxelsNeedUpdated) {
         Vector3 p = Sys_Global.instances[PLAYER1].position;
         glUseProgram(Sys_Render.voxelUpdateShaderProgram);
         glUniform3f(5,p.x,p.y,p.z);
         glUniform1ui(6,(uint32_t)MAX_LIGHTS_PER_VOXEL);
         glDispatchCompute((512+31)/32,(512+31)/32,1);
     }
-    
-    return *voxelsNeedUpdated;
 }
 
 #define IS_CHANGED(a, b) _Generic((a), float:(vabs((a) - (b)) > 0.0001f), default:((a) != (b)))
@@ -1741,7 +1740,7 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
     Vector3 playerPos = Sys_Global.instances[PLAYER1].position;
     float pfx = Sys_Global.instances[PLAYER1].forward.x;    float pfy = Sys_Global.instances[PLAYER1].forward.y;    float pfz = Sys_Global.instances[PLAYER1].forward.z;
     for (uint16_t i = 0; i < Sys_Global.loadedLights; ++i) { // Collect candidates: only lights that are enabled, within FAR_PLANE, and in PVS
-//         if (!(lights[i].lflags & SHADON)) continue;
+        if (!(lights[i].lflags & SHADON) || !(lights[i].lflags & LIGHTON)) continue;
 
         Vector3 lightPos = lights[i].pos;
         float intensity = lights[i].intensity;
@@ -1860,8 +1859,7 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
         glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
         glNamedBufferData(Sys_Render.shadowMapsIndirectionID,Sys_Global.loadedLights * sizeof(uint32_t),voxen_Shadow_System.shadowmapIndirectionList,GL_DYNAMIC_DRAW);
     }
-    
-    Sys_Render.shadowmapsNeedUpdated = false;
+
     glDisable(GL_POLYGON_OFFSET_FILL);
     voxen_Shadow_System.shadowTime = get_time() - shadowStartTime;
 }
@@ -2036,8 +2034,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
     glUseProgram(Sys_Render.chunkShaderProgram);
     glUniformMatrix4fv(2,1,GL_FALSE,viewProj);
     glUniform1ui(25,0u); // default constIndex
-    uint32_t grayscaleOn = (uint32_t)(/*(Sys_Global.inventoryPlayer1.hasHardware & HW_INF) && */(Sys_Global.inventoryPlayer1.hardwareIsActive & HW_INF));
-    glUniform1ui(26,grayscaleOn);
+    glUniform1ui(26,(uint32_t)ModRequestsGrayscale());
     glUniform1ui(3,0u); // isUI false
     float fogActual = Sys_Global.fogColor.a + (float)(Sys_Global.fogFac / 255u); // Alpha is base density for level.
     glUniform3f(4,Sys_Global.fogColor.r * fogActual,Sys_Global.fogColor.g * fogActual,Sys_Global.fogColor.b * fogActual); // Fog Color(which is density)
@@ -2105,7 +2102,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
     glUniformMatrix3fv(25, 1, GL_FALSE, invViewRot);
     glUniform1i(27, 0); // Texture 0 for the rendered geometry color buffer
     glUniform1f(28, GetPainStatic());
-    glUniform1ui(29,grayscaleOn); // Grayscale
+    glUniform1ui(29,(uint32_t)ModRequestsGrayscale()); // Grayscale
     glBindVertexArray(Sys_Render.quadVAO);
     glDisable(GL_DEPTH_TEST); // Reenabled later after all UI just up there before RenderShadowmaps call
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
@@ -2182,38 +2179,35 @@ int32_t main(void) {
             UpdateMusic();
         }
 
-        bool playerCellUpdated = false;
         if (likely(!Sys_Global.gamePaused) && camViewCount > 0) { // Render in-world camera views.  Pops player elsewhere, renders to tiny fbo, pops player back, renders as normal below.
             Vector3 tempPlayerPos = Sys_Global.instances[PLAYER1].position;
             Quaternion tempPlayerRot = Sys_Global.instances[PLAYER1].rotation;
-            bool lastShadNeedUpdated = Sys_Render.shadowmapsNeedUpdated;
             for (int cm=0;cm<camViewCount;++cm) {
                 if (camViews[cm].finished < Sys_Global.pauseRelativeTime) {
                     camViews[cm].finished = Sys_Global.pauseRelativeTime + 0.5f;
                     Sys_Global.instances[PLAYER1].position = camViews[cm].position;
                     Sys_Global.instances[PLAYER1].rotation = camViews[cm].rotation;
-                    Sys_Render.shadowmapsNeedUpdated = playerCellUpdated = UpdatedPlayerCell();
-                    UpdateLights(&Sys_Render.shadowmapsNeedUpdated);
+                    UpdatedPlayerCell();
+                    UpdateLights();
                     CullCore();
                     Render(true,cm,camViews[cm].sensaround); // Ok culling and light clusters (in voxels) have been updated, now render the view.
                 }
             }
-            
-            Sys_Render.shadowmapsNeedUpdated = lastShadNeedUpdated; // Restore so we don't inadvertently render shadows if we don't actually have to.
+
             Sys_Global.instances[PLAYER1].position = tempPlayerPos; // Restore player for normal render.
             Sys_Global.instances[PLAYER1].rotation = tempPlayerRot;
         }
         
         if (likely(!Sys_Global.gamePaused || Sys_Global.menuActive)) {
-            Sys_Render.shadowmapsNeedUpdated = UpdatedPlayerCell() || playerCellUpdated;
-            Sys_Render.shadowmapsNeedUpdated = UpdateLights(&Sys_Render.shadowmapsNeedUpdated);
+            UpdatedPlayerCell();
+            UpdateLights();
             CullCore();
             bool uploadInstances = false;
             for (uint32_t i = START_INDEX_LEVEL_INSTANCES; i < Sys_Global.loadedInstances; i++) {
                 if (Sys_Global.dirtyInstances[i]) {
                     if (Sys_Global.instances[i].modelIndex >= loadedModelsMaxIndex || modelVertexCounts[Sys_Global.instances[i].modelIndex] < 1) { Sys_Global.dirtyInstances[i] = false; continue; } // No model or empty model
 
-                    uploadInstances = true;    Sys_Render.shadowmapsNeedUpdated = true;
+                    uploadInstances = true;
                     float x = Sys_Global.instances[i].rotation.x, y = Sys_Global.instances[i].rotation.y, z = Sys_Global.instances[i].rotation.z, w = Sys_Global.instances[i].rotation.w;
                     float x2 = x * x,   y2 = y * y,   z2 = z * z,   xy = x * y,   xz = x * z,   yz = y * z,   wx = w * x,   wy = w * y,   wz = w * z;
                     float sclx = Sys_Global.instances[i].scale.x; float scly = Sys_Global.instances[i].scale.y; float sclz = Sys_Global.instances[i].scale.z;

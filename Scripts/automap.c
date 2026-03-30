@@ -190,13 +190,13 @@ static const float camMaxAmount = 0.2548032f
 // 			Utils.DisableCamera(automapCamera);
 // 		}
 // 
-// 		if (Eng_Global->inventoryPlayer1.NavUnitVersion() < 2) {
+// 		if (Eng_Global->invP1.NavUnitVersion() < 2) {
 // 			Utils.Deactivate(poolContainerAutomapBotOverlays);
 // 		} else {
 // 			Utils.Activate(poolContainerAutomapBotOverlays);
 // 		}
 // 
-// 		if (Eng_Global->inventoryPlayer1.NavUnitVersion() < 3) {
+// 		if (Eng_Global->invP1.NavUnitVersion() < 3) {
 // 			Utils.Deactivate(poolContainerAutomapCyborgOverlays);
 // 			Utils.Deactivate(poolContainerAutomapMutantOverlays);
 // 		} else {
@@ -273,8 +273,8 @@ static const float camMaxAmount = 0.2548032f
 // 			}
 // 
 // 			updateTime = 0.2f;
-// 			if (Eng_Global->inventoryPlayer1.NavUnitVersion() > 1) updateTime = 0.1f;
-// 			if (Eng_Global->inventoryPlayer1.NavUnitVersion() > 2) {
+// 			if (Eng_Global->invP1.NavUnitVersion() > 1) updateTime = 0.1f;
+// 			if (Eng_Global->invP1.NavUnitVersion() > 2) {
 // 				updateTime = 0.05f;
 // 
 // 				// Display hazards
@@ -342,7 +342,7 @@ static const float camMaxAmount = 0.2548032f
 // 	}
 // 
 // 	void SetAutomapActiveState() {
-// 		if (Eng_Global->inventoryPlayer1.hasHardware[1]) {
+// 		if (Eng_Global->invP1.hasHardware[1]) {
 // 			if (AutoMapDisplayActive()) {
 // 				ActivateAutomapUI();
 // 			} else {
@@ -423,7 +423,7 @@ static const float camMaxAmount = 0.2548032f
 // 	}
 // 
 // 	void AutomapZoomOut() {
-// 		if (Eng_Global->inventoryPlayer1.NavUnitVersion() < 2) {
+// 		if (Eng_Global->invP1.NavUnitVersion() < 2) {
 // 			// Map hardware version doesn't support zoom.
 // 			CenterStatusPrint("%s", Eng_Text->stringTable[465]);
 // 			return;
@@ -441,7 +441,7 @@ static const float camMaxAmount = 0.2548032f
 // 	}
 // 
 // 	public void AutomapZoomIn() {
-// 		if (Eng_Global->inventoryPlayer1.NavUnitVersion() < 2) {
+// 		if (Eng_Global->invP1.NavUnitVersion() < 2) {
 // 			// Map hardware version doesn't support zoom.
 // 			CenterStatusPrint("%s", Eng_Text->stringTable[465],Const.a.player1);
 // 			return;
@@ -554,7 +554,7 @@ static const float camMaxAmount = 0.2548032f
 // 									bool isNPC) {
 // 		if (over == null) return;
 // 
-// 		bool navVersionFine = Inventory.a != null ? Eng_Global->inventoryPlayer1.NavUnitVersion() > 1 : false;
+// 		bool navVersionFine = Inventory.a != null ? Eng_Global->invP1.NavUnitVersion() > 1 : false;
 // 		if (health > 0 && ((isNPC && navVersionFine) || !isNPC)) {
 // 			Utils.EnableImage(over); // Enable on automap.
 // 			Utils.Activate(over.gameObject);

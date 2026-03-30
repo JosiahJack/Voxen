@@ -173,6 +173,7 @@ void Input_MouselookApply(void) {
 
 // static const float HeadBobRate   = 0.2f; TODO
 // static const float HeadBobAmount = 0.08f; TODO
+// static const float bobTarget = 0.3f; TODO
 int32_t Input_MouseMove(int32_t xrel, int32_t yrel) {
     if ((Sys_Global.inventoryMode && !Sys_Cheats.noHUD) || Sys_Global.menuActive || Sys_Global.gamePaused) {
         int32_t newX = Sys_Global.cursorPosition_x + xrel;

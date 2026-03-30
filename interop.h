@@ -63,9 +63,11 @@
     X(void, ProcessInput, (void)) \
     X(void, CheckAndTakeScreenshot, (void)) \
     X(uint16_t, GetCursorTexture, (void)) \
-    X(void, LoadLevelMod, (uint8_t))
-
-#ifdef MOD_INTEROP_IMPLEMENTATION  // mod.h usage:
+    X(void, LoadLevelMod, (uint8_t)) \
+    X(void, SetModFatigue, (float)) \
+    X(bool, ModRequestsGrayscale, (void))
+    
+#ifdef MOD_INTEROP_MOD  // mod.h usage:
     // Interop - To Engine
     #if defined(_WIN32) || defined(__CYGWIN__)
         #define MOD_TO_ENGINE __declspec(dllexport)
@@ -84,7 +86,7 @@
         MOD_FUNCTION_LIST(X)
         #undef X
     #else
-        #ifdef MOD_INTEROP // voxen.c imported this for the actual dlopen/dlsym
+        #ifdef MOD_INTEROP_ENGINE // voxen.c imported this for the actual dlopen/dlsym
             #define MOD_TO_ENGINE // This is the definition
         #else
             #define MOD_TO_ENGINE extern // Shared declaration
@@ -97,10 +99,10 @@
     
 // ----------------------------------------------------------------------------
 // Engine Functions::
-#ifdef MOD_INTEROP_IMPLEMENTATION // mod.h usage:
+#ifdef MOD_INTEROP_MOD // mod.h usage:
     // Interop - To Engine
     #define ENGINE_TO_MOD extern
-#else                             // voxen.h usage:
+#else                             // voxen.h usage, MOD_INTEROP_ENGINE:
     // Interop - To Mod
     #if defined(_WIN32) || defined(__CYGWIN__)
         #define ENGINE_TO_MOD __declspec(dllexport)

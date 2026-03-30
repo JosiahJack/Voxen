@@ -151,7 +151,6 @@ typedef struct {
 	GLuint uniqueLightListsID;
 	GLuint vbos[MODEL_IDX_MAX];
 	GLuint tbos[MODEL_IDX_MAX];
-	bool shadowmapsNeedUpdated;
 } RenderSystem;
 
 extern bool instanceIsLODArray[INSTANCE_COUNT];

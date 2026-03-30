@@ -102,7 +102,6 @@
 		randomShakeFinished = Eng_Global->pauseRelativeTime;
 		randomKlaxonFinished = Eng_Global->pauseRelativeTime;
 		headBobShiftFinished = Eng_Global->pauseRelativeTime;
-		bobTarget = 0.3f;
     }
     
     void OnPreCull() {
@@ -193,24 +192,6 @@
 
 		if (!inventoryMode) Mouselook(); // Only do mouselook in Shoot Mode.
 		if(GetInput.a.Use()) Frob(); // Frob what is under our cursor.
-	}
-
-	public void Frob() {
-		if (!Eng_Global->uiIsBlocking && !inCyberSpace) {
-			if (dropFinished < Time.time) {
-				currentButton = null; // Force this to reset.
-				if (Eng_Global->inventoryPlayer1.holdingObject) {
-					if (!FrobWithHeldObject()) DropHeldItem();
-				} else FrobEmptyHanded();
-			}
-		} else {
-			//We are holding cursor over the GUI
-			if ( && !inCyberSpace) {
-				AddItemToInventory(Eng_Global->inventoryPlayer1.heldObjectIndex,heldObjectCustomIndex);
-				MouseCursor.a.liveGrenade = false;
-				ResetHeldItem();
-			} else InventoryButtonUse();
-		}
 	}
 
 	public void Mouselook() {
@@ -370,64 +351,9 @@
 		SetCameraCullDistances();
 	}
 
-	// Draw line from cursor - used for projectile firing, e.g. magpulse/stugngun/railgun/plasma
-	public void SetCameraFocusPoint() {
-		cursorPoint = MouseCursor.a.GetCursorScreenPointForRay();
-        if (Raycast(playerCamera.ScreenPointToRay(cursorPoint), out tempHit, 71.68f)) cameraFocusPoint = tempHit.point;
-	}
-
 	// Clamp cyberspace up/down look rotation to with in +/- 360f.
 	float Clamp0360(float val) {
 		return (val - (vceil(val*(1f/360f)) * 360f)); // Subtract out 360 times the number of times 360 fits within val.
-	}
-
-	public void SetCameraCullDistances() {
-		if (cameraDistances == null) cameraDistances = new float[32];
-		else if (cameraDistances.Length < 32) cameraDistances = new float[32];
-		
-		if (inCyberSpace) {
-			for (int i=0;i<32;i++) { cameraDistances[i] = 3350f; } // Increased from 2400 to fit the Saturn's rings without overlapping with star sphere.
-		} else {
-			for (int i=0;i<32;i++) { cameraDistances[i] = 79f; } // Can't see further than this.  31 * 2.56 - player radius 0.48 = 78.88f rounded up to be careful..longest line of sight is the crawlway on level 6
-			cameraDistances[0]  = 45.1f; // Default, most static objects and some dynamic.
-			cameraDistances[1]  = 16f;   // TransparentFX, for mist and drips
-			cameraDistances[4]  = 30f;   // Water, used for effects like steam
-										 // and well, spraying water.
-			cameraDistances[14] = 30f;   // PhysObjects, patches, carts, barrels
-			cameraDistances[15] = 3350f; // Sky is visible, only exception.
-		}
-		playerCamera.layerCullDistances = cameraDistances; // Cull anything beyond 79f except for sky layer.
-	}
-	
-	void TouchLook() {
-	    Vector2 rightTouchstick = GetInput.a.rightTS.Coordinate();
-	    if (rightTouchstick.x < 0f) {
-			yRotation -= keyboardTurnSpeed * rightTouchstick.x;
-			playerCapsuleTransform.localRotation = Quaternion.Euler(0f, yRotation, 0f);
-		} else if (rightTouchstick.x > 0f) {
-			yRotation += keyboardTurnSpeed * rightTouchstick.x;
-			playerCapsuleTransform.localRotation = Quaternion.Euler(0f, yRotation, 0f);
-		}
-		
-		if (rightTouchstick.y < 0f) {
-			if ((inCyberSpace && Const.a.InputInvertCyberspaceLook) || (!inCyberSpace && Const.a.InputInvertLook))
-				xRotation -= keyboardTurnSpeed;
-			else
-				xRotation += keyboardTurnSpeed;
-
-			if (!inCyberSpace) xRotation = vclamp(xRotation, -90f, 90f);  // Limit up and down angle.
-			Eng_Global->instances[i].rotation = Quaternion.Euler(xRotation,0f,
-													   Eng_Global->instances[i].rotation.z);
-		} else if (rightTouchstick.y > 0f) {
-			if ((inCyberSpace && Const.a.InputInvertCyberspaceLook) || (!inCyberSpace && Const.a.InputInvertLook))
-				xRotation += keyboardTurnSpeed * rightTouchstick.y;
-			else
-				xRotation -= keyboardTurnSpeed * rightTouchstick.y;
-
-			if (!inCyberSpace) xRotation = vclamp(xRotation, -90f, 90f);  // Limit up and down angle.
-			Eng_Global->instances[i].rotation = Quaternion.Euler(xRotation, 0f,
-													   Eng_Global->instances[i].rotation.z);
-		}
 	}
 
 	void KeyboardTurn() {
@@ -511,18 +437,6 @@
 		}
 	}
 
-	bool RayOffset() {
-		bool successfulRay = false;
-		successfulRay = Raycast(playerCamera.ScreenPointToRay(cursorPoint), out tempHit,Const.frobDistance,Const.a.layerMaskPlayerFrob);
-		if (successfulRay) {
-			successfulRay = (tempHit.collider != null);
-			if (successfulRay) {
-				successfulRay = (tempHit.collider.CompareTag("Usable") || tempHit.collider.CompareTag("Searchable") || tempHit.collider.CompareTag("NPC"));
-			}
-		}
-		return successfulRay;
-	}
-
 	bool TargetIDFrob(Vector3 cP) {
 		if (inCyberSpace) return false;
 
@@ -555,7 +469,7 @@
 			}
 		}
 
-		if (Eng_Global->inventoryPlayer1.hasHardware[4] && Eng_Global->inventoryPlayer1.hardwareVersion[4] > 1) {
+		if (Eng_Global->invP1.hasHardware[4] && Eng_Global->invP1.hardwareVersion[4] > 1) {
 			if (!aic.hasTargetIDAttached) { WeaponFire.a.CreateTargetIDInstance(-1f,aic.healthManager,-1f); return true; }
 		}
 
@@ -564,16 +478,16 @@
 	}
 
 	bool FrobWithHeldObject() {
-		if (Eng_Global->inventoryPlayer1.heldObjectIndex < 0) {
+		if (Eng_Global->invP1.heldObjectIndex < 0) {
 			DualLog("BUG: Attempting to frob with held object, but "
-					  + "Eng_Global->inventoryPlayer1.heldObjectIndex < 0.");
+					  + "Eng_Global->invP1.heldObjectIndex < 0.");
 			return false; // Invalid item will be dropped, wasn't used up.
 		}
 
-		bool frobUser = (Eng_Global->inventoryPlayer1.heldObjectIndex == 54 || Eng_Global->inventoryPlayer1.heldObjectIndex == 56
-						 || Eng_Global->inventoryPlayer1.heldObjectIndex == 57 || Eng_Global->inventoryPlayer1.heldObjectIndex == 61
-						 || Eng_Global->inventoryPlayer1.heldObjectIndex == 64 || Eng_Global->inventoryPlayer1.heldObjectIndex == 92
-						 || Eng_Global->inventoryPlayer1.heldObjectIndex == 93 || Eng_Global->inventoryPlayer1.heldObjectIndex == 94);
+		bool frobUser = (Eng_Global->invP1.heldObjectIndex == 54 || Eng_Global->invP1.heldObjectIndex == 56
+						 || Eng_Global->invP1.heldObjectIndex == 57 || Eng_Global->invP1.heldObjectIndex == 61
+						 || Eng_Global->invP1.heldObjectIndex == 64 || Eng_Global->invP1.heldObjectIndex == 92
+						 || Eng_Global->invP1.heldObjectIndex == 93 || Eng_Global->invP1.heldObjectIndex == 94);
 
 		if (!frobUser) return false;
 
@@ -591,7 +505,7 @@
 
 		UseData ud = new UseData();
 		ud.owner = player;
-		ud.mainIndex = Eng_Global->inventoryPlayer1.heldObjectIndex;
+		ud.mainIndex = Eng_Global->invP1.heldObjectIndex;
 		ud.customIndex = heldObjectCustomIndex;
 		UseHandler uh = go.GetComponent<UseHandler>();
 		bool playedSound = false;
@@ -620,8 +534,8 @@
 						 int ammo2, bool loadedAlt, bool fromButton) {
 		if (useableConstdex < 0) return;
 
-		Eng_Global->inventoryPlayer1.holdingObject = true;
-		Eng_Global->inventoryPlayer1.heldObjectIndex = useableConstdex;
+		Eng_Global->invP1.holdingObject = true;
+		Eng_Global->invP1.heldObjectIndex = useableConstdex;
 		heldObjectCustomIndex = customIndex;
 		heldObjectAmmo = ammo1;
 		heldObjectAmmo2 = ammo2;
@@ -635,27 +549,27 @@
 		// other strings I need to CTRL+F my way to this buggy code!
 		WeaponButton wepbut = currentButton.GetComponent<WeaponButton>();
 		int indexPriorToRemoval = wepbut.useableItemIndex;
-		int am1 = Eng_Global->inventoryPlayer1.currentMagazineAmount[wepbut.WepButtonIndex];
-		Eng_Global->inventoryPlayer1.currentMagazineAmount[wepbut.WepButtonIndex] = 0;
-		int am2 = Eng_Global->inventoryPlayer1.currentMagazineAmount2[wepbut.WepButtonIndex];
-		Eng_Global->inventoryPlayer1.currentMagazineAmount2[wepbut.WepButtonIndex] = 0;
+		int am1 = Eng_Global->invP1.currentMagazineAmount[wepbut.WepButtonIndex];
+		Eng_Global->invP1.currentMagazineAmount[wepbut.WepButtonIndex] = 0;
+		int am2 = Eng_Global->invP1.currentMagazineAmount2[wepbut.WepButtonIndex];
+		Eng_Global->invP1.currentMagazineAmount2[wepbut.WepButtonIndex] = 0;
 		bool loadAlt = false;
 		if (am2 > 0) loadAlt = true;
 		PutObjectInHand(indexPriorToRemoval,-1,am1,am2,loadAlt,true);
-		Eng_Global->inventoryPlayer1.RemoveWeapon(wepbut.WepButtonIndex);
-		Eng_Global->inventoryPlayer1.RemoveWeapon(wepbut.WepButtonIndex);
+		Eng_Global->invP1.RemoveWeapon(wepbut.WepButtonIndex);
+		Eng_Global->invP1.RemoveWeapon(wepbut.WepButtonIndex);
 		Eng_UI->SetAmmoIcons(-1,false) ; // Clear the ammo icons.
 		Eng_UI->HideAmmoAndEnergyItems();
 		wepbut.useableItemIndex = -1;
 		wepbut = Eng_UI->wepbutMan.wepButtonsScripts[0];
-		Eng_Global->inventoryPlayer1.WeaponChange(wepbut.useableItemIndex,
+		Eng_Global->invP1.WeaponChange(wepbut.useableItemIndex,
 									 wepbut.WepButtonIndex);
 	}
 
 	// Because Unity does not see fit for their Button class to support right
 	// click behavior...or any other reasonable mouse button interaction.
 	void InventoryButtonUse() {
-		if (Eng_Global->inventoryPlayer1.holdingObject) return;
+		if (Eng_Global->invP1.holdingObject) return;
 		if (!GUIState.a.overButton) return;
 		if (GUIState.a.overButtonType == ButtonType.None) return;
 		if (currentButton == null) return;
@@ -667,21 +581,21 @@
 			case ButtonType.Grenade:
 				GrenadeButton grenbut = currentButton.GetComponent<GrenadeButton>();
 				indexPriorToRemoval = grenbut.useableItemIndex;
-				Eng_Global->inventoryPlayer1.grenAmmo[grenbut.GrenButtonIndex]--;
-				Eng_Global->inventoryPlayer1.GrenadeCycleDown();
-				//Eng_Global->inventoryPlayer1.grenadeCurrent = -1; This was up here, and seemed fine.  Might need to revert line 473 add.
-				if (Eng_Global->inventoryPlayer1.grenAmmo[grenbut.GrenButtonIndex] <= 0) {
-					Eng_Global->inventoryPlayer1.grenAmmo[grenbut.GrenButtonIndex] = 0;
-					Eng_Global->inventoryPlayer1.grenadeCurrent = -1;
+				Eng_Global->invP1.grenAmmo[grenbut.GrenButtonIndex]--;
+				Eng_Global->invP1.GrenadeCycleDown();
+				//Eng_Global->invP1.grenadeCurrent = -1; This was up here, and seemed fine.  Might need to revert line 473 add.
+				if (Eng_Global->invP1.grenAmmo[grenbut.GrenButtonIndex] <= 0) {
+					Eng_Global->invP1.grenAmmo[grenbut.GrenButtonIndex] = 0;
+					Eng_Global->invP1.grenadeCurrent = -1;
 					for (int i = 0; i < 7; i++) {
-						if (Eng_Global->inventoryPlayer1.grenAmmo[i] > 0) {
-							Eng_Global->inventoryPlayer1.grenadeCurrent = i;
+						if (Eng_Global->invP1.grenAmmo[i] > 0) {
+							Eng_Global->invP1.grenadeCurrent = i;
 						}
 					}
 
-					Eng_UI->SendInfoToItemTab(Eng_Global->inventoryPlayer1.grenadeCurrent);
-					if (Eng_Global->inventoryPlayer1.grenadeCurrent < 0) {
-						Eng_Global->inventoryPlayer1.grenadeCurrent = 0;
+					Eng_UI->SendInfoToItemTab(Eng_Global->invP1.grenadeCurrent);
+					if (Eng_Global->invP1.grenadeCurrent < 0) {
+						Eng_Global->invP1.grenadeCurrent = 0;
 					}
 				}
 
@@ -691,17 +605,17 @@
 			case ButtonType.Patch:
 				PatchButton patbut = currentButton.GetComponent<PatchButton>();
 				indexPriorToRemoval = patbut.useableItemIndex;
-				Eng_Global->inventoryPlayer1.patchCounts[patbut.PatchButtonIndex]--;
-				if (Eng_Global->inventoryPlayer1.patchCounts[patbut.PatchButtonIndex] <= 0) {
-					Eng_Global->inventoryPlayer1.patchCounts[patbut.PatchButtonIndex] = 0;
-					Eng_Global->inventoryPlayer1.patchCurrent = -1;
+				Eng_Global->invP1.patchCounts[patbut.PatchButtonIndex]--;
+				if (Eng_Global->invP1.patchCounts[patbut.PatchButtonIndex] <= 0) {
+					Eng_Global->invP1.patchCounts[patbut.PatchButtonIndex] = 0;
+					Eng_Global->invP1.patchCurrent = -1;
 					
 					for (int i = 0; i < 7; i++) {
-						if (Eng_Global->inventoryPlayer1.patchCounts[i] > 0) Eng_Global->inventoryPlayer1.patchCurrent = i;
+						if (Eng_Global->invP1.patchCounts[i] > 0) Eng_Global->invP1.patchCurrent = i;
 					}
-					Eng_UI->SendInfoToItemTab(Eng_Global->inventoryPlayer1.patchCurrent);
-					if (Eng_Global->inventoryPlayer1.patchCurrent < 0) {
-						Eng_Global->inventoryPlayer1.patchCurrent = 0;
+					Eng_UI->SendInfoToItemTab(Eng_Global->invP1.patchCurrent);
+					if (Eng_Global->invP1.patchCurrent < 0) {
+						Eng_Global->invP1.patchCurrent = 0;
 					}
 				}
 				PutObjectInHand(indexPriorToRemoval,-1,0,0,false,true);
@@ -719,16 +633,16 @@
 
 				indexPriorToRemoval = genbut.useableItemIndex;
 				customIndexPrior = genbut.customIndex;
-				Eng_Global->inventoryPlayer1.generalInventoryIndexRef[genbut.GeneralInvButtonIndex] = -1;
-				Eng_Global->inventoryPlayer1.generalInvCurrent = -1;
+				Eng_Global->invP1.generalInventoryIndexRef[genbut.GeneralInvButtonIndex] = -1;
+				Eng_Global->invP1.generalInvCurrent = -1;
 				for (int i = 0; i < 7; i++) {
-					if (Eng_Global->inventoryPlayer1.generalInventoryIndexRef[i] >= 0) {
-						Eng_Global->inventoryPlayer1.generalInvCurrent = i;
+					if (Eng_Global->invP1.generalInventoryIndexRef[i] >= 0) {
+						Eng_Global->invP1.generalInvCurrent = i;
 					}
 				}
 				int referenceIndex = -1;
-				if (Eng_Global->inventoryPlayer1.generalInvCurrent >= 0) {
-					referenceIndex = Eng_Global->inventoryPlayer1.genButtons[Eng_Global->inventoryPlayer1.generalInvCurrent].transform.GetComponent<GeneralInvButton>().useableItemIndex;
+				if (Eng_Global->invP1.generalInvCurrent >= 0) {
+					referenceIndex = Eng_Global->invP1.genButtons[Eng_Global->invP1.generalInvCurrent].transform.GetComponent<GeneralInvButton>().useableItemIndex;
 				}
 
 				if (referenceIndex < 0 || referenceIndex > 110) {
@@ -774,8 +688,8 @@
 	}
 	
 	public void SearchButtonClick(int index, SearchButton sebut) {
-		Eng_Global->inventoryPlayer1.holdingObject = true;
-		Eng_Global->inventoryPlayer1.heldObjectIndex = sebut.contEng_Global->instances[index];
+		Eng_Global->invP1.holdingObject = true;
+		Eng_Global->invP1.heldObjectIndex = sebut.contEng_Global->instances[index];
 		heldObjectCustomIndex = sebut.customIndex[index];
 		if (currentSearchItem != null) {
 			SearchableItem sitem = currentSearchItem.GetComponent<SearchableItem>();
@@ -789,10 +703,10 @@
 		sebut.CheckForEmpty();
 		
 		if (Const.a.InputQuickItemPickup) {
-			AddItemToInventory(Eng_Global->inventoryPlayer1.heldObjectIndex,heldObjectCustomIndex);
+			AddItemToInventory(Eng_Global->invP1.heldObjectIndex,heldObjectCustomIndex);
 			ResetHeldItem();
 		} else {
-			CenterStatusPrint("%s", Eng_Text->stringTable[Eng_Global->inventoryPlayer1.heldObjectIndex + 326] + Eng_Text->stringTable[319],player);
+			CenterStatusPrint("%s", Eng_Text->stringTable[Eng_Global->invP1.heldObjectIndex + 326] + Eng_Text->stringTable[319],player);
 			ForceInventoryMode();
 		}	
 	}
@@ -832,15 +746,15 @@
 
 	public void DropHeldItem() {
 		dropFinished = Time.time + 0.2f; // Prevent immediate regrab at high fps
-		if (Eng_Global->inventoryPlayer1.heldObjectIndex < 0 || Eng_Global->inventoryPlayer1.heldObjectIndex > 110) { 
-			DualLog("BUG: Attempted to DropHeldItem with index out of bounds (<0 or >110) and Eng_Global->inventoryPlayer1.heldObjectIndex = " + Eng_Global->inventoryPlayer1.heldObjectIndex.ToString(),player);
+		if (Eng_Global->invP1.heldObjectIndex < 0 || Eng_Global->invP1.heldObjectIndex > 110) { 
+			DualLog("BUG: Attempted to DropHeldItem with index out of bounds (<0 or >110) and Eng_Global->invP1.heldObjectIndex = " + Eng_Global->invP1.heldObjectIndex.ToString(),player);
 			ResetHeldItem();
 			return;
 		}
 
-		if (!grenadeActive) heldObject = Const.a.GetPrefab(Eng_Global->inventoryPlayer1.heldObjectIndex + 307); // heldObject is set by UseGrenade() so don't override here.
+		if (!grenadeActive) heldObject = Const.a.GetPrefab(Eng_Global->invP1.heldObjectIndex + 307); // heldObject is set by UseGrenade() so don't override here.
 		if (heldObject == null) {
-			CenterStatusPrint("BUG: Object "+Eng_Global->inventoryPlayer1.heldObjectIndex.ToString()+" not assigned, vaporized.",player);
+			CenterStatusPrint("BUG: Object "+Eng_Global->invP1.heldObjectIndex.ToString()+" not assigned, vaporized.",player);
 			ResetHeldItem();
 			return;
 		}
@@ -856,7 +770,7 @@
 				GameObject go = tr.gameObject;
 				UseableObjectUse reference = go.GetComponent<UseableObjectUse>();
 				if (reference != null) {
-					if (reference.useableItemIndex == Eng_Global->inventoryPlayer1.heldObjectIndex && go.activeSelf == false) {
+					if (reference.useableItemIndex == Eng_Global->invP1.heldObjectIndex && go.activeSelf == false) {
 						reference.customIndex = heldObjectCustomIndex;
 						tossObject = go;
 						freeObjectInPoolFound = true;

@@ -82,7 +82,7 @@ ENGINE_TO_MOD void LoadFieldIntoLight(char* trimmed_key, char* trimmed_value, ch
     else if (StringsEqual(trimmed_key,"color.r"))      lit->col.r = parse_float(trimmed_value,initialLine,lineNum);
     else if (StringsEqual(trimmed_key,"color.g"))      lit->col.g = parse_float(trimmed_value,initialLine,lineNum);
     else if (StringsEqual(trimmed_key,"color.b"))      lit->col.b = parse_float(trimmed_value,initialLine,lineNum);
-//     else if (StringsEqual(trimmed_key,"lightOn"))      flag_setu32(&lit->lflags,LIGHTON,parse_bool(trimmed_value,initialLine,lineNum));
+    else if (StringsEqual(trimmed_key,"lightOn"))      flag_setu32(&lit->lflags,LIGHTON,parse_bool(trimmed_value,initialLine,lineNum));
     else if (StringsEqual(trimmed_key,"lerpOn"))       flag_setu32(&lit->lflags,LERPON,parse_bool(trimmed_value,initialLine,lineNum));
-//  else if (StringsEqual(trimmed_key,"shadows"))      flag_setu32(&lit->lflags,SHADON,trimmed_value[0] != 'N'); // None
+    else if (StringsEqual(trimmed_key,"shadows"))      flag_setu32(&lit->lflags,SHADON,trimmed_value[0] != 'N'); // None
 }

@@ -1,6 +1,6 @@
 // mod.h - Header only used by gamecode files
 #include "common.h" // Types needed first
-#define MOD_INTEROP_IMPLEMENTATION
+#define MOD_INTEROP_MOD
 #include "interop.h"
 extern GlobalContext* Eng_Global; extern CheatsSystem* Eng_Cheats; extern SettingsSystem* Eng_Settings; extern TextSystem* Eng_Text; extern SystemUI* Eng_UI;
 // For use with LiveSplit or other future speedrunner utilities for doing speedruns
@@ -149,7 +149,7 @@ static inline __attribute__((always_inline)) void HealthManagerHealingBed(uint16
 static inline __attribute__((always_inline)) void PlayerTakeDamage(uint16_t playerIdx, float damage) { Entity* p = &Eng_Global->instances[playerIdx]; p->health -= damage; if (p->health < 0.0f) p->health = 0.0f; }
 static inline __attribute__((always_inline)) Entity* PE(uint16_t p) { return &Eng_Global->instances[p]; }
 static inline __attribute__((always_inline)) float SfxVol(void) { return (float)Eng_Settings->VolumeEffects / 100.0f; }
-static inline __attribute__((always_inline)) InventorySystem* Inv(uint16_t p) { return p == PLAYER1 ? &Eng_Global->inventoryPlayer1 : &Eng_Global->inventoryPlayer2; }
+static inline __attribute__((always_inline)) InventorySystem* Inv(uint16_t p) { return p == PLAYER1 ? &Eng_Global->invP1 : &Eng_Global->invP2; }
 
 // Mod Shared Functions across TU's
 void WeaponsUpdate(void);

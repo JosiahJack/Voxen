@@ -82,7 +82,7 @@
 		ctbButtonMain.SetActive(true);
 		ctbButtonHardware.SetActive(true);
 		ctbButtonGeneral.SetActive(true);
-		if (Eng_Global->inventoryPlayer1.hardwareIsActive[3]) Eng_UI->hwb.UnhideSensaround();
+		if (Eng_Global->invP1.hardwareIsActive[3]) Eng_UI->hwb.UnhideSensaround();
 		tabButtonsLHButtons.SetActive(true);
 		tabButtonsRHButtons.SetActive(true);
 		Config.SetSEGI(); // Turn it back on if setting is on.
@@ -230,9 +230,9 @@
 		for (int i=0; i<7; i++) {
 			WeaponButton wepbut = wepbutMan.wepButtonsScripts[i];
 			GameObject buttonGO = wepbut.gameObject;
-			if (Eng_Global->inventoryPlayer1.weaponInventoryIndices[i] > 0) {
+			if (Eng_Global->invP1.weaponInventoryIndices[i] > 0) {
 				if (!buttonGO.activeInHierarchy) buttonGO.SetActive(true);
-				wepbut.useableItemIndex = Eng_Global->inventoryPlayer1.weaponInventoryIndices[i];
+				wepbut.useableItemIndex = Eng_Global->invP1.weaponInventoryIndices[i];
 				if (!wepbutMan.wepCountsText[i].activeInHierarchy) {
 					wepbutMan.wepCountsText[i].SetActive(true);
 				}
@@ -374,25 +374,25 @@
 			// General Inventory
 			// ----------------------------------------------------------------
 			GameObject invbtn = 
-				Eng_Global->inventoryPlayer1.genButtons[Eng_Global->inventoryPlayer1.generalInvCurrent];
+				Eng_Global->invP1.genButtons[Eng_Global->invP1.generalInvCurrent];
 
 			if (invbtn != null) {
 				invbtn.GetComponent<GeneralInvButton>().DoubleClick();
 			}
 
-			int nextIndex = Eng_Global->inventoryPlayer1.generalInvIndex - 1;
+			int nextIndex = Eng_Global->invP1.generalInvIndex - 1;
 			if (nextIndex < 0) nextIndex = 0;
-			Eng_Global->inventoryPlayer1.generalInvIndex = nextIndex;
+			Eng_Global->invP1.generalInvIndex = nextIndex;
 
 			// Set item tab to next general inv current.
-			SendInfoToItemTab(Eng_Global->inventoryPlayer1.generalInvIndex);
+			SendInfoToItemTab(Eng_Global->invP1.generalInvIndex);
 		} else {
 			// Patches
 			// ----------------------------------------------------------------
-			Eng_Global->inventoryPlayer1.patchButtonScripts[Eng_Global->inventoryPlayer1.patchCurrent].DoubleClick();
+			Eng_Global->invP1.patchButtonScripts[Eng_Global->invP1.patchCurrent].DoubleClick();
 
 			// Set item tab to next patch.
-			SendInfoToItemTab(Eng_Global->inventoryPlayer1.patchIndex);
+			SendInfoToItemTab(Eng_Global->invP1.patchIndex);
 		}
 	}
 
@@ -909,23 +909,23 @@
 	void ChangeAmmoButtons(GameObject loadNormalAmmoButton, GameObject loadAlternateAmmoButton) {
 		if (loadNormalAmmoButton == null || loadAlternateAmmoButton == null) return;
 
-		int wep16index = Get16WeaponIndexFromConstIndex(Eng_Global->inventoryPlayer1.weaponIndex);
+		int wep16index = Get16WeaponIndexFromConstIndex(Eng_Global->invP1.weaponIndex);
 		if (wep16index == 1 || wep16index == 4 || wep16index == 10 || wep16index == 14 || wep16index == 15) return; // Already hidden.
 
 		Image norm = loadNormalAmmoButton.GetComponent<Image>();
 		Image anorm = loadAlternateAmmoButton.GetComponent<Image>();
-		if (Eng_Global->inventoryPlayer1.wepLoadedWithAlternate[Eng_Global->inventoryPlayer1.weaponCurrent]) {
-			SetAmmoIcons(Eng_Global->inventoryPlayer1.weaponIndex,true);
+		if (Eng_Global->invP1.wepLoadedWithAlternate[Eng_Global->invP1.weaponCurrent]) {
+			SetAmmoIcons(Eng_Global->invP1.weaponIndex,true);
 			norm.overrideSprite = ammoButtonDeHighlighted;
-			if (Eng_Global->inventoryPlayer1.currentMagazineAmount2[Eng_Global->inventoryPlayer1.weaponCurrent] > 0) {
+			if (Eng_Global->invP1.currentMagazineAmount2[Eng_Global->invP1.weaponCurrent] > 0) {
 				anorm.overrideSprite = ammoButtonHighlighted;
 			} else {
 				anorm.overrideSprite = ammoButtonDeHighlighted;
 			}
 		} else {
-			SetAmmoIcons(Eng_Global->inventoryPlayer1.weaponIndex,false);
+			SetAmmoIcons(Eng_Global->invP1.weaponIndex,false);
 			anorm.overrideSprite = ammoButtonDeHighlighted;
-			if (Eng_Global->inventoryPlayer1.currentMagazineAmount[Eng_Global->inventoryPlayer1.weaponCurrent] > 0) {
+			if (Eng_Global->invP1.currentMagazineAmount[Eng_Global->invP1.weaponCurrent] > 0) {
 				norm.overrideSprite = ammoButtonHighlighted;
 			} else {
 				norm.overrideSprite = ammoButtonDeHighlighted;
@@ -934,18 +934,18 @@
 	}
 
 	public void UpdateHUDAmmoCountsEither() {
-		if (Eng_Global->inventoryPlayer1.weaponCurrent >= 0) {
-			if (Eng_Global->inventoryPlayer1.wepLoadedWithAlternate[Eng_Global->inventoryPlayer1.weaponCurrent]) {
-				UpdateHUDAmmoCounts(Eng_Global->inventoryPlayer1.currentMagazineAmount2[Eng_Global->inventoryPlayer1.weaponCurrent]);
+		if (Eng_Global->invP1.weaponCurrent >= 0) {
+			if (Eng_Global->invP1.wepLoadedWithAlternate[Eng_Global->invP1.weaponCurrent]) {
+				UpdateHUDAmmoCounts(Eng_Global->invP1.currentMagazineAmount2[Eng_Global->invP1.weaponCurrent]);
 			} else {
-				UpdateHUDAmmoCounts(Eng_Global->inventoryPlayer1.currentMagazineAmount[Eng_Global->inventoryPlayer1.weaponCurrent]);
+				UpdateHUDAmmoCounts(Eng_Global->invP1.currentMagazineAmount[Eng_Global->invP1.weaponCurrent]);
 			}
 		}
 	}
 
 	void UpdateAmmoAndLoadButtons() {
-		if (Eng_Global->inventoryPlayer1.weaponCurrent < 0
-			|| Eng_Global->inventoryPlayer1.weaponCurrentPending >= 0) {
+		if (Eng_Global->invP1.weaponCurrent < 0
+			|| Eng_Global->invP1.weaponCurrentPending >= 0) {
 
 			return;
 		}
@@ -973,14 +973,14 @@
 			rightTC.ReturnToLastTab();
 			if (rightTC.lastTab == 4) {
 				if (tetheredPGP == null && tetheredPWP == null && tetheredKeypadElevator == null && tetheredKeypadKeycode == null && tetheredSearchable == null) {
-					if (Eng_Global->inventoryPlayer1.hasHardware[0]) sysAnalyzerRH.SetActive(true);
+					if (Eng_Global->invP1.hasHardware[0]) sysAnalyzerRH.SetActive(true);
 				}
 			}
 		} else {
 			leftTC.ReturnToLastTab();
 			if (leftTC.lastTab == 4) {
 				if (tetheredPGP == null && tetheredPWP == null && tetheredKeypadElevator == null && tetheredKeypadKeycode == null && tetheredSearchable == null) {
-					if (Eng_Global->inventoryPlayer1.hasHardware[0]) sysAnalyzerLH.SetActive(true);
+					if (Eng_Global->invP1.hasHardware[0]) sysAnalyzerLH.SetActive(true);
 				}
 			}
 		}
@@ -1047,7 +1047,7 @@
 
 		Utils.PlayUIOneShotSavable(97);
 		CenterTabButtonClickSilent(tabNum,false);
-		if (Eng_Global->inventoryPlayer1.hardwareIsActive[3]) {
+		if (Eng_Global->invP1.hardwareIsActive[3]) {
 			hwb.SensaroundOff();
 			Utils.PlayUIOneShotSavable(82); // deactivate
 		}
@@ -1218,7 +1218,7 @@
 		Eng_UI->mouseClickHeldOverGUI = true;
 		ResetMultiMediaTabs();
 		dataTab.SetActive(true);
-		Eng_Global->inventoryPlayer1.hasNewData = false;
+		Eng_Global->invP1.hasNewData = false;
 		multiMediaHeaderLabel.text = "DATA";
 		lastMultiMediaTabOpened = MULTI_MEDIA_TAB_DATA_TABLE;
 		ersbLH.SetEReaderSectionsButtonsHighlights(2);
@@ -1231,7 +1231,7 @@
 		Eng_UI->mouseClickHeldOverGUI = true;
 		ResetMultiMediaTabs();
 		notesTab.SetActive(true);
-		Eng_Global->inventoryPlayer1.hasNewNotes = false;
+		Eng_Global->invP1.hasNewNotes = false;
 		multiMediaHeaderLabel.text = "NOTES";
 		lastMultiMediaTabOpened = MULTI_MEDIA_TAB_NOTES;
 		ersbLH.SetEReaderSectionsButtonsHighlights(3);

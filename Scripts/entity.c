@@ -1000,7 +1000,8 @@ MOD_TO_ENGINE void LoadLevelMod(uint8_t curlevel) {
     char initialLine[LINE_LEN_MAX];
     Light lightsFromFile[LIGHT_COUNT]; // 131072 bytes
     LightAnimation lanimsFromFile[LIGHT_COUNT];
-    __builtin_memset(lightsFromFile,0,LIGHT_COUNT*sizeof(Light));    
+    __builtin_memset(lightsFromFile,0,LIGHT_COUNT*sizeof(Light));
+    for (int i=0;i<LIGHT_COUNT;++i) lightsFromFile[i].lflags = LIGHT_AND_SHADOW_ON;
     while(GetLevelFileNextStringUpToNewlineOrEOF(lineSpace,LINE_LEN_MAX)) {
         size_t len = GetStringLength(lineSpace);
         while (len && (lineSpace[len - 1] == '\n' || lineSpace[len - 1] == '\r'))
@@ -1201,7 +1202,7 @@ MOD_TO_ENGINE void LoadLevelMod(uint8_t curlevel) {
         instanceIdx++;
     }
 
-    Light hl = (Light){.pos=Eng_Global->instances[PLAYER1].position,.col=(Color3){1.0f,1.0f,1.0f},.range=11.52f,.lflags=LIGHT_AND_SHADOW_ON,.intensity=0.0f,.minIntensity=0.0f,.maxIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY};
+    Light hl = (Light){.pos=Eng_Global->instances[PLAYER1].position,.col=(Color3){1.0f,1.0f,1.0f},.range=11.52f,.lflags=LIGHTON,.intensity=0.0f,.minIntensity=0.0f,.maxIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY};
     LightAnimation lam={0};
     headmountedLanternLight = AddLight(&hl,&lam); lightsIdx++; // Add player headmounted lantern light
     Color c = fogLUT[curlevel]; c.a *= 3.8f; /*Global modifier to tweak it.*/ Eng_Global->fogColor = c;
