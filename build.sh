@@ -17,7 +17,7 @@ mkdir -p $TEMP_DIR
 now_ms() { date +%s%3N; }
 shader_start=$(now_ms)
 if [ $# -eq 0 ] || [ "${1:-}" != "ci" ]; then
-    CSV="build_history.csv"
+    CSV="builds.csv"
     TODAY=$(date '+%Y-%m-%d')
     if [ ! -f "$CSV" ]; then
         printf "date,builds_today\n" > "$CSV"

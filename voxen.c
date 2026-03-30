@@ -232,23 +232,23 @@ bool UpdateLights(bool* voxelsNeedUpdated) {
     return *voxelsNeedUpdated;
 }
 
-typedef struct {
-    float depth;
-    uint16_t index;
-} DepthSort;
-
-__attribute__((pure)) int32_t compareDepthSort(const void* a, const void* b) {
-    float da = ((const DepthSort*)a)->depth;
-    float db = ((const DepthSort*)b)->depth;
-    return (db > da) - (db < da);
+#define IS_CHANGED(a, b) _Generic((a), float:(vabs((a) - (b)) > 0.0001f), default:((a) != (b)))
+#define CHECK_UPDATE(target, value) do { if (IS_CHANGED(target, value)) { (target) = (value); changed = true; }} while(0)
+ENGINE_TO_MOD void UpdateLight(uint16_t i, Vector3 pos, Color3 col, float range, float intensity, float maxIntensity, float minIntensity, float spotAng, Quaternion spotDir, bool on, bool shadOn) {
+    bool changed = false;
+    if ((lights[i].lflags & SHADON) - shadOn) changed = true;
+    if ((lights[i].lflags & LIGHTON) - on) changed = true;
+    flag_setu32(&lights[i].lflags,SHADON,shadOn);
+    flag_setu32(&lights[i].lflags,LIGHTON,on);
+    lights[i].intensity=intensity; lights[i].minIntensity=minIntensity; lights[i].maxIntensity=maxIntensity; lights[i].spotAng=spotAng;
+    CHECK_UPDATE(lights[i].range,range);
+    lights[i].col=col;
+    CHECK_UPDATE(lights[i].pos.x,pos.x);
+    CHECK_UPDATE(lights[i].pos.y,pos.y);
+    CHECK_UPDATE(lights[i].pos.z,pos.z);
+    lights[i].spotDir = spotDir;
+    if (changed) { lightsNewPosition[i]=pos; flag_setu32(&lights[i].lflags,LDIRTY,true); }
 }
-
-__attribute__((pure)) int32_t compareDepthSortInverted(const void* a, const void* b) {
-    float da = ((const DepthSort*)a)->depth;
-    float db = ((const DepthSort*)b)->depth;
-    return (da > db) - (da < db);
-}
-
 // ============================================================================
 // UI Rendering and Text
 #define BASE_RES_X 1366.0f // Positions done in fixed int positions off base resolution, scaled against current resolution.
@@ -401,6 +401,49 @@ void CenterStatusPrint(const char * restrict fmt, ...) {
     Sys_Global.statusTextDecayFinished = get_time() + 2.5; // 2.5 second decay time before text dissappears.
 }
 
+void LoadTextures(void); void LoadModels(void); void CullInit(void);
+OsFileHandle levelFileHandle;
+void LoadLevel(uint8_t curlevel) {
+    double start_time = get_time();
+    DebugRAM("start of LoadLevel");
+    Sys_Global.levelCurrentlyLoading = true;
+    queuedLevelToLoad = 255u; // Reset any loading state that got us here.
+    RenderLoadingProgress(100,"Loading level...");
+    __builtin_memset(lights,0,LIGHT_COUNT * sizeof(Light));
+    __builtin_memset(lanims,0,LIGHT_COUNT * sizeof(LightAnimation));
+    __builtin_memset(modelMatrices,0,INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
+    __builtin_memset(camViews,0,MAX_CAMVIEWS * sizeof(CamView));
+    char filename[20]; // Minimum size for 0 through 13.
+    StringFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel);
+    levelFileHandle = OS_OpenReadonly(filename);
+    LoadLevelMod(curlevel);
+    OS_Close(levelFileHandle);
+    for (int i=0;i<Sys_Global.loadedLights;++i) {/* lights[i].maxIntensity *= 2.0f; */lightsNewPosition[i]=lights[i].pos; }
+    DualLog("Loaded %d entities, %u static lights for Level %d... took %f secs\n",Sys_Global.loadedInstances,Sys_Global.loadedLights,curlevel,get_time() - start_time);
+    DebugRAM("end of LoadLevel instances");
+    RenderLoadingProgress(110,"Loading models...");
+    LoadModels();
+    RenderLoadingProgress(110,"Loading textures...");
+    LoadTextures();
+    RenderLoadingProgress(110,"Initialize entities...");
+    for (int i=PLAYER1;i<Sys_Global.loadedInstances;++i) {        
+        int32_t cellIdx = PosGetCellCoords(Sys_Global.instances[i].position.x,Sys_Global.instances[i].position.z);
+        Sys_Global.instances[i].cellIndex = cellIdx;
+    }
+    
+    ModInitAfterLoad();
+    ResetLevelAudio();
+    ResetLevelMusic();
+    DualLog("Entity instances initialized after load\n");
+    RenderLoadingProgress(110,"Loading cull system...");
+    CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
+    RenderLoadingProgress(120,"Loading voxel lighting data...");
+    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < Sys_Global.loadedInstances; i++) Sys_Global.dirtyInstances[i] = true;
+    for (uint16_t i = 0; i < Sys_Global.loadedLights; i++) { lightsNewPosition[i] = lights[i].pos; lightInPVS[i] = false; }
+    __builtin_memset(voxen_Shadow_System.shadowmapIndirectionList, MAX_SHADOWMAPS + 1, Sys_Global.loadedLights * sizeof(uint32_t)); // Set to invalid values for all
+    Sys_Global.levelCurrentlyLoading = false;
+}
+
 __attribute__((cold)) void NewGame(void) { // Reset World States
     DualLog("Loading new game...\n");
     RenderLoadingProgress(100,"Loading new game...");
@@ -469,148 +512,6 @@ __attribute__((cold)) void LoadGameModDefinition(void) { // Unique set separate 
     }
 
     DualLog(" %s:: num levels: %d, start level: %d... took %f secs\n",Sys_Global.global_modname, Sys_Global.numLevels, Sys_Global.startLevel, get_time() - start_time);
-}
-
-ENGINE_TO_MOD bool parse_data_file(DataParser *parser, uint16_t maxSize, const char *filename) {
-    OsFileHandle fd; int st_size; char* data = OS_OpenAndAllocateFileBufferReadonly(filename,&fd,&st_size);
-    char* cursor = data; char* end = data + st_size;
-    uint32_t lineNum = 0, max_index = 0;
-    while (cursor < end) { // First pass: count entries and find max index
-        char* start = cursor;
-        while (cursor < end && *cursor != '\n' && *cursor != '\r') cursor++;
-        size_t lineLen = cursor - start;
-        lineNum++;
-        if (lineLen <= 0) { cursor++; continue; }
-
-        while (CharacterIsEmpty(*start)) start++; // Trim leading whitespace
-        char *lineend = start + lineLen - 1;
-        while (lineend > start && CharacterIsEmpty(*lineend)) lineend--; // Trim trailing whitespace
-        if (*start == '\0' || (start[0] == '/' && start[1] == '/')) continue; // Skip empty lines and commented lines
-        if (start[0] == '#') { continue; } // Skip entry start marker, only count ones with valid index thereafter in the key|value block lines
-
-        char *colon = StringFindFirstCharWithin(start, ':');
-        if (colon && StringCompareUpToLength(start, "index", colon - start) == 0) {
-            char *value = colon + 1;
-            while (CharacterIsEmpty(*value)) value++;
-            uint32_t idx = parse_numberu32(value, start, lineNum);
-            if (idx > max_index) max_index = idx;
-       }
-       
-       if (cursor < end && *cursor == '\r') cursor++;
-       if (cursor < end && *cursor == '\n') cursor++;
-    }
-    
-    if (max_index == 0) { DualLogWarn("No entries found in %s\n", filename); OS_DeallocateRAM(data,st_size); return true; }
-    if (max_index >= maxSize) { DualLogWarn("Too large of index found in %s, %u exceeds limit %u\n", filename, max_index, maxSize); OS_DeallocateRAM(data,st_size); return true; }
-
-    uint32_t entry_count = max_index + 1;
-    Entity *new_entries = OS_AllocateRAM(NULL, entry_count * sizeof(Entity), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);  
-    parser->entries = new_entries;
-    for (uint32_t i = 0; i < entry_count; ++i) { InitializeEntity(&parser->entries[i]); parser->entries[i].index = UINT16_MAX; }
-    parser->capacity = entry_count;
-    parser->count = entry_count;
-    Entity entry;
-    InitializeEntity(&entry); entry.index = UINT16_MAX;
-    lineNum = 0;
-    int32_t currentChild = -1;
-    cursor = data; end = data + st_size; // Rewind
-    while (cursor < end) {
-        char* start = cursor;
-        while (cursor < end && *cursor != '\n' && *cursor != '\r') cursor++;
-        size_t lineLen = cursor - start;
-        lineNum++;
-        if (lineLen < 3) { cursor++; continue; } // Must have at least k:v, skip if shorter
-
-        while (CharacterIsEmpty(*start)) start++; // Trim leading whitespace
-        char *lineend = start + lineLen - 1;
-        while (lineend > start && CharacterIsEmpty(*lineend)) lineend--; // Trim trailing whitespace
-        if (start[0] == '/' && start[1] == '/') continue; // Skip comment(ed out) line
-
-        if (*start == '#') {
-            if (entry.path[0] && entry.index != UINT16_MAX && entry.index < parser->capacity) parser->entries[entry.index] = entry;
-            InitializeEntity(&entry); entry.index = UINT16_MAX;
-            if (lineend > start) {
-                size_t actualLen = lineend - (start + 1) + 1;
-                if (actualLen >= sizeof(entry.path)) actualLen = sizeof(entry.path) - 1;
-                __builtin_memcpy(entry.path, start + 1, actualLen);
-                entry.path[actualLen] = '\0';
-            }
-            continue;
-        }
-
-        // Handle key-value pair
-        char *colon = StringFindFirstCharWithin(start, ':');
-        if (colon) {
-            char *key = start;
-            char *value = colon + 1;
-            while (CharacterIsEmpty(*key) && key < colon) key++;
-            while (CharacterIsEmpty(*value) && value < lineend) value++;
-            size_t keylen = colon - key; size_t vallen = (lineend >= value) ? (lineend - value + 1) : 0;
-            if (keylen > 0 && vallen > 0) {
-                char trimmed_key[256];
-                char trimmed_value[256];
-                StringCopyInto_A_SubstringFrom_B(trimmed_key, keylen, key, 256);
-                StringCopyInto_A_SubstringFrom_B(trimmed_value, vallen, value, 256);
-                char *key_end = trimmed_key + GetStringLength(trimmed_key) - 1;
-                char *val_end = trimmed_value + GetStringLength(trimmed_value) - 1;
-                while (key_end > trimmed_key && CharacterIsEmpty(*key_end)) *key_end-- = '\0';
-                while (val_end > trimmed_value && CharacterIsEmpty(*val_end)) *val_end-- = '\0';
-//                 if (!Sys_Global.entityFields) DualLogError("Mod entity fields failed to link!\n"); // WORKED!
-//                 for (int field=0;field<NUM_ENTITY_FIELDS;++field) {
-//                     EntityField* ef = &Sys_Global.entityFields[field];
-//                     if (StringsEqual(trimmed_key,ef->fieldName)) {
-//                         DualLog("Found matched entity field %s:%u\n",ef->fieldName,ef->dataType);
-//                     }
-//                 }
-                     if (StringsEqual(trimmed_key, "index"))             entry.index = parse_numberu16(trimmed_value, start, lineNum);
-                else if (StringsEqual(trimmed_key, "model"))             entry.modelIndex = parse_numberu16(trimmed_value, start, lineNum);
-                else if (StringsEqual(trimmed_key, "animationNum")) {    entry.animationNum = parse_numberu16(trimmed_value, start, lineNum); entry.entflags |= ENTFLAG_ANIMATED; }
-                else if (StringsEqual(trimmed_key, "animated"))          flag_set(&entry.entflags,ENTFLAG_ANIMATED,parse_numberu8(trimmed_value, start, lineNum));
-                else if (StringsEqual(trimmed_key, "texture"))           entry.texIndex = parse_numberu16(trimmed_value, start, lineNum);
-                else if (StringsEqual(trimmed_key, "alttexture"))        entry.altTexIndex = parse_numberu16(trimmed_value, start, lineNum);
-                else if (StringsEqual(trimmed_key, "glowtexture"))       entry.glowIndex = parse_numberu16(trimmed_value, start, lineNum);
-                else if (StringsEqual(trimmed_key, "altglowtexture"))    entry.altGlowIndex = parse_numberu16(trimmed_value, start, lineNum);
-                else if (StringsEqual(trimmed_key, "spectexture"))       entry.specIndex = parse_numberu16(trimmed_value, start, lineNum);
-                else if (StringsEqual(trimmed_key, "normtexture"))       entry.normIndex = parse_numberu16(trimmed_value, start, lineNum);
-                else if (StringsEqual(trimmed_key, "cardchunk"))         flag_set(&entry.entflags,ENTFLAG_CARDCHUNK,  parse_bool(trimmed_value, start, lineNum));
-                else if (StringsEqual(trimmed_key, "collider"))          entry.collider = parse_numberu8(trimmed_value, start, lineNum);
-                else if (StringsEqual(trimmed_key, "collider_centerx"))  entry.colliderCenter.x = parse_float(trimmed_value, start, lineNum);
-                else if (StringsEqual(trimmed_key, "collider_centery"))  entry.colliderCenter.x = parse_float(trimmed_value, start, lineNum);
-                else if (StringsEqual(trimmed_key, "collider_centerz"))  entry.colliderCenter.x = parse_float(trimmed_value, start, lineNum);
-                else if (StringsEqual(trimmed_key, "collider_sizex"))    entry.colliderSize.x = parse_float(trimmed_value, start, lineNum);
-                else if (StringsEqual(trimmed_key, "collider_sizey"))    entry.colliderSize.y = parse_float(trimmed_value, start, lineNum);
-                else if (StringsEqual(trimmed_key, "collider_sizez"))    entry.colliderSize.z = parse_float(trimmed_value, start, lineNum);
-                else if (StringsEqual(trimmed_key, "colliderMeshIndex")) entry.colliderMeshIndex = parse_numberu16(trimmed_value, start, lineNum);
-                else if (StringsEqual(trimmed_key, "mass"))              entry.mass = parse_float(trimmed_value, start, lineNum);
-                else if (StringsEqual(trimmed_key, "linearDrag"))        entry.linearDrag = parse_float(trimmed_value, start, lineNum);
-                else if (StringsEqual(trimmed_key, "angularDrag"))       entry.angularDrag = parse_float(trimmed_value, start, lineNum);
-                else if (StringsEqual(trimmed_key, "kinematic"))         flag_set(&entry.entflags,ENTFLAG_KINEMATIC, parse_bool(trimmed_value, start, lineNum));
-                else if (StringsEqual(trimmed_key, "useGravity"))        parse_bool(trimmed_value,start,lineNum) ? entry.gravity = 1.0f : 0.0f;
-                else if (StringsEqual(trimmed_key, "bounciness"))        entry.bounciness = parse_float(trimmed_value,start,lineNum);
-                else if (StringsEqual(trimmed_key, "dynamicFriction"))   entry.dynamicFriction = parse_float(trimmed_value,start,lineNum);
-                else if (StringsEqual(trimmed_key, "frictionCombine"))   entry.frictionCombine = parse_numberu8(trimmed_value,start,lineNum);
-                else if (StringsEqual(trimmed_key, "bounceCombine"))     entry.bounceCombine = parse_numberu8(trimmed_value,start,lineNum);
-                else if (StringsEqual(trimmed_key, "numclips"))          entry.numclips = parse_numberu8(trimmed_value,start,lineNum);
-                else if (StringsEqual(trimmed_key, "changeMatOnActive")) flag_set(&entry.entflags,ENTFLAG_CHANGE_TEX_ON_ACTIVE,parse_bool(trimmed_value,start,lineNum));
-                else if (StringsEqual(trimmed_key, "blinkWhenActive"))   flag_set(&entry.entflags,ENTFLAG_BLINK_TEX_ON_ACTIVE,parse_bool(trimmed_value,start,lineNum));
-                else if (StringsEqual(trimmed_key, "noshadows"))         flag_set(&entry.entflags,ENTFLAG_NO_SHADOWS,parse_bool(trimmed_value,start,lineNum));
-                else if (StringsEqual(trimmed_key, "volume"))            entry.volume = parse_float(trimmed_value,start,lineNum);
-                else if (StringsEqual(trimmed_key, "##child")) {
-                    ++currentChild;
-                    if (currentChild >= MAX_CHILD_COUNT) { DualLogError("Too many children %u! Minivan is full!!\n", currentChild); OS_Exit(1); }
-                    
-                    entry.child[currentChild] = parse_numberu16(trimmed_value, start, lineNum);
-                } else if (StringsEqual(trimmed_key, "child_offsetx"))    entry.child_offset[currentChild].x = parse_float(trimmed_value, start, lineNum);
-                else if (StringsEqual(trimmed_key, "child_offsety"))    entry.child_offset[currentChild].y = parse_float(trimmed_value, start, lineNum);
-                else if (StringsEqual(trimmed_key, "child_offsetz"))    entry.child_offset[currentChild].z = parse_float(trimmed_value, start, lineNum);
-            } else DualLogWarn("Invalid key-value pair at line %u: %s\n", lineNum, start);
-        } else DualLogWarn("No colon found in line %u: %s\n", lineNum, start);
-    }
-
-    // Store last entry
-    if (entry.path[0] && entry.index != UINT16_MAX && entry.index < parser->capacity) parser->entries[entry.index] = entry;
-    OS_DeallocateRAM(data,st_size);
-    return true;
 }
 
 void GenerateAndBindTexture(GLuint *id, GLint internalFormat, int32_t width, int32_t height, GLenum format, GLenum type, GLenum target) {
@@ -1066,8 +967,8 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     result = ma_engine_init(&engine_config, &Sys_Global.audio_engine); if (result != MA_SUCCESS) DualLog("ERROR: Failed to initialize miniaudio engine: %d\n", result);
     LoadGameModDefinition();
     LoadModFunctions();
-    LoadEntities();
-    DebugRAM("after loading all entities");
+    ModEntityDefinitionsInitAfterLoad();
+    DebugRAM("after loading mod");
     InitFontAtlasses();
     double nextInitTimeSection = get_time();
     RenderLoadingProgress(80,"Loading...");
@@ -1805,6 +1706,7 @@ static inline __attribute__((always_inline)) double RenderUI(void) {
 }
 
 #define SHADOW_NEARMESH_MAX 768 // 350 was too low for light 712 on security atrium
+typedef struct {float depth; uint16_t index; } DepthSort;
 DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX]; // Found that this is typically around 172
 float shadows_nearMeshRadii[SHADOW_NEARMESH_MAX];
 
@@ -2000,6 +1902,8 @@ static inline __attribute__((always_inline)) bool DetermineIfInstanceVisible(uin
     return true;
 }
 
+__attribute__((pure)) int32_t compareDepthSort(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (db > da) - (db < da); }
+__attribute__((pure)) int32_t compareDepthSortInverted(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (da > db) - (da < db); }
 void qsort(void* base, size_t nmemb, size_t size, int (*cmp)(const void*, const void*));
 static inline __attribute__((always_inline)) void RenderInstances(Vector3 playerPos, bool transparents) {
     uint16_t visibleCount = 0, currentTexIndex = 0, currentNormIndex = 0, currentGlowIndex = 0, currentSpecIndex = 0, currentModelType = 0;

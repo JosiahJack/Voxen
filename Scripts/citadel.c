@@ -4,7 +4,7 @@ __attribute__((used)) AutoSplitterData autoSplitter = {0x1337133713371337,0,fals
 //=============================================================================
 // Entity and Mod Initialization
 GlobalContext* Eng_Global; CheatsSystem*  Eng_Cheats; SettingsSystem* Eng_Settings; TextSystem* Eng_Text; SystemUI* Eng_UI; // From Engine
-MOD_TO_ENGINE void ModLink(GlobalContext* g,CheatsSystem* c,SettingsSystem* s,TextSystem* t,SystemUI* ui){Eng_Global=g;Eng_Cheats=c;Eng_Settings=s;Eng_Text=t;Eng_UI=ui; Eng_Global->entityFields = (EntityField*)&entityFields;}
+MOD_TO_ENGINE void ModLink(GlobalContext* g,CheatsSystem* c,SettingsSystem* s,TextSystem* t,SystemUI* ui){Eng_Global=g;Eng_Cheats=c;Eng_Settings=s;Eng_Text=t;Eng_UI=ui;}
 int lev1SecCode;
 int lev2SecCode;
 int lev3SecCode;
@@ -987,7 +987,7 @@ void FuncWallUpdate(uint16_t self) {
 }
 //=============================================================================
 // ForceBridge
-void ForceBridgeInitBeforeLoad(uint16_t self) {
+void func_forcebridge(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
     e->tickTime = 0.05f;
     e->tickFinished = Eng_Global->pauseRelativeTime + e->tickTime + (double)random_range(0.0f,1.0f);
@@ -995,10 +995,6 @@ void ForceBridgeInitBeforeLoad(uint16_t self) {
     if (e->activatedScale.x <= 0.02f) e->activatedScale.x = 2.56f;
     if (e->activatedScale.y <= 0.02f) e->activatedScale.y = 0.08f;
     if (e->activatedScale.z <= 0.02f) e->activatedScale.z = 2.56f;
-}
-
-void ForceBridgeInitAfterLoad(uint16_t self) {
-    Entity* e = &Eng_Global->instances[self];
     if (!e->active) { flag_set(&e->entflags,ENTFLAG_VISIBLE,false); e->collider = COLLIDER_TYPE_NONE; }
     switch (e->fieldColor) {
         case ForceFieldColor_Red:      e->texIndex = 38; break;
@@ -1119,8 +1115,8 @@ void TextureChangerInitAfterLoad(uint16_t self) {
 void TextureChangerToggle(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->currentTexture) {
-        e->texIndex = Eng_Global->entities[e->index].texIndex;
-        e->glowIndex = Eng_Global->entities[e->index].glowIndex;
+        e->texIndex = EntityDefinitions[e->index].texIndex;
+        e->glowIndex = EntityDefinitions[e->index].glowIndex;
     } else {
         e->texIndex = e->altTexIndex;
         if (e->altGlowIndex < MAX_VALID_TEXTURE) e->glowIndex = e->altGlowIndex;
@@ -1211,19 +1207,14 @@ void ButtonSwitchInitAfterLoad(uint16_t self) {
     if (e->active) e->tickFinished = Eng_Global->pauseRelativeTime + 1.5 + (double)random_range(0.0f,1.0f);
 }
 
-void ButtonSwitchToggleLocked(uint16_t self) { Entity* e = &Eng_Global->instances[self]; EntitySetLocked(e,!EntityLocked(e)); }
-void ButtonSwitchToggleMaterial(uint16_t self) { Entity* e = &Eng_Global->instances[self]; e->texIndex = e->alternateOn ? e->alternateSwitchMaterial : e->mainSwitchMaterial; }
-void ButtonSwitchSetMaterialToAlternate(uint16_t self) { Entity* e = &Eng_Global->instances[self]; if (e->entflags & ENTFLAG_BLINK_TEX_ON_ACTIVE) e->texIndex = e->alternateSwitchMaterial; }
-void ButtonSwitchSetMaterialToNormal(uint16_t self) { Entity* e = &Eng_Global->instances[self]; if (e->entflags & ENTFLAG_BLINK_TEX_ON_ACTIVE) e->texIndex = e->mainSwitchMaterial; }
-
 void ButtonSwitchUseTargets(uint16_t self, uint16_t activator, const char* argvalue) {
     Entity* e = &Eng_Global->instances[self];
     UseTargets(activator,argvalue,e->target);
     e->active = !e->active;
     e->alternateOn = e->active;
-    if (e->entflags & ENTFLAG_CHANGE_TEX_ON_ACTIVE) {
-        ButtonSwitchToggleMaterial(self);
-        if ((e->entflags & ENTFLAG_BLINK_TEX_ON_ACTIVE) && e->active) e->tickFinished = Eng_Global->pauseRelativeTime + 1.5f;
+    if (e->changeTexOnActive) {
+        e->texIndex = e->alternateOn ? e->alternateSwitchMaterial : e->mainSwitchMaterial;
+        if (e->blinkTexOnActive && e->active) e->tickFinished = Eng_Global->pauseRelativeTime + 1.5f;
     }
 }
 
@@ -1236,6 +1227,7 @@ void ButtonSwitchUse(uint16_t self, uint16_t activator, const char* argvalue) {
         if (e->SFXLockedIndex >= 0 && e->SFXLockedIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXLockedIndex],1.0f,e->position,true);
         return;
     }
+    
     if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
     CenterStatusPrint("%s",Eng_Text->stringTable[e->messageIndex]);
     if (e->delay > 0.0f) { e->recentMostActivator = activator; e->delayFinished = Eng_Global->pauseRelativeTime + e->delay; }
@@ -1245,9 +1237,9 @@ void ButtonSwitchUse(uint16_t self, uint16_t activator, const char* argvalue) {
 void ButtonSwitchUpdate(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->delayFinished > 0.0 && e->delayFinished < Eng_Global->pauseRelativeTime) { e->delayFinished = 0.0; ButtonSwitchUseTargets(self,e->recentMostActivator,e->argvalue); }
-    if ((e->entflags & ENTFLAG_BLINK_TEX_ON_ACTIVE) && e->active && e->tickFinished < Eng_Global->pauseRelativeTime) {
+    if (e->blinkTexOnActive && e->active && e->tickFinished < Eng_Global->pauseRelativeTime) {
         e->alternateOn = !e->alternateOn;
-        ButtonSwitchToggleMaterial(self);
+        e->texIndex = e->alternateOn ? e->alternateSwitchMaterial : e->mainSwitchMaterial;
         e->tickFinished = Eng_Global->pauseRelativeTime + e->tickTime;
     }
 }
@@ -1304,7 +1296,7 @@ void Targetted(uint16_t activator, uint16_t self, const char* argvalue) {
     if (a->ioflags & TARG_IOFLAGS_GRAVLIFT_TOGGLE) GravityLiftToggle(self);
     if (a->ioflags & TARG_IOFLAGS_TEXTURE_CHG_TOGGLE) TextureChangerToggle(self);
     if (a->ioflags & TARG_IOFLAGS_FUNCWALL_MOVE) FuncWallTargetted(self,activator,argvalue);
-    if (a->ioflags & TARG_IOFLAGS_SWITCH_LOCK_TOGGLE) ButtonSwitchToggleLocked(self);
+    if (a->ioflags & TARG_IOFLAGS_SWITCH_LOCK_TOGGLE) EntitySetLocked(e,!EntityLocked(e));
     if (a->ioflags & TARG_IOFLAGS_UNLOCK_SWITCH) EntitySetLocked(e,false);
     if (a->ioflags & TARG_IOFLAGS_INST_ACTIVATE) flag_set(&e->entflags,ENTFLAG_ACTIVE,true);
     if (a->ioflags & TARG_IOFLAGS_INST_DEACTIVATE) flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
@@ -3449,7 +3441,7 @@ static inline __attribute__((always_inline)) void Frob(Vector3 pos, Vector3 forw
     Eng_Global->debugLineFinished = Eng_Global->pauseRelativeTime + 3.0;
     if (!tempHit.hit) { CenterStatusPrint("%s",Eng_Text->stringTable[30]); return; }
     Eng_Global->debugLine_end = tempHit.point;
-    DualLog("Raycast hit!  Hit object %u named of entity type %s(%u) at hit point %f %f %f\n",tempHit.hitInstanceIndex,Eng_Global->entities[Eng_Global->instances[tempHit.hitInstanceIndex].index].path,Eng_Global->instances[tempHit.hitInstanceIndex].index,tempHit.point.x,tempHit.point.y,tempHit.point.z);
+    DualLog("Raycast hit!  Hit object %u named of entity type %s(%u) at hit point %f %f %f\n",tempHit.hitInstanceIndex,EntityDefinitions[Eng_Global->instances[tempHit.hitInstanceIndex].index].path,Eng_Global->instances[tempHit.hitInstanceIndex].index,tempHit.point.x,tempHit.point.y,tempHit.point.z);
     UseEntity(PLAYER1,tempHit.hitInstanceIndex);
 }
 
@@ -3656,46 +3648,25 @@ MOD_TO_ENGINE void PlayerInit(uint16_t i) {
     else if (i == PLAYER2) InventoryInit(&Eng_Global->inventoryPlayer2);
 }
 
-#define GEOMETRY_LOD_CARD_MODEL_IDX 178
-MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(DataParser* entity_parser) {
-    for (int32_t i = 0; i < Eng_Global->entityCount; i++) {
-        if (entity_parser->entries[i].index == UINT16_MAX) continue;
-        Eng_Global->entities[i] = entity_parser->entries[i];
-        flag_set(&Eng_Global->entities[i].entflags,ENTFLAG_ACTIVE,true);
-        flag_set(&Eng_Global->entities[i].entflags,ENTFLAG_GROUNDED,false);
-        flag_set(&Eng_Global->entities[i].entflags,ENTFLAG_RIGIDBODY,ConstIndexIsDynamicObject(Eng_Global->entities[i].index));
-        if (entity_parser->entries[i].entflags & ENTFLAG_CARDCHUNK) {
-            Eng_Global->entities[i].lodIndex = GEOMETRY_LOD_CARD_MODEL_IDX;
-            Eng_Global->entities[i].collider = COLLIDER_TYPE_BOX;
-            Eng_Global->entities[i].colliderCenter = (Vector3){ .x = 0.0f, .y = 1.44f, .z = 0.0f };
-            Eng_Global->entities[i].colliderSize = (Vector3){ .x = 2.56f, .y = 0.32f, .z = 2.56f };
-        }
-        if (ConstIndexIsButtonSwitch(Eng_Global->entities[i].index)) {
-            Eng_Global->entities[i].lockedMessageLingdex = 193; // ButtonSwitch
-            Eng_Global->entities[i].tickTime = 1.5;
-        }
-    }
-}
-
 MOD_TO_ENGINE void ModInitAfterLoad(void) {
     for (int i=PLAYER1;i<Eng_Global->loadedInstances;++i) {
         Entity* e = &Eng_Global->instances[i];
         uint16_t constIndex = e->index;
         if (i == PLAYER1 || i == PLAYER2 || ConstIndexIsDynamicObject(constIndex)) e->gravity = 1.0f;
         else e->gravity = 0.0f;
-        if (constIndex < MAX_ENTITIES) flag_set(&e->entflags,ENTFLAG_ANIMATED,Eng_Global->entities[constIndex].entflags & ENTFLAG_ANIMATED);
+        if (constIndex < MAX_ENTITIES) flag_set(&e->entflags,ENTFLAG_ANIMATED,EntityDefinitions[constIndex].entflags & ENTFLAG_ANIMATED);
         if (ConstIndexIsGeometry(constIndex)) e->layer = PhysicsLayer_Geometry;
         else if (ConstIndexIsDoor(constIndex)) e->layer = PhysicsLayer_Door;
         else if (ConstIndexIsUsableObject(constIndex)) UsableInit(i);
         else if (ConstIndexIsDoor(e->index)) DoorInitAfterLoad(i);
         else if (ConstIndexIsNPC(constIndex)) { e->layer = PhysicsLayer_NPC; /* TODO AIInit funcion */ }
         else if (ConstIndexIsSearchable(constIndex)) SearchableInit(i);
-        else if (constIndex == 515) { ForceBridgeInitBeforeLoad(i); ForceBridgeInitAfterLoad(i); }
+        else if (constIndex == 515) func_forcebridge(i); // func_forcebridge
         else if (constIndex == 517) FuncWallInitAfterLoad(i);
         else if (constIndex == 596) GravityLiftInitAfterLoad(i);
         else if (constIndex == 701) LogicTimerInitBeforeLoad(i);
-        else if (constIndex == 556) TeleportTouchInitAfterLoad(i);
-        else if (constIndex == 555) CyberSwitchInitAfterLoad(i);
+        else if (constIndex == 556) TeleportTouchInitAfterLoad(i); // prop_cyberport
+        else if (constIndex == 555) { } // prop_cyber_switch CyberSwitchInitAfterLoad(i);
         else if (constIndex == 21 || constIndex == 22) CyberWallInitAfterLoad(i); // chunk_cyberpanel or chunk_cyberpanel_slice45
         else if (constIndex == 736) TargetIDInitAfterLoad(i);
         else if (ConstIndexIsButtonSwitch(e->index)) ButtonSwitchInitAfterLoad(i);

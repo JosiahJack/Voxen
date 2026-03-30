@@ -65,16 +65,16 @@ MOD_TO_ENGINE void UpdateAnims(void) {
         if (e->modelIndex >= MODEL_IDX_MAX) continue;
         if (!(e->entflags & ENTFLAG_ACTIVE)) continue;
         
-        uint16_t animNum = e->animationNum;
-        if (animNum >= MAX_ANIMATED_MODELS) continue; // Invalid animated model index
+        uint16_t anim = e->animationNum;
+        if (anim >= MAX_ANIMATED_MODELS) continue; // Invalid animated model index
         if (e->numclips >= MAX_ANIMATION_CLIPS_PER_MODEL) continue; // Invalid animation clip index
         if (e->numclips == 0) continue; // Invalid animation clip index
         if (!(e->entflags & ENTFLAG_ANIMATED)) continue;
         
-        AnimationClip currentClip = modelAnimationClips[animNum][e->clip];
-        if (e->currentFrameFinished >= Eng_Global->current_time) continue;
+        AnimationClip currentClip = modelAnimationClips[anim][e->clip];
+        if (e->currentFrameFinished >= Eng_Global->pauseRelativeTime) continue;
         
-        e->currentFrameFinished = Eng_Global->current_time + ((1.0/(double)currentClip.speed) * (1.0 / (double)currentClip.framerate));
+        e->currentFrameFinished = Eng_Global->pauseRelativeTime + ((1.0/(double)currentClip.speed) * (1.0 / (double)currentClip.framerate));
         e->frame++;
              if (e->frame > currentClip.frameEnd)   e->frame = currentClip.frameStart;
         else if (e->frame < currentClip.frameStart) e->frame = currentClip.frameEnd;
@@ -83,7 +83,7 @@ MOD_TO_ENGINE void UpdateAnims(void) {
         Eng_Global->dirtyInstances[i] = true;
         if (!EntityIndexIsPortalBlockingDoor(e->index)) continue;
 
-        if (ToggleDoorPortal(e->portalIndex,i,modelAnimationClips[animNum][ANIM_IDLE_CLOSED].frameStartModelIndex)) portalsNeedUpdated = true;
+        if (ToggleDoorPortal(e->portalIndex,i,modelAnimationClips[anim][ANIM_IDLE_CLOSED].frameStartModelIndex)) portalsNeedUpdated = true;
     }
     
     if (portalsNeedUpdated) PortalCulling();

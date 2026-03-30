@@ -547,19 +547,12 @@ char* GetNextStringUpToNewlineOrEOF(char* buf, int size, OsFileHandle fd) { // f
     static char buffer[4096];
     while (remaining > 0) {
         if (pos >= end) {
-            long n = OS_Read(fd,buffer,sizeof(buffer));
-            if (n <= 0 && p == buf) return NULL;
-
-            pos = 0;
-            end = (int)n;
+            long n = OS_Read(fd,buffer,sizeof(buffer)); if (n <= 0 && p == buf) return NULL;
+            pos = 0; end = (int)n;
         }
 
         while (remaining > 0 && pos < end) {
-            char c = buffer[pos++];
-            *p++ = c;
-            remaining--;
-
-            if (c == '\n') goto done;
+            char c = buffer[pos++]; *p++ = c; remaining--; if (c == '\n') goto done;
         }
     }
 
@@ -567,6 +560,9 @@ char* GetNextStringUpToNewlineOrEOF(char* buf, int size, OsFileHandle fd) { // f
     *p = '\0';
     return buf;
 }
+
+extern OsFileHandle levelFileHandle;
+ENGINE_TO_MOD char* GetLevelFileNextStringUpToNewlineOrEOF(char* buf, int size) { return GetNextStringUpToNewlineOrEOF(buf,size,levelFileHandle); }
 
 void FilePrintString(OsFileHandle f, const char* fmt, ...) {
     va_list args; __builtin_va_start(args,fmt);

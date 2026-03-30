@@ -56,10 +56,9 @@
     X(void, UpdateAnims, (void)) \
     X(uint16_t, SpawnDynamicObject, (int, bool)) \
     X(void, TextureSequenceInit, (uint16_t, char*)) \
-    X(void, LoadEntities, (void)) \
     X(void, ModNewGame, (void)) \
     X(void, ModInitAfterLoad, (void)) \
-    X(void, ModEntityDefinitionsInitAfterLoad, (DataParser*)) \
+    X(void, ModEntityDefinitionsInitAfterLoad, (void)) \
     X(void, PlayerInit, (uint16_t)) \
     X(void, ProcessInput, (void)) \
     X(void, CheckAndTakeScreenshot, (void)) \
@@ -147,12 +146,9 @@ ENGINE_TO_MOD void MenuGoBack(void);
 ENGINE_TO_MOD void IgnoreNextMouseDelta(void);
 ENGINE_TO_MOD void ApplyPlayerMovements(void);
 ENGINE_TO_MOD void AddForce(uint16_t idx, Vector3 force, bool isImpulse);
-ENGINE_TO_MOD void DeleteInstance(uint16_t i);
 ENGINE_TO_MOD void CenterStatusPrint(const char* fmt, ...);
 ENGINE_TO_MOD void play_wav(const char* path, float volume, Vector3 pos, bool positional);
 ENGINE_TO_MOD void PortalCulling(void);
-ENGINE_TO_MOD void AddInstance(uint16_t entIdx, uint16_t i);
-ENGINE_TO_MOD bool parse_data_file(DataParser *parser, uint16_t maxSize, const char *filename);
 ENGINE_TO_MOD char* GetLevelFileNextStringUpToNewlineOrEOF(char* buf, int size);
 ENGINE_TO_MOD void LoadFieldIntoLight(char* trimmed_key, char* trimmed_value, char* initialLine, uint32_t lineNum, Light* lit, LightAnimation* lan);
 ENGINE_TO_MOD int32_t AddLight(Light* lit, LightAnimation* lanim);
@@ -166,4 +162,3 @@ ENGINE_TO_MOD bool ToggleDoorPortal(uint8_t portalIdx, uint16_t doorIdx, uint16_
 ENGINE_TO_MOD Vector3 GetEntityLocalSpawnPointFromUnrotatedOffsetVector(Entity* originator, Vector3 offsetFromOriginator);
 ENGINE_TO_MOD void TurnLightOff(uint16_t litIdx);
 ENGINE_TO_MOD void AddCamView(Vector3 pos, Quaternion rot, uint8_t fov, uint16_t width, uint16_t height, float near, float far, bool sensaround);
-extern EntityField entityFields[NUM_ENTITY_FIELDS];

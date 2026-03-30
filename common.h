@@ -83,7 +83,7 @@ typedef struct {
     uint8_t numLerpSteps;
 } LightAnimation; // Separate from main lights buffer struct since it's not used very often
 
-#define INSTANCE_COUNT 10240 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
+#define INSTANCE_COUNT 20480 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
 #define LIGHT_COUNT 2048
 #define MODEL_IDX_MAX 6805
 #define MAX_VALID_TEXTURE 2048
@@ -132,8 +132,8 @@ typedef struct {
 #define ENTFLAG_GROUNDED             (1ull <<  2)
 #define ENTFLAG_KINEMATIC            (1ull <<  3)
 #define ENTFLAG_RIGIDBODY            (1ull <<  4)
-#define ENTFLAG_CHANGE_TEX_ON_ACTIVE (1ull <<  5)
-#define ENTFLAG_BLINK_TEX_ON_ACTIVE  (1ull <<  6)
+
+
 #define ENTFLAG_NO_SHADOWS           (1ull <<  7)
 #define ENTFLAG_ANIMATED             (1ull <<  8)
 #define ENTFLAG_ASLEEP               (1ull <<  9) // Check if enemy starts out asleep such as the sleeping sec-2 bots on level 8 in the maintenance and recharge bays.
@@ -1272,7 +1272,6 @@ typedef struct { uint8_t dataType; const char* fieldName; } EntityField;
 #include "miniaudio.h"
 typedef struct {
     uint32_t globalFrameNum;
-    uint16_t entityCount; // Number of entity definitions loaded (similar to Prefabs)
     uint16_t loadedInstances; // Number of instances of entities loaded (always for just the current level)
 	double cpuTime, thisFrameTime, cpuFrameTime, lastFrameSecCountTime;
 	uint32_t lastFrameSecCount, framesPerLastSecond, worstFPS;
@@ -1327,7 +1326,6 @@ typedef struct {
     float timeScale;
     bool  geniusActive;
     Vector3 cyberspaceRecallPoint;
-    Entity entities[MAX_ENTITIES]; // Global array of entity definitions (similar in concept to Prefabs)
     Entity instances[INSTANCE_COUNT];
     uint8_t dirtyInstances[INSTANCE_COUNT];
     Color fogColor;
@@ -1335,7 +1333,6 @@ typedef struct {
     char audiologSubjects[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
     char audiologSenders[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
     char audioLogSpeech2Text[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
-    EntityField* entityFields;
     float worldMin_x, worldMin_z;
     float voxelMinCenterX, voxelMinCenterZ;
     uint16_t loadedLights;

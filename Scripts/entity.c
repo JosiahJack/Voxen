@@ -173,10 +173,10 @@ Entity EntityDefinitions[MAX_ENTITIES] = {
     {.path="chunk_med1_8",.index=169,.modelIndex=268,.cardchunk=true,.texIndex=503,.normIndex=502,.specIndex=1242},
     {.path="chunk_med1_8d",.index=170,.modelIndex=267,.cardchunk=true,.texIndex=501,.normIndex=163,.specIndex=1242},
     {.path="chunk_med1_9",.index=171,.modelIndex=278,.cardchunk=true,.texIndex=507,.normIndex=506,.specIndex=1267},
-    {.index=172},
-    {.index=173},
+    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 172 unused slot
+    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 173 empty
     {.path="chunk_med1_9d",.index=174,.modelIndex=269,.cardchunk=true,.texIndex=505,.normIndex=504,.specIndex=1267},
-    {.index=175},
+    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 175 nothin to see here
     {.path="chunk_med1_9d_ofs112_90",.index=176,.modelIndex=270,.texIndex=505,.normIndex=504,.specIndex=1267,.collider=COLLIDER_TYPE_MESH,.colliderMeshIndex=270},
     {.path="chunk_med1_9d_ofs144_90",.index=177,.modelIndex=272,.texIndex=505,.normIndex=504,.specIndex=1267,.collider=COLLIDER_TYPE_MESH,.colliderMeshIndex=272},
     {.path="chunk_med2_1",.index=178,.modelIndex=280,.cardchunk=true,.texIndex=513,.specIndex=1254,.glowIndex=511,.normIndex=512},
@@ -287,8 +287,8 @@ Entity EntityDefinitions[MAX_ENTITIES] = {
     {.path="chunk_sec1_1c_slice45",.index=283,.modelIndex=580,.texIndex=786,.specIndex=786},
     {.path="chunk_sec1_1c_slice64highlh",.index=284,.modelIndex=581,.texIndex=786,.specIndex=786},
     {.path="chunk_sec1_1c_slice64highrh",.index=285,.modelIndex=582,.texIndex=786,.specIndex=786},
-    {.index=286},
-    {.index=287},
+    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 286 move along
+    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 287 don't think too much about it
     {.path="chunk_sec1_2",.index=288,.modelIndex=584,.cardchunk=true,.texIndex=789,.specIndex=1233},
     {.path="chunk_sec1_2b",.index=289,.modelIndex=583,.cardchunk=true,.texIndex=788,.specIndex=1233},
     {.path="chunk_sec1_3",.index=290,.modelIndex=585,.cardchunk=true,.texIndex=790,.specIndex=1233},
@@ -409,17 +409,17 @@ Entity EntityDefinitions[MAX_ENTITIES] = {
     {.path="line_sparqbeam",.index=405,.modelIndex=656},
     {.path="line_blaster",.index=406,.modelIndex=638},
     {.path="line_ion",.index=407,.modelIndex=643},
-    {.path="line_hopperbeam",.index=408},
-    {.path="red_crosshair",.index=409},
-    {.path="orange_crosshair",.index=410},
-    {.path="yellow_crosshair",.index=411},
-    {.path="green_crosshair_small",.index=412},
-    {.path="teal_crosshair",.index=413},
-    {.path="blue_crosshair",.index=414},
-    {.path="cursor_vmail",.index=415},
-    {.path="cursor_cyberspace",.index=416},
+    {.path="line_hopperbeam",.index=408,.modelIndex=MODEL_IDX_MAX},
+    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 409 wut I decided I didn't need these ok
+    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 410
+    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 411
+    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 412
+    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 413
+    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 414
+    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 415
+    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 416
     {.path="item_access_card_perdarcy",.index=417,.modelIndex=0,.texIndex=8,.glowIndex=341,.collider=COLLIDER_TYPE_CONVEXMESH,.colliderMeshIndex=672,.mass=0.2f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
-    {.index=418},
+    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 418
     {.path="npc_autobomb",.index=419,.modelIndex=299,.texIndex=542,.glowIndex=541,.mass=1.0f,.linearDrag=0.0f,.angularDrag=1.0f,.gravity=1.0f,.kinematic=true,.dynamicFriction=0.15f,.staticFriction=1.0f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_MUL,.bounceCombine=PHYS_COMBINE_MAX},
     {.path="npc_cyborg_assassin",.index=420,.modelIndex=306,.numclips=8,.animationNum=24,.texIndex=545,.glowIndex=544,.mass=1.5f,.linearDrag=0.0f,.angularDrag=1.5f,.gravity=1.0f,.kinematic=true,.dynamicFriction=0.15f,.staticFriction=1.0f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_MUL,.bounceCombine=PHYS_COMBINE_MAX},
     {.path="npc_avian_mutant",.index=421,.modelIndex=328,.numclips=5,.animationNum=35,.texIndex=568,.mass=2.0f,.linearDrag=0.0f,.angularDrag=1.0f,.gravity=1.0f,.kinematic=true,.dynamicFriction=0.15f,.staticFriction=1.0f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_MUL,.bounceCombine=PHYS_COMBINE_MAX},
@@ -448,7 +448,7 @@ Entity EntityDefinitions[MAX_ENTITIES] = {
     {.path="npc_cyberguard",.index=444,.modelIndex=303,.mass=2.0f,.linearDrag=0.0f,.angularDrag=3.0f,.gravity=0.0f,.kinematic=true,.dynamicFriction=0.15f,.staticFriction=1.0f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_MUL,.bounceCombine=PHYS_COMBINE_MAX},
     {.path="npc_cyberram",.index=445,.modelIndex=304,.mass=2.0f,.linearDrag=0.0f,.angularDrag=3.0f,.gravity=0.0f,.kinematic=true,.dynamicFriction=0.15f,.staticFriction=1.0f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_MUL,.bounceCombine=PHYS_COMBINE_MAX},
     {.path="npc_cyber_reaver",.index=446,.modelIndex=305,.mass=2.2f,.linearDrag=0.0f,.angularDrag=3.0f,.gravity=0.0f,.kinematic=true,.dynamicFriction=0.15f,.staticFriction=1.0f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_MUL,.bounceCombine=PHYS_COMBINE_MAX},
-    {.path="npc_cybershodan",.index=447,.mass=4.51f,.linearDrag=0.0f,.angularDrag=3.0f,.gravity=0.0f,.kinematic=true,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="npc_cybershodan",.index=447,.modelIndex=MODEL_IDX_MAX,.mass=4.51f,.linearDrag=0.0f,.angularDrag=3.0f,.gravity=0.0f,.kinematic=true,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
     {.path="item_cyber_data",.index=448,.modelIndex=65,.collider=COLLIDER_TYPE_SPHERE,.colliderCenter=(Vector3){0.0f,0.0f,0.0f},.colliderSize=(Vector3){1.5f,1.5f,1.5f}},
     {.path="item_cyber_decoy",.index=449,.modelIndex=72,.collider=COLLIDER_TYPE_SPHERE,.colliderCenter=(Vector3){0.0f,0.0f,0.0f},.colliderSize=(Vector3){1.5f,1.5f,1.5f}},
     {.path="item_cyber_drill",.index=450,.modelIndex=68,.collider=COLLIDER_TYPE_SPHERE,.colliderCenter=(Vector3){0.0f,0.0f,0.0f},.colliderSize=(Vector3){1.5f,1.5f,1.5f}},
@@ -482,22 +482,22 @@ Entity EntityDefinitions[MAX_ENTITIES] = {
     {.path="sec_cpunode",.index=478,.modelIndex=587,.texIndex=242,.glowIndex=248},
     {.path="sec_cpunode_small",.index=479,.modelIndex=588,.texIndex=107},
     {.path="weapon_cyber_mine",.index=480,.modelIndex=71,.texIndex=1224},
-    {.path="proj_enemshot2",.index=481,.mass=0.3f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=0.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
-    {.path="proj_magpulse_shot",.index=482,.texIndex=807,.mass=0.3f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=0.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
-    {.path="proj_stungun_shot",.index=483,.texIndex=835,.mass=0.3f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=0.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="proj_enemshot2",.index=481,.modelIndex=MODEL_IDX_MAX,.mass=0.3f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=0.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="proj_magpulse_shot",.index=482,.modelIndex=MODEL_IDX_MAX,.texIndex=807,.mass=0.3f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=0.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="proj_stungun_shot",.index=483,.modelIndex=MODEL_IDX_MAX,.texIndex=835,.mass=0.3f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=0.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
     {.path="proj_rail_shot",.index=484,.modelIndex=652,.mass=0.3f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=0.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
     {.path="proj_plasmarifle_shot",.index=485,.modelIndex=651,.mass=0.3f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=0.0f,.kinematic=false,.dynamicFriction=0.1f,.staticFriction=0.2f,.bounciness=0.9f,.frictionCombine=PHYS_COMBINE_MUL,.bounceCombine=PHYS_COMBINE_MAX},
-    {.path="proj_enemshot6",.index=486,.mass=0.3f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=0.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
-    {.path="proj_enemshot5",.index=487,.mass=0.2f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=0.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
-    {.path="proj_enemshot4",.index=488,.mass=0.3f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=0.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="proj_enemshot6",.index=486,.modelIndex=MODEL_IDX_MAX,.mass=0.3f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=0.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="proj_enemshot5",.index=487,.modelIndex=MODEL_IDX_MAX,.mass=0.2f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=0.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="proj_enemshot4",.index=488,.modelIndex=MODEL_IDX_MAX,.mass=0.3f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=0.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
     {.path="proj_throwingstar",.index=489,.modelIndex=307,.mass=0.3f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=0.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
     {.path="proj_magpulsenpc_shot",.index=490,.modelIndex=645,.mass=0.3f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=0.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
-    {.path="proj_railnpc_shot",.index=491,.mass=0.3f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=0.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="proj_railnpc_shot",.index=491,.modelIndex=MODEL_IDX_MAX,.mass=0.3f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=0.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
     {.path="proj_cyberplayer_shot",.index=492,.modelIndex=72,.mass=0.3f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=0.0f,.kinematic=false},
     {.path="proj_cyberdog_shot",.index=493,.modelIndex=63,.mass=0.3f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=0.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
     {.path="proj_cyberreaver_shot",.index=494,.modelIndex=64,.mass=0.3f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=0.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
     {.path="proj_cyberice_shot",.index=495,.modelIndex=68,.mass=0.3f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=0.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
-    {.path="doorA",.index=496,.modelIndex=0,.texIndex=185,.numclips=4,.animationNum=1},
+    {.path="doorA",.index=496,.modelIndex=719,.texIndex=185,.numclips=4,.animationNum=1},
     {.path="doorB",.index=497,.modelIndex=0,.texIndex=189,.glowIndex=188,.numclips=4,.animationNum=0},
     {.path="doorC",.index=498,.modelIndex=0,.texIndex=184,.numclips=4,.animationNum=5},
     {.path="doorD",.index=499,.modelIndex=0,.numclips=4,.animationNum=4,.texIndex=196,.glowIndex=197},
@@ -518,13 +518,13 @@ Entity EntityDefinitions[MAX_ENTITIES] = {
     {.path="door_secret3",.index=514,.modelIndex=94,.numclips=4,.animationNum=20,.texIndex=211},
     {.path="func_forcebridge",.index=515,.modelIndex=78,.texIndex=38},
     {.path="prop_lift2",.index=516,.modelIndex=215,.texIndex=155,.glowIndex=154,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,0.0f,0.0f},.colliderSize=(Vector3){1.0f,1.0f,1.0f},.colliderMeshIndex=UINT16_MAX},
-    {.path="func_wall",.index=517,.mass=10.0f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=0.0f,.kinematic=true,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
-    {.path="BulletHoleLarge",.index=518},
-    {.path="BulletHoleScorchLarge",.index=519},
-    {.path="BulletHoleScorchSmall",.index=520},
-    {.path="BulletHoleSmall",.index=521},
-    {.path="BulletHoleTiny",.index=522},
-    {.path="BulletHoleTinySpread",.index=523},
+    {.path="func_wall",.index=517,.modelIndex=MODEL_IDX_MAX,.mass=10.0f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=0.0f,.kinematic=true,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="BulletHoleLarge",.index=518,.modelIndex=MODEL_IDX_MAX},
+    {.path="BulletHoleScorchLarge",.index=519,.modelIndex=MODEL_IDX_MAX},
+    {.path="BulletHoleScorchSmall",.index=520,.modelIndex=MODEL_IDX_MAX},
+    {.path="BulletHoleSmall",.index=521,.modelIndex=MODEL_IDX_MAX},
+    {.path="BulletHoleTiny",.index=522,.modelIndex=MODEL_IDX_MAX},
+    {.path="BulletHoleTinySpread",.index=523,.modelIndex=MODEL_IDX_MAX},
     {.path="func_door_cyber",.index=524,.modelIndex=178,.texIndex=1224,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,1.31f,0.0f},.colliderSize=(Vector3){2.56f,0.06f,2.56f},.colliderMeshIndex=UINT16_MAX},
     {.path="prop_console01",.index=525,.texIndex=100,.modelIndex=49},
     {.path="prop_console02",.index=526,.texIndex=100,.modelIndex=50},
@@ -538,71 +538,71 @@ Entity EntityDefinitions[MAX_ENTITIES] = {
     {.path="prop_bed_hospital",.index=534,.modelIndex=608,.texIndex=759},
     {.path="prop_bed_neurosurgery",.index=535,.texIndex=18,.normIndex=29,.specIndex=1238,.modelIndex=17},
     {.path="prop_bonepile1",.index=536,.modelIndex=19,.texIndex=815},
-    {.path="prop_bridgewall1",.index=537},
+    {.path="prop_bridgewall1",.index=537,.modelIndex=33},
     {.path="prop_broken_clock",.index=538,.modelIndex=38,.texIndex=1117,.altTexIndex=1118,.glowIndex=1115,.altGlowIndex=1116},
     {.path="prop_brokengun",.index=539,.modelIndex=639,.texIndex=878},
-    {.path="prop_chair01",.index=540,.texIndex=195,.modelIndex=41},
-    {.path="prop_chair02",.index=541,.modelIndex=42},
-    {.path="prop_chair03",.index=542,.modelIndex=43},
-    {.path="prop_chair04",.index=543},
-    {.path="prop_chair05",.index=544},
-    {.path="prop_chandelier",.index=545},
+    {.path="prop_chair01",.index=540,.modelIndex=41,.texIndex=195},
+    {.path="prop_chair02",.index=541,.modelIndex=42,.texIndex=195},
+    {.path="prop_chair03",.index=542,.modelIndex=43,.texIndex=195},
+    {.path="prop_chair04",.index=543,.modelIndex=41,.texIndex=195},
+    {.path="prop_chair05",.index=544,.modelIndex=42,.texIndex=195},
+    {.path="prop_chandelier",.index=545,.modelIndex=496,.texIndex=644},
     {.path="prop_charge_station",.index=546,.modelIndex=44,.texIndex=77,.glowIndex=76},
     {.path="prop_clothes",.index=547,.modelIndex=47,.texIndex=97},
     {.path="prop_computer",.index=548,.modelIndex=48},
     {.path="prop_couch",.index=549,.modelIndex=59},
     {.path="prop_couch2",.index=550,.modelIndex=59},
     {.path="prop_cpuscreen",.index=551,.modelIndex=178,.texIndex=768},
-    {.path="prop_cyber_datafrag",.index=552},
-    {.path="prop_cyber_decoy",.index=553},
-    {.path="prop_cyber_exit",.index=554},
-    {.path="prop_cyber_switch",.index=555},
+    {.path="prop_cyber_datafrag",.index=552,.modelIndex=78},
+    {.path="prop_cyber_decoy",.index=553,.modelIndex=78},
+    {.path="prop_cyber_exit",.index=554,.modelIndex=78},
+    {.path="prop_cyber_switch",.index=555,.modelIndex=0},
     {.path="prop_cyberport",.index=556,.modelIndex=62,.texIndex=117,.glowIndex=116},
-    {.path="prop_desk01",.index=557},
-    {.path="prop_desk02",.index=558},
+    {.path="prop_desk01",.index=557,.modelIndex=74,.texIndex=125},
+    {.path="prop_desk02",.index=558,.modelIndex=75,.texIndex=124},
     {.path="prop_dexmissile",.index=559,.modelIndex=76,.texIndex=164,.glowIndex=162},
     {.path="prop_foliage_fernpoison",.index=560,.modelIndex=160,.texIndex=331},
     {.path="prop_foliage_bush",.index=561,.modelIndex=495,.texIndex=643,.glowIndex=642},
     {.path="prop_foliage_fern",.index=562,.modelIndex=160,.texIndex=333,.glowIndex=330},
     {.path="prop_foliage_fernblueflower",.index=563,.modelIndex=159,.texIndex=333,.glowIndex=330},
-    {.path="prop_foliage_pinetreem",.index=564},
-    {.path="prop_foliage_poisonbush1",.index=565},
+    {.path="prop_foliage_pinetreem",.index=564,.modelIndex=489,.texIndex=594},
+    {.path="prop_foliage_poisonbush1",.index=565,.modelIndex=493,.texIndex=638},
     {.path="prop_gear_large",.index=566,.modelIndex=166,.texIndex=335},
     {.path="prop_gear_small",.index=567,.modelIndex=167,.texIndex=336},
-    {.path="prop_grass1",.index=568},
-    {.path="prop_grass2",.index=569},
-    {.path="prop_grass3",.index=570},
-    {.path="prop_grass4",.index=571},
-    {.path="prop_grass5",.index=572},
-    {.path="prop_grate4",.index=573},
+    {.path="prop_grass1",.index=568,.modelIndex=161,.texIndex=329},
+    {.path="prop_grass2",.index=569,.modelIndex=162,.texIndex=329},
+    {.path="prop_grass3",.index=570,.modelIndex=163,.texIndex=329},
+    {.path="prop_grass4",.index=571,.modelIndex=164,.texIndex=329},
+    {.path="prop_grass5",.index=572,.modelIndex=140,.texIndex=329},
+    {.path="prop_grate4",.index=573,.modelIndex=161,.texIndex=329},
     {.path="prop_healingbed",.index=574,.modelIndex=195,.texIndex=1139},
     {.path="prop_lamp",.index=575,.modelIndex=212,.texIndex=423},
     {.path="prop_light_emergsignal",.index=576,.modelIndex=216,.texIndex=426,.altTexIndex=424,.glowIndex=0,.altGlowIndex=424},
     {.path="prop_microscope",.index=577,.modelIndex=298,.texIndex=645,.specIndex=1241},
-    {.path="prop_pipe",.index=578},
-    {.path="prop_puddle",.index=579},
-    {.path="prop_puddle_grease",.index=580},
-    {.path="prop_puddle_oil",.index=581},
-    {.path="prop_shelves",.index=582},
-    {.path="prop_skeleton",.index=583},
-    {.path="prop_sleeping_cables",.index=584},
+    {.path="prop_pipe",.index=578,.modelIndex=490,.texIndex=595}, // TODO, support texture index 596 somehow from level override
+    {.path="prop_puddle",.index=579,.modelIndex=157,.texIndex=648},
+    {.path="prop_puddle_grease",.index=580,.modelIndex=157,.texIndex=650},
+    {.path="prop_puddle_oil",.index=581,.modelIndex=157,.texIndex=652},
+    {.path="prop_shelves",.index=582,.modelIndex=591,.texIndex=94},
+    {.path="prop_skeleton",.index=583,.modelIndex=592,.texIndex=815},
+    {.path="prop_sleeping_cables",.index=584,.modelIndex=595,.texIndex=71},
     {.path="prop_sparkingwire",.index=585,.modelIndex=0,.numclips=1,.animationNum=46,.texIndex=71},
-    {.path="prop_table",.index=586},
-    {.path="prop_tv_on_a_post",.index=587},
-    {.path="prop_vendingmachines1",.index=588},
-    {.path="prop_vendingmachines2",.index=589},
+    {.path="prop_table",.index=586,.modelIndex=619,.texIndex=92},
+    {.path="prop_tv_on_a_post",.index=587,.modelIndex=625,.texIndex=1228},
+    {.path="prop_vendingmachines1",.index=588,.modelIndex=627,.texIndex=870}, // TODO: Get child vending1_2.obj and vending1_3.obj
+    {.path="prop_vendingmachines2",.index=589,.modelIndex=614,.texIndex=871}, // TODO: Get child vending2_2.obj
     {.path="prop_weapon_rack",.index=590,.modelIndex=641,.texIndex=113},
     {.path="prop_xray",.index=591,.modelIndex=660,.texIndex=153},
-    {.path="text_decal",.index=592},
-    {.path="text_decalStopDSS1",.index=593},
-    {.path="trigger_counter",.index=594},
-    {.path="trigger_cyberpush",.index=595},
-    {.path="trigger_gravitylift",.index=596},
-    {.path="trigger_ladder",.index=597},
-    {.path="trigger_multiple",.index=598},
-    {.path="trigger_music",.index=599},
-    {.path="trigger_once",.index=600},
-    {.path="trigger_radiation",.index=601},
+    {.path="text_decal",.index=592,.modelIndex=77},
+    {.path="text_decalStopDSS1",.index=593,.modelIndex=77},
+    {.path="trigger_counter",.index=594,.modelIndex=MODEL_IDX_MAX},
+    {.path="trigger_cyberpush",.index=595,.modelIndex=MODEL_IDX_MAX},
+    {.path="trigger_gravitylift",.index=596,.modelIndex=MODEL_IDX_MAX},
+    {.path="trigger_ladder",.index=597,.modelIndex=MODEL_IDX_MAX},
+    {.path="trigger_multiple",.index=598,.modelIndex=MODEL_IDX_MAX},
+    {.path="trigger_music",.index=599,.modelIndex=MODEL_IDX_MAX},
+    {.path="trigger_once",.index=600,.modelIndex=MODEL_IDX_MAX},
+    {.path="trigger_radiation",.index=601,.modelIndex=MODEL_IDX_MAX},
     {.path="us_isotopepanel",.index=602,.modelIndex=0,.texIndex=616,.numclips=5,.animationNum=44},
     {.path="us_paperlog",.index=603,.modelIndex=486,.texIndex=580},
     {.path="us_puz_elevatorkeypad",.index=604,.modelIndex=615,.texIndex=247},
@@ -622,41 +622,41 @@ Entity EntityDefinitions[MAX_ENTITIES] = {
     {.path="prop_vending1_3",.index=618,.modelIndex=629,.texIndex=870},
     {.path="prop_vending2_1",.index=619,.modelIndex=614,.texIndex=871},
     {.path="prop_vending2_2",.index=620,.modelIndex=621,.texIndex=871},
-    {.path="ambient_airhiss",.index=621,.volume=0.05f},
-    {.path="ambient_clicker",.index=622,.volume=0.20f},
-    {.path="ambient_compressor",.index=623,.volume=0.4f},
-    {.path="ambient_dishwasher",.index=624,.volume=0.2f},
-    {.path="ambient_drip_amb",.index=625,.volume=0.5f},
-    {.path="ambient_fan",.index=626,.volume=0.3f},
-    {.path="ambient_generator_gas",.index=627,.volume=0.3f},
-    {.path="ambient_gurgle",.index=628,.volume=0.3f},
-    {.path="ambient_icemaker",.index=629,.volume=0.6f},
-    {.path="ambient_intake",.index=630,.volume=0.2f},
-    {.path="ambient_lathe",.index=631,.volume=0.4f},
-    {.path="ambient_lev3loop1",.index=632,.volume=0.1f},
-    {.path="ambient_lev3loop2",.index=633,.volume=0.1f},
-    {.path="ambient_lev3loop3",.index=634,.volume=0.1f},
-    {.path="ambient_lev3loop4",.index=635,.volume=0.1f},
-    {.path="ambient_liquid_bubble",.index=636,.volume=1.0f},
-    {.path="ambient_liquid_lava2",.index=637,.volume=0.4f},
-    {.path="ambient_looping",.index=638,.volume=0.4f},
-    {.path="ambient_machgear_loop",.index=639,.volume=0.4f},
-    {.path="ambient_machine_ambience",.index=640,.volume=0.8f},
-    {.path="ambient_machine_go",.index=641,.volume=0.6f},
-    {.path="ambient_machine_humamb7",.index=642,.volume=1.0f},
-    {.path="ambient_machine_humlonoise",.index=643,.volume=0.4f},
-    {.path="ambient_machine_loop1",.index=644,.volume=0.4f},
-    {.path="ambient_machine_loop2",.index=645,.volume=0.4f},
-    {.path="ambient_machinea1",.index=646,.volume=0.4f},
-    {.path="ambient_machinevat_loop",.index=647,.volume=0.8f},
-    {.path="ambient_mist",.index=648,.volume=0.02f},
-    {.path="ambient_pipewater_loop",.index=649,.volume=0.65f},
-    {.path="ambient_powerloom",.index=650,.volume=0.3f},
-    {.path="ambient_pump",.index=651,.volume=0.2f},
-    {.path="ambient_pump2",.index=652,.volume=0.05f},
-    {.path="ambient_rain",.index=653,.volume=0.55f},
-    {.path="ambient_steam_loop",.index=654,.volume=0.1f},
-    {.path="ambient_washing_machine",.index=655,.volume=0.5f},
+    {.path="ambient_airhiss",.index=621,.volume=0.05f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_clicker",.index=622,.volume=0.20f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_compressor",.index=623,.volume=0.4f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_dishwasher",.index=624,.volume=0.2f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_drip_amb",.index=625,.volume=0.5f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_fan",.index=626,.volume=0.3f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_generator_gas",.index=627,.volume=0.3f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_gurgle",.index=628,.volume=0.3f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_icemaker",.index=629,.volume=0.6f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_intake",.index=630,.volume=0.2f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_lathe",.index=631,.volume=0.4f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_lev3loop1",.index=632,.volume=0.1f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_lev3loop2",.index=633,.volume=0.1f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_lev3loop3",.index=634,.volume=0.1f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_lev3loop4",.index=635,.volume=0.1f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_liquid_bubble",.index=636,.volume=1.0f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_liquid_lava2",.index=637,.volume=0.4f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_looping",.index=638,.volume=0.4f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_machgear_loop",.index=639,.volume=0.4f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_machine_ambience",.index=640,.volume=0.8f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_machine_go",.index=641,.volume=0.6f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_machine_humamb7",.index=642,.volume=1.0f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_machine_humlonoise",.index=643,.volume=0.4f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_machine_loop1",.index=644,.volume=0.4f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_machine_loop2",.index=645,.volume=0.4f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_machinea1",.index=646,.volume=0.4f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_machinevat_loop",.index=647,.volume=0.8f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_mist",.index=648,.volume=0.02f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_pipewater_loop",.index=649,.volume=0.65f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_powerloom",.index=650,.volume=0.3f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_pump",.index=651,.volume=0.2f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_pump2",.index=652,.volume=0.05f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_rain",.index=653,.volume=0.55f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_steam_loop",.index=654,.volume=0.1f,.modelIndex=MODEL_IDX_MAX},
+    {.path="ambient_washing_machine",.index=655,.volume=0.5f,.modelIndex=MODEL_IDX_MAX},
     {.path="decal_blood_die",.index=656,.modelIndex=77,.texIndex=237,.shadows=false},
     {.path="decal_blood_resist",.index=657,.modelIndex=77,.texIndex=240,.shadows=false},
     {.path="decal_blood_stayaway",.index=658,.modelIndex=77,.texIndex=235,.shadows=false},
@@ -697,78 +697,78 @@ Entity EntityDefinitions[MAX_ENTITIES] = {
     {.path="func_switch5broken",.index=693,.modelIndex=613,.texIndex=847,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,0.0f,0.0f},.colliderSize=(Vector3){0.64f,0.64f,0.08f},.colliderMeshIndex=UINT16_MAX},
     {.path="func_switch7",.index=694,.modelIndex=612,.texIndex=854,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){1.523325f,0.0f,0.0f},.colliderSize=(Vector3){5.020065f,16.0f,16.0f},.colliderMeshIndex=UINT16_MAX},
     {.path="func_switch8",.index=695,.modelIndex=616,.texIndex=856,.altTexIndex=858,.glowIndex=855,.altGlowIndex=857,.changeTexOnActive=true,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){-1.0f,0.0f,0.0001220703f},.colliderSize=(Vector3){2.0f,16.0f,16.0f},.colliderMeshIndex=UINT16_MAX},
-    {.path="func_switchbroken1",.index=696},
-    {.path="clip_npc",.index=697,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){1.005016f,0.0f,0.0f},.colliderSize=(Vector3){2.010033f,16.0f,16.0f},.colliderMeshIndex=UINT16_MAX},
-    {.path="clip_objects",.index=698,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,0.0f,0.0f},.colliderSize=(Vector3){2.56f,2.56f,2.56f},.colliderMeshIndex=UINT16_MAX},
-    {.path="logic_relay",.index=699},
-    {.path="logic_branch",.index=700},
-    {.path="logic_timer",.index=701},
-    {.path="logic_spawner",.index=702},
-    {.path="info_teleport_destination",.index=703},
-    {.path="prop_debris_panel",.index=704},
-    {.path="info_cyborgconversion",.index=705},
-    {.path="info_elev_destination",.index=706},
-    {.path="info_email",.index=707},
-    {.path="info_gameend",.index=708},
-    {.path="info_message",.index=709},
-    {.path="info_mission",.index=710},
-    {.path="info_note",.index=711},
-    {.path="info_playsound",.index=712},
-    {.path="info_ressurection_point",.index=713},
-    {.path="info_screenshake",.index=714},
-    {.path="info_spawnpoint",.index=715},
-    {.path="fx_reverbzone",.index=716},
+    {.path="func_switchbroken1",.index=696,.modelIndex=617,.texIndex=618},
+    {.path="clip_npc",.index=697,.modelIndex=MODEL_IDX_MAX,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){1.005016f,0.0f,0.0f},.colliderSize=(Vector3){2.010033f,16.0f,16.0f},.colliderMeshIndex=UINT16_MAX},
+    {.path="clip_objects",.index=698,.modelIndex=MODEL_IDX_MAX,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,0.0f,0.0f},.colliderSize=(Vector3){2.56f,2.56f,2.56f},.colliderMeshIndex=UINT16_MAX},
+    {.path="logic_relay",.index=699,.modelIndex=MODEL_IDX_MAX},
+    {.path="logic_branch",.index=700,.modelIndex=MODEL_IDX_MAX},
+    {.path="logic_timer",.index=701,.modelIndex=MODEL_IDX_MAX},
+    {.path="logic_spawner",.index=702,.modelIndex=MODEL_IDX_MAX},
+    {.path="info_teleport_destination",.index=703,.modelIndex=MODEL_IDX_MAX},
+    {.path="prop_debris_panel",.index=704,.modelIndex=MODEL_IDX_MAX}, // TODO ???
+    {.path="info_cyborgconversion",.index=705,.modelIndex=MODEL_IDX_MAX},
+    {.path="info_elev_destination",.index=706,.modelIndex=MODEL_IDX_MAX},
+    {.path="info_email",.index=707,.modelIndex=MODEL_IDX_MAX},
+    {.path="info_gameend",.index=708,.modelIndex=MODEL_IDX_MAX},
+    {.path="info_message",.index=709,.modelIndex=MODEL_IDX_MAX},
+    {.path="info_mission",.index=710,.modelIndex=MODEL_IDX_MAX},
+    {.path="info_note",.index=711,.modelIndex=MODEL_IDX_MAX},
+    {.path="info_playsound",.index=712,.modelIndex=MODEL_IDX_MAX},
+    {.path="info_ressurection_point",.index=713,.modelIndex=MODEL_IDX_MAX},
+    {.path="info_screenshake",.index=714,.modelIndex=MODEL_IDX_MAX},
+    {.path="info_spawnpoint",.index=715,.modelIndex=MODEL_IDX_MAX},
+    {.path="fx_reverbzone",.index=716,.modelIndex=MODEL_IDX_MAX},
     {.path="ef_cyber_ice",.index=717,.collider=COLLIDER_TYPE_SPHERE,.colliderCenter=(Vector3){0.0f,0.004354001f,-0.014725f},.colliderSize=(Vector3){1.0f,0.0f,0.0f},.colliderMeshIndex=UINT16_MAX},
-    {.path="ef_fragexplosion",.index=718},
-    {.path="ef_line_sparqbeam",.index=719},
-    {.path="ef_mist",.index=720},
-    {.path="ef_particle_bloodspurtsmall",.index=721},
-    {.path="ef_particle_bloodspurtsmallgreen",.index=722},
-    {.path="ef_particle_bloodspurtsmallyellow",.index=723},
-    {.path="ef_particle_bloodspurttiny",.index=724},
-    {.path="ef_particle_camerahit",.index=725},
-    {.path="ef_particle_darthit",.index=726},
-    {.path="ef_particle_sec2muzburst",.index=727},
-    {.path="ef_particle_sec2rotmuzburst",.index=728},
-    {.path="ef_particle_sparksmall",.index=729},
-    {.path="ef_particle_sparksmallblue",.index=730},
-    {.path="ef_particle_sparqhit",.index=731},
-    {.path="ef_sparkspits",.index=732},
-    {.path="ef_spraydrips",.index=733},
-    {.path="ef_steam",.index=734},
-    {.path="env_sparksmall",.index=735},
-    {.path="TargetIDInstance",.index=736},
+    {.path="ef_fragexplosion",.index=718,.modelIndex=MODEL_IDX_MAX},
+    {.path="ef_line_sparqbeam",.index=719,.modelIndex=MODEL_IDX_MAX},
+    {.path="ef_mist",.index=720,.modelIndex=MODEL_IDX_MAX},
+    {.path="ef_particle_bloodspurtsmall",.index=721,.modelIndex=MODEL_IDX_MAX},
+    {.path="ef_particle_bloodspurtsmallgreen",.index=722,.modelIndex=MODEL_IDX_MAX},
+    {.path="ef_particle_bloodspurtsmallyellow",.index=723,.modelIndex=MODEL_IDX_MAX},
+    {.path="ef_particle_bloodspurttiny",.index=724,.modelIndex=MODEL_IDX_MAX},
+    {.path="ef_particle_camerahit",.index=725,.modelIndex=MODEL_IDX_MAX},
+    {.path="ef_particle_darthit",.index=726,.modelIndex=MODEL_IDX_MAX},
+    {.path="ef_particle_sec2muzburst",.index=727,.modelIndex=MODEL_IDX_MAX},
+    {.path="ef_particle_sec2rotmuzburst",.index=728,.modelIndex=MODEL_IDX_MAX},
+    {.path="ef_particle_sparksmall",.index=729,.modelIndex=MODEL_IDX_MAX},
+    {.path="ef_particle_sparksmallblue",.index=730,.modelIndex=MODEL_IDX_MAX},
+    {.path="ef_particle_sparqhit",.index=731,.modelIndex=MODEL_IDX_MAX},
+    {.path="ef_sparkspits",.index=732,.modelIndex=MODEL_IDX_MAX},
+    {.path="ef_spraydrips",.index=733,.modelIndex=MODEL_IDX_MAX},
+    {.path="ef_steam",.index=734,.modelIndex=MODEL_IDX_MAX},
+    {.path="env_sparksmall",.index=735,.modelIndex=MODEL_IDX_MAX},
+    {.path="TargetIDInstance",.index=736,.modelIndex=MODEL_IDX_MAX},
     {.path="prop_papers01",.index=737,.modelIndex=484,.texIndex=580},
     {.path="prop_papers02",.index=738,.modelIndex=485,.texIndex=580},
-    {.path="ef_particle_blasterhit",.index=739},
-    {.path="ef_particle_ionhit",.index=740},
+    {.path="ef_particle_blasterhit",.index=739,.modelIndex=MODEL_IDX_MAX},
+    {.path="ef_particle_ionhit",.index=740,.modelIndex=MODEL_IDX_MAX},
     {.path="us_puz_panel_blue_wire",.index=741,.modelIndex=0,.texIndex=604,.numclips=3,.animationNum=43},
-    {.path="us_puz_panel_brown_wire",.index=742,.modelIndex=0,.texIndex=604,.numclips=3,.animationNum=43},
+    {.path="us_puz_panel_brown_wire",.index=742,.modelIndex=0,.texIndex=631,.numclips=3,.animationNum=43},
     {.path="us_puz_panel_gray_wire",.index=743,.modelIndex=0,.texIndex=634,.numclips=3,.animationNum=43},
     {.path="us_puz_panel_red_wire",.index=744,.modelIndex=0,.texIndex=625,.numclips=3,.animationNum=43},
     {.path="us_puz_panel_teal_wire",.index=745,.modelIndex=0,.texIndex=601,.numclips=3,.animationNum=43},
-    {.path="weapon_grenadeenergmine_live",.index=746},
+    {.path="weapon_grenadeenergmine_live",.index=746,.modelIndex=169,.texIndex=852}, // TODO tex anim hook up at init
     {.path="decal_logo_storage",.index=747,.modelIndex=77,.texIndex=169,.shadows=false},
-    {.path="light_animated",.index=748},
-    {.path="generic_transform",.index=749},
+    {.path="light_animated",.index=748,.modelIndex=MODEL_IDX_MAX},
+    {.path="generic_transform",.index=749,.modelIndex=MODEL_IDX_MAX},
     {.path="chunk_crate_impenetrable2",.index=750,.modelIndex=61,.texIndex=147},
     {.path="chunk_crate_impenetrable3",.index=751,.modelIndex=61,.texIndex=148},
     {.path="chunk_crate_impenetrable4",.index=752,.modelIndex=61,.texIndex=149},
     {.path="npc_sec3_bot",.index=753,.modelIndex=681,.texIndex=553},
     {.path="prop_shieldgenerator",.index=754,.modelIndex=143,.texIndex=316},
-    {.path="camera_view",.index=755},
-    {.path="ef_particle_leafburst",.index=756},
-    {.path="ef_particle_mutationburst",.index=757},
-    {.path="ef_particle_graytationburst",.index=758},
-    {.index=759},
-    {.index=760},
-    {.index=761},
-    {.index=762},
-    {.index=763},
-    {.index=764},
-    {.index=765},
-    {.index=766},
-    {.path="player",.index=767}
+    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 755 cameraview now handled directly in mod code instead of as an entity.
+    {.path="ef_particle_leafburst",.index=756,.modelIndex=MODEL_IDX_MAX},
+    {.path="ef_particle_mutationburst",.index=757,.modelIndex=MODEL_IDX_MAX},
+    {.path="ef_particle_graytationburst",.index=758,.modelIndex=MODEL_IDX_MAX},
+    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 759 stop
+    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 760 judging
+    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 761 me
+    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 762 alright!
+    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 763 I
+    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 764 didn't feel
+    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 765 like
+    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 766 reordering everything!
+    {.path="player",.index=767,.modelIndex=MODEL_IDX_MAX}
 };
 
 static inline __attribute__((always_inline)) uint32_t parse_numberu32(const char* str, const char* line, uint32_t lineNum) {
@@ -841,54 +841,103 @@ static inline __attribute__((always_inline)) float parse_float(const char* str, 
     return (float)value;
 }
 
+#define GEOMETRY_LOD_CARD_MODEL_IDX 178
+MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(void) { // Global conditions for all entities.  No sense inflating the table data in entity.c
+    for (int32_t i = 0; i < MAX_ENTITIES; i++) {
+        if (EntityDefinitions[i].index == UINT16_MAX) continue;
+        
+        flag_set(&EntityDefinitions[i].entflags,ENTFLAG_ACTIVE,true); // Individual value setting to allow mods to set custom starting flags themselves. (or here too if they want, tis your oyster).
+        DualLog("Set entity %u to active\n",i);
+        flag_set(&EntityDefinitions[i].entflags,ENTFLAG_RIGIDBODY,ConstIndexIsDynamicObject(EntityDefinitions[i].index));
+        if (EntityDefinitions[i].cardchunk) {
+            EntityDefinitions[i].lodIndex = GEOMETRY_LOD_CARD_MODEL_IDX;
+            EntityDefinitions[i].collider = COLLIDER_TYPE_BOX;
+            EntityDefinitions[i].colliderCenter = (Vector3){ .x = 0.0f, .y = 1.44f, .z = 0.0f };
+            EntityDefinitions[i].colliderSize = (Vector3){ .x = 2.56f, .y = 0.32f, .z = 2.56f };
+        }
+        
+        EntityDefinitions[i].currentFrameFinished = Eng_Global->pauseRelativeTime + 0.1;
+        if (ConstIndexIsButtonSwitch(EntityDefinitions[i].index)) {
+            EntityDefinitions[i].lockedMessageLingdex = 193; // ButtonSwitch
+            EntityDefinitions[i].tickTime = 1.5;
+        }
+    }
+    
+}
 
-#define B_8 0
-#define U_8 1
-#define U16 2
-#define U32 3
-#define I16 4
-#define I32 5
-#define F32 6
-#define CHD 7
-EntityField entityFields[NUM_ENTITY_FIELDS] = {
-    {U16,"index"},
-    {U16,"model"},
-    {U16,"animationNum"},
-    {U_8,"animated"},
-    {U16,"texture"},
-    {U16,"alttexture"},
-    {U16,"glowtexture"},
-    {U16,"altglowtexture"},
-    {U16,"spectexture"},
-    {U16,"normtexture"},
-    {B_8,"cardchunk"},
-    {U_8,"collider"},
-    {F32,"collider_centerx"},
-    {F32,"collider_centery"},
-    {F32,"collider_centerz"},
-    {F32,"collider_sizex"},
-    {F32,"collider_sizey"},
-    {F32,"collider_sizez"},
-    {U16,"colliderMeshIndex"},
-    {F32,"mass"},
-    {F32,"linearDrag"},
-    {F32,"angularDrag"},
-    {B_8,"kinematic"},
-    {B_8,"useGravity"},
-    {F32,"bounciness"},
-    {F32,"dynamicFriction"},
-    {U_8,"frictionCombine"},
-    {U_8,"bounceCombine"},
-    {U_8,"numclips"},
-    {B_8,"changeMatOnActive"},
-    {B_8,"blinkWhenActive"},
-    {B_8,"noshadows"},
-    {F32,"volume"},
-    {CHD,"##child"}
-//     "child_offsetx",
-//     "child_offsety",
-//     "child_offsetz"
-};
+void AddInstance(uint16_t entIdx, uint16_t i) {
+    if (entIdx >= MAX_ENTITIES) { DualLogError("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d, skipped\n",entIdx,MAX_ENTITIES); return; }
+    
+    Entity* e = &Eng_Global->instances[i];
+    e->index = entIdx;
+    if (ConstIndexIsNPC(entIdx)) InitializeAIAfterLoad(i);
+    bool isCardChunk = (EntityDefinitions[entIdx].entflags & ENTFLAG_CARDCHUNK);
+    e->modelIndex = EntityDefinitions[entIdx].modelIndex;
+    e->colliderMeshIndex = EntityDefinitions[entIdx].colliderMeshIndex;
+    e->numclips = EntityDefinitions[entIdx].numclips;
+    e->animationNum = EntityDefinitions[entIdx].animationNum;
+    e->texIndex = EntityDefinitions[entIdx].texIndex;
+    e->glowIndex = EntityDefinitions[entIdx].glowIndex >= MAX_VALID_TEXTURE ? 0 : EntityDefinitions[entIdx].glowIndex;
+    e->specIndex = EntityDefinitions[entIdx].specIndex >= MAX_VALID_TEXTURE ? 0 : EntityDefinitions[entIdx].specIndex;
+    e->normIndex = EntityDefinitions[entIdx].normIndex >= MAX_VALID_TEXTURE ? 0 : EntityDefinitions[entIdx].normIndex;
+    e->lodIndex = EntityDefinitions[entIdx].lodIndex;
+    flag_set(&e->entflags,ENTFLAG_CARDCHUNK,isCardChunk);
+    e->gravity = EntityDefinitions[entIdx].gravity >= 0.0f ? EntityDefinitions[entIdx].gravity : 0.0f; // No up falling.
+    flag_set(&e->entflags,ENTFLAG_KINEMATIC,EntityDefinitions[entIdx].entflags & ENTFLAG_KINEMATIC);
+    flag_set(&e->entflags,ENTFLAG_RIGIDBODY,EntityDefinitions[entIdx].entflags & ENTFLAG_RIGIDBODY);
+    flag_set(&e->entflags,ENTFLAG_NO_SHADOWS, EntityDefinitions[entIdx].entflags & ENTFLAG_NO_SHADOWS);
+    e->collider = EntityDefinitions[entIdx].collider;
+    e->colliderCenter = EntityDefinitions[entIdx].colliderCenter;
+    e->colliderSize = EntityDefinitions[entIdx].colliderSize;
+    e->mass = EntityDefinitions[entIdx].mass > 0.0f ? EntityDefinitions[entIdx].mass : 1.0f; // Nonzero fallback.
+    e->linearDrag = EntityDefinitions[entIdx].linearDrag > 0.0f ? EntityDefinitions[entIdx].linearDrag : 0.0f;
+    e->angularDrag = EntityDefinitions[entIdx].angularDrag > 0.0f ? EntityDefinitions[entIdx].angularDrag : 0.05f;
+    for (int c=0;c<MAX_CHILD_COUNT;++c) {
+        e->child[c] = EntityDefinitions[entIdx].child[c];
+        e->child_offset[c] = EntityDefinitions[entIdx].child_offset[c];
+        e->child_rotation[c] = EntityDefinitions[entIdx].child_rotation[c];
+        e->child_scale[c] = isCardChunk ? EntityDefinitions[entIdx].child_scale[c] : (Vector3){ 1.0f, 1.0f, 1.0f };
+    }
+    
+    if (entIdx == 525) { // prop_console01
+        Vector3 ofs1 = GetEntityLocalSpawnPointFromUnrotatedOffsetVector(e,(Vector3){5.81f,2.29f,38.05f-38.3552f});
+        Vector3 ofs2 = GetEntityLocalSpawnPointFromUnrotatedOffsetVector(e,(Vector3){-10.1f,0.9f,18.21f-38.3552f});
+        Light lit1 = (Light){.pos=ofs1,.col=(Color3){0.3531f,0.4837f,0.6509f},.range=1.85f,.intensity=0.7f,.maxIntensity=0.7f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
+        Light lit2 = (Light){.pos=ofs2,.col=(Color3){0.3561f,0.3561f,0.8970f},.range=2.0f,.intensity=1.12f,.maxIntensity=1.12f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
+        LightAnimation lam={0};
+        e->texAnimLight  = AddLight(&lit1,&lam);
+        e->texAnimLight2 = AddLight(&lit2,&lam);
+    } else if (entIdx == 279) { // chunk_screen
+        Vector3 ofs1 = GetEntityLocalSpawnPointFromUnrotatedOffsetVector(e,(Vector3){0.0f,-0.08f,0.0f});
+        Light lit1 = (Light){.pos=ofs1,.col=(Color3){0.909803922f,0.929411765f,1.0f},.range=3.2f,.intensity=1.575f,.maxIntensity=1.575f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
+        LightAnimation lam={0};
+        e->texAnimLight = AddLight(&lit1,&lam);
+    } else if (e->index == 574) { // prop_healingbed
+        Vector3 ofs1 = GetEntityLocalSpawnPointFromUnrotatedOffsetVector(e,(Vector3){0.5292511f,0.065,0.915f});
+        Vector3 ofs2 = GetEntityLocalSpawnPointFromUnrotatedOffsetVector(e,(Vector3){-0.5317497f,0.065f,1.039f});
+        Light lit1 = (Light){.pos=ofs1,.col=(Color3){0.0f,0.925490196f,0.082352941f},.range=3.0f,.intensity=0.72f,.maxIntensity=0.72f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
+        Light lit2 = (Light){.pos=ofs2,.col=(Color3){0.0f,0.925490196f,0.082352941f},.range=3.0f,.intensity=0.72f,.maxIntensity=0.72f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
+        LightAnimation lam={0};
+        e->texAnimLight  = AddLight(&lit1,&lam);
+        e->texAnimLight2 = AddLight(&lit2,&lam);
+        e->textureAnimating = true; e->texAnimClip = 12; e->texFrame = 0;
+    } else if (e->index == 746) { // weapon_grenadeenergmine_live
+        e->textureAnimating = true; e->texAnimClip = 2; e->texFrame = 0;
+    }
+    
+    Eng_Global->instances[i].lockedMessageLingdex = EntityDefinitions[entIdx].lockedMessageLingdex;
+    Eng_Global->dirtyInstances[i] = true;
+    Eng_Global->loadedInstances++;
+}
+
+void DeleteInstance(uint16_t i) {
+    if (i <= PLAYER2 || i >= Eng_Global->loadedInstances) return; // Don't delete null ent, player 1, nor player 2 or already empty slots.
+    
+    uint16_t endInstance = vmax(vmin(INSTANCE_COUNT - 1, Eng_Global->loadedInstances - 1),START_INDEX_LEVEL_INSTANCES);
+//     for (;i<endInstance;++i) Eng_Global->instances[i] = Eng_Global->instances[i + 1]; // Shift the entire list down, overwriting the entity we're deleting at starting i
+    for (;i<endInstance;++i) __builtin_memcpy(&Eng_Global->instances[i], &Eng_Global->instances[i+1], sizeof(Entity));
+    --Eng_Global->loadedInstances; // Shift final marker.  It's history!
+}
 
 static const Color fogLUT[] = {
     {0.3207547f, 0.29200783f, 0.29200783f, 0.07f},
@@ -906,23 +955,6 @@ static const Color fogLUT[] = {
     {0.48235294f,0.58431375f, 0.5176471f, 0.05f},
     {0.0f,       0.0f,        0.0f,       0.005f},
 };
-
-MOD_TO_ENGINE void LoadEntities(void) {
-    double start_time = get_time();
-    Eng_Global->entityCount = 0;
-    DataParser entity_parser;
-    if (!parse_data_file(&entity_parser, MAX_ENTITIES, "./Data/entities.txt")) { DualLogError("Could not parse ./Data/entities.txt!\n"); return; }
-    
-    Eng_Global->entityCount = (uint16_t)entity_parser.count;
-    DualLog("Loading  %d entities...", Eng_Global->entityCount);
-    if (Eng_Global->entityCount > MAX_ENTITIES) { DualLogError("Too many entities in parser count %d, greater than %d!\n",Eng_Global->entityCount,MAX_ENTITIES); return; }
-    if (Eng_Global->entityCount == 0) { DualLogError("No entities found in entities.txt\n"); return; }
-
-    __builtin_memset(Eng_Global->entities,0,MAX_ENTITIES * sizeof(Entity));
-    ModEntityDefinitionsInitAfterLoad(&entity_parser);
-//     OS_DeallocateRAM(entity_parser.entries,entity_parser.count * sizeof(Entity));
-    DualLog(" took %f secs\n", get_time() - start_time);
-}
 
 extern uint16_t headmountedLanternLight;
 MOD_TO_ENGINE void LoadLevelMod(uint8_t curlevel) {
@@ -1065,8 +1097,8 @@ MOD_TO_ENGINE void LoadLevelMod(uint8_t curlevel) {
                 else if (StringsEqual(trimmed_key,"useFinished"))     inst->useFinished = parse_float(trimmed_value, initialLine, lineNum) + Eng_Global->pauseRelativeTime;
                 else if (StringsEqual(trimmed_key,"waitBeforeClose")) inst->waitBeforeClose = parse_float(trimmed_value, initialLine, lineNum) + Eng_Global->pauseRelativeTime;
                 else if (StringsEqual(trimmed_key,"lasersFinished"))  inst->lasersFinished = parse_float(trimmed_value, initialLine, lineNum) + Eng_Global->pauseRelativeTime;
-                else if (StringsEqual(trimmed_key,"changeMatOnActive")) flag_set(&inst->entflags, ENTFLAG_CHANGE_TEX_ON_ACTIVE, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (StringsEqual(trimmed_key,"blinkWhenActive")) flag_set(&inst->entflags, ENTFLAG_BLINK_TEX_ON_ACTIVE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsEqual(trimmed_key,"changeMatOnActive")) inst->changeTexOnActive = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"blinkWhenActive")) inst->blinkTexOnActive = parse_bool(trimmed_value, initialLine, lineNum);
                 else if (StringsEqual(trimmed_key,"doorOpen"))        flag_set(&inst->ioflags, TARG_IOFLAGS_DOOROPEN, parse_bool(trimmed_value, initialLine, lineNum));
                 else if (StringsEqual(trimmed_key,"doorOpenIfUnlocked")) flag_set(&inst->ioflags, TARG_IOFLAGS_DOOROPENIFUNLOCKED, parse_bool(trimmed_value, initialLine, lineNum));
                 else if (StringsEqual(trimmed_key,"doorClose"))       flag_set(&inst->ioflags, TARG_IOFLAGS_DOORCLOSE, parse_bool(trimmed_value, initialLine, lineNum));
@@ -1127,17 +1159,17 @@ MOD_TO_ENGINE void LoadLevelMod(uint8_t curlevel) {
             if (!activeStateRead) flag_set(&Eng_Global->instances[parent].entflags, ENTFLAG_ACTIVE, true);
             if (EntityIndexIsPortalBlockingDoor(entIdx)) AddDoorPortal(entIdx,parent);
             for (int i=0;i<MAX_CHILD_COUNT;++i) {
-                if (Eng_Global->instances[parent].child[i] < Eng_Global->entityCount) {
-                    if (Eng_Global->entities[entIdx].child[i] != UINT16_MAX) { // Add child
+                if (Eng_Global->instances[parent].child[i] < MAX_ENTITIES) {
+                    if (EntityDefinitions[entIdx].child[i] != UINT16_MAX) { // Add child
                         instanceIdx++; // Increment head of the list an extra time for the child entity.
-                        AddInstance(Eng_Global->entities[entIdx].child[i], instanceIdx);
-                        Eng_Global->instances[instanceIdx].index = Eng_Global->entities[entIdx].child[i];
-                        Eng_Global->instances[instanceIdx].position.x = Eng_Global->instances[parent].position.x + Eng_Global->entities[entIdx].child_offset[i].x;
-                        Eng_Global->instances[instanceIdx].position.y = Eng_Global->instances[parent].position.y + Eng_Global->entities[entIdx].child_offset[i].y;
-                        Eng_Global->instances[instanceIdx].position.z = Eng_Global->instances[parent].position.z + Eng_Global->entities[entIdx].child_offset[i].z;
-                        Eng_Global->instances[instanceIdx].scale.x = Eng_Global->instances[parent].scale.x * Eng_Global->entities[entIdx].child_scale[i].x;
-                        Eng_Global->instances[instanceIdx].scale.y = Eng_Global->instances[parent].scale.y * Eng_Global->entities[entIdx].child_scale[i].y;
-                        Eng_Global->instances[instanceIdx].scale.z = Eng_Global->instances[parent].scale.z * Eng_Global->entities[entIdx].child_scale[i].z;
+                        AddInstance(EntityDefinitions[entIdx].child[i], instanceIdx);
+                        Eng_Global->instances[instanceIdx].index = EntityDefinitions[entIdx].child[i];
+                        Eng_Global->instances[instanceIdx].position.x = Eng_Global->instances[parent].position.x + EntityDefinitions[entIdx].child_offset[i].x;
+                        Eng_Global->instances[instanceIdx].position.y = Eng_Global->instances[parent].position.y + EntityDefinitions[entIdx].child_offset[i].y;
+                        Eng_Global->instances[instanceIdx].position.z = Eng_Global->instances[parent].position.z + EntityDefinitions[entIdx].child_offset[i].z;
+                        Eng_Global->instances[instanceIdx].scale.x = Eng_Global->instances[parent].scale.x * EntityDefinitions[entIdx].child_scale[i].x;
+                        Eng_Global->instances[instanceIdx].scale.y = Eng_Global->instances[parent].scale.y * EntityDefinitions[entIdx].child_scale[i].y;
+                        Eng_Global->instances[instanceIdx].scale.z = Eng_Global->instances[parent].scale.z * EntityDefinitions[entIdx].child_scale[i].z;
                     }
                 }
             }

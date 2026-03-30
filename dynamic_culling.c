@@ -17,17 +17,17 @@ Portal activePortals[MAX_PORTALS];
 static uint8_t numActivePortals = 0;
 
 __attribute__((pure)) bool get_cull_bit(const uint32_t* arr, int idx) {
-    int word = idx / 32;
-    int bit = idx % 32;
+    int word = idx / 32; int bit = idx % 32;
     return ((arr[word] & (1U << bit)) != 0);
 }
 
 static inline __attribute__((always_inline)) void set_cull_bit(uint32_t* arr, int idx, bool val) {
-    int word = idx / 32;
-    int bit = idx % 32;
+    int word = idx / 32; int bit = idx % 32;
     if (val) arr[word] |= (1U << bit);
     else arr[word] &= ~(1U << bit);
 }
+
+ENGINE_TO_MOD int32_t PosGetCellCoords(float x, float z) { return (PosGetCellCoordZ(z) * WORLDX) + PosGetCellCoordX(x); } // Clamped just above.
 
 static unsigned char* LoadCullPNG(const char* name, int level) {
     char path[256]; StringFormat(path, sizeof(path),"./Data/%s_%d.png",name,level);

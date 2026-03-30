@@ -1325,13 +1325,12 @@ index: 598
 index: 599
 #Textures/p_medi.png
 index: 600
-#Textures/pnl10_cl.png
+#Textures/pnl10.png
 index: 601
 #Textures/UI/frobicons/amm_tranq.png
 index: 602
 transparent: 1
-#Textures/pnl12_on.png
-index: 603
+
 #Textures/pnl13.png
 index: 604
 #Textures/UI/frobicons/arm.png
@@ -1384,34 +1383,28 @@ transparent: 1
 #Textures/UI/frobicons/card_group4.png
 index: 624
 transparent: 1
-#Textures/pnl6_cl.png
+#Textures/pnl6.png
 index: 625
 #Textures/UI/frobicons/card_group5.png
 index: 626
 transparent: 1
-#Textures/pnl6_on.png
-index: 627
-#Textures/pnl7_cl.png
-index: 628
+
 #Textures/UI/frobicons/card_group6.png
 index: 629
 transparent: 1
-#Textures/pnl7_on.png
-index: 630
-#Textures/pnl8_cl.png
+
+#Textures/pnl8.png
 index: 631
 #Textures/UI/frobicons/card_medi.png
 index: 632
 transparent: 1
-#Textures/pnl8_on.png
-index: 633
-#Textures/pnl9_cl.png
+
+#Textures/pnl9.png
 index: 634
 #Textures/UI/frobicons/card_per1.png
 index: 635
 transparent: 1
-#Textures/pnl9_on.png
-index: 636
+
 #Textures/pnl_ded.png
 index: 637
 #Textures/poisonbushtrunk.png

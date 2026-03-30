@@ -226,7 +226,6 @@ void Screenshot(void);
 void DebugRAM(const char *context);
 extern uint32_t random_range_rng;
 double get_time(void);
-void AddInstance(uint16_t entIdx, uint16_t instanceIdx);
 uint32_t xs32(void);
 char* data_parser_trim(char* s);
 int32_t StringToInt(const char *str);
