@@ -140,7 +140,7 @@ void DebugRAM(const char *context) {
         p++;
     }
 
-    DualLog("Memory at %s: Heap %zu bytes (%zu KB | %.2f MB), USS %zu bytes (%zu KB | %.2f MB)\n",context,heap_bytes,heap_bytes / 1024,heap_bytes / 1024.0 / 1024.0,uss_bytes,uss_bytes / 1024,uss_bytes / 1024.0 / 1024.0);
+    DualLog("Memory at %s: Heap %u bytes (%u KB | %.2f MB), USS %u bytes (%u KB | %.2f MB)\n",context,heap_bytes,heap_bytes / 1024,heap_bytes / 1024.0 / 1024.0,uss_bytes,uss_bytes / 1024,uss_bytes / 1024.0 / 1024.0);
 #else
     (void)context;
 #endif

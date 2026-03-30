@@ -847,7 +847,6 @@ MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(void) { // Global condition
         if (EntityDefinitions[i].index == UINT16_MAX) continue;
         
         flag_set(&EntityDefinitions[i].entflags,ENTFLAG_ACTIVE,true); // Individual value setting to allow mods to set custom starting flags themselves. (or here too if they want, tis your oyster).
-        DualLog("Set entity %u to active\n",i);
         flag_set(&EntityDefinitions[i].entflags,ENTFLAG_RIGIDBODY,ConstIndexIsDynamicObject(EntityDefinitions[i].index));
         if (EntityDefinitions[i].cardchunk) {
             EntityDefinitions[i].lodIndex = GEOMETRY_LOD_CARD_MODEL_IDX;
