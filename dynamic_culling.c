@@ -651,28 +651,23 @@ ENGINE_TO_MOD void PortalCulling(void) { // Called just once at end of animation
     }
     
     DetermineVisibleCells(playerCellX,playerCellZ); // Recompute full PVS with new closed edges for all portal states.  So much for the precomputed set.
-    for (uint16_t i=0; i<Sys_Global.loadedLights;++i) flag_setu32(&lights[i].lflags,LDIRTY,true);
+    for (uint16_t i=0;i<Sys_Global.loadedLights;++i) flag_setu32(&lights[i].lflags,LDIRTY,true);
 }
 
-static inline __attribute__((always_inline)) void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* pos_z) {
-    *pos_x = Sys_Global.worldMin_x + (x * WORLDCELL_WIDTH_F);
-    *pos_z = Sys_Global.worldMin_z + (z * WORLDCELL_WIDTH_F);
-}
-
+static inline __attribute__((always_inline)) void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* pos_z) { *pos_x = Sys_Global.worldMin_x + (x * WORLDCELL_WIDTH_F); *pos_z = Sys_Global.worldMin_z + (z * WORLDCELL_WIDTH_F); }
 bool CullCore(void) {
     if (Sys_Global.currentLevel >= LEVEL_CYBERSPACE) return false;
 
     numCellsVisible = 0;
-    float pos_x, pos_z;
-    uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((Sys_Global.instances[PLAYER1].position.x - Sys_Global.worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
-	uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((Sys_Global.instances[PLAYER1].position.z - Sys_Global.worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
-    CellCoordsToPos(cellX,cellZ, &pos_x,&pos_z);
+    float pos_x,pos_z;
+    uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((Sys_Global.instances[PLAYER1].position.x - Sys_Global.worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F),0,WORLDX_0BASED);
+    uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((Sys_Global.instances[PLAYER1].position.z - Sys_Global.worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F),0,WORLDX_0BASED);
+    CellCoordsToPos(cellX,cellZ,&pos_x,&pos_z);
     for (int i=0;i<Sys_Global.loadedInstances;++i) {
-        float distSqrd = squareDistance2D(Sys_Global.instances[i].position.x, Sys_Global.instances[i].position.z, pos_x, pos_z);
+        float distSqrd = squareDistance2D(Sys_Global.instances[i].position.x,Sys_Global.instances[i].position.z,pos_x,pos_z);
         instanceIsLODArray[i] = (distSqrd >= 655.36f); // 25.6f * 25.6f
     }
     
     PortalCulling(); // Update based on portal states.
-    glNamedBufferData(Sys_Render.cellVisibleDataID,ARRSIZE * sizeof(uint32_t), gridCellStates, GL_DYNAMIC_DRAW);
     return true;
 }

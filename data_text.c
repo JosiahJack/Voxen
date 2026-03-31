@@ -3,7 +3,6 @@
 char *strncpy(char *dest, const char *src, size_t n);
 TextSystem Sys_Text = { .file_data = NULL };
 uint16_t logImages = 1272; // Start index of first index 0 logImages[0] is blank1.png
-
 size_t utf16le_to_utf8(const uint8_t* src, size_t src_len, char* dst, size_t dst_len) {
     size_t dst_pos = 0; size_t src_pos = 0;
     while (src_pos < src_len && dst_pos < dst_len - 4) {
@@ -23,42 +22,23 @@ size_t utf16le_to_utf8(const uint8_t* src, size_t src_len, char* dst, size_t dst
     dst[dst_pos] = '\0'; return dst_pos;
 }
 
+const char* localizations[8] = {"./Data/text_english.txt","./Data/text_espanol.txt","./Data/text_deutsch.txt","./Data/text_francais.txt",
+                               "./Data/text_nihongo.txt","./Data/text_russkiy.txt","./Data/text_italiano.txt","./Data/text_portugues.txt"};
 void LoadTextForLanguage(uint8_t lang) {
     char textFile[256] = {0};
-    const char* filename;
-
-    switch (lang) {
-        case 1: filename = "./Data/text_espanol.txt";   break;
-        case 2: filename = "./Data/text_deutsch.txt";   break;
-        case 3: filename = "./Data/text_francais.txt";  break;
-        case 4: filename = "./Data/text_nihongo.txt";   break;
-        case 5: filename = "./Data/text_russkiy.txt";   break;
-        case 6: filename = "./Data/text_italiano.txt";  break;
-        case 7: filename = "./Data/text_portugues.txt"; break;
-        default:filename = "./Data/text_english.txt";   break;
-    }
+    const char* filename = localizations[lang < 8 ? lang : 0];
     strncpy(textFile, filename, sizeof(textFile) - 1);
     textFile[sizeof(textFile) - 1] = '\0';
-
     OsFileHandle dummy_fd = OS_INVALID_HANDLE;
     int alloc_size = 0;
-
-    // Free previous allocation if any (important when changing language)
-    if (Sys_Text.file_data) {
+    if (Sys_Text.file_data) { // Free previous allocation if any (important when changing language)
         OS_DeallocateRAM(Sys_Text.file_data, Sys_Text.file_size);
         Sys_Text.file_data = NULL;
         Sys_Text.file_size = 0;
     }
 
-    Sys_Text.file_data = (uint8_t*) OS_OpenAndAllocateFileBufferReadonly(
-        textFile, &dummy_fd, &alloc_size);
-
-    if (!Sys_Text.file_data || alloc_size <= 0) {
-        DualLogError("Failed to load text file: %s\n", textFile);
-        Sys_Text.file_data = NULL;
-        Sys_Text.file_size = 0;
-        return;
-    }
+    Sys_Text.file_data = (uint8_t*)OS_OpenAndAllocateFileBufferReadonly(textFile,&dummy_fd,&alloc_size);
+    if (!Sys_Text.file_data || alloc_size <= 0) { DualLogError("Failed to load text file: %s\n", textFile); return; }
 
     Sys_Text.file_size = (size_t)alloc_size;
     size_t data_pos=0;int is_utf16le=0;
@@ -99,53 +79,33 @@ static inline __attribute__((always_inline)) int StringToIntLen(const char *str,
         char c = str[i];
         if (c < '0' || c > '9') break;
 
-        value = value * 10 + (c - '0');
-        ++i;
+        value = value * 10 + (c - '0'); ++i;
     }
+    
     return value;
 }
 
+const char* logLocalizations[8] = {"./Data/logs_text_english.txt","./Data/logs_text_espanol.txt","./Data/logs_text_deutsch.txt","./Data/logs_text_francais.txt",
+                                  "./Data/logs_text_nihongo.txt","./Data/logs_text_russkiy.txt","./Data/logs_text_italiano.txt","./Data/logs_text_portugues.txt"};
 void LoadLogTextForLanguage(uint8_t lang) {
     __builtin_memset(Sys_Text.audioLogImagesRefIndicesLH, 0, TEXT_LOGS_COUNT * sizeof(uint16_t));
     __builtin_memset(Sys_Text.audioLogImagesRefIndicesRH, 0, TEXT_LOGS_COUNT * sizeof(uint16_t));
     __builtin_memset(Sys_Text.audioLogType,               0, TEXT_LOGS_COUNT * sizeof(uint8_t));
     __builtin_memset(Sys_Text.audioLogLevelFound,         0, TEXT_LOGS_COUNT * sizeof(uint8_t));
-
     char textFile[256] = {0};
-    const char* filename;
-
-    switch (lang) {
-        case 1: filename = "./Data/logs_text_espanol.txt";   break;
-        case 2: filename = "./Data/logs_text_deutsch.txt";   break;
-        case 3: filename = "./Data/logs_text_francais.txt";  break;
-        case 4: filename = "./Data/logs_text_nihongo.txt";   break;
-        case 5: filename = "./Data/logs_text_russkiy.txt";   break;
-        case 6: filename = "./Data/logs_text_italiano.txt";  break;
-        case 7: filename = "./Data/logs_text_portugues.txt"; break;
-        default:filename = "./Data/logs_text_english.txt";   break;
-    }
+    const char* filename = logLocalizations[lang < 8 ? lang : 0];
     strncpy(textFile, filename, sizeof(textFile) - 1);
     textFile[sizeof(textFile) - 1] = '\0';
-
     OsFileHandle dummy_fd = OS_INVALID_HANDLE;
     int alloc_size = 0;
-
-    // Free previous allocation if any
-    if (Sys_Text.filelog_data) {
+    if (Sys_Text.filelog_data) { // Free previous allocation if any
         OS_DeallocateRAM(Sys_Text.filelog_data, Sys_Text.filelog_size);
         Sys_Text.filelog_data = NULL;
         Sys_Text.filelog_size = 0;
     }
 
-    Sys_Text.filelog_data = (uint8_t*) OS_OpenAndAllocateFileBufferReadonly(
-        textFile, &dummy_fd, &alloc_size);
-
-    if (!Sys_Text.filelog_data || alloc_size <= 0) {
-        DualLogError("Failed to load log text file: %s\n", textFile);
-        Sys_Text.filelog_data = NULL;
-        Sys_Text.filelog_size = 0;
-        return;
-    }
+    Sys_Text.filelog_data = (uint8_t*) OS_OpenAndAllocateFileBufferReadonly(textFile,&dummy_fd,&alloc_size);
+    if (!Sys_Text.filelog_data || alloc_size <= 0) { DualLogError("Failed to load log text file: %s\n", textFile); return; }
 
     Sys_Text.filelog_size = (size_t)alloc_size;
     size_t data_pos=0;int is_utf16le=0;
@@ -187,14 +147,19 @@ void LoadLogTextForLanguage(uint8_t lang) {
                 case 6:log_type=StringToIntLen(start,tok_len);break;
                 case 7:level_found=StringToIntLen(start,tok_len);break;
                 default:if(log_index>=0&&log_index<TEXT_LOGS_COUNT){char*dst=Sys_Global.audioLogSpeech2Text[log_index];size_t cur=GetStringLength(dst);if(cur>0&&cur<TEXT_LOCALIZATION_MAX_LENGTH*4-2){dst[cur++]=',';dst[cur]='\0';}size_t left=TEXT_LOCALIZATION_MAX_LENGTH*4-cur-1;if(left>0){size_t cl=tok_len;if(cl>left)cl=left;StringCopyInto_A_SubstringFrom_B(dst+cur,cl,start,left+1);}}break;
-            }if(*pos==',')++pos;field_idx++;
+            }
+            
+            if(*pos==',') ++pos;
+            field_idx++;
         }
+        
         if(log_index>=0&&log_index<TEXT_LOGS_COUNT){
             Sys_Text.audioLogImagesRefIndicesLH[log_index]=(uint16_t)img_lh;
             Sys_Text.audioLogImagesRefIndicesRH[log_index]=(uint16_t)img_rh;
             Sys_Text.audioLogType[log_index]=(uint8_t)log_type;
             Sys_Text.audioLogLevelFound[log_index]=(uint8_t)level_found;
         }
+        
     next_line:continue;
     }
 }

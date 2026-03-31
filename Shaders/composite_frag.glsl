@@ -2,7 +2,7 @@
 #version 430 core
 in vec2 TexCoord;
 out vec4 FragColor;
-layout(rgba32f, binding = 1) readonly uniform image2D inputWorldPos;
+layout(rgba32f,binding=1) readonly uniform image2D inputWorldPos;
 
 layout(location =  2) uniform uint screenWidth;
 layout(location =  3) uniform uint screenHeight;

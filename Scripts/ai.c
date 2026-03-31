@@ -779,7 +779,7 @@ static void AIDying(Entity* self) {
         self->currentState = AIState_Dead;
     }
 
-    if (AIDeactivatesVisibleMeshWhileDying(self)) flag_set(&self->entflags,ENTFLAG_VISIBLE,false);
+    if (AIDeactivatesVisibleMeshWhileDying(self)) self->modelIndex = MODEL_IDX_MAX;
     if (self->index == 439) self->layer = PhysicsLayer_Corpse | PhysicsLayer_CorpseSearchable; // Zero-G mutant enables search collider while still dying
 }
 
@@ -791,16 +791,16 @@ static void AIDead(uint16_t idx) {
     flag_set(&self->entflags, ENTFLAG_DYING_SETUP,  false);
     if (self->entflags & ENTFLAG_DEAD_CHECKS_DONE) return;
 
-    if (AIDeactivatesVisibleMeshWhileDying(self)) flag_set(&self->entflags,ENTFLAG_VISIBLE,false);
+    if (AIDeactivatesVisibleMeshWhileDying(self)) self->modelIndex = MODEL_IDX_MAX;
     self->currentState = AIState_Dead;
     self->layer = PhysicsLayer_Corpse;
     if (self->entflags & ENTFLAG_TELEPORT_ON_DEATH) {
         self->gravity = 1.0f;
-        flag_set(&self->entflags,ENTFLAG_VISIBLE,false);
+        self->modelIndex = MODEL_IDX_MAX;
         // TODO: TeleportAway(ai_self_idx(self)), DeleteInstance(idx);
     } else if (ai_is_cyber(self)) {
         self->gravity = 0.0f;
-        flag_set(&self->entflags, ENTFLAG_VISIBLE,false);
+        self->modelIndex = MODEL_IDX_MAX;
         // TODO: Gib(ai_self_idx(self)) — spawn gibs
         DeleteInstance(idx);
     } else {
@@ -949,7 +949,7 @@ static void ProjectileLaunched(Entity* self, int n) {
     if (vabs(self->gravity) > 0.05f) { shove.x += self->velocity.x; shove.z += self->velocity.z; }
     proj->velocity = (Vector3){0,0,0};
     AddForce(bb, shove, true);
-    flag_set(&proj->entflags, ENTFLAG_ACTIVE | ENTFLAG_VISIBLE | ENTFLAG_RIGIDBODY, true);
+    flag_set(&proj->entflags, ENTFLAG_ACTIVE | ENTFLAG_RIGIDBODY, true);
 }
 
 static void AIExplodeAttack(Entity* self) {

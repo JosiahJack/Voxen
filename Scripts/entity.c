@@ -1047,7 +1047,7 @@ MOD_TO_ENGINE void LoadLevelMod(uint8_t curlevel) {
             StringFormat(trimmed_value, sizeof(trimmed_value), "%s", value);
             trimmed_key[sizeof(trimmed_key) - 1] = '\0';
             trimmed_value[sizeof(trimmed_value) - 1] = '\0';
-            if (isLight) LoadFieldIntoLight((char*)&trimmed_key,(char*)&trimmed_value,initialLine,lineNum,&lightsFromFile[lightsIdx],&lanimsFromFile[lightsIdx]);
+            if (isLight) LoadFieldIntoLight((char*)&trimmed_key,(char*)&trimmed_value,initialLine,lineNum,&lightsFromFile[lightsIdx],&lanimsFromFile[lightsIdx],lightsIdx);
             else {
                 Entity* inst = &Eng_Global->instances[instanceIdx];
                      if (StringsEqual(trimmed_key,"constIndex"))      inst->index = parse_numberu16(trimmed_value, initialLine, lineNum);

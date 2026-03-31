@@ -33,6 +33,7 @@ static float lightViewProj[LIGHT_COUNT][6][16]; // Array of Array of 6 Arrays of
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6]; // Array of Array of 6 Arrays of FrustumPlane structs (four floats).  lightFrustumPlanes[i][face][.nx,.ny,, .nz, .d]
 FrustumPlane playerFrustumPlanes[6];
 uint16_t editModeSelection, editModeTestEntityDefinition = 0; // Test instance and its model index
+typedef struct { double shadowTime; uint32_t numShadowsCouldRender; uint32_t shadowmapIndirectionList[LIGHT_COUNT]; float shadDotThresh; } VoxenShadowSystem;
 VoxenShadowSystem voxen_Shadow_System;
 uint16_t loadedTexturesMaxIndex;
 bool doubleSidedTexture[MAX_VALID_TEXTURE];
@@ -68,25 +69,18 @@ typedef struct { unsigned short x0,y0,x1,y1; float xoff,yoff,xadvance; float xof
 typedef struct { float x0,y0,s0,t0; float x1,y1,s1,t1; } stbtt_aligned_quad; // 0 is top-left, 1 is bottom-right
 void stbtt_GetPackedQuad(const stbtt_packedchar *chardata, int pw, int ph, int char_index, float *xpos, float *ypos, stbtt_aligned_quad *q, int align_to_integer);
 
-// Logs both to log file and console, usage same as printf
-static void DualLogMain(const char *prefix, const char *fmt, va_list args) {
-    char buf[2048]; va_list copy;
-    __builtin_va_copy(copy, args);
-    StringFormatV(buf, sizeof(buf), fmt, copy);
-    __builtin_va_end(copy);
-    // Write to console (stdout / stderr)
-    #ifdef WINDOWS
+static void DualLogMain(const char *prefix, const char *fmt, va_list args) { // Logs both to log file and console, usage same as printf
+    char buf[4096]; va_list copy; __builtin_va_copy(copy,args); StringFormatV(buf,sizeof(buf),fmt,copy); __builtin_va_end(copy);
+    #ifdef WINDOWS // Write to console (stdout / stderr)
         OsFileHandle out = GetStdHandle((prefix && prefix[0] == '\033') ? (DWORD)-12 : (DWORD)-11);
         if (prefix) OS_RawWrite(out, prefix, GetStringLength(prefix));
         OS_RawWrite(out, buf, GetStringLength(buf));
-    #else
-        // Linux - write to stdout (fd 1) or stderr (fd 2)
+    #else // Linux - write to stdout (fd 1) or stderr (fd 2)
         OsFileHandle out = (prefix && prefix[0] == '\033') ? 2 : 1;  // use stderr for colored warnings/errors
         if (prefix) { OS_RawWrite(out, prefix, GetStringLength(prefix)); OS_RawWrite(out,"\033[0m ", 5); }
         OS_RawWrite(out, buf, GetStringLength(buf));
     #endif
-    // Write to console_log_file
-    if (console_log_file != OS_INVALID_HANDLE) {
+    if (console_log_file != OS_INVALID_HANDLE) { // Write to console_log_file
         if (prefix) { OS_Write(console_log_file, prefix, GetStringLength(prefix), "console.log"); OS_Write(console_log_file,"\033[0m ",5,"console.log"); }
         OS_Write(console_log_file, buf, GetStringLength(buf), "console.log");
     }
@@ -112,11 +106,7 @@ void CompileShaders(void) {
     Sys_Render.shadowmapsClearShaderProgram = CompileComputeShader(shadowmapsClearComputeSrc, "Shadowmaps Clear");
 }
 
-GLuint SetupSSBO(GLuint* id, GLuint bindingIndex, GLsizeiptr size, const void* data, GLenum usage) {
-    glGenBuffers(1, id); glBindBuffer(GL_SHADER_STORAGE_BUFFER, *id);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, size, data, usage);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, bindingIndex, *id); return *id;
-}
+GLuint SetupSSBO(GLuint* id, GLuint bindx, GLsizeiptr sz, const void* d, GLenum typ) { glGenBuffers(1,id); glBindBuffer(GL_SSBO,*id); glBufferData(GL_SSBO,sz,d,typ); glBindBufferBase(GL_SHADER_STORAGE_BUFFER,bindx,*id); return *id; }
 
 // Generates View Matrix4x4 for Geometry Rasterizer Pass from camera world position + orientation
 void mat4_lookat_from(float* m, Quaternion* camRotation, Vector3 eye) { // Kept around for light views for shadowmap cubemap faces.
@@ -155,6 +145,93 @@ Quaternion cubemapOrientationQuaternion[6] = {
     {0.0f, 0.0f, 0.0f, 1.0f},                  // +Z: Forward
     {0.0f, 1.0f, 0.0f, 0.0f}                   // -Z: Backward
 };
+
+ENGINE_TO_MOD void InitializeEntity(Entity* entry) { // Blank entity, no index yet, for initial list population or temporary Entity.
+    entry->index = UINT16_MAX; // memset here would be harmful as only a handful of fields are the same.
+    entry->entflags = (ENTFLAG_KINEMATIC | ENTFLAG_ACTIVE); // Zeroes the rest out.
+    entry->modelIndex = MODEL_IDX_MAX;
+    entry->layer = PhysicsLayer_Default;
+    entry->texIndex = entry->glowIndex = entry->specIndex = entry->normIndex = MAX_VALID_TEXTURE;
+    entry->lodIndex  = MODEL_IDX_MAX;
+    entry->camView = 255;
+    entry->rotation.x = entry->rotation.y = entry->rotation.z = 0.0f; entry->rotation.w = 1.0f; // Quaternion identity
+    entry->scale.x = entry->scale.y = entry->scale.z = 1.0f;
+    entry->collider = COLLIDER_TYPE_NONE;
+    entry->colliderMeshIndex = MODEL_IDX_MAX;
+    entry->tickTime = 0.35f;
+    entry->mass = 1.0f;
+    entry->angularDrag = 0.05f;
+    entry->dynamicFriction = entry->staticFriction = 0.6f;
+    entry->frictionCombine = entry->bounceCombine = PHYS_COMBINE_AVG;
+    entry->volume = 1.0f;
+    for (int i=0;i<MAX_CHILD_COUNT;++i) {
+        entry->child[i] = UINT16_MAX;
+        entry->child_offset[i].x = entry->child_offset[i].y = entry->child_offset[i].z = 0.0f;
+        entry->child_rotation[i].x = entry->child_rotation[i].y = entry->child_rotation[i].z = 0.0f; entry->child_rotation[i].w = 1.0f;
+        entry->child_scale[i].x = entry->child_scale[i].y = entry->child_scale[i].z = 1.0f;
+    }
+    entry->path[0] = '\0';    
+}
+
+ENGINE_TO_MOD int32_t AddLight(Light* lit, LightAnimation* lanim) {
+    int32_t i = Sys_Global.loadedLights;
+    Sys_Global.loadedLights++;
+    if (Sys_Global.loadedLights >= LIGHT_COUNT) { DualLogError("Too many lights %u added in level %d!\n",i,Sys_Global.currentLevel); OS_Exit(1); }
+
+    __builtin_memcpy(&lights[i],lit,sizeof(Light));
+    __builtin_memcpy(&lanims[i],lanim,sizeof(LightAnimation));
+    lightsNewPosition[i] = lit->pos;
+    flag_setu32(&lights[i].lflags,LDIRTY,true);
+    return i;
+}
+
+ENGINE_TO_MOD void TurnLightOff(uint16_t litIdx) {
+    if (litIdx >= Sys_Global.loadedLights) return;
+    
+    flag_setu32(&lights[litIdx].lflags,LIGHTON,false);
+}
+
+bool alreadyReadLightOnOnce[LIGHT_COUNT] = {0};
+ENGINE_TO_MOD void LoadFieldIntoLight(char* trimmed_key, char* trimmed_value, char* initialLine, uint32_t lineNum, Light* lit, LightAnimation* lam, uint16_t lightIdx) {
+    char buffer[32];
+    for (int i=0;i <32;++i) {
+        StringFormat(buffer,sizeof(buffer),"intervalSteps[%d]",i);
+        if (StringsEqual(trimmed_key,buffer)) { lam->intervalSteps[i] = parse_float(trimmed_value,initialLine,lineNum); return; }
+    }
+    
+    for (int i=0;i <32;++i) {
+        StringFormat(buffer,sizeof(buffer),"intervalStepisLerping[%d]",i);
+        if (StringsEqual(trimmed_key,buffer)) { lam->stepIsLerping[i] = parse_float(trimmed_value,initialLine,lineNum); return; }
+    }
+         if (StringsEqual(trimmed_key,"currentStep"))                  lam->currentStep = parse_numberu8(trimmed_value,initialLine,lineNum);
+    else if (StringsEqual(trimmed_key,"lerpValue"))                    lam->lerpValue = parse_float(trimmed_value,initialLine,lineNum);
+    else if (StringsEqual(trimmed_key,"intervalSteps.Length"))         lam->numIntervalSteps = parse_numberu8(trimmed_value,initialLine,lineNum);
+    else if (StringsEqual(trimmed_key,"intervalStepisLerping.Length")) lam->numLerpSteps = parse_numberu8(trimmed_value,initialLine,lineNum);
+    
+    else if (StringsEqual(trimmed_key,"localPosition.x")) lit->pos.x = parse_float(trimmed_value,initialLine,lineNum);
+    else if (StringsEqual(trimmed_key,"localPosition.y")) lit->pos.y = parse_float(trimmed_value,initialLine,lineNum);
+    else if (StringsEqual(trimmed_key,"localPosition.z")) lit->pos.z = parse_float(trimmed_value,initialLine,lineNum);
+    else if (StringsEqual(trimmed_key,"localRotation.x")) lit->spotDir.x = parse_float(trimmed_value,initialLine,lineNum);
+    else if (StringsEqual(trimmed_key,"localRotation.y")) lit->spotDir.y = parse_float(trimmed_value,initialLine,lineNum);
+    else if (StringsEqual(trimmed_key,"localRotation.z")) lit->spotDir.z = parse_float(trimmed_value,initialLine,lineNum);
+    else if (StringsEqual(trimmed_key,"localRotation.w")) lit->spotDir.w = parse_float(trimmed_value,initialLine,lineNum);
+    else if (StringsEqual(trimmed_key,"intensity"))    lit->intensity = lit->maxIntensity = parse_float(trimmed_value,initialLine,lineNum) * 0.35f;
+    else if (StringsEqual(trimmed_key,"range"))        lit->range = parse_float(trimmed_value, initialLine, lineNum);
+    else if (StringsEqual(trimmed_key,"spotAngle"))    lit->spotAng = parse_float(trimmed_value, initialLine, lineNum);
+    else if (StringsEqual(trimmed_key,"type")) {
+             if (StringsEqual(trimmed_value,"Spot"))        flag_setu32(&lit->lflags,LSPOT,true);
+        else if (StringsEqual(trimmed_value,"Directional")) flag_setu32(&lit->lflags,LDIR,true);
+    }
+    else if (StringsEqual(trimmed_key,"minIntensity")) lit->minIntensity = parse_float(trimmed_value,initialLine,lineNum);
+    else if (StringsEqual(trimmed_key,"maxIntensity")) lit->maxIntensity = parse_float(trimmed_value,initialLine,lineNum);
+    else if (StringsEqual(trimmed_key,"color.r"))      lit->col.r = parse_float(trimmed_value,initialLine,lineNum);
+    else if (StringsEqual(trimmed_key,"color.g"))      lit->col.g = parse_float(trimmed_value,initialLine,lineNum);
+    else if (StringsEqual(trimmed_key,"color.b"))      lit->col.b = parse_float(trimmed_value,initialLine,lineNum);
+    else if (StringsEqual(trimmed_key,"lightOn")) { // This exact value is duplicated from the Unity TargetIO class, ugh.
+        if (!alreadyReadLightOnOnce[lightIdx]) { alreadyReadLightOnOnce[lightIdx] = true; bool on = parse_bool(trimmed_value,initialLine,lineNum); flag_setu32(&lit->lflags,LIGHTON,on); }
+    }
+    else if (StringsEqual(trimmed_key,"lerpOn"))       flag_setu32(&lit->lflags,LERPON,parse_bool(trimmed_value,initialLine,lineNum));
+}
 
 bool lightInPVS[LIGHT_COUNT];
 Vector3 lightsNewPosition[LIGHT_COUNT];
@@ -195,8 +272,7 @@ void UpdateLights(void) {
     if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
         for (int i=0;i<Sys_Global.loadedLights;++i) { // Just lerps/flickers in intensity
             if (lanims[i].numIntervalSteps < 1) continue;
-
-//             if (!(lights[i].lflags & LIGHTON)) { lights[i].intensity = 0.0f; continue; }
+            if (!(lights[i].lflags & LIGHTON)) { lights[i].intensity = 0.0f; continue; }
 
             if (lanims[i].lerpTime < (float)Sys_Global.pauseRelativeTime) {
                 lights[i].intensity = lanims[i].lerpUp ? lights[i].maxIntensity : lights[i].minIntensity; // Pick target to lerp towards
@@ -218,8 +294,7 @@ void UpdateLights(void) {
         }
     }
 
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER,Sys_Render.lightsID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER,Sys_Global.loadedLights * sizeof(Light),lights,GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_SSBO,Sys_Render.lightsID); glBufferData(GL_SSBO,Sys_Global.loadedLights * sizeof(Light),lights,GL_DYNAMIC_DRAW);
     Vector3 p = Sys_Global.instances[PLAYER1].position;
     glUseProgram(Sys_Render.voxelUpdateShaderProgram);
     glUniform3f(5,p.x,p.y,p.z);
@@ -416,10 +491,6 @@ void LoadLevel(uint8_t curlevel) {
     for (int i=0;i<Sys_Global.loadedLights;++i) {/* lights[i].maxIntensity *= 2.0f; */lightsNewPosition[i]=lights[i].pos; }
     DualLog("Loaded %d entities, %u static lights for Level %d... took %f secs\n",Sys_Global.loadedInstances,Sys_Global.loadedLights,curlevel,get_time() - start_time);
     DebugRAM("end of LoadLevel instances");
-    RenderLoadingProgress(110,"Loading models...");
-    LoadModels();
-    RenderLoadingProgress(110,"Loading textures...");
-    LoadTextures();
     RenderLoadingProgress(110,"Initialize entities...");
     for (int i=PLAYER1;i<Sys_Global.loadedInstances;++i) {        
         int32_t cellIdx = PosGetCellCoords(Sys_Global.instances[i].position.x,Sys_Global.instances[i].position.z);
@@ -435,7 +506,7 @@ void LoadLevel(uint8_t curlevel) {
     RenderLoadingProgress(120,"Loading voxel lighting data...");
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < Sys_Global.loadedInstances; i++) Sys_Global.dirtyInstances[i] = true;
     for (uint16_t i = 0; i < Sys_Global.loadedLights; i++) { lightsNewPosition[i] = lights[i].pos; lightInPVS[i] = false; }
-    __builtin_memset(voxen_Shadow_System.shadowmapIndirectionList, MAX_SHADOWMAPS + 1, Sys_Global.loadedLights * sizeof(uint32_t)); // Set to invalid values for all
+    __builtin_memset(voxen_Shadow_System.shadowmapIndirectionList,MAX_SHADOWMAPS + 1,Sys_Global.loadedLights * sizeof(uint32_t)); // Set to invalid values for all
     Sys_Global.levelCurrentlyLoading = false;
 }
 
@@ -998,32 +1069,33 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     DebugRAM("after freeing window bar icon");
     float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     __builtin_memcpy(&modelMatrices[0],mat,16 * sizeof(float)); // Null instance matrix used for UI
-    Sys_Render.cellVisibleDataID       = SetupSSBO(&Sys_Render.cellVisibleDataID,        4, ARRSIZE * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-    Sys_Render.shadowMapSSBO           = SetupSSBO(&Sys_Render.shadowMapSSBO,            5, TOTAL_SHADOWMAP_PIXELS * sizeof(uint32_t), NULL, GL_STATIC_DRAW);    
-    glUseProgram(Sys_Render.shadowmapsShaderProgram); glUniform1ui(9,         SHADOW_MAP_SIZE);
-    glUseProgram(Sys_Render.chunkShaderProgram);      glUniform1ui(21,        SHADOW_MAP_SIZE);
-                                                      glUniform1f (22, (float)SHADOW_MAP_SIZE); glUniform1ui(23, LIGHT_COUNT);
-                                                      glUniform1ui(24, (uint32_t)MAX_LIGHTS_PER_VOXEL);
-    Sys_Render.voxelLightListCountsID  = SetupSSBO(&Sys_Render.voxelLightListCountsID,   6, VOXEL_COUNT * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-    Sys_Render.shadowMapsIndirectionID = SetupSSBO(&Sys_Render.shadowMapsIndirectionID,  8, LIGHT_COUNT * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-    Sys_Render.matricesBufferID        = SetupSSBO(&Sys_Render.matricesBufferID,        11, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices, GL_STATIC_DRAW);
-    Sys_Render.colorBufferID           = SetupSSBO(&Sys_Render.colorBufferID,           12, MAX_TOTAL_PIXELS * sizeof(uint8_t), NULL, GL_STATIC_DRAW);
-    Sys_Render.blueNoiseBuffer         = SetupSSBO(&Sys_Render.blueNoiseBuffer,         13, 12288 * sizeof(float), blueNoise, GL_STATIC_DRAW);
-    Sys_Render.textureOffsetsID        = SetupSSBO(&Sys_Render.textureOffsetsID,        14, MAX_VALID_TEXTURE * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-    Sys_Render.textureSizesID          = SetupSSBO(&Sys_Render.textureSizesID,          15, MAX_VALID_TEXTURE * 2 * sizeof(int32_t), NULL, GL_STATIC_DRAW);
-    Sys_Render.texturePalettesID       = SetupSSBO(&Sys_Render.texturePalettesID,       16, MAX_UNIQUE_COLORS * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-    Sys_Render.texturePaletteOffsetsID = SetupSSBO(&Sys_Render.texturePaletteOffsetsID, 17, MAX_VALID_TEXTURE * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-    Sys_Render.lightsID                = SetupSSBO(&Sys_Render.lightsID,                19, LIGHT_COUNT * sizeof(Light), NULL, GL_STATIC_DRAW);
-    Sys_Render.uniqueLightListsID      = SetupSSBO(&Sys_Render.uniqueLightListsID,      27, VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+    Sys_Render.matricesBufferID        = SetupSSBO(&Sys_Render.matricesBufferID,        1,INSTANCE_COUNT * 16 * sizeof(float),modelMatrices, GL_STATIC_DRAW);
+    Sys_Render.voxelLightListCountsID  = SetupSSBO(&Sys_Render.voxelLightListCountsID,  2,VOXEL_COUNT * sizeof(uint32_t),NULL,GL_STATIC_DRAW);
+    Sys_Render.uniqueLightListsID      = SetupSSBO(&Sys_Render.uniqueLightListsID,      3,VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t),NULL,GL_STATIC_DRAW);
+    Sys_Render.lightsID                = SetupSSBO(&Sys_Render.lightsID,                4,LIGHT_COUNT * sizeof(Light),NULL,GL_STATIC_DRAW);
+    Sys_Render.shadowMapSSBO           = SetupSSBO(&Sys_Render.shadowMapSSBO,           5,(MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(uint32_t), NULL, GL_STATIC_DRAW);    
+    Sys_Render.shadowMapsIndirectionID = SetupSSBO(&Sys_Render.shadowMapsIndirectionID, 6,LIGHT_COUNT * sizeof(uint32_t),NULL,GL_STATIC_DRAW);
+    Sys_Render.colorBufferID           = SetupSSBO(&Sys_Render.colorBufferID,          12,MAX_TOTAL_PIXELS * sizeof(uint8_t),NULL,GL_STATIC_DRAW);
+    Sys_Render.blueNoiseBuffer         = SetupSSBO(&Sys_Render.blueNoiseBuffer,        13,12288 * sizeof(float), blueNoise,GL_STATIC_DRAW);
+    Sys_Render.textureOffsetsID        = SetupSSBO(&Sys_Render.textureOffsetsID,       14,MAX_VALID_TEXTURE * sizeof(uint32_t),NULL,GL_STATIC_DRAW);
+    Sys_Render.textureSizesID          = SetupSSBO(&Sys_Render.textureSizesID,         15,MAX_VALID_TEXTURE * 2 * sizeof(int32_t),NULL, GL_STATIC_DRAW);
+    Sys_Render.texturePalettesID       = SetupSSBO(&Sys_Render.texturePalettesID,      16,MAX_UNIQUE_COLORS * sizeof(uint32_t),NULL,GL_STATIC_DRAW);
+    Sys_Render.texturePaletteOffsetsID = SetupSSBO(&Sys_Render.texturePaletteOffsetsID,17,MAX_VALID_TEXTURE * sizeof(uint32_t),NULL,GL_STATIC_DRAW);
+    glUseProgram(Sys_Render.shadowmapsShaderProgram); glUniform1ui(9,SHADOW_MAP_SIZE);
+    glUseProgram(Sys_Render.chunkShaderProgram);  glUniform1ui(21,SHADOW_MAP_SIZE); glUniform1f(22,(float)SHADOW_MAP_SIZE); glUniform1ui(23,LIGHT_COUNT); glUniform1ui(24,(uint32_t)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);
     DualLog("GL SSBOs and Settings Apply... took %f secs\n",get_time() - nextInitTimeSection);
     RenderLoadingProgress(110,"Loading models...");
     LoadModels();
     RenderLoadingProgress(110,"Loading textures...");
     LoadTextures();
     if (Sys_Global.introNotPlayed) {} // TODO: Play intro
+    RenderLoadingProgress(110,"Loading models...");
+    LoadModels();
+    RenderLoadingProgress(110,"Loading textures...");
+    LoadTextures();
 //     NewGame();
     play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500);
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetInputMode(window,GLFW_CURSOR,GLFW_CURSOR_DISABLED);
     DebugRAM("InitializeEnvironment end");
     DualLog("InitializeEnvironment completed\n");
 }
@@ -1700,7 +1772,7 @@ static inline __attribute__((always_inline)) double RenderUI(void) {
     return time_now;
 }
 
-#define SHADOW_NEARMESH_MAX 768 // 350 was too low for light 712 on security atrium
+#define SHADOW_NEARMESH_MAX 2048
 typedef struct {float depth; uint16_t index; } DepthSort;
 DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX]; // Found that this is typically around 172
 float shadows_nearMeshRadii[SHADOW_NEARMESH_MAX];
@@ -1875,12 +1947,12 @@ static inline __attribute__((always_inline)) bool DetermineIfInstanceVisible(uin
     if (EntityIndexIsPortalBlockingDoor(Sys_Global.instances[i].index)) { // Extra checks only needed for opaque portal blocking doors.
         bool inPVS = (gridCellStates[instCellIdx] & CELL_VISIBLE);
         if (!inPVS) {
-            for (int ix = cellX - 2; ix <= (int)cellX + 2 && !inPVS; ++ix) {
-                for (int iz = cellZ - 2; iz <= (int)cellZ + 2; ++iz) {
+            for (int ix=cellX - 2;ix<=(int)cellX + 2 && !inPVS;++ix) {
+                for (int iz=cellZ - 2;iz<=(int)cellZ + 2;++iz) {
                     if (!XZPairInBounds(ix, iz)) return false;
 
                     int subIdx = iz * WORLDX + ix;
-                    if (get_cull_bit(precomputedVisibleCellsFromHere, instCellIdx * ARRSIZE + subIdx) && (gridCellStates[subIdx] & CELL_VISIBLE)) { inPVS = true; break; }
+                    if (get_cull_bit(precomputedVisibleCellsFromHere,instCellIdx * ARRSIZE + subIdx) && (gridCellStates[subIdx] & CELL_VISIBLE)) { inPVS = true; break; }
                 }
             }
         }
@@ -1975,7 +2047,6 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
     uint16_t swidth = camView ? camViews[camViewIdx].width : Sys_Settings.ScreenWidth; uint16_t sheight = camView ? camViews[camViewIdx].height : Sys_Settings.ScreenHeight;
     float sfov = camView ? (float)camViews[camViewIdx].fov : (float)Sys_Settings.FOV;
     float snear = camView ? camViews[camViewIdx].near : NEAR_PLANE; float sfar = camView ? camViews[camViewIdx].far : FAR_PLANE;
-    drawCallsRenderedThisFrame = textDrawCallsRenderedThisFrame = uiImageDrawCallsRenderedThisFrame = shadowDrawCallsRenderedThisFrame = verticesRenderedThisFrame = 0; // Reset per frame
     
     // Frame prep, View Matrix, and Projection Matrix
     float view[16]; // Also known as view matrix
@@ -2008,7 +2079,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
     mul_mat4(viewProj,rasterPerspectiveProjection,view);
     float invViewRot[9] = {view[0],view[4],view[8], view[1],view[5],view[9], view[2],view[6],view[10]};
     ExtractFrustumPlanes(viewProj,playerFrustumPlanes);
-    glBindVertexArray(Sys_Render.vao_chunk); // Common vao for RenderShadowmaps and Rasterized Geometry
+    glBindVertexArray(Sys_Render.vao_chunk); // Common vao for RenderDynamicShadowmaps and Rasterized Geometry
     glEnable(GL_DEPTH_TEST);
     if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps(); // No shadows on camviews for performance, except for sensaround that has to look right
     for (int i=0;i<LIGHT_COUNT;++i) flag_setu32(&lights[i].lflags,LDIRTY,false); // Clear dirty after shadowmaps for minimal shadowmap updating.
@@ -2091,13 +2162,13 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
         else if (Sys_Global.currentLevel <= 5) shieldOnType = 1u; // Shielding everywhere as levels fully within shield.
     }
     
-    glUniform1ui(20, shieldOnType);
+    glUniform1ui(20,shieldOnType);
     Color painStaticColor = GetPainStaticColor();
-    glUniform3f(23, painStaticColor.r, painStaticColor.g, painStaticColor.b);
-    glUniformMatrix4fv(24, 1, GL_FALSE, viewProj);
-    glUniformMatrix3fv(25, 1, GL_FALSE, invViewRot);
-    glUniform1i(27, 0); // Texture 0 for the rendered geometry color buffer
-    glUniform1f(28, GetPainStatic());
+    glUniform3f(23,painStaticColor.r,painStaticColor.g,painStaticColor.b);
+    glUniformMatrix4fv(24,1,GL_FALSE,viewProj);
+    glUniformMatrix3fv(25,1,GL_FALSE,invViewRot);
+    glUniform1i(27,0); // Texture 0 for the rendered geometry color buffer
+    glUniform1f(28,GetPainStatic());
     glUniform1ui(29,(uint32_t)ModRequestsGrayscale()); // Grayscale
     glBindVertexArray(Sys_Render.quadVAO);
     glDisable(GL_DEPTH_TEST); // Reenabled later after all UI just up there before RenderShadowmaps call
@@ -2145,11 +2216,12 @@ int32_t main(void) {
         if (glfwWindowShouldClose(window)) OS_Exit(0);
         if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad); queuedLevelToLoad = 255u; continue; }
 
+        voxen_Shadow_System.numShadowsCouldRender = drawCallsRenderedThisFrame = textDrawCallsRenderedThisFrame = uiImageDrawCallsRenderedThisFrame = shadowDrawCallsRenderedThisFrame = verticesRenderedThisFrame = 0; // Reset per frame
         Sys_Global.current_time = get_time(); // Update Time
         Sys_Global.deltaTime = Sys_Global.current_time - Sys_Global.last_topframe_time;
         Sys_Global.absoluteTime += Sys_Global.deltaTime;
         Sys_Global.last_topframe_time = Sys_Global.current_time;
-        if (!Sys_Global.gamePaused) Sys_Global.pauseRelativeTime += Sys_Global.deltaTime;
+        if (!Sys_Global.gamePaused && !Sys_Global.menuActive) Sys_Global.pauseRelativeTime += Sys_Global.deltaTime;
     
         // Update Events, calls Physics()
         mouseMovementThisFrame = false;
@@ -2184,8 +2256,8 @@ int32_t main(void) {
                     Sys_Global.instances[PLAYER1].position = camViews[cm].position;
                     Sys_Global.instances[PLAYER1].rotation = camViews[cm].rotation;
                     UpdatedPlayerCell();
-                    UpdateLights();
                     CullCore();
+                    UpdateLights();
                     Render(true,cm); // Ok culling and light clusters (in voxels) have been updated, now render the view.
                 }
             }
@@ -2196,8 +2268,8 @@ int32_t main(void) {
         
         if (likely(!Sys_Global.gamePaused || Sys_Global.menuActive)) {
             UpdatedPlayerCell();
-            UpdateLights();
             CullCore();
+            UpdateLights();
             bool uploadInstances = false;
             for (uint32_t i = START_INDEX_LEVEL_INSTANCES; i < Sys_Global.loadedInstances; i++) {
                 if (Sys_Global.dirtyInstances[i]) {
@@ -2235,4 +2307,4 @@ int32_t main(void) {
         #endif
     }
     return 0;
-}
+} // 2318

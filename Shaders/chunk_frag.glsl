@@ -3,70 +3,55 @@
 #version 430 core
 #extension GL_ARB_shading_language_packing : require
 #extension GL_ARB_shader_image_load_store : enable
-
 in vec2 TexCoord;
 in vec3 Normal;
 in vec3 FragPos;
+layout(location=0) uniform uint instanceIndex; // start vert shader uniforms
+layout(location=1) uniform uint normInstanceIndex;
+layout(location=2) uniform mat4 viewProjection;
+layout(location=3) uniform uint isUI; // end vert shader uniforms
+layout(location=4) uniform vec3 fogColor;
+layout(location=6) uniform uint screenWidth;
+layout(location=7) uniform uint screenHeight;
+layout(location=8) uniform float worldMin_x;
+layout(location=9) uniform float worldMin_z;
+layout(location=10) uniform vec3 camPos;
+layout(location=11) uniform uint shadSizeSqd;
 
-layout(location =  0) uniform uint instanceIndex; // start vert shader uniforms
-layout(location =  1) uniform uint normInstanceIndex;
-layout(location =  2) uniform mat4 viewProjection;
-layout(location =  3) uniform uint isUI; // end vert shader uniforms
-layout(location =  4) uniform vec3 fogColor;
-layout(location =  6) uniform uint screenWidth;
-layout(location =  7) uniform uint screenHeight;
-layout(location =  8) uniform float worldMin_x;
-layout(location =  9) uniform float worldMin_z;
-layout(location = 10) uniform vec3 camPos;
-layout(location = 14) uniform uint reflectionsEnabled;
-layout(location = 15) uniform uint shadowsEnabled;
-layout(location = 17) uniform uint unlit;
-layout(location = 18) uniform uint texIndex;
-layout(location = 19) uniform uint glowIndex;
-layout(location = 20) uniform uint specIndex;
-layout(location = 21) uniform uint shadowMapSize;
-layout(location = 22) uniform float shadowMapSizeF;
-layout(location = 23) uniform uint lightCount;
-layout(location = 24) uniform uint maxLightsPerVoxel;
-layout(location = 25) uniform uint constIndex;
-layout(location = 26) uniform uint grayscaleEnabled;
-layout(location = 27) uniform float volume;
-layout(location = 28) uniform uvec2 camViewSize;
-layout(location = 29) uniform sampler2D camViewTex;
-layout(location = 30) uniform uint useCamView;
-
-struct Light {
-    vec3  pos;
-    float intensity;
-    vec3  col;
-    uint  lflags;
-    float range;
-    float spotAng;
-    float maxIntensity;
-    float minIntensity;
-    vec4  spotDir; // Quaternions are vec4
-};
-
-layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
-layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
-layout(location = 2) out vec4 outSpecular; // GL_COLOR_ATTACHMENT2
-layout(location = 3) out vec2 outNormal;   // GL_COLOR_ATTACHMENT3
-layout(std430, binding = 5) buffer ShadowMaps { uint shadowMaps[]; };
-layout(std430, binding = 8) buffer ShadowMapsIndirection { uint shadowMapsIndirection[]; };
-layout(std430, binding = 12) buffer ColorBuffer { uint colors[]; }; // 1D color array (RGBA)
-layout(std430, binding = 13) buffer BlueNoise { float blueNoiseColors[]; };
-layout(std430, binding = 14) buffer TextureOffsets { uint textureOffsets[]; }; // Starting index in colors for each texture
-layout(std430, binding = 15) buffer TextureSizes { ivec2 textureSizes[]; }; // x,y pairs for width and height of textures
-layout(std430, binding = 16) buffer TexturePalettes { uint texturePalettes[]; }; // Palette colors
-layout(std430, binding = 17) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; }; // Palette starting indices for each texture
-layout(std430, binding = 19) buffer LightIndices { Light lights[]; };
-layout(std430, binding = 6) buffer VoxelLightListCounts { uint voxelLightListCounts[]; };
-layout(std430, binding = 27) buffer UniqueLightLists { uint uniqueLightLists[]; };
-
-const float WORLDCELL_WIDTH_F = 2.56;
+layout(location=14) uniform uint reflectionsEnabled;
+layout(location=15) uniform uint shadowsEnabled;
+layout(location=17) uniform uint unlit;
+layout(location=18) uniform uint texIndex;
+layout(location=19) uniform uint glowIndex;
+layout(location=20) uniform uint specIndex;
+layout(location=21) uniform uint shadowMapSize;
+layout(location=22) uniform float shadowMapSizeF;
+layout(location=23) uniform uint lightCount;
+layout(location=24) uniform uint maxLightsPerVoxel;
+layout(location=25) uniform uint constIndex;
+layout(location=26) uniform uint grayscaleEnabled;
+layout(location=27) uniform float volume;
+layout(location=28) uniform uvec2 camViewSize;
+layout(location=29) uniform sampler2D camViewTex;
+layout(location=30) uniform uint useCamView;
+struct Light { vec3 pos; float intensity; vec3 col; uint lflags; float range; float spotAng; float maxIntensity; float minIntensity; vec4 spotDir; };
+layout(location=0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
+layout(location=1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
+layout(location=2) out vec4 outSpecular; // GL_COLOR_ATTACHMENT2
+layout(location=3) out vec2 outNormal;   // GL_COLOR_ATTACHMENT3
+layout(std430,binding=2) buffer VoxelLightListCounts { uint voxelLightListCounts[]; };
+layout(std430,binding=3) buffer UniqueLightLists { uint uniqueLightLists[]; };
+layout(std430,binding=4) buffer LightIndices { Light lights[]; };
+layout(std430,binding=5) buffer ShadowMaps { uint shadowMaps[]; };
+layout(std430,binding=6) buffer ShadowMapsIndirection { uint shadowMapsIndirection[]; };
+layout(std430,binding=12) buffer ColorBuffer { uint colors[]; }; // 1D color array (RGBA)
+layout(std430,binding=13) buffer BlueNoise { float blueNoiseColors[]; };
+layout(std430,binding=14) buffer TextureOffsets { uint textureOffsets[]; }; // Starting index in colors for each texture
+layout(std430,binding=15) buffer TextureSizes { ivec2 textureSizes[]; }; // x,y pairs for width and height of textures
+layout(std430,binding=16) buffer TexturePalettes { uint texturePalettes[]; }; // Palette colors
+layout(std430,binding=17) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; }; // Palette starting indices for each texture
 const float VOXEL_SIZE = 0.32;
-const vec3 baseDir = vec3(0.0, 0.0, 1.0);
-
+const uint SHADON = 2u;
 uint GetVoxelIndex(vec3 worldPos) {
     float offsetX = worldPos.x - worldMin_x;
     float offsetZ = worldPos.z - worldMin_z;
@@ -75,30 +60,19 @@ uint GetVoxelIndex(vec3 worldPos) {
     return (voxelZ * 512) + voxelX;
 }
 
-const int PCF_SAMPLES = 12;
+const int PCF_SAMPLES = 8;
 const float invSamples = 1.0 / float(PCF_SAMPLES);
 const vec2 poissonDisk[PCF_SAMPLES] = vec2[](
-    vec2( 0.0000,  0.0000), vec2( 0.0812,  0.0941),
-    vec2(-0.0451,  0.1192), vec2(-0.1221,  0.0321),
-    vec2(-0.0914, -0.0882), vec2( 0.0021, -0.1275),
-    vec2( 0.1023, -0.0621), vec2( 0.0452,  0.0325),
-    vec2(-0.0512,  0.0421), vec2(-0.0215, -0.0612),
-    vec2( 0.0581, -0.0214), vec2( 0.1215,  0.0112)
-);
+    vec2( 0.0000, 0.0000), vec2( 0.0812, 0.0941),
+    vec2(-0.0451, 0.1192), vec2(-0.1221, 0.0321),
+    vec2(-0.0914,-0.0882), vec2( 0.0021,-0.1275),
+    vec2( 0.1023,-0.0621), vec2( 0.0452, 0.0325));
 
 vec3 quat_rotate(vec4 q, vec3 v) {
-    float x2 = q.x + q.x;
-    float y2 = q.y + q.y;
-    float z2 = q.z + q.z;
-    float xx2 = q.x * x2;
-    float yy2 = q.y * y2;
-    float zz2 = q.z * z2;
-    float xy2 = q.x * y2;
-    float xz2 = q.x * z2;
-    float yz2 = q.y * z2;
-    float wx2 = q.w * x2;
-    float wy2 = q.w * y2;
-    float wz2 = q.w * z2;
+    float x2 = q.x + q.x; float y2 = q.y + q.y; float z2 = q.z + q.z;
+    float xx2 = q.x * x2; float yy2 = q.y * y2; float zz2 = q.z * z2;
+    float xy2 = q.x * y2; float xz2 = q.x * z2; float yz2 = q.y * z2;
+    float wx2 = q.w * x2; float wy2 = q.w * y2; float wz2 = q.w * z2;
     return vec3(
         v.x * (1.0 - yy2 - zz2) + v.y * (xy2 - wz2) + v.z * (xz2 + wy2),
         v.x * (xy2 + wz2) + v.y * (1.0 - xx2 - zz2) + v.z * (yz2 - wx2),
@@ -107,7 +81,6 @@ vec3 quat_rotate(vec4 q, vec3 v) {
 }
 
 const vec4 BYTE_TO_FLOAT = vec4(1.0/255.0);
-
 vec4 getTextureColor(uint texIndex, ivec2 texCoord) {
     uint pixelOffset = textureOffsets[texIndex] + uint(texCoord.y) * textureSizes[texIndex].x + uint(texCoord.x);
     uint slotIndex = pixelOffset >> 2u;// / 4u;
@@ -116,7 +89,7 @@ vec4 getTextureColor(uint texIndex, ivec2 texCoord) {
     uint paletteIndex = (packedIdx >> (localOffset << 3u)) & 0xFFu; // << 3u is same as * 8
     uint paletteOffset = texturePaletteOffsets[texIndex];
     uint color = texturePalettes[paletteOffset + paletteIndex];
-    return vec4(color & 0xFFu, (color>>8)&0xFFu, (color>>16)&0xFFu, color>>24) * BYTE_TO_FLOAT;
+    return vec4(color & 0xFFu,(color>>8)&0xFFu,(color>>16)&0xFFu,color>>24) * BYTE_TO_FLOAT;
 }
 
 vec2 EncodeOctahedral(vec3 n) {
@@ -125,6 +98,7 @@ vec2 EncodeOctahedral(vec3 n) {
     return n.z >= 0.0 ? p : (1.0 - abs(p.yx)) * vec2(n.x >= 0.0 ? 1.0 : -1.0, n.y >= 0.0 ? 1.0 : -1.0);
 }
 
+const vec3 baseDir = vec3(0.0,0.0,1.0);
 void main() {
     vec3 worldPos = FragPos.xyz;
     vec3 viewDir = (camPos - worldPos);
@@ -241,35 +215,32 @@ void main() {
 
         float shadowFactor = 1.0;
         uint shadowIndex = shadowMapsIndirection[lightIdx];
-        if (shadowsEnabled > 0 && shadowIndex < lightCount) {
+//         bool lightHasShadows = (lights[lightIdx].lflags & SHADON) != 0u;
+        if (shadowsEnabled > 0 && (shadowIndex < lightCount)) {
             float smearness = distOverRangeSqd * 24.0 + range + intensity + 4.51;
             vec3 a = abs(toLight);
-            float mx = step(a.y, a.x) * step(a.z, a.x);
-            float my = step(a.x, a.y) * step(a.z, a.y);
-            vec3 mxyz = vec3(mx, my, 1.0 - mx - my);
-            vec3 sxyz = vec3(step(0.0, -toLight.x), step(0.0, -toLight.y), step(0.0, -toLight.z));
-            vec3 fxyz = vec3(mix(1.0, 0.0, sxyz.x), mix(3.0, 2.0, sxyz.y), mix(5.0, 4.0, sxyz.z));
+            float mx = step(a.y,a.x) * step(a.z,a.x);
+            float my = step(a.x,a.y) * step(a.z,a.y);
+            vec3 mxyz = vec3(mx,my,1.0 - mx - my);
+            vec3 sxyz = vec3(step(0.0, -toLight.x),step(0.0,-toLight.y),step(0.0,-toLight.z));
+            vec3 fxyz = vec3(mix(1.0,0.0,sxyz.x),mix(3.0,2.0,sxyz.y),mix(5.0,4.0,sxyz.z));
             uint face = uint(mxyz.x * fxyz.x + mxyz.y * fxyz.y + mxyz.z * fxyz.z);
-            float invMax = 1.0 / max(max(a.x, a.y), a.z);
+            float invMax = 1.0 / max(max(a.x,a.y),a.z);
             vec3 dir = -toLight * invMax;
-            vec2 uvx = mix(vec2( dir.z, dir.y), vec2(-dir.z, dir.y), sxyz.x);
-            vec2 uvy = mix(vec2( dir.x, dir.z), vec2( dir.x,-dir.z), sxyz.y);
-            vec2 uvz = mix(vec2(-dir.x, dir.y), vec2( dir.x, dir.y), sxyz.z);
+            vec2 uvx = mix(vec2( dir.z,dir.y),vec2(-dir.z, dir.y),sxyz.x);
+            vec2 uvy = mix(vec2( dir.x,dir.z),vec2( dir.x,-dir.z),sxyz.y);
+            vec2 uvz = mix(vec2(-dir.x,dir.y),vec2( dir.x, dir.y),sxyz.z);
             vec2 uv = mxyz.x * uvx + mxyz.y * uvy + mxyz.z * uvz;
             uv = uv * 0.5 + 0.5;
-
-            uint faceOff = (shadowIndex * shadowMapSize * shadowMapSize * 6) + (face * shadowMapSize * shadowMapSize);
+            uint faceOff = (shadowIndex * shadSizeSqd * 6) + (face * shadSizeSqd);
             vec2 tc = uv * shadowMapSizeF;
             float slopeBias = 0.24 * (1.0 - NdotL);
             slopeBias = max(slopeBias,0.035);
             float bias = slopeBias * distOverRange;
-            bias = max(bias,0.0);
-            bias += 0.03; // Account for glancing angle acne
-
-            // Pseudo-Stochastic PCF sampling
+            bias = max(bias,0.0) + 0.03; // Account for glancing angle acne
             float sum = 0.0;
             float shadSizeMaxUV = shadowMapSizeF - 1.0;
-            for (int si = 0; si < PCF_SAMPLES; ++si) {
+            for (int si=0;si<PCF_SAMPLES;++si) { // Pseudo-Stochastic PCF sampling
                 vec2 off = poissonDisk[si] * smearness;
                 vec2 t = tc + off;
                 vec2 st = fract(t - 0.5);
@@ -284,7 +255,7 @@ void main() {
                     }
                 }
 
-                float res = mix(mix(samples[0], samples[1], st.x), mix(samples[2], samples[3], st.x), st.y); // Manual bilinear shadowmap filter
+                float res = mix(mix(samples[0],samples[1],st.x),mix(samples[2],samples[3],st.x),st.y); // Manual bilinear shadowmap filter
                 sum += res;
             }
 

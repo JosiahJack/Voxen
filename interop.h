@@ -152,7 +152,7 @@ ENGINE_TO_MOD void CenterStatusPrint(const char* fmt, ...);
 ENGINE_TO_MOD void play_wav(const char* path, float volume, Vector3 pos, bool positional);
 ENGINE_TO_MOD void PortalCulling(void);
 ENGINE_TO_MOD char* GetLevelFileNextStringUpToNewlineOrEOF(char* buf, int size);
-ENGINE_TO_MOD void LoadFieldIntoLight(char* trimmed_key, char* trimmed_value, char* initialLine, uint32_t lineNum, Light* lit, LightAnimation* lan);
+ENGINE_TO_MOD void LoadFieldIntoLight(char* trimmed_key, char* trimmed_value, char* initialLine, uint32_t lineNum, Light* lit, LightAnimation* lan, uint16_t lightIdx);
 ENGINE_TO_MOD int32_t AddLight(Light* lit, LightAnimation* lanim);
 ENGINE_TO_MOD void UpdateLight(uint16_t lightsIdx, Vector3 pos, Color3 col, float range, float intensity, float maxIntensity, float minIntensity, float spotAng, Quaternion spotDir, bool on, bool shadOn);
 ENGINE_TO_MOD void InitializeEntity(Entity* entry);

@@ -117,10 +117,6 @@ typedef struct {
 #define CELL_SIZE 2.56f // Each cell is 2.56x2.56
 #define VOXEL_SIZE 0.32f
 #define VOXEL_HALF (VOXEL_SIZE * 0.5f)
-#define ENG_ACTIVE               (1ull <<  0) // Instance renders and updates
-#define ENG_GROUNDED             (1ull <<  1)
-#define ENG_RIGIDBODY            (1ull <<  2)
-
 #define ENTFLAG_ACTIVE               (1ull <<  0) // Instance renders and updates
 #define ENTFLAG_CARDCHUNK            (1ull <<  1)
 #define ENTFLAG_GROUNDED             (1ull <<  2)
@@ -967,35 +963,6 @@ typedef struct {
     bool      isOtherNPC;
     bool      berserkActive;
 } DamageData;
-
-typedef struct {
-    uint16_t index;
-    uint16_t modelIndex;
-    uint16_t lodIndex;
-    uint16_t pad0;
-    uint32_t pad1;
-    uint32_t pad2; // Pad out to 16byte alignment
-    
-    Quaternion rotation;
-    
-    Vector3 position;
-    float volume;
-    
-    Vector3 scale;
-    int32_t cellIndex;
-    
-    Vector3 velocity;
-    uint32_t engflags;
-    
-    Vector3 forward;
-    uint16_t texIndex;
-    uint16_t glowIndex;
-    
-    Vector3 right;
-    uint16_t specIndex;
-    uint16_t normIndex;
-
-} EngineEnt;
 
 #define NUM_ENTITY_FIELDS 34
 typedef /*FAT*/ struct  {

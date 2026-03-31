@@ -115,8 +115,7 @@ fi
 
 export CC=$CC
 export CFLAGS=$CFLAGS
-SOURCES="voxen.c physics.c helpers.c console.c level.c data_text.c data_fonts.c \
-         data_models.c dynamic_culling.c data_textures.c glad.c input.c miniaudio.c"
+SOURCES="voxen.c physics.c helpers.c console.c data_text.c data_fonts.c data_models.c dynamic_culling.c data_textures.c glad.c input.c miniaudio.c"
 export TEMP_DIR=temp_build
 printf "%s\n" $SOURCES | xargs -P12 -I{} $CC -c {} $CFLAGS -o "$TEMP_DIR"/{}.o
 $LINKER "$TEMP_DIR"/*.o $LDFLAGS -rdynamic -lm -o $BINARY_NAME
@@ -167,5 +166,5 @@ if ! $IS_CI; then
         *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
 #         *)        ./voxen ;;   # linux
     esac
-    rm -f "$TEMP_DIR"/*.o ./Shaders/*.h "$TEMP_DIRGC"/*.o #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.
+    rm -f "$TEMP_DIR"/*.o ./Shaders/*.h "$TEMP_DIRGC"/*.o ./voxen.upx ./*.lib #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.
 fi

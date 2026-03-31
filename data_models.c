@@ -13,7 +13,6 @@ uint16_t modelTriangleCounts[MODEL_IDX_MAX] = {0};
 bool modelHasAnimation[MODEL_IDX_MAX] = {0};
 float modelBounds[MODEL_IDX_MAX*BOUNDS_ATTRIBUTES_COUNT] = {0};
 uint16_t loadedModelsMaxIndex = 0;
-GLuint SetupSSBO(GLuint* id, GLuint bindingIndex, GLsizeiptr size, const void* data, GLenum usage);
 #define MAX_VERT_ELEMENT_SIZE 6964
 #define MAX_OUTPUT_VERTS      20892
 static float**    thread_temp_pos   = NULL;

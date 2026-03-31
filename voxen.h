@@ -10,9 +10,8 @@
 #define MAX_JOYSTICK_BUTTONS 16
 #define MAX_JOYSTICK_HATS 5
 #define MAX_GAMEPAD_BUTTONS 20
-#define MAX_SHADOWMAPS 96u
+#define MAX_SHADOWMAPS 256u
 #define SHADOW_MAP_SIZE 128u
-#define TOTAL_SHADOWMAP_PIXELS (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U))
 #define MAX_SAVENAME_LENGTH 24
 #define MAX_PALETTE_SIZE 256
 #define MAX_TEXTURE_DIMENSION 2048
@@ -79,16 +78,6 @@ typedef struct {
 extern InputSystem Sys_Input;
 
 typedef struct {
-    double shadowTime;
-    uint32_t numShadowsCouldRender;
-    uint32_t shadowmapSizes[MAX_SHADOWMAPS];
-    uint32_t shadowmapOffsets[MAX_SHADOWMAPS];
-    uint32_t shadowmapIndirectionList[LIGHT_COUNT];
-    float shadDotThresh;
-} VoxenShadowSystem;
-extern VoxenShadowSystem voxen_Shadow_System;
-
-typedef struct {
     double timestamp;
     double deltaTime_ns;
     uint32_t frameNum; // Can't unionize the payloads as some need both.
@@ -109,48 +98,48 @@ typedef struct StbiArena {
 
 typedef uint32_t GLuint;
 typedef struct {
-	GLuint inputImageID;
-	GLuint inputDepthID;
-	GLuint inputWorldPosID;
-	GLuint inputSpecID;
-	GLuint inputNormalID;
-	GLuint inputImageLastID;
-	GLuint gBufferFBO;
-	GLuint outputImageID;
+    GLuint inputImageID;
+    GLuint inputDepthID;
+    GLuint inputWorldPosID;
+    GLuint inputSpecID;
+    GLuint inputNormalID;
+    GLuint inputImageLastID;
+    GLuint gBufferFBO;
+    GLuint outputImageID;
     GLuint depthPrepassShaderProgram;
-	GLuint chunkShaderProgram; // Generic lit and unlit raster shader forward+
-	GLuint debugUnlitShaderProgram;
-	GLuint vao_chunk; // Vertex Array Object
-	GLuint shadowFBO;
-	GLuint shadowmapsShaderProgram;
-	GLuint shadowmapsClearShaderProgram;
-	GLuint shadowMapSSBO;
-	GLuint ssrShaderProgram; // SSR (Screen Space Reflections)
-	GLuint imageBlitShaderProgram; // Full Screen Quad Blit for rendering final compositing output/image effect passes
-	GLuint quadVAO;
-	GLuint quadVBO;
-	GLuint textShaderProgram;
-	GLuint textVAO;
-	GLuint textVBO;
-	GLuint debugLinesVAO;
-	GLuint debugLinesVBO;
-	GLuint blueNoiseBuffer;
+    GLuint chunkShaderProgram; // Generic lit and unlit raster shader forward+
+    GLuint debugUnlitShaderProgram;
+    GLuint vao_chunk; // Vertex Array Object
+    GLuint shadowFBO;
+    GLuint shadowmapsShaderProgram;
+    GLuint shadowmapsClearShaderProgram;
+    GLuint shadowMapSSBO;
+    GLuint ssrShaderProgram; // SSR (Screen Space Reflections)
+    GLuint imageBlitShaderProgram; // Full Screen Quad Blit for rendering final compositing output/image effect passes
+    GLuint quadVAO;
+    GLuint quadVBO;
+    GLuint textShaderProgram;
+    GLuint textVAO;
+    GLuint textVBO;
+    GLuint debugLinesVAO;
+    GLuint debugLinesVBO;
+    GLuint blueNoiseBuffer;
     GLuint modelAnimDeltasID;
     GLuint modelAnimDeltaOffsetsID;
-	GLuint matricesBufferID;
-	GLuint colorBufferID;
-	GLuint texturePalettesID;
-	GLuint textureOffsetsID;
-	GLuint textureSizesID;
-	GLuint texturePaletteOffsetsID;
-	GLuint lightsID;
-	GLuint shadowMapsIndirectionID;
-	GLuint cellVisibleDataID;
-	GLuint voxelUpdateShaderProgram;
-	GLuint voxelLightListCountsID;
-	GLuint uniqueLightListsID;
-	GLuint vbos[MODEL_IDX_MAX];
-	GLuint tbos[MODEL_IDX_MAX];
+    GLuint matricesBufferID;
+    GLuint colorBufferID;
+    GLuint texturePalettesID;
+    GLuint textureOffsetsID;
+    GLuint textureSizesID;
+    GLuint texturePaletteOffsetsID;
+    GLuint lightsID;
+    GLuint shadowMapsIndirectionID;
+    GLuint cellVisibleDataID;
+    GLuint voxelUpdateShaderProgram;
+    GLuint voxelLightListCountsID;
+    GLuint uniqueLightListsID;
+    GLuint vbos[MODEL_IDX_MAX];
+    GLuint tbos[MODEL_IDX_MAX];
 } RenderSystem;
 
 extern bool instanceIsLODArray[INSTANCE_COUNT];

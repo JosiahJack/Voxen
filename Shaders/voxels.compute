@@ -2,35 +2,19 @@
 // Compute shader for determining light lists for voxels and updating voxel tables 
 #version 430 core
 layout(local_size_x = 32, local_size_y = 32) in;
-
-struct Light {
-    vec3  pos;
-    float intensity;
-    vec3  col;
-    uint  lflags;
-    float range;
-    float spotAng;
-    float maxIntensity;
-    float minIntensity;
-    vec4  spotDir; // Quaternion
-};
-
-layout(std430, binding = 6) buffer VoxelLightListCounts { uint voxelLightListCounts[]; };
-layout(std430, binding = 4) buffer CullingData { uint gridCellStates[]; };
-layout(std430, binding = 19) buffer LightIndices { Light lights[]; };
-layout(std430, binding = 27) buffer UniqueLightLists { uint uniqueLightLists[]; };
-
-layout(location = 0) uniform float voxelMinCenterX;
-layout(location = 1) uniform float voxelMinCenterZ;
-layout(location = 2) uniform uint loadedLights;
-layout(location = 3) uniform float worldMin_x;
-layout(location = 4) uniform float worldMin_z;
-layout(location = 5) uniform vec3 camPos;
-layout(location = 6) uniform uint maxLightsPerVoxel;
-
+struct Light { vec3 pos; float intensity; vec3 col; uint lflags; float range; float spotAng; float maxIntensity; float minIntensity; vec4 spotDir; };
+layout(std430,binding=2) buffer VoxelLightListCounts { uint voxelLightListCounts[]; };
+layout(std430,binding=3) buffer UniqueLightLists { uint uniqueLightLists[]; };
+layout(std430,binding=4) buffer LightIndices { Light lights[]; };
+layout(location=0) uniform float voxelMinCenterX;
+layout(location=1) uniform float voxelMinCenterZ;
+layout(location=2) uniform uint loadedLights;
+layout(location=3) uniform float worldMin_x;
+layout(location=4) uniform float worldMin_z;
+layout(location=5) uniform vec3 camPos;
+layout(location=6) uniform uint maxLightsPerVoxel;
 const int WORLD_X_VOXELCOUNT = 512;
 const float VOXEL_SIZE = 0.32;
-
 void main() {    
     if (gl_GlobalInvocationID.x >= WORLD_X_VOXELCOUNT || gl_GlobalInvocationID.y >= WORLD_X_VOXELCOUNT) return;
 
@@ -39,13 +23,13 @@ void main() {
     uint voxelIndex = (voxelZ * WORLD_X_VOXELCOUNT) + voxelX;
     uint baseOffset = voxelIndex * maxLightsPerVoxel;
     voxelLightListCounts[voxelIndex] = 0u;
-    vec3 voxelPos = vec3(voxelMinCenterX + (voxelX * VOXEL_SIZE), 0.0, voxelMinCenterZ + (voxelZ * VOXEL_SIZE));
-    vec3 cam = vec3(camPos.x, 0.0, camPos.z);
+    vec3 voxelPos = vec3(voxelMinCenterX + (voxelX * VOXEL_SIZE), 0.0,voxelMinCenterZ + (voxelZ * VOXEL_SIZE));
+    vec3 cam = vec3(camPos.x, 0.0,camPos.z);
     if (length(voxelPos - cam) > 71.68) return;
     
     uint count = 0;
     for (uint lightIdx = 0; lightIdx < loadedLights; ++lightIdx) {
-        vec3 lightPos = vec3(lights[lightIdx].pos.x, 0.0, lights[lightIdx].pos.z);
+        vec3 lightPos = vec3(lights[lightIdx].pos.x,0.0,lights[lightIdx].pos.z);
         float range = lights[lightIdx].range;
         float intensity = lights[lightIdx].intensity;
         if (distance(lightPos, voxelPos) < range) {

@@ -141,6 +141,7 @@ typedef void (*GLADpostcallback)(void *ret, const char *name, GLADapiproc apipro
 #define GL_RGBA32F 0x8814
 #define GL_RGBA8 0x8058
 #define GL_SHADER_STORAGE_BUFFER 0x90D2
+#define GL_SSBO GL_SHADER_STORAGE_BUFFER
 #define GL_SRC_ALPHA 0x0302
 #define GL_STATIC_DRAW 0x88E4
 #define GL_TEXTURE0 0x84C0
