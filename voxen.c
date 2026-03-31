@@ -236,10 +236,12 @@ ENGINE_TO_MOD void LoadFieldIntoLight(char* trimmed_key, char* trimmed_value, ch
 bool lightInPVS[LIGHT_COUNT];
 Vector3 lightsNewPosition[LIGHT_COUNT];
 void UpdateLights(void) {
+    bool voxelsNeedUpdated = false;
     for (uint16_t lightIdx = 0; lightIdx < Sys_Global.loadedLights; ++lightIdx) { 
         Vector3 lightPos = lightsNewPosition[lightIdx];
         lights[lightIdx].pos = lightPos;
         if (lights[lightIdx].lflags & LDIRTY) { // Marked all as true at level load.
+            voxelsNeedUpdated = true;
             #pragma GCC unroll 6
             for (int j=0;j<6;++j) { // Update to new position
                 mat4_lookat_from((float*)lightView[lightIdx][j], &cubemapOrientationQuaternion[j], lightPos);
@@ -267,6 +269,8 @@ void UpdateLights(void) {
                 }
             }
         }
+        
+        flag_setu32(&lights[lightIdx].lflags,LDIRTY,false);
     }
     
     if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
@@ -295,11 +299,13 @@ void UpdateLights(void) {
     }
 
     glBindBuffer(GL_SSBO,Sys_Render.lightsID); glBufferData(GL_SSBO,Sys_Global.loadedLights * sizeof(Light),lights,GL_DYNAMIC_DRAW);
-    Vector3 p = Sys_Global.instances[PLAYER1].position;
-    glUseProgram(Sys_Render.voxelUpdateShaderProgram);
-    glUniform3f(5,p.x,p.y,p.z);
-    glUniform1ui(6,(uint32_t)MAX_LIGHTS_PER_VOXEL);
-    glDispatchCompute((512+31)/32,(512+31)/32,1);
+    if (voxelsNeedUpdated) {
+        Vector3 p = Sys_Global.instances[PLAYER1].position;
+        glUseProgram(Sys_Render.voxelUpdateShaderProgram);
+        glUniform3f(5,p.x,p.y,p.z);
+        glUniform1ui(6,(uint32_t)MAX_LIGHTS_PER_VOXEL);
+        glDispatchCompute((512+31)/32,(512+31)/32,1);
+    }
 }
 
 #define IS_CHANGED(a, b) _Generic((a), float:(vabs((a) - (b)) > 0.0001f), default:((a) != (b)))
@@ -483,6 +489,7 @@ void LoadLevel(uint8_t curlevel) {
     __builtin_memset(lanims,0,LIGHT_COUNT * sizeof(LightAnimation));
     __builtin_memset(modelMatrices,0,INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
     __builtin_memset(camViews,0,MAX_CAMVIEWS * sizeof(CamView));
+    __builtin_memset(Sys_Global.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
     char filename[20]; // Minimum size for 0 through 13.
     StringFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel);
     levelFileHandle = OS_OpenReadonly(filename);

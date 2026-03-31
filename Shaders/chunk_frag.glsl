@@ -215,8 +215,8 @@ void main() {
 
         float shadowFactor = 1.0;
         uint shadowIndex = shadowMapsIndirection[lightIdx];
-//         bool lightHasShadows = (lights[lightIdx].lflags & SHADON) != 0u;
-        if (shadowsEnabled > 0 && (shadowIndex < lightCount)) {
+        bool lightHasShadows = (lights[lightIdx].lflags & SHADON) != 0u;
+        if (shadowsEnabled > 0 && (shadowIndex < lightCount) && lightHasShadows) {
             float smearness = distOverRangeSqd * 24.0 + range + intensity + 4.51;
             vec3 a = abs(toLight);
             float mx = step(a.y,a.x) * step(a.z,a.x);

@@ -851,8 +851,8 @@ MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(void) { // Global condition
         if (EntityDefinitions[i].cardchunk) {
             EntityDefinitions[i].lodIndex = GEOMETRY_LOD_CARD_MODEL_IDX;
             EntityDefinitions[i].collider = COLLIDER_TYPE_BOX;
-            EntityDefinitions[i].colliderCenter = (Vector3){ .x = 0.0f, .y = 1.44f, .z = 0.0f };
-            EntityDefinitions[i].colliderSize = (Vector3){ .x = 2.56f, .y = 0.32f, .z = 2.56f };
+            EntityDefinitions[i].colliderCenter = (Vector3){0.0f,1.44f,0.0f};
+            EntityDefinitions[i].colliderSize = (Vector3){2.56f,0.32f,2.56f};
         }
         
         EntityDefinitions[i].currentFrameFinished = Eng_Global->pauseRelativeTime + 0.1;
@@ -955,32 +955,28 @@ static const Color fogLUT[] = {
     {0.0f,       0.0f,        0.0f,       0.005f},
 };
 
+typedef struct { Vector2 worldMin; Vector2 worldMax; } LevelBounds;
+static const LevelBounds levelBoundsTable[13] = {
+    {{-34.8000f, -50.2000f}, {0.0f, 0.0f}},/*Level 0*/  {{-51.2400f, -61.5200f}, {0.0f, 0.0f}},/*Level 1*/  {{-43.5600f, -53.7800f}, {0.0f, 0.0f}},/*Level 2*/
+    {{-48.7060f, -48.6860f}, {0.0f, 0.0f}},/*Level 3*/  {{-26.9020f, -51.2272f}, {0.0f, 0.0f}},/*Level 4*/  {{-44.8022f, -52.4800f}, {0.0f, 0.0f}},/*Level 5*/
+    {{-63.3800f, -69.1233f}, {0.0f, 0.0f}},/*Level 6*/  {{-64.3389f, -79.4544f}, {0.0f, 0.0f}},/*Level 7*/  {{-41.1856f, -41.4272f}, {0.0f, 0.0f}},/*Level 8*/
+    {{-48.9439f, -66.4706f}, {0.0f, 0.0f}},/*Level 9*/  {{-21.5394f, -37.2372f}, {0.0f, 0.0f}},/*Level 10*/ {{-24.6172f, -25.7794f}, {0.0f, 0.0f}},/*Level 11*/
+    {{-15.4900f, -27.9400f}, {0.0f, 0.0f}} /*Level 12*/
+};
+
 extern uint16_t headmountedLanternLight;
 MOD_TO_ENGINE void LoadLevelMod(uint8_t curlevel) {
-    if (!Eng_Global->levelCurrentlyLoading) __builtin_memset(Eng_Global->instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
     Eng_Global->levelCurrentlyLoading = true;
     Eng_Global->currentLevel = curlevel;
     Eng_Global->loadedInstances = 3; // 0 == NULL, 1 == Player1, 2 == Player2
     Eng_Global->loadedLights = 0;
-    switch(curlevel) { // Setting these as early as possible. TODO: These are Citadel specific offsets.  Ideally we just determine these from modelBounds of each instance we load later on...
-        case 0: Eng_Global->worldMin_x = -38.40f + ( 0.00000f +    3.6000f); Eng_Global->worldMin_z = -51.20f + (0.0f + 1.0f); break;
-        case 1: Eng_Global->worldMin_x = -76.80f + ( 0.00000f +   25.5600f); Eng_Global->worldMin_z = -56.32f + (0.0f + -5.2f); break;
-        case 2: Eng_Global->worldMin_x = -40.96f + ( 0.00000f +   -2.6000f); Eng_Global->worldMin_z = -46.08f + (0.0f + -7.7f); break;
-        case 3: Eng_Global->worldMin_x = -53.76f + (50.17400f +  -45.1200f); Eng_Global->worldMin_z = -46.08f + (13.714f + -16.32f); break;
-        case 4: Eng_Global->worldMin_x =  -7.68f + ( 1.17800f +  -20.4000f); Eng_Global->worldMin_z = -64.00f + (1.292799f + 11.48f); break;
-        case 5: Eng_Global->worldMin_x = -35.84f + ( 1.17780f +  -10.1400f); Eng_Global->worldMin_z = -51.20f + (-1.2417f + -0.0383f); break;
-        case 6: Eng_Global->worldMin_x = -64.00f + ( 1.29280f +   -0.6728f); Eng_Global->worldMin_z = -71.68f + (-1.2033f + 3.76f); break;
-        case 7: Eng_Global->worldMin_x = -58.88f + ( 1.24110f +   -6.7000f); Eng_Global->worldMin_z = -79.36f + (-1.2544f + 1.16f); break;
-        case 8: Eng_Global->worldMin_x = -40.96f + (-1.30560f +    1.0800f); Eng_Global->worldMin_z = -43.52f + (1.2928f + 0.8f); break;
-        case 9: Eng_Global->worldMin_x = -51.20f + (-1.34390f +    3.6000f); Eng_Global->worldMin_z = -64.0f + (-1.1906f + -1.28f); break;
-        case 10:Eng_Global->worldMin_x =-128.00f + (-0.90945f +  107.3700f); Eng_Global->worldMin_z = -71.68f + (-1.0372f + 35.48f); break;
-        case 11:Eng_Global->worldMin_x = -38.40f + (-1.26720f +   15.0500f); Eng_Global->worldMin_z =  51.2f + (0.96056f + -77.94f); break;
-        case 12:Eng_Global->worldMin_x = -34.53f + ( 0.00000f +   19.0400f); Eng_Global->worldMin_z = -123.74f + (0.0f + 95.8f); break;
-    }
-    
+    Eng_Global->worldMin_x = levelBoundsTable[curlevel].worldMin.x;
+    Eng_Global->worldMin_z = levelBoundsTable[curlevel].worldMin.y;    
     if (curlevel == 1) {
         AddCamView((Vector3){-19.2301f,-42.6604f,-49.7453f},(Quaternion){0.2375f,0.0008f,-0.0002f,0.9713f},75u,256u,256u,2.21f,11.5f,false); // View of CPU room
         AddCamView((Vector3){7.664583f,-44.88017f,-14.26742f},(Quaternion){0.0f,0.9999f,0.0129f,0.0f},60u,256u,256u,2.192f,20.6f,false); // View of X door
+    } else if (curlevel == 2) {
+//         AddCamView((Vector3){34.13389f,-24.66895f,1.7706f},(Quaternion){0.0f,0.9999f,0.0129f,0.0f},60u,256u,256u,2.192f,20.6f,false); // View of restoration machine       
     }
     
     // worldMin_x and worldMin_z are the center points of the cells at furthest extents, thus correspond to minimum x or z positions in open cells the player can access.

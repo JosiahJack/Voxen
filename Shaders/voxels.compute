@@ -15,41 +15,42 @@ layout(location=5) uniform vec3 camPos;
 layout(location=6) uniform uint maxLightsPerVoxel;
 const int WORLD_X_VOXELCOUNT = 512;
 const float VOXEL_SIZE = 0.32;
-void main() {    
+const float FAR_PLANE_SQD = 71.68 * 71.68;
+void main() {
     if (gl_GlobalInvocationID.x >= WORLD_X_VOXELCOUNT || gl_GlobalInvocationID.y >= WORLD_X_VOXELCOUNT) return;
-
-    uint voxelX = gl_GlobalInvocationID.x;
-    uint voxelZ = gl_GlobalInvocationID.y;
-    uint voxelIndex = (voxelZ * WORLD_X_VOXELCOUNT) + voxelX;
+    uint voxelIndex = (gl_GlobalInvocationID.y * WORLD_X_VOXELCOUNT) + gl_GlobalInvocationID.x;
     uint baseOffset = voxelIndex * maxLightsPerVoxel;
+    float vx  = voxelMinCenterX + float(gl_GlobalInvocationID.x) * VOXEL_SIZE;
+    float vz  = voxelMinCenterZ + float(gl_GlobalInvocationID.y) * VOXEL_SIZE;
+    float cdx = vx - camPos.x;
+    float cdz = vz - camPos.z;
     voxelLightListCounts[voxelIndex] = 0u;
-    vec3 voxelPos = vec3(voxelMinCenterX + (voxelX * VOXEL_SIZE), 0.0,voxelMinCenterZ + (voxelZ * VOXEL_SIZE));
-    vec3 cam = vec3(camPos.x, 0.0,camPos.z);
-    if (length(voxelPos - cam) > 71.68) return;
-    
-    uint count = 0;
-    for (uint lightIdx = 0; lightIdx < loadedLights; ++lightIdx) {
-        vec3 lightPos = vec3(lights[lightIdx].pos.x,0.0,lights[lightIdx].pos.z);
-        float range = lights[lightIdx].range;
-        float intensity = lights[lightIdx].intensity;
-        if (distance(lightPos, voxelPos) < range) {
-            uint insertPos = count;
-            for (uint i = 0; i < count; i++) {
-                uint existingIdx = uniqueLightLists[baseOffset + i];
-                float existingIntensity = lights[existingIdx].intensity;
-                if (intensity > existingIntensity) { insertPos = i; break; }
-            }
+    if ((cdx*cdx + cdz*cdz) > FAR_PLANE_SQD) return;
 
-            // If we have room or this light is stronger than the weakest currently in the list
-            if (insertPos < maxLightsPerVoxel) {
-                uint moveCount = min(count, maxLightsPerVoxel - 1);
-                for (uint j = moveCount; j > insertPos; j--) uniqueLightLists[baseOffset + j] = uniqueLightLists[baseOffset + j - 1];
-                uniqueLightLists[baseOffset + insertPos] = lightIdx;
-                if (count < maxLightsPerVoxel) count++;
+    uint  count        = 0u;
+    uint  weakestSlot  = 0u;
+    float weakestScore = 1e38;
+    for (uint lightIdx = 0u; lightIdx < loadedLights; ++lightIdx) {
+        float dx    = lights[lightIdx].pos.x - vx;
+        float dz    = lights[lightIdx].pos.z - vz;
+        float range = lights[lightIdx].range;
+        if ((dx*dx + dz*dz) >= range*range) continue;
+
+        float intensity = lights[lightIdx].intensity;
+        if (count < maxLightsPerVoxel) {
+            uniqueLightLists[baseOffset + count] = lightIdx;
+            if (intensity < weakestScore) { weakestScore = intensity; weakestSlot = count; }
+            count++;
+        } else if (intensity > weakestScore) {
+            uniqueLightLists[baseOffset + weakestSlot] = lightIdx;
+            // Rescan for new weakest — only happens on eviction
+            weakestScore = intensity;
+            for (uint i = 0u; i < maxLightsPerVoxel; i++) {
+                float s = lights[uniqueLightLists[baseOffset + i]].intensity;
+                if (s < weakestScore) { weakestScore = s; weakestSlot = i; }
             }
         }
     }
-    
+
     voxelLightListCounts[voxelIndex] = count;
-    for (uint i = count; i < maxLightsPerVoxel; i++) uniqueLightLists[baseOffset + i] = 0xFFFFFFFFu;
 }
