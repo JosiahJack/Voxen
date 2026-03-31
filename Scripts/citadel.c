@@ -48,8 +48,7 @@ void DropHeldItem(uint16_t p) {
     if (inv->dropFinished > Eng_Global->pauseRelativeTime) return;
     
     inv->dropFinished = Eng_Global->pauseRelativeTime + 0.2; // Prevent immediate regrab at high fps
-    uint16_t newent = Eng_Global->loadedInstances;
-    AddInstance(inv->heldObjectIndex,newent); Eng_Global->loadedInstances++;
+    uint16_t newent = AddInstance(inv->heldObjectIndex,Eng_Global->instances[p].position);
     Entity* tossObject = &Eng_Global->instances[newent];
     tossObject->usableCustomIndex = inv->heldObjectCustomIndex;
     tossObject->ammo = inv->heldObjectAmmo;
@@ -926,13 +925,10 @@ void DelayedSpawnEnable(uint16_t self) {
 void DelayedSpawnUpdate(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
     if (!e->active || e->timerFinished >= Eng_Global->pauseRelativeTime) return;
+    
     e->active = false;
-    for (uint8_t i = 0; i < MAX_CHILD_COUNT; i++) {
-        uint16_t child = e->child[i];
-        if (child == UINT16_MAX) continue; // TODO child[] is the DelayedSpawn object list replacement in the C port.
-        flag_set(&Eng_Global->instances[child].entflags,ENTFLAG_ACTIVE,!e->despawnInstead);
-    }
     if (!e->doSelfAfterList) return;
+    
     if (e->despawnInstead) {
         if (e->destroyAfterListInsteadOfDeactivate) DeleteInstance(self);
         else flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
@@ -2237,13 +2233,6 @@ static void ObjectDeath(uint16_t self) {
     if (e->entflags & ENTFLAG_DEATH_BURST_DONE) { // gibOnDeath reuses DEATH_BURST_DONE
         // Gib path
         CreateDeathEffects(self,e->deathBurst);
-        for (int i = 0; i < MAX_CHILD_COUNT; i++) {
-            if (e->child[i] == NULLENT) continue;
-            flag_set(&Eng_Global->instances[e->child[i]].entflags,ENTFLAG_ACTIVE,true);
-            if (e->entflags & ENTFLAG_GROUNDED) { // gibsGetVelocity reuses GROUNDED on objects
-                AddForce(e->child[i],e->direction,true); // gibVelocityBoost stored in direction
-            }
-        }
         DropSearchables(self);
         if (e->index != 279) e->collider = COLLIDER_TYPE_NONE;
         HideSelf(self);

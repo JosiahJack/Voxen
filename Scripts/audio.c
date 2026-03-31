@@ -2,7 +2,7 @@
 #include "mod.h"
 #include "miniaudio.h"
 #include "tables_audio.h"
-#define MAX_AMBIENT_NOISES 64 // Equal to number used
+#define MAX_AMBIENT_NOISES 80 // Equal to number used
 uint16_t loadedAmbients = 0;
 typedef struct { ma_sound  sound; ma_bool32 loaded; float     length_sec; } AmbientSlot;
 typedef struct { uint16_t    index; const char* filename; } AmbientDef;

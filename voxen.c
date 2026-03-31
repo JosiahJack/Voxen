@@ -164,12 +164,6 @@ ENGINE_TO_MOD void InitializeEntity(Entity* entry) { // Blank entity, no index y
     entry->dynamicFriction = entry->staticFriction = 0.6f;
     entry->frictionCombine = entry->bounceCombine = PHYS_COMBINE_AVG;
     entry->volume = 1.0f;
-    for (int i=0;i<MAX_CHILD_COUNT;++i) {
-        entry->child[i] = UINT16_MAX;
-        entry->child_offset[i].x = entry->child_offset[i].y = entry->child_offset[i].z = 0.0f;
-        entry->child_rotation[i].x = entry->child_rotation[i].y = entry->child_rotation[i].z = 0.0f; entry->child_rotation[i].w = 1.0f;
-        entry->child_scale[i].x = entry->child_scale[i].y = entry->child_scale[i].z = 1.0f;
-    }
     entry->path[0] = '\0';    
 }
 

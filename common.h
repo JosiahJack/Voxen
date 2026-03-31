@@ -77,7 +77,7 @@ typedef struct {
     uint8_t numLerpSteps;
 } LightAnimation; // Separate from main lights buffer struct since it's not used very often
 
-#define INSTANCE_COUNT 20480 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
+#define INSTANCE_COUNT 10240 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
 #define LIGHT_COUNT 2048
 #define MODEL_IDX_MAX 6805
 #define MAX_VALID_TEXTURE 2048
@@ -112,7 +112,6 @@ typedef struct {
 #define WORLD   0u // Much like Quake, the world is entity 0.  Aand also like Quake, world is nullent and is 0.
 #define PLAYER1 1u
 #define PLAYER2 2u
-#define MAX_CHILD_COUNT 2
 #define START_INDEX_LEVEL_INSTANCES 3
 #define CELL_SIZE 2.56f // Each cell is 2.56x2.56
 #define VOXEL_SIZE 0.32f
@@ -1169,12 +1168,6 @@ typedef /*FAT*/ struct  {
     // Audio
     float volume;
 
-    // Attachment
-    uint16_t   child[MAX_CHILD_COUNT];
-    Vector3    child_offset[MAX_CHILD_COUNT];
-    Quaternion child_rotation[MAX_CHILD_COUNT];
-    Vector3    child_scale[MAX_CHILD_COUNT];
-
     // NPC logic
     AIState currentState;
     double timeForTranquilization;
@@ -1218,6 +1211,7 @@ typedef /*FAT*/ struct  {
     double timeSinceMovedEnough;
     double posCheckFinished;
     char targetID[TARGET_ID_LENGTH];
+    char texAnimResourceFolder[TARGET_STRING_LENGTH];
 
     // Misc
     char path[128];

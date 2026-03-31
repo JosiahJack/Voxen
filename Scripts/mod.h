@@ -206,7 +206,7 @@ void ResetHeldItem(uint16_t p);
 void DropHeldItem(uint16_t p);
 void AddItemToInventory(uint16_t p, int index, int customIndex);
 void TextureSequenceUpdate(uint16_t self);
-void AddInstance(uint16_t entIdx, uint16_t i);
+uint16_t AddInstance(uint16_t entIdx, Vector3 pos);
 void DeleteInstance(uint16_t i);
 uint8_t GetCurrentLevelSecurity(void);
 uint16_t GetImpactType(uint16_t instanceIdx);
