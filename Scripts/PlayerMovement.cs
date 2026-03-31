@@ -165,9 +165,7 @@ public class PlayerMovement : MonoBehaviour {
 	private float slideAngle = 0.9f;
 	private float gravFinished;
 	private float bodyLerpGravityOffDelayFinished;
-	private ContactPoint[] contactsCache;
 	private static Vector3 feetOffset = (Vector3){0f,-0.48f,0f);
-	private static StringBuilder s1 = new StringBuilder();
 	
 	public static PlayerMovement a;
 
@@ -202,13 +200,9 @@ public class PlayerMovement : MonoBehaviour {
 		doubleJumpFinished = Eng_Global->pauseRelativeTime;
 		doubleJumpTicks = 0;
 		turboFinished = Eng_Global->pauseRelativeTime;
-		playerHome = Eng_Global->instances[i].position;
-		ConsoleEmulator.lastCommand = new string[7];
-		ConsoleEmulator.consoleMemdex = consoleMemdex = 0;
 		stepFinished = Eng_Global->pauseRelativeTime;
 		rustleFinished = Eng_Global->pauseRelativeTime;
 		bodyLerpGravityOffDelayFinished = 0;
-		contactsCache = new ContactPoint[16];
     }
 
 	void Update() {

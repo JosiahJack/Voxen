@@ -4,6 +4,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <unistd.h>
+extern uint16_t loadedTexturesMaxIndex;
 uint32_t totalPixels;
 uint32_t totalPaletteColors;
 uint32_t* texturePaletteOffsets;
@@ -19,11 +20,8 @@ typedef struct { uint16_t index; bool transparent; bool doublesided; char path[1
 typedef struct { TextureData* entries; uint32_t count; uint32_t capacity; } TextureDataParser;
 typedef struct { const char* data; int size; } RawTexture;
 typedef struct TextureParseTask { uint32_t start_tex; uint32_t end_tex; RawTexture* raw_textures; int32_t* index_to_parser; const TextureDataParser* parser; int tid; } TextureParseTask;
-static uint8_t** textureIndexBuffers = NULL;
-static uint32_t** texturePaletteBuffers = NULL;
-static uint32_t* texturePaletteSizes = NULL;
-static int32_t* textureWidths = NULL;
-static int32_t* textureHeights = NULL;
+static uint8_t** textureIndexBuffers = NULL; static uint32_t** texturePaletteBuffers = NULL; static uint32_t* texturePaletteSizes = NULL;
+static int32_t* textureWidths = NULL; static int32_t* textureHeights = NULL;
 void stbi__arena_init(void) {
     if (!stbi__arena_base) {
         stbi__arena_base = OS_AllocateRAM(NULL,STBI_ARENA_SIZE,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
@@ -41,16 +39,10 @@ void stbi__arena_init_thread(StbiArena* arena) {
 }
 
 void* stbi__arena_alloc(size_t size) {
-    if (!stbi__arena_base) {
-        DualLogError("stbi__arena_base was invalid\n");
-        return NULL;
-    }
+    if (!stbi__arena_base) { DualLogError("stbi__arena_base was invalid\n"); return NULL; }
 
     uint8_t* aligned = stbi__arena_cursor;
-    if (aligned + size > stbi__arena_end) {
-        DualLogError("stbi__arena_alloc failed buffer overflowed with %zu vs %zu\n",(size_t)aligned + size,(size_t)stbi__arena_end);
-        return NULL;
-    }
+    if (aligned + size > stbi__arena_end) { DualLogError("stbi__arena_alloc failed buffer overflowed with %zu vs %zu\n",(size_t)aligned + size,(size_t)stbi__arena_end); return NULL; }
 
     stbi__arena_cursor = aligned + size;
     return aligned;
@@ -64,27 +56,9 @@ void* stbi__arena_alloc_thread(StbiArena* arena, size_t size) {
     return aligned;
 }
 
-typedef struct {
-    uint32_t img_x, img_y;
-    int32_t img_n, img_out_n;
-    uint8_t* img_buffer, *img_buffer_end;
-} stbi__context;
-
-typedef struct {
-    stbi__context* s;
-    uint8_t* idata, *expanded, *out;
-} stbi__png;
-
-enum {
-    STBI__F_none = 0,
-    STBI__F_sub = 1,
-    STBI__F_up = 2,
-    STBI__F_avg = 3,
-    STBI__F_paeth = 4,
-    STBI__F_avg_first,
-    STBI__F_paeth_first
-};
-
+typedef struct { uint32_t img_x, img_y; int32_t img_n, img_out_n; uint8_t* img_buffer, *img_buffer_end; } stbi__context;
+typedef struct { stbi__context* s; uint8_t* idata, *expanded, *out; } stbi__png;
+enum { STBI__F_none = 0, STBI__F_sub = 1, STBI__F_up = 2, STBI__F_avg = 3, STBI__F_paeth = 4, STBI__F_avg_first, STBI__F_paeth_first };
 inline static uint32_t stbi__get32be(stbi__context* s) {
     const uint8_t* p = s->img_buffer;
     s->img_buffer += 4;
@@ -121,14 +95,9 @@ static int32_t stbi__zbuild_huffman(stbi__zhuffman* z, const uint8_t* sizelist, 
     int32_t i, k = 0, next_code[16], sizes[17];
     __builtin_memset(sizes, 0, sizeof(sizes));
     __builtin_memset(z->fast, 0, sizeof(z->fast));
-    if (num != 32) {
-        for (i = 0; i < num; ++i) ++sizes[sizelist[i]];
-    }
-
+    if (num != 32) { for (i = 0; i < num; ++i) {++sizes[sizelist[i]];} }
     sizes[0] = 0;
-    for (i = 1; i < 16; ++i) {
-        if (sizes[i] > (1 << i)) return 0;
-    }
+    for (i = 1; i < 16; ++i) { if (sizes[i] > (1 << i)) {return 0;} }
 
     int32_t code = 0;
     for (i = 1; i < 16; ++i) {
@@ -136,9 +105,7 @@ static int32_t stbi__zbuild_huffman(stbi__zhuffman* z, const uint8_t* sizelist, 
         z->firstcode[i] = (uint16_t)code;
         z->firstsymbol[i] = (uint16_t)k;
         code = (code + sizes[i]);
-        if (sizes[i]) {
-            if (code - 1 >= (1 << i)) return 0;
-        }
+        if (sizes[i]) { if (code - 1 >= (1 << i)) {return 0;} }
 
         z->maxcode[i] = code << (16 - i);
         code <<= 1;
@@ -155,10 +122,7 @@ static int32_t stbi__zbuild_huffman(stbi__zhuffman* z, const uint8_t* sizelist, 
             z->value[c] = (uint16_t)i;
             if (s <= 9) {
                 int j = stbi__bit_reverse(next_code[s], s);
-                while (j < (1 << 9)) {
-                    z->fast[j] = fastv;
-                    j += (1 << s);
-                }
+                while (j < (1 << 9)) { z->fast[j] = fastv; j += (1 << s); }
             }
             ++next_code[s];
         }
@@ -632,6 +596,8 @@ extern uint8_t* stbi_load_from_memory(const uint8_t* buffer, int len, int* x, in
     return (unsigned char*)result;
 }
 
+extern bool doubleSidedTexture[MAX_VALID_TEXTURE];
+extern bool transparentTexture[MAX_VALID_TEXTURE];
 static void* TextureParsingWorker(void* argument) {
     TextureParseTask* task = (TextureParseTask*)argument;
     for (uint32_t i = task->start_tex; i < task->end_tex; ++i) {

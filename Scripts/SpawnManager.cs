@@ -89,24 +89,17 @@ public class SpawnManager : MonoBehaviour {
 		Vector3 spot = GetRandomLocation();
 		if (spot.x == 0 && spot.y == 0 && spot.z == 0) return;
 
-		GameObject instGO = ConsoleEmulator.SpawnDynamicObject(
-			index,LevelManager.a.currentLevel,false,null,-1
-		);
+		uint16_t instGO = SpawnDynamicObject(index,Eng_Global->currentLevel,false,null,-1);
+        instGO.Eng_Global->instances[i].position = spot;
+        AIController aic = instGO.GetComponent<AIController>();
+        if (aic == null) return;
 
-		if (instGO == null) {
-			DualLog("BUG: Could not spawn NPC index " + index.ToString());
-		} else {
-			instGO.Eng_Global->instances[i].position = spot;
-			AIController aic = instGO.GetComponent<AIController>();
-			if (aic == null) return;
+        if (!alertEnemiesOnAwake) {
+            if (aic.index != 14) aic.wandering = true;
+            return;
+        }
 
-			if (!alertEnemiesOnAwake) {
-				if (aic.index != 14) aic.wandering = true;
-				return;
-			}
-
-			aic.SetEnemy(Const.a.player1Capsule,Const.a.player1TargettingPos);
-		}
+        aic.SetEnemy(Const.a.player1Capsule,Const.a.player1TargettingPos);
 	}
 
 	Vector3 GetRandomLocation() {

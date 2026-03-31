@@ -3,9 +3,27 @@
 #include "gl.h"
 #include "voxen.h"
 // #define DUMP_FONT_BITMAPS
-#define STB_TRUETYPE_IMPLEMENTATION
+typedef struct { unsigned short x0,y0,x1,y1;/* coordinates of bbox in bitmap*/ float xoff,yoff,xadvance; float xoff2,yoff2; } stbtt_packedchar;
+typedef struct { float x0,y0,s0,t0; float x1,y1,s1,t1; } stbtt_aligned_quad; // 0 is top-left, 1 is bottom-right
+void stbtt_GetPackedQuad(const stbtt_packedchar *chardata, int pw, int ph, int char_index, float *xpos, float *ypos, stbtt_aligned_quad *q, int align_to_integer) {
+   float ipw = 1.0f / (float)pw, iph = 1.0f / (float)ph;
+   const stbtt_packedchar *b = chardata + char_index;
+   if (align_to_integer) {
+      float x = vfloor((*xpos + b->xoff) + 0.5f); float y = vfloor((*ypos + b->yoff) + 0.5f);
+      q->x0 = x; q->y0 = y;
+      q->x1 = x + b->xoff2 - b->xoff; q->y1 = y + b->yoff2 - b->yoff;
+   } else {
+      q->x0 = *xpos + b->xoff; q->y0 = *ypos + b->yoff;
+      q->x1 = *xpos + b->xoff2; q->y1 = *ypos + b->yoff2;
+   }
+
+   q->s0 = b->x0 * ipw; q->t0 = b->y0 * iph;
+   q->s1 = b->x1 * ipw; q->t1 = b->y1 * iph;
+   *xpos += b->xadvance;
+}
+
+typedef struct { unsigned char *data; int cursor; int size; } stbtt__buf;
 #include "stb_truetype.h"
-// MAX_GLYPHS is 4096 as is FONT_ATLAS_SIZE which is more than twice as large as needed without hiragana/katakana present
 int numPackedGlyphs = 0;
 int numPackedGlyphsStopD = 0;
 GLuint fontAtlasTex;
@@ -16,40 +34,14 @@ float fixedNumberAdvanceWidth = 0.0f; // Global for fixed-width number spacing
 float fixedNumberAdvanceWidthStopD = 0.0f;
 static const char* const fallbackFontPaths[] = { "./Fonts/FreeSerifBold.ttf", "./Fonts/cambriab.ttf", "./Fonts/NotoSansCJK-Bold.ttc" };
 static const char* const fontPaths[] = { "./Fonts/SystemShockText.ttf", "./Fonts/StopD.ttf" };
-
-typedef struct {
-    char *path;
-    unsigned char *data;
-    size_t size;
-    stbtt_fontinfo info;
-} LoadedFont;
-
 static stbtt_fontinfo fontInfo[5];
 static unsigned char *fontData[5];
+typedef struct { char *path; unsigned char *data; size_t size; stbtt_fontinfo info; } LoadedFont;
 LoadedFont fallbackFonts[3]; 
-
-typedef struct {
-    int32_t first;   // first codepoint in range
-    int32_t count;   // number of codepoints
-    int32_t startIndex; // index into fontPackedChar where this range starts
-} GlyphRange;
-
-GlyphRange fontRanges[] = {
-    {0x0020, 0x7E - 0x20+1, 0},       // ASCII 94
-    {0x00A0, 0xFF - 0xA0+1, 95},      // Latin-1 95
-    {0x0400, 0x04FF - 0x0400+1, 95+96}, // Cyrillic 255
-    {0x3040, 0x30FF - 0x3040+1, 95+96+256}, // Hiragana/Katakana 191
-};
-
-GlyphRange fontRangesStopD[] = {
-    {0x0020, 0x7E - 0x20+1, 0},       // ASCII
-    {0x00A0, 0xFF - 0xA0+1, 95},      // Latin-1
-    {0x0400, 0x04FF - 0x0400+1, 95+96}, // Cyrillic
-    {0x3040, 0x30FF - 0x3040+1, 95+96+256}, // Hiragana/Katakana
-};
-
+typedef struct { int32_t first; int32_t count; int32_t startIndex; } GlyphRange;
+GlyphRange fontRanges[] = {{0x0020,0x7E - 0x20+1,0},/*ASCII 94*/ {0x00A0,0xFF - 0xA0+1, 95},/*Latin-1 95*/ {0x0400,0x04FF - 0x0400+1,95+96},/*Cyrillic 255*/ {0x3040,0x30FF - 0x3040+1,95+96+256},/*Hiragana/Katakana 191*/};
+GlyphRange fontRangesStopD[] = {{0x0020,0x7E - 0x20+1,0},/*ASCII*/ {0x00A0,0xFF - 0xA0+1,95},/*Latin-1*/ {0x0400,0x04FF - 0x0400+1,95+96},/*Cyrillic*/ {0x3040,0x30FF - 0x3040+1,95+96+256},/*Hiragana/Katakana*/};
 int32_t numFontRanges = sizeof(fontRanges)/sizeof(fontRanges[0]);
-
 __attribute__((pure)) int32_t CodepointToPackedIndex(int32_t codepoint, int fontID) {
     if (codepoint < 32) codepoint = 32;
     if (codepoint >= 447) codepoint = 446;
@@ -70,8 +62,7 @@ static LoadedFont LoadFallbackFont(const char *path, int fontInfoIdx, int collec
     int offset = stbtt_GetFontOffsetForIndex(fontData[fontInfoIdx], collection_index);
     if (offset < 0) { DualLogError("Invalid collection index %d for font %s\n", collection_index, path); OS_Exit(1); }
     if (!stbtt_InitFont_internal(&fontInfo[fontInfoIdx], fontData[fontInfoIdx], offset)) { DualLogError("Failed to init font at index %d in %s\n", collection_index, path); OS_Exit(1); }
-    
-    return (LoadedFont){ .path = (char*)path, .data = fontData[fontInfoIdx], .size = fontFileSize, .info = fontInfo[fontInfoIdx] };
+    return (LoadedFont){(char*)path,fontData[fontInfoIdx],fontFileSize,fontInfo[fontInfoIdx]};
 }
 
 static int GetGlyphAndFont(uint32_t codepoint, stbtt_fontinfo **outFont, uint8_t fontID) {
@@ -132,9 +123,8 @@ static bool load_font_cache(const char *path, int32_t expected_glyphs, const uin
 }
 
 #ifdef DUMP_FONT_BITMAPS
-    int stbi_write_bmp(char const *filename, int x, int y, int comp, const void *data);
+    void stbi_write_bmp(char const *filename, int x, int y, int comp, const void *data);
     static void dump_atlas_bmp(const char *bmp_path, const unsigned char *atlas_data) {
-        // stbi_write_bmp expects RGB data, so expand R8 -> RGB24
         unsigned char *rgb = OS_AllocateRAM(NULL,FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * 4,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
         for (int i=0;i<FONT_ATLAS_SIZE * FONT_ATLAS_SIZE;++i) { unsigned char v = atlas_data[i]; rgb[i*3+0] = v; rgb[i*3+1] = v; rgb[i*3+2] = v; rgb[i*3+3] = 255; }
         stbi_write_bmp(bmp_path,FONT_ATLAS_SIZE, FONT_ATLAS_SIZE,4,rgb);
@@ -171,16 +161,11 @@ void InitFontAtlasses(void) {
 
     // Primary
     unsigned char *bmp = OS_AllocateRAM(NULL,FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * sizeof(unsigned char),PROT_READ | PROT_WRITE,MAP_PRIVATE | MAP_ANONYMOUS,OS_INVALID_HANDLE);
-    stbtt_pack_context pc;
-    stbtt_PackBegin(&pc,bmp,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0,16,NULL);
-    pc.h_oversample = 4; // STBTT_MAX_OVERSAMPLE = 8 for chunky 2pixel black outline support for readability and to follow System Shock.
-    pc.v_oversample = 4;
-    pc.skip_missing = 1;
-    numPackedGlyphs = 0;
-    float h = 20.0f;
-    for (int r = 0; r < numFontRanges; r++) {
+    stbtt_pack_context pc; stbtt_PackBegin(&pc,bmp,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0,16,NULL);
+    pc.h_oversample = 4; pc.v_oversample = 4; pc.skip_missing = 1; numPackedGlyphs = 0; float h = 20.0f;
+    for (int r=0;r<numFontRanges;++r) {
         fontRanges[r].startIndex = numPackedGlyphs;
-        for (int i = 0; i < fontRanges[r].count; i++) {
+        for (int i=0;i<fontRanges[r].count;++i) {
             if (numPackedGlyphs >= MAX_GLYPHS) break;
             
             uint32_t cp = fontRanges[r].first + i;
@@ -218,14 +203,9 @@ void InitFontAtlasses(void) {
         
     // Secondary
     __builtin_memset(bmp,0,FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * sizeof(unsigned char));
-    stbtt_pack_context pc2;
-    stbtt_PackBegin(&pc2, bmp, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 16, NULL);
-    pc2.h_oversample = 4; // STBTT_MAX_OVERSAMPLE = 8
-    pc2.v_oversample = 4;
-    pc2.skip_missing = 1;
-    numPackedGlyphsStopD = 0;
-    float h2 = 54.0f;
-    for (int r = 0; r < numFontRanges; r++) {
+    stbtt_pack_context pc2; stbtt_PackBegin(&pc2, bmp, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 16, NULL);
+    pc2.h_oversample = 4; pc2.v_oversample = 4; pc2.skip_missing = 1; numPackedGlyphsStopD = 0; float h2 = 54.0f;
+    for (int r=0;r<numFontRanges;++r) {
         fontRangesStopD[r].startIndex = numPackedGlyphsStopD;
         for (int i = 0; i < fontRangesStopD[r].count; i++) {
             if (numPackedGlyphsStopD >= MAX_GLYPHS) break;

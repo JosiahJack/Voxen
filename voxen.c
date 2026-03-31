@@ -17,17 +17,26 @@ GLFWwindow* window;
 #include "miniaudio.h"
 #include "Shaders/shaders.h"
 #include "credits.h"
-GlobalContext Sys_Global = {.menuActive=true, .screenshotTimeout=1.0, .creditsPageIndex=1, .difficultyCombat=2, .difficultyCyber=2, .difficultyPuzzle=2, .difficultyMission=2, .deaths=0, .worstFPS=UINT32_MAX, .cursorPosition_x=680, .cursorPosition_y=384};
-CheatsSystem Sys_Cheats = {.god=false, .noclip=true, .showLocation=true, .showFPS=true, .editMode=true};
-RenderSystem Sys_Render; SystemUI Sys_UI;
-OsFileHandle console_log_file = 0;
+GlobalContext Sys_Global = {.menuActive=true,.screenshotTimeout=1.0,.creditsPageIndex=1,.difficultyCombat=2,.difficultyCyber=2,.difficultyPuzzle=2,.difficultyMission=2,.deaths=0,.worstFPS=UINT32_MAX,.cursorPosition_x=680,.cursorPosition_y=384};
+CheatsSystem Sys_Cheats = {.god=false,.noclip=true,.showLocation=true,.showFPS=true,.editMode=true}; RenderSystem Sys_Render; SystemUI Sys_UI;
+SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on first run for potatoes (e.g. won't crash for out of VRAM, or won't take 5min to init).
+    .InputCodeSettings = {
+        5,  /* Forward    = F */     0,/* Strafe Left= A */         18,/* Backpedal  = S */        3,/* Strafe Right= D */       100,/* Jump    = SPACE */      2,/* Crouch   = C        */ 23,/* Prone     = X */ 16,/* Lean Left = Q  */
+        4,  /* Lean Right = E */    45,/* Sprint     = LEFT SHIFT */38,/* Turn Left  = LF ARROW */39,/* Turn Right  = RT ARROW */ 36,/* Look Up = UP ARROW */  37,/* Look Down= DN ARROW */ 20,/* Recent Log= U */ 26,/* Biomonitor= 1  */
+        27, /* Sensaround = 2 */    28,/* Lantern    = 3 */         29,/* Shield     = 4 */       30,/* Infrared    = 5 */        31,/* Email   = 6 */         32,/* Booster  = 7        */ 33,/* Jumpjets  = 8 */ 56,/* Attack    = LMB*/
+        57, /* Use        = RMB */  99,/* Menu/Back  = ESCAPE */    97,/* Toggle Mode= TAB */     17,/* Reload      = R */       128,/* Weapon += MWHEEL + */ 129,/* Weapon - = MWHEEL - */  6,/* Grenade   = G */ 19,/* Grenade + = T  */
+        131,/* Grenade -  = B */    21,/* Ammo Type  = V */          9,/* Patch Use  = J */        8,/* Patch +     = I */       132,/* Patch - = , */         12,/* Full Map = M        */ 21,/* Swim Up   = V */  2,/* Swim Down = C  */
+        103,/* Console    = `/~ */ 102/* Screenshot  = F12 */},
+    .ScreenWidth=800u,.ScreenHeight=600u,.Fullscreen=0u,.FOV=65u,.Brightness=50u,.Gamma=50u,.AntiAliasing=0u,.Shadows=0u,.Reflections=0u,.Vsync=0u,.ModelDetail=0u,
+    .GI=0u,.SpeakerMode=1u,.Reverb=0u,.VolumeMaster=100u,.VolumeMusic=25u,.VolumeMessage=75u,.VolumeEffects=100u,.Language=0u,.DynamicMusic=1u,.Footsteps=1u,.InvertLook=0u,
+    .InvertCyberspaceLook=0u,.QuickItemPickup=0u,.QuickReloadWeapons=0u,.MouseSensitivity=10u,.NoShootMode=0u,.HeadBob=1u,.SSR_RES=8u};/*Ratio is (1 / SSR_RES) * res*/
 uint8_t queuedLevelToLoad = 255u;
-float berserkSeedTime, cam_pitch, cam_yaw = 90.0f, cam_roll, rasterPerspectiveProjection[16], shadowmapsPerspectiveProjection[16], modelMatrices[INSTANCE_COUNT * 16];
+float berserkSeedTime, cam_pitch,cam_yaw=90.0f,cam_roll, rasterPerspectiveProjection[16], shadowmapsPerspectiveProjection[16], modelMatrices[INSTANCE_COUNT * 16];
 double berserkFinished;
 char uiTextBuffer[TEXT_BUFFER_SIZE];
 float uiOrthoProjection[16];
-Light lights[LIGHT_COUNT];
-LightAnimation lanims[LIGHT_COUNT];
+extern uint32_t gridCellStates[ARRSIZE];
+Light lights[LIGHT_COUNT]; LightAnimation lanims[LIGHT_COUNT];
 static float lightView[LIGHT_COUNT][6][4][4]; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightView[i][face][0 ... 15]
 static float lightViewProj[LIGHT_COUNT][6][16]; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightViewProj[i][face][0 ... 15]
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6]; // Array of Array of 6 Arrays of FrustumPlane structs (four floats).  lightFrustumPlanes[i][face][.nx,.ny,, .nz, .d]
@@ -36,19 +45,14 @@ uint16_t editModeSelection, editModeTestEntityDefinition = 0; // Test instance a
 typedef struct { double shadowTime; uint32_t numShadowsCouldRender; uint32_t shadowmapIndirectionList[LIGHT_COUNT]; float shadDotThresh; } VoxenShadowSystem;
 VoxenShadowSystem voxen_Shadow_System;
 uint16_t loadedTexturesMaxIndex;
-bool doubleSidedTexture[MAX_VALID_TEXTURE];
-bool transparentTexture[MAX_VALID_TEXTURE];
-uint32_t drawCallsRenderedThisFrame;
-uint32_t textDrawCallsRenderedThisFrame;
-uint32_t uiImageDrawCallsRenderedThisFrame;
-uint32_t shadowDrawCallsRenderedThisFrame;
-uint32_t verticesRenderedThisFrame;
-uint32_t drawCallsNormal;
+bool doubleSidedTexture[MAX_VALID_TEXTURE]; bool transparentTexture[MAX_VALID_TEXTURE];
+extern uint32_t modelVertexCounts[MODEL_IDX_MAX]; extern uint16_t modelTriangleCounts[MODEL_IDX_MAX];
+uint32_t drawCallsRenderedThisFrame,textDrawCallsRenderedThisFrame,uiImageDrawCallsRenderedThisFrame,shadowDrawCallsRenderedThisFrame,verticesRenderedThisFrame,drawCallsNormal;
+extern GLuint fontAtlasTex; extern GLuint fontAtlasTexStopD;
 #define MAX_CHANNELS 256
 ma_sound wav_sounds[MAX_CHANNELS];
 float wav_volumes[MAX_CHANNELS]; // Setting independent base sfx volume (e.g. dropped physics object hard or lightly volume, independent of position).
-int32_t wav_count = 0;
-ma_sound log_sound;
+int32_t wav_count = 0; ma_sound log_sound;
 #define MENUPAD        1028
 #define MENUPAD_HILITE 1029
 MenuPages currentMenuPage = MenuPages_FrontPage;
@@ -68,7 +72,7 @@ uint8_t camViewCount = 0;
 typedef struct { unsigned short x0,y0,x1,y1; float xoff,yoff,xadvance; float xoff2,yoff2; } stbtt_packedchar; // x0,y0,x1,y1 are coordinates of bbox in bitmap
 typedef struct { float x0,y0,s0,t0; float x1,y1,s1,t1; } stbtt_aligned_quad; // 0 is top-left, 1 is bottom-right
 void stbtt_GetPackedQuad(const stbtt_packedchar *chardata, int pw, int ph, int char_index, float *xpos, float *ypos, stbtt_aligned_quad *q, int align_to_integer);
-
+typedef __builtin_va_list va_list; OsFileHandle console_log_file=0;
 static void DualLogMain(const char *prefix, const char *fmt, va_list args) { // Logs both to log file and console, usage same as printf
     char buf[4096]; va_list copy; __builtin_va_copy(copy,args); StringFormatV(buf,sizeof(buf),fmt,copy); __builtin_va_end(copy);
     #ifdef WINDOWS // Write to console (stdout / stderr)
@@ -95,15 +99,15 @@ static inline __attribute__((always_inline)) GLuint LinkProgram(GLuint* s, int32
 GLuint CompileStandardShader(const char* vsrc, const char* fsrc, const char* name) { GLuint vertShader = CompileShader(GL_VERTEX_SHADER, vsrc, name); GLuint fragShader = CompileShader(GL_FRAGMENT_SHADER, fsrc, name); return LinkProgram((GLuint[]){vertShader, fragShader}, 2, name); }
 GLuint CompileComputeShader(const char* src, const char* name) { GLuint computeShader = CompileShader(GL_COMPUTE_SHADER, src, name); return LinkProgram((GLuint[]){computeShader}, 1, name); }
 void CompileShaders(void) {
-    Sys_Render.depthPrepassShaderProgram       = CompileStandardShader(depthPrepassVertSrc, depthPrepassFragSrc, "Depth Prepass");
-    Sys_Render.chunkShaderProgram       = CompileStandardShader(vertSrc, fragSrc, "Main");
-    Sys_Render.debugUnlitShaderProgram  = CompileStandardShader(debugUnlitVertSrc, debugUnlitFragSrc, "Debug Unlit");
-    Sys_Render.shadowmapsShaderProgram  = CompileStandardShader(shadowmapVertSrc, shadowmapFragSrc, "Shadowmaps");
-    Sys_Render.textShaderProgram        = CompileStandardShader(textVertSrc, textFragSrc, "Text");
-    Sys_Render.imageBlitShaderProgram   = CompileStandardShader(quadVertSrc, quadFragSrc, "Image Blit");
-    Sys_Render.ssrShaderProgram         = CompileComputeShader(ssrComputeSrc, "SSR");
-    Sys_Render.voxelUpdateShaderProgram     = CompileComputeShader(voxelUpdateComputeSrc, "Voxel Update");
-    Sys_Render.shadowmapsClearShaderProgram = CompileComputeShader(shadowmapsClearComputeSrc, "Shadowmaps Clear");
+    Sys_Render.depthPrepassShaderProgram= CompileStandardShader(depthPrepassVertSrc,depthPrepassFragSrc,"Depth Prepass");
+    Sys_Render.chunkShaderProgram       = CompileStandardShader(vertSrc,fragSrc,"Main");
+    Sys_Render.debugUnlitShaderProgram  = CompileStandardShader(debugUnlitVertSrc,debugUnlitFragSrc,"Debug Unlit");
+    Sys_Render.shadowmapsShaderProgram  = CompileStandardShader(shadowmapVertSrc,shadowmapFragSrc,"Shadowmaps");
+    Sys_Render.textShaderProgram        = CompileStandardShader(textVertSrc,textFragSrc,"Text");
+    Sys_Render.imageBlitShaderProgram   = CompileStandardShader(quadVertSrc,quadFragSrc,"Image Blit");
+    Sys_Render.ssrShaderProgram            = CompileComputeShader(ssrComputeSrc,"SSR");
+    Sys_Render.voxelUpdateShaderProgram    = CompileComputeShader(voxelUpdateComputeSrc,"Voxel Update");
+    Sys_Render.shadowmapsClearShaderProgram= CompileComputeShader(shadowmapsClearComputeSrc,"Shadowmaps Clear");
 }
 
 GLuint SetupSSBO(GLuint* id, GLuint bindx, GLsizeiptr sz, const void* d, GLenum typ) { glGenBuffers(1,id); glBindBuffer(GL_SSBO,*id); glBufferData(GL_SSBO,sz,d,typ); glBindBufferBase(GL_SHADER_STORAGE_BUFFER,bindx,*id); return *id; }
@@ -167,6 +171,8 @@ ENGINE_TO_MOD void InitializeEntity(Entity* entry) { // Blank entity, no index y
     entry->path[0] = '\0';    
 }
 
+bool lightInPVS[LIGHT_COUNT];
+Vector3 lightsNewPosition[LIGHT_COUNT];
 ENGINE_TO_MOD int32_t AddLight(Light* lit, LightAnimation* lanim) {
     int32_t i = Sys_Global.loadedLights;
     Sys_Global.loadedLights++;
@@ -227,8 +233,25 @@ ENGINE_TO_MOD void LoadFieldIntoLight(char* trimmed_key, char* trimmed_value, ch
     else if (StringsEqual(trimmed_key,"lerpOn"))       flag_setu32(&lit->lflags,LERPON,parse_bool(trimmed_value,initialLine,lineNum));
 }
 
-bool lightInPVS[LIGHT_COUNT];
-Vector3 lightsNewPosition[LIGHT_COUNT];
+static inline __attribute__((always_inline)) void mul_mat4(float *out, const float *a, const float *b) { // out = a * b
+	out[0] =  a[0] * b[0]  + a[4] * b[1]  + a[8]  * b[2] + a[12]  * b[3];
+	out[1] =  a[1] * b[0]  + a[5] * b[1]  + a[9]  * b[2] + a[13]  * b[3];
+	out[2] =  a[2] * b[0]  + a[6] * b[1] + a[10]  * b[2] + a[14]  * b[3];
+	out[3] =  a[3] * b[0]  + a[7] * b[1] + a[11]  * b[2] + a[15]  * b[3];
+	out[4] =  a[0] * b[4]  + a[4] * b[5]  + a[8]  * b[6] + a[12]  * b[7];
+	out[5] =  a[1] * b[4]  + a[5] * b[5]  + a[9]  * b[6] + a[13]  * b[7];
+	out[6] =  a[2] * b[4]  + a[6] * b[5] + a[10]  * b[6] + a[14]  * b[7];
+	out[7] =  a[3] * b[4]  + a[7] * b[5] + a[11]  * b[6] + a[15]  * b[7];
+	out[8] =  a[0] * b[8]  + a[4] * b[9]  + a[8] * b[10] + a[12] * b[11];
+	out[9] =  a[1] * b[8]  + a[5] * b[9]  + a[9] * b[10] + a[13] * b[11];
+	out[10] = a[2] * b[8]  + a[6] * b[9] + a[10] * b[10] + a[14] * b[11];
+	out[11] = a[3] * b[8]  + a[7] * b[9] + a[11] * b[10] + a[15] * b[11];
+	out[12] = a[0] * b[12] + a[4] * b[13] + a[8] * b[14] + a[12] * b[15];
+	out[13] = a[1] * b[12] + a[5] * b[13] + a[9] * b[14] + a[13] * b[15];
+	out[14] = a[2] * b[12] + a[6] * b[13] + a[10]* b[14] + a[14] * b[15];
+	out[15] = a[3] * b[12] + a[7] * b[13] + a[11]* b[14] + a[15] * b[15];
+}
+
 void UpdateLights(void) {
     bool voxelsNeedUpdated = false;
     for (uint16_t lightIdx = 0; lightIdx < Sys_Global.loadedLights; ++lightIdx) { 
@@ -372,8 +395,8 @@ Color textColors[] = {
 };
 
 float textVertexData[8192]; // Reusable buffer for text vertices.  Most text only needs ~3000
-extern stbtt_packedchar fontPackedChar[MAX_GLYPHS];
-extern stbtt_packedchar fontPackedCharStopD[MAX_GLYPHS];
+extern stbtt_packedchar fontPackedChar[MAX_GLYPHS]; extern stbtt_packedchar fontPackedCharStopD[MAX_GLYPHS];
+extern float fixedNumberAdvanceWidth; extern float fixedNumberAdvanceWidthStopD;
 __attribute__((pure)) int32_t CodepointToPackedIndex(int32_t codepoint, int fontID);
 void RenderFormattedText(int16_t x, int16_t y, uint32_t color, uint8_t fontID, float scaleInput, const char * restrict format, ...) {
     float scale = scaleInput;// * UIY(Sys_Settings.ScreenHeight);
@@ -385,9 +408,9 @@ void RenderFormattedText(int16_t x, int16_t y, uint32_t color, uint8_t fontID, f
     if (fontID == FONT_STOPD) glBindTextureUnit(6, fontAtlasTexStopD);
     else glBindTextureUnit(6, fontAtlasTex);
     
-    glUniform2f(4, 1.0f / (float)FONT_ATLAS_SIZE, 1.0f / (float)FONT_ATLAS_SIZE);
-    glUniform1ui(2, fontID);
-    glUniform1i(1, 6); // textTexture sampler2D
+    glUniform2f(4,1.0f / (float)FONT_ATLAS_SIZE, 1.0f / (float)FONT_ATLAS_SIZE);
+    glUniform1ui(2,fontID);
+    glUniform1i(1,6); // textTexture sampler2D
     glBindVertexArray(Sys_Render.textVAO);
     size_t vertexCount = 0;
     const char* p = uiTextBuffer;
@@ -397,11 +420,10 @@ void RenderFormattedText(int16_t x, int16_t y, uint32_t color, uint8_t fontID, f
     int characterCount = 0;
     float paddingUV = (10.0f / (float)FONT_ATLAS_SIZE); // This is for the black outline around all text for readability. (2.0f makes an interesting bold effect)
     float borderWidthPixels = 2.0f;
-    while (*p) {
-        // Decode UTF8
+    while (*p) { // Decode UTF8
         const unsigned char *s = (const unsigned char *)p;
         uint32_t codepoint = 0;
-        if (*s < 0x80) {          // 1-byte ASCII
+        if (*s < 0x80) { // 1-byte ASCII
             codepoint = *s++;
         } else if ((*s & 0xE0) == 0xC0) { // 2-byte
             codepoint  = (*s & 0x1F) << 6;
@@ -418,21 +440,14 @@ void RenderFormattedText(int16_t x, int16_t y, uint32_t color, uint8_t fontID, f
             codepoint |= (s[2] & 0x3F) << 6;
             codepoint |= (s[3] & 0x3F);
             s += 4;
-        } else {
-            s++; // invalid byte
-        }
+        } else s++; // invalid byte
         p = (const char *)s;
         characterCount++;
-        if (codepoint == '\n' || characterCount > 120) {
-            xpos = x;
-            ypos += lineSpacing;
-            characterCount = 0;
-            continue;
-        }
+        if (codepoint == '\n' || characterCount > 120) {xpos=x; ypos+=lineSpacing; characterCount=0; continue;}
         
         int idx = CodepointToPackedIndex(codepoint, fontID);
-        if (fontID == FONT_STOPD) stbtt_GetPackedQuad(fontPackedCharStopD, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, idx, &xpos, &ypos, &q, 1);
-        else stbtt_GetPackedQuad(fontPackedChar, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, idx, &xpos, &ypos, &q, 1);
+        if (fontID == FONT_STOPD) stbtt_GetPackedQuad(fontPackedCharStopD,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,idx,&xpos,&ypos,&q,1);
+        else stbtt_GetPackedQuad(fontPackedChar,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,idx,&xpos,&ypos,&q,1);
         float vx0 = (q.x0 * scale) - (borderWidthPixels);
         float vy0 = (q.y0 * scale) - (borderWidthPixels);
         float vx1 = (q.x1 * scale) + (borderWidthPixels);
@@ -442,8 +457,8 @@ void RenderFormattedText(int16_t x, int16_t y, uint32_t color, uint8_t fontID, f
         float s1 = (q.s1) + (paddingUV);
         float t1 = (q.t1) + (paddingUV);
         float z = 0.0f;
-        float textVertices[30] = { vx0, vy0, z, s0, t0, vx1, vy1, z, s1, t1, vx1, vy0, z, s1, t0, vx0, vy0, z, s0, t0, vx0, vy1, z, s0, t1, vx1, vy1, z, s1, t1 };
-        __builtin_memcpy(textVertexData + vertexCount * 30, textVertices, sizeof(textVertices));
+        float tverts[30] = {vx0,vy0,z,s0,t0,vx1,vy1,z,s1,t1,vx1,vy0,z,s1,t0,vx0,vy0,z,s0,t0,vx0,vy1,z,s0,t1,vx1,vy1,z,s1,t1};
+        __builtin_memcpy(textVertexData + vertexCount * 30,tverts,sizeof(tverts));
         vertexCount++;
         if (codepoint >= '0' && codepoint <= '9') {
             if (fontID == FONT_STOPD) xpos = q.x0 + fixedNumberAdvanceWidthStopD;
@@ -452,8 +467,8 @@ void RenderFormattedText(int16_t x, int16_t y, uint32_t color, uint8_t fontID, f
     }
     
     if (vertexCount > 0) {
-        glNamedBufferData(Sys_Render.textVBO, vertexCount * 30 * sizeof(float), textVertexData, GL_DYNAMIC_DRAW);
-        glDrawArrays(GL_TRIANGLES, 0, vertexCount * 6);
+        glNamedBufferData(Sys_Render.textVBO,vertexCount * 30 * sizeof(float),textVertexData,GL_DYNAMIC_DRAW);
+        glDrawArrays(GL_TRIANGLES,0,vertexCount * 6);
         drawCallsRenderedThisFrame++; textDrawCallsRenderedThisFrame++; verticesRenderedThisFrame += vertexCount * 6;
     }
 }
@@ -471,6 +486,205 @@ void CenterStatusPrint(const char * restrict fmt, ...) {
     Sys_Global.statusTextDecayFinished = get_time() + 2.5; // 2.5 second decay time before text dissappears.
 }
 
+InputSystem Sys_Input;
+extern uint16_t editModeTestEntityDefinition;
+extern uint16_t editModeSelection;
+bool mouseMovementThisFrame;
+typedef struct { const char* name; int value; } InputElement;
+InputElement inputElements[149] = {
+    { "A", GLFW_KEY_A }, { "B", GLFW_KEY_B }, { "C", GLFW_KEY_C }, { "D", GLFW_KEY_D }, { "E", GLFW_KEY_E }, { "F", GLFW_KEY_F }, { "G", GLFW_KEY_G }, { "H", GLFW_KEY_H }, { "I", GLFW_KEY_I }, { "J", GLFW_KEY_J },
+    { "K", GLFW_KEY_K }, { "L", GLFW_KEY_L }, { "M", GLFW_KEY_M }, { "N", GLFW_KEY_N }, { "O", GLFW_KEY_O }, { "P", GLFW_KEY_P }, { "Q", GLFW_KEY_Q }, { "R", GLFW_KEY_R }, { "S", GLFW_KEY_S }, { "T", GLFW_KEY_T },
+    { "U", GLFW_KEY_U }, { "V", GLFW_KEY_V }, { "W", GLFW_KEY_W }, { "X", GLFW_KEY_X }, { "Y", GLFW_KEY_Y }, { "Z", GLFW_KEY_Z }, { "1", GLFW_KEY_1 }, { "2", GLFW_KEY_2 }, { "3", GLFW_KEY_3 }, { "4", GLFW_KEY_4 },
+    { "5", GLFW_KEY_5 }, { "6", GLFW_KEY_6 }, { "7", GLFW_KEY_7 }, { "8", GLFW_KEY_8 }, { "9", GLFW_KEY_9 }, { "0", GLFW_KEY_0 }, { "UP ARROW", GLFW_KEY_UP }, { "DN ARROW", GLFW_KEY_DOWN }, { "LF ARROW", GLFW_KEY_LEFT }, { "RT ARROW", GLFW_KEY_RIGHT },
+    { "NUM 1", GLFW_KEY_KP_1 }, { "NUM 2", GLFW_KEY_KP_2 }, { "NUM 3", GLFW_KEY_KP_3 }, { "NUM +", GLFW_KEY_KP_ADD }, { "ENTER", GLFW_KEY_ENTER }, { "RIGHT SHIFT", GLFW_KEY_RIGHT_SHIFT }, { "LEFT SHIFT", GLFW_KEY_LEFT_SHIFT }, { "RIGHT CTRL", GLFW_KEY_RIGHT_CONTROL }, { "LEFT CTRL", GLFW_KEY_LEFT_CONTROL }, { "RIGHT ALT", GLFW_KEY_RIGHT_ALT },
+    { "LEFT ALT", GLFW_KEY_LEFT_ALT }, { "RIGHT CMD", GLFW_KEY_RIGHT_SUPER }, { "LEFT CMD", GLFW_KEY_LEFT_SUPER }, { "LMB", GLFW_MOUSE_BUTTON_1 }, { "RMB", GLFW_MOUSE_BUTTON_2 }, { "MMB", GLFW_MOUSE_BUTTON_3 }, { "MB 3", GLFW_MOUSE_BUTTON_4 }, { "MB 4", GLFW_MOUSE_BUTTON_5 }, { "MB 5", GLFW_MOUSE_BUTTON_6 }, { "MB 6", GLFW_MOUSE_BUTTON_7 },
+    { "MB 7", GLFW_MOUSE_BUTTON_8 }, { "MB 8", GLFW_MOUSE_BUTTON_LAST }, { "JOY 0", GLFW_JOYSTICK_1 }, { "JOY 1", GLFW_JOYSTICK_2 }, { "JOY 2", GLFW_JOYSTICK_3 }, { "JOY 3", GLFW_JOYSTICK_4 }, { "JOY 4", GLFW_JOYSTICK_5 }, { "JOY 5", GLFW_JOYSTICK_6 }, { "JOY 6", GLFW_JOYSTICK_7 }, { "JOY 7", GLFW_JOYSTICK_8 },
+    { "JOY 8", GLFW_JOYSTICK_9 }, { "JOY 9", GLFW_JOYSTICK_10 }, { "JOY 10", GLFW_JOYSTICK_11 }, { "JOY 11", GLFW_JOYSTICK_12 }, { "JOY 12", GLFW_JOYSTICK_13 }, { "JOY 13", GLFW_JOYSTICK_14 }, { "JOY 14", GLFW_JOYSTICK_15 }, { "JOY 15", GLFW_JOYSTICK_16 }, { "JOY 16", GLFW_HAT_UP }, { "JOY 17", GLFW_HAT_RIGHT },
+    { "BACKSPACE", GLFW_KEY_BACKSPACE }, { "TAB", GLFW_KEY_TAB }, { "NUM ENTER", GLFW_KEY_KP_ENTER }, { "ESCAPE", GLFW_KEY_ESCAPE }, { "SPACE", GLFW_KEY_SPACE }, { "DELETE", GLFW_KEY_DELETE }, { "INSERT", GLFW_KEY_INSERT }, { "HOME", GLFW_KEY_HOME }, { "END", GLFW_KEY_END }, { "PAGE UP", GLFW_KEY_PAGE_UP },
+    { "PAGE DN", GLFW_KEY_PAGE_DOWN }, { "F1", GLFW_KEY_F1 }, { "F2", GLFW_KEY_F2 }, { "F3", GLFW_KEY_F3 }, { "F4", GLFW_KEY_F4 }, { "F5", GLFW_KEY_F5 }, { "F6", GLFW_KEY_F6 }, { "F7", GLFW_KEY_F7 }, { "F8", GLFW_KEY_F8 }, { "F9", GLFW_KEY_F9 },
+    { "F10", GLFW_KEY_F10 }, { "F11", GLFW_KEY_F11 }, { "F12", GLFW_KEY_F12 }, { "GRAVE", GLFW_KEY_GRAVE_ACCENT }, { "-", GLFW_KEY_MINUS }, { "=", GLFW_KEY_EQUAL }, { "[", GLFW_KEY_LEFT_BRACKET }, { "]", GLFW_KEY_RIGHT_BRACKET }, { "\\", GLFW_KEY_BACKSLASH }, { "/", GLFW_KEY_SLASH },
+    { ".", GLFW_KEY_PERIOD }, { ",", GLFW_KEY_COMMA }, { ";", GLFW_KEY_SEMICOLON }, { "'", GLFW_KEY_APOSTROPHE }, { "CAPSLOCK", GLFW_KEY_CAPS_LOCK }, { "NUM 0", GLFW_KEY_KP_0 }, { "NUM 4", GLFW_KEY_KP_4 }, { "NUM 5", GLFW_KEY_KP_5 }, { "NUM 6", GLFW_KEY_KP_6 }, { "NUM 7", GLFW_KEY_KP_7 },
+    { "NUM 8", GLFW_KEY_KP_8 }, { "NUM 9", GLFW_KEY_KP_9 }, { "NUM *", GLFW_KEY_KP_MULTIPLY }, { "NUM -", GLFW_KEY_KP_SUBTRACT }, { "NUM .", GLFW_KEY_KP_DECIMAL }, { "MENU", GLFW_KEY_MENU }, { "PAUSE", GLFW_KEY_PAUSE }, { "NUMLOCK", GLFW_KEY_NUM_LOCK }, { "MWHEEL +", 128 }, { "MWHEEL -", 129 }, // 128, 129, Handled special case for mouse wheel + / - respectively
+    { "PRINT", GLFW_KEY_PRINT_SCREEN }, { "JOY 18", GLFW_HAT_DOWN }, { "JOY 19", GLFW_HAT_LEFT }, { "GPAD A", GLFW_GAMEPAD_BUTTON_A }, { "GPAD B", GLFW_GAMEPAD_BUTTON_B }, { "GPAD X", GLFW_GAMEPAD_BUTTON_X }, { "GPAD Y", GLFW_GAMEPAD_BUTTON_Y }, { "GPAD L1", GLFW_GAMEPAD_BUTTON_LEFT_BUMPER }, { "GPAD R1", GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER }, { "GPAD BACK", GLFW_GAMEPAD_BUTTON_BACK },
+    { "GPAD START", GLFW_GAMEPAD_BUTTON_START }, { "GPAD GUIDE", GLFW_GAMEPAD_BUTTON_GUIDE }, { "GPAD LSTICK CLICK", GLFW_GAMEPAD_BUTTON_LEFT_THUMB }, { "GPAD RSTICK CLICK", GLFW_GAMEPAD_BUTTON_RIGHT_THUMB }, { "GPAD D UP", GLFW_GAMEPAD_BUTTON_DPAD_UP }, { "GPAD D RIGHT", GLFW_GAMEPAD_BUTTON_DPAD_RIGHT }, { "GPAD D DOWN", GLFW_GAMEPAD_BUTTON_DPAD_DOWN }, { "GPAD D LEFT", GLFW_GAMEPAD_BUTTON_DPAD_LEFT }, { "UNUSED", 0 } //, {}
+};
+
+typedef enum { SETTING_U8, SETTING_U16, SETTING_INPUT } SettingType;
+typedef struct { const char* name; void* ptr; SettingType type; } Setting;
+#define S_U8(n, v)  { n, &Sys_Settings.v, SETTING_U8 }
+#define S_U16(n, v) { n, &Sys_Settings.v, SETTING_U16 }
+#define S_IN(n, i)  { n, &Sys_Settings.InputCodeSettings[i], SETTING_INPUT }
+const Setting configTable[] = {
+    S_U16("ResolutionWidth", ScreenWidth), S_U16("ResolutionHeight", ScreenHeight), S_U8("Fullscreen", Fullscreen), S_U8("FOV", FOV),
+    S_U8("Brightness", Brightness), S_U8("Gamma", Gamma), S_U8("AA", AntiAliasing), S_U8("Shadows", Shadows), S_U8("SSR", Reflections),
+    S_U8("VSync", Vsync), S_U8("ModelDetail", ModelDetail), S_U8("GI", GI), S_U8("SpeakerMode", SpeakerMode), S_U8("Reverb", Reverb),
+    S_U8("VolumeMaster", VolumeMaster), S_U8("VolumeMusic", VolumeMusic), S_U8("VolumeMessage", VolumeMessage), S_U8("VolumeEffects", VolumeEffects),
+    S_U8("Language", Language), S_U8("DynamicMusic", DynamicMusic), S_U8("Footsteps", Footsteps), S_U8("InvertLook", InvertLook),
+    S_U8("InvertCyberspaceLook", InvertCyberspaceLook), S_U8("InvertInventoryCycling", InvertInventoryCycling), S_U8("QuickItemPickup", QuickItemPickup), S_U8("QuickReloadWeapons", QuickReloadWeapons),
+    S_U8("MouseSensitivity", MouseSensitivity), S_U8("NoShootMode", NoShootMode), S_U8("HeadBob", HeadBob),
+    S_IN("Forward", 0), S_IN("Strafe Left", 1), S_IN("Backpedal", 2), S_IN("Strafe Right", 3),
+    S_IN("Jump", 4), S_IN("Crouch", 5), S_IN("Prone", 6), S_IN("Lean Left", 7),
+    S_IN("Lean Right", 8), S_IN("Sprint", 9), S_IN("Turn Left", 10), S_IN("Turn Right", 11),
+    S_IN("Look Up", 12), S_IN("Look Down", 13), S_IN("Recent Log", 14), S_IN("Biomonitor", 15),
+    S_IN("Sensaround", 16), S_IN("Lantern", 17), S_IN("Shield", 18), S_IN("Infrared", 19),
+    S_IN("Email", 20), S_IN("Booster", 21), S_IN("Jumpjets", 22), S_IN("Attack", 23),
+    S_IN("Use", 24), S_IN("Menu/Back", 25), S_IN("Toggle Mode", 26), S_IN("Reload", 27),
+    S_IN("Weapon +", 28), S_IN("Weapon -", 29), S_IN("Grenade", 30), S_IN("Grenade +", 31),
+    S_IN("Grenade -", 32), S_IN("Ammo Type", 33), S_IN("Patch Use", 34), S_IN("Patch +", 35),
+    S_IN("Patch -", 36), S_IN("Full Map", 37), S_IN("Swim Up", 38), S_IN("Swim Down", 39), S_IN("Screenshot", 40)
+};
+const int configTableSize = sizeof(configTable) / sizeof(Setting);
+
+static inline __attribute__((always_inline)) int32_t GetGLFWIndirectionIndexForAnInput(const char* val) {
+    for (int i=0;i<149;++i) { if (StringsEqual(val,inputElements[i].name)) return i; }
+    return 148;
+}
+
+char* GetNextStringUpToNewlineOrEOF(char* buf, int size, OsFileHandle fd); char* data_parser_trim(char* s);
+void LoadConfig(void) {
+    OsFileHandle f = OS_OpenReadonly("./Data/Config.ini");
+    char line[512];
+    while (GetNextStringUpToNewlineOrEOF(line,sizeof(line),f)) {
+        char* s = data_parser_trim(line);
+        if (*s == 0 || (s[0] == '/' && s[1] == '/')) continue;
+
+        char* eq = StringFindFirstCharWithin(s, '=');
+        if (!eq) continue;
+        *eq = 0;
+
+        char* key = data_parser_trim(s);
+        char* val = data_parser_trim(eq + 1);
+        for (int i = 0; i < configTableSize; i++) {
+            if (StringsEqual(key,configTable[i].name)) {
+                if (configTable[i].type == SETTING_U8)         *( uint8_t*)configTable[i].ptr = (uint8_t)StringToInt(val);
+                else if (configTable[i].type == SETTING_U16)   *(uint16_t*)configTable[i].ptr = (uint16_t)StringToInt(val);
+                else if (configTable[i].type == SETTING_INPUT) *(uint16_t*)configTable[i].ptr = GetGLFWIndirectionIndexForAnInput(val);
+                break;
+            }
+        }
+    }
+
+    OS_Close(f);
+}
+
+void FilePrintString(OsFileHandle f, const char* fmt, ...);
+void SaveConfig(void) {
+    OsFileHandle f = OS_OpenWriteonly("./Data/Config.ini");
+    for (int i=0;i<configTableSize;++i) {
+        if (configTable[i].type == SETTING_U8)         FilePrintString(f,"%s = %u\n",configTable[i].name,*(uint8_t*)configTable[i].ptr);
+        else if (configTable[i].type == SETTING_U16)   FilePrintString(f,"%s = %u\n",configTable[i].name,*(uint16_t*)configTable[i].ptr);
+        else if (configTable[i].type == SETTING_INPUT) FilePrintString(f,"%s = %s\n",configTable[i].name,inputElements[*(uint16_t*)configTable[i].ptr].name);
+    }
+
+    OS_Close(f);
+    DualLog("Saved settings to ./Data/Config.ini!\n");
+}
+
+extern bool enteringPlayerName;
+void ConsoleEmulator(int32_t keycode);
+int32_t Input_KeyDown(int32_t keycode) {
+    if (keycode >= 0 && keycode < MAX_KEYS) Sys_Input.keyStates[keycode].pressed = Sys_Input.keyStates[keycode].down = true;
+    if (Sys_Cheats.consoleActive) { ConsoleEmulator(keycode); return 0; }
+    if (enteringPlayerName && Sys_Global.menuActive) { TextEntry(keycode); return 0; }
+    return 0;
+}
+
+int32_t Input_KeyUp(int32_t keycode) { if (keycode >= 0 && keycode < MAX_KEYS) {Sys_Input.keyStates[keycode].pressed = Sys_Input.keyStates[keycode].down = false;} return 0; }
+
+void UpdatePlayerFacingAngles(void) {
+    Quaternion rot = Sys_Global.instances[PLAYER1].rotation;
+    float y2 = rot.y * rot.y;  float xz = rot.x * rot.z;  float wy = rot.w * rot.y;
+    Sys_Global.instances[PLAYER1].forward = normalize_vector3((Vector3){ 2.0f * (xz + wy), 2.0f * (rot.y * rot.z - rot.w * rot.x), 1.0f - 2.0f * (rot.x * rot.x + y2) });
+    Sys_Global.instances[PLAYER1].right = normalize_vector3((Vector3){ 1.0f - 2.0f * (y2 + rot.z * rot.z), 2.0f * (rot.x * rot.y + rot.w * rot.z), 2.0f * (xz - wy) });
+    ma_engine_listener_set_direction(&Sys_Global.audio_engine,0,Sys_Global.instances[PLAYER1].forward.x,Sys_Global.instances[PLAYER1].forward.y,Sys_Global.instances[PLAYER1].forward.z);
+    Vector3 up = cross_vector3(Sys_Global.instances[PLAYER1].forward,Sys_Global.instances[PLAYER1].right);
+    ma_engine_listener_set_world_up(&Sys_Global.audio_engine,0,up.x,up.y,up.z);
+}
+
+// Create a quaternion from yaw (around Y), pitch (around X), and roll (around Z) in degrees
+void quat_from_yaw_pitch_roll(Quaternion* q, float yaw_deg, float pitch_deg, float roll_deg) {
+    float yaw = deg2rad(yaw_deg);   // Around Y (up)
+    float pitch = deg2rad(pitch_deg); // Around X (right)
+    float roll = deg2rad(roll_deg);  // Around Z (forward)
+    float cy = vcosf(yaw * 0.5f);
+    float sy = vsinf(yaw * 0.5f);
+    float cp = vcosf(pitch * 0.5f);
+    float sp = vsinf(pitch * 0.5f);
+    float cr = vcosf(roll * 0.5f);
+    float sr = vsinf(roll * 0.5f);
+    q->w = cy * cp * cr + sy * sp * sr;
+    q->x = cy * sp * cr + sy * cp * sr; // X-axis (pitch)
+    q->y = sy * cp * cr - cy * sp * sr; // Y-axis (yaw)
+    q->z = cy * cp * sr - sy * sp * cr; // Z-axis (roll)
+} // Skipping quat normalization, not needed
+
+extern float cam_yaw,cam_pitch,cam_roll;
+void Input_MouselookApply(void) {
+    if (Sys_Global.currentLevel == LEVEL_CYBERSPACE) quat_from_yaw_pitch_roll(&Sys_Global.instances[PLAYER1].rotation,cam_yaw,cam_pitch,cam_roll);
+    else                                             quat_from_yaw_pitch_roll(&Sys_Global.instances[PLAYER1].rotation,cam_yaw,cam_pitch,    0.0f);
+    
+    UpdatePlayerFacingAngles();
+}
+
+// static const float HeadBobRate   = 0.2f; TODO
+// static const float HeadBobAmount = 0.08f; TODO
+// static const float bobTarget = 0.3f; TODO
+int32_t Input_MouseMove(int32_t xrel, int32_t yrel) {
+    if ((Sys_Global.inventoryMode && !Sys_Cheats.noHUD) || Sys_Global.menuActive || Sys_Global.gamePaused) {
+        int32_t newX = Sys_Global.cursorPosition_x + xrel;
+        if (newX > Sys_Settings.ScreenWidth) newX = Sys_Settings.ScreenWidth;
+        if (newX < 0) newX = 0;
+        if (newX != Sys_Global.cursorPosition_x) mouseMovementThisFrame = true;
+        Sys_Global.cursorPosition_x = newX;
+        int32_t newY = Sys_Global.cursorPosition_y + yrel;
+        if (newY > Sys_Settings.ScreenHeight) newY = Sys_Settings.ScreenHeight;
+        if (newY < 0) newY = 0;
+        if (newY != Sys_Global.cursorPosition_y) mouseMovementThisFrame = true;
+        Sys_Global.cursorPosition_y = newY;
+    }
+    
+    if (Sys_Global.gamePaused || Sys_Global.menuActive || Sys_Global.inventoryMode) return 0;
+    
+    float sensitivity = vclamp((float)Sys_Settings.MouseSensitivity / 100.0f, 0.01f, 1.0f) * 0.2f;
+    cam_yaw += (float)xrel * sensitivity;
+    if (cam_yaw >= 360.0f) cam_yaw -= 360.0f;
+    if (cam_yaw < 0.0f) cam_yaw += 360.0f;
+    cam_pitch += (float)yrel * sensitivity;
+    if (cam_pitch > 89.0f) cam_pitch = 89.0f; // Avoid gimbal lock at pure 90deg
+    if (cam_pitch < -89.0f) cam_pitch = -89.0f;
+    Input_MouselookApply();
+    return 0;
+}
+
+KeyState* GetCodeMapping(int settingIndex) {
+    int32_t i = Sys_Settings.InputCodeSettings[settingIndex]; // Get table index into all recognized inputs
+    if (i == 148 || i >= MAX_KEYS) return &Sys_Input.keyStates[MAX_KEYS - 1]; // UNUSED NULL (e.g. setting unbound)
+    
+    if (i >= 53 && i <= 61) { // Pick subtable of GLFW values that were set by GLFW callbacks
+        return &Sys_Input.mouseButtons[inputElements[i].value];
+    } else if (i >= 62 && i <= 77) {
+        return &Sys_Input.joystickButtons[GLFW_JOYSTICK_1][inputElements[i].value];        
+    } else if ((i >= 78 && i <= 79) || (i >= 132 && i <= 133)) {
+        return &Sys_Input.joystickHats[inputElements[i].value];        
+    }
+    
+    return &Sys_Input.keyStates[inputElements[i].value];
+}
+
+bool GetKeyRiseEdgeOrHeld(int settingIndex, bool risingEdge) {
+    int32_t i = Sys_Settings.InputCodeSettings[settingIndex]; // Get table index into all recognized inputs
+         if (i == 129) return Sys_Input.scrollDelta > 0.0; // Mousewheel +
+    else if (i == 130) return Sys_Input.scrollDelta < 0.0; // Mousewheel -
+    
+    KeyState* keyOfConcern = GetCodeMapping(settingIndex);
+    bool retval = risingEdge ? keyOfConcern->pressed : keyOfConcern->down;
+    return retval;
+}
+
+ENGINE_TO_MOD bool GetKey(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,false); }  // True while held down.
+ENGINE_TO_MOD bool GetKeyPressed(int settingIndex) { return (settingIndex < 0) ? Sys_Input.keyStates[GLFW_KEY_GRAVE_ACCENT].pressed : GetKeyRiseEdgeOrHeld(settingIndex,true); } // True 1st frame down.
+ENGINE_TO_MOD void IgnoreNextMouseDelta(void) { Sys_Input.ignore_next_mouse_delta = true; }
+
 void LoadTextures(void); void LoadModels(void); void CullInit(void);
 OsFileHandle levelFileHandle;
 void LoadLevel(uint8_t curlevel) {
@@ -479,8 +693,7 @@ void LoadLevel(uint8_t curlevel) {
     Sys_Global.levelCurrentlyLoading = true;
     queuedLevelToLoad = 255u; // Reset any loading state that got us here.
     RenderLoadingProgress(100,"Loading level...");
-    __builtin_memset(lights,0,LIGHT_COUNT * sizeof(Light));
-    __builtin_memset(lanims,0,LIGHT_COUNT * sizeof(LightAnimation));
+    __builtin_memset(lights,0,LIGHT_COUNT * sizeof(Light)); __builtin_memset(lanims,0,LIGHT_COUNT * sizeof(LightAnimation));
     __builtin_memset(modelMatrices,0,INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
     __builtin_memset(camViews,0,MAX_CAMVIEWS * sizeof(CamView));
     __builtin_memset(Sys_Global.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
@@ -498,9 +711,7 @@ void LoadLevel(uint8_t curlevel) {
         Sys_Global.instances[i].cellIndex = cellIdx;
     }
     
-    ModInitAfterLoad();
-    ResetLevelAudio();
-    ResetLevelMusic();
+    ModInitAfterLoad(); ResetLevelAudio(); ResetLevelMusic();
     DualLog("Entity instances initialized after load\n");
     RenderLoadingProgress(110,"Loading cull system...");
     CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
@@ -509,6 +720,12 @@ void LoadLevel(uint8_t curlevel) {
     for (uint16_t i = 0; i < Sys_Global.loadedLights; i++) { lightsNewPosition[i] = lights[i].pos; lightInPVS[i] = false; }
     __builtin_memset(voxen_Shadow_System.shadowmapIndirectionList,MAX_SHADOWMAPS + 1,Sys_Global.loadedLights * sizeof(uint32_t)); // Set to invalid values for all
     Sys_Global.levelCurrentlyLoading = false;
+}
+
+void InputClearRisingAndFallingEdges(void) { // Clear keypress rising and falling edge triggers
+    for (int32_t i=0;i<MAX_KEYS;++i)          Sys_Input.keyStates[i].pressed = Sys_Input.keyStates[i].released = false;       // Can't memset as we want to preserve down state
+    for (int32_t i=0;i<MAX_MOUSE_BUTTONS;i++) Sys_Input.mouseButtons[i].pressed = Sys_Input.mouseButtons[i].released = false; // Can't memset as we want to preserve down state
+    Sys_Input.scrollDelta = 0;
 }
 
 __attribute__((cold)) void NewGame(void) { // Reset World States
@@ -774,6 +991,101 @@ GLFWmonitor* GetCurrentMonitor(void) {
     return bestMonitor;
 }
 
+ENGINE_TO_MOD bool GetSoundIsPlaying(ma_sound* sound) { return ma_sound_is_playing(sound); }
+float GetSoundRemainingTime(ma_sound* pSound) {
+    if (!pSound || !ma_sound_is_playing(pSound)) return 0.0f;
+
+    ma_uint64 currentFrame = ma_sound_get_time_in_pcm_frames(pSound);
+    ma_uint64 pcmFramesLength = 0;
+    ma_sound_get_length_in_pcm_frames(pSound, &pcmFramesLength);
+    if (currentFrame >= pcmFramesLength) return 0.0f;
+
+    uint64_t deltaFrames = pcmFramesLength - currentFrame;
+    uint32_t sampleRate = ma_engine_get_sample_rate(&Sys_Global.audio_engine);
+    return (float)deltaFrames / (float)sampleRate;
+}
+
+void mp3_clear(void) {
+    ma_sound_stop(&Sys_Global.mp3_sounds[0]);
+    ma_sound_stop(&Sys_Global.mp3_sounds[1]);
+    Sys_Global.mp3_slot = 0;
+}
+
+ENGINE_TO_MOD void SoundSetVolume(ma_sound* pSound, float volume) { ma_sound_set_volume(pSound,volume); }
+float GetSFXVolume(float volume) { return ((float)Sys_Settings.VolumeMaster/100.0f) * ((float)Sys_Settings.VolumeEffects/100.0f) * volume; }
+float GetMusicVolume(void) { return ((float)Sys_Settings.VolumeMaster/100.0f) * ((float)Sys_Settings.VolumeMusic/100.0f); }
+float GetMessageVolume(void) { return ((float)Sys_Settings.VolumeMaster/100.0f) * ((float)Sys_Settings.VolumeMessage/100.0f); }
+void set_music_volume(void) { for (int i=0;i<2;++i) { ma_sound_set_volume(&Sys_Global.mp3_sounds[i], GetMusicVolume()); } }
+void set_sfx_volume(void) { for (int i=0;i<MAX_CHANNELS;++i) { ma_sound_set_volume(&wav_sounds[i], GetSFXVolume(wav_volumes[i])); } }
+void set_message_volume(void) { ma_sound_set_volume(&log_sound, GetMessageVolume()); }
+void set_master_volume(void) { set_sfx_volume(); set_music_volume(); set_message_volume(); }
+
+void play_mp3(const char* path, int32_t fade_in_ms) {
+    int32_t old_slot = Sys_Global.mp3_slot;
+    int32_t next_slot = Sys_Global.mp3_slot ? 0 : 1;
+    if (ma_sound_is_playing(&Sys_Global.mp3_sounds[old_slot])) ma_sound_set_fade_in_milliseconds(&Sys_Global.mp3_sounds[old_slot], GetMusicVolume(), 0.0f, fade_in_ms);
+    ma_sound_uninit(&Sys_Global.mp3_sounds[next_slot]); 
+    ma_result result = ma_sound_init_from_file(&Sys_Global.audio_engine, path, MA_SOUND_FLAG_STREAM, NULL, NULL, &Sys_Global.mp3_sounds[next_slot]);
+    if (result != MA_SUCCESS) { DualLog("ERROR: Failed to load MP3 %s: %d\n", path, result); return; }
+
+    ma_sound_set_fade_in_milliseconds(&Sys_Global.mp3_sounds[next_slot], 0.0f, GetMusicVolume(), fade_in_ms);
+    ma_sound_start(&Sys_Global.mp3_sounds[next_slot]);
+    Sys_Global.mp3_slot = next_slot;
+}
+
+ENGINE_TO_MOD void play_wav(const char* path, float volume, Vector3 pos, bool positional) {
+    int32_t slot = -1;
+    for (int32_t i = 0; i < wav_count; i++) { // Try to find a free slot (either unused or finished)
+        if (!ma_sound_is_playing(&wav_sounds[i]) && ma_sound_at_end(&wav_sounds[i])) {
+            ma_sound_uninit(&wav_sounds[i]);
+            slot = i;
+            break;
+        }
+    }
+
+    if (slot == -1 && wav_count < MAX_CHANNELS) slot = wav_count++; // If no free slot, use a new one if available
+    if (slot == -1) { DualLog("WARNING: Max effect WAV channels (%d) reached\n", MAX_CHANNELS); return; }
+
+    ma_result result = ma_sound_init_from_file(&Sys_Global.audio_engine, path, 0, NULL, NULL, &wav_sounds[slot]);
+    if (result != MA_SUCCESS) {
+        DualLog("ERROR: Failed to load effect WAV %s: %d\n", path, result);
+        if (slot == wav_count - 1) wav_count--; // Revert count if init fails
+        return;
+    }
+    
+    if (positional) ma_sound_set_position(&wav_sounds[slot], pos.x, pos.y, pos.z);
+    ma_sound_set_spatialization_enabled(&wav_sounds[slot], (ma_bool32)positional);
+    wav_volumes[slot] = volume;
+    ma_sound_set_volume(&wav_sounds[slot], GetSFXVolume(wav_volumes[slot]));
+    ma_sound_start(&wav_sounds[slot]);
+}
+
+void play_message(const char* path) {
+    if (ma_sound_is_playing(&log_sound)) { ma_sound_stop(&log_sound); ma_sound_uninit(&log_sound); }
+    ma_result result = ma_sound_init_from_file(&Sys_Global.audio_engine, path, 0, NULL, NULL, &log_sound);
+    if (result != MA_SUCCESS) { DualLog("ERROR: Failed to load message WAV %s: %d\n", path, result); return; }
+    
+    ma_sound_set_spatialization_enabled(&log_sound, false);
+    ma_sound_set_volume(&log_sound, GetMessageVolume());
+    ma_sound_start(&log_sound);
+}
+
+ENGINE_TO_MOD void SoundUninit(ma_sound* snd) { ma_sound_uninit(snd); }
+ENGINE_TO_MOD ma_result SoundInit(const char* path, ma_uint32 flags, ma_sound_group* pGroup, ma_fence* pDoneFence, ma_sound* pSound) { return ma_sound_init_from_file(&Sys_Global.audio_engine,path,flags,pGroup,pDoneFence,pSound); }
+ENGINE_TO_MOD void SoundSetLooping(ma_sound* pSound, ma_bool32 isLooping) { ma_sound_set_looping(pSound,isLooping); }
+ENGINE_TO_MOD ma_result SoundStart(ma_sound* pSound) { return ma_sound_start(pSound); }
+ENGINE_TO_MOD ma_result SoundStop(ma_sound* pSound) { return ma_sound_stop(pSound); }
+ENGINE_TO_MOD ma_result SoundGetCurrentFrameCursor(const ma_sound* pSound, ma_uint64* pCursor) { return ma_sound_get_cursor_in_pcm_frames(pSound,pCursor); }
+ENGINE_TO_MOD float SoundGetLength(ma_sound* pSound) {
+    if (!pSound) return 0.0f;
+    
+    ma_uint64 frames;
+    if (ma_sound_get_length_in_pcm_frames(pSound, &frames) != MA_SUCCESS) return 0.0f;
+    
+    ma_uint32 sr = ma_engine_get_sample_rate(ma_sound_get_engine(pSound));
+    return (sr == 0) ? 0.0f : (float)frames / (float)sr;
+}
+
 void GoIntoGame(void) {
     Sys_Global.menuActive = Sys_Global.gamePaused = enteringPlayerName = gammaSliderActive = fovSliderActive = masterVolumeSliderActive = musicVolumeSliderActive = messageVolumeSliderActive = sfxVolumeSliderActive = returnToPause = false;
     currentMenuItem = currentMenuTab = 0; currentMenuPage = MenuPages_FrontPage;
@@ -804,6 +1116,7 @@ void GatherResolutionModes(void) {
     }
 }
 
+void SaveConfig(void);
 void ChangeResolution(void) {
     if (resDropdownCount < 1) return;
     resSelectedIdx = (resSelectedIdx + 1) % resDropdownCount;
@@ -951,6 +1264,7 @@ extern uint8_t*  stbi__arena_base;
 extern void stbi__arena_init(void);
 void LoadTextures(void); void LoadModels(void);
 #define STBI_ARENA_SIZE 16 * 1024 * 1024
+void LoadConfig(void);
 __attribute__((cold)) void InitializeEnvironment(void) {
     double init_start_time = get_time();
     Sys_Global.globalFrameNum = 0;
@@ -1101,103 +1415,6 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     DualLog("InitializeEnvironment completed\n");
 }
 
-ENGINE_TO_MOD bool GetSoundIsPlaying(ma_sound* sound) { return ma_sound_is_playing(sound); }
-float GetSoundRemainingTime(ma_sound* pSound) {
-    if (!pSound || !ma_sound_is_playing(pSound)) return 0.0f;
-
-    ma_uint64 currentFrame = ma_sound_get_time_in_pcm_frames(pSound);
-    ma_uint64 pcmFramesLength = 0;
-    ma_sound_get_length_in_pcm_frames(pSound, &pcmFramesLength);
-    if (currentFrame >= pcmFramesLength) return 0.0f;
-
-    uint64_t deltaFrames = pcmFramesLength - currentFrame;
-    uint32_t sampleRate = ma_engine_get_sample_rate(&Sys_Global.audio_engine);
-    return (float)deltaFrames / (float)sampleRate;
-}
-
-void mp3_clear(void) {
-    ma_sound_stop(&Sys_Global.mp3_sounds[0]);
-    ma_sound_stop(&Sys_Global.mp3_sounds[1]);
-    Sys_Global.mp3_slot = 0;
-}
-
-ENGINE_TO_MOD void SoundSetVolume(ma_sound* pSound, float volume) { ma_sound_set_volume(pSound,volume); }
-float GetSFXVolume(float volume) { return ((float)Sys_Settings.VolumeMaster/100.0f) * ((float)Sys_Settings.VolumeEffects/100.0f) * volume; }
-float GetMusicVolume(void) { return ((float)Sys_Settings.VolumeMaster/100.0f) * ((float)Sys_Settings.VolumeMusic/100.0f); }
-float GetMessageVolume(void) { return ((float)Sys_Settings.VolumeMaster/100.0f) * ((float)Sys_Settings.VolumeMessage/100.0f); }
-void set_music_volume(void) { for (int i=0;i<2;++i) { ma_sound_set_volume(&Sys_Global.mp3_sounds[i], GetMusicVolume()); } }
-void set_sfx_volume(void) { for (int i=0;i<MAX_CHANNELS;++i) { ma_sound_set_volume(&wav_sounds[i], GetSFXVolume(wav_volumes[i])); } }
-void set_message_volume(void) { ma_sound_set_volume(&log_sound, GetMessageVolume()); }
-void set_master_volume(void) { set_sfx_volume(); set_music_volume(); set_message_volume(); }
-
-void play_mp3(const char* path, int32_t fade_in_ms) {
-    int32_t old_slot = Sys_Global.mp3_slot;
-    int32_t next_slot = Sys_Global.mp3_slot ? 0 : 1;
-    if (ma_sound_is_playing(&Sys_Global.mp3_sounds[old_slot])) ma_sound_set_fade_in_milliseconds(&Sys_Global.mp3_sounds[old_slot], GetMusicVolume(), 0.0f, fade_in_ms);
-    ma_sound_uninit(&Sys_Global.mp3_sounds[next_slot]); 
-    ma_result result = ma_sound_init_from_file(&Sys_Global.audio_engine, path, MA_SOUND_FLAG_STREAM, NULL, NULL, &Sys_Global.mp3_sounds[next_slot]);
-    if (result != MA_SUCCESS) { DualLog("ERROR: Failed to load MP3 %s: %d\n", path, result); return; }
-
-    ma_sound_set_fade_in_milliseconds(&Sys_Global.mp3_sounds[next_slot], 0.0f, GetMusicVolume(), fade_in_ms);
-    ma_sound_start(&Sys_Global.mp3_sounds[next_slot]);
-    Sys_Global.mp3_slot = next_slot;
-}
-
-ENGINE_TO_MOD void play_wav(const char* path, float volume, Vector3 pos, bool positional) {
-    int32_t slot = -1;
-    for (int32_t i = 0; i < wav_count; i++) { // Try to find a free slot (either unused or finished)
-        if (!ma_sound_is_playing(&wav_sounds[i]) && ma_sound_at_end(&wav_sounds[i])) {
-            ma_sound_uninit(&wav_sounds[i]);
-            slot = i;
-            break;
-        }
-    }
-
-    if (slot == -1 && wav_count < MAX_CHANNELS) slot = wav_count++; // If no free slot, use a new one if available
-    if (slot == -1) { DualLog("WARNING: Max effect WAV channels (%d) reached\n", MAX_CHANNELS); return; }
-
-    ma_result result = ma_sound_init_from_file(&Sys_Global.audio_engine, path, 0, NULL, NULL, &wav_sounds[slot]);
-    if (result != MA_SUCCESS) {
-        DualLog("ERROR: Failed to load effect WAV %s: %d\n", path, result);
-        if (slot == wav_count - 1) wav_count--; // Revert count if init fails
-        return;
-    }
-    
-    if (positional) ma_sound_set_position(&wav_sounds[slot], pos.x, pos.y, pos.z);
-    ma_sound_set_spatialization_enabled(&wav_sounds[slot], (ma_bool32)positional);
-    wav_volumes[slot] = volume;
-    ma_sound_set_volume(&wav_sounds[slot], GetSFXVolume(wav_volumes[slot]));
-    ma_sound_start(&wav_sounds[slot]);
-}
-
-void play_message(const char* path) {
-    if (ma_sound_is_playing(&log_sound)) { ma_sound_stop(&log_sound); ma_sound_uninit(&log_sound); }
-    ma_result result = ma_sound_init_from_file(&Sys_Global.audio_engine, path, 0, NULL, NULL, &log_sound);
-    if (result != MA_SUCCESS) { DualLog("ERROR: Failed to load message WAV %s: %d\n", path, result); return; }
-    
-    ma_sound_set_spatialization_enabled(&log_sound, false);
-    ma_sound_set_volume(&log_sound, GetMessageVolume());
-    ma_sound_start(&log_sound);
-}
-
-ENGINE_TO_MOD void SoundUninit(ma_sound* snd) { ma_sound_uninit(snd); }
-ENGINE_TO_MOD ma_result SoundInit(const char* path, ma_uint32 flags, ma_sound_group* pGroup, ma_fence* pDoneFence, ma_sound* pSound) { return ma_sound_init_from_file(&Sys_Global.audio_engine,path,flags,pGroup,pDoneFence,pSound); }
-ENGINE_TO_MOD void SoundSetLooping(ma_sound* pSound, ma_bool32 isLooping) { ma_sound_set_looping(pSound,isLooping); }
-ENGINE_TO_MOD ma_result SoundStart(ma_sound* pSound) { return ma_sound_start(pSound); }
-ENGINE_TO_MOD ma_result SoundStop(ma_sound* pSound) { return ma_sound_stop(pSound); }
-
-ENGINE_TO_MOD float SoundGetLength(ma_sound* pSound) {
-    if (!pSound) return 0.0f;
-    
-    ma_uint64 frames;
-    if (ma_sound_get_length_in_pcm_frames(pSound, &frames) != MA_SUCCESS) return 0.0f;
-    
-    ma_uint32 sr = ma_engine_get_sample_rate(ma_sound_get_engine(pSound));
-    return (sr == 0) ? 0.0f : (float)frames / (float)sr;
-}
-
-ENGINE_TO_MOD ma_result SoundGetCurrentFrameCursor(const ma_sound* pSound, ma_uint64* pCursor) { return ma_sound_get_cursor_in_pcm_frames(pSound,pCursor); }
-
 void TextEntry(int32_t k) {
     if (k == GLFW_KEY_U && Sys_Input.keyStates[GLFW_KEY_LEFT_CONTROL].down) { Sys_Global.playerName[0] = '\0'; currentPlayerNameLength = 0; return; }
     if (k == GLFW_KEY_ENTER || k == GLFW_KEY_KP_ENTER) { currentMenuItem++; return; }
@@ -1209,9 +1426,10 @@ void TextEntry(int32_t k) {
     if (c) { Sys_Global.playerName[currentPlayerNameLength] = c; Sys_Global.playerName[++currentPlayerNameLength] = '\0'; }
 }
 
+extern bool mouseMovementThisFrame;
 uint8_t UI_Button(int16_t x, int16_t y, float w, float h, bool* cursorOver, int8_t this) {
     float width = RelX(w); float height = RelY(h);
-    float xpos = RelX(x); float ypos = RelY(y) - height;
+    float xpos = RelX(x); float ypos = RelY(y - height);
     bool cursorIsOver = CursorIsOverBounds(xpos, xpos + width, ypos + height, ypos);
     if (cursorIsOver && mouseMovementThisFrame && cursorOver != NULL) {
         currentMenuItem = this;
@@ -1717,7 +1935,7 @@ void RenderCredits(void) {
 
 void RenderMenu(void);
 void RenderPausedUI(void);
-extern float shadBiasMin;
+extern float shadBiasMin; extern uint16_t playerCellIdx;
 static inline __attribute__((always_inline)) double RenderUI(void) {
     float* m;
     m = uiOrthoProjection;
@@ -1734,27 +1952,21 @@ static inline __attribute__((always_inline)) double RenderUI(void) {
     if ((Sys_Global.menuActive || Sys_Global.gamePaused) && Sys_Input.keyStates[GLFW_KEY_UP].pressed) currentMenuItem = (currentMenuItem - 1) < 0 ? (menuItemCount - 1) : (currentMenuItem - 1);
     
     // Diagnostics / Debugging
-    int16_t debugTextStartY = 58;
+    int16_t debugTextStartY = 48;
     if (Sys_Cheats.showLocation && !Sys_Global.menuActive) RenderFormattedText(16, debugTextStartY, TEXT_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f",Sys_Global.instances[PLAYER1].position.x,Sys_Global.instances[PLAYER1].position.y,Sys_Global.instances[PLAYER1].position.z,Sys_Global.instances[PLAYER1].rotation.x,Sys_Global.instances[PLAYER1].rotation.y,Sys_Global.instances[PLAYER1].rotation.z,Sys_Global.instances[PLAYER1].rotation.w);
     int16_t lineSpacing = 18;
-    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 1),TEXT_WHITE,FONT_NORMAL,1.0f,"timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u",Sys_Global.timeSinceLastPhysicsTick, voxen_Shadow_System.numShadowsCouldRender,playerCellIdx,numCellsVisible);
+    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 1),TEXT_WHITE,FONT_NORMAL,1.0f,"numShadowsCouldRender: %u, playerCellIdx: %u",Sys_Global.timeSinceLastPhysicsTick, voxen_Shadow_System.numShadowsCouldRender,playerCellIdx);
     if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 2),TEXT_WHITE,FONT_NORMAL,1.0f,"Player velocity: %.2f, %.2f, %.2f",Sys_Global.instances[PLAYER1].velocity.x,Sys_Global.instances[PLAYER1].velocity.y,Sys_Global.instances[PLAYER1].velocity.z);
-    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 3),TEXT_WHITE,FONT_NORMAL,1.0f,"Test Entity[%u] %s Index: %u, Shadow cpu ms: %.3f",editModeSelection,Sys_Global.instances[editModeSelection].path,editModeTestEntityDefinition,voxen_Shadow_System.shadowTime * 1000);
-    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 4),TEXT_WHITE,FONT_NORMAL,1.0f,"Player cell: %u",Sys_Global.instances[PLAYER1].cellIndex);
-    RenderFormattedText(16,debugTextStartY + (lineSpacing * 5),TEXT_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d   dx: %d dy: %d",Sys_Global.cursorPosition_x,Sys_Global.cursorPosition_y,Sys_Input.currentMouse_dx,Sys_Input.currentMouse_dy);
+    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 3),TEXT_WHITE,FONT_NORMAL,1.0f,"Shadow cpu ms: %.3f",voxen_Shadow_System.shadowTime * 1000);
+    RenderFormattedText(16,debugTextStartY + (lineSpacing * 4),TEXT_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d  dx:%d dy:%d",Sys_Global.cursorPosition_x,Sys_Global.cursorPosition_y,Sys_Input.currentMouse_dx,Sys_Input.currentMouse_dy);
     if (Sys_Cheats.consoleActive) RenderFormattedText(16, 0, TEXT_WHITE, FONT_NORMAL,1.0f, "] %s",consoleEntryText);
     if (Sys_Global.statusTextDecayFinished > Sys_Global.current_time) RenderFormattedText(479,114,TEXT_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
     if (!Sys_Global.menuActive && !Sys_Global.gamePaused) {
         if (!Sys_Global.gamePaused && !Sys_Cheats.noHUD) RenderUIImage(672,0,22,22,1020); // Shoot mode button
         bool mouseReleased = Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].pressed;
-        if (Sys_Global.inventoryMode) {
-            if (CursorIsOverBounds(672,694,22,0)) {
-                if (mouseReleased) {
-                    Sys_Global.inventoryMode = false;
-                    Sys_Global.cursorPosition_x = Sys_Settings.ScreenWidth / 2;
-                    Sys_Global.cursorPosition_y = Sys_Settings.ScreenHeight / 2;
-                }
-            }
+        if (Sys_Global.inventoryMode && mouseReleased && CursorIsOverBounds(672,694,22,0)) {
+            Sys_Global.inventoryMode = false;
+            Sys_Global.cursorPosition_x = Sys_Settings.ScreenWidth / 2; Sys_Global.cursorPosition_y = Sys_Settings.ScreenHeight / 2;
         }
     }
     
@@ -1767,7 +1979,7 @@ static inline __attribute__((always_inline)) double RenderUI(void) {
         if (Sys_Global.thisFrameTime > 6.944444) timingColor = TEXT_RED;
         drawCallsRenderedThisFrame += 2; textDrawCallsRenderedThisFrame += 2; // Add two more for this text render ;)
         RenderFormattedText(16, debugTextStartY - lineSpacing, timingColor, FONT_NORMAL,1.0f, "ms: %.2f, CPU %.2f", Sys_Global.thisFrameTime,Sys_Global.cpuFrameTime);
-        RenderFormattedText(16 + 230.0f, debugTextStartY - lineSpacing, TEXT_WHITE, FONT_NORMAL,1.0f, "(FPS: %d, Worst: %d), Drwclls: %d [G %d UI %d Txt %d Shd %d] Vrts: %d E:%u|M:%u|P:%u|T:%.5f",Sys_Global.framesPerLastSecond,Sys_Global.worstFPS,drawCallsRenderedThisFrame,drawCallsNormal,uiImageDrawCallsRenderedThisFrame,textDrawCallsRenderedThisFrame,shadowDrawCallsRenderedThisFrame,verticesRenderedThisFrame,Sys_Cheats.editMode,Sys_Global.menuActive,Sys_Global.gamePaused,Sys_Global.pauseRelativeTime);
+        RenderFormattedText(16 + 230.0f, debugTextStartY - lineSpacing, TEXT_WHITE, FONT_NORMAL,1.0f, "(FPS:%d, Worst:%d),Drwclls:%d [G:%d UI:%d Tx:%d Sh:%d] Vrt:%d E:%u|M:%u|P:%u|T:%.5f",Sys_Global.framesPerLastSecond,Sys_Global.worstFPS,drawCallsRenderedThisFrame,drawCallsNormal,uiImageDrawCallsRenderedThisFrame,textDrawCallsRenderedThisFrame,shadowDrawCallsRenderedThisFrame,verticesRenderedThisFrame,Sys_Cheats.editMode,Sys_Global.menuActive,Sys_Global.gamePaused,Sys_Global.pauseRelativeTime);
     }
     
     return time_now;
@@ -1777,17 +1989,11 @@ static inline __attribute__((always_inline)) double RenderUI(void) {
 typedef struct {float depth; uint16_t index; } DepthSort;
 DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX]; // Found that this is typically around 172
 float shadows_nearMeshRadii[SHADOW_NEARMESH_MAX];
-
-typedef struct {
-    uint16_t index; // Original index in lights array
-    float distanceSquared; // Distance to camera squared
-    float score; // Priority score (lower distance, higher intensity = higher priority)
-    float radius;
-    Vector3 position;
-} LightCandidate;
+typedef struct { uint16_t index; float distanceSquared, score, radius; Vector3 position; } LightCandidate;
 
 static inline __attribute__((always_inline)) bool EntNotVisible(uint16_t i, bool otherCondition) { Entity* e = &Sys_Global.instances[i]; return e->texIndex > loadedTexturesMaxIndex || !(e->entflags & ENTFLAG_ACTIVE) || e->index >= MAX_ENTITIES || e->modelIndex >= MODEL_IDX_MAX || e->texIndex >= MAX_VALID_TEXTURE || otherCondition; }
 
+extern bool instanceIsLODArray[INSTANCE_COUNT]; extern uint16_t loadedModelsMaxIndex; extern float modelBounds[MODEL_IDX_MAX * BOUNDS_ATTRIBUTES_COUNT]; extern uint8_t** modelVertices; extern uint16_t** modelTriangles;
 static inline __attribute__((always_inline,hot)) uint16_t GetAndBindModel(uint16_t i, uint16_t currentModelType) {
     glUniform1ui(0,i);
     uint16_t modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && Sys_Global.instances[i].lodIndex < loadedModelsMaxIndex ? Sys_Global.instances[i].lodIndex : Sys_Global.instances[i].modelIndex;
@@ -1798,6 +2004,8 @@ static inline __attribute__((always_inline,hot)) uint16_t GetAndBindModel(uint16
     return modelType;
 }
 
+extern uint32_t* texturePaletteOffsets;
+extern int32_t* textureSizes;
 static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {    
     double shadowStartTime = get_time();
     glEnable(GL_POLYGON_OFFSET_FILL);
@@ -2198,8 +2406,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
     CHECK_GL_ERROR();
 }
 
-bool UpdatedPlayerCell(void);
-bool CullCore(void);
+bool UpdatedPlayerCell(void); bool CullCore(void); extern uint32_t random_range_rng;
 int32_t main(void) {
     double game_start_time = get_time();
     random_range_rng = (uint32_t)game_start_time; // Seed global rand uniquely with time since system boot.
@@ -2277,26 +2484,22 @@ int32_t main(void) {
                     if (Sys_Global.instances[i].modelIndex >= loadedModelsMaxIndex || modelVertexCounts[Sys_Global.instances[i].modelIndex] < 1) { Sys_Global.dirtyInstances[i] = false; continue; } // No model or empty model
 
                     uploadInstances = true;
-                    float x = Sys_Global.instances[i].rotation.x, y = Sys_Global.instances[i].rotation.y, z = Sys_Global.instances[i].rotation.z, w = Sys_Global.instances[i].rotation.w;
-                    float x2 = x * x,   y2 = y * y,   z2 = z * z,   xy = x * y,   xz = x * z,   yz = y * z,   wx = w * x,   wy = w * y,   wz = w * z;
+                    Quaternion q = Sys_Global.instances[i].rotation;
+                    float x=q.x, y = q.y, z = q.z, w = q.w;
+                    float x2 = x*x, y2 = y*y, z2 = z*z, xy = x*y, xz = x*z, yz = y*z, wx = w*x, wy = w*y, wz = w*z;
                     float sclx = Sys_Global.instances[i].scale.x; float scly = Sys_Global.instances[i].scale.y; float sclz = Sys_Global.instances[i].scale.z;
-                    modelMatrices[(i * 16) + 0]  = (1.0f - 2.0f * (y2 + z2)) * sclx; // Right X, Necessary -x for blender right to left handed coordinate conversion.
-                    modelMatrices[(i * 16) + 1]  =        (2.0f * (xy + wz)) * sclx; // Right Y
-                    modelMatrices[(i * 16) + 2]  =        (2.0f * (xz - wy)) * sclx; // Right Z
-                    modelMatrices[(i * 16) + 3]  = modelMatrices[(i * 16) + 7] = modelMatrices[(i * 16) + 11] = 0.0f;
-                    modelMatrices[(i * 16) + 4]  =        (2.0f * (xy - wz)) * scly; // Up X
-                    modelMatrices[(i * 16) + 5]  = (1.0f - 2.0f * (x2 + z2)) * scly; // Up Y
-                    modelMatrices[(i * 16) + 6]  =        (2.0f * (yz + wx)) * scly; // Up Z
-                    modelMatrices[(i * 16) + 8]  =        (2.0f * (xz + wy)) * sclz; // Forward X
-                    modelMatrices[(i * 16) + 9]  =        (2.0f * (yz - wx)) * sclz; // Forward Y
-                    modelMatrices[(i * 16) + 10] = (1.0f - 2.0f * (x2 + y2)) * sclz; // Forward Z
-                    modelMatrices[(i * 16) + 12] = Sys_Global.instances[i].position.x;   modelMatrices[(i * 16) + 13] = Sys_Global.instances[i].position.y;   modelMatrices[(i * 16) + 14] = Sys_Global.instances[i].position.z;
-                    modelMatrices[(i * 16) + 15] = 1.0f;
+                    uint32_t m = i*16;
+                    modelMatrices[m+0] = (1.0f - 2.0f * (y2 + z2)) * sclx;/*Right X*/ modelMatrices[m+1] = (2.0f * (xy + wz)) * sclx;/*Right Y*/ modelMatrices[m+2] = (2.0f * (xz - wy)) * sclx;/*Right Z*/
+                    modelMatrices[m+3] = modelMatrices[m + 7] = modelMatrices[m + 11] = 0.0f;
+                    modelMatrices[m+4] =        (2.0f * (xy - wz)) * scly;/*Up X*/ modelMatrices[m+5] = (1.0f - 2.0f * (x2 + z2)) * scly;/*Up Y*/ modelMatrices[m+6] =        (2.0f * (yz + wx)) * scly;/*Up Z*/
+                    modelMatrices[m+8] =        (2.0f * (xz + wy)) * sclz;/*Forward X*/ modelMatrices[m+9] =        (2.0f * (yz - wx)) * sclz;/*Forward Y*/ modelMatrices[m+10]= (1.0f - 2.0f * (x2 + y2)) * sclz;/*Forward Z*/
+                    modelMatrices[m+12]= Sys_Global.instances[i].position.x; modelMatrices[m + 13] = Sys_Global.instances[i].position.y; modelMatrices[m + 14] = Sys_Global.instances[i].position.z;
+                    modelMatrices[m+15]= 1.0f;
                 }
             }
-            if (uploadInstances) glNamedBufferData(Sys_Render.matricesBufferID, Sys_Global.loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
+            if (uploadInstances) glNamedBufferData(Sys_Render.matricesBufferID,Sys_Global.loadedInstances * 16 * sizeof(float),modelMatrices,GL_DYNAMIC_DRAW);
         }
-                
+
         Render(false,0u); // Not a cam view, no camview index.  This is the normal main render.
         Sys_Global.globalFrameNum++;
         InputClearRisingAndFallingEdges();

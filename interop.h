@@ -164,3 +164,4 @@ ENGINE_TO_MOD bool ToggleDoorPortal(uint8_t portalIdx, uint16_t doorIdx, uint16_
 ENGINE_TO_MOD Vector3 GetEntityLocalSpawnPointFromUnrotatedOffsetVector(Entity* originator, Vector3 offsetFromOriginator);
 ENGINE_TO_MOD void TurnLightOff(uint16_t litIdx);
 ENGINE_TO_MOD void AddCamView(Vector3 pos, Quaternion rot, uint8_t fov, uint16_t width, uint16_t height, float near, float far, bool sensaround);
+ENGINE_TO_MOD RaycastHit CapsuleCast(Vector3 start, Vector3 end, float capsuleRadius, float castDist, uint32_t layerMask, bool hitTriggers);

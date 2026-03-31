@@ -463,7 +463,7 @@ void WeaponsUpdate(void) {
 // 	void FireCyberBeachball(bool isPulser, float shoveForce, int prefabID) {
 //         // Create and hurl a beachball-like object.  On the developer commentary they said that the projectiles act
 //         // like a beachball for collisions with enemies, but act like a baseball for walls/floor to prevent hitting corners
-//         GameObject beachball = ConsoleEmulator.SpawnDynamicObject(prefabID,-1);
+//         GameObject beachball = SpawnDynamicObject(prefabID,-1);
 //         if (beachball != null) {
 // 			damageData.damage = 10f * Eng_Global->invP1.softVersions[0];
 // 			if (isPulser) {
@@ -800,7 +800,7 @@ void WeaponsUpdate(void) {
 // 			impactConstdex = 740; // Yellow laser for ion
 //         }
 // 
-//         GameObject impact = ConsoleEmulator.SpawnDynamicObject(impactConstdex);
+//         GameObject impact = SpawnDynamicObject(impactConstdex);
 // 		impact.transform.SetPositionAndRotation(tempHit.point,Quaternion.FromToRotation(Vector3.up, tempHit.normal));
 // 		impact.SetActive(true);
 //     }
@@ -1256,7 +1256,7 @@ void WeaponsUpdate(void) {
 // 		// commentary they said that the projectiles act like a beachball for
 // 		// collisions with enemies, but act like a baseball for walls/floor to
 // 		// prevent hitting corners.
-//         GameObject beachball = ConsoleEmulator.SpawnDynamicObject(prefabID,1);
+//         GameObject beachball = SpawnDynamicObject(prefabID,1);
 //         if (beachball != null) {
 // 			if (CurrentWeaponUsesEnergy()) {
 //                 damageData.damage = DamageForPower(index16);

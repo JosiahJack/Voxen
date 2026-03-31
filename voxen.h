@@ -51,7 +51,6 @@
 #else
 	#define CHECK_GL_ERROR() do {} while(0)
 #endif
-    
 #define FAR_PLANE (71.68f) // Max player view, level 6 crawlway 28 cells
 #define NEAR_PLANE (0.02f)
 #define TEXT_BUFFER_SIZE 1024
@@ -59,7 +58,7 @@
 #define MAX_GLYPHS 4096
 extern GlobalContext Sys_Global;
 extern SystemUI Sys_UI;
-typedef struct { bool down; bool pressed; bool released; } KeyState;
+typedef struct {bool down,pressed,released;} KeyState;
 typedef struct {
 	KeyState keyStates[MAX_KEYS];
 	KeyState mouseButtons[MAX_MOUSE_BUTTONS];
@@ -77,25 +76,8 @@ typedef struct {
 } InputSystem;
 extern InputSystem Sys_Input;
 
-typedef struct {
-    double timestamp;
-    double deltaTime_ns;
-    uint32_t frameNum; // Can't unionize the payloads as some need both.
-    int32_t payload1i; // First one used for payloads less than or equal to 4 bytes
-    int32_t payload2i; // Second one used for more values or for long ints by using bitpacking
-    float payload1f;   // First one used for float payloads
-    float payload2f;   // Second one used for a 2nd value or for double via bitpacking
-    uint8_t type;
-} Event;
-
 typedef struct { Vector3 normal; float d; } FrustumPlane;
-
-typedef struct StbiArena {
-    uint8_t* base;
-    uint8_t* cursor;
-    uint8_t* end;
-} StbiArena;
-
+typedef struct StbiArena { uint8_t* base; uint8_t* cursor; uint8_t* end; } StbiArena;
 typedef uint32_t GLuint;
 typedef struct {
     GLuint inputImageID;
@@ -142,44 +124,14 @@ typedef struct {
     GLuint tbos[MODEL_IDX_MAX];
 } RenderSystem;
 
-extern bool instanceIsLODArray[INSTANCE_COUNT];
-extern float modelMatrices[INSTANCE_COUNT * 16];
-extern const char* sounds[670];
-extern const char* audioLogs[134];
-void play_mp3(const char* path, int32_t fade_in_ms);
-void play_wav(const char* path, float volume, Vector3 pos, bool positional);
-extern float modelBounds[MODEL_IDX_MAX * BOUNDS_ATTRIBUTES_COUNT];
-extern uint8_t** modelVertices;
-extern uint16_t** modelTriangles;
-extern uint16_t loadedTexturesMaxIndex;
-extern uint16_t loadedModelsMaxIndex;
-extern uint16_t loadedLights;
-extern Vector3 lightsNewPosition[LIGHT_COUNT];
-extern uint32_t modelVertexCounts[MODEL_IDX_MAX];
-extern uint16_t modelTriangleCounts[MODEL_IDX_MAX];
-extern bool modelHasAnimation[MODEL_IDX_MAX];
-extern Light lights[LIGHT_COUNT];
-LightAnimation lanims[LIGHT_COUNT];
-extern bool lightInPVS[LIGHT_COUNT];
-extern uint8_t queuedLevelToLoad;
-extern uint16_t playerCellIdx;
-extern uint16_t numCellsVisible;
-extern uint32_t gridCellStates[ARRSIZE];
 extern uint32_t precomputedVisibleCellsFromHere[524288];
 bool get_cull_bit(const uint32_t* arr, int idx);
-void RenderFormattedText(int16_t x, int16_t y, uint32_t color, uint8_t fontID, float scale, const char * restrict format, ...);
-// ----------------------------------------------------------------------------
-// Physics
-extern uint16_t testPointInSolid;
 void AddForce(uint16_t idx, Vector3 force, bool isImpulse);
 int32_t Physics(void); // Main event tick
 RaycastHit Raycast(Vector3 origin, Vector3 dir, float distance, uint32_t layerMask);
 void RaycastAll(Vector3 origin, Vector3 dir, float distance, uint32_t layerMask, RaycastHit* hits, uint16_t maxCount);
 bool CheckCapsule(Vector3 start, Vector3 end, float capsuleRadius, float capsuleHeight, uint32_t layerMask);
-RaycastHit CapsuleCast(Vector3 start, Vector3 end, float capsuleRadius, float castDist, uint32_t layerMask, bool hitTriggers);
 void ApplyPlayerMovements(void);
-// ----------------------------------------------------------------------------
-// Input
 void Input_MouselookApply(void);
 int32_t Input_KeyDown(int32_t scancode);
 int32_t Input_KeyUp(int32_t scancode);
@@ -187,70 +139,20 @@ int32_t Input_MouseMove(int32_t xrel, int32_t yrel);
 bool MouseWheelBoundAndRolled(int setCode);
 void UpdatePlayerFacingAngles(void);
 void InputClearRisingAndFallingEdges(void);
-void LoadConfig(void);
-void SaveConfig(void);
-// ----------------------------------------------------------------------------
-// Rendering
-extern float cam_yaw, cam_pitch, cam_roll;
-extern uint16_t loadedModelsMaxIndex;
-extern bool enteringPlayerName;
-void ConsoleEmulator(int32_t keycode);
-void SetSkyRotateSpeed(void);
-// ----------------------------------------------------------------------------
-// UI
-extern bool returnToPause;
-extern GLuint fontAtlasTex;
-extern GLuint fontAtlasTexStopD;
-extern float fixedNumberAdvanceWidth;
-extern float fixedNumberAdvanceWidthStopD;
-extern bool mouseMovementThisFrame;
 extern char consoleEntryText[TEXT_BUFFER_SIZE];
 void LoadTextForLanguage(uint8_t lang);
 void LoadLogTextForLanguage(uint8_t lang);
 void InitFontAtlasses(void);
-// ----------------------------------------------------------------------------
-// Helper Functions
 void Screenshot(void);
 void DebugRAM(const char *context);
-extern uint32_t random_range_rng;
-double get_time(void);
-uint32_t xs32(void);
-char* data_parser_trim(char* s);
 int32_t StringToInt(const char *str);
 size_t GetStringLength(const char *s);
 bool CharacterIsEmpty(const char c);
-bool StringIsEmpty(const char* c);
-bool StringsEqual(const char* c, const char* c2);
 bool StringsEqualLimitedBy(const char* a, const char* b, size_t limit);
-void StringCopyInto_A_From_B(char* a, const char* b, size_t bufferSize);
 void StringCopyInto_A_SubstringFrom_B(char* a, size_t substringSize, const char* b, size_t bufferSize);
 void StringConcatenate(char* a, const char* b, size_t bufferSize);
 extern RenderSystem Sys_Render; // Added last to make use of all defines for sizes.
 bool EntityIsAnimated(uint16_t entIdx);
-
-static inline __attribute__((always_inline)) void mul_mat4(float *out, const float *a, const float *b) { // out = a * b
-	out[0] =  a[0] * b[0]  + a[4] * b[1]  + a[8]  * b[2] + a[12]  * b[3];
-	out[1] =  a[1] * b[0]  + a[5] * b[1]  + a[9]  * b[2] + a[13]  * b[3];
-	out[2] =  a[2] * b[0]  + a[6] * b[1] + a[10]  * b[2] + a[14]  * b[3];
-	out[3] =  a[3] * b[0]  + a[7] * b[1] + a[11]  * b[2] + a[15]  * b[3];
-	out[4] =  a[0] * b[4]  + a[4] * b[5]  + a[8]  * b[6] + a[12]  * b[7];
-	out[5] =  a[1] * b[4]  + a[5] * b[5]  + a[9]  * b[6] + a[13]  * b[7];
-	out[6] =  a[2] * b[4]  + a[6] * b[5] + a[10]  * b[6] + a[14]  * b[7];
-	out[7] =  a[3] * b[4]  + a[7] * b[5] + a[11]  * b[6] + a[15]  * b[7];
-	out[8] =  a[0] * b[8]  + a[4] * b[9]  + a[8] * b[10] + a[12] * b[11];
-	out[9] =  a[1] * b[8]  + a[5] * b[9]  + a[9] * b[10] + a[13] * b[11];
-	out[10] = a[2] * b[8]  + a[6] * b[9] + a[10] * b[10] + a[14] * b[11];
-	out[11] = a[3] * b[8]  + a[7] * b[9] + a[11] * b[10] + a[15] * b[11];
-	out[12] = a[0] * b[12] + a[4] * b[13] + a[8] * b[14] + a[12] * b[15];
-	out[13] = a[1] * b[12] + a[5] * b[13] + a[9] * b[14] + a[13] * b[15];
-	out[14] = a[2] * b[12] + a[6] * b[13] + a[10]* b[14] + a[14] * b[15];
-	out[15] = a[3] * b[12] + a[7] * b[13] + a[11]* b[14] + a[15] * b[15];
-}
-
-extern uint16_t invalidModelIndexCount;
-extern uint16_t startOfDoubleSidedInstances;
-extern uint16_t startOfTransparentInstances;
-extern uint16_t endOfModels;
 void InitializeEntity(Entity* entry);
 void LoadLevel(uint8_t curlevel);
 void EnableCheatArsenal(uint8_t level);
@@ -266,19 +168,8 @@ void GoIntoGame(void);
 void NewGame(void);
 void mp3_clear(void);
 void play_message(const char* path);
-void set_music_volume(void);
-void set_sfx_volume(void);
-void set_message_volume(void);
-void set_master_volume(void);
-char CharToLower(const char c);
 char* StringFindSubstring(const char* haystack, const char* needle);
-const char* StringFindLastChar(const char* str, const char c);
-char* StringReturnUpToDelimiterAndLopOffAndShiftOriginal(char* str, const char delim, char** saveptr);
 int StringCompareUpToLength(const char* s1, const char* s2, size_t n);
-extern uint16_t loadedTexturesMaxIndex;
-extern bool doubleSidedTexture[MAX_VALID_TEXTURE];
-extern bool transparentTexture[MAX_VALID_TEXTURE];
-
 static inline __attribute__((always_inline)) uint32_t parse_numberu32(const char* str, const char* line, uint32_t lineNum) {
     if (str == 0 || *str == '\0') { DualLogError("Invalid blank string from line[%d]: %s\n", lineNum+1, line); return 0; }
     while (CharacterIsEmpty((char)*str)) str++;
@@ -349,12 +240,6 @@ static inline __attribute__((always_inline)) float parse_float(const char* str, 
     return (float)value;
 }
 
-typedef __builtin_va_list va_list;
-int StringFormatV(char* buffer, size_t bufferSize, const char* format, va_list args);
-int StringFormat(char* buffer, size_t bufferSize, const char* format, ...);
 static inline __attribute__((always_inline)) int32_t PosGetCellCoordX(float pos_x) { return (uint16_t)clamp((int32_t)vfloor((pos_x - Sys_Global.worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED); }
 static inline __attribute__((always_inline)) int32_t PosGetCellCoordZ(float pos_z) { return (uint16_t)clamp((int32_t)vfloor((pos_z - Sys_Global.worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED); }
 static inline __attribute__((always_inline)) bool XZPairInBounds(int32_t x, int32_t z) { return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0); }
-
-extern uint32_t* texturePaletteOffsets;
-extern int32_t* textureSizes;

@@ -73,6 +73,7 @@ typedef struct {
     enum { CMD_NOARG, CMD_INT, CMD_STR } type;
 } ConsoleCommand;
 
+char CharToLower(const char c);
 __attribute__((pure)) static int CommandMatch(const char* input, const char* cmd) {
     while (*cmd && *input) {
         char c1 = CharToLower((unsigned char)*input++);
@@ -193,6 +194,7 @@ static Vector3 cyberSpaceEntryLocations[8] = {
     {185.16100f,  84.50200f, -46.04246f}, // 9
 };
 
+extern uint8_t queuedLevelToLoad;
 static void cmd_loadlevel(const char* arg) {
     if (Sys_Global.menuActive) { CenterStatusPrint("%s", Sys_Text.stringTable[1015]); return; } // "Cannot load levels via cheat while on the main menu!"
 
@@ -231,12 +233,8 @@ static void cmd_energy(void) {
     else CenterStatusPrint("%s", Sys_Text.stringTable[1005]); // Energy usage normal
 }
 
-static void cmd_dizzy(void) {
-    Sys_Cheats.dizzyLevel++;
-    if (Sys_Cheats.dizzyLevel > 4) Sys_Cheats.dizzyLevel = 0;
-    SetSkyRotateSpeed();
-}
-
+void SetSkyRotateSpeed(void);
+static void cmd_dizzy(void) { Sys_Cheats.dizzyLevel = (Sys_Cheats.dizzyLevel >= 3) ? 0 : Sys_Cheats.dizzyLevel + 1; SetSkyRotateSpeed(); }
 static void cmd_bottomless(void) {
     Sys_Cheats.bottomless = !Sys_Cheats.bottomless;
     if (Sys_Cheats.bottomless) CenterStatusPrint("bottomlessclip! %s", Sys_Text.stringTable[1002]); // "Bring it!"
@@ -271,6 +269,7 @@ static void cmd_katiebrayshaw(void)  { CenterStatusPrint("Hi there! Hello! Hey! 
 
 static void cmd_sudo(void)           { CenterStatusPrint("Super user access granted...ERROR: access restricted by SHODAN"); }
 
+const char* StringFindLastChar(const char* str, const char c);
 static void cmd_git(const char* arg) {
     if (!arg) arg = "";
     if (StringFindSubstring(arg, "pull") || StringFindSubstring(arg, "fetch")) {
@@ -287,10 +286,10 @@ static void cmd_git(const char* arg) {
         CenterStatusPrint("Could not find Username for 'triopttp://192.168.1.451'");
     } else if (StringFindSubstring(arg, "clone")) {
         CenterStatusPrint("Failed, connection blocked by SHODAN. Employee ID invalid.");
-    } else if (StringFindSubstring(arg, "branch") || StringFindSubstring(arg, "-b")) {
-        const char* last = StringFindLastChar(arg, ' ');
+    } else if (StringFindSubstring(arg, "branch") || StringFindSubstring(arg,"-b")) {
+        const char* last = StringFindLastChar(arg,' ');
         const char* name = last ? last + 1 : "unknown";
-        CenterStatusPrint("Created new branch %s", name);
+        CenterStatusPrint("Created new branch %s",name);
     } else if (StringFindSubstring(arg, "checkout")) {
         CenterStatusPrint("Branch name not recognized. Contact your TriopBucket representative.");
     } else {

@@ -10,7 +10,6 @@ uint8_t** modelVertices=NULL;
 uint16_t** modelTriangles=NULL;
 uint32_t modelVertexCounts[MODEL_IDX_MAX] = {0};
 uint16_t modelTriangleCounts[MODEL_IDX_MAX] = {0};
-bool modelHasAnimation[MODEL_IDX_MAX] = {0};
 float modelBounds[MODEL_IDX_MAX*BOUNDS_ATTRIBUTES_COUNT] = {0};
 uint16_t loadedModelsMaxIndex = 0;
 #define MAX_VERT_ELEMENT_SIZE 6964
@@ -297,10 +296,11 @@ static void* ModelParsingWorker(void* argument){
 	for(uint32_t current_model=task->start_model;current_model<task->end_model;++current_model){
 		int32_t parser_index=task->index_to_parser[current_model];
 		if(unlikely(parser_index<0||parser_index>=(int32_t)task->data_parser->count))continue;
-		modelHasAnimation[current_model]=(task->data_parser->entries[parser_index].animationNum < 255);
-		const char* model_data=task->raw_models[current_model].data;
+
+        const char* model_data=task->raw_models[current_model].data;
 		int model_file_size=task->raw_models[current_model].size;
 		if(unlikely(!model_data||model_file_size<=0))continue;
+        
 		int tid=task->thread_id;
 		float min_x,min_y,min_z,max_x,max_y,max_z;
 		if(unlikely(!ParseOBJ(model_data,model_file_size,thread_temp_pos[tid],thread_temp_nrm[tid],thread_temp_uv[tid],thread_out_verts[tid],thread_out_tris[tid],&modelVertices[current_model],&modelVertexCounts[current_model],&modelTriangles[current_model],&modelTriangleCounts[current_model],&min_x,&min_y,&min_z,&max_x,&max_y,&max_z)))continue;

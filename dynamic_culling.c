@@ -9,7 +9,6 @@ extern uint8_t*  stbi__arena_base;
 uint32_t gridCellStates[ARRSIZE];
 uint32_t precomputedVisibleCellsFromHere[PRECOMPUTED_VISIBILITY_SIZE];
 uint16_t playerCellIdx = 0u;
-uint16_t numCellsVisible = 0u;
 bool instanceIsLODArray[INSTANCE_COUNT];
 #define MAX_CULL_FILESIZE 500000
 uint8_t cullingFileBuffer[MAX_CULL_FILESIZE];
@@ -621,6 +620,7 @@ void CullInit(void) {
     DebugRAM("end of Cull_Init");
 }
 
+extern Light lights[LIGHT_COUNT];
 ENGINE_TO_MOD void PortalCulling(void) { // Called just once at end of animation loop for the frame after each frame perfect change to door models becoming either closed or not closed.
     uint16_t playerCellX = PosGetCellCoordX(Sys_Global.instances[PLAYER1].position.x);
     uint16_t playerCellZ = PosGetCellCoordZ(Sys_Global.instances[PLAYER1].position.z);
@@ -658,7 +658,6 @@ static inline __attribute__((always_inline)) void CellCoordsToPos(uint16_t x, ui
 bool CullCore(void) {
     if (Sys_Global.currentLevel >= LEVEL_CYBERSPACE) return false;
 
-    numCellsVisible = 0;
     float pos_x,pos_z;
     uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((Sys_Global.instances[PLAYER1].position.x - Sys_Global.worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F),0,WORLDX_0BASED);
     uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((Sys_Global.instances[PLAYER1].position.z - Sys_Global.worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F),0,WORLDX_0BASED);

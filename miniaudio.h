@@ -774,15 +774,7 @@ MA_API void ma_version(ma_uint32* pMajor, ma_uint32* pMinor, ma_uint32* pRevisio
 Retrieves the version of miniaudio as a string which can be useful for logging purposes.
 */
 MA_API const char* ma_version_string(void);
-
-
-/**************************************************************************************************************************************************************
-
-Logging
-
-**************************************************************************************************************************************************************/
-#include <stdarg.h> /* For va_list. */
-
+typedef __builtin_va_list va_list;
 #if defined(__has_attribute)
     #if __has_attribute(format)
         #define MA_ATTRIBUTE_FORMAT(fmt, va) __attribute__((format(printf, fmt, va)))
@@ -795,45 +787,11 @@ Logging
 #ifndef MA_MAX_LOG_CALLBACKS
 #define MA_MAX_LOG_CALLBACKS    4
 #endif
-
-
-/*
-The callback for handling log messages.
-
-
-Parameters
-----------
-pUserData (in)
-    The user data pointer that was passed into ma_log_register_callback().
-
-logLevel (in)
-    The log level. This can be one of the following:
-
-    +----------------------+
-    | Log Level            |
-    +----------------------+
-    | MA_LOG_LEVEL_DEBUG   |
-    | MA_LOG_LEVEL_INFO    |
-    | MA_LOG_LEVEL_WARNING |
-    | MA_LOG_LEVEL_ERROR   |
-    +----------------------+
-
-pMessage (in)
-    The log message.
-*/
 typedef void (* ma_log_callback_proc)(void* pUserData, ma_uint32 level, const char* pMessage);
-
-typedef struct
-{
-    ma_log_callback_proc onLog;
-    void* pUserData;
-} ma_log_callback;
+typedef struct { ma_log_callback_proc onLog; void* pUserData; } ma_log_callback;
 
 MA_API ma_log_callback ma_log_callback_init(ma_log_callback_proc onLog, void* pUserData);
-
-
-typedef struct
-{
+typedef struct {
     ma_log_callback callbacks[MA_MAX_LOG_CALLBACKS];
     ma_uint32 callbackCount;
     ma_allocation_callbacks allocationCallbacks;    /* Need to store these persistently because ma_log_postv() might need to allocate a buffer on the heap. */
@@ -849,21 +807,8 @@ MA_API ma_result ma_log_unregister_callback(ma_log* pLog, ma_log_callback callba
 MA_API ma_result ma_log_post(ma_log* pLog, ma_uint32 level, const char* pMessage);
 MA_API ma_result ma_log_postv(ma_log* pLog, ma_uint32 level, const char* pFormat, va_list args);
 MA_API ma_result ma_log_postf(ma_log* pLog, ma_uint32 level, const char* pFormat, ...) MA_ATTRIBUTE_FORMAT(3, 4);
-
-
-/**************************************************************************************************************************************************************
-
-Biquad Filtering
-
-**************************************************************************************************************************************************************/
-typedef union
-{
-    float    f32;
-    ma_int32 s32;
-} ma_biquad_coefficient;
-
-typedef struct
-{
+typedef union { float f32; ma_int32 s32; } ma_biquad_coefficient;
+typedef struct {
     ma_format format;
     ma_uint32 channels;
     double b0;

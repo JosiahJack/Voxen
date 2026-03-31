@@ -796,13 +796,10 @@ static int glad_gl_find_core_gl(void) {
 }
 
 int gladLoadGLUserPtr( GLADuserptrloadfunc load, void *userptr) {
-    double startTime = get_time();
-    int version;
-
     glad_glGetString = (PFNGLGETSTRINGPROC) load(userptr, "glGetString");
     if(glad_glGetString == NULL) return 0;
     
-    version = glad_gl_find_core_gl();
+    int version = glad_gl_find_core_gl();
     glad_glBlendFunc = (PFNGLBLENDFUNCPROC) load(userptr, "glBlendFunc");
     glad_glClear = (PFNGLCLEARPROC) load(userptr, "glClear");
     glad_glClearColor = (PFNGLCLEARCOLORPROC) load(userptr, "glClearColor");
@@ -1270,11 +1267,11 @@ int gladLoadGLUserPtr( GLADuserptrloadfunc load, void *userptr) {
     glad_glVertexAttribLFormat = (PFNGLVERTEXATTRIBLFORMATPROC) load(userptr, "glVertexAttribLFormat");
     glad_glVertexBindingDivisor = (PFNGLVERTEXBINDINGDIVISORPROC) load(userptr, "glVertexBindingDivisor");
     if (!glad_gl_find_extensions_gl()) return 0;
+    
     glad_gl_load_GL_ARB_buffer_storage(load, userptr);
     glad_gl_load_GL_ARB_copy_buffer(load, userptr);
     glad_gl_load_GL_ARB_direct_state_access(load, userptr);
     glad_gl_load_GL_ARB_map_buffer_range(load, userptr);
-    DualLog("GL function loading took %f secs\n",get_time() - startTime);
     return version;
 }
 
@@ -1283,22 +1280,16 @@ int gladLoadGL( GLADloadfunc load) {
 }
 
 #ifdef GLAD_GL
-
 #ifndef GLAD_LOADER_LIBRARY_C_
 #define GLAD_LOADER_LIBRARY_C_
-
 #if GLAD_PLATFORM_WIN32
 #include <windows.h>
 #else
 #include <dlfcn.h>
 #endif
-
-
 static void* glad_get_dlopen_handle(const char *lib_names[], int length) {
     void *handle = NULL;
-    int i;
-
-    for (i = 0; i < length; ++i) {
+    for (int i = 0; i < length; ++i) {
 #if GLAD_PLATFORM_WIN32
   #if GLAD_PLATFORM_UWP
         size_t buffer_size = (GetStringLength(lib_names[i]) + 1) * sizeof(WCHAR);
@@ -1354,18 +1345,12 @@ static GLADapiproc glad_gl_get_proc(void *vuserptr, const char *name) {
     struct _glad_gl_userptr userptr = *(struct _glad_gl_userptr*) vuserptr;
     GLADapiproc result = NULL;
 
-    if(userptr.gl_get_proc_address_ptr != NULL) {
-        result = GLAD_GNUC_EXTENSION (GLADapiproc) userptr.gl_get_proc_address_ptr(name);
-    }
-    if(result == NULL) {
-        result = glad_dlsym_handle(userptr.handle, name);
-    }
-
+    if(userptr.gl_get_proc_address_ptr != NULL) result = GLAD_GNUC_EXTENSION (GLADapiproc) userptr.gl_get_proc_address_ptr(name);
+    if(result == NULL) result = glad_dlsym_handle(userptr.handle, name);
     return result;
 }
 
 static void* _glad_GL_loader_handle = NULL;
-
 static void* glad_gl_dlopen_handle(void) {
 #if GLAD_PLATFORM_WIN32
     static const char *NAMES[] = {"opengl32.dll"};
@@ -1379,16 +1364,12 @@ static void* glad_gl_dlopen_handle(void) {
     };
 #endif
 
-    if (_glad_GL_loader_handle == NULL) {
-        _glad_GL_loader_handle = glad_get_dlopen_handle(NAMES, sizeof(NAMES) / sizeof(NAMES[0]));
-    }
-
+    if (_glad_GL_loader_handle == NULL) _glad_GL_loader_handle = glad_get_dlopen_handle(NAMES, sizeof(NAMES) / sizeof(NAMES[0]));
     return _glad_GL_loader_handle;
 }
 
 static struct _glad_gl_userptr glad_gl_build_userptr(void *handle) {
     struct _glad_gl_userptr userptr;
-
     userptr.handle = handle;
 #if GLAD_PLATFORM_WIN32
     userptr.gl_get_proc_address_ptr = (GLADglprocaddrfunc) glad_dlsym_handle(handle, "wglGetProcAddress");
@@ -1414,11 +1395,5 @@ int gladLoaderLoadGL(void) {
     return version;
 }
 
-void gladLoaderUnloadGL(void) {
-    if (_glad_GL_loader_handle != NULL) {
-        glad_close_dlopen_handle(_glad_GL_loader_handle);
-        _glad_GL_loader_handle = NULL;
-    }
-}
-
+void gladLoaderUnloadGL(void) { if (_glad_GL_loader_handle != NULL) { glad_close_dlopen_handle(_glad_GL_loader_handle); _glad_GL_loader_handle = NULL; } }
 #endif /* GLAD_GL */

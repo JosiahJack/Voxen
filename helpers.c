@@ -4,7 +4,6 @@
 #include "voxen.h"
 #define STBIW_UCHAR(x) (unsigned char)((x) & 0xff)
 typedef void stbi_write_func(void *context, void *data, int size);
-
 typedef struct {
    OsFileHandle context;
    const char *filePath;
@@ -12,13 +11,12 @@ typedef struct {
    int buf_used;
 } stbi__write_context;
 
+typedef __builtin_va_list va_list;
 static void stbiw__writefv(stbi__write_context *s, const char *fmt, va_list v) {
    while (*fmt) {
       switch (*fmt++) {
          case ' ': break;
-         case '1': { unsigned char x = STBIW_UCHAR(__builtin_va_arg(v, int));
-                     OS_Write(s->context, &x, 1, s->filePath);
-                     break; }
+         case '1': { unsigned char x = STBIW_UCHAR(__builtin_va_arg(v, int)); OS_Write(s->context, &x, 1, s->filePath); break; }
          case '2': { int x = __builtin_va_arg(v,int);
                      unsigned char b[2];
                      b[0] = STBIW_UCHAR(x);
@@ -38,18 +36,8 @@ static void stbiw__writefv(stbi__write_context *s, const char *fmt, va_list v) {
    }
 }
 
-static void stbiw__write_flush(stbi__write_context *s) {
-   if (s->buf_used) {
-      OS_Write(s->context, &s->buffer, s->buf_used, s->filePath);
-      s->buf_used = 0;
-   }
-}
-
-static void stbiw__write1(stbi__write_context *s, unsigned char a) {
-   if ((size_t)s->buf_used + 1 > sizeof(s->buffer)) stbiw__write_flush(s);
-   s->buffer[s->buf_used++] = a;
-}
-
+static void stbiw__write_flush(stbi__write_context *s) { if (s->buf_used) { OS_Write(s->context, &s->buffer, s->buf_used, s->filePath); s->buf_used = 0; } }
+static void stbiw__write1(stbi__write_context *s, unsigned char a) { if ((size_t)s->buf_used + 1 > sizeof(s->buffer)) {stbiw__write_flush(s);} s->buffer[s->buf_used++] = a; }
 static void stbiw__write3(stbi__write_context *s, unsigned char a, unsigned char b, unsigned char c) {
    int n;
    if ((size_t)s->buf_used + 3 > sizeof(s->buffer)) stbiw__write_flush(s);
@@ -71,20 +59,18 @@ static void stbiw__write_pixels(stbi__write_context *s, int x, int y, void *data
    }
 }
 
-static int stbiw__outfile(stbi__write_context *s, int x, int y, void *data, const char *fmt, ...) {
+static void stbiw__outfile(stbi__write_context *s, int x, int y, void *data, const char *fmt, ...) {
    va_list v; __builtin_va_start(v, fmt); stbiw__writefv(s,fmt,v); __builtin_va_end(v);
    stbiw__write_pixels(s,x,y,data);
-   return 1;
 }
 
-int stbi_write_bmp(char const *filename, int x, int y, const void *data) {
+void stbi_write_bmp(char const *filename, int x, int y, const void *data) {
     stbi__write_context s = { 0 };
     OsFileHandle f = OS_OpenWriteonly(filename);
     s.context = f;
     s.filePath = filename;
     stbiw__outfile(&s,x,y,(void *)data,"11 4 22 4" "4 44 22 444444 4444 4 444 444 444 444",'B','M',14+108+x*y*4,0,0,14+108,/*<<<fileheader*/108,x,y,1,32,3,0,0,0,0,0,0xff0000,0xff00,0xff,0xff000000u,0,0,0,0,0,0,0,0,0,0,0,0,0); // bitmap V4 header
     OS_Close(f);
-    return 1;
 }
 
 double get_time(void) {
@@ -369,31 +355,6 @@ ENGINE_TO_MOD char* StringFindFirstCharWithin(const char *s, char c) { // strchr
     return stringwalker;
 }
 
-char* StringReturnUpToDelimiterAndLopOffAndShiftOriginal(char* str, const char delim, char** saveptr) { // strtok_r replacement
-    if (str) *saveptr = str;
-
-    char* token = *saveptr;
-    if (!token || *token == '\0') {
-        *saveptr = NULL;
-        return NULL;
-    }
-
-    char* p = token;
-    while (*p != '\0' && *p != delim) {
-        p++;
-    }
-
-    if (*p == delim) {
-        *p = '\0';
-        *saveptr = p + 1;
-    } else {
-        // End of string reached — no more tokens after this
-        *saveptr = NULL;
-    }
-
-    return token;
-}
-
 void DoubleToStringFixed(char* dest, double value, int decimalPlaces, size_t bufferSize) {
     if (decimalPlaces < 0 || decimalPlaces > 9) { DualLogError("DoubleToStringFixed: decimalPlaces out of range\n"); OS_Exit(1); }
 
@@ -530,6 +491,7 @@ ENGINE_TO_MOD int StringFormat(char* buffer, size_t bufferSize, const char* form
     return ret;
 }
 
+extern uint16_t playerCellIdx;
 ENGINE_TO_MOD bool PositionVisibleFromPlayerCell(float x, float z) {
     int32_t subIdx = PosGetCellCoords(x,z);
     int cellIdx = (playerCellIdx * ARRSIZE);

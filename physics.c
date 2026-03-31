@@ -14,7 +14,8 @@ typedef struct {
     Vector3  normal;       // contact normal pointing AWAY from geometry (toward player)
 } CapsuleContact;
 #define NO_CONTACT ((CapsuleContact){ .depth = -1.0f, .normal = {0,1,0} })
-
+extern uint16_t loadedModelsMaxIndex; extern float modelBounds[MODEL_IDX_MAX * BOUNDS_ATTRIBUTES_COUNT]; extern uint8_t** modelVertices; extern uint16_t** modelTriangles;
+extern uint32_t modelVertexCounts[MODEL_IDX_MAX]; extern uint16_t modelTriangleCounts[MODEL_IDX_MAX]; extern uint32_t gridCellStates[ARRSIZE];
 static uint32_t GetCollisionMask(uint32_t layer) {
     switch (layer) {
         case PhysicsLayer_Default:           return PhysicsLayer_Default | PhysicsLayer_TransparentFX | PhysicsLayer_IgnoreRaycast | PhysicsLayer_Geometry | PhysicsLayer_NPC | PhysicsLayer_PlayerBullets | PhysicsLayer_Player | PhysicsLayer_Corpse | PhysicsLayer_PhysObjects | PhysicsLayer_Sky | PhysicsLayer_Trigger | PhysicsLayer_Door | PhysicsLayer_InterDebris | PhysicsLayer_Player2 | PhysicsLayer_Player3 | PhysicsLayer_Player4 | PhysicsLayer_NPCBullet | PhysicsLayer_Clip | PhysicsLayer_CorpseSearchable;
@@ -135,6 +136,7 @@ static inline float half_to_float(half h){
     return f;
 }
 
+extern float modelMatrices[INSTANCE_COUNT * 16];
 static CapsuleContact QueryCapsuleContact(Vector3 start, Vector3 end, float capsuleRadius, uint32_t layerMask) {
     CapsuleContact worst = NO_CONTACT;
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
@@ -145,7 +147,7 @@ static CapsuleContact QueryCapsuleContact(Vector3 start, Vector3 end, float caps
         if (triCount < 1) continue;
  
         float M[16];
-        __builtin_memcpy(M, &modelMatrices[i * 16], 16 * sizeof(float));
+        __builtin_memcpy(M,&modelMatrices[i * 16],16 * sizeof(float));
         float m00=M[0], m10=M[1], m20=M[2];
         float m01=M[4], m11=M[5], m21=M[6];
         float m02=M[8], m12=M[9], m22=M[10];
@@ -515,6 +517,7 @@ RaycastHit RayTriangle(Vector3 origin, Vector3 dir, Vector3 posA, Vector3 posB, 
     return hitInfo;
 }
 
+extern uint16_t playerCellIdx;
 ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uint32_t layerMask) {
     uint32_t numMeshesCheckedForRaycast = 0, numTrisCastAgainst = 0;
     bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX);
@@ -609,7 +612,7 @@ void RaycastAll(Vector3 origin, Vector3 dir, float distance, uint32_t layerMask,
     (void)layerMask;
 }
 
-RaycastHit CapsuleCast(Vector3 start, Vector3 end, float capsuleRadius, float castDist, uint32_t layerMask, bool hitTriggers) {
+ENGINE_TO_MOD RaycastHit CapsuleCast(Vector3 start, Vector3 end, float capsuleRadius, float castDist, uint32_t layerMask, bool hitTriggers) {
     RaycastHit result = { .hit = false };
     Vector3 dir = Vector3_A_minus_B(end, start);
     (void)capsuleRadius;
