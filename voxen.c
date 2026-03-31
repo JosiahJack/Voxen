@@ -515,13 +515,11 @@ __attribute__((cold)) void NewGame(void) { // Reset World States
     DualLog("Loading new game...\n");
     RenderLoadingProgress(100,"Loading new game...");
     DualLog("Rendered screen saying \"Loading new game...\"\n");
-    Sys_Global.instances[WORLD].ioflags = 0u;
-    ModNewGame();
-    __builtin_memset(Sys_Global.instances,0,INSTANCE_COUNT * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
+    __builtin_memset(Sys_Global.instances,0,2 * sizeof(Entity)); // Blank out player entities
     PlayerInit(PLAYER1); PlayerInit(PLAYER2);
+    Sys_Global.instances[WORLD].ioflags = 0u;
     cam_yaw = 90.0f; cam_pitch = 0.0f; cam_roll = 0.0f;
     Sys_Global.inventoryMode = Sys_Settings.NoShootMode;
-    LoadLevel(Sys_Global.startLevel); // Must be after entities!
     Sys_Global.pauseRelativeTime =  Sys_Global.last_physics_time = 0.0;
     Sys_Global.last_topframe_time = Sys_Global.last_physics_time - 0.05;
     Sys_Global.timeSinceLastPhysicsTick = 0.0166666666f;
@@ -537,6 +535,8 @@ __attribute__((cold)) void NewGame(void) { // Reset World States
     Sys_Input.ignore_next_mouse_delta = true;
     Sys_Input.isCapsLockOn = false; // As far as we're concerned, don't worry about OS state.
     Sys_Input.lastUse = false;
+    LoadLevel(Sys_Global.startLevel); // Must be after entities!
+    ModNewGame();
 }
 
 __attribute__((cold)) void LoadGameModDefinition(void) { // Unique set separate from savedata path and resource data to keep it focussed

@@ -117,7 +117,7 @@ typedef struct {
 #define VOXEL_SIZE 0.32f
 #define VOXEL_HALF (VOXEL_SIZE * 0.5f)
 #define ENTFLAG_ACTIVE               (1ull <<  0) // Instance renders and updates
-#define ENTFLAG_CARDCHUNK            (1ull <<  1)
+#define ENTFLAG_ISGRENADE            (1ull <<  1)
 #define ENTFLAG_GROUNDED             (1ull <<  2)
 #define ENTFLAG_KINEMATIC            (1ull <<  3)
 #define ENTFLAG_RIGIDBODY            (1ull <<  4)

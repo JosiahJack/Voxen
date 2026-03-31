@@ -2286,7 +2286,7 @@ static void Death(uint16_t self,bool energyVaporized) {
 //     bool gib        = (e->entflags & ENTFLAG_DEATH_BURST_DONE) != 0;
     bool vaporize   = (e->entflags & ENTFLAG_VISIBLE) != 0; // vaporizeCorpse maps to VISIBLE being set
     bool isScreen   = (e->index == 279);
-    bool isGrenade  = (e->entflags & ENTFLAG_CARDCHUNK) != 0; // CARDCHUNK reused as isGrenade flag
+    bool isGrenade  = (e->entflags & ENTFLAG_ISGRENADE) != 0;
     bool isCam      = (e->index == 477);
     bool doTeleport = (e->entflags & ENTFLAG_REQUIRE_RESET) != 0; // REQUIRE_RESET reused as teleportOnDeath
     if (e->iceActive) e->collider = COLLIDER_TYPE_NONE;
@@ -2308,7 +2308,7 @@ float TakeDamage(uint16_t self,DamageData dd) {
     bool isNPC   = ConstIndexIsNPC(e->index);
     bool isPlayer = (self == PLAYER1 || self == PLAYER2);
 //     bool isObj   = ConstIndexIsDynamicObject(e->index);
-    bool isGrenade = (e->entflags & ENTFLAG_CARDCHUNK) != 0;
+    bool isGrenade = (e->entflags & ENTFLAG_ISGRENADE) != 0;
 //     bool isScreen  = (e->index == 279);
     bool isCam     = (e->index == 477);
 

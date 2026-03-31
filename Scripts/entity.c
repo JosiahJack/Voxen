@@ -896,7 +896,7 @@ uint16_t AddInstance(uint16_t entIdx, Vector3 pos) {
     e->index = entIdx;
     e->position = pos;
     if (ConstIndexIsNPC(entIdx)) InitializeAIAfterLoad(i);
-    bool isCardChunk = (EntityDefinitions[entIdx].entflags & ENTFLAG_CARDCHUNK);
+    e->cardchunk = EntityDefinitions[entIdx].cardchunk;
     e->modelIndex = EntityDefinitions[entIdx].modelIndex;
     e->colliderMeshIndex = EntityDefinitions[entIdx].colliderMeshIndex;
     e->numclips = EntityDefinitions[entIdx].numclips;
@@ -906,7 +906,6 @@ uint16_t AddInstance(uint16_t entIdx, Vector3 pos) {
     e->specIndex = EntityDefinitions[entIdx].specIndex >= MAX_VALID_TEXTURE ? 0 : EntityDefinitions[entIdx].specIndex;
     e->normIndex = EntityDefinitions[entIdx].normIndex >= MAX_VALID_TEXTURE ? 0 : EntityDefinitions[entIdx].normIndex;
     e->lodIndex = EntityDefinitions[entIdx].lodIndex;
-    flag_set(&e->entflags,ENTFLAG_CARDCHUNK,isCardChunk);
     e->gravity = EntityDefinitions[entIdx].gravity >= 0.0f ? EntityDefinitions[entIdx].gravity : 0.0f; // No up falling.
     flag_set(&e->entflags,ENTFLAG_KINEMATIC,EntityDefinitions[entIdx].entflags & ENTFLAG_KINEMATIC);
     flag_set(&e->entflags,ENTFLAG_RIGIDBODY,EntityDefinitions[entIdx].entflags & ENTFLAG_RIGIDBODY);
@@ -942,10 +941,10 @@ uint16_t AddInstance(uint16_t entIdx, Vector3 pos) {
     } else if (e->index == 746) { // weapon_grenadeenergmine_live
         e->textureAnimating = true; e->texAnimClip = 2; e->texFrame = 0;
     } else if (entIdx == 720) {
-        uint16_t mist = AddInstance(648,e->position); // ambient_mist
+        /*uint16_t mist = */AddInstance(648,e->position); // ambient_mist
     } else if (entIdx == 733) {
-        uint16_t pipewater = AddInstance(649,e->position); // ambient_pipewater_loop
-        uint16_t rain = AddInstance(653,(Vector3){e->position.x,e->position.y - 1.26f,e->position.z}); // ambient_rain
+        /*uint16_t pipewater = */AddInstance(649,e->position); // ambient_pipewater_loop
+        /*uint16_t rain = */AddInstance(653,(Vector3){e->position.x,e->position.y - 1.26f,e->position.z}); // ambient_rain
     }
     
     Eng_Global->instances[i].lockedMessageLingdex = EntityDefinitions[entIdx].lockedMessageLingdex;
