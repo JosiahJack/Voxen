@@ -1970,7 +1970,7 @@ typedef struct { uint16_t index; float distanceSquared, score, radius; Vector3 p
 
 static inline __attribute__((always_inline)) bool EntNotVisible(uint16_t i, bool otherCondition) { Entity* e = &Sys_Global.instances[i]; return e->texIndex > loadedTexturesMaxIndex || !(e->entflags & ENTFLAG_ACTIVE) || e->index >= MAX_ENTITIES || e->modelIndex >= MODEL_IDX_MAX || e->texIndex >= MAX_VALID_TEXTURE || otherCondition; }
 
-extern bool instanceIsLODArray[INSTANCE_COUNT]; extern uint16_t loadedModelsMaxIndex; extern float modelBounds[MODEL_IDX_MAX * BOUNDS_ATTRIBUTES_COUNT]; extern uint8_t** modelVertices; extern uint16_t** modelTriangles;
+extern bool instanceIsLODArray[INSTANCE_COUNT]; extern uint16_t loadedModelsMaxIndex; extern float modelBounds[MODEL_IDX_MAX]; extern uint8_t** modelVertices; extern uint16_t** modelTriangles;
 static inline __attribute__((always_inline,hot)) uint16_t GetAndBindModel(uint16_t i, uint16_t currentModelType) {
     glUniform1ui(0,i);
     uint16_t modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && Sys_Global.instances[i].lodIndex < loadedModelsMaxIndex ? Sys_Global.instances[i].lodIndex : Sys_Global.instances[i].modelIndex;
@@ -2066,7 +2066,7 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
             uint16_t nearbyMeshCount = 0;
             for (uint16_t shadowCasterInstanceIdx = 0; shadowCasterInstanceIdx < numShadowCasters; shadowCasterInstanceIdx++) {
                 uint16_t j = shadowCasterIndices[shadowCasterInstanceIdx];
-                shadows_nearMeshRadii[nearbyMeshCount] = modelBounds[(Sys_Global.instances[j].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 0.99f * vmax(vmax(Sys_Global.instances[j].scale.x,Sys_Global.instances[j].scale.y),Sys_Global.instances[j].scale.z);
+                shadows_nearMeshRadii[nearbyMeshCount] = modelBounds[Sys_Global.instances[j].modelIndex] * 0.99f * vmax(vmax(Sys_Global.instances[j].scale.x,Sys_Global.instances[j].scale.y),Sys_Global.instances[j].scale.z);
                 Vector3 d = Vector3_A_minus_B(Sys_Global.instances[j].position, lightPos);
                 float distToLightSqrd = dot_vector3(d, d);
                 float radSum = (effectiveRadius + shadows_nearMeshRadii[nearbyMeshCount]);
@@ -2080,7 +2080,7 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
 
             if (nearbyMeshCount < 1) continue;
 
-            glUniform3f(3, lightPos.x, lightPos.y, lightPos.z);
+            glUniform3f(3,lightPos.x,lightPos.y,lightPos.z);
             voxen_Shadow_System.shadowmapIndirectionList[lightIdx] = numShadowingLightsHandled;
             #pragma GCC unroll 6
             for (uint8_t face = 0; face < 6; face++) {                                            
@@ -2121,25 +2121,25 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
 DepthSort visibleInstances[INSTANCE_COUNT];
 static inline __attribute__((always_inline)) bool DetermineIfInstanceVisible(uint16_t i, bool otherCondition, bool skyVisible, Vector3 playerPos, float* distSqrd) {
     if (EntNotVisible(i,otherCondition)) return false; // must be transparent && transparents or neither
-        
-    Vector3 objPos = Sys_Global.instances[i].position;
-    uint16_t cellX = PosGetCellCoordX(objPos.x); uint16_t cellZ = PosGetCellCoordZ(objPos.z);
-    uint16_t instCellIdx = (cellZ * WORLDX) + cellX;
-    Vector3 delta = Vector3_A_minus_B(objPos, playerPos);
-    *distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
-    float radius = modelBounds[(Sys_Global.instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f * vmax(vmax(Sys_Global.instances[i].scale.x,Sys_Global.instances[i].scale.y),Sys_Global.instances[i].scale.z);
-    if (!SphereInFrustum(playerFrustumPlanes,objPos,radius) && (Sys_Global.instances[i].index != 754 || !skyVisible) && i != editModeSelection) return false;
     
-    if (ConstIndexIsPortalBlockingDoor(Sys_Global.instances[i].index)) { // Extra checks only needed for opaque portal blocking doors.
+    Entity* e = &Sys_Global.instances[i];
+    uint16_t cellX = PosGetCellCoordX(e->position.x), cellZ = PosGetCellCoordZ(e->position.z);
+    uint16_t instCellIdx = (cellZ * WORLDX) + cellX; uint16_t entIdx = e->index;
+    Vector3 delta = Vector3_A_minus_B(e->position,playerPos);
+    *distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
+    float radius = modelBounds[e->modelIndex] * 2.0f * vmax(vmax(e->scale.x,e->scale.y),e->scale.z);
+    if (!SphereInFrustum(playerFrustumPlanes,e->position,radius) && (entIdx != 754 || !skyVisible) && i != editModeSelection) return false;
+    
+    if (ConstIndexIsPortalBlockingDoor(entIdx)) { // Extra checks only needed for opaque portal blocking doors.
         bool inPVS = (gridCellStates[instCellIdx] & CELL_VISIBLE);
         if (!inPVS) inPVS = NeighborhoodInPVS(cellX,cellZ,2);
         if (!inPVS) return false;
     } else {
-        if (!(Sys_Global.currentLevel == 1 && (Sys_Global.instances[i].index == 309 ||  Sys_Global.instances[i].index == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
-            if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (Sys_Global.instances[i].index != 754 || !skyVisible)) return false; // For some shelves that are inset away from cells, need to still draw their items by checking && CELL_OPEN here, unfortunately this means they don't ever get culled :(
+        if (!(Sys_Global.currentLevel == 1 && (entIdx == 309 || entIdx == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
+            if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (entIdx != 754 || !skyVisible)) return false; // For some shelves that are inset away from cells, need to still draw their items by checking && CELL_OPEN here, unfortunately this means they don't ever get culled :(
         }
         
-        if (!(gridCellStates[instCellIdx] & CELL_OPEN) && *distSqrd >= 943.7184f && (Sys_Global.instances[i].index != 754 || !skyVisible)) return false; // 30.72 * 30.72, 12 cells
+        if (!(gridCellStates[instCellIdx] & CELL_OPEN) && *distSqrd >= 943.7184f && (entIdx != 754 || !skyVisible)) return false; // 30.72 * 30.72, 12 cells
     }
     
     return true;

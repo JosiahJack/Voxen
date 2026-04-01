@@ -1330,7 +1330,8 @@ index: 601
 #Textures/UI/frobicons/amm_tranq.png
 index: 602
 transparent: 1
-
+#Textures/normal_blank.png
+index: 603
 #Textures/pnl13.png
 index: 604
 #Textures/UI/frobicons/arm.png

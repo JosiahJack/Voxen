@@ -14,7 +14,7 @@ typedef struct {
     Vector3  normal;       // contact normal pointing AWAY from geometry (toward player)
 } CapsuleContact;
 #define NO_CONTACT ((CapsuleContact){ .depth = -1.0f, .normal = {0,1,0} })
-extern uint16_t loadedModelsMaxIndex; extern float modelBounds[MODEL_IDX_MAX * BOUNDS_ATTRIBUTES_COUNT]; extern uint8_t** modelVertices; extern uint16_t** modelTriangles;
+extern uint16_t loadedModelsMaxIndex; extern float modelBounds[MODEL_IDX_MAX]; extern uint8_t** modelVertices; extern uint16_t** modelTriangles;
 extern uint32_t modelVertexCounts[MODEL_IDX_MAX]; extern uint16_t modelTriangleCounts[MODEL_IDX_MAX]; extern uint32_t gridCellStates[ARRSIZE];
 static uint32_t GetCollisionMask(uint32_t layer) {
     switch (layer) {
@@ -60,21 +60,16 @@ static inline Vector3 ClosestPointOnSegment(Vector3 p, Vector3 q, Vector3 a) {
 }
 
 static inline Vector3 ClosestPointOnTriangle(Vector3 a, Vector3 b, Vector3 c, Vector3 p) {
-    Vector3 ab = Vector3_A_minus_B(b, a);
-    Vector3 ac = Vector3_A_minus_B(c, a);
-    Vector3 ap = Vector3_A_minus_B(p, a);
-    float d1 = dot_vector3(ab, ap);
-    float d2 = dot_vector3(ac, ap);
+    Vector3 ab = Vector3_A_minus_B(b,a), ac = Vector3_A_minus_B(c,a), ap = Vector3_A_minus_B(p,a);
+    float d1 = dot_vector3(ab,ap), d2 = dot_vector3(ac,ap);
     if (d1 <= 0.0f && d2 <= 0.0f) return a;            // vertex A region
  
     Vector3 bp = Vector3_A_minus_B(p, b);
-    float d3 = dot_vector3(ab, bp);
-    float d4 = dot_vector3(ac, bp);
+    float d3 = dot_vector3(ab, bp), d4 = dot_vector3(ac, bp);
     if (d3 >= 0.0f && d4 <= d3) return b;              // vertex B region
  
     Vector3 cp = Vector3_A_minus_B(p, c);
-    float d5 = dot_vector3(ab, cp);
-    float d6 = dot_vector3(ac, cp);
+    float d5 = dot_vector3(ab, cp), d6 = dot_vector3(ac, cp);
     if (d6 >= 0.0f && d5 <= d6) return c;              // vertex C region
  
     float vc = d1 * d4 - d3 * d2;
@@ -146,12 +141,9 @@ static CapsuleContact QueryCapsuleContact(Vector3 start, Vector3 end, float caps
         uint32_t triCount = modelTriangleCounts[mindex];
         if (triCount < 1) continue;
  
-        float M[16];
-        __builtin_memcpy(M,&modelMatrices[i * 16],16 * sizeof(float));
-        float m00=M[0], m10=M[1], m20=M[2];
-        float m01=M[4], m11=M[5], m21=M[6];
-        float m02=M[8], m12=M[9], m22=M[10];
-        float tx=M[12], ty=M[13], tz=M[14];
+        float M[16]; __builtin_memcpy(M,&modelMatrices[i * 16],16 * sizeof(float));
+        float m00=M[0], m10=M[1], m20=M[2]; float m01=M[4], m11=M[5], m21=M[6];
+        float m02=M[8], m12=M[9], m22=M[10]; float tx=M[12], ty=M[13], tz=M[14];
         float scl_x = vsqrtf(m00*m00 + m10*m10 + m20*m20);
         float scl_y = vsqrtf(m01*m01 + m11*m11 + m21*m21);
         float scl_z = vsqrtf(m02*m02 + m12*m12 + m22*m22);
@@ -161,7 +153,7 @@ static CapsuleContact QueryCapsuleContact(Vector3 start, Vector3 end, float caps
         Vector3 capsuleMid = { (start.x+end.x)*0.5f, (start.y+end.y)*0.5f, (start.z+end.z)*0.5f };
         Vector3 delta = Vector3_A_minus_B(objPos, capsuleMid);
         float distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
-        float modelRad = vmax(modelBounds[(mindex*BOUNDS_ATTRIBUTES_COUNT)+BOUNDS_DATA_OFFSET_RADIUS], 1.81f);
+        float modelRad = vmax(modelBounds[mindex], 1.81f);
         Vector3 spine = Vector3_A_minus_B(end, start);
         float spineHalf = magnitude_vector3(spine) * 0.5f;
         float combinedRad = modelRad + spineHalf + capsuleRadius + 0.1f;
@@ -172,24 +164,22 @@ static CapsuleContact QueryCapsuleContact(Vector3 start, Vector3 end, float caps
         Vector3 relE = {end.x-tx,end.y-ty,end.z-tz};
         Vector3 localEnd = {(relE.x*m00 + relE.y*m10 + relE.z*m20) / (scl_x*scl_x), (relE.x*m01 + relE.y*m11 + relE.z*m21) / (scl_y*scl_y), (relE.x*m02 + relE.y*m12 + relE.z*m22) / (scl_z*scl_z)};
         float minScl = scl_x;
-        if (scl_y < minScl) minScl = scl_y;
-        if (scl_z < minScl) minScl = scl_z;
+        if (scl_y < minScl) { minScl = scl_y; } if (scl_z < minScl) { minScl = scl_z; }
         float localRadius = capsuleRadius / minScl;
         for (uint32_t j = 0; j < triCount; ++j) {            
             uint32_t bA = (uint32_t)modelTriangles[mindex][j*3 + 0] * VERTEX_ATTRIBUTES_SIZE, bB = (uint32_t)modelTriangles[mindex][j*3 + 1] * VERTEX_ATTRIBUTES_SIZE, bC = (uint32_t)modelTriangles[mindex][j*3 + 2] * VERTEX_ATTRIBUTES_SIZE;
             Vector3 posA = {half_to_float( *(half*)(modelVertices[mindex] + bA + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 4) )};
             Vector3 posB = {half_to_float( *(half*)(modelVertices[mindex] + bB + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 4) )};
             Vector3 posC = {half_to_float( *(half*)(modelVertices[mindex] + bC + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 4) )};
-            Vector3 cpP   = ClosestPointOnTriangle(posA, posB, posC, localStart); // Closest point on triangle to spine, then closest point on spine to that.
-            Vector3 spP   = ClosestPointOnSegment(localStart, localEnd, cpP);     // This gives actual contact point and direction, winding-independent.
-            Vector3 cpP2  = ClosestPointOnTriangle(posA, posB, posC, spP);
-            Vector3 cpQ   = ClosestPointOnTriangle(posA, posB, posC, localEnd);
-            Vector3 spQ   = ClosestPointOnSegment(localStart, localEnd, cpQ);
-            Vector3 cpQ2  = ClosestPointOnTriangle(posA, posB, posC, spQ);
-            Vector3 dP = Vector3_A_minus_B(spP, cpP2);
-            Vector3 dQ = Vector3_A_minus_B(spQ, cpQ2);
-            float distP = vsqrtf(dot_vector3(dP, dP));
-            float distQ = vsqrtf(dot_vector3(dQ, dQ));
+            Vector3 cpP   = ClosestPointOnTriangle(posA,posB,posC,localStart); // Closest point on triangle to spine, then closest point on spine to that.
+            Vector3 spP   = ClosestPointOnSegment(localStart,localEnd,cpP);     // This gives actual contact point and direction, winding-independent.
+            Vector3 cpP2  = ClosestPointOnTriangle(posA,posB,posC,spP);
+            Vector3 cpQ   = ClosestPointOnTriangle(posA,posB,posC,localEnd);
+            Vector3 spQ   = ClosestPointOnSegment(localStart,localEnd,cpQ);
+            Vector3 cpQ2  = ClosestPointOnTriangle(posA,posB,posC,spQ);
+            Vector3 dP = Vector3_A_minus_B(spP,cpP2); Vector3 dQ = Vector3_A_minus_B(spQ,cpQ2);
+            float distP = vsqrtf(dot_vector3(dP,dP));
+            float distQ = vsqrtf(dot_vector3(dQ,dQ));
             float localDist; Vector3 localContactVec;
             if (distP <= distQ) { localDist = distP; localContactVec = dP; } // Pick whichever contact point has the smallest distance (deepest penetration).
             else                { localDist = distQ; localContactVec = dQ; }
@@ -202,8 +192,7 @@ static CapsuleContact QueryCapsuleContact(Vector3 start, Vector3 end, float caps
             if (localDist > 1e-6f) {
                 localNormal = (Vector3){ localContactVec.x / localDist, localContactVec.y / localDist, localContactVec.z / localDist };
             } else { // Degenerate: use face normal, pick orientation toward capsule mid
-                Vector3 eAB = Vector3_A_minus_B(posB, posA);
-                Vector3 eAC = Vector3_A_minus_B(posC, posA);
+                Vector3 eAB = Vector3_A_minus_B(posB, posA); Vector3 eAC = Vector3_A_minus_B(posC, posA);
                 localNormal = normalize_vector3(cross_vector3(eAB, eAC));
                 Vector3 spMid = { (localStart.x+localEnd.x)*0.5f, (localStart.y+localEnd.y)*0.5f, (localStart.z+localEnd.z)*0.5f };
                 Vector3 toMid = Vector3_A_minus_B(spMid, posA);
@@ -533,7 +522,7 @@ ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uin
         uint16_t instCellIdx = PosGetCellCoords(objPos.x,objPos.z);
         Vector3 delta = Vector3_A_minus_B(objPos,origin);
         float distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
-        float radBounds = vmax(modelBounds[(mindex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS], 1.81f); // 1.28x1.28 corner of modular chunk
+        float radBounds = vmax(modelBounds[mindex], 1.81f); // 1.28x1.28 corner of modular chunk
         float maxDistToObj = vmax(maxDist - radBounds,maxDist);
         if (distSqrd >= (maxDistToObj * maxDistToObj)) continue;
 

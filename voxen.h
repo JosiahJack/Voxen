@@ -14,16 +14,9 @@
 #define MAX_SAVENAME_LENGTH 24
 #define MAX_PALETTE_SIZE 256
 #define MAX_TEXTURE_DIMENSION 2048
+#define MAX_LIGHTS_PER_VOXEL 32 // Cap to prevent overflow
 #define VERTEX_ATTRIBUTES_COUNT 8 // x,y,z,nx,ny,nz,u,v
 #define VERTEX_ATTRIBUTES_SIZE 16 // Was 32
-#define BOUNDS_ATTRIBUTES_COUNT 7
-#define BOUNDS_DATA_OFFSET_MINX 0
-#define BOUNDS_DATA_OFFSET_MINY 1
-#define BOUNDS_DATA_OFFSET_MINZ 2
-#define BOUNDS_DATA_OFFSET_MAXX 3
-#define BOUNDS_DATA_OFFSET_MAXY 4
-#define BOUNDS_DATA_OFFSET_MAXZ 5
-#define BOUNDS_DATA_OFFSET_RADIUS 6
 #define WORLDX 64
 #define WORLDZ WORLDX
 #define WORLDY 18 // Level 8 is only 17.5 cells tall!!  Could be 16 if I make the ceiling same height in last room as in original.
@@ -34,7 +27,6 @@
 #define WORLDCELL_WIDTH_F 2.56f
 #define CELLXHALF (WORLDCELL_WIDTH_F * 0.5f)
 #define VOXEL_COUNT 262144 // 64 * 64 * 8 * 8
-#define MAX_LIGHTS_PER_VOXEL 32 // Cap to prevent overflow
 #define CELL_VISIBLE       1u
 #define CELL_OPEN          2u
 #define CELL_CLOSEDNORTH   4u

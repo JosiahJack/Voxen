@@ -10,7 +10,7 @@ uint8_t** modelVertices=NULL;
 uint16_t** modelTriangles=NULL;
 uint32_t modelVertexCounts[MODEL_IDX_MAX] = {0};
 uint16_t modelTriangleCounts[MODEL_IDX_MAX] = {0};
-float modelBounds[MODEL_IDX_MAX*BOUNDS_ATTRIBUTES_COUNT] = {0};
+float modelBounds[MODEL_IDX_MAX] = {0};
 uint16_t loadedModelsMaxIndex = 0;
 #define MAX_VERT_ELEMENT_SIZE 6964
 #define MAX_OUTPUT_VERTS      20892
@@ -302,20 +302,8 @@ static void* ModelParsingWorker(void* argument){
 		int tid=task->thread_id;
 		float min_x,min_y,min_z,max_x,max_y,max_z;
 		if(unlikely(!ParseOBJ(model_data,model_file_size,thread_temp_pos[tid],thread_temp_nrm[tid],thread_temp_uv[tid],thread_out_verts[tid],thread_out_tris[tid],&modelVertices[current_model],&modelVertexCounts[current_model],&modelTriangles[current_model],&modelTriangleCounts[current_model],&min_x,&min_y,&min_z,&max_x,&max_y,&max_z)))continue;
-		uint32_t bounds_base=current_model*BOUNDS_ATTRIBUTES_COUNT;
-		modelBounds[bounds_base+BOUNDS_DATA_OFFSET_MINX]=min_x;
-		modelBounds[bounds_base+BOUNDS_DATA_OFFSET_MINY]=min_y;
-		modelBounds[bounds_base+BOUNDS_DATA_OFFSET_MINZ]=min_z;
-		modelBounds[bounds_base+BOUNDS_DATA_OFFSET_MAXX]=max_x;
-		modelBounds[bounds_base+BOUNDS_DATA_OFFSET_MAXY]=max_y;
-		modelBounds[bounds_base+BOUNDS_DATA_OFFSET_MAXZ]=max_z;
-		float radius=vmax(0.0f,vabs(min_x));
-		radius=vmax(radius,vabs(min_y));
-		radius=vmax(radius,vabs(min_z));
-		radius=vmax(radius,max_x);
-		radius=vmax(radius,max_y);
-		radius=vmax(radius,max_z);
-		modelBounds[bounds_base+BOUNDS_DATA_OFFSET_RADIUS]=radius;
+		float radius=vmax(0.0f,vabs(min_x)); radius=vmax(radius,vabs(min_y)); radius=vmax(radius,vabs(min_z)); radius=vmax(radius,max_x); radius=vmax(radius,max_y); radius=vmax(radius,max_z);
+		modelBounds[current_model]=radius;
 	}
 	return NULL;
 }
