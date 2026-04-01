@@ -14,10 +14,8 @@ float modelBounds[MODEL_IDX_MAX*BOUNDS_ATTRIBUTES_COUNT] = {0};
 uint16_t loadedModelsMaxIndex = 0;
 #define MAX_VERT_ELEMENT_SIZE 6964
 #define MAX_OUTPUT_VERTS      20892
-static float**    thread_temp_pos   = NULL;
-static float**    thread_temp_nrm   = NULL;
-static float**    thread_temp_uv    = NULL;
-static float**    thread_out_verts  = NULL;
+static float**    thread_temp_pos   = NULL; static float**    thread_temp_nrm   = NULL;
+static float**    thread_temp_uv    = NULL; static float**    thread_out_verts  = NULL;
 static uint16_t** thread_out_tris   = NULL;
 static int        num_parse_threads = 0;
 typedef struct { const char* data; int size; } RawOBJ;

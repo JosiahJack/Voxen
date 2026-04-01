@@ -1292,7 +1292,7 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     glGetIntegerv(GL_MINOR_VERSION, &minor);
     if (major < 4 || (major == 4 && minor < 3)) { DualLogError("Need OpenGL >= 4.3, got %d.%d\n", major, minor); OS_Exit(1); }
     double initMarker3 = get_time();
-//     CycleToNextMonitor();
+    CycleToNextMonitor();
     glfwSetKeyCallback(window, key_callback);
     glfwSetJoystickCallback(joystick_callback);
     glfwSetCursorPosCallback(window, cursor_pos_callback);
@@ -1300,8 +1300,7 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     glfwSetMouseButtonCallback(window, mouse_button_callback);
     glfwSetScrollCallback(window, scroll_callback);
     glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
-//     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Globally same alpha blending
-    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE);
+    glBlendFuncSeparate(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA,GL_ZERO,GL_ONE);
     CompileShaders();
     double initMarker4 = get_time();
     DualLog("Set monitor, Set GLFW callbacks, Compile shaders took %f secs\n",initMarker4 - initMarker3);

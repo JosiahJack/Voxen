@@ -2,27 +2,7 @@
 #include "os.h"
 #include "gl.h"
 #include "voxen.h"
-// #define DUMP_FONT_BITMAPS
-typedef struct { unsigned short x0,y0,x1,y1;/* coordinates of bbox in bitmap*/ float xoff,yoff,xadvance; float xoff2,yoff2; } stbtt_packedchar;
-typedef struct { float x0,y0,s0,t0; float x1,y1,s1,t1; } stbtt_aligned_quad; // 0 is top-left, 1 is bottom-right
-void stbtt_GetPackedQuad(const stbtt_packedchar *chardata, int pw, int ph, int char_index, float *xpos, float *ypos, stbtt_aligned_quad *q, int align_to_integer) {
-   float ipw = 1.0f / (float)pw, iph = 1.0f / (float)ph;
-   const stbtt_packedchar *b = chardata + char_index;
-   if (align_to_integer) {
-      float x = vfloor((*xpos + b->xoff) + 0.5f); float y = vfloor((*ypos + b->yoff) + 0.5f);
-      q->x0 = x; q->y0 = y;
-      q->x1 = x + b->xoff2 - b->xoff; q->y1 = y + b->yoff2 - b->yoff;
-   } else {
-      q->x0 = *xpos + b->xoff; q->y0 = *ypos + b->yoff;
-      q->x1 = *xpos + b->xoff2; q->y1 = *ypos + b->yoff2;
-   }
-
-   q->s0 = b->x0 * ipw; q->t0 = b->y0 * iph;
-   q->s1 = b->x1 * ipw; q->t1 = b->y1 * iph;
-   *xpos += b->xadvance;
-}
-
-typedef struct { unsigned char *data; int cursor; int size; } stbtt__buf;
+#define DUMP_FONT_BITMAPS
 #include "stb_truetype.h"
 int numPackedGlyphs = 0;
 int numPackedGlyphsStopD = 0;
@@ -77,58 +57,20 @@ static int GetGlyphAndFont(uint32_t codepoint, stbtt_fontinfo **outFont, uint8_t
     return 0;
 }
 
-static void write_font_cache(const char *path, uint32_t expected_glyphs, const uint64_t file_stamp, const stbtt_packedchar *packed, uint32_t actual_packed, float fixed_advance, const unsigned char *bitmap) {
-    OsFileHandle fd = OS_OpenWriteonly(path);
-    OS_Write(fd, &expected_glyphs, sizeof(uint32_t), path);
-    OS_Write(fd, &file_stamp, sizeof(uint64_t), path);
-    OS_Write(fd, &actual_packed, sizeof(uint32_t), path);
-    OS_Write(fd, &fixed_advance, sizeof(float), path);
-    OS_Write(fd, packed, sizeof(stbtt_packedchar) * actual_packed, path);
-    OS_Write(fd, bitmap, FONT_ATLAS_SIZE * FONT_ATLAS_SIZE, path);
-    OS_Close(fd);
-}
-
-static bool load_font_cache(const char *path, int32_t expected_glyphs, const uint64_t file_stamp, stbtt_packedchar *out_packed, int32_t *out_num, float *out_fixed_advance, GLuint *out_tex) {
-    OsFileHandle fd; int fontFileSize; uint8_t *map = OS_OpenAndAllocateFileBufferReadonly(path, &fd, &fontFileSize);
-    if (!map || fd == OS_INVALID_HANDLE || fontFileSize <= 0) return false;
-    if (fontFileSize < 20 + FONT_ATLAS_SIZE * FONT_ATLAS_SIZE) { OS_Close(fd); DualLogWarn("cache too small %s\n", path); return false; }
-
-    const uint8_t *p = map;
-    int32_t file_expected = *(int32_t*)p; p += 4;
-    if (file_expected != expected_glyphs) { DualLogWarn("range mismatch %s (file:%u exp:%u)\n", path, file_expected, expected_glyphs); OS_DeallocateRAM(map, fontFileSize); return false; }
-
-    uint64_t file_stamp_on_disk;
-    __builtin_memcpy(&file_stamp_on_disk, p, sizeof(uint64_t));
-    p += sizeof(uint64_t);
-    if (file_stamp_on_disk != file_stamp) { OS_DeallocateRAM(map, fontFileSize); DualLogWarn("Filestamp mismatch %s\n", path); return false; }
-
-    uint32_t actual_packed = *(uint32_t*)p; p += 4;
-    if (actual_packed > MAX_GLYPHS) { OS_DeallocateRAM(map, fontFileSize); return false; }
-
-    float fixed_advance = *(float*)p;       p += 4;
-    __builtin_memcpy(out_packed, p, sizeof(stbtt_packedchar) * actual_packed);
-    *out_num = (int32_t)actual_packed;
-    *out_fixed_advance = fixed_advance;
-    p += sizeof(stbtt_packedchar) * actual_packed;
-    glCreateTextures(GL_TEXTURE_2D, 1, out_tex);
-    glTextureStorage2D(*out_tex, 1, GL_R8, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE);
-    glTextureSubImage2D(*out_tex, 0, 0, 0, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, GL_RED, GL_UNSIGNED_BYTE, p);
-    glFinish(); // Ensure transfer finishes prior to dealloc.
-    OS_DeallocateRAM(map, fontFileSize);
-    glTextureParameteri(*out_tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTextureParameteri(*out_tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTextureParameteri(*out_tex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTextureParameteri(*out_tex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    return true;
-}
-
 #ifdef DUMP_FONT_BITMAPS
-    void stbi_write_bmp(char const *filename, int x, int y, int comp, const void *data);
+    void stbi_write_bmp(char const *filename, int x, int y, const void *data);
     static void dump_atlas_bmp(const char *bmp_path, const unsigned char *atlas_data) {
-        unsigned char *rgb = OS_AllocateRAM(NULL,FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * 4,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
-        for (int i=0;i<FONT_ATLAS_SIZE * FONT_ATLAS_SIZE;++i) { unsigned char v = atlas_data[i]; rgb[i*3+0] = v; rgb[i*3+1] = v; rgb[i*3+2] = v; rgb[i*3+3] = 255; }
-        stbi_write_bmp(bmp_path,FONT_ATLAS_SIZE, FONT_ATLAS_SIZE,4,rgb);
-        OS_DeallocateRAM(rgb,FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * 3);
+        unsigned char *rgb = OS_AllocateRAM(NULL,(size_t)FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * 4,PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, OS_INVALID_HANDLE);
+        for (int i = 0; i < FONT_ATLAS_SIZE * FONT_ATLAS_SIZE; ++i) {
+            unsigned char v = atlas_data[i];
+            rgb[i*4 + 0] = v;  // B
+            rgb[i*4 + 1] = v;  // G
+            rgb[i*4 + 2] = v;  // R
+            rgb[i*4 + 3] = 255;// A
+        }
+
+        stbi_write_bmp(bmp_path, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, rgb);
+        OS_DeallocateRAM(rgb, (size_t)FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * 4);
     }
 #endif
 
@@ -141,24 +83,9 @@ void InitFontAtlasses(void) {
     if (!stbtt_InitFont_internal(&fontInfo[0],fontData[0],0)) { DualLogError("%s font init failed\n",fontPaths[0]); OS_Exit(1); }
     if (!stbtt_InitFont_internal(&fontInfo[1],fontData[1],0)) { DualLogError("%s font init failed\n",fontPaths[1]); OS_Exit(1); }
 
-    // Check if either the primary font or secondary font .vfnt cache file is out of date prompting an atlas rebuild.
-    FileFingerprint fp1 = {0}, fp2 = {0};
-    if (!OS_GetFileFingerprint(fontPaths[0],&fp1)) DualLogError("File change detection failed for %s\n",fontPaths[0]);
-    if (!OS_GetFileFingerprint(fontPaths[1],&fp2)) DualLogError("File change detection failed for %s\n",fontPaths[1]);
-    uint64_t fbx_stamp1 = OS_GetFilestamp(&fp1);
-    uint64_t fbx_stamp2 = OS_GetFilestamp(&fp2);
-    int32_t pri_expected = 0, sec_expected = 0;
-    for (int i = 0; i < numFontRanges; i++) { pri_expected += fontRanges[i].count; sec_expected += fontRangesStopD[i].count; }
-    const char *pri_cache = "./Fonts/SystemShockText.vfnt";
-    const char *sec_cache = "./Fonts/StopD.vfnt";
-    bool pri_hit = load_font_cache(pri_cache,pri_expected,fbx_stamp1,fontPackedChar,&numPackedGlyphs,&fixedNumberAdvanceWidth,&fontAtlasTex);
-    bool sec_hit = load_font_cache(sec_cache,sec_expected,fbx_stamp2,fontPackedCharStopD,&numPackedGlyphsStopD,&fixedNumberAdvanceWidthStopD,&fontAtlasTexStopD);
-    if (pri_hit && sec_hit) { DualLog("took %f secs\n", get_time() - t0); return; }
-
     fallbackFonts[0] = LoadFallbackFont(fallbackFontPaths[0],2,0); // Preload known fallback fonts for Cyrillic, Kanji, etc.
     fallbackFonts[1] = LoadFallbackFont(fallbackFontPaths[1],3,0);
     fallbackFonts[2] = LoadFallbackFont(fallbackFontPaths[2],4,2); // Index 2 for Japanese in NotoSansCJK-Bold.ttc
-    DualLog("Font ranges changed or .vfnt files not present – regenerating...");
 
     // Primary
     unsigned char *bmp = OS_AllocateRAM(NULL,FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * sizeof(unsigned char),PROT_READ | PROT_WRITE,MAP_PRIVATE | MAP_ANONYMOUS,OS_INVALID_HANDLE);
@@ -189,7 +116,7 @@ void InitFontAtlasses(void) {
         }
     }
     
-    OS_DeallocateRAM(pc.pack_info,0);
+    free(pc.pack_info);
     glCreateTextures(GL_TEXTURE_2D,1,&fontAtlasTex);
     glTextureStorage2D(fontAtlasTex,1,GL_R8,FONT_ATLAS_SIZE, FONT_ATLAS_SIZE);
     glTextureSubImage2D(fontAtlasTex,0,0,0,FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, GL_RED, GL_UNSIGNED_BYTE, bmp);
@@ -197,14 +124,13 @@ void InitFontAtlasses(void) {
     glTextureParameteri(fontAtlasTex,GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTextureParameteri(fontAtlasTex,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
     glTextureParameteri(fontAtlasTex,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
-    write_font_cache(pri_cache,pri_expected,fbx_stamp1,fontPackedChar, numPackedGlyphs,fixedNumberAdvanceWidth, bmp);
     #ifdef DUMP_FONT_BITMAPS
         dump_atlas_bmp("./Fonts/SystemShockText_atlas.bmp", bmp);
     #endif
         
     // Secondary
     __builtin_memset(bmp,0,FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * sizeof(unsigned char));
-    stbtt_pack_context pc2; stbtt_PackBegin(&pc2, bmp, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 16, NULL);
+    stbtt_pack_context pc2; stbtt_PackBegin(&pc2,bmp,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0,16,NULL);
     pc2.h_oversample = 4; pc2.v_oversample = 4; pc2.skip_missing = 1; numPackedGlyphsStopD = 0; float h2 = 54.0f;
     for (int r=0;r<numFontRanges;++r) {
         fontRangesStopD[r].startIndex = numPackedGlyphsStopD;
@@ -229,7 +155,7 @@ void InitFontAtlasses(void) {
         }
     }
     
-    OS_DeallocateRAM(pc2.pack_info,0);
+    free(pc2.pack_info);
     glCreateTextures(GL_TEXTURE_2D, 1, &fontAtlasTexStopD);
     glTextureStorage2D(fontAtlasTexStopD, 1, GL_R8, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE);
     glTextureSubImage2D(fontAtlasTexStopD, 0, 0, 0, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, GL_RED, GL_UNSIGNED_BYTE, bmp);
@@ -237,7 +163,6 @@ void InitFontAtlasses(void) {
     glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    write_font_cache(sec_cache, sec_expected, fbx_stamp2, fontPackedCharStopD, numPackedGlyphsStopD, fixedNumberAdvanceWidthStopD, bmp);
     #ifdef DUMP_FONT_BITMAPS
         dump_atlas_bmp("./Fonts/StopD_atlas.bmp", bmp);
     #endif
@@ -277,7 +202,7 @@ void LoadTextForLanguage(uint8_t lang) {
     OsFileHandle dummy_fd = OS_INVALID_HANDLE;
     int alloc_size = 0;
     if (Sys_Text.file_data) { // Free previous allocation if any (important when changing language)
-        OS_DeallocateRAM(Sys_Text.file_data, Sys_Text.file_size);
+        OS_DeallocateRAM(Sys_Text.file_data,Sys_Text.file_size);
         Sys_Text.file_data = NULL;
         Sys_Text.file_size = 0;
     }
@@ -344,7 +269,7 @@ void LoadLogTextForLanguage(uint8_t lang) {
     OsFileHandle dummy_fd = OS_INVALID_HANDLE;
     int alloc_size = 0;
     if (Sys_Text.filelog_data) { // Free previous allocation if any
-        OS_DeallocateRAM(Sys_Text.filelog_data, Sys_Text.filelog_size);
+        OS_DeallocateRAM(Sys_Text.filelog_data,Sys_Text.filelog_size);
         Sys_Text.filelog_data = NULL;
         Sys_Text.filelog_size = 0;
     }

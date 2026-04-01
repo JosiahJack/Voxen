@@ -129,10 +129,12 @@ static inline __attribute__((always_inline)) OsFileHandle OS_OpenReadonly(const 
 static inline __attribute__((always_inline)) OsFileHandle OS_OpenWriteonly(const char* filePath) {
     #ifdef WINDOWS
         OsFileHandle h = CreateFileA(filePath, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-        return (h == OS_INVALID_HANDLE) ? (DualLogError("Failed to open %s for writing\n", filePath), OS_Exit(1), OS_INVALID_HANDLE) : h;
+        if (h == OS_INVALID_HANDLE) { DualLogError("Failed to open %s for writing\n", filePath); return OS_INVALID_HANDLE; }
+        return h;
     #else // Linux
         OsFileHandle h = OS_Open(filePath,O_WRONLY|O_CREAT|O_TRUNC,0644);
-        return (h < 0) ? (DualLogError("Failed to open %s for writing\n", filePath), OS_Exit(1), OS_INVALID_HANDLE) : h;
+        if (h < 0) { DualLogError("Failed to open %s for writing\n", filePath); return OS_INVALID_HANDLE; }
+        return h;
     #endif
 }
 
@@ -169,12 +171,12 @@ static inline __attribute__((always_inline)) void* OS_AllocateFileBackedRAMReado
 
 static inline __attribute__((always_inline)) void* OS_OpenAndAllocateFileBufferReadonly(const char* filePath, OsFileHandle* fileDescriptor, int* size) {
     *fileDescriptor = OS_OpenReadonly(filePath);
-    if (*fileDescriptor == OS_INVALID_HANDLE) { *size = 0; OS_Exit(1); }
+    if (*fileDescriptor == OS_INVALID_HANDLE) { *size = 0; return (void*)0; }
     
     *size = (int)OS_FileSize(*fileDescriptor);
     if (*size <= 0) { DualLogError("Warning: File %s is empty, skipping allocation.\n", filePath); OS_Close(*fileDescriptor); OS_Exit(1); }
     
-    void* ramSpacePointer = OS_AllocateFileBackedRAMReadonly(*size, *fileDescriptor, (char*)filePath);
+    void* ramSpacePointer = OS_AllocateFileBackedRAMReadonly(*size,*fileDescriptor,(char*)filePath);
     OS_Close(*fileDescriptor);
     return ramSpacePointer;
 }

@@ -2,74 +2,26 @@
 #include "os.h"
 #include "gl.h"
 #include "voxen.h"
-#define STBIW_UCHAR(x) (unsigned char)((x) & 0xff)
-typedef void stbi_write_func(void *context, void *data, int size);
-typedef struct {
-   OsFileHandle context;
-   const char *filePath;
-   unsigned char buffer[64];
-   int buf_used;
-} stbi__write_context;
-
-typedef __builtin_va_list va_list;
-static void stbiw__writefv(stbi__write_context *s, const char *fmt, va_list v) {
-   while (*fmt) {
-      switch (*fmt++) {
-         case ' ': break;
-         case '1': { unsigned char x = STBIW_UCHAR(__builtin_va_arg(v, int)); OS_Write(s->context, &x, 1, s->filePath); break; }
-         case '2': { int x = __builtin_va_arg(v,int);
-                     unsigned char b[2];
-                     b[0] = STBIW_UCHAR(x);
-                     b[1] = STBIW_UCHAR(x>>8);
-                     OS_Write(s->context, b, 2, s->filePath);
-                     break; }
-         case '4': { uint32_t x = __builtin_va_arg(v,int);
-                     unsigned char b[4];
-                     b[0]=STBIW_UCHAR(x);
-                     b[1]=STBIW_UCHAR(x>>8);
-                     b[2]=STBIW_UCHAR(x>>16);
-                     b[3]=STBIW_UCHAR(x>>24);
-                     OS_Write(s->context, b, 4, s->filePath);
-                     break; }
-         default: return;
-      }
-   }
-}
-
-static void stbiw__write_flush(stbi__write_context *s) { if (s->buf_used) { OS_Write(s->context, &s->buffer, s->buf_used, s->filePath); s->buf_used = 0; } }
-static void stbiw__write1(stbi__write_context *s, unsigned char a) { if ((size_t)s->buf_used + 1 > sizeof(s->buffer)) {stbiw__write_flush(s);} s->buffer[s->buf_used++] = a; }
-static void stbiw__write3(stbi__write_context *s, unsigned char a, unsigned char b, unsigned char c) {
-   int n;
-   if ((size_t)s->buf_used + 3 > sizeof(s->buffer)) stbiw__write_flush(s);
-   n = s->buf_used;
-   s->buf_used = n+3; s->buffer[n+0] = a; s->buffer[n+1] = b; s->buffer[n+2] = c;
-}
-
-static void stbiw__write_pixels(stbi__write_context *s, int x, int y, void *data) {    
-   uint32_t zero = 0;
-   for (int j=0;j!=y;j+=1) {
-      for (int i=0; i < x; ++i) {
-         unsigned char *d = (unsigned char *) data + (j*x+i)*4;
-         stbiw__write3(s,d[2],d[1],d[0]);
-         stbiw__write1(s,255);
-      }
-      
-      stbiw__write_flush(s);
-      OS_Write(s->context,&zero,0,s->filePath);
-   }
-}
-
-static void stbiw__outfile(stbi__write_context *s, int x, int y, void *data, const char *fmt, ...) {
-   va_list v; __builtin_va_start(v, fmt); stbiw__writefv(s,fmt,v); __builtin_va_end(v);
-   stbiw__write_pixels(s,x,y,data);
-}
-
 void stbi_write_bmp(char const *filename, int x, int y, const void *data) {
-    stbi__write_context s = { 0 };
     OsFileHandle f = OS_OpenWriteonly(filename);
-    s.context = f;
-    s.filePath = filename;
-    stbiw__outfile(&s,x,y,(void *)data,"11 4 22 4" "4 44 22 444444 4444 4 444 444 444 444",'B','M',14+108+x*y*4,0,0,14+108,/*<<<fileheader*/108,x,y,1,32,3,0,0,0,0,0,0xff0000,0xff00,0xff,0xff000000u,0,0,0,0,0,0,0,0,0,0,0,0,0); // bitmap V4 header
+    if (f == OS_INVALID_HANDLE) { DualLogError("Failed to open %s for writing\n", filename); return; }
+
+    uint32_t fileSize = 14 + 108 + (uint32_t)x * y * 4; // BMP file header (14 bytes)
+    unsigned char fileHeader[14] = {'B','M',fileSize & 0xFF,(fileSize >> 8) & 0xFF,(fileSize >> 16) & 0xFF,(fileSize >> 24) & 0xFF,0,0,0,0,14 + 108,0,0,0};
+    unsigned char infoHeader[108] = {0}; // Bitmap V4 header (108 bytes) - 32-bit BGRA
+    *(uint32_t*)(infoHeader +  0) = 108;           // biSize
+    *(uint32_t*)(infoHeader +  4) = (uint32_t)x;   // biWidth
+    *(uint32_t*)(infoHeader +  8) = (uint32_t)-y;  // biHeight (negative = top-down)
+    *(uint16_t*)(infoHeader + 12) = 1;             // biPlanes
+    *(uint16_t*)(infoHeader + 14) = 32;            // biBitCount
+    *(uint32_t*)(infoHeader + 16) = 3;             // BI_BITFIELDS
+    *(uint32_t*)(infoHeader + 40) = 0x000000FF;    // Red
+    *(uint32_t*)(infoHeader + 44) = 0x0000FF00;    // Green
+    *(uint32_t*)(infoHeader + 48) = 0x00FF0000;    // Blue
+    *(uint32_t*)(infoHeader + 52) = 0x00000000;    // Alpha
+    OS_Write(f,fileHeader,14,filename); OS_Write(f,infoHeader,108,filename);
+    const unsigned char *pixels = (const unsigned char *)data;
+    for (int j=y-1;j>=0;--j) OS_Write(f,(void*)(pixels + j*x*4),(size_t)x*4,filename);
     OS_Close(f);
 }
 
