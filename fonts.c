@@ -74,7 +74,6 @@ static int GetGlyphAndFont(uint32_t codepoint, stbtt_fontinfo **outFont, uint8_t
     }
 #endif
 
-uint64_t OS_GetFilestamp(const FileFingerprint *fp); bool OS_GetFileFingerprint(const char *path, FileFingerprint *fp);
 void InitFontAtlasses(void) {
     double t0 = get_time();
     DualLog("Loading    5 fonts...");

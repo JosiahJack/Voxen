@@ -1,13 +1,4 @@
 // voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake
-// TODO: Add camera view entities
-// TODO: Proper physics
-// TODO: Particle system
-// TODO: Voxel GI
-// TODO: Save/Load system
-// TODO: Directional lights for cyberspace
-// TODO: Directional light for sunlight
-// TODO: Directional light shadowmapping just for sunlight
-// TODO: TARGET ID: Type-LevelNum(0#)EnemyNum(###),Example: Mutant-06003, EXCEPTIONS: Cyborg-00001 is Edward Diego
 #include "os.h" // Operating System calls shim layer.
 #include "gl.h"
 #include "glfw3.h"

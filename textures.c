@@ -612,10 +612,7 @@ static void* TextureParsingWorker(void* argument) {
 
         int w = 0, h = 0;
         uint8_t* pixels = stbi_load_from_memory_arena((const uint8_t*)data, size, &w, &h, &thread_stbi_arenas[task->tid]);
-        if (!pixels || w < 1 || h < 1) {
-            OS_DeallocateRAM((void*)data, (size_t)size);
-            continue;
-        }
+        if (!pixels || w < 1 || h < 1) { OS_DeallocateRAM((void*)data, (size_t)size); continue; }
 
         uint32_t numPixels = (uint32_t)w * h;
         uint8_t* indices = (uint8_t*)OS_AllocateRAM(NULL, numPixels, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
@@ -627,10 +624,8 @@ static void* TextureParsingWorker(void* argument) {
             uint32_t color = ((uint32_t*)pixels)[p];
             uint32_t slot = (color * 0x9e3779b9u) & 1023;
             while (color_hash[slot]) {
-                if (palette[color_hash[slot] - 1] == color) {
-                    indices[p] = color_hash[slot] - 1;
-                    goto found;
-                }
+                if (palette[color_hash[slot] - 1] == color) { indices[p] = color_hash[slot] - 1; goto found; }
+                
                 slot = (slot + 1) & 1023;
             }
             if (pal_size >= 256) {
@@ -655,7 +650,7 @@ static void* TextureParsingWorker(void* argument) {
             indices[p] = pal_size;
             color_hash[slot] = (uint8_t)(pal_size + 1);
             ++pal_size;
-        found:;
+            found:;
         }
 
         textureIndexBuffers[i] = indices;

@@ -460,25 +460,3 @@ ENGINE_TO_MOD Vector3 GetEntityLocalSpawnPointFromUnrotatedOffsetVector(Entity* 
     Vector3 result = Vector3_A_plus_B(originator->position, rotatedOfs);
     return result;
 }
-
-static inline __attribute__((always_inline)) uint64_t mix64(uint64_t x) { x ^= x >> 33; x *= 0xff51afd7ed558ccdULL; x ^= x >> 33; x *= 0xc4ceb9fe1a85ec53ULL; x ^= x >> 33; return x; }
-uint64_t OS_GetFilestamp(const FileFingerprint *fp) { return mix64(fp->size); }
-bool OS_GetFileFingerprint(const char *path, FileFingerprint *fp) {
-    #ifdef WINDOWS
-        // Use CreateFile to get a handle (required for detailed file info)
-        HANDLE hFile = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-        if (hFile == OS_INVALID_HANDLE) return false;
-
-        BY_HANDLE_FILE_INFORMATION bhfi;
-        if (!GetFileInformationByHandle(hFile, &bhfi)) { CloseHandle(hFile); return false; }
-
-        fp->size     = ((uint64_t)bhfi.nFileSizeHigh << 32) | bhfi.nFileSizeLow;
-        CloseHandle(hFile);
-    #else // Linux
-        struct stat st;
-        if (stat(path, &st) != 0) { DualLogError("Failed to stat \"%s\"\n", path); return false; }
-
-        fp->size = (uint64_t)st.st_size;
-    #endif
-    return true;
-}
