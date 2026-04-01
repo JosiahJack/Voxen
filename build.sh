@@ -103,7 +103,7 @@ if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
     LINKER=$CC
     CFLAGS="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe"
-    LDFLAGS="$COMMON_LFLAGS -L. -lopengl32 -lglfw3 -Wl,--out-implib=voxen.lib"
+    LDFLAGS="$COMMON_LFLAGS -L. -lopengl32 -lglfw3 -lpthread -Wl,--out-implib=voxen.lib"
     BINARY_NAME="voxen.exe"
 else
     CC=$LINUX_CC
@@ -115,7 +115,7 @@ fi
 
 export CC=$CC
 export CFLAGS=$CFLAGS
-SOURCES="voxen.c physics.c helpers.c console.c data_text.c data_fonts.c data_models.c dynamic_culling.c data_textures.c glad.c miniaudio.c"
+SOURCES="voxen.c physics.c helpers.c console.c fonts.c models.c culling.c textures.c glad.c miniaudio.c"
 export TEMP_DIR=temp_build
 printf "%s\n" $SOURCES | xargs -P12 -I{} $CC -c {} $CFLAGS -o "$TEMP_DIR"/{}.o
 $LINKER "$TEMP_DIR"/*.o $LDFLAGS -rdynamic -lm -o $BINARY_NAME

@@ -416,28 +416,15 @@ ENGINE_TO_MOD int StringFormatV(char* buffer, size_t bufferSize, const char* for
     while (*f && pos < bufferSize - 1) {
         if (*f != '%') { buffer[pos++] = *f++; continue; } else f++; // skip the '%'
         int decimals = 9;
-        if (*f == '.') {
-            f++;
-            if (*f == '1') { decimals = 1; f++; }
-            else if (*f == '2') { decimals = 2; f++; }
-            else if (*f == '3') { decimals = 3; f++; }
-            else if (*f == '4') { decimals = 4; f++; }
-            else if (*f == '5') { decimals = 5; f++; }
-            else if (*f == '6') { decimals = 6; f++; }
-        }
-
+        if (*f == '.') { f++; if (*f >= '1' && *f <= '9') {decimals = *f - '0';} f++; } // Handle %.3f etc.
         switch (*f) {
-        case 's':
-            {
+        case 's': {
                 const char* s = __builtin_va_arg(args, const char*);
                 size_t len = GetStringLength(s);
                 if (pos + len >= bufferSize) len = bufferSize - pos - 1;
-                for (size_t i = 0; i < len; ++i) buffer[pos++] = s[i];
-            }
-            break;
+                for (size_t i = 0; i < len; ++i) buffer[pos++] = s[i]; } break;
         case 'd':
-        case 'i':
-            {
+        case 'i': {
                 int val = __builtin_va_arg(args, int);
                 if (val < 0) {
                     if (pos < bufferSize - 1) buffer[pos++] = '-';
@@ -446,18 +433,13 @@ ENGINE_TO_MOD int StringFormatV(char* buffer, size_t bufferSize, const char* for
                 char num[32];
                 int i = 0;
                 do { num[i++] = '0' + (val % 10); val /= 10; } while (val);
-                while (i-- > 0 && pos < bufferSize - 1) buffer[pos++] = num[i];
-            }
-            break;
-        case 'u':
-            {
+                while (i-- > 0 && pos < bufferSize - 1) buffer[pos++] = num[i]; } break;
+        case 'u': {
                 unsigned int val = __builtin_va_arg(args, unsigned int);
                 char num[32];
                 int i = 0;
                 do { num[i++] = '0' + (val % 10); val /= 10; } while (val);
-                while (i-- > 0 && pos < bufferSize - 1) buffer[pos++] = num[i];
-            }
-            break;
+                while (i-- > 0 && pos < bufferSize - 1) buffer[pos++] = num[i]; } break;
         case 'f':
             {
                 double val = __builtin_va_arg(args, double);
@@ -468,9 +450,7 @@ ENGINE_TO_MOD int StringFormatV(char* buffer, size_t bufferSize, const char* for
                 for (size_t i = 0; i < len; ++i) buffer[pos++] = num[i];
             }
             break;
-        case '%':
-            if (pos < bufferSize - 1) buffer[pos++] = '%';
-            break;
+        case '%': if (pos < bufferSize - 1) {buffer[pos++] = '%';} break;
         default:
             if (pos < bufferSize - 1) buffer[pos++] = '%';
             if (pos < bufferSize - 1) buffer[pos++] = *f;
@@ -483,21 +463,7 @@ ENGINE_TO_MOD int StringFormatV(char* buffer, size_t bufferSize, const char* for
     return (int)pos;
 }
 
-ENGINE_TO_MOD int StringFormat(char* buffer, size_t bufferSize, const char* format, ...) { // snprintf replacement
-    va_list args;
-    __builtin_va_start(args, format);
-    int ret = StringFormatV(buffer, bufferSize, format, args);
-    __builtin_va_end(args);
-    return ret;
-}
-
-extern uint16_t playerCellIdx;
-ENGINE_TO_MOD bool PositionVisibleFromPlayerCell(float x, float z) {
-    int32_t subIdx = PosGetCellCoords(x,z);
-    int cellIdx = (playerCellIdx * ARRSIZE);
-    int flat_idx = cellIdx + subIdx;
-    return (get_cull_bit(precomputedVisibleCellsFromHere,flat_idx));
-}
+ENGINE_TO_MOD int StringFormat(char* buffer, size_t bufferSize, const char* format, ...) { va_list args; __builtin_va_start(args,format); int ret = StringFormatV(buffer,bufferSize,format,args); __builtin_va_end(args); return ret; } // snprintf replacement
 
 char* GetNextStringUpToNewlineOrEOF(char* buf, int size, OsFileHandle fd) { // fgets replacement, not thread safe but we don't do multithreading
     if (size <= 1 || buf == NULL) return NULL;
@@ -541,4 +507,26 @@ ENGINE_TO_MOD Vector3 GetEntityLocalSpawnPointFromUnrotatedOffsetVector(Entity* 
     Vector3 rotatedOfs = quat_rotate_vector(originator->rotation, scaledOfs);
     Vector3 result = Vector3_A_plus_B(originator->position, rotatedOfs);
     return result;
+}
+
+static inline __attribute__((always_inline)) uint64_t mix64(uint64_t x) { x ^= x >> 33; x *= 0xff51afd7ed558ccdULL; x ^= x >> 33; x *= 0xc4ceb9fe1a85ec53ULL; x ^= x >> 33; return x; }
+uint64_t OS_GetFilestamp(const FileFingerprint *fp) { return mix64(fp->size); }
+bool OS_GetFileFingerprint(const char *path, FileFingerprint *fp) {
+    #ifdef WINDOWS
+        // Use CreateFile to get a handle (required for detailed file info)
+        HANDLE hFile = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (hFile == OS_INVALID_HANDLE) return false;
+
+        BY_HANDLE_FILE_INFORMATION bhfi;
+        if (!GetFileInformationByHandle(hFile, &bhfi)) { CloseHandle(hFile); return false; }
+
+        fp->size     = ((uint64_t)bhfi.nFileSizeHigh << 32) | bhfi.nFileSizeLow;
+        CloseHandle(hFile);
+    #else // Linux
+        struct stat st;
+        if (stat(path, &st) != 0) { DualLogError("Failed to stat \"%s\"\n", path); return false; }
+
+        fp->size = (uint64_t)st.st_size;
+    #endif
+    return true;
 }

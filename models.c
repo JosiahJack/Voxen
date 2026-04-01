@@ -257,7 +257,7 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(const char* _
 		++unique_cnt;
 	next_vertex:;
 	}
-
+	
 	size_t vbytes=(size_t)unique_cnt*VERTEX_ATTRIBUTES_SIZE;
 	uint8_t* final_verts=(uint8_t*)OS_AllocateRAM(NULL,vbytes,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
 	uint8_t* dst=final_verts;
@@ -453,19 +453,17 @@ void LoadModels(void){
 	num_parse_threads=OS_GetNumThreads();
 	if(num_parse_threads<1)num_parse_threads=1;
 	if(num_parse_threads>32)num_parse_threads=32;
-
 	thread_temp_pos=(float**)OS_AllocateRAM(NULL,(size_t)num_parse_threads*sizeof(float*),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
 	thread_temp_nrm=(float**)OS_AllocateRAM(NULL,(size_t)num_parse_threads*sizeof(float*),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
 	thread_temp_uv=(float**)OS_AllocateRAM(NULL,(size_t)num_parse_threads*sizeof(float*),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
 	thread_out_verts=(float**)OS_AllocateRAM(NULL,(size_t)num_parse_threads*sizeof(float*),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
 	thread_out_tris=(uint16_t**)OS_AllocateRAM(NULL,(size_t)num_parse_threads*sizeof(uint16_t*),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
-
 	for(int t=0;t<num_parse_threads;++t){
 		thread_temp_pos[t]=(float*)OS_AllocateRAM(NULL,MAX_VERT_ELEMENT_SIZE*3*sizeof(float),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
 		thread_temp_nrm[t]=(float*)OS_AllocateRAM(NULL,MAX_VERT_ELEMENT_SIZE*3*sizeof(float),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
 		thread_temp_uv[t]=(float*)OS_AllocateRAM(NULL,MAX_VERT_ELEMENT_SIZE*2*sizeof(float),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
 		thread_out_verts[t]=(float*)OS_AllocateRAM(NULL,MAX_OUTPUT_VERTS*8*sizeof(float),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
-		thread_out_tris[t]=(uint16_t*)OS_AllocateRAM(NULL,MAX_OUTPUT_VERTS*sizeof(uint16_t),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
+		thread_out_tris[t]=(uint16_t*)OS_AllocateRAM(NULL,MAX_OUTPUT_VERTS*sizeof(uint32_t),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
 	}
 
 	ModelParseTask tasks[32];
@@ -481,18 +479,13 @@ void LoadModels(void){
 	}
 
 	pthread_t worker_threads[32];
-    pthread_attr_t attr;
-    pthread_attr_init(&attr);
-    pthread_attr_setstacksize(&attr, 8 * 1024 * 1024);
-	for(int t=0;t<num_parse_threads;++t)pthread_create(&worker_threads[t],&attr,ModelParsingWorker,&tasks[t]);
+	for(int t=0;t<num_parse_threads;++t)pthread_create(&worker_threads[t],NULL,ModelParsingWorker,&tasks[t]);
 	for(int t=0;t<num_parse_threads;++t)pthread_join(worker_threads[t],NULL);
-
-    pthread_attr_destroy(&attr);
 	for(int t=0;t<num_parse_threads;++t){
 		OS_DeallocateRAM(thread_temp_nrm[t],MAX_VERT_ELEMENT_SIZE*3*sizeof(float));
 		OS_DeallocateRAM(thread_temp_uv[t],MAX_VERT_ELEMENT_SIZE*2*sizeof(float));
 		OS_DeallocateRAM(thread_out_verts[t],MAX_OUTPUT_VERTS*8*sizeof(float));
-		OS_DeallocateRAM(thread_out_tris[t],MAX_OUTPUT_VERTS*sizeof(uint16_t));
+		OS_DeallocateRAM(thread_out_tris[t],MAX_OUTPUT_VERTS*sizeof(uint32_t));
 	}
 
 	OS_DeallocateRAM(thread_temp_pos,(size_t)num_parse_threads*sizeof(float*));

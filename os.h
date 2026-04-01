@@ -37,14 +37,7 @@ typedef __INTPTR_TYPE__ intptr_t;
 #endif
 ENGINE_TO_MOD void DualLogError(const char* fmt, ...);
 char* StringFindSubstring(const char* haystack, const char* needle);
-ENGINE_TO_MOD char* StringFindFirstCharWithin(const char *s, char c);
-typedef struct {
-    uint64_t mtime_ns;
-    uint64_t size;
-    uint64_t inode;
-    uint64_t dev;
-} FileFingerprint;
-
+void DebugRAM(const char *context);
 #if defined(_WIN32) || defined(_WIN64)
     #define WINDOWS
     #define WIN32_LEAN_AND_MEAN // Let 'er rip, tater chip
@@ -56,40 +49,26 @@ typedef struct {
     typedef HANDLE OsFileHandle;
     #define OS_INVALID_HANDLE INVALID_HANDLE_VALUE
     #define OS_MakeFolder(path) _mkdir(path)
+    #undef near
+    #undef far
     static inline __attribute__((always_inline, noreturn)) void OS_Exit(int64_t exitCode) { ExitProcess((UINT)exitCode); }
     static inline __attribute__((always_inline)) void OS_Close(OsFileHandle fileDescriptor) { CloseHandle(fileDescriptor); }
     static inline __attribute__((always_inline)) void* OS_AllocateRAM(void* addr, size_t length, int32_t prot, int32_t flags, OsFileHandle fd) {
         (void)flags;
         bool writable = (prot & PROT_WRITE);
-        if (fd == INVALID_HANDLE_VALUE) {
-            void* ptr;
-            if ((ptr = (void*)VirtualAlloc(addr, length, MEM_RESERVE | MEM_COMMIT, writable ? PAGE_READWRITE : PAGE_READONLY)) == NULL) { DualLogError("Failed to allocate RAM\n"); OS_Exit(1); } // Handle standard memory allocations (MAP_ANONYMOUS)
-            return ptr;
-        }
+        if (fd == INVALID_HANDLE_VALUE) { return (void*)VirtualAlloc(addr,length,MEM_RESERVE|MEM_COMMIT,writable ? PAGE_READWRITE : PAGE_READONLY); } // Handle standard memory allocations (MAP_ANONYMOUS)
 
-        // Handle File-Backed Memory
-        HANDLE hMap = CreateFileMapping(fd, NULL, writable ? PAGE_READWRITE : PAGE_READONLY, (DWORD)((uint64_t)length >> 32), (DWORD)((uint64_t)length & 0xFFFFFFFF), NULL);
-        if (hMap == NULL) { DualLogError("Failed to allocate RAM\n"); OS_Exit(1); }
-
-        void* ptr = MapViewOfFileEx(hMap, writable ? FILE_MAP_WRITE : FILE_MAP_READ, 0, 0, length, addr);
-        CloseHandle(hMap);
-        return ptr;
+        HANDLE hMap = CreateFileMapping(fd,NULL,writable ? PAGE_READWRITE : PAGE_READONLY,(DWORD)((uint64_t)length >> 32),(DWORD)((uint64_t)length & 0xFFFFFFFF),NULL);
+        void* ptr = MapViewOfFileEx(hMap,writable ? FILE_MAP_WRITE : FILE_MAP_READ,0,0,length,addr); CloseHandle(hMap); return ptr;
     }
     
-    static inline __attribute__((always_inline)) long OS_Read(OsFileHandle fd, void* buf, size_t count) {
-        DWORD bytesRead = 0;
-        if (ReadFile((HANDLE)fd, buf, (DWORD)count, &bytesRead, NULL)) {
-            return (long)bytesRead;
-        }
-        return (long)-1;
-    }
+    static inline __attribute__((always_inline)) long OS_Read(OsFileHandle fd, void* buf, size_t count) { DWORD bytesRead = 0; return (ReadFile((HANDLE)fd,buf,(DWORD)count,&bytesRead,NULL)) ? (long)bytesRead : (long)-1; }
 #else
     #define LINUX
     #include <sys/mman.h>
     #include <sys/stat.h>
     #include <fcntl.h>
     #include <time.h>
-    #include <stdio.h>
     #include <unistd.h>
     typedef int OsFileHandle;
     #define OS_INVALID_HANDLE -1
@@ -99,11 +78,7 @@ typedef struct {
     static inline __attribute__((always_inline, noreturn)) void OS_Exit(int64_t exitCode) { _exit(exitCode); }
     static inline __attribute__((always_inline)) int OS_MakeFolder(const char *path) { return mkdir(path, 0755); }
     static inline __attribute__((always_inline)) void OS_Close(OsFileHandle fileDescriptor) { close(fileDescriptor); }
-    static inline __attribute__((always_inline)) void* OS_AllocateRAM(void* addr, size_t length, int32_t prot, int32_t flags, OsFileHandle fd) {
-        void* ptr = mmap(addr,length,prot,flags,fd,0);
-        if (ptr == MAP_FAILED || ptr == NULL) { DualLogError("Failed to allocate RAM\n"); OS_Exit(1); }
-        return ptr;
-    }
+    static inline __attribute__((always_inline)) void* OS_AllocateRAM(void* addr, size_t length, int32_t prot, int32_t flags, OsFileHandle fd) { return mmap(addr,length,prot,flags,fd,0); }
 #endif
 
 static inline __attribute__((always_inline)) int64_t OS_RawWrite(OsFileHandle fd, const void* buf, size_t count) {
@@ -156,7 +131,7 @@ static inline __attribute__((always_inline)) OsFileHandle OS_OpenWriteonly(const
         OsFileHandle h = CreateFileA(filePath, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
         return (h == OS_INVALID_HANDLE) ? (DualLogError("Failed to open %s for writing\n", filePath), OS_Exit(1), OS_INVALID_HANDLE) : h;
     #else // Linux
-        OsFileHandle h = OS_Open(filePath,O_WRONLY | O_CREAT | O_TRUNC,0644);
+        OsFileHandle h = OS_Open(filePath,O_WRONLY|O_CREAT|O_TRUNC,0644);
         return (h < 0) ? (DualLogError("Failed to open %s for writing\n", filePath), OS_Exit(1), OS_INVALID_HANDLE) : h;
     #endif
 }
@@ -217,54 +192,15 @@ static inline __attribute__((always_inline)) void OS_DeallocateRAM(void* ramSpac
     #endif
 }
 
-static inline __attribute__((always_inline)) uint64_t mix64(uint64_t x) {
-    x ^= x >> 33;
-    x *= 0xff51afd7ed558ccdULL;
-    x ^= x >> 33;
-    x *= 0xc4ceb9fe1a85ec53ULL;
-    x ^= x >> 33;
-    return x;
-}
-
-static inline __attribute__((always_inline)) uint64_t OS_GetFilestamp(const FileFingerprint *fp) { return mix64(fp->size); }
-
-static inline __attribute__((always_inline)) bool OS_GetFileFingerprint(const char *path, FileFingerprint *fp) {
-    #ifdef _WIN32
-        // Use CreateFile to get a handle (required for detailed file info)
-        HANDLE hFile = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-        if (hFile == OS_INVALID_HANDLE) return false;
-
-        BY_HANDLE_FILE_INFORMATION bhfi;
-        if (!GetFileInformationByHandle(hFile, &bhfi)) { CloseHandle(hFile); return false; }
-
-        fp->size     = ((uint64_t)bhfi.nFileSizeHigh << 32) | bhfi.nFileSizeLow;
-        CloseHandle(hFile);
-    #else // Linux
-        struct stat st;
-        if (stat(path, &st) != 0) { DualLogError("Failed to stat \"%s\"\n", path); return false; }
-
-        fp->size  = (uint64_t)st.st_size;
-    #endif
-    return true;
-}
-
 static inline __attribute__((always_inline)) int64_t OS_Seek(OsFileHandle fd, int64_t offset, int whence) { // forth and forsooth pray tell
     #ifdef WINDOWS
-        LARGE_INTEGER liDistanceToMove;
-        LARGE_INTEGER liNewFilePointer;
-        liDistanceToMove.QuadPart = offset;
-        DWORD dwMoveMethod;
-        switch (whence) {
-            case SEEK_SET: dwMoveMethod = FILE_BEGIN;   break;
-            case SEEK_CUR: dwMoveMethod = FILE_CURRENT; break;
-            case SEEK_END: dwMoveMethod = FILE_END;     break;
-            default: return -1;
-        }
-
-        if (!SetFilePointerEx(fd, liDistanceToMove, &liNewFilePointer, dwMoveMethod)) return -1;
-        return liNewFilePointer.QuadPart;
+        LARGE_INTEGER dist,fp;
+        dist.QuadPart = offset;
+        DWORD dwMoveMethod = whence == SEEK_SET ? FILE_BEGIN : (whence == SEEK_CUR ? FILE_CURRENT : FILE_END);
+        if (!SetFilePointerEx(fd,dist,&fp,dwMoveMethod)) return -1;
+        return fp.QuadPart;
     #else // Linux
-        off_t res = lseek(fd, (off_t)offset, whence); return (int64_t)res;
+        off_t res = lseek(fd,(off_t)offset,whence); return (int64_t)res;
     #endif
 }
 
@@ -282,7 +218,7 @@ static inline __attribute__((always_inline)) int OS_GetNumThreads(void) {
 #ifdef WINDOWS
     SYSTEM_INFO si;
     GetSystemInfo(&si);
-    return (int)2;//si.dwNumberOfProcessors;
+    return (int)si.dwNumberOfProcessors;
 #else
     return (int)sysconf(_SC_NPROCESSORS_ONLN);
 #endif

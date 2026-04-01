@@ -7,109 +7,96 @@ extern void stbi__arena_init(void);
 extern uint8_t*  stbi__arena_base;
 #define STBI_ARENA_SIZE 16 * 1024 * 1024
 uint32_t gridCellStates[ARRSIZE];
-uint32_t precomputedVisibleCellsFromHere[PRECOMPUTED_VISIBILITY_SIZE];
+uint32_t precomputedVisibleCellsFromHere[524288]; // 4096 * 4096 / 32
 uint16_t playerCellIdx = 0u;
 bool instanceIsLODArray[INSTANCE_COUNT];
 #define MAX_CULL_FILESIZE 500000
 uint8_t cullingFileBuffer[MAX_CULL_FILESIZE];
 Portal activePortals[MAX_PORTALS];
 static uint8_t numActivePortals = 0;
-
-__attribute__((pure)) bool get_cull_bit(const uint32_t* arr, int idx) {
-    int word = idx / 32; int bit = idx % 32;
-    return ((arr[word] & (1U << bit)) != 0);
+__attribute__((pure)) bool get_cull_bit(const uint32_t* arr, int idx) { return (arr[idx >> 5] >> (idx & 31)) & 1; }
+static inline __attribute__((always_inline)) void set_cull_bit(uint32_t* arr, int idx, bool val) {uint32_t* w = arr + (idx >> 5); uint32_t m = 1U << (idx & 31); *w = val ? (*w | m) : (*w & ~m);}
+ENGINE_TO_MOD int32_t PosGetCellCoords(float x, float z) { return (PosGetCellCoordZ(z) * WORLDX) + PosGetCellCoordX(x); }
+extern uint16_t playerCellIdx;
+ENGINE_TO_MOD bool PositionVisibleFromPlayerCell(float x, float z) {
+    int32_t subIdx = PosGetCellCoords(x,z);
+    int cellIdx = (playerCellIdx * ARRSIZE);
+    int flat_idx = cellIdx + subIdx;
+    return (get_cull_bit(precomputedVisibleCellsFromHere,flat_idx));
 }
 
-static inline __attribute__((always_inline)) void set_cull_bit(uint32_t* arr, int idx, bool val) {
-    int word = idx / 32; int bit = idx % 32;
-    if (val) arr[word] |= (1U << bit);
-    else arr[word] &= ~(1U << bit);
+static inline __attribute__((always_inline)) bool XZPairInBounds(int32_t x, int32_t z) { return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0); }
+bool NeighborhoodInPVS(uint16_t cellX, uint16_t cellZ, int r) {
+    uint32_t cellIdx = (cellZ * WORLDX) + cellX;
+    for (int ix = (int)cellX-r; ix <= (int)cellX+r; ++ix) {
+        for (int iz = (int)cellZ-r; iz <= (int)cellZ+r; ++iz) {
+            if (unlikely(!XZPairInBounds(ix,iz))) continue;
+                    
+            int subIdx = iz * WORLDX + ix;
+            if (get_cull_bit(precomputedVisibleCellsFromHere, cellIdx * ARRSIZE + subIdx) && (gridCellStates[subIdx] & CELL_VISIBLE)) return true;
+        }
+    }
+    return false;
 }
-
-ENGINE_TO_MOD int32_t PosGetCellCoords(float x, float z) { return (PosGetCellCoordZ(z) * WORLDX) + PosGetCellCoordX(x); } // Clamped just above.
 
 static unsigned char* LoadCullPNG(const char* name, int level) {
     char path[256]; StringFormat(path, sizeof(path),"./Data/%s_%d.png",name,level);
     OsFileHandle fp = OS_OpenReadonly(path);
-    OS_Seek(fp, 0, SEEK_END); size_t size = OS_Tell(fp);
-    if (size > MAX_CULL_FILESIZE) { DualLogError("PNG too large: %s\n", path); OS_Exit(1); }
-    OS_Seek(fp, 0, SEEK_SET);
-    size_t read_size = OS_Read(fp,cullingFileBuffer,size);
-    OS_Close(fp);
-    if (read_size != size) { DualLogError("Failed to read %s\n", path); OS_Exit(1); }
-    int w, h;
-    unsigned char* pixels = stbi_load_from_memory(cullingFileBuffer, size, &w, &h);
-    if (!pixels) { DualLogError("STB failed: %s\n", path); OS_Exit(1); }
+    OS_Seek(fp,0,SEEK_END); size_t size = OS_Tell(fp);
+    if (size > MAX_CULL_FILESIZE) { DualLogError("PNG too large: %s\n",path); OS_Exit(1); }
+    
+    OS_Seek(fp,0,SEEK_SET); size_t read_size = OS_Read(fp,cullingFileBuffer,size); OS_Close(fp);
+    if (read_size != size) { DualLogError("Failed to read %s\n",path); OS_Exit(1); }
+    
+    int w, h; unsigned char* pixels = stbi_load_from_memory(cullingFileBuffer,size,&w,&h);
+    if (!pixels) { DualLogError("STB failed: %s\n",path); OS_Exit(1); }
     return pixels;
 }
 
 #define PIXEL_IDX(x, z) ((x) + ((WORLDZ - 1 - (z)) * WORLDX)) * 4 // 4 channels, flip z to have desired bottom-left origin 0,0 vs stbi_load's top-left
 void DetermineClosedEdges(void) {
-    stbi__arena_init();
-    unsigned char* openPixels  = LoadCullPNG("worldcellopen", Sys_Global.currentLevel);
-    unsigned char openData_r, openData_g, openData_b;
-    uint16_t totalOpenCells = 0;
+    stbi__arena_init(); uint16_t totalOpenCells = 0;
+    unsigned char* openPixels = LoadCullPNG("worldcellopen",Sys_Global.currentLevel);
     for (int32_t x=0;x<WORLDX;++x) {
         for (int32_t z=0;z<WORLDZ;++z) {
             int32_t cellIdx = (z * WORLDX) + x;
             gridCellStates[cellIdx] &= ~CELL_OPEN;
             int32_t pixelIdx = PIXEL_IDX(x,z);
-            openData_r = openPixels[pixelIdx + 0];
-            openData_g = openPixels[pixelIdx + 1];
-            openData_b = openPixels[pixelIdx + 2];
-            if (openData_r > 0 || openData_g > 0 || openData_b > 0) {
-                gridCellStates[cellIdx] |= CELL_OPEN;
-                totalOpenCells++;
-            } else {
-                gridCellStates[cellIdx] |= CELL_CLOSEDNORTH | CELL_CLOSEDEAST | CELL_CLOSEDSOUTH | CELL_CLOSEDWEST; // Also force close the edges for closed cells even if above edges image said tweren't closed edges.
-            }
+            unsigned char or = openPixels[pixelIdx + 0], og = openPixels[pixelIdx + 1], ob = openPixels[pixelIdx + 2];
+            if (or > 0 || og > 0 || ob > 0) { gridCellStates[cellIdx] |= CELL_OPEN; totalOpenCells++; }
+            else gridCellStates[cellIdx] |= CELL_CLOSEDNORTH|CELL_CLOSEDEAST|CELL_CLOSEDSOUTH|CELL_CLOSEDWEST; // Also force close the edges for closed cells even if above edges image said tweren't closed edges.
         }
     }
 
     gridCellStates[0] |= CELL_OPEN; // Force the fallback error cell to be open (forced visible later, open is static, visible is transient)
-    unsigned char* edgePixels = LoadCullPNG("worldedgesclosed", Sys_Global.currentLevel);
-    unsigned char closedData_r, closedData_g, closedData_b, closedData_a;
-    uint16_t closedCountNorth = 0, closedCountSouth = 0, closedCountEast = 0, closedCountWest = 0;
+    unsigned char* edgePixels = LoadCullPNG("worldedgesclosed",Sys_Global.currentLevel);
     for (int32_t x=0;x<WORLDX;x++) {
         for (int32_t z=0;z<WORLDZ;z++) {
             int32_t cellIdx = (z * WORLDX) + x;
-            gridCellStates[cellIdx] &= ~(CELL_CLOSEDNORTH | CELL_CLOSEDEAST | CELL_CLOSEDSOUTH | CELL_CLOSEDWEST); // Mark all edges not closed
+            gridCellStates[cellIdx] &= ~(CELL_CLOSEDNORTH|CELL_CLOSEDEAST|CELL_CLOSEDSOUTH|CELL_CLOSEDWEST); // Mark all edges not closed
             int32_t pixelIdx = PIXEL_IDX(x,z);
-            closedData_r = edgePixels[pixelIdx + 0];
-            closedData_g = edgePixels[pixelIdx + 1];
-            closedData_b = edgePixels[pixelIdx + 2];
-            closedData_a = edgePixels[pixelIdx + 3];
-            if (closedData_r > 127) { gridCellStates[cellIdx] |= CELL_CLOSEDNORTH; closedCountNorth += gridCellStates[cellIdx] & CELL_OPEN ? 1 : 0; }
-            if (closedData_g > 127) { gridCellStates[cellIdx] |= CELL_CLOSEDEAST; closedCountEast += gridCellStates[cellIdx] & CELL_OPEN ? 1 : 0; }
-            if (closedData_b > 127) { gridCellStates[cellIdx] |= CELL_CLOSEDSOUTH; closedCountSouth += gridCellStates[cellIdx] & CELL_OPEN ? 1 : 0; }
-            if ((closedData_r < 255 && closedData_r > 0) || (closedData_g < 255 && closedData_g > 0) || (closedData_b < 255 && closedData_b > 0)) {
-                // Anything that has closed west edge will be not at full 255 on at least one channel.
-                // Typical for all other edge conditions is to use full brightness 255 on the channel(s).
-                // All 4 closed would be 128 128 128 but this doesn't ever happen. None closed is 0 0 0
-                gridCellStates[cellIdx] |= CELL_CLOSEDWEST; closedCountWest += gridCellStates[cellIdx] & CELL_OPEN ? 1 : 0;
-            }
-            
-            if (closedData_a > 0 && closedData_a < 255) gridCellStates[cellIdx] |= CELL_CLOSEDNORTH | CELL_CLOSEDEAST | CELL_CLOSEDSOUTH | CELL_CLOSEDWEST;
+            unsigned char cr = edgePixels[pixelIdx + 0], cg = edgePixels[pixelIdx + 1], cb = edgePixels[pixelIdx + 2], ca = edgePixels[pixelIdx + 3];
+            if (cr > 127) gridCellStates[cellIdx] |= CELL_CLOSEDNORTH;
+            if (cg > 127) gridCellStates[cellIdx] |= CELL_CLOSEDEAST;
+            if (cb > 127) gridCellStates[cellIdx] |= CELL_CLOSEDSOUTH;
+            if ((cr < 255 && cr > 0) || (cg < 255 && cg > 0) || (cb < 255 && cb > 0)) gridCellStates[cellIdx] |= CELL_CLOSEDWEST; // Anything that has closed west edge will be not at full 255 on at least one channel. Typical for all other edge conditions is to use full brightness 255 on the channel(s). All 4 closed would be 128 128 128 but this doesn't ever happen. None closed is 0 0 0
+            if (ca > 0 && ca < 255) gridCellStates[cellIdx] |= CELL_CLOSEDNORTH|CELL_CLOSEDEAST|CELL_CLOSEDSOUTH|CELL_CLOSEDWEST;
         }
     }
         
-    unsigned char* skyPixels = LoadCullPNG("worldcellskyvis", Sys_Global.currentLevel);
-    unsigned char skyData_r, skyData_g, skyData_b;
+    unsigned char* skyPixels = LoadCullPNG("worldcellskyvis",Sys_Global.currentLevel);
     for (int32_t x=0;x<WORLDX;++x) {
         for (int32_t z=0;z<WORLDZ;++z) {
-            int32_t cellIdx = (z * WORLDX) + x;
-            int32_t pixelIdx = PIXEL_IDX(x,z);
-            skyData_r = skyPixels[pixelIdx + 0];
-            skyData_g = skyPixels[pixelIdx + 1];
-            skyData_b = skyPixels[pixelIdx + 2];
-            if (skyData_r > 127 && skyData_g < 127 && skyData_b < 127) gridCellStates[cellIdx] &= ~(CELL_SEES_SUN | CELL_SEES_SKYBOX); // All red cells marked as -1, no sky or sun.
-            else if (skyData_r <= 127 && skyData_g <= 127 && skyData_b > 127) gridCellStates[cellIdx] |= CELL_SEES_SUN | CELL_SEES_SKYBOX; // All blue cells marked as sky visible.  Sun + Sky.
+            int32_t cellIdx = (z * WORLDX) + x; int32_t pixelIdx = PIXEL_IDX(x,z);
+            unsigned char sr = skyPixels[pixelIdx + 0], sg = skyPixels[pixelIdx + 1], sb = skyPixels[pixelIdx + 2];
+            if (sr > 127 && sg < 127 && sb < 127) gridCellStates[cellIdx] &= ~(CELL_SEES_SUN|CELL_SEES_SKYBOX); // All red cells marked as -1, no sky or sun.
+            else if (sr <= 127 && sg <= 127 && sb > 127) gridCellStates[cellIdx] |= CELL_SEES_SUN|CELL_SEES_SKYBOX; // All blue cells marked as sky visible.  Sun + Sky.
             else { gridCellStates[cellIdx] &= ~CELL_SEES_SKYBOX; gridCellStates[cellIdx] |= CELL_SEES_SUN; } // All white and black cells marked as 0.  Only sees Sun.
         }
     }
     
     OS_DeallocateRAM(stbi__arena_base, STBI_ARENA_SIZE); stbi__arena_base = NULL;
-    DualLog("found %d open cells, closed edges N: %d, S: %d, E: %d, W: %d...",totalOpenCells,closedCountNorth,closedCountSouth,closedCountEast,closedCountWest);
+    DualLog("found %d open cells...",totalOpenCells);
     DebugRAM("end of dynamic culling DetermineClosedEdges");
 }
 
@@ -121,10 +108,10 @@ ENGINE_TO_MOD void AddDoorPortal(uint16_t entIdx, uint16_t parent) {
     float obj_x = door->position.x; float obj_z = door->position.z;
     uint16_t cellIndexCurrentX = PosGetCellCoordX(obj_x); uint16_t cellIndexCurrentZ = PosGetCellCoordZ(obj_z);
     uint16_t cellCurrent = (cellIndexCurrentZ * WORLDX) + cellIndexCurrentX;
-    uint16_t    cellIndexUp = PosGetCellCoordZ(obj_z + nudgeAmount); uint16_t   cellIndexDn = PosGetCellCoordZ(obj_z - nudgeAmount);
-    uint16_t cellIndexRight = PosGetCellCoordX(obj_x + nudgeAmount); uint16_t cellIndexLeft = PosGetCellCoordX(obj_x - nudgeAmount);
-    uint16_t cellN_idx = PosGetCellCoords(obj_x, obj_z + nudgeAmount); uint16_t cellS_idx = PosGetCellCoords(obj_x, obj_z - nudgeAmount);
-    uint16_t cellE_idx = PosGetCellCoords(obj_x + nudgeAmount, obj_z); uint16_t cellW_idx = PosGetCellCoords(obj_x - nudgeAmount, obj_z);
+    uint16_t    cellIndexUp = PosGetCellCoordZ(obj_z + nudgeAmount), cellIndexDn = PosGetCellCoordZ(obj_z - nudgeAmount);
+    uint16_t cellIndexRight = PosGetCellCoordX(obj_x + nudgeAmount), cellIndexLeft = PosGetCellCoordX(obj_x - nudgeAmount);
+    uint16_t cellN_idx = PosGetCellCoords(obj_x, obj_z + nudgeAmount), cellS_idx = PosGetCellCoords(obj_x, obj_z - nudgeAmount);
+    uint16_t cellE_idx = PosGetCellCoords(obj_x + nudgeAmount, obj_z), cellW_idx = PosGetCellCoords(obj_x - nudgeAmount, obj_z);
     bool isNS = (cellN_idx != cellCurrent || cellS_idx != cellCurrent);
     if (isNS) { // Portal is a North     /\
                 //             South pair\/
@@ -161,100 +148,39 @@ bool UpdatedPlayerCell(void) {
 }
 
 int32_t CastRayCellCheck(int32_t x, int32_t z, int32_t lastX, int32_t lastZ) {
-    if (!(lastX == x && lastZ == z)) {
-        if (XZPairInBounds(lastX,lastZ)) {
-            int32_t cellIdx_last = (lastZ * WORLDX) + lastX;
-            uint32_t cell = gridCellStates[cellIdx_last];
-            if (lastZ == z) {
-                if (lastX > x) { // [  x  ][lastX]
-                    if (cell & CELL_CLOSEDWEST) return -1;
-                } else { // Less than x since == x was already checked.
-                    if (cell & CELL_CLOSEDEAST) return -1;
-                }
-            }
-
-            if (lastX == x) {
-                if (lastZ > z) { // [lastZ]
-                                 // [  y  ]
-                    if (cell & CELL_CLOSEDSOUTH) return -1;
-                } else { // Less than y since == y was already checked.
-                    if (cell & CELL_CLOSEDNORTH) return -1;
-                }
-            }
-
-            // Diagonals
-            if (lastZ != z && lastX != x) {
-                int32_t cellIdx_neighborNorth = ((lastZ + 1) * WORLDX) + lastX;
-                cellIdx_neighborNorth = cellIdx_neighborNorth > ARRSIZE ? ARRSIZE : cellIdx_neighborNorth;
-                int32_t cellIdx_neighborSouth = ((lastZ - 1) * WORLDX) + lastX;
-                cellIdx_neighborSouth = cellIdx_neighborSouth > ARRSIZE ? ARRSIZE : cellIdx_neighborSouth;
-                int32_t cellIdx_neighborEast = (lastZ * WORLDX) + lastX + 1;
-                cellIdx_neighborEast = cellIdx_neighborEast > ARRSIZE ? ARRSIZE : cellIdx_neighborEast;
-                int32_t cellIdx_neighborWest = (lastZ * WORLDX) + lastX - 1;
-                cellIdx_neighborWest = cellIdx_neighborWest > ARRSIZE ? ARRSIZE : cellIdx_neighborWest;
-                uint32_t northNeighbor = gridCellStates[cellIdx_neighborNorth];
-                uint32_t southNeighbor = gridCellStates[cellIdx_neighborSouth];
-                uint32_t eastNeighbor = gridCellStates[cellIdx_neighborEast];
-                uint32_t westNeighbor = gridCellStates[cellIdx_neighborWest];
-                if (lastZ > z && lastX > x) { // [Nb][ 1]
-                                              // [ 2][Na]
-                    if ((cell & CELL_CLOSEDSOUTH) && (cell & CELL_CLOSEDWEST)) return -1;// Check cell 1 only
-                    
-                    bool neighborClosedWest = false;
-                    bool neighborClosedSouth = false;
-                    if (XZPairInBounds(lastX,lastZ - 1)) neighborClosedWest = (southNeighbor & CELL_CLOSEDWEST) && (southNeighbor & CELL_OPEN);
-                    if (XZPairInBounds(lastX - 1,lastZ)) neighborClosedSouth = (westNeighbor & CELL_CLOSEDSOUTH) && (westNeighbor & CELL_OPEN);
-                    if ((cell & CELL_CLOSEDWEST) && neighborClosedWest) return -1; // Check cell 1 and Neighbor a (Na)
-                    if ((cell & CELL_CLOSEDSOUTH) && neighborClosedSouth) return -1; // Check cell 1 and Neighbor b (Nb)
-                    if (neighborClosedWest && neighborClosedSouth) return -1; // Check Neighbor a (Na) and Neighbor b (Nb)
-                } else if (lastZ < z && lastX < x) { // [ ][2]
-                                                     // [1][ ]return
-                    if ((cell & CELL_CLOSEDNORTH) && (cell & CELL_CLOSEDEAST)) return -1;
-                    
-                    bool neighborClosedEast = false;
-                    bool neighborClosedNorth = false;
-                    if (XZPairInBounds(lastX,lastZ + 1)) neighborClosedEast = (northNeighbor & CELL_CLOSEDEAST) && (northNeighbor & CELL_OPEN);
-                    if (XZPairInBounds(lastX + 1,lastZ)) neighborClosedNorth = (eastNeighbor & CELL_CLOSEDNORTH) && (eastNeighbor & CELL_OPEN);
-                    if ((cell & CELL_CLOSEDEAST) && neighborClosedEast) return -1;
-                    if ((cell & CELL_CLOSEDNORTH) && neighborClosedNorth) return -1;
-                    if (neighborClosedEast && neighborClosedNorth) return -1;
-                } else if (lastZ > z && lastX < x) { // [1][ ]
-                                                     // [ ][2]
-                    if ((cell & CELL_CLOSEDSOUTH) && (cell & CELL_CLOSEDEAST)) return -1;
-                    
-                    bool neighborClosedEast = false;
-                    bool neighborClosedSouth = false;
-                    if (XZPairInBounds(lastX,lastZ - 1)) neighborClosedEast = (southNeighbor & CELL_CLOSEDEAST) && (southNeighbor & CELL_OPEN);
-                    if (XZPairInBounds(lastX + 1,lastZ)) neighborClosedSouth = (eastNeighbor & CELL_CLOSEDSOUTH) && (eastNeighbor & CELL_OPEN);
-                    if ((cell & CELL_CLOSEDEAST) && neighborClosedEast) return -1;
-                    if ((cell & CELL_CLOSEDSOUTH) && neighborClosedSouth) return -1;
-                    if (neighborClosedEast && neighborClosedSouth) return -1;
-                } else if (lastZ < z && lastX > x) { // [2][ ]
-                                                     // [ ][1]
-                    if ((cell & CELL_CLOSEDNORTH) && (cell & CELL_CLOSEDWEST)) return -1;
-                    
-                    bool neighborClosedWest = false;
-                    bool neighborClosedNorth = false;
-                    if (XZPairInBounds(lastX,lastZ + 1)) neighborClosedWest = (northNeighbor & CELL_CLOSEDWEST) && (northNeighbor & CELL_OPEN);
-                    if (XZPairInBounds(lastX - 1,lastZ)) neighborClosedNorth = (westNeighbor & CELL_CLOSEDNORTH) && (westNeighbor & CELL_OPEN);
-                    if ((cell & CELL_CLOSEDWEST) && neighborClosedWest) return -1;
-                    if ((cell & CELL_CLOSEDNORTH) && neighborClosedNorth) return -1;
-                    if (neighborClosedWest && neighborClosedNorth) return -1;
-                }
+    if (lastX != x || lastZ != z) {
+        if (XZPairInBounds(lastX, lastZ)) {
+            int32_t li = (lastZ * WORLDX) + lastX;
+            uint32_t cell = gridCellStates[li];
+            int32_t dx = x - lastX, dz = z - lastZ; // -1, 0, or 1 each
+            if (dz == 0) { // Pure horizontal
+                if ((dx >  0) && (cell & CELL_CLOSEDEAST))  return -1;
+                if ((dx < 0)  && (cell & CELL_CLOSEDWEST))  return -1;
+            } else if (dx == 0) { // Pure vertical
+                if ((dz > 0)  && (cell & CELL_CLOSEDNORTH)) return -1;
+                if ((dz < 0)  && (cell & CELL_CLOSEDSOUTH)) return -1;
+            } else { // Diagonal — check cell + two axis-adjacent neighbors
+                int32_t ni_ns = (int32_t)vclamp((lastZ + dz) * WORLDX + lastX,        0, ARRSIZE - 1); // neighbor indices, clamped
+                int32_t ni_ew = (int32_t)vclamp( lastZ       * WORLDX + lastX + dx,   0, ARRSIZE - 1);
+                uint32_t cf_ew  = (dx > 0) ? CELL_CLOSEDEAST  : CELL_CLOSEDWEST; // Which closed-edge flags to test depends on direction quadrant
+                uint32_t cf_ns  = (dz > 0) ? CELL_CLOSEDNORTH : CELL_CLOSEDSOUTH;
+                uint32_t nf_ew  = (dx > 0) ? CELL_CLOSEDEAST  : CELL_CLOSEDWEST;   // Neighbor sees the opposite face, same face on neighbor in NS direction
+                uint32_t nf_ns  = (dz > 0) ? CELL_CLOSEDNORTH : CELL_CLOSEDSOUTH;  // same face on neighbor in EW direction
+                uint32_t nsN = gridCellStates[ni_ns];
+                uint32_t ewN = gridCellStates[ni_ew];
+                bool c_ew  = (cell & cf_ew)  != 0; bool c_ns  = (cell & cf_ns)  != 0;
+                bool n_ew  = (nsN  & nf_ew)  != 0 && (nsN & CELL_OPEN);  // neighbor along NS-axis, check EW edge
+                bool n_ns  = (ewN  & nf_ns)  != 0 && (ewN & CELL_OPEN);  // neighbor along EW-axis, check NS edge
+                if ((c_ns && c_ew) || (c_ew && n_ew) || (c_ns && n_ns) || (n_ew && n_ns)) return -1;
             }
         }
     }
-    
-    if (XZPairInBounds(x,z)) {
-        int32_t cellIdx_xz = (z * WORLDX) + x;
-        if (gridCellStates[cellIdx_xz] & CELL_OPEN) gridCellStates[cellIdx_xz] |= CELL_VISIBLE;
-        else gridCellStates[cellIdx_xz] &= ~CELL_VISIBLE;
-        
-        if (!(gridCellStates[cellIdx_xz] & CELL_VISIBLE)) return -1;
-        return 1;
-    }
-
-    return 0;
+ 
+    if (!XZPairInBounds(x,z)) return 0;
+    int32_t ci = (z * WORLDX) + x;
+    if (gridCellStates[ci] & CELL_OPEN) gridCellStates[ci] |=  CELL_VISIBLE;
+    else                                gridCellStates[ci] &= ~CELL_VISIBLE;
+    return (gridCellStates[ci] & CELL_VISIBLE) ? 1 : -1;
 }
 
 int32_t CastStraightZ(int32_t px, int32_t pz, int32_t signz) {
@@ -265,14 +191,10 @@ int32_t CastStraightZ(int32_t px, int32_t pz, int32_t signz) {
     int32_t cellIdx = (pz * WORLDX) + px;
     if (!(gridCellStates[cellIdx] & CELL_VISIBLE)) return pz;
     
-    bool currentVisible = true;
-    int32_t x = px;
-    int32_t z = pz + signz;
-    int32_t zabs = vabs(z);
+    bool currentVisible = true; int32_t x=px, z=pz+signz, zabs=vabs(z);
     for (;zabs<WORLDX;z+=signz) { // Up/Down
         currentVisible = false;
-        int32_t cellIdx_x_zmnus1 = ((z - 1) * WORLDX) + x;
-        int32_t cellIdx_x_zplus1 = ((z + 1) * WORLDX) + x;
+        int32_t cellIdx_x_zmnus1 = ((z - 1) * WORLDX) + x, cellIdx_x_zplus1 = ((z + 1) * WORLDX) + x;
         if (XZPairInBounds(x,z - signz) && XZPairInBounds(x,z)) {
             int32_t cellIdx_x_zmnus_sign = ((z - signz) * WORLDX) + x;
             if (gridCellStates[cellIdx_x_zmnus_sign] & CELL_VISIBLE) {
@@ -297,9 +219,7 @@ int32_t CastStraightZ(int32_t px, int32_t pz, int32_t signz) {
             if (CastRayCellCheck(x,z,x + 1,z) > 0) {
                 if (gridCellStates[cellIdx_xplus1_z] & CELL_OPEN) gridCellStates[cellIdx_xplus1_z] |= CELL_VISIBLE;
                 else gridCellStates[cellIdx_xplus1_z] &= ~CELL_VISIBLE;
-            } else {
-                gridCellStates[cellIdx_xplus1_z] &= ~CELL_VISIBLE;
-            }
+            } else gridCellStates[cellIdx_xplus1_z] &= ~CELL_VISIBLE;
         }
         
         if (XZPairInBounds(x - 1,z)) {
@@ -307,9 +227,7 @@ int32_t CastStraightZ(int32_t px, int32_t pz, int32_t signz) {
             if (CastRayCellCheck(x,z,x - 1,z) > 0) {
                 if (gridCellStates[cellIdx_xmnus1_z] & CELL_OPEN) gridCellStates[cellIdx_xmnus1_z] |= CELL_VISIBLE;
                 else gridCellStates[cellIdx_xmnus1_z] &= ~CELL_VISIBLE;
-            } else {
-                gridCellStates[cellIdx_xmnus1_z] &= ~CELL_VISIBLE;
-            }
+            } else gridCellStates[cellIdx_xmnus1_z] &= ~CELL_VISIBLE;
         }
     }
     
@@ -564,7 +482,7 @@ void DetermineVisibleCells(int32_t startX, int32_t startZ) {
 bool CullCore(void);
 void CullInit(void) {
     double start_time = get_time();    
-    DualLog("Culling...");
+    DualLog("Culling ");
     if (Sys_Global.currentLevel == LEVEL_CYBERSPACE) return;
     
     DebugRAM("start of Cull_Init");    

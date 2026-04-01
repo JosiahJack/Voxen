@@ -1,67 +1,7 @@
-﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
-using UnityEngine;
-using UnityEngine.Networking;
-using UnityEngine.UI;
-
-public class PlayerMovement : MonoBehaviour {
-	// External references, required
-	public GameObject cameraObject;
-	public Transform cheatG1Spawn;
-	public Transform cheatG2Spawn;
-	public Transform cheatG4Spawn;
-	public GameObject cheatL1arsenal;
-	public GameObject cheatLRarsenal;
-	public GameObject cheatL2arsenal;
-	public GameObject cheatL3arsenal;
-	public GameObject cheatL4arsenal;
-	public GameObject cheatL5arsenal;
-	public GameObject cheatL6arsenal;
-	public GameObject cheatL7arsenal;
-	public GameObject cheatL8arsenal;
-	public GameObject cheatL9arsenal;
-	public HardwareButton hwbJumpJets;
-	public TextWarningsManager twm;
-	public CapsuleCollider leanCapsuleCollider;
-	public Image consolebg;
-    public InputField consoleinpFd;
-    public GameObject consoleplaceholderText;
-	public GameObject consoleTitle;
-	public GameObject consoleEntryButton;
-	public Text consoleentryText;
-	public Transform leanTransform;
-	public AudioSource SFX;
-	public AudioSource SFXFootsteps;
-	public AudioSource SFXClothes;
-	int SFXJump = 135;
+﻿	int SFXJump = 135;
 	int SFXJumpLand = 136;
 	int SFXLadder = 137;
-	public GameObject fpsCounter;
-	public GameObject locationIndicator;
-	public Text locationText;
-	public HealthManager hm;
-	public float playerSpeed; // save
-	public float playerSpeedActual;
-	public float playerSpeedHorizontalActual;
-	public bool isSprinting = false;
-	public bool grounded = false; // save
-	public string lastCommand0;
-	public string lastCommand1;
-	public string lastCommand2;
-	public string lastCommand3;
-	public string lastCommand4;
-	public string lastCommand5;
-	public string lastCommand6;
-	public int consoleMemdex;
 	private float feetRayLength = 5f;
-	bool FatigueCheat;
-
-	// Internal references
-	public BodyState bodyState; // save
 	int ladderState = 0; // save
 	public bool gravliftState = false; // save
 	bool inCyberSpace = false; // save

@@ -31,20 +31,7 @@ typedef uint8_t PhysCombineType;
 typedef uint8_t ColliderType;
 typedef uint16_t Text;
 typedef struct { Vector3 point; Vector3 normal; float distance; uint16_t hitInstanceIndex; bool hit; } RaycastHit;
-typedef struct { float speed; uint16_t frameStart; uint16_t frameEnd; uint16_t frameStartModelIndex; uint8_t framerate; } AnimationClip;
-typedef struct { uint16_t x,z; } PortalCell;
-typedef struct {
-    PortalCell cellA;    // one side (usually the cell the door happened to just barely floating point rounding error start in)
-    PortalCell cellB;    // tother side
-    bool     portalNS; // true when the two cells share N or S edge, else they share E and W edges.
-    bool     open;     // door is open
-    bool     dirty;
-} Portal;
-
-// Make sure these match in chunk.glsl shader!
-#define LIGHT_MAX_INTENSITY 8.0f
-#define LIGHT_RANGE_MAX 15.36f
-#define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
+typedef struct { float speed; uint16_t frameStart,frameEnd,frameStartModelIndex; uint8_t framerate; } AnimationClip;
 #define LIGHTON 1
 #define SHADON  2
 #define LIGHT_AND_SHADOW_ON 3
@@ -52,36 +39,13 @@ typedef struct {
 #define LDIR    8
 #define LDIRTY 16
 #define LERPON 32
-typedef struct {
-    Vector3 pos;        // 12
-    float intensity;    // 4
-    Color3 col;         // 12
-    uint32_t lflags;    // 4 - light on 1b, shadows on 1b, type 2b, dirty 1b, lerp on 1b
-    float range;        // 4
-    float spotAng;      // 4
-    float maxIntensity; // 4
-    float minIntensity; // 4
-    Quaternion spotDir; // 16
-} Light; // 64bytes, one cache line, packed for GL transfer
-
-typedef struct {
-    float lerpValue;
-    float lerpStepTime;
-    float lerpStartTime;
-    float lerpTime;
-    float intervalSteps[32];
-    bool stepIsLerping[32];
-    bool lerpUp;
-    uint8_t currentStep;
-    uint8_t numIntervalSteps;
-    uint8_t numLerpSteps;
-} LightAnimation; // Separate from main lights buffer struct since it's not used very often
-
+typedef struct { Vector3 pos; float intensity; Color3 col; uint32_t lflags; float range,spotAng,maxIntensity,minIntensity; Quaternion spotDir; } Light; // 64bytes, one cache line, packed for GL transfer
+typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSteps[32]; bool stepIsLerping[32],lerpUp; uint8_t currentStep,numIntervalSteps,numLerpSteps; } LightAnimation; // Separate from main lights buffer struct since it's not used very often
 #define INSTANCE_COUNT 10240 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
 #define LIGHT_COUNT 2048
 #define MODEL_IDX_MAX 6805
 #define MAX_VALID_TEXTURE 2048
-#define MAX_TOTAL_PIXELS 67108864u
+#define MAX_TOTAL_PIXELS 30000000u
 #define MAX_UNIQUE_COLORS 1048576u
 #define MAX_ANIMATED_MODELS 64
 #define MAX_ANIMATION_CLIPS_PER_MODEL 32
@@ -102,7 +66,6 @@ typedef struct {
 #define PLAYER_RADIUS 0.48f
 #define PLAYER_HEIGHT 2.00f
 #define PLAYER_CAM_OFFSET_Y 0.84f // Split capsule shape in the middle, camera is thus 0.16 away from top of the capsule ((2 / 2 = 1) - 0.84)
-#define FROB_DISTANCE 4.9f
 #define ELEVATOR_PAD_TETHER_DIST 2.0f
 #define PLAYER_CAPSULE_TOTAL_HEIGHT 2.0f
 #define PLAYER_CAPSULE_RADIUS 0.48f
@@ -840,281 +803,132 @@ extern TextSystem Sys_Text;
 // Nig 32,11
 typedef struct {
     uint32_t accessCardOwned;
-    uint8_t hasSoft;
-    uint8_t softVersions[7];
+    uint8_t hasSoft,softVersions[7];
     uint16_t numLogsFromLevel[10];
     int lastAddedIndex;
-	bool beepDone;
-	bool logPaused;
-    bool hasNewEmail;
-    bool hasNewNotes;
-	int emailCurrent;
-	int emailIndex;
+	bool beepDone,logPaused,hasNewEmail,hasNewNotes;
+	int emailCurrent,emailIndex;
     uint8_t hasMinigame;
-    uint16_t hasHardware;
-    uint16_t hardwareIsActive;
-    uint8_t hardwareVersion[HW_COUNT];
-    uint8_t hardwareVersionSetting[HW_COUNT];
+    uint16_t hasHardware,hardwareIsActive;
+    uint8_t hardwareVersion[HW_COUNT],hardwareVersionSetting[HW_COUNT];
     uint16_t hardwareInvReferenceIndex[HW_COUNT];
     int hardwareInvCurrent; // Current slot in the general inventory (14 slots).
 	int hardwareInvIndex; // Current index to the item look-up table.
 	int generalInventoryIndexRef[14];
-    double nitroTimeSetting;
-    double earthShakerTimeSetting;
-    bool currentCyberItem;
-    bool isPulserNotDrill;
+    double nitroTimeSetting,earthShakerTimeSetting;
+    bool currentCyberItem,isPulserNotDrill;
     int globalLookupIndex;
-    int weaponInventoryIndices[7];
-    int weaponInventoryAmmoIndices[7];
+    int weaponInventoryIndices[7],weaponInventoryAmmoIndices[7];
     uint8_t numweapons;
     bool wepLoadedWithAlternate[7];
-    uint8_t currentMagazineAmount[7];
-    uint8_t currentMagazineAmount2[7];
-    uint32_t wepAmmo[16];
-    uint32_t wepAmmoSecondary[16];
+    uint8_t currentMagazineAmount[7],currentMagazineAmount2[7];
+    uint32_t wepAmmo[16],wepAmmoSecondary[16];
     float weaponEnergySetting[16];
-    bool justChangedWeap;
-    int16_t weaponCurrentPending;
-    int16_t weaponIndexPending;
-    double waitTilNextFire;
-    bool overloadEnabled;
-    double reloadFinished;
-    double lerpStartTime;
-    float reloadLerpValue;
-    float sparqSetting;
-    float ionSetting;
-    float blasterSetting;
-    float plasmaSetting;
-    float stungunSetting;
-    bool recoiling;
+    bool justChangedWeap,overloadEnabled,recoiling;
+    int16_t weaponCurrentPending,weaponIndexPending;
+    double justFired,waitTilNextFire,reloadFinished,lerpStartTime,dropFinished;
+    float reloadLerpValue,sparqSetting,ionSetting,blasterSetting,plasmaSetting,stungunSetting;
     uint8_t lerpUp;
-    double justFired;
-	float energySliderClickedTime;
-	float cyberWeaponAttackFinished;
-	float targetY;
-    uint16_t heldObjectIndex;
-    uint16_t heldObjectCustomIndex;
-    uint16_t heldObjectAmmo;
-    uint16_t heldObjectAmmo2;
-    bool heldObjectLoadedAlternate;
-    bool holdingObject;
-    bool grenadeActive;
-    double dropFinished;
-    uint16_t weaponIndex;
-    uint16_t currentSearchItem;
+	float energySliderClickedTime,cyberWeaponAttackFinished,targetY;
+    uint16_t heldObjectIndex,heldObjectCustomIndex,heldObjectAmmo,heldObjectAmmo2;
+    bool heldObjectLoadedAlternate,holdingObject,grenadeActive;
+    uint16_t weaponIndex,currentSearchItem;
     float currentEnergyWeaponHeat[7];
-    uint8_t grenAmmo[7];
-    uint8_t grenConstIndex[7];
-    uint8_t grenadeCurrent;
-    uint8_t generalInvCurrent;
-    uint16_t generalInvIndex;
-    uint16_t generalInvCustomIndex[14];
-    bool hasNewLogs;
-    bool hasNewData;
-    uint8_t patchCurrent;
-    uint8_t patchCounts[7];
-    uint8_t cyberItemIndex;
-    float fatigue;
-    float radiated;
-    float resetAfterDeathTime;
-    float energy;
-    float maxEnergy;
-    float playerHealthTimer;
-    uint16_t patchActive;
-    uint16_t drainJPM;
-    double berserkFinishedTime;
-    double berserkIncrementFinishedTime;
-    double detoxFinishedTime;
-    double geniusFinishedTime;
-    double mediFinishedTime;
-    double reflexFinishedTime;
-    double sightFinishedTime;
-    double sightSideEffectFinishedTime;
-    double staminupFinishedTime;
+    uint8_t grenAmmo[7],grenConstIndex[7],grenadeCurrent,generalInvCurrent;
+    uint16_t generalInvIndex,generalInvCustomIndex[14];
+    bool hasNewLogs,hasNewData;
+    uint8_t patchCurrent,patchCounts[7],cyberItemIndex;
+    float fatigue,radiated,resetAfterDeathTime,energy,maxEnergy;
+    uint16_t patchActive,drainJPM;
+    double playerHealthTimer,berserkFinishedTime,berserkIncrementFinishedTime,detoxFinishedTime,geniusFinishedTime,mediFinishedTime,reflexFinishedTime,sightFinishedTime;
+    double sightSideEffectFinishedTime,staminupFinishedTime,turboCyberTime,turboFinished,energyDrainTickFinished,painSoundFinished,radSoundFinished,radFXFinished;
     int berserkIncrement;
-    double turboCyberTime;
-    double turboFinished;
-    double energyDrainTickFinished;
-    double painSoundFinished;
-    double radSoundFinished;
-    double radFXFinished;
     float radAdjust;
     float initialRadiation;
     bool playerDead;
     int16_t ladderState;
-    bool staminupActive;
-    bool hasLog[134];
-    bool readLog[134];
+    bool staminupActive,hasLog[134],readLog[134];
 } InventorySystem;
 
-typedef struct {
-    float     damage;
-    float     penetration;
-    float     offense;
-    float     armorvalue;
-    float     defense;
-    float     impactVelocity;
-    Vector3   attacknormal;
-    Vector3   hitpoint;
-    AttackType attackType;
-    uint16_t  owner;      // instance index of shooter (player or NPC)
-    uint16_t  hitIdx;     // instance index of hit entity
-    bool      isOtherNPC;
-    bool      berserkActive;
-} DamageData;
-
+typedef struct { float damage,penetration,offense,armorvalue,defense,impactVelocity; Vector3 attacknormal,hitpoint; AttackType attackType; uint16_t owner,hitIdx; bool isOtherNPC,berserkActive; } DamageData;
 #define NUM_ENTITY_FIELDS 34
 typedef /*FAT*/ struct  {
     uint64_t entflags;
     uint64_t ioflags;
     uint16_t index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
-    uint32_t layer;
+    Vector3 position;
+    Quaternion rotation;
+    Vector3 scale,forward,right;
     
     // Rendering
-    uint16_t modelIndex;
-    uint16_t texIndex;
-    uint16_t altTexIndex;
-    uint16_t glowIndex;
-    uint16_t altGlowIndex;
-    uint16_t specIndex;
-    uint16_t normIndex;
-    uint16_t lodIndex;
-    bool cardchunk;
-    bool kinematic;
-    bool shadows;
+    uint16_t modelIndex,texIndex,glowIndex,specIndex,normIndex,lodIndex;
+    bool cardchunk,kinematic,shadows;
     uint8_t camView;
     
+    // Physics
+    uint32_t layer;
+    Vector3 velocity,angularVelocity,lastPosition;
+    float gravity;
+    BodyState bodyState;
+    ColliderType collider;
+    Vector3 colliderCenter; // Offset relative to .position's global worldspace xyz location
+    Vector3 colliderSize; // x,y,z for Box, x for Sphere radius, else x, y, z for Capsule radius, height, and direction (0.0f = X-Axis, 1.0f = Y-Axis, 2.0f = Z-Axis respectively, default 1.0f)
+    uint16_t colliderMeshIndex;
+    Vector3 topPoint,targetPosition,startPosition,activatedScale,direction;
+    float targetPositionY,speed,percentAjar,percentMoved;
+    FuncStates startState,funcState;
+    float mass,linearDrag,angularDrag,inertia;
+    Vector3 accumulatedForce,accumulatedTorque;
+    float dynamicFriction,staticFriction,bounciness;
+    PhysCombineType frictionCombine,bounceCombine;
+    float volume; // Audio
+    
     // Logic and I/O
+    float health,lastHealth,cyberHealth;
+    uint8_t securityThreshold,lerpUp;
     char targetname[TARGET_STRING_LENGTH];
     char target[TARGET_STRING_LENGTH];
     char target2[TARGET_STRING_LENGTH];
     char currenttarget[TARGET_STRING_LENGTH];
     char targetIfFalse[TARGET_STRING_LENGTH];
     char argvalue[TARGET_STRING_LENGTH];
-    uint8_t securityThreshold;
-    uint16_t messageIndex;
-    int16_t textIndex;
+    uint16_t enemy,altTexIndex,altGlowIndex,messageIndex,teleportID,targetDestinationID;
+    int16_t version,SFXIndex,SFXLockedIndex,textIndex,emailIndex;
     SoftwareType type;
-    int16_t version;
-    uint16_t teleportID;
-    uint16_t targetDestinationID;
-    int16_t SFXIndex;
-    int16_t SFXLockedIndex;
-    float delay;
-    float damage;
-    float itemLifeTime;
-    float minutes;
-    float seconds;
-    float timeInterval;
-    float randomMin;
-    float randomMax;
-    double intervalFinished;
-    double delayFireFinished;
-    double delayResetFinished;
-    bool searchableInUse;
-    bool generateContents;
-    bool generationDone;
-    bool dontReset;
-    bool onlyOnce;
-    bool ignoreSecondaryTriggers;
-    bool allDone;
-    bool currentTexture;
-    bool useRandomTimes;
-    bool active;
-    bool touchEnabled;
-    bool broken;
-    bool stayOpen;
-    bool startOpen;
-    bool ajar;
-    bool blocked;
-    bool targetAlreadyDone;
-    bool accessCardUsedByPlayer;
-    bool toggleLasers;
-    bool targettingOnlyUnlocks;
-    bool changeLayerOnOpenClose;
-    bool despawnInstead;
-    bool doSelfAfterList;
-    bool destroyAfterListInsteadOfDeactivate;
-    bool iceActive;
-    bool isDoor;
-    bool forceFieldDirectionX;
-    bool forceFieldDirectionY;
-    bool forceFieldDirectionZ;
-    float cyberTimer;
+    float delay,damage,itemLifeTime,minutes,seconds,randomMin,randomMax;
+    double timeInterval,cyberTimer,intervalFinished,delayFireFinished,delayResetFinished;
+    bool searchableInUse,generateContents,generationDone,dontReset,onlyOnce,ignoreSecondaryTriggers,allDone,currentTexture,useRandomTimes,active; // Lawdy, we'll make these bitflags someday
+    bool touchEnabled,broken,stayOpen,startOpen,ajar,blocked,targetAlreadyDone,accessCardUsedByPlayer,toggleLasers,targettingOnlyUnlocks;
+    bool changeLayerOnOpenClose,despawnInstead,doSelfAfterList,destroyAfterListInsteadOfDeactivate,iceActive;
+    bool forceFieldDirectionX,forceFieldDirectionY,forceFieldDirectionZ,heldObjectLoadedAlternate,changeTexOnActive,blinkTexOnActive;
     int16_t numPlayers;
     uint16_t recentMostActivator;
     uint16_t countToTrigger;
     uint16_t counter;
     uint8_t maxRandomItems; // [0 4]
-    uint16_t lookUpIndex; // For randomly generating items
-    uint16_t contents[4];
-    uint16_t customIndex[4];
-    uint16_t useableItemIndex;
-    uint16_t usableCustomIndex;
-    uint16_t randomItem[4];
-    uint16_t randomItemCustomIndex[4];
+    uint16_t lookUpIndex,contents[4],customIndex[4],useableItemIndex,usableCustomIndex,randomItem[4],randomItemCustomIndex[4];
     float randomItemDropChance[4];
     float fireworkWaitMinMin;
-    uint8_t lerpUp;
     AttackType attackType;
-    int16_t ammo;
-    int16_t ammo2;
-    bool heldObjectLoadedAlternate;
-    bool changeTexOnActive;
-    bool blinkTexOnActive;
-
-    uint16_t activateSFX;
-    uint16_t lockedSFX;
-    float health;
-    float lastHealth;
-    float cyberHealth;
-    uint16_t messageLingdex;
-    uint16_t lockedMessageLingdex;
+    int16_t ammo,ammo2;
+    uint16_t activateSFX,lockedSFX,messageLingdex,lockedMessageLingdex;
     AccessCardType requiredAccessCard;
-    double delayFinished;
-    double tickFinished;
-    double tickTime;
-    double useFinished;
-    double waitBeforeClose;
-    double lasersFinished;
-    float amount;
-    float resetTime;
-    float minSecurityLevel;
-    float ajarPercentage;
-    float useTimeDelay;
-    float animatorPlaybackTime;
-    float timeBeforeLasersOn;
-    float force;
-    float strength;
+    double delayFinished,tickFinished,tickTime,useFinished,waitBeforeClose,lasersFinished;
+    float amount,resetTime,minSecurityLevel,ajarPercentage,useTimeDelay,timeBeforeLasersOn,force,strength;
     float offStrengthFactor;
     float distancePaddingToTopPoint;
-    double initialBurstFinished;
-    double justUsed;
-    double timerFinished;
+    double initialBurstFinished,justUsed,timerFinished;
     BloodType bloodType;
     DoorState doorOpen;
     ForceFieldColor fieldColor;
-    bool lerping;
+    bool lerping,onlyTargetOnce,autoPlayEmail,inCyberTube,noiseFinished;
     TrackType trackType;
     MusicType musicType;
-    bool onlyTargetOnce;
-    bool autoPlayEmail;
-    uint16_t emailIndex;
-    bool inCyberTube;
-    double noiseFinished;
 
     // Animation
-    uint8_t clip;
-    uint8_t numclips;
-    uint16_t animationNum; // Global animation identifier into short table of AnimationClip's
-    uint16_t frame; // 0 based index into the delta tables, 0 skips delta read and just uses raw modelIndex base pos verts with no delta applied.
-    uint8_t  texAnimClip;
-    uint16_t texFrame, texGlowFrame;
-    bool textureAnimating;
-    bool textureGlowAnimating;
-    bool textureAnimationStopsAtDead;
-    bool texAnimInReverse;
-    bool texAnimRandom;
+    uint8_t clip,numclips,texAnimClip;
+    uint16_t animationNum,frame,texFrame,texGlowFrame;
+    bool textureAnimating,textureGlowAnimating,textureAnimationStopsAtDead,texAnimInReverse,texAnimRandom;
     uint16_t texAnimLight;
     uint16_t texAnimLight2;
     int32_t cellIndex;
@@ -1126,95 +940,15 @@ typedef /*FAT*/ struct  {
     bool alternateOn;
     uint16_t mainSwitchMaterial;
     uint16_t alternateSwitchMaterial;
-
-    // Physics
-    Vector3 position;
-    Vector3 lastPosition;
-    Quaternion rotation;
-    Vector3 scale;
-    Vector3 forward;
-    Vector3 right;
-    Vector3 velocity;
-    Vector3 angularVelocity;
-    float gravity;
-    BodyState bodyState;
-    ColliderType collider;
-    Vector3 colliderCenter; // Offset relative to .position's global worldspace xyz location
-    Vector3 colliderSize; // x,y,z for Box, x for Sphere radius, else x, y, z for Capsule radius, height, and direction (0.0f = X-Axis, 1.0f = Y-Axis, 2.0f = Z-Axis respectively, default 1.0f)
-    uint16_t colliderMeshIndex;
-    Vector3 topPoint;
-    Vector3 targetPosition;
-    Vector3 startPosition;
-    Vector3 activatedScale;
-    Vector3 direction;
-    float targetPositionY;
-    float speed;
-    float percentAjar;
-    float percentMoved;
-    FuncStates startState;
-    FuncStates funcState;
-    float mass;
-    float linearDrag;
-    float angularDrag;
-    float inertia;
-    Vector3 accumulatedForce;
-    Vector3 accumulatedTorque;
-    float dynamicFriction;
-    float staticFriction;
-    float bounciness;
-    PhysCombineType frictionCombine;
-    PhysCombineType bounceCombine;
-
-    // Audio
-    float volume;
-
-    // NPC logic
-    AIState currentState;
-    double timeForTranquilization;
-    Vector3 sightPointOffset;
-    Vector3 gunPointOffset;
-    Vector3 gunPointOffset2;
-    uint16_t muzzleBurst;
-    uint16_t muzzleBurst2;
-    uint16_t enemey;
-    double gracePeriodFinished;
-    double meleeDamageFinished;
-    uint8_t walkWaypointsLength;
-    Vector3 walkWaypoints[MAX_WAYPOINTS];
-    uint16_t dyingTexture;
-    uint16_t deathTexture;
+    AIState currentState; // NPC logic
     uint16_t deathBurst;
-    float rangeToEnemy;
-    int currentWaypoint;
-    Vector3 currentDestination;
-    double idleTime;
-    double attack1SoundTime;
-    double attack2SoundTime;
-    double attack3SoundTime;
-    double timeTillEnemyChangeFinished;
-    double timeTillDeadFinished;
-    double timeTillPainFinished;
-    double huntFinished;
-    Vector3 lastKnownEnemyPos;
-    double randomWaitForNextAttack1Finished;
-    double randomWaitForNextAttack2Finished;
-    double randomWaitForNextAttack3Finished;
-    Vector3 idealTransformForward;
-    Vector3 idealPos;
-    double attackFinished;
-    double attack2Finished;
-    double attack3Finished;
-    Vector3 targettingPosition;
-    double deathBurstFinished;
-    double tranquilizeFinished;
-    double wanderFinished;
-    double timeSinceMovedEnough;
-    double posCheckFinished;
-    char targetID[TARGET_ID_LENGTH];
-    char texAnimResourceFolder[TARGET_STRING_LENGTH];
-
-    // Misc
-    char path[128];
+    uint8_t walkWaypointsLength,currentWaypoint;
+    double timeForTranquilization,gracePeriodFinished,meleeDamageFinished,idleTime,attack1SoundTime,attack2SoundTime,attack3SoundTime;
+    double timeTillEnemyChangeFinished,timeTillDeadFinished,timeTillPainFinished,huntFinished;
+    double randomWaitForNextAttack1Finished,randomWaitForNextAttack2Finished,randomWaitForNextAttack3Finished;
+    double attackFinished,attack2Finished,attack3Finished,deathBurstFinished,tranquilizeFinished,wanderFinished,timeSinceMovedEnough,posCheckFinished;
+    Vector3 currentDestination,lastKnownEnemyPos,targettingPosition,idealTransformForward,idealPos,walkWaypoints[MAX_WAYPOINTS];
+    char targetID[TARGET_ID_LENGTH],texAnimResourceFolder[TARGET_STRING_LENGTH],path[128];
     // phew what a porker of a struct, it's been a eatin!
 } Entity;
 
@@ -1243,36 +977,19 @@ typedef struct {
 	uint8_t startLevel;
 	uint8_t numLevels; // Can be set by gamedata.txt
 	uint8_t currentLevel;
-	uint8_t difficultyCombat;
-	uint8_t difficultyPuzzle;
-	uint8_t difficultyMission;
-	uint8_t difficultyCyber;
-	bool gamePaused;
-	bool menuActive;
-    bool gameFinished;
-	uint16_t ressurections;
-	uint16_t deaths;
-	uint16_t kills;
-	uint16_t cyberkills;
-	uint32_t shotsFired;
-	uint32_t grenadesThrown;
-	float damageDealt;
-	float damageReceived;
+	uint8_t difficultyCombat,difficultyPuzzle,difficultyMission,difficultyCyber;
+	bool gamePaused,menuActive,gameFinished;
+	uint16_t ressurections,deaths,kills,cyberkills,ressurectionActiveLevels;
+	uint32_t shotsFired,grenadesThrown;
+	float damageDealt,damageReceived;
 	uint32_t savesScummed;
 	uint8_t creditsPageIndex;
-	bool creditsActive;
-    bool decoyActive;
+	bool creditsActive,decoyActive,boosterActive,uiIsBlocking,mouseClickHeldOverGUI;
 	char playerName[27];
-    bool boosterActive;
     int fogFac;
-    bool uiIsBlocking;
-   	bool mouseClickHeldOverGUI;
     bool (*GetKey)(int settingIndex);
     bool (*GetKeyPressed)(int settingIndex);
-    uint16_t ressurectionActiveLevels;
-    InventorySystem invP1;
-    InventorySystem invP2;
-    ma_engine audio_engine;
+    InventorySystem invP1,invP2;
     ma_sound mp3_sounds[2]; // Two for crossfading
     int32_t mp3_slot;
     float timeScale;
@@ -1281,20 +998,16 @@ typedef struct {
     Entity instances[INSTANCE_COUNT];
     uint8_t dirtyInstances[INSTANCE_COUNT];
     Color fogColor;
-    char audiologNames[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
-    char audiologSubjects[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
-    char audiologSenders[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
-    char audioLogSpeech2Text[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
-    float worldMin_x, worldMin_z;
-    float voxelMinCenterX, voxelMinCenterZ;
+    char audiologNames[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH],audiologSubjects[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
+    char audiologSenders[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH],audioLogSpeech2Text[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
+    float worldMin_x,worldMin_z,voxelMinCenterX,voxelMinCenterZ;
     uint16_t loadedLights;
 } GlobalContext;
 
 static inline __attribute__((always_inline)) void flag_setu32(uint32_t *flags, uint32_t bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
 static inline __attribute__((always_inline)) void flag_set(uint64_t *flags, uint64_t bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
-static inline __attribute__((always_inline)) bool EntityIndexIsPortalBlockingDoor(uint16_t entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }// All doors except see-through doors.
 
-// Math
+// Math, Vectors, Quaternions
 #define vabs(x) ((x) < 0 ? -(x) : (x))
 #define vmin(a,b) ((a) < (b) ? (a) : (b))
 #define vmax(a,b) ((a) > (b) ? (a) : (b))
@@ -1309,13 +1022,7 @@ static inline __attribute__((always_inline)) float vsinf(float x) { x -= TAU * v
 static inline __attribute__((always_inline)) float vcosf(float x) { return vsinf(x + 1.57079632f); }
 static inline __attribute__((always_inline)) float vacosf(float x) {
     float negate = (x < 0.0f) ? 1.0f : 0.0f;
-    x = vabs(x);
-    float ret = -0.0187293f;
-    ret = ret * x + 0.0742610f;
-    ret = ret * x - 0.2121144f;
-    ret = ret * x + 1.5707288f;
-    ret = ret * vsqrtf(1.0f - x);
-    ret = ret - 2.0f * negate * ret;
+    x = vabs(x); float ret = (-0.0187293f * x + 0.0742610f) * x - 0.2121144f; ret = (ret * x + 1.5707288f) * vsqrtf(1.0f - x); ret = ret - 2.0f * negate * ret;
     return negate * PI + (1.0f - 2.0f * negate) * ret;
 }
 static inline __attribute__((always_inline)) float vtan(float x) { return vsinf(x) / vcosf(x); }
@@ -1345,8 +1052,6 @@ static inline __attribute__((always_inline)) float vexp2f(float x) {
 static inline __attribute__((always_inline)) float vexp(float x) { return vexp2f(x * 1.4426950409f); } // 1/ln(2)
 static inline __attribute__((always_inline)) float vpow(float a, float b) { return vexp(b * vlog(a)); }
 static inline __attribute__((always_inline)) int32_t clamp(int32_t val, int32_t min, int32_t max) { return (val > max) ? max : ((val < min) ? min : val); }
-
-// Math, Vectors, Quaternions
 static inline __attribute__((always_inline)) Vector3 Vector3_A_plus_B(Vector3 a, Vector3 b) { return (Vector3){a.x + b.x, a.y + b.y, a.z + b.z}; }
 static inline __attribute__((always_inline)) Vector3 Vector3_A_minus_B(Vector3 a, Vector3 b) { return (Vector3){a.x - b.x, a.y - b.y, a.z - b.z}; }
 static inline __attribute__((always_inline)) Vector3 scale_vector3(Vector3 v, float s) { return (Vector3){v.x * s, v.y * s, v.z * s}; }
@@ -1367,6 +1072,7 @@ static inline __attribute__((always_inline)) float squareDistance3D(float x1, fl
 static inline __attribute__((always_inline)) Quaternion quat_multiply(Quaternion q1, Quaternion q2) { return (Quaternion){(q1.w * q2.x + q1.x * q2.w + q1.y * q2.z - q1.z * q2.y),(q1.w * q2.y - q1.x * q2.z + q1.y * q2.w + q1.z * q2.x),(q1.w * q2.z + q1.x * q2.y - q1.y * q2.x + q1.z * q2.w),(q1.w * q2.w - q1.x * q2.x - q1.y * q2.y - q1.z * q2.z)}; } // Hamilton product, rotates q1 by q2
 static inline __attribute__((always_inline)) Vector3 quat_rotate_vector(Quaternion q, Vector3 v) { Quaternion r = quat_multiply((quat_multiply(q, (Quaternion){v.x,v.y,v.z,0.0f})),(Quaternion){-q.x,-q.y,-q.z,q.w}); return (Vector3){r.x,r.y,r.z}; } // Returns rotated input vector rotated by a quaternion.
 static inline __attribute__((always_inline)) uint8_t hardware14fromConstdex(uint16_t c) { return clamp(c - 21,0,14); }
+static inline __attribute__((always_inline)) bool ConstIndexIsPortalBlockingDoor(uint16_t entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }// All doors except see-through doors.
 static inline __attribute__((always_inline)) bool ConstIndexInBounds(int c) { return (c >= 0 && c <= 760); }
 static inline __attribute__((always_inline)) bool ConstIndexIsGeometry(int c) { return (c >= 0 && c <= 306 && c != 112 && c != 279) || c == 760; }
 static inline __attribute__((always_inline)) bool ConstIndexIsDoor(int c) { return (c >= 496 && c < 515); }
@@ -1381,10 +1087,4 @@ static inline __attribute__((always_inline)) bool ConstIndexIsUsableObject(uint1
 static inline __attribute__((always_inline)) bool ConstIndexIsAccessCard(uint16_t c) { return ((c >= 388 && c <= 398) || c == 417); }
 static inline __attribute__((always_inline)) bool ConstIndexIsDynamicObject(uint16_t c) { return (c >= 307 && c <= 404) ||  c == 417 || (c >= 419 && c <= 428) || (c >= 430 && c <= 437) || (c >= 440 && c <= 442) || (c >= 458 && c <= 463) || (c >= 465 && c <= 476); }
 static inline __attribute__((always_inline)) bool ConstIndexIsStaticObjectSaveable(int c) { return (c == 112 || c == 279 || (c >= 448 && c < 458) || c == 480 || c == 516 || (c >= 518 && c <= 526) || c == 530 || c == 531 || c == 546 || c == 555 || c == 594 || c == 596 || c == 598 || (c >= 600 && c < 603) || (c >= 604 && c < 616) || (c >= 688 && c < 693) || c == 694 || c == 695 || (c >= 699 && c < 704) || (c >= 741 && c < 746)); }
-static inline __attribute__((always_inline)) bool ConstIndexIsStaticObjectImmutable(int c) {
-	return ((c >= 527 && c < 530) || (c >= 532 && c < 546) || (c >= 547 && c < 553)
-			|| c == 554 || (c >= 556 && c < 594) || c == 595 || c == 597 || c == 599
-			|| c == 601 || c == 603 || (c >= 616 && c < 688) || c == 693 || c == 696 || c == 697
-			|| c == 698 || (c >= 704 && c < 717) || c == 720 || (c >= 733 && c < 736)
-			|| (c >= 737 && c < 739) || c == 746 || c == 747 || (c >= 750 && c <= 759 && c != 755));
-}
+static inline __attribute__((always_inline)) bool ConstIndexIsStaticObjectImmutable(int c) { return ((c >= 527 && c < 530) || (c >= 532 && c < 546) || (c >= 547 && c < 553) || c == 554 || (c >= 556 && c < 594) || c == 595 || c == 597 || c == 599 || c == 601 || c == 603 || (c >= 616 && c < 688) || c == 693 || c == 696 || c == 697 || c == 698 || (c >= 704 && c < 717) || c == 720 || (c >= 733 && c < 736) || (c >= 737 && c < 739) || c == 746 || c == 747 || (c >= 750 && c <= 759 && c != 755)); }

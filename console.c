@@ -94,15 +94,14 @@ static void cmd_noclip(void) {
     } else CenterStatusPrint("noclip: %s", Sys_Text.stringTable[717]); // "DISABLED"
 }
 
-void EnableCheatArsenal(uint8_t level) {
+void EnableCheatArsenal(uint8_t level) { // TODO
     switch(level) {
         default: break;
     }
 }
 
 void cmd_kill(void) {
-    CenterStatusPrint("%s", Sys_Text.stringTable[1011]); // "Player decides to become a cyborg."
-    // TakeDamage(...)
+    CenterStatusPrint("%s", Sys_Text.stringTable[1011]); // "Player decides to become a cyborg."  TakeDamage(...) // TODO
 }
 
 void cmd_undo(void) {
@@ -141,6 +140,7 @@ static void cmd_edit(void) {
     }
 }
 
+int32_t StringToInt(const char *str);
 static int ParseLevelArg(const char* arg) {
     if (!arg || !*arg) return -1;
 

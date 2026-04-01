@@ -219,7 +219,7 @@ static CapsuleContact QueryCapsuleContact(Vector3 start, Vector3 end, float caps
     return worst;
 }
 
-bool CheckCapsule(Vector3 start, Vector3 end, float capsuleRadius, float capsuleHeight, uint32_t layerMask) {
+ENGINE_TO_MOD bool CheckCapsule(Vector3 start, Vector3 end, float capsuleRadius, float capsuleHeight, uint32_t layerMask) {
     (void)capsuleHeight;
     return QueryCapsuleContact(start, end, capsuleRadius, layerMask).depth > 0.0f;
 }
@@ -470,9 +470,10 @@ void ApplyCorpseFriction(uint16_t instanceIdx) {
     Sys_Global.instances[instanceIdx].bounceCombine = PHYS_COMBINE_MAX;
 }
 
+extern ma_engine audio_engine;
 void UpdatePositions(void) {
     for (int32_t i=PLAYER1;i<Sys_Global.loadedInstances;++i) ApplyVelocityUntilCollision(i);
-    ma_engine_listener_set_position(&Sys_Global.audio_engine,0,Sys_Global.instances[PLAYER1].position.x,Sys_Global.instances[PLAYER1].position.y,Sys_Global.instances[PLAYER1].position.z);
+    ma_engine_listener_set_position(&audio_engine,0,Sys_Global.instances[PLAYER1].position.x,Sys_Global.instances[PLAYER1].position.y,Sys_Global.instances[PLAYER1].position.z);
 }
 
 void ClampVelocity(void) {
@@ -537,7 +538,7 @@ ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uin
         if (distSqrd >= (maxDistToObj * maxDistToObj)) continue;
 
         uint16_t constIndex = Sys_Global.instances[i].index;
-        if (!(Sys_Global.currentLevel == 1 && (constIndex == 309 || constIndex == 532)) && !EntityIndexIsPortalBlockingDoor(constIndex)) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
+        if (!(Sys_Global.currentLevel == 1 && (constIndex == 309 || constIndex == 532)) && !ConstIndexIsPortalBlockingDoor(constIndex)) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
             if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (constIndex != 754 || !skyVisible)) continue; // For some shelves that are inset away from cells, need to still draw their items by checking && CELL_OPEN here, unfortunately this means they don't ever get culled :(
         }
         
@@ -603,7 +604,7 @@ ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uin
     return result;
 }
 
-void RaycastAll(Vector3 origin, Vector3 dir, float distance, uint32_t layerMask, RaycastHit* hits, uint16_t maxCount) {
+ENGINE_TO_MOD void RaycastAll(Vector3 origin, Vector3 dir, float distance, uint32_t layerMask, RaycastHit* hits, uint16_t maxCount) {
     for (int i=0;i<maxCount;++i) hits[i].hit = false;
     //uint16_t hitHead = 0;
     (void)origin;

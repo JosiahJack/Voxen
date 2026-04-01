@@ -5,12 +5,7 @@ __attribute__((used)) AutoSplitterData autoSplitter = {0x1337133713371337,0,fals
 // Entity and Mod Initialization
 GlobalContext* Eng_Global; CheatsSystem*  Eng_Cheats; SettingsSystem* Eng_Settings; TextSystem* Eng_Text; SystemUI* Eng_UI; // From Engine
 MOD_TO_ENGINE void ModLink(GlobalContext* g,CheatsSystem* c,SettingsSystem* s,TextSystem* t,SystemUI* ui){Eng_Global=g;Eng_Cheats=c;Eng_Settings=s;Eng_Text=t;Eng_UI=ui;}
-int lev1SecCode;
-int lev2SecCode;
-int lev3SecCode;
-int lev4SecCode;
-int lev5SecCode;
-int lev6SecCode;
+int lev1SecCode,lev2SecCode,lev3SecCode,lev4SecCode,lev5SecCode,lev6SecCode;
 //=============================================================================
 // New Game
 MOD_TO_ENGINE void ModNewGame(void) {
@@ -821,7 +816,7 @@ void CyberPushOnTriggerExit(uint16_t self, uint16_t other) {
 // CyberDoor
 void CyberDoorOnCollisionEnter(uint16_t self, uint16_t other) {
     Entity* e = &Eng_Global->instances[self];
-    if (!e->isDoor || (other != PLAYER1 && other != PLAYER2)) return;
+    if (!ConstIndexIsDoor(e->index) || (other != PLAYER1 && other != PLAYER2)) return;
     CenterStatusPrint("%s  %s",Eng_Text->stringTable[e->messageIndex],Eng_Text->stringTable[601]);
 }
 //=============================================================================
@@ -1799,10 +1794,10 @@ float TargetIDGetSensingRange(bool manual) {
 float TargetIDGetTetherRange(void) { return (Eng_Global->invP1.hardwareVersion[HW_TID_IDX] >= 4) ? 22.0f : 15.0f; }
 static void TargetIDDeactivate(uint16_t self) {
     Entity* e = &Eng_Global->instances[self];
-    if (e->enemey != NULLENT) {
-        Entity* npc = &Eng_Global->instances[e->enemey];
+    if (e->enemy != WORLD) {
+        Entity* npc = &Eng_Global->instances[e->enemy];
         flag_set(&npc->entflags,ENTFLAG_TARGID_ATTACHED,false);
-        e->enemey = NULLENT;
+        e->enemy = NULLENT;
     }
     e->textIndex  = -1;
     flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
@@ -1810,8 +1805,8 @@ static void TargetIDDeactivate(uint16_t self) {
 
 void TargetIDSendDamageReceive(uint16_t self,float damage,AttackType attackType) {
     Entity* e   = &Eng_Global->instances[self];
-    if (e->enemey == NULLENT) return;
-    Entity* npc = &Eng_Global->instances[e->enemey];
+    if (e->enemy == NULLENT) return;
+    Entity* npc = &Eng_Global->instances[e->enemy];
     if (attackType == AttackType_Tranq) {
         e->textIndex         = 536; // STUNNED
         e->animSwapFinished  = Eng_Global->pauseRelativeTime - 1.0; // expire damage text
@@ -1833,8 +1828,8 @@ void TargetIDUpdate(uint16_t self) {
     if (!(e->entflags & ENTFLAG_ACTIVE)) return;
 
     // Deactivation checks
-    if (e->enemey == NULLENT)                                          { TargetIDDeactivate(self); return; }
-    Entity* npc = &Eng_Global->instances[e->enemey];
+    if (e->enemy == NULLENT)                                          { TargetIDDeactivate(self); return; }
+    Entity* npc = &Eng_Global->instances[e->enemy];
     if (npc->health <= 0.0f)                                           { TargetIDDeactivate(self); return; }
     if (distance_vector3(e->position,Eng_Global->instances[PLAYER1].position)
         > TARGETID_LINK_DIST)                                          { TargetIDDeactivate(self); return; }
@@ -1860,7 +1855,7 @@ void TargetIDUpdate(uint16_t self) {
     }
 
     // Secondary display string — built at render time from flags + npc state
-    // TODO: render TargetID billboard text using e->textIndex, e->enemey,
+    // TODO: render TargetID billboard text using e->textIndex, e->enemy,
     // e->ioflags TARGID_DISPLAY_* flags — pass to HUD/world-space text renderer:
     //   TARGID_DISPLAY_NAME    → npc->targetID string
     //   TARGID_DISPLAY_HEALTH  → vfloor(npc->health)
@@ -1875,7 +1870,7 @@ void TargetIDUpdate(uint16_t self) {
 void TargetIDInitAfterLoad(uint16_t self) {
     Entity* e        = &Eng_Global->instances[self];
     e->textIndex     = -1;
-    e->enemey        = NULLENT;
+    e->enemy        = NULLENT;
     e->tickFinished  = 0.0;
     e->animSwapFinished = 0.0;
     flag_set(&e->entflags,ENTFLAG_ACTIVE,false); // starts pooled
@@ -3256,8 +3251,8 @@ void DoorInitAfterLoad(uint16_t self) {
     }
     switch (e->doorOpen) {
         case DoorState_Open:    DoorSetClipFrame(self,DOOR_CLIP_IDLE_OPEN,DoorGetClip(e,DOOR_CLIP_IDLE_OPEN).frameStart); break;
-        case DoorState_Opening: DoorSetClipFrame(self,DOOR_CLIP_OPENING,DoorFrameFromProgress(DoorGetClip(e,DOOR_CLIP_OPENING),e->animatorPlaybackTime)); break;
-        case DoorState_Closing: DoorSetClipFrame(self,DOOR_CLIP_CLOSING,DoorFrameFromProgress(DoorGetClip(e,DOOR_CLIP_CLOSING),e->animatorPlaybackTime)); break;
+        case DoorState_Opening: DoorSetClipFrame(self,DOOR_CLIP_OPENING,DoorFrameFromProgress(DoorGetClip(e,DOOR_CLIP_OPENING),0.0f/*TODO percent of anim*/)); break;
+        case DoorState_Closing: DoorSetClipFrame(self,DOOR_CLIP_CLOSING,DoorFrameFromProgress(DoorGetClip(e,DOOR_CLIP_CLOSING),0.0f/*TODO percent of anim*/)); break;
         default:                DoorSetClipFrame(self,DOOR_CLIP_IDLE_CLOSED,DoorGetClip(e,DOOR_CLIP_IDLE_CLOSED).frameStart); break;
     }
     DoorSyncLayer(self);

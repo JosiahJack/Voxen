@@ -506,8 +506,8 @@ Entity EntityDefinitions[MAX_ENTITIES] = {
     {.path="doorG",.index=502,.modelIndex=0,.numclips=4,.animationNum=11,.texIndex=193,.glowIndex=194},
     {.path="doorH",.index=503,.modelIndex=0,.numclips=4,.animationNum=12,.texIndex=190},
     {.path="doorI",.index=504,.modelIndex=0,.numclips=4,.animationNum=13,.texIndex=200,.glowIndex=199},
-    {.path="doorJ",.index=506,.modelIndex=82,.numclips=4,.animationNum=7,.texIndex=214},
-    {.path="doorK",.index=505,.modelIndex=82,.numclips=4,.animationNum=6,.texIndex=215},
+    {.path="doorJ",.index=505,.modelIndex=0,.numclips=4,.animationNum=6,.texIndex=215},
+    {.path="doorK",.index=506,.modelIndex=0,.numclips=4,.animationNum=7,.texIndex=214},
     {.path="doorL",.index=507,.modelIndex=0,.numclips=4,.animationNum=8,.texIndex=191},
     {.path="door_elevator1",.index=508,.modelIndex=0,.numclips=4,.animationNum=14,.texIndex=202},
     {.path="door_elevator2",.index=509,.modelIndex=0,.numclips=4,.animationNum=15,.texIndex=203},
@@ -1105,7 +1105,6 @@ MOD_TO_ENGINE void LoadLevelMod(uint8_t curlevel) {
                 else if (StringsEqual(trimmed_key,"toggleLasers"))    inst->toggleLasers = parse_bool(trimmed_value,initialLine,lineNum);
                 else if (StringsEqual(trimmed_key,"targettingOnlyUnlocks")) inst->targettingOnlyUnlocks = parse_bool(trimmed_value,initialLine,lineNum);
                 else if (StringsEqual(trimmed_key,"changeLayerOnOpenClose")) inst->changeLayerOnOpenClose = parse_bool(trimmed_value,initialLine,lineNum);
-                else if (StringsEqual(trimmed_key,"animatorPlaybackTime") || StringsEqual(trimmed_key,"asi.normalizedTime")) inst->animatorPlaybackTime = parse_float(trimmed_value, initialLine, lineNum);
                 else if (StringsEqual(trimmed_key,"useFinished"))     inst->useFinished = parse_float(trimmed_value, initialLine, lineNum) + Eng_Global->pauseRelativeTime;
                 else if (StringsEqual(trimmed_key,"waitBeforeClose")) inst->waitBeforeClose = parse_float(trimmed_value,initialLine, lineNum) + Eng_Global->pauseRelativeTime;
                 else if (StringsEqual(trimmed_key,"lasersFinished"))  inst->lasersFinished = parse_float(trimmed_value,initialLine, lineNum) + Eng_Global->pauseRelativeTime;
@@ -1205,7 +1204,6 @@ MOD_TO_ENGINE void LoadLevelMod(uint8_t curlevel) {
         par->toggleLasers          = src->toggleLasers;
         par->targettingOnlyUnlocks = src->targettingOnlyUnlocks;
         par->changeLayerOnOpenClose= src->changeLayerOnOpenClose;
-        par->animatorPlaybackTime  = src->animatorPlaybackTime;
         par->useFinished           = src->useFinished;
         par->waitBeforeClose       = src->waitBeforeClose;
         par->lasersFinished        = src->lasersFinished;
@@ -1221,7 +1219,7 @@ MOD_TO_ENGINE void LoadLevelMod(uint8_t curlevel) {
         StringCopyInto_A_From_B(par->targetname,src->targetname,TARGET_STRING_LENGTH);
         StringCopyInto_A_From_B(par->texAnimResourceFolder,src->texAnimResourceFolder,TARGET_STRING_LENGTH);
         TextureSequenceInit(parent,par->texAnimResourceFolder);
-        if (EntityIndexIsPortalBlockingDoor(entIdx)) AddDoorPortal(entIdx, parent); // Only at load, not in AddInstance
+        if (ConstIndexIsPortalBlockingDoor(entIdx)) AddDoorPortal(entIdx, parent); // Only at load, not in AddInstance
     }
     
     DualLog("Total children added: %u\n",childrenTotal);

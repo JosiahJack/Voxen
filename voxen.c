@@ -30,27 +30,24 @@ SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on f
     .ScreenWidth=800u,.ScreenHeight=600u,.Fullscreen=0u,.FOV=65u,.Brightness=50u,.Gamma=50u,.AntiAliasing=0u,.Shadows=0u,.Reflections=0u,.Vsync=0u,.ModelDetail=0u,
     .GI=0u,.SpeakerMode=1u,.Reverb=0u,.VolumeMaster=100u,.VolumeMusic=25u,.VolumeMessage=75u,.VolumeEffects=100u,.Language=0u,.DynamicMusic=1u,.Footsteps=1u,.InvertLook=0u,
     .InvertCyberspaceLook=0u,.QuickItemPickup=0u,.QuickReloadWeapons=0u,.MouseSensitivity=10u,.NoShootMode=0u,.HeadBob=1u,.SSR_RES=8u};/*Ratio is (1 / SSR_RES) * res*/
+#define SHADOW_MAP_SIZE 128u
 uint8_t queuedLevelToLoad = 255u;
-float berserkSeedTime, cam_pitch,cam_yaw=90.0f,cam_roll, rasterPerspectiveProjection[16], shadowmapsPerspectiveProjection[16], modelMatrices[INSTANCE_COUNT * 16];
-double berserkFinished;
+float berserkSeedTime,cam_pitch,cam_yaw=90.0f,cam_roll,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],modelMatrices[INSTANCE_COUNT*16];
 char uiTextBuffer[TEXT_BUFFER_SIZE];
 float uiOrthoProjection[16];
-extern uint32_t gridCellStates[ARRSIZE];
 Light lights[LIGHT_COUNT]; LightAnimation lanims[LIGHT_COUNT];
-static float lightView[LIGHT_COUNT][6][4][4]; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightView[i][face][0 ... 15]
-static float lightViewProj[LIGHT_COUNT][6][16]; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightViewProj[i][face][0 ... 15]
-FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6]; // Array of Array of 6 Arrays of FrustumPlane structs (four floats).  lightFrustumPlanes[i][face][.nx,.ny,, .nz, .d]
-FrustumPlane playerFrustumPlanes[6];
-uint16_t editModeSelection, editModeTestEntityDefinition = 0; // Test instance and its model index
+static float lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
+FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6],playerFrustumPlanes[6];
+uint16_t editModeSelection,editModeTestEntityDefinition=0; // Test instance and its model index
 typedef struct { double shadowTime; uint32_t numShadowsCouldRender; uint32_t shadowmapIndirectionList[LIGHT_COUNT]; float shadDotThresh; } VoxenShadowSystem;
 VoxenShadowSystem voxen_Shadow_System;
 uint16_t loadedTexturesMaxIndex;
-bool doubleSidedTexture[MAX_VALID_TEXTURE]; bool transparentTexture[MAX_VALID_TEXTURE];
-extern uint32_t modelVertexCounts[MODEL_IDX_MAX]; extern uint16_t modelTriangleCounts[MODEL_IDX_MAX];
+bool doubleSidedTexture[MAX_VALID_TEXTURE],transparentTexture[MAX_VALID_TEXTURE];
+extern uint32_t gridCellStates[ARRSIZE],modelVertexCounts[MODEL_IDX_MAX]; extern uint16_t modelTriangleCounts[MODEL_IDX_MAX];
 uint32_t drawCallsRenderedThisFrame,textDrawCallsRenderedThisFrame,uiImageDrawCallsRenderedThisFrame,shadowDrawCallsRenderedThisFrame,verticesRenderedThisFrame,drawCallsNormal;
-extern GLuint fontAtlasTex; extern GLuint fontAtlasTexStopD;
+extern GLuint fontAtlasTex,fontAtlasTexStopD;
 #define MAX_CHANNELS 256
-ma_sound wav_sounds[MAX_CHANNELS];
+ma_engine audio_engine; ma_sound wav_sounds[MAX_CHANNELS];
 float wav_volumes[MAX_CHANNELS]; // Setting independent base sfx volume (e.g. dropped physics object hard or lightly volume, independent of position).
 int32_t wav_count = 0; ma_sound log_sound;
 #define MENUPAD        1028
@@ -65,7 +62,7 @@ typedef struct { int w, h, hz; } ResMode;
 static ResMode resModes[8];
 static int resSelectedIdx = 0;
 #define MAX_CAMVIEWS 11
-typedef struct { Vector3 position; Quaternion rotation; uint8_t fov; uint16_t width; uint16_t height; float near; float far; float finished; bool sensaround; } CamView;
+typedef struct { Vector3 position; Quaternion rotation; uint8_t fov; uint16_t width,height; float near,far,finished; bool sensaround; } CamView;
 CamView camViews[MAX_CAMVIEWS]; // Max is 8 camera views on level 8 + 3 sensaround views.  Populated at level load.
 GLuint camViewTextures[MAX_CAMVIEWS];
 uint8_t camViewCount = 0;
@@ -252,6 +249,7 @@ static inline __attribute__((always_inline)) void mul_mat4(float *out, const flo
 	out[15] = a[3] * b[12] + a[7] * b[13] + a[11]* b[14] + a[15] * b[15];
 }
 
+bool NeighborhoodInPVS(uint16_t cellX, uint16_t cellZ, int r);
 void UpdateLights(void) {
     bool voxelsNeedUpdated = false;
     for (uint16_t lightIdx = 0; lightIdx < Sys_Global.loadedLights; ++lightIdx) { 
@@ -273,20 +271,7 @@ void UpdateLights(void) {
         float range = lights[lightIdx].range;
         int r = vceil(range * (1.0f / WORLDCELL_WIDTH_F));
         lightInPVS[lightIdx] = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
-        if (!lightInPVS[lightIdx]) {
-            for (int ix = cellX - r; ix <= (int)cellX + r; ++ix) {
-                for (int iz = cellZ - r; iz <= (int)cellZ + r; ++iz) {
-                    if (unlikely(!XZPairInBounds(ix, iz))) continue;
-                    
-                    int subIdx = iz * WORLDX + ix;
-                    if (get_cull_bit(precomputedVisibleCellsFromHere, lightCellIdx * ARRSIZE + subIdx) && (gridCellStates[subIdx] & CELL_VISIBLE)) {
-                        lightInPVS[lightIdx] = true;
-                        break;
-                    }
-                }
-            }
-        }
-        
+        if (!lightInPVS[lightIdx]) lightInPVS[lightIdx] = NeighborhoodInPVS(cellX,cellZ,r);
         flag_setu32(&lights[lightIdx].lflags,LDIRTY,false);
     }
     
@@ -540,7 +525,7 @@ static inline __attribute__((always_inline)) int32_t GetGLFWIndirectionIndexForA
     return 148;
 }
 
-char* GetNextStringUpToNewlineOrEOF(char* buf, int size, OsFileHandle fd); char* data_parser_trim(char* s);
+char *GetNextStringUpToNewlineOrEOF(char*,int,OsFileHandle),*data_parser_trim(char*); int32_t StringToInt(const char*);
 void LoadConfig(void) {
     OsFileHandle f = OS_OpenReadonly("./Data/Config.ini");
     char line[512];
@@ -580,6 +565,17 @@ void SaveConfig(void) {
     DualLog("Saved settings to ./Data/Config.ini!\n");
 }
 
+void TextEntry(int32_t k) {
+    if (k == GLFW_KEY_U && Sys_Input.keyStates[GLFW_KEY_LEFT_CONTROL].down) { Sys_Global.playerName[0] = '\0'; currentPlayerNameLength = 0; return; }
+    if (k == GLFW_KEY_ENTER || k == GLFW_KEY_KP_ENTER) { currentMenuItem++; return; }
+    if (k == GLFW_KEY_BACKSPACE && currentPlayerNameLength > 0) { Sys_Global.playerName[--currentPlayerNameLength] = '\0'; return; }
+    if (currentPlayerNameLength >= 26) return;
+    char c = (k >= GLFW_KEY_A && k <= GLFW_KEY_Z) ? 'a' + (k - GLFW_KEY_A) :
+             (k >= GLFW_KEY_1 && k <= GLFW_KEY_9) ? '1' + (k - GLFW_KEY_1) :
+             (k == GLFW_KEY_0)                    ? '0' : (k == GLFW_KEY_SPACE) ? ' ' : 0;
+    if (c) { Sys_Global.playerName[currentPlayerNameLength] = c; Sys_Global.playerName[++currentPlayerNameLength] = '\0'; }
+}
+
 extern bool enteringPlayerName;
 void ConsoleEmulator(int32_t keycode);
 int32_t Input_KeyDown(int32_t keycode) {
@@ -596,9 +592,9 @@ void UpdatePlayerFacingAngles(void) {
     float y2 = rot.y * rot.y;  float xz = rot.x * rot.z;  float wy = rot.w * rot.y;
     Sys_Global.instances[PLAYER1].forward = normalize_vector3((Vector3){ 2.0f * (xz + wy), 2.0f * (rot.y * rot.z - rot.w * rot.x), 1.0f - 2.0f * (rot.x * rot.x + y2) });
     Sys_Global.instances[PLAYER1].right = normalize_vector3((Vector3){ 1.0f - 2.0f * (y2 + rot.z * rot.z), 2.0f * (rot.x * rot.y + rot.w * rot.z), 2.0f * (xz - wy) });
-    ma_engine_listener_set_direction(&Sys_Global.audio_engine,0,Sys_Global.instances[PLAYER1].forward.x,Sys_Global.instances[PLAYER1].forward.y,Sys_Global.instances[PLAYER1].forward.z);
+    ma_engine_listener_set_direction(&audio_engine,0,Sys_Global.instances[PLAYER1].forward.x,Sys_Global.instances[PLAYER1].forward.y,Sys_Global.instances[PLAYER1].forward.z);
     Vector3 up = cross_vector3(Sys_Global.instances[PLAYER1].forward,Sys_Global.instances[PLAYER1].right);
-    ma_engine_listener_set_world_up(&Sys_Global.audio_engine,0,up.x,up.y,up.z);
+    ma_engine_listener_set_world_up(&audio_engine,0,up.x,up.y,up.z);
 }
 
 // Create a quaternion from yaw (around Y), pitch (around X), and roll (around Z) in degrees
@@ -859,6 +855,15 @@ ENGINE_TO_MOD void AddCamView(Vector3 pos, Quaternion rot, uint8_t fov, uint16_t
     if (camViewCount >= MAX_CAMVIEWS) DualLogWarn("Too many camviews!\n");
 }
 
+void GoIntoGame(void) {
+    Sys_Global.menuActive = Sys_Global.gamePaused = enteringPlayerName = gammaSliderActive = fovSliderActive = masterVolumeSliderActive = musicVolumeSliderActive = messageVolumeSliderActive = sfxVolumeSliderActive = returnToPause = false;
+    currentMenuItem = currentMenuTab = 0; currentMenuPage = MenuPages_FrontPage;
+    Sys_Global.inventoryMode = false;
+    NewGame();
+    PlayGameMusic();
+    DualLog("Player named \"%s\" started the game!\n", Sys_Global.playerName);
+}
+
 // GLFW Callbacks
 bool IsNonRepeatingKey(int32_t key) { return key == GLFW_KEY_KP_ENTER || key == GLFW_KEY_ENTER || key == GLFW_KEY_TAB || key == GLFW_KEY_ESCAPE; }
 
@@ -1001,7 +1006,7 @@ float GetSoundRemainingTime(ma_sound* pSound) {
     if (currentFrame >= pcmFramesLength) return 0.0f;
 
     uint64_t deltaFrames = pcmFramesLength - currentFrame;
-    uint32_t sampleRate = ma_engine_get_sample_rate(&Sys_Global.audio_engine);
+    uint32_t sampleRate = ma_engine_get_sample_rate(&audio_engine);
     return (float)deltaFrames / (float)sampleRate;
 }
 
@@ -1025,7 +1030,7 @@ void play_mp3(const char* path, int32_t fade_in_ms) {
     int32_t next_slot = Sys_Global.mp3_slot ? 0 : 1;
     if (ma_sound_is_playing(&Sys_Global.mp3_sounds[old_slot])) ma_sound_set_fade_in_milliseconds(&Sys_Global.mp3_sounds[old_slot], GetMusicVolume(), 0.0f, fade_in_ms);
     ma_sound_uninit(&Sys_Global.mp3_sounds[next_slot]); 
-    ma_result result = ma_sound_init_from_file(&Sys_Global.audio_engine, path, MA_SOUND_FLAG_STREAM, NULL, NULL, &Sys_Global.mp3_sounds[next_slot]);
+    ma_result result = ma_sound_init_from_file(&audio_engine, path, MA_SOUND_FLAG_STREAM, NULL, NULL, &Sys_Global.mp3_sounds[next_slot]);
     if (result != MA_SUCCESS) { DualLog("ERROR: Failed to load MP3 %s: %d\n", path, result); return; }
 
     ma_sound_set_fade_in_milliseconds(&Sys_Global.mp3_sounds[next_slot], 0.0f, GetMusicVolume(), fade_in_ms);
@@ -1046,7 +1051,7 @@ ENGINE_TO_MOD void play_wav(const char* path, float volume, Vector3 pos, bool po
     if (slot == -1 && wav_count < MAX_CHANNELS) slot = wav_count++; // If no free slot, use a new one if available
     if (slot == -1) { DualLog("WARNING: Max effect WAV channels (%d) reached\n", MAX_CHANNELS); return; }
 
-    ma_result result = ma_sound_init_from_file(&Sys_Global.audio_engine, path, 0, NULL, NULL, &wav_sounds[slot]);
+    ma_result result = ma_sound_init_from_file(&audio_engine, path, 0, NULL, NULL, &wav_sounds[slot]);
     if (result != MA_SUCCESS) {
         DualLog("ERROR: Failed to load effect WAV %s: %d\n", path, result);
         if (slot == wav_count - 1) wav_count--; // Revert count if init fails
@@ -1060,9 +1065,9 @@ ENGINE_TO_MOD void play_wav(const char* path, float volume, Vector3 pos, bool po
     ma_sound_start(&wav_sounds[slot]);
 }
 
-void play_message(const char* path) {
+ENGINE_TO_MOD void play_message(const char* path) {
     if (ma_sound_is_playing(&log_sound)) { ma_sound_stop(&log_sound); ma_sound_uninit(&log_sound); }
-    ma_result result = ma_sound_init_from_file(&Sys_Global.audio_engine, path, 0, NULL, NULL, &log_sound);
+    ma_result result = ma_sound_init_from_file(&audio_engine, path, 0, NULL, NULL, &log_sound);
     if (result != MA_SUCCESS) { DualLog("ERROR: Failed to load message WAV %s: %d\n", path, result); return; }
     
     ma_sound_set_spatialization_enabled(&log_sound, false);
@@ -1071,7 +1076,7 @@ void play_message(const char* path) {
 }
 
 ENGINE_TO_MOD void SoundUninit(ma_sound* snd) { ma_sound_uninit(snd); }
-ENGINE_TO_MOD ma_result SoundInit(const char* path, ma_uint32 flags, ma_sound_group* pGroup, ma_fence* pDoneFence, ma_sound* pSound) { return ma_sound_init_from_file(&Sys_Global.audio_engine,path,flags,pGroup,pDoneFence,pSound); }
+ENGINE_TO_MOD ma_result SoundInit(const char* path, ma_uint32 flags, ma_sound_group* pGroup, ma_fence* pDoneFence, ma_sound* pSound) { return ma_sound_init_from_file(&audio_engine,path,flags,pGroup,pDoneFence,pSound); }
 ENGINE_TO_MOD void SoundSetLooping(ma_sound* pSound, ma_bool32 isLooping) { ma_sound_set_looping(pSound,isLooping); }
 ENGINE_TO_MOD ma_result SoundStart(ma_sound* pSound) { return ma_sound_start(pSound); }
 ENGINE_TO_MOD ma_result SoundStop(ma_sound* pSound) { return ma_sound_stop(pSound); }
@@ -1084,15 +1089,6 @@ ENGINE_TO_MOD float SoundGetLength(ma_sound* pSound) {
     
     ma_uint32 sr = ma_engine_get_sample_rate(ma_sound_get_engine(pSound));
     return (sr == 0) ? 0.0f : (float)frames / (float)sr;
-}
-
-void GoIntoGame(void) {
-    Sys_Global.menuActive = Sys_Global.gamePaused = enteringPlayerName = gammaSliderActive = fovSliderActive = masterVolumeSliderActive = musicVolumeSliderActive = messageVolumeSliderActive = sfxVolumeSliderActive = returnToPause = false;
-    currentMenuItem = currentMenuTab = 0; currentMenuPage = MenuPages_FrontPage;
-    Sys_Global.inventoryMode = false;
-    NewGame();
-    PlayGameMusic();
-    DualLog("Player named \"%s\" started the game!\n", Sys_Global.playerName);
 }
 
 void GatherResolutionModes(void) {
@@ -1180,6 +1176,7 @@ void SetSpeakerMode(void) {
     }
 }
 
+void LoadTextForLanguage(uint8_t),LoadLogTextForLanguage(uint8_t);
 void SetLanguage(void) { LoadTextForLanguage(Sys_Settings.Language); LoadLogTextForLanguage(Sys_Settings.Language); }
 
 void ApplySettings(void) {
@@ -1262,8 +1259,9 @@ extern unsigned char *stbi_load_from_memory(const uint8_t* buffer, int32_t len, 
 extern int32_t stbi_arena_size;
 extern uint8_t*  stbi__arena_base;
 extern void stbi__arena_init(void);
-void LoadTextures(void); void LoadModels(void);
+void LoadTextures(void),LoadModels(void),InitFontAtlasses(void);
 #define STBI_ARENA_SIZE 16 * 1024 * 1024
+#define LIGHT_RANGE_MAX 15.36f
 void LoadConfig(void);
 __attribute__((cold)) void InitializeEnvironment(void) {
     double init_start_time = get_time();
@@ -1345,7 +1343,7 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     ma_result result;
     ma_engine_config engine_config = ma_engine_config_init();
     engine_config.channels = 2; // Stereo output, adjust if needed
-    result = ma_engine_init(&engine_config, &Sys_Global.audio_engine); if (result != MA_SUCCESS) DualLog("ERROR: Failed to initialize miniaudio engine: %d\n", result);
+    result = ma_engine_init(&engine_config, &audio_engine); if (result != MA_SUCCESS) DualLog("ERROR: Failed to initialize miniaudio engine: %d\n", result);
     LoadGameModDefinition();
     LoadModFunctions();
     ModEntityDefinitionsInitAfterLoad();
@@ -1413,17 +1411,6 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     glfwSetInputMode(window,GLFW_CURSOR,GLFW_CURSOR_DISABLED);
     DebugRAM("InitializeEnvironment end");
     DualLog("InitializeEnvironment completed\n");
-}
-
-void TextEntry(int32_t k) {
-    if (k == GLFW_KEY_U && Sys_Input.keyStates[GLFW_KEY_LEFT_CONTROL].down) { Sys_Global.playerName[0] = '\0'; currentPlayerNameLength = 0; return; }
-    if (k == GLFW_KEY_ENTER || k == GLFW_KEY_KP_ENTER) { currentMenuItem++; return; }
-    if (k == GLFW_KEY_BACKSPACE && currentPlayerNameLength > 0) { Sys_Global.playerName[--currentPlayerNameLength] = '\0'; return; }
-    if (currentPlayerNameLength >= 26) return;
-    char c = (k >= GLFW_KEY_A && k <= GLFW_KEY_Z) ? 'a' + (k - GLFW_KEY_A) :
-             (k >= GLFW_KEY_1 && k <= GLFW_KEY_9) ? '1' + (k - GLFW_KEY_1) :
-             (k == GLFW_KEY_0)                    ? '0' : (k == GLFW_KEY_SPACE) ? ' ' : 0;
-    if (c) { Sys_Global.playerName[currentPlayerNameLength] = c; Sys_Global.playerName[++currentPlayerNameLength] = '\0'; }
 }
 
 extern bool mouseMovementThisFrame;
@@ -1935,7 +1922,7 @@ void RenderCredits(void) {
 
 void RenderMenu(void);
 void RenderPausedUI(void);
-extern float shadBiasMin; extern uint16_t playerCellIdx;
+extern float shadBiasMin; extern uint16_t playerCellIdx; extern char consoleEntryText[TEXT_BUFFER_SIZE];
 static inline __attribute__((always_inline)) double RenderUI(void) {
     float* m;
     m = uiOrthoProjection;
@@ -1959,7 +1946,7 @@ static inline __attribute__((always_inline)) double RenderUI(void) {
     if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 2),TEXT_WHITE,FONT_NORMAL,1.0f,"Player velocity: %.2f, %.2f, %.2f",Sys_Global.instances[PLAYER1].velocity.x,Sys_Global.instances[PLAYER1].velocity.y,Sys_Global.instances[PLAYER1].velocity.z);
     if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 3),TEXT_WHITE,FONT_NORMAL,1.0f,"Shadow cpu ms: %.3f",voxen_Shadow_System.shadowTime * 1000);
     RenderFormattedText(16,debugTextStartY + (lineSpacing * 4),TEXT_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d  dx:%d dy:%d",Sys_Global.cursorPosition_x,Sys_Global.cursorPosition_y,Sys_Input.currentMouse_dx,Sys_Input.currentMouse_dy);
-    if (Sys_Cheats.consoleActive) RenderFormattedText(16, 0, TEXT_WHITE, FONT_NORMAL,1.0f, "] %s",consoleEntryText);
+    if (Sys_Cheats.consoleActive) RenderFormattedText(16,0,TEXT_WHITE,FONT_NORMAL,1.0f, "] %s",consoleEntryText);
     if (Sys_Global.statusTextDecayFinished > Sys_Global.current_time) RenderFormattedText(479,114,TEXT_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
     if (!Sys_Global.menuActive && !Sys_Global.gamePaused) {
         if (!Sys_Global.gamePaused && !Sys_Cheats.noHUD) RenderUIImage(672,0,22,22,1020); // Shoot mode button
@@ -2153,18 +2140,9 @@ static inline __attribute__((always_inline)) bool DetermineIfInstanceVisible(uin
     float radius = modelBounds[(Sys_Global.instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f * vmax(vmax(Sys_Global.instances[i].scale.x,Sys_Global.instances[i].scale.y),Sys_Global.instances[i].scale.z);
     if (!SphereInFrustum(playerFrustumPlanes,objPos,radius) && (Sys_Global.instances[i].index != 754 || !skyVisible) && i != editModeSelection) return false;
     
-    if (EntityIndexIsPortalBlockingDoor(Sys_Global.instances[i].index)) { // Extra checks only needed for opaque portal blocking doors.
+    if (ConstIndexIsPortalBlockingDoor(Sys_Global.instances[i].index)) { // Extra checks only needed for opaque portal blocking doors.
         bool inPVS = (gridCellStates[instCellIdx] & CELL_VISIBLE);
-        if (!inPVS) {
-            for (int ix=cellX - 2;ix<=(int)cellX + 2 && !inPVS;++ix) {
-                for (int iz=cellZ - 2;iz<=(int)cellZ + 2;++iz) {
-                    if (!XZPairInBounds(ix, iz)) return false;
-
-                    int subIdx = iz * WORLDX + ix;
-                    if (get_cull_bit(precomputedVisibleCellsFromHere,instCellIdx * ARRSIZE + subIdx) && (gridCellStates[subIdx] & CELL_VISIBLE)) { inPVS = true; break; }
-                }
-            }
-        }
+        if (!inPVS) inPVS = NeighborhoodInPVS(cellX,cellZ,2);
         if (!inPVS) return false;
     } else {
         if (!(Sys_Global.currentLevel == 1 && (Sys_Global.instances[i].index == 309 ||  Sys_Global.instances[i].index == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
@@ -2349,8 +2327,8 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D,Sys_Render.inputImageID);
     glUniform1i(4,4); // outputImage texture sampler2D, don't remember why when active texture is texture 0.  meh.... oh maybe to not read and write same binding?
-    double berserkTimeRemainingNormalized = berserkFinished > 0.0001 ? (berserkFinished - Sys_Global.pauseRelativeTime) / BERSERK_TIME : 0.0;
-    if (berserkFinished < Sys_Global.pauseRelativeTime && berserkFinished > 0.0001) berserkFinished = berserkTimeRemainingNormalized = 0.0;
+    double berserkTimeRemainingNormalized = Sys_Global.invP1.berserkFinishedTime > 0.0001 ? (Sys_Global.invP1.berserkFinishedTime - Sys_Global.pauseRelativeTime) / BERSERK_TIME : 0.0;
+    if (Sys_Global.invP1.berserkFinishedTime < Sys_Global.pauseRelativeTime && Sys_Global.invP1.berserkFinishedTime > 0.0001) Sys_Global.invP1.berserkFinishedTime = berserkTimeRemainingNormalized = 0.0;
     glUniform1ui(5,Sys_Settings.Reflections);
     glUniform1ui(6,Sys_Settings.AntiAliasing);
     glUniform1f(14,Sys_Settings.FOV);
@@ -2406,7 +2384,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
     CHECK_GL_ERROR();
 }
 
-bool UpdatedPlayerCell(void); bool CullCore(void); extern uint32_t random_range_rng;
+bool UpdatedPlayerCell(void); bool CullCore(void); int32_t Physics(void); extern uint32_t random_range_rng;
 int32_t main(void) {
     double game_start_time = get_time();
     random_range_rng = (uint32_t)game_start_time; // Seed global rand uniquely with time since system boot.
@@ -2430,8 +2408,6 @@ int32_t main(void) {
         Sys_Global.absoluteTime += Sys_Global.deltaTime;
         Sys_Global.last_topframe_time = Sys_Global.current_time;
         if (!Sys_Global.gamePaused && !Sys_Global.menuActive) Sys_Global.pauseRelativeTime += Sys_Global.deltaTime;
-    
-        // Update Events, calls Physics()
         mouseMovementThisFrame = false;
         glfwPollEvents();
         Input_PollJoysticks();

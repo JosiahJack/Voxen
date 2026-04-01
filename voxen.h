@@ -11,7 +11,6 @@
 #define MAX_JOYSTICK_HATS 5
 #define MAX_GAMEPAD_BUTTONS 20
 #define MAX_SHADOWMAPS 256u
-#define SHADOW_MAP_SIZE 128u
 #define MAX_SAVENAME_LENGTH 24
 #define MAX_PALETTE_SIZE 256
 #define MAX_TEXTURE_DIMENSION 2048
@@ -34,7 +33,6 @@
 #define ARRSIZE (WORLDX * WORLDZ)
 #define WORLDCELL_WIDTH_F 2.56f
 #define CELLXHALF (WORLDCELL_WIDTH_F * 0.5f)
-#define PRECOMPUTED_VISIBILITY_SIZE 524288 // 4096 * 4096 / 32
 #define VOXEL_COUNT 262144 // 64 * 64 * 8 * 8
 #define MAX_LIGHTS_PER_VOXEL 32 // Cap to prevent overflow
 #define CELL_VISIBLE       1u
@@ -58,94 +56,36 @@
 #define MAX_GLYPHS 4096
 extern GlobalContext Sys_Global;
 extern SystemUI Sys_UI;
+typedef struct { uint16_t x,z; } PortalCell;
+typedef struct { PortalCell cellA,cellB; bool portalNS, open,dirty; } Portal;
 typedef struct {bool down,pressed,released;} KeyState;
 typedef struct {
-	KeyState keyStates[MAX_KEYS];
-	KeyState mouseButtons[MAX_MOUSE_BUTTONS];
-	KeyState gamepadButtons[MAX_GAMEPAD_BUTTONS];
-	bool joystickPresent[16];
-	KeyState joystickButtons[16][MAX_JOYSTICK_BUTTONS];
-	KeyState joystickHats[MAX_JOYSTICK_HATS]; // What can I say, I'm a man of many hats. ^^D
-	bool window_has_focus;
-	double last_mouse_x, last_mouse_y;
-    int32_t currentMouse_dx, currentMouse_dy;
-	double scrollDelta;
-	bool ignore_next_mouse_delta;
-	bool lastUse;
-	bool isCapsLockOn;
+	double last_mouse_x,last_mouse_y,scrollDelta;
+	KeyState keyStates[MAX_KEYS],mouseButtons[MAX_MOUSE_BUTTONS],gamepadButtons[MAX_GAMEPAD_BUTTONS],joystickButtons[16][MAX_JOYSTICK_BUTTONS],joystickHats[MAX_JOYSTICK_HATS]; // What can I say, I'm a man of many hats. ^^D
+    int32_t currentMouse_dx,currentMouse_dy;
+	bool window_has_focus,ignore_next_mouse_delta,lastUse,isCapsLockOn,joystickPresent[16];
 } InputSystem;
 extern InputSystem Sys_Input;
-
+typedef struct { uint64_t mtime_ns,size,inode,dev; } FileFingerprint;
 typedef struct { Vector3 normal; float d; } FrustumPlane;
-typedef struct StbiArena { uint8_t* base; uint8_t* cursor; uint8_t* end; } StbiArena;
+typedef struct StbiArena { uint8_t*base,*cursor,*end; } StbiArena;
 typedef uint32_t GLuint;
 typedef struct {
-    GLuint inputImageID;
-    GLuint inputDepthID;
-    GLuint inputWorldPosID;
-    GLuint inputSpecID;
-    GLuint inputNormalID;
-    GLuint inputImageLastID;
-    GLuint gBufferFBO;
-    GLuint outputImageID;
+    GLuint inputImageID,inputDepthID,inputWorldPosID,inputSpecID,inputNormalID,gBufferFBO,outputImageID;
     GLuint depthPrepassShaderProgram;
-    GLuint chunkShaderProgram; // Generic lit and unlit raster shader forward+
+    GLuint chunkShaderProgram,vao_chunk; // Generic lit and unlit raster shader forward+
     GLuint debugUnlitShaderProgram;
-    GLuint vao_chunk; // Vertex Array Object
-    GLuint shadowFBO;
-    GLuint shadowmapsShaderProgram;
-    GLuint shadowmapsClearShaderProgram;
-    GLuint shadowMapSSBO;
+    GLuint shadowmapsShaderProgram,shadowmapsClearShaderProgram,shadowMapSSBO,shadowMapsIndirectionID;
     GLuint ssrShaderProgram; // SSR (Screen Space Reflections)
-    GLuint imageBlitShaderProgram; // Full Screen Quad Blit for rendering final compositing output/image effect passes
-    GLuint quadVAO;
-    GLuint quadVBO;
-    GLuint textShaderProgram;
-    GLuint textVAO;
-    GLuint textVBO;
-    GLuint debugLinesVAO;
-    GLuint debugLinesVBO;
+    GLuint imageBlitShaderProgram,quadVAO,quadVBO; // Full Screen Quad Blit for rendering final compositing output/image effect passes
+    GLuint textShaderProgram,textVAO,textVBO;
+    GLuint debugLinesVAO,debugLinesVBO;
     GLuint blueNoiseBuffer;
-    GLuint modelAnimDeltasID;
-    GLuint modelAnimDeltaOffsetsID;
     GLuint matricesBufferID;
-    GLuint colorBufferID;
-    GLuint texturePalettesID;
-    GLuint textureOffsetsID;
-    GLuint textureSizesID;
-    GLuint texturePaletteOffsetsID;
-    GLuint lightsID;
-    GLuint shadowMapsIndirectionID;
-    GLuint cellVisibleDataID;
-    GLuint voxelUpdateShaderProgram;
-    GLuint voxelLightListCountsID;
-    GLuint uniqueLightListsID;
-    GLuint vbos[MODEL_IDX_MAX];
-    GLuint tbos[MODEL_IDX_MAX];
+    GLuint colorBufferID,texturePalettesID,texturePaletteOffsetsID,textureOffsetsID,textureSizesID;
+    GLuint lightsID,voxelUpdateShaderProgram,voxelLightListCountsID,uniqueLightListsID;
+    GLuint vbos[MODEL_IDX_MAX],tbos[MODEL_IDX_MAX];
 } RenderSystem;
-
-extern uint32_t precomputedVisibleCellsFromHere[524288];
-bool get_cull_bit(const uint32_t* arr, int idx);
-void AddForce(uint16_t idx, Vector3 force, bool isImpulse);
-int32_t Physics(void); // Main event tick
-RaycastHit Raycast(Vector3 origin, Vector3 dir, float distance, uint32_t layerMask);
-void RaycastAll(Vector3 origin, Vector3 dir, float distance, uint32_t layerMask, RaycastHit* hits, uint16_t maxCount);
-bool CheckCapsule(Vector3 start, Vector3 end, float capsuleRadius, float capsuleHeight, uint32_t layerMask);
-void ApplyPlayerMovements(void);
-void Input_MouselookApply(void);
-int32_t Input_KeyDown(int32_t scancode);
-int32_t Input_KeyUp(int32_t scancode);
-int32_t Input_MouseMove(int32_t xrel, int32_t yrel);
-bool MouseWheelBoundAndRolled(int setCode);
-void UpdatePlayerFacingAngles(void);
-void InputClearRisingAndFallingEdges(void);
-extern char consoleEntryText[TEXT_BUFFER_SIZE];
-void LoadTextForLanguage(uint8_t lang);
-void LoadLogTextForLanguage(uint8_t lang);
-void InitFontAtlasses(void);
-void Screenshot(void);
-void DebugRAM(const char *context);
-int32_t StringToInt(const char *str);
 size_t GetStringLength(const char *s);
 bool CharacterIsEmpty(const char c);
 bool StringsEqualLimitedBy(const char* a, const char* b, size_t limit);
@@ -155,20 +95,8 @@ extern RenderSystem Sys_Render; // Added last to make use of all defines for siz
 bool EntityIsAnimated(uint16_t entIdx);
 void InitializeEntity(Entity* entry);
 void LoadLevel(uint8_t curlevel);
-void EnableCheatArsenal(uint8_t level);
 float GetPainStatic(void);
 Color GetPainStaticColor(void);
-extern int currentMonitorIndex;
-void ScreenShake(float force, double duration);
-void Shake(float force);
-void InitAfterLoad(void);
-void SetVSync(void);
-void TextEntry(int32_t keycode);
-void GoIntoGame(void);
-void NewGame(void);
-void mp3_clear(void);
-void play_message(const char* path);
-char* StringFindSubstring(const char* haystack, const char* needle);
 int StringCompareUpToLength(const char* s1, const char* s2, size_t n);
 static inline __attribute__((always_inline)) uint32_t parse_numberu32(const char* str, const char* line, uint32_t lineNum) {
     if (str == 0 || *str == '\0') { DualLogError("Invalid blank string from line[%d]: %s\n", lineNum+1, line); return 0; }
@@ -234,12 +162,8 @@ static inline __attribute__((always_inline)) float parse_float(const char* str, 
         value += frac;
     }
 
-    if (!has_digit) return 0.0f;
-
-    if (negative) value = -value;
-    return (float)value;
+    return (!has_digit) ? 0.0f : (negative ? (float)(-value) : (float)value);
 }
 
 static inline __attribute__((always_inline)) int32_t PosGetCellCoordX(float pos_x) { return (uint16_t)clamp((int32_t)vfloor((pos_x - Sys_Global.worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED); }
 static inline __attribute__((always_inline)) int32_t PosGetCellCoordZ(float pos_z) { return (uint16_t)clamp((int32_t)vfloor((pos_z - Sys_Global.worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED); }
-static inline __attribute__((always_inline)) bool XZPairInBounds(int32_t x, int32_t z) { return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0); }
