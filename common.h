@@ -604,7 +604,7 @@ typedef struct {
 	uint8_t FOV;
 	uint8_t Brightness;
 	uint8_t Gamma;
-	uint8_t AntiAliasing;
+	uint8_t FXAA;
 	uint8_t Shadows;
 	uint8_t Reflections;
 	uint8_t Vsync;
@@ -959,6 +959,7 @@ typedef struct { uint8_t dataType; const char* fieldName; } EntityField;
 typedef struct {
     uint32_t globalFrameNum;
     uint16_t loadedInstances; // Number of instances of entities loaded (always for just the current level)
+    float farPlane;
 	double cpuTime, thisFrameTime, cpuFrameTime, lastFrameSecCountTime;
 	uint32_t lastFrameSecCount, framesPerLastSecond, worstFPS;
     int32_t cursorPosition_x, cursorPosition_y; // Separate internal cursor from system cursor.  This gets relatively pushed around by real cursor movement to give consistent platform behavior.
@@ -1052,6 +1053,7 @@ static inline __attribute__((always_inline)) float vexp2f(float x) {
 static inline __attribute__((always_inline)) float vexp(float x) { return vexp2f(x * 1.4426950409f); } // 1/ln(2)
 static inline __attribute__((always_inline)) float vpow(float a, float b) { return vexp(b * vlog(a)); }
 static inline __attribute__((always_inline)) int32_t clamp(int32_t val, int32_t min, int32_t max) { return (val > max) ? max : ((val < min) ? min : val); }
+static inline __attribute__((always_inline)) float vround(float val) { return (val >= 0.0f) ? (float)(int)(val + 0.5f) : (float)(int)(val - 0.5f); }
 static inline __attribute__((always_inline)) Vector3 Vector3_A_plus_B(Vector3 a, Vector3 b) { return (Vector3){a.x + b.x, a.y + b.y, a.z + b.z}; }
 static inline __attribute__((always_inline)) Vector3 Vector3_A_minus_B(Vector3 a, Vector3 b) { return (Vector3){a.x - b.x, a.y - b.y, a.z - b.z}; }
 static inline __attribute__((always_inline)) Vector3 scale_vector3(Vector3 v, float s) { return (Vector3){v.x * s, v.y * s, v.z * s}; }

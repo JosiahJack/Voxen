@@ -6,6 +6,7 @@ struct Light { vec3 pos; float intensity; vec3 col; uint lflags; float range; fl
 layout(std430,binding=2) buffer VoxelLightListCounts { uint voxelLightListCounts[]; };
 layout(std430,binding=3) buffer UniqueLightLists { uint uniqueLightLists[]; };
 layout(std430,binding=4) buffer LightIndices { Light lights[]; };
+layout(std430,binding=7) buffer CullingData { uint gridCellStates[]; };
 layout(location=0) uniform float voxelMinCenterX;
 layout(location=1) uniform float voxelMinCenterZ;
 layout(location=2) uniform uint loadedLights;
@@ -13,9 +14,40 @@ layout(location=3) uniform float worldMin_x;
 layout(location=4) uniform float worldMin_z;
 layout(location=5) uniform vec3 camPos;
 layout(location=6) uniform uint maxLightsPerVoxel;
+layout(location=7) uniform float farPlaneSqd;
+const int CELL_VISIBLE = 1;
+const float WORLDCELL_WIDTH_F = 2.56;
+const float CELLXHALF = 1.28;
+const int WORLDX = 64;
+const int WORLDX_0BASED = 63;
+const int ARRSIZE = 4096;
 const int WORLD_X_VOXELCOUNT = 512;
 const float VOXEL_SIZE = 0.32;
-const float FAR_PLANE_SQD = 71.68 * 71.68;
+
+int PosGetCellCoordX(float pos_x) { return int(clamp(int(floor((pos_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F)), 0, WORLDX_0BASED)); }
+int PosGetCellCoordZ(float pos_z) { return int(clamp(int(floor((pos_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F)), 0, WORLDX_0BASED)); }
+int PosGetCellCoords(float x, float z) { return (PosGetCellCoordZ(z) * WORLDX) + PosGetCellCoordX(x); }
+bool CellVisible(float x, float z) {
+    int subIdx = PosGetCellCoords(x,z);
+    return (gridCellStates[subIdx] & CELL_VISIBLE) > 0;
+}
+
+const float NEIGHBOR_OFFSET = 1.26;
+
+// Helper that checks center + N/S/E/W neighbors
+bool VoxelOrNeighborVisible(float x, float z) {
+    // Center
+    if (CellVisible(x, z)) return true;
+    
+    // Four cardinal neighbors with a small offset
+    if (CellVisible(x + NEIGHBOR_OFFSET, z)) return true;
+    if (CellVisible(x - NEIGHBOR_OFFSET, z)) return true;
+    if (CellVisible(x, z + NEIGHBOR_OFFSET)) return true;
+    if (CellVisible(x, z - NEIGHBOR_OFFSET)) return true;
+    
+    return false;
+}
+
 void main() {
     if (gl_GlobalInvocationID.x >= WORLD_X_VOXELCOUNT || gl_GlobalInvocationID.y >= WORLD_X_VOXELCOUNT) return;
     uint voxelIndex = (gl_GlobalInvocationID.y * WORLD_X_VOXELCOUNT) + gl_GlobalInvocationID.x;
@@ -24,19 +56,24 @@ void main() {
     float vz  = voxelMinCenterZ + float(gl_GlobalInvocationID.y) * VOXEL_SIZE;
     float cdx = vx - camPos.x;
     float cdz = vz - camPos.z;
-    voxelLightListCounts[voxelIndex] = 0u;
-    if ((cdx*cdx + cdz*cdz) > FAR_PLANE_SQD) return;
-
+    if ((cdx*cdx + cdz*cdz) > farPlaneSqd) return;
+    
+    if (!VoxelOrNeighborVisible(vx, vz)) { voxelLightListCounts[voxelIndex] = 0u; return; }
     uint  count        = 0u;
     uint  weakestSlot  = 0u;
     float weakestScore = 1e38;
     for (uint lightIdx = 0u; lightIdx < loadedLights; ++lightIdx) {
-        float dx    = lights[lightIdx].pos.x - vx;
-        float dz    = lights[lightIdx].pos.z - vz;
+        float lx = lights[lightIdx].pos.x;
+        float lz = lights[lightIdx].pos.z; // is hot
+        float dx    = lx - vx;
+        float dz    = lz - vz;
         float range = lights[lightIdx].range;
         if ((dx*dx + dz*dz) >= range*range) continue;
 
         float intensity = lights[lightIdx].intensity;
+        if (intensity < 0.1) continue;
+        if (!CellVisible(lx,lz)) continue;
+        
         if (count < maxLightsPerVoxel) {
             uniqueLightLists[baseOffset + count] = lightIdx;
             if (intensity < weakestScore) { weakestScore = intensity; weakestSlot = count; }

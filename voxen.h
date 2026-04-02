@@ -41,7 +41,6 @@
 #else
 	#define CHECK_GL_ERROR() do {} while(0)
 #endif
-#define FAR_PLANE (71.68f) // Max player view, level 6 crawlway 28 cells
 #define NEAR_PLANE (0.02f)
 #define TEXT_BUFFER_SIZE 1024
 #define FONT_ATLAS_SIZE 4672
@@ -73,7 +72,7 @@ typedef struct {
     GLuint textShaderProgram,textVAO,textVBO;
     GLuint debugLinesVAO,debugLinesVBO;
     GLuint blueNoiseBuffer;
-    GLuint matricesBufferID;
+    GLuint matricesBufferID,cellVisibleDataID;
     GLuint colorBufferID,texturePalettesID,texturePaletteOffsetsID,textureOffsetsID,textureSizesID;
     GLuint lightsID,voxelUpdateShaderProgram,voxelLightListCountsID,uniqueLightListsID;
     GLuint vbos[MODEL_IDX_MAX],tbos[MODEL_IDX_MAX];

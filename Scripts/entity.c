@@ -871,6 +871,7 @@ MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(void) { // Global condition
         if (EntityDefinitions[i].index == UINT16_MAX) continue;
         
         EntityDefinitions[i].rotation = QUAT_IDENTITY;
+        EntityDefinitions[i].lodIndex = MODEL_IDX_MAX;
         flag_set(&EntityDefinitions[i].entflags,ENTFLAG_ACTIVE,true); // Individual value setting to allow mods to set custom starting flags themselves. (or here too if they want, tis your oyster).
         flag_set(&EntityDefinitions[i].entflags,ENTFLAG_RIGIDBODY,ConstIndexIsDynamicObject(EntityDefinitions[i].index));
         if (EntityDefinitions[i].cardchunk) {
@@ -917,37 +918,6 @@ uint16_t AddInstance(uint16_t entIdx, Vector3 pos) {
     e->mass = EntityDefinitions[entIdx].mass > 0.0f ? EntityDefinitions[entIdx].mass : 1.0f; // Nonzero fallback.
     e->linearDrag = EntityDefinitions[entIdx].linearDrag > 0.0f ? EntityDefinitions[entIdx].linearDrag : 0.0f;
     e->angularDrag = EntityDefinitions[entIdx].angularDrag > 0.0f ? EntityDefinitions[entIdx].angularDrag : 0.05f;    
-    if (entIdx == 525) { // prop_console01
-        Vector3 ofs1 = GetEntityLocalSpawnPointFromUnrotatedOffsetVector(e,(Vector3){5.81f,2.29f,38.05f-38.3552f});
-        Vector3 ofs2 = GetEntityLocalSpawnPointFromUnrotatedOffsetVector(e,(Vector3){-10.1f,0.9f,18.21f-38.3552f});
-        Light lit1 = (Light){.pos=ofs1,.col=(Color3){0.3531f,0.4837f,0.6509f},.range=1.85f,.intensity=0.7f,.maxIntensity=0.7f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
-        Light lit2 = (Light){.pos=ofs2,.col=(Color3){0.3561f,0.3561f,0.8970f},.range=2.0f,.intensity=1.12f,.maxIntensity=1.12f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
-        LightAnimation lam={0};
-        e->texAnimLight  = AddLight(&lit1,&lam);
-        e->texAnimLight2 = AddLight(&lit2,&lam);
-    } else if (entIdx == 279) { // chunk_screen
-        Vector3 ofs1 = GetEntityLocalSpawnPointFromUnrotatedOffsetVector(e,(Vector3){0.0f,-0.08f,0.0f});
-        Light lit1 = (Light){.pos=ofs1,.col=(Color3){0.909803922f,0.929411765f,1.0f},.range=3.2f,.intensity=1.575f,.maxIntensity=1.575f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
-        LightAnimation lam={0};
-        e->texAnimLight = AddLight(&lit1,&lam);
-    } else if (e->index == 574) { // prop_healingbed
-        Vector3 ofs1 = GetEntityLocalSpawnPointFromUnrotatedOffsetVector(e,(Vector3){0.5292511f,0.065,0.915f});
-        Vector3 ofs2 = GetEntityLocalSpawnPointFromUnrotatedOffsetVector(e,(Vector3){-0.5317497f,0.065f,1.039f});
-        Light lit1 = (Light){.pos=ofs1,.col=(Color3){0.0f,0.925490196f,0.082352941f},.range=3.0f,.intensity=0.72f,.maxIntensity=0.72f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
-        Light lit2 = (Light){.pos=ofs2,.col=(Color3){0.0f,0.925490196f,0.082352941f},.range=3.0f,.intensity=0.72f,.maxIntensity=0.72f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
-        LightAnimation lam={0};
-        e->texAnimLight  = AddLight(&lit1,&lam);
-        e->texAnimLight2 = AddLight(&lit2,&lam);
-        e->textureAnimating = true; e->texAnimClip = 12; e->texFrame = 0;
-    } else if (e->index == 746) { // weapon_grenadeenergmine_live
-        e->textureAnimating = true; e->texAnimClip = 2; e->texFrame = 0;
-    } else if (entIdx == 720) {
-        /*uint16_t mist = */AddInstance(648,e->position); // ambient_mist
-    } else if (entIdx == 733) {
-        /*uint16_t pipewater = */AddInstance(649,e->position); // ambient_pipewater_loop
-        /*uint16_t rain = */AddInstance(653,(Vector3){e->position.x,e->position.y - 1.26f,e->position.z}); // ambient_rain
-    }
-    
     Eng_Global->instances[i].lockedMessageLingdex = EntityDefinitions[entIdx].lockedMessageLingdex;
     Eng_Global->dirtyInstances[i] = true;
     Eng_Global->loadedInstances++;
@@ -988,6 +958,8 @@ static const LevelBounds levelBoundsTable[13] = {
     {{-48.9439f, -66.4706f}, {0.0f, 0.0f}},/*Level 9*/  {{-21.5394f, -37.2372f}, {0.0f, 0.0f}},/*Level 10*/ {{-24.6172f, -25.7794f}, {0.0f, 0.0f}},/*Level 11*/
     {{-15.4900f, -27.9400f}, {0.0f, 0.0f}} /*Level 12*/
 };
+//                                            R       1      2      3       4       5       6       7       8       9      10      11     12      13
+static const float levelFarPlane[14] = { 56.32f, 56.32f, 51.2f, 51.2f, 40.96f, 58.88f, 79.36f, 56.32f, 69.12f, 53.76f,  51.2f,  51.2f, 38.4f, 71.68f};
 
 extern uint16_t headmountedLanternLight;
 Entity entsFromFile[INSTANCE_COUNT];
@@ -1005,6 +977,7 @@ MOD_TO_ENGINE void LoadLevelMod(uint8_t curlevel) {
         AddCamView((Vector3){7.664583f,-44.88017f,-14.26742f},(Quaternion){0.0f,0.9999f,0.0129f,0.0f},60u,256u,256u,2.192f,20.6f,false);
     }
 
+    Eng_Global->farPlane = levelFarPlane[curlevel];
     Eng_Global->worldMin_x -= CELL_SIZE;
     Eng_Global->worldMin_z -= CELL_SIZE;
     Eng_Global->voxelMinCenterX = Eng_Global->worldMin_x + VOXEL_HALF;
@@ -1219,8 +1192,41 @@ MOD_TO_ENGINE void LoadLevelMod(uint8_t curlevel) {
         StringCopyInto_A_From_B(par->argvalue,src->argvalue,TARGET_STRING_LENGTH);
         StringCopyInto_A_From_B(par->targetname,src->targetname,TARGET_STRING_LENGTH);
         StringCopyInto_A_From_B(par->texAnimResourceFolder,src->texAnimResourceFolder,TARGET_STRING_LENGTH);
-        TextureSequenceInit(parent,par->texAnimResourceFolder);
         if (ConstIndexIsPortalBlockingDoor(entIdx)) AddDoorPortal(entIdx, parent); // Only at load, not in AddInstance
+        if (entIdx == 525) { // prop_console01
+            Vector3 ofs1 = GetEntityLocalSpawnPointFromUnrotatedOffsetVector(par,(Vector3){5.81f,2.29f,38.05f-38.3552f});
+            Vector3 ofs2 = GetEntityLocalSpawnPointFromUnrotatedOffsetVector(par,(Vector3){-10.1f,0.9f,18.21f-38.3552f});
+            Light lit1 = (Light){.pos=ofs1,.col=(Color3){0.3531f,0.4837f,0.6509f},.range=1.85f,.intensity=0.7f,.maxIntensity=0.7f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
+            Light lit2 = (Light){.pos=ofs2,.col=(Color3){0.3561f,0.3561f,0.8970f},.range=2.0f,.intensity=1.12f,.maxIntensity=1.12f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
+            LightAnimation lam={0};
+            par->texAnimLight  = AddLight(&lit1,&lam);
+            par->texAnimLight2 = AddLight(&lit2,&lam);
+        } else if (entIdx == 279) { // chunk_screen
+            Vector3 ofs1 = GetEntityLocalSpawnPointFromUnrotatedOffsetVector(par,(Vector3){0.0f,-0.08f,0.0f});
+            Light lit1 = (Light){.pos=ofs1,.col=(Color3){0.909803922f,0.929411765f,1.0f},.range=3.2f,.intensity=1.575f,.maxIntensity=1.575f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
+            LightAnimation lam={0};
+            par->texAnimLight = AddLight(&lit1,&lam);
+        } else if (par->index == 574) { // prop_healingbed
+            Vector3 ofs1 = GetEntityLocalSpawnPointFromUnrotatedOffsetVector(par,(Vector3){0.5292511f,0.065,0.915f});
+            Vector3 ofs2 = GetEntityLocalSpawnPointFromUnrotatedOffsetVector(par,(Vector3){-0.5317497f,0.065f,1.039f});
+            Light lit1 = (Light){.pos=ofs1,.col=(Color3){0.0f,0.925490196f,0.082352941f},.range=3.0f,.intensity=0.72f,.maxIntensity=0.72f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
+            Light lit2 = (Light){.pos=ofs2,.col=(Color3){0.0f,0.925490196f,0.082352941f},.range=3.0f,.intensity=0.72f,.maxIntensity=0.72f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
+            LightAnimation lam={0};
+            par->texAnimLight  = AddLight(&lit1,&lam);
+            par->texAnimLight2 = AddLight(&lit2,&lam);
+            par->textureAnimating = true; par->texAnimClip = 12; par->texFrame = 0;
+            StringCopyInto_A_From_B(par->texAnimResourceFolder,"MedicalBed",TARGET_STRING_LENGTH);
+        } else if (par->index == 746) { // weapon_grenadeenergmine_live
+            par->textureAnimating = true; par->texAnimClip = 2; par->texFrame = 0;
+        } else if (entIdx == 720) {
+            /*uint16_t mist = */AddInstance(648,par->position); // ambient_mist
+        } else if (entIdx == 733) {
+            /*uint16_t pipewater = */AddInstance(649,par->position); // ambient_pipewater_loop
+            /*uint16_t rain = */AddInstance(653,(Vector3){par->position.x,par->position.y - 1.26f,par->position.z}); // ambient_rain
+        }
+        
+        if (par->texAnimResourceFolder[0] != '\0' && par->tickTime <= 0.01f) par->tickTime = 0.35f;
+        TextureSequenceInit(parent,par->texAnimResourceFolder);
     }
     
     DualLog("Total children added: %u\n",childrenTotal);

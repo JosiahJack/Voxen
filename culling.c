@@ -534,6 +534,7 @@ void CullInit(void) {
     glUniform1ui(2,Sys_Global.loadedLights);
     glUniform1f(3,Sys_Global.worldMin_x);
     glUniform1f(4,Sys_Global.worldMin_z);
+    glUniform1f(7,Sys_Global.farPlane * Sys_Global.farPlane);
     DualLog(" took %f secs\n", get_time() - start_time);
     DebugRAM("end of Cull_Init");
 }
@@ -570,6 +571,7 @@ ENGINE_TO_MOD void PortalCulling(void) { // Called just once at end of animation
     
     DetermineVisibleCells(playerCellX,playerCellZ); // Recompute full PVS with new closed edges for all portal states.  So much for the precomputed set.
     for (uint16_t i=0;i<Sys_Global.loadedLights;++i) flag_setu32(&lights[i].lflags,LDIRTY,true);
+    glNamedBufferData(Sys_Render.cellVisibleDataID,ARRSIZE * sizeof(uint32_t),gridCellStates,GL_DYNAMIC_DRAW);
 }
 
 static inline __attribute__((always_inline)) void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* pos_z) { *pos_x = Sys_Global.worldMin_x + (x * WORLDCELL_WIDTH_F); *pos_z = Sys_Global.worldMin_z + (z * WORLDCELL_WIDTH_F); }

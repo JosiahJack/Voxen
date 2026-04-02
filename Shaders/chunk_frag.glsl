@@ -34,6 +34,7 @@ layout(location=27) uniform float volume;
 layout(location=28) uniform uvec2 camViewSize;
 layout(location=29) uniform sampler2D camViewTex;
 layout(location=30) uniform uint useCamView;
+layout(location=31) uniform float biasFac;
 struct Light { vec3 pos; float intensity; vec3 col; uint lflags; float range; float spotAng; float maxIntensity; float minIntensity; vec4 spotDir; };
 layout(location=0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location=1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
@@ -98,6 +99,31 @@ vec2 EncodeOctahedral(vec3 n) {
     return n.z >= 0.0 ? p : (1.0 - abs(p.yx)) * vec2(n.x >= 0.0 ? 1.0 : -1.0, n.y >= 0.0 ? 1.0 : -1.0);
 }
 
+void GetCubemapSampleCoord(vec3 toLight, uint shadowIndex, out uint faceOff, out vec2 tc) {
+    vec3 a = abs(toLight);
+    float mx = step(a.y,a.x) * step(a.z,a.x);
+    float my = step(a.x,a.y) * step(a.z,a.y);
+    vec3 mxyz = vec3(mx,my,1.0 - mx - my);
+    vec3 sxyz = vec3(step(0.0,-toLight.x),step(0.0,-toLight.y),step(0.0,-toLight.z));
+    vec3 fxyz = vec3(mix(1.0,0.0,sxyz.x), mix(3.0,2.0,sxyz.y), mix(5.0,4.0,sxyz.z));
+    uint face = uint(mxyz.x * fxyz.x + mxyz.y * fxyz.y + mxyz.z * fxyz.z);
+    float invMax = 1.0 / max(max(a.x,a.y),a.z);
+    vec3 dir = -toLight * invMax;
+    vec2 uvx = mix(vec2( dir.z, dir.y), vec2(-dir.z, dir.y), sxyz.x);
+    vec2 uvy = mix(vec2( dir.x, dir.z), vec2( dir.x,-dir.z), sxyz.y);
+    vec2 uvz = mix(vec2(-dir.x, dir.y), vec2( dir.x, dir.y), sxyz.z);
+    float fmx = step(a.y,a.x)*step(a.z,a.x);
+    float fmy = step(a.x,a.y)*step(a.z,a.y);
+    vec2 uv = fmx * uvx + fmy * uvy + (1.0 - fmx - fmy) * uvz;
+//     vec2 uv = mxyz.x * uvx + mxyz.y * uvy + mxyz.z * uvz;
+    uv = uv * 0.5 + 0.5;
+    faceOff = (shadowIndex * shadSizeSqd * 6u) + (face * shadSizeSqd);
+    tc = uv * shadowMapSizeF;
+}
+
+float quintic_polynomial_smoothstep( float x ) { return x*x*x*(x*(x*6.0-15.0)+10.0); } // From https://iquilezles.org/articles/smoothsteps/
+float easeInOutQuint(float x) { return x < 0.5 ? 16 * x * x * x * x * x : 1 - pow(-2 * x + 2, 5) / 2; } // From https://easings.net/#easeInOutQuint
+
 const vec3 baseDir = vec3(0.0,0.0,1.0);
 void main() {
     vec3 worldPos = FragPos.xyz;
@@ -128,8 +154,18 @@ void main() {
                 heat = 1.5;
         }
     }
+
     vec3 adjustedNormal = Normal;
-    if (normInstanceIndex != 0) { //  && distToPixel < 10.24 only has 0.073ms savings, leaving off for better quality of visuals
+    bool hasNormalMap = normInstanceIndex != 0;
+    float blend = 0.0;
+    float facing = dot(Normal,viewDir);
+    if (distToPixel < 5.12 && hasNormalMap) blend = 1.0;
+    else if (distToPixel < 30.0 && hasNormalMap) {
+        blend = smoothstep(30.0,5.12,distToPixel);
+        blend *= smoothstep(0.1,0.4,facing);
+    }
+
+    if (hasNormalMap && blend > 0.01) {
         vec3 dp1 = dFdx(FragPos);
         vec3 dp2 = dFdy(FragPos);
         vec2 duv1 = dFdx(TexCoord);
@@ -147,6 +183,7 @@ void main() {
             normalColor.g = -normalColor.g;
             adjustedNormal = normalize(TBN3x3 * normalColor);
             if (dot(adjustedNormal,Normal) < 0.0) adjustedNormal = Normal;
+            adjustedNormal = mix(Normal,adjustedNormal,blend);
         }
     }
 
@@ -179,17 +216,11 @@ void main() {
     float intensityTotal = 0.0;
     for (uint i = 0u; i < count; i++) {
         uint lightIdx = uniqueLightLists[(voxelIdx * maxLightsPerVoxel) + i];
-        if (lightIdx >= lightCount) continue;
-
         vec3 lightPos = lights[lightIdx].pos;
         float intensity = lights[lightIdx].intensity;
-        if (intensity < 0.1) continue;
-
         float range = lights[lightIdx].range;
         vec3 toLight = lightPos - worldPos;
         float dist = length(toLight);
-        if (dist > range) continue;
-
         vec3 lightDir = normalize(toLight);
         float NdotL = dot(adjustedNormal, lightDir);
         float lambertian = clamp(max(NdotL, 0.0),0.0,1.0);
@@ -217,38 +248,28 @@ void main() {
         uint shadowIndex = shadowMapsIndirection[lightIdx];
         bool lightHasShadows = (lights[lightIdx].lflags & SHADON) != 0u;
         if (shadowsEnabled > 0 && (shadowIndex < lightCount) && lightHasShadows) {
-            float smearness = distOverRangeSqd * 24.0 + range + intensity + 4.51;
-            vec3 a = abs(toLight);
-            float mx = step(a.y,a.x) * step(a.z,a.x);
-            float my = step(a.x,a.y) * step(a.z,a.y);
-            vec3 mxyz = vec3(mx,my,1.0 - mx - my);
-            vec3 sxyz = vec3(step(0.0, -toLight.x),step(0.0,-toLight.y),step(0.0,-toLight.z));
-            vec3 fxyz = vec3(mix(1.0,0.0,sxyz.x),mix(3.0,2.0,sxyz.y),mix(5.0,4.0,sxyz.z));
-            uint face = uint(mxyz.x * fxyz.x + mxyz.y * fxyz.y + mxyz.z * fxyz.z);
-            float invMax = 1.0 / max(max(a.x,a.y),a.z);
-            vec3 dir = -toLight * invMax;
-            vec2 uvx = mix(vec2( dir.z,dir.y),vec2(-dir.z, dir.y),sxyz.x);
-            vec2 uvy = mix(vec2( dir.x,dir.z),vec2( dir.x,-dir.z),sxyz.y);
-            vec2 uvz = mix(vec2(-dir.x,dir.y),vec2( dir.x, dir.y),sxyz.z);
-            vec2 uv = mxyz.x * uvx + mxyz.y * uvy + mxyz.z * uvz;
-            uv = uv * 0.5 + 0.5;
-            uint faceOff = (shadowIndex * shadSizeSqd * 6) + (face * shadSizeSqd);
-            vec2 tc = uv * shadowMapSizeF;
-            float slopeBias = 0.24 * (1.0 - NdotL);
-            slopeBias = max(slopeBias,0.035);
-            float bias = slopeBias * distOverRange;
-            bias = max(bias,0.0) + 0.03; // Account for glancing angle acne
-            float sum = 0.0;
+            uint faceOff; vec2 tc; GetCubemapSampleCoord(toLight,shadowIndex,faceOff,tc);
             float shadSizeMaxUV = shadowMapSizeF - 1.0;
+            vec2 halfTc = (tc - 0.5);
+            vec2 stc = fract(halfTc);
+            vec2 basec = floor(halfTc);
+            vec2 coordc = clamp(basec,0.0,shadSizeMaxUV);
+            uint ssbo_idx_center = faceOff + uint(coordc.y) * shadowMapSize + uint(coordc.x);
+            float dc = float(shadowMaps[ssbo_idx_center]) * 0.00001;
+            float distToOccluderFac = (dc / 7.68);
+            float smearness = clamp(distToOccluderFac,0.0,1.0) * (range + intensity + 4.51) * 2.5;
+            float bias = quintic_polynomial_smoothstep(distToOccluderFac) * 0.48 * attenuation;
+            float sum = 0.0;
             for (int si=0;si<PCF_SAMPLES;++si) { // Pseudo-Stochastic PCF sampling
                 vec2 off = poissonDisk[si] * smearness;
                 vec2 t = tc + off;
-                vec2 st = fract(t - 0.5);
-                vec2 base = floor(t - 0.5);
+                vec2 halfT = (t - 0.5);
+                vec2 st = fract(halfT);
+                vec2 base = floor(halfT);
                 float samples[4];
                 for(int i=0; i<2; ++i) {
                     for(int j=0; j<2; ++j) {
-                        vec2 coord = clamp(base + vec2(i, j), 0.0, shadSizeMaxUV);
+                        vec2 coord = clamp(base + vec2(i, j),0.0,shadSizeMaxUV);
                         uint ssbo_idx = faceOff + uint(coord.y) * shadowMapSize + uint(coord.x);
                         float d = float(shadowMaps[ssbo_idx]) * 0.00001;
                         samples[i + j*2] = dist <= (d + bias) ? 1.0 : 0.0;
@@ -259,7 +280,7 @@ void main() {
                 sum += res;
             }
 
-            shadowFactor = sum * invSamples;
+            shadowFactor = (sum * invSamples);
         }
 
         vec3 lightColor = lights[lightIdx].col;
