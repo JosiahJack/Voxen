@@ -34,7 +34,7 @@ layout(location=27) uniform float volume;
 layout(location=28) uniform uvec2 camViewSize;
 layout(location=29) uniform sampler2D camViewTex;
 layout(location=30) uniform uint useCamView;
-layout(location=31) uniform float biasFac;
+layout(location=31) uniform float heat;
 struct Light { vec3 pos; float intensity; vec3 col; uint lflags; float range; float spotAng; float maxIntensity; float minIntensity; vec4 spotDir; };
 layout(location=0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location=1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
@@ -145,16 +145,6 @@ void main() {
 
     if (albedoColor.a < 0.05 && volume < 0.05) discard; // Alpha cutout threshold
 
-    float heat = 0.0;
-    if (grayscaleEnabled > 0) {
-        if (constIndex >= 419 && constIndex <= 448) { // NPC's are hot!
-            heat = 4.0;
-            if (constIndex == 419 || constIndex == 422 || constIndex == 424 || constIndex == 429 || constIndex == 430
-            || constIndex == 431 || constIndex == 433 || constIndex == 437 || constIndex == 438 || constIndex == 441)
-                heat = 1.5;
-        }
-    }
-
     vec3 adjustedNormal = Normal;
     bool hasNormalMap = normInstanceIndex != 0;
     float blend = 0.0;
@@ -166,10 +156,8 @@ void main() {
     }
 
     if (hasNormalMap && blend > 0.01) {
-        vec3 dp1 = dFdx(FragPos);
-        vec3 dp2 = dFdy(FragPos);
-        vec2 duv1 = dFdx(TexCoord);
-        vec2 duv2 = dFdy(TexCoord);
+        vec3 dp1 = dFdx(FragPos); vec3 dp2 = dFdy(FragPos);
+        vec2 duv1 = dFdx(TexCoord); vec2 duv2 = dFdy(TexCoord);
         float uvArea = abs(duv1.x * duv2.y - duv1.y * duv2.x);
         if (uvArea > 0.000000001) {
             vec3 t = normalize(dp1 * duv2.y - dp2 * duv1.y);
@@ -177,8 +165,7 @@ void main() {
             mat3 TBN3x3 = mat3(t, b, adjustedNormal);
             ivec2 texSizeNorm = textureSizes[normInstanceIndex];
             ivec2 texUVNorm = ivec2(int(floor(uv.x * float(texSizeNorm.x))), int(floor(uv.y * float(texSizeNorm.y))));
-            texUVNorm.x = texUVNorm.x % texSizeNorm.x;
-            texUVNorm.y = texUVNorm.y % texSizeNorm.y;
+            texUVNorm.x = texUVNorm.x % texSizeNorm.x; texUVNorm.y = texUVNorm.y % texSizeNorm.y;
             vec3 normalColor = (getTextureColor(normInstanceIndex,texUVNorm).rgb * 2.0 - 1.0);
             normalColor.g = -normalColor.g;
             adjustedNormal = normalize(TBN3x3 * normalColor);
@@ -258,7 +245,7 @@ void main() {
             float dc = float(shadowMaps[ssbo_idx_center]) * 0.00001;
             float distToOccluderFac = (dc / 7.68);
             float smearness = clamp(distToOccluderFac,0.0,1.0) * (range + intensity + 4.51) * 2.5;
-            float bias = quintic_polynomial_smoothstep(distToOccluderFac) * 0.48 * attenuation;
+            float bias = quintic_polynomial_smoothstep(distToOccluderFac) * 0.48 + quintic_polynomial_smoothstep(0.16 * attenuation);
             float sum = 0.0;
             for (int si=0;si<PCF_SAMPLES;++si) { // Pseudo-Stochastic PCF sampling
                 vec2 off = poissonDisk[si] * smearness;

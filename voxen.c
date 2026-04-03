@@ -8,9 +8,6 @@ GLFWwindow* window;
 #include "miniaudio.h"
 #include "Shaders/shaders.h"
 #include "credits.h"
-float testBias = 0.05f;
-
-
 GlobalContext Sys_Global = {.menuActive=true,.screenshotTimeout=1.0,.creditsPageIndex=1,.difficultyCombat=2,.difficultyCyber=2,.difficultyPuzzle=2,.difficultyMission=2,.deaths=0,.worstFPS=UINT32_MAX,.cursorPosition_x=680,.cursorPosition_y=384};
 CheatsSystem Sys_Cheats = {.god=false,.noclip=true,.showLocation=true,.showFPS=true,.editMode=true}; RenderSystem Sys_Render; SystemUI Sys_UI;
 SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on first run for potatoes (e.g. won't crash for out of VRAM, or won't take 5min to init).
@@ -1916,7 +1913,7 @@ static inline __attribute__((always_inline)) double RenderUI(void) {
     int16_t lineSpacing = 18;
     if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 1),TEXT_WHITE,FONT_NORMAL,1.0f,"numShadowsCouldRender: %u, playerCellIdx: %u",Sys_Global.timeSinceLastPhysicsTick, voxen_Shadow_System.numShadowsCouldRender,playerCellIdx);
     if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 2),TEXT_WHITE,FONT_NORMAL,1.0f,"Player velocity: %.2f, %.2f, %.2f",Sys_Global.instances[PLAYER1].velocity.x,Sys_Global.instances[PLAYER1].velocity.y,Sys_Global.instances[PLAYER1].velocity.z);
-    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 3),TEXT_WHITE,FONT_NORMAL,1.0f,"Shadow cpu ms: %.3f, Test bias; %f",voxen_Shadow_System.shadowTime * 1000,testBias);
+    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 3),TEXT_WHITE,FONT_NORMAL,1.0f,"Shadow cpu ms: %.3f",voxen_Shadow_System.shadowTime * 1000);
     RenderFormattedText(16,debugTextStartY + (lineSpacing * 4),TEXT_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d  dx:%d dy:%d",Sys_Global.cursorPosition_x,Sys_Global.cursorPosition_y,Sys_Input.currentMouse_dx,Sys_Input.currentMouse_dy);
     if (Sys_Cheats.consoleActive) RenderFormattedText(16,0,TEXT_WHITE,FONT_NORMAL,1.0f, "] %s",consoleEntryText);
     if (Sys_Global.statusTextDecayFinished > Sys_Global.current_time) RenderFormattedText(479,114,TEXT_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
@@ -2131,6 +2128,8 @@ static inline __attribute__((always_inline)) void RenderInstances(Vector3 player
         visibleCount++;
     }
     
+    bool grayscaleEnabled = ModRequestsGrayscale();
+    glUniform1f(31,0.0f); // Reset heat for infrared vision
     if (visibleCount > 1) qsort(visibleInstances,visibleCount,sizeof(DepthSort),transparents ? dsort : dsortInv); // Sort by depth (ascending for front-to-back)
     for (uint16_t visibleIndex = 0; visibleIndex < visibleCount; ++visibleIndex) {
         uint16_t i = visibleInstances[visibleIndex].index;
@@ -2140,7 +2139,12 @@ static inline __attribute__((always_inline)) void RenderInstances(Vector3 player
         else { glEnable(GL_CULL_FACE); glDisable(GL_BLEND); } // Opaque
 
         glUniform1ui(17,tex == 316 ? 1u : 0u);
-        glUniform1ui(25,(uint32_t)e->index); // constIndex
+        uint32_t constIndex = e->index;
+        if (transparents) {
+            if ((constIndex >= 561 && constIndex <= 565) || (constIndex >= 568 && constIndex <= 573)) glDepthFunc(GL_EQUAL); // Cutouts
+            else glDepthFunc(GL_LEQUAL); // Actual alphas
+        }
+        glUniform1ui(25,constIndex);
         glUniform1f(27,e->volume); // CyberWall bump go alpha 1.0 then fade.
         uint8_t cmi = e->camView;
         glUniform1ui(30,cmi < camViewCount ? 1u : 0u); // useCamView
@@ -2149,6 +2153,11 @@ static inline __attribute__((always_inline)) void RenderInstances(Vector3 player
             glBindTexture(GL_TEXTURE_2D,camViewTextures[cmi]);
             glUniform2ui(28,camViews[cmi].width,camViews[cmi].height);
             glUniform1i(29,6); // Cam View put into Uniform
+            if (grayscaleEnabled) {
+                float heat = (constIndex >= 419 && constIndex <= 448) ? (  (constIndex == 419 || constIndex == 422 || constIndex == 424 || constIndex == 429 || constIndex == 430
+                                                                         || constIndex == 431 || constIndex == 433 || constIndex == 437 || constIndex == 438 || constIndex == 441) ? 1.5f : 4.0f) : 0.0f;
+                glUniform1f(31,heat);
+            }
         }
         
         if (currentNormIndex != norm || norm == 0) { currentNormIndex = norm; glUniform1ui( 1,(uint32_t)norm); }
@@ -2166,7 +2175,7 @@ static inline __attribute__((always_inline)) void RenderInstancesDepthOnly(Vecto
     bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX);
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
         float distSqrd = Sys_Global.farPlane * Sys_Global.farPlane;
-        if (!DetermineIfInstanceVisible(i,transparentTexture[Sys_Global.instances[i].texIndex],skyVisible,playerPos,&distSqrd)) continue;
+        if (!DetermineIfInstanceVisible(i,false,skyVisible,playerPos,&distSqrd)) continue;
         
         visibleInstances[visibleCount].index = i;
         visibleInstances[visibleCount].depth = distSqrd;
@@ -2177,10 +2186,13 @@ static inline __attribute__((always_inline)) void RenderInstancesDepthOnly(Vecto
     glDisable(GL_BLEND);
     for (uint16_t visibleIndex = 0; visibleIndex < visibleCount; ++visibleIndex) {
         uint16_t i = visibleInstances[visibleIndex].index;
-        if (doubleSidedTexture[Sys_Global.instances[i].texIndex] || Sys_Global.instances[i].scale.x < 0.0f || Sys_Global.instances[i].scale.y < 0.0f || Sys_Global.instances[i].scale.z < 0.0f) glDisable(GL_CULL_FACE); // Doublesided
-        else glEnable(GL_CULL_FACE); // Opaque
-
+        Entity* e = &Sys_Global.instances[i]; uint16_t tex = e->texIndex;
+        if (transparentTexture[tex]) { glEnable(GL_CULL_FACE); glEnable(GL_BLEND); } // Transparents (with sort)
+        else if (doubleSidedTexture[tex] || e->scale.x < 0.0f || e->scale.y < 0.0f || e->scale.z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided
+        else { glEnable(GL_CULL_FACE); glDisable(GL_BLEND); } // Opaque
+        
         currentModelType = GetAndBindModel(i,currentModelType);
+        glUniform1ui(3,(uint32_t)tex);
         uint32_t vertCount = modelTriangleCounts[currentModelType] * 3;
         glDrawElements(GL_TRIANGLES,vertCount,GL_UNSIGNED_SHORT,0); drawCallsRenderedThisFrame++; verticesRenderedThisFrame += vertCount;
     }
@@ -2248,9 +2260,6 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
     glUniformMatrix4fv(2,1,GL_FALSE,viewProj);
     glUniform1ui(25,0u); // default constIndex
     glUniform1ui(26,(uint32_t)ModRequestsGrayscale());
-    if (Sys_Input.keyStates[GLFW_KEY_1].pressed) testBias+=0.001f;
-    else if (Sys_Input.keyStates[GLFW_KEY_2].pressed) testBias-= 0.001f;
-    glUniform1f(31,testBias);
     glUniform1ui(3,0u); // isUI false
     float fogActual = Sys_Global.fogColor.a + (float)(Sys_Global.fogFac / 255u); // Alpha is base density for level.
     glUniform3f(4,Sys_Global.fogColor.r * fogActual,Sys_Global.fogColor.g * fogActual,Sys_Global.fogColor.b * fogActual); // Fog Color(which is density)
@@ -2261,7 +2270,6 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
     glDepthFunc(GL_LEQUAL);
     RenderInstances(playerPos,false);
     glDepthMask(GL_TRUE);
-    glDepthFunc(GL_LESS);
     RenderInstances(playerPos,true); // opaque, then transparents
     glUniform1ui(25,0u); // reset constIndex
     if (camView) {

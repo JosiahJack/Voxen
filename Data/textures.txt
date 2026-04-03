@@ -826,9 +826,11 @@ index: 356
 #Textures/grass_mutatedorange.png
 index: 357
 transparent: 1
+doublesided: 1
 #Textures/grass.png
 index: 358
 transparent: 1
+doublesided: 1
 #Textures/grate1_1.png
 index: 359
 #Textures/grate1_2.png
