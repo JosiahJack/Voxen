@@ -973,8 +973,8 @@ MOD_TO_ENGINE void LoadLevelMod(uint8_t curlevel) {
     Eng_Global->worldMin_x = levelBoundsTable[curlevel].worldMin.x;
     Eng_Global->worldMin_z = levelBoundsTable[curlevel].worldMin.y;
     if (curlevel == 1) {
-        AddCamView((Vector3){-19.2301f,-42.6604f,-49.7453f},(Quaternion){0.2375f,0.0008f,-0.0002f,0.9713f},75u,256u,256u,2.21f,11.5f,false);
-        AddCamView((Vector3){7.664583f,-44.88017f,-14.26742f},(Quaternion){0.0f,0.9999f,0.0129f,0.0f},60u,256u,256u,2.192f,20.6f,false);
+        AddCamView((Vector3){-19.2301f,-42.6604f,-49.7453f},(Quaternion){0.2375f,0.0008f,-0.0002f,0.9713f},75u,256u,256u,2.21f,11.5f);
+        AddCamView((Vector3){7.664583f,-44.88017f,-14.26742f},(Quaternion){0.0f,0.9999f,0.0129f,0.0f},60u,256u,256u,2.192f,20.6f);
     }
 
     Eng_Global->farPlane = levelFarPlane[curlevel];

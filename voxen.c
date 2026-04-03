@@ -56,7 +56,7 @@ typedef struct { int w, h, hz; } ResMode;
 static ResMode resModes[8];
 static int resSelectedIdx = 0;
 #define MAX_CAMVIEWS 11
-typedef struct { Vector3 position; Quaternion rotation; uint8_t fov; uint16_t width,height; float near,far,finished; bool sensaround; } CamView;
+typedef struct { Vector3 position; Quaternion rotation; uint8_t fov; uint16_t width,height; float near,far,finished; bool visible; } CamView;
 CamView camViews[MAX_CAMVIEWS]; // Max is 8 camera views on level 8 + 3 sensaround views.  Populated at level load.
 GLuint camViewTextures[MAX_CAMVIEWS];
 uint8_t camViewCount = 0;
@@ -162,7 +162,6 @@ ENGINE_TO_MOD void InitializeEntity(Entity* entry) { // Blank entity, no index y
     entry->path[0] = '\0';    
 }
 
-bool lightInPVS[LIGHT_COUNT];
 Vector3 lightsNewPosition[LIGHT_COUNT];
 ENGINE_TO_MOD int32_t AddLight(Light* lit, LightAnimation* lanim) {
     int32_t i = Sys_Global.loadedLights;
@@ -250,6 +249,7 @@ void UpdateLights(void) {
         Vector3 lightPos = lightsNewPosition[lightIdx];
         lights[lightIdx].pos = lightPos;
         if (lights[lightIdx].lflags & LDIRTY) { // Marked all as true at level load.
+            flag_setu32(&lights[lightIdx].lflags,LDIRTY,false);
             voxelsNeedUpdated = true;
             #pragma GCC unroll 6
             for (int j=0;j<6;++j) { // Update to new position
@@ -258,15 +258,6 @@ void UpdateLights(void) {
                 ExtractFrustumPlanes((float*)lightViewProj[lightIdx][j], lightFrustumPlanes[lightIdx][j]);
             }
         }
-        
-        uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((lightPos.x - Sys_Global.worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
-        uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((lightPos.z - Sys_Global.worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
-        int lightCellIdx = (cellZ * WORLDX) + cellX;
-        float range = lights[lightIdx].range;
-        int r = vceil(range * (1.0f / WORLDCELL_WIDTH_F));
-        lightInPVS[lightIdx] = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
-        if (!lightInPVS[lightIdx]) lightInPVS[lightIdx] = NeighborhoodInPVS(cellX,cellZ,r);
-        flag_setu32(&lights[lightIdx].lflags,LDIRTY,false);
     }
     
     if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
@@ -299,13 +290,11 @@ void UpdateLights(void) {
         Vector3 p = Sys_Global.instances[PLAYER1].position;
         glUseProgram(Sys_Render.voxelUpdateShaderProgram);
         glUniform3f(5,p.x,p.y,p.z);
-        glUniform1ui(6,(uint32_t)MAX_LIGHTS_PER_VOXEL);
         glDispatchCompute((512+31)/32,(512+31)/32,1);
     }
 }
 
-#define IS_CHANGED(a, b) _Generic((a), float:(vabs((a) - (b)) > 0.0001f), default:((a) != (b)))
-#define CHECK_UPDATE(target, value) do { if (IS_CHANGED(target, value)) { (target) = (value); changed = true; }} while(0)
+#define IS_CHANGED(a, b) (vabs((a) - (b)) > 0.0001f)
 ENGINE_TO_MOD void UpdateLight(uint16_t i, Vector3 pos, Color3 col, float range, float intensity, float maxIntensity, float minIntensity, float spotAng, Quaternion spotDir, bool on, bool shadOn) {
     bool changed = false;
     if ((lights[i].lflags & SHADON) - shadOn) changed = true;
@@ -313,11 +302,11 @@ ENGINE_TO_MOD void UpdateLight(uint16_t i, Vector3 pos, Color3 col, float range,
     flag_setu32(&lights[i].lflags,SHADON,shadOn);
     flag_setu32(&lights[i].lflags,LIGHTON,on);
     lights[i].intensity=intensity; lights[i].minIntensity=minIntensity; lights[i].maxIntensity=maxIntensity; lights[i].spotAng=spotAng;
-    CHECK_UPDATE(lights[i].range,range);
+    if (IS_CHANGED(lights[i].range,range)) { lights[i].range = range; changed = true; }
     lights[i].col=col;
-    CHECK_UPDATE(lights[i].pos.x,pos.x);
-    CHECK_UPDATE(lights[i].pos.y,pos.y);
-    CHECK_UPDATE(lights[i].pos.z,pos.z);
+    if (IS_CHANGED(lights[i].pos.x,pos.x)) { lights[i].pos.x = pos.x; changed = true; }
+    if (IS_CHANGED(lights[i].pos.y,pos.y)) { lights[i].pos.y = pos.y; changed = true; }
+    if (IS_CHANGED(lights[i].pos.z,pos.z)) { lights[i].pos.z = pos.z; changed = true; }
     lights[i].spotDir = spotDir;
     if (changed) { lightsNewPosition[i]=pos; flag_setu32(&lights[i].lflags,LDIRTY,true); }
 }
@@ -707,7 +696,7 @@ void LoadLevel(uint8_t curlevel) {
     CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
     RenderLoadingProgress(120,"Loading voxel lighting data...");
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < Sys_Global.loadedInstances; i++) Sys_Global.dirtyInstances[i] = true;
-    for (uint16_t i = 0; i < Sys_Global.loadedLights; i++) { lightsNewPosition[i] = lights[i].pos; lightInPVS[i] = false; }
+    for (uint16_t i = 0; i < Sys_Global.loadedLights; i++) { lightsNewPosition[i] = lights[i].pos; }
     __builtin_memset(voxen_Shadow_System.shadowmapIndirectionList,MAX_SHADOWMAPS + 1,Sys_Global.loadedLights * sizeof(uint32_t)); // Set to invalid values for all
     Sys_Global.levelCurrentlyLoading = false;
 }
@@ -838,10 +827,10 @@ void UpdateScreenSize(GLFWwindow* unused, int32_t width, int32_t height) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-ENGINE_TO_MOD void AddCamView(Vector3 pos, Quaternion rot, uint8_t fov, uint16_t width, uint16_t height, float near, float far, bool sensaround) {
+ENGINE_TO_MOD void AddCamView(Vector3 pos, Quaternion rot, uint8_t fov, uint16_t width, uint16_t height, float near, float far) {
     if (camViewCount >= MAX_CAMVIEWS) { DualLogWarn("Too many camviews!\n"); return; }
     
-    camViews[camViewCount] = (CamView){pos,rot,fov,width,height,near,far,Sys_Global.pauseRelativeTime + (camViewCount * 0.05f) + 0.5f,sensaround}; // Staggered starts so not all at once for performance.
+    camViews[camViewCount] = (CamView){pos,rot,fov,width,height,near,far,Sys_Global.pauseRelativeTime + (camViewCount * 0.05f) + 0.5f,false}; // Staggered starts so not all at once for performance.
     GenerateAndBindTexture(&camViewTextures[camViewCount],GL_RGBA8,width,height,GL_RGBA,GL_UNSIGNED_BYTE,GL_TEXTURE_2D); // Cam View Lit Raster
 //     glBindImageTexture(6 + camViewCount,camViewTextures[camViewCount],0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8); // Camer View RGB (e.g. sensaround, in-world security cam views)
     camViewCount++;
@@ -1389,7 +1378,9 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     Sys_Render.texturePalettesID       = SetupSSBO(&Sys_Render.texturePalettesID,      16,MAX_UNIQUE_COLORS * sizeof(uint32_t),NULL,GL_STATIC_DRAW);
     Sys_Render.texturePaletteOffsetsID = SetupSSBO(&Sys_Render.texturePaletteOffsetsID,17,MAX_VALID_TEXTURE * sizeof(uint32_t),NULL,GL_STATIC_DRAW);
     glUseProgram(Sys_Render.shadowmapsShaderProgram); glUniform1ui(9,SHADOW_MAP_SIZE);
-    glUseProgram(Sys_Render.chunkShaderProgram);  glUniform1ui(21,SHADOW_MAP_SIZE); glUniform1f(22,(float)SHADOW_MAP_SIZE); glUniform1ui(23,LIGHT_COUNT); glUniform1ui(24,(uint32_t)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);
+    glUseProgram(Sys_Render.shadowmapsClearShaderProgram); glUniform1ui(1,SHADOW_MAP_SIZE);
+    glUseProgram(Sys_Render.chunkShaderProgram); glUniform1ui(21,SHADOW_MAP_SIZE); glUniform1f(22,(float)SHADOW_MAP_SIZE); glUniform1ui(23,LIGHT_COUNT); glUniform1ui(24,(uint32_t)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);
+    glUseProgram(Sys_Render.voxelUpdateShaderProgram); glUniform1ui(6,(uint32_t)MAX_LIGHTS_PER_VOXEL);
     DualLog("GL SSBOs and Settings Apply... took %f secs\n",get_time() - nextInitTimeSection);
     RenderLoadingProgress(110,"Loading models...");
     LoadModels();
@@ -1953,12 +1944,10 @@ static inline __attribute__((always_inline)) double RenderUI(void) {
     return time_now;
 }
 
-#define SHADOW_NEARMESH_MAX 2048
+#define SHADOW_NEARMESH_MAX 1024
 typedef struct {float depth; uint16_t index; } DepthSort;
-DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX]; // Found that this is typically around 172
+DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX];
 float shadows_nearMeshRadii[SHADOW_NEARMESH_MAX];
-typedef struct { uint16_t index; float distanceSquared, score, radius; Vector3 position; } LightCandidate;
-
 static inline __attribute__((always_inline)) bool EntNotVisible(uint16_t i, bool otherCondition) { Entity* e = &Sys_Global.instances[i]; return e->texIndex > loadedTexturesMaxIndex || !(e->entflags & ENTFLAG_ACTIVE) || e->index >= MAX_ENTITIES || e->modelIndex >= MODEL_IDX_MAX || e->texIndex >= MAX_VALID_TEXTURE || otherCondition; }
 
 extern bool instanceIsLODArray[INSTANCE_COUNT]; extern uint16_t loadedModelsMaxIndex; extern float modelBounds[MODEL_IDX_MAX]; extern uint8_t** modelVertices; extern uint16_t** modelTriangles;
@@ -1976,63 +1965,51 @@ extern uint32_t* texturePaletteOffsets;
 extern int32_t* textureSizes;
 static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {    
     double shadowStartTime = get_time();
-    LightCandidate candidates[MAX_SHADOWMAPS];
-    uint16_t numberFoundLightCandidatesForShadows = 0;
-    float bestScores[MAX_SHADOWMAPS];
+    uint16_t candidates[MAX_SHADOWMAPS];
     voxen_Shadow_System.numShadowsCouldRender = 0;
     Vector3 playerPos = Sys_Global.instances[PLAYER1].position;
     float pfx = Sys_Global.instances[PLAYER1].forward.x;    float pfy = Sys_Global.instances[PLAYER1].forward.y;    float pfz = Sys_Global.instances[PLAYER1].forward.z;
+    float minx = Sys_Global.worldMin_x, minz = Sys_Global.worldMin_z;
     for (uint16_t i = 0; i < Sys_Global.loadedLights; ++i) { // Collect candidates: only lights that are enabled and in PVS
-        if (!(lights[i].lflags & SHADON) || !(lights[i].lflags & LIGHTON)) continue;
+        if (unlikely(!(lights[i].lflags & SHADON) || !(lights[i].lflags & LIGHTON))) continue;
 
         Vector3 lightPos = lights[i].pos;
-        float intensity = lights[i].intensity;
-        if ((intensity < 0.1f)) continue;
+        float intensity = lights[i].maxIntensity; // Much more stable than actual intensity (from fade/flickers).  Since gated by on above, this is fine now.
+        if (unlikely(intensity < 0.1f)) continue;
         
         float range =  lights[i].range;
         float luminosity = (intensity / (range * range));
         if (luminosity < 0.008f && (range < 8.0f || intensity < 0.5f)) continue;
-        if (!lightInPVS[i]) continue;
+        
+        uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((lightPos.x - minx + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+        uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((lightPos.z - minz + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+        int lightCellIdx = (cellZ * WORLDX) + cellX;
+        int r = vceil(range * (1.0f / WORLDCELL_WIDTH_F));
+        bool inPVS = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
+        if (likely(!inPVS)) inPVS = NeighborhoodInPVS(cellX,cellZ,r);
+        if (!inPVS) continue;
         
         float dx = lightPos.x - playerPos.x; float dy = lightPos.y - playerPos.y; float dz = lightPos.z - playerPos.z;
         float distSqrdToPlayer = dx*dx + dy*dy + dz*dz;
         float dotResult = (dx*pfx + dy*pfy + dz*pfz);
         if (dotResult < 0.0f && distSqrdToPlayer > (range * range)) continue;
-        
-        float score = distSqrdToPlayer / vmax(intensity, 0.01f);
-        if (numberFoundLightCandidatesForShadows < MAX_SHADOWMAPS) {
-            candidates[numberFoundLightCandidatesForShadows] = (LightCandidate){ i, distSqrdToPlayer, score, range, lightPos };
-            bestScores[numberFoundLightCandidatesForShadows] = score;
-            numberFoundLightCandidatesForShadows++;
-        } else {
-            float currentWorst = bestScores[0];
-            for (uint32_t j = 1; j < numberFoundLightCandidatesForShadows; j++) currentWorst = vmax(currentWorst, bestScores[j]);
-            if (score < currentWorst) {  // Only compare against current worst
-                int worstIdx = 0; // Find worst (highest score) and replace it
-                for (uint32_t j = 1; j < numberFoundLightCandidatesForShadows; ++j) {
-                    if (bestScores[j] > bestScores[worstIdx]) worstIdx = j;
-                }
-                candidates[worstIdx] = (LightCandidate){ i, distSqrdToPlayer, score, range, lightPos };
-                bestScores[worstIdx] = score;
-            }
-        }
 
+        candidates[voxen_Shadow_System.numShadowsCouldRender] = i;
         voxen_Shadow_System.numShadowsCouldRender++;
+        if (voxen_Shadow_System.numShadowsCouldRender >= MAX_SHADOWMAPS) break;
     }
 
-    uint32_t numLightsShadowmapsToRender = vmin(voxen_Shadow_System.numShadowsCouldRender, MAX_SHADOWMAPS);
-    if (numLightsShadowmapsToRender > 0) { // Added since there is now work between here and the for loop so this is beneficial to check.
+    if (voxen_Shadow_System.numShadowsCouldRender > 0) { // Added since there is now work between here and the for loop so this is beneficial to check.
         glUseProgram(Sys_Render.shadowmapsClearShaderProgram); // Clear shadowmaps.  One might think that this would be less performant than standard shadowmap FBO with gl clears and textures but in fact this is faster on all but the oldest hardware (e.g. 10yrs old is fine, 13yrs suffers a small hit).
-        glUniform1ui(1, SHADOW_MAP_SIZE);
-        for (uint32_t c=0;c<numLightsShadowmapsToRender;++c) {
-            glUniform1ui(0, c);
+        for (uint32_t c=0;c<voxen_Shadow_System.numShadowsCouldRender;++c) {
+            glUniform1ui(0,c);
             GLuint groupX_shadClear = ((SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) + 31) / 32;
             glDispatchCompute(groupX_shadClear,6,1);
         }
 
         shadowDrawCallsRenderedThisFrame = 0;
         __builtin_memset(voxen_Shadow_System.shadowmapIndirectionList,MAX_SHADOWMAPS + 1,Sys_Global.loadedLights * sizeof(uint32_t)); // Set to invalid values for all
-        glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+        glViewport(0,0,SHADOW_MAP_SIZE,SHADOW_MAP_SIZE);
         glUseProgram(Sys_Render.shadowmapsShaderProgram);
         uint32_t shadowmapOffsetHead = 0U;
         uint16_t shadowCasterIndices[SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS];
@@ -2045,12 +2022,11 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
             if (numShadowCasters >= (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS)) break; // Ran out of shadowcasters max for frame.
         }
         
-        uint16_t numShadowingLightsHandled = 0, currentModelType = 0, currentTexIndex = 0;
+        uint16_t shadowMapIdx = 0, currentModelType = 0, currentTexIndex = 0;
         bool currentIsTransparent = 0;
-        for (uint32_t c = 0; c < numLightsShadowmapsToRender; ++c) { // Render top MAX_SHADOWMAPS candidates
-            uint16_t lightIdx = candidates[c].index;
-            float effectiveRadius = vmin(candidates[c].radius, 15.36f);
-            Vector3 lightPos = candidates[c].position;
+        for (uint32_t c = 0; c < voxen_Shadow_System.numShadowsCouldRender; ++c, ++shadowMapIdx) { // Render top MAX_SHADOWMAPS candidates
+            uint16_t lightIdx = candidates[c];
+            float effectiveRadius = vmin(lights[lightIdx].range,15.36f);
             uint16_t nearbyMeshCount = 0;
             Vector3 lpos = lights[lightIdx].pos;
             float cellCenterX = vround(lpos.x / CELL_SIZE) * CELL_SIZE;
@@ -2061,7 +2037,7 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
             for (uint16_t shadowCasterInstanceIdx = 0; shadowCasterInstanceIdx < numShadowCasters; shadowCasterInstanceIdx++) {
                 uint16_t j = shadowCasterIndices[shadowCasterInstanceIdx];
                 shadows_nearMeshRadii[nearbyMeshCount] = modelBounds[Sys_Global.instances[j].modelIndex] * 0.99f * vmax(vmax(Sys_Global.instances[j].scale.x,Sys_Global.instances[j].scale.y),Sys_Global.instances[j].scale.z);
-                Vector3 d = Vector3_A_minus_B(Sys_Global.instances[j].position, lightPos);
+                Vector3 d = Vector3_A_minus_B(Sys_Global.instances[j].position,lpos);
                 float distToLightSqrd = dot_vector3(d,d);
                 float radSum = (effectiveRadius + shadows_nearMeshRadii[nearbyMeshCount]);
                 if (distToLightSqrd >= radSum * radSum) continue;
@@ -2073,39 +2049,38 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
                 if (nearbyMeshCount >= SHADOW_NEARMESH_MAX) { DualLogWarn("Shadowmapping needs larger nearMeshes count than %u!  Skipping some renderables for light %u!\n", SHADOW_NEARMESH_MAX, lightIdx); break; }
             }
 
-            if (nearbyMeshCount < 1) continue;
+            if (unlikely(nearbyMeshCount < 1)) continue;
 
-            glUniform3f(3,lightPos.x,lightPos.y,lightPos.z);
-            voxen_Shadow_System.shadowmapIndirectionList[lightIdx] = numShadowingLightsHandled;
+            glUniform3f(3,lpos.x,lpos.y,lpos.z);
+            voxen_Shadow_System.shadowmapIndirectionList[lightIdx] = shadowMapIdx;
             #pragma GCC unroll 6
             for (uint8_t face = 0; face < 6; face++) {                                            
-                glUniform1ui(2, face);
+                glUniform1ui(2,face);
                 glUniformMatrix4fv(1,1,GL_FALSE,(float*)lightViewProj[lightIdx][face]);
-                glUniform1ui(7, shadowmapOffsetHead + (face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE));
-                shadowDrawCallsRenderedThisFrame++;
+                glUniform1ui(7,shadowmapOffsetHead + (face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE));
                 for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
-                    int i = shadows_nearMeshes[j].index;            
-                    if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face], Sys_Global.instances[i].position, shadows_nearMeshRadii[j] * 1.41f)) continue;
+                    int i = shadows_nearMeshes[j].index;
+                    Entity* e = &Sys_Global.instances[i];
+                    if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face],e->position,shadows_nearMeshRadii[j] * 1.41f)) continue;
 
                     currentModelType = GetAndBindModel(i,currentModelType);
-                    if (currentTexIndex != Sys_Global.instances[i].texIndex) { currentTexIndex = Sys_Global.instances[i].texIndex; glUniform1ui(6, Sys_Global.instances[i].texIndex); }
-                    if (currentIsTransparent != transparentTexture[Sys_Global.instances[i].texIndex]) {
-                        currentIsTransparent = transparentTexture[Sys_Global.instances[i].texIndex];
-                        glUniform1ui(8, currentIsTransparent ? 1u : 0u);
+                    if (currentTexIndex != e->texIndex) { currentTexIndex = e->texIndex; glUniform1ui(6,e->texIndex); }
+                    if (currentIsTransparent != transparentTexture[e->texIndex]) {
+                        currentIsTransparent = transparentTexture[e->texIndex];
+                        glUniform1ui(8,currentIsTransparent ? 1u : 0u);
                         if (currentIsTransparent) {
                             glUniform2i(10,textureSizes[currentTexIndex * 2],textureSizes[currentTexIndex * 2 + 1]);
                             glUniform1ui(11,texturePaletteOffsets[currentTexIndex]);
                         }
                     }
-                    glDrawElements(GL_TRIANGLES,modelTriangleCounts[currentModelType]*3,GL_UNSIGNED_SHORT,0); drawCallsRenderedThisFrame++; verticesRenderedThisFrame += modelTriangleCounts[currentModelType] * 3;
+                    glDrawElements(GL_TRIANGLES,modelTriangleCounts[currentModelType]*3,GL_UNSIGNED_SHORT,0); drawCallsRenderedThisFrame++; shadowDrawCallsRenderedThisFrame++; verticesRenderedThisFrame += modelTriangleCounts[currentModelType] * 3;
                 }
             }
             
             shadowmapOffsetHead += (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) * 6;
-            numShadowingLightsHandled++;
         }
 
-        glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
+        glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
         glNamedBufferData(Sys_Render.shadowMapsIndirectionID,Sys_Global.loadedLights * sizeof(uint32_t),voxen_Shadow_System.shadowmapIndirectionList,GL_DYNAMIC_DRAW);
     }
 
@@ -2136,17 +2111,19 @@ static inline __attribute__((always_inline)) bool DetermineIfInstanceVisible(uin
         if (!(gridCellStates[instCellIdx] & CELL_OPEN) && *distSqrd >= 943.7184f && (entIdx != 754 || !skyVisible)) return false; // 30.72 * 30.72, 12 cells
     }
     
+    // One frame delay is fine for cam views to become visible
+    if (Sys_Global.instances[i].camView != 255) camViews[Sys_Global.instances[i].camView].visible = true;
     return true;
 }
 
-__attribute__((pure)) int32_t compareDepthSort(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (db > da) - (db < da); }
-__attribute__((pure)) int32_t compareDepthSortInverted(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (da > db) - (da < db); }
+__attribute__((pure)) int32_t dsort(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (db > da) - (db < da); }
+__attribute__((pure)) int32_t dsortInv(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (da > db) - (da < db); }
 void qsort(void* base, size_t nmemb, size_t size, int (*cmp)(const void*, const void*));
 static inline __attribute__((always_inline)) void RenderInstances(Vector3 playerPos, bool transparents) {
     uint16_t visibleCount = 0, currentTexIndex = 0, currentNormIndex = 0, currentGlowIndex = 0, currentSpecIndex = 0, currentModelType = 0;
     bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX);
+    float distSqrd = Sys_Global.farPlane * Sys_Global.farPlane;
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
-        float distSqrd = Sys_Global.farPlane * Sys_Global.farPlane;
         if (!DetermineIfInstanceVisible(i,(transparentTexture[Sys_Global.instances[i].texIndex] ^ transparents),skyVisible,playerPos,&distSqrd)) continue;
 
         visibleInstances[visibleCount].index = i;
@@ -2154,32 +2131,30 @@ static inline __attribute__((always_inline)) void RenderInstances(Vector3 player
         visibleCount++;
     }
     
-    if (visibleCount > 1) qsort(visibleInstances, visibleCount, sizeof(DepthSort), transparents ? compareDepthSort : compareDepthSortInverted); // Sort by depth (ascending for front-to-back)
+    if (visibleCount > 1) qsort(visibleInstances,visibleCount,sizeof(DepthSort),transparents ? dsort : dsortInv); // Sort by depth (ascending for front-to-back)
     for (uint16_t visibleIndex = 0; visibleIndex < visibleCount; ++visibleIndex) {
         uint16_t i = visibleInstances[visibleIndex].index;
-        if (transparentTexture[Sys_Global.instances[i].texIndex] && transparents) { glEnable(GL_CULL_FACE); glEnable(GL_BLEND); } // Transparents (with sort)
-        else if (doubleSidedTexture[Sys_Global.instances[i].texIndex] || Sys_Global.instances[i].scale.x < 0.0f || Sys_Global.instances[i].scale.y < 0.0f || Sys_Global.instances[i].scale.z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided
+        Entity* e = &Sys_Global.instances[i]; uint16_t tex = e->texIndex, glow = e->glowIndex, norm = e->normIndex, spec = e->specIndex;
+        if (transparentTexture[tex] && transparents) { glEnable(GL_CULL_FACE); glEnable(GL_BLEND); } // Transparents (with sort)
+        else if (doubleSidedTexture[tex] || e->scale.x < 0.0f || e->scale.y < 0.0f || e->scale.z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided
         else { glEnable(GL_CULL_FACE); glDisable(GL_BLEND); } // Opaque
 
-        glUniform1ui(17, Sys_Global.instances[i].texIndex == 316 ? 1u : 0u);
-        glUniform1ui(25,(uint32_t)Sys_Global.instances[i].index); // constIndex
-        glUniform1f(27,Sys_Global.instances[i].volume); // CyberWall bump go alpha 1.0 then fade.
-        uint8_t cmi = Sys_Global.instances[i].camView;
+        glUniform1ui(17,tex == 316 ? 1u : 0u);
+        glUniform1ui(25,(uint32_t)e->index); // constIndex
+        glUniform1f(27,e->volume); // CyberWall bump go alpha 1.0 then fade.
+        uint8_t cmi = e->camView;
+        glUniform1ui(30,cmi < camViewCount ? 1u : 0u); // useCamView
         if (cmi < camViewCount) {
             glActiveTexture(GL_TEXTURE6);
             glBindTexture(GL_TEXTURE_2D,camViewTextures[cmi]);
             glUniform2ui(28,camViews[cmi].width,camViews[cmi].height);
             glUniform1i(29,6); // Cam View put into Uniform
-            glUniform1ui(30,1u); // useCamView
-        } else {
-            glUniform1ui(30,0u); // Well... don't
-            glActiveTexture(GL_TEXTURE0);
         }
         
-        if (currentNormIndex != (uint32_t)Sys_Global.instances[i].normIndex || Sys_Global.instances[i].normIndex == 0) { currentNormIndex = (uint32_t)Sys_Global.instances[i].normIndex; glUniform1ui(1, currentNormIndex); }
-        if (currentTexIndex  != (uint32_t)Sys_Global.instances[i].texIndex  || Sys_Global.instances[i].texIndex == 0)  { currentTexIndex  =  (uint32_t)Sys_Global.instances[i].texIndex; glUniform1ui(18, currentTexIndex); }
-        if (currentGlowIndex != (uint32_t)Sys_Global.instances[i].glowIndex || Sys_Global.instances[i].glowIndex == 0) { currentGlowIndex = (uint32_t)Sys_Global.instances[i].glowIndex; glUniform1ui(19, currentGlowIndex); }
-        if (currentSpecIndex != (uint32_t)Sys_Global.instances[i].specIndex || Sys_Global.instances[i].specIndex == 0) { currentSpecIndex = (uint32_t)Sys_Global.instances[i].specIndex; glUniform1ui(20, currentSpecIndex); }
+        if (currentNormIndex != norm || norm == 0) { currentNormIndex = norm; glUniform1ui( 1,(uint32_t)norm); }
+        if (currentTexIndex  != tex  ||  tex == 0) { currentTexIndex  =  tex; glUniform1ui(18,(uint32_t)tex ); }
+        if (currentGlowIndex != glow || glow == 0) { currentGlowIndex = glow; glUniform1ui(19,(uint32_t)glow); }
+        if (currentSpecIndex != spec || spec == 0) { currentSpecIndex = spec; glUniform1ui(20,(uint32_t)spec); }
         currentModelType = GetAndBindModel(i,currentModelType);
         uint32_t vertCount = modelTriangleCounts[currentModelType] * 3;
         glDrawElements(GL_TRIANGLES,vertCount,GL_UNSIGNED_SHORT,0); drawCallsRenderedThisFrame++; verticesRenderedThisFrame += vertCount;
@@ -2196,14 +2171,14 @@ static inline __attribute__((always_inline)) void RenderInstancesDepthOnly(Vecto
         visibleInstances[visibleCount].index = i;
         visibleInstances[visibleCount].depth = distSqrd;
         visibleCount++;
-        if (visibleCount >= INSTANCE_COUNT) break; // Feels unnecessary given the loop bounds?
     }
     
-    if (visibleCount > 1) qsort(visibleInstances, visibleCount, sizeof(DepthSort), compareDepthSortInverted); // Sort by depth (ascending for front-to-back)
+    if (visibleCount > 1) qsort(visibleInstances,visibleCount,sizeof(DepthSort),dsortInv);
+    glDisable(GL_BLEND);
     for (uint16_t visibleIndex = 0; visibleIndex < visibleCount; ++visibleIndex) {
         uint16_t i = visibleInstances[visibleIndex].index;
-        if (doubleSidedTexture[Sys_Global.instances[i].texIndex] || Sys_Global.instances[i].scale.x < 0.0f || Sys_Global.instances[i].scale.y < 0.0f || Sys_Global.instances[i].scale.z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided
-        else { glEnable(GL_CULL_FACE); glDisable(GL_BLEND); } // Opaque
+        if (doubleSidedTexture[Sys_Global.instances[i].texIndex] || Sys_Global.instances[i].scale.x < 0.0f || Sys_Global.instances[i].scale.y < 0.0f || Sys_Global.instances[i].scale.z < 0.0f) glDisable(GL_CULL_FACE); // Doublesided
+        else glEnable(GL_CULL_FACE); // Opaque
 
         currentModelType = GetAndBindModel(i,currentModelType);
         uint32_t vertCount = modelTriangleCounts[currentModelType] * 3;
@@ -2422,7 +2397,7 @@ int32_t main(void) {
             Vector3 tempPlayerPos = Sys_Global.instances[PLAYER1].position;
             Quaternion tempPlayerRot = Sys_Global.instances[PLAYER1].rotation;
             for (int cm=0;cm<camViewCount;++cm) {
-                if (camViews[cm].finished < Sys_Global.pauseRelativeTime) {
+                if (camViews[cm].finished < Sys_Global.pauseRelativeTime && camViews[cm].visible) {
                     camViews[cm].finished = Sys_Global.pauseRelativeTime + 0.5f;
                     Sys_Global.instances[PLAYER1].position = camViews[cm].position;
                     Sys_Global.instances[PLAYER1].rotation = camViews[cm].rotation;
@@ -2459,6 +2434,8 @@ int32_t main(void) {
                     modelMatrices[m+12]= Sys_Global.instances[i].position.x; modelMatrices[m + 13] = Sys_Global.instances[i].position.y; modelMatrices[m + 14] = Sys_Global.instances[i].position.z;
                     modelMatrices[m+15]= 1.0f;
                 }
+                
+                
             }
             if (uploadInstances) glNamedBufferData(Sys_Render.matricesBufferID,Sys_Global.loadedInstances * 16 * sizeof(float),modelMatrices,GL_DYNAMIC_DRAW);
         }

@@ -15,36 +15,21 @@ layout(location=4) uniform float worldMin_z;
 layout(location=5) uniform vec3 camPos;
 layout(location=6) uniform uint maxLightsPerVoxel;
 layout(location=7) uniform float farPlaneSqd;
-const int CELL_VISIBLE = 1;
-const float WORLDCELL_WIDTH_F = 2.56;
-const float CELLXHALF = 1.28;
-const int WORLDX = 64;
-const int WORLDX_0BASED = 63;
-const int ARRSIZE = 4096;
 const int WORLD_X_VOXELCOUNT = 512;
 const float VOXEL_SIZE = 0.32;
 
-int PosGetCellCoordX(float pos_x) { return int(clamp(int(floor((pos_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F)), 0, WORLDX_0BASED)); }
-int PosGetCellCoordZ(float pos_z) { return int(clamp(int(floor((pos_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F)), 0, WORLDX_0BASED)); }
-int PosGetCellCoords(float x, float z) { return (PosGetCellCoordZ(z) * WORLDX) + PosGetCellCoordX(x); }
 bool CellVisible(float x, float z) {
-    int subIdx = PosGetCellCoords(x,z);
-    return (gridCellStates[subIdx] & CELL_VISIBLE) > 0;
+    int subIdx = (int(clamp(int(floor(((z - worldMin_z) + 1.28) / 2.56)),0,63)) * 64)
+                + int(clamp(int(floor(((x - worldMin_x) + 1.28) / 2.56)),0,63));
+    return (gridCellStates[subIdx] & 1) > 0;
 }
 
-const float NEIGHBOR_OFFSET = 1.26;
-
-// Helper that checks center + N/S/E/W neighbors
 bool VoxelOrNeighborVisible(float x, float z) {
-    // Center
-    if (CellVisible(x, z)) return true;
-    
-    // Four cardinal neighbors with a small offset
-    if (CellVisible(x + NEIGHBOR_OFFSET, z)) return true;
-    if (CellVisible(x - NEIGHBOR_OFFSET, z)) return true;
-    if (CellVisible(x, z + NEIGHBOR_OFFSET)) return true;
-    if (CellVisible(x, z - NEIGHBOR_OFFSET)) return true;
-    
+    if (CellVisible(x,z)) return true;
+    if (CellVisible(x + 1.30,z)) return true;
+    if (CellVisible(x - 1.30,z)) return true;
+    if (CellVisible(x,z + 1.30)) return true;
+    if (CellVisible(x,z - 1.30)) return true;
     return false;
 }
 
