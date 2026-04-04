@@ -53,7 +53,6 @@ gen_header() {
 
 # Shaders and their C variable names
 gen_header ./Shaders/ssr.compute                ssrComputeSrc
-gen_header ./Shaders/voxels.compute             voxelUpdateComputeSrc
 gen_header ./Shaders/shadowmaps_clear.compute   shadowmapsClearComputeSrc
 gen_header ./Shaders/depth_prepass_vert.glsl    depthPrepassVertSrc
 gen_header ./Shaders/depth_prepass.glsl         depthPrepassFragSrc
@@ -82,7 +81,6 @@ cat > Shaders/shaders.h <<'EOF'
 #include "composite_vert.glsl.h"
 #include "composite_frag.glsl.h"
 #include "ssr.compute.h"
-#include "voxels.compute.h"
 #include "shadowmaps_clear.compute.h"
 #include "bluenoise64.cginc"
 EOF

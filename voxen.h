@@ -74,7 +74,7 @@ typedef struct {
     GLuint blueNoiseBuffer;
     GLuint matricesBufferID,cellVisibleDataID;
     GLuint colorBufferID,texturePalettesID,texturePaletteOffsetsID,textureOffsetsID,textureSizesID;
-    GLuint lightsID,voxelUpdateShaderProgram,voxelLightListCountsID,voxelLightListsID;
+    GLuint lightsID,voxelLightListCountsID,voxelLightListsID;
     GLuint vbos[MODEL_IDX_MAX],tbos[MODEL_IDX_MAX];
 } RenderSystem;
 size_t GetStringLength(const char *s);

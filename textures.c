@@ -7,8 +7,6 @@
 extern uint16_t loadedTexturesMaxIndex;
 uint32_t totalPixels;
 uint32_t totalPaletteColors;
-uint32_t* texturePaletteOffsets;
-int32_t* textureSizes;
 #define STBI_ARENA_SIZE 16*1024*1024
 uint8_t* stbi__arena_base = NULL;
 uint8_t* stbi__arena_cursor = NULL;
@@ -848,8 +846,8 @@ void LoadTextures(void) {
     void* arena = OS_AllocateRAM(NULL,arena_size,PROT_READ|PROT_WRITE,MAP_ANONYMOUS|MAP_PRIVATE|MAP_POPULATE,OS_INVALID_HANDLE);
     uint8_t* cur = (uint8_t*)arena;
     uint32_t* textureOffsets = (uint32_t*)cur; cur += offsets_size;
-    textureSizes = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * 2 * sizeof(int32_t),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
-    texturePaletteOffsets = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * sizeof(uint32_t),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
+    int32_t* textureSizes = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * 2 * sizeof(int32_t),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
+    uint32_t* texturePaletteOffsets = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * sizeof(uint32_t),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
     uint32_t* texturePalettes = (uint32_t*)cur; cur += palettes_size;
     uint8_t* all_indices = cur;
     uint32_t pixel_base = 0, color_base = 0;
@@ -891,8 +889,10 @@ void LoadTextures(void) {
     OS_DeallocateRAM(rawTextures,loadedTexturesMaxIndex * sizeof(RawTexture));
     OS_DeallocateRAM(indexToParser,loadedTexturesMaxIndex * sizeof(int32_t));
     OS_DeallocateRAM(textureIndexBuffers,loadedTexturesMaxIndex * sizeof(uint8_t*));
+    OS_DeallocateRAM(textureSizes,loadedTexturesMaxIndex * 2 * sizeof(int32_t));
     OS_DeallocateRAM(texturePaletteBuffers,loadedTexturesMaxIndex * sizeof(uint32_t*));
     OS_DeallocateRAM(texturePaletteSizes,loadedTexturesMaxIndex * sizeof(uint32_t));
+    OS_DeallocateRAM(texturePaletteOffsets,loadedTexturesMaxIndex * sizeof(uint32_t));
     OS_DeallocateRAM(textureWidths,loadedTexturesMaxIndex * sizeof(int32_t));
     OS_DeallocateRAM(textureHeights,loadedTexturesMaxIndex * sizeof(int32_t));
     for (int t=0;t<num_parse_threads;++t) OS_DeallocateRAM(thread_stbi_arenas[t].base,STBI_ARENA_SIZE);

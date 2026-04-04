@@ -483,13 +483,6 @@ void CullInit(void) {
 
     gridCellStates[0] |= CELL_VISIBLE; // Errors default here so draw them anyways.
     CullCore(); // Do first Cull pass, forcing as player moved to new cell.
-    glUseProgram(Sys_Render.voxelUpdateShaderProgram);
-    glUniform1f(0,Sys_Global.voxelMinCenterX);
-    glUniform1f(1,Sys_Global.voxelMinCenterZ);
-    glUniform1ui(2,Sys_Global.loadedLights);
-    glUniform1f(3,Sys_Global.worldMin_x);
-    glUniform1f(4,Sys_Global.worldMin_z);
-    glUniform1f(7,Sys_Global.farPlane * Sys_Global.farPlane);
     DualLog(" took %f secs\n",get_time() - start_time);
     DebugRAM("end of Cull_Init");
 }

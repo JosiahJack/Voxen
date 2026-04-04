@@ -30,6 +30,7 @@ float uiOrthoProjection[16];
 Light lights[LIGHT_COUNT]; LightAnimation lanims[LIGHT_COUNT];
 static float lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6],playerFrustumPlanes[6];
+static pthread_t shadowCasterThread;
 uint16_t editModeSelection,editModeTestEntityDefinition=0; // Test instance and its model index
 typedef struct { double shadowTime; uint32_t shadowmapIndirectionList[LIGHT_COUNT]; float shadDotThresh; } VoxenShadowSystem;
 VoxenShadowSystem voxen_Shadow_System;
@@ -95,7 +96,6 @@ void CompileShaders(void) {
     Sys_Render.textShaderProgram        = CompileStandardShader(textVertSrc,textFragSrc,"Text");
     Sys_Render.imageBlitShaderProgram   = CompileStandardShader(quadVertSrc,quadFragSrc,"Image Blit");
     Sys_Render.ssrShaderProgram            = CompileComputeShader(ssrComputeSrc,"SSR");
-    Sys_Render.voxelUpdateShaderProgram    = CompileComputeShader(voxelUpdateComputeSrc,"Voxel Update");
     Sys_Render.shadowmapsClearShaderProgram= CompileComputeShader(shadowmapsClearComputeSrc,"Shadowmaps Clear");
 }
 
@@ -262,12 +262,14 @@ bool VoxelOrNeighborVisible(float x, float z) {
 static void* VoxelWorkerPersistent(void* arg) {
     VoxelJobSlice* slice = (VoxelJobSlice*)arg;
     while (1) {
+        if (*(volatile bool*)&Sys_Global.levelCurrentlyLoading ||  *(volatile bool*)&Sys_Global.gamePaused ||  *(volatile bool*)&Sys_Global.menuActive) continue;
+        
         for (uint32_t voxelZ = slice->zStart; voxelZ < slice->zEnd; ++voxelZ) {
             for (uint32_t voxelX = 0; voxelX < 512; ++voxelX) {
                 float posX = Sys_Global.voxelMinCenterX + (voxelX * VOXEL_SIZE);
                 float posZ = Sys_Global.voxelMinCenterZ + (voxelZ * VOXEL_SIZE);
                 uint32_t voxelIndex = voxelZ * 512 + voxelX;
-                if (!VoxelOrNeighborVisible(posX, posZ)) continue;
+                if (!VoxelOrNeighborVisible(posX,posZ)) continue;
 
                 uint32_t count=0,baseOffset=voxelIndex*MAX_LIGHTS_PER_VOXEL;
                 for (uint32_t lightIdx = 0; lightIdx < Sys_Global.loadedLights; ++lightIdx) {
@@ -326,7 +328,30 @@ void UpdateLights(void) {
         }
     }
 
-    __builtin_memcpy(lightsMapped, lights, Sys_Global.loadedLights * sizeof(Light));
+    __builtin_memcpy(lightsMapped,lights,Sys_Global.loadedLights * sizeof(Light));
+}
+
+#define SHADOW_NEARMESH_MAX 1024
+static inline __attribute__((always_inline)) bool EntNotVisible(uint16_t i, bool otherCondition) { Entity* e = &Sys_Global.instances[i]; return e->texIndex > loadedTexturesMaxIndex || !(e->entflags & ENTFLAG_ACTIVE) || e->index >= MAX_ENTITIES || e->modelIndex >= MODEL_IDX_MAX || e->texIndex >= MAX_VALID_TEXTURE || otherCondition; }
+typedef struct { uint16_t count,indices[SHADOW_NEARMESH_MAX]; float radii[SHADOW_NEARMESH_MAX]; } ShadowLightMeshList;
+static uint16_t shadowCasterIndices[SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS];
+static volatile uint32_t numShadowCasters = 0;
+static void* ShadowCasterWorker(void* arg) {
+    (void)arg;
+    while (1) {        
+        if (*(volatile bool*)&Sys_Global.levelCurrentlyLoading ||  *(volatile bool*)&Sys_Global.gamePaused ||  *(volatile bool*)&Sys_Global.menuActive) continue;
+
+        uint32_t count = 0;
+        for (int i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
+            if (EntNotVisible(i,(Sys_Global.instances[i].entflags & ENTFLAG_NO_SHADOWS))) continue;
+            shadowCasterIndices[count] = i;
+            count++;
+            if (count >= (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS)) break;
+        }
+        numShadowCasters = count; // written last so main thread never sees stale count with partial list
+    }
+
+    return NULL;
 }
 
 #define IS_CHANGED(a, b) (vabs((a) - (b)) > 0.0001f)
@@ -733,7 +758,7 @@ void LoadLevel(uint8_t curlevel) {
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < Sys_Global.loadedInstances; i++) Sys_Global.dirtyInstances[i] = true;
     for (uint16_t i = 0; i < Sys_Global.loadedLights; i++) { lightsNewPosition[i] = lights[i].pos; }
     __builtin_memset(voxen_Shadow_System.shadowmapIndirectionList,MAX_SHADOWMAPS + 1,Sys_Global.loadedLights * sizeof(uint32_t)); // Set to invalid values for all
-    Sys_Global.levelCurrentlyLoading = false;
+    Sys_Global.levelCurrentlyLoading = Sys_Global.gamePaused = Sys_Global.menuActive = false; numShadowCasters = 0;
 }
 
 void InputClearRisingAndFallingEdges(void) { // Clear keypress rising and falling edge triggers
@@ -1415,7 +1440,6 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     glUseProgram(Sys_Render.shadowmapsShaderProgram); glUniform1ui(9,SHADOW_MAP_SIZE);
     glUseProgram(Sys_Render.shadowmapsClearShaderProgram); glUniform1ui(1,SHADOW_MAP_SIZE);
     glUseProgram(Sys_Render.chunkShaderProgram); glUniform1ui(21,SHADOW_MAP_SIZE); glUniform1f(22,(float)SHADOW_MAP_SIZE); glUniform1ui(23,LIGHT_COUNT); glUniform1ui(24,(uint32_t)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);
-    glUseProgram(Sys_Render.voxelUpdateShaderProgram); glUniform1ui(6,(uint32_t)MAX_LIGHTS_PER_VOXEL);
     DualLog("GL SSBOs and Settings Apply... took %f secs\n",get_time() - nextInitTimeSection);
     RenderLoadingProgress(110,"Loading models...");
     LoadModels();
@@ -1435,6 +1459,7 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     glBufferStorage(GL_SHADER_STORAGE_BUFFER,LIGHT_COUNT * sizeof(Light),NULL,storageFlags);
     lightsMapped = (Light*)glMapBufferRange(GL_SHADER_STORAGE_BUFFER,0,LIGHT_COUNT * sizeof(Light),mapFlags);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER,4,Sys_Render.lightsID);
+    pthread_create(&shadowCasterThread,NULL,ShadowCasterWorker,NULL);
     
     // Init voxels
     glGenBuffers(1,&Sys_Render.voxelLightListCountsID);
@@ -1971,11 +1996,9 @@ static inline __attribute__((always_inline)) double RenderUI(void) {
     return time_now;
 }
 
-#define SHADOW_NEARMESH_MAX 1024
 typedef struct {float depth; uint16_t index; } DepthSort;
 DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX];
 float shadows_nearMeshRadii[SHADOW_NEARMESH_MAX];
-static inline __attribute__((always_inline)) bool EntNotVisible(uint16_t i, bool otherCondition) { Entity* e = &Sys_Global.instances[i]; return e->texIndex > loadedTexturesMaxIndex || !(e->entflags & ENTFLAG_ACTIVE) || e->index >= MAX_ENTITIES || e->modelIndex >= MODEL_IDX_MAX || e->texIndex >= MAX_VALID_TEXTURE || otherCondition; }
 
 extern bool instanceIsLODArray[INSTANCE_COUNT]; extern uint16_t loadedModelsMaxIndex; extern float modelBounds[MODEL_IDX_MAX]; extern uint8_t** modelVertices; extern uint16_t** modelTriangles;
 static inline __attribute__((always_inline,hot)) uint16_t GetAndBindModel(uint16_t i, uint16_t currentModelType) {
@@ -1988,8 +2011,6 @@ static inline __attribute__((always_inline,hot)) uint16_t GetAndBindModel(uint16
     return modelType;
 }
 
-extern uint32_t* texturePaletteOffsets;
-extern int32_t* textureSizes;
 static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {    
     double shadowStartTime = get_time();
     uint16_t candidates[MAX_SHADOWMAPS];
@@ -2038,15 +2059,14 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
         glViewport(0,0,SHADOW_MAP_SIZE,SHADOW_MAP_SIZE);
         glUseProgram(Sys_Render.shadowmapsShaderProgram);
         uint32_t shadowmapOffsetHead = 0U;
-        uint16_t shadowCasterIndices[SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS];
-        uint32_t numShadowCasters = 0;
-        for (int i=START_INDEX_LEVEL_INSTANCES;i<INSTANCE_COUNT;++i) {
-            if (EntNotVisible(i,(Sys_Global.instances[i].entflags & ENTFLAG_NO_SHADOWS))) continue;
-
-            shadowCasterIndices[numShadowCasters] = i;
-            numShadowCasters++;
-            if (numShadowCasters >= (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS)) break; // Ran out of shadowcasters max for frame.
-        }
+//         numShadowCasters = 0;
+//         for (int i=START_INDEX_LEVEL_INSTANCES;i<INSTANCE_COUNT;++i) {
+//             if (EntNotVisible(i,(Sys_Global.instances[i].entflags & ENTFLAG_NO_SHADOWS))) continue;
+// 
+//             shadowCasterIndices[numShadowCasters] = i;
+//             numShadowCasters++;
+//             if (numShadowCasters >= (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS)) break; // Ran out of shadowcasters max for frame.
+//         }
         
         uint16_t shadowMapIdx=0,currentModelType=0,currentTexIndex=0; bool currentIsTransparent=0;
         bool useDetail = Sys_Settings.ModelDetail;
