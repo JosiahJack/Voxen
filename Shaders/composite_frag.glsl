@@ -242,6 +242,12 @@ vec3 Grayscale(vec3 currentColor) {
         return vec3(lum);
 }
 
+const float ssr_weights[9] = float[](
+    0.0625, 0.125, 0.0625,
+    0.125,  0.25,  0.125,
+    0.0625, 0.125, 0.0625
+);
+
 void main() {
     vec2 texCoordUsed = TexCoord;
     if (empEffectActive > 0u) texCoordUsed.y += timeVal * 15.0;
@@ -400,12 +406,14 @@ void main() {
         vec4 reflectionColor = vec4(0.0);
         reflectionColor.rgb += texture(outputImage, sampleUV).rgb;
         float weightSum = 1.0;
-        for (int x = -4; x <= 4; ++x) {
-            for (int y = -4; y <= 4; ++y) {
+        int wi = 0;
+        for (int x = -1; x <= 1; ++x) {
+            for (int y = -1; y <= 1; ++y) {
                 vec2 offset = vec2(float(x), float(y));
                 vec2 sampleUV = (pixelLow + offset) / lowResSize;
-                vec3 samp = texture(outputImage, sampleUV).rgb;
-                reflectionColor.rgb += samp;
+                vec3 samp = texture(outputImage,sampleUV).rgb;
+                float w = ssr_weights[wi++];
+                reflectionColor.rgb += samp * w;
                 weightSum += 1.0;
             }
         }
@@ -413,7 +421,7 @@ void main() {
         reflectionColor.rgb /= weightSum;
         if (isSky) { FragColor.rgb += reflectionColor.rgb; return; }
 
-        color.rgb += reflectionColor.rgb;
+        color.rgb += (reflectionColor.rgb * 1.8);
     }
 
     vec3 aaColor = color.rgb;

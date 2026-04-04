@@ -2146,6 +2146,7 @@ static inline __attribute__((always_inline)) void RenderInstances(Vector3 player
         }
         glUniform1ui(25,constIndex);
         glUniform1f(27,e->volume); // CyberWall bump go alpha 1.0 then fade.
+        glUniform1ui(32,(tex == 36 || tex == 887) ? 1U : 0U);
         uint8_t cmi = e->camView;
         glUniform1ui(30,cmi < camViewCount ? 1u : 0u); // useCamView
         if (cmi < camViewCount) {
@@ -2286,8 +2287,8 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
     glBindFramebuffer(GL_FRAMEBUFFER,0);
     if (likely(Sys_Settings.Reflections > 0u)) { // Screen Space Reflections
         glUseProgram(Sys_Render.ssrShaderProgram);
-        glUniformMatrix4fv(4,1,GL_FALSE,viewProj);
         glUniform3f(3,playerPos.x,playerPos.y,playerPos.z);
+        glUniformMatrix4fv(4,1,GL_FALSE,viewProj);
         GLuint groupX_ssr = ((Sys_Settings.ScreenWidth  / Sys_Settings.SSR_RES) + 31) / 32;
         GLuint groupY_ssr = ((Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES) + 31) / 32;
         glDispatchCompute(groupX_ssr,groupY_ssr,1);

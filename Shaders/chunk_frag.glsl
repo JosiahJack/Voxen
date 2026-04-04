@@ -35,6 +35,7 @@ layout(location=28) uniform uvec2 camViewSize;
 layout(location=29) uniform sampler2D camViewTex;
 layout(location=30) uniform uint useCamView;
 layout(location=31) uniform float heat;
+layout(location=32) uniform uint useStrengthMod;
 struct Light { vec3 pos; float intensity; vec3 col; uint lflags; float range; float spotAng; float maxIntensity; float minIntensity; vec4 spotDir; };
 layout(location=0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location=1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
@@ -82,8 +83,8 @@ vec3 quat_rotate(vec4 q, vec3 v) {
 }
 
 const vec4 BYTE_TO_FLOAT = vec4(1.0/255.0);
-vec4 getTextureColor(uint texIndex, ivec2 texCoord) {
-    uint pixelOffset = textureOffsets[texIndex] + uint(texCoord.y) * textureSizes[texIndex].x + uint(texCoord.x);
+vec4 getTextureColor(uint texIndex, ivec2 texCoord, int texSizeX) {
+    uint pixelOffset = textureOffsets[texIndex] + uint(texCoord.y) * texSizeX + uint(texCoord.x);
     uint slotIndex = pixelOffset >> 2u;// / 4u;
     uint packedIdx = colors[slotIndex];
     uint localOffset = pixelOffset & 3u;//% 4u;
@@ -115,7 +116,6 @@ void GetCubemapSampleCoord(vec3 toLight, uint shadowIndex, out uint faceOff, out
     float fmx = step(a.y,a.x)*step(a.z,a.x);
     float fmy = step(a.x,a.y)*step(a.z,a.y);
     vec2 uv = fmx * uvx + fmy * uvy + (1.0 - fmx - fmy) * uvz;
-//     vec2 uv = mxyz.x * uvx + mxyz.y * uvy + mxyz.z * uvz;
     uv = uv * 0.5 + 0.5;
     faceOff = (shadowIndex * shadSizeSqd * 6u) + (face * shadSizeSqd);
     tc = uv * shadowMapSizeF;
@@ -140,7 +140,7 @@ void main() {
         vec2 uv2 = (vec2(TexCoord.x,TexCoord.y));
         albedoColor = texture(camViewTex,uv2);
     } else {
-        albedoColor = getTextureColor(texIndex,texUV);
+        albedoColor = getTextureColor(texIndex,texUV,texSize.x);
     }
 
     if (albedoColor.a < 0.05 && volume < 0.05) discard; // Alpha cutout threshold
@@ -166,7 +166,7 @@ void main() {
             ivec2 texSizeNorm = textureSizes[normInstanceIndex];
             ivec2 texUVNorm = ivec2(int(floor(uv.x * float(texSizeNorm.x))), int(floor(uv.y * float(texSizeNorm.y))));
             texUVNorm.x = texUVNorm.x % texSizeNorm.x; texUVNorm.y = texUVNorm.y % texSizeNorm.y;
-            vec3 normalColor = (getTextureColor(normInstanceIndex,texUVNorm).rgb * 2.0 - 1.0);
+            vec3 normalColor = (getTextureColor(normInstanceIndex,texUVNorm,texSizeNorm.x).rgb * 2.0 - 1.0);
             normalColor.g = -normalColor.g;
             adjustedNormal = normalize(TBN3x3 * normalColor);
             if (dot(adjustedNormal,Normal) < 0.0) adjustedNormal = Normal;
@@ -180,15 +180,18 @@ void main() {
         ivec2 texUVGlow = ivec2(int(floor(uv.x * float(texSizeGlow.x))), int(floor(uv.y * float(texSizeGlow.y))));
         texUVGlow.x = texUVGlow.x % texSizeGlow.x;
         texUVGlow.y = texUVGlow.y % texSizeGlow.y;
-        glowColor = getTextureColor(glowIndex,texUVGlow);
+        glowColor = getTextureColor(glowIndex,texUVGlow,texSizeGlow.x);
     }
 
     vec4 specColor = vec4(0.0);
-    ivec2 texSizeSpec = textureSizes[specIndex];
-    ivec2 texUVSpec = ivec2(int(floor(uv.x * float(texSizeSpec.x))),int(floor(uv.y * float(texSizeSpec.y))));
-    texUVSpec.x = texUVSpec.x % texSizeSpec.x;
-    texUVSpec.y = texUVSpec.y % texSizeSpec.y;
-    specColor = getTextureColor(specIndex,texUVSpec);
+    if (specIndex  != 0) {
+        ivec2 texSizeSpec = textureSizes[specIndex];
+        ivec2 texUVSpec = ivec2(int(floor(uv.x * float(texSizeSpec.x))),int(floor(uv.y * float(texSizeSpec.y))));
+        texUVSpec.x = texUVSpec.x % texSizeSpec.x;
+        texUVSpec.y = texUVSpec.y % texSizeSpec.y;
+        specColor = getTextureColor(specIndex,texUVSpec,texSizeSpec.x);
+    }
+
     if (reflectionsEnabled > 0 && isUI == 0) {
         outSpecular = specColor;
         outWorldPos.xyz = FragPos.xyz;
@@ -206,12 +209,13 @@ void main() {
         vec3 lightPos = lights[lightIdx].pos;
         float intensity = lights[lightIdx].intensity;
         float range = lights[lightIdx].range;
+        float invRange = 1.0 / range;
         vec3 toLight = lightPos - worldPos;
         float dist = length(toLight);
-        vec3 lightDir = normalize(toLight);
+        vec3 lightDir = toLight * (1.0 / dist);
         float NdotL = dot(adjustedNormal, lightDir);
         float lambertian = clamp(max(NdotL, 0.0),0.0,1.0);
-        float distOverRange = dist / range;
+        float distOverRange = dist * invRange;
         float distOverRangeSqd = distOverRange * distOverRange;
         float attenuation = (1.0 - distOverRangeSqd) * lambertian;
         if (attenuation < 0.015) continue;
@@ -243,7 +247,7 @@ void main() {
             vec2 coordc = clamp(basec,0.0,shadSizeMaxUV);
             uint ssbo_idx_center = faceOff + uint(coordc.y) * shadowMapSize + uint(coordc.x);
             float dc = float(shadowMaps[ssbo_idx_center]) * 0.00001;
-            float distToOccluderFac = (dc / 7.68);
+            float distToOccluderFac = dc * 0.130208333;//(1.0 / 7.68);
             float smearness = clamp(distToOccluderFac,0.0,1.0) * (range + intensity + 4.51) * 2.5;
             float bias = quintic_polynomial_smoothstep(distToOccluderFac) * 0.48 + quintic_polynomial_smoothstep(0.16 * attenuation);
             float sum = 0.0;
@@ -263,8 +267,7 @@ void main() {
                     }
                 }
 
-                float res = mix(mix(samples[0],samples[1],st.x),mix(samples[2],samples[3],st.x),st.y); // Manual bilinear shadowmap filter
-                sum += res;
+                sum += mix(mix(samples[0],samples[1],st.x),mix(samples[2],samples[3],st.x),st.y); // Manual bilinear shadowmap filter
             }
 
             shadowFactor = (sum * invSamples);
@@ -276,8 +279,8 @@ void main() {
         intensityTotal = fma(intensity,attenuation * 1.5,intensityTotal);
         vec3 halfDir = normalize(lightDir + viewDir);
         float ndh = max(dot(adjustedNormal, halfDir), 0.0);
-        float strength = texIndex == 36 || texIndex == 887 ? 1.0 : max(specColor.r, max(specColor.g, specColor.b)) * 4.51;
-        float spec = clamp(pow(ndh, 100.0),0.0,1.0);
+        float strength = (useStrengthMod > 0) ? 1.0 : max(specColor.r, max(specColor.g, specColor.b)) * 4.51;
+        float spec = clamp(pow(ndh,100.0),0.0,1.0);
         lighting += specColor.rgb * intensity * attenuation * spotFalloff * spec * shadowFactor * strength;
     }
 
