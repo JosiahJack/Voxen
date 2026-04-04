@@ -30,7 +30,7 @@ Light lights[LIGHT_COUNT]; LightAnimation lanims[LIGHT_COUNT];
 static float lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6],playerFrustumPlanes[6];
 uint16_t editModeSelection,editModeTestEntityDefinition=0; // Test instance and its model index
-typedef struct { double shadowTime; uint32_t numShadowsCouldRender; uint32_t shadowmapIndirectionList[LIGHT_COUNT]; float shadDotThresh; } VoxenShadowSystem;
+typedef struct { double shadowTime; uint32_t shadowmapIndirectionList[LIGHT_COUNT]; float shadDotThresh; } VoxenShadowSystem;
 VoxenShadowSystem voxen_Shadow_System;
 uint16_t loadedTexturesMaxIndex;
 bool doubleSidedTexture[MAX_VALID_TEXTURE],transparentTexture[MAX_VALID_TEXTURE];
@@ -666,7 +666,7 @@ OsFileHandle levelFileHandle;
 void LoadLevel(uint8_t curlevel) {
     double start_time = get_time();
     DebugRAM("start of LoadLevel");
-    Sys_Global.levelCurrentlyLoading = true;
+    Sys_Global.levelCurrentlyLoading = true; Sys_Global.gamePaused = false; Sys_Global.menuActive = false;
     queuedLevelToLoad = 255u; // Reset any loading state that got us here.
     RenderLoadingProgress(100,"Loading level...");
     __builtin_memset(lights,0,LIGHT_COUNT * sizeof(Light)); __builtin_memset(lanims,0,LIGHT_COUNT * sizeof(LightAnimation));
@@ -1564,73 +1564,38 @@ void RenderMenu(void) {
             // Resolution
             {
                 // Header hit area - UI_Button subtracts h from y internally, so pass y+h as y
-                bool headerClick = (UI_Button(190, (int16_t)(710 + 16), 328, 16, &overRes, 7) != 0)
-                                || (MenuEnter() && currentMenuItem == 7);
+                if (UI_Button(190,726,328,16,&overRes,7) || (MenuEnter() && currentMenuItem == 7)) { resDropdownOpen = !resDropdownOpen; currentMenuItem = 7; }
                 overRes = overRes || currentMenuItem == 7;
-
                 char resBuf[32];
-                if (resDropdownCount > 0)
-                    StringFormat(resBuf, sizeof(resBuf), "%ux%u %uHz",
-                        Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight,
-                        (uint32_t)resModes[resSelectedIdx].hz);
-                else
-                    StringFormat(resBuf, sizeof(resBuf), "%ux%u",
-                        Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
+                if (resDropdownCount > 0) StringFormat(resBuf, sizeof(resBuf), "%ux%u %uHz",Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight,(uint32_t)resModes[resSelectedIdx].hz);
+                else StringFormat(resBuf, sizeof(resBuf), "%ux%u",Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
 
                 RenderUIImage(476, 710, 16, 16, overRes ? 1119 : 1077);
-                RenderFormattedText(200, 710, overRes ? TEXT_YELLOW : TEXT_GREEN,
-                                    FONT_NORMAL, 1.0f, "RESOLUTION %s", resBuf);
-
-                if (headerClick) {
-                    resDropdownOpen = !resDropdownOpen;
-                    currentMenuItem = 7;
-                }
-
-                if (resDropdownOpen) {
-                    // Items stack upward: item 0 (largest res) is furthest up, item N-1 nearest header
-                    // Each item is 24px tall (matching texture 1120 which is 108x24)
-                    // Item i draws at baseY = 710 - (resDropdownCount - i) * 24
-                    // so item 0 is highest (smallest Y), last item is just above header
+                RenderFormattedText(200, 710, overRes ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL, 1.0f, "RESOLUTION %s", resBuf);
+                if (resDropdownOpen) { // TODO
                     for (int i = 0; i < resDropdownCount; ++i) {
                         int16_t itemBaseY = (int16_t)(710 - (resDropdownCount - i) * 24);
                         bool overItem = false;
-                        // UI_Button(x, y, w, h) — y is the BOTTOM of the hit zone in your coord system
-                        // because it does: ypos = RelY(y) - RelY(h), then checks cursor >= ypos && <= ypos+h
-                        // So pass itemBaseY + 24 as y so the hit zone covers [itemBaseY, itemBaseY+24]
-                        bool clicked = (UI_Button(190, (int16_t)(itemBaseY + 24), 328, 24, &overItem, (int8_t)(10 + i)) != 0);
+                        bool clicked = (UI_Button(190, (int16_t)(itemBaseY + 24),328,24,&overItem,(int8_t)(10 + i)) != 0);
                         bool isEnterSelected = (MenuEnter() && currentMenuItem == (int8_t)(10 + i));
-
                         bool isSelected = (i == resSelectedIdx);
-                        uint8_t color = isSelected   ? TEXT_YELLOW
-                                    : overItem     ? TEXT_GREEN
-                                                    : TEXT_WHITE;
-
-                        // Background image for this item (108x24 → scale to 328x24 to match hit width)
-                        RenderUIImage(190, (int16_t)(itemBaseY + 24), 328, 24, 1120);
-
+                        uint8_t color = isSelected ? TEXT_YELLOW : (overItem ? TEXT_GREEN : TEXT_WHITE);
+                        RenderUIImage(190, (int16_t)(itemBaseY + 24),328,24,1120);
                         char itemBuf[32];
-                        StringFormat(itemBuf, sizeof(itemBuf), "%dx%d %dHz",
-                            resModes[i].w, resModes[i].h, resModes[i].hz);
-                        // Text sits 4px below itemBaseY for vertical centering within 24px item
-                        RenderFormattedText(200, (int16_t)(itemBaseY + 4), color, FONT_NORMAL, 1.0f, "%s", itemBuf);
-
+                        StringFormat(itemBuf,sizeof(itemBuf),"%dx%d %dHz",resModes[i].w,resModes[i].h,resModes[i].hz);
+                        RenderFormattedText(200,(int16_t)(itemBaseY + 4),color,FONT_NORMAL,1.0f,"%s",itemBuf);
                         if (clicked || isEnterSelected) {
                             resSelectedIdx = i;
-                            Sys_Settings.ScreenWidth  = (uint32_t)resModes[i].w;
-                            Sys_Settings.ScreenHeight = (uint32_t)resModes[i].h;
-
+                            Sys_Settings.ScreenWidth  = (uint32_t)resModes[i].w; Sys_Settings.ScreenHeight = (uint32_t)resModes[i].h;
                             GLFWmonitor* monitor = GetCurrentMonitor();
                             if (!monitor) monitor = glfwGetPrimaryMonitor();
-                            int mx, my;
-                            glfwGetMonitorPos(monitor, &mx, &my);
+                            int mx,my; glfwGetMonitorPos(monitor,&mx,&my);
                             const GLFWvidmode* mode = glfwGetVideoMode(monitor);
                             int xpos = mx + (mode->width  - (int)Sys_Settings.ScreenWidth)  / 2;
                             int ypos = my + (mode->height - (int)Sys_Settings.ScreenHeight) / 2;
-                            glfwSetWindowSize(window, (int)Sys_Settings.ScreenWidth,
-                                                    (int)Sys_Settings.ScreenHeight);
+                            glfwSetWindowSize(window, (int)Sys_Settings.ScreenWidth,(int)Sys_Settings.ScreenHeight);
                             glfwSetWindowPos(window, xpos, ypos);
-                            UpdateScreenSize(NULL, (int)Sys_Settings.ScreenWidth,
-                                                (int)Sys_Settings.ScreenHeight);
+                            UpdateScreenSize(NULL, (int)Sys_Settings.ScreenWidth,(int)Sys_Settings.ScreenHeight);
                             Sys_Input.ignore_next_mouse_delta = true;
                             resDropdownOpen = false;
                             SaveConfig();
@@ -1911,9 +1876,8 @@ static inline __attribute__((always_inline)) double RenderUI(void) {
     int16_t debugTextStartY = 48;
     if (Sys_Cheats.showLocation && !Sys_Global.menuActive) RenderFormattedText(16, debugTextStartY, TEXT_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f",Sys_Global.instances[PLAYER1].position.x,Sys_Global.instances[PLAYER1].position.y,Sys_Global.instances[PLAYER1].position.z,Sys_Global.instances[PLAYER1].rotation.x,Sys_Global.instances[PLAYER1].rotation.y,Sys_Global.instances[PLAYER1].rotation.z,Sys_Global.instances[PLAYER1].rotation.w);
     int16_t lineSpacing = 18;
-    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 1),TEXT_WHITE,FONT_NORMAL,1.0f,"numShadowsCouldRender: %u, playerCellIdx: %u",Sys_Global.timeSinceLastPhysicsTick, voxen_Shadow_System.numShadowsCouldRender,playerCellIdx);
+    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 1),TEXT_WHITE,FONT_NORMAL,1.0f,"playerCellIdx: %u, Shadow cpu ms: %.3f",playerCellIdx,voxen_Shadow_System.shadowTime * 1000);
     if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 2),TEXT_WHITE,FONT_NORMAL,1.0f,"Player velocity: %.2f, %.2f, %.2f",Sys_Global.instances[PLAYER1].velocity.x,Sys_Global.instances[PLAYER1].velocity.y,Sys_Global.instances[PLAYER1].velocity.z);
-    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 3),TEXT_WHITE,FONT_NORMAL,1.0f,"Shadow cpu ms: %.3f",voxen_Shadow_System.shadowTime * 1000);
     RenderFormattedText(16,debugTextStartY + (lineSpacing * 4),TEXT_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d  dx:%d dy:%d",Sys_Global.cursorPosition_x,Sys_Global.cursorPosition_y,Sys_Input.currentMouse_dx,Sys_Input.currentMouse_dy);
     if (Sys_Cheats.consoleActive) RenderFormattedText(16,0,TEXT_WHITE,FONT_NORMAL,1.0f, "] %s",consoleEntryText);
     if (Sys_Global.statusTextDecayFinished > Sys_Global.current_time) RenderFormattedText(479,114,TEXT_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
@@ -1963,9 +1927,9 @@ extern int32_t* textureSizes;
 static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {    
     double shadowStartTime = get_time();
     uint16_t candidates[MAX_SHADOWMAPS];
-    voxen_Shadow_System.numShadowsCouldRender = 0;
+    uint16_t numShadowsCouldRender = 0;
     Vector3 playerPos = Sys_Global.instances[PLAYER1].position;
-    float pfx = Sys_Global.instances[PLAYER1].forward.x;    float pfy = Sys_Global.instances[PLAYER1].forward.y;    float pfz = Sys_Global.instances[PLAYER1].forward.z;
+    Vector3 pf = Sys_Global.instances[PLAYER1].forward;
     float minx = Sys_Global.worldMin_x, minz = Sys_Global.worldMin_z;
     for (uint16_t i = 0; i < Sys_Global.loadedLights; ++i) { // Collect candidates: only lights that are enabled and in PVS
         if (unlikely(!(lights[i].lflags & SHADON) || !(lights[i].lflags & LIGHTON))) continue;
@@ -1988,24 +1952,23 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
         
         float dx = lightPos.x - playerPos.x; float dy = lightPos.y - playerPos.y; float dz = lightPos.z - playerPos.z;
         float distSqrdToPlayer = dx*dx + dy*dy + dz*dz;
-        float dotResult = (dx*pfx + dy*pfy + dz*pfz);
+        float dotResult = (dx*pf.x + dy*pf.y + dz*pf.z);
         if (dotResult < 0.0f && distSqrdToPlayer > (range * range)) continue;
 
-        candidates[voxen_Shadow_System.numShadowsCouldRender] = i;
-        voxen_Shadow_System.numShadowsCouldRender++;
-        if (voxen_Shadow_System.numShadowsCouldRender >= MAX_SHADOWMAPS) break;
+        candidates[numShadowsCouldRender] = i;
+        numShadowsCouldRender++;
+        if (numShadowsCouldRender >= MAX_SHADOWMAPS) break;
     }
 
-    if (voxen_Shadow_System.numShadowsCouldRender > 0) { // Added since there is now work between here and the for loop so this is beneficial to check.
+    if (numShadowsCouldRender > 0) { // Added since there is now work between here and the for loop so this is beneficial to check.
         glUseProgram(Sys_Render.shadowmapsClearShaderProgram); // Clear shadowmaps.  One might think that this would be less performant than standard shadowmap FBO with gl clears and textures but in fact this is faster on all but the oldest hardware (e.g. 10yrs old is fine, 13yrs suffers a small hit).
-        for (uint32_t c=0;c<voxen_Shadow_System.numShadowsCouldRender;++c) {
+        for (uint32_t c=0;c<numShadowsCouldRender;++c) {
             glUniform1ui(0,c);
             GLuint groupX_shadClear = ((SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) + 31) / 32;
             glDispatchCompute(groupX_shadClear,6,1);
         }
 
         shadowDrawCallsRenderedThisFrame = 0;
-        __builtin_memset(voxen_Shadow_System.shadowmapIndirectionList,MAX_SHADOWMAPS + 1,Sys_Global.loadedLights * sizeof(uint32_t)); // Set to invalid values for all
         glViewport(0,0,SHADOW_MAP_SIZE,SHADOW_MAP_SIZE);
         glUseProgram(Sys_Render.shadowmapsShaderProgram);
         uint32_t shadowmapOffsetHead = 0U;
@@ -2019,9 +1982,9 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
             if (numShadowCasters >= (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS)) break; // Ran out of shadowcasters max for frame.
         }
         
-        uint16_t shadowMapIdx = 0, currentModelType = 0, currentTexIndex = 0;
-        bool currentIsTransparent = 0;
-        for (uint32_t c = 0; c < voxen_Shadow_System.numShadowsCouldRender; ++c, ++shadowMapIdx) { // Render top MAX_SHADOWMAPS candidates
+        uint16_t shadowMapIdx=0,currentModelType=0,currentTexIndex=0; bool currentIsTransparent=0;
+        bool useDetail = Sys_Settings.ModelDetail;
+        for (uint32_t c = 0; c < numShadowsCouldRender; ++c, ++shadowMapIdx) { // Render top MAX_SHADOWMAPS candidates
             uint16_t lightIdx = candidates[c];
             float effectiveRadius = vmin(lights[lightIdx].range,15.36f);
             uint16_t nearbyMeshCount = 0;
@@ -2033,12 +1996,13 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
             bool skipNPCs = (distToCenterSqrd < 0.4096f); // 0.64 * 0.64
             for (uint16_t shadowCasterInstanceIdx = 0; shadowCasterInstanceIdx < numShadowCasters; shadowCasterInstanceIdx++) {
                 uint16_t j = shadowCasterIndices[shadowCasterInstanceIdx];
-                shadows_nearMeshRadii[nearbyMeshCount] = modelBounds[Sys_Global.instances[j].modelIndex] * 0.99f * vmax(vmax(Sys_Global.instances[j].scale.x,Sys_Global.instances[j].scale.y),Sys_Global.instances[j].scale.z);
-                Vector3 d = Vector3_A_minus_B(Sys_Global.instances[j].position,lpos);
+                Entity* e = &Sys_Global.instances[j];
+                shadows_nearMeshRadii[nearbyMeshCount] = modelBounds[e->modelIndex] * 0.99f * vmax(vmax(e->scale.x,e->scale.y),e->scale.z);
+                Vector3 d = Vector3_A_minus_B(e->position,lpos);
                 float distToLightSqrd = dot_vector3(d,d);
                 float radSum = (effectiveRadius + shadows_nearMeshRadii[nearbyMeshCount]);
                 if (distToLightSqrd >= radSum * radSum) continue;
-                if (skipNPCs && ConstIndexIsNPC(Sys_Global.instances[j].index)) continue;
+                if (skipNPCs && ConstIndexIsNPC(e->index)) continue;
                 
                 shadows_nearMeshes[nearbyMeshCount].index = j;
                 shadows_nearMeshes[nearbyMeshCount].depth = distToLightSqrd; 
@@ -2060,16 +2024,12 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
                     Entity* e = &Sys_Global.instances[i];
                     if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face],e->position,shadows_nearMeshRadii[j] * 1.41f)) continue;
 
-                    currentModelType = GetAndBindModel(i,currentModelType);
+                    glUniform1ui(0,i);
+                    uint16_t modelType = (instanceIsLODArray[i] || useDetail < 1u) && e->lodIndex < loadedModelsMaxIndex ? e->lodIndex : e->modelIndex;
+                    if (currentModelType != modelType || currentModelType == 0) { currentModelType = modelType; glBindVertexBuffer(0,Sys_Render.vbos[modelType],0,VERTEX_ATTRIBUTES_SIZE); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,Sys_Render.tbos[modelType]); }
                     if (currentTexIndex != e->texIndex) { currentTexIndex = e->texIndex; glUniform1ui(6,e->texIndex); }
-                    if (currentIsTransparent != transparentTexture[e->texIndex]) {
-                        currentIsTransparent = transparentTexture[e->texIndex];
-                        glUniform1ui(8,currentIsTransparent ? 1u : 0u);
-                        if (currentIsTransparent) {
-                            glUniform2i(10,textureSizes[currentTexIndex * 2],textureSizes[currentTexIndex * 2 + 1]);
-                            glUniform1ui(11,texturePaletteOffsets[currentTexIndex]);
-                        }
-                    }
+                    bool texIsTransparent = transparentTexture[e->texIndex];
+                    if (currentIsTransparent != texIsTransparent) { currentIsTransparent = texIsTransparent; glUniform1ui(8,currentIsTransparent ? 1u : 0u); }
                     glDrawElements(GL_TRIANGLES,modelTriangleCounts[currentModelType]*3,GL_UNSIGNED_SHORT,0); drawCallsRenderedThisFrame++; shadowDrawCallsRenderedThisFrame++; verticesRenderedThisFrame += modelTriangleCounts[currentModelType] * 3;
                 }
             }
@@ -2373,7 +2333,7 @@ int32_t main(void) {
         if (glfwWindowShouldClose(window)) OS_Exit(0);
         if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad); queuedLevelToLoad = 255u; continue; }
 
-        voxen_Shadow_System.numShadowsCouldRender = drawCallsRenderedThisFrame = textDrawCallsRenderedThisFrame = uiImageDrawCallsRenderedThisFrame = shadowDrawCallsRenderedThisFrame = verticesRenderedThisFrame = 0; // Reset per frame
+        drawCallsRenderedThisFrame = textDrawCallsRenderedThisFrame = uiImageDrawCallsRenderedThisFrame = shadowDrawCallsRenderedThisFrame = verticesRenderedThisFrame = 0; // Reset per frame
         Sys_Global.current_time = get_time(); // Update Time
         Sys_Global.deltaTime = Sys_Global.current_time - Sys_Global.last_topframe_time;
         Sys_Global.absoluteTime += Sys_Global.deltaTime;
@@ -2428,23 +2388,21 @@ int32_t main(void) {
             bool uploadInstances = false;
             for (uint32_t i = START_INDEX_LEVEL_INSTANCES; i < Sys_Global.loadedInstances; i++) {
                 if (Sys_Global.dirtyInstances[i]) {
-                    if (Sys_Global.instances[i].modelIndex >= loadedModelsMaxIndex || modelVertexCounts[Sys_Global.instances[i].modelIndex] < 1) { Sys_Global.dirtyInstances[i] = false; continue; } // No model or empty model
+                    Entity* e = &Sys_Global.instances[i]; uint16_t mdx = e->modelIndex;
+                    if (mdx >= loadedModelsMaxIndex || modelVertexCounts[mdx] < 1) { Sys_Global.dirtyInstances[i] = false; continue; } // No model or empty model
 
                     uploadInstances = true;
-                    Quaternion q = Sys_Global.instances[i].rotation;
-                    float x=q.x, y = q.y, z = q.z, w = q.w;
+                    float x=e->rotation.x, y = e->rotation.y, z = e->rotation.z, w = e->rotation.w;
                     float x2 = x*x, y2 = y*y, z2 = z*z, xy = x*y, xz = x*z, yz = y*z, wx = w*x, wy = w*y, wz = w*z;
-                    float sclx = Sys_Global.instances[i].scale.x; float scly = Sys_Global.instances[i].scale.y; float sclz = Sys_Global.instances[i].scale.z;
+                    float sclx = e->scale.x; float scly = e->scale.y; float sclz = e->scale.z;
                     uint32_t m = i*16;
                     modelMatrices[m+0] = (1.0f - 2.0f * (y2 + z2)) * sclx;/*Right X*/ modelMatrices[m+1] = (2.0f * (xy + wz)) * sclx;/*Right Y*/ modelMatrices[m+2] = (2.0f * (xz - wy)) * sclx;/*Right Z*/
                     modelMatrices[m+3] = modelMatrices[m + 7] = modelMatrices[m + 11] = 0.0f;
-                    modelMatrices[m+4] =        (2.0f * (xy - wz)) * scly;/*Up X*/ modelMatrices[m+5] = (1.0f - 2.0f * (x2 + z2)) * scly;/*Up Y*/ modelMatrices[m+6] =        (2.0f * (yz + wx)) * scly;/*Up Z*/
-                    modelMatrices[m+8] =        (2.0f * (xz + wy)) * sclz;/*Forward X*/ modelMatrices[m+9] =        (2.0f * (yz - wx)) * sclz;/*Forward Y*/ modelMatrices[m+10]= (1.0f - 2.0f * (x2 + y2)) * sclz;/*Forward Z*/
-                    modelMatrices[m+12]= Sys_Global.instances[i].position.x; modelMatrices[m + 13] = Sys_Global.instances[i].position.y; modelMatrices[m + 14] = Sys_Global.instances[i].position.z;
+                    modelMatrices[m+4] = (2.0f * (xy - wz)) * scly;/*Up X*/      modelMatrices[m+5] = (1.0f - 2.0f * (x2 + z2)) * scly;/*Up Y*/      modelMatrices[m+6] =        (2.0f * (yz + wx)) * scly;/*Up Z*/
+                    modelMatrices[m+8] = (2.0f * (xz + wy)) * sclz;/*Forward X*/ modelMatrices[m+9] =        (2.0f * (yz - wx)) * sclz;/*Forward Y*/ modelMatrices[m+10]= (1.0f - 2.0f * (x2 + y2)) * sclz;/*Forward Z*/
+                    modelMatrices[m+12]= e->position.x; modelMatrices[m + 13] = e->position.y; modelMatrices[m + 14] = e->position.z;
                     modelMatrices[m+15]= 1.0f;
                 }
-                
-                
             }
             if (uploadInstances) glNamedBufferData(Sys_Render.matricesBufferID,Sys_Global.loadedInstances * 16 * sizeof(float),modelMatrices,GL_DYNAMIC_DRAW);
         }

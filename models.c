@@ -493,7 +493,7 @@ void LoadModels(void){
 
 	uint32_t total_vertices=0,total_tris=0;
 	for(int i=0;i<loadedModelsMaxIndex;++i){
-		if(unlikely(modelVertexCounts[i]==0))continue;
+		if(unlikely(modelVertexCounts[i]==0)) continue;
 		size_t vert_size=(size_t)modelVertexCounts[i]*VERTEX_ATTRIBUTES_SIZE;
 		total_vertices+=modelVertexCounts[i];
 		size_t tri_size=(size_t)modelTriangleCounts[i]*3*sizeof(uint16_t);

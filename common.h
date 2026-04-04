@@ -958,7 +958,7 @@ typedef struct { uint8_t dataType; const char* fieldName; } EntityField;
 #include "miniaudio.h"
 typedef struct {
     uint32_t globalFrameNum;
-    uint16_t loadedInstances; // Number of instances of entities loaded (always for just the current level)
+    uint16_t loadedInstances,loadedLights; // Numbers of instances of entities and lights loaded (always for just the current level)
     float farPlane;
 	double cpuTime, thisFrameTime, cpuFrameTime, lastFrameSecCountTime;
 	uint32_t lastFrameSecCount, framesPerLastSecond, worstFPS;
@@ -1002,7 +1002,6 @@ typedef struct {
     char audiologNames[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH],audiologSubjects[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
     char audiologSenders[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH],audioLogSpeech2Text[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
     float worldMin_x,worldMin_z,voxelMinCenterX,voxelMinCenterZ;
-    uint16_t loadedLights;
 } GlobalContext;
 
 static inline __attribute__((always_inline)) void flag_setu32(uint32_t *flags, uint32_t bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }

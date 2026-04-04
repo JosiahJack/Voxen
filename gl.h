@@ -987,6 +987,8 @@ GLAD_API_CALL PFNGLDRAWBUFFERSPROC glad_glDrawBuffers;
 #define glDrawBuffers glad_glDrawBuffers
 GLAD_API_CALL PFNGLDRAWELEMENTSPROC glad_glDrawElements;
 #define glDrawElements glad_glDrawElements
+GLAD_API_CALL PFNGLDRAWELEMENTSBASEVERTEXPROC glad_glDrawElementsBaseVertex;
+#define glDrawElementsBaseVertex glad_glDrawElementsBaseVertex
 GLAD_API_CALL PFNGLENABLEPROC glad_glEnable;
 #define glEnable glad_glEnable
 GLAD_API_CALL PFNGLENABLEVERTEXARRAYATTRIBPROC glad_glEnableVertexArrayAttrib;
@@ -1305,7 +1307,8 @@ GLAD_API_CALL PFNGLUNIFORM2UIPROC glad_glUniform2ui;
 #define glUniform2ui glad_glUniform2ui
 GLAD_API_CALL PFNGLCLEARCOLORPROC glad_glClearColor;
 #define glClearColor glad_glClearColor
-
+GLAD_API_CALL PFNGLBUFFERSUBDATAPROC glad_glBufferSubData;
+#define glBufferSubData glad_glBufferSubData
 GLAD_API_CALL int gladLoadGLUserPtr( GLADuserptrloadfunc load, void *userptr);
 GLAD_API_CALL int gladLoadGL( GLADloadfunc load);
 #ifdef GLAD_GL
