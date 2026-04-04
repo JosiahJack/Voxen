@@ -3,7 +3,6 @@
 in vec2 TexCoord;
 out vec4 FragColor;
 layout(rgba32f,binding=1) readonly uniform image2D inputWorldPos;
-
 layout(location =  2) uniform uint screenWidth;
 layout(location =  3) uniform uint screenHeight;
 layout(location =  4) uniform sampler2D outputImage;
@@ -31,7 +30,6 @@ layout(location = 27) uniform sampler2D tex;
 layout(location = 28) uniform float staticIntensity;
 layout(location = 29) uniform uint grayscaleEnabled;
 layout(location = 30) uniform float skyRotateSpeed;
-
 const float vhsBlurAmount = 0.5; // Cannot be overstated just how magical and impactful this setting is.  DO NOT EVER TURN OFF EVER!!  I recant my former statement about avoiding blur at all costs in all scenarios.
 const float vhsRadiusMax = 3.0; // in pixels
 const float staticBandThickness = 0.005;
@@ -255,7 +253,7 @@ void main() {
     vec4 worldPosPacked;
     bool isSky = false;
     if (skyVisible > 0) {
-        isSky = ((color.a > 0.0 && color.a < 0.21) || color.a < 0.001); // Sky hack alpha (alpha of 0 for when noclipping) (the extra color.a < 0.001 check for noclip has no discernible quality impact, leaving)
+        isSky = (((color.a > 0.0 && color.a < 0.21))); // Sky hack alpha (alpha of 0 for when noclipping) (the extra color.a < 0.001 check for noclip has no discernible quality impact, leaving)
         float mappedLat = 0.0;
         if (isSky) {
             vec2 ndc = texCoordUsed * 2.0 - 1.0;

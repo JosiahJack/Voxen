@@ -1213,7 +1213,7 @@ void ButtonSwitchUseTargets(uint16_t self, uint16_t activator, const char* argva
     e->active = !e->active;
     e->alternateOn = e->active;
     if (e->changeTexOnActive) {
-        e->texIndex = e->alternateOn ? e->alternateSwitchMaterial : e->mainSwitchMaterial;
+        e->texIndex = e->alternateOn ? e->altTexIndex : e->mainSwitchMaterial;
         if (e->blinkTexOnActive && e->active) e->tickFinished = Eng_Global->pauseRelativeTime + 1.5f;
     }
 }
@@ -1239,7 +1239,7 @@ void ButtonSwitchUpdate(uint16_t self) {
     if (e->delayFinished > 0.0 && e->delayFinished < Eng_Global->pauseRelativeTime) { e->delayFinished = 0.0; ButtonSwitchUseTargets(self,e->recentMostActivator,e->argvalue); }
     if (e->blinkTexOnActive && e->active && e->tickFinished < Eng_Global->pauseRelativeTime) {
         e->alternateOn = !e->alternateOn;
-        e->texIndex = e->alternateOn ? e->alternateSwitchMaterial : e->mainSwitchMaterial;
+        e->texIndex = e->alternateOn ? e->altTexIndex : e->mainSwitchMaterial;
         e->tickFinished = Eng_Global->pauseRelativeTime + e->tickTime;
     }
 }

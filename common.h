@@ -939,7 +939,6 @@ typedef /*FAT*/ struct  {
     double animSwapFinished;
     bool alternateOn;
     uint16_t mainSwitchMaterial;
-    uint16_t alternateSwitchMaterial;
     AIState currentState; // NPC logic
     uint16_t deathBurst;
     uint8_t walkWaypointsLength,currentWaypoint;

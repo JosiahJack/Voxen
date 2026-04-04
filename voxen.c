@@ -283,12 +283,12 @@ void UpdateLights(void) {
     }
 
     glBindBuffer(GL_SSBO,Sys_Render.lightsID); glBufferData(GL_SSBO,Sys_Global.loadedLights * sizeof(Light),lights,GL_DYNAMIC_DRAW);
-    if (voxelsNeedUpdated) {
+//     if (voxelsNeedUpdated) {
         Vector3 p = Sys_Global.instances[PLAYER1].position;
         glUseProgram(Sys_Render.voxelUpdateShaderProgram);
         glUniform3f(5,p.x,p.y,p.z);
         glDispatchCompute((512+31)/32,(512+31)/32,1);
-    }
+//     }
 }
 
 #define IS_CHANGED(a, b) (vabs((a) - (b)) > 0.0001f)
@@ -2191,7 +2191,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
         view[0]  = right.x; view[1]  = up.x; view[2]  = -forward.x; view[3]  = 0.0f;
         view[4]  = right.y; view[5]  = up.y; view[6]  = -forward.y; view[7]  = 0.0f;
         view[8]  = right.z; view[9]  = up.z; view[10] = -forward.z; view[11] = 0.0f;
-        view[12] = -dot_vector3(right, playerPos); view[13] = -dot_vector3(up, playerPos); view[14] = dot_vector3(forward, playerPos); view[15] = 1.0f;
+        view[12] = -dot_vector3(right,playerPos); view[13] = -dot_vector3(up,playerPos); view[14] = dot_vector3(forward,playerPos); view[15] = 1.0f;
     }
     
     float viewProj[16]; // view-projection matrix
