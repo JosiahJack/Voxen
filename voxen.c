@@ -5,6 +5,7 @@
 GLFWwindow* window;
 #define MOD_INTEROP_ENGINE
 #include "voxen.h"
+#include <pthread.h>
 #include "miniaudio.h"
 #include "Shaders/shaders.h"
 #include "credits.h"
@@ -240,14 +241,100 @@ static inline __attribute__((always_inline)) void mul_mat4(float *out, const flo
 }
 
 bool NeighborhoodInPVS(uint16_t cellX, uint16_t cellZ, int r);
+#define VOXEL_THREADS 1
+uint32_t voxelLightLists[VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL];
+uint32_t voxelLightListCounts[VOXEL_COUNT];
+typedef struct { uint32_t zStart,zEnd; } VoxelJobSlice;
+static VoxelJobSlice    voxelSlices[VOXEL_THREADS];
+static pthread_t        voxelThreads[VOXEL_THREADS];
+
+bool vCellVisible(float x, float z) { return (gridCellStates[PosGetCellCoords(x,z)] & 1) > 0; }
+
+bool VoxelOrNeighborVisible(float x, float z) {
+    if (vCellVisible(x,z)) return true;
+    if (vCellVisible(x + 1.30,z)) return true;
+    if (vCellVisible(x - 1.30,z)) return true;
+    if (vCellVisible(x,z + 1.30)) return true;
+    if (vCellVisible(x,z - 1.30)) return true;
+    return false;
+}
+
+static void* VoxelWorkerPersistent(void* arg) {
+    VoxelJobSlice* slice = (VoxelJobSlice*)arg;
+    while (1) {
+        for (uint32_t voxelZ = slice->zStart; voxelZ < slice->zEnd; ++voxelZ) {
+            for (uint32_t voxelX = 0; voxelX < 512; ++voxelX) {
+                float posX = Sys_Global.voxelMinCenterX + (voxelX * VOXEL_SIZE);
+                float posZ = Sys_Global.voxelMinCenterZ + (voxelZ * VOXEL_SIZE);
+                uint32_t voxelIndex = voxelZ * 512 + voxelX;
+                if (!VoxelOrNeighborVisible(posX, posZ)) continue;
+
+                uint32_t count=0,baseOffset=voxelIndex*MAX_LIGHTS_PER_VOXEL;
+                for (uint32_t lightIdx = 0; lightIdx < Sys_Global.loadedLights; ++lightIdx) {
+                    if (count >= MAX_LIGHTS_PER_VOXEL) break;
+                    float litX  = lights[lightIdx].pos.x;
+                    float litZ  = lights[lightIdx].pos.z;
+                    float range = lights[lightIdx].range;
+                    float distSqrd = squareDistance2D(posX, posZ, litX, litZ);
+                    if (distSqrd < (range * range)) { voxelLightLists[baseOffset + count] = lightIdx; ++count; }
+                }
+                voxelLightListCounts[voxelIndex] = count;
+            }
+        }
+    }
+    return NULL;
+}
+
+void Voxels_InitThreads(void) {
+    uint32_t rowsPerThread = 512 / VOXEL_THREADS;
+    for (int t=0;t<VOXEL_THREADS;++t) {
+        voxelSlices[t].zStart = t * rowsPerThread;
+        voxelSlices[t].zEnd   = (t == VOXEL_THREADS - 1) ? 512 : voxelSlices[t].zStart + rowsPerThread;
+        pthread_create(&voxelThreads[t],NULL,VoxelWorkerPersistent,&voxelSlices[t]);
+    }
+}
+
+void UpdateVoxelLightLists(void) {
+    glNamedBufferData(Sys_Render.voxelLightListCountsID,VOXEL_COUNT * sizeof(uint32_t),voxelLightListCounts,GL_DYNAMIC_DRAW);
+    glNamedBufferData(Sys_Render.voxelLightListsID,VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t),voxelLightLists,GL_DYNAMIC_DRAW);
+}
+
+// void UpdateVoxelLightLists(void) {
+//     __builtin_memset(voxelLightLists,0xFFFFFFFFu,VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t));
+//     __builtin_memset(voxelLightListCounts,0,VOXEL_COUNT * sizeof(uint32_t));
+//     for (uint32_t voxelZ = 0; voxelZ < 512; ++voxelZ) {
+//         for (uint32_t voxelX = 0; voxelX < 512; ++voxelX) {
+//             float posX = Sys_Global.voxelMinCenterX + (voxelX * VOXEL_SIZE);
+//             float posZ = Sys_Global.voxelMinCenterZ + (voxelZ * VOXEL_SIZE);
+//             int32_t cellIdx = PosGetCellCoords(posX, posZ);
+//             uint32_t voxelIndex = voxelZ * 512 + voxelX;
+//             if (!VoxelOrNeighborVisible(posX,posZ)) { voxelLightListCounts[voxelIndex] = 0u; continue; }
+// 
+//             for (uint32_t lightIdx = 0; lightIdx < Sys_Global.loadedLights; ++lightIdx) {
+//                 float litX = lights[lightIdx].pos.x;
+//                 float litZ = lights[lightIdx].pos.z;
+//                 float range =  lights[lightIdx].range;
+//                 float distSqrd = squareDistance2D(posX, posZ, litX, litZ);
+//                 if (distSqrd < (range * range)) {
+//                     voxelLightLists[(voxelIndex * MAX_LIGHTS_PER_VOXEL) + voxelLightListCounts[voxelIndex]] = lightIdx;
+//                     ++voxelLightListCounts[voxelIndex];
+//                 }
+//             }
+//         }
+//     }
+//     
+//     glNamedBufferData(Sys_Render.voxelLightListCountsID,VOXEL_COUNT * sizeof(uint32_t),voxelLightListCounts,GL_DYNAMIC_DRAW);
+//     glNamedBufferData(Sys_Render.voxelLightListsID,VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t),voxelLightLists,GL_DYNAMIC_DRAW);
+// }
+
 void UpdateLights(void) {
-    bool voxelsNeedUpdated = false;
+//     bool voxelsNeedUpdated = false;
     for (uint16_t lightIdx = 0; lightIdx < Sys_Global.loadedLights; ++lightIdx) { 
         Vector3 lightPos = lightsNewPosition[lightIdx];
         lights[lightIdx].pos = lightPos;
         if (lights[lightIdx].lflags & LDIRTY) { // Marked all as true at level load.
             flag_setu32(&lights[lightIdx].lflags,LDIRTY,false);
-            voxelsNeedUpdated = true;
+//             voxelsNeedUpdated = true;
             #pragma GCC unroll 6
             for (int j=0;j<6;++j) { // Update to new position
                 mat4_lookat_from((float*)lightView[lightIdx][j], &cubemapOrientationQuaternion[j], lightPos);
@@ -283,11 +370,12 @@ void UpdateLights(void) {
     }
 
     glBindBuffer(GL_SSBO,Sys_Render.lightsID); glBufferData(GL_SSBO,Sys_Global.loadedLights * sizeof(Light),lights,GL_DYNAMIC_DRAW);
+    UpdateVoxelLightLists();
 //     if (voxelsNeedUpdated) {
-        Vector3 p = Sys_Global.instances[PLAYER1].position;
-        glUseProgram(Sys_Render.voxelUpdateShaderProgram);
-        glUniform3f(5,p.x,p.y,p.z);
-        glDispatchCompute((512+31)/32,(512+31)/32,1);
+//         Vector3 p = Sys_Global.instances[PLAYER1].position;
+//         glUseProgram(Sys_Render.voxelUpdateShaderProgram);
+//         glUniform3f(5,p.x,p.y,p.z);
+//         glDispatchCompute((512+31)/32,(512+31)/32,1);
 //     }
 }
 
@@ -1363,7 +1451,7 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     __builtin_memcpy(&modelMatrices[0],mat,16 * sizeof(float)); // Null instance matrix used for UI
     Sys_Render.matricesBufferID        = SetupSSBO(&Sys_Render.matricesBufferID,        1,INSTANCE_COUNT * 16 * sizeof(float),modelMatrices, GL_STATIC_DRAW);
     Sys_Render.voxelLightListCountsID  = SetupSSBO(&Sys_Render.voxelLightListCountsID,  2,VOXEL_COUNT * sizeof(uint32_t),NULL,GL_STATIC_DRAW);
-    Sys_Render.uniqueLightListsID      = SetupSSBO(&Sys_Render.uniqueLightListsID,      3,VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t),NULL,GL_STATIC_DRAW);
+    Sys_Render.voxelLightListsID       = SetupSSBO(&Sys_Render.voxelLightListsID,      3,VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t),NULL,GL_STATIC_DRAW);
     Sys_Render.lightsID                = SetupSSBO(&Sys_Render.lightsID,                4,LIGHT_COUNT * sizeof(Light),NULL,GL_STATIC_DRAW);
     Sys_Render.shadowMapSSBO           = SetupSSBO(&Sys_Render.shadowMapSSBO,           5,(MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(uint32_t), NULL, GL_STATIC_DRAW);    
     Sys_Render.shadowMapsIndirectionID = SetupSSBO(&Sys_Render.shadowMapsIndirectionID, 6,LIGHT_COUNT * sizeof(uint32_t),NULL,GL_STATIC_DRAW);
@@ -1388,6 +1476,7 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     LoadModels();
     RenderLoadingProgress(110,"Loading textures...");
     LoadTextures();
+    Voxels_InitThreads();
 //     NewGame();
     play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500);
     glfwSetInputMode(window,GLFW_CURSOR,GLFW_CURSOR_DISABLED);
