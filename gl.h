@@ -193,6 +193,8 @@ typedef void (*GLADpostcallback)(void *ret, const char *name, GLADapiproc apipro
 #define GL_MAJOR_VERSION 0x821B
 #define GL_MINOR_VERSION 0x821C
 #define GL_READ_FRAMEBUFFER 0x8CA8
+#define GL_MAP_COHERENT_BIT 0x0080
+#define GL_MAP_PERSISTENT_BIT 0x0040
 #if defined(__SIZEOF_LONG__) && defined(__SIZEOF_POINTER__)
     #if __SIZEOF_POINTER__ > __SIZEOF_LONG__
         #define KHRONOS_USE_INTPTR_T
@@ -1309,6 +1311,8 @@ GLAD_API_CALL PFNGLCLEARCOLORPROC glad_glClearColor;
 #define glClearColor glad_glClearColor
 GLAD_API_CALL PFNGLBUFFERSUBDATAPROC glad_glBufferSubData;
 #define glBufferSubData glad_glBufferSubData
+GLAD_API_CALL PFNGLBUFFERSTORAGEPROC glad_glBufferStorage;
+#define glBufferStorage glad_glBufferStorage
 GLAD_API_CALL int gladLoadGLUserPtr( GLADuserptrloadfunc load, void *userptr);
 GLAD_API_CALL int gladLoadGL( GLADloadfunc load);
 #ifdef GLAD_GL
