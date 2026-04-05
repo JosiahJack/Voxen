@@ -30,7 +30,6 @@ float uiOrthoProjection[16];
 Light lights[LIGHT_COUNT]; LightAnimation lanims[LIGHT_COUNT];
 static float lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6],playerFrustumPlanes[6];
-static pthread_t shadowCasterThread;
 uint16_t editModeSelection,editModeTestEntityDefinition=0; // Test instance and its model index
 typedef struct { double shadowTime; uint32_t shadowmapIndirectionList[LIGHT_COUNT]; float shadDotThresh; } VoxenShadowSystem;
 VoxenShadowSystem voxen_Shadow_System;
@@ -259,7 +258,7 @@ bool VoxelOrNeighborVisible(float x, float z) {
     return false;
 }
 
-static void* VoxelWorkerPersistent(void* arg) {
+static void* VoxelWorker(void* arg) {
     VoxelJobSlice* slice = (VoxelJobSlice*)arg;
     while (1) {
         if (*(volatile bool*)&Sys_Global.levelCurrentlyLoading ||  *(volatile bool*)&Sys_Global.gamePaused ||  *(volatile bool*)&Sys_Global.menuActive) continue;
@@ -280,6 +279,7 @@ static void* VoxelWorkerPersistent(void* arg) {
                     float distSqrd = squareDistance2D(posX, posZ, litX, litZ);
                     if (distSqrd < (range * range)) { voxelLightListsMapped[baseOffset + count] = lightIdx; ++count; }
                 }
+                
                 voxelLightListCountsMapped[voxelIndex] = count;
             }
         }
@@ -331,94 +331,7 @@ void UpdateLights(void) {
     __builtin_memcpy(lightsMapped,lights,Sys_Global.loadedLights * sizeof(Light));
 }
 
-#define SHADOW_NEARMESH_MAX 1024
 static inline __attribute__((always_inline)) bool EntNotVisible(uint16_t i, bool otherCondition) { Entity* e = &Sys_Global.instances[i]; return e->texIndex > loadedTexturesMaxIndex || !(e->entflags & ENTFLAG_ACTIVE) || e->index >= MAX_ENTITIES || e->modelIndex >= MODEL_IDX_MAX || e->texIndex >= MAX_VALID_TEXTURE || otherCondition; }
-extern bool instanceIsLODArray[INSTANCE_COUNT]; extern uint16_t loadedModelsMaxIndex; extern float modelBounds[MODEL_IDX_MAX]; extern uint8_t** modelVertices; extern uint16_t** modelTriangles;
-typedef struct { volatile uint16_t count; uint16_t indices[SHADOW_NEARMESH_MAX]; float radii[SHADOW_NEARMESH_MAX]; } ShadowLightMeshList;
-static uint16_t shadowCasterIndices[SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS];
-static volatile uint32_t numShadowCasters = 0;
-static ShadowLightMeshList shadowNearMeshes[MAX_SHADOWMAPS]; // one per candidate slot, not per light
-static volatile uint16_t shadowCandidates[MAX_SHADOWMAPS];
-static volatile uint16_t numShadowCandidates = 0;
-static void* ShadowCasterWorker(void* arg) {
-    (void)arg;
-    while (1) {
-        if (*(volatile bool*)&Sys_Global.levelCurrentlyLoading || *(volatile bool*)&Sys_Global.gamePaused || *(volatile bool*)&Sys_Global.menuActive) continue;
-
-        Vector3 playerPos = Sys_Global.instances[PLAYER1].position;
-        Vector3 pf        = Sys_Global.instances[PLAYER1].forward;
-        float minx = Sys_Global.worldMin_x, minz = Sys_Global.worldMin_z;
-        volatile uint32_t count = 0;
-        for (int i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
-            if (EntNotVisible(i,(Sys_Global.instances[i].entflags & ENTFLAG_NO_SHADOWS))) continue;
-            shadowCasterIndices[count] = i;
-            count++;
-            if (count >= (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS)) break;
-        }
-        
-        numShadowCasters = count;
-        uint16_t candCount = 0;
-        uint16_t cands[MAX_SHADOWMAPS];
-        for (uint16_t i = 0; i < Sys_Global.loadedLights; ++i) {
-            if (!(lights[i].lflags & SHADON) || !(lights[i].lflags & LIGHTON)) continue;
-            
-            float intensity = lights[i].maxIntensity;
-            if (intensity < 0.1f) continue;
-            
-            float range = lights[i].range;
-            if ((intensity / (range * range)) < 0.008f && (range < 8.0f || intensity < 0.5f)) continue;
-
-            Vector3 lp = lights[i].pos;
-            uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((lp.x - minx + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
-            uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((lp.z - minz + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
-            int lightCellIdx = (cellZ * WORLDX) + cellX;
-            int r = vceil(range * (1.0f / WORLDCELL_WIDTH_F));
-            bool inPVS = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
-            if (!inPVS) inPVS = NeighborhoodInPVS(cellX, cellZ, r);
-            if (!inPVS) continue;
-
-            float dx = lp.x - playerPos.x, dy = lp.y - playerPos.y, dz = lp.z - playerPos.z;
-            float distSqrd = dx*dx + dy*dy + dz*dz;
-            if ((dx*pf.x + dy*pf.y + dz*pf.z) < 0.0f && distSqrd > range*range) continue;
-
-            cands[candCount++] = i;
-            if (candCount >= MAX_SHADOWMAPS) break;
-        }
-
-        for (uint16_t c = 0; c < candCount; ++c) {
-            uint16_t lightIdx = cands[c];
-            float effectiveRadius = vmin(lights[lightIdx].range, 15.36f);
-            Vector3 lpos = lights[lightIdx].pos;
-            float cellCenterX = vround(lpos.x / CELL_SIZE) * CELL_SIZE;
-            float cellCenterZ = vround(lpos.z / CELL_SIZE) * CELL_SIZE;
-            Vector3 delta = Vector3_A_minus_B((Vector3){lpos.x,0.0f,lpos.z},(Vector3){cellCenterX,0.0f,cellCenterZ});
-            bool skipNPCs = (dot_vector3(delta,delta) < 0.4096f);
-
-            uint16_t meshCount = 0;
-            for (uint32_t si = 0; si < numShadowCasters; ++si) {
-                uint16_t j = shadowCasterIndices[si];
-                Entity* e = &Sys_Global.instances[j];
-                float radius = modelBounds[e->modelIndex] * 0.99f * vmax(vmax(e->scale.x,e->scale.y),e->scale.z);
-                Vector3 d = Vector3_A_minus_B(e->position, lpos);
-                float distSqrd = dot_vector3(d,d);
-                float radSum = effectiveRadius + radius;
-                if (distSqrd >= radSum * radSum) continue;
-                if (skipNPCs && ConstIndexIsNPC(e->index)) continue;
-
-                shadowNearMeshes[c].indices[meshCount] = j;
-                shadowNearMeshes[c].radii[meshCount]   = radius;
-                meshCount++;
-                if (meshCount >= SHADOW_NEARMESH_MAX) break;
-            }
-            shadowNearMeshes[c].count = meshCount;
-            shadowCandidates[c] = lightIdx;
-        }
-
-        numShadowCandidates = candCount;
-    }
-    
-    return NULL;
-}
 
 #define IS_CHANGED(a, b) (vabs((a) - (b)) > 0.0001f)
 ENGINE_TO_MOD void UpdateLight(uint16_t i, Vector3 pos, Color3 col, float range, float intensity, float maxIntensity, float minIntensity, float spotAng, Quaternion spotDir, bool on, bool shadOn) {
@@ -824,7 +737,7 @@ void LoadLevel(uint8_t curlevel) {
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < Sys_Global.loadedInstances; i++) Sys_Global.dirtyInstances[i] = true;
     for (uint16_t i = 0; i < Sys_Global.loadedLights; i++) { lightsNewPosition[i] = lights[i].pos; }
     __builtin_memset(voxen_Shadow_System.shadowmapIndirectionList,MAX_SHADOWMAPS + 1,Sys_Global.loadedLights * sizeof(uint32_t)); // Set to invalid values for all
-    Sys_Global.levelCurrentlyLoading = Sys_Global.gamePaused = Sys_Global.menuActive = false; numShadowCasters = 0;
+    Sys_Global.levelCurrentlyLoading = Sys_Global.gamePaused = Sys_Global.menuActive = false;
 }
 
 void InputClearRisingAndFallingEdges(void) { // Clear keypress rising and falling edge triggers
@@ -1525,7 +1438,7 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     glBufferStorage(GL_SHADER_STORAGE_BUFFER,LIGHT_COUNT * sizeof(Light),NULL,storageFlags);
     lightsMapped = (Light*)glMapBufferRange(GL_SHADER_STORAGE_BUFFER,0,LIGHT_COUNT * sizeof(Light),mapFlags);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER,4,Sys_Render.lightsID);
-    pthread_create(&shadowCasterThread,NULL,ShadowCasterWorker,NULL);
+//     pthread_create(&shadowCasterThread,NULL,ShadowCasterWorker,NULL);
     
     // Init voxels
     glGenBuffers(1,&Sys_Render.voxelLightListCountsID);
@@ -1542,7 +1455,7 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     for (int t=0;t<VOXEL_THREADS;++t) {
         voxelSlices[t].zStart = t * rowsPerThread;
         voxelSlices[t].zEnd   = (t == VOXEL_THREADS - 1) ? 512 : voxelSlices[t].zStart + rowsPerThread;
-        pthread_create(&voxelThreads[t],NULL,VoxelWorkerPersistent,&voxelSlices[t]);
+        pthread_create(&voxelThreads[t],NULL,VoxelWorker,&voxelSlices[t]);
     }
     
 //     NewGame();
@@ -2063,9 +1976,7 @@ static inline __attribute__((always_inline)) double RenderUI(void) {
 }
 
 typedef struct {float depth; uint16_t index; } DepthSort;
-DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX];
-float shadows_nearMeshRadii[SHADOW_NEARMESH_MAX];
-
+extern bool instanceIsLODArray[INSTANCE_COUNT]; extern uint16_t loadedModelsMaxIndex;
 static inline __attribute__((always_inline,hot)) uint16_t GetAndBindModel(uint16_t i, uint16_t currentModelType) {
     glUniform1ui(0,i);
     uint16_t modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && Sys_Global.instances[i].lodIndex < loadedModelsMaxIndex ? Sys_Global.instances[i].lodIndex : Sys_Global.instances[i].modelIndex;
@@ -2076,59 +1987,126 @@ static inline __attribute__((always_inline,hot)) uint16_t GetAndBindModel(uint16
     return modelType;
 }
 
-static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
+#define SHADOW_NEARMESH_MAX 1024
+DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX]; float shadows_nearMeshRadii[SHADOW_NEARMESH_MAX];
+extern float modelBounds[MODEL_IDX_MAX];
+static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {    
     double shadowStartTime = get_time();
-    uint16_t numShadowsCouldRender = *(volatile uint16_t*)&numShadowCandidates;
-    if (numShadowsCouldRender < 1) { voxen_Shadow_System.shadowTime = get_time() - shadowStartTime; return; }
+    uint16_t candidates[MAX_SHADOWMAPS];
+    uint16_t numShadowsCouldRender = 0;
+    Vector3 playerPos = Sys_Global.instances[PLAYER1].position;
+    Vector3 pf = Sys_Global.instances[PLAYER1].forward;
+    float minx = Sys_Global.worldMin_x, minz = Sys_Global.worldMin_z;
+    for (uint16_t i = 0; i < Sys_Global.loadedLights; ++i) { // Collect candidates: only lights that are enabled and in PVS
+        if (unlikely(!(lights[i].lflags & SHADON) || !(lights[i].lflags & LIGHTON))) continue;
 
-    glUseProgram(Sys_Render.shadowmapsClearShaderProgram);
-    for (uint32_t c = 0; c < numShadowsCouldRender; ++c) {
-        glUniform1ui(0,c);
-        glDispatchCompute(((SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) + 31) / 32, 6, 1);
+        Vector3 lightPos = lights[i].pos;
+        float intensity = lights[i].maxIntensity; // Much more stable than actual intensity (from fade/flickers).  Since gated by on above, this is fine now.
+        if (unlikely(intensity < 0.1f)) continue;
+        
+        float range =  lights[i].range;
+        float luminosity = (intensity / (range * range));
+        if (luminosity < 0.008f && (range < 8.0f || intensity < 0.5f)) continue;
+        
+        uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((lightPos.x - minx + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+        uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((lightPos.z - minz + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+        int lightCellIdx = (cellZ * WORLDX) + cellX;
+        int r = vceil(range * (1.0f / WORLDCELL_WIDTH_F));
+        bool inPVS = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
+        if (likely(!inPVS)) inPVS = NeighborhoodInPVS(cellX,cellZ,r);
+        if (!inPVS) continue;
+        
+        float dx = lightPos.x - playerPos.x; float dy = lightPos.y - playerPos.y; float dz = lightPos.z - playerPos.z;
+        float distSqrdToPlayer = dx*dx + dy*dy + dz*dz;
+        float dotResult = (dx*pf.x + dy*pf.y + dz*pf.z);
+        if (dotResult < 0.0f && distSqrdToPlayer > (range * range)) continue;
+
+        candidates[numShadowsCouldRender] = i;
+        numShadowsCouldRender++;
+        if (numShadowsCouldRender >= MAX_SHADOWMAPS) break;
     }
 
-    shadowDrawCallsRenderedThisFrame = 0;
-    glViewport(0,0,SHADOW_MAP_SIZE,SHADOW_MAP_SIZE);
-    glUseProgram(Sys_Render.shadowmapsShaderProgram);
-    uint32_t shadowmapOffsetHead = 0U;
-    uint16_t shadowMapIdx=0,currentModelType=0,currentTexIndex=0;
-    bool currentIsTransparent=0, useDetail=Sys_Settings.ModelDetail;
-
-    for (uint32_t c = 0; c < numShadowsCouldRender; ++c, ++shadowMapIdx) {
-        uint16_t lightIdx  = shadowCandidates[c];
-        uint16_t meshCount = shadowNearMeshes[c].count;
-        if (meshCount < 1) continue;
-
-        Vector3 lpos = lights[lightIdx].pos;
-        glUniform3f(3, lpos.x, lpos.y, lpos.z);
-        voxen_Shadow_System.shadowmapIndirectionList[lightIdx] = shadowMapIdx;
-
-        #pragma GCC unroll 6
-        for (uint8_t face = 0; face < 6; face++) {
-            glUniform1ui(2, face);
-            glUniformMatrix4fv(1,1,GL_FALSE,(float*)lightViewProj[lightIdx][face]);
-            glUniform1ui(7, shadowmapOffsetHead + (face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE));
-
-            for (uint16_t j = 0; j < meshCount; ++j) {
-                uint16_t instIdx = shadowNearMeshes[c].indices[j];
-                Entity* e = &Sys_Global.instances[instIdx];
-                if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face], e->position, shadowNearMeshes[c].radii[j] * 1.41f)) continue;
-
-                glUniform1ui(0, instIdx);
-                uint16_t modelType = (instanceIsLODArray[instIdx] || useDetail < 1u) && e->lodIndex < loadedModelsMaxIndex ? e->lodIndex : e->modelIndex;
-                if (currentModelType != modelType || currentModelType == 0) { currentModelType = modelType; glBindVertexBuffer(0,Sys_Render.vbos[modelType],0,VERTEX_ATTRIBUTES_SIZE); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,Sys_Render.tbos[modelType]); }
-                if (currentTexIndex != e->texIndex) { currentTexIndex = e->texIndex; glUniform1ui(6,e->texIndex); }
-                bool texIsTransparent = transparentTexture[e->texIndex];
-                if (currentIsTransparent != texIsTransparent) { currentIsTransparent = texIsTransparent; glUniform1ui(8, currentIsTransparent ? 1u : 0u); }
-                glDrawElements(GL_TRIANGLES,modelTriangleCounts[currentModelType]*3,GL_UNSIGNED_SHORT,0);
-                drawCallsRenderedThisFrame++; shadowDrawCallsRenderedThisFrame++; verticesRenderedThisFrame += modelTriangleCounts[currentModelType]*3;
-            }
+    if (numShadowsCouldRender > 0) { // Added since there is now work between here and the for loop so this is beneficial to check.
+        glUseProgram(Sys_Render.shadowmapsClearShaderProgram); // Clear shadowmaps.  One might think that this would be less performant than standard shadowmap FBO with gl clears and textures but in fact this is faster on all but the oldest hardware (e.g. 10yrs old is fine, 13yrs suffers a small hit).
+        for (uint32_t c=0;c<numShadowsCouldRender;++c) {
+            glUniform1ui(0,c);
+            GLuint groupX_shadClear = ((SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) + 31) / 32;
+            glDispatchCompute(groupX_shadClear,6,1);
         }
-        shadowmapOffsetHead += (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) * 6;
+
+        shadowDrawCallsRenderedThisFrame = 0;
+        glViewport(0,0,SHADOW_MAP_SIZE,SHADOW_MAP_SIZE);
+        glUseProgram(Sys_Render.shadowmapsShaderProgram);
+        uint32_t shadowmapOffsetHead = 0U;
+        uint16_t shadowCasterIndices[SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS];
+        uint32_t numShadowCasters = 0;
+        for (int i=START_INDEX_LEVEL_INSTANCES;i<INSTANCE_COUNT;++i) {
+            if (EntNotVisible(i,(Sys_Global.instances[i].entflags & ENTFLAG_NO_SHADOWS))) continue;
+
+            shadowCasterIndices[numShadowCasters] = i;
+            numShadowCasters++;
+            if (numShadowCasters >= (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS)) break; // Ran out of shadowcasters max for frame.
+        }
+        
+        uint16_t shadowMapIdx=0,currentModelType=0,currentTexIndex=0; bool currentIsTransparent=0;
+        bool useDetail = Sys_Settings.ModelDetail;
+        for (uint32_t c = 0; c < numShadowsCouldRender; ++c, ++shadowMapIdx) { // Render top MAX_SHADOWMAPS candidates
+            uint16_t lightIdx = candidates[c];
+            float effectiveRadius = vmin(lights[lightIdx].range,15.36f);
+            uint16_t nearbyMeshCount = 0;
+            Vector3 lpos = lights[lightIdx].pos;
+            float cellCenterX = vround(lpos.x / CELL_SIZE) * CELL_SIZE;
+            float cellCenterZ = vround(lpos.z / CELL_SIZE) * CELL_SIZE;
+            Vector3 deltaCellCenter = Vector3_A_minus_B((Vector3){lpos.x,0.0f,lpos.z},(Vector3){cellCenterX,0.0f,cellCenterZ});
+            float distToCenterSqrd = dot_vector3(deltaCellCenter,deltaCellCenter);
+            bool skipNPCs = (distToCenterSqrd < 0.4096f); // 0.64 * 0.64
+            for (uint16_t shadowCasterInstanceIdx = 0; shadowCasterInstanceIdx < numShadowCasters; shadowCasterInstanceIdx++) {
+                uint16_t j = shadowCasterIndices[shadowCasterInstanceIdx];
+                Entity* e = &Sys_Global.instances[j];
+                shadows_nearMeshRadii[nearbyMeshCount] = modelBounds[e->modelIndex] * 0.99f * vmax(vmax(e->scale.x,e->scale.y),e->scale.z);
+                Vector3 d = Vector3_A_minus_B(e->position,lpos);
+                float distToLightSqrd = dot_vector3(d,d);
+                float radSum = (effectiveRadius + shadows_nearMeshRadii[nearbyMeshCount]);
+                if (distToLightSqrd >= radSum * radSum) continue;
+                if (skipNPCs && ConstIndexIsNPC(e->index)) continue;
+                
+                shadows_nearMeshes[nearbyMeshCount].index = j;
+                shadows_nearMeshes[nearbyMeshCount].depth = distToLightSqrd; 
+                nearbyMeshCount++;
+                if (nearbyMeshCount >= SHADOW_NEARMESH_MAX) { DualLogWarn("Shadowmapping needs larger nearMeshes count than %u!  Skipping some renderables for light %u!\n", SHADOW_NEARMESH_MAX, lightIdx); break; }
+            }
+
+            if (unlikely(nearbyMeshCount < 1)) continue;
+
+            glUniform3f(3,lpos.x,lpos.y,lpos.z);
+            voxen_Shadow_System.shadowmapIndirectionList[lightIdx] = shadowMapIdx;
+            #pragma GCC unroll 6
+            for (uint8_t face = 0; face < 6; face++) {                                            
+                glUniform1ui(2,face);
+                glUniformMatrix4fv(1,1,GL_FALSE,(float*)lightViewProj[lightIdx][face]);
+                glUniform1ui(7,shadowmapOffsetHead + (face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE));
+                for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
+                    int i = shadows_nearMeshes[j].index;
+                    Entity* e = &Sys_Global.instances[i];
+                    if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face],e->position,shadows_nearMeshRadii[j] * 1.41f)) continue;
+
+                    glUniform1ui(0,i);
+                    uint16_t modelType = (instanceIsLODArray[i] || useDetail < 1u) && e->lodIndex < loadedModelsMaxIndex ? e->lodIndex : e->modelIndex;
+                    if (currentModelType != modelType || currentModelType == 0) { currentModelType = modelType; glBindVertexBuffer(0,Sys_Render.vbos[modelType],0,VERTEX_ATTRIBUTES_SIZE); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,Sys_Render.tbos[modelType]); }
+                    if (currentTexIndex != e->texIndex) { currentTexIndex = e->texIndex; glUniform1ui(6,e->texIndex); }
+                    bool texIsTransparent = transparentTexture[e->texIndex];
+                    if (currentIsTransparent != texIsTransparent) { currentIsTransparent = texIsTransparent; glUniform1ui(8,currentIsTransparent ? 1u : 0u); }
+                    glDrawElements(GL_TRIANGLES,modelTriangleCounts[currentModelType]*3,GL_UNSIGNED_SHORT,0); drawCallsRenderedThisFrame++; shadowDrawCallsRenderedThisFrame++; verticesRenderedThisFrame += modelTriangleCounts[currentModelType] * 3;
+                }
+            }
+            
+            shadowmapOffsetHead += (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) * 6;
+        }
+
+        glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
+        glNamedBufferData(Sys_Render.shadowMapsIndirectionID,Sys_Global.loadedLights * sizeof(uint32_t),voxen_Shadow_System.shadowmapIndirectionList,GL_DYNAMIC_DRAW);
     }
 
-    glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
-    glNamedBufferData(Sys_Render.shadowMapsIndirectionID,Sys_Global.loadedLights * sizeof(uint32_t),voxen_Shadow_System.shadowmapIndirectionList,GL_DYNAMIC_DRAW);
     voxen_Shadow_System.shadowTime = get_time() - shadowStartTime;
 }
 
