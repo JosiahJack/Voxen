@@ -713,8 +713,7 @@ typedef struct {
 	uint16_t audioLogImagesRefIndicesRH[TEXT_LOGS_COUNT];
 	uint8_t audioLogType[TEXT_LOGS_COUNT];
 	uint8_t audioLogLevelFound[TEXT_LOGS_COUNT];
-	size_t file_size;
-	size_t filelog_size;
+	size_t file_size,filelog_size;
 	uint8_t* file_data;
 	uint8_t* filelog_data;
 } TextSystem;
@@ -851,7 +850,7 @@ typedef struct {
 } InventorySystem;
 
 typedef struct { float damage,penetration,offense,armorvalue,defense,impactVelocity; Vector3 attacknormal,hitpoint; AttackType attackType; uint16_t owner,hitIdx; bool isOtherNPC,berserkActive; } DamageData;
-#define NUM_ENTITY_FIELDS 34
+
 typedef /*FAT*/ struct  {
     uint64_t entflags;
     uint64_t ioflags;

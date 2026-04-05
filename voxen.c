@@ -21,7 +21,7 @@ SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on f
         103,/* Console    = `/~ */ 102/* Screenshot  = F12 */},
     .ScreenWidth=800u,.ScreenHeight=600u,.Fullscreen=0u,.FOV=65u,.Brightness=50u,.Gamma=50u,.FXAA=0u,.Shadows=0u,.Reflections=0u,.Vsync=0u,.ModelDetail=0u,
     .GI=0u,.SpeakerMode=1u,.Reverb=0u,.VolumeMaster=100u,.VolumeMusic=25u,.VolumeMessage=75u,.VolumeEffects=100u,.Language=0u,.DynamicMusic=1u,.Footsteps=1u,.InvertLook=0u,
-    .InvertCyberspaceLook=0u,.QuickItemPickup=0u,.QuickReloadWeapons=0u,.MouseSensitivity=10u,.NoShootMode=0u,.HeadBob=1u,.SSR_RES=8u};/*Ratio is (1 / SSR_RES) * res*/
+    .InvertCyberspaceLook=0u,.QuickItemPickup=0u,.QuickReloadWeapons=0u,.MouseSensitivity=10u,.NoShootMode=0u,.HeadBob=1u,.SSR_RES=2u};/*Ratio is (1 / SSR_RES) * res*/
 #define SHADOW_MAP_SIZE 128u
 uint8_t queuedLevelToLoad = 255u;
 float berserkSeedTime,cam_pitch,cam_yaw=90.0f,cam_roll,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],modelMatrices[INSTANCE_COUNT*16];
@@ -98,7 +98,8 @@ void CompileShaders(void) {
     Sys_Render.shadowmapsClearShaderProgram= CompileComputeShader(shadowmapsClearComputeSrc,"Shadowmaps Clear");
 }
 
-GLuint SetupSSBO(GLuint* id, GLuint bindx, GLsizeiptr sz, const void* d, GLenum typ) { glGenBuffers(1,id); glBindBuffer(GL_SSBO,*id); glBufferData(GL_SSBO,sz,d,typ); glBindBufferBase(GL_SHADER_STORAGE_BUFFER,bindx,*id); return *id; }
+GLuint SetupSSBO(GLuint* id, GLuint bindx, GLsizeiptr sz, const void* d, GLenum typ) { glGenBuffers(1,id); glBindBuffer(GL_SSBO,*id); glBufferData(GL_SSBO,sz,d,typ); glBindBufferBase(GL_SSBO,bindx,*id); return *id; }
+GLuint SetupSSBOMapped(GLuint* id, GLuint bindx, GLsizeiptr sz, void** map) { glGenBuffers(1,id); glBindBuffer(GL_SSBO,*id); glBufferStorage(GL_SSBO,sz,NULL,GL_MAP_WRITE_BIT|GL_MAP_PERSISTENT_BIT|GL_MAP_COHERENT_BIT); *map = glMapBufferRange(GL_SSBO,0,sz,GL_MAP_WRITE_BIT|GL_MAP_PERSISTENT_BIT|GL_MAP_COHERENT_BIT); glBindBufferBase(GL_SSBO,bindx,*id); return *id; }
 
 // Generates View Matrix4x4 for Geometry Rasterizer Pass from camera world position + orientation
 void mat4_lookat_from(float* m, Quaternion* camRotation, Vector3 eye) { // Kept around for light views for shadowmap cubemap faces.
@@ -130,12 +131,12 @@ void ExtractFrustumPlanes(float* m, FrustumPlane* planes) {
 }
 
 Quaternion cubemapOrientationQuaternion[6] = {
-    {0.0f, 0.707106781f, 0.0f, 0.707106781f},  // +X: Right
-    {0.0f, -0.707106781f, 0.0f, 0.707106781f}, // -X: Left
-    {-0.707106781f, 0.0f, 0.0f, 0.707106781f}, // +Y: Up
-    {0.707106781f, 0.0f, 0.0f, 0.707106781f},  // -Y: Down
-    {0.0f, 0.0f, 0.0f, 1.0f},                  // +Z: Forward
-    {0.0f, 1.0f, 0.0f, 0.0f}                   // -Z: Backward
+    {0.0f,0.707106781f,0.0f,0.707106781f},  // +X: Right
+    {0.0f,-0.707106781f,0.0f,0.707106781f}, // -X: Left
+    {-0.707106781f,0.0f,0.0f,0.707106781f}, // +Y: Up
+    {0.707106781f,0.0f,0.0f,0.707106781f},  // -Y: Down
+    {0.0f,0.0f,0.0f,1.0f},                  // +Z: Forward
+    {0.0f,1.0f,0.0f,0.0f}                   // -Z: Backward
 };
 
 ENGINE_TO_MOD void InitializeEntity(Entity* entry) { // Blank entity, no index yet, for initial list population or temporary Entity.
@@ -349,7 +350,7 @@ ENGINE_TO_MOD void UpdateLight(uint16_t i, Vector3 pos, Color3 col, float range,
     lights[i].spotDir = spotDir;
     if (changed) { lightsNewPosition[i]=pos; flag_setu32(&lights[i].lflags,LDIRTY,true); }
 }
-// ============================================================================
+
 // UI Rendering and Text
 #define BASE_RES_X 1366.0f // Positions done in fixed int positions off base resolution, scaled against current resolution.
 #define BASE_RES_Y 768.0f
@@ -357,7 +358,6 @@ float UIX(int16_t x) { return (float)x / BASE_RES_X; } // Pos or value as percen
 float RelX(int16_t x) { return UIX(x) * (float)Sys_Settings.ScreenWidth; } // Pos or value in current resolution
 float UIY(int16_t y) { return (float)y / BASE_RES_Y; }
 float RelY(int16_t y) { return UIY(y) * (float)Sys_Settings.ScreenHeight; }
-
 void RenderUIImage(int16_t x, int16_t y, int16_t width, int16_t height, uint32_t texIndex) {
     float xpos = RelX(x); float ypos = RelY(y);
     glUseProgram(Sys_Render.chunkShaderProgram);
@@ -1404,10 +1404,10 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     __builtin_memcpy(&modelMatrices[0],mat,16 * sizeof(float)); // Null instance matrix used for UI
     Sys_Render.matricesBufferID        = SetupSSBO(&Sys_Render.matricesBufferID,        1,INSTANCE_COUNT * 16 * sizeof(float),modelMatrices, GL_STATIC_DRAW);
-//     Sys_Render.voxelLightListCountsID  = SetupSSBO(&Sys_Render.voxelLightListCountsID,  2,VOXEL_COUNT * sizeof(uint32_t),NULL,GL_STATIC_DRAW);
-//     Sys_Render.voxelLightListsID       = SetupSSBO(&Sys_Render.voxelLightListsID,       3,VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t),NULL,GL_STATIC_DRAW);
-//     Sys_Render.lightsID                = SetupSSBO(&Sys_Render.lightsID,                4,LIGHT_COUNT * sizeof(Light),NULL,GL_STATIC_DRAW);
-    Sys_Render.shadowMapSSBO           = SetupSSBO(&Sys_Render.shadowMapSSBO,           5,(MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(uint32_t), NULL, GL_STATIC_DRAW);    
+    Sys_Render.voxelLightListCountsID  = SetupSSBOMapped(&Sys_Render.voxelLightListsID, 2,VOXEL_COUNT * sizeof(uint32_t),(void**)&voxelLightListCountsMapped);
+    Sys_Render.voxelLightListsID       = SetupSSBOMapped(&Sys_Render.voxelLightListsID, 3,VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t),(void**)&voxelLightListsMapped);
+    Sys_Render.lightsID                = SetupSSBOMapped(&Sys_Render.lightsID,          4,LIGHT_COUNT * sizeof(Light),(void**)&lightsMapped);
+    Sys_Render.shadowMapSSBO           = SetupSSBO(&Sys_Render.shadowMapSSBO,           5,(MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(uint32_t),NULL,GL_STATIC_DRAW);    
     Sys_Render.shadowMapsIndirectionID = SetupSSBO(&Sys_Render.shadowMapsIndirectionID, 6,LIGHT_COUNT * sizeof(uint32_t),NULL,GL_STATIC_DRAW);
     Sys_Render.cellVisibleDataID       = SetupSSBO(&Sys_Render.cellVisibleDataID,       7,ARRSIZE * sizeof(uint32_t),NULL,GL_STATIC_DRAW);
     Sys_Render.colorBufferID           = SetupSSBO(&Sys_Render.colorBufferID,          12,MAX_TOTAL_PIXELS * sizeof(uint8_t),NULL,GL_STATIC_DRAW);
@@ -1429,35 +1429,12 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     LoadModels();
     RenderLoadingProgress(110,"Loading textures...");
     LoadTextures();
-    
-    // Init lights
-    GLbitfield mapFlags     = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
-    GLbitfield storageFlags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
-    glGenBuffers(1,&Sys_Render.lightsID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER,Sys_Render.lightsID);
-    glBufferStorage(GL_SHADER_STORAGE_BUFFER,LIGHT_COUNT * sizeof(Light),NULL,storageFlags);
-    lightsMapped = (Light*)glMapBufferRange(GL_SHADER_STORAGE_BUFFER,0,LIGHT_COUNT * sizeof(Light),mapFlags);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER,4,Sys_Render.lightsID);
-//     pthread_create(&shadowCasterThread,NULL,ShadowCasterWorker,NULL);
-    
-    // Init voxels
-    glGenBuffers(1,&Sys_Render.voxelLightListCountsID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, Sys_Render.voxelLightListCountsID);
-    glBufferStorage(GL_SHADER_STORAGE_BUFFER,VOXEL_COUNT * sizeof(uint32_t),NULL,storageFlags);
-    voxelLightListCountsMapped = (uint32_t*)glMapBufferRange(GL_SHADER_STORAGE_BUFFER,0,VOXEL_COUNT * sizeof(uint32_t),mapFlags);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER,2,Sys_Render.voxelLightListCountsID);
-    glGenBuffers(1,&Sys_Render.voxelLightListsID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, Sys_Render.voxelLightListsID);
-    glBufferStorage(GL_SHADER_STORAGE_BUFFER,VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t), NULL, storageFlags);
-    voxelLightListsMapped = (uint32_t*)glMapBufferRange(GL_SHADER_STORAGE_BUFFER,0,VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t),mapFlags);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER,3,Sys_Render.voxelLightListsID);
     uint32_t rowsPerThread = 512 / VOXEL_THREADS;
     for (int t=0;t<VOXEL_THREADS;++t) {
         voxelSlices[t].zStart = t * rowsPerThread;
         voxelSlices[t].zEnd   = (t == VOXEL_THREADS - 1) ? 512 : voxelSlices[t].zStart + rowsPerThread;
         pthread_create(&voxelThreads[t],NULL,VoxelWorker,&voxelSlices[t]);
     }
-    
 //     NewGame();
     play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500);
     glfwSetInputMode(window,GLFW_CURSOR,GLFW_CURSOR_DISABLED);
