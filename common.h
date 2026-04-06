@@ -41,7 +41,7 @@ typedef struct { float speed; uint16_t frameStart,frameEnd,frameStartModelIndex;
 #define LERPON 32
 typedef struct { Vector3 pos; float intensity; Color3 col; uint32_t lflags; float range,spotAng,maxIntensity,minIntensity; Quaternion spotDir; } Light; // 64bytes, one cache line, packed for GL transfer
 typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSteps[32]; bool stepIsLerping[32],lerpUp; uint8_t currentStep,numIntervalSteps,numLerpSteps; } LightAnimation; // Separate from main lights buffer struct since it's not used very often
-#define INSTANCE_COUNT 10240 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
+#define INSTANCE_COUNT 7680 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
 #define LIGHT_COUNT 2048
 #define MODEL_IDX_MAX 6805
 #define MAX_VALID_TEXTURE 2048
@@ -76,9 +76,27 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define PLAYER1 1u
 #define PLAYER2 2u
 #define START_INDEX_LEVEL_INSTANCES 3
+#define WORLDX 64
+#define WORLDZ WORLDX
+#define WORLDY 18 // Level 8 is only 17.5 cells tall!!  Could be 16 if I make the ceiling same height in last room as in original.
+#define WORLDX_0BASED (WORLDX - 1)
+#define WORLDZ_0BASED (WORLDZ - 1)
+#define TOTAL_WORLD_CELLS (WORLDX * WORLDY * WORLDZ)
+#define ARRSIZE (WORLDX * WORLDZ)
+#define CELLXHALF (CELL_SIZE * 0.5f)
+#define VOXEL_COUNT (WORLDX * WORLDZ * VOXELS_PER_CELL * VOXELS_PER_CELL) // 64 * 64 * 8 * 8
 #define CELL_SIZE 2.56f // Each cell is 2.56x2.56
-#define VOXEL_SIZE 0.32f
+#define VOXELS_PER_CELL 8
+#define VOXEL_SIZE (CELL_SIZE / (float)VOXELS_PER_CELL)
 #define VOXEL_HALF (VOXEL_SIZE * 0.5f)
+#define CELL_VISIBLE       1u
+#define CELL_OPEN          2u
+#define CELL_CLOSEDNORTH   4u
+#define CELL_CLOSEDEAST    8u
+#define CELL_CLOSEDSOUTH  16u
+#define CELL_CLOSEDWEST   32u
+#define CELL_SEES_SUN     64u
+#define CELL_SEES_SKYBOX 128u
 #define ENTFLAG_ACTIVE               (1ull <<  0) // Instance renders and updates
 #define ENTFLAG_ISGRENADE            (1ull <<  1)
 #define ENTFLAG_GROUNDED             (1ull <<  2)
@@ -1000,6 +1018,7 @@ typedef struct {
     char audiologNames[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH],audiologSubjects[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
     char audiologSenders[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH],audioLogSpeech2Text[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
     float worldMin_x,worldMin_z,voxelMinCenterX,voxelMinCenterZ;
+    uint8_t physicsDebug;
 } GlobalContext;
 
 static inline __attribute__((always_inline)) void flag_setu32(uint32_t *flags, uint32_t bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }

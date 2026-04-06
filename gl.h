@@ -197,6 +197,7 @@ typedef void (*GLADpostcallback)(void *ret, const char *name, GLADapiproc apipro
 #define GL_MAP_PERSISTENT_BIT 0x0040
 #define GL_SHADER_IMAGE_ACCESS_BARRIER_BIT 0x00000020
 #define GL_SHADER_STORAGE_BARRIER_BIT 0x00002000
+#define GL_TEXTURE_FETCH_BARRIER_BIT 0x00000008
 #if defined(__SIZEOF_LONG__) && defined(__SIZEOF_POINTER__)
     #if __SIZEOF_POINTER__ > __SIZEOF_LONG__
         #define KHRONOS_USE_INTPTR_T

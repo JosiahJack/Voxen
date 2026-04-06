@@ -65,6 +65,7 @@ void DebugRAM(const char *context);
     static inline __attribute__((always_inline)) long OS_Read(OsFileHandle fd, void* buf, size_t count) { DWORD bytesRead = 0; return (ReadFile((HANDLE)fd,buf,(DWORD)count,&bytesRead,NULL)) ? (long)bytesRead : (long)-1; }
 #else
     #define LINUX
+    #include <stdio.h>
     #include <sys/mman.h>
     #include <sys/stat.h>
     #include <fcntl.h>
@@ -75,7 +76,7 @@ void DebugRAM(const char *context);
     int brk(void *addr); void *sbrk(intptr_t increment);
     static inline __attribute__((always_inline)) void* OS_Brk(void* addr) { brk(addr); return (void*)sbrk(0); }
     static inline __attribute__((always_inline)) OsFileHandle OS_Read(OsFileHandle fd, void* buf, size_t count) { ssize_t res = read(fd, buf, count); return (long)res; }
-    static inline __attribute__((always_inline, noreturn)) void OS_Exit(int64_t exitCode) { _exit(exitCode); }
+    static inline __attribute__((always_inline, noreturn)) void OS_Exit(int64_t exitCode) { fflush(stderr); fflush(stdout); _exit(exitCode); }
     static inline __attribute__((always_inline)) int OS_MakeFolder(const char *path) { return mkdir(path, 0755); }
     static inline __attribute__((always_inline)) void OS_Close(OsFileHandle fileDescriptor) { close(fileDescriptor); }
     static inline __attribute__((always_inline)) void* OS_AllocateRAM(void* addr, size_t length, int32_t prot, int32_t flags, OsFileHandle fd) { return mmap(addr,length,prot,flags,fd,0); }

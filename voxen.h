@@ -14,27 +14,8 @@
 #define MAX_SAVENAME_LENGTH 24
 #define MAX_PALETTE_SIZE 256
 #define MAX_TEXTURE_DIMENSION 2048
-#define MAX_LIGHTS_PER_VOXEL 32 // Cap to prevent overflow
-#define VERTEX_ATTRIBUTES_COUNT 8 // x,y,z,nx,ny,nz,u,v
+#define MAX_LIGHTS_PER_VOXEL 64
 #define VERTEX_ATTRIBUTES_SIZE 16 // Was 32
-#define WORLDX 64
-#define WORLDZ WORLDX
-#define WORLDY 18 // Level 8 is only 17.5 cells tall!!  Could be 16 if I make the ceiling same height in last room as in original.
-#define WORLDX_0BASED (WORLDX - 1)
-#define WORLDZ_0BASED (WORLDZ - 1)
-#define TOTAL_WORLD_CELLS (WORLDX * WORLDY * WORLDZ)
-#define ARRSIZE (WORLDX * WORLDZ)
-#define WORLDCELL_WIDTH_F 2.56f
-#define CELLXHALF (WORLDCELL_WIDTH_F * 0.5f)
-#define VOXEL_COUNT 262144 // 64 * 64 * 8 * 8
-#define CELL_VISIBLE       1u
-#define CELL_OPEN          2u
-#define CELL_CLOSEDNORTH   4u
-#define CELL_CLOSEDEAST    8u
-#define CELL_CLOSEDSOUTH  16u
-#define CELL_CLOSEDWEST   32u
-#define CELL_SEES_SUN     64u
-#define CELL_SEES_SKYBOX 128u
 #define DEBUG_OPENGL
 #ifdef DEBUG_OPENGL
 	#define CHECK_GL_ERROR() do { GLenum err = glGetError(); if (err != GL_NO_ERROR) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
@@ -45,10 +26,12 @@
 #define TEXT_BUFFER_SIZE 1024
 #define FONT_ATLAS_SIZE 4672
 #define MAX_GLYPHS 4096
+#define MAX_CAMVIEWS 11
 extern GlobalContext Sys_Global;
 extern SystemUI Sys_UI;
 typedef struct { uint16_t x,z; } PortalCell;
 typedef struct { PortalCell cellA,cellB; bool portalNS, open,dirty; } Portal;
+typedef struct { Vector3 position; Quaternion rotation; uint8_t fov; uint16_t width,height; float near,far,finished; bool visible; } CamView;
 typedef struct {bool down,pressed,released;} KeyState;
 typedef struct {
 	double last_mouse_x,last_mouse_y,scrollDelta;
@@ -156,5 +139,5 @@ static inline __attribute__((always_inline)) float parse_float(const char* str, 
     return (!has_digit) ? 0.0f : (negative ? (float)(-value) : (float)value);
 }
 
-static inline __attribute__((always_inline)) int32_t PosGetCellCoordX(float pos_x) { return (uint16_t)clamp((int32_t)vfloor((pos_x - Sys_Global.worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED); }
-static inline __attribute__((always_inline)) int32_t PosGetCellCoordZ(float pos_z) { return (uint16_t)clamp((int32_t)vfloor((pos_z - Sys_Global.worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED); }
+static inline __attribute__((always_inline)) int32_t PosGetCellCoordX(float pos_x) { return (uint16_t)clamp((int32_t)vfloor((pos_x - Sys_Global.worldMin_x + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
+static inline __attribute__((always_inline)) int32_t PosGetCellCoordZ(float pos_z) { return (uint16_t)clamp((int32_t)vfloor((pos_z - Sys_Global.worldMin_z + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }

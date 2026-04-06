@@ -897,7 +897,6 @@ void LoadTextures(void) {
     OS_DeallocateRAM(textureHeights,loadedTexturesMaxIndex * sizeof(int32_t));
     for (int t=0;t<num_parse_threads;++t) OS_DeallocateRAM(thread_stbi_arenas[t].base,STBI_ARENA_SIZE);
     OS_DeallocateRAM(thread_stbi_arenas,(size_t)num_parse_threads * sizeof(StbiArena));
-    double end_time = get_time();
-    DualLog(" took %.6f secs\n",end_time - start_time);
+    DualLog(" took %.6f secs\n",get_time() - start_time);
     DebugRAM("After LoadTextures and after deallocation");
 }
