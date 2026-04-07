@@ -21,7 +21,7 @@ SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on f
         103,/* Console    = `/~ */ 102/* Screenshot  = F12 */},
     .ScreenWidth=800u,.ScreenHeight=600u,.Fullscreen=0u,.FOV=65u,.Brightness=50u,.Gamma=50u,.FXAA=0u,.Shadows=0u,.Reflections=0u,.Vsync=0u,.ModelDetail=0u,
     .GI=0u,.SpeakerMode=1u,.Reverb=0u,.VolumeMaster=100u,.VolumeMusic=25u,.VolumeMessage=75u,.VolumeEffects=100u,.Language=0u,.DynamicMusic=1u,.Footsteps=1u,.InvertLook=0u,
-    .InvertCyberspaceLook=0u,.QuickItemPickup=0u,.QuickReloadWeapons=0u,.MouseSensitivity=10u,.NoShootMode=0u,.HeadBob=1u,.SSR_RES=2u};/*Ratio is (1 / SSR_RES) * res*/
+    .InvertCyberspaceLook=0u,.QuickItemPickup=0u,.QuickReloadWeapons=0u,.MouseSensitivity=10u,.NoShootMode=0u,.HeadBob=1u,.SSR_RES=8u};/*Ratio is (1 / SSR_RES) * res*/
 #define SHADOW_MAP_SIZE 128u
 uint8_t queuedLevelToLoad = 255u;
 float berserkSeedTime,cam_pitch,cam_yaw=90.0f,cam_roll,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],modelMatrices[INSTANCE_COUNT*16];
@@ -93,6 +93,7 @@ void CompileShaders(void) {
     Sys_Render.textShaderProgram        = CompileStandardShader(textVertSrc,textFragSrc,"Text");
     Sys_Render.imageBlitShaderProgram   = CompileStandardShader(quadVertSrc,quadFragSrc,"Image Blit");
     Sys_Render.ssrShaderProgram            = CompileComputeShader(ssrComputeSrc,"SSR");
+    Sys_Render.voxelUpdateShaderProgram    = CompileComputeShader(voxelUpdateComputeSrc,"Voxel Update");
     Sys_Render.shadowmapsClearShaderProgram= CompileComputeShader(shadowmapsClearComputeSrc,"Shadowmaps Clear");
 }
 
@@ -237,43 +238,6 @@ static inline __attribute__((always_inline)) void mul_mat4(float *out, const flo
 }
 
 bool NeighborhoodInPVS(uint16_t cellX, uint16_t cellZ, int r);
-#define VOXEL_THREADS 2
-uint32_t* voxelLightListsMapped      = NULL;
-uint32_t* voxelLightListCountsMapped = NULL;
-typedef struct { uint32_t zStart,zEnd; } VoxelJobSlice;
-static VoxelJobSlice    voxelSlices[VOXEL_THREADS];
-static pthread_t        voxelThreads[VOXEL_THREADS];
-bool VoxelOrNeighborVisible(float x, float z);
-static void* VoxelWorker(void* arg) {
-    VoxelJobSlice* slice = (VoxelJobSlice*)arg;
-    uint32_t VXW = WORLDX * VOXELS_PER_CELL;
-    while (1) {
-        if (*(volatile bool*)&Sys_Global.levelCurrentlyLoading ||  *(volatile bool*)&Sys_Global.gamePaused ||  *(volatile bool*)&Sys_Global.menuActive) continue;
-        
-        for (uint32_t voxelZ = slice->zStart; voxelZ < slice->zEnd; ++voxelZ) {
-            for (uint32_t voxelX = 0; voxelX < VXW; ++voxelX) {
-                float posX = Sys_Global.voxelMinCenterX + (voxelX * VOXEL_SIZE);
-                float posZ = Sys_Global.voxelMinCenterZ + (voxelZ * VOXEL_SIZE);
-                uint32_t voxelIndex = voxelZ * VXW + voxelX;
-                if (!VoxelOrNeighborVisible(posX,posZ)) continue;
-
-                uint32_t count=0,baseOffset=voxelIndex*MAX_LIGHTS_PER_VOXEL;
-                for (uint32_t lightIdx = 0; lightIdx < Sys_Global.loadedLights; ++lightIdx) {
-                    if (count >= MAX_LIGHTS_PER_VOXEL) break;
-                    float litX  = lights[lightIdx].pos.x;
-                    float litZ  = lights[lightIdx].pos.z;
-                    float range = lights[lightIdx].range;
-                    float distSqrd = squareDistance2D(posX,posZ, litX,litZ);
-                    if (distSqrd < (range * range)) { voxelLightListsMapped[baseOffset + count] = lightIdx; ++count; }
-                }
-                
-                voxelLightListCountsMapped[voxelIndex] = count;
-            }
-        }
-    }
-    return NULL;
-}
-
 static Light* lightsMapped = NULL;
 void UpdateLights(void) {
     for (uint16_t lightIdx = 0; lightIdx < Sys_Global.loadedLights; ++lightIdx) { 
@@ -316,6 +280,14 @@ void UpdateLights(void) {
     }
 
     __builtin_memcpy(lightsMapped,lights,Sys_Global.loadedLights * sizeof(Light));
+    Vector3 p = Sys_Global.instances[PLAYER1].position;
+    CHECK_GL_ERROR();
+    glUseProgram(Sys_Render.voxelUpdateShaderProgram); // Update voxels
+    CHECK_GL_ERROR();
+    glUniform3f(5,p.x,p.y,p.z);
+    CHECK_GL_ERROR();
+    glDispatchCompute((512+31)/32,(512+31)/32,1);
+    CHECK_GL_ERROR();
 }
 
 #define IS_CHANGED(a, b) (vabs((a) - (b)) > 0.0001f)
@@ -1391,8 +1363,8 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     __builtin_memcpy(&modelMatrices[0],mat,16 * sizeof(float)); // Null instance matrix used for UI
     Sys_Render.matricesBufferID        = SetupSSBO(&Sys_Render.matricesBufferID,        1,INSTANCE_COUNT * 16 * sizeof(float),modelMatrices, GL_STATIC_DRAW);
-    Sys_Render.voxelLightListCountsID  = SetupSSBOMapped(&Sys_Render.voxelLightListsID, 2,VOXEL_COUNT * sizeof(uint32_t),(void**)&voxelLightListCountsMapped);
-    Sys_Render.voxelLightListsID       = SetupSSBOMapped(&Sys_Render.voxelLightListsID, 3,VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t),(void**)&voxelLightListsMapped);
+    Sys_Render.voxelLightListCountsID  = SetupSSBO(&Sys_Render.voxelLightListCountsID,  2,VOXEL_COUNT * sizeof(uint32_t),NULL,GL_STATIC_DRAW);
+    Sys_Render.voxelLightListsID       = SetupSSBO(&Sys_Render.voxelLightListsID,      3,VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t),NULL,GL_STATIC_DRAW);
     Sys_Render.lightsID                = SetupSSBOMapped(&Sys_Render.lightsID,          4,LIGHT_COUNT * sizeof(Light),(void**)&lightsMapped);
     Sys_Render.shadowMapSSBO           = SetupSSBO(&Sys_Render.shadowMapSSBO,           5,(MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(uint32_t),NULL,GL_STATIC_DRAW);    
     Sys_Render.shadowMapsIndirectionID = SetupSSBO(&Sys_Render.shadowMapsIndirectionID, 6,LIGHT_COUNT * sizeof(uint32_t),NULL,GL_STATIC_DRAW);
@@ -1406,6 +1378,7 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     glUseProgram(Sys_Render.shadowmapsShaderProgram); glUniform1ui(9,SHADOW_MAP_SIZE);
     glUseProgram(Sys_Render.shadowmapsClearShaderProgram); glUniform1ui(1,SHADOW_MAP_SIZE);
     glUseProgram(Sys_Render.chunkShaderProgram); glUniform1ui(21,SHADOW_MAP_SIZE); glUniform1f(22,(float)SHADOW_MAP_SIZE); glUniform1ui(23,LIGHT_COUNT); glUniform1ui(24,(uint32_t)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);
+    glUseProgram(Sys_Render.voxelUpdateShaderProgram); glUniform1ui(6,(uint32_t)MAX_LIGHTS_PER_VOXEL);
     DualLog("GL SSBOs and Settings Apply... took %f secs\n",get_time() - nextInitTimeSection);
     RenderLoadingProgress(110,"Loading models...");
     LoadModels();
@@ -1416,12 +1389,6 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     LoadModels();
     RenderLoadingProgress(110,"Loading textures...");
     LoadTextures();
-    uint32_t rowsPerThread = (WORLDX * VOXELS_PER_CELL) / VOXEL_THREADS;
-    for (int t=0;t<VOXEL_THREADS;++t) {
-        voxelSlices[t].zStart = t * rowsPerThread;
-        voxelSlices[t].zEnd   = (t == VOXEL_THREADS - 1) ? (WORLDX * VOXELS_PER_CELL) : voxelSlices[t].zStart + rowsPerThread;
-        pthread_create(&voxelThreads[t],NULL,VoxelWorker,&voxelSlices[t]);
-    }
 //     NewGame();
     play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500);
     glfwSetInputMode(window,GLFW_CURSOR,GLFW_CURSOR_DISABLED);
