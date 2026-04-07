@@ -419,7 +419,7 @@ void main() {
         reflectionColor.rgb /= weightSum;
         if (isSky) { FragColor.rgb += reflectionColor.rgb; return; }
 
-        color.rgb += (reflectionColor.rgb * 1.8);
+        color.rgb += (reflectionColor.rgb * 2.2);
     }
 
     vec3 aaColor = color.rgb;

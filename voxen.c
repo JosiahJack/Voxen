@@ -44,7 +44,7 @@ int32_t wav_count = 0; ma_sound log_sound;
 #define MENUPAD        1028
 #define MENUPAD_HILITE 1029
 MenuPages currentMenuPage = MenuPages_FrontPage;
-bool returnToPause = false, fovSliderActive = false, gammaSliderActive = false, masterVolumeSliderActive = false, musicVolumeSliderActive = false, messageVolumeSliderActive = false, sfxVolumeSliderActive = false, enteringPlayerName = false;
+bool returnToPause=false,fovSliderActive=false,gammaSliderActive=false,masterVolumeSliderActive=false,musicVolumeSliderActive=false,messageVolumeSliderActive=false,sfxVolumeSliderActive=false,enteringPlayerName=false;
 uint8_t currentPlayerNameLength = 0;
 int8_t currentMenuItem = 0, currentMenuTab = 0, menuItemCount = 4, menuTabCount = 1;
 static bool resDropdownOpen = false;
@@ -81,10 +81,10 @@ static void DualLogMain(const char *prefix, const char *fmt, va_list args) { // 
 ENGINE_TO_MOD void DualLog(const char* fmt, ...) { va_list args; __builtin_va_start(args,fmt); DualLogMain(NULL,fmt,args); __builtin_va_end(args); }
 ENGINE_TO_MOD void DualLogWarn(const char* fmt, ...) { va_list args; __builtin_va_start(args,fmt); DualLogMain("\033[1;38;5;208mWARN:",fmt,args); __builtin_va_end(args); }
 ENGINE_TO_MOD void DualLogError(const char* fmt, ...) { va_list args; __builtin_va_start(args,fmt); DualLogMain("\033[1;31mERROR:",fmt,args); __builtin_va_end(args); }
-static inline __attribute__((always_inline)) void LogShaderError(GLuint s, const char* name) { char er[512]; glGetShaderInfoLog(s, 512, NULL, er); DualLogError("%s Compilation Failed: %s\n", name, er); OS_Exit(1); }
-static inline __attribute__((always_inline)) GLuint CompileShader(GLenum type, const char* source, const char* name) { GLuint s = glCreateShader(type); glShaderSource(s, 1, &source, NULL); glCompileShader(s); GLint ok; glGetShaderiv(s, GL_COMPILE_STATUS, &ok); if (!ok) LogShaderError(s, name); return s; }
-static inline __attribute__((always_inline)) GLuint LinkProgram(GLuint* s, int32_t num, const char* name) { GLuint p = glCreateProgram(); for (int32_t i = 0; i < num; i++) { glAttachShader(p, s[i]); glDeleteShader(s[i]); } glLinkProgram(p); GLint ok; glGetProgramiv(p, GL_LINK_STATUS, &ok); if (!ok) LogShaderError(p, name); return p; }
-GLuint CompileStandardShader(const char* vsrc, const char* fsrc, const char* name) { GLuint vertShader = CompileShader(GL_VERTEX_SHADER, vsrc, name); GLuint fragShader = CompileShader(GL_FRAGMENT_SHADER, fsrc, name); return LinkProgram((GLuint[]){vertShader, fragShader}, 2, name); }
+static inline __attribute__((always_inline)) void LogShaderError(GLuint s, const char* name) { char er[512]; glGetShaderInfoLog(s,512,NULL,er); DualLogError("%s Compilation Failed: %s\n",name,er); OS_Exit(1); }
+static inline __attribute__((always_inline)) GLuint CompileShader(GLenum type, const char* source, const char* name) { GLuint s = glCreateShader(type); glShaderSource(s,1,&source,NULL); glCompileShader(s); GLint ok; glGetShaderiv(s,GL_COMPILE_STATUS,&ok); if (!ok) LogShaderError(s,name); return s; }
+static inline __attribute__((always_inline)) GLuint LinkProgram(GLuint* s, int32_t num, const char* name) { GLuint p = glCreateProgram(); for (int32_t i=0;i<num;++i) { glAttachShader(p,s[i]); glDeleteShader(s[i]); } glLinkProgram(p); GLint ok; glGetProgramiv(p,GL_LINK_STATUS,&ok); if (!ok) LogShaderError(p,name); return p; }
+GLuint CompileStandardShader(const char* vsrc, const char* fsrc, const char* name) { GLuint vertShader = CompileShader(GL_VERTEX_SHADER,vsrc,name); GLuint fragShader = CompileShader(GL_FRAGMENT_SHADER,fsrc,name); return LinkProgram((GLuint[]){vertShader,fragShader},2,name); }
 GLuint CompileComputeShader(const char* src, const char* name) { GLuint computeShader = CompileShader(GL_COMPUTE_SHADER, src, name); return LinkProgram((GLuint[]){computeShader}, 1, name); }
 void CompileShaders(void) {
     Sys_Render.depthPrepassShaderProgram= CompileStandardShader(depthPrepassVertSrc,depthPrepassFragSrc,"Depth Prepass");
@@ -100,7 +100,6 @@ void CompileShaders(void) {
 
 GLuint SetupSSBO(GLuint* id, GLuint bindx, GLsizeiptr sz, const void* d, GLenum typ) { glGenBuffers(1,id); glBindBuffer(GL_SSBO,*id); glBufferData(GL_SSBO,sz,d,typ); glBindBufferBase(GL_SHADER_STORAGE_BUFFER,bindx,*id); return *id; }
 
-// Generates View Matrix4x4 for Geometry Rasterizer Pass from camera world position + orientation
 void mat4_lookat_from(float* m, Quaternion* camRotation, Vector3 eye) { // Kept around for light views for shadowmap cubemap faces.
     float x = camRotation->x, y = camRotation->y, z = camRotation->z, w = camRotation->w;
     float x2 = x * x, y2 = y * y, z2 = z * z;
@@ -241,13 +240,11 @@ static inline __attribute__((always_inline)) void mul_mat4(float *out, const flo
 
 bool NeighborhoodInPVS(uint16_t cellX, uint16_t cellZ, int r);
 void UpdateLights(void) {
-    bool voxelsNeedUpdated = false;
     for (uint16_t lightIdx = 0; lightIdx < Sys_Global.loadedLights; ++lightIdx) { 
         Vector3 lightPos = lightsNewPosition[lightIdx];
         lights[lightIdx].pos = lightPos;
         if (lights[lightIdx].lflags & LDIRTY) { // Marked all as true at level load.
             flag_setu32(&lights[lightIdx].lflags,LDIRTY,false);
-            voxelsNeedUpdated = true;
             #pragma GCC unroll 6
             for (int j=0;j<6;++j) { // Update to new position
                 mat4_lookat_from((float*)lightView[lightIdx][j], &cubemapOrientationQuaternion[j], lightPos);
@@ -283,12 +280,10 @@ void UpdateLights(void) {
     }
 
     glBindBuffer(GL_SSBO,Sys_Render.lightsID); glBufferData(GL_SSBO,Sys_Global.loadedLights * sizeof(Light),lights,GL_DYNAMIC_DRAW);
-//     if (voxelsNeedUpdated) {
-        Vector3 p = Sys_Global.instances[PLAYER1].position;
-        glUseProgram(Sys_Render.voxelUpdateShaderProgram);
-        glUniform3f(5,p.x,p.y,p.z);
-        glDispatchCompute((512+31)/32,(512+31)/32,1);
-//     }
+    Vector3 p = Sys_Global.instances[PLAYER1].position;
+    glUseProgram(Sys_Render.voxelUpdateShaderProgram);
+    glUniform3f(5,p.x,p.y,p.z);
+    glDispatchCompute((VOXELS_X+31)/32,(VOXELS_Z+31)/32,1);
 }
 
 #define IS_CHANGED(a, b) (vabs((a) - (b)) > 0.0001f)
@@ -606,17 +601,9 @@ void Input_MouselookApply(void) {
 // static const float HeadBobAmount = 0.08f; TODO
 // static const float bobTarget = 0.3f; TODO
 int32_t Input_MouseMove(int32_t xrel, int32_t yrel) {
-    if ((Sys_Global.inventoryMode && !Sys_Cheats.noHUD) || Sys_Global.menuActive || Sys_Global.gamePaused) {
-        int32_t newX = Sys_Global.cursorPosition_x + xrel;
-        if (newX > Sys_Settings.ScreenWidth) newX = Sys_Settings.ScreenWidth;
-        if (newX < 0) newX = 0;
-        if (newX != Sys_Global.cursorPosition_x) mouseMovementThisFrame = true;
-        Sys_Global.cursorPosition_x = newX;
-        int32_t newY = Sys_Global.cursorPosition_y + yrel;
-        if (newY > Sys_Settings.ScreenHeight) newY = Sys_Settings.ScreenHeight;
-        if (newY < 0) newY = 0;
-        if (newY != Sys_Global.cursorPosition_y) mouseMovementThisFrame = true;
-        Sys_Global.cursorPosition_y = newY;
+    if ((Sys_Global.inventoryMode && !Sys_Cheats.noHUD) || Sys_Global.menuActive || Sys_Global.gamePaused) { // Uses UI baseline resolution 1366x768
+        int32_t newX = clamp(Sys_Global.cursorPosition_x + xrel,0,1366); if (newX != Sys_Global.cursorPosition_x) {mouseMovementThisFrame = true;} Sys_Global.cursorPosition_x = newX;
+        int32_t newY = clamp(Sys_Global.cursorPosition_y + yrel,0,768);  if (newY != Sys_Global.cursorPosition_y) {mouseMovementThisFrame = true;} Sys_Global.cursorPosition_y = newY;
     }
     
     if (Sys_Global.gamePaused || Sys_Global.menuActive || Sys_Global.inventoryMode) return 0;
@@ -660,9 +647,7 @@ bool GetKeyRiseEdgeOrHeld(int settingIndex, bool risingEdge) {
 ENGINE_TO_MOD bool GetKey(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,false); }  // True while held down.
 ENGINE_TO_MOD bool GetKeyPressed(int settingIndex) { return (settingIndex < 0) ? Sys_Input.keyStates[GLFW_KEY_GRAVE_ACCENT].pressed : GetKeyRiseEdgeOrHeld(settingIndex,true); } // True 1st frame down.
 ENGINE_TO_MOD void IgnoreNextMouseDelta(void) { Sys_Input.ignore_next_mouse_delta = true; }
-
-void LoadTextures(void); void LoadModels(void); void CullInit(void);
-OsFileHandle levelFileHandle;
+OsFileHandle levelFileHandle; void CullInit(void);
 void LoadLevel(uint8_t curlevel) {
     double start_time = get_time();
     DebugRAM("start of LoadLevel");
@@ -671,7 +656,7 @@ void LoadLevel(uint8_t curlevel) {
     RenderLoadingProgress(100,"Loading level...");
     __builtin_memset(lights,0,LIGHT_COUNT * sizeof(Light)); __builtin_memset(lanims,0,LIGHT_COUNT * sizeof(LightAnimation));
     __builtin_memset(modelMatrices,0,INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
-    __builtin_memset(camViews,0,MAX_CAMVIEWS * sizeof(CamView));
+    __builtin_memset(camViews,0,MAX_CAMVIEWS * sizeof(CamView)); camViewCount = 0;
     __builtin_memset(Sys_Global.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
     char filename[20]; // Minimum size for 0 through 13.
     StringFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel);
@@ -707,6 +692,10 @@ void InputClearRisingAndFallingEdges(void) { // Clear keypress rising and fallin
 __attribute__((cold)) void NewGame(void) { // Reset World States
     DualLog("Loading new game...\n");
     RenderLoadingProgress(100,"Loading new game...");
+    Sys_Global.menuActive = Sys_Global.gamePaused = enteringPlayerName = fovSliderActive = gammaSliderActive = masterVolumeSliderActive = musicVolumeSliderActive = messageVolumeSliderActive = sfxVolumeSliderActive = returnToPause = false;
+    currentMenuItem = currentMenuTab = 0; currentMenuPage = MenuPages_FrontPage;
+    Sys_Global.pauseRelativeTime = Sys_Global.last_physics_time = 0.0;
+    Sys_Global.inventoryMode = false;
     DualLog("Rendered screen saying \"Loading new game...\"\n");
     __builtin_memset(Sys_Global.instances,0,2 * sizeof(Entity)); // Blank out player entities
     PlayerInit(PLAYER1); PlayerInit(PLAYER2);
@@ -731,6 +720,8 @@ __attribute__((cold)) void NewGame(void) { // Reset World States
     LoadLevel(Sys_Global.startLevel); // Must be after entities!
     ModNewGame();
 }
+
+void GoIntoGame(void) { NewGame(); PlayGameMusic(); DualLog("Player named \"%s\" started the game!\n", Sys_Global.playerName); }
 
 __attribute__((cold)) void LoadGameModDefinition(void) { // Unique set separate from savedata path and resource data to keep it focussed
     double start_time = get_time();
@@ -782,75 +773,58 @@ void GenerateAndBindTexture(GLuint *id, GLint internalFormat, int32_t width, int
 }
 
 void UpdateScreenSize(GLFWwindow* unused, int32_t width, int32_t height) {
-    (void)unused; // Appease glfwSetFramebufferSizeCallback pointer type
-    Sys_Settings.ScreenWidth = vmax(vmin((uint16_t)width,7680u),320u); Sys_Settings.ScreenHeight = vmax(vmin((uint16_t)height,4320u),200u); // Cap at minimum Quake 1 resolution and maximum 8k.
-    Sys_Settings.ScreenCenterX = (float)Sys_Settings.ScreenWidth * 0.5f; Sys_Settings.ScreenCenterY = (float)Sys_Settings.ScreenHeight * 0.5f;
-    glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
-    glUseProgram(Sys_Render.imageBlitShaderProgram);
-    glUniform1ui(2,Sys_Settings.ScreenWidth);
-    glUniform1ui(3,Sys_Settings.ScreenHeight);
-    glUniform1i(26,Sys_Settings.SSR_RES);
-    glUseProgram(Sys_Render.chunkShaderProgram);
-    glUniform1ui(6,Sys_Settings.ScreenWidth);
-    glUniform1ui(7,Sys_Settings.ScreenHeight);
-    glUseProgram(Sys_Render.ssrShaderProgram);
-    glUniform1ui(0,Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES);
-    glUniform1ui(1,Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES);       
-    glUniform1i(2,Sys_Settings.SSR_RES);
-    GenerateAndBindTexture(&Sys_Render.inputImageID,            GL_RGBA8,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight,           GL_RGBA,GL_UNSIGNED_BYTE,GL_TEXTURE_2D); // Lit Raster
-    GenerateAndBindTexture(&Sys_Render.inputWorldPosID,       GL_RGBA32F,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight,           GL_RGBA,        GL_FLOAT,GL_TEXTURE_2D); // Raster World Positions
-    GenerateAndBindTexture(&Sys_Render.inputDepthID,GL_DEPTH_COMPONENT32,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight,GL_DEPTH_COMPONENT,        GL_FLOAT,GL_TEXTURE_2D); // Raster Depth
-    GenerateAndBindTexture(&Sys_Render.inputSpecID,             GL_RGBA8,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight,           GL_RGBA,GL_UNSIGNED_BYTE,GL_TEXTURE_2D); // Specular Colors
-    GenerateAndBindTexture(&Sys_Render.inputNormalID,           GL_RG16F,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight,            GL_RGB,        GL_FLOAT,GL_TEXTURE_2D); // Normal XYZ
+    uint16_t w,h; float wf,hf; (void)unused; // Appease glfwSetFramebufferSizeCallback pointer type
+    w = Sys_Settings.ScreenWidth = vmax(vmin((uint16_t)width,7680u),320u); h = Sys_Settings.ScreenHeight = vmax(vmin((uint16_t)height,4320u),200u); // Cap at minimum Quake resolution and maximum 8k.
+    wf = (float)w; hf = (float)h; Sys_Settings.ScreenCenterX = wf * 0.5f; Sys_Settings.ScreenCenterY = hf * 0.5f;
+    glViewport(0,0,w,h);
+    glUseProgram(Sys_Render.imageBlitShaderProgram); glUniform1ui(2,w); glUniform1ui(3,h); glUniform1i(26,Sys_Settings.SSR_RES);
+    glUseProgram(Sys_Render.chunkShaderProgram); glUniform1ui(6,w); glUniform1ui(7,h);
+    glUseProgram(Sys_Render.ssrShaderProgram); glUniform1ui(0,w / Sys_Settings.SSR_RES); glUniform1ui(1,h / Sys_Settings.SSR_RES); glUniform1i(2,Sys_Settings.SSR_RES);
+    GenerateAndBindTexture(&Sys_Render.inputImageID,     GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,GL_TEXTURE_2D); // Lit Raster
+    GenerateAndBindTexture(&Sys_Render.inputWorldPosID,GL_RGBA32F,w,h,GL_RGBA,        GL_FLOAT,GL_TEXTURE_2D); // Raster World Positions
+    GenerateAndBindTexture(&Sys_Render.inputSpecID,      GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,GL_TEXTURE_2D); // Specular Colors
+    GenerateAndBindTexture(&Sys_Render.inputNormalID,    GL_RG16F,w,h, GL_RGB,        GL_FLOAT,GL_TEXTURE_2D); // Normal XYZ
+    GenerateAndBindTexture(&Sys_Render.inputDepthID,GL_DEPTH_COMPONENT32,w,h,GL_DEPTH_COMPONENT,GL_FLOAT,GL_TEXTURE_2D); // Raster Depth
     glGenTextures(1,&Sys_Render.outputImageID);
     glBindTexture(GL_TEXTURE_2D,Sys_Render.outputImageID);
-    glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA8,Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES,Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES,0,GL_RGBA,GL_UNSIGNED_BYTE,NULL);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+    glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA8,w / Sys_Settings.SSR_RES,h / Sys_Settings.SSR_RES,0,GL_RGBA,GL_UNSIGNED_BYTE,NULL);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
     glBindTexture(GL_TEXTURE_2D,0);
-    glBindFramebuffer(GL_FRAMEBUFFER, Sys_Render.gBufferFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER,Sys_Render.gBufferFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,Sys_Render.inputImageID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT1,GL_TEXTURE_2D,Sys_Render.inputWorldPosID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT2,GL_TEXTURE_2D,Sys_Render.inputSpecID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT3,GL_TEXTURE_2D,Sys_Render.inputNormalID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_TEXTURE_2D,Sys_Render.inputDepthID, 0);
-    glBindImageTexture(0,Sys_Render.inputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8); // Main Rendered Color
+    glBindImageTexture(0,Sys_Render.inputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);      // Main Rendered Color
     glBindImageTexture(1,Sys_Render.inputWorldPosID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA32F); // World Position XYZ
-    glBindImageTexture(2,Sys_Render.inputSpecID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8); // Specular
-    glBindImageTexture(4,Sys_Render.outputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8); // SSR result
-    glBindImageTexture(5,Sys_Render.inputNormalID,0,GL_FALSE,0,GL_READ_WRITE,GL_RG16F); // Normal XYZ
+    glBindImageTexture(2,Sys_Render.inputSpecID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);       // Specular
+    glBindImageTexture(4,Sys_Render.outputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);     // SSR result
+    glBindImageTexture(5,Sys_Render.inputNormalID,0,GL_FALSE,0,GL_READ_WRITE,GL_RG16F);     // Normal XYZ
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_2D,Sys_Render.outputImageID);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    uiOrthoProjection[0] = 2.0f / wf; uiOrthoProjection[1] =       0.0f; uiOrthoProjection[2] =  0.0f; uiOrthoProjection[3] = 0.0f;
+    uiOrthoProjection[4] =      0.0f; uiOrthoProjection[5] = -2.0f / hf; uiOrthoProjection[6] =  0.0f; uiOrthoProjection[7] = 0.0f;
+    uiOrthoProjection[8] =      0.0f; uiOrthoProjection[9] =       0.0f; uiOrthoProjection[10]= -1.0f; uiOrthoProjection[11]= 0.0f;
+    uiOrthoProjection[12]=     -1.0f; uiOrthoProjection[13]=       1.0f; uiOrthoProjection[14]=  0.0f; uiOrthoProjection[15]= 1.0f;
+    glfwSwapBuffers(window);
 }
 
 ENGINE_TO_MOD void AddCamView(Vector3 pos, Quaternion rot, uint8_t fov, uint16_t width, uint16_t height, float near, float far) {
-    if (camViewCount >= MAX_CAMVIEWS) { DualLogWarn("Too many camviews!\n"); return; }
+    if (camViewCount >= MAX_CAMVIEWS) { DualLogWarn("Too many camviews! Skipping adding.  Max is %u\n",MAX_CAMVIEWS); return; }
     
     camViews[camViewCount] = (CamView){pos,rot,fov,width,height,near,far,Sys_Global.pauseRelativeTime + (camViewCount * 0.05f) + 0.5f,false}; // Staggered starts so not all at once for performance.
     GenerateAndBindTexture(&camViewTextures[camViewCount],GL_RGBA8,width,height,GL_RGBA,GL_UNSIGNED_BYTE,GL_TEXTURE_2D); // Cam View Lit Raster
-//     glBindImageTexture(6 + camViewCount,camViewTextures[camViewCount],0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8); // Camer View RGB (e.g. sensaround, in-world security cam views)
-    camViewCount++;
+    camViewCount++; if (camViewCount >= MAX_CAMVIEWS) DualLogWarn("Too many camviews!  Added last one at %u\n",MAX_CAMVIEWS);
     DualLog("Cam view added.  Count at %u\n",camViewCount);
-    if (camViewCount >= MAX_CAMVIEWS) DualLogWarn("Too many camviews!\n");
-}
-
-void GoIntoGame(void) {
-    Sys_Global.menuActive = Sys_Global.gamePaused = enteringPlayerName = gammaSliderActive = fovSliderActive = masterVolumeSliderActive = musicVolumeSliderActive = messageVolumeSliderActive = sfxVolumeSliderActive = returnToPause = false;
-    currentMenuItem = currentMenuTab = 0; currentMenuPage = MenuPages_FrontPage;
-    Sys_Global.inventoryMode = false;
-    NewGame();
-    PlayGameMusic();
-    DualLog("Player named \"%s\" started the game!\n", Sys_Global.playerName);
 }
 
 // GLFW Callbacks
 bool IsNonRepeatingKey(int32_t key) { return key == GLFW_KEY_KP_ENTER || key == GLFW_KEY_ENTER || key == GLFW_KEY_TAB || key == GLFW_KEY_ESCAPE; }
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
 static void key_callback(GLFWwindow* window, int32_t key, int32_t scancode, int32_t action, int32_t mods) {
-    if (key == GLFW_KEY_F10 && action) OS_Exit(0);
+    if (key == GLFW_KEY_F10 && action) OS_Exit(0); (void)window; (void)scancode; (void)mods; // Suppress warnings about unused parameters forced upon me by glfw3 dependency deadweight anchor.
     if (Sys_Global.menuActive && !returnToPause) {
         if ((key == GLFW_KEY_RIGHT_ALT || key == GLFW_KEY_LEFT_ALT) && action && Sys_Input.keyStates[GLFW_KEY_ENTER].down)                    GoIntoGame();
         if (key == GLFW_KEY_ENTER && action && (Sys_Input.keyStates[GLFW_KEY_LEFT_ALT].down || Sys_Input.keyStates[GLFW_KEY_RIGHT_ALT].down)) GoIntoGame();
@@ -901,6 +875,7 @@ static void joystick_callback(int32_t jid, int32_t event) {
 }
 
 static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
+    (void)window;
     if (Sys_Input.window_has_focus) {
         Sys_Input.currentMouse_dx = (int32_t)(xpos - Sys_Input.last_mouse_x);
         Sys_Input.currentMouse_dy = (int32_t)(ypos - Sys_Input.last_mouse_y);
@@ -913,40 +888,43 @@ static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
 }
 
 static void window_focus_callback(GLFWwindow* window, int32_t focused) {
-    Sys_Input.window_has_focus = focused != 0;
+    Sys_Input.window_has_focus = focused != 0; (void)window;
     Sys_Input.ignore_next_mouse_delta = true;
-    glfwSetInputMode(window, GLFW_CURSOR, Sys_Input.window_has_focus ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+    glfwSetInputMode(window,GLFW_CURSOR,Sys_Input.window_has_focus ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
 }
 
 static void mouse_button_callback(GLFWwindow* window, int32_t button, int32_t action, int32_t mods) {
-    Sys_Input.mouseButtons[button].down = Sys_Input.mouseButtons[button].pressed = (action == GLFW_PRESS);
+    Sys_Input.mouseButtons[button].down = Sys_Input.mouseButtons[button].pressed = (action == GLFW_PRESS); (void)window; (void)mods;
     Sys_Input.mouseButtons[button].released = (action == GLFW_RELEASE);
 }
 
-static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) { Sys_Input.scrollDelta += yoffset; }
-#pragma GCC diagnostic pop
+static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) { (void)window; (void)xoffset; Sys_Input.scrollDelta += yoffset; }
+
+int currentMonitorIndex = 0; // Start on primary
+void CenterWindowOnMonitor(void) {
+    int monitorCount;
+    GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
+    if (!monitors || monitorCount < 2) return;
+    
+    int mx, my; GLFWmonitor* next = monitors[currentMonitorIndex];
+    glfwGetMonitorPos(next,&mx,&my);
+    const GLFWvidmode* mode = glfwGetVideoMode(next);
+    int xpos = mx + (mode->width - Sys_Settings.ScreenWidth) / 2;
+    int ypos = my + (mode->height - Sys_Settings.ScreenHeight) / 2;
+    glfwSetWindowPos(window,xpos,ypos);
+    Sys_Input.ignore_next_mouse_delta = true;
+}
 
 double monitorSwitchTime;
-int currentMonitorIndex = 1; // Start on primary after first cycle, puts it a 0.
 void CycleToNextMonitor(void) {
     if (get_time() < monitorSwitchTime) return;
     
     monitorSwitchTime = get_time() + 0.5; // Prevent toggling rapidly on accident
-    int monitorCount;
-    GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
+    int monitorCount; GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
     if (!monitors || monitorCount < 2) return;
 
     currentMonitorIndex = (currentMonitorIndex + 1) % monitorCount;
-    GLFWmonitor* next = monitors[currentMonitorIndex];
-
-    int mx, my;
-    glfwGetMonitorPos(next, &mx, &my);
-    const GLFWvidmode* mode = glfwGetVideoMode(next);
-    int xpos = mx + (mode->width - Sys_Settings.ScreenWidth) / 2;
-    int ypos = my + (mode->height - Sys_Settings.ScreenHeight) / 2;
-    glfwSetWindowPos(window, xpos, ypos);
-    Sys_Input.ignore_next_mouse_delta = true;
-    DualLog("Window moved to monitor %d: %s at x: %d, y: %d\n", currentMonitorIndex, glfwGetMonitorName(next), xpos, ypos);
+    CenterWindowOnMonitor();
 }
 
 GLFWmonitor* GetCurrentMonitor(void) {
@@ -1106,27 +1084,34 @@ void ChangeResolution(void) {
     int ypos = my + (mode->height - (int)Sys_Settings.ScreenHeight) / 2;
     glfwSetWindowSize(window, (int)Sys_Settings.ScreenWidth, (int)Sys_Settings.ScreenHeight);
     glfwSetWindowPos(window, xpos, ypos);
-    UpdateScreenSize(NULL, (int)Sys_Settings.ScreenWidth, (int)Sys_Settings.ScreenHeight);
+    UpdateScreenSize(NULL,(int)Sys_Settings.ScreenWidth,(int)Sys_Settings.ScreenHeight);
     Sys_Input.ignore_next_mouse_delta = true;
     resDropdownOpen = false;
     SaveConfig();
 }
 
 void ChangeFullScreenWindowed(void) {
-    int monitorCount;
-    GLFWmonitor* next = glfwGetMonitors(&monitorCount)[currentMonitorIndex];
+    int monitorCount; GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
+    GLFWmonitor* monitor = monitors[currentMonitorIndex];
+    const GLFWvidmode* mode = glfwGetVideoMode(monitor);
     if (Sys_Settings.Fullscreen) {
-        int xpos, ypos, width, height;
-        glfwGetMonitorWorkarea(next,&xpos,&ypos,&width,&height);
-        Sys_Settings.ScreenWidth = width; Sys_Settings.ScreenHeight = height;
-        glfwSetWindowSize(window,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
-        glfwSetWindowPos(window,xpos,ypos - 18);
+        glfwSetWindowAttrib(window,GLFW_DECORATED,0);
+        int x,y,w,h;
+        glfwGetMonitorWorkarea(monitor,&x,&y,&w,&h);
+        glfwSetWindowMonitor(window,NULL,x,y,w,h,mode->refreshRate);
+        Sys_Settings.ScreenWidth = w;
+        Sys_Settings.ScreenHeight = h;
     } else {
-        int mx,my; glfwGetMonitorPos(next, &mx, &my);
-        const GLFWvidmode* mode = glfwGetVideoMode(next);
-        int xpos = mx + (mode->width-Sys_Settings.ScreenWidth) / 2;
-        int ypos = my + (mode->height-Sys_Settings.ScreenHeight) / 2;
-        glfwSetWindowPos(window,xpos,ypos);
+        glfwSetWindowAttrib(window,GLFW_DECORATED,1);
+        int mx, my; 
+        glfwGetMonitorPos(monitor,&mx,&my);
+        int x,y,w,h;
+        glfwGetMonitorWorkarea(monitor,&x,&y,&w,&h);
+        Sys_Settings.ScreenWidth  = vmax(vmin((w*3)/4,1366),320);
+        Sys_Settings.ScreenHeight = vmax(vmin((h*3)/4, 768),200);
+        int xpos = mx + (mode->width - Sys_Settings.ScreenWidth) / 2;
+        int ypos = my + (mode->height - Sys_Settings.ScreenHeight) / 2;
+        glfwSetWindowMonitor(window,NULL,xpos,ypos,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight,mode->refreshRate);
     }
     
     UpdateScreenSize(NULL,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
@@ -1158,82 +1143,35 @@ void SetSpeakerMode(void) {
 
 void LoadTextForLanguage(uint8_t),LoadLogTextForLanguage(uint8_t);
 void SetLanguage(void) { LoadTextForLanguage(Sys_Settings.Language); LoadLogTextForLanguage(Sys_Settings.Language); }
-
-void ApplySettings(void) {
-    UpdateScreenSize(NULL, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
-    SetSkyRotateSpeed();
-    SetVSync();
-    SetGI();
-    SetSpeakerMode();
-    SetLanguage();
-}
-
-#if defined(_WIN32) || defined(__CYGWIN__)
-    #include <windows.h>
-    #define PLATFORM_DLOPEN(path)        LoadLibraryA(path)
-    #define PLATFORM_DLSYM(handle, name) GetProcAddress((handle), (name))
-    #define PLATFORM_DLCLOSE(handle)     FreeLibrary((handle))
-    static char win_err_buf[512];
-    static const char* PLATFORM_DLERROR(void) {
-        DWORD err = GetLastError();
-        if (err == 0) return NULL;
-        FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,NULL,err,MAKELANGID(LANG_NEUTRAL,SUBLANG_DEFAULT),win_err_buf,sizeof(win_err_buf),NULL);
-        return win_err_buf;
-    }
-#else
-    #include <dlfcn.h>
-    #define PLATFORM_DLOPEN(path)        dlopen((path), RTLD_NOW)
-    #define PLATFORM_DLSYM(handle, name) dlsym((handle), (name))
-    #define PLATFORM_DLCLOSE(handle)     dlclose((handle))
-    #define PLATFORM_DLERROR()           dlerror()
-#endif
-
+void ApplySettings(void) { ChangeFullScreenWindowed(); SetSkyRotateSpeed(); SetVSync(); SetGI(); SetSpeakerMode(); SetLanguage(); }
 bool GetKey(int settingIndex);
 bool GetKeyPressed(int settingIndex);
 void* mod_handle = NULL;
 void LoadModFunctions(void) {
-    // Clear previous handle if reloading
-    if (mod_handle) {
-        PLATFORM_DLCLOSE(mod_handle);
-        mod_handle = NULL;
-    }
-
-    DualLog("Reloading mod code...");
+    DualLog("Loading mod code...");
     char mod_path[256];
-    StringCopyInto_A_From_B(mod_path, "./", 256);
-    StringConcatenate(mod_path, Sys_Global.global_modname, 256);
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wformat-truncation"
-    #if defined(_WIN32) || defined(__CYGWIN__)
-        StringConcatenate(mod_path,".dll",256); // e.g. Citadel.dll
-    #else
-        StringConcatenate(mod_path,".so",256); // e.g. Citadel.so
-    #endif
-#pragma GCC diagnostic pop
-
-    DualLog("dlopen-ing...");
+    StringCopyInto_A_From_B(mod_path,"./",256);
+    StringConcatenate(mod_path,Sys_Global.global_modname,256);
+    StringConcatenate(mod_path,MOD_EXTENSION,256);
     mod_handle = PLATFORM_DLOPEN(mod_path);
     if (!mod_handle) {
         const char* err = PLATFORM_DLERROR();
-        if (err && *err) {
-            DualLogError("dlopen of %s failed: %s",mod_path,err);
-        } else {
-            DualLogError("dlopen of %s failed: no detailed error from dlerror() — common with unresolved symbols or format issues",mod_path);
-        }
+        if (err && *err) DualLogError("dlopen of %s failed: %s",mod_path,err);
+        else             DualLogError("dlopen of %s failed: no detailed error from dlerror() — common with unresolved symbols or format issues",mod_path);
         OS_Exit(1);
     }
     
     #define X(ret, name, params) \
         name = (ret (*) params)PLATFORM_DLSYM(mod_handle, #name); \
         if(!name) DualLogError("Failed to load mod function: %s", #name);
-
     MOD_FUNCTION_LIST(X)
     #undef X
-    ModLink(&Sys_Global,&Sys_Cheats,&Sys_Settings,&Sys_Text,&Sys_UI);
-    Sys_Global.GetKey = GetKey;
-    Sys_Global.GetKeyPressed = GetKeyPressed;
+    ModLink(&Sys_Global,&Sys_Cheats,&Sys_Settings,&Sys_Text,&Sys_UI); // Link engine to mod
+    Sys_Global.GetKey = GetKey; Sys_Global.GetKeyPressed = GetKeyPressed; // Link mod to engine
     DualLog("done!\n");
 }
+
+void OpenMainMenu(void) { PlayMenuMusic(); Sys_Global.menuActive = true; currentMenuPage = MenuPages_FrontPage; }
 
 extern unsigned char *stbi_load_from_memory(const uint8_t* buffer, int32_t len, int32_t *x, int32_t *y);
 extern int32_t stbi_arena_size;
@@ -1253,11 +1191,7 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     double initMarker2 = get_time();
     DualLog("GLFW init took %f secs\n",initMarker2 - init_start_time);
     glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_SRGB_CAPABLE, 0);
-    glfwWindowHint(GLFW_RESIZABLE, 1);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,4); glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,3); glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
     LoadConfig(); // Get settings before setting window size.
     window = glfwCreateWindow(Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, "Voxen", NULL, NULL);
     glfwSetFramebufferSizeCallback(window, UpdateScreenSize);
@@ -1267,47 +1201,37 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     DualLog("Load Config.ini, glfw create window and GL context took %f secs\n",get_time() - initMarker2);
     if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress)) { DualLogError("Failed to initialize GLAD\n"); OS_Exit(1); }
     
-    GLint major = 0, minor = 0;
-    glGetIntegerv(GL_MAJOR_VERSION, &major);
-    glGetIntegerv(GL_MINOR_VERSION, &minor);
-    if (major < 4 || (major == 4 && minor < 3)) { DualLogError("Need OpenGL >= 4.3, got %d.%d\n", major, minor); OS_Exit(1); }
+    GLint major=0,minor=0; glGetIntegerv(GL_MAJOR_VERSION,&major); glGetIntegerv(GL_MINOR_VERSION,&minor);
+    if (major < 4 || (major == 4 && minor < 3)) { DualLogError("Need OpenGL >= 4.3, got %d.%d\n",major,minor); OS_Exit(1); }
     double initMarker3 = get_time();
-//     CycleToNextMonitor();
-    glfwSetKeyCallback(window, key_callback);
-    glfwSetJoystickCallback(joystick_callback);
-    glfwSetCursorPosCallback(window, cursor_pos_callback);
-    glfwSetWindowFocusCallback(window, window_focus_callback);
-    glfwSetMouseButtonCallback(window, mouse_button_callback);
-    glfwSetScrollCallback(window, scroll_callback);
+    CenterWindowOnMonitor();
+    glfwSetKeyCallback(window,key_callback); glfwSetJoystickCallback(joystick_callback);
+    glfwSetCursorPosCallback(window,cursor_pos_callback); glfwSetWindowFocusCallback(window,window_focus_callback);
+    glfwSetMouseButtonCallback(window,mouse_button_callback); glfwSetScrollCallback(window,scroll_callback);
+    glfwSetInputMode(window,GLFW_CURSOR,GLFW_CURSOR_DISABLED);
     glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
     glBlendFuncSeparate(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA,GL_ZERO,GL_ONE);
     CompileShaders();
     double initMarker4 = get_time();
     DualLog("Set monitor, Set GLFW callbacks, Compile shaders took %f secs\n",initMarker4 - initMarker3);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
-    GLuint vaos[4]; GLuint vbos[4];
-    glCreateVertexArrays(4, vaos);
-    glCreateBuffers(3, vbos);
+    GLuint vaos[4],vbos[4]; glCreateVertexArrays(4,vaos); glCreateBuffers(3,vbos);
     Sys_Render.quadVAO = vaos[0]; Sys_Render.vao_chunk = vaos[1]; Sys_Render.textVAO = vaos[2]; Sys_Render.debugLinesVAO = vaos[3];
-    Sys_Render.quadVBO = vbos[0];                                     Sys_Render.textVBO = vbos[1]; Sys_Render.debugLinesVBO = vbos[2];
-    float quadBlit_vertices[] = { 1.0f, -1.0f, 1.0f, 0.0f,    1.0f, 1.0f, 1.0f, 1.0f,    -1.0f,1.0f, 0.0f, 1.0f,   -1.0f, -1.0f, 0.0f, 0.0f }; // 4 verts, 4 floats each pos.xy, uv.xy
-    glNamedBufferData(Sys_Render.quadVBO, sizeof(quadBlit_vertices), quadBlit_vertices, GL_STATIC_DRAW);
-
+    Sys_Render.quadVBO = vbos[0]; Sys_Render.textVBO = vbos[1]; Sys_Render.debugLinesVBO = vbos[2];
+    float quadBlit_vertices[] = {1.0f,-1.0f,1.0f,0.0f, 1.0f,1.0f,1.0f,1.0f, -1.0f,1.0f,0.0f,1.0f, -1.0f,-1.0f,0.0f,0.0f}; // 4 verts, 4 floats each x,y,u,v
+    glNamedBufferData(Sys_Render.quadVBO,sizeof(quadBlit_vertices),quadBlit_vertices,GL_STATIC_DRAW);
     glVertexArrayAttribFormat(Sys_Render.quadVAO,0,2,GL_FLOAT,GL_FALSE,0); // DSA: Set position format
     glVertexArrayAttribFormat(Sys_Render.quadVAO,1,2,GL_FLOAT,GL_FALSE,2 * sizeof(float)); // DSA: Set texcoord format
     glVertexArrayVertexBuffer(Sys_Render.quadVAO,0,Sys_Render.quadVBO,0,4 * sizeof(float)); // DSA: Link VBO to VAO
     for (uint8_t i = 0; i < 2; i++) { glVertexArrayAttribBinding(Sys_Render.quadVAO,i,0); glEnableVertexArrayAttrib(Sys_Render.quadVAO,i); }
-
     glVertexArrayAttribFormat(Sys_Render.vao_chunk,0,3,GL_HALF_FLOAT,GL_FALSE,0);      // pos xyz half-float @ offset 0
     glVertexArrayAttribFormat(Sys_Render.vao_chunk,1,3,GL_HALF_FLOAT,GL_FALSE,6);      // normal xyz float   @ offset 6  (after 3×2 bytes)
     glVertexArrayAttribFormat(Sys_Render.vao_chunk,2,2,GL_HALF_FLOAT,GL_FALSE,12);     // uv st float
     for (uint8_t i = 0; i < 3; i++) { glVertexArrayAttribBinding(Sys_Render.vao_chunk,i,0); glEnableVertexArrayAttrib(Sys_Render.vao_chunk,i); }
-    
     glVertexArrayAttribFormat(Sys_Render.textVAO,0,3,GL_FLOAT,GL_FALSE,0);             // pos (x,y,z) 4 floats per vertex, stride = 4*sizeof(float)
     glVertexArrayAttribFormat(Sys_Render.textVAO,1,2,GL_FLOAT,GL_FALSE,3 * sizeof(float));  // uv (s,t)
     glVertexArrayVertexBuffer(Sys_Render.textVAO,0,Sys_Render.textVBO,0,5 * sizeof(float));
     for (uint8_t i = 0; i < 2; i++) { glVertexArrayAttribBinding(Sys_Render.textVAO,i,0); glEnableVertexArrayAttrib(Sys_Render.textVAO,i); }
-    
     glNamedBufferStorage(Sys_Render.debugLinesVBO,MAX_DEBUG_LINE_VERTS * 3 * sizeof(float),NULL,GL_DYNAMIC_STORAGE_BIT);
     glVertexArrayAttribFormat(Sys_Render.debugLinesVAO,0,3,GL_FLOAT,GL_FALSE,0);
     glEnableVertexArrayAttrib(Sys_Render.debugLinesVAO,0);
@@ -1333,13 +1257,13 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     glGenFramebuffers(1, &Sys_Render.gBufferFBO);
     ApplySettings(); // After loading of text and game data.
     glBindFramebuffer(GL_FRAMEBUFFER, Sys_Render.gBufferFBO);
-    GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3 };
-    glDrawBuffers(4, drawBuffers);
+    GLenum drawBuffers[] = {GL_COLOR_ATTACHMENT0,GL_COLOR_ATTACHMENT1,GL_COLOR_ATTACHMENT2,GL_COLOR_ATTACHMENT3};
+    glDrawBuffers(4,drawBuffers);
     GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     if (status != GL_FRAMEBUFFER_COMPLETE) DualLogError("Framebuffer incomplete: Error code %d\n", status);
     glBindFramebuffer(GL_FRAMEBUFFER, 0); // Needed to render loading progress.
     glDepthMask(GL_TRUE); // Always true, set just once ever.
-    glfwSetWindowTitle(window, Sys_Global.global_modname);
+    glfwSetWindowTitle(window,Sys_Global.global_modname);
     OsFileHandle fp = OS_OpenReadonly("./Textures/UI/menudot1.png");
     if (fp) {
         int windowIconFileSize = OS_FileSize(fp);
@@ -1347,13 +1271,13 @@ __attribute__((cold)) void InitializeEnvironment(void) {
         if (!file_buffer) { DualLogError("Could not open backed buffer for ./Textures/UI/menudot1.png\n"); OS_Exit(1); }
         
         OS_Close(fp);
-        int w = 1, h = 1;
+        int w=1,h=1;
         stbi__arena_init();
         unsigned char* pixels = stbi_load_from_memory(file_buffer, windowIconFileSize, &w, &h);
         if (!pixels) { DualLogError("Failed to load icon: ./Textures/UI/menudot1.png\n"); OS_Exit(1); }
         
-        GLFWimage image; image.width  = w; image.height = h; image.pixels = pixels;
-        glfwSetWindowIcon(window, 1, &image);
+        GLFWimage image; image.width=w; image.height=h; image.pixels=pixels;
+        glfwSetWindowIcon(window,1,&image);
         OS_DeallocateRAM(file_buffer, windowIconFileSize);
         OS_DeallocateRAM(stbi__arena_base, STBI_ARENA_SIZE); stbi__arena_base = NULL;
     }
@@ -1379,38 +1303,53 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     glUseProgram(Sys_Render.chunkShaderProgram); glUniform1ui(21,SHADOW_MAP_SIZE); glUniform1f(22,(float)SHADOW_MAP_SIZE); glUniform1ui(23,LIGHT_COUNT); glUniform1ui(24,(uint32_t)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);
     glUseProgram(Sys_Render.voxelUpdateShaderProgram); glUniform1ui(6,(uint32_t)MAX_LIGHTS_PER_VOXEL);
     DualLog("GL SSBOs and Settings Apply... took %f secs\n",get_time() - nextInitTimeSection);
-    RenderLoadingProgress(110,"Loading models...");
-    LoadModels();
     RenderLoadingProgress(110,"Loading textures...");
     LoadTextures();
+    RenderLoadingProgress(110,"Loading models...");
+    LoadModels();
     if (Sys_Global.introNotPlayed) {} // TODO: Play intro
-    RenderLoadingProgress(110,"Loading models...");
-    LoadModels();
-    RenderLoadingProgress(110,"Loading textures...");
-    LoadTextures();
-//     NewGame();
-    play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500);
-    glfwSetInputMode(window,GLFW_CURSOR,GLFW_CURSOR_DISABLED);
+    Sys_Global.absoluteTime = Sys_Global.last_topframe_time = Sys_Global.current_time = get_time();
+    Sys_Global.pauseRelativeTime = Sys_Global.last_physics_time = 0.0;
+//     NewGame(); // Almost works, just causes GL errors once entering game and SSR doesn't appear to work.  Needed to fix bug where you can't see options take effect on config menu unless returned to from after starting a game.
+    OpenMainMenu();
     DebugRAM("InitializeEnvironment end");
-    DualLog("InitializeEnvironment completed\n");
+    DualLog("Game Initialized in %f secs\n",get_time() - init_start_time);
 }
 
 extern bool mouseMovementThisFrame;
-uint8_t UI_Button(int16_t x, int16_t y, float w, float h, bool* cursorOver, int8_t this) {
-    float width = RelX(w); float height = RelY(h);
-    float xpos = RelX(x); float ypos = RelY(y - height);
-    bool cursorIsOver = CursorIsOverBounds(xpos, xpos + width, ypos + height, ypos);
-    if (cursorIsOver && mouseMovementThisFrame && cursorOver != NULL) {
-        currentMenuItem = this;
-        *cursorOver = cursorIsOver;
-    }
-    
-    if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT ].pressed && cursorIsOver) return 1u;
-    if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].pressed && cursorIsOver) return 2u;
+bool MenuEnter(void) { return (Sys_Input.keyStates[GLFW_KEY_KP_ENTER].pressed || Sys_Input.keyStates[GLFW_KEY_ENTER].pressed || Sys_Input.gamepadButtons[GLFW_GAMEPAD_BUTTON_A].pressed); }
+uint8_t UI_Interactable(int16_t x, int16_t y, float w, float h, bool* cursorOver, int8_t this, bool sustained) {
+    bool cursorIsOver = CursorIsOverBounds(x,x + w,y + h,y);
+    if (cursorIsOver && mouseMovementThisFrame) { currentMenuItem = this; if (cursorOver != NULL) {*cursorOver = cursorIsOver;} }
+    if ((sustained ? Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT ].down : Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT ].pressed) && cursorIsOver) return 1u;
+    if ((sustained ? Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].down : Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].pressed) && cursorIsOver) return 2u;
     return 0u;
 }
 
-bool MenuEnter(void) { return (Sys_Input.keyStates[GLFW_KEY_KP_ENTER].pressed || Sys_Input.keyStates[GLFW_KEY_ENTER].pressed || Sys_Input.gamepadButtons[GLFW_GAMEPAD_BUTTON_A].pressed); }
+uint8_t UI_Button(int16_t x, int16_t y, float w, float h, bool* cursorOver, int8_t this) { return UI_Interactable(x,y,w,h,cursorOver,this,false); }
+bool AnyLeftRightMouseDown(void) { return (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].down); }
+bool UI_Slider(int16_t x, int16_t y, int16_t w, int16_t h, int16_t sliderPos, int16_t xPosForLabel, uint8_t currentValue, uint8_t* out, bool* sliderActive, uint8_t min, uint8_t max, uint8_t step, uint8_t mindex, uint16_t lingdex) {
+    bool over=false,changed=false; *out = currentValue;
+    RenderUIImage(x,y, w,h, 1079); // Slider background
+    RenderUIImage(x + sliderPos,y, h,h,1078); // Slider handle
+    if (UI_Interactable(xPosForLabel,y + h,xPosForLabel + w,h,&over,mindex,true)) *sliderActive = true;
+    if (*sliderActive && Sys_Input.currentMouse_dx != 0) {
+        int32_t new = (int32_t)currentValue + vmin(vmax(Sys_Input.currentMouse_dx,-1),1); *out = (uint8_t)vmin(vmax(new,min),max); if (*out != currentValue) {changed = true;}
+    }
+    
+    if (!AnyLeftRightMouseDown()) { if (*sliderActive) { *sliderActive = false; SaveConfig(); } }
+    if (MenuEnter() && currentMenuItem == mindex) {
+        bool shiftHeld = Sys_Input.keyStates[GLFW_KEY_LEFT_SHIFT].down || Sys_Input.keyStates[GLFW_KEY_RIGHT_SHIFT].down;
+        if (shiftHeld) *out = *out <=  ((min + step) - 1) ? max : *out - step;
+        else           *out = *out >= ((max - step) + 1) ?  min : *out + step;
+        changed = true;
+    }
+    
+    over = over || currentMenuItem == mindex;
+    RenderFormattedText(xPosForLabel,y,over ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"%s %u",Sys_Text.stringTable[lingdex],*out);
+    return changed;
+}
+
 uint8_t UI_MenuButton(int16_t bX, int16_t bY, uint8_t menuItem, int16_t bW, int16_t bH,  int16_t tX, int16_t tY, const char* text, int16_t pX, int16_t pY) {
     bool over = false; uint8_t retvalue = 0u;
     retvalue = UI_Button(bX,bY, bW,bH, &over, menuItem);
@@ -1419,20 +1358,6 @@ uint8_t UI_MenuButton(int16_t bX, int16_t bY, uint8_t menuItem, int16_t bW, int1
     RenderFormattedText(tX,tY, over ? TEXT_STOPD_RED : TEXT_RED_MENU,FONT_STOPD,1.5f,text);
     RenderUIImage(pX,pY, 40,40, over ? MENUPAD_HILITE : MENUPAD); // Menu pad
     return retvalue;
-}
-
-uint8_t UI_Slider(int16_t x, int16_t y, float w, float h, bool* cursorOver, int8_t this) {
-    float width = RelX(w); float height = RelY(h);
-    float xpos = RelX(x); float ypos = RelY(y) - height;
-    bool cursorIsOver = CursorIsOverBounds(xpos, xpos + width, ypos + height, ypos);
-    if (cursorIsOver && mouseMovementThisFrame) {
-        currentMenuItem = this;
-        if (cursorOver != NULL) *cursorOver = cursorIsOver;
-    }
-    
-    if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT ].down && cursorIsOver) return 1u;
-    if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].down && cursorIsOver) return 2u;
-    return 0u;
 }
 
 bool UI_Checkbox(int16_t x, int16_t y, int8_t mitem, uint16_t textIdx, bool currentlyOn) {
@@ -1465,7 +1390,6 @@ void RenderMenu(void) {
     if (currentMenuPage != MenuPages_IntroVideo && currentMenuPage != MenuPages_CreditsVideo && currentMenuPage != MenuPages_Options) RenderUIImage(-417,-384, 2200,1536, 1026); // Menu background
     if (currentMenuPage == MenuPages_IntroVideo || currentMenuPage == MenuPages_CreditsVideo) RenderUIImage(-417,-384, 2200,1536, 0); // Video blackground
     if (currentMenuPage == MenuPages_Options) RenderUIImage(-417,-384, 2200,1536, 1032); // Menu background
-    bool shiftHeld = Sys_Input.keyStates[GLFW_KEY_LEFT_SHIFT].down || Sys_Input.keyStates[GLFW_KEY_RIGHT_SHIFT].down;
     if (currentMenuPage == MenuPages_FrontPage) {
         menuItemCount = 4; menuTabCount = 1;
         RenderUIImage(282,46, 800,128, 1031); // Title CITADEL with strikethrough effect
@@ -1508,58 +1432,17 @@ void RenderMenu(void) {
         if (UI_Button(190,196+30, 160,30, NULL, 0)) currentMenuTab = 0;
         RenderFormattedText(200,202,currentMenuTab == 0 ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,/*"GRAPHICS"*/Sys_Text.stringTable[791]);
         if (currentMenuTab == 0) {
-            bool overFOV = false, overBrightness = false, overRes = false, overFull = false, overChgM = false;
+            bool overRes = false, overFull = false, overChgM = false;
             menuItemCount = 11; // Graphics
             if (UI_Checkbox(200,500,0,Sys_Settings.ModelDetail ? /*High*/915 : /*No Detail Level Models*/914,Sys_Settings.ModelDetail)) { Sys_Settings.ModelDetail = Sys_Settings.ModelDetail ? 0u : 1u; SaveConfig(); }
             if (UI_Checkbox(200,530,1,/*"FXAA"*/780,Sys_Settings.FXAA)) { Sys_Settings.FXAA = Sys_Settings.FXAA ? 0u : 1u; SaveConfig(); }
             if (UI_Checkbox(200,560,2,Sys_Settings.Shadows ? /*Soft*/787 : /*No Shadows*/785,Sys_Settings.Shadows)) { Sys_Settings.Shadows = Sys_Settings.Shadows ? 0u : 1u; SaveConfig(); }
             if (UI_Checkbox(200,590,3,/*SSR*/788,Sys_Settings.Reflections)) { Sys_Settings.Reflections = Sys_Settings.Reflections ? 0u : 1u; SaveConfig(); }
             if (UI_Checkbox(200,620,4,/*VSYNC*/1026,Sys_Settings.Vsync)) { Sys_Settings.Vsync = Sys_Settings.Vsync ? 0u : 1u; SetVSync(); SaveConfig(); }
-            RenderFormattedText(310,620,TEXT_GREEN,FONT_NORMAL,1.0f,"(FPS: %d)", Sys_Global.framesPerLastSecond);
-            
-            // FOV Slider
-            RenderUIImage(400,650, 128,16, 1079); // Slider background
-            RenderUIImage(400 + (((Sys_Settings.FOV - 45.0f) / 105.0f) * 112),650, 16,16, 1078); // Slider handle [45, 150]
-            if (UI_Slider(200,666, 328,16, &overFOV, 5)) fovSliderActive = true;
-            if (fovSliderActive && Sys_Input.currentMouse_dx != 0) {
-                int32_t new = (int32_t)Sys_Settings.FOV + vmin(vmax(Sys_Input.currentMouse_dx,-1),1); Sys_Settings.FOV = (uint8_t)vmin(vmax(new,45),150);
-            }
-            
-            if (!Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].down && !Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].down) {
-                if (fovSliderActive) SaveConfig();
-                fovSliderActive = false;
-            }
-            
-            if (MenuEnter() && currentMenuItem == 5) {
-                if (shiftHeld) Sys_Settings.FOV = Sys_Settings.FOV <=  49 ? 150 : Sys_Settings.FOV - 5;
-                else           Sys_Settings.FOV = Sys_Settings.FOV >= 146 ?  45 : Sys_Settings.FOV + 5;
-                SaveConfig();
-            }
-            
-            overFOV = overFOV || currentMenuItem == 5;
-            RenderFormattedText(200,650,overFOV ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"%s %u",/*Field of View*/Sys_Text.stringTable[775],Sys_Settings.FOV);
-            
-            // Brightness Slider
-            RenderUIImage(400,680, 128,16, 1079); // Slider background
-            RenderUIImage(400 + ((Sys_Settings.Brightness / 100.0f) * 112),680, 16,16, 1078); // Slider handle [45, 150]
-            if (UI_Slider(200,696, 328,16, &overBrightness, 6)) gammaSliderActive = true;
-            if (gammaSliderActive && Sys_Input.currentMouse_dx != 0) {
-                int32_t new = (int32_t)Sys_Settings.Brightness + vmin(vmax(Sys_Input.currentMouse_dx,-1),1); Sys_Settings.Brightness = (uint8_t)vmin(vmax(new,0),100);
-            }
-            
-            if (!Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].down && !Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].down) {
-                if (gammaSliderActive) SaveConfig();
-                gammaSliderActive = false;
-            }
-            
-            if (MenuEnter() && currentMenuItem == 6) {
-                if (shiftHeld) Sys_Settings.Brightness = Sys_Settings.Brightness <=  1 ? 100 : Sys_Settings.Brightness - 2;
-                else           Sys_Settings.Brightness = Sys_Settings.Brightness >= 99 ?   0 : Sys_Settings.Brightness + 2;
-                SaveConfig();
-            }
-            
-            overBrightness = overBrightness || currentMenuItem == 6;
-            RenderFormattedText(200,680,overBrightness ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"%s %u",/*Brightness*/Sys_Text.stringTable[771],Sys_Settings.Brightness);
+            RenderFormattedText(310,620,TEXT_GREEN,FONT_NORMAL,1.0f,"(FPS: %d)", Sys_Global.framesPerLastSecond); // Helper to see vsync take effect.
+            uint8_t newVal;
+            if (UI_Slider(400,650,128,16,(((Sys_Settings.FOV - 45.0f) / 105.0f) * (128 - 16)),200,Sys_Settings.FOV,&newVal,&fovSliderActive,45,150,5,5,/*Field of View*/775)) { Sys_Settings.FOV = newVal; if (!AnyLeftRightMouseDown()) {SaveConfig();} }
+            if (UI_Slider(400,680,128,16,((Sys_Settings.Brightness / 100.0f) * (128 - 16)),200,Sys_Settings.Brightness,&newVal,&gammaSliderActive,0,100,2,6,/*Gamma*/774)) { Sys_Settings.Brightness = newVal; if (!AnyLeftRightMouseDown()) {SaveConfig();} }
             
             // Resolution
             {
@@ -1642,53 +1525,10 @@ void RenderMenu(void) {
         } else if (currentMenuTab == 1) {
             menuItemCount = 49; // Input
         } else {
-            bool overMasterVolume = false, overMusicSlider = false;
             menuItemCount = 10; // Audio / Lang
-            // Master Volume Slider
-            RenderUIImage(426,240, 128,16, 1079); // Slider background
-            RenderUIImage(426 + ((Sys_Settings.VolumeMaster / 100.0f) * 112),240, 16,16, 1078); // Slider handle [45, 150]
-            if (UI_Slider(200,256, 328,16, &overMasterVolume, 0)) masterVolumeSliderActive = true;
-            if (masterVolumeSliderActive && Sys_Input.currentMouse_dx != 0) {
-                int32_t new = (int32_t)Sys_Settings.VolumeMaster + vmin(vmax(Sys_Input.currentMouse_dx,-1),1); Sys_Settings.VolumeMaster = (uint8_t)vmin(vmax(new,0),100); set_master_volume();
-            }
-            
-            if (!Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].down && !Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].down) {
-                if (masterVolumeSliderActive) SaveConfig();
-                masterVolumeSliderActive = false;
-            }
-            
-            if (MenuEnter() && currentMenuItem == 0) {
-                if (shiftHeld) Sys_Settings.VolumeMaster = Sys_Settings.VolumeMaster <=  4 ? 100 : Sys_Settings.VolumeMaster - 5;
-                else           Sys_Settings.VolumeMaster = Sys_Settings.VolumeMaster >= 96 ?   0 : Sys_Settings.VolumeMaster + 5;
-                set_master_volume();
-                SaveConfig();
-            }
-            
-            overMasterVolume = overMasterVolume || currentMenuItem == 0;
-            RenderFormattedText(200,240,overMasterVolume ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"%s %u",/*Master Volume*/Sys_Text.stringTable[802],Sys_Settings.VolumeMaster);
-            
-            // Music Volume Slider
-            RenderUIImage(426,270, 128,16, 1079); // Slider background
-            RenderUIImage(426 + ((Sys_Settings.VolumeMusic / 100.0f) * 112),270, 16,16, 1078); // Slider handle [45, 150]
-            if (UI_Slider(200,286, 328,16, &overMusicSlider, 1)) musicVolumeSliderActive = true;
-            if (musicVolumeSliderActive && Sys_Input.currentMouse_dx != 0) {
-                int32_t new = (int32_t)Sys_Settings.VolumeMusic + vmin(vmax(Sys_Input.currentMouse_dx,-1),1); Sys_Settings.VolumeMusic = (uint8_t)vmin(vmax(new,0),100); set_music_volume();
-            }
-            
-            if (!Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].down && !Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].down) {
-                if (musicVolumeSliderActive) SaveConfig();
-                musicVolumeSliderActive = false;
-            }
-            
-            if (MenuEnter() && currentMenuItem == 1) {
-                if (shiftHeld) Sys_Settings.VolumeMusic = Sys_Settings.VolumeMusic <=  4 ? 100 : Sys_Settings.VolumeMusic - 5;
-                else           Sys_Settings.VolumeMusic = Sys_Settings.VolumeMusic >= 96 ?   0 : Sys_Settings.VolumeMusic + 5;
-                set_music_volume();
-                SaveConfig();
-            }
-            
-            overMusicSlider = overMusicSlider || currentMenuItem == 1;
-            RenderFormattedText(200,270,overMusicSlider ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"%s %u",/*Music Volume*/Sys_Text.stringTable[803],Sys_Settings.VolumeMusic);
+            uint8_t newVal;
+            if (UI_Slider(426,240,128,16,((Sys_Settings.VolumeMaster / 100.0f) * (128 - 16)),200,Sys_Settings.VolumeMaster,&newVal,&masterVolumeSliderActive,0,100,5,0,/*Master Volume*/802)) { Sys_Settings.VolumeMaster = newVal; set_master_volume(); if (!AnyLeftRightMouseDown()) {SaveConfig();} }
+            if (UI_Slider(426,270,128,16,((Sys_Settings.VolumeMusic / 100.0f) * (128 - 16)),200,Sys_Settings.VolumeMusic,&newVal,&musicVolumeSliderActive,0,100,5,1,/*Music Volume*/803)) { Sys_Settings.VolumeMusic = newVal; set_master_volume(); if (!AnyLeftRightMouseDown()) {SaveConfig();} }
         }
         
         RenderUIImage(1087,723, 84,36, 1252); // Back Button background
@@ -1777,7 +1617,7 @@ void RenderPausedUI(void) {
     if (UI_Button(522,510, 322,60, &overOptions, 3) || (MenuEnter() && currentMenuItem == 3)) { currentMenuPage = MenuPages_Options; PlayMenuMusic(); Sys_Global.menuActive = true; returnToPause = true; }
     overOptions = overOptions || currentMenuItem == 3;
     RenderFormattedText(599,480,overOptions ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,/*"OPTIONS"*/Sys_Text.stringTable[721]);
-    if (UI_Button(522,570, 322,60, &overQuitMenu, 4) || (MenuEnter() && currentMenuItem == 4)) { PlayMenuMusic(); Sys_Global.menuActive = true; currentMenuPage = MenuPages_FrontPage; }
+    if (UI_Button(522,570, 322,60, &overQuitMenu, 4) || (MenuEnter() && currentMenuItem == 4)) OpenMainMenu();
     overQuitMenu = overQuitMenu || currentMenuItem == 4;
     RenderFormattedText(546,538,overQuitMenu ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,/*"QUIT TO MENU"*/Sys_Text.stringTable[728]);
     RenderUIImage(519,672,328,42,1252); // Pause Quit Game background
@@ -1824,7 +1664,7 @@ static inline __attribute__((always_inline)) float GetScore(float stupid, bool i
     return vfloor(score);
 }
 
-static inline void DecomposeTime(double t, uint32_t* h, uint32_t* m, double* s) {
+static inline __attribute__((always_inline)) void DecomposeTime(double t, uint32_t* h, uint32_t* m, double* s) {
     double tb = vfloor(t / 3600.0); *h = (uint32_t)tb; t -= tb * 3600.0;
     tb = vfloor(t / 60.0);          *m = (uint32_t)tb; *s = t - tb * 60.0;
 }
@@ -1847,31 +1687,21 @@ static inline __attribute__((always_inline)) void CreditsStats(void) {
     off += StringFormat(creditStats + off,sizeof(creditStats),"Damage Dealt: %f\nDamage Received: %f\nSaves Scummed: %u\n\nClick to continue...\n",Sys_Global.damageDealt,Sys_Global.damageReceived,Sys_Global.savesScummed);
 }
 
-void RenderCredits(void) {
-    if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].pressed) {
-        ++Sys_Global.creditsPageIndex;
-        if (Sys_Global.creditsPageIndex > CREDITS_PAGES) {Sys_Global.creditsActive = false; return; }
-    }
-
-    if (Sys_Global.creditsPageIndex == 1) {
-        CreditsStats();
-        RenderFormattedText(300,10,TEXT_WHITE,FONT_NORMAL,1.0f,(const char*)&creditStats);
-    } else RenderFormattedText(300,10,TEXT_WHITE,FONT_NORMAL,1.0f,creditPages[Sys_Global.creditsPageIndex]);
-}
-
-void RenderMenu(void);
-void RenderPausedUI(void);
-extern float shadBiasMin; extern uint16_t playerCellIdx; extern char consoleEntryText[TEXT_BUFFER_SIZE];
+extern uint16_t playerCellIdx; extern char consoleEntryText[TEXT_BUFFER_SIZE]; void RenderMenu(void); void RenderPausedUI(void);
 static inline __attribute__((always_inline)) double RenderUI(void) {
-    float* m;
-    m = uiOrthoProjection;
-    m[0] = 2.0f / (float)Sys_Settings.ScreenWidth; m[1] =                                       0.0f; m[2] =  0.0f; m[3] = 0.0f;
-    m[4] =                                   0.0f; m[5] = -2.0f / ((float)Sys_Settings.ScreenHeight); m[6] =  0.0f; m[7] = 0.0f;
-    m[8] =                                   0.0f; m[9] =                                       0.0f; m[10]= -1.0f; m[11]= 0.0f;
-    m[12]=                                  -1.0f; m[13]=                                       1.0f; m[14]=  0.0f; m[15]= 1.0f;
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER,0);
     drawCallsNormal = drawCallsRenderedThisFrame;
-    if (Sys_Global.creditsActive) { RenderCredits(); return get_time(); }
+    if (Sys_Global.creditsActive) { // Render Credits
+        if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].pressed) {
+            ++Sys_Global.creditsPageIndex;
+            if (Sys_Global.creditsPageIndex > CREDITS_PAGES) {Sys_Global.creditsActive = false; return get_time(); } // Finished with Erthang!  That's it, go home.
+        }
+
+        if (Sys_Global.creditsPageIndex == 1) { CreditsStats(); RenderFormattedText(300,10,TEXT_WHITE,FONT_NORMAL,1.0f,(const char*)&creditStats); }
+        else                                                    RenderFormattedText(300,10,TEXT_WHITE,FONT_NORMAL,1.0f,creditPages[Sys_Global.creditsPageIndex]);
+        
+        return get_time();
+    }
     if (Sys_Global.menuActive) RenderMenu();
     else if (Sys_Global.gamePaused) RenderPausedUI();
     if ((Sys_Global.menuActive || Sys_Global.gamePaused) && Sys_Input.keyStates[GLFW_KEY_DOWN].pressed) currentMenuItem = (currentMenuItem + 1) >= menuItemCount ? 0 : (currentMenuItem + 1);
@@ -1889,10 +1719,7 @@ static inline __attribute__((always_inline)) double RenderUI(void) {
     if (!Sys_Global.menuActive && !Sys_Global.gamePaused) {
         if (!Sys_Global.gamePaused && !Sys_Cheats.noHUD) RenderUIImage(672,0,22,22,1020); // Shoot mode button
         bool mouseReleased = Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].pressed;
-        if (Sys_Global.inventoryMode && mouseReleased && CursorIsOverBounds(672,694,22,0)) {
-            Sys_Global.inventoryMode = false;
-            Sys_Global.cursorPosition_x = Sys_Settings.ScreenWidth / 2; Sys_Global.cursorPosition_y = Sys_Settings.ScreenHeight / 2;
-        }
+        if (Sys_Global.inventoryMode && mouseReleased && CursorIsOverBounds(672,694,22,0)) ForceShootMode();
     }
     
     double time_now = get_time();
@@ -1927,8 +1754,6 @@ static inline __attribute__((always_inline,hot)) uint16_t GetAndBindModel(uint16
     return modelType;
 }
 
-extern uint32_t* texturePaletteOffsets;
-extern int32_t* textureSizes;
 static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {    
     double shadowStartTime = get_time();
     uint16_t candidates[MAX_SHADOWMAPS];
@@ -2217,8 +2042,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
     glUseProgram(Sys_Render.depthPrepassShaderProgram);
     glUniformMatrix4fv(2,1,GL_FALSE,viewProj);
     glColorMask(GL_FALSE,GL_FALSE,GL_FALSE,GL_FALSE);
-    glDepthMask(GL_TRUE);
-    glDepthFunc(GL_LESS);
+    glDepthMask(GL_TRUE); glDepthFunc(GL_LESS);
     RenderInstancesDepthOnly(playerPos); // opaques only
     
     // Main Pass
@@ -2232,8 +2056,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
     glUniform1ui(14,Sys_Settings.Reflections);   glUniform1ui(15,Sys_Settings.Shadows);
     glUniform1f(8,Sys_Global.worldMin_x); glUniform1f(9,Sys_Global.worldMin_z); glUniform3f(10,playerPos.x,playerPos.y,playerPos.z);
     glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE);
-    glDepthMask(GL_FALSE);
-    glDepthFunc(GL_LEQUAL);
+    glDepthMask(GL_FALSE); glDepthFunc(GL_LEQUAL);
     RenderInstances(playerPos,false);
     glDepthMask(GL_TRUE);
     RenderInstances(playerPos,true); // opaque, then transparents
@@ -2306,7 +2129,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
 
     // Cursor [ /// VERY LAST DRAWN OVER EVERYTHING ELSE! /// ]
     if ((Sys_Global.inventoryMode && !Sys_Cheats.noHUD) || Sys_Global.menuActive || Sys_Global.gamePaused) RenderUIImage((int16_t)(Sys_Global.cursorPosition_x) - 20,(int16_t)(Sys_Global.cursorPosition_y) - 20,40,40,GetCursorTexture());
-    else RenderUIImage(683-20,371,40,40,GetCursorTexture());
+    else RenderUIImage(663,371,40,40,GetCursorTexture()); // Centered on UI baseline resolution 1366x768
     if ((Sys_Global.last_time - Sys_Global.lastFrameSecCountTime) >= 1.00) { // Update Diagnostic Poll
         Sys_Global.lastFrameSecCountTime = Sys_Global.last_time;
         Sys_Global.framesPerLastSecond = Sys_Global.globalFrameNum - Sys_Global.lastFrameSecCount;
@@ -2330,10 +2153,6 @@ int32_t main(void) {
         SetDllDirectory("External\\Windows");
     #endif
     InitializeEnvironment();
-    DebugRAM("prior to game loop");
-    DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
-    Sys_Global.absoluteTime = Sys_Global.last_topframe_time = Sys_Global.current_time = get_time();
-    Sys_Global.pauseRelativeTime = Sys_Global.last_physics_time = 0.0;
     while(1) { // Main Loop
         if (glfwWindowShouldClose(window)) OS_Exit(0);
         if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad); queuedLevelToLoad = 255u; continue; }

@@ -403,14 +403,13 @@ bool ParseModelData(ModelDataParser *parser, uint16_t maxSize, const char *filen
     return true;
 }
 
-void LoadModels(void){
-	if(unlikely(loadedModelsMaxIndex>0))return;
+void LoadModels(void){    
 	double start_time=get_time();
 	ModelDataParser mpars;
-	if(unlikely(!ParseModelData(&mpars,MODEL_IDX_MAX,"./Data/models.txt"))){DualLogError("Could not parse ./Data/models.txt!\n");OS_Exit(1);}
+	if (unlikely(!ParseModelData(&mpars,MODEL_IDX_MAX,"./Data/models.txt"))) { DualLogError("Could not parse ./Data/models.txt!\n"); OS_Exit(1); }
 	int32_t max_index=-1;
-	for(uint32_t k=0;k<mpars.count;++k){
-		if(mpars.entries[k].index>max_index&&mpars.entries[k].index!=UINT16_MAX)max_index=mpars.entries[k].index;
+	for(uint32_t k=0;k<mpars.count;++k) {
+		if (mpars.entries[k].index>max_index&&mpars.entries[k].index!=UINT16_MAX) max_index=mpars.entries[k].index;
 	}
 	
 	loadedModelsMaxIndex=(uint16_t)max_index+1U;
@@ -426,9 +425,10 @@ void LoadModels(void){
 
 	RawOBJ* raw_models=OS_AllocateRAM(NULL,loadedModelsMaxIndex*sizeof(RawOBJ),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
 	__builtin_memset(raw_models,0,loadedModelsMaxIndex*sizeof(RawOBJ));
-	for(uint32_t i=0;i<loadedModelsMaxIndex;++i){
+	for(uint32_t i=0;i<loadedModelsMaxIndex;++i) {
 		int32_t parser_index=index_to_parser[i];
 		if(unlikely(parser_index<0||parser_index>=(int32_t)mpars.count))continue;
+        
 		const char* path=mpars.entries[parser_index].path;
 		OsFileHandle dummy_fd;
 		int size=0;
@@ -479,18 +479,15 @@ void LoadModels(void){
 	OS_DeallocateRAM(thread_temp_uv,(size_t)num_parse_threads*sizeof(float*));
 	OS_DeallocateRAM(thread_out_verts,(size_t)num_parse_threads*sizeof(float*));
 	OS_DeallocateRAM(thread_out_tris,(size_t)num_parse_threads*sizeof(uint16_t*));
-
 	for(uint32_t i=0;i<loadedModelsMaxIndex;++i){
 		if(raw_models[i].data)OS_DeallocateRAM((void*)raw_models[i].data,(size_t)raw_models[i].size);
 	}
+	
 	OS_DeallocateRAM(raw_models,loadedModelsMaxIndex*sizeof(RawOBJ));
-
 	DebugRAM("after model load loop");
 	OS_DeallocateRAM(index_to_parser,index_map_size);
-
 	glGenBuffers(loadedModelsMaxIndex,Sys_Render.vbos);
 	glGenBuffers(loadedModelsMaxIndex,Sys_Render.tbos);
-
 	uint32_t total_vertices=0,total_tris=0;
 	for(int i=0;i<loadedModelsMaxIndex;++i){
 		if(unlikely(modelVertexCounts[i]==0)) continue;
@@ -513,7 +510,7 @@ void LoadModels(void){
 	DebugRAM("after to model to gpu transfer");
 	glBindBuffer(GL_ARRAY_BUFFER,0);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0);
-	glFlush();glFinish();
+	glFlush(); glFinish();
 	OS_DeallocateRAM(mpars.entries,mpars.count*sizeof(ModelData));
 	DualLog(" total vertices: %u, total tris: %u, took %f secs\n",total_vertices,total_tris,get_time()-start_time);
 	DebugRAM("After Load Models");

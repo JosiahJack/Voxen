@@ -169,43 +169,12 @@ typedef void (* GLFWcharmodsfun)(GLFWwindow* window, unsigned int codepoint, int
 typedef void (* GLFWdropfun)(GLFWwindow* window, int path_count, const char* paths[]);
 typedef void (* GLFWmonitorfun)(GLFWmonitor* monitor, int event);
 typedef void (* GLFWjoystickfun)(int jid, int event);
-
-typedef struct GLFWvidmode {
-    int width;
-    int height;
-    int redBits;
-    int greenBits;
-    int blueBits;
-    int refreshRate;
-} GLFWvidmode;
-
-typedef struct GLFWgammaramp {
-    unsigned short* red;
-    unsigned short* green;
-    unsigned short* blue;
-    unsigned int size;
-} GLFWgammaramp;
-
-typedef struct GLFWimage {
-    int width;
-    int height;
-    unsigned char* pixels;
-} GLFWimage;
-
-typedef struct GLFWgamepadstate {
-    unsigned char buttons[15];
-    float axes[6];
-} GLFWgamepadstate;
-
-typedef struct GLFWallocator {
-    GLFWallocatefun allocate;
-    GLFWreallocatefun reallocate;
-    GLFWdeallocatefun deallocate;
-    void* user;
-} GLFWallocator;
-
+typedef struct GLFWvidmode { int width,height,redBits,greenBits,blueBits,refreshRate; } GLFWvidmode;
+typedef struct GLFWgammaramp { unsigned short *red,*green,*blue; unsigned int size; } GLFWgammaramp;
+typedef struct GLFWimage { int width,height; unsigned char* pixels; } GLFWimage;
+typedef struct GLFWgamepadstate { unsigned char buttons[15]; float axes[6]; } GLFWgamepadstate;
+typedef struct GLFWallocator { GLFWallocatefun allocate; GLFWreallocatefun reallocate; GLFWdeallocatefun deallocate; void* user; } GLFWallocator;
 GLFWAPI const GLFWvidmode* glfwGetVideoModes(GLFWmonitor* monitor, int* count);
-
 GLFWAPI void glfwSetWindowTitle(GLFWwindow* window, const char* title);
 GLFWAPI void glfwSetWindowIcon(GLFWwindow* window, int count, const GLFWimage* images);
 GLFWAPI void glfwSetWindowSize(GLFWwindow* window, int width, int height);
@@ -218,16 +187,13 @@ GLFWAPI void glfwSetWindowAttrib(GLFWwindow* window, int attrib, int value);
 GLFWAPI GLFWwindowposfun glfwSetWindowPosCallback(GLFWwindow* window, GLFWwindowposfun callback);
 GLFWAPI GLFWwindowsizefun glfwSetWindowSizeCallback(GLFWwindow* window, GLFWwindowsizefun callback);
 GLFWAPI GLFWwindowfocusfun glfwSetWindowFocusCallback(GLFWwindow* window, GLFWwindowfocusfun callback);
-
 GLFWAPI const char* glfwGetKeyName(int key, int scancode);
 GLFWAPI int glfwGetKeyScancode(int key);
 GLFWAPI int glfwGetKey(GLFWwindow* window, int key);
-
 GLFWAPI void glfwSetCursor(GLFWwindow* window, GLFWcursor* cursor);
 GLFWAPI GLFWcharfun glfwSetCharCallback(GLFWwindow* window, GLFWcharfun callback);
 GLFWAPI GLFWcharmodsfun glfwSetCharModsCallback(GLFWwindow* window, GLFWcharmodsfun callback);
 GLFWAPI GLFWcursorenterfun glfwSetCursorEnterCallback(GLFWwindow* window, GLFWcursorenterfun callback);
-
 GLFWAPI int glfwJoystickPresent(int jid);
 GLFWAPI const float* glfwGetJoystickAxes(int jid, int* count);
 GLFWAPI const unsigned char* glfwGetJoystickButtons(int jid, int* count);
@@ -238,20 +204,14 @@ GLFWAPI void glfwSetJoystickUserPointer(int jid, void* pointer);
 GLFWAPI void* glfwGetJoystickUserPointer(int jid);
 GLFWAPI int glfwJoystickIsGamepad(int jid);
 GLFWAPI GLFWjoystickfun glfwSetJoystickCallback(GLFWjoystickfun callback);
-
 GLFWAPI int glfwUpdateGamepadMappings(const char* string);
 GLFWAPI const char* glfwGetGamepadName(int jid);
 GLFWAPI int glfwGetGamepadState(int jid, GLFWgamepadstate* state);
-
 void glfwGetMonitorWorkarea(GLFWmonitor * monitor, int* xpos, int* ypos, int* width, int* height);
-
-// Used by Voxen:
-#define GLFW_SRGB_CAPABLE           0x0002100E
 #define GLFW_CONTEXT_VERSION_MAJOR  0x00022002
 #define GLFW_CONTEXT_VERSION_MINOR  0x00022003
 #define GLFW_OPENGL_PROFILE         0x00022008
 #define GLFW_CLIENT_API             0x00022001
-
 GLFWframebuffersizefun glfwSetFramebufferSizeCallback (GLFWwindow *window, GLFWframebuffersizefun callback);
 GLFWAPI GLFWglproc glfwGetProcAddress(const char* procname);
 GLFWAPI int glfwInit(void);

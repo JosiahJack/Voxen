@@ -84,7 +84,9 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define TOTAL_WORLD_CELLS (WORLDX * WORLDY * WORLDZ)
 #define ARRSIZE (WORLDX * WORLDZ)
 #define CELLXHALF (CELL_SIZE * 0.5f)
-#define VOXEL_COUNT (WORLDX * WORLDZ * VOXELS_PER_CELL * VOXELS_PER_CELL) // 64 * 64 * 8 * 8
+#define VOXELS_X (WORLDX * VOXELS_PER_CELL)
+#define VOXELS_Z (WORLDZ * VOXELS_PER_CELL)
+#define VOXEL_COUNT (VOXELS_X * VOXELS_Z) // 64 * 64 * 8 * 8
 #define CELL_SIZE 2.56f // Each cell is 2.56x2.56
 #define VOXELS_PER_CELL 8
 #define VOXEL_SIZE (CELL_SIZE / (float)VOXELS_PER_CELL)

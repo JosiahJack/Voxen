@@ -65,8 +65,9 @@
     X(uint16_t, GetCursorTexture, (void)) \
     X(void, LoadLevelMod, (uint8_t)) \
     X(void, SetModFatigue, (float)) \
+    X(void, ForceShootMode, (void)) \
     X(bool, ModRequestsGrayscale, (void))
-    
+
 #ifdef MOD_INTEROP_MOD  // mod.h usage:
     // Interop - To Engine
     #if defined(_WIN32) || defined(__CYGWIN__)

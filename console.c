@@ -17,11 +17,7 @@ ENGINE_TO_MOD void ToggleConsole(void) {
     if (!Sys_Cheats.consoleActive) inventoryModeWasActivePriorToConsole = Sys_Global.inventoryMode;
     Sys_Cheats.consoleActive = !Sys_Cheats.consoleActive; // Tilde
     if (Sys_Cheats.consoleActive) Sys_Global.inventoryMode = true;
-    else if (!inventoryModeWasActivePriorToConsole && Sys_Global.inventoryMode) {
-        Sys_Global.inventoryMode = false;
-        Sys_Global.cursorPosition_x = (int32_t)((float)Sys_Settings.ScreenWidth * 0.5f);
-        Sys_Global.cursorPosition_y = (int32_t)((float)Sys_Settings.ScreenHeight * 0.5f);
-    }
+    else if (!inventoryModeWasActivePriorToConsole && Sys_Global.inventoryMode) ForceShootMode();
 }
 
 static void AddToHistory(const char* entry) {

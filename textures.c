@@ -757,26 +757,18 @@ static bool ParseTextureData(TextureDataParser *parser, uint16_t maxSize, const 
 }
 
 void LoadTextures(void) {
-    if (unlikely(loadedTexturesMaxIndex > 0)) return;
-
     double start_time = get_time();
     DebugRAM("start of LoadTextures");
     loadedTexturesMaxIndex = totalPixels = totalPaletteColors = 0u;
     TextureDataParser texture_parser;
-    if (unlikely(!ParseTextureData(&texture_parser, MAX_VALID_TEXTURE, "./Data/textures.txt"))) {
-        DualLogError("Could not parse ./Data/textures.txt!\n");
-        OS_Exit(1);
-    }
+    if (unlikely(!ParseTextureData(&texture_parser, MAX_VALID_TEXTURE, "./Data/textures.txt"))) { DualLogError("Could not parse ./Data/textures.txt!\n"); OS_Exit(1); }
 
     int32_t maxIndex = -1;
     for (uint32_t k = 0; k < texture_parser.count; ++k) {
         if (texture_parser.entries[k].index > maxIndex && texture_parser.entries[k].index != UINT16_MAX) maxIndex = texture_parser.entries[k].index;
     }
     loadedTexturesMaxIndex = (uint16_t)(maxIndex + 1);
-    if (loadedTexturesMaxIndex == 0) {
-        DualLogError("No textures found in textures.txt\n");
-        OS_Exit(1);
-    }
+    if (loadedTexturesMaxIndex == 0) { DualLogError("No textures found in textures.txt\n"); OS_Exit(1); }
 
     int32_t* indexToParser = OS_AllocateRAM(NULL, loadedTexturesMaxIndex * sizeof(int32_t), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, OS_INVALID_HANDLE);
     __builtin_memset(indexToParser, -1, loadedTexturesMaxIndex * sizeof(int32_t));
@@ -801,11 +793,7 @@ void LoadTextures(void) {
     if (num_parse_threads < 1) num_parse_threads = 1;
     if (num_parse_threads > 32) num_parse_threads = 32;
     thread_stbi_arenas = (StbiArena*)OS_AllocateRAM(NULL,(size_t)num_parse_threads * sizeof(StbiArena),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
-    for (int t = 0; t < num_parse_threads; ++t) {
-        thread_stbi_arenas[t].base = NULL;
-        stbi__arena_init_thread(&thread_stbi_arenas[t]);
-    }
-
+    for (int t = 0; t < num_parse_threads; ++t) { thread_stbi_arenas[t].base = NULL; stbi__arena_init_thread(&thread_stbi_arenas[t]); }
     textureIndexBuffers = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * sizeof(uint8_t*),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
     texturePaletteBuffers = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * sizeof(uint32_t*),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
     texturePaletteSizes = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * sizeof(uint32_t),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
@@ -833,10 +821,7 @@ void LoadTextures(void) {
     for (int t = 0; t < num_parse_threads; ++t) pthread_join(workers[t], NULL);
     totalPixels = totalPaletteColors = 0u;
     for (uint16_t i = 0; i < loadedTexturesMaxIndex; ++i) {
-        if (textureIndexBuffers[i]) {
-            totalPixels += (uint32_t)textureWidths[i] * textureHeights[i];
-            totalPaletteColors += texturePaletteSizes[i];
-        }
+        if (textureIndexBuffers[i]) { totalPixels += (uint32_t)textureWidths[i] * textureHeights[i]; totalPaletteColors += texturePaletteSizes[i]; }
     }
 
     size_t offsets_size = loadedTexturesMaxIndex * sizeof(uint32_t);
@@ -883,7 +868,6 @@ void LoadTextures(void) {
     glBindBuffer(GL_SSBO,Sys_Render.texturePaletteOffsetsID);
     glBufferData(GL_SSBO,loadedTexturesMaxIndex * sizeof(uint32_t),texturePaletteOffsets,GL_STATIC_DRAW);
     glBindBuffer(GL_SSBO,0);
-    glFlush(); glFinish();
     OS_DeallocateRAM(texture_parser.entries,texture_parser.count * sizeof(TextureData));
     OS_DeallocateRAM(arena,arena_size);
     OS_DeallocateRAM(rawTextures,loadedTexturesMaxIndex * sizeof(RawTexture));

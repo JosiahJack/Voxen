@@ -33,7 +33,7 @@ bool NeighborhoodInPVS(uint16_t cellX, uint16_t cellZ, int r) {
     for (int ix = (int)cellX-r; ix <= (int)cellX+r; ++ix) {
         for (int iz = (int)cellZ-r; iz <= (int)cellZ+r; ++iz) {
             if (unlikely(!XZPairInBounds(ix,iz))) continue;
-                    
+
             int subIdx = iz * WORLDX + ix;
             if (get_cull_bit(precomputedVisibleCellsFromHere, cellIdx * ARRSIZE + subIdx) && (gridCellStates[subIdx] & CELL_VISIBLE)) return true;
         }
@@ -443,24 +443,24 @@ void DetermineVisibleCells(int32_t startX, int32_t startZ) {
     CircleFanRays(startX - 1,startZ - 1);
     CircleFanRays(startX,startZ - 1);
     CircleFanRays(startX + 1,startZ - 1);
-//     for (int32_t x=0;x<WORLDX;++x) {
-//         for (int32_t z=0;z<WORLDZ;++z) {
-//             int32_t cellIdx_xz = (z * WORLDX) + x;
-//             if (Sys_Global.currentLevel == 5) { // Citadel flight level hackarounds for algorithm discrepancies at glancing angles.
-//                 if (   (x <= 15 && startX <= 15) || (z <= 9 && startZ <= 9)
-//                     || (x >= 32 && startX >= 32)
-//                     || (z == 31 && startZ == 31 && x >= 27 && startX >= 27)
-//                     ||  x >= 34) {
-//                     
-//                     gridCellStates[cellIdx_xz] |= CELL_VISIBLE;
-//                 }
-//                 
-//                 if (startX <=12 && x == 14 && z == 31 && startZ >= 24) gridCellStates[cellIdx_xz] |= CELL_VISIBLE;
-//                 if (startX <=12 && x == 14 && z == 30 && startZ >= 24) gridCellStates[cellIdx_xz] |= CELL_VISIBLE;
-//                 if (startX <=12 && x == 13 && z == 30 && startZ >= 24) gridCellStates[cellIdx_xz] |= CELL_VISIBLE;
-//             }
-//         }
-//     }
+    for (int32_t x=0;x<WORLDX;++x) {
+        for (int32_t z=0;z<WORLDZ;++z) {
+            int32_t cellIdx_xz = (z * WORLDX) + x;
+            if (Sys_Global.currentLevel == 5) { // Citadel flight level hackarounds for algorithm discrepancies at glancing angles.
+                if (   (x <= 15 && startX <= 15) || (z <= 9 && startZ <= 9)
+                    || (x >= 32 && startX >= 32)
+                    || (z == 31 && startZ == 31 && x >= 27 && startX >= 27)
+                    ||  x >= 34) {
+                    
+                    gridCellStates[cellIdx_xz] |= CELL_VISIBLE;
+                }
+                
+                if (startX <=12 && x == 14 && z == 31 && startZ >= 24) gridCellStates[cellIdx_xz] |= CELL_VISIBLE;
+                if (startX <=12 && x == 14 && z == 30 && startZ >= 24) gridCellStates[cellIdx_xz] |= CELL_VISIBLE;
+                if (startX <=12 && x == 13 && z == 30 && startZ >= 24) gridCellStates[cellIdx_xz] |= CELL_VISIBLE;
+            }
+        }
+    }
 }
 
 bool CullCore(void);

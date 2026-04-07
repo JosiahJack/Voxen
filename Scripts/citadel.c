@@ -2445,24 +2445,17 @@ void HealthManagerInitAfterLoad(uint16_t self) {
 }
 //================================================================================
 // Inventory Mode
-void ForceShootMode(void) {
+MOD_TO_ENGINE void ForceShootMode(void) {
     if (Eng_Settings->NoShootMode) return; // We are being like the original now!
 
     Eng_UI->mouseClickHeldOverGUI = false;
 //     CloseFullmap(); // TODO
-    Eng_Global->inventoryMode = false;
+    Eng_Global->inventoryMode = false; Eng_Global->cursorPosition_x = 663; Eng_Global->cursorPosition_y = 371; IgnoreNextMouseDelta(); // Centered on UI baseline resolution 1366x768
 //     if (vmailActive) { Eng_Global->invP1.DeactivateVMail(); vmailActive = false; } // TODO
 }
 
-void ForceInventoryMode(void) { Eng_Global->inventoryMode = true; }
-void ToggleInventoryMode(void) {
-    if (Eng_Global->inventoryMode) ForceShootMode();
-    else                           ForceInventoryMode();
-    
-    IgnoreNextMouseDelta();    
-    Eng_Global->cursorPosition_x = Eng_Settings->ScreenWidth / 2;
-    Eng_Global->cursorPosition_y = Eng_Settings->ScreenHeight / 2;
-}
+void ForceInventoryMode(void) { Eng_Global->inventoryMode = true; Eng_Global->cursorPosition_x = 663; Eng_Global->cursorPosition_y = 371; IgnoreNextMouseDelta(); } // Centered on UI baseline resolution 1366x768
+void ToggleInventoryMode(void) { if (Eng_Global->inventoryMode) {ForceShootMode();} else {ForceInventoryMode();} }
 //================================================================================
 // Hardware
 void HardwareBioOff(void) {

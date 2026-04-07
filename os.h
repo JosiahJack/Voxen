@@ -63,9 +63,22 @@ void DebugRAM(const char *context);
     }
     
     static inline __attribute__((always_inline)) long OS_Read(OsFileHandle fd, void* buf, size_t count) { DWORD bytesRead = 0; return (ReadFile((HANDLE)fd,buf,(DWORD)count,&bytesRead,NULL)) ? (long)bytesRead : (long)-1; }
+
+    // Gamecode loading:
+    #define MOD_EXTENSION ".dll" // e.g. Citadel.dll
+    #define PLATFORM_DLOPEN(path)        LoadLibraryA(path)
+    #define PLATFORM_DLSYM(handle, name) GetProcAddress((handle), (name))
+    static char win_err_buf[512];
+    static const char* PLATFORM_DLERROR(void) {
+        DWORD err = GetLastError();
+        if (err == 0) return NULL;
+        FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,NULL,err,MAKELANGID(LANG_NEUTRAL,SUBLANG_DEFAULT),win_err_buf,sizeof(win_err_buf),NULL);
+        return win_err_buf;
+    }
 #else
     #define LINUX
     #include <stdio.h>
+    #include <dlfcn.h> // For gamecode dll load
     #include <sys/mman.h>
     #include <sys/stat.h>
     #include <fcntl.h>
@@ -80,6 +93,12 @@ void DebugRAM(const char *context);
     static inline __attribute__((always_inline)) int OS_MakeFolder(const char *path) { return mkdir(path, 0755); }
     static inline __attribute__((always_inline)) void OS_Close(OsFileHandle fileDescriptor) { close(fileDescriptor); }
     static inline __attribute__((always_inline)) void* OS_AllocateRAM(void* addr, size_t length, int32_t prot, int32_t flags, OsFileHandle fd) { return mmap(addr,length,prot,flags,fd,0); }
+
+    // Gamecode loading:
+    #define MOD_EXTENSION ".so" // e.g. Citadel.so
+    #define PLATFORM_DLOPEN(path)        dlopen((path), RTLD_NOW)
+    #define PLATFORM_DLSYM(handle, name) dlsym((handle), (name))
+    #define PLATFORM_DLERROR()           dlerror()
 #endif
 
 static inline __attribute__((always_inline)) int64_t OS_RawWrite(OsFileHandle fd, const void* buf, size_t count) {
