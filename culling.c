@@ -7,7 +7,7 @@ extern void stbi__arena_init(void);
 extern uint8_t*  stbi__arena_base;
 #define STBI_ARENA_SIZE 16 * 1024 * 1024
 uint32_t gridCellStates[ARRSIZE];
-uint32_t precomputedVisibleCellsFromHere[(ARRSIZE * ARRSIZE) / 32]; // 4096 * 4096 / 32bits
+uint32_t precomputedVisibleCellsFromHere[524288]; // 4096 * 4096 / 32
 uint16_t playerCellIdx = 0u;
 bool instanceIsLODArray[INSTANCE_COUNT];
 #define MAX_CULL_FILESIZE 500000
@@ -18,8 +18,6 @@ __attribute__((pure)) bool get_cull_bit(const uint32_t* arr, int idx) { return (
 static inline __attribute__((always_inline)) void set_cull_bit(uint32_t* arr, int idx, bool val) {uint32_t* w = arr + (idx >> 5); uint32_t m = 1U << (idx & 31); *w = val ? (*w | m) : (*w & ~m);}
 ENGINE_TO_MOD int32_t PosGetCellCoords(float x, float z) { return (PosGetCellCoordZ(z) * WORLDX) + PosGetCellCoordX(x); }
 extern uint16_t playerCellIdx;
-extern FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6],playerFrustumPlanes[6];
-extern CamView camViews[MAX_CAMVIEWS];
 ENGINE_TO_MOD bool PositionVisibleFromPlayerCell(float x, float z) {
     int32_t subIdx = PosGetCellCoords(x,z);
     int cellIdx = (playerCellIdx * ARRSIZE);
@@ -28,16 +26,8 @@ ENGINE_TO_MOD bool PositionVisibleFromPlayerCell(float x, float z) {
 }
 
 static inline __attribute__((always_inline)) bool XZPairInBounds(int32_t x, int32_t z) { return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0); }
-static inline bool vCellVisible(float x, float z) { return (gridCellStates[PosGetCellCoords(x,z)] & 1) > 0; }
-bool VoxelOrNeighborVisible(float x, float z) {
-    if (vCellVisible(x,z)) return true;
-    if (vCellVisible(x + 1.30,z)) return true;
-    if (vCellVisible(x - 1.30,z)) return true;
-    if (vCellVisible(x,z + 1.30)) return true;
-    if (vCellVisible(x,z - 1.30)) return true;
-    return false;
-}
-
+bool SkyIsVisible(void) { return ((gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || Sys_Global.currentLevel == LEVEL_CYBERSPACE); }
+bool SkySunIsVisible(void) { return ((gridCellStates[playerCellIdx] & CELL_SEES_SUN) && Sys_Global.currentLevel != LEVEL_CYBERSPACE); }
 bool NeighborhoodInPVS(uint16_t cellX, uint16_t cellZ, int r) {
     uint32_t cellIdx = (cellZ * WORLDX) + cellX;
     for (int ix = (int)cellX-r; ix <= (int)cellX+r; ++ix) {
@@ -50,55 +40,6 @@ bool NeighborhoodInPVS(uint16_t cellX, uint16_t cellZ, int r) {
     }
     return false;
 }
-
-bool CellNotVisible(uint32_t instCellIdx, uint32_t cellX, uint32_t cellZ, uint32_t cellRadiusCount) {
-    bool inPVS = (gridCellStates[instCellIdx] & CELL_VISIBLE);
-    if (!inPVS) inPVS = NeighborhoodInPVS(cellX,cellZ,cellRadiusCount);
-    if (!inPVS) return true;
-    return false;
-}
-
-bool CheckLightNotInPVS(Vector3 lightPos, float range) {
-    uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((lightPos.x - Sys_Global.worldMin_x + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED);
-    uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((lightPos.z - Sys_Global.worldMin_z + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED);
-    uint32_t lightCellIdx = (cellZ * WORLDX) + cellX;
-    uint32_t r = vceil(range * (1.0f / CELL_SIZE));
-    if (CellNotVisible(lightCellIdx,cellX,cellZ,r)) return true;
-    return false;
-}
-
-bool SkyIsVisible(void) { return ((gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || Sys_Global.currentLevel == LEVEL_CYBERSPACE); }
-bool SkySunIsVisible(void) { return ((gridCellStates[playerCellIdx] & CELL_SEES_SUN) && Sys_Global.currentLevel != LEVEL_CYBERSPACE); }
-
-extern float modelBounds[MODEL_IDX_MAX]; extern uint16_t editModeSelection,loadedTexturesMaxIndex;
-bool EntNotVisible(uint16_t i, bool otherCondition) { Entity* e = &Sys_Global.instances[i]; return e->texIndex > loadedTexturesMaxIndex || !(e->entflags & ENTFLAG_ACTIVE) || e->index >= MAX_ENTITIES || e->modelIndex >= MODEL_IDX_MAX || e->texIndex >= MAX_VALID_TEXTURE || otherCondition; }
-__attribute__((pure)) bool SphereInFrustum(FrustumPlane* planes, Vector3 c, float radius) { for (int i=0;i<6;++i) { if ((dot_vector3(planes[i].normal,c) + planes[i].d) < -radius) return false; } return true; }
-bool DetermineIfInstanceVisible(uint16_t i, bool otherCondition, bool skyVisible, Vector3 playerPos, float* distSqrd) {
-    if (EntNotVisible(i,otherCondition)) return false; // must be transparent && transparents or neither
-    
-    Entity* e = &Sys_Global.instances[i];
-    uint16_t cellX = PosGetCellCoordX(e->position.x), cellZ = PosGetCellCoordZ(e->position.z);
-    uint16_t instCellIdx = (cellZ * WORLDX) + cellX; uint16_t entIdx = e->index;
-    Vector3 delta = Vector3_A_minus_B(e->position,playerPos);
-    *distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
-    float radius = modelBounds[e->modelIndex] * 2.0f * vmax(vmax(e->scale.x,e->scale.y),e->scale.z);
-    if (!SphereInFrustum(playerFrustumPlanes,e->position,radius) && (entIdx != 754 || !skyVisible) && i != editModeSelection) return false;
-    
-    if (ConstIndexIsPortalBlockingDoor(entIdx)) { // Extra checks only needed for opaque portal blocking doors.
-        if (CellNotVisible(instCellIdx,cellX,cellZ,2)) return false;
-    } else {
-        if (!(Sys_Global.currentLevel == 1 && (entIdx == 309 || entIdx == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
-            if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (entIdx != 754 || !skyVisible)) return false; // For some shelves that are inset away from cells, need to still draw their items by checking && CELL_OPEN here, unfortunately this means they don't ever get culled :(
-        }
-        
-        if (!(gridCellStates[instCellIdx] & CELL_OPEN) && *distSqrd >= 943.7184f && (entIdx != 754 || !skyVisible)) return false; // 30.72 * 30.72, 12 cells
-    }
-    
-    // One frame delay is fine for cam views to become visible
-    if (Sys_Global.instances[i].camView != 255) camViews[Sys_Global.instances[i].camView].visible = true;
-    return true;
-}
-
 
 bool LevelSpecificHacksForClosedCellsThatProbablyShouldntBeBecauseOfInsetMeshes(uint32_t instCellIdx, uint16_t constIndex) {
     if (!(Sys_Global.currentLevel == 1 && (constIndex == 309 || constIndex == 532)) && !ConstIndexIsPortalBlockingDoor(constIndex)) {
@@ -502,24 +443,24 @@ void DetermineVisibleCells(int32_t startX, int32_t startZ) {
     CircleFanRays(startX - 1,startZ - 1);
     CircleFanRays(startX,startZ - 1);
     CircleFanRays(startX + 1,startZ - 1);
-    for (int32_t x=0;x<WORLDX;++x) {
-        for (int32_t z=0;z<WORLDZ;++z) {
-            int32_t cellIdx_xz = (z * WORLDX) + x;
-            if (Sys_Global.currentLevel == 5) { // Citadel flight level hackarounds for algorithm discrepancies at glancing angles.
-                if (   (x <= 15 && startX <= 15) || (z <= 9 && startZ <= 9)
-                    || (x >= 32 && startX >= 32)
-                    || (z == 31 && startZ == 31 && x >= 27 && startX >= 27)
-                    ||  x >= 34) {
-                    
-                    gridCellStates[cellIdx_xz] |= CELL_VISIBLE;
-                }
-                
-                if (startX <=12 && x == 14 && z == 31 && startZ >= 24) gridCellStates[cellIdx_xz] |= CELL_VISIBLE;
-                if (startX <=12 && x == 14 && z == 30 && startZ >= 24) gridCellStates[cellIdx_xz] |= CELL_VISIBLE;
-                if (startX <=12 && x == 13 && z == 30 && startZ >= 24) gridCellStates[cellIdx_xz] |= CELL_VISIBLE;
-            }
-        }
-    }
+//     for (int32_t x=0;x<WORLDX;++x) {
+//         for (int32_t z=0;z<WORLDZ;++z) {
+//             int32_t cellIdx_xz = (z * WORLDX) + x;
+//             if (Sys_Global.currentLevel == 5) { // Citadel flight level hackarounds for algorithm discrepancies at glancing angles.
+//                 if (   (x <= 15 && startX <= 15) || (z <= 9 && startZ <= 9)
+//                     || (x >= 32 && startX >= 32)
+//                     || (z == 31 && startZ == 31 && x >= 27 && startX >= 27)
+//                     ||  x >= 34) {
+//                     
+//                     gridCellStates[cellIdx_xz] |= CELL_VISIBLE;
+//                 }
+//                 
+//                 if (startX <=12 && x == 14 && z == 31 && startZ >= 24) gridCellStates[cellIdx_xz] |= CELL_VISIBLE;
+//                 if (startX <=12 && x == 14 && z == 30 && startZ >= 24) gridCellStates[cellIdx_xz] |= CELL_VISIBLE;
+//                 if (startX <=12 && x == 13 && z == 30 && startZ >= 24) gridCellStates[cellIdx_xz] |= CELL_VISIBLE;
+//             }
+//         }
+//     }
 }
 
 bool CullCore(void);

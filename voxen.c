@@ -5,11 +5,10 @@
 GLFWwindow* window;
 #define MOD_INTEROP_ENGINE
 #include "voxen.h"
-#include <pthread.h>
 #include "miniaudio.h"
 #include "Shaders/shaders.h"
 #include "credits.h"
-GlobalContext Sys_Global = {.menuActive=true,.screenshotTimeout=1.0,.creditsPageIndex=1,.difficultyCombat=2,.difficultyCyber=2,.difficultyPuzzle=2,.difficultyMission=2,.deaths=0,.worstFPS=UINT32_MAX,.cursorPosition_x=680,.cursorPosition_y=384,.physicsDebug=1u};
+GlobalContext Sys_Global = {.menuActive=true,.screenshotTimeout=1.0,.creditsPageIndex=1,.difficultyCombat=2,.difficultyCyber=2,.difficultyPuzzle=2,.difficultyMission=2,.deaths=0,.worstFPS=UINT32_MAX,.cursorPosition_x=680,.cursorPosition_y=384};
 CheatsSystem Sys_Cheats = {.god=false,.noclip=true,.showLocation=true,.showFPS=true,.editMode=true}; RenderSystem Sys_Render; SystemUI Sys_UI;
 SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on first run for potatoes (e.g. won't crash for out of VRAM, or won't take 5min to init).
     .InputCodeSettings = {
@@ -35,7 +34,7 @@ typedef struct { double shadowTime; uint32_t shadowmapIndirectionList[LIGHT_COUN
 VoxenShadowSystem voxen_Shadow_System;
 uint16_t loadedTexturesMaxIndex;
 bool doubleSidedTexture[MAX_VALID_TEXTURE],transparentTexture[MAX_VALID_TEXTURE];
-extern uint32_t modelVertexCounts[MODEL_IDX_MAX]; extern uint16_t modelTriangleCounts[MODEL_IDX_MAX];
+extern uint32_t gridCellStates[ARRSIZE],modelVertexCounts[MODEL_IDX_MAX]; extern uint16_t modelTriangleCounts[MODEL_IDX_MAX];
 uint32_t drawCallsRenderedThisFrame,textDrawCallsRenderedThisFrame,uiImageDrawCallsRenderedThisFrame,shadowDrawCallsRenderedThisFrame,verticesRenderedThisFrame,drawCallsNormal;
 extern GLuint fontAtlasTex,fontAtlasTexStopD;
 #define MAX_CHANNELS 256
@@ -53,6 +52,8 @@ static int resDropdownCount = 0;
 typedef struct { int w, h, hz; } ResMode;
 static ResMode resModes[8];
 static int resSelectedIdx = 0;
+#define MAX_CAMVIEWS 11
+typedef struct { Vector3 position; Quaternion rotation; uint8_t fov; uint16_t width,height; float near,far,finished; bool visible; } CamView;
 CamView camViews[MAX_CAMVIEWS]; // Max is 8 camera views on level 8 + 3 sensaround views.  Populated at level load.
 GLuint camViewTextures[MAX_CAMVIEWS];
 uint8_t camViewCount = 0;
@@ -97,8 +98,7 @@ void CompileShaders(void) {
     Sys_Render.shadowmapsClearShaderProgram= CompileComputeShader(shadowmapsClearComputeSrc,"Shadowmaps Clear");
 }
 
-GLuint SetupSSBO(GLuint* id, GLuint bindx, GLsizeiptr sz, const void* d, GLenum typ) { glGenBuffers(1,id); glBindBuffer(GL_SSBO,*id); glBufferData(GL_SSBO,sz,d,typ); glBindBufferBase(GL_SSBO,bindx,*id); return *id; }
-GLuint SetupSSBOMapped(GLuint* id, GLuint bindx, GLsizeiptr sz, void** map) { glGenBuffers(1,id); glBindBuffer(GL_SSBO,*id); glBufferStorage(GL_SSBO,sz,NULL,GL_MAP_WRITE_BIT|GL_MAP_PERSISTENT_BIT|GL_MAP_COHERENT_BIT); *map = glMapBufferRange(GL_SSBO,0,sz,GL_MAP_WRITE_BIT|GL_MAP_PERSISTENT_BIT|GL_MAP_COHERENT_BIT); glBindBufferBase(GL_SSBO,bindx,*id); return *id; }
+GLuint SetupSSBO(GLuint* id, GLuint bindx, GLsizeiptr sz, const void* d, GLenum typ) { glGenBuffers(1,id); glBindBuffer(GL_SSBO,*id); glBufferData(GL_SSBO,sz,d,typ); glBindBufferBase(GL_SHADER_STORAGE_BUFFER,bindx,*id); return *id; }
 
 // Generates View Matrix4x4 for Geometry Rasterizer Pass from camera world position + orientation
 void mat4_lookat_from(float* m, Quaternion* camRotation, Vector3 eye) { // Kept around for light views for shadowmap cubemap faces.
@@ -115,6 +115,8 @@ void mat4_lookat_from(float* m, Quaternion* camRotation, Vector3 eye) { // Kept 
     m[12] = -dot_vector3(right, eye); m[13] = -dot_vector3(up, eye); m[14] = dot_vector3(forward, eye); m[15] = 1.0f;
 }
 
+__attribute__((pure,always_inline)) bool SphereInFrustum(FrustumPlane* planes, Vector3 c, float radius) { for (int i=0;i<6;++i) { if ((dot_vector3(planes[i].normal,c) + planes[i].d) < -radius) return false; } return true; }
+
 void ExtractFrustumPlanes(float* m, FrustumPlane* planes) {
     planes[0].normal.x = m[3]  + m[0];  planes[0].normal.y = m[7]  + m[4];  planes[0].normal.z = m[11] + m[8];  planes[0].d = m[15] + m[12]; // Left
     planes[1].normal.x = m[3]  - m[0];  planes[1].normal.y = m[7]  - m[4];  planes[1].normal.z = m[11] - m[8];  planes[1].d = m[15] - m[12]; // Right
@@ -128,12 +130,12 @@ void ExtractFrustumPlanes(float* m, FrustumPlane* planes) {
 }
 
 Quaternion cubemapOrientationQuaternion[6] = {
-    {0.0f,0.707106781f,0.0f,0.707106781f},  // +X: Right
-    {0.0f,-0.707106781f,0.0f,0.707106781f}, // -X: Left
-    {-0.707106781f,0.0f,0.0f,0.707106781f}, // +Y: Up
-    {0.707106781f,0.0f,0.0f,0.707106781f},  // -Y: Down
-    {0.0f,0.0f,0.0f,1.0f},                  // +Z: Forward
-    {0.0f,1.0f,0.0f,0.0f}                   // -Z: Backward
+    {0.0f, 0.707106781f, 0.0f, 0.707106781f},  // +X: Right
+    {0.0f, -0.707106781f, 0.0f, 0.707106781f}, // -X: Left
+    {-0.707106781f, 0.0f, 0.0f, 0.707106781f}, // +Y: Up
+    {0.707106781f, 0.0f, 0.0f, 0.707106781f},  // -Y: Down
+    {0.0f, 0.0f, 0.0f, 1.0f},                  // +Z: Forward
+    {0.0f, 1.0f, 0.0f, 0.0f}                   // -Z: Backward
 };
 
 ENGINE_TO_MOD void InitializeEntity(Entity* entry) { // Blank entity, no index yet, for initial list population or temporary Entity.
@@ -238,13 +240,14 @@ static inline __attribute__((always_inline)) void mul_mat4(float *out, const flo
 }
 
 bool NeighborhoodInPVS(uint16_t cellX, uint16_t cellZ, int r);
-static Light* lightsMapped = NULL;
 void UpdateLights(void) {
+    bool voxelsNeedUpdated = false;
     for (uint16_t lightIdx = 0; lightIdx < Sys_Global.loadedLights; ++lightIdx) { 
         Vector3 lightPos = lightsNewPosition[lightIdx];
         lights[lightIdx].pos = lightPos;
         if (lights[lightIdx].lflags & LDIRTY) { // Marked all as true at level load.
             flag_setu32(&lights[lightIdx].lflags,LDIRTY,false);
+            voxelsNeedUpdated = true;
             #pragma GCC unroll 6
             for (int j=0;j<6;++j) { // Update to new position
                 mat4_lookat_from((float*)lightView[lightIdx][j], &cubemapOrientationQuaternion[j], lightPos);
@@ -279,15 +282,13 @@ void UpdateLights(void) {
         }
     }
 
-    __builtin_memcpy(lightsMapped,lights,Sys_Global.loadedLights * sizeof(Light));
-    Vector3 p = Sys_Global.instances[PLAYER1].position;
-    CHECK_GL_ERROR();
-    glUseProgram(Sys_Render.voxelUpdateShaderProgram); // Update voxels
-    CHECK_GL_ERROR();
-    glUniform3f(5,p.x,p.y,p.z);
-    CHECK_GL_ERROR();
-    glDispatchCompute((512+31)/32,(512+31)/32,1);
-    CHECK_GL_ERROR();
+    glBindBuffer(GL_SSBO,Sys_Render.lightsID); glBufferData(GL_SSBO,Sys_Global.loadedLights * sizeof(Light),lights,GL_DYNAMIC_DRAW);
+//     if (voxelsNeedUpdated) {
+        Vector3 p = Sys_Global.instances[PLAYER1].position;
+        glUseProgram(Sys_Render.voxelUpdateShaderProgram);
+        glUniform3f(5,p.x,p.y,p.z);
+        glDispatchCompute((512+31)/32,(512+31)/32,1);
+//     }
 }
 
 #define IS_CHANGED(a, b) (vabs((a) - (b)) > 0.0001f)
@@ -306,7 +307,7 @@ ENGINE_TO_MOD void UpdateLight(uint16_t i, Vector3 pos, Color3 col, float range,
     lights[i].spotDir = spotDir;
     if (changed) { lightsNewPosition[i]=pos; flag_setu32(&lights[i].lflags,LDIRTY,true); }
 }
-
+// ============================================================================
 // UI Rendering and Text
 #define BASE_RES_X 1366.0f // Positions done in fixed int positions off base resolution, scaled against current resolution.
 #define BASE_RES_Y 768.0f
@@ -314,6 +315,7 @@ float UIX(int16_t x) { return (float)x / BASE_RES_X; } // Pos or value as percen
 float RelX(int16_t x) { return UIX(x) * (float)Sys_Settings.ScreenWidth; } // Pos or value in current resolution
 float UIY(int16_t y) { return (float)y / BASE_RES_Y; }
 float RelY(int16_t y) { return UIY(y) * (float)Sys_Settings.ScreenHeight; }
+
 void RenderUIImage(int16_t x, int16_t y, int16_t width, int16_t height, uint32_t texIndex) {
     float xpos = RelX(x); float ypos = RelY(y);
     glUseProgram(Sys_Render.chunkShaderProgram);
@@ -659,7 +661,7 @@ ENGINE_TO_MOD bool GetKey(int settingIndex) { return GetKeyRiseEdgeOrHeld(settin
 ENGINE_TO_MOD bool GetKeyPressed(int settingIndex) { return (settingIndex < 0) ? Sys_Input.keyStates[GLFW_KEY_GRAVE_ACCENT].pressed : GetKeyRiseEdgeOrHeld(settingIndex,true); } // True 1st frame down.
 ENGINE_TO_MOD void IgnoreNextMouseDelta(void) { Sys_Input.ignore_next_mouse_delta = true; }
 
-void LoadTextures(void); void LoadModels(void); void CullInit(void); void Physics_ResetForLevelLoad(void); void Physics_InitEntityInertia(uint16_t idx);
+void LoadTextures(void); void LoadModels(void); void CullInit(void);
 OsFileHandle levelFileHandle;
 void LoadLevel(uint8_t curlevel) {
     double start_time = get_time();
@@ -671,7 +673,6 @@ void LoadLevel(uint8_t curlevel) {
     __builtin_memset(modelMatrices,0,INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
     __builtin_memset(camViews,0,MAX_CAMVIEWS * sizeof(CamView));
     __builtin_memset(Sys_Global.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
-    Physics_ResetForLevelLoad();
     char filename[20]; // Minimum size for 0 through 13.
     StringFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel);
     levelFileHandle = OS_OpenReadonly(filename);
@@ -684,19 +685,17 @@ void LoadLevel(uint8_t curlevel) {
     for (int i=PLAYER1;i<Sys_Global.loadedInstances;++i) {        
         int32_t cellIdx = PosGetCellCoords(Sys_Global.instances[i].position.x,Sys_Global.instances[i].position.z);
         Sys_Global.instances[i].cellIndex = cellIdx;
-        Sys_Global.instances[i].lastPosition = Sys_Global.instances[i].position;
     }
     
     ModInitAfterLoad(); ResetLevelAudio(); ResetLevelMusic();
-    for (int i=START_INDEX_LEVEL_INSTANCES;i<Sys_Global.loadedInstances;++i) { if (Sys_Global.instances[i].entflags & ENTFLAG_RIGIDBODY) Physics_InitEntityInertia((uint16_t)i); }
     DualLog("Entity instances initialized after load\n");
     RenderLoadingProgress(110,"Loading cull system...");
-    CullInit(); // Runs first cull over level generating the precomputed cells for every cell as the first x,z world cell broadphase layer for all systems (ala Ultima Underworld / System Shock 1 engine).
+    CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
     RenderLoadingProgress(120,"Loading voxel lighting data...");
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < Sys_Global.loadedInstances; i++) Sys_Global.dirtyInstances[i] = true;
     for (uint16_t i = 0; i < Sys_Global.loadedLights; i++) { lightsNewPosition[i] = lights[i].pos; }
     __builtin_memset(voxen_Shadow_System.shadowmapIndirectionList,MAX_SHADOWMAPS + 1,Sys_Global.loadedLights * sizeof(uint32_t)); // Set to invalid values for all
-    Sys_Global.levelCurrentlyLoading = Sys_Global.gamePaused = Sys_Global.menuActive = false;
+    Sys_Global.levelCurrentlyLoading = false;
 }
 
 void InputClearRisingAndFallingEdges(void) { // Clear keypress rising and falling edge triggers
@@ -1335,7 +1334,7 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     ApplySettings(); // After loading of text and game data.
     glBindFramebuffer(GL_FRAMEBUFFER, Sys_Render.gBufferFBO);
     GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3 };
-    glDrawBuffers(4,drawBuffers);
+    glDrawBuffers(4, drawBuffers);
     GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     if (status != GL_FRAMEBUFFER_COMPLETE) DualLogError("Framebuffer incomplete: Error code %d\n", status);
     glBindFramebuffer(GL_FRAMEBUFFER, 0); // Needed to render loading progress.
@@ -1364,9 +1363,9 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     __builtin_memcpy(&modelMatrices[0],mat,16 * sizeof(float)); // Null instance matrix used for UI
     Sys_Render.matricesBufferID        = SetupSSBO(&Sys_Render.matricesBufferID,        1,INSTANCE_COUNT * 16 * sizeof(float),modelMatrices, GL_STATIC_DRAW);
     Sys_Render.voxelLightListCountsID  = SetupSSBO(&Sys_Render.voxelLightListCountsID,  2,VOXEL_COUNT * sizeof(uint32_t),NULL,GL_STATIC_DRAW);
-    Sys_Render.voxelLightListsID       = SetupSSBO(&Sys_Render.voxelLightListsID,      3,VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t),NULL,GL_STATIC_DRAW);
-    Sys_Render.lightsID                = SetupSSBOMapped(&Sys_Render.lightsID,          4,LIGHT_COUNT * sizeof(Light),(void**)&lightsMapped);
-    Sys_Render.shadowMapSSBO           = SetupSSBO(&Sys_Render.shadowMapSSBO,           5,(MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(uint32_t),NULL,GL_STATIC_DRAW);    
+    Sys_Render.voxelLightListsID       = SetupSSBO(&Sys_Render.voxelLightListsID,       3,VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t),NULL,GL_STATIC_DRAW);
+    Sys_Render.lightsID                = SetupSSBO(&Sys_Render.lightsID,                4,LIGHT_COUNT * sizeof(Light),NULL,GL_STATIC_DRAW);
+    Sys_Render.shadowMapSSBO           = SetupSSBO(&Sys_Render.shadowMapSSBO,           5,(MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(uint32_t), NULL, GL_STATIC_DRAW);    
     Sys_Render.shadowMapsIndirectionID = SetupSSBO(&Sys_Render.shadowMapsIndirectionID, 6,LIGHT_COUNT * sizeof(uint32_t),NULL,GL_STATIC_DRAW);
     Sys_Render.cellVisibleDataID       = SetupSSBO(&Sys_Render.cellVisibleDataID,       7,ARRSIZE * sizeof(uint32_t),NULL,GL_STATIC_DRAW);
     Sys_Render.colorBufferID           = SetupSSBO(&Sys_Render.colorBufferID,          12,MAX_TOTAL_PIXELS * sizeof(uint8_t),NULL,GL_STATIC_DRAW);
@@ -1911,8 +1910,13 @@ static inline __attribute__((always_inline)) double RenderUI(void) {
     return time_now;
 }
 
+#define SHADOW_NEARMESH_MAX 1024
 typedef struct {float depth; uint16_t index; } DepthSort;
-extern bool instanceIsLODArray[INSTANCE_COUNT]; extern uint16_t loadedModelsMaxIndex;
+DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX];
+float shadows_nearMeshRadii[SHADOW_NEARMESH_MAX];
+static inline __attribute__((always_inline)) bool EntNotVisible(uint16_t i, bool otherCondition) { Entity* e = &Sys_Global.instances[i]; return e->texIndex > loadedTexturesMaxIndex || !(e->entflags & ENTFLAG_ACTIVE) || e->index >= MAX_ENTITIES || e->modelIndex >= MODEL_IDX_MAX || e->texIndex >= MAX_VALID_TEXTURE || otherCondition; }
+
+extern bool instanceIsLODArray[INSTANCE_COUNT]; extern uint16_t loadedModelsMaxIndex; extern float modelBounds[MODEL_IDX_MAX]; extern uint8_t** modelVertices; extern uint16_t** modelTriangles;
 static inline __attribute__((always_inline,hot)) uint16_t GetAndBindModel(uint16_t i, uint16_t currentModelType) {
     glUniform1ui(0,i);
     uint16_t modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && Sys_Global.instances[i].lodIndex < loadedModelsMaxIndex ? Sys_Global.instances[i].lodIndex : Sys_Global.instances[i].modelIndex;
@@ -1923,16 +1927,15 @@ static inline __attribute__((always_inline,hot)) uint16_t GetAndBindModel(uint16
     return modelType;
 }
 
-#define SHADOW_NEARMESH_MAX 1024
-DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX]; float shadows_nearMeshRadii[SHADOW_NEARMESH_MAX];
-extern float modelBounds[MODEL_IDX_MAX]; bool CheckLightNotInPVS(Vector3 lightPos, float range); bool EntNotVisible(uint16_t i, bool otherCondition);
-__attribute__((pure)) bool SphereInFrustum(FrustumPlane* planes, Vector3 c, float radius);
+extern uint32_t* texturePaletteOffsets;
+extern int32_t* textureSizes;
 static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {    
     double shadowStartTime = get_time();
     uint16_t candidates[MAX_SHADOWMAPS];
     uint16_t numShadowsCouldRender = 0;
     Vector3 playerPos = Sys_Global.instances[PLAYER1].position;
     Vector3 pf = Sys_Global.instances[PLAYER1].forward;
+    float minx = Sys_Global.worldMin_x, minz = Sys_Global.worldMin_z;
     for (uint16_t i = 0; i < Sys_Global.loadedLights; ++i) { // Collect candidates: only lights that are enabled and in PVS
         if (unlikely(!(lights[i].lflags & SHADON) || !(lights[i].lflags & LIGHTON))) continue;
 
@@ -1943,7 +1946,14 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
         float range =  lights[i].range;
         float luminosity = (intensity / (range * range));
         if (luminosity < 0.008f && (range < 8.0f || intensity < 0.5f)) continue;
-        if (CheckLightNotInPVS(lightPos,range)) continue;
+        
+        uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((lightPos.x - minx + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED);
+        uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((lightPos.z - minz + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED);
+        int lightCellIdx = (cellZ * WORLDX) + cellX;
+        int r = vceil(range * (1.0f / CELL_SIZE));
+        bool inPVS = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
+        if (likely(!inPVS)) inPVS = NeighborhoodInPVS(cellX,cellZ,r);
+        if (!inPVS) continue;
         
         float dx = lightPos.x - playerPos.x; float dy = lightPos.y - playerPos.y; float dz = lightPos.z - playerPos.z;
         float distSqrdToPlayer = dx*dx + dy*dy + dz*dz;
@@ -2040,13 +2050,40 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
 }
 
 DepthSort visibleInstances[INSTANCE_COUNT];
-bool DetermineIfInstanceVisible(uint16_t i, bool otherCondition, bool skyVisible, Vector3 playerPos, float* distSqrd); bool SkyIsVisible(void);
+static inline __attribute__((always_inline)) bool DetermineIfInstanceVisible(uint16_t i, bool otherCondition, bool skyVisible, Vector3 playerPos, float* distSqrd) {
+    if (EntNotVisible(i,otherCondition)) return false; // must be transparent && transparents or neither
+    
+    Entity* e = &Sys_Global.instances[i];
+    uint16_t cellX = PosGetCellCoordX(e->position.x), cellZ = PosGetCellCoordZ(e->position.z);
+    uint16_t instCellIdx = (cellZ * WORLDX) + cellX; uint16_t entIdx = e->index;
+    Vector3 delta = Vector3_A_minus_B(e->position,playerPos);
+    *distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
+    float radius = modelBounds[e->modelIndex] * 2.0f * vmax(vmax(e->scale.x,e->scale.y),e->scale.z);
+    if (!SphereInFrustum(playerFrustumPlanes,e->position,radius) && (entIdx != 754 || !skyVisible) && i != editModeSelection) return false;
+    
+    if (ConstIndexIsPortalBlockingDoor(entIdx)) { // Extra checks only needed for opaque portal blocking doors.
+        bool inPVS = (gridCellStates[instCellIdx] & CELL_VISIBLE);
+        if (!inPVS) inPVS = NeighborhoodInPVS(cellX,cellZ,2);
+        if (!inPVS) return false;
+    } else {
+        if (!(Sys_Global.currentLevel == 1 && (entIdx == 309 || entIdx == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
+            if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (entIdx != 754 || !skyVisible)) return false; // For some shelves that are inset away from cells, need to still draw their items by checking && CELL_OPEN here, unfortunately this means they don't ever get culled :(
+        }
+        
+        if (!(gridCellStates[instCellIdx] & CELL_OPEN) && *distSqrd >= 943.7184f && (entIdx != 754 || !skyVisible)) return false; // 30.72 * 30.72, 12 cells
+    }
+    
+    // One frame delay is fine for cam views to become visible
+    if (Sys_Global.instances[i].camView != 255) camViews[Sys_Global.instances[i].camView].visible = true;
+    return true;
+}
+
 __attribute__((pure)) int32_t dsort(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (db > da) - (db < da); }
 __attribute__((pure)) int32_t dsortInv(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (da > db) - (da < db); }
 void qsort(void* base, size_t nmemb, size_t size, int (*cmp)(const void*, const void*));
 static inline __attribute__((always_inline)) void RenderInstances(Vector3 playerPos, bool transparents) {
     uint16_t visibleCount = 0, currentTexIndex = 0, currentNormIndex = 0, currentGlowIndex = 0, currentSpecIndex = 0, currentModelType = 0;
-    bool skyVisible = SkyIsVisible();
+    bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX);
     float distSqrd = Sys_Global.farPlane * Sys_Global.farPlane;
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
         if (!DetermineIfInstanceVisible(i,(transparentTexture[Sys_Global.instances[i].texIndex] ^ transparents),skyVisible,playerPos,&distSqrd)) continue;
@@ -2101,7 +2138,7 @@ static inline __attribute__((always_inline)) void RenderInstances(Vector3 player
 
 static inline __attribute__((always_inline)) void RenderInstancesDepthOnly(Vector3 playerPos) {
     uint16_t visibleCount = 0, currentModelType = 0;
-    bool skyVisible = SkyIsVisible();
+    bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX);
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
         float distSqrd = Sys_Global.farPlane * Sys_Global.farPlane;
         if (!DetermineIfInstanceVisible(i,false,skyVisible,playerPos,&distSqrd)) continue;
@@ -2129,7 +2166,7 @@ static inline __attribute__((always_inline)) void RenderInstancesDepthOnly(Vecto
 
 float GetPainStatic(void) { return 0.0f; } // TODO: Hook into pain/health management and shield impact effect
 Color GetPainStaticColor(void) { return (Color){1.0f,0.0f,0.0f,1.0f}; } // TODO: Hook staticColor up to red or blue for pain or shield impact.
-bool SkySunIsVisible(void);
+
 static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bool camView, uint8_t camViewIdx) {
     uint16_t swidth = camView ? camViews[camViewIdx].width : Sys_Settings.ScreenWidth; uint16_t sheight = camView ? camViews[camViewIdx].height : Sys_Settings.ScreenHeight;
     float sfov = camView ? (float)camViews[camViewIdx].fov : (float)Sys_Settings.FOV;
@@ -2239,9 +2276,9 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
     glUniform3f(12,deg2rad(cam_yaw), deg2rad(cam_pitch), deg2rad(cam_roll));
     glUniform3f(13,px, py, pz);
     glUniform1f(15,(float)Sys_Global.pauseRelativeTime * 0.1f);
-    glUniform1ui(17,SkyIsVisible());
-    glUniform1ui(18,SkySunIsVisible());
-    glUniform1ui(19,((Sys_Global.currentLevel >= 10 && Sys_Global.currentLevel < LEVEL_CYBERSPACE) ? 1u : 0u) && SkyIsVisible());
+    glUniform1ui(17,(gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || Sys_Global.currentLevel == LEVEL_CYBERSPACE);
+    glUniform1ui(18,(gridCellStates[playerCellIdx] & CELL_SEES_SUN) && Sys_Global.currentLevel != LEVEL_CYBERSPACE);
+    glUniform1ui(19,((Sys_Global.currentLevel >= 10 && Sys_Global.currentLevel < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
     uint32_t shieldOnType = 0u; // No shield green tint.
     if (Sys_Global.instances[WORLD].ioflags & QUESTBIT_SHIELD_ACTIVATED) {
         if (Sys_Global.currentLevel == 6 || Sys_Global.currentLevel == 7) shieldOnType = 2u; // Shielding only below player for lower levels.
@@ -2257,8 +2294,8 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
     glUniform1f(28,GetPainStatic());
     glUniform1ui(29,(uint32_t)ModRequestsGrayscale()); // Grayscale
     glBindVertexArray(Sys_Render.quadVAO);
-    glDisable(GL_DEPTH_TEST);
-    glDrawArrays(GL_TRIANGLE_FAN,0,4);
+    glDisable(GL_DEPTH_TEST); // Reenabled later after all UI just up there before RenderShadowmaps call
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
     drawCallsRenderedThisFrame++; verticesRenderedThisFrame += 4;
 
     // UI
@@ -2283,7 +2320,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
     CHECK_GL_ERROR();
 }
 
-bool UpdatedPlayerCell(void); bool CullCore(void); void Physics(void); extern uint32_t random_range_rng;
+bool UpdatedPlayerCell(void); bool CullCore(void); int32_t Physics(void); extern uint32_t random_range_rng;
 int32_t main(void) {
     double game_start_time = get_time();
     random_range_rng = (uint32_t)game_start_time; // Seed global rand uniquely with time since system boot.

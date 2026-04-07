@@ -31,7 +31,6 @@ extern GlobalContext Sys_Global;
 extern SystemUI Sys_UI;
 typedef struct { uint16_t x,z; } PortalCell;
 typedef struct { PortalCell cellA,cellB; bool portalNS, open,dirty; } Portal;
-typedef struct { Vector3 position; Quaternion rotation; uint8_t fov; uint16_t width,height; float near,far,finished; bool visible; } CamView;
 typedef struct {bool down,pressed,released;} KeyState;
 typedef struct {
 	double last_mouse_x,last_mouse_y,scrollDelta;
