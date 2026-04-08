@@ -24,15 +24,15 @@ MOD_TO_ENGINE void ModNewGame(void) {
 }
 //=============================================================================
 // Inventory
-void ResetHeldItem(uint16_t p) {
+void ResetHeldItem(u16 p) {
     InventorySystem* inv = Inv(p);
-    inv->heldObjectIndex = inv->heldObjectCustomIndex = UINT16_MAX;
+    inv->heldObjectIndex = inv->heldObjectCustomIndex = U16_MAX;
     inv->heldObjectAmmo = inv->heldObjectAmmo2 = 0;
     inv->heldObjectLoadedAlternate = inv->holdingObject = inv->grenadeActive = false;
 }
 
 Vector3 ScreenPointToRay(Vector3 fwd, Vector3 rt) {
-    uint16_t swidth = Eng_Settings->ScreenWidth, sheight = Eng_Settings->ScreenHeight;
+    u16 swidth = Eng_Settings->ScreenWidth, sheight = Eng_Settings->ScreenHeight;
     float offsetX = Eng_Global->cursorPosition_x - ((float)swidth * 0.5f);
     float offsetY = Eng_Global->cursorPosition_y - ((float)sheight * 0.5f);
     float ndcX = offsetX / ((float)swidth * 0.5f);
@@ -46,13 +46,13 @@ Vector3 ScreenPointToRay(Vector3 fwd, Vector3 rt) {
     return (Vector3){view.x * rt.x + view.y * up.x + view.z * flipForward.x,view.x * rt.y + view.y * up.y + view.z * flipForward.y,view.x * rt.z + view.y * up.z + view.z * flipForward.z};
 }
 
-void DropHeldItem(uint16_t p) {
+void DropHeldItem(u16 p) {
     InventorySystem* inv = Inv(p);
     if (inv->heldObjectIndex >= Eng_Global->loadedInstances) { ResetHeldItem(p); return; }
     if (inv->dropFinished > Eng_Global->pauseRelativeTime) return;
     
     inv->dropFinished = Eng_Global->pauseRelativeTime + 0.2; // Prevent immediate regrab at high fps
-    uint16_t newent = AddInstance(inv->heldObjectIndex,Eng_Global->instances[p].position);
+    u16 newent = AddInstance(inv->heldObjectIndex,Eng_Global->instances[p].position);
     Entity* tossObject = &Eng_Global->instances[newent];
     tossObject->usableCustomIndex = inv->heldObjectCustomIndex;
     tossObject->ammo = inv->heldObjectAmmo;
@@ -65,11 +65,11 @@ void DropHeldItem(uint16_t p) {
     ResetHeldItem(p);
 }
 
-void PatchUse(uint16_t playerIdx,int patchSlot) { (void)playerIdx; (void)patchSlot; } // TODO
+void PatchUse(u16 playerIdx,int patchSlot) { (void)playerIdx; (void)patchSlot; } // TODO
 void WeaponFireStartWeaponDip(float t) { (void)t; } // TODO
 void WeaponFireCompleteWeaponChange(void) { } // TODO
-bool InventoryHasAccessCard(uint16_t p,AccessCardType card) { return (Inv(p)->accessCardOwned & (1u << card)) != 0; }
-bool InventoryHasAnyAccessCards(uint16_t p) { return Inv(p)->accessCardOwned != 0; }
+bool InventoryHasAccessCard(u16 p,AccessCardType card) { return (Inv(p)->accessCardOwned & (1u << card)) != 0; }
+bool InventoryHasAnyAccessCards(u16 p) { return Inv(p)->accessCardOwned != 0; }
 const char* AccessCardCodeForType(AccessCardType a) { // Called by ItemTabManager
     switch(a) {
         case AccessCardType_Standard:    return "STD";
@@ -95,7 +95,7 @@ const char* AccessCardCodeForType(AccessCardType a) { // Called by ItemTabManage
     }
 }
 
-void AddAccessCardToInventory(uint16_t p,int index) {
+void AddAccessCardToInventory(u16 p,int index) {
     AccessCardType card;
     switch(index) {
         case  34: card = AccessCardType_Admin;       break;
@@ -131,7 +131,7 @@ void AddAccessCardToInventory(uint16_t p,int index) {
     CenterStatusPrint("%s%s",Eng_Text->stringTable[45],AccessCardCodeForType(card));
 }
 
-void AddHardwareToInventory(uint16_t p,int index,int constIndex,int hwversion,bool overt) {
+void AddHardwareToInventory(u16 p,int index,int constIndex,int hwversion,bool overt) {
     (void)constIndex;
     if (index < 0) return;
     InventorySystem* inv = Inv(p);
@@ -140,44 +140,44 @@ void AddHardwareToInventory(uint16_t p,int index,int constIndex,int hwversion,bo
         if (overt) CenterStatusPrint("%s",Eng_Text->stringTable[46]); // THAT WARE IS OBSOLETE. DISCARDED.
         return;
     }
-    static const uint8_t textIdx[12] = {21,22,23,24,25,26,27,28,29,30,31,32};
+    static const u8 textIdx[12] = {21,22,23,24,25,26,27,28,29,30,31,32};
     inv->hardwareInvIndex             = index;
-    inv->hasHardware                 |= (uint16_t)(1u << index);
-    inv->hardwareVersion[index]       = (uint8_t)hwversion;
-    inv->hardwareVersionSetting[index]= hwversion > 0 ? (uint8_t)(hwversion - 1) : 0;
+    inv->hasHardware                 |= (u16)(1u << index);
+    inv->hardwareVersion[index]       = (u8)hwversion;
+    inv->hardwareVersionSetting[index]= hwversion > 0 ? (u8)(hwversion - 1) : 0;
     // TODO: engine enables HUD hardware buttons from hasHardware bitmask on render
     // TODO: nav unit (index 1): compass/automap HUD visibility from hasHardware & HW_NAV + version
     if (overt) CenterStatusPrint("%s v%d",Eng_Text->stringTable[textIdx[index] + 326],hwversion);
 }
 
-int  NavUnitVersion(uint16_t p)     { return Inv(p)->hardwareVersion[HW_NAV_IDX]; }
-int  BioMonitorVersion(uint16_t p)  { return Inv(p)->hardwareVersion[HW_BIO_IDX]; }
-bool BioMonitorActive(uint16_t p)   { InventorySystem* i=Inv(p); return (i->hasHardware & HW_BIO) && (i->hardwareIsActive & HW_BIO); }
-bool LanternActive(uint16_t p)      { InventorySystem* i=Inv(p); return (i->hasHardware & HW_LAN) && (i->hardwareIsActive & HW_LAN); }
-int  EnvirosuitVersion(uint16_t p)  { return Inv(p)->hardwareVersion[HW_ENV_IDX]; }
-bool BoosterSetToSkates(uint16_t p) { return Inv(p)->hardwareVersionSetting[HW_BST_IDX] == 0; }
-bool BoosterSetToBoost(uint16_t p)  { return Inv(p)->hardwareVersionSetting[HW_BST_IDX] >= 1; }
-bool BoosterActive(uint16_t p)      { InventorySystem* i=Inv(p); return (i->hasHardware & HW_BST) && (i->hardwareIsActive & HW_BST); }
-void JumpJetsToggle(uint16_t p)     { Inv(p)->hardwareIsActive ^= HW_JET; }
-int  JumpJetsVersion(uint16_t p)    { return Inv(p)->hardwareVersion[HW_JET_IDX]; }
-bool JumpJetsActive(uint16_t p)     { InventorySystem* i=Inv(p); return (i->hasHardware & HW_JET) && (i->hardwareIsActive & HW_JET); }
+int  NavUnitVersion(u16 p)     { return Inv(p)->hardwareVersion[HW_NAV_IDX]; }
+int  BioMonitorVersion(u16 p)  { return Inv(p)->hardwareVersion[HW_BIO_IDX]; }
+bool BioMonitorActive(u16 p)   { InventorySystem* i=Inv(p); return (i->hasHardware & HW_BIO) && (i->hardwareIsActive & HW_BIO); }
+bool LanternActive(u16 p)      { InventorySystem* i=Inv(p); return (i->hasHardware & HW_LAN) && (i->hardwareIsActive & HW_LAN); }
+int  EnvirosuitVersion(u16 p)  { return Inv(p)->hardwareVersion[HW_ENV_IDX]; }
+bool BoosterSetToSkates(u16 p) { return Inv(p)->hardwareVersionSetting[HW_BST_IDX] == 0; }
+bool BoosterSetToBoost(u16 p)  { return Inv(p)->hardwareVersionSetting[HW_BST_IDX] >= 1; }
+bool BoosterActive(u16 p)      { InventorySystem* i=Inv(p); return (i->hasHardware & HW_BST) && (i->hardwareIsActive & HW_BST); }
+void JumpJetsToggle(u16 p)     { Inv(p)->hardwareIsActive ^= HW_JET; }
+int  JumpJetsVersion(u16 p)    { return Inv(p)->hardwareVersion[HW_JET_IDX]; }
+bool JumpJetsActive(u16 p)     { InventorySystem* i=Inv(p); return (i->hasHardware & HW_JET) && (i->hardwareIsActive & HW_JET); }
 // HideBioMonitor / UnHideBioMonitor: engine reads InventoryBioMonitorActive() for HUD visibility, no gamecode needed
 
-bool AddGeneralObjectToInventory(uint16_t p,int index,int customIndex) {
+bool AddGeneralObjectToInventory(u16 p,int index,int customIndex) {
     if (index < 0) return false;
     InventorySystem* inv = Inv(p);
     for (int i = 1; i < 14; i++) {
         if (inv->generalInventoryIndexRef[i] != -1) continue;
-        if (!InventoryHasAnyAccessCards(p) && inv->generalInvCurrent == 0) inv->generalInvCurrent = (int8_t)i;
+        if (!InventoryHasAnyAccessCards(p) && inv->generalInvCurrent == 0) inv->generalInvCurrent = (i8)i;
         inv->generalInventoryIndexRef[i] = index;
-        inv->generalInvCustomIndex[i]    = (int16_t)customIndex;
+        inv->generalInvCustomIndex[i]    = (i16)customIndex;
         CenterStatusPrint("%s%s",Eng_Text->stringTable[index + 326],Eng_Text->stringTable[31]);
         return true;
     }
     return false;
 }
 
-void GeneralInventoryActivate(uint16_t p) {
+void GeneralInventoryActivate(u16 p) {
     InventorySystem* inv = Inv(p);
     int cur = inv->generalInvCurrent;
     if (cur < 0 || cur >= 14) { DualLog("BUG: generalInvCurrent out of range at %d",cur); return; }
@@ -185,7 +185,7 @@ void GeneralInventoryActivate(uint16_t p) {
     if (cur != 0) inv->generalInventoryIndexRef[cur] = -1;
 }
 
-void GrenadeCycleDown(uint16_t p) {
+void GrenadeCycleDown(u16 p) {
     InventorySystem* inv = Inv(p);
     int last = inv->grenadeCurrent, next = last - 1;
     if (next < 0) next = 6;
@@ -195,12 +195,12 @@ void GrenadeCycleDown(uint16_t p) {
         if (--next < 0) next = 6;
     }
     if (last == next) return;
-    inv->grenadeCurrent = (int8_t)next;
-    static const uint16_t msg[7] = {579,580,581,582,583,584,585};
+    inv->grenadeCurrent = (i8)next;
+    static const u16 msg[7] = {579,580,581,582,583,584,585};
     CenterStatusPrint("%s",Eng_Text->stringTable[msg[next]]);
 }
 
-void GrenadeCycleUp(uint16_t p) {
+void GrenadeCycleUp(u16 p) {
     InventorySystem* inv = Inv(p);
     int last = inv->grenadeCurrent, next = last + 1;
     if (next > 6) next = 0;
@@ -210,29 +210,29 @@ void GrenadeCycleUp(uint16_t p) {
         if (++next > 6) next = 0;
     }
     if (last == next) return;
-    inv->grenadeCurrent = (int8_t)next;
-    static const uint16_t msg[7] = {579,580,581,582,583,584,585};
+    inv->grenadeCurrent = (i8)next;
+    static const u16 msg[7] = {579,580,581,582,583,584,585};
     CenterStatusPrint("%s",Eng_Text->stringTable[msg[next]]);
 }
 
-void AddGrenadeToInventory(uint16_t p,int index,int useableIndex) {
+void AddGrenadeToInventory(u16 p,int index,int useableIndex) {
     if (index < 0) return;
     InventorySystem* inv = Inv(p);
     bool anyGren = false;
     for (int i = 0; i < 7; i++) if (inv->grenAmmo[i]) { anyGren = true; break; }
-    if (!anyGren) inv->grenadeCurrent = (int8_t)index;
+    if (!anyGren) inv->grenadeCurrent = (i8)index;
     inv->grenAmmo[index]++;
-    inv->grenConstIndex[index] = (int16_t)useableIndex;
+    inv->grenConstIndex[index] = (i16)useableIndex;
     CenterStatusPrint("%s%s",Eng_Text->stringTable[useableIndex + 326],Eng_Text->stringTable[34]);
 }
 
-void RemoveGrenade(uint16_t p,int index) {
+void RemoveGrenade(u16 p,int index) {
     InventorySystem* inv = Inv(p);
     if (inv->grenAmmo[index] > 0) inv->grenAmmo[index]--;
     if (!inv->grenAmmo[index]) GrenadeCycleDown(p);
 }
 
-void CheckForUnreadLogs(uint16_t p) {
+void CheckForUnreadLogs(u16 p) {
     InventorySystem* inv = Inv(p);
     int em = 0, lg = 0;
     for (int i = TEXT_LOGS_COUNT-1; i >= 0; i--) {
@@ -244,7 +244,7 @@ void CheckForUnreadLogs(uint16_t p) {
     if (!lg) inv->hasNewLogs  = false;
 }
 
-static int FindNextUnreadLog(uint16_t p) {
+static int FindNextUnreadLog(u16 p) {
     InventorySystem* inv = Inv(p);
     for (int i = TEXT_LOGS_COUNT-1; i >= 0; i--) {
         if (inv->hasLog[i] && !inv->readLog[i]) return i;
@@ -252,7 +252,7 @@ static int FindNextUnreadLog(uint16_t p) {
     return -1;
 }
 
-static void PlayLog(uint16_t p,int logIndex) {
+static void PlayLog(u16 p,int logIndex) {
     if (logIndex < 0) return;
     InventorySystem* inv = Inv(p);
     if (!(inv->hasHardware & HW_ERD)) return;
@@ -265,7 +265,7 @@ static void PlayLog(uint16_t p,int logIndex) {
 //     inv->readLog[logIndex] = true;
 //     if (Eng_Text->audioLogType[logIndex] == AudioLogType_Vmail) {
 //         vmailActive        = true;
-//         inv->vmailLogIndex = (int16_t)logIndex; // engine reads to select which .webm to play
+//         inv->vmailLogIndex = (i16)logIndex; // engine reads to select which .webm to play
 //         switch (logIndex) { // TODO
 //             case 119:
 //                 vmailbetajet.SetActive(true);
@@ -321,13 +321,13 @@ static void PlayLog(uint16_t p,int logIndex) {
     // TODO: SendAudioLogToDataTab(logIndex) — engine-side data tab notification
 }
 
-void PlayLastAddedLog(uint16_t p,int logIndex) {
+void PlayLastAddedLog(u16 p,int logIndex) {
     if (logIndex < 0) return;
     PlayLog(p,logIndex);
     Inv(p)->lastAddedIndex = -1;
 }
 
-void AddAudioLogToInventory(uint16_t p,int index) {
+void AddAudioLogToInventory(u16 p,int index) {
     if (index < 0) { DualLog("BUG: Audio log picked up has no assigned index (-1)"); return; }
     if (index == 128) { CenterStatusPrint("%s",Eng_Text->stringTable[309]); return; } // Trioptimum Funpack
     InventorySystem* inv = Inv(p);
@@ -344,43 +344,43 @@ void AddAudioLogToInventory(uint16_t p,int index) {
     }
 }
 
-void PatchCycleDown(uint16_t p,bool useSound) {
+void PatchCycleDown(u16 p,bool useSound) {
     (void)useSound; // engine plays patch select sound on patchCurrent change
     InventorySystem* inv = Inv(p);
     int next = inv->patchCurrent - 1;
     if (next < 0) next = 6;
-    inv->patchCurrent = (int8_t)next;
+    inv->patchCurrent = (i8)next;
     for (int c = 0; c <= 13; c++) {
         if (inv->patchCounts[next] > 0) break;
         if (c == 13) return;
         if (--next < 0) next = 6;
     }
-    inv->patchCurrent = (int8_t)next;
+    inv->patchCurrent = (i8)next;
 }
 
-void PatchCycleUp(uint16_t p,bool useSound) {
+void PatchCycleUp(u16 p,bool useSound) {
     (void)useSound;
     InventorySystem* inv = Inv(p);
     int next = inv->patchCurrent + 1;
     if (next > 6) next = 0;
-    inv->patchCurrent = (int8_t)next;
+    inv->patchCurrent = (i8)next;
     for (int c = 0; c <= 13; c++) {
         if (inv->patchCounts[next] > 0) break;
         if (c == 13) return;
         if (++next > 6) next = 0;
     }
-    inv->patchCurrent = (int8_t)next;
+    inv->patchCurrent = (i8)next;
 }
 
-void AddPatchToInventory(uint16_t p,int index,int constIndex) {
+void AddPatchToInventory(u16 p,int index,int constIndex) {
     if (index < 0) return;
     InventorySystem* inv = Inv(p);
     inv->patchCounts[index]++;
-    if (!inv->patchCounts[inv->patchCurrent]) inv->patchCurrent = (int8_t)index;
+    if (!inv->patchCounts[inv->patchCurrent]) inv->patchCurrent = (i8)index;
     CenterStatusPrint("%s%s",Eng_Text->stringTable[constIndex + 326],Eng_Text->stringTable[35]);
 }
 
-static int8_t GetExistingCyberItemIndex(uint16_t p) {
+static i8 GetExistingCyberItemIndex(u16 p) {
     InventorySystem* inv = Inv(p);
     if (inv->softVersions[SW_TURBO]  > 0) return 0;
     if (inv->softVersions[SW_DECOY]  > 0) return 1;
@@ -388,31 +388,31 @@ static int8_t GetExistingCyberItemIndex(uint16_t p) {
     return -1;
 }
 
-static void UseTurbo(uint16_t p) {
+static void UseTurbo(u16 p) {
     InventorySystem* inv = Inv(p);
-    if (inv->softVersions[SW_TURBO] <= 0) { inv->hasSoft &= (uint8_t)~(1u << SW_TURBO); return; }
-    if (--inv->softVersions[SW_TURBO] == 0) inv->hasSoft &= (uint8_t)~(1u << SW_TURBO);
+    if (inv->softVersions[SW_TURBO] <= 0) { inv->hasSoft &= (u8)~(1u << SW_TURBO); return; }
+    if (--inv->softVersions[SW_TURBO] == 0) inv->hasSoft &= (u8)~(1u << SW_TURBO);
     if (inv->turboFinished > Eng_Global->pauseRelativeTime) inv->turboFinished += inv->turboCyberTime;
     else                                                    inv->turboFinished = inv->turboCyberTime + Eng_Global->pauseRelativeTime;
 }
 
-static void UseDecoy(uint16_t p) {
+static void UseDecoy(u16 p) {
     InventorySystem* inv = Inv(p);
     if (Eng_Global->decoyActive) { CenterStatusPrint("%s",Eng_Text->stringTable[537]); return; }
-    if (inv->softVersions[SW_DECOY] <= 0) { inv->hasSoft &= (uint8_t)~(1u << SW_DECOY); return; }
-    if (--inv->softVersions[SW_DECOY] == 0) inv->hasSoft &= (uint8_t)~(1u << SW_DECOY);
-    uint16_t decoyIdx = SpawnDynamicObject(417,true); // 417 = CyberDecoy constIndex
-    if (decoyIdx != UINT16_MAX) Eng_Global->instances[decoyIdx].position = PE(p)->position;
+    if (inv->softVersions[SW_DECOY] <= 0) { inv->hasSoft &= (u8)~(1u << SW_DECOY); return; }
+    if (--inv->softVersions[SW_DECOY] == 0) inv->hasSoft &= (u8)~(1u << SW_DECOY);
+    u16 decoyIdx = SpawnDynamicObject(417,true); // 417 = CyberDecoy constIndex
+    if (decoyIdx != U16_MAX) Eng_Global->instances[decoyIdx].position = PE(p)->position;
 }
 
-static void UseRecall(uint16_t p) {
+static void UseRecall(u16 p) {
     InventorySystem* inv = Inv(p);
     if (inv->softVersions[SW_RECALL] <= 0) return;
-    if (--inv->softVersions[SW_RECALL] == 0) inv->hasSoft &= (uint8_t)~(1u << SW_RECALL);
+    if (--inv->softVersions[SW_RECALL] == 0) inv->hasSoft &= (u8)~(1u << SW_RECALL);
     PE(p)->position = Eng_Global->cyberspaceRecallPoint;
 }
 
-void UseCyberspaceItem(uint16_t p) {
+void UseCyberspaceItem(u16 p) {
     InventorySystem* inv = Inv(p);
     if (inv->cyberItemIndex <= 0) {
         inv->cyberItemIndex = GetExistingCyberItemIndex(p);
@@ -425,36 +425,36 @@ void UseCyberspaceItem(uint16_t p) {
     }
 }
 
-void CycleCyberSpaceItemUp(uint16_t p) {
+void CycleCyberSpaceItemUp(u16 p) {
     InventorySystem* inv = Inv(p);
     int next = inv->cyberItemIndex + 1;
     if (next > 2) next = 0;
     for (int c = 0; c <= 7; c++) {
-        if (!(inv->hasSoft & (1u << next))) { inv->cyberItemIndex = (int8_t)next; return; }
+        if (!(inv->hasSoft & (1u << next))) { inv->cyberItemIndex = (i8)next; return; }
         if (c == 7) { inv->cyberItemIndex = -1; return; }
         if (++next > 2) next = 0;
     }
 }
 
-void CycleCyberSpaceItemDn(uint16_t p) {
+void CycleCyberSpaceItemDn(u16 p) {
     InventorySystem* inv = Inv(p);
     int next = inv->cyberItemIndex - 1;
     if (next < 0) next = 2;
     for (int c = 0; c <= 7; c++) {
-        if (inv->hasSoft & (1u << next)) { inv->cyberItemIndex = (int8_t)next; return; }
+        if (inv->hasSoft & (1u << next)) { inv->cyberItemIndex = (i8)next; return; }
         if (c == 7) { inv->cyberItemIndex = -1; return; }
         if (--next < 0) next = 2;
     }
 }
 
-bool AddSoftwareItem(uint16_t p,SoftwareType type,int vers) {
+bool AddSoftwareItem(u16 p,SoftwareType type,int vers) {
     InventorySystem* inv = Inv(p);
     Entity* player       = PE(p);
     float sfxVol         = (float)Eng_Settings->VolumeEffects / 100.0f;
     switch(type) {
         case SoftwareType_Drill:
             if (inv->isPulserNotDrill && !(inv->hasSoft & (1u << SW_PULSER))) inv->isPulserNotDrill = false;
-            if (vers > inv->softVersions[SW_DRILL]) inv->softVersions[SW_DRILL] = (uint8_t)vers;
+            if (vers > inv->softVersions[SW_DRILL]) inv->softVersions[SW_DRILL] = (u8)vers;
             else CenterStatusPrint("%s",Eng_Text->stringTable[46]);
             inv->hasSoft |= (1u << SW_DRILL);
             play_wav(sounds[86],sfxVol,(Vector3){},false);
@@ -462,14 +462,14 @@ bool AddSoftwareItem(uint16_t p,SoftwareType type,int vers) {
             return true;
         case SoftwareType_Pulser:
             if (!inv->isPulserNotDrill && !(inv->hasSoft & (1u << SW_PULSER))) inv->isPulserNotDrill = true;
-            if (vers > inv->softVersions[SW_PULSER]) inv->softVersions[SW_PULSER] = (uint8_t)vers;
+            if (vers > inv->softVersions[SW_PULSER]) inv->softVersions[SW_PULSER] = (u8)vers;
             else CenterStatusPrint("%s",Eng_Text->stringTable[46]);
             inv->hasSoft |= (1u << SW_PULSER);
             play_wav(sounds[86],sfxVol,(Vector3){},false);
             CenterStatusPrint("%s%d%s",Eng_Text->stringTable[445],inv->softVersions[SW_PULSER],Eng_Text->stringTable[458]);
             return true;
         case SoftwareType_CShield:
-            if (vers > inv->softVersions[SW_SHIELD]) inv->softVersions[SW_SHIELD] = (uint8_t)vers;
+            if (vers > inv->softVersions[SW_SHIELD]) inv->softVersions[SW_SHIELD] = (u8)vers;
             else CenterStatusPrint("%s",Eng_Text->stringTable[46]);
             inv->hasSoft |= (1u << SW_SHIELD);
             play_wav(sounds[86],sfxVol,(Vector3){},false);
@@ -499,8 +499,8 @@ bool AddSoftwareItem(uint16_t p,SoftwareType type,int vers) {
         case SoftwareType_Game: {
             if (vers < 0 || vers >= 7) return false;
             inv->hasNewData  = true;
-            inv->hasMinigame |= (uint8_t)(1u << vers);
-            static const uint16_t gameMsg[7] = {450,451,452,453,454,455,456};
+            inv->hasMinigame |= (u8)(1u << vers);
+            static const u16 gameMsg[7] = {450,451,452,453,454,455,456};
             play_wav(sounds[86],sfxVol,(Vector3){},false);
             CenterStatusPrint("%s",Eng_Text->stringTable[gameMsg[vers]]);
             return true;
@@ -529,7 +529,7 @@ bool AddSoftwareItem(uint16_t p,SoftwareType type,int vers) {
     return false;
 }
 
-void RemoveWeapon(uint16_t p,int slot) {
+void RemoveWeapon(u16 p,int slot) {
     InventorySystem* inv = Inv(p);
     inv->weaponInventoryIndices[slot]    = -1;
     inv->weaponInventoryAmmoIndices[slot] = -1;
@@ -546,7 +546,7 @@ static float DefaultEnergySettingForWeapon(int wep16Index) {
     }
 }
 
-void UpdateAmmoCount(uint16_t p) {
+void UpdateAmmoCount(u16 p) {
     InventorySystem* inv = Inv(p);
     inv->numweapons = 0;
     for (int i = 0; i < 7; i++) if (inv->weaponInventoryIndices[i] >= 0) inv->numweapons++;
@@ -554,12 +554,12 @@ void UpdateAmmoCount(uint16_t p) {
 
 // Returns ammo display string for slot. Writes to caller-provided buffer.
 // Engine calls this per-frame for HUD weapon pane text.
-void GetWeaponAmmoText(uint16_t p,int slot,char* buf,size_t bufSize) {
+void GetWeaponAmmoText(u16 p,int slot,char* buf,size_t bufSize) {
     InventorySystem* inv = Inv(p);
     buf[0] = '\0';
     int wepIdx = inv->weaponInventoryIndices[slot];
     bool alt   = inv->wepLoadedWithAlternate[slot];
-    uint8_t mag  = alt ? inv->currentMagazineAmount2[slot] : inv->currentMagazineAmount[slot];
+    u8 mag  = alt ? inv->currentMagazineAmount2[slot] : inv->currentMagazineAmount[slot];
     float heat   = inv->currentEnergyWeaponHeat[slot];
     switch(wepIdx) {
         case 36: // MK3 Assault Rifle
@@ -600,15 +600,15 @@ void GetWeaponAmmoText(uint16_t p,int slot,char* buf,size_t bufSize) {
     }
 }
 
-void AddAmmoToInventory(uint16_t p,int index,int constIndex,int amount,bool isSecondary) {
+void AddAmmoToInventory(u16 p,int index,int constIndex,int amount,bool isSecondary) {
     if (index < 0) return;
     InventorySystem* inv = Inv(p);
-    if (isSecondary) inv->wepAmmoSecondary[index] += (uint16_t)amount;
-    else             inv->wepAmmo[index]          += (uint16_t)amount;
+    if (isSecondary) inv->wepAmmoSecondary[index] += (u16)amount;
+    else             inv->wepAmmo[index]          += (u16)amount;
     CenterStatusPrint("%s%s",Eng_Text->stringTable[constIndex + 326],Eng_Text->stringTable[630]);
 }
 
-bool AddWeaponToInventory(uint16_t p,int index,int ammo1,int ammo2,bool loadedAlt) {
+bool AddWeaponToInventory(u16 p,int index,int ammo1,int ammo2,bool loadedAlt) {
     if (index < 0) return false;
     InventorySystem* inv = Inv(p);
     for (int i = 0; i < 7; i++) {
@@ -618,18 +618,18 @@ bool AddWeaponToInventory(uint16_t p,int index,int ammo1,int ammo2,bool loadedAl
         inv->weaponEnergySetting[i] = DefaultEnergySettingForWeapon(index16);
         if (i == 0) {
             inv->weaponCurrentPending = 0;
-            inv->weaponIndexPending   = (uint16_t)index;
+            inv->weaponIndexPending   = (u16)index;
             inv->justChangedWeap      = true;
             WeaponFireStartWeaponDip(0.5f);
             WeaponFireCompleteWeaponChange();
         }
         if (loadedAlt && ammo2 > 0) {
-            inv->currentMagazineAmount2[i] = (uint8_t)ammo2;
-            if (ammo1 > 0) inv->wepAmmo[index16] += (uint16_t)ammo1;
+            inv->currentMagazineAmount2[i] = (u8)ammo2;
+            if (ammo1 > 0) inv->wepAmmo[index16] += (u16)ammo1;
             inv->wepLoadedWithAlternate[i] = true;
         } else {
-            inv->currentMagazineAmount[i] = (uint8_t)ammo1;
-            if (ammo2 > 0) inv->wepAmmoSecondary[index16] += (uint16_t)ammo2;
+            inv->currentMagazineAmount[i] = (u8)ammo1;
+            if (ammo2 > 0) inv->wepAmmoSecondary[index16] += (u16)ammo2;
             inv->wepLoadedWithAlternate[i] = false;
         }
         CenterStatusPrint("%s%s",Eng_Text->stringTable[index + 326],Eng_Text->stringTable[33]);
@@ -639,7 +639,7 @@ bool AddWeaponToInventory(uint16_t p,int index,int ammo1,int ammo2,bool loadedAl
     return false;
 }
 
-void InventoryUpdate(uint16_t p) {
+void InventoryUpdate(u16 p) {
     InventorySystem* inv = Inv(p);
     if (Grenade()) {
         if (PE(p)->inCyberTube) UseCyberspaceItem(p);
@@ -677,13 +677,13 @@ void InventoryUpdate(uint16_t p) {
     if (PatchCycDown()) PatchCycleDown(p,true);
 }
 
-extern uint8_t magazinePitchCountForWeapon[16];
-extern uint8_t magazinePitchCountForWeapon2[16];
+extern u8 magazinePitchCountForWeapon[16];
+extern u8 magazinePitchCountForWeapon2[16];
 static bool firstTimePickup = true;
 static bool firstTimeSearch = true;
 // Expects usableItem index
-void AddItemFail(uint16_t p, int index) { DropHeldItem(p); CenterStatusPrint("%s%s%s", Eng_Text->stringTable[32],Eng_Text->stringTable[index + 326],Eng_Text->stringTable[318]); } // Inventory full.
-void AddItemToInventory(uint16_t p, int index, int customIndex) {
+void AddItemFail(u16 p, int index) { DropHeldItem(p); CenterStatusPrint("%s%s%s", Eng_Text->stringTable[32],Eng_Text->stringTable[index + 326],Eng_Text->stringTable[318]); } // Inventory full.
+void AddItemToInventory(u16 p, int index, int customIndex) {
     InventorySystem* inv = Inv(p);
     Eng_UI->mouseClickHeldOverGUI = true; // Prevent gun shooting.
     if (index < 0) index = 0; // Good check on paper.
@@ -748,30 +748,30 @@ void AddItemToInventory(uint16_t p, int index, int customIndex) {
 }
 //=============================================================================
 // CyberDecoy
-void CyberDecoyEnable(uint16_t self) { (void)self; Eng_Global->decoyActive = true; }
-void CyberDecoyDisable(uint16_t self) { (void)self; Eng_Global->decoyActive = false; }
+void CyberDecoyEnable(u16 self) { (void)self; Eng_Global->decoyActive = true; }
+void CyberDecoyDisable(u16 self) { (void)self; Eng_Global->decoyActive = false; }
 //=============================================================================
 // CyberExit
-void CyberExitOnTriggerEnter(uint16_t self, uint16_t other) {
+void CyberExitOnTriggerEnter(u16 self, u16 other) {
     (void)self;
     if (other != PLAYER1) return;
     UIExitCyberspace();
 }
 //=============================================================================
 // CyberDataFragment
-void CyberDataFragmentOnTriggerEnter(uint16_t self, uint16_t other) {
+void CyberDataFragmentOnTriggerEnter(u16 self, u16 other) {
     Entity* e = &Eng_Global->instances[self];
     if (other != PLAYER1) return;
-    UICyberSprint((uint16_t)e->textIndex);
+    UICyberSprint((u16)e->textIndex);
 }
 //=============================================================================
 // CyberItem
-void CyberItemInitBeforeLoad(uint16_t self) {
+void CyberItemInitBeforeLoad(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (Eng_Global->difficultyMission == 0 && e->type == SoftwareType_Data) flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
 }
 
-void CyberItemOnTriggerEnter(uint16_t self, uint16_t other) {
+void CyberItemOnTriggerEnter(u16 self, u16 other) {
     Entity* e = &Eng_Global->instances[self];
     if (other != PLAYER1) return;
     if (!AddSoftwareItem(PLAYER1,e->type,e->version)) return;
@@ -779,7 +779,7 @@ void CyberItemOnTriggerEnter(uint16_t self, uint16_t other) {
 }
 //=============================================================================
 // CyberIce
-void CyberIceOnTriggerEnter(uint16_t self, uint16_t other) {
+void CyberIceOnTriggerEnter(u16 self, u16 other) {
     (void)self;
     Entity* e = &Eng_Global->instances[other];
     if (!(e->entflags & ENTFLAG_RIGIDBODY)) return;
@@ -788,7 +788,7 @@ void CyberIceOnTriggerEnter(uint16_t self, uint16_t other) {
 }
 //=============================================================================
 // CyberMine
-void CyberMineInitBeforeLoad(uint16_t self) {
+void CyberMineInitBeforeLoad(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     e->damage = 55.0f;
     if (Eng_Global->difficultyCyber < 3) { if (random_range(0.0f,1.0f) < 0.2f) flag_set(&e->entflags,ENTFLAG_ACTIVE,false); e->damage = 33.0f; }
@@ -796,7 +796,7 @@ void CyberMineInitBeforeLoad(uint16_t self) {
     if (Eng_Global->difficultyCyber < 1) { if (random_range(0.0f,1.0f) < 0.50f) flag_set(&e->entflags,ENTFLAG_ACTIVE,false); e->damage = 11.0f; }
 }
 
-void CyberMineOnTriggerEnter(uint16_t self, uint16_t other) {
+void CyberMineOnTriggerEnter(u16 self, u16 other) {
     Entity* e = &Eng_Global->instances[self];
     if (other != PLAYER1) return;
     PlayerTakeDamage(PLAYER1,e->damage);
@@ -805,7 +805,7 @@ void CyberMineOnTriggerEnter(uint16_t self, uint16_t other) {
 }
 //=============================================================================
 // CyberPush
-void CyberPushOnTriggerStay(uint16_t self, uint16_t other) {
+void CyberPushOnTriggerStay(u16 self, u16 other) {
     Entity* e = &Eng_Global->instances[self];
     Entity* player = &Eng_Global->instances[PLAYER1];
     if (Eng_Global->difficultyCyber < 1 || other != PLAYER1) return;
@@ -814,7 +814,7 @@ void CyberPushOnTriggerStay(uint16_t self, uint16_t other) {
     Sys_Music.cyberTube = true;
 }
 
-void CyberPushOnTriggerExit(uint16_t self, uint16_t other) {
+void CyberPushOnTriggerExit(u16 self, u16 other) {
     (void)self;
     if (other != PLAYER1) return;
     
@@ -823,34 +823,34 @@ void CyberPushOnTriggerExit(uint16_t self, uint16_t other) {
 }
 //=============================================================================
 // CyberDoor
-void CyberDoorOnCollisionEnter(uint16_t self, uint16_t other) {
+void CyberDoorOnCollisionEnter(u16 self, u16 other) {
     Entity* e = &Eng_Global->instances[self];
     if (!ConstIndexIsDoor(e->index) || (other != PLAYER1 && other != PLAYER2)) return;
     CenterStatusPrint("%s  %s",Eng_Text->stringTable[e->messageIndex],Eng_Text->stringTable[601]);
 }
 //=============================================================================
 // CyberSwitch
-void CyberSwitchInitAfterLoad(uint16_t self) {
+void CyberSwitchInitAfterLoad(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->iceActive) flag_set(&e->entflags,ENTFLAG_ACTIVE,true); // TODO Visual subobject parity removed with hierarchy removal.
 }
 
-void CyberSwitchOnTriggerEnter(uint16_t self, uint16_t other) {
+void CyberSwitchOnTriggerEnter(u16 self, u16 other) {
     Entity* e = &Eng_Global->instances[self];
     if (e->active || other != PLAYER1) return;
-    UICyberSprint((uint16_t)e->textIndex);
+    UICyberSprint((u16)e->textIndex);
     e->active = true;
     UseTargets(other,e->argvalue,e->target);
 }
 //=============================================================================
 // CyberTimer
-void CyberTimerInitAfterLoad(uint16_t self) {
+void CyberTimerInitAfterLoad(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     e->cyberTimer = 600.0f;
     e->timerFinished = Eng_Global->pauseRelativeTime + 1.0;
 }
 
-void CyberTimerReset(uint16_t self, int diff) {
+void CyberTimerReset(u16 self, int diff) {
     Entity* e = &Eng_Global->instances[self];
     switch (diff) {
         case 0: e->cyberTimer = 600.0f; break;
@@ -860,7 +860,7 @@ void CyberTimerReset(uint16_t self, int diff) {
     }
 }
 
-void CyberTimerUpdate(uint16_t self) {
+void CyberTimerUpdate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->cyberTimer <= 0.0f) { UIExitCyberspace(); return; }
     if (e->timerFinished >= Eng_Global->pauseRelativeTime) return;
@@ -873,7 +873,7 @@ void CyberTimerUpdate(uint16_t self) {
 
 //=============================================================================
 // Ladder
-void LadderOnTriggerEnter(uint16_t self, uint16_t other) {
+void LadderOnTriggerEnter(u16 self, u16 other) {
     (void)self;
     if (other != PLAYER1) return;
 
@@ -882,7 +882,7 @@ void LadderOnTriggerEnter(uint16_t self, uint16_t other) {
     if (inv->ladderState < 1) inv->ladderState = 1;
 }
 
-void LadderOnTriggerExit(uint16_t self, uint16_t other) {
+void LadderOnTriggerExit(u16 self, u16 other) {
     (void)self;
     if (other != PLAYER1) return;
     
@@ -892,27 +892,27 @@ void LadderOnTriggerExit(uint16_t self, uint16_t other) {
 }
 //=============================================================================
 // SearchFX
-void SearchFXResetEnable(uint16_t self) {
+void SearchFXResetEnable(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->itemLifeTime <= 0.0f) e->itemLifeTime = 3.0f;
     e->delayFinished = Eng_Global->pauseRelativeTime + e->itemLifeTime;
 }
 
-void SearchFXResetUpdate(uint16_t self) {
+void SearchFXResetUpdate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->delayFinished >= Eng_Global->pauseRelativeTime) return;
     flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
 }
 //=============================================================================
 // ExplosionLife
-void ExplosionLifeInitAfterLoad(uint16_t self) {
+void ExplosionLifeInitAfterLoad(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->tickTime <= 0.0f) e->tickTime = 0.05f;
     if (e->delay <= 0.0f) e->delay = 0.8f;
     e->delayFinished = Eng_Global->pauseRelativeTime + e->delay;
 }
 
-void ExplosionLifeUpdate(uint16_t self) {
+void ExplosionLifeUpdate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (!(e->entflags & ENTFLAG_ACTIVE) || e->delayFinished >= Eng_Global->pauseRelativeTime) return;
     if (e->dontReset) flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
@@ -920,13 +920,13 @@ void ExplosionLifeUpdate(uint16_t self) {
 }
 //=============================================================================
 // DelayedSpawn
-void DelayedSpawnEnable(uint16_t self) {
+void DelayedSpawnEnable(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     e->timerFinished = Eng_Global->pauseRelativeTime + e->delay;
     e->active = true;
 }
 
-void DelayedSpawnUpdate(uint16_t self) {
+void DelayedSpawnUpdate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (!e->active || e->timerFinished >= Eng_Global->pauseRelativeTime) return;
     
@@ -940,7 +940,7 @@ void DelayedSpawnUpdate(uint16_t self) {
 }
 //=============================================================================
 // FuncWall
-void FuncWallInitAfterLoad(uint16_t self) {
+void FuncWallInitAfterLoad(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     Vector3 tempVec = Vector3_A_minus_B(e->position,e->targetPosition);
     float distTotal = distance_vector3(e->startPosition,e->targetPosition);
@@ -952,10 +952,10 @@ void FuncWallInitAfterLoad(uint16_t self) {
     e->position = Vector3_A_plus_B(e->position,tempVec);
 }
 
-void FuncWallMoveStart(uint16_t self) { Eng_Global->instances[self].funcState = FuncStates_MovingStart; Eng_Global->instances[self].tickFinished = Eng_Global->pauseRelativeTime + 10.0f; }
-void FuncWallMoveTarget(uint16_t self) { Eng_Global->instances[self].funcState = FuncStates_MovingTarget; Eng_Global->instances[self].tickFinished = Eng_Global->pauseRelativeTime + 10.0f; }
+void FuncWallMoveStart(u16 self) { Eng_Global->instances[self].funcState = FuncStates_MovingStart; Eng_Global->instances[self].tickFinished = Eng_Global->pauseRelativeTime + 10.0f; }
+void FuncWallMoveTarget(u16 self) { Eng_Global->instances[self].funcState = FuncStates_MovingTarget; Eng_Global->instances[self].tickFinished = Eng_Global->pauseRelativeTime + 10.0f; }
 
-void FuncWallTargetted(uint16_t self, uint16_t activator, const char* argvalue) {
+void FuncWallTargetted(u16 self, u16 activator, const char* argvalue) {
     (void)activator; (void)argvalue;
     Entity* e = &Eng_Global->instances[self];
     if (e->funcState == FuncStates_Start || e->funcState == FuncStates_MovingStart || e->funcState == FuncStates_AjarMovingTarget) FuncWallMoveTarget(self);
@@ -964,7 +964,7 @@ void FuncWallTargetted(uint16_t self, uint16_t activator, const char* argvalue) 
     flag_set(&e->entflags,ENTFLAG_STOPSOUND_PLAYED,false);
 }
 
-void FuncWallUpdate(uint16_t self) {
+void FuncWallUpdate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     Vector3 goal = e->funcState == FuncStates_MovingStart ? e->startPosition : e->targetPosition;
     FuncStates doneState = e->funcState == FuncStates_MovingStart ? FuncStates_Start : FuncStates_Target;
@@ -987,7 +987,7 @@ void FuncWallUpdate(uint16_t self) {
 }
 //=============================================================================
 // ForceBridge
-void func_forcebridge(uint16_t self) {
+void func_forcebridge(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     e->tickTime = 0.05f;
     e->tickFinished = Eng_Global->pauseRelativeTime + e->tickTime + (double)random_range(0.0f,1.0f);
@@ -1005,7 +1005,7 @@ void func_forcebridge(uint16_t self) {
     }
 }
 
-void ForceBridgeActivate(uint16_t self, bool isSilent) {
+void ForceBridgeActivate(u16 self, bool isSilent) {
     Entity* e = &Eng_Global->instances[self];
     if (e->active) return;
     
@@ -1016,7 +1016,7 @@ void ForceBridgeActivate(uint16_t self, bool isSilent) {
     e->scale = (Vector3){ e->forceFieldDirectionX ? 0.1f : e->activatedScale.x, e->forceFieldDirectionY ? 0.1f : e->activatedScale.y, e->forceFieldDirectionZ ? 0.1f : e->activatedScale.z };
 }
 
-void ForceBridgeDeactivate(uint16_t self, bool isSilent) {
+void ForceBridgeDeactivate(u16 self, bool isSilent) {
     Entity* e = &Eng_Global->instances[self];
     if (!e->active) return;
     
@@ -1024,12 +1024,12 @@ void ForceBridgeDeactivate(uint16_t self, bool isSilent) {
     e->active = false; e->lerping = true;
 }
 
-void ForceBridgeToggle(uint16_t self) {
+void ForceBridgeToggle(u16 self) {
     if (Eng_Global->instances[self].active) ForceBridgeDeactivate(self,false);
     else ForceBridgeActivate(self,false);
 }
 
-void ForceBridgeUpdate(uint16_t self) {
+void ForceBridgeUpdate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->tickFinished >= Eng_Global->pauseRelativeTime) return;
     e->tickFinished = Eng_Global->pauseRelativeTime + e->tickTime;
@@ -1051,22 +1051,22 @@ void ForceBridgeUpdate(uint16_t self) {
 
 //=============================================================================
 // TeleportTouch
-static uint16_t TeleportTouch_allTeleportTouches[8];
+static u16 TeleportTouch_allTeleportTouches[8];
 static bool TeleportTouch_initialized;
-void TeleportTouchInitAfterLoad(uint16_t self) {
+void TeleportTouchInitAfterLoad(u16 self) {
     Entity* e = &Eng_Global->instances[self];
-    if (!TeleportTouch_initialized) { for (uint8_t i = 0; i < 8; i++) TeleportTouch_allTeleportTouches[i] = UINT16_MAX; TeleportTouch_initialized = true; }
+    if (!TeleportTouch_initialized) { for (u8 i = 0; i < 8; i++) TeleportTouch_allTeleportTouches[i] = U16_MAX; TeleportTouch_initialized = true; }
     if (e->teleportID >= 8) { DeleteInstance(self); return; }
     TeleportTouch_allTeleportTouches[e->teleportID] = self;
 }
 
-void TeleportTouchOnTriggerEnter(uint16_t self, uint16_t other) {
+void TeleportTouchOnTriggerEnter(u16 self, u16 other) {
     Entity* e = &Eng_Global->instances[self];
     Entity* player = &Eng_Global->instances[PLAYER1];
     if (!e->touchEnabled || other != PLAYER1) return;
     if (player->health <= 0.0f || e->justUsed >= Eng_Global->pauseRelativeTime) return;
-    uint16_t dest = e->targetDestinationID < 8 ? TeleportTouch_allTeleportTouches[e->targetDestinationID] : UINT16_MAX;
-    if (dest == UINT16_MAX) return;
+    u16 dest = e->targetDestinationID < 8 ? TeleportTouch_allTeleportTouches[e->targetDestinationID] : U16_MAX;
+    if (dest == U16_MAX) return;
     player->position = Eng_Global->instances[dest].position;
     Eng_Global->instances[dest].justUsed = Eng_Global->pauseRelativeTime + 1.0;
     play_wav(sounds[106],1.0f,Eng_Global->instances[dest].position,false);
@@ -1074,10 +1074,10 @@ void TeleportTouchOnTriggerEnter(uint16_t self, uint16_t other) {
 
 //=============================================================================
 // Trigger
-void TriggerUseTargets(uint16_t self, uint16_t activator) { UseTargets(activator,Eng_Global->instances[self].argvalue,Eng_Global->instances[self].target); }
-void TriggerDelayedTarget(uint16_t self, uint16_t activator) { Eng_Global->instances[self].delayFireFinished = Eng_Global->pauseRelativeTime + Eng_Global->instances[self].delay; TriggerUseTargets(self,activator); }
+void TriggerUseTargets(u16 self, u16 activator) { UseTargets(activator,Eng_Global->instances[self].argvalue,Eng_Global->instances[self].target); }
+void TriggerDelayedTarget(u16 self, u16 activator) { Eng_Global->instances[self].delayFireFinished = Eng_Global->pauseRelativeTime + Eng_Global->instances[self].delay; TriggerUseTargets(self,activator); }
 
-void TriggerTriggerTripped(uint16_t self, uint16_t other, bool initialEntry) {
+void TriggerTriggerTripped(u16 self, u16 other, bool initialEntry) {
     Entity* e = &Eng_Global->instances[self];
     if (other != PLAYER1 && other != PLAYER2) return;
     if (e->recentMostActivator && e->ignoreSecondaryTriggers) return;
@@ -1087,16 +1087,16 @@ void TriggerTriggerTripped(uint16_t self, uint16_t other, bool initialEntry) {
     if (e->delay <= 0.0f) TriggerUseTargets(self,other); else TriggerDelayedTarget(self,other);
 }
 
-void TriggerOnTriggerEnter(uint16_t self, uint16_t other) { if (!Eng_Global->instances[self].allDone) TriggerTriggerTripped(self,other,true); }
-void TriggerOnTriggerStay(uint16_t self, uint16_t other) { if (!Eng_Global->instances[self].allDone) TriggerTriggerTripped(self,other,false); }
-void TriggerOnTriggerExit(uint16_t self, uint16_t other) { if (!Eng_Global->instances[self].allDone && (other == PLAYER1 || other == PLAYER2)) Eng_Global->instances[self].numPlayers--; }
-void TriggerTargetted(uint16_t self, uint16_t activator) { if (Eng_Global->instances[self].ignoreSecondaryTriggers) Eng_Global->instances[self].recentMostActivator = activator; }
+void TriggerOnTriggerEnter(u16 self, u16 other) { if (!Eng_Global->instances[self].allDone) TriggerTriggerTripped(self,other,true); }
+void TriggerOnTriggerStay(u16 self, u16 other) { if (!Eng_Global->instances[self].allDone) TriggerTriggerTripped(self,other,false); }
+void TriggerOnTriggerExit(u16 self, u16 other) { if (!Eng_Global->instances[self].allDone && (other == PLAYER1 || other == PLAYER2)) Eng_Global->instances[self].numPlayers--; }
+void TriggerTargetted(u16 self, u16 activator) { if (Eng_Global->instances[self].ignoreSecondaryTriggers) Eng_Global->instances[self].recentMostActivator = activator; }
 //=============================================================================
 // TriggerCounter
-void TriggerCounterTarget(uint16_t self, uint16_t activator, const char* argvalue) { (void)argvalue; UseTargets(activator,Eng_Global->instances[self].argvalue,Eng_Global->instances[self].target); }
-void TriggerCounterDelayedTarget(uint16_t self, uint16_t activator, const char* argvalue) { Eng_Global->instances[self].delayFinished = Eng_Global->pauseRelativeTime + Eng_Global->instances[self].delay; TriggerCounterTarget(self,activator,argvalue); }
+void TriggerCounterTarget(u16 self, u16 activator, const char* argvalue) { (void)argvalue; UseTargets(activator,Eng_Global->instances[self].argvalue,Eng_Global->instances[self].target); }
+void TriggerCounterDelayedTarget(u16 self, u16 activator, const char* argvalue) { Eng_Global->instances[self].delayFinished = Eng_Global->pauseRelativeTime + Eng_Global->instances[self].delay; TriggerCounterTarget(self,activator,argvalue); }
 
-void TriggerCounterTargetted(uint16_t self, uint16_t activator, const char* argvalue) {
+void TriggerCounterTargetted(u16 self, u16 activator, const char* argvalue) {
     Entity* e = &Eng_Global->instances[self];
     e->counter++;
     if (e->counter != e->countToTrigger) return;
@@ -1105,14 +1105,14 @@ void TriggerCounterTargetted(uint16_t self, uint16_t activator, const char* argv
 }
 //=============================================================================
 // TextureChanger
-void TextureChangerInitAfterLoad(uint16_t self) {
+void TextureChangerInitAfterLoad(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (!e->currentTexture) return;
     e->texIndex = e->altTexIndex;
     if (e->altGlowIndex < MAX_VALID_TEXTURE) e->glowIndex = e->altGlowIndex;
 }
 
-void TextureChangerToggle(uint16_t self) {
+void TextureChangerToggle(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->currentTexture) {
         e->texIndex = EntityDefinitions[e->index].texIndex;
@@ -1126,7 +1126,7 @@ void TextureChangerToggle(uint16_t self) {
 
 //=============================================================================
 // GravityLift
-void GravityLiftInitAfterLoad(uint16_t self) {
+void GravityLiftInitAfterLoad(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->strength <= 0.0f) e->strength = 12.0f;
     if (e->offStrengthFactor <= 0.0f) e->offStrengthFactor = 0.3f;
@@ -1134,12 +1134,12 @@ void GravityLiftInitAfterLoad(uint16_t self) {
     e->topPoint = (Vector3){ 0.0f, e->position.y + (e->colliderSize.y * 0.5f), 0.0f };
 }
 
-void GravityLiftOnTriggerExit(uint16_t self, uint16_t other) {
+void GravityLiftOnTriggerExit(u16 self, u16 other) {
     (void)self;
     if (other == PLAYER1) flag_set(&Eng_Global->instances[PLAYER1].entflags,ENTFLAG_GRAV_LIFT_STATE,false);
 }
 
-void GravityLiftOnForce(uint16_t self, uint16_t other, bool initial) {
+void GravityLiftOnForce(u16 self, u16 other, bool initial) {
     Entity* e = &Eng_Global->instances[self];
     Entity* o = &Eng_Global->instances[other];
     if (other == PLAYER1) flag_set(&Eng_Global->instances[PLAYER1].entflags,ENTFLAG_GRAV_LIFT_STATE,true);
@@ -1154,7 +1154,7 @@ void GravityLiftOnForce(uint16_t self, uint16_t other, bool initial) {
     }
 }
 
-void GravityLiftOffForce(uint16_t self, uint16_t other, bool initial) {
+void GravityLiftOffForce(u16 self, u16 other, bool initial) {
     Entity* e = &Eng_Global->instances[self];
     Entity* o = &Eng_Global->instances[other];
     if (other == PLAYER1) flag_set(&Eng_Global->instances[PLAYER1].entflags,ENTFLAG_GRAV_LIFT_STATE,true);
@@ -1165,22 +1165,22 @@ void GravityLiftOffForce(uint16_t self, uint16_t other, bool initial) {
     }
 }
 
-void GravityLiftOnTriggerEnter(uint16_t self, uint16_t other) {
+void GravityLiftOnTriggerEnter(u16 self, u16 other) {
     Eng_Global->instances[self].initialBurstFinished = Eng_Global->pauseRelativeTime + 1.0f;
     if (Eng_Global->instances[self].active) GravityLiftOnForce(self,other,true);
     else GravityLiftOffForce(self,other,true);
 }
 
-void GravityLiftOnTriggerStay(uint16_t self, uint16_t other) {
+void GravityLiftOnTriggerStay(u16 self, u16 other) {
     if (Eng_Global->instances[self].active) GravityLiftOnForce(self,other,false);
     else GravityLiftOffForce(self,other,false);
 }
 
-void GravityLiftToggle(uint16_t self) { Eng_Global->instances[self].active = !Eng_Global->instances[self].active; }
+void GravityLiftToggle(u16 self) { Eng_Global->instances[self].active = !Eng_Global->instances[self].active; }
 
 //=============================================================================
 // LogicTimer
-void LogicTimerInitBeforeLoad(uint16_t self) {
+void LogicTimerInitBeforeLoad(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->timeInterval <= 0.0f) e->timeInterval = 0.35f;
     if (e->randomMin <= 0.0f) e->randomMin = 5.0f;
@@ -1188,26 +1188,26 @@ void LogicTimerInitBeforeLoad(uint16_t self) {
     e->intervalFinished = Eng_Global->pauseRelativeTime + (e->useRandomTimes ? (double)random_range(e->randomMin,e->randomMax) : (double)e->timeInterval);
 }
 
-void LogicTimerUseTargets(uint16_t self) { UseTargets(self,Eng_Global->instances[self].argvalue,Eng_Global->instances[self].target); }
+void LogicTimerUseTargets(u16 self) { UseTargets(self,Eng_Global->instances[self].argvalue,Eng_Global->instances[self].target); }
 
-void LogicTimerUpdate(uint16_t self) {
+void LogicTimerUpdate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (!e->active || e->intervalFinished >= Eng_Global->pauseRelativeTime) return;
     e->intervalFinished = Eng_Global->pauseRelativeTime + (e->useRandomTimes ? (double)random_range(e->randomMin,e->randomMax) : (double)e->timeInterval);
     LogicTimerUseTargets(self);
 }
 
-void LogicTimerTargetted(uint16_t self, uint16_t activator, const char* argvalue) { (void)activator; (void)argvalue; Eng_Global->instances[self].active = !Eng_Global->instances[self].active; }
+void LogicTimerTargetted(u16 self, u16 activator, const char* argvalue) { (void)activator; (void)argvalue; Eng_Global->instances[self].active = !Eng_Global->instances[self].active; }
 
 //=============================================================================
 // ButtonSwitch
-void ButtonSwitchInitAfterLoad(uint16_t self) {
+void ButtonSwitchInitAfterLoad(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     e->delayFinished = 0.0f;
     if (e->active) e->tickFinished = Eng_Global->pauseRelativeTime + 1.5 + (double)random_range(0.0f,1.0f);
 }
 
-void ButtonSwitchUseTargets(uint16_t self, uint16_t activator, const char* argvalue) {
+void ButtonSwitchUseTargets(u16 self, u16 activator, const char* argvalue) {
     Entity* e = &Eng_Global->instances[self];
     UseTargets(activator,argvalue,e->target);
     e->active = !e->active;
@@ -1218,7 +1218,7 @@ void ButtonSwitchUseTargets(uint16_t self, uint16_t activator, const char* argva
     }
 }
 
-void ButtonSwitchUse(uint16_t self, uint16_t activator, const char* argvalue) {
+void ButtonSwitchUse(u16 self, u16 activator, const char* argvalue) {
     Entity* e = &Eng_Global->instances[self];
     if (Eng_Cheats->superoverride || Eng_Global->difficultyMission == 0) EntitySetLocked(e,false);
     else if (GetCurrentLevelSecurity() > e->securityThreshold) { UIBlockedBySecurity(e->position); return; }
@@ -1234,7 +1234,7 @@ void ButtonSwitchUse(uint16_t self, uint16_t activator, const char* argvalue) {
     else ButtonSwitchUseTargets(self,activator,argvalue);
 }
 
-void ButtonSwitchUpdate(uint16_t self) {
+void ButtonSwitchUpdate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->delayFinished > 0.0 && e->delayFinished < Eng_Global->pauseRelativeTime) { e->delayFinished = 0.0; ButtonSwitchUseTargets(self,e->recentMostActivator,e->argvalue); }
     if (e->blinkTexOnActive && e->active && e->tickFinished < Eng_Global->pauseRelativeTime) {
@@ -1244,12 +1244,12 @@ void ButtonSwitchUpdate(uint16_t self) {
     }
 }
 
-void ButtonSwitchTargetted(uint16_t self, uint16_t activator, const char* argvalue) { ButtonSwitchUse(self,activator,argvalue); }
+void ButtonSwitchTargetted(u16 self, u16 activator, const char* argvalue) { ButtonSwitchUse(self,activator,argvalue); }
 //=============================================================================
 // HealingBed
-void HealingBedUse(uint16_t self, uint16_t owner) {
+void HealingBedUse(u16 self, u16 owner) {
     Entity* e = &Eng_Global->instances[self];
-    if (GetCurrentLevelSecurity() <= (uint8_t)e->minSecurityLevel) {
+    if (GetCurrentLevelSecurity() <= (u8)e->minSecurityLevel) {
         if (!e->broken) {
             HealthManagerHealingBed(PLAYER1,e->amount,true);
             CenterStatusPrint("%s",Eng_Text->stringTable[23],owner);
@@ -1259,10 +1259,10 @@ void HealingBedUse(uint16_t self, uint16_t owner) {
 }
 //=============================================================================
 // TargetIO
-void UseTargets(uint16_t activator, const char* argvalue, const char* targetname) {
+void UseTargets(u16 activator, const char* argvalue, const char* targetname) {
     bool succeeded = false;
     if (StringIsEmpty(targetname)) return;
-    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < Eng_Global->loadedInstances; i++) {
+    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < Eng_Global->loadedInstances; i++) {
         if (!StringsEqual(Eng_Global->instances[i].targetname,targetname)) continue;
         Targetted(activator,i,argvalue);
         succeeded = true;
@@ -1270,7 +1270,7 @@ void UseTargets(uint16_t activator, const char* argvalue, const char* targetname
     if (!succeeded) DualLogWarn("Failed to find a matching targetname for %s\n",targetname);
 }
 
-void Targetted(uint16_t activator, uint16_t self, const char* argvalue) {
+void Targetted(u16 activator, u16 self, const char* argvalue) {
     Entity* e = &Eng_Global->instances[self];
     Entity* a = &Eng_Global->instances[activator];
     if (argvalue && !StringIsEmpty(argvalue)) StringCopyInto_A_From_B(e->argvalue,argvalue,TARGET_STRING_LENGTH);
@@ -1346,7 +1346,7 @@ void VaporizeClick(void) { // TODO
 #define AMMO_ICON_NONE    -1
 #define AMMO_ICON_ENERGY  -2
 
-typedef struct { int8_t norm; int8_t alt; } AmmoIconEntry;
+typedef struct { i8 norm,alt; } AmmoIconEntry;
 static const AmmoIconEntry ammoIconTable[51] = {
     [36-36] = { 7,  8  }, // MK3 Magnesium / Penetrator
     [37-36] = {AMMO_ICON_ENERGY, AMMO_ICON_ENERGY},
@@ -1370,7 +1370,7 @@ static const AmmoIconEntry ammoIconTable[51] = {
 // AMMO_ICON_ENERGY = render energy bar UI instead of icon/border.
 // AMMO_ICON_NONE   = render nothing (no ammo type for this weapon).
 // >= 0             = index into ammIcons sprite array for UI renderer.
-int8_t AmmoIconGet(int index,bool alt) {
+i8 AmmoIconGet(int index,bool alt) {
     if (index < 36 || index > 51) return AMMO_ICON_NONE;
     const AmmoIconEntry* e = &ammoIconTable[index - 36];
     return alt ? e->alt : e->norm;
@@ -1383,7 +1383,7 @@ int8_t AmmoIconGet(int index,bool alt) {
 // Video text phases: 0=text1 visible, 1=text2 visible, 2=text3 visible, 3=all hidden
 static double creditsVidStartTime = 0.0;
 static double creditsVidFinished  = 0.0;
-static uint8_t creditsVidPhase    = 0;
+static u8 creditsVidPhase    = 0;
 
 void CreditsOnEnable(void) {
     Eng_Global->creditsActive    = true;
@@ -1448,7 +1448,7 @@ void CreditsUpdate(void) {
 // volume  = centerAlphaCurrent
 // tickFinished    = next alpha decay tick (already on Entity)
 // animSwapFinished = conwayFinished (already on Entity)
-void CyberWallInitAfterLoad(uint16_t self) {
+void CyberWallInitAfterLoad(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     e->volume        = CYBERWALL_ALPHA_MIN;
     e->tickFinished  = Eng_Global->pauseRelativeTime + CYBERWALL_INIT_DELAY;
@@ -1457,7 +1457,7 @@ void CyberWallInitAfterLoad(uint16_t self) {
     // per-instance draw param for this geometry instance's material slot
 }
 
-void CyberWallUpdate(uint16_t self) {
+void CyberWallUpdate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (Eng_Global->pauseRelativeTime < e->tickFinished) return;
     if (e->volume > CYBERWALL_ALPHA_MIN) {
@@ -1467,22 +1467,22 @@ void CyberWallUpdate(uint16_t self) {
     e->tickFinished = Eng_Global->pauseRelativeTime + CYBERWALL_TICK;
 }
 
-void CyberWallHit(uint16_t self) { // Called by projectile hit, collision, or ConwaySignal propagation from adjacent wall
+void CyberWallHit(u16 self) { // Called by projectile hit, collision, or ConwaySignal propagation from adjacent wall
     Entity* e = &Eng_Global->instances[self];
     e->volume = CYBERWALL_ALPHA_MAX;
     // TODO: push e->volume to renderer as _CenterAlpha for this instance
 }
 
-void CyberWallConwaySignal(uint16_t self) { // Called when a conway propagation signal arrives from a neighbour TODO Conway's game of life propagation on world x,z plane
+void CyberWallConwaySignal(u16 self) { // Called when a conway propagation signal arrives from a neighbour TODO Conway's game of life propagation on world x,z plane
     Eng_Global->instances[self].animSwapFinished = Eng_Global->pauseRelativeTime + CYBERWALL_CONWAY_TIME;
 }
 //=============================================================================
 // CyborgConversionToggle
-void CyborgConversionToggleTargetted(uint16_t activator, const char* argvalue) {
+void CyborgConversionToggleTargetted(u16 activator, const char* argvalue) {
     (void)activator; (void)argvalue;
-    uint8_t lev = Eng_Global->currentLevel;
+    u8 lev = Eng_Global->currentLevel;
     bool active = (Eng_Global->ressurectionActiveLevels >> lev) & 1u;
-    flag_set((uint64_t*)&Eng_Global->ressurectionActiveLevels,(uint64_t)(1u << lev),!active);
+    flag_set((u64*)&Eng_Global->ressurectionActiveLevels,(u64)(1u << lev),!active);
 //     if (Eng_Global->currentLevel == 6) { TODO, set the ones for 10, 11, 12 when 6 gets toggled as they don't have their own switch
 //         if (ressurectionActive[Eng_Global->currentLevel]) {
 //             ressurectionActive[Eng_Global->currentLevel] = false;
@@ -1509,10 +1509,10 @@ void CyborgConversionToggleTargetted(uint16_t activator, const char* argvalue) {
 //=============================================================================
 // ElevatorButton
 // static const char* elevFloorLabels[14] = {"R","1","2","3","4","5","6","7","8","9","G1","G2","G4","C"};
-void ElevatorButtonClick(uint16_t self) {
+void ElevatorButtonClick(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     Eng_UI->mouseClickHeldOverGUI = true;
-    if (Eng_UI->linkedElevatorDoor == UINT16_MAX) {
+    if (Eng_UI->linkedElevatorDoor == U16_MAX) {
         CenterStatusPrint("%s",Eng_Text->stringTable[6]); // Too far away from that.
         return;
     }
@@ -1533,7 +1533,7 @@ void ElevatorButtonClick(uint16_t self) {
     }
     // TODO: call engine LoadLevel(e->teleportID, spawnPos) — destination spawn
     // position comes from instance[e->targetDestinationID].position if set
-    // (targetDestinationID != UINT16_MAX), else Vector3 zero.
+    // (targetDestinationID != U16_MAX), else Vector3 zero.
     // LoadLevel is engine-side level transition, not yet in interop.h.
 //     if (floorAccessible) { // floorAccessible set from the us_puz_elevatorkeypad, us_puz_elevatorkeypad2, us_puz_elevatorkeypad3, or us_puz_elevatorkeypad4 entity
 //         LoadLevel(levelIndex,targetDestination.Eng_Global->instances[i].position);
@@ -1544,7 +1544,7 @@ void ElevatorButtonClick(uint16_t self) {
 
 // Elevator pad UI — layout for 1366x768, scaled by engine to actual res.
 // Called from RenderUI when TabMSG_Elevator is the active tab.
-void RenderElevatorPadUI(uint16_t padIdx) {
+void RenderElevatorPadUI(u16 padIdx) {
     // TODO: full button grid layout once UI primitive set is confirmed.
     // Expected layout: 14 floor buttons in a vertical or 2-col grid,
     // each ~84x32, labeled R/1-9/G1/G2/G4/C, greyed out if !floorAccessible.
@@ -1563,7 +1563,7 @@ void RenderElevatorPadUI(uint16_t padIdx) {
 // elevCurrentFloor      — current floor index 0-10 for indicator sprite
 // tetheredKeypadElevator, linkedElevatorDoor, objectInUsePos already on SystemUI
 
-void SendElevatorKeypadToDataTab(uint16_t padIdx,uint16_t linkedDoor,Vector3 tetherPoint,bool isRH) {
+void SendElevatorKeypadToDataTab(u16 padIdx,u16 linkedDoor,Vector3 tetherPoint,bool isRH) {
     Entity* pad = &Eng_Global->instances[padIdx];
     for (int i = 0; i < 8; i++) {
         // Each button slot on the pad entity is encoded in contents[]/customIndex[]
@@ -1572,7 +1572,7 @@ void SendElevatorKeypadToDataTab(uint16_t padIdx,uint16_t linkedDoor,Vector3 tet
         // customIndex[i] as spawn point instance index, active flag as accessible.
         Eng_UI->elevButtonLevelIdx[i]  = pad->contents[i < 4 ? i : 0];     // TODO: slots 4-7
         Eng_UI->elevButtonSpawnIdx[i]  = pad->customIndex[i < 4 ? i : 0];  // TODO: slots 4-7
-        Eng_UI->buttonsEnabled[i]      = pad->contents[i < 4 ? i : 0] != UINT16_MAX;
+        Eng_UI->buttonsEnabled[i]      = pad->contents[i < 4 ? i : 0] != U16_MAX;
         Eng_UI->buttonsDarkened[i]     = (Eng_Global->levelSecurity[Eng_UI->elevButtonLevelIdx[i]]
                                           > GetCurrentLevelSecurity());
     }
@@ -1615,10 +1615,10 @@ void RenderElevatorKeypadUI(void) {
 }
 //=============================================================================
 // Email
-void EmailTargetted(uint16_t self,uint16_t activator,const char* argvalue) {
+void EmailTargetted(u16 self,u16 activator,const char* argvalue) {
     (void)activator; (void)argvalue;
     Entity* e = &Eng_Global->instances[self];
-    uint16_t idx = e->emailIndex;
+    u16 idx = e->emailIndex;
     InventorySystem* inv = &Eng_Global->invP1;
     if (inv->hasLog[idx]) return;
     inv->hasLog[idx]      = true;
@@ -1665,7 +1665,7 @@ void OverloadFired(void) {
 
 // Called from weapon pane render — returns visual state for renderer to act on
 // 0 = normal+clickable, 1 = overloaded, 2 = disabled (post-fire/too hot)
-uint8_t OverloadButtonVisualState(void) {
+u8 OverloadButtonVisualState(void) {
     InventorySystem* inv = &Eng_Global->invP1;
     if (inv->currentEnergyWeaponHeat[inv->weaponIndex] > OVERLOAD_HEAT_THRESHOLD) return 2;
     if (inv->overloadEnabled) return 1;
@@ -1677,7 +1677,7 @@ uint8_t OverloadButtonVisualState(void) {
 #define FIREWORK_PHASE_WAIT_FULL 1
 #define FIREWORK_PHASE_WAIT_MIN  2
 
-void FireWorkThangOnEnable(uint16_t self) {
+void FireWorkThangOnEnable(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->randomMin >= e->randomMax) {
         e->randomMin = 0.0f;
@@ -1691,7 +1691,7 @@ void FireWorkThangOnEnable(uint16_t self) {
     e->tickFinished  = Eng_Global->pauseRelativeTime;
 }
 
-void FireWorkThangUpdate(uint16_t self) {
+void FireWorkThangUpdate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->tickFinished >= Eng_Global->pauseRelativeTime) return;
     e->tickFinished = Eng_Global->pauseRelativeTime + (1.0/60.0);
@@ -1795,13 +1795,13 @@ void GeneralInvDoubleClick(int buttonIdx,int customIdx) { Eng_UI->mouseClickHeld
 #define TARGID_DISPLAY_NAME    (1ull << 63)
 
 float TargetIDGetSensingRange(bool manual) {
-    uint8_t ver = Eng_Global->invP1.hardwareVersion[HW_TID_IDX];
+    u8 ver = Eng_Global->invP1.hardwareVersion[HW_TID_IDX];
     if (manual) return (ver >= 4) ? 18.0f : 13.0f;
     else return (ver <= 2) ? 0.0f : ((ver == 3) ? 13.0f : 20.0f);
 }
 
 float TargetIDGetTetherRange(void) { return (Eng_Global->invP1.hardwareVersion[HW_TID_IDX] >= 4) ? 22.0f : 15.0f; }
-static void TargetIDDeactivate(uint16_t self) {
+static void TargetIDDeactivate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->enemy != WORLD) {
         Entity* npc = &Eng_Global->instances[e->enemy];
@@ -1812,7 +1812,7 @@ static void TargetIDDeactivate(uint16_t self) {
     flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
 }
 
-void TargetIDSendDamageReceive(uint16_t self,float damage,AttackType attackType) {
+void TargetIDSendDamageReceive(u16 self,float damage,AttackType attackType) {
     Entity* e   = &Eng_Global->instances[self];
     if (e->enemy == NULLENT) return;
     Entity* npc = &Eng_Global->instances[e->enemy];
@@ -1832,7 +1832,7 @@ void TargetIDSendDamageReceive(uint16_t self,float damage,AttackType attackType)
     }
 }
 
-void TargetIDUpdate(uint16_t self) {
+void TargetIDUpdate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (!(e->entflags & ENTFLAG_ACTIVE)) return;
 
@@ -1876,7 +1876,7 @@ void TargetIDUpdate(uint16_t self) {
     //     default                                    → 516 Idle
 }
 
-void TargetIDInitAfterLoad(uint16_t self) {
+void TargetIDInitAfterLoad(u16 self) {
     Entity* e        = &Eng_Global->instances[self];
     e->textIndex     = -1;
     e->enemy        = NULLENT;
@@ -1896,7 +1896,7 @@ static const float hwDrain[12][4] = {
     [9]  = { 0.0f,     0.02f,    0.015f,   0.0f    },
     [11] = { 0.08533f, 0.0f,     0.0f,     0.0f    },
 };
-static const uint16_t hwDrainJPM[12][4] = {
+static const u16 hwDrainJPM[12][4] = {
     [3]  = {  9, 20, 15,   0},
     [5]  = { 24, 60,105,  30},
     [6]  = {  1,  0,  0,   0},
@@ -1906,7 +1906,7 @@ static const uint16_t hwDrainJPM[12][4] = {
 };
 
 static void TargetIdentifierSenseTargets(void) {
-    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < Eng_Global->loadedInstances; i++) {
+    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < Eng_Global->loadedInstances; i++) {
         Entity* e = &Eng_Global->instances[i];
         if (!(e->entflags & ENTFLAG_ACTIVE))         continue;
         if (!ConstIndexIsNPC(e->index))              continue;
@@ -1922,27 +1922,27 @@ MOD_TO_ENGINE bool ModRequestsGrayscale(void) {return (/*(Eng_Global->invP1.hasH
 
 static void DeactivateHardwareOnEnergyDepleted(void) {
     InventorySystem* inv = &Eng_Global->invP1;
-    uint16_t* active = &inv->hardwareIsActive;
-    flag_set((uint64_t*)active, HW_SNS, false);
+    u16* active = &inv->hardwareIsActive;
+    flag_set((u64*)active, HW_SNS, false);
     // TODO: SensaroundOff() — hardware button manager effects
     if ((*active & HW_BIO) && inv->hardwareVersionSetting[HW_BIO_IDX] == 0) {
-        flag_set((uint64_t*)active, HW_BIO, false);
+        flag_set((u64*)active, HW_BIO, false);
         // TODO: BioOff()
     }
     if (*active & HW_SHD) {
-        flag_set((uint64_t*)active, HW_SHD, false);
+        flag_set((u64*)active, HW_SHD, false);
         // TODO: ShieldOffWithEffects()
     }
     if (*active & HW_LAN) {
-        flag_set((uint64_t*)active, HW_LAN, false);
+        flag_set((u64*)active, HW_LAN, false);
         // TODO: LanternOff()
     }
     if (*active & HW_BST) {
-        flag_set((uint64_t*)active, HW_BST, false);
+        flag_set((u64*)active, HW_BST, false);
         // TODO: BoosterOff()
     }
     if (*active & HW_INF) {
-        flag_set((uint64_t*)active, HW_INF, false);
+        flag_set((u64*)active, HW_INF, false);
         // TODO: InfraredOff()
     }
 }
@@ -1981,9 +1981,9 @@ void PlayerEnergyUpdate(void) {
     if (inv->energyDrainTickFinished > Eng_Global->pauseRelativeTime) return;
     
     inv->energyDrainTickFinished = Eng_Global->pauseRelativeTime + ENERGY_TICK;
-    bool anyDrain = false; uint8_t ver; inv->drainJPM = 0;
+    bool anyDrain = false; u8 ver; inv->drainJPM = 0;
     for (int hw = 3; hw <= 11; hw++) {
-        uint16_t bit = (uint16_t)(1u << hw);
+        u16 bit = (u16)(1u << hw);
         if (!(inv->hardwareIsActive & bit)) continue;
         if (hw == 4 || hw == 8 || hw == 10) continue; // No energy usage
         
@@ -2000,8 +2000,8 @@ void PlayerEnergyUpdate(void) {
 #define GREN_FLAG_EXPLODE_CONTACT (1ull << 59)
 #define GREN_FLAG_USE_TIMER       (1ull << 58)
 #define GREN_FLAG_USE_PROX        (1ull << 57)
-static bool GrenadeIsNPCMine(uint16_t self) { return Eng_Global->instances[self].layer != PhysicsLayer_PlayerBullets; }
-void GrenadeExplode(uint16_t self) {
+static bool GrenadeIsNPCMine(u16 self) { return Eng_Global->instances[self].layer != PhysicsLayer_PlayerBullets; }
+void GrenadeExplode(u16 self) {
     DualLog("Grenade exploded");
     Entity* e = &Eng_Global->instances[self];
     // TODO: DamageData + ApplyImpactForceSphere(damage,attackType,penetration,offense,damage*1.5f,e->position,e->strength,1.0f)
@@ -2010,7 +2010,7 @@ void GrenadeExplode(uint16_t self) {
         flag_set(&p->entflags,ENTFLAG_MAKING_NOISE,true);
         p->noiseFinished = Eng_Global->pauseRelativeTime + 2.0;
     }
-    int16_t idx = (int16_t)e->index;
+    i16 idx = (i16)e->index;
     int soundIndex = 60;
     switch (idx) {
         case 7:  soundIndex = 64; Eng_Global->fogFac += 5;  break; // frag
@@ -2027,9 +2027,9 @@ void GrenadeExplode(uint16_t self) {
     DeleteInstance(self);
 }
 
-void GrenadeActivate(uint16_t self) {
+void GrenadeActivate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
-    int16_t idx = (int16_t)e->index;
+    i16 idx = (i16)e->index;
     switch (idx) {
         case 7:  flag_set(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
         case 8:  flag_set(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
@@ -2042,28 +2042,28 @@ void GrenadeActivate(uint16_t self) {
     }
 }
 
-void GrenadeUpdate(uint16_t self) {
+void GrenadeUpdate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
-    if ((int16_t)e->index == 14) { GrenadeExplode(self); return; } // Plastique
+    if ((i16)e->index == 14) { GrenadeExplode(self); return; } // Plastique
     
     if (((e->ioflags & GREN_FLAG_USE_TIMER) && e->timerFinished < Eng_Global->pauseRelativeTime) || ((e->ioflags & GREN_FLAG_USE_PROX) && (e->entflags & ENTFLAG_MAKING_NOISE))) GrenadeExplode(self);
 }
 
 // Called by physics collision callback when grenade touches anything
-void GrenadeOnCollision(uint16_t self) {
+void GrenadeOnCollision(u16 self) {
     if (Eng_Global->instances[self].ioflags & GREN_FLAG_EXPLODE_CONTACT) GrenadeExplode(self);
 }
 //=============================================================================
 // ProjectileEffectImpact
 // TODO: GetDamageTakeAmount(DamageData* dd) — weapon/armor calculation system
-// TODO: TakeDamage(uint16_t target, DamageData* dd) -> float — health manager
-// TODO: Tranquilize(uint16_t target, float amount, bool fromProjectile) -> float
+// TODO: TakeDamage(u16 target, DamageData* dd) -> float — health manager
+// TODO: Tranquilize(u16 target, float amount, bool fromProjectile) -> float
 // TODO: ApplyImpactForceSphere — needs OverlapSphere from physics, engine-side
-// TODO: ApplyImpactForce(uint16_t target, float vel, Vector3 normal, Vector3 pt)
-// TODO: SpawnImpactEffect(uint16_t impactType, Vector3 pos) — object pool
+// TODO: ApplyImpactForce(u16 target, float vel, Vector3 normal, Vector3 pt)
+// TODO: SpawnImpactEffect(u16 impactType, Vector3 pos) — object pool
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
-static void ProjectileEffectImpactOnCollision(uint16_t self,uint16_t hitIdx, Vector3 hitPos,Vector3 hitNormal) {
+static void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, Vector3 hitPos,Vector3 hitNormal) {
     Entity* e   = &Eng_Global->instances[self];
     if (hitIdx == e->recentMostActivator) return; // hit own host, ignore
     e->counter++;
@@ -2123,7 +2123,7 @@ static void ProjectileEffectImpactOnCollision(uint16_t self,uint16_t hitIdx, Vec
 }
 #pragma GCC diagnostic pop
 
-void ProjectileEffectImpactInitAfterLoad(uint16_t self) {
+void ProjectileEffectImpactInitAfterLoad(u16 self) {
     Entity* e       = &Eng_Global->instances[self];
     e->counter      = 0;
     if (e->countToTrigger < 1) e->countToTrigger = 1;
@@ -2145,7 +2145,7 @@ static const float attackTypeMult[7][12] = {
 };
 
 // Object death sound table indexed by constIndex
-static const int16_t objectDeathSound[] = {
+static const i16 objectDeathSound[] = {
     [458]=63,[459]=66,[460]=66,
     [464]=62,[465]=532,[466]=532,[467]=532,[468]=532,[469]=532,[470]=532,[471]=532,
     [472]=62,[473]=62,[474]=62,[475]=62,[476]=62,
@@ -2153,14 +2153,14 @@ static const int16_t objectDeathSound[] = {
     [525]=68,[526]=68,
 };
 
-static bool IsCyberEntity(uint16_t self) {
+static bool IsCyberEntity(u16 self) {
     if (Eng_Global->currentLevel == LEVEL_CYBERSPACE) return true;
     Entity* e = &Eng_Global->instances[self];
     if (self != PLAYER1 && e->cyberHealth > 0.0f) return true;
     return (ConstIndexIsNPC(e->index) && (e->index - 419) > 23); // 24-28 are cyber enemies
 }
 
-static float ApplyAttackTypeAdjustments(uint16_t self,float take,AttackType at) {
+static float ApplyAttackTypeAdjustments(u16 self,float take,AttackType at) {
     Entity* e = &Eng_Global->instances[self];
     if (!ConstIndexIsNPC(e->index) || e->health <= 0.0f) return take;
     NPCType t = npcTable[e->index - 419].type;
@@ -2168,13 +2168,13 @@ static float ApplyAttackTypeAdjustments(uint16_t self,float take,AttackType at) 
     return take * attackTypeMult[t][at];
 }
 
-static void UseDeathTargets(uint16_t self) {
+static void UseDeathTargets(u16 self) {
     if (self == PLAYER1 || self == PLAYER2) return;
     Entity* e = &Eng_Global->instances[self];
     if (!StringIsEmpty(e->target)) UseTargets(self,NULL,e->target);
 }
 
-static void TeleportAway(uint16_t self) {
+static void TeleportAway(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->entflags & ENTFLAG_TELEPORT_ON_DEATH) return; // already done, flag reused as teleportDone
     flag_set(&e->entflags,ENTFLAG_TELEPORT_ON_DEATH,true);
@@ -2182,28 +2182,26 @@ static void TeleportAway(uint16_t self) {
     e->gravity         = 0.0f;
     e->velocity        = (Vector3){0,0,0};
     e->angularVelocity = (Vector3){0,0,0};
-    e->modelIndex      = UINT16_MAX; // remove from rendering
+    e->modelIndex      = U16_MAX; // remove from rendering
     // TODO: activate teleport effect particle instance at e->position
 }
 
-static void DropSearchables(uint16_t self) {
+static void DropSearchables(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     // TODO: NotifySearchThatSearchableWasDestroyed()
     for (int i = 0; i < 4; i++) {
-        if (e->contents[i] == UINT16_MAX) continue;
-        uint16_t spawned = SpawnDynamicObject(e->contents[i] + 307,true);
-        if (spawned != UINT16_MAX) {
+        if (e->contents[i] == U16_MAX) continue;
+        u16 spawned = SpawnDynamicObject(e->contents[i] + 307,true);
+        if (spawned != U16_MAX) {
             Eng_Global->instances[spawned].position   = e->position;
             Eng_Global->instances[spawned].customIndex[0] = e->customIndex[i];
-        } else {
-            CenterStatusPrint("BUG: Failed to instantiate object being dropped on gib.");
-        }
-        e->contents[i]   = UINT16_MAX;
-        e->customIndex[i] = UINT16_MAX;
+        } else CenterStatusPrint("BUG: Failed to instantiate object being dropped on gib.");
+        
+        e->contents[i] = e->customIndex[i] = U16_MAX;
     }
 }
 
-static void CreateDeathEffects(uint16_t self,uint16_t fxPoolType) {
+static void CreateDeathEffects(u16 self,u16 fxPoolType) {
     if (fxPoolType == 0) return; // PoolType_None
     Entity* e = &Eng_Global->instances[self];
     Vector3 pos = e->position;
@@ -2214,14 +2212,14 @@ static void CreateDeathEffects(uint16_t self,uint16_t fxPoolType) {
     // TODO: SpawnEffectFromPool(fxPoolType, pos)
 }
 
-static void HideSelf(uint16_t self) {
+static void HideSelf(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->index == 279) return; // screens keep mesh
     flag_set(&e->entflags,ENTFLAG_VISIBLE,false);
     e->gravity = 0.0f;
 }
 
-static void NPCDeath(uint16_t self) {
+static void NPCDeath(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->entflags & ENTFLAG_DEAD_CHECKS_DONE) return;
     flag_set(&e->entflags,ENTFLAG_DEAD_CHECKS_DONE,true);
@@ -2231,7 +2229,7 @@ static void NPCDeath(uint16_t self) {
     // else: keep collider alive to prevent falling through floor (Unity physics note preserved)
 }
 
-static void ObjectDeath(uint16_t self) {
+static void ObjectDeath(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->entflags & ENTFLAG_DEAD_CHECKS_DONE) return;
     if (e->entflags & ENTFLAG_DEATH_BURST_DONE) { // gibOnDeath reuses DEATH_BURST_DONE
@@ -2250,14 +2248,14 @@ static void ObjectDeath(uint16_t self) {
     if (e->securityThreshold > 0) {
         // TODO: ReduceCurrentLevelSecurity(e->securityThreshold) — security system
     }
-    uint16_t idx = e->index;
-    int16_t soundex = 62; // default: crate_break
+    u16 idx = e->index;
+    i16 soundex = 62; // default: crate_break
     if (idx < 527 && objectDeathSound[idx] != 0) soundex = objectDeathSound[idx];
     play_wav(sounds[soundex],1.0f,e->position,true);
     if (e->deathBurst != 0) HideSelf(self);
 }
 
-static void ScreenDeath(uint16_t self) {
+static void ScreenDeath(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->entflags & ENTFLAG_DEAD_CHECKS_DONE) return;
     flag_set(&e->entflags,ENTFLAG_DEAD_CHECKS_DONE,true);
@@ -2266,11 +2264,11 @@ static void ScreenDeath(uint16_t self) {
     if (e->entflags & ENTFLAG_DEATH_BURST_DONE) ObjectDeath(self); // gib path
 }
 
-static void VaporizeCorpse(uint16_t self,bool energyVaporized) {
+static void VaporizeCorpse(u16 self,bool energyVaporized) {
     Entity* e = &Eng_Global->instances[self];
     flag_set(&e->entflags,ENTFLAG_DEAD_CHECKS_DONE,true);
     DropSearchables(self);
-    uint16_t fx = e->deathBurst;
+    u16 fx = e->deathBurst;
     if (fx == 0) fx = 1; // PoolType_CorpseHit fallback
     if (energyVaporized) fx = 2; // PoolType_Vaporize
     flag_set(&e->entflags,ENTFLAG_VISIBLE,false);
@@ -2280,7 +2278,7 @@ static void VaporizeCorpse(uint16_t self,bool energyVaporized) {
     CreateDeathEffects(self,fx);
 }
 
-static void Death(uint16_t self,bool energyVaporized) {
+static void Death(u16 self,bool energyVaporized) {
     Entity* e = &Eng_Global->instances[self];
     if (e->entflags & ENTFLAG_DEAD_CHECKS_DONE) return;
     UseDeathTargets(self);
@@ -2304,7 +2302,7 @@ static void Death(uint16_t self,bool energyVaporized) {
     flag_set(&e->entflags,ENTFLAG_DEAD_CHECKS_DONE,true);
 }
 
-float TakeDamage(uint16_t self,DamageData dd) {
+float TakeDamage(u16 self,DamageData dd) {
     Entity* e = &Eng_Global->instances[self];
     if (Eng_Cheats->god && (self == PLAYER1 || self == PLAYER2)) return 0.0f;
     bool isCyber = IsCyberEntity(self);
@@ -2334,7 +2332,7 @@ float TakeDamage(uint16_t self,DamageData dd) {
         if (isCyber) {
             // Cyber C-Shield software absorption
             if (Eng_Global->invP1.hasSoft & (1 << SW_SHIELD)) {
-                uint8_t sv = Eng_Global->invP1.softVersions[SW_SHIELD];
+                u8 sv = Eng_Global->invP1.softVersions[SW_SHIELD];
                 absorb = (sv <= 9) ? sv * 0.05f : 0.0f;
                 take *= (1.0f - absorb);
                 if (take <= 0.0f) return 0.0f;
@@ -2418,7 +2416,7 @@ float TakeDamage(uint16_t self,DamageData dd) {
     return take;
 }
 
-void HealthManagerInitAfterLoad(uint16_t self) {
+void HealthManagerInitAfterLoad(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     bool isPlayer = (self == PLAYER1 || self == PLAYER2);
     bool isNPC    = ConstIndexIsNPC(e->index);
@@ -2583,7 +2581,7 @@ void HardwareBoosterClick(void) { Eng_UI->mouseClickHeldOverGUI = true; Hardware
 
 void HardwareJumpJetsOn(void)  { Eng_Global->invP1.hardwareIsActive |=  HW_JET; }
 void HardwareJumpJetsOff(void) { Eng_Global->invP1.hardwareIsActive &= ~HW_JET; }
-void HardwareJumpJetsAction(uint16_t p) {
+void HardwareJumpJetsAction(u16 p) {
     InventorySystem* inv = Inv(p);
     if (inv->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
     
@@ -2592,15 +2590,15 @@ void HardwareJumpJetsAction(uint16_t p) {
     if (JumpJetsActive(PLAYER1)) HardwareJumpJetsOn(); else HardwareJumpJetsOff();
 }
 
-void HardwareJumpJetsClick(uint16_t p) { Eng_UI->mouseClickHeldOverGUI = true; HardwareJumpJetsAction(p); }
+void HardwareJumpJetsClick(u16 p) { Eng_UI->mouseClickHeldOverGUI = true; HardwareJumpJetsAction(p); }
 
 #define INFRARED_RANGE 50.35f
 #define LANTERN_RANGE 11.52f
 Color3 lantCol = (Color3){1.0f,1.0f,1.0f};
-uint16_t headmountedLanternLight;
+u16 headmountedLanternLight;
 Vector3 lanternPos;
 float lanternVersionBrightness[3] = {0.875f,1.4f,1.75f};
-void HardwareUpdate(uint16_t p, bool playerMoved) {
+void HardwareUpdate(u16 p, bool playerMoved) {
     InventorySystem* inv = Inv(p); (void)playerMoved; // TODO: Only update light while on when player moves?
     bool infraredOn = /*(inv->hasHardware & HW_INF) && */(inv->hardwareIsActive & HW_INF);
     bool lanternOn = /*(inv->hasHardware & HW_LAN) && */(inv->hardwareIsActive & HW_LAN);
@@ -2613,7 +2611,7 @@ void HardwareUpdate(uint16_t p, bool playerMoved) {
 }
 //================================================================================
 // Patches
-void PatchInit(uint16_t p) {
+void PatchInit(u16 p) {
     InventorySystem* inv = Inv(p);
     inv->mediFinishedTime     = -1.0;
     inv->reflexFinishedTime   = -1.0;
@@ -2627,7 +2625,7 @@ void PatchInit(uint16_t p) {
     // TODO: BerserkFX disabled — engine reads patchActive & PATCH_BERSERK + berserkIncrement
 }
 
-void PatchUpdate(uint16_t playerIdx) {
+void PatchUpdate(u16 playerIdx) {
     InventorySystem* inv = Inv(playerIdx);
     if (inv->patchActive & PATCH_DETOX) { // Detox
         if (inv->detoxFinishedTime < Eng_Global->pauseRelativeTime) inv->patchActive -= PATCH_DETOX;
@@ -2737,7 +2735,7 @@ void PatchDisableAll(void) {
 	int[] levelLargeNodeDestroyedCount;
 	Vector3[] ressurectionLocation;
 	bool[] ressurectionActive;
-	uint16_t[] ressurectionBayDoor;
+	u16[] ressurectionBayDoor;
 	Vector3[] elevatorTargetDestinations;
     
 	bool RessurectPlayer() {
@@ -2789,7 +2787,7 @@ void PatchDisableAll(void) {
 }*/
 //=============================================================================
 // Grenades
-void UseGrenade(uint16_t playerIndex, int index) { // TODO
+void UseGrenade(u16 playerIndex, int index) { // TODO
     (void)playerIndex; (void)index;
     if (Eng_Global->invP1.holdingObject) { CenterStatusPrint("%s",Eng_Text->stringTable[311]); return; } // Can't use grenade, hands full
 
@@ -2821,7 +2819,7 @@ void UseGrenade(uint16_t playerIndex, int index) { // TODO
 //     UseTargets(targ);
 // }
 // 
-// void EnableBits(uint16_t i) {
+// void EnableBits(u16 i) {
 //     Eng_Global->instances[WORLD].ioflags |= Eng_Global->instances[i].ioflags;
 //     
 //     if (Eng_Global->instances[i].ioflags & QUESTBIT_ROBOT_SPAWN_DEACTIVATED) DualLog("QUESTBIT_ROBOT_SPAWN_DEACTIVATED: 1");
@@ -3144,24 +3142,24 @@ void UseGrenade(uint16_t playerIndex, int index) { // TODO
 // Doors
 enum { DOOR_CLIP_IDLE_CLOSED = 0, DOOR_CLIP_OPENING = 1, DOOR_CLIP_IDLE_OPEN = 2, DOOR_CLIP_CLOSING = 3 };
 
-static AnimationClip DoorGetClip(const Entity* e, uint8_t clip) { return modelAnimationClips[e->animationNum][clip]; }
+static AnimationClip DoorGetClip(const Entity* e, u8 clip) { return modelAnimationClips[e->animationNum][clip]; }
 static float DoorClamp01(float v) { if (v < 0.0f) return 0.0f; if (v > 1.0f) return 1.0f; return v; }
 static bool DoorInventoryHasAccessCard(AccessCardType card) { return card == AccessCardType_None || (Eng_Global->invP1.accessCardOwned & (1u << card)); }
 static bool DoorIsOpenish(const Entity* e) { return e->doorOpen == DoorState_Open || e->doorOpen == DoorState_Opening; }
 
-static float DoorGetProgress(const Entity* e, uint8_t clip) {
+static float DoorGetProgress(const Entity* e, u8 clip) {
     AnimationClip c = DoorGetClip(e,clip);
     if (c.frameEnd <= c.frameStart) return 1.0f;
     return DoorClamp01((float)(e->frame - c.frameStart) / (float)(c.frameEnd - c.frameStart));
 }
 
-static uint16_t DoorFrameFromProgress(AnimationClip c, float t) {
+static u16 DoorFrameFromProgress(AnimationClip c, float t) {
     if (c.frameEnd <= c.frameStart) return c.frameStart;
-    uint16_t span = c.frameEnd - c.frameStart;
-    return (uint16_t)(c.frameStart + (uint16_t)(DoorClamp01(t) * (float)span));
+    u16 span = c.frameEnd - c.frameStart;
+    return (u16)(c.frameStart + (u16)(DoorClamp01(t) * (float)span));
 }
 
-static void DoorSetClipFrame(uint16_t self, uint8_t clip, uint16_t frame) {
+static void DoorSetClipFrame(u16 self, u8 clip, u16 frame) {
     Entity* e = &Eng_Global->instances[self];
     AnimationClip c = DoorGetClip(e,clip);
     if (c.framerate == 0) return;
@@ -3173,13 +3171,13 @@ static void DoorSetClipFrame(uint16_t self, uint8_t clip, uint16_t frame) {
     e->currentFrameFinished = Eng_Global->current_time + ((1.0 / (double)c.speed) * (1.0 / (double)c.framerate));
 }
 
-static void DoorSyncLayer(uint16_t self) {
+static void DoorSyncLayer(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (!e->changeLayerOnOpenClose) return;
     e->layer = DoorIsOpenish(e) ? PhysicsLayer_InterDebris : PhysicsLayer_Door;
 }
 
-static void DoorOpen(uint16_t self) {
+static void DoorOpen(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     DoorSetClipFrame(self,DOOR_CLIP_OPENING,DoorGetClip(e,DOOR_CLIP_OPENING).frameStart);
     e->doorOpen = e->doorState = DoorState_Opening;
@@ -3188,7 +3186,7 @@ static void DoorOpen(uint16_t self) {
     if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
 }
 
-static void DoorClose(uint16_t self) {
+static void DoorClose(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     DoorSetClipFrame(self,DOOR_CLIP_CLOSING,DoorGetClip(e,DOOR_CLIP_CLOSING).frameStart);
     e->doorOpen = e->doorState = DoorState_Closing;
@@ -3196,22 +3194,22 @@ static void DoorClose(uint16_t self) {
     if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
 }
 
-void DoorLock(uint16_t self) { EntitySetLocked(&Eng_Global->instances[self],true); }
-void DoorUnlock(uint16_t self) { Entity* e = &Eng_Global->instances[self]; EntitySetLocked(e,false); e->accessCardUsedByPlayer = true; }
-void DoorToggleLocked(uint16_t self) { if (EntityLocked(&Eng_Global->instances[self])) DoorUnlock(self); else DoorLock(self); }
-void DoorToggleAccessCardOverride(uint16_t self) { Eng_Global->instances[self].accessCardUsedByPlayer = !Eng_Global->instances[self].accessCardUsedByPlayer; }
+void DoorLock(u16 self) { EntitySetLocked(&Eng_Global->instances[self],true); }
+void DoorUnlock(u16 self) { Entity* e = &Eng_Global->instances[self]; EntitySetLocked(e,false); e->accessCardUsedByPlayer = true; }
+void DoorToggleLocked(u16 self) { if (EntityLocked(&Eng_Global->instances[self])) DoorUnlock(self); else DoorLock(self); }
+void DoorToggleAccessCardOverride(u16 self) { Eng_Global->instances[self].accessCardUsedByPlayer = !Eng_Global->instances[self].accessCardUsedByPlayer; }
 
-void DoorForceOpen(uint16_t self) {
+void DoorForceOpen(u16 self) {
     if (Eng_Global->instances[self].doorOpen == DoorState_Open) return;
     DoorOpen(self);
 }
 
-void DoorForceClose(uint16_t self) {
+void DoorForceClose(u16 self) {
     if (Eng_Global->instances[self].doorOpen == DoorState_Closed) return;
     DoorClose(self);
 }
 
-void DoorActuate(uint16_t self) {
+void DoorActuate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->doorOpen == DoorState_Open) { DoorClose(self); return; }
     if (e->doorOpen == DoorState_Closed) { DoorOpen(self); return; }
@@ -3235,7 +3233,7 @@ void DoorActuate(uint16_t self) {
     }
 }
 
-void DoorInitAfterLoad(uint16_t self) {
+void DoorInitAfterLoad(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->requiredAccessCard == AccessCardType_None) e->accessCardUsedByPlayer = true;
     if (e->startOpen) e->stayOpen = true;
@@ -3260,7 +3258,7 @@ void DoorInitAfterLoad(uint16_t self) {
     DoorSyncLayer(self);
 }
 
-void DoorUse(uint16_t self, uint16_t activator, const char* argvalue) {
+void DoorUse(u16 self, u16 activator, const char* argvalue) {
     (void)argvalue;
     Entity* e = &Eng_Global->instances[self];
     if (activator == NULLENT) return;
@@ -3299,13 +3297,13 @@ void DoorUse(uint16_t self, uint16_t activator, const char* argvalue) {
     DoorActuate(self);
 }
 
-void DoorTargetted(uint16_t self, uint16_t activator, const char* argvalue) {
+void DoorTargetted(u16 self, u16 activator, const char* argvalue) {
     (void)argvalue;
     if (EntityLocked(&Eng_Global->instances[self])) DoorUnlock(self);
     if (!Eng_Global->instances[self].targettingOnlyUnlocks) DoorUse(self,activator,argvalue);
 }
 
-void DoorUpdate(uint16_t self) {
+void DoorUpdate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->blocked) return; // TODO frame-pause blocked doors instead of fully skipping.
     if (e->ajar) return;
@@ -3324,18 +3322,18 @@ void DoorUpdate(uint16_t self) {
 }
 //================================================================================
 // Misc
-MOD_TO_ENGINE uint16_t SpawnDynamicObject(int val, bool cheat) {
+MOD_TO_ENGINE u16 SpawnDynamicObject(int val, bool cheat) {
     if (!ConstIndexInBounds(val)) { DualLogError("Const index out of bounds: %u", val); return NULLENT; }
     if (cheat) DualLog("Cheat spawn constIndex %u, level: %u, from cheat: %u, name: ", val, Eng_Global->currentLevel, cheat);
     if (ConstIndexIsGeometry(val) && !Eng_Cheats->editMode) { CenterStatusPrint("Indices 0 through 306 (level geometry chunks) not possible when not on edit mode!"); return NULLENT; }
-    uint16_t entityIndexInInstanceTable = NULLENT;
+    u16 entityIndexInInstanceTable = NULLENT;
     return entityIndexInInstanceTable;
 }
 
 void DeactivateVMail(void) { } // TODO
 //================================================================================
 // Physics
-MOD_TO_ENGINE float GetBasePlayerSpeed(uint16_t p, bool running) {
+MOD_TO_ENGINE float GetBasePlayerSpeed(u16 p, bool running) {
     InventorySystem* inv = Inv(p);
     bool isSprinting = Sprint();
     if (Eng_Cheats->noclip && isSprinting) return PLAYER_MAX_CYBER_SPEED * 2.5f;
@@ -3383,7 +3381,7 @@ void SearchObject(int searchable, bool first) {
     } else play_wav(sounds[91],0.75f,(Vector3){},false);
 }
 
-void UseEntity(uint16_t p, uint16_t i) {
+void UseEntity(u16 p, u16 i) {
     InventorySystem* inv = Inv(p);
     Entity* ent = &Eng_Global->instances[i];
     if (ConstIndexIsSearchable(ent->index)) {
@@ -3446,10 +3444,10 @@ MOD_TO_ENGINE void ModUpdate(bool player1Moved) {
     HardwareUpdate(PLAYER1,player1Moved);
     if (Use()) Frob(Eng_Global->instances[PLAYER1].position,Eng_Global->instances[PLAYER1].forward,Eng_Global->instances[PLAYER1].right);
     if (Eng_Global->pauseRelativeTime < Eng_Global->debugLineFinished && (Eng_Global->debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Eng_Global->debugLine_start,Eng_Global->debugLine_end);
-    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < Eng_Global->loadedInstances; ++i) {
+    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < Eng_Global->loadedInstances; ++i) {
         Entity* e = &Eng_Global->instances[i];
         TextureSequenceUpdate(i);
-        uint16_t constdex = e->index;
+        u16 constdex = e->index;
         if (constdex == 718) ExplosionLifeUpdate(i);
         if (ConstIndexIsButtonSwitch(constdex)) ButtonSwitchUpdate(i);
         if (ConstIndexIsDoor(constdex)) DoorUpdate(i);
@@ -3517,19 +3515,19 @@ MOD_TO_ENGINE void ProcessInput(void) {
     if (Eng_Global->gamePaused || Eng_Global->menuActive || Eng_Cheats->consoleActive) return; // Pause/Menu barrier <<<<<<<
     
     if (ToggleMode()) ToggleInventoryMode();
-    if (Lantern()) Eng_Global->invP1.hardwareIsActive ^= HW_LAN;
-    if (Infrared()) Eng_Global->invP1.hardwareIsActive ^= HW_INF;
+//     if (Lantern()) Eng_Global->invP1.hardwareIsActive ^= HW_LAN;
+//     if (Infrared()) Eng_Global->invP1.hardwareIsActive ^= HW_INF;
     ApplyPlayerMovements();
 }
 
 MOD_TO_ENGINE void CheckAndTakeScreenshot(void) { if (TakeScreenshot() && Eng_Global->current_time > Eng_Global->screenshotTimeout) Screenshot(); }
 
-void SearchableInit(uint16_t i) {
+void SearchableInit(u16 i) {
     int numRandomGeneratedItems = 0;
     if (Eng_Global->instances[i].generateContents && !Eng_Global->instances[i].generationDone) {
         for(int j=0;j<4;j++) {
             if (Eng_Global->instances[i].randomItemDropChance[j] <= 0.0f) continue;
-            uint8_t tempInt = random_range_u8(0,100);
+            u8 tempInt = random_range_u8(0,100);
             if (((float)tempInt / 100.0f) <= Eng_Global->instances[i].randomItemDropChance[j]) {
                 Eng_Global->instances[i].contents[numRandomGeneratedItems] = Eng_Global->instances[i].randomItem[j];
                 numRandomGeneratedItems++;
@@ -3541,8 +3539,8 @@ void SearchableInit(uint16_t i) {
 }
 //================================================================================
 // Entity Init
-uint8_t GetCurrentLevelSecurity(void) { return (Eng_Global->difficultyMission < 1 || Eng_Cheats->superoverride) ? 0u : Eng_Global->levelSecurity[Eng_Global->currentLevel]; }
-uint16_t GetImpactType(uint16_t instanceIdx) {
+u8 GetCurrentLevelSecurity(void) { return (Eng_Global->difficultyMission < 1 || Eng_Cheats->superoverride) ? 0u : Eng_Global->levelSecurity[Eng_Global->currentLevel]; }
+u16 GetImpactType(u16 instanceIdx) {
     switch (Eng_Global->instances[instanceIdx].bloodType) {
         case BloodType_None:         return 729; // SparksSmall
         case BloodType_Red:          return 724; // BloodSpurtSmall
@@ -3556,7 +3554,7 @@ uint16_t GetImpactType(uint16_t instanceIdx) {
     return 729; // SparksSmall
 }
 
-void UsableInit(uint16_t i) {
+void UsableInit(u16 i) {
     Entity* e = &Eng_Global->instances[i];
     if (Eng_Global->difficultyPuzzle == 3 && e->index == 361 && random_range(0.0f,1.0f) < 0.33f) DeleteInstance(i); // 33% chance of not spawning logic probes on Puzzle difficulty of 3
     if (Eng_Global->difficultyMission <= 1 && ConstIndexIsAccessCard(e->index)) DeleteInstance(i); // Remove access cards on Mission difficulty 1 or 0
@@ -3613,7 +3611,7 @@ void InventoryInit(InventorySystem* inv) {
     inv->radFXFinished = Eng_Global->pauseRelativeTime;
 }
 
-MOD_TO_ENGINE void PlayerInit(uint16_t i) {
+MOD_TO_ENGINE void PlayerInit(u16 i) {
     Eng_Global->instances[i].index = 767;
     Eng_Global->instances[i].layer = PhysicsLayer_Player;
     Eng_Global->instances[i].position = (Vector3){10.52f,-43.792f + 0.84f,20.2908f}; // Start Actual: Puts player on Medical Level in actual game start position.  Added 0.84f
@@ -3640,7 +3638,7 @@ MOD_TO_ENGINE void PlayerInit(uint16_t i) {
 MOD_TO_ENGINE void ModInitAfterLoad(void) {
     for (int i=PLAYER1;i<Eng_Global->loadedInstances;++i) {
         Entity* e = &Eng_Global->instances[i];
-        uint16_t constIndex = e->index;
+        u16 constIndex = e->index;
         if (i == PLAYER1 || i == PLAYER2 || ConstIndexIsDynamicObject(constIndex)) e->gravity = 1.0f;
         else e->gravity = 0.0f;
         if (ConstIndexIsGeometry(constIndex)) e->layer = PhysicsLayer_Geometry;
@@ -3673,7 +3671,7 @@ MOD_TO_ENGINE void ModInitAfterLoad(void) {
     }
 }
 
-uint16_t GetCrosshairTexture(void) {
+u16 GetCrosshairTexture(void) {
     switch(Eng_Global->invP1.weaponIndex) {
         case 36: return 1121; // red
         case 37: return 1253; // blue
@@ -3697,7 +3695,7 @@ uint16_t GetCrosshairTexture(void) {
     return 1260;
 }
 
-uint16_t GetCursorTexture(void) {
+u16 GetCursorTexture(void) {
     if (Eng_Global->gamePaused || Eng_Global->menuActive) return 1261; // Red standard cursor
     if (!Eng_Global->invP1.holdingObject) return GetCrosshairTexture();
     switch(Eng_Global->invP1.heldObjectIndex) {

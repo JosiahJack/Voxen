@@ -1,15 +1,15 @@
 // os.h - starts most translation units and defines the shim layer between Voxen and the OS as well as defining project wide OS defines.
 #pragma once
-typedef __INT16_TYPE__ int16_t;
-typedef __INT32_TYPE__ int32_t;
-typedef __UINT8_TYPE__ uint8_t;
-typedef __UINT16_TYPE__ uint16_t;
-typedef __UINT32_TYPE__ uint32_t;
-typedef __INT64_TYPE__ int64_t;
-typedef __UINT64_TYPE__ uint64_t;
 typedef __SIZE_TYPE__ size_t;
 typedef __UINTPTR_TYPE__ uintptr_t;
 typedef __INTPTR_TYPE__ intptr_t;
+typedef __INT16_TYPE__ i16;
+typedef __INT32_TYPE__ i32;
+typedef __UINT8_TYPE__ u8;
+typedef __UINT16_TYPE__ u16;
+typedef __UINT32_TYPE__ u32;
+typedef __INT64_TYPE__ i64;
+typedef __UINT64_TYPE__ u64;
 #define bool _Bool
 #define true 1
 #define false 0
@@ -51,14 +51,14 @@ void DebugRAM(const char *context);
     #define OS_MakeFolder(path) _mkdir(path)
     #undef near
     #undef far
-    static inline __attribute__((always_inline, noreturn)) void OS_Exit(int64_t exitCode) { ExitProcess((UINT)exitCode); }
+    static inline __attribute__((always_inline, noreturn)) void OS_Exit(i64 exitCode) { ExitProcess((UINT)exitCode); }
     static inline __attribute__((always_inline)) void OS_Close(OsFileHandle fileDescriptor) { CloseHandle(fileDescriptor); }
-    static inline __attribute__((always_inline)) void* OS_AllocateRAM(void* addr, size_t length, int32_t prot, int32_t flags, OsFileHandle fd) {
+    static inline __attribute__((always_inline)) void* OS_AllocateRAM(void* addr, size_t length, i32 prot, i32 flags, OsFileHandle fd) {
         (void)flags;
         bool writable = (prot & PROT_WRITE);
         if (fd == INVALID_HANDLE_VALUE) { return (void*)VirtualAlloc(addr,length,MEM_RESERVE|MEM_COMMIT,writable ? PAGE_READWRITE : PAGE_READONLY); } // Handle standard memory allocations (MAP_ANONYMOUS)
 
-        HANDLE hMap = CreateFileMapping(fd,NULL,writable ? PAGE_READWRITE : PAGE_READONLY,(DWORD)((uint64_t)length >> 32),(DWORD)((uint64_t)length & 0xFFFFFFFF),NULL);
+        HANDLE hMap = CreateFileMapping(fd,NULL,writable ? PAGE_READWRITE : PAGE_READONLY,(DWORD)((u64)length >> 32),(DWORD)((u64)length & 0xFFFFFFFF),NULL);
         void* ptr = MapViewOfFileEx(hMap,writable ? FILE_MAP_WRITE : FILE_MAP_READ,0,0,length,addr); CloseHandle(hMap); return ptr;
     }
     
@@ -89,10 +89,10 @@ void DebugRAM(const char *context);
     int brk(void *addr); void *sbrk(intptr_t increment);
     static inline __attribute__((always_inline)) void* OS_Brk(void* addr) { brk(addr); return (void*)sbrk(0); }
     static inline __attribute__((always_inline)) OsFileHandle OS_Read(OsFileHandle fd, void* buf, size_t count) { ssize_t res = read(fd, buf, count); return (long)res; }
-    static inline __attribute__((always_inline, noreturn)) void OS_Exit(int64_t exitCode) { fflush(stderr); fflush(stdout); _exit(exitCode); }
+    static inline __attribute__((always_inline, noreturn)) void OS_Exit(i64 exitCode) { fflush(stderr); fflush(stdout); _exit(exitCode); }
     static inline __attribute__((always_inline)) int OS_MakeFolder(const char *path) { return mkdir(path, 0755); }
     static inline __attribute__((always_inline)) void OS_Close(OsFileHandle fileDescriptor) { close(fileDescriptor); }
-    static inline __attribute__((always_inline)) void* OS_AllocateRAM(void* addr, size_t length, int32_t prot, int32_t flags, OsFileHandle fd) { return mmap(addr,length,prot,flags,fd,0); }
+    static inline __attribute__((always_inline)) void* OS_AllocateRAM(void* addr, size_t length, i32 prot, i32 flags, OsFileHandle fd) { return mmap(addr,length,prot,flags,fd,0); }
 
     // Gamecode loading:
     #define MOD_EXTENSION ".so" // e.g. Citadel.so
@@ -100,15 +100,16 @@ void DebugRAM(const char *context);
     #define PLATFORM_DLSYM(handle, name) dlsym((handle), (name))
     #define PLATFORM_DLERROR()           dlerror()
 #endif
+static inline __attribute__((always_inline)) void* OS_Alloc(size_t amount) { return OS_AllocateRAM(NULL,amount,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE); }
 
-static inline __attribute__((always_inline)) int64_t OS_RawWrite(OsFileHandle fd, const void* buf, size_t count) {
+static inline __attribute__((always_inline)) i64 OS_RawWrite(OsFileHandle fd, const void* buf, size_t count) {
     #ifdef WINDOWS
         DWORD written = 0;
-        if (WriteFile((HANDLE)fd, buf, (DWORD)count, &written, NULL)) return (int64_t)written;
+        if (WriteFile((HANDLE)fd, buf, (DWORD)count, &written, NULL)) return (i64)written;
         return -1;
     #else // Linux
-        register int64_t     rax __asm__("rax") = 1; // sys_write
-        register int32_t     rdi __asm__("rdi") = fd;
+        register i64     rax __asm__("rax") = 1; // sys_write
+        register i32     rdi __asm__("rdi") = fd;
         register const void* rsi __asm__("rsi") = buf;
         register size_t      rdx __asm__("rdx") = count;
         __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi), "r"(rsi), "r"(rdx) : "rcx", "r11", "memory");
@@ -119,14 +120,14 @@ static inline __attribute__((always_inline)) int64_t OS_RawWrite(OsFileHandle fd
 static inline __attribute__((always_inline)) void OS_Write(OsFileHandle fd, const void* buffer, size_t size, const char* filePath) {
     size_t total = 0;
     while (total < size) {
-        int64_t written = OS_RawWrite(fd,(const char*)buffer + total,size - total);
-        if (written < 0) { DualLogError("Write error when attempting write to %s: %s (code: %d)\n",filePath,written,(int32_t)(-written)); OS_Exit(1); }
+        i64 written = OS_RawWrite(fd,(const char*)buffer + total,size - total);
+        if (written < 0) { DualLogError("Write error when attempting write to %s: %s (code: %d)\n",filePath,written,(i32)(-written)); OS_Exit(1); }
 
         total += (size_t)written;
     }
 }
 
-static inline __attribute__((always_inline)) long OS_Open(const char* path, int32_t flags, int32_t mode) {
+static inline __attribute__((always_inline)) long OS_Open(const char* path, i32 flags, i32 mode) {
     register long rax __asm__("rax") = 2;           // sys_open
     register const char* rdi __asm__("rdi") = path;
     register long rsi __asm__("rsi") = flags;
@@ -210,11 +211,11 @@ static inline __attribute__((always_inline)) void OS_DeallocateRAM(void* ramSpac
     #else // Linux
         if (!ramSpacePointer || ramSpacePointer == MAP_FAILED) { DualLogError("Attempting to double free!\n"); OS_Exit(1); }
         
-        if ((void *)(int64_t)munmap(ramSpacePointer, size) == MAP_FAILED) DualLogError("munmap failed\n");
+        if ((void *)(i64)munmap(ramSpacePointer, size) == MAP_FAILED) DualLogError("munmap failed\n");
     #endif
 }
 
-static inline __attribute__((always_inline)) int64_t OS_Seek(OsFileHandle fd, int64_t offset, int whence) { // forth and forsooth pray tell
+static inline __attribute__((always_inline)) i64 OS_Seek(OsFileHandle fd, i64 offset, int whence) { // forth and forsooth pray tell
     #ifdef WINDOWS
         LARGE_INTEGER dist,fp;
         dist.QuadPart = offset;
@@ -222,11 +223,11 @@ static inline __attribute__((always_inline)) int64_t OS_Seek(OsFileHandle fd, in
         if (!SetFilePointerEx(fd,dist,&fp,dwMoveMethod)) return -1;
         return fp.QuadPart;
     #else // Linux
-        off_t res = lseek(fd,(off_t)offset,whence); return (int64_t)res;
+        off_t res = lseek(fd,(off_t)offset,whence); return (i64)res;
     #endif
 }
 
-static inline __attribute__((always_inline)) int64_t OS_Tell(OsFileHandle fd) {
+static inline __attribute__((always_inline)) i64 OS_Tell(OsFileHandle fd) {
     #ifdef WINDOWS
         LARGE_INTEGER pos = {0};
         if (!SetFilePointerEx(fd, (LARGE_INTEGER){0}, &pos, FILE_CURRENT)) return -1;

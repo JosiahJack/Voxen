@@ -4,84 +4,67 @@
 #include <string.h>
 #include <pthread.h>
 #include <unistd.h>
-extern uint16_t loadedTexturesMaxIndex;
-uint32_t totalPixels;
-uint32_t totalPaletteColors;
+extern u16 loadedTexturesMaxIndex;
+u32 totalPixels;
+u32 totalPaletteColors;
 #define STBI_ARENA_SIZE 16*1024*1024
-uint8_t* stbi__arena_base = NULL;
-uint8_t* stbi__arena_cursor = NULL;
-uint8_t* stbi__arena_end = NULL;
 static int num_parse_threads = 0;
-uint8_t* stbi_load_from_memory(const uint8_t* buffer, int32_t len, int32_t* x, int32_t* y);
+u8* stbi_load_from_memory(const u8* buffer, i32 len, i32* x, i32* y);
+StbiArena stbi_arena_main;
 static StbiArena* thread_stbi_arenas = NULL;
-typedef struct { uint16_t index; bool transparent; bool doublesided; char path[128]; } TextureData;
-typedef struct { TextureData* entries; uint32_t count; uint32_t capacity; } TextureDataParser;
+typedef struct { u16 index; bool transparent; bool doublesided; char path[128]; } TextureData;
+typedef struct { TextureData* entries; u32 count; u32 capacity; } TextureDataParser;
 typedef struct { const char* data; int size; } RawTexture;
-typedef struct TextureParseTask { uint32_t start_tex; uint32_t end_tex; RawTexture* raw_textures; int32_t* index_to_parser; const TextureDataParser* parser; int tid; } TextureParseTask;
-static uint8_t** textureIndexBuffers = NULL; static uint32_t** texturePaletteBuffers = NULL; static uint32_t* texturePaletteSizes = NULL;
-static int32_t* textureWidths = NULL; static int32_t* textureHeights = NULL;
-void stbi__arena_init(void) {
-    if (!stbi__arena_base) {
-        stbi__arena_base = OS_AllocateRAM(NULL,STBI_ARENA_SIZE,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
-        stbi__arena_cursor = stbi__arena_base;
-        stbi__arena_end = stbi__arena_base + STBI_ARENA_SIZE;
-    }
-}
-
-void stbi__arena_init_thread(StbiArena* arena) {
-    if (!arena->base) {
-        arena->base = OS_AllocateRAM(NULL,STBI_ARENA_SIZE,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
-        arena->cursor = arena->base;
-        arena->end = arena->base + STBI_ARENA_SIZE;
-    }
-}
-
+typedef struct TextureParseTask { u32 start_tex; u32 end_tex; RawTexture* raw_textures; i32* parsIdx; const TextureDataParser* parser; int tid; } TextureParseTask;
+static u8** textureIndexBuffers = NULL; static u32** texturePaletteBuffers = NULL; static u32* texturePaletteSizes = NULL;
+static i32* textureWidths = NULL; static i32* textureHeights = NULL;
+void stbi__arena_init_thread(StbiArena* arena) {if (!arena->base) { arena->base = OS_Alloc(STBI_ARENA_SIZE); arena->cursor = arena->base; arena->end = arena->base + STBI_ARENA_SIZE; } }
 void* stbi__arena_alloc(size_t size) {
-    if (!stbi__arena_base) { DualLogError("stbi__arena_base was invalid\n"); return NULL; }
+    if (!stbi_arena_main.base) { DualLogError("stbi_arena_main.base was invalid\n"); return NULL; }
 
-    uint8_t* aligned = stbi__arena_cursor;
-    if (aligned + size > stbi__arena_end) { DualLogError("stbi__arena_alloc failed buffer overflowed with %zu vs %zu\n",(size_t)aligned + size,(size_t)stbi__arena_end); return NULL; }
+    u8* aligned = stbi_arena_main.cursor;
+    if (aligned + size > stbi_arena_main.end) { DualLogError("stbi__arena_alloc failed buffer overflowed with %zu vs %zu\n",(size_t)aligned + size,(size_t)stbi_arena_main.end); return NULL; }
 
-    stbi__arena_cursor = aligned + size;
+    stbi_arena_main.cursor = aligned + size;
     return aligned;
 }
 
 void* stbi__arena_alloc_thread(StbiArena* arena, size_t size) {
     if (!arena->base) return NULL;
-    uint8_t* aligned = arena->cursor;
+    u8* aligned = arena->cursor;
     if (aligned + size > arena->end) return NULL;
     arena->cursor = aligned + size;
     return aligned;
 }
 
-typedef struct { uint32_t img_x, img_y; int32_t img_n, img_out_n; uint8_t* img_buffer, *img_buffer_end; } stbi__context;
-typedef struct { stbi__context* s; uint8_t* idata, *expanded, *out; } stbi__png;
+typedef struct { u32 img_x, img_y; i32 img_n, img_out_n; u8* img_buffer, *img_buffer_end; } stbi__context;
+typedef struct { stbi__context* s; u8* idata, *expanded, *out; } stbi__png;
 enum { STBI__F_none = 0, STBI__F_sub = 1, STBI__F_up = 2, STBI__F_avg = 3, STBI__F_paeth = 4, STBI__F_avg_first, STBI__F_paeth_first };
-inline static uint32_t stbi__get32be(stbi__context* s) {
-    const uint8_t* p = s->img_buffer;
+inline static u32 stbi__get32be(stbi__context* s) {
+    const u8* p = s->img_buffer;
     s->img_buffer += 4;
     return (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
 }
 
 typedef struct {
-    uint16_t fast[1 << 9];
-    uint16_t firstcode[16];
-    int32_t maxcode[17];
-    uint16_t firstsymbol[16];
-    uint8_t size[288];
-    uint16_t value[288];
+    u16 fast[1 << 9];
+    u16 firstcode[16];
+    i32 maxcode[17];
+    u16 firstsymbol[16];
+    u8 size[288];
+    u16 value[288];
 } stbi__zhuffman;
 
 typedef struct {
-    uint8_t* zbuffer, *zbuffer_end;
-    int32_t num_bits;
-    uint32_t code_buffer;
-    uint8_t* zout;
-    uint8_t* zout_start;
+    u8* zbuffer, *zbuffer_end;
+    i32 num_bits;
+    u32 code_buffer;
+    u8* zout;
+    u8* zout_start;
     stbi__zhuffman z_length, z_distance;
 } stbi__zbuf;
 
-inline static int32_t stbi__bit_reverse(int32_t n, int32_t bits) {
+inline static i32 stbi__bit_reverse(i32 n, i32 bits) {
     n = ((n & 0xAAAA) >> 1) | ((n & 0x5555) << 1);
     n = ((n & 0xCCCC) >> 2) | ((n & 0x3333) << 2);
     n = ((n & 0xF0F0) >> 4) | ((n & 0x0F0F) << 4);
@@ -89,19 +72,19 @@ inline static int32_t stbi__bit_reverse(int32_t n, int32_t bits) {
     return n >> (16 - bits);
 }
 
-static int32_t stbi__zbuild_huffman(stbi__zhuffman* z, const uint8_t* sizelist, int32_t num) {
-    int32_t i, k = 0, next_code[16], sizes[17];
+static i32 stbi__zbuild_huffman(stbi__zhuffman* z, const u8* sizelist, i32 num) {
+    i32 i, k = 0, next_code[16], sizes[17];
     __builtin_memset(sizes, 0, sizeof(sizes));
     __builtin_memset(z->fast, 0, sizeof(z->fast));
     if (num != 32) { for (i = 0; i < num; ++i) {++sizes[sizelist[i]];} }
     sizes[0] = 0;
     for (i = 1; i < 16; ++i) { if (sizes[i] > (1 << i)) {return 0;} }
 
-    int32_t code = 0;
+    i32 code = 0;
     for (i = 1; i < 16; ++i) {
         next_code[i] = code;
-        z->firstcode[i] = (uint16_t)code;
-        z->firstsymbol[i] = (uint16_t)k;
+        z->firstcode[i] = (u16)code;
+        z->firstsymbol[i] = (u16)k;
         code = (code + sizes[i]);
         if (sizes[i]) { if (code - 1 >= (1 << i)) {return 0;} }
 
@@ -115,9 +98,9 @@ static int32_t stbi__zbuild_huffman(stbi__zhuffman* z, const uint8_t* sizelist, 
         int s = num == 32 ? 5 : sizelist[i];
         if (s) {
             int c = next_code[s] - z->firstcode[s] + z->firstsymbol[s];
-            uint16_t fastv = (uint16_t)((s << 9) | i);
+            u16 fastv = (u16)((s << 9) | i);
             z->size[c] = (unsigned char)s;
-            z->value[c] = (uint16_t)i;
+            z->value[c] = (u16)i;
             if (s <= 9) {
                 int j = stbi__bit_reverse(next_code[s], s);
                 while (j < (1 << 9)) { z->fast[j] = fastv; j += (1 << s); }
@@ -128,7 +111,7 @@ static int32_t stbi__zbuild_huffman(stbi__zhuffman* z, const uint8_t* sizelist, 
     return 1;
 }
 
-inline static uint32_t stbi__zreceive(stbi__zbuf* z, int n) {
+inline static u32 stbi__zreceive(stbi__zbuf* z, int n) {
     if (z->num_bits < n) {
         #pragma GCC unroll 24
         do {
@@ -137,13 +120,13 @@ inline static uint32_t stbi__zreceive(stbi__zbuf* z, int n) {
         } while (z->num_bits <= 24);
     }
 
-    uint32_t k = z->code_buffer & ((1u << (uint32_t)n) - 1u);
+    u32 k = z->code_buffer & ((1u << (u32)n) - 1u);
     z->code_buffer >>= n;
     z->num_bits -= n;
     return k;
 }
 
-inline static uint32_t stbi__zhuffman_decode(stbi__zbuf* a, stbi__zhuffman* z) {
+inline static u32 stbi__zhuffman_decode(stbi__zbuf* a, stbi__zhuffman* z) {
     int s;
     if (a->num_bits < 16) {
         #pragma GCC unroll 24
@@ -160,14 +143,14 @@ inline static uint32_t stbi__zhuffman_decode(stbi__zbuf* a, stbi__zhuffman* z) {
         return b & 511;
     }
 
-    int k = stbi__bit_reverse((int32_t)a->code_buffer, 16);
+    int k = stbi__bit_reverse((i32)a->code_buffer, 16);
     for (s = 10;; ++s) {
         if (k < z->maxcode[s]) break;
     }
     b = (k >> (16 - s)) - z->firstcode[s] + z->firstsymbol[s];
     a->code_buffer >>= s;
     a->num_bits -= s;
-    return (uint32_t)z->value[b];
+    return (u32)z->value[b];
 }
 
 static const int stbi__zlength_base[31] = {3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258,0,0};
@@ -176,11 +159,11 @@ static const int stbi__zdist_base[32] = {1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,
 static const int stbi__zdist_extra[32] = {0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13};
 
 static int stbi__parse_huffman_block(stbi__zbuf* a) {
-    uint8_t* zout = a->zout;
+    u8* zout = a->zout;
     for (;;) {
         int z = stbi__zhuffman_decode(a, &a->z_length);
         if (z < 256) {
-            *zout++ = (uint8_t)z;
+            *zout++ = (u8)z;
         } else {
             int len, dist;
             if (z == 256) {
@@ -194,9 +177,9 @@ static int stbi__parse_huffman_block(stbi__zbuf* a) {
             z = stbi__zhuffman_decode(a, &a->z_distance);
             dist = stbi__zdist_base[z];
             if (stbi__zdist_extra[z]) dist += stbi__zreceive(a, stbi__zdist_extra[z]);
-            uint8_t* p = (uint8_t*)(zout - dist);
+            u8* p = (u8*)(zout - dist);
             if (dist == 1) {
-                uint8_t v = *p;
+                u8 v = *p;
                 if (len) {
                     do *zout++ = v;
                     while (--len);
@@ -212,28 +195,28 @@ static int stbi__parse_huffman_block(stbi__zbuf* a) {
 }
 
 static int stbi__compute_huffman_codes(stbi__zbuf* a) {
-    static const uint8_t length_dezigzag[19] = {16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15};
+    static const u8 length_dezigzag[19] = {16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15};
     stbi__zhuffman z_codelength;
-    uint8_t lencodes[286 + 32 + 137];
-    uint8_t codelength_sizes[19];
-    uint32_t hlit = stbi__zreceive(a, 5) + 257;
-    uint32_t hdist = stbi__zreceive(a, 5) + 1;
-    uint32_t hclen = stbi__zreceive(a, 4) + 4;
-    uint32_t ntot = hlit + hdist;
+    u8 lencodes[286 + 32 + 137];
+    u8 codelength_sizes[19];
+    u32 hlit = stbi__zreceive(a, 5) + 257;
+    u32 hdist = stbi__zreceive(a, 5) + 1;
+    u32 hclen = stbi__zreceive(a, 4) + 4;
+    u32 ntot = hlit + hdist;
     __builtin_memset(codelength_sizes, 0, sizeof(codelength_sizes));
-    for (uint32_t i = 0; i < hclen; ++i) {
-        uint32_t s = stbi__zreceive(a, 3);
-        codelength_sizes[length_dezigzag[i]] = (uint8_t)s;
+    for (u32 i = 0; i < hclen; ++i) {
+        u32 s = stbi__zreceive(a, 3);
+        codelength_sizes[length_dezigzag[i]] = (u8)s;
     }
 
     stbi__zbuild_huffman(&z_codelength, codelength_sizes, 19);
-    uint32_t n = 0;
+    u32 n = 0;
     while (n < ntot) {
-        uint32_t c = stbi__zhuffman_decode(a, &z_codelength);
+        u32 c = stbi__zhuffman_decode(a, &z_codelength);
         if (c < 16) {
-            lencodes[n++] = (uint8_t)c;
+            lencodes[n++] = (u8)c;
         } else {
-            uint8_t fill = 0;
+            u8 fill = 0;
             if (c == 16) {
                 c = stbi__zreceive(a, 2) + 3;
                 fill = lencodes[n - 1];
@@ -254,11 +237,11 @@ static int stbi__compute_huffman_codes(stbi__zbuf* a) {
 }
 
 static int stbi__parse_uncompressed_block(stbi__zbuf* a) {
-    uint8_t header[4];
+    u8 header[4];
     if (a->num_bits & 7) stbi__zreceive(a, a->num_bits & 7);
-    int32_t k = 0;
+    i32 k = 0;
     while (a->num_bits > 0) {
-        header[k] = (uint8_t)(a->code_buffer & 255);
+        header[k] = (u8)(a->code_buffer & 255);
         a->code_buffer >>= 8;
         a->num_bits -= 8;
         ++k;
@@ -268,14 +251,14 @@ static int stbi__parse_uncompressed_block(stbi__zbuf* a) {
     if (k <= 1) header[1] = *a->zbuffer++;
     if (k <= 2) header[2] = *a->zbuffer++;
     if (k <= 3) header[3] = *a->zbuffer++;
-    int32_t len = header[1] * 256 + header[0];
+    i32 len = header[1] * 256 + header[0];
     __builtin_memcpy(a->zout, a->zbuffer, len);
     a->zbuffer += len;
     a->zout += len;
     return 1;
 }
 
-static const uint8_t stbi__zdefault_length[288] = {
+static const u8 stbi__zdefault_length[288] = {
     8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8, 8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,
     8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8, 8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,
     8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8, 8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,
@@ -287,18 +270,18 @@ static const uint8_t stbi__zdefault_length[288] = {
     7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7, 7,7,7,7,7,7,7,7,8,8,8,8,8,8,8,8
 };
 
-uint8_t* stbi_zlib_decode_malloc_guesssize_headerflag(const uint8_t* buffer, int32_t len, int32_t initial_size, int32_t* outlen) {
+u8* stbi_zlib_decode_malloc_guesssize_headerflag(const u8* buffer, i32 len, i32 initial_size, i32* outlen) {
     stbi__zbuf a = {0};
-    uint8_t* p = (uint8_t*)stbi__arena_alloc(initial_size);
-    a.zbuffer = (uint8_t*)buffer;
-    a.zbuffer_end = (uint8_t*)buffer + len;
+    u8* p = (u8*)stbi__arena_alloc(initial_size);
+    a.zbuffer = (u8*)buffer;
+    a.zbuffer_end = (u8*)buffer + len;
     a.zout_start = p;
     a.zout = p;
     a.zbuffer++;
     a.zbuffer++;
     a.num_bits = 0;
     a.code_buffer = 0;
-    int32_t finalOne, type;
+    i32 finalOne, type;
     do {
         finalOne = stbi__zreceive(&a, 1);
         type = stbi__zreceive(&a, 2);
@@ -314,20 +297,20 @@ uint8_t* stbi_zlib_decode_malloc_guesssize_headerflag(const uint8_t* buffer, int
         }
     } while (!finalOne);
 
-    if (outlen) *outlen = (int32_t)(a.zout - a.zout_start);
+    if (outlen) *outlen = (i32)(a.zout - a.zout_start);
     return a.zout_start;
 }
 
-uint8_t* stbi_zlib_decode_malloc_guesssize_headerflag_arena(const uint8_t* buffer, int32_t len, int32_t initial_size, int32_t* outlen, StbiArena* arena) {
+u8* stbi_zlib_decode_malloc_guesssize_headerflag_arena(const u8* buffer, i32 len, i32 initial_size, i32* outlen, StbiArena* arena) {
     stbi__zbuf a = {0};
-    uint8_t* p = (uint8_t*)stbi__arena_alloc_thread(arena, initial_size);
-    a.zbuffer = (uint8_t*)buffer;
-    a.zbuffer_end = (uint8_t*)buffer + len;
+    u8* p = (u8*)stbi__arena_alloc_thread(arena, initial_size);
+    a.zbuffer = (u8*)buffer;
+    a.zbuffer_end = (u8*)buffer + len;
     a.zout_start = a.zout = p;
     a.zbuffer += 2;
     a.num_bits = 0;
     a.code_buffer = 0;
-    int32_t finalOne, type;
+    i32 finalOne, type;
     do {
         finalOne = stbi__zreceive(&a, 1);
         type = stbi__zreceive(&a, 2);
@@ -340,11 +323,11 @@ uint8_t* stbi_zlib_decode_malloc_guesssize_headerflag_arena(const uint8_t* buffe
             stbi__parse_huffman_block(&a);
         }
     } while (!finalOne);
-    if (outlen) *outlen = (int32_t)(a.zout - a.zout_start);
+    if (outlen) *outlen = (i32)(a.zout - a.zout_start);
     return a.zout_start;
 }
 
-static uint8_t first_row_filter[5] = {
+static u8 first_row_filter[5] = {
     STBI__F_none,
     STBI__F_sub,
     STBI__F_none,
@@ -352,30 +335,30 @@ static uint8_t first_row_filter[5] = {
     STBI__F_paeth_first
 };
 
-inline static int32_t stbi__paeth(int32_t a, int32_t b, int32_t c) {
-    int32_t p = a + b - c;
-    int32_t pa = vabs(p - a);
-    int32_t pb = vabs(p - b);
-    int32_t pc = vabs(p - c);
+inline static i32 stbi__paeth(i32 a, i32 b, i32 c) {
+    i32 p = a + b - c;
+    i32 pa = vabs(p - a);
+    i32 pb = vabs(p - b);
+    i32 pc = vabs(p - c);
     if (pa <= pb && pa <= pc) return a;
     if (pb <= pc) return b;
     return c;
 }
 
-static int32_t stbi__create_png_image_raw_arena(StbiArena* arena, stbi__png* a, uint8_t* raw, uint32_t raw_len, int32_t out_n, uint32_t x, uint32_t y, int32_t img_n) {
-    uint32_t i, stride = x * out_n;
-    uint32_t img_len, img_width_bytes;
-    int32_t k;
-    int32_t output_bytes = out_n;
-    int32_t filter_bytes = img_n;
-    a->out = (uint8_t*)stbi__arena_alloc_thread(arena, (size_t)x * y * output_bytes);
+static i32 stbi__create_png_image_raw_arena(StbiArena* arena, stbi__png* a, u8* raw, u32 raw_len, i32 out_n, u32 x, u32 y, i32 img_n) {
+    u32 i, stride = x * out_n;
+    u32 img_len, img_width_bytes;
+    i32 k;
+    i32 output_bytes = out_n;
+    i32 filter_bytes = img_n;
+    a->out = (u8*)stbi__arena_alloc_thread(arena, (size_t)x * y * output_bytes);
     img_width_bytes = (((img_n * x * 8) + 7) >> 3);
     img_len = (img_width_bytes + 1) * y;
     if (raw_len < img_len) return 0;
 
-    for (uint32_t j = 0; j < y; ++j) {
-        uint8_t* cur = a->out + stride * j;
-        uint8_t* prior;
+    for (u32 j = 0; j < y; ++j) {
+        u8* cur = a->out + stride * j;
+        u8* prior;
         int filter = *raw++;
         if (filter > 4) return 0;
 
@@ -417,20 +400,20 @@ static int32_t stbi__create_png_image_raw_arena(StbiArena* arena, stbi__png* a, 
     return 1;
 }
 
-static int32_t stbi__create_png_image_raw(stbi__png* a, uint8_t* raw, uint32_t raw_len, int32_t out_n, uint32_t x, uint32_t y, int32_t img_n) {
-    uint32_t i, stride = x * out_n;
-    uint32_t img_len, img_width_bytes;
-    int32_t k;
-    int32_t output_bytes = out_n;
-    int32_t filter_bytes = img_n;
-    a->out = (uint8_t*)stbi__arena_alloc(x * y * output_bytes);
+static i32 stbi__create_png_image_raw(stbi__png* a, u8* raw, u32 raw_len, i32 out_n, u32 x, u32 y, i32 img_n) {
+    u32 i, stride = x * out_n;
+    u32 img_len, img_width_bytes;
+    i32 k;
+    i32 output_bytes = out_n;
+    i32 filter_bytes = img_n;
+    a->out = (u8*)stbi__arena_alloc(x * y * output_bytes);
     img_width_bytes = (((img_n * x * 8) + 7) >> 3);
     img_len = (img_width_bytes + 1) * y;
     if (raw_len < img_len) return 0;
 
-    for (uint32_t j = 0; j < y; ++j) {
-        uint8_t* cur = a->out + stride * j;
-        uint8_t* prior;
+    for (u32 j = 0; j < y; ++j) {
+        u8* cur = a->out + stride * j;
+        u8* prior;
         int filter = *raw++;
         if (filter > 4) return 0;
 
@@ -472,28 +455,28 @@ static int32_t stbi__create_png_image_raw(stbi__png* a, uint8_t* raw, uint32_t r
     return 1;
 }
 
-uint8_t* stbi_load_from_memory_arena(const uint8_t* buffer, int len, int* x, int* y, StbiArena* arena) {
+u8* stbi_load_from_memory_arena(const u8* buffer, int len, int* x, int* y, StbiArena* arena) {
     if (arena->base) arena->cursor = arena->base;
     stbi__context s;
     s.img_n = s.img_out_n = 0;
-    s.img_buffer = (uint8_t*)buffer;
-    s.img_buffer_end = (uint8_t*)buffer + len;
+    s.img_buffer = (u8*)buffer;
+    s.img_buffer_end = (u8*)buffer + len;
     void* result = NULL;
     stbi__png z = {0};
     z.s = &s;
-    uint32_t ioff = 0;
+    u32 ioff = 0;
     z.expanded = z.idata = z.out = NULL;
     s.img_buffer += 8;
     s.img_x = s.img_y = 1;
     for (;;) {
-        uint32_t length = stbi__get32be(&s);
-        uint32_t type = stbi__get32be(&s);
+        u32 length = stbi__get32be(&s);
+        u32 type = stbi__get32be(&s);
         switch (type) {
             case 0x49484452: {
                 s.img_x = stbi__get32be(&s);
                 s.img_y = stbi__get32be(&s);
                 s.img_buffer++;
-                int32_t color = (*s.img_buffer++);
+                i32 color = (*s.img_buffer++);
                 s.img_buffer += 3;
                 s.img_n = (color & 2 ? 3 : 1) + (color & 4 ? 1 : 0);
                 break;
@@ -508,9 +491,9 @@ uint8_t* stbi_load_from_memory_arena(const uint8_t* buffer, int len, int* x, int
             }
 
             case 0x49454E44: {
-                uint32_t bpl = (s.img_x);
-                uint32_t raw_len = bpl * s.img_y * s.img_n + s.img_y;
-                z.expanded = (uint8_t*)stbi_zlib_decode_malloc_guesssize_headerflag_arena((uint8_t*)z.idata, ioff, raw_len, (int32_t*)(&raw_len), arena);
+                u32 bpl = (s.img_x);
+                u32 raw_len = bpl * s.img_y * s.img_n + s.img_y;
+                z.expanded = (u8*)stbi_zlib_decode_malloc_guesssize_headerflag_arena((u8*)z.idata, ioff, raw_len, (i32*)(&raw_len), arena);
                 if (s.img_n + 1 == 4) s.img_out_n = s.img_n + 1;
                 else s.img_out_n = s.img_n;
 
@@ -533,28 +516,28 @@ uint8_t* stbi_load_from_memory_arena(const uint8_t* buffer, int len, int* x, int
     return (unsigned char*)result;
 }
 
-extern uint8_t* stbi_load_from_memory(const uint8_t* buffer, int len, int* x, int* y) {
-    if (stbi__arena_base) stbi__arena_cursor = stbi__arena_base;
+extern u8* stbi_load_from_memory(const u8* buffer, int len, int* x, int* y) {
+    if (stbi_arena_main.base) stbi_arena_main.cursor = stbi_arena_main.base;
     stbi__context s;
     s.img_n = s.img_out_n = 0;
-    s.img_buffer = (uint8_t*)buffer;
-    s.img_buffer_end = (uint8_t*)buffer + len;
+    s.img_buffer = (u8*)buffer;
+    s.img_buffer_end = (u8*)buffer + len;
     void* result = NULL;
     stbi__png z = {0};
     z.s = &s;
-    uint32_t ioff = 0;
+    u32 ioff = 0;
     z.expanded = z.idata = z.out = NULL;
     s.img_buffer += 8;
     s.img_x = s.img_y = 1;
     for (;;) {
-        uint32_t length = stbi__get32be(&s);
-        uint32_t type = stbi__get32be(&s);
+        u32 length = stbi__get32be(&s);
+        u32 type = stbi__get32be(&s);
         switch (type) {
             case 0x49484452: {
                 s.img_x = stbi__get32be(&s);
                 s.img_y = stbi__get32be(&s);
                 s.img_buffer++;
-                int32_t color = (*s.img_buffer++);
+                i32 color = (*s.img_buffer++);
                 s.img_buffer += 3;
                 s.img_n = (color & 2 ? 3 : 1) + (color & 4 ? 1 : 0);
                 break;
@@ -569,9 +552,9 @@ extern uint8_t* stbi_load_from_memory(const uint8_t* buffer, int len, int* x, in
             }
 
             case 0x49454E44: {
-                uint32_t bpl = (s.img_x);
-                uint32_t raw_len = bpl * s.img_y * s.img_n + s.img_y;
-                z.expanded = (uint8_t*)stbi_zlib_decode_malloc_guesssize_headerflag((uint8_t*)z.idata, ioff, raw_len, (int32_t*)(&raw_len));
+                u32 bpl = (s.img_x);
+                u32 raw_len = bpl * s.img_y * s.img_n + s.img_y;
+                z.expanded = (u8*)stbi_zlib_decode_malloc_guesssize_headerflag((u8*)z.idata, ioff, raw_len, (i32*)(&raw_len));
                 if (s.img_n + 1 == 4) s.img_out_n = s.img_n + 1;
                 else s.img_out_n = s.img_n;
 
@@ -594,50 +577,43 @@ extern uint8_t* stbi_load_from_memory(const uint8_t* buffer, int len, int* x, in
     return (unsigned char*)result;
 }
 
-extern bool doubleSidedTexture[MAX_VALID_TEXTURE];
-extern bool transparentTexture[MAX_VALID_TEXTURE];
+extern bool doubleSidedTexture[MAX_VALID_TEXTURE],transparentTexture[MAX_VALID_TEXTURE];
 static void* TextureParsingWorker(void* argument) {
     TextureParseTask* task = (TextureParseTask*)argument;
-    for (uint32_t i = task->start_tex; i < task->end_tex; ++i) {
-        int32_t parserIdx = task->index_to_parser[i];
-        if (unlikely(parserIdx < 0 || parserIdx >= (int32_t)task->parser->count)) continue;
+    for (u32 i = task->start_tex; i < task->end_tex; ++i) {
+        i32 parserIdx = task->parsIdx[i];
+        if (unlikely(parserIdx < 0 || parserIdx >= (i32)task->parser->count)) continue;
 
-        doubleSidedTexture[i] = task->parser->entries[parserIdx].doublesided;
-        transparentTexture[i] = task->parser->entries[parserIdx].transparent;
-        const char* data = task->raw_textures[i].data;
-        int size = task->raw_textures[i].size;
+        doubleSidedTexture[i] = task->parser->entries[parserIdx].doublesided;   transparentTexture[i] = task->parser->entries[parserIdx].transparent;
+        const char* data = task->raw_textures[i].data; int size = task->raw_textures[i].size;
         if (unlikely(!data || size <= 0)) continue;
 
-        int w = 0, h = 0;
-        uint8_t* pixels = stbi_load_from_memory_arena((const uint8_t*)data, size, &w, &h, &thread_stbi_arenas[task->tid]);
-        if (!pixels || w < 1 || h < 1) { OS_DeallocateRAM((void*)data, (size_t)size); continue; }
+        int w=0,h=0;
+        u8 *pixels = stbi_load_from_memory_arena((const u8*)data,size,&w,&h,&thread_stbi_arenas[task->tid]);
+        if (!pixels || w < 1 || h < 1) { OS_DeallocateRAM((void*)data,(size_t)size); continue; }
 
-        uint32_t numPixels = (uint32_t)w * h;
-        uint8_t* indices = (uint8_t*)OS_AllocateRAM(NULL, numPixels, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-        uint32_t* palette = (uint32_t*)OS_AllocateRAM(NULL, 256 * sizeof(uint32_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-        uint32_t pal_size = 0;
-        uint8_t color_hash[1024] = {0};
-
-        for (uint32_t p = 0; p < numPixels; ++p) {
-            uint32_t color = ((uint32_t*)pixels)[p];
-            uint32_t slot = (color * 0x9e3779b9u) & 1023;
+        u32 numPixels = (u32)w * h, pal_size=0;
+        u8 *indices = (u8*)OS_Alloc(numPixels); u32* palette = (u32*)OS_Alloc(256 * sizeof(u32));
+        u8 color_hash[1024] = {0};
+        for (u32 p = 0; p < numPixels; ++p) {
+            u32 color = ((u32*)pixels)[p];
+            u32 slot = (color * 0x9e3779b9u) & 1023;
             while (color_hash[slot]) {
                 if (palette[color_hash[slot] - 1] == color) { indices[p] = color_hash[slot] - 1; goto found; }
-                
                 slot = (slot + 1) & 1023;
             }
             if (pal_size >= 256) {
                 // Find closest existing palette entry instead of breaking
-                uint32_t bestIdx = 0;
-                uint32_t bestDist = UINT32_MAX;
-                uint8_t r1 = color & 0xFF, g1 = (color>>8) & 0xFF;
-                uint8_t b1 = (color>>16) & 0xFF, a1 = color>>24;
-                for (uint32_t k = 0; k < pal_size; k++) {
-                    int32_t dr = (int32_t)(palette[k] & 0xFF) - r1;
-                    int32_t dg = (int32_t)((palette[k]>>8) & 0xFF) - g1;
-                    int32_t db = (int32_t)((palette[k]>>16) & 0xFF) - b1;
-                    int32_t da = (int32_t)(palette[k]>>24) - a1;
-                    uint32_t dist = dr*dr + dg*dg + db*db + da*da;
+                u32 bestIdx = 0;
+                u32 bestDist = 0xFFFFFFFF;
+                u8 r1 = color & 0xFF, g1 = (color>>8) & 0xFF;
+                u8 b1 = (color>>16) & 0xFF, a1 = color>>24;
+                for (u32 k = 0; k < pal_size; k++) {
+                    i32 dr = (i32)(palette[k] & 0xFF) - r1;
+                    i32 dg = (i32)((palette[k]>>8) & 0xFF) - g1;
+                    i32 db = (i32)((palette[k]>>16) & 0xFF) - b1;
+                    i32 da = (i32)(palette[k]>>24) - a1;
+                    u32 dist = dr*dr + dg*dg + db*db + da*da;
                     if (dist < bestDist) { bestDist = dist; bestIdx = k; }
                 }
                 indices[p] = bestIdx;
@@ -646,26 +622,21 @@ static void* TextureParsingWorker(void* argument) {
             
             palette[pal_size] = color;
             indices[p] = pal_size;
-            color_hash[slot] = (uint8_t)(pal_size + 1);
+            color_hash[slot] = (u8)(pal_size + 1);
             ++pal_size;
             found:;
         }
 
-        textureIndexBuffers[i] = indices;
-        texturePaletteBuffers[i] = palette;
-        texturePaletteSizes[i] = pal_size;
-        textureWidths[i] = w;
-        textureHeights[i] = h;
-
+        textureIndexBuffers[i] = indices; texturePaletteBuffers[i] = palette; texturePaletteSizes[i] = pal_size; textureWidths[i] = w; textureHeights[i] = h;
         OS_DeallocateRAM((void*)data, (size_t)size);
     }
     return NULL;
 }
 
-static bool ParseTextureData(TextureDataParser *parser, uint16_t maxSize, const char *filename) {
+static bool ParseTextureData(TextureDataParser *parser, u16 maxSize, const char *filename) {
     OsFileHandle fd; int st_size; char* data = OS_OpenAndAllocateFileBufferReadonly(filename,&fd,&st_size);
     char* cursor = data; char* end = data + st_size;
-    uint32_t lineNum = 0, max_index = 0;
+    u32 lineNum = 0, max_index = 0;
     while (cursor < end) { // First pass: count entries and find max index
         char* start = cursor;
         while (cursor < end && *cursor != '\n' && *cursor != '\r') cursor++;
@@ -683,24 +654,23 @@ static bool ParseTextureData(TextureDataParser *parser, uint16_t maxSize, const 
         if (colon && StringCompareUpToLength(start, "index", colon - start) == 0) {
             char *value = colon + 1;
             while (CharacterIsEmpty(*value)) value++;
-            uint32_t idx = parse_numberu32(value, start, lineNum);
+            u32 idx = parse_numberu32(value, start, lineNum);
             if (idx > max_index) max_index = idx;
        }
        
-       if (cursor < end && *cursor == '\r') cursor++;
-       if (cursor < end && *cursor == '\n') cursor++;
+       if (cursor < end && (*cursor == '\r' || *cursor == '\n')) cursor++;
     }
     
     if (max_index == 0) { DualLogWarn("No entries found in %s\n", filename); OS_DeallocateRAM(data,st_size); return true; }
     if (max_index >= maxSize) { DualLogWarn("Too large of index found in %s, %u exceeds limit %u\n", filename, max_index, maxSize); OS_DeallocateRAM(data,st_size); return true; }
 
-    uint32_t entry_count = max_index + 1;
-    TextureData *new_entries = OS_AllocateRAM(NULL,entry_count * sizeof(TextureData),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);  
+    u32 entry_count = max_index + 1;
+    TextureData *new_entries = OS_Alloc(entry_count * sizeof(TextureData));  
     parser->entries = new_entries;
-    for (uint32_t i = 0; i < entry_count; ++i) { parser->entries[i] = (TextureData){ .index=UINT16_MAX, .transparent=false, .doublesided=false, .path={0} }; }
+    for (u32 i = 0; i < entry_count; ++i) { parser->entries[i] = (TextureData){ .index=U16_MAX, .transparent=false, .doublesided=false, .path={0} }; }
     parser->capacity = entry_count;
     parser->count = entry_count;
-    TextureData entry = (TextureData){ .index=UINT16_MAX, .transparent=false, .doublesided=false, .path={0} };
+    TextureData entry = (TextureData){ .index=U16_MAX, .transparent=false, .doublesided=false, .path={0} };
     lineNum = 0;
     cursor = data; end = data + st_size; // Rewind
     while (cursor < end) {
@@ -716,8 +686,8 @@ static bool ParseTextureData(TextureDataParser *parser, uint16_t maxSize, const 
         if (start[0] == '/' && start[1] == '/') continue; // Skip comment(ed out) line
 
         if (*start == '#') {
-            if (entry.path[0] && entry.index != UINT16_MAX && entry.index < parser->capacity) parser->entries[entry.index] = entry;
-            entry = (TextureData){ .index=UINT16_MAX, .transparent=false, .doublesided=false, .path={0} };
+            if (entry.path[0] && entry.index != U16_MAX && entry.index < parser->capacity) parser->entries[entry.index] = entry;
+            entry = (TextureData){ .index=U16_MAX, .transparent=false, .doublesided=false, .path={0} };
             if (lineend > start) {
                 size_t actualLen = lineend - (start + 1) + 1;
                 if (actualLen >= sizeof(entry.path)) actualLen = sizeof(entry.path) - 1;
@@ -751,7 +721,7 @@ static bool ParseTextureData(TextureDataParser *parser, uint16_t maxSize, const 
         } else DualLogWarn("No colon found in line %u: %s\n",lineNum,start);
     }
 
-    if (entry.path[0] && entry.index != UINT16_MAX && entry.index < parser->capacity) parser->entries[entry.index] = entry; // Store last entry
+    if (entry.path[0] && entry.index != U16_MAX && entry.index < parser->capacity) parser->entries[entry.index] = entry; // Store last entry
     OS_DeallocateRAM(data,st_size);
     return true;
 }
@@ -763,24 +733,24 @@ void LoadTextures(void) {
     TextureDataParser texture_parser;
     if (unlikely(!ParseTextureData(&texture_parser, MAX_VALID_TEXTURE, "./Data/textures.txt"))) { DualLogError("Could not parse ./Data/textures.txt!\n"); OS_Exit(1); }
 
-    int32_t maxIndex = -1;
-    for (uint32_t k = 0; k < texture_parser.count; ++k) {
-        if (texture_parser.entries[k].index > maxIndex && texture_parser.entries[k].index != UINT16_MAX) maxIndex = texture_parser.entries[k].index;
+    i32 maxIndex = -1;
+    for (u32 k = 0; k < texture_parser.count; ++k) {
+        if (texture_parser.entries[k].index > maxIndex && texture_parser.entries[k].index != U16_MAX) maxIndex = texture_parser.entries[k].index;
     }
-    loadedTexturesMaxIndex = (uint16_t)(maxIndex + 1);
+    loadedTexturesMaxIndex = (u16)(maxIndex + 1);
     if (loadedTexturesMaxIndex == 0) { DualLogError("No textures found in textures.txt\n"); OS_Exit(1); }
 
-    int32_t* indexToParser = OS_AllocateRAM(NULL, loadedTexturesMaxIndex * sizeof(int32_t), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, OS_INVALID_HANDLE);
-    __builtin_memset(indexToParser, -1, loadedTexturesMaxIndex * sizeof(int32_t));
-    for (uint32_t k = 0; k < texture_parser.count; ++k) {
-        if (texture_parser.entries[k].index < loadedTexturesMaxIndex) indexToParser[texture_parser.entries[k].index] = (int32_t)k;
+    i32* parsIdx = OS_Alloc(loadedTexturesMaxIndex * sizeof(i32));
+    __builtin_memset(parsIdx, -1, loadedTexturesMaxIndex * sizeof(i32));
+    for (u32 k = 0; k < texture_parser.count; ++k) {
+        if (texture_parser.entries[k].index < loadedTexturesMaxIndex) parsIdx[texture_parser.entries[k].index] = (i32)k;
     }
 
     DualLog("Loading textures (%u) ... ", texture_parser.count);
-    RawTexture* rawTextures = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * sizeof(RawTexture),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
+    RawTexture* rawTextures = OS_Alloc(loadedTexturesMaxIndex * sizeof(RawTexture));
     __builtin_memset(rawTextures,0,loadedTexturesMaxIndex * sizeof(RawTexture));
-    for (uint32_t i = 0; i < loadedTexturesMaxIndex; ++i) {
-        int32_t parserIdx = indexToParser[i];
+    for (u32 i = 0; i < loadedTexturesMaxIndex; ++i) {
+        i32 parserIdx = parsIdx[i];
         if (parserIdx < 0) continue;
         const char* path = texture_parser.entries[parserIdx].path;
         OsFileHandle dummy_fd;
@@ -792,95 +762,84 @@ void LoadTextures(void) {
     num_parse_threads = OS_GetNumThreads();
     if (num_parse_threads < 1) num_parse_threads = 1;
     if (num_parse_threads > 32) num_parse_threads = 32;
-    thread_stbi_arenas = (StbiArena*)OS_AllocateRAM(NULL,(size_t)num_parse_threads * sizeof(StbiArena),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
+    thread_stbi_arenas = (StbiArena*)OS_Alloc((size_t)num_parse_threads * sizeof(StbiArena));
     for (int t = 0; t < num_parse_threads; ++t) { thread_stbi_arenas[t].base = NULL; stbi__arena_init_thread(&thread_stbi_arenas[t]); }
-    textureIndexBuffers = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * sizeof(uint8_t*),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
-    texturePaletteBuffers = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * sizeof(uint32_t*),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
-    texturePaletteSizes = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * sizeof(uint32_t),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
-    textureWidths = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * sizeof(int32_t),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
-    textureHeights = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * sizeof(int32_t),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
-    __builtin_memset(textureIndexBuffers,0,loadedTexturesMaxIndex * sizeof(uint8_t*));
-    __builtin_memset(texturePaletteBuffers,0,loadedTexturesMaxIndex * sizeof(uint32_t*));
-    __builtin_memset(texturePaletteSizes,0,loadedTexturesMaxIndex * sizeof(uint32_t));
-    __builtin_memset(textureWidths,0,loadedTexturesMaxIndex * sizeof(int32_t));
-    __builtin_memset(textureHeights,0,loadedTexturesMaxIndex * sizeof(int32_t));
-    TextureParseTask tasks[32];
-    uint32_t chunk = (loadedTexturesMaxIndex + (uint32_t)num_parse_threads - 1U) / (uint32_t)num_parse_threads;
+    textureIndexBuffers = OS_Alloc(loadedTexturesMaxIndex * sizeof(u8*));
+    texturePaletteBuffers = OS_Alloc(loadedTexturesMaxIndex * sizeof(u32*));
+    texturePaletteSizes = OS_Alloc(loadedTexturesMaxIndex * sizeof(u32));
+    textureWidths = OS_Alloc(loadedTexturesMaxIndex * sizeof(i32));
+    textureHeights = OS_Alloc(loadedTexturesMaxIndex * sizeof(i32));
+    TextureParseTask tasks[32]; u32 chunk = (loadedTexturesMaxIndex + (u32)num_parse_threads - 1U) / (u32)num_parse_threads;
     for (int t = 0; t < num_parse_threads; ++t) {
-        tasks[t].start_tex = (uint32_t)t * chunk;
-        tasks[t].end_tex = tasks[t].start_tex + chunk;
-        if (tasks[t].end_tex > loadedTexturesMaxIndex) tasks[t].end_tex = loadedTexturesMaxIndex;
-        tasks[t].raw_textures = rawTextures;
-        tasks[t].index_to_parser = indexToParser;
-        tasks[t].parser = &texture_parser;
-        tasks[t].tid = t;
+        u32 start = ((u32)t * chunk);
+        tasks[t] = (TextureParseTask){.start_tex=start,.end_tex=clamp(start+chunk,0,loadedTexturesMaxIndex),.raw_textures=rawTextures,.parsIdx=parsIdx,.parser=&texture_parser,.tid=t};
     }
 
     pthread_t workers[32];
     for (int t = 0; t < num_parse_threads; ++t) pthread_create(&workers[t], NULL, TextureParsingWorker, &tasks[t]);
     for (int t = 0; t < num_parse_threads; ++t) pthread_join(workers[t], NULL);
     totalPixels = totalPaletteColors = 0u;
-    for (uint16_t i = 0; i < loadedTexturesMaxIndex; ++i) {
-        if (textureIndexBuffers[i]) { totalPixels += (uint32_t)textureWidths[i] * textureHeights[i]; totalPaletteColors += texturePaletteSizes[i]; }
+    for (u16 i = 0; i < loadedTexturesMaxIndex; ++i) {
+        if (textureIndexBuffers[i]) { totalPixels += (u32)textureWidths[i] * textureHeights[i]; totalPaletteColors += texturePaletteSizes[i]; }
     }
 
-    size_t offsets_size = loadedTexturesMaxIndex * sizeof(uint32_t);
-    size_t palettes_size = totalPaletteColors * sizeof(uint32_t);
+    size_t offsets_size = loadedTexturesMaxIndex * sizeof(u32);
+    size_t palettes_size = totalPaletteColors * sizeof(u32);
     size_t indices_size = totalPixels;
     size_t arena_size = offsets_size + palettes_size + indices_size;
     void* arena = OS_AllocateRAM(NULL,arena_size,PROT_READ|PROT_WRITE,MAP_ANONYMOUS|MAP_PRIVATE|MAP_POPULATE,OS_INVALID_HANDLE);
-    uint8_t* cur = (uint8_t*)arena;
-    uint32_t* textureOffsets = (uint32_t*)cur; cur += offsets_size;
-    int32_t* textureSizes = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * 2 * sizeof(int32_t),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
-    uint32_t* texturePaletteOffsets = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * sizeof(uint32_t),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
-    uint32_t* texturePalettes = (uint32_t*)cur; cur += palettes_size;
-    uint8_t* all_indices = cur;
-    uint32_t pixel_base = 0, color_base = 0;
-    for (uint16_t i=0;i<loadedTexturesMaxIndex;++i) {
+    u8* cur = (u8*)arena;
+    u32* textureOffsets = (u32*)cur; cur += offsets_size;
+    i32* textureSizes = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * 2 * sizeof(i32),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
+    u32* texturePaletteOffsets = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * sizeof(u32),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
+    u32* texturePalettes = (u32*)cur; cur += palettes_size;
+    u8* all_indices = cur;
+    u32 pixel_base = 0, color_base = 0;
+    for (u16 i=0;i<loadedTexturesMaxIndex;++i) {
         if (!textureIndexBuffers[i]) continue;
-        uint32_t numP = (uint32_t)textureWidths[i] * textureHeights[i];
-        uint32_t palS = texturePaletteSizes[i];
+        u32 numP = (u32)textureWidths[i] * textureHeights[i];
+        u32 palS = texturePaletteSizes[i];
         textureOffsets[i] = pixel_base;
         texturePaletteOffsets[i] = color_base;
         textureSizes[i*2]     = textureWidths[i];
         textureSizes[i*2 + 1] = textureHeights[i];
         __builtin_memcpy(all_indices + pixel_base,textureIndexBuffers[i],numP);
-        __builtin_memcpy(texturePalettes + color_base,texturePaletteBuffers[i],palS * sizeof(uint32_t));
+        __builtin_memcpy(texturePalettes + color_base,texturePaletteBuffers[i],palS * sizeof(u32));
         pixel_base += numP;
         color_base += palS;
         OS_DeallocateRAM(textureIndexBuffers[i],numP);
-        OS_DeallocateRAM(texturePaletteBuffers[i],palS * sizeof(uint32_t));
+        OS_DeallocateRAM(texturePaletteBuffers[i],palS * sizeof(u32));
     }
 
     DebugRAM("After loop for load textures");
     DualLog("total palette colors: %u, total pixels: %u...", totalPaletteColors,totalPixels);
-    int32_t packed_size = ((int32_t)totalPixels + 3) / 4 * sizeof(uint32_t);
+    i32 packed_size = ((i32)totalPixels + 3) / 4 * sizeof(u32);
     glBindBuffer(GL_SSBO,Sys_Render.colorBufferID);
     void* dst = glMapBufferRange(GL_SSBO,0,packed_size,GL_MAP_WRITE_BIT|GL_MAP_INVALIDATE_RANGE_BIT);
     __builtin_memcpy(dst,all_indices,packed_size);
     glUnmapBuffer(GL_SSBO);
     glBindBuffer(GL_SSBO,Sys_Render.texturePalettesID);
-    glBufferData(GL_SSBO,totalPaletteColors * sizeof(uint32_t),texturePalettes,GL_STATIC_DRAW);
+    glBufferData(GL_SSBO,totalPaletteColors * sizeof(u32),texturePalettes,GL_STATIC_DRAW);
     glBindBuffer(GL_SSBO,Sys_Render.textureOffsetsID);
-    glBufferData(GL_SSBO,loadedTexturesMaxIndex * sizeof(uint32_t),textureOffsets,GL_STATIC_DRAW);
+    glBufferData(GL_SSBO,loadedTexturesMaxIndex * sizeof(u32),textureOffsets,GL_STATIC_DRAW);
     glBindBuffer(GL_SSBO,Sys_Render.textureSizesID);
-    glBufferData(GL_SSBO,loadedTexturesMaxIndex * 2 * sizeof(int32_t),textureSizes,GL_STATIC_DRAW);
+    glBufferData(GL_SSBO,loadedTexturesMaxIndex * 2 * sizeof(i32),textureSizes,GL_STATIC_DRAW);
     glBindBuffer(GL_SSBO,Sys_Render.texturePaletteOffsetsID);
-    glBufferData(GL_SSBO,loadedTexturesMaxIndex * sizeof(uint32_t),texturePaletteOffsets,GL_STATIC_DRAW);
+    glBufferData(GL_SSBO,loadedTexturesMaxIndex * sizeof(u32),texturePaletteOffsets,GL_STATIC_DRAW);
     glBindBuffer(GL_SSBO,0);
     OS_DeallocateRAM(texture_parser.entries,texture_parser.count * sizeof(TextureData));
     OS_DeallocateRAM(arena,arena_size);
     OS_DeallocateRAM(rawTextures,loadedTexturesMaxIndex * sizeof(RawTexture));
-    OS_DeallocateRAM(indexToParser,loadedTexturesMaxIndex * sizeof(int32_t));
-    OS_DeallocateRAM(textureIndexBuffers,loadedTexturesMaxIndex * sizeof(uint8_t*));
-    OS_DeallocateRAM(textureSizes,loadedTexturesMaxIndex * 2 * sizeof(int32_t));
-    OS_DeallocateRAM(texturePaletteBuffers,loadedTexturesMaxIndex * sizeof(uint32_t*));
-    OS_DeallocateRAM(texturePaletteSizes,loadedTexturesMaxIndex * sizeof(uint32_t));
-    OS_DeallocateRAM(texturePaletteOffsets,loadedTexturesMaxIndex * sizeof(uint32_t));
-    OS_DeallocateRAM(textureWidths,loadedTexturesMaxIndex * sizeof(int32_t));
-    OS_DeallocateRAM(textureHeights,loadedTexturesMaxIndex * sizeof(int32_t));
+    OS_DeallocateRAM(parsIdx,loadedTexturesMaxIndex * sizeof(i32));
+    OS_DeallocateRAM(textureIndexBuffers,loadedTexturesMaxIndex * sizeof(u8*));
+    OS_DeallocateRAM(textureSizes,loadedTexturesMaxIndex * 2 * sizeof(i32));
+    OS_DeallocateRAM(texturePaletteBuffers,loadedTexturesMaxIndex * sizeof(u32*));
+    OS_DeallocateRAM(texturePaletteSizes,loadedTexturesMaxIndex * sizeof(u32));
+    OS_DeallocateRAM(texturePaletteOffsets,loadedTexturesMaxIndex * sizeof(u32));
+    OS_DeallocateRAM(textureWidths,loadedTexturesMaxIndex * sizeof(i32));
+    OS_DeallocateRAM(textureHeights,loadedTexturesMaxIndex * sizeof(i32));
     for (int t=0;t<num_parse_threads;++t) OS_DeallocateRAM(thread_stbi_arenas[t].base,STBI_ARENA_SIZE);
     OS_DeallocateRAM(thread_stbi_arenas,(size_t)num_parse_threads * sizeof(StbiArena));
     DualLog(" took %.6f secs\n",get_time() - start_time);
     DebugRAM("After LoadTextures and after deallocation");
-}
+} //886

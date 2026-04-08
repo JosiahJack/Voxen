@@ -130,7 +130,7 @@ void MusicNotifyZone(TrackType tt) {
     }
 }
 
-void MusicTriggerEnter(uint16_t self, uint16_t other) {
+void MusicTriggerEnter(u16 self, u16 other) {
     if (Eng_Global->instances[self].tickFinished < Eng_Global->pauseRelativeTime) { // Prevent flickering retrigger when player slides along glancing angle of trigger volume.
         if (other == PLAYER1 || other == PLAYER2) {
             PlayTrack(Eng_Global->instances[self].trackType,Eng_Global->instances[self].musicType);
@@ -141,7 +141,7 @@ void MusicTriggerEnter(uint16_t self, uint16_t other) {
     }
 }
 
-void MusicTriggerExit(uint16_t other) {
+void MusicTriggerExit(u16 other) {
     if (other == PLAYER1 || other == PLAYER2) { mp3_clear(); Sys_Music.inZone = Sys_Music.elevator = Sys_Music.distortion = false; } // return to normal upon leaving the trigger
 }
 

@@ -44,8 +44,8 @@
     X(bool, SwimUp, (void)) \
     X(bool, SwimDn, (void)) \
     X(bool, Console, (void)) \
-    X(float,GetBasePlayerSpeed, (uint16_t, bool)) \
-    X(void, InitializeAIAfterLoad, (uint16_t)) \
+    X(float,GetBasePlayerSpeed, (u16, bool)) \
+    X(void, InitializeAIAfterLoad, (u16)) \
     X(bool, TakeScreenshot, (void)) \
     X(void, UpdateMusic, (void)) \
     X(void, UpdateAmbientSounds, (void)) \
@@ -54,16 +54,16 @@
     X(void, ResetLevelMusic, (void)) \
     X(void, ResetLevelAudio, (void)) \
     X(void, UpdateAnims, (void)) \
-    X(uint16_t, SpawnDynamicObject, (int, bool)) \
-    X(void, TextureSequenceInit, (uint16_t, char*)) \
+    X(u16, SpawnDynamicObject, (int, bool)) \
+    X(void, TextureSequenceInit, (u16, char*)) \
     X(void, ModNewGame, (void)) \
     X(void, ModInitAfterLoad, (void)) \
     X(void, ModEntityDefinitionsInitAfterLoad, (void)) \
-    X(void, PlayerInit, (uint16_t)) \
+    X(void, PlayerInit, (u16)) \
     X(void, ProcessInput, (void)) \
     X(void, CheckAndTakeScreenshot, (void)) \
-    X(uint16_t, GetCursorTexture, (void)) \
-    X(void, LoadLevelMod, (uint8_t)) \
+    X(u16, GetCursorTexture, (void)) \
+    X(void, LoadLevelMod, (u8)) \
     X(void, SetModFatigue, (float)) \
     X(void, ForceShootMode, (void)) \
     X(bool, ModRequestsGrayscale, (void))
@@ -114,9 +114,9 @@
 ENGINE_TO_MOD void DualLog(const char* fmt, ...);
 ENGINE_TO_MOD void DualLogWarn(const char* fmt, ...);
 ENGINE_TO_MOD void DualLogError(const char* fmt, ...);
-ENGINE_TO_MOD uint8_t random_range_u8(uint8_t a, uint8_t b);
-ENGINE_TO_MOD uint32_t random_range_u32(uint32_t a, uint32_t b);
-ENGINE_TO_MOD int32_t random_range_i32(int32_t a, int32_t b);
+ENGINE_TO_MOD u8 random_range_u8(u8 a, u8 b);
+ENGINE_TO_MOD u32 random_range_u32(u32 a, u32 b);
+ENGINE_TO_MOD i32 random_range_i32(i32 a, i32 b);
 ENGINE_TO_MOD float random_range(float a, float b);
 ENGINE_TO_MOD double random_rangedub(double a, double b);
 ENGINE_TO_MOD double get_time(void);
@@ -124,19 +124,19 @@ ENGINE_TO_MOD float lerp(float min, float max, float val);
 ENGINE_TO_MOD float inverse_lerp(float min, float max, float val);
 ENGINE_TO_MOD void play_wav(const char* path, float volume, Vector3 pos, bool positional);
 ENGINE_TO_MOD void play_message(const char* path);
-ENGINE_TO_MOD void play_mp3(const char* path, int32_t fade_in_ms);
+ENGINE_TO_MOD void play_mp3(const char* path, i32 fade_in_ms);
 ENGINE_TO_MOD void mp3_clear(void);
 ENGINE_TO_MOD bool GetSoundIsPlaying(ma_sound* sound);
 ENGINE_TO_MOD float GetSoundRemainingTime(ma_sound* pSound);
 ENGINE_TO_MOD bool StringIsEmpty(const char* a);
 ENGINE_TO_MOD bool StringsEqual(const char* a, const char* b);
 ENGINE_TO_MOD void StringCopyInto_A_From_B(char* a, const char* b, size_t bufferSize);
-ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uint32_t layerMask);
-ENGINE_TO_MOD void RaycastAll(Vector3 origin, Vector3 dir, float distance, uint32_t layerMask, RaycastHit* hits, uint16_t maxCount);
-ENGINE_TO_MOD RaycastHit CapsuleCast(Vector3 start, Vector3 end, float capsuleRadius, float castDist, uint32_t layerMask, bool hitTriggers);
-ENGINE_TO_MOD bool CheckCapsule(Vector3 start, Vector3 end, float capsuleRadius, float capsuleHeight, uint32_t layerMask);
+ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, u32 layerMask);
+ENGINE_TO_MOD void RaycastAll(Vector3 origin, Vector3 dir, float distance, u32 layerMask, RaycastHit* hits, u16 maxCount);
+ENGINE_TO_MOD RaycastHit CapsuleCast(Vector3 start, Vector3 end, float capsuleRadius, float castDist, u32 layerMask, bool hitTriggers);
+ENGINE_TO_MOD bool CheckCapsule(Vector3 start, Vector3 end, float capsuleRadius, float capsuleHeight, u32 layerMask);
 ENGINE_TO_MOD void AddDebugLine(Vector3 start, Vector3 end);
-ENGINE_TO_MOD int32_t PosGetCellCoords(float pos_x, float pos_z);
+ENGINE_TO_MOD i32 PosGetCellCoords(float pos_x, float pos_z);
 ENGINE_TO_MOD int StringFormatV(char* buffer, size_t bufferSize, const char* format, va_list args); // vsnprintf replacement
 ENGINE_TO_MOD int StringFormat(char* buffer, size_t bufferSize, const char* format, ...); // snprintf replacement
 ENGINE_TO_MOD bool PositionVisibleFromPlayerCell(float x, float z);
@@ -153,19 +153,19 @@ ENGINE_TO_MOD void ToggleConsole(void);
 ENGINE_TO_MOD void MenuGoBack(void);
 ENGINE_TO_MOD void IgnoreNextMouseDelta(void);
 ENGINE_TO_MOD void ApplyPlayerMovements(void);
-ENGINE_TO_MOD void AddForce(uint16_t idx, Vector3 force, bool isImpulse);
+ENGINE_TO_MOD void AddForce(u16 idx, Vector3 force, bool isImpulse);
 ENGINE_TO_MOD void CenterStatusPrint(const char* fmt, ...);
 ENGINE_TO_MOD void PortalCulling(void);
 ENGINE_TO_MOD char* GetLevelFileNextStringUpToNewlineOrEOF(char* buf, int size);
-ENGINE_TO_MOD void LoadFieldIntoLight(char* trimmed_key, char* trimmed_value, char* initialLine, uint32_t lineNum, Light* lit, LightAnimation* lan, uint16_t lightIdx);
-ENGINE_TO_MOD int32_t AddLight(Light* lit, LightAnimation* lanim);
-ENGINE_TO_MOD void UpdateLight(uint16_t lightsIdx, Vector3 pos, Color3 col, float range, float intensity, float maxIntensity, float minIntensity, float spotAng, Quaternion spotDir, bool on, bool shadOn);
+ENGINE_TO_MOD void LoadFieldIntoLight(char* trimmed_key, char* trimmed_value, char* initialLine, u32 lineNum, Light* lit, LightAnimation* lan, u16 lightIdx);
+ENGINE_TO_MOD i32 AddLight(Light* lit, LightAnimation* lanim);
+ENGINE_TO_MOD void UpdateLight(u16 lightsIdx, Vector3 pos, Color3 col, float range, float intensity, float maxIntensity, float minIntensity, float spotAng, Quaternion spotDir, bool on, bool shadOn);
 ENGINE_TO_MOD void InitializeEntity(Entity* entry);
 ENGINE_TO_MOD size_t GetStringLength(const char* s);
 ENGINE_TO_MOD char* StringFindFirstCharWithin(const char *s, char c);
 ENGINE_TO_MOD bool CharacterIsEmpty(const char c);
-ENGINE_TO_MOD void AddDoorPortal(uint16_t entIdx, uint16_t parent);
-ENGINE_TO_MOD bool ToggleDoorPortal(uint8_t portalIdx, uint16_t doorIdx, uint16_t closedModelIndex);
+ENGINE_TO_MOD void AddDoorPortal(u16 entIdx, u16 parent);
+ENGINE_TO_MOD bool ToggleDoorPortal(u8 portalIdx, u16 doorIdx, u16 closedModelIndex);
 ENGINE_TO_MOD Vector3 GetEntityLocalSpawnPointFromUnrotatedOffsetVector(Entity* originator, Vector3 offsetFromOriginator);
-ENGINE_TO_MOD void TurnLightOff(uint16_t litIdx);
-ENGINE_TO_MOD void AddCamView(Vector3 pos, Quaternion rot, uint8_t fov, uint16_t width, uint16_t height, float near, float far);
+ENGINE_TO_MOD void TurnLightOff(u16 litIdx);
+ENGINE_TO_MOD void AddCamView(Vector3 pos, Quaternion rot, u8 fov, u16 width, u16 height, float near, float far);

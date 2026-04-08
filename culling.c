@@ -2,34 +2,34 @@
 #include "os.h"
 #include "gl.h"
 #include "voxen.h"
-uint8_t *stbi_load_from_memory(const uint8_t* buffer, int32_t len, int32_t* x, int32_t* y);
-extern void stbi__arena_init(void);
-extern uint8_t*  stbi__arena_base;
+u8 *stbi_load_from_memory(const u8* buffer, i32 len, i32* x, i32* y);
+void stbi__arena_init_thread(StbiArena* arena);
+extern StbiArena stbi_arena_main;
 #define STBI_ARENA_SIZE 16 * 1024 * 1024
-uint32_t gridCellStates[ARRSIZE];
-uint32_t precomputedVisibleCellsFromHere[524288]; // 4096 * 4096 / 32
-uint16_t playerCellIdx = 0u;
+u32 gridCellStates[ARRSIZE];
+u32 precomputedVisibleCellsFromHere[524288]; // 4096 * 4096 / 32
+u16 playerCellIdx = 0u;
 bool instanceIsLODArray[INSTANCE_COUNT];
 #define MAX_CULL_FILESIZE 500000
-uint8_t cullingFileBuffer[MAX_CULL_FILESIZE];
+u8 cullingFileBuffer[MAX_CULL_FILESIZE];
 Portal activePortals[MAX_PORTALS];
-static uint8_t numActivePortals = 0;
-__attribute__((pure)) bool get_cull_bit(const uint32_t* arr, int idx) { return (arr[idx >> 5] >> (idx & 31)) & 1; }
-static inline __attribute__((always_inline)) void set_cull_bit(uint32_t* arr, int idx, bool val) {uint32_t* w = arr + (idx >> 5); uint32_t m = 1U << (idx & 31); *w = val ? (*w | m) : (*w & ~m);}
-ENGINE_TO_MOD int32_t PosGetCellCoords(float x, float z) { return (PosGetCellCoordZ(z) * WORLDX) + PosGetCellCoordX(x); }
-extern uint16_t playerCellIdx;
+static u8 numActivePortals = 0;
+__attribute__((pure)) bool get_cull_bit(const u32* arr, int idx) { return (arr[idx >> 5] >> (idx & 31)) & 1; }
+static inline __attribute__((always_inline)) void set_cull_bit(u32* arr, int idx, bool val) {u32* w = arr + (idx >> 5); u32 m = 1U << (idx & 31); *w = val ? (*w | m) : (*w & ~m);}
+ENGINE_TO_MOD i32 PosGetCellCoords(float x, float z) { return (PosGetCellCoordZ(z) * WORLDX) + PosGetCellCoordX(x); }
+extern u16 playerCellIdx;
 ENGINE_TO_MOD bool PositionVisibleFromPlayerCell(float x, float z) {
-    int32_t subIdx = PosGetCellCoords(x,z);
+    i32 subIdx = PosGetCellCoords(x,z);
     int cellIdx = (playerCellIdx * ARRSIZE);
     int flat_idx = cellIdx + subIdx;
     return (get_cull_bit(precomputedVisibleCellsFromHere,flat_idx));
 }
 
-static inline __attribute__((always_inline)) bool XZPairInBounds(int32_t x, int32_t z) { return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0); }
+static inline __attribute__((always_inline)) bool XZPairInBounds(i32 x, i32 z) { return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0); }
 bool SkyIsVisible(void) { return ((gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || Sys_Global.currentLevel == LEVEL_CYBERSPACE); }
 bool SkySunIsVisible(void) { return ((gridCellStates[playerCellIdx] & CELL_SEES_SUN) && Sys_Global.currentLevel != LEVEL_CYBERSPACE); }
-bool NeighborhoodInPVS(uint16_t cellX, uint16_t cellZ, int r) {
-    uint32_t cellIdx = (cellZ * WORLDX) + cellX;
+bool NeighborhoodInPVS(u16 cellX, u16 cellZ, int r) {
+    u32 cellIdx = (cellZ * WORLDX) + cellX;
     for (int ix = (int)cellX-r; ix <= (int)cellX+r; ++ix) {
         for (int iz = (int)cellZ-r; iz <= (int)cellZ+r; ++iz) {
             if (unlikely(!XZPairInBounds(ix,iz))) continue;
@@ -41,7 +41,7 @@ bool NeighborhoodInPVS(uint16_t cellX, uint16_t cellZ, int r) {
     return false;
 }
 
-bool LevelSpecificHacksForClosedCellsThatProbablyShouldntBeBecauseOfInsetMeshes(uint32_t instCellIdx, uint16_t constIndex) {
+bool LevelSpecificHacksForClosedCellsThatProbablyShouldntBeBecauseOfInsetMeshes(u32 instCellIdx, u16 constIndex) {
     if (!(Sys_Global.currentLevel == 1 && (constIndex == 309 || constIndex == 532)) && !ConstIndexIsPortalBlockingDoor(constIndex)) {
         if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (constIndex != 754 || !SkyIsVisible())) return true;
     }
@@ -49,10 +49,10 @@ bool LevelSpecificHacksForClosedCellsThatProbablyShouldntBeBecauseOfInsetMeshes(
     return false;
 }
 
-bool GridCellBlock(uint16_t i,Vector3 pos,Vector3 newPos) {
-    int32_t ccx=PosGetCellCoordX(pos.x),    ccz=PosGetCellCoordZ(pos.z);
-    int32_t ncx=PosGetCellCoordX(newPos.x), ncz=PosGetCellCoordZ(newPos.z);
-    int32_t cc=(ccz*WORLDX)+ccx, nc=(ncz*WORLDX)+ncx;
+bool GridCellBlock(u16 i,Vector3 pos,Vector3 newPos) {
+    i32 ccx=PosGetCellCoordX(pos.x),    ccz=PosGetCellCoordZ(pos.z);
+    i32 ncx=PosGetCellCoordX(newPos.x), ncz=PosGetCellCoordZ(newPos.z);
+    i32 cc=(ccz*WORLDX)+ccx, nc=(ncz*WORLDX)+ncx;
     if (ncz>ccz && (gridCellStates[cc]&CELL_CLOSEDNORTH)) { Sys_Global.instances[i].velocity.z=-0.1f; return true; }
     if (ncz<ccz && (gridCellStates[cc]&CELL_CLOSEDSOUTH)) { Sys_Global.instances[i].velocity.z= 0.1f; return true; }
     if (ncx>ccx && (gridCellStates[cc]&CELL_CLOSEDEAST))  { Sys_Global.instances[i].velocity.x=-0.1f; return true; }
@@ -77,13 +77,13 @@ static unsigned char* LoadCullPNG(const char* name, int level) {
 
 #define PIXEL_IDX(x, z) ((x) + ((WORLDZ - 1 - (z)) * WORLDX)) * 4 // 4 channels, flip z to have desired bottom-left origin 0,0 vs stbi_load's top-left
 void DetermineClosedEdges(void) {
-    stbi__arena_init(); uint16_t totalOpenCells = 0;
+    stbi__arena_init_thread(&stbi_arena_main); u16 totalOpenCells = 0;
     unsigned char* openPixels = LoadCullPNG("worldcellopen",Sys_Global.currentLevel);
-    for (int32_t x=0;x<WORLDX;++x) {
-        for (int32_t z=0;z<WORLDZ;++z) {
-            int32_t cellIdx = (z * WORLDX) + x;
+    for (i32 x=0;x<WORLDX;++x) {
+        for (i32 z=0;z<WORLDZ;++z) {
+            i32 cellIdx = (z * WORLDX) + x;
             gridCellStates[cellIdx] &= ~CELL_OPEN;
-            int32_t pixelIdx = PIXEL_IDX(x,z);
+            i32 pixelIdx = PIXEL_IDX(x,z);
             unsigned char or = openPixels[pixelIdx + 0], og = openPixels[pixelIdx + 1], ob = openPixels[pixelIdx + 2];
             if (or > 0 || og > 0 || ob > 0) { gridCellStates[cellIdx] |= CELL_OPEN; totalOpenCells++; }
             else gridCellStates[cellIdx] |= CELL_CLOSEDNORTH|CELL_CLOSEDEAST|CELL_CLOSEDSOUTH|CELL_CLOSEDWEST; // Also force close the edges for closed cells even if above edges image said tweren't closed edges.
@@ -92,11 +92,11 @@ void DetermineClosedEdges(void) {
 
     gridCellStates[0] |= CELL_OPEN; // Force the fallback error cell to be open (forced visible later, open is static, visible is transient)
     unsigned char* edgePixels = LoadCullPNG("worldedgesclosed",Sys_Global.currentLevel);
-    for (int32_t x=0;x<WORLDX;x++) {
-        for (int32_t z=0;z<WORLDZ;z++) {
-            int32_t cellIdx = (z * WORLDX) + x;
+    for (i32 x=0;x<WORLDX;x++) {
+        for (i32 z=0;z<WORLDZ;z++) {
+            i32 cellIdx = (z * WORLDX) + x;
             gridCellStates[cellIdx] &= ~(CELL_CLOSEDNORTH|CELL_CLOSEDEAST|CELL_CLOSEDSOUTH|CELL_CLOSEDWEST); // Mark all edges not closed
-            int32_t pixelIdx = PIXEL_IDX(x,z);
+            i32 pixelIdx = PIXEL_IDX(x,z);
             unsigned char cr = edgePixels[pixelIdx + 0], cg = edgePixels[pixelIdx + 1], cb = edgePixels[pixelIdx + 2], ca = edgePixels[pixelIdx + 3];
             if (cr > 127) gridCellStates[cellIdx] |= CELL_CLOSEDNORTH;
             if (cg > 127) gridCellStates[cellIdx] |= CELL_CLOSEDEAST;
@@ -107,9 +107,9 @@ void DetermineClosedEdges(void) {
     }
         
     unsigned char* skyPixels = LoadCullPNG("worldcellskyvis",Sys_Global.currentLevel);
-    for (int32_t x=0;x<WORLDX;++x) {
-        for (int32_t z=0;z<WORLDZ;++z) {
-            int32_t cellIdx = (z * WORLDX) + x; int32_t pixelIdx = PIXEL_IDX(x,z);
+    for (i32 x=0;x<WORLDX;++x) {
+        for (i32 z=0;z<WORLDZ;++z) {
+            i32 cellIdx = (z * WORLDX) + x; i32 pixelIdx = PIXEL_IDX(x,z);
             unsigned char sr = skyPixels[pixelIdx + 0], sg = skyPixels[pixelIdx + 1], sb = skyPixels[pixelIdx + 2];
             if (sr > 127 && sg < 127 && sb < 127) gridCellStates[cellIdx] &= ~(CELL_SEES_SUN|CELL_SEES_SKYBOX); // All red cells marked as -1, no sky or sun.
             else if (sr <= 127 && sg <= 127 && sb > 127) gridCellStates[cellIdx] |= CELL_SEES_SUN|CELL_SEES_SKYBOX; // All blue cells marked as sky visible.  Sun + Sky.
@@ -117,23 +117,24 @@ void DetermineClosedEdges(void) {
         }
     }
     
-    OS_DeallocateRAM(stbi__arena_base, STBI_ARENA_SIZE); stbi__arena_base = NULL;
+    OS_DeallocateRAM(stbi_arena_main.base, STBI_ARENA_SIZE); stbi_arena_main.base = NULL;
     DualLog("found %d open cells...",totalOpenCells);
     DebugRAM("end of dynamic culling DetermineClosedEdges");
 }
 
-ENGINE_TO_MOD void AddDoorPortal(uint16_t entIdx, uint16_t parent) {
-    float nudgeAmount = entIdx == 499 || entIdx == 509 ? 3.84f : 0.32f; // Bulkhead and giant elevator door need to nudge further to be sure.
+ENGINE_TO_MOD void AddDoorPortal(u16 entIdx, u16 parent) {
+    if (entIdx == 499 || entIdx == 509) return; // Don't add bulkheads
+    float nudgeAmount = 0.32f;
     Entity* door = &Sys_Global.instances[parent];
     door->portalIndex = numActivePortals;
     bool isOpen = (door->doorState != DoorState_Closed); // Allows for any of DoorState_Open, DoorState_Opening, or DoorState_Closing to be considered open as far as portals are concerned so we can draw objects between the door panels.
     float obj_x = door->position.x; float obj_z = door->position.z;
-    uint16_t cellIndexCurrentX = PosGetCellCoordX(obj_x); uint16_t cellIndexCurrentZ = PosGetCellCoordZ(obj_z);
-    uint16_t cellCurrent = (cellIndexCurrentZ * WORLDX) + cellIndexCurrentX;
-    uint16_t    cellIndexUp = PosGetCellCoordZ(obj_z + nudgeAmount), cellIndexDn = PosGetCellCoordZ(obj_z - nudgeAmount);
-    uint16_t cellIndexRight = PosGetCellCoordX(obj_x + nudgeAmount), cellIndexLeft = PosGetCellCoordX(obj_x - nudgeAmount);
-    uint16_t cellN_idx = PosGetCellCoords(obj_x, obj_z + nudgeAmount), cellS_idx = PosGetCellCoords(obj_x, obj_z - nudgeAmount);
-    uint16_t cellE_idx = PosGetCellCoords(obj_x + nudgeAmount, obj_z), cellW_idx = PosGetCellCoords(obj_x - nudgeAmount, obj_z);
+    u16 cellIndexCurrentX = PosGetCellCoordX(obj_x); u16 cellIndexCurrentZ = PosGetCellCoordZ(obj_z);
+    u16 cellCurrent = (cellIndexCurrentZ * WORLDX) + cellIndexCurrentX;
+    u16    cellIndexUp = PosGetCellCoordZ(obj_z + nudgeAmount), cellIndexDn = PosGetCellCoordZ(obj_z - nudgeAmount);
+    u16 cellIndexRight = PosGetCellCoordX(obj_x + nudgeAmount), cellIndexLeft = PosGetCellCoordX(obj_x - nudgeAmount);
+    u16 cellN_idx = PosGetCellCoords(obj_x, obj_z + nudgeAmount), cellS_idx = PosGetCellCoords(obj_x, obj_z - nudgeAmount);
+    u16 cellE_idx = PosGetCellCoords(obj_x + nudgeAmount, obj_z), cellW_idx = PosGetCellCoords(obj_x - nudgeAmount, obj_z);
     bool isNS = (cellN_idx != cellCurrent || cellS_idx != cellCurrent);
     if (isNS) { // Portal is a North     /\
                 //             South pair\/
@@ -153,28 +154,28 @@ ENGINE_TO_MOD void AddDoorPortal(uint16_t entIdx, uint16_t parent) {
     numActivePortals++;
 }
 
-ENGINE_TO_MOD bool ToggleDoorPortal(uint8_t portalIdx, uint16_t doorIdx, uint16_t closedModelIndex) {
+ENGINE_TO_MOD bool ToggleDoorPortal(u8 portalIdx, u16 doorIdx, u16 closedModelIndex) {
     if (portalIdx >= MAX_PORTALS) return false;
 
     Portal* prt = &activePortals[portalIdx];
-    bool currentState = prt->open; uint16_t mdx = Sys_Global.instances[doorIdx].modelIndex;
+    bool currentState = prt->open; u16 mdx = Sys_Global.instances[doorIdx].modelIndex;
          if (mdx == closedModelIndex &&  currentState) { prt->open = false; prt->dirty = true; }
     else if (mdx != closedModelIndex && !currentState) { prt->open =  true; prt->dirty = true; }
     return true;
 }
 
 bool UpdatedPlayerCell(void) {
-    uint16_t lastCell = playerCellIdx;
-    playerCellIdx = PosGetCellCoords(Sys_Global.instances[PLAYER1].position.x, Sys_Global.instances[PLAYER1].position.z);
+    u16 lastCell = playerCellIdx;
+    playerCellIdx = PosGetCellCoords(Sys_Global.instances[PLAYER1].position.x,Sys_Global.instances[PLAYER1].position.z);
     return (playerCellIdx != lastCell);
 }
 
-int32_t CastRayCellCheck(int32_t x, int32_t z, int32_t lastX, int32_t lastZ) {
+i32 CastRayCellCheck(i32 x, i32 z, i32 lastX, i32 lastZ) {
     if (lastX != x || lastZ != z) {
-        if (XZPairInBounds(lastX, lastZ)) {
-            int32_t li = (lastZ * WORLDX) + lastX;
-            uint32_t cell = gridCellStates[li];
-            int32_t dx = x - lastX, dz = z - lastZ; // -1, 0, or 1 each
+        if (XZPairInBounds(lastX, lastZ)) { 
+            i32 li = (lastZ * WORLDX) + lastX;
+            u32 cell = gridCellStates[li];
+            i32 dx = x - lastX, dz = z - lastZ; // -1, 0, or 1 each
             if (dz == 0) { // Pure horizontal
                 if ((dx >  0) && (cell & CELL_CLOSEDEAST))  return -1;
                 if ((dx < 0)  && (cell & CELL_CLOSEDWEST))  return -1;
@@ -182,43 +183,55 @@ int32_t CastRayCellCheck(int32_t x, int32_t z, int32_t lastX, int32_t lastZ) {
                 if ((dz > 0)  && (cell & CELL_CLOSEDNORTH)) return -1;
                 if ((dz < 0)  && (cell & CELL_CLOSEDSOUTH)) return -1;
             } else { // Diagonal — check cell + two axis-adjacent neighbors
-                int32_t ni_ns = (int32_t)vclamp((lastZ + dz) * WORLDX + lastX,        0, ARRSIZE - 1); // neighbor indices, clamped
-                int32_t ni_ew = (int32_t)vclamp( lastZ       * WORLDX + lastX + dx,   0, ARRSIZE - 1);
-                uint32_t cf_ew  = (dx > 0) ? CELL_CLOSEDEAST  : CELL_CLOSEDWEST; // Which closed-edge flags to test depends on direction quadrant
-                uint32_t cf_ns  = (dz > 0) ? CELL_CLOSEDNORTH : CELL_CLOSEDSOUTH;
-                uint32_t nf_ew  = (dx > 0) ? CELL_CLOSEDEAST  : CELL_CLOSEDWEST;   // Neighbor sees the opposite face, same face on neighbor in NS direction
-                uint32_t nf_ns  = (dz > 0) ? CELL_CLOSEDNORTH : CELL_CLOSEDSOUTH;  // same face on neighbor in EW direction
-                uint32_t nsN = gridCellStates[ni_ns];
-                uint32_t ewN = gridCellStates[ni_ew];
-                bool c_ew  = (cell & cf_ew)  != 0; bool c_ns  = (cell & cf_ns)  != 0;
-                bool n_ew  = (nsN  & nf_ew)  != 0 && (nsN & CELL_OPEN);  // neighbor along NS-axis, check EW edge
-                bool n_ns  = (ewN  & nf_ns)  != 0 && (ewN & CELL_OPEN);  // neighbor along EW-axis, check NS edge
+                u32 cf_ew  = (dx > 0) ? CELL_CLOSEDEAST  : CELL_CLOSEDWEST; // Which closed-edge flags to test depends on direction quadrant
+                u32 cf_ns  = (dz > 0) ? CELL_CLOSEDNORTH : CELL_CLOSEDSOUTH;
+                bool c_ew = (cell & cf_ew) != 0;
+                bool c_ns = (cell & cf_ns) != 0;
+                u32 nf_ew  = (dx > 0) ? CELL_CLOSEDEAST  : CELL_CLOSEDWEST;   // Neighbor sees the opposite face, same face on neighbor in NS direction
+                u32 nf_ns  = (dz > 0) ? CELL_CLOSEDNORTH : CELL_CLOSEDSOUTH;  // same face on neighbor in EW direction
+                bool n_ew = false;
+                bool n_ns = false;
+
+                i32 ni_ns_coord_x = lastX;
+                i32 ni_ns_coord_z = lastZ + dz;
+                if (XZPairInBounds(ni_ns_coord_x, ni_ns_coord_z)) {
+                    u32 nsN = gridCellStates[ni_ns_coord_z * WORLDX + ni_ns_coord_x];
+                    n_ew = (nsN & nf_ew) != 0 && (nsN & CELL_OPEN);
+                }
+
+                i32 ni_ew_coord_x = lastX + dx;
+                i32 ni_ew_coord_z = lastZ;
+                if (XZPairInBounds(ni_ew_coord_x, ni_ew_coord_z)) {
+                    u32 ewN = gridCellStates[ni_ew_coord_z * WORLDX + ni_ew_coord_x];
+                    n_ns = (ewN & nf_ns) != 0 && (ewN & CELL_OPEN);
+                }
+
                 if ((c_ns && c_ew) || (c_ew && n_ew) || (c_ns && n_ns) || (n_ew && n_ns)) return -1;
             }
         }
     }
  
     if (!XZPairInBounds(x,z)) return 0;
-    int32_t ci = (z * WORLDX) + x;
+    i32 ci = (z * WORLDX) + x;
     if (gridCellStates[ci] & CELL_OPEN) gridCellStates[ci] |=  CELL_VISIBLE;
     else                                gridCellStates[ci] &= ~CELL_VISIBLE;
     return (gridCellStates[ci] & CELL_VISIBLE) ? 1 : -1;
 }
 
-int32_t CastStraightZ(int32_t px, int32_t pz, int32_t signz) {
+i32 CastStraightZ(i32 px, i32 pz, i32 signz) {
     if (signz > 0 && pz >= (WORLDZ - 1)) return pz; // Nowwhere to step to if right by edge, hence WORLDX - 1 here.
     if (signz < 0 && pz <= 0) return pz;
     if (!XZPairInBounds(px,pz)) return pz;
     
-    int32_t cellIdx = (pz * WORLDX) + px;
+    i32 cellIdx = (pz * WORLDX) + px;
     if (!(gridCellStates[cellIdx] & CELL_VISIBLE)) return pz;
     
-    bool currentVisible = true; int32_t x=px, z=pz+signz, zabs=vabs(z);
+    bool currentVisible = true; i32 x=px, z=pz+signz, zabs=vabs(z);
     for (;zabs<WORLDX;z+=signz) { // Up/Down
         currentVisible = false;
-        int32_t cellIdx_x_zmnus1 = ((z - 1) * WORLDX) + x, cellIdx_x_zplus1 = ((z + 1) * WORLDX) + x;
+        i32 cellIdx_x_zmnus1 = ((z - 1) * WORLDX) + x, cellIdx_x_zplus1 = ((z + 1) * WORLDX) + x;
         if (XZPairInBounds(x,z - signz) && XZPairInBounds(x,z)) {
-            int32_t cellIdx_x_zmnus_sign = ((z - signz) * WORLDX) + x;
+            i32 cellIdx_x_zmnus_sign = ((z - signz) * WORLDX) + x;
             if (gridCellStates[cellIdx_x_zmnus_sign] & CELL_VISIBLE) {
                 if (signz > 0) {
                     if (gridCellStates[cellIdx_x_zmnus1] & CELL_CLOSEDNORTH && gridCellStates[cellIdx_x_zmnus1] & CELL_OPEN) return z;
@@ -226,7 +239,7 @@ int32_t CastStraightZ(int32_t px, int32_t pz, int32_t signz) {
                     if (gridCellStates[cellIdx_x_zplus1] & CELL_CLOSEDSOUTH && gridCellStates[cellIdx_x_zplus1] & CELL_OPEN) return z;
                 }
 
-                int32_t subCellIdx = (z * WORLDX) + x;
+                i32 subCellIdx = (z * WORLDX) + x;
                 if (gridCellStates[subCellIdx] & CELL_OPEN) gridCellStates[subCellIdx] |= CELL_VISIBLE;
                 else gridCellStates[subCellIdx] &= ~CELL_VISIBLE;
                 
@@ -237,7 +250,7 @@ int32_t CastStraightZ(int32_t px, int32_t pz, int32_t signz) {
         if (!currentVisible) break; // Hit wall!
 
         if (XZPairInBounds(x + 1,z)) {
-            int32_t cellIdx_xplus1_z = (z * WORLDX) + x + 1;
+            i32 cellIdx_xplus1_z = (z * WORLDX) + x + 1;
             if (CastRayCellCheck(x,z,x + 1,z) > 0) {
                 if (gridCellStates[cellIdx_xplus1_z] & CELL_OPEN) gridCellStates[cellIdx_xplus1_z] |= CELL_VISIBLE;
                 else gridCellStates[cellIdx_xplus1_z] &= ~CELL_VISIBLE;
@@ -245,7 +258,7 @@ int32_t CastStraightZ(int32_t px, int32_t pz, int32_t signz) {
         }
         
         if (XZPairInBounds(x - 1,z)) {
-            int32_t cellIdx_xmnus1_z = (z * WORLDX) + x - 1;
+            i32 cellIdx_xmnus1_z = (z * WORLDX) + x - 1;
             if (CastRayCellCheck(x,z,x - 1,z) > 0) {
                 if (gridCellStates[cellIdx_xmnus1_z] & CELL_OPEN) gridCellStates[cellIdx_xmnus1_z] |= CELL_VISIBLE;
                 else gridCellStates[cellIdx_xmnus1_z] &= ~CELL_VISIBLE;
@@ -256,24 +269,28 @@ int32_t CastStraightZ(int32_t px, int32_t pz, int32_t signz) {
     return WORLDX * signz;
 }
 
-int32_t CastStraightX(int32_t px, int32_t pz, int32_t signx) {
+i32 CastStraightX(i32 px, i32 pz, i32 signx) {
     if (signx > 0 && px >= (WORLDX - 1)) return px; // Nowwhere to step to if right by edge, hence WORLDX - 1 here.
     if (signx < 0 && px <= 0) return px;
     if (!XZPairInBounds(px,pz)) return px;
     if (!(gridCellStates[(pz * WORLDX) + px] & CELL_VISIBLE)) return px;
 
-    int32_t x = px + signx;
-    int32_t z = pz;
+    i32 x = px + signx;
+    i32 z = pz;
     bool currentVisible = true;
-    int32_t xabs = vabs(x);
+    i32 xabs = vabs(x);
     for (;xabs<WORLDX;x+=signx) { // Right/Left
         currentVisible = false;
         if (XZPairInBounds(x - signx,z) && XZPairInBounds(x,z)) {
-            int32_t cellIdx_xmnussign_z = (z * WORLDX) + x - signx;
+            i32 cellIdx_xmnussign_z = (z * WORLDX) + x - signx;
             if (gridCellStates[cellIdx_xmnussign_z] & CELL_VISIBLE) {
-                if ((gridCellStates[(z * WORLDX) + x + signx] & CELL_CLOSEDEAST) && (gridCellStates[(z * WORLDX) + x + signx] & CELL_OPEN)) return x;
+                if (signx > 0) {
+                    if ((gridCellStates[(z * WORLDX) + x - 1] & CELL_CLOSEDEAST) && gridCellStates[(z * WORLDX) + x - 1] & CELL_OPEN) return x;
+                } else if (signx < 0) {
+                    if ((gridCellStates[(z * WORLDX) + x + 1] & CELL_CLOSEDWEST) && gridCellStates[(z * WORLDX) + x + 1] & CELL_OPEN) return x;
+                }
                 
-                int32_t subCellIdx = (z * WORLDX) + x;
+                i32 subCellIdx = (z * WORLDX) + x;
                 if (gridCellStates[subCellIdx] & CELL_OPEN) gridCellStates[subCellIdx] |= CELL_VISIBLE;
                 else gridCellStates[subCellIdx] &= ~CELL_VISIBLE;
                 
@@ -284,7 +301,7 @@ int32_t CastStraightX(int32_t px, int32_t pz, int32_t signx) {
         if (!currentVisible) break; // Hit wall!
         
         if (XZPairInBounds(x,z + 1)) {
-            int32_t cellIdx_x_zplus1 = ((z + 1) * WORLDX) + x;
+            i32 cellIdx_x_zplus1 = ((z + 1) * WORLDX) + x;
             if (CastRayCellCheck(x,z,x,z + 1) > 0) {
                 if (gridCellStates[cellIdx_x_zplus1] & CELL_OPEN) gridCellStates[cellIdx_x_zplus1] |= CELL_VISIBLE;
                 else gridCellStates[cellIdx_x_zplus1] &= ~CELL_VISIBLE;
@@ -294,7 +311,7 @@ int32_t CastStraightX(int32_t px, int32_t pz, int32_t signx) {
         }
         
         if (XZPairInBounds(x,z - 1)) {
-            int32_t cellIdx_x_zmnus1 = ((z - 1) * WORLDX) + x;
+            i32 cellIdx_x_zmnus1 = ((z - 1) * WORLDX) + x;
             if (CastRayCellCheck(x,z,x,z - 1) > 0) {
                 if (gridCellStates[cellIdx_x_zmnus1] & CELL_OPEN) gridCellStates[cellIdx_x_zmnus1] |= CELL_VISIBLE;
                 else gridCellStates[cellIdx_x_zmnus1] &= ~CELL_VISIBLE;
@@ -307,52 +324,52 @@ int32_t CastStraightX(int32_t px, int32_t pz, int32_t signx) {
     return WORLDX * signx;
 }
 
-void CastRay(int32_t x0, int32_t z0, int32_t x1, int32_t z1) {
-    int32_t dx = vabs(x1 - x0);      int32_t dz = vabs(z1 - z0);
-    int32_t sx = (x0 < x1) ? 1 : -1; int32_t sz = (z0 < z1) ? 1 : -1;
-    int32_t x = x0;                  int32_t z = z0;
-    int32_t lastX = x;               int32_t lastZ = z;
-    int32_t err = dx - dz;
-    int32_t iter = dx > dz ? dx : dz;
+void CastRay(i32 x0, i32 z0, i32 x1, i32 z1) {
+    i32 dx = vabs(x1 - x0);      i32 dz = vabs(z1 - z0);
+    i32 sx = (x0 < x1) ? 1 : -1; i32 sz = (z0 < z1) ? 1 : -1;
+    i32 x = x0;                  i32 z = z0;
+    i32 lastX = x;               i32 lastZ = z;
+    i32 err = dx - dz;
+    i32 iter = dx > dz ? dx : dz;
     while (iter >= 0) {
-        if (!XZPairInBounds(x,z) || !XZPairInBounds(lastX,lastZ)) continue;
+        if (!XZPairInBounds(x,z) || !XZPairInBounds(lastX,lastZ)) { --iter; continue; }
         if (CastRayCellCheck(x,z,lastX,lastZ) == -1) return;
 
         lastX = x; lastZ = z;
-        int32_t e2 = 2 * err;
+        i32 e2 = 2 * err;
         if (e2 > -dz) { err -= dz; x += sx; }
         if (e2 <  dx) { err += dx; z += sz; }
-        iter--;
+        --iter;
     }
 }
 
-void CircleFanRays(int32_t x0, int32_t z0) { // CastRay()'s in fan from x0,z0 out to every cell around map perimeter.
+void CircleFanRays(i32 x0, i32 z0) { // CastRay()'s in fan from x0,z0 out to every cell around map perimeter.
     if (!XZPairInBounds(x0,z0)) return;
     if (!(gridCellStates[(z0 * WORLDX) + x0] & CELL_VISIBLE)) return;
 
-    int32_t x,z,max=WORLDX,min=0; // Reduce work slightly by not casting towards edges but 1 less = [1,63].
+    i32 x,z,max=WORLDX,min=0; // Reduce work slightly by not casting towards edges but 1 less = [1,63].
     for (x=min;x<max;x++) CastRay(x0,z0,x,min);
     for (x=min;x<max;x++) CastRay(x0,z0,x,max);
     for (z=min;z<max;z++) CastRay(x0,z0,min,z);
     for (z=min;z<max;z++) CastRay(x0,z0,max,z);
 }
 
-void DetermineVisibleCells(int32_t startX, int32_t startZ) {
+void DetermineVisibleCells(i32 startX, i32 startZ) {
     if (!XZPairInBounds(startX,startZ)) return;
 
-    for (int32_t x=0;x<WORLDX;x++) {
-        for (int32_t z=0;z<WORLDZ;z++) {
-            int32_t subCellIdx = (z * WORLDX) + x;
+    for (i32 x=0;x<WORLDX;x++) {
+        for (i32 z=0;z<WORLDZ;z++) {
+            i32 subCellIdx = (z * WORLDX) + x;
             gridCellStates[subCellIdx] &= ~CELL_VISIBLE; // Clear all to not visible.
         }
     }
 
-    int32_t cellIdx_start = (startZ * WORLDX) + startX;
+    i32 cellIdx_start = (startZ * WORLDX) + startX;
     gridCellStates[cellIdx_start] |= CELL_VISIBLE; // Force starting player cell to visible.
     // Cast to the right (East)        [ ][3]
     CastStraightX(startX,startZ,1); // [1][2]
-    int32_t iter = 0;               // [ ][3]
-    for (int32_t march=startX;march<(WORLDX - 1);march++) {
+    i32 iter = 0;               // [ ][3]
+    for (i32 march=startX;march<(WORLDX - 1);march++) {
         iter++;
         if (iter > WORLDX) break;
         
@@ -362,7 +379,7 @@ void DetermineVisibleCells(int32_t startX, int32_t startZ) {
     }
     
     iter = 0;
-    for (int32_t march=startX;march<(WORLDX - 1);march++) {
+    for (i32 march=startX;march<(WORLDX - 1);march++) {
         iter++;
         if (iter > WORLDX) break;
 
@@ -373,7 +390,7 @@ void DetermineVisibleCells(int32_t startX, int32_t startZ) {
     // Cast to the left (West)          [3][ ]
     CastStraightX(startX,startZ,-1); // [2][1]
     iter = 0;                        // [3][ ]
-    for (int32_t march=startX;march>=1;march--) {
+    for (i32 march=startX;march>=1;march--) {
         iter++;
         if (iter > WORLDX) break;
         
@@ -383,7 +400,7 @@ void DetermineVisibleCells(int32_t startX, int32_t startZ) {
     }
 
     iter = 0;
-    for (int32_t march=startX;march>=1;march--) {
+    for (i32 march=startX;march>=1;march--) {
         iter++;
         if (iter > WORLDX) break;
 
@@ -394,7 +411,7 @@ void DetermineVisibleCells(int32_t startX, int32_t startZ) {
     // Cast down (South)                [ ][1][ ]
     CastStraightZ(startX,startZ,-1); // [3][2][3]
     iter = 0;
-    for (int32_t march=startZ;march>=1;march--) {
+    for (i32 march=startZ;march>=1;march--) {
         iter++;
         if (iter > WORLDX) break;
 
@@ -404,7 +421,7 @@ void DetermineVisibleCells(int32_t startX, int32_t startZ) {
     }
     
     iter = 0;
-    for (int32_t march=startZ;march>=1;march--) {
+    for (i32 march=startZ;march>=1;march--) {
         iter++;
         if (iter > WORLDX) break;
 
@@ -415,7 +432,7 @@ void DetermineVisibleCells(int32_t startX, int32_t startZ) {
     // Cast up (North)                 [3][2][3]
     CastStraightZ(startX,startZ,1); // [ ][1][ ]
     iter = 0;
-    for (int32_t march=startZ;march<(WORLDX - 1);march++) {
+    for (i32 march=startZ;march<(WORLDX - 1);march++) {
         iter++;
         if (iter > WORLDX) break;
 
@@ -425,7 +442,7 @@ void DetermineVisibleCells(int32_t startX, int32_t startZ) {
     }
     
     iter = 0;
-    for (int32_t march=startZ;march<(WORLDX - 1);march++) {
+    for (i32 march=startZ;march<(WORLDX - 1);march++) {
         iter++;
         if (iter > WORLDX) break;
 
@@ -443,9 +460,9 @@ void DetermineVisibleCells(int32_t startX, int32_t startZ) {
     CircleFanRays(startX - 1,startZ - 1);
     CircleFanRays(startX,startZ - 1);
     CircleFanRays(startX + 1,startZ - 1);
-    for (int32_t x=0;x<WORLDX;++x) {
-        for (int32_t z=0;z<WORLDZ;++z) {
-            int32_t cellIdx_xz = (z * WORLDX) + x;
+    for (i32 x=0;x<WORLDX;++x) {
+        for (i32 z=0;z<WORLDZ;++z) {
+            i32 cellIdx_xz = (z * WORLDX) + x;
             if (Sys_Global.currentLevel == 5) { // Citadel flight level hackarounds for algorithm discrepancies at glancing angles.
                 if (   (x <= 15 && startX <= 15) || (z <= 9 && startZ <= 9)
                     || (x >= 32 && startX >= 32)
@@ -471,13 +488,13 @@ void CullInit(void) {
     
     DebugRAM("start of Cull_Init"); // For each cell, get the visibility as though player were there and put into gridCellStates.  Then store the visibility of gridCellStates into the table of all visible cells for that cell
     DetermineClosedEdges();         // at the appropriate offset for looking up later when actually re-assigning gridCellStates from this precalculated visibility state for the particular cell.
-    for (int32_t z=0;z<WORLDZ;z++) {
-        for (int32_t x=0;x<WORLDX;x++) {
+    for (i32 z=0;z<WORLDZ;z++) {
+        for (i32 x=0;x<WORLDX;x++) {
             DetermineVisibleCells(x,z);
-            int32_t cellIdx = (z * WORLDX) + x;
-            for (int32_t z2=0;z2<WORLDZ;z2++) {
-                for (int32_t x2=0;x2<WORLDX;x2++) {
-                    int32_t subCellIdx = (z2 * WORLDX) + x2;
+            i32 cellIdx = (z * WORLDX) + x;
+            for (i32 z2=0;z2<WORLDZ;z2++) {
+                for (i32 x2=0;x2<WORLDX;x2++) {
+                    i32 subCellIdx = (z2 * WORLDX) + x2;
                     size_t flat_idx = (size_t)(cellIdx * ARRSIZE) + subCellIdx;
                     bool is_visible = (gridCellStates[subCellIdx] & CELL_VISIBLE);
                     set_cull_bit(precomputedVisibleCellsFromHere,flat_idx,is_visible);
@@ -494,10 +511,10 @@ void CullInit(void) {
     }
     
     (void)UpdatedPlayerCell();
-    int32_t cellToCellIdx = playerCellIdx * ARRSIZE;
-    for (int32_t z=0;z<WORLDZ;++z) {
-        for (int32_t x=0;x<WORLDX;++x) {
-            int32_t cellIdx = (z * WORLDX) + x;
+    i32 cellToCellIdx = playerCellIdx * ARRSIZE;
+    for (i32 z=0;z<WORLDZ;++z) {
+        for (i32 x=0;x<WORLDX;++x) {
+            i32 cellIdx = (z * WORLDX) + x;
             size_t flat_idx = (size_t)(cellToCellIdx + cellIdx);
             if (get_cull_bit(precomputedVisibleCellsFromHere,flat_idx)) gridCellStates[cellIdx] |= CELL_VISIBLE; // Get visible before putting meshes into their cells so we can nudge them a little.
         }
@@ -518,56 +535,49 @@ void CullInit(void) {
 
 extern Light lights[LIGHT_COUNT];
 ENGINE_TO_MOD void PortalCulling(void) { // Called just once at end of animation loop for the frame after each frame perfect change to door models becoming either closed or not closed.
-    uint16_t playerCellX = PosGetCellCoordX(Sys_Global.instances[PLAYER1].position.x);
-    uint16_t playerCellZ = PosGetCellCoordZ(Sys_Global.instances[PLAYER1].position.z);
+    u16 playerCellX = PosGetCellCoordX(Sys_Global.instances[PLAYER1].position.x);
+    u16 playerCellZ = PosGetCellCoordZ(Sys_Global.instances[PLAYER1].position.z);
     bool previousLightVisible[LIGHT_COUNT];
     __builtin_memset(previousLightVisible,false,LIGHT_COUNT * sizeof(bool));
-    for (uint16_t i=0;i<Sys_Global.loadedLights;++i) {
-        uint16_t lcell = (lights[i].pos.z * WORLDX) + lights[i].pos.x;
+    for (u16 i=0;i<Sys_Global.loadedLights;++i) {
+        u16 lcell = (lights[i].pos.z * WORLDX) + lights[i].pos.x;
         if (gridCellStates[lcell] & CELL_VISIBLE) previousLightVisible[i] = true;
     }
     
     PortalCell cellA, cellB;
-    for (uint8_t portalIdx=0;portalIdx<MAX_PORTALS;++portalIdx) {
+    for (u8 portalIdx=0;portalIdx<MAX_PORTALS;++portalIdx) {
         Portal* prt = &activePortals[portalIdx];
         if (!prt->dirty) continue;
         
         prt->dirty = false;
         cellA = prt->cellA; cellB = prt->cellB; // Guaranteed order at level load.  A = N or E, B = S or W
         bool isNS = prt->portalNS;
-        uint16_t cellIdxA = (cellA.z * WORLDX) + cellA.x;
-        uint16_t cellIdxB = (cellB.z * WORLDX) + cellB.x;
+        u16 cellIdxA = (cellA.z * WORLDX) + cellA.x;
+        u16 cellIdxB = (cellB.z * WORLDX) + cellB.x;
         if (prt->open) { // Open the edges up
-            if (isNS) {
-                gridCellStates[cellIdxA] &= ~(CELL_CLOSEDSOUTH); gridCellStates[cellIdxB] &= ~(CELL_CLOSEDNORTH);
-//                 if (entIdx == 499 || entIdx == 509) // Bulkhead or giant elevator door spans 2 cells perpendicular to its isNS direction. TODO, need neighboring Portal concept
-            } else {
-                gridCellStates[cellIdxA] &= ~(CELL_CLOSEDWEST); gridCellStates[cellIdxB] &= ~(CELL_CLOSEDEAST);
-            }
+            if (isNS) { gridCellStates[cellIdxA] &= ~(CELL_CLOSEDSOUTH); gridCellStates[cellIdxB] &= ~(CELL_CLOSEDNORTH); }
+            else { gridCellStates[cellIdxA] &= ~(CELL_CLOSEDWEST); gridCellStates[cellIdxB] &= ~(CELL_CLOSEDEAST); }
         } else {
-            if (isNS) {
-                gridCellStates[cellIdxA] |= CELL_CLOSEDSOUTH; gridCellStates[cellIdxB] |= CELL_CLOSEDNORTH;
-            } else {
-                gridCellStates[cellIdxA] |= CELL_CLOSEDWEST; gridCellStates[cellIdxB] |= CELL_CLOSEDEAST;
-            }
+            if (isNS) { gridCellStates[cellIdxA] |= CELL_CLOSEDSOUTH; gridCellStates[cellIdxB] |= CELL_CLOSEDNORTH; }
+            else { gridCellStates[cellIdxA] |= CELL_CLOSEDWEST; gridCellStates[cellIdxB] |= CELL_CLOSEDEAST; }
         }
     }
     
     DetermineVisibleCells(playerCellX,playerCellZ); // Recompute full PVS with new closed edges for all portal states.  So much for the precomputed set.
-    for (uint16_t i=0;i<Sys_Global.loadedLights;++i) {
-        uint16_t lcell = (lights[i].pos.z * WORLDX) + lights[i].pos.x;
+    for (u16 i=0;i<Sys_Global.loadedLights;++i) {
+        u16 lcell = (lights[i].pos.z * WORLDX) + lights[i].pos.x;
         if (!previousLightVisible[i] && (gridCellStates[lcell] & CELL_VISIBLE)) flag_setu32(&lights[i].lflags,LDIRTY,true);
     }
-    glNamedBufferData(Sys_Render.cellVisibleDataID,ARRSIZE * sizeof(uint32_t),gridCellStates,GL_DYNAMIC_DRAW);
+    glNamedBufferData(Sys_Render.cellVisibleDataID,ARRSIZE * sizeof(u32),gridCellStates,GL_DYNAMIC_DRAW);
 }
 
-static inline __attribute__((always_inline)) void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* pos_z) { *pos_x = Sys_Global.worldMin_x + (x * CELL_SIZE); *pos_z = Sys_Global.worldMin_z + (z * CELL_SIZE); }
+static inline __attribute__((always_inline)) void CellCoordsToPos(u16 x, u16 z, float* xf, float* xz) { *xf = Sys_Global.worldMin_x + (x * CELL_SIZE); *xz = Sys_Global.worldMin_z + (z * CELL_SIZE); }
 bool CullCore(void) {
     if (Sys_Global.currentLevel >= LEVEL_CYBERSPACE) return false;
 
     float pos_x,pos_z;
-    uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((Sys_Global.instances[PLAYER1].position.x - Sys_Global.worldMin_x + CELLXHALF) / CELL_SIZE),0,WORLDX_0BASED);
-    uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((Sys_Global.instances[PLAYER1].position.z - Sys_Global.worldMin_z + CELLXHALF) / CELL_SIZE),0,WORLDX_0BASED);
+    u16 cellX = (u16)clamp((i32)vfloor((Sys_Global.instances[PLAYER1].position.x - Sys_Global.worldMin_x + CELLXHALF) / CELL_SIZE),0,WORLDX_0BASED);
+    u16 cellZ = (u16)clamp((i32)vfloor((Sys_Global.instances[PLAYER1].position.z - Sys_Global.worldMin_z + CELLXHALF) / CELL_SIZE),0,WORLDX_0BASED);
     CellCoordsToPos(cellX,cellZ,&pos_x,&pos_z);
     for (int i=0;i<Sys_Global.loadedInstances;++i) {
         float distSqrd = squareDistance2D(Sys_Global.instances[i].position.x,Sys_Global.instances[i].position.z,pos_x,pos_z);
@@ -576,4 +586,4 @@ bool CullCore(void) {
     
     PortalCulling(); // Update based on portal states.
     return true;
-} // 602
+} // 579

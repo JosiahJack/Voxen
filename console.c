@@ -6,7 +6,7 @@
     #define NULL 0
 #endif
 #define MAX_HISTORY 7
-static int32_t currentEntryLength = 0;
+static i32 currentEntryLength = 0;
 char consoleEntryText[TEXT_BUFFER_SIZE] = "Enter a command...";
 char history[MAX_HISTORY][TEXT_BUFFER_SIZE] = {0};
 static int numHistory = 0;
@@ -90,7 +90,7 @@ static void cmd_noclip(void) {
     } else CenterStatusPrint("noclip: %s", Sys_Text.stringTable[717]); // "DISABLED"
 }
 
-void EnableCheatArsenal(uint8_t level) { // TODO
+void EnableCheatArsenal(u8 level) { // TODO
     switch(level) {
         default: break;
     }
@@ -136,7 +136,7 @@ static void cmd_edit(void) {
     }
 }
 
-int32_t StringToInt(const char *str);
+i32 StringToInt(const char *str);
 static int ParseLevelArg(const char* arg) {
     if (!arg || !*arg) return -1;
 
@@ -190,7 +190,7 @@ static Vector3 cyberSpaceEntryLocations[8] = {
     {185.16100f,  84.50200f, -46.04246f}, // 9
 };
 
-extern uint8_t queuedLevelToLoad;
+extern u8 queuedLevelToLoad;
 static void cmd_loadlevel(const char* arg) {
     if (Sys_Global.menuActive) { CenterStatusPrint("%s", Sys_Text.stringTable[1015]); return; } // "Cannot load levels via cheat while on the main menu!"
 
@@ -409,7 +409,7 @@ void ProcessConsoleCommand(const char* command) {
     while (*arg_start && CharacterIsEmpty((unsigned char)*arg_start)) arg_start++;
     AddToHistory(command);
     bool commandProcessed = false;
-    for (uint16_t i = 0; g_ConsoleCommands[i].name != NULL; ++i) {
+    for (u16 i = 0; g_ConsoleCommands[i].name != NULL; ++i) {
         const ConsoleCommand* cmd = &g_ConsoleCommands[i];
         if (CommandMatch(command_trimmed, cmd->name)) {
             if (cmd->type == CMD_NOARG) {      cmd->func.noArg();                              commandProcessed = true;
@@ -431,7 +431,7 @@ void ProcessConsoleCommand(const char* command) {
     ToggleConsole();
 }
 
-void ConsoleEmulator(int32_t keycode) {
+void ConsoleEmulator(i32 keycode) {
     if (keycode == GLFW_KEY_UP) { RecallHistory(1); return; }
     else if (keycode == GLFW_KEY_DOWN) { RecallHistory(-1); return; }
     

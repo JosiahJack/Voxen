@@ -3,10 +3,10 @@
 #include "miniaudio.h"
 #include "tables_audio.h"
 #define MAX_AMBIENT_NOISES 80 // Equal to number used
-uint16_t loadedAmbients = 0;
+u16 loadedAmbients = 0;
 typedef struct { ma_sound  sound; ma_bool32 loaded; float     length_sec; } AmbientSlot;
-typedef struct { uint16_t    index; const char* filename; } AmbientDef;
-uint16_t ambientRegistry[MAX_AMBIENT_NOISES]; // For ambient_ type entities that play looped sound
+typedef struct { u16    index; const char* filename; } AmbientDef;
+u16 ambientRegistry[MAX_AMBIENT_NOISES]; // For ambient_ type entities that play looped sound
 static AmbientSlot ambientSlots[MAX_AMBIENT_NOISES] = {0};
 
 static const AmbientDef g_ambient_defs[MAX_AMBIENT_NOISES] = {
@@ -30,7 +30,7 @@ static const AmbientDef g_ambient_defs[MAX_AMBIENT_NOISES] = {
     {655, "washing_machine.wav"}
 };
 
-static const AmbientDef* ambient_def_by_index(uint16_t idx) {
+static const AmbientDef* ambient_def_by_index(u16 idx) {
     for (size_t i = 0; i < MAX_AMBIENT_NOISES; ++i) {
         if (g_ambient_defs[i].index == idx) return &g_ambient_defs[i];
     }
@@ -42,8 +42,8 @@ MOD_TO_ENGINE void UpdateAmbientSounds(void) {
     const Vector3* player = &Eng_Global->instances[PLAYER1].position;
     const float max_range = 7.68f;
     const float max_range_sq = max_range * max_range;
-    for (uint16_t i = 0; i < loadedAmbients; ++i) {
-        const uint16_t ent_idx = ambientRegistry[i];
+    for (u16 i = 0; i < loadedAmbients; ++i) {
+        const u16 ent_idx = ambientRegistry[i];
         const Entity* ent = &Eng_Global->instances[ent_idx];
         const AmbientDef* def = ambient_def_by_index(ent->index);
         if (!def) { DualLogError("  [SKIP] Entity %u has unknown index %u\n", ent_idx, ent->index); continue; }
@@ -91,8 +91,8 @@ MOD_TO_ENGINE void UpdateAmbientSounds(void) {
 
 MOD_TO_ENGINE void ResetLevelAudio(void) {
     loadedAmbients = 0;
-    __builtin_memset(ambientRegistry, 0, loadedAmbients * sizeof(uint16_t));
-    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i<Eng_Global->loadedInstances;++i) {
+    __builtin_memset(ambientRegistry, 0, loadedAmbients * sizeof(u16));
+    for (u16 i = START_INDEX_LEVEL_INSTANCES; i<Eng_Global->loadedInstances;++i) {
         if (ConstIndexIsAmbient(Eng_Global->instances[i].index)) {
             ambientRegistry[loadedAmbients] = i;
             loadedAmbients++;

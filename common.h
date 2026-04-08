@@ -1,22 +1,18 @@
 // common.h - Shared items between engine and gamecode (e.g. enums)
-typedef __INT8_TYPE__     int8_t;
-typedef __UINT8_TYPE__   uint8_t;
-typedef __INT16_TYPE__   int16_t;
-typedef __UINT16_TYPE__ uint16_t;
-typedef __INT32_TYPE__   int32_t;
-typedef __UINT32_TYPE__ uint32_t;
-typedef __INT64_TYPE__   int64_t;
-typedef __UINT64_TYPE__ uint64_t;
-typedef uint64_t size_t;
-typedef uint64_t size_t;
-#ifndef UINT8_MAX
-    #define UINT8_MAX 255
+typedef __INT8_TYPE__    i8;
+typedef __UINT8_TYPE__   u8;
+typedef __INT16_TYPE__  i16;
+typedef __UINT16_TYPE__ u16;
+typedef __INT32_TYPE__  i32;
+typedef __UINT32_TYPE__ u32;
+typedef __INT64_TYPE__  i64;
+typedef __UINT64_TYPE__ u64;
+typedef __SIZE_TYPE__ size_t;
+#ifndef U8_MAX
+    #define U8_MAX 255
 #endif
-#ifndef UINT16_MAX
-    #define UINT16_MAX 65535
-#endif
-#ifndef UINT32_MAX
-    #define UINT32_MAX 4294967295
+#ifndef U16_MAX
+    #define U16_MAX 65535
 #endif
 #define bool _Bool
 #define true 1
@@ -27,11 +23,11 @@ typedef struct { float x,y; } Vector2;
 typedef struct { float x,y,z; } Vector3;
 typedef struct { float x,y,z,w; } Quaternion;
 #define QUAT_IDENTITY ((Quaternion){0.0f,0.0f,0.0f,1.0f})
-typedef uint8_t PhysCombineType;
-typedef uint8_t ColliderType;
-typedef uint16_t Text;
-typedef struct { Vector3 point; Vector3 normal; float distance; uint16_t hitInstanceIndex; bool hit; } RaycastHit;
-typedef struct { float speed; uint16_t frameStart,frameEnd,frameStartModelIndex; uint8_t framerate; } AnimationClip;
+typedef u8 PhysCombineType;
+typedef u8 ColliderType;
+typedef u16 Text;
+typedef struct { Vector3 point; Vector3 normal; float distance; u16 hitInstanceIndex; bool hit; } RaycastHit;
+typedef struct { float speed; u16 frameStart,frameEnd,frameStartModelIndex; u8 framerate; } AnimationClip;
 #define LIGHTON 1
 #define SHADON  2
 #define LIGHT_AND_SHADOW_ON 3
@@ -39,8 +35,8 @@ typedef struct { float speed; uint16_t frameStart,frameEnd,frameStartModelIndex;
 #define LDIR    8
 #define LDIRTY 16
 #define LERPON 32
-typedef struct { Vector3 pos; float intensity; Color3 col; uint32_t lflags; float range,spotAng,maxIntensity,minIntensity; Quaternion spotDir; } Light; // 64bytes, one cache line, packed for GL transfer
-typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSteps[32]; bool stepIsLerping[32],lerpUp; uint8_t currentStep,numIntervalSteps,numLerpSteps; } LightAnimation; // Separate from main lights buffer struct since it's not used very often
+typedef struct { Vector3 pos; float intensity; Color3 col; u32 lflags; float range,spotAng,maxIntensity,minIntensity; Quaternion spotDir; } Light; // 64bytes, one cache line, packed for GL transfer
+typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSteps[32]; bool stepIsLerping[32],lerpUp; u8 currentStep,numIntervalSteps,numLerpSteps; } LightAnimation; // Separate from main lights buffer struct since it's not used very often
 #define INSTANCE_COUNT 7680 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
 #define LIGHT_COUNT 2048
 #define MODEL_IDX_MAX 6805
@@ -83,11 +79,11 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define WORLDZ_0BASED (WORLDZ - 1)
 #define TOTAL_WORLD_CELLS (WORLDX * WORLDY * WORLDZ)
 #define ARRSIZE (WORLDX * WORLDZ)
-#define CELLXHALF (CELL_SIZE * 0.5f)
 #define VOXELS_X (WORLDX * VOXELS_PER_CELL)
 #define VOXELS_Z (WORLDZ * VOXELS_PER_CELL)
 #define VOXEL_COUNT (VOXELS_X * VOXELS_Z) // 64 * 64 * 8 * 8
 #define CELL_SIZE 2.56f // Each cell is 2.56x2.56
+#define CELLXHALF (CELL_SIZE * 0.5f)
 #define VOXELS_PER_CELL 8
 #define VOXEL_SIZE (CELL_SIZE / (float)VOXELS_PER_CELL)
 #define VOXEL_HALF (VOXEL_SIZE * 0.5f)
@@ -269,319 +265,319 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define COLLIDER_CAPSULE_DIRECTION_Z_F 2.0f // Z-Axis
 
 // BodyState
-typedef uint8_t BodyState;
-static const uint8_t BodyState_Standing = 0;
-static const uint8_t BodyState_Crouch = 1;
-static const uint8_t BodyState_CrouchingDown = 2;
-static const uint8_t BodyState_StandingUp = 3;
-static const uint8_t BodyState_Prone = 4;
-static const uint8_t BodyState_ProningDown = 5;
-static const uint8_t BodyState_ProningUp = 6;
+typedef u8 BodyState;
+static const u8 BodyState_Standing = 0;
+static const u8 BodyState_Crouch = 1;
+static const u8 BodyState_CrouchingDown = 2;
+static const u8 BodyState_StandingUp = 3;
+static const u8 BodyState_Prone = 4;
+static const u8 BodyState_ProningDown = 5;
+static const u8 BodyState_ProningUp = 6;
 
 // Handedness
-typedef uint8_t Handedness;
-static const uint8_t Handedness_Center = 0;
-static const uint8_t Handedness_LH = 1;
-static const uint8_t Handedness_RH = 2;
+typedef u8 Handedness;
+static const u8 Handedness_Center = 0;
+static const u8 Handedness_LH = 1;
+static const u8 Handedness_RH = 2;
 
 // AttackType
-typedef uint8_t AttackType;
-static const uint8_t AttackType_None = 0;
-static const uint8_t AttackType_Melee = 1;
-static const uint8_t AttackType_MeleeEnergy = 2;
-static const uint8_t AttackType_EnergyBeam = 3;
-static const uint8_t AttackType_Magnetic = 4;
-static const uint8_t AttackType_Projectile = 5;
-static const uint8_t AttackType_ProjectileNeedle = 6;
-static const uint8_t AttackType_ProjectileEnergyBeam = 7;
-static const uint8_t AttackType_ProjectileLaunched = 8;
-static const uint8_t AttackType_Gas = 9;
-static const uint8_t AttackType_Tranq = 10;
-static const uint8_t AttackType_Drill = 11;
+typedef u8 AttackType;
+static const u8 AttackType_None = 0;
+static const u8 AttackType_Melee = 1;
+static const u8 AttackType_MeleeEnergy = 2;
+static const u8 AttackType_EnergyBeam = 3;
+static const u8 AttackType_Magnetic = 4;
+static const u8 AttackType_Projectile = 5;
+static const u8 AttackType_ProjectileNeedle = 6;
+static const u8 AttackType_ProjectileEnergyBeam = 7;
+static const u8 AttackType_ProjectileLaunched = 8;
+static const u8 AttackType_Gas = 9;
+static const u8 AttackType_Tranq = 10;
+static const u8 AttackType_Drill = 11;
 
 // NPCType
-typedef uint8_t NPCType;
-static const uint8_t NPCType_Mutant = 0;
-static const uint8_t NPCType_Supermutant = 1;
-static const uint8_t NPCType_Robot = 2;
-static const uint8_t NPCType_Cyborg = 3;
-static const uint8_t NPCType_Supercyborg = 4;
-static const uint8_t NPCType_Cyber = 5;
-static const uint8_t NPCType_MutantCyborg = 6;
+typedef u8 NPCType;
+static const u8 NPCType_Mutant = 0;
+static const u8 NPCType_Supermutant = 1;
+static const u8 NPCType_Robot = 2;
+static const u8 NPCType_Cyborg = 3;
+static const u8 NPCType_Supercyborg = 4;
+static const u8 NPCType_Cyber = 5;
+static const u8 NPCType_MutantCyborg = 6;
 
 // PerceptionLevel
-typedef uint8_t PerceptionLevel;
-static const uint8_t PerceptionLevel_Low = 0;
-static const uint8_t PerceptionLevel_Medium = 1;
-static const uint8_t PerceptionLevel_High = 2;
-static const uint8_t PerceptionLevel_Omniscient = 3;
+typedef u8 PerceptionLevel;
+static const u8 PerceptionLevel_Low = 0;
+static const u8 PerceptionLevel_Medium = 1;
+static const u8 PerceptionLevel_High = 2;
+static const u8 PerceptionLevel_Omniscient = 3;
 
 // AIState
-typedef uint8_t AIState;
-static const uint8_t AIState_Idle = 0;
-static const uint8_t AIState_Walk = 1;
-static const uint8_t AIState_Run = 2;
-static const uint8_t AIState_Attack1 = 3;
-static const uint8_t AIState_Attack2 = 4;
-static const uint8_t AIState_Attack3 = 5;
-static const uint8_t AIState_Pain = 6;
-static const uint8_t AIState_Dying = 7;
-static const uint8_t AIState_Dead = 8;
-static const uint8_t AIState_Inspect = 9;
-static const uint8_t AIState_Interacting = 10;
+typedef u8 AIState;
+static const u8 AIState_Idle = 0;
+static const u8 AIState_Walk = 1;
+static const u8 AIState_Run = 2;
+static const u8 AIState_Attack1 = 3;
+static const u8 AIState_Attack2 = 4;
+static const u8 AIState_Attack3 = 5;
+static const u8 AIState_Pain = 6;
+static const u8 AIState_Dying = 7;
+static const u8 AIState_Dead = 8;
+static const u8 AIState_Inspect = 9;
+static const u8 AIState_Interacting = 10;
 
 // AIMoveType
-typedef uint8_t AIMoveType;
-static const uint8_t AIMoveType_Walk = 0;
-static const uint8_t AIMoveType_Fly = 1;
-static const uint8_t AIMoveType_Swim = 2;
-static const uint8_t AIMoveType_Cyber = 3;
-static const uint8_t AIMoveType_None = 4;
+typedef u8 AIMoveType;
+static const u8 AIMoveType_Walk = 0;
+static const u8 AIMoveType_Fly = 1;
+static const u8 AIMoveType_Swim = 2;
+static const u8 AIMoveType_Cyber = 3;
+static const u8 AIMoveType_None = 4;
 
 // DoorState
-typedef uint8_t DoorState;
-static const uint8_t DoorState_Closed = 0;
-static const uint8_t DoorState_Open = 1;
-static const uint8_t DoorState_Closing = 2;
-static const uint8_t DoorState_Opening = 3;
+typedef u8 DoorState;
+static const u8 DoorState_Closed = 0;
+static const u8 DoorState_Open = 1;
+static const u8 DoorState_Closing = 2;
+static const u8 DoorState_Opening = 3;
 
 // FuncStates
-typedef uint8_t FuncStates;
-static const uint8_t FuncStates_Start = 0;
-static const uint8_t FuncStates_Target = 1;
-static const uint8_t FuncStates_MovingStart = 2;
-static const uint8_t FuncStates_MovingTarget = 3;
-static const uint8_t FuncStates_AjarMovingStart = 4;
-static const uint8_t FuncStates_AjarMovingTarget = 5;
+typedef u8 FuncStates;
+static const u8 FuncStates_Start = 0;
+static const u8 FuncStates_Target = 1;
+static const u8 FuncStates_MovingStart = 2;
+static const u8 FuncStates_MovingTarget = 3;
+static const u8 FuncStates_AjarMovingStart = 4;
+static const u8 FuncStates_AjarMovingTarget = 5;
 
 // SoftwareType
-typedef uint8_t SoftwareType;
-static const uint8_t SoftwareType_None = 0;
-static const uint8_t SoftwareType_Drill = 1;
-static const uint8_t SoftwareType_Pulser = 2;
-static const uint8_t SoftwareType_CShield = 3;
-static const uint8_t SoftwareType_Decoy = 4;
-static const uint8_t SoftwareType_Recall = 5;
-static const uint8_t SoftwareType_Turbo = 6;
-static const uint8_t SoftwareType_Game = 7;
-static const uint8_t SoftwareType_Data = 8;
-static const uint8_t SoftwareType_Integrity = 9;
-static const uint8_t SoftwareType_Keycard = 10;
+typedef u8 SoftwareType;
+static const u8 SoftwareType_None = 0;
+static const u8 SoftwareType_Drill = 1;
+static const u8 SoftwareType_Pulser = 2;
+static const u8 SoftwareType_CShield = 3;
+static const u8 SoftwareType_Decoy = 4;
+static const u8 SoftwareType_Recall = 5;
+static const u8 SoftwareType_Turbo = 6;
+static const u8 SoftwareType_Game = 7;
+static const u8 SoftwareType_Data = 8;
+static const u8 SoftwareType_Integrity = 9;
+static const u8 SoftwareType_Keycard = 10;
 
 // AccessCardType
-typedef uint8_t AccessCardType;
-static const uint8_t AccessCardType_None = 0;
-static const uint8_t AccessCardType_Standard = 1;
-static const uint8_t AccessCardType_Medical = 2;
-static const uint8_t AccessCardType_Science = 3;
-static const uint8_t AccessCardType_Admin = 4;
-static const uint8_t AccessCardType_Group1 = 5;
-static const uint8_t AccessCardType_Group2 = 6;
-static const uint8_t AccessCardType_Group3 = 7;
-static const uint8_t AccessCardType_Group4 = 8;
-static const uint8_t AccessCardType_GroupA = 9;
-static const uint8_t AccessCardType_GroupB = 10;
-static const uint8_t AccessCardType_Storage = 11;
-static const uint8_t AccessCardType_Engineering = 12;
-static const uint8_t AccessCardType_Maintenance = 13;
-static const uint8_t AccessCardType_Security = 14;
-static const uint8_t AccessCardType_Per1 = 15;
-static const uint8_t AccessCardType_Per2 = 16;
-static const uint8_t AccessCardType_Per3 = 17;
-static const uint8_t AccessCardType_Per4 = 18;
-static const uint8_t AccessCardType_Per5 = 19;
+typedef u8 AccessCardType;
+static const u8 AccessCardType_None = 0;
+static const u8 AccessCardType_Standard = 1;
+static const u8 AccessCardType_Medical = 2;
+static const u8 AccessCardType_Science = 3;
+static const u8 AccessCardType_Admin = 4;
+static const u8 AccessCardType_Group1 = 5;
+static const u8 AccessCardType_Group2 = 6;
+static const u8 AccessCardType_Group3 = 7;
+static const u8 AccessCardType_Group4 = 8;
+static const u8 AccessCardType_GroupA = 9;
+static const u8 AccessCardType_GroupB = 10;
+static const u8 AccessCardType_Storage = 11;
+static const u8 AccessCardType_Engineering = 12;
+static const u8 AccessCardType_Maintenance = 13;
+static const u8 AccessCardType_Security = 14;
+static const u8 AccessCardType_Per1 = 15;
+static const u8 AccessCardType_Per2 = 16;
+static const u8 AccessCardType_Per3 = 17;
+static const u8 AccessCardType_Per4 = 18;
+static const u8 AccessCardType_Per5 = 19;
 
 // MusicType
-typedef uint8_t MusicType;
-static const uint8_t MusicType_None     = 0;
-static const uint8_t MusicType_Walking  = 1;
-static const uint8_t MusicType_Combat   = 2;
-static const uint8_t MusicType_Override = 3;
+typedef u8 MusicType;
+static const u8 MusicType_None     = 0;
+static const u8 MusicType_Walking  = 1;
+static const u8 MusicType_Combat   = 2;
+static const u8 MusicType_Override = 3;
 
 // TrackType
-typedef uint8_t TrackType;
-static const uint8_t TrackType_None       = 0;
-static const uint8_t TrackType_Walking    = 1;
-static const uint8_t TrackType_Combat     = 2;
-static const uint8_t TrackType_Revive     = 3;
-static const uint8_t TrackType_Death      = 4;
-static const uint8_t TrackType_Cybertube  = 5;
-static const uint8_t TrackType_Elevator   = 6;
-static const uint8_t TrackType_Distortion = 7;
+typedef u8 TrackType;
+static const u8 TrackType_None       = 0;
+static const u8 TrackType_Walking    = 1;
+static const u8 TrackType_Combat     = 2;
+static const u8 TrackType_Revive     = 3;
+static const u8 TrackType_Death      = 4;
+static const u8 TrackType_Cybertube  = 5;
+static const u8 TrackType_Elevator   = 6;
+static const u8 TrackType_Distortion = 7;
 
 // BloodType
-typedef uint8_t BloodType;
-static const uint8_t BloodType_None = 0;
-static const uint8_t BloodType_Red = 1;
-static const uint8_t BloodType_Yellow = 2;
-static const uint8_t BloodType_Green = 3;
-static const uint8_t BloodType_Robot = 4;
-static const uint8_t BloodType_Leaf = 5;
-static const uint8_t BloodType_Mutation = 6;
-static const uint8_t BloodType_GrayMutation = 7;
+typedef u8 BloodType;
+static const u8 BloodType_None = 0;
+static const u8 BloodType_Red = 1;
+static const u8 BloodType_Yellow = 2;
+static const u8 BloodType_Green = 3;
+static const u8 BloodType_Robot = 4;
+static const u8 BloodType_Leaf = 5;
+static const u8 BloodType_Mutation = 6;
+static const u8 BloodType_GrayMutation = 7;
 
 // SecurityType
-typedef uint8_t SecurityType;
-static const uint8_t SecurityType_None = 0;
-static const uint8_t SecurityType_Camera = 1;
-static const uint8_t SecurityType_NodeSmall = 2;
-static const uint8_t SecurityType_NodeLarge = 3;
+typedef u8 SecurityType;
+static const u8 SecurityType_None = 0;
+static const u8 SecurityType_Camera = 1;
+static const u8 SecurityType_NodeSmall = 2;
+static const u8 SecurityType_NodeLarge = 3;
 
 // AudioLogType
-typedef uint8_t AudioLogType;
-static const uint8_t AudioLogType_TextOnly = 0;
-static const uint8_t AudioLogType_Normal = 1;
-static const uint8_t AudioLogType_Email = 2;
-static const uint8_t AudioLogType_Papers = 3;
-static const uint8_t AudioLogType_Vmail = 4;
-static const uint8_t AudioLogType_Game = 5;
+typedef u8 AudioLogType;
+static const u8 AudioLogType_TextOnly = 0;
+static const u8 AudioLogType_Normal = 1;
+static const u8 AudioLogType_Email = 2;
+static const u8 AudioLogType_Papers = 3;
+static const u8 AudioLogType_Vmail = 4;
+static const u8 AudioLogType_Game = 5;
 
 // EnergyType
-typedef uint8_t EnergyType;
-static const uint8_t EnergyType_Battery = 0;
-static const uint8_t EnergyType_ChargeStation = 1;
+typedef u8 EnergyType;
+static const u8 EnergyType_Battery = 0;
+static const u8 EnergyType_ChargeStation = 1;
 
 // FootStepType
-typedef uint8_t FootStepType;
-static const uint8_t FootStepType_None = 0;
-static const uint8_t FootStepType_Carpet = 1;
-static const uint8_t FootStepType_Concrete = 2;
-static const uint8_t FootStepType_GrittyCrete = 3;
-static const uint8_t FootStepType_Grass = 4;
-static const uint8_t FootStepType_Gravel = 5;
-static const uint8_t FootStepType_Rock = 6;
-static const uint8_t FootStepType_Glass = 7;
-static const uint8_t FootStepType_Marble = 8;
-static const uint8_t FootStepType_Metal = 9;
-static const uint8_t FootStepType_Grate = 10;
-static const uint8_t FootStepType_Metal2 = 11;
-static const uint8_t FootStepType_Metpanel = 12;
-static const uint8_t FootStepType_Panel = 13;
-static const uint8_t FootStepType_Plaster = 14;
-static const uint8_t FootStepType_Plastic = 15;
-static const uint8_t FootStepType_Plastic2 = 16;
-static const uint8_t FootStepType_Rubber = 17;
-static const uint8_t FootStepType_Sand = 18;
-static const uint8_t FootStepType_Squish = 19;
-static const uint8_t FootStepType_Vent = 20;
-static const uint8_t FootStepType_Water = 21;
-static const uint8_t FootStepType_Wood = 22;
-static const uint8_t FootStepType_Wood2 = 23;
+typedef u8 FootStepType;
+static const u8 FootStepType_None = 0;
+static const u8 FootStepType_Carpet = 1;
+static const u8 FootStepType_Concrete = 2;
+static const u8 FootStepType_GrittyCrete = 3;
+static const u8 FootStepType_Grass = 4;
+static const u8 FootStepType_Gravel = 5;
+static const u8 FootStepType_Rock = 6;
+static const u8 FootStepType_Glass = 7;
+static const u8 FootStepType_Marble = 8;
+static const u8 FootStepType_Metal = 9;
+static const u8 FootStepType_Grate = 10;
+static const u8 FootStepType_Metal2 = 11;
+static const u8 FootStepType_Metpanel = 12;
+static const u8 FootStepType_Panel = 13;
+static const u8 FootStepType_Plaster = 14;
+static const u8 FootStepType_Plastic = 15;
+static const u8 FootStepType_Plastic2 = 16;
+static const u8 FootStepType_Rubber = 17;
+static const u8 FootStepType_Sand = 18;
+static const u8 FootStepType_Squish = 19;
+static const u8 FootStepType_Vent = 20;
+static const u8 FootStepType_Water = 21;
+static const u8 FootStepType_Wood = 22;
+static const u8 FootStepType_Wood2 = 23;
 
 // MusicResourceType
-typedef uint8_t MusicResourceType;
-static const uint8_t MusicResourceType_Menu = 0;
-static const uint8_t MusicResourceType_Medical = 1;
-static const uint8_t MusicResourceType_Science = 2;
-static const uint8_t MusicResourceType_Reactor = 3;
-static const uint8_t MusicResourceType_Executive = 4;
-static const uint8_t MusicResourceType_Grove = 5;
-static const uint8_t MusicResourceType_Cyber = 6;
-static const uint8_t MusicResourceType_Security = 7;
-static const uint8_t MusicResourceType_Revive = 8;
-static const uint8_t MusicResourceType_Death = 9;
-static const uint8_t MusicResourceType_Elevator = 10;
-static const uint8_t MusicResourceType_Distortion = 11;
-static const uint8_t MusicResourceType_Looped = 12;
-static const uint8_t MusicResourceType_Level = 13;
+typedef u8 MusicResourceType;
+static const u8 MusicResourceType_Menu = 0;
+static const u8 MusicResourceType_Medical = 1;
+static const u8 MusicResourceType_Science = 2;
+static const u8 MusicResourceType_Reactor = 3;
+static const u8 MusicResourceType_Executive = 4;
+static const u8 MusicResourceType_Grove = 5;
+static const u8 MusicResourceType_Cyber = 6;
+static const u8 MusicResourceType_Security = 7;
+static const u8 MusicResourceType_Revive = 8;
+static const u8 MusicResourceType_Death = 9;
+static const u8 MusicResourceType_Elevator = 10;
+static const u8 MusicResourceType_Distortion = 11;
+static const u8 MusicResourceType_Looped = 12;
+static const u8 MusicResourceType_Level = 13;
 
 // HUDColor
-typedef uint8_t HUDColor;
-static const uint8_t HUDColor_White = 0;
-static const uint8_t HUDColor_Red = 1;
-static const uint8_t HUDColor_Orange = 2;
-static const uint8_t HUDColor_Yellow = 3;
-static const uint8_t HUDColor_Green = 4;
-static const uint8_t HUDColor_Blue = 5;
-static const uint8_t HUDColor_Purple = 6;
-static const uint8_t HUDColor_Gray = 7;
+typedef u8 HUDColor;
+static const u8 HUDColor_White = 0;
+static const u8 HUDColor_Red = 1;
+static const u8 HUDColor_Orange = 2;
+static const u8 HUDColor_Yellow = 3;
+static const u8 HUDColor_Green = 4;
+static const u8 HUDColor_Blue = 5;
+static const u8 HUDColor_Purple = 6;
+static const u8 HUDColor_Gray = 7;
 
 // ForceFieldColor
-typedef uint8_t ForceFieldColor;
-static const uint8_t ForceFieldColor_Red = 0;
-static const uint8_t ForceFieldColor_Green = 1;
-static const uint8_t ForceFieldColor_Blue = 2;
-static const uint8_t ForceFieldColor_Purple = 3;
-static const uint8_t ForceFieldColor_RedFaint = 4;
+typedef u8 ForceFieldColor;
+static const u8 ForceFieldColor_Red = 0;
+static const u8 ForceFieldColor_Green = 1;
+static const u8 ForceFieldColor_Blue = 2;
+static const u8 ForceFieldColor_Purple = 3;
+static const u8 ForceFieldColor_RedFaint = 4;
 
 // ButtonType
-typedef uint8_t ButtonType;
-static const uint8_t ButtonType_Generic = 0;
-static const uint8_t ButtonType_GeneralInv = 1;
-static const uint8_t ButtonType_Patch = 2;
-static const uint8_t ButtonType_Grenade = 3;
-static const uint8_t ButtonType_Weapon = 4;
-static const uint8_t ButtonType_Search = 5;
-static const uint8_t ButtonType_None = 6;
-static const uint8_t ButtonType_PGrid = 7;
-static const uint8_t ButtonType_PWire = 8;
-static const uint8_t ButtonType_Vaporize = 9;
-static const uint8_t ButtonType_ShootMode = 10;
-static const uint8_t ButtonType_GrenadeTimerSlider = 11;
+typedef u8 ButtonType;
+static const u8 ButtonType_Generic = 0;
+static const u8 ButtonType_GeneralInv = 1;
+static const u8 ButtonType_Patch = 2;
+static const u8 ButtonType_Grenade = 3;
+static const u8 ButtonType_Weapon = 4;
+static const u8 ButtonType_Search = 5;
+static const u8 ButtonType_None = 6;
+static const u8 ButtonType_PGrid = 7;
+static const u8 ButtonType_PWire = 8;
+static const u8 ButtonType_Vaporize = 9;
+static const u8 ButtonType_ShootMode = 10;
+static const u8 ButtonType_GrenadeTimerSlider = 11;
 
 // TabMSG
-typedef uint8_t TabMSG;
-static const uint8_t TabMSG_None = 0;
-static const uint8_t TabMSG_Search = 1;
-static const uint8_t TabMSG_AudioLog = 2;
-static const uint8_t TabMSG_Keypad = 3;
-static const uint8_t TabMSG_Elevator = 4;
-static const uint8_t TabMSG_GridPuzzle = 5;
-static const uint8_t TabMSG_WirePuzzle = 6;
-static const uint8_t TabMSG_EReader = 7;
-static const uint8_t TabMSG_Weapon = 8;
-static const uint8_t TabMSG_SystemAnalyzer = 9;
+typedef u8 TabMSG;
+static const u8 TabMSG_None = 0;
+static const u8 TabMSG_Search = 1;
+static const u8 TabMSG_AudioLog = 2;
+static const u8 TabMSG_Keypad = 3;
+static const u8 TabMSG_Elevator = 4;
+static const u8 TabMSG_GridPuzzle = 5;
+static const u8 TabMSG_WirePuzzle = 6;
+static const u8 TabMSG_EReader = 7;
+static const u8 TabMSG_Weapon = 8;
+static const u8 TabMSG_SystemAnalyzer = 9;
 
 // PuzzleCellType
-typedef uint8_t PuzzleCellType;
-static const uint8_t PuzzleCellType_Off = 0;
-static const uint8_t PuzzleCellType_Standard = 1;
-static const uint8_t PuzzleCellType_And = 2;
-static const uint8_t PuzzleCellType_Bypass = 3;
+typedef u8 PuzzleCellType;
+static const u8 PuzzleCellType_Off = 0;
+static const u8 PuzzleCellType_Standard = 1;
+static const u8 PuzzleCellType_And = 2;
+static const u8 PuzzleCellType_Bypass = 3;
 
 // PuzzleGridType
-typedef uint8_t PuzzleGridType;
-static const uint8_t PuzzleGridType_King = 0;
-static const uint8_t PuzzleGridType_Queen = 1;
-static const uint8_t PuzzleGridType_Knight = 2;
-static const uint8_t PuzzleGridType_Rook = 3;
-static const uint8_t PuzzleGridType_Bishop = 4;
-static const uint8_t PuzzleGridType_Pawn = 5;
+typedef u8 PuzzleGridType;
+static const u8 PuzzleGridType_King = 0;
+static const u8 PuzzleGridType_Queen = 1;
+static const u8 PuzzleGridType_Knight = 2;
+static const u8 PuzzleGridType_Rook = 3;
+static const u8 PuzzleGridType_Bishop = 4;
+static const u8 PuzzleGridType_Pawn = 5;
 
-typedef uint32_t PhysicsLayer;
-static const uint32_t PhysicsLayer_Default          = (1u << 0);
-static const uint32_t PhysicsLayer_TransparentFX    = (1u << 1);
-static const uint32_t PhysicsLayer_IgnoreRaycast    = (1u << 2);
+typedef u32 PhysicsLayer;
+static const u32 PhysicsLayer_Default          = (1u << 0);
+static const u32 PhysicsLayer_TransparentFX    = (1u << 1);
+static const u32 PhysicsLayer_IgnoreRaycast    = (1u << 2);
 //                                                   (1u << 3)  // unused
-static const uint32_t PhysicsLayer_Water            = (1u << 4);
-static const uint32_t PhysicsLayer_BlocksRaycast    = (1u << 4); // same as Water
-static const uint32_t PhysicsLayer_UI               = (1u << 5);
+static const u32 PhysicsLayer_Water            = (1u << 4);
+static const u32 PhysicsLayer_BlocksRaycast    = (1u << 4); // same as Water
+static const u32 PhysicsLayer_UI               = (1u << 5);
 //                                                   (1u << 6)  // unused
 //                                                   (1u << 7)  // unused
-static const uint32_t PhysicsLayer_GunViewModel     = (1u << 8);
-static const uint32_t PhysicsLayer_Geometry         = (1u << 9);
-static const uint32_t PhysicsLayer_NPC              = (1u << 10);
-static const uint32_t PhysicsLayer_PlayerBullets    = (1u << 11);
-static const uint32_t PhysicsLayer_Player           = (1u << 12);
-static const uint32_t PhysicsLayer_Corpse           = (1u << 13);
-static const uint32_t PhysicsLayer_PhysObjects      = (1u << 14);
-static const uint32_t PhysicsLayer_Sky              = (1u << 15);
-static const uint32_t PhysicsLayer_PlayerTriggerOnly= (1u << 16);
-static const uint32_t PhysicsLayer_Trigger          = (1u << 17);
-static const uint32_t PhysicsLayer_Door             = (1u << 18);
-static const uint32_t PhysicsLayer_InterDebris      = (1u << 19);
-static const uint32_t PhysicsLayer_Player2          = (1u << 20);
-static const uint32_t PhysicsLayer_Player3          = (1u << 21);
-static const uint32_t PhysicsLayer_Player4          = (1u << 22);
-static const uint32_t PhysicsLayer_NPCTrigger       = (1u << 23);
-static const uint32_t PhysicsLayer_NPCBullet        = (1u << 24);
-static const uint32_t PhysicsLayer_NPCClip          = (1u << 25);
-static const uint32_t PhysicsLayer_Clip             = (1u << 26);
-static const uint32_t PhysicsLayer_Automap          = (1u << 27);
-static const uint32_t PhysicsLayer_Culling          = (1u << 28);
-static const uint32_t PhysicsLayer_CorpseSearchable = (1u << 29);
+static const u32 PhysicsLayer_GunViewModel     = (1u << 8);
+static const u32 PhysicsLayer_Geometry         = (1u << 9);
+static const u32 PhysicsLayer_NPC              = (1u << 10);
+static const u32 PhysicsLayer_PlayerBullets    = (1u << 11);
+static const u32 PhysicsLayer_Player           = (1u << 12);
+static const u32 PhysicsLayer_Corpse           = (1u << 13);
+static const u32 PhysicsLayer_PhysObjects      = (1u << 14);
+static const u32 PhysicsLayer_Sky              = (1u << 15);
+static const u32 PhysicsLayer_PlayerTriggerOnly= (1u << 16);
+static const u32 PhysicsLayer_Trigger          = (1u << 17);
+static const u32 PhysicsLayer_Door             = (1u << 18);
+static const u32 PhysicsLayer_InterDebris      = (1u << 19);
+static const u32 PhysicsLayer_Player2          = (1u << 20);
+static const u32 PhysicsLayer_Player3          = (1u << 21);
+static const u32 PhysicsLayer_Player4          = (1u << 22);
+static const u32 PhysicsLayer_NPCTrigger       = (1u << 23);
+static const u32 PhysicsLayer_NPCBullet        = (1u << 24);
+static const u32 PhysicsLayer_NPCClip          = (1u << 25);
+static const u32 PhysicsLayer_Clip             = (1u << 26);
+static const u32 PhysicsLayer_Automap          = (1u << 27);
+static const u32 PhysicsLayer_Culling          = (1u << 28);
+static const u32 PhysicsLayer_CorpseSearchable = (1u << 29);
 //                                                   (1u << 30) // unused
-static const uint32_t PhysicsLayer_NULL             = (1u << 31);
+static const u32 PhysicsLayer_NULL             = (1u << 31);
 
 #define LAYER_MASK_PLAYER_COLLIDESWITH (PhysicsLayer_Clip | PhysicsLayer_NPCBullet | PhysicsLayer_Player2 | PhysicsLayer_Door \
                                        | PhysicsLayer_Trigger | PhysicsLayer_PlayerTriggerOnly | PhysicsLayer_Default | PhysicsLayer_TransparentFX \
@@ -615,39 +611,39 @@ static const uint32_t PhysicsLayer_NULL             = (1u << 31);
 #define LAYER_MASK_PLAYER_FEET (PhysicsLayer_Default | PhysicsLayer_Geometry)
 
 typedef struct {
-	int32_t InputCodeSettings[42];
-	uint16_t ScreenWidth;
-	uint16_t ScreenHeight;
+	i32 InputCodeSettings[42];
+	u16 ScreenWidth;
+	u16 ScreenHeight;
     float ScreenCenterX;
     float ScreenCenterY;
 	bool Fullscreen;
-	uint8_t FOV;
-	uint8_t Brightness;
-	uint8_t Gamma;
-	uint8_t FXAA;
-	uint8_t Shadows;
-	uint8_t Reflections;
-	uint8_t Vsync;
-	uint8_t ModelDetail;
-	uint8_t GI;
-	uint8_t SpeakerMode;
-	uint8_t Reverb;
-	uint8_t VolumeMaster;
-	uint8_t VolumeMusic;
-	uint8_t VolumeMessage;
-	uint8_t VolumeEffects;
-	uint8_t Language;
-	uint8_t DynamicMusic;
-	uint8_t Footsteps;
-	uint8_t InvertLook;
-	uint8_t InvertInventoryCycling;
-	uint8_t InvertCyberspaceLook;
-	uint8_t QuickItemPickup;
-	uint8_t QuickReloadWeapons;
-	uint8_t MouseSensitivity;
-	uint8_t NoShootMode;
-	uint8_t HeadBob;
-	uint8_t SSR_RES;
+	u8 FOV;
+	u8 Brightness;
+	u8 Gamma;
+	u8 FXAA;
+	u8 Shadows;
+	u8 Reflections;
+	u8 Vsync;
+	u8 ModelDetail;
+	u8 GI;
+	u8 SpeakerMode;
+	u8 Reverb;
+	u8 VolumeMaster;
+	u8 VolumeMusic;
+	u8 VolumeMessage;
+	u8 VolumeEffects;
+	u8 Language;
+	u8 DynamicMusic;
+	u8 Footsteps;
+	u8 InvertLook;
+	u8 InvertInventoryCycling;
+	u8 InvertCyberspaceLook;
+	u8 QuickItemPickup;
+	u8 QuickReloadWeapons;
+	u8 MouseSensitivity;
+	u8 NoShootMode;
+	u8 HeadBob;
+	u8 SSR_RES;
 } SettingsSystem;
 extern SettingsSystem Sys_Settings;
 
@@ -664,20 +660,20 @@ typedef struct {
 	bool showLocation;
 	bool showFPS;
 	bool editMode;
-	uint8_t dizzyLevel;
+	u8 dizzyLevel;
 } CheatsSystem;
 extern CheatsSystem Sys_Cheats;
 
-typedef uint8_t MenuPages;
-static const uint8_t MenuPages_FrontPage = 0;
-static const uint8_t MenuPages_Singleplayer = 1;
-static const uint8_t MenuPages_Multiplayer = 2;
-static const uint8_t MenuPages_NewGame = 3;
-static const uint8_t MenuPages_Load = 4;
-static const uint8_t MenuPages_Options = 5;
-static const uint8_t MenuPages_Save = 6;
-static const uint8_t MenuPages_IntroVideo = 7;
-static const uint8_t MenuPages_CreditsVideo = 8;
+typedef u8 MenuPages;
+static const u8 MenuPages_FrontPage = 0;
+static const u8 MenuPages_Singleplayer = 1;
+static const u8 MenuPages_Multiplayer = 2;
+static const u8 MenuPages_NewGame = 3;
+static const u8 MenuPages_Load = 4;
+static const u8 MenuPages_Options = 5;
+static const u8 MenuPages_Save = 6;
+static const u8 MenuPages_IntroVideo = 7;
+static const u8 MenuPages_CreditsVideo = 8;
 typedef struct {
 	int lastMultiMediaTabOpened;
 	bool lastWeaponSideRH;
@@ -692,13 +688,13 @@ typedef struct {
 	double logFinished;
 	bool logActive;
 	AudioLogType logType;
-	uint16_t linkedElevatorDoor;
+	u16 linkedElevatorDoor;
 	Vector3 objectInUsePos;
-	uint16_t tetheredPGP;
-	uint16_t tetheredPWP;
-	uint16_t tetheredSearchable;
-	uint16_t tetheredKeypadElevator;
-	uint16_t tetheredKeypadKeycode;
+	u16 tetheredPGP;
+	u16 tetheredPWP;
+	u16 tetheredSearchable;
+	u16 tetheredKeypadElevator;
+	u16 tetheredKeypadKeycode;
 	bool paperLogInUse;
 	bool usingObject;
 	int applyButtonReferenceIndex;
@@ -714,28 +710,28 @@ typedef struct {
 	bool centerTabNotified[4];
 	double centerTabsTickFinished; // Visual only, Time.time controlled
 	bool highlightStatus[4];
-	uint8_t highlightTickCount[4];
+	u8 highlightTickCount[4];
 	double blinkFinished;
 	double beepFinished;
-	uint8_t beepCount;
+	u8 beepCount;
 	bool audPaused;
     bool mouseClickHeldOverGUI;
-    uint8_t elevButtonLevelIdx[8];
-    uint16_t elevButtonSpawnIdx[8];
+    u8 elevButtonLevelIdx[8];
+    u16 elevButtonSpawnIdx[8];
     bool buttonsEnabled[8];
     bool buttonsDarkened[8];
-    uint8_t elevCurrentFloor;
+    u8 elevCurrentFloor;
 } SystemUI;
 
 typedef struct {	
 	char stringTable[TEXT_STRING_COUNT][TEXT_LOCALIZATION_MAX_LENGTH]; // Hefty table for localization support.
-	uint16_t audioLogImagesRefIndicesLH[TEXT_LOGS_COUNT];
-	uint16_t audioLogImagesRefIndicesRH[TEXT_LOGS_COUNT];
-	uint8_t audioLogType[TEXT_LOGS_COUNT];
-	uint8_t audioLogLevelFound[TEXT_LOGS_COUNT];
+	u16 audioLogImagesRefIndicesLH[TEXT_LOGS_COUNT];
+	u16 audioLogImagesRefIndicesRH[TEXT_LOGS_COUNT];
+	u8 audioLogType[TEXT_LOGS_COUNT];
+	u8 audioLogLevelFound[TEXT_LOGS_COUNT];
 	size_t file_size,filelog_size;
-	uint8_t* file_data;
-	uint8_t* filelog_data;
+	u8* file_data;
+	u8* filelog_data;
 } TextSystem;
 extern TextSystem Sys_Text;
 
@@ -821,16 +817,16 @@ extern TextSystem Sys_Text;
 // Jum 31,10
 // Nig 32,11
 typedef struct {
-    uint32_t accessCardOwned;
-    uint8_t hasSoft,softVersions[7];
-    uint16_t numLogsFromLevel[10];
+    u32 accessCardOwned;
+    u8 hasSoft,softVersions[7];
+    u16 numLogsFromLevel[10];
     int lastAddedIndex;
 	bool beepDone,logPaused,hasNewEmail,hasNewNotes;
 	int emailCurrent,emailIndex;
-    uint8_t hasMinigame;
-    uint16_t hasHardware,hardwareIsActive;
-    uint8_t hardwareVersion[HW_COUNT],hardwareVersionSetting[HW_COUNT];
-    uint16_t hardwareInvReferenceIndex[HW_COUNT];
+    u8 hasMinigame;
+    u16 hasHardware,hardwareIsActive;
+    u8 hardwareVersion[HW_COUNT],hardwareVersionSetting[HW_COUNT];
+    u16 hardwareInvReferenceIndex[HW_COUNT];
     int hardwareInvCurrent; // Current slot in the general inventory (14 slots).
 	int hardwareInvIndex; // Current index to the item look-up table.
 	int generalInventoryIndexRef[14];
@@ -838,61 +834,61 @@ typedef struct {
     bool currentCyberItem,isPulserNotDrill;
     int globalLookupIndex;
     int weaponInventoryIndices[7],weaponInventoryAmmoIndices[7];
-    uint8_t numweapons;
+    u8 numweapons;
     bool wepLoadedWithAlternate[7];
-    uint8_t currentMagazineAmount[7],currentMagazineAmount2[7];
-    uint32_t wepAmmo[16],wepAmmoSecondary[16];
+    u8 currentMagazineAmount[7],currentMagazineAmount2[7];
+    u32 wepAmmo[16],wepAmmoSecondary[16];
     float weaponEnergySetting[16];
     bool justChangedWeap,overloadEnabled,recoiling;
-    int16_t weaponCurrentPending,weaponIndexPending;
+    i16 weaponCurrentPending,weaponIndexPending;
     double justFired,waitTilNextFire,reloadFinished,lerpStartTime,dropFinished;
     float reloadLerpValue,sparqSetting,ionSetting,blasterSetting,plasmaSetting,stungunSetting;
-    uint8_t lerpUp;
+    u8 lerpUp;
 	float energySliderClickedTime,cyberWeaponAttackFinished,targetY;
-    uint16_t heldObjectIndex,heldObjectCustomIndex,heldObjectAmmo,heldObjectAmmo2;
+    u16 heldObjectIndex,heldObjectCustomIndex,heldObjectAmmo,heldObjectAmmo2;
     bool heldObjectLoadedAlternate,holdingObject,grenadeActive;
-    uint16_t weaponIndex,currentSearchItem;
+    u16 weaponIndex,currentSearchItem;
     float currentEnergyWeaponHeat[7];
-    uint8_t grenAmmo[7],grenConstIndex[7],grenadeCurrent,generalInvCurrent;
-    uint16_t generalInvIndex,generalInvCustomIndex[14];
+    u8 grenAmmo[7],grenConstIndex[7],grenadeCurrent,generalInvCurrent;
+    u16 generalInvIndex,generalInvCustomIndex[14];
     bool hasNewLogs,hasNewData;
-    uint8_t patchCurrent,patchCounts[7],cyberItemIndex;
+    u8 patchCurrent,patchCounts[7],cyberItemIndex;
     float fatigue,radiated,resetAfterDeathTime,energy,maxEnergy;
-    uint16_t patchActive,drainJPM;
+    u16 patchActive,drainJPM;
     double playerHealthTimer,berserkFinishedTime,berserkIncrementFinishedTime,detoxFinishedTime,geniusFinishedTime,mediFinishedTime,reflexFinishedTime,sightFinishedTime;
     double sightSideEffectFinishedTime,staminupFinishedTime,turboCyberTime,turboFinished,energyDrainTickFinished,painSoundFinished,radSoundFinished,radFXFinished;
     int berserkIncrement;
     float radAdjust;
     float initialRadiation;
     bool playerDead;
-    int16_t ladderState;
+    i16 ladderState;
     bool staminupActive,hasLog[134],readLog[134];
 } InventorySystem;
 
-typedef struct { float damage,penetration,offense,armorvalue,defense,impactVelocity; Vector3 attacknormal,hitpoint; AttackType attackType; uint16_t owner,hitIdx; bool isOtherNPC,berserkActive; } DamageData;
+typedef struct { float damage,penetration,offense,armorvalue,defense,impactVelocity; Vector3 attacknormal,hitpoint; AttackType attackType; u16 owner,hitIdx; bool isOtherNPC,berserkActive; } DamageData;
 
 typedef /*FAT*/ struct  {
-    uint64_t entflags;
-    uint64_t ioflags;
-    uint16_t index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
+    u64 entflags;
+    u64 ioflags;
+    u16 index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
     Vector3 position;
     Quaternion rotation;
     Vector3 scale,forward,right;
     
     // Rendering
-    uint16_t modelIndex,texIndex,glowIndex,specIndex,normIndex,lodIndex;
+    u16 modelIndex,texIndex,glowIndex,specIndex,normIndex,lodIndex;
     bool cardchunk,kinematic,shadows;
-    uint8_t camView;
+    u8 camView;
     
     // Physics
-    uint32_t layer;
+    u32 layer;
     Vector3 velocity,angularVelocity,lastPosition;
     float gravity;
     BodyState bodyState;
     ColliderType collider;
     Vector3 colliderCenter; // Offset relative to .position's global worldspace xyz location
     Vector3 colliderSize; // x,y,z for Box, x for Sphere radius, else x, y, z for Capsule radius, height, and direction (0.0f = X-Axis, 1.0f = Y-Axis, 2.0f = Z-Axis respectively, default 1.0f)
-    uint16_t colliderMeshIndex;
+    u16 colliderMeshIndex;
     Vector3 topPoint,targetPosition,startPosition,activatedScale,direction;
     float targetPositionY,speed,percentAjar,percentMoved;
     FuncStates startState,funcState;
@@ -904,15 +900,15 @@ typedef /*FAT*/ struct  {
     
     // Logic and I/O
     float health,lastHealth,cyberHealth;
-    uint8_t securityThreshold,lerpUp;
+    u8 securityThreshold,lerpUp;
     char targetname[TARGET_STRING_LENGTH];
     char target[TARGET_STRING_LENGTH];
     char target2[TARGET_STRING_LENGTH];
     char currenttarget[TARGET_STRING_LENGTH];
     char targetIfFalse[TARGET_STRING_LENGTH];
     char argvalue[TARGET_STRING_LENGTH];
-    uint16_t enemy,altTexIndex,altGlowIndex,messageIndex,teleportID,targetDestinationID;
-    int16_t version,SFXIndex,SFXLockedIndex,textIndex,emailIndex;
+    u16 enemy,altTexIndex,altGlowIndex,messageIndex,teleportID,targetDestinationID;
+    i16 version,SFXIndex,SFXLockedIndex,textIndex,emailIndex;
     SoftwareType type;
     float delay,damage,itemLifeTime,minutes,seconds,randomMin,randomMax;
     double timeInterval,cyberTimer,intervalFinished,delayFireFinished,delayResetFinished;
@@ -920,17 +916,17 @@ typedef /*FAT*/ struct  {
     bool touchEnabled,broken,stayOpen,startOpen,ajar,blocked,targetAlreadyDone,accessCardUsedByPlayer,toggleLasers,targettingOnlyUnlocks;
     bool changeLayerOnOpenClose,despawnInstead,doSelfAfterList,destroyAfterListInsteadOfDeactivate,iceActive;
     bool forceFieldDirectionX,forceFieldDirectionY,forceFieldDirectionZ,heldObjectLoadedAlternate,changeTexOnActive,blinkTexOnActive;
-    int16_t numPlayers;
-    uint16_t recentMostActivator;
-    uint16_t countToTrigger;
-    uint16_t counter;
-    uint8_t maxRandomItems; // [0 4]
-    uint16_t lookUpIndex,contents[4],customIndex[4],useableItemIndex,usableCustomIndex,randomItem[4],randomItemCustomIndex[4];
+    i16 numPlayers;
+    u16 recentMostActivator;
+    u16 countToTrigger;
+    u16 counter;
+    u8 maxRandomItems; // [0 4]
+    u16 lookUpIndex,contents[4],customIndex[4],useableItemIndex,usableCustomIndex,randomItem[4],randomItemCustomIndex[4];
     float randomItemDropChance[4];
     float fireworkWaitMinMin;
     AttackType attackType;
-    int16_t ammo,ammo2;
-    uint16_t activateSFX,lockedSFX,messageLingdex,lockedMessageLingdex;
+    i16 ammo,ammo2;
+    u16 activateSFX,lockedSFX,messageLingdex,lockedMessageLingdex;
     AccessCardType requiredAccessCard;
     double delayFinished,tickFinished,tickTime,useFinished,waitBeforeClose,lasersFinished;
     float amount,resetTime,minSecurityLevel,ajarPercentage,useTimeDelay,timeBeforeLasersOn,force,strength;
@@ -945,22 +941,22 @@ typedef /*FAT*/ struct  {
     MusicType musicType;
 
     // Animation
-    uint8_t clip,numclips,texAnimClip;
-    uint16_t animationNum,frame,texFrame,texGlowFrame;
+    u8 clip,numclips,texAnimClip;
+    u16 animationNum,frame,texFrame,texGlowFrame;
     bool textureAnimating,textureGlowAnimating,textureAnimationStopsAtDead,texAnimInReverse,texAnimRandom;
-    uint16_t texAnimLight;
-    uint16_t texAnimLight2;
-    int32_t cellIndex;
-    uint8_t portalIndex; // If this is a door, index into portal array for toggling state.
+    u16 texAnimLight;
+    u16 texAnimLight2;
+    i32 cellIndex;
+    u8 portalIndex; // If this is a door, index into portal array for toggling state.
     DoorState doorState;
     double currentFrameFinished;
     double currentFrameStartTime;
     double animSwapFinished;
     bool alternateOn;
-    uint16_t mainSwitchMaterial;
+    u16 mainSwitchMaterial;
     AIState currentState; // NPC logic
-    uint16_t deathBurst;
-    uint8_t walkWaypointsLength,currentWaypoint;
+    u16 deathBurst;
+    u8 walkWaypointsLength,currentWaypoint;
     double timeForTranquilization,gracePeriodFinished,meleeDamageFinished,idleTime,attack1SoundTime,attack2SoundTime,attack3SoundTime;
     double timeTillEnemyChangeFinished,timeTillDeadFinished,timeTillPainFinished,huntFinished;
     double randomWaitForNextAttack1Finished,randomWaitForNextAttack2Finished,randomWaitForNextAttack3Finished;
@@ -970,21 +966,21 @@ typedef /*FAT*/ struct  {
     // phew what a porker of a struct, it's been a eatin!
 } Entity;
 
-typedef struct { Entity* entries; uint32_t count; uint32_t capacity; } DataParser;
-typedef struct { uint8_t dataType; const char* fieldName; } EntityField;
+typedef struct { Entity* entries; u32 count; u32 capacity; } DataParser;
+typedef struct { u8 dataType; const char* fieldName; } EntityField;
 
 #include "miniaudio.h"
 typedef struct {
-    uint32_t globalFrameNum;
-    uint16_t loadedInstances,loadedLights; // Numbers of instances of entities and lights loaded (always for just the current level)
+    u32 globalFrameNum;
+    u16 loadedInstances,loadedLights; // Numbers of instances of entities and lights loaded (always for just the current level)
     float farPlane;
 	double cpuTime, thisFrameTime, cpuFrameTime, lastFrameSecCountTime;
-	uint32_t lastFrameSecCount, framesPerLastSecond, worstFPS;
-    int32_t cursorPosition_x, cursorPosition_y; // Separate internal cursor from system cursor.  This gets relatively pushed around by real cursor movement to give consistent platform behavior.
+	u32 lastFrameSecCount, framesPerLastSecond, worstFPS;
+    i32 cursorPosition_x, cursorPosition_y; // Separate internal cursor from system cursor.  This gets relatively pushed around by real cursor movement to give consistent platform behavior.
 	Vector3 debugLine_start;
 	Vector3 debugLine_end;
 	double debugLineFinished;
-	uint32_t debugLineVertCount;
+	u32 debugLineVertCount;
 	bool inventoryMode;
 	double last_time, last_topframe_time, last_physics_time, deltaTime, current_time, timeSinceLastPhysicsTick;
 	double screenshotTimeout, pauseRelativeTime, absoluteTime, statusTextDecayFinished, justSavedTimeStamp;
@@ -992,17 +988,17 @@ typedef struct {
     double shakeFinished;
 	char global_modname[256];
     bool introNotPlayed;
-    uint8_t levelSecurity[14];
-	uint8_t startLevel;
-	uint8_t numLevels; // Can be set by gamedata.txt
-	uint8_t currentLevel;
-	uint8_t difficultyCombat,difficultyPuzzle,difficultyMission,difficultyCyber;
+    u8 levelSecurity[14];
+	u8 startLevel;
+	u8 numLevels; // Can be set by gamedata.txt
+	u8 currentLevel;
+	u8 difficultyCombat,difficultyPuzzle,difficultyMission,difficultyCyber;
 	bool gamePaused,menuActive,gameFinished;
-	uint16_t ressurections,deaths,kills,cyberkills,ressurectionActiveLevels;
-	uint32_t shotsFired,grenadesThrown;
+	u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels;
+	u32 shotsFired,grenadesThrown;
 	float damageDealt,damageReceived;
-	uint32_t savesScummed;
-	uint8_t creditsPageIndex;
+	u32 savesScummed;
+	u8 creditsPageIndex;
 	bool creditsActive,decoyActive,boosterActive,uiIsBlocking,mouseClickHeldOverGUI;
 	char playerName[27];
     int fogFac;
@@ -1010,21 +1006,21 @@ typedef struct {
     bool (*GetKeyPressed)(int settingIndex);
     InventorySystem invP1,invP2;
     ma_sound mp3_sounds[2]; // Two for crossfading
-    int32_t mp3_slot;
+    i32 mp3_slot;
     float timeScale;
     bool  geniusActive;
     Vector3 cyberspaceRecallPoint;
     Entity instances[INSTANCE_COUNT];
-    uint8_t dirtyInstances[INSTANCE_COUNT];
+    u8 dirtyInstances[INSTANCE_COUNT];
     Color fogColor;
     char audiologNames[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH],audiologSubjects[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
     char audiologSenders[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH],audioLogSpeech2Text[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
     float worldMin_x,worldMin_z,voxelMinCenterX,voxelMinCenterZ;
-    uint8_t physicsDebug;
+    u8 physicsDebug;
 } GlobalContext;
 
-static inline __attribute__((always_inline)) void flag_setu32(uint32_t *flags, uint32_t bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
-static inline __attribute__((always_inline)) void flag_set(uint64_t *flags, uint64_t bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
+static inline __attribute__((always_inline)) void flag_setu32(u32 *flags, u32 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
+static inline __attribute__((always_inline)) void flag_set(u64 *flags, u64 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
 
 // Math, Vectors, Quaternions
 #define vabs(x) ((x) < 0 ? -(x) : (x))
@@ -1070,7 +1066,7 @@ static inline __attribute__((always_inline)) float vexp2f(float x) {
 
 static inline __attribute__((always_inline)) float vexp(float x) { return vexp2f(x * 1.4426950409f); } // 1/ln(2)
 static inline __attribute__((always_inline)) float vpow(float a, float b) { return vexp(b * vlog(a)); }
-static inline __attribute__((always_inline)) int32_t clamp(int32_t val, int32_t min, int32_t max) { return (val > max) ? max : ((val < min) ? min : val); }
+static inline __attribute__((always_inline)) i32 clamp(i32 val, i32 min, i32 max) { return (val > max) ? max : ((val < min) ? min : val); }
 static inline __attribute__((always_inline)) float vround(float val) { return (val >= 0.0f) ? (float)(int)(val + 0.5f) : (float)(int)(val - 0.5f); }
 static inline __attribute__((always_inline)) Vector3 Vector3_A_plus_B(Vector3 a, Vector3 b) { return (Vector3){a.x + b.x, a.y + b.y, a.z + b.z}; }
 static inline __attribute__((always_inline)) Vector3 Vector3_A_minus_B(Vector3 a, Vector3 b) { return (Vector3){a.x - b.x, a.y - b.y, a.z - b.z}; }
@@ -1091,8 +1087,8 @@ static inline __attribute__((always_inline)) float squareDistance2D(float x1, fl
 static inline __attribute__((always_inline)) float squareDistance3D(float x1, float y1, float z1, float x2, float y2, float z2) { float dx = x2 - x1; float dy = y2 - y1; float dz = z2 - z1; return dx * dx + dy * dy + dz * dz; }
 static inline __attribute__((always_inline)) Quaternion quat_multiply(Quaternion q1, Quaternion q2) { return (Quaternion){(q1.w * q2.x + q1.x * q2.w + q1.y * q2.z - q1.z * q2.y),(q1.w * q2.y - q1.x * q2.z + q1.y * q2.w + q1.z * q2.x),(q1.w * q2.z + q1.x * q2.y - q1.y * q2.x + q1.z * q2.w),(q1.w * q2.w - q1.x * q2.x - q1.y * q2.y - q1.z * q2.z)}; } // Hamilton product, rotates q1 by q2
 static inline __attribute__((always_inline)) Vector3 quat_rotate_vector(Quaternion q, Vector3 v) { Quaternion r = quat_multiply((quat_multiply(q, (Quaternion){v.x,v.y,v.z,0.0f})),(Quaternion){-q.x,-q.y,-q.z,q.w}); return (Vector3){r.x,r.y,r.z}; } // Returns rotated input vector rotated by a quaternion.
-static inline __attribute__((always_inline)) uint8_t hardware14fromConstdex(uint16_t c) { return clamp(c - 21,0,14); }
-static inline __attribute__((always_inline)) bool ConstIndexIsPortalBlockingDoor(uint16_t entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }// All doors except see-through doors.
+static inline __attribute__((always_inline)) u8 hardware14fromConstdex(u16 c) { return clamp(c - 21,0,14); }
+static inline __attribute__((always_inline)) bool ConstIndexIsPortalBlockingDoor(u16 entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }// All doors except see-through doors.
 static inline __attribute__((always_inline)) bool ConstIndexInBounds(int c) { return (c >= 0 && c <= 760); }
 static inline __attribute__((always_inline)) bool ConstIndexIsGeometry(int c) { return (c >= 0 && c <= 306 && c != 112 && c != 279) || c == 760; }
 static inline __attribute__((always_inline)) bool ConstIndexIsDoor(int c) { return (c >= 496 && c < 515); }
@@ -1103,8 +1099,8 @@ static inline __attribute__((always_inline)) bool ConstIndexIsHardware(int c) { 
 static inline __attribute__((always_inline)) bool ConstIndexIsAmbient(int c) { return (c >= 621 && c <= 655); }
 static inline __attribute__((always_inline)) bool ConstIndexIsButtonSwitch(int c) { return ((c >= 688 && c <= 692) || c == 694 || c == 695); }
 static inline __attribute__((always_inline)) bool ConstIndexIsSearchable(int c) { return ((c >= 464 && c <= 476) || c == 530 || c == 531); }
-static inline __attribute__((always_inline)) bool ConstIndexIsUsableObject(uint16_t c) { return ((c >= 307 && c <= 404) || c == 417); }
-static inline __attribute__((always_inline)) bool ConstIndexIsAccessCard(uint16_t c) { return ((c >= 388 && c <= 398) || c == 417); }
-static inline __attribute__((always_inline)) bool ConstIndexIsDynamicObject(uint16_t c) { return (c >= 307 && c <= 404) ||  c == 417 || (c >= 419 && c <= 428) || (c >= 430 && c <= 437) || (c >= 440 && c <= 442) || (c >= 458 && c <= 463) || (c >= 465 && c <= 476); }
+static inline __attribute__((always_inline)) bool ConstIndexIsUsableObject(u16 c) { return ((c >= 307 && c <= 404) || c == 417); }
+static inline __attribute__((always_inline)) bool ConstIndexIsAccessCard(u16 c) { return ((c >= 388 && c <= 398) || c == 417); }
+static inline __attribute__((always_inline)) bool ConstIndexIsDynamicObject(u16 c) { return (c >= 307 && c <= 404) ||  c == 417 || (c >= 419 && c <= 428) || (c >= 430 && c <= 437) || (c >= 440 && c <= 442) || (c >= 458 && c <= 463) || (c >= 465 && c <= 476); }
 static inline __attribute__((always_inline)) bool ConstIndexIsStaticObjectSaveable(int c) { return (c == 112 || c == 279 || (c >= 448 && c < 458) || c == 480 || c == 516 || (c >= 518 && c <= 526) || c == 530 || c == 531 || c == 546 || c == 555 || c == 594 || c == 596 || c == 598 || (c >= 600 && c < 603) || (c >= 604 && c < 616) || (c >= 688 && c < 693) || c == 694 || c == 695 || (c >= 699 && c < 704) || (c >= 741 && c < 746)); }
 static inline __attribute__((always_inline)) bool ConstIndexIsStaticObjectImmutable(int c) { return ((c >= 527 && c < 530) || (c >= 532 && c < 546) || (c >= 547 && c < 553) || c == 554 || (c >= 556 && c < 594) || c == 595 || c == 597 || c == 599 || c == 601 || c == 603 || (c >= 616 && c < 688) || c == 693 || c == 696 || c == 697 || c == 698 || (c >= 704 && c < 717) || c == 720 || (c >= 733 && c < 736) || (c >= 737 && c < 739) || c == 746 || c == 747 || (c >= 750 && c <= 759 && c != 755)); }

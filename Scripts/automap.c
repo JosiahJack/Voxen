@@ -76,12 +76,12 @@ static const float camMaxAmount = 0.2548032f
 // 	private const float automapZoom0 = 1.2f;
 // 	private const float automapZoom1 = 0.75f;
 // 	private const float automapZoom2 = 0.55f;
-// 	// private float circleInnerRangev1 = 7.679999f; //(2.5f * 2.56f) + 1.28f;
-// 	// private float circleOuterRangev1 = 11.52f; //(4f * 2.56f) + 1.28f;
-// 	// private float circleInnerRangev2 = 8.96f; //(3f * 2.56f) + 1.28f;
-// 	// private float circleOuterRangev2 = 12.8f; //(4.5f * 2.56f) + 1.28f;
-// 	// private float circleInnerRangev3 = 14.08f; //(5f * 2.56f) + 1.28f;
-// 	// private float circleOuterRangev3 = 20.48f; //(7.5f * 2.56f) + 1.28f;
+// 	// private float circleInnerRangev1 = 7.679999f; //(2.5f * CELL_SIZE) + CELLXHALF;
+// 	// private float circleOuterRangev1 = 11.52f; //(4f * CELL_SIZE) + CELLXHALF;
+// 	// private float circleInnerRangev2 = 8.96f; //(3f * CELL_SIZE) + CELLXHALF;
+// 	// private float circleOuterRangev2 = 12.8f; //(4.5f * CELL_SIZE) + CELLXHALF;
+// 	// private float circleInnerRangev3 = 14.08f; //(5f * CELL_SIZE) + CELLXHALF;
+// 	// private float circleOuterRangev3 = 20.48f; //(7.5f * CELL_SIZE) + CELLXHALF;
 // 	// private float automapFactorx = 1.25f;
 // 	// private float automapFactory = 1.135f;
 // 	private const float automapCorrectionX = -0.008f;
@@ -510,7 +510,7 @@ static const float camMaxAmount = 0.2548032f
 // 		automapSideRH.SetActive(false);
 // 	}
 // 
-// 	public void AutomapGoFull(uint16_t playerIdx, SystemUI* ui) {
+// 	public void AutomapGoFull(u16 playerIdx, SystemUI* ui) {
 // 		if (ui->inSideView) {
 // 			AutomapGoTop();
 // 			UpdateAutomap(Eng_Global->instances[playerIdx].position);

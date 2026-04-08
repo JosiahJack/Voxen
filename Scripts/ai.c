@@ -18,7 +18,7 @@ const float stopDistance = 1.28f; // Constant
 const float positionCheckDelay = 2.0f;
 const float searchTime = 5.0f;
 Vector3 targetOffset = (Vector3){0.0f, 0.24f, 0.0f};
-uint16_t npcCountInWorldPerType[NUM_AI_TYPES];
+u16 npcCountInWorldPerType[NUM_AI_TYPES];
 // Name,AtkTyp1,2,3,Dmg1,2,3,Range1,2,3,Health,CybHealth,Percp,Disrp,Armr,Def,Movtyp,Yawspd,FOV,FOVAtk,FOVStartMov,DistToSeeBehind,SightRange,WalkSpd,RunSpd,AtkSpd1,2,3,AtkForce3,AtkRad3,TtPain,TbwPain,TtDead,TtActualAtk1,2,3,TbwAtk1,2,3,TEnemChg,TIdleSFXMin,TIdleSFXMax,TAtk1WaitMin,TAtk1WaitMax,TAtk1WaitChnc,TAtk2WaitMin,TAtk2WaitMax,TAtk2WaitChnc,TAtk3WaitMin,TAtk3WaitMax,TAtk3WaitChnc,ProjType1,2,3,ProjSpd1,2,3,HasLaser1,2,3,ExplodeOn3,PreActMeleCols,THunt,FlightHeight,FlightHeightIsPerc,SwitchMatOnDie,RangeHear,TTranq,Hops,NPCType,AtkProj1,2,3
 NPCTable npcTable[NUM_AI_TYPES] = {
  { "AUTOBOMB"              ,0,0,1,  0,  0,200, 0,0,2.4,50,0,1,0.5,40,1,1,300,180,120,55,3.84,50,2.5,2.5,0,0,0,100,6,0,0,0.1,0,0,0,0,0,0,3,5,12,0.5,1,0.1,1,3,0.5,0,0,0,0,0,0,0,0,0,0,0,0,1,0,20,0,0,0,10,3,0,2,0,0,0 },
@@ -60,8 +60,8 @@ int sfxAttack3[NUM_AI_TYPES] =        {  -1,  -1,  -1, -1, -1,244,244,244,245, -
 int sfxDeath[NUM_AI_TYPES] =          {  -1,  48, 110,143, 48,145, 48, 51, 47, 47,142,143,144, 47,162,123,120,134,144,144,120,117,144,124, -1, -1, -1, -1, -1};
 float deathBurstTimer[NUM_AI_TYPES] = {0.0f,0.0f, 0.1f,0.0f,0.1f,0.1f,0.2f,0.1f,0.1f,0.1f,0.0f,0.45f,0.75f,0.1f,0.0f,0.0f,0.1f,0.224f,0.9f,0.0f,0.1f,0.1f,0.1f,0.2f,0.1f,0.1f,0.1f,0.1f,0.1f};
 
-void SetHuntFinished(uint16_t i) {
-    uint16_t npcID = Eng_Global->instances[i].index - 419;
+void SetHuntFinished(u16 i) {
+    u16 npcID = Eng_Global->instances[i].index - 419;
     Eng_Global->instances[i].huntFinished = Eng_Global->pauseRelativeTime;
     int diff = Eng_Global->difficultyCombat;
     if (npcTable[npcID].type == NPCType_Cyber) diff = Eng_Global->difficultyCyber;
@@ -74,10 +74,10 @@ void SetHuntFinished(uint16_t i) {
     }
 }
 
-MOD_TO_ENGINE void InitializeAIAfterLoad(uint16_t i) {
+MOD_TO_ENGINE void InitializeAIAfterLoad(u16 i) {
     Entity* e = &Eng_Global->instances[i];
     e->layer = PhysicsLayer_NPC;
-    uint16_t npcID = e->index - 419;
+    u16 npcID = e->index - 419;
     e->idleTime = Eng_Global->pauseRelativeTime + (double)random_range(npcTable[npcID].timeIdleSFXMin,npcTable[npcID].timeIdleSFXMax);
     e->attack1SoundTime = e->attack2SoundTime = e->attack3SoundTime = Eng_Global->pauseRelativeTime;
     e->timeTillEnemyChangeFinished = Eng_Global->pauseRelativeTime;
@@ -119,7 +119,7 @@ MOD_TO_ENGINE void InitializeAIAfterLoad(uint16_t i) {
     StringFormat(e->targetID,TARGET_ID_LENGTH * sizeof(char),"%s %05u",npcTable[npcID].name,npcCountInWorldPerType[npcID]++);
     
     flag_set(&e->entflags,ENTFLAG_ANIM_DEAD_DONE,false);
-    uint8_t c;
+    u8 c;
     switch (e->currentState) {
         case AIState_Walk:    c = ANIM_WALK;    break;
         case AIState_Run:     c = ANIM_RUN;     break;
@@ -137,8 +137,8 @@ MOD_TO_ENGINE void InitializeAIAfterLoad(uint16_t i) {
     e->currentFrameFinished = 0.0;
 }
     
-float Tranquilize(uint16_t i, float amount, bool energy) {
-    uint16_t npcID = Eng_Global->instances[i].index - 419;
+float Tranquilize(u16 i, float amount, bool energy) {
+    u16 npcID = Eng_Global->instances[i].index - 419;
     if (npcTable[npcID].type == NPCType_Robot && !energy) return 0.0f;
 
     float tranqSecs = (amount < 3.0f) ? npcTable[npcID].timeForTranquilization : amount; // If we're going to tranq, at least do it for 3 secs.
@@ -146,9 +146,9 @@ float Tranquilize(uint16_t i, float amount, bool energy) {
     return tranqSecs;
 }
 
-static inline __attribute__((always_inline)) bool IsCyberNPC(uint16_t i) { uint16_t npcID = Eng_Global->instances[i].index - 419; return npcTable[npcID].type == NPCType_Cyber; }
+static inline __attribute__((always_inline)) bool IsCyberNPC(u16 i) { u16 npcID = Eng_Global->instances[i].index - 419; return npcTable[npcID].type == NPCType_Cyber; }
 
-bool HasHealth(uint16_t i) {
+bool HasHealth(u16 i) {
     if (IsCyberNPC(i)) return (Eng_Global->instances[i].cyberHealth > 0.0f);
     return (Eng_Global->instances[i].health > 0.0f);
 }
@@ -156,7 +156,7 @@ bool HasHealth(uint16_t i) {
 static inline bool     ai_is_cyber(Entity* e)  { return npcTable[e->index - 419].type == NPCType_Cyber; }
 static inline bool     ai_has_health(Entity* e){ return ai_is_cyber(e) ? e->cyberHealth > 0.0f : e->health > 0.0f; }
 static inline Vector3  ai_sight_pos(Entity* e) { return Vector3_A_plus_B(e->position,(Vector3){0.0f,0.0f,0.0f}/* e->sightPointOffset*/); } // TODO table of sight point offsets
-static inline uint16_t ai_self_idx(Entity* e)  { return (uint16_t)(e - Eng_Global->instances); }
+static inline u16 ai_self_idx(Entity* e)  { return (u16)(e - Eng_Global->instances); }
 
 static inline Vector3 ai_gun_pos(Entity* e, int n) {
     Vector3 off = (Vector3){0.0f,0.0f,0.0f};//(n == 3) ? e->gunPointOffset2 : e->gunPointOffset; // TODO table of offsets
@@ -207,7 +207,7 @@ static float quat_angle_deg(Quaternion a, Quaternion b) {
     return 2.0f * vacosf(d) * (180.0f / PI);
 }
 
-static void aiac_set_clip(Entity* self, uint8_t c) {
+static void aiac_set_clip(Entity* self, u8 c) {
     if (self->clip == c) return;
     self->clip  = c;
     self->frame = modelAnimationClips[self->animationNum][c].frameStart;
@@ -249,7 +249,7 @@ static void aiac_dying(Entity* self) {
     
 //     aiac_set_clip(self, ANIM_DYING);
 //     AnimationClip cl = modelAnimationClips[self->animationNum][ANIM_DYING];
-//     uint16_t range = cl.frameEnd > cl.frameStart ? cl.frameEnd - cl.frameStart : 1;
+//     u16 range = cl.frameEnd > cl.frameStart ? cl.frameEnd - cl.frameStart : 1;
 //     self->animatorPlaybackTime = (float)(self->frame - cl.frameStart) / (float)range; // TODO
 //     if (self->animatorPlaybackTime > 0.99f) flag_set(&self->entflags,ENTFLAG_DYING,false);
 }
@@ -267,7 +267,7 @@ static void aiac_dead(Entity* self) {
     aiac_freeze(self);
 }
 
-void AIAnimationControllerUpdate(uint16_t idx) {
+void AIAnimationControllerUpdate(u16 idx) {
     Entity* self = &Eng_Global->instances[idx];
     if (!(self->entflags & ENTFLAG_ACTIVE))        return;
     if (self->animationNum >= MAX_ANIMATED_MODELS)  return;
@@ -289,7 +289,7 @@ void AIAnimationControllerUpdate(uint16_t idx) {
 }
 
 static bool AICheckIfEnemyInSight(Entity* self) {
-    uint16_t eidx = self->enemy;
+    u16 eidx = self->enemy;
     if (!eidx || !ai_has_health(self)) return false;
     Entity* en = &Eng_Global->instances[eidx];
     bool enIsNPC = (en->layer & PhysicsLayer_NPC) != 0;
@@ -317,7 +317,7 @@ static bool AICheckIfEnemyInSight(Entity* self) {
         // Smart NPCs try to open doors blocking line-of-sight
         NPCType t = npcTable[self->index - 419].type;
         if (t != NPCType_Mutant && t != NPCType_Supermutant && t != NPCType_Cyber) {
-            uint16_t hi = hit.hitInstanceIndex;
+            u16 hi = hit.hitInstanceIndex;
             if (hi && dist_sq_vector3(hit.point, spos) < 4.0f && ConstIndexIsDoor(Eng_Global->instances[hi].index)) {
                 Entity* dr = &Eng_Global->instances[hi];
                 if ((dr->doorOpen == DoorState_Closed || (dr->doorOpen == DoorState_Closing && Eng_Global->difficultyCombat > 2))
@@ -343,7 +343,7 @@ static void AISetHuntFinished(Entity* self) {
     else                self->huntFinished += (ht         > mn ? ht        : mn);
 }
 
-static void AISetEnemy(Entity* self, uint16_t eidx) {
+static void AISetEnemy(Entity* self, u16 eidx) {
     if (!eidx) return;
     
     self->enemy = eidx;
@@ -363,8 +363,8 @@ static void AIPlaySightSound(Entity* self) {
     if (self->entflags & ENTFLAG_ACT_AS_CORPSE_ONLY) return;
     
     flag_set(&self->entflags, ENTFLAG_FIRST_SIGHTING, false);
-    int16_t sfx = sfxSightSound[self->index - 419];
-    if (sfx >= 0 && sfx < (int16_t)SOUNDS_COUNT) play_wav(sounds[sfx], self->volume, self->position, true);
+    i16 sfx = sfxSightSound[self->index - 419];
+    if (sfx >= 0 && sfx < (i16)SOUNDS_COUNT) play_wav(sounds[sfx], self->volume, self->position, true);
 }
 
 static bool AICheckIfPlayerInSight(Entity* self) {
@@ -404,7 +404,7 @@ static bool AICheckIfPlayerInSight(Entity* self) {
     return false;
 }
 
-static void AIEnemyInFrontChecks(Entity* self, uint16_t eidx) {
+static void AIEnemyInFrontChecks(Entity* self, u16 eidx) {
     if (!eidx) { flag_set(&self->entflags, ENTFLAG_ENEM_IN_FRONT|ENTFLAG_ENEM_IN_FOV, false); return; }
     if (ai_is_cyber(self)) { flag_set(&self->entflags, ENTFLAG_ENEM_IN_FRONT|ENTFLAG_ENEM_IN_FOV, true); return; }
     Vector3 spos = ai_sight_pos(self);
@@ -421,7 +421,7 @@ static void AIFace(Entity* self, Vector3 goal) {
     if (!ai_is_cyber(self)) fv.y = 0.0f;
     if (fv.x == 0.0f && fv.y == 0.0f && fv.z == 0.0f) return;
 
-    uint16_t eidx = self->enemy;
+    u16 eidx = self->enemy;
     if (ai_is_cyber(self) && eidx) { self->rotation = Eng_Global->instances[eidx].rotation; return; }
 
     if (fv.x == 0.0f && fv.z == 0.0f) {
@@ -452,7 +452,7 @@ bool AICheckPain(Entity* self) {
     if (!(self->entflags & ENTFLAG_GO_INTO_PAIN) || self->timeTillPainFinished >= Eng_Global->pauseRelativeTime) return false;
 
     self->currentState = AIState_Pain;
-    uint16_t atkIdx = self->recentMostActivator;
+    u16 atkIdx = self->recentMostActivator;
     if (atkIdx && self->timeTillEnemyChangeFinished < Eng_Global->pauseRelativeTime) {
         self->timeTillEnemyChangeFinished = Eng_Global->pauseRelativeTime + npcTable[self->index - 419].timeToChangeEnemy;
         Entity* atk = &Eng_Global->instances[atkIdx];
@@ -492,7 +492,7 @@ static void AIIdle(Entity* self) {
     NPCTable* npc = &npcTable[self->index - 419];
     if (self->idleTime < Eng_Global->pauseRelativeTime) {
         int sidle = sfxIdle[self->index - 419];
-        if (random_range(0.0f, 1.0f) < 0.5f && sidle >= 0 && sidle < (int16_t)SOUNDS_COUNT) play_wav(sounds[sidle],self->volume,self->position,true);
+        if (random_range(0.0f, 1.0f) < 0.5f && sidle >= 0 && sidle < (i16)SOUNDS_COUNT) play_wav(sounds[sidle],self->volume,self->position,true);
         self->idleTime = Eng_Global->pauseRelativeTime + random_range(npc->timeIdleSFXMin, npc->timeIdleSFXMax);
     }
 
@@ -512,8 +512,8 @@ static Vector3 AIGetAStarPoint(Entity* self) {
     Vector3 ep = self->enemy ? Eng_Global->instances[self->enemy].position : self->position;
     float px = self->position.x, py = self->position.y, pz = self->position.z;
     Vector3 cands[4] = {
-        {px, py, pz + AI_ASTAR_STEP}, {px, py, pz - AI_ASTAR_STEP},
-        {px + AI_ASTAR_STEP, py, pz}, {px - AI_ASTAR_STEP, py, pz}
+        {px,py,pz + CELL_SIZE}, {px,py,pz - CELL_SIZE},
+        {px + CELL_SIZE,py,pz}, {px - CELL_SIZE,py,pz}
     };
     int best = -1; float bestD = 1e9f;
     for (int i = 0; i < 4; ++i) {
@@ -570,7 +570,7 @@ static void AIWalk(Entity* self) {
             if (npcTable[self->index - 419].moveType != AIMoveType_Fly) {
                 Vector3 spos = ai_sight_pos(self);
                 Vector3 cp = { spos.x + self->forward.x*0.48f, spos.y, spos.z + self->forward.z*0.48f };
-                RaycastHit gh = Raycast(cp, (Vector3){0,-1,0}, 2.56f, LAYER_MASK_NPC_COLLISION);
+                RaycastHit gh = Raycast(cp,(Vector3){0,-1,0},CELL_SIZE,LAYER_MASK_NPC_COLLISION);
                 if (!gh.hit) { mv.x = 0.0f; mv.z = 0.0f; }
             }
             mv.y = self->velocity.y;
@@ -611,7 +611,7 @@ static void AIRunMove(Entity* self) {
 }
 
 static void AIHunt(Entity* self) {
-    uint16_t eidx = self->enemy;
+    u16 eidx = self->enemy;
     if (!eidx) return;
     self->currentDestination = ai_is_cyber(self) ? Eng_Global->instances[eidx].position : AIGetSearchPoint(self);
     if (npcTable[self->index - 419].moveType == AIMoveType_None) return;
@@ -623,7 +623,7 @@ static void AIHunt(Entity* self) {
     self->velocity = (Vector3){ self->forward.x*rs, self->velocity.y, self->forward.z*rs };
 }
 
-float DistToEnemy(uint16_t self, uint16_t enem) {
+float DistToEnemy(u16 self, u16 enem) {
     if (self >= Eng_Global->loadedInstances) return 100000.0f;
     if (enem >= Eng_Global->loadedInstances) return 100000.0f;
     
@@ -631,7 +631,7 @@ float DistToEnemy(uint16_t self, uint16_t enem) {
     Vector3 d = Vector3_A_minus_B(selfPos,enemPos); return dot_vector3(d,d);
 }
 
-static bool AICanAttack(uint16_t selfIdx, float dsq, uint8_t type, float* rangeToEnemy) {
+static bool AICanAttack(u16 selfIdx, float dsq, u8 type, float* rangeToEnemy) {
     Entity* self = &Eng_Global->instances[selfIdx];
 
     *rangeToEnemy = DistToEnemy(selfIdx,self->enemy);
@@ -652,7 +652,7 @@ static bool AICanAttack(uint16_t selfIdx, float dsq, uint8_t type, float* rangeT
 }
 
 static void AIBrakingMovement(Entity* self) {
-    uint8_t ni = self->index - 419;
+    u8 ni = self->index - 419;
     if (ni == 1 || (ni >= 3 && ni <= 9) || (ni >= 11 && ni <= 13) || ni == 17 || ni == 23) {
         self->velocity.x *= 0.15f;
         self->velocity.z *= 0.15f;
@@ -673,7 +673,7 @@ static void AIStartAttack(Entity* self, int n) {
     self->currentState = (AIState)(AIState_Attack1 + (n - 1));
 }
 
-static void AIRun(uint16_t selfIdx) {
+static void AIRun(u16 selfIdx) {
     Entity* self = &Eng_Global->instances[selfIdx];
     if (AICheckPain(self)) return;
     if (self->entflags & ENTFLAG_ASLEEP) return;
@@ -748,7 +748,7 @@ static void AIDyingSetup(Entity* self) {
 
     if (!(self->entflags & ENTFLAG_ACT_AS_CORPSE_ONLY) && !(self->entflags & ENTFLAG_TELEPORT_ON_DEATH)) {
         int sded = sfxDeath[self->index - 419];
-        if (sded >= 0 && sded < (int16_t)SOUNDS_COUNT) play_wav(sounds[sded], self->volume, self->position, true);
+        if (sded >= 0 && sded < (i16)SOUNDS_COUNT) play_wav(sounds[sded], self->volume, self->position, true);
     }
 
     // Physics for death
@@ -781,7 +781,7 @@ static void AIDying(Entity* self) {
     if (self->index == 439) self->layer = PhysicsLayer_Corpse | PhysicsLayer_CorpseSearchable; // Zero-G mutant enables search collider while still dying
 }
 
-static void AIDead(uint16_t idx) {
+static void AIDead(u16 idx) {
     Entity* self = &Eng_Global->instances[idx];   
     flag_set(&self->entflags, ENTFLAG_ASLEEP,       false);
     flag_set(&self->entflags, ENTFLAG_DEAD,         true);
@@ -832,7 +832,7 @@ static float ai_damage_take_amount(DamageData dd) {
     return dd.damage * (1.0f - reduction);
 }
 
-static void ai_apply_damage(DamageData dd, uint16_t hitIdx) {
+static void ai_apply_damage(DamageData dd, u16 hitIdx) {
     if (!hitIdx || hitIdx >= INSTANCE_COUNT) return;
     dd.hitIdx = hitIdx;
     dd.damage = ai_damage_take_amount(dd);
@@ -848,7 +848,7 @@ static void ai_apply_damage(DamageData dd, uint16_t hitIdx) {
 }
 
 static void AIApplyAttackMovement(Entity* self, float speed) {
-    uint16_t eidx = self->enemy;
+    u16 eidx = self->enemy;
     if (!eidx) return;
     if (self->entflags & ENTFLAG_ACT_AS_TURRET) { self->currentDestination = ai_sight_pos(self); return; }
     if (speed <= 0.0f || self->tranquilizeFinished >= Eng_Global->pauseRelativeTime) return;
@@ -885,7 +885,7 @@ static void MuzzleBurst(Entity* self, int attackNum) { // TODO Table of muzzleBu
 static void ProjectileRaycast(Entity* self, int n) {
     if (n < 1 || n > 3) n = 1;
     Vector3 spos = (n == 1) ? ai_sight_pos(self) : ai_gun_pos(self, n);
-    uint16_t eidx = self->enemy;
+    u16 eidx = self->enemy;
     Vector3 targ = eidx ? self->targettingPosition : (Vector3){spos.x + self->forward.x*10.0f, spos.y, spos.z + self->forward.z*10.0f};
     Vector3 dir  = (n == 1) ? self->forward : normalize_vector3(Vector3_A_minus_B(targ, spos));
     float range;
@@ -899,7 +899,7 @@ static void ProjectileRaycast(Entity* self, int n) {
     RaycastHit hit = Raycast(spos, dir, range, LAYER_MASK_NPC_ATTACK);
     if (!hit.hit) return;
 
-    uint16_t hi = hit.hitInstanceIndex;
+    u16 hi = hit.hitInstanceIndex;
     // TODO: laser effect SpawnDynamicObject(408) when npc has laser on attack
 
     // Targeting laser (Cyborg Elite, attack3)
@@ -913,9 +913,9 @@ static void ProjectileRaycast(Entity* self, int n) {
     if (hitPlayer) dd.impactVelocity *= 0.5f;
     dd.isOtherNPC = !hitPlayer && ConstIndexIsNPC(Eng_Global->instances[hi].index);
     if (hi) ai_apply_damage(dd, hi);
-    uint16_t impactCI = GetImpactType(hi);
+    u16 impactCI = GetImpactType(hi);
     if (impactCI) {
-        uint16_t imp = SpawnDynamicObject(impactCI, true);
+        u16 imp = SpawnDynamicObject(impactCI, true);
         if (imp && imp < INSTANCE_COUNT) Eng_Global->instances[imp].position = hit.point;
     }
 }
@@ -930,11 +930,11 @@ static void ProjectileLaunched(Entity* self, int n) {
     }
     
     Vector3 spos = ai_gun_pos(self, n);
-    uint16_t eidx = self->enemy;
+    u16 eidx = self->enemy;
     Vector3 targ = eidx ? self->targettingPosition : (Vector3){spos.x + self->forward.x*20.0f, spos.y, spos.z + self->forward.z*20.0f};
     Vector3 dir  = normalize_vector3(Vector3_A_minus_B(targ, spos));
     MuzzleBurst(self,n);
-    uint16_t bb = SpawnDynamicObject((uint16_t)masterIdx, false);
+    u16 bb = SpawnDynamicObject((u16)masterIdx, false);
     if (!bb || bb >= INSTANCE_COUNT) bb = SpawnDynamicObject(370, false);
     if (!bb || bb >= INSTANCE_COUNT) return;
 
@@ -954,7 +954,7 @@ static void AIExplodeAttack(Entity* self) {
     float radius = npcTable[self->index - 419].attack3Radius; float force  = npcTable[self->index - 419].attack3Force;
     Vector3 epos = ai_sight_pos(self);
     DamageData dd = SetNPCData(self, 3);
-    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < Eng_Global->loadedInstances; ++i) {
+    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < Eng_Global->loadedInstances; ++i) {
         Entity* t = &Eng_Global->instances[i];
         if (!(t->entflags & ENTFLAG_ACTIVE)) continue;
         
@@ -986,7 +986,7 @@ static void AIAttack1(Entity* self) {
     if (self->gracePeriodFinished < Eng_Global->pauseRelativeTime && !(self->entflags & ENTFLAG_SHOT_FIRED)) {
         flag_set(&self->entflags, ENTFLAG_SHOT_FIRED, true);
         int sat = sfxAttack1[self->index - 419];
-        if (self->attack1SoundTime < Eng_Global->pauseRelativeTime && sat >= 0 && sat < (int16_t)SOUNDS_COUNT) {
+        if (self->attack1SoundTime < Eng_Global->pauseRelativeTime && sat >= 0 && sat < (i16)SOUNDS_COUNT) {
             play_wav(sounds[sat], self->volume, self->position, true);
             self->attack1SoundTime = Eng_Global->pauseRelativeTime + npc->timeBetweenAttack1;
         }
@@ -1002,7 +1002,7 @@ static void AIAttack2(Entity* self) {
     if (self->gracePeriodFinished < Eng_Global->pauseRelativeTime && !(self->entflags & ENTFLAG_SHOT_FIRED)) {
         flag_set(&self->entflags, ENTFLAG_SHOT_FIRED, true);
         int sat2 = sfxAttack2[self->index - 419];
-        if (self->attack2SoundTime < Eng_Global->pauseRelativeTime && sat2 >= 0 && sat2 < (int16_t)SOUNDS_COUNT) {
+        if (self->attack2SoundTime < Eng_Global->pauseRelativeTime && sat2 >= 0 && sat2 < (i16)SOUNDS_COUNT) {
             play_wav(sounds[sat2],self->volume,self->position,true);
             self->attack2SoundTime = Eng_Global->pauseRelativeTime + npc->timeBetweenAttack2;
         }
@@ -1018,7 +1018,7 @@ static void AIAttack3(Entity* self) {
     if (self->gracePeriodFinished < Eng_Global->pauseRelativeTime && !(self->entflags & ENTFLAG_SHOT_FIRED)) {
         flag_set(&self->entflags, ENTFLAG_SHOT_FIRED, true);
         int sat3 = sfxAttack3[self->index - 419];
-        if (self->attack3SoundTime < Eng_Global->pauseRelativeTime && sat3 >= 0 && sat3 < (int16_t)SOUNDS_COUNT) {
+        if (self->attack3SoundTime < Eng_Global->pauseRelativeTime && sat3 >= 0 && sat3 < (i16)SOUNDS_COUNT) {
             play_wav(sounds[sat3], self->volume, self->position, true);
             self->attack3SoundTime = Eng_Global->pauseRelativeTime + npc->timeBetweenAttack3;
         }
@@ -1033,7 +1033,7 @@ static void AIAttack3(Entity* self) {
 static void AIFlierMoveToHoverHeight(Entity* self) {
     NPCTable* npc = &npcTable[self->index - 419];
     if (npc->runSpeed <= 0.0f) return;
-    uint16_t eidx = self->enemy;
+    u16 eidx = self->enemy;
     if (eidx) {
         self->idealPos.y = Eng_Global->instances[eidx].position.y + AI_TARGET_OFFSET_Y;
         self->idealPos.x = self->position.x;
@@ -1055,7 +1055,7 @@ static void AIFlierMoveToHoverHeight(Entity* self) {
     self->position.y += step;
 }
 
-float AITranquilize(uint16_t idx, float amount, bool energy) {
+float AITranquilize(u16 idx, float amount, bool energy) {
     Entity* self = &Eng_Global->instances[idx];
     float secs = (amount < 3.0f) ? (float)npcTable[self->index - 419].timeForTranquilization : amount;
     if (npcTable[self->index - 419].type != NPCType_Robot || energy) {
@@ -1066,7 +1066,7 @@ float AITranquilize(uint16_t idx, float amount, bool energy) {
     return 0.0f;
 }
 
-void AIAlert(uint16_t idx) {
+void AIAlert(u16 idx) {
     if (Eng_Global->difficultyCombat == 0) return;
     Entity* self = &Eng_Global->instances[idx];
     AISetEnemy(self, PLAYER1);
@@ -1074,14 +1074,14 @@ void AIAlert(uint16_t idx) {
     flag_set(&self->entflags, ENTFLAG_ENEM_IN_SIGHT, false);
 }
 
-void AIAwakeFromSleep(uint16_t idx) {
+void AIAwakeFromSleep(u16 idx) {
     Entity* self = &Eng_Global->instances[idx];
     flag_set(&self->entflags, ENTFLAG_ASLEEP, false);
     // TODO deactivate sleeping cables
     AIAlert(idx);
 }
 
-static void AIThink(uint16_t idx) {
+static void AIThink(u16 idx) {
     Entity* self = &Eng_Global->instances[idx];   
     if ((self->entflags & ENTFLAG_DYING_SETUP) && self->deathBurstFinished < Eng_Global->pauseRelativeTime && !(self->entflags & ENTFLAG_DEATH_BURST_DONE)) {
         // TODO activate death burst effect
@@ -1115,13 +1115,13 @@ static void AIThink(uint16_t idx) {
     if (self->currentState == AIState_Dead || self->currentState == AIState_Dying) return;
 }
 
-void AIControllerUpdate(uint16_t idx) {
+void AIControllerUpdate(u16 idx) {
     Entity* self = &Eng_Global->instances[idx];
     if (!(self->entflags & ENTFLAG_ACTIVE)) return;
 
     if (!ai_is_cyber(self) && npcTable[self->index - 419].moveType != AIMoveType_Fly && self->currentState != AIState_Dead && self->currentState != AIState_Dying) self->gravity = 1.0f;
     flag_set(&self->entflags, ENTFLAG_ENEM_IN_SIGHT, AICheckIfPlayerInSight(self));
-    uint16_t eidx = self->enemy;
+    u16 eidx = self->enemy;
     if (eidx && ai_has_health(self)) {
         Entity* en = &Eng_Global->instances[eidx];
         bool enAlive = ai_is_cyber(self) ? en->cyberHealth > 0.0f : en->health > 0.0f;

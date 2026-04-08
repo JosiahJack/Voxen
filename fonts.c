@@ -4,32 +4,28 @@
 #include "voxen.h"
 #define DUMP_FONT_BITMAPS
 #include "stb_truetype.h"
-int numPackedGlyphs = 0;
-int numPackedGlyphsStopD = 0;
-GLuint fontAtlasTex;
-GLuint fontAtlasTexStopD;
-stbtt_packedchar fontPackedChar[MAX_GLYPHS];
-stbtt_packedchar fontPackedCharStopD[MAX_GLYPHS];
-float fixedNumberAdvanceWidth = 0.0f; // Global for fixed-width number spacing
-float fixedNumberAdvanceWidthStopD = 0.0f;
-static const char* const fallbackFontPaths[] = { "./Fonts/FreeSerifBold.ttf", "./Fonts/cambriab.ttf", "./Fonts/NotoSansCJK-Bold.ttc" };
-static const char* const fontPaths[] = { "./Fonts/SystemShockText.ttf", "./Fonts/StopD.ttf" };
+int numPackedGlyphs=0,numPackedGlyphsStopD=0;
+GLuint fontAtlasTex,fontAtlasTexStopD;
+stbtt_packedchar fontPackedChar[MAX_GLYPHS],fontPackedCharStopD[MAX_GLYPHS];
+float fixedNumberAdvanceWidth=0.0f, fixedNumberAdvanceWidthStopD=0.0f;
+static const char* fallbackFontPaths[] = { "./Fonts/FreeSerifBold.ttf", "./Fonts/cambriab.ttf", "./Fonts/NotoSansCJK-Bold.ttc" };
+static const char* fontPaths[] = { "./Fonts/SystemShockText.ttf", "./Fonts/StopD.ttf" };
 static stbtt_fontinfo fontInfo[5];
 static unsigned char *fontData[5];
 typedef struct { char *path; unsigned char *data; size_t size; stbtt_fontinfo info; } LoadedFont;
 LoadedFont fallbackFonts[3]; 
-typedef struct { int32_t first; int32_t count; int32_t startIndex; } GlyphRange;
+typedef struct { i32 first; i32 count; i32 startIndex; } GlyphRange;
 GlyphRange fontRanges[] = {{0x0020,0x7E - 0x20+1,0},/*ASCII 94*/ {0x00A0,0xFF - 0xA0+1, 95},/*Latin-1 95*/ {0x0400,0x04FF - 0x0400+1,95+96},/*Cyrillic 255*/ {0x3040,0x30FF - 0x3040+1,95+96+256},/*Hiragana/Katakana 191*/};
 GlyphRange fontRangesStopD[] = {{0x0020,0x7E - 0x20+1,0},/*ASCII*/ {0x00A0,0xFF - 0xA0+1,95},/*Latin-1*/ {0x0400,0x04FF - 0x0400+1,95+96},/*Cyrillic*/ {0x3040,0x30FF - 0x3040+1,95+96+256},/*Hiragana/Katakana*/};
-int32_t numFontRanges = sizeof(fontRanges)/sizeof(fontRanges[0]);
-__attribute__((pure)) int32_t CodepointToPackedIndex(int32_t codepoint, int fontID) {
+i32 numFontRanges = sizeof(fontRanges)/sizeof(fontRanges[0]);
+__attribute__((pure)) i32 CodepointToPackedIndex(i32 codepoint, int fontID) {
     if (codepoint < 32) codepoint = 32;
     if (codepoint >= 447) codepoint = 446;
     const GlyphRange* ranges = (fontID == FONT_STOPD) ? fontRangesStopD : fontRanges;
-    int32_t total_packed = (fontID == FONT_STOPD) ? numPackedGlyphsStopD : numPackedGlyphs;
-    for (int32_t i = 0; i < numFontRanges; i++) {
+    i32 total_packed = (fontID == FONT_STOPD) ? numPackedGlyphsStopD : numPackedGlyphs;
+    for (i32 i = 0; i < numFontRanges; i++) {
         if (codepoint >= ranges[i].first && codepoint < ranges[i].first + ranges[i].count) {
-            int32_t idx = ranges[i].startIndex + vmax((codepoint - ranges[i].first),0);
+            i32 idx = ranges[i].startIndex + vmax((codepoint - ranges[i].first),0);
             if (idx < total_packed) return idx;
         }
     }
@@ -45,7 +41,7 @@ static LoadedFont LoadFallbackFont(const char *path, int fontInfoIdx, int collec
     return (LoadedFont){(char*)path,fontData[fontInfoIdx],fontFileSize,fontInfo[fontInfoIdx]};
 }
 
-static int GetGlyphAndFont(uint32_t codepoint, stbtt_fontinfo **outFont, uint8_t fontID) {
+static int GetGlyphAndFont(u32 codepoint, stbtt_fontinfo **outFont, u8 fontID) {
     int glyph = stbtt_FindGlyphIndex((fontID == FONT_STOPD ? &fontInfo[1] : &fontInfo[0]), codepoint);
     if (glyph) { *outFont = (fontID == FONT_STOPD ? &fontInfo[1] : &fontInfo[0]); return glyph; }
 
@@ -60,17 +56,13 @@ static int GetGlyphAndFont(uint32_t codepoint, stbtt_fontinfo **outFont, uint8_t
 #ifdef DUMP_FONT_BITMAPS
     void stbi_write_bmp(char const *filename, int x, int y, const void *data);
     static void dump_atlas_bmp(const char *bmp_path, const unsigned char *atlas_data) {
-        unsigned char *rgb = OS_AllocateRAM(NULL,(size_t)FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * 4,PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, OS_INVALID_HANDLE);
-        for (int i = 0; i < FONT_ATLAS_SIZE * FONT_ATLAS_SIZE; ++i) {
-            unsigned char v = atlas_data[i];
-            rgb[i*4 + 0] = v;  // B
-            rgb[i*4 + 1] = v;  // G
-            rgb[i*4 + 2] = v;  // R
-            rgb[i*4 + 3] = 255;// A
+        u32 pxCount = FONT_ATLAS_SIZE * FONT_ATLAS_SIZE; size_t sz = (size_t)(pxCount * 4); unsigned char *rgb = OS_Alloc(sz);
+        for (u32 i = 0; i < pxCount; ++i) {
+            unsigned char v = atlas_data[i]; rgb[i*4 + 0] = v; rgb[i*4 + 1] = v; rgb[i*4 + 2] = v; rgb[i*4 + 3] = 255; // BGRA, alpha overriden to 1.0f
         }
 
-        stbi_write_bmp(bmp_path, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, rgb);
-        OS_DeallocateRAM(rgb, (size_t)FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * 4);
+        stbi_write_bmp(bmp_path,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,rgb);
+        OS_DeallocateRAM(rgb,sz);
     }
 #endif
 
@@ -87,7 +79,7 @@ void InitFontAtlasses(void) {
     fallbackFonts[2] = LoadFallbackFont(fallbackFontPaths[2],4,2); // Index 2 for Japanese in NotoSansCJK-Bold.ttc
 
     // Primary
-    unsigned char *bmp = OS_AllocateRAM(NULL,FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * sizeof(unsigned char),PROT_READ | PROT_WRITE,MAP_PRIVATE | MAP_ANONYMOUS,OS_INVALID_HANDLE);
+    unsigned char *bmp = OS_Alloc(FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * sizeof(unsigned char));
     stbtt_pack_context pc; stbtt_PackBegin(&pc,bmp,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0,16,NULL);
     pc.h_oversample = 4; pc.v_oversample = 4; pc.skip_missing = 1; numPackedGlyphs = 0; float h = 20.0f;
     for (int r=0;r<numFontRanges;++r) {
@@ -95,15 +87,14 @@ void InitFontAtlasses(void) {
         for (int i=0;i<fontRanges[r].count;++i) {
             if (numPackedGlyphs >= MAX_GLYPHS) break;
             
-            uint32_t cp = fontRanges[r].first + i;
+            u32 cp = fontRanges[r].first + i;
             int g = stbtt_FindGlyphIndex(&fontInfo[0], cp);
             stbtt_fontinfo *font = &fontInfo[0];
             unsigned char *data = fontData[0];
             if (!g) {
                 g = GetGlyphAndFont(cp, &font, FONT_NORMAL);
                 if (!g) continue;
-                
-                
+
                 data = (font == &fontInfo[0]) ? fontData[0] : ((LoadedFont*)((char*)font - __builtin_offsetof(LoadedFont, info)))->data;
             }
             
@@ -119,10 +110,8 @@ void InitFontAtlasses(void) {
     glCreateTextures(GL_TEXTURE_2D,1,&fontAtlasTex);
     glTextureStorage2D(fontAtlasTex,1,GL_R8,FONT_ATLAS_SIZE, FONT_ATLAS_SIZE);
     glTextureSubImage2D(fontAtlasTex,0,0,0,FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, GL_RED, GL_UNSIGNED_BYTE, bmp);
-    glTextureParameteri(fontAtlasTex,GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTextureParameteri(fontAtlasTex,GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTextureParameteri(fontAtlasTex,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
-    glTextureParameteri(fontAtlasTex,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+    glTextureParameteri(fontAtlasTex,GL_TEXTURE_MIN_FILTER, GL_LINEAR); glTextureParameteri(fontAtlasTex,GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTextureParameteri(fontAtlasTex,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE); glTextureParameteri(fontAtlasTex,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
     #ifdef DUMP_FONT_BITMAPS
         dump_atlas_bmp("./Fonts/SystemShockText_atlas.bmp", bmp);
     #endif
@@ -135,7 +124,7 @@ void InitFontAtlasses(void) {
         fontRangesStopD[r].startIndex = numPackedGlyphsStopD;
         for (int i = 0; i < fontRangesStopD[r].count; i++) {
             if (numPackedGlyphsStopD >= MAX_GLYPHS) break;
-            uint32_t cp = fontRangesStopD[r].first + i;
+            u32 cp = fontRangesStopD[r].first + i;
             int g = stbtt_FindGlyphIndex(&fontInfo[1], cp);
             stbtt_fontinfo *font = &fontInfo[1];
             unsigned char *data = fontData[1];
@@ -158,10 +147,8 @@ void InitFontAtlasses(void) {
     glCreateTextures(GL_TEXTURE_2D, 1, &fontAtlasTexStopD);
     glTextureStorage2D(fontAtlasTexStopD, 1, GL_R8, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE);
     glTextureSubImage2D(fontAtlasTexStopD, 0, 0, 0, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, GL_RED, GL_UNSIGNED_BYTE, bmp);
-    glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_MIN_FILTER, GL_LINEAR); glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     #ifdef DUMP_FONT_BITMAPS
         dump_atlas_bmp("./Fonts/StopD_atlas.bmp", bmp);
     #endif
@@ -171,12 +158,12 @@ void InitFontAtlasses(void) {
 
 char *strncpy(char *dest, const char *src, size_t n);
 TextSystem Sys_Text = { .file_data = NULL };
-uint16_t logImages = 1272; // Start index of first index 0 logImages[0] is blank1.png
-size_t utf16le_to_utf8(const uint8_t* src, size_t src_len, char* dst, size_t dst_len) {
+u16 logImages = 1272; // Start index of first index 0 logImages[0] is blank1.png
+size_t utf16le_to_utf8(const u8* src, size_t src_len, char* dst, size_t dst_len) {
     size_t dst_pos = 0; size_t src_pos = 0;
     while (src_pos < src_len && dst_pos < dst_len - 4) {
         if (src_pos + 1 >= src_len) break;
-        uint32_t code = (uint32_t)src[src_pos + 1] << 8 | src[src_pos]; src_pos += 2;
+        u32 code = (u32)src[src_pos + 1] << 8 | src[src_pos]; src_pos += 2;
         if (code < 0x80) {
             dst[dst_pos++] = (char)code;
         } else if (code < 0x800) {
@@ -193,7 +180,7 @@ size_t utf16le_to_utf8(const uint8_t* src, size_t src_len, char* dst, size_t dst
 
 const char* localizations[8] = {"./Data/text_english.txt","./Data/text_espanol.txt","./Data/text_deutsch.txt","./Data/text_francais.txt",
                                 "./Data/text_nihongo.txt","./Data/text_russkiy.txt","./Data/text_italiano.txt","./Data/text_portugues.txt"};
-void LoadTextForLanguage(uint8_t lang) {
+void LoadTextForLanguage(u8 lang) {
     char textFile[256] = {0};
     const char* filename = localizations[lang < 8 ? lang : 0];
     strncpy(textFile, filename, sizeof(textFile) - 1);
@@ -206,7 +193,7 @@ void LoadTextForLanguage(uint8_t lang) {
         Sys_Text.file_size = 0;
     }
 
-    Sys_Text.file_data = (uint8_t*)OS_OpenAndAllocateFileBufferReadonly(textFile,&dummy_fd,&alloc_size);
+    Sys_Text.file_data = (u8*)OS_OpenAndAllocateFileBufferReadonly(textFile,&dummy_fd,&alloc_size);
     if (!Sys_Text.file_data || alloc_size <= 0) { DualLogError("Failed to load text file: %s\n", textFile); return; }
 
     Sys_Text.file_size = (size_t)alloc_size;
@@ -219,12 +206,12 @@ void LoadTextForLanguage(uint8_t lang) {
         size_t line_start=data_pos;
         if(is_utf16le){
             while(data_pos+1<Sys_Text.file_size){
-                uint16_t ch=Sys_Text.file_data[data_pos]|(Sys_Text.file_data[data_pos+1]<<8);data_pos+=2;
-                if(ch=='\r'||ch=='\n'){if(ch=='\r'&&data_pos+1<Sys_Text.file_size){uint16_t n=Sys_Text.file_data[data_pos]|(Sys_Text.file_data[data_pos+1]<<8);if(n=='\n')data_pos+=2;}break;}
+                u16 ch=Sys_Text.file_data[data_pos]|(Sys_Text.file_data[data_pos+1]<<8);data_pos+=2;
+                if(ch=='\r'||ch=='\n'){if(ch=='\r'&&data_pos+1<Sys_Text.file_size){u16 n=Sys_Text.file_data[data_pos]|(Sys_Text.file_data[data_pos+1]<<8);if(n=='\n')data_pos+=2;}break;}
             }
         }else{
             while(data_pos<Sys_Text.file_size){
-                uint8_t c=Sys_Text.file_data[data_pos];
+                u8 c=Sys_Text.file_data[data_pos];
                 if(c=='\r'||c=='\n'){if(c=='\r'&&data_pos+1<Sys_Text.file_size&&Sys_Text.file_data[data_pos+1]=='\n')++data_pos;++data_pos;break;}
                 ++data_pos;
             }
@@ -256,11 +243,11 @@ static inline __attribute__((always_inline)) int StringToIntLen(const char *str,
 
 const char* logLocalizations[8] = {"./Data/logs_text_english.txt","./Data/logs_text_espanol.txt","./Data/logs_text_deutsch.txt","./Data/logs_text_francais.txt",
                                   "./Data/logs_text_nihongo.txt","./Data/logs_text_russkiy.txt","./Data/logs_text_italiano.txt","./Data/logs_text_portugues.txt"};
-void LoadLogTextForLanguage(uint8_t lang) {
-    __builtin_memset(Sys_Text.audioLogImagesRefIndicesLH, 0, TEXT_LOGS_COUNT * sizeof(uint16_t));
-    __builtin_memset(Sys_Text.audioLogImagesRefIndicesRH, 0, TEXT_LOGS_COUNT * sizeof(uint16_t));
-    __builtin_memset(Sys_Text.audioLogType,               0, TEXT_LOGS_COUNT * sizeof(uint8_t));
-    __builtin_memset(Sys_Text.audioLogLevelFound,         0, TEXT_LOGS_COUNT * sizeof(uint8_t));
+void LoadLogTextForLanguage(u8 lang) {
+    __builtin_memset(Sys_Text.audioLogImagesRefIndicesLH, 0, TEXT_LOGS_COUNT * sizeof(u16));
+    __builtin_memset(Sys_Text.audioLogImagesRefIndicesRH, 0, TEXT_LOGS_COUNT * sizeof(u16));
+    __builtin_memset(Sys_Text.audioLogType,               0, TEXT_LOGS_COUNT * sizeof(u8));
+    __builtin_memset(Sys_Text.audioLogLevelFound,         0, TEXT_LOGS_COUNT * sizeof(u8));
     char textFile[256] = {0};
     const char* filename = logLocalizations[lang < 8 ? lang : 0];
     strncpy(textFile, filename, sizeof(textFile) - 1);
@@ -273,7 +260,7 @@ void LoadLogTextForLanguage(uint8_t lang) {
         Sys_Text.filelog_size = 0;
     }
 
-    Sys_Text.filelog_data = (uint8_t*) OS_OpenAndAllocateFileBufferReadonly(textFile,&dummy_fd,&alloc_size);
+    Sys_Text.filelog_data = (u8*) OS_OpenAndAllocateFileBufferReadonly(textFile,&dummy_fd,&alloc_size);
     if (!Sys_Text.filelog_data || alloc_size <= 0) { DualLogError("Failed to load log text file: %s\n", textFile); return; }
 
     Sys_Text.filelog_size = (size_t)alloc_size;
@@ -286,12 +273,12 @@ void LoadLogTextForLanguage(uint8_t lang) {
         size_t line_start=data_pos;
         if(is_utf16le){
             while(data_pos+1<(size_t)Sys_Text.filelog_size){
-                uint16_t ch=Sys_Text.filelog_data[data_pos]|(Sys_Text.filelog_data[data_pos+1]<<8);data_pos+=2;
-                if(ch=='\r'||ch=='\n'){if(ch=='\r'&&data_pos+1<(size_t)Sys_Text.filelog_size){uint16_t next=Sys_Text.filelog_data[data_pos]|(Sys_Text.filelog_data[data_pos+1]<<8);if(next=='\n')data_pos+=2;}break;}
+                u16 ch=Sys_Text.filelog_data[data_pos]|(Sys_Text.filelog_data[data_pos+1]<<8);data_pos+=2;
+                if(ch=='\r'||ch=='\n'){if(ch=='\r'&&data_pos+1<(size_t)Sys_Text.filelog_size){u16 next=Sys_Text.filelog_data[data_pos]|(Sys_Text.filelog_data[data_pos+1]<<8);if(next=='\n')data_pos+=2;}break;}
             }
         }else{
             while(data_pos<(size_t)Sys_Text.filelog_size){
-                uint8_t c=Sys_Text.filelog_data[data_pos];
+                u8 c=Sys_Text.filelog_data[data_pos];
                 if(c=='\r'||c=='\n'){if(c=='\r'&&data_pos+1<(size_t)Sys_Text.filelog_size&&Sys_Text.filelog_data[data_pos+1]=='\n')++data_pos;++data_pos;break;}
                 ++data_pos;
             }
@@ -323,10 +310,10 @@ void LoadLogTextForLanguage(uint8_t lang) {
         }
         
         if(log_index>=0&&log_index<TEXT_LOGS_COUNT){
-            Sys_Text.audioLogImagesRefIndicesLH[log_index]=(uint16_t)img_lh;
-            Sys_Text.audioLogImagesRefIndicesRH[log_index]=(uint16_t)img_rh;
-            Sys_Text.audioLogType[log_index]=(uint8_t)log_type;
-            Sys_Text.audioLogLevelFound[log_index]=(uint8_t)level_found;
+            Sys_Text.audioLogImagesRefIndicesLH[log_index]=(u16)img_lh;
+            Sys_Text.audioLogImagesRefIndicesRH[log_index]=(u16)img_rh;
+            Sys_Text.audioLogType[log_index]=(u8)log_type;
+            Sys_Text.audioLogLevelFound[log_index]=(u8)level_found;
         }
         
     next_line:continue;

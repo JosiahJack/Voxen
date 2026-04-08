@@ -12,8 +12,8 @@ float penetrationForWeapon[16]={50.0f,25.0f,6.0f,35.0f,35.0f,80.0f,40.0f,30.0f,1
 float penetrationForWeapon2[16]={70.0f,0.0f,0.0f,32.0f,0.0f,0.0f,0.0f,25.0f,120.0f,30.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f};
 float offenseForWeapon[16]={4.0f,4.0f,2.0f,2.0f,6.0f,5.0f,3.0f,4.0f,4.0f,2.0f,3.0f,6.0f,2.0f,2.0f,3.0f,3.0f};
 float offenseForWeapon2[16]={5.0f,0.0f,3.0f,3.0f,0.0f,0.0f,0.0f,5.0f,5.0f,3.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f};
-uint8_t magazinePitchCountForWeapon[16]={10,0,15,60,0,0,0,12,25,20,0,12,20,50,0,0};
-uint8_t magazinePitchCountForWeapon2[16]={8,0,15,60,0,0,0,12,10,20,0,0,0,100,0,0};
+u8 magazinePitchCountForWeapon[16]={10,0,15,60,0,0,0,12,25,20,0,12,20,50,0,0};
+u8 magazinePitchCountForWeapon2[16]={8,0,15,60,0,0,0,12,10,20,0,0,0,100,0,0};
 float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0f,1.5f,2.0f,0.8f,0.8f};
 float recoilForWeapon[16]={1.3f,0.0f,0.1f,0.2f,0.0f,0.0f,0.0f,1.2f,0.8f,0.5f,1.5f,1.0f,0.9f,0.7f,0.0f,0.1f};
 float driftForWeapon[16] = {5.0f,0.0f,15.0f,50.0f,0.0f,0.0f,0.0f,8.0f,3.0f,3.0f,3.0f,12.0f,10.0f,30.0f,0.0f,3.0f};
@@ -277,7 +277,7 @@ int Get16WeaponIndexFromConstIndex(int index) {
 // 
 
 bool vmailActive;
-void CheckAttackInput(uint16_t p) {
+void CheckAttackInput(u16 p) {
     InventorySystem* inv = Inv(p);
     // Check for other things that must capture and override clicks
     if (Attack()) {
@@ -847,7 +847,7 @@ void WeaponsUpdate(void) {
 // 	}
 // 
 // 	// TargetID Instance
-// 	void CreateTargetIDInstance(float dmgFinal, uint16_t npcIdx, float tranq) {
+// 	void CreateTargetIDInstance(float dmgFinal, u16 npcIdx, float tranq) {
 // 		 if (!ConstIndexIsNPC(Eng_Global->instances[npcIdx].index) || Eng_Global->instances[npcIdx].health <= 0f) return;
 //          if (!(Eng_Global->invP1.hasHardware & HW_TID) || tranq > 0.0f) return;
 // 		if (Eng_Global->instances[npcIdx].linkedTargetID) return; // Let SendDamageReceive handle updates

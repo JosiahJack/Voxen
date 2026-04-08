@@ -89,7 +89,7 @@ public class SpawnManager : MonoBehaviour {
 		Vector3 spot = GetRandomLocation();
 		if (spot.x == 0 && spot.y == 0 && spot.z == 0) return;
 
-		uint16_t instGO = SpawnDynamicObject(index,Eng_Global->currentLevel,false,null,-1);
+		u16 instGO = SpawnDynamicObject(index,Eng_Global->currentLevel,false,null,-1);
         instGO.Eng_Global->instances[i].position = spot;
         AIController aic = instGO.GetComponent<AIController>();
         if (aic == null) return;
@@ -111,28 +111,19 @@ public class SpawnManager : MonoBehaviour {
 		return retval;
 	}
 
-	// CapsuleCast using largest NPC's bounding capsule to check area is clear.
-	bool AreaClear(Vector3 spot) {
-		RaycastHit hit = new RaycastHit();
-		if (Physics.CapsuleCast(spot + (Vector3){0,0.52f,0),
-								spot + (Vector3){0,-0.52f,0),0.48f,
-								(Vector3){0.0f,0.0f,0.0f},out hit,0.02f,
-								Const.a.layerMaskNPCCollision)) {
-			return false;
-		} else {
-			return true;
-		}
+
+	RaycastHit AreaClear(Vector3 spot) { // CapsuleCast using largest NPC's bounding capsule to check area is clear.
+		return Physics.CapsuleCast(spot + (Vector3){0.0f,0.52f,0.0f},spot + (Vector3){0.0f,-0.52f,0.0f},0.48f,(Vector3){0.0f,0.0f,0.0f},out hit,0.02f,Const.a.layerMaskNPCCollision);
 	}
 
 	bool AreaHidden(Vector3 spot) {
 		Vector3 plyPos = Const.a.player1Capsule.Eng_Global->instances[i].position;
-		float range = 50f;
-		if (distance_vector3(plyPos,spot) > range) return true;
+		if (distance_vector3(plyPos,spot) > 50.0f) return true;
 
 		int mask = Const.a.layerMaskNPCAttack;
 		Vector3 ray = (plyPos - spot).normalized;
 		RaycastHit tempHit;
-		if (Raycast(spot,ray,out tempHit,range,mask)) {
+		if (Raycast(spot,ray,out tempHit,50.0f,mask)) {
 			if (tempHit.collider.CompareTag("Player")) return false;
 		}
 		return true;

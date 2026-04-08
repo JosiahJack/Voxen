@@ -29,20 +29,19 @@
 #define MAX_CAMVIEWS 11
 extern GlobalContext Sys_Global;
 extern SystemUI Sys_UI;
-typedef struct { uint16_t x,z; } PortalCell;
-typedef struct { PortalCell cellA,cellB; bool portalNS, open,dirty; } Portal;
+typedef struct { u16 x,z; } PortalCell;
+typedef struct { PortalCell cellA,cellB,cellA2,cellB2; bool portalNS,open,dirty,isBulkhead;} Portal;
 typedef struct {bool down,pressed,released;} KeyState;
 typedef struct {
 	double last_mouse_x,last_mouse_y,scrollDelta;
 	KeyState keyStates[MAX_KEYS],mouseButtons[MAX_MOUSE_BUTTONS],gamepadButtons[MAX_GAMEPAD_BUTTONS],joystickButtons[16][MAX_JOYSTICK_BUTTONS],joystickHats[MAX_JOYSTICK_HATS]; // What can I say, I'm a man of many hats. ^^D
-    int32_t currentMouse_dx,currentMouse_dy;
+    i32 currentMouse_dx,currentMouse_dy;
 	bool window_has_focus,ignore_next_mouse_delta,lastUse,isCapsLockOn,joystickPresent[16];
 } InputSystem;
 extern InputSystem Sys_Input;
-typedef struct { uint64_t mtime_ns,size,inode,dev; } FileFingerprint;
 typedef struct { Vector3 normal; float d; } FrustumPlane;
-typedef struct StbiArena { uint8_t*base,*cursor,*end; } StbiArena;
-typedef uint32_t GLuint;
+typedef struct StbiArena { u8*base,*cursor,*end; } StbiArena;
+typedef u32 GLuint;
 typedef struct {
     GLuint inputImageID,inputDepthID,inputWorldPosID,inputSpecID,inputNormalID,gBufferFBO,outputImageID;
     GLuint depthPrepassShaderProgram;
@@ -65,13 +64,13 @@ bool StringsEqualLimitedBy(const char* a, const char* b, size_t limit);
 void StringCopyInto_A_SubstringFrom_B(char* a, size_t substringSize, const char* b, size_t bufferSize);
 void StringConcatenate(char* a, const char* b, size_t bufferSize);
 extern RenderSystem Sys_Render; // Added last to make use of all defines for sizes.
-bool EntityIsAnimated(uint16_t entIdx);
+bool EntityIsAnimated(u16 entIdx);
 void InitializeEntity(Entity* entry);
-void LoadLevel(uint8_t curlevel);
+void LoadLevel(u8 curlevel);
 float GetPainStatic(void);
 Color GetPainStaticColor(void);
 int StringCompareUpToLength(const char* s1, const char* s2, size_t n);
-static inline __attribute__((always_inline)) uint32_t parse_numberu32(const char* str, const char* line, uint32_t lineNum) {
+static inline __attribute__((always_inline)) u32 parse_numberu32(const char* str, const char* line, u32 lineNum) {
     if (str == 0 || *str == '\0') { DualLogError("Invalid blank string from line[%d]: %s\n", lineNum+1, line); return 0; }
     while (CharacterIsEmpty((char)*str)) str++;
     while (CharacterIsEmpty(*str)) str++;
@@ -84,28 +83,28 @@ static inline __attribute__((always_inline)) uint32_t parse_numberu32(const char
         str++;
     }
 
-    return (uint32_t)result;
+    return (u32)result;
 }
 
-static inline __attribute__((always_inline)) uint16_t parse_numberu16(const char* str, const char* line, uint32_t lineNum) {
-    uint32_t retval = parse_numberu32(str, line, lineNum);
-    if (retval > UINT16_MAX) { DualLogError("Value %u out of range for uint16_t from line[%d]: %s\n", retval, lineNum+1, line); return 0; }
-    return (uint16_t)retval;
+static inline __attribute__((always_inline)) u16 parse_numberu16(const char* str, const char* line, u32 lineNum) {
+    u32 retval = parse_numberu32(str, line, lineNum);
+    if (retval > U16_MAX) { DualLogError("Value %u out of range for u16 from line[%d]: %s\n", retval, lineNum+1, line); return 0; }
+    return (u16)retval;
 }
 
-static inline __attribute__((always_inline)) uint8_t parse_numberu8(const char* str, const char* line, uint32_t lineNum) {
-    uint32_t retval = parse_numberu32(str, line, lineNum);
-    if (retval > UINT8_MAX) { DualLogError("Value %u out of range for uint8_t from line[%d]: %s\n", retval, lineNum+1, line); return 0; }
-    return (uint8_t)retval;
+static inline __attribute__((always_inline)) u8 parse_numberu8(const char* str, const char* line, u32 lineNum) {
+    u32 retval = parse_numberu32(str, line, lineNum);
+    if (retval > U8_MAX) { DualLogError("Value %u out of range for u8 from line[%d]: %s\n", retval, lineNum+1, line); return 0; }
+    return (u8)retval;
 }
 
-static inline __attribute__((always_inline)) bool parse_bool(const char* str, const char* line, uint32_t lineNum) {
-    uint32_t parseval = parse_numberu32(str, line, lineNum);
+static inline __attribute__((always_inline)) bool parse_bool(const char* str, const char* line, u32 lineNum) {
+    u32 parseval = parse_numberu32(str, line, lineNum);
     if (parseval > 1) DualLogWarn("Loaded %u but expected boolean from line[%u]: %s\n",parseval, lineNum+1, line);
     return parseval > 0 ? true : false;
 }
 
-static inline __attribute__((always_inline)) float parse_float(const char* str, const char* line, uint32_t lineNum) {
+static inline __attribute__((always_inline)) float parse_float(const char* str, const char* line, u32 lineNum) {
     if (str == 0 || *str == '\0') { DualLogError("Invalid blank string from line[%d]: %s\n", lineNum+1, line); return 0.0f; }
     
     while (CharacterIsEmpty(*str)) str++;
@@ -138,5 +137,5 @@ static inline __attribute__((always_inline)) float parse_float(const char* str, 
     return (!has_digit) ? 0.0f : (negative ? (float)(-value) : (float)value);
 }
 
-static inline __attribute__((always_inline)) int32_t PosGetCellCoordX(float pos_x) { return (uint16_t)clamp((int32_t)vfloor((pos_x - Sys_Global.worldMin_x + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
-static inline __attribute__((always_inline)) int32_t PosGetCellCoordZ(float pos_z) { return (uint16_t)clamp((int32_t)vfloor((pos_z - Sys_Global.worldMin_z + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
+static inline __attribute__((always_inline)) i32 PosGetCellCoordX(float pos_x) { return (u16)clamp((i32)vfloor((pos_x - Sys_Global.worldMin_x + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
+static inline __attribute__((always_inline)) i32 PosGetCellCoordZ(float pos_z) { return (u16)clamp((i32)vfloor((pos_z - Sys_Global.worldMin_z + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }

@@ -6,19 +6,19 @@ void stbi_write_bmp(char const *filename, int x, int y, const void *data) {
     OsFileHandle f = OS_OpenWriteonly(filename);
     if (f == OS_INVALID_HANDLE) { DualLogError("Failed to open %s for writing\n", filename); return; }
 
-    uint32_t fileSize = 14 + 108 + (uint32_t)x * y * 4; // BMP file header (14 bytes)
+    u32 fileSize = 14 + 108 + (u32)x * y * 4; // BMP file header (14 bytes)
     unsigned char fileHeader[14] = {'B','M',fileSize & 0xFF,(fileSize >> 8) & 0xFF,(fileSize >> 16) & 0xFF,(fileSize >> 24) & 0xFF,0,0,0,0,14 + 108,0,0,0};
     unsigned char infoHeader[108] = {0}; // Bitmap V4 header (108 bytes) - 32-bit BGRA
-    *(uint32_t*)(infoHeader +  0) = 108;           // biSize
-    *(uint32_t*)(infoHeader +  4) = (uint32_t)x;   // biWidth
-    *(uint32_t*)(infoHeader +  8) = (uint32_t)-y;  // biHeight (negative = top-down)
-    *(uint16_t*)(infoHeader + 12) = 1;             // biPlanes
-    *(uint16_t*)(infoHeader + 14) = 32;            // biBitCount
-    *(uint32_t*)(infoHeader + 16) = 3;             // BI_BITFIELDS
-    *(uint32_t*)(infoHeader + 40) = 0x000000FF;    // Red
-    *(uint32_t*)(infoHeader + 44) = 0x0000FF00;    // Green
-    *(uint32_t*)(infoHeader + 48) = 0x00FF0000;    // Blue
-    *(uint32_t*)(infoHeader + 52) = 0x00000000;    // Alpha
+    *(u32*)(infoHeader +  0) = 108;           // biSize
+    *(u32*)(infoHeader +  4) = (u32)x;   // biWidth
+    *(u32*)(infoHeader +  8) = (u32)-y;  // biHeight (negative = top-down)
+    *(u16*)(infoHeader + 12) = 1;             // biPlanes
+    *(u16*)(infoHeader + 14) = 32;            // biBitCount
+    *(u32*)(infoHeader + 16) = 3;             // BI_BITFIELDS
+    *(u32*)(infoHeader + 40) = 0x000000FF;    // Red
+    *(u32*)(infoHeader + 44) = 0x0000FF00;    // Green
+    *(u32*)(infoHeader + 48) = 0x00FF0000;    // Blue
+    *(u32*)(infoHeader + 52) = 0x00000000;    // Alpha
     OS_Write(f,fileHeader,14,filename); OS_Write(f,infoHeader,108,filename);
     const unsigned char *pixels = (const unsigned char *)data;
     for (int j=y-1;j>=0;--j) OS_Write(f,(void*)(pixels + j*x*4),(size_t)x*4,filename);
@@ -84,14 +84,14 @@ void DebugRAM(const char *context) {
 #endif
 }
 
-void print_bytes_no_newline(int32_t count) { DualLog("%d bytes | %f kb | %f Mb",count,(double)count / 1000.0,(double)count / 1000000.0); }
+void print_bytes_no_newline(i32 count) { DualLog("%d bytes | %f kb | %f Mb",count,(double)count / 1000.0,(double)count / 1000000.0); }
 
 ENGINE_TO_MOD void Screenshot(void) {
     if (!TakeScreenshot() || Sys_Global.current_time <= Sys_Global.screenshotTimeout) return;
     
     Sys_Global.screenshotTimeout = Sys_Global.current_time + 1.0; // Prevent saving more than 1 per second for sanity purposes.
-    OS_MakeFolder("Screenshots"); uint16_t w = Sys_Settings.ScreenWidth, h = Sys_Settings.ScreenHeight;
-    unsigned char* pixels = OS_AllocateRAM(NULL,w * h * 4 * sizeof(char),PROT_READ|PROT_WRITE,MAP_ANONYMOUS|MAP_PRIVATE|MAP_POPULATE,OS_INVALID_HANDLE);
+    OS_MakeFolder("Screenshots"); u16 w = Sys_Settings.ScreenWidth, h = Sys_Settings.ScreenHeight;
+    unsigned char* pixels = OS_Alloc(w * h * 4 * sizeof(char));
     glad_glReadPixels(0,0,w,h,GL_RGBA,GL_UNSIGNED_BYTE,pixels);
     Vector3 p = Sys_Global.instances[PLAYER1].position;
     char filename[96]; StringFormat(filename,sizeof(filename),"Screenshots/%.2f_x%.1f_y%.1f_z%.1f.bmp",get_time(),p.x,p.y,p.z);
@@ -99,28 +99,28 @@ ENGINE_TO_MOD void Screenshot(void) {
     OS_DeallocateRAM(pixels,w * h * 4 * sizeof(char));
 }
 
-uint32_t random_range_rng = 0x12345678u;
-uint32_t xs32(void) { uint32_t x = random_range_rng; x ^= x << 13; x ^= x >> 17; x ^= x << 5; return random_range_rng = x ? x : 0xdeadbeefu; }
-uint32_t random_u32(void) { return xs32(); }
-uint8_t random_range_u8(uint8_t a, uint8_t b) {
+u32 random_range_rng = 0x12345678u;
+u32 xs32(void) { u32 x = random_range_rng; x ^= x << 13; x ^= x >> 17; x ^= x << 5; return random_range_rng = x ? x : 0xdeadbeefu; }
+u32 random_u32(void) { return xs32(); }
+u8 random_range_u8(u8 a, u8 b) {
     if (a == b) return a;
-    if (a > b) { uint8_t temp = a; a = b; b = temp; }
-    uint32_t r = (uint32_t)b - a; if (!r) return a; if (r == 256) return (uint8_t)xs32();
-    uint32_t t = 256u - (256u % r), v; do v = (uint8_t)xs32(); while (v >= t); return a + (v % r);
+    if (a > b) { u8 temp = a; a = b; b = temp; }
+    u32 r = (u32)b - a; if (!r) return a; if (r == 256) return (u8)xs32();
+    u32 t = 256u - (256u % r), v; do v = (u8)xs32(); while (v >= t); return a + (v % r);
 }
 
-uint32_t random_range_u32(uint32_t a, uint32_t b) {
+u32 random_range_u32(u32 a, u32 b) {
     if (a == b) return a;
-    if (a > b) { uint32_t temp = a; a = b; b = temp; }
-    uint64_t r = (uint64_t)b - a; if (!r) return a;
-    return a + (uint32_t)(((uint64_t)xs32() * r) >> 32);
+    if (a > b) { u32 temp = a; a = b; b = temp; }
+    u64 r = (u64)b - a; if (!r) return a;
+    return a + (u32)(((u64)xs32() * r) >> 32);
 }
 
-int32_t random_range_i32(int32_t a, int32_t b) {
+i32 random_range_i32(i32 a, i32 b) {
     if (a == b) return a;
-    if (a > b) { int32_t temp = a; a = b; b = temp; }
-    uint32_t r = (uint32_t)b - (uint32_t)a;
-    return a + (int32_t)(((uint64_t)xs32() * r) >> 32);
+    if (a > b) { i32 temp = a; a = b; b = temp; }
+    u32 r = (u32)b - (u32)a;
+    return a + (i32)(((u64)xs32() * r) >> 32);
 }
 
 float random_range(float a, float b) { return a + (b - a) * ((float)(xs32() >> 8) * (1.0f / (1U << 24))); }
@@ -167,14 +167,14 @@ char* data_parser_trim(char* s) {
     return s;
 }
 
-int32_t StringToInt(const char *str) { // atoi replacement
+i32 StringToInt(const char *str) { // atoi replacement
     while (CharacterIsEmpty(*str)) str++;
     int sign = 1;
          if (*str == '-') { sign = -1; str++; }
     else if (*str == '+') str++;
 
     if (*str < '0' || *str > '9') return 0;
-    int64_t result = 0;
+    i64 result = 0;
     while (*str >= '0' && *str <= '9') {
         int digit = *str - '0';
         if (result > (2147483647 - digit) / 10) return (sign == 1) ? 2147483647 : -2147483648;
@@ -183,7 +183,7 @@ int32_t StringToInt(const char *str) { // atoi replacement
         str++;
     }
 
-    return (int32_t)(sign * result);
+    return (i32)(sign * result);
 }
 
 ENGINE_TO_MOD bool CharacterIsEmpty(const char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r'; } // isspace replacement
@@ -318,7 +318,7 @@ void DoubleToStringFixed(char* dest, double value, int decimalPlaces, size_t buf
         value = -value;
     }
 
-    uint64_t intPart = (uint64_t)value;
+    u64 intPart = (u64)value;
     char temp[32];
     size_t len = 0;
     if (intPart == 0) temp[len++] = '0';
@@ -338,10 +338,10 @@ void DoubleToStringFixed(char* dest, double value, int decimalPlaces, size_t buf
     
     *dest++ = '.';
     bufferSize--;
-    double frac = value - (uint64_t)value;
+    double frac = value - (u64)value;
     double scale = 1.0;
     for (int i = 0; i < decimalPlaces; ++i) scale *= 10.0;
-    uint64_t fracPart = (uint64_t)(frac * scale + 0.5);
+    u64 fracPart = (u64)(frac * scale + 0.5);
     for (int i = decimalPlaces - 1; i >= 0; --i) {
         if (bufferSize < 1) OS_Exit(1);
         dest[i] = '0' + (fracPart % 10);

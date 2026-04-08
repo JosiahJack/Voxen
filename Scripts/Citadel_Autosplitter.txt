@@ -43,7 +43,7 @@ HAPPY SPEEDRUNNING!!
 
 
 The code as it is in mod.h:
-typedef struct __attribute__((packed, aligned(8))) { uint64_t magicNumber; double thisRunTime; bool isLoading; int32_t missionSplitID; } AutoSplitterData;
+typedef struct __attribute__((packed, aligned(8))) { u64 magicNumber; double thisRunTime; bool isLoading; i32 missionSplitID; } AutoSplitterData;
 extern AutoSplitterData autoSplitter;
 
 And citadel.c:

@@ -1,11 +1,11 @@
 #include "mod.h"
 #define LINE_LEN_MAX 81920
 Entity EntityDefinitions[MAX_ENTITIES] = {
-    {.path="chunk_black",.index=0,.modelIndex=178,.cardchunk=true,.texIndex=0,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,1.44f,0.0f},.colliderSize=(Vector3){2.56f,0.32f,2.56f},.colliderMeshIndex=UINT16_MAX},
-    {.path="chunk_blocker",.index=1,.modelIndex=178,.cardchunk=true,.texIndex=1230,.normIndex=160,.specIndex=1230,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,1.44f,0.0f},.colliderSize=(Vector3){2.56f,0.32f,2.56f},.colliderMeshIndex=UINT16_MAX},
-    {.path="chunk_bridg1_1",.index=2,.modelIndex=661,.cardchunk=true,.texIndex=44,.normIndex=43,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,1.54f,0.0f},.colliderSize=(Vector3){2.56f,0.32f,2.56f},.colliderMeshIndex=UINT16_MAX},
-    {.path="chunk_bridg1_1flipx",.index=3,.modelIndex=667,.cardchunk=true,.texIndex=44,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,1.54f,0.0f},.colliderSize=(Vector3){2.56f,0.32f,2.56f},.colliderMeshIndex=UINT16_MAX},
-    {.path="chunk_bridg1_2",.index=4,.modelIndex=662,.cardchunk=true,.texIndex=45,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,1.44f,0.0f},.colliderSize=(Vector3){2.56f,0.32f,2.56f},.colliderMeshIndex=UINT16_MAX},
+    {.path="chunk_black",.index=0,.modelIndex=178,.cardchunk=true,.texIndex=0,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,1.44f,0.0f},.colliderSize=(Vector3){2.56f,0.32f,2.56f},.colliderMeshIndex=U16_MAX},
+    {.path="chunk_blocker",.index=1,.modelIndex=178,.cardchunk=true,.texIndex=1230,.normIndex=160,.specIndex=1230,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,1.44f,0.0f},.colliderSize=(Vector3){2.56f,0.32f,2.56f},.colliderMeshIndex=U16_MAX},
+    {.path="chunk_bridg1_1",.index=2,.modelIndex=661,.cardchunk=true,.texIndex=44,.normIndex=43,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,1.54f,0.0f},.colliderSize=(Vector3){2.56f,0.32f,2.56f},.colliderMeshIndex=U16_MAX},
+    {.path="chunk_bridg1_1flipx",.index=3,.modelIndex=667,.cardchunk=true,.texIndex=44,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,1.54f,0.0f},.colliderSize=(Vector3){2.56f,0.32f,2.56f},.colliderMeshIndex=U16_MAX},
+    {.path="chunk_bridg1_2",.index=4,.modelIndex=662,.cardchunk=true,.texIndex=45,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,1.44f,0.0f},.colliderSize=(Vector3){2.56f,0.32f,2.56f},.colliderMeshIndex=U16_MAX},
     {.path="chunk_bridg1_3",.index=5,.modelIndex=20,.cardchunk=true,.texIndex=47,.collider=COLLIDER_TYPE_MESH,.colliderMeshIndex=20},
     {.path="chunk_bridg1_3_slice45",.index=6,.modelIndex=21,.texIndex=47},
     {.path="chunk_bridg1_3flipx",.index=7,.modelIndex=663,.cardchunk=true,.texIndex=47},
@@ -124,7 +124,7 @@ Entity EntityDefinitions[MAX_ENTITIES] = {
     {.path="chunk_maint1_5",.index=120,.modelIndex=225,.cardchunk=true,.texIndex=443,.glowIndex=442},
     {.path="chunk_maint1_6",.index=121,.modelIndex=226,.cardchunk=true,.texIndex=96},
     {.path="chunk_maint1_7",.index=122,.modelIndex=227,.cardchunk=true,.texIndex=447,.glowIndex=446},
-    {.path="chunk_blockerflightbay",.index=123,.modelIndex=178,.normIndex=160,.texIndex=1230,.specIndex=1242,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,1.44f,0.0f},.colliderSize=(Vector3){2.56f,0.32f,2.56f},.colliderMeshIndex=UINT16_MAX},
+    {.path="chunk_blockerflightbay",.index=123,.modelIndex=178,.normIndex=160,.texIndex=1230,.specIndex=1242,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,1.44f,0.0f},.colliderSize=(Vector3){2.56f,0.32f,2.56f},.colliderMeshIndex=U16_MAX},
     {.path="chunk_maint1_9",.index=124,.modelIndex=606,.cardchunk=true,.texIndex=450},
     {.path="chunk_maint1_9d",.index=125,.modelIndex=620,.cardchunk=true,.texIndex=449,.glowIndex=448},
     {.path="chunk_maint2_1",.index=126,.modelIndex=230,.cardchunk=true,.texIndex=455},
@@ -173,10 +173,10 @@ Entity EntityDefinitions[MAX_ENTITIES] = {
     {.path="chunk_med1_8",.index=169,.modelIndex=268,.cardchunk=true,.texIndex=503,.normIndex=502,.specIndex=1242},
     {.path="chunk_med1_8d",.index=170,.modelIndex=267,.cardchunk=true,.texIndex=501,.normIndex=163,.specIndex=1242},
     {.path="chunk_med1_9",.index=171,.modelIndex=278,.cardchunk=true,.texIndex=507,.normIndex=506,.specIndex=1267},
-    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 172 unused slot
-    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 173 empty
+    {.index=U16_MAX,.modelIndex=MODEL_IDX_MAX}, // 172 unused slot
+    {.index=U16_MAX,.modelIndex=MODEL_IDX_MAX}, // 173 empty
     {.path="chunk_med1_9d",.index=174,.modelIndex=269,.cardchunk=true,.texIndex=505,.normIndex=504,.specIndex=1267},
-    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 175 nothin to see here
+    {.index=U16_MAX,.modelIndex=MODEL_IDX_MAX}, // 175 nothin to see here
     {.path="chunk_med1_9d_ofs112_90",.index=176,.modelIndex=270,.texIndex=505,.normIndex=504,.specIndex=1267,.collider=COLLIDER_TYPE_MESH,.colliderMeshIndex=270},
     {.path="chunk_med1_9d_ofs144_90",.index=177,.modelIndex=272,.texIndex=505,.normIndex=504,.specIndex=1267,.collider=COLLIDER_TYPE_MESH,.colliderMeshIndex=272},
     {.path="chunk_med2_1",.index=178,.modelIndex=280,.cardchunk=true,.texIndex=513,.specIndex=1254,.glowIndex=511,.normIndex=512},
@@ -188,7 +188,7 @@ Entity EntityDefinitions[MAX_ENTITIES] = {
     {.path="chunk_med2_3",.index=184,.modelIndex=286,.cardchunk=true,.texIndex=521,.glowIndex=520,.specIndex=1242},
     {.path="chunk_med2_3d",.index=185,.modelIndex=285,.cardchunk=true,.texIndex=519,.glowIndex=518,.specIndex=1242},
     {.path="chunk_med2_4",.index=186,.modelIndex=287,.cardchunk=true,.texIndex=523,.glowIndex=522,.specIndex=1242},
-    {.path="chunk_med2_5",.index=187,.modelIndex=288,.texIndex=527,.glowIndex=526,.specIndex=539,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,1.44f,0.0f},.colliderSize=(Vector3){2.56f,0.32f,2.56f},.colliderMeshIndex=UINT16_MAX},
+    {.path="chunk_med2_5",.index=187,.modelIndex=288,.texIndex=527,.glowIndex=526,.specIndex=539,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,1.44f,0.0f},.colliderSize=(Vector3){2.56f,0.32f,2.56f},.colliderMeshIndex=U16_MAX},
     {.path="chunk_med2_6",.index=188,.modelIndex=289,.texIndex=528,.specIndex=1271},
     {.path="chunk_med2_7",.index=189,.modelIndex=290,.cardchunk=true,.texIndex=530,.glowIndex=529,.specIndex=1245},
     {.path="chunk_med2_8",.index=190,.modelIndex=291,.cardchunk=true,.texIndex=531,.specIndex=1242},
@@ -287,8 +287,8 @@ Entity EntityDefinitions[MAX_ENTITIES] = {
     {.path="chunk_sec1_1c_slice45",.index=283,.modelIndex=580,.texIndex=786,.specIndex=786},
     {.path="chunk_sec1_1c_slice64highlh",.index=284,.modelIndex=581,.texIndex=786,.specIndex=786},
     {.path="chunk_sec1_1c_slice64highrh",.index=285,.modelIndex=582,.texIndex=786,.specIndex=786},
-    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 286 move along
-    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 287 don't think too much about it
+    {.index=U16_MAX,.modelIndex=MODEL_IDX_MAX}, // 286 move along
+    {.index=U16_MAX,.modelIndex=MODEL_IDX_MAX}, // 287 don't think too much about it
     {.path="chunk_sec1_2",.index=288,.modelIndex=584,.cardchunk=true,.texIndex=789,.specIndex=1233},
     {.path="chunk_sec1_2b",.index=289,.modelIndex=583,.cardchunk=true,.texIndex=788,.specIndex=1233},
     {.path="chunk_sec1_3",.index=290,.modelIndex=585,.cardchunk=true,.texIndex=790,.specIndex=1233},
@@ -365,21 +365,21 @@ Entity EntityDefinitions[MAX_ENTITIES] = {
     {.path="item_logic_probe",.index=361,.modelIndex=217,.texIndex=427,.mass=0.15f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
     {.path="item_healthkit",.index=362,.modelIndex=196,.collider=COLLIDER_TYPE_CONVEXMESH,.colliderMeshIndex=688,.mass=0.25f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
     {.path="item_plastique",.index=363,.modelIndex=492,.mass=1.4f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
-    {.path="item_chipset_interfacedemod",.index=364,.modelIndex=45,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.003744498f,0.0001704991f,0.03192701f},.colliderSize=(Vector3){0.459303f,0.3412231f,0.06385402f},.colliderMeshIndex=UINT16_MAX,.mass=0.3f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="item_chipset_interfacedemod",.index=364,.modelIndex=45,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.003744498f,0.0001704991f,0.03192701f},.colliderSize=(Vector3){0.459303f,0.3412231f,0.06385402f},.colliderMeshIndex=U16_MAX,.mass=0.3f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
     {.path="item_flask",.index=365,.modelIndex=145,.collider=COLLIDER_TYPE_CONVEXMESH,.colliderMeshIndex=685,.texIndex=36,.specIndex=1242,.mass=0.22f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
-    {.path="item_chipset_bitflag",.index=366,.modelIndex=45,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.003744498f,0.0001704991f,0.03192701f},.colliderSize=(Vector3){0.459303f,0.3412231f,0.06385402f},.colliderMeshIndex=UINT16_MAX,.mass=0.3f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="item_chipset_bitflag",.index=366,.modelIndex=45,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.003744498f,0.0001704991f,0.03192701f},.colliderSize=(Vector3){0.459303f,0.3412231f,0.06385402f},.colliderMeshIndex=U16_MAX,.mass=0.3f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
     {.path="item_ammo_rubber",.index=367,.modelIndex=8,.collider=COLLIDER_TYPE_CONVEXMESH,.colliderMeshIndex=676,.mass=0.25f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
     {.path="item_isotopex22",.index=368,.modelIndex=209,.mass=1.2f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
     {.path="item_testtube",.index=369,.modelIndex=622,.texIndex=36,.specIndex=1242,.mass=0.21f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
     {.path="weapon_grenadefrag_live",.index=370,.modelIndex=182,.mass=1.0f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
-    {.path="item_chipset_isolinear",.index=371,.modelIndex=46,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){-0.0009825006f,-0.0129465f,0.0148115f},.colliderSize=(Vector3){0.223635f,0.4175691f,0.02912301f},.colliderMeshIndex=UINT16_MAX,.mass=0.26f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="item_chipset_isolinear",.index=371,.modelIndex=46,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){-0.0009825006f,-0.0129465f,0.0148115f},.colliderSize=(Vector3){0.223635f,0.4175691f,0.02912301f},.colliderMeshIndex=U16_MAX,.mass=0.26f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
     {.path="weapon_grenadeconc_live",.index=372,.modelIndex=165,.mass=1.0f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
-    {.path="item_ammo_needle",.index=373,.modelIndex=4,.texIndex=15,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){-0.0004654949f,0.0004549972f,0.0244365f},.colliderSize=(Vector3){0.131339f,0.1442801f,0.04838703f},.colliderMeshIndex=UINT16_MAX,.mass=0.15f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
-    {.path="item_ammo_tranq",.index=374,.modelIndex=4,.texIndex=27,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){-0.0004654949f,0.0004549972f,0.0244365f},.colliderSize=(Vector3){0.131339f,0.1442801f,0.04838703f},.colliderMeshIndex=UINT16_MAX,.mass=0.15f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
-    {.path="item_ammo_standard",.index=375,.modelIndex=5,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0001984993f,0.0f,0.02172501f},.colliderSize=(Vector3){0.1209471f,0.2176701f,0.04345007f},.colliderMeshIndex=UINT16_MAX,.mass=0.2f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
-    {.path="item_ammo_teflon",.index=376,.modelIndex=5,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0001984993f,0.0f,0.02172501f},.colliderSize=(Vector3){0.1209471f,0.2176701f,0.04345007f},.colliderMeshIndex=UINT16_MAX,.mass=0.2f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
-    {.path="item_ammo_hollow",.index=377,.modelIndex=5,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0002185023f,0.0f,0.02122951f},.colliderSize=(Vector3){0.1423431f,0.2127061f,0.04245907f},.colliderMeshIndex=UINT16_MAX,.mass=0.2f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
-    {.path="item_ammo_slug",.index=378,.modelIndex=3,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0002185023f,0.0f,0.02122951f},.colliderSize=(Vector3){0.1423431f,0.2127061f,0.04245907f},.colliderMeshIndex=UINT16_MAX,.glowIndex=22,.mass=0.2f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="item_ammo_needle",.index=373,.modelIndex=4,.texIndex=15,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){-0.0004654949f,0.0004549972f,0.0244365f},.colliderSize=(Vector3){0.131339f,0.1442801f,0.04838703f},.colliderMeshIndex=U16_MAX,.mass=0.15f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="item_ammo_tranq",.index=374,.modelIndex=4,.texIndex=27,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){-0.0004654949f,0.0004549972f,0.0244365f},.colliderSize=(Vector3){0.131339f,0.1442801f,0.04838703f},.colliderMeshIndex=U16_MAX,.mass=0.15f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="item_ammo_standard",.index=375,.modelIndex=5,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0001984993f,0.0f,0.02172501f},.colliderSize=(Vector3){0.1209471f,0.2176701f,0.04345007f},.colliderMeshIndex=U16_MAX,.mass=0.2f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="item_ammo_teflon",.index=376,.modelIndex=5,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0001984993f,0.0f,0.02172501f},.colliderSize=(Vector3){0.1209471f,0.2176701f,0.04345007f},.colliderMeshIndex=U16_MAX,.mass=0.2f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="item_ammo_hollow",.index=377,.modelIndex=5,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0002185023f,0.0f,0.02122951f},.colliderSize=(Vector3){0.1423431f,0.2127061f,0.04245907f},.colliderMeshIndex=U16_MAX,.mass=0.2f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="item_ammo_slug",.index=378,.modelIndex=3,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0002185023f,0.0f,0.02122951f},.colliderSize=(Vector3){0.1423431f,0.2127061f,0.04245907f},.colliderMeshIndex=U16_MAX,.glowIndex=22,.mass=0.2f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
     {.path="item_ammo_magnesium",.index=379,.modelIndex=3,.collider=COLLIDER_TYPE_CONVEXMESH,.colliderMeshIndex=673,.mass=0.35f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
     {.path="item_ammo_penetrator",.index=380,.modelIndex=3,.collider=COLLIDER_TYPE_CONVEXMESH,.colliderMeshIndex=673,.mass=0.35f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
     {.path="item_ammo_hornet",.index=381,.modelIndex=1,.collider=COLLIDER_TYPE_CONVEXMESH,.colliderMeshIndex=673,.mass=0.35f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
@@ -410,16 +410,16 @@ Entity EntityDefinitions[MAX_ENTITIES] = {
     {.path="line_blaster",.index=406,.modelIndex=638},
     {.path="line_ion",.index=407,.modelIndex=643},
     {.path="line_hopperbeam",.index=408,.modelIndex=MODEL_IDX_MAX},
-    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 409 wut I decided I didn't need these ok
-    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 410
-    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 411
-    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 412
-    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 413
-    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 414
-    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 415
-    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 416
+    {.index=U16_MAX,.modelIndex=MODEL_IDX_MAX}, // 409 wut I decided I didn't need these ok
+    {.index=U16_MAX,.modelIndex=MODEL_IDX_MAX}, // 410
+    {.index=U16_MAX,.modelIndex=MODEL_IDX_MAX}, // 411
+    {.index=U16_MAX,.modelIndex=MODEL_IDX_MAX}, // 412
+    {.index=U16_MAX,.modelIndex=MODEL_IDX_MAX}, // 413
+    {.index=U16_MAX,.modelIndex=MODEL_IDX_MAX}, // 414
+    {.index=U16_MAX,.modelIndex=MODEL_IDX_MAX}, // 415
+    {.index=U16_MAX,.modelIndex=MODEL_IDX_MAX}, // 416
     {.path="item_access_card_perdarcy",.index=417,.modelIndex=0,.texIndex=8,.glowIndex=341,.collider=COLLIDER_TYPE_CONVEXMESH,.colliderMeshIndex=672,.mass=0.2f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
-    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 418
+    {.index=U16_MAX,.modelIndex=MODEL_IDX_MAX}, // 418
     {.path="npc_autobomb",.index=419,.modelIndex=299,.texIndex=542,.glowIndex=541,.mass=1.0f,.linearDrag=0.0f,.angularDrag=1.0f,.gravity=1.0f,.kinematic=true,.dynamicFriction=0.15f,.staticFriction=1.0f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_MUL,.bounceCombine=PHYS_COMBINE_MAX},
     {.path="npc_cyborg_assassin",.index=420,.modelIndex=306,.numclips=8,.animationNum=24,.texIndex=545,.glowIndex=544,.mass=1.5f,.linearDrag=0.0f,.angularDrag=1.5f,.gravity=1.0f,.kinematic=true,.dynamicFriction=0.15f,.staticFriction=1.0f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_MUL,.bounceCombine=PHYS_COMBINE_MAX},
     {.path="npc_avian_mutant",.index=421,.modelIndex=328,.numclips=5,.animationNum=35,.texIndex=568,.mass=2.0f,.linearDrag=0.0f,.angularDrag=1.0f,.gravity=1.0f,.kinematic=true,.dynamicFriction=0.15f,.staticFriction=1.0f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_MUL,.bounceCombine=PHYS_COMBINE_MAX},
@@ -473,11 +473,11 @@ Entity EntityDefinitions[MAX_ENTITIES] = {
     {.path="se_corpse_security",.index=469,.texIndex=136,.specIndex=137,.modelIndex=56},
     {.path="se_corpse_tan",.index=470,.texIndex=138,.modelIndex=57},
     {.path="se_corpse_torso",.index=471,.texIndex=126,.specIndex=127,.modelIndex=58},
-    {.path="se_crate1",.index=472,.texIndex=145,.modelIndex=60,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,0.0f,0.3420931f},.colliderSize=(Vector3){0.684186f,0.6841861f,0.6841861f},.colliderMeshIndex=UINT16_MAX,.mass=0.75f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
-    {.path="se_crate2",.index=473,.texIndex=143,.modelIndex=60,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,0.0f,0.3420931f},.colliderSize=(Vector3){0.684186f,0.6841861f,0.6841861f},.colliderMeshIndex=UINT16_MAX,.mass=0.75f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
-    {.path="se_crate3",.index=474,.texIndex=144,.modelIndex=60,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,0.0f,0.3420931f},.colliderSize=(Vector3){0.684186f,0.6841861f,0.6841861f},.colliderMeshIndex=UINT16_MAX,.mass=0.75f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
-    {.path="se_crate4",.index=475,.texIndex=146,.modelIndex=60,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,0.0f,0.3420931f},.colliderSize=(Vector3){0.684186f,0.6841861f,0.6841861f},.colliderMeshIndex=UINT16_MAX,.mass=2.25f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
-    {.path="se_crate5",.index=476,.modelIndex=60,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,0.0f,0.3420931f},.colliderSize=(Vector3){0.684186f,0.6841861f,0.6841861f},.colliderMeshIndex=UINT16_MAX,.mass=2.25f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="se_crate1",.index=472,.texIndex=145,.modelIndex=60,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,0.0f,0.3420931f},.colliderSize=(Vector3){0.684186f,0.6841861f,0.6841861f},.colliderMeshIndex=U16_MAX,.mass=0.75f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="se_crate2",.index=473,.texIndex=143,.modelIndex=60,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,0.0f,0.3420931f},.colliderSize=(Vector3){0.684186f,0.6841861f,0.6841861f},.colliderMeshIndex=U16_MAX,.mass=0.75f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="se_crate3",.index=474,.texIndex=144,.modelIndex=60,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,0.0f,0.3420931f},.colliderSize=(Vector3){0.684186f,0.6841861f,0.6841861f},.colliderMeshIndex=U16_MAX,.mass=0.75f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="se_crate4",.index=475,.texIndex=146,.modelIndex=60,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,0.0f,0.3420931f},.colliderSize=(Vector3){0.684186f,0.6841861f,0.6841861f},.colliderMeshIndex=U16_MAX,.mass=2.25f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="se_crate5",.index=476,.modelIndex=60,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,0.0f,0.3420931f},.colliderSize=(Vector3){0.684186f,0.6841861f,0.6841861f},.colliderMeshIndex=U16_MAX,.mass=2.25f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
     {.path="sec_camera",.index=477,.modelIndex=589,.texIndex=73,.glowIndex=72},
     {.path="sec_cpunode",.index=478,.modelIndex=587,.texIndex=242,.glowIndex=248},
     {.path="sec_cpunode_small",.index=479,.modelIndex=588,.texIndex=107},
@@ -517,7 +517,7 @@ Entity EntityDefinitions[MAX_ENTITIES] = {
     {.path="door_secret2",.index=513,.modelIndex=0,.numclips=4,.animationNum=18,.texIndex=209},
     {.path="door_secret3",.index=514,.modelIndex=94,.numclips=4,.animationNum=20,.texIndex=211},
     {.path="func_forcebridge",.index=515,.modelIndex=78,.texIndex=38},
-    {.path="prop_lift2",.index=516,.modelIndex=215,.texIndex=155,.glowIndex=154,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,0.0f,0.0f},.colliderSize=(Vector3){1.0f,1.0f,1.0f},.colliderMeshIndex=UINT16_MAX},
+    {.path="prop_lift2",.index=516,.modelIndex=215,.texIndex=155,.glowIndex=154,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,0.0f,0.0f},.colliderSize=(Vector3){1.0f,1.0f,1.0f},.colliderMeshIndex=U16_MAX},
     {.path="func_wall",.index=517,.modelIndex=MODEL_IDX_MAX,.mass=10.0f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=0.0f,.kinematic=true,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
     {.path="BulletHoleLarge",.index=518,.modelIndex=MODEL_IDX_MAX},
     {.path="BulletHoleScorchLarge",.index=519,.modelIndex=MODEL_IDX_MAX},
@@ -525,7 +525,7 @@ Entity EntityDefinitions[MAX_ENTITIES] = {
     {.path="BulletHoleSmall",.index=521,.modelIndex=MODEL_IDX_MAX},
     {.path="BulletHoleTiny",.index=522,.modelIndex=MODEL_IDX_MAX},
     {.path="BulletHoleTinySpread",.index=523,.modelIndex=MODEL_IDX_MAX},
-    {.path="func_door_cyber",.index=524,.modelIndex=178,.texIndex=1224,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,1.31f,0.0f},.colliderSize=(Vector3){2.56f,0.06f,2.56f},.colliderMeshIndex=UINT16_MAX},
+    {.path="func_door_cyber",.index=524,.modelIndex=178,.texIndex=1224,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,1.31f,0.0f},.colliderSize=(Vector3){2.56f,0.06f,2.56f},.colliderMeshIndex=U16_MAX},
     {.path="prop_console01",.index=525,.texIndex=100,.modelIndex=49},
     {.path="prop_console02",.index=526,.texIndex=100,.modelIndex=50},
     {.path="prop_grate1_1",.index=527,.modelIndex=186,.texIndex=359},
@@ -689,17 +689,17 @@ Entity EntityDefinitions[MAX_ENTITIES] = {
     {.path="decal_scorch4",.index=685,.modelIndex=77,.texIndex=230,.shadows=false},
     {.path="decal_scorchtiny",.index=686,.modelIndex=77,.texIndex=232,.shadows=false},
     {.path="decal_blood_splat",.index=687,.modelIndex=77,.texIndex=234,.shadows=false},
-    {.path="func_switch1",.index=688,.modelIndex=609,.texIndex=837,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,0.0f,0.0f},.colliderSize=(Vector3){0.32f,0.04f,0.32f},.colliderMeshIndex=UINT16_MAX},
-    {.path="func_switch2",.index=689,.modelIndex=610,.texIndex=839,.mainSwitchMaterial=839,.altTexIndex=841,.glowIndex=0,.altGlowIndex=840,.changeTexOnActive=true,.blinkTexOnActive=true,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){-0.6088825f,0.0f,0.0001220703f},.colliderSize=(Vector3){1.190795f,16.0f,16.0f},.colliderMeshIndex=UINT16_MAX},
-    {.path="func_switch3",.index=690,.modelIndex=611,.texIndex=842,.altTexIndex=844,.glowIndex=0,.altGlowIndex=843,.changeTexOnActive=true,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){-0.571252f,0.001326527f,-0.001424824f},.colliderSize=(Vector3){0.5f,8.0f,8.0f},.colliderMeshIndex=UINT16_MAX},
-    {.path="func_switch4",.index=691,.modelIndex=612,.texIndex=846,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.06f,0.0f,0.0f},.colliderSize=(Vector3){0.2f,0.64f,0.64f},.colliderMeshIndex=UINT16_MAX},
-    {.path="func_switch5",.index=692,.modelIndex=614,.texIndex=848,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,0.0f,0.0f},.colliderSize=(Vector3){0.64f,0.64f,0.08f},.colliderMeshIndex=UINT16_MAX},
-    {.path="func_switch5broken",.index=693,.modelIndex=613,.texIndex=847,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,0.0f,0.0f},.colliderSize=(Vector3){0.64f,0.64f,0.08f},.colliderMeshIndex=UINT16_MAX},
-    {.path="func_switch7",.index=694,.modelIndex=612,.texIndex=854,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){1.523325f,0.0f,0.0f},.colliderSize=(Vector3){5.020065f,16.0f,16.0f},.colliderMeshIndex=UINT16_MAX},
-    {.path="func_switch8",.index=695,.modelIndex=616,.texIndex=856,.altTexIndex=858,.glowIndex=855,.altGlowIndex=857,.changeTexOnActive=true,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){-1.0f,0.0f,0.0001220703f},.colliderSize=(Vector3){2.0f,16.0f,16.0f},.colliderMeshIndex=UINT16_MAX},
+    {.path="func_switch1",.index=688,.modelIndex=609,.texIndex=837,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,0.0f,0.0f},.colliderSize=(Vector3){0.32f,0.04f,0.32f},.colliderMeshIndex=U16_MAX},
+    {.path="func_switch2",.index=689,.modelIndex=610,.texIndex=839,.mainSwitchMaterial=839,.altTexIndex=841,.glowIndex=0,.altGlowIndex=840,.changeTexOnActive=true,.blinkTexOnActive=true,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){-0.6088825f,0.0f,0.0001220703f},.colliderSize=(Vector3){1.190795f,16.0f,16.0f},.colliderMeshIndex=U16_MAX},
+    {.path="func_switch3",.index=690,.modelIndex=611,.texIndex=842,.altTexIndex=844,.glowIndex=0,.altGlowIndex=843,.changeTexOnActive=true,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){-0.571252f,0.001326527f,-0.001424824f},.colliderSize=(Vector3){0.5f,8.0f,8.0f},.colliderMeshIndex=U16_MAX},
+    {.path="func_switch4",.index=691,.modelIndex=612,.texIndex=846,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.06f,0.0f,0.0f},.colliderSize=(Vector3){0.2f,0.64f,0.64f},.colliderMeshIndex=U16_MAX},
+    {.path="func_switch5",.index=692,.modelIndex=614,.texIndex=848,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,0.0f,0.0f},.colliderSize=(Vector3){0.64f,0.64f,0.08f},.colliderMeshIndex=U16_MAX},
+    {.path="func_switch5broken",.index=693,.modelIndex=613,.texIndex=847,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,0.0f,0.0f},.colliderSize=(Vector3){0.64f,0.64f,0.08f},.colliderMeshIndex=U16_MAX},
+    {.path="func_switch7",.index=694,.modelIndex=612,.texIndex=854,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){1.523325f,0.0f,0.0f},.colliderSize=(Vector3){5.020065f,16.0f,16.0f},.colliderMeshIndex=U16_MAX},
+    {.path="func_switch8",.index=695,.modelIndex=616,.texIndex=856,.altTexIndex=858,.glowIndex=855,.altGlowIndex=857,.changeTexOnActive=true,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){-1.0f,0.0f,0.0001220703f},.colliderSize=(Vector3){2.0f,16.0f,16.0f},.colliderMeshIndex=U16_MAX},
     {.path="func_switchbroken1",.index=696,.modelIndex=617,.texIndex=618},
-    {.path="clip_npc",.index=697,.modelIndex=MODEL_IDX_MAX,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){1.005016f,0.0f,0.0f},.colliderSize=(Vector3){2.010033f,16.0f,16.0f},.colliderMeshIndex=UINT16_MAX},
-    {.path="clip_objects",.index=698,.modelIndex=MODEL_IDX_MAX,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,0.0f,0.0f},.colliderSize=(Vector3){2.56f,2.56f,2.56f},.colliderMeshIndex=UINT16_MAX},
+    {.path="clip_npc",.index=697,.modelIndex=MODEL_IDX_MAX,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){1.005016f,0.0f,0.0f},.colliderSize=(Vector3){2.010033f,16.0f,16.0f},.colliderMeshIndex=U16_MAX},
+    {.path="clip_objects",.index=698,.modelIndex=MODEL_IDX_MAX,.collider=COLLIDER_TYPE_BOX,.colliderCenter=(Vector3){0.0f,0.0f,0.0f},.colliderSize=(Vector3){2.56f,2.56f,2.56f},.colliderMeshIndex=U16_MAX},
     {.path="logic_relay",.index=699,.modelIndex=MODEL_IDX_MAX},
     {.path="logic_branch",.index=700,.modelIndex=MODEL_IDX_MAX},
     {.path="logic_timer",.index=701,.modelIndex=MODEL_IDX_MAX},
@@ -718,7 +718,7 @@ Entity EntityDefinitions[MAX_ENTITIES] = {
     {.path="info_screenshake",.index=714,.modelIndex=MODEL_IDX_MAX},
     {.path="info_spawnpoint",.index=715,.modelIndex=MODEL_IDX_MAX},
     {.path="fx_reverbzone",.index=716,.modelIndex=MODEL_IDX_MAX},
-    {.path="ef_cyber_ice",.index=717,.collider=COLLIDER_TYPE_SPHERE,.colliderCenter=(Vector3){0.0f,0.004354001f,-0.014725f},.colliderSize=(Vector3){1.0f,0.0f,0.0f},.colliderMeshIndex=UINT16_MAX},
+    {.path="ef_cyber_ice",.index=717,.collider=COLLIDER_TYPE_SPHERE,.colliderCenter=(Vector3){0.0f,0.004354001f,-0.014725f},.colliderSize=(Vector3){1.0f,0.0f,0.0f},.colliderMeshIndex=U16_MAX},
     {.path="ef_fragexplosion",.index=718,.modelIndex=MODEL_IDX_MAX},
     {.path="ef_line_sparqbeam",.index=719,.modelIndex=MODEL_IDX_MAX},
     {.path="ef_mist",.index=720,.modelIndex=MODEL_IDX_MAX},
@@ -756,22 +756,22 @@ Entity EntityDefinitions[MAX_ENTITIES] = {
     {.path="chunk_crate_impenetrable4",.index=752,.modelIndex=61,.texIndex=149},
     {.path="npc_sec3_bot",.index=753,.modelIndex=681,.texIndex=553},
     {.path="prop_shieldgenerator",.index=754,.modelIndex=143,.texIndex=316},
-    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 755 cameraview now handled directly in mod code instead of as an entity.
+    {.index=U16_MAX,.modelIndex=MODEL_IDX_MAX}, // 755 cameraview now handled directly in mod code instead of as an entity.
     {.path="ef_particle_leafburst",.index=756,.modelIndex=MODEL_IDX_MAX},
     {.path="ef_particle_mutationburst",.index=757,.modelIndex=MODEL_IDX_MAX},
     {.path="ef_particle_graytationburst",.index=758,.modelIndex=MODEL_IDX_MAX},
-    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 759 stop
-    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 760 judging
-    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 761 me
-    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 762 alright!
-    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 763 I
-    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 764 didn't feel
-    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 765 like
-    {.index=UINT16_MAX,.modelIndex=MODEL_IDX_MAX}, // 766 reordering everything!
+    {.index=U16_MAX,.modelIndex=MODEL_IDX_MAX}, // 759 stop
+    {.index=U16_MAX,.modelIndex=MODEL_IDX_MAX}, // 760 judging
+    {.index=U16_MAX,.modelIndex=MODEL_IDX_MAX}, // 761 me
+    {.index=U16_MAX,.modelIndex=MODEL_IDX_MAX}, // 762 alright!
+    {.index=U16_MAX,.modelIndex=MODEL_IDX_MAX}, // 763 I
+    {.index=U16_MAX,.modelIndex=MODEL_IDX_MAX}, // 764 didn't feel
+    {.index=U16_MAX,.modelIndex=MODEL_IDX_MAX}, // 765 like
+    {.index=U16_MAX,.modelIndex=MODEL_IDX_MAX}, // 766 reordering everything!
     {.path="player",.index=767,.modelIndex=MODEL_IDX_MAX}
 };
 
-static inline __attribute__((always_inline)) uint32_t parse_numberu32(const char* str, const char* line, uint32_t lineNum) {
+static inline __attribute__((always_inline)) u32 parse_numberu32(const char* str, const char* line, u32 lineNum) {
     if (str == 0 || *str == '\0') { DualLogError("Invalid blank string from line[%d]: %s\n", lineNum+1, line); return 0; }
     while (CharacterIsEmpty((char)*str)) str++;
     while (CharacterIsEmpty(*str)) str++;
@@ -784,28 +784,28 @@ static inline __attribute__((always_inline)) uint32_t parse_numberu32(const char
         str++;
     }
 
-    return (uint32_t)result;
+    return (u32)result;
 }
 
-static inline __attribute__((always_inline)) uint16_t parse_numberu16(const char* str, const char* line, uint32_t lineNum) {
-    uint32_t retval = parse_numberu32(str, line, lineNum);
-    if (retval > UINT16_MAX) { DualLogError("Value %u out of range for uint16_t from line[%d]: %s\n", retval, lineNum+1, line); return 0; }
-    return (uint16_t)retval;
+static inline __attribute__((always_inline)) u16 parse_numberu16(const char* str, const char* line, u32 lineNum) {
+    u32 retval = parse_numberu32(str, line, lineNum);
+    if (retval > U16_MAX) { DualLogError("Value %u out of range for u16 from line[%d]: %s\n", retval, lineNum+1, line); return 0; }
+    return (u16)retval;
 }
 
-static inline __attribute__((always_inline)) uint8_t parse_numberu8(const char* str, const char* line, uint32_t lineNum) {
-    uint32_t retval = parse_numberu32(str, line, lineNum);
-    if (retval > UINT8_MAX) { DualLogError("Value %u out of range for uint8_t from line[%d]: %s\n", retval, lineNum+1, line); return 0; }
-    return (uint8_t)retval;
+static inline __attribute__((always_inline)) u8 parse_numberu8(const char* str, const char* line, u32 lineNum) {
+    u32 retval = parse_numberu32(str, line, lineNum);
+    if (retval > U8_MAX) { DualLogError("Value %u out of range for u8 from line[%d]: %s\n", retval, lineNum+1, line); return 0; }
+    return (u8)retval;
 }
 
-static inline __attribute__((always_inline)) bool parse_bool(const char* str, const char* line, uint32_t lineNum) {
-    uint32_t parseval = parse_numberu32(str, line, lineNum);
+static inline __attribute__((always_inline)) bool parse_bool(const char* str, const char* line, u32 lineNum) {
+    u32 parseval = parse_numberu32(str, line, lineNum);
     if (parseval > 1) DualLogWarn("Loaded %u but expected boolean from line[%u]: %s\n",parseval, lineNum+1, line);
     return parseval > 0 ? true : false;
 }
 
-static inline __attribute__((always_inline)) int32_t parse_numberi32(const char* str, const char* line, uint32_t lineNum) {
+static inline __attribute__((always_inline)) i32 parse_numberi32(const char* str, const char* line, u32 lineNum) {
     if (str == 0 || *str == '\0') { DualLogError("Invalid blank string from line[%d]: %s\n", lineNum+1, line); return 0; }
     while (CharacterIsEmpty((char)*str)) str++;
     bool negative = false;
@@ -816,20 +816,20 @@ static inline __attribute__((always_inline)) int32_t parse_numberi32(const char*
         result = result * 10L + (*str - '0');
         str++;
     }
-    return (int32_t)(negative ? -result : result);
+    return (i32)(negative ? -result : result);
 }
-static inline __attribute__((always_inline)) int16_t parse_numberi16(const char* str, const char* line, uint32_t lineNum) {
-    int32_t retval = parse_numberi32(str, line, lineNum);
-    if (retval < INT16_MIN || retval > INT16_MAX) { DualLogError("Value %d out of range for int16_t from line[%d]: %s\n", retval, lineNum+1, line); return 0; }
-    return (int16_t)retval;
+static inline __attribute__((always_inline)) i16 parse_numberi16(const char* str, const char* line, u32 lineNum) {
+    i32 retval = parse_numberi32(str, line, lineNum);
+    if (retval < -32768 || retval > 32767) { DualLogError("Value %d out of range for i16 from line[%d]: %s\n", retval, lineNum+1, line); return 0; }
+    return (i16)retval;
 }
-static inline __attribute__((always_inline)) int8_t parse_numberi8(const char* str, const char* line, uint32_t lineNum) {
-    int32_t retval = parse_numberi32(str, line, lineNum);
-    if (retval < INT8_MIN || retval > INT8_MAX) { DualLogError("Value %d out of range for int8_t from line[%d]: %s\n", retval, lineNum+1, line); return 0; }
-    return (int8_t)retval;
+static inline __attribute__((always_inline)) i8 parse_numberi8(const char* str, const char* line, u32 lineNum) {
+    i32 retval = parse_numberi32(str, line, lineNum);
+    if (retval < -128 || retval > 127) { DualLogError("Value %d out of range for i8 from line[%d]: %s\n", retval, lineNum+1, line); return 0; }
+    return (i8)retval;
 }
 
-static inline __attribute__((always_inline)) float parse_float(const char* str, const char* line, uint32_t lineNum) {
+static inline __attribute__((always_inline)) float parse_float(const char* str, const char* line, u32 lineNum) {
     if (str == 0 || *str == '\0') { DualLogError("Invalid blank string from line[%d]: %s\n", lineNum+1, line); return 0.0f; }
     
     while (CharacterIsEmpty(*str)) str++;
@@ -867,8 +867,8 @@ static inline __attribute__((always_inline)) float parse_float(const char* str, 
 
 #define GEOMETRY_LOD_CARD_MODEL_IDX 178
 MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(void) { // Global conditions for all entities.  No sense inflating the table data in entity.c
-    for (int32_t i = 0; i < MAX_ENTITIES; i++) {
-        if (EntityDefinitions[i].index == UINT16_MAX) continue;
+    for (i32 i = 0; i < MAX_ENTITIES; i++) {
+        if (EntityDefinitions[i].index == U16_MAX) continue;
         
         EntityDefinitions[i].rotation = QUAT_IDENTITY;
         EntityDefinitions[i].lodIndex = MODEL_IDX_MAX;
@@ -890,10 +890,10 @@ MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(void) { // Global condition
     
 }
 
-uint16_t AddInstance(uint16_t entIdx, Vector3 pos) {
+u16 AddInstance(u16 entIdx, Vector3 pos) {
     if (entIdx >= MAX_ENTITIES) { DualLogError("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d, skipped\n",entIdx,MAX_ENTITIES); return INSTANCE_COUNT; }
     
-    uint16_t i = Eng_Global->loadedInstances;
+    u16 i = Eng_Global->loadedInstances;
     Entity* e = &Eng_Global->instances[i];
     e->index = entIdx;
     e->position = pos;
@@ -924,10 +924,10 @@ uint16_t AddInstance(uint16_t entIdx, Vector3 pos) {
     return i;
 }
 
-void DeleteInstance(uint16_t i) {
+void DeleteInstance(u16 i) {
     if (i <= PLAYER2 || i >= Eng_Global->loadedInstances) return; // Don't delete null ent, player 1, nor player 2 or already empty slots.
     
-    uint16_t endInstance = vmax(vmin(INSTANCE_COUNT - 1, Eng_Global->loadedInstances - 1),START_INDEX_LEVEL_INSTANCES);
+    u16 endInstance = vmax(vmin(INSTANCE_COUNT - 1, Eng_Global->loadedInstances - 1),START_INDEX_LEVEL_INSTANCES);
 //     for (;i<endInstance;++i) Eng_Global->instances[i] = Eng_Global->instances[i + 1]; // Shift the entire list down, overwriting the entity we're deleting at starting i
     for (;i<endInstance;++i) __builtin_memcpy(&Eng_Global->instances[i], &Eng_Global->instances[i+1], sizeof(Entity));
     --Eng_Global->loadedInstances; // Shift final marker.  It's history!
@@ -961,11 +961,11 @@ static const LevelBounds levelBoundsTable[13] = {
 //                                            R       1      2      3       4       5       6       7       8       9      10      11     12      13
 static const float levelFarPlane[14] = { 56.32f, 56.32f, 51.2f, 51.2f, 40.96f, 58.88f, 79.36f, 56.32f, 69.12f, 53.76f,  51.2f,  51.2f, 38.4f, 71.68f};
 
-extern uint16_t headmountedLanternLight;
+extern u16 headmountedLanternLight;
 Entity entsFromFile[INSTANCE_COUNT];
 Light lightsFromFile[LIGHT_COUNT];
 LightAnimation lanimsFromFile[LIGHT_COUNT];
-MOD_TO_ENGINE void LoadLevelMod(uint8_t curlevel) {
+MOD_TO_ENGINE void LoadLevelMod(u8 curlevel) {
     Eng_Global->levelCurrentlyLoading = true;
     Eng_Global->currentLevel = curlevel;
     Eng_Global->loadedInstances = 3; // 0 == NULL, 1 == Player1, 2 == Player2
@@ -984,14 +984,14 @@ MOD_TO_ENGINE void LoadLevelMod(uint8_t curlevel) {
     Eng_Global->voxelMinCenterZ = Eng_Global->worldMin_z + VOXEL_HALF;
     if (curlevel >= Eng_Global->numLevels) { DualLogError("Cannot load world geometry, level number %d out of bounds 0 to %d\n", curlevel, Eng_Global->numLevels - 1); return; }
 
-    for (uint16_t idx = START_INDEX_LEVEL_INSTANCES; idx < INSTANCE_COUNT; idx++) { InitializeEntity(&Eng_Global->instances[idx]); Eng_Global->dirtyInstances[idx] = true; }
+    for (u16 idx = START_INDEX_LEVEL_INSTANCES; idx < INSTANCE_COUNT; idx++) { InitializeEntity(&Eng_Global->instances[idx]); Eng_Global->dirtyInstances[idx] = true; }
     __builtin_memset(entsFromFile,0,INSTANCE_COUNT * sizeof(Entity));
     __builtin_memset(lightsFromFile,0,LIGHT_COUNT * sizeof(Light));
     __builtin_memset(lanimsFromFile,0,LIGHT_COUNT * sizeof(LightAnimation));
     for (int i = 0; i < LIGHT_COUNT; ++i) lightsFromFile[i].lflags = LIGHT_AND_SHADOW_ON;
-    uint32_t lineNum = 0;
-    int32_t entCount = -1;  // incremented to 0 on first entity line
-    int32_t lightsIdx = -1; // incremented to 0 on first light line
+    u32 lineNum = 0;
+    i32 entCount = -1;  // incremented to 0 on first entity line
+    i32 lightsIdx = -1; // incremented to 0 on first light line
     char lineSpace[LINE_LEN_MAX];
     char* line = &lineSpace[0];
     char firstKeyCheck[11];
@@ -1135,7 +1135,7 @@ MOD_TO_ENGINE void LoadLevelMod(uint8_t curlevel) {
                 else if (StringsEqual(trimmed_key,"reverseSequence")) inst->texAnimInReverse = parse_bool(trimmed_value,initialLine,lineNum);
                 else if (StringsEqual(trimmed_key,"messageLingdex"))  inst->messageLingdex = parse_numberi16(trimmed_value,initialLine,lineNum);
                 else if (StringsEqual(trimmed_key,"lockedMessageLingdex")) inst->lockedMessageLingdex = parse_numberi16(trimmed_value, initialLine, lineNum);
-                else if (StringsEqual(trimmed_key,"SFXIndex"))        inst->SFXIndex = (int16_t)parse_numberi16(trimmed_value, initialLine, lineNum);
+                else if (StringsEqual(trimmed_key,"SFXIndex"))        inst->SFXIndex = (i16)parse_numberi16(trimmed_value, initialLine, lineNum);
                 else if (StringsEqual(trimmed_key,"requiredAccessCard")) inst->requiredAccessCard = parse_numberi8(trimmed_value, initialLine, lineNum);
                 else if (StringsEqual(trimmed_key,"doorOpenState"))   inst->doorOpen = parse_numberu8(trimmed_value, initialLine, lineNum);
             }
@@ -1148,11 +1148,11 @@ MOD_TO_ENGINE void LoadLevelMod(uint8_t curlevel) {
 
     // --- Commit pass: push all parsed entities through AddInstance ---
     DualLog("Ended level parse with %u entCount\n",entCount);
-    int32_t totalEnts = entCount + 1; uint32_t childrenTotal = 0;
-    for (int32_t e = 0; e < totalEnts; ++e) {
+    i32 totalEnts = entCount + 1; u32 childrenTotal = 0;
+    for (i32 e = 0; e < totalEnts; ++e) {
         Entity* src = &entsFromFile[e];
-        uint16_t entIdx = src->index;
-        uint16_t parent = AddInstance(entIdx,src->position);
+        u16 entIdx = src->index;
+        u16 parent = AddInstance(entIdx,src->position);
         Entity* par = &Eng_Global->instances[parent];
         par->rotation              = src->rotation;
         par->scale                 = src->scale;
@@ -1219,10 +1219,10 @@ MOD_TO_ENGINE void LoadLevelMod(uint8_t curlevel) {
         } else if (par->index == 746) { // weapon_grenadeenergmine_live
             par->textureAnimating = true; par->texAnimClip = 2; par->texFrame = 0;
         } else if (entIdx == 720) {
-            /*uint16_t mist = */AddInstance(648,par->position); // ambient_mist
+            /*u16 mist = */AddInstance(648,par->position); // ambient_mist
         } else if (entIdx == 733) {
-            /*uint16_t pipewater = */AddInstance(649,par->position); // ambient_pipewater_loop
-            /*uint16_t rain = */AddInstance(653,(Vector3){par->position.x,par->position.y - 1.26f,par->position.z}); // ambient_rain
+            /*u16 pipewater = */AddInstance(649,par->position); // ambient_pipewater_loop
+            /*u16 rain = */AddInstance(653,(Vector3){par->position.x,par->position.y - 1.26f,par->position.z}); // ambient_rain
         }
         
         if (par->texAnimResourceFolder[0] != '\0' && par->tickTime <= 0.01f) par->tickTime = 0.35f;
@@ -1234,10 +1234,10 @@ MOD_TO_ENGINE void LoadLevelMod(uint8_t curlevel) {
 
     // Shield generators
     if (curlevel == 1 || curlevel == 2 || curlevel == 5 || curlevel == 6 || curlevel == 7) {
-        uint16_t shd1 = AddInstance(754, (Vector3){-51.30664f,  -47.42f,  56.42651f}); Eng_Global->instances[shd1].rotation = (Quaternion){0.0f,0.0f,0.0f,1.0f};
-        uint16_t shd2 = AddInstance(754, (Vector3){ 71.5f,      -47.42f, -66.6f    }); Eng_Global->instances[shd2].rotation = (Quaternion){0.0f,0.0f,0.0f,1.0f};
-        uint16_t shd3 = AddInstance(754, (Vector3){-51.306650f, -47.42f, -66.66652f}); Eng_Global->instances[shd3].rotation = (Quaternion){0.0f,0.0f,0.0f,1.0f};
-        uint16_t shd4 = AddInstance(754, (Vector3){ 71.78664f,  -47.42f,  56.42651f}); Eng_Global->instances[shd4].rotation = (Quaternion){0.0f,0.0f,0.0f,1.0f};
+        u16 shd1 = AddInstance(754, (Vector3){-51.30664f,  -47.42f,  56.42651f}); Eng_Global->instances[shd1].rotation = (Quaternion){0.0f,0.0f,0.0f,1.0f};
+        u16 shd2 = AddInstance(754, (Vector3){ 71.5f,      -47.42f, -66.6f    }); Eng_Global->instances[shd2].rotation = (Quaternion){0.0f,0.0f,0.0f,1.0f};
+        u16 shd3 = AddInstance(754, (Vector3){-51.306650f, -47.42f, -66.66652f}); Eng_Global->instances[shd3].rotation = (Quaternion){0.0f,0.0f,0.0f,1.0f};
+        u16 shd4 = AddInstance(754, (Vector3){ 71.78664f,  -47.42f,  56.42651f}); Eng_Global->instances[shd4].rotation = (Quaternion){0.0f,0.0f,0.0f,1.0f};
     }
 
     Light hl = (Light){.pos=Eng_Global->instances[PLAYER1].position,.col=(Color3){1.0f,1.0f,1.0f},.range=11.52f,.lflags=LIGHTON,.intensity=0.0f,.minIntensity=0.0f,.maxIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY};

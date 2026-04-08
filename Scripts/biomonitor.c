@@ -234,7 +234,7 @@ static void BiomonitorEnergyPulse(float take) {
 }
 #pragma GCC diagnostic pop
 
-void BioMonitorUpdate(uint16_t p) {
+void BioMonitorUpdate(u16 p) {
     InventorySystem* inv = Inv(p);
     if (!(inv->hasHardware & HW_BIO) || !(inv->hardwareIsActive & HW_BIO)) return;
 

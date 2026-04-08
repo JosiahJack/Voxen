@@ -1,31 +1,24 @@
 // physics.c - Physics
 #include "voxen.h"
 #include <malloc.h>
-extern uint16_t loadedModelsMaxIndex; extern float modelBounds[MODEL_IDX_MAX]; extern uint8_t** modelVertices; extern uint16_t** modelTriangles;
-extern uint32_t modelVertexCounts[MODEL_IDX_MAX]; extern uint16_t modelTriangleCounts[MODEL_IDX_MAX];
+typedef __builtin_va_list va_list;
+extern u16 loadedModelsMaxIndex; extern float modelBounds[MODEL_IDX_MAX]; extern u8** modelVertices; extern u16** modelTriangles;
+extern u32 modelVertexCounts[MODEL_IDX_MAX]; extern u16 modelTriangleCounts[MODEL_IDX_MAX];
 extern float modelMatrices[INSTANCE_COUNT * 16];
-typedef uint16_t half;
+typedef u16 half;
 static inline float half_to_float(half h){
-    uint32_t s = (h & 0x8000) << 16;
-    uint32_t e = (h & 0x7C00) >> 10;
-    uint32_t m = (h & 0x03FF);
-    uint32_t out;
+    u32 s=(h&0x8000)<<16,e=(h&0x7C00)>>10,m=(h&0x03FF),out;
     if (e == 0){
-        if (m == 0){
-            out = s;
-        } else { // normalize subnormal
+        if (m == 0) out = s;
+        else { // normalize subnormal
             e = 1;
             while ((m & 0x0400) == 0) { m <<= 1; e--; }
             m &= 0x03FF;
             e = e + (127 - 15);
             out = s | (e << 23) | (m << 13);
         }
-    } else if (e == 31){
-        out = s | 0x7F800000 | (m << 13);
-    } else {
-        e = e + (127 - 15);
-        out = s | (e << 23) | (m << 13);
-    }
+    } else if (e == 31) out = s | 0x7F800000 | (m << 13);
+    else { e = e + (127 - 15); out = s | (e << 23) | (m << 13); }
  
     float f;
     __builtin_memcpy(&f, &out, 4);
@@ -81,7 +74,7 @@ static inline Vector3 ClosestPointOnTriangle(Vector3 a, Vector3 b, Vector3 c, Ve
     return result;
 }
  
-static uint32_t GetCollisionMask(uint32_t layer) {
+static u32 GetCollisionMask(u32 layer) {
     switch (layer) {
         case PhysicsLayer_Default:           return PhysicsLayer_Default | PhysicsLayer_TransparentFX | PhysicsLayer_IgnoreRaycast | PhysicsLayer_Geometry | PhysicsLayer_NPC | PhysicsLayer_PlayerBullets | PhysicsLayer_Player | PhysicsLayer_Corpse | PhysicsLayer_PhysObjects | PhysicsLayer_Sky | PhysicsLayer_Trigger | PhysicsLayer_Door | PhysicsLayer_InterDebris | PhysicsLayer_Player2 | PhysicsLayer_Player3 | PhysicsLayer_Player4 | PhysicsLayer_NPCBullet | PhysicsLayer_Clip | PhysicsLayer_CorpseSearchable;
         case PhysicsLayer_TransparentFX:     return PhysicsLayer_Default | PhysicsLayer_TransparentFX | PhysicsLayer_IgnoreRaycast | PhysicsLayer_Geometry | PhysicsLayer_NPC | PhysicsLayer_PlayerBullets | PhysicsLayer_Player | PhysicsLayer_PhysObjects | PhysicsLayer_Trigger | PhysicsLayer_Door | PhysicsLayer_InterDebris | PhysicsLayer_Player2 | PhysicsLayer_NPCBullet | PhysicsLayer_Clip;
@@ -126,36 +119,21 @@ static uint32_t GetCollisionMask(uint32_t layer) {
 typedef struct { Vector3 center; Vector3 halfExtents; Quaternion rot; } ShapeBox;
 typedef struct { Vector3 center; float radius; }                        ShapeSphere;
 typedef struct { Vector3 tip,base; float radius; }                      ShapeCapsule;
- 
-// ─── cell-neighbor broadphase helpers ────────────────────────────────────────
-// Objects are guaranteed <= CELL_SIZE (2.56f) on any axis, so only the 3x3
-// neighbourhood of cells needs to be checked to find all potential pairs.
-// We use the XZ cell grid as the broadphase; Y is not cell-partitioned.
-#define CELL_SIZE 2.56f
- 
-static inline int32_t CellX(float wx) { return PosGetCellCoordX(wx); }
-static inline int32_t CellZ(float wz) { return PosGetCellCoordZ(wz); }
-static inline uint16_t CellIndex(int32_t cx, int32_t cz) { return (uint16_t)((cz * WORLDX) + cx); }
+static inline u16 CellIndex(i32 cx, i32 cz) { return (u16)((cz * WORLDX) + cx); }
  
 typedef struct { Vector3 center; Vector3 halfExtents; Quaternion rot; } OBB;
 static inline void obb_axes(Quaternion q,Vector3 *ax,Vector3 *ay,Vector3 *az) { *ax = quat_rotate_vector(q,(Vector3){1,0,0}); *ay = quat_rotate_vector(q,(Vector3){0,1,0}); *az = quat_rotate_vector(q,(Vector3){0,0,1}); }
 static inline float obb_project(ShapeBox b,Vector3 axis) {
     Vector3 ax,ay,az; obb_axes(b.rot,&ax,&ay,&az);
-    return b.halfExtents.x*vabs(dot_vector3(ax,axis))
-         + b.halfExtents.y*vabs(dot_vector3(ay,axis))
-         + b.halfExtents.z*vabs(dot_vector3(az,axis));
+    return b.halfExtents.x*vabs(dot_vector3(ax,axis)) + b.halfExtents.y*vabs(dot_vector3(ay,axis)) + b.halfExtents.z*vabs(dot_vector3(az,axis));
 }
 static inline Vector3 closest_point_obb(ShapeBox box,Vector3 p) {
     Vector3 ax,ay,az; obb_axes(box.rot,&ax,&ay,&az);
     Vector3 d = Vector3_A_minus_B(p,box.center);
-    float tx = vclamp(dot_vector3(d,ax),-box.halfExtents.x,box.halfExtents.x);
-    float ty = vclamp(dot_vector3(d,ay),-box.halfExtents.y,box.halfExtents.y);
-    float tz = vclamp(dot_vector3(d,az),-box.halfExtents.z,box.halfExtents.z);
-    return Vector3_A_plus_B(box.center,
-        Vector3_A_plus_B(Vector3_A_plus_B(scale_vector3(ax,tx),scale_vector3(ay,ty)),scale_vector3(az,tz)));
+    float tx=vclamp(dot_vector3(d,ax),-box.halfExtents.x,box.halfExtents.x),ty=vclamp(dot_vector3(d,ay),-box.halfExtents.y,box.halfExtents.y),tz=vclamp(dot_vector3(d,az),-box.halfExtents.z,box.halfExtents.z);
+    return Vector3_A_plus_B(box.center,Vector3_A_plus_B(Vector3_A_plus_B(scale_vector3(ax,tx),scale_vector3(ay,ty)),scale_vector3(az,tz)));
 }
-static inline float seg_seg_closest(Vector3 p,Vector3 q,Vector3 a,Vector3 b,
-                                    Vector3 *cpPQ,Vector3 *cpAB) {
+static inline float seg_seg_closest(Vector3 p,Vector3 q,Vector3 a,Vector3 b, Vector3 *cpPQ,Vector3 *cpAB) {
     Vector3 d1=Vector3_A_minus_B(q,p), d2=Vector3_A_minus_B(b,a), r=Vector3_A_minus_B(p,a);
     float e=dot_vector3(d2,d2), f=dot_vector3(d2,r);
     float s,t;
@@ -186,14 +164,14 @@ typedef struct {
  
 #define MAX_CONTACTS_PER_PAIR 4
 typedef struct {
-    uint16_t idxA,idxB;
-    uint8_t  count;
+    u16 idxA,idxB;
+    u8  count;
     Contact  contacts[MAX_CONTACTS_PER_PAIR];
 } ContactManifold;
  
 #define MAX_MANIFOLDS 2048
 ContactManifold g_manifolds[MAX_MANIFOLDS];
-uint16_t        g_manifoldCount = 0;
+u16        g_manifoldCount = 0;
  
 // ─── narrowphase: sphere–sphere ───────────────────────────────────────────────
 static bool TestSphereSphere(ShapeSphere a,ShapeSphere b,Contact *c) {
@@ -313,13 +291,13 @@ static inline void Entity_GetSphere(const Entity *e,ShapeSphere *out) {
 // Matches the proven pattern in QueryCapsuleContact.  Contact normal and depth
 // are transformed back to world space identically to that function.
 #define MAX_MESH_CONTACTS MAX_CONTACTS_PER_PAIR
-static uint32_t g_meshContactCount;
+static u32 g_meshContactCount;
 static Contact  g_meshContacts[MAX_MESH_CONTACTS];
  
-static void TestSphereMeshInstance(ShapeSphere ws, uint16_t instanceIdx) {
-    uint16_t mi = Sys_Global.instances[instanceIdx].modelIndex;
+static void TestSphereMeshInstance(ShapeSphere ws, u16 instanceIdx) {
+    u16 mi = Sys_Global.instances[instanceIdx].modelIndex;
     if (mi >= loadedModelsMaxIndex) return;
-    uint32_t triCount = modelTriangleCounts[mi];
+    u32 triCount = modelTriangleCounts[mi];
     if (!triCount) return;
  
     float M[16]; __builtin_memcpy(M, &modelMatrices[instanceIdx * 16], 64);
@@ -335,10 +313,10 @@ static void TestSphereMeshInstance(ShapeSphere ws, uint16_t instanceIdx) {
     float minScl=sx; if(sy<minScl)minScl=sy; if(sz<minScl)minScl=sz;
     float localR = ws.radius / minScl;
  
-    for (uint32_t j = 0; j < triCount && g_meshContactCount < MAX_MESH_CONTACTS; ++j) {
-        uint32_t bA=(uint32_t)modelTriangles[mi][j*3+0]*VERTEX_ATTRIBUTES_SIZE;
-        uint32_t bB=(uint32_t)modelTriangles[mi][j*3+1]*VERTEX_ATTRIBUTES_SIZE;
-        uint32_t bC=(uint32_t)modelTriangles[mi][j*3+2]*VERTEX_ATTRIBUTES_SIZE;
+    for (u32 j = 0; j < triCount && g_meshContactCount < MAX_MESH_CONTACTS; ++j) {
+        u32 bA=(u32)modelTriangles[mi][j*3+0]*VERTEX_ATTRIBUTES_SIZE;
+        u32 bB=(u32)modelTriangles[mi][j*3+1]*VERTEX_ATTRIBUTES_SIZE;
+        u32 bC=(u32)modelTriangles[mi][j*3+2]*VERTEX_ATTRIBUTES_SIZE;
         Vector3 A={half_to_float(*(half*)(modelVertices[mi]+bA+0)),half_to_float(*(half*)(modelVertices[mi]+bA+2)),half_to_float(*(half*)(modelVertices[mi]+bA+4))};
         Vector3 B={half_to_float(*(half*)(modelVertices[mi]+bB+0)),half_to_float(*(half*)(modelVertices[mi]+bB+2)),half_to_float(*(half*)(modelVertices[mi]+bB+4))};
         Vector3 C={half_to_float(*(half*)(modelVertices[mi]+bC+0)),half_to_float(*(half*)(modelVertices[mi]+bC+2)),half_to_float(*(half*)(modelVertices[mi]+bC+4))};
@@ -372,7 +350,7 @@ static void TestSphereMeshInstance(ShapeSphere ws, uint16_t instanceIdx) {
     }
 }
  
-static void TestCapsuleMeshInstance(ShapeCapsule cap, uint16_t instanceIdx) {
+static void TestCapsuleMeshInstance(ShapeCapsule cap, u16 instanceIdx) {
     for (int i = 0; i <= 4 && g_meshContactCount < MAX_MESH_CONTACTS; ++i) {
         float t = (float)i * 0.25f;
         Vector3 sp = Vector3_A_plus_B(cap.base, scale_vector3(Vector3_A_minus_B(cap.tip,cap.base), t));
@@ -382,12 +360,12 @@ static void TestCapsuleMeshInstance(ShapeCapsule cap, uint16_t instanceIdx) {
 }
  
 // ─── manifold generation ──────────────────────────────────────────────────────
-static ContactManifold* GenerateManifold(uint16_t idxA,uint16_t idxB) {
+static ContactManifold* GenerateManifold(u16 idxA,u16 idxB) {
     Entity *eA=&Sys_Global.instances[idxA], *eB=&Sys_Global.instances[idxB];
     ColliderType ctA=eA->collider, ctB=eB->collider;
  
     ContactManifold *m=NULL;
-    for (uint16_t i=0;i<g_manifoldCount;++i)
+    for (u16 i=0;i<g_manifoldCount;++i)
         if ((g_manifolds[i].idxA==idxA && g_manifolds[i].idxB==idxB) ||
             (g_manifolds[i].idxA==idxB && g_manifolds[i].idxB==idxA)) { m=&g_manifolds[i]; break; }
     if (!m) {
@@ -414,7 +392,7 @@ static ContactManifold* GenerateManifold(uint16_t idxA,uint16_t idxB) {
                 TestSphereMeshInstance(cs,idxB);
             }
         }
-        for (uint32_t i=0;i<g_meshContactCount && m->count<MAX_CONTACTS_PER_PAIR;++i) {
+        for (u32 i=0;i<g_meshContactCount && m->count<MAX_CONTACTS_PER_PAIR;++i) {
             float prevLN=0.0f,prevLT=0.0f;
             for (int k=0;k<(int)m->count;++k)
                 if (dist_sq_vector3(m->contacts[k].pointWorld,g_meshContacts[i].pointWorld)<0.01f)
@@ -514,10 +492,10 @@ static void SolveContact(ContactManifold *m,float dt) {
 }
  
 // ─── speculative pre-clamp ───────────────────────────────────────────────────
-static void SpeculativePreClamp(uint16_t idxA,float dt) {
+static void SpeculativePreClamp(u16 idxA,float dt) {
     Entity *eA=&Sys_Global.instances[idxA];
     if (entity_invmass(eA)<1e-10f) return;
-    for (uint16_t m=0;m<g_manifoldCount;++m) {
+    for (u16 m=0;m<g_manifoldCount;++m) {
         ContactManifold *mf=&g_manifolds[m];
         if (mf->idxA!=idxA && mf->idxB!=idxA) continue;
         for (int ci=0;ci<(int)mf->count;++ci) {
@@ -539,39 +517,39 @@ static void SpeculativePreClamp(uint16_t idxA,float dt) {
 // neighbourhood (9 cells) around a dynamic object needs to be searched.
 // Static vs static pairs are skipped.  j<i dedup is done for dynamic–dynamic.
 #define MAX_PAIRS 4096
-static uint16_t g_pairA[MAX_PAIRS], g_pairB[MAX_PAIRS];
-static uint16_t g_pairCount;
+static u16 g_pairA[MAX_PAIRS], g_pairB[MAX_PAIRS];
+static u16 g_pairCount;
  
 // Per-cell instance list — rebuilt each broadphase tick.
 // Sized for the world grid; cells hold up to 32 instances before overflow
 // (overflow falls back to checking without the spatial index).
 #define CELL_BUCKET_MAX 32
 typedef struct {
-    uint16_t count;
-    uint16_t idx[CELL_BUCKET_MAX];
+    u16 count;
+    u16 idx[CELL_BUCKET_MAX];
 } CellBucket;
 static CellBucket g_cellBuckets[ARRSIZE]; // zero-initialised by BSS
  
 static void CollectBroadphasePairs(void) {
     g_pairCount = 0;
-    uint16_t n = Sys_Global.loadedInstances;
+    u16 n = Sys_Global.loadedInstances;
  
     // Clear only the cells that were touched last frame — O(instances) not O(grid).
     // We track which cells were written so we can clear them without a full memset.
-    static uint16_t g_dirtyCells[INSTANCE_COUNT];
-    static uint16_t g_dirtyCellCount = 0;
-    for (uint16_t d = 0; d < g_dirtyCellCount; ++d)
+    static u16 g_dirtyCells[INSTANCE_COUNT];
+    static u16 g_dirtyCellCount = 0;
+    for (u16 d = 0; d < g_dirtyCellCount; ++d)
         g_cellBuckets[g_dirtyCells[d]].count = 0;
     g_dirtyCellCount = 0;
  
     // Build cell buckets for ALL active, collideable instances (dynamic and static).
-    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < n; ++i) {
+    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < n; ++i) {
         Entity *e = &Sys_Global.instances[i];
         if (!(e->entflags & ENTFLAG_ACTIVE))    continue;
         if (  e->collider == COLLIDER_TYPE_NONE) continue;
-        int32_t cx = CellX(e->position.x), cz = CellZ(e->position.z);
+        i32 cx = PosGetCellCoordX(e->position.x), cz = PosGetCellCoordZ(e->position.z);
         if (cx < 0 || cx >= WORLDX || cz < 0 || cz >= WORLDZ) continue;
-        uint16_t ci = CellIndex(cx, cz);
+        u16 ci = CellIndex(cx, cz);
         CellBucket *b = &g_cellBuckets[ci];
         if (b->count == 0) {
             if (g_dirtyCellCount < INSTANCE_COUNT) g_dirtyCells[g_dirtyCellCount++] = ci;
@@ -580,25 +558,25 @@ static void CollectBroadphasePairs(void) {
     }
  
     // Collect pairs: for each awake rigidbody, check its 3×3 neighbourhood.
-    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < n; ++i) {
+    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < n; ++i) {
         Entity *eA = &Sys_Global.instances[i];
         if (!(eA->entflags & ENTFLAG_ACTIVE))    continue;
         if (!(eA->entflags & ENTFLAG_RIGIDBODY)) continue;
         if (  eA->entflags & ENTFLAG_ASLEEP)      continue;
         if (  eA->collider == COLLIDER_TYPE_NONE)  continue;
  
-        int32_t acx = CellX(eA->position.x), acz = CellZ(eA->position.z);
-        uint32_t maskA = GetCollisionMask(eA->layer);
+        i32 acx = PosGetCellCoordX(eA->position.x), acz = PosGetCellCoordZ(eA->position.z);
+        u32 maskA = GetCollisionMask(eA->layer);
  
-        for (int32_t dz = -1; dz <= 1; ++dz) {
-            int32_t ncz = acz + dz;
+        for (i32 dz = -1; dz <= 1; ++dz) {
+            i32 ncz = acz + dz;
             if (ncz < 0 || ncz >= WORLDZ) continue;
-            for (int32_t dx = -1; dx <= 1; ++dx) {
-                int32_t ncx = acx + dx;
+            for (i32 dx = -1; dx <= 1; ++dx) {
+                i32 ncx = acx + dx;
                 if (ncx < 0 || ncx >= WORLDX) continue;
                 CellBucket *b = &g_cellBuckets[CellIndex(ncx, ncz)];
-                for (uint16_t bi = 0; bi < b->count; ++bi) {
-                    uint16_t j = b->idx[bi];
+                for (u16 bi = 0; bi < b->count; ++bi) {
+                    u16 j = b->idx[bi];
                     if (j == i) continue;
                     Entity *eB = &Sys_Global.instances[j];
                     if (!(eB->entflags & ENTFLAG_ACTIVE))    continue;
@@ -616,9 +594,9 @@ pairs_full:;
 }
  
 // ─── sleep system ─────────────────────────────────────────────────────────────
-static uint8_t g_sleepCounter[INSTANCE_COUNT];
+static u8 g_sleepCounter[INSTANCE_COUNT];
  
-static void UpdateSleep(uint16_t i,float dt) {
+static void UpdateSleep(u16 i,float dt) {
     Entity *e=&Sys_Global.instances[i];
     (void)dt;
     if (entity_invmass(e)<1e-10f) return;
@@ -645,7 +623,7 @@ static inline Quaternion IntegrateRotation(Quaternion q,Vector3 omega,float dt) 
     float invLen=1.0f/vsqrtf(q.x*q.x+q.y*q.y+q.z*q.z+q.w*q.w);
     return (Quaternion){q.x*invLen,q.y*invLen,q.z*invLen,q.w*invLen};
 }
-static void IntegrateAngularVelocity(uint16_t i,float dt) {
+static void IntegrateAngularVelocity(u16 i,float dt) {
     Entity *e=&Sys_Global.instances[i];
     if (!(e->entflags & ENTFLAG_RIGIDBODY)) return;
     if (  e->entflags & ENTFLAG_ASLEEP)     return;
@@ -671,27 +649,27 @@ void Physics_PrimitiveStep(float dt) {
     }
  
     CollectBroadphasePairs();
-    for (uint16_t m=0;m<g_manifoldCount;) {
+    for (u16 m=0;m<g_manifoldCount;) {
         bool found=false;
-        for (uint16_t p=0;p<g_pairCount;++p)
+        for (u16 p=0;p<g_pairCount;++p)
             if ((g_manifolds[m].idxA==g_pairA[p] && g_manifolds[m].idxB==g_pairB[p]) ||
                 (g_manifolds[m].idxA==g_pairB[p] && g_manifolds[m].idxB==g_pairA[p]))
                 { found=true; break; }
         if (!found) { g_manifolds[m]=g_manifolds[--g_manifoldCount]; }
         else ++m;
     }
-    for (uint16_t p=0;p<g_pairCount;++p) GenerateManifold(g_pairA[p],g_pairB[p]);
+    for (u16 p=0;p<g_pairCount;++p) GenerateManifold(g_pairA[p],g_pairB[p]);
  
-    for (uint16_t i=START_INDEX_LEVEL_INSTANCES;i<Sys_Global.loadedInstances;++i)
+    for (u16 i=START_INDEX_LEVEL_INSTANCES;i<Sys_Global.loadedInstances;++i)
         if (Sys_Global.instances[i].entflags & ENTFLAG_RIGIDBODY) SpeculativePreClamp(i,dt);
  
     for (int iter=0;iter<SOLVER_ITERATIONS;++iter)
-        for (uint16_t m=0;m<g_manifoldCount;++m) SolveContact(&g_manifolds[m],dt);
+        for (u16 m=0;m<g_manifoldCount;++m) SolveContact(&g_manifolds[m],dt);
  
-    for (uint16_t i=START_INDEX_LEVEL_INSTANCES;i<Sys_Global.loadedInstances;++i)
+    for (u16 i=START_INDEX_LEVEL_INSTANCES;i<Sys_Global.loadedInstances;++i)
         if (Sys_Global.instances[i].entflags & ENTFLAG_RIGIDBODY) IntegrateAngularVelocity(i,dt);
  
-    for (uint16_t i=START_INDEX_LEVEL_INSTANCES;i<Sys_Global.loadedInstances;++i)
+    for (u16 i=START_INDEX_LEVEL_INSTANCES;i<Sys_Global.loadedInstances;++i)
         if (Sys_Global.instances[i].entflags & ENTFLAG_RIGIDBODY) UpdateSleep(i,dt);
 }
  
@@ -711,7 +689,7 @@ static inline float DefaultInertia(const Entity *e) {
     float hx=e->colliderSize.x*0.5f,hy=e->colliderSize.y*0.5f,hz=e->colliderSize.z*0.5f;
     return m*(hx*hx+hy*hy+hz*hz)*(1.0f/3.0f);
 }
-void Physics_InitEntityInertia(uint16_t idx) {
+void Physics_InitEntityInertia(u16 idx) {
     Entity *e=&Sys_Global.instances[idx];
     if (e->inertia<0.0001f) e->inertia=DefaultInertia(e);
 }
@@ -772,7 +750,7 @@ static void DebugDrawCapsule(ShapeCapsule cap) {
 }
  
 // ── per-instance collider wireframe ──────────────────────────────────────────
-static void DebugDrawCollider(uint16_t idx, float r, float g, float b) {
+static void DebugDrawCollider(u16 idx, float r, float g, float b) {
     Entity *e = &Sys_Global.instances[idx];
     SetDebugLineColor(r, g, b);
     switch (e->collider) {
@@ -796,18 +774,18 @@ static void DebugDrawCollider(uint16_t idx, float r, float g, float b) {
             // For mesh colliders draw the actual triangles as wireframe edges.
             // Limited to the model's triangle list — identical fetch path to
             // QueryCapsuleContact so it shows exactly what the collision uses.
-            uint16_t mi = e->modelIndex;
+            u16 mi = e->modelIndex;
             if (mi >= loadedModelsMaxIndex) break;
-            uint32_t tc = modelTriangleCounts[mi];
+            u32 tc = modelTriangleCounts[mi];
             float M[16]; __builtin_memcpy(M, &modelMatrices[idx*16], 64);
             float m00=M[0],m10=M[1],m20=M[2],m01=M[4],m11=M[5],m21=M[6],m02=M[8],m12=M[9],m22=M[10];
             float tx=M[12],ty=M[13],tz=M[14];
             // Cap triangle wireframe to avoid flooding the debug buffer on huge meshes.
-            uint32_t step = (tc > 256) ? (tc / 256) : 1;
-            for (uint32_t j=0; j<tc; j+=step) {
-                uint32_t bA=(uint32_t)modelTriangles[mi][j*3+0]*VERTEX_ATTRIBUTES_SIZE;
-                uint32_t bB=(uint32_t)modelTriangles[mi][j*3+1]*VERTEX_ATTRIBUTES_SIZE;
-                uint32_t bC=(uint32_t)modelTriangles[mi][j*3+2]*VERTEX_ATTRIBUTES_SIZE;
+            u32 step = (tc > 256) ? (tc / 256) : 1;
+            for (u32 j=0; j<tc; j+=step) {
+                u32 bA=(u32)modelTriangles[mi][j*3+0]*VERTEX_ATTRIBUTES_SIZE;
+                u32 bB=(u32)modelTriangles[mi][j*3+1]*VERTEX_ATTRIBUTES_SIZE;
+                u32 bC=(u32)modelTriangles[mi][j*3+2]*VERTEX_ATTRIBUTES_SIZE;
                 Vector3 lA={half_to_float(*(half*)(modelVertices[mi]+bA+0)),half_to_float(*(half*)(modelVertices[mi]+bA+2)),half_to_float(*(half*)(modelVertices[mi]+bA+4))};
                 Vector3 lB={half_to_float(*(half*)(modelVertices[mi]+bB+0)),half_to_float(*(half*)(modelVertices[mi]+bB+2)),half_to_float(*(half*)(modelVertices[mi]+bB+4))};
                 Vector3 lC={half_to_float(*(half*)(modelVertices[mi]+bC+0)),half_to_float(*(half*)(modelVertices[mi]+bC+2)),half_to_float(*(half*)(modelVertices[mi]+bC+4))};
@@ -844,15 +822,15 @@ static void DebugDrawManifoldNormals(const ContactManifold *m) {
 // No heap allocation — uses fixed arrays sized to MAX_MANIFOLDS.
  
 #define MAX_DEBUG_MANIFOLD_IDS MAX_MANIFOLDS
-static uint32_t g_prevManifoldIDs[MAX_DEBUG_MANIFOLD_IDS]; // packed (idxA<<16)|idxB
-static uint16_t g_prevManifoldCount = 0;
+static u32 g_prevManifoldIDs[MAX_DEBUG_MANIFOLD_IDS]; // packed (idxA<<16)|idxB
+static u16 g_prevManifoldCount = 0;
  
 // Pack a pair into a canonical ID regardless of A/B order.
-static inline uint32_t ManifoldID(uint16_t a, uint16_t b) {
-    return (a < b) ? ((uint32_t)a << 16) | b : ((uint32_t)b << 16) | a;
+static inline u32 ManifoldID(u16 a, u16 b) {
+    return (a < b) ? ((u32)a << 16) | b : ((u32)b << 16) | a;
 }
-static inline bool IDInPrevSet(uint32_t id) {
-    for (uint16_t i = 0; i < g_prevManifoldCount; ++i)
+static inline bool IDInPrevSet(u32 id) {
+    for (u16 i = 0; i < g_prevManifoldCount; ++i)
         if (g_prevManifoldIDs[i] == id) return true;
     return false;
 }
@@ -860,25 +838,25 @@ static inline bool IDInPrevSet(uint32_t id) {
 void Physics_DrawDebug(void) {
     if (Sys_Global.physicsDebug <= 0) return;
  
-    uint16_t n = Sys_Global.loadedInstances;
+    u16 n = Sys_Global.loadedInstances;
  
     // ── 1. Build set of active manifold IDs this frame ────────────────────────
-    uint32_t curIDs[MAX_DEBUG_MANIFOLD_IDS];
-    uint16_t curCount = 0;
-    for (uint16_t m = 0; m < g_manifoldCount && curCount < MAX_DEBUG_MANIFOLD_IDS; ++m)
+    u32 curIDs[MAX_DEBUG_MANIFOLD_IDS];
+    u16 curCount = 0;
+    for (u16 m = 0; m < g_manifoldCount && curCount < MAX_DEBUG_MANIFOLD_IDS; ++m)
         curIDs[curCount++] = ManifoldID(g_manifolds[m].idxA, g_manifolds[m].idxB);
  
     // ── 2. Identify which instance indices are in contact (stay vs enter) ─────
     // staySet / enterSet: bitmask or parallel array — use a small flag array.
     // INSTANCE_COUNT <= 7680, so a byte array is 7.5 KB — fine on stack for debug.
     // Use 0=idle, 1=stay, 2=enter.
-    static uint8_t g_contactState[INSTANCE_COUNT]; // 0=idle,1=stay,2=enter
+    static u8 g_contactState[INSTANCE_COUNT]; // 0=idle,1=stay,2=enter
     __builtin_memset(g_contactState, 0, n); // only clear loaded range
  
-    for (uint16_t m = 0; m < g_manifoldCount; ++m) {
-        uint16_t a = g_manifolds[m].idxA, b = g_manifolds[m].idxB;
-        uint32_t id = ManifoldID(a, b);
-        uint8_t state = IDInPrevSet(id) ? 1 : 2; // 1=stay, 2=enter
+    for (u16 m = 0; m < g_manifoldCount; ++m) {
+        u16 a = g_manifolds[m].idxA, b = g_manifolds[m].idxB;
+        u32 id = ManifoldID(a, b);
+        u8 state = IDInPrevSet(id) ? 1 : 2; // 1=stay, 2=enter
         // Only flag dynamic objects (kinematic/static don't need enter/stay colouring)
         if (Sys_Global.instances[a].entflags & ENTFLAG_RIGIDBODY) {
             if (state > g_contactState[a]) g_contactState[a] = state;
@@ -889,12 +867,12 @@ void Physics_DrawDebug(void) {
     }
  
     // ── 3. Draw collider wireframes ───────────────────────────────────────────
-    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < n; ++i) {
+    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < n; ++i) {
         Entity *e = &Sys_Global.instances[i];
         if (!(e->entflags & ENTFLAG_ACTIVE))    continue;
         if (  e->collider == COLLIDER_TYPE_NONE) continue;
  
-        uint8_t cs = g_contactState[i];
+        u8 cs = g_contactState[i];
         if (cs == 2) {
             // OnColliderEnter — red
             DebugDrawCollider(i, DBG_COLOR_ENTER_R, DBG_COLOR_ENTER_G, DBG_COLOR_ENTER_B);
@@ -908,11 +886,11 @@ void Physics_DrawDebug(void) {
     }
  
     // ── 4. Draw contact normals (blue rays) for all capsule contacts ──────────
-    for (uint16_t m = 0; m < g_manifoldCount; ++m)
+    for (u16 m = 0; m < g_manifoldCount; ++m)
         DebugDrawManifoldNormals(&g_manifolds[m]);
  
     // ── 5. Advance frame: current IDs become previous ─────────────────────────
-    __builtin_memcpy(g_prevManifoldIDs, curIDs, curCount * sizeof(uint32_t));
+    __builtin_memcpy(g_prevManifoldIDs, curIDs, curCount * sizeof(u32));
     g_prevManifoldCount = curCount;
 }
  
@@ -936,13 +914,13 @@ typedef struct {
 } CapsuleContact;
 #define NO_CONTACT ((CapsuleContact){ .depth = -1.0f, .normal = {0,1,0} })
  
-static CapsuleContact QueryCapsuleContact(Vector3 start, Vector3 end, float capsuleRadius, uint32_t layerMask) {
+static CapsuleContact QueryCapsuleContact(Vector3 start, Vector3 end, float capsuleRadius, u32 layerMask) {
     CapsuleContact worst = NO_CONTACT;
-    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
+    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
         if (!(layerMask & Sys_Global.instances[i].layer)) continue;
-        uint16_t mindex = Sys_Global.instances[i].modelIndex;
+        u16 mindex = Sys_Global.instances[i].modelIndex;
         if (mindex >= loadedModelsMaxIndex) continue;
-        uint32_t triCount = modelTriangleCounts[mindex];
+        u32 triCount = modelTriangleCounts[mindex];
         if (triCount < 1) continue;
  
         float M[16]; __builtin_memcpy(M,&modelMatrices[i * 16],16 * sizeof(float));
@@ -970,8 +948,8 @@ static CapsuleContact QueryCapsuleContact(Vector3 start, Vector3 end, float caps
         float minScl = scl_x;
         if (scl_y < minScl) { minScl = scl_y; } if (scl_z < minScl) { minScl = scl_z; }
         float localRadius = capsuleRadius / minScl;
-        for (uint32_t j = 0; j < triCount; ++j) {
-            uint32_t bA = (uint32_t)modelTriangles[mindex][j*3 + 0] * VERTEX_ATTRIBUTES_SIZE, bB = (uint32_t)modelTriangles[mindex][j*3 + 1] * VERTEX_ATTRIBUTES_SIZE, bC = (uint32_t)modelTriangles[mindex][j*3 + 2] * VERTEX_ATTRIBUTES_SIZE;
+        for (u32 j = 0; j < triCount; ++j) {
+            u32 bA = (u32)modelTriangles[mindex][j*3 + 0] * VERTEX_ATTRIBUTES_SIZE, bB = (u32)modelTriangles[mindex][j*3 + 1] * VERTEX_ATTRIBUTES_SIZE, bC = (u32)modelTriangles[mindex][j*3 + 2] * VERTEX_ATTRIBUTES_SIZE;
             Vector3 posA = {half_to_float( *(half*)(modelVertices[mindex] + bA + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 4) )};
             Vector3 posB = {half_to_float( *(half*)(modelVertices[mindex] + bB + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 4) )};
             Vector3 posC = {half_to_float( *(half*)(modelVertices[mindex] + bC + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 4) )};
@@ -1011,7 +989,7 @@ static CapsuleContact QueryCapsuleContact(Vector3 start, Vector3 end, float caps
     return worst;
 }
  
-ENGINE_TO_MOD bool CheckCapsule(Vector3 start, Vector3 end, float capsuleRadius, float capsuleHeight, uint32_t layerMask) {
+ENGINE_TO_MOD bool CheckCapsule(Vector3 start, Vector3 end, float capsuleRadius, float capsuleHeight, u32 layerMask) {
     (void)capsuleHeight;
     return QueryCapsuleContact(start, end, capsuleRadius, layerMask).depth > 0.0f;
 }
@@ -1023,7 +1001,7 @@ static inline void CapsuleTipsFromEye(Vector3 eye, Vector3 *start, Vector3 *end)
     *end   = (Vector3){ eye.x, centreY + innerSpine * 0.5f, eye.z };
 }
  
-static float SnapEyeAboveFloor(float eyeX, float eyeY, float eyeZ, uint32_t mask) {
+static float SnapEyeAboveFloor(float eyeX, float eyeY, float eyeZ, u32 mask) {
     float corrected   = eyeY;
     float totalPushed = 0.0f;
     while (totalPushed < SNAP_MAX) {
@@ -1036,7 +1014,7 @@ static float SnapEyeAboveFloor(float eyeX, float eyeY, float eyeZ, uint32_t mask
     return corrected;
 }
  
-void BuildPlayerCapsule(uint16_t playerIdx, Vector3 *start, Vector3 *end) {
+void BuildPlayerCapsule(u16 playerIdx, Vector3 *start, Vector3 *end) {
     Vector3 eye = Sys_Global.instances[playerIdx].position;
     float innerSpine = PLAYER_HEIGHT - 2.0f * PLAYER_RADIUS;
     float centreY = eye.y - PLAYER_CAM_OFFSET_Y;
@@ -1044,7 +1022,7 @@ void BuildPlayerCapsule(uint16_t playerIdx, Vector3 *start, Vector3 *end) {
     end->x   = eye.x; end->y   = centreY + innerSpine * 0.5f; end->z   = eye.z;
 }
  
-ENGINE_TO_MOD void AddForce(uint16_t idx, Vector3 force, bool isImpulse) {
+ENGINE_TO_MOD void AddForce(u16 idx, Vector3 force, bool isImpulse) {
     if (idx >= INSTANCE_COUNT) return;
     Entity* e = &Sys_Global.instances[idx];
     float mass = e->mass > 0.0001f ? e->mass : 1.0f;
@@ -1081,15 +1059,15 @@ const Vector3 gravityVelocity = { 0.0f, -0.981f, 0.0f };
  
 void UpdateVelocityFromGravity(void) {
     if (Sys_Global.pauseRelativeTime < 10.0f) return;
-    for (uint32_t i=PLAYER1;i<INSTANCE_COUNT;++i) {
+    for (u32 i=PLAYER1;i<INSTANCE_COUNT;++i) {
         if (i > Sys_Global.loadedInstances) return;
         if (Sys_Global.instances[i].gravity < 0.01f && Sys_Global.instances[i].gravity > -0.01f) continue;
-        if (i <= (int32_t)PLAYER2 && Sys_Cheats.noclip) continue;
+        if (i <= (i32)PLAYER2 && Sys_Cheats.noclip) continue;
         Sys_Global.instances[i].velocity = Vector3_A_plus_B(Sys_Global.instances[i].velocity, scale_vector3(gravityVelocity, Sys_Global.instances[i].gravity * (float)Sys_Global.timeSinceLastPhysicsTick));
     }
 }
  
-void ApplyCorpseFriction(uint16_t instanceIdx) {
+void ApplyCorpseFriction(u16 instanceIdx) {
     Sys_Global.instances[instanceIdx].dynamicFriction = 10.0f;
     Sys_Global.instances[instanceIdx].staticFriction = 10.0f;
     Sys_Global.instances[instanceIdx].bounciness = 0.0f;
@@ -1097,8 +1075,8 @@ void ApplyCorpseFriction(uint16_t instanceIdx) {
     Sys_Global.instances[instanceIdx].bounceCombine = PHYS_COMBINE_MAX;
 }
  
-bool GridCellBlock(uint16_t i,Vector3 pos,Vector3 newPos);
-static void IntegrateRigidbody(uint16_t i,float dt){
+bool GridCellBlock(u16 i,Vector3 pos,Vector3 newPos);
+static void IntegrateRigidbody(u16 i,float dt){
     Entity*e=&Sys_Global.instances[i];
     if(!(e->entflags&ENTFLAG_ACTIVE))return;
     if(!(e->entflags&ENTFLAG_RIGIDBODY))return;
@@ -1109,7 +1087,7 @@ static void IntegrateRigidbody(uint16_t i,float dt){
  
     Vector3 pos=e->position; Vector3 newPos=Vector3_A_plus_B(pos,scale_vector3(e->velocity,dt));
     if(GridCellBlock(i,pos,newPos))return;
-    uint32_t mask=GetCollisionMask(e->layer); Vector3 s,en; CapsuleTipsFromEye(newPos,&s,&en);
+    u32 mask=GetCollisionMask(e->layer); Vector3 s,en; CapsuleTipsFromEye(newPos,&s,&en);
     CapsuleContact c = QueryCapsuleContact(s,en,PLAYER_RADIUS,mask);
     if(c.depth>0.0f){ newPos=Vector3_A_plus_B(newPos,scale_vector3(c.normal,c.depth+0.001f)); }
     e->lastPosition=pos; e->position=newPos; e->cellIndex=PosGetCellCoords(newPos.x,newPos.z);
@@ -1124,7 +1102,7 @@ static void IntegrateRigidbody(uint16_t i,float dt){
     }
 }
  
-static void IntegratePlayer(uint16_t i,float dt) {
+static void IntegratePlayer(u16 i,float dt) {
     Entity *e=&Sys_Global.instances[i];
     Vector3 pos=e->position;
     e->cellIndex=PosGetCellCoords(pos.x,pos.z);
@@ -1143,7 +1121,7 @@ static void IntegratePlayer(uint16_t i,float dt) {
  
     if (GridCellBlock(i,pos,newHitPos)) return;
  
-    uint32_t mask=GetCollisionMask(e->layer);
+    u32 mask=GetCollisionMask(e->layer);
     float innerSpine=PLAYER_HEIGHT-2.0f*PLAYER_RADIUS;
     bool boosted=Sys_Global.boosterActive;
  
@@ -1246,15 +1224,15 @@ static void IntegratePlayer(uint16_t i,float dt) {
 extern ma_engine audio_engine;
 void UpdatePositions(void) {
     float dt=(float)Sys_Global.timeSinceLastPhysicsTick;
-    for (uint32_t i=PLAYER1;i<PLAYER2/*Sys_Global.loadedInstances*/;++i) {
-        if (i<=PLAYER2)                                              IntegratePlayer((uint16_t)i,dt);
-        else if (Sys_Global.instances[i].entflags&ENTFLAG_RIGIDBODY) IntegrateRigidbody((uint16_t)i,dt);
+    for (u32 i=PLAYER1;i<PLAYER2/*Sys_Global.loadedInstances*/;++i) {
+        if (i<=PLAYER2)                                              IntegratePlayer((u16)i,dt);
+        else if (Sys_Global.instances[i].entflags&ENTFLAG_RIGIDBODY) IntegrateRigidbody((u16)i,dt);
     }
     ma_engine_listener_set_position(&audio_engine,0,Sys_Global.instances[PLAYER1].position.x,Sys_Global.instances[PLAYER1].position.y,Sys_Global.instances[PLAYER1].position.z);
 }
  
 void ClampVelocity(void) {
-    for (int32_t i=START_INDEX_LEVEL_INSTANCES;i<Sys_Global.loadedInstances;++i) {
+    for (i32 i=START_INDEX_LEVEL_INSTANCES;i<Sys_Global.loadedInstances;++i) {
         Vector3 curvel = Sys_Global.instances[i].velocity;
         if (magnitude_vector3(curvel) > TERMINAL_VELOCITY) {
             Vector3 dir = normalize_vector3(curvel);
@@ -1297,16 +1275,16 @@ RaycastHit RayTriangle(Vector3 origin, Vector3 dir, Vector3 posA, Vector3 posB, 
     return hitInfo;
 }
  
-extern uint16_t playerCellIdx; bool SkyIsVisible(void); bool LevelSpecificHacksForClosedCellsThatProbablyShouldntBeBecauseOfInsetMeshes(uint32_t instCellIdx, uint16_t constIndex);
-ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uint32_t layerMask) {
-    uint32_t numMeshesCheckedForRaycast = 0, numTrisCastAgainst = 0;
+extern u16 playerCellIdx; bool SkyIsVisible(void); bool LevelSpecificHacksForClosedCellsThatProbablyShouldntBeBecauseOfInsetMeshes(u32 instCellIdx, u16 constIndex);
+ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, u32 layerMask) {
+    u32 numMeshesCheckedForRaycast = 0, numTrisCastAgainst = 0;
     RaycastHit result = { .hit = false, .distance = maxDist, .point = {0.0f, 0.0f, 0.0f}, .normal = {0.0f, 0.0f, 0.0f}, .hitInstanceIndex = INSTANCE_COUNT };
-    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
+    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
         if (!(layerMask & Sys_Global.instances[i].layer)) continue;
-        uint16_t mindex = Sys_Global.instances[i].modelIndex;
+        u16 mindex = Sys_Global.instances[i].modelIndex;
         if (mindex >= loadedModelsMaxIndex) continue;
         Vector3 objPos = Sys_Global.instances[i].position;
-        uint16_t instCellIdx = PosGetCellCoords(objPos.x,objPos.z);
+        u16 instCellIdx = PosGetCellCoords(objPos.x,objPos.z);
         Vector3 delta = Vector3_A_minus_B(objPos,origin);
         float distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
         float radBounds = vmax(modelBounds[mindex], 1.81f);
@@ -1314,7 +1292,7 @@ ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uin
         if (distSqrd >= (maxDistToObj * maxDistToObj)) continue;
         if (LevelSpecificHacksForClosedCellsThatProbablyShouldntBeBecauseOfInsetMeshes(instCellIdx,Sys_Global.instances[i].index)) continue;
         
-        uint32_t triCount = modelTriangleCounts[mindex];
+        u32 triCount = modelTriangleCounts[mindex];
         if (triCount < 1) continue;
         float M[16];
         __builtin_memcpy(M,&modelMatrices[i * 16],16 * sizeof(float));
@@ -1330,8 +1308,8 @@ ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uin
         Vector3 localDir =    {(dir.x*m00 + dir.y*m10 + dir.z*m20) / sclx2, (dir.x*m01 + dir.y*m11 + dir.z*m21) / scly2, (dir.x*m02 + dir.y*m12 + dir.z*m22) / sclz2};
         localDir = normalize_vector3(localDir);
         numMeshesCheckedForRaycast++;
-        for (uint32_t j=0;j<triCount;++j) {
-            uint32_t bA = (uint32_t)modelTriangles[mindex][j*3 + 0] * VERTEX_ATTRIBUTES_SIZE, bB = (uint32_t)modelTriangles[mindex][j*3 + 1] * VERTEX_ATTRIBUTES_SIZE, bC = (uint32_t)modelTriangles[mindex][j*3 + 2] * VERTEX_ATTRIBUTES_SIZE;
+        for (u32 j=0;j<triCount;++j) {
+            u32 bA = (u32)modelTriangles[mindex][j*3 + 0] * VERTEX_ATTRIBUTES_SIZE, bB = (u32)modelTriangles[mindex][j*3 + 1] * VERTEX_ATTRIBUTES_SIZE, bC = (u32)modelTriangles[mindex][j*3 + 2] * VERTEX_ATTRIBUTES_SIZE;
             Vector3 posA = {half_to_float( *(half*)(modelVertices[mindex] + bA + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 4) )};
             Vector3 posB = {half_to_float( *(half*)(modelVertices[mindex] + bB + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 4) )};
             Vector3 posC = {half_to_float( *(half*)(modelVertices[mindex] + bC + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 4) )};
@@ -1367,13 +1345,9 @@ ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uin
     return result;
 }
  
-ENGINE_TO_MOD void RaycastAll(Vector3 origin, Vector3 dir, float distance, uint32_t layerMask, RaycastHit* hits, uint16_t maxCount) {
+ENGINE_TO_MOD void RaycastAll(Vector3 origin, Vector3 dir, float distance, u32 layerMask, RaycastHit* hits, u16 maxCount) {
     for (int i=0;i<maxCount;++i) hits[i].hit = false;
     (void)origin; (void)dir; (void)distance; (void)layerMask;
 }
  
-ENGINE_TO_MOD RaycastHit CapsuleCast(Vector3 start, Vector3 end, float capsuleRadius, float castDist, uint32_t layerMask, bool hitTriggers) {
-    RaycastHit result = { .hit = false };
-    (void)start; (void)end; (void)capsuleRadius; (void)castDist; (void)layerMask; (void)hitTriggers;
-    return result;
-}
+ENGINE_TO_MOD RaycastHit CapsuleCast(Vector3 start, Vector3 end, float capsuleRadius, float castDist, u32 layerMask, bool hitTriggers) { RaycastHit result = { .hit = false }; (void)start; (void)end; (void)capsuleRadius; (void)castDist; (void)layerMask; (void)hitTriggers; return result; }
