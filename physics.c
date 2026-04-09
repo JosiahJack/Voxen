@@ -3,28 +3,8 @@
 #include <malloc.h>
 typedef __builtin_va_list va_list;
 extern u16 loadedModelsMaxIndex; extern float modelBounds[MODEL_IDX_MAX]; extern u8** modelVertices; extern u16** modelTriangles;
-extern u32 modelVertexCounts[MODEL_IDX_MAX]; extern u16 modelTriangleCounts[MODEL_IDX_MAX];
-extern float modelMatrices[INSTANCE_COUNT * 16];
-typedef u16 half;
-static inline float half_to_float(half h){
-    u32 s=(h&0x8000)<<16,e=(h&0x7C00)>>10,m=(h&0x03FF),out;
-    if (e == 0){
-        if (m == 0) out = s;
-        else { // normalize subnormal
-            e = 1;
-            while ((m & 0x0400) == 0) { m <<= 1; e--; }
-            m &= 0x03FF;
-            e = e + (127 - 15);
-            out = s | (e << 23) | (m << 13);
-        }
-    } else if (e == 31) out = s | 0x7F800000 | (m << 13);
-    else { e = e + (127 - 15); out = s | (e << 23) | (m << 13); }
- 
-    float f;
-    __builtin_memcpy(&f, &out, 4);
-    return f;
-}
- 
+extern u32 modelVertexCounts[MODEL_IDX_MAX]; extern u16 modelTriangleCounts[MODEL_IDX_MAX]; extern float modelMatrices[INSTANCE_COUNT * 16]; extern u32 gridCellStates[ARRSIZE];
+
 static inline Vector3 ClosestPointOnSegment(Vector3 p, Vector3 q, Vector3 a) {
     Vector3 pq  = Vector3_A_minus_B(q, p);
     Vector3 pa  = Vector3_A_minus_B(a, p);
@@ -114,12 +94,11 @@ static u32 GetCollisionMask(u32 layer) {
 #define SPECULATIVE_MARGIN    0.005f
 #define BAUMGARTE_FACTOR      0.2f
 #define BAUMGARTE_SLOP        0.002f
-#define SUB_STEP_DT_MAX       0.016f
+#define SUB_STEP_DT_MAX       0.027777778f
 #define RESTITUTION_THRESHOLD 1.8f
 typedef struct { Vector3 center; Vector3 halfExtents; Quaternion rot; } ShapeBox;
 typedef struct { Vector3 center; float radius; }                        ShapeSphere;
 typedef struct { Vector3 tip,base; float radius; }                      ShapeCapsule;
-static inline u16 CellIndex(i32 cx, i32 cz) { return (u16)((cz * WORLDX) + cx); }
  
 typedef struct { Vector3 center; Vector3 halfExtents; Quaternion rot; } OBB;
 static inline void obb_axes(Quaternion q,Vector3 *ax,Vector3 *ay,Vector3 *az) { *ax = quat_rotate_vector(q,(Vector3){1,0,0}); *ay = quat_rotate_vector(q,(Vector3){0,1,0}); *az = quat_rotate_vector(q,(Vector3){0,0,1}); }
@@ -363,7 +342,6 @@ static void TestCapsuleMeshInstance(ShapeCapsule cap, u16 instanceIdx) {
 static ContactManifold* GenerateManifold(u16 idxA,u16 idxB) {
     Entity *eA=&Sys_Global.instances[idxA], *eB=&Sys_Global.instances[idxB];
     ColliderType ctA=eA->collider, ctB=eB->collider;
- 
     ContactManifold *m=NULL;
     for (u16 i=0;i<g_manifoldCount;++i)
         if ((g_manifolds[i].idxA==idxA && g_manifolds[i].idxB==idxB) ||
@@ -433,60 +411,98 @@ static inline void ApplyAngularImpulse(Entity *e,Vector3 r,Vector3 impulse,float
     e->angularVelocity.z+=sign*torqueImpulse.z*invI;
 }
  
-static void SolveContact(ContactManifold *m,float dt) {
-    Entity *eA=&Sys_Global.instances[m->idxA], *eB=&Sys_Global.instances[m->idxB];
-    float imA=entity_invmass(eA), imB=entity_invmass(eB);
-    if (imA+imB<1e-10f) return;
- 
+static void SolveContact(ContactManifold *m, float dt) {
+    Entity *eA = &Sys_Global.instances[m->idxA];
+    Entity *eB = &Sys_Global.instances[m->idxB];
+    float imA = entity_invmass(eA), imB = entity_invmass(eB);
+    if (imA + imB < 1e-10f) return;
+
     float restitution, friction;
     {
-        float rA=eA->bounciness, rB=eB->bounciness;
+        float rA = eA->bounciness, rB = eB->bounciness;
         restitution = (eA->bounceCombine==PHYS_COMBINE_MAX||eB->bounceCombine==PHYS_COMBINE_MAX) ? vmax(rA,rB)
                     : (eA->bounceCombine==PHYS_COMBINE_MIN||eB->bounceCombine==PHYS_COMBINE_MIN) ? vmin(rA,rB)
                     : (eA->bounceCombine==PHYS_COMBINE_MUL||eB->bounceCombine==PHYS_COMBINE_MUL) ? rA*rB
                     : (rA+rB)*0.5f;
-        float fA=(eA->dynamicFriction+eA->staticFriction)*0.5f, fB=(eB->dynamicFriction+eB->staticFriction)*0.5f;
+        float fA = (eA->dynamicFriction+eA->staticFriction)*0.5f;
+        float fB = (eB->dynamicFriction+eB->staticFriction)*0.5f;
         friction = (eA->frictionCombine==PHYS_COMBINE_MAX||eB->frictionCombine==PHYS_COMBINE_MAX) ? vmax(fA,fB)
                  : (eA->frictionCombine==PHYS_COMBINE_MIN||eB->frictionCombine==PHYS_COMBINE_MIN) ? vmin(fA,fB)
                  : (eA->frictionCombine==PHYS_COMBINE_MUL||eB->frictionCombine==PHYS_COMBINE_MUL) ? fA*fB
                  : (fA+fB)*0.5f;
     }
- 
-    for (int ci=0;ci<(int)m->count;++ci) {
-        Contact *c=&m->contacts[ci];
-        Vector3 relVel = Vector3_A_minus_B(eA->velocity,eB->velocity);
-        float vn = dot_vector3(relVel,c->normal);
-        if (vn > SPECULATIVE_MARGIN/dt) continue;
-        float effectiveRestitution = (vabs(vn)>RESTITUTION_THRESHOLD) ? restitution : 0.0f;
-        float jnDenom = imA+imB;
-        float jn = -(1.0f+effectiveRestitution)*vn / jnDenom;
+
+    float invIA = (eA->inertia > 0.0001f) ? 1.0f / eA->inertia : 0.0f;
+    float invIB = (eB->inertia > 0.0001f) ? 1.0f / eB->inertia : 0.0f;
+
+    for (int ci = 0; ci < (int)m->count; ++ci) {
+        Contact *c = &m->contacts[ci];
+
+        // Arms from each body's collider centre to the contact point
+        Vector3 rA = Vector3_A_minus_B(c->pointWorld,
+            Vector3_A_plus_B(eA->position, quat_rotate_vector(eA->rotation, eA->colliderCenter)));
+        Vector3 rB = Vector3_A_minus_B(c->pointWorld,
+            Vector3_A_plus_B(eB->position, quat_rotate_vector(eB->rotation, eB->colliderCenter)));
+
+        // Relative velocity at the contact point (includes angular contribution)
+        Vector3 vAtA = Vector3_A_plus_B(eA->velocity, cross_vector3(eA->angularVelocity, rA));
+        Vector3 vAtB = Vector3_A_plus_B(eB->velocity, cross_vector3(eB->angularVelocity, rB));
+        Vector3 relVel = Vector3_A_minus_B(vAtA, vAtB);
+
+        float vn = dot_vector3(relVel, c->normal);
+        if (vn > SPECULATIVE_MARGIN / dt) continue;
+
+        // Angular terms:  (r × n)² / I  for each body
+        Vector3 rAxN = cross_vector3(rA, c->normal);
+        Vector3 rBxN = cross_vector3(rB, c->normal);
+        float angTermA = dot_vector3(rAxN, rAxN) * invIA;
+        float angTermB = dot_vector3(rBxN, rBxN) * invIB;
+        float jnDenom  = imA + imB + angTermA + angTermB;
+
+        float effectiveRestitution = (vabs(vn) > RESTITUTION_THRESHOLD) ? restitution : 0.0f;
+        float jn = -(1.0f + effectiveRestitution) * vn / jnDenom;
         float pen = c->depth - BAUMGARTE_SLOP;
-        if (pen>0.0f) jn += (BAUMGARTE_FACTOR*pen/dt) / jnDenom;
-        float newLN = vmax(0.0f, c->lambdaN+jn);
-        float dLN   = newLN-c->lambdaN;
+        if (pen > 0.0f) jn += (BAUMGARTE_FACTOR * pen / dt) / jnDenom;
+
+        float newLN = vmax(0.0f, c->lambdaN + jn);
+        float dLN   = newLN - c->lambdaN;
         c->lambdaN  = newLN;
-        Vector3 impulseN=scale_vector3(c->normal,dLN);
-        eA->velocity=Vector3_A_plus_B(eA->velocity,scale_vector3(impulseN, imA));
-        eB->velocity=Vector3_A_minus_B(eB->velocity,scale_vector3(impulseN, imB));
-        Vector3 rA=Vector3_A_minus_B(c->pointWorld,Vector3_A_plus_B(eA->position,quat_rotate_vector(eA->rotation,eA->colliderCenter)));
-        Vector3 rB=Vector3_A_minus_B(c->pointWorld,Vector3_A_plus_B(eB->position,quat_rotate_vector(eB->rotation,eB->colliderCenter)));
-        ApplyAngularImpulse(eA,rA,impulseN, 1.0f);
-        ApplyAngularImpulse(eB,rB,impulseN,-1.0f);
-        relVel = Vector3_A_minus_B(eA->velocity,eB->velocity);
-        Vector3 tangent = Vector3_A_minus_B(relVel,scale_vector3(c->normal,dot_vector3(relVel,c->normal)));
-        float tLen=magnitude_vector3(tangent);
-        if (tLen>1e-6f) {
-            tangent=scale_vector3(tangent,1.0f/tLen);
-            float vt=dot_vector3(relVel,tangent);
-            float jt=-vt/(imA+imB);
-            float maxFric=friction*newLN;
-            float newLT=vclamp(c->lambdaT+jt,-maxFric,maxFric);
-            float dLT=newLT-c->lambdaT; c->lambdaT=newLT;
-            Vector3 impulseT=scale_vector3(tangent,dLT);
-            eA->velocity=Vector3_A_plus_B(eA->velocity,scale_vector3(impulseT, imA));
-            eB->velocity=Vector3_A_minus_B(eB->velocity,scale_vector3(impulseT, imB));
-            ApplyAngularImpulse(eA,rA,impulseT, 1.0f);
-            ApplyAngularImpulse(eB,rB,impulseT,-1.0f);
+
+        Vector3 impulseN = scale_vector3(c->normal, dLN);
+        eA->velocity = Vector3_A_plus_B(eA->velocity, scale_vector3(impulseN,  imA));
+        eB->velocity = Vector3_A_minus_B(eB->velocity, scale_vector3(impulseN, imB));
+        ApplyAngularImpulse(eA, rA, impulseN,  1.0f);
+        ApplyAngularImpulse(eB, rB, impulseN, -1.0f);
+
+        // Recompute relative velocity after normal impulse for friction
+        vAtA   = Vector3_A_plus_B(eA->velocity, cross_vector3(eA->angularVelocity, rA));
+        vAtB   = Vector3_A_plus_B(eB->velocity, cross_vector3(eB->angularVelocity, rB));
+        relVel = Vector3_A_minus_B(vAtA, vAtB);
+
+        Vector3 tangent = Vector3_A_minus_B(relVel,
+            scale_vector3(c->normal, dot_vector3(relVel, c->normal)));
+        float tLen = magnitude_vector3(tangent);
+        if (tLen > 1e-6f) {
+            tangent = scale_vector3(tangent, 1.0f / tLen);
+
+            Vector3 rAxT = cross_vector3(rA, tangent);
+            Vector3 rBxT = cross_vector3(rB, tangent);
+            float angTermAT = dot_vector3(rAxT, rAxT) * invIA;
+            float angTermBT = dot_vector3(rBxT, rBxT) * invIB;
+            float jtDenom   = imA + imB + angTermAT + angTermBT;
+
+            float vt  = dot_vector3(relVel, tangent);
+            float jt  = -vt / jtDenom;
+            float maxFric = friction * newLN;
+            float newLT   = vclamp(c->lambdaT + jt, -maxFric, maxFric);
+            float dLT     = newLT - c->lambdaT;
+            c->lambdaT    = newLT;
+
+            Vector3 impulseT = scale_vector3(tangent, dLT);
+            eA->velocity = Vector3_A_plus_B(eA->velocity, scale_vector3(impulseT,  imA));
+            eB->velocity = Vector3_A_minus_B(eB->velocity, scale_vector3(impulseT, imB));
+            ApplyAngularImpulse(eA, rA, impulseT,  1.0f);
+            ApplyAngularImpulse(eB, rB, impulseT, -1.0f);
         }
     }
 }
@@ -511,88 +527,7 @@ static void SpeculativePreClamp(u16 idxA,float dt) {
         }
     }
 }
- 
-// ─── broadphase: cell-neighbor pair collection ────────────────────────────────
-// Since no object exceeds CELL_SIZE (2.56f) on any axis, only the 3×3 XZ
-// neighbourhood (9 cells) around a dynamic object needs to be searched.
-// Static vs static pairs are skipped.  j<i dedup is done for dynamic–dynamic.
-#define MAX_PAIRS 4096
-static u16 g_pairA[MAX_PAIRS], g_pairB[MAX_PAIRS];
-static u16 g_pairCount;
- 
-// Per-cell instance list — rebuilt each broadphase tick.
-// Sized for the world grid; cells hold up to 32 instances before overflow
-// (overflow falls back to checking without the spatial index).
-#define CELL_BUCKET_MAX 32
-typedef struct {
-    u16 count;
-    u16 idx[CELL_BUCKET_MAX];
-} CellBucket;
-static CellBucket g_cellBuckets[ARRSIZE]; // zero-initialised by BSS
- 
-static void CollectBroadphasePairs(void) {
-    g_pairCount = 0;
-    u16 n = Sys_Global.loadedInstances;
- 
-    // Clear only the cells that were touched last frame — O(instances) not O(grid).
-    // We track which cells were written so we can clear them without a full memset.
-    static u16 g_dirtyCells[INSTANCE_COUNT];
-    static u16 g_dirtyCellCount = 0;
-    for (u16 d = 0; d < g_dirtyCellCount; ++d)
-        g_cellBuckets[g_dirtyCells[d]].count = 0;
-    g_dirtyCellCount = 0;
- 
-    // Build cell buckets for ALL active, collideable instances (dynamic and static).
-    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < n; ++i) {
-        Entity *e = &Sys_Global.instances[i];
-        if (!(e->entflags & ENTFLAG_ACTIVE))    continue;
-        if (  e->collider == COLLIDER_TYPE_NONE) continue;
-        i32 cx = PosGetCellCoordX(e->position.x), cz = PosGetCellCoordZ(e->position.z);
-        if (cx < 0 || cx >= WORLDX || cz < 0 || cz >= WORLDZ) continue;
-        u16 ci = CellIndex(cx, cz);
-        CellBucket *b = &g_cellBuckets[ci];
-        if (b->count == 0) {
-            if (g_dirtyCellCount < INSTANCE_COUNT) g_dirtyCells[g_dirtyCellCount++] = ci;
-        }
-        if (b->count < CELL_BUCKET_MAX) b->idx[b->count++] = i;
-    }
- 
-    // Collect pairs: for each awake rigidbody, check its 3×3 neighbourhood.
-    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < n; ++i) {
-        Entity *eA = &Sys_Global.instances[i];
-        if (!(eA->entflags & ENTFLAG_ACTIVE))    continue;
-        if (!(eA->entflags & ENTFLAG_RIGIDBODY)) continue;
-        if (  eA->entflags & ENTFLAG_ASLEEP)      continue;
-        if (  eA->collider == COLLIDER_TYPE_NONE)  continue;
- 
-        i32 acx = PosGetCellCoordX(eA->position.x), acz = PosGetCellCoordZ(eA->position.z);
-        u32 maskA = GetCollisionMask(eA->layer);
- 
-        for (i32 dz = -1; dz <= 1; ++dz) {
-            i32 ncz = acz + dz;
-            if (ncz < 0 || ncz >= WORLDZ) continue;
-            for (i32 dx = -1; dx <= 1; ++dx) {
-                i32 ncx = acx + dx;
-                if (ncx < 0 || ncx >= WORLDX) continue;
-                CellBucket *b = &g_cellBuckets[CellIndex(ncx, ncz)];
-                for (u16 bi = 0; bi < b->count; ++bi) {
-                    u16 j = b->idx[bi];
-                    if (j == i) continue;
-                    Entity *eB = &Sys_Global.instances[j];
-                    if (!(eB->entflags & ENTFLAG_ACTIVE))    continue;
-                    if (  eB->collider == COLLIDER_TYPE_NONE) continue;
-                    if (!(maskA & eB->layer))                 continue;
-                    // Skip if both dynamic and j already processed against i
-                    if ((eB->entflags & ENTFLAG_RIGIDBODY) && j < i) continue;
-                    if (g_pairCount >= MAX_PAIRS) goto pairs_full;
-                    g_pairA[g_pairCount] = i; g_pairB[g_pairCount] = j; ++g_pairCount;
-                }
-            }
-        }
-    }
-pairs_full:;
-}
- 
+
 // ─── sleep system ─────────────────────────────────────────────────────────────
 static u8 g_sleepCounter[INSTANCE_COUNT];
  
@@ -647,39 +582,78 @@ void Physics_PrimitiveStep(float dt) {
         Physics_PrimitiveStep(half);
         return;
     }
- 
-    CollectBroadphasePairs();
-    for (u16 m=0;m<g_manifoldCount;) {
-        bool found=false;
-        for (u16 p=0;p<g_pairCount;++p)
-            if ((g_manifolds[m].idxA==g_pairA[p] && g_manifolds[m].idxB==g_pairB[p]) ||
-                (g_manifolds[m].idxA==g_pairB[p] && g_manifolds[m].idxB==g_pairA[p]))
-                { found=true; break; }
-        if (!found) { g_manifolds[m]=g_manifolds[--g_manifoldCount]; }
-        else ++m;
+
+    // ── Broadphase: find candidate pairs via cell neighbourhood ──────────
+    // For each awake rigidbody, check instances in the same cell and the
+    // 3 neighbouring cells (4 total — sufficient since no object spans a cell).
+    u16 n = Sys_Global.loadedInstances;
+    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < n; ++i) {
+        Entity *eA = &Sys_Global.instances[i];
+        if (!(eA->entflags & ENTFLAG_ACTIVE))    continue;
+        if (!(eA->entflags & ENTFLAG_RIGIDBODY)) continue;
+        if (  eA->entflags & ENTFLAG_ASLEEP)     continue;
+        if (  eA->collider == COLLIDER_TYPE_NONE) continue;
+
+        u32 maskA = GetCollisionMask(eA->layer);
+        u32 cellA = eA->cellIndex;
+        i32 acx   = (i32)(cellA % WORLDX);
+        i32 acz   = (i32)(cellA / WORLDX);
+
+        for (u16 j = START_INDEX_LEVEL_INSTANCES; j < n; ++j) {
+            if (j == i) continue;
+            Entity *eB = &Sys_Global.instances[j];
+            if (!(eB->entflags & ENTFLAG_ACTIVE))    continue;
+            if (  eB->collider == COLLIDER_TYPE_NONE) continue;
+            if (!(maskA & eB->layer))                 continue;
+            // Avoid duplicate dynamic-vs-dynamic pairs
+            if ((eB->entflags & ENTFLAG_RIGIDBODY) && j < i) continue;
+
+            // Cell proximity: must be in the same cell or an adjacent one
+            u32 cellB = eB->cellIndex;
+            i32 bcx   = (i32)(cellB % WORLDX);
+            i32 bcz   = (i32)(cellB / WORLDX);
+            i32 dx    = bcx - acx;
+            i32 dz    = bcz - acz;
+            if (dx < -1 || dx > 1 || dz < -1 || dz > 1) continue;
+
+            GenerateManifold(i, j);
+        }
     }
-    for (u16 p=0;p<g_pairCount;++p) GenerateManifold(g_pairA[p],g_pairB[p]);
- 
-    for (u16 i=START_INDEX_LEVEL_INSTANCES;i<Sys_Global.loadedInstances;++i)
-        if (Sys_Global.instances[i].entflags & ENTFLAG_RIGIDBODY) SpeculativePreClamp(i,dt);
- 
-    for (int iter=0;iter<SOLVER_ITERATIONS;++iter)
-        for (u16 m=0;m<g_manifoldCount;++m) SolveContact(&g_manifolds[m],dt);
- 
-    for (u16 i=START_INDEX_LEVEL_INSTANCES;i<Sys_Global.loadedInstances;++i)
-        if (Sys_Global.instances[i].entflags & ENTFLAG_RIGIDBODY) IntegrateAngularVelocity(i,dt);
- 
-    for (u16 i=START_INDEX_LEVEL_INSTANCES;i<Sys_Global.loadedInstances;++i)
-        if (Sys_Global.instances[i].entflags & ENTFLAG_RIGIDBODY) UpdateSleep(i,dt);
+
+    // Prune manifolds whose pairs are no longer adjacent
+    for (u16 m = 0; m < g_manifoldCount; ) {
+        Entity *eA = &Sys_Global.instances[g_manifolds[m].idxA];
+        Entity *eB = &Sys_Global.instances[g_manifolds[m].idxB];
+        i32 acx = (i32)(eA->cellIndex % WORLDX), acz = (i32)(eA->cellIndex / WORLDX);
+        i32 bcx = (i32)(eB->cellIndex % WORLDX), bcz = (i32)(eB->cellIndex / WORLDX);
+        i32 dx = bcx - acx, dz = bcz - acz;
+        if (dx < -1 || dx > 1 || dz < -1 || dz > 1)
+            g_manifolds[m] = g_manifolds[--g_manifoldCount];
+        else
+            ++m;
+    }
+
+    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < n; ++i)
+        if (Sys_Global.instances[i].entflags & ENTFLAG_RIGIDBODY)
+            SpeculativePreClamp(i, dt);
+
+    for (int iter = 0; iter < SOLVER_ITERATIONS; ++iter)
+        for (u16 m = 0; m < g_manifoldCount; ++m)
+            SolveContact(&g_manifolds[m], dt);
+
+    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < n; ++i)
+        if (Sys_Global.instances[i].entflags & ENTFLAG_RIGIDBODY)
+            IntegrateAngularVelocity(i, dt);
+
+    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < n; ++i)
+        if (Sys_Global.instances[i].entflags & ENTFLAG_RIGIDBODY)
+            UpdateSleep(i, dt);
 }
  
 void Physics_ResetForLevelLoad(void) {
     __builtin_memset(g_manifolds,    0, sizeof(g_manifolds));
     __builtin_memset(g_sleepCounter, 0, sizeof(g_sleepCounter));
-    __builtin_memset(g_pairA,        0, sizeof(g_pairA));
-    __builtin_memset(g_pairB,        0, sizeof(g_pairB));
     g_manifoldCount = 0;
-    g_pairCount     = 0;
 }
  
 static inline float DefaultInertia(const Entity *e) {
@@ -841,10 +815,8 @@ void Physics_DrawDebug(void) {
     u16 n = Sys_Global.loadedInstances;
  
     // ── 1. Build set of active manifold IDs this frame ────────────────────────
-    u32 curIDs[MAX_DEBUG_MANIFOLD_IDS];
-    u16 curCount = 0;
-    for (u16 m = 0; m < g_manifoldCount && curCount < MAX_DEBUG_MANIFOLD_IDS; ++m)
-        curIDs[curCount++] = ManifoldID(g_manifolds[m].idxA, g_manifolds[m].idxB);
+    u32 curIDs[MAX_DEBUG_MANIFOLD_IDS]; u16 curCount = 0;
+    for (u16 m = 0; m < g_manifoldCount && curCount < MAX_DEBUG_MANIFOLD_IDS; ++m) curIDs[curCount++] = ManifoldID(g_manifolds[m].idxA, g_manifolds[m].idxB);
  
     // ── 2. Identify which instance indices are in contact (stay vs enter) ─────
     // staySet / enterSet: bitmask or parallel array — use a small flag array.
@@ -852,7 +824,6 @@ void Physics_DrawDebug(void) {
     // Use 0=idle, 1=stay, 2=enter.
     static u8 g_contactState[INSTANCE_COUNT]; // 0=idle,1=stay,2=enter
     __builtin_memset(g_contactState, 0, n); // only clear loaded range
- 
     for (u16 m = 0; m < g_manifoldCount; ++m) {
         u16 a = g_manifolds[m].idxA, b = g_manifolds[m].idxB;
         u32 id = ManifoldID(a, b);
@@ -886,8 +857,7 @@ void Physics_DrawDebug(void) {
     }
  
     // ── 4. Draw contact normals (blue rays) for all capsule contacts ──────────
-    for (u16 m = 0; m < g_manifoldCount; ++m)
-        DebugDrawManifoldNormals(&g_manifolds[m]);
+    for (u16 m = 0; m < g_manifoldCount; ++m) DebugDrawManifoldNormals(&g_manifolds[m]);
  
     // ── 5. Advance frame: current IDs become previous ─────────────────────────
     __builtin_memcpy(g_prevManifoldIDs, curIDs, curCount * sizeof(u32));
@@ -913,80 +883,212 @@ typedef struct {
     Vector3  normal;
 } CapsuleContact;
 #define NO_CONTACT ((CapsuleContact){ .depth = -1.0f, .normal = {0,1,0} })
- 
+
 static CapsuleContact QueryCapsuleContact(Vector3 start, Vector3 end, float capsuleRadius, u32 layerMask) {
     CapsuleContact worst = NO_CONTACT;
-    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
+    float minX = vmin(start.x, end.x) - capsuleRadius;
+    float maxX = vmax(start.x, end.x) + capsuleRadius;
+    float minZ = vmin(start.z, end.z) - capsuleRadius;
+    float maxZ = vmax(start.z, end.z) + capsuleRadius;
+    i32 cxMin = vmax(0, vmin(WORLDX-1, PosGetCellCoordX(minX)));
+    i32 cxMax = vmax(0, vmin(WORLDX-1, PosGetCellCoordX(maxX)));
+    i32 czMin = vmax(0, vmin(WORLDZ-1, PosGetCellCoordZ(minZ)));
+    i32 czMax = vmax(0, vmin(WORLDZ-1, PosGetCellCoordZ(maxZ)));
+    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < Sys_Global.loadedInstances; ++i) {
         if (!(layerMask & Sys_Global.instances[i].layer)) continue;
+
+        // Cell culling: skip if this instance isn't in one of the cells
+        // overlapping the capsule's XZ AABB.
+        u32 instCell = Sys_Global.instances[i].cellIndex;
+        i32 icx = (i32)(instCell % WORLDX);
+        i32 icz = (i32)(instCell / WORLDX);
+        if (icx < cxMin || icx > cxMax || icz < czMin || icz > czMax) continue;
+
+        // Open-cell cull: geometry in closed cells is never reachable.
+        if (!(gridCellStates[instCell] & CELL_OPEN)) continue;
+
         u16 mindex = Sys_Global.instances[i].modelIndex;
         if (mindex >= loadedModelsMaxIndex) continue;
         u32 triCount = modelTriangleCounts[mindex];
         if (triCount < 1) continue;
- 
-        float M[16]; __builtin_memcpy(M,&modelMatrices[i * 16],16 * sizeof(float));
-        float m00=M[0], m10=M[1], m20=M[2]; float m01=M[4], m11=M[5], m21=M[6];
-        float m02=M[8], m12=M[9], m22=M[10]; float tx=M[12], ty=M[13], tz=M[14];
-        float scl_x = vsqrtf(m00*m00 + m10*m10 + m20*m20);
-        float scl_y = vsqrtf(m01*m01 + m11*m11 + m21*m21);
-        float scl_z = vsqrtf(m02*m02 + m12*m12 + m22*m22);
-        if (scl_x < 1e-6f || scl_y < 1e-6f || scl_z < 1e-6f) continue;
- 
+
+        float M[16]; __builtin_memcpy(M, &modelMatrices[i*16], 64);
+        float m00=M[0],m10=M[1],m20=M[2];
+        float m01=M[4],m11=M[5],m21=M[6];
+        float m02=M[8],m12=M[9],m22=M[10];
+        float tx=M[12],ty=M[13],tz=M[14];
+        float scl_x=vsqrtf(m00*m00+m10*m10+m20*m20);
+        float scl_y=vsqrtf(m01*m01+m11*m11+m21*m21);
+        float scl_z=vsqrtf(m02*m02+m12*m12+m22*m22);
+        if (scl_x<1e-6f||scl_y<1e-6f||scl_z<1e-6f) continue;
+
+        // Bounding-sphere pre-reject.
         Vector3 objPos = Sys_Global.instances[i].position;
-        Vector3 capsuleMid = { (start.x+end.x)*0.5f, (start.y+end.y)*0.5f, (start.z+end.z)*0.5f };
+        Vector3 capsuleMid = {
+            (start.x+end.x)*0.5f,
+            (start.y+end.y)*0.5f,
+            (start.z+end.z)*0.5f
+        };
         Vector3 delta = Vector3_A_minus_B(objPos, capsuleMid);
-        float distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
+        float distSqrd = delta.x*delta.x+delta.y*delta.y+delta.z*delta.z;
         float modelRad = vmax(modelBounds[mindex], 1.81f);
-        Vector3 spine = Vector3_A_minus_B(end, start);
-        float spineHalf = magnitude_vector3(spine) * 0.5f;
-        float combinedRad = modelRad + spineHalf + capsuleRadius + 0.1f;
+        float spineHalf = magnitude_vector3(Vector3_A_minus_B(end,start))*0.5f;
+        float combinedRad = modelRad+spineHalf+capsuleRadius+0.1f;
         if (distSqrd > combinedRad*combinedRad) continue;
- 
-        Vector3 relS = { start.x-tx, start.y-ty, start.z-tz };
-        Vector3 localStart = { (relS.x*m00 + relS.y*m10 + relS.z*m20) / (scl_x*scl_x), (relS.x*m01 + relS.y*m11 + relS.z*m21) / (scl_y*scl_y), (relS.x*m02 + relS.y*m12 + relS.z*m22) / (scl_z*scl_z)};
-        Vector3 relE = {end.x-tx,end.y-ty,end.z-tz};
-        Vector3 localEnd = {(relE.x*m00 + relE.y*m10 + relE.z*m20) / (scl_x*scl_x), (relE.x*m01 + relE.y*m11 + relE.z*m21) / (scl_y*scl_y), (relE.x*m02 + relE.y*m12 + relE.z*m22) / (scl_z*scl_z)};
-        float minScl = scl_x;
-        if (scl_y < minScl) { minScl = scl_y; } if (scl_z < minScl) { minScl = scl_z; }
-        float localRadius = capsuleRadius / minScl;
-        for (u32 j = 0; j < triCount; ++j) {
-            u32 bA = (u32)modelTriangles[mindex][j*3 + 0] * VERTEX_ATTRIBUTES_SIZE, bB = (u32)modelTriangles[mindex][j*3 + 1] * VERTEX_ATTRIBUTES_SIZE, bC = (u32)modelTriangles[mindex][j*3 + 2] * VERTEX_ATTRIBUTES_SIZE;
-            Vector3 posA = {half_to_float( *(half*)(modelVertices[mindex] + bA + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 4) )};
-            Vector3 posB = {half_to_float( *(half*)(modelVertices[mindex] + bB + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 4) )};
-            Vector3 posC = {half_to_float( *(half*)(modelVertices[mindex] + bC + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 4) )};
-            Vector3 cpP   = ClosestPointOnTriangle(posA,posB,posC,localStart);
-            Vector3 spP   = ClosestPointOnSegment(localStart,localEnd,cpP);
-            Vector3 cpP2  = ClosestPointOnTriangle(posA,posB,posC,spP);
-            Vector3 cpQ   = ClosestPointOnTriangle(posA,posB,posC,localEnd);
-            Vector3 spQ   = ClosestPointOnSegment(localStart,localEnd,cpQ);
-            Vector3 cpQ2  = ClosestPointOnTriangle(posA,posB,posC,spQ);
-            Vector3 dP = Vector3_A_minus_B(spP,cpP2); Vector3 dQ = Vector3_A_minus_B(spQ,cpQ2);
-            float distP = vsqrtf(dot_vector3(dP,dP));
-            float distQ = vsqrtf(dot_vector3(dQ,dQ));
+
+        float scl_x2=scl_x*scl_x, scl_y2=scl_y*scl_y, scl_z2=scl_z*scl_z;
+        Vector3 relS={start.x-tx,start.y-ty,start.z-tz};
+        Vector3 localStart={
+            (relS.x*m00+relS.y*m10+relS.z*m20)/scl_x2,
+            (relS.x*m01+relS.y*m11+relS.z*m21)/scl_y2,
+            (relS.x*m02+relS.y*m12+relS.z*m22)/scl_z2
+        };
+        Vector3 relE={end.x-tx,end.y-ty,end.z-tz};
+        Vector3 localEnd={
+            (relE.x*m00+relE.y*m10+relE.z*m20)/scl_x2,
+            (relE.x*m01+relE.y*m11+relE.z*m21)/scl_y2,
+            (relE.x*m02+relE.y*m12+relE.z*m22)/scl_z2
+        };
+        float minScl=scl_x;
+        if (scl_y<minScl) minScl=scl_y;
+        if (scl_z<minScl) minScl=scl_z;
+        float localRadius=capsuleRadius/minScl;
+
+        for (u32 j=0; j<triCount; ++j) {
+            u32 bA=(u32)modelTriangles[mindex][j*3+0]*VERTEX_ATTRIBUTES_SIZE;
+            u32 bB=(u32)modelTriangles[mindex][j*3+1]*VERTEX_ATTRIBUTES_SIZE;
+            u32 bC=(u32)modelTriangles[mindex][j*3+2]*VERTEX_ATTRIBUTES_SIZE;
+            Vector3 posA={
+                half_to_float(*(half*)(modelVertices[mindex]+bA+0)),
+                half_to_float(*(half*)(modelVertices[mindex]+bA+2)),
+                half_to_float(*(half*)(modelVertices[mindex]+bA+4))
+            };
+            Vector3 posB={
+                half_to_float(*(half*)(modelVertices[mindex]+bB+0)),
+                half_to_float(*(half*)(modelVertices[mindex]+bB+2)),
+                half_to_float(*(half*)(modelVertices[mindex]+bB+4))
+            };
+            Vector3 posC={
+                half_to_float(*(half*)(modelVertices[mindex]+bC+0)),
+                half_to_float(*(half*)(modelVertices[mindex]+bC+2)),
+                half_to_float(*(half*)(modelVertices[mindex]+bC+4))
+            };
+
+            Vector3 cpP  = ClosestPointOnTriangle(posA,posB,posC,localStart);
+            Vector3 spP  = ClosestPointOnSegment(localStart,localEnd,cpP);
+            Vector3 cpP2 = ClosestPointOnTriangle(posA,posB,posC,spP);
+            Vector3 cpQ  = ClosestPointOnTriangle(posA,posB,posC,localEnd);
+            Vector3 spQ  = ClosestPointOnSegment(localStart,localEnd,cpQ);
+            Vector3 cpQ2 = ClosestPointOnTriangle(posA,posB,posC,spQ);
+
+            Vector3 dP=Vector3_A_minus_B(spP,cpP2);
+            Vector3 dQ=Vector3_A_minus_B(spQ,cpQ2);
+            float distP=vsqrtf(dot_vector3(dP,dP));
+            float distQ=vsqrtf(dot_vector3(dQ,dQ));
             float localDist; Vector3 localContactVec;
-            if (distP <= distQ) { localDist = distP; localContactVec = dP; }
-            else                { localDist = distQ; localContactVec = dQ; }
- 
-            float localPen = localRadius - localDist;
-            if (localPen <= 0.0f) continue;
- 
+            if (distP<=distQ) { localDist=distP; localContactVec=dP; }
+            else              { localDist=distQ; localContactVec=dQ; }
+
+            float localPen=localRadius-localDist;
+            if (localPen<=0.0f) continue;
+
             Vector3 localNormal;
-            if (localDist > 1e-6f) {
-                localNormal = (Vector3){ localContactVec.x / localDist, localContactVec.y / localDist, localContactVec.z / localDist };
+            if (localDist>1e-6f) {
+                localNormal=(Vector3){
+                    localContactVec.x/localDist,
+                    localContactVec.y/localDist,
+                    localContactVec.z/localDist
+                };
             } else {
-                Vector3 eAB = Vector3_A_minus_B(posB, posA); Vector3 eAC = Vector3_A_minus_B(posC, posA);
-                localNormal = normalize_vector3(cross_vector3(eAB, eAC));
-                Vector3 spMid = { (localStart.x+localEnd.x)*0.5f, (localStart.y+localEnd.y)*0.5f, (localStart.z+localEnd.z)*0.5f };
-                Vector3 toMid = Vector3_A_minus_B(spMid, posA);
-                if (dot_vector3(localNormal, toMid) < 0.0f) { localNormal.x=-localNormal.x; localNormal.y=-localNormal.y; localNormal.z=-localNormal.z; }
+                Vector3 eAB=Vector3_A_minus_B(posB,posA);
+                Vector3 eAC=Vector3_A_minus_B(posC,posA);
+                localNormal=normalize_vector3(cross_vector3(eAB,eAC));
+                Vector3 spMid={
+                    (localStart.x+localEnd.x)*0.5f,
+                    (localStart.y+localEnd.y)*0.5f,
+                    (localStart.z+localEnd.z)*0.5f
+                };
+                Vector3 toMid=Vector3_A_minus_B(spMid,posA);
+                if (dot_vector3(localNormal,toMid)<0.0f) {
+                    localNormal.x=-localNormal.x;
+                    localNormal.y=-localNormal.y;
+                    localNormal.z=-localNormal.z;
+                }
             }
- 
-            Vector3 worldNormal = {(m00/scl_x)*localNormal.x + (m01/scl_y)*localNormal.y + (m02/scl_z)*localNormal.z, (m10/scl_x)*localNormal.x + (m11/scl_y)*localNormal.y + (m12/scl_z)*localNormal.z, (m20/scl_x)*localNormal.x + (m21/scl_y)*localNormal.y + (m22/scl_z)*localNormal.z};
-            worldNormal = normalize_vector3(worldNormal);
-            float worldPen = localPen * minScl;
-            if (worldPen > worst.depth) { worst.depth = worldPen; worst.normal = worldNormal; }
+
+            Vector3 worldNormal=normalize_vector3((Vector3){
+                (m00/scl_x)*localNormal.x+(m01/scl_y)*localNormal.y+(m02/scl_z)*localNormal.z,
+                (m10/scl_x)*localNormal.x+(m11/scl_y)*localNormal.y+(m12/scl_z)*localNormal.z,
+                (m20/scl_x)*localNormal.x+(m21/scl_y)*localNormal.y+(m22/scl_z)*localNormal.z
+            });
+            float worldPen=localPen*minScl;
+            if (worldPen>worst.depth) {
+                worst.depth=worldPen;
+                worst.normal=worldNormal;
+            }
         }
     }
     return worst;
+}
+
+// World collision response for a single rigidbody using its own collider shape.
+// Returns the worst penetration contact against static mesh geometry, or NO_CONTACT.
+static CapsuleContact QueryRigidbodyWorldContact(u16 i, Vector3 pos) {
+    Entity *e = &Sys_Global.instances[i];
+    u32 mask  = GetCollisionMask(e->layer);
+    switch (e->collider) {
+        case COLLIDER_TYPE_SPHERE: {
+            // Recentre the sphere at `pos` (pos is the entity position, not eye)
+            ShapeSphere s;
+            s.center = Vector3_A_plus_B(pos,
+                quat_rotate_vector(e->rotation, e->colliderCenter));
+            s.radius = e->colliderSize.x;
+            // We can reuse QueryCapsuleContact with a degenerate zero-length spine
+            return QueryCapsuleContact(s.center, s.center, s.radius, mask);
+        }
+        case COLLIDER_TYPE_CAPSULE: {
+            // Rebuild capsule tips at the new position
+            float r         = e->colliderSize.x;
+            float halfInner = (e->colliderSize.y * 0.5f) - r;
+            if (halfInner < 0.0f) halfInner = 0.0f;
+            Vector3 center  = Vector3_A_plus_B(pos,
+                quat_rotate_vector(e->rotation, e->colliderCenter));
+            Vector3 axis    = (e->colliderSize.z < 0.5f) ? quat_rotate_vector(e->rotation, (Vector3){1,0,0}) : ((e->colliderSize.z < 1.5f) ? quat_rotate_vector(e->rotation, (Vector3){0,1,0}) :  quat_rotate_vector(e->rotation, (Vector3){0,0,1}));
+            Vector3 base    = Vector3_A_minus_B(center,scale_vector3(axis,halfInner));
+            Vector3 tip     = Vector3_A_plus_B (center,scale_vector3(axis,halfInner));
+            return QueryCapsuleContact(base, tip, r, mask);
+        }
+        case COLLIDER_TYPE_BOX: {
+            ShapeBox b;
+            b.center      = Vector3_A_plus_B(pos, quat_rotate_vector(e->rotation, e->colliderCenter));
+            b.halfExtents = scale_vector3(e->colliderSize, 0.5f);
+            b.rot         = e->rotation;
+            Vector3 ax, ay, az;
+            obb_axes(b.rot, &ax, &ay, &az);
+            CapsuleContact worst = NO_CONTACT;
+            for (int cx = -1; cx <= 1; cx += 2) {
+                for (int cy = -1; cy <= 1; cy += 2) {
+                    for (int cz = -1; cz <= 1; cz += 2) {
+                        Vector3 corner = Vector3_A_plus_B(b.center,
+                            Vector3_A_plus_B(
+                                Vector3_A_plus_B(
+                                    scale_vector3(ax, b.halfExtents.x * (float)cx),
+                                    scale_vector3(ay, b.halfExtents.y * (float)cy)),
+                                scale_vector3(az, b.halfExtents.z * (float)cz)));
+                        CapsuleContact c = QueryCapsuleContact(corner, corner, 0.004f, mask);
+                        // Only accept contacts where the normal pushes us out (not further in)
+                        if (c.depth > worst.depth && c.normal.y > -0.1f)
+                            worst = c;
+                    }
+                }
+            }
+            return worst;
+        }
+        default:
+            // MESH colliders don't move as rigidbodies in practice;
+            // fall back to a bounding-sphere approximation.
+            return QueryCapsuleContact(pos,pos,modelBounds[e->modelIndex] > 0.01f ? modelBounds[e->modelIndex] : 0.5f,mask);
+    }
 }
  
 ENGINE_TO_MOD bool CheckCapsule(Vector3 start, Vector3 end, float capsuleRadius, float capsuleHeight, u32 layerMask) {
@@ -1055,8 +1157,7 @@ ENGINE_TO_MOD void ApplyPlayerMovements(void) {
     Sys_Global.instances[PLAYER1].velocity = appliedVel;
 }
  
-const Vector3 gravityVelocity = { 0.0f, -0.981f, 0.0f };
- 
+const Vector3 gravityVelocity = { 0.0f, -0.0981f, 0.0f };
 void UpdateVelocityFromGravity(void) {
     if (Sys_Global.pauseRelativeTime < 10.0f) return;
     for (u32 i=PLAYER1;i<INSTANCE_COUNT;++i) {
@@ -1074,32 +1175,81 @@ void ApplyCorpseFriction(u16 instanceIdx) {
     Sys_Global.instances[instanceIdx].frictionCombine = PHYS_COMBINE_MUL;
     Sys_Global.instances[instanceIdx].bounceCombine = PHYS_COMBINE_MAX;
 }
- 
+
+float floorMinimum = -48.6316f;
 bool GridCellBlock(u16 i,Vector3 pos,Vector3 newPos);
-static void IntegrateRigidbody(u16 i,float dt){
-    Entity*e=&Sys_Global.instances[i];
-    if(!(e->entflags&ENTFLAG_ACTIVE))return;
-    if(!(e->entflags&ENTFLAG_RIGIDBODY))return;
-    if(e->entflags&ENTFLAG_ASLEEP)return;
-    if(e->entflags&ENTFLAG_KINEMATIC)return;
-    float mag=magnitude_vector3(e->velocity);
-    if(mag<0.005f)return;
- 
-    Vector3 pos=e->position; Vector3 newPos=Vector3_A_plus_B(pos,scale_vector3(e->velocity,dt));
-    if(GridCellBlock(i,pos,newPos))return;
-    u32 mask=GetCollisionMask(e->layer); Vector3 s,en; CapsuleTipsFromEye(newPos,&s,&en);
-    CapsuleContact c = QueryCapsuleContact(s,en,PLAYER_RADIUS,mask);
-    if(c.depth>0.0f){ newPos=Vector3_A_plus_B(newPos,scale_vector3(c.normal,c.depth+0.001f)); }
-    e->lastPosition=pos; e->position=newPos; e->cellIndex=PosGetCellCoords(newPos.x,newPos.z);
-    Sys_Global.dirtyInstances[i]=true; float angMag=magnitude_vector3(e->angularVelocity);
-    if(angMag>0.0001f){
-        float angle=angMag*dt;
-        Vector3 axis=normalize_vector3(e->angularVelocity);
-        Quaternion dq={axis.x*vsinf(angle*0.5f),axis.y*vsinf(angle*0.5f),axis.z*vsinf(angle*0.5f),vcosf(angle*0.5f)};
-        e->rotation=quat_multiply(dq,e->rotation); float qmag=quat_dot(e->rotation,e->rotation);
-        if(qmag>0.0001f){ float inv=1.0f/vsqrtf(qmag); e->rotation.x*=inv; e->rotation.y*=inv; e->rotation.z*=inv; e->rotation.w*=inv; }
-        e->angularVelocity=scale_vector3(e->angularVelocity,1.0f-e->angularDrag*dt);
+static void IntegrateRigidbody(u16 i, float dt) {
+    Entity *e = &Sys_Global.instances[i];
+    if (!(e->entflags & ENTFLAG_ACTIVE))    return;
+    if (!(e->entflags & ENTFLAG_RIGIDBODY)) return;
+    if (  e->entflags & ENTFLAG_ASLEEP)     return;
+    if (  e->entflags & ENTFLAG_KINEMATIC)  return;
+
+    float mag = magnitude_vector3(e->velocity);
+    if (mag < 0.005f) return;
+
+    Vector3 pos    = e->position;
+    Vector3 newPos = Vector3_A_plus_B(pos, scale_vector3(e->velocity, dt));
+
+    if (GridCellBlock(i, pos, newPos)) return;
+
+    // ── Step 1: resolve contact at the PROPOSED new position ──────────────
+    // Allow multiple iterations so a corner can't tunnel through thin geometry.
+    // Hard limit to avoid infinite loop on degenerate geometry.
+    for (int iter = 0; iter < 4; ++iter) {
+        CapsuleContact c = QueryRigidbodyWorldContact(i, newPos);
+        if (c.depth <= 0.0f) break;  // clean, done
+
+        // Only trust normals that point somewhat away from geometry
+        // (away = positive dot with the direction from old to new pos).
+        // This rejects inside-out normals from corners that tunnelled through.
+        Vector3 motion = Vector3_A_minus_B(newPos, pos);
+        float motionLen = magnitude_vector3(motion);
+        if (motionLen > 1e-5f) {
+            Vector3 motionDir = scale_vector3(motion, 1.0f / motionLen);
+            if (dot_vector3(c.normal, motionDir) > 0.5f) {
+                // Normal points the same direction as motion — we tunnelled.
+                // Binary search back along the motion ray to find the surface.
+                Vector3 safePos = pos;
+                Vector3 testPos = newPos;
+                for (int bi = 0; bi < 6; ++bi) {
+                    Vector3 mid = {
+                        (safePos.x + testPos.x) * 0.5f,
+                        (safePos.y + testPos.y) * 0.5f,
+                        (safePos.z + testPos.z) * 0.5f
+                    };
+                    CapsuleContact mc = QueryRigidbodyWorldContact(i, mid);
+                    if (mc.depth > 0.0f) testPos = mid;
+                    else                 safePos  = mid;
+                }
+                newPos = safePos;
+                // Zero ALL velocity — tunnelling means we have no reliable normal
+                e->velocity = (Vector3){0, 0, 0};
+                goto position_resolved;
+            }
+        }
+
+        // ── Normal push: move position to surface, no velocity injection ──
+        // Push by exactly depth + tiny epsilon so next query returns clean.
+        newPos = Vector3_A_plus_B(newPos, scale_vector3(c.normal, c.depth + 0.0005f));
+
+        // ── Velocity: cancel only the into-surface component ──────────────
+        // This makes the object slide along the surface instead of stopping dead.
+        float vn = dot_vector3(e->velocity, c.normal);
+        if (vn < 0.0f) {
+            // Remove the penetrating component.  No restitution here —
+            // bouncing is handled by the impulse solver, not integration.
+            e->velocity = Vector3_A_minus_B(e->velocity,
+                scale_vector3(c.normal, vn));
+        }
+        // If vn >= 0 the object is already moving away — don't touch velocity at all.
     }
+position_resolved:;
+
+    e->lastPosition = pos;
+    e->position     = newPos;
+    e->cellIndex    = PosGetCellCoords(newPos.x, newPos.z);
+    Sys_Global.dirtyInstances[i] = true;
 }
  
 static void IntegratePlayer(u16 i,float dt) {
@@ -1223,11 +1373,14 @@ static void IntegratePlayer(u16 i,float dt) {
  
 extern ma_engine audio_engine;
 void UpdatePositions(void) {
-    float dt=(float)Sys_Global.timeSinceLastPhysicsTick;
-    for (u32 i=PLAYER1;i<PLAYER2/*Sys_Global.loadedInstances*/;++i) {
-        if (i<=PLAYER2)                                              IntegratePlayer((u16)i,dt);
-        else if (Sys_Global.instances[i].entflags&ENTFLAG_RIGIDBODY) IntegrateRigidbody((u16)i,dt);
+    float dt = vclamp((float)Sys_Global.timeSinceLastPhysicsTick,0.0005f,0.027777778f); // At most 4 frames at 144fps rate
+    for (u32 i = PLAYER1; i <= PLAYER2; ++i) IntegratePlayer((u16)i, dt);
+    
+    // Every other active rigidbody in the loaded level range.
+    for (u32 i = START_INDEX_LEVEL_INSTANCES; i < (u32)Sys_Global.loadedInstances; ++i) {
+        if (Sys_Global.instances[i].entflags & ENTFLAG_RIGIDBODY) IntegrateRigidbody((u16)i, dt);
     }
+
     ma_engine_listener_set_position(&audio_engine,0,Sys_Global.instances[PLAYER1].position.x,Sys_Global.instances[PLAYER1].position.y,Sys_Global.instances[PLAYER1].position.z);
 }
  
@@ -1241,113 +1394,12 @@ void ClampVelocity(void) {
     }
 }
  
-void UpdateTriggers(void) {
-    // Separate system, simple AABB checks.
-}
- 
+void UpdateTriggers(void);
 void Physics(void) {
     UpdateVelocityFromGravity();
-//     Physics_PrimitiveStep((float)Sys_Global.timeSinceLastPhysicsTick);
+    Physics_PrimitiveStep((float)Sys_Global.timeSinceLastPhysicsTick);
     ClampVelocity();
     UpdatePositions();
     UpdateTriggers();
-//     Physics_DrawDebug(); // no-op when physicsDebug == 0
+    Physics_DrawDebug();
 }
- 
-// ─── raycasting ───────────────────────────────────────────────────────────────
-RaycastHit RayTriangle(Vector3 origin, Vector3 dir, Vector3 posA, Vector3 posB, Vector3 posC, Vector3 normA, Vector3 normB, Vector3 normC) {
-    Vector3 edgeAB = Vector3_A_minus_B(posB,posA);
-    Vector3 edgeAC = Vector3_A_minus_B(posC,posA);
-    Vector3 normalVector = cross_vector3(edgeAB,edgeAC);
-    Vector3 ao = Vector3_A_minus_B(origin,posA);
-    Vector3 dao = cross_vector3(ao,dir);
-    float determinant = -dot_vector3(dir, normalVector);
-    float invDet = 1.0f / determinant;
-    float dst = dot_vector3(ao, normalVector) * invDet;
-    float u = dot_vector3(edgeAC, dao) * invDet;
-    float v = -dot_vector3(edgeAB, dao) * invDet;
-    float w = 1.0f - u - v;
-    RaycastHit hitInfo;
-    hitInfo.hit = vabs(determinant) >= 1E-8f && dst >= 0.0f && u >= 0.0f && v >= 0.0f && w >= 0.0f;
-    hitInfo.point = Vector3_A_plus_B(origin,scale_vector3(dir,dst));
-    hitInfo.normal = normalize_vector3(Vector3_A_plus_B(Vector3_A_plus_B(scale_vector3(normA,w),scale_vector3(normB,u)),scale_vector3(normC,v)));
-    hitInfo.distance = dst;
-    return hitInfo;
-}
- 
-extern u16 playerCellIdx; bool SkyIsVisible(void); bool LevelSpecificHacksForClosedCellsThatProbablyShouldntBeBecauseOfInsetMeshes(u32 instCellIdx, u16 constIndex);
-ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, u32 layerMask) {
-    u32 numMeshesCheckedForRaycast = 0, numTrisCastAgainst = 0;
-    RaycastHit result = { .hit = false, .distance = maxDist, .point = {0.0f, 0.0f, 0.0f}, .normal = {0.0f, 0.0f, 0.0f}, .hitInstanceIndex = INSTANCE_COUNT };
-    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
-        if (!(layerMask & Sys_Global.instances[i].layer)) continue;
-        u16 mindex = Sys_Global.instances[i].modelIndex;
-        if (mindex >= loadedModelsMaxIndex) continue;
-        Vector3 objPos = Sys_Global.instances[i].position;
-        u16 instCellIdx = PosGetCellCoords(objPos.x,objPos.z);
-        Vector3 delta = Vector3_A_minus_B(objPos,origin);
-        float distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
-        float radBounds = vmax(modelBounds[mindex], 1.81f);
-        float maxDistToObj = vmax(maxDist - radBounds,maxDist);
-        if (distSqrd >= (maxDistToObj * maxDistToObj)) continue;
-        if (LevelSpecificHacksForClosedCellsThatProbablyShouldntBeBecauseOfInsetMeshes(instCellIdx,Sys_Global.instances[i].index)) continue;
-        
-        u32 triCount = modelTriangleCounts[mindex];
-        if (triCount < 1) continue;
-        float M[16];
-        __builtin_memcpy(M,&modelMatrices[i * 16],16 * sizeof(float));
-        float m00=M[0], m10=M[1], m20=M[2];
-        float m01=M[4], m11=M[5], m21=M[6];
-        float m02=M[8], m12=M[9], m22=M[10];
-        float tx=M[12], ty=M[13], tz=M[14];
-        float sclx = vsqrtf(m00*m00 + m10*m10 + m20*m20); float sclx2 = sclx * sclx;
-        float scly = vsqrtf(m01*m01 + m11*m11 + m21*m21); float scly2 = scly * scly;
-        float sclz = vsqrtf(m02*m02 + m12*m12 + m22*m22); float sclz2 = sclz * sclz;
-        Vector3 rel = {origin.x - tx, origin.y - ty, origin.z - tz};
-        Vector3 localOrigin = {(rel.x*m00 + rel.y*m10 + rel.z*m20) / sclx2, (rel.x*m01 + rel.y*m11 + rel.z*m21) / scly2, (rel.x*m02 + rel.y*m12 + rel.z*m22) / sclz2};
-        Vector3 localDir =    {(dir.x*m00 + dir.y*m10 + dir.z*m20) / sclx2, (dir.x*m01 + dir.y*m11 + dir.z*m21) / scly2, (dir.x*m02 + dir.y*m12 + dir.z*m22) / sclz2};
-        localDir = normalize_vector3(localDir);
-        numMeshesCheckedForRaycast++;
-        for (u32 j=0;j<triCount;++j) {
-            u32 bA = (u32)modelTriangles[mindex][j*3 + 0] * VERTEX_ATTRIBUTES_SIZE, bB = (u32)modelTriangles[mindex][j*3 + 1] * VERTEX_ATTRIBUTES_SIZE, bC = (u32)modelTriangles[mindex][j*3 + 2] * VERTEX_ATTRIBUTES_SIZE;
-            Vector3 posA = {half_to_float( *(half*)(modelVertices[mindex] + bA + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 4) )};
-            Vector3 posB = {half_to_float( *(half*)(modelVertices[mindex] + bB + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 4) )};
-            Vector3 posC = {half_to_float( *(half*)(modelVertices[mindex] + bC + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 4) )};
-            Vector3 normA ={half_to_float( *(half*)(modelVertices[mindex] + bA + 6) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 8) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 10) )};
-            Vector3 normB ={half_to_float( *(half*)(modelVertices[mindex] + bB + 6) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 8) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 10) )};
-            Vector3 normC ={half_to_float( *(half*)(modelVertices[mindex] + bC + 6) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 8) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 10) )};
-            RaycastHit tryTri = RayTriangle(localOrigin,localDir,posA,posB,posC,normA,normB,normC);
-            numTrisCastAgainst++;
-            if (!tryTri.hit) continue;
-            Vector3 worldPoint = {
-                m00*tryTri.point.x + m01*tryTri.point.y + m02*tryTri.point.z + tx,
-                m10*tryTri.point.x + m11*tryTri.point.y + m12*tryTri.point.z + ty,
-                m20*tryTri.point.x + m21*tryTri.point.y + m22*tryTri.point.z + tz
-            };
-            Vector3 toHit = Vector3_A_minus_B(worldPoint, origin);
-            float worldDist = vsqrtf(toHit.x*toHit.x + toHit.y*toHit.y + toHit.z*toHit.z);
-            if (worldDist >= result.distance) continue;
-            Vector3 worldNormal = {
-                (m00/sclx)*tryTri.normal.x + (m01/scly)*tryTri.normal.y + (m02/sclz)*tryTri.normal.z,
-                (m10/sclx)*tryTri.normal.x + (m11/scly)*tryTri.normal.y + (m12/sclz)*tryTri.normal.z,
-                (m20/sclx)*tryTri.normal.x + (m21/scly)*tryTri.normal.y + (m22/sclz)*tryTri.normal.z
-            };
-            worldNormal = normalize_vector3(worldNormal);
-            result.hit              = true;
-            result.point            = worldPoint;
-            result.normal           = normalize_vector3(worldNormal);
-            result.distance         = worldDist;
-            result.hitInstanceIndex = i;
-        }
-    }
-    if (result.hit) DualLog("[HIT] Raycast with org %f %f %f and dir %f %f %f, range %f, mask %u, tested against %u instances, tris %u, hit %u, layer %u\n",origin.x,origin.y,origin.z,dir.x,dir.y,dir.z,maxDist,layerMask,numMeshesCheckedForRaycast,numTrisCastAgainst,result.hitInstanceIndex,Sys_Global.instances[result.hitInstanceIndex].layer);
-    else            DualLog("[MISS] Raycast with org %f %f %f and dir %f %f %f, range %f, mask %u, tested against %u instances, tris %u\n",origin.x,origin.y,origin.z,dir.x,dir.y,dir.z,maxDist,layerMask,numMeshesCheckedForRaycast,numTrisCastAgainst);
-    return result;
-}
- 
-ENGINE_TO_MOD void RaycastAll(Vector3 origin, Vector3 dir, float distance, u32 layerMask, RaycastHit* hits, u16 maxCount) {
-    for (int i=0;i<maxCount;++i) hits[i].hit = false;
-    (void)origin; (void)dir; (void)distance; (void)layerMask;
-}
- 
-ENGINE_TO_MOD RaycastHit CapsuleCast(Vector3 start, Vector3 end, float capsuleRadius, float castDist, u32 layerMask, bool hitTriggers) { RaycastHit result = { .hit = false }; (void)start; (void)end; (void)capsuleRadius; (void)castDist; (void)layerMask; (void)hitTriggers; return result; }

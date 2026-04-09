@@ -139,3 +139,22 @@ static inline __attribute__((always_inline)) float parse_float(const char* str, 
 
 static inline __attribute__((always_inline)) i32 PosGetCellCoordX(float pos_x) { return (u16)clamp((i32)vfloor((pos_x - Sys_Global.worldMin_x + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
 static inline __attribute__((always_inline)) i32 PosGetCellCoordZ(float pos_z) { return (u16)clamp((i32)vfloor((pos_z - Sys_Global.worldMin_z + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
+typedef u16 half;
+static inline __attribute__((always_inline)) float half_to_float(half h){
+    u32 s=(h&0x8000)<<16,e=(h&0x7C00)>>10,m=(h&0x03FF),out;
+    if (e == 0){
+        if (m == 0) out = s;
+        else { // normalize subnormal
+            e = 1;
+            while ((m & 0x0400) == 0) { m <<= 1; e--; }
+            m &= 0x03FF;
+            e = e + (127 - 15);
+            out = s | (e << 23) | (m << 13);
+        }
+    } else if (e == 31) out = s | 0x7F800000 | (m << 13);
+    else { e = e + (127 - 15); out = s | (e << 23) | (m << 13); }
+ 
+    float f;
+    __builtin_memcpy(&f, &out, 4);
+    return f;
+}

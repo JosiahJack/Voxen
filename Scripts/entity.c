@@ -322,13 +322,13 @@ Entity EntityDefinitions[MAX_ENTITIES] = {
     {.path="weapon_grenademine",.index=318,.modelIndex=184,.mass=1.0f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
     {.path="weapon_grenadenitro",.index=319,.modelIndex=185,.mass=1.0f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
     {.path="weapon_grenadegas",.index=320,.modelIndex=183,.mass=1.0f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
-    {.path="item_patch_berserk",.index=321,.modelIndex=488,.texIndex=590,.mass=0.12f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
-    {.path="item_patch_detox",.index=322,.modelIndex=488,.texIndex=591,.mass=0.12f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
-    {.path="item_patch_genius",.index=323,.modelIndex=488,.texIndex=592,.mass=0.12f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
-    {.path="item_patch_medi",.index=324,.modelIndex=488,.texIndex=600,.mass=0.12f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
-    {.path="item_patch_reflex",.index=325,.modelIndex=488,.texIndex=641,.mass=0.12f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
-    {.path="item_patch_sight",.index=326,.modelIndex=488,.texIndex=646,.mass=0.12f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
-    {.path="item_patch_staminup",.index=327,.modelIndex=488,.texIndex=647,.mass=0.12f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="item_patch_berserk",.index=321,.modelIndex=488,.collider=COLLIDER_TYPE_CONVEXMESH,.colliderMeshIndex=491,.texIndex=590,.mass=0.12f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="item_patch_detox",.index=322,.modelIndex=488,.collider=COLLIDER_TYPE_CONVEXMESH,.colliderMeshIndex=491,.texIndex=591,.mass=0.12f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="item_patch_genius",.index=323,.modelIndex=488,.collider=COLLIDER_TYPE_CONVEXMESH,.colliderMeshIndex=491,.texIndex=592,.mass=0.12f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="item_patch_medi",.index=324,.modelIndex=488,.collider=COLLIDER_TYPE_CONVEXMESH,.colliderMeshIndex=491,.texIndex=600,.mass=0.12f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="item_patch_reflex",.index=325,.modelIndex=488,.collider=COLLIDER_TYPE_CONVEXMESH,.colliderMeshIndex=491,.texIndex=641,.mass=0.12f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="item_patch_sight",.index=326,.modelIndex=488,.collider=COLLIDER_TYPE_CONVEXMESH,.colliderMeshIndex=491,.texIndex=646,.mass=0.12f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
+    {.path="item_patch_staminup",.index=327,.modelIndex=488,.collider=COLLIDER_TYPE_CONVEXMESH,.colliderMeshIndex=491,.texIndex=647,.mass=0.12f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
     {.path="item_hw_system",.index=328,.modelIndex=207,.texIndex=405,.glowIndex=404,.mass=0.17f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
     {.path="item_hw_navunit",.index=329,.modelIndex=204,.collider=COLLIDER_TYPE_CONVEXMESH,.colliderMeshIndex=696,.texIndex=1258,.glowIndex=1259,.mass=0.1f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
     {.path="item_hw_ereader",.index=330,.modelIndex=200,.collider=COLLIDER_TYPE_CONVEXMESH,.colliderMeshIndex=692,.mass=0.12f,.linearDrag=0.0f,.angularDrag=0.05f,.gravity=1.0f,.kinematic=false,.dynamicFriction=0.6f,.staticFriction=0.6f,.bounciness=0.0f,.frictionCombine=PHYS_COMBINE_AVG,.bounceCombine=PHYS_COMBINE_AVG},
@@ -872,6 +872,15 @@ MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(void) { // Global condition
         
         EntityDefinitions[i].rotation = QUAT_IDENTITY;
         EntityDefinitions[i].lodIndex = MODEL_IDX_MAX;
+        if (!EntityDefinitions[i].layer) EntityDefinitions[i].layer = PhysicsLayer_Default;
+        // TODO REMOVE!  TESTING WITH SPHERES FOR EVERYTHING NON BOX!
+        if (EntityDefinitions[i].collider != COLLIDER_TYPE_BOX) {
+            EntityDefinitions[i].collider = COLLIDER_TYPE_SPHERE;
+            EntityDefinitions[i].colliderCenter=(Vector3){0.0f,0.0f,0.0f};
+            EntityDefinitions[i].colliderSize=(Vector3){0.16f,0.16f,0.16f};
+        }
+        
+        EntityDefinitions[i].velocity = (Vector3){0.0f,0.0f,0.0f};
         flag_set(&EntityDefinitions[i].entflags,ENTFLAG_ACTIVE,true); // Individual value setting to allow mods to set custom starting flags themselves. (or here too if they want, tis your oyster).
         flag_set(&EntityDefinitions[i].entflags,ENTFLAG_RIGIDBODY,ConstIndexIsDynamicObject(EntityDefinitions[i].index));
         if (EntityDefinitions[i].cardchunk) {

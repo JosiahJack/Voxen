@@ -578,4 +578,4 @@ bool CullCore(void) {
     
     PortalCulling(); // Update based on portal states.
     return true;
-} // 579
+}
