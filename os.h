@@ -100,12 +100,12 @@ void DebugRAM(const char *context);
     #define PLATFORM_DLSYM(handle, name) dlsym((handle), (name))
     #define PLATFORM_DLERROR()           dlerror()
 #endif
+#include <pthread.h>
 static inline __attribute__((always_inline)) void* OS_Alloc(size_t amount) { return OS_AllocateRAM(NULL,amount,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE); }
-
 static inline __attribute__((always_inline)) i64 OS_RawWrite(OsFileHandle fd, const void* buf, size_t count) {
     #ifdef WINDOWS
         DWORD written = 0;
-        if (WriteFile((HANDLE)fd, buf, (DWORD)count, &written, NULL)) return (i64)written;
+        if (WriteFile((HANDLE)fd,buf,(DWORD)count,&written,NULL)) return (i64)written;
         return -1;
     #else // Linux
         register i64     rax __asm__("rax") = 1; // sys_write

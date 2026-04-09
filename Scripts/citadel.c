@@ -3515,8 +3515,8 @@ MOD_TO_ENGINE void ProcessInput(void) {
     if (Eng_Global->gamePaused || Eng_Global->menuActive || Eng_Cheats->consoleActive) return; // Pause/Menu barrier <<<<<<<
     
     if (ToggleMode()) ToggleInventoryMode();
-//     if (Lantern()) Eng_Global->invP1.hardwareIsActive ^= HW_LAN;
-//     if (Infrared()) Eng_Global->invP1.hardwareIsActive ^= HW_INF;
+    if (Lantern()) Eng_Global->invP1.hardwareIsActive ^= HW_LAN;
+    if (Infrared()) Eng_Global->invP1.hardwareIsActive ^= HW_INF;
     ApplyPlayerMovements();
 }
 

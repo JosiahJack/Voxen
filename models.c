@@ -2,22 +2,14 @@
 #include "os.h"
 #include "gl.h"
 #include "voxen.h"
-#include <string.h>
-#include <stdlib.h>
-#include <pthread.h>
-#include <unistd.h>
-u8** modelVertices=NULL;
-u16** modelTriangles=NULL;
-u32 modelVertexCounts[MODEL_IDX_MAX] = {0};
-u16 modelTriangleCounts[MODEL_IDX_MAX] = {0};
-float modelBounds[MODEL_IDX_MAX] = {0};
-u16 loadedModelsMaxIndex = 0;
+void qsort(void* base, size_t nmemb, size_t size, int (*cmp)(const void*, const void*));
+u8** modelVertices=NULL; u16** modelTriangles=NULL;
+u32 modelVertexCounts[MODEL_IDX_MAX] = {0}; u16 modelTriangleCounts[MODEL_IDX_MAX] = {0};
+float modelBounds[MODEL_IDX_MAX] = {0}; u16 loadedModelsMaxIndex = 0;
 #define MAX_VERT_ELEMENT_SIZE 6964
 #define MAX_OUTPUT_VERTS      20892
-static float**    thread_temp_pos   = NULL; static float**    thread_temp_nrm   = NULL;
-static float**    thread_temp_uv    = NULL; static float**    thread_out_verts  = NULL;
-static u16** thread_out_tris   = NULL;
-static int        num_parse_threads = 0;
+static float **thread_temp_pos=NULL, **thread_temp_nrm=NULL, **thread_temp_uv =NULL, **thread_out_verts=NULL;
+static u16** thread_out_tris=NULL; static int num_parse_threads=0;
 typedef struct { const char* data; int size; } RawOBJ;
 typedef u16 half;
 typedef struct { u16 index; bool animated; u8 animationNum; char path[128]; } ModelData;
@@ -56,13 +48,68 @@ static inline __attribute__((always_inline)) i32 fast_atoi(const char** p){
 	return val*sign;
 }
 
-typedef struct { u32 idx; u32 key; } TriSort;   // renamed sumv → key for clarity
-int cmp(const void* a, const void* b) {
-    u32 ka = ((const TriSort*)a)->key;
-    u32 kb = ((const TriSort*)b)->key;
-    return (ka < kb) ? -1 : (ka > kb);
+
+
+#define UNIQUE_FLOAT_HASH_SIZE 16384
+typedef struct { float value; bool occupied; } FloatEntry;
+static u32 float_hash(float f) { u32 bits; __builtin_memcpy(&bits, &f, 4); return (bits * 2654435761u) % UNIQUE_FLOAT_HASH_SIZE; }
+static int count_unique_floats(const float* values, u32 count) {
+    if (count == 0) return 0;
+
+    FloatEntry* table = (FloatEntry*)OS_Alloc(UNIQUE_FLOAT_HASH_SIZE * sizeof(FloatEntry));
+    __builtin_memset(table, 0, UNIQUE_FLOAT_HASH_SIZE * sizeof(FloatEntry));
+    int unique = 0;
+    for (u32 i = 0; i < count; ++i) {
+        float v = values[i]; u32 slot = float_hash(v);
+        while (table[slot].occupied) {
+            if (vabs(table[slot].value - v) < 1e-3f) goto next_float;  // treat as duplicate (tolerance for FP)
+            slot = (slot + 1) % UNIQUE_FLOAT_HASH_SIZE;
+        }
+        table[slot].value = v;
+        table[slot].occupied = true;
+        ++unique;
+        next_float:;
+    }
+
+    OS_DeallocateRAM(table, UNIQUE_FLOAT_HASH_SIZE * sizeof(FloatEntry));
+    return unique;
 }
 
+static u64 normal_hash(const float* n) { u32 hx,hy,hz; __builtin_memcpy(&hx,&n[0],4); __builtin_memcpy(&hy,&n[1],4); __builtin_memcpy(&hz,&n[2],4); return ((u64)hx << 32) ^ hy ^ ((u64)hz << 16); }
+#define UNIQUE_NORMAL_HASH_SIZE 8192
+typedef struct { float x,y,z; bool occupied; } NormalEntry;
+static int count_unique_normals(const float* normals, u32 vert_count) {  // normals are interleaved every 8 floats starting at offset 3
+    if (vert_count == 0) return 0;
+
+    NormalEntry* table = (NormalEntry*)OS_Alloc(UNIQUE_NORMAL_HASH_SIZE * sizeof(NormalEntry));
+    __builtin_memset(table, 0, UNIQUE_NORMAL_HASH_SIZE * sizeof(NormalEntry));
+    int unique = 0;
+    for (u32 i = 0; i < vert_count; ++i) {
+        const float* n = normals + (i << 3) + 3;  // offset 3 in your 8-float scratch layout: pos(0-2), nrm(3-5), uv(6-7)
+        u64 h = normal_hash(n);
+        u32 slot = (u32)(h % UNIQUE_NORMAL_HASH_SIZE);
+        while (table[slot].occupied) {
+            if (vabs(table[slot].x - n[0]) < 1e-6f && vabs(table[slot].y - n[1]) < 1e-6f && vabs(table[slot].z - n[2]) < 1e-6f) goto next_normal;
+
+            slot = (slot + 1) % UNIQUE_NORMAL_HASH_SIZE;
+        }
+
+        table[slot].x = n[0]; table[slot].y = n[1]; table[slot].z = n[2]; table[slot].occupied = true;
+        ++unique;
+        next_normal:;
+    }
+
+    OS_DeallocateRAM(table, UNIQUE_NORMAL_HASH_SIZE * sizeof(NormalEntry));
+    return unique;
+}
+
+
+
+
+
+
+typedef struct { u32 idx; u32 key; } TriSort;   // renamed sumv → key for clarity
+int cmp(const void* a, const void* b) { u32 ka = ((const TriSort*)a)->key, kb = ((const TriSort*)b)->key; return (ka < kb) ? -1 : (ka > kb); }
 static void OptimizeVertexCache(u16* indices, u32 indexCount, u32 vertexCount) {
     if (indexCount < 3 || vertexCount == 0) return;
     u32 triCount = indexCount / 3;
@@ -72,22 +119,20 @@ static void OptimizeVertexCache(u16* indices, u32 indexCount, u32 vertexCount) {
         u32 v0 = t[0], v1 = t[1], v2 = t[2];
         u32 minv = v0 < v1 ? v0 : v1;
         minv = minv < v2 ? minv : v2;
-        tris[i].idx = i;
-        tris[i].key = minv;
+        tris[i].idx = i; tris[i].key = minv;
     }
 
     qsort(tris, triCount, sizeof(TriSort), cmp);
     u16* newIndices = (u16*)OS_Alloc(indexCount * sizeof(u16));
     for (u32 i = 0; i < triCount; ++i) {
         u32 old = tris[i].idx;
-        u16* src = indices + old * 3;
-        u16* dst = newIndices + i * 3;
+        u16* src = indices + old * 3; u16* dst = newIndices + i * 3;
         dst[0] = src[0]; dst[1] = src[1]; dst[2] = src[2];
     }
 
-    __builtin_memcpy(indices, newIndices, indexCount * sizeof(u16));
-    OS_DeallocateRAM(newIndices, indexCount * sizeof(u16));
-    OS_DeallocateRAM(tris, triCount * sizeof(TriSort));
+    __builtin_memcpy(indices,newIndices,indexCount * sizeof(u16));
+    OS_DeallocateRAM(newIndices,indexCount * sizeof(u16));
+    OS_DeallocateRAM(tris,triCount * sizeof(TriSort));
 }
 
 static u8* OptimizeVertexFetch(u8* vertices, u32* vertexCount, u16* indices, u32 indexCount, size_t vertexStride) {
@@ -115,7 +160,7 @@ static u8* OptimizeVertexFetch(u8* vertices, u32* vertexCount, u16* indices, u32
     return newVertices;
 }
 
-static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(const char* __restrict data,int file_size,float* __restrict temp_pos,float* __restrict temp_nrm,float* __restrict temp_uv,float* __restrict scratch_verts,u16* __restrict scratch_tris,u8** out_vertices,u32* out_vertex_count,u16** out_triangles,u16* out_triangle_count,float* out_minx,float* out_miny,float* out_minz,float* out_maxx,float* out_maxy,float* out_maxz){
+static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(const char* __restrict data,int file_size,float* __restrict temp_pos,float* __restrict temp_nrm,float* __restrict temp_uv,float* __restrict scratch_verts,u16* __restrict scratch_tris,u8** out_vertices,u32* out_vertex_count,u16** out_triangles,u16* out_triangle_count,float* out_minx,float* out_miny,float* out_minz,float* out_maxx,float* out_maxy,float* out_maxz, u16 currentModel){
 	*out_vertices=NULL;*out_triangles=NULL;
 	*out_vertex_count=*out_triangle_count=0;
 	if(unlikely(!data||file_size<=0))return false;
@@ -126,7 +171,6 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(const char* _
 	float maxx=-1e9f,maxy=-1e9f,maxz=-1e9f;
 	const char* p=data;
 	const char* const end=data+file_size;
-
 	while(likely(p<end)){
 		while(p<end&&(*p==' '||*p=='\t'||*p=='\r'||*p=='\n'))++p;
 		if(p>=end)break;
@@ -156,33 +200,27 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(const char* _
 			}
 		}else if(*p=='f' && p[1]==' '){
             p += 2;
-
-            // Collect up to 8 indices per face (enough for typical models)
-            u32 vert_ids[8] = {0}, tex_ids[8] = {0}, norm_ids[8] = {0};
+            u32 vert_ids[8] = {0}, tex_ids[8] = {0}, norm_ids[8] = {0}; // Up to 8 indices per face
             int num_verts = 0;
-
             while(num_verts < 8 && p < end && *p != '\n' && *p != '\r'){
                 while(*p == ' ' || *p == '\t') ++p;
                 if(*p == '\n' || *p == '\r' || *p == '#') break;
 
                 long raw = fast_atoi(&p);
-                u32 vidx = (raw > 0) ? (u32)raw :
-                                (raw < 0) ? (u32)((i32)pos_count + raw) : 0;
+                u32 vidx = (raw > 0) ? (u32)raw : (raw < 0) ? (u32)((i32)pos_count + raw) : 0;
                 vert_ids[num_verts] = vidx;
 
                 if(*p == '/'){
                     ++p;
                     if(*p != '/'){
                         raw = fast_atoi(&p);
-                        u32 tidx = (raw > 0) ? (u32)raw :
-                                        (raw < 0) ? (u32)((i32)uv_count + raw) : 0;
+                        u32 tidx = (raw > 0) ? (u32)raw : (raw < 0) ? (u32)((i32)uv_count + raw) : 0;
                         tex_ids[num_verts] = tidx;
                     }
                     if(*p == '/'){
                         ++p;
                         raw = fast_atoi(&p);
-                        u32 nidx = (raw > 0) ? (u32)raw :
-                                        (raw < 0) ? (u32)((i32)norm_count + raw) : 0;
+                        u32 nidx = (raw > 0) ? (u32)raw : (raw < 0) ? (u32)((i32)norm_count + raw) : 0;
                         norm_ids[num_verts] = nidx;
                     }
                 }
@@ -263,6 +301,39 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(const char* _
     OptimizeVertexCache(final_tris,expanded_count,unique_cnt);
     u32 oldVertexCount = unique_cnt;
     u8* optimizedVerts = OptimizeVertexFetch(final_verts,&unique_cnt,final_tris,expanded_count,VERTEX_ATTRIBUTES_SIZE);
+    
+    
+    
+    //if (unique_cnt > 0) {
+        //float* xs = (float*)OS_Alloc(unique_cnt * sizeof(float));
+        //float* ys = (float*)OS_Alloc(unique_cnt * sizeof(float));
+        //float* zs = (float*)OS_Alloc(unique_cnt * sizeof(float));
+        //for (u32 i = 0; i < unique_cnt; ++i) {
+            //const float* v = unique_verts + (i << 3);
+            //xs[i] = v[0];
+            //ys[i] = v[1];
+            //zs[i] = v[2];
+        //}
+
+        //int uniq_x = count_unique_floats(xs, unique_cnt), uniq_y = count_unique_floats(ys, unique_cnt), uniq_z = count_unique_floats(zs, unique_cnt);
+        //int uniq_norm = count_unique_normals(unique_verts,unique_cnt);  // uses the interleaved layout
+        //OS_DeallocateRAM(xs,unique_cnt * sizeof(float));
+        //OS_DeallocateRAM(ys,unique_cnt * sizeof(float));
+        //OS_DeallocateRAM(zs,unique_cnt * sizeof(float));
+        //if (uniq_x > 255 || uniq_y > 255 || uniq_z > 255) {
+            ////if (uniq_norm > 255) {
+                ////DualLogError("verts=%u | unique X=%d, Y=%d, Z=%d | unique Normals=%d\n", unique_cnt, uniq_x, uniq_y, uniq_z, uniq_norm);
+            ////} else {
+                //DualLogWarn("Model: %u | verts=%u | unique X=%d, Y=%d, Z=%d | unique Normals=%d\n",currentModel, unique_cnt, uniq_x, uniq_y, uniq_z, uniq_norm);                
+            ////}
+        //} else {
+            //DualLog("Model: %u | verts=%u | unique X=%d, Y=%d, Z=%d | unique Normals=%d\n",currentModel, unique_cnt, uniq_x, uniq_y, uniq_z, uniq_norm);
+        //}
+    //}
+    
+    
+    
+    
     OS_DeallocateRAM(final_verts,(size_t)oldVertexCount * VERTEX_ATTRIBUTES_SIZE);
 	*out_vertices=optimizedVerts;
 	*out_vertex_count=unique_cnt;
@@ -287,7 +358,7 @@ static void* ModelParsingWorker(void* argument){
         
 		int tid=task->thread_id;
 		float min_x,min_y,min_z,max_x,max_y,max_z;
-		if(unlikely(!ParseOBJ(model_data,model_file_size,thread_temp_pos[tid],thread_temp_nrm[tid],thread_temp_uv[tid],thread_out_verts[tid],thread_out_tris[tid],&modelVertices[current_model],&modelVertexCounts[current_model],&modelTriangles[current_model],&modelTriangleCounts[current_model],&min_x,&min_y,&min_z,&max_x,&max_y,&max_z)))continue;
+		if(unlikely(!ParseOBJ(model_data,model_file_size,thread_temp_pos[tid],thread_temp_nrm[tid],thread_temp_uv[tid],thread_out_verts[tid],thread_out_tris[tid],&modelVertices[current_model],&modelVertexCounts[current_model],&modelTriangles[current_model],&modelTriangleCounts[current_model],&min_x,&min_y,&min_z,&max_x,&max_y,&max_z,current_model)))continue;
 		float radius=vmax(0.0f,vabs(min_x)); radius=vmax(radius,vabs(min_y)); radius=vmax(radius,vabs(min_z)); radius=vmax(radius,max_x); radius=vmax(radius,max_y); radius=vmax(radius,max_z);
 		modelBounds[current_model]=radius;
 	}

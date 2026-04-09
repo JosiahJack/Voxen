@@ -1,9 +1,6 @@
 #include "os.h"
 #include "gl.h"
 #include "voxen.h"
-#include <string.h>
-#include <pthread.h>
-#include <unistd.h>
 extern u16 loadedTexturesMaxIndex;
 u32 totalPixels;
 u32 totalPaletteColors;

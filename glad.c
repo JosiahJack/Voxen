@@ -1,9 +1,7 @@
-#include <stdlib.h>
-#include <stdint.h>
 #include "os.h"
 #include "voxen.h"
 #include "gl.h"
-
+void* malloc(size_t sz); void free(void* ptr);
 int GLAD_GL_ARB_buffer_storage = 0;
 int GLAD_GL_ARB_copy_buffer = 0;
 int GLAD_GL_ARB_direct_state_access = 0;
@@ -1282,11 +1280,6 @@ int gladLoadGL( GLADloadfunc load) {
 #ifdef GLAD_GL
 #ifndef GLAD_LOADER_LIBRARY_C_
 #define GLAD_LOADER_LIBRARY_C_
-#if GLAD_PLATFORM_WIN32
-#include <windows.h>
-#else
-#include <dlfcn.h>
-#endif
 static void* glad_get_dlopen_handle(const char *lib_names[], int length) {
     void *handle = NULL;
     for (int i = 0; i < length; ++i) {

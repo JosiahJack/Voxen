@@ -1,5 +1,4 @@
-// chunk.glsl: Generic shader for unlit textured surfaces (all world geometry, items,
-// enemies, doors, etc., without transparency for first pass prior to lighting.
+// chunk_vert.glsl: Generic shader for unlit textured surfaces (all world geometry, items, enemies, doors, etc., without transparency for first pass prior to lighting.
 #version 430 core
 layout(location=0) in vec3 aPos;
 layout(location=1) in vec3 aNormal;

@@ -1,5 +1,5 @@
 #include "voxen.h"
-extern u16 loadedModelsMaxIndex; extern float modelBounds[MODEL_IDX_MAX]; extern u8** modelVertices; extern u16** modelTriangles;
+extern u16 loadedModelsMaxIndex; extern float modelBounds[MODEL_IDX_MAX]; extern u8** modelVertices; extern u16** modelTriangles; extern u32 gridCellStates[ARRSIZE];
 extern u32 modelVertexCounts[MODEL_IDX_MAX]; extern u16 modelTriangleCounts[MODEL_IDX_MAX]; extern float modelMatrices[INSTANCE_COUNT * 16];
 RaycastHit RayTriangle(Vector3 origin, Vector3 dir, Vector3 posA, Vector3 posB, Vector3 posC, Vector3 normA, Vector3 normB, Vector3 normC) {
     Vector3 edgeAB = Vector3_A_minus_B(posB,posA);
@@ -36,7 +36,9 @@ ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, u32
         float radBounds = vmax(modelBounds[mindex], 1.81f);
         float maxDistToObj = vmax(maxDist - radBounds,maxDist);
         if (distSqrd >= (maxDistToObj * maxDistToObj)) continue;
-        if (LevelSpecificHacksForClosedCellsThatProbablyShouldntBeBecauseOfInsetMeshes(instCellIdx,Sys_Global.instances[i].index)) continue;
+        if (!ConstIndexIsPortalBlockingDoor(Sys_Global.instances[i].index)) {
+            if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (Sys_Global.instances[i].index != 754 || !SkyIsVisible())) continue;
+        }
         
         u32 triCount = modelTriangleCounts[mindex];
         if (triCount < 1) continue;

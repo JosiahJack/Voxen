@@ -40,14 +40,6 @@ bool NeighborhoodInPVS(u16 cellX, u16 cellZ, int r) {
     return false;
 }
 
-bool LevelSpecificHacksForClosedCellsThatProbablyShouldntBeBecauseOfInsetMeshes(u32 instCellIdx, u16 constIndex) {
-    if (!(Sys_Global.currentLevel == 1 && (constIndex == 309 || constIndex == 532)) && !ConstIndexIsPortalBlockingDoor(constIndex)) {
-        if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (constIndex != 754 || !SkyIsVisible())) return true;
-    }
-    
-    return false;
-}
-
 bool GridCellBlock(u16 i,Vector3 pos,Vector3 newPos) {
     i32 ccx=PosGetCellCoordX(pos.x),    ccz=PosGetCellCoordZ(pos.z);
     i32 ncx=PosGetCellCoordX(newPos.x), ncz=PosGetCellCoordZ(newPos.z);

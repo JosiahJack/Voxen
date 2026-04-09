@@ -363,9 +363,9 @@ void RenderFormattedText(i16 x, i16 y, u32 color, u8 fontID, float scaleInput, c
     __builtin_va_start(args, format); StringFormatV(uiTextBuffer,TEXT_BUFFER_SIZE,format,args); __builtin_va_end(args);
     glUseProgram(Sys_Render.textShaderProgram);
     glUniformMatrix4fv(0, 1, GL_FALSE, uiOrthoProjection);
-    glUniform4f(3, textColors[color].r, textColors[color].g, textColors[color].b, textColors[color].a);
-    if (fontID == FONT_STOPD) glBindTextureUnit(6, fontAtlasTexStopD);
-    else glBindTextureUnit(6, fontAtlasTex);
+    glUniform4f(3,textColors[color].r,textColors[color].g,textColors[color].b,textColors[color].a);
+    if (fontID == FONT_STOPD) glBindTextureUnit(6,fontAtlasTexStopD);
+    else glBindTextureUnit(6,fontAtlasTex);
     
     glUniform2f(4,1.0f / (float)FONT_ATLAS_SIZE, 1.0f / (float)FONT_ATLAS_SIZE);
     glUniform1ui(2,fontID);
@@ -908,10 +908,7 @@ static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) 
 
 int currentMonitorIndex = 0; // Start on primary
 void CenterWindowOnMonitor(void) {
-    int monitorCount;
-    GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
-    if (!monitors || monitorCount < 2) return;
-    
+    int monitorCount; GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
     int mx, my; GLFWmonitor* next = monitors[currentMonitorIndex];
     glfwGetMonitorPos(next,&mx,&my);
     const GLFWvidmode* mode = glfwGetVideoMode(next);
@@ -1198,18 +1195,27 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,4); glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,3); glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
     LoadConfig(); // Get settings before setting window size.
+    int monitorCount;
+    GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
+    int mx, my; GLFWmonitor* next = monitors[currentMonitorIndex];
+    glfwGetMonitorPos(next,&mx,&my);
+    const GLFWvidmode* mode = glfwGetVideoMode(next);
+    int xpos = mx + (mode->width - Sys_Settings.ScreenWidth) / 2;
+    int ypos = my + (mode->height - Sys_Settings.ScreenHeight) / 2;
     window = glfwCreateWindow(Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, "Voxen", NULL, NULL);
-    glfwSetFramebufferSizeCallback(window, UpdateScreenSize);
     if (!window) { DualLogError("glfwCreateWindow failed\n"); OS_Exit(1); }
-
+    glfwSetWindowPos(window,xpos,ypos);
+    
     glfwMakeContextCurrent(window);
+    glfwSetFramebufferSizeCallback(window, UpdateScreenSize);
     DualLog("Load Config.ini, glfw create window and GL context took %f secs\n",get_time() - initMarker2);
     if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress)) { DualLogError("Failed to initialize GLAD\n"); OS_Exit(1); }
     
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
+    glfwSwapBuffers(window);
     GLint major=0,minor=0; glGetIntegerv(GL_MAJOR_VERSION,&major); glGetIntegerv(GL_MINOR_VERSION,&minor);
     if (major < 4 || (major == 4 && minor < 3)) { DualLogError("Need OpenGL >= 4.3, got %d.%d\n",major,minor); OS_Exit(1); }
     double initMarker3 = get_time();
-    CenterWindowOnMonitor();
     glfwSetKeyCallback(window,key_callback); glfwSetJoystickCallback(joystick_callback);
     glfwSetCursorPosCallback(window,cursor_pos_callback); glfwSetWindowFocusCallback(window,window_focus_callback);
     glfwSetMouseButtonCallback(window,mouse_button_callback); glfwSetScrollCallback(window,scroll_callback);
@@ -1219,7 +1225,7 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     CompileShaders();
     double initMarker4 = get_time();
     DualLog("Set monitor, Set GLFW callbacks, Compile shaders took %f secs\n",initMarker4 - initMarker3);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
+
     GLuint vaos[4],vbos[4]; glCreateVertexArrays(4,vaos); glCreateBuffers(3,vbos);
     Sys_Render.quadVAO = vaos[0]; Sys_Render.vao_chunk = vaos[1]; Sys_Render.textVAO = vaos[2]; Sys_Render.debugLinesVAO = vaos[3];
     Sys_Render.quadVBO = vbos[0]; Sys_Render.textVBO = vbos[1]; Sys_Render.debugLinesVBO = vbos[2];
@@ -1237,6 +1243,8 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     glVertexArrayAttribFormat(Sys_Render.textVAO,1,2,GL_FLOAT,GL_FALSE,3 * sizeof(float));  // uv (s,t)
     glVertexArrayVertexBuffer(Sys_Render.textVAO,0,Sys_Render.textVBO,0,5 * sizeof(float));
     for (u8 i = 0; i < 2; i++) { glVertexArrayAttribBinding(Sys_Render.textVAO,i,0); glEnableVertexArrayAttrib(Sys_Render.textVAO,i); }
+    InitFontAtlasses();
+    RenderLoadingProgress(80,"Loading...");
     glNamedBufferStorage(Sys_Render.debugLinesVBO,MAX_DEBUG_LINE_VERTS * 3 * sizeof(float),NULL,GL_DYNAMIC_STORAGE_BIT);
     glVertexArrayAttribFormat(Sys_Render.debugLinesVAO,0,3,GL_FLOAT,GL_FALSE,0);
     glEnableVertexArrayAttrib(Sys_Render.debugLinesVAO,0);
@@ -1247,6 +1255,7 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     m[4] = 0.0f; m[5] = 1.0f; m[6] =                                                                  0.0f; m[7] =  0.0f;
     m[8] = 0.0f; m[9] = 0.0f; m[10]=      -(LIGHT_RANGE_MAX + NEAR_PLANE) / (LIGHT_RANGE_MAX - NEAR_PLANE); m[11]= -1.0f;
     m[12]= 0.0f; m[13]= 0.0f; m[14]= -2.0f * LIGHT_RANGE_MAX * NEAR_PLANE / (LIGHT_RANGE_MAX - NEAR_PLANE); m[15]=  0.0f;
+
     DualLog("GL buffer definitions took %f secs\n", get_time() - initMarker4);
     ma_result result;
     ma_engine_config engine_config = ma_engine_config_init();
@@ -1256,9 +1265,7 @@ __attribute__((cold)) void InitializeEnvironment(void) {
     LoadModFunctions();
     ModEntityDefinitionsInitAfterLoad();
     DebugRAM("after loading mod");
-    InitFontAtlasses();
     double nextInitTimeSection = get_time();
-    RenderLoadingProgress(80,"Loading...");
     glGenFramebuffers(1, &Sys_Render.gBufferFBO);
     ApplySettings(); // After loading of text and game data.
     glBindFramebuffer(GL_FRAMEBUFFER, Sys_Render.gBufferFBO);
@@ -1914,14 +1921,10 @@ static inline __attribute__((always_inline)) bool DetermineIfInstanceVisible(u16
         if (!inPVS) inPVS = NeighborhoodInPVS(cellX,cellZ,2);
         if (!inPVS) return false;
     } else {
-        if (!(Sys_Global.currentLevel == 1 && (entIdx == 309 || entIdx == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
-            if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (entIdx != 754 || !skyVisible)) return false; // For some shelves that are inset away from cells, need to still draw their items by checking && CELL_OPEN here, unfortunately this means they don't ever get culled :(
-        }
-        
+        if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (entIdx != 754 || !skyVisible)) return false;
         if (!(gridCellStates[instCellIdx] & CELL_OPEN) && *distSqrd >= 943.7184f && (entIdx != 754 || !skyVisible)) return false; // 30.72 * 30.72, 12 cells
     }
-    
-    // One frame delay is fine for cam views to become visible
+
     if (Sys_Global.instances[i].camView != 255) camViews[Sys_Global.instances[i].camView].visible = true;
     return true;
 }

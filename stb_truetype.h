@@ -1,8 +1,18 @@
 // stb_truetype.h - Font Load System
 #pragma once
-#include <malloc.h>
-#define STBTT_malloc(size)  malloc(size)
-#define STBTT_free(ptr)     free(ptr)
+typedef struct { void* ptr; size_t sz; } TAlloc;
+TAlloc ttAllocs[4474]; int tallocCount = 0;
+void* TempAlloc(size_t amount) {
+    if (tallocCount >= 4474) { DualLogError("TempAlloc too many!\n"); return NULL; }
+    void* ptr = OS_Alloc(amount);
+    if (!ptr) { DualLogError("TempAlloc: OS_Alloc failed!\n"); return NULL; }
+    ttAllocs[tallocCount++] = (TAlloc){ptr, amount};
+    return ptr;
+}
+
+void TempFree(void* ptr) { if (!ptr || tallocCount == 0 || ttAllocs[tallocCount-1].ptr != ptr) {return;} OS_DeallocateRAM(ptr,ttAllocs[tallocCount-1].sz); tallocCount--; }
+#define STBTT_malloc(size)  TempAlloc(size)
+#define STBTT_free(ptr)     TempFree(ptr)
 typedef struct { unsigned short x0,y0,x1,y1;/* coordinates of bbox in bitmap*/ float xoff,yoff,xadvance; float xoff2,yoff2; } stbtt_packedchar;
 typedef struct { float x0,y0,s0,t0; float x1,y1,s1,t1; } stbtt_aligned_quad; // 0 is top-left, 1 is bottom-right
 void stbtt_GetPackedQuad(const stbtt_packedchar *chardata, int pw, int ph, int char_index, float *xpos, float *ypos, stbtt_aligned_quad *q, int align_to_integer) {
@@ -10,11 +20,9 @@ void stbtt_GetPackedQuad(const stbtt_packedchar *chardata, int pw, int ph, int c
    const stbtt_packedchar *b = chardata + char_index;
    if (align_to_integer) {
       float x = vfloor((*xpos + b->xoff) + 0.5f); float y = vfloor((*ypos + b->yoff) + 0.5f);
-      q->x0 = x; q->y0 = y;
-      q->x1 = x + b->xoff2 - b->xoff; q->y1 = y + b->yoff2 - b->yoff;
+      q->x0 = x; q->y0 = y; q->x1 = x + b->xoff2 - b->xoff; q->y1 = y + b->yoff2 - b->yoff;
    } else { q->x0 = *xpos + b->xoff; q->y0 = *ypos + b->yoff; q->x1 = *xpos + b->xoff2; q->y1 = *ypos + b->yoff2; }
-   q->s0 = b->x0 * ipw; q->t0 = b->y0 * iph;
-   q->s1 = b->x1 * ipw; q->t1 = b->y1 * iph;
+   q->s0 = b->x0 * ipw; q->t0 = b->y0 * iph; q->s1 = b->x1 * ipw; q->t1 = b->y1 * iph;
    *xpos += b->xadvance;
 }
 
@@ -785,48 +793,28 @@ static void stbtt__handle_clipped_edge(float *scanline, int x, stbtt__active_edg
 static float stbtt__sized_trapezoid_area(float height, float top_width, float bottom_width) { return (top_width + bottom_width) / 2.0f * height; }
 static float stbtt__position_trapezoid_area(float height, float tx0, float tx1, float bx0, float bx1) { return stbtt__sized_trapezoid_area(height, tx1 - tx0, bx1 - bx0); }
 static float stbtt__sized_triangle_area(float height, float width) { return height * width / 2; }
-
 static void stbtt__fill_active_edges_new(float *scanline, float *scanline_fill, int len, stbtt__active_edge *e, float y_top) {
    float y_bottom = y_top+1;
    while (e) {
       if (e->fdx == 0) {
          float x0 = e->fx;
          if (x0 < len) {
-            if (x0 >= 0) {
-               stbtt__handle_clipped_edge(scanline,(int) x0,e, x0,y_top, x0,y_bottom);
-               stbtt__handle_clipped_edge(scanline_fill-1,(int) x0+1,e, x0,y_top, x0,y_bottom);
-            } else {
-               stbtt__handle_clipped_edge(scanline_fill-1,0,e, x0,y_top, x0,y_bottom);
-            }
+            if (x0 >= 0) { stbtt__handle_clipped_edge(scanline,(int)x0,e,x0,y_top,x0,y_bottom); stbtt__handle_clipped_edge(scanline_fill-1,(int) x0+1,e,x0,y_top,x0,y_bottom); }
+            else stbtt__handle_clipped_edge(scanline_fill-1,0,e,x0,y_top,x0,y_bottom);
          }
       } else {
-         float x0 = e->fx;
-         float dx = e->fdx;
-         float xb = x0 + dx;
-         float x_top, x_bottom;
-         float sy0,sy1;
-         float dy = e->fdy;
-         if (e->sy > y_top) {
-            x_top = x0 + dx * (e->sy - y_top);
-            sy0 = e->sy;
-         } else {
-            x_top = x0;
-            sy0 = y_top;
-         }
-         if (e->ey < y_bottom) {
-            x_bottom = x0 + dx * (e->ey - y_top);
-            sy1 = e->ey;
-         } else {
-            x_bottom = xb;
-            sy1 = y_bottom;
-         }
+         float x0=e->fx,dx=e->fdx,dy = e->fdy;
+         float xb=x0 + dx,x_top,x_bottom,sy0,sy1;
+         if (e->sy > y_top) { x_top = x0 + dx * (e->sy - y_top); sy0 = e->sy; }
+         else { x_top = x0; sy0 = y_top; }
+
+         if (e->ey < y_bottom) { x_bottom = x0 + dx * (e->ey - y_top); sy1 = e->ey; }
+         else { x_bottom = xb; sy1 = y_bottom; }
 
          if (x_top >= 0 && x_bottom >= 0 && x_top < len && x_bottom < len) {
             if ((int)x_top == (int)x_bottom) {
-               float height;
-               int x = (int) x_top;
-               height = (sy1 - sy0) * e->direction;
-               scanline[x]      += stbtt__position_trapezoid_area(height, x_top, (float)x + 1.0f, x_bottom, (float)x + 1.0f);
+               int x = (int)x_top; float height = (sy1 - sy0) * e->direction;
+               scanline[x]      += stbtt__position_trapezoid_area(height,x_top,(float)x + 1.0f,x_bottom,(float)x + 1.0f);
                scanline_fill[x] += height; // everything right of this pixel is filled
             } else {
                int x,x1,x2;
@@ -858,11 +846,7 @@ static void stbtt__fill_active_edges_new(float *scanline, float *scanline_fill, 
                }
 
                step = sign * dy * 1;
-               for (x = x1+1; x < x2; ++x) {
-                  scanline[x] += area + step/2; // area of trapezoid is 1*step/2
-                  area += step;
-               }
-               
+               for (x = x1+1; x < x2; ++x) { scanline[x] += area + step/2; area += step; }
                scanline[x2] += area + sign * stbtt__position_trapezoid_area(sy1-y_final, (float)x2, (float)x2 + 1.0f, x_bottom, (float)x2 + 1.0f);
                scanline_fill[x2] += sign * (sy1-sy0);
             }
