@@ -1150,14 +1150,16 @@ int stbtt_PackBegin(stbtt_pack_context *spc, unsigned char *pixels, int pw, int 
    return *spc = (stbtt_pack_context){alloc,ctx,pw,ph,stride?stride:pw,padding,0,1,1,pixels},1;
 }
 
+
+#define STBTT__OVER_MASK  (STBTT_MAX_OVERSAMPLE-1)
 static void stbtt__h_prefilter(unsigned char *p, int w, int h, int stride, unsigned int kw) {
    for (int j = 0; j < h; ++j, p += stride) {
-      unsigned char buf[8] = {0}; int total=0;
+      unsigned char buf[STBTT_MAX_OVERSAMPLE] = {0}; int total=0;
       for (int i=0; i < w; ++i) {
          if (i <= w - (int)kw) {
-            total += p[i] - buf[i & 7];
-            buf[(i + kw) & 7] = p[i];
-         } else total -= buf[i & 7];
+            total += p[i] - buf[i & STBTT__OVER_MASK];
+            buf[(i + kw) & STBTT__OVER_MASK] = p[i];
+         } else total -= buf[i & STBTT__OVER_MASK];
          p[i] = (unsigned char)(total / kw);
       }
    }
@@ -1165,12 +1167,12 @@ static void stbtt__h_prefilter(unsigned char *p, int w, int h, int stride, unsig
 
 static void stbtt__v_prefilter(unsigned char *p, int w, int h, int stride, unsigned int kw) {
    for (int j=0;j<w;++j,++p) {
-      unsigned char buf[8] = {0}; int total=0;
+      unsigned char buf[STBTT_MAX_OVERSAMPLE] = {0}; int total=0;
       for (int i=0;i<h;++i) {
          if (i <= h - (int)kw) {
-            total += p[i*stride] - buf[i & 7];
-            buf[(i+kw) & 7] = p[i*stride];
-         } else total -= buf[i & 7];
+            total += p[i*stride] - buf[i & STBTT__OVER_MASK];
+            buf[(i+kw) & STBTT__OVER_MASK] = p[i*stride];
+         } else total -= buf[i & STBTT__OVER_MASK];
          p[i*stride] = (unsigned char)(total / kw);
       }
    }
@@ -1268,4 +1270,3 @@ extern int stbtt_PackFontRanges(stbtt_pack_context *spc, const unsigned char *fo
 }
 
 extern int stbtt_PackFontRange(stbtt_pack_context *spc, const unsigned char *fontdata, int font_index, float sz, int frst, int num, stbtt_packedchar *d) { stbtt_pack_range range = (stbtt_pack_range){sz,frst,NULL,num,d,0,0}; return stbtt_PackFontRanges(spc,fontdata,font_index,&range,1); }
-//1273

@@ -1,6 +1,5 @@
 // dynamic_culling.c - Culling functions for x,z grid based culling system ala System Shock 1 / Underworld style
 #include "os.h"
-#include "gl.h"
 #include "voxen.h"
 u8 *stbi_load_from_memory(const u8* buffer, i32 len, i32* x, i32* y);
 void stbi__arena_init_thread(StbiArena* arena);
@@ -522,18 +521,11 @@ void CullInit(void) {
 
     gridCellStates[0] |= CELL_VISIBLE; // Errors default here so draw them anyways.
     CullCore(); // Do first Cull pass, forcing as player moved to new cell.
-    glUseProgram(Sys_Render.voxelUpdateShaderProgram);
-    glUniform1f(0,Sys_Global.voxelMinCenterX);
-    glUniform1f(1,Sys_Global.voxelMinCenterZ);
-    glUniform1ui(2,Sys_Global.loadedLights);
-    glUniform1f(3,Sys_Global.worldMin_x);
-    glUniform1f(4,Sys_Global.worldMin_z);
-    glUniform1f(7,Sys_Global.farPlane * Sys_Global.farPlane);
     DualLog(" took %f secs\n",get_time() - start_time);
     DebugRAM("end of Cull_Init");
 }
 
-extern Light lights[LIGHT_COUNT];
+extern Light lights[LIGHT_COUNT]; void UploadGridCellVisibility(void);
 ENGINE_TO_MOD void PortalCulling(void) { // Called just once at end of animation loop for the frame after each frame perfect change to door models becoming either closed or not closed.
     u16 playerCellX = PosGetCellCoordX(Sys_Global.instances[PLAYER1].position.x);
     u16 playerCellZ = PosGetCellCoordZ(Sys_Global.instances[PLAYER1].position.z);
@@ -568,7 +560,7 @@ ENGINE_TO_MOD void PortalCulling(void) { // Called just once at end of animation
         u16 lcell = (lights[i].pos.z * WORLDX) + lights[i].pos.x;
         if (!previousLightVisible[i] && (gridCellStates[lcell] & CELL_VISIBLE)) flag_setu32(&lights[i].lflags,LDIRTY,true);
     }
-    glNamedBufferData(Sys_Render.cellVisibleDataID,ARRSIZE * sizeof(u32),gridCellStates,GL_DYNAMIC_DRAW);
+    UploadGridCellVisibility();
 }
 
 static inline __attribute__((always_inline)) void CellCoordsToPos(u16 x, u16 z, float* xf, float* xz) { *xf = Sys_Global.worldMin_x + (x * CELL_SIZE); *xz = Sys_Global.worldMin_z + (z * CELL_SIZE); }

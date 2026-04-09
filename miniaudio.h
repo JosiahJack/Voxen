@@ -91748,11 +91748,7 @@ static void ma_dr_mp3__accumulate_running_pcm_frame_count(ma_dr_mp3* pMP3, ma_ui
     *pRunningPCMFrameCountFractionalPart = pcmFrameCountOutF - pcmFrameCountOut;
     *pRunningPCMFrameCount += pcmFrameCountOut;
 }
-typedef struct
-{
-    ma_uint64 bytePos;
-    ma_uint64 pcmFrameIndex;
-} ma_dr_mp3__seeking_mp3_frame_info;
+typedef struct { ma_uint64 bytePos; ma_uint64 pcmFrameIndex; } ma_dr_mp3__seeking_mp3_frame_info;
 MA_API ma_bool32 ma_dr_mp3_calculate_seek_points(ma_dr_mp3* pMP3, ma_uint32* pSeekPointCount, ma_dr_mp3_seek_point* pSeekPoints)
 {
     ma_uint32 seekPointCount;

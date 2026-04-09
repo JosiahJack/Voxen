@@ -1,7 +1,6 @@
 // voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake
 #include "os.h" // Operating System calls shim layer.
 #include "gl.h"
-#include "glfw3.h"
 GLFWwindow* window;
 #define MOD_INTEROP_ENGINE
 #include "voxen.h"
@@ -238,7 +237,7 @@ static inline __attribute__((always_inline)) void mul_mat4(float *out, const flo
 
 bool NeighborhoodInPVS(u16 cellX, u16 cellZ, int r);
 void UpdateLights(void) {
-    for (u16 lightIdx = 0; lightIdx < Sys_Global.loadedLights; ++lightIdx) { 
+    for (u16 lightIdx = 0; lightIdx < Sys_Global.loadedLights; ++lightIdx) {
         Vector3 lightPos = lightsNewPosition[lightIdx];
         lights[lightIdx].pos = lightPos;
         if (lights[lightIdx].lflags & LDIRTY) { // Marked all as true at level load.
@@ -283,6 +282,8 @@ void UpdateLights(void) {
     glUniform3f(5,p.x,p.y,p.z);
     glDispatchCompute((VOXELS_X+31)/32,(VOXELS_Z+31)/32,1);
 }
+
+void UploadGridCellVisibility(void) { glNamedBufferData(Sys_Render.cellVisibleDataID,ARRSIZE * sizeof(u32),gridCellStates,GL_DYNAMIC_DRAW); }
 
 #define IS_CHANGED(a, b) (vabs((a) - (b)) > 0.0001f)
 ENGINE_TO_MOD void UpdateLight(u16 i, Vector3 pos, Color3 col, float range, float intensity, float maxIntensity, float minIntensity, float spotAng, Quaternion spotDir, bool on, bool shadOn) {
@@ -674,6 +675,13 @@ void LoadLevel(u8 curlevel) {
     DualLog("Entity instances initialized after load\n");
     RenderLoadingProgress(110,"Loading cull system...");
     CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
+    glUseProgram(Sys_Render.voxelUpdateShaderProgram);
+    glUniform1f(0,Sys_Global.voxelMinCenterX);
+    glUniform1f(1,Sys_Global.voxelMinCenterZ);
+    glUniform1ui(2,Sys_Global.loadedLights);
+    glUniform1f(3,Sys_Global.worldMin_x);
+    glUniform1f(4,Sys_Global.worldMin_z);
+    glUniform1f(7,Sys_Global.farPlane * Sys_Global.farPlane);
     RenderLoadingProgress(120,"Loading voxel lighting data...");
     for (u16 i = START_INDEX_LEVEL_INSTANCES; i < Sys_Global.loadedInstances; i++) Sys_Global.dirtyInstances[i] = true;
     for (u16 i = 0; i < Sys_Global.loadedLights; i++) { lightsNewPosition[i] = lights[i].pos; }

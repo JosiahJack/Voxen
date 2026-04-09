@@ -1,6 +1,5 @@
 // modaudio.c
 #include "mod.h"
-#include "miniaudio.h"
 #include "tables_audio.h"
 #define MAX_AMBIENT_NOISES 80 // Equal to number used
 u16 loadedAmbients = 0;
@@ -40,8 +39,7 @@ static const AmbientDef* ambient_def_by_index(u16 idx) {
 
 MOD_TO_ENGINE void UpdateAmbientSounds(void) {
     const Vector3* player = &Eng_Global->instances[PLAYER1].position;
-    const float max_range = 7.68f;
-    const float max_range_sq = max_range * max_range;
+    const float max_range = 7.68f, max_range_sq = 7.68f * 7.68f;
     for (u16 i = 0; i < loadedAmbients; ++i) {
         const u16 ent_idx = ambientRegistry[i];
         const Entity* ent = &Eng_Global->instances[ent_idx];
