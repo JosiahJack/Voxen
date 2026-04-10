@@ -54,7 +54,7 @@ void DebugRAM(const char *context) {
     if (fd == OS_INVALID_HANDLE) { DualLogError("Failed to open /proc/self/smaps_rollup\n"); return; }
 
     char buf[4096];
-    long bytes_read = OS_Read(fd, buf, sizeof(buf)-1);
+    long bytes_read = OS_Read(fd,buf,sizeof(buf)-1);
     if (bytes_read > 0) { buf[bytes_read] = '\0'; } else buf[0] = '\0';
     OS_Close(fd);
     char* p = buf;

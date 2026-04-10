@@ -155,12 +155,6 @@ ENGINE_TO_MOD bool ToggleDoorPortal(u8 portalIdx, u16 doorIdx, u16 closedModelIn
     return true;
 }
 
-bool UpdatedPlayerCell(void) {
-    u16 lastCell = playerCellIdx;
-    playerCellIdx = PosGetCellCoords(Sys_Global.instances[PLAYER1].position.x,Sys_Global.instances[PLAYER1].position.z);
-    return (playerCellIdx != lastCell);
-}
-
 i32 CastRayCellCheck(i32 x, i32 z, i32 lastX, i32 lastZ) {
     if (lastX != x || lastZ != z) {
         if (XZPairInBounds(lastX, lastZ)) { 
@@ -501,7 +495,7 @@ void CullInit(void) {
         }
     }
     
-    (void)UpdatedPlayerCell();
+    playerCellIdx = PosGetCellCoords(Sys_Global.instances[PLAYER1].position.x,Sys_Global.instances[PLAYER1].position.z);
     i32 cellToCellIdx = playerCellIdx * ARRSIZE;
     for (i32 z=0;z<WORLDZ;++z) {
         for (i32 x=0;x<WORLDX;++x) {
@@ -557,6 +551,7 @@ ENGINE_TO_MOD void PortalCulling(void) { // Called just once at end of animation
 
 static inline __attribute__((always_inline)) void CellCoordsToPos(u16 x, u16 z, float* xf, float* xz) { *xf = Sys_Global.worldMin_x + (x * CELL_SIZE); *xz = Sys_Global.worldMin_z + (z * CELL_SIZE); }
 bool CullCore(void) {
+    playerCellIdx = PosGetCellCoords(Sys_Global.instances[PLAYER1].position.x,Sys_Global.instances[PLAYER1].position.z);
     if (Sys_Global.currentLevel >= LEVEL_CYBERSPACE) return false;
 
     float pos_x,pos_z;

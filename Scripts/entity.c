@@ -1157,7 +1157,7 @@ MOD_TO_ENGINE void LoadLevelMod(u8 curlevel) {
 
     // --- Commit pass: push all parsed entities through AddInstance ---
     DualLog("Ended level parse with %u entCount\n",entCount);
-    i32 totalEnts = entCount + 1; u32 childrenTotal = 0;
+    i32 totalEnts = entCount + 1;
     for (i32 e = 0; e < totalEnts; ++e) {
         Entity* src = &entsFromFile[e];
         u16 entIdx = src->index;
@@ -1238,7 +1238,6 @@ MOD_TO_ENGINE void LoadLevelMod(u8 curlevel) {
         TextureSequenceInit(parent,par->texAnimResourceFolder);
     }
     
-    DualLog("Total children added: %u\n",childrenTotal);
     for (int i = 0; i < lightsIdx; ++i) { if (!(lightsFromFile[i].lflags & LSPOT)){lightsFromFile[i].spotAng=0.0f;} AddLight(&lightsFromFile[i], &lanimsFromFile[i]); } // Add all level lights
 
     // Shield generators

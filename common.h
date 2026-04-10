@@ -644,6 +644,7 @@ typedef struct {
 	u8 NoShootMode;
 	u8 HeadBob;
 	u8 SSR_RES;
+    u8 CurrentMonitor;
 } SettingsSystem;
 extern SettingsSystem Sys_Settings;
 

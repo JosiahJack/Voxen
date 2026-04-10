@@ -7,7 +7,7 @@ GLFWwindow* window;
 #include "miniaudio.h"
 #include "Shaders/shaders.h"
 #include "credits.h"
-GlobalContext Sys_Global = {.menuActive=true,.screenshotTimeout=1.0,.creditsPageIndex=1,.difficultyCombat=2,.difficultyCyber=2,.difficultyPuzzle=2,.difficultyMission=2,.deaths=0,.worstFPS=0,.cursorPosition_x=680,.cursorPosition_y=384};
+GlobalContext Sys_Global = {.globalFrameNum=0,.menuActive=true,.screenshotTimeout=1.0,.creditsPageIndex=1,.difficultyCombat=2,.difficultyCyber=2,.difficultyPuzzle=2,.difficultyMission=2,.deaths=0,.worstFPS=0,.cursorPosition_x=680,.cursorPosition_y=384};
 CheatsSystem Sys_Cheats = {.god=false,.noclip=true,.showLocation=true,.showFPS=true,.editMode=true}; RenderSystem Sys_Render; SystemUI Sys_UI;
 SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on first run for potatoes (e.g. won't crash for out of VRAM, or won't take 5min to init).
     .InputCodeSettings = {
@@ -17,7 +17,7 @@ SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on f
         57, /* Use        = RMB */  99,/* Menu/Back  = ESCAPE */    97,/* Toggle Mode= TAB */     17,/* Reload      = R */       128,/* Weapon += MWHEEL + */ 129,/* Weapon - = MWHEEL - */  6,/* Grenade   = G */ 19,/* Grenade + = T  */
         131,/* Grenade -  = B */    21,/* Ammo Type  = V */          9,/* Patch Use  = J */        8,/* Patch +     = I */       132,/* Patch - = , */         12,/* Full Map = M        */ 21,/* Swim Up   = V */  2,/* Swim Down = C  */
         103,/* Console    = `/~ */ 102/* Screenshot  = F12 */},
-    .ScreenWidth=800u,.ScreenHeight=600u,.Fullscreen=0u,.FOV=65u,.Brightness=50u,.Gamma=50u,.FXAA=0u,.Shadows=0u,.Reflections=0u,.Vsync=0u,.ModelDetail=0u,
+    .ScreenWidth=800u,.ScreenHeight=600u,.Fullscreen=0u,.FOV=65u,.Brightness=50u,.Gamma=50u,.FXAA=0u,.Shadows=0u,.Reflections=0u,.Vsync=0u,.ModelDetail=0u,.CurrentMonitor=0u,
     .GI=0u,.SpeakerMode=1u,.Reverb=0u,.VolumeMaster=100u,.VolumeMusic=25u,.VolumeMessage=75u,.VolumeEffects=100u,.Language=0u,.DynamicMusic=1u,.Footsteps=1u,.InvertLook=0u,
     .InvertCyberspaceLook=0u,.QuickItemPickup=0u,.QuickReloadWeapons=0u,.MouseSensitivity=10u,.NoShootMode=0u,.HeadBob=1u,.SSR_RES=8u};/*Ratio is (1 / SSR_RES) * res*/
 #define SHADOW_MAP_SIZE 128u
@@ -50,10 +50,9 @@ static bool resDropdownOpen = false;
 static int resDropdownCount=0,resSelectedIdx=0;
 typedef struct { int w, h, hz; } ResMode;
 static ResMode resModes[8];
-#define MAX_CAMVIEWS 11
 typedef struct { Vector3 position; Quaternion rotation; u8 fov; u16 width,height; float near,far,finished; bool visible; } CamView;
-CamView camViews[MAX_CAMVIEWS]; // Max is 8 camera views on level 8 + 3 sensaround views.  Populated at level load.
-GLuint camViewTextures[MAX_CAMVIEWS];
+CamView camViews[64]; // Max is 8 camera views on level 8 + 3 sensaround views = 11.  Populated at level load.
+GLuint camViewTextures[64];
 u8 camViewCount = 0;
 typedef struct { unsigned short x0,y0,x1,y1; float xoff,yoff,xadvance; float xoff2,yoff2; } stbtt_packedchar; // x0,y0,x1,y1 are coordinates of bbox in bitmap
 typedef struct { float x0,y0,s0,t0; float x1,y1,s1,t1; } stbtt_aligned_quad; // 0 is top-left, 1 is bottom-right
@@ -111,28 +110,19 @@ void mat4_lookat_from(float* m, Quaternion* camRotation, Vector3 eye) { // Kept 
     m[12] = -dot_vector3(right, eye); m[13] = -dot_vector3(up, eye); m[14] = dot_vector3(forward, eye); m[15] = 1.0f;
 }
 
-__attribute__((pure,always_inline)) bool SphereInFrustum(FrustumPlane* planes, Vector3 c, float radius) { for (int i=0;i<6;++i) { if ((dot_vector3(planes[i].normal,c) + planes[i].d) < -radius) return false; } return true; }
-
-void ExtractFrustumPlanes(float* m, FrustumPlane* planes) {
-    planes[0].normal.x = m[3]  + m[0];  planes[0].normal.y = m[7]  + m[4];  planes[0].normal.z = m[11] + m[8];  planes[0].d = m[15] + m[12]; // Left
-    planes[1].normal.x = m[3]  - m[0];  planes[1].normal.y = m[7]  - m[4];  planes[1].normal.z = m[11] - m[8];  planes[1].d = m[15] - m[12]; // Right
-    planes[2].normal.x = m[3]  + m[1];  planes[2].normal.y = m[7]  + m[5];  planes[2].normal.z = m[11] + m[9];  planes[2].d = m[15] + m[13]; // Bottom
-    planes[3].normal.x = m[3]  - m[1];  planes[3].normal.y = m[7]  - m[5];  planes[3].normal.z = m[11] - m[9];  planes[3].d = m[15] - m[13]; // Top
-    planes[4].normal.x = m[3]  + m[2];  planes[4].normal.y = m[7]  + m[6];  planes[4].normal.z = m[11] + m[10]; planes[4].d = m[15] + m[14]; // Near
-    planes[5].normal.x = m[3]  - m[2];  planes[5].normal.y = m[7]  - m[6];  planes[5].normal.z = m[11] - m[10]; planes[5].d = m[15] - m[14]; // Far
-    for (int i = 0; i < 6; i++) {
-        float len = magnitude_vector3(planes[i].normal); if (len > 1e-6f) { planes[i].normal.x /= len; planes[i].normal.y /= len; planes[i].normal.z /= len; planes[i].d /= len; } // Normalize (could use normalize_vector3 but need len for d term of FrustumPlane).
+__attribute__((pure,always_inline)) bool SphereInFrustum(FrustumPlane* ps, Vector3 c, float radius) { for (int i=0;i<6;++i) { if ((dot_vector3(ps[i].normal,c) + ps[i].d) < -radius) return false; } return true; }
+void ExtractFrustumPlanes(float* m, FrustumPlane* ps) {
+    ps[0].normal.x = m[3] + m[0]; ps[0].normal.y = m[7] + m[4]; ps[0].normal.z = m[11] + m[8];  ps[0].d = m[15] + m[12]; // Left
+    ps[1].normal.x = m[3] - m[0]; ps[1].normal.y = m[7] - m[4]; ps[1].normal.z = m[11] - m[8];  ps[1].d = m[15] - m[12]; // Right
+    ps[2].normal.x = m[3] + m[1]; ps[2].normal.y = m[7] + m[5]; ps[2].normal.z = m[11] + m[9];  ps[2].d = m[15] + m[13]; // Bottom
+    ps[3].normal.x = m[3] - m[1]; ps[3].normal.y = m[7] - m[5]; ps[3].normal.z = m[11] - m[9];  ps[3].d = m[15] - m[13]; // Top
+    ps[4].normal.x = m[3] + m[2]; ps[4].normal.y = m[7] + m[6]; ps[4].normal.z = m[11] + m[10]; ps[4].d = m[15] + m[14]; // Near
+    ps[5].normal.x = m[3] - m[2]; ps[5].normal.y = m[7] - m[6]; ps[5].normal.z = m[11] - m[10]; ps[5].d = m[15] - m[14]; // Far
+    for (int i=0;i<6;i++) {
+        float len = magnitude_vector3(ps[i].normal); if (len > 1e-6f) { ps[i].normal.x /= len; ps[i].normal.y /= len; ps[i].normal.z /= len; ps[i].d /= len; } // Normalize (could use normalize_vector3 but need len for d term of FrustumPlane).
     }
 }
 
-Quaternion cubemapOrientationQuaternion[6] = {
-    {0.0f, 0.707106781f, 0.0f, 0.707106781f},  // +X: Right
-    {0.0f, -0.707106781f, 0.0f, 0.707106781f}, // -X: Left
-    {-0.707106781f, 0.0f, 0.0f, 0.707106781f}, // +Y: Up
-    {0.707106781f, 0.0f, 0.0f, 0.707106781f},  // -Y: Down
-    {0.0f, 0.0f, 0.0f, 1.0f},                  // +Z: Forward
-    {0.0f, 1.0f, 0.0f, 0.0f}                   // -Z: Backward
-};
 
 ENGINE_TO_MOD void InitializeEntity(Entity* entry) { // Blank entity, no index yet, for initial list population or temporary Entity.
     entry->index = U16_MAX; // memset here would be harmful as only a handful of fields are the same.
@@ -235,6 +225,8 @@ static inline __attribute__((always_inline)) void mul_mat4(float *out, const flo
 	out[15] = a[3] * b[12] + a[7] * b[13] + a[11]* b[14] + a[15] * b[15];
 }
 
+#define QTR90 0.707106781f
+Quaternion cubeQuats[6] = {{0.0f,QTR90,0.0f,QTR90}/*+X:Right*/,{0.0f,-QTR90,0.0f,QTR90}/*-X:Left*/,{-QTR90,0.0f,0.0f,QTR90}/*+Y:Up*/,{QTR90,0.0f,0.0f,QTR90}/*-Y:Down*/,{0.0f,0.0f,0.0f,1.0f}/*+Z:Forward*/,{0.0f,1.0f,0.0f,0.0f}/*-Z:Backward*/ };
 bool NeighborhoodInPVS(u16 cellX, u16 cellZ, int r);
 void UpdateLights(void) {
     for (u16 lightIdx = 0; lightIdx < Sys_Global.loadedLights; ++lightIdx) {
@@ -244,9 +236,9 @@ void UpdateLights(void) {
             flag_setu32(&lights[lightIdx].lflags,LDIRTY,false);
             #pragma GCC unroll 6
             for (int j=0;j<6;++j) { // Update to new position
-                mat4_lookat_from((float*)lightView[lightIdx][j], &cubemapOrientationQuaternion[j], lightPos);
-                mul_mat4((float*)lightViewProj[lightIdx][j], shadowmapsPerspectiveProjection, (float*)lightView[lightIdx][j]);
-                ExtractFrustumPlanes((float*)lightViewProj[lightIdx][j], lightFrustumPlanes[lightIdx][j]);
+                mat4_lookat_from((float*)lightView[lightIdx][j],&cubeQuats[j],lightPos);
+                mul_mat4((float*)lightViewProj[lightIdx][j],shadowmapsPerspectiveProjection,(float*)lightView[lightIdx][j]);
+                ExtractFrustumPlanes((float*)lightViewProj[lightIdx][j],lightFrustumPlanes[lightIdx][j]);
             }
         }
     }
@@ -474,45 +466,31 @@ typedef struct { const char* name; void* ptr; SettingType type; } Setting;
 #define S_U16(n, v) { n, &Sys_Settings.v, SETTING_U16 }
 #define S_IN(n, i)  { n, &Sys_Settings.InputCodeSettings[i], SETTING_INPUT }
 const Setting configTable[] = {
-    S_U16("ResolutionWidth", ScreenWidth), S_U16("ResolutionHeight", ScreenHeight), S_U8("Fullscreen", Fullscreen), S_U8("FOV", FOV),
-    S_U8("Brightness", Brightness), S_U8("Gamma", Gamma), S_U8("AA", FXAA), S_U8("Shadows", Shadows), S_U8("SSR", Reflections),
-    S_U8("VSync", Vsync), S_U8("ModelDetail", ModelDetail), S_U8("GI", GI), S_U8("SpeakerMode", SpeakerMode), S_U8("Reverb", Reverb),
-    S_U8("VolumeMaster", VolumeMaster), S_U8("VolumeMusic", VolumeMusic), S_U8("VolumeMessage", VolumeMessage), S_U8("VolumeEffects", VolumeEffects),
-    S_U8("Language", Language), S_U8("DynamicMusic", DynamicMusic), S_U8("Footsteps", Footsteps), S_U8("InvertLook", InvertLook),
-    S_U8("InvertCyberspaceLook", InvertCyberspaceLook), S_U8("InvertInventoryCycling", InvertInventoryCycling), S_U8("QuickItemPickup", QuickItemPickup), S_U8("QuickReloadWeapons", QuickReloadWeapons),
-    S_U8("MouseSensitivity", MouseSensitivity), S_U8("NoShootMode", NoShootMode), S_U8("HeadBob", HeadBob),
-    S_IN("Forward", 0), S_IN("Strafe Left", 1), S_IN("Backpedal", 2), S_IN("Strafe Right", 3),
-    S_IN("Jump", 4), S_IN("Crouch", 5), S_IN("Prone", 6), S_IN("Lean Left", 7),
-    S_IN("Lean Right", 8), S_IN("Sprint", 9), S_IN("Turn Left", 10), S_IN("Turn Right", 11),
-    S_IN("Look Up", 12), S_IN("Look Down", 13), S_IN("Recent Log", 14), S_IN("Biomonitor", 15),
-    S_IN("Sensaround", 16), S_IN("Lantern", 17), S_IN("Shield", 18), S_IN("Infrared", 19),
-    S_IN("Email", 20), S_IN("Booster", 21), S_IN("Jumpjets", 22), S_IN("Attack", 23),
-    S_IN("Use", 24), S_IN("Menu/Back", 25), S_IN("Toggle Mode", 26), S_IN("Reload", 27),
-    S_IN("Weapon +", 28), S_IN("Weapon -", 29), S_IN("Grenade", 30), S_IN("Grenade +", 31),
-    S_IN("Grenade -", 32), S_IN("Ammo Type", 33), S_IN("Patch Use", 34), S_IN("Patch +", 35),
-    S_IN("Patch -", 36), S_IN("Full Map", 37), S_IN("Swim Up", 38), S_IN("Swim Down", 39), S_IN("Screenshot", 40)
+    S_U16("ResolutionWidth",ScreenWidth),S_U16("ResolutionHeight",ScreenHeight),S_U8("Fullscreen",Fullscreen),S_U8("FOV",FOV),
+    S_U8("Brightness",Brightness),S_U8("Gamma",Gamma),S_U8("AA",FXAA),S_U8("Shadows",Shadows),S_U8("SSR",Reflections),
+    S_U8("VSync",Vsync),S_U8("ModelDetail",ModelDetail),S_U8("GI",GI),S_U8("SpeakerMode",SpeakerMode),S_U8("Reverb",Reverb),
+    S_U8("VolumeMaster",VolumeMaster),S_U8("VolumeMusic",VolumeMusic),S_U8("VolumeMessage",VolumeMessage),S_U8("VolumeEffects",VolumeEffects),
+    S_U8("Language",Language),S_U8("DynamicMusic",DynamicMusic),S_U8("Footsteps",Footsteps),S_U8("InvertLook",InvertLook),S_U8("Monitor",CurrentMonitor),
+    S_U8("InvertCyberspaceLook",InvertCyberspaceLook),S_U8("InvertInventoryCycling",InvertInventoryCycling),S_U8("QuickItemPickup",QuickItemPickup),
+    S_U8("QuickReloadWeapons",QuickReloadWeapons),S_U8("MouseSensitivity",MouseSensitivity),S_U8("NoShootMode",NoShootMode),S_U8("HeadBob",HeadBob),
+    S_IN("Forward",0),S_IN("Strafe Left",1),S_IN("Backpedal",2),S_IN("Strafe Right",3),S_IN("Jump",4),S_IN("Crouch",5),S_IN("Prone",6),S_IN("Lean Left",7),
+    S_IN("Lean Right",8),S_IN("Sprint",9),S_IN("Turn Left",10),S_IN("Turn Right",11),S_IN("Look Up",12),S_IN("Look Down",13),S_IN("Recent Log",14),
+    S_IN("Biomonitor",15),S_IN("Sensaround",16),S_IN("Lantern",17),S_IN("Shield",18),S_IN("Infrared",19),S_IN("Email",20),S_IN("Booster",21),
+    S_IN("Jumpjets",22),S_IN("Attack",23),S_IN("Use",24), S_IN("Menu/Back",25),S_IN("Toggle Mode",26),S_IN("Reload",27),
+    S_IN("Weapon +",28),S_IN("Weapon -",29),S_IN("Grenade",30),S_IN("Grenade +",31),S_IN("Grenade -",32),S_IN("Ammo Type",33),S_IN("Patch Use",34),
+    S_IN("Patch +",35),S_IN("Patch -",36),S_IN("Full Map",37),S_IN("Swim Up",38),S_IN("Swim Down",39),S_IN("Screenshot",40)
 };
 const int configTableSize = sizeof(configTable) / sizeof(Setting);
-
-static inline __attribute__((always_inline)) i32 GetGLFWIndirectionIndexForAnInput(const char* val) {
-    for (int i=0;i<149;++i) { if (StringsEqual(val,inputElements[i].name)) return i; }
-    return 148;
-}
-
+static inline __attribute__((always_inline)) i32 GetGLFWIndirectionIndexForAnInput(const char* val) { for (int i=0;i<149;++i) {if (StringsEqual(val,inputElements[i].name)) return i;} return 148; }
 char *GetNextStringUpToNewlineOrEOF(char*,int,OsFileHandle),*data_parser_trim(char*); i32 StringToInt(const char*);
 void LoadConfig(void) {
     OsFileHandle f = OS_OpenReadonly("./Data/Config.ini");
     char line[512];
     while (GetNextStringUpToNewlineOrEOF(line,sizeof(line),f)) {
-        char* s = data_parser_trim(line);
-        if (*s == 0 || (s[0] == '/' && s[1] == '/')) continue;
-
-        char* eq = StringFindFirstCharWithin(s, '=');
-        if (!eq) continue;
-        *eq = 0;
-
-        char* key = data_parser_trim(s);
-        char* val = data_parser_trim(eq + 1);
+        char* s = data_parser_trim(line); if (*s == 0 || (s[0] == '/' && s[1] == '/')) continue;
+        char* eq = StringFindFirstCharWithin(s, '='); if (!eq) continue;
+        
+        *eq = 0; char *key = data_parser_trim(s), *val = data_parser_trim(eq + 1);
         for (int i = 0; i < configTableSize; i++) {
             if (StringsEqual(key,configTable[i].name)) {
                 if (configTable[i].type == SETTING_U8)         *( u8*)configTable[i].ptr = (u8)StringToInt(val);
@@ -544,44 +522,14 @@ void TextEntry(i32 k) {
     if (k == GLFW_KEY_ENTER || k == GLFW_KEY_KP_ENTER) { currentMenuItem++; return; }
     if (k == GLFW_KEY_BACKSPACE && currentPlayerNameLength > 0) { Sys_Global.playerName[--currentPlayerNameLength] = '\0'; return; }
     if (currentPlayerNameLength >= 26) return;
-    char c = (k >= GLFW_KEY_A && k <= GLFW_KEY_Z) ? 'a' + (k - GLFW_KEY_A) :
-             (k >= GLFW_KEY_1 && k <= GLFW_KEY_9) ? '1' + (k - GLFW_KEY_1) :
-             (k == GLFW_KEY_0)                    ? '0' : (k == GLFW_KEY_SPACE) ? ' ' : 0;
+    char c = (k >= GLFW_KEY_A && k <= GLFW_KEY_Z) ? 'a' + (k - GLFW_KEY_A) : ((k >= GLFW_KEY_1 && k <= GLFW_KEY_9) ? '1' + (k - GLFW_KEY_1) : ((k == GLFW_KEY_0) ? '0' : ((k == GLFW_KEY_SPACE) ? ' ' : 0)));
     if (c) { Sys_Global.playerName[currentPlayerNameLength] = c; Sys_Global.playerName[++currentPlayerNameLength] = '\0'; }
-}
-
-extern bool enteringPlayerName;
-void ConsoleEmulator(i32 keycode);
-i32 Input_KeyDown(i32 keycode) {
-    if (keycode >= 0 && keycode < MAX_KEYS) Sys_Input.keyStates[keycode].pressed = Sys_Input.keyStates[keycode].down = true;
-    if (Sys_Cheats.consoleActive) { ConsoleEmulator(keycode); return 0; }
-    if (enteringPlayerName && Sys_Global.menuActive) { TextEntry(keycode); return 0; }
-    return 0;
-}
-
-i32 Input_KeyUp(i32 keycode) { if (keycode >= 0 && keycode < MAX_KEYS) {Sys_Input.keyStates[keycode].pressed = Sys_Input.keyStates[keycode].down = false;} return 0; }
-
-void UpdatePlayerFacingAngles(void) {
-    Quaternion rot = Sys_Global.instances[PLAYER1].rotation;
-    float y2 = rot.y * rot.y;  float xz = rot.x * rot.z;  float wy = rot.w * rot.y;
-    Sys_Global.instances[PLAYER1].forward = normalize_vector3((Vector3){ 2.0f * (xz + wy), 2.0f * (rot.y * rot.z - rot.w * rot.x), 1.0f - 2.0f * (rot.x * rot.x + y2) });
-    Sys_Global.instances[PLAYER1].right = normalize_vector3((Vector3){ 1.0f - 2.0f * (y2 + rot.z * rot.z), 2.0f * (rot.x * rot.y + rot.w * rot.z), 2.0f * (xz - wy) });
-    ma_engine_listener_set_direction(&audio_engine,0,Sys_Global.instances[PLAYER1].forward.x,Sys_Global.instances[PLAYER1].forward.y,Sys_Global.instances[PLAYER1].forward.z);
-    Vector3 up = cross_vector3(Sys_Global.instances[PLAYER1].forward,Sys_Global.instances[PLAYER1].right);
-    ma_engine_listener_set_world_up(&audio_engine,0,up.x,up.y,up.z);
 }
 
 // Create a quaternion from yaw (around Y), pitch (around X), and roll (around Z) in degrees
 void quat_from_yaw_pitch_roll(Quaternion* q, float yaw_deg, float pitch_deg, float roll_deg) {
-    float yaw = deg2rad(yaw_deg);   // Around Y (up)
-    float pitch = deg2rad(pitch_deg); // Around X (right)
-    float roll = deg2rad(roll_deg);  // Around Z (forward)
-    float cy = vcosf(yaw * 0.5f);
-    float sy = vsinf(yaw * 0.5f);
-    float cp = vcosf(pitch * 0.5f);
-    float sp = vsinf(pitch * 0.5f);
-    float cr = vcosf(roll * 0.5f);
-    float sr = vsinf(roll * 0.5f);
+    float yaw = deg2rad(yaw_deg), pitch = deg2rad(pitch_deg), roll = deg2rad(roll_deg);  // Around Z (forward)
+    float cy = vcosf(yaw * 0.5f), sy = vsinf(yaw * 0.5f), cp = vcosf(pitch * 0.5f), sp = vsinf(pitch * 0.5f), cr = vcosf(roll * 0.5f), sr = vsinf(roll * 0.5f);
     q->w = cy * cp * cr + sy * sp * sr;
     q->x = cy * sp * cr + sy * cp * sr; // X-axis (pitch)
     q->y = sy * cp * cr - cy * sp * sr; // Y-axis (yaw)
@@ -590,10 +538,14 @@ void quat_from_yaw_pitch_roll(Quaternion* q, float yaw_deg, float pitch_deg, flo
 
 extern float cam_yaw,cam_pitch,cam_roll;
 void Input_MouselookApply(void) {
-    if (Sys_Global.currentLevel == LEVEL_CYBERSPACE) quat_from_yaw_pitch_roll(&Sys_Global.instances[PLAYER1].rotation,cam_yaw,cam_pitch,cam_roll);
-    else                                             quat_from_yaw_pitch_roll(&Sys_Global.instances[PLAYER1].rotation,cam_yaw,cam_pitch,    0.0f);
-    
-    UpdatePlayerFacingAngles();
+    quat_from_yaw_pitch_roll(&Sys_Global.instances[PLAYER1].rotation,cam_yaw,cam_pitch,(Sys_Global.currentLevel == LEVEL_CYBERSPACE) ? cam_roll : 0.0f);
+    Quaternion rot = Sys_Global.instances[PLAYER1].rotation;
+    float y2 = rot.y * rot.y;  float xz = rot.x * rot.z;  float wy = rot.w * rot.y;
+    Sys_Global.instances[PLAYER1].forward = normalize_vector3((Vector3){ 2.0f * (xz + wy), 2.0f * (rot.y * rot.z - rot.w * rot.x), 1.0f - 2.0f * (rot.x * rot.x + y2) });
+    Sys_Global.instances[PLAYER1].right = normalize_vector3((Vector3){ 1.0f - 2.0f * (y2 + rot.z * rot.z), 2.0f * (rot.x * rot.y + rot.w * rot.z), 2.0f * (xz - wy) });
+    ma_engine_listener_set_direction(&audio_engine,0,Sys_Global.instances[PLAYER1].forward.x,Sys_Global.instances[PLAYER1].forward.y,Sys_Global.instances[PLAYER1].forward.z);
+    Vector3 up = cross_vector3(Sys_Global.instances[PLAYER1].forward,Sys_Global.instances[PLAYER1].right);
+    ma_engine_listener_set_world_up(&audio_engine,0,up.x,up.y,up.z);
 }
 
 // static const float HeadBobRate   = 0.2f; TODO
@@ -655,7 +607,7 @@ void LoadLevel(u8 curlevel) {
     RenderLoadingProgress(100,"Loading level...");
     __builtin_memset(lights,0,LIGHT_COUNT * sizeof(Light)); __builtin_memset(lanims,0,LIGHT_COUNT * sizeof(LightAnimation));
     __builtin_memset(modelMatrices,0,INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
-    __builtin_memset(camViews,0,MAX_CAMVIEWS * sizeof(CamView)); camViewCount = 0;
+    __builtin_memset(camViews,0,64 * sizeof(CamView)); camViewCount = 0;
     __builtin_memset(Sys_Global.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
     char filename[20]; // Minimum size for 0 through 13.
     StringFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel);
@@ -702,7 +654,6 @@ __attribute__((cold)) void NewGame(void) { // Reset World States
     currentMenuItem = currentMenuTab = 0; currentMenuPage = MenuPages_FrontPage;
     Sys_Global.pauseRelativeTime = Sys_Global.last_physics_time = 0.0;
     Sys_Global.inventoryMode = false;
-    DualLog("Rendered screen saying \"Loading new game...\"\n");
     __builtin_memset(Sys_Global.instances,0,2 * sizeof(Entity)); // Blank out player entities
     PlayerInit(PLAYER1); PlayerInit(PLAYER2);
     Sys_Global.instances[WORLD].ioflags = 0u;
@@ -729,53 +680,10 @@ __attribute__((cold)) void NewGame(void) { // Reset World States
 
 void GoIntoGame(void) { NewGame(); PlayGameMusic(); DualLog("Player named \"%s\" started the game!\n", Sys_Global.playerName); }
 
-__attribute__((cold)) void LoadGameModDefinition(void) { // Unique set separate from savedata path and resource data to keep it focussed
-    double start_time = get_time();
-    DualLog("Loading game definition...");
-    OsFileHandle fp    = OS_OpenReadonly("./Data/gamedata.txt");
-    if (!fp) { DualLogError("\nCannot open ./Data/gamedata.txt\n"); DualLogError("Could not parse ./Data/gamedata.txt!\n"); OS_Exit(1); }
-    
-    i32 gamedatSize = OS_FileSize(fp);
-    char* fb = OS_AllocateFileBackedRAMReadonly(gamedatSize, fp, "./Data/gamedata.txt");
-    if (!fb || gamedatSize < 1) { DualLogError("Could not open ./Data/gamedata.txt\n"); OS_Exit(1); }
-    
-    OS_Close(fp);
-    u32 lineNum = 0; u8 lineLength = 0; char line[256]; char key[256]; char value[256]; bool is_comment = false, in_value = false;
-    u32 keyLength = 0; u32 valueLength = 0;
-    for (i32 i=0;i<gamedatSize;++i) { // Less 1 to avoid comment check overflow
-        if (lineLength>=255 || valueLength>=255 || keyLength>=255) continue; // Keep going until we hit a newline or EOF, no valid line is this long so must be a comment.
-        if (fb[i] == ' ' || fb[i] == '\t' || fb[i] == '\v' || fb[i] == '\f' || fb[i] == '\r') continue; // Disregard blanks or Windows garbage (this ain't a typewriter, yeesh).
-        if (fb[i] == '/' && fb[i + 1] == '/') is_comment = true;
-        if (fb[i] == '\n') {
-            if (keyLength == 0 || valueLength == 0) { is_comment = in_value = false; lineLength = keyLength = valueLength = 0; lineNum++; continue; }
-
-            // Ok, process kv pair
-            value[valueLength] = '\0'; line[lineLength] = '\0';
-                 if (StringsEqual(key, "modname"))    StringCopyInto_A_From_B(Sys_Global.global_modname,value,sizeof(Sys_Global.global_modname));
-            else if (StringsEqual(key, "levelcount")) Sys_Global.numLevels = parse_numberu8(value, line, lineNum);
-            else if (StringsEqual(key, "startlevel")) Sys_Global.startLevel = parse_numberu8(value, line, lineNum);
-            
-            is_comment = in_value = false; lineLength = keyLength = valueLength = 0; lineNum++;
-            continue;
-        }
-        
-        if (is_comment) continue; // Keep walking characters to finish the commented line.
-        if (fb[i] == ':') { in_value = true; key[keyLength] = '\0'; continue; } // Skip splitter, mark inside value for key:value pair.
-
-        if (in_value) { value[valueLength] = fb[i]; valueLength++; }
-        else          {   key[keyLength] = fb[i];   keyLength++; }
-        
-        line[lineLength] = fb[i]; lineLength++; // Keep filling up the current line.
-    }
-
-    DualLog(" %s:: num levels: %d, start level: %d... took %f secs\n",Sys_Global.global_modname, Sys_Global.numLevels, Sys_Global.startLevel, get_time() - start_time);
-}
-
-void GenerateAndBindTexture(GLuint *id, GLint internalFormat, i32 width, i32 height, GLenum format, GLenum type, GLenum target) {
-    if (*id == 0) glGenTextures(1, id);
-    glBindTexture(target, *id);
-    glTexImage2D(target, 0, internalFormat, width, height, 0, format, type, NULL);
-    glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);    glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+void GenerateAndBindTexture(GLuint *id, GLint internalFormat, i32 width, i32 height, GLenum format, GLenum type) {
+    if (*id == 0) {glGenTextures(1,id);} glBindTexture(GL_TEXTURE_2D,*id);
+    glTexImage2D(GL_TEXTURE_2D,0,internalFormat,width,height,0,format,type,NULL);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
 }
 
 void UpdateScreenSize(GLFWwindow* unused, i32 width, i32 height) {
@@ -786,12 +694,12 @@ void UpdateScreenSize(GLFWwindow* unused, i32 width, i32 height) {
     glUseProgram(Sys_Render.imageBlitShaderProgram); glUniform1ui(2,w); glUniform1ui(3,h); glUniform1i(26,Sys_Settings.SSR_RES);
     glUseProgram(Sys_Render.chunkShaderProgram); glUniform1ui(6,w); glUniform1ui(7,h);
     glUseProgram(Sys_Render.ssrShaderProgram); glUniform1ui(0,w / Sys_Settings.SSR_RES); glUniform1ui(1,h / Sys_Settings.SSR_RES); glUniform1i(2,Sys_Settings.SSR_RES);
-    GenerateAndBindTexture(&Sys_Render.inputImageID,     GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,GL_TEXTURE_2D); // Lit Raster
-    GenerateAndBindTexture(&Sys_Render.inputWorldPosID,GL_RGBA32F,w,h,GL_RGBA,        GL_FLOAT,GL_TEXTURE_2D); // Raster World Positions
-    GenerateAndBindTexture(&Sys_Render.inputSpecID,      GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,GL_TEXTURE_2D); // Specular Colors
-    GenerateAndBindTexture(&Sys_Render.inputNormalID,    GL_RG16F,w,h, GL_RGB,        GL_FLOAT,GL_TEXTURE_2D); // Normal XYZ
-    GenerateAndBindTexture(&Sys_Render.inputDepthID,GL_DEPTH_COMPONENT32,w,h,GL_DEPTH_COMPONENT,GL_FLOAT,GL_TEXTURE_2D); // Raster Depth
-    glGenTextures(1,&Sys_Render.outputImageID);
+    GenerateAndBindTexture(&Sys_Render.inputImageID,     GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE); // Lit Raster
+    GenerateAndBindTexture(&Sys_Render.inputWorldPosID,GL_RGBA32F,w,h,GL_RGBA,        GL_FLOAT); // Raster World Positions
+    GenerateAndBindTexture(&Sys_Render.inputSpecID,      GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE); // Specular Colors
+    GenerateAndBindTexture(&Sys_Render.inputNormalID,    GL_RG16F,w,h, GL_RGB,        GL_FLOAT); // Normal XYZ
+    GenerateAndBindTexture(&Sys_Render.inputDepthID,GL_DEPTH_COMPONENT32,w,h,GL_DEPTH_COMPONENT,GL_FLOAT); // Raster Depth
+    if (Sys_Render.outputImageID == 0) glGenTextures(1,&Sys_Render.outputImageID);
     glBindTexture(GL_TEXTURE_2D,Sys_Render.outputImageID);
     glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA8,w / Sys_Settings.SSR_RES,h / Sys_Settings.SSR_RES,0,GL_RGBA,GL_UNSIGNED_BYTE,NULL);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
@@ -817,18 +725,14 @@ void UpdateScreenSize(GLFWwindow* unused, i32 width, i32 height) {
     glfwSwapBuffers(window);
 }
 
-ENGINE_TO_MOD void AddCamView(Vector3 pos, Quaternion rot, u8 fov, u16 width, u16 height, float near, float far) {
-    if (camViewCount >= MAX_CAMVIEWS) { DualLogWarn("Too many camviews! Skipping adding.  Max is %u\n",MAX_CAMVIEWS); return; }
-    
+ENGINE_TO_MOD void AddCamView(Vector3 pos, Quaternion rot, u8 fov, u16 width, u16 height, float near, float far) {    
     camViews[camViewCount] = (CamView){pos,rot,fov,width,height,near,far,Sys_Global.pauseRelativeTime + (camViewCount * 0.05f) + 0.5f,false}; // Staggered starts so not all at once for performance.
-    GenerateAndBindTexture(&camViewTextures[camViewCount],GL_RGBA8,width,height,GL_RGBA,GL_UNSIGNED_BYTE,GL_TEXTURE_2D); // Cam View Lit Raster
-    camViewCount++; if (camViewCount >= MAX_CAMVIEWS) DualLogWarn("Too many camviews!  Added last one at %u\n",MAX_CAMVIEWS);
-    DualLog("Cam view added.  Count at %u\n",camViewCount);
+    GenerateAndBindTexture(&camViewTextures[camViewCount],GL_RGBA8,width,height,GL_RGBA,GL_UNSIGNED_BYTE); camViewCount++;
 }
 
 // GLFW Callbacks
 bool IsNonRepeatingKey(i32 key) { return key == GLFW_KEY_KP_ENTER || key == GLFW_KEY_ENTER || key == GLFW_KEY_TAB || key == GLFW_KEY_ESCAPE; }
-
+extern bool enteringPlayerName; void ConsoleEmulator(i32 keycode);
 static void key_callback(GLFWwindow* window, i32 key, i32 scancode, i32 action, i32 mods) {
     if (key == GLFW_KEY_F10 && action) OS_Exit(0); (void)window; (void)scancode; (void)mods; // Suppress warnings about unused parameters forced upon me by glfw3 dependency deadweight anchor.
     if (Sys_Global.menuActive && !returnToPause) {
@@ -836,11 +740,15 @@ static void key_callback(GLFWwindow* window, i32 key, i32 scancode, i32 action, 
         if (key == GLFW_KEY_ENTER && action && (Sys_Input.keyStates[GLFW_KEY_LEFT_ALT].down || Sys_Input.keyStates[GLFW_KEY_RIGHT_ALT].down)) GoIntoGame();
     }
 
-    if (action == GLFW_PRESS || (action == GLFW_REPEAT && !IsNonRepeatingKey(key))) Input_KeyDown(key);
-    else if (action == GLFW_RELEASE)                                                Input_KeyUp(key);
+    if (key >=0 && key < MAX_KEYS && (action == GLFW_PRESS || (action == GLFW_REPEAT && !IsNonRepeatingKey(key)))) {
+        Sys_Input.keyStates[key].pressed = Sys_Input.keyStates[key].down = true;
+        if (Sys_Cheats.consoleActive) ConsoleEmulator(key);
+        else if (enteringPlayerName && Sys_Global.menuActive) TextEntry(key);
+    } else if (key >= 0 && key < MAX_KEYS && action == GLFW_RELEASE) Sys_Input.keyStates[key].pressed = Sys_Input.keyStates[key].down = false;
 }
 
-void Input_PollJoysticks(void) {
+void Input_Poll(void) {
+    glfwPollEvents();
     for (int jid = GLFW_JOYSTICK_1; jid <= GLFW_JOYSTICK_LAST; ++jid) {
         if (!glfwJoystickPresent(jid)) continue;
 
@@ -849,27 +757,20 @@ void Input_PollJoysticks(void) {
         for (int i = 0; i < buttonCount && i < MAX_JOYSTICK_BUTTONS; ++i) {
             KeyState* k = &Sys_Input.joystickButtons[GLFW_JOYSTICK_1][i];
             bool down = buttons[i] == GLFW_PRESS;
-            k->pressed  = down && !k->down;
-            k->released = !down && k->down;
-            k->down     = down;
+            k->pressed =down&&!k->down; k->released=!down&&k->down; k->down=down;
         }
 
-        int hatCount;
-        const unsigned char* hats = glfwGetJoystickHats(jid, &hatCount);
+        int hatCount; const unsigned char* hats = glfwGetJoystickHats(jid, &hatCount);
         for (int i = 0; i < hatCount && i < MAX_JOYSTICK_HATS; ++i) Sys_Input.joystickHats[i].down = hats[i];
     }
-}
 
-void Input_PollGamepad(void) {
     GLFWgamepadstate s;
-    if (!glfwGetGamepadState(GLFW_JOYSTICK_1, &s)) return;
+    if (!glfwGetGamepadState(GLFW_JOYSTICK_1,&s)) return;
 
     for (int i = 0; i < GLFW_GAMEPAD_BUTTON_LAST + 1; ++i) {
         KeyState* k = &Sys_Input.gamepadButtons[i];
         bool down = s.buttons[i] == GLFW_PRESS;
-        k->pressed  = down && !k->down;
-        k->released = !down && k->down;
-        k->down     = down;
+        k->pressed=down&&!k->down; k->released=!down&&k->down; k->down=down;
     }
 }
 
@@ -906,10 +807,10 @@ static void mouse_button_callback(GLFWwindow* window, i32 button, i32 action, i3
 
 static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) { (void)window; (void)xoffset; Sys_Input.scrollDelta += yoffset; }
 
-int currentMonitorIndex = 0; // Start on primary
 void CenterWindowOnMonitor(void) {
     int monitorCount; GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
-    int mx, my; GLFWmonitor* next = monitors[currentMonitorIndex];
+    if (Sys_Settings.CurrentMonitor > (monitorCount - 1)) { Sys_Settings.CurrentMonitor = 0; SaveConfig(); }
+    int mx, my; GLFWmonitor* next = monitors[Sys_Settings.CurrentMonitor];
     glfwGetMonitorPos(next,&mx,&my);
     const GLFWvidmode* mode = glfwGetVideoMode(next);
     int xpos = mx + (mode->width - Sys_Settings.ScreenWidth) / 2;
@@ -924,9 +825,11 @@ void CycleToNextMonitor(void) {
     
     monitorSwitchTime = get_time() + 0.5; // Prevent toggling rapidly on accident
     int monitorCount; GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
+    if (Sys_Settings.CurrentMonitor > (monitorCount - 1)) { Sys_Settings.CurrentMonitor = 0; SaveConfig(); }
     if (!monitors || monitorCount < 2) return;
 
-    currentMonitorIndex = (currentMonitorIndex + 1) % monitorCount;
+    Sys_Settings.CurrentMonitor = (Sys_Settings.CurrentMonitor + 1) % monitorCount;
+    SaveConfig();
     CenterWindowOnMonitor();
 }
 
@@ -1095,7 +998,7 @@ void ChangeResolution(void) {
 
 void ChangeFullScreenWindowed(void) {
     int monitorCount; GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
-    GLFWmonitor* monitor = monitors[currentMonitorIndex];
+    GLFWmonitor* monitor = monitors[Sys_Settings.CurrentMonitor];
     const GLFWvidmode* mode = glfwGetVideoMode(monitor);
     if (Sys_Settings.Fullscreen) {
         glfwSetWindowAttrib(window,GLFW_DECORATED,0);
@@ -1175,158 +1078,6 @@ void LoadModFunctions(void) {
 }
 
 void OpenMainMenu(void) { PlayMenuMusic(); Sys_Global.menuActive = true; currentMenuPage = MenuPages_FrontPage; }
-
-unsigned char *stbi_load_from_memory(const u8* buffer, i32 len, i32 *x, i32 *y);
-extern StbiArena stbi_arena_main;
-void stbi__arena_init_thread(StbiArena* arena);
-void LoadTextures(void),LoadModels(void),InitFontAtlasses(void);
-#define STBI_ARENA_SIZE 16 * 1024 * 1024
-#define LIGHT_RANGE_MAX 15.36f
-void LoadConfig(void);
-__attribute__((cold)) void InitializeEnvironment(void) {
-    double init_start_time = get_time();
-    Sys_Global.globalFrameNum = 0;
-    DebugRAM("InitializeEnvironment start");
-    DualLog("Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed\n");
-    if (!glfwInit()) { DualLogError("GLFW initialization failed\n"); OS_Exit(1); }
-    
-    double initMarker2 = get_time();
-    DualLog("GLFW init took %f secs\n",initMarker2 - init_start_time);
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,4); glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,3); glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
-    LoadConfig(); // Get settings before setting window size.
-    int monitorCount;
-    GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
-    int mx, my; GLFWmonitor* next = monitors[currentMonitorIndex];
-    glfwGetMonitorPos(next,&mx,&my);
-    const GLFWvidmode* mode = glfwGetVideoMode(next);
-    int xpos = mx + (mode->width - Sys_Settings.ScreenWidth) / 2;
-    int ypos = my + (mode->height - Sys_Settings.ScreenHeight) / 2;
-    window = glfwCreateWindow(Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, "Voxen", NULL, NULL);
-    if (!window) { DualLogError("glfwCreateWindow failed\n"); OS_Exit(1); }
-    glfwSetWindowPos(window,xpos,ypos);
-    
-    glfwMakeContextCurrent(window);
-    glfwSetFramebufferSizeCallback(window, UpdateScreenSize);
-    DualLog("Load Config.ini, glfw create window and GL context took %f secs\n",get_time() - initMarker2);
-    if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress)) { DualLogError("Failed to initialize GLAD\n"); OS_Exit(1); }
-    
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
-    glfwSwapBuffers(window);
-    GLint major=0,minor=0; glGetIntegerv(GL_MAJOR_VERSION,&major); glGetIntegerv(GL_MINOR_VERSION,&minor);
-    if (major < 4 || (major == 4 && minor < 3)) { DualLogError("Need OpenGL >= 4.3, got %d.%d\n",major,minor); OS_Exit(1); }
-    double initMarker3 = get_time();
-    glfwSetKeyCallback(window,key_callback); glfwSetJoystickCallback(joystick_callback);
-    glfwSetCursorPosCallback(window,cursor_pos_callback); glfwSetWindowFocusCallback(window,window_focus_callback);
-    glfwSetMouseButtonCallback(window,mouse_button_callback); glfwSetScrollCallback(window,scroll_callback);
-    glfwSetInputMode(window,GLFW_CURSOR,GLFW_CURSOR_DISABLED);
-    glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
-    glBlendFuncSeparate(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA,GL_ZERO,GL_ONE);
-    CompileShaders();
-    double initMarker4 = get_time();
-    DualLog("Set monitor, Set GLFW callbacks, Compile shaders took %f secs\n",initMarker4 - initMarker3);
-
-    GLuint vaos[4],vbos[4]; glCreateVertexArrays(4,vaos); glCreateBuffers(3,vbos);
-    Sys_Render.quadVAO = vaos[0]; Sys_Render.vao_chunk = vaos[1]; Sys_Render.textVAO = vaos[2]; Sys_Render.debugLinesVAO = vaos[3];
-    Sys_Render.quadVBO = vbos[0]; Sys_Render.textVBO = vbos[1]; Sys_Render.debugLinesVBO = vbos[2];
-    float quadBlit_vertices[] = {1.0f,-1.0f,1.0f,0.0f, 1.0f,1.0f,1.0f,1.0f, -1.0f,1.0f,0.0f,1.0f, -1.0f,-1.0f,0.0f,0.0f}; // 4 verts, 4 floats each x,y,u,v
-    glNamedBufferData(Sys_Render.quadVBO,sizeof(quadBlit_vertices),quadBlit_vertices,GL_STATIC_DRAW);
-    glVertexArrayAttribFormat(Sys_Render.quadVAO,0,2,GL_FLOAT,GL_FALSE,0); // DSA: Set position format
-    glVertexArrayAttribFormat(Sys_Render.quadVAO,1,2,GL_FLOAT,GL_FALSE,2 * sizeof(float)); // DSA: Set texcoord format
-    glVertexArrayVertexBuffer(Sys_Render.quadVAO,0,Sys_Render.quadVBO,0,4 * sizeof(float)); // DSA: Link VBO to VAO
-    for (u8 i = 0; i < 2; i++) { glVertexArrayAttribBinding(Sys_Render.quadVAO,i,0); glEnableVertexArrayAttrib(Sys_Render.quadVAO,i); }
-    glVertexArrayAttribFormat(Sys_Render.vao_chunk,0,3,GL_HALF_FLOAT,GL_FALSE,0);      // pos xyz half-float @ offset 0
-    glVertexArrayAttribFormat(Sys_Render.vao_chunk,1,3,GL_HALF_FLOAT,GL_FALSE,6);      // normal xyz float   @ offset 6  (after 3×2 bytes)
-    glVertexArrayAttribFormat(Sys_Render.vao_chunk,2,2,GL_HALF_FLOAT,GL_FALSE,12);     // uv st float
-    for (u8 i = 0; i < 3; i++) { glVertexArrayAttribBinding(Sys_Render.vao_chunk,i,0); glEnableVertexArrayAttrib(Sys_Render.vao_chunk,i); }
-    glVertexArrayAttribFormat(Sys_Render.textVAO,0,3,GL_FLOAT,GL_FALSE,0);             // pos (x,y,z) 4 floats per vertex, stride = 4*sizeof(float)
-    glVertexArrayAttribFormat(Sys_Render.textVAO,1,2,GL_FLOAT,GL_FALSE,3 * sizeof(float));  // uv (s,t)
-    glVertexArrayVertexBuffer(Sys_Render.textVAO,0,Sys_Render.textVBO,0,5 * sizeof(float));
-    for (u8 i = 0; i < 2; i++) { glVertexArrayAttribBinding(Sys_Render.textVAO,i,0); glEnableVertexArrayAttrib(Sys_Render.textVAO,i); }
-    InitFontAtlasses();
-    RenderLoadingProgress(80,"Loading...");
-    glNamedBufferStorage(Sys_Render.debugLinesVBO,MAX_DEBUG_LINE_VERTS * 3 * sizeof(float),NULL,GL_DYNAMIC_STORAGE_BIT);
-    glVertexArrayAttribFormat(Sys_Render.debugLinesVAO,0,3,GL_FLOAT,GL_FALSE,0);
-    glEnableVertexArrayAttrib(Sys_Render.debugLinesVAO,0);
-    glVertexArrayAttribBinding(Sys_Render.debugLinesVAO,0,0);
-    glVertexArrayVertexBuffer(Sys_Render.debugLinesVAO,0,Sys_Render.debugLinesVBO,0,3 * sizeof(float));
-    float* m = shadowmapsPerspectiveProjection;
-    m[0] = 1.0f; m[1] = 0.0f; m[2] =                                                                  0.0f; m[3] =  0.0f;
-    m[4] = 0.0f; m[5] = 1.0f; m[6] =                                                                  0.0f; m[7] =  0.0f;
-    m[8] = 0.0f; m[9] = 0.0f; m[10]=      -(LIGHT_RANGE_MAX + NEAR_PLANE) / (LIGHT_RANGE_MAX - NEAR_PLANE); m[11]= -1.0f;
-    m[12]= 0.0f; m[13]= 0.0f; m[14]= -2.0f * LIGHT_RANGE_MAX * NEAR_PLANE / (LIGHT_RANGE_MAX - NEAR_PLANE); m[15]=  0.0f;
-
-    DualLog("GL buffer definitions took %f secs\n", get_time() - initMarker4);
-    ma_result result;
-    ma_engine_config engine_config = ma_engine_config_init();
-    engine_config.channels = 2; // Stereo output, adjust if needed
-    result = ma_engine_init(&engine_config, &audio_engine); if (result != MA_SUCCESS) DualLog("ERROR: Failed to initialize miniaudio engine: %d\n", result);
-    LoadGameModDefinition();
-    LoadModFunctions();
-    ModEntityDefinitionsInitAfterLoad();
-    DebugRAM("after loading mod");
-    double nextInitTimeSection = get_time();
-    glGenFramebuffers(1, &Sys_Render.gBufferFBO);
-    ApplySettings(); // After loading of text and game data.
-    glBindFramebuffer(GL_FRAMEBUFFER, Sys_Render.gBufferFBO);
-    GLenum drawBuffers[] = {GL_COLOR_ATTACHMENT0,GL_COLOR_ATTACHMENT1,GL_COLOR_ATTACHMENT2,GL_COLOR_ATTACHMENT3};
-    glDrawBuffers(4,drawBuffers);
-    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-    if (status != GL_FRAMEBUFFER_COMPLETE) DualLogError("Framebuffer incomplete: Error code %d\n", status);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0); // Needed to render loading progress.
-    glDepthMask(GL_TRUE); // Always true, set just once ever.
-    glfwSetWindowTitle(window,Sys_Global.global_modname);
-    OsFileHandle fp = OS_OpenReadonly("./Textures/UI/menudot1.png");
-    if (fp) {
-        int windowIconFileSize = OS_FileSize(fp);
-        u8* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize, fp, "./Textures/UI/menudot1.png");
-        if (!file_buffer) { DualLogError("Could not open backed buffer for ./Textures/UI/menudot1.png\n"); OS_Exit(1); }
-        
-        OS_Close(fp);
-        int w=1,h=1;
-        stbi__arena_init_thread(&stbi_arena_main);
-        unsigned char* pixels = stbi_load_from_memory(file_buffer, windowIconFileSize, &w, &h);
-        if (!pixels) { DualLogError("Failed to load icon: ./Textures/UI/menudot1.png\n"); OS_Exit(1); }
-        
-        GLFWimage image; image.width=w; image.height=h; image.pixels=pixels;
-        glfwSetWindowIcon(window,1,&image);
-        OS_DeallocateRAM(file_buffer, windowIconFileSize);
-        OS_DeallocateRAM(stbi_arena_main.base, STBI_ARENA_SIZE); stbi_arena_main.base = NULL;
-    }
-
-    DebugRAM("after freeing window bar icon");
-    float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
-    __builtin_memcpy(&modelMatrices[0],mat,16 * sizeof(float)); // Null instance matrix used for UI
-    Sys_Render.matricesBufferID        = SetupSSBO(&Sys_Render.matricesBufferID,        1,INSTANCE_COUNT * 16 * sizeof(float),modelMatrices, GL_STATIC_DRAW);
-    Sys_Render.voxelLightListCountsID  = SetupSSBO(&Sys_Render.voxelLightListCountsID,  2,VOXEL_COUNT * sizeof(u32),NULL,GL_STATIC_DRAW);
-    Sys_Render.voxelLightListsID       = SetupSSBO(&Sys_Render.voxelLightListsID,       3,VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(u32),NULL,GL_STATIC_DRAW);
-    Sys_Render.lightsID                = SetupSSBO(&Sys_Render.lightsID,                4,LIGHT_COUNT * sizeof(Light),NULL,GL_STATIC_DRAW);
-    Sys_Render.shadowMapSSBO           = SetupSSBO(&Sys_Render.shadowMapSSBO,           5,(MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(u32), NULL, GL_STATIC_DRAW);    
-    Sys_Render.shadowMapsIndirectionID = SetupSSBO(&Sys_Render.shadowMapsIndirectionID, 6,LIGHT_COUNT * sizeof(u32),NULL,GL_STATIC_DRAW);
-    Sys_Render.cellVisibleDataID       = SetupSSBO(&Sys_Render.cellVisibleDataID,       7,ARRSIZE * sizeof(u32),NULL,GL_STATIC_DRAW);
-    Sys_Render.colorBufferID           = SetupSSBO(&Sys_Render.colorBufferID,          12,MAX_TOTAL_PIXELS * sizeof(u8),NULL,GL_STATIC_DRAW);
-    Sys_Render.blueNoiseBuffer         = SetupSSBO(&Sys_Render.blueNoiseBuffer,        13,12288 * sizeof(float), blueNoise,GL_STATIC_DRAW);
-    Sys_Render.textureOffsetsID        = SetupSSBO(&Sys_Render.textureOffsetsID,       14,MAX_VALID_TEXTURE * sizeof(u32),NULL,GL_STATIC_DRAW);
-    Sys_Render.textureSizesID          = SetupSSBO(&Sys_Render.textureSizesID,         15,MAX_VALID_TEXTURE * 2 * sizeof(i32),NULL, GL_STATIC_DRAW);
-    Sys_Render.texturePalettesID       = SetupSSBO(&Sys_Render.texturePalettesID,      16,MAX_UNIQUE_COLORS * sizeof(u32),NULL,GL_STATIC_DRAW);
-    Sys_Render.texturePaletteOffsetsID = SetupSSBO(&Sys_Render.texturePaletteOffsetsID,17,MAX_VALID_TEXTURE * sizeof(u32),NULL,GL_STATIC_DRAW);
-    glUseProgram(Sys_Render.shadowmapsShaderProgram); glUniform1ui(9,SHADOW_MAP_SIZE);
-    glUseProgram(Sys_Render.shadowmapsClearShaderProgram); glUniform1ui(1,SHADOW_MAP_SIZE);
-    glUseProgram(Sys_Render.chunkShaderProgram); glUniform1ui(21,SHADOW_MAP_SIZE); glUniform1f(22,(float)SHADOW_MAP_SIZE); glUniform1ui(23,LIGHT_COUNT); glUniform1ui(24,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);
-    glUseProgram(Sys_Render.voxelUpdateShaderProgram); glUniform1ui(6,(u32)MAX_LIGHTS_PER_VOXEL);
-    DualLog("GL SSBOs and Settings Apply... took %f secs\n",get_time() - nextInitTimeSection);
-    RenderLoadingProgress(110,"Loading textures...");
-    LoadTextures();
-    RenderLoadingProgress(110,"Loading models...");
-    LoadModels();
-    if (Sys_Global.introNotPlayed) {} // TODO: Play intro
-    Sys_Global.absoluteTime = Sys_Global.last_topframe_time = Sys_Global.current_time = get_time();
-    Sys_Global.pauseRelativeTime = Sys_Global.last_physics_time = 0.0;
-//     NewGame(); // Almost works, just causes GL errors once entering game and SSR doesn't appear to work.  Needed to fix bug where you can't see options take effect on config menu unless returned to from after starting a game.
-    OpenMainMenu();
-    DebugRAM("InitializeEnvironment end");
-    DualLog("Game Initialized in %f secs\n",get_time() - init_start_time);
-}
 
 extern bool mouseMovementThisFrame;
 bool MenuEnter(void) { return (Sys_Input.keyStates[GLFW_KEY_KP_ENTER].pressed || Sys_Input.keyStates[GLFW_KEY_ENTER].pressed || Sys_Input.gamepadButtons[GLFW_GAMEPAD_BUTTON_A].pressed); }
@@ -1929,163 +1680,149 @@ static inline __attribute__((always_inline)) bool DetermineIfInstanceVisible(u16
     return true;
 }
 
-__attribute__((pure)) i32 dsort(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (db > da) - (db < da); }
-__attribute__((pure)) i32 dsortInv(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (da > db) - (da < db); }
-void qsort(void* base, size_t nmemb, size_t size, int (*cmp)(const void*, const void*));
-static inline __attribute__((always_inline)) void RenderInstances(Vector3 playerPos, bool transparents) {
-    u16 visibleCount = 0, currentTexIndex = 0, currentNormIndex = 0, currentGlowIndex = 0, currentSpecIndex = 0, currentModelType = 0;
-    bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX);
-    float distSqrd = Sys_Global.farPlane * Sys_Global.farPlane;
-    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
-        if (!DetermineIfInstanceVisible(i,(transparentTexture[Sys_Global.instances[i].texIndex] ^ transparents),skyVisible,playerPos,&distSqrd)) continue;
-
-        visibleInstances[visibleCount].index = i;
-        visibleInstances[visibleCount].depth = distSqrd;
-        visibleCount++;
-    }
-    
-    bool grayscaleEnabled = ModRequestsGrayscale();
-    glUniform1f(31,0.0f); // Reset heat for infrared vision
-    if (visibleCount > 1) qsort(visibleInstances,visibleCount,sizeof(DepthSort),transparents ? dsort : dsortInv); // Sort by depth (ascending for front-to-back)
-    for (u16 visibleIndex = 0; visibleIndex < visibleCount; ++visibleIndex) {
-        u16 i = visibleInstances[visibleIndex].index;
-        Entity* e = &Sys_Global.instances[i]; u16 tex = e->texIndex, glow = e->glowIndex, norm = e->normIndex, spec = e->specIndex;
-        if (transparentTexture[tex] && transparents) { glEnable(GL_CULL_FACE); glEnable(GL_BLEND); } // Transparents (with sort)
-        else if (doubleSidedTexture[tex] || e->scale.x < 0.0f || e->scale.y < 0.0f || e->scale.z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided
-        else { glEnable(GL_CULL_FACE); glDisable(GL_BLEND); } // Opaque
-
-        glUniform1ui(17,tex == 316 ? 1u : 0u);
-        u32 constIndex = e->index;
-        if (transparents) {
-            if ((constIndex >= 561 && constIndex <= 565) || (constIndex >= 568 && constIndex <= 573)) glDepthFunc(GL_EQUAL); // Cutouts
-            else glDepthFunc(GL_LEQUAL); // Actual alphas
-        }
-        glUniform1ui(25,constIndex);
-        glUniform1f(27,e->volume); // CyberWall bump go alpha 1.0 then fade.
-        glUniform1ui(32,(tex == 36 || tex == 887) ? 1U : 0U);
-        u8 cmi = e->camView;
-        glUniform1ui(30,cmi < camViewCount ? 1u : 0u); // useCamView
-        if (cmi < camViewCount) {
-            glActiveTexture(GL_TEXTURE6);
-            glBindTexture(GL_TEXTURE_2D,camViewTextures[cmi]);
-            glUniform2ui(28,camViews[cmi].width,camViews[cmi].height);
-            glUniform1i(29,6); // Cam View put into Uniform
-            if (grayscaleEnabled) {
-                float heat = (constIndex >= 419 && constIndex <= 448) ? (  (constIndex == 419 || constIndex == 422 || constIndex == 424 || constIndex == 429 || constIndex == 430
-                                                                         || constIndex == 431 || constIndex == 433 || constIndex == 437 || constIndex == 438 || constIndex == 441) ? 1.5f : 4.0f) : 0.0f;
-                glUniform1f(31,heat);
-            }
-        }
-        
-        if (currentNormIndex != norm || norm == 0) { currentNormIndex = norm; glUniform1ui( 1,(u32)norm); }
-        if (currentTexIndex  != tex  ||  tex == 0) { currentTexIndex  =  tex; glUniform1ui(18,(u32)tex ); }
-        if (currentGlowIndex != glow || glow == 0) { currentGlowIndex = glow; glUniform1ui(19,(u32)glow); }
-        if (currentSpecIndex != spec || spec == 0) { currentSpecIndex = spec; glUniform1ui(20,(u32)spec); }
-        currentModelType = GetAndBindModel(i,currentModelType);
-        u32 vertCount = modelTriangleCounts[currentModelType] * 3;
-        glDrawElements(GL_TRIANGLES,vertCount,GL_UNSIGNED_SHORT,0); drawCallsRenderedThisFrame++; verticesRenderedThisFrame += vertCount;
-    }
-}
-
-static inline __attribute__((always_inline)) void RenderInstancesDepthOnly(Vector3 playerPos) {
-    u16 visibleCount = 0, currentModelType = 0;
-    bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX);
-    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
-        float distSqrd = Sys_Global.farPlane * Sys_Global.farPlane;
-        if (!DetermineIfInstanceVisible(i,false,skyVisible,playerPos,&distSqrd)) continue;
-        
-        visibleInstances[visibleCount].index = i;
-        visibleInstances[visibleCount].depth = distSqrd;
-        visibleCount++;
-    }
-    
-    if (visibleCount > 1) qsort(visibleInstances,visibleCount,sizeof(DepthSort),dsortInv);
-    glDisable(GL_BLEND);
-    for (u16 visibleIndex = 0; visibleIndex < visibleCount; ++visibleIndex) {
-        u16 i = visibleInstances[visibleIndex].index;
-        Entity* e = &Sys_Global.instances[i]; u16 tex = e->texIndex;
-        if (transparentTexture[tex]) { glEnable(GL_CULL_FACE); glEnable(GL_BLEND); } // Transparents (with sort)
-        else if (doubleSidedTexture[tex] || e->scale.x < 0.0f || e->scale.y < 0.0f || e->scale.z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided
-        else { glEnable(GL_CULL_FACE); glDisable(GL_BLEND); } // Opaque
-        
-        currentModelType = GetAndBindModel(i,currentModelType);
-        glUniform1ui(3,(u32)tex);
-        u32 vertCount = modelTriangleCounts[currentModelType] * 3;
-        glDrawElements(GL_TRIANGLES,vertCount,GL_UNSIGNED_SHORT,0); drawCallsRenderedThisFrame++; verticesRenderedThisFrame += vertCount;
-    }
-}
-
 float GetPainStatic(void) { return 0.0f; } // TODO: Hook into pain/health management and shield impact effect
 Color GetPainStaticColor(void) { return (Color){1.0f,0.0f,0.0f,1.0f}; } // TODO: Hook staticColor up to red or blue for pain or shield impact.
 
+__attribute__((pure)) i32 dsort(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (db > da) - (db < da); }
+__attribute__((pure)) i32 dsortInv(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (da > db) - (da < db); }
+void qsort(void* base, size_t nmemb, size_t size, int (*cmp)(const void*, const void*));
+// Bind textures only on change (norm/tex/glow/spec); cmi<camViewCount handled inline
+#define MAX_VISIBLE 4096
+#define BIND_TEX(slot,cur,next) if((cur)!=(next)||(next)==0){(cur)=(next);glUniform1ui(slot,(u32)(next));}
+#define SET_CAMVIEW(cmi,constIndex,gs) \
+    glUniform1ui(30,(cmi)<camViewCount?1u:0u); \
+    if((cmi)<camViewCount){ \
+        glActiveTexture(GL_TEXTURE6);glBindTexture(GL_TEXTURE_2D,camViewTextures[cmi]); \
+        glUniform2ui(28,camViews[cmi].width,camViews[cmi].height);glUniform1i(29,6); \
+        if(gs){float _h=(constIndex>=419&&constIndex<=448)?(( \
+            constIndex==419||constIndex==422||constIndex==424||constIndex==429||constIndex==430|| \
+            constIndex==431||constIndex==433||constIndex==437||constIndex==438||constIndex==441)?1.5f:4.0f):0.0f; \
+            glUniform1f(31,_h);} \
+    }
+#define DRAW_ENTITY(i,curN,curT,curG,curS,curM) \
+    {Entity*e=&Sys_Global.instances[i];u16 tex=e->texIndex,glow=e->glowIndex,norm=e->normIndex,spec=e->specIndex; \
+     u32 ci=e->index; \
+     glUniform1ui(17,tex==316?1u:0u); \
+     glUniform1ui(25,ci); \
+     glUniform1f(27,e->volume); \
+     glUniform1ui(32,(tex==36||tex==887)?1u:0u); \
+     SET_CAMVIEW(e->camView,ci,grayscaleEnabled) \
+     BIND_TEX(1,curN,norm) BIND_TEX(18,curT,tex) BIND_TEX(19,curG,glow) BIND_TEX(20,curS,spec) \
+     curM=GetAndBindModel(i,curM); \
+     u32 vc=modelTriangleCounts[curM]*3; \
+     glDrawElements(GL_TRIANGLES,vc,GL_UNSIGNED_SHORT,0);drawCallsRenderedThisFrame++;verticesRenderedThisFrame+=vc;}
+
 static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
-    u16 swidth = camView ? camViews[camViewIdx].width : Sys_Settings.ScreenWidth; u16 sheight = camView ? camViews[camViewIdx].height : Sys_Settings.ScreenHeight;
+    u16 swidth = camView ? camViews[camViewIdx].width : Sys_Settings.ScreenWidth, sheight = camView ? camViews[camViewIdx].height : Sys_Settings.ScreenHeight;
     float sfov = camView ? (float)camViews[camViewIdx].fov : (float)Sys_Settings.FOV;
     float snear = camView ? camViews[camViewIdx].near : NEAR_PLANE; float sfar = camView ? camViews[camViewIdx].far : Sys_Global.farPlane;
-    
-    // Frame prep, View Matrix, and Projection Matrix
-    float view[16]; // Also known as view matrix
     Vector3 playerPos = Sys_Global.instances[PLAYER1].position;
     float px = playerPos.x, py = playerPos.y, pz = playerPos.z;
-    
     float aspect3D = (float)swidth / (float)sheight;
     float f = vcot(sfov * PI / 360.0f);
     float* m = rasterPerspectiveProjection;
-    m[0] = f / aspect3D; m[1] = 0.0f; m[2] =                                           0.0f; m[3] =  0.0f;
-    m[4] =         0.0f; m[5] =    f; m[6] =                                                      0.0f; m[7] =  0.0f;
-    m[8] =         0.0f; m[9] = 0.0f; m[10]=      -(sfar + snear) / (sfar - snear); m[11]= -1.0f;
-    m[12]=         0.0f; m[13]= 0.0f; m[14]= -2.0f * sfar * snear / (sfar - snear); m[15]=  0.0f;
+    m[0] = f / aspect3D; m[1] = 0.0f; m[2] = 0.0f; m[3] = 0.0f;
+    m[4] = 0.0f; m[5] = f; m[6] = 0.0f; m[7] = 0.0f;
+    m[8] = 0.0f; m[9] = 0.0f; m[10]= -(sfar + snear) / (sfar - snear); m[11]= -1.0f;
+    m[12]= 0.0f; m[13]= 0.0f; m[14]= -2.0f * sfar * snear / (sfar - snear); m[15]= 0.0f;
     voxen_Shadow_System.shadDotThresh = 1.0f / vsqrtf(1.0f + vtan(sfov * PI / 360.0f) * (1.0f + aspect3D * aspect3D));
-    {// mat4_lookat_from(view,&Sys_Global.instances[PLAYER1].rotation, playerPos); Manually inlined for performance
-        float x = Sys_Global.instances[PLAYER1].rotation.x, y = Sys_Global.instances[PLAYER1].rotation.y, z = Sys_Global.instances[PLAYER1].rotation.z, w = Sys_Global.instances[PLAYER1].rotation.w;
-        float x2 = x * x, y2 = y * y, z2 = z * z;
-        float xy = x * y, xz = x * z, yz = y * z;
-        float wx = w * x, wy = w * y, wz = w * z;
-        Vector3 right   = { 1.0f - 2.0f * (y2 + z2),        2.0f * (xy + wz),        2.0f * (xz - wy) };  // X+ (right)
-        Vector3 up      = {        2.0f * (xy - wz), 1.0f - 2.0f * (x2 + z2),        2.0f * (yz + wx) };  // Y+ (up)
-        Vector3 forward = {        2.0f * (xz + wy),        2.0f * (yz - wx), 1.0f - 2.0f * (x2 + y2) };  // Z+ (forward)
-        view[0]  = right.x; view[1]  = up.x; view[2]  = -forward.x; view[3]  = 0.0f;
-        view[4]  = right.y; view[5]  = up.y; view[6]  = -forward.y; view[7]  = 0.0f;
-        view[8]  = right.z; view[9]  = up.z; view[10] = -forward.z; view[11] = 0.0f;
-        view[12] = -dot_vector3(right,playerPos); view[13] = -dot_vector3(up,playerPos); view[14] = dot_vector3(forward,playerPos); view[15] = 1.0f;
-    }
-    
+    float x = Sys_Global.instances[PLAYER1].rotation.x, y = Sys_Global.instances[PLAYER1].rotation.y, z = Sys_Global.instances[PLAYER1].rotation.z, w = Sys_Global.instances[PLAYER1].rotation.w;
+    float x2=x*x, y2=y*y, z2=z*z, xy=x*y, xz=x*z, yz=y*z, wx=w*x, wy=w*y, wz=w*z;
+    Vector3 right = { 1.0f - 2.0f * (y2 + z2), 2.0f * (xy + wz), 2.0f * (xz - wy) };   // X+ (right)
+    Vector3 up = { 2.0f * (xy - wz), 1.0f - 2.0f * (x2 + z2), 2.0f * (yz + wx) };      // Y+ (up)
+    Vector3 forward = { 2.0f * (xz + wy), 2.0f * (yz - wx), 1.0f - 2.0f * (x2 + y2) }; // Z+ (forward)
+    float view[16]; // view matrix
+    view[0] = right.x; view[1] = up.x; view[2] = -forward.x; view[3] = 0.0f;
+    view[4] = right.y; view[5] = up.y; view[6] = -forward.y; view[7] = 0.0f;
+    view[8] = right.z; view[9] = up.z; view[10] = -forward.z; view[11] = 0.0f;
+    view[12] = -dot_vector3(right,playerPos); view[13] = -dot_vector3(up,playerPos); view[14] = dot_vector3(forward,playerPos); view[15] = 1.0f;
     float viewProj[16]; // view-projection matrix
     mul_mat4(viewProj,rasterPerspectiveProjection,view);
     float invViewRot[9] = {view[0],view[4],view[8], view[1],view[5],view[9], view[2],view[6],view[10]};
     ExtractFrustumPlanes(viewProj,playerFrustumPlanes);
     glBindVertexArray(Sys_Render.vao_chunk); // Common vao for RenderDynamicShadowmaps and Rasterized Geometry
     glEnable(GL_DEPTH_TEST);
-    if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps(); // No shadows on camviews for performance, except for sensaround that has to look right
-    for (int i=0;i<LIGHT_COUNT;++i) flag_setu32(&lights[i].lflags,LDIRTY,false); // Clear dirty after shadowmaps for minimal shadowmap updating.
-    __builtin_memset(Sys_Global.dirtyInstances,0,Sys_Global.loadedInstances * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
+    if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps();
+    for (int i=0;i<LIGHT_COUNT;++i) flag_setu32(&lights[i].lflags,LDIRTY,false);
+    __builtin_memset(Sys_Global.dirtyInstances,0,Sys_Global.loadedInstances * sizeof(bool));
     glBindFramebuffer(GL_FRAMEBUFFER,Sys_Render.gBufferFBO);
     glViewport(0,0,swidth,sheight);
-    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
-    glEnable(GL_CULL_FACE); glDisable(GL_BLEND); // Opaques
-    
-    // Depth Prepass - Eliminates some overdraw for ~6.1% performance improvement in spite of added draw calls since these are relatively cheap and avoid the heavy fragment work in main pass.
-    glUseProgram(Sys_Render.depthPrepassShaderProgram);
-    glUniformMatrix4fv(2,1,GL_FALSE,viewProj);
-    glColorMask(GL_FALSE,GL_FALSE,GL_FALSE,GL_FALSE);
-    glDepthMask(GL_TRUE); glDepthFunc(GL_LESS);
-    RenderInstancesDepthOnly(playerPos); // opaques only
-    
+    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); glEnable(GL_CULL_FACE); glDisable(GL_BLEND); // Opaques
+    u16 visibleCount = 0, currentTexIndex = 0, currentNormIndex = 0, currentGlowIndex = 0, currentSpecIndex = 0, currentModelType = 0, opaqueCount = 0;
+    bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX);
+    float distSqrd = sfar * sfar;
+    DepthSort tmpTransparent[MAX_VISIBLE]; u16 tcnt = 0;
+    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) { // Determine base visibility
+        if (!DetermineIfInstanceVisible(i,false,skyVisible,playerPos,&distSqrd)) continue;
+       
+        if (transparentTexture[Sys_Global.instances[i].texIndex]) { tmpTransparent[tcnt].index = i; tmpTransparent[tcnt].depth = distSqrd; tcnt++; }
+        else { visibleInstances[opaqueCount].index = i; visibleInstances[opaqueCount].depth = distSqrd; opaqueCount++; }
+    }
+
+    __builtin_memcpy(visibleInstances + opaqueCount,tmpTransparent,tcnt * sizeof(DepthSort));
+    visibleCount = opaqueCount + tcnt;
+    glUseProgram(Sys_Render.depthPrepassShaderProgram); // Depth Prepass - Eliminates some overdraw for ~6.1% performance improvement in spite of added draw calls
+    glUniformMatrix4fv(2,1,0,viewProj);
+    glColorMask(0,0,0,0); glDepthMask(1); glDepthFunc(GL_LESS); glDisable(GL_BLEND);
+    if (opaqueCount > 1) qsort(visibleInstances,opaqueCount,sizeof(DepthSort),dsortInv);
+    if (tcnt > 1) qsort(visibleInstances + opaqueCount,tcnt,sizeof(DepthSort),dsort);
+    for (u16 visibleIndex = 0; visibleIndex < visibleCount; ++visibleIndex) {
+        u16 i = visibleInstances[visibleIndex].index;
+        Entity* e = &Sys_Global.instances[i]; u16 tex = e->texIndex;
+        if (transparentTexture[tex]) { glEnable(GL_CULL_FACE); glEnable(GL_BLEND); } // Transparents (with sort)
+        else if (doubleSidedTexture[tex] || e->scale.x < 0.0f || e->scale.y < 0.0f || e->scale.z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided
+        else { glEnable(GL_CULL_FACE); glDisable(GL_BLEND); } // Opaque
+       
+        currentModelType = GetAndBindModel(i,currentModelType);
+        glUniform1ui(3,(u32)tex);
+        u32 vertCount = modelTriangleCounts[currentModelType] * 3;
+        glDrawElements(GL_TRIANGLES,vertCount,GL_UNSIGNED_SHORT,0); drawCallsRenderedThisFrame++; verticesRenderedThisFrame += vertCount;
+    }
+
     // Main Pass
     glUseProgram(Sys_Render.chunkShaderProgram);
-    glUniformMatrix4fv(2,1,GL_FALSE,viewProj);
+    glUniformMatrix4fv(2,1,0,viewProj);
     glUniform1ui(25,0u); // default constIndex
-    glUniform1ui(26,(u32)ModRequestsGrayscale());
+    bool grayscaleEnabled = ModRequestsGrayscale();
+    glUniform1ui(26,(u32)grayscaleEnabled);
     glUniform1ui(3,0u); // isUI false
     float fogActual = Sys_Global.fogColor.a + (float)(Sys_Global.fogFac / 255u); // Alpha is base density for level.
     glUniform3f(4,Sys_Global.fogColor.r * fogActual,Sys_Global.fogColor.g * fogActual,Sys_Global.fogColor.b * fogActual); // Fog Color(which is density)
-    glUniform1ui(14,Sys_Settings.Reflections);   glUniform1ui(15,Sys_Settings.Shadows);
+    glUniform1ui(14,Sys_Settings.Reflections); glUniform1ui(15,Sys_Settings.Shadows);
     glUniform1f(8,Sys_Global.worldMin_x); glUniform1f(9,Sys_Global.worldMin_z); glUniform3f(10,playerPos.x,playerPos.y,playerPos.z);
-    glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE);
-    glDepthMask(GL_FALSE); glDepthFunc(GL_LEQUAL);
-    RenderInstances(playerPos,false);
-    glDepthMask(GL_TRUE);
-    RenderInstances(playerPos,true); // opaque, then transparents
+   
+    // Opaque Pass
+    glColorMask(1,1,1,1); glDepthMask(0); glDepthFunc(GL_LEQUAL);
+    visibleCount = currentTexIndex = currentNormIndex = currentGlowIndex = currentSpecIndex = currentModelType = 0;
+    glUniform1f(31,0.0f); // Reset heat for infrared vision
+    for (u16 visibleIndex = 0; visibleIndex < opaqueCount; ++visibleIndex) { // Opaques (already front-to-back)
+        u16 i = visibleInstances[visibleIndex].index;
+        Entity* e = &Sys_Global.instances[i]; u16 tex = e->texIndex;
+        if (transparentTexture[tex]) continue;
+        else if (doubleSidedTexture[tex] || e->scale.x < 0.0f || e->scale.y < 0.0f || e->scale.z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided (either)
+        else { glEnable(GL_CULL_FACE); glDisable(GL_BLEND); } // Opaque
+       
+        DRAW_ENTITY(i, currentNormIndex, currentTexIndex, currentGlowIndex, currentSpecIndex, currentModelType)
+    }
+   
+    // Transparents Pass
+    glDepthMask(1);
+    currentTexIndex = currentNormIndex = currentGlowIndex = currentSpecIndex = currentModelType = 0;
+    glUniform1f(31,0.0f); // Reset heat for infrared vision
+    for (u16 visibleIndex = opaqueCount; visibleIndex < (opaqueCount + tcnt); ++visibleIndex) {
+        u16 i = visibleInstances[visibleIndex].index;
+        Entity* e = &Sys_Global.instances[i]; u16 tex = e->texIndex;
+        if (transparentTexture[tex]) { glEnable(GL_CULL_FACE); glEnable(GL_BLEND); } // Transparents (with sort)
+        else if (doubleSidedTexture[tex] || e->scale.x < 0.0f || e->scale.y < 0.0f || e->scale.z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided (either)
+        else continue; // Opaque
+       
+        u32 constIndex = e->index;
+        if ((constIndex >= 561 && constIndex <= 565) || (constIndex >= 568 && constIndex <= 573)) glDepthFunc(GL_EQUAL); // Cutouts
+        else glDepthFunc(GL_LEQUAL); // Actual alphas
+       
+        DRAW_ENTITY(i,currentNormIndex,currentTexIndex,currentGlowIndex,currentSpecIndex,currentModelType)
+    }
+   
     glUniform1ui(25,0u); // reset constIndex
     if (camView) {
         glBindFramebuffer(GL_READ_FRAMEBUFFER,Sys_Render.gBufferFBO);
@@ -2095,7 +1832,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
         glBindTexture(GL_TEXTURE_2D,0);
         return; // After copying render result, skip SSR and composite for camviews <<<<<<<<<<<<< CAM VIEW BARRIER
     }
-    
+   
     // Draw Debug Lines
     if (unlikely(Sys_Global.debugLineVertCount > 1)) DrawDebugLines(viewProj);
     glBindFramebuffer(GL_FRAMEBUFFER,0);
@@ -2103,27 +1840,24 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
         glUseProgram(Sys_Render.ssrShaderProgram);
         glUniform3f(3,playerPos.x,playerPos.y,playerPos.z);
         glUniformMatrix4fv(4,1,GL_FALSE,viewProj);
-        GLuint groupX_ssr = ((Sys_Settings.ScreenWidth  / Sys_Settings.SSR_RES) + 31) / 32;
-        GLuint groupY_ssr = ((Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES) + 31) / 32;
+        GLuint groupX_ssr = ((Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES) + 31) / 32, groupY_ssr = ((Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES) + 31) / 32;
         glDispatchCompute(groupX_ssr,groupY_ssr,1);
     }
-
     glUseProgram(Sys_Render.imageBlitShaderProgram);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D,Sys_Render.inputImageID);
-    glUniform1i(4,4); // outputImage texture sampler2D, don't remember why when active texture is texture 0.  meh.... oh maybe to not read and write same binding?
+    glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,Sys_Render.inputImageID);
+    glUniform1i(4,4); // outputImage texture sampler2D, don't remember why when active texture is texture 0. meh.... oh maybe to not read and write same binding?
     double berserkTimeRemainingNormalized = Sys_Global.invP1.berserkFinishedTime > 0.0001 ? (Sys_Global.invP1.berserkFinishedTime - Sys_Global.pauseRelativeTime) / BERSERK_TIME : 0.0;
     if (Sys_Global.invP1.berserkFinishedTime < Sys_Global.pauseRelativeTime && Sys_Global.invP1.berserkFinishedTime > 0.0001) Sys_Global.invP1.berserkFinishedTime = berserkTimeRemainingNormalized = 0.0;
     glUniform1ui(5,Sys_Settings.Reflections);
     glUniform1ui(6,Sys_Settings.FXAA);
     glUniform1f(14,Sys_Settings.FOV);
-    glUniform1f(16,(float)Sys_Settings.ScreenWidth / (float)Sys_Settings.ScreenHeight);
+    glUniform1f(16,(float)swidth / (float)sheight);
     glUniform1ui(22,Sys_Settings.Shadows);
     glUniform1f(9,(float)berserkTimeRemainingNormalized);
     glUniform1f(10,berserkSeedTime);
     glUniform1ui(11,Sys_Settings.Brightness);
-    glUniform3f(12,deg2rad(cam_yaw), deg2rad(cam_pitch), deg2rad(cam_roll));
-    glUniform3f(13,px, py, pz);
+    glUniform3f(12,deg2rad(cam_yaw),deg2rad(cam_pitch),deg2rad(cam_roll));
+    glUniform3f(13,px,py,pz);
     glUniform1f(15,(float)Sys_Global.pauseRelativeTime * 0.1f);
     glUniform1ui(17,(gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || Sys_Global.currentLevel == LEVEL_CYBERSPACE);
     glUniform1ui(18,(gridCellStates[playerCellIdx] & CELL_SEES_SUN) && Sys_Global.currentLevel != LEVEL_CYBERSPACE);
@@ -2133,26 +1867,23 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
         if (Sys_Global.currentLevel == 6 || Sys_Global.currentLevel == 7) shieldOnType = 2u; // Shielding only below player for lower levels.
         else if (Sys_Global.currentLevel <= 5) shieldOnType = 1u; // Shielding everywhere as levels fully within shield.
     }
-    
+   
     glUniform1ui(20,shieldOnType);
     Color painStaticColor = GetPainStaticColor();
     glUniform3f(23,painStaticColor.r,painStaticColor.g,painStaticColor.b);
-    glUniformMatrix4fv(24,1,GL_FALSE,viewProj);
-    glUniformMatrix3fv(25,1,GL_FALSE,invViewRot);
+    glUniformMatrix4fv(24,1,0,viewProj);
+    glUniformMatrix3fv(25,1,0,invViewRot);
     glUniform1i(27,0); // Texture 0 for the rendered geometry color buffer
     glUniform1f(28,GetPainStatic());
-    glUniform1ui(29,(u32)ModRequestsGrayscale()); // Grayscale    
+    glUniform1ui(29,(u32)ModRequestsGrayscale()); // Grayscale
     glBindVertexArray(Sys_Render.quadVAO);
-    glDisable(GL_DEPTH_TEST); // Reenabled later after all UI just up there before RenderShadowmaps call
+    glDisable(GL_DEPTH_TEST);
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
     drawCallsRenderedThisFrame++; verticesRenderedThisFrame += 4;
-
+    
     // UI
-    glEnable(GL_BLEND);
-    glClear(GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!  2nd Clear needed or UI dissappears/flickers!!
-    glDisable(GL_CULL_FACE);
+    glEnable(GL_BLEND); glDisable(GL_CULL_FACE); glClear(GL_DEPTH_BUFFER_BIT); // Clear main FBO. glClearBufferfv was actually SLOWER! 2nd Clear needed or UI dissappears/flickers!!
     Sys_Global.last_time = RenderUI();
-
     // Cursor [ /// VERY LAST DRAWN OVER EVERYTHING ELSE! /// ]
     if ((Sys_Global.inventoryMode && !Sys_Cheats.noHUD) || Sys_Global.menuActive || Sys_Global.gamePaused) RenderUIImage((i16)(Sys_Global.cursorPosition_x) - 20,(i16)(Sys_Global.cursorPosition_y) - 20,40,40,GetCursorTexture());
     else RenderUIImage(663,371,40,40,GetCursorTexture()); // Centered on UI baseline resolution 1366x768
@@ -2162,23 +1893,155 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
         if (Sys_Global.framesPerLastSecond < Sys_Global.worstFPS && Sys_Global.globalFrameNum > 2000) Sys_Global.worstFPS = Sys_Global.framesPerLastSecond; // After startup, keep track of worst framerate seen.
         Sys_Global.lastFrameSecCount = Sys_Global.globalFrameNum;
     }
-    
+   
     Sys_Global.cpuTime = get_time() - Sys_Global.current_time; // Measure time over everything this frame before GPU swap buffers
     glfwSwapBuffers(window); // Present frame
-    CheckAndTakeScreenshot();
     CHECK_GL_ERROR();
 }
 
-bool UpdatedPlayerCell(void); bool CullCore(void); i32 Physics(void); extern u32 random_range_rng;
+unsigned char *stbi_load_from_memory(const u8* buffer, i32 len, i32 *x, i32 *y);
+extern StbiArena stbi_arena_main; extern u32 random_range_rng;
+void stbi__arena_init_thread(StbiArena* arena);
+#define STBI_ARENA_SIZE 16 * 1024 * 1024
+#define LIGHT_RANGE_MAX 15.36f
+void LoadConfig(void),InitFontAtlasses(void),LoadTextures(void),LoadModels(void); i32 Physics(void); bool CullCore(void);
 i32 main(void) {
     double game_start_time = get_time();
     random_range_rng = (u32)game_start_time; // Seed global rand uniquely with time since system boot.
     console_log_file = OS_OpenWriteonly("./voxen.log"); // Initialize log system for all prints to go to both stdout and voxen.log file
     DebugRAM("program start");
-    #ifdef WINDOWS
-        SetDllDirectory("External\\Windows");
-    #endif
-    InitializeEnvironment();
+    DualLog("Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed\n");
+    if (!glfwInit()) { DualLogError("GLFW initialization failed\n"); OS_Exit(1); }
+    
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,4); glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,3); glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
+    LoadConfig(); // Get settings before setting window size.
+    window = glfwCreateWindow(Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, "Voxen", NULL, NULL);
+    if (!window) { DualLogError("glfwCreateWindow failed\n"); OS_Exit(1); }
+    
+    CenterWindowOnMonitor();
+    glfwMakeContextCurrent(window);
+    glfwSetFramebufferSizeCallback(window, UpdateScreenSize);
+    if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress)) { DualLogError("Failed to initialize GLAD\n"); OS_Exit(1); }
+    
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
+    glfwSwapBuffers(window);
+    GLint major=0,minor=0; glGetIntegerv(GL_MAJOR_VERSION,&major); glGetIntegerv(GL_MINOR_VERSION,&minor);
+    if (major < 4 || (major == 4 && minor < 3)) { DualLogError("Need OpenGL >= 4.3, got %d.%d\n",major,minor); OS_Exit(1); }
+    glfwSetKeyCallback(window,key_callback); glfwSetJoystickCallback(joystick_callback);
+    glfwSetCursorPosCallback(window,cursor_pos_callback); glfwSetWindowFocusCallback(window,window_focus_callback);
+    glfwSetMouseButtonCallback(window,mouse_button_callback); glfwSetScrollCallback(window,scroll_callback);
+    glfwSetInputMode(window,GLFW_CURSOR,GLFW_CURSOR_DISABLED);
+    glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
+    glBlendFuncSeparate(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA,GL_ZERO,GL_ONE);
+    CompileShaders();
+    GLuint vaos[4],vbos[4]; glCreateVertexArrays(4,vaos); glCreateBuffers(3,vbos);
+    Sys_Render.quadVAO = vaos[0]; Sys_Render.vao_chunk = vaos[1]; Sys_Render.textVAO = vaos[2]; Sys_Render.debugLinesVAO = vaos[3];
+    Sys_Render.quadVBO = vbos[0]; Sys_Render.textVBO = vbos[1]; Sys_Render.debugLinesVBO = vbos[2];
+    float quadBlit_vertices[] = {1.0f,-1.0f,1.0f,0.0f, 1.0f,1.0f,1.0f,1.0f, -1.0f,1.0f,0.0f,1.0f, -1.0f,-1.0f,0.0f,0.0f}; // 4 verts, 4 floats each x,y,u,v
+    glNamedBufferData(Sys_Render.quadVBO,sizeof(quadBlit_vertices),quadBlit_vertices,GL_STATIC_DRAW);
+    glVertexArrayAttribFormat(Sys_Render.quadVAO,0,2,GL_FLOAT,GL_FALSE,0); // DSA: Set position format
+    glVertexArrayAttribFormat(Sys_Render.quadVAO,1,2,GL_FLOAT,GL_FALSE,2 * sizeof(float)); // DSA: Set texcoord format
+    glVertexArrayVertexBuffer(Sys_Render.quadVAO,0,Sys_Render.quadVBO,0,4 * sizeof(float)); // DSA: Link VBO to VAO
+    for (u8 i = 0; i < 2; i++) { glVertexArrayAttribBinding(Sys_Render.quadVAO,i,0); glEnableVertexArrayAttrib(Sys_Render.quadVAO,i); }
+    glVertexArrayAttribFormat(Sys_Render.vao_chunk,0,3,GL_HALF_FLOAT,GL_FALSE,0);      // pos xyz half-float @ offset 0
+    glVertexArrayAttribFormat(Sys_Render.vao_chunk,1,3,GL_HALF_FLOAT,GL_FALSE,6);      // normal xyz float   @ offset 6  (after 3×2 bytes)
+    glVertexArrayAttribFormat(Sys_Render.vao_chunk,2,2,GL_HALF_FLOAT,GL_FALSE,12);     // uv st float
+    for (u8 i = 0; i < 3; i++) { glVertexArrayAttribBinding(Sys_Render.vao_chunk,i,0); glEnableVertexArrayAttrib(Sys_Render.vao_chunk,i); }
+    glVertexArrayAttribFormat(Sys_Render.textVAO,0,3,GL_FLOAT,GL_FALSE,0);             // pos (x,y,z) 4 floats per vertex, stride = 4*sizeof(float)
+    glVertexArrayAttribFormat(Sys_Render.textVAO,1,2,GL_FLOAT,GL_FALSE,3 * sizeof(float));  // uv (s,t)
+    glVertexArrayVertexBuffer(Sys_Render.textVAO,0,Sys_Render.textVBO,0,5 * sizeof(float));
+    for (u8 i = 0; i < 2; i++) { glVertexArrayAttribBinding(Sys_Render.textVAO,i,0); glEnableVertexArrayAttrib(Sys_Render.textVAO,i); }
+    InitFontAtlasses();
+    RenderLoadingProgress(80,"Loading...");
+    glNamedBufferStorage(Sys_Render.debugLinesVBO,MAX_DEBUG_LINE_VERTS * 3 * sizeof(float),NULL,GL_DYNAMIC_STORAGE_BIT);
+    glVertexArrayAttribFormat(Sys_Render.debugLinesVAO,0,3,GL_FLOAT,GL_FALSE,0);
+    glEnableVertexArrayAttrib(Sys_Render.debugLinesVAO,0);
+    glVertexArrayAttribBinding(Sys_Render.debugLinesVAO,0,0);
+    glVertexArrayVertexBuffer(Sys_Render.debugLinesVAO,0,Sys_Render.debugLinesVBO,0,3 * sizeof(float));
+    float* m = shadowmapsPerspectiveProjection;
+    m[0] = 1.0f; m[1] = 0.0f; m[2] =                                                                  0.0f; m[3] =  0.0f;
+    m[4] = 0.0f; m[5] = 1.0f; m[6] =                                                                  0.0f; m[7] =  0.0f;
+    m[8] = 0.0f; m[9] = 0.0f; m[10]=      -(LIGHT_RANGE_MAX + NEAR_PLANE) / (LIGHT_RANGE_MAX - NEAR_PLANE); m[11]= -1.0f;
+    m[12]= 0.0f; m[13]= 0.0f; m[14]= -2.0f * LIGHT_RANGE_MAX * NEAR_PLANE / (LIGHT_RANGE_MAX - NEAR_PLANE); m[15]=  0.0f;
+    ma_result result;
+    ma_engine_config engine_config = ma_engine_config_init();
+    engine_config.channels = 2; // Stereo output, adjust if needed
+    result = ma_engine_init(&engine_config, &audio_engine); if (result != MA_SUCCESS) DualLog("ERROR: Failed to initialize miniaudio engine: %d\n", result);
+    DualLog("Loading game definition...");
+    OsFileHandle gmFP = OS_OpenReadonly("./Data/gamedata.txt");
+    if (!gmFP) { DualLogError("\nCannot open ./Data/gamedata.txt\n"); OS_Exit(1);  }
+   
+    char gmLine[512]; u32 lineNum = 0;
+    while (GetNextStringUpToNewlineOrEOF(gmLine,sizeof(gmLine),gmFP)) {
+        lineNum++;
+        char* s = data_parser_trim(gmLine); if (*s == 0 || (s[0] == '/' && s[1] == '/')) continue;
+        char* colon = StringFindFirstCharWithin(s, ':'); if (!colon) continue;
+        *colon = '\0'; char* key = data_parser_trim(s); char* val = data_parser_trim(colon + 1); if (*key == 0 || *val == 0) continue;
+
+        if (StringsEqual(key, "modname")) StringCopyInto_A_From_B(Sys_Global.global_modname,val,sizeof(Sys_Global.global_modname));
+        else if (StringsEqual(key, "levelcount")) Sys_Global.numLevels = parse_numberu8(val,gmLine,lineNum);
+        else if (StringsEqual(key, "startlevel")) Sys_Global.startLevel = parse_numberu8(val,gmLine,lineNum);
+    }
+    
+    OS_Close(gmFP); DualLog(" %s:: num levels: %d, start level: %d\n",Sys_Global.global_modname,Sys_Global.numLevels,Sys_Global.startLevel);
+    LoadModFunctions();
+    ModEntityDefinitionsInitAfterLoad();
+    glGenFramebuffers(1,&Sys_Render.gBufferFBO);
+    ApplySettings(); // After loading of text and game data.
+    glBindFramebuffer(GL_FRAMEBUFFER,Sys_Render.gBufferFBO);
+    GLenum drawBuffers[] = {GL_COLOR_ATTACHMENT0,GL_COLOR_ATTACHMENT1,GL_COLOR_ATTACHMENT2,GL_COLOR_ATTACHMENT3};
+    glDrawBuffers(4,drawBuffers);
+    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    if (status != GL_FRAMEBUFFER_COMPLETE) DualLogError("Framebuffer incomplete: Error code %d\n", status);
+    glBindFramebuffer(GL_FRAMEBUFFER,0); // Needed to render loading progress.
+    glfwSetWindowTitle(window,Sys_Global.global_modname);
+    OsFileHandle fp = OS_OpenReadonly("./Textures/UI/menudot1.png");
+    if (fp) {
+        int windowIconFileSize = OS_FileSize(fp);
+        u8* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize,fp,"./Textures/UI/menudot1.png");
+        if (!file_buffer) { DualLogError("Could not open backed buffer for ./Textures/UI/menudot1.png\n"); OS_Exit(1); }
+        
+        OS_Close(fp); stbi__arena_init_thread(&stbi_arena_main);
+        int w=1,h=1; unsigned char* pixels = stbi_load_from_memory(file_buffer,windowIconFileSize,&w,&h);
+        if (!pixels) { DualLogError("Failed to load icon: ./Textures/UI/menudot1.png\n"); OS_Exit(1); }
+        
+        GLFWimage image = (GLFWimage){w,h,pixels};
+        glfwSetWindowIcon(window,1,&image);
+        OS_DeallocateRAM(file_buffer,windowIconFileSize);
+        OS_DeallocateRAM(stbi_arena_main.base,STBI_ARENA_SIZE); stbi_arena_main.base = NULL;
+    }
+
+    float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    __builtin_memcpy(&modelMatrices[0],mat,16 * sizeof(float)); // Null instance matrix used for UI
+    Sys_Render.matricesBufferID        = SetupSSBO(&Sys_Render.matricesBufferID,        1,INSTANCE_COUNT * 16 * sizeof(float),modelMatrices, GL_STATIC_DRAW);
+    Sys_Render.voxelLightListCountsID  = SetupSSBO(&Sys_Render.voxelLightListCountsID,  2,VOXEL_COUNT * sizeof(u32),NULL,GL_STATIC_DRAW);
+    Sys_Render.voxelLightListsID       = SetupSSBO(&Sys_Render.voxelLightListsID,       3,VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(u32),NULL,GL_STATIC_DRAW);
+    Sys_Render.lightsID                = SetupSSBO(&Sys_Render.lightsID,                4,LIGHT_COUNT * sizeof(Light),NULL,GL_STATIC_DRAW);
+    Sys_Render.shadowMapSSBO           = SetupSSBO(&Sys_Render.shadowMapSSBO,           5,(MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(u32), NULL, GL_STATIC_DRAW);    
+    Sys_Render.shadowMapsIndirectionID = SetupSSBO(&Sys_Render.shadowMapsIndirectionID, 6,LIGHT_COUNT * sizeof(u32),NULL,GL_STATIC_DRAW);
+    Sys_Render.cellVisibleDataID       = SetupSSBO(&Sys_Render.cellVisibleDataID,       7,ARRSIZE * sizeof(u32),NULL,GL_STATIC_DRAW);
+    Sys_Render.colorBufferID           = SetupSSBO(&Sys_Render.colorBufferID,          12,MAX_TOTAL_PIXELS * sizeof(u8),NULL,GL_STATIC_DRAW);
+    Sys_Render.blueNoiseBuffer         = SetupSSBO(&Sys_Render.blueNoiseBuffer,        13,12288 * sizeof(float), blueNoise,GL_STATIC_DRAW);
+    Sys_Render.textureOffsetsID        = SetupSSBO(&Sys_Render.textureOffsetsID,       14,MAX_VALID_TEXTURE * sizeof(u32),NULL,GL_STATIC_DRAW);
+    Sys_Render.textureSizesID          = SetupSSBO(&Sys_Render.textureSizesID,         15,MAX_VALID_TEXTURE * 2 * sizeof(i32),NULL, GL_STATIC_DRAW);
+    Sys_Render.texturePalettesID       = SetupSSBO(&Sys_Render.texturePalettesID,      16,MAX_UNIQUE_COLORS * sizeof(u32),NULL,GL_STATIC_DRAW);
+    Sys_Render.texturePaletteOffsetsID = SetupSSBO(&Sys_Render.texturePaletteOffsetsID,17,MAX_VALID_TEXTURE * sizeof(u32),NULL,GL_STATIC_DRAW);
+    glUseProgram(Sys_Render.shadowmapsShaderProgram); glUniform1ui(9,SHADOW_MAP_SIZE);
+    glUseProgram(Sys_Render.shadowmapsClearShaderProgram); glUniform1ui(1,SHADOW_MAP_SIZE);
+    glUseProgram(Sys_Render.chunkShaderProgram); glUniform1ui(21,SHADOW_MAP_SIZE); glUniform1f(22,(float)SHADOW_MAP_SIZE); glUniform1ui(23,LIGHT_COUNT); glUniform1ui(24,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);
+    glUseProgram(Sys_Render.voxelUpdateShaderProgram); glUniform1ui(6,(u32)MAX_LIGHTS_PER_VOXEL);
+    RenderLoadingProgress(110,"Loading textures...");
+    LoadTextures();
+    RenderLoadingProgress(110,"Loading models...");
+    LoadModels();
+    if (Sys_Global.introNotPlayed) {} // TODO: Play intro
+    Sys_Global.absoluteTime = Sys_Global.last_topframe_time = Sys_Global.current_time = get_time();
+    Sys_Global.pauseRelativeTime = Sys_Global.last_physics_time = 0.0;
+//     NewGame(); // Almost works, just causes GL errors once entering game and SSR doesn't appear to work.  Needed to fix bug where you can't see options take effect on config menu unless returned to from after starting a game.
+    OpenMainMenu();
+    DebugRAM("InitializeEnvironment end");
+    DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
     while(1) { // Main Loop
         if (glfwWindowShouldClose(window)) OS_Exit(0);
         if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad); queuedLevelToLoad = 255u; continue; }
@@ -2190,9 +2053,7 @@ i32 main(void) {
         Sys_Global.last_topframe_time = Sys_Global.current_time;
         if (!Sys_Global.gamePaused && !Sys_Global.menuActive) Sys_Global.pauseRelativeTime += Sys_Global.deltaTime;
         mouseMovementThisFrame = false;
-        glfwPollEvents();
-        Input_PollJoysticks();
-        Input_PollGamepad();
+        Input_Poll();
         if (Sys_Input.keyStates[GLFW_KEY_E].pressed) play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f,(Vector3){},false);
         if (Sys_Input.window_has_focus) {
             if (Sys_Input.keyStates[GLFW_KEY_CAPS_LOCK].pressed) Sys_Input.isCapsLockOn = !Sys_Input.isCapsLockOn; // Change capslock state to match keyboard having toggled.  Must always happen regardless of paused/menu.
@@ -2207,7 +2068,6 @@ i32 main(void) {
             Vector3 pDelta = Vector3_A_minus_B(Sys_Global.instances[PLAYER1].lastPosition,Sys_Global.instances[PLAYER1].position);
             bool playerMoved = ((vabs(pDelta.x) + vabs(pDelta.y) + vabs(pDelta.z)) > 0.02f);
             ModUpdate(playerMoved);
-            UpdatePlayerFacingAngles();
             UpdateAmbientSounds();
             UpdateMusic();
         }
@@ -2220,7 +2080,6 @@ i32 main(void) {
                     camViews[cm].finished = Sys_Global.pauseRelativeTime + 0.5f;
                     Sys_Global.instances[PLAYER1].position = camViews[cm].position;
                     Sys_Global.instances[PLAYER1].rotation = camViews[cm].rotation;
-                    UpdatedPlayerCell();
                     CullCore();
                     UpdateLights();
                     Render(true,cm); // Ok culling and light clusters (in voxels) have been updated, now render the view.
@@ -2232,7 +2091,6 @@ i32 main(void) {
         }
         
         if (likely(!Sys_Global.gamePaused || Sys_Global.menuActive)) {
-            UpdatedPlayerCell();
             CullCore();
             UpdateLights();
             bool uploadInstances = false;
@@ -2258,6 +2116,7 @@ i32 main(void) {
         }
 
         Render(false,0u); // Not a cam view, no camview index.  This is the normal main render.
+        CheckAndTakeScreenshot();
         Sys_Global.globalFrameNum++;
         InputClearRisingAndFallingEdges();
         Sys_Input.currentMouse_dx = Sys_Input.currentMouse_dy = 0;

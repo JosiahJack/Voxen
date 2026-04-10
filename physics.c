@@ -663,7 +663,7 @@ ENGINE_TO_MOD void ApplyPlayerMovements(void) {
     Sys_Global.instances[PLAYER1].velocity=Vector3_A_plus_B(cur,scale_vector3(dv,accel*(float)Sys_Global.timeSinceLastPhysicsTick));
 }
 
-const Vector3 gravityVelocity={0.0f,-0.0981f,0.0f};
+const Vector3 gravityVelocity={0.0f,-9.81f,0.0f};
 void UpdateVelocityFromGravity(void) {
     if (Sys_Global.pauseRelativeTime<10.0f) return;
     for (u32 i=PLAYER1; i<INSTANCE_COUNT; ++i) {
@@ -795,7 +795,7 @@ void ClampVelocity(void) {
 
 void UpdateTriggers(void);
 void Physics(void) {
-    UpdateVelocityFromGravity();
-    Physics_PrimitiveStep((float)Sys_Global.timeSinceLastPhysicsTick);
+//     UpdateVelocityFromGravity();
+//     Physics_PrimitiveStep((float)Sys_Global.timeSinceLastPhysicsTick);
     ClampVelocity(); UpdatePositions(); UpdateTriggers(); Physics_DrawDebug();
 }

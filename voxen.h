@@ -26,7 +26,6 @@
 #define TEXT_BUFFER_SIZE 1024
 #define FONT_ATLAS_SIZE 4672
 #define MAX_GLYPHS 4096
-#define MAX_CAMVIEWS 11
 extern GlobalContext Sys_Global;
 extern SystemUI Sys_UI;
 typedef struct { u16 x,z; } PortalCell;
