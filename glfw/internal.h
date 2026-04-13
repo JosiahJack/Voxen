@@ -1,8 +1,10 @@
+// GLFW 3.5 This software is provided 'as-is', without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
+// Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
+// 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
 #pragma once
-#if defined(_GLFW_USE_CONFIG_H)
- #include "glfw_config.h"
-#endif
-
+#include "../gl.h"
 #if defined(GLFW_INCLUDE_GLCOREARB) || \
     defined(GLFW_INCLUDE_ES1)       || \
     defined(GLFW_INCLUDE_ES2)       || \
@@ -18,21 +20,23 @@
 #endif
 
 #define GLFW_INCLUDE_NONE
-#include "glfw3.h"
-
+#define GLFW_TRUE 1
+#define GLFW_FALSE 0
+#include <stdint.h>
+typedef __SIZE_TYPE__ size_t;
+typedef void* (* GLFWallocatefun)(size_t size, void* user);
+typedef void* (* GLFWreallocatefun)(void* block, size_t size, void* user);
+typedef void (* GLFWdeallocatefun)(void* block, void* user);
+typedef struct GLFWallocator { GLFWallocatefun allocate; GLFWreallocatefun reallocate; GLFWdeallocatefun deallocate; void* user; } GLFWallocator;
 #define _GLFW_INSERT_FIRST      0
 #define _GLFW_INSERT_LAST       1
-
 #define _GLFW_POLL_PRESENCE     0
 #define _GLFW_POLL_AXES         1
 #define _GLFW_POLL_BUTTONS      2
 #define _GLFW_POLL_ALL          (_GLFW_POLL_AXES | _GLFW_POLL_BUTTONS)
-
 #define _GLFW_MESSAGE_SIZE      1024
-
 typedef int GLFWbool;
 typedef void (*GLFWproc)(void);
-
 typedef struct _GLFWerror       _GLFWerror;
 typedef struct _GLFWinitconfig  _GLFWinitconfig;
 typedef struct _GLFWwndconfig   _GLFWwndconfig;
@@ -49,13 +53,9 @@ typedef struct _GLFWmapping     _GLFWmapping;
 typedef struct _GLFWjoystick    _GLFWjoystick;
 typedef struct _GLFWtls         _GLFWtls;
 typedef struct _GLFWmutex       _GLFWmutex;
-
-#define GL_VERSION 0x1f02
 #define GL_NONE 0
 #define GL_COLOR_BUFFER_BIT 0x00004000
 #define GL_UNSIGNED_BYTE 0x1401
-#define GL_EXTENSIONS 0x1f03
-#define GL_NUM_EXTENSIONS 0x821d
 #define GL_CONTEXT_FLAGS 0x821e
 #define GL_CONTEXT_FLAG_FORWARD_COMPATIBLE_BIT 0x00000001
 #define GL_CONTEXT_FLAG_DEBUG_BIT 0x00000002
@@ -68,18 +68,15 @@ typedef struct _GLFWmutex       _GLFWmutex;
 #define GL_CONTEXT_RELEASE_BEHAVIOR 0x82fb
 #define GL_CONTEXT_RELEASE_BEHAVIOR_FLUSH 0x82fc
 #define GL_CONTEXT_FLAG_NO_ERROR_BIT_KHR 0x00000008
-
 typedef int GLint;
 typedef unsigned int GLuint;
 typedef unsigned int GLenum;
 typedef unsigned int GLbitfield;
 typedef unsigned char GLubyte;
-
 typedef void (APIENTRY * PFNGLCLEARPROC)(GLbitfield);
 typedef const GLubyte* (APIENTRY * PFNGLGETSTRINGPROC)(GLenum);
 typedef void (APIENTRY * PFNGLGETINTEGERVPROC)(GLenum,GLint*);
 typedef const GLubyte* (APIENTRY * PFNGLGETSTRINGIPROC)(GLenum,GLuint);
-
 #include "platform.h"
 
 // Checks for whether the library has been initialized
@@ -105,84 +102,24 @@ typedef const GLubyte* (APIENTRY * PFNGLGETSTRINGIPROC)(GLenum,GLuint);
         y = t;                 \
     }
 
-// Per-thread error structure
-//
-struct _GLFWerror
-{
-    _GLFWerror*     next;
-    int             code;
-    char            description[_GLFW_MESSAGE_SIZE];
+struct _GLFWerror { _GLFWerror* next; int code; char description[_GLFW_MESSAGE_SIZE]; };
+struct _GLFWinitconfig {
+    GLFWbool hatButtons;
+    int  angleType,platformID;
+    struct { GLFWbool menubar,chdir; } ns;
+    struct { int libdecorMode; } wl;
 };
 
-// Initialization configuration
-//
-// Parameters relating to the initialization of the library
-//
-struct _GLFWinitconfig
-{
-    GLFWbool      hatButtons;
-    int           angleType;
-    int           platformID;
-    struct {
-        GLFWbool  menubar;
-        GLFWbool  chdir;
-    } ns;
-    struct {
-        GLFWbool  xcbVulkanSurface;
-    } x11;
-    struct {
-        int       libdecorMode;
-    } wl;
+struct _GLFWwndconfig {
+    int xpos,ypos,width,height;
+    GLFWbool resizable,visible,decorated,focused,autoIconify,floating,maximized,centerCursor,focusOnShow,mousePassthrough,scaleToMonitor,scaleFramebuffer;
+    struct { char frameName[256]; } ns;
+    struct { char className[256],instanceName[256]; } x11;
+    struct { GLFWbool keymenu,showDefault; } win32;
+    struct { char appId[256]; } wl;
 };
 
-// Window configuration
-//
-// Parameters relating to the creation of the window but not directly related
-// to the framebuffer.  This is used to pass window creation parameters from
-// shared code to the platform API.
-//
-struct _GLFWwndconfig
-{
-    int           xpos;
-    int           ypos;
-    int           width;
-    int           height;
-    GLFWbool      resizable;
-    GLFWbool      visible;
-    GLFWbool      decorated;
-    GLFWbool      focused;
-    GLFWbool      autoIconify;
-    GLFWbool      floating;
-    GLFWbool      maximized;
-    GLFWbool      centerCursor;
-    GLFWbool      focusOnShow;
-    GLFWbool      mousePassthrough;
-    GLFWbool      scaleToMonitor;
-    GLFWbool      scaleFramebuffer;
-    struct {
-        char      frameName[256];
-    } ns;
-    struct {
-        char      className[256];
-        char      instanceName[256];
-    } x11;
-    struct {
-        GLFWbool  keymenu;
-        GLFWbool  showDefault;
-    } win32;
-    struct {
-        char      appId[256];
-    } wl;
-};
-
-// Context configuration
-//
-// Parameters relating to the creation of the context but not directly related
-// to the framebuffer.  This is used to pass context creation parameters from
-// shared code to the platform API.
-//
-struct _GLFWctxconfig
-{
+struct _GLFWctxconfig {
     int           client;
     int           source;
     int           major;
@@ -322,81 +259,39 @@ struct _GLFWmonitor
     GLFW_PLATFORM_MONITOR_STATE
 };
 
-// Cursor structure
-//
-struct _GLFWcursor
-{
-    _GLFWcursor*    next;
-    // This is defined in platform.h
+struct _GLFWcursor { _GLFWcursor*    next;
     GLFW_PLATFORM_CURSOR_STATE
 };
 
-// Gamepad mapping element structure
-//
-struct _GLFWmapelement
-{
-    uint8_t         type;
-    uint8_t         index;
-    int8_t          axisScale;
-    int8_t          axisOffset;
-};
-
-// Gamepad mapping structure
-//
-struct _GLFWmapping
-{
-    char            name[128];
-    char            guid[33];
-    _GLFWmapelement buttons[15];
-    _GLFWmapelement axes[6];
-};
-
-// Joystick structure
-//
-struct _GLFWjoystick
-{
-    GLFWbool        allocated;
-    GLFWbool        connected;
-    float*          axes;
-    int             axisCount;
-    unsigned char*  buttons;
-    int             buttonCount;
-    unsigned char*  hats;
-    int             hatCount;
-    char            name[128];
-    void*           userPointer;
-    char            guid[33];
-    _GLFWmapping*   mapping;
-
-    // This is defined in platform.h
+struct _GLFWmapelement { uint8_t type,index; int8_t axisScale,axisOffset; }; // Gamepad mapping element structure
+struct _GLFWmapping { char name[128],guid[33]; _GLFWmapelement buttons[15],axes[6]; }; // Gamepad mapping structure
+struct _GLFWjoystick {
+    GLFWbool allocated,connected;
+    float*  axes;
+    int axisCount;
+    unsigned char* buttons;
+    int buttonCount;
+    unsigned char* hats;
+    int hatCount;
+    char name[128];
+    void* userPointer;
+    char guid[33];
+    _GLFWmapping* mapping;
     GLFW_PLATFORM_JOYSTICK_STATE
 };
 
 // Thread local storage structure
-//
-struct _GLFWtls
-{
-    // This is defined in platform.h
+struct _GLFWtls {
     GLFW_PLATFORM_TLS_STATE
 };
 
-// Mutex structure
-//
-struct _GLFWmutex
-{
-    // This is defined in platform.h
+struct _GLFWmutex {
     GLFW_PLATFORM_MUTEX_STATE
 };
 
-// Platform API structure
-//
-struct _GLFWplatform
-{
+struct _GLFWplatform {
     int platformID;
-    // init
     GLFWbool (*init)(void);
-//     void (*terminate)(void);
-    // input
     void (*getCursorPos)(_GLFWwindow*,double*,double*);
     void (*setCursorPos)(_GLFWwindow*,double,double);
     void (*setCursorMode)(_GLFWwindow*,int);
@@ -408,15 +303,10 @@ struct _GLFWplatform
     void (*setCursor)(_GLFWwindow*,_GLFWcursor*);
     const char* (*getScancodeName)(int);
     int (*getKeyScancode)(int);
-    void (*setClipboardString)(const char*);
-    const char* (*getClipboardString)(void);
     GLFWbool (*initJoysticks)(void);
-//     void (*terminateJoysticks)(void);
     GLFWbool (*pollJoystick)(_GLFWjoystick*,int);
     const char* (*getMappingName)(void);
     void (*updateGamepadGUID)(char*);
-    // monitor
-    void (*freeMonitor)(_GLFWmonitor*);
     void (*getMonitorPos)(_GLFWmonitor*,int*,int*);
     void (*getMonitorContentScale)(_GLFWmonitor*,float*,float*);
     void (*getMonitorWorkarea)(_GLFWmonitor*,int*,int*,int*,int*);
@@ -424,7 +314,6 @@ struct _GLFWplatform
     GLFWbool (*getVideoMode)(_GLFWmonitor*,GLFWvidmode*);
     GLFWbool (*getGammaRamp)(_GLFWmonitor*,GLFWgammaramp*);
     void (*setGammaRamp)(_GLFWmonitor*,const GLFWgammaramp*);
-    // window
     GLFWbool (*createWindow)(_GLFWwindow*,const _GLFWwndconfig*,const _GLFWctxconfig*,const _GLFWfbconfig*);
     void (*destroyWindow)(_GLFWwindow*);
     void (*setWindowTitle)(_GLFWwindow*,const char*);
@@ -433,11 +322,7 @@ struct _GLFWplatform
     void (*setWindowPos)(_GLFWwindow*,int,int);
     void (*getWindowSize)(_GLFWwindow*,int*,int*);
     void (*setWindowSize)(_GLFWwindow*,int,int);
-    void (*setWindowSizeLimits)(_GLFWwindow*,int,int,int,int);
-    void (*setWindowAspectRatio)(_GLFWwindow*,int,int);
-    void (*getFramebufferSize)(_GLFWwindow*,int*,int*);
     void (*getWindowFrameSize)(_GLFWwindow*,int*,int*,int*,int*);
-    void (*getWindowContentScale)(_GLFWwindow*,float*,float*);
     void (*iconifyWindow)(_GLFWwindow*);
     void (*restoreWindow)(_GLFWwindow*);
     void (*maximizeWindow)(_GLFWwindow*);
@@ -487,18 +372,8 @@ struct _GLFWlibrary {
     _GLFWtls            errorSlot;
     _GLFWtls            contextSlot;
     _GLFWmutex          errorLock;
-    struct {
-        uint64_t        offset;
-        // This is defined in platform.h
-        GLFW_PLATFORM_LIBRARY_TIMER_STATE
-    } timer;
-
-    struct {
-        GLFWmonitorfun  monitor;
-        GLFWjoystickfun joystick;
-    } callbacks;
-
-    // These are defined in platform.h
+    struct { uint64_t offset; GLFW_PLATFORM_LIBRARY_TIMER_STATE } timer;
+    struct { GLFWmonitorfun  monitor; GLFWjoystickfun joystick; } callbacks;
     GLFW_PLATFORM_LIBRARY_WINDOW_STATE
     GLFW_PLATFORM_LIBRARY_CONTEXT_STATE
     GLFW_PLATFORM_LIBRARY_JOYSTICK_STATE
@@ -591,7 +466,6 @@ const GLFWvidmode* _glfwChooseVideoMode(_GLFWmonitor* monitor,
                                         const GLFWvidmode* desired);
 int _glfwCompareVideoModes(const GLFWvidmode* first, const GLFWvidmode* second);
 _GLFWmonitor* _glfwAllocMonitor(const char* name, int widthMM, int heightMM);
-void _glfwFreeMonitor(_GLFWmonitor* monitor);
 void _glfwAllocGammaArrays(GLFWgammaramp* ramp, unsigned int size);
 void _glfwFreeGammaArrays(GLFWgammaramp* ramp);
 void _glfwSplitBPP(int bpp, int* red, int* green, int* blue);
@@ -611,7 +485,6 @@ GLFWbool _glfwChooseVisualEGL(const _GLFWwndconfig* wndconfig,
                               Visual** visual, int* depth);
 #endif /*_GLFW_X11*/
 
-size_t _glfwEncodeUTF8(char* s, uint32_t codepoint);
 char** _glfwParseUriList(char* text, int* count);
 
 char* _glfw_strdup(const char* source);

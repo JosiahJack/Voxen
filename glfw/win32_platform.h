@@ -319,7 +319,6 @@ typedef struct _GLFWlibraryWin32
     ATOM                mainWindowClass;
     HDEVNOTIFY          deviceNotificationHandle;
     int                 acquiredMonitorCount;
-    char*               clipboardString;
     short int           keycodes[512];
     short int           scancodes[GLFW_KEY_LAST + 1];
     char                keynames[GLFW_KEY_LAST + 1][5];
@@ -334,7 +333,6 @@ typedef struct _GLFWlibraryWin32
     UINT                mouseTrailSize;
     // The cursor handle to use to hide the cursor (NULL or a transparent cursor)
     HCURSOR             blankCursor;
-
     struct {
         HINSTANCE                       instance;
         PFN_DirectInput8Create          Create;
@@ -376,12 +374,8 @@ typedef struct _GLFWlibraryWin32
     } ntdll;
 } _GLFWlibraryWin32;
 
-// Win32-specific per-monitor data
-//
-typedef struct _GLFWmonitorWin32
-{
+typedef struct _GLFWmonitorWin32 {
     HMONITOR            handle;
-    // This size matches the static size of DISPLAY_DEVICE.DeviceName
     WCHAR               adapterName[32];
     WCHAR               displayName[32];
     char                publicAdapterName[32];
@@ -390,29 +384,22 @@ typedef struct _GLFWmonitorWin32
     GLFWbool            modeChanged;
 } _GLFWmonitorWin32;
 
-// Win32-specific per-cursor data
-//
-typedef struct _GLFWcursorWin32
-{
+typedef struct _GLFWcursorWin32 {
     HCURSOR             handle;
 } _GLFWcursorWin32;
 
-
 GLFWbool _glfwConnectWin32(int platformID, _GLFWplatform* platform);
 int _glfwInitWin32(void);
-
 WCHAR* _glfwCreateWideStringFromUTF8Win32(const char* source);
 char* _glfwCreateUTF8FromWideStringWin32(const WCHAR* source);
 BOOL _glfwIsWindowsVersionOrGreaterWin32(WORD major, WORD minor, WORD sp);
 BOOL _glfwIsWindows10BuildOrGreaterWin32(WORD build);
 void _glfwInputErrorWin32(int error, const char* description);
 void _glfwUpdateKeyNamesWin32(void);
-
 void _glfwPollMonitorsWin32(void);
 void _glfwSetVideoModeWin32(_GLFWmonitor* monitor, const GLFWvidmode* desired);
 void _glfwRestoreVideoModeWin32(_GLFWmonitor* monitor);
 void _glfwGetHMONITORContentScaleWin32(HMONITOR handle, float* xscale, float* yscale);
-
 GLFWbool _glfwCreateWindowWin32(_GLFWwindow* window, const _GLFWwndconfig* wndconfig, const _GLFWctxconfig* ctxconfig, const _GLFWfbconfig* fbconfig);
 void _glfwDestroyWindowWin32(_GLFWwindow* window);
 void _glfwSetWindowTitleWin32(_GLFWwindow* window, const char* title);
@@ -446,45 +433,30 @@ void _glfwSetWindowFloatingWin32(_GLFWwindow* window, GLFWbool enabled);
 void _glfwSetWindowMousePassthroughWin32(_GLFWwindow* window, GLFWbool enabled);
 float _glfwGetWindowOpacityWin32(_GLFWwindow* window);
 void _glfwSetWindowOpacityWin32(_GLFWwindow* window, float opacity);
-
 void _glfwSetRawMouseMotionWin32(_GLFWwindow *window, GLFWbool enabled);
 GLFWbool _glfwRawMouseMotionSupportedWin32(void);
-
 void _glfwPollEventsWin32(void);
 void _glfwWaitEventsWin32(void);
 void _glfwWaitEventsTimeoutWin32(double timeout);
 void _glfwPostEmptyEventWin32(void);
-
 void _glfwGetCursorPosWin32(_GLFWwindow* window, double* xpos, double* ypos);
 void _glfwSetCursorPosWin32(_GLFWwindow* window, double xpos, double ypos);
 void _glfwSetCursorModeWin32(_GLFWwindow* window, int mode);
-const char* _glfwGetScancodeNameWin32(int scancode);
-int _glfwGetKeyScancodeWin32(int key);
 GLFWbool _glfwCreateCursorWin32(_GLFWcursor* cursor, const GLFWimage* image, int xhot, int yhot);
 GLFWbool _glfwCreateStandardCursorWin32(_GLFWcursor* cursor, int shape);
 void _glfwDestroyCursorWin32(_GLFWcursor* cursor);
 void _glfwSetCursorWin32(_GLFWwindow* window, _GLFWcursor* cursor);
-void _glfwSetClipboardStringWin32(const char* string);
-const char* _glfwGetClipboardStringWin32(void);
-
-void _glfwFreeMonitorWin32(_GLFWmonitor* monitor);
 void _glfwGetMonitorPosWin32(_GLFWmonitor* monitor, int* xpos, int* ypos);
-void _glfwGetMonitorContentScaleWin32(_GLFWmonitor* monitor, float* xscale, float* yscale);
 void _glfwGetMonitorWorkareaWin32(_GLFWmonitor* monitor, int* xpos, int* ypos, int* width, int* height);
 GLFWvidmode* _glfwGetVideoModesWin32(_GLFWmonitor* monitor, int* count);
 GLFWbool _glfwGetVideoModeWin32(_GLFWmonitor* monitor, GLFWvidmode* mode);
 GLFWbool _glfwGetGammaRampWin32(_GLFWmonitor* monitor, GLFWgammaramp* ramp);
 void _glfwSetGammaRampWin32(_GLFWmonitor* monitor, const GLFWgammaramp* ramp);
-
 GLFWbool _glfwInitJoysticksWin32(void);
 void _glfwTerminateJoysticksWin32(void);
 GLFWbool _glfwPollJoystickWin32(_GLFWjoystick* js, int mode);
 const char* _glfwGetMappingNameWin32(void);
 void _glfwUpdateGamepadGUIDWin32(char* guid);
-
 GLFWbool _glfwInitWGL(void);
 void _glfwTerminateWGL(void);
-GLFWbool _glfwCreateContextWGL(_GLFWwindow* window,
-                               const _GLFWctxconfig* ctxconfig,
-                               const _GLFWfbconfig* fbconfig);
-
+GLFWbool _glfwCreateContextWGL(_GLFWwindow* window, const _GLFWctxconfig* ctxconfig, const _GLFWfbconfig* fbconfig);

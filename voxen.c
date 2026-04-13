@@ -490,7 +490,8 @@ void LoadConfig(void) {
             }
         }
     }
-
+    Sys_Settings.ScreenWidth = vmax(Sys_Settings.ScreenWidth,320);
+    Sys_Settings.ScreenHeight = vmax(Sys_Settings.ScreenHeight,200);
     OS_Close(f);
 }
 
@@ -1037,12 +1038,18 @@ void SetSpeakerMode(void) {
     }
 }
 
-void LoadTextForLanguage(u8),LoadLogTextForLanguage(u8);
+#ifdef WINDOWS
+    static const char* PLATFORM_DLERROR(void) {
+        DWORD err = GetLastError(); if (err == 0) return NULL;
+        FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM|FORMAT_MESSAGE_IGNORE_INSERTS,NULL,err,MAKELANGID(LANG_NEUTRAL,SUBLANG_DEFAULT),win_err_buf,sizeof(win_err_buf),NULL);
+        return win_err_buf;
+    }
+#else
+    #define PLATFORM_DLERROR() dlerror()
+#endif
+void LoadTextForLanguage(u8),LoadLogTextForLanguage(u8); bool GetKey(int settingIndex),GetKeyPressed(int settingIndex); void* mod_handle = NULL;
 void SetLanguage(void) { LoadTextForLanguage(Sys_Settings.Language); LoadLogTextForLanguage(Sys_Settings.Language); }
 void ApplySettings(void) { ChangeFullScreenWindowed(); SetSkyRotateSpeed(); SetVSync(); SetGI(); SetSpeakerMode(); SetLanguage(); }
-bool GetKey(int settingIndex);
-bool GetKeyPressed(int settingIndex);
-void* mod_handle = NULL;
 void LoadModFunctions(void) {
     DualLog("Loading mod code...");
     char mod_path[256];
@@ -1890,7 +1897,7 @@ extern StbiArena stbi_arena_main; extern u32 random_range_rng;
 void stbi__arena_init_thread(StbiArena* arena);
 #define STBI_ARENA_SIZE 16 * 1024 * 1024
 #define LIGHT_RANGE_MAX 15.36f
-void LoadConfig(void),InitFontAtlasses(void),LoadTextures(void),LoadModels(void); i32 Physics(void); bool CullCore(void);
+void InitFontAtlasses(void),LoadTextures(void),LoadModels(void); i32 Physics(void); bool CullCore(void);
 i32 main(void) {
     double game_start_time = get_time();
     random_range_rng = (u32)game_start_time; // Seed global rand uniquely with time since system boot.
@@ -1899,18 +1906,14 @@ i32 main(void) {
     DualLog("Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed\n");
     if (!glfwInit()) { DualLogError("GLFW initialization failed\n"); OS_Exit(1); }
     
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,4); glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,3); glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
     LoadConfig(); // Get settings before setting window size.
-    window = glfwCreateWindow(Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, "Voxen", NULL, NULL);
-    if (!window) { DualLogError("glfwCreateWindow failed\n"); OS_Exit(1); }
+    window = glfwCreateWindow(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight,"Voxen",NULL,NULL); if (!window) { DualLogError("glfwCreateWindow failed\n"); OS_Exit(1); }
     
     CenterWindowOnMonitor();
-    glfwMakeContextCurrent(window);
-    glfwSetFramebufferSizeCallback(window, UpdateScreenSize);
+    glfwMakeContextCurrent(window); glfwSetFramebufferSizeCallback(window,UpdateScreenSize);
     if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress)) { DualLogError("Failed to initialize GLAD\n"); OS_Exit(1); }
     
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
+    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
     glfwSwapBuffers(window);
     GLint major=0,minor=0; glGetIntegerv(GL_MAJOR_VERSION,&major); glGetIntegerv(GL_MINOR_VERSION,&minor);
     if (major < 4 || (major == 4 && minor < 3)) { DualLogError("Need OpenGL >= 4.3, got %d.%d\n",major,minor); OS_Exit(1); }

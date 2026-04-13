@@ -271,16 +271,12 @@ static void disableCursor(_GLFWwindow* window)
 
 // Exit disabled cursor mode for the specified window
 //
-static void enableCursor(_GLFWwindow* window)
-{
-    if (window->rawMouseMotion)
-        disableRawMouseMotion(window);
+static void enableCursor(_GLFWwindow* window) {
+    if (window->rawMouseMotion) disableRawMouseMotion(window);
 
     _glfw.win32.disabledCursorWindow = NULL;
     releaseCursor();
-    _glfwSetCursorPosWin32(window,
-                           _glfw.win32.restoreCursorPosX,
-                           _glfw.win32.restoreCursorPosY);
+    _glfwSetCursorPosWin32(window,_glfw.win32.restoreCursorPosX,_glfw.win32.restoreCursorPosY);
     updateCursorImage(window);
 }
 
@@ -1344,117 +1340,56 @@ static int createNativeWindow(_GLFWwindow* window,
     }
 
     wideTitle = _glfwCreateWideStringFromUTF8Win32(window->title);
-    if (!wideTitle)
-        return GLFW_FALSE;
+    if (!wideTitle) return GLFW_FALSE;
 
-    window->win32.handle = CreateWindowExW(exStyle,
-                                           MAKEINTATOM(_glfw.win32.mainWindowClass),
-                                           wideTitle,
-                                           style,
-                                           frameX, frameY,
-                                           frameWidth, frameHeight,
-                                           NULL, // No parent window
-                                           NULL, // No window menu
-                                           _glfw.win32.instance,
-                                           (LPVOID) wndconfig);
-
+    window->win32.handle = CreateWindowExW(exStyle,MAKEINTATOM(_glfw.win32.mainWindowClass),wideTitle,style,frameX,frameY,frameWidth,frameHeight,NULL,NULL,_glfw.win32.instance,(LPVOID) wndconfig);
     _glfw_free(wideTitle);
-
-    if (!window->win32.handle)
-    {
-        _glfwInputErrorWin32(GLFW_PLATFORM_ERROR,
-                             "Win32: Failed to create window");
-        return GLFW_FALSE;
-    }
+    if (!window->win32.handle) { _glfwInputErrorWin32(GLFW_PLATFORM_ERROR,"Win32: Failed to create window"); return GLFW_FALSE; }
 
     SetPropW(window->win32.handle, L"GLFW", window);
-
     ChangeWindowMessageFilterEx(window->win32.handle, WM_DROPFILES, MSGFLT_ALLOW, NULL);
     ChangeWindowMessageFilterEx(window->win32.handle, WM_COPYDATA, MSGFLT_ALLOW, NULL);
     ChangeWindowMessageFilterEx(window->win32.handle, WM_COPYGLOBALDATA, MSGFLT_ALLOW, NULL);
-
     window->win32.scaleToMonitor = wndconfig->scaleToMonitor;
     window->win32.keymenu = wndconfig->win32.keymenu;
     window->win32.showDefault = wndconfig->win32.showDefault;
-
-    if (!window->monitor)
-    {
+    if (!window->monitor) {
         RECT rect = { 0, 0, wndconfig->width, wndconfig->height };
         WINDOWPLACEMENT wp = { sizeof(wp) };
-        const HMONITOR mh = MonitorFromWindow(window->win32.handle,
-                                              MONITOR_DEFAULTTONEAREST);
-
-        // Adjust window rect to account for DPI scaling of the window frame and
-        // (if enabled) DPI scaling of the content area
-        // This cannot be done until we know what monitor the window was placed on
-        // Only update the restored window rect as the window may be maximized
-
-        if (wndconfig->scaleToMonitor)
-        {
+        const HMONITOR mh = MonitorFromWindow(window->win32.handle,MONITOR_DEFAULTTONEAREST);
+        if (wndconfig->scaleToMonitor) {
             float xscale, yscale;
             _glfwGetHMONITORContentScaleWin32(mh, &xscale, &yscale);
-
-            if (xscale > 0.f && yscale > 0.f)
-            {
-                rect.right = (int) (rect.right * xscale);
-                rect.bottom = (int) (rect.bottom * yscale);
-            }
+            if (xscale > 0.f && yscale > 0.f) { rect.right = (int) (rect.right * xscale); rect.bottom = (int) (rect.bottom * yscale); }
         }
 
-        if (_glfwIsWindows10Version1607OrGreaterWin32())
-        {
-            AdjustWindowRectExForDpi(&rect, style, FALSE, exStyle,
-                                     GetDpiForWindow(window->win32.handle));
-        }
-        else
-            AdjustWindowRectEx(&rect, style, FALSE, exStyle);
+        if (_glfwIsWindows10Version1607OrGreaterWin32()) {
+            AdjustWindowRectExForDpi(&rect,style,FALSE,exStyle,GetDpiForWindow(window->win32.handle));
+        } else AdjustWindowRectEx(&rect, style, FALSE, exStyle);
 
         GetWindowPlacement(window->win32.handle, &wp);
-        OffsetRect(&rect,
-                   wp.rcNormalPosition.left - rect.left,
-                   wp.rcNormalPosition.top - rect.top);
-
+        OffsetRect(&rect,wp.rcNormalPosition.left - rect.left,wp.rcNormalPosition.top - rect.top);
         wp.rcNormalPosition = rect;
         wp.showCmd = SW_HIDE;
         SetWindowPlacement(window->win32.handle, &wp);
 
         // Adjust rect of maximized undecorated window, because by default Windows will
         // make such a window cover the whole monitor instead of its workarea
-
-        if (wndconfig->maximized && !wndconfig->decorated)
-        {
+        if (wndconfig->maximized && !wndconfig->decorated) {
             MONITORINFO mi = { sizeof(mi) };
             GetMonitorInfoW(mh, &mi);
-
-            SetWindowPos(window->win32.handle, HWND_TOP,
-                         mi.rcWork.left,
-                         mi.rcWork.top,
-                         mi.rcWork.right - mi.rcWork.left,
-                         mi.rcWork.bottom - mi.rcWork.top,
-                         SWP_NOACTIVATE | SWP_NOZORDER);
+            SetWindowPos(window->win32.handle,HWND_TOP,mi.rcWork.left,mi.rcWork.top,mi.rcWork.right - mi.rcWork.left,mi.rcWork.bottom - mi.rcWork.top,SWP_NOACTIVATE|SWP_NOZORDER);
         }
     }
 
     DragAcceptFiles(window->win32.handle, TRUE);
-
-    if (fbconfig->transparent)
-    {
-        updateFramebufferTransparency(window);
-        window->win32.transparent = GLFW_TRUE;
-    }
-
+    if (fbconfig->transparent) { updateFramebufferTransparency(window); window->win32.transparent = GLFW_TRUE; }
     _glfwGetWindowSizeWin32(window, &window->win32.width, &window->win32.height);
-
     return GLFW_TRUE;
 }
 
-GLFWbool _glfwCreateWindowWin32(_GLFWwindow* window,
-                                const _GLFWwndconfig* wndconfig,
-                                const _GLFWctxconfig* ctxconfig,
-                                const _GLFWfbconfig* fbconfig)
-{
-    if (!createNativeWindow(window, wndconfig, fbconfig))
-        return GLFW_FALSE;
+GLFWbool _glfwCreateWindowWin32(_GLFWwindow* window, const _GLFWwndconfig* wndconfig, const _GLFWctxconfig* ctxconfig, const _GLFWfbconfig* fbconfig) {
+    if (!createNativeWindow(window, wndconfig, fbconfig)) return GLFW_FALSE;
 
     if (ctxconfig->client != GLFW_NO_API) {
         if (ctxconfig->source == GLFW_NATIVE_CONTEXT_API) {
@@ -1465,26 +1400,18 @@ GLFWbool _glfwCreateWindowWin32(_GLFWwindow* window,
         if (!_glfwRefreshContextAttribs(window, ctxconfig)) return GLFW_FALSE;
     }
 
-    if (wndconfig->mousePassthrough)
-        _glfwSetWindowMousePassthroughWin32(window, GLFW_TRUE);
+    if (wndconfig->mousePassthrough) _glfwSetWindowMousePassthroughWin32(window, GLFW_TRUE);
 
-    if (window->monitor)
-    {
+    if (window->monitor) {
         _glfwShowWindowWin32(window);
         _glfwFocusWindowWin32(window);
         acquireMonitor(window);
         fitToMonitor(window);
-
-        if (wndconfig->centerCursor)
-            _glfwCenterCursorInContentArea(window);
-    }
-    else
-    {
-        if (wndconfig->visible)
-        {
+        if (wndconfig->centerCursor) _glfwCenterCursorInContentArea(window);
+    } else {
+        if (wndconfig->visible) {
             _glfwShowWindowWin32(window);
-            if (wndconfig->focused)
-                _glfwFocusWindowWin32(window);
+            if (wndconfig->focused) _glfwFocusWindowWin32(window);
         }
     }
 
@@ -1529,16 +1456,11 @@ void _glfwSetWindowTitleWin32(_GLFWwindow* window, const char* title)
     _glfw_free(wideTitle);
 }
 
-void _glfwSetWindowIconWin32(_GLFWwindow* window, int count, const GLFWimage* images)
-{
+void _glfwSetWindowIconWin32(_GLFWwindow* window, int count, const GLFWimage* images) {
     HICON bigIcon = NULL, smallIcon = NULL;
-
-    if (count)
-    {
-        const GLFWimage* bigImage = chooseImage(count, images,
-                                                GetSystemMetrics(SM_CXICON),
-                                                GetSystemMetrics(SM_CYICON));
-        const GLFWimage* smallImage = chooseImage(count, images,
+    if (count) {
+        const GLFWimage* bigImage = chooseImage(count,images,GetSystemMetrics(SM_CXICON),GetSystemMetrics(SM_CYICON));
+        const GLFWimage* smallImage = chooseImage(count,images,
                                                   GetSystemMetrics(SM_CXSMICON),
                                                   GetSystemMetrics(SM_CYSMICON));
 
@@ -2201,26 +2123,6 @@ void _glfwSetCursorModeWin32(_GLFWwindow* window, int mode)
         updateCursorImage(window);
 }
 
-const char* _glfwGetScancodeNameWin32(int scancode)
-{
-    if (scancode < 0 || scancode > (KF_EXTENDED | 0xff))
-    {
-        _glfwInputError(GLFW_INVALID_VALUE, "Invalid scancode %i", scancode);
-        return NULL;
-    }
-
-    const int key = _glfw.win32.keycodes[scancode];
-    if (key == GLFW_KEY_UNKNOWN)
-        return NULL;
-
-    return _glfw.win32.keynames[key];
-}
-
-int _glfwGetKeyScancodeWin32(int key)
-{
-    return _glfw.win32.scancodes[key];
-}
-
 GLFWbool _glfwCreateCursorWin32(_GLFWcursor* cursor,
                                 const GLFWimage* image,
                                 int xhot, int yhot)
@@ -2273,143 +2175,24 @@ GLFWbool _glfwCreateStandardCursorWin32(_GLFWcursor* cursor, int shape)
             return GLFW_FALSE;
     }
 
-    cursor->win32.handle = LoadImageW(NULL,
-                                      MAKEINTRESOURCEW(id), IMAGE_CURSOR, 0, 0,
-                                      LR_DEFAULTSIZE | LR_SHARED);
-    if (!cursor->win32.handle)
-    {
-        _glfwInputErrorWin32(GLFW_PLATFORM_ERROR,
-                             "Win32: Failed to create standard cursor");
-        return GLFW_FALSE;
-    }
-
+    cursor->win32.handle = LoadImageW(NULL,MAKEINTRESOURCEW(id),IMAGE_CURSOR,0,0,LR_DEFAULTSIZE|LR_SHARED);
+    if (!cursor->win32.handle) { _glfwInputErrorWin32(GLFW_PLATFORM_ERROR,"Win32: Failed to create standard cursor"); return GLFW_FALSE; }
     return GLFW_TRUE;
 }
 
-void _glfwDestroyCursorWin32(_GLFWcursor* cursor)
-{
-    if (cursor->win32.handle)
-        DestroyIcon((HICON) cursor->win32.handle);
+void _glfwDestroyCursorWin32(_GLFWcursor* cursor) {
+    if (cursor->win32.handle) DestroyIcon((HICON) cursor->win32.handle);
 }
 
-void _glfwSetCursorWin32(_GLFWwindow* window, _GLFWcursor* cursor)
-{
-    if (cursorInContentArea(window))
-        updateCursorImage(window);
-}
-
-void _glfwSetClipboardStringWin32(const char* string)
-{
-    int characterCount, tries = 0;
-    HANDLE object;
-    WCHAR* buffer;
-
-    characterCount = MultiByteToWideChar(CP_UTF8, 0, string, -1, NULL, 0);
-    if (!characterCount)
-        return;
-
-    object = GlobalAlloc(GMEM_MOVEABLE, characterCount * sizeof(WCHAR));
-    if (!object)
-    {
-        _glfwInputErrorWin32(GLFW_PLATFORM_ERROR,
-                             "Win32: Failed to allocate global handle for clipboard");
-        return;
-    }
-
-    buffer = GlobalLock(object);
-    if (!buffer)
-    {
-        _glfwInputErrorWin32(GLFW_PLATFORM_ERROR,
-                             "Win32: Failed to lock global handle");
-        GlobalFree(object);
-        return;
-    }
-
-    MultiByteToWideChar(CP_UTF8, 0, string, -1, buffer, characterCount);
-    GlobalUnlock(object);
-
-    // NOTE: Retry clipboard opening a few times as some other application may have it
-    //       open and also the Windows Clipboard History reads it after each update
-    while (!OpenClipboard(_glfw.win32.helperWindowHandle))
-    {
-        Sleep(1);
-        tries++;
-
-        if (tries == 3)
-        {
-            _glfwInputErrorWin32(GLFW_PLATFORM_ERROR,
-                                 "Win32: Failed to open clipboard");
-            GlobalFree(object);
-            return;
-        }
-    }
-
-    EmptyClipboard();
-    SetClipboardData(CF_UNICODETEXT, object);
-    CloseClipboard();
-}
-
-const char* _glfwGetClipboardStringWin32(void)
-{
-    HANDLE object;
-    WCHAR* buffer;
-    int tries = 0;
-
-    // NOTE: Retry clipboard opening a few times as some other application may have it
-    //       open and also the Windows Clipboard History reads it after each update
-    while (!OpenClipboard(_glfw.win32.helperWindowHandle))
-    {
-        Sleep(1);
-        tries++;
-
-        if (tries == 3)
-        {
-            _glfwInputErrorWin32(GLFW_PLATFORM_ERROR,
-                                 "Win32: Failed to open clipboard");
-            return NULL;
-        }
-    }
-
-    object = GetClipboardData(CF_UNICODETEXT);
-    if (!object)
-    {
-        _glfwInputErrorWin32(GLFW_FORMAT_UNAVAILABLE,
-                             "Win32: Failed to convert clipboard to string");
-        CloseClipboard();
-        return NULL;
-    }
-
-    buffer = GlobalLock(object);
-    if (!buffer)
-    {
-        _glfwInputErrorWin32(GLFW_PLATFORM_ERROR,
-                             "Win32: Failed to lock global handle");
-        CloseClipboard();
-        return NULL;
-    }
-
-    _glfw_free(_glfw.win32.clipboardString);
-    _glfw.win32.clipboardString = _glfwCreateUTF8FromWideStringWin32(buffer);
-
-    GlobalUnlock(object);
-    CloseClipboard();
-
-    return _glfw.win32.clipboardString;
+void _glfwSetCursorWin32(_GLFWwindow* window, _GLFWcursor* cursor) {
+    if (cursorInContentArea(window)) updateCursorImage(window);
 }
 
 GLFWAPI HWND glfwGetWin32Window(GLFWwindow* handle) {
     _GLFW_REQUIRE_INIT_OR_RETURN(NULL);
-
-    if (_glfw.platform.platformID != GLFW_PLATFORM_WIN32)
-    {
-        _glfwInputError(GLFW_PLATFORM_UNAVAILABLE,
-                        "Win32: Platform not initialized");
-        return NULL;
-    }
+    if (_glfw.platform.platformID != GLFW_PLATFORM_WIN32) { _glfwInputError(GLFW_PLATFORM_UNAVAILABLE,"Win32: Platform not initialized"); return NULL; }
 
     _GLFWwindow* window = (_GLFWwindow*) handle;
-    assert(window != NULL);
-
     return window->win32.handle;
 }
 

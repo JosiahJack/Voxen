@@ -341,11 +341,9 @@ static LRESULT CALLBACK helperWindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LP
 
 // Creates a dummy window for behind-the-scenes work
 //
-static GLFWbool createHelperWindow(void)
-{
+static GLFWbool createHelperWindow(void) {
     MSG msg;
     WNDCLASSEXW wc = { sizeof(wc) };
-
     wc.style         = CS_OWNDC;
     wc.lpfnWndProc   = (WNDPROC) helperWindowProc;
     wc.hInstance     = _glfw.win32.instance;
@@ -363,18 +361,9 @@ static GLFWbool createHelperWindow(void)
         CreateWindowExW(WS_EX_OVERLAPPEDWINDOW,
                         MAKEINTATOM(_glfw.win32.helperWindowClass),
                         L"GLFW message window",
-                        WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
-                        0, 0, 1, 1,
-                        NULL, NULL,
-                        _glfw.win32.instance,
-                        NULL);
+                        WS_CLIPSIBLINGS|WS_CLIPCHILDREN,0,0,1,1,NULL,NULL,_glfw.win32.instance,NULL);
 
-    if (!_glfw.win32.helperWindowHandle)
-    {
-        _glfwInputErrorWin32(GLFW_PLATFORM_ERROR,
-                             "Win32: Failed to create helper window");
-        return GLFW_FALSE;
-    }
+    if (!_glfw.win32.helperWindowHandle) { _glfwInputErrorWin32(GLFW_PLATFORM_ERROR,"Win32: Failed to create helper window"); return GLFW_FALSE; }
 
     // HACK: The command to the first ShowWindow call is ignored if the parent
     //       process passed along a STARTUPINFO, so clear that with a no-op call
@@ -572,10 +561,8 @@ BOOL _glfwIsWindows10BuildOrGreaterWin32(WORD build)
     return RtlVerifyVersionInfo(&osvi, mask, cond) == 0;
 }
 
-GLFWbool _glfwConnectWin32(int platformID, _GLFWplatform* platform)
-{
-    const _GLFWplatform win32 =
-    {
+GLFWbool _glfwConnectWin32(int platformID, _GLFWplatform* platform) {
+    const _GLFWplatform win32 = {
         .platformID = GLFW_PLATFORM_WIN32,
         .init = _glfwInitWin32,
         .getCursorPos = _glfwGetCursorPosWin32,
@@ -587,15 +574,11 @@ GLFWbool _glfwConnectWin32(int platformID, _GLFWplatform* platform)
         .createStandardCursor = _glfwCreateStandardCursorWin32,
         .destroyCursor = _glfwDestroyCursorWin32,
         .setCursor = _glfwSetCursorWin32,
-        .getScancodeName = _glfwGetScancodeNameWin32,
-        .getKeyScancode = _glfwGetKeyScancodeWin32,
         .initJoysticks = _glfwInitJoysticksWin32,
         .pollJoystick = _glfwPollJoystickWin32,
         .getMappingName = _glfwGetMappingNameWin32,
         .updateGamepadGUID = _glfwUpdateGamepadGUIDWin32,
-        .freeMonitor = _glfwFreeMonitorWin32,
         .getMonitorPos = _glfwGetMonitorPosWin32,
-        .getMonitorContentScale = _glfwGetMonitorContentScaleWin32,
         .getMonitorWorkarea = _glfwGetMonitorWorkareaWin32,
         .getVideoModes = _glfwGetVideoModesWin32,
         .getVideoMode = _glfwGetVideoModeWin32,
@@ -609,11 +592,7 @@ GLFWbool _glfwConnectWin32(int platformID, _GLFWplatform* platform)
         .setWindowPos = _glfwSetWindowPosWin32,
         .getWindowSize = _glfwGetWindowSizeWin32,
         .setWindowSize = _glfwSetWindowSizeWin32,
-        .setWindowSizeLimits = _glfwSetWindowSizeLimitsWin32,
-        .setWindowAspectRatio = _glfwSetWindowAspectRatioWin32,
-        .getFramebufferSize = _glfwGetFramebufferSizeWin32,
         .getWindowFrameSize = _glfwGetWindowFrameSizeWin32,
-        .getWindowContentScale = _glfwGetWindowContentScaleWin32,
         .iconifyWindow = _glfwIconifyWindowWin32,
         .restoreWindow = _glfwRestoreWindowWin32,
         .maximizeWindow = _glfwMaximizeWindowWin32,

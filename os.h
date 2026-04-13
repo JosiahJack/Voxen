@@ -69,12 +69,6 @@ void DebugRAM(const char *context);
     #define PLATFORM_DLOPEN(path)        LoadLibraryA(path)
     #define PLATFORM_DLSYM(handle, name) GetProcAddress((handle), (name))
     static char win_err_buf[512];
-    static const char* PLATFORM_DLERROR(void) {
-        DWORD err = GetLastError();
-        if (err == 0) return NULL;
-        FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,NULL,err,MAKELANGID(LANG_NEUTRAL,SUBLANG_DEFAULT),win_err_buf,sizeof(win_err_buf),NULL);
-        return win_err_buf;
-    }
 #else
     #define LINUX
     #include <stdio.h>
@@ -98,7 +92,6 @@ void DebugRAM(const char *context);
     #define MOD_EXTENSION ".so" // e.g. Citadel.so
     #define PLATFORM_DLOPEN(path)        dlopen((path), RTLD_NOW)
     #define PLATFORM_DLSYM(handle, name) dlsym((handle), (name))
-    #define PLATFORM_DLERROR()           dlerror()
 #endif
 #include <pthread.h>
 static inline __attribute__((always_inline)) void* OS_Alloc(size_t amount) { return OS_AllocateRAM(NULL,amount,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE); }

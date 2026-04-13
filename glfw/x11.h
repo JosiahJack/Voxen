@@ -1,55 +1,22 @@
-//========================================================================
-// GLFW 3.5 X11 - www.glfw.org
-//------------------------------------------------------------------------
-// Copyright (c) 2002-2006 Marcus Geelnard
-// Copyright (c) 2006-2019 Camilla Löwy <elmindreda@glfw.org>
-//
-// This software is provided 'as-is', without any express or implied
-// warranty. In no event will the authors be held liable for any damages
-// arising from the use of this software.
-//
-// Permission is granted to anyone to use this software for any purpose,
-// including commercial applications, and to alter it and redistribute it
-// freely, subject to the following restrictions:
-//
-// 1. The origin of this software must not be misrepresented; you must not
-//    claim that you wrote the original software. If you use this software
-//    in a product, an acknowledgment in the product documentation would
-//    be appreciated but is not required.
-//
-// 2. Altered source versions must be plainly marked as such, and must not
-//    be misrepresented as being the original software.
-//
-// 3. This notice may not be removed or altered from any source
-//    distribution.
-//
-//========================================================================
-
+// GLFW 3.5 X11 - www.glfw.org Copyright (c) 2002-2006 Marcus Geelnard Copyright (c) 2006-2019 Camilla Löwy <elmindreda@glfw.org>
+// This software is provided 'as-is', without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
+// Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
+// 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
 #include <unistd.h>
 #include <signal.h>
 #include <stdint.h>
-
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
 #include <X11/Xatom.h>
 #include <X11/Xresource.h>
 #include <X11/Xcursor/Xcursor.h>
-
-// The XRandR extension provides mode setting and gamma control
 #include <X11/extensions/Xrandr.h>
-
-// The Xkb extension provides improved keyboard support
 #include <X11/XKBlib.h>
-
-// The Xinerama extension provides legacy monitor indices
 #include <X11/extensions/Xinerama.h>
-
-// The XInput extension provides raw mouse motion input
 #include <X11/extensions/XInput2.h>
-
-// The Shape extension provides custom window shapes
 #include <X11/extensions/shape.h>
-
 #define GLX_VENDOR 1
 #define GLX_RGBA_BIT 0x00000001
 #define GLX_WINDOW_BIT 0x00000001
@@ -71,7 +38,6 @@
 #define GLX_ACCUM_ALPHA_SIZE 17
 #define GLX_SAMPLES 0x186a1
 #define GLX_VISUAL_ID 0x800b
-
 #define GLX_FRAMEBUFFER_SRGB_CAPABLE_ARB 0x20b2
 #define GLX_CONTEXT_DEBUG_BIT_ARB 0x00000001
 #define GLX_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB 0x00000002
@@ -426,8 +392,8 @@ typedef GLXContext (*PFNGLXCREATECONTEXTATTRIBSARBPROC)(Display*,GLXFBConfig,GLX
 #define glXCreateWindow _glfw.glx.CreateWindow
 #define glXDestroyWindow _glfw.glx.DestroyWindow
 
-#include "xkb_unicode.h"
-#include "posix_poll.h"
+#include <poll.h>
+GLFWbool _glfwPollPOSIX(struct pollfd* fds, nfds_t count, double* timeout);
 #define GLFW_X11_WINDOW_STATE           _GLFWwindowX11 x11;
 #define GLFW_X11_LIBRARY_WINDOW_STATE   _GLFWlibraryX11 x11;
 #define GLFW_X11_MONITOR_STATE          _GLFWmonitorX11 x11;
@@ -849,8 +815,7 @@ typedef struct _GLFWlibraryX11
 
 // X11-specific per-monitor data
 //
-typedef struct _GLFWmonitorX11
-{
+typedef struct _GLFWmonitorX11 {
     RROutput        output;
     RRCrtc          crtc;
     RRMode          oldMode;
@@ -860,18 +825,9 @@ typedef struct _GLFWmonitorX11
     int             index;
 } _GLFWmonitorX11;
 
-// X11-specific per-cursor data
-//
-typedef struct _GLFWcursorX11
-{
-    Cursor handle;
-} _GLFWcursorX11;
-
-
+typedef struct _GLFWcursorX11 { Cursor handle; } _GLFWcursorX11;
 GLFWbool _glfwConnectX11(int platformID, _GLFWplatform* platform);
 int _glfwInitX11(void);
-// void _glfwTerminateX11(void);
-
 GLFWbool _glfwCreateWindowX11(_GLFWwindow* window, const _GLFWwndconfig* wndconfig, const _GLFWctxconfig* ctxconfig, const _GLFWfbconfig* fbconfig);
 void _glfwSetWindowTitleX11(_GLFWwindow* window, const char* title);
 void _glfwSetWindowIconX11(_GLFWwindow* window, int count, const GLFWimage* images);
@@ -904,28 +860,19 @@ void _glfwSetWindowFloatingX11(_GLFWwindow* window, GLFWbool enabled);
 float _glfwGetWindowOpacityX11(_GLFWwindow* window);
 void _glfwSetWindowOpacityX11(_GLFWwindow* window, float opacity);
 void _glfwSetWindowMousePassthroughX11(_GLFWwindow* window, GLFWbool enabled);
-
 void _glfwSetRawMouseMotionX11(_GLFWwindow *window, GLFWbool enabled);
 GLFWbool _glfwRawMouseMotionSupportedX11(void);
-
 void _glfwPollEventsX11(void);
 void _glfwWaitEventsX11(void);
 void _glfwWaitEventsTimeoutX11(double timeout);
 void _glfwPostEmptyEventX11(void);
-
 void _glfwGetCursorPosX11(_GLFWwindow* window, double* xpos, double* ypos);
 void _glfwSetCursorPosX11(_GLFWwindow* window, double xpos, double ypos);
 void _glfwSetCursorModeX11(_GLFWwindow* window, int mode);
-const char* _glfwGetScancodeNameX11(int scancode);
-int _glfwGetKeyScancodeX11(int key);
 GLFWbool _glfwCreateCursorX11(_GLFWcursor* cursor, const GLFWimage* image, int xhot, int yhot);
 GLFWbool _glfwCreateStandardCursorX11(_GLFWcursor* cursor, int shape);
 void _glfwDestroyCursorX11(_GLFWcursor* cursor);
 void _glfwSetCursorX11(_GLFWwindow* window, _GLFWcursor* cursor);
-void _glfwSetClipboardStringX11(const char* string);
-const char* _glfwGetClipboardStringX11(void);
-
-void _glfwFreeMonitorX11(_GLFWmonitor* monitor);
 void _glfwGetMonitorPosX11(_GLFWmonitor* monitor, int* xpos, int* ypos);
 void _glfwGetMonitorContentScaleX11(_GLFWmonitor* monitor, float* xscale, float* yscale);
 void _glfwGetMonitorWorkareaX11(_GLFWmonitor* monitor, int* xpos, int* ypos, int* width, int* height);
@@ -933,34 +880,19 @@ GLFWvidmode* _glfwGetVideoModesX11(_GLFWmonitor* monitor, int* count);
 GLFWbool _glfwGetVideoModeX11(_GLFWmonitor* monitor, GLFWvidmode* mode);
 GLFWbool _glfwGetGammaRampX11(_GLFWmonitor* monitor, GLFWgammaramp* ramp);
 void _glfwSetGammaRampX11(_GLFWmonitor* monitor, const GLFWgammaramp* ramp);
-
 void _glfwPollMonitorsX11(void);
 void _glfwSetVideoModeX11(_GLFWmonitor* monitor, const GLFWvidmode* desired);
 void _glfwRestoreVideoModeX11(_GLFWmonitor* monitor);
-
 Cursor _glfwCreateNativeCursorX11(const GLFWimage* image, int xhot, int yhot);
-
-unsigned long _glfwGetWindowPropertyX11(Window window,
-                                        Atom property,
-                                        Atom type,
-                                        unsigned char** value);
+unsigned long _glfwGetWindowPropertyX11(Window window, Atom property, Atom type, unsigned char** value);
 GLFWbool _glfwIsVisualTransparentX11(Visual* visual);
-
 void _glfwGrabErrorHandlerX11(void);
 void _glfwReleaseErrorHandlerX11(void);
 void _glfwInputErrorX11(int error, const char* message);
-
 void _glfwPushSelectionToManagerX11(void);
 void _glfwCreateInputContextX11(_GLFWwindow* window);
-
 GLFWbool _glfwInitGLX(void);
-void _glfwTerminateGLX(void);
-GLFWbool _glfwCreateContextGLX(_GLFWwindow* window,
-                               const _GLFWctxconfig* ctxconfig,
-                               const _GLFWfbconfig* fbconfig);
+GLFWbool _glfwCreateContextGLX(_GLFWwindow* window, const _GLFWctxconfig* ctxconfig, const _GLFWfbconfig* fbconfig);
 void _glfwDestroyContextGLX(_GLFWwindow* window);
-GLFWbool _glfwChooseVisualGLX(const _GLFWwndconfig* wndconfig,
-                              const _GLFWctxconfig* ctxconfig,
-                              const _GLFWfbconfig* fbconfig,
-                              Visual** visual, int* depth);
+GLFWbool _glfwChooseVisualGLX(const _GLFWwndconfig* wndconfig, const _GLFWctxconfig* ctxconfig, const _GLFWfbconfig* fbconfig, Visual** visual, int* depth);
 

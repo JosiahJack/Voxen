@@ -112,7 +112,7 @@ else
     LINKER=$CC
     CFLAGS="$COMMON_CFLAGS -fno-plt -fno-semantic-interposition -I./include/"
     LDFLAGS="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -lGL -lX11 -lXi -lXrandr"
-    GLFW_PLAT="posix_module.c posix_time.c posix_thread.c x11_init.c x11_monitor.c x11_window.c xkb_unicode.c glx_context.c linux_joystick.c posix_poll.c"
+    GLFW_PLAT="x11.c"
     GLFW_DEFS="-D_GLFW_X11 -D_DEFAULT_SOURCE"
     BINARY_NAME="voxen"
 fi
@@ -122,7 +122,7 @@ export CFLAGS=$CFLAGS
 SOURCES="voxen.c physics.c helpers.c console.c fonts.c models.c culling.c textures.c glad.c miniaudio.c ray.c trigger.c"
 export TEMP_DIR=temp_build
 
-GLFW_CORE="context.c init.c input.c monitor.c platform.c window.c"
+GLFW_CORE="glfw.c input.c monitor.c platform.c window.c"
 GLFW_SOURCES=""
 for f in $GLFW_CORE $GLFW_PLAT; do
     GLFW_SOURCES="$GLFW_SOURCES glfw/$f"

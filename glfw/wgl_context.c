@@ -30,10 +30,7 @@
 #if defined(_GLFW_WIN32)
 
 #include <stdlib.h>
-#include <assert.h>
 
-// Return the value corresponding to the specified attribute
-//
 static int findPixelFormatAttribValueWGL(const int* attribs,
                                          int attribCount,
                                          const int* values,
@@ -54,7 +51,6 @@ static int findPixelFormatAttribValueWGL(const int* attribs,
 
 #define ADD_ATTRIB(a) \
 { \
-    assert((size_t) attribCount < sizeof(attribs) / sizeof(attribs[0])); \
     attribs[attribCount++] = a; \
 }
 #define FIND_ATTRIB_VALUE(a) \
@@ -344,15 +340,10 @@ static void swapBuffersWGL(_GLFWwindow* window)
     SwapBuffers(window->context.wgl.dc);
 }
 
-static void swapIntervalWGL(int interval)
-{
+static void swapIntervalWGL(int interval) {
     _GLFWwindow* window = _glfwPlatformGetTls(&_glfw.contextSlot);
-    assert(window != NULL);
-
     window->context.wgl.interval = interval;
-
-    if (!window->monitor)
-    {
+    if (!window->monitor) {
         // HACK: Disable WGL swap interval when desktop composition is enabled on
         //       Windows 7 to avoid interfering with DWM vsync
         if (!IsWindows8OrGreater())
@@ -527,7 +518,6 @@ void _glfwTerminateWGL(void)
 
 #define SET_ATTRIB(a, v) \
 { \
-    assert(((size_t) index + 1) < sizeof(attribs) / sizeof(attribs[0])); \
     attribs[index++] = a; \
     attribs[index++] = v; \
 }
@@ -733,9 +723,7 @@ GLFWbool _glfwCreateContextWGL(_GLFWwindow* window,
 
             return GLFW_FALSE;
         }
-    }
-    else
-    {
+    } else {
         window->context.wgl.handle = wglCreateContext(window->context.wgl.dc);
         if (!window->context.wgl.handle)
         {
@@ -761,32 +749,17 @@ GLFWbool _glfwCreateContextWGL(_GLFWwindow* window,
     window->context.extensionSupported = extensionSupportedWGL;
     window->context.getProcAddress = getProcAddressWGL;
     window->context.destroy = destroyContextWGL;
-
     return GLFW_TRUE;
 }
 
 #undef SET_ATTRIB
 
-GLFWAPI HGLRC glfwGetWGLContext(GLFWwindow* handle)
-{
+GLFWAPI HGLRC glfwGetWGLContext(GLFWwindow* handle) {
     _GLFW_REQUIRE_INIT_OR_RETURN(NULL);
-
-    if (_glfw.platform.platformID != GLFW_PLATFORM_WIN32)
-    {
-        _glfwInputError(GLFW_PLATFORM_UNAVAILABLE,
-                        "WGL: Platform not initialized");
-        return NULL;
-    }
+    if (_glfw.platform.platformID != GLFW_PLATFORM_WIN32) { _glfwInputError(GLFW_PLATFORM_UNAVAILABLE,"WGL: Platform not initialized"); return NULL; }
 
     _GLFWwindow* window = (_GLFWwindow*) handle;
-    assert(window != NULL);
-
-    if (window->context.source != GLFW_NATIVE_CONTEXT_API)
-    {
-        _glfwInputError(GLFW_NO_WINDOW_CONTEXT, NULL);
-        return NULL;
-    }
-
+    if (window->context.source != GLFW_NATIVE_CONTEXT_API) { _glfwInputError(GLFW_NO_WINDOW_CONTEXT, NULL); return NULL; }
     return window->context.wgl.handle;
 }
 
