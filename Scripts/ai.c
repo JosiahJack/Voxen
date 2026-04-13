@@ -373,7 +373,7 @@ static bool AICheckIfPlayerInSight(Entity* self) {
     if (diff == 0 && (self->index - 419) != 28) return false;
     if (self->enemy) return AICheckIfEnemyInSight(self);
 
-    flag_set(&self->entflags, ENTFLAG_ENEM_IN_LOS, false);
+    flag_set(&self->entflags,ENTFLAG_ENEM_IN_LOS,false);
     if (ai_is_cyber(self) && Eng_Global->decoyActive) return false;
     if (Eng_Cheats->notarget) return false;
 
@@ -405,14 +405,11 @@ static bool AICheckIfPlayerInSight(Entity* self) {
 }
 
 static void AIEnemyInFrontChecks(Entity* self, u16 eidx) {
-    if (!eidx) { flag_set(&self->entflags, ENTFLAG_ENEM_IN_FRONT|ENTFLAG_ENEM_IN_FOV, false); return; }
-    if (ai_is_cyber(self)) { flag_set(&self->entflags, ENTFLAG_ENEM_IN_FRONT|ENTFLAG_ENEM_IN_FOV, true); return; }
-    Vector3 spos = ai_sight_pos(self);
-    Vector3 epos = Eng_Global->instances[eidx].position;
-    Vector3 iv   = normalize_vector3((Vector3){epos.x - spos.x, 0.0f, epos.z - spos.z});
-    float d = dot_vector3(iv, self->forward);
-    flag_set(&self->entflags, ENTFLAG_ENEM_IN_FOV,   d > 0.800f);
-    flag_set(&self->entflags, ENTFLAG_ENEM_IN_FRONT, d > 0.300f);
+    if (!eidx) { flag_set(&self->entflags,ENTFLAG_ENEM_IN_FOV,false); flag_set(&self->entflags,ENTFLAG_ENEM_IN_FRONT,false);  return; }
+    if (ai_is_cyber(self)) { flag_set(&self->entflags,ENTFLAG_ENEM_IN_FOV,true); flag_set(&self->entflags,ENTFLAG_ENEM_IN_FRONT,true); return; }
+    Vector3 spos=ai_sight_pos(self), epos=Eng_Global->instances[eidx].position;
+    Vector3 iv = normalize_vector3((Vector3){epos.x - spos.x,0.0f,epos.z - spos.z}); float d = dot_vector3(iv,self->forward);
+    flag_set(&self->entflags,ENTFLAG_ENEM_IN_FOV,d > 0.800f); flag_set(&self->entflags,ENTFLAG_ENEM_IN_FRONT,d > 0.300f);
 }
 
 static void AIFace(Entity* self, Vector3 goal) {
@@ -1120,7 +1117,7 @@ void AIControllerUpdate(u16 idx) {
     if (!(self->entflags & ENTFLAG_ACTIVE)) return;
 
     if (!ai_is_cyber(self) && npcTable[self->index - 419].moveType != AIMoveType_Fly && self->currentState != AIState_Dead && self->currentState != AIState_Dying) self->gravity = 1.0f;
-    flag_set(&self->entflags, ENTFLAG_ENEM_IN_SIGHT, AICheckIfPlayerInSight(self));
+    flag_set(&self->entflags,ENTFLAG_ENEM_IN_SIGHT,AICheckIfPlayerInSight(self));
     u16 eidx = self->enemy;
     if (eidx && ai_has_health(self)) {
         Entity* en = &Eng_Global->instances[eidx];
@@ -1134,12 +1131,8 @@ void AIControllerUpdate(u16 idx) {
                 self->currentState = AIState_Walk;
             }
             
-            self->enemy = 0;
-            self->posCheckFinished = Eng_Global->pauseRelativeTime;
-            self->lastPosition = self->position;
-        } else {
-            AIEnemyInFrontChecks(self, eidx);
-        }
+            self->enemy = 0; self->posCheckFinished = Eng_Global->pauseRelativeTime; self->lastPosition = self->position;
+        } else AIEnemyInFrontChecks(self, eidx);
     }
 
     if (self->tickFinished < Eng_Global->pauseRelativeTime) { self->tickFinished = Eng_Global->pauseRelativeTime + AI_TICK_TIME; AIThink(idx); }

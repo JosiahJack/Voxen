@@ -1020,6 +1020,7 @@ typedef struct {
     u8 physicsDebug;
 } GlobalContext;
 
+static inline __attribute__((always_inline)) void flag_setu16(u16 *flags, u16 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
 static inline __attribute__((always_inline)) void flag_setu32(u32 *flags, u32 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
 static inline __attribute__((always_inline)) void flag_set(u64 *flags, u64 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
 

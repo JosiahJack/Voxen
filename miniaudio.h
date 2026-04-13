@@ -14167,8 +14167,7 @@ static ma_result ma_event_wait__win32(ma_event* pEvent)
     return ma_result_from_GetLastError(GetLastError());
 }
 
-static ma_result ma_event_signal__win32(ma_event* pEvent)
-{
+static ma_result ma_event_signal__win32(ma_event* pEvent) {
     BOOL result = SetEvent((HANDLE)*pEvent);
     if (result == 0) {
         return ma_result_from_GetLastError(GetLastError());
@@ -14177,14 +14176,9 @@ static ma_result ma_event_signal__win32(ma_event* pEvent)
     return MA_SUCCESS;
 }
 
-
-static ma_result ma_semaphore_init__win32(int initialValue, ma_semaphore* pSemaphore)
-{
-    *pSemaphore = CreateSemaphore(NULL, (LONG)initialValue, LONG_MAX, NULL);
-    if (*pSemaphore == NULL) {
-        return ma_result_from_GetLastError(GetLastError());
-    }
-
+static ma_result ma_semaphore_init__win32(int initialValue, ma_semaphore* pSemaphore) {
+    *pSemaphore = CreateSemaphore(NULL,(LONG)initialValue,LONG_MAX,NULL);
+    if (*pSemaphore == NULL) return ma_result_from_GetLastError(GetLastError());
     return MA_SUCCESS;
 }
 

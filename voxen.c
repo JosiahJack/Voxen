@@ -4,7 +4,6 @@
 GLFWwindow* window;
 #define MOD_INTEROP_ENGINE
 #include "voxen.h"
-#include "miniaudio.h"
 #include "Shaders/shaders.h"
 #include "credits.h"
 GlobalContext Sys_Global = {.globalFrameNum=0,.menuActive=true,.screenshotTimeout=1.0,.creditsPageIndex=1,.difficultyCombat=2,.difficultyCyber=2,.difficultyPuzzle=2,.difficultyMission=2,.deaths=0,.worstFPS=0,.cursorPosition_x=680,.cursorPosition_y=384};
@@ -277,22 +276,13 @@ void UpdateLights(void) {
 
 void UploadGridCellVisibility(void) { glNamedBufferData(Sys_Render.cellVisibleDataID,ARRSIZE * sizeof(u32),gridCellStates,GL_DYNAMIC_DRAW); }
 
-#define IS_CHANGED(a, b) (vabs((a) - (b)) > 0.0001f)
-ENGINE_TO_MOD void UpdateLight(u16 i, Vector3 pos, Color3 col, float range, float intensity, float maxIntensity, float minIntensity, float spotAng, Quaternion spotDir, bool on, bool shadOn) {
-    bool changed = false;
-    if ((lights[i].lflags & SHADON) - shadOn) changed = true;
-    if ((lights[i].lflags & LIGHTON) - on) changed = true;
-    flag_setu32(&lights[i].lflags,SHADON,shadOn);
-    flag_setu32(&lights[i].lflags,LIGHTON,on);
-    lights[i].intensity=intensity; lights[i].minIntensity=minIntensity; lights[i].maxIntensity=maxIntensity; lights[i].spotAng=spotAng;
-    if (IS_CHANGED(lights[i].range,range)) { lights[i].range = range; changed = true; }
-    lights[i].col=col;
-    if (IS_CHANGED(lights[i].pos.x,pos.x)) { lights[i].pos.x = pos.x; changed = true; }
-    if (IS_CHANGED(lights[i].pos.y,pos.y)) { lights[i].pos.y = pos.y; changed = true; }
-    if (IS_CHANGED(lights[i].pos.z,pos.z)) { lights[i].pos.z = pos.z; changed = true; }
-    lights[i].spotDir = spotDir;
-    if (changed) { lightsNewPosition[i]=pos; flag_setu32(&lights[i].lflags,LDIRTY,true); }
+#define CHGD(a,b) (vabs((a) - (b)) > 0.0001f)
+ENGINE_TO_MOD void UpdateLight(u16 i, Vector3 pos, Color3 col, float range, float intensity, float max, float min, float spotAng, Quaternion spotDir, bool on, bool shad) {
+    bool changed = ((!!(lights[i].lflags & SHADON) - shad) || (!!(lights[i].lflags & LIGHTON) -  on) || CHGD(lights[i].range,range) || CHGD(lights[i].pos.x,pos.x) || CHGD(lights[i].pos.y,pos.y) || CHGD(lights[i].pos.z,pos.z));
+    lights[i].intensity=intensity; lights[i].minIntensity=min; lights[i].maxIntensity=max; lights[i].spotAng=spotAng; lights[i].spotDir=spotDir; lights[i].col=col; lights[i].pos=lightsNewPosition[i]=pos; lights[i].range=range;
+    flag_setu32(&lights[i].lflags,19,(lights[i].lflags&LDIRTY)|changed<<4|on|shad<<1);
 }
+#undef CHGD
 // ============================================================================
 // UI Rendering and Text
 #define BASE_RES_X 1366.0f // Positions done in fixed int positions off base resolution, scaled against current resolution.
@@ -1893,10 +1883,6 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
         if (Sys_Global.framesPerLastSecond < Sys_Global.worstFPS && Sys_Global.globalFrameNum > 2000) Sys_Global.worstFPS = Sys_Global.framesPerLastSecond; // After startup, keep track of worst framerate seen.
         Sys_Global.lastFrameSecCount = Sys_Global.globalFrameNum;
     }
-   
-    Sys_Global.cpuTime = get_time() - Sys_Global.current_time; // Measure time over everything this frame before GPU swap buffers
-    glfwSwapBuffers(window); // Present frame
-    CHECK_GL_ERROR();
 }
 
 unsigned char *stbi_load_from_memory(const u8* buffer, i32 len, i32 *x, i32 *y);
@@ -1959,14 +1945,14 @@ i32 main(void) {
     glEnableVertexArrayAttrib(Sys_Render.debugLinesVAO,0);
     glVertexArrayAttribBinding(Sys_Render.debugLinesVAO,0,0);
     glVertexArrayVertexBuffer(Sys_Render.debugLinesVAO,0,Sys_Render.debugLinesVBO,0,3 * sizeof(float));
-    float* m = shadowmapsPerspectiveProjection;
-    m[0] = 1.0f; m[1] = 0.0f; m[2] =                                                                  0.0f; m[3] =  0.0f;
-    m[4] = 0.0f; m[5] = 1.0f; m[6] =                                                                  0.0f; m[7] =  0.0f;
-    m[8] = 0.0f; m[9] = 0.0f; m[10]=      -(LIGHT_RANGE_MAX + NEAR_PLANE) / (LIGHT_RANGE_MAX - NEAR_PLANE); m[11]= -1.0f;
-    m[12]= 0.0f; m[13]= 0.0f; m[14]= -2.0f * LIGHT_RANGE_MAX * NEAR_PLANE / (LIGHT_RANGE_MAX - NEAR_PLANE); m[15]=  0.0f;
+    float* m = shadowmapsPerspectiveProjection; float viewRange = (LIGHT_RANGE_MAX - NEAR_PLANE);
+    m[0] = 1.0f; m[1] = 0.0f; m[2] =                                             0.0f; m[3] =  0.0f;
+    m[4] = 0.0f; m[5] = 1.0f; m[6] =                                             0.0f; m[7] =  0.0f;
+    m[8] = 0.0f; m[9] = 0.0f; m[10]=      -(LIGHT_RANGE_MAX + NEAR_PLANE) / viewRange; m[11]= -1.0f;
+    m[12]= 0.0f; m[13]= 0.0f; m[14]= -2.0f * LIGHT_RANGE_MAX * NEAR_PLANE / viewRange; m[15]=  0.0f;
     ma_result result;
     ma_engine_config engine_config = ma_engine_config_init();
-    engine_config.channels = 2; // Stereo output, adjust if needed
+    engine_config.channels = 2; engine_config.periodSizeInMilliseconds = 10; engine_config.periodSizeInFrames = 512;
     result = ma_engine_init(&engine_config, &audio_engine); if (result != MA_SUCCESS) DualLog("ERROR: Failed to initialize miniaudio engine: %d\n", result);
     DualLog("Loading game definition...");
     OsFileHandle gmFP = OS_OpenReadonly("./Data/gamedata.txt");
@@ -2120,6 +2106,9 @@ i32 main(void) {
         Sys_Global.globalFrameNum++;
         InputClearRisingAndFallingEdges();
         Sys_Input.currentMouse_dx = Sys_Input.currentMouse_dy = 0;
+        Sys_Global.cpuTime = get_time() - Sys_Global.current_time; // Measure time over everything this frame before GPU swap buffers
+        glfwSwapBuffers(window); // Present frame
+        CHECK_GL_ERROR();
         #ifdef DEBUG_RAM_OUTPUT
             static const u32 dbgFrames[] = {4,100,200,500,1000};
             static const char*    dbgLabels[] = {"after 4 frames","after 100 frames","after 200 frames","after 500 frames","after 1000 frames"};

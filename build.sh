@@ -93,7 +93,7 @@ WINDOWS_CC="zig cc -target x86_64-windows-gnu -Wl,--stack,8388608"
 COMMON_CFLAGS="-fno-exceptions -fno-stack-protector -fno-asynchronous-unwind-tables -fno-unwind-tables -Wno-format-nonliteral \
                -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -fvisibility=hidden -pipe -fno-ident -fdata-sections -Wno-int-to-void-pointer-cast \
                -ffunction-sections -ffast-math -std=c11 -Wall -Wextra -Wno-implicit-fallthrough -fdeclspec \
-               -fomit-frame-pointer -g1 -fstrict-aliasing -fcommon -Walloca -DMA_USE_STDINT \
+               -fomit-frame-pointer -g0 -fstrict-aliasing -fcommon -Walloca -DMA_USE_STDINT \
                -Wformat=2 -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings -fno-math-errno -fno-sanitize=all \
                -fno-trapping-math -fmerge-all-constants -m64 -O3 -march=haswell -fstack-usage"
 COMMON_LFLAGS="-Wl,--sort-common -Wl,-z,now -Wl,-z,relro $ZIG_LIBS"
@@ -103,13 +103,17 @@ if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
     LINKER=$CC
     CFLAGS="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe"
-    LDFLAGS="$COMMON_LFLAGS -L. -lopengl32 -lglfw3 -lpthread -Wl,--out-implib=voxen.lib"
+    LDFLAGS="$COMMON_LFLAGS -L. -lgdi32 -lopengl32 -lpthread -Wl,--out-implib=voxen.lib"
+    GLFW_PLAT="win32_module.c win32_time.c win32_thread.c win32_init.c win32_joystick.c win32_monitor.c win32_window.c wgl_context.c"
+    GLFW_DEFS="-D_GLFW_WIN32"
     BINARY_NAME="voxen.exe"
 else
     CC=$LINUX_CC
     LINKER=$CC
-    CFLAGS="$COMMON_CFLAGS -fno-plt -fno-semantic-interposition"
-    LDFLAGS="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -pthread -lglfw -lGL "
+    CFLAGS="$COMMON_CFLAGS -fno-plt -fno-semantic-interposition -I./include/"
+    LDFLAGS="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -lGL -lX11 -lXi -lXrandr"
+    GLFW_PLAT="posix_module.c posix_time.c posix_thread.c x11_init.c x11_monitor.c x11_window.c xkb_unicode.c glx_context.c linux_joystick.c posix_poll.c"
+    GLFW_DEFS="-D_GLFW_X11 -D_DEFAULT_SOURCE"
     BINARY_NAME="voxen"
 fi
 
@@ -117,7 +121,15 @@ export CC=$CC
 export CFLAGS=$CFLAGS
 SOURCES="voxen.c physics.c helpers.c console.c fonts.c models.c culling.c textures.c glad.c miniaudio.c ray.c trigger.c"
 export TEMP_DIR=temp_build
-printf "%s\n" $SOURCES | xargs -P12 -I{} $CC -c {} $CFLAGS -o "$TEMP_DIR"/{}.o
+
+GLFW_CORE="context.c init.c input.c monitor.c platform.c window.c"
+GLFW_SOURCES=""
+for f in $GLFW_CORE $GLFW_PLAT; do
+    GLFW_SOURCES="$GLFW_SOURCES glfw/$f"
+done
+export CFLAGS="$CFLAGS $GLFW_DEFS -Iglfw"
+
+printf "%s\n" $SOURCES $GLFW_SOURCES | xargs -P12 -I{} sh -c "$CC -c {} $CFLAGS -o $TEMP_DIR/\$(basename {}).o"
 $LINKER "$TEMP_DIR"/*.o $LDFLAGS -rdynamic -lm -o $BINARY_NAME
 link_status=$?
 if [ $link_status -ne 0 ]; then

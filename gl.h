@@ -1457,7 +1457,6 @@ GLAD_API_CALL int gladLoadGL( GLADloadfunc load);
 #define GLFW_HAT_RIGHT_DOWN         (GLFW_HAT_RIGHT | GLFW_HAT_DOWN)
 #define GLFW_HAT_LEFT_UP            (GLFW_HAT_LEFT  | GLFW_HAT_UP)
 #define GLFW_HAT_LEFT_DOWN          (GLFW_HAT_LEFT  | GLFW_HAT_DOWN)
-
 #define GLFW_KEY_UNKNOWN            -1
 #define GLFW_KEY_SPACE              32
 #define GLFW_KEY_APOSTROPHE         39  /* ' */
@@ -1509,7 +1508,6 @@ GLAD_API_CALL int gladLoadGL( GLADloadfunc load);
 #define GLFW_KEY_GRAVE_ACCENT       96  /* ` */
 #define GLFW_KEY_WORLD_1            161 /* non-US #1 */
 #define GLFW_KEY_WORLD_2            162 /* non-US #2 */
-
 #define GLFW_KEY_ESCAPE             256
 #define GLFW_KEY_ENTER              257
 #define GLFW_KEY_TAB                258
@@ -1580,16 +1578,13 @@ GLAD_API_CALL int gladLoadGL( GLADloadfunc load);
 #define GLFW_KEY_RIGHT_ALT          346
 #define GLFW_KEY_RIGHT_SUPER        347
 #define GLFW_KEY_MENU               348
-
 #define GLFW_KEY_LAST               GLFW_KEY_MENU
-
 #define GLFW_MOD_SHIFT           0x0001
 #define GLFW_MOD_CONTROL         0x0002
 #define GLFW_MOD_ALT             0x0004
 #define GLFW_MOD_SUPER           0x0008
 #define GLFW_MOD_CAPS_LOCK       0x0010
 #define GLFW_MOD_NUM_LOCK        0x0020
-
 #define GLFW_MOUSE_BUTTON_1         0
 #define GLFW_MOUSE_BUTTON_2         1
 #define GLFW_MOUSE_BUTTON_3         2
@@ -1602,7 +1597,6 @@ GLAD_API_CALL int gladLoadGL( GLADloadfunc load);
 #define GLFW_MOUSE_BUTTON_LEFT      GLFW_MOUSE_BUTTON_1
 #define GLFW_MOUSE_BUTTON_RIGHT     GLFW_MOUSE_BUTTON_2
 #define GLFW_MOUSE_BUTTON_MIDDLE    GLFW_MOUSE_BUTTON_3
-
 #define GLFW_JOYSTICK_1             0
 #define GLFW_JOYSTICK_2             1
 #define GLFW_JOYSTICK_3             2
@@ -1620,7 +1614,6 @@ GLAD_API_CALL int gladLoadGL( GLADloadfunc load);
 #define GLFW_JOYSTICK_15            14
 #define GLFW_JOYSTICK_16            15
 #define GLFW_JOYSTICK_LAST          GLFW_JOYSTICK_16
-
 #define GLFW_GAMEPAD_BUTTON_A               0
 #define GLFW_GAMEPAD_BUTTON_B               1
 #define GLFW_GAMEPAD_BUTTON_X               2
@@ -1637,12 +1630,10 @@ GLAD_API_CALL int gladLoadGL( GLADloadfunc load);
 #define GLFW_GAMEPAD_BUTTON_DPAD_DOWN       13
 #define GLFW_GAMEPAD_BUTTON_DPAD_LEFT       14
 #define GLFW_GAMEPAD_BUTTON_LAST            GLFW_GAMEPAD_BUTTON_DPAD_LEFT
-
 #define GLFW_GAMEPAD_BUTTON_CROSS       GLFW_GAMEPAD_BUTTON_A
 #define GLFW_GAMEPAD_BUTTON_CIRCLE      GLFW_GAMEPAD_BUTTON_B
 #define GLFW_GAMEPAD_BUTTON_SQUARE      GLFW_GAMEPAD_BUTTON_X
 #define GLFW_GAMEPAD_BUTTON_TRIANGLE    GLFW_GAMEPAD_BUTTON_Y
-
 #define GLFW_GAMEPAD_AXIS_LEFT_X        0
 #define GLFW_GAMEPAD_AXIS_LEFT_Y        1
 #define GLFW_GAMEPAD_AXIS_RIGHT_X       2
@@ -1650,70 +1641,42 @@ GLAD_API_CALL int gladLoadGL( GLADloadfunc load);
 #define GLFW_GAMEPAD_AXIS_LEFT_TRIGGER  4
 #define GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER 5
 #define GLFW_GAMEPAD_AXIS_LAST          GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER
-
 #define GLFW_FOCUSED                0x00020001
 #define GLFW_ICONIFIED              0x00020002
 #define GLFW_RESIZABLE              0x00020003
 #define GLFW_MAXIMIZED              0x00020008
-
 #define GLFW_CENTER_CURSOR          0x00020009
-
 #define GLFW_NO_API                          0
 #define GLFW_OPENGL_API             0x00030001
 #define GLFW_OPENGL_ES_API          0x00030002
-
 #define GLFW_OPENGL_ANY_PROFILE              0
 #define GLFW_OPENGL_CORE_PROFILE    0x00032001
 #define GLFW_OPENGL_COMPAT_PROFILE  0x00032002
-
 #define GLFW_CURSOR                  0x00033001
 #define GLFW_STICKY_KEYS             0x00033002
 #define GLFW_STICKY_MOUSE_BUTTONS    0x00033003
 #define GLFW_LOCK_KEY_MODS           0x00033004
 #define GLFW_RAW_MOUSE_MOTION        0x00033005
 #define GLFW_UNLIMITED_MOUSE_BUTTONS 0x00033006
-
 #define GLFW_CURSOR_NORMAL          0x00034001
 #define GLFW_CURSOR_HIDDEN          0x00034002
 #define GLFW_CURSOR_DISABLED        0x00034003
 #define GLFW_CURSOR_CAPTURED        0x00034004
-
 #define GLFW_ANY_RELEASE_BEHAVIOR            0
 #define GLFW_RELEASE_BEHAVIOR_FLUSH 0x00035001
 #define GLFW_RELEASE_BEHAVIOR_NONE  0x00035002
-
 #define GLFW_NATIVE_CONTEXT_API     0x00036001
-#define GLFW_EGL_CONTEXT_API        0x00036002
-#define GLFW_OSMESA_CONTEXT_API     0x00036003
-
-#define GLFW_ANGLE_PLATFORM_TYPE_NONE    0x00037001
-#define GLFW_ANGLE_PLATFORM_TYPE_OPENGL  0x00037002
-#define GLFW_ANGLE_PLATFORM_TYPE_OPENGLES 0x00037003
-#define GLFW_ANGLE_PLATFORM_TYPE_D3D9    0x00037004
-#define GLFW_ANGLE_PLATFORM_TYPE_D3D11   0x00037005
-#define GLFW_ANGLE_PLATFORM_TYPE_VULKAN  0x00037007
-#define GLFW_ANGLE_PLATFORM_TYPE_METAL   0x00037008
-
 #define GLFW_ANY_POSITION           0x80000000
-
 #define GLFW_CONNECTED              0x00040001
 #define GLFW_DISCONNECTED           0x00040002
 #define GLFW_JOYSTICK_HAT_BUTTONS   0x00050001
-#define GLFW_ANGLE_PLATFORM_TYPE    0x00050002
 #define GLFW_PLATFORM               0x00050003
-#define GLFW_COCOA_CHDIR_RESOURCES  0x00051001
-#define GLFW_COCOA_MENUBAR          0x00051002
 #define GLFW_ANY_PLATFORM           0x00060000
 #define GLFW_PLATFORM_WIN32         0x00060001
-#define GLFW_PLATFORM_COCOA         0x00060002
-#define GLFW_PLATFORM_WAYLAND       0x00060003
 #define GLFW_PLATFORM_X11           0x00060004
-#define GLFW_PLATFORM_NULL          0x00060005
 #define GLFW_DONT_CARE              -1
 #define GLFW_DECORATED              0x00020005
-
 typedef void (*GLFWglproc)(void);
-typedef void (*GLFWvkproc)(void);
 typedef struct GLFWmonitor GLFWmonitor;
 typedef struct GLFWwindow GLFWwindow;
 typedef struct GLFWcursor GLFWcursor;

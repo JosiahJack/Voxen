@@ -1478,33 +1478,12 @@ void CyberWallConwaySignal(u16 self) { // Called when a conway propagation signa
 }
 //=============================================================================
 // CyborgConversionToggle
-void CyborgConversionToggleTargetted(u16 activator, const char* argvalue) {
-    (void)activator; (void)argvalue;
-    u8 lev = Eng_Global->currentLevel;
-    bool active = (Eng_Global->ressurectionActiveLevels >> lev) & 1u;
-    flag_set((u64*)&Eng_Global->ressurectionActiveLevels,(u64)(1u << lev),!active);
-//     if (Eng_Global->currentLevel == 6) { TODO, set the ones for 10, 11, 12 when 6 gets toggled as they don't have their own switch
-//         if (ressurectionActive[Eng_Global->currentLevel]) {
-//             ressurectionActive[Eng_Global->currentLevel] = false;
-//             ressurectionActive[10] = false;
-//             ressurectionActive[11] = false;
-//             ressurectionActive[12] = false;
-//         } else {
-//             ressurectionActive[Eng_Global->currentLevel] = true;
-//             ressurectionActive[10] = true;
-//             ressurectionActive[11] = true;
-//             ressurectionActive[12] = true;
-//         }
-//     } else {
-//         ressurectionActive[Eng_Global->currentLevel] = !ressurectionActive[Eng_Global->currentLevel]; // Toggle current level.
-//     }
-    if (active) {
-        play_wav(sounds[183],Eng_Settings->VolumeMessage,(Vector3){},false); // "vox_cybconvcancelled"
-        CenterStatusPrint("%s",Eng_Text->stringTable[591]);
-    } else {
-        play_wav(sounds[184],Eng_Settings->VolumeMessage,(Vector3){},false); // "vox_cybconvenabled"
-        CenterStatusPrint("%s",Eng_Text->stringTable[592]);
-    }
+void CyborgConversionToggleTargetted(void) {
+    bool active = (Eng_Global->ressurectionActiveLevels >> Eng_Global->currentLevel) & 1u;
+    flag_setu16(&Eng_Global->ressurectionActiveLevels,(1u << Eng_Global->currentLevel),!active);
+    if (Eng_Global->currentLevel == 6) flag_setu16(&Eng_Global->ressurectionActiveLevels, (1u<<10|1u<<11|1u<<12),!active); // Set groves 10,11,12 when 6 gets toggled as they don't have their own switch
+    play_wav(sounds[active ? 183 : 184],Eng_Settings->VolumeMessage,(Vector3){},false); // "vox_cybconvcancelled" : "vox_cybconvenabled"
+    CenterStatusPrint("%s",Eng_Text->stringTable[active ? 591 : 592]);
 }
 //=============================================================================
 // ElevatorButton
@@ -3660,13 +3639,8 @@ MOD_TO_ENGINE void ModInitAfterLoad(void) {
         else if (constIndex == 480) CyberMineInitBeforeLoad(i);
         if (!StringIsEmpty(e->targetname) && (e->ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE) && !(e->entflags & TARG_IOFLAGS_DISABLD_ONCE_4EVER)) flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
         if (e->index == 700) {
-            if ((e->ioflags & TARG_IOFLAGS_START_ON_SECOND) || (e->ioflags & TARG_IOFLAGS_ON_SECOND)) {
-                StringCopyInto_A_From_B(e->currenttarget,e->target,TARGET_STRING_LENGTH);
-                flag_set(&e->ioflags,TARG_IOFLAGS_ON_SECOND,false);
-            } else {
-                StringCopyInto_A_From_B(e->currenttarget,e->target2,TARGET_STRING_LENGTH);
-                flag_set(&e->ioflags,TARG_IOFLAGS_ON_SECOND,true);
-            }
+            if ((e->ioflags & TARG_IOFLAGS_START_ON_SECOND) || (e->ioflags & TARG_IOFLAGS_ON_SECOND)) { StringCopyInto_A_From_B(e->currenttarget,e->target ,TARGET_STRING_LENGTH); flag_set(&e->ioflags,TARG_IOFLAGS_ON_SECOND,false); }
+            else                                                                                      { StringCopyInto_A_From_B(e->currenttarget,e->target2,TARGET_STRING_LENGTH); flag_set(&e->ioflags,TARG_IOFLAGS_ON_SECOND,true ); }
         }
     }
 }
