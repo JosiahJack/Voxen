@@ -68,9 +68,4 @@ public class TextWarningsManager : MonoBehaviour {
 			}
 		}
 	}
-	
-	void OnDestroy() {
-		warningTextGObjects = null;
-		warningTexts = null; // Components are cleaned up with their GameObjects
-	}
 }

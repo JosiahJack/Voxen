@@ -356,7 +356,6 @@ typedef struct {
 
 typedef int XContext;
 
-#define XUniqueContext()       ((XContext) XrmUniqueQuark())
 #define XStringToContext(string)   ((XContext) XrmStringToQuark(string))
 
 _XFUNCPROTOBEGIN

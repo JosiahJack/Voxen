@@ -81,10 +81,5 @@ TryAgain:
 			playDone = true;
 		}
 		StopCoroutine("Play"); //Stop this coroutine
-	} 
-	
-	void OnDestroy() {
-		objects = null;
-		sprites = null;
 	}
 }

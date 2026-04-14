@@ -6,6 +6,7 @@ GLFWwindow* window;
 #include "voxen.h"
 #include "Shaders/shaders.h"
 #include "credits.h"
+#include "glfw.c"
 GlobalContext Sys_Global = {.globalFrameNum=0,.menuActive=true,.screenshotTimeout=1.0,.creditsPageIndex=1,.difficultyCombat=2,.difficultyCyber=2,.difficultyPuzzle=2,.difficultyMission=2,.deaths=0,.worstFPS=0,.cursorPosition_x=680,.cursorPosition_y=384};
 CheatsSystem Sys_Cheats = {.god=false,.noclip=true,.showLocation=true,.showFPS=true,.editMode=true}; RenderSystem Sys_Render; SystemUI Sys_UI;
 SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on first run for potatoes (e.g. won't crash for out of VRAM, or won't take 5min to init).
@@ -825,22 +826,18 @@ void CycleToNextMonitor(void) {
 }
 
 GLFWmonitor* GetCurrentMonitor(void) {
-    int wx, wy, ww, wh;
-    glfwGetWindowPos(window, &wx, &wy);
-    glfwGetWindowSize(window, &ww, &wh);
-    int bestArea = 0;
+    int wx,wy,ww,wh; glfwGetWindowPos(window,&wx,&wy); glfwGetWindowSize(window,&ww,&wh);
     GLFWmonitor* bestMonitor = glfwGetPrimaryMonitor();
-    int monitorCount;
-    GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
-    for (int i = 0; i < monitorCount; i++) {
+    int bestArea=0,monitorCount; GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
+    for (int i=0;i<monitorCount;++i) {
         int mx, my;
         glfwGetMonitorPos(monitors[i], &mx, &my);
         const GLFWvidmode* mode = glfwGetVideoMode(monitors[i]);
         int mw = mode->width;
         int mh = mode->height;
-        int left   = vmax(wx, mx);
+        int left   = vmax(wx,mx);
         int right  = vmin(wx + ww, mx + mw);
-        int top    = vmax(wy, my);
+        int top    = vmax(wy,my);
         int bottom = vmin(wy + wh, my + mh);
         int area = (right > left && bottom > top) ? (right - left) * (bottom - top) : 0;
         if (area > bestArea) {
@@ -987,19 +984,20 @@ void ChangeResolution(void) {
     SaveConfig();
 }
 
+GLFWAPI void glfwSetWindowAttrib(GLFWwindow* window, int attrib, int value);
 void ChangeFullScreenWindowed(void) {
     int monitorCount; GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
     GLFWmonitor* monitor = monitors[Sys_Settings.CurrentMonitor];
     const GLFWvidmode* mode = glfwGetVideoMode(monitor);
     if (Sys_Settings.Fullscreen) {
-        glfwSetWindowAttrib(window,GLFW_DECORATED,0);
+        glfwSetWindowAttrib(window,0x00020005/*GLFW_DECORATED*/,0);
         int x,y,w,h;
         glfwGetMonitorWorkarea(monitor,&x,&y,&w,&h);
         glfwSetWindowMonitor(window,NULL,x,y,w,h,mode->refreshRate);
         Sys_Settings.ScreenWidth = w;
         Sys_Settings.ScreenHeight = h;
     } else {
-        glfwSetWindowAttrib(window,GLFW_DECORATED,1);
+        glfwSetWindowAttrib(window,0x00020005/*GLFW_DECORATED*/,1);
         int mx, my; 
         glfwGetMonitorPos(monitor,&mx,&my);
         int x,y,w,h;
@@ -1907,13 +1905,18 @@ i32 main(void) {
     if (!glfwInit()) { DualLogError("GLFW initialization failed\n"); OS_Exit(1); }
     
     LoadConfig(); // Get settings before setting window size.
+    DualLog("Creating glfw window...\n");
     window = glfwCreateWindow(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight,"Voxen",NULL,NULL); if (!window) { DualLogError("glfwCreateWindow failed\n"); OS_Exit(1); }
     
+    DualLog("Centering glfw window...\n");
     CenterWindowOnMonitor();
+    DualLog("Making context...\n");
     glfwMakeContextCurrent(window); glfwSetFramebufferSizeCallback(window,UpdateScreenSize);
+    DualLog("GLAD load...\n");
     if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress)) { DualLogError("Failed to initialize GLAD\n"); OS_Exit(1); }
     
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
+    DualLog("First swap buffer...\n");
     glfwSwapBuffers(window);
     GLint major=0,minor=0; glGetIntegerv(GL_MAJOR_VERSION,&major); glGetIntegerv(GL_MINOR_VERSION,&minor);
     if (major < 4 || (major == 4 && minor < 3)) { DualLogError("Need OpenGL >= 4.3, got %d.%d\n",major,minor); OS_Exit(1); }

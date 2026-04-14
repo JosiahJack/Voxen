@@ -103,17 +103,13 @@ if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
     LINKER=$CC
     CFLAGS="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe"
-    LDFLAGS="$COMMON_LFLAGS -L. -lgdi32 -lopengl32 -lpthread -Wl,--out-implib=voxen.lib"
-    GLFW_PLAT="win32_module.c win32_time.c win32_thread.c win32_init.c win32_joystick.c win32_monitor.c win32_window.c wgl_context.c"
-    GLFW_DEFS="-D_GLFW_WIN32"
+    LDFLAGS="$COMMON_LFLAGS -L. -lgdi32 -lopengl32 -lpthread -Wl,--out-implib=voxen.lib -D_GLFW_WIN32"
     BINARY_NAME="voxen.exe"
 else
     CC=$LINUX_CC
     LINKER=$CC
-    CFLAGS="$COMMON_CFLAGS -fno-plt -fno-semantic-interposition -I./include/"
-    LDFLAGS="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -lGL -lX11 -lXi -lXrandr"
-    GLFW_PLAT="x11.c"
-    GLFW_DEFS="-D_GLFW_X11 -D_DEFAULT_SOURCE"
+    CFLAGS="$COMMON_CFLAGS -fno-plt -fno-semantic-interposition -I./include/ -D_GLFW_X11 -D_GNU_SOURCE"
+    LDFLAGS="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -lGL -Wl,-Bstatic -lX11 -lXext -lXi -lXcursor -lXmu -lXinerama -lXrandr -Wl,-Bdynamic -lm -ldl -lpthread"
     BINARY_NAME="voxen"
 fi
 
@@ -121,15 +117,7 @@ export CC=$CC
 export CFLAGS=$CFLAGS
 SOURCES="voxen.c physics.c helpers.c console.c fonts.c models.c culling.c textures.c glad.c miniaudio.c ray.c trigger.c"
 export TEMP_DIR=temp_build
-
-GLFW_CORE="glfw.c input.c monitor.c platform.c window.c"
-GLFW_SOURCES=""
-for f in $GLFW_CORE $GLFW_PLAT; do
-    GLFW_SOURCES="$GLFW_SOURCES glfw/$f"
-done
-export CFLAGS="$CFLAGS $GLFW_DEFS -Iglfw"
-
-printf "%s\n" $SOURCES $GLFW_SOURCES | xargs -P12 -I{} sh -c "$CC -c {} $CFLAGS -o $TEMP_DIR/\$(basename {}).o"
+printf "%s\n" $SOURCES | xargs -P12 -I{} sh -c "$CC -c {} $CFLAGS -o $TEMP_DIR/\$(basename {}).o"
 $LINKER "$TEMP_DIR"/*.o $LDFLAGS -rdynamic -lm -o $BINARY_NAME
 link_status=$?
 if [ $link_status -ne 0 ]; then

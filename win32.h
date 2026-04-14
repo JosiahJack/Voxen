@@ -1,37 +1,31 @@
+// GLFW 3.5 This software is provided 'as-is', without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
+// Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
+// 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
 #ifndef NOMINMAX
- #define NOMINMAX
+    #define NOMINMAX
 #endif
-
 #ifndef VC_EXTRALEAN
- #define VC_EXTRALEAN
+    #define VC_EXTRALEAN
 #endif
-
 #ifndef WIN32_LEAN_AND_MEAN
- #define WIN32_LEAN_AND_MEAN
+    #define WIN32_LEAN_AND_MEAN
 #endif
 #undef APIENTRY
-
-// GLFW on Windows is Unicode only and does not work in MBCS mode
-#ifndef UNICODE
- #define UNICODE
+#ifndef UNICODE // GLFW on Windows is Unicode only and does not work in MBCS mode
+    #define UNICODE
 #endif
-
-// GLFW requires Windows 7 or later
-#if WINVER < 0x0601
- #undef WINVER
- #define WINVER 0x0601
+#if WINVER < 0x0601 // GLFW requires Windows 7 or later
+    #undef WINVER
+    #define WINVER 0x0601
 #endif
 #if _WIN32_WINNT < 0x0601
- #undef _WIN32_WINNT
- #define _WIN32_WINNT 0x0601
+    #undef _WIN32_WINNT
+    #define _WIN32_WINNT 0x0601
 #endif
-
-// GLFW uses DirectInput8 interfaces
-#define DIRECTINPUT_VERSION 0x0800
-
-// GLFW uses OEM cursor resources
-#define OEMRESOURCE
-
+#define DIRECTINPUT_VERSION 0x0800 // GLFW uses DirectInput8 interfaces
+#define OEMRESOURCE // GLFW uses OEM cursor resources
 #include <wctype.h>
 #include <windows.h>
 #include <dwmapi.h>
@@ -63,38 +57,24 @@
 #endif
 
 #ifndef DPI_ENUMS_DECLARED
-typedef enum
-{
-    PROCESS_DPI_UNAWARE = 0,
-    PROCESS_SYSTEM_DPI_AWARE = 1,
-    PROCESS_PER_MONITOR_DPI_AWARE = 2
-} PROCESS_DPI_AWARENESS;
-typedef enum
-{
-    MDT_EFFECTIVE_DPI = 0,
-    MDT_ANGULAR_DPI = 1,
-    MDT_RAW_DPI = 2,
-    MDT_DEFAULT = MDT_EFFECTIVE_DPI
-} MONITOR_DPI_TYPE;
+    typedef enum { PROCESS_DPI_UNAWARE = 0, PROCESS_SYSTEM_DPI_AWARE = 1, PROCESS_PER_MONITOR_DPI_AWARE = 2 } PROCESS_DPI_AWARENESS;
+    typedef enum { MDT_EFFECTIVE_DPI = 0, MDT_ANGULAR_DPI = 1, MDT_RAW_DPI = 2, MDT_DEFAULT = MDT_EFFECTIVE_DPI } MONITOR_DPI_TYPE;
 #endif /*DPI_ENUMS_DECLARED*/
 
 #ifndef DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
-#define DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 ((HANDLE) -4)
+    #define DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 ((HANDLE) -4)
 #endif /*DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2*/
 
-// Replacement for versionhelpers.h macros, as we cannot rely on the
-// application having a correct embedded manifest
-//
 #define IsWindows8OrGreater()                                         \
     _glfwIsWindowsVersionOrGreaterWin32(HIBYTE(_WIN32_WINNT_WIN8),    \
                                         LOBYTE(_WIN32_WINNT_WIN8), 0)
 #define IsWindows8Point1OrGreater()                                   \
     _glfwIsWindowsVersionOrGreaterWin32(HIBYTE(_WIN32_WINNT_WINBLUE), \
                                         LOBYTE(_WIN32_WINNT_WINBLUE), 0)
-
 // Windows 10 Anniversary Update
 #define _glfwIsWindows10Version1607OrGreaterWin32() \
     _glfwIsWindows10BuildOrGreaterWin32(14393)
+
 // Windows 10 Creators Update
 #define _glfwIsWindows10Version1703OrGreaterWin32() \
     _glfwIsWindows10BuildOrGreaterWin32(15063)
@@ -127,12 +107,9 @@ typedef enum
 #ifndef XUSER_MAX_COUNT
  #define XUSER_MAX_COUNT 4
 #endif
-
-// HACK: Define macros that some dinput.h variants don't
 #ifndef DIDFT_OPTIONAL
- #define DIDFT_OPTIONAL 0x80000000
+ #define DIDFT_OPTIONAL 0x80000000 // HACK: Define macros that some dinput.h variants don't
 #endif
-
 #define WGL_NUMBER_PIXEL_FORMATS_ARB 0x2000
 #define WGL_SUPPORT_OPENGL_ARB 0x2010
 #define WGL_DRAW_TO_WINDOW_ARB 0x2001
@@ -179,22 +156,15 @@ typedef enum
 #define WGL_CONTEXT_OPENGL_NO_ERROR_ARB 0x31b3
 #define WGL_COLORSPACE_EXT 0x309d
 #define WGL_COLORSPACE_SRGB_EXT 0x3089
-
 #define ERROR_INVALID_VERSION_ARB 0x2095
 #define ERROR_INVALID_PROFILE_ARB 0x2096
 #define ERROR_INCOMPATIBLE_DEVICE_CONTEXTS_ARB 0x2054
-
-// xinput.dll function pointer typedefs
 typedef DWORD (WINAPI * PFN_XInputGetCapabilities)(DWORD,DWORD,XINPUT_CAPABILITIES*);
 typedef DWORD (WINAPI * PFN_XInputGetState)(DWORD,XINPUT_STATE*);
 #define XInputGetCapabilities _glfw.win32.xinput.GetCapabilities
 #define XInputGetState _glfw.win32.xinput.GetState
-
-// dinput8.dll function pointer typedefs
 typedef HRESULT (WINAPI * PFN_DirectInput8Create)(HINSTANCE,DWORD,REFIID,LPVOID*,LPUNKNOWN);
 #define DirectInput8Create _glfw.win32.dinput8.Create
-
-// user32.dll function pointer typedefs
 typedef BOOL (WINAPI * PFN_EnableNonClientDpiScaling)(HWND);
 typedef BOOL (WINAPI * PFN_SetProcessDpiAwarenessContext)(HANDLE);
 typedef UINT (WINAPI * PFN_GetDpiForWindow)(HWND);
@@ -205,8 +175,6 @@ typedef int (WINAPI * PFN_GetSystemMetricsForDpi)(int,UINT);
 #define GetDpiForWindow _glfw.win32.user32.GetDpiForWindow_
 #define AdjustWindowRectExForDpi _glfw.win32.user32.AdjustWindowRectExForDpi_
 #define GetSystemMetricsForDpi _glfw.win32.user32.GetSystemMetricsForDpi_
-
-// dwmapi.dll function pointer typedefs
 typedef HRESULT (WINAPI * PFN_DwmIsCompositionEnabled)(BOOL*);
 typedef HRESULT (WINAPI * PFN_DwmFlush)(VOID);
 typedef HRESULT(WINAPI * PFN_DwmEnableBlurBehindWindow)(HWND,const DWM_BLURBEHIND*);
@@ -215,8 +183,6 @@ typedef HRESULT (WINAPI * PFN_DwmGetColorizationColor)(DWORD*,BOOL*);
 #define DwmFlush _glfw.win32.dwmapi.Flush
 #define DwmEnableBlurBehindWindow _glfw.win32.dwmapi.EnableBlurBehindWindow
 #define DwmGetColorizationColor _glfw.win32.dwmapi.GetColorizationColor
-
-// shcore.dll function pointer typedefs
 typedef HRESULT (WINAPI * PFN_SetProcessDpiAwareness)(PROCESS_DPI_AWARENESS);
 typedef HRESULT (WINAPI * PFN_GetDpiForMonitor)(HMONITOR,MONITOR_DPI_TYPE,UINT*,UINT*);
 #define SetProcessDpiAwareness _glfw.win32.shcore.SetProcessDpiAwareness_
@@ -388,7 +354,6 @@ typedef struct _GLFWcursorWin32 {
     HCURSOR             handle;
 } _GLFWcursorWin32;
 
-GLFWbool _glfwConnectWin32(int platformID, _GLFWplatform* platform);
 int _glfwInitWin32(void);
 WCHAR* _glfwCreateWideStringFromUTF8Win32(const char* source);
 char* _glfwCreateUTF8FromWideStringWin32(const WCHAR* source);
@@ -401,7 +366,6 @@ void _glfwSetVideoModeWin32(_GLFWmonitor* monitor, const GLFWvidmode* desired);
 void _glfwRestoreVideoModeWin32(_GLFWmonitor* monitor);
 void _glfwGetHMONITORContentScaleWin32(HMONITOR handle, float* xscale, float* yscale);
 GLFWbool _glfwCreateWindowWin32(_GLFWwindow* window, const _GLFWwndconfig* wndconfig, const _GLFWctxconfig* ctxconfig, const _GLFWfbconfig* fbconfig);
-void _glfwDestroyWindowWin32(_GLFWwindow* window);
 void _glfwSetWindowTitleWin32(_GLFWwindow* window, const char* title);
 void _glfwSetWindowIconWin32(_GLFWwindow* window, int count, const GLFWimage* images);
 void _glfwGetWindowPosWin32(_GLFWwindow* window, int* xpos, int* ypos);
@@ -450,13 +414,12 @@ void _glfwGetMonitorPosWin32(_GLFWmonitor* monitor, int* xpos, int* ypos);
 void _glfwGetMonitorWorkareaWin32(_GLFWmonitor* monitor, int* xpos, int* ypos, int* width, int* height);
 GLFWvidmode* _glfwGetVideoModesWin32(_GLFWmonitor* monitor, int* count);
 GLFWbool _glfwGetVideoModeWin32(_GLFWmonitor* monitor, GLFWvidmode* mode);
-GLFWbool _glfwGetGammaRampWin32(_GLFWmonitor* monitor, GLFWgammaramp* ramp);
-void _glfwSetGammaRampWin32(_GLFWmonitor* monitor, const GLFWgammaramp* ramp);
+// GLFWbool _glfwGetGammaRampWin32(_GLFWmonitor* monitor, GLFWgammaramp* ramp);
+// void _glfwSetGammaRampWin32(_GLFWmonitor* monitor, const GLFWgammaramp* ramp);
 GLFWbool _glfwInitJoysticksWin32(void);
 void _glfwTerminateJoysticksWin32(void);
 GLFWbool _glfwPollJoystickWin32(_GLFWjoystick* js, int mode);
 const char* _glfwGetMappingNameWin32(void);
 void _glfwUpdateGamepadGUIDWin32(char* guid);
 GLFWbool _glfwInitWGL(void);
-void _glfwTerminateWGL(void);
 GLFWbool _glfwCreateContextWGL(_GLFWwindow* window, const _GLFWctxconfig* ctxconfig, const _GLFWfbconfig* fbconfig);

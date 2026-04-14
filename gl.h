@@ -1329,8 +1329,7 @@ GLAD_API_CALL int gladLoadGL( GLADloadfunc load);
 
 #endif
 
-    
-    
+// glfw3.h
 #ifndef _glfw3_h_
 #define _glfw3_h_
 
@@ -1357,76 +1356,6 @@ GLAD_API_CALL int gladLoadGL( GLADloadfunc load);
  #define GLFW_CALLBACK_DEFINED
 #endif /* CALLBACK */
 
-#if defined(GLFW_INCLUDE_ES1)
- #include <GLES/gl.h>
- #if defined(GLFW_INCLUDE_GLEXT)
-  #include <GLES/glext.h>
- #endif
-#elif defined(GLFW_INCLUDE_ES2)
- #include <GLES2/gl2.h>
- #if defined(GLFW_INCLUDE_GLEXT)
-  #include <GLES2/gl2ext.h>
- #endif
-#elif defined(GLFW_INCLUDE_ES3)
- #include <GLES3/gl3.h>
- #if defined(GLFW_INCLUDE_GLEXT)
-  #include <GLES2/gl2ext.h>
- #endif
-#elif defined(GLFW_INCLUDE_ES31)
- #include <GLES3/gl31.h>
- #if defined(GLFW_INCLUDE_GLEXT)
-  #include <GLES2/gl2ext.h>
- #endif
-#elif defined(GLFW_INCLUDE_ES32)
- #include <GLES3/gl32.h>
- #if defined(GLFW_INCLUDE_GLEXT)
-  #include <GLES2/gl2ext.h>
- #endif
-#elif defined(GLFW_INCLUDE_GLCOREARB)
- #if defined(__APPLE__)
-  #include <OpenGL/gl3.h>
-  #if defined(GLFW_INCLUDE_GLEXT)
-   #include <OpenGL/gl3ext.h>
-  #endif /*GLFW_INCLUDE_GLEXT*/
- #else /*__APPLE__*/
-  #include <GL/glcorearb.h>
-  #if defined(GLFW_INCLUDE_GLEXT)
-   #include <GL/glext.h>
-  #endif
- #endif /*__APPLE__*/
-#elif defined(GLFW_INCLUDE_GLU)
-  #if defined(GLFW_INCLUDE_GLU)
-   #include <GL/glu.h>
-  #endif
-#elif !defined(GLFW_INCLUDE_NONE) && \
-      !defined(__gl_h_) && \
-      !defined(__gles1_gl_h_) && \
-      !defined(__gles2_gl2_h_) && \
-      !defined(__gles2_gl3_h_) && \
-      !defined(__gles2_gl31_h_) && \
-      !defined(__gles2_gl32_h_) && \
-      !defined(__gl_glcorearb_h_) && \
-      !defined(__gl2_h_) /*legacy*/ && \
-      !defined(__gl3_h_) /*legacy*/ && \
-      !defined(__gl31_h_) /*legacy*/ && \
-      !defined(__gl32_h_) /*legacy*/ && \
-      !defined(__glcorearb_h_) /*legacy*/ && \
-      !defined(__GL_H__) /*non-standard*/ && \
-      !defined(__gltypes_h_) /*non-standard*/ && \
-      !defined(__glee_h_) /*non-standard*/
- #if defined(__APPLE__)
-  #if !defined(GLFW_INCLUDE_GLEXT)
-   #define GL_GLEXT_LEGACY
-  #endif
-  #include <OpenGL/gl.h>
- #else /*__APPLE__*/
-  #include <GL/gl.h>
-  #if defined(GLFW_INCLUDE_GLEXT)
-   #include <GL/glext.h>
-  #endif
- #endif /*__APPLE__*/
-#endif /* OpenGL and OpenGL ES headers */
-
 #if defined(GLFW_DLL) && defined(_GLFW_BUILD_DLL)
  #error "You must not have both GLFW_DLL and _GLFW_BUILD_DLL defined"
 #endif
@@ -1444,9 +1373,6 @@ GLAD_API_CALL int gladLoadGL( GLADloadfunc load);
  #define GLFWAPI
 #endif
 
-#define GLFW_VERSION_MAJOR          3
-#define GLFW_VERSION_MINOR          5
-#define GLFW_VERSION_REVISION       0
 #define GLFW_RELEASE                0
 #define GLFW_PRESS                  1
 #define GLFW_REPEAT                 2
@@ -1643,11 +1569,6 @@ GLAD_API_CALL int gladLoadGL( GLADloadfunc load);
 #define GLFW_GAMEPAD_AXIS_LEFT_TRIGGER  4
 #define GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER 5
 #define GLFW_GAMEPAD_AXIS_LAST          GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER
-#define GLFW_FOCUSED                0x00020001
-#define GLFW_ICONIFIED              0x00020002
-#define GLFW_RESIZABLE              0x00020003
-#define GLFW_MAXIMIZED              0x00020008
-#define GLFW_CENTER_CURSOR          0x00020009
 #define GLFW_NO_API                          0
 #define GLFW_OPENGL_API             0x00030001
 #define GLFW_OPENGL_ES_API          0x00030002
@@ -1660,10 +1581,6 @@ GLAD_API_CALL int gladLoadGL( GLADloadfunc load);
 #define GLFW_LOCK_KEY_MODS           0x00033004
 #define GLFW_RAW_MOUSE_MOTION        0x00033005
 #define GLFW_UNLIMITED_MOUSE_BUTTONS 0x00033006
-#define GLFW_CURSOR_NORMAL          0x00034001
-#define GLFW_CURSOR_HIDDEN          0x00034002
-#define GLFW_CURSOR_DISABLED        0x00034003
-#define GLFW_CURSOR_CAPTURED        0x00034004
 #define GLFW_ANY_RELEASE_BEHAVIOR            0
 #define GLFW_RELEASE_BEHAVIOR_FLUSH 0x00035001
 #define GLFW_RELEASE_BEHAVIOR_NONE  0x00035002
@@ -1677,7 +1594,6 @@ GLAD_API_CALL int gladLoadGL( GLADloadfunc load);
 #define GLFW_PLATFORM_WIN32         0x00060001
 #define GLFW_PLATFORM_X11           0x00060004
 #define GLFW_DONT_CARE              -1
-#define GLFW_DECORATED              0x00020005
 #define GLFW_NO_ERROR               0
 #define GLFW_NOT_INITIALIZED        0x00010001
 #define GLFW_NO_CURRENT_CONTEXT     0x00010002
@@ -1693,19 +1609,6 @@ GLAD_API_CALL int gladLoadGL( GLADloadfunc load);
 #define GLFW_FEATURE_UNAVAILABLE    0x0001000C
 #define GLFW_FEATURE_UNIMPLEMENTED  0x0001000D
 #define GLFW_PLATFORM_UNAVAILABLE   0x0001000E
-#define GLFW_FOCUSED                0x00020001
-#define GLFW_ICONIFIED              0x00020002
-#define GLFW_RESIZABLE              0x00020003
-#define GLFW_VISIBLE                0x00020004
-#define GLFW_DECORATED              0x00020005
-#define GLFW_AUTO_ICONIFY           0x00020006
-#define GLFW_FLOATING               0x00020007
-#define GLFW_MAXIMIZED              0x00020008
-#define GLFW_CENTER_CURSOR          0x00020009
-#define GLFW_TRANSPARENT_FRAMEBUFFER 0x0002000A
-#define GLFW_HOVERED                0x0002000B
-#define GLFW_FOCUS_ON_SHOW          0x0002000C
-#define GLFW_MOUSE_PASSTHROUGH      0x0002000D
 #define GLFW_POSITION_X             0x0002000E
 #define GLFW_POSITION_Y             0x0002000F
 #define GLFW_RED_BITS               0x00021001
@@ -1724,15 +1627,8 @@ GLAD_API_CALL int gladLoadGL( GLADloadfunc load);
 #define GLFW_SRGB_CAPABLE           0x0002100E
 #define GLFW_REFRESH_RATE           0x0002100F
 #define GLFW_DOUBLEBUFFER           0x00021010
-#define GLFW_CLIENT_API             0x00022001
-#define GLFW_CONTEXT_VERSION_MAJOR  0x00022002
-#define GLFW_CONTEXT_VERSION_MINOR  0x00022003
-#define GLFW_CONTEXT_REVISION       0x00022004
-#define GLFW_CONTEXT_ROBUSTNESS     0x00022005
-#define GLFW_OPENGL_FORWARD_COMPAT  0x00022006
 #define GLFW_CONTEXT_DEBUG          0x00022007
 #define GLFW_OPENGL_DEBUG_CONTEXT   GLFW_CONTEXT_DEBUG
-#define GLFW_OPENGL_PROFILE         0x00022008
 #define GLFW_CONTEXT_RELEASE_BEHAVIOR 0x00022009
 #define GLFW_CONTEXT_NO_ERROR       0x0002200A
 #define GLFW_CONTEXT_CREATION_API   0x0002200B
@@ -1776,7 +1672,6 @@ GLAD_API_CALL int gladLoadGL( GLADloadfunc load);
 #define GLFW_RESIZE_NESW_CURSOR     0x00036008
 #define GLFW_RESIZE_ALL_CURSOR      0x00036009
 #define GLFW_NOT_ALLOWED_CURSOR     0x0003600A
-#define GLFW_PLATFORM_NULL          0x00060005
 typedef void (*GLFWglproc)(void);
 typedef struct GLFWmonitor GLFWmonitor;
 typedef struct GLFWwindow GLFWwindow;
@@ -1805,72 +1700,7 @@ typedef struct GLFWvidmode { int width,height,redBits,greenBits,blueBits,refresh
 typedef struct GLFWgammaramp { unsigned short *red,*green,*blue; unsigned int size; } GLFWgammaramp;
 typedef struct GLFWimage { int width,height; unsigned char* pixels; } GLFWimage;
 typedef struct GLFWgamepadstate { unsigned char buttons[15]; float axes[6]; } GLFWgamepadstate;
-GLFWAPI void glfwDefaultWindowHints(void);
-GLFWAPI const GLFWgammaramp* glfwGetGammaRamp(GLFWmonitor* monitor);
-GLFWAPI void glfwSetGammaRamp(GLFWmonitor* monitor, const GLFWgammaramp* ramp);
-GLFWAPI void glfwDestroyWindow(GLFWwindow* window);
-GLFWAPI int glfwExtensionSupported(const char* extension);
-GLFWAPI const GLFWvidmode* glfwGetVideoModes(GLFWmonitor* monitor, int* count);
-GLFWAPI void glfwSetWindowTitle(GLFWwindow* window, const char* title);
-GLFWAPI void glfwSetWindowIcon(GLFWwindow* window, int count, const GLFWimage* images);
-GLFWAPI void glfwSetWindowSize(GLFWwindow* window, int width, int height);
-GLFWAPI void glfwIconifyWindow(GLFWwindow* window);
-GLFWAPI void glfwRestoreWindow(GLFWwindow* window);
-GLFWAPI void glfwMaximizeWindow(GLFWwindow* window);
-GLFWAPI GLFWmonitor* glfwGetWindowMonitor(GLFWwindow* window);
-GLFWAPI void glfwSetWindowMonitor(GLFWwindow* window, GLFWmonitor* monitor, int xpos, int ypos, int width, int height, int refreshRate);
-GLFWAPI void glfwSetWindowAttrib(GLFWwindow* window, int attrib, int value);
-GLFWAPI GLFWwindowposfun glfwSetWindowPosCallback(GLFWwindow* window, GLFWwindowposfun callback);
-GLFWAPI GLFWwindowsizefun glfwSetWindowSizeCallback(GLFWwindow* window, GLFWwindowsizefun callback);
-GLFWAPI GLFWwindowfocusfun glfwSetWindowFocusCallback(GLFWwindow* window, GLFWwindowfocusfun callback);
-GLFWAPI int glfwGetKey(GLFWwindow* window, int key);
-GLFWAPI void glfwSetCursor(GLFWwindow* window, GLFWcursor* cursor);
-GLFWAPI GLFWcharfun glfwSetCharCallback(GLFWwindow* window, GLFWcharfun callback);
-GLFWAPI GLFWcharmodsfun glfwSetCharModsCallback(GLFWwindow* window, GLFWcharmodsfun callback);
-GLFWAPI GLFWcursorenterfun glfwSetCursorEnterCallback(GLFWwindow* window, GLFWcursorenterfun callback);
-GLFWAPI int glfwJoystickPresent(int jid);
-GLFWAPI const float* glfwGetJoystickAxes(int jid, int* count);
-GLFWAPI const unsigned char* glfwGetJoystickButtons(int jid, int* count);
-GLFWAPI const unsigned char* glfwGetJoystickHats(int jid, int* count);
-GLFWAPI const char* glfwGetJoystickName(int jid);
-GLFWAPI const char* glfwGetJoystickGUID(int jid);
-GLFWAPI void glfwSetJoystickUserPointer(int jid, void* pointer);
-GLFWAPI void* glfwGetJoystickUserPointer(int jid);
-GLFWAPI int glfwJoystickIsGamepad(int jid);
-GLFWAPI GLFWjoystickfun glfwSetJoystickCallback(GLFWjoystickfun callback);
-GLFWAPI int glfwUpdateGamepadMappings(const char* string);
-GLFWAPI const char* glfwGetGamepadName(int jid);
-GLFWAPI int glfwGetGamepadState(int jid, GLFWgamepadstate* state);
-void glfwGetMonitorWorkarea(GLFWmonitor * monitor, int* xpos, int* ypos, int* width, int* height);
-#define GLFW_CONTEXT_VERSION_MAJOR  0x00022002
-#define GLFW_CONTEXT_VERSION_MINOR  0x00022003
-#define GLFW_OPENGL_PROFILE         0x00022008
-#define GLFW_CLIENT_API             0x00022001
-GLFWframebuffersizefun glfwSetFramebufferSizeCallback (GLFWwindow *window, GLFWframebuffersizefun callback);
-GLFWAPI GLFWglproc glfwGetProcAddress(const char* procname);
-GLFWAPI int glfwInit(void);
-GLFWAPI GLFWmonitor** glfwGetMonitors(int* count);
-GLFWAPI GLFWmonitor* glfwGetPrimaryMonitor(void);
-GLFWAPI void glfwGetMonitorPos(GLFWmonitor* monitor, int* xpos, int* ypos);
-GLFWAPI const char* glfwGetMonitorName(GLFWmonitor* monitor);
-GLFWAPI const GLFWvidmode* glfwGetVideoMode(GLFWmonitor* monitor);
-GLFWAPI int glfwWindowShouldClose(GLFWwindow* window);
-GLFWAPI void glfwWindowHint(int hint, int value);
-GLFWAPI GLFWwindow* glfwCreateWindow(int width, int height, const char* title, GLFWmonitor* monitor, GLFWwindow* share);
-GLFWAPI void glfwSetWindowPos(GLFWwindow* window, int xpos, int ypos);
-GLFWAPI void glfwPollEvents(void);
-GLFWAPI void glfwSetInputMode(GLFWwindow* window, int mode, int value);
-GLFWAPI int glfwGetMouseButton(GLFWwindow* window, int button);
-GLFWAPI GLFWkeyfun glfwSetKeyCallback(GLFWwindow* window, GLFWkeyfun callback);
-GLFWAPI GLFWmousebuttonfun glfwSetMouseButtonCallback(GLFWwindow* window, GLFWmousebuttonfun callback);
-GLFWAPI GLFWcursorposfun glfwSetCursorPosCallback(GLFWwindow* window, GLFWcursorposfun callback);
-GLFWAPI GLFWscrollfun glfwSetScrollCallback(GLFWwindow* window, GLFWscrollfun callback);
 GLFWAPI void glfwMakeContextCurrent(GLFWwindow* window);
-GLFWAPI void glfwSwapBuffers(GLFWwindow* window);
-GLFWAPI void glfwSwapInterval(int interval);
-GLFWAPI void glfwGetWindowPos(GLFWwindow* window, int* xpos, int* ypos);
-GLFWAPI void glfwGetWindowSize(GLFWwindow* window, int* width, int* height);
-
 #ifdef GLFW_WINGDIAPI_DEFINED
  #undef WINGDIAPI
  #undef GLFW_WINGDIAPI_DEFINED
