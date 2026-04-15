@@ -103,13 +103,13 @@ if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
     LINKER=$CC
     CFLAGS="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe"
-    LDFLAGS="$COMMON_LFLAGS -L. -lgdi32 -lopengl32 -lpthread -Wl,--out-implib=voxen.lib -D_GLFW_WIN32"
+    LDFLAGS="$COMMON_LFLAGS -L. -lgdi32 -lopengl32 -lpthread -Wl,--out-implib=voxen.lib"
     BINARY_NAME="voxen.exe"
 else
     CC=$LINUX_CC
     LINKER=$CC
-    CFLAGS="$COMMON_CFLAGS -fno-plt -fno-semantic-interposition -I./include/ -D_GLFW_X11 -D_GNU_SOURCE"
-    LDFLAGS="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -lGL -Wl,-Bstatic -lX11 -lXext -lXi -lXcursor -lXmu -lXinerama -lXrandr -Wl,-Bdynamic -lm -ldl -lpthread"
+    CFLAGS="$COMMON_CFLAGS -fno-plt -fno-semantic-interposition -I./include -D_GLFW_X11 -D_GNU_SOURCE"
+    LDFLAGS="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -lGL -lm -ldl -lpthread"
     BINARY_NAME="voxen"
 fi
 

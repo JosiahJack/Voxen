@@ -1905,18 +1905,13 @@ i32 main(void) {
     if (!glfwInit()) { DualLogError("GLFW initialization failed\n"); OS_Exit(1); }
     
     LoadConfig(); // Get settings before setting window size.
-    DualLog("Creating glfw window...\n");
     window = glfwCreateWindow(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight,"Voxen",NULL,NULL); if (!window) { DualLogError("glfwCreateWindow failed\n"); OS_Exit(1); }
     
-    DualLog("Centering glfw window...\n");
     CenterWindowOnMonitor();
-    DualLog("Making context...\n");
     glfwMakeContextCurrent(window); glfwSetFramebufferSizeCallback(window,UpdateScreenSize);
-    DualLog("GLAD load...\n");
     if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress)) { DualLogError("Failed to initialize GLAD\n"); OS_Exit(1); }
     
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
-    DualLog("First swap buffer...\n");
     glfwSwapBuffers(window);
     GLint major=0,minor=0; glGetIntegerv(GL_MAJOR_VERSION,&major); glGetIntegerv(GL_MINOR_VERSION,&minor);
     if (major < 4 || (major == 4 && minor < 3)) { DualLogError("Need OpenGL >= 4.3, got %d.%d\n",major,minor); OS_Exit(1); }
