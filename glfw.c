@@ -76,7 +76,6 @@ typedef const GLubyte* (APIENTRY * PFNGLGETSTRINGIPROC)(GLenum,GLuint);
     #ifndef near
         #define near
     #endif
-    #include <wctype.h>
     #include <dwmapi.h>
     #include <dinput.h>
     #include <xinput.h>

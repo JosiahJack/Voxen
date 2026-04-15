@@ -2809,14 +2809,12 @@ This section contains the APIs for device playback and capture. Here is where yo
 ************************************************************************************************************************************************************/
 #ifndef MA_NO_DEVICE_IO
 /* Some backends are only supported on certain platforms. */
-#if defined(MA_WIN32) && !defined(MA_XBOX)
+#if defined(WINDOWS)
     #define MA_SUPPORT_WASAPI
-
-    #if defined(MA_WIN32_DESKTOP)   /* DirectSound and WinMM backends are only supported on desktops. */
-        #define MA_SUPPORT_DSOUND
-        #define MA_SUPPORT_WINMM
-        #define MA_SUPPORT_JACK     /* JACK is technically supported on Windows, but I don't know how many people use it in practice... */
-    #endif
+    #define MA_WIN32_DESKTOP
+    #define MA_SUPPORT_DSOUND
+    #define MA_SUPPORT_WINMM
+    #define MA_SUPPORT_JACK     /* JACK is technically supported on Windows, but I don't know how many people use it in practice... */
 #endif
 #if defined(MA_UNIX) && !defined(MA_ORBIS) && !defined(MA_PROSPERO)
     #if defined(MA_LINUX)
