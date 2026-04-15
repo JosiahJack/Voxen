@@ -21,15 +21,15 @@ to Quake, Half-Life, and other classic games.  The voxel volume may work fine fo
 outdoor environments but Voxen is not intended to be used for large open world games.
 Further, the procedural sky is hardcoded and not intended to be a general sky system.
 Modifications are of course welcome, however.  The hope is that everything is quite
-straightforward.
+straightforward. (TBD shaders part of mod/gamecode?)
 
-Using on GLFW and OpenGL 4.3+, this engine attempts to leverage low latency and
-GPU driven rendering methods with minimal state changes and maximum flexibility
-with user customizable entities.  Heavy use of SSBOs is made though this is still
-compatible with old hardware and GL drivers from 15yrs ago; further very few GL
-extensions are used to further widen compatibility.  Careful handling of CPU to GPU
-transfers is made to minimize VRAM and to prevent naughty GL drivers duplicating
-that VRAM into the CPU RAM space which is also kept minimal.
+Using GLFW3.5(what's left of it) and OpenGL 4.3+, this engine attempts to achieve
+maximum compatibility and maximum performance with minimal footprint.  Heavy use of 
+SSBOs is made though this is still compatible with old hardware and GL drivers from
+15yrs ago; further very few GL extensions are used to further widen compatibility.
+Careful handling of CPU to GPU transfers is made to minimize VRAM and to prevent 
+naughty GL drivers duplicating that VRAM into the CPU RAM space which is also kept
+minimal.
 
 All texture and model data is loaded from disk directly for ease of development
 and full mod support by design.  Any intermediate format is internal to the engine.
@@ -37,6 +37,9 @@ and full mod support by design.  Any intermediate format is internal to the engi
 Minimizing hierarchical layers and leveraging sensibly named globals to cut out
 fluff and overhead is important.  Minimal dependencies and leveraging tried and
 true systems is important.
+
+The gamecode for mod as game lives in a separately compiled hermetic dll/so file
+that has no libc usage, no external linking, and strict API interop with the engine.
 
 ## Supported Platforms
 
@@ -58,17 +61,17 @@ Build by calling ./build.sh build script.
 ### Prerequisites
 
 Project must be linked against the following libraries which your system must install.  I'll continue to reduce these as much as I can:
- * mold linker
- * -lGL (`sudo apt install libgl1-mesa-dev`)
- * -L./External -l:libassimp.6.0.2.a -lz -lstdc++ -static-libstdc++ (Prebuilt, included in ./External/, for model loading from .fbx (for now))
- * libstdc++
- * -lfontconfig
+ * zig cc for cross compilation and libc underversioning for compatibility
+ * OpenGL(Linux) / OpenGL32(Win)
+ * pthread
 
 Single command:
 
 ```bash
-sudo apt install libglfw3-dev libgl1-mesa-dev libassimp-dev
+sudo apt install zig libgl1-mesa-dev
 ```
+
+Notes: Glfw remnants still present, bundled together in glfw.c as I ever continue to reduce dependencies.
 
 ## System Architecture
 
@@ -80,12 +83,13 @@ Parses all game/mod scripts
 Initializes data handling systems and parsers using all above data
 Level Load using gamedata definition to pick starting level
 Starts game loop:
-  Polls GLFW input
+  Polls input
   Processes input and applies movement key states, mouselook
   Animation (done prior to physics such that physics can respond properly)
   Physics
   Game Logic Update Loop
   Render Shadowmaps
+  Render Depth Prepass
   Render Opaques + Doublesided
   Render Transparents
   Render UI
