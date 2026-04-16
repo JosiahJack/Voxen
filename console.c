@@ -19,12 +19,8 @@
 #define GLFW_KEY_LEFT_CONTROL       341
 #define GLFW_KEY_RIGHT_SHIFT        344
 #define MAX_HISTORY 7
-static i32 currentEntryLength = 0;
-char consoleEntryText[TEXT_BUFFER_SIZE] = "Enter a command...";
-char history[MAX_HISTORY][TEXT_BUFFER_SIZE] = {0};
-static int numHistory = 0;
-static int historyPos = 0;
-
+static i32 currentEntryLength=0, numHistory=0, historyPos=0;
+char consoleEntryText[TEXT_BUFFER_SIZE]="Enter a command...",history[MAX_HISTORY][TEXT_BUFFER_SIZE]={0};
 ENGINE_TO_MOD void ToggleConsole(void) {
     static bool inventoryModeWasActivePriorToConsole = false;
     if (!Sys_Cheats.consoleActive) inventoryModeWasActivePriorToConsole = Sys_Global.inventoryMode;
@@ -70,16 +66,10 @@ static void RecallHistory(int direction) { // direction 1 up (older), -1 down (n
 typedef void (*ConsoleCmdFuncNoArg)(void);
 typedef void (*ConsoleCmdFuncInt)(int);
 typedef void (*ConsoleCmdFuncStr)(const char*);
-
 typedef struct {
     const char* name;
-    union {
-        ConsoleCmdFuncNoArg  noArg;
-        ConsoleCmdFuncInt    withInt;
-        ConsoleCmdFuncStr    withStr;
-        void*                raw;
-    } func;
-    enum { CMD_NOARG, CMD_INT, CMD_STR } type;
+    union { ConsoleCmdFuncNoArg noArg; ConsoleCmdFuncInt withInt; ConsoleCmdFuncStr withStr; void* raw; } func;
+    enum { CMD_NOARG,CMD_INT,CMD_STR } type;
 } ConsoleCommand;
 
 char CharToLower(const char c);

@@ -1,5 +1,24 @@
 // physics.c
 #include "voxen.h"
+typedef u16 half;
+static inline __attribute__((always_inline)) float half_to_float(half h){
+    u32 s=(h&0x8000)<<16,e=(h&0x7C00)>>10,m=(h&0x03FF),out;
+    if (e == 0){
+        if (m == 0) out = s;
+        else { // normalize subnormal
+            e = 1;
+            while ((m & 0x0400) == 0) { m <<= 1; e--; }
+            m &= 0x03FF; e+=(127 - 15);
+            out = s | (e << 23) | (m << 13);
+        }
+    } else if (e == 31) { out = s | 0x7F800000 | (m << 13); }
+    else { e = e + (127 - 15); out = s | (e << 23) | (m << 13); }
+    float f; __builtin_memcpy(&f,&out,4);
+    return f;
+}
+
+#include "ray.c"
+#include "trigger.c"
 extern u16 loadedModelsMaxIndex,modelTriangleCounts[MODEL_IDX_MAX]; extern u8** modelVertices; extern u16** modelTriangles;
 extern u32 modelVertexCounts[MODEL_IDX_MAX]; extern float modelMatrices[INSTANCE_COUNT*16],modelBounds[MODEL_IDX_MAX];
 extern u32 gridCellStates[ARRSIZE];
@@ -704,11 +723,11 @@ static void IntegrateRigidbody(u16 i,float dt) {
         if (vn<0.0f) e->velocity=Vector3_A_minus_B(e->velocity,scale_vector3(c.normal,vn));
     }
     position_resolved:;
-    e->lastPosition=pos; e->position=newPos; e->cellIndex=PosGetCellCoords(newPos.x,newPos.z); Sys_Global.dirtyInstances[i]=true;
+    e->lastPosition=pos; e->position=newPos; e->cellIndex=PosGetCellCoords(newPos.x,newPos.z); e->cellX=PosGetCellCoordX(e->position.x); e->cellZ=PosGetCellCoordZ(e->position.z); Sys_Global.dirtyInstances[i]=true;
 }
 
 static void IntegratePlayer(u16 i,float dt) {
-    Entity *e=&Sys_Global.instances[i]; Vector3 pos=e->position; e->cellIndex=PosGetCellCoords(pos.x,pos.z); Vector3 vel=e->velocity;
+    Entity *e=&Sys_Global.instances[i]; Vector3 pos=e->position; e->cellIndex=PosGetCellCoords(pos.x,pos.z); e->cellX=PosGetCellCoordX(e->position.x); e->cellZ=PosGetCellCoordZ(e->position.z); Vector3 vel=e->velocity;
     if (i<=PLAYER2&&Sys_Cheats.noclip) { e->position=Vector3_A_plus_B(pos,scale_vector3(vel,dt)); return; }
     if (magnitude_vector3(vel)<0.05f) return;
     Vector3 dir=normalize_vector3(vel);

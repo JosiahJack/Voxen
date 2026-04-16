@@ -306,7 +306,6 @@ static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
 
 void LoadTextures(void) {
     double start_time = get_time();
-    DebugRAM("start of LoadTextures");
     loadedTexturesMaxIndex = totalPixels = totalPaletteColors = 0u;
     TextureDataParser texture_parser;
     if (unlikely(!ParseTextureData(&texture_parser, MAX_VALID_TEXTURE, "./Data/textures.txt"))) { DualLogError("Could not parse ./Data/textures.txt!\n"); OS_Exit(1); }
@@ -387,7 +386,6 @@ void LoadTextures(void) {
         OS_DeallocateRAM(texturePaletteBuffers[i],palS * sizeof(u32));
     }
 
-    DebugRAM("After loop for load textures");
     DualLog("total palette colors: %u, total pixels: %u...", totalPaletteColors,totalPixels);
     i32 packed_size = ((i32)totalPixels + 3) / 4 * sizeof(u32);
     glBindBuffer(GL_SSBO,Sys_Render.colorBufferID);

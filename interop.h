@@ -157,6 +157,7 @@ ENGINE_TO_MOD void AddForce(u16 idx, Vector3 force, bool isImpulse);
 ENGINE_TO_MOD void CenterStatusPrint(const char* fmt, ...);
 ENGINE_TO_MOD void PortalCulling(void);
 ENGINE_TO_MOD char* GetLevelFileNextStringUpToNewlineOrEOF(char* buf, int size);
+ENGINE_TO_MOD void LoadLevel(u8 curlevel);
 ENGINE_TO_MOD void LoadFieldIntoLight(char* trimmed_key, char* trimmed_value, char* initialLine, u32 lineNum, Light* lit, LightAnimation* lan, u16 lightIdx);
 ENGINE_TO_MOD i32 AddLight(Light* lit, LightAnimation* lanim);
 ENGINE_TO_MOD void UpdateLight(u16 lightsIdx, Vector3 pos, Color3 col, float range, float intensity, float maxIntensity, float minIntensity, float spotAng, Quaternion spotDir, bool on, bool shadOn);
@@ -169,3 +170,98 @@ ENGINE_TO_MOD bool ToggleDoorPortal(u8 portalIdx, u16 doorIdx, u16 closedModelIn
 ENGINE_TO_MOD Vector3 GetEntityLocalSpawnPointFromUnrotatedOffsetVector(Entity* originator, Vector3 offsetFromOriginator);
 ENGINE_TO_MOD void TurnLightOff(u16 litIdx);
 ENGINE_TO_MOD void AddCamView(Vector3 pos, Quaternion rot, u8 fov, u16 width, u16 height, float near, float far);
+
+// Common inlines that need to span both engine and gamecode
+static inline __attribute__((always_inline)) u32 parse_numberu32(const char* str, const char* line, u32 lineNum) {
+    if (str == 0 || *str == '\0') { DualLogError("Invalid blank string from line[%d]: %s\n", lineNum+1, line); return 0; }
+    while (CharacterIsEmpty((char)*str)) str++;
+    while (CharacterIsEmpty(*str)) str++;
+    if (*str == '+') str++;
+    if (*str == '-') { DualLogError("Invalid input, negative not allowed (%s)\n      from line[%d]: %s\n", str, lineNum+1, line); return 0; }
+    unsigned long result = 0;
+    while (*str >= '0' && *str <= '9') {
+        int digit = *str - '0';
+        result = result * 10uL + (unsigned long)digit;
+        str++;
+    }
+
+    return (u32)result;
+}
+
+static inline __attribute__((always_inline)) u16 parse_numberu16(const char* str, const char* line, u32 lineNum) {
+    u32 retval = parse_numberu32(str, line, lineNum);
+    if (retval > U16_MAX) { DualLogError("Value %u out of range for u16 from line[%d]: %s\n", retval, lineNum+1, line); return 0; }
+    return (u16)retval;
+}
+
+static inline __attribute__((always_inline)) u8 parse_numberu8(const char* str, const char* line, u32 lineNum) {
+    u32 retval = parse_numberu32(str, line, lineNum);
+    if (retval > U8_MAX) { DualLogError("Value %u out of range for u8 from line[%d]: %s\n", retval, lineNum+1, line); return 0; }
+    return (u8)retval;
+}
+
+static inline __attribute__((always_inline)) bool parse_bool(const char* str, const char* line, u32 lineNum) {
+    u32 parseval = parse_numberu32(str, line, lineNum);
+    if (parseval > 1) DualLogWarn("Loaded %u but expected boolean from line[%u]: %s\n",parseval, lineNum+1, line);
+    return parseval > 0 ? true : false;
+}
+
+static inline __attribute__((always_inline)) i32 parse_numberi32(const char* str, const char* line, u32 lineNum) {
+    if (str == 0 || *str == '\0') { DualLogError("Invalid blank string from line[%d]: %s\n", lineNum+1, line); return 0; }
+    while (CharacterIsEmpty((char)*str)) str++;
+    bool negative = false;
+    if (*str == '+') str++;
+    else if (*str == '-') { negative = true; str++; }
+    long result = 0;
+    while (*str >= '0' && *str <= '9') {
+        result = result * 10L + (*str - '0');
+        str++;
+    }
+    return (i32)(negative ? -result : result);
+}
+static inline __attribute__((always_inline)) i16 parse_numberi16(const char* str, const char* line, u32 lineNum) {
+    i32 retval = parse_numberi32(str, line, lineNum);
+    if (retval < -32768 || retval > 32767) { DualLogError("Value %d out of range for i16 from line[%d]: %s\n", retval, lineNum+1, line); return 0; }
+    return (i16)retval;
+}
+static inline __attribute__((always_inline)) i8 parse_numberi8(const char* str, const char* line, u32 lineNum) {
+    i32 retval = parse_numberi32(str, line, lineNum);
+    if (retval < -128 || retval > 127) { DualLogError("Value %d out of range for i8 from line[%d]: %s\n", retval, lineNum+1, line); return 0; }
+    return (i8)retval;
+}
+
+static inline __attribute__((always_inline)) float parse_float(const char* str, const char* line, u32 lineNum) {
+    if (str == 0 || *str == '\0') { DualLogError("Invalid blank string from line[%d]: %s\n", lineNum+1, line); return 0.0f; }
+    
+    while (CharacterIsEmpty(*str)) str++;
+    bool negative = false;
+    if (*str == '-') { negative = true; str++; }
+    else if (*str == '+') { str++; }
+
+    double value = 0.0;
+    bool has_digit = false;
+    while (*str >= '0' && *str <= '9') { // Integer part
+        value = value * 10.0 + (*str - '0');
+        str++;
+        has_digit = true;
+    }
+
+    if (*str == '.') { // Decimal part
+        str++;
+        double frac = 0.0;
+        double place = 0.1;
+        while (*str >= '0' && *str <= '9') {
+            frac += (*str - '0') * place;
+            place *= 0.1;
+            str++;
+            has_digit = true;
+        }
+
+        value += frac;
+    }
+
+    if (!has_digit) return 0.0f;
+
+    if (negative) value = -value;
+    return (float)value;
+}

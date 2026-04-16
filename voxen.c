@@ -7,8 +7,13 @@ GLFWwindow* window;
 #include "Shaders/shaders.h"
 #include "credits.h"
 #include "glfw.c"
-GlobalContext Sys_Global = {.globalFrameNum=0,.menuActive=true,.screenshotTimeout=1.0,.creditsPageIndex=1,.difficultyCombat=2,.difficultyCyber=2,.difficultyPuzzle=2,.difficultyMission=2,.deaths=0,.worstFPS=0,.cursorPosition_x=680,.cursorPosition_y=384};
-CheatsSystem Sys_Cheats = {.god=false,.noclip=true,.showLocation=true,.showFPS=true,.editMode=true}; RenderSystem Sys_Render; SystemUI Sys_UI;
+#define CHECK_GL_ERROR() do { GLenum err = glGetError(); if (err != GL_NO_ERROR) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
+#define SHADOW_MAP_SIZE 128u
+#define MAX_SHADOWMAPS 256u
+#define MAX_LIGHTS_PER_VOXEL 64
+#define MAX_CHANNELS 256
+#define NEAR_PLANE (0.02f)
+GlobalContext Sys_Global = {0}; CheatsSystem Sys_Cheats = {.god=false,.noclip=true,.showLocation=true,.showFPS=true,.editMode=true}; RenderSystem Sys_Render; SystemUI Sys_UI;
 SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on first run for potatoes (e.g. won't crash for out of VRAM, or won't take 5min to init).
     .InputCodeSettings = {
         5,  /* Forward    = F */     0,/* Strafe Left= A */         18,/* Backpedal  = S */        3,/* Strafe Right= D */       100,/* Jump    = SPACE */      2,/* Crouch   = C        */ 23,/* Prone     = X */ 16,/* Lean Left = Q  */
@@ -20,13 +25,8 @@ SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on f
     .ScreenWidth=800u,.ScreenHeight=600u,.Fullscreen=0u,.FOV=65u,.Brightness=50u,.Gamma=50u,.FXAA=0u,.Shadows=0u,.Reflections=0u,.Vsync=0u,.ModelDetail=0u,.CurrentMonitor=0u,
     .GI=0u,.SpeakerMode=1u,.Reverb=0u,.VolumeMaster=100u,.VolumeMusic=25u,.VolumeMessage=75u,.VolumeEffects=100u,.Language=0u,.DynamicMusic=1u,.Footsteps=1u,.InvertLook=0u,
     .InvertCyberspaceLook=0u,.QuickItemPickup=0u,.QuickReloadWeapons=0u,.MouseSensitivity=10u,.NoShootMode=0u,.HeadBob=1u,.SSR_RES=8u};/*Ratio is (1 / SSR_RES) * res*/
-#define SHADOW_MAP_SIZE 128u
-u8 queuedLevelToLoad = 255u;
-float berserkSeedTime,cam_pitch,cam_yaw=90.0f,cam_roll,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],modelMatrices[INSTANCE_COUNT*16];
-char uiTextBuffer[TEXT_BUFFER_SIZE];
-float uiOrthoProjection[16];
+u8 queuedLevelToLoad = 255u; float berserkSeedTime,cam_pitch,cam_yaw=90.0f,cam_roll,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],modelMatrices[INSTANCE_COUNT*16],uiOrthoProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
 Light lights[LIGHT_COUNT]; LightAnimation lanims[LIGHT_COUNT];
-static float lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6],playerFrustumPlanes[6];
 u16 editModeSelection,editModeTestEntityDefinition=0; // Test instance and its model index
 typedef struct { double shadowTime; u32 shadowmapIndirectionList[LIGHT_COUNT]; float shadDotThresh; } VoxenShadowSystem;
@@ -34,29 +34,22 @@ VoxenShadowSystem voxen_Shadow_System;
 u16 loadedTexturesMaxIndex;
 bool doubleSidedTexture[MAX_VALID_TEXTURE],transparentTexture[MAX_VALID_TEXTURE];
 extern u32 gridCellStates[ARRSIZE],modelVertexCounts[MODEL_IDX_MAX]; extern u16 modelTriangleCounts[MODEL_IDX_MAX];
-u32 drawCallsRenderedThisFrame,textDrawCallsRenderedThisFrame,uiImageDrawCallsRenderedThisFrame,shadowDrawCallsRenderedThisFrame,verticesRenderedThisFrame,drawCallsNormal;
+u32 drawCallsRenderedThisFrame,uiImageDrawCallsRenderedThisFrame,shadowDrawCallsRenderedThisFrame,verticesRenderedThisFrame,drawCallsNormal;
 extern GLuint fontAtlasTex,fontAtlasTexStopD;
-#define MAX_CHANNELS 256
 ma_engine audio_engine; ma_sound wav_sounds[MAX_CHANNELS];
 float wav_volumes[MAX_CHANNELS]; // Setting independent base sfx volume (e.g. dropped physics object hard or lightly volume, independent of position).
 i32 wav_count = 0; ma_sound log_sound;
-#define MENUPAD        1028
-#define MENUPAD_HILITE 1029
 MenuPages currentMenuPage = MenuPages_FrontPage;
 bool returnToPause=false,fovSliderActive=false,gammaSliderActive=false,masterVolumeSliderActive=false,musicVolumeSliderActive=false,messageVolumeSliderActive=false,sfxVolumeSliderActive=false,enteringPlayerName=false;
-u8 currentPlayerNameLength = 0;
-i8 currentMenuItem = 0, currentMenuTab = 0, menuItemCount = 4, menuTabCount = 1;
-static bool resDropdownOpen = false;
-static int resDropdownCount=0,resSelectedIdx=0;
+u8 currentPlayerNameLength=0; i8 currentMenuItem=0, currentMenuTab=0, menuItemCount=4, menuTabCount=1;
+static bool resDropdownOpen = false; static int resDropdownCount=0,resSelectedIdx=0;
 typedef struct { int w, h, hz; } ResMode;
 static ResMode resModes[8];
 typedef struct { Vector3 position; Quaternion rotation; u8 fov; u16 width,height; float near,far,finished; bool visible; } CamView;
-CamView camViews[64]; // Max is 8 camera views on level 8 + 3 sensaround views = 11.  Populated at level load.
-GLuint camViewTextures[64];
-u8 camViewCount = 0;
+CamView camViews[64]; GLuint camViewTextures[64]; u8 camViewCount = 0; // Max is 8 cam views on level 8 + 3 sensaround views = 11.
 typedef struct { unsigned short x0,y0,x1,y1; float xoff,yoff,xadvance; float xoff2,yoff2; } stbtt_packedchar; // x0,y0,x1,y1 are coordinates of bbox in bitmap
 typedef struct { float x0,y0,s0,t0; float x1,y1,s1,t1; } stbtt_aligned_quad; // 0 is top-left, 1 is bottom-right
-void stbtt_GetPackedQuad(const stbtt_packedchar *chardata, int pw, int ph, int char_index, float *xpos, float *ypos, stbtt_aligned_quad *q, int align_to_integer); OsFileHandle console_log_file=0;
+OsFileHandle console_log_file=0;
 static void DualLogMain(const char *prefix, const char *fmt, va_list args) { // Logs both to log file and console, usage same as printf
     char buf[4096]; va_list copy; __builtin_va_copy(copy,args); StringFormatV(buf,sizeof(buf),fmt,copy); __builtin_va_end(copy);
     #ifdef WINDOWS // Write to console (stdout / stderr)
@@ -320,101 +313,7 @@ __attribute__((pure)) bool CursorIsOverBounds(float startX, float endX, float st
            && Sys_Global.cursorPosition_y >= endY && Sys_Global.cursorPosition_y <= startY); /* 0 == top */
 }
 
-Color textColors[] = {
-    {         1.0f,         1.0f,          1.0f, 1.0f}, // 0 White                       TEXT_WHITE
-    { 0.890196078f, 0.874509804f,          0.0f, 1.0f}, // 1 Yellow                      TEXT_YELLOW
-    { 0.623529412f, 0.611764706f,          0.0f, 1.0f}, // 2 Dark Yellow (Yellow * 0.7f) TEXT_DARK_YELLOW
-    { 0.372549020f, 0.654901961f,  0.168627451f, 1.0f}, // 3 Green                       TEXT_GREEN
-    { 0.917647059f, 0.137254902f,  0.168627451f, 1.0f}, // 4 Red                         TEXT_RED
-    {         1.0f, 0.498039216f,          0.0f, 1.0f}, // 5 Orange                      TEXT_ORANGE
-    { 0.674509804f, 0.058823529f,  0.070588235f, 1.0f}, // 6 StopD Red                   TEXT_STOPD_RED
-    { 0.941176471f, 0.282352941f,  0.298039216f, 1.0f}, // 7 StopD Red Highlight         TEXT_STOPD_RED_HIGHLIGHT
-    { 0.909803922f, 0.203921569f,  0.219607843f, 1.0f}, // 8 StopD Red Pause Title       TEXT_STOPD_RED_PAUSETITLE
-    { 0.470588235f, 0.721568627f,  0.172549020f, 1.0f}, // 9 Green Menu Title            TEXT_GREEN_MENU
-    { 0.137254902f, 0.356862745f,  0.109803922f, 1.0f}, // 10 Green Menu Title Shadow    TEXT_GREEN_MENU_SHADOW
-    { 0.239215686f, 0.466666667f,  0.129411765f, 1.0f}, // 11 Green Menu Title Glow      TEXT_GREEN_MENU_GLOW
-    { 0.392156863f, 0.031372549f,  0.039215686f, 1.0f}  // 12 Red Menu Text Dark         TEXT_RED_MENU
-};
-
-float textVertexData[8192]; // Reusable buffer for text vertices.  Most text only needs ~3000
-extern stbtt_packedchar fontPackedChar[MAX_GLYPHS]; extern stbtt_packedchar fontPackedCharStopD[MAX_GLYPHS];
-extern float fixedNumberAdvanceWidth; extern float fixedNumberAdvanceWidthStopD;
-__attribute__((pure)) i32 CodepointToPackedIndex(i32 codepoint, int fontID);
-void RenderFormattedText(i16 x, i16 y, u32 color, u8 fontID, float scaleInput, const char * restrict format, ...) {
-    float scale = scaleInput;// * UIY(Sys_Settings.ScreenHeight);
-    va_list args;
-    __builtin_va_start(args, format); StringFormatV(uiTextBuffer,TEXT_BUFFER_SIZE,format,args); __builtin_va_end(args);
-    glUseProgram(Sys_Render.textShaderProgram);
-    glUniformMatrix4fv(0, 1, GL_FALSE, uiOrthoProjection);
-    glUniform4f(3,textColors[color].r,textColors[color].g,textColors[color].b,textColors[color].a);
-    if (fontID == FONT_STOPD) glBindTextureUnit(6,fontAtlasTexStopD);
-    else glBindTextureUnit(6,fontAtlasTex);
-    
-    glUniform2f(4,1.0f / (float)FONT_ATLAS_SIZE, 1.0f / (float)FONT_ATLAS_SIZE);
-    glUniform1ui(2,fontID);
-    glUniform1i(1,6); // textTexture sampler2D
-    glBindVertexArray(Sys_Render.textVAO);
-    size_t vertexCount = 0;
-    const char* p = uiTextBuffer;
-    float xpos = RelX(x), ypos = RelY(y) + (RelY(16) * scale);
-    float lineSpacing = RelY(22) * scale;
-    stbtt_aligned_quad q;
-    int characterCount = 0;
-    float paddingUV = (10.0f / (float)FONT_ATLAS_SIZE); // This is for the black outline around all text for readability. (2.0f makes an interesting bold effect)
-    float borderWidthPixels = 2.0f;
-    while (*p) { // Decode UTF8
-        const unsigned char *s = (const unsigned char *)p;
-        u32 codepoint = 0;
-        if (*s < 0x80) { // 1-byte ASCII
-            codepoint = *s++;
-        } else if ((*s & 0xE0) == 0xC0) { // 2-byte
-            codepoint  = (*s & 0x1F) << 6;
-            codepoint |= (s[1] & 0x3F);
-            s += 2;
-        } else if ((*s & 0xF0) == 0xE0) { // 3-byte
-            codepoint  = (*s & 0x0F) << 12;
-            codepoint |= (s[1] & 0x3F) << 6;
-            codepoint |= (s[2] & 0x3F);
-            s += 3;
-        } else if ((*s & 0xF8) == 0xF0) { // 4-byte
-            codepoint  = (*s & 0x07) << 18;
-            codepoint |= (s[1] & 0x3F) << 12;
-            codepoint |= (s[2] & 0x3F) << 6;
-            codepoint |= (s[3] & 0x3F);
-            s += 4;
-        } else s++; // invalid byte
-        p = (const char *)s;
-        characterCount++;
-        if (codepoint == '\n' || characterCount > 120) {xpos=x; ypos+=lineSpacing; characterCount=0; continue;}
-        
-        int idx = CodepointToPackedIndex(codepoint, fontID);
-        if (fontID == FONT_STOPD) stbtt_GetPackedQuad(fontPackedCharStopD,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,idx,&xpos,&ypos,&q,1);
-        else stbtt_GetPackedQuad(fontPackedChar,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,idx,&xpos,&ypos,&q,1);
-        float vx0 = (q.x0 * scale) - (borderWidthPixels);
-        float vy0 = (q.y0 * scale) - (borderWidthPixels);
-        float vx1 = (q.x1 * scale) + (borderWidthPixels);
-        float vy1 = (q.y1 * scale) + (borderWidthPixels);
-        float s0 = (q.s0) - (paddingUV);
-        float t0 = (q.t0) - (paddingUV);
-        float s1 = (q.s1) + (paddingUV);
-        float t1 = (q.t1) + (paddingUV);
-        float z = 0.0f;
-        float tverts[30] = {vx0,vy0,z,s0,t0,vx1,vy1,z,s1,t1,vx1,vy0,z,s1,t0,vx0,vy0,z,s0,t0,vx0,vy1,z,s0,t1,vx1,vy1,z,s1,t1};
-        __builtin_memcpy(textVertexData + vertexCount * 30,tverts,sizeof(tverts));
-        vertexCount++;
-        if (codepoint >= '0' && codepoint <= '9') {
-            if (fontID == FONT_STOPD) xpos = q.x0 + fixedNumberAdvanceWidthStopD;
-            else xpos = q.x0 + fixedNumberAdvanceWidth;
-        }
-    }
-    
-    if (vertexCount > 0) {
-        glNamedBufferData(Sys_Render.textVBO,vertexCount * 30 * sizeof(float),textVertexData,GL_DYNAMIC_DRAW);
-        glDrawArrays(GL_TRIANGLES,0,vertexCount * 6);
-        drawCallsRenderedThisFrame++; textDrawCallsRenderedThisFrame++; verticesRenderedThisFrame += vertexCount * 6;
-    }
-}
-
+void RenderFormattedText(i16 x, i16 y, u32 color, u8 fontID, float scaleInput, const char * restrict format, ...);
 void RenderLoadingProgress(i32 offset, const char * restrict text) { // Only adds 0.01secs to game startup time.
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     RenderFormattedText(Sys_Settings.ScreenWidth / 2 - offset, Sys_Settings.ScreenHeight / 2 - 5, TEXT_WHITE, FONT_NORMAL,1.0f,text);
@@ -506,7 +405,7 @@ void SaveConfig(void) {
     }
 
     OS_Close(f);
-    DualLog("Saved settings to ./Data/Config.ini!\n");
+    DualLog("Saved settings to ./Data/Config.ini! framenum %u\n",Sys_Global.globalFrameNum);
 }
 
 void TextEntry(i32 k) {
@@ -579,8 +478,8 @@ KeyState* GetCodeMapping(int settingIndex) {
 
 bool GetKeyRiseEdgeOrHeld(int settingIndex, bool risingEdge) {
     i32 i = Sys_Settings.InputCodeSettings[settingIndex]; // Get table index into all recognized inputs
-         if (i == 129) return Sys_Input.scrollDelta > 0.0; // Mousewheel +
-    else if (i == 130) return Sys_Input.scrollDelta < 0.0; // Mousewheel -
+         if (i == 128) return Sys_Input.scrollDelta > 0.0; // Mousewheel +
+    else if (i == 129) return Sys_Input.scrollDelta < 0.0; // Mousewheel -
     
     KeyState* keyOfConcern = GetCodeMapping(settingIndex);
     bool retval = risingEdge ? keyOfConcern->pressed : keyOfConcern->down;
@@ -590,14 +489,14 @@ bool GetKeyRiseEdgeOrHeld(int settingIndex, bool risingEdge) {
 ENGINE_TO_MOD bool GetKey(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,false); }  // True while held down.
 ENGINE_TO_MOD bool GetKeyPressed(int settingIndex) { return (settingIndex < 0) ? Sys_Input.keyStates[GLFW_KEY_GRAVE_ACCENT].pressed : GetKeyRiseEdgeOrHeld(settingIndex,true); } // True 1st frame down.
 ENGINE_TO_MOD void IgnoreNextMouseDelta(void) { Sys_Input.ignore_next_mouse_delta = true; }
-OsFileHandle levelFileHandle; void CullInit(void);
-void LoadLevel(u8 curlevel) {
+OsFileHandle levelFileHandle; void CullInit(void); extern float modelBounds[MODEL_IDX_MAX];
+ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
     double start_time = get_time();
     DebugRAM("start of LoadLevel");
     Sys_Global.levelCurrentlyLoading = true; Sys_Global.gamePaused = false; Sys_Global.menuActive = false;
-    queuedLevelToLoad = 255u; // Reset any loading state that got us here.
     RenderLoadingProgress(100,"Loading level...");
     __builtin_memset(lights,0,LIGHT_COUNT * sizeof(Light)); __builtin_memset(lanims,0,LIGHT_COUNT * sizeof(LightAnimation));
+    __builtin_memset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
     __builtin_memset(modelMatrices,0,INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
     __builtin_memset(camViews,0,64 * sizeof(CamView)); camViewCount = 0;
     __builtin_memset(Sys_Global.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
@@ -608,11 +507,13 @@ void LoadLevel(u8 curlevel) {
     OS_Close(levelFileHandle);
     for (int i=0;i<Sys_Global.loadedLights;++i) {/* lights[i].maxIntensity *= 2.0f; */lightsNewPosition[i]=lights[i].pos; }
     DualLog("Loaded %d entities, %u static lights for Level %d... took %f secs\n",Sys_Global.loadedInstances,Sys_Global.loadedLights,curlevel,get_time() - start_time);
-    DebugRAM("end of LoadLevel instances");
     RenderLoadingProgress(110,"Initialize entities...");
-    for (int i=PLAYER1;i<Sys_Global.loadedInstances;++i) {        
-        i32 cellIdx = PosGetCellCoords(Sys_Global.instances[i].position.x,Sys_Global.instances[i].position.z);
-        Sys_Global.instances[i].cellIndex = cellIdx;
+    for (int i=PLAYER1;i<Sys_Global.loadedInstances;++i) {
+        Entity* e = &Sys_Global.instances[i];
+        i32 cellIdx = PosGetCellCoords(e->position.x,e->position.z);
+        e->cellIndex = cellIdx; e->cellX=PosGetCellCoordX(e->position.x); e->cellZ=PosGetCellCoordZ(e->position.z);
+        e->radius = modelBounds[e->modelIndex]*vmax(vmax(e->scale.x,e->scale.y),e->scale.z);
+        e->shadRadius = e->radius * 1.41;
     }
     
     ModInitAfterLoad(); ResetLevelAudio(); ResetLevelMusic();
@@ -631,6 +532,7 @@ void LoadLevel(u8 curlevel) {
     for (u16 i = 0; i < Sys_Global.loadedLights; i++) { lightsNewPosition[i] = lights[i].pos; }
     __builtin_memset(voxen_Shadow_System.shadowmapIndirectionList,MAX_SHADOWMAPS + 1,Sys_Global.loadedLights * sizeof(u32)); // Set to invalid values for all
     Sys_Global.levelCurrentlyLoading = false;
+    DebugRAM("end of LoadLevel");
 }
 
 void InputClearRisingAndFallingEdges(void) { // Clear keypress rising and falling edge triggers
@@ -1020,22 +922,6 @@ void SetSkyRotateSpeed(void) {
     glUniform1f(30, skyRotateSpeed);
 }
 
-void SetVSync(void) { glfwSwapInterval((i32)Sys_Settings.Vsync); }
-void SetGI(void) { }// TODO: Set needed Voxel GI uniforms from Sys_Settings.GI
-void SetSpeakerMode(void) {
-    ma_device_config config = ma_device_config_init(ma_device_type_playback);
-    switch (Sys_Settings.SpeakerMode) {
-        case 0: config.playback.channels = 1; break;  // Mono
-        case 1: config.playback.channels = 2; break;  // Stereo
-        case 2: config.playback.channels = 4; break;  // Quad (4.0)
-        case 3: config.playback.channels = 4; break;  // Surround (often 4.0)
-        case 4: config.playback.channels = 6; break;  // 5.1
-        case 5: config.playback.channels = 8; break;  // 7.1
-        case 6: config.playback.channels = 2; break;  // Prologic → usually handled as stereo + decoder
-        default: config.playback.channels = 0; break; // Let device decide
-    }
-}
-
 #ifdef WINDOWS
     static const char* PLATFORM_DLERROR(void) {
         DWORD err = GetLastError(); if (err == 0) return NULL;
@@ -1045,9 +931,12 @@ void SetSpeakerMode(void) {
 #else
     #define PLATFORM_DLERROR() dlerror()
 #endif
+void SetVSync(void) { glfwSwapInterval((i32)Sys_Settings.Vsync); }
+void SetGI(void) { }// TODO: Set needed Voxel GI uniforms from Sys_Settings.GI
 void LoadTextForLanguage(u8),LoadLogTextForLanguage(u8); bool GetKey(int settingIndex),GetKeyPressed(int settingIndex); void* mod_handle = NULL;
 void SetLanguage(void) { LoadTextForLanguage(Sys_Settings.Language); LoadLogTextForLanguage(Sys_Settings.Language); }
-void ApplySettings(void) { ChangeFullScreenWindowed(); SetSkyRotateSpeed(); SetVSync(); SetGI(); SetSpeakerMode(); SetLanguage(); }
+void ApplySettings(void) { ChangeFullScreenWindowed(); SetSkyRotateSpeed(); SetVSync(); SetGI(); SetLanguage(); }
+void StringConcatenate(char* a, const char* b, size_t bufferSize);
 void LoadModFunctions(void) {
     DualLog("Loading mod code...");
     char mod_path[256];
@@ -1114,7 +1003,7 @@ u8 UI_MenuButton(i16 bX, i16 bY, u8 menuItem, i16 bW, i16 bH,  i16 tX, i16 tY, c
     if (!retvalue) retvalue = (MenuEnter() && currentMenuItem == menuItem);
     over = over || currentMenuItem == menuItem;
     RenderFormattedText(tX,tY, over ? TEXT_STOPD_RED : TEXT_RED_MENU,FONT_STOPD,1.5f,text);
-    RenderUIImage(pX,pY, 40,40, over ? MENUPAD_HILITE : MENUPAD); // Menu pad
+    RenderUIImage(pX,pY, 40,40, over ? 1029 : 1028); // Menu pad
     return retvalue;
 }
 
@@ -1435,10 +1324,9 @@ static inline __attribute__((always_inline)) void CreditsStats(void) {
     DecomposeTime(Sys_Global.absoluteTime,&h,&m,&s);
     off += StringFormat(creditStats + off,sizeof(creditStats),"Total Time (with reload from deaths): %uh %um %.3fs\n",h,m,s);
     float stupid = ((float)(Sys_Global.difficultyCombat * Sys_Global.difficultyCombat)) + ((float)(Sys_Global.difficultyPuzzle * Sys_Global.difficultyPuzzle)) + ((float)(Sys_Global.difficultyMission * Sys_Global.difficultyMission)) + ((float)(Sys_Global.difficultyCyber * Sys_Global.difficultyCyber));
-    u32 finalSubscore = GetScore(stupid,false);
+    u32 finalSubscore = GetScore(stupid,false), finalScore = (u32)GetScore(stupid,true);
     off += StringFormat(creditStats + off,sizeof(creditStats),"Kills: %u\nKills in Cyberspace: %u\nScoreSubtotal: %u\nDeaths: %u\nRessurections: %u\n",Sys_Global.kills,Sys_Global.cyberkills,(u32)finalSubscore,Sys_Global.deaths,Sys_Global.ressurections);
     off += StringFormat(creditStats + off,sizeof(creditStats),"Combat: %u | Puzzle: %u | Mission: %u | Cyber: %u\n",Sys_Global.difficultyCombat,Sys_Global.difficultyPuzzle,Sys_Global.difficultyMission,Sys_Global.difficultyCyber);
-    u32 finalScore = (u32)GetScore(stupid,true);
     off += StringFormat(creditStats + off,sizeof(creditStats),"Difficulty Index: %.2f\nFinal Score: %u\n\n",stupid,finalScore);
     off += StringFormat(creditStats + off,sizeof(creditStats),"Shots Fired: %u\nGrenades Thrown: %u\n",Sys_Global.shotsFired,Sys_Global.grenadesThrown);
     off += StringFormat(creditStats + off,sizeof(creditStats),"Damage Dealt: %f\nDamage Received: %f\nSaves Scummed: %u\n\nClick to continue...\n",Sys_Global.damageDealt,Sys_Global.damageReceived,Sys_Global.savesScummed);
@@ -1505,9 +1393,9 @@ static inline __attribute__((always_inline)) double RenderUI(void) {
         u8 timingColor = TEXT_WHITE;
         if (vabs(Sys_Global.thisFrameTime - Sys_Global.cpuFrameTime) < 0.451) timingColor = TEXT_GREEN;
         if (Sys_Global.thisFrameTime > 6.944444) timingColor = TEXT_RED;
-        drawCallsRenderedThisFrame += 2; textDrawCallsRenderedThisFrame += 2; // Add two more for this text render ;)
+        drawCallsRenderedThisFrame += 2; // Add two more for this text render ;)
         RenderFormattedText(16, debugTextStartY - lineSpacing, timingColor, FONT_NORMAL,1.0f, "ms: %.2f, CPU %.2f", Sys_Global.thisFrameTime,Sys_Global.cpuFrameTime);
-        RenderFormattedText(16 + 230.0f, debugTextStartY - lineSpacing, TEXT_WHITE, FONT_NORMAL,1.0f, "(FPS:%d, Worst:%d),Drwclls:%d [G:%d UI:%d Tx:%d Sh:%d] Vrt:%d E:%u|M:%u|P:%u|T:%.5f",Sys_Global.framesPerLastSecond,Sys_Global.worstFPS,drawCallsRenderedThisFrame,drawCallsNormal,uiImageDrawCallsRenderedThisFrame,textDrawCallsRenderedThisFrame,shadowDrawCallsRenderedThisFrame,verticesRenderedThisFrame,Sys_Cheats.editMode,Sys_Global.menuActive,Sys_Global.gamePaused,Sys_Global.pauseRelativeTime);
+        RenderFormattedText(16 + 230.0f, debugTextStartY - lineSpacing, TEXT_WHITE, FONT_NORMAL,1.0f, "(FPS:%d, Worst:%d),Drwclls:%d [G:%d UI:%d Sh:%d] Vrt:%d E:%u|M:%u|P:%u",Sys_Global.framesPerLastSecond,Sys_Global.worstFPS,drawCallsRenderedThisFrame,drawCallsNormal,uiImageDrawCallsRenderedThisFrame,shadowDrawCallsRenderedThisFrame,verticesRenderedThisFrame,Sys_Cheats.editMode,Sys_Global.menuActive,Sys_Global.gamePaused);
     }
     
     return time_now;
@@ -1530,6 +1418,8 @@ static inline __attribute__((always_inline,hot)) u16 GetAndBindModel(u16 i, u16 
     return modelType;
 }
 
+#define SC_MAX (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS)
+static const GLuint groupX_shadClear = ((SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) + 31) / 32;
 static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {    
     double shadowStartTime = get_time();
     u16 candidates[MAX_SHADOWMAPS];
@@ -1569,23 +1459,21 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
     if (numShadowsCouldRender > 0) { // Added since there is now work between here and the for loop so this is beneficial to check.
         glUseProgram(Sys_Render.shadowmapsClearShaderProgram); // Clear shadowmaps.  One might think that this would be less performant than standard shadowmap FBO with gl clears and textures but in fact this is faster on all but the oldest hardware (e.g. 10yrs old is fine, 13yrs suffers a small hit).
         for (u32 c=0;c<numShadowsCouldRender;++c) {
-            glUniform1ui(0,c);
-            GLuint groupX_shadClear = ((SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) + 31) / 32;
-            glDispatchCompute(groupX_shadClear,6,1);
+            glUniform1ui(0,c); glDispatchCompute(groupX_shadClear,6,1);
         }
 
         shadowDrawCallsRenderedThisFrame = 0;
         glViewport(0,0,SHADOW_MAP_SIZE,SHADOW_MAP_SIZE);
         glUseProgram(Sys_Render.shadowmapsShaderProgram);
         u32 shadowmapOffsetHead = 0U;
-        u16 shadowCasterIndices[SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS];
+        u16 shadowCasterIndices[SC_MAX];
         u32 numShadowCasters = 0;
         for (int i=START_INDEX_LEVEL_INSTANCES;i<INSTANCE_COUNT;++i) {
             if (EntNotVisible(i,(Sys_Global.instances[i].entflags & ENTFLAG_NO_SHADOWS))) continue;
 
             shadowCasterIndices[numShadowCasters] = i;
             numShadowCasters++;
-            if (numShadowCasters >= (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS)) break; // Ran out of shadowcasters max for frame.
+            if (numShadowCasters >= (SC_MAX)) break; // Ran out of shadowcasters max for frame.
         }
         
         u16 shadowMapIdx=0,currentModelType=0,currentTexIndex=0; bool currentIsTransparent=0;
@@ -1603,10 +1491,9 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
             for (u16 shadowCasterInstanceIdx = 0; shadowCasterInstanceIdx < numShadowCasters; shadowCasterInstanceIdx++) {
                 u16 j = shadowCasterIndices[shadowCasterInstanceIdx];
                 Entity* e = &Sys_Global.instances[j];
-                shadows_nearMeshRadii[nearbyMeshCount] = modelBounds[e->modelIndex] * 0.99f * vmax(vmax(e->scale.x,e->scale.y),e->scale.z);
                 Vector3 d = Vector3_A_minus_B(e->position,lpos);
                 float distToLightSqrd = dot_vector3(d,d);
-                float radSum = (effectiveRadius + shadows_nearMeshRadii[nearbyMeshCount]);
+                float radSum = (effectiveRadius + e->radius);
                 if (distToLightSqrd >= radSum * radSum) continue;
                 if (skipNPCs && ConstIndexIsNPC(e->index)) continue;
                 
@@ -1628,7 +1515,7 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
                 for (u16 j = 0; j < nearbyMeshCount; ++j) {
                     int i = shadows_nearMeshes[j].index;
                     Entity* e = &Sys_Global.instances[i];
-                    if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face],e->position,shadows_nearMeshRadii[j] * 1.41f)) continue;
+                    if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face],e->position,e->shadRadius)) continue;
 
                     glUniform1ui(0,i);
                     u16 modelType = (instanceIsLODArray[i] || useDetail < 1u) && e->lodIndex < loadedModelsMaxIndex ? e->lodIndex : e->modelIndex;
@@ -1655,8 +1542,7 @@ static inline __attribute__((always_inline)) bool DetermineIfInstanceVisible(u16
     if (EntNotVisible(i,otherCondition)) return false; // must be transparent && transparents or neither
     
     Entity* e = &Sys_Global.instances[i];
-    u16 cellX = PosGetCellCoordX(e->position.x), cellZ = PosGetCellCoordZ(e->position.z);
-    u16 instCellIdx = (cellZ * WORLDX) + cellX; u16 entIdx = e->index;
+    u16 instCellIdx = e->cellIndex; u16 entIdx = e->index;
     Vector3 delta = Vector3_A_minus_B(e->position,playerPos);
     *distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
     float radius = modelBounds[e->modelIndex] * 2.0f * vmax(vmax(e->scale.x,e->scale.y),e->scale.z);
@@ -1664,7 +1550,7 @@ static inline __attribute__((always_inline)) bool DetermineIfInstanceVisible(u16
     
     if (ConstIndexIsPortalBlockingDoor(entIdx)) { // Extra checks only needed for opaque portal blocking doors.
         bool inPVS = (gridCellStates[instCellIdx] & CELL_VISIBLE);
-        if (!inPVS) inPVS = NeighborhoodInPVS(cellX,cellZ,2);
+        if (!inPVS) inPVS = NeighborhoodInPVS(e->cellX,e->cellZ,2);
         if (!inPVS) return false;
     } else {
         if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (entIdx != 754 || !skyVisible)) return false;
@@ -1738,6 +1624,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
     glBindVertexArray(Sys_Render.vao_chunk); // Common vao for RenderDynamicShadowmaps and Rasterized Geometry
     glEnable(GL_DEPTH_TEST);
     if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps();
+    UpdateLights(); // This is where the voxels get updated!
     for (int i=0;i<LIGHT_COUNT;++i) flag_setu32(&lights[i].lflags,LDIRTY,false);
     __builtin_memset(Sys_Global.dirtyInstances,0,Sys_Global.loadedInstances * sizeof(bool));
     glBindFramebuffer(GL_FRAMEBUFFER,Sys_Render.gBufferFBO);
@@ -1827,9 +1714,8 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
         glBindTexture(GL_TEXTURE_2D,0);
         return; // After copying render result, skip SSR and composite for camviews <<<<<<<<<<<<< CAM VIEW BARRIER
     }
-   
-    // Draw Debug Lines
-    if (unlikely(Sys_Global.debugLineVertCount > 1)) DrawDebugLines(viewProj);
+
+    if (unlikely(Sys_Global.debugLineVertCount > 1)) DrawDebugLines(viewProj); // Draw Debug Lines
     glBindFramebuffer(GL_FRAMEBUFFER,0);
     if (likely(Sys_Settings.Reflections > 0u)) { // Screen Space Reflections
         glUseProgram(Sys_Render.ssrShaderProgram);
@@ -1904,6 +1790,7 @@ i32 main(void) {
     DualLog("Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed\n");
     if (!glfwInit()) { DualLogError("GLFW initialization failed\n"); OS_Exit(1); }
     
+    Sys_Global.globalFrameNum=0,Sys_Global.menuActive=true,Sys_Global.screenshotTimeout=1.0,Sys_Global.creditsPageIndex=1,Sys_Global.difficultyCombat=Sys_Global.difficultyCyber=Sys_Global.difficultyPuzzle=Sys_Global.difficultyMission=2,Sys_Global.deaths=0,Sys_Global.worstFPS=0,Sys_Global.cursorPosition_x=680,Sys_Global.cursorPosition_y=384;
     LoadConfig(); // Get settings before setting window size.
     window = glfwCreateWindow(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight,"Voxen",NULL,NULL); if (!window) { DualLogError("glfwCreateWindow failed\n"); OS_Exit(1); }
     
@@ -2017,7 +1904,7 @@ i32 main(void) {
     glUseProgram(Sys_Render.shadowmapsShaderProgram); glUniform1ui(9,SHADOW_MAP_SIZE);
     glUseProgram(Sys_Render.shadowmapsClearShaderProgram); glUniform1ui(1,SHADOW_MAP_SIZE);
     glUseProgram(Sys_Render.chunkShaderProgram); glUniform1ui(21,SHADOW_MAP_SIZE); glUniform1f(22,(float)SHADOW_MAP_SIZE); glUniform1ui(23,LIGHT_COUNT); glUniform1ui(24,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);
-    glUseProgram(Sys_Render.voxelUpdateShaderProgram); glUniform1ui(6,(u32)MAX_LIGHTS_PER_VOXEL);
+    glUseProgram(Sys_Render.voxelUpdateShaderProgram); glUniform1ui(6,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(8,SHADOW_MAP_SIZE); glUniform1f(9,(float)SHADOW_MAP_SIZE); glUniform1ui(10,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE); glUniform1ui(11,LIGHT_COUNT);
     RenderLoadingProgress(110,"Loading textures...");
     LoadTextures();
     RenderLoadingProgress(110,"Loading models...");
@@ -2033,7 +1920,7 @@ i32 main(void) {
         if (glfwWindowShouldClose(window)) OS_Exit(0);
         if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad); queuedLevelToLoad = 255u; continue; }
 
-        drawCallsRenderedThisFrame = textDrawCallsRenderedThisFrame = uiImageDrawCallsRenderedThisFrame = shadowDrawCallsRenderedThisFrame = verticesRenderedThisFrame = 0; // Reset per frame
+        drawCallsRenderedThisFrame = uiImageDrawCallsRenderedThisFrame = shadowDrawCallsRenderedThisFrame = verticesRenderedThisFrame = 0; // Reset per frame
         Sys_Global.current_time = get_time(); // Update Time
         Sys_Global.deltaTime = Sys_Global.current_time - Sys_Global.last_topframe_time;
         Sys_Global.absoluteTime += Sys_Global.deltaTime;
@@ -2068,7 +1955,6 @@ i32 main(void) {
                     Sys_Global.instances[PLAYER1].position = camViews[cm].position;
                     Sys_Global.instances[PLAYER1].rotation = camViews[cm].rotation;
                     CullCore();
-                    UpdateLights();
                     Render(true,cm); // Ok culling and light clusters (in voxels) have been updated, now render the view.
                 }
             }
@@ -2079,7 +1965,6 @@ i32 main(void) {
         
         if (likely(!Sys_Global.gamePaused || Sys_Global.menuActive)) {
             CullCore();
-            UpdateLights();
             bool uploadInstances = false;
             for (u32 i = START_INDEX_LEVEL_INSTANCES; i < Sys_Global.loadedInstances; i++) {
                 if (Sys_Global.dirtyInstances[i]) {

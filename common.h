@@ -870,11 +870,11 @@ typedef struct { float damage,penetration,offense,armorvalue,defense,impactVeloc
 
 typedef /*FAT*/ struct  {
     u64 entflags;
-    u64 ioflags;
     u16 index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
     Vector3 position;
-    Quaternion rotation;
+    float radius,shadRadius;
     Vector3 scale,forward,right;
+    Quaternion rotation;
     
     // Rendering
     u16 modelIndex,texIndex,glowIndex,specIndex,normIndex,lodIndex;
@@ -900,6 +900,7 @@ typedef /*FAT*/ struct  {
     float volume; // Audio
     
     // Logic and I/O
+    u64 ioflags;
     float health,lastHealth,cyberHealth;
     u8 securityThreshold,lerpUp;
     char targetname[TARGET_STRING_LENGTH];
@@ -948,6 +949,7 @@ typedef /*FAT*/ struct  {
     u16 texAnimLight;
     u16 texAnimLight2;
     i32 cellIndex;
+    i16 cellX,cellZ;
     u8 portalIndex; // If this is a door, index into portal array for toggling state.
     DoorState doorState;
     double currentFrameFinished;

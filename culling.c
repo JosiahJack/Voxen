@@ -1,6 +1,8 @@
 // dynamic_culling.c - Culling functions for x,z grid based culling system ala System Shock 1 / Underworld style
 #include "os.h"
 #include "voxen.h"
+typedef struct { u16 x,z; } PortalCell;
+typedef struct { PortalCell cellA,cellB,cellA2,cellB2; bool portalNS,open,dirty,isBulkhead;} Portal;
 u8 *stbi_load_from_memory(const u8* buffer, i32 len, i32* x, i32* y);
 void stbi__arena_init_thread(StbiArena* arena);
 extern StbiArena stbi_arena_main;
@@ -110,7 +112,6 @@ void DetermineClosedEdges(void) {
     
     OS_DeallocateRAM(stbi_arena_main.base, STBI_ARENA_SIZE); stbi_arena_main.base = NULL;
     DualLog("found %d open cells...",totalOpenCells);
-    DebugRAM("end of dynamic culling DetermineClosedEdges");
 }
 
 ENGINE_TO_MOD void AddDoorPortal(u16 entIdx, u16 parent) {
@@ -470,9 +471,8 @@ void CullInit(void) {
     double start_time = get_time();    
     DualLog("Culling ");
     if (Sys_Global.currentLevel == LEVEL_CYBERSPACE) return;
-    
-    DebugRAM("start of Cull_Init"); // For each cell, get the visibility as though player were there and put into gridCellStates.  Then store the visibility of gridCellStates into the table of all visible cells for that cell
-    DetermineClosedEdges();         // at the appropriate offset for looking up later when actually re-assigning gridCellStates from this precalculated visibility state for the particular cell.
+
+    DetermineClosedEdges(); // For each cell, get the visibility as though player were there and put into gridCellStates.  Then store the visibility of gridCellStates into the table of all visible cells for that cell at the appropriate offset for looking up later when actually re-assigning gridCellStates from this precalculated visibility state for the particular cell.
     for (i32 z=0;z<WORLDZ;z++) {
         for (i32 x=0;x<WORLDX;x++) {
             DetermineVisibleCells(x,z);
@@ -508,7 +508,6 @@ void CullInit(void) {
     gridCellStates[0] |= CELL_VISIBLE; // Errors default here so draw them anyways.
     CullCore(); // Do first Cull pass, forcing as player moved to new cell.
     DualLog(" took %f secs\n",get_time() - start_time);
-    DebugRAM("end of Cull_Init");
 }
 
 extern Light lights[LIGHT_COUNT]; void UploadGridCellVisibility(void);

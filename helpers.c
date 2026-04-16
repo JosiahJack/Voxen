@@ -8,17 +8,9 @@ void stbi_write_bmp(char const *filename, int x, int y, const void *data) {
 
     u32 fileSize = 14 + 108 + (u32)x * y * 4; // BMP file header (14 bytes)
     unsigned char fileHeader[14] = {'B','M',fileSize & 0xFF,(fileSize >> 8) & 0xFF,(fileSize >> 16) & 0xFF,(fileSize >> 24) & 0xFF,0,0,0,0,14 + 108,0,0,0};
-    unsigned char infoHeader[108] = {0}; // Bitmap V4 header (108 bytes) - 32-bit BGRA
-    *(u32*)(infoHeader +  0) = 108;           // biSize
-    *(u32*)(infoHeader +  4) = (u32)x;   // biWidth
-    *(u32*)(infoHeader +  8) = (u32)-y;  // biHeight (negative = top-down)
-    *(u16*)(infoHeader + 12) = 1;             // biPlanes
-    *(u16*)(infoHeader + 14) = 32;            // biBitCount
-    *(u32*)(infoHeader + 16) = 3;             // BI_BITFIELDS
-    *(u32*)(infoHeader + 40) = 0x000000FF;    // Red
-    *(u32*)(infoHeader + 44) = 0x0000FF00;    // Green
-    *(u32*)(infoHeader + 48) = 0x00FF0000;    // Blue
-    *(u32*)(infoHeader + 52) = 0x00000000;    // Alpha
+    unsigned char infoHeader[108]={0}; *(u32*)(infoHeader+0)=108;/*size*/
+    *(u32*)(infoHeader+4)=(u32)x;/*w*/ *(u32*)(infoHeader+8)=(u32)-y;/*h*/ *(u16*)(infoHeader+12)=1;/*planes*/ *(u16*)(infoHeader+14)=32;/*bit count*/ *(u32*)(infoHeader+16)=3;/*bit fields*/
+    *(u32*)(infoHeader+40)=0x000000FF;/*Red*/ *(u32*)(infoHeader + 44) = 0x0000FF00;/*Green*/ *(u32*)(infoHeader + 48) = 0x00FF0000;/*Blue*/ *(u32*)(infoHeader + 52) = 0x00000000;/*Alpha*/
     OS_Write(f,fileHeader,14,filename); OS_Write(f,infoHeader,108,filename);
     const unsigned char *pixels = (const unsigned char *)data;
     for (int j=y-1;j>=0;--j) OS_Write(f,(void*)(pixels + j*x*4),(size_t)x*4,filename);
@@ -53,11 +45,9 @@ void DebugRAM(const char *context) {
     long fd = OS_OpenReadonly("/proc/self/smaps_rollup");
     if (fd == OS_INVALID_HANDLE) { DualLogError("Failed to open /proc/self/smaps_rollup\n"); return; }
 
-    char buf[4096];
-    long bytes_read = OS_Read(fd,buf,sizeof(buf)-1);
+    char buf[4096]; long bytes_read = OS_Read(fd,buf,sizeof(buf)-1);
     if (bytes_read > 0) { buf[bytes_read] = '\0'; } else buf[0] = '\0';
-    OS_Close(fd);
-    char* p = buf;
+    OS_Close(fd); char* p = buf;
     while (*p) {
         if (p[0]=='P'&&p[1]=='r'&&p[2]=='i'&&p[3]=='v'&&p[4]=='a'&&p[5]=='t'&&p[6]=='e'&&p[7]=='_') {
             p += 8;
@@ -125,10 +115,8 @@ i32 random_range_i32(i32 a, i32 b) {
 
 float random_range(float a, float b) { return a + (b - a) * ((float)(xs32() >> 8) * (1.0f / (1U << 24))); }
 double random_rangedub(double a, double b) { return a + (b - a) * ((double)(xs32() >> 8) * (1.0 / (1U << 24))); }
-
 float lerp(float min, float max, float val) { return min + (max - min) * vclamp(val,0.0f,1.0f); }
 float inverse_lerp(float min, float max, float val) { return (min == max) ? 0.0f : vclamp((val - min) / (max - min),0.0f,1.0f); }
-
 float smooth_damp(float current, float target, float *current_velocity, float smooth_time) { 
     if (smooth_time < 0.0001f) smooth_time = 0.0001f;
     float omega = 2.0f / smooth_time;
@@ -203,22 +191,6 @@ bool StringsEqual(const char* a, const char* b) { // !strcmp replacement (hated 
     if (size != size2) return false;
     
     for (size_t i=0;i<size;++i) {
-        if (a[i] != b[i]) return false;
-        if (a[i] == '\0') break;
-    }
-    
-    return true;
-}
-// int strcmp(const char *s1, const char *s2) { return !StringsEqual(s1,s2); }
-
-bool StringsEqualLimitedBy(const char* a, const char* b, size_t limit) {
-    if (limit == 0) return false;
-    
-    size_t size  = GetStringLength(a);
-    size_t size2 = GetStringLength(b);
-    if (size != size2) return false;
-    
-    for (size_t i=0;i<limit;++i) {
         if (a[i] != b[i]) return false;
         if (a[i] == '\0') break;
     }
