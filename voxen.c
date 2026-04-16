@@ -11,7 +11,7 @@ GLFWwindow* window;
 #define SHADOW_MAP_SIZE 128u
 #define MAX_SHADOWMAPS 256u
 #define MAX_LIGHTS_PER_VOXEL 64
-#define MAX_CHANNELS 256
+#define MAX_CHANNELS 48 // Max concurrent sounds, must keep track of for volume setting
 #define NEAR_PLANE (0.02f)
 GlobalContext Sys_Global = {0}; CheatsSystem Sys_Cheats = {.god=false,.noclip=true,.showLocation=true,.showFPS=true,.editMode=true}; RenderSystem Sys_Render; SystemUI Sys_UI;
 SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on first run for potatoes (e.g. won't crash for out of VRAM, or won't take 5min to init).

@@ -12,7 +12,6 @@ u32 precomputedVisibleCellsFromHere[524288]; // 4096 * 4096 / 32
 u16 playerCellIdx = 0u;
 bool instanceIsLODArray[INSTANCE_COUNT];
 #define MAX_CULL_FILESIZE 500000
-u8 cullingFileBuffer[MAX_CULL_FILESIZE];
 Portal activePortals[MAX_PORTALS];
 static u8 numActivePortals = 0;
 __attribute__((pure)) bool get_cull_bit(const u32* arr, int idx) { return (arr[idx >> 5] >> (idx & 31)) & 1; }
@@ -60,11 +59,13 @@ static unsigned char* LoadCullPNG(const char* name, int level) {
     OS_Seek(fp,0,SEEK_END); size_t size = OS_Tell(fp);
     if (size > MAX_CULL_FILESIZE) { DualLogError("PNG too large: %s\n",path); OS_Exit(1); }
     
+    u8* cullingFileBuffer = OS_Alloc(MAX_CULL_FILESIZE * sizeof(u8));
     OS_Seek(fp,0,SEEK_SET); size_t read_size = OS_Read(fp,cullingFileBuffer,size); OS_Close(fp);
     if (read_size != size) { DualLogError("Failed to read %s\n",path); OS_Exit(1); }
     
     int w, h; unsigned char* pixels = stbi_load_from_memory(cullingFileBuffer,size,&w,&h);
     if (!pixels) { DualLogError("STB failed: %s\n",path); OS_Exit(1); }
+    OS_DeallocateRAM(cullingFileBuffer,MAX_CULL_FILESIZE * sizeof(u8));
     return pixels;
 }
 
