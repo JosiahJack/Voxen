@@ -6,143 +6,38 @@
 // 3. This notice may not be removed or altered from any source distribution.
 #define GLFW_TRUE 1
 #define GLFW_FALSE 0
+#define GLFW_CURSOR_NORMAL 0x00034001
+#define GLFW_CURSOR_DISABLED 0x00034003
+#define GLFW_CONNECTED 0x00040001
+#define GLFW_DISCONNECTED 0x00040002
+void glfwMakeContextCurrent(GLFWwindow* window); void UpdateScreenSize(i32 width, i32 height);
 typedef void* (* GLFWallocatefun)(size_t size, void* user);
 typedef void* (* GLFWreallocatefun)(void* block, size_t size, void* user);
 typedef void (* GLFWdeallocatefun)(void* block, void* user);
 typedef struct GLFWallocator { GLFWallocatefun allocate; GLFWreallocatefun reallocate; GLFWdeallocatefun deallocate; void* user; } GLFWallocator;
-#define _GLFW_INSERT_FIRST      0
-#define _GLFW_INSERT_LAST       1
-#define _GLFW_POLL_PRESENCE     0
-#define _GLFW_POLL_AXES         1
-#define _GLFW_POLL_BUTTONS      2
-#define _GLFW_POLL_ALL          (_GLFW_POLL_AXES | _GLFW_POLL_BUTTONS)
 typedef int GLFWbool;
 typedef void (*GLFWproc)(void);
-typedef struct _GLFWinitconfig  _GLFWinitconfig;
-typedef struct _GLFWwndconfig   _GLFWwndconfig;
-typedef struct _GLFWctxconfig   _GLFWctxconfig;
-typedef struct _GLFWfbconfig    _GLFWfbconfig;
-typedef struct _GLFWcontext     _GLFWcontext;
-typedef struct _GLFWwindow      _GLFWwindow;
-typedef struct _GLFWplatform    _GLFWplatform;
-typedef struct _GLFWlibrary     _GLFWlibrary;
-typedef struct _GLFWmonitor     _GLFWmonitor;
-typedef struct _GLFWcursor      _GLFWcursor;
-typedef struct _GLFWmapelement  _GLFWmapelement;
-typedef struct _GLFWmapping     _GLFWmapping;
-typedef struct _GLFWjoystick    _GLFWjoystick;
-typedef struct _GLFWtls         _GLFWtls;
-typedef struct _GLFWmutex       _GLFWmutex;
+typedef struct _GLFWinitconfig _GLFWinitconfig; typedef struct _GLFWwndconfig _GLFWwndconfig; typedef struct _GLFWctxconfig _GLFWctxconfig;
+typedef struct _GLFWfbconfig _GLFWfbconfig; typedef struct _GLFWcontext _GLFWcontext; typedef struct _GLFWwindow _GLFWwindow;
+typedef struct _GLFWplatform _GLFWplatform; typedef struct _GLFWlibrary _GLFWlibrary; typedef struct _GLFWmonitor _GLFWmonitor;
+typedef struct _GLFWcursor _GLFWcursor; typedef struct _GLFWmapelement _GLFWmapelement; typedef struct _GLFWmapping _GLFWmapping;
+typedef struct _GLFWjoystick _GLFWjoystick; typedef struct _GLFWtls _GLFWtls; typedef struct _GLFWmutex _GLFWmutex;
 #if defined(WINDOWS)
-    #define NOMINMAX
-    #define VC_EXTRALEAN
-    #undef APIENTRY
-    #define UNICODE
-    #if WINVER < 0x0601 // GLFW requires Windows 7 or later
-        #undef WINVER
-        #define WINVER 0x0601
-    #endif
-    #if _WIN32_WINNT < 0x0601
-        #undef _WIN32_WINNT
-        #define _WIN32_WINNT 0x0601
-    #endif
-    #define OEMRESOURCE // GLFW uses OEM cursor resources
-    #ifndef far
-        #define far
-    #endif
-    #ifndef near
-        #define near
-    #endif
-    #include <dwmapi.h>
-    #include <dinput.h>
-    #include <xinput.h>
-    #include <dbt.h>
-    #define OCR_NORMAL 32512
-    #ifndef DPI_ENUMS_DECLARED
-        typedef enum { PROCESS_DPI_UNAWARE = 0, PROCESS_SYSTEM_DPI_AWARE = 1, PROCESS_PER_MONITOR_DPI_AWARE = 2 } PROCESS_DPI_AWARENESS;
-        typedef enum { MDT_EFFECTIVE_DPI = 0, MDT_ANGULAR_DPI = 1, MDT_RAW_DPI = 2, MDT_DEFAULT = MDT_EFFECTIVE_DPI } MONITOR_DPI_TYPE;
-    #endif /*DPI_ENUMS_DECLARED*/
-
-    #ifndef DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
-        #define DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 ((HANDLE) -4)
-    #endif /*DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2*/
-
     #define IsWindows8OrGreater()                              \
         _glfwIsWindowsVersionOrGreaterWin32(HIBYTE(0x0602),    \
                                             LOBYTE(0x0602), 0)
     #define IsWindows8Point1OrGreater()                     \
         _glfwIsWindowsVersionOrGreaterWin32(HIBYTE(0x0603), \
                                             LOBYTE(0x0603), 0)
-    // Windows 10 Anniversary Update
-    #define _glfwIsWindows10Version1607OrGreaterWin32() \
-        _glfwIsWindows10BuildOrGreaterWin32(14393)
 
-    // Windows 10 Creators Update
-    #define _glfwIsWindows10Version1703OrGreaterWin32() \
-        _glfwIsWindows10BuildOrGreaterWin32(15063)
-
-    #ifndef XINPUT_CAPS_WIRELESS
-    #define XINPUT_CAPS_WIRELESS 0x0002
-    #endif
-    #ifndef DIDFT_OPTIONAL
-    #define DIDFT_OPTIONAL 0x80000000 // HACK: Define macros that some dinput.h variants don't
-    #endif
-    #define WGL_NUMBER_PIXEL_FORMATS_ARB 0x2000
-    #define WGL_SUPPORT_OPENGL_ARB 0x2010
-    #define WGL_DRAW_TO_WINDOW_ARB 0x2001
-    #define WGL_PIXEL_TYPE_ARB 0x2013
-    #define WGL_TYPE_RGBA_ARB 0x202b
-    #define WGL_ACCELERATION_ARB 0x2003
-    #define WGL_NO_ACCELERATION_ARB 0x2025
-    #define WGL_RED_BITS_ARB 0x2015
-    #define WGL_RED_SHIFT_ARB 0x2016
-    #define WGL_GREEN_BITS_ARB 0x2017
-    #define WGL_GREEN_SHIFT_ARB 0x2018
-    #define WGL_BLUE_BITS_ARB 0x2019
-    #define WGL_BLUE_SHIFT_ARB 0x201a
-    #define WGL_ALPHA_BITS_ARB 0x201b
-    #define WGL_ALPHA_SHIFT_ARB 0x201c
-    #define WGL_ACCUM_BITS_ARB 0x201d
-    #define WGL_ACCUM_RED_BITS_ARB 0x201e
-    #define WGL_ACCUM_GREEN_BITS_ARB 0x201f
-    #define WGL_ACCUM_BLUE_BITS_ARB 0x2020
-    #define WGL_ACCUM_ALPHA_BITS_ARB 0x2021
-    #define WGL_DEPTH_BITS_ARB 0x2022
-    #define WGL_STENCIL_BITS_ARB 0x2023
-    #define WGL_AUX_BUFFERS_ARB 0x2024
-    #define WGL_STEREO_ARB 0x2012
-    #define WGL_DOUBLE_BUFFER_ARB 0x2011
-    #define WGL_SAMPLES_ARB 0x2042
-    #define WGL_CONTEXT_DEBUG_BIT_ARB 0x00000001
-    #define WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB 0x00000002
-    #define WGL_CONTEXT_PROFILE_MASK_ARB 0x9126
     #define WGL_CONTEXT_CORE_PROFILE_BIT_ARB 0x00000001
     #define WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB 0x00000002
-    #define WGL_CONTEXT_MAJOR_VERSION_ARB 0x2091
-    #define WGL_CONTEXT_MINOR_VERSION_ARB 0x2092
-    #define WGL_CONTEXT_FLAGS_ARB 0x2094
-    #define WGL_LOSE_CONTEXT_ON_RESET_ARB 0x8252
-    #define WGL_CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB 0x8256
-    #define WGL_NO_RESET_NOTIFICATION_ARB 0x8261
-    #define WGL_CONTEXT_RELEASE_BEHAVIOR_ARB 0x2097
-    #define WGL_CONTEXT_RELEASE_BEHAVIOR_NONE_ARB 0
-    #define WGL_CONTEXT_RELEASE_BEHAVIOR_FLUSH_ARB 0x2098
     typedef DWORD (WINAPI * PFN_XInputGetCapabilities)(DWORD,DWORD,XINPUT_CAPABILITIES*);
     typedef DWORD (WINAPI * PFN_XInputGetState)(DWORD,XINPUT_STATE*);
     #define XInputGetCapabilities _glfw.win32.xinput.GetCapabilities
     #define XInputGetState _glfw.win32.xinput.GetState
     typedef HRESULT (WINAPI * PFN_DirectInput8Create)(HINSTANCE,DWORD,REFIID,LPVOID*,LPUNKNOWN);
     #define DirectInput8Create _glfw.win32.dinput8.Create
-    typedef BOOL (WINAPI * PFN_EnableNonClientDpiScaling)(HWND);
-    typedef BOOL (WINAPI * PFN_SetProcessDpiAwarenessContext)(HANDLE);
-    typedef UINT (WINAPI * PFN_GetDpiForWindow)(HWND);
-    typedef BOOL (WINAPI * PFN_AdjustWindowRectExForDpi)(LPRECT,DWORD,BOOL,DWORD,UINT);
-    typedef int (WINAPI * PFN_GetSystemMetricsForDpi)(int,UINT);
-    #define EnableNonClientDpiScaling _glfw.win32.user32.EnableNonClientDpiScaling_
-    #define SetProcessDpiAwarenessContext _glfw.win32.user32.SetProcessDpiAwarenessContext_
-    #define GetDpiForWindow _glfw.win32.user32.GetDpiForWindow_
-    #define AdjustWindowRectExForDpi _glfw.win32.user32.AdjustWindowRectExForDpi_
-    #define GetSystemMetricsForDpi _glfw.win32.user32.GetSystemMetricsForDpi_
     typedef HRESULT (WINAPI * PFN_DwmIsCompositionEnabled)(BOOL*);
     typedef HRESULT (WINAPI * PFN_DwmFlush)(VOID);
     typedef HRESULT(WINAPI * PFN_DwmEnableBlurBehindWindow)(HWND,const DWM_BLURBEHIND*);
@@ -151,16 +46,8 @@ typedef struct _GLFWmutex       _GLFWmutex;
     #define DwmFlush _glfw.win32.dwmapi.Flush
     #define DwmEnableBlurBehindWindow _glfw.win32.dwmapi.EnableBlurBehindWindow
     #define DwmGetColorizationColor _glfw.win32.dwmapi.GetColorizationColor
-    typedef HRESULT (WINAPI * PFN_SetProcessDpiAwareness)(PROCESS_DPI_AWARENESS);
-    typedef HRESULT (WINAPI * PFN_GetDpiForMonitor)(HMONITOR,MONITOR_DPI_TYPE,UINT*,UINT*);
-    #define SetProcessDpiAwareness _glfw.win32.shcore.SetProcessDpiAwareness_
-    #define GetDpiForMonitor _glfw.win32.shcore.GetDpiForMonitor_
-
-    // ntdll.dll function pointer typedefs
     typedef LONG (WINAPI * PFN_RtlVerifyVersionInfo)(OSVERSIONINFOEXW*,ULONG,ULONGLONG);
     #define RtlVerifyVersionInfo _glfw.win32.ntdll.RtlVerifyVersionInfo_
-
-    // WGL extension pointer typedefs
     typedef BOOL (WINAPI * PFNWGLSWAPINTERVALEXTPROC)(int);
     typedef BOOL (WINAPI * PFNWGLGETPIXELFORMATATTRIBIVARBPROC)(HDC,int,int,UINT,const int*,int*);
     typedef const char* (WINAPI * PFNWGLGETEXTENSIONSSTRINGEXTPROC)(void);
@@ -171,8 +58,6 @@ typedef struct _GLFWmutex       _GLFWmutex;
     #define wglGetExtensionsStringEXT _glfw.wgl.GetExtensionsStringEXT
     #define wglGetExtensionsStringARB _glfw.wgl.GetExtensionsStringARB
     #define wglCreateContextAttribsARB _glfw.wgl.CreateContextAttribsARB
-
-    // opengl32.dll function pointer typedefs
     typedef HGLRC (WINAPI * PFN_wglCreateContext)(HDC);
     typedef BOOL (WINAPI * PFN_wglDeleteContext)(HGLRC);
     typedef PROC (WINAPI * PFN_wglGetProcAddress)(LPCSTR);
@@ -211,7 +96,7 @@ typedef struct _GLFWmutex       _GLFWmutex;
         GLFWbool EXT_swap_control,EXT_colorspace,ARB_pixel_format,ARB_create_context,ARB_create_context_profile;
     } _GLFWlibraryWGL;
 
-    typedef struct _GLFWwindowWin32 { HWND handle; GLFWbool cursorTracked,frameAction,iconified,maximized,transparent,scaleToMonitor,keymenu,showDefault; int width,height,lastCursorPosX,lastCursorPosY; WCHAR highSurrogate; } _GLFWwindowWin32;
+    typedef struct _GLFWwindowWin32 { HWND handle; GLFWbool cursorTracked,frameAction,iconified,maximized,scaleToMonitor,keymenu,showDefault; int width,height,lastCursorPosX,lastCursorPosY; WCHAR highSurrogate; } _GLFWwindowWin32;
     typedef struct _GLFWlibraryWin32 {
         HINSTANCE           instance;
         HWND                helperWindowHandle;
@@ -229,9 +114,8 @@ typedef struct _GLFWmutex       _GLFWmutex;
         HCURSOR             blankCursor;
         struct { HINSTANCE instance; PFN_DirectInput8Create Create; IDirectInput8W* api; } dinput8;
         struct { HINSTANCE instance; PFN_XInputGetCapabilities GetCapabilities; PFN_XInputGetState GetState; } xinput;
-        struct { HINSTANCE instance; PFN_EnableNonClientDpiScaling EnableNonClientDpiScaling_; PFN_SetProcessDpiAwarenessContext SetProcessDpiAwarenessContext_; PFN_GetDpiForWindow GetDpiForWindow_; PFN_AdjustWindowRectExForDpi AdjustWindowRectExForDpi_; PFN_GetSystemMetricsForDpi GetSystemMetricsForDpi_; } user32;
+        struct { HINSTANCE instance; } user32;
         struct { HINSTANCE instance; PFN_DwmIsCompositionEnabled IsCompositionEnabled; PFN_DwmFlush Flush; PFN_DwmEnableBlurBehindWindow EnableBlurBehindWindow; PFN_DwmGetColorizationColor GetColorizationColor; } dwmapi;
-        struct { HINSTANCE instance; PFN_SetProcessDpiAwareness SetProcessDpiAwareness_; PFN_GetDpiForMonitor GetDpiForMonitor_; } shcore;
         struct { HINSTANCE instance; PFN_RtlVerifyVersionInfo RtlVerifyVersionInfo_; } ntdll;
     } _GLFWlibraryWin32;
     typedef struct _GLFWmonitorWin32 { HMONITOR handle; WCHAR adapterName[32],displayName[32]; char publicAdapterName[32],publicDisplayName[32]; GLFWbool modesPruned,modeChanged; } _GLFWmonitorWin32;
@@ -242,7 +126,6 @@ typedef struct _GLFWmutex       _GLFWmutex;
     void _glfwPollMonitorsWin32(void);
     void _glfwSetVideoModeWin32(_GLFWmonitor* monitor, const GLFWvidmode* desired);
     void _glfwRestoreVideoModeWin32(_GLFWmonitor* monitor);
-    void _glfwGetHMONITORContentScaleWin32(HMONITOR handle, float* xscale, float* yscale);
     void _glfwGetWindowSizeWin32(_GLFWwindow* window, int* width, int* height);
     void _glfwGetCursorPosWin32(_GLFWwindow* window, double* xpos, double* ypos);
     void _glfwSetCursorPosWin32(_GLFWwindow* window, double xpos, double ypos);
@@ -269,7 +152,14 @@ typedef struct _GLFWmutex       _GLFWmutex;
     typedef struct _XcursorImage { XcursorUInt version; XcursorDim size,width,height,xhot,yhot; XcursorUInt delay; XcursorPixel *pixels; } XcursorImage;
     #include <X11/extensions/Xrandr.h>
     #include <X11/XKBlib.h>
-    #include <X11/extensions/XInput2.h>
+    typedef struct { int deviceid,mask_len; unsigned char* mask; } XIEventMask;
+    #define XISetMask(ptr,event)   (((unsigned char*)(ptr))[(event)>>3] |=  (1 << ((event) & 7)))
+    #define XIMaskIsSet(ptr,event) (((unsigned char*)(ptr))[(event)>>3] &   (1 << ((event) & 7)))
+    #define XIMaskLen(event)        (((event) >> 3) + 1)
+    #define XIAllMasterDevices 1
+    #define XI_RawMotion 17
+    typedef struct { int mask_len; unsigned char *mask; double *values; } XIValuatorState;
+    typedef struct { int type; unsigned long serial; Bool send_event; Display *display; int extension,evtype; Time time; int deviceid,sourceid,detail,flags; XIValuatorState valuators; double *raw_values; } XIRawEvent;
     typedef XID GLXWindow,GLXDrawable;
     typedef struct __GLXFBConfig* GLXFBConfig;
     typedef struct __GLXcontext* GLXContext;
@@ -591,7 +481,7 @@ typedef struct _GLFWmutex       _GLFWmutex;
         GLFWbool EXT_swap_control,ARB_framebuffer_sRGB,EXT_framebuffer_sRGB,ARB_create_context,ARB_create_context_profile;
     } _GLFWlibraryGLX;
 
-    typedef struct _GLFWwindowX11 { Colormap colormap; Window handle,parent; XIC ic; GLFWbool overrideRedirect,iconified,maximized,transparent; int width,height,xpos,ypos,lastCursorPosX,lastCursorPosY,warpCursorPosX,warpCursorPosY; Time keyPressTimes[256]; } _GLFWwindowX11;
+    typedef struct _GLFWwindowX11 { Colormap colormap; Window handle,parent; XIC ic; GLFWbool overrideRedirect,iconified,maximized; int width,height,xpos,ypos,lastCursorPosX,lastCursorPosY,warpCursorPosX,warpCursorPosY; Time keyPressTimes[256]; } _GLFWwindowX11;
     typedef struct _GLFWlibraryX11 {
         Display* display;
         int screen;
@@ -742,7 +632,7 @@ typedef struct _GLFWmutex       _GLFWmutex;
     #define GLFW_GLX_CONTEXT_STATE
     #define GLFW_GLX_LIBRARY_CONTEXT_STATE
 #endif
-
+    
 #if defined(WINDOWS)
     #define GLFW_WIN32_JOYSTICK_STATE _GLFWjoystickWin32 win32;
     #define GLFW_WIN32_LIBRARY_JOYSTICK_STATE
@@ -794,6 +684,11 @@ typedef struct _GLFWmutex       _GLFWmutex;
     typedef struct _GLFWmutexWin32 { GLFWbool allocated; CRITICAL_SECTION section; } _GLFWmutexWin32;
     #define GLFW_PLATFORM_TLS_STATE    GLFW_WIN32_TLS_STATE
     #define GLFW_PLATFORM_MUTEX_STATE  GLFW_WIN32_MUTEX_STATE
+    #undef APIENTRY
+    #include <windows.h>
+    #define GLFW_WIN32_LIBRARY_TIMER_STATE  _GLFWtimerWin32   win32;
+    typedef struct _GLFWtimerWin32 { u64 frequency; } _GLFWtimerWin32;
+    #define GLFW_PLATFORM_LIBRARY_TIMER_STATE  GLFW_WIN32_LIBRARY_TIMER_STATE
 #else
     #define SIZE_MAX (~(size_t)0)
     #define GLFW_POSIX_TLS_STATE _GLFWtlsPOSIX   posix;
@@ -802,15 +697,6 @@ typedef struct _GLFWmutex       _GLFWmutex;
     typedef struct _GLFWmutexPOSIX { GLFWbool allocated; pthread_mutex_t handle; } _GLFWmutexPOSIX;
     #define GLFW_PLATFORM_TLS_STATE    GLFW_POSIX_TLS_STATE
     #define GLFW_PLATFORM_MUTEX_STATE  GLFW_POSIX_MUTEX_STATE
-#endif
-
-#if defined(WINDOWS)
-    #undef APIENTRY
-    #include <windows.h>
-    #define GLFW_WIN32_LIBRARY_TIMER_STATE  _GLFWtimerWin32   win32;
-    typedef struct _GLFWtimerWin32 { u64 frequency; } _GLFWtimerWin32;
-    #define GLFW_PLATFORM_LIBRARY_TIMER_STATE  GLFW_WIN32_LIBRARY_TIMER_STATE
-#else
     #define GLFW_POSIX_LIBRARY_TIMER_STATE _GLFWtimerPOSIX posix;
     #include <time.h>
     typedef struct _GLFWtimerPOSIX { clockid_t clock; u64 frequency; } _GLFWtimerPOSIX;
@@ -819,22 +705,21 @@ typedef struct _GLFWmutex       _GLFWmutex;
 
 #define _GLFW_SWAP(type, x, y) \
     { type t; t = x; x = y; y = t; }
-
-struct _GLFWinitconfig { GLFWbool hatButtons; i32 angleType,platformID; struct { GLFWbool menubar,chdir; } ns; struct {i32 libdecorMode;}wl; };
+struct _GLFWinitconfig { GLFWbool hatButtons; i32 angleType; struct { GLFWbool menubar,chdir; } ns; struct {i32 libdecorMode;}wl; };
 struct _GLFWwndconfig {
     i32 xpos,ypos,width,height;
-    GLFWbool resizable,visible,decorated,focused,autoIconify,floating,maximized,centerCursor,focusOnShow,mousePassthrough,scaleToMonitor,scaleFramebuffer;
+    GLFWbool resizable,visible,decorated,focused,autoIconify,floating,maximized,centerCursor,focusOnShow,scaleToMonitor;
     struct { char frameName[256]; } ns;
     struct { char className[256],instanceName[256]; } x11;
     struct { GLFWbool keymenu,showDefault; } win32;
     struct { char appId[256]; } wl;
 };
 
-struct _GLFWctxconfig { int client,source,major,minor; GLFWbool forward,debug,noerror; int profile,release; _GLFWwindow* share; struct {GLFWbool offline;}nsgl; };
-struct _GLFWfbconfig { int redBits,greenBits,blueBits,alphaBits,depthBits,stencilBits,accumRedBits,accumGreenBits,accumBlueBits,accumAlphaBits,auxBuffers; GLFWbool stereo; int samples; GLFWbool sRGB,doublebuffer,transparent; uintptr_t handle; };
+struct _GLFWctxconfig { int client,source,major,minor; GLFWbool debug; int profile,release; _GLFWwindow* share; struct {GLFWbool offline;}nsgl; };
+struct _GLFWfbconfig { int redBits,greenBits,blueBits,alphaBits,depthBits,stencilBits,accumRedBits,accumGreenBits,accumBlueBits,accumAlphaBits,auxBuffers; GLFWbool stereo; int samples; GLFWbool sRGB,doublebuffer; uintptr_t handle; };
 struct _GLFWcontext {
     int client, source, major, minor, revision;
-    GLFWbool  forward, debug, noerror;
+    GLFWbool debug;
     int profile,release;
     PFNGLGETSTRINGIPROC  GetStringi;
     PFNGLGETINTEGERVPROC GetIntegerv;
@@ -850,7 +735,7 @@ struct _GLFWcontext {
 
 struct _GLFWwindow {
     struct _GLFWwindow* next;
-    GLFWbool resizable,decorated,autoIconify,floating,focusOnShow,mousePassthrough,shouldClose,doublebuffer;
+    GLFWbool resizable,decorated,autoIconify,floating,focusOnShow,shouldClose,doublebuffer;
     GLFWvidmode videoMode;
     _GLFWmonitor* monitor;
     _GLFWcursor* cursor;
@@ -862,23 +747,7 @@ struct _GLFWwindow {
     double virtualCursorPosX,virtualCursorPosY;
     GLFWbool rawMouseMotion;
     _GLFWcontext context;
-    struct {
-        GLFWwindowposfun          pos;
-        GLFWwindowsizefun         size;
-        GLFWwindowclosefun        close;
-        GLFWwindowrefreshfun      refresh;
-        GLFWwindowfocusfun        focus;
-        GLFWwindowiconifyfun      iconify;
-        GLFWwindowmaximizefun     maximize;
-        GLFWframebuffersizefun    fbsize;
-        GLFWwindowcontentscalefun scale;
-        GLFWmousebuttonfun        mouseButton;
-        GLFWcursorposfun          cursorPos;
-        GLFWcursorenterfun        cursorEnter;
-        GLFWscrollfun             scroll;
-        GLFWkeyfun                key;
-        GLFWdropfun               drop;
-    } callbacks;
+    struct { GLFWwindowfocusfun focus; GLFWframebuffersizefun fbsize; } callbacks;
     GLFW_PLATFORM_WINDOW_STATE
 };
 
@@ -917,7 +786,6 @@ struct _GLFWjoystick {
 struct _GLFWtls { GLFW_PLATFORM_TLS_STATE };
 struct _GLFWmutex { GLFW_PLATFORM_MUTEX_STATE };
 struct _GLFWplatform {
-    int platformID;
     void (*getCursorPos)(_GLFWwindow*,double*,double*);
     void (*setCursorPos)(_GLFWwindow*,double,double);
     void (*setCursorMode)(_GLFWwindow*,int);
@@ -959,14 +827,9 @@ struct _GLFWplatform {
     GLFWbool (*windowIconified)(_GLFWwindow*);
     GLFWbool (*windowVisible)(_GLFWwindow*);
     GLFWbool (*windowMaximized)(_GLFWwindow*);
-    GLFWbool (*windowHovered)(_GLFWwindow*);
-    GLFWbool (*framebufferTransparent)(_GLFWwindow*);
     float (*getWindowOpacity)(_GLFWwindow*);
     void (*setWindowResizable)(_GLFWwindow*,GLFWbool);
     void (*setWindowDecorated)(_GLFWwindow*,GLFWbool);
-    void (*setWindowFloating)(_GLFWwindow*,GLFWbool);
-    void (*setWindowOpacity)(_GLFWwindow*,float);
-    void (*setWindowMousePassthrough)(_GLFWwindow*,GLFWbool);
     void (*pollEvents)(void);
     void (*waitEvents)(void);
     void (*waitEventsTimeout)(double);
@@ -989,7 +852,7 @@ struct _GLFWlibrary {
     _GLFWtls errorSlot,contextSlot;
     _GLFWmutex errorLock;
     struct { u64 offset; GLFW_PLATFORM_LIBRARY_TIMER_STATE } timer;
-    struct { GLFWmonitorfun  monitor; GLFWjoystickfun joystick; } callbacks;
+    struct { GLFWmonitorfun  monitor; } callbacks;
     GLFW_PLATFORM_LIBRARY_WINDOW_STATE
     GLFW_PLATFORM_LIBRARY_CONTEXT_STATE
     GLFW_PLATFORM_LIBRARY_JOYSTICK_STATE
@@ -1008,22 +871,12 @@ void _glfwPlatformDestroyMutex(_GLFWmutex* mutex);
 void _glfwPlatformLockMutex(_GLFWmutex* mutex);
 void _glfwPlatformUnlockMutex(_GLFWmutex* mutex);
 void* _glfwPlatformLoadModule(const char* path);
-void _glfwPlatformFreeModule(void* module);
 GLFWproc _glfwPlatformGetModuleSymbol(void* module, const char* name);
 void _glfwInputWindowFocus(_GLFWwindow* window, GLFWbool focused);
-void _glfwInputWindowPos(_GLFWwindow* window, int xpos, int ypos);
-void _glfwInputWindowSize(_GLFWwindow* window, int width, int height);
-void _glfwInputFramebufferSize(_GLFWwindow* window, int width, int height);
-void _glfwInputWindowIconify(_GLFWwindow* window, GLFWbool iconified);
-void _glfwInputWindowMaximize(_GLFWwindow* window, GLFWbool maximized);
-void _glfwInputWindowCloseRequest(_GLFWwindow* window);
 void _glfwInputWindowMonitor(_GLFWwindow* window, _GLFWmonitor* monitor);
-void _glfwInputKey(_GLFWwindow* window, int key, int scancode, int action, int mods);
-void _glfwInputChar(_GLFWwindow* window, u32 codepoint, int mods, GLFWbool plain);
-void _glfwInputScroll(_GLFWwindow* window, double xoffset, double yoffset);
-void _glfwInputMouseClick(_GLFWwindow* window, int button, int action, int mods);
+void _glfwInputKey(_GLFWwindow* window, int key, int action);
+void _glfwInputMouseClick(_GLFWwindow* window, int button, int action);
 void _glfwInputCursorPos(_GLFWwindow* window, double xpos, double ypos);
-void _glfwInputCursorEnter(_GLFWwindow* window, GLFWbool entered);
 void _glfwInputJoystick(_GLFWjoystick* js, int event);
 void _glfwInputJoystickAxis(_GLFWjoystick* js, int axis, float value);
 void _glfwInputJoystickButton(_GLFWjoystick* js, int button, char value);
@@ -1114,18 +967,14 @@ void* _glfw_realloc(void* block, size_t size) {
         RECT frame={0};
         const float ratio=(float)window->numer/(float)window->denom;
         const DWORD style=getWindowStyle(window),exStyle=getWindowExStyle(window);
-        if (_glfwIsWindows10Version1607OrGreaterWin32()) AdjustWindowRectExForDpi(&frame,style,FALSE,exStyle,GetDpiForWindow(window->win32.handle));
-        else AdjustWindowRectEx(&frame,style,FALSE,exStyle);
-        if (edge==WMSZ_LEFT||edge==WMSZ_BOTTOMLEFT||edge==WMSZ_RIGHT||edge==WMSZ_BOTTOMRIGHT)
-            area->bottom=area->top+(frame.bottom-frame.top)+(int)(((area->right-area->left)-(frame.right-frame.left))/ratio);
-        else if (edge==WMSZ_TOPLEFT||edge==WMSZ_TOPRIGHT)
-            area->top=area->bottom-(frame.bottom-frame.top)-(int)(((area->right-area->left)-(frame.right-frame.left))/ratio);
-        else if (edge==WMSZ_TOP||edge==WMSZ_BOTTOM)
-            area->right=area->left+(frame.right-frame.left)+(int)(((area->bottom-area->top)-(frame.bottom-frame.top))*ratio);
+        AdjustWindowRectEx(&frame,style,FALSE,exStyle);
+        if (edge==WMSZ_LEFT||edge==WMSZ_BOTTOMLEFT||edge==WMSZ_RIGHT||edge==WMSZ_BOTTOMRIGHT) area->bottom=area->top+(frame.bottom-frame.top)+(int)(((area->right-area->left)-(frame.right-frame.left))/ratio);
+        else if (edge==WMSZ_TOPLEFT||edge==WMSZ_TOPRIGHT) area->top=area->bottom-(frame.bottom-frame.top)-(int)(((area->right-area->left)-(frame.right-frame.left))/ratio);
+        else if (edge==WMSZ_TOP||edge==WMSZ_BOTTOM) area->right=area->left+(frame.right-frame.left)+(int)(((area->bottom-area->top)-(frame.bottom-frame.top))*ratio);
     }
 
     static void updateCursorImage(_GLFWwindow* window) {
-        if (window->cursorMode==GLFW_CURSOR_NORMAL||window->cursorMode==GLFW_CURSOR_CAPTURED) {
+        if (window->cursorMode==GLFW_CURSOR_NORMAL) {
             if (window->cursor) SetCursor(window->cursor->win32.handle);
             else SetCursor(LoadCursorW(NULL,(LPCWSTR)IDC_ARROW));
         } else SetCursor(_glfw.win32.blankCursor);
@@ -1185,39 +1034,11 @@ void* _glfw_realloc(void* block, size_t size) {
         style &= ~(WS_OVERLAPPEDWINDOW|WS_POPUP);
         style |= getWindowStyle(window);
         GetClientRect(window->win32.handle,&rect);
-        if (_glfwIsWindows10Version1607OrGreaterWin32()) AdjustWindowRectExForDpi(&rect,style,FALSE,getWindowExStyle(window),GetDpiForWindow(window->win32.handle));
-        else AdjustWindowRectEx(&rect,style,FALSE,getWindowExStyle(window));
+        AdjustWindowRectEx(&rect,style,FALSE,getWindowExStyle(window));
         ClientToScreen(window->win32.handle,(POINT*)&rect.left);
         ClientToScreen(window->win32.handle,(POINT*)&rect.right);
         SetWindowLongW(window->win32.handle,GWL_STYLE,style);
         SetWindowPos(window->win32.handle,HWND_TOP,rect.left,rect.top,rect.right-rect.left,rect.bottom-rect.top,SWP_FRAMECHANGED|SWP_NOACTIVATE|SWP_NOZORDER);
-    }
-
-    static void updateFramebufferTransparency(const _GLFWwindow* window) {
-        BOOL composition,opaque; DWORD color;
-        if (FAILED(DwmIsCompositionEnabled(&composition))||!composition) return;
-        if (IsWindows8OrGreater()||(SUCCEEDED(DwmGetColorizationColor(&color,&opaque))&&!opaque)) {
-            HRGN region=CreateRectRgn(0,0,-1,-1);
-            DWM_BLURBEHIND bb={0};
-            bb.dwFlags=DWM_BB_ENABLE|DWM_BB_BLURREGION; bb.hRgnBlur=region; bb.fEnable=TRUE;
-            DwmEnableBlurBehindWindow(window->win32.handle,&bb);
-            DeleteObject(region);
-        } else {
-            DWM_BLURBEHIND bb={0};
-            bb.dwFlags=DWM_BB_ENABLE;
-            DwmEnableBlurBehindWindow(window->win32.handle,&bb);
-        }
-    }
-
-    static int getKeyMods(void) {
-        int mods=0;
-        if (GetKeyState(VK_SHIFT)&0x8000)   mods|=GLFW_MOD_SHIFT;
-        if (GetKeyState(VK_CONTROL)&0x8000) mods|=GLFW_MOD_CONTROL;
-        if (GetKeyState(VK_MENU)&0x8000)    mods|=GLFW_MOD_ALT;
-        if ((GetKeyState(VK_LWIN)|GetKeyState(VK_RWIN))&0x8000) mods|=GLFW_MOD_SUPER;
-        if (GetKeyState(VK_CAPITAL)&1) mods|=GLFW_MOD_CAPS_LOCK;
-        if (GetKeyState(VK_NUMLOCK)&1) mods|=GLFW_MOD_NUM_LOCK;
-        return mods;
     }
 
     static void fitToMonitor(_GLFWwindow* window) {
@@ -1256,25 +1077,13 @@ void* _glfw_realloc(void* block, size_t size) {
         SetWindowLongW(window->win32.handle,GWL_STYLE,style);
         if (window->decorated) {
             const DWORD exStyle=GetWindowLongW(window->win32.handle,GWL_EXSTYLE);
-            if (_glfwIsWindows10Version1607OrGreaterWin32()) { const UINT dpi=GetDpiForWindow(window->win32.handle); AdjustWindowRectExForDpi(&rect,style,FALSE,exStyle,dpi); OffsetRect(&rect,0,GetSystemMetricsForDpi(SM_CYCAPTION,dpi)); }
-            else { AdjustWindowRectEx(&rect,style,FALSE,exStyle); OffsetRect(&rect,0,GetSystemMetrics(SM_CYCAPTION)); }
-            rect.bottom=vmin(rect.bottom,mi.rcWork.bottom);
+            AdjustWindowRectEx(&rect,style,FALSE,exStyle); OffsetRect(&rect,0,GetSystemMetrics(SM_CYCAPTION)); rect.bottom=vmin(rect.bottom,mi.rcWork.bottom);
         }
         SetWindowPos(window->win32.handle,HWND_TOP,rect.left,rect.top,rect.right-rect.left,rect.bottom-rect.top,SWP_NOACTIVATE|SWP_NOZORDER|SWP_FRAMECHANGED);
     }
 
     static LRESULT CALLBACK windowProc(HWND hWnd,UINT uMsg,WPARAM wParam,LPARAM lParam) {
-        _GLFWwindow* window=GetPropW(hWnd,L"GLFW");
-        if (!window) {
-            if (uMsg==WM_NCCREATE) {
-                if (_glfwIsWindows10Version1607OrGreaterWin32()) {
-                    const CREATESTRUCTW* cs=(const CREATESTRUCTW*)lParam;
-                    const _GLFWwndconfig* wndconfig=cs->lpCreateParams;
-                    if (wndconfig&&wndconfig->scaleToMonitor) EnableNonClientDpiScaling(hWnd);
-                }
-            }
-            return DefWindowProcW(hWnd,uMsg,wParam,lParam);
-        }
+        _GLFWwindow* window=GetPropW(hWnd,L"GLFW"); if (!window) return DefWindowProcW(hWnd,uMsg,wParam,lParam);
 
         switch (uMsg) {
             case WM_MOUSEACTIVATE: {
@@ -1284,7 +1093,6 @@ void* _glfw_realloc(void* block, size_t size) {
             case WM_CAPTURECHANGED: {
                 if (lParam==0&&window->win32.frameAction) {
                     if (window->cursorMode==GLFW_CURSOR_DISABLED) disableCursor(window);
-                    else if (window->cursorMode==GLFW_CURSOR_CAPTURED) captureCursor(window);
                     window->win32.frameAction=GLFW_FALSE;
                 }
                 break;
@@ -1293,12 +1101,10 @@ void* _glfw_realloc(void* block, size_t size) {
                 _glfwInputWindowFocus(window,GLFW_TRUE);
                 if (window->win32.frameAction) break;
                 if (window->cursorMode==GLFW_CURSOR_DISABLED) disableCursor(window);
-                else if (window->cursorMode==GLFW_CURSOR_CAPTURED) captureCursor(window);
                 return 0;
             }
             case WM_KILLFOCUS: {
                 if (window->cursorMode==GLFW_CURSOR_DISABLED) enableCursor(window);
-                else if (window->cursorMode==GLFW_CURSOR_CAPTURED) releaseCursor();
                 _glfwInputWindowFocus(window,GLFW_FALSE);
                 return 0;
             }
@@ -1310,13 +1116,13 @@ void* _glfw_realloc(void* block, size_t size) {
                 }
                 break;
             }
-            case WM_CLOSE: _glfwInputWindowCloseRequest(window); return 0;
+            case WM_CLOSE: window->shouldClose = GLFW_TRUE; return 0;
             case WM_KEYDOWN:
             case WM_SYSKEYDOWN:
             case WM_KEYUP:
             case WM_SYSKEYUP: {
                 int key,scancode;
-                const int action=(HIWORD(lParam)&KF_UP)?GLFW_RELEASE:GLFW_PRESS,mods=getKeyMods();
+                const int action=(HIWORD(lParam)&KF_UP)?GLFW_RELEASE:GLFW_PRESS;
                 scancode=(HIWORD(lParam)&(KF_EXTENDED|0xff));
                 if (!scancode) scancode=MapVirtualKeyW((UINT)wParam,MAPVK_VK_TO_VSC);
                 if (scancode==0x54) scancode=0x137;
@@ -1336,12 +1142,12 @@ void* _glfw_realloc(void* block, size_t size) {
                     }
                 } else if (wParam==VK_PROCESSKEY) break;
                 if (action==GLFW_RELEASE&&wParam==VK_SHIFT) {
-                    _glfwInputKey(window,GLFW_KEY_LEFT_SHIFT,scancode,action,mods);
-                    _glfwInputKey(window,GLFW_KEY_RIGHT_SHIFT,scancode,action,mods);
+                    _glfwInputKey(window,GLFW_KEY_LEFT_SHIFT,action);
+                    _glfwInputKey(window,GLFW_KEY_RIGHT_SHIFT,action);
                 } else if (wParam==VK_SNAPSHOT) {
-                    _glfwInputKey(window,key,scancode,GLFW_PRESS,mods);
-                    _glfwInputKey(window,key,scancode,GLFW_RELEASE,mods);
-                } else _glfwInputKey(window,key,scancode,action,mods);
+                    _glfwInputKey(window,key,GLFW_PRESS);
+                    _glfwInputKey(window,key,GLFW_RELEASE);
+                } else _glfwInputKey(window,key,action);
                 break;
             }
             case WM_LBUTTONDOWN: case WM_RBUTTONDOWN: case WM_MBUTTONDOWN: case WM_XBUTTONDOWN:
@@ -1355,7 +1161,7 @@ void* _glfw_realloc(void* block, size_t size) {
                 action=(uMsg==WM_LBUTTONDOWN||uMsg==WM_RBUTTONDOWN||uMsg==WM_MBUTTONDOWN||uMsg==WM_XBUTTONDOWN)?GLFW_PRESS:GLFW_RELEASE;
                 for (i=0;i<=GLFW_MOUSE_BUTTON_LAST;i++) { if (window->mouseButtons[i]==GLFW_PRESS) break; }
                 if (i>GLFW_MOUSE_BUTTON_LAST) SetCapture(hWnd);
-                _glfwInputMouseClick(window,button,action,getKeyMods());
+                _glfwInputMouseClick(window,button,action);
                 for (i=0;i<=GLFW_MOUSE_BUTTON_LAST;i++) { if (window->mouseButtons[i]==GLFW_PRESS) break; }
                 if (i>GLFW_MOUSE_BUTTON_LAST) ReleaseCapture();
                 if (uMsg==WM_XBUTTONDOWN||uMsg==WM_XBUTTONUP) return TRUE;
@@ -1368,13 +1174,12 @@ void* _glfw_realloc(void* block, size_t size) {
                     tme.cbSize=sizeof(tme); tme.dwFlags=TME_LEAVE; tme.hwndTrack=window->win32.handle;
                     TrackMouseEvent(&tme);
                     window->win32.cursorTracked=GLFW_TRUE;
-                    _glfwInputCursorEnter(window,GLFW_TRUE);
                 }
                 if (window->cursorMode==GLFW_CURSOR_DISABLED) {
                     const int dx=x-window->win32.lastCursorPosX,dy=y-window->win32.lastCursorPosY;
                     if (_glfw.win32.disabledCursorWindow!=window||window->rawMouseMotion) break;
                     _glfwInputCursorPos(window,window->virtualCursorPosX+dx,window->virtualCursorPosY+dy);
-                } else _glfwInputCursorPos(window,x,y);
+                }
                 window->win32.lastCursorPosX=x; window->win32.lastCursorPosY=y;
                 return 0;
             }
@@ -1403,21 +1208,19 @@ void* _glfw_realloc(void* block, size_t size) {
                 window->win32.lastCursorPosX+=dx; window->win32.lastCursorPosY+=dy;
                 break;
             }
-            case WM_MOUSELEAVE: { window->win32.cursorTracked=GLFW_FALSE; _glfwInputCursorEnter(window,GLFW_FALSE); return 0; }
-            case WM_MOUSEWHEEL: { _glfwInputScroll(window,0.0,(SHORT)HIWORD(wParam)/(double)WHEEL_DELTA); return 0; }
-            case WM_MOUSEHWHEEL: { _glfwInputScroll(window,-((SHORT)HIWORD(wParam)/(double)WHEEL_DELTA),0.0); return 0; }
+            case WM_MOUSELEAVE: { window->win32.cursorTracked=GLFW_FALSE; return 0; }
+            case WM_MOUSEWHEEL: { Sys_Input.scrollDelta += (SHORT)HIWORD(wParam)/(double)WHEEL_DELTA; return 0; }
+            case WM_MOUSEHWHEEL: return 0;
             case WM_ENTERSIZEMOVE:
             case WM_ENTERMENULOOP: {
                 if (window->win32.frameAction) break;
                 if (window->cursorMode==GLFW_CURSOR_DISABLED) enableCursor(window);
-                else if (window->cursorMode==GLFW_CURSOR_CAPTURED) releaseCursor();
                 break;
             }
             case WM_EXITSIZEMOVE:
             case WM_EXITMENULOOP: {
                 if (window->win32.frameAction) break;
                 if (window->cursorMode==GLFW_CURSOR_DISABLED) disableCursor(window);
-                else if (window->cursorMode==GLFW_CURSOR_CAPTURED) captureCursor(window);
                 break;
             }
             case WM_SIZE: {
@@ -1425,13 +1228,7 @@ void* _glfw_realloc(void* block, size_t size) {
                 const GLFWbool iconified=wParam==SIZE_MINIMIZED;
                 const GLFWbool maximized=wParam==SIZE_MAXIMIZED||(window->win32.maximized&&wParam!=SIZE_RESTORED);
                 if (_glfw.win32.capturedCursorWindow==window) captureCursor(window);
-                if (window->win32.iconified!=iconified) _glfwInputWindowIconify(window,iconified);
-                if (window->win32.maximized!=maximized) _glfwInputWindowMaximize(window,maximized);
-                if (width!=window->win32.width||height!=window->win32.height) {
-                    window->win32.width=width; window->win32.height=height;
-                    _glfwInputFramebufferSize(window,width,height);
-                    _glfwInputWindowSize(window,width,height);
-                }
+                if (width!=window->win32.width||height!=window->win32.height) { window->win32.width=width; window->win32.height=height; UpdateScreenSize(width,height); }
                 if (window->monitor&&window->win32.iconified!=iconified) {
                     if (iconified) releaseMonitor(window);
                     else { acquireMonitor(window); fitToMonitor(window); }
@@ -1439,11 +1236,7 @@ void* _glfw_realloc(void* block, size_t size) {
                 window->win32.iconified=iconified; window->win32.maximized=maximized;
                 return 0;
             }
-            case WM_MOVE: {
-                if (_glfw.win32.capturedCursorWindow==window) captureCursor(window);
-                _glfwInputWindowPos(window,GET_X_LPARAM(lParam),GET_Y_LPARAM(lParam));
-                return 0;
-            }
+            case WM_MOVE: if (_glfw.win32.capturedCursorWindow==window) {captureCursor(window);} return 0;
             case WM_SIZING: {
                 if (window->numer==GLFW_DONT_CARE||window->denom==GLFW_DONT_CARE) break;
                 applyAspectRatio(window,(int)wParam,(RECT*)lParam);
@@ -1453,8 +1246,7 @@ void* _glfw_realloc(void* block, size_t size) {
                 RECT frame={0}; MINMAXINFO* mmi=(MINMAXINFO*)lParam;
                 const DWORD style=getWindowStyle(window),exStyle=getWindowExStyle(window);
                 if (window->monitor) break;
-                if (_glfwIsWindows10Version1607OrGreaterWin32()) AdjustWindowRectExForDpi(&frame,style,FALSE,exStyle,GetDpiForWindow(window->win32.handle));
-                else AdjustWindowRectEx(&frame,style,FALSE,exStyle);
+                AdjustWindowRectEx(&frame,style,FALSE,exStyle);
                 if (window->minwidth!=GLFW_DONT_CARE&&window->minheight!=GLFW_DONT_CARE) { mmi->ptMinTrackSize.x=window->minwidth+frame.right-frame.left; mmi->ptMinTrackSize.y=window->minheight+frame.bottom-frame.top; }
                 if (window->maxwidth!=GLFW_DONT_CARE&&window->maxheight!=GLFW_DONT_CARE) { mmi->ptMaxTrackSize.x=window->maxwidth+frame.right-frame.left; mmi->ptMaxTrackSize.y=window->maxheight+frame.bottom-frame.top; }
                 if (!window->decorated) {
@@ -1469,13 +1261,13 @@ void* _glfw_realloc(void* block, size_t size) {
             case WM_NCACTIVATE:
             case WM_NCPAINT: { if (!window->decorated) return TRUE; break; }
             case WM_DWMCOMPOSITIONCHANGED:
-            case WM_DWMCOLORIZATIONCOLORCHANGED: { if (window->win32.transparent) updateFramebufferTransparency(window); return 0; }
+            case WM_DWMCOLORIZATIONCOLORCHANGED: return 0;
             case WM_SETCURSOR: { if (LOWORD(lParam)==HTCLIENT) { updateCursorImage(window); return TRUE; } break; }
         }
         return DefWindowProcW(hWnd,uMsg,wParam,lParam);
     }
 
-    static int createNativeWindow(_GLFWwindow* window,char* title,const _GLFWwndconfig* wndconfig,const _GLFWfbconfig* fbconfig) {
+    static int createNativeWindow(_GLFWwindow* window, char* title, const _GLFWwndconfig* wndconfig) {
         int frameX,frameY,frameWidth,frameHeight; DWORD style=getWindowStyle(window),exStyle=getWindowExStyle(window);
         if (!_glfw.win32.mainWindowClass) {
             WNDCLASSEXW wc={0}; wc.cbSize=sizeof(wc),wc.style=CS_HREDRAW|CS_VREDRAW|CS_OWNDC,wc.lpfnWndProc=windowProc,wc.hInstance=_glfw.win32.instance,wc.lpszClassName=L"Voxen",wc.hIcon=wc.hCursor=NULL;
@@ -1502,15 +1294,13 @@ void* _glfw_realloc(void* block, size_t size) {
         if (!window->monitor) {
             RECT rect={0,0,wndconfig->width,wndconfig->height}; WINDOWPLACEMENT wp={0}; wp.length=sizeof(wp);
             const HMONITOR mh=MonitorFromWindow(window->win32.handle,MONITOR_DEFAULTTONEAREST);
-            if (wndconfig->scaleToMonitor) { float xs,ys; _glfwGetHMONITORContentScaleWin32(mh,&xs,&ys); if (xs>0.f&&ys>0.f) { rect.right=(int)(rect.right*xs), rect.bottom=(int)(rect.bottom*ys); }}
-            if (_glfwIsWindows10Version1607OrGreaterWin32()) AdjustWindowRectExForDpi(&rect,style,FALSE,exStyle,GetDpiForWindow(window->win32.handle));
-            else AdjustWindowRectEx(&rect,style,FALSE,exStyle);
+            AdjustWindowRectEx(&rect,style,FALSE,exStyle);
             GetWindowPlacement(window->win32.handle,&wp), OffsetRect(&rect,wp.rcNormalPosition.left-rect.left,wp.rcNormalPosition.top-rect.top);
             wp.rcNormalPosition=rect, wp.showCmd=SW_HIDE, SetWindowPlacement(window->win32.handle,&wp);
             if (wndconfig->maximized&&!wndconfig->decorated) { MONITORINFO mi={0}; mi.cbSize=sizeof(mi), GetMonitorInfoW(mh,&mi), SetWindowPos(window->win32.handle,HWND_TOP,mi.rcWork.left,mi.rcWork.top,mi.rcWork.right-mi.rcWork.left,mi.rcWork.bottom-mi.rcWork.top,SWP_NOACTIVATE|SWP_NOZORDER); }
         }
         
-        DragAcceptFiles(window->win32.handle,TRUE); if (fbconfig->transparent) { updateFramebufferTransparency(window); window->win32.transparent=GLFW_TRUE; }
+        DragAcceptFiles(window->win32.handle,TRUE);
         _glfwGetWindowSizeWin32(window,&window->win32.width,&window->win32.height); return GLFW_TRUE;
     }
 
@@ -1534,8 +1324,7 @@ void* _glfw_realloc(void* block, size_t size) {
 
     void _glfwSetWindowPosWin32(_GLFWwindow* window,int xpos,int ypos) {
         RECT rect={xpos,ypos,xpos,ypos};
-        if (_glfwIsWindows10Version1607OrGreaterWin32()) AdjustWindowRectExForDpi(&rect,getWindowStyle(window),FALSE,getWindowExStyle(window),GetDpiForWindow(window->win32.handle));
-        else AdjustWindowRectEx(&rect,getWindowStyle(window),FALSE,getWindowExStyle(window));
+        AdjustWindowRectEx(&rect,getWindowStyle(window),FALSE,getWindowExStyle(window));
         SetWindowPos(window->win32.handle,NULL,rect.left,rect.top,0,0,SWP_NOACTIVATE|SWP_NOZORDER|SWP_NOSIZE);
     }
 
@@ -1548,25 +1337,16 @@ void* _glfw_realloc(void* block, size_t size) {
         if (window->monitor) { if (window->monitor->window==window) { acquireMonitor(window); fitToMonitor(window); } }
         else {
             RECT rect={0,0,width,height};
-            if (_glfwIsWindows10Version1607OrGreaterWin32()) AdjustWindowRectExForDpi(&rect,getWindowStyle(window),FALSE,getWindowExStyle(window),GetDpiForWindow(window->win32.handle));
-            else AdjustWindowRectEx(&rect,getWindowStyle(window),FALSE,getWindowExStyle(window));
+            AdjustWindowRectEx(&rect,getWindowStyle(window),FALSE,getWindowExStyle(window));
             SetWindowPos(window->win32.handle,HWND_TOP,0,0,rect.right-rect.left,rect.bottom-rect.top,SWP_NOACTIVATE|SWP_NOOWNERZORDER|SWP_NOMOVE|SWP_NOZORDER);
         }
-    }
-
-    void _glfwSetWindowSizeLimitsWin32(_GLFWwindow* window,int minwidth,int minheight,int maxwidth,int maxheight) {
-        RECT area;
-        if ((minwidth==GLFW_DONT_CARE||minheight==GLFW_DONT_CARE)&&(maxwidth==GLFW_DONT_CARE||maxheight==GLFW_DONT_CARE)) return;
-        GetWindowRect(window->win32.handle,&area);
-        MoveWindow(window->win32.handle,area.left,area.top,area.right-area.left,area.bottom-area.top,TRUE);
     }
 
     void _glfwGetWindowFrameSizeWin32(_GLFWwindow* window,int* left,int* top,int* right,int* bottom) {
         RECT rect; int width,height;
         _glfwGetWindowSizeWin32(window,&width,&height);
         SetRect(&rect,0,0,width,height);
-        if (_glfwIsWindows10Version1607OrGreaterWin32()) AdjustWindowRectExForDpi(&rect,getWindowStyle(window),FALSE,getWindowExStyle(window),GetDpiForWindow(window->win32.handle));
-        else AdjustWindowRectEx(&rect,getWindowStyle(window),FALSE,getWindowExStyle(window));
+        AdjustWindowRectEx(&rect,getWindowStyle(window),FALSE,getWindowExStyle(window));
         if (left) *left=-rect.left; if (top) *top=-rect.top; if (right) *right=rect.right-width; if (bottom) *bottom=rect.bottom-height;
     }
 
@@ -1591,8 +1371,7 @@ void* _glfw_realloc(void* block, size_t size) {
             if (monitor) { if (monitor->window == window) acquireMonitor(window), fitToMonitor(window); }
             else {
                 RECT r = {xpos,ypos,xpos+width,ypos+height};
-                if (_glfwIsWindows10Version1607OrGreaterWin32()) AdjustWindowRectExForDpi(&r,getWindowStyle(window),FALSE,getWindowExStyle(window),GetDpiForWindow(window->win32.handle));
-                else AdjustWindowRectEx(&r,getWindowStyle(window),FALSE,getWindowExStyle(window));
+                AdjustWindowRectEx(&r,getWindowStyle(window),FALSE,getWindowExStyle(window));
                 SetWindowPos(window->win32.handle,HWND_TOP,r.left,r.top,r.right-r.left,r.bottom-r.top,SWP_NOCOPYBITS|SWP_NOACTIVATE|SWP_NOZORDER);
             }
             return;
@@ -1607,8 +1386,7 @@ void* _glfw_realloc(void* block, size_t size) {
             RECT r = {xpos,ypos,xpos+width,ypos+height}; DWORD s = GetWindowLongW(window->win32.handle,GWL_STYLE); UINT f = SWP_NOACTIVATE|SWP_NOCOPYBITS;
             if (window->decorated) { s &= ~WS_POPUP, s |= getWindowStyle(window), SetWindowLongW(window->win32.handle,GWL_STYLE,s), f |= SWP_FRAMECHANGED; }
             HWND a = window->floating ? HWND_TOPMOST : HWND_NOTOPMOST;
-            if (_glfwIsWindows10Version1607OrGreaterWin32()) AdjustWindowRectExForDpi(&r,getWindowStyle(window),FALSE,getWindowExStyle(window),GetDpiForWindow(window->win32.handle));
-            else AdjustWindowRectEx(&r,getWindowStyle(window),FALSE,getWindowExStyle(window));
+            AdjustWindowRectEx(&r,getWindowStyle(window),FALSE,getWindowExStyle(window));
             SetWindowPos(window->win32.handle,a,r.left,r.top,r.right-r.left,r.bottom-r.top,f);
         }
     }
@@ -1617,41 +1395,12 @@ void* _glfw_realloc(void* block, size_t size) {
     GLFWbool _glfwWindowIconifiedWin32(_GLFWwindow* window) { return IsIconic(window->win32.handle); }
     GLFWbool _glfwWindowVisibleWin32(_GLFWwindow* window) { return IsWindowVisible(window->win32.handle); }
     GLFWbool _glfwWindowMaximizedWin32(_GLFWwindow* window) { return IsZoomed(window->win32.handle); }
-    GLFWbool _glfwWindowHoveredWin32(_GLFWwindow* window) { return cursorInContentArea(window); }
-
-    GLFWbool _glfwFramebufferTransparentWin32(_GLFWwindow* window) {
-        BOOL composition,opaque; DWORD color;
-        if (!window->win32.transparent) return GLFW_FALSE;
-        if (FAILED(DwmIsCompositionEnabled(&composition))||!composition) return GLFW_FALSE;
-        if (!IsWindows8OrGreater()&&(FAILED(DwmGetColorizationColor(&color,&opaque))||opaque)) return GLFW_FALSE;
-        return GLFW_TRUE;
-    }
-
     void _glfwSetWindowResizableWin32(_GLFWwindow* window,GLFWbool enabled) { (void)enabled; updateWindowStyles(window); }
     void _glfwSetWindowDecoratedWin32(_GLFWwindow* window,GLFWbool enabled) { (void)enabled; updateWindowStyles(window); }
-    void _glfwSetWindowFloatingWin32(_GLFWwindow* window,GLFWbool enabled) { SetWindowPos(window->win32.handle,enabled?HWND_TOPMOST:HWND_NOTOPMOST,0,0,0,0,SWP_NOACTIVATE|SWP_NOMOVE|SWP_NOSIZE); }
-
-    void _glfwSetWindowMousePassthroughWin32(_GLFWwindow* window,GLFWbool enabled) {
-        COLORREF key=0; BYTE alpha=0; DWORD flags=0;
-        DWORD exStyle=GetWindowLongW(window->win32.handle,GWL_EXSTYLE);
-        if (exStyle&WS_EX_LAYERED) GetLayeredWindowAttributes(window->win32.handle,&key,&alpha,&flags);
-        if (enabled) exStyle|=(WS_EX_TRANSPARENT|WS_EX_LAYERED);
-        else { exStyle&=~WS_EX_TRANSPARENT; if ((exStyle&WS_EX_LAYERED)&&!(flags&LWA_ALPHA)) exStyle&=~WS_EX_LAYERED; }
-        SetWindowLongW(window->win32.handle,GWL_EXSTYLE,exStyle);
-        if (enabled) SetLayeredWindowAttributes(window->win32.handle,key,alpha,flags);
-    }
-
     float _glfwGetWindowOpacityWin32(_GLFWwindow* window) {
         BYTE alpha; DWORD flags;
         if ((GetWindowLongW(window->win32.handle,GWL_EXSTYLE)&WS_EX_LAYERED)&&GetLayeredWindowAttributes(window->win32.handle,NULL,&alpha,&flags)&&(flags&LWA_ALPHA)) return alpha/255.f;
         return 1.f;
-    }
-
-    void _glfwSetWindowOpacityWin32(_GLFWwindow* window,float opacity) {
-        LONG exStyle=GetWindowLongW(window->win32.handle,GWL_EXSTYLE);
-        if (opacity<1.f||(exStyle&WS_EX_TRANSPARENT)) { exStyle|=WS_EX_LAYERED; SetWindowLongW(window->win32.handle,GWL_EXSTYLE,exStyle); SetLayeredWindowAttributes(window->win32.handle,0,(BYTE)(255*opacity),LWA_ALPHA); }
-        else if (exStyle&WS_EX_TRANSPARENT) SetLayeredWindowAttributes(window->win32.handle,0,0,0);
-        else { exStyle&=~WS_EX_LAYERED; SetWindowLongW(window->win32.handle,GWL_EXSTYLE,exStyle); }
     }
 
     void _glfwSetRawMouseMotionWin32(_GLFWwindow* window,GLFWbool enabled) {
@@ -1664,7 +1413,7 @@ void* _glfw_realloc(void* block, size_t size) {
     void _glfwPollEventsWin32(void) {
         MSG msg; HWND handle; _GLFWwindow* window;
         while (PeekMessageW(&msg,NULL,0,0,PM_REMOVE)) {
-            if (msg.message==WM_QUIT) { window=_glfw.windowListHead; while (window) { _glfwInputWindowCloseRequest(window); window=window->next; } }
+            if (msg.message==WM_QUIT) { window=_glfw.windowListHead; while (window) { window->shouldClose = GLFW_TRUE; window=window->next; } }
             else { TranslateMessage(&msg); DispatchMessageW(&msg); }
         }
         handle=GetActiveWindow();
@@ -1674,9 +1423,9 @@ void* _glfw_realloc(void* block, size_t size) {
                 int i;
                 const int keys[4][2]={{VK_LSHIFT,GLFW_KEY_LEFT_SHIFT},{VK_RSHIFT,GLFW_KEY_RIGHT_SHIFT},{VK_LWIN,GLFW_KEY_LEFT_SUPER},{VK_RWIN,GLFW_KEY_RIGHT_SUPER}};
                 for (i=0;i<4;i++) {
-                    const int vk=keys[i][0],key=keys[i][1],scancode=_glfw.win32.scancodes[key];
+                    const int vk=keys[i][0],key=keys[i][1];
                     if ((GetKeyState(vk)&0x8000)||window->keys[key]!=GLFW_PRESS) continue;
-                    _glfwInputKey(window,key,scancode,GLFW_RELEASE,getKeyMods());
+                    _glfwInputKey(window,key,GLFW_RELEASE);
                 }
             }
         }
@@ -1686,10 +1435,6 @@ void* _glfw_realloc(void* block, size_t size) {
             if (window->win32.lastCursorPosX!=width/2||window->win32.lastCursorPosY!=height/2) _glfwSetCursorPosWin32(window,width/2,height/2);
         }
     }
-
-    void _glfwWaitEventsWin32(void) { WaitMessage(); _glfwPollEventsWin32(); }
-    void _glfwWaitEventsTimeoutWin32(double timeout) { MsgWaitForMultipleObjects(0,NULL,FALSE,(DWORD)(timeout*1e3),QS_ALLINPUT); _glfwPollEventsWin32(); }
-    void _glfwPostEmptyEventWin32(void) { PostMessageW(_glfw.win32.helperWindowHandle,WM_NULL,0,0); }
 
     void _glfwGetCursorPosWin32(_GLFWwindow* window,double* xpos,double* ypos) {
         POINT pos;
@@ -1706,110 +1451,46 @@ void* _glfw_realloc(void* block, size_t size) {
         if (_glfwWindowFocusedWin32(window)) {
             if (mode==GLFW_CURSOR_DISABLED) { _glfwGetCursorPosWin32(window,&_glfw.win32.restoreCursorPosX,&_glfw.win32.restoreCursorPosY); _glfwCenterCursorInContentArea(window); if (window->rawMouseMotion) enableRawMouseMotion(window); }
             else if (_glfw.win32.disabledCursorWindow==window) { if (window->rawMouseMotion) disableRawMouseMotion(window); }
-            if (mode==GLFW_CURSOR_DISABLED||mode==GLFW_CURSOR_CAPTURED) captureCursor(window); else releaseCursor();
+            if (mode==GLFW_CURSOR_DISABLED) captureCursor(window); else releaseCursor();
             if (mode==GLFW_CURSOR_DISABLED) _glfw.win32.disabledCursorWindow=window;
             else if (_glfw.win32.disabledCursorWindow==window) { _glfw.win32.disabledCursorWindow=NULL; _glfwSetCursorPosWin32(window,_glfw.win32.restoreCursorPosX,_glfw.win32.restoreCursorPosY); }
         }
         if (cursorInContentArea(window)) updateCursorImage(window);
     }
 
-    GLFWbool _glfwCreateCursorWin32(_GLFWcursor* cursor,const GLFWimage* image,int xhot,int yhot) {
-        cursor->win32.handle=(HCURSOR)createIcon(image,xhot,yhot,GLFW_FALSE);
-        return cursor->win32.handle ? GLFW_TRUE : GLFW_FALSE;
-    }
-
-    GLFWbool _glfwCreateStandardCursorWin32(_GLFWcursor* cursor,int shape) {
-        cursor->win32.handle=LoadImageW(NULL,MAKEINTRESOURCEW(OCR_NORMAL),IMAGE_CURSOR,0,0,LR_DEFAULTSIZE|LR_SHARED); (void)shape;
-        if (!cursor->win32.handle) { DualLogError("Win32: Failed to create standard cursor"); return GLFW_FALSE; }
-        return GLFW_TRUE;
-    }
-
     void _glfwDestroyCursorWin32(_GLFWcursor* cursor) { if (cursor->win32.handle) DestroyIcon((HICON)cursor->win32.handle); }
     void _glfwSetCursorWin32(_GLFWwindow* window,_GLFWcursor* cursor) { (void)cursor; if (cursorInContentArea(window)) updateCursorImage(window); }
     static const GUID _glfw_GUID_DEVINTERFACE_HID = {0x4d1e55b2,0xf16f,0x11cf,{0x88,0xcb,0x00,0x11,0x11,0x00,0x00,0x30}};
-    void* _glfwPlatformLoadModule(const char* path) { return LoadLibraryA(path); }
     void _glfwPlatformFreeModule(void* module) { if (module) {FreeLibrary((HMODULE)module);} }
     GLFWproc _glfwPlatformGetModuleSymbol(void* module, const char* name) { return (GLFWproc)GetProcAddress((HMODULE)module,name); }
     static GLFWbool loadLibraries(void) {
         if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,(const WCHAR*) &_glfw,(HMODULE*) &_glfw.win32.instance)){ DualLogError("Win32: Failed to retrieve own module handle"); return GLFW_FALSE;}
 
-        _glfw.win32.user32.instance = _glfwPlatformLoadModule("user32.dll");
+        _glfw.win32.user32.instance = LoadLibraryA("user32.dll");
         if (!_glfw.win32.user32.instance) { DualLogError("Win32: Failed to load user32.dll"); return GLFW_FALSE; }
 
-        _glfw.win32.user32.EnableNonClientDpiScaling_ = (PFN_EnableNonClientDpiScaling)
-            _glfwPlatformGetModuleSymbol(_glfw.win32.user32.instance, "EnableNonClientDpiScaling");
-        _glfw.win32.user32.SetProcessDpiAwarenessContext_ = (PFN_SetProcessDpiAwarenessContext)
-            _glfwPlatformGetModuleSymbol(_glfw.win32.user32.instance, "SetProcessDpiAwarenessContext");
-        _glfw.win32.user32.GetDpiForWindow_ = (PFN_GetDpiForWindow)
-            _glfwPlatformGetModuleSymbol(_glfw.win32.user32.instance, "GetDpiForWindow");
-        _glfw.win32.user32.AdjustWindowRectExForDpi_ = (PFN_AdjustWindowRectExForDpi)
-            _glfwPlatformGetModuleSymbol(_glfw.win32.user32.instance, "AdjustWindowRectExForDpi");
-        _glfw.win32.user32.GetSystemMetricsForDpi_ = (PFN_GetSystemMetricsForDpi)
-            _glfwPlatformGetModuleSymbol(_glfw.win32.user32.instance, "GetSystemMetricsForDpi");
-
-        _glfw.win32.dinput8.instance = _glfwPlatformLoadModule("dinput8.dll");
-        if (_glfw.win32.dinput8.instance)
-        {
-            _glfw.win32.dinput8.Create = (PFN_DirectInput8Create)
-                _glfwPlatformGetModuleSymbol(_glfw.win32.dinput8.instance, "DirectInput8Create");
-        }
-
-        {
-            int i;
-            const char* names[] =
-            {
-                "xinput1_4.dll",
-                "xinput1_3.dll",
-                "xinput9_1_0.dll",
-                "xinput1_2.dll",
-                "xinput1_1.dll",
-                NULL
-            };
-
-            for (i = 0;  names[i];  i++)
-            {
-                _glfw.win32.xinput.instance = _glfwPlatformLoadModule(names[i]);
-                if (_glfw.win32.xinput.instance)
-                {
-                    _glfw.win32.xinput.GetCapabilities = (PFN_XInputGetCapabilities)
-                        _glfwPlatformGetModuleSymbol(_glfw.win32.xinput.instance, "XInputGetCapabilities");
-                    _glfw.win32.xinput.GetState = (PFN_XInputGetState)
-                        _glfwPlatformGetModuleSymbol(_glfw.win32.xinput.instance, "XInputGetState");
-
-                    break;
-                }
+        _glfw.win32.dinput8.instance = LoadLibraryA("dinput8.dll");
+        if (_glfw.win32.dinput8.instance) _glfw.win32.dinput8.Create = (PFN_DirectInput8Create)_glfwPlatformGetModuleSymbol(_glfw.win32.dinput8.instance, "DirectInput8Create");
+        const char* names[] = {"xinput1_4.dll","xinput1_3.dll","xinput9_1_0.dll","xinput1_2.dll","xinput1_1.dll",NULL};
+        for (int i=0;names[i];++i) {
+            _glfw.win32.xinput.instance = LoadLibraryA(names[i]);
+            if (_glfw.win32.xinput.instance) {
+                _glfw.win32.xinput.GetCapabilities = (PFN_XInputGetCapabilities)_glfwPlatformGetModuleSymbol(_glfw.win32.xinput.instance, "XInputGetCapabilities");
+                _glfw.win32.xinput.GetState = (PFN_XInputGetState)_glfwPlatformGetModuleSymbol(_glfw.win32.xinput.instance, "XInputGetState");
+                break;
             }
         }
 
-        _glfw.win32.dwmapi.instance = _glfwPlatformLoadModule("dwmapi.dll");
-        if (_glfw.win32.dwmapi.instance)
-        {
-            _glfw.win32.dwmapi.IsCompositionEnabled = (PFN_DwmIsCompositionEnabled)
-                _glfwPlatformGetModuleSymbol(_glfw.win32.dwmapi.instance, "DwmIsCompositionEnabled");
-            _glfw.win32.dwmapi.Flush = (PFN_DwmFlush)
-                _glfwPlatformGetModuleSymbol(_glfw.win32.dwmapi.instance, "DwmFlush");
-            _glfw.win32.dwmapi.EnableBlurBehindWindow = (PFN_DwmEnableBlurBehindWindow)
-                _glfwPlatformGetModuleSymbol(_glfw.win32.dwmapi.instance, "DwmEnableBlurBehindWindow");
-            _glfw.win32.dwmapi.GetColorizationColor = (PFN_DwmGetColorizationColor)
-                _glfwPlatformGetModuleSymbol(_glfw.win32.dwmapi.instance, "DwmGetColorizationColor");
+        _glfw.win32.dwmapi.instance = LoadLibraryA("dwmapi.dll");
+        if (_glfw.win32.dwmapi.instance) {
+            _glfw.win32.dwmapi.IsCompositionEnabled = (PFN_DwmIsCompositionEnabled)_glfwPlatformGetModuleSymbol(_glfw.win32.dwmapi.instance, "DwmIsCompositionEnabled");
+            _glfw.win32.dwmapi.Flush = (PFN_DwmFlush)_glfwPlatformGetModuleSymbol(_glfw.win32.dwmapi.instance, "DwmFlush");
+            _glfw.win32.dwmapi.EnableBlurBehindWindow = (PFN_DwmEnableBlurBehindWindow)_glfwPlatformGetModuleSymbol(_glfw.win32.dwmapi.instance, "DwmEnableBlurBehindWindow");
+            _glfw.win32.dwmapi.GetColorizationColor = (PFN_DwmGetColorizationColor)_glfwPlatformGetModuleSymbol(_glfw.win32.dwmapi.instance, "DwmGetColorizationColor");
         }
 
-        _glfw.win32.shcore.instance = _glfwPlatformLoadModule("shcore.dll");
-        if (_glfw.win32.shcore.instance)
-        {
-            _glfw.win32.shcore.SetProcessDpiAwareness_ = (PFN_SetProcessDpiAwareness)
-                _glfwPlatformGetModuleSymbol(_glfw.win32.shcore.instance, "SetProcessDpiAwareness");
-            _glfw.win32.shcore.GetDpiForMonitor_ = (PFN_GetDpiForMonitor)
-                _glfwPlatformGetModuleSymbol(_glfw.win32.shcore.instance, "GetDpiForMonitor");
-        }
-
-        _glfw.win32.ntdll.instance = _glfwPlatformLoadModule("ntdll.dll");
-        if (_glfw.win32.ntdll.instance)
-        {
-            _glfw.win32.ntdll.RtlVerifyVersionInfo_ = (PFN_RtlVerifyVersionInfo)
-                _glfwPlatformGetModuleSymbol(_glfw.win32.ntdll.instance, "RtlVerifyVersionInfo");
-        }
-
+        _glfw.win32.ntdll.instance = LoadLibraryA("ntdll.dll");
+        if (_glfw.win32.ntdll.instance) _glfw.win32.ntdll.RtlVerifyVersionInfo_ = (PFN_RtlVerifyVersionInfo)_glfwPlatformGetModuleSymbol(_glfw.win32.ntdll.instance, "RtlVerifyVersionInfo");
         return GLFW_TRUE;
     }
 
@@ -2016,13 +1697,7 @@ void* _glfw_realloc(void* block, size_t size) {
 
     int _glfwInitWin32(void) {
         if (!loadLibraries()) return GLFW_FALSE;
-
-        createKeyTables();
-        if (_glfwIsWindows10Version1703OrGreaterWin32()) SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
-        else if (IsWindows8Point1OrGreater()) SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
-        else SetProcessDPIAware();
-
-        if (!createHelperWindow()) return GLFW_FALSE;
+        createKeyTables(); if (!createHelperWindow()) return GLFW_FALSE;
 
         _glfwPollMonitorsWin32();
         return GLFW_TRUE;
@@ -2105,7 +1780,7 @@ void* _glfw_realloc(void* block, size_t size) {
             case 0x03: return "XInput Arcade Stick";
             case 0x04: return "XInput Flight Stick";
             case XINPUT_DEVSUBTYPE_GAMEPAD: {
-                if (xic->Flags & XINPUT_CAPS_WIRELESS) return "Wireless Xbox Controller";
+                if (xic->Flags & 0x0002/*Xinput caps wireless*/) return "Wireless Xbox Controller";
                 else return "Xbox Controller";
             }
         }
@@ -2264,7 +1939,7 @@ void* _glfw_realloc(void* block, size_t size) {
             }
 
             if (FAILED(result)) { closeJoystick(js); return GLFW_FALSE; }
-            if (mode == _GLFW_POLL_PRESENCE) return GLFW_TRUE;
+            if (mode == 0/*presence*/) return GLFW_TRUE;
 
             for (i = 0;  i < js->win32.objectCount;  i++) {
                 const void* data = (char*) &state + js->win32.objects[i].offset;
@@ -2307,7 +1982,7 @@ void* _glfw_realloc(void* block, size_t size) {
                 return GLFW_FALSE;
             }
 
-            if (mode == _GLFW_POLL_PRESENCE) return GLFW_TRUE;
+            if (mode == 0/*presence*/) return GLFW_TRUE;
 
             _glfwInputJoystickAxis(js, 0, (xis.Gamepad.sThumbLX + 0.5f) / 32767.5f);
             _glfwInputJoystickAxis(js, 1, -(xis.Gamepad.sThumbLY + 0.5f) / 32767.5f);
@@ -2336,7 +2011,7 @@ void* _glfw_realloc(void* block, size_t size) {
     void _glfwDetectJoystickDisconnectionWin32(void) {
         for (int jid = 0;  jid <= GLFW_JOYSTICK_LAST;  jid++) {
             _GLFWjoystick* js = _glfw.joysticks + jid;
-            if (js->connected) _glfwPollJoystickWin32(js, _GLFW_POLL_PRESENCE);
+            if (js->connected) _glfwPollJoystickWin32(js,0/*presence*/);
         }
     }
 
@@ -2403,13 +2078,12 @@ void* _glfw_realloc(void* block, size_t size) {
         }
 
         for (adapterIndex = 0;  ;  adapterIndex++) {
-            int type = _GLFW_INSERT_LAST;
-            ZeroMemory(&adapter, sizeof(adapter));
+            int type = 1; ZeroMemory(&adapter, sizeof(adapter));
             adapter.cb = sizeof(adapter);
             if (!EnumDisplayDevicesW(NULL, adapterIndex, &adapter, 0)) break;
             if (!(adapter.StateFlags & DISPLAY_DEVICE_ACTIVE)) continue;
 
-            if (adapter.StateFlags & DISPLAY_DEVICE_PRIMARY_DEVICE) type = _GLFW_INSERT_FIRST;
+            if (adapter.StateFlags & DISPLAY_DEVICE_PRIMARY_DEVICE) type = 0;
             for (displayIndex = 0;  ;  displayIndex++) {
                 ZeroMemory(&display, sizeof(display));
                 display.cb = sizeof(display);
@@ -2429,8 +2103,7 @@ void* _glfw_realloc(void* block, size_t size) {
                 monitor = createMonitor(&adapter, &display);
                 if (!monitor) { free(disconnected); return; }
 
-                _glfwInputMonitor(monitor, GLFW_CONNECTED, type);
-                type = _GLFW_INSERT_LAST;
+                _glfwInputMonitor(monitor,GLFW_CONNECTED,type); type = 1;
             }
 
             if (displayIndex == 0) {
@@ -2483,19 +2156,6 @@ void* _glfw_realloc(void* block, size_t size) {
     }
 
     void _glfwRestoreVideoModeWin32(_GLFWmonitor* monitor) { if (monitor->win32.modeChanged) { ChangeDisplaySettingsExW(monitor->win32.adapterName,NULL,NULL,CDS_FULLSCREEN,NULL); monitor->win32.modeChanged = GLFW_FALSE; } }
-    void _glfwGetHMONITORContentScaleWin32(HMONITOR handle, float* xscale, float* yscale) {
-        UINT xdpi, ydpi; if (xscale) {*xscale = 0.f;} if (yscale) {*yscale = 0.f;}
-        if (IsWindows8Point1OrGreater()) {
-            if (GetDpiForMonitor(handle, MDT_EFFECTIVE_DPI, &xdpi, &ydpi) != S_OK) { DualLogError("Win32: Failed to query monitor DPI"); return; }
-        } else {
-            const HDC dc = GetDC(NULL);
-            xdpi = GetDeviceCaps(dc,LOGPIXELSX); ydpi = GetDeviceCaps(dc,LOGPIXELSY);
-            ReleaseDC(NULL,dc);
-        }
-
-        if (xscale) {*xscale = xdpi / 96.0f;} if (yscale) {*yscale = ydpi / 96.0f;}
-    }
-
     void _glfwGetMonitorPosWin32(_GLFWmonitor* monitor, int* xpos, int* ypos) {
         DEVMODEW dm; ZeroMemory(&dm,sizeof(dm));
         dm.dmSize = sizeof(dm);
@@ -2542,8 +2202,7 @@ void* _glfw_realloc(void* block, size_t size) {
         dm.dmSize = sizeof(dm);
         if (!EnumDisplaySettingsW(monitor->win32.adapterName, ENUM_CURRENT_SETTINGS, &dm)) { DualLogError("Win32: Failed to query display settings"); return GLFW_FALSE; }
 
-        mode->width  = dm.dmPelsWidth;
-        mode->height = dm.dmPelsHeight;
+        mode->width  = dm.dmPelsWidth; mode->height = dm.dmPelsHeight;
         mode->refreshRate = dm.dmDisplayFrequency;
         _glfwSplitBPP(dm.dmBitsPerPel,&mode->redBits,&mode->greenBits,&mode->blueBits);
         return GLFW_TRUE;
@@ -2567,117 +2226,30 @@ void* _glfw_realloc(void* block, size_t size) {
     void _glfwPlatformDestroyMutex(_GLFWmutex* mutex) { if (mutex->win32.allocated) {DeleteCriticalSection(&mutex->win32.section);} __builtin_memset(mutex, 0, sizeof(_GLFWmutex)); }
     void _glfwPlatformLockMutex(_GLFWmutex* mutex) { EnterCriticalSection(&mutex->win32.section); }
     void _glfwPlatformUnlockMutex(_GLFWmutex* mutex) { LeaveCriticalSection(&mutex->win32.section); }
-    static int findPixelFormatAttribValueWGL(const int* attribs, int attribCount, const int* values, int attrib) {
-        int i;
-        for (i = 0;  i < attribCount;  i++) {
-            if (attribs[i] == attrib) return values[i];
-        }
-
-        DualLogError("WGL: Unknown pixel format attribute requested");
-        return 0;
-    }
-
-    #define ADD_ATTRIB(a) \
-    { \
-        attribs[attribCount++] = a; \
-    }
-    #define FIND_ATTRIB_VALUE(a) \
-        findPixelFormatAttribValueWGL(attribs, attribCount, values, a)
     static int choosePixelFormatWGL(_GLFWwindow* window, const _GLFWctxconfig* ctxconfig, const _GLFWfbconfig* fbconfig) {
-        _GLFWfbconfig* usableConfigs; const _GLFWfbconfig* closest; (void)ctxconfig;
-        int i, pixelFormat, nativeCount, usableCount = 0, attribCount = 0, attribs[40];
-        int values[sizeof(attribs) / sizeof(attribs[0])];
-        nativeCount = DescribePixelFormat(window->context.wgl.dc,1,sizeof(PIXELFORMATDESCRIPTOR),NULL);
-        if (_glfw.wgl.ARB_pixel_format) {
-            ADD_ATTRIB(WGL_SUPPORT_OPENGL_ARB);
-            ADD_ATTRIB(WGL_DRAW_TO_WINDOW_ARB);
-            ADD_ATTRIB(WGL_PIXEL_TYPE_ARB);
-            ADD_ATTRIB(WGL_ACCELERATION_ARB);
-            ADD_ATTRIB(WGL_RED_BITS_ARB);
-            ADD_ATTRIB(WGL_RED_SHIFT_ARB);
-            ADD_ATTRIB(WGL_GREEN_BITS_ARB);
-            ADD_ATTRIB(WGL_GREEN_SHIFT_ARB);
-            ADD_ATTRIB(WGL_BLUE_BITS_ARB);
-            ADD_ATTRIB(WGL_BLUE_SHIFT_ARB);
-            ADD_ATTRIB(WGL_ALPHA_BITS_ARB);
-            ADD_ATTRIB(WGL_ALPHA_SHIFT_ARB);
-            ADD_ATTRIB(WGL_DEPTH_BITS_ARB);
-            ADD_ATTRIB(WGL_STENCIL_BITS_ARB);
-            ADD_ATTRIB(WGL_ACCUM_BITS_ARB);
-            ADD_ATTRIB(WGL_ACCUM_RED_BITS_ARB);
-            ADD_ATTRIB(WGL_ACCUM_GREEN_BITS_ARB);
-            ADD_ATTRIB(WGL_ACCUM_BLUE_BITS_ARB);
-            ADD_ATTRIB(WGL_ACCUM_ALPHA_BITS_ARB);
-            ADD_ATTRIB(WGL_AUX_BUFFERS_ARB);
-            ADD_ATTRIB(WGL_STEREO_ARB);
-            ADD_ATTRIB(WGL_DOUBLE_BUFFER_ARB);
-            const int attrib = 0x2000; int extensionCount;
-            if (!wglGetPixelFormatAttribivARB(window->context.wgl.dc,1,0,1,&attrib,&extensionCount)) { DualLogError("WGL: Failed to retrieve pixel format attribute"); return 0; }
+        (void)ctxconfig;
+        int attribs[24],values[24],attribCount=0,i,pixelFormat,nativeCount,usableCount=0;
+        const int query = 0x2000/*num pixel formats*/;
+        if (!wglGetPixelFormatAttribivARB(window->context.wgl.dc,1,0,1,&query,&nativeCount)) { DualLogError("WGL: Failed to retrieve number of pixel formats"); return 0; }
 
-            nativeCount = vmin(nativeCount, extensionCount);
+        attribs[attribCount++] = 0x2010/*support opengl*/; attribs[attribCount++] = 0x2001/*draw to window*/; attribs[attribCount++] = 0x2013/*pixel type*/; attribs[attribCount++] = 0x2003/*accelaration*/;
+        attribs[attribCount++] = 0x2011/*double buffer*/; attribs[attribCount++] = 0x2015/*r bits*/; attribs[attribCount++] = 0x2017/*g bits*/;
+        attribs[attribCount++] = 0x2019/*b bits*/; attribs[attribCount++] = 0x201b/*a bits*/; attribs[attribCount++] = 0x2022/*depth bits*/; attribs[attribCount++] = 0x2023/*stencil bits*/;
+        _GLFWfbconfig* usableConfigs = _glfw_calloc(nativeCount, sizeof(_GLFWfbconfig));
+        for (i = 0; i < nativeCount; i++) {
+            _GLFWfbconfig* u = usableConfigs + usableCount; pixelFormat = i + 1;
+            if (!wglGetPixelFormatAttribivARB(window->context.wgl.dc,pixelFormat,0,attribCount,attribs,values)) { DualLogError("WGL: Failed to retrieve pixel format attributes"); free(usableConfigs); return 0; }
+            if (values[0] == 0 || values[1] == 0/* support OpenGL + draw to window */ || values[2] != 0x202b/*type rgba*/ || values[3] == 0x2025/*no accel*/ || values[4] != fbconfig->doublebuffer) continue;
+            
+            u->redBits=values[5]; u->greenBits=values[6]; u->blueBits=values[7]; u->alphaBits=values[8]; u->depthBits=values[9]; u->stencilBits=values[10]; u->handle=pixelFormat; usableCount++;
         }
 
-        usableConfigs = _glfw_calloc(nativeCount, sizeof(_GLFWfbconfig));
-
-        for (i = 0;  i < nativeCount;  i++) {
-            _GLFWfbconfig* u = usableConfigs + usableCount;
-            pixelFormat = i + 1;
-            if (_glfw.wgl.ARB_pixel_format) {
-                if (!wglGetPixelFormatAttribivARB(window->context.wgl.dc,pixelFormat,0,attribCount,attribs,values)){ DualLogError("WGL: Failed to retrieve pixel format attributes"); free(usableConfigs); return 0; }
-                if (!FIND_ATTRIB_VALUE(WGL_SUPPORT_OPENGL_ARB) || !FIND_ATTRIB_VALUE(WGL_DRAW_TO_WINDOW_ARB)) continue;
-                if (FIND_ATTRIB_VALUE(WGL_PIXEL_TYPE_ARB) != WGL_TYPE_RGBA_ARB) continue;
-                if (FIND_ATTRIB_VALUE(WGL_ACCELERATION_ARB) == WGL_NO_ACCELERATION_ARB) continue;
-                if (FIND_ATTRIB_VALUE(WGL_DOUBLE_BUFFER_ARB) != fbconfig->doublebuffer) continue;
-
-                u->redBits = FIND_ATTRIB_VALUE(WGL_RED_BITS_ARB);
-                u->greenBits = FIND_ATTRIB_VALUE(WGL_GREEN_BITS_ARB);
-                u->blueBits = FIND_ATTRIB_VALUE(WGL_BLUE_BITS_ARB);
-                u->alphaBits = FIND_ATTRIB_VALUE(WGL_ALPHA_BITS_ARB);
-                u->depthBits = FIND_ATTRIB_VALUE(WGL_DEPTH_BITS_ARB);
-                u->stencilBits = FIND_ATTRIB_VALUE(WGL_STENCIL_BITS_ARB);
-                u->accumRedBits = FIND_ATTRIB_VALUE(WGL_ACCUM_RED_BITS_ARB);
-                u->accumGreenBits = FIND_ATTRIB_VALUE(WGL_ACCUM_GREEN_BITS_ARB);
-                u->accumBlueBits = FIND_ATTRIB_VALUE(WGL_ACCUM_BLUE_BITS_ARB);
-                u->accumAlphaBits = FIND_ATTRIB_VALUE(WGL_ACCUM_ALPHA_BITS_ARB);
-                u->auxBuffers = FIND_ATTRIB_VALUE(WGL_AUX_BUFFERS_ARB);
-                if (FIND_ATTRIB_VALUE(WGL_STEREO_ARB)) u->stereo = GLFW_TRUE;
-            } else {
-                PIXELFORMATDESCRIPTOR pfd;
-                if (!DescribePixelFormat(window->context.wgl.dc,pixelFormat,sizeof(PIXELFORMATDESCRIPTOR),&pfd)) { DualLogError("WGL: Failed to describe pixel format"); free(usableConfigs); return 0; }
-                if (!(pfd.dwFlags & PFD_DRAW_TO_WINDOW) || !(pfd.dwFlags & PFD_SUPPORT_OPENGL)) continue;
-                if (!(pfd.dwFlags & PFD_GENERIC_ACCELERATED) && (pfd.dwFlags & PFD_GENERIC_FORMAT)) continue;
-                if (pfd.iPixelType != PFD_TYPE_RGBA) continue;
-                if (!!(pfd.dwFlags & PFD_DOUBLEBUFFER) != fbconfig->doublebuffer) continue;
-
-                u->redBits = pfd.cRedBits;
-                u->greenBits = pfd.cGreenBits;
-                u->blueBits = pfd.cBlueBits;
-                u->alphaBits = pfd.cAlphaBits;
-                u->depthBits = pfd.cDepthBits;
-                u->stencilBits = pfd.cStencilBits;
-                u->accumRedBits = pfd.cAccumRedBits;
-                u->accumGreenBits = pfd.cAccumGreenBits;
-                u->accumBlueBits = pfd.cAccumBlueBits;
-                u->accumAlphaBits = pfd.cAccumAlphaBits;
-                u->auxBuffers = pfd.cAuxBuffers;
-                if (pfd.dwFlags & PFD_STEREO) u->stereo = GLFW_TRUE;
-            }
-
-            u->handle = pixelFormat;
-            usableCount++;
-        }
-
-        if (!usableCount) { DualLogError("WGL: The driver does not appear to support OpenGL"); free(usableConfigs); return 0; }
-
-        closest = _glfwChooseFBConfig(fbconfig, usableConfigs, usableCount);
+        const _GLFWfbconfig* closest = _glfwChooseFBConfig(fbconfig, usableConfigs, usableCount);
         if (!closest) { DualLogError("WGL: Failed to find a suitable pixel format"); free(usableConfigs); return 0; }
 
-        pixelFormat = (int) closest->handle;
-        free(usableConfigs);
+        pixelFormat = (int)closest->handle; free(usableConfigs);
         return pixelFormat;
     }
-    #undef ADD_ATTRIB
-    #undef FIND_ATTRIB_VALUE
 
     static void makeContextCurrentWGL(_GLFWwindow* window) {
         if (window) {
@@ -2729,7 +2301,7 @@ void* _glfw_realloc(void* block, size_t size) {
 
     GLFWbool _glfwInitWGL(void) {
         PIXELFORMATDESCRIPTOR pfd; HGLRC prc,rc; HDC pdc,dc;
-        _glfw.wgl.instance = _glfwPlatformLoadModule("opengl32.dll"); if (!_glfw.wgl.instance) { DualLogError("WGL: Failed to load opengl32.dll"); return GLFW_FALSE; }
+        _glfw.wgl.instance = LoadLibraryA("opengl32.dll"); if (!_glfw.wgl.instance) { DualLogError("WGL: Failed to load opengl32.dll"); return GLFW_FALSE; }
         _glfw.wgl.CreateContext = (PFN_wglCreateContext)_glfwPlatformGetModuleSymbol(_glfw.wgl.instance, "wglCreateContext");
         _glfw.wgl.DeleteContext = (PFN_wglDeleteContext)_glfwPlatformGetModuleSymbol(_glfw.wgl.instance, "wglDeleteContext");
         _glfw.wgl.GetProcAddress = (PFN_wglGetProcAddress)_glfwPlatformGetModuleSymbol(_glfw.wgl.instance, "wglGetProcAddress");
@@ -2757,11 +2329,6 @@ void* _glfw_realloc(void* block, size_t size) {
         return GLFW_TRUE;
     }
 
-    #define SET_ATTRIB(a, v) \
-    { \
-        attribs[index++] = a; \
-        attribs[index++] = v; \
-    }
     GLFWbool _glfwCreateContextWGL(_GLFWwindow* window, const _GLFWctxconfig* ctxconfig, const _GLFWfbconfig* fbconfig) {
         int attribs[40],pixelFormat; PIXELFORMATDESCRIPTOR pfd; HGLRC share = NULL;
         if (ctxconfig->share) share = ctxconfig->share->context.wgl.handle;
@@ -2772,39 +2339,24 @@ void* _glfw_realloc(void* block, size_t size) {
         if (!pixelFormat) return GLFW_FALSE;
         if (!DescribePixelFormat(window->context.wgl.dc,pixelFormat,sizeof(pfd),&pfd)) { DualLogError("WGL: Failed to retrieve PFD for selected pixel format"); return GLFW_FALSE; }
         if (!SetPixelFormat(window->context.wgl.dc, pixelFormat, &pfd)) { DualLogError("WGL: Failed to set selected pixel format"); return GLFW_FALSE; }
-
-        if (ctxconfig->forward) {
-            if (!_glfw.wgl.ARB_create_context) { DualLogError("WGL: A forward compatible OpenGL context requested but WGL_ARB_create_context is unavailable"); return GLFW_FALSE; }
-        }
-
         if (ctxconfig->profile) {
             if (!_glfw.wgl.ARB_create_context_profile) { DualLogError("WGL: OpenGL profile requested but WGL_ARB_create_context_profile is unavailable"); return GLFW_FALSE; }
         }
 
-
         if (_glfw.wgl.ARB_create_context) {
             int index = 0, mask = 0, flags = 0;
-            if (ctxconfig->forward) flags |= WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB;
             mask |= WGL_CONTEXT_CORE_PROFILE_BIT_ARB;
-            if (ctxconfig->debug) flags |= WGL_CONTEXT_DEBUG_BIT_ARB;
-            if (ctxconfig->major != 1 || ctxconfig->minor != 0) {
-                SET_ATTRIB(WGL_CONTEXT_MAJOR_VERSION_ARB, ctxconfig->major);
-                SET_ATTRIB(WGL_CONTEXT_MINOR_VERSION_ARB, ctxconfig->minor);
-            }
-
-            if (flags)
-                SET_ATTRIB(WGL_CONTEXT_FLAGS_ARB, flags);
-
-            if (mask)
-                SET_ATTRIB(WGL_CONTEXT_PROFILE_MASK_ARB, mask);
-
-            SET_ATTRIB(0, 0);
+            if (ctxconfig->debug) flags |= 0x00000001/*debug bit*/;
+            attribs[index++] = 0x2091/*major*/; attribs[index++] = 4; // OpenGL 4.3
+            attribs[index++] = 0x2092/*minor*/; attribs[index++] = 3; 
+            if (flags) { attribs[index++] = 0x2094/*flags*/; attribs[index++] = flags; }
+            if (mask) { attribs[index++] = 0x9126/*context profile mask*/; attribs[index++] = mask; }
+            attribs[index++] = 0; attribs[index++] = 0;
             window->context.wgl.handle = wglCreateContextAttribsARB(window->context.wgl.dc, share, attribs);
             if (!window->context.wgl.handle) {
                 const DWORD error = GetLastError();
-                if (error == (0xc0070000 | 0x2095)) {
-                    DualLogError("WGL: Driver does not support OpenGL version %i.%i",ctxconfig->major,ctxconfig->minor);
-                } else if (error == (0xc0070000 | 0x2096)) DualLogError("WGL: Driver does not support the requested OpenGL profile");
+                if (error == (0xc0070000 | 0x2095)) DualLogError("WGL: Driver does not support OpenGL version 4.3");
+                else if (error == (0xc0070000 | 0x2096)) DualLogError("WGL: Driver does not support the requested OpenGL profile");
                 else if (error == (0xc0070000 | 0x2054)) DualLogError("WGL: The share context is not compatible with the requested context");
                 else DualLogError("WGL: Failed to create OpenGL context");
                 return GLFW_FALSE;
@@ -2825,23 +2377,19 @@ void* _glfw_realloc(void* block, size_t size) {
         window->context.getProcAddress = getProcAddressWGL;
         return GLFW_TRUE;
     }
-    #undef SET_ATTRIB
     
     GLFWbool _glfwCreateWindowWin32(_GLFWwindow* window, char* title, const _GLFWwndconfig* wndconfig,const _GLFWctxconfig* ctxconfig,const _GLFWfbconfig* fbconfig) {
-        if (!createNativeWindow(window,title,wndconfig,fbconfig)) return GLFW_FALSE;
-        if (ctxconfig->source==GLFW_NATIVE_CONTEXT_API) {
-            if (!_glfwInitWGL()) return GLFW_FALSE;
-            if (!_glfwCreateContextWGL(window,ctxconfig,fbconfig)) return GLFW_FALSE;
-        }
+        if (!createNativeWindow(window,title,wndconfig)) return GLFW_FALSE;
+        if (!_glfwInitWGL()) return GLFW_FALSE;
+        if (!_glfwCreateContextWGL(window,ctxconfig,fbconfig)) return GLFW_FALSE;
         if (!_glfwRefreshContextAttribs(window,ctxconfig)) return GLFW_FALSE;
-        if (wndconfig->mousePassthrough) _glfwSetWindowMousePassthroughWin32(window,GLFW_TRUE);
         if (window->monitor) { _glfwShowWindowWin32(window); _glfwFocusWindowWin32(window); acquireMonitor(window); fitToMonitor(window); if (wndconfig->centerCursor) _glfwCenterCursorInContentArea(window); }
         else if (wndconfig->visible) { _glfwShowWindowWin32(window); if (wndconfig->focused) _glfwFocusWindowWin32(window); }
         return GLFW_TRUE;
     }
 
     int _glfwGetKeyScancodeWin32(int key) { return _glfw.win32.scancodes[key]; }
-    GLFWAPI HGLRC glfwGetWGLContext(GLFWwindow* handle) { _GLFWwindow* window = (_GLFWwindow*) handle; if (window->context.source != GLFW_NATIVE_CONTEXT_API) { return NULL; } return window->context.wgl.handle; }
+    HGLRC glfwGetWGLContext(GLFWwindow* handle) { _GLFWwindow* window = (_GLFWwindow*) handle; return window->context.wgl.handle; }
     #define PLATFORM_getCursorPos(w,x,y)            _glfwGetCursorPosWin32(w,x,y)
     #define PLATFORM_setCursorPos(w,x,y)            _glfwSetCursorPosWin32(w,x,y)
     #define PLATFORM_setCursorMode(w,m)             _glfwSetCursorModeWin32(w,m)
@@ -2876,8 +2424,6 @@ void* _glfw_realloc(void* block, size_t size) {
     #include <dirent.h>
     #define _NET_WM_STATE_REMOVE 0
     #define _NET_WM_STATE_ADD    1
-    #define _NET_WM_STATE_TOGGLE 2
-    #define Button6 6
     #define Button7 7
     #define MWM_HINTS_DECORATIONS 2
     #define MWM_DECOR_ALL         1
@@ -2940,7 +2486,6 @@ void* _glfw_realloc(void* block, size_t size) {
     void* _glfwPlatformLoadModule(const char* path) { return dlopen(path, RTLD_LAZY | RTLD_LOCAL); }
     void _glfwPlatformFreeModule(void* module) { if (module) {dlclose(module);} }
     GLFWproc _glfwPlatformGetModuleSymbol(void* module, const char* name) { return dlsym(module, name); }
-
     static GLFWbool waitForX11Event(double* timeout) {
         struct pollfd fd = {ConnectionNumber(_glfw.x11.display),POLLIN,0U};
         while (!XPending(_glfw.x11.display)) { if (!_glfwPollPOSIX(&fd,1,timeout)) return GLFW_FALSE; }
@@ -2970,17 +2515,6 @@ void* _glfw_realloc(void* block, size_t size) {
     static Bool isFrameExtentsEvent(Display* display,XEvent* event,XPointer pointer) {
         _GLFWwindow* window=(_GLFWwindow*)pointer; (void)display;
         return event->type==PropertyNotify && event->xproperty.state==PropertyNewValue && event->xproperty.window==window->x11.handle && event->xproperty.atom==_glfw.x11.NET_FRAME_EXTENTS;
-    }
-
-    static int translateState(int state) {
-        int mods=0;
-        if (state & ShiftMask)   mods |= GLFW_MOD_SHIFT;
-        if (state & ControlMask) mods |= GLFW_MOD_CONTROL;
-        if (state & Mod1Mask)    mods |= GLFW_MOD_ALT;
-        if (state & Mod4Mask)    mods |= GLFW_MOD_SUPER;
-        if (state & LockMask)    mods |= GLFW_MOD_CAPS_LOCK;
-        if (state & Mod2Mask)    mods |= GLFW_MOD_NUM_LOCK;
-        return mods;
     }
 
     static int translateKey(int scancode) { return (scancode<0||scancode>255) ? GLFW_KEY_UNKNOWN : _glfw.x11.keycodes[scancode]; }
@@ -3018,7 +2552,8 @@ void* _glfw_realloc(void* block, size_t size) {
                 XChangeWindowAttributes(_glfw.x11.display,window->x11.handle,CWOverrideRedirect,&attributes);
                 window->x11.overrideRedirect=GLFW_TRUE;
             }
-            if (!window->x11.transparent) { const unsigned long value=1; XChangeProperty(_glfw.x11.display,window->x11.handle,_glfw.x11.NET_WM_BYPASS_COMPOSITOR,XA_CARDINAL,32,PropModeReplace,(unsigned char*)&value,1); }
+            
+            const unsigned long value=1; XChangeProperty(_glfw.x11.display,window->x11.handle,_glfw.x11.NET_WM_BYPASS_COMPOSITOR,XA_CARDINAL,32,PropModeReplace,(unsigned char*)&value,1);
         } else {
             if (_glfw.x11.NET_WM_STATE && _glfw.x11.NET_WM_STATE_FULLSCREEN) sendEventToWM(window,_glfw.x11.NET_WM_STATE,_NET_WM_STATE_REMOVE,_glfw.x11.NET_WM_STATE_FULLSCREEN,0,1,0);
             else {
@@ -3026,12 +2561,13 @@ void* _glfw_realloc(void* block, size_t size) {
                 XChangeWindowAttributes(_glfw.x11.display,window->x11.handle,CWOverrideRedirect,&attributes);
                 window->x11.overrideRedirect=GLFW_FALSE;
             }
-            if (!window->x11.transparent) XDeleteProperty(_glfw.x11.display,window->x11.handle,_glfw.x11.NET_WM_BYPASS_COMPOSITOR);
+            
+            XDeleteProperty(_glfw.x11.display,window->x11.handle,_glfw.x11.NET_WM_BYPASS_COMPOSITOR);
         }
     }
 
     static void updateCursorImage(_GLFWwindow* window) {
-        if (window->cursorMode==GLFW_CURSOR_NORMAL || window->cursorMode==GLFW_CURSOR_CAPTURED) { // Used when pressing windows key to lose focus and while cursor is hovered over window
+        if (window->cursorMode==GLFW_CURSOR_NORMAL) { // Used when pressing windows key to lose focus and while cursor is hovered over window
             if (window->cursor) XDefineCursor(_glfw.x11.display,window->x11.handle,window->cursor->x11.handle);
             else XUndefineCursor(_glfw.x11.display,window->x11.handle);
         } else XDefineCursor(_glfw.x11.display,window->x11.handle,_glfw.x11.hiddenCursorHandle);
@@ -3122,12 +2658,6 @@ void* _glfw_realloc(void* block, size_t size) {
             XSetScreenSaver(_glfw.x11.display,_glfw.x11.saver.timeout,_glfw.x11.saver.interval,_glfw.x11.saver.blanking,_glfw.x11.saver.exposure);
     }
 
-    GLFWbool _glfwIsVisualTransparentX11(Visual* visual) {
-        if (!_glfw.x11.xrender.available) return GLFW_FALSE;
-        XRenderPictFormat* pf=XRenderFindVisualFormat(_glfw.x11.display,visual);
-        return pf && pf->direct.alphaMask;
-    }
-
     void _glfwCreateInputContextX11(_GLFWwindow* window) {
         XIMCallback callback; callback.callback=(XIMProc)inputContextDestroyCallback; callback.client_data=(XPointer)window;
         window->x11.ic=XCreateIC(_glfw.x11.im,XNInputStyle,XIMPreeditNothing|XIMStatusNothing,XNClientWindow,window->x11.handle,XNFocusWindow,window->x11.handle,XNDestroyCallback,&callback,NULL);
@@ -3187,11 +2717,6 @@ void* _glfw_realloc(void* block, size_t size) {
         if (window->monitor) { if (window->monitor->window==window) acquireMonitor(window); }
         else { if (!window->resizable) updateNormalHints(window,width,height); XResizeWindow(_glfw.x11.display,window->x11.handle,width,height); }
         XFlush(_glfw.x11.display);
-    }
-
-    void _glfwSetWindowSizeLimitsX11(_GLFWwindow* window,int minwidth,int minheight,int maxwidth,int maxheight) {
-        int width,height; (void)minwidth;(void)minheight;(void)maxwidth;(void)maxheight;
-        _glfwGetWindowSizeX11(window,&width,&height); updateNormalHints(window,width,height); XFlush(_glfw.x11.display);
     }
 
     void _glfwGetWindowFrameSizeX11(_GLFWwindow* window,int* left,int* top,int* right,int* bottom) {
@@ -3281,7 +2806,7 @@ void* _glfw_realloc(void* block, size_t size) {
         } else { updateWindowMode(window); XMoveResizeWindow(_glfw.x11.display,window->x11.handle,xpos,ypos,width,height); }
         XFlush(_glfw.x11.display);
     }
-
+    
     GLFWbool _glfwWindowFocusedX11(_GLFWwindow* window) { Window focused; int state; XGetInputFocus(_glfw.x11.display,&focused,&state); return window->x11.handle==focused; }
     GLFWbool _glfwWindowVisibleX11(_GLFWwindow* window) { XWindowAttributes wa; XGetWindowAttributes(_glfw.x11.display,window->x11.handle,&wa); return wa.map_state==IsViewable; }
     static int errorHandler(Display* display, XErrorEvent* event) { if (_glfw.x11.display == display) _glfw.x11.errorCode = event->error_code; return 0; }
@@ -3321,39 +2846,33 @@ void* _glfw_realloc(void* block, size_t size) {
             case ReparentNotify: window->x11.parent=event->xreparent.parent; return;
             case KeyPress:
             case KeyRelease: {
-                const int key=translateKey(keycode),mods=translateState(event->xkey.state),action=(event->type==KeyPress)?GLFW_PRESS:GLFW_RELEASE;
-                if (key!=GLFW_KEY_UNKNOWN) _glfwInputKey(window,key,keycode,action,mods);
+                const int key=translateKey(keycode),action=(event->type==KeyPress)?GLFW_PRESS:GLFW_RELEASE;
+                if (key!=GLFW_KEY_UNKNOWN) _glfwInputKey(window,key,action);
                 return;
             }
             case ButtonPress: {
-                const int mods=translateState(event->xbutton.state);
-                if      (event->xbutton.button==Button1) _glfwInputMouseClick(window,GLFW_MOUSE_BUTTON_LEFT,GLFW_PRESS,mods);
-                else if (event->xbutton.button==Button2) _glfwInputMouseClick(window,GLFW_MOUSE_BUTTON_MIDDLE,GLFW_PRESS,mods);
-                else if (event->xbutton.button==Button3) _glfwInputMouseClick(window,GLFW_MOUSE_BUTTON_RIGHT,GLFW_PRESS,mods);
-                else if (event->xbutton.button==Button4) _glfwInputScroll(window,0.0,1.0);
-                else if (event->xbutton.button==Button5) _glfwInputScroll(window,0.0,-1.0);
-                else if (event->xbutton.button==Button6) _glfwInputScroll(window,1.0,0.0);
-                else if (event->xbutton.button==Button7) _glfwInputScroll(window,-1.0,0.0);
-                else _glfwInputMouseClick(window,event->xbutton.button-Button1-4,GLFW_PRESS,mods);
+                if      (event->xbutton.button==1) _glfwInputMouseClick(window,GLFW_MOUSE_BUTTON_LEFT,GLFW_PRESS);
+                else if (event->xbutton.button==2) _glfwInputMouseClick(window,GLFW_MOUSE_BUTTON_MIDDLE,GLFW_PRESS);
+                else if (event->xbutton.button==3) _glfwInputMouseClick(window,GLFW_MOUSE_BUTTON_RIGHT,GLFW_PRESS);
+                else if (event->xbutton.button==4) Sys_Input.scrollDelta += 1.0;
+                else if (event->xbutton.button==5) Sys_Input.scrollDelta += -1.0;
+                else _glfwInputMouseClick(window,event->xbutton.button-Button1-4,GLFW_PRESS);
                 return;
             }
             case ButtonRelease: {
-                const int mods=translateState(event->xbutton.state);
-                if      (event->xbutton.button==Button1) _glfwInputMouseClick(window,GLFW_MOUSE_BUTTON_LEFT,GLFW_RELEASE,mods);
-                else if (event->xbutton.button==Button2) _glfwInputMouseClick(window,GLFW_MOUSE_BUTTON_MIDDLE,GLFW_RELEASE,mods);
-                else if (event->xbutton.button==Button3) _glfwInputMouseClick(window,GLFW_MOUSE_BUTTON_RIGHT,GLFW_RELEASE,mods);
-                else if (event->xbutton.button>Button7)  _glfwInputMouseClick(window,event->xbutton.button-Button1-4,GLFW_RELEASE,mods);
+                if      (event->xbutton.button==1) _glfwInputMouseClick(window,GLFW_MOUSE_BUTTON_LEFT,GLFW_RELEASE);
+                else if (event->xbutton.button==2) _glfwInputMouseClick(window,GLFW_MOUSE_BUTTON_MIDDLE,GLFW_RELEASE);
+                else if (event->xbutton.button==3) _glfwInputMouseClick(window,GLFW_MOUSE_BUTTON_RIGHT,GLFW_RELEASE);
+                else if (event->xbutton.button>7)  _glfwInputMouseClick(window,event->xbutton.button-Button1-4,GLFW_RELEASE);
                 return;
             }
             case EnterNotify: {
                 const int x=event->xcrossing.x,y=event->xcrossing.y;
-                if (window->cursorMode==GLFW_CURSOR_HIDDEN) updateCursorImage(window);
-                _glfwInputCursorEnter(window,GLFW_TRUE);
                 _glfwInputCursorPos(window,x,y);
                 window->x11.lastCursorPosX=x; window->x11.lastCursorPosY=y;
                 return;
             }
-            case LeaveNotify: _glfwInputCursorEnter(window,GLFW_FALSE); return;
+            case LeaveNotify: return;
             case MotionNotify: {
                 const int x=event->xmotion.x,y=event->xmotion.y;
                 if (x!=window->x11.warpCursorPosX || y!=window->x11.warpCursorPosY) {
@@ -3366,11 +2885,7 @@ void* _glfw_realloc(void* block, size_t size) {
                 return;
             }
             case ConfigureNotify: {
-                if (event->xconfigure.width!=window->x11.width || event->xconfigure.height!=window->x11.height) {
-                    window->x11.width=event->xconfigure.width; window->x11.height=event->xconfigure.height;
-                    _glfwInputFramebufferSize(window,event->xconfigure.width,event->xconfigure.height);
-                    _glfwInputWindowSize(window,event->xconfigure.width,event->xconfigure.height);
-                }
+                if (event->xconfigure.width!=window->x11.width || event->xconfigure.height!=window->x11.height) { window->x11.width=event->xconfigure.width; window->x11.height=event->xconfigure.height; UpdateScreenSize(event->xconfigure.width,event->xconfigure.height); }
                 int xpos=event->xconfigure.x,ypos=event->xconfigure.y;
                 if (!event->xany.send_event && window->x11.parent!=_glfw.x11.root) {
                     _glfwGrabErrorHandlerX11();
@@ -3379,7 +2894,7 @@ void* _glfw_realloc(void* block, size_t size) {
                     _glfwReleaseErrorHandlerX11();
                     if (_glfw.x11.errorCode==BadWindow) return;
                 }
-                if (xpos!=window->x11.xpos || ypos!=window->x11.ypos) { window->x11.xpos=xpos; window->x11.ypos=ypos; _glfwInputWindowPos(window,xpos,ypos); }
+                if (xpos!=window->x11.xpos || ypos!=window->x11.ypos) { window->x11.xpos=xpos; window->x11.ypos=ypos; }
                 return;
             }
             case ClientMessage: {
@@ -3388,8 +2903,8 @@ void* _glfw_realloc(void* block, size_t size) {
                 if (event->xclient.message_type==_glfw.x11.WM_PROTOCOLS) {
                     const Atom protocol=event->xclient.data.l[0];
                     if (protocol==None) return;
-                    if (protocol==_glfw.x11.WM_DELETE_WINDOW) _glfwInputWindowCloseRequest(window);
-                    else if (protocol==_glfw.x11.NET_WM_PING) {
+                    if (protocol == _glfw.x11.WM_DELETE_WINDOW) window->shouldClose = GLFW_TRUE;
+                    if (protocol==_glfw.x11.NET_WM_PING) {
                         XEvent reply=*event; reply.xclient.window=_glfw.x11.root;
                         XSendEvent(_glfw.x11.display,_glfw.x11.root,False,SubstructureNotifyMask|SubstructureRedirectMask,&reply);
                     }
@@ -3399,7 +2914,6 @@ void* _glfw_realloc(void* block, size_t size) {
             case FocusIn: {
                 if (event->xfocus.mode==NotifyGrab || event->xfocus.mode==NotifyUngrab) return;
                 if (window->cursorMode==GLFW_CURSOR_DISABLED) disableCursor(window);
-                else if (window->cursorMode==GLFW_CURSOR_CAPTURED) captureCursor(window);
                 if (window->x11.ic) XSetICFocus(window->x11.ic);
                 _glfwInputWindowFocus(window,GLFW_TRUE);
                 return;
@@ -3407,7 +2921,6 @@ void* _glfw_realloc(void* block, size_t size) {
             case FocusOut: {
                 if (event->xfocus.mode==NotifyGrab || event->xfocus.mode==NotifyUngrab) return;
                 if (window->cursorMode==GLFW_CURSOR_DISABLED) enableCursor(window);
-                else if (window->cursorMode==GLFW_CURSOR_CAPTURED) releaseCursor();
                 if (window->x11.ic) XUnsetICFocus(window->x11.ic);
                 _glfwInputWindowFocus(window,GLFW_FALSE);
                 return;
@@ -3421,11 +2934,10 @@ void* _glfw_realloc(void* block, size_t size) {
                     if (window->x11.iconified!=iconified) {
                         if (window->monitor) { if (iconified) releaseMonitor(window); else acquireMonitor(window); }
                         window->x11.iconified=iconified;
-                        _glfwInputWindowIconify(window,iconified);
                     }
                 } else if (event->xproperty.atom==_glfw.x11.NET_WM_STATE) {
                     const GLFWbool maximized=_glfwWindowMaximizedX11(window);
-                    if (window->x11.maximized!=maximized) { window->x11.maximized=maximized; _glfwInputWindowMaximize(window,maximized); }
+                    if (window->x11.maximized!=maximized) window->x11.maximized=maximized;
                 }
                 return;
             }
@@ -3440,7 +2952,6 @@ void* _glfw_realloc(void* block, size_t size) {
         int xpos=0,ypos=0;
         if (wndconfig->xpos!=(int)GLFW_ANY_POSITION && wndconfig->ypos!=(int)GLFW_ANY_POSITION) { xpos=wndconfig->xpos; ypos=wndconfig->ypos; }
         window->x11.colormap=XCreateColormap(_glfw.x11.display,_glfw.x11.root,visual,AllocNone);
-        window->x11.transparent=_glfwIsVisualTransparentX11(visual);
         XSetWindowAttributes wa={0};
         wa.colormap=window->x11.colormap;
         wa.event_mask=StructureNotifyMask|KeyPressMask|KeyReleaseMask|PointerMotionMask|ButtonPressMask|ButtonReleaseMask|ExposureMask|FocusChangeMask|VisibilityChangeMask|EnterWindowMask|LeaveWindowMask|PropertyChangeMask;
@@ -3547,7 +3058,7 @@ void* _glfw_realloc(void* block, size_t size) {
                 _glfwCenterCursorInContentArea(window);
                 if (window->rawMouseMotion) enableRawMouseMotion(window);
             } else if (_glfw.x11.disabledCursorWindow==window) { if (window->rawMouseMotion) disableRawMouseMotion(window); }
-            if (mode==GLFW_CURSOR_DISABLED || mode==GLFW_CURSOR_CAPTURED) captureCursor(window); else releaseCursor();
+            if (mode==GLFW_CURSOR_DISABLED) captureCursor(window); else releaseCursor();
             if (mode==GLFW_CURSOR_DISABLED) _glfw.x11.disabledCursorWindow=window;
             else if (_glfw.x11.disabledCursorWindow==window) { _glfw.x11.disabledCursorWindow=NULL; _glfwSetCursorPosX11(window,_glfw.x11.restoreCursorPosX,_glfw.x11.restoreCursorPosY); }
         }
@@ -3558,7 +3069,7 @@ void* _glfw_realloc(void* block, size_t size) {
 
     void _glfwSetCursorX11(_GLFWwindow* window,_GLFWcursor* cursor) {
         (void)cursor;
-        if (window->cursorMode==GLFW_CURSOR_NORMAL || window->cursorMode==GLFW_CURSOR_CAPTURED) { updateCursorImage(window); XFlush(_glfw.x11.display); }
+        if (window->cursorMode==GLFW_CURSOR_NORMAL) { updateCursorImage(window); XFlush(_glfw.x11.display); }
     }
 
     static GLFWbool modeIsGood(const XRRModeInfo* mi) { return (mi->modeFlags & RR_Interlace) == 0; }
@@ -3612,11 +3123,7 @@ void* _glfw_realloc(void* block, size_t size) {
                 if (j < disconnectedCount) { XRRFreeOutputInfo(oi); continue; }
 
                 XRRCrtcInfo* ci = XRRGetCrtcInfo(_glfw.x11.display, sr, oi->crtc);
-                if (!ci)
-                {
-                    XRRFreeOutputInfo(oi);
-                    continue;
-                }
+                if (!ci) { XRRFreeOutputInfo(oi); continue; }
 
                 if (ci->rotation == RR_Rotate_90 || ci->rotation == RR_Rotate_270) { widthMM  = oi->mm_height; heightMM = oi->mm_width; }
                 else { widthMM  = oi->mm_width; heightMM = oi->mm_height; }
@@ -3628,11 +3135,7 @@ void* _glfw_realloc(void* block, size_t size) {
                     if (screens[j].x_org == ci->x && screens[j].y_org == ci->y && screens[j].width == (short)ci->width && screens[j].height == (short)ci->height) { monitor->x11.index = j; break; }
                 }
 
-                if (monitor->x11.output == primary) type = _GLFW_INSERT_FIRST;
-                else type = _GLFW_INSERT_LAST;
-
-                _glfwInputMonitor(monitor, GLFW_CONNECTED, type);
-                XRRFreeOutputInfo(oi); XRRFreeCrtcInfo(ci);
+                type = (monitor->x11.output == primary) ? 0 : 1; _glfwInputMonitor(monitor,GLFW_CONNECTED,type); XRRFreeOutputInfo(oi); XRRFreeCrtcInfo(ci);
             }
 
             XRRFreeScreenResources(sr);
@@ -3644,7 +3147,7 @@ void* _glfw_realloc(void* block, size_t size) {
             free(disconnected);
         } else {
             const int widthMM = DisplayWidthMM(_glfw.x11.display, _glfw.x11.screen); const int heightMM = DisplayHeightMM(_glfw.x11.display, _glfw.x11.screen);
-            _glfwInputMonitor(_glfwAllocMonitor("Display", widthMM, heightMM),GLFW_CONNECTED,_GLFW_INSERT_FIRST);
+            _glfwInputMonitor(_glfwAllocMonitor("Display", widthMM, heightMM),GLFW_CONNECTED,0);
         }
     }
 
@@ -3752,20 +3255,8 @@ void* _glfw_realloc(void* block, size_t size) {
     }
 
     int _glfwGetKeyScancodeX11(int key) { return _glfw.x11.scancodes[key]; }
-    GLFWAPI RRCrtc glfwGetX11Adapter(GLFWmonitor* handle) {
-        if (_glfw.platform.platformID != GLFW_PLATFORM_X11) { DualLogError("X11: Platform not initialized"); return None; }
-
-        _GLFWmonitor* monitor = (_GLFWmonitor*) handle;
-        return monitor->x11.crtc;
-    }
-
-    GLFWAPI RROutput glfwGetX11Monitor(GLFWmonitor* handle) {
-        if (_glfw.platform.platformID != GLFW_PLATFORM_X11) { DualLogError("X11: Platform not initialized"); return None; }
-
-        _GLFWmonitor* monitor = (_GLFWmonitor*) handle;
-        return monitor->x11.output;
-    }
-
+    RRCrtc glfwGetX11Adapter(GLFWmonitor* handle) { _GLFWmonitor* monitor = (_GLFWmonitor*) handle; return monitor->x11.crtc; }
+    RROutput glfwGetX11Monitor(GLFWmonitor* handle) { _GLFWmonitor* monitor = (_GLFWmonitor*) handle; return monitor->x11.output; }
     static int translateKeySyms(const KeySym* keysyms, int width) {
         if (width > 1) {
             switch (keysyms[1]) {
@@ -4095,21 +3586,6 @@ void* _glfw_realloc(void* block, size_t size) {
         return GLFW_TRUE;
     }
 
-    static void getSystemContentScale(float* xscale, float* yscale) {
-        float xdpi = 96.f, ydpi = 96.f;
-        char* rms = XResourceManagerString(_glfw.x11.display);
-        if (rms) {
-            XrmDatabase db = XrmGetStringDatabase(rms);
-            if (db) {
-                XrmValue value; char* type = NULL;
-                if (XrmGetResource(db, "Xft.dpi","Xft.Dpi",&type,&value))
-                    if (type && strcmp(type, "String") == 0) xdpi = ydpi = atof(value.addr);
-                XrmDestroyDatabase(db);
-            }
-        }
-        *xscale = xdpi / 96.f; *yscale = ydpi / 96.f;
-    }
-
     static Window createHelperWindow(void) {
         XSetWindowAttributes wa; wa.event_mask = PropertyChangeMask;
         return XCreateWindow(_glfw.x11.display,_glfw.x11.root,0,0,1,1,0,0,InputOnly,DefaultVisual(_glfw.x11.display,_glfw.x11.screen),CWEventMask,&wa);
@@ -4175,9 +3651,6 @@ void* _glfw_realloc(void* block, size_t size) {
         _glfw.x11.xlib.GetIMValues = (PFN_XGetIMValues)_glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XGetIMValues");
         _glfw.x11.xlib.GetInputFocus = (PFN_XGetInputFocus)_glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XGetInputFocus");
         _glfw.x11.xlib.GetKeyboardMapping = (PFN_XGetKeyboardMapping)_glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XGetKeyboardMapping");
-        _glfw.x11.xlib.GetScreenSaver = (PFN_XGetScreenSaver)_glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XGetScreenSaver");
-        _glfw.x11.xlib.GetSelectionOwner = (PFN_XGetSelectionOwner)_glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XGetSelectionOwner");
-        _glfw.x11.xlib.GetVisualInfo = (PFN_XGetVisualInfo)_glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XGetVisualInfo");
         _glfw.x11.xlib.GetWMNormalHints = (PFN_XGetWMNormalHints)_glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XGetWMNormalHints");
         _glfw.x11.xlib.GetWindowAttributes = (PFN_XGetWindowAttributes)_glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XGetWindowAttributes");
         _glfw.x11.xlib.GetWindowProperty = (PFN_XGetWindowProperty)_glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XGetWindowProperty");
@@ -4208,8 +3681,6 @@ void* _glfw_realloc(void* block, size_t size) {
         _glfw.x11.xlib.SetIMValues = (PFN_XSetIMValues)_glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XSetIMValues");
         _glfw.x11.xlib.SetInputFocus = (PFN_XSetInputFocus)_glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XSetInputFocus");
         _glfw.x11.xlib.SetLocaleModifiers = (PFN_XSetLocaleModifiers)_glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XSetLocaleModifiers");
-        _glfw.x11.xlib.SetScreenSaver = (PFN_XSetScreenSaver)_glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XSetScreenSaver");
-        _glfw.x11.xlib.SetSelectionOwner = (PFN_XSetSelectionOwner)_glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XSetSelectionOwner");
         _glfw.x11.xlib.SetWMHints = (PFN_XSetWMHints)_glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XSetWMHints");
         _glfw.x11.xlib.SetWMNormalHints = (PFN_XSetWMNormalHints)_glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XSetWMNormalHints");
         _glfw.x11.xlib.SetWMProtocols = (PFN_XSetWMProtocols)_glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XSetWMProtocols");
@@ -4231,18 +3702,11 @@ void* _glfw_realloc(void* block, size_t size) {
         _glfw.x11.xkb.QueryExtension = (PFN_XkbQueryExtension) _glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XkbQueryExtension");
         _glfw.x11.xkb.SelectEventDetails = (PFN_XkbSelectEventDetails) _glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XkbSelectEventDetails");
         _glfw.x11.xkb.SetDetectableAutoRepeat = (PFN_XkbSetDetectableAutoRepeat)_glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XkbSetDetectableAutoRepeat");
-        _glfw.x11.xrm.DestroyDatabase = (PFN_XrmDestroyDatabase)_glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XrmDestroyDatabase");
-        _glfw.x11.xrm.GetResource = (PFN_XrmGetResource)_glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XrmGetResource");
-        _glfw.x11.xrm.GetStringDatabase = (PFN_XrmGetStringDatabase)_glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XrmGetStringDatabase");
-        _glfw.x11.xrm.UniqueQuark = (PFN_XrmUniqueQuark)_glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XrmUniqueQuark");
-        _glfw.x11.xlib.UnregisterIMInstantiateCallback = (PFN_XUnregisterIMInstantiateCallback)_glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XUnregisterIMInstantiateCallback");
-        _glfw.x11.xlib.utf8LookupString = (PFN_Xutf8LookupString)_glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "Xutf8LookupString");
-        _glfw.x11.xlib.utf8SetWMProperties = (PFN_Xutf8SetWMProperties)_glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "Xutf8SetWMProperties");
         if (_glfw.x11.xlib.utf8LookupString && _glfw.x11.xlib.utf8SetWMProperties) _glfw.x11.xlib.utf8 = GLFW_TRUE;
         _glfw.x11.screen = DefaultScreen(_glfw.x11.display);
         _glfw.x11.root = RootWindow(_glfw.x11.display,_glfw.x11.screen);
         _glfw.x11.context = XUniqueContext();
-        getSystemContentScale(&_glfw.x11.contentScaleX, &_glfw.x11.contentScaleY);
+        _glfw.x11.contentScaleX=_glfw.x11.contentScaleY=1.0f;
         if (!initExtensions()) return GLFW_FALSE;
         _glfw.x11.helperWindowHandle = createHelperWindow();
         XcursorImage* native = XcursorImageCreate(16,16); __builtin_memset(native->pixels,0,256*sizeof(XcursorPixel)); native->xhot=native->yhot=0;
@@ -4448,9 +3912,7 @@ void* _glfw_realloc(void* block, size_t size) {
     void _glfwUpdateGamepadGUIDLinux(char* guid) { (void)guid; }
     static int getGLXFBConfigAttrib(GLXFBConfig fbconfig, int attrib) { int value; _glfw.glx.GetFBConfigAttrib(_glfw.x11.display, fbconfig, attrib, &value); return value; }
     static GLFWbool chooseGLXFBConfig(const _GLFWfbconfig* desired, GLXFBConfig* result) {
-        GLXFBConfig* nativeConfigs; _GLFWfbconfig* usableConfigs; const _GLFWfbconfig* closest; int nativeCount, usableCount; const char* vendor; GLFWbool trustWindowBit = GLFW_TRUE;
-        vendor = glXGetClientString(_glfw.x11.display,1);
-        if (vendor && strcmp(vendor, "Chromium") == 0) trustWindowBit = GLFW_FALSE;
+        GLXFBConfig* nativeConfigs; _GLFWfbconfig* usableConfigs; const _GLFWfbconfig* closest; int nativeCount,usableCount;
         nativeConfigs = _glfw.glx.GetFBConfigs(_glfw.x11.display, _glfw.x11.screen, &nativeCount);
         if (!nativeConfigs || !nativeCount) { DualLogError("GLX: No GLXFBConfigs returned"); return GLFW_FALSE; }
         usableConfigs = _glfw_calloc(nativeCount, sizeof(_GLFWfbconfig)); usableCount = 0;
@@ -4458,15 +3920,8 @@ void* _glfw_realloc(void* block, size_t size) {
             const GLXFBConfig n = nativeConfigs[i];
             _GLFWfbconfig* u = usableConfigs + usableCount;
             if (!(getGLXFBConfigAttrib(n,0x8011/*render type*/) & 0x00000001/*rgba bit*/)) continue;
-            if (!(getGLXFBConfigAttrib(n,0x8010/*drawable type*/) & 0x00000001/*window bit*/)) {
-                if (trustWindowBit) continue;
-            }
-
+            if (!(getGLXFBConfigAttrib(n,0x8010/*drawable type*/) & 0x00000001/*window bit*/)) continue;
             if (getGLXFBConfigAttrib(n,5) != desired->doublebuffer) continue;
-            if (desired->transparent) {
-                XVisualInfo* vi = glXGetVisualFromFBConfig(_glfw.x11.display, n);
-                if (vi) { u->transparent = _glfwIsVisualTransparentX11(vi->visual); XFree(vi); }
-            }
 
             u->redBits = getGLXFBConfigAttrib(n,8); u->greenBits = getGLXFBConfigAttrib(n,9); u->blueBits = getGLXFBConfigAttrib(n,10); u->alphaBits = getGLXFBConfigAttrib(n,11); u->depthBits = getGLXFBConfigAttrib(n,12); u->stencilBits = getGLXFBConfigAttrib(n,13);
             u->accumRedBits = getGLXFBConfigAttrib(n,14); u->accumGreenBits = getGLXFBConfigAttrib(n,15); u->accumBlueBits = getGLXFBConfigAttrib(n,16); u->accumAlphaBits = getGLXFBConfigAttrib(n,17); u->auxBuffers = getGLXFBConfigAttrib(n,7);
@@ -4515,20 +3970,18 @@ void* _glfw_realloc(void* block, size_t size) {
         GLXFBConfig native = NULL; GLXContext share = NULL;
         if (ctxconfig->share) share = ctxconfig->share->context.glx.handle;
         if (!chooseGLXFBConfig(fbconfig, &native)) { DualLogError("GLX: Failed to find GLXFBConfig"); return GLFW_FALSE; }
-        if (ctxconfig->forward && !_glfw.glx.ARB_create_context) { DualLogError("GLX: Forward compat requested but missing ARB_create_context"); return GLFW_FALSE; }
         if (ctxconfig->profile && (!_glfw.glx.ARB_create_context || !_glfw.glx.ARB_create_context_profile)) { DualLogError("GLX: Profile requested but missing extension"); return GLFW_FALSE; }
 
         _glfwGrabErrorHandlerX11();
         if (_glfw.glx.ARB_create_context) {
-            if (ctxconfig->forward) flags |= 0x00000002/*fwd compat*/;
             mask |= 0x00000001/*core profile*/;
             if (ctxconfig->debug) flags |= 0x00000001/*debug bit arb*/;
-            if (ctxconfig->major != 1 || ctxconfig->minor != 0) { attribs[index++] = 0x2091/*major*/; attribs[index++] = ctxconfig->major; attribs[index++] = 0x2092/*minor*/; attribs[index++] = ctxconfig->minor; }
+            attribs[index++] = 0x2091/*major*/; attribs[index++] = 4; attribs[index++] = 0x2092/*minor*/; attribs[index++] = 3; // OpenGL 4.3
             if (mask) { attribs[index++] = 0x9126/*profile mask arb*/; attribs[index++] = mask; }
             if (flags) { attribs[index++] = 0x2094/*context flags arb*/; attribs[index++] = flags; }
             attribs[index++] = None; attribs[index++] = None;
             window->context.glx.handle = _glfw.glx.CreateContextAttribsARB(_glfw.x11.display,native,share,True,attribs);
-            if (!window->context.glx.handle && _glfw.x11.errorCode == _glfw.glx.errorBase + 13 && !ctxconfig->forward) window->context.glx.handle = createLegacyContextGLX(window, native, share);
+            if (!window->context.glx.handle && _glfw.x11.errorCode == _glfw.glx.errorBase + 13) window->context.glx.handle = createLegacyContextGLX(window, native, share);
         } else window->context.glx.handle = createLegacyContextGLX(window, native, share);
 
         _glfwReleaseErrorHandlerX11();
@@ -4539,16 +3992,6 @@ void* _glfw_realloc(void* block, size_t size) {
         window->context.swapBuffers = swapBuffersGLX; window->context.swapInterval = swapIntervalGLX;
         window->context.extensionSupported = extensionSupportedGLX; window->context.getProcAddress = getProcAddressGLX;
         return GLFW_TRUE;
-    }
-    
-    GLFWbool _glfwChooseVisualGLX(const _GLFWwndconfig* wndconfig, const _GLFWctxconfig* ctxconfig, const _GLFWfbconfig* fbconfig, Visual** visual, int* depth) {
-        GLXFBConfig native; XVisualInfo* result; (void)wndconfig; (void)ctxconfig;
-        if (!chooseGLXFBConfig(fbconfig, &native)) { DualLogError("GLX: Failed to find a suitable GLXFBConfig"); return GLFW_FALSE; }
-
-        result = glXGetVisualFromFBConfig(_glfw.x11.display, native);
-        if (!result) { DualLogError("GLX: Failed to retrieve Visual for GLXFBConfig"); return GLFW_FALSE; }
-
-        *visual = result->visual; *depth  = result->depth; XFree(result); return GLFW_TRUE;
     }
     
     GLFWbool _glfwCreateWindowX11(_GLFWwindow* window, char* title, const _GLFWwndconfig* wndconfig,const _GLFWctxconfig* ctxconfig,const _GLFWfbconfig* fbconfig) {
@@ -4578,8 +4021,13 @@ void* _glfw_realloc(void* block, size_t size) {
         if (extensionSupportedGLX("GLX_EXT_swap_control")) { _glfw.glx.SwapIntervalEXT = (PFNGLXSWAPINTERVALEXTPROC)getProcAddressGLX("glXSwapIntervalEXT"); if (_glfw.glx.SwapIntervalEXT) _glfw.glx.EXT_swap_control = GLFW_TRUE; }
         if (extensionSupportedGLX("GLX_ARB_create_context")) { _glfw.glx.CreateContextAttribsARB = (PFNGLXCREATECONTEXTATTRIBSARBPROC)getProcAddressGLX("glXCreateContextAttribsARB"); if (_glfw.glx.CreateContextAttribsARB) _glfw.glx.ARB_create_context = GLFW_TRUE; }
         if (extensionSupportedGLX("GLX_ARB_create_context_profile")) _glfw.glx.ARB_create_context_profile = GLFW_TRUE;
-        if (!_glfwChooseVisualGLX(wndconfig,ctxconfig,fbconfig,&visual,&depth)) return GLFW_FALSE;
-        
+        GLXFBConfig native; XVisualInfo* result;
+        if (!chooseGLXFBConfig(fbconfig,&native)) { DualLogError("GLX: Failed to find a suitable GLXFBConfig"); return GLFW_FALSE; }
+
+        result = glXGetVisualFromFBConfig(_glfw.x11.display,native);
+        if (!result) { DualLogError("GLX: Failed to retrieve Visual for GLXFBConfig"); return GLFW_FALSE; }
+
+        visual = result->visual; depth = result->depth; XFree(result);
         if (!visual) { visual=DefaultVisual(_glfw.x11.display,_glfw.x11.screen); depth=DefaultDepth(_glfw.x11.display,_glfw.x11.screen); }
         if (!createNativeWindow(window,title,wndconfig,visual,depth)) return GLFW_FALSE;
         if (!_glfwCreateContextGLX(window,ctxconfig,fbconfig)) return GLFW_FALSE;
@@ -4621,12 +4069,10 @@ void* _glfw_realloc(void* block, size_t size) {
     #define PLATFORM_getKeyScancode(k)              _glfwGetKeyScancodeX11(k)
     #define PLATFORM_pollEvents()                   _glfwPollEventsX11()
 #endif
-
-_GLFWlibrary _glfw = { GLFW_FALSE };
-static GLFWerrorfun _glfwErrorCallback; static GLFWallocator _glfwInitAllocator;
+_GLFWlibrary _glfw={0}; static GLFWallocator _glfwInitAllocator;
 typedef __builtin_va_list va_list;
-static _GLFWinitconfig _glfwInitHints = { .hatButtons = GLFW_TRUE, .platformID = GLFW_ANY_PLATFORM, .ns = { .menubar = GLFW_TRUE, .chdir = GLFW_TRUE } };
-GLFWAPI int glfwInit(void) {
+static _GLFWinitconfig _glfwInitHints = { .hatButtons = GLFW_TRUE, .ns = { .menubar = GLFW_TRUE, .chdir = GLFW_TRUE } };
+int glfwInit(void) {
     __builtin_memset(&_glfw,0,sizeof(_glfw)); _glfw.hints.init = _glfwInitHints; _glfw.allocator = _glfwInitAllocator;
     #if defined(WINDOWS)
         if (!_glfwInitWin32()) return GLFW_FALSE;
@@ -4640,12 +4086,10 @@ GLFWAPI int glfwInit(void) {
     _glfw.timer.offset = _glfwPlatformGetTimerValue();
     _glfw.initialized = GLFW_TRUE;
     __builtin_memset(&_glfw.hints.context, 0, sizeof(_glfw.hints.context));
-    _glfw.hints.context.source = GLFW_NATIVE_CONTEXT_API;
     _glfw.hints.context.major = 4; _glfw.hints.context.minor = 3;
     __builtin_memset(&_glfw.hints.window,0,sizeof(_glfw.hints.window));
     _glfw.hints.window.resizable = _glfw.hints.window.visible = _glfw.hints.window.decorated = _glfw.hints.window.focused = _glfw.hints.window.autoIconify = _glfw.hints.window.centerCursor = _glfw.hints.window.focusOnShow = GLFW_TRUE;
     _glfw.hints.window.xpos = _glfw.hints.window.ypos = GLFW_ANY_POSITION;
-    _glfw.hints.window.scaleFramebuffer = GLFW_TRUE;
     __builtin_memset(&_glfw.hints.framebuffer,0,sizeof(_glfw.hints.framebuffer));
     _glfw.hints.framebuffer.redBits = _glfw.hints.framebuffer.greenBits = _glfw.hints.framebuffer.blueBits = _glfw.hints.framebuffer.alphaBits = _glfw.hints.framebuffer.stencilBits = 8;
     _glfw.hints.framebuffer.depthBits = 24;
@@ -4660,13 +4104,13 @@ const _GLFWfbconfig* _glfwChooseFBConfig(const _GLFWfbconfig* desired, const _GL
     for (unsigned int i = 0; i < count; i++) {
         const _GLFWfbconfig* cur = alts + i;
         if (desired->stereo > 0 && cur->stereo == 0) continue;
+        
         missing = 0;
         if (desired->alphaBits   > 0 && cur->alphaBits == 0)   missing++;
         if (desired->depthBits   > 0 && cur->depthBits == 0)   missing++;
         if (desired->stencilBits > 0 && cur->stencilBits == 0) missing++;
         if (desired->auxBuffers  > 0 && cur->auxBuffers < desired->auxBuffers) missing += desired->auxBuffers - cur->auxBuffers;
         if (desired->samples     > 0 && cur->samples == 0)     missing++;
-        if (desired->transparent != cur->transparent)          missing++;
         colorDiff = 0;
         if (desired->redBits   != GLFW_DONT_CARE) colorDiff += (desired->redBits   - cur->redBits)   * (desired->redBits   - cur->redBits);
         if (desired->greenBits != GLFW_DONT_CARE) colorDiff += (desired->greenBits - cur->greenBits) * (desired->greenBits - cur->greenBits);
@@ -4681,31 +4125,10 @@ const _GLFWfbconfig* _glfwChooseFBConfig(const _GLFWfbconfig* desired, const _GL
         if (desired->accumAlphaBits != GLFW_DONT_CARE) extraDiff += (desired->accumAlphaBits - cur->accumAlphaBits) * (desired->accumAlphaBits - cur->accumAlphaBits);
         if (desired->samples        != GLFW_DONT_CARE) extraDiff += (desired->samples        - cur->samples)        * (desired->samples        - cur->samples);
         if (desired->sRGB && !cur->sRGB) extraDiff++;
-        if (missing < leastMissing || (missing == leastMissing && (colorDiff < leastColorDiff || (colorDiff == leastColorDiff && extraDiff < leastExtraDiff))))
-            closest = cur;
+        if (missing < leastMissing || (missing == leastMissing && (colorDiff < leastColorDiff || (colorDiff == leastColorDiff && extraDiff < leastExtraDiff)))) closest = cur;
         if (cur == closest) { leastMissing = missing; leastColorDiff = colorDiff; leastExtraDiff = extraDiff; }
     }
     return closest;
-}
-
-GLFWAPI int glfwExtensionSupported(const char* extension) {
-    _GLFWwindow* window = _glfwPlatformGetTls(&_glfw.contextSlot);
-    if (!window) { DualLogError("Cannot query extension without a current OpenGL context"); return GLFW_FALSE; }
-    if (*extension == '\0') { DualLogError("Extension name cannot be an empty string"); return GLFW_FALSE; }
-
-    if (window->context.major >= 3) {
-        GLint count; window->context.GetIntegerv(GL_NUM_EXTENSIONS, &count);
-        for (int i = 0; i < count; i++) {
-            const char* en = (const char*) window->context.GetStringi(GL_EXTENSIONS, i);
-            if (!en) { DualLogError("Extension string retrieval is broken"); return GLFW_FALSE; }
-            if (strcmp(en, extension) == 0) return GLFW_TRUE;
-        }
-    } else {
-        const char* extensions = (const char*) window->context.GetString(GL_EXTENSIONS);
-        if (!extensions) { DualLogError("Extension string retrieval is broken"); return GLFW_FALSE; }
-        if (_glfwStringInExtensionString(extension, extensions)) return GLFW_TRUE;
-    }
-    return window->context.extensionSupported(extension);
 }
 
 int sscanf(const char *str, const char *format, ...);
@@ -4715,24 +4138,19 @@ GLFWbool _glfwRefreshContextAttribs(_GLFWwindow* window, const _GLFWctxconfig* c
     glfwMakeContextCurrent((GLFWwindow*) window);
     if (_glfwPlatformGetTls(&_glfw.contextSlot) != window) return GLFW_FALSE;
 
-    window->context.GetIntegerv = (PFNGLGETINTEGERVPROC) window->context.getProcAddress("glGetIntegerv");
-    window->context.GetString   = (PFNGLGETSTRINGPROC)   window->context.getProcAddress("glGetString");
+    window->context.GetIntegerv = (PFNGLGETINTEGERVPROC)window->context.getProcAddress("glGetIntegerv");
+    window->context.GetString = (PFNGLGETSTRINGPROC)window->context.getProcAddress("glGetString");
     if (!window->context.GetIntegerv || !window->context.GetString) { DualLogError("Entry point retrieval is broken"); glfwMakeContextCurrent((GLFWwindow*) previous); return GLFW_FALSE; }
 
     const char* version = (const char*) window->context.GetString(GL_VERSION);
     if (!version) { DualLogError("OpenGL version string retrieval is broken"); glfwMakeContextCurrent((GLFWwindow*) previous); return GLFW_FALSE; }
     if (!sscanf(version, "%d.%d.%d", &window->context.major, &window->context.minor, &window->context.revision)) { DualLogError("No version found in OpenGL version string"); glfwMakeContextCurrent((GLFWwindow*) previous); return GLFW_FALSE; }
-    if (window->context.major < ctxconfig->major || (window->context.major == ctxconfig->major && window->context.minor < ctxconfig->minor)) { DualLogError("Requested OpenGL version %i.%i, got version %i.%i", ctxconfig->major, ctxconfig->minor, window->context.major, window->context.minor); glfwMakeContextCurrent((GLFWwindow*) previous); return GLFW_FALSE; }
+    if (window->context.major < 4 || (window->context.major == 4 && window->context.minor < 3)) { DualLogError("Requested OpenGL version 4.3, got version %i.%i", window->context.major, window->context.minor); glfwMakeContextCurrent((GLFWwindow*) previous); return GLFW_FALSE; }
 
     window->context.GetStringi = (PFNGLGETSTRINGIPROC) window->context.getProcAddress("glGetStringi");
     if (!window->context.GetStringi) { DualLogError("Entry point retrieval is broken"); glfwMakeContextCurrent((GLFWwindow*) previous); return GLFW_FALSE; }
     GLint flags; window->context.GetIntegerv(0x821e/*Context flags*/,&flags);
-    if (flags & 0x00000001/*Forward compat*/) window->context.forward = GLFW_TRUE;
     if (flags & 0x00000002/*debug*/) window->context.debug = GLFW_TRUE;
-    else if (glfwExtensionSupported("GL_ARB_debug_output") && ctxconfig->debug) window->context.debug = GLFW_TRUE;
-
-    PFNGLCLEARPROC glClear = (PFNGLCLEARPROC) window->context.getProcAddress("glClear");
-    glClear(GL_COLOR_BUFFER_BIT);
     if (window->doublebuffer) window->context.swapBuffers(window);
     glfwMakeContextCurrent((GLFWwindow*) previous);
     return GLFW_TRUE;
@@ -4750,28 +4168,16 @@ GLFWbool _glfwStringInExtensionString(const char* string, const char* extensions
     return GLFW_TRUE;
 }
 
-GLFWAPI void glfwMakeContextCurrent(GLFWwindow* handle) {
+void glfwMakeContextCurrent(GLFWwindow* handle) {
     _GLFWwindow* window = (_GLFWwindow*) handle;
     _GLFWwindow* previous = _glfwPlatformGetTls(&_glfw.contextSlot);
     if (previous && (!window || window->context.source != previous->context.source)) previous->context.makeCurrent(NULL);
     if (window) window->context.makeCurrent(window);
 }
 
-GLFWAPI void glfwSwapBuffers(GLFWwindow* handle) {
-    _GLFWwindow* window = (_GLFWwindow*) handle;
-    window->context.swapBuffers(window);
-}
-
-GLFWAPI void glfwSwapInterval(int interval) {
-    _GLFWwindow* window = _glfwPlatformGetTls(&_glfw.contextSlot);
-    window->context.swapInterval(interval);
-}
-
-GLFWAPI GLFWglproc glfwGetProcAddress(const char* procname) {
-    _GLFWwindow* window = _glfwPlatformGetTls(&_glfw.contextSlot);
-    return window->context.getProcAddress(procname);
-}
-
+void glfwSwapBuffers(GLFWwindow* handle) { _GLFWwindow* window = (_GLFWwindow*)handle; window->context.swapBuffers(window); }
+void glfwSwapInterval(int interval) { _GLFWwindow* window = _glfwPlatformGetTls(&_glfw.contextSlot); window->context.swapInterval(interval); }
+GLFWglproc glfwGetProcAddress(const char* procname) { _GLFWwindow* window = _glfwPlatformGetTls(&_glfw.contextSlot); return window->context.getProcAddress(procname); }
 static int compareVideoModes(const void* fp, const void* sp) {
     const GLFWvidmode *fm=fp, *sm=sp;
     const int fbpp=fm->redBits + fm->greenBits + fm->blueBits, sbpp=sm->redBits + sm->greenBits + sm->blueBits;
@@ -4783,16 +4189,12 @@ static int compareVideoModes(const void* fp, const void* sp) {
 }
 
 static GLFWbool refreshVideoModes(_GLFWmonitor* monitor) {
-    int modeCount; GLFWvidmode* modes;
     if (monitor->modes) return GLFW_TRUE;
-
-    modes = PLATFORM_getVideoModes(monitor, &modeCount);
-    if (!modes) return GLFW_FALSE;
+    int modeCount; GLFWvidmode* modes = PLATFORM_getVideoModes(monitor, &modeCount); if (!modes) return GLFW_FALSE;
 
     qsort(modes,modeCount,sizeof(GLFWvidmode),compareVideoModes);
     free(monitor->modes);
-    monitor->modes = modes;
-    monitor->modeCount = modeCount;
+    monitor->modes = modes; monitor->modeCount = modeCount;
     return GLFW_TRUE;
 }
 
@@ -4800,10 +4202,8 @@ void _glfwInputMonitor(_GLFWmonitor* monitor, int action, int placement) {
     if (action == GLFW_CONNECTED) {
         _glfw.monitorCount++;
         _glfw.monitors = _glfw.monitors ? realloc(_glfw.monitors,sizeof(_GLFWmonitor*) * _glfw.monitorCount) : calloc(_glfw.monitorCount,sizeof(_GLFWmonitor*));
-        if (placement == _GLFW_INSERT_FIRST) {
-            memmove(_glfw.monitors + 1,_glfw.monitors,((size_t) _glfw.monitorCount - 1) * sizeof(_GLFWmonitor*));
-            _glfw.monitors[0] = monitor;
-        } else _glfw.monitors[_glfw.monitorCount - 1] = monitor;
+        if (placement == 0) { memmove(_glfw.monitors + 1,_glfw.monitors,((size_t) _glfw.monitorCount - 1) * sizeof(_GLFWmonitor*)); _glfw.monitors[0] = monitor; }
+        else _glfw.monitors[_glfw.monitorCount - 1] = monitor;
     } else if (action == GLFW_DISCONNECTED) {
         int i;
         _GLFWwindow* window;
@@ -4874,10 +4274,10 @@ void _glfwSplitBPP(int bpp, int* red, int* green, int* blue) {
     if (delta == 2) *red = *red + 1;
 }
 
-GLFWAPI GLFWmonitor** glfwGetMonitors(int* count) { *count = 0; *count = _glfw.monitorCount; return (GLFWmonitor**) _glfw.monitors; }
-GLFWAPI GLFWmonitor* glfwGetPrimaryMonitor(void) { if (!_glfw.monitorCount) {return NULL;} return (GLFWmonitor*) _glfw.monitors[0]; }
-GLFWAPI void glfwGetMonitorPos(GLFWmonitor* handle, int* xpos, int* ypos) { if (xpos) {*xpos = 0;} if (ypos) {*ypos = 0;} _GLFWmonitor* monitor = (_GLFWmonitor*)handle; PLATFORM_getMonitorPos(monitor,xpos,ypos); }
-GLFWAPI void glfwGetMonitorWorkarea(GLFWmonitor* handle, int* xpos, int* ypos, int* width, int* height) {
+GLFWmonitor** glfwGetMonitors(int* count) { *count = 0; *count = _glfw.monitorCount; return (GLFWmonitor**) _glfw.monitors; }
+GLFWmonitor* glfwGetPrimaryMonitor(void) { if (!_glfw.monitorCount) {return NULL;} return (GLFWmonitor*) _glfw.monitors[0]; }
+void glfwGetMonitorPos(GLFWmonitor* handle, int* xpos, int* ypos) { if (xpos) {*xpos = 0;} if (ypos) {*ypos = 0;} _GLFWmonitor* monitor = (_GLFWmonitor*)handle; PLATFORM_getMonitorPos(monitor,xpos,ypos); }
+void glfwGetMonitorWorkarea(GLFWmonitor* handle, int* xpos, int* ypos, int* width, int* height) {
     if (xpos) *xpos = 0;
     if (ypos) *ypos = 0;
     if (width) *width = 0;
@@ -4886,43 +4286,44 @@ GLFWAPI void glfwGetMonitorWorkarea(GLFWmonitor* handle, int* xpos, int* ypos, i
     PLATFORM_getMonitorWorkarea(monitor, xpos, ypos, width, height);
 }
 
-GLFWAPI const GLFWvidmode* glfwGetVideoModes(GLFWmonitor* handle, int* count) {
+const GLFWvidmode* glfwGetVideoModes(GLFWmonitor* handle, int* count) {
     *count = 0; _GLFWmonitor* monitor = (_GLFWmonitor*) handle;
     if (!refreshVideoModes(monitor)) return NULL;
     *count = monitor->modeCount;
     return monitor->modes;
 }
 
-GLFWAPI const GLFWvidmode* glfwGetVideoMode(GLFWmonitor* handle) {
+const GLFWvidmode* glfwGetVideoMode(GLFWmonitor* handle) {
     _GLFWmonitor* monitor = (_GLFWmonitor*) handle;
     if (!PLATFORM_getVideoMode(monitor, &monitor->currentMode)) return NULL;
     return &monitor->currentMode;
 }
 
+void SetCursorMode(GLFWwindow* handle,int value) {
+    _GLFWwindow* window = (_GLFWwindow*)handle;
+    if (window->cursorMode == value) return;
+    window->cursorMode = value;
+    PLATFORM_getCursorPos(window,&window->virtualCursorPosX,&window->virtualCursorPosY);
+    PLATFORM_setCursorMode(window,value); return;
+}
+
 void _glfwInputWindowFocus(_GLFWwindow* window, GLFWbool focused) {
-    if (window->callbacks.focus) window->callbacks.focus((GLFWwindow*)window,focused);
+    Sys_Input.window_has_focus = focused != 0;
+    Sys_Input.ignore_next_mouse_delta = true;
+    SetCursorMode((GLFWwindow*)window,Sys_Input.window_has_focus ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
     if (!focused) {
         for (int key = 0;  key <= GLFW_KEY_LAST;  key++) {
-            if (window->keys[key] == GLFW_PRESS) {
-                const int scancode = PLATFORM_getKeyScancode(key);
-                _glfwInputKey(window,key,scancode,GLFW_RELEASE,0);
-            }
+            if (window->keys[key] == GLFW_PRESS) _glfwInputKey(window,key,GLFW_RELEASE);
         }
 
         for (int button = 0;  button <= GLFW_MOUSE_BUTTON_LAST;  button++) {
-            if (window->mouseButtons[button] == GLFW_PRESS)  _glfwInputMouseClick(window, button, GLFW_RELEASE, 0);
+            if (window->mouseButtons[button] == GLFW_PRESS)  _glfwInputMouseClick(window, button, GLFW_RELEASE);
         }
     }
 }
 
-void _glfwInputWindowPos(_GLFWwindow* window, int x, int y) { if (window->callbacks.pos) {window->callbacks.pos((GLFWwindow*)window,x,y);} }
-void _glfwInputWindowSize(_GLFWwindow* window, int width, int height) { if (window->callbacks.size) {window->callbacks.size((GLFWwindow*)window,width,height);} }
-void _glfwInputWindowIconify(_GLFWwindow* window, GLFWbool iconified) { if (window->callbacks.iconify) {window->callbacks.iconify((GLFWwindow*)window,iconified);} }
-void _glfwInputWindowMaximize(_GLFWwindow* window, GLFWbool maximized) { if (window->callbacks.maximize) {window->callbacks.maximize((GLFWwindow*)window,maximized);} }
-void _glfwInputFramebufferSize(_GLFWwindow* window, int width, int height) { if (window->callbacks.fbsize) window->callbacks.fbsize((GLFWwindow*)window,width,height); }
-void _glfwInputWindowCloseRequest(_GLFWwindow* window) { window->shouldClose = GLFW_TRUE; if (window->callbacks.close) {window->callbacks.close((GLFWwindow*) window);} }
 void _glfwInputWindowMonitor(_GLFWwindow* window, _GLFWmonitor* monitor) { window->monitor = monitor; }
-GLFWAPI GLFWwindow* glfwCreateWindow(int width, int height, char* title, GLFWmonitor* monitor, GLFWwindow* share) {
+GLFWwindow* glfwCreateWindow(int width, int height, char* title, GLFWmonitor* monitor, GLFWwindow* share) {
     _GLFWfbconfig fbconfig; _GLFWctxconfig ctxconfig; _GLFWwndconfig wndconfig; _GLFWwindow* window;
     fbconfig  = _glfw.hints.framebuffer;
     ctxconfig = _glfw.hints.context;
@@ -4941,38 +4342,37 @@ GLFWAPI GLFWwindow* glfwCreateWindow(int width, int height, char* title, GLFWmon
     window->autoIconify      = wndconfig.autoIconify;
     window->floating         = wndconfig.floating;
     window->focusOnShow      = wndconfig.focusOnShow;
-    window->mousePassthrough = wndconfig.mousePassthrough;
     window->cursorMode       = GLFW_CURSOR_NORMAL;
     window->doublebuffer = fbconfig.doublebuffer;
     window->minwidth = window->minheight = window->maxwidth = window->maxheight = window->numer = window->denom = GLFW_DONT_CARE;
-    if (!PLATFORM_createWindow(window,title,&wndconfig,&ctxconfig,&fbconfig)) { return NULL; }
+    if (!PLATFORM_createWindow(window,title,&wndconfig,&ctxconfig,&fbconfig)) { DualLogError("glfwCreateWindow failed\n"); OS_Exit(1); }
     return (GLFWwindow*) window;
 }
 
-GLFWAPI int glfwWindowShouldClose(GLFWwindow* handle) { _GLFWwindow* window = (_GLFWwindow*) handle; return window->shouldClose; }
-GLFWAPI void glfwSetWindowIcon(GLFWwindow* handle, int count, const GLFWimage* images) { _GLFWwindow* window = (_GLFWwindow*) handle; PLATFORM_setWindowIcon(window,count,images); }
-GLFWAPI void glfwGetWindowPos(GLFWwindow* handle, int* xpos, int* ypos) {
+int glfwWindowShouldClose(GLFWwindow* handle) { _GLFWwindow* window = (_GLFWwindow*) handle; return window->shouldClose; }
+void glfwSetWindowIcon(GLFWwindow* handle, int count, const GLFWimage* images) { _GLFWwindow* window = (_GLFWwindow*) handle; PLATFORM_setWindowIcon(window,count,images); }
+void glfwGetWindowPos(GLFWwindow* handle, int* xpos, int* ypos) {
     if (xpos) {*xpos = 0;} if (ypos) {*ypos = 0;}
     _GLFWwindow* window = (_GLFWwindow*) handle;
     PLATFORM_getWindowPos(window, xpos, ypos);
 }
 
-GLFWAPI void glfwSetWindowPos(GLFWwindow* handle, int xpos, int ypos) {
+void glfwSetWindowPos(GLFWwindow* handle, int xpos, int ypos) {
     _GLFWwindow* window = (_GLFWwindow*) handle;
     if (window->monitor) return;
     PLATFORM_setWindowPos(window, xpos, ypos);
 }
 
-GLFWAPI void glfwGetWindowSize(GLFWwindow* handle, int* width, int* height) {
+void glfwGetWindowSize(GLFWwindow* handle, int* width, int* height) {
     if (width) *width = 0;
     if (height) *height = 0;
     _GLFWwindow* window = (_GLFWwindow*) handle;
     PLATFORM_getWindowSize(window, width, height);
 }
 
-GLFWAPI void glfwSetWindowSize(GLFWwindow* handle, int width, int height) { _GLFWwindow* window = (_GLFWwindow*)handle; window->videoMode.width=width; window->videoMode.height=height; PLATFORM_setWindowSize(window,width,height); }
+void glfwSetWindowSize(GLFWwindow* handle, int width, int height) { _GLFWwindow* window = (_GLFWwindow*)handle; window->videoMode.width=width; window->videoMode.height=height; PLATFORM_setWindowSize(window,width,height); }
 
-GLFWAPI void glfwSetWindowAttrib(GLFWwindow* handle, int attrib, int value) {
+void glfwSetWindowAttrib(GLFWwindow* handle, int attrib, int value) {
     _GLFWwindow* window = (_GLFWwindow*) handle;
     value = value ? GLFW_TRUE : GLFW_FALSE;
     switch (attrib) {
@@ -4981,7 +4381,7 @@ GLFWAPI void glfwSetWindowAttrib(GLFWwindow* handle, int attrib, int value) {
     DualLogError("Invalid window attribute 0x%08X",attrib);
 }
 
-GLFWAPI void glfwSetWindowMonitor(GLFWwindow* wh, GLFWmonitor* mh, int xpos, int ypos, int width, int height, int refreshRate) {
+void glfwSetWindowMonitor(GLFWwindow* wh, GLFWmonitor* mh, int xpos, int ypos, int width, int height, int refreshRate) {
     _GLFWwindow* window = (_GLFWwindow*) wh;
     _GLFWmonitor* monitor = (_GLFWmonitor*) mh;
     if (width <= 0 || height <= 0) { DualLogError("Invalid window size %ix%i",width,height); return; }
@@ -4991,11 +4391,7 @@ GLFWAPI void glfwSetWindowMonitor(GLFWwindow* wh, GLFWmonitor* mh, int xpos, int
     PLATFORM_setWindowMonitor(window,monitor,xpos,ypos,width,height,refreshRate);
 }
 
-GLFWAPI GLFWwindowfocusfun glfwSetWindowFocusCallback(GLFWwindow* handle, GLFWwindowfocusfun cbfun) { _GLFWwindow* window = (_GLFWwindow*)handle; _GLFW_SWAP(GLFWwindowfocusfun,window->callbacks.focus,cbfun); return cbfun; }
-GLFWAPI GLFWframebuffersizefun glfwSetFramebufferSizeCallback(GLFWwindow* handle, GLFWframebuffersizefun cbfun) { _GLFWwindow* window = (_GLFWwindow*) handle; _GLFW_SWAP(GLFWframebuffersizefun,window->callbacks.fbsize,cbfun); return cbfun; }
-//=============================================================================
-// Input
-GLFWAPI void glfwPollEvents(void) { PLATFORM_pollEvents(); }
+void glfwPollEvents(void) { PLATFORM_pollEvents(); }
 static GLFWbool initJoysticks(void) {
     if (!_glfw.joysticksInitialized && !PLATFORM_initJoysticks()) return GLFW_FALSE;
     return _glfw.joysticksInitialized = GLFW_TRUE;
@@ -5080,7 +4476,18 @@ static GLFWbool parseMapping(_GLFWmapping* mapping,const char* string) {
     return GLFW_TRUE;
 }
 
-void _glfwInputKey(_GLFWwindow* window,int key,int scancode,int action,int mods) {
+void TextEntry(i32 k) {
+    if (k == GLFW_KEY_U && Sys_Input.keyStates[GLFW_KEY_LEFT_CONTROL].down) { Sys_Global.playerName[0] = '\0'; currentPlayerNameLength = 0; return; }
+    if (k == GLFW_KEY_ENTER || k == GLFW_KEY_KP_ENTER) { currentMenuItem++; return; }
+    if (k == GLFW_KEY_BACKSPACE && currentPlayerNameLength > 0) { Sys_Global.playerName[--currentPlayerNameLength] = '\0'; return; }
+    if (currentPlayerNameLength >= 26) return;
+    char c = (k >= GLFW_KEY_A && k <= GLFW_KEY_Z) ? 'a' + (k - GLFW_KEY_A) : ((k >= GLFW_KEY_1 && k <= GLFW_KEY_9) ? '1' + (k - GLFW_KEY_1) : ((k == GLFW_KEY_0) ? '0' : ((k == GLFW_KEY_SPACE) ? ' ' : 0)));
+    if (c) { Sys_Global.playerName[currentPlayerNameLength] = c; Sys_Global.playerName[++currentPlayerNameLength] = '\0'; }
+}
+
+bool IsNonRepeatingKey(i32 key) { return key == GLFW_KEY_KP_ENTER || key == GLFW_KEY_ENTER || key == GLFW_KEY_TAB || key == GLFW_KEY_ESCAPE; }
+void GoIntoGame(void); void ConsoleEmulator(i32 keycode); extern bool enteringPlayerName;
+void _glfwInputKey(_GLFWwindow* window,int key,int action) {
     if (key >= 0 && key <= GLFW_KEY_LAST) {
         GLFWbool repeated = GLFW_FALSE;
         if (action == GLFW_RELEASE && window->keys[key] == GLFW_RELEASE) return;
@@ -5088,41 +4495,89 @@ void _glfwInputKey(_GLFWwindow* window,int key,int scancode,int action,int mods)
         window->keys[key] = (action == GLFW_RELEASE && window->stickyKeys) ? _GLFW_STICK : (char)action;
         if (repeated) action = GLFW_REPEAT;
     }
-    if (!window->lockKeyMods) mods &= ~(GLFW_MOD_CAPS_LOCK|GLFW_MOD_NUM_LOCK);
-    if (window->callbacks.key) window->callbacks.key((GLFWwindow*)window,key,scancode,action,mods);
+
+    if (!Sys_Input.window_has_focus) return;
+    
+    if (key == GLFW_KEY_F10 && action) OS_Exit(0); // Suppress warnings about unused parameters forced upon me by glfw3 dependency deadweight anchor.
+    if (Sys_Global.menuActive && !returnToPause) {
+        if ((key == GLFW_KEY_RIGHT_ALT || key == GLFW_KEY_LEFT_ALT) && action && Sys_Input.keyStates[GLFW_KEY_ENTER].down)                    GoIntoGame();
+        if (key == GLFW_KEY_ENTER && action && (Sys_Input.keyStates[GLFW_KEY_LEFT_ALT].down || Sys_Input.keyStates[GLFW_KEY_RIGHT_ALT].down)) GoIntoGame();
+    }
+
+    if (key >=0 && key < MAX_KEYS && (action == GLFW_PRESS || (action == GLFW_REPEAT && !IsNonRepeatingKey(key)))) {
+        Sys_Input.keyStates[key].pressed = Sys_Input.keyStates[key].down = true;
+        if (Sys_Cheats.consoleActive) ConsoleEmulator(key);
+        else if (enteringPlayerName && Sys_Global.menuActive) TextEntry(key);
+    } else if (key >= 0 && key < MAX_KEYS && action == GLFW_RELEASE) Sys_Input.keyStates[key].pressed = Sys_Input.keyStates[key].down = false;
 }
 
-void _glfwInputScroll(_GLFWwindow* window,double xoffset,double yoffset) {
-    if (window->callbacks.scroll) window->callbacks.scroll((GLFWwindow*)window,xoffset,yoffset);
+void _glfwInputMouseClick(_GLFWwindow* window,int button,int action) {
+    if (button < 0 || button > GLFW_MOUSE_BUTTON_LAST) return;
+    if (button <= GLFW_MOUSE_BUTTON_LAST) window->mouseButtons[button] = (action == GLFW_RELEASE && window->stickyMouseButtons) ? _GLFW_STICK : (char)action;
+    Sys_Input.mouseButtons[button].down = Sys_Input.mouseButtons[button].pressed = (action == GLFW_PRESS);
+    Sys_Input.mouseButtons[button].released = (action == GLFW_RELEASE);
 }
 
-void _glfwInputMouseClick(_GLFWwindow* window,int button,int action,int mods) {
-    if (button < 0 || (!window->disableMouseButtonLimit && button > GLFW_MOUSE_BUTTON_LAST)) return;
-    if (!window->lockKeyMods) mods &= ~(GLFW_MOD_CAPS_LOCK|GLFW_MOD_NUM_LOCK);
-    if (button <= GLFW_MOUSE_BUTTON_LAST)
-        window->mouseButtons[button] = (action == GLFW_RELEASE && window->stickyMouseButtons) ? _GLFW_STICK : (char)action;
-    if (window->callbacks.mouseButton) window->callbacks.mouseButton((GLFWwindow*)window,button,action,mods);
-}
+// Create a quaternion from yaw (around Y), pitch (around X), and roll (around Z) in degrees
+void quat_from_yaw_pitch_roll(Quaternion* q, float yaw_deg, float pitch_deg, float roll_deg) {
+    float yaw = deg2rad(yaw_deg), pitch = deg2rad(pitch_deg), roll = deg2rad(roll_deg);  // Around Z (forward)
+    float cy = vcosf(yaw * 0.5f), sy = vsinf(yaw * 0.5f), cp = vcosf(pitch * 0.5f), sp = vsinf(pitch * 0.5f), cr = vcosf(roll * 0.5f), sr = vsinf(roll * 0.5f);
+    q->w = cy * cp * cr + sy * sp * sr;
+    q->x = cy * sp * cr + sy * cp * sr; // X-axis (pitch)
+    q->y = sy * cp * cr - cy * sp * sr; // Y-axis (yaw)
+    q->z = cy * cp * sr - sy * sp * cr; // Z-axis (roll)
+} // Skipping quat normalization, not needed
 
 void _glfwInputCursorPos(_GLFWwindow* window,double xpos,double ypos) {
     if (window->virtualCursorPosX == xpos && window->virtualCursorPosY == ypos) return;
     window->virtualCursorPosX = xpos; window->virtualCursorPosY = ypos;
-    if (window->callbacks.cursorPos) window->callbacks.cursorPos((GLFWwindow*)window,xpos,ypos);
-}
-
-void _glfwInputCursorEnter(_GLFWwindow* window,GLFWbool entered) {
-    if (window->callbacks.cursorEnter) window->callbacks.cursorEnter((GLFWwindow*)window,entered);
+    if (Sys_Input.window_has_focus) {
+        Sys_Input.currentMouse_dx = (i32)(xpos - Sys_Input.last_mouse_x);
+        Sys_Input.currentMouse_dy = (i32)(ypos - Sys_Input.last_mouse_y);
+        Sys_Input.last_mouse_x = xpos; Sys_Input.last_mouse_y = ypos;
+        if (Sys_Input.ignore_next_mouse_delta) { Sys_Input.ignore_next_mouse_delta = false; return; }
+        
+        if (Sys_Global.globalFrameNum > 1) {
+            // static const float HeadBobRate   = 0.2f, HeadBobAmount = 0.08f,bobTarget = 0.3f; TODO
+            if ((Sys_Global.inventoryMode && !Sys_Cheats.noHUD) || Sys_Global.menuActive || Sys_Global.gamePaused) { // Uses UI baseline resolution 1366x768
+                i32 newX = clamp(Sys_Global.cursorPosition_x + Sys_Input.currentMouse_dx,0,1366); if (newX != Sys_Global.cursorPosition_x) {mouseMovementThisFrame = true;} Sys_Global.cursorPosition_x = newX;
+                i32 newY = clamp(Sys_Global.cursorPosition_y + Sys_Input.currentMouse_dy,0,768);  if (newY != Sys_Global.cursorPosition_y) {mouseMovementThisFrame = true;} Sys_Global.cursorPosition_y = newY;
+            }
+            
+            if (Sys_Global.gamePaused || Sys_Global.menuActive || Sys_Global.inventoryMode) return;
+            
+            float sensitivity = vclamp((float)Sys_Settings.MouseSensitivity / 100.0f, 0.01f, 1.0f) * 0.2f;
+            cam_yaw += (float)Sys_Input.currentMouse_dx * sensitivity;
+            if (cam_yaw >= 360.0f) cam_yaw -= 360.0f;
+            if (cam_yaw < 0.0f) cam_yaw += 360.0f;
+            cam_pitch += (float)Sys_Input.currentMouse_dy * sensitivity;
+            if (cam_pitch > 89.0f) cam_pitch = 89.0f; // Avoid gimbal lock at pure 90deg
+            if (cam_pitch < -89.0f) cam_pitch = -89.0f;
+            quat_from_yaw_pitch_roll(&Sys_Global.instances[PLAYER1].rotation,cam_yaw,cam_pitch,(Sys_Global.currentLevel == LEVEL_CYBERSPACE) ? cam_roll : 0.0f);
+            Quaternion rot = Sys_Global.instances[PLAYER1].rotation;
+            float y2 = rot.y * rot.y;  float xz = rot.x * rot.z;  float wy = rot.w * rot.y;
+            Sys_Global.instances[PLAYER1].forward = normalize_vector3((Vector3){ 2.0f * (xz + wy), 2.0f * (rot.y * rot.z - rot.w * rot.x), 1.0f - 2.0f * (rot.x * rot.x + y2) });
+            Sys_Global.instances[PLAYER1].right = normalize_vector3((Vector3){ 1.0f - 2.0f * (y2 + rot.z * rot.z), 2.0f * (rot.x * rot.y + rot.w * rot.z), 2.0f * (xz - wy) });
+            ma_engine_listener_set_direction(&audio_engine,0,Sys_Global.instances[PLAYER1].forward.x,Sys_Global.instances[PLAYER1].forward.y,Sys_Global.instances[PLAYER1].forward.z);
+            Vector3 up = cross_vector3(Sys_Global.instances[PLAYER1].forward,Sys_Global.instances[PLAYER1].right);
+            ma_engine_listener_set_world_up(&audio_engine,0,up.x,up.y,up.z);
+        }
+    }
 }
 
 void _glfwInputJoystick(_GLFWjoystick* js,int event) {
     if (event == GLFW_CONNECTED) js->connected = GLFW_TRUE;
     else if (event == GLFW_DISCONNECTED) js->connected = GLFW_FALSE;
-    if (_glfw.callbacks.joystick) _glfw.callbacks.joystick((int)(js - _glfw.joysticks),event);
+    
+    int jid = (int)(js - _glfw.joysticks);
+    if (jid > GLFW_JOYSTICK_LAST) return;
+    bool connected = (event == GLFW_CONNECTED);
+    Sys_Input.joystickPresent[jid] = connected;
+    if (!connected) { __builtin_memset(Sys_Input.joystickButtons,0,sizeof(Sys_Input.joystickButtons)); __builtin_memset(Sys_Input.joystickHats,0,sizeof(Sys_Input.joystickHats)); } // Clear
 }
 
 void _glfwInputJoystickAxis(_GLFWjoystick* js,int axis,float value) { js->axes[axis] = value; }
 void _glfwInputJoystickButton(_GLFWjoystick* js,int button,char value) { js->buttons[button] = value; }
-
 void _glfwInputJoystickHat(_GLFWjoystick* js,int hat,char value) {
     int base = js->buttonCount + hat * 4;
     js->buttons[base+0] = (value & 0x01) ? GLFW_PRESS : GLFW_RELEASE;
@@ -5154,48 +4609,33 @@ _GLFWjoystick* _glfwAllocJoystick(const char* name,const char* guid,int axisCoun
 
 void _glfwFreeJoystick(_GLFWjoystick* js) { free(js->axes); free(js->buttons); free(js->hats); __builtin_memset(js,0,sizeof(_GLFWjoystick)); }
 void _glfwCenterCursorInContentArea(_GLFWwindow* window) { int width,height; PLATFORM_getWindowSize(window,&width,&height); PLATFORM_setCursorPos(window,width/2.0,height/2.0); }
-void SetCursorMode(GLFWwindow* handle,int value) {
-    _GLFWwindow* window = (_GLFWwindow*)handle;
-    if (value != GLFW_CURSOR_NORMAL && value != GLFW_CURSOR_HIDDEN && value != GLFW_CURSOR_DISABLED && value != GLFW_CURSOR_CAPTURED) { DualLogError("Invalid cursor mode %d",value); return; }
-    if (window->cursorMode == value) return;
-    window->cursorMode = value;
-    PLATFORM_getCursorPos(window,&window->virtualCursorPosX,&window->virtualCursorPosY);
-    PLATFORM_setCursorMode(window,value); return;
-}
-
-GLFWAPI GLFWkeyfun glfwSetKeyCallback(GLFWwindow* handle,GLFWkeyfun cbfun) { _GLFWwindow* window = (_GLFWwindow*)handle; _GLFW_SWAP(GLFWkeyfun,window->callbacks.key,cbfun); return cbfun; }
-GLFWAPI GLFWmousebuttonfun glfwSetMouseButtonCallback(GLFWwindow* handle,GLFWmousebuttonfun cbfun) { _GLFWwindow* window = (_GLFWwindow*)handle; _GLFW_SWAP(GLFWmousebuttonfun,window->callbacks.mouseButton,cbfun); return cbfun; }
-GLFWAPI GLFWcursorposfun glfwSetCursorPosCallback(GLFWwindow* handle,GLFWcursorposfun cbfun) { _GLFWwindow* window = (_GLFWwindow*)handle; _GLFW_SWAP(GLFWcursorposfun,window->callbacks.cursorPos,cbfun); return cbfun; }
-GLFWAPI GLFWscrollfun glfwSetScrollCallback(GLFWwindow* handle,GLFWscrollfun cbfun) { _GLFWwindow* window = (_GLFWwindow*)handle; _GLFW_SWAP(GLFWscrollfun,window->callbacks.scroll,cbfun); return cbfun; }
-GLFWAPI int glfwJoystickPresent(int jid) {
+int glfwJoystickPresent(int jid) {
     if (jid < 0 || jid > GLFW_JOYSTICK_LAST) return GLFW_FALSE;
     if (!initJoysticks()) return GLFW_FALSE;
     _GLFWjoystick* js = _glfw.joysticks + jid;
-    return js->connected ? PLATFORM_pollJoystick(js,_GLFW_POLL_PRESENCE) : GLFW_FALSE;
+    return js->connected ? PLATFORM_pollJoystick(js,0/*presence*/) : GLFW_FALSE;
 }
 
-GLFWAPI const unsigned char* glfwGetJoystickButtons(int jid,int* count) {
+const unsigned char* glfwGetJoystickButtons(int jid,int* count) {
     *count = 0; if (jid < 0 || jid > GLFW_JOYSTICK_LAST) return NULL;
     if (!initJoysticks()) return NULL;
-    _GLFWjoystick* js = _glfw.joysticks + jid; if (!js->connected || !PLATFORM_pollJoystick(js,_GLFW_POLL_BUTTONS)) return NULL;
+    _GLFWjoystick* js = _glfw.joysticks + jid; if (!js->connected || !PLATFORM_pollJoystick(js,2/*buttons*/)) return NULL;
     *count = _glfw.hints.init.hatButtons ? js->buttonCount + js->hatCount * 4 : js->buttonCount; return js->buttons;
 }
 
-GLFWAPI const unsigned char* glfwGetJoystickHats(int jid,int* count) {
+const unsigned char* glfwGetJoystickHats(int jid,int* count) {
     *count = 0; if (jid < 0 || jid > GLFW_JOYSTICK_LAST) return NULL;
     if (!initJoysticks()) return NULL;
-    _GLFWjoystick* js = _glfw.joysticks + jid; if (!js->connected || !PLATFORM_pollJoystick(js,_GLFW_POLL_BUTTONS)) return NULL;
+    _GLFWjoystick* js = _glfw.joysticks + jid; if (!js->connected || !PLATFORM_pollJoystick(js,2/*buttons*/)) return NULL;
     return *count = js->hatCount, js->hats;
 }
 
-GLFWAPI GLFWjoystickfun glfwSetJoystickCallback(GLFWjoystickfun cbfun) { if (!initJoysticks()) {return NULL;} _GLFW_SWAP(GLFWjoystickfun,_glfw.callbacks.joystick,cbfun); return cbfun; }
-
-GLFWAPI int glfwGetGamepadState(int jid,GLFWgamepadstate* state) {
+int glfwGetGamepadState(int jid,GLFWgamepadstate* state) {
     __builtin_memset(state,0,sizeof(GLFWgamepadstate));
     if (jid < 0 || jid > GLFW_JOYSTICK_LAST) return GLFW_FALSE;
     if (!initJoysticks()) return GLFW_FALSE;
     _GLFWjoystick* js = _glfw.joysticks + jid;
-    if (!js->connected || !PLATFORM_pollJoystick(js,_GLFW_POLL_ALL) || !js->mapping) return GLFW_FALSE;
+    if (!js->connected || !PLATFORM_pollJoystick(js,(1/*axes*/ | 2/*buttons*/)) || !js->mapping) return GLFW_FALSE;
     for (int i = 0; i <= GLFW_GAMEPAD_BUTTON_LAST; i++) {
         const _GLFWmapelement* e = js->mapping->buttons + i;
         if (e->type == _GLFW_JOYSTICK_AXIS) {
@@ -5213,6 +4653,3 @@ GLFWAPI int glfwGetGamepadState(int jid,GLFWgamepadstate* state) {
     }
     return GLFW_TRUE;
 }
-
-#undef near
-#undef far

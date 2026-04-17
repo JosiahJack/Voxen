@@ -1320,16 +1320,6 @@ GLAD_API_CALL int gladLoadGL( GLADloadfunc load);
  #define WINGDIAPI __declspec(dllimport)
  #define GLFW_WINGDIAPI_DEFINED
 #endif /* WINGDIAPI */
-
-#if !defined(CALLBACK) && defined(_WIN32)
- #define CALLBACK __stdcall
- #define GLFW_CALLBACK_DEFINED
-#endif /* CALLBACK */
-
-
- #define GLFWAPI
-
-
 #define GLFW_RELEASE                0
 #define GLFW_PRESS                  1
 #define GLFW_REPEAT                 2
@@ -1526,104 +1516,22 @@ GLAD_API_CALL int gladLoadGL( GLADloadfunc load);
 #define GLFW_GAMEPAD_AXIS_LEFT_TRIGGER  4
 #define GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER 5
 #define GLFW_GAMEPAD_AXIS_LAST          GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER
-#define GLFW_CURSOR                  0x00033001
-#define GLFW_STICKY_KEYS             0x00033002
-#define GLFW_STICKY_MOUSE_BUTTONS    0x00033003
-#define GLFW_LOCK_KEY_MODS           0x00033004
-#define GLFW_RAW_MOUSE_MOTION        0x00033005
-#define GLFW_UNLIMITED_MOUSE_BUTTONS 0x00033006
-#define GLFW_ANY_RELEASE_BEHAVIOR            0
-#define GLFW_RELEASE_BEHAVIOR_FLUSH 0x00035001
-#define GLFW_RELEASE_BEHAVIOR_NONE  0x00035002
-#define GLFW_NATIVE_CONTEXT_API     0x00036001
 #define GLFW_ANY_POSITION           0x80000000
-#define GLFW_CONNECTED              0x00040001
-#define GLFW_DISCONNECTED           0x00040002
-#define GLFW_JOYSTICK_HAT_BUTTONS   0x00050001
-#define GLFW_PLATFORM               0x00050003
-#define GLFW_ANY_PLATFORM           0x00060000
-#define GLFW_PLATFORM_WIN32         0x00060001
-#define GLFW_PLATFORM_X11           0x00060004
 #define GLFW_DONT_CARE              -1
-#define GLFW_INVALID_VALUE          0x00010004
-#define GLFW_API_UNAVAILABLE        0x00010006
-#define GLFW_VERSION_UNAVAILABLE    0x00010007
-#define GLFW_PLATFORM_ERROR         0x00010008
-#define GLFW_FORMAT_UNAVAILABLE     0x00010009
-#define GLFW_NO_WINDOW_CONTEXT      0x0001000A
-#define GLFW_CURSOR_UNAVAILABLE     0x0001000B
-#define GLFW_FEATURE_UNAVAILABLE    0x0001000C
-#define GLFW_FEATURE_UNIMPLEMENTED  0x0001000D
-#define GLFW_PLATFORM_UNAVAILABLE   0x0001000E
-#define GLFW_POSITION_X             0x0002000E
-#define GLFW_POSITION_Y             0x0002000F
-#define GLFW_RED_BITS               0x00021001
-#define GLFW_GREEN_BITS             0x00021002
-#define GLFW_BLUE_BITS              0x00021003
-#define GLFW_ALPHA_BITS             0x00021004
-#define GLFW_DEPTH_BITS             0x00021005
-#define GLFW_STENCIL_BITS           0x00021006
-#define GLFW_ACCUM_RED_BITS         0x00021007
-#define GLFW_ACCUM_GREEN_BITS       0x00021008
-#define GLFW_ACCUM_BLUE_BITS        0x00021009
-#define GLFW_ACCUM_ALPHA_BITS       0x0002100A
-#define GLFW_AUX_BUFFERS            0x0002100B
-#define GLFW_STEREO                 0x0002100C
-#define GLFW_SAMPLES                0x0002100D
-#define GLFW_REFRESH_RATE           0x0002100F
-#define GLFW_DOUBLEBUFFER           0x00021010
-#define GLFW_CONTEXT_DEBUG          0x00022007
-#define GLFW_OPENGL_DEBUG_CONTEXT   GLFW_CONTEXT_DEBUG
-#define GLFW_CONTEXT_RELEASE_BEHAVIOR 0x00022009
-#define GLFW_CONTEXT_NO_ERROR       0x0002200A
-#define GLFW_CONTEXT_CREATION_API   0x0002200B
-#define GLFW_SCALE_TO_MONITOR       0x0002200C
-#define GLFW_SCALE_FRAMEBUFFER      0x0002200D
-#define GLFW_X11_CLASS_NAME         0x00024001
-#define GLFW_X11_INSTANCE_NAME      0x00024002
-#define GLFW_WIN32_KEYBOARD_MENU    0x00025001
-#define GLFW_WIN32_SHOWDEFAULT      0x00025002
-#define GLFW_NO_RESET_NOTIFICATION  0x00031001
-#define GLFW_LOSE_CONTEXT_ON_RESET  0x00031002
-#define GLFW_CURSOR_NORMAL          0x00034001
-#define GLFW_CURSOR_HIDDEN          0x00034002
-#define GLFW_CURSOR_DISABLED        0x00034003
-#define GLFW_CURSOR_CAPTURED        0x00034004
 typedef void (*GLFWglproc)(void);
 typedef struct GLFWmonitor GLFWmonitor;
 typedef struct GLFWwindow GLFWwindow;
-typedef void (* GLFWerrorfun)(int error_code, const char* description);
-typedef void (* GLFWwindowposfun)(GLFWwindow* window, int xpos, int ypos);
-typedef void (* GLFWwindowsizefun)(GLFWwindow* window, int width, int height);
-typedef void (* GLFWwindowclosefun)(GLFWwindow* window);
-typedef void (* GLFWwindowrefreshfun)(GLFWwindow* window);
 typedef void (* GLFWwindowfocusfun)(GLFWwindow* window, int focused);
-typedef void (* GLFWwindowiconifyfun)(GLFWwindow* window, int iconified);
-typedef void (* GLFWwindowmaximizefun)(GLFWwindow* window, int maximized);
 typedef void (* GLFWframebuffersizefun)(GLFWwindow* window, int width, int height);
-typedef void (* GLFWwindowcontentscalefun)(GLFWwindow* window, float xscale, float yscale);
-typedef void (* GLFWmousebuttonfun)(GLFWwindow* window, int button, int action, int mods);
-typedef void (* GLFWcursorposfun)(GLFWwindow* window, double xpos, double ypos);
-typedef void (* GLFWcursorenterfun)(GLFWwindow* window, int entered);
-typedef void (* GLFWscrollfun)(GLFWwindow* window, double xoffset, double yoffset);
-typedef void (* GLFWkeyfun)(GLFWwindow* window, int key, int scancode, int action, int mods);
-typedef void (* GLFWdropfun)(GLFWwindow* window, int path_count, const char* paths[]);
 typedef void (* GLFWmonitorfun)(GLFWmonitor* monitor, int event);
 typedef void (* GLFWjoystickfun)(int jid, int event);
 typedef struct GLFWvidmode { int width,height,redBits,greenBits,blueBits,refreshRate; } GLFWvidmode;
 typedef struct GLFWimage { int width,height; unsigned char* pixels; } GLFWimage;
 typedef struct GLFWgamepadstate { unsigned char buttons[15]; float axes[6]; } GLFWgamepadstate;
-GLFWAPI void glfwMakeContextCurrent(GLFWwindow* window);
 #ifdef GLFW_WINGDIAPI_DEFINED
  #undef WINGDIAPI
  #undef GLFW_WINGDIAPI_DEFINED
 #endif
-
-#ifdef GLFW_CALLBACK_DEFINED
- #undef CALLBACK
- #undef GLFW_CALLBACK_DEFINED
-#endif
-
 #ifndef GLAPIENTRY
  #define GLAPIENTRY APIENTRY
  #define GLFW_GLAPIENTRY_DEFINED

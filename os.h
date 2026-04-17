@@ -41,11 +41,21 @@ void DebugRAM(const char *context);
 #if defined(_WIN32) || defined(_WIN64)
     #define WINDOWS
     #define WIN32_LEAN_AND_MEAN // Let 'er rip, tater chip
+    #define NOMINMAX
+    #define VC_EXTRALEAN
+    #define UNICODE
+    #define OEMRESOURCE // OEM cursor resources for win init
+    #define OCR_NORMAL 32512
+    #define WINVER 0x0601 // Windows 7 or later
     #include <windows.h> // The things I do for my players, yeesh
     #include <direct.h>
     #include <winternl.h>
     #include <ntstatus.h>
     #include <io.h>
+    #include <dwmapi.h>
+    #include <dinput.h>
+    #include <xinput.h>
+    #include <dbt.h>
     typedef HANDLE OsFileHandle;
     #define OS_INVALID_HANDLE INVALID_HANDLE_VALUE
     #define OS_MakeFolder(path) _mkdir(path)
