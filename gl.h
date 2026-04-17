@@ -31,14 +31,6 @@
   #endif
 #endif
 
-#ifndef GLAD_PLATFORM_APPLE
-    #define GLAD_PLATFORM_APPLE 0
-#endif
-
-#ifndef GLAD_PLATFORM_EMSCRIPTEN
-    #define GLAD_PLATFORM_EMSCRIPTEN 0
-#endif
-
 #define GLAD_GNUC_EXTENSION __extension__
 #define GLAD_UNUSED(x) (void)(x)
 
@@ -511,7 +503,6 @@ typedef void (GLAD_API_PTR *PFNGLGETINTEGERI_VPROC)(GLenum target, GLuint index,
 typedef void (GLAD_API_PTR *PFNGLGETINTEGERVPROC)(GLenum pname, GLint * data);
 typedef void (GLAD_API_PTR *PFNGLGETINTERNALFORMATI64VPROC)(GLenum target, GLenum internalformat, GLenum pname, GLsizei count, GLint64 * params);
 typedef void (GLAD_API_PTR *PFNGLGETINTERNALFORMATIVPROC)(GLenum target, GLenum internalformat, GLenum pname, GLsizei count, GLint * params);
-typedef void (GLAD_API_PTR *PFNGLGETMULTISAMPLEFVPROC)(GLenum pname, GLuint index, GLfloat * val);
 typedef void (GLAD_API_PTR *PFNGLGETNAMEDBUFFERPARAMETERI64VPROC)(GLuint buffer, GLenum pname, GLint64 * params);
 typedef void (GLAD_API_PTR *PFNGLGETNAMEDBUFFERPARAMETERIVPROC)(GLuint buffer, GLenum pname, GLint * params);
 typedef void (GLAD_API_PTR *PFNGLGETNAMEDBUFFERPOINTERVPROC)(GLuint buffer, GLenum pname, void ** params);
@@ -642,7 +633,6 @@ typedef void (GLAD_API_PTR *PFNGLNAMEDFRAMEBUFFERRENDERBUFFERPROC)(GLuint frameb
 typedef void (GLAD_API_PTR *PFNGLNAMEDFRAMEBUFFERTEXTUREPROC)(GLuint framebuffer, GLenum attachment, GLuint texture, GLint level);
 typedef void (GLAD_API_PTR *PFNGLNAMEDFRAMEBUFFERTEXTURELAYERPROC)(GLuint framebuffer, GLenum attachment, GLuint texture, GLint level, GLint layer);
 typedef void (GLAD_API_PTR *PFNGLNAMEDRENDERBUFFERSTORAGEPROC)(GLuint renderbuffer, GLenum internalformat, GLsizei width, GLsizei height);
-typedef void (GLAD_API_PTR *PFNGLNAMEDRENDERBUFFERSTORAGEMULTISAMPLEPROC)(GLuint renderbuffer, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height);
 typedef void (GLAD_API_PTR *PFNGLOBJECTLABELPROC)(GLenum identifier, GLuint name, GLsizei length, const GLchar * label);
 typedef void (GLAD_API_PTR *PFNGLOBJECTPTRLABELPROC)(const void * ptr, GLsizei length, const GLchar * label);
 typedef void (GLAD_API_PTR *PFNGLPATCHPARAMETERFVPROC)(GLenum pname, const GLfloat * values);
@@ -718,7 +708,6 @@ typedef void (GLAD_API_PTR *PFNGLREADBUFFERPROC)(GLenum src);
 typedef void (GLAD_API_PTR *PFNGLREADPIXELSPROC)(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, void * pixels);
 typedef void (GLAD_API_PTR *PFNGLRELEASESHADERCOMPILERPROC)(void);
 typedef void (GLAD_API_PTR *PFNGLRENDERBUFFERSTORAGEPROC)(GLenum target, GLenum internalformat, GLsizei width, GLsizei height);
-typedef void (GLAD_API_PTR *PFNGLRENDERBUFFERSTORAGEMULTISAMPLEPROC)(GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height);
 typedef void (GLAD_API_PTR *PFNGLRESUMETRANSFORMFEEDBACKPROC)(void);
 typedef void (GLAD_API_PTR *PFNGLSAMPLECOVERAGEPROC)(GLfloat value, GLboolean invert);
 typedef void (GLAD_API_PTR *PFNGLSAMPLEMASKIPROC)(GLuint maskNumber, GLbitfield mask);
@@ -745,9 +734,7 @@ typedef void (GLAD_API_PTR *PFNGLTEXBUFFERPROC)(GLenum target, GLenum internalfo
 typedef void (GLAD_API_PTR *PFNGLTEXBUFFERRANGEPROC)(GLenum target, GLenum internalformat, GLuint buffer, GLintptr offset, GLsizeiptr size);
 typedef void (GLAD_API_PTR *PFNGLTEXIMAGE1DPROC)(GLenum target, GLint level, GLint internalformat, GLsizei width, GLint border, GLenum format, GLenum type, const void * pixels);
 typedef void (GLAD_API_PTR *PFNGLTEXIMAGE2DPROC)(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const void * pixels);
-typedef void (GLAD_API_PTR *PFNGLTEXIMAGE2DMULTISAMPLEPROC)(GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height, GLboolean fixedsamplelocations);
 typedef void (GLAD_API_PTR *PFNGLTEXIMAGE3DPROC)(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLsizei depth, GLint border, GLenum format, GLenum type, const void * pixels);
-typedef void (GLAD_API_PTR *PFNGLTEXIMAGE3DMULTISAMPLEPROC)(GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth, GLboolean fixedsamplelocations);
 typedef void (GLAD_API_PTR *PFNGLTEXPARAMETERIIVPROC)(GLenum target, GLenum pname, const GLint * params);
 typedef void (GLAD_API_PTR *PFNGLTEXPARAMETERIUIVPROC)(GLenum target, GLenum pname, const GLuint * params);
 typedef void (GLAD_API_PTR *PFNGLTEXPARAMETERFPROC)(GLenum target, GLenum pname, GLfloat param);
@@ -756,9 +743,7 @@ typedef void (GLAD_API_PTR *PFNGLTEXPARAMETERIPROC)(GLenum target, GLenum pname,
 typedef void (GLAD_API_PTR *PFNGLTEXPARAMETERIVPROC)(GLenum target, GLenum pname, const GLint * params);
 typedef void (GLAD_API_PTR *PFNGLTEXSTORAGE1DPROC)(GLenum target, GLsizei levels, GLenum internalformat, GLsizei width);
 typedef void (GLAD_API_PTR *PFNGLTEXSTORAGE2DPROC)(GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height);
-typedef void (GLAD_API_PTR *PFNGLTEXSTORAGE2DMULTISAMPLEPROC)(GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height, GLboolean fixedsamplelocations);
 typedef void (GLAD_API_PTR *PFNGLTEXSTORAGE3DPROC)(GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth);
-typedef void (GLAD_API_PTR *PFNGLTEXSTORAGE3DMULTISAMPLEPROC)(GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth, GLboolean fixedsamplelocations);
 typedef void (GLAD_API_PTR *PFNGLTEXSUBIMAGE1DPROC)(GLenum target, GLint level, GLint xoffset, GLsizei width, GLenum format, GLenum type, const void * pixels);
 typedef void (GLAD_API_PTR *PFNGLTEXSUBIMAGE2DPROC)(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const void * pixels);
 typedef void (GLAD_API_PTR *PFNGLTEXSUBIMAGE3DPROC)(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type, const void * pixels);
@@ -772,9 +757,7 @@ typedef void (GLAD_API_PTR *PFNGLTEXTUREPARAMETERIPROC)(GLuint texture, GLenum p
 typedef void (GLAD_API_PTR *PFNGLTEXTUREPARAMETERIVPROC)(GLuint texture, GLenum pname, const GLint * param);
 typedef void (GLAD_API_PTR *PFNGLTEXTURESTORAGE1DPROC)(GLuint texture, GLsizei levels, GLenum internalformat, GLsizei width);
 typedef void (GLAD_API_PTR *PFNGLTEXTURESTORAGE2DPROC)(GLuint texture, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height);
-typedef void (GLAD_API_PTR *PFNGLTEXTURESTORAGE2DMULTISAMPLEPROC)(GLuint texture, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height, GLboolean fixedsamplelocations);
 typedef void (GLAD_API_PTR *PFNGLTEXTURESTORAGE3DPROC)(GLuint texture, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth);
-typedef void (GLAD_API_PTR *PFNGLTEXTURESTORAGE3DMULTISAMPLEPROC)(GLuint texture, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth, GLboolean fixedsamplelocations);
 typedef void (GLAD_API_PTR *PFNGLTEXTURESUBIMAGE1DPROC)(GLuint texture, GLint level, GLint xoffset, GLsizei width, GLenum format, GLenum type, const void * pixels);
 typedef void (GLAD_API_PTR *PFNGLTEXTURESUBIMAGE2DPROC)(GLuint texture, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const void * pixels);
 typedef void (GLAD_API_PTR *PFNGLTEXTURESUBIMAGE3DPROC)(GLuint texture, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type, const void * pixels);
@@ -1153,8 +1136,6 @@ GLAD_API_CALL PFNGLRELEASESHADERCOMPILERPROC glad_glReleaseShaderCompiler;
 #define glReleaseShaderCompiler glad_glReleaseShaderCompiler
 GLAD_API_CALL PFNGLRENDERBUFFERSTORAGEPROC glad_glRenderbufferStorage;
 #define glRenderbufferStorage glad_glRenderbufferStorage
-GLAD_API_CALL PFNGLRENDERBUFFERSTORAGEMULTISAMPLEPROC glad_glRenderbufferStorageMultisample;
-#define glRenderbufferStorageMultisample glad_glRenderbufferStorageMultisample
 GLAD_API_CALL PFNGLRESUMETRANSFORMFEEDBACKPROC glad_glResumeTransformFeedback;
 #define glResumeTransformFeedback glad_glResumeTransformFeedback
 GLAD_API_CALL PFNGLSAMPLEMASKIPROC glad_glSampleMaski;
@@ -1205,12 +1186,8 @@ GLAD_API_CALL PFNGLTEXIMAGE1DPROC glad_glTexImage1D;
 #define glTexImage1D glad_glTexImage1D
 GLAD_API_CALL PFNGLTEXIMAGE2DPROC glad_glTexImage2D;
 #define glTexImage2D glad_glTexImage2D
-GLAD_API_CALL PFNGLTEXIMAGE2DMULTISAMPLEPROC glad_glTexImage2DMultisample;
-#define glTexImage2DMultisample glad_glTexImage2DMultisample
 GLAD_API_CALL PFNGLTEXIMAGE3DPROC glad_glTexImage3D;
 #define glTexImage3D glad_glTexImage3D
-GLAD_API_CALL PFNGLTEXIMAGE3DMULTISAMPLEPROC glad_glTexImage3DMultisample;
-#define glTexImage3DMultisample glad_glTexImage3DMultisample
 GLAD_API_CALL PFNGLTEXPARAMETERIIVPROC glad_glTexParameterIiv;
 #define glTexParameterIiv glad_glTexParameterIiv
 GLAD_API_CALL PFNGLTEXPARAMETERIUIVPROC glad_glTexParameterIuiv;
@@ -1223,10 +1200,6 @@ GLAD_API_CALL PFNGLTEXPARAMETERIPROC glad_glTexParameteri;
 #define glTexParameteri glad_glTexParameteri
 GLAD_API_CALL PFNGLTEXPARAMETERIVPROC glad_glTexParameteriv;
 #define glTexParameteriv glad_glTexParameteriv
-GLAD_API_CALL PFNGLTEXSTORAGE2DMULTISAMPLEPROC glad_glTexStorage2DMultisample;
-#define glTexStorage2DMultisample glad_glTexStorage2DMultisample
-GLAD_API_CALL PFNGLTEXSTORAGE3DMULTISAMPLEPROC glad_glTexStorage3DMultisample;
-#define glTexStorage3DMultisample glad_glTexStorage3DMultisample
 GLAD_API_CALL PFNGLTEXSUBIMAGE1DPROC glad_glTexSubImage1D;
 #define glTexSubImage1D glad_glTexSubImage1D
 GLAD_API_CALL PFNGLTEXSUBIMAGE2DPROC glad_glTexSubImage2D;
@@ -1255,12 +1228,8 @@ GLAD_API_CALL PFNGLTEXTURESTORAGE1DPROC glad_glTextureStorage1D;
 #define glTextureStorage1D glad_glTextureStorage1D
 GLAD_API_CALL PFNGLTEXTURESTORAGE2DPROC glad_glTextureStorage2D;
 #define glTextureStorage2D glad_glTextureStorage2D
-GLAD_API_CALL PFNGLTEXTURESTORAGE2DMULTISAMPLEPROC glad_glTextureStorage2DMultisample;
-#define glTextureStorage2DMultisample glad_glTextureStorage2DMultisample
 GLAD_API_CALL PFNGLTEXTURESTORAGE3DPROC glad_glTextureStorage3D;
 #define glTextureStorage3D glad_glTextureStorage3D
-GLAD_API_CALL PFNGLTEXTURESTORAGE3DMULTISAMPLEPROC glad_glTextureStorage3DMultisample;
-#define glTextureStorage3DMultisample glad_glTextureStorage3DMultisample
 GLAD_API_CALL PFNGLTEXTURESUBIMAGE1DPROC glad_glTextureSubImage1D;
 #define glTextureSubImage1D glad_glTextureSubImage1D
 GLAD_API_CALL PFNGLTEXTURESUBIMAGE2DPROC glad_glTextureSubImage2D;
@@ -1357,22 +1326,9 @@ GLAD_API_CALL int gladLoadGL( GLADloadfunc load);
  #define GLFW_CALLBACK_DEFINED
 #endif /* CALLBACK */
 
-#if defined(GLFW_DLL) && defined(_GLFW_BUILD_DLL)
- #error "You must not have both GLFW_DLL and _GLFW_BUILD_DLL defined"
-#endif
 
-#if defined(_WIN32) && defined(_GLFW_BUILD_DLL)
- /* We are building GLFW as a Win32 DLL */
- #define GLFWAPI __declspec(dllexport)
-#elif defined(_WIN32) && defined(GLFW_DLL)
- /* We are calling a GLFW Win32 DLL */
- #define GLFWAPI __declspec(dllimport)
-#elif defined(_GLFW_BUILD_DLL)
- /* We are building GLFW as a Unix shared library */
- #define GLFWAPI __attribute__((visibility("default")))
-#else
  #define GLFWAPI
-#endif
+
 
 #define GLFW_RELEASE                0
 #define GLFW_PRESS                  1
@@ -1570,12 +1526,6 @@ GLAD_API_CALL int gladLoadGL( GLADloadfunc load);
 #define GLFW_GAMEPAD_AXIS_LEFT_TRIGGER  4
 #define GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER 5
 #define GLFW_GAMEPAD_AXIS_LAST          GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER
-#define GLFW_NO_API                          0
-#define GLFW_OPENGL_API             0x00030001
-#define GLFW_OPENGL_ES_API          0x00030002
-#define GLFW_OPENGL_ANY_PROFILE              0
-#define GLFW_OPENGL_CORE_PROFILE    0x00032001
-#define GLFW_OPENGL_COMPAT_PROFILE  0x00032002
 #define GLFW_CURSOR                  0x00033001
 #define GLFW_STICKY_KEYS             0x00033002
 #define GLFW_STICKY_MOUSE_BUTTONS    0x00033003
@@ -1595,12 +1545,7 @@ GLAD_API_CALL int gladLoadGL( GLADloadfunc load);
 #define GLFW_PLATFORM_WIN32         0x00060001
 #define GLFW_PLATFORM_X11           0x00060004
 #define GLFW_DONT_CARE              -1
-#define GLFW_NO_ERROR               0
-#define GLFW_NOT_INITIALIZED        0x00010001
-#define GLFW_NO_CURRENT_CONTEXT     0x00010002
-#define GLFW_INVALID_ENUM           0x00010003
 #define GLFW_INVALID_VALUE          0x00010004
-#define GLFW_OUT_OF_MEMORY          0x00010005
 #define GLFW_API_UNAVAILABLE        0x00010006
 #define GLFW_VERSION_UNAVAILABLE    0x00010007
 #define GLFW_PLATFORM_ERROR         0x00010008
@@ -1625,7 +1570,6 @@ GLAD_API_CALL int gladLoadGL( GLADloadfunc load);
 #define GLFW_AUX_BUFFERS            0x0002100B
 #define GLFW_STEREO                 0x0002100C
 #define GLFW_SAMPLES                0x0002100D
-#define GLFW_SRGB_CAPABLE           0x0002100E
 #define GLFW_REFRESH_RATE           0x0002100F
 #define GLFW_DOUBLEBUFFER           0x00021010
 #define GLFW_CONTEXT_DEBUG          0x00022007
@@ -1639,44 +1583,15 @@ GLAD_API_CALL int gladLoadGL( GLADloadfunc load);
 #define GLFW_X11_INSTANCE_NAME      0x00024002
 #define GLFW_WIN32_KEYBOARD_MENU    0x00025001
 #define GLFW_WIN32_SHOWDEFAULT      0x00025002
-#define GLFW_NO_API                          0
-#define GLFW_OPENGL_API             0x00030001
-#define GLFW_OPENGL_ES_API          0x00030002
-#define GLFW_NO_ROBUSTNESS                   0
 #define GLFW_NO_RESET_NOTIFICATION  0x00031001
 #define GLFW_LOSE_CONTEXT_ON_RESET  0x00031002
-#define GLFW_OPENGL_ANY_PROFILE              0
-#define GLFW_OPENGL_CORE_PROFILE    0x00032001
-#define GLFW_OPENGL_COMPAT_PROFILE  0x00032002
-#define GLFW_CURSOR                  0x00033001
-#define GLFW_STICKY_KEYS             0x00033002
-#define GLFW_STICKY_MOUSE_BUTTONS    0x00033003
-#define GLFW_LOCK_KEY_MODS           0x00033004
-#define GLFW_RAW_MOUSE_MOTION        0x00033005
-#define GLFW_UNLIMITED_MOUSE_BUTTONS 0x00033006
 #define GLFW_CURSOR_NORMAL          0x00034001
 #define GLFW_CURSOR_HIDDEN          0x00034002
 #define GLFW_CURSOR_DISABLED        0x00034003
 #define GLFW_CURSOR_CAPTURED        0x00034004
-#define GLFW_ANY_RELEASE_BEHAVIOR            0
-#define GLFW_RELEASE_BEHAVIOR_FLUSH 0x00035001
-#define GLFW_RELEASE_BEHAVIOR_NONE  0x00035002
-#define GLFW_NATIVE_CONTEXT_API     0x00036001
-#define GLFW_ANY_POSITION           0x80000000
-#define GLFW_ARROW_CURSOR           0x00036001
-#define GLFW_IBEAM_CURSOR           0x00036002
-#define GLFW_CROSSHAIR_CURSOR       0x00036003
-#define GLFW_POINTING_HAND_CURSOR   0x00036004
-#define GLFW_RESIZE_EW_CURSOR       0x00036005
-#define GLFW_RESIZE_NS_CURSOR       0x00036006
-#define GLFW_RESIZE_NWSE_CURSOR     0x00036007
-#define GLFW_RESIZE_NESW_CURSOR     0x00036008
-#define GLFW_RESIZE_ALL_CURSOR      0x00036009
-#define GLFW_NOT_ALLOWED_CURSOR     0x0003600A
 typedef void (*GLFWglproc)(void);
 typedef struct GLFWmonitor GLFWmonitor;
 typedef struct GLFWwindow GLFWwindow;
-typedef struct GLFWcursor GLFWcursor;
 typedef void (* GLFWerrorfun)(int error_code, const char* description);
 typedef void (* GLFWwindowposfun)(GLFWwindow* window, int xpos, int ypos);
 typedef void (* GLFWwindowsizefun)(GLFWwindow* window, int width, int height);
@@ -1692,13 +1607,10 @@ typedef void (* GLFWcursorposfun)(GLFWwindow* window, double xpos, double ypos);
 typedef void (* GLFWcursorenterfun)(GLFWwindow* window, int entered);
 typedef void (* GLFWscrollfun)(GLFWwindow* window, double xoffset, double yoffset);
 typedef void (* GLFWkeyfun)(GLFWwindow* window, int key, int scancode, int action, int mods);
-typedef void (* GLFWcharfun)(GLFWwindow* window, unsigned int codepoint);
-typedef void (* GLFWcharmodsfun)(GLFWwindow* window, unsigned int codepoint, int mods);
 typedef void (* GLFWdropfun)(GLFWwindow* window, int path_count, const char* paths[]);
 typedef void (* GLFWmonitorfun)(GLFWmonitor* monitor, int event);
 typedef void (* GLFWjoystickfun)(int jid, int event);
 typedef struct GLFWvidmode { int width,height,redBits,greenBits,blueBits,refreshRate; } GLFWvidmode;
-typedef struct GLFWgammaramp { unsigned short *red,*green,*blue; unsigned int size; } GLFWgammaramp;
 typedef struct GLFWimage { int width,height; unsigned char* pixels; } GLFWimage;
 typedef struct GLFWgamepadstate { unsigned char buttons[15]; float axes[6]; } GLFWgamepadstate;
 GLFWAPI void glfwMakeContextCurrent(GLFWwindow* window);

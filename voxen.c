@@ -691,7 +691,7 @@ static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
 static void window_focus_callback(GLFWwindow* window, i32 focused) {
     Sys_Input.window_has_focus = focused != 0; (void)window;
     Sys_Input.ignore_next_mouse_delta = true;
-    glfwSetInputMode(window,GLFW_CURSOR,Sys_Input.window_has_focus ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+    SetCursorMode(window,Sys_Input.window_has_focus ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
 }
 
 static void mouse_button_callback(GLFWwindow* window, i32 button, i32 action, i32 mods) {
@@ -1791,10 +1791,28 @@ i32 main(void) {
     if (!glfwInit()) { DualLogError("GLFW initialization failed\n"); OS_Exit(1); }
     
     Sys_Global.globalFrameNum=0,Sys_Global.menuActive=true,Sys_Global.screenshotTimeout=1.0,Sys_Global.creditsPageIndex=1,Sys_Global.difficultyCombat=Sys_Global.difficultyCyber=Sys_Global.difficultyPuzzle=Sys_Global.difficultyMission=2,Sys_Global.deaths=0,Sys_Global.worstFPS=0,Sys_Global.cursorPosition_x=680,Sys_Global.cursorPosition_y=384;
+    DualLog("Loading game definition...");
+    OsFileHandle gmFP = OS_OpenReadonly("./Data/gamedata.txt");
+    if (!gmFP) { DualLogError("\nCannot open ./Data/gamedata.txt\n"); OS_Exit(1);  }
+   
+    char gmLine[512]; u32 lineNum = 0;
+    while (GetNextStringUpToNewlineOrEOF(gmLine,sizeof(gmLine),gmFP)) {
+        lineNum++;
+        char* s = data_parser_trim(gmLine); if (*s == 0 || (s[0] == '/' && s[1] == '/')) continue;
+        char* colon = StringFindFirstCharWithin(s, ':'); if (!colon) continue;
+        *colon = '\0'; char* key = data_parser_trim(s); char* val = data_parser_trim(colon + 1); if (*key == 0 || *val == 0) continue;
+
+        if (StringsEqual(key, "modname")) StringCopyInto_A_From_B(Sys_Global.global_modname,val,sizeof(Sys_Global.global_modname));
+        else if (StringsEqual(key, "levelcount")) Sys_Global.numLevels = parse_numberu8(val,gmLine,lineNum);
+        else if (StringsEqual(key, "startlevel")) Sys_Global.startLevel = parse_numberu8(val,gmLine,lineNum);
+    }
+    
+    OS_Close(gmFP); DualLog(" %s:: num levels: %d, start level: %d\n",Sys_Global.global_modname,Sys_Global.numLevels,Sys_Global.startLevel);
     LoadConfig(); // Get settings before setting window size.
-    window = glfwCreateWindow(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight,"Voxen",NULL,NULL); if (!window) { DualLogError("glfwCreateWindow failed\n"); OS_Exit(1); }
+    window = glfwCreateWindow(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight,&Sys_Global.global_modname[0],NULL,NULL); if (!window) { DualLogError("glfwCreateWindow failed\n"); OS_Exit(1); }
     
     CenterWindowOnMonitor();
+    //glfwFocusWindow(window); TODO to fix mouse input not starting out working on windows (at least Wine test builds).
     glfwMakeContextCurrent(window); glfwSetFramebufferSizeCallback(window,UpdateScreenSize);
     if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress)) { DualLogError("Failed to initialize GLAD\n"); OS_Exit(1); }
     
@@ -1804,8 +1822,7 @@ i32 main(void) {
     if (major < 4 || (major == 4 && minor < 3)) { DualLogError("Need OpenGL >= 4.3, got %d.%d\n",major,minor); OS_Exit(1); }
     glfwSetKeyCallback(window,key_callback); glfwSetJoystickCallback(joystick_callback);
     glfwSetCursorPosCallback(window,cursor_pos_callback); glfwSetWindowFocusCallback(window,window_focus_callback);
-    glfwSetMouseButtonCallback(window,mouse_button_callback); glfwSetScrollCallback(window,scroll_callback);
-    glfwSetInputMode(window,GLFW_CURSOR,GLFW_CURSOR_DISABLED);
+    glfwSetMouseButtonCallback(window,mouse_button_callback); glfwSetScrollCallback(window,scroll_callback); SetCursorMode(window,GLFW_CURSOR_DISABLED);
     glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
     glBlendFuncSeparate(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA,GL_ZERO,GL_ONE);
     CompileShaders();
@@ -1842,23 +1859,6 @@ i32 main(void) {
     ma_engine_config engine_config = ma_engine_config_init();
     engine_config.channels = 2; engine_config.periodSizeInMilliseconds = 10; engine_config.periodSizeInFrames = 512;
     result = ma_engine_init(&engine_config, &audio_engine); if (result != MA_SUCCESS) DualLog("ERROR: Failed to initialize miniaudio engine: %d\n", result);
-    DualLog("Loading game definition...");
-    OsFileHandle gmFP = OS_OpenReadonly("./Data/gamedata.txt");
-    if (!gmFP) { DualLogError("\nCannot open ./Data/gamedata.txt\n"); OS_Exit(1);  }
-   
-    char gmLine[512]; u32 lineNum = 0;
-    while (GetNextStringUpToNewlineOrEOF(gmLine,sizeof(gmLine),gmFP)) {
-        lineNum++;
-        char* s = data_parser_trim(gmLine); if (*s == 0 || (s[0] == '/' && s[1] == '/')) continue;
-        char* colon = StringFindFirstCharWithin(s, ':'); if (!colon) continue;
-        *colon = '\0'; char* key = data_parser_trim(s); char* val = data_parser_trim(colon + 1); if (*key == 0 || *val == 0) continue;
-
-        if (StringsEqual(key, "modname")) StringCopyInto_A_From_B(Sys_Global.global_modname,val,sizeof(Sys_Global.global_modname));
-        else if (StringsEqual(key, "levelcount")) Sys_Global.numLevels = parse_numberu8(val,gmLine,lineNum);
-        else if (StringsEqual(key, "startlevel")) Sys_Global.startLevel = parse_numberu8(val,gmLine,lineNum);
-    }
-    
-    OS_Close(gmFP); DualLog(" %s:: num levels: %d, start level: %d\n",Sys_Global.global_modname,Sys_Global.numLevels,Sys_Global.startLevel);
     LoadModFunctions();
     ModEntityDefinitionsInitAfterLoad();
     glGenFramebuffers(1,&Sys_Render.gBufferFBO);
@@ -1869,7 +1869,6 @@ i32 main(void) {
     GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     if (status != GL_FRAMEBUFFER_COMPLETE) DualLogError("Framebuffer incomplete: Error code %d\n", status);
     glBindFramebuffer(GL_FRAMEBUFFER,0); // Needed to render loading progress.
-    glfwSetWindowTitle(window,Sys_Global.global_modname);
     OsFileHandle fp = OS_OpenReadonly("./Textures/UI/menudot1.png");
     if (fp) {
         int windowIconFileSize = OS_FileSize(fp);
