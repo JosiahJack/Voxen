@@ -136,14 +136,13 @@ float smooth_damp(float current, float target, float *current_velocity, float sm
     return output;
 }
 
-ENGINE_TO_MOD size_t GetStringLength(const char* s) {
+ENGINE_TO_MOD size_t GetStringLength(const char* s) { // strlen replacement
     if (s == NULL) return 0;
     
     const char *p = s;
     while (*(p++));
     return (size_t)(p - s - 1);
 }
-// size_t strlen(const char* s) { return GetStringLength(s); }
 
 char* data_parser_trim(char* s) {
     while (CharacterIsEmpty((unsigned char)*s)) s++;

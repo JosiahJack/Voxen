@@ -86,6 +86,8 @@ void DebugRAM(const char *context);
     #include <sys/mman.h>
     #include <sys/stat.h>
     #include <fcntl.h>
+    #include <linux/input.h>
+    #include <regex.h>
     #include <time.h>
     #include <unistd.h>
     typedef int OsFileHandle;

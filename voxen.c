@@ -569,21 +569,25 @@ ENGINE_TO_MOD void AddCamView(Vector3 pos, Quaternion rot, u8 fov, u16 width, u1
     GenerateAndBindTexture(&camViewTextures[camViewCount],GL_RGBA8,width,height,GL_RGBA,GL_UNSIGNED_BYTE); camViewCount++;
 }
 
-
-void Input_Poll(void) {
+static inline __attribute__((always_inline)) __attribute__((hot)) void Input_Poll(void) {
     glfwPollEvents();
     for (int jid = GLFW_JOYSTICK_1; jid <= GLFW_JOYSTICK_LAST; ++jid) {
         if (!glfwJoystickPresent(jid)) continue;
 
         int buttonCount;
-        const unsigned char* buttons = glfwGetJoystickButtons(jid, &buttonCount);
+        const unsigned char* buttons = glfwGetJoystickButtons(jid,&buttonCount);
         for (int i = 0; i < buttonCount && i < MAX_JOYSTICK_BUTTONS; ++i) {
             KeyState* k = &Sys_Input.joystickButtons[GLFW_JOYSTICK_1][i];
             bool down = buttons[i] == GLFW_PRESS;
             k->pressed =down&&!k->down; k->released=!down&&k->down; k->down=down;
         }
 
-        int hatCount; const unsigned char* hats = glfwGetJoystickHats(jid, &hatCount);
+        const unsigned char* hats = NULL; int hatCount = 0;
+        if (jid > 0 && jid <= GLFW_JOYSTICK_LAST && initJoysticks()) {
+            _GLFWjoystick* js = _glfw.joysticks + jid;
+            if (js->connected && PLATFORM_pollJoystick(js,2/*buttons*/)) { hatCount = js->hatCount; hats = js->hats; }
+        }
+        
         for (int i = 0; i < hatCount && i < MAX_JOYSTICK_HATS; ++i) Sys_Input.joystickHats[i].down = hats[i];
     }
 

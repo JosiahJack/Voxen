@@ -108,8 +108,8 @@ if [ "$PLATFORM" = "windows" ]; then
 else
     CC=$LINUX_CC
     LINKER=$CC
-    CFLAGS="$COMMON_CFLAGS -fno-plt -fno-semantic-interposition -I./include -D_GLFW_X11 -D_GNU_SOURCE"
-    LDFLAGS="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -lGL -lm -ldl -lpthread"
+    CFLAGS="$COMMON_CFLAGS -fno-plt -fno-semantic-interposition -D_GNU_SOURCE"
+    LDFLAGS="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -ldl -lpthread"
     BINARY_NAME="voxen"
 fi
 
@@ -118,7 +118,7 @@ export CFLAGS=$CFLAGS
 SOURCES="voxen.c physics.c helpers.c console.c fonts.c models.c culling.c textures.c glad.c miniaudio.c"
 export TEMP_DIR=temp_build
 printf "%s\n" $SOURCES | xargs -P12 -I{} sh -c "$CC -c {} $CFLAGS -o $TEMP_DIR/\$(basename {}).o"
-$LINKER "$TEMP_DIR"/*.o $LDFLAGS -rdynamic -lm -o $BINARY_NAME
+$LINKER "$TEMP_DIR"/*.o $LDFLAGS -rdynamic -o $BINARY_NAME
 link_status=$?
 if [ $link_status -ne 0 ]; then
     echo "ERROR: Linking failed."
@@ -163,8 +163,8 @@ echo "Built engine and mod in ${total_build_time} ms"
 if ! $IS_CI; then
     case "$PLATFORM" in
         windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; wine ./voxen.exe ;;
-        *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
-#         *)        strip --strip-all --strip-unneeded ./voxen; ./voxen ;;   # linux
+#         *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
+        *)        strip --strip-all --strip-unneeded ./voxen; ./voxen ;;   # linux
     esac
     rm -f "$TEMP_DIR"/*.o ./Shaders/*.h "$TEMP_DIRGC"/*.o ./voxen.upx ./*.lib #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.
 fi

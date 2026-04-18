@@ -23,4 +23,5 @@
 #define MA_NO_NEON
 #define MA_NO_ENCODING
 #include "os.h"
+#include "common.h"
 #include "miniaudio.h"
