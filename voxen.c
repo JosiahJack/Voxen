@@ -88,7 +88,6 @@ void CompileShaders(void) {
 }
 
 GLuint SetupSSBO(GLuint* id, GLuint bindx, GLsizeiptr sz, const void* d, GLenum typ) { glGenBuffers(1,id); glBindBuffer(GL_SSBO,*id); glBufferData(GL_SSBO,sz,d,typ); glBindBufferBase(GL_SHADER_STORAGE_BUFFER,bindx,*id); return *id; }
-
 void mat4_lookat_from(float* m, Quaternion* camRotation, Vector3 eye) { // Kept around for light views for shadowmap cubemap faces.
     float x = camRotation->x, y = camRotation->y, z = camRotation->z, w = camRotation->w;
     float x2 = x * x, y2 = y * y, z2 = z * z;
@@ -269,7 +268,6 @@ void UpdateLights(void) {
 }
 
 void UploadGridCellVisibility(void) { glNamedBufferData(Sys_Render.cellVisibleDataID,ARRSIZE * sizeof(u32),gridCellStates,GL_DYNAMIC_DRAW); }
-
 #define CHGD(a,b) (vabs((a) - (b)) > 0.0001f)
 ENGINE_TO_MOD void UpdateLight(u16 i, Vector3 pos, Color3 col, float range, float intensity, float max, float min, float spotAng, Quaternion spotDir, bool on, bool shad) {
     bool changed = ((!!(lights[i].lflags & SHADON) - shad) || (!!(lights[i].lflags & LIGHTON) -  on) || CHGD(lights[i].range,range) || CHGD(lights[i].pos.x,pos.x) || CHGD(lights[i].pos.y,pos.y) || CHGD(lights[i].pos.z,pos.z));
@@ -285,9 +283,8 @@ float UIX(i16 x) { return (float)x / BASE_RES_X; } // Pos or value as percent of
 float RelX(i16 x) { return UIX(x) * (float)Sys_Settings.ScreenWidth; } // Pos or value in current resolution
 float UIY(i16 y) { return (float)y / BASE_RES_Y; }
 float RelY(i16 y) { return UIY(y) * (float)Sys_Settings.ScreenHeight; }
-
 void RenderUIImage(i16 x, i16 y, i16 width, i16 height, u32 texIndex) {
-    float xpos = RelX(x); float ypos = RelY(y);
+    float xpos=RelX(x), ypos=RelY(y);
     glUseProgram(Sys_Render.chunkShaderProgram);
     glBindVertexArray(Sys_Render.textVAO);
     glUniform1ui(1,0);
@@ -297,9 +294,7 @@ void RenderUIImage(i16 x, i16 y, i16 width, i16 height, u32 texIndex) {
     glUniform1ui(20,0);
     glUniformMatrix4fv(2,1,GL_FALSE,uiOrthoProjection);
     glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.textVBO);
-    float x1 = xpos + RelX(width);
-    float y1 = ypos + RelY(height);
-    float z = 0.0f;
+    float x1=xpos + RelX(width), y1=ypos + RelY(height), z=0.0f;
     float vertices[30] = {xpos,y1,z,0.0f,0.0f,x1,ypos,z,1.0f,1.0f,x1,y1,z,1.0f,0.0f,xpos,y1,z,0.0f,0.0f,xpos,ypos,z,0.0f,1.0f,x1,ypos,z,1.0f,1.0f};
     glUniform1ui(18,texIndex);    
     glBufferData(GL_ARRAY_BUFFER,30 * sizeof(float),vertices,GL_DYNAMIC_DRAW);
@@ -308,11 +303,7 @@ void RenderUIImage(i16 x, i16 y, i16 width, i16 height, u32 texIndex) {
     glBindBuffer(GL_ARRAY_BUFFER,0);
 }
 
-__attribute__((pure)) bool CursorIsOverBounds(float startX, float endX, float startY, float endY) {
-    return   (Sys_Global.cursorPosition_x >= startX && Sys_Global.cursorPosition_x <= endX   /* 0 == left */
-           && Sys_Global.cursorPosition_y >= endY && Sys_Global.cursorPosition_y <= startY); /* 0 == top */
-}
-
+static inline __attribute__((always_inline,pure)) bool CursorIsOverBounds(float startX, float endX, float startY, float endY) { return Sys_Global.cursorPosition_x >= startX && Sys_Global.cursorPosition_x <= endX /* 0 == left */ && Sys_Global.cursorPosition_y >= endY && Sys_Global.cursorPosition_y <= startY; /* 0 == top */ }
 void RenderFormattedText(i16 x, i16 y, u32 color, u8 fontID, float scaleInput, const char * restrict format, ...);
 void RenderLoadingProgress(i32 offset, const char * restrict text) { // Only adds 0.01secs to game startup time.
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -795,7 +786,7 @@ void ChangeFullScreenWindowed(void) {
         glfwSetWindowAttrib(window,0x00020005/*GLFW_DECORATED*/,0);
         int x,y,w,h;
         glfwGetMonitorWorkarea(monitor,&x,&y,&w,&h);
-        glfwSetWindowMonitor(window,NULL,x,y,w,h,mode->refreshRate);
+        glfwSetWindowMonitor(window,x,y,w,h);
         Sys_Settings.ScreenWidth = w;
         Sys_Settings.ScreenHeight = h;
     } else {
@@ -808,7 +799,7 @@ void ChangeFullScreenWindowed(void) {
         Sys_Settings.ScreenHeight = vmax(vmin((h*3)/4, 768),200);
         int xpos = mx + (mode->width - Sys_Settings.ScreenWidth) / 2;
         int ypos = my + (mode->height - Sys_Settings.ScreenHeight) / 2;
-        glfwSetWindowMonitor(window,NULL,xpos,ypos,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight,mode->refreshRate);
+        glfwSetWindowMonitor(window,xpos,ypos,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
     }
     
     UpdateScreenSize(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
@@ -1709,7 +1700,7 @@ i32 main(void) {
     
     OS_Close(gmFP); DualLog(" %s:: num levels: %d, start level: %d\n",Sys_Global.global_modname,Sys_Global.numLevels,Sys_Global.startLevel);
     LoadConfig(); // Get settings before setting window size.
-    window = glfwCreateWindow(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight,&Sys_Global.global_modname[0],NULL,NULL);
+    window = glfwCreateWindow(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight,&Sys_Global.global_modname[0]);
     CenterWindowOnMonitor();
     glfwMakeContextCurrent(window);
     if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress)) { DualLogError("Failed to initialize GLAD\n"); OS_Exit(1); }
@@ -1718,7 +1709,6 @@ i32 main(void) {
     glfwSwapBuffers(window);
     GLint major=0,minor=0; glGetIntegerv(GL_MAJOR_VERSION,&major); glGetIntegerv(GL_MINOR_VERSION,&minor);
     if (major < 4 || (major == 4 && minor < 3)) { DualLogError("Need OpenGL >= 4.3, got %d.%d\n",major,minor); OS_Exit(1); }
-    SetCursorMode(window,0x00034003/*disabled*/);
     glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
     glBlendFuncSeparate(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA,GL_ZERO,GL_ONE);
     CompileShaders();
