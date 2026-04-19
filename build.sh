@@ -163,8 +163,8 @@ echo "Built engine and mod in ${total_build_time} ms"
 if ! $IS_CI; then
     case "$PLATFORM" in
         windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; wine ./voxen.exe ;;
-#         *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
-        *)        strip --strip-all --strip-unneeded ./voxen; ./voxen ;;   # linux
+        *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
+#         *)        strip --strip-all --strip-unneeded ./voxen; ./voxen ;;   # linux
     esac
     rm -f "$TEMP_DIR"/*.o ./Shaders/*.h "$TEMP_DIRGC"/*.o ./voxen.upx ./*.lib #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.
 fi
