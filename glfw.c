@@ -9,8 +9,6 @@
 #define GLFW_FALSE 0
 #define GLFW_CURSOR_NORMAL 0x00034001
 #define GLFW_CURSOR_DISABLED 0x00034003
-#define GLFW_CONNECTED 0x00040001
-#define GLFW_DISCONNECTED 0x00040002
 #define _GLFW_STICK 3
 #define _GLFW_JOYSTICK_AXIS 1
 #define _GLFW_JOYSTICK_BUTTON 2
@@ -853,7 +851,6 @@ u64 _glfwPlatformGetTimerFrequency(void);
 GLFWbool _glfwPlatformCreateTls(_GLFWtls* tls);
 void* _glfwPlatformGetTls(_GLFWtls* tls);
 void _glfwPlatformSetTls(_GLFWtls* tls, void* value);
-GLFWbool _glfwPlatformCreateMutex(_GLFWmutex* mutex);
 void* _glfwPlatformLoadModule(const char* path);
 GLFWproc _glfwPlatformGetModuleSymbol(void* module, const char* name);
 void _glfwInputWindowFocus(_GLFWwindow* window, GLFWbool focused);
@@ -1614,7 +1611,7 @@ void* _glfw_realloc(void* block, size_t size) {
     }
 
     static void closeJoystick(_GLFWjoystick* js) {
-        _glfwInputJoystick(js,GLFW_DISCONNECTED);
+        _glfwInputJoystick(js,0x00040002/*disconnected*/);
         if (js->win32.device) { IDirectInputDevice8_Unacquire(js->win32.device); IDirectInputDevice8_Release(js->win32.device); }
         free(js->win32.objects); _glfwFreeJoystick(js);
     }
@@ -1673,7 +1670,7 @@ void* _glfw_realloc(void* block, size_t size) {
         if (!(js=_glfwAllocJoystick(name,guid,data.axisCount+data.sliderCount,data.buttonCount,data.povCount))) { IDirectInputDevice8_Release(device), free(data.objects); return DIENUM_STOP; }
         
         js->win32.device=device, js->win32.guid=di->guidInstance, js->win32.objects=data.objects, js->win32.objectCount=data.objectCount;
-        _glfwInputJoystick(js,GLFW_CONNECTED); return DIENUM_CONTINUE;
+        _glfwInputJoystick(js,0x00040001/*connected*/); return DIENUM_CONTINUE;
     }
 
 
@@ -1694,7 +1691,7 @@ void* _glfw_realloc(void* block, size_t size) {
                 if (!js) continue;
 
                 js->win32.index = index;
-                _glfwInputJoystick(js,GLFW_CONNECTED);
+                _glfwInputJoystick(js,0x00040001/*connected*/);
             }
         }
 
@@ -1888,7 +1885,7 @@ void* _glfw_realloc(void* block, size_t size) {
                 monitor = createMonitor(&adapter, &display);
                 if (!monitor) { free(disconnected); return; }
 
-                _glfwInputMonitor(monitor,GLFW_CONNECTED,type); type = 1;
+                _glfwInputMonitor(monitor,0x00040001/*connected*/,type); type = 1;
             }
 
             if (displayIndex == 0) {
@@ -1901,12 +1898,12 @@ void* _glfw_realloc(void* block, size_t size) {
                 monitor = createMonitor(&adapter, NULL);
                 if (!monitor) { free(disconnected); return; }
 
-                _glfwInputMonitor(monitor, GLFW_CONNECTED, type);
+                _glfwInputMonitor(monitor, 0x00040001/*connected*/, type);
             }
         }
 
         for (i = 0;  i < disconnectedCount;  i++) {
-            if (disconnected[i]) _glfwInputMonitor(disconnected[i],GLFW_DISCONNECTED,0);
+            if (disconnected[i]) _glfwInputMonitor(disconnected[i],0x00040002/*disconnected*/,0);
         }
 
         free(disconnected);
@@ -1977,7 +1974,6 @@ void* _glfw_realloc(void* block, size_t size) {
 
     void* _glfwPlatformGetTls(_GLFWtls* tls) { return TlsGetValue(tls->win32.index); }
     void _glfwPlatformSetTls(_GLFWtls* tls, void* value) { TlsSetValue(tls->win32.index,value); }
-    GLFWbool _glfwPlatformCreateMutex(_GLFWmutex* mutex) { InitializeCriticalSection(&mutex->win32.section); return mutex->win32.allocated = GLFW_TRUE; }
     static int choosePixelFormatWGL(_GLFWwindow* window, const _GLFWctxconfig* ctxconfig, const _GLFWfbconfig* fbconfig) {
         (void)ctxconfig;
         int attribs[24],values[24],attribCount=0,i,pixelFormat,nativeCount,usableCount=0;
@@ -2174,11 +2170,6 @@ void* _glfw_realloc(void* block, size_t size) {
 
     void* _glfwPlatformGetTls(_GLFWtls* tls) { return pthread_getspecific(tls->posix.key); }
     void _glfwPlatformSetTls(_GLFWtls* tls, void* value) { pthread_setspecific(tls->posix.key, value); }
-    GLFWbool _glfwPlatformCreateMutex(_GLFWmutex* mutex) {
-        if (pthread_mutex_init(&mutex->posix.handle, NULL) != 0) { DualLogError("POSIX: Failed to create mutex"); return GLFW_FALSE; }
-        return mutex->posix.allocated = GLFW_TRUE;
-    }
-
     int ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *tmo_p, const sigset_t *sigmask);
     GLFWbool _glfwPollPOSIX(struct pollfd* fds, nfds_t count, double* timeout) {
         for (;;) {
@@ -2563,12 +2554,10 @@ void* _glfw_realloc(void* block, size_t size) {
         return mode;
     }
 
-    typedef struct { int screen_number; short x_org, y_org, width, height; } ScreenInfo;
     void _glfwPollMonitorsX11(void) {
         if (_glfw.x11.randr.available && !_glfw.x11.randr.monitorBroken) {
-            int disconnectedCount, screenCount = 0;
+            int disconnectedCount;
             _GLFWmonitor** disconnected = NULL;
-            ScreenInfo* screens = NULL;
             XRRScreenResources* sr = XRRGetScreenResourcesCurrent(_glfw.x11.display,_glfw.x11.root);
             RROutput primary = XRRGetOutputPrimary(_glfw.x11.display,_glfw.x11.root);
             disconnectedCount = _glfw.monitorCount;
@@ -2597,23 +2586,18 @@ void* _glfw_realloc(void* block, size_t size) {
                 if (widthMM <= 0 || heightMM <= 0) { widthMM  = (int) (ci->width * 25.4f / 96.f); heightMM = (int) (ci->height * 25.4f / 96.f); }
                 _GLFWmonitor* monitor = _glfwAllocMonitor(oi->name, widthMM, heightMM);
                 monitor->x11.output = sr->outputs[i]; monitor->x11.crtc   = oi->crtc;
-                for (j = 0;  j < screenCount;  j++) {
-                    if (screens[j].x_org == ci->x && screens[j].y_org == ci->y && screens[j].width == (short)ci->width && screens[j].height == (short)ci->height) { monitor->x11.index = j; break; }
-                }
-
-                type = (monitor->x11.output == primary) ? 0 : 1; _glfwInputMonitor(monitor,GLFW_CONNECTED,type); XRRFreeOutputInfo(oi); XRRFreeCrtcInfo(ci);
+                type = (monitor->x11.output == primary) ? 0 : 1; _glfwInputMonitor(monitor,0x00040001/*connected*/,type); XRRFreeOutputInfo(oi); XRRFreeCrtcInfo(ci);
             }
 
             XRRFreeScreenResources(sr);
-            if (screens) XFree(screens);
             for (int i = 0;  i < disconnectedCount;  i++) {
-                if (disconnected[i]) _glfwInputMonitor(disconnected[i], GLFW_DISCONNECTED, 0);
+                if (disconnected[i]) _glfwInputMonitor(disconnected[i],0x00040002/*disconnected*/,0);
             }
 
             free(disconnected);
         } else {
             const int widthMM = DisplayWidthMM(_glfw.x11.display, _glfw.x11.screen); const int heightMM = DisplayHeightMM(_glfw.x11.display, _glfw.x11.screen);
-            _glfwInputMonitor(_glfwAllocMonitor("Display", widthMM, heightMM),GLFW_CONNECTED,0);
+            _glfwInputMonitor(_glfwAllocMonitor("Display", widthMM, heightMM),0x00040001/*connected*/,0);
         }
     }
 
@@ -3127,12 +3111,12 @@ void* _glfw_realloc(void* block, size_t size) {
         strncpy(linjs.path, path, sizeof(linjs.path) - 1);
         __builtin_memcpy(&js->linjs, &linjs, sizeof(linjs));
         pollAbsState(js);
-        _glfwInputJoystick(js, GLFW_CONNECTED);
+        _glfwInputJoystick(js, 0x00040001/*connected*/);
         return GLFW_TRUE;
     }
     #undef isBitSet
 
-    static void closeJoystick(_GLFWjoystick* js) { _glfwInputJoystick(js, GLFW_DISCONNECTED); close(js->linjs.fd); _glfwFreeJoystick(js); }
+    static void closeJoystick(_GLFWjoystick* js) { _glfwInputJoystick(js,0x00040002/*disconnected*/); close(js->linjs.fd); _glfwFreeJoystick(js); }
     static int compareJoysticks(const void* fp, const void* sp) { const _GLFWjoystick* fj = fp; const _GLFWjoystick* sj = sp; return strcmp(fj->linjs.path, sj->linjs.path); }
     void _glfwDetectJoystickConnectionLinux(void) {
         if (_glfw.linjs.inotify <= 0) return;
@@ -3385,7 +3369,7 @@ int glfwInit(void) {
     #else
         if (!_glfwInitX11()) return GLFW_FALSE;
     #endif
-    if (!_glfwPlatformCreateMutex(&_glfw.errorLock) || !_glfwPlatformCreateTls(&_glfw.errorSlot) || !_glfwPlatformCreateTls(&_glfw.contextSlot)) return GLFW_FALSE;
+    if (!_glfwPlatformCreateTls(&_glfw.contextSlot)) return GLFW_FALSE;
 
     _glfwInitGamepadMappings();
     _glfwPlatformInitTimer();
@@ -3487,23 +3471,13 @@ static int compareVideoModes(const void* fp, const void* sp) {
     return fm->refreshRate - sm->refreshRate;
 }
 
-static GLFWbool refreshVideoModes(_GLFWmonitor* monitor) {
-    if (monitor->modes) return GLFW_TRUE;
-    int modeCount; GLFWvidmode* modes = PLATFORM_getVideoModes(monitor, &modeCount); if (!modes) return GLFW_FALSE;
-
-    qsort(modes,modeCount,sizeof(GLFWvidmode),compareVideoModes);
-    free(monitor->modes);
-    monitor->modes = modes; monitor->modeCount = modeCount;
-    return GLFW_TRUE;
-}
-
 void _glfwInputMonitor(_GLFWmonitor* monitor, int action, int placement) {
-    if (action == GLFW_CONNECTED) {
+    if (action == 0x00040001/*connected*/) {
         _glfw.monitorCount++;
         _glfw.monitors = _glfw.monitors ? realloc(_glfw.monitors,sizeof(_GLFWmonitor*) * _glfw.monitorCount) : calloc(_glfw.monitorCount,sizeof(_GLFWmonitor*));
         if (placement == 0) { memmove(_glfw.monitors + 1,_glfw.monitors,((size_t) _glfw.monitorCount - 1) * sizeof(_GLFWmonitor*)); _glfw.monitors[0] = monitor; }
         else _glfw.monitors[_glfw.monitorCount - 1] = monitor;
-    } else if (action == GLFW_DISCONNECTED) {
+    } else if (action == 0x00040002/*disconnected*/) {
         for (int i=0;i<_glfw.monitorCount;++i) {
             if (_glfw.monitors[i] == monitor) {
                 _glfw.monitorCount--;
@@ -3544,10 +3518,18 @@ void glfwGetMonitorWorkarea(GLFWmonitor* handle, int* xpos, int* ypos, int* widt
 
 const GLFWvidmode* glfwGetVideoModes(GLFWmonitor* handle, int* count) {
     *count = 0; _GLFWmonitor* monitor = (_GLFWmonitor*) handle;
-    if (!refreshVideoModes(monitor)) return NULL;
+    if (!monitor->modes) {
+        int modeCount; GLFWvidmode* modes = PLATFORM_getVideoModes(monitor, &modeCount); if (!modes) return NULL;
+
+        qsort(modes,modeCount,sizeof(GLFWvidmode),compareVideoModes);
+        free(monitor->modes);
+        monitor->modes = modes; monitor->modeCount = modeCount;
+    }
+
     *count = monitor->modeCount;
     return monitor->modes;
 }
+
 
 const GLFWvidmode* glfwGetVideoMode(GLFWmonitor* handle) {
     _GLFWmonitor* monitor = (_GLFWmonitor*) handle;
@@ -3788,12 +3770,12 @@ void _glfwInputCursorPos(_GLFWwindow* window,double xpos,double ypos) {
 }
 
 void _glfwInputJoystick(_GLFWjoystick* js,int event) {
-    if (event == GLFW_CONNECTED) js->connected = GLFW_TRUE;
-    else if (event == GLFW_DISCONNECTED) js->connected = GLFW_FALSE;
+    if (event == 0x00040001/*connected*/) js->connected = GLFW_TRUE;
+    else if (event == 0x00040002/*disconnected*/) js->connected = GLFW_FALSE;
     
     int jid = (int)(js - _glfw.joysticks);
     if (jid > GLFW_JOYSTICK_LAST) return;
-    bool connected = (event == GLFW_CONNECTED);
+    bool connected = (event == 0x00040001/*connected*/);
     Sys_Input.joystickPresent[jid] = connected;
     if (!connected) { __builtin_memset(Sys_Input.joystickButtons,0,sizeof(Sys_Input.joystickButtons)); __builtin_memset(Sys_Input.joystickHats,0,sizeof(Sys_Input.joystickHats)); } // Clear
 }

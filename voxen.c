@@ -738,19 +738,22 @@ ENGINE_TO_MOD float SoundGetLength(ma_sound* pSound) {
 
 void GatherResolutionModes(void) {
     resDropdownCount = 0;
-    GLFWmonitor* monitor = GetCurrentMonitor();    if (!monitor) monitor = glfwGetPrimaryMonitor();
-    int modeCount; const GLFWvidmode* modes = glfwGetVideoModes(monitor, &modeCount);
-    if (!modes || modeCount < 1) return;
-    for (int i = modeCount - 1; i >= 0 && resDropdownCount < 8; --i) {
-        int w = modes[i].width, h = modes[i].height, hz = modes[i].refreshRate;
-        int j = 0;
-        for (; j < resDropdownCount; ++j) {
-            if (resModes[j].w == w && resModes[j].h == h) { if (hz > resModes[j].hz) resModes[j].hz = hz; break; }
+    GLFWmonitor* monitor = GetCurrentMonitor(); if (!monitor) monitor = glfwGetPrimaryMonitor();
+    const GLFWvidmode* desktop = glfwGetVideoMode(monitor); if (!desktop) return;
+
+    static const struct {int w,h;} commonRes[] = {{320,200}, {640,400}, {640,480}, {800,600}, {1024,768}, {1280,720}, {1280,800}, {1366,768}, {1440,900}, {1600,900}, {1920,1080}, {2560,1440}};
+    int maxW = desktop->width, maxH = desktop->height,j;
+    for (int i = 0; i < (int)(sizeof(commonRes)/sizeof(commonRes[0])) && resDropdownCount < 8; ++i) {
+        int w = commonRes[i].w, h = commonRes[i].h;
+        if (w > maxW || h > maxH || w < 320 || h < 200) continue;
+
+        for (j = 0; j < resDropdownCount; ++j) {
+            if (resModes[j].w == w && resModes[j].h == h) break;
         }
-        
-        if (j == resDropdownCount) { resModes[resDropdownCount++] = (ResMode){w, h, hz}; }
+        if (j == resDropdownCount) resModes[resDropdownCount++] = (ResMode){w,h,desktop->refreshRate};
     }
-    
+
+    if (resDropdownCount < 8) resModes[resDropdownCount++] = (ResMode){desktop->width,desktop->height,desktop->refreshRate};
     resSelectedIdx = 0;
     for (int i = 0; i < resDropdownCount; ++i) {
         if (resModes[i].w == (int)Sys_Settings.ScreenWidth && resModes[i].h == (int)Sys_Settings.ScreenHeight) { resSelectedIdx = i; break; }
@@ -760,18 +763,21 @@ void GatherResolutionModes(void) {
 void SaveConfig(void);
 void ChangeResolution(void) {
     if (resDropdownCount < 1) return;
+
     resSelectedIdx = (resSelectedIdx + 1) % resDropdownCount;
     Sys_Settings.ScreenWidth  = (u32)resModes[resSelectedIdx].w;
     Sys_Settings.ScreenHeight = (u32)resModes[resSelectedIdx].h;
     GLFWmonitor* monitor = GetCurrentMonitor();
     if (!monitor) monitor = glfwGetPrimaryMonitor();
-    int mx,my; glfwGetMonitorPos(monitor, &mx, &my);
-    const GLFWvidmode* mode = glfwGetVideoMode(monitor);
-    int xpos = mx + (mode->width  - (int)Sys_Settings.ScreenWidth)  / 2;
-    int ypos = my + (mode->height - (int)Sys_Settings.ScreenHeight) / 2;
+
+    int mx, my;
+    glfwGetMonitorPos(monitor, &mx, &my);
+    const GLFWvidmode* desktop = glfwGetVideoMode(monitor);
+    int xpos = mx + (desktop->width  - (int)Sys_Settings.ScreenWidth)  / 2;
+    int ypos = my + (desktop->height - (int)Sys_Settings.ScreenHeight) / 2;
     glfwSetWindowSize(window, (int)Sys_Settings.ScreenWidth, (int)Sys_Settings.ScreenHeight);
     glfwSetWindowPos(window, xpos, ypos);
-    UpdateScreenSize((int)Sys_Settings.ScreenWidth,(int)Sys_Settings.ScreenHeight);
+    UpdateScreenSize((int)Sys_Settings.ScreenWidth, (int)Sys_Settings.ScreenHeight);
     Sys_Input.ignore_next_mouse_delta = true;
     resDropdownOpen = false;
     SaveConfig();
