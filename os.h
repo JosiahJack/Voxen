@@ -3,6 +3,7 @@
 typedef __SIZE_TYPE__ size_t;
 typedef __UINTPTR_TYPE__ uintptr_t;
 typedef __INTPTR_TYPE__ intptr_t;
+typedef __INT8_TYPE__ i8;
 typedef __INT16_TYPE__ i16;
 typedef __INT32_TYPE__ i32;
 typedef __UINT8_TYPE__ u8;
