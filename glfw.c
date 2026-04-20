@@ -3222,6 +3222,7 @@ void* _glfw_realloc(void* block, size_t size) {
         return closest != NULL;
     }
 
+    static GLXContext createLegacyContextGLX(_GLFWwindow* window, GLXFBConfig fbconfig, GLXContext share) { (void)window; return glXCreateNewContext(_glfw.x11.display,fbconfig,0x8014/*rgba type*/,share,True); }
     static void makeContextCurrentGLX(_GLFWwindow* window) {
         if (window) {
             if (!_glfw.glx.MakeCurrent(_glfw.x11.display,window->context.glx.window,window->context.glx.handle)) { DualLogError("GLX: Failed to make context current"); return; }
@@ -3255,14 +3256,16 @@ void* _glfw_realloc(void* block, size_t size) {
         if (ctxconfig->share) share = ctxconfig->share->context.glx.handle;
         if (!chooseGLXFBConfig(fbconfig, &native)) { DualLogError("GLX: Failed to find GLXFBConfig"); return GLFW_FALSE; }
 
-        mask |= 0x00000001/*core profile*/;
-        attribs[index++] = 0x2091/*major*/; attribs[index++] = 4; attribs[index++] = 0x2092/*minor*/; attribs[index++] = 3; // OpenGL 4.3
-        if (mask) { attribs[index++] = 0x9126/*profile mask arb*/; attribs[index++] = mask; }
-        if (flags) { attribs[index++] = 0x2094/*context flags arb*/; attribs[index++] = flags; }
-        attribs[index++] = None; attribs[index++] = None;
-        window->context.glx.handle = _glfw.glx.CreateContextAttribsARB(_glfw.x11.display,native,share,True,attribs);
-        if (!window->context.glx.handle) { DualLogError("GLX: Failed to create context"); return GLFW_FALSE; }
-        if (!(window->context.glx.window = glXCreateWindow(_glfw.x11.display, native, window->x11.handle, NULL))) { DualLogError("GLX: Failed to create window"); return GLFW_FALSE; }
+        if (_glfw.glx.ARB_create_context) {
+            mask |= 0x00000001/*core profile*/;
+            attribs[index++] = 0x2091/*major*/; attribs[index++] = 4; attribs[index++] = 0x2092/*minor*/; attribs[index++] = 3; // OpenGL 4.3
+            if (mask) { attribs[index++] = 0x9126/*profile mask arb*/; attribs[index++] = mask; }
+            if (flags) { attribs[index++] = 0x2094/*context flags arb*/; attribs[index++] = flags; }
+            attribs[index++] = None; attribs[index++] = None;
+            window->context.glx.handle = _glfw.glx.CreateContextAttribsARB(_glfw.x11.display,native,share,True,attribs);
+            if (!window->context.glx.handle) { DualLogError("GLX: Failed to create context"); return GLFW_FALSE; }
+            if (!(window->context.glx.window = glXCreateWindow(_glfw.x11.display, native, window->x11.handle, NULL))) { DualLogError("GLX: Failed to create window"); return GLFW_FALSE; }
+        } else window->context.glx.handle = createLegacyContextGLX(window, native, share);
 
         window->context.glx.fbconfig = native; window->context.makeCurrent = makeContextCurrentGLX;
         window->context.swapBuffers = swapBuffersGLX; window->context.swapInterval = swapIntervalGLX;
