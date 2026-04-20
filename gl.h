@@ -33,25 +33,7 @@
 
 #define GLAD_GNUC_EXTENSION __extension__
 #define GLAD_UNUSED(x) (void)(x)
-
-#ifndef GLAD_API_CALL
-  #if defined(GLAD_API_CALL_EXPORT)
-    #if GLAD_PLATFORM_WIN32 || defined(__CYGWIN__)
-      #if defined(GLAD_API_CALL_EXPORT_BUILD)
-        #define GLAD_API_CALL __attribute__ ((dllexport)) extern
-      #else
-        #define GLAD_API_CALL __attribute__ ((dllimport)) extern
-      #endif
-    #elif defined(GLAD_API_CALL_EXPORT_BUILD)
-      #define GLAD_API_CALL __attribute__ ((visibility ("default"))) extern
-    #else
-      #define GLAD_API_CALL extern
-    #endif
-  #else
-    #define GLAD_API_CALL extern
-  #endif
-#endif
-
+#define GLAD_API_CALL
 #ifdef APIENTRY
   #define GLAD_API_PTR APIENTRY
 #elif GLAD_PLATFORM_WIN32
@@ -1290,13 +1272,6 @@ GLAD_API_CALL PFNGLBUFFERSTORAGEPROC glad_glBufferStorage;
 #define glBufferStorage glad_glBufferStorage
 GLAD_API_CALL PFNGLMEMORYBARRIERPROC glad_glMemoryBarrier;
 #define glMemoryBarrier glad_glMemoryBarrier
-GLAD_API_CALL int gladLoadGLUserPtr( GLADuserptrloadfunc load, void *userptr);
-GLAD_API_CALL int gladLoadGL( GLADloadfunc load);
-#ifdef GLAD_GL
-    GLAD_API_CALL int gladLoaderLoadGL(void);
-    GLAD_API_CALL void gladLoaderUnloadGL(void);
-#endif
-
 #endif
 
 // glfw3.h

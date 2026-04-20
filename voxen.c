@@ -1678,7 +1678,7 @@ extern StbiArena stbi_arena_main; extern u32 random_range_rng;
 void stbi__arena_init_thread(StbiArena* arena);
 #define STBI_ARENA_SIZE 16 * 1024 * 1024
 #define LIGHT_RANGE_MAX 15.36f
-void InitFontAtlasses(void),LoadTextures(void),LoadModels(void); i32 Physics(void); bool CullCore(void);
+void InitFontAtlasses(void),LoadTextures(void),LoadModels(void); i32 Physics(void); bool CullCore(void); void gladLoadGL(GLADloadfunc load);
 i32 main(void) {
     double game_start_time = get_time();
     random_range_rng = (u32)game_start_time; // Seed global rand uniquely with time since system boot.
@@ -1709,8 +1709,7 @@ i32 main(void) {
     window = glfwCreateWindow(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight,&Sys_Global.global_modname[0]);
     CenterWindowOnMonitor();
     glfwMakeContextCurrent(window);
-    if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress)) { DualLogError("Failed to initialize GLAD\n"); OS_Exit(1); }
-    
+    gladLoadGL((GLADloadfunc)glfwGetProcAddress);
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
     glfwSwapBuffers(window);
     GLint major=0,minor=0; glGetIntegerv(GL_MAJOR_VERSION,&major); glGetIntegerv(GL_MINOR_VERSION,&minor);

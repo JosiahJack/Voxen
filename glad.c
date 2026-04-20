@@ -671,44 +671,6 @@ static void glad_gl_free_extensions(char **exts_i) {
     }
 }
 
-static int glad_gl_get_extensions( const char** out_exts, char*** out_exts_i) {
-#if defined(GL_ES_VERSION_3_0) || defined(GL_VERSION_3_0)
-    if (glad_glGetStringi != NULL && glad_glGetIntegerv != NULL) {
-        unsigned int index = 0;
-        unsigned int num_exts_i = 0;
-        char **exts_i = NULL;
-        glad_glGetIntegerv(GL_NUM_EXTENSIONS,(int*)&num_exts_i);
-        exts_i = (char **)malloc((num_exts_i + 1) * (sizeof *exts_i));
-        if (exts_i == NULL) return 0;
-
-        for(index = 0; index < num_exts_i; index++) {
-            const char *gl_str_tmp = (const char*) glad_glGetStringi(GL_EXTENSIONS, index);
-            size_t len = GetStringLength(gl_str_tmp) + 1;
-
-            char *local_str = (char*)malloc(len * sizeof(char));
-            if(local_str == NULL) {
-                exts_i[index] = NULL;
-                glad_gl_free_extensions(exts_i);
-                return 0;
-            }
-
-            __builtin_memcpy(local_str,gl_str_tmp,len * sizeof(char));
-            exts_i[index] = local_str;
-        }
-        
-        exts_i[index] = NULL;
-        *out_exts_i = exts_i;
-        return 1;
-    }
-#else
-    GLAD_UNUSED(out_exts_i);
-#endif
-    if (glad_glGetString == NULL) return 0;
-
-    *out_exts = (const char *)glad_glGetString(GL_EXTENSIONS);
-    return 1;
-}
-
 __attribute__((pure)) static int glad_gl_has_extension(const char *exts, char **exts_i, const char *ext) {
     if(exts_i) {
         unsigned int index;
@@ -741,11 +703,20 @@ static GLADapiproc glad_gl_get_proc_from_userptr(void *userptr, const char* name
     return (GLAD_GNUC_EXTENSION (GLADapiproc (*)(const char *name)) userptr)(name);
 }
 
-static int glad_gl_find_extensions_gl(void) {
-    const char *exts = NULL;
-    char **exts_i = NULL;
-    if (!glad_gl_get_extensions(&exts, &exts_i)) return 0;
+static void glad_gl_find_extensions_gl(void) {
+    const char *exts = NULL; char **exts_i = NULL;
+    unsigned int index = 0,num_exts_i = 0;
+    glad_glGetIntegerv(GL_NUM_EXTENSIONS,(int*)&num_exts_i);
+    exts_i = (char **)malloc((num_exts_i + 1) * (sizeof *exts_i));
+    for(index = 0; index < num_exts_i; index++) {
+        const char *gl_str_tmp = (const char*) glad_glGetStringi(GL_EXTENSIONS, index);
+        size_t len = GetStringLength(gl_str_tmp) + 1;
+        char *local_str = (char*)malloc(len * sizeof(char));
+        __builtin_memcpy(local_str,gl_str_tmp,len * sizeof(char));
+        exts_i[index] = local_str;
+    }
 
+    exts_i[index] = NULL;
     GLAD_GL_ARB_buffer_storage = glad_gl_has_extension(exts, exts_i, "GL_ARB_buffer_storage");
     GLAD_GL_ARB_copy_buffer = glad_gl_has_extension(exts, exts_i, "GL_ARB_copy_buffer");
     GLAD_GL_ARB_direct_state_access = glad_gl_has_extension(exts, exts_i, "GL_ARB_direct_state_access");
@@ -754,38 +725,10 @@ static int glad_gl_find_extensions_gl(void) {
     GLAD_GL_ARB_texture_storage = glad_gl_has_extension(exts, exts_i, "GL_ARB_texture_storage");
     GLAD_GL_ARB_texture_view = glad_gl_has_extension(exts, exts_i, "GL_ARB_texture_view");
     glad_gl_free_extensions(exts_i);
-    return 1;
 }
 
-int sscanf(const char *str, const char *format, ...);
-static int glad_gl_find_core_gl(void) {
-    int i;
-    const char* version;
-    const char* prefixes[] = {
-        "OpenGL ES-CM ",
-        "OpenGL ES-CL ",
-        "OpenGL ES ",
-        "OpenGL SC ",
-        NULL
-    };
-    int major = 0;
-    int minor = 0;
-    version = (const char*) glad_glGetString(GL_VERSION);
-    if (!version) return 0;
-    for (i = 0;  prefixes[i];  i++) {
-        const size_t length = GetStringLength(prefixes[i]);
-        if (StringCompareUpToLength(version, prefixes[i], length)) { version += length; break; }
-    }
-
-    sscanf(version, "%d.%d", &major, &minor);
-    return GLAD_MAKE_VERSION(major, minor);
-}
-
-int gladLoadGLUserPtr( GLADuserptrloadfunc load, void *userptr) {
+void gladLoadGLUserPtr( GLADuserptrloadfunc load, void *userptr) {
     glad_glGetString = (PFNGLGETSTRINGPROC) load(userptr, "glGetString");
-    if(glad_glGetString == NULL) return 0;
-    
-    int version = glad_gl_find_core_gl();
     glad_glBlendFunc = (PFNGLBLENDFUNCPROC) load(userptr, "glBlendFunc");
     glad_glClear = (PFNGLCLEARPROC) load(userptr, "glClear");
     glad_glClearColor = (PFNGLCLEARCOLORPROC) load(userptr, "glClearColor");
@@ -1246,129 +1189,106 @@ int gladLoadGLUserPtr( GLADuserptrloadfunc load, void *userptr) {
     glad_glVertexAttribIFormat = (PFNGLVERTEXATTRIBIFORMATPROC) load(userptr, "glVertexAttribIFormat");
     glad_glVertexAttribLFormat = (PFNGLVERTEXATTRIBLFORMATPROC) load(userptr, "glVertexAttribLFormat");
     glad_glVertexBindingDivisor = (PFNGLVERTEXBINDINGDIVISORPROC) load(userptr, "glVertexBindingDivisor");
-    if (!glad_gl_find_extensions_gl()) return 0;
-    
+    glad_gl_find_extensions_gl();
     glad_gl_load_GL_ARB_buffer_storage(load, userptr);
     glad_gl_load_GL_ARB_copy_buffer(load, userptr);
     glad_gl_load_GL_ARB_direct_state_access(load, userptr);
     glad_gl_load_GL_ARB_map_buffer_range(load, userptr);
-    return version;
 }
+void gladLoadGL( GLADloadfunc load) { gladLoadGLUserPtr(glad_gl_get_proc_from_userptr,GLAD_GNUC_EXTENSION(void*)load); }
 
-int gladLoadGL( GLADloadfunc load) {
-    return gladLoadGLUserPtr( glad_gl_get_proc_from_userptr, GLAD_GNUC_EXTENSION (void*) load);
-}
-
-#ifdef GLAD_GL
-#ifndef GLAD_LOADER_LIBRARY_C_
-#define GLAD_LOADER_LIBRARY_C_
-static void* glad_get_dlopen_handle(const char *lib_names[], int length) {
-    void *handle = NULL;
-    for (int i = 0; i < length; ++i) {
-#if GLAD_PLATFORM_WIN32
-  #if GLAD_PLATFORM_UWP
-        size_t buffer_size = (GetStringLength(lib_names[i]) + 1) * sizeof(WCHAR);
-        LPWSTR buffer = (LPWSTR) malloc(buffer_size);
-        if (buffer != NULL) {
-            int ret = MultiByteToWideChar(CP_ACP, 0, lib_names[i], -1, buffer, buffer_size);
-            if (ret != 0) handle = (void*)LoadPackagedLibrary(buffer,0);
-            free((void*)buffer);
-        }
-  #else
-        handle = (void*) LoadLibraryA(lib_names[i]);
-  #endif
-#else
-        handle = dlopen(lib_names[i], RTLD_LAZY | RTLD_LOCAL);
-#endif
-        if (handle != NULL) return handle;
-    }
-
-    return NULL;
-}
-
-static void glad_close_dlopen_handle(void* handle) {
-    if (handle != NULL) {
-#if GLAD_PLATFORM_WIN32
-        FreeLibrary((HMODULE) handle);
-#else
-        dlclose(handle);
-#endif
-    }
-}
-
-static GLADapiproc glad_dlsym_handle(void* handle, const char *name) {
-    if (handle == NULL) {
-        return NULL;
-    }
-
-#if GLAD_PLATFORM_WIN32
-    return (GLADapiproc) GetProcAddress((HMODULE) handle, name);
-#else
-    return GLAD_GNUC_EXTENSION (GLADapiproc) dlsym(handle, name);
-#endif
-}
-
-#endif /* GLAD_LOADER_LIBRARY_C_ */
-
-typedef void* (GLAD_API_PTR *GLADglprocaddrfunc)(const char*);
-struct _glad_gl_userptr {
-    void *handle;
-    GLADglprocaddrfunc gl_get_proc_address_ptr;
-};
-
-static GLADapiproc glad_gl_get_proc(void *vuserptr, const char *name) {
-    struct _glad_gl_userptr userptr = *(struct _glad_gl_userptr*) vuserptr;
-    GLADapiproc result = NULL;
-
-    if(userptr.gl_get_proc_address_ptr != NULL) result = GLAD_GNUC_EXTENSION (GLADapiproc) userptr.gl_get_proc_address_ptr(name);
-    if(result == NULL) result = glad_dlsym_handle(userptr.handle, name);
-    return result;
-}
-
-static void* _glad_GL_loader_handle = NULL;
-static void* glad_gl_dlopen_handle(void) {
-#if GLAD_PLATFORM_WIN32
-    static const char *NAMES[] = {"opengl32.dll"};
-#else
-    static const char *NAMES[] = {
-  #if defined(__CYGWIN__)
-        "libGL-1.so",
-  #endif
-        "libGL.so.1",
-        "libGL.so"
-    };
-#endif
-
-    if (_glad_GL_loader_handle == NULL) _glad_GL_loader_handle = glad_get_dlopen_handle(NAMES, sizeof(NAMES) / sizeof(NAMES[0]));
-    return _glad_GL_loader_handle;
-}
-
-static struct _glad_gl_userptr glad_gl_build_userptr(void *handle) {
-    struct _glad_gl_userptr userptr;
-    userptr.handle = handle;
-#if GLAD_PLATFORM_WIN32
-    userptr.gl_get_proc_address_ptr = (GLADglprocaddrfunc) glad_dlsym_handle(handle, "wglGetProcAddress");
-#else
-    userptr.gl_get_proc_address_ptr = (GLADglprocaddrfunc) glad_dlsym_handle(handle, "glXGetProcAddressARB");
-#endif
-    return userptr;
-}
-
-int gladLoaderLoadGL(void) {
-    int version = 0;
-    void *handle;
-    int did_load = 0;
-    struct _glad_gl_userptr userptr;
-    did_load = _glad_GL_loader_handle == NULL;
-    handle = glad_gl_dlopen_handle();
-    if (handle) {
-        userptr = glad_gl_build_userptr(handle);
-        version = gladLoadGLUserPtr(glad_gl_get_proc, &userptr);
-        if (did_load) gladLoaderUnloadGL();
-    }
-
-    return version;
-}
-
-void gladLoaderUnloadGL(void) { if (_glad_GL_loader_handle != NULL) { glad_close_dlopen_handle(_glad_GL_loader_handle); _glad_GL_loader_handle = NULL; } }
-#endif /* GLAD_GL */
+// #ifdef GLAD_GL
+// #ifndef GLAD_LOADER_LIBRARY_C_
+// #define GLAD_LOADER_LIBRARY_C_
+// static void* glad_get_dlopen_handle(const char *lib_names[], int length) {
+//     void *handle = NULL;
+//     for (int i = 0; i < length; ++i) {
+// #if GLAD_PLATFORM_WIN32
+//   #if GLAD_PLATFORM_UWP
+//         size_t buffer_size = (GetStringLength(lib_names[i]) + 1) * sizeof(WCHAR);
+//         LPWSTR buffer = (LPWSTR) malloc(buffer_size);
+//         if (buffer != NULL) {
+//             int ret = MultiByteToWideChar(CP_ACP, 0, lib_names[i], -1, buffer, buffer_size);
+//             if (ret != 0) handle = (void*)LoadPackagedLibrary(buffer,0);
+//             free((void*)buffer);
+//         }
+//   #else
+//         handle = (void*) LoadLibraryA(lib_names[i]);
+//   #endif
+// #else
+//         handle = dlopen(lib_names[i], RTLD_LAZY | RTLD_LOCAL);
+// #endif
+//         if (handle != NULL) return handle;
+//     }
+//
+//     return NULL;
+// }
+//
+// static void glad_close_dlopen_handle(void* handle) {
+//     if (handle != NULL) {
+// #if GLAD_PLATFORM_WIN32
+//         FreeLibrary((HMODULE) handle);
+// #else
+//         dlclose(handle);
+// #endif
+//     }
+// }
+//
+// static GLADapiproc glad_dlsym_handle(void* handle, const char *name) {
+//     if (handle == NULL) {
+//         return NULL;
+//     }
+//
+// #if GLAD_PLATFORM_WIN32
+//     return (GLADapiproc) GetProcAddress((HMODULE) handle, name);
+// #else
+//     return GLAD_GNUC_EXTENSION (GLADapiproc) dlsym(handle, name);
+// #endif
+// }
+//
+// #endif /* GLAD_LOADER_LIBRARY_C_ */
+//
+// typedef void* (GLAD_API_PTR *GLADglprocaddrfunc)(const char*);
+// struct _glad_gl_userptr {
+//     void *handle;
+//     GLADglprocaddrfunc gl_get_proc_address_ptr;
+// };
+//
+// static GLADapiproc glad_gl_get_proc(void *vuserptr, const char *name) {
+//     struct _glad_gl_userptr userptr = *(struct _glad_gl_userptr*) vuserptr;
+//     GLADapiproc result = NULL;
+//
+//     if(userptr.gl_get_proc_address_ptr != NULL) result = GLAD_GNUC_EXTENSION (GLADapiproc) userptr.gl_get_proc_address_ptr(name);
+//     if(result == NULL) result = glad_dlsym_handle(userptr.handle, name);
+//     return result;
+// }
+//
+// static void* _glad_GL_loader_handle = NULL;
+// static void* glad_gl_dlopen_handle(void) {
+// #if GLAD_PLATFORM_WIN32
+//     static const char *NAMES[] = {"opengl32.dll"};
+// #else
+//     static const char *NAMES[] = {
+//   #if defined(__CYGWIN__)
+//         "libGL-1.so",
+//   #endif
+//         "libGL.so.1",
+//         "libGL.so"
+//     };
+// #endif
+//
+//     if (_glad_GL_loader_handle == NULL) _glad_GL_loader_handle = glad_get_dlopen_handle(NAMES, sizeof(NAMES) / sizeof(NAMES[0]));
+//     return _glad_GL_loader_handle;
+// }
+//
+// static struct _glad_gl_userptr glad_gl_build_userptr(void *handle) {
+//     struct _glad_gl_userptr userptr;
+//     userptr.handle = handle;
+// #if GLAD_PLATFORM_WIN32
+//     userptr.gl_get_proc_address_ptr = (GLADglprocaddrfunc) glad_dlsym_handle(handle, "wglGetProcAddress");
+// #else
+//     userptr.gl_get_proc_address_ptr = (GLADglprocaddrfunc) glad_dlsym_handle(handle, "glXGetProcAddressARB");
+// #endif
+//     return userptr;
+// }
+// #endif /* GLAD_GL */
