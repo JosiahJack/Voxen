@@ -12,7 +12,7 @@ bool mouseMovementThisFrame,returnToPause=false,fovSliderActive=false,gammaSlide
 ma_engine audio_engine; ma_sound wav_sounds[MAX_CHANNELS];
 u8 currentPlayerNameLength=0; i8 currentMenuItem=0, currentMenuTab=0, menuItemCount=4, menuTabCount=1;
 #include "glfw.c"
-#define CHECK_GL_ERROR() do { GLenum err = glGetError(); if (err != GL_NO_ERROR) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
+#define CHECK_GL_ERROR() do { GLenum err = glad_glGetError(); if (err != GL_NO_ERROR) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
 #define SHADOW_MAP_SIZE 128u
 #define MAX_SHADOWMAPS 256u
 #define MAX_LIGHTS_PER_VOXEL 64
@@ -72,19 +72,18 @@ ENGINE_TO_MOD void DualLogWarn(const char* fmt, ...) { va_list args; __builtin_v
 ENGINE_TO_MOD void DualLogError(const char* fmt, ...) { va_list args; __builtin_va_start(args,fmt); DualLogMain("\033[1;31mERROR:",fmt,args); __builtin_va_end(args); }
 static inline __attribute__((always_inline)) void LogShaderError(GLuint s, const char* name) { char er[512]; glGetShaderInfoLog(s,512,NULL,er); DualLogError("%s Compilation Failed: %s\n",name,er); OS_Exit(1); }
 static inline __attribute__((always_inline)) GLuint CompileShader(GLenum type, const char* source, const char* name) { GLuint s = glCreateShader(type); glShaderSource(s,1,&source,NULL); glCompileShader(s); GLint ok; glGetShaderiv(s,GL_COMPILE_STATUS,&ok); if (!ok) LogShaderError(s,name); return s; }
-static inline __attribute__((always_inline)) GLuint LinkProgram(GLuint* s, i32 num, const char* name) { GLuint p = glCreateProgram(); for (i32 i=0;i<num;++i) { glAttachShader(p,s[i]); glDeleteShader(s[i]); } glLinkProgram(p); GLint ok; glGetProgramiv(p,GL_LINK_STATUS,&ok); if (!ok) LogShaderError(p,name); return p; }
-GLuint CompileStandardShader(const char* vsrc, const char* fsrc, const char* name) { GLuint vertShader = CompileShader(GL_VERTEX_SHADER,vsrc,name); GLuint fragShader = CompileShader(GL_FRAGMENT_SHADER,fsrc,name); return LinkProgram((GLuint[]){vertShader,fragShader},2,name); }
-GLuint CompileComputeShader(const char* src, const char* name) { GLuint computeShader = CompileShader(GL_COMPUTE_SHADER, src, name); return LinkProgram((GLuint[]){computeShader}, 1, name); }
+static inline __attribute__((always_inline)) GLuint LinkProgram(GLuint* s, i32 num, const char* name) { GLuint p = glCreateProgram(); for (i32 i=0;i<num;++i) { glAttachShader(p,s[i]); } glLinkProgram(p); GLint ok; glGetProgramiv(p,GL_LINK_STATUS,&ok); if (!ok) LogShaderError(p,name); return p; }
+GLuint CompileAnyShader(const char* vsrc, const char* src, const char* name) { return (vsrc) ? LinkProgram((GLuint[]){CompileShader(GL_VERTEX_SHADER,vsrc,name),CompileShader(GL_FRAGMENT_SHADER,src,name)},2,name) : LinkProgram((GLuint[]){CompileShader(GL_COMPUTE_SHADER,src,name)},1,name); }
 void CompileShaders(void) {
-    Sys_Render.depthPrepassShaderProgram= CompileStandardShader(depthPrepassVertSrc,depthPrepassFragSrc,"Depth Prepass");
-    Sys_Render.chunkShaderProgram       = CompileStandardShader(vertSrc,fragSrc,"Main");
-    Sys_Render.debugUnlitShaderProgram  = CompileStandardShader(debugUnlitVertSrc,debugUnlitFragSrc,"Debug Unlit");
-    Sys_Render.shadowmapsShaderProgram  = CompileStandardShader(shadowmapVertSrc,shadowmapFragSrc,"Shadowmaps");
-    Sys_Render.textShaderProgram        = CompileStandardShader(textVertSrc,textFragSrc,"Text");
-    Sys_Render.imageBlitShaderProgram   = CompileStandardShader(quadVertSrc,quadFragSrc,"Image Blit");
-    Sys_Render.ssrShaderProgram            = CompileComputeShader(ssrComputeSrc,"SSR");
-    Sys_Render.voxelUpdateShaderProgram    = CompileComputeShader(voxelUpdateComputeSrc,"Voxel Update");
-    Sys_Render.shadowmapsClearShaderProgram= CompileComputeShader(shadowmapsClearComputeSrc,"Shadowmaps Clear");
+    Sys_Render.depthPrepassShaderProgram= CompileAnyShader(depthPrepassVertSrc,depthPrepassFragSrc,"Depth Prepass");
+    Sys_Render.chunkShaderProgram       = CompileAnyShader(vertSrc,fragSrc,"Main");
+    Sys_Render.debugUnlitShaderProgram  = CompileAnyShader(debugUnlitVertSrc,debugUnlitFragSrc,"Debug Unlit");
+    Sys_Render.shadowmapsShaderProgram  = CompileAnyShader(shadowmapVertSrc,shadowmapFragSrc,"Shadowmaps");
+    Sys_Render.textShaderProgram        = CompileAnyShader(textVertSrc,textFragSrc,"Text");
+    Sys_Render.imageBlitShaderProgram   = CompileAnyShader(quadVertSrc,quadFragSrc,"Image Blit");
+    Sys_Render.ssrShaderProgram            = CompileAnyShader(NULL,ssrComputeSrc,"SSR");
+    Sys_Render.voxelUpdateShaderProgram    = CompileAnyShader(NULL,voxelUpdateComputeSrc,"Voxel Update");
+    Sys_Render.shadowmapsClearShaderProgram= CompileAnyShader(NULL,shadowmapsClearComputeSrc,"Shadowmaps Clear");
 }
 
 GLuint SetupSSBO(GLuint* id, GLuint bindx, GLsizeiptr sz, const void* d, GLenum typ) { glGenBuffers(1,id); glBindBuffer(GL_SSBO,*id); glBufferData(GL_SSBO,sz,d,typ); glBindBufferBase(GL_SHADER_STORAGE_BUFFER,bindx,*id); return *id; }
@@ -115,7 +114,6 @@ void ExtractFrustumPlanes(float* m, FrustumPlane* ps) {
     }
 }
 
-
 ENGINE_TO_MOD void InitializeEntity(Entity* entry) { // Blank entity, no index yet, for initial list population or temporary Entity.
     entry->index = U16_MAX; // memset here would be harmful as only a handful of fields are the same.
     entry->entflags = (ENTFLAG_KINEMATIC | ENTFLAG_ACTIVE); // Zeroes the rest out.
@@ -134,7 +132,7 @@ ENGINE_TO_MOD void InitializeEntity(Entity* entry) { // Blank entity, no index y
     entry->dynamicFriction = entry->staticFriction = 0.6f;
     entry->frictionCombine = entry->bounceCombine = PHYS_COMBINE_AVG;
     entry->volume = 1.0f;
-    entry->path[0] = '\0';    
+    entry->path[0] = '\0';
 }
 
 Vector3 lightsNewPosition[LIGHT_COUNT];
@@ -150,12 +148,7 @@ ENGINE_TO_MOD i32 AddLight(Light* lit, LightAnimation* lanim) {
     return i;
 }
 
-ENGINE_TO_MOD void TurnLightOff(u16 litIdx) {
-    if (litIdx >= Sys_Global.loadedLights) return;
-    
-    flag_setu32(&lights[litIdx].lflags,LIGHTON,false);
-}
-
+ENGINE_TO_MOD void TurnLightOff(u16 litIdx) { if (litIdx < Sys_Global.loadedLights) {flag_setu32(&lights[litIdx].lflags,LIGHTON,false);} }
 bool alreadyReadLightOnOnce[LIGHT_COUNT] = {0};
 ENGINE_TO_MOD void LoadFieldIntoLight(char* trimmed_key, char* trimmed_value, char* initialLine, u32 lineNum, Light* lit, LightAnimation* lam, u16 lightIdx) {
     char buffer[32];
@@ -172,7 +165,6 @@ ENGINE_TO_MOD void LoadFieldIntoLight(char* trimmed_key, char* trimmed_value, ch
     else if (StringsEqual(trimmed_key,"lerpValue"))                    lam->lerpValue = parse_float(trimmed_value,initialLine,lineNum);
     else if (StringsEqual(trimmed_key,"intervalSteps.Length"))         lam->numIntervalSteps = parse_numberu8(trimmed_value,initialLine,lineNum);
     else if (StringsEqual(trimmed_key,"intervalStepisLerping.Length")) lam->numLerpSteps = parse_numberu8(trimmed_value,initialLine,lineNum);
-    
     else if (StringsEqual(trimmed_key,"localPosition.x")) lit->pos.x = parse_float(trimmed_value,initialLine,lineNum);
     else if (StringsEqual(trimmed_key,"localPosition.y")) lit->pos.y = parse_float(trimmed_value,initialLine,lineNum);
     else if (StringsEqual(trimmed_key,"localPosition.z")) lit->pos.z = parse_float(trimmed_value,initialLine,lineNum);
@@ -199,22 +191,14 @@ ENGINE_TO_MOD void LoadFieldIntoLight(char* trimmed_key, char* trimmed_value, ch
 }
 
 static inline __attribute__((always_inline)) void mul_mat4(float *out, const float *a, const float *b) { // out = a * b
-	out[0] =  a[0] * b[0]  + a[4] * b[1]  + a[8]  * b[2] + a[12]  * b[3];
-	out[1] =  a[1] * b[0]  + a[5] * b[1]  + a[9]  * b[2] + a[13]  * b[3];
-	out[2] =  a[2] * b[0]  + a[6] * b[1] + a[10]  * b[2] + a[14]  * b[3];
-	out[3] =  a[3] * b[0]  + a[7] * b[1] + a[11]  * b[2] + a[15]  * b[3];
-	out[4] =  a[0] * b[4]  + a[4] * b[5]  + a[8]  * b[6] + a[12]  * b[7];
-	out[5] =  a[1] * b[4]  + a[5] * b[5]  + a[9]  * b[6] + a[13]  * b[7];
-	out[6] =  a[2] * b[4]  + a[6] * b[5] + a[10]  * b[6] + a[14]  * b[7];
-	out[7] =  a[3] * b[4]  + a[7] * b[5] + a[11]  * b[6] + a[15]  * b[7];
-	out[8] =  a[0] * b[8]  + a[4] * b[9]  + a[8] * b[10] + a[12] * b[11];
-	out[9] =  a[1] * b[8]  + a[5] * b[9]  + a[9] * b[10] + a[13] * b[11];
-	out[10] = a[2] * b[8]  + a[6] * b[9] + a[10] * b[10] + a[14] * b[11];
-	out[11] = a[3] * b[8]  + a[7] * b[9] + a[11] * b[10] + a[15] * b[11];
-	out[12] = a[0] * b[12] + a[4] * b[13] + a[8] * b[14] + a[12] * b[15];
-	out[13] = a[1] * b[12] + a[5] * b[13] + a[9] * b[14] + a[13] * b[15];
-	out[14] = a[2] * b[12] + a[6] * b[13] + a[10]* b[14] + a[14] * b[15];
-	out[15] = a[3] * b[12] + a[7] * b[13] + a[11]* b[14] + a[15] * b[15];
+    out[0] =  a[0] * b[0]  + a[4] * b[1]  + a[8]  * b[2] + a[12]  * b[3]; out[1] =  a[1] * b[0]  + a[5] * b[1]  + a[9]  * b[2] + a[13]  * b[3];
+    out[2] =  a[2] * b[0]  + a[6] * b[1] + a[10]  * b[2] + a[14]  * b[3]; out[3] =  a[3] * b[0]  + a[7] * b[1] + a[11]  * b[2] + a[15]  * b[3];
+    out[4] =  a[0] * b[4]  + a[4] * b[5]  + a[8]  * b[6] + a[12]  * b[7]; out[5] =  a[1] * b[4]  + a[5] * b[5]  + a[9]  * b[6] + a[13]  * b[7];
+    out[6] =  a[2] * b[4]  + a[6] * b[5] + a[10]  * b[6] + a[14]  * b[7]; out[7] =  a[3] * b[4]  + a[7] * b[5] + a[11]  * b[6] + a[15]  * b[7];
+    out[8] =  a[0] * b[8]  + a[4] * b[9]  + a[8] * b[10] + a[12] * b[11]; out[9] =  a[1] * b[8]  + a[5] * b[9]  + a[9] * b[10] + a[13] * b[11];
+    out[10] = a[2] * b[8]  + a[6] * b[9] + a[10] * b[10] + a[14] * b[11]; out[11] = a[3] * b[8]  + a[7] * b[9] + a[11] * b[10] + a[15] * b[11];
+    out[12] = a[0] * b[12] + a[4] * b[13] + a[8] * b[14] + a[12] * b[15]; out[13] = a[1] * b[12] + a[5] * b[13] + a[9] * b[14] + a[13] * b[15];
+    out[14] = a[2] * b[12] + a[6] * b[13] + a[10]* b[14] + a[14] * b[15]; out[15] = a[3] * b[12] + a[7] * b[13] + a[11]* b[14] + a[15] * b[15];
 }
 
 #define QTR90 0.707106781f
@@ -261,9 +245,8 @@ void UpdateLights(void) {
     }
 
     glBindBuffer(GL_SSBO,Sys_Render.lightsID); glBufferData(GL_SSBO,Sys_Global.loadedLights * sizeof(Light),lights,GL_DYNAMIC_DRAW);
-    Vector3 p = Sys_Global.instances[PLAYER1].position;
     glUseProgram(Sys_Render.voxelUpdateShaderProgram);
-    glUniform3f(5,p.x,p.y,p.z);
+    glUniform3f(5,Sys_Global.instances[PLAYER1].position.x,Sys_Global.instances[PLAYER1].position.y,Sys_Global.instances[PLAYER1].position.z);
     glDispatchCompute((VOXELS_X+31)/32,(VOXELS_Z+31)/32,1);
 }
 
@@ -275,16 +258,8 @@ ENGINE_TO_MOD void UpdateLight(u16 i, Vector3 pos, Color3 col, float range, floa
     flag_setu32(&lights[i].lflags,19,(lights[i].lflags&LDIRTY)|changed<<4|on|shad<<1);
 }
 #undef CHGD
-// ============================================================================
-// UI Rendering and Text
-#define BASE_RES_X 1366.0f // Positions done in fixed int positions off base resolution, scaled against current resolution.
-#define BASE_RES_Y 768.0f
-float UIX(i16 x) { return (float)x / BASE_RES_X; } // Pos or value as percent of 1366x768 resolution
-float RelX(i16 x) { return UIX(x) * (float)Sys_Settings.ScreenWidth; } // Pos or value in current resolution
-float UIY(i16 y) { return (float)y / BASE_RES_Y; }
-float RelY(i16 y) { return UIY(y) * (float)Sys_Settings.ScreenHeight; }
+
 void RenderUIImage(i16 x, i16 y, i16 width, i16 height, u32 texIndex) {
-    float xpos=RelX(x), ypos=RelY(y);
     glUseProgram(Sys_Render.chunkShaderProgram);
     glBindVertexArray(Sys_Render.textVAO);
     glUniform1ui(1,0);
@@ -294,8 +269,8 @@ void RenderUIImage(i16 x, i16 y, i16 width, i16 height, u32 texIndex) {
     glUniform1ui(20,0);
     glUniformMatrix4fv(2,1,GL_FALSE,uiOrthoProjection);
     glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.textVBO);
-    float x1=xpos + RelX(width), y1=ypos + RelY(height), z=0.0f;
-    float vertices[30] = {xpos,y1,z,0.0f,0.0f,x1,ypos,z,1.0f,1.0f,x1,y1,z,1.0f,0.0f,xpos,y1,z,0.0f,0.0f,xpos,ypos,z,0.0f,1.0f,x1,ypos,z,1.0f,1.0f};
+    float x1=x + width, y1=y + height, z=0.0f;
+    float vertices[30] = {x,y1,z,0.0f,0.0f,x1,y,z,1.0f,1.0f,x1,y1,z,1.0f,0.0f,x,y1,z,0.0f,0.0f,x,y,z,0.0f,1.0f,x1,y,z,1.0f,1.0f};
     glUniform1ui(18,texIndex);    
     glBufferData(GL_ARRAY_BUFFER,30 * sizeof(float),vertices,GL_DYNAMIC_DRAW);
     glDrawArrays(GL_TRIANGLES,0,6);
@@ -511,10 +486,10 @@ __attribute__((cold)) void NewGame(void) { // Reset World States
 
 void GoIntoGame(void) { NewGame(); PlayGameMusic(); DualLog("Player named \"%s\" started the game!\n", Sys_Global.playerName); }
 
-void GenerateAndBindTexture(GLuint *id, GLint internalFormat, i32 width, i32 height, GLenum format, GLenum type) {
+void GenerateAndBindTexture(GLuint *id, GLint internalFormat, i32 width, i32 height, GLenum format, GLenum type, GLint filt) {
     if (*id == 0) {glGenTextures(1,id);} glBindTexture(GL_TEXTURE_2D,*id);
     glTexImage2D(GL_TEXTURE_2D,0,internalFormat,width,height,0,format,type,NULL);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,filt); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,filt);
 }
 
 void UpdateScreenSize(i32 width, i32 height) {
@@ -524,27 +499,24 @@ void UpdateScreenSize(i32 width, i32 height) {
     glUseProgram(Sys_Render.imageBlitShaderProgram); glUniform1ui(2,w); glUniform1ui(3,h); glUniform1i(26,Sys_Settings.SSR_RES);
     glUseProgram(Sys_Render.chunkShaderProgram); glUniform1ui(6,w); glUniform1ui(7,h);
     glUseProgram(Sys_Render.ssrShaderProgram); glUniform1ui(0,w / Sys_Settings.SSR_RES); glUniform1ui(1,h / Sys_Settings.SSR_RES); glUniform1i(2,Sys_Settings.SSR_RES);
-    GenerateAndBindTexture(&Sys_Render.inputImageID,     GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE); // Lit Raster
-    GenerateAndBindTexture(&Sys_Render.inputWorldPosID,GL_RGBA32F,w,h,GL_RGBA,        GL_FLOAT); // Raster World Positions
-    GenerateAndBindTexture(&Sys_Render.inputSpecID,      GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE); // Specular Colors
-    GenerateAndBindTexture(&Sys_Render.inputNormalID,    GL_RG16F,w,h, GL_RGB,        GL_FLOAT); // Normal XYZ
-    GenerateAndBindTexture(&Sys_Render.inputDepthID,GL_DEPTH_COMPONENT32,w,h,GL_DEPTH_COMPONENT,GL_FLOAT); // Raster Depth
-    if (Sys_Render.outputImageID == 0) glGenTextures(1,&Sys_Render.outputImageID);
-    glBindTexture(GL_TEXTURE_2D,Sys_Render.outputImageID);
-    glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA8,w / Sys_Settings.SSR_RES,h / Sys_Settings.SSR_RES,0,GL_RGBA,GL_UNSIGNED_BYTE,NULL);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-    glBindTexture(GL_TEXTURE_2D,0);
+    GenerateAndBindTexture(&Sys_Render.inputImageID,     GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,GL_NEAREST); // Lit Raster
+    GenerateAndBindTexture(&Sys_Render.inputUIID,     GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,GL_NEAREST); // Lit Raster
+    GenerateAndBindTexture(&Sys_Render.inputWorldPosID,GL_RGBA32F,w,h,GL_RGBA,        GL_FLOAT,GL_NEAREST); // Raster World Positions
+    GenerateAndBindTexture(&Sys_Render.inputSpecID,      GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,GL_NEAREST); // Specular Colors
+    GenerateAndBindTexture(&Sys_Render.inputNormalID,    GL_RG16F,w,h, GL_RGB,        GL_FLOAT,GL_NEAREST); // Normal XYZ
+    GenerateAndBindTexture(&Sys_Render.inputDepthID,GL_DEPTH_COMPONENT32,w,h,GL_DEPTH_COMPONENT,GL_FLOAT,GL_NEAREST); // Raster Depth
+    GenerateAndBindTexture(&Sys_Render.outputImageID,GL_RGBA8,w / Sys_Settings.SSR_RES,h / Sys_Settings.SSR_RES,GL_RGBA,GL_UNSIGNED_BYTE,GL_LINEAR);
     glBindFramebuffer(GL_FRAMEBUFFER,Sys_Render.gBufferFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,Sys_Render.inputImageID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT1,GL_TEXTURE_2D,Sys_Render.inputWorldPosID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT2,GL_TEXTURE_2D,Sys_Render.inputSpecID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT3,GL_TEXTURE_2D,Sys_Render.inputNormalID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_TEXTURE_2D,Sys_Render.inputDepthID, 0);
-    glBindImageTexture(0,Sys_Render.inputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);      // Main Rendered Color
-    glBindImageTexture(1,Sys_Render.inputWorldPosID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA32F); // World Position XYZ
-    glBindImageTexture(2,Sys_Render.inputSpecID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);       // Specular
-    glBindImageTexture(4,Sys_Render.outputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);     // SSR result
-    glBindImageTexture(5,Sys_Render.inputNormalID,0,GL_FALSE,0,GL_READ_WRITE,GL_RG16F);     // Normal XYZ
+    glad_glBindImageTexture(0,Sys_Render.inputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);      // Main Rendered Color
+    glad_glBindImageTexture(1,Sys_Render.inputWorldPosID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA32F); // World Position XYZ
+    glad_glBindImageTexture(2,Sys_Render.inputSpecID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);       // Specular
+    glad_glBindImageTexture(4,Sys_Render.outputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);     // SSR result
+    glad_glBindImageTexture(5,Sys_Render.inputNormalID,0,GL_FALSE,0,GL_READ_WRITE,GL_RG16F);     // Normal XYZ
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_2D,Sys_Render.outputImageID);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -557,7 +529,7 @@ void UpdateScreenSize(i32 width, i32 height) {
 
 ENGINE_TO_MOD void AddCamView(Vector3 pos, Quaternion rot, u8 fov, u16 width, u16 height, float near, float far) {    
     camViews[camViewCount] = (CamView){pos,rot,fov,width,height,near,far,Sys_Global.pauseRelativeTime + (camViewCount * 0.05f) + 0.5f,false}; // Staggered starts so not all at once for performance.
-    GenerateAndBindTexture(&camViewTextures[camViewCount],GL_RGBA8,width,height,GL_RGBA,GL_UNSIGNED_BYTE); camViewCount++;
+    GenerateAndBindTexture(&camViewTextures[camViewCount],GL_RGBA8,width,height,GL_RGBA,GL_UNSIGNED_BYTE,GL_NEAREST); camViewCount++;
 }
 
 static inline __attribute__((always_inline)) __attribute__((hot)) void Input_Poll(void) {

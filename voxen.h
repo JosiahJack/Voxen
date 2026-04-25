@@ -26,7 +26,7 @@ typedef struct { Vector3 normal; float d; } FrustumPlane;
 typedef struct StbiArena { u8*base,*cursor,*end; } StbiArena;
 typedef u32 GLuint;
 typedef struct {
-    GLuint inputImageID,inputDepthID,inputWorldPosID,inputSpecID,inputNormalID,gBufferFBO,outputImageID;
+    GLuint inputImageID,inputUIID,inputDepthID,inputWorldPosID,inputSpecID,inputNormalID,gBufferFBO,outputImageID;
     GLuint depthPrepassShaderProgram;
     GLuint chunkShaderProgram,vao_chunk; // Generic lit and unlit raster shader forward+
     GLuint debugUnlitShaderProgram;

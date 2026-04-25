@@ -11,12 +11,11 @@
 #include "mod.h"
 __attribute__((used)) AutoSplitterData autoSplitter = {0x1337133713371337,0,false,0}; // Fore use with LiveSplit or other future speedrunner utilities for doing speedruns
 //=============================================================================
-// Entity and Mod Initialization
+// Initialization
 GlobalContext* Eng_Global; CheatsSystem*  Eng_Cheats; SettingsSystem* Eng_Settings; TextSystem* Eng_Text; SystemUI* Eng_UI; // From Engine
 MOD_TO_ENGINE void ModLink(GlobalContext* g,CheatsSystem* c,SettingsSystem* s,TextSystem* t,SystemUI* ui){Eng_Global=g;Eng_Cheats=c;Eng_Settings=s;Eng_Text=t;Eng_UI=ui;}
 int lev1SecCode,lev2SecCode,lev3SecCode,lev4SecCode,lev5SecCode,lev6SecCode;
-//=============================================================================
-// New Game
+
 MOD_TO_ENGINE void ModNewGame(void) {
     lev1SecCode = random_range_u8(0u,9u); lev2SecCode = random_range_u8(0u,9u);
     lev3SecCode = random_range_u8(0u,9u); lev4SecCode = random_range_u8(0u,9u);

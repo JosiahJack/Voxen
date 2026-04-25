@@ -122,8 +122,6 @@ void GetCubemapSampleCoord(vec3 toLight, uint shadowIndex, out uint faceOff, out
 }
 
 float quintic_polynomial_smoothstep( float x ) { return x*x*x*(x*(x*6.0-15.0)+10.0); } // From https://iquilezles.org/articles/smoothsteps/
-float easeInOutQuint(float x) { return x < 0.5 ? 16 * x * x * x * x * x : 1 - pow(-2 * x + 2, 5) / 2; } // From https://easings.net/#easeInOutQuint
-
 const vec3 baseDir = vec3(0.0,0.0,1.0);
 void main() {
     vec3 worldPos = FragPos.xyz;

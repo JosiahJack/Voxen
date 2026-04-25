@@ -411,8 +411,10 @@ static int GetGlyphAndFont(u32 cp,stbtt_fontinfo**outFont,u8 fontID){
 }
 
 static void _make_gl_atlas(GLuint*tex,unsigned char*bmp){
-    glCreateTextures(GL_TEXTURE_2D,1,tex);glTextureStorage2D(*tex,1,GL_R8,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE);glTextureSubImage2D(*tex,0,0,0,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,GL_RED,GL_UNSIGNED_BYTE,bmp);
-    glTextureParameteri(*tex,GL_TEXTURE_MIN_FILTER,GL_LINEAR);glTextureParameteri(*tex,GL_TEXTURE_MAG_FILTER,GL_LINEAR);glTextureParameteri(*tex,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTextureParameteri(*tex,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+    glad_glCreateTextures(GL_TEXTURE_2D,1,tex);glTextureStorage2D(*tex,1,GL_R8,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE);
+    glad_glTextureSubImage2D(*tex,0,0,0,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,GL_RED,GL_UNSIGNED_BYTE,bmp);
+    glad_glTextureParameteri(*tex,GL_TEXTURE_MIN_FILTER,GL_LINEAR);glTextureParameteri(*tex,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+    glad_glTextureParameteri(*tex,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE); glad_glTextureParameteri(*tex,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
 }
 
 void InitFontAtlasses(void){
@@ -528,7 +530,6 @@ Color textColors[] = {
 };
 
 float textVertexData[8192];
-float RelX(i16),RelY(i16);
 void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scaleInput,const char* restrict format,...){
     float scale=scaleInput;
     va_list args;__builtin_va_start(args,format);StringFormatV(uiTextBuffer,TEXT_BUFFER_SIZE,format,args);__builtin_va_end(args);
@@ -537,7 +538,7 @@ void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scaleInput,const 
     glBindTextureUnit(6,fontID==FONT_STOPD?fontAtlasTexStopD:fontAtlasTex);
     glUniform2f(4,1.0f/(float)FONT_ATLAS_SIZE,1.0f/(float)FONT_ATLAS_SIZE);glUniform1ui(2,fontID);glUniform1i(1,6);
     glBindVertexArray(Sys_Render.textVAO);
-    size_t vc=0;const char*p=uiTextBuffer;float xpos=RelX(x),ypos=RelY(y)+(RelY(16)*scale),ls=RelY(22)*scale;stbtt_aligned_quad q;int cc=0;
+    size_t vc=0;const char*p=uiTextBuffer;float xpos=x,ypos=y+(16*scale),ls=22*scale;stbtt_aligned_quad q;int cc=0;
     float puv=10.0f/(float)FONT_ATLAS_SIZE,bw=2.0f;
     while(*p){const unsigned char*s=(const unsigned char*)p;u32 cp=0;
         if(*s<0x80){cp=*s++;}
