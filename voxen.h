@@ -26,17 +26,11 @@ typedef struct { Vector3 normal; float d; } FrustumPlane;
 typedef struct StbiArena { u8*base,*cursor,*end; } StbiArena;
 typedef u32 GLuint;
 typedef struct {
-    GLuint inputImageID,inputUIID,inputDepthID,inputWorldPosID,inputSpecID,inputNormalID,gBufferFBO,outputImageID;
-    GLuint depthPrepassShaderProgram;
-    GLuint chunkShaderProgram,vao_chunk; // Generic lit and unlit raster shader forward+
-    GLuint debugUnlitShaderProgram;
+    GLuint inputImageID,inputUIID,inputDepthID,inputWorldPosID,inputSpecID,inputNormalID,gBufferFBO,uiFBO,outputImageID;
+    GLuint depthPrepassShaderProgram,chunkShaderProgram,vao_chunk,uiShaderProgram,debugUnlitShaderProgram;
     GLuint shadowmapsShaderProgram,shadowmapsClearShaderProgram,shadowMapSSBO,shadowMapsIndirectionID;
-    GLuint ssrShaderProgram; // SSR (Screen Space Reflections)
-    GLuint imageBlitShaderProgram,quadVAO,quadVBO; // Full Screen Quad Blit for rendering final compositing output/image effect passes
-    GLuint textShaderProgram,textVAO,textVBO;
-    GLuint debugLinesVAO,debugLinesVBO;
-    GLuint blueNoiseBuffer;
-    GLuint matricesBufferID,cellVisibleDataID;
+    GLuint ssrShaderProgram,imageBlitShaderProgram,quadVAO,quadVBO,textShaderProgram,textVAO,textVBO;
+    GLuint debugLinesVAO,debugLinesVBO,matricesBufferID,cellVisibleDataID;
     GLuint colorBufferID,texturePalettesID,texturePaletteOffsetsID,textureOffsetsID,textureSizesID;
     GLuint lightsID,voxelLightListCountsID,voxelLightListsID,voxelUpdateShaderProgram,shadowViewProjID;
     GLuint vbos[MODEL_IDX_MAX],tbos[MODEL_IDX_MAX];

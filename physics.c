@@ -424,8 +424,6 @@ static void IntegrateAngularVelocity(u16 i,float dt) {
 }
 
 void Physics_PrimitiveStep(float dt) {
-    if (dt>SUB_STEP_DT_MAX*4.0f) dt=SUB_STEP_DT_MAX*4.0f;
-    if (dt>SUB_STEP_DT_MAX) { float h=dt*0.5f; Physics_PrimitiveStep(h); Physics_PrimitiveStep(h); return; }
     u16 n=Sys_Global.loadedInstances;
     ResetManifoldTable(); BuildCellBuckets(n);
     for (u16 i=START_INDEX_LEVEL_INSTANCES; i<n; ++i) {
@@ -815,6 +813,10 @@ void ClampVelocity(void) {
 void UpdateTriggers(void);
 void Physics(void) {
 //     UpdateVelocityFromGravity();
-//     Physics_PrimitiveStep((float)Sys_Global.timeSinceLastPhysicsTick);
+    float dt = (float)Sys_Global.timeSinceLastPhysicsTick;
+    if (dt>SUB_STEP_DT_MAX*4.0f) dt=SUB_STEP_DT_MAX*4.0f;
+    if (dt>SUB_STEP_DT_MAX) { float h=dt*0.5f; Physics_PrimitiveStep(h); Physics_PrimitiveStep(h); }
+    else Physics_PrimitiveStep(dt);
+    
     ClampVelocity(); UpdatePositions(); UpdateTriggers(); Physics_DrawDebug();
 }

@@ -1,4 +1,4 @@
-// composite.glsl
+// composite.glsl - Full screen quad blit with compositing pass to combine rendered view with UI overlay.
 #version 430 core
 in vec2 TexCoord;
 out vec4 FragColor;
@@ -30,6 +30,7 @@ layout(location = 27) uniform sampler2D tex;
 layout(location = 28) uniform float staticIntensity;
 layout(location = 29) uniform uint grayscaleEnabled;
 layout(location = 30) uniform float skyRotateSpeed;
+layout(location = 31) uniform sampler2D uiImage;
 const float vhsBlurAmount = 0.5; // Cannot be overstated just how magical and impactful this setting is.  DO NOT EVER TURN OFF EVER!!  I recant my former statement about avoiding blur at all costs in all scenarios.
 const float vhsRadiusMax = 3.0; // in pixels
 const float staticBandThickness = 0.005;
@@ -513,5 +514,7 @@ void main() {
     ivec2 uv = ivec2(gl_FragCoord.xy);                // pixel centre
     if (berserkTimeRemaining > 0.0) aaColor = applyBerserk(imageLoad(inputWorldPos,uv).xyz, aaColor); // Berserk last as it's a brain effect not an eye effect
     if (grayscaleEnabled > 0) aaColor = Grayscale(aaColor);
-    FragColor = vec4(aaColor, 1.0); // Output final composited color
+
+    vec4 uiSample = texture(uiImage,texCoordUsed);
+    FragColor = vec4(mix(aaColor,uiSample.rgb,uiSample.a),1.0);
 }

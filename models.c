@@ -329,11 +329,11 @@ void LoadModels(void) {
         size_t ts = (size_t)modelTriangleCounts[i] * 3 * sizeof(u16);
         tv += modelVertexCounts[i]; tt += modelTriangleCounts[i];
         glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.vbos[i]); glBufferData(GL_ARRAY_BUFFER,vs,NULL,GL_STATIC_DRAW);
-        void* mp = glMapBufferRange(GL_ARRAY_BUFFER,0,vs,GL_MAP_WRITE_BIT|GL_MAP_INVALIDATE_BUFFER_BIT);
+        void* mp = glMapBufferRange(GL_ARRAY_BUFFER,0,vs,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/);
         __builtin_memcpy(mp, modelVertices[i],vs);
         glUnmapBuffer(GL_ARRAY_BUFFER);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,Sys_Render.tbos[i]); glBufferData(GL_ELEMENT_ARRAY_BUFFER,ts,NULL,GL_STATIC_DRAW);
-        mp = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER,0,ts,GL_MAP_WRITE_BIT|GL_MAP_INVALIDATE_BUFFER_BIT);
+        mp = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER,0,ts,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/);
         __builtin_memcpy(mp, modelTriangles[i],ts);
         glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
     }

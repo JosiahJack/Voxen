@@ -1,4 +1,4 @@
-// chunk.glsl: Generic shader for unlit textured surfaces (all world geometry, items,
+// chunk_frag.glsl: Generic shader for unlit textured surfaces (all world geometry, items,
 // enemies, doors, etc., without transparency for first pass prior to lighting.
 #version 430 core
 #extension GL_ARB_shading_language_packing : require
@@ -8,17 +8,19 @@ in vec3 Normal;
 in vec3 FragPos;
 layout(location=0) uniform uint instanceIndex; // start vert shader uniforms
 layout(location=1) uniform uint normInstanceIndex;
-layout(location=2) uniform mat4 viewProjection;
-layout(location=3) uniform uint isUI; // end vert shader uniforms
-layout(location=4) uniform vec3 fogColor;
+layout(location=2) uniform mat4 viewProjection; /*
+layout(location=3) 
+layout(location=4) 
+layout(location=5) */
 layout(location=6) uniform uint screenWidth;
 layout(location=7) uniform uint screenHeight;
-layout(location=8) uniform float worldMin_x;
-layout(location=9) uniform float worldMin_z;
+layout(location=8) uniform vec2 worldMin;
+layout(location=9) uniform float heat;
 layout(location=10) uniform vec3 camPos;
 layout(location=11) uniform uint shadSizeSqd;
-
+layout(location=12) uniform vec3 fogColor;
 layout(location=14) uniform uint reflectionsEnabled;
+layout(location=13) uniform uint useStrengthMod; // For spec boost on some materials
 layout(location=15) uniform uint shadowsEnabled;
 layout(location=17) uniform uint unlit;
 layout(location=18) uniform uint texIndex;
@@ -34,8 +36,6 @@ layout(location=27) uniform float volume;
 layout(location=28) uniform uvec2 camViewSize;
 layout(location=29) uniform sampler2D camViewTex;
 layout(location=30) uniform uint useCamView;
-layout(location=31) uniform float heat;
-layout(location=32) uniform uint useStrengthMod;
 struct Light { vec3 pos; float intensity; vec3 col; uint lflags; float range; float spotAng; float maxIntensity; float minIntensity; vec4 spotDir; };
 layout(location=0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location=1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
@@ -47,16 +47,34 @@ layout(std430,binding=4) buffer LightIndices { Light lights[]; };
 layout(std430,binding=5) buffer ShadowMaps { uint shadowMaps[]; };
 layout(std430,binding=6) buffer ShadowMapsIndirection { uint shadowMapsIndirection[]; };
 layout(std430,binding=12) buffer ColorBuffer { uint colors[]; }; // 1D color array (RGBA)
-layout(std430,binding=13) buffer BlueNoise { float blueNoiseColors[]; };
 layout(std430,binding=14) buffer TextureOffsets { uint textureOffsets[]; }; // Starting index in colors for each texture
 layout(std430,binding=15) buffer TextureSizes { ivec2 textureSizes[]; }; // x,y pairs for width and height of textures
 layout(std430,binding=16) buffer TexturePalettes { uint texturePalettes[]; }; // Palette colors
 layout(std430,binding=17) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; }; // Palette starting indices for each texture
+
+const uint blueNoise[64] = uint[](
+    0x23F1A408u, 0x8C4BDE72u, 0x159D3F66u, 0xB1549A2Du, 0x47C20E89u, 0xD67B1F58u, 0x32A96C17u, 0xE4832B94u,
+    0x915F36C8u, 0x1A7D42B9u, 0xE1842C9Au, 0x3F6E15B2u, 0x8D4C0F73u, 0x54A61EBDu, 0x27D39F0Cu, 0xC17A58E6u,
+    0x4E921B6Fu, 0xB843D157u, 0x2A8C09F4u, 0x7E3596C2u, 0x1F5D8B41u, 0xAC6E24D9u, 0x38B712A3u, 0xF682490Du,
+    0x147C5A3Eu, 0xD92E81F3u, 0x4B62079Cu, 0xA25F31D7u, 0x8B4E1676u, 0x2D935C1Bu, 0xF17A4802u, 0x39C46D15u,
+    0x6D1A4F82u, 0xB42C9E35u, 0x1F8D5473u, 0xD60B7A42u, 0x39E1842Cu, 0x9A58C71Fu, 0x4B7D12B1u, 0xE62409F3u,
+    0x2D8C4F1Au, 0x73B9541Eu, 0xC26E0B8Du, 0x159A3F47u, 0x842C6D1Bu, 0x3F7A4E92u, 0xB158D60Cu, 0x1A842D93u,
+    0x547B1E8Cu, 0x9D3F6215u, 0x42B91A7Du, 0x0E842C9Au, 0xF31D7B4Eu, 0x24D60B8Cu, 0x81F34B62u, 0x39C17A48u,
+    0xA25F147Cu, 0x8B4E2D93u, 0x1F7A4802u, 0xD62E81F3u, 0x4B62147Cu, 0xA25F31D7u, 0x8B4E1676u, 0x2D935C1Bu
+);
+
+float getBlueNoise(ivec2 p) {
+    int idx = ((p.y & 15) << 4) | (p.x & 15);
+    uint val = blueNoise[idx >> 2];
+    uint byte = (val >> ((idx & 3) << 3)) & 0xFFu;
+    return float(byte) * 0.00392156862; // Pre-multiplied 1.0/255.0
+}
+
 const float VOXEL_SIZE = 0.32;
 const uint SHADON = 2u;
 uint GetVoxelIndex(vec3 worldPos) {
-    float offsetX = worldPos.x - worldMin_x;
-    float offsetZ = worldPos.z - worldMin_z;
+    float offsetX = worldPos.x - worldMin.x;
+    float offsetZ = worldPos.z - worldMin.y;
     uint voxelX = uint(offsetX / VOXEL_SIZE);
     uint voxelZ = uint(offsetZ / VOXEL_SIZE);
     return (voxelZ * 512) + voxelX;
@@ -137,10 +155,7 @@ void main() {
     if (useCamView > 0) {
         vec2 uv2 = (vec2(TexCoord.x,TexCoord.y));
         albedoColor = texture(camViewTex,uv2);
-    } else {
-        albedoColor = getTextureColor(texIndex,texUV,texSize.x);
-    }
-
+    } else albedoColor = getTextureColor(texIndex,texUV,texSize.x);
     if (albedoColor.a < 0.05 && volume < 0.05) discard; // Alpha cutout threshold
 
     vec3 adjustedNormal = Normal;
@@ -190,7 +205,7 @@ void main() {
         specColor = getTextureColor(specIndex,texUVSpec,texSizeSpec.x);
     }
 
-    if (reflectionsEnabled > 0 && isUI == 0) {
+    if (reflectionsEnabled > 0) {
         outSpecular = specColor;
         outWorldPos.xyz = FragPos.xyz;
         outNormal = EncodeOctahedral(adjustedNormal) * 0.5 + 0.5;  // Map to [0,1]
@@ -292,9 +307,7 @@ void main() {
     }
 
     // Blue Noise Dither for banding (0.03ms performance cost, leaving in for quality)
-    ivec2 sp = ivec2(gl_FragCoord.xy);
-    int idx = (sp.x & 63) + (sp.y & 63) * 64;
-    float blue = blueNoiseColors[idx*3 + 0];
+    float blue = getBlueNoise(ivec2(gl_FragCoord.xy));
     float dither = (blue - 0.5) * 0.003921569; // 1.0 / 255.0;
     lighting.rgb += vec3(dither);
 

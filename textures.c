@@ -304,6 +304,7 @@ static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
     OS_DeallocateRAM(data, sz); return true;
 }
 
+void glfwSetWindowIcon(GLFWwindow* handle, int count, const GLFWimage* images); extern GLFWwindow* window;
 void LoadTextures(void) {
     double start_time = get_time();
     loadedTexturesMaxIndex = totalPixels = totalPaletteColors = 0u;
@@ -389,7 +390,7 @@ void LoadTextures(void) {
     DualLog("total palette colors: %u, total pixels: %u...", totalPaletteColors,totalPixels);
     i32 packed_size = ((i32)totalPixels + 3) / 4 * sizeof(u32);
     glBindBuffer(GL_SSBO,Sys_Render.colorBufferID);
-    void* dst = glMapBufferRange(GL_SSBO,0,packed_size,GL_MAP_WRITE_BIT|GL_MAP_INVALIDATE_RANGE_BIT);
+    void* dst = glMapBufferRange(GL_SSBO,0,packed_size,0x0002/*GL_MAP_WRITE_BIT*/|0x0004/*GL_MAP_INVALIDATE_RANGE_BIT*/);
     __builtin_memcpy(dst,all_indices,packed_size);
     glUnmapBuffer(GL_SSBO);
     glBindBuffer(GL_SSBO,Sys_Render.texturePalettesID);
@@ -414,6 +415,17 @@ void LoadTextures(void) {
     OS_DeallocateRAM(textureHeights,loadedTexturesMaxIndex * sizeof(i32));
     for (int t=0;t<num_parse_threads;++t) OS_DeallocateRAM(thread_stbi_arenas[t].base,STBI_ARENA_SIZE);
     OS_DeallocateRAM(thread_stbi_arenas,(size_t)num_parse_threads * sizeof(StbiArena));
+    OsFileHandle fp = OS_OpenReadonly(Sys_Global.global_winicon); // Load window icon
+    int windowIconFileSize = OS_FileSize(fp);
+    u8* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize,fp,Sys_Global.global_winicon);    
+    OS_Close(fp); stbi__arena_init_thread(&stbi_arena_main);
+    int w=1,h=1; unsigned char* pixels = stbi_load_from_memory(file_buffer,windowIconFileSize,&w,&h);
+    if (!pixels) { DualLogError("Failed to load icon: %s\n",Sys_Global.global_winicon); OS_Exit(1); }
+    
+    GLFWimage image = (GLFWimage){w,h,pixels};
+    glfwSetWindowIcon(window,1,&image);
+    OS_DeallocateRAM(file_buffer,windowIconFileSize);
+    OS_DeallocateRAM(stbi_arena_main.base,STBI_ARENA_SIZE); stbi_arena_main.base = NULL;
     DualLog(" took %.6f secs\n",get_time() - start_time);
     DebugRAM("After LoadTextures and after deallocation");
 }

@@ -61,6 +61,8 @@ gen_header ./Shaders/debugunlit_vert.glsl       debugUnlitVertSrc
 gen_header ./Shaders/debugunlit_frag.glsl       debugUnlitFragSrc
 gen_header ./Shaders/chunk_vert.glsl            vertSrc
 gen_header ./Shaders/chunk_frag.glsl            fragSrc
+gen_header ./Shaders/ui_vert.glsl               vertUISrc
+gen_header ./Shaders/ui_frag.glsl               fragUISrc
 gen_header ./Shaders/text_vert.glsl             textVertSrc
 gen_header ./Shaders/text_frag.glsl             textFragSrc
 gen_header ./Shaders/composite_vert.glsl        quadVertSrc
@@ -77,6 +79,8 @@ cat > Shaders/shaders.h <<'EOF'
 #include "debugunlit_frag.glsl.h"
 #include "chunk_vert.glsl.h"
 #include "chunk_frag.glsl.h"
+#include "ui_vert.glsl.h"
+#include "ui_frag.glsl.h"
 #include "shadowmap_vert.glsl.h"
 #include "shadowmap_frag.glsl.h"
 #include "composite_vert.glsl.h"
@@ -84,7 +88,6 @@ cat > Shaders/shaders.h <<'EOF'
 #include "ssr.compute.h"
 #include "voxels.compute.h"
 #include "shadowmaps_clear.compute.h"
-#include "bluenoise64.cginc"
 EOF
 
 ZIG_LIBS="-L/usr/lib/x86_64-linux-gnu -L/usr/lib64"
@@ -95,8 +98,8 @@ COMMON_CFLAGS="-ferror-limit=500 -fno-exceptions -fno-stack-protector -fno-async
                -ffunction-sections -ffast-math -std=c11 -Wall -Wextra -Wno-implicit-fallthrough -fdeclspec \
                -fomit-frame-pointer -g0 -fstrict-aliasing -fcommon -Walloca -DMA_USE_STDINT \
                -Wformat=2 -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings -fno-math-errno -fno-sanitize=all \
-               -fno-trapping-math -fmerge-all-constants -m64 -O3 -march=haswell -fstack-usage"
-COMMON_LFLAGS="-Wl,--sort-common -Wl,-z,now -Wl,-z,relro $ZIG_LIBS"
+               -fno-trapping-math -fmerge-all-constants -m64 -Os -march=haswell -fstack-usage"
+COMMON_LFLAGS="-Wl,--sort-common -Wl,-z,now -Wl,-z,relro -Wl,--gc-sections -Wl,-z,norelro -Wl,--build-id=none -flto $ZIG_LIBS"
 
 # Engine Build 214.5kb
 if [ "$PLATFORM" = "windows" ]; then
@@ -115,7 +118,7 @@ fi
 
 export CC=$CC
 export CFLAGS=$CFLAGS
-SOURCES="voxen.c physics.c helpers.c console.c fonts.c models.c culling.c textures.c glad.c miniaudio.c"
+SOURCES="voxen.c physics.c helpers.c console.c models.c culling.c textures.c miniaudio.c"
 export TEMP_DIR=temp_build
 printf "%s\n" $SOURCES | xargs -P12 -I{} sh -c "$CC -c {} $CFLAGS -o $TEMP_DIR/\$(basename {}).o"
 $LINKER "$TEMP_DIR"/*.o $LDFLAGS -rdynamic -o $BINARY_NAME
@@ -162,9 +165,11 @@ total_build_time=$((build_end - shader_start))
 echo "Built engine and mod in ${total_build_time} ms"
 if ! $IS_CI; then
     case "$PLATFORM" in
-        windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; wine ./voxen.exe ;;
-        *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
-#         *)        strip --strip-all --strip-unneeded ./voxen; ./voxen ;;   # linux
+#         windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; wine ./voxen.exe ;;
+        windows)  wine ./voxen.exe ;;
+#         *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
+#         *)        strip --strip-all --strip-unneeded ./voxen; ./voxen ;;   # linux Alternate build methods to be able to look at symbols and debugging
+        *)        ./voxen ;;   # linux
     esac
     rm -f "$TEMP_DIR"/*.o ./Shaders/*.h "$TEMP_DIRGC"/*.o ./voxen.upx ./*.lib #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.
 fi

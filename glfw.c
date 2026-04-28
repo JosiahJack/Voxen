@@ -4,15 +4,11 @@
 // 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
 // 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
 // 3. This notice may not be removed or altered from any source distribution.
-#include "mappings.h"
 #define GLFW_TRUE 1
 #define GLFW_FALSE 0
 #define GLFW_CURSOR_NORMAL 0x00034001
 #define GLFW_CURSOR_DISABLED 0x00034003
 #define _GLFW_STICK 3
-#define _GLFW_JOYSTICK_AXIS 1
-#define _GLFW_JOYSTICK_BUTTON 2
-#define _GLFW_JOYSTICK_HATBIT 3
 unsigned long strtoul(const char *nptr, char **endptr, int base);
 int sprintf(char *str, const char *format, ...); size_t strspn(const char *s, const char *accept); char *strstr(const char *haystack, const char *needle); int strncmp(const char *s1, const char *s2, size_t n); int strcmp(const char *s1, const char *s2);
 void glfwMakeContextCurrent(GLFWwindow* window); void UpdateScreenSize(i32 width, i32 height); char *strncpy(char *dest, const char *src, size_t n); void *memmove(void *dest, const void *src, size_t n); size_t strcspn(const char *s, const char *reject);
@@ -35,8 +31,6 @@ typedef struct _GLFWjoystick _GLFWjoystick; typedef struct _GLFWtls _GLFWtls; ty
     typedef DWORD (WINAPI * PFN_XInputGetState)(DWORD,XINPUT_STATE*);
     #define XInputGetCapabilities _glfw.win32.xinput.GetCapabilities
     #define XInputGetState _glfw.win32.xinput.GetState
-    typedef HRESULT (WINAPI * PFN_DirectInput8Create)(HINSTANCE,DWORD,REFIID,LPVOID*,LPUNKNOWN);
-    #define DirectInput8Create _glfw.win32.dinput8.Create
     typedef HRESULT (WINAPI * PFN_DwmIsCompositionEnabled)(BOOL*);
     typedef HRESULT (WINAPI * PFN_DwmFlush)(VOID);
     #define DwmIsCompositionEnabled _glfw.win32.dwmapi.IsCompositionEnabled
@@ -104,9 +98,7 @@ typedef struct _GLFWjoystick _GLFWjoystick; typedef struct _GLFWtls _GLFWtls; ty
         RAWINPUT*           rawInput;
         int                 rawInputSize;
         HCURSOR             blankCursor;
-        struct { HINSTANCE instance; PFN_DirectInput8Create Create; IDirectInput8W* api; } dinput8;
         struct { HINSTANCE instance; PFN_XInputGetCapabilities GetCapabilities; PFN_XInputGetState GetState; } xinput;
-        struct { HINSTANCE instance; } user32;
         struct { HINSTANCE instance; PFN_DwmIsCompositionEnabled IsCompositionEnabled; PFN_DwmFlush Flush; } dwmapi;
         struct { HINSTANCE instance; PFN_RtlVerifyVersionInfo RtlVerifyVersionInfo_; } ntdll;
     } _GLFWlibraryWin32;
@@ -118,7 +110,6 @@ typedef struct _GLFWjoystick _GLFWjoystick; typedef struct _GLFWtls _GLFWtls; ty
     void _glfwGetWindowSizeWin32(_GLFWwindow* window, int* width, int* height);
     void _glfwGetCursorPosWin32(_GLFWwindow* window, double* xpos, double* ypos);
     void _glfwSetCursorPosWin32(_GLFWwindow* window, double xpos, double ypos);
-    GLFWvidmode* _glfwGetVideoModesWin32(_GLFWmonitor* monitor, int* count);
     GLFWbool _glfwGetVideoModeWin32(_GLFWmonitor* monitor, GLFWvidmode* mode);
     #define GLFW_X11_WINDOW_STATE
     #define GLFW_X11_MONITOR_STATE
@@ -129,7 +120,7 @@ typedef struct _GLFWjoystick _GLFWjoystick; typedef struct _GLFWtls _GLFWtls; ty
     #define GLFW_WIN32_JOYSTICK_STATE _GLFWjoystickWin32 win32;
     #define GLFW_WIN32_LIBRARY_JOYSTICK_STATE
     typedef struct _GLFWjoyobjectWin32 { int offset,type; } _GLFWjoyobjectWin32;
-    typedef struct _GLFWjoystickWin32{ _GLFWjoyobjectWin32* objects; int objectCount; IDirectInputDevice8W* device; DWORD index; GUID guid; } _GLFWjoystickWin32;
+    typedef struct _GLFWjoystickWin32{ _GLFWjoyobjectWin32* objects; int objectCount; DWORD index; GUID guid; } _GLFWjoystickWin32;
     void _glfwDetectJoystickConnectionWin32(void);
     void _glfwDetectJoystickDisconnectionWin32(void);
     #define GLFW_LINUX_JOYSTICK_STATE
@@ -151,7 +142,6 @@ typedef struct _GLFWjoystick _GLFWjoystick; typedef struct _GLFWtls _GLFWtls; ty
     #define GLFW_WGL_CONTEXT_STATE
     #define GLFW_WGL_LIBRARY_CONTEXT_STATE
     typedef unsigned char KeyCode; typedef int Bool; typedef unsigned long Atom; typedef unsigned long KeySym;
-    #define	XkbActionMessageLength 6
     #define XA_ATOM ((Atom) 4)
     #define XA_CARDINAL ((Atom) 6)
     #define XA_WINDOW ((Atom) 33)
@@ -320,111 +310,12 @@ typedef struct _GLFWjoystick _GLFWjoystick; typedef struct _GLFWtls _GLFWtls; ty
     typedef struct _XRRScreenResources { Time timestamp; Time configTimestamp; int ncrtc; RRCrtc *crtcs; int noutput; RROutput *outputs; int nmode; XRRModeInfo *modes; } XRRScreenResources;
     typedef struct _XRROutputInfo { Time timestamp; RRCrtc crtc; char *name; int nameLen; unsigned long mm_width; unsigned long mm_height; Connection connection; SubpixelOrder subpixel_order; int ncrtc; RRCrtc *crtcs; int nclone; RROutput *clones; int nmode; int npreferred; RRMode *modes; } XRROutputInfo;
     typedef struct _XRRCrtcInfo { Time timestamp; int x, y; unsigned int width, height; RRMode mode; Rotation rotation; int noutput; RROutput *outputs; Rotation rotations; int npossible; RROutput *possible; } XRRCrtcInfo;
-    #define	XkbStateNotify			2
-    #define	XkbGroupStateMask		(1L << 4)
-    #define	XkbUseCoreKbd		0x0100
-    #define	XkbNumKbdGroups		4
-    #define	XkbMaxLegalKeyCode	255
-    #define	XkbPerKeyBitArraySize	((XkbMaxLegalKeyCode+1)/8)
-    #define	XkbNumVirtualMods	16
-    #define	XkbNumIndicators	32
-    #define	XkbKeyNameLength	4
-    #define	XkbKeyNamesMask		(1<<9)
-    #define	XkbKeyAliasesMask	(1<<10)
-    #define	XkbCharToInt(v)		((v)&0x80?(int)((v)|(~0xff)):(int)((v)&0x7f))
-    #define	XkbIntTo2Chars(i,h,l)	(((h)=((i>>8)&0xff)),((l)=((i)&0xff)))
-    #define	Xkb2CharsToInt(h,l)	((short)(((h)<<8)|(l)))
-    #ifdef __clang__
-        #pragma clang diagnostic push
-        #pragma clang diagnostic ignored "-Wpadded"
-    #endif
-    #define	XkbModLocks(s)	 ((s)->locked_mods)
-    #define	XkbStateMods(s)	 ((s)->base_mods|(s)->latched_mods|XkbModLocks(s))
-    #define	XkbGroupLock(s)	 ((s)->locked_group)
-    #define	XkbStateGroup(s) ((s)->base_group+(s)->latched_group+XkbGroupLock(s))
-    #define	XkbStateFieldFromRec(s)	XkbBuildCoreState((s)->lookup_mods,(s)->group)
-    #define	XkbGrabStateFromRec(s)	XkbBuildCoreState((s)->grab_mods,(s)->group)
-    typedef struct { unsigned char group, locked_group; unsigned short base_group, latched_group; unsigned char mods, base_mods, latched_mods, locked_mods, compat_state, grab_mods, compat_grab_mods, lookup_mods, compat_lookup_mods; unsigned short ptr_buttons; } XkbStateRec, *XkbStatePtr;
-    typedef struct { unsigned char mask, real_mods; unsigned short vmods; } XkbModsRec, *XkbModsPtr;
-    typedef struct { Bool active; unsigned char level; XkbModsRec mods; } XkbKTMapEntryRec, *XkbKTMapEntryPtr;
-    typedef struct { XkbModsRec mods; unsigned char num_levels, map_count; XkbKTMapEntryPtr map; XkbModsPtr preserve; Atom name; Atom *level_names; } XkbKeyTypeRec, *XkbKeyTypePtr;
-    #define	XkbNumGroups(g)			((g)&0x0f)
-    #define	XkbOutOfRangeGroupInfo(g)	((g)&0xf0)
-    #define	XkbOutOfRangeGroupAction(g)	((g)&0xc0)
-    #define	XkbOutOfRangeGroupNumber(g)	(((g)&0x30)>>4)
-    #define	XkbSetGroupInfo(g,w,n)	(((w)&0xc0)|(((n)&3)<<4)|((g)&0x0f))
-    #define	XkbSetNumGroups(g,n)	(((g)&0xf0)|((n)&0x0f))
-    typedef struct _XkbBehavior { unsigned char type,data; } XkbBehavior;
-    #define	XkbAnyActionDataSize 7
-    typedef	struct _XkbAnyAction { unsigned char type,data[XkbAnyActionDataSize]; } XkbAnyAction;
-    typedef struct _XkbModAction { unsigned char type,flags,mask,real_mods,vmods1,vmods2; } XkbModAction;
-    #define	XkbModActionVMods(a)      \
-        ((short)(((a)->vmods1<<8)|((a)->vmods2)))
-    #define	XkbSetModActionVMods(a,v) \
-        (((a)->vmods1=(((v)>>8)&0xff)),(a)->vmods2=((v)&0xff))
-    typedef struct _XkbGroupAction { unsigned char type,flags; char group_XXX; } XkbGroupAction;
-    #define	XkbSAGroup(a)		(XkbCharToInt((a)->group_XXX))
-    #define	XkbSASetGroup(a,g)	((a)->group_XXX=(g))
-    typedef struct _XkbISOAction { unsigned char type,flags,mask,real_mods; char group_XXX; unsigned char affect,vmods1,vmods2; } XkbISOAction;
-    typedef struct _XkbPtrAction { unsigned char type,flags,high_XXX,low_XXX,high_YYY,low_YYY; } XkbPtrAction;
-    typedef struct _XkbPtrBtnAction { unsigned char type,flags,count,button; } XkbPtrBtnAction;
-    typedef struct _XkbPtrDfltAction { unsigned char type,flags,affect; char valueXXX; } XkbPtrDfltAction;
-    typedef struct _XkbSwitchScreenAction { unsigned char type,flags; char screenXXX; } XkbSwitchScreenAction;
-    typedef struct { unsigned char type, flags, ctrls3, ctrls2, ctrls1, ctrls0; } XkbCtrlsAction;
-    typedef struct { unsigned char type, flags, message[6]; } XkbMessageAction;
-    typedef struct { unsigned char type, new_key, mods_mask, mods, vmods_mask0, vmods_mask1, vmods0, vmods1; } XkbRedirectKeyAction;
-    typedef struct { unsigned char type, flags, count, button, device; } XkbDeviceBtnAction;
-    typedef struct { unsigned char type, device, v1_what, v1_ndx, v1_value, v2_what, v2_ndx, v2_value; } XkbDeviceValuatorAction;
-    typedef union { XkbAnyAction any; XkbModAction mods; XkbGroupAction group; XkbISOAction iso; XkbPtrAction ptr; XkbPtrBtnAction btn; XkbPtrDfltAction dflt; XkbSwitchScreenAction screen; XkbCtrlsAction ctrls; XkbMessageAction msg; XkbRedirectKeyAction redirect; XkbDeviceBtnAction devbtn; XkbDeviceValuatorAction devval; unsigned char type; } XkbAction;
-    typedef struct { unsigned char mk_dflt_btn, num_groups, groups_wrap; XkbModsRec internal, ignore_lock; unsigned int enabled_ctrls; unsigned short repeat_delay, repeat_interval, slow_keys_delay, debounce_delay, mk_delay, mk_interval, mk_time_to_max, mk_max_speed; short mk_curve; unsigned short ax_options, ax_timeout, axt_opts_mask, axt_opts_values; unsigned int axt_ctrls_mask, axt_ctrls_values; unsigned char per_key_repeat[XkbPerKeyBitArraySize]; } XkbControlsRec, *XkbControlsPtr;
-    typedef struct { unsigned short num_acts, size_acts; XkbAction *acts; XkbBehavior *behaviors; unsigned short *key_acts; unsigned char *explicit, vmods[XkbNumVirtualMods]; unsigned short *vmodmap; } XkbServerMapRec, *XkbServerMapPtr;
-    typedef struct { unsigned char kt_index[XkbNumKbdGroups], group_info, width; unsigned short offset; } XkbSymMapRec, *XkbSymMapPtr;
-    typedef struct { unsigned char size_types, num_types; XkbKeyTypePtr types; unsigned short size_syms, num_syms; KeySym *syms; XkbSymMapPtr key_sym_map; unsigned char *modmap; } XkbClientMapRec, *XkbClientMapPtr;
-    typedef struct { KeySym sym; unsigned char flags, match, mods, virtual_mod; XkbAnyAction act; } XkbSymInterpretRec, *XkbSymInterpretPtr;
-    typedef struct { XkbSymInterpretPtr sym_interpret; XkbModsRec groups[XkbNumKbdGroups]; unsigned short num_si, size_si; } XkbCompatMapRec, *XkbCompatMapPtr;
-    typedef struct { unsigned char flags, which_groups, groups, which_mods; XkbModsRec mods; unsigned int ctrls; } XkbIndicatorMapRec, *XkbIndicatorMapPtr;
-    typedef struct { unsigned long phys_indicators; XkbIndicatorMapRec maps[XkbNumIndicators]; } XkbIndicatorRec, *XkbIndicatorPtr;
-    typedef struct { char name[XkbKeyNameLength]; } XkbKeyNameRec, *XkbKeyNamePtr;
-    typedef struct { char real[XkbKeyNameLength], alias[XkbKeyNameLength]; } XkbKeyAliasRec, *XkbKeyAliasPtr;
-    typedef struct { Atom keycodes, geometry, symbols, types, compat, vmods[XkbNumVirtualMods], indicators[XkbNumIndicators], groups[XkbNumKbdGroups]; XkbKeyNamePtr keys; XkbKeyAliasPtr key_aliases; Atom *radio_groups, phys_symbols; unsigned char num_keys, num_key_aliases; unsigned short num_rg; } XkbNamesRec, *XkbNamesPtr;
-    typedef struct _XkbGeometry *XkbGeometryPtr;
-    typedef struct { struct _XDisplay *dpy; unsigned short flags, device_spec; KeyCode min_key_code, max_key_code; XkbControlsPtr ctrls; XkbServerMapPtr server; XkbClientMapPtr map; XkbIndicatorPtr indicators; XkbNamesPtr names; XkbCompatMapPtr compat; XkbGeometryPtr geom; } XkbDescRec, *XkbDescPtr;
-    typedef struct { unsigned short changed; KeyCode min_key_code, max_key_code; unsigned char first_type, num_types; KeyCode first_key_sym; unsigned char num_key_syms; KeyCode first_key_act; unsigned char num_key_acts; KeyCode first_key_behavior, num_key_behaviors, first_key_explicit, num_key_explicit, first_modmap_key, num_modmap_keys, first_vmodmap_key, num_vmodmap_keys, pad; unsigned short vmods; } XkbMapChangesRec, *XkbMapChangesPtr;
-    typedef struct { unsigned int changed_ctrls, enabled_ctrls_changes; Bool num_groups_changed; } XkbControlsChangesRec, *XkbControlsChangesPtr;
-    typedef struct { unsigned int state_changes, map_changes; } XkbIndicatorChangesRec, *XkbIndicatorChangesPtr;
-    typedef struct { unsigned int changed; unsigned char first_type, num_types, first_lvl, num_lvls, num_aliases, num_rg, first_key, num_keys; unsigned short changed_vmods; unsigned long changed_indicators; unsigned char changed_groups; } XkbNameChangesRec, *XkbNameChangesPtr;
-    typedef struct { unsigned char changed_groups; unsigned short first_si, num_si; } XkbCompatChangesRec, *XkbCompatChangesPtr;
-    typedef struct { unsigned short device_spec, state_changes; XkbMapChangesRec map; XkbControlsChangesRec ctrls; XkbIndicatorChangesRec indicators; XkbNameChangesRec names; XkbCompatChangesRec compat; } XkbChangesRec, *XkbChangesPtr;
-    typedef struct { char *keymap, *keycodes, *types, *compat, *symbols, *geometry; } XkbComponentNamesRec, *XkbComponentNamesPtr;
-    typedef struct { unsigned short flags; char *name; } XkbComponentNameRec, *XkbComponentNamePtr;
-    typedef struct { int num_keymaps, num_keycodes, num_types, num_compat, num_symbols, num_geometry; XkbComponentNamePtr keymaps, keycodes, types, compat, symbols, geometry; } XkbComponentListRec, *XkbComponentListPtr;
-    typedef struct { unsigned short led_class, led_id; unsigned int phys_indicators, maps_present, names_present, state; Atom names[XkbNumIndicators]; XkbIndicatorMapRec maps[XkbNumIndicators]; } XkbDeviceLedInfoRec, *XkbDeviceLedInfoPtr;
-    typedef struct { char *name; Atom type; unsigned short device_spec; Bool has_own_state; unsigned short supported, unsupported, num_btns; XkbAction *btn_acts; unsigned short sz_leds, num_leds, dflt_kbd_fb, dflt_led_fb; XkbDeviceLedInfoPtr leds; } XkbDeviceInfoRec, *XkbDeviceInfoPtr;
-    typedef struct _XkbDeviceLedChanges { unsigned short led_class, led_id; unsigned int defined; struct _XkbDeviceLedChanges *next; } XkbDeviceLedChangesRec, *XkbDeviceLedChangesPtr;
-    typedef struct { unsigned int changed; unsigned short first_btn, num_btns; XkbDeviceLedChangesRec leds; } XkbDeviceChangesRec, *XkbDeviceChangesPtr;
-    #ifdef __clang__
-        #pragma clang diagnostic pop
-    #endif
-    typedef struct _XkbAnyEvent { int type; unsigned long serial; Bool send_event; Display *display; Time time; int xkb_type; unsigned int device; } XkbAnyEvent;
-    typedef struct _XkbNewKeyboardNotify { int type; unsigned long serial; Bool send_event; Display *display; Time time; int xkb_type; int device; int old_device; int min_key_code; int max_key_code; int old_min_key_code; int old_max_key_code; unsigned int changed; char req_major; char req_minor; } XkbNewKeyboardNotifyEvent;
-    typedef struct _XkbMapNotifyEvent { int type; unsigned long serial; Bool send_event; Display *display; Time time; int xkb_type; int device; unsigned int changed; unsigned int flags; int first_type; int num_types; KeyCode min_key_code; KeyCode max_key_code; KeyCode first_key_sym; KeyCode first_key_act; KeyCode first_key_behavior; KeyCode first_key_explicit; KeyCode first_modmap_key; KeyCode first_vmodmap_key; int num_key_syms; int num_key_acts; int num_key_behaviors; int num_key_explicit; int num_modmap_keys; int num_vmodmap_keys; unsigned int vmods; } XkbMapNotifyEvent;
-    typedef struct _XkbStateNotifyEvent { int type; unsigned long serial; Bool send_event; Display *display; Time time; int xkb_type; int device; unsigned int changed; int group; int base_group; int latched_group; int locked_group; unsigned int mods; unsigned int base_mods; unsigned int latched_mods; unsigned int locked_mods; int compat_state; unsigned char grab_mods; unsigned char compat_grab_mods; unsigned char lookup_mods; unsigned char compat_lookup_mods; int ptr_buttons; KeyCode keycode; char event_type; char req_major; char req_minor; } XkbStateNotifyEvent;
-    typedef struct _XkbControlsNotify { int type; unsigned long serial; Bool send_event; Display *display; Time time; int xkb_type; int device; unsigned int changed_ctrls; unsigned int enabled_ctrls; unsigned int enabled_ctrl_changes; int num_groups; KeyCode keycode; char event_type; char req_major; char req_minor; } XkbControlsNotifyEvent;
-    typedef struct _XkbIndicatorNotify { int type; unsigned long serial; Bool send_event; Display *display; Time time; int xkb_type; int device; unsigned int changed; unsigned int state; } XkbIndicatorNotifyEvent;
-    typedef struct _XkbNamesNotify { int type; unsigned long serial; Bool send_event; Display *display; Time time; int xkb_type; int device; unsigned int changed; int first_type; int num_types; int first_lvl; int num_lvls; int num_aliases; int num_radio_groups; unsigned int changed_vmods; unsigned int changed_groups; unsigned int changed_indicators; int first_key; int num_keys; } XkbNamesNotifyEvent;
-    typedef struct _XkbCompatMapNotify { int type; unsigned long serial; Bool send_event; Display *display; Time time; int xkb_type; int device; unsigned int changed_groups; int first_si; int num_si; int num_total_si; } XkbCompatMapNotifyEvent;
-    typedef struct _XkbBellNotify { int type; unsigned long serial; Bool send_event; Display *display; Time time; int xkb_type; int device; int percent; int pitch; int duration; int bell_class; int bell_id; Atom name; Window window; Bool event_only; } XkbBellNotifyEvent;
-    typedef struct _XkbActionMessage { int type; unsigned long serial; Bool send_event; Display *display; Time time; int xkb_type; int device; KeyCode keycode; Bool press; Bool key_event_follows; int group; unsigned int mods; char message[XkbActionMessageLength+1]; } XkbActionMessageEvent;
-    typedef struct _XkbAccessXNotify { int type; unsigned long serial; Bool send_event; Display *display; Time time; int xkb_type; int device; int detail; int keycode; int sk_delay; int debounce_delay; } XkbAccessXNotifyEvent;
-    typedef struct _XkbExtensionDeviceNotify { int type; unsigned long serial; Bool send_event; Display *display; Time time; int xkb_type; int device; unsigned int reason; unsigned int supported; unsigned int unsupported; int first_btn; int num_btns; unsigned int leds_defined; unsigned int led_state; int led_class; int led_id; } XkbExtensionDeviceNotifyEvent;
-    typedef union _XkbEvent { int type; XkbAnyEvent any; XkbNewKeyboardNotifyEvent new_kbd; XkbMapNotifyEvent map; XkbStateNotifyEvent state; XkbControlsNotifyEvent ctrls; XkbIndicatorNotifyEvent indicators; XkbNamesNotifyEvent names; XkbCompatMapNotifyEvent compat; XkbBellNotifyEvent bell; XkbActionMessageEvent message; XkbAccessXNotifyEvent accessx; XkbExtensionDeviceNotifyEvent device; XEvent core; } XkbEvent;
     typedef struct { int deviceid,mask_len; unsigned char* mask; } XIEventMask;
     #define XISetMask(ptr,event)   (((unsigned char*)(ptr))[(event)>>3] |=  (1 << ((event) & 7)))
     #define XIMaskIsSet(ptr,event) (((unsigned char*)(ptr))[(event)>>3] &   (1 << ((event) & 7)))
     #define XIMaskLen(event)        (((event) >> 3) + 1)
     #define XIAllMasterDevices 1
     typedef struct { int mask_len; unsigned char *mask; double *values; } XIValuatorState;
-    typedef struct { int type; unsigned long serial; Bool send_event; Display *display; int extension,evtype; Time time; int deviceid,sourceid,detail,flags; XIValuatorState valuators; double *raw_values; } XIRawEvent;
     typedef XID GLXWindow,GLXDrawable;
     typedef struct __GLXFBConfig* GLXFBConfig;
     typedef struct __GLXcontext* GLXContext;
@@ -487,14 +378,6 @@ typedef struct _GLFWjoystick _GLFWjoystick; typedef struct _GLFWtls _GLFWtls; ty
     typedef int (* PFN_XUngrabPointer)(Display*,Time);
     typedef void (* PFN_XUnsetICFocus)(XIC);
     typedef int (* PFN_XWarpPointer)(Display*,Window,Window,int,int,unsigned int,unsigned int,int,int);
-    typedef void (* PFN_XkbFreeKeyboard)(XkbDescPtr,unsigned int,Bool);
-    typedef void (* PFN_XkbFreeNames)(XkbDescPtr,unsigned int,Bool);
-    typedef XkbDescPtr (* PFN_XkbGetMap)(Display*,unsigned int,unsigned int);
-    typedef Status (* PFN_XkbGetNames)(Display*,unsigned int,XkbDescPtr);
-    typedef Status (* PFN_XkbGetState)(Display*,unsigned int,XkbStatePtr);
-    typedef Bool (* PFN_XkbQueryExtension)(Display*,int*,int*,int*,int*,int*);
-    typedef Bool (* PFN_XkbSelectEventDetails)(Display*,unsigned int,unsigned int,unsigned long,unsigned long);
-    typedef Bool (* PFN_XkbSetDetectableAutoRepeat)(Display*,Bool,Bool*);
     typedef void (* PFN_Xutf8SetWMProperties)(Display*,Window,const char*,const char*,char**,int,XSizeHints*,XWMHints*,XClassHint*);
     #define XAllocClassHint _glfw.x11.xlib.AllocClassHint
     #define XAllocSizeHints _glfw.x11.xlib.AllocSizeHints
@@ -552,14 +435,6 @@ typedef struct _GLFWjoystick _GLFWjoystick; typedef struct _GLFWtls _GLFWtls; ty
     #define XUngrabPointer _glfw.x11.xlib.UngrabPointer
     #define XUnsetICFocus _glfw.x11.xlib.UnsetICFocus
     #define XWarpPointer _glfw.x11.xlib.WarpPointer
-    #define XkbFreeKeyboard _glfw.x11.xkb.FreeKeyboard
-    #define XkbFreeNames _glfw.x11.xkb.FreeNames
-    #define XkbGetMap _glfw.x11.xkb.GetMap
-    #define XkbGetNames _glfw.x11.xkb.GetNames
-    #define XkbGetState _glfw.x11.xkb.GetState
-    #define XkbQueryExtension _glfw.x11.xkb.QueryExtension
-    #define XkbSelectEventDetails _glfw.x11.xkb.SelectEventDetails
-    #define XkbSetDetectableAutoRepeat _glfw.x11.xkb.SetDetectableAutoRepeat
     #define Xutf8SetWMProperties _glfw.x11.xlib.utf8SetWMProperties
     typedef void (* PFN_XRRFreeCrtcInfo)(XRRCrtcInfo*);
     typedef void (* PFN_XRRFreeOutputInfo)(XRROutputInfo*);
@@ -726,7 +601,6 @@ typedef struct _GLFWjoystick _GLFWjoystick; typedef struct _GLFWtls _GLFWtls; ty
             PFN_Xutf8SetWMProperties utf8SetWMProperties;
         } xlib;
         struct { GLFWbool available; void* handle; int eventBase,errorBase,major,minor; GLFWbool monitorBroken; PFN_XRRFreeCrtcInfo FreeCrtcInfo; PFN_XRRFreeOutputInfo FreeOutputInfo; PFN_XRRFreeScreenResources FreeScreenResources; PFN_XRRGetCrtcInfo GetCrtcInfo; PFN_XRRGetOutputInfo GetOutputInfo; PFN_XRRGetOutputPrimary GetOutputPrimary; PFN_XRRGetScreenResourcesCurrent GetScreenResourcesCurrent; PFN_XRRQueryExtension QueryExtension; PFN_XRRQueryVersion QueryVersion; PFN_XRRSelectInput SelectInput; PFN_XRRSetCrtcConfig SetCrtcConfig; PFN_XRRUpdateConfiguration UpdateConfiguration; } randr;
-        struct { GLFWbool available,detectable; int majorOpcode,eventBase,errorBase,major,minor; unsigned int group; PFN_XkbFreeKeyboard FreeKeyboard; PFN_XkbFreeNames FreeNames; PFN_XkbGetMap GetMap; PFN_XkbGetNames GetNames; PFN_XkbGetState GetState; PFN_XkbQueryExtension QueryExtension; PFN_XkbSelectEventDetails SelectEventDetails; PFN_XkbSetDetectableAutoRepeat SetDetectableAutoRepeat; } xkb;
         struct { void* handle; PFN_XcursorImageCreate ImageCreate; PFN_XcursorImageDestroy ImageDestroy; PFN_XcursorImageLoadCursor ImageLoadCursor; } xcursor;
         struct { GLFWbool available; void* handle; int majorOpcode,eventBase,errorBase,major,minor; PFN_XIQueryVersion QueryVersion; PFN_XISelectEvents SelectEvents; } xi;
     } _GLFWlibraryX11;
@@ -799,7 +673,6 @@ struct _GLFWwindow {
     int cursorMode;
     char mouseButtons[GLFW_MOUSE_BUTTON_LAST + 1],keys[GLFW_KEY_LAST + 1];
     double virtualCursorPosX,virtualCursorPosY;
-    GLFWbool rawMouseMotion;
     _GLFWcontext context;
     GLFW_PLATFORM_WINDOW_STATE
 };
@@ -834,8 +707,6 @@ struct _GLFWlibrary {
     int monitorCount;
     GLFWbool joysticksInitialized;
     _GLFWjoystick joysticks[GLFW_JOYSTICK_LAST + 1];
-    _GLFWmapping* mappings;
-    int mappingCount;
     _GLFWtls errorSlot,contextSlot;
     _GLFWmutex errorLock;
     struct { u64 offset; GLFW_PLATFORM_LIBRARY_TIMER_STATE } timer;
@@ -865,10 +736,8 @@ void _glfwInputMonitor(_GLFWmonitor* monitor, int action, int placement);
 GLFWbool _glfwStringInExtensionString(const char* string, const char* extensions);
 const _GLFWfbconfig* _glfwChooseFBConfig(const _GLFWfbconfig* desired, const _GLFWfbconfig* alternatives, unsigned int count);
 GLFWbool _glfwRefreshContextAttribs(_GLFWwindow* window, const _GLFWctxconfig* ctxconfig);
-int _glfwCompareVideoModes(const GLFWvidmode* first, const GLFWvidmode* second);
 _GLFWmonitor* _glfwAllocMonitor(const char* name, int widthMM, int heightMM);
 void _glfwSplitBPP(int bpp, int* red, int* green, int* blue);
-void _glfwInitGamepadMappings(void);
 _GLFWjoystick* _glfwAllocJoystick(const char* name, const char* guid, int axisCount, int buttonCount, int hatCount);
 void _glfwFreeJoystick(_GLFWjoystick* js);
 void* _glfw_calloc(size_t count, size_t size) {
@@ -879,13 +748,6 @@ void* _glfw_calloc(size_t count, size_t size) {
         block = malloc(count * size);
         return __builtin_memset(block,0,count * size);
     } else return NULL;
-}
-
-void* _glfw_realloc(void* block, size_t size) {
-    if (block && size) {
-        return realloc(block,size);
-    } else if (block) { free(block); return NULL;
-    } else return calloc(1,size);
 }
 
 #if defined(WINDOWS)
@@ -930,26 +792,14 @@ void* _glfw_realloc(void* block, size_t size) {
 
     static void releaseCursor(void) { ClipCursor(NULL); _glfw.win32.capturedCursorWindow=NULL; }
 
-    static void enableRawMouseMotion(_GLFWwindow* window) {
-        const RAWINPUTDEVICE rid={0x01,0x02,0,window->win32.handle};
-        if (!RegisterRawInputDevices(&rid,1,sizeof(rid))) DualLogError("Win32: Failed to register raw input device");
-    }
-
-    static void disableRawMouseMotion(_GLFWwindow* window) {
-        const RAWINPUTDEVICE rid={0x01,0x02,RIDEV_REMOVE,NULL}; (void)window;
-        if (!RegisterRawInputDevices(&rid,1,sizeof(rid))) DualLogError("Win32: Failed to remove raw input device");
-    }
-
     static void disableCursor(_GLFWwindow* window) {
         _glfw.win32.disabledCursorWindow=window;
         _glfwGetCursorPosWin32(window,&_glfw.win32.restoreCursorPosX,&_glfw.win32.restoreCursorPosY);
         updateCursorImage(window);
         captureCursor(window);
-        if (window->rawMouseMotion) enableRawMouseMotion(window);
     }
 
     static void enableCursor(_GLFWwindow* window) {
-        if (window->rawMouseMotion) disableRawMouseMotion(window);
         _glfw.win32.disabledCursorWindow=NULL;
         releaseCursor();
         _glfwSetCursorPosWin32(window,_glfw.win32.restoreCursorPosX,_glfw.win32.restoreCursorPosY);
@@ -1074,37 +924,13 @@ void* _glfw_realloc(void* block, size_t size) {
                 }
                 if (window->cursorMode==GLFW_CURSOR_DISABLED) {
                     const int dx=x-window->win32.lastCursorPosX,dy=y-window->win32.lastCursorPosY;
-                    if (_glfw.win32.disabledCursorWindow!=window||window->rawMouseMotion) break;
+                    if (_glfw.win32.disabledCursorWindow!=window) break;
                     _glfwInputCursorPos(window,window->virtualCursorPosX+dx,window->virtualCursorPosY+dy);
                 }
                 window->win32.lastCursorPosX=x; window->win32.lastCursorPosY=y;
                 return 0;
             }
-            case WM_INPUT: {
-                UINT size=0; HRAWINPUT ri=(HRAWINPUT)lParam; RAWINPUT* data=NULL; int dx,dy;
-                if (_glfw.win32.disabledCursorWindow!=window||!window->rawMouseMotion) break;
-                GetRawInputData(ri,RID_INPUT,NULL,&size,sizeof(RAWINPUTHEADER));
-                if (size>(UINT)_glfw.win32.rawInputSize) {
-                    free(_glfw.win32.rawInput);
-                    _glfw.win32.rawInput=_glfw_calloc(size,1);
-                    _glfw.win32.rawInputSize=size;
-                }
-                size=_glfw.win32.rawInputSize;
-                if (GetRawInputData(ri,RID_INPUT,_glfw.win32.rawInput,&size,sizeof(RAWINPUTHEADER))==(UINT)-1) { DualLogError("Win32: Failed to retrieve raw input data"); break; }
-                data=_glfw.win32.rawInput;
-                if (data->data.mouse.usFlags&MOUSE_MOVE_ABSOLUTE) {
-                    POINT pos={0}; int width,height;
-                    if (data->data.mouse.usFlags&MOUSE_VIRTUAL_DESKTOP) { pos.x+=GetSystemMetrics(SM_XVIRTUALSCREEN); pos.y+=GetSystemMetrics(SM_YVIRTUALSCREEN); width=GetSystemMetrics(SM_CXVIRTUALSCREEN); height=GetSystemMetrics(SM_CYVIRTUALSCREEN); }
-                    else { width=GetSystemMetrics(SM_CXSCREEN); height=GetSystemMetrics(SM_CYSCREEN); }
-                    pos.x+=(int)((data->data.mouse.lLastX/65535.f)*width);
-                    pos.y+=(int)((data->data.mouse.lLastY/65535.f)*height);
-                    ScreenToClient(window->win32.handle,&pos);
-                    dx=pos.x-window->win32.lastCursorPosX; dy=pos.y-window->win32.lastCursorPosY;
-                } else { dx=data->data.mouse.lLastX; dy=data->data.mouse.lLastY; }
-                _glfwInputCursorPos(window,window->virtualCursorPosX+dx,window->virtualCursorPosY+dy);
-                window->win32.lastCursorPosX+=dx; window->win32.lastCursorPosY+=dy;
-                break;
-            }
+            case WM_INPUT: break;
             case WM_MOUSELEAVE: { window->win32.cursorTracked=GLFW_FALSE; return 0; }
             case WM_MOUSEWHEEL: { Sys_Input.scrollDelta += (SHORT)HIWORD(wParam)/(double)WHEEL_DELTA; return 0; }
             case WM_MOUSEHWHEEL: return 0;
@@ -1204,11 +1030,6 @@ void* _glfw_realloc(void* block, size_t size) {
     }
 
     void _glfwSetWindowDecoratedWin32(_GLFWwindow* window,GLFWbool enabled) { (void)enabled; updateWindowStyles(window); }
-    void _glfwSetRawMouseMotionWin32(_GLFWwindow* window,GLFWbool enabled) {
-        if (_glfw.win32.disabledCursorWindow!=window) return;
-        if (enabled) enableRawMouseMotion(window); else disableRawMouseMotion(window);
-    }
-
     void _glfwPollEventsWin32(void) {
         MSG msg; HWND handle; _GLFWwindow* window;
         while (PeekMessageW(&msg,NULL,0,0,PM_REMOVE)) {
@@ -1248,10 +1069,8 @@ void* _glfw_realloc(void* block, size_t size) {
 
     void _glfwSetCursorModeWin32(_GLFWwindow* window,int mode) {
         if (window->win32.handle==GetActiveWindow()) {
-            if (mode==GLFW_CURSOR_DISABLED) { _glfwGetCursorPosWin32(window,&_glfw.win32.restoreCursorPosX,&_glfw.win32.restoreCursorPosY); if (window->rawMouseMotion) enableRawMouseMotion(window); }
-            else if (_glfw.win32.disabledCursorWindow==window) { if (window->rawMouseMotion) disableRawMouseMotion(window); }
-            if (mode==GLFW_CURSOR_DISABLED) captureCursor(window); else releaseCursor();
-            if (mode==GLFW_CURSOR_DISABLED) _glfw.win32.disabledCursorWindow=window;
+            if (mode!=GLFW_CURSOR_DISABLED) releaseCursor();
+            if (mode==GLFW_CURSOR_DISABLED) { _glfwGetCursorPosWin32(window,&_glfw.win32.restoreCursorPosX,&_glfw.win32.restoreCursorPosY); captureCursor(window); _glfw.win32.disabledCursorWindow=window; }
             else if (_glfw.win32.disabledCursorWindow==window) { _glfw.win32.disabledCursorWindow=NULL; _glfwSetCursorPosWin32(window,_glfw.win32.restoreCursorPosX,_glfw.win32.restoreCursorPosY); }
         }
         if (cursorInContentArea(window)) updateCursorImage(window);
@@ -1263,11 +1082,6 @@ void* _glfw_realloc(void* block, size_t size) {
     static GLFWbool loadLibraries(void) {
         if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,(const WCHAR*) &_glfw,(HMODULE*) &_glfw.win32.instance)){ DualLogError("Win32: Failed to retrieve own module handle"); return GLFW_FALSE;}
 
-        _glfw.win32.user32.instance = LoadLibraryA("user32.dll");
-        if (!_glfw.win32.user32.instance) { DualLogError("Win32: Failed to load user32.dll"); return GLFW_FALSE; }
-
-        _glfw.win32.dinput8.instance = LoadLibraryA("dinput8.dll");
-        if (_glfw.win32.dinput8.instance) _glfw.win32.dinput8.Create = (PFN_DirectInput8Create)_glfwPlatformGetModuleSymbol(_glfw.win32.dinput8.instance, "DirectInput8Create");
         const char* names[] = {"xinput1_4.dll","xinput1_3.dll","xinput9_1_0.dll","xinput1_2.dll","xinput1_1.dll",NULL};
         for (int i=0;names[i];++i) {
             _glfw.win32.xinput.instance = LoadLibraryA(names[i]);
@@ -1495,8 +1309,7 @@ void* _glfw_realloc(void* block, size_t size) {
     #define _GLFW_TYPE_SLIDER   1
     #define _GLFW_TYPE_BUTTON   2
     #define _GLFW_TYPE_POV      3
-    typedef struct _GLFWobjenumWin32 { IDirectInputDevice8W* device; _GLFWjoyobjectWin32* objects; int objectCount,axisCount,sliderCount,buttonCount,povCount; } _GLFWobjenumWin32;
-    static const GUID _glfw_IID_IDirectInput8W = {0xbf798031,0x483a,0x4da2,{0xaa,0x99,0x5d,0x64,0xed,0x36,0x97,0x00}};
+    typedef struct _GLFWobjenumWin32 { _GLFWjoyobjectWin32* objects; int objectCount,axisCount,sliderCount,buttonCount,povCount; } _GLFWobjenumWin32;
     static const GUID _glfw_GUID_XAxis = {0xa36d02e0,0xc9f3,0x11cf,{0xbf,0xc7,0x44,0x45,0x53,0x54,0x00,0x00}};
     static const GUID _glfw_GUID_YAxis = {0xa36d02e1,0xc9f3,0x11cf,{0xbf,0xc7,0x44,0x45,0x53,0x54,0x00,0x00}};
     static const GUID _glfw_GUID_ZAxis = {0xa36d02e2,0xc9f3,0x11cf,{0xbf,0xc7,0x44,0x45,0x53,0x54,0x00,0x00}};
@@ -1505,7 +1318,6 @@ void* _glfw_realloc(void* block, size_t size) {
     static const GUID _glfw_GUID_RzAxis = {0xa36d02e3,0xc9f3,0x11cf,{0xbf,0xc7,0x44,0x45,0x53,0x54,0x00,0x00}};
     static const GUID _glfw_GUID_Slider = {0xa36d02e4,0xc9f3,0x11cf,{0xbf,0xc7,0x44,0x45,0x53,0x54,0x00,0x00}};
     static const GUID _glfw_GUID_POV = {0xa36d02f2,0xc9f3,0x11cf,{0xbf,0xc7,0x44,0x45,0x53,0x54,0x00,0x00}};
-    #define IID_IDirectInput8W _glfw_IID_IDirectInput8W
     #define GUID_XAxis _glfw_GUID_XAxis
     #define GUID_YAxis _glfw_GUID_YAxis
     #define GUID_ZAxis _glfw_GUID_ZAxis
@@ -1576,111 +1388,14 @@ void* _glfw_realloc(void* block, size_t size) {
         return "Unknown XInput Device";
     }
 
-    static int compareJoystickObjects(const void* first, const void* second) {
-        const _GLFWjoyobjectWin32* fo = first; const _GLFWjoyobjectWin32* so = second;
-        if (fo->type != so->type) return fo->type - so->type;
-        return fo->offset - so->offset;
-    }
-
-    static GLFWbool supportsXInput(const GUID* guid) {
-        UINT i, count = 0;
-        RAWINPUTDEVICELIST* ridl;
-        GLFWbool result = GLFW_FALSE;
-        if (GetRawInputDeviceList(NULL, &count, sizeof(RAWINPUTDEVICELIST)) != 0) return GLFW_FALSE;
-
-        ridl = _glfw_calloc(count, sizeof(RAWINPUTDEVICELIST));
-        if (GetRawInputDeviceList(ridl, &count, sizeof(RAWINPUTDEVICELIST)) == (UINT) -1) { free(ridl); return GLFW_FALSE; }
-
-        for (i = 0;  i < count;  i++) {
-            RID_DEVICE_INFO rdi; char name[256]; UINT size;
-            if (ridl[i].dwType != RIM_TYPEHID) continue;
-
-            ZeroMemory(&rdi, sizeof(rdi)); rdi.cbSize = sizeof(rdi); size = sizeof(rdi);
-            if ((INT) GetRawInputDeviceInfoA(ridl[i].hDevice,RIDI_DEVICEINFO,&rdi, &size) == -1) continue;
-            if (MAKELONG(rdi.hid.dwVendorId, rdi.hid.dwProductId) != (LONG) guid->Data1) continue;
-
-            __builtin_memset(name, 0, sizeof(name)); size = sizeof(name);
-            if ((INT) GetRawInputDeviceInfoA(ridl[i].hDevice,RIDI_DEVICENAME,name,&size) == -1) break;
-
-            name[sizeof(name) - 1] = '\0';
-            if (strstr(name, "IG_")) { result = GLFW_TRUE; break; }
-        }
-
-        free(ridl);
-        return result;
-    }
-
-    static void closeJoystick(_GLFWjoystick* js) {
-        _glfwInputJoystick(js,0x00040002/*disconnected*/);
-        if (js->win32.device) { IDirectInputDevice8_Unacquire(js->win32.device); IDirectInputDevice8_Release(js->win32.device); }
-        free(js->win32.objects); _glfwFreeJoystick(js);
-    }
-
-    static BOOL CALLBACK deviceObjectCallback(const DIDEVICEOBJECTINSTANCEW* doi, void* user) {
-        _GLFWobjenumWin32* data = user;
-        _GLFWjoyobjectWin32* object = data->objects + data->objectCount;
-        if (DIDFT_GETTYPE(doi->dwType) & DIDFT_AXIS) {
-            DIPROPRANGE dipr;
-            if (memcmp(&doi->guidType, &GUID_Slider, sizeof(GUID)) == 0) object->offset = DIJOFS_SLIDER(data->sliderCount);
-            else if (memcmp(&doi->guidType, &GUID_XAxis, sizeof(GUID)) == 0) object->offset = DIJOFS_X;
-            else if (memcmp(&doi->guidType, &GUID_YAxis, sizeof(GUID)) == 0) object->offset = DIJOFS_Y;
-            else if (memcmp(&doi->guidType, &GUID_ZAxis, sizeof(GUID)) == 0) object->offset = DIJOFS_Z;
-            else if (memcmp(&doi->guidType, &GUID_RxAxis, sizeof(GUID)) == 0) object->offset = DIJOFS_RX;
-            else if (memcmp(&doi->guidType, &GUID_RyAxis, sizeof(GUID)) == 0) object->offset = DIJOFS_RY;
-            else if (memcmp(&doi->guidType, &GUID_RzAxis, sizeof(GUID)) == 0) object->offset = DIJOFS_RZ;
-            else return DIENUM_CONTINUE;
-
-            ZeroMemory(&dipr, sizeof(dipr)); dipr.diph.dwSize = sizeof(dipr); dipr.diph.dwHeaderSize = sizeof(dipr.diph);
-            dipr.diph.dwObj = doi->dwType; dipr.diph.dwHow = DIPH_BYID; dipr.lMin = -32768; dipr.lMax =  32767;
-            if (FAILED(IDirectInputDevice8_SetProperty(data->device,DIPROP_RANGE,&dipr.diph))) return DIENUM_CONTINUE;
-
-            if (memcmp(&doi->guidType, &GUID_Slider, sizeof(GUID)) == 0) { object->type = _GLFW_TYPE_SLIDER; data->sliderCount++; }
-            else { object->type = _GLFW_TYPE_AXIS; data->axisCount++; }
-        } else if (DIDFT_GETTYPE(doi->dwType) & DIDFT_BUTTON) { object->offset = DIJOFS_BUTTON(data->buttonCount); object->type = _GLFW_TYPE_BUTTON; data->buttonCount++;
-        } else if (DIDFT_GETTYPE(doi->dwType) & DIDFT_POV) { object->offset = DIJOFS_POV(data->povCount); object->type = _GLFW_TYPE_POV; data->povCount++; }
-        
-        data->objectCount++;
-        return DIENUM_CONTINUE;
-    }
-
-    static BOOL CALLBACK deviceCallback(const DIDEVICEINSTANCEW* di,void* user) {
-        int jid; DIDEVCAPS dc; DIPROPDWORD dipd; IDirectInputDevice8W* device; _GLFWobjenumWin32 data; _GLFWjoystick* js; char guid[33],name[256]; (void)user;
-        for (jid=0;jid<=GLFW_JOYSTICK_LAST;jid++) {
-            js=_glfw.joysticks+jid;
-            if (js->connected && memcmp(&js->win32.guid,&di->guidInstance,sizeof(GUID))==0) return DIENUM_CONTINUE;
-        }
-        if (supportsXInput(&di->guidProduct)) return DIENUM_CONTINUE;
-        if (FAILED(IDirectInput8_CreateDevice(_glfw.win32.dinput8.api,&di->guidInstance,&device,NULL))) return DIENUM_CONTINUE;
-        if (FAILED(IDirectInputDevice8_SetDataFormat(device,&_glfwDataFormat))) { IDirectInputDevice8_Release(device); return DIENUM_CONTINUE; }
-        
-        __builtin_memset(&dc,0,sizeof(dc)), dc.dwSize=sizeof(dc);
-        if (FAILED(IDirectInputDevice8_GetCapabilities(device,&dc))) { IDirectInputDevice8_Release(device); return DIENUM_CONTINUE; }
-        
-        __builtin_memset(&dipd,0,sizeof(dipd)), dipd.diph.dwSize=sizeof(dipd), dipd.diph.dwHeaderSize=sizeof(dipd.diph), dipd.diph.dwHow=DIPH_DEVICE, dipd.dwData=DIPROPAXISMODE_ABS;
-        if (FAILED(IDirectInputDevice8_SetProperty(device,DIPROP_AXISMODE,&dipd.diph))) { IDirectInputDevice8_Release(device); return DIENUM_CONTINUE; }
-        
-        __builtin_memset(&data,0,sizeof(data)), data.device=device, data.objects=_glfw_calloc(dc.dwAxes+(size_t)dc.dwButtons+dc.dwPOVs,sizeof(_GLFWjoyobjectWin32));
-        if (FAILED(IDirectInputDevice8_EnumObjects(device,deviceObjectCallback,&data,DIDFT_AXIS|DIDFT_BUTTON|DIDFT_POV))) { IDirectInputDevice8_Release(device), free(data.objects); return DIENUM_CONTINUE; }
-        
-        qsort(data.objects,data.objectCount,sizeof(_GLFWjoyobjectWin32),compareJoystickObjects);
-        if (!WideCharToMultiByte(CP_UTF8,0,di->tszInstanceName,-1,name,sizeof(name),NULL,NULL)) { IDirectInputDevice8_Release(device), free(data.objects); return DIENUM_STOP; }
-        
-        if (memcmp(&di->guidProduct.Data4[2],"PIDVID",6)==0) sprintf(guid,"03000000%02x%02x0000%02x%02x000000000000",(u8)di->guidProduct.Data1,(u8)(di->guidProduct.Data1>>8),(u8)(di->guidProduct.Data1>>16),(u8)(di->guidProduct.Data1>>24));
-        else sprintf(guid,"05000000%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x00",name[0],name[1],name[2],name[3],name[4],name[5],name[6],name[7],name[8],name[9],name[10]);
-        if (!(js=_glfwAllocJoystick(name,guid,data.axisCount+data.sliderCount,data.buttonCount,data.povCount))) { IDirectInputDevice8_Release(device), free(data.objects); return DIENUM_STOP; }
-        
-        js->win32.device=device, js->win32.guid=di->guidInstance, js->win32.objects=data.objects, js->win32.objectCount=data.objectCount;
-        _glfwInputJoystick(js,0x00040001/*connected*/); return DIENUM_CONTINUE;
-    }
-
-
+    static void closeJoystick(_GLFWjoystick* js) { _glfwInputJoystick(js,0x00040002/*disconnected*/); free(js->win32.objects); _glfwFreeJoystick(js); }
     void _glfwDetectJoystickConnectionWin32(void) {
         if (_glfw.win32.xinput.instance) {
             DWORD index;
             for (index=0;index<4;index++) {
                 int jid; char guid[33]; XINPUT_CAPABILITIES xic; _GLFWjoystick* js;
                 for (jid = 0;  jid <= GLFW_JOYSTICK_LAST;  jid++) {
-                    if (_glfw.joysticks[jid].connected && _glfw.joysticks[jid].win32.device == NULL && _glfw.joysticks[jid].win32.index == index) break;
+                    if (_glfw.joysticks[jid].connected && _glfw.joysticks[jid].win32.index == index) break;
                 }
 
                 if (jid <= GLFW_JOYSTICK_LAST) continue;
@@ -1694,99 +1409,34 @@ void* _glfw_realloc(void* block, size_t size) {
                 _glfwInputJoystick(js,0x00040001/*connected*/);
             }
         }
-
-        if (_glfw.win32.dinput8.api) {
-            if (FAILED(IDirectInput8_EnumDevices(_glfw.win32.dinput8.api,DI8DEVCLASS_GAMECTRL,deviceCallback,NULL,DIEDFL_ALLDEVICES))) {DualLogError("Failed to enumerate DirectInput8 devices"); return; }
-        }
     }
 
-    GLFWbool _glfwInitJoysticksWin32(void) {
-        if (_glfw.win32.dinput8.instance) {
-            if (FAILED(DirectInput8Create(_glfw.win32.instance,0x0800,&IID_IDirectInput8W,(void**) &_glfw.win32.dinput8.api,NULL))) { DualLogError("Win32: Failed to create interface"); return GLFW_FALSE; }
-        }
-
-        _glfwDetectJoystickConnectionWin32();
-        return GLFW_TRUE;
-    }
-
+    GLFWbool _glfwInitJoysticksWin32(void) { _glfwDetectJoystickConnectionWin32(); return GLFW_TRUE; }
     GLFWbool _glfwPollJoystickWin32(_GLFWjoystick* js, int mode) {
-        if (js->win32.device) {
-            int i, ai = 0, bi = 0, pi = 0; HRESULT result; DIJOYSTATE state = {0};
-            IDirectInputDevice8_Poll(js->win32.device);
-            result = IDirectInputDevice8_GetDeviceState(js->win32.device,sizeof(state),&state);
-            if (result == DIERR_NOTACQUIRED || result == DIERR_INPUTLOST) {
-                IDirectInputDevice8_Acquire(js->win32.device);
-                IDirectInputDevice8_Poll(js->win32.device);
-                result = IDirectInputDevice8_GetDeviceState(js->win32.device,sizeof(state),&state);
-            }
+        int i, dpad = 0; DWORD result; XINPUT_STATE xis;
+        const WORD buttons[10] = {XINPUT_GAMEPAD_A,XINPUT_GAMEPAD_B,XINPUT_GAMEPAD_X,XINPUT_GAMEPAD_Y,XINPUT_GAMEPAD_LEFT_SHOULDER,XINPUT_GAMEPAD_RIGHT_SHOULDER,XINPUT_GAMEPAD_BACK,XINPUT_GAMEPAD_START,XINPUT_GAMEPAD_LEFT_THUMB,XINPUT_GAMEPAD_RIGHT_THUMB};
+        result = XInputGetState(js->win32.index, &xis);
+        if (result != ERROR_SUCCESS) { if (result == ERROR_DEVICE_NOT_CONNECTED) {closeJoystick(js);} return GLFW_FALSE; }
+        if (mode == 0/*presence*/) return GLFW_TRUE;
 
-            if (FAILED(result)) { closeJoystick(js); return GLFW_FALSE; }
-            if (mode == 0/*presence*/) return GLFW_TRUE;
-
-            for (i = 0;  i < js->win32.objectCount;  i++) {
-                const void* data = (char*) &state + js->win32.objects[i].offset;
-                switch (js->win32.objects[i].type) {
-                    case _GLFW_TYPE_AXIS:
-                    case _GLFW_TYPE_SLIDER: {
-                        const float value = (*((LONG*) data) + 0.5f) / 32767.5f;
-                        _glfwInputJoystickAxis(js, ai, value);
-                        ai++;
-                        break;
-                    }
-
-                    case _GLFW_TYPE_BUTTON: {
-                        const char value = (*((BYTE*) data) & 0x80) != 0;
-                        _glfwInputJoystickButton(js, bi, value);
-                        bi++;
-                        break;
-                    }
-
-                    case _GLFW_TYPE_POV: {
-                        const int states[9] = {GLFW_HAT_UP,GLFW_HAT_RIGHT_UP,GLFW_HAT_RIGHT,GLFW_HAT_RIGHT_DOWN,GLFW_HAT_DOWN,GLFW_HAT_LEFT_DOWN,GLFW_HAT_LEFT,GLFW_HAT_LEFT_UP,GLFW_HAT_CENTERED};
-
-                        // Screams of horror are appropriate at this point
-                        int stateIndex = LOWORD(*(DWORD*) data) / (45 * DI_DEGREES);
-                        if (stateIndex < 0 || stateIndex > 8) stateIndex = 8;
-                        _glfwInputJoystickHat(js, pi, states[stateIndex]);
-                        pi++;
-                        break;
-                    }
-                }
-            }
-        } else {
-            int i, dpad = 0;
-            DWORD result;
-            XINPUT_STATE xis;
-            const WORD buttons[10] = {XINPUT_GAMEPAD_A,XINPUT_GAMEPAD_B,XINPUT_GAMEPAD_X,XINPUT_GAMEPAD_Y,XINPUT_GAMEPAD_LEFT_SHOULDER,XINPUT_GAMEPAD_RIGHT_SHOULDER,XINPUT_GAMEPAD_BACK,XINPUT_GAMEPAD_START,XINPUT_GAMEPAD_LEFT_THUMB,XINPUT_GAMEPAD_RIGHT_THUMB};
-            result = XInputGetState(js->win32.index, &xis);
-            if (result != ERROR_SUCCESS) {
-                if (result == ERROR_DEVICE_NOT_CONNECTED) closeJoystick(js);
-                return GLFW_FALSE;
-            }
-
-            if (mode == 0/*presence*/) return GLFW_TRUE;
-
-            _glfwInputJoystickAxis(js, 0, (xis.Gamepad.sThumbLX + 0.5f) / 32767.5f);
-            _glfwInputJoystickAxis(js, 1, -(xis.Gamepad.sThumbLY + 0.5f) / 32767.5f);
-            _glfwInputJoystickAxis(js, 2, (xis.Gamepad.sThumbRX + 0.5f) / 32767.5f);
-            _glfwInputJoystickAxis(js, 3, -(xis.Gamepad.sThumbRY + 0.5f) / 32767.5f);
-            _glfwInputJoystickAxis(js, 4, xis.Gamepad.bLeftTrigger / 127.5f - 1.f);
-            _glfwInputJoystickAxis(js, 5, xis.Gamepad.bRightTrigger / 127.5f - 1.f);
-
-            for (i = 0;  i < 10;  i++) {
-                const char value = (xis.Gamepad.wButtons & buttons[i]) ? 1 : 0;
-                _glfwInputJoystickButton(js, i, value);
-            }
-
-            if (xis.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_UP) dpad |= GLFW_HAT_UP;
-            if (xis.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_RIGHT) dpad |= GLFW_HAT_RIGHT;
-            if (xis.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_DOWN) dpad |= GLFW_HAT_DOWN;
-            if (xis.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_LEFT) dpad |= GLFW_HAT_LEFT;
-            if ((dpad & GLFW_HAT_RIGHT) && (dpad & GLFW_HAT_LEFT)) dpad &= ~(GLFW_HAT_RIGHT | GLFW_HAT_LEFT);
-            if ((dpad & GLFW_HAT_UP) && (dpad & GLFW_HAT_DOWN)) dpad &= ~(GLFW_HAT_UP | GLFW_HAT_DOWN);
-            _glfwInputJoystickHat(js, 0, dpad);
+        _glfwInputJoystickAxis(js, 0, (xis.Gamepad.sThumbLX + 0.5f) / 32767.5f);
+        _glfwInputJoystickAxis(js, 1, -(xis.Gamepad.sThumbLY + 0.5f) / 32767.5f);
+        _glfwInputJoystickAxis(js, 2, (xis.Gamepad.sThumbRX + 0.5f) / 32767.5f);
+        _glfwInputJoystickAxis(js, 3, -(xis.Gamepad.sThumbRY + 0.5f) / 32767.5f);
+        _glfwInputJoystickAxis(js, 4, xis.Gamepad.bLeftTrigger / 127.5f - 1.f);
+        _glfwInputJoystickAxis(js, 5, xis.Gamepad.bRightTrigger / 127.5f - 1.f);
+        for (i = 0;  i < 10;  i++) {
+            const char value = (xis.Gamepad.wButtons & buttons[i]) ? 1 : 0;
+            _glfwInputJoystickButton(js, i, value);
         }
 
+        if (xis.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_UP) dpad |= GLFW_HAT_UP;
+        if (xis.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_RIGHT) dpad |= GLFW_HAT_RIGHT;
+        if (xis.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_DOWN) dpad |= GLFW_HAT_DOWN;
+        if (xis.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_LEFT) dpad |= GLFW_HAT_LEFT;
+        if ((dpad & GLFW_HAT_RIGHT) && (dpad & GLFW_HAT_LEFT)) dpad &= ~(GLFW_HAT_RIGHT | GLFW_HAT_LEFT);
+        if ((dpad & GLFW_HAT_UP) && (dpad & GLFW_HAT_DOWN)) dpad &= ~(GLFW_HAT_UP | GLFW_HAT_DOWN);
+        _glfwInputJoystickHat(js, 0, dpad);
         return GLFW_TRUE;
     }
     
@@ -1794,15 +1444,6 @@ void* _glfw_realloc(void* block, size_t size) {
         for (int jid = 0;  jid <= GLFW_JOYSTICK_LAST;  jid++) {
             _GLFWjoystick* js = _glfw.joysticks + jid;
             if (js->connected) _glfwPollJoystickWin32(js,0/*presence*/);
-        }
-    }
-
-    const char* _glfwGetMappingNameWin32(void) { return "Windows"; }
-    void _glfwUpdateGamepadGUIDWin32(char* guid) {
-        if (strcmp(guid + 20, "504944564944") == 0) {
-            char original[33];
-            strncpy(original,guid,sizeof(original) - 1);
-            sprintf(guid,"03000000%.4s0000%.4s000000000000",original,original + 4);
         }
     }
 
@@ -1920,33 +1561,6 @@ void* _glfw_realloc(void* block, size_t size) {
         MONITORINFO mi = {0}; mi.cbSize = sizeof(mi); GetMonitorInfoW(monitor->win32.handle, &mi);
         if (xpos) {*xpos = mi.rcWork.left;} if (ypos) {*ypos = mi.rcWork.top;}
         if (width) {*width = mi.rcWork.right - mi.rcWork.left;} if (height) {*height = mi.rcWork.bottom - mi.rcWork.top;}
-    }
-
-    GLFWvidmode* _glfwGetVideoModesWin32(_GLFWmonitor* monitor, int* count) {
-        int modeIndex = 0, size = 0; GLFWvidmode* result = NULL; *count = 0;
-        for (;;) {
-            int i; GLFWvidmode mode; DEVMODEW dm; ZeroMemory(&dm,sizeof(dm)); dm.dmSize = sizeof(dm);
-            if (!EnumDisplaySettingsW(monitor->win32.adapterName, modeIndex, &dm)) break;
-
-            modeIndex++;
-            if (dm.dmBitsPerPel < 15) continue; // Skip modes with less than 15 BPP
-
-            mode.width  = dm.dmPelsWidth; mode.height = dm.dmPelsHeight; mode.refreshRate = dm.dmDisplayFrequency;
-            _glfwSplitBPP(dm.dmBitsPerPel,&mode.redBits,&mode.greenBits,&mode.blueBits);
-            for (i = 0;  i < *count;  i++) { if (_glfwCompareVideoModes(result + i, &mode) == 0) {break;} }
-            if (i < *count) continue; // Skip duplicate modes
-            if (monitor->win32.modesPruned) {
-                // Skip modes not supported by the connected displays
-                if (ChangeDisplaySettingsExW(monitor->win32.adapterName,&dm,NULL,CDS_TEST,NULL) != DISP_CHANGE_SUCCESSFUL) continue;
-            }
-
-            if (*count == size) { size += 128; result = (GLFWvidmode*)_glfw_realloc(result,size * sizeof(GLFWvidmode)); }
-            (*count)++;
-            result[*count - 1] = mode;
-        }
-
-        if (!*count) { result = _glfw_calloc(1, sizeof(GLFWvidmode)); _glfwGetVideoModeWin32(monitor,result); *count = 1; }
-        return result;
     }
 
     GLFWbool _glfwGetVideoModeWin32(_GLFWmonitor* monitor, GLFWvidmode* mode) {
@@ -2124,14 +1738,10 @@ void* _glfw_realloc(void* block, size_t size) {
     #define PLATFORM_getCursorPos(w,x,y)            _glfwGetCursorPosWin32(w,x,y)
     #define PLATFORM_setCursorPos(w,x,y)            _glfwSetCursorPosWin32(w,x,y)
     #define PLATFORM_setCursorMode(w,m)             _glfwSetCursorModeWin32(w,m)
-    #define PLATFORM_setRawMouseMotion(w,e)         _glfwSetRawMouseMotionWin32(w,e)
     #define PLATFORM_initJoysticks()                _glfwInitJoysticksWin32()
     #define PLATFORM_pollJoystick(js,m)             _glfwPollJoystickWin32(js,m)
-    #define PLATFORM_getMappingName()               _glfwGetMappingNameWin32()
-    #define PLATFORM_updateGamepadGUID(g)           _glfwUpdateGamepadGUIDWin32(g)
     #define PLATFORM_getMonitorPos(m,x,y)           _glfwGetMonitorPosWin32(m,x,y)
     #define PLATFORM_getMonitorWorkarea(m,x,y,w,h)  _glfwGetMonitorWorkareaWin32(m,x,y,w,h)
-    #define PLATFORM_getVideoModes(m,c)             _glfwGetVideoModesWin32(m,c)
     #define PLATFORM_getVideoMode(m,cur)            _glfwGetVideoModeWin32(m,cur)
     #define PLATFORM_setWindowIcon(w,c,i)           _glfwSetWindowIconWin32(w,c,i)
     #define PLATFORM_getWindowPos(w,x,y)            _glfwGetWindowPosWin32(w,x,y)
@@ -2193,7 +1803,6 @@ void* _glfw_realloc(void* block, size_t size) {
     }
 
     void* _glfwPlatformLoadModule(const char* path) { return dlopen(path, RTLD_LAZY | RTLD_LOCAL); }
-    void _glfwPlatformFreeModule(void* module) { if (module) {dlclose(module);} }
     GLFWproc _glfwPlatformGetModuleSymbol(void* module, const char* name) { return dlsym(module, name); }
     static GLFWbool waitForX11Event(double* timeout) {
         struct pollfd fd = {ConnectionNumber(_glfw.x11.display),POLLIN,0U};
@@ -2248,22 +1857,7 @@ void* _glfw_realloc(void* block, size_t size) {
 
     static void captureCursor(_GLFWwindow* window) { XGrabPointer(_glfw.x11.display,window->x11.handle,True,ButtonPressMask|ButtonReleaseMask|PointerMotionMask,1/*GrabModeAsync*/,1/*GrabModeAsync*/,window->x11.handle,None,CurrentTime); }
     static void releaseCursor(void) { XUngrabPointer(_glfw.x11.display,CurrentTime); }
-
-    static void enableRawMouseMotion(_GLFWwindow* window) {
-        XIEventMask em; unsigned char mask[XIMaskLen(17/*XI_RawMotion*/)]={0}; (void)window;
-        em.deviceid=XIAllMasterDevices; em.mask_len=sizeof(mask); em.mask=mask;
-        XISetMask(mask,17/*XI_RawMotion*/);
-        XISelectEvents(_glfw.x11.display,_glfw.x11.root,&em,1);
-    }
-
-    static void disableRawMouseMotion(_GLFWwindow* window) {
-        XIEventMask em; unsigned char mask[]={0}; (void)window;
-        em.deviceid=XIAllMasterDevices; em.mask_len=sizeof(mask); em.mask=mask;
-        XISelectEvents(_glfw.x11.display,_glfw.x11.root,&em,1);
-    }
-
     static void disableCursor(_GLFWwindow* window) {
-        if (window->rawMouseMotion) enableRawMouseMotion(window);
         _glfw.x11.disabledCursorWindow=window;
         _glfwGetCursorPosX11(window,&_glfw.x11.restoreCursorPosX,&_glfw.x11.restoreCursorPosY);
         updateCursorImage(window);
@@ -2271,7 +1865,6 @@ void* _glfw_realloc(void* block, size_t size) {
     }
 
     static void enableCursor(_GLFWwindow* window) {
-        if (window->rawMouseMotion) disableRawMouseMotion(window);
         _glfw.x11.disabledCursorWindow=NULL;
         releaseCursor();
         _glfwSetCursorPosX11(window,_glfw.x11.restoreCursorPosX,_glfw.x11.restoreCursorPosY);
@@ -2380,27 +1973,7 @@ void* _glfw_realloc(void* block, size_t size) {
         if (event->type==KeyPress || event->type==KeyRelease) keycode=event->xkey.keycode;
         filtered=XFilterEvent(event,None);
         if (_glfw.x11.randr.available && event->type==_glfw.x11.randr.eventBase+1/*notify*/) { XRRUpdateConfiguration(event); _glfwPollMonitorsX11(); return; }
-        if (_glfw.x11.xkb.available && event->type==_glfw.x11.xkb.eventBase/* +0 XkbEventCode*/) {
-            if (((XkbEvent*)event)->any.xkb_type==XkbStateNotify && (((XkbEvent*)event)->state.changed & XkbGroupStateMask)) _glfw.x11.xkb.group=((XkbEvent*)event)->state.group;
-            return;
-        }
-        if (event->type==GenericEvent) {
-            if (_glfw.x11.xi.available) {
-                _GLFWwindow* window=_glfw.x11.disabledCursorWindow;
-                if (window && window->rawMouseMotion && event->xcookie.extension==_glfw.x11.xi.majorOpcode && XGetEventData(_glfw.x11.display,&event->xcookie) && event->xcookie.evtype==17/*XI_RawMotion*/) {
-                    XIRawEvent* re=event->xcookie.data;
-                    if (re->valuators.mask_len) {
-                        const double* values=re->raw_values;
-                        double xpos=window->virtualCursorPosX,ypos=window->virtualCursorPosY;
-                        if (XIMaskIsSet(re->valuators.mask,0)) { xpos+=*values; values++; }
-                        if (XIMaskIsSet(re->valuators.mask,1)) ypos+=*values;
-                        _glfwInputCursorPos(window,xpos,ypos);
-                    }
-                }
-                XFreeEventData(_glfw.x11.display,&event->xcookie);
-            }
-            return;
-        }
+        if (event->type==GenericEvent) { if (_glfw.x11.xi.available) {XFreeEventData(_glfw.x11.display,&event->xcookie);} return; }
 
         _GLFWwindow* window=NULL;
         if (XFindContext(_glfw.x11.display,event->xany.window,_glfw.x11.context,(XPointer*)&window)!=0) return;
@@ -2440,7 +2013,7 @@ void* _glfw_realloc(void* block, size_t size) {
                 const int x=event->xmotion.x,y=event->xmotion.y;
                 if (x!=window->x11.warpCursorPosX || y!=window->x11.warpCursorPosY) {
                     if (window->cursorMode==GLFW_CURSOR_DISABLED) {
-                        if (_glfw.x11.disabledCursorWindow!=window || window->rawMouseMotion) return;
+                        if (_glfw.x11.disabledCursorWindow!=window) return;
                         _glfwInputCursorPos(window,window->virtualCursorPosX+(x-window->x11.lastCursorPosX),window->virtualCursorPosY+(y-window->x11.lastCursorPosY));
                     } else _glfwInputCursorPos(window,x,y);
                 }
@@ -2502,11 +2075,6 @@ void* _glfw_realloc(void* block, size_t size) {
         XChangeProperty(_glfw.x11.display,window->x11.handle,_glfw.x11.MOTIF_WM_HINTS,_glfw.x11.MOTIF_WM_HINTS,32,PropModeReplace,(unsigned char*)&hints,sizeof(hints)/sizeof(long));
     }
 
-    void _glfwSetRawMouseMotionX11(_GLFWwindow* window,GLFWbool enabled) {
-        if (!_glfw.x11.xi.available || _glfw.x11.disabledCursorWindow!=window) return;
-        if (enabled) enableRawMouseMotion(window); else disableRawMouseMotion(window);
-    }
-
     void _glfwPollEventsX11(void) {
         if (_glfw.joysticksInitialized) _glfwDetectJoystickConnectionLinux();
         XPending(_glfw.x11.display);
@@ -2533,12 +2101,8 @@ void* _glfw_realloc(void* block, size_t size) {
 
     void _glfwSetCursorModeX11(_GLFWwindow* window,int mode) {
         if (_glfwWindowFocusedX11(window)) {
-            if (mode==GLFW_CURSOR_DISABLED) {
-                _glfwGetCursorPosX11(window,&_glfw.x11.restoreCursorPosX,&_glfw.x11.restoreCursorPosY);
-                if (window->rawMouseMotion) enableRawMouseMotion(window);
-            } else if (_glfw.x11.disabledCursorWindow==window) { if (window->rawMouseMotion) disableRawMouseMotion(window); }
-            if (mode==GLFW_CURSOR_DISABLED) captureCursor(window); else releaseCursor();
-            if (mode==GLFW_CURSOR_DISABLED) _glfw.x11.disabledCursorWindow=window;
+            if (mode!=GLFW_CURSOR_DISABLED) releaseCursor();
+            if (mode==GLFW_CURSOR_DISABLED) { _glfwGetCursorPosX11(window,&_glfw.x11.restoreCursorPosX,&_glfw.x11.restoreCursorPosY); captureCursor(window); _glfw.x11.disabledCursorWindow=window; }
             else if (_glfw.x11.disabledCursorWindow==window) { _glfw.x11.disabledCursorWindow=NULL; _glfwSetCursorPosX11(window,_glfw.x11.restoreCursorPosX,_glfw.x11.restoreCursorPosY); }
         }
         updateCursorImage(window); XFlush(_glfw.x11.display);
@@ -2627,31 +2191,6 @@ void* _glfw_realloc(void* block, size_t size) {
             if (extents) {XFree(extents);} if (desktop) {XFree(desktop);}
         }
         if (xpos) {*xpos = areaX;} if (ypos) {*ypos = areaY;} if (width) {*width = areaWidth;} if (height) {*height = areaHeight;}
-    }
-
-    GLFWvidmode* _glfwGetVideoModesX11(_GLFWmonitor* monitor,int* count) {
-        GLFWvidmode* result;
-        *count = 0;
-        if (_glfw.x11.randr.available && !_glfw.x11.randr.monitorBroken) {
-            XRRScreenResources* sr = XRRGetScreenResourcesCurrent(_glfw.x11.display,_glfw.x11.root);
-            XRRCrtcInfo* ci = XRRGetCrtcInfo(_glfw.x11.display,sr,monitor->x11.crtc);
-            XRROutputInfo* oi = XRRGetOutputInfo(_glfw.x11.display,sr,monitor->x11.output);
-            result = _glfw_calloc(oi->nmode,sizeof(GLFWvidmode));
-            for (int i = 0; i < oi->nmode; i++) {
-                const XRRModeInfo* mi = getModeInfo(sr,oi->modes[i]);
-                if (!((mi->modeFlags & 0x00000010/*interlace*/) == 0)) continue;
-                const GLFWvidmode mode = vidmodeFromModeInfo(mi,ci);
-                int j;
-                for (j = 0; j < *count; j++) if (_glfwCompareVideoModes(result+j,&mode) == 0) break;
-                if (j < *count) continue;
-                (*count)++, result[*count - 1] = mode;
-            }
-            XRRFreeOutputInfo(oi), XRRFreeCrtcInfo(ci), XRRFreeScreenResources(sr);
-        } else {
-            *count = 1, result = _glfw_calloc(1,sizeof(GLFWvidmode));
-            _glfwGetVideoModeX11(monitor,result);
-        }
-        return result;
     }
 
     GLFWbool _glfwGetVideoModeX11(_GLFWmonitor* monitor,GLFWvidmode* mode) {
@@ -2750,65 +2289,7 @@ void* _glfw_realloc(void* block, size_t size) {
         int scancodeMin, scancodeMax;
         __builtin_memset(_glfw.x11.keycodes, -1, sizeof(_glfw.x11.keycodes));
         __builtin_memset(_glfw.x11.scancodes, -1, sizeof(_glfw.x11.scancodes));
-        if (_glfw.x11.xkb.available) {
-            XkbDescPtr desc = XkbGetMap(_glfw.x11.display, 0, XkbUseCoreKbd);
-            XkbGetNames(_glfw.x11.display, XkbKeyNamesMask | XkbKeyAliasesMask, desc);
-            scancodeMin = desc->min_key_code; scancodeMax = desc->max_key_code;
-            const struct { int key; char* name; } keymap[] = {
-                {GLFW_KEY_GRAVE_ACCENT,"TLDE"},{GLFW_KEY_1,"AE01"},{GLFW_KEY_2,"AE02"},{GLFW_KEY_3,"AE03"},
-                {GLFW_KEY_4,"AE04"},{GLFW_KEY_5,"AE05"},{GLFW_KEY_6,"AE06"},{GLFW_KEY_7,"AE07"},
-                {GLFW_KEY_8,"AE08"},{GLFW_KEY_9,"AE09"},{GLFW_KEY_0,"AE10"},{GLFW_KEY_MINUS,"AE11"},
-                {GLFW_KEY_EQUAL,"AE12"},{GLFW_KEY_Q,"AD01"},{GLFW_KEY_W,"AD02"},{GLFW_KEY_E,"AD03"},
-                {GLFW_KEY_R,"AD04"},{GLFW_KEY_T,"AD05"},{GLFW_KEY_Y,"AD06"},{GLFW_KEY_U,"AD07"},
-                {GLFW_KEY_I,"AD08"},{GLFW_KEY_O,"AD09"},{GLFW_KEY_P,"AD10"},{GLFW_KEY_LEFT_BRACKET,"AD11"},
-                {GLFW_KEY_RIGHT_BRACKET,"AD12"},{GLFW_KEY_A,"AC01"},{GLFW_KEY_S,"AC02"},{GLFW_KEY_D,"AC03"},
-                {GLFW_KEY_F,"AC04"},{GLFW_KEY_G,"AC05"},{GLFW_KEY_H,"AC06"},{GLFW_KEY_J,"AC07"},
-                {GLFW_KEY_K,"AC08"},{GLFW_KEY_L,"AC09"},{GLFW_KEY_SEMICOLON,"AC10"},{GLFW_KEY_APOSTROPHE,"AC11"},
-                {GLFW_KEY_Z,"AB01"},{GLFW_KEY_X,"AB02"},{GLFW_KEY_C,"AB03"},{GLFW_KEY_V,"AB04"},
-                {GLFW_KEY_B,"AB05"},{GLFW_KEY_N,"AB06"},{GLFW_KEY_M,"AB07"},{GLFW_KEY_COMMA,"AB08"},
-                {GLFW_KEY_PERIOD,"AB09"},{GLFW_KEY_SLASH,"AB10"},{GLFW_KEY_BACKSLASH,"BKSL"},
-                {GLFW_KEY_WORLD_1,"LSGT"},{GLFW_KEY_SPACE,"SPCE"},{GLFW_KEY_ESCAPE,"ESC"},
-                {GLFW_KEY_ENTER,"RTRN"},{GLFW_KEY_TAB,"TAB"},{GLFW_KEY_BACKSPACE,"BKSP"},
-                {GLFW_KEY_INSERT,"INS"},{GLFW_KEY_DELETE,"DELE"},{GLFW_KEY_RIGHT,"RGHT"},
-                {GLFW_KEY_LEFT,"LEFT"},{GLFW_KEY_DOWN,"DOWN"},{GLFW_KEY_UP,"UP"},
-                {GLFW_KEY_PAGE_UP,"PGUP"},{GLFW_KEY_PAGE_DOWN,"PGDN"},{GLFW_KEY_HOME,"HOME"},
-                {GLFW_KEY_END,"END"},{GLFW_KEY_CAPS_LOCK,"CAPS"},{GLFW_KEY_SCROLL_LOCK,"SCLK"},
-                {GLFW_KEY_NUM_LOCK,"NMLK"},{GLFW_KEY_PRINT_SCREEN,"PRSC"},{GLFW_KEY_PAUSE,"PAUS"},
-                {GLFW_KEY_F1,"FK01"},{GLFW_KEY_F2,"FK02"},{GLFW_KEY_F3,"FK03"},{GLFW_KEY_F4,"FK04"},
-                {GLFW_KEY_F5,"FK05"},{GLFW_KEY_F6,"FK06"},{GLFW_KEY_F7,"FK07"},{GLFW_KEY_F8,"FK08"},
-                {GLFW_KEY_F9,"FK09"},{GLFW_KEY_F10,"FK10"},{GLFW_KEY_F11,"FK11"},{GLFW_KEY_F12,"FK12"},
-                {GLFW_KEY_F13,"FK13"},{GLFW_KEY_F14,"FK14"},{GLFW_KEY_F15,"FK15"},{GLFW_KEY_F16,"FK16"},
-                {GLFW_KEY_F17,"FK17"},{GLFW_KEY_F18,"FK18"},{GLFW_KEY_F19,"FK19"},{GLFW_KEY_F20,"FK20"},
-                {GLFW_KEY_F21,"FK21"},{GLFW_KEY_F22,"FK22"},{GLFW_KEY_F23,"FK23"},{GLFW_KEY_F24,"FK24"},
-                {GLFW_KEY_F25,"FK25"},{GLFW_KEY_KP_0,"KP0"},{GLFW_KEY_KP_1,"KP1"},{GLFW_KEY_KP_2,"KP2"},
-                {GLFW_KEY_KP_3,"KP3"},{GLFW_KEY_KP_4,"KP4"},{GLFW_KEY_KP_5,"KP5"},{GLFW_KEY_KP_6,"KP6"},
-                {GLFW_KEY_KP_7,"KP7"},{GLFW_KEY_KP_8,"KP8"},{GLFW_KEY_KP_9,"KP9"},
-                {GLFW_KEY_KP_DECIMAL,"KPDL"},{GLFW_KEY_KP_DIVIDE,"KPDV"},{GLFW_KEY_KP_MULTIPLY,"KPMU"},
-                {GLFW_KEY_KP_SUBTRACT,"KPSU"},{GLFW_KEY_KP_ADD,"KPAD"},{GLFW_KEY_KP_ENTER,"KPEN"},
-                {GLFW_KEY_KP_EQUAL,"KPEQ"},{GLFW_KEY_LEFT_SHIFT,"LFSH"},{GLFW_KEY_LEFT_CONTROL,"LCTL"},
-                {GLFW_KEY_LEFT_ALT,"LALT"},{GLFW_KEY_LEFT_SUPER,"LWIN"},{GLFW_KEY_RIGHT_SHIFT,"RTSH"},
-                {GLFW_KEY_RIGHT_CONTROL,"RCTL"},{GLFW_KEY_RIGHT_ALT,"RALT"},{GLFW_KEY_RIGHT_ALT,"LVL3"},
-                {GLFW_KEY_RIGHT_ALT,"MDSW"},{GLFW_KEY_RIGHT_SUPER,"RWIN"},{GLFW_KEY_MENU,"MENU"},
-            };
-
-            for (int sc = scancodeMin; sc <= scancodeMax; sc++) {
-                int key = GLFW_KEY_UNKNOWN;
-                for (int i = 0; i < (int)(sizeof(keymap)/sizeof(keymap[0])); i++) {
-                    if (strncmp(desc->names->keys[sc].name, keymap[i].name, XkbKeyNameLength) == 0) { key = keymap[i].key; break; }
-                }
-                for (int i = 0; i < desc->names->num_key_aliases && key == GLFW_KEY_UNKNOWN; i++) {
-                    if (strncmp(desc->names->key_aliases[i].real, desc->names->keys[sc].name, XkbKeyNameLength) != 0) continue;
-                    for (int j = 0; j < (int)(sizeof(keymap)/sizeof(keymap[0])); j++) {
-                        if (strncmp(desc->names->key_aliases[i].alias, keymap[j].name, XkbKeyNameLength) == 0) { key = keymap[j].key; break; }
-                    }
-                }
-                _glfw.x11.keycodes[sc] = key;
-            }
-            XkbFreeNames(desc, XkbKeyNamesMask, True);
-            XkbFreeKeyboard(desc, 0, True);
-        } else
-            XDisplayKeycodes(_glfw.x11.display, &scancodeMin, &scancodeMax);
-
+        XDisplayKeycodes(_glfw.x11.display, &scancodeMin, &scancodeMax);
         int width;
         KeySym* keysyms = XGetKeyboardMapping(_glfw.x11.display, scancodeMin, scancodeMax - scancodeMin + 1, &width);
         for (int sc = scancodeMin; sc <= scancodeMax; sc++) {
@@ -2890,18 +2371,6 @@ void* _glfw_realloc(void* block, size_t size) {
             _glfw.x11.xcursor.ImageCreate      = (PFN_XcursorImageCreate)      _glfwPlatformGetModuleSymbol(_glfw.x11.xcursor.handle,"XcursorImageCreate");
             _glfw.x11.xcursor.ImageDestroy     = (PFN_XcursorImageDestroy)     _glfwPlatformGetModuleSymbol(_glfw.x11.xcursor.handle,"XcursorImageDestroy");
             _glfw.x11.xcursor.ImageLoadCursor  = (PFN_XcursorImageLoadCursor)  _glfwPlatformGetModuleSymbol(_glfw.x11.xcursor.handle,"XcursorImageLoadCursor");
-        }
-
-        _glfw.x11.xkb.major = 1; _glfw.x11.xkb.minor = 0;
-        _glfw.x11.xkb.available = XkbQueryExtension(_glfw.x11.display, &_glfw.x11.xkb.majorOpcode,
-            &_glfw.x11.xkb.eventBase, &_glfw.x11.xkb.errorBase, &_glfw.x11.xkb.major, &_glfw.x11.xkb.minor);
-        if (_glfw.x11.xkb.available) {
-            Bool supported;
-            if (XkbSetDetectableAutoRepeat(_glfw.x11.display,True,&supported) && supported) _glfw.x11.xkb.detectable = GLFW_TRUE;
-            XkbStateRec state;
-            if (XkbGetState(_glfw.x11.display, XkbUseCoreKbd, &state) == Success)
-                _glfw.x11.xkb.group = (unsigned int)state.group;
-            XkbSelectEventDetails(_glfw.x11.display, XkbUseCoreKbd, XkbStateNotify, XkbGroupStateMask, XkbGroupStateMask);
         }
 
         createKeyTables();
@@ -2999,14 +2468,6 @@ void* _glfw_realloc(void* block, size_t size) {
         _glfw.x11.xlib.UngrabPointer = (PFN_XUngrabPointer)_glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XUngrabPointer");
         _glfw.x11.xlib.UnsetICFocus = (PFN_XUnsetICFocus)_glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XUnsetICFocus");
         _glfw.x11.xlib.WarpPointer = (PFN_XWarpPointer)_glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XWarpPointer");
-        _glfw.x11.xkb.FreeKeyboard = (PFN_XkbFreeKeyboard) _glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XkbFreeKeyboard");
-        _glfw.x11.xkb.FreeNames = (PFN_XkbFreeNames) _glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XkbFreeNames");
-        _glfw.x11.xkb.GetMap = (PFN_XkbGetMap) _glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XkbGetMap");
-        _glfw.x11.xkb.GetNames = (PFN_XkbGetNames) _glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XkbGetNames");
-        _glfw.x11.xkb.GetState = (PFN_XkbGetState) _glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XkbGetState");
-        _glfw.x11.xkb.QueryExtension = (PFN_XkbQueryExtension) _glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XkbQueryExtension");
-        _glfw.x11.xkb.SelectEventDetails = (PFN_XkbSelectEventDetails) _glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XkbSelectEventDetails");
-        _glfw.x11.xkb.SetDetectableAutoRepeat = (PFN_XkbSetDetectableAutoRepeat)_glfwPlatformGetModuleSymbol(_glfw.x11.xlib.handle, "XkbSetDetectableAutoRepeat");
         _glfw.x11.screen = DefaultScreen(_glfw.x11.display);
         _glfw.x11.root = RootWindow(_glfw.x11.display,_glfw.x11.screen);
         static XContext lastContext = 0;
@@ -3193,8 +2654,6 @@ void* _glfw_realloc(void* block, size_t size) {
         return js->connected;
     }
 
-    const char* _glfwGetMappingNameLinux(void) { return "Linux"; }
-    void _glfwUpdateGamepadGUIDLinux(char* guid) { (void)guid; }
     static int getGLXFBConfigAttrib(GLXFBConfig fbconfig, int attrib) { int value; _glfw.glx.GetFBConfigAttrib(_glfw.x11.display, fbconfig, attrib, &value); return value; }
     static GLFWbool chooseGLXFBConfig(const _GLFWfbconfig* desired, GLXFBConfig* result) {
         GLXFBConfig* nativeConfigs; _GLFWfbconfig* usableConfigs; const _GLFWfbconfig* closest; int nativeCount,usableCount;
@@ -3344,14 +2803,10 @@ void* _glfw_realloc(void* block, size_t size) {
     #define PLATFORM_getCursorPos(w,x,y)            _glfwGetCursorPosX11(w,x,y)
     #define PLATFORM_setCursorPos(w,x,y)            _glfwSetCursorPosX11(w,x,y)
     #define PLATFORM_setCursorMode(w,m)             _glfwSetCursorModeX11(w,m)
-    #define PLATFORM_setRawMouseMotion(w,e)         _glfwSetRawMouseMotionX11(w,e)
     #define PLATFORM_initJoysticks()                _glfwInitJoysticksLinux()
     #define PLATFORM_pollJoystick(js,m)             _glfwPollJoystickLinux(js,m)
-    #define PLATFORM_getMappingName()               _glfwGetMappingNameLinux()
-    #define PLATFORM_updateGamepadGUID(g)           _glfwUpdateGamepadGUIDLinux(g)
     #define PLATFORM_getMonitorPos(m,x,y)           _glfwGetMonitorPosX11(m,x,y)
     #define PLATFORM_getMonitorWorkarea(m,x,y,w,h)  _glfwGetMonitorWorkareaX11(m,x,y,w,h)
-    #define PLATFORM_getVideoModes(m,c)             _glfwGetVideoModesX11(m,c)
     #define PLATFORM_getVideoMode(m,cur)            _glfwGetVideoModeX11(m,cur)
     #define PLATFORM_setWindowIcon(w,c,i)           _glfwSetWindowIconX11(w,c,i)
     #define PLATFORM_getWindowPos(w,x,y)            _glfwGetWindowPosX11(w,x,y)
@@ -3374,7 +2829,6 @@ int glfwInit(void) {
     #endif
     if (!_glfwPlatformCreateTls(&_glfw.contextSlot)) return GLFW_FALSE;
 
-    _glfwInitGamepadMappings();
     _glfwPlatformInitTimer();
     _glfw.timer.offset = _glfwPlatformGetTimerValue();
     __builtin_memset(&_glfw.hints.context, 0, sizeof(_glfw.hints.context));
@@ -3429,7 +2883,7 @@ GLFWbool _glfwRefreshContextAttribs(_GLFWwindow* window, const _GLFWctxconfig* c
     window->context.GetString = (PFNGLGETSTRINGPROC)window->context.getProcAddress("glGetString");
     if (!window->context.GetIntegerv || !window->context.GetString) { DualLogError("Entry point retrieval is broken"); glfwMakeContextCurrent((GLFWwindow*) previous); return GLFW_FALSE; }
 
-    const char* version = (const char*) window->context.GetString(GL_VERSION);
+    const char* version = (const char*) window->context.GetString(0x1F02/*GL_VERSION*/);
     if (!version) { DualLogError("OpenGL version string retrieval is broken"); glfwMakeContextCurrent((GLFWwindow*) previous); return GLFW_FALSE; }
     if (!sscanf(version,"%d.%d",&window->context.major,&window->context.minor)) { DualLogError("No version found in OpenGL version string"); glfwMakeContextCurrent((GLFWwindow*) previous); return GLFW_FALSE; }
     if (window->context.major < 4 || (window->context.major == 4 && window->context.minor < 3)) { DualLogError("Requested OpenGL version 4.3, got version %i.%i", window->context.major, window->context.minor); glfwMakeContextCurrent((GLFWwindow*) previous); return GLFW_FALSE; }
@@ -3464,15 +2918,6 @@ void glfwMakeContextCurrent(GLFWwindow* handle) {
 void glfwSwapBuffers(GLFWwindow* handle) { _GLFWwindow* window = (_GLFWwindow*)handle; window->context.swapBuffers(window); }
 void glfwSwapInterval(int interval) { _GLFWwindow* window = _glfwPlatformGetTls(&_glfw.contextSlot); window->context.swapInterval(interval); }
 GLFWglproc glfwGetProcAddress(const char* procname) { _GLFWwindow* window = _glfwPlatformGetTls(&_glfw.contextSlot); return window->context.getProcAddress(procname); }
-static int compareVideoModes(const void* fp, const void* sp) {
-    const GLFWvidmode *fm=fp, *sm=sp;
-    const int fbpp=fm->redBits + fm->greenBits + fm->blueBits, sbpp=sm->redBits + sm->greenBits + sm->blueBits;
-    const int farea=fm->width * fm->height, sarea=sm->width * sm->height;
-    if (fbpp != sbpp) return fbpp - sbpp;
-    if (farea != sarea) return farea - sarea;
-    if (fm->width != sm->width) return fm->width - sm->width;
-    return fm->refreshRate - sm->refreshRate;
-}
 
 void _glfwInputMonitor(_GLFWmonitor* monitor, int action, int placement) {
     if (action == 0x00040001/*connected*/) {
@@ -3498,7 +2943,6 @@ _GLFWmonitor* _glfwAllocMonitor(const char* name, int widthMM, int heightMM) {
     return monitor;
 }
 
-int _glfwCompareVideoModes(const GLFWvidmode* fm, const GLFWvidmode* sm) { return compareVideoModes(fm, sm); }
 void _glfwSplitBPP(int bpp, int* red, int* green, int* blue) {
     int delta; if (bpp == 32) bpp = 24;
     *red = *green = *blue = bpp / 3;
@@ -3507,7 +2951,7 @@ void _glfwSplitBPP(int bpp, int* red, int* green, int* blue) {
     if (delta == 2) *red = *red + 1;
 }
 
-GLFWmonitor** glfwGetMonitors(int* count) { *count = 0; *count = _glfw.monitorCount; return (GLFWmonitor**) _glfw.monitors; }
+GLFWmonitor** glfwGetMonitors(int* count) { *count = _glfw.monitorCount; return (GLFWmonitor**) _glfw.monitors; }
 GLFWmonitor* glfwGetPrimaryMonitor(void) { if (!_glfw.monitorCount) {return NULL;} return (GLFWmonitor*) _glfw.monitors[0]; }
 void glfwGetMonitorPos(GLFWmonitor* handle, int* xpos, int* ypos) { if (xpos) {*xpos = 0;} if (ypos) {*ypos = 0;} _GLFWmonitor* monitor = (_GLFWmonitor*)handle; PLATFORM_getMonitorPos(monitor,xpos,ypos); }
 void glfwGetMonitorWorkarea(GLFWmonitor* handle, int* xpos, int* ypos, int* width, int* height) {
@@ -3518,21 +2962,6 @@ void glfwGetMonitorWorkarea(GLFWmonitor* handle, int* xpos, int* ypos, int* widt
     _GLFWmonitor* monitor = (_GLFWmonitor*) handle;
     PLATFORM_getMonitorWorkarea(monitor, xpos, ypos, width, height);
 }
-
-const GLFWvidmode* glfwGetVideoModes(GLFWmonitor* handle, int* count) {
-    *count = 0; _GLFWmonitor* monitor = (_GLFWmonitor*) handle;
-    if (!monitor->modes) {
-        int modeCount; GLFWvidmode* modes = PLATFORM_getVideoModes(monitor, &modeCount); if (!modes) return NULL;
-
-        qsort(modes,modeCount,sizeof(GLFWvidmode),compareVideoModes);
-        free(monitor->modes);
-        monitor->modes = modes; monitor->modeCount = modeCount;
-    }
-
-    *count = monitor->modeCount;
-    return monitor->modes;
-}
-
 
 const GLFWvidmode* glfwGetVideoMode(GLFWmonitor* handle) {
     _GLFWmonitor* monitor = (_GLFWmonitor*) handle;
@@ -3588,15 +3017,7 @@ void glfwGetWindowPos(GLFWwindow* handle, int* xpos, int* ypos) { *xpos = *ypos 
 void glfwSetWindowPos(GLFWwindow* handle, int xpos, int ypos) { _GLFWwindow* window = (_GLFWwindow*)handle; PLATFORM_setWindowPos(window,xpos,ypos); }
 void glfwGetWindowSize(GLFWwindow* handle, int* width, int* height) { *width = *height = 0; _GLFWwindow* window = (_GLFWwindow*)handle; PLATFORM_getWindowSize(window,width,height); }
 void glfwSetWindowSize(GLFWwindow* handle, int width, int height) { _GLFWwindow* window = (_GLFWwindow*)handle; window->videoMode.width=width; window->videoMode.height=height; PLATFORM_setWindowSize(window,width,height); }
-void glfwSetWindowAttrib(GLFWwindow* handle, int attrib, int value) {
-    _GLFWwindow* window = (_GLFWwindow*) handle;
-    value = value ? GLFW_TRUE : GLFW_FALSE;
-    switch (attrib) {
-        case 0x00020005/*GLFW_DECORATED*/: window->decorated = value; PLATFORM_setWindowDecorated(window,value); return;
-    }
-    DualLogError("Invalid window attribute 0x%08X",attrib);
-}
-
+void glfwSetWindowAttrib(GLFWwindow* handle, int value) { _GLFWwindow* window = (_GLFWwindow*) handle; window->decorated = value; PLATFORM_setWindowDecorated(window,value); }
 void glfwSetWindowMonitor(GLFWwindow* wh, int xpos, int ypos, int width, int height) {
     _GLFWwindow* window = (_GLFWwindow*) wh;
     if (width <= 0 || height <= 0) { DualLogError("Invalid window size %ix%i",width,height); return; }
@@ -3609,80 +3030,6 @@ void glfwPollEvents(void) { PLATFORM_pollEvents(); }
 static GLFWbool initJoysticks(void) {
     if (!_glfw.joysticksInitialized && !PLATFORM_initJoysticks()) return GLFW_FALSE;
     return _glfw.joysticksInitialized = GLFW_TRUE;
-}
-
-static GLFWbool isValidElementForJoystick(const _GLFWmapelement* e,const _GLFWjoystick* js) {
-    if (e->type == _GLFW_JOYSTICK_HATBIT && (e->index >> 4) >= js->hatCount) return GLFW_FALSE;
-    if (e->type == _GLFW_JOYSTICK_BUTTON && e->index >= js->buttonCount) return GLFW_FALSE;
-    if (e->type == _GLFW_JOYSTICK_AXIS && e->index >= js->axisCount) return GLFW_FALSE;
-    return GLFW_TRUE;
-}
-
-static _GLFWmapping* findValidMapping(const _GLFWjoystick* js) {
-    _GLFWmapping* mapping = NULL;
-    for (int i = 0; i < _glfw.mappingCount; i++) { if (strcmp(_glfw.mappings[i].guid,js->guid) == 0) {mapping = _glfw.mappings + i; break;} }
-    if (mapping) {
-        for (int i = 0; i <= GLFW_GAMEPAD_BUTTON_LAST; i++) { if (!isValidElementForJoystick(mapping->buttons + i,js)) return NULL; }
-        for (int i = 0; i <= GLFW_GAMEPAD_AXIS_LAST; i++) { if (!isValidElementForJoystick(mapping->axes + i,js)) return NULL; }
-    }
-    return mapping;
-}
-
-static GLFWbool parseMapping(_GLFWmapping* mapping,const char* string) {
-    const char* c = string;
-    size_t i,length;
-    struct { const char* name; _GLFWmapelement* element; } fields[] = {
-        {"platform",NULL},
-        {"a",mapping->buttons + GLFW_GAMEPAD_BUTTON_A},{"b",mapping->buttons + GLFW_GAMEPAD_BUTTON_B},
-        {"x",mapping->buttons + GLFW_GAMEPAD_BUTTON_X},{"y",mapping->buttons + GLFW_GAMEPAD_BUTTON_Y},
-        {"back",mapping->buttons + GLFW_GAMEPAD_BUTTON_BACK},{"start",mapping->buttons + GLFW_GAMEPAD_BUTTON_START},
-        {"guide",mapping->buttons + GLFW_GAMEPAD_BUTTON_GUIDE},{"leftshoulder",mapping->buttons + GLFW_GAMEPAD_BUTTON_LEFT_BUMPER},
-        {"rightshoulder",mapping->buttons + GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER},{"leftstick",mapping->buttons + GLFW_GAMEPAD_BUTTON_LEFT_THUMB},
-        {"rightstick",mapping->buttons + GLFW_GAMEPAD_BUTTON_RIGHT_THUMB},{"dpup",mapping->buttons + GLFW_GAMEPAD_BUTTON_DPAD_UP},
-        {"dpright",mapping->buttons + GLFW_GAMEPAD_BUTTON_DPAD_RIGHT},{"dpdown",mapping->buttons + GLFW_GAMEPAD_BUTTON_DPAD_DOWN},
-        {"dpleft",mapping->buttons + GLFW_GAMEPAD_BUTTON_DPAD_LEFT},{"lefttrigger",mapping->axes + GLFW_GAMEPAD_AXIS_LEFT_TRIGGER},
-        {"righttrigger",mapping->axes + GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER},{"leftx",mapping->axes + GLFW_GAMEPAD_AXIS_LEFT_X},
-        {"lefty",mapping->axes + GLFW_GAMEPAD_AXIS_LEFT_Y},{"rightx",mapping->axes + GLFW_GAMEPAD_AXIS_RIGHT_X},
-        {"righty",mapping->axes + GLFW_GAMEPAD_AXIS_RIGHT_Y}
-    };
-    if ((length = strcspn(c,",")) != 32 || c[length] != ',') return GLFW_FALSE;
-    __builtin_memcpy(mapping->guid,c,length); c += length + 1;
-    if ((length = strcspn(c,",")) >= sizeof(mapping->name) || c[length] != ',') return GLFW_FALSE;
-    __builtin_memcpy(mapping->name,c,length); c += length + 1;
-    while (*c) {
-        if (*c == '+' || *c == '-') return GLFW_FALSE;
-        for (i = 0; i < sizeof(fields)/sizeof(fields[0]); i++) {
-            length = GetStringLength(fields[i].name);
-            if (strncmp(c,fields[i].name,length) != 0 || c[length] != ':') continue;
-            c += length + 1;
-            if (fields[i].element) {
-                _GLFWmapelement* e = fields[i].element;
-                i8 minimum = -1,maximum = 1;
-                if (*c == '+') { minimum = 0; c++; }
-                else if (*c == '-') { maximum = 0; c++; }
-                if (*c == 'a') e->type = _GLFW_JOYSTICK_AXIS;
-                else if (*c == 'b') e->type = _GLFW_JOYSTICK_BUTTON;
-                else if (*c == 'h') e->type = _GLFW_JOYSTICK_HATBIT;
-                else break;
-                if (e->type == _GLFW_JOYSTICK_HATBIT) {
-                    const unsigned long hat = strtoul(c+1,(char**)&c,10),bit = strtoul(c+1,(char**)&c,10);
-                    e->index = (u8)((hat << 4) | bit);
-                } else e->index = (u8)strtoul(c+1,(char**)&c,10);
-                if (e->type == _GLFW_JOYSTICK_AXIS) {
-                    e->axisScale = 2/(maximum - minimum); e->axisOffset = -(maximum + minimum);
-                    if (*c == '~') { e->axisScale = -e->axisScale; e->axisOffset = -e->axisOffset; }
-                }
-            } else {
-                const char* name = PLATFORM_getMappingName();
-                if (strncmp(c,name,GetStringLength(name)) != 0) return GLFW_FALSE;
-            }
-            break;
-        }
-        c += strcspn(c,","); c += strspn(c,",");
-    }
-    for (i = 0; i < 32; i++) { if (mapping->guid[i] >= 'A' && mapping->guid[i] <= 'F') mapping->guid[i] += 'a'-'A'; }
-    PLATFORM_updateGamepadGUID(mapping->guid);
-    return GLFW_TRUE;
 }
 
 void TextEntry(i32 k) {
@@ -3794,12 +3141,6 @@ void _glfwInputJoystickHat(_GLFWjoystick* js,int hat,char value) {
     js->hats[hat] = value;
 }
 
-void _glfwInitGamepadMappings(void) {
-    const size_t count = sizeof(_glfwDefaultMappings)/sizeof(char*);
-    _glfw.mappings = calloc(count,sizeof(_GLFWmapping));
-    for (size_t i = 0; i < count; i++) { if (parseMapping(&_glfw.mappings[_glfw.mappingCount],_glfwDefaultMappings[i])) _glfw.mappingCount++; }
-}
-
 _GLFWjoystick* _glfwAllocJoystick(const char* name,const char* guid,int axisCount,int buttonCount,int hatCount) {
     int jid; _GLFWjoystick* js;
     for (jid = 0; jid <= GLFW_JOYSTICK_LAST; jid++) { if (!_glfw.joysticks[jid].allocated) break; }
@@ -3810,7 +3151,6 @@ _GLFWjoystick* _glfwAllocJoystick(const char* name,const char* guid,int axisCoun
     js->buttons = calloc(buttonCount + (size_t)hatCount * 4,1);
     js->hats = calloc(hatCount,1);
     strncpy(js->name,name,sizeof(js->name)-1); strncpy(js->guid,guid,sizeof(js->guid)-1);
-    js->mapping = findValidMapping(js);
     return js;
 }
 
@@ -3837,18 +3177,18 @@ int glfwGetGamepadState(int jid,GLFWgamepadstate* state) {
     if (!js->connected || !PLATFORM_pollJoystick(js,(1/*axes*/ | 2/*buttons*/)) || !js->mapping) return GLFW_FALSE;
     for (int i = 0; i <= GLFW_GAMEPAD_BUTTON_LAST; i++) {
         const _GLFWmapelement* e = js->mapping->buttons + i;
-        if (e->type == _GLFW_JOYSTICK_AXIS) {
+        if (e->type == 1/*_GLFW_JOYSTICK_AXIS*/) {
             const float value = js->axes[e->index] * e->axisScale + e->axisOffset;
             if (e->axisOffset < 0 || (e->axisOffset == 0 && e->axisScale > 0)) { if (value >= 0.f) state->buttons[i] = GLFW_PRESS; }
             else { if (value <= 0.f) state->buttons[i] = GLFW_PRESS; }
-        } else if (e->type == _GLFW_JOYSTICK_HATBIT) { if (js->hats[e->index >> 4] & (e->index & 0xf)) state->buttons[i] = GLFW_PRESS; }
-        else if (e->type == _GLFW_JOYSTICK_BUTTON) state->buttons[i] = js->buttons[e->index];
+        } else if (e->type == 3/*_GLFW_JOYSTICK_HATBIT*/) { if (js->hats[e->index >> 4] & (e->index & 0xf)) state->buttons[i] = GLFW_PRESS; }
+        else if (e->type == 2/*_GLFW_JOYSTICK_BUTTON*/) state->buttons[i] = js->buttons[e->index];
     }
     for (int i = 0; i <= GLFW_GAMEPAD_AXIS_LAST; i++) {
         const _GLFWmapelement* e = js->mapping->axes + i;
-        if (e->type == _GLFW_JOYSTICK_AXIS) state->axes[i] = vmin(vmax(js->axes[e->index] * e->axisScale + e->axisOffset,-1.f),1.f);
-        else if (e->type == _GLFW_JOYSTICK_HATBIT) state->axes[i] = (js->hats[e->index >> 4] & (e->index & 0xf)) ? 1.f : -1.f;
-        else if (e->type == _GLFW_JOYSTICK_BUTTON) state->axes[i] = js->buttons[e->index] * 2.f - 1.f;
+        if (e->type == 1/*_GLFW_JOYSTICK_AXIS*/) state->axes[i] = vmin(vmax(js->axes[e->index] * e->axisScale + e->axisOffset,-1.f),1.f);
+        else if (e->type == 3/*_GLFW_JOYSTICK_HATBIT*/) state->axes[i] = (js->hats[e->index >> 4] & (e->index & 0xf)) ? 1.f : -1.f;
+        else if (e->type == 2/*_GLFW_JOYSTICK_BUTTON*/) state->axes[i] = js->buttons[e->index] * 2.f - 1.f;
     }
     return GLFW_TRUE;
 }

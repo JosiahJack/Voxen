@@ -965,7 +965,7 @@ typedef /*FAT*/ struct  {
     double randomWaitForNextAttack1Finished,randomWaitForNextAttack2Finished,randomWaitForNextAttack3Finished;
     double attackFinished,attack2Finished,attack3Finished,deathBurstFinished,tranquilizeFinished,wanderFinished,timeSinceMovedEnough,posCheckFinished;
     Vector3 currentDestination,lastKnownEnemyPos,targettingPosition,idealTransformForward,idealPos,walkWaypoints[MAX_WAYPOINTS];
-    char targetID[TARGET_ID_LENGTH],texAnimResourceFolder[TARGET_STRING_LENGTH],path[128];
+    char targetID[TARGET_ID_LENGTH],texAnimResourceFolder[TARGET_STRING_LENGTH],path[TARGET_STRING_LENGTH];
     // phew what a porker of a struct, it's been a eatin!
 } Entity;
 
@@ -990,6 +990,8 @@ typedef struct {
 	bool levelCurrentlyLoading;
     double shakeFinished;
 	char global_modname[256];
+	char global_dllname[256];
+	char global_winicon[256];
     bool introNotPlayed;
     u8 levelSecurity[14];
 	u8 startLevel;

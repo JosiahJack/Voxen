@@ -5,3 +5,5 @@
 modname: Citadel
 levelcount: 14
 startlevel: 1
+windowicon: ./Textures/UI/menudot1.png
+dllname: Citadel

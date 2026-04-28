@@ -2,6 +2,7 @@
 #define MINIAUDIO_IMPLEMENTATION
 #define MA_NO_FLAC
 #define MA_NO_SNDIO
+#define MA_NO_OSS
 #define MA_NO_NULL
 #define MA_NO_AUDIO4
 #define MA_NO_WEBAUDIO
@@ -11,12 +12,17 @@
 #define MA_NO_JACK
 #define MA_NO_WINMM
 #define MA_NO_DSOUND
+#define MA_NO_PULSEAUDIO
+#define MA_NO_GENERATION
+#define MA_NO_VFS
+// #define MA_NO_RESOURCE_MANAGER
+// #define MA_NO_NODE_GRAPH
+// #define MA_NO_ENGINE
 #ifndef _WIN32
     #define MA_NO_WASAPI
 #else
     #define MA_SUPPORT_WASAPI
     #define MA_NO_ALSA
-    #define MA_NO_PULSEAUDIO
 #endif
 #define MA_NO_OPENSL
 #define MA_NO_AVX2

@@ -82,7 +82,7 @@ ENGINE_TO_MOD void Screenshot(void) {
     Sys_Global.screenshotTimeout = Sys_Global.current_time + 1.0; // Prevent saving more than 1 per second for sanity purposes.
     OS_MakeFolder("Screenshots"); u16 w = Sys_Settings.ScreenWidth, h = Sys_Settings.ScreenHeight;
     unsigned char* pixels = OS_Alloc(w * h * 4 * sizeof(char));
-    glad_glReadPixels(0,0,w,h,GL_RGBA,GL_UNSIGNED_BYTE,pixels);
+    glReadPixels(0,0,w,h,GL_RGBA,GL_UNSIGNED_BYTE,pixels);
     Vector3 p = Sys_Global.instances[PLAYER1].position;
     char filename[96]; StringFormat(filename,sizeof(filename),"Screenshots/%.2f_x%.1f_y%.1f_z%.1f.bmp",get_time(),p.x,p.y,p.z);
     stbi_write_bmp(filename,w,h,pixels); DualLog("Saved screenshot %s\n",filename);

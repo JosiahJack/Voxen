@@ -1,23 +1,7 @@
 // console.c - Console Emulator
 #include "os.h"
 #include "voxen.h"
-#define GLFW_KEY_SPACE              32
-#define GLFW_KEY_MINUS              45  /* - */
-#define GLFW_KEY_0                  48
-#define GLFW_KEY_1                  49
-#define GLFW_KEY_9                  57
-#define GLFW_KEY_A                  65
-#define GLFW_KEY_U                  85
-#define GLFW_KEY_Z                  90
-#define GLFW_KEY_ENTER              257
-#define GLFW_KEY_BACKSPACE          259
-#define GLFW_KEY_DOWN               264
-#define GLFW_KEY_UP                 265
-#define GLFW_KEY_KP_SUBTRACT        333
-#define GLFW_KEY_KP_ENTER           335
-#define GLFW_KEY_LEFT_SHIFT         340
-#define GLFW_KEY_LEFT_CONTROL       341
-#define GLFW_KEY_RIGHT_SHIFT        344
+#include "gl.h"
 #define MAX_HISTORY 7
 static i32 currentEntryLength=0, numHistory=0, historyPos=0;
 char consoleEntryText[TEXT_BUFFER_SIZE]="Enter a command...",history[MAX_HISTORY][TEXT_BUFFER_SIZE]={0};
