@@ -30,9 +30,6 @@ typedef struct _GLFWfbconfig _GLFWfbconfig; typedef struct _GLFWcontext _GLFWcon
     typedef const char* (WINAPI * PFNWGLGETEXTENSIONSSTRINGEXTPROC)(void);
     typedef const char* (WINAPI * PFNWGLGETEXTENSIONSSTRINGARBPROC)(HDC);
     typedef HGLRC (WINAPI * PFNWGLCREATECONTEXTATTRIBSARBPROC)(HDC,HGLRC,const int*);
-    #define wglSwapIntervalEXT _glfw.wgl.SwapIntervalEXT
-    #define wglGetPixelFormatAttribivARB _glfw.wgl.GetPixelFormatAttribivARB
-    #define wglGetExtensionsStringEXT _glfw.wgl.GetExtensionsStringEXT
     #define wglGetExtensionsStringARB _glfw.wgl.GetExtensionsStringARB
     #define wglCreateContextAttribsARB _glfw.wgl.CreateContextAttribsARB
     typedef HGLRC (WINAPI * PFN_wglCreateContext)(HDC);
@@ -54,11 +51,10 @@ typedef struct _GLFWfbconfig _GLFWfbconfig; typedef struct _GLFWcontext _GLFWcon
     #define GLFW_WGL_CONTEXT_STATE          _GLFWcontextWGL wgl;
     #define GLFW_WGL_LIBRARY_CONTEXT_STATE  _GLFWlibraryWGL wgl;
     typedef struct _GLFWcontextWGL { HDC dc; HGLRC handle; int interval; } _GLFWcontextWGL;
-    typedef struct _GLFWlibraryWGL { HINSTANCE instance; PFN_wglCreateContext CreateContext; PFN_wglGetProcAddress GetProcAddress; PFN_wglGetCurrentDC GetCurrentDC; PFN_wglGetCurrentContext GetCurrentContext; PFN_wglMakeCurrent MakeCurrent; PFN_wglShareLists ShareLists; PFNWGLSWAPINTERVALEXTPROC SwapIntervalEXT; PFNWGLGETPIXELFORMATATTRIBIVARBPROC GetPixelFormatAttribivARB; PFNWGLGETEXTENSIONSSTRINGEXTPROC GetExtensionsStringEXT; PFNWGLGETEXTENSIONSSTRINGARBPROC GetExtensionsStringARB; PFNWGLCREATECONTEXTATTRIBSARBPROC CreateContextAttribsARB; GLFWbool EXT_swap_control,ARB_create_context,ARB_create_context_profile; } _GLFWlibraryWGL;
+    typedef struct _GLFWlibraryWGL { HINSTANCE instance; PFN_wglCreateContext CreateContext; PFN_wglGetProcAddress GetProcAddress; PFN_wglGetCurrentDC GetCurrentDC; PFN_wglGetCurrentContext GetCurrentContext; PFN_wglMakeCurrent MakeCurrent; PFN_wglShareLists ShareLists; PFNWGLSWAPINTERVALEXTPROC SwapIntervalEXT; PFNWGLGETPIXELFORMATATTRIBIVARBPROC GetPixelFormatAttribivARB; PFNWGLGETEXTENSIONSSTRINGEXTPROC GetExtensionsStringEXT; PFNWGLGETEXTENSIONSSTRINGARBPROC GetExtensionsStringARB; PFNWGLCREATECONTEXTATTRIBSARBPROC CreateContextAttribsARB; } _GLFWlibraryWGL;
     typedef struct _GLFWwindowWin32 { HWND handle; GLFWbool cursorTracked,frameAction,keymenu; int width,height,lastCursorPosX,lastCursorPosY; } _GLFWwindowWin32;
     typedef struct _GLFWlibraryWin32 {
-        HINSTANCE           instance;
-        HWND                helperWindowHandle;
+        HINSTANCE instance; HWND helperWindowHandle;
         ATOM helperWindowClass,mainWindowClass;
         HDEVNOTIFY          deviceNotificationHandle;
         short int           keycodes[512],scancodes[GLFW_KEY_LAST + 1];
@@ -330,7 +326,6 @@ typedef struct _GLFWfbconfig _GLFWfbconfig; typedef struct _GLFWcontext _GLFWcon
         PFNGLXGETPROCADDRESSPROC            GetProcAddressARB;
         PFNGLXSWAPINTERVALEXTPROC           SwapIntervalEXT;
         PFNGLXCREATECONTEXTATTRIBSARBPROC   CreateContextAttribsARB;
-        GLFWbool EXT_swap_control,ARB_create_context,ARB_create_context_profile;
     } _GLFWlibraryGLX;
 
     typedef struct _GLFWwindowX11 { Colormap colormap; Window handle,parent; XIC ic; GLFWbool overrideRedirect; int width,height,xpos,ypos,lastCursorPosX,lastCursorPosY,warpCursorPosX,warpCursorPosY; } _GLFWwindowX11;
@@ -434,7 +429,6 @@ struct _GLFWcontext {
 };
 
 struct _GLFWwindow {
-    struct _GLFWwindow* next;
     GLFWbool decorated,shouldClose,doublebuffer;
     GLFWvidmode videoMode;
     int minwidth,minheight,maxwidth,maxheight;
@@ -463,7 +457,7 @@ struct _GLFWjoystick {
 };
 
 struct _GLFWtls { GLFW_PLATFORM_TLS_STATE };
-struct _GLFWlibrary { _GLFWwindow* windowListHead; _GLFWmonitor** monitors; int monitorCount; GLFWbool joysticksInitialized; _GLFWjoystick joysticks[GLFW_JOYSTICK_LAST + 1]; _GLFWtls errorSlot,contextSlot; struct { u64 offset; GLFW_PLATFORM_LIBRARY_TIMER_STATE } timer; GLFW_WIN32_LIBRARY_WINDOW_STATE GLFW_X11_LIBRARY_WINDOW_STATE GLFW_WGL_LIBRARY_CONTEXT_STATE GLFW_GLX_LIBRARY_CONTEXT_STATE GLFW_WIN32_LIBRARY_JOYSTICK_STATE GLFW_LINUX_LIBRARY_JOYSTICK_STATE };
+struct _GLFWlibrary { _GLFWmonitor** monitors; int monitorCount; GLFWbool joysticksInitialized; _GLFWjoystick joysticks[GLFW_JOYSTICK_LAST + 1]; _GLFWtls errorSlot,contextSlot; struct { u64 offset; GLFW_PLATFORM_LIBRARY_TIMER_STATE } timer; GLFW_WIN32_LIBRARY_WINDOW_STATE GLFW_X11_LIBRARY_WINDOW_STATE GLFW_WGL_LIBRARY_CONTEXT_STATE GLFW_GLX_LIBRARY_CONTEXT_STATE GLFW_WIN32_LIBRARY_JOYSTICK_STATE GLFW_LINUX_LIBRARY_JOYSTICK_STATE };
 extern _GLFWlibrary _glfw;
 void _glfwPlatformInitTimer(void);
 u64 _glfwPlatformGetTimerValue(void);
@@ -716,22 +710,19 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     void _glfwSetWindowDecoratedWin32(_GLFWwindow* window,GLFWbool enabled) { (void)enabled; updateWindowStyles(window); }
     void _glfwPollEventsWin32(void) {
         MSG msg; HWND handle; _GLFWwindow* window;
+        handle=GetActiveWindow();
+        window=GetPropW(handle,L"GLFW");
         while (PeekMessageW(&msg,NULL,0,0,PM_REMOVE)) {
-            if (msg.message==WM_QUIT) { window=_glfw.windowListHead; while (window) { window->shouldClose =  1; window=window->next; } }
+            if (msg.message==WM_QUIT) window->shouldClose = 1;
             else { TranslateMessage(&msg); DispatchMessageW(&msg); }
         }
-        handle=GetActiveWindow();
-        if (handle) {
-            window=GetPropW(handle,L"GLFW");
-            if (window) {
-                int i;
-                const int keys[4][2]={{VK_LSHIFT,GLFW_KEY_LEFT_SHIFT},{VK_RSHIFT,GLFW_KEY_RIGHT_SHIFT},{VK_LWIN,GLFW_KEY_LEFT_SUPER},{VK_RWIN,GLFW_KEY_RIGHT_SUPER}};
-                for (i=0;i<4;i++) {
-                    const int vk=keys[i][0],key=keys[i][1];
-                    if ((GetKeyState(vk)&0x8000)||window->keys[key]!=GLFW_PRESS) continue;
-                    _glfwInputKey(window,key,GLFW_RELEASE);
-                }
-            }
+        
+        int i;
+        const int keys[4][2]={{VK_LSHIFT,GLFW_KEY_LEFT_SHIFT},{VK_RSHIFT,GLFW_KEY_RIGHT_SHIFT},{VK_LWIN,GLFW_KEY_LEFT_SUPER},{VK_RWIN,GLFW_KEY_RIGHT_SUPER}};
+        for (i=0;i<4;i++) {
+            const int vk=keys[i][0],key=keys[i][1];
+            if ((GetKeyState(vk)&0x8000)||window->keys[key]!=GLFW_PRESS) continue;
+            _glfwInputKey(window,key,GLFW_RELEASE);
         }
         window=_glfw.win32.disabledCursorWindow;
         if (window) {
@@ -993,17 +984,8 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     }
 
     void _glfwPollMonitorsWin32(void) {
-        int i, disconnectedCount;
-        _GLFWmonitor** disconnected = NULL;
-        DWORD adapterIndex, displayIndex;
-        DISPLAY_DEVICEW adapter, display;
-        _GLFWmonitor* monitor;
-        disconnectedCount = _glfw.monitorCount;
-        if (disconnectedCount) {
-            disconnected = calloc(_glfw.monitorCount, sizeof(_GLFWmonitor*));
-            __builtin_memcpy(disconnected,_glfw.monitors,_glfw.monitorCount * sizeof(_GLFWmonitor*));
-        }
-
+        int i, disconnectedCount = _glfw.monitorCount; _GLFWmonitor** disconnected = NULL; DWORD adapterIndex,displayIndex; DISPLAY_DEVICEW adapter, display; _GLFWmonitor* monitor;
+        if (disconnectedCount) { disconnected = calloc(_glfw.monitorCount, sizeof(_GLFWmonitor*)); __builtin_memcpy(disconnected,_glfw.monitors,_glfw.monitorCount * sizeof(_GLFWmonitor*)); }
         for (adapterIndex = 0;;adapterIndex++) {
             int type = 1; ZeroMemory(&adapter, sizeof(adapter));
             adapter.cb = sizeof(adapter);
@@ -1065,14 +1047,14 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     void _glfwPlatformSetTls(_GLFWtls* tls, void* value) { TlsSetValue(tls->win32.index,value); }
     static int choosePixelFormatWGL(_GLFWwindow* window) {
         int attribs[24],values[24],attribCount=0,i,pixelFormat,nativeCount,usableCount=0;
-        const int query = 0x2000/*num pixel formats*/; wglGetPixelFormatAttribivARB(window->context.wgl.dc,1,0,1,&query,&nativeCount);
+        const int query = 0x2000/*num pixel formats*/; _glfw.wgl.GetPixelFormatAttribivARB(window->context.wgl.dc,1,0,1,&query,&nativeCount);
         attribs[attribCount++] = 0x2010/*support opengl*/; attribs[attribCount++] = 0x2001/*draw to window*/; attribs[attribCount++] = 0x2013/*pixel type*/; attribs[attribCount++] = 0x2003/*accelaration*/;
         attribs[attribCount++] = 0x2011/*double buffer*/; attribs[attribCount++] = 0x2015/*r bits*/; attribs[attribCount++] = 0x2017/*g bits*/;
         attribs[attribCount++] = 0x2019/*b bits*/; attribs[attribCount++] = 0x201b/*a bits*/; attribs[attribCount++] = 0x2022/*depth bits*/; attribs[attribCount++] = 0x2023/*stencil bits*/;
         _GLFWfbconfig* usableConfigs = calloc(nativeCount,sizeof(_GLFWfbconfig));
         for (i = 0; i < nativeCount; i++) {
             _GLFWfbconfig* u = usableConfigs + usableCount; pixelFormat = i + 1;
-            wglGetPixelFormatAttribivARB(window->context.wgl.dc,pixelFormat,0,attribCount,attribs,values);
+            _glfw.wgl.GetPixelFormatAttribivARB(window->context.wgl.dc,pixelFormat,0,attribCount,attribs,values);
             if (values[0] == 0 || values[1] == 0/* support OpenGL + draw to window */ || values[2] != 0x202b/*type rgba*/ || values[3] == 0x2025/*no accel*/ || values[4] !=  1) continue;
             
             u->redBits=values[5]; u->greenBits=values[6]; u->blueBits=values[7]; u->alphaBits=values[8]; u->depthBits=values[9]; u->stencilBits=values[10]; u->handle=pixelFormat; usableCount++;
@@ -1104,13 +1086,13 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
             if (SUCCEEDED(DwmIsCompositionEnabled(&enabled)) && enabled) interval = 0;
         }
 
-        if (_glfw.wgl.EXT_swap_control) wglSwapIntervalEXT(interval);
+        _glfw.wgl.SwapIntervalEXT(interval);
     }
 
     static int extensionSupportedWGL(const char* extension) {
         const char* extensions = NULL;
-        if (_glfw.wgl.GetExtensionsStringARB) extensions = wglGetExtensionsStringARB(wglGetCurrentDC());
-        else if (_glfw.wgl.GetExtensionsStringEXT) extensions = wglGetExtensionsStringEXT();
+        if (_glfw.wgl.GetExtensionsStringARB) extensions = _glfw.wgl.GetExtensionsStringARB(wglGetCurrentDC());
+        else if (_glfw.wgl.GetExtensionsStringEXT) extensions = _glfw.wgl.GetExtensionsStringEXT();
         if (!extensions) return 0;
         return _glfwStringInExtensionString(extension, extensions);
     }
@@ -1680,7 +1662,6 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     }
 
     static int getGLXFBConfigAttrib(GLXFBConfig fbconfig, int attrib) { int value; _glfw.glx.GetFBConfigAttrib(_glfw.x11.display, fbconfig, attrib, &value); return value; }
-    static GLXContext createLegacyContextGLX(_GLFWwindow* window, GLXFBConfig fbconfig, GLXContext share) { (void)window; return _glfw.glx.CreateNewContext(_glfw.x11.display,fbconfig,0x8014/*rgba type*/,share,True); }
     static void makeContextCurrentGLX(_GLFWwindow* window) { _glfw.glx.MakeCurrent(_glfw.x11.display,window->context.glx.window,window->context.glx.handle); _glfwPlatformSetTls(&_glfw.contextSlot,window); }
     static void swapBuffersGLX(_GLFWwindow* window) { _glfw.glx.SwapBuffers(_glfw.x11.display, window->context.glx.window); }
     static void swapIntervalGLX(int interval) { _GLFWwindow* window = _glfwPlatformGetTls(&_glfw.contextSlot); _glfw.glx.SwapIntervalEXT(_glfw.x11.display,window->context.glx.window,interval); }
@@ -1955,8 +1936,7 @@ void _glfwInputWindowFocus(_GLFWwindow* window, GLFWbool focused) {
 
 GLFWwindow* glfwCreateWindow(int width, int height, char* title) {
     _GLFWwindow* window=calloc(1,sizeof(_GLFWwindow));
-    window->next = _glfw.windowListHead;
-    _glfw.windowListHead = window; window->videoMode.width=width; window->videoMode.height=height;
+    window->videoMode.width=width; window->videoMode.height=height;
     window->videoMode.redBits=window->videoMode.greenBits=window->videoMode.blueBits=8;
     window->videoMode.refreshRate = GLFW_DONT_CARE; window->decorated =  1; window->cursorMode = 0x00034003/*disabled*/; window->doublebuffer= 1;
     window->minwidth = window->minheight = window->maxwidth = window->maxheight = GLFW_DONT_CARE;
@@ -1979,8 +1959,6 @@ GLFWwindow* glfwCreateWindow(int width, int height, char* title) {
     _glfw.wgl.CreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");
     _glfw.wgl.SwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)wglGetProcAddress("wglSwapIntervalEXT");
     _glfw.wgl.GetPixelFormatAttribivARB = (PFNWGLGETPIXELFORMATATTRIBIVARBPROC)wglGetProcAddress("wglGetPixelFormatAttribivARB");
-    _glfw.wgl.ARB_create_context_profile = extensionSupportedWGL("WGL_ARB_create_context_profile");
-    _glfw.wgl.EXT_swap_control = extensionSupportedWGL("WGL_EXT_swap_control");
     wglMakeCurrent(pdc,prc);
     int attribs[40],pixelFormat; PIXELFORMATDESCRIPTOR pfd2;
     window->context.wgl.dc = GetDC(window->win32.handle);
@@ -1992,7 +1970,7 @@ GLFWwindow* glfwCreateWindow(int width, int height, char* title) {
     if (flags) { attribs[index++] = 0x2094/*flags*/; attribs[index++] = flags; }
     if (mask) { attribs[index++] = 0x9126/*context profile mask*/; attribs[index++] = mask; }
     attribs[index++] = 0; attribs[index++] = 0;
-    window->context.wgl.handle = wglCreateContextAttribsARB(window->context.wgl.dc,NULL,attribs);
+    window->context.wgl.handle = _glfw.wgl.CreateContextAttribsARB(window->context.wgl.dc,NULL,attribs);
     window->context.makeCurrent = makeContextCurrentWGL;
     window->context.swapBuffers = swapBuffersWGL;
     window->context.swapInterval = swapIntervalWGL;
@@ -2016,9 +1994,8 @@ GLFWwindow* glfwCreateWindow(int width, int height, char* title) {
     _glfw.glx.GetProcAddressARB = (PFNGLXGETPROCADDRESSPROC)_glfwPlatformGetModuleSymbol(_glfw.glx.handle,"glXGetProcAddressARB");
     glXQueryExtension(_glfw.x11.display,&_glfw.glx.errorBase,&_glfw.glx.eventBase);
     glXQueryVersion(_glfw.x11.display,&_glfw.glx.major,&_glfw.glx.minor);
-    if (extensionSupportedGLX("GLX_EXT_swap_control")) { _glfw.glx.SwapIntervalEXT = (PFNGLXSWAPINTERVALEXTPROC)getProcAddressGLX("glXSwapIntervalEXT"); if (_glfw.glx.SwapIntervalEXT) _glfw.glx.EXT_swap_control =  1; }
-    if (extensionSupportedGLX("GLX_ARB_create_context")) { _glfw.glx.CreateContextAttribsARB = (PFNGLXCREATECONTEXTATTRIBSARBPROC)getProcAddressGLX("glXCreateContextAttribsARB"); if (_glfw.glx.CreateContextAttribsARB) _glfw.glx.ARB_create_context =  1; }
-    if (extensionSupportedGLX("GLX_ARB_create_context_profile")) _glfw.glx.ARB_create_context_profile =  1;
+    _glfw.glx.SwapIntervalEXT = (PFNGLXSWAPINTERVALEXTPROC)getProcAddressGLX("glXSwapIntervalEXT");
+    _glfw.glx.CreateContextAttribsARB = (PFNGLXCREATECONTEXTATTRIBSARBPROC)getProcAddressGLX("glXCreateContextAttribsARB");
     GLXFBConfig native; XVisualInfo* result;
     GLXFBConfig* nativeConfigs; _GLFWfbconfig* usableConfigs; const _GLFWfbconfig* closest; int nativeCount,usableCount;
     nativeConfigs = _glfw.glx.GetFBConfigs(_glfw.x11.display, _glfw.x11.screen, &nativeCount);        
@@ -2062,15 +2039,13 @@ GLFWwindow* glfwCreateWindow(int width, int height, char* title) {
     _glfwGetWindowPosX11(window,&window->x11.xpos,&window->x11.ypos);
     _glfwGetWindowSizeX11(window,&window->x11.width,&window->x11.height);
     int attribs[40], index=0,flags=0;
-    if (_glfw.glx.ARB_create_context) {
-        int mask=0; mask |= 0x00000001/*core profile*/;
-        attribs[index++] = 0x2091/*major*/; attribs[index++] = 4; attribs[index++] = 0x2092/*minor*/; attribs[index++] = 3; // OpenGL 4.3
-        if (mask) { attribs[index++] = 0x9126/*profile mask arb*/; attribs[index++] = mask; }
-        if (flags) { attribs[index++] = 0x2094/*context flags arb*/; attribs[index++] = flags; }
-        attribs[index++] = 0L; attribs[index++] = 0L;
-        window->context.glx.handle = _glfw.glx.CreateContextAttribsARB(_glfw.x11.display,native,NULL,True,attribs);
-        window->context.glx.window = _glfw.glx.CreateWindow(_glfw.x11.display,native,window->x11.handle,NULL);
-    } else window->context.glx.handle = createLegacyContextGLX(window,native,NULL);
+    int mask=0; mask |= 0x00000001/*core profile*/;
+    attribs[index++] = 0x2091/*major*/; attribs[index++] = 4; attribs[index++] = 0x2092/*minor*/; attribs[index++] = 3; // OpenGL 4.3
+    if (mask) { attribs[index++] = 0x9126/*profile mask arb*/; attribs[index++] = mask; }
+    if (flags) { attribs[index++] = 0x2094/*context flags arb*/; attribs[index++] = flags; }
+    attribs[index++] = 0L; attribs[index++] = 0L;
+    window->context.glx.handle = _glfw.glx.CreateContextAttribsARB(_glfw.x11.display,native,NULL,True,attribs);
+    window->context.glx.window = _glfw.glx.CreateWindow(_glfw.x11.display,native,window->x11.handle,NULL);
     window->context.glx.fbconfig = native; window->context.makeCurrent = makeContextCurrentGLX;
     window->context.swapBuffers = swapBuffersGLX; window->context.swapInterval = swapIntervalGLX;
     window->context.extensionSupported = extensionSupportedGLX; window->context.getProcAddress = getProcAddressGLX;

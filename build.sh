@@ -41,7 +41,7 @@ else
 fi
 
 # Convert shaders into string headers
-gen_header() {
+gh() {
     local infile="$1"
     local varname="$2"
     local outfile="$infile.h"
@@ -52,23 +52,23 @@ gen_header() {
 }
 
 # Shaders and their C variable names
-gen_header ./Shaders/ssr.compute                ssrComputeSrc
-gen_header ./Shaders/voxels.compute             voxelUpdateComputeSrc
-gen_header ./Shaders/shadowmaps_clear.compute   shadowmapsClearComputeSrc
-gen_header ./Shaders/depth_prepass_vert.glsl    depthPrepassVertSrc
-gen_header ./Shaders/depth_prepass.glsl         depthPrepassFragSrc
-gen_header ./Shaders/debugunlit_vert.glsl       debugUnlitVertSrc
-gen_header ./Shaders/debugunlit_frag.glsl       debugUnlitFragSrc
-gen_header ./Shaders/chunk_vert.glsl            vertSrc
-gen_header ./Shaders/chunk_frag.glsl            fragSrc
-gen_header ./Shaders/ui_vert.glsl               vertUISrc
-gen_header ./Shaders/ui_frag.glsl               fragUISrc
-gen_header ./Shaders/text_vert.glsl             textVertSrc
-gen_header ./Shaders/text_frag.glsl             textFragSrc
-gen_header ./Shaders/composite_vert.glsl        quadVertSrc
-gen_header ./Shaders/composite_frag.glsl        quadFragSrc
-gen_header ./Shaders/shadowmap_vert.glsl        shadowmapVertSrc
-gen_header ./Shaders/shadowmap_frag.glsl        shadowmapFragSrc
+gh ./Shaders/ssr.compute              ssrComputeSrc
+gh ./Shaders/voxels.compute           voxelUpdateComputeSrc
+gh ./Shaders/shadowmaps_clear.compute shadowmapsClearComputeSrc
+gh ./Shaders/depth_prepass_vert.glsl  depthPrepassVertSrc
+gh ./Shaders/depth_prepass.glsl       depthPrepassFragSrc
+gh ./Shaders/debugunlit_vert.glsl     debugUnlitVertSrc
+gh ./Shaders/debugunlit_frag.glsl     debugUnlitFragSrc
+gh ./Shaders/chunk_vert.glsl          vertSrc
+gh ./Shaders/chunk_frag.glsl          fragSrc
+gh ./Shaders/ui_vert.glsl             vertUISrc
+gh ./Shaders/ui_frag.glsl             fragUISrc
+gh ./Shaders/text_vert.glsl           textVertSrc
+gh ./Shaders/text_frag.glsl           textFragSrc
+gh ./Shaders/composite_vert.glsl      quadVertSrc
+gh ./Shaders/composite_frag.glsl      quadFragSrc
+gh ./Shaders/shadowmap_vert.glsl      shadowmapVertSrc
+gh ./Shaders/shadowmap_frag.glsl      shadowmapFragSrc
 cat > Shaders/shaders.h <<'EOF'
 #pragma once
 #include "text_vert.glsl.h"
@@ -101,19 +101,25 @@ COMMON_CFLAGS="-ferror-limit=500 -fno-exceptions -fno-stack-protector -fno-async
                -fno-trapping-math -fmerge-all-constants -m64 -Os -march=haswell -fstack-usage"
 COMMON_LFLAGS="-Wl,--sort-common -Wl,-z,now -Wl,-z,relro -Wl,--gc-sections -Wl,-z,norelro -Wl,--build-id=none -flto $ZIG_LIBS"
 
-# Engine Build 214.5kb
+# Engine Build
 if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
     LINKER=$CC
     CFLAGS="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe"
+    CFLAGSGC="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe"
     LDFLAGS="$COMMON_LFLAGS -L. -lgdi32 -lopengl32 -lpthread -Wl,--out-implib=voxen.lib -Xlinker /pdb:none"
+    LDFLAGSGC="$COMMON_LFLAGS -Wl,--allow-shlib-undefined -Wl,--entry,DllMainCRTStartup -Wl,--subsystem,windows -Wl,--no-entry -L. -lvoxen -Xlinker /pdb:none"
     BINARY_NAME="voxen.exe"
+    BINARY_NAMEGC="Citadel.dll"
 else
     CC=$LINUX_CC
     LINKER=$CC
     CFLAGS="$COMMON_CFLAGS -fno-plt -fno-semantic-interposition -D_GNU_SOURCE"
+    CFLAGSGC="$COMMON_CFLAGS -fno-plt -fno-semantic-interposition"
     LDFLAGS="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -ldl -lpthread"
+    LDFLAGSGC="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -nostdlib"
     BINARY_NAME="voxen"
+    BINARY_NAMEGC="Citadel.so"
 fi
 
 export CC=$CC
@@ -122,44 +128,15 @@ SOURCES="voxen.c physics.c helpers.c console.c models.c culling.c textures.c min
 export TEMP_DIR=temp_build
 printf "%s\n" $SOURCES | xargs -P12 -I{} sh -c "$CC -c {} $CFLAGS -o $TEMP_DIR/\$(basename {}).o"
 $LINKER "$TEMP_DIR"/*.o $LDFLAGS -rdynamic -o $BINARY_NAME
-link_status=$?
-if [ $link_status -ne 0 ]; then
-    echo "ERROR: Linking failed."
-    exit 1
-else
-    echo "Built engine successfully."
-fi
 
-# Game Code Build 14.4kb
-if [ "$PLATFORM" = "windows" ]; then
-    CC=$WINDOWS_CC
-    LINKERGC=$CC
-    CFLAGSGC="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe"
-    LDFLAGSGC="$COMMON_LFLAGS -Wl,--allow-shlib-undefined -Wl,--entry,DllMainCRTStartup -Wl,--subsystem,windows -Wl,--no-entry -L. -lvoxen -Xlinker /pdb:none"
-    BINARY_NAMEGC="Citadel.dll"
-else
-    CC=$LINUX_CC
-    LINKERGC=$CC
-    CFLAGSGC="$COMMON_CFLAGS -fno-plt -fno-semantic-interposition"
-    LDFLAGSGC="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -nostdlib"
-    BINARY_NAMEGC="Citadel.so"
-fi
-
+# Game Code Build
 export CCGC=$CC
 export CFLAGSGC=$CFLAGSGC
 SOURCESGC="animation.c ai.c biomonitor.c weapons.c music.c audio.c citadel.c entity.c"
 export TEMP_DIRGC=temp_build_gc
 export SCRIPT_DIR="./Scripts"
 printf "%s\n" $SOURCESGC | xargs -P12 -I{} $CCGC -c $SCRIPT_DIR/{} $CFLAGSGC -I. -nostdinc -fPIC -ffreestanding -fno-builtin -Wshadow -o "$TEMP_DIRGC"/{}.o
-$LINKERGC "$TEMP_DIRGC"/*.o $LDFLAGSGC -Wl,-soname,$BINARY_NAMEGC -shared -o $BINARY_NAMEGC
-link_status=$?
-if [ $link_status -ne 0 ]; then
-    echo "ERROR: Linking failed."
-    exit 1
-else
-    echo "Built mod gamecode successfully."
-fi
-
+$LINKER "$TEMP_DIRGC"/*.o $LDFLAGSGC -Wl,-soname,$BINARY_NAMEGC -shared -o $BINARY_NAMEGC
 build_end=$(now_ms)
 total_build_time=$((build_end - shader_start))
 echo "Built engine and mod in ${total_build_time} ms"
