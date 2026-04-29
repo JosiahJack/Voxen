@@ -265,29 +265,11 @@ typedef struct _GLFWfbconfig _GLFWfbconfig; typedef struct _GLFWcontext _GLFWcon
     typedef XRROutputInfo* (* PFN_XRRGetOutputInfo)(Display*,XRRScreenResources*,RROutput);
     typedef RROutput (* PFN_XRRGetOutputPrimary)(Display*,Window);
     typedef XRRScreenResources* (* PFN_XRRGetScreenResourcesCurrent)(Display*,Window);
-    typedef Bool (* PFN_XRRQueryExtension)(Display*,int*,int*);
-    typedef Status (* PFN_XRRQueryVersion)(Display*,int*,int*);
     typedef void (* PFN_XRRSelectInput)(Display*,Window,int);
-    typedef Status (* PFN_XRRSetCrtcConfig)(Display*,XRRScreenResources*,RRCrtc,Time,int,int,RRMode,Rotation,RROutput*,int);
     typedef int (* PFN_XRRUpdateConfiguration)(XEvent*);
-    #define XRRFreeCrtcInfo _glfw.x11.randr.FreeCrtcInfo
-    #define XRRFreeOutputInfo _glfw.x11.randr.FreeOutputInfo
-    #define XRRFreeScreenResources _glfw.x11.randr.FreeScreenResources
-    #define XRRGetCrtcInfo _glfw.x11.randr.GetCrtcInfo
-    #define XRRGetOutputInfo _glfw.x11.randr.GetOutputInfo
-    #define XRRGetOutputPrimary _glfw.x11.randr.GetOutputPrimary
-    #define XRRGetScreenResourcesCurrent _glfw.x11.randr.GetScreenResourcesCurrent
-    #define XRRQueryExtension _glfw.x11.randr.QueryExtension
-    #define XRRQueryVersion _glfw.x11.randr.QueryVersion
-    #define XRRSelectInput _glfw.x11.randr.SelectInput
-    #define XRRSetCrtcConfig _glfw.x11.randr.SetCrtcConfig
-    #define XRRUpdateConfiguration _glfw.x11.randr.UpdateConfiguration
     typedef XcursorImage* (* PFN_XcursorImageCreate)(int,int);
     typedef void (* PFN_XcursorImageDestroy)(XcursorImage*);
     typedef Cursor (* PFN_XcursorImageLoadCursor)(Display*,const XcursorImage*);
-    #define XcursorImageCreate _glfw.x11.xcursor.ImageCreate
-    #define XcursorImageDestroy _glfw.x11.xcursor.ImageDestroy
-    #define XcursorImageLoadCursor _glfw.x11.xcursor.ImageLoadCursor
     typedef int (*PFNGLXGETFBCONFIGATTRIBPROC)(Display*,GLXFBConfig,int,int*);
     typedef Bool (*PFNGLXQUERYEXTENSIONPROC)(Display*,int*,int*);
     typedef Bool (*PFNGLXQUERYVERSIONPROC)(Display*,int*,int*);
@@ -301,9 +283,6 @@ typedef struct _GLFWfbconfig _GLFWfbconfig; typedef struct _GLFWcontext _GLFWcon
     typedef XVisualInfo* (*PFNGLXGETVISUALFROMFBCONFIGPROC)(Display*,GLXFBConfig);
     typedef GLXWindow (*PFNGLXCREATEWINDOWPROC)(Display*,GLXFBConfig,Window,const int*);
     typedef GLXContext (*PFNGLXCREATECONTEXTATTRIBSARBPROC)(Display*,GLXFBConfig,GLXContext,Bool,const int*);
-    #define glXGetFBConfigAttrib _glfw.glx.GetFBConfigAttrib
-    #define glXQueryExtension _glfw.glx.QueryExtension
-    #define glXQueryVersion _glfw.glx.QueryVersion
     #define GLFW_X11_WINDOW_STATE           _GLFWwindowX11 x11;
     #define GLFW_X11_LIBRARY_WINDOW_STATE   _GLFWlibraryX11 x11;
     #define GLFW_X11_MONITOR_STATE          _GLFWmonitorX11 x11;
@@ -323,69 +302,16 @@ typedef struct _GLFWfbconfig _GLFWfbconfig; typedef struct _GLFWcontext _GLFWcon
         PFNGLXGETVISUALFROMFBCONFIGPROC     GetVisualFromFBConfig;
         PFNGLXCREATEWINDOWPROC              CreateWindow;
         PFNGLXGETPROCADDRESSPROC            GetProcAddress;
-        PFNGLXGETPROCADDRESSPROC            GetProcAddressARB;
         PFNGLXSWAPINTERVALEXTPROC           SwapIntervalEXT;
         PFNGLXCREATECONTEXTATTRIBSARBPROC   CreateContextAttribsARB;
     } _GLFWlibraryGLX;
 
     typedef struct _GLFWwindowX11 { Colormap colormap; Window handle,parent; XIC ic; GLFWbool overrideRedirect; int width,height,xpos,ypos,lastCursorPosX,lastCursorPosY,warpCursorPosX,warpCursorPosY; } _GLFWwindowX11;
     typedef struct _GLFWlibraryX11 {
-        Display* display;
-        int screen;
-        Window root;
-        Window helperWindowHandle;
-        Cursor hiddenCursorHandle;
-        XContext context;
-        XIM im;
-        short int keycodes[256],scancodes[GLFW_KEY_LAST + 1];
-        double restoreCursorPosX, restoreCursorPosY;
-        _GLFWwindow* disabledCursorWindow;
+        Display* display; int screen; Window root; Cursor hiddenCursorHandle; XContext context; short int keycodes[256],scancodes[GLFW_KEY_LAST + 1]; double restoreCursorPosX, restoreCursorPosY; _GLFWwindow* disabledCursorWindow;
         Atom NET_SUPPORTED,NET_SUPPORTING_WM_CHECK,WM_PROTOCOLS,WM_STATE,WM_DELETE_WINDOW,NET_WM_NAME,NET_WM_ICON,NET_WM_PING,NET_WM_WINDOW_TYPE,NET_WM_WINDOW_TYPE_NORMAL,NET_WM_STATE,NET_WM_STATE_FULLSCREEN,NET_WM_BYPASS_COMPOSITOR,NET_WORKAREA,NET_CURRENT_DESKTOP,NET_ACTIVE_WINDOW,MOTIF_WM_HINTS,UTF8_STRING;
-        struct {
-            void*       handle;
-            GLFWbool    utf8;
-            PFN_XAllocSizeHints AllocSizeHints;
-            PFN_XChangeProperty ChangeProperty;
-            PFN_XChangeWindowAttributes ChangeWindowAttributes;
-            PFN_XCheckTypedWindowEvent CheckTypedWindowEvent;
-            PFN_XCreateColormap CreateColormap;
-            PFN_XCreateWindow CreateWindow;
-            PFN_XDefineCursor DefineCursor;
-            PFN_XDeleteProperty DeleteProperty;
-            PFN_XDisplayKeycodes DisplayKeycodes;
-            PFN_XFilterEvent FilterEvent;
-            PFN_XFindContext FindContext;
-            PFN_XFree Free;
-            PFN_XFreeEventData FreeEventData;
-            PFN_XGetInputFocus GetInputFocus;
-            PFN_XGetKeyboardMapping GetKeyboardMapping;
-            PFN_XGetWMNormalHints GetWMNormalHints;
-            PFN_XGetWindowAttributes GetWindowAttributes;
-            PFN_XGetWindowProperty GetWindowProperty;
-            PFN_XGrabPointer GrabPointer;
-            PFN_XInternAtom InternAtom;
-            PFN_XMapWindow MapWindow;
-            PFN_XMoveResizeWindow MoveResizeWindow;
-            PFN_XMoveWindow MoveWindow;
-            PFN_XNextEvent NextEvent;
-            PFN_XPending Pending;
-            PFN_XQueryExtension QueryExtension;
-            PFN_XQueryPointer QueryPointer;
-            PFN_XRaiseWindow RaiseWindow;
-            PFN_XResizeWindow ResizeWindow;
-            PFN_XSaveContext SaveContext;
-            PFN_XSendEvent SendEvent;
-            PFN_XSetICFocus SetICFocus;
-            PFN_XSetInputFocus SetInputFocus;
-            PFN_XSetWMNormalHints SetWMNormalHints;
-            PFN_XSetWMProtocols SetWMProtocols;
-            PFN_XTranslateCoordinates TranslateCoordinates;
-            PFN_XUndefineCursor UndefineCursor;
-            PFN_XUngrabPointer UngrabPointer;
-            PFN_XUnsetICFocus UnsetICFocus;
-            PFN_XWarpPointer WarpPointer;
-        } xlib;
-        struct { void* handle; int eventBase,errorBase,major,minor; PFN_XRRFreeCrtcInfo FreeCrtcInfo; PFN_XRRFreeOutputInfo FreeOutputInfo; PFN_XRRFreeScreenResources FreeScreenResources; PFN_XRRGetCrtcInfo GetCrtcInfo; PFN_XRRGetOutputInfo GetOutputInfo; PFN_XRRGetOutputPrimary GetOutputPrimary; PFN_XRRGetScreenResourcesCurrent GetScreenResourcesCurrent; PFN_XRRQueryExtension QueryExtension; PFN_XRRQueryVersion QueryVersion; PFN_XRRSelectInput SelectInput; PFN_XRRSetCrtcConfig SetCrtcConfig; PFN_XRRUpdateConfiguration UpdateConfiguration; } randr;
+        struct { void* handle; GLFWbool utf8; PFN_XAllocSizeHints AllocSizeHints; PFN_XChangeProperty ChangeProperty; PFN_XChangeWindowAttributes ChangeWindowAttributes; PFN_XCheckTypedWindowEvent CheckTypedWindowEvent; PFN_XCreateColormap CreateColormap; PFN_XCreateWindow CreateWindow; PFN_XDefineCursor DefineCursor; PFN_XDeleteProperty DeleteProperty; PFN_XDisplayKeycodes DisplayKeycodes; PFN_XFilterEvent FilterEvent; PFN_XFindContext FindContext; PFN_XFree Free; PFN_XFreeEventData FreeEventData; PFN_XGetInputFocus GetInputFocus; PFN_XGetKeyboardMapping GetKeyboardMapping; PFN_XGetWMNormalHints GetWMNormalHints; PFN_XGetWindowAttributes GetWindowAttributes; PFN_XGetWindowProperty GetWindowProperty; PFN_XGrabPointer GrabPointer; PFN_XInternAtom InternAtom; PFN_XMapWindow MapWindow; PFN_XMoveResizeWindow MoveResizeWindow; PFN_XMoveWindow MoveWindow; PFN_XNextEvent NextEvent; PFN_XPending Pending; PFN_XQueryExtension QueryExtension; PFN_XQueryPointer QueryPointer; PFN_XRaiseWindow RaiseWindow; PFN_XResizeWindow ResizeWindow; PFN_XSaveContext SaveContext; PFN_XSendEvent SendEvent; PFN_XSetICFocus SetICFocus; PFN_XSetInputFocus SetInputFocus; PFN_XSetWMNormalHints SetWMNormalHints; PFN_XSetWMProtocols SetWMProtocols; PFN_XTranslateCoordinates TranslateCoordinates; PFN_XUndefineCursor UndefineCursor; PFN_XUngrabPointer UngrabPointer; PFN_XUnsetICFocus UnsetICFocus; PFN_XWarpPointer WarpPointer; } xlib;
+        struct { void* handle; int eventBase,errorBase,major,minor; PFN_XRRFreeCrtcInfo FreeCrtcInfo; PFN_XRRFreeOutputInfo FreeOutputInfo; PFN_XRRFreeScreenResources FreeScreenResources; PFN_XRRGetCrtcInfo GetCrtcInfo; PFN_XRRGetOutputInfo GetOutputInfo; PFN_XRRGetOutputPrimary GetOutputPrimary; PFN_XRRGetScreenResourcesCurrent GetScreenResourcesCurrent; PFN_XRRSelectInput SelectInput; PFN_XRRUpdateConfiguration UpdateConfiguration; } randr;
         struct { void* handle; PFN_XcursorImageCreate ImageCreate; PFN_XcursorImageDestroy ImageDestroy; PFN_XcursorImageLoadCursor ImageLoadCursor; } xcursor;
     } _GLFWlibraryX11;
     typedef struct _GLFWmonitorX11 { RROutput output; RRCrtc crtc; int index; } _GLFWmonitorX11;
@@ -408,47 +334,13 @@ typedef struct _GLFWfbconfig _GLFWfbconfig; typedef struct _GLFWcontext _GLFWcon
     typedef struct _GLFWtlsPOSIX { GLFWbool allocated; pthread_key_t key; } _GLFWtlsPOSIX;
     typedef struct _GLFWmutexPOSIX { GLFWbool allocated; pthread_mutex_t handle; } _GLFWmutexPOSIX;
     #define GLFW_PLATFORM_TLS_STATE    GLFW_POSIX_TLS_STATE
-    #define GLFW_POSIX_LIBRARY_TIMER_STATE _GLFWtimerPOSIX posix;
-    typedef struct _GLFWtimerPOSIX { clockid_t clock; u64 frequency; } _GLFWtimerPOSIX;
-    #define GLFW_PLATFORM_LIBRARY_TIMER_STATE  GLFW_POSIX_LIBRARY_TIMER_STATE
 #endif
-#define GLFW_PLATFORM_WINDOW_STATE \
-    GLFW_WIN32_WINDOW_STATE \
-    GLFW_X11_WINDOW_STATE
 struct _GLFWfbconfig { int redBits,greenBits,blueBits,alphaBits,depthBits,stencilBits,accumRedBits,accumGreenBits,accumBlueBits,accumAlphaBits; GLFWbool stereo; int samples; GLFWbool sRGB,doublebuffer; uintptr_t handle; };
-struct _GLFWcontext {
-    int client,source,major,minor;
-    PFNGLGETINTEGERVPROC GetIntegerv;
-    void (*makeCurrent)(_GLFWwindow*);
-    void (*swapBuffers)(_GLFWwindow*);
-    void (*swapInterval)(int);
-    int (*extensionSupported)(const char*);
-    GLFWglproc (*getProcAddress)(const char*);
-    GLFW_WGL_CONTEXT_STATE
-    GLFW_GLX_CONTEXT_STATE
-};
-
-struct _GLFWwindow {
-    GLFWbool decorated,shouldClose,doublebuffer;
-    GLFWvidmode videoMode;
-    int minwidth,minheight,maxwidth,maxheight;
-    int cursorMode;
-    char mouseButtons[GLFW_MOUSE_BUTTON_LAST + 1],keys[GLFW_KEY_LAST + 1];
-    double virtualCursorPosX,virtualCursorPosY;
-    _GLFWcontext context;
-    GLFW_PLATFORM_WINDOW_STATE
-};
-
+struct _GLFWcontext { int client,source,major,minor; PFNGLGETINTEGERVPROC GetIntegerv; void (*makeCurrent)(_GLFWwindow*); void (*swapBuffers)(_GLFWwindow*); void (*swapInterval)(int); int (*extensionSupported)(const char*); GLFWglproc (*getProcAddress)(const char*); GLFW_WGL_CONTEXT_STATE GLFW_GLX_CONTEXT_STATE };
+struct _GLFWwindow { GLFWbool decorated,shouldClose,doublebuffer; GLFWvidmode videoMode; int minwidth,minheight,maxwidth,maxheight; int cursorMode; char mouseButtons[GLFW_MOUSE_BUTTON_LAST + 1],keys[GLFW_KEY_LAST + 1]; double virtualCursorPosX,virtualCursorPosY; _GLFWcontext context; GLFW_WIN32_WINDOW_STATE GLFW_X11_WINDOW_STATE };
 struct _GLFWmonitor { char name[128]; int widthMM,heightMM; GLFWvidmode currentMode; GLFW_WIN32_MONITOR_STATE GLFW_X11_MONITOR_STATE };
 struct _GLFWjoystick {
-    GLFWbool allocated,connected;
-    float*  axes;
-    int axisCount;
-    unsigned char* buttons;
-    int buttonCount;
-    unsigned char* hats;
-    int hatCount;
-    char name[128],guid[33];
+    GLFWbool allocated,connected; float*  axes; int axisCount; unsigned char* buttons; int buttonCount; unsigned char* hats; int hatCount; char name[128],guid[33];
     #if defined(LINUX)
         GLFW_LINUX_JOYSTICK_STATE
     #else
@@ -457,12 +349,9 @@ struct _GLFWjoystick {
 };
 
 struct _GLFWtls { GLFW_PLATFORM_TLS_STATE };
-struct _GLFWlibrary { _GLFWmonitor** monitors; int monitorCount; GLFWbool joysticksInitialized; _GLFWjoystick joysticks[GLFW_JOYSTICK_LAST + 1]; _GLFWtls errorSlot,contextSlot; struct { u64 offset; GLFW_PLATFORM_LIBRARY_TIMER_STATE } timer; GLFW_WIN32_LIBRARY_WINDOW_STATE GLFW_X11_LIBRARY_WINDOW_STATE GLFW_WGL_LIBRARY_CONTEXT_STATE GLFW_GLX_LIBRARY_CONTEXT_STATE GLFW_WIN32_LIBRARY_JOYSTICK_STATE GLFW_LINUX_LIBRARY_JOYSTICK_STATE };
+struct _GLFWlibrary { _GLFWmonitor** monitors; int monitorCount; GLFWbool joysticksInitialized; _GLFWjoystick joysticks[GLFW_JOYSTICK_LAST + 1]; _GLFWtls errorSlot,contextSlot; GLFW_WIN32_LIBRARY_WINDOW_STATE GLFW_X11_LIBRARY_WINDOW_STATE GLFW_WGL_LIBRARY_CONTEXT_STATE GLFW_GLX_LIBRARY_CONTEXT_STATE GLFW_WIN32_LIBRARY_JOYSTICK_STATE GLFW_LINUX_LIBRARY_JOYSTICK_STATE };
 extern _GLFWlibrary _glfw;
-void _glfwPlatformInitTimer(void);
-u64 _glfwPlatformGetTimerValue(void);
-u64 _glfwPlatformGetTimerFrequency(void);
-void* _glfwPlatformGetTls(_GLFWtls* tls);
+//void* _glfwPlatformGetTls(_GLFWtls* tls);
 void _glfwPlatformSetTls(_GLFWtls* tls, void* value);
 void* _glfwPlatformLoadModule(const char* path);
 GLFWproc _glfwPlatformGetModuleSymbol(void* module, const char* name);
@@ -744,130 +633,45 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
 
     void _glfwSetCursorModeWin32(_GLFWwindow* window) { if (window->win32.handle==GetActiveWindow()) {_glfwGetCursorPosWin32(window,&_glfw.win32.restoreCursorPosX,&_glfw.win32.restoreCursorPosY); captureCursor(window); _glfw.win32.disabledCursorWindow=window;} else Sys_Global.gamePaused = true; updateCursorImage(window); }
     GLFWproc _glfwPlatformGetModuleSymbol(void* module, const char* name) { return (GLFWproc)GetProcAddress((HMODULE)module,name); }
-    static void createKeyTables(void) {
+static void createKeyTables(void) {
         int scancode;
-        __builtin_memset(_glfw.win32.keycodes, -1, sizeof(_glfw.win32.keycodes));
-        __builtin_memset(_glfw.win32.scancodes, -1, sizeof(_glfw.win32.scancodes));
-        _glfw.win32.keycodes[0x00B] = GLFW_KEY_0;
-        _glfw.win32.keycodes[0x002] = GLFW_KEY_1;
-        _glfw.win32.keycodes[0x003] = GLFW_KEY_2;
-        _glfw.win32.keycodes[0x004] = GLFW_KEY_3;
-        _glfw.win32.keycodes[0x005] = GLFW_KEY_4;
-        _glfw.win32.keycodes[0x006] = GLFW_KEY_5;
-        _glfw.win32.keycodes[0x007] = GLFW_KEY_6;
-        _glfw.win32.keycodes[0x008] = GLFW_KEY_7;
-        _glfw.win32.keycodes[0x009] = GLFW_KEY_8;
-        _glfw.win32.keycodes[0x00A] = GLFW_KEY_9;
-        _glfw.win32.keycodes[0x01E] = GLFW_KEY_A;
-        _glfw.win32.keycodes[0x030] = GLFW_KEY_B;
-        _glfw.win32.keycodes[0x02E] = GLFW_KEY_C;
-        _glfw.win32.keycodes[0x020] = GLFW_KEY_D;
-        _glfw.win32.keycodes[0x012] = GLFW_KEY_E;
-        _glfw.win32.keycodes[0x021] = GLFW_KEY_F;
-        _glfw.win32.keycodes[0x022] = GLFW_KEY_G;
-        _glfw.win32.keycodes[0x023] = GLFW_KEY_H;
-        _glfw.win32.keycodes[0x017] = GLFW_KEY_I;
-        _glfw.win32.keycodes[0x024] = GLFW_KEY_J;
-        _glfw.win32.keycodes[0x025] = GLFW_KEY_K;
-        _glfw.win32.keycodes[0x026] = GLFW_KEY_L;
-        _glfw.win32.keycodes[0x032] = GLFW_KEY_M;
-        _glfw.win32.keycodes[0x031] = GLFW_KEY_N;
-        _glfw.win32.keycodes[0x018] = GLFW_KEY_O;
-        _glfw.win32.keycodes[0x019] = GLFW_KEY_P;
-        _glfw.win32.keycodes[0x010] = GLFW_KEY_Q;
-        _glfw.win32.keycodes[0x013] = GLFW_KEY_R;
-        _glfw.win32.keycodes[0x01F] = GLFW_KEY_S;
-        _glfw.win32.keycodes[0x014] = GLFW_KEY_T;
-        _glfw.win32.keycodes[0x016] = GLFW_KEY_U;
-        _glfw.win32.keycodes[0x02F] = GLFW_KEY_V;
-        _glfw.win32.keycodes[0x011] = GLFW_KEY_W;
-        _glfw.win32.keycodes[0x02D] = GLFW_KEY_X;
-        _glfw.win32.keycodes[0x015] = GLFW_KEY_Y;
-        _glfw.win32.keycodes[0x02C] = GLFW_KEY_Z;
-        _glfw.win32.keycodes[0x028] = GLFW_KEY_APOSTROPHE;
-        _glfw.win32.keycodes[0x02B] = GLFW_KEY_BACKSLASH;
-        _glfw.win32.keycodes[0x033] = GLFW_KEY_COMMA;
-        _glfw.win32.keycodes[0x00D] = GLFW_KEY_EQUAL;
-        _glfw.win32.keycodes[0x029] = GLFW_KEY_GRAVE_ACCENT;
-        _glfw.win32.keycodes[0x01A] = GLFW_KEY_LEFT_BRACKET;
-        _glfw.win32.keycodes[0x00C] = GLFW_KEY_MINUS;
-        _glfw.win32.keycodes[0x034] = GLFW_KEY_PERIOD;
-        _glfw.win32.keycodes[0x01B] = GLFW_KEY_RIGHT_BRACKET;
-        _glfw.win32.keycodes[0x027] = GLFW_KEY_SEMICOLON;
-        _glfw.win32.keycodes[0x035] = GLFW_KEY_SLASH;
-        _glfw.win32.keycodes[0x00E] = GLFW_KEY_BACKSPACE;
-        _glfw.win32.keycodes[0x153] = GLFW_KEY_DELETE;
-        _glfw.win32.keycodes[0x14F] = GLFW_KEY_END;
-        _glfw.win32.keycodes[0x01C] = GLFW_KEY_ENTER;
-        _glfw.win32.keycodes[0x001] = GLFW_KEY_ESCAPE;
-        _glfw.win32.keycodes[0x147] = GLFW_KEY_HOME;
-        _glfw.win32.keycodes[0x152] = GLFW_KEY_INSERT;
-        _glfw.win32.keycodes[0x15D] = GLFW_KEY_MENU;
-        _glfw.win32.keycodes[0x151] = GLFW_KEY_PAGE_DOWN;
-        _glfw.win32.keycodes[0x149] = GLFW_KEY_PAGE_UP;
-        _glfw.win32.keycodes[0x045] = GLFW_KEY_PAUSE;
-        _glfw.win32.keycodes[0x039] = GLFW_KEY_SPACE;
-        _glfw.win32.keycodes[0x00F] = GLFW_KEY_TAB;
-        _glfw.win32.keycodes[0x03A] = GLFW_KEY_CAPS_LOCK;
-        _glfw.win32.keycodes[0x145] = GLFW_KEY_NUM_LOCK;
-        _glfw.win32.keycodes[0x046] = GLFW_KEY_SCROLL_LOCK;
-        _glfw.win32.keycodes[0x03B] = GLFW_KEY_F1;
-        _glfw.win32.keycodes[0x03C] = GLFW_KEY_F2;
-        _glfw.win32.keycodes[0x03D] = GLFW_KEY_F3;
-        _glfw.win32.keycodes[0x03E] = GLFW_KEY_F4;
-        _glfw.win32.keycodes[0x03F] = GLFW_KEY_F5;
-        _glfw.win32.keycodes[0x040] = GLFW_KEY_F6;
-        _glfw.win32.keycodes[0x041] = GLFW_KEY_F7;
-        _glfw.win32.keycodes[0x042] = GLFW_KEY_F8;
-        _glfw.win32.keycodes[0x043] = GLFW_KEY_F9;
-        _glfw.win32.keycodes[0x044] = GLFW_KEY_F10;
-        _glfw.win32.keycodes[0x057] = GLFW_KEY_F11;
-        _glfw.win32.keycodes[0x058] = GLFW_KEY_F12;
-        _glfw.win32.keycodes[0x064] = GLFW_KEY_F13;
-        _glfw.win32.keycodes[0x065] = GLFW_KEY_F14;
-        _glfw.win32.keycodes[0x066] = GLFW_KEY_F15;
-        _glfw.win32.keycodes[0x067] = GLFW_KEY_F16;
-        _glfw.win32.keycodes[0x068] = GLFW_KEY_F17;
-        _glfw.win32.keycodes[0x069] = GLFW_KEY_F18;
-        _glfw.win32.keycodes[0x06A] = GLFW_KEY_F19;
-        _glfw.win32.keycodes[0x06B] = GLFW_KEY_F20;
-        _glfw.win32.keycodes[0x06C] = GLFW_KEY_F21;
-        _glfw.win32.keycodes[0x06D] = GLFW_KEY_F22;
-        _glfw.win32.keycodes[0x06E] = GLFW_KEY_F23;
-        _glfw.win32.keycodes[0x076] = GLFW_KEY_F24;
-        _glfw.win32.keycodes[0x038] = GLFW_KEY_LEFT_ALT;
-        _glfw.win32.keycodes[0x01D] = GLFW_KEY_LEFT_CONTROL;
-        _glfw.win32.keycodes[0x02A] = GLFW_KEY_LEFT_SHIFT;
-        _glfw.win32.keycodes[0x15B] = GLFW_KEY_LEFT_SUPER;
-        _glfw.win32.keycodes[0x137] = GLFW_KEY_PRINT_SCREEN;
-        _glfw.win32.keycodes[0x138] = GLFW_KEY_RIGHT_ALT;
-        _glfw.win32.keycodes[0x11D] = GLFW_KEY_RIGHT_CONTROL;
-        _glfw.win32.keycodes[0x036] = GLFW_KEY_RIGHT_SHIFT;
-        _glfw.win32.keycodes[0x15C] = GLFW_KEY_RIGHT_SUPER;
-        _glfw.win32.keycodes[0x150] = GLFW_KEY_DOWN;
-        _glfw.win32.keycodes[0x14B] = GLFW_KEY_LEFT;
-        _glfw.win32.keycodes[0x14D] = GLFW_KEY_RIGHT;
-        _glfw.win32.keycodes[0x148] = GLFW_KEY_UP;
-        _glfw.win32.keycodes[0x052] = GLFW_KEY_KP_0;
-        _glfw.win32.keycodes[0x04F] = GLFW_KEY_KP_1;
-        _glfw.win32.keycodes[0x050] = GLFW_KEY_KP_2;
-        _glfw.win32.keycodes[0x051] = GLFW_KEY_KP_3;
-        _glfw.win32.keycodes[0x04B] = GLFW_KEY_KP_4;
-        _glfw.win32.keycodes[0x04C] = GLFW_KEY_KP_5;
-        _glfw.win32.keycodes[0x04D] = GLFW_KEY_KP_6;
-        _glfw.win32.keycodes[0x047] = GLFW_KEY_KP_7;
-        _glfw.win32.keycodes[0x048] = GLFW_KEY_KP_8;
-        _glfw.win32.keycodes[0x049] = GLFW_KEY_KP_9;
-        _glfw.win32.keycodes[0x04E] = GLFW_KEY_KP_ADD;
-        _glfw.win32.keycodes[0x053] = GLFW_KEY_KP_DECIMAL;
-        _glfw.win32.keycodes[0x135] = GLFW_KEY_KP_DIVIDE;
-        _glfw.win32.keycodes[0x11C] = GLFW_KEY_KP_ENTER;
-        _glfw.win32.keycodes[0x059] = GLFW_KEY_KP_EQUAL;
-        _glfw.win32.keycodes[0x037] = GLFW_KEY_KP_MULTIPLY;
-        _glfw.win32.keycodes[0x04A] = GLFW_KEY_KP_SUBTRACT;
-        for (scancode = 0;  scancode < 512;  scancode++) {
-            if (_glfw.win32.keycodes[scancode] > 0) _glfw.win32.scancodes[_glfw.win32.keycodes[scancode]] = scancode;
-        }
+        __builtin_memset(_glfw.win32.keycodes,-1,sizeof(_glfw.win32.keycodes)); __builtin_memset(_glfw.win32.scancodes,-1,sizeof(_glfw.win32.scancodes));
+        _glfw.win32.keycodes[0x00B] = GLFW_KEY_0; _glfw.win32.keycodes[0x002] = GLFW_KEY_1; _glfw.win32.keycodes[0x003] = GLFW_KEY_2;
+        _glfw.win32.keycodes[0x004] = GLFW_KEY_3; _glfw.win32.keycodes[0x005] = GLFW_KEY_4; _glfw.win32.keycodes[0x006] = GLFW_KEY_5;
+        _glfw.win32.keycodes[0x007] = GLFW_KEY_6; _glfw.win32.keycodes[0x008] = GLFW_KEY_7; _glfw.win32.keycodes[0x009] = GLFW_KEY_8;
+        _glfw.win32.keycodes[0x00A] = GLFW_KEY_9; _glfw.win32.keycodes[0x01E] = GLFW_KEY_A; _glfw.win32.keycodes[0x030] = GLFW_KEY_B;
+        _glfw.win32.keycodes[0x02E] = GLFW_KEY_C; _glfw.win32.keycodes[0x020] = GLFW_KEY_D; _glfw.win32.keycodes[0x012] = GLFW_KEY_E;
+        _glfw.win32.keycodes[0x021] = GLFW_KEY_F; _glfw.win32.keycodes[0x022] = GLFW_KEY_G; _glfw.win32.keycodes[0x023] = GLFW_KEY_H;
+        _glfw.win32.keycodes[0x017] = GLFW_KEY_I; _glfw.win32.keycodes[0x024] = GLFW_KEY_J; _glfw.win32.keycodes[0x025] = GLFW_KEY_K;
+        _glfw.win32.keycodes[0x026] = GLFW_KEY_L; _glfw.win32.keycodes[0x032] = GLFW_KEY_M; _glfw.win32.keycodes[0x031] = GLFW_KEY_N;
+        _glfw.win32.keycodes[0x018] = GLFW_KEY_O; _glfw.win32.keycodes[0x019] = GLFW_KEY_P; _glfw.win32.keycodes[0x010] = GLFW_KEY_Q;
+        _glfw.win32.keycodes[0x013] = GLFW_KEY_R; _glfw.win32.keycodes[0x01F] = GLFW_KEY_S; _glfw.win32.keycodes[0x014] = GLFW_KEY_T;
+        _glfw.win32.keycodes[0x016] = GLFW_KEY_U; _glfw.win32.keycodes[0x02F] = GLFW_KEY_V; _glfw.win32.keycodes[0x011] = GLFW_KEY_W;
+        _glfw.win32.keycodes[0x02D] = GLFW_KEY_X; _glfw.win32.keycodes[0x015] = GLFW_KEY_Y; _glfw.win32.keycodes[0x02C] = GLFW_KEY_Z;
+        _glfw.win32.keycodes[0x028] = GLFW_KEY_APOSTROPHE; _glfw.win32.keycodes[0x02B] = GLFW_KEY_BACKSLASH; _glfw.win32.keycodes[0x033] = GLFW_KEY_COMMA;
+        _glfw.win32.keycodes[0x00D] = GLFW_KEY_EQUAL; _glfw.win32.keycodes[0x029] = GLFW_KEY_GRAVE_ACCENT; _glfw.win32.keycodes[0x01A] = GLFW_KEY_LEFT_BRACKET;
+        _glfw.win32.keycodes[0x00C] = GLFW_KEY_MINUS; _glfw.win32.keycodes[0x034] = GLFW_KEY_PERIOD; _glfw.win32.keycodes[0x01B] = GLFW_KEY_RIGHT_BRACKET;
+        _glfw.win32.keycodes[0x027] = GLFW_KEY_SEMICOLON; _glfw.win32.keycodes[0x035] = GLFW_KEY_SLASH; _glfw.win32.keycodes[0x00E] = GLFW_KEY_BACKSPACE;
+        _glfw.win32.keycodes[0x153] = GLFW_KEY_DELETE; _glfw.win32.keycodes[0x14F] = GLFW_KEY_END; _glfw.win32.keycodes[0x01C] = GLFW_KEY_ENTER;
+        _glfw.win32.keycodes[0x001] = GLFW_KEY_ESCAPE; _glfw.win32.keycodes[0x147] = GLFW_KEY_HOME; _glfw.win32.keycodes[0x152] = GLFW_KEY_INSERT;
+        _glfw.win32.keycodes[0x15D] = GLFW_KEY_MENU; _glfw.win32.keycodes[0x151] = GLFW_KEY_PAGE_DOWN; _glfw.win32.keycodes[0x149] = GLFW_KEY_PAGE_UP;
+        _glfw.win32.keycodes[0x045] = GLFW_KEY_PAUSE; _glfw.win32.keycodes[0x039] = GLFW_KEY_SPACE; _glfw.win32.keycodes[0x00F] = GLFW_KEY_TAB;
+        _glfw.win32.keycodes[0x03A] = GLFW_KEY_CAPS_LOCK; _glfw.win32.keycodes[0x145] = GLFW_KEY_NUM_LOCK; _glfw.win32.keycodes[0x046] = GLFW_KEY_SCROLL_LOCK;
+        _glfw.win32.keycodes[0x03B] = GLFW_KEY_F1; _glfw.win32.keycodes[0x03C] = GLFW_KEY_F2; _glfw.win32.keycodes[0x03D] = GLFW_KEY_F3;
+        _glfw.win32.keycodes[0x03E] = GLFW_KEY_F4; _glfw.win32.keycodes[0x03F] = GLFW_KEY_F5; _glfw.win32.keycodes[0x040] = GLFW_KEY_F6;
+        _glfw.win32.keycodes[0x041] = GLFW_KEY_F7; _glfw.win32.keycodes[0x042] = GLFW_KEY_F8; _glfw.win32.keycodes[0x043] = GLFW_KEY_F9;
+        _glfw.win32.keycodes[0x044] = GLFW_KEY_F10; _glfw.win32.keycodes[0x057] = GLFW_KEY_F11; _glfw.win32.keycodes[0x058] = GLFW_KEY_F12;
+        _glfw.win32.keycodes[0x038] = GLFW_KEY_LEFT_ALT; _glfw.win32.keycodes[0x01D] = GLFW_KEY_LEFT_CONTROL; _glfw.win32.keycodes[0x02A] = GLFW_KEY_LEFT_SHIFT;
+        _glfw.win32.keycodes[0x15B] = GLFW_KEY_LEFT_SUPER; _glfw.win32.keycodes[0x137] = GLFW_KEY_PRINT_SCREEN; _glfw.win32.keycodes[0x138] = GLFW_KEY_RIGHT_ALT;
+        _glfw.win32.keycodes[0x11D] = GLFW_KEY_RIGHT_CONTROL; _glfw.win32.keycodes[0x036] = GLFW_KEY_RIGHT_SHIFT; _glfw.win32.keycodes[0x15C] = GLFW_KEY_RIGHT_SUPER;
+        _glfw.win32.keycodes[0x150] = GLFW_KEY_DOWN; _glfw.win32.keycodes[0x14B] = GLFW_KEY_LEFT; _glfw.win32.keycodes[0x14D] = GLFW_KEY_RIGHT;
+        _glfw.win32.keycodes[0x148] = GLFW_KEY_UP; _glfw.win32.keycodes[0x052] = GLFW_KEY_KP_0; _glfw.win32.keycodes[0x04F] = GLFW_KEY_KP_1;
+        _glfw.win32.keycodes[0x050] = GLFW_KEY_KP_2; _glfw.win32.keycodes[0x051] = GLFW_KEY_KP_3; _glfw.win32.keycodes[0x04B] = GLFW_KEY_KP_4;
+        _glfw.win32.keycodes[0x04C] = GLFW_KEY_KP_5; _glfw.win32.keycodes[0x04D] = GLFW_KEY_KP_6; _glfw.win32.keycodes[0x047] = GLFW_KEY_KP_7;
+        _glfw.win32.keycodes[0x048] = GLFW_KEY_KP_8; _glfw.win32.keycodes[0x049] = GLFW_KEY_KP_9; _glfw.win32.keycodes[0x04E] = GLFW_KEY_KP_ADD;
+        _glfw.win32.keycodes[0x053] = GLFW_KEY_KP_DECIMAL; _glfw.win32.keycodes[0x135] = GLFW_KEY_KP_DIVIDE; _glfw.win32.keycodes[0x11C] = GLFW_KEY_KP_ENTER;
+        _glfw.win32.keycodes[0x059] = GLFW_KEY_KP_EQUAL;_glfw.win32.keycodes[0x037] = GLFW_KEY_KP_MULTIPLY; _glfw.win32.keycodes[0x04A] = GLFW_KEY_KP_SUBTRACT;
+        for (scancode=0;scancode<512;scancode++) { if (_glfw.win32.keycodes[scancode] > 0) {_glfw.win32.scancodes[_glfw.win32.keycodes[scancode]] = scancode;} }
     }
 
     static LRESULT CALLBACK helperWindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
@@ -1039,9 +843,6 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     void _glfwGetMonitorPosWin32(_GLFWmonitor* monitor, int* xpos, int* ypos) { DEVMODEW dm; ZeroMemory(&dm,sizeof(dm)); dm.dmSize = sizeof(dm); EnumDisplaySettingsExW(monitor->win32.adapterName,ENUM_CURRENT_SETTINGS,&dm,0x00000004); *xpos = dm.dmPosition.x; *ypos = dm.dmPosition.y; }
     void _glfwGetMonitorWorkareaWin32(_GLFWmonitor* monitor, int* xpos, int* ypos, int* width, int* height) { MONITORINFO mi = {0}; mi.cbSize = sizeof(mi); GetMonitorInfoW(monitor->win32.handle, &mi); *xpos = mi.rcWork.left; *ypos = mi.rcWork.top; *width = mi.rcWork.right - mi.rcWork.left; *height = mi.rcWork.bottom - mi.rcWork.top; }
     void _glfwGetVideoModeWin32(_GLFWmonitor* monitor, GLFWvidmode* mode) { DEVMODEW dm; ZeroMemory(&dm, sizeof(dm)); dm.dmSize = sizeof(dm); EnumDisplaySettingsW(monitor->win32.adapterName,ENUM_CURRENT_SETTINGS,&dm); mode->width=dm.dmPelsWidth; mode->height=dm.dmPelsHeight; mode->refreshRate=dm.dmDisplayFrequency; }
-    void _glfwPlatformInitTimer(void) { QueryPerformanceFrequency((LARGE_INTEGER*) &_glfw.timer.win32.frequency); }
-    u64 _glfwPlatformGetTimerValue(void) { u64 value; QueryPerformanceCounter((LARGE_INTEGER*)&value); return value; }
-    u64 _glfwPlatformGetTimerFrequency(void) { return _glfw.timer.win32.frequency; }
     void _glfwPlatformCreateTls(_GLFWtls* tls) { tls->win32.index = TlsAlloc(); tls->win32.allocated =  1; }
     void* _glfwPlatformGetTls(_GLFWtls* tls) { return TlsGetValue(tls->win32.index); }
     void _glfwPlatformSetTls(_GLFWtls* tls, void* value) { TlsSetValue(tls->win32.index,value); }
@@ -1119,20 +920,6 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     #include <sys/time.h>
     #include <sys/inotify.h>
     #include <dirent.h>
-    void _glfwPlatformInitTimer(void) {
-        _glfw.timer.posix.clock = CLOCK_REALTIME;
-        _glfw.timer.posix.frequency = 1000000000;
-        struct timespec ts;
-        if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0) _glfw.timer.posix.clock = CLOCK_MONOTONIC;
-    }
-
-    u64 _glfwPlatformGetTimerValue(void) {
-        struct timespec ts;
-        clock_gettime(_glfw.timer.posix.clock, &ts);
-        return (u64) ts.tv_sec * _glfw.timer.posix.frequency + (u64) ts.tv_nsec;
-    }
-
-    u64 _glfwPlatformGetTimerFrequency(void) { return _glfw.timer.posix.frequency; }
     void _glfwPlatformCreateTls(_GLFWtls* tls) { pthread_key_create(&tls->posix.key,NULL); tls->posix.allocated =  1; }
     void* _glfwPlatformGetTls(_GLFWtls* tls) { return pthread_getspecific(tls->posix.key); }
     void _glfwPlatformSetTls(_GLFWtls* tls, void* value) { pthread_setspecific(tls->posix.key, value); }
@@ -1168,10 +955,10 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     static void disableCursor(_GLFWwindow* window) { _glfw.x11.disabledCursorWindow=window; _glfwGetCursorPosX11(window,&_glfw.x11.restoreCursorPosX,&_glfw.x11.restoreCursorPosY); updateCursorImage(window); captureCursor(window); }
     static void enableCursor(_GLFWwindow* window) { _glfw.x11.disabledCursorWindow=NULL; releaseCursor(); _glfwSetCursorPosX11(window,_glfw.x11.restoreCursorPosX,_glfw.x11.restoreCursorPosY); updateCursorImage(window); }
     void _glfwGetMonitorPosX11(_GLFWmonitor* monitor, int* xpos, int* ypos) {
-        XRRScreenResources* sr = XRRGetScreenResourcesCurrent(_glfw.x11.display, _glfw.x11.root);
-        XRRCrtcInfo* ci = XRRGetCrtcInfo(_glfw.x11.display, sr, monitor->x11.crtc);
-        if (ci) { *xpos = ci->x; *ypos = ci->y; XRRFreeCrtcInfo(ci); }
-        XRRFreeScreenResources(sr);
+        XRRScreenResources* sr = _glfw.x11.randr.GetScreenResourcesCurrent(_glfw.x11.display, _glfw.x11.root);
+        XRRCrtcInfo* ci = _glfw.x11.randr.GetCrtcInfo(_glfw.x11.display, sr, monitor->x11.crtc);
+        if (ci) { *xpos = ci->x; *ypos = ci->y; _glfw.x11.randr.FreeCrtcInfo(ci); }
+        _glfw.x11.randr.FreeScreenResources(sr);
     }
 
     void _glfwSetWindowIconX11(_GLFWwindow* window, const GLFWimage* images) {
@@ -1221,7 +1008,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
         unsigned int keycode=0; Bool filtered=False;
         if (event->type==2/*KeyPress*/ || event->type==3/*KeyRelease*/) keycode=event->xkey.keycode;
         filtered=_glfw.x11.xlib.FilterEvent(event,0L);
-        if (event->type==_glfw.x11.randr.eventBase+1/*notify*/) { XRRUpdateConfiguration(event); _glfwPollMonitorsX11(); return; }
+        if (event->type==_glfw.x11.randr.eventBase+1/*notify*/) { _glfw.x11.randr.UpdateConfiguration(event); _glfwPollMonitorsX11(); return; }
         if (event->type==35/*GenericEvent*/) return;
         _GLFWwindow* window=NULL; if (_glfw.x11.xlib.FindContext(_glfw.x11.display,event->xany.window,_glfw.x11.context,(XPointer*)&window)!=0) return;
 
@@ -1340,23 +1127,23 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
 
     void _glfwPollMonitorsX11(void) {
         int disconnectedCount; _GLFWmonitor** disconnected = NULL;
-        XRRScreenResources* sr = XRRGetScreenResourcesCurrent(_glfw.x11.display,_glfw.x11.root);
-        RROutput primary = XRRGetOutputPrimary(_glfw.x11.display,_glfw.x11.root);
+        XRRScreenResources* sr = _glfw.x11.randr.GetScreenResourcesCurrent(_glfw.x11.display,_glfw.x11.root);
+        RROutput primary = _glfw.x11.randr.GetOutputPrimary(_glfw.x11.display,_glfw.x11.root);
         disconnectedCount = _glfw.monitorCount;
         if (disconnectedCount) { disconnected = calloc(_glfw.monitorCount, sizeof(_GLFWmonitor*)); __builtin_memcpy(disconnected,_glfw.monitors,_glfw.monitorCount * sizeof(_GLFWmonitor*)); }
         for (int i = 0;  i < sr->noutput;  i++) {
             int j, type, widthMM, heightMM;
-            XRROutputInfo* oi = XRRGetOutputInfo(_glfw.x11.display, sr, sr->outputs[i]);
-            if (oi->connection != 0/*connected*/ || oi->crtc == 0L) { XRRFreeOutputInfo(oi); continue; }
+            XRROutputInfo* oi = _glfw.x11.randr.GetOutputInfo(_glfw.x11.display, sr, sr->outputs[i]);
+            if (oi->connection != 0/*connected*/ || oi->crtc == 0L) { _glfw.x11.randr.FreeOutputInfo(oi); continue; }
 
             for (j = 0;  j < disconnectedCount;  j++) {
                 if (disconnected[j] && disconnected[j]->x11.output == sr->outputs[i]) { disconnected[j] = NULL; break; }
             }
 
-            if (j < disconnectedCount) { XRRFreeOutputInfo(oi); continue; }
+            if (j < disconnectedCount) { _glfw.x11.randr.FreeOutputInfo(oi); continue; }
 
-            XRRCrtcInfo* ci = XRRGetCrtcInfo(_glfw.x11.display, sr, oi->crtc);
-            if (!ci) { XRRFreeOutputInfo(oi); continue; }
+            XRRCrtcInfo* ci = _glfw.x11.randr.GetCrtcInfo(_glfw.x11.display, sr, oi->crtc);
+            if (!ci) { _glfw.x11.randr.FreeOutputInfo(oi); continue; }
 
             if (ci->rotation == 2 || ci->rotation == 8) { widthMM  = oi->mm_height; heightMM = oi->mm_width; } // == 90, == 270
             else { widthMM  = oi->mm_width; heightMM = oi->mm_height; }
@@ -1364,23 +1151,23 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
             if (widthMM <= 0 || heightMM <= 0) { widthMM  = (int) (ci->width * 25.4f / 96.f); heightMM = (int) (ci->height * 25.4f / 96.f); }
             _GLFWmonitor* monitor = _glfwAllocMonitor(oi->name, widthMM, heightMM);
             monitor->x11.output = sr->outputs[i]; monitor->x11.crtc   = oi->crtc;
-            type = (monitor->x11.output == primary) ? 0 : 1; _glfwInputMonitor(monitor,0x00040001/*connected*/,type); XRRFreeOutputInfo(oi); XRRFreeCrtcInfo(ci);
+            type = (monitor->x11.output == primary) ? 0 : 1; _glfwInputMonitor(monitor,0x00040001/*connected*/,type); _glfw.x11.randr.FreeOutputInfo(oi); _glfw.x11.randr.FreeCrtcInfo(ci);
         }
 
-        XRRFreeScreenResources(sr);
+        _glfw.x11.randr.FreeScreenResources(sr);
         for (int i = 0;  i < disconnectedCount;  i++) { if (disconnected[i]) {_glfwInputMonitor(disconnected[i],0x00040002/*disconnected*/,0);} }
         free(disconnected);
     }
 
     void _glfwGetMonitorWorkareaX11(_GLFWmonitor* monitor,int* xpos,int* ypos,int* width,int* height) {
         int areaX = 0, areaY = 0, areaWidth = 0, areaHeight = 0;
-        XRRScreenResources* sr = XRRGetScreenResourcesCurrent(_glfw.x11.display,_glfw.x11.root);
-        XRRCrtcInfo* ci = XRRGetCrtcInfo(_glfw.x11.display,sr,monitor->x11.crtc);
+        XRRScreenResources* sr = _glfw.x11.randr.GetScreenResourcesCurrent(_glfw.x11.display,_glfw.x11.root);
+        XRRCrtcInfo* ci = _glfw.x11.randr.GetCrtcInfo(_glfw.x11.display,sr,monitor->x11.crtc);
         const XRRModeInfo* mi = getModeInfo(sr,ci->mode);
         areaX = ci->x, areaY = ci->y;
         if (ci->rotation == 2 || ci->rotation == 8) { areaWidth = mi->height, areaHeight = mi->width; } // ==90, ==270
         else { areaWidth = mi->width, areaHeight = mi->height; }
-        XRRFreeCrtcInfo(ci), XRRFreeScreenResources(sr);
+        _glfw.x11.randr.FreeCrtcInfo(ci), _glfw.x11.randr.FreeScreenResources(sr);
         if (_glfw.x11.NET_WORKAREA && _glfw.x11.NET_CURRENT_DESKTOP) {
             Atom *extents = NULL, *desktop = NULL;
             const unsigned long extentCount = _glfwGetWindowPropertyX11(_glfw.x11.root,_glfw.x11.NET_WORKAREA,((Atom) 6),(unsigned char**) &extents);
@@ -1399,11 +1186,11 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     }
 
     void _glfwGetVideoModeX11(_GLFWmonitor* monitor,GLFWvidmode* mode) {
-        XRRScreenResources* sr = XRRGetScreenResourcesCurrent(_glfw.x11.display,_glfw.x11.root);
+        XRRScreenResources* sr = _glfw.x11.randr.GetScreenResourcesCurrent(_glfw.x11.display,_glfw.x11.root);
         const XRRModeInfo* mi = NULL;
-        XRRCrtcInfo* ci = XRRGetCrtcInfo(_glfw.x11.display,sr,monitor->x11.crtc);
-        if (ci) { mi = getModeInfo(sr,ci->mode); if (mi) {*mode = vidmodeFromModeInfo(mi,ci);} XRRFreeCrtcInfo(ci); }
-        XRRFreeScreenResources(sr);
+        XRRCrtcInfo* ci = _glfw.x11.randr.GetCrtcInfo(_glfw.x11.display,sr,monitor->x11.crtc);
+        if (ci) { mi = getModeInfo(sr,ci->mode); if (mi) {*mode = vidmodeFromModeInfo(mi,ci);} _glfw.x11.randr.FreeCrtcInfo(ci); }
+        _glfw.x11.randr.FreeScreenResources(sr);
     }
 
     static int translateKeySyms(const KeySym* keysyms, int width) {
@@ -1427,53 +1214,23 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
             if (r != -1) return r;
         }
         switch (k) {
-            case 0xff1b: return GLFW_KEY_ESCAPE;
-            case 0xff09: return GLFW_KEY_TAB;
-            case 0xff0d: return GLFW_KEY_ENTER;
-            case 0xff08: return GLFW_KEY_BACKSPACE;
-            case 0xffff: return GLFW_KEY_DELETE;
-            case 0xff50: return GLFW_KEY_HOME;
-            case 0xff57: return GLFW_KEY_END;
-            case 0xff55: return GLFW_KEY_PAGE_UP;
-            case 0xff56: return GLFW_KEY_PAGE_DOWN;
-            case 0xff63: return GLFW_KEY_INSERT;
-            case 0xff51: return GLFW_KEY_LEFT;
-            case 0xff53: return GLFW_KEY_RIGHT;
-            case 0xff54: return GLFW_KEY_DOWN;
-            case 0xff52: return GLFW_KEY_UP;
-            case 0xff13: return GLFW_KEY_PAUSE;
-            case 0xff14: return GLFW_KEY_SCROLL_LOCK;
-            case 0xff61: return GLFW_KEY_PRINT_SCREEN;
-            case 0xff7f: return GLFW_KEY_NUM_LOCK;
-            case 0xffe5: return GLFW_KEY_CAPS_LOCK;
-            case 0xff67: return GLFW_KEY_MENU;
-            case 0xffe1: return GLFW_KEY_LEFT_SHIFT;
-            case 0xffe2: return GLFW_KEY_RIGHT_SHIFT;
-            case 0xffe3: return GLFW_KEY_LEFT_CONTROL;
-            case 0xffe4: return GLFW_KEY_RIGHT_CONTROL;
+            case 0xff1b: return GLFW_KEY_ESCAPE; case 0xff09: return GLFW_KEY_TAB; case 0xff0d: return GLFW_KEY_ENTER;
+            case 0xff08: return GLFW_KEY_BACKSPACE; case 0xffff: return GLFW_KEY_DELETE; case 0xff50: return GLFW_KEY_HOME;
+            case 0xff57: return GLFW_KEY_END; case 0xff55: return GLFW_KEY_PAGE_UP; case 0xff56: return GLFW_KEY_PAGE_DOWN;
+            case 0xff63: return GLFW_KEY_INSERT; case 0xff51: return GLFW_KEY_LEFT; case 0xff53: return GLFW_KEY_RIGHT;
+            case 0xff54: return GLFW_KEY_DOWN; case 0xff52: return GLFW_KEY_UP; case 0xff13: return GLFW_KEY_PAUSE;
+            case 0xff14: return GLFW_KEY_SCROLL_LOCK; case 0xff61: return GLFW_KEY_PRINT_SCREEN; case 0xff7f: return GLFW_KEY_NUM_LOCK;
+            case 0xffe5: return GLFW_KEY_CAPS_LOCK; case 0xff67: return GLFW_KEY_MENU; case 0xffe1: return GLFW_KEY_LEFT_SHIFT;
+            case 0xffe2: return GLFW_KEY_RIGHT_SHIFT; case 0xffe3: return GLFW_KEY_LEFT_CONTROL; case 0xffe4: return GLFW_KEY_RIGHT_CONTROL;
             case 0xffe7: case 0xffe9: return GLFW_KEY_LEFT_ALT;   // Meta_L, Alt_L
             case 0xff7e: case 0xfe03: case 0xffe8: case 0xffea: return GLFW_KEY_RIGHT_ALT; // Mode_switch, ISO_Level3_Shift, Meta_R, Alt_R
-            case 0xffeb: return GLFW_KEY_LEFT_SUPER;
-            case 0xffec: return GLFW_KEY_RIGHT_SUPER;
-            case 0xffaa: return GLFW_KEY_KP_MULTIPLY;
-            case 0xffab: return GLFW_KEY_KP_ADD;
-            case 0xffad: return GLFW_KEY_KP_SUBTRACT;
-            case 0xffaf: return GLFW_KEY_KP_DIVIDE;
-            case 0xffbd: return GLFW_KEY_KP_EQUAL;
-            case 0xff8d: return GLFW_KEY_KP_ENTER;
-            case 0x0020: return GLFW_KEY_SPACE;
-            case 0x0027: return GLFW_KEY_APOSTROPHE;
-            case 0x002c: return GLFW_KEY_COMMA;
-            case 0x002d: return GLFW_KEY_MINUS;
-            case 0x002e: return GLFW_KEY_PERIOD;
-            case 0x002f: return GLFW_KEY_SLASH;
-            case 0x003b: return GLFW_KEY_SEMICOLON;
-            case 0x003d: return GLFW_KEY_EQUAL;
-            case 0x005b: return GLFW_KEY_LEFT_BRACKET;
-            case 0x005c: return GLFW_KEY_BACKSLASH;
-            case 0x005d: return GLFW_KEY_RIGHT_BRACKET;
-            case 0x0060: return GLFW_KEY_GRAVE_ACCENT;
-            default:     return GLFW_KEY_UNKNOWN;
+            case 0xffeb: return GLFW_KEY_LEFT_SUPER; case 0xffec: return GLFW_KEY_RIGHT_SUPER; case 0xffaa: return GLFW_KEY_KP_MULTIPLY;
+            case 0xffab: return GLFW_KEY_KP_ADD; case 0xffad: return GLFW_KEY_KP_SUBTRACT; case 0xffaf: return GLFW_KEY_KP_DIVIDE;
+            case 0xffbd: return GLFW_KEY_KP_EQUAL; case 0xff8d: return GLFW_KEY_KP_ENTER; case 0x0020: return GLFW_KEY_SPACE;
+            case 0x0027: return GLFW_KEY_APOSTROPHE; case 0x002c: return GLFW_KEY_COMMA; case 0x002d: return GLFW_KEY_MINUS;
+            case 0x002e: return GLFW_KEY_PERIOD; case 0x002f: return GLFW_KEY_SLASH; case 0x003b: return GLFW_KEY_SEMICOLON;
+            case 0x003d: return GLFW_KEY_EQUAL; case 0x005b: return GLFW_KEY_LEFT_BRACKET; case 0x005c: return GLFW_KEY_BACKSLASH;
+            case 0x005d: return GLFW_KEY_RIGHT_BRACKET; case 0x0060: return GLFW_KEY_GRAVE_ACCENT; default: return GLFW_KEY_UNKNOWN;
         }
     }
 
@@ -1674,12 +1431,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
         return 0;
     }
 
-    static GLFWglproc getProcAddressGLX(const char* procname) {
-        if (_glfw.glx.GetProcAddress) return _glfw.glx.GetProcAddress((const GLubyte*) procname);
-        else if (_glfw.glx.GetProcAddressARB) return _glfw.glx.GetProcAddressARB((const GLubyte*) procname);
-        else return _glfwPlatformGetModuleSymbol(_glfw.glx.handle, procname);
-    }
-
+    static GLFWglproc getProcAddressGLX(const char* procname) { return _glfw.glx.GetProcAddress((const GLubyte*) procname); }
     #define PLATFORM_getCursorPos(w,x,y)            _glfwGetCursorPosX11(w,x,y)
     #define PLATFORM_setCursorPos(w,x,y)            _glfwSetCursorPosX11(w,x,y)
     #define PLATFORM_setCursorMode(w)               _glfwSetCursorModeX11(w)
@@ -1722,7 +1474,7 @@ int WindowInit(void) {
         if (_glfw.win32.ntdll.instance) _glfw.win32.ntdll.RtlVerifyVersionInfo_ = (PFN_RtlVerifyVersionInfo)_glfwPlatformGetModuleSymbol(_glfw.win32.ntdll.instance, "RtlVerifyVersionInfo");
         createKeyTables();
         MSG msg; WNDCLASSEXW wc={0}; wc.cbSize=sizeof(wc); // Start making of a helper window
-        wc.style = CS_OWNDC; wc.lpfnWndProc = (WNDPROC) helperWindowProc; wc.hInstance = _glfw.win32.instance; wc.lpszClassName = L"GLFW3 Helper";
+        wc.style = CS_OWNDC; wc.lpfnWndProc = (WNDPROC)helperWindowProc; wc.hInstance = _glfw.win32.instance; wc.lpszClassName = L"GLFW3 Helper";
         _glfw.win32.helperWindowClass = RegisterClassExW(&wc);
         _glfw.win32.helperWindowHandle = CreateWindowExW(WS_EX_OVERLAPPEDWINDOW,(LPCWSTR)MAKEINTATOM(_glfw.win32.helperWindowClass),L"GLFW message window",WS_CLIPSIBLINGS|WS_CLIPCHILDREN,0,0,1,1,NULL,NULL,_glfw.win32.instance,NULL);
         ShowWindow(_glfw.win32.helperWindowHandle, SW_HIDE);
@@ -1794,14 +1546,11 @@ int WindowInit(void) {
         _glfw.x11.randr.GetOutputInfo          = (PFN_XRRGetOutputInfo)          _glfwPlatformGetModuleSymbol(_glfw.x11.randr.handle,"XRRGetOutputInfo");
         _glfw.x11.randr.GetOutputPrimary       = (PFN_XRRGetOutputPrimary)       _glfwPlatformGetModuleSymbol(_glfw.x11.randr.handle,"XRRGetOutputPrimary");
         _glfw.x11.randr.GetScreenResourcesCurrent=(PFN_XRRGetScreenResourcesCurrent)_glfwPlatformGetModuleSymbol(_glfw.x11.randr.handle,"XRRGetScreenResourcesCurrent");
-        _glfw.x11.randr.QueryExtension         = (PFN_XRRQueryExtension)         _glfwPlatformGetModuleSymbol(_glfw.x11.randr.handle,"XRRQueryExtension");
-        _glfw.x11.randr.QueryVersion           = (PFN_XRRQueryVersion)           _glfwPlatformGetModuleSymbol(_glfw.x11.randr.handle,"XRRQueryVersion");
         _glfw.x11.randr.SelectInput            = (PFN_XRRSelectInput)            _glfwPlatformGetModuleSymbol(_glfw.x11.randr.handle,"XRRSelectInput");
-        _glfw.x11.randr.SetCrtcConfig          = (PFN_XRRSetCrtcConfig)          _glfwPlatformGetModuleSymbol(_glfw.x11.randr.handle,"XRRSetCrtcConfig");
         _glfw.x11.randr.UpdateConfiguration   = (PFN_XRRUpdateConfiguration)    _glfwPlatformGetModuleSymbol(_glfw.x11.randr.handle,"XRRUpdateConfiguration");
-        XRRScreenResources* sr = XRRGetScreenResourcesCurrent(_glfw.x11.display,_glfw.x11.root);
-        XRRFreeScreenResources(sr);
-        XRRSelectInput(_glfw.x11.display,_glfw.x11.root,(1L << 2)/*change notify mask*/);
+        XRRScreenResources* sr = _glfw.x11.randr.GetScreenResourcesCurrent(_glfw.x11.display,_glfw.x11.root);
+        _glfw.x11.randr.FreeScreenResources(sr);
+        _glfw.x11.randr.SelectInput(_glfw.x11.display,_glfw.x11.root,(1L << 2)/*change notify mask*/);
         _glfw.x11.xcursor.handle = _glfwPlatformLoadModule("libXcursor.so.1");
         _glfw.x11.xcursor.ImageCreate      = (PFN_XcursorImageCreate)      _glfwPlatformGetModuleSymbol(_glfw.x11.xcursor.handle,"XcursorImageCreate");
         _glfw.x11.xcursor.ImageDestroy     = (PFN_XcursorImageDestroy)     _glfwPlatformGetModuleSymbol(_glfw.x11.xcursor.handle,"XcursorImageDestroy");
@@ -1835,14 +1584,12 @@ int WindowInit(void) {
         #undef GA
         if (sa) _glfw.x11.xlib.Free(sa);
         XSetWindowAttributes wa; wa.event_mask = (1L<<22);
-        _glfw.x11.helperWindowHandle = _glfw.x11.xlib.CreateWindow(_glfw.x11.display,_glfw.x11.root,0,0,1,1,0,0,2/*input only*/,DefaultVisual(_glfw.x11.display,_glfw.x11.screen),(1L<<11)/*event mask*/,&wa);
-        XcursorImage* native = XcursorImageCreate(16,16); __builtin_memset(native->pixels,0,256*sizeof(XcursorUInt)); native->xhot=native->yhot=0;
-        _glfw.x11.hiddenCursorHandle = XcursorImageLoadCursor(_glfw.x11.display,native); XcursorImageDestroy(native);
+        _glfw.x11.xlib.CreateWindow(_glfw.x11.display,_glfw.x11.root,0,0,1,1,0,0,2/*input only*/,DefaultVisual(_glfw.x11.display,_glfw.x11.screen),(1L<<11)/*event mask*/,&wa);
+        XcursorImage* native = _glfw.x11.xcursor.ImageCreate(16,16); __builtin_memset(native->pixels,0,256*sizeof(XcursorUInt)); native->xhot=native->yhot=0;
+        _glfw.x11.hiddenCursorHandle = _glfw.x11.xcursor.ImageLoadCursor(_glfw.x11.display,native); _glfw.x11.xcursor.ImageDestroy(native);
         _glfwPollMonitorsX11();
     #endif
     _glfwPlatformCreateTls(&_glfw.contextSlot);
-    _glfwPlatformInitTimer();
-    _glfw.timer.offset = _glfwPlatformGetTimerValue();
     return  1;
 }
 
@@ -1991,9 +1738,8 @@ GLFWwindow* glfwCreateWindow(int width, int height, char* title) {
     _glfw.glx.CreateWindow = (PFNGLXCREATEWINDOWPROC)_glfwPlatformGetModuleSymbol(_glfw.glx.handle,"glXCreateWindow");
     _glfw.glx.GetVisualFromFBConfig = (PFNGLXGETVISUALFROMFBCONFIGPROC)_glfwPlatformGetModuleSymbol(_glfw.glx.handle,"glXGetVisualFromFBConfig");
     _glfw.glx.GetProcAddress = (PFNGLXGETPROCADDRESSPROC)_glfwPlatformGetModuleSymbol(_glfw.glx.handle,"glXGetProcAddress");
-    _glfw.glx.GetProcAddressARB = (PFNGLXGETPROCADDRESSPROC)_glfwPlatformGetModuleSymbol(_glfw.glx.handle,"glXGetProcAddressARB");
-    glXQueryExtension(_glfw.x11.display,&_glfw.glx.errorBase,&_glfw.glx.eventBase);
-    glXQueryVersion(_glfw.x11.display,&_glfw.glx.major,&_glfw.glx.minor);
+    _glfw.glx.QueryExtension(_glfw.x11.display,&_glfw.glx.errorBase,&_glfw.glx.eventBase);
+    _glfw.glx.QueryVersion(_glfw.x11.display,&_glfw.glx.major,&_glfw.glx.minor);
     _glfw.glx.SwapIntervalEXT = (PFNGLXSWAPINTERVALEXTPROC)getProcAddressGLX("glXSwapIntervalEXT");
     _glfw.glx.CreateContextAttribsARB = (PFNGLXCREATECONTEXTATTRIBSARBPROC)getProcAddressGLX("glXCreateContextAttribsARB");
     GLXFBConfig native; XVisualInfo* result;
