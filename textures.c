@@ -304,7 +304,7 @@ static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
     OS_DeallocateRAM(data, sz); return true;
 }
 
-void glfwSetWindowIcon(GLFWwindow* handle, int count, const GLFWimage* images); extern GLFWwindow* window;
+void glfwSetWindowIcon(GLFWwindow* handle, const GLFWimage* images); extern GLFWwindow* window;
 void LoadTextures(void) {
     double start_time = get_time();
     loadedTexturesMaxIndex = totalPixels = totalPaletteColors = 0u;
@@ -423,7 +423,7 @@ void LoadTextures(void) {
     if (!pixels) { DualLogError("Failed to load icon: %s\n",Sys_Global.global_winicon); OS_Exit(1); }
     
     GLFWimage image = (GLFWimage){w,h,pixels};
-    glfwSetWindowIcon(window,1,&image);
+    glfwSetWindowIcon(window,&image);
     OS_DeallocateRAM(file_buffer,windowIconFileSize);
     OS_DeallocateRAM(stbi_arena_main.base,STBI_ARENA_SIZE); stbi_arena_main.base = NULL;
     DualLog(" took %.6f secs\n",get_time() - start_time);

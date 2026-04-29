@@ -7,9 +7,6 @@
 #include "interop.h"
 #define MAX_KEYS 512
 #define MAX_MOUSE_BUTTONS 8
-#define MAX_JOYSTICK_BUTTONS 16
-#define MAX_JOYSTICK_HATS 5
-#define MAX_GAMEPAD_BUTTONS 20
 #define VERTEX_ATTRIBUTES_SIZE 16 // Was 32
 #define TEXT_BUFFER_SIZE 1024
 #define FONT_ATLAS_SIZE 4672
@@ -17,7 +14,7 @@
 typedef struct {bool down,pressed,released;} KeyState;
 typedef struct {
 	double last_mouse_x,last_mouse_y,scrollDelta;
-	KeyState keyStates[MAX_KEYS],mouseButtons[MAX_MOUSE_BUTTONS],gamepadButtons[MAX_GAMEPAD_BUTTONS],joystickButtons[16][MAX_JOYSTICK_BUTTONS],joystickHats[MAX_JOYSTICK_HATS]; // What can I say, I'm a man of many hats. ^^D
+	KeyState keyStates[MAX_KEYS],mouseButtons[MAX_MOUSE_BUTTONS],joystickButtons[16][16],joystickHats[5]; // What can I say, I'm a man of many hats. ^^D
     i32 currentMouse_dx,currentMouse_dy;
 	bool window_has_focus,ignore_next_mouse_delta,lastUse,isCapsLockOn,joystickPresent[16];
 } InputSystem;

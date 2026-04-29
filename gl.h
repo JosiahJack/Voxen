@@ -92,8 +92,6 @@ typedef void (  *PFNGLGETINTEGERVPROC)(GLenum pname, GLint * data);
 typedef void (  *PFNGLGETPROGRAMIVPROC)(GLuint program, GLenum pname, GLint * params);
 typedef void (  *PFNGLGETSHADERINFOLOGPROC)(GLuint shader, GLsizei bufSize, GLsizei * length, GLchar * infoLog);
 typedef void (  *PFNGLGETSHADERIVPROC)(GLuint shader, GLenum pname, GLint * params);
-typedef const GLubyte * (  *PFNGLGETSTRINGPROC)(GLenum name);
-typedef const GLubyte * (  *PFNGLGETSTRINGIPROC)(GLenum name, GLuint index);
 typedef void (  *PFNGLLINEWIDTHPROC)(GLfloat width);
 typedef void (  *PFNGLLINKPROGRAMPROC)(GLuint program);
 typedef void * (  *PFNGLMAPBUFFERRANGEPROC)(GLenum target, GLintptr offset, GLsizeiptr length, GLbitfield access);
@@ -267,8 +265,6 @@ PFNGLCLEARBUFFERFVPROC glClearBufferFv;
 #define GLFW_KEY_BACKSLASH          92  /* \ */
 #define GLFW_KEY_RIGHT_BRACKET      93  /* ] */
 #define GLFW_KEY_GRAVE_ACCENT       96  /* ` */
-#define GLFW_KEY_WORLD_1            161 /* non-US #1 */
-#define GLFW_KEY_WORLD_2            162 /* non-US #2 */
 #define GLFW_KEY_ESCAPE             256
 #define GLFW_KEY_ENTER              257
 #define GLFW_KEY_TAB                258
@@ -375,42 +371,9 @@ PFNGLCLEARBUFFERFVPROC glClearBufferFv;
 #define GLFW_JOYSTICK_15            14
 #define GLFW_JOYSTICK_16            15
 #define GLFW_JOYSTICK_LAST          GLFW_JOYSTICK_16
-#define GLFW_GAMEPAD_BUTTON_A               0
-#define GLFW_GAMEPAD_BUTTON_B               1
-#define GLFW_GAMEPAD_BUTTON_X               2
-#define GLFW_GAMEPAD_BUTTON_Y               3
-#define GLFW_GAMEPAD_BUTTON_LEFT_BUMPER     4
-#define GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER    5
-#define GLFW_GAMEPAD_BUTTON_BACK            6
-#define GLFW_GAMEPAD_BUTTON_START           7
-#define GLFW_GAMEPAD_BUTTON_GUIDE           8
-#define GLFW_GAMEPAD_BUTTON_LEFT_THUMB      9
-#define GLFW_GAMEPAD_BUTTON_RIGHT_THUMB     10
-#define GLFW_GAMEPAD_BUTTON_DPAD_UP         11
-#define GLFW_GAMEPAD_BUTTON_DPAD_RIGHT      12
-#define GLFW_GAMEPAD_BUTTON_DPAD_DOWN       13
-#define GLFW_GAMEPAD_BUTTON_DPAD_LEFT       14
-#define GLFW_GAMEPAD_BUTTON_LAST            GLFW_GAMEPAD_BUTTON_DPAD_LEFT
-#define GLFW_GAMEPAD_BUTTON_CROSS       GLFW_GAMEPAD_BUTTON_A
-#define GLFW_GAMEPAD_BUTTON_CIRCLE      GLFW_GAMEPAD_BUTTON_B
-#define GLFW_GAMEPAD_BUTTON_SQUARE      GLFW_GAMEPAD_BUTTON_X
-#define GLFW_GAMEPAD_BUTTON_TRIANGLE    GLFW_GAMEPAD_BUTTON_Y
-#define GLFW_GAMEPAD_AXIS_LEFT_X        0
-#define GLFW_GAMEPAD_AXIS_LEFT_Y        1
-#define GLFW_GAMEPAD_AXIS_RIGHT_X       2
-#define GLFW_GAMEPAD_AXIS_RIGHT_Y       3
-#define GLFW_GAMEPAD_AXIS_LEFT_TRIGGER  4
-#define GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER 5
-#define GLFW_GAMEPAD_AXIS_LAST          GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER
-#define GLFW_ANY_POSITION           0x80000000
 #define GLFW_DONT_CARE              -1
 typedef void (*GLFWglproc)(void);
-typedef struct GLFWmonitor GLFWmonitor;
-typedef struct GLFWwindow GLFWwindow;
-typedef void (* GLFWwindowfocusfun)(GLFWwindow* window, int focused);
-typedef void (* GLFWframebuffersizefun)(GLFWwindow* window, int width, int height);
-typedef void (* GLFWmonitorfun)(GLFWmonitor* monitor, int event);
-typedef void (* GLFWjoystickfun)(int jid, int event);
+typedef struct GLFWmonitor GLFWmonitor; typedef struct GLFWwindow GLFWwindow;
 typedef struct GLFWvidmode { int width,height,redBits,greenBits,blueBits,refreshRate; } GLFWvidmode;
 typedef struct GLFWimage { int width,height; unsigned char* pixels; } GLFWimage;
 typedef struct GLFWgamepadstate { unsigned char buttons[15]; float axes[6]; } GLFWgamepadstate;

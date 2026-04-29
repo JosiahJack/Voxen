@@ -43,7 +43,7 @@ float wav_volumes[MAX_CHANNELS]; // Setting independent base sfx volume (e.g. dr
 i32 wav_count = 0; ma_sound log_sound;
 MenuPages currentMenuPage = MenuPages_FrontPage;
 static bool resDropdownOpen = false; static int resDropdownCount=0,resSelectedIdx=0;
-typedef struct { int w, h, hz; } ResMode;
+typedef struct {int w,h;} ResMode;
 static ResMode resModes[8];
 typedef struct { Vector3 position; Quaternion rotation; u8 fov; u16 width,height; float near,far,finished; bool visible; } CamView;
 CamView camViews[64]; GLuint camViewTextures[64]; u8 camViewCount = 0; // Max is 8 cam views on level 8 + 3 sensaround views = 11.
@@ -848,7 +848,7 @@ InputSystem Sys_Input;
 extern u16 editModeTestEntityDefinition;
 extern u16 editModeSelection;
 typedef struct { const char* name; int value; } InputElement;
-InputElement inputElements[149] = {
+InputElement inputElements[134] = {
     { "A", GLFW_KEY_A }, { "B", GLFW_KEY_B }, { "C", GLFW_KEY_C }, { "D", GLFW_KEY_D }, { "E", GLFW_KEY_E }, { "F", GLFW_KEY_F }, { "G", GLFW_KEY_G }, { "H", GLFW_KEY_H }, { "I", GLFW_KEY_I }, { "J", GLFW_KEY_J },
     { "K", GLFW_KEY_K }, { "L", GLFW_KEY_L }, { "M", GLFW_KEY_M }, { "N", GLFW_KEY_N }, { "O", GLFW_KEY_O }, { "P", GLFW_KEY_P }, { "Q", GLFW_KEY_Q }, { "R", GLFW_KEY_R }, { "S", GLFW_KEY_S }, { "T", GLFW_KEY_T },
     { "U", GLFW_KEY_U }, { "V", GLFW_KEY_V }, { "W", GLFW_KEY_W }, { "X", GLFW_KEY_X }, { "Y", GLFW_KEY_Y }, { "Z", GLFW_KEY_Z }, { "1", GLFW_KEY_1 }, { "2", GLFW_KEY_2 }, { "3", GLFW_KEY_3 }, { "4", GLFW_KEY_4 },
@@ -862,8 +862,7 @@ InputElement inputElements[149] = {
     { "F10", GLFW_KEY_F10 }, { "F11", GLFW_KEY_F11 }, { "F12", GLFW_KEY_F12 }, { "GRAVE", GLFW_KEY_GRAVE_ACCENT }, { "-", GLFW_KEY_MINUS }, { "=", GLFW_KEY_EQUAL }, { "[", GLFW_KEY_LEFT_BRACKET }, { "]", GLFW_KEY_RIGHT_BRACKET }, { "\\", GLFW_KEY_BACKSLASH }, { "/", GLFW_KEY_SLASH },
     { ".", GLFW_KEY_PERIOD }, { ",", GLFW_KEY_COMMA }, { ";", GLFW_KEY_SEMICOLON }, { "'", GLFW_KEY_APOSTROPHE }, { "CAPSLOCK", GLFW_KEY_CAPS_LOCK }, { "NUM 0", GLFW_KEY_KP_0 }, { "NUM 4", GLFW_KEY_KP_4 }, { "NUM 5", GLFW_KEY_KP_5 }, { "NUM 6", GLFW_KEY_KP_6 }, { "NUM 7", GLFW_KEY_KP_7 },
     { "NUM 8", GLFW_KEY_KP_8 }, { "NUM 9", GLFW_KEY_KP_9 }, { "NUM *", GLFW_KEY_KP_MULTIPLY }, { "NUM -", GLFW_KEY_KP_SUBTRACT }, { "NUM .", GLFW_KEY_KP_DECIMAL }, { "MENU", GLFW_KEY_MENU }, { "PAUSE", GLFW_KEY_PAUSE }, { "NUMLOCK", GLFW_KEY_NUM_LOCK }, { "MWHEEL +", 128 }, { "MWHEEL -", 129 }, // 128, 129, Handled special case for mouse wheel + / - respectively
-    { "PRINT", GLFW_KEY_PRINT_SCREEN }, { "JOY 18", GLFW_HAT_DOWN }, { "JOY 19", GLFW_HAT_LEFT }, { "GPAD A", GLFW_GAMEPAD_BUTTON_A }, { "GPAD B", GLFW_GAMEPAD_BUTTON_B }, { "GPAD X", GLFW_GAMEPAD_BUTTON_X }, { "GPAD Y", GLFW_GAMEPAD_BUTTON_Y }, { "GPAD L1", GLFW_GAMEPAD_BUTTON_LEFT_BUMPER }, { "GPAD R1", GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER }, { "GPAD BACK", GLFW_GAMEPAD_BUTTON_BACK },
-    { "GPAD START", GLFW_GAMEPAD_BUTTON_START }, { "GPAD GUIDE", GLFW_GAMEPAD_BUTTON_GUIDE }, { "GPAD LSTICK CLICK", GLFW_GAMEPAD_BUTTON_LEFT_THUMB }, { "GPAD RSTICK CLICK", GLFW_GAMEPAD_BUTTON_RIGHT_THUMB }, { "GPAD D UP", GLFW_GAMEPAD_BUTTON_DPAD_UP }, { "GPAD D RIGHT", GLFW_GAMEPAD_BUTTON_DPAD_RIGHT }, { "GPAD D DOWN", GLFW_GAMEPAD_BUTTON_DPAD_DOWN }, { "GPAD D LEFT", GLFW_GAMEPAD_BUTTON_DPAD_LEFT }, { "UNUSED", 0 } //, {}
+    { "PRINT", GLFW_KEY_PRINT_SCREEN }, { "JOY 18", GLFW_HAT_DOWN }, { "JOY 19", GLFW_HAT_LEFT },{ "UNUSED", 0 } //, {}
 };
 
 typedef enum { SETTING_U8, SETTING_U16, SETTING_INPUT } SettingType;
@@ -887,7 +886,7 @@ const Setting configTable[] = {
     S_IN("Patch +",35),S_IN("Patch -",36),S_IN("Full Map",37),S_IN("Swim Up",38),S_IN("Swim Down",39),S_IN("Screenshot",40)
 };
 const int configTableSize = sizeof(configTable) / sizeof(Setting);
-static inline __attribute__((always_inline)) i32 GetGLFWIndirectionIndexForAnInput(const char* val) { for (int i=0;i<149;++i) {if (StringsEqual(val,inputElements[i].name)) return i;} return 148; }
+static inline __attribute__((always_inline)) i32 GetGLFWIndirectionIndexForAnInput(const char* val) { for (int i=0;i<134;++i) {if (StringsEqual(val,inputElements[i].name)) return i;} return 148; }
 char *GetNextStringUpToNewlineOrEOF(char*,int,OsFileHandle),*data_parser_trim(char*); i32 StringToInt(const char*);
 void LoadConfig(void) {
     OsFileHandle f = OS_OpenReadonly("./Data/Config.ini");
@@ -1078,35 +1077,34 @@ ENGINE_TO_MOD void AddCamView(Vector3 pos, Quaternion rot, u8 fov, u16 width, u1
     GenerateAndBindTexture(&camViewTextures[camViewCount],GL_RGBA8,width,height,GL_RGBA,GL_UNSIGNED_BYTE,GL_NEAREST,NULL); camViewCount++;
 }
 
+static GLFWbool initJoysticks(void) { if (!_glfw.joysticksInitialized && !PLATFORM_initJoysticks()) {return 0;} return _glfw.joysticksInitialized =  1; }
+bool JoystickPresent(int jid) {
+    if (jid < 0 || jid > GLFW_JOYSTICK_LAST) return false;
+    if (!initJoysticks()) return false;
+    _GLFWjoystick* js = _glfw.joysticks + jid;
+    return js->connected ? PLATFORM_pollJoystick(js) : false;
+}
+
 static inline __attribute__((always_inline)) __attribute__((hot)) void Input_Poll(void) {
-    glfwPollEvents();
+    PLATFORM_pollEvents();
     for (int jid = GLFW_JOYSTICK_1; jid <= GLFW_JOYSTICK_LAST; ++jid) {
-        if (!glfwJoystickPresent(jid)) continue;
+        if (!JoystickPresent(jid)) continue;
 
-        int buttonCount;
-        const unsigned char* buttons = glfwGetJoystickButtons(jid,&buttonCount);
-        for (int i = 0; i < buttonCount && i < MAX_JOYSTICK_BUTTONS; ++i) {
-            KeyState* k = &Sys_Input.joystickButtons[GLFW_JOYSTICK_1][i];
-            bool down = buttons[i] == GLFW_PRESS;
-            k->pressed =down&&!k->down; k->released=!down&&k->down; k->down=down;
+        _GLFWjoystick* js = _glfw.joysticks + jid;
+        if (!js->connected) continue;
+
+        PLATFORM_pollJoystick(js);
+        int totalButtons = js->buttonCount + js->hatCount * 4;
+        for (int i = 0; i < totalButtons && i < 16; ++i) {
+            KeyState* k = &Sys_Input.joystickButtons[jid - GLFW_JOYSTICK_1][i];
+            bool down = js->buttons[i] == GLFW_PRESS;
+            k->pressed  = down && !k->down;
+            k->released = !down && k->down;
+            k->down     = down;
         }
 
-        const unsigned char* hats = NULL; int hatCount = 0;
-        if (jid > 0 && jid <= GLFW_JOYSTICK_LAST && initJoysticks()) {
-            _GLFWjoystick* js = _glfw.joysticks + jid;
-            if (js->connected && PLATFORM_pollJoystick(js,2/*buttons*/)) { hatCount = js->hatCount; hats = js->hats; }
-        }
-        
-        for (int i = 0; i < hatCount && i < MAX_JOYSTICK_HATS; ++i) Sys_Input.joystickHats[i].down = hats[i];
-    }
-
-    GLFWgamepadstate s;
-    if (!glfwGetGamepadState(GLFW_JOYSTICK_1,&s)) return;
-
-    for (int i = 0; i < GLFW_GAMEPAD_BUTTON_LAST + 1; ++i) {
-        KeyState* k = &Sys_Input.gamepadButtons[i];
-        bool down = s.buttons[i] == GLFW_PRESS;
-        k->pressed=down&&!k->down; k->released=!down&&k->down; k->down=down;
+        for (int i = 0; i < js->hatCount && i < 5; ++i) { Sys_Input.joystickHats[i].down = js->hats[i]; }
+//         for (int i = 0; i < js->axisCount && i < MAX_JOYSTICK_AXES; ++i) { Sys_Input.joystickAxes[jid - GLFW_JOYSTICK_1][i] = js->axes[i]; } TODO??
     }
 }
 
@@ -1137,7 +1135,7 @@ void CycleToNextMonitor(void) {
 }
 
 GLFWmonitor* GetCurrentMonitor(void) {
-    int wx,wy,ww,wh; glfwGetWindowPos(window,&wx,&wy); glfwGetWindowSize(window,&ww,&wh);
+    int wx=0,wy=0,ww=0,wh=0; PLATFORM_getWindowPos(((_GLFWwindow*)window),&wx,&wy); PLATFORM_getWindowSize(((_GLFWwindow*)window),&ww,&wh);
     GLFWmonitor* bestMonitor = glfwGetPrimaryMonitor();
     int bestArea=0,monitorCount; GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
     for (int i=0;i<monitorCount;++i) {
@@ -1262,10 +1260,10 @@ void GatherResolutionModes(void) {
         for (j = 0; j < resDropdownCount; ++j) {
             if (resModes[j].w == w && resModes[j].h == h) break;
         }
-        if (j == resDropdownCount) resModes[resDropdownCount++] = (ResMode){w,h,desktop->refreshRate};
+        if (j == resDropdownCount) resModes[resDropdownCount++] = (ResMode){w,h};
     }
 
-    if (resDropdownCount < 8) resModes[resDropdownCount++] = (ResMode){desktop->width,desktop->height,desktop->refreshRate};
+    if (resDropdownCount < 8) resModes[resDropdownCount++] = (ResMode){desktop->width,desktop->height};
     resSelectedIdx = 0;
     for (int i = 0; i < resDropdownCount; ++i) {
         if (resModes[i].w == (int)Sys_Settings.ScreenWidth && resModes[i].h == (int)Sys_Settings.ScreenHeight) { resSelectedIdx = i; break; }
@@ -1300,14 +1298,14 @@ void ChangeFullScreenWindowed(void) {
     GLFWmonitor* monitor = monitors[Sys_Settings.CurrentMonitor];
     const GLFWvidmode* mode = glfwGetVideoMode(monitor);
     if (Sys_Settings.Fullscreen) {
-        glfwSetWindowAttrib(window,0);
+        ((_GLFWwindow*)window)->decorated = 0; PLATFORM_setWindowDecorated(((_GLFWwindow*)window),0);
         int x,y,w,h;
         glfwGetMonitorWorkarea(monitor,&x,&y,&w,&h);
         glfwSetWindowMonitor(window,x,y,w,h);
         Sys_Settings.ScreenWidth = w;
         Sys_Settings.ScreenHeight = h;
     } else {
-        glfwSetWindowAttrib(window,1);
+        ((_GLFWwindow*)window)->decorated = 1; PLATFORM_setWindowDecorated(((_GLFWwindow*)window),1);
         int mx, my; 
         glfwGetMonitorPos(monitor,&mx,&my);
         int x,y,w,h;
@@ -1332,7 +1330,7 @@ void ChangeFullScreenWindowed(void) {
 #else
     #define PLATFORM_DLERROR() dlerror()
 #endif
-void SetVSync(void) { glfwSwapInterval((i32)Sys_Settings.Vsync); }
+void SetVSync(void) { _GLFWwindow* window = _glfwPlatformGetTls(&_glfw.contextSlot); window->context.swapInterval((i32)Sys_Settings.Vsync); }
 void SetGI(void) { }// TODO: Set needed Voxel GI uniforms from Sys_Settings.GI
 void LoadTextForLanguage(u8),LoadLogTextForLanguage(u8); bool GetKey(int settingIndex),GetKeyPressed(int settingIndex); void* mod_handle = NULL;
 void SetLanguage(void) { LoadTextForLanguage(Sys_Settings.Language); LoadLogTextForLanguage(Sys_Settings.Language); }
@@ -1365,7 +1363,7 @@ void LoadModFunctions(void) {
 void OpenMainMenu(void) { PlayMenuMusic(); Sys_Global.menuActive = true; currentMenuPage = MenuPages_FrontPage; }
 
 extern bool mouseMovementThisFrame;
-bool MenuEnter(void) { return (Sys_Input.keyStates[GLFW_KEY_KP_ENTER].pressed || Sys_Input.keyStates[GLFW_KEY_ENTER].pressed || Sys_Input.gamepadButtons[GLFW_GAMEPAD_BUTTON_A].pressed); }
+bool MenuEnter(void) { return (Sys_Input.keyStates[GLFW_KEY_KP_ENTER].pressed || Sys_Input.keyStates[GLFW_KEY_ENTER].pressed); }
 u8 UI_Interactable(i16 x, i16 y, float w, float h, bool* cursorOver, i8 this, bool sustained) {
     bool cursorIsOver = CursorIsOverBounds(x,x + w,y + h,y);
     if (cursorIsOver && mouseMovementThisFrame) { currentMenuItem = this; if (cursorOver != NULL) {*cursorOver = cursorIsOver;} }
@@ -1432,9 +1430,7 @@ ENGINE_TO_MOD void MenuGoBack(void) {
 
 void ChangeMenuPage(MenuPages pg) { currentMenuPage = pg; currentMenuItem = currentMenuTab = 0; }
 
-void RenderMenu(void) {
-    if (Sys_Input.gamepadButtons[GLFW_GAMEPAD_BUTTON_B].pressed && currentMenuPage != MenuPages_FrontPage) { MenuGoBack(); return; }
-    
+void RenderMenu(void) {    
     if (currentMenuPage != MenuPages_IntroVideo && currentMenuPage != MenuPages_CreditsVideo && currentMenuPage != MenuPages_Options) RenderUIImage(-417,-384, 2200,1536, 1026); // Menu background
     if (currentMenuPage == MenuPages_IntroVideo || currentMenuPage == MenuPages_CreditsVideo) RenderUIImage(-417,-384, 2200,1536, 0); // Video blackground
     if (currentMenuPage == MenuPages_Options) RenderUIImage(-417,-384, 2200,1536, 1032); // Menu background
@@ -1498,7 +1494,7 @@ void RenderMenu(void) {
                 if (UI_Button(190,726,328,16,&overRes,7) || (MenuEnter() && currentMenuItem == 7)) { resDropdownOpen = !resDropdownOpen; currentMenuItem = 7; }
                 overRes = overRes || currentMenuItem == 7;
                 char resBuf[32];
-                if (resDropdownCount > 0) StringFormat(resBuf, sizeof(resBuf), "%ux%u %uHz",Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight,(u32)resModes[resSelectedIdx].hz);
+                if (resDropdownCount > 0) StringFormat(resBuf, sizeof(resBuf), "%ux%u",(u32)resModes[resSelectedIdx].w,(u32)resModes[resSelectedIdx].h);
                 else StringFormat(resBuf, sizeof(resBuf), "%ux%u",Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
 
                 RenderUIImage(476, 710, 16, 16, overRes ? 1119 : 1077);
@@ -1513,7 +1509,7 @@ void RenderMenu(void) {
                         u8 color = isSelected ? TEXT_YELLOW : (overItem ? TEXT_GREEN : TEXT_WHITE);
                         RenderUIImage(190, (i16)(itemBaseY + 24),328,24,1120);
                         char itemBuf[32];
-                        StringFormat(itemBuf,sizeof(itemBuf),"%dx%d %dHz",resModes[i].w,resModes[i].h,resModes[i].hz);
+                        StringFormat(itemBuf,sizeof(itemBuf),"%dx%d",(u32)resModes[i].w,(u32)resModes[i].h);
                         RenderFormattedText(200,(i16)(itemBaseY + 4),color,FONT_NORMAL,1.0f,"%s",itemBuf);
                         if (clicked || isEnterSelected) {
                             resSelectedIdx = i;
@@ -1525,7 +1521,7 @@ void RenderMenu(void) {
                             int xpos = mx + (mode->width  - (int)Sys_Settings.ScreenWidth)  / 2;
                             int ypos = my + (mode->height - (int)Sys_Settings.ScreenHeight) / 2;
                             glfwSetWindowSize(window, (int)Sys_Settings.ScreenWidth,(int)Sys_Settings.ScreenHeight);
-                            glfwSetWindowPos(window, xpos, ypos);
+                            glfwSetWindowPos(window,xpos,ypos);
                             UpdateScreenSize((int)Sys_Settings.ScreenWidth,(int)Sys_Settings.ScreenHeight);
                             Sys_Input.ignore_next_mouse_delta = true;
                             resDropdownOpen = false;
@@ -2250,8 +2246,7 @@ i32 main(void) {
     console_log_file = OS_OpenWriteonly("./voxen.log"); // Initialize log system for all prints to go to both stdout and voxen.log file
     DebugRAM("program start");
     DualLog("Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed\n");
-    if (!glfwInit()) { DualLogError("GLFW initialization failed\n"); OS_Exit(1); }
-    
+    WindowInit();
     Sys_Global.globalFrameNum=0,Sys_Global.menuActive=true,Sys_Global.screenshotTimeout=1.0,Sys_Global.creditsPageIndex=1,Sys_Global.difficultyCombat=Sys_Global.difficultyCyber=Sys_Global.difficultyPuzzle=Sys_Global.difficultyMission=2,Sys_Global.deaths=0,Sys_Global.worstFPS=0,Sys_Global.cursorPosition_x=680,Sys_Global.cursorPosition_y=384;
     DualLog("Loading game definition...");
     OsFileHandle gmFP = OS_OpenReadonly("./Data/gamedata.txt");
@@ -2366,7 +2361,7 @@ i32 main(void) {
     DebugRAM("InitializeEnvironment end");
     DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
     while(1) { // Main Loop
-        if (glfwWindowShouldClose(window)) OS_Exit(0);
+        if (((_GLFWwindow*)window)->shouldClose) OS_Exit(0);
         if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad); queuedLevelToLoad = 255u; continue; }
 
         drawCallsRenderedThisFrame = uiImageDrawCallsRenderedThisFrame = shadowDrawCallsRenderedThisFrame = verticesRenderedThisFrame = 0; // Reset per frame
