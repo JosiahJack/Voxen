@@ -3,8 +3,8 @@
 #include "tables_audio.h"
 #define MAX_AMBIENT_NOISES 80 // Equal to number used
 u16 loadedAmbients = 0;
-typedef struct { ma_sound  sound; ma_bool32 loaded; float     length_sec; } AmbientSlot;
-typedef struct { u16    index; const char* filename; } AmbientDef;
+typedef struct { SoundFX sound; u32 loaded; float length_sec; } AmbientSlot;
+typedef struct { u16 index; const char* filename; } AmbientDef;
 u16 ambientRegistry[MAX_AMBIENT_NOISES]; // For ambient_ type entities that play looped sound
 static AmbientSlot ambientSlots[MAX_AMBIENT_NOISES] = {0};
 
@@ -56,8 +56,8 @@ MOD_TO_ENGINE void UpdateAmbientSounds(void) {
                 char path[512];
                 StringFormat(path, sizeof(path), "./Audio/ambient/%s", def->filename);
                 SoundUninit(&slot->sound);
-                ma_result r = SoundInit(path,MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_NO_SPATIALIZATION,NULL,NULL,&slot->sound);
-                if (r != MA_SUCCESS) continue;
+                int r = SoundInit(path,&slot->sound);
+                if (r != 0) continue;
 
                 slot->length_sec = SoundGetLength(&slot->sound);
                 if (slot->length_sec <= 0.0f) { SoundUninit(&slot->sound); continue; }
@@ -67,17 +67,10 @@ MOD_TO_ENGINE void UpdateAmbientSounds(void) {
             }
 
             if (!GetSoundIsPlaying(&slot->sound)) SoundStart(&slot->sound);
-
-            // Time sync
-            if (slot->length_sec > 0.0f) {
-                ma_uint64 cur;
-                SoundGetCurrentFrameCursor(&slot->sound, &cur);
-            }
-
-            // Volume
+            if (slot->length_sec > 0.0f) { u64 cur; SoundGetCurrentFrameCursor(&slot->sound,&cur); } // Time sync
             float vol_factor = (distance <= 1.0f) ? 1.0f
                                : (distance >= max_range) ? 0.0f
-                                 : (max_range - distance) / (max_range - 1.0f);
+                                 : (max_range - distance) / (max_range - 1.0f); // Volume
                                  
             float final_vol = ent->volume * vol_factor;
             SoundSetVolume(&slot->sound, final_vol);
@@ -89,7 +82,7 @@ MOD_TO_ENGINE void UpdateAmbientSounds(void) {
 
 MOD_TO_ENGINE void ResetLevelAudio(void) {
     loadedAmbients = 0;
-    __builtin_memset(ambientRegistry, 0, loadedAmbients * sizeof(u16));
+    SetMemoryToValueForNBytes(ambientRegistry, 0, loadedAmbients * sizeof(u16));
     for (u16 i = START_INDEX_LEVEL_INSTANCES; i<Eng_Global->loadedInstances;++i) {
         if (ConstIndexIsAmbient(Eng_Global->instances[i].index)) {
             ambientRegistry[loadedAmbients] = i;

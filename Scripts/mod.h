@@ -6,7 +6,9 @@ extern GlobalContext* Eng_Global; extern CheatsSystem* Eng_Cheats; extern Settin
 // For use with LiveSplit or other future speedrunner utilities for doing speedruns
 typedef struct __attribute__((packed, aligned(8))) { u64 magicNumber; double thisRunTime; bool isLoading; i32 missionSplitID; } AutoSplitterData;
 extern AutoSplitterData autoSplitter;
-#define NULL 0
+#ifndef NULL
+    #define NULL 0
+#endif
 #define MULTI_MEDIA_TAB_EMAIL_TABLE 0
 #define MULTI_MEDIA_TAB_LOG_TABLE   1
 #define MULTI_MEDIA_TAB_DATA_TABLE  2

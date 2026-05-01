@@ -165,16 +165,16 @@ typedef ma_uint16 wchar_t;
         miniaudio. The risk here is that these types might be too small for a given platform. This
         risk is yours to take and no support will be offered if you enable this option.
         */
-        #ifndef MA_NO_PTHREAD_IN_HEADER
-            #include <pthread.h>    /* Unfortunate #include, but needed for pthread_t, pthread_mutex_t and pthread_cond_t types. */
-            typedef pthread_t       ma_pthread_t;
-            typedef pthread_mutex_t ma_pthread_mutex_t;
-            typedef pthread_cond_t  ma_pthread_cond_t;
-        #else
+        //#ifndef MA_NO_PTHREAD_IN_HEADER
+            //#include <pthread.h>    /* Unfortunate #include, but needed for pthread_t, pthread_mutex_t and pthread_cond_t types. */
+            //typedef pthread_t       ma_pthread_t;
+            //typedef pthread_mutex_t ma_pthread_mutex_t;
+            //typedef pthread_cond_t  ma_pthread_cond_t;
+        //#else
             typedef ma_uintptr      ma_pthread_t;
             typedef union           ma_pthread_mutex_t { char __data[40]; ma_uint64 __alignment; } ma_pthread_mutex_t;
             typedef union           ma_pthread_cond_t  { char __data[48]; ma_uint64 __alignment; } ma_pthread_cond_t;
-        #endif
+        //#endif
     #endif
 
     #if defined(__unix__)
@@ -7758,10 +7758,10 @@ IMPLEMENTATION
 #ifndef miniaudio_c
 #define miniaudio_c
 
-#include <assert.h>
+// #include <assert.h>
 #include <limits.h>         /* For INT_MAX */
-#include <math.h>           /* sin(), etc. */
-#include <stdlib.h>         /* For malloc(), free(), wcstombs(). */
+// #include <math.h>           /* sin(), etc. */
+// #include <stdlib.h>         /* For malloc(), free(), wcstombs(). */
 #include <string.h>         /* For memset() */
 
 #include <stdarg.h>
@@ -8527,7 +8527,7 @@ Standard Library Stuff
 
 ******************************************************************************/
 #ifndef MA_ASSERT
-#define MA_ASSERT(condition)            assert(condition)
+#define MA_ASSERT(condition)            (void)(condition)
 #endif
 
 #ifndef MA_MALLOC
@@ -8575,7 +8575,8 @@ static MA_INLINE void ma_zero_memory_default(void* p, size_t sz)
 #define ma_align_64(x)                  ma_align(x, 8)
 
 #define ma_buffer_frame_capacity(buffer, channels, format) (sizeof(buffer) / ma_get_bytes_per_sample(format) / (channels))
-
+#include <math.h>
+#include <malloc.h>
 static MA_INLINE double ma_sind(double x)
 {
     /* TODO: Implement custom sin(x). */

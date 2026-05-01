@@ -8,8 +8,6 @@ GLFWwindow* window;
 #include "credits.h"
 u8 queuedLevelToLoad = 255u; float berserkSeedTime,cam_pitch,cam_yaw=90.0f,cam_roll,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],modelMatrices[INSTANCE_COUNT*16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
 bool mouseMovementThisFrame,returnToPause=false,fovSliderActive=false,gammaSliderActive=false,masterVolumeSliderActive=false,musicVolumeSliderActive=false,messageVolumeSliderActive=false,sfxVolumeSliderActive=false,enteringPlayerName=false;
-#define MAX_CHANNELS 48 // Max concurrent sounds, must keep track of for volume setting
-ma_engine audio_engine; ma_sound wav_sounds[MAX_CHANNELS];
 u8 currentPlayerNameLength=0; i8 currentMenuItem=0, currentMenuTab=0, menuItemCount=4, menuTabCount=1;
 #include "glfw.c"
 #define CHECK_GL_ERROR() do { GLenum err = glGetError(); if (err != 0) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
@@ -39,8 +37,6 @@ bool doubleSidedTexture[MAX_VALID_TEXTURE],transparentTexture[MAX_VALID_TEXTURE]
 extern u32 gridCellStates[ARRSIZE],modelVertexCounts[MODEL_IDX_MAX]; extern u16 modelTriangleCounts[MODEL_IDX_MAX];
 u32 drawCallsRenderedThisFrame,uiImageDrawCallsRenderedThisFrame,shadowDrawCallsRenderedThisFrame,verticesRenderedThisFrame,drawCallsNormal;
 extern GLuint fontAtlasTex,fontAtlasTexStopD;
-float wav_volumes[MAX_CHANNELS]; // Setting independent base sfx volume (e.g. dropped physics object hard or lightly volume, independent of position).
-i32 wav_count = 0; ma_sound log_sound;
 MenuPages currentMenuPage = MenuPages_FrontPage;
 static bool resDropdownOpen = false; static int resDropdownCount=0,resSelectedIdx=0;
 typedef struct {int w,h;} ResMode;
@@ -324,10 +320,7 @@ static int _font_offset(unsigned char*d,int idx){
     return -1;
 }
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcast-qual"
 static __attribute__((pure)) int stbtt_GetFontOffsetForIndex(const unsigned char*d,int i){return _font_offset((unsigned char*)d,i);}
-#pragma GCC diagnostic pop
 static __attribute__((pure)) int stbtt_FindGlyphIndex(const stbtt_fontinfo*info,int cp){
     u8*d=info->data;u32 im=info->index_map;u16 fmt=ttUSHORT(d+im);
     if(fmt==0){i32 b=ttUSHORT(d+im+2);return cp<b-6?ttBYTE(d+im+6+cp):0;}
@@ -527,7 +520,7 @@ static void _rse(stbtt__bitmap*res,stbtt__edge*e,int n,int ox,int oy){
     float sd[129],*sl,*sl2;if(res->w>64)sl=(float*)TempAlloc((size_t)(res->w*2+1)*sizeof(float));else sl=sd;
     sl2=sl+res->w;y=oy;e[n].y0=(float)(oy+res->h)+1;
     while(j<res->h){float syt=(float)y,syb=(float)y+1;stbtt__active_edge**step=&active;
-        __builtin_memset(sl,0,(size_t)res->w*sizeof(sl[0]));__builtin_memset(sl2,0,((size_t)res->w+1)*sizeof(sl[0]));
+        SetMemoryToValueForNBytes(sl,0,(size_t)res->w*sizeof(sl[0]));SetMemoryToValueForNBytes(sl2,0,((size_t)res->w+1)*sizeof(sl[0]));
         while(*step){stbtt__active_edge*z=*step;if(z->ey<=syt){*step=z->next;z->direction=0;_hhf(&hh,z);}else step=&(*step)->next;}
         while(e->y0<=syb){if(e->y0!=e->y1){stbtt__active_edge*z=_new_ae(&hh,e,ox,syt);if(z){if(j==0&&oy!=0&&z->ey<syt)z->ey=syt;z->next=active;active=z;}}++e;}
         if(active)_fae(sl,sl2+1,res->w,active,syt);
@@ -602,7 +595,7 @@ static void stbtt_GetPackedQuad(const stbtt_packedchar*cd,int pw,int ph,int ci,f
 }
 
 int stbtt_PackBegin(stbtt_pack_context*spc,unsigned char*px,int pw,int ph,int str,int pad,void*a){
-    stbrp_context*ctx=(stbrp_context*)TempAlloc(sizeof(*ctx));*ctx=(stbrp_context){pw-pad,ph-pad,0,0,0};if(px)__builtin_memset(px,0,(size_t)(pw*ph));
+    stbrp_context*ctx=(stbrp_context*)TempAlloc(sizeof(*ctx));*ctx=(stbrp_context){pw-pad,ph-pad,0,0,0};if(px)SetMemoryToValueForNBytes(px,0,(size_t)(pw*ph));
     return *spc=(stbtt_pack_context){a,ctx,pw,ph,str?str:pw,pad,0,1,1,px},1;
 }
 
@@ -687,7 +680,7 @@ void InitFontAtlasses(void){
     TempFree(pc.pack_info);GenerateAndBindTexture(&fontAtlasTex,0x8229/*GL_R8*/,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0x1903/*GL_RED*/,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,bmp);
 
     // Secondary atlas
-    __builtin_memset(bmp,0,FONT_ATLAS_SIZE*FONT_ATLAS_SIZE);
+    SetMemoryToValueForNBytes(bmp,0,FONT_ATLAS_SIZE*FONT_ATLAS_SIZE);
     stbtt_pack_context pc2;stbtt_PackBegin(&pc2,bmp,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0,16,NULL);pc2.h_oversample=4;pc2.v_oversample=4;pc2.skip_missing=1;numPackedGlyphsStopD=0;
     for(int r=0;r<numFontRanges;++r){fontRangesStopD[r].startIndex=numPackedGlyphsStopD;
         for(int i=0;i<fontRangesStopD[r].count;++i){if(numPackedGlyphsStopD>=MAX_GLYPHS)break;u32 cp=fontRangesStopD[r].first+i;stbtt_fontinfo*font=&fontInfo[1];unsigned char*data=fontData[1];
@@ -736,7 +729,7 @@ void LoadTextForLanguage(u8 lang){
 static inline __attribute__((always_inline)) int StringToIntLen(const char*str,size_t len){int v=0;for(size_t i=0;i<len&&str[i]>='0'&&str[i]<='9';++i)v=v*10+(str[i]-'0');return v;}
 static const char* logLocalizations[8]={"./Data/logs_text_english.txt","./Data/logs_text_espanol.txt","./Data/logs_text_deutsch.txt","./Data/logs_text_francais.txt","./Data/logs_text_nihongo.txt","./Data/logs_text_russkiy.txt","./Data/logs_text_italiano.txt","./Data/logs_text_portugues.txt"};
 void LoadLogTextForLanguage(u8 lang){
-    __builtin_memset(Sys_Text.audioLogImagesRefIndicesLH,0,TEXT_LOGS_COUNT*sizeof(u16));__builtin_memset(Sys_Text.audioLogImagesRefIndicesRH,0,TEXT_LOGS_COUNT*sizeof(u16));__builtin_memset(Sys_Text.audioLogType,0,TEXT_LOGS_COUNT*sizeof(u8));__builtin_memset(Sys_Text.audioLogLevelFound,0,TEXT_LOGS_COUNT*sizeof(u8));
+    SetMemoryToValueForNBytes(Sys_Text.audioLogImagesRefIndicesLH,0,TEXT_LOGS_COUNT*sizeof(u16));SetMemoryToValueForNBytes(Sys_Text.audioLogImagesRefIndicesRH,0,TEXT_LOGS_COUNT*sizeof(u16));SetMemoryToValueForNBytes(Sys_Text.audioLogType,0,TEXT_LOGS_COUNT*sizeof(u8));SetMemoryToValueForNBytes(Sys_Text.audioLogLevelFound,0,TEXT_LOGS_COUNT*sizeof(u8));
     char tf[256]={0};strncpy(tf,logLocalizations[lang<8?lang:0],255);
     OsFileHandle dfd=OS_INVALID_HANDLE;int asz=0;
     if(Sys_Text.filelog_data){OS_DeallocateRAM(Sys_Text.filelog_data,Sys_Text.filelog_size);Sys_Text.filelog_data=NULL;Sys_Text.filelog_size=0;}
@@ -834,7 +827,7 @@ static inline __attribute__((always_inline,pure)) bool CursorIsOverBounds(float 
 void RenderLoadingProgress(i32 offset, const char * restrict text) { // Only adds 0.01secs to game startup time.
     ClearAll();
     RenderFormattedText(Sys_Settings.ScreenWidth / 2 - offset, Sys_Settings.ScreenHeight / 2 - 5, TEXT_WHITE, FONT_NORMAL,1.0f,text);
-    glfwSwapBuffers(window);
+    glfwSwapBuffers();
 }
 
 char statusText[TEXT_BUFFER_SIZE];
@@ -957,11 +950,11 @@ ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
     DebugRAM("start of LoadLevel");
     Sys_Global.levelCurrentlyLoading = true; Sys_Global.gamePaused = false; Sys_Global.menuActive = false;
     RenderLoadingProgress(100,"Loading level...");
-    __builtin_memset(lights,0,LIGHT_COUNT * sizeof(Light)); __builtin_memset(lanims,0,LIGHT_COUNT * sizeof(LightAnimation));
-    __builtin_memset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
-    __builtin_memset(modelMatrices,0,INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
-    __builtin_memset(camViews,0,64 * sizeof(CamView)); camViewCount = 0;
-    __builtin_memset(Sys_Global.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
+    SetMemoryToValueForNBytes(lights,0,LIGHT_COUNT * sizeof(Light)); SetMemoryToValueForNBytes(lanims,0,LIGHT_COUNT * sizeof(LightAnimation));
+    SetMemoryToValueForNBytes(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
+    SetMemoryToValueForNBytes(modelMatrices,0,INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
+    SetMemoryToValueForNBytes(camViews,0,64 * sizeof(CamView)); camViewCount = 0;
+    SetMemoryToValueForNBytes(Sys_Global.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
     char filename[20]; // Minimum size for 0 through 13.
     StringFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel);
     levelFileHandle = OS_OpenReadonly(filename);
@@ -992,7 +985,7 @@ ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
     RenderLoadingProgress(120,"Loading voxel lighting data...");
     for (u16 i = START_INDEX_LEVEL_INSTANCES; i < Sys_Global.loadedInstances; i++) Sys_Global.dirtyInstances[i] = true;
     for (u16 i = 0; i < Sys_Global.loadedLights; i++) { lightsNewPosition[i] = lights[i].pos; }
-    __builtin_memset(voxen_Shadow_System.shadowmapIndirectionList,MAX_SHADOWMAPS + 1,Sys_Global.loadedLights * sizeof(u32)); // Set to invalid values for all
+    SetMemoryToValueForNBytes(voxen_Shadow_System.shadowmapIndirectionList,MAX_SHADOWMAPS + 1,Sys_Global.loadedLights * sizeof(u32)); // Set to invalid values for all
     Sys_Global.levelCurrentlyLoading = false;
     DebugRAM("end of LoadLevel");
 }
@@ -1010,7 +1003,7 @@ __attribute__((cold)) void NewGame(void) { // Reset World States
     currentMenuItem = currentMenuTab = 0; currentMenuPage = MenuPages_FrontPage;
     Sys_Global.pauseRelativeTime = Sys_Global.last_physics_time = 0.0;
     Sys_Global.inventoryMode = false;
-    __builtin_memset(Sys_Global.instances,0,2 * sizeof(Entity)); // Blank out player entities
+    SetMemoryToValueForNBytes(Sys_Global.instances,0,2 * sizeof(Entity)); // Blank out player entities
     PlayerInit(PLAYER1); PlayerInit(PLAYER2);
     Sys_Global.instances[WORLD].ioflags = 0u;
     cam_yaw = 90.0f; cam_pitch = 0.0f; cam_roll = 0.0f;
@@ -1069,7 +1062,7 @@ void UpdateScreenSize(i32 width, i32 height) {
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_2D,Sys_Render.outputImageID);
     glBindFramebuffer(GL_FRAMEBUFFER,0);
-    glfwSwapBuffers(window);
+    glfwSwapBuffers();
 }
 
 ENGINE_TO_MOD void AddCamView(Vector3 pos, Quaternion rot, u8 fov, u16 width, u16 height, float near, float far) {    
@@ -1077,7 +1070,7 @@ ENGINE_TO_MOD void AddCamView(Vector3 pos, Quaternion rot, u8 fov, u16 width, u1
     GenerateAndBindTexture(&camViewTextures[camViewCount],GL_RGBA8,width,height,GL_RGBA,GL_UNSIGNED_BYTE,GL_NEAREST,NULL); camViewCount++;
 }
 
-static GLFWbool initJoysticks(void) { if (!_glfw.joysticksInitialized && !PLATFORM_initJoysticks()) {return 0;} return _glfw.joysticksInitialized =  1; }
+static i32 initJoysticks(void) { if (!_glfw.joysticksInitialized && !PLATFORM_initJoysticks()) {return 0;} return _glfw.joysticksInitialized =  1; }
 bool JoystickPresent(int jid) {
     if (jid < 0 || jid > GLFW_JOYSTICK_LAST) return false;
     if (!initJoysticks()) return false;
@@ -1149,101 +1142,6 @@ GLFWmonitor* GetCurrentMonitor(void) {
         if (area > bestArea) { bestArea = area; bestMonitor = monitors[i]; }
     }
     return bestMonitor;
-}
-
-ENGINE_TO_MOD bool GetSoundIsPlaying(ma_sound* sound) { return ma_sound_is_playing(sound); }
-float GetSoundRemainingTime(ma_sound* pSound) {
-    if (!pSound || !ma_sound_is_playing(pSound)) return 0.0f;
-
-    ma_uint64 currentFrame = ma_sound_get_time_in_pcm_frames(pSound);
-    ma_uint64 pcmFramesLength = 0;
-    ma_sound_get_length_in_pcm_frames(pSound, &pcmFramesLength);
-    if (currentFrame >= pcmFramesLength) return 0.0f;
-
-    u64 deltaFrames = pcmFramesLength - currentFrame;
-    u32 sampleRate = ma_engine_get_sample_rate(&audio_engine);
-    return (float)deltaFrames / (float)sampleRate;
-}
-
-void mp3_clear(void) {
-    ma_sound_stop(&Sys_Global.mp3_sounds[0]);
-    ma_sound_stop(&Sys_Global.mp3_sounds[1]);
-    Sys_Global.mp3_slot = 0;
-}
-
-ENGINE_TO_MOD void SoundSetVolume(ma_sound* pSound, float volume) { ma_sound_set_volume(pSound,volume); }
-float GetSFXVolume(float volume) { return ((float)Sys_Settings.VolumeMaster/100.0f) * ((float)Sys_Settings.VolumeEffects/100.0f) * volume; }
-float GetMusicVolume(void) { return ((float)Sys_Settings.VolumeMaster/100.0f) * ((float)Sys_Settings.VolumeMusic/100.0f); }
-float GetMessageVolume(void) { return ((float)Sys_Settings.VolumeMaster/100.0f) * ((float)Sys_Settings.VolumeMessage/100.0f); }
-void set_music_volume(void) { for (int i=0;i<2;++i) { ma_sound_set_volume(&Sys_Global.mp3_sounds[i], GetMusicVolume()); } }
-void set_sfx_volume(void) { for (int i=0;i<MAX_CHANNELS;++i) { ma_sound_set_volume(&wav_sounds[i], GetSFXVolume(wav_volumes[i])); } }
-void set_message_volume(void) { ma_sound_set_volume(&log_sound, GetMessageVolume()); }
-void set_master_volume(void) { set_sfx_volume(); set_music_volume(); set_message_volume(); }
-
-void play_mp3(const char* path, i32 fade_in_ms) {
-    i32 old_slot = Sys_Global.mp3_slot;
-    i32 next_slot = Sys_Global.mp3_slot ? 0 : 1;
-    if (ma_sound_is_playing(&Sys_Global.mp3_sounds[old_slot])) ma_sound_set_fade_in_milliseconds(&Sys_Global.mp3_sounds[old_slot], GetMusicVolume(), 0.0f, fade_in_ms);
-    ma_sound_uninit(&Sys_Global.mp3_sounds[next_slot]); 
-    ma_result result = ma_sound_init_from_file(&audio_engine, path, MA_SOUND_FLAG_STREAM, NULL, NULL, &Sys_Global.mp3_sounds[next_slot]);
-    if (result != MA_SUCCESS) { DualLog("ERROR: Failed to load MP3 %s: %d\n", path, result); return; }
-
-    ma_sound_set_fade_in_milliseconds(&Sys_Global.mp3_sounds[next_slot], 0.0f, GetMusicVolume(), fade_in_ms);
-    ma_sound_start(&Sys_Global.mp3_sounds[next_slot]);
-    Sys_Global.mp3_slot = next_slot;
-}
-
-ENGINE_TO_MOD void play_wav(const char* path, float volume, Vector3 pos, bool positional) {
-    i32 slot = -1;
-    for (i32 i = 0; i < wav_count; i++) { // Try to find a free slot (either unused or finished)
-        if (!ma_sound_is_playing(&wav_sounds[i]) && ma_sound_at_end(&wav_sounds[i])) {
-            ma_sound_uninit(&wav_sounds[i]);
-            slot = i;
-            break;
-        }
-    }
-
-    if (slot == -1 && wav_count < MAX_CHANNELS) slot = wav_count++; // If no free slot, use a new one if available
-    if (slot == -1) { DualLog("WARNING: Max effect WAV channels (%d) reached\n", MAX_CHANNELS); return; }
-
-    ma_result result = ma_sound_init_from_file(&audio_engine, path, 0, NULL, NULL, &wav_sounds[slot]);
-    if (result != MA_SUCCESS) {
-        DualLog("ERROR: Failed to load effect WAV %s: %d\n", path, result);
-        if (slot == wav_count - 1) wav_count--; // Revert count if init fails
-        return;
-    }
-    
-    if (positional) ma_sound_set_position(&wav_sounds[slot], pos.x, pos.y, pos.z);
-    ma_sound_set_spatialization_enabled(&wav_sounds[slot], (ma_bool32)positional);
-    wav_volumes[slot] = volume;
-    ma_sound_set_volume(&wav_sounds[slot], GetSFXVolume(wav_volumes[slot]));
-    ma_sound_start(&wav_sounds[slot]);
-}
-
-ENGINE_TO_MOD void play_message(const char* path) {
-    if (ma_sound_is_playing(&log_sound)) { ma_sound_stop(&log_sound); ma_sound_uninit(&log_sound); }
-    ma_result result = ma_sound_init_from_file(&audio_engine, path, 0, NULL, NULL, &log_sound);
-    if (result != MA_SUCCESS) { DualLog("ERROR: Failed to load message WAV %s: %d\n", path, result); return; }
-    
-    ma_sound_set_spatialization_enabled(&log_sound, false);
-    ma_sound_set_volume(&log_sound, GetMessageVolume());
-    ma_sound_start(&log_sound);
-}
-
-ENGINE_TO_MOD void SoundUninit(ma_sound* snd) { ma_sound_uninit(snd); }
-ENGINE_TO_MOD ma_result SoundInit(const char* path, ma_uint32 flags, ma_sound_group* pGroup, ma_fence* pDoneFence, ma_sound* pSound) { return ma_sound_init_from_file(&audio_engine,path,flags,pGroup,pDoneFence,pSound); }
-ENGINE_TO_MOD void SoundSetLooping(ma_sound* pSound, ma_bool32 isLooping) { ma_sound_set_looping(pSound,isLooping); }
-ENGINE_TO_MOD ma_result SoundStart(ma_sound* pSound) { return ma_sound_start(pSound); }
-ENGINE_TO_MOD ma_result SoundStop(ma_sound* pSound) { return ma_sound_stop(pSound); }
-ENGINE_TO_MOD ma_result SoundGetCurrentFrameCursor(const ma_sound* pSound, ma_uint64* pCursor) { return ma_sound_get_cursor_in_pcm_frames(pSound,pCursor); }
-ENGINE_TO_MOD float SoundGetLength(ma_sound* pSound) {
-    if (!pSound) return 0.0f;
-    
-    ma_uint64 frames;
-    if (ma_sound_get_length_in_pcm_frames(pSound, &frames) != MA_SUCCESS) return 0.0f;
-    
-    ma_uint32 sr = ma_engine_get_sample_rate(ma_sound_get_engine(pSound));
-    return (sr == 0) ? 0.0f : (float)frames / (float)sr;
 }
 
 void GatherResolutionModes(void) {
@@ -1330,7 +1228,7 @@ void ChangeFullScreenWindowed(void) {
 #else
     #define PLATFORM_DLERROR() dlerror()
 #endif
-void SetVSync(void) { _GLFWwindow* window = _glfwPlatformGetTls(&_glfw.contextSlot); window->context.swapInterval((i32)Sys_Settings.Vsync); }
+void SetVSync(void) { _GLFWwindow* handle = (_GLFWwindow*)window; handle->context.swapInterval((i32)Sys_Settings.Vsync); }
 void SetGI(void) { }// TODO: Set needed Voxel GI uniforms from Sys_Settings.GI
 void LoadTextForLanguage(u8),LoadLogTextForLanguage(u8); bool GetKey(int settingIndex),GetKeyPressed(int settingIndex); void* mod_handle = NULL;
 void SetLanguage(void) { LoadTextForLanguage(Sys_Settings.Language); LoadLogTextForLanguage(Sys_Settings.Language); }
@@ -1430,6 +1328,7 @@ ENGINE_TO_MOD void MenuGoBack(void) {
 
 void ChangeMenuPage(MenuPages pg) { currentMenuPage = pg; currentMenuItem = currentMenuTab = 0; }
 
+void set_master_volume(void); void set_message_volume(void); void set_sfx_volume(void);
 void RenderMenu(void) {    
     if (currentMenuPage != MenuPages_IntroVideo && currentMenuPage != MenuPages_CreditsVideo && currentMenuPage != MenuPages_Options) RenderUIImage(-417,-384, 2200,1536, 1026); // Menu background
     if (currentMenuPage == MenuPages_IntroVideo || currentMenuPage == MenuPages_CreditsVideo) RenderUIImage(-417,-384, 2200,1536, 0); // Video blackground
@@ -2014,7 +1913,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
     if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps();
     UpdateLights(); // This is where the voxels get updated!
     for (int i=0;i<LIGHT_COUNT;++i) flag_setu32(&lights[i].lflags,LDIRTY,false);
-    __builtin_memset(Sys_Global.dirtyInstances,0,Sys_Global.loadedInstances * sizeof(bool));
+    SetMemoryToValueForNBytes(Sys_Global.dirtyInstances,0,Sys_Global.loadedInstances * sizeof(bool));
     glViewport(0,0,swidth,sheight);
     ClearAll();
     glBindFramebuffer(GL_FRAMEBUFFER,Sys_Render.gBufferFBO);
@@ -2239,7 +2138,7 @@ void LoadGLUserPtr(void) {
 
 extern u32 random_range_rng;
 #define LIGHT_RANGE_MAX 15.36f
-void InitFontAtlasses(void),LoadTextures(void),LoadModels(void); i32 Physics(void); bool CullCore(void);
+void InitFontAtlasses(void),LoadTextures(void),LoadModels(void); i32 Physics(void); bool CullCore(void); void InitAudio(void);
 i32 main(void) {
     double game_start_time = get_time();
     random_range_rng = (u32)game_start_time; // Seed global rand uniquely with time since system boot.
@@ -2270,9 +2169,12 @@ i32 main(void) {
     LoadConfig(); // Get settings before setting window size.
     window = glfwCreateWindow(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight,&Sys_Global.global_modname[0]);
     CenterWindowOnMonitor();
-    glfwMakeContextCurrent(window);
+    _GLFWwindow* handle = (_GLFWwindow*)window;
+    //_GLFWwindow* previous = _glfwPlatformGetTls(&_glfw.contextSlot);
+    //if (previous && (!handle || handle->context.source != previous->context.source)) previous->context.makeCurrent(NULL);
+    handle->context.makeCurrent(handle);
     LoadGLUserPtr();
-    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); glfwSwapBuffers(window); // Black out the window as early as possible for better presentation.
+    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); glfwSwapBuffers(); // Black out the window as early as possible for better presentation.
     GLint major=0,minor=0; glGetIntegerv(0x821B/*GL_MAJOR_VERSION*/,&major); glGetIntegerv(0x821C/*GL_MINOR_VERSION*/,&minor);
     if (major < 4 || (major == 4 && minor < 3)) { DualLogError("Need OpenGL >= 4.3, got %d.%d\n",major,minor); OS_Exit(1); }
     glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
@@ -2318,12 +2220,7 @@ i32 main(void) {
     m[4] = 0.0f; m[5] = 1.0f; m[6] =                                             0.0f; m[7] =  0.0f;
     m[8] = 0.0f; m[9] = 0.0f; m[10]=      -(LIGHT_RANGE_MAX + NEAR_PLANE) / viewRange; m[11]= -1.0f;
     m[12]= 0.0f; m[13]= 0.0f; m[14]= -2.0f * LIGHT_RANGE_MAX * NEAR_PLANE / viewRange; m[15]=  0.0f;
-    ma_result result;
-    ma_engine_config engine_config = ma_engine_config_init();
-    engine_config.channels = 2; engine_config.periodSizeInMilliseconds = 10; engine_config.periodSizeInFrames = 512;
-    result = ma_engine_init(&engine_config, &audio_engine); if (result != MA_SUCCESS) DualLog("ERROR: Failed to initialize miniaudio engine: %d\n",result);
-    LoadModFunctions();
-    ModEntityDefinitionsInitAfterLoad();
+    InitAudio(); LoadModFunctions(); ModEntityDefinitionsInitAfterLoad();
     glGenFramebuffers(1,&Sys_Render.gBufferFBO);
     ApplySettings(); // After loading of text and game data.
     glBindFramebuffer(GL_FRAMEBUFFER,Sys_Render.gBufferFBO);
@@ -2437,7 +2334,7 @@ i32 main(void) {
         InputClearRisingAndFallingEdges();
         Sys_Input.currentMouse_dx = Sys_Input.currentMouse_dy = 0;
         Sys_Global.cpuTime = get_time() - Sys_Global.current_time; // Measure time over everything this frame before GPU swap buffers
-        glfwSwapBuffers(window); // Present frame
+        glfwSwapBuffers(); // Present frame
         CHECK_GL_ERROR();
         #ifdef DEBUG_RAM_OUTPUT
             static const u32 dbgFrames[] = {4,100,200,500,1000};

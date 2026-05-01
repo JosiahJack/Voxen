@@ -516,7 +516,7 @@ ENGINE_TO_MOD void PortalCulling(void) { // Called just once at end of animation
     u16 playerCellX = PosGetCellCoordX(Sys_Global.instances[PLAYER1].position.x);
     u16 playerCellZ = PosGetCellCoordZ(Sys_Global.instances[PLAYER1].position.z);
     bool previousLightVisible[LIGHT_COUNT];
-    __builtin_memset(previousLightVisible,false,LIGHT_COUNT * sizeof(bool));
+    SetMemoryToValueForNBytes(previousLightVisible,false,LIGHT_COUNT * sizeof(bool));
     for (u16 i=0;i<Sys_Global.loadedLights;++i) {
         u16 lcell = (lights[i].pos.z * WORLDX) + lights[i].pos.x;
         if (gridCellStates[lcell] & CELL_VISIBLE) previousLightVisible[i] = true;

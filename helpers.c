@@ -74,8 +74,6 @@ void DebugRAM(const char *context) {
 #endif
 }
 
-void print_bytes_no_newline(i32 count) { DualLog("%d bytes | %f kb | %f Mb",count,(double)count / 1000.0,(double)count / 1000000.0); }
-
 ENGINE_TO_MOD void Screenshot(void) {
     if (!TakeScreenshot() || Sys_Global.current_time <= Sys_Global.screenshotTimeout) return;
     
@@ -223,11 +221,17 @@ void StringCopyInto_A_From_B(char* a, const char* b, size_t bufferSize) { // str
     a[size2] = '\0';
 }
 
-void StringCopyInto_A_SubstringFrom_B(char* a, size_t substringSize, const char* b, size_t bufferSize) { // strcpy replacement (hopefully my mnemonic "SubstringFrom_B" will help me remember substringSize comes before be in the args passed)
+void StringCopyInto_A_SubstringFrom_B(char* a, size_t substringSize, const char* b, size_t bufferSize) { // strncpy replacement (hopefully my mnemonic "SubstringFrom_B" will help me remember substringSize comes before be in the args passed)
     if (substringSize >= bufferSize) { DualLogError("Substring too large for buffer! %u >= %u\n", substringSize, bufferSize);  OS_Exit(1); }
     
-    for (size_t i=0;i<substringSize;++i) a[i] = b[i];
-    a[substringSize] = '\0';
+    bool reachedEndB = false;
+    for (size_t i= 0;i<substringSize;++i) {
+        if (!reachedEndB && b[i] == '\0') reachedEndB = true;
+        if (reachedEndB) a[i] = '\0';
+        else a[i] = b[i]; // Normal copy
+    }
+    
+    a[substringSize] = '\0'; 
 }
 
 void StringConcatenate(char* a, const char* b, size_t bufferSize) { // strcat replacement
@@ -241,7 +245,6 @@ void StringConcatenate(char* a, const char* b, size_t bufferSize) { // strcat re
 }
 
 char CharToLower(const char c) { return c + ((c >= 'A' && c <= 'Z') ? 32 : 0); } // If uppercase 'A'-'Z' (65-90), +32 into 'a'-'z' (97-122)
-
 char* StringFindSubstring(const char* haystack, const char* needle) { // strstr replacement
     if (needle[0] == '\0') return (char*)haystack;
 
@@ -331,63 +334,75 @@ void StringAppendLiteral(char* dest, const char* literal, size_t bufferSize) {
     dest[curLen + litLen] = '\0';
 }
 
-ENGINE_TO_MOD int StringFormatV(char* buffer, size_t bufferSize, const char* format, va_list args) { // vsnprintf replacement
+ENGINE_TO_MOD int StringFormatV(char* buffer, size_t bufferSize, const char* format, va_list args) {
     if (bufferSize == 0) return 0;
 
     size_t pos = 0;
     const char* f = format;
     while (*f && pos < bufferSize - 1) {
-        if (*f != '%') { buffer[pos++] = *f++; continue; } else f++; // skip the '%'
+        if (*f != '%') { buffer[pos++] = *f++; continue; } 
+        f++; // skip '%'
+        int width = 0;
+        char padChar = ' ';
+        if (*f == '0') { padChar = '0'; f++; }
+        while (*f >= '0' && *f <= '9') { width = width * 10 + (*f - '0'); f++; }
         int decimals = 9;
-        if (*f == '.') { f++; if (*f >= '1' && *f <= '9') {decimals = *f - '0';} f++; } // Handle %.3f etc.
+        if (*f == '.') { f++; if (*f >= '1' && *f <= '9') { decimals = *f - '0'; } f++; }
         switch (*f) {
-        case 's': {
-                const char* s = __builtin_va_arg(args, const char*);
-                size_t len = GetStringLength(s);
-                if (pos + len >= bufferSize) len = bufferSize - pos - 1;
-                for (size_t i = 0; i < len; ++i) buffer[pos++] = s[i]; } break;
-        case 'd':
-        case 'i': {
-                int val = __builtin_va_arg(args, int);
-                if (val < 0) {
-                    if (pos < bufferSize - 1) buffer[pos++] = '-';
-                    val = -val;
-                }
+            case 'x': {
+                unsigned int val = __builtin_va_arg(args, unsigned int);
                 char num[32];
                 int i = 0;
-                do { num[i++] = '0' + (val % 10); val /= 10; } while (val);
-                while (i-- > 0 && pos < bufferSize - 1) buffer[pos++] = num[i]; } break;
-        case 'u': {
+                const char* hexChars = "0123456789abcdef";
+                do { num[i++] = hexChars[val % 16]; val /= 16; } while (val);
+                while (i < width && pos < bufferSize - 1) { buffer[pos++] = padChar; width--; }
+                while (i-- > 0 && pos < bufferSize - 1) buffer[pos++] = num[i];
+            } break;
+            case 'u': {
                 unsigned int val = __builtin_va_arg(args, unsigned int);
                 char num[32];
                 int i = 0;
                 do { num[i++] = '0' + (val % 10); val /= 10; } while (val);
-                while (i-- > 0 && pos < bufferSize - 1) buffer[pos++] = num[i]; } break;
-        case 'f':
-            {
+                while (i < width && pos < bufferSize - 1) { buffer[pos++] = padChar; width--; }
+                while (i-- > 0 && pos < bufferSize - 1) buffer[pos++] = num[i];
+            } break;
+            case 'c': {
+                char c = (char)__builtin_va_arg(args,int);
+                if (pos < bufferSize - 1) buffer[pos++] = c;
+            } break;
+            case 'd':
+            case 'i': {
+                int val = __builtin_va_arg(args, int);
+                if (val < 0) { if (pos < bufferSize - 1) buffer[pos++] = '-'; val = -val; }
+                char num[32];
+                int i = 0;
+                do { num[i++] = '0' + (val % 10); val /= 10; } while (val);
+                while (i < width && pos < bufferSize - 1) { buffer[pos++] = padChar; width--; }
+                while (i-- > 0 && pos < bufferSize - 1) buffer[pos++] = num[i];
+            } break;
+            case 's': {
+                const char* s = __builtin_va_arg(args, const char*);
+                size_t len = GetStringLength(s);
+                if (pos + len >= bufferSize) len = bufferSize - pos - 1;
+                for (size_t i = 0; i < len; ++i) buffer[pos++] = s[i];
+            } break;
+            case 'f': {
                 double val = __builtin_va_arg(args, double);
                 char num[64];
                 DoubleToStringFixed(num, val, decimals, sizeof(num));
                 size_t len = GetStringLength(num);
                 if (pos + len >= bufferSize) len = bufferSize - pos - 1;
                 for (size_t i = 0; i < len; ++i) buffer[pos++] = num[i];
-            }
-            break;
-        case '%': if (pos < bufferSize - 1) {buffer[pos++] = '%';} break;
-        default:
-            if (pos < bufferSize - 1) buffer[pos++] = '%';
-            if (pos < bufferSize - 1) buffer[pos++] = *f;
-            break;
+            } break;
+            case '%': if (pos < bufferSize - 1) buffer[pos++] = '%'; break;
         }
         f++;
     }
-
     buffer[pos] = '\0';
     return (int)pos;
 }
 
 ENGINE_TO_MOD int StringFormat(char* buffer, size_t bufferSize, const char* format, ...) { va_list args; __builtin_va_start(args,format); int ret = StringFormatV(buffer,bufferSize,format,args); __builtin_va_end(args); return ret; } // snprintf replacement
-
 char* GetNextStringUpToNewlineOrEOF(char* buf, int size, OsFileHandle fd) { // fgets replacement, not thread safe but we don't do multithreading
     if (size <= 1 || buf == NULL) return NULL;
 
@@ -414,7 +429,6 @@ char* GetNextStringUpToNewlineOrEOF(char* buf, int size, OsFileHandle fd) { // f
 
 extern OsFileHandle levelFileHandle;
 ENGINE_TO_MOD char* GetLevelFileNextStringUpToNewlineOrEOF(char* buf, int size) { return GetNextStringUpToNewlineOrEOF(buf,size,levelFileHandle); }
-
 void FilePrintString(OsFileHandle f, const char* fmt, ...) {
     va_list args; __builtin_va_start(args,fmt);
     char buf[128]; va_list copy;

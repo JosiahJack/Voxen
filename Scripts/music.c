@@ -145,9 +145,8 @@ void MusicTriggerExit(u16 other) {
 }
 
 MOD_TO_ENGINE void UpdateMusic(void) {
-    ma_sound* curr = Eng_Global->mp3_slot ? &Eng_Global->mp3_sounds[1] : &Eng_Global->mp3_sounds[0];
-    float remaining = GetSoundRemainingTime(curr);
-    if (remaining > AUD_BUFFER_T) return;
+    MP3Swap();
+    float remaining = GetMP3RemainingTime(); if (remaining > AUD_BUFFER_T) return;
 
     if (Sys_Music.inCombat && !Sys_Music.inZone && Sys_Music.combatImpulseFinished < Eng_Global->pauseRelativeTime) {
         Sys_Music.inCombat = false;

@@ -126,8 +126,9 @@ ENGINE_TO_MOD void play_wav(const char* path, float volume, Vector3 pos, bool po
 ENGINE_TO_MOD void play_message(const char* path);
 ENGINE_TO_MOD void play_mp3(const char* path, i32 fade_in_ms);
 ENGINE_TO_MOD void mp3_clear(void);
-ENGINE_TO_MOD bool GetSoundIsPlaying(ma_sound* sound);
-ENGINE_TO_MOD float GetSoundRemainingTime(ma_sound* pSound);
+ENGINE_TO_MOD bool GetSoundIsPlaying(SoundFX* sound);
+ENGINE_TO_MOD float GetMP3RemainingTime(void);
+ENGINE_TO_MOD void MP3Swap(void);
 ENGINE_TO_MOD bool StringIsEmpty(const char* a);
 ENGINE_TO_MOD bool StringsEqual(const char* a, const char* b);
 ENGINE_TO_MOD void StringCopyInto_A_From_B(char* a, const char* b, size_t bufferSize);
@@ -140,14 +141,14 @@ ENGINE_TO_MOD i32 PosGetCellCoords(float pos_x, float pos_z);
 ENGINE_TO_MOD int StringFormatV(char* buffer, size_t bufferSize, const char* format, va_list args); // vsnprintf replacement
 ENGINE_TO_MOD int StringFormat(char* buffer, size_t bufferSize, const char* format, ...); // snprintf replacement
 ENGINE_TO_MOD bool PositionVisibleFromPlayerCell(float x, float z);
-ENGINE_TO_MOD void SoundUninit(ma_sound* snd);
-ENGINE_TO_MOD ma_result SoundInit(const char* path, ma_uint32 flags, ma_sound_group* pGroup, ma_fence* pDoneFence, ma_sound* pSound);
-ENGINE_TO_MOD void SoundSetLooping(ma_sound* pSound, ma_bool32 isLooping);
-ENGINE_TO_MOD void SoundSetVolume(ma_sound* pSound, float volume);
-ENGINE_TO_MOD ma_result SoundStart(ma_sound* pSound);
-ENGINE_TO_MOD ma_result SoundStop(ma_sound* pSound);
-ENGINE_TO_MOD float SoundGetLength(ma_sound* pSound);
-ENGINE_TO_MOD ma_result SoundGetCurrentFrameCursor(const ma_sound* pSound, ma_uint64* pCursor);
+ENGINE_TO_MOD void SoundUninit(SoundFX* snd);
+ENGINE_TO_MOD i32 SoundInit(const char* path, SoundFX* pSound);
+ENGINE_TO_MOD void SoundSetLooping(SoundFX* pSound, u32 isLooping);
+ENGINE_TO_MOD void SoundSetVolume(SoundFX* pSound, float volume);
+ENGINE_TO_MOD i32 SoundStart(SoundFX* pSound);
+ENGINE_TO_MOD i32 SoundStop(SoundFX* pSound);
+ENGINE_TO_MOD float SoundGetLength(SoundFX* pSound);
+ENGINE_TO_MOD i32 SoundGetCurrentFrameCursor(const SoundFX* pSound, u64* pCursor);
 ENGINE_TO_MOD void Screenshot(void);
 ENGINE_TO_MOD void ToggleConsole(void);
 ENGINE_TO_MOD void MenuGoBack(void);

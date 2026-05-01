@@ -973,6 +973,7 @@ typedef struct { Entity* entries; u32 count; u32 capacity; } DataParser;
 typedef struct { u8 dataType; const char* fieldName; } EntityField;
 
 #include "miniaudio.h"
+typedef ma_sound SoundFX;
 typedef struct {
     u32 globalFrameNum;
     u16 loadedInstances,loadedLights; // Numbers of instances of entities and lights loaded (always for just the current level)
@@ -1010,8 +1011,6 @@ typedef struct {
     bool (*GetKey)(int settingIndex);
     bool (*GetKeyPressed)(int settingIndex);
     InventorySystem invP1,invP2;
-    ma_sound mp3_sounds[2]; // Two for crossfading
-    i32 mp3_slot;
     float timeScale;
     bool  geniusActive;
     Vector3 cyberspaceRecallPoint;
@@ -1110,3 +1109,5 @@ static inline __attribute__((always_inline)) bool ConstIndexIsAccessCard(u16 c) 
 static inline __attribute__((always_inline)) bool ConstIndexIsDynamicObject(u16 c) { return (c >= 307 && c <= 404) ||  c == 417 || (c >= 419 && c <= 428) || (c >= 430 && c <= 437) || (c >= 440 && c <= 442) || (c >= 458 && c <= 463) || (c >= 465 && c <= 476); }
 static inline __attribute__((always_inline)) bool ConstIndexIsStaticObjectSaveable(int c) { return (c == 112 || c == 279 || (c >= 448 && c < 458) || c == 480 || c == 516 || (c >= 518 && c <= 526) || c == 530 || c == 531 || c == 546 || c == 555 || c == 594 || c == 596 || c == 598 || (c >= 600 && c < 603) || (c >= 604 && c < 616) || (c >= 688 && c < 693) || c == 694 || c == 695 || (c >= 699 && c < 704) || (c >= 741 && c < 746)); }
 static inline __attribute__((always_inline)) bool ConstIndexIsStaticObjectImmutable(int c) { return ((c >= 527 && c < 530) || (c >= 532 && c < 546) || (c >= 547 && c < 553) || c == 554 || (c >= 556 && c < 594) || c == 595 || c == 597 || c == 599 || c == 601 || c == 603 || (c >= 616 && c < 688) || c == 693 || c == 696 || c == 697 || c == 698 || (c >= 704 && c < 717) || c == 720 || (c >= 733 && c < 736) || (c >= 737 && c < 739) || c == 746 || c == 747 || (c >= 750 && c <= 759 && c != 755)); }
+static inline __attribute__((always_inline)) void* SetMemoryToValueForNBytes(void *dst, int c, size_t n) { unsigned char *p=(unsigned char *)dst; unsigned char v=(unsigned char)c; while (n--) {*p++=v;} return dst; } // memset replacement
+static inline __attribute__((always_inline)) void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n) { unsigned char *d=(unsigned char *)dst; const unsigned char *s=(const unsigned char *)src; while (n--) {*d++=*s++;} return dst; } // memcpy replacement

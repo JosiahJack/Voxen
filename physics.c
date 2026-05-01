@@ -1,4 +1,5 @@
 // physics.c
+#include "os.h"
 #include "voxen.h"
 typedef u16 half;
 static inline __attribute__((always_inline)) float half_to_float(half h){
@@ -56,7 +57,7 @@ ContactManifold g_manifolds[MAX_MANIFOLDS];
 u16 g_manifoldCount = 0;
 static CellBucket g_cellBuckets[ARRSIZE];
 static void BuildCellBuckets(u16 n) {
-    __builtin_memset(g_cellBuckets,0,sizeof(g_cellBuckets));
+    SetMemoryToValueForNBytes(g_cellBuckets,0,sizeof(g_cellBuckets));
     for (u16 i=START_INDEX_LEVEL_INSTANCES; i<n; ++i) {
         Entity *e=&Sys_Global.instances[i];
         if (!(e->entflags&ENTFLAG_ACTIVE) || e->collider==COLLIDER_TYPE_NONE) continue;
@@ -87,7 +88,7 @@ static ContactManifold* FindOrCreateManifold(u16 idxA,u16 idxB) {
     return NULL;
 }
 
-static void ResetManifoldTable(void) { __builtin_memset(g_manifoldHT,0,sizeof(g_manifoldHT)); g_manifoldCount=0; }
+static void ResetManifoldTable(void) { SetMemoryToValueForNBytes(g_manifoldHT,0,sizeof(g_manifoldHT)); g_manifoldCount=0; }
 
 static inline Vector3 ClosestPointOnSegment(Vector3 p,Vector3 q,Vector3 a) {
     Vector3 pq=Vector3_A_minus_B(q,p), pa=Vector3_A_minus_B(a,p);
@@ -460,7 +461,7 @@ void Physics_PrimitiveStep(float dt) {
 }
  
 void Physics_ResetForLevelLoad(void) {
-    __builtin_memset(g_manifolds,0,sizeof(g_manifolds)); __builtin_memset(g_manifoldHT,0,sizeof(g_manifoldHT)); __builtin_memset(g_sleepCounter,0,sizeof(g_sleepCounter));
+    SetMemoryToValueForNBytes(g_manifolds,0,sizeof(g_manifolds)); SetMemoryToValueForNBytes(g_manifoldHT,0,sizeof(g_manifoldHT)); SetMemoryToValueForNBytes(g_sleepCounter,0,sizeof(g_sleepCounter));
     g_manifoldCount=0;
 }
 
@@ -532,7 +533,7 @@ void Physics_DrawDebug(void) {
     u32 curIDs[MAX_DEBUG_MANIFOLD_IDS]; u16 curCount=0;
     for (u16 m=0; m<g_manifoldCount&&curCount<MAX_DEBUG_MANIFOLD_IDS; ++m) curIDs[curCount++]=ManifoldID(g_manifolds[m].idxA,g_manifolds[m].idxB);
     static u8 g_contactState[INSTANCE_COUNT];
-    __builtin_memset(g_contactState,0,n);
+    SetMemoryToValueForNBytes(g_contactState,0,n);
     for (u16 m=0; m<g_manifoldCount; ++m) {
         u16 a=g_manifolds[m].idxA, b=g_manifolds[m].idxB;
         u8 state=IDInPrevSet(ManifoldID(a,b))?1:2;
@@ -794,13 +795,14 @@ static void IntegratePlayer(u16 i,float dt) {
     e->lastPosition=pos; e->position=Vector3_A_plus_B(pos,scale_vector3(vel,dt)); Sys_Global.dirtyInstances[i]=true;
 }
 
-extern ma_engine audio_engine;
+void SetPlayerListenerPos(void);
 void UpdatePositions(void) {
     float dt=vclamp((float)Sys_Global.timeSinceLastPhysicsTick,0.0005f,0.027777778f);
     for (u32 i=PLAYER1; i<=PLAYER2; ++i) IntegratePlayer((u16)i,dt);
-    for (u32 i=START_INDEX_LEVEL_INSTANCES; i<(u32)Sys_Global.loadedInstances; ++i)
+    for (u32 i=START_INDEX_LEVEL_INSTANCES; i<(u32)Sys_Global.loadedInstances; ++i) {
         if (Sys_Global.instances[i].entflags&ENTFLAG_RIGIDBODY) IntegrateRigidbody((u16)i,dt);
-    ma_engine_listener_set_position(&audio_engine,0,Sys_Global.instances[PLAYER1].position.x,Sys_Global.instances[PLAYER1].position.y,Sys_Global.instances[PLAYER1].position.z);
+    }
+    SetPlayerListenerPos();
 }
 
 void ClampVelocity(void) {

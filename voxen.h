@@ -38,3 +38,5 @@ extern RenderSystem Sys_Render; // Added last to make use of all defines for siz
 int StringCompareUpToLength(const char* s1, const char* s2, size_t n);
 static inline __attribute__((always_inline)) i32 PosGetCellCoordX(float pos_x) { return (u16)clamp((i32)vfloor((pos_x - Sys_Global.worldMin_x + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
 static inline __attribute__((always_inline)) i32 PosGetCellCoordZ(float pos_z) { return (u16)clamp((i32)vfloor((pos_z - Sys_Global.worldMin_z + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
+
+#define MAX_CHANNELS 48 // Max concurrent sounds, must keep track of for volume setting
