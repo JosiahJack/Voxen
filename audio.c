@@ -1,13 +1,16 @@
 // audio.c - Audio System
 #include "os.h"
 #include "voxen.h"
-#include <math.h>
 #define DR_WAV_IMPLEMENTATION
 #define DR_MP3_IMPLEMENTATION
 #define DR_MP3_FLOAT_OUTPUT
 #include "dr_wav.h"
 #include "dr_mp3.h"
-#include "nanoalsa.c"
+#ifdef WINDOWS
+    #include "nanowasapi.c"
+#else
+    #include "nanoalsa.c"
+#endif
 #define AUDIO_RATE      48000
 #define AUDIO_CHANNELS  2
 #define AUDIO_PERIOD_MS 10
@@ -30,7 +33,7 @@ static float music_scale(void)   { return (Sys_Settings.VolumeMaster/100.0f)*(Sy
 static float message_scale(void) { return (Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeMessage/100.0f); }
 static float spatial_atten(Vector3 pos) {
     Vector3 d = {pos.x-Sys_Global.instances[PLAYER1].position.x, pos.y-Sys_Global.instances[PLAYER1].position.y, pos.z-Sys_Global.instances[PLAYER1].position.z};
-    float dist = sqrtf(d.x*d.x+d.y*d.y+d.z*d.z);
+    float dist = vsqrtf(d.x*d.x+d.y*d.y+d.z*d.z);
     if (dist <= 1.0f) return 1.0f;
     if (dist >= 64.0f) return 0.0f;
     return 1.0f-(dist-1.0f)/63.0f;
@@ -216,43 +219,50 @@ void SetPlayerListenerOrientation(void) {}
 void SetPlayerListenerPos(void)         {}
 
 #define MAX_PCM_DEVICES 8
-static i32 pcm_fds[MAX_PCM_DEVICES];
+static OsFileHandle pcm_fds[MAX_PCM_DEVICES];
 static i32 pcm_fd_count = 0;
-static void init_pcm_device(i32 card,i32 dev) {
-    i32 r = pcm_open(card,dev,PCM_OUTPUT|PCM_NONBLOCK);
-    if (r<0) return;
-    
-    pcm_params_t p; pcm_params_init(&p);
-    pcm_set(&p,PCM_FORMAT,PCM_FORMAT_S16_LE); pcm_set(&p,PCM_ACCESS,PCM_ACCESS_RW);
-    pcm_set(&p,PCM_RATE,AUDIO_RATE); pcm_set(&p,PCM_CHANNELS,AUDIO_CHANNELS);
-    pcm_set(&p,PCM_PERIOD_SIZE,AUDIO_FRAMES); pcm_set(&p,PCM_PERIODS,AUDIO_PERIODS);
-    if (pcm_params_setup(r,&p)>=0 && pcm_fd_count<MAX_PCM_DEVICES) {
-        DualLog("Audio: opened card %d device %d\n",card,dev);
-        pcm_fds[pcm_fd_count++] = r;
-    } else OS_Close(r);
-}
+#ifndef WINDOWS
+    static void init_pcm_device(i32 card,i32 dev) {
+        OsFileHandle r = pcm_open(card,dev,PCM_OUTPUT|PCM_NONBLOCK);
+        if (r==OS_INVALID_HANDLE) return;
+        
+        pcm_params_t p; pcm_params_init(&p);
+        pcm_set(&p,PCM_FORMAT,PCM_FORMAT_S16_LE); pcm_set(&p,PCM_ACCESS,PCM_ACCESS_RW);
+        pcm_set(&p,PCM_RATE,AUDIO_RATE); pcm_set(&p,PCM_CHANNELS,AUDIO_CHANNELS);
+        pcm_set(&p,PCM_PERIOD_SIZE,AUDIO_FRAMES); pcm_set(&p,PCM_PERIODS,AUDIO_PERIODS);
+        if (pcm_params_setup(r,&p)>=0 && pcm_fd_count<MAX_PCM_DEVICES) {
+            DualLog("Audio: opened card %d device %d\n",card,dev);
+            pcm_fds[pcm_fd_count++]=r;
+        } else OS_Close(r);
+    }
+#endif
 
 void InitAudio(void) {
+#ifdef WINDOWS
+    OsFileHandle first = pcm_open_all(AUDIO_RATE,AUDIO_CHANNELS,AUDIO_FRAMES,AUDIO_PERIODS);
+    if (first==OS_INVALID_HANDLE) { DualLog("ERROR: No WASAPI audio device found\n"); return; }
+    pcm_fds[0]=first; pcm_fd_count=1;
+    DualLog("Audio: WASAPI %d device(s) active\n",wasapi_dev_count);
+#else
     for (i32 card=0;card<8;card++)
         for (i32 dev=0;dev<8;dev++)
             init_pcm_device(card,dev);
     if (pcm_fd_count==0) DualLog("ERROR: No audio output device found\n");
     else DualLog("Audio: %d device(s) active\n",pcm_fd_count);
+#endif
 }
 
 void AudioUpdate(void) {
     if (pcm_fd_count==0) return;
-    
     i16 buf[AUDIO_FRAMES*AUDIO_CHANNELS]; pcm_sync_t sync;
     if (pcm_sync(pcm_fds[0],&sync,SNDRV_PCM_SYNC_PTR_HWSYNC)<0) return;
-    
-    snd_pcm_uframes_t hw=sync.status.hw_ptr,appl=sync.control.appl_ptr;
-    snd_pcm_uframes_t buffer_size=AUDIO_FRAMES*AUDIO_PERIODS,queued=appl-hw;
+    u32 hw=sync.status.hw_ptr,appl=sync.control.appl_ptr;
+    u32 buffer_size=AUDIO_FRAMES*AUDIO_PERIODS,queued=appl-hw;
     if (queued>buffer_size) queued=0;
-    snd_pcm_uframes_t avail=buffer_size-queued;
-    while (avail>=(snd_pcm_uframes_t)AUDIO_FRAMES) {
+    u32 avail=buffer_size-queued;
+    while (avail>=(u32)AUDIO_FRAMES) {
         audio_mix_period(buf);
-        for (i32 i=0;i<pcm_fd_count;i++) { if (pcm_write(pcm_fds[i],buf,AUDIO_FRAMES)<0) {pcm_prepare(pcm_fds[i]);} }
+        for (i32 i=0;i<pcm_fd_count;i++) if (pcm_write(pcm_fds[i],buf,AUDIO_FRAMES)<0) pcm_prepare(pcm_fds[i]);
         avail-=AUDIO_FRAMES;
     }
 }
