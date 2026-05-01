@@ -14,7 +14,7 @@ static inline __attribute__((always_inline)) float half_to_float(half h){
         }
     } else if (e == 31) { out = s | 0x7F800000 | (m << 13); }
     else { e = e + (127 - 15); out = s | (e << 23) | (m << 13); }
-    float f; __builtin_memcpy(&f,&out,4);
+    float f; CopyMemoryFromBtoAForNBytes(&f,&out,4);
     return f;
 }
 
@@ -252,7 +252,7 @@ static void TestSphereMeshInstance(ShapeSphere ws,u16 instanceIdx) {
     if (mi>=loadedModelsMaxIndex) return;
     u32 triCount=modelTriangleCounts[mi];
     if (!triCount) return;
-    float M[16]; __builtin_memcpy(M,&modelMatrices[instanceIdx*16],64);
+    float M[16]; CopyMemoryFromBtoAForNBytes(M,&modelMatrices[instanceIdx*16],64);
     float m00=M[0],m10=M[1],m20=M[2],m01=M[4],m11=M[5],m21=M[6],m02=M[8],m12=M[9],m22=M[10],tx=M[12],ty=M[13],tz=M[14];
     float sx=vsqrtf(m00*m00+m10*m10+m20*m20), sy=vsqrtf(m01*m01+m11*m11+m21*m21), sz=vsqrtf(m02*m02+m12*m12+m22*m22);
     if (sx<1e-6f||sy<1e-6f||sz<1e-6f) return;
@@ -503,7 +503,7 @@ static void DebugDrawCollider(u16 idx,float r,float g,float b) {
         case COLLIDER_TYPE_CAPSULE: { ShapeCapsule cap; Entity_GetCapsule(e,&cap); DebugDrawCapsule(cap); break; }
         case COLLIDER_TYPE_MESH: case COLLIDER_TYPE_CONVEXMESH: {
             u16 mi=e->modelIndex; if (mi>=loadedModelsMaxIndex) break;
-            u32 tc=modelTriangleCounts[mi]; float M[16]; __builtin_memcpy(M,&modelMatrices[idx*16],64);
+            u32 tc=modelTriangleCounts[mi]; float M[16]; CopyMemoryFromBtoAForNBytes(M,&modelMatrices[idx*16],64);
             float m00=M[0],m10=M[1],m20=M[2],m01=M[4],m11=M[5],m21=M[6],m02=M[8],m12=M[9],m22=M[10],tx=M[12],ty=M[13],tz=M[14];
             u32 step=(tc>256)?(tc/256):1;
             #define LTW(l) (Vector3){m00*(l).x+m01*(l).y+m02*(l).z+tx,m10*(l).x+m11*(l).y+m12*(l).z+ty,m20*(l).x+m21*(l).y+m22*(l).z+tz}
@@ -552,7 +552,7 @@ void Physics_DrawDebug(void) {
         SetDebugLineColor(DBG_NORM);
         for (int ci=0; ci<(int)g_manifolds[m].count; ++ci) { const Contact *c=&g_manifolds[m].contacts[ci]; AddDebugLine(c->pointWorld,Vector3_A_plus_B(c->pointWorld,scale_vector3(c->normal,DEBUG_NORMAL_LEN))); }
     }
-    __builtin_memcpy(g_prevManifoldIDs,curIDs,curCount*sizeof(u32)); g_prevManifoldCount=curCount;
+    CopyMemoryFromBtoAForNBytes(g_prevManifoldIDs,curIDs,curCount*sizeof(u32)); g_prevManifoldCount=curCount;
 }
 
 #define NO_CONTACT ((CapsuleContact){.depth=-1.0f,.normal={0,1,0}})
@@ -572,7 +572,7 @@ static CapsuleContact QueryCapsuleContact(Vector3 start,Vector3 end,float capsul
         if (mindex>=loadedModelsMaxIndex) continue;
         u32 triCount=modelTriangleCounts[mindex];
         if (triCount<1) continue;
-        float M[16]; __builtin_memcpy(M,&modelMatrices[i*16],64);
+        float M[16]; CopyMemoryFromBtoAForNBytes(M,&modelMatrices[i*16],64);
         float m00=M[0],m10=M[1],m20=M[2],m01=M[4],m11=M[5],m21=M[6],m02=M[8],m12=M[9],m22=M[10],tx=M[12],ty=M[13],tz=M[14];
         float scl_x=vsqrtf(m00*m00+m10*m10+m20*m20), scl_y=vsqrtf(m01*m01+m11*m11+m21*m21), scl_z=vsqrtf(m02*m02+m12*m12+m22*m22);
         if (scl_x<1e-6f||scl_y<1e-6f||scl_z<1e-6f) continue;

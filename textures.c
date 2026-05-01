@@ -96,7 +96,7 @@ static int stbi__parse_uncompressed_block(stbi__zbuf* a) {
     if (k <= 2) header[2] = *a->zbuffer++;
     if (k <= 3) header[3] = *a->zbuffer++;
     i32 len = header[1] * 256 + header[0];
-    __builtin_memcpy(a->zout, a->zbuffer, len);
+    CopyMemoryFromBtoAForNBytes(a->zout, a->zbuffer, len);
     a->zbuffer += len; a->zout += len;
     return 1;
 }
@@ -195,7 +195,7 @@ u8* stbi_load_from_memory_arena(const u8* buffer, int len, int* x, int* y, StbiA
         u32 length = stbi__get32be(&s), type = stbi__get32be(&s);
         switch (type) {
             case 0x49484452: s.img_x = stbi__get32be(&s); s.img_y = stbi__get32be(&s); s.img_buffer++; { i32 color = (*s.img_buffer++); s.img_buffer += 3; s.img_n = (color & 2 ? 3 : 1) + (color & 4 ? 1 : 0); } break;
-            case 0x49444154: if (!z.idata) { z.idata = (u8*)stbi__arena_alloc_thread(arena, len + 16); ioff = 0; } __builtin_memcpy(z.idata + ioff, s.img_buffer, length); s.img_buffer += length; ioff += length; break;
+            case 0x49444154: if (!z.idata) { z.idata = (u8*)stbi__arena_alloc_thread(arena, len + 16); ioff = 0; } CopyMemoryFromBtoAForNBytes(z.idata + ioff, s.img_buffer, length); s.img_buffer += length; ioff += length; break;
             case 0x49454E44: { u32 rL = s.img_x * s.img_y * s.img_n + s.img_y; z.expanded = (u8*)stbi_zlib_decode_malloc_guesssize_headerflag_arena(z.idata, ioff, rL, (i32*)(&rL), arena);
                 s.img_out_n = (s.img_n + 1 == 4) ? 4 : s.img_n; stbi__create_png_image_raw_arena(arena, &z, z.expanded, rL, s.img_out_n, s.img_x, s.img_y, s.img_n); stbi__get32be(&s); goto Label_parsesuccess; }
             default: s.img_buffer += length; break;
@@ -214,7 +214,7 @@ extern u8* stbi_load_from_memory(const u8* buffer, int len, int* x, int* y) {
         u32 length = stbi__get32be(&s), type = stbi__get32be(&s);
         switch (type) {
             case 0x49484452: s.img_x = stbi__get32be(&s); s.img_y = stbi__get32be(&s); s.img_buffer++; { i32 color = (*s.img_buffer++); s.img_buffer += 3; s.img_n = (color & 2 ? 3 : 1) + (color & 4 ? 1 : 0); } break;
-            case 0x49444154: if (!z.idata) { z.idata = (u8*)stbi__arena_alloc(len + 16); ioff = 0; } __builtin_memcpy(z.idata + ioff, s.img_buffer, length); s.img_buffer += length; ioff += length; break;
+            case 0x49444154: if (!z.idata) { z.idata = (u8*)stbi__arena_alloc(len + 16); ioff = 0; } CopyMemoryFromBtoAForNBytes(z.idata + ioff, s.img_buffer, length); s.img_buffer += length; ioff += length; break;
             case 0x49454E44: { u32 rL = s.img_x * s.img_y * s.img_n + s.img_y; z.expanded = (u8*)stbi_zlib_decode_malloc_guesssize_headerflag(z.idata, ioff, rL, (i32*)(&rL));
                 s.img_out_n = (s.img_n + 1 == 4) ? 4 : s.img_n; stbi__create_png_image_raw(&z, z.expanded, rL, s.img_out_n, s.img_x, s.img_y, s.img_n); stbi__get32be(&s); goto Label_parsesuccess; }
             default: s.img_buffer += length; break;
@@ -281,7 +281,7 @@ static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
         if (*s == '#') {
             if (e.path[0] && e.index < p->capacity) p->entries[e.index] = e;
             e = (TextureData){.index = U16_MAX}; size_t aL = le - s;
-            if (aL >= sizeof(e.path)) aL = sizeof(e.path) - 1; __builtin_memcpy(e.path,s + 1,aL); e.path[aL] = 0;
+            if (aL >= sizeof(e.path)) aL = sizeof(e.path) - 1; CopyMemoryFromBtoAForNBytes(e.path,s + 1,aL); e.path[aL] = 0;
         } else {
             char *col = StringFindFirstCharWithin(s, ':');
             if (col) {
@@ -380,8 +380,8 @@ void LoadTextures(void) {
         texturePaletteOffsets[i] = color_base;
         textureSizes[i*2]     = textureWidths[i];
         textureSizes[i*2 + 1] = textureHeights[i];
-        __builtin_memcpy(all_indices + pixel_base,textureIndexBuffers[i],numP);
-        __builtin_memcpy(texturePalettes + color_base,texturePaletteBuffers[i],palS * sizeof(u32));
+        CopyMemoryFromBtoAForNBytes(all_indices + pixel_base,textureIndexBuffers[i],numP);
+        CopyMemoryFromBtoAForNBytes(texturePalettes + color_base,texturePaletteBuffers[i],palS * sizeof(u32));
         pixel_base += numP;
         color_base += palS;
         OS_DeallocateRAM(textureIndexBuffers[i],numP);
@@ -392,7 +392,7 @@ void LoadTextures(void) {
     i32 packed_size = ((i32)totalPixels + 3) / 4 * sizeof(u32);
     glBindBuffer(GL_SSBO,Sys_Render.colorBufferID);
     void* dst = glMapBufferRange(GL_SSBO,0,packed_size,0x0002/*GL_MAP_WRITE_BIT*/|0x0004/*GL_MAP_INVALIDATE_RANGE_BIT*/);
-    __builtin_memcpy(dst,all_indices,packed_size);
+    CopyMemoryFromBtoAForNBytes(dst,all_indices,packed_size);
     glUnmapBuffer(GL_SSBO);
     glBindBuffer(GL_SSBO,Sys_Render.texturePalettesID);
     glBufferData(GL_SSBO,totalPaletteColors * sizeof(u32),texturePalettes,GL_STATIC_DRAW);

@@ -1113,3 +1113,11 @@ static inline __attribute__((always_inline)) bool ConstIndexIsStaticObjectSaveab
 static inline __attribute__((always_inline)) bool ConstIndexIsStaticObjectImmutable(int c) { return ((c >= 527 && c < 530) || (c >= 532 && c < 546) || (c >= 547 && c < 553) || c == 554 || (c >= 556 && c < 594) || c == 595 || c == 597 || c == 599 || c == 601 || c == 603 || (c >= 616 && c < 688) || c == 693 || c == 696 || c == 697 || c == 698 || (c >= 704 && c < 717) || c == 720 || (c >= 733 && c < 736) || (c >= 737 && c < 739) || c == 746 || c == 747 || (c >= 750 && c <= 759 && c != 755)); }
 static inline __attribute__((always_inline)) void* SetMemoryToValueForNBytes(void *dst, int c, size_t n) { unsigned char *p=(unsigned char *)dst; unsigned char v=(unsigned char)c; while (n--) {*p++=v;} return dst; } // memset replacement
 static inline __attribute__((always_inline)) void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n) { unsigned char *d=(unsigned char *)dst; const unsigned char *s=(const unsigned char *)src; while (n--) {*d++=*s++;} return dst; } // memcpy replacement
+static inline __attribute__((always_inline)) int CompareMemoryForNBytes(const void *s1, const void *s2, size_t n) { const unsigned char *p1 = (const unsigned char *)s1; const unsigned char *p2 = (const unsigned char *)s2; while (n--) { if (*p1 != *p2) {return *p1 - *p2;} p1++; p2++; } return 0; } // memcmp replacement
+static inline __attribute__((always_inline)) void* MoveMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n) {
+    unsigned char *d = (unsigned char *)dst; const unsigned char *s = (const unsigned char *)src;
+    if (d < s) {
+        while (n--) { *d++ = *s++; }
+    } else if (d > s) { d += n; s += n; while (n--) { *--d = *--s; } }
+    return dst;
+} // memmove replacement

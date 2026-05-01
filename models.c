@@ -15,7 +15,7 @@ typedef u16 half;
 typedef struct { u16 index; bool animated; u8 animationNum; char path[128]; } ModelData;
 typedef struct { ModelData* entries; u32 count; u32 capacity; } ModelDataParser;
 static inline __attribute__((always_inline)) half float_to_half(float f) {
-    u32 x; __builtin_memcpy(&x, &f, 4);
+    u32 x; CopyMemoryFromBtoAForNBytes(&x,&f,4);
     u32 s = x>>31, ue = (x>>23)&0xff; i32 e = (i32)ue-127; u32 m = x&0x7fffff;
     if (ue == 0xff) return m ? (half)(0x7e00|(m>>13)|(s<<15)) : (half)((s<<15)|0x7c00);
     if (!ue && !m) return (half)(s<<15);
@@ -54,7 +54,7 @@ static void OptimizeVertexCache(u16* idx, u32 ic, u32 vc) {
     qsort(t, tc, sizeof(TriSort), cmp);
     u16* n = OS_Alloc(ic*sizeof(u16));
     for (u32 i=0; i<tc; ++i) { u16* s=idx+t[i].idx*3; u16* d=n+i*3; d[0]=s[0];d[1]=s[1];d[2]=s[2]; }
-    __builtin_memcpy(idx, n, ic*sizeof(u16));
+    CopyMemoryFromBtoAForNBytes(idx,n,ic*sizeof(u16));
     OS_DeallocateRAM(n, ic*sizeof(u16)); OS_DeallocateRAM(t, tc*sizeof(TriSort));
 }
 
@@ -68,7 +68,7 @@ static u8* OptimizeVertexFetch(u8* v, u32* vc, u16* idx, u32 ic, size_t stride) 
         if (id < oc && remap[id] == 0xFFFFFFFFU) { remap[id] = nc; first[nc] = id; ++nc; }
     }
     u8* nv = OS_Alloc(nc*stride);
-    for (u32 i=0; i<nc; ++i) __builtin_memcpy(nv+i*stride, v+first[i]*stride, stride);
+    for (u32 i=0; i<nc; ++i) CopyMemoryFromBtoAForNBytes(nv+i*stride,v+first[i]*stride,stride);
     for (u32 i=0; i<ic; ++i) if (idx[i] < oc) idx[i] = (u16)remap[idx[i]];
     *vc = nc;
     OS_DeallocateRAM(remap, oc*sizeof(u32)); OS_DeallocateRAM(first, oc*sizeof(u32));
@@ -152,11 +152,11 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(const char* _
         u64 h = *(u32*)(v+0) ^ *(u32*)(v+2) ^ *(u32*)(v+4) ^ *(u32*)(v+6);
         u32 s = (u32)(h ^ (h>>32)) & (HASH_SIZE-1);
         while (ht[s] != 0xFFFFFFFFU) {
-            if (__builtin_memcmp(sv+(ht[s]<<3), v, 32) == 0) { rem[i] = ht[s]; goto nxt; }
+            if (CompareMemoryForNBytes(sv+(ht[s]<<3), v, 32) == 0) { rem[i] = ht[s]; goto nxt; }
             s = (s+1) & (HASH_SIZE-1);
         }
         ht[s] = ucnt; rem[i] = ucnt;
-        __builtin_memcpy(sv+(ucnt<<3), v, 32);
+        CopyMemoryFromBtoAForNBytes(sv+(ucnt<<3), v, 32);
         ++ucnt; nxt:;
     }
 
@@ -239,7 +239,7 @@ bool ParseModelData(ModelDataParser *p, u16 maxSz, const char *fn) {
             cur = (ModelData){U16_MAX, false, 255, {0}};
             if (le > s) {
                 size_t pl = le - s; if (pl >= sizeof(cur.path)) pl = sizeof(cur.path)-1;
-                __builtin_memcpy(cur.path, s+1, pl); cur.path[pl] = 0;
+                CopyMemoryFromBtoAForNBytes(cur.path,s+1,pl); cur.path[pl] = 0;
             }
             goto next;
         }
@@ -332,11 +332,11 @@ void LoadModels(void) {
         tv += modelVertexCounts[i]; tt += modelTriangleCounts[i];
         glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.vbos[i]); glBufferData(GL_ARRAY_BUFFER,vs,NULL,GL_STATIC_DRAW);
         void* mp = glMapBufferRange(GL_ARRAY_BUFFER,0,vs,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/);
-        __builtin_memcpy(mp, modelVertices[i],vs);
+        CopyMemoryFromBtoAForNBytes(mp,modelVertices[i],vs);
         glUnmapBuffer(GL_ARRAY_BUFFER);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,Sys_Render.tbos[i]); glBufferData(GL_ELEMENT_ARRAY_BUFFER,ts,NULL,GL_STATIC_DRAW);
         mp = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER,0,ts,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/);
-        __builtin_memcpy(mp, modelTriangles[i],ts);
+        CopyMemoryFromBtoAForNBytes(mp,modelTriangles[i],ts);
         glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
     }
 

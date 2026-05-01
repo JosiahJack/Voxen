@@ -135,8 +135,8 @@ ENGINE_TO_MOD i32 AddLight(Light* lit, LightAnimation* lanim) {
     Sys_Global.loadedLights++;
     if (Sys_Global.loadedLights >= LIGHT_COUNT) { DualLogError("Too many lights %u added in level %d!\n",i,Sys_Global.currentLevel); OS_Exit(1); }
 
-    __builtin_memcpy(&lights[i],lit,sizeof(Light));
-    __builtin_memcpy(&lanims[i],lanim,sizeof(LightAnimation));
+    CopyMemoryFromBtoAForNBytes(&lights[i],lit,sizeof(Light));
+    CopyMemoryFromBtoAForNBytes(&lanims[i],lanim,sizeof(LightAnimation));
     lightsNewPosition[i] = lit->pos;
     flag_setu32(&lights[i].lflags,LDIRTY,true);
     return i;
@@ -387,7 +387,7 @@ static int _GetGlyphShapeTT(const stbtt_fontinfo*info,int gi,stbtt_vertex**pv){
             int cn=stbtt_GetGlyphShape(info,gidx,&cv);
             if(cn>0){for(int i=0;i<cn;++i){stbtt_vertex*v=&cv[i];stbtt_vertex_type vx=v->x,vy=v->y;v->x=(stbtt_vertex_type)(fm*(mtx[0]*vx+mtx[2]*vy+mtx[4]));v->y=(stbtt_vertex_type)(fn*(mtx[1]*vx+mtx[3]*vy+mtx[5]));vx=v->cx;vy=v->cy;v->cx=(stbtt_vertex_type)(fm*(mtx[0]*vx+mtx[2]*vy+mtx[4]));v->cy=(stbtt_vertex_type)(fn*(mtx[1]*vx+mtx[3]*vy+mtx[5]));}
                 tmp=(stbtt_vertex*)TempAlloc((nv+cn)*sizeof(stbtt_vertex));if(!tmp){TempFree(verts);TempFree(cv);return 0;}
-                if(nv>0&&verts)__builtin_memcpy(tmp,verts,nv*sizeof(stbtt_vertex));__builtin_memcpy(tmp+nv,cv,cn*sizeof(stbtt_vertex));TempFree(verts);TempFree(cv);verts=tmp;nv+=cn;}
+                if(nv>0&&verts) CopyMemoryFromBtoAForNBytes(tmp,verts,nv*sizeof(stbtt_vertex)); CopyMemoryFromBtoAForNBytes(tmp+nv,cv,cn*sizeof(stbtt_vertex));TempFree(verts);TempFree(cv);verts=tmp;nv+=cn;}
             more=fl&(1<<5);}
     }
     *pv=verts;return nv;
@@ -720,10 +720,10 @@ void LoadTextForLanguage(u8 lang){
         if(utf16){while(dp+1<Sys_Text.file_size){u16 ch=Sys_Text.file_data[dp]|(Sys_Text.file_data[dp+1]<<8);dp+=2;if(ch=='\r'||ch=='\n'){if(ch=='\r'&&dp+1<Sys_Text.file_size){u16 nx=Sys_Text.file_data[dp]|(Sys_Text.file_data[dp+1]<<8);if(nx=='\n')dp+=2;}break;}}}
         else{while(dp<Sys_Text.file_size){u8 c=Sys_Text.file_data[dp];if(c=='\r'||c=='\n'){if(c=='\r'&&dp+1<Sys_Text.file_size&&Sys_Text.file_data[dp+1]=='\n')++dp;++dp;break;}++dp;}}
         size_t ll=dp-ls;if(ll==0){if(ln<TEXT_STRING_COUNT)Sys_Text.stringTable[ln][0]='\0';++ln;continue;}
-        if(utf16)utf16le_to_utf8(&Sys_Text.file_data[ls],ll,line,sizeof(line));else{if(ll>=sizeof(line))ll=sizeof(line)-1;__builtin_memcpy(line,&Sys_Text.file_data[ls],ll);line[ll]='\0';}
+        if(utf16)utf16le_to_utf8(&Sys_Text.file_data[ls],ll,line,sizeof(line));else{if(ll>=sizeof(line))ll=sizeof(line)-1; CopyMemoryFromBtoAForNBytes(line,&Sys_Text.file_data[ls],ll);line[ll]='\0';}
         size_t sl=GetStringLength(line);while(sl>0&&(line[sl-1]=='\r'||line[sl-1]=='\n'))line[--sl]='\0';
         if(sl==0){if(ln<TEXT_STRING_COUNT)Sys_Text.stringTable[ln][0]='\0';++ln;continue;}
-        if(ln<TEXT_STRING_COUNT){__builtin_memcpy(Sys_Text.stringTable[ln],line,sl);Sys_Text.stringTable[ln][sl]='\0';++ln;}}
+        if(ln<TEXT_STRING_COUNT) {CopyMemoryFromBtoAForNBytes(Sys_Text.stringTable[ln],line,sl);Sys_Text.stringTable[ln][sl]='\0';++ln;} }
 }
 
 static inline __attribute__((always_inline)) int StringToIntLen(const char*str,size_t len){int v=0;for(size_t i=0;i<len&&str[i]>='0'&&str[i]<='9';++i)v=v*10+(str[i]-'0');return v;}
@@ -744,7 +744,7 @@ void LoadLogTextForLanguage(u8 lang){
         if(utf16){while(dp+1<Sys_Text.filelog_size){u16 ch=Sys_Text.filelog_data[dp]|(Sys_Text.filelog_data[dp+1]<<8);dp+=2;if(ch=='\r'||ch=='\n'){if(ch=='\r'&&dp+1<Sys_Text.filelog_size){u16 nx=Sys_Text.filelog_data[dp]|(Sys_Text.filelog_data[dp+1]<<8);if(nx=='\n')dp+=2;}break;}}}
         else{while(dp<Sys_Text.filelog_size){u8 c=Sys_Text.filelog_data[dp];if(c=='\r'||c=='\n'){if(c=='\r'&&dp+1<Sys_Text.filelog_size&&Sys_Text.filelog_data[dp+1]=='\n')++dp;++dp;break;}++dp;}}
         size_t ll=dp-ls;if(!ll)continue;
-        if(utf16)utf16le_to_utf8(&Sys_Text.filelog_data[ls],ll,line,sizeof(line));else{if(ll>=sizeof(line))ll=sizeof(line)-1;__builtin_memcpy(line,&Sys_Text.filelog_data[ls],ll);line[ll]='\0';}
+        if(utf16)utf16le_to_utf8(&Sys_Text.filelog_data[ls],ll,line,sizeof(line));else{if(ll>=sizeof(line))ll=sizeof(line)-1;CopyMemoryFromBtoAForNBytes(line,&Sys_Text.filelog_data[ls],ll);line[ll]='\0';}
         size_t sl=GetStringLength(line);while(sl>0&&(line[sl-1]=='\r'||line[sl-1]=='\n'))line[--sl]='\0';if(!sl)continue;
         int li=-1,ilh=-1,irh=-1,lt=0,lf=0,fi=0;char*pos=line;
         while(*pos&&fi<32){while(*pos==' ')++pos;char*st=pos;int q=(*pos=='"');if(q)++pos;while(*pos){if(*pos==','&&!q)break;if(*pos=='"'&&q){if(pos[1]==','){pos++;break;}if(pos[1]=='"'){pos+=2;continue;}}++pos;}char*en=pos;if(q&&*en=='"')--en;size_t tl=(size_t)(en-st);if(!tl){if(*pos==',')++pos;fi++;continue;}
@@ -795,7 +795,7 @@ void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scaleInput,const 
         float vx0=q.x0*scale-bw,vy0=q.y0*scale-bw,vx1=q.x1*scale+bw,vy1=q.y1*scale+bw;
         float s0=q.s0-puv,t0=q.t0-puv,s1=q.s1+puv,t1=q.t1+puv,z=0.0f;
         float tv[30]={vx0,vy0,z,s0,t0,vx1,vy1,z,s1,t1,vx1,vy0,z,s1,t0,vx0,vy0,z,s0,t0,vx0,vy1,z,s0,t1,vx1,vy1,z,s1,t1};
-        __builtin_memcpy(textVertexData+vc*30,tv,sizeof(tv));vc++;
+        CopyMemoryFromBtoAForNBytes(textVertexData+vc*30,tv,sizeof(tv));vc++;
         if(cp>='0'&&cp<='9'){if(fontID==FONT_STOPD)xpos=q.x0+fixedNumberAdvanceWidthStopD;else xpos=q.x0+fixedNumberAdvanceWidth;}
     }
     if(vc){glNamedBufferData(Sys_Render.textVBO,vc*30*sizeof(float),textVertexData,GL_DYNAMIC_DRAW);glDrawArrays(GL_TRIANGLES,0,vc*6);}
@@ -1929,7 +1929,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
         else { visibleInstances[opaqueCount].index = i; visibleInstances[opaqueCount].depth = distSqrd; opaqueCount++; }
     }
 
-    __builtin_memcpy(visibleInstances + opaqueCount,tmpTransparent,tcnt * sizeof(DepthSort));
+    CopyMemoryFromBtoAForNBytes(visibleInstances + opaqueCount,tmpTransparent,tcnt * sizeof(DepthSort));
     visibleCount = opaqueCount + tcnt;
     glUseProgram(Sys_Render.depthPrepassShaderProgram); // Depth Prepass - Eliminates some overdraw for ~6.1% performance improvement in spite of added draw calls
     glUniformMatrix4fv(2,1,0,viewProj);
@@ -2230,7 +2230,7 @@ i32 main(void) {
     GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER); if (status != 0x8CD5/*GL_FRAMEBUFFER_COMPLETE*/) DualLogError("Framebuffer incomplete: Error code %d\n",status);
     glBindFramebuffer(GL_FRAMEBUFFER,0);
     float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
-    __builtin_memcpy(&modelMatrices[0],mat,16 * sizeof(float)); // Null instance matrix used for UI
+    CopyMemoryFromBtoAForNBytes(&modelMatrices[0],mat,16 * sizeof(float)); // Null instance matrix used for UI
     Sys_Render.matricesBufferID        = SetupSSBO(&Sys_Render.matricesBufferID,        1,INSTANCE_COUNT * 16 * sizeof(float),modelMatrices, GL_STATIC_DRAW);
     Sys_Render.voxelLightListCountsID  = SetupSSBO(&Sys_Render.voxelLightListCountsID,  2,VOXEL_COUNT * sizeof(u32),NULL,GL_STATIC_DRAW);
     Sys_Render.voxelLightListsID       = SetupSSBO(&Sys_Render.voxelLightListsID,       3,VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(u32),NULL,GL_STATIC_DRAW);

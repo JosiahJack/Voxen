@@ -844,7 +844,7 @@ void DeleteInstance(u16 i) {
     
     u16 endInstance = vmax(vmin(INSTANCE_COUNT - 1, Eng_Global->loadedInstances - 1),START_INDEX_LEVEL_INSTANCES);
 //     for (;i<endInstance;++i) Eng_Global->instances[i] = Eng_Global->instances[i + 1]; // Shift the entire list down, overwriting the entity we're deleting at starting i
-    for (;i<endInstance;++i) __builtin_memcpy(&Eng_Global->instances[i], &Eng_Global->instances[i+1], sizeof(Entity));
+    for (;i<endInstance;++i) CopyMemoryFromBtoAForNBytes(&Eng_Global->instances[i],&Eng_Global->instances[i+1],sizeof(Entity));
     --Eng_Global->loadedInstances; // Shift final marker.  It's history!
 }
 
@@ -917,8 +917,8 @@ MOD_TO_ENGINE void LoadLevelMod(u8 curlevel) {
         while (len && (lineSpace[len - 1] == '\n' || lineSpace[len - 1] == '\r'))
             lineSpace[--len] = '\0';
         line = lineSpace;
-        StringFormat(initialLine, sizeof(initialLine), "%s", line);
-        __builtin_memcpy(firstKeyCheck, line, 10); firstKeyCheck[10] = '\0';
+        StringFormat(initialLine,sizeof(initialLine),"%s",line);
+        CopyMemoryFromBtoAForNBytes(firstKeyCheck,line,10); firstKeyCheck[10] = '\0';
         lineNum++;
         bool isLight = !StringsEqual(firstKeyCheck, "constIndex");
         if (isLight) {

@@ -1,10 +1,6 @@
 // audio.c - Audio System
 #include "os.h"
 #include "voxen.h"
-#define DR_WAV_IMPLEMENTATION
-#define DR_MP3_IMPLEMENTATION
-#define DR_MP3_FLOAT_OUTPUT
-#include "dr_wav.h"
 #include "dr_mp3.h"
 #ifdef WINDOWS
     #include "nanowasapi.c"
@@ -16,6 +12,91 @@
 #define AUDIO_PERIOD_MS 10
 #define AUDIO_PERIODS   4
 #define AUDIO_FRAMES    ((AUDIO_RATE * AUDIO_PERIOD_MS) / 1000)
+
+// Wav parsing
+typedef struct { OsFileHandle fp; u16 channels,bitsPerSample,fmtTag; u32 sampleRate; u64 totalPCMFrameCount,dataChunkDataPos,bytesRemaining; } WaveFile;
+static u16 WavU16LE(const u8 *d) { return (u16)(d[0]|(d[1]<<8)); }
+static u32 WavU32LE(const u8 *d) { return (u32)(d[0]|(d[1]<<8)|(d[2]<<16)|(d[3]<<24)); }
+static bool WavInit(WaveFile *w, const char *path) {
+    u8 buf[36]; SetMemoryToValueForNBytes(w,0,sizeof(*w));
+    w->fp = OS_OpenReadonly(path);
+    if (w->fp == OS_INVALID_HANDLE) return false;
+    if (OS_Read(w->fp, buf, 12) != 12) goto fail;
+    if (CompareMemoryForNBytes(buf,"RIFF",4) != 0) goto fail;
+    if (CompareMemoryForNBytes(buf+8,"WAVE",4) != 0) goto fail;
+    bool got_fmt=false,got_data=false;
+    for (;;) {
+        u8 chunkId[4],szBuf[4];
+        if (OS_Read(w->fp,chunkId,4) != 4) break;
+        if (OS_Read(w->fp,szBuf,4) != 4) break;
+        
+        u32 chunkSize = WavU32LE(szBuf);
+        if (CompareMemoryForNBytes(chunkId, "fmt ", 4) == 0) {
+            if (chunkSize < 16) goto fail;
+            
+            u8 fmt[18]; u32 toRead = chunkSize < 18 ? chunkSize : 18;
+            if (OS_Read(w->fp,fmt,toRead) != (long)toRead) goto fail;
+            if (chunkSize > toRead) OS_Seek(w->fp, (i64)(chunkSize - toRead),SEEK_CUR);
+            w->fmtTag = WavU16LE(fmt+0); w->channels = WavU16LE(fmt+2); w->sampleRate = WavU32LE(fmt+4); w->bitsPerSample = WavU16LE(fmt+14);
+            if (w->fmtTag == 0xFFFE && toRead >= 18) {
+                u16 cbSize = WavU16LE(fmt + 16);
+                if (cbSize >= 22) {
+                    u8 ext[22];
+                    if (OS_Read(w->fp,ext,22) == 22) w->fmtTag = WavU16LE(ext + 6);
+                }
+            }
+            if (w->fmtTag != 0x1) goto fail; // PCM format
+            if (w->bitsPerSample != 8 && w->bitsPerSample != 16) goto fail;
+            got_fmt = true;
+        } else if (CompareMemoryForNBytes(chunkId,"data",4) == 0) {
+            w->dataChunkDataPos = (u64)OS_Tell(w->fp);
+            u32 bpf = (u32)w->channels * (w->bitsPerSample / 8);
+            if (bpf == 0) goto fail;
+            w->bytesRemaining = chunkSize - (chunkSize % bpf);
+            w->totalPCMFrameCount = w->bytesRemaining / bpf;
+            got_data = true;
+            break; /* data chunk is last thing we need */
+        } else {
+            OS_Seek(w->fp,(i64)(chunkSize + (chunkSize & 1)),SEEK_CUR);
+        }
+    }
+
+    if (got_fmt && got_data) return true;
+    fail:
+    if (w->fp != OS_INVALID_HANDLE) { OS_Close(w->fp); w->fp = OS_INVALID_HANDLE; }
+    return false;
+}
+
+static u64 WavReadPCMFrames(WaveFile *w, u64 framesToRead, float *out) {
+    if (!w || !out || framesToRead == 0) return 0;
+    u32 bps = w->bitsPerSample; u32 bpf = (u32)w->channels * (bps / 8); if (bpf == 0) return 0;
+
+    u64 framesLeft = w->bytesRemaining / bpf;
+    if (framesToRead > framesLeft) framesToRead = framesLeft;
+    u64 totalRead = 0; u8  tmp[4096];
+    while (framesToRead > 0) {
+        u64 batchFrames=framesToRead; u64 batchBytes=batchFrames * bpf;
+        if (batchBytes > sizeof(tmp)) { batchFrames = sizeof(tmp) / bpf; batchBytes  = batchFrames * bpf; }
+        size_t got = OS_Read(w->fp, tmp, (size_t)batchBytes);
+        u64 gotFrames = got / bpf;
+        u64 samples   = gotFrames * w->channels;
+        if (bps == 8) {
+            for (u64 i = 0; i < samples; i++) *out++ = (tmp[i] / 255.0f) * 2.0f - 1.0f;
+        } else { // 16bit LE
+            for (u64 i = 0; i < samples; i++) {
+                i16 s;
+                SetMemoryToValueForNBytes(&s,(i64)tmp + i*2,2);
+                *out++ = s * (1.0f / 32768.0f);
+            }
+        }
+
+        w->bytesRemaining -= gotFrames * bpf; framesToRead -= gotFrames; totalRead += gotFrames; if (gotFrames < batchFrames) break;
+    }
+    return totalRead;
+}
+
+static void WavUnInit(WaveFile *w) { if (w && w->fp != OS_INVALID_HANDLE) { OS_Close(w->fp); w->fp = OS_INVALID_HANDLE; } }
+
 typedef struct { float *samples; u32 frame_count,frame_pos; float volume; bool looping,positional,playing; Vector3 pos; } wav_channel_t;
 typedef struct { drmp3 dec; bool open; float fade_vol,fade_target,fade_step; u32 src_rate; u64 frames_decoded,total_frames; } mp3_channel_t;
 static wav_channel_t wav_ch[MAX_CHANNELS];
@@ -55,16 +136,16 @@ static float *resample_stereo(float *src,u32 *frames,u32 src_rate) {
 }
 
 static float *load_wav(const char *path,u32 *out_frames) {
-    drwav wav;
-    if (!drwav_init_file(&wav,path,NULL)) return NULL;
-    if (wav.channels > 2) { drwav_uninit(&wav); return NULL; }
+    WaveFile wav;
+    if (!WavInit(&wav,path)) return NULL;
+    if (wav.channels > 2) { WavUnInit(&wav); return NULL; }
     u64 frames = wav.totalPCMFrameCount;
     float *buf = (float*)malloc(frames*AUDIO_CHANNELS*sizeof(float));
-    if (!buf) { drwav_uninit(&wav); return NULL; }
-    u64 got = drwav_read_pcm_frames_f32(&wav,frames,buf);
+    if (!buf) { WavUnInit(&wav); return NULL; }
+    u64 got = WavReadPCMFrames(&wav,frames,buf);
     if (wav.channels == 1) for (i64 i=(i64)got-1;i>=0;i--) { buf[i*2+1]=buf[i]; buf[i*2]=buf[i]; }
     u32 src_rate = wav.sampleRate;
-    drwav_uninit(&wav);
+    WavUnInit(&wav);
     *out_frames = (u32)got;
     return resample_stereo(buf,out_frames,src_rate);
 }
@@ -114,9 +195,9 @@ static void audio_mix_period(i16 *out) {
             mp3_channel_t *m = &mp3_ch[s];
             if (!m->open) continue;
             u32 src_rate = m->src_rate ? m->src_rate : AUDIO_RATE;
-            drmp3_uint64 frames_to_read = (src_rate == AUDIO_RATE) ? AUDIO_FRAMES : (drmp3_uint64)((u64)AUDIO_FRAMES*src_rate/AUDIO_RATE)+2;
+            u64 frames_to_read = (src_rate == AUDIO_RATE) ? AUDIO_FRAMES : (u64)((u64)AUDIO_FRAMES*src_rate/AUDIO_RATE)+2;
             float raw[AUDIO_FRAMES*4];
-            drmp3_uint64 got = drmp3_read_pcm_frames_f32(&m->dec,frames_to_read,raw);
+            u64 got = drmp3_read_pcm_frames_f32(&m->dec,frames_to_read,raw);
             if (got == 0) { drmp3_uninit(&m->dec); m->open=false; continue; }
             float vol = m->fade_vol*music_scale();
             m->frames_decoded += got;

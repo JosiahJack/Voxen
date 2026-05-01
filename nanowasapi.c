@@ -110,7 +110,7 @@ int pcm_write(OsFileHandle fd,void *buf,int frames) {
         wasapi_dev_t *w=&wasapi_devs[i]; if (!w->open) continue;
         BYTE *data=NULL;
         if (FAILED(w->render->lpVtbl->GetBuffer(w->render,(UINT32)frames,&data))) { pcm_prepare(IDX_TO_FD(i)); continue; }
-        __builtin_memcpy(data,buf,frames*w->channels*2);
+        CopyMemoryFromBtoAForNBytes(data,buf,frames*w->channels*2);
         w->render->lpVtbl->ReleaseBuffer(w->render,(UINT32)frames,0);
     }
     return frames;

@@ -12,6 +12,7 @@ typedef __UINT32_TYPE__ u32;
 typedef __INT64_TYPE__ i64;
 typedef __UINT64_TYPE__ u64;
 #define UINT_MAX 0xffffffffU
+#define INT_MAX 2147483647
 #define bool _Bool
 #define true 1
 #define false 0
@@ -347,12 +348,13 @@ static inline __attribute__((always_inline)) void* OS_OpenAndAllocateFileBufferR
     return ramSpacePointer;
 }
 
+static inline __attribute__((always_inline)) void* OSCopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n) { unsigned char *d=(unsigned char *)dst; const unsigned char *s=(const unsigned char *)src; while (n--) {*d++=*s++;} return dst; } // memcpy replacement
 static inline __attribute__((always_inline)) void* OS_Realloc(void* oldPtr, size_t oldSize, size_t newSize) {
     if (oldPtr == NULL) return OS_Alloc(newSize);
     if (newSize <= oldSize) return oldPtr;
 
     void* newPtr = OS_Alloc(newSize);
-    __builtin_memcpy(newPtr,oldPtr,oldSize);
+    OSCopyMemoryFromBtoAForNBytes(newPtr,oldPtr,oldSize);
     OS_DeallocateRAM(oldPtr,oldSize);
     return newPtr;
 }

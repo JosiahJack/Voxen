@@ -663,7 +663,7 @@ static void createKeyTables(void) {
 
     void _glfwPollMonitorsWin32(void) {
         int i, disconnectedCount = _glfw.monitorCount; _GLFWmonitor** disconnected = NULL; DWORD adapterIndex,displayIndex; DISPLAY_DEVICEW adapter, display; _GLFWmonitor* monitor;
-        if (disconnectedCount) { disconnected = OS_Calloc(_glfw.monitorCount,sizeof(_GLFWmonitor*)); __builtin_memcpy(disconnected,_glfw.monitors,_glfw.monitorCount * sizeof(_GLFWmonitor*)); }
+        if (disconnectedCount) { disconnected = OS_Calloc(_glfw.monitorCount,sizeof(_GLFWmonitor*)); CopyMemoryFromBtoAForNBytes(disconnected,_glfw.monitors,_glfw.monitorCount * sizeof(_GLFWmonitor*)); }
         for (adapterIndex = 0;;adapterIndex++) {
             int type = 1; ZeroMemory(&adapter, sizeof(adapter));
             adapter.cb = sizeof(adapter);
@@ -986,7 +986,7 @@ static void createKeyTables(void) {
         XRRScreenResources* sr = _glfw.x11.randr.GetScreenResourcesCurrent(_glfw.x11.display,_glfw.x11.root);
         RROutput primary = _glfw.x11.randr.GetOutputPrimary(_glfw.x11.display,_glfw.x11.root);
         disconnectedCount = _glfw.monitorCount;
-        if (disconnectedCount) { disconnected = OS_Calloc(_glfw.monitorCount,sizeof(_GLFWmonitor*)); __builtin_memcpy(disconnected,_glfw.monitors,_glfw.monitorCount * sizeof(_GLFWmonitor*)); }
+        if (disconnectedCount) { disconnected = OS_Calloc(_glfw.monitorCount,sizeof(_GLFWmonitor*)); CopyMemoryFromBtoAForNBytes(disconnected,_glfw.monitors,_glfw.monitorCount * sizeof(_GLFWmonitor*)); }
         for (int i = 0;  i < sr->noutput;  i++) {
             int j, type, widthMM, heightMM;
             XRROutputInfo* oi = _glfw.x11.randr.GetOutputInfo(_glfw.x11.display, sr, sr->outputs[i]);
@@ -1193,7 +1193,7 @@ static void createKeyTables(void) {
         if (!js) { OS_Close(linjs.fd); return 0; }
 
         StringCopyInto_A_From_B(linjs.path,path,sizeof(linjs.path));
-        __builtin_memcpy(&js->linjs,&linjs,sizeof(linjs));
+        CopyMemoryFromBtoAForNBytes(&js->linjs,&linjs,sizeof(linjs));
         pollAbsState(js);
         _glfwInputJoystick(js, 0x00040001/*connected*/);
         return  1;
@@ -1553,13 +1553,13 @@ void _glfwInputMonitor(_GLFWmonitor* monitor, int action, int placement) {
         _glfw.monitorCount++;
         _glfw.monitors = _glfw.monitors ? OS_Realloc(_glfw.monitors,monitorAllocationSize,sizeof(_GLFWmonitor*) * _glfw.monitorCount) : OS_Alloc(_glfw.monitorCount * sizeof(_GLFWmonitor*));
         monitorAllocationSize = _glfw.monitorCount * sizeof(_GLFWmonitor*);
-        if (placement == 0) { __builtin_memmove(_glfw.monitors + 1,_glfw.monitors,((size_t) _glfw.monitorCount - 1) * sizeof(_GLFWmonitor*)); _glfw.monitors[0] = monitor; }
+        if (placement == 0) { MoveMemoryFromBtoAForNBytes(_glfw.monitors + 1,_glfw.monitors,((size_t) _glfw.monitorCount - 1) * sizeof(_GLFWmonitor*)); _glfw.monitors[0] = monitor; }
         else _glfw.monitors[_glfw.monitorCount - 1] = monitor;
     } else if (action == 0x00040002/*disconnected*/) {
         for (int i=0;i<_glfw.monitorCount;++i) {
             if (_glfw.monitors[i] == monitor) {
                 _glfw.monitorCount--;
-                __builtin_memmove(_glfw.monitors + i, _glfw.monitors + i + 1,((size_t) _glfw.monitorCount - i) * sizeof(_GLFWmonitor*));
+                MoveMemoryFromBtoAForNBytes(_glfw.monitors + i, _glfw.monitors + i + 1,((size_t) _glfw.monitorCount - i) * sizeof(_GLFWmonitor*));
                 break;
             }
         }

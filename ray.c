@@ -43,7 +43,7 @@ ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, u32
         u32 triCount = modelTriangleCounts[mindex];
         if (triCount < 1) continue;
         float M[16];
-        __builtin_memcpy(M,&modelMatrices[i * 16],16 * sizeof(float));
+        CopyMemoryFromBtoAForNBytes(M,&modelMatrices[i * 16],16 * sizeof(float));
         float m00=M[0], m10=M[1], m20=M[2];
         float m01=M[4], m11=M[5], m21=M[6];
         float m02=M[8], m12=M[9], m22=M[10];
