@@ -124,7 +124,7 @@ fi
 
 export CC=$CC
 export CFLAGS=$CFLAGS
-SOURCES="voxen.c physics.c helpers.c console.c models.c culling.c textures.c audio.c nanoalsa.c"
+SOURCES="voxen.c physics.c helpers.c console.c models.c culling.c textures.c audio.c"
 export TEMP_DIR=temp_build
 printf "%s\n" $SOURCES | xargs -P12 -I{} sh -c "$CC -c {} $CFLAGS -o $TEMP_DIR/\$(basename {}).o"
 $LINKER "$TEMP_DIR"/*.o $LDFLAGS -rdynamic -o $BINARY_NAME
@@ -132,7 +132,7 @@ $LINKER "$TEMP_DIR"/*.o $LDFLAGS -rdynamic -o $BINARY_NAME
 # Game Code Build
 export CCGC=$CC
 export CFLAGSGC=$CFLAGSGC
-SOURCESGC="animation.c ai.c biomonitor.c weapons.c music.c audio.c citadel.c entity.c"
+SOURCESGC="animation.c ai.c biomonitor.c weapons.c music.c modaudio.c citadel.c entity.c"
 export TEMP_DIRGC=temp_build_gc
 export SCRIPT_DIR="./Scripts"
 printf "%s\n" $SOURCESGC | xargs -P12 -I{} $CCGC -c $SCRIPT_DIR/{} $CFLAGSGC -I. -nostdinc -fPIC -ffreestanding -fno-builtin -Wshadow -o "$TEMP_DIRGC"/{}.o
@@ -144,9 +144,9 @@ if ! $IS_CI; then
     case "$PLATFORM" in
         windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; wine ./voxen.exe ;;
 #         windows)  wine ./voxen.exe ;;
-#         *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
+        *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
 #         *)        strip --strip-all --strip-unneeded ./voxen; ./voxen ;;   # linux Alternate build methods to be able to look at symbols and debugging
-        *)        ./voxen ;;   # linux
+#         *)        ./voxen ;;   # linux
     esac
     rm -f "$TEMP_DIR"/*.o ./Shaders/*.h "$TEMP_DIRGC"/*.o ./voxen.upx ./*.lib #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.
 fi

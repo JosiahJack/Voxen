@@ -188,6 +188,7 @@ static inline __attribute__((always_inline)) long OS_Open(const char* path, i32 
     #define SYN_DROPPED  3
     typedef int OsFileHandle;
     #define OS_INVALID_HANDLE -1
+    typedef int wchar_t;
     static inline int OS_IOControl(int fd, unsigned long request, void *arg) {
         register long rax __asm__("rax") = 16;
         register int  rdi __asm__("rdi") = fd;

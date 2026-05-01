@@ -3,7 +3,7 @@
 #include "tables_audio.h"
 #define MAX_AMBIENT_NOISES 80 // Equal to number used
 u16 loadedAmbients = 0;
-typedef struct { SoundFX sound; u32 loaded; float length_sec; } AmbientSlot;
+typedef struct { ma_sound sound; u32 loaded; float length_sec; } AmbientSlot;
 typedef struct { u16 index; const char* filename; } AmbientDef;
 u16 ambientRegistry[MAX_AMBIENT_NOISES]; // For ambient_ type entities that play looped sound
 static AmbientSlot ambientSlots[MAX_AMBIENT_NOISES] = {0};

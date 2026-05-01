@@ -1,7 +1,7 @@
 // g_music.c - Music System
 #include "mod.h"
 #define BUFFER_MS 50
-#define AUD_BUFFER_T 0.25f
+#define AUD_BUFFER_T 0.05f
 MusicSystem Sys_Music;
 const char* levelMusicLooped[14] = {"./Audio/music/looped/track0.mp3","./Audio/music/looped/track1.mp3","./Audio/music/looped/track2.mp3","./Audio/music/looped/track3.mp3","./Audio/music/looped/track4.mp3",
                                     "./Audio/music/looped/track5.mp3","./Audio/music/looped/track6.mp3","./Audio/music/looped/track7.mp3","./Audio/music/looped/track8.mp3","./Audio/music/looped/track9.mp3",
@@ -145,9 +145,11 @@ void MusicTriggerExit(u16 other) {
 }
 
 MOD_TO_ENGINE void UpdateMusic(void) {
-    MP3Swap();
+    if (Eng_Global->gamePaused && !Eng_Global->menuActive) { MP3Pause(); return; }
+    MP3Resume();
     float remaining = GetMP3RemainingTime(); if (remaining > AUD_BUFFER_T) return;
 
+    if (Eng_Global->menuActive) { play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500); return; }
     if (Sys_Music.inCombat && !Sys_Music.inZone && Sys_Music.combatImpulseFinished < Eng_Global->pauseRelativeTime) {
         Sys_Music.inCombat = false;
         PlayTrack(TrackType_Combat, MusicType_Override);

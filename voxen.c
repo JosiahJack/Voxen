@@ -2138,7 +2138,7 @@ void LoadGLUserPtr(void) {
 
 extern u32 random_range_rng;
 #define LIGHT_RANGE_MAX 15.36f
-void InitFontAtlasses(void),LoadTextures(void),LoadModels(void); i32 Physics(void); bool CullCore(void); void InitAudio(void);
+void InitFontAtlasses(void),LoadTextures(void),LoadModels(void); i32 Physics(void); bool CullCore(void); void InitAudio(void); void AudioUpdate(void);
 i32 main(void) {
     double game_start_time = get_time();
     random_range_rng = (u32)game_start_time; // Seed global rand uniquely with time since system boot.
@@ -2284,9 +2284,9 @@ i32 main(void) {
             bool playerMoved = ((vabs(pDelta.x) + vabs(pDelta.y) + vabs(pDelta.z)) > 0.02f);
             ModUpdate(playerMoved);
             UpdateAmbientSounds();
-            UpdateMusic();
         }
 
+        UpdateMusic();
         if (likely(!Sys_Global.gamePaused) && camViewCount > 0) { // Render in-world camera views.  Pops player elsewhere, renders to tiny fbo, pops player back, renders as normal below.
             Vector3 tempPlayerPos = Sys_Global.instances[PLAYER1].position;
             Quaternion tempPlayerRot = Sys_Global.instances[PLAYER1].rotation;
@@ -2328,6 +2328,7 @@ i32 main(void) {
             if (uploadInstances) glNamedBufferData(Sys_Render.matricesBufferID,Sys_Global.loadedInstances * 16 * sizeof(float),modelMatrices,GL_DYNAMIC_DRAW);
         }
 
+        AudioUpdate();
         Render(false,0u); // Not a cam view, no camview index.  This is the normal main render.
         CheckAndTakeScreenshot();
         Sys_Global.globalFrameNum++;

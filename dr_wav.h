@@ -12,15 +12,13 @@ extern "C" {
 #define DRWAV_VERSION_REVISION  6
 #define DRWAV_VERSION_STRING    DRWAV_XSTRINGIFY(DRWAV_VERSION_MAJOR) "." DRWAV_XSTRINGIFY(DRWAV_VERSION_MINOR) "." DRWAV_XSTRINGIFY(DRWAV_VERSION_REVISION)
 
-#include <stddef.h> /* For size_t. */
-
 /* Sized Types */
-typedef   signed char           drwav_int8;
-typedef unsigned char           drwav_uint8;
-typedef   signed short          drwav_int16;
-typedef unsigned short          drwav_uint16;
-typedef   signed int            drwav_int32;
-typedef unsigned int            drwav_uint32;
+typedef i8           drwav_int8;
+typedef u8          drwav_uint8;
+typedef i16          drwav_int16;
+typedef u16          drwav_uint16;
+typedef i32            drwav_int32;
+typedef u32            drwav_uint32;
 #if defined(_MSC_VER) && !defined(__clang__)
     typedef   signed __int64    drwav_int64;
     typedef unsigned __int64    drwav_uint64;
