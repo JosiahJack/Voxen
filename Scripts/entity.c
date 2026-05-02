@@ -900,9 +900,9 @@ MOD_TO_ENGINE void LoadLevelMod(u8 curlevel) {
     if (curlevel >= Eng_Global->numLevels) { DualLogError("Cannot load world geometry, level number %d out of bounds 0 to %d\n", curlevel, Eng_Global->numLevels - 1); return; }
 
     for (u16 idx = START_INDEX_LEVEL_INSTANCES; idx < INSTANCE_COUNT; idx++) { InitializeEntity(&Eng_Global->instances[idx]); Eng_Global->dirtyInstances[idx] = true; }
-    SetMemoryToValueForNBytes(entsFromFile,0,INSTANCE_COUNT * sizeof(Entity));
-    SetMemoryToValueForNBytes(lightsFromFile,0,LIGHT_COUNT * sizeof(Light));
-    SetMemoryToValueForNBytes(lanimsFromFile,0,LIGHT_COUNT * sizeof(LightAnimation));
+    MemSetToValueForNBytes(entsFromFile,0,INSTANCE_COUNT * sizeof(Entity));
+    MemSetToValueForNBytes(lightsFromFile,0,LIGHT_COUNT * sizeof(Light));
+    MemSetToValueForNBytes(lanimsFromFile,0,LIGHT_COUNT * sizeof(LightAnimation));
     for (int i = 0; i < LIGHT_COUNT; ++i) lightsFromFile[i].lflags = LIGHT_AND_SHADOW_ON;
     u32 lineNum = 0;
     i32 entCount = -1;  // incremented to 0 on first entity line

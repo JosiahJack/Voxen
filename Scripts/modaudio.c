@@ -82,7 +82,7 @@ MOD_TO_ENGINE void UpdateAmbientSounds(void) {
 
 MOD_TO_ENGINE void ResetLevelAudio(void) {
     loadedAmbients = 0;
-    SetMemoryToValueForNBytes(ambientRegistry, 0, loadedAmbients * sizeof(u16));
+    MemSetToValueForNBytes(ambientRegistry, 0, loadedAmbients * sizeof(u16));
     for (u16 i = START_INDEX_LEVEL_INSTANCES; i<Eng_Global->loadedInstances;++i) {
         if (ConstIndexIsAmbient(Eng_Global->instances[i].index)) {
             ambientRegistry[loadedAmbients] = i;

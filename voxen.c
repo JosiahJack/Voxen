@@ -520,7 +520,7 @@ static void _rse(stbtt__bitmap*res,stbtt__edge*e,int n,int ox,int oy){
     float sd[129],*sl,*sl2;if(res->w>64)sl=(float*)TempAlloc((size_t)(res->w*2+1)*sizeof(float));else sl=sd;
     sl2=sl+res->w;y=oy;e[n].y0=(float)(oy+res->h)+1;
     while(j<res->h){float syt=(float)y,syb=(float)y+1;stbtt__active_edge**step=&active;
-        SetMemoryToValueForNBytes(sl,0,(size_t)res->w*sizeof(sl[0]));SetMemoryToValueForNBytes(sl2,0,((size_t)res->w+1)*sizeof(sl[0]));
+        MemSetToValueForNBytes(sl,0,(size_t)res->w*sizeof(sl[0]));MemSetToValueForNBytes(sl2,0,((size_t)res->w+1)*sizeof(sl[0]));
         while(*step){stbtt__active_edge*z=*step;if(z->ey<=syt){*step=z->next;z->direction=0;_hhf(&hh,z);}else step=&(*step)->next;}
         while(e->y0<=syb){if(e->y0!=e->y1){stbtt__active_edge*z=_new_ae(&hh,e,ox,syt);if(z){if(j==0&&oy!=0&&z->ey<syt)z->ey=syt;z->next=active;active=z;}}++e;}
         if(active)_fae(sl,sl2+1,res->w,active,syt);
@@ -595,7 +595,7 @@ static void stbtt_GetPackedQuad(const stbtt_packedchar*cd,int pw,int ph,int ci,f
 }
 
 int stbtt_PackBegin(stbtt_pack_context*spc,unsigned char*px,int pw,int ph,int str,int pad,void*a){
-    stbrp_context*ctx=(stbrp_context*)TempAlloc(sizeof(*ctx));*ctx=(stbrp_context){pw-pad,ph-pad,0,0,0};if(px)SetMemoryToValueForNBytes(px,0,(size_t)(pw*ph));
+    stbrp_context*ctx=(stbrp_context*)TempAlloc(sizeof(*ctx));*ctx=(stbrp_context){pw-pad,ph-pad,0,0,0};if(px)MemSetToValueForNBytes(px,0,(size_t)(pw*ph));
     return *spc=(stbtt_pack_context){a,ctx,pw,ph,str?str:pw,pad,0,1,1,px},1;
 }
 
@@ -680,7 +680,7 @@ void InitFontAtlasses(void){
     TempFree(pc.pack_info);GenerateAndBindTexture(&fontAtlasTex,0x8229/*GL_R8*/,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0x1903/*GL_RED*/,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,bmp);
 
     // Secondary atlas
-    SetMemoryToValueForNBytes(bmp,0,FONT_ATLAS_SIZE*FONT_ATLAS_SIZE);
+    MemSetToValueForNBytes(bmp,0,FONT_ATLAS_SIZE*FONT_ATLAS_SIZE);
     stbtt_pack_context pc2;stbtt_PackBegin(&pc2,bmp,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0,16,NULL);pc2.h_oversample=4;pc2.v_oversample=4;pc2.skip_missing=1;numPackedGlyphsStopD=0;
     for(int r=0;r<numFontRanges;++r){fontRangesStopD[r].startIndex=numPackedGlyphsStopD;
         for(int i=0;i<fontRangesStopD[r].count;++i){if(numPackedGlyphsStopD>=MAX_GLYPHS)break;u32 cp=fontRangesStopD[r].first+i;stbtt_fontinfo*font=&fontInfo[1];unsigned char*data=fontData[1];
@@ -729,7 +729,7 @@ void LoadTextForLanguage(u8 lang){
 static inline __attribute__((always_inline)) int StringToIntLen(const char*str,size_t len){int v=0;for(size_t i=0;i<len&&str[i]>='0'&&str[i]<='9';++i)v=v*10+(str[i]-'0');return v;}
 static const char* logLocalizations[8]={"./Data/logs_text_english.txt","./Data/logs_text_espanol.txt","./Data/logs_text_deutsch.txt","./Data/logs_text_francais.txt","./Data/logs_text_nihongo.txt","./Data/logs_text_russkiy.txt","./Data/logs_text_italiano.txt","./Data/logs_text_portugues.txt"};
 void LoadLogTextForLanguage(u8 lang){
-    SetMemoryToValueForNBytes(Sys_Text.audioLogImagesRefIndicesLH,0,TEXT_LOGS_COUNT*sizeof(u16));SetMemoryToValueForNBytes(Sys_Text.audioLogImagesRefIndicesRH,0,TEXT_LOGS_COUNT*sizeof(u16));SetMemoryToValueForNBytes(Sys_Text.audioLogType,0,TEXT_LOGS_COUNT*sizeof(u8));SetMemoryToValueForNBytes(Sys_Text.audioLogLevelFound,0,TEXT_LOGS_COUNT*sizeof(u8));
+    MemSetToValueForNBytes(Sys_Text.audioLogImagesRefIndicesLH,0,TEXT_LOGS_COUNT*sizeof(u16));MemSetToValueForNBytes(Sys_Text.audioLogImagesRefIndicesRH,0,TEXT_LOGS_COUNT*sizeof(u16));MemSetToValueForNBytes(Sys_Text.audioLogType,0,TEXT_LOGS_COUNT*sizeof(u8));MemSetToValueForNBytes(Sys_Text.audioLogLevelFound,0,TEXT_LOGS_COUNT*sizeof(u8));
     char tf[256]={0};strncpy(tf,logLocalizations[lang<8?lang:0],255);
     OsFileHandle dfd=OS_INVALID_HANDLE;int asz=0;
     if(Sys_Text.filelog_data){OS_DeallocateRAM(Sys_Text.filelog_data,Sys_Text.filelog_size);Sys_Text.filelog_data=NULL;Sys_Text.filelog_size=0;}
@@ -950,11 +950,11 @@ ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
     DebugRAM("start of LoadLevel");
     Sys_Global.levelCurrentlyLoading = true; Sys_Global.gamePaused = false; Sys_Global.menuActive = false;
     RenderLoadingProgress(100,"Loading level...");
-    SetMemoryToValueForNBytes(lights,0,LIGHT_COUNT * sizeof(Light)); SetMemoryToValueForNBytes(lanims,0,LIGHT_COUNT * sizeof(LightAnimation));
-    SetMemoryToValueForNBytes(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
-    SetMemoryToValueForNBytes(modelMatrices,0,INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
-    SetMemoryToValueForNBytes(camViews,0,64 * sizeof(CamView)); camViewCount = 0;
-    SetMemoryToValueForNBytes(Sys_Global.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
+    MemSetToValueForNBytes(lights,0,LIGHT_COUNT * sizeof(Light)); MemSetToValueForNBytes(lanims,0,LIGHT_COUNT * sizeof(LightAnimation));
+    MemSetToValueForNBytes(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
+    MemSetToValueForNBytes(modelMatrices,0,INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
+    MemSetToValueForNBytes(camViews,0,64 * sizeof(CamView)); camViewCount = 0;
+    MemSetToValueForNBytes(Sys_Global.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
     char filename[20]; // Minimum size for 0 through 13.
     StringFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel);
     levelFileHandle = OS_OpenReadonly(filename);
@@ -985,7 +985,7 @@ ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
     RenderLoadingProgress(120,"Loading voxel lighting data...");
     for (u16 i = START_INDEX_LEVEL_INSTANCES; i < Sys_Global.loadedInstances; i++) Sys_Global.dirtyInstances[i] = true;
     for (u16 i = 0; i < Sys_Global.loadedLights; i++) { lightsNewPosition[i] = lights[i].pos; }
-    SetMemoryToValueForNBytes(voxen_Shadow_System.shadowmapIndirectionList,MAX_SHADOWMAPS + 1,Sys_Global.loadedLights * sizeof(u32)); // Set to invalid values for all
+    MemSetToValueForNBytes(voxen_Shadow_System.shadowmapIndirectionList,MAX_SHADOWMAPS + 1,Sys_Global.loadedLights * sizeof(u32)); // Set to invalid values for all
     Sys_Global.levelCurrentlyLoading = false;
     DebugRAM("end of LoadLevel");
 }
@@ -1003,7 +1003,7 @@ __attribute__((cold)) void NewGame(void) { // Reset World States
     currentMenuItem = currentMenuTab = 0; currentMenuPage = MenuPages_FrontPage;
     Sys_Global.pauseRelativeTime = Sys_Global.last_physics_time = 0.0;
     Sys_Global.inventoryMode = false;
-    SetMemoryToValueForNBytes(Sys_Global.instances,0,2 * sizeof(Entity)); // Blank out player entities
+    MemSetToValueForNBytes(Sys_Global.instances,0,2 * sizeof(Entity)); // Blank out player entities
     PlayerInit(PLAYER1); PlayerInit(PLAYER2);
     Sys_Global.instances[WORLD].ioflags = 0u;
     cam_yaw = 90.0f; cam_pitch = 0.0f; cam_roll = 0.0f;
@@ -1913,7 +1913,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
     if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps();
     UpdateLights(); // This is where the voxels get updated!
     for (int i=0;i<LIGHT_COUNT;++i) flag_setu32(&lights[i].lflags,LDIRTY,false);
-    SetMemoryToValueForNBytes(Sys_Global.dirtyInstances,0,Sys_Global.loadedInstances * sizeof(bool));
+    MemSetToValueForNBytes(Sys_Global.dirtyInstances,0,Sys_Global.loadedInstances * sizeof(bool));
     glViewport(0,0,swidth,sheight);
     ClearAll();
     glBindFramebuffer(GL_FRAMEBUFFER,Sys_Render.gBufferFBO);

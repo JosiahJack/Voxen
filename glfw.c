@@ -514,7 +514,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     GLFWproc _glfwPlatformGetModuleSymbol(void* module, const char* name) { return (GLFWproc)GetProcAddress((HMODULE)module,name); }
 static void createKeyTables(void) {
         int scancode;
-        SetMemoryToValueForNBytes(_glfw.win32.keycodes,-1,sizeof(_glfw.win32.keycodes)); SetMemoryToValueForNBytes(_glfw.win32.scancodes,-1,sizeof(_glfw.win32.scancodes));
+        MemSetToValueForNBytes(_glfw.win32.keycodes,-1,sizeof(_glfw.win32.keycodes)); MemSetToValueForNBytes(_glfw.win32.scancodes,-1,sizeof(_glfw.win32.scancodes));
         _glfw.win32.keycodes[0x00B] = GLFW_KEY_0; _glfw.win32.keycodes[0x002] = GLFW_KEY_1; _glfw.win32.keycodes[0x003] = GLFW_KEY_2;
         _glfw.win32.keycodes[0x004] = GLFW_KEY_3; _glfw.win32.keycodes[0x005] = GLFW_KEY_4; _glfw.win32.keycodes[0x006] = GLFW_KEY_5;
         _glfw.win32.keycodes[0x007] = GLFW_KEY_6; _glfw.win32.keycodes[0x008] = GLFW_KEY_7; _glfw.win32.keycodes[0x009] = GLFW_KEY_8;
@@ -1092,8 +1092,8 @@ static void createKeyTables(void) {
 
     static void createKeyTables(void) {
         int scancodeMin, scancodeMax;
-        SetMemoryToValueForNBytes(_glfw.x11.keycodes,-1,sizeof(_glfw.x11.keycodes));
-        SetMemoryToValueForNBytes(_glfw.x11.scancodes,-1,sizeof(_glfw.x11.scancodes));
+        MemSetToValueForNBytes(_glfw.x11.keycodes,-1,sizeof(_glfw.x11.keycodes));
+        MemSetToValueForNBytes(_glfw.x11.scancodes,-1,sizeof(_glfw.x11.scancodes));
         _glfw.x11.xlib.DisplayKeycodes(_glfw.x11.display,&scancodeMin,&scancodeMax);
         int width; KeySym* keysyms = _glfw.x11.xlib.GetKeyboardMapping(_glfw.x11.display,scancodeMin,scancodeMax - scancodeMin + 1,&width);
         for (int sc = scancodeMin; sc <= scancodeMax; sc++) {
@@ -1378,9 +1378,9 @@ static void createKeyTables(void) {
     #define PLATFORM_pollEvents()                   _glfwPollEventsX11()
 #endif
 _GLFWlibrary _glfw={0};
-void* SetMemoryToValueForNBytes(void *dst, int c, size_t n);
+void* MemSetToValueForNBytes(void *dst, int c, size_t n);
 int WindowInit(void) {
-    SetMemoryToValueForNBytes(&_glfw,0,sizeof(_glfw));
+    MemSetToValueForNBytes(&_glfw,0,sizeof(_glfw));
     #if defined(WINDOWS)
         GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,(const WCHAR*)&_glfw,(HMODULE*)&_glfw.win32.instance);
         const char* names[] = {"xinput1_4.dll","xinput1_3.dll","xinput9_1_0.dll","xinput1_2.dll","xinput1_1.dll",NULL};
@@ -1514,7 +1514,7 @@ int WindowInit(void) {
         if (sa) _glfw.x11.xlib.Free(sa);
         XSetWindowAttributes wa; wa.event_mask = (1L<<22);
         _glfw.x11.xlib.CreateWindow(_glfw.x11.display,_glfw.x11.root,0,0,1,1,0,0,2/*input only*/,DefaultVisual(_glfw.x11.display,_glfw.x11.screen),(1L<<11)/*event mask*/,&wa);
-        XcursorImage* native = _glfw.x11.xcursor.ImageCreate(16,16); SetMemoryToValueForNBytes(native->pixels,0,256*sizeof(XcursorUInt)); native->xhot=native->yhot=0;
+        XcursorImage* native = _glfw.x11.xcursor.ImageCreate(16,16); MemSetToValueForNBytes(native->pixels,0,256*sizeof(XcursorUInt)); native->xhot=native->yhot=0;
         _glfw.x11.hiddenCursorHandle = _glfw.x11.xcursor.ImageLoadCursor(_glfw.x11.display,native); _glfw.x11.xcursor.ImageDestroy(native);
         _glfwPollMonitorsX11();
     #endif
@@ -1806,7 +1806,7 @@ void _glfwInputJoystick(_GLFWjoystick* js,int event) {
     if (jid > GLFW_JOYSTICK_LAST) return;
     bool connected = (event == 0x00040001/*connected*/);
     Sys_Input.joystickPresent[jid] = connected;
-    if (!connected) { SetMemoryToValueForNBytes(Sys_Input.joystickButtons,0,sizeof(Sys_Input.joystickButtons)); SetMemoryToValueForNBytes(Sys_Input.joystickHats,0,sizeof(Sys_Input.joystickHats)); } // Clear
+    if (!connected) { MemSetToValueForNBytes(Sys_Input.joystickButtons,0,sizeof(Sys_Input.joystickButtons)); MemSetToValueForNBytes(Sys_Input.joystickHats,0,sizeof(Sys_Input.joystickHats)); } // Clear
 }
 
 void _glfwInputJoystickAxis(_GLFWjoystick* js,int axis,float value) { js->axes[axis] = value; }
@@ -1836,4 +1836,4 @@ _GLFWjoystick* _glfwAllocJoystick(const char* name,const char* guid,int axisCoun
     return js;
 }
 
-void _glfwFreeJoystick(_GLFWjoystick* js) { OS_DeallocateRAM(js->axes,js->axesSize); OS_DeallocateRAM(js->buttons,js->buttonsSize); OS_DeallocateRAM(js->hats,js->hatsSize); SetMemoryToValueForNBytes(js,0,sizeof(_GLFWjoystick)); }
+void _glfwFreeJoystick(_GLFWjoystick* js) { OS_DeallocateRAM(js->axes,js->axesSize); OS_DeallocateRAM(js->buttons,js->buttonsSize); OS_DeallocateRAM(js->hats,js->hatsSize); MemSetToValueForNBytes(js,0,sizeof(_GLFWjoystick)); }

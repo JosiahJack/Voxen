@@ -57,7 +57,7 @@ ContactManifold g_manifolds[MAX_MANIFOLDS];
 u16 g_manifoldCount = 0;
 static CellBucket g_cellBuckets[ARRSIZE];
 static void BuildCellBuckets(u16 n) {
-    SetMemoryToValueForNBytes(g_cellBuckets,0,sizeof(g_cellBuckets));
+    MemSetToValueForNBytes(g_cellBuckets,0,sizeof(g_cellBuckets));
     for (u16 i=START_INDEX_LEVEL_INSTANCES; i<n; ++i) {
         Entity *e=&Sys_Global.instances[i];
         if (!(e->entflags&ENTFLAG_ACTIVE) || e->collider==COLLIDER_TYPE_NONE) continue;
@@ -88,7 +88,7 @@ static ContactManifold* FindOrCreateManifold(u16 idxA,u16 idxB) {
     return NULL;
 }
 
-static void ResetManifoldTable(void) { SetMemoryToValueForNBytes(g_manifoldHT,0,sizeof(g_manifoldHT)); g_manifoldCount=0; }
+static void ResetManifoldTable(void) { MemSetToValueForNBytes(g_manifoldHT,0,sizeof(g_manifoldHT)); g_manifoldCount=0; }
 
 static inline Vector3 ClosestPointOnSegment(Vector3 p,Vector3 q,Vector3 a) {
     Vector3 pq=Vector3_A_minus_B(q,p), pa=Vector3_A_minus_B(a,p);
@@ -461,7 +461,7 @@ void Physics_PrimitiveStep(float dt) {
 }
  
 void Physics_ResetForLevelLoad(void) {
-    SetMemoryToValueForNBytes(g_manifolds,0,sizeof(g_manifolds)); SetMemoryToValueForNBytes(g_manifoldHT,0,sizeof(g_manifoldHT)); SetMemoryToValueForNBytes(g_sleepCounter,0,sizeof(g_sleepCounter));
+    MemSetToValueForNBytes(g_manifolds,0,sizeof(g_manifolds)); MemSetToValueForNBytes(g_manifoldHT,0,sizeof(g_manifoldHT)); MemSetToValueForNBytes(g_sleepCounter,0,sizeof(g_sleepCounter));
     g_manifoldCount=0;
 }
 
@@ -533,7 +533,7 @@ void Physics_DrawDebug(void) {
     u32 curIDs[MAX_DEBUG_MANIFOLD_IDS]; u16 curCount=0;
     for (u16 m=0; m<g_manifoldCount&&curCount<MAX_DEBUG_MANIFOLD_IDS; ++m) curIDs[curCount++]=ManifoldID(g_manifolds[m].idxA,g_manifolds[m].idxB);
     static u8 g_contactState[INSTANCE_COUNT];
-    SetMemoryToValueForNBytes(g_contactState,0,n);
+    MemSetToValueForNBytes(g_contactState,0,n);
     for (u16 m=0; m<g_manifoldCount; ++m) {
         u16 a=g_manifolds[m].idxA, b=g_manifolds[m].idxB;
         u8 state=IDInPrevSet(ManifoldID(a,b))?1:2;

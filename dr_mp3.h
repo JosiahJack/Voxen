@@ -23,10 +23,9 @@
 #define DRMP3_HDR_IS_LAYER_1(h)          ((h[1] & 6) == 6)
 #define DRMP3_COPY_MEMORY(dst,src,sz) CopyMemoryFromBtoAForNBytes((dst),(src),(sz))
 #define DRMP3_MOVE_MEMORY(dst,src,sz) MoveMemoryFromBtoAForNBytes((dst),(src),(sz))
-#define DRMP3_ZERO_MEMORY(p,sz)       SetMemoryToValueForNBytes((p),0,(sz))
+#define DRMP3_ZERO_MEMORY(p,sz)       MemSetToValueForNBytes((p),0,(sz))
 #define DRMP3_ZERO_OBJECT(p)          DRMP3_ZERO_MEMORY((p),sizeof(*(p)))
 #define DRMP3_OFFSET_PTR(p,offset) ((void*)((u8*)(p)+(offset)))
-void *realloc(void *ptr, size_t size); void free(void *ptr);
 typedef enum { DRMP3_SEEK_SET, DRMP3_SEEK_CUR, DRMP3_SEEK_END } drmp3_seek_origin;
 typedef struct { int frame_bytes, channels, sample_rate, layer, bitrate_kbps; } drmp3dec_frame_info;
 typedef struct { const u8 *buf; int pos, limit; } drmp3_bs;
@@ -41,13 +40,12 @@ typedef struct {
     drmp3_read_proc onRead;
     drmp3_seek_proc onSeek;
     void *pUserData;
-    u32 mp3FrameChannels, mp3FrameSampleRate;
-    u32 pcmFramesConsumedInMP3Frame, pcmFramesRemainingInMP3Frame;
-    u8  pcmFrames[sizeof(float)*DRMP3_MAX_SAMPLES_PER_FRAME];
+    u32 mp3FrameChannels,mp3FrameSampleRate,pcmFramesConsumedInMP3Frame,pcmFramesRemainingInMP3Frame;
+    u8 pcmFrames[sizeof(float)*DRMP3_MAX_SAMPLES_PER_FRAME];
     u64 currentPCMFrame,streamCursor,streamLength,streamStartOffset;
     u32 delayInPCMFrames,paddingInPCMFrames;
     u64 totalPCMFrameCount;
-    bool isVBR,isCBR,atEnd;
+    bool atEnd;
     size_t dataSize,dataCapacity,dataConsumed;
     u8 *pData;
 } drmp3;
@@ -646,8 +644,7 @@ static u32 drmp3_decode_next_frame_ex(drmp3 *p, drmp3d_sample_t *pPCMFrames, drm
             if(p->pData) DRMP3_MOVE_MEMORY(p->pData,p->pData+p->dataConsumed,p->dataSize);
             p->dataConsumed=0;
             if(p->dataCapacity<(16384*4)){
-                u8 *nd=(u8*)realloc(p->pData,16384*4);
-                if(!nd){p->atEnd=1;return 0;}
+                u8 *nd=(u8*)OS_Realloc(p->pData,p->dataCapacity,16384*4);
                 p->pData=nd; p->dataCapacity=16384*4;
             }
             bytesRead=drmp3__on_read_clamped(p,p->pData+p->dataSize,p->dataCapacity-p->dataSize);
@@ -672,9 +669,9 @@ static u32 drmp3_decode_next_frame_ex(drmp3 *p, drmp3d_sample_t *pPCMFrames, drm
             DRMP3_MOVE_MEMORY(p->pData,p->pData+p->dataConsumed,p->dataSize);
             p->dataConsumed=0;
             if(p->dataCapacity==p->dataSize){
-                u8 *nd=(u8*)realloc(p->pData,p->dataCapacity+16384*4);
-                if(!nd){p->atEnd=1;return 0;}
-                p->pData=nd; p->dataCapacity+=16384*4;
+                size_t needed = p->dataCapacity+16384*4;
+                u8 *nd=(u8*)OS_Realloc(p->pData,p->dataCapacity,needed);
+                p->pData=nd; p->dataCapacity=needed;
             }
             bytesRead=drmp3__on_read_clamped(p,p->pData+p->dataSize,p->dataCapacity-p->dataSize);
             if(!bytesRead){p->atEnd=1;return 0;}
@@ -734,7 +731,7 @@ static bool drmp3_init_internal(drmp3 *p, drmp3_read_proc onRead, drmp3_seek_pro
 
     firstFramePCMFrameCount=drmp3_decode_next_frame_ex(p,(drmp3d_sample_t*)p->pcmFrames,&firstFrameInfo);
     if(firstFramePCMFrameCount==0){
-        free(p->pData); p->pData=NULL;
+        OS_DeallocateRAM(p->pData,p->dataCapacity); p->pData=NULL; p->dataCapacity=0;
         return 0;
     }
 
@@ -767,7 +764,6 @@ static bool drmp3_init_internal(drmp3 *p, drmp3_read_proc onRead, drmp3_seek_pro
                         if(pad<0) pad=0;
                         p->delayInPCMFrames=(u32)d; p->paddingInPCMFrames=(u32)pad;
                     }
-                    if(isXing) p->isVBR=1; else p->isCBR=1;
                     /* reset and skip the Xing frame */
                     p->pcmFramesRemainingInMP3Frame=0;
                     p->streamStartOffset+=(u32)firstFrameInfo.frame_bytes;
@@ -802,7 +798,7 @@ static bool drmp3_init_file(drmp3 *pMP3, const char *pFilePath, void *unused){
 static void drmp3_uninit(drmp3 *pMP3){
     if(!pMP3) return;
     if(pMP3->pUserData){ fclose((FILE*)pMP3->pUserData); pMP3->pUserData=NULL; }
-    free(pMP3->pData); pMP3->pData=NULL;
+    OS_DeallocateRAM(pMP3->pData,pMP3->dataCapacity); pMP3->pData=NULL; pMP3->dataCapacity=0;
 }
 
 static void drmp3_reset(drmp3 *p){
@@ -881,4 +877,3 @@ static u64 drmp3_get_pcm_frame_count(drmp3 *pMP3){
     drmp3_seek_to_pcm_frame(pMP3,savedFrame);
     return total;
 }
-

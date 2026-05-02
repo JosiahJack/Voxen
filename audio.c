@@ -18,7 +18,7 @@ typedef struct { OsFileHandle fp; u16 channels,bitsPerSample,fmtTag; u32 sampleR
 static u16 WavU16LE(const u8 *d) { return (u16)(d[0]|(d[1]<<8)); }
 static u32 WavU32LE(const u8 *d) { return (u32)(d[0]|(d[1]<<8)|(d[2]<<16)|(d[3]<<24)); }
 static bool WavInit(WaveFile *w, const char *path) {
-    u8 buf[36]; SetMemoryToValueForNBytes(w,0,sizeof(*w));
+    u8 buf[36]; MemSetToValueForNBytes(w,0,sizeof(*w));
     w->fp = OS_OpenReadonly(path);
     if (w->fp == OS_INVALID_HANDLE) return false;
     if (OS_Read(w->fp, buf, 12) != 12) goto fail;
@@ -85,7 +85,7 @@ static u64 WavReadPCMFrames(WaveFile *w, u64 framesToRead, float *out) {
         } else { // 16bit LE
             for (u64 i = 0; i < samples; i++) {
                 i16 s;
-                SetMemoryToValueForNBytes(&s,(i64)tmp + i*2,2);
+                MemSetToValueForNBytes(&s,(i64)tmp + i*2,2);
                 *out++ = s * (1.0f / 32768.0f);
             }
         }
@@ -97,7 +97,7 @@ static u64 WavReadPCMFrames(WaveFile *w, u64 framesToRead, float *out) {
 
 static void WavUnInit(WaveFile *w) { if (w && w->fp != OS_INVALID_HANDLE) { OS_Close(w->fp); w->fp = OS_INVALID_HANDLE; } }
 
-typedef struct { float *samples; u32 frame_count,frame_pos; float volume; bool looping,positional,playing; Vector3 pos; } wav_channel_t;
+typedef struct { float *samples; u32 frame_count,frame_pos; float volume; bool looping,positional,playing; Vector3 pos; size_t allocSize; } wav_channel_t;
 typedef struct { drmp3 dec; bool open; float fade_vol,fade_target,fade_step; u32 src_rate; u64 frames_decoded,total_frames; } mp3_channel_t;
 static wav_channel_t wav_ch[MAX_CHANNELS];
 static i32           wav_count = 0;
@@ -106,6 +106,7 @@ static i32            ext_count = 0;
 static mp3_channel_t mp3_ch[2];
 static i32           mp3_slot = 0;
 static float        *log_samples;
+static size_t log_allocSize=0;
 static u32           log_frame_count,log_frame_pos;
 static bool          log_playing;
 static bool mp3_paused = false;
@@ -121,39 +122,37 @@ static float spatial_atten(Vector3 pos) {
 }
 
 static inline i16 f32_to_s16(float s) { s = s>1.0f?1.0f:(s<-1.0f?-1.0f:s); return (i16)(s*32767.0f); }
-static float *resample_stereo(float *src,u32 *frames,u32 src_rate) {
+static float *resample_stereo(float *src, size_t srcSize, u32 *frames, u32 src_rate, size_t* allocSize) {
     if (src_rate == AUDIO_RATE) return src;
+    
     u32 sf = *frames, df = (u32)((u64)sf*AUDIO_RATE/src_rate);
-    float *dst = (float*)malloc(df*2*sizeof(float));
-    if (!dst) return src;
+    float *dst = (float*)OS_Alloc(df*2*sizeof(float)); *allocSize = df*2*sizeof(float);
     float ratio = (float)sf/(float)df;
     for (u32 i = 0; i < df; i++) {
         float pos = i*ratio; u32 a = (u32)pos, b = a+1<sf?a+1:a; float t = pos-(float)a;
         dst[i*2+0] = src[a*2+0]+t*(src[b*2+0]-src[a*2+0]);
         dst[i*2+1] = src[a*2+1]+t*(src[b*2+1]-src[a*2+1]);
     }
-    free(src); *frames = df; return dst;
+    OS_DeallocateRAM(src,srcSize); *frames = df; return dst;
 }
 
-static float *load_wav(const char *path,u32 *out_frames) {
-    WaveFile wav;
-    if (!WavInit(&wav,path)) return NULL;
+static float *load_wav(const char *path,u32 *out_frames, size_t* allocSize) {
+    WaveFile wav; if (!WavInit(&wav,path)) return NULL;
     if (wav.channels > 2) { WavUnInit(&wav); return NULL; }
+    
     u64 frames = wav.totalPCMFrameCount;
-    float *buf = (float*)malloc(frames*AUDIO_CHANNELS*sizeof(float));
-    if (!buf) { WavUnInit(&wav); return NULL; }
+    float *buf = (float*)OS_Alloc(frames*AUDIO_CHANNELS*sizeof(float)); size_t bufSize = frames*AUDIO_CHANNELS*sizeof(float);
     u64 got = WavReadPCMFrames(&wav,frames,buf);
     if (wav.channels == 1) for (i64 i=(i64)got-1;i>=0;i--) { buf[i*2+1]=buf[i]; buf[i*2]=buf[i]; }
     u32 src_rate = wav.sampleRate;
     WavUnInit(&wav);
     *out_frames = (u32)got;
-    return resample_stereo(buf,out_frames,src_rate);
+    return resample_stereo(buf,bufSize,out_frames,src_rate,allocSize);
 }
 
 static void audio_mix_period(i16 *out) {
     float mix[AUDIO_FRAMES*AUDIO_CHANNELS];
-    SetMemoryToValueForNBytes(mix,0,sizeof(mix));
-
+    MemSetToValueForNBytes(mix,0,sizeof(mix));
     for (i32 c = 0; c < wav_count; c++) {
         wav_channel_t *w = &wav_ch[c];
         if (!w->playing || !w->samples) continue;
@@ -224,24 +223,24 @@ static void audio_mix_period(i16 *out) {
 
 ENGINE_TO_MOD void play_wav(const char *path,float volume,Vector3 pos,bool positional) {
     i32 slot = -1;
-    for (i32 i = 0; i < wav_count; i++) if (!wav_ch[i].playing && wav_ch[i].samples) { free(wav_ch[i].samples); wav_ch[i].samples=NULL; slot=i; break; }
+    for (i32 i = 0; i < wav_count; i++) if (!wav_ch[i].playing && wav_ch[i].samples) { OS_DeallocateRAM(wav_ch[i].samples,wav_ch[i].allocSize); wav_ch[i].samples=NULL; wav_ch[i].allocSize=0; slot=i; break; }
     if (slot==-1 && wav_count<MAX_CHANNELS) slot=wav_count++;
     if (slot==-1) { DualLog("WARNING: Max WAV channels (%d) reached\n",MAX_CHANNELS); return; }
-    u32 frames; float *buf = load_wav(path,&frames);
+    u32 frames; size_t allocSize=0; float *buf = load_wav(path,&frames,&allocSize);
     if (!buf) { DualLog("ERROR: Failed to load WAV %s\n",path); return; }
     wav_channel_t *w = &wav_ch[slot];
-    w->samples=buf; w->frame_count=frames; w->frame_pos=0; w->volume=volume;
+    w->samples=buf; w->allocSize = allocSize; w->frame_count=frames; w->frame_pos=0; w->volume=volume;
     w->looping=false; w->positional=positional; w->pos=pos; w->playing=true;
 }
 
 ENGINE_TO_MOD void play_message(const char *path) {
-    if (log_playing && log_samples) { log_playing=false; free(log_samples); log_samples=NULL; }
-    u32 frames; float *buf = load_wav(path,&frames);
+    if (log_playing && log_samples && log_allocSize > 0) { log_playing=false; OS_DeallocateRAM(log_samples,log_allocSize); log_samples=NULL; log_allocSize=0; }
+    u32 frames; float *buf = load_wav(path,&frames,&log_allocSize);
     if (!buf) { DualLog("ERROR: Failed to load message WAV %s\n",path); return; }
     log_samples=buf; log_frame_count=frames; log_frame_pos=0; log_playing=true;
 }
 
-ENGINE_TO_MOD i32 SoundInit(const char *path,ma_sound *pSound) { wav_channel_t *w=(wav_channel_t*)pSound; u32 frames; float *buf=load_wav(path,&frames); if (!buf) return -1; w->samples=buf; w->frame_count=frames; w->frame_pos=0; w->volume=1.0f; w->looping=false; w->positional=false; w->playing=false; return 0; }
+ENGINE_TO_MOD i32 SoundInit(const char *path,ma_sound *pSound) { wav_channel_t *w=(wav_channel_t*)pSound; u32 frames; size_t allocSize=0; float *buf=load_wav(path,&frames,&allocSize); if (!buf) return -1; w->samples=buf; w->allocSize=allocSize; w->frame_count=frames; w->frame_pos=0; w->volume=1.0f; w->looping=false; w->positional=false; w->playing=false; return 0; }
 ENGINE_TO_MOD i32 SoundStart(ma_sound *pSound) {
     wav_channel_t *w=(wav_channel_t*)pSound; w->frame_pos=0; w->playing=true;
     for (i32 i=0;i<ext_count;i++) if (ext_ch[i]==w) return 0;
@@ -251,7 +250,7 @@ ENGINE_TO_MOD i32 SoundStart(ma_sound *pSound) {
 ENGINE_TO_MOD i32 SoundStop(ma_sound *pSound) { ((wav_channel_t*)pSound)->playing=false; return 0; }
 ENGINE_TO_MOD void SoundUninit(ma_sound *pSound) {
     wav_channel_t *w=(wav_channel_t*)pSound;
-    if (w->samples){free(w->samples);w->samples=NULL;} w->playing=false;
+    if (w->samples){OS_DeallocateRAM(w->samples,w->allocSize);w->samples=NULL;w->allocSize=0;} w->playing=false;
     for (i32 i=0;i<ext_count;i++) if (ext_ch[i]==w) { ext_ch[i]=ext_ch[--ext_count]; break; }
 }
 ENGINE_TO_MOD void SoundSetVolume(ma_sound *pSound,float volume) { ((wav_channel_t*)pSound)->volume=volume; }
@@ -304,13 +303,13 @@ static OsFileHandle pcm_fds[MAX_PCM_DEVICES];
 static i32 pcm_fd_count = 0;
 #ifndef WINDOWS
     static void init_pcm_device(i32 card,i32 dev) {
-        OsFileHandle r = pcm_open(card,dev,PCM_OUTPUT|PCM_NONBLOCK);
+        OsFileHandle r = pcm_open(card,dev,1|(1 << 1));
         if (r==OS_INVALID_HANDLE) return;
         
         pcm_params_t p; pcm_params_init(&p);
-        pcm_set(&p,PCM_FORMAT,PCM_FORMAT_S16_LE); pcm_set(&p,PCM_ACCESS,PCM_ACCESS_RW);
+        pcm_set(&p,PCM_FORMAT,SNDRV_PCM_FORMAT_S16_LE); pcm_set(&p,SNDRV_PCM_HW_PARAM_ACCESS,SNDRV_PCM_ACCESS_RW_INTERLEAVED);
         pcm_set(&p,PCM_RATE,AUDIO_RATE); pcm_set(&p,PCM_CHANNELS,AUDIO_CHANNELS);
-        pcm_set(&p,PCM_PERIOD_SIZE,AUDIO_FRAMES); pcm_set(&p,PCM_PERIODS,AUDIO_PERIODS);
+        pcm_set(&p,PCM_PERIOD_SIZE,AUDIO_FRAMES); pcm_set(&p,SNDRV_PCM_HW_PARAM_PERIODS,AUDIO_PERIODS);
         if (pcm_params_setup(r,&p)>=0 && pcm_fd_count<MAX_PCM_DEVICES) {
             DualLog("Audio: opened card %d device %d\n",card,dev);
             pcm_fds[pcm_fd_count++]=r;

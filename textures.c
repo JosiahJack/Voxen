@@ -32,7 +32,7 @@ static i32 stbi__bit_reverse(i32 n, i32 b) {
 }
 
 static i32 stbi__zbuild_huffman(stbi__zhuffman* z, const u8* sl, i32 num) {
-    i32 i, k=0, code=0, nc[16], sz[17]={0}; SetMemoryToValueForNBytes(z->fast, 0, sizeof(z->fast));
+    i32 i, k=0, code=0, nc[16], sz[17]={0}; MemSetToValueForNBytes(z->fast, 0, sizeof(z->fast));
     if(num!=32){ for(i=0;i<num;++i)++sz[sl[i]]; } sz[0]=0;
     for(i=1;i<16;++i){
         if(sz[i]>(1<<i))return 0;
@@ -82,7 +82,7 @@ static int stbi__compute_huffman_codes(stbi__zbuf* a) {
             if(c==16){c=stbi__zreceive(a,2)+3; f=lc[n-1];}
             else if(c==17)c=stbi__zreceive(a,3)+3;
             else if(c==18)c=stbi__zreceive(a,7)+11;
-            else return 0; SetMemoryToValueForNBytes(lc+n,f,c); n+=c;
+            else return 0; MemSetToValueForNBytes(lc+n,f,c); n+=c;
         }
     } return stbi__zbuild_huffman(&a->z_length,lc,hl) && stbi__zbuild_huffman(&a->z_distance,lc+hl,hd);
 }
@@ -319,14 +319,14 @@ void LoadTextures(void) {
     if (loadedTexturesMaxIndex == 0) { DualLogError("No textures found in textures.txt\n"); OS_Exit(1); }
 
     i32* parsIdx = OS_Alloc(loadedTexturesMaxIndex * sizeof(i32));
-    SetMemoryToValueForNBytes(parsIdx, -1, loadedTexturesMaxIndex * sizeof(i32));
+    MemSetToValueForNBytes(parsIdx, -1, loadedTexturesMaxIndex * sizeof(i32));
     for (u32 k = 0; k < texture_parser.count; ++k) {
         if (texture_parser.entries[k].index < loadedTexturesMaxIndex) parsIdx[texture_parser.entries[k].index] = (i32)k;
     }
 
     DualLog("Loading textures (%u) ... ", texture_parser.count);
     RawTexture* rawTextures = OS_Alloc(loadedTexturesMaxIndex * sizeof(RawTexture));
-    SetMemoryToValueForNBytes(rawTextures,0,loadedTexturesMaxIndex * sizeof(RawTexture));
+    MemSetToValueForNBytes(rawTextures,0,loadedTexturesMaxIndex * sizeof(RawTexture));
     for (u32 i = 0; i < loadedTexturesMaxIndex; ++i) {
         i32 p = parsIdx[i]; if (p < 0) continue;
         const char* path = texture_parser.entries[p].path;

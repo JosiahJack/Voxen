@@ -8,7 +8,6 @@
 
 typedef u32 snd_pcm_uframes_t; // match nanoalsa
 
-#define PCM_OUTPUT   1
 #define PCM_NONBLOCK (1<<1)
 #define PCM_FORMAT_S16_LE 2
 #define PCM_ACCESS_RW     3
@@ -73,7 +72,7 @@ OsFileHandle pcm_open_all(int rate,int channels,int period_frames,int periods) {
     return IDX_TO_FD(0);
 }
 
-void pcm_params_init(pcm_params_t *p) { SetMemoryToValueForNBytes(p,0,sizeof(*p)); }
+void pcm_params_init(pcm_params_t *p) { MemSetToValueForNBytes(p,0,sizeof(*p)); }
 void pcm_set(pcm_params_t *p,pcm_param_t param,unsigned long v) {
     switch(param) {
     case PCM_FORMAT:      p->format=v; break;       case PCM_ACCESS:   p->access=v; break;

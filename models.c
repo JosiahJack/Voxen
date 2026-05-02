@@ -61,7 +61,7 @@ static void OptimizeVertexCache(u16* idx, u32 ic, u32 vc) {
 static u8* OptimizeVertexFetch(u8* v, u32* vc, u16* idx, u32 ic, size_t stride) {
     u32 oc = *vc; if (!oc || !ic) return v;
     u32 *remap = OS_Alloc(oc*sizeof(u32)), *first = OS_Alloc(oc*sizeof(u32));
-    SetMemoryToValueForNBytes(remap, 0xFF, oc*sizeof(u32));
+    MemSetToValueForNBytes(remap, 0xFF, oc*sizeof(u32));
     u32 nc = 0;
     for (u32 i=0; i<ic; ++i) {
         u32 id = idx[i];
@@ -145,7 +145,7 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(const char* _
     if (unlikely(!ec)) return false;
 
     #define HASH_SIZE 32768
-    u32 ht[HASH_SIZE]; SetMemoryToValueForNBytes(ht, 0xFF, sizeof(ht));
+    u32 ht[HASH_SIZE]; MemSetToValueForNBytes(ht, 0xFF, sizeof(ht));
     u32* rem = (u32*)st; u32 ucnt = 0;
     for (u32 i=0; i<ec; ++i) {
         const float* v = sv + (i<<3);
@@ -278,7 +278,7 @@ void LoadModels(void) {
     size_t arena = n*sizeof(i32) + n*sizeof(RawOBJ) + 5*n*sizeof(float*) + (size_t)num_parse_threads * ((MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*2)*sizeof(float) + MAX_OUTPUT_VERTS*8*sizeof(float) + MAX_OUTPUT_VERTS*sizeof(u32));
     void* arena_base = OS_Alloc(arena); char* p = arena_base;
     i32* idxmap = (i32*)p; p += n*sizeof(i32);
-    SetMemoryToValueForNBytes(idxmap, -1, n*sizeof(i32));
+    MemSetToValueForNBytes(idxmap, -1, n*sizeof(i32));
     for (u32 i=0; i<mp.count; ++i) if (mp.entries[i].index != U16_MAX) idxmap[mp.entries[i].index] = (i32)i;
     RawOBJ* raw = (RawOBJ*)p; p += n*sizeof(RawOBJ);
     for (u32 i=0; i<n; ++i) {
