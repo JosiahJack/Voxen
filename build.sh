@@ -45,10 +45,39 @@ gh() {
     local infile="$1"
     local varname="$2"
     local outfile="$infile.h"
-    sed 's/"/\\"/g; s/^/"/; s/$/\\n"/' "$infile" \
-        | sed "1i static const char* $varname =" \
-        | sed '$a ;' \
-        > "$outfile"
+
+    sed 's|//.*||g' "$infile" \
+    | sed 's/\t/ /g' \
+    | awk '
+        # Remove // comments already done, now process lines
+        /^\s*#/ {
+            gsub(/^\s+|\s+$/, "")
+            print
+            next
+        }
+        {
+            # Collapse all whitespace
+            gsub(/[ \t]+/, " ")
+            gsub(/^[ \t]+|[ \t]+$/, "")
+            if (NF == 0) next
+
+            # Aggressive space removal around operators and punctuation
+            gsub(/ *\* */,"*");  gsub(/ *\/ */,"/");  gsub(/ *\+ */,"+")
+            gsub(/ *- */,"-");   gsub(/ *< */,"<");  gsub(/ *> */,">")
+            gsub(/ *== */,"=="); gsub(/ *!= */,"!=");gsub(/ *<= */,"<=")
+            gsub(/ *>= */,">="); gsub(/ *= */,"=");  gsub(/ *, */,",");
+            gsub(/ *; */,";");   gsub(/ *\{ */,"{"); gsub(/ *\} */,"}")
+            gsub(/ *\(/,"(");    gsub(/ *\) */,")"); gsub(/ *\[/,"[")
+            gsub(/ *\] */,"]");  gsub(/ *\. */,".")
+
+            printf "%s", $0
+        }
+        END { print "" }
+    ' \
+    | sed 's/"/\\"/g; s/^/"/; s/$/\\n"/' \
+    | sed "1i static const char* $varname =" \
+    | sed '$a ;' \
+    > "$outfile"
 }
 
 # Shaders and their C variable names
@@ -95,7 +124,7 @@ LINUX_CC="zig cc -target x86_64-linux-gnu.2.7"
 WINDOWS_CC="zig cc -target x86_64-windows-gnu -Wl,--stack,8388608"
 COMMON_CFLAGS="-ferror-limit=500 -fno-exceptions -fno-stack-protector -fno-asynchronous-unwind-tables -fno-unwind-tables -Wno-format-nonliteral \
                -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -fvisibility=hidden -pipe -fno-ident -fdata-sections -Wno-int-to-void-pointer-cast \
-               -ffunction-sections -ffast-math -std=c11 -Wall -Wextra -Wno-implicit-fallthrough -fdeclspec \
+               -ffunction-sections -ffast-math -std=c11 -Wall -Wextra -Wno-implicit-fallthrough -fdeclspec -fno-rtti \
                -fomit-frame-pointer -g0 -fstrict-aliasing -fcommon -Walloca -DMA_USE_STDINT \
                -Wformat=2 -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings -fno-math-errno -fno-sanitize=all \
                -fno-trapping-math -fmerge-all-constants -m64 -Os -march=haswell -fstack-usage"
@@ -124,7 +153,7 @@ fi
 
 export CC=$CC
 export CFLAGS=$CFLAGS
-SOURCES="voxen.c physics.c helpers.c console.c models.c culling.c textures.c audio.c"
+SOURCES="voxen.c"
 export TEMP_DIR=temp_build
 printf "%s\n" $SOURCES | xargs -P12 -I{} sh -c "$CC -c {} $CFLAGS -o $TEMP_DIR/\$(basename {}).o"
 $LINKER "$TEMP_DIR"/*.o $LDFLAGS -rdynamic -o $BINARY_NAME
@@ -144,9 +173,9 @@ if ! $IS_CI; then
     case "$PLATFORM" in
         windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; wine ./voxen.exe ;;
 #         windows)  wine ./voxen.exe ;;
-        *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
+#         *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
 #         *)        strip --strip-all --strip-unneeded ./voxen; ./voxen ;;   # linux Alternate build methods to be able to look at symbols and debugging
-#         *)        ./voxen ;;   # linux
+        *)        ./voxen ;;   # linux
     esac
     rm -f "$TEMP_DIR"/*.o ./Shaders/*.h "$TEMP_DIRGC"/*.o ./voxen.upx ./*.lib #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.
 fi

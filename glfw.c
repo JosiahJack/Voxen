@@ -1764,7 +1764,6 @@ void quat_from_yaw_pitch_roll(Quaternion* q, float yaw_deg, float pitch_deg, flo
     q->z = cy * cp * sr - sy * sp * cr; // Z-axis (roll)
 } // Skipping quat normalization, not needed
 
-void SetPlayerListenerOrientation(void);
 void _glfwInputCursorPos(_GLFWwindow* window,double xpos,double ypos) {
     if (window->virtualCursorPosX == xpos && window->virtualCursorPosY == ypos) return;
     window->virtualCursorPosX = xpos; window->virtualCursorPosY = ypos;
@@ -1794,7 +1793,6 @@ void _glfwInputCursorPos(_GLFWwindow* window,double xpos,double ypos) {
         float y2 = rot.y * rot.y;  float xz = rot.x * rot.z;  float wy = rot.w * rot.y;
         Sys_Global.instances[PLAYER1].forward = normalize_vector3((Vector3){ 2.0f * (xz + wy), 2.0f * (rot.y * rot.z - rot.w * rot.x), 1.0f - 2.0f * (rot.x * rot.x + y2) });
         Sys_Global.instances[PLAYER1].right = normalize_vector3((Vector3){ 1.0f - 2.0f * (y2 + rot.z * rot.z), 2.0f * (rot.x * rot.y + rot.w * rot.z), 2.0f * (xz - wy) });
-        SetPlayerListenerOrientation();
     }
 }
 

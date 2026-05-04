@@ -9,7 +9,7 @@ float modelBounds[MODEL_IDX_MAX] = {0}; u16 loadedModelsMaxIndex = 0;
 #define MAX_VERT_ELEMENT_SIZE 6964
 #define MAX_OUTPUT_VERTS      20892
 static float **thread_temp_pos = NULL, **thread_temp_nrm = NULL, **thread_temp_uv = NULL, **thread_out_verts = NULL;
-static u16** thread_out_tris = NULL; static int num_parse_threads = 0;
+static u16** thread_out_tris = NULL;
 typedef struct { const char* data; int size; } RawOBJ;
 typedef u16 half;
 typedef struct { u16 index; bool animated; u8 animationNum; char path[128]; } ModelData;

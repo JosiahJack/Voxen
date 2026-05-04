@@ -2,7 +2,7 @@
 #include "os.h"
 #include "voxen.h"
 typedef u16 half;
-static inline __attribute__((always_inline)) float half_to_float(half h){
+static float half_to_float(half h){
     u32 s=(h&0x8000)<<16,e=(h&0x7C00)>>10,m=(h&0x03FF),out;
     if (e == 0){
         if (m == 0) out = s;
@@ -44,7 +44,6 @@ extern u32 gridCellStates[ARRSIZE];
 #define SLOPE_CLIMB_MAX_DEG       55.0f
 #define SLOPE_SLIDE_ACCEL         8.0f
 #define SLOPE_SLIDE_ACCEL_BOOST  14.0f
-#define SLOPE_FRICTION_ACCEL      1.0f
 #define SLOPE_FRICTION_ACCEL_BOOST 0.3f
 typedef struct { float depth; Vector3 normal; } CapsuleContact;
 typedef struct { Vector3 center,halfExtents; Quaternion rot; } ShapeBox;
@@ -118,7 +117,7 @@ static inline Vector3 ClosestPointOnTriangle(Vector3 a,Vector3 b,Vector3 c,Vecto
     return Vector3_A_plus_B(Vector3_A_plus_B(a,scale_vector3(ab,v)),scale_vector3(ac,w));
 }
 
-static u32 GetCollisionMask(u32 layer) {
+static __attribute__((noinline)) u32 GetCollisionMask(u32 layer) {
     switch (layer) {
         case PhysicsLayer_Default:           return PhysicsLayer_Default|PhysicsLayer_TransparentFX|PhysicsLayer_IgnoreRaycast|PhysicsLayer_Geometry|PhysicsLayer_NPC|PhysicsLayer_PlayerBullets|PhysicsLayer_Player|PhysicsLayer_Corpse|PhysicsLayer_PhysObjects|PhysicsLayer_Sky|PhysicsLayer_Trigger|PhysicsLayer_Door|PhysicsLayer_InterDebris|PhysicsLayer_Player2|PhysicsLayer_Player3|PhysicsLayer_Player4|PhysicsLayer_NPCBullet|PhysicsLayer_Clip|PhysicsLayer_CorpseSearchable;
         case PhysicsLayer_TransparentFX:     return PhysicsLayer_Default|PhysicsLayer_TransparentFX|PhysicsLayer_IgnoreRaycast|PhysicsLayer_Geometry|PhysicsLayer_NPC|PhysicsLayer_PlayerBullets|PhysicsLayer_Player|PhysicsLayer_PhysObjects|PhysicsLayer_Trigger|PhysicsLayer_Door|PhysicsLayer_InterDebris|PhysicsLayer_Player2|PhysicsLayer_NPCBullet|PhysicsLayer_Clip;
@@ -335,7 +334,7 @@ static inline void ApplyAngularImpulse(Entity *e,Vector3 r,Vector3 impulse,float
     e->angularVelocity.x+=sign*ti.x*invI; e->angularVelocity.y+=sign*ti.y*invI; e->angularVelocity.z+=sign*ti.z*invI;
 }
 
-static void SolveContact(ContactManifold *m,float dt) {
+static __attribute__((noinline)) void SolveContact(ContactManifold *m,float dt) {
     Entity *eA=&Sys_Global.instances[m->idxA], *eB=&Sys_Global.instances[m->idxB];
     float imA=entity_invmass(eA), imB=entity_invmass(eB);
     if (imA+imB<1e-10f) return;
@@ -383,7 +382,7 @@ static void SolveContact(ContactManifold *m,float dt) {
     }
 }
 
-static void SpeculativePreClamp(u16 idxA,float dt) {
+static __attribute__((noinline)) void SpeculativePreClamp(u16 idxA,float dt) {
     Entity *eA=&Sys_Global.instances[idxA];
     if (entity_invmass(eA)<1e-10f) return;
     for (u16 m=0; m<g_manifoldCount; ++m) {
@@ -399,7 +398,7 @@ static void SpeculativePreClamp(u16 idxA,float dt) {
 }
 
 static u8 g_sleepCounter[INSTANCE_COUNT];
-static void UpdateSleep(u16 i,float dt) {
+static __attribute__((noinline)) void UpdateSleep(u16 i,float dt) {
     (void)dt; Entity *e=&Sys_Global.instances[i];
     if (entity_invmass(e)<1e-10f) return;
     if (dot_vector3(e->velocity,e->velocity)<SLEEP_KE_THRESHOLD) {
@@ -413,7 +412,7 @@ static inline Quaternion IntegrateRotation(Quaternion q,Vector3 omega,float dt) 
     float invLen=1.0f/vsqrtf(q.x*q.x+q.y*q.y+q.z*q.z+q.w*q.w);
     return (Quaternion){q.x*invLen,q.y*invLen,q.z*invLen,q.w*invLen};
 }
-static void IntegrateAngularVelocity(u16 i,float dt) {
+static __attribute__((noinline)) void IntegrateAngularVelocity(u16 i,float dt) {
     Entity *e=&Sys_Global.instances[i];
     if (!(e->entflags&ENTFLAG_RIGIDBODY)||e->entflags&ENTFLAG_ASLEEP||entity_invmass(e)<1e-10f) return;
     float invI=(e->inertia>0.0001f)?1.0f/e->inertia:0.0f;
@@ -424,7 +423,7 @@ static void IntegrateAngularVelocity(u16 i,float dt) {
     e->rotation=IntegrateRotation(e->rotation,e->angularVelocity,dt); Sys_Global.dirtyInstances[i]=true;
 }
 
-void Physics_PrimitiveStep(float dt) {
+static void Physics_PrimitiveStep(float dt) {
     u16 n=Sys_Global.loadedInstances;
     ResetManifoldTable(); BuildCellBuckets(n);
     for (u16 i=START_INDEX_LEVEL_INSTANCES; i<n; ++i) {
@@ -527,7 +526,7 @@ static u16 g_prevManifoldCount=0;
 static inline u32 ManifoldID(u16 a,u16 b) { return (a<b)?((u32)a<<16)|b:((u32)b<<16)|a; }
 static inline bool IDInPrevSet(u32 id) { for (u16 i=0; i<g_prevManifoldCount; ++i) if (g_prevManifoldIDs[i]==id) return true; return false; }
 
-void Physics_DrawDebug(void) {
+static void Physics_DrawDebug(void) {
     if (Sys_Global.physicsDebug<=0) return;
     u16 n=Sys_Global.loadedInstances;
     u32 curIDs[MAX_DEBUG_MANIFOLD_IDS]; u16 curCount=0;
@@ -682,7 +681,8 @@ ENGINE_TO_MOD void ApplyPlayerMovements(void) {
 }
 
 const Vector3 gravityVelocity={0.0f,-9.81f,0.0f};
-void UpdateVelocityFromGravity(void) {
+static void UpdateVelocityFromGravity(void) {
+    return;
     if (Sys_Global.pauseRelativeTime<10.0f) return;
     for (u32 i=PLAYER1; i<INSTANCE_COUNT; ++i) {
         if (i>(u32)Sys_Global.loadedInstances) return;
@@ -770,7 +770,7 @@ static void IntegratePlayer(u16 i,float dt) {
             Vector3 slide={-floorNormal.x*gdn,-9.81f-floorNormal.y*gdn,-floorNormal.z*gdn}; float slen=magnitude_vector3(slide);
             if (slen>1e-4f) { vel.x+=(slide.x/slen)*accel*dt; vel.y+=(slide.y/slen)*accel*dt; vel.z+=(slide.z/slen)*accel*dt; }
         } else if (slopeDeg>SLOPE_WALK_MAX_DEG) { float t=(slopeDeg-SLOPE_WALK_MAX_DEG)/(SLOPE_CLIMB_MAX_DEG-SLOPE_WALK_MAX_DEG); vel.x*=(1.0f-t); vel.z*=(1.0f-t); }
-        float frAccel=boosted?SLOPE_FRICTION_ACCEL_BOOST:SLOPE_FRICTION_ACCEL, hspeed=vsqrtf(vel.x*vel.x+vel.z*vel.z);
+        float frAccel=boosted?SLOPE_FRICTION_ACCEL_BOOST:1.0f, hspeed=vsqrtf(vel.x*vel.x+vel.z*vel.z);
         if (hspeed>1e-4f) { float fd=frAccel*dt; if (fd>=hspeed) { vel.x=0.0f; vel.z=0.0f; } else { float s=(hspeed-fd)/hspeed; vel.x*=s; vel.z*=s; } }
         e->velocity=vel;
     }
@@ -795,17 +795,15 @@ static void IntegratePlayer(u16 i,float dt) {
     e->lastPosition=pos; e->position=Vector3_A_plus_B(pos,scale_vector3(vel,dt)); Sys_Global.dirtyInstances[i]=true;
 }
 
-void SetPlayerListenerPos(void);
-void UpdatePositions(void) {
+static void UpdatePositions(void) {
     float dt=vclamp((float)Sys_Global.timeSinceLastPhysicsTick,0.0005f,0.027777778f);
     for (u32 i=PLAYER1; i<=PLAYER2; ++i) IntegratePlayer((u16)i,dt);
     for (u32 i=START_INDEX_LEVEL_INSTANCES; i<(u32)Sys_Global.loadedInstances; ++i) {
         if (Sys_Global.instances[i].entflags&ENTFLAG_RIGIDBODY) IntegrateRigidbody((u16)i,dt);
     }
-    SetPlayerListenerPos();
 }
 
-void ClampVelocity(void) {
+static void ClampVelocity(void) {
     for (i32 i=START_INDEX_LEVEL_INSTANCES; i<Sys_Global.loadedInstances; ++i) {
         Vector3 v=Sys_Global.instances[i].velocity;
         if (magnitude_vector3(v)>TERMINAL_VELOCITY) Sys_Global.instances[i].velocity=scale_vector3(normalize_vector3(v),TERMINAL_VELOCITY);
@@ -814,7 +812,7 @@ void ClampVelocity(void) {
 
 void UpdateTriggers(void);
 void Physics(void) {
-//     UpdateVelocityFromGravity();
+    UpdateVelocityFromGravity();
     float dt = (float)Sys_Global.timeSinceLastPhysicsTick;
     if (dt>SUB_STEP_DT_MAX*4.0f) dt=SUB_STEP_DT_MAX*4.0f;
     if (dt>SUB_STEP_DT_MAX) { float h=dt*0.5f; Physics_PrimitiveStep(h); Physics_PrimitiveStep(h); }

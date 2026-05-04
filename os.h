@@ -191,10 +191,7 @@ static inline __attribute__((always_inline)) long OS_Open(const char* path, i32 
     #define OS_INVALID_HANDLE -1
     typedef int wchar_t;
     static inline int OS_IOControl(int fd, unsigned long request, void *arg) {
-        register long rax __asm__("rax") = 16;
-        register int  rdi __asm__("rdi") = fd;
-        register long rsi __asm__("rsi") = request;
-        register void *rdx __asm__("rdx") = arg;
+        register long rax __asm__("rax") = 16; register int  rdi __asm__("rdi") = fd; register long rsi __asm__("rsi") = request; register void *rdx __asm__("rdx") = arg;
         __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi), "r"(rsi), "r"(rdx) : "rcx", "r11", "memory");
         return (int)rax;
     }
@@ -211,10 +208,7 @@ static inline __attribute__((always_inline)) long OS_Open(const char* path, i32 
     //int brk(void *addr); void *sbrk(intptr_t increment);
     static inline __attribute__((always_inline)) void* OS_Brk(void* addr) { register long rax __asm__("rax") = 12; register void* rdi __asm__("rdi") = addr; __asm__ __volatile__("syscall":"+r"(rax):"r"(rdi):"rcx","r11","memory"); return (void*)rax; }
     static inline __attribute__((always_inline)) long OS_Read(long fd, void* buf, size_t count) {
-        register long rax __asm__("rax") = 0;
-        register long rdi __asm__("rdi") = fd;
-        register void* rsi __asm__("rsi") = buf;
-        register size_t rdx __asm__("rdx") = count;
+        register long rax __asm__("rax") = 0; register long rdi __asm__("rdi") = fd; register void* rsi __asm__("rsi") = buf; register size_t rdx __asm__("rdx") = count;
         __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi), "r"(rsi), "r"(rdx) : "rcx", "r11", "memory");
         return rax;
     }

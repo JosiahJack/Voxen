@@ -11,6 +11,7 @@
 #define TEXT_BUFFER_SIZE 1024
 #define FONT_ATLAS_SIZE 4672
 #define MAX_GLYPHS 4096
+#define STBI_ARENA_SIZE 16*1024*1024
 typedef struct {bool down,pressed,released;} KeyState;
 typedef struct {
 	double last_mouse_x,last_mouse_y,scrollDelta;

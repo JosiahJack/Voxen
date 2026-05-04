@@ -4,7 +4,6 @@
 extern u16 loadedTexturesMaxIndex;
 u32 totalPixels;
 u32 totalPaletteColors;
-#define STBI_ARENA_SIZE 16*1024*1024
 typedef struct { u16 index; bool transparent; bool doublesided; char path[128]; } TextureData;
 typedef struct { TextureData* entries; u32 count; u32 capacity; } TextureDataParser;
 typedef struct { const char* data; int size; } RawTexture;
@@ -14,13 +13,11 @@ typedef struct { stbi__context* s; u8* idata, *expanded, *out; } stbi__png;
 enum { STBI__F_none = 0, STBI__F_sub = 1, STBI__F_up = 2, STBI__F_avg = 3, STBI__F_paeth = 4, STBI__F_avg_first, STBI__F_paeth_first };
 typedef struct { u16 fast[1<<9], firstcode[16], firstsymbol[16], value[288]; i32 maxcode[17]; u8 size[288]; } stbi__zhuffman;
 typedef struct { u8 *zbuffer, *zbuffer_end, *zout, *zout_start; i32 num_bits; u32 code_buffer; stbi__zhuffman z_length, z_distance; } stbi__zbuf;
-static int num_parse_threads = 0;
 u8* stbi_load_from_memory(const u8* buffer, i32 len, i32* x, i32* y);
 StbiArena stbi_arena_main;
 static StbiArena* thread_stbi_arenas = NULL;
 static u8** textureIndexBuffers = NULL; static u32** texturePaletteBuffers = NULL; static u32* texturePaletteSizes = NULL;
 static i32* textureWidths = NULL; static i32* textureHeights = NULL;
-
 void stbi__arena_init_thread(StbiArena* arena) {if (!arena->base) { arena->base = OS_Alloc(STBI_ARENA_SIZE); arena->cursor = arena->base; arena->end = arena->base + STBI_ARENA_SIZE; } }
 void* stbi__arena_alloc_thread(StbiArena* a, size_t s) { if(!a->base||a->cursor+s>a->end)return NULL; void* p=a->cursor; a->cursor+=s; return p; }
 void* stbi__arena_alloc(size_t s) { return stbi__arena_alloc_thread(&stbi_arena_main, s); }
@@ -235,17 +232,57 @@ static void* TextureParsingWorker(void* arg) {
         if (!pix || w < 1 || h < 1) { OS_DeallocateRAM((void*)d, (size_t)sz); continue; }
         u32 nP = (u32)w * h, pSz = 0, *pal = (u32*)OS_Alloc(1024); u8 *idx = (u8*)OS_Alloc(nP), hash[1024] = {0};
         for (u32 p = 0; p < nP; ++p) {
-            u32 c = ((u32*)pix)[p], s = (c * 0x9e3779b9u) & 1023;
-            while (hash[s]) { if (pal[hash[s]-1] == c) { idx[p] = hash[s]-1; goto found; } s = (s+1) & 1023; }
-            if (pSz >= 256) {
-                u32 bIdx = 0, bDist = -1; u8 r1=c, g1=c>>8, b1=c>>16, a1=c>>24;
-                for (u32 k=0; k<pSz; k++) {
-                    i32 dr=(pal[k]&255)-r1, dg=((pal[k]>>8)&255)-g1, db=((pal[k]>>16)&255)-b1, da=(pal[k]>>24)-a1;
-                    u32 dst = dr*dr + dg*dg + db*db + da*da; if (dst < bDist) { bDist = dst; bIdx = k; }
+            u32 c = ((u32*)pix)[p];
+            u8 r1 = (u8)c, g1 = (u8)(c>>8), b1 = (u8)(c>>16), a1 = (u8)(c>>24);
+            u32 s = (c * 0x9e3779b9u) & 1023;
+            while (hash[s]) { // Try exact first
+                u32 existing = pal[hash[s]-1];
+                if (existing == c) {
+                    idx[p] = hash[s]-1;
+                    goto found;
                 }
-                idx[p] = bIdx; continue;
+                s = (s+1) & 1023;
             }
-            pal[pSz] = c; idx[p] = pSz; hash[s] = (u8)(++pSz); found:;
+
+            if (pSz > 0) { // Lenient check to reduce total unique colors.
+                const int MAX_DIFF = 4;
+                u32 bestIdx = 0;
+                u32 bestDist = ~0u;
+                for (u32 k = 0; k < pSz; ++k) {
+                    u8 r2 = (u8)pal[k];
+                    u8 g2 = (u8)(pal[k]>>8);
+                    u8 b2 = (u8)(pal[k]>>16);
+                    u8 a2 = (u8)(pal[k]>>24);
+                    int dr = r1 - r2, dg = g1 - g2, db = b1 - b2, da = a1 - a2;
+                    u32 dist = (u32)(dr*dr + dg*dg + db*db + da*da);
+                    if (dist < bestDist) {
+                        bestDist = dist;
+                        bestIdx = k;
+                        if (bestDist == 0) break; // exact match already handled above
+                    }
+                }
+
+                if (bestDist <= (u32)(MAX_DIFF * MAX_DIFF * 3 + 1)) { idx[p] = bestIdx; goto found; }
+            }
+
+            if (pSz >= 256) {
+                u32 bIdx = 0, bDist = ~0u;
+                for (u32 k = 0; k < pSz; ++k) {
+                    i32 dr = (pal[k]&255) - r1;
+                    i32 dg = ((pal[k]>>8)&255) - g1;
+                    i32 db = ((pal[k]>>16)&255) - b1;
+                    i32 da = (pal[k]>>24) - a1;
+                    u32 dst = dr*dr + dg*dg + db*db + da*da;
+                    if (dst < bDist) { bDist = dst; bIdx = k; }
+                }
+                idx[p] = bIdx;
+                continue;
+            }
+
+            pal[pSz] = c;
+            idx[p] = pSz;
+            hash[s] = (u8)(++pSz);
+            found:;
         }
         textureIndexBuffers[i] = idx; texturePaletteBuffers[i] = pal; texturePaletteSizes[i] = pSz; textureWidths[i] = w; textureHeights[i] = h;
         OS_DeallocateRAM((void*)d, (size_t)sz);

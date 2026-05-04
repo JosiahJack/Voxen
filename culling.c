@@ -6,7 +6,6 @@ typedef struct { PortalCell cellA,cellB,cellA2,cellB2; bool portalNS,open,dirty,
 u8 *stbi_load_from_memory(const u8* buffer, i32 len, i32* x, i32* y);
 void stbi__arena_init_thread(StbiArena* arena);
 extern StbiArena stbi_arena_main;
-#define STBI_ARENA_SIZE 16 * 1024 * 1024
 u32 gridCellStates[ARRSIZE];
 u32 precomputedVisibleCellsFromHere[524288]; // 4096 * 4096 / 32
 u16 playerCellIdx = 0u;

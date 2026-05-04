@@ -3123,7 +3123,7 @@ enum { DOOR_CLIP_IDLE_CLOSED = 0, DOOR_CLIP_OPENING = 1, DOOR_CLIP_IDLE_OPEN = 2
 static AnimationClip DoorGetClip(const Entity* e, u8 clip) { return modelAnimationClips[e->animationNum][clip]; }
 static float DoorClamp01(float v) { if (v < 0.0f) return 0.0f; if (v > 1.0f) return 1.0f; return v; }
 static bool DoorInventoryHasAccessCard(AccessCardType card) { return card == AccessCardType_None || (Eng_Global->invP1.accessCardOwned & (1u << card)); }
-static bool DoorIsOpenish(const Entity* e) { return e->doorOpen == DoorState_Open || e->doorOpen == DoorState_Opening; }
+static bool DoorIsAjar(const Entity* e) { return e->doorOpen == DoorState_Open || e->doorOpen == DoorState_Opening; }
 
 static float DoorGetProgress(const Entity* e, u8 clip) {
     AnimationClip c = DoorGetClip(e,clip);
@@ -3152,7 +3152,7 @@ static void DoorSetClipFrame(u16 self, u8 clip, u16 frame) {
 static void DoorSyncLayer(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (!e->changeLayerOnOpenClose) return;
-    e->layer = DoorIsOpenish(e) ? PhysicsLayer_InterDebris : PhysicsLayer_Door;
+    e->layer = DoorIsAjar(e) ? PhysicsLayer_InterDebris : PhysicsLayer_Door;
 }
 
 static void DoorOpen(u16 self) {
@@ -3161,7 +3161,7 @@ static void DoorOpen(u16 self) {
     e->doorOpen = e->doorState = DoorState_Opening;
     e->waitBeforeClose = Eng_Global->pauseRelativeTime + e->delay;
     DoorSyncLayer(self);
-    if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
+    if (e->SFXIndex > 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
 }
 
 static void DoorClose(u16 self) {
@@ -3169,7 +3169,7 @@ static void DoorClose(u16 self) {
     DoorSetClipFrame(self,DOOR_CLIP_CLOSING,DoorGetClip(e,DOOR_CLIP_CLOSING).frameStart);
     e->doorOpen = e->doorState = DoorState_Closing;
     DoorSyncLayer(self);
-    if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
+    if (e->SFXIndex > 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
 }
 
 void DoorLock(u16 self) { EntitySetLocked(&Eng_Global->instances[self],true); }

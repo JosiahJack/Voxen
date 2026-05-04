@@ -6,10 +6,18 @@ GLFWwindow* window;
 #include "voxen.h"
 #include "Shaders/shaders.h"
 #include "credits.h"
-u8 queuedLevelToLoad = 255u; float berserkSeedTime,cam_pitch,cam_yaw=90.0f,cam_roll,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],modelMatrices[INSTANCE_COUNT*16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
+u8 queuedLevelToLoad = 255u; static float berserkSeedTime,cam_pitch,cam_yaw=90.0f,cam_roll,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],modelMatrices[INSTANCE_COUNT*16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
 bool mouseMovementThisFrame,returnToPause=false,fovSliderActive=false,gammaSliderActive=false,masterVolumeSliderActive=false,musicVolumeSliderActive=false,messageVolumeSliderActive=false,sfxVolumeSliderActive=false,enteringPlayerName=false;
 u8 currentPlayerNameLength=0; i8 currentMenuItem=0, currentMenuTab=0, menuItemCount=4, menuTabCount=1;
+static int num_parse_threads = 0;
+#include "helpers.c"
 #include "glfw.c"
+#include "console.c"
+#include "physics.c"
+#include "models.c"
+#include "textures.c"
+#include "audio.c"
+#include "culling.c"
 #define CHECK_GL_ERROR() do { GLenum err = glGetError(); if (err != 0) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
 #define SHADOW_MAP_SIZE 128u
 #define MAX_SHADOWMAPS 256u
@@ -823,7 +831,7 @@ void ClearAll(void) {
     glClearColor(0.0f,0.0f,0.0f,1.0f); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 }
 
-static inline __attribute__((always_inline,pure)) bool CursorIsOverBounds(float startX, float endX, float startY, float endY) { return Sys_Global.cursorPosition_x >= startX && Sys_Global.cursorPosition_x <= endX /* 0 == left */ && Sys_Global.cursorPosition_y >= endY && Sys_Global.cursorPosition_y <= startY; /* 0 == top */ }
+static bool CursorIsOverBounds(float startX, float endX, float startY, float endY) { return Sys_Global.cursorPosition_x >= startX && Sys_Global.cursorPosition_x <= endX /* 0 == left */ && Sys_Global.cursorPosition_y >= endY && Sys_Global.cursorPosition_y <= startY; /* 0 == top */ }
 void RenderLoadingProgress(i32 offset, const char * restrict text) { // Only adds 0.01secs to game startup time.
     ClearAll();
     RenderFormattedText(Sys_Settings.ScreenWidth / 2 - offset, Sys_Settings.ScreenHeight / 2 - 5, TEXT_WHITE, FONT_NORMAL,1.0f,text);
@@ -1078,7 +1086,7 @@ bool JoystickPresent(int jid) {
     return js->connected ? PLATFORM_pollJoystick(js) : false;
 }
 
-static inline __attribute__((always_inline)) __attribute__((hot)) void Input_Poll(void) {
+static __attribute__((hot)) void Input_Poll(void) {
     PLATFORM_pollEvents();
     for (int jid = GLFW_JOYSTICK_1; jid <= GLFW_JOYSTICK_LAST; ++jid) {
         if (!JoystickPresent(jid)) continue;
@@ -1328,7 +1336,6 @@ ENGINE_TO_MOD void MenuGoBack(void) {
 
 void ChangeMenuPage(MenuPages pg) { currentMenuPage = pg; currentMenuItem = currentMenuTab = 0; }
 
-void set_master_volume(void); void set_message_volume(void); void set_sfx_volume(void);
 void RenderMenu(void) {    
     if (currentMenuPage != MenuPages_IntroVideo && currentMenuPage != MenuPages_CreditsVideo && currentMenuPage != MenuPages_Options) RenderUIImage(-417,-384, 2200,1536, 1026); // Menu background
     if (currentMenuPage == MenuPages_IntroVideo || currentMenuPage == MenuPages_CreditsVideo) RenderUIImage(-417,-384, 2200,1536, 0); // Video blackground
@@ -1462,8 +1469,8 @@ void RenderMenu(void) {
         } else {
             menuItemCount = 10; // Audio / Lang
             u8 newVal;
-            if (UI_Slider(426,240,128,16,((Sys_Settings.VolumeMaster / 100.0f) * (128 - 16)),200,Sys_Settings.VolumeMaster,&newVal,&masterVolumeSliderActive,0,100,5,0,/*Master Volume*/802)) { Sys_Settings.VolumeMaster = newVal; set_master_volume(); if (!AnyLeftRightMouseDown()) {SaveConfig();} }
-            if (UI_Slider(426,270,128,16,((Sys_Settings.VolumeMusic / 100.0f) * (128 - 16)),200,Sys_Settings.VolumeMusic,&newVal,&musicVolumeSliderActive,0,100,5,1,/*Music Volume*/803)) { Sys_Settings.VolumeMusic = newVal; set_master_volume(); if (!AnyLeftRightMouseDown()) {SaveConfig();} }
+            if (UI_Slider(426,240,128,16,((Sys_Settings.VolumeMaster / 100.0f) * (128 - 16)),200,Sys_Settings.VolumeMaster,&newVal,&masterVolumeSliderActive,0,100,5,0,/*Master Volume*/802)) { Sys_Settings.VolumeMaster = newVal; if (!AnyLeftRightMouseDown()) {SaveConfig();} }
+            if (UI_Slider(426,270,128,16,((Sys_Settings.VolumeMusic / 100.0f) * (128 - 16)),200,Sys_Settings.VolumeMusic,&newVal,&musicVolumeSliderActive,0,100,5,1,/*Music Volume*/803)) { Sys_Settings.VolumeMusic = newVal; if (!AnyLeftRightMouseDown()) {SaveConfig();} }
         }
         
         RenderUIImage(1087,723, 84,36, 1252); // Back Button background
@@ -1563,7 +1570,7 @@ void RenderPausedUI(void) {
 static float g_debugLineColorR = 0.0f, g_debugLineColorG = 1.0f, g_debugLineColorB = 0.0f;
 float debugLineBuffer[MAX_DEBUG_LINE_VERTS * 3]; // xyz only
 void SetDebugLineColor(float r, float g, float b) { g_debugLineColorR = r; g_debugLineColorG = g; g_debugLineColorB = b; }
-static inline __attribute__((always_inline)) void DrawDebugLines(float* viewProj) {
+static void DrawDebugLines(float* viewProj) {
     if (Sys_Global.debugLineVertCount == 0) return;
     
     glNamedBufferSubData(Sys_Render.debugLinesVBO,0,Sys_Global.debugLineVertCount * sizeof(float),debugLineBuffer);
@@ -1622,7 +1629,7 @@ static inline __attribute__((always_inline)) void CreditsStats(void) {
 
 u8 MFD_LefTab=0,MFD_CenterTab=0,MFD_RightTab=0;
 extern u16 playerCellIdx; extern char consoleEntryText[TEXT_BUFFER_SIZE]; void RenderMenu(void); void RenderPausedUI(void);
-static inline __attribute__((always_inline)) double RenderUI(void) {
+static double RenderUI(void) {
     drawCallsNormal = drawCallsRenderedThisFrame;
     if (Sys_Global.creditsActive) { // Render Credits
         if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].pressed) {
@@ -1692,10 +1699,10 @@ static inline __attribute__((always_inline)) double RenderUI(void) {
 typedef struct {float depth; u16 index; } DepthSort;
 DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX];
 float shadows_nearMeshRadii[SHADOW_NEARMESH_MAX];
-static inline __attribute__((always_inline)) bool EntNotVisible(u16 i, bool otherCondition) { Entity* e = &Sys_Global.instances[i]; return e->texIndex > loadedTexturesMaxIndex || !(e->entflags & ENTFLAG_ACTIVE) || e->index >= MAX_ENTITIES || e->modelIndex >= MODEL_IDX_MAX || e->texIndex >= MAX_VALID_TEXTURE || otherCondition; }
+static bool EntNotVisible(u16 i, bool otherCondition) { Entity* e = &Sys_Global.instances[i]; return e->texIndex > loadedTexturesMaxIndex || !(e->entflags & ENTFLAG_ACTIVE) || e->index >= MAX_ENTITIES || e->modelIndex >= MODEL_IDX_MAX || e->texIndex >= MAX_VALID_TEXTURE || otherCondition; }
 
 extern bool instanceIsLODArray[INSTANCE_COUNT]; extern u16 loadedModelsMaxIndex; extern float modelBounds[MODEL_IDX_MAX]; extern u8** modelVertices; extern u16** modelTriangles;
-static inline __attribute__((always_inline,hot)) u16 GetAndBindModel(u16 i, u16 currentModelType) {
+static __attribute__((hot)) u16 GetAndBindModel(u16 i, u16 currentModelType) {
     glUniform1ui(0,i);
     u16 modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && Sys_Global.instances[i].lodIndex < loadedModelsMaxIndex ? Sys_Global.instances[i].lodIndex : Sys_Global.instances[i].modelIndex;
     if (currentModelType == modelType && currentModelType != 0) return currentModelType;
@@ -1707,7 +1714,7 @@ static inline __attribute__((always_inline,hot)) u16 GetAndBindModel(u16 i, u16 
 
 #define SC_MAX (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS)
 static const GLuint groupX_shadClear = ((SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) + 31) / 32;
-static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {    
+static __attribute__((hot)) void RenderShadowmaps(void) {    
     double shadowStartTime = get_time();
     u16 candidates[MAX_SHADOWMAPS];
     u16 numShadowsCouldRender = 0;
@@ -1825,7 +1832,7 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
 }
 
 DepthSort visibleInstances[INSTANCE_COUNT];
-static inline __attribute__((always_inline)) bool DetermineIfInstanceVisible(u16 i, bool otherCondition, bool skyVisible, Vector3 playerPos, float* distSqrd) {
+static bool DetermineIfInstanceVisible(u16 i, bool otherCondition, bool skyVisible, Vector3 playerPos, float* distSqrd) {
     if (EntNotVisible(i,otherCondition)) return false; // must be transparent && transparents or neither
     
     Entity* e = &Sys_Global.instances[i];
@@ -1852,7 +1859,6 @@ float GetPainStatic(void) { return 0.0f; } // TODO: Hook into pain/health manage
 Color GetPainStaticColor(void) { return (Color){1.0f,0.0f,0.0f,1.0f}; } // TODO: Hook staticColor up to red or blue for pain or shield impact.
 
 __attribute__((pure)) i32 dsort(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (db > da) - (db < da); }
-__attribute__((pure)) i32 dsortInv(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (da > db) - (da < db); }
 void qsort(void* base, size_t nmemb, size_t size, int (*cmp)(const void*, const void*));
 // Bind textures only on change (norm/tex/glow/spec); cmi<camViewCount handled inline
 #define MAX_VISIBLE 4096
@@ -1880,7 +1886,7 @@ void qsort(void* base, size_t nmemb, size_t size, int (*cmp)(const void*, const 
      u32 vc=modelTriangleCounts[curM]*3; \
      glDrawElements(GL_TRIANGLES,vc,GL_UNSIGNED_SHORT,0);drawCallsRenderedThisFrame++;verticesRenderedThisFrame+=vc;}
 
-static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
+static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     u16 swidth = camView ? camViews[camViewIdx].width : Sys_Settings.ScreenWidth, sheight = camView ? camViews[camViewIdx].height : Sys_Settings.ScreenHeight;
     float sfov = camView ? (float)camViews[camViewIdx].fov : (float)Sys_Settings.FOV;
     float snear = camView ? camViews[camViewIdx].near : NEAR_PLANE; float sfar = camView ? camViews[camViewIdx].far : Sys_Global.farPlane;
@@ -1934,7 +1940,6 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
     glUseProgram(Sys_Render.depthPrepassShaderProgram); // Depth Prepass - Eliminates some overdraw for ~6.1% performance improvement in spite of added draw calls
     glUniformMatrix4fv(2,1,0,viewProj);
     glEnable(GL_DEPTH_TEST); glColorMask(0,0,0,0); glDepthMask(1); glDepthFunc(0x0201/*GL_LESS*/); glDisable(GL_BLEND);
-    if (opaqueCount > 1) qsort(visibleInstances,opaqueCount,sizeof(DepthSort),dsortInv);
     if (tcnt > 1) qsort(visibleInstances + opaqueCount,tcnt,sizeof(DepthSort),dsort);
     for (u16 visibleIndex = 0; visibleIndex < visibleCount; ++visibleIndex) {
         u16 i = visibleInstances[visibleIndex].index;
@@ -2138,7 +2143,7 @@ void LoadGLUserPtr(void) {
 
 extern u32 random_range_rng;
 #define LIGHT_RANGE_MAX 15.36f
-void InitFontAtlasses(void),LoadTextures(void),LoadModels(void); i32 Physics(void); bool CullCore(void); void InitAudio(void); void AudioUpdate(void);
+void InitFontAtlasses(void); bool CullCore(void); void InitAudio(void); void AudioUpdate(void);
 i32 main(void) {
     double game_start_time = get_time();
     random_range_rng = (u32)game_start_time; // Seed global rand uniquely with time since system boot.
@@ -2270,7 +2275,7 @@ i32 main(void) {
         if (!Sys_Global.gamePaused && !Sys_Global.menuActive) Sys_Global.pauseRelativeTime += Sys_Global.deltaTime;
         mouseMovementThisFrame = false;
         Input_Poll();
-        if (Sys_Input.keyStates[GLFW_KEY_E].pressed) play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f,(Vector3){},false);
+        if (Sys_Input.keyStates[GLFW_KEY_E].pressed) play_wav("cyborgs/yourlevelsareterrible",0.1f,(Vector3){},false);
         if (Sys_Input.window_has_focus) {
             if (Sys_Input.keyStates[GLFW_KEY_CAPS_LOCK].pressed) Sys_Input.isCapsLockOn = !Sys_Input.isCapsLockOn; // Change capslock state to match keyboard having toggled.  Must always happen regardless of paused/menu.
             ProcessInput(); // Calls ApplyPlayerMovements(), needs called without checking paused state for menus handling.
