@@ -1,28 +1,4 @@
 // physics.c
-#include "os.h"
-#include "voxen.h"
-typedef u16 half;
-static inline __attribute__((always_inline)) float half_to_float(half h){
-    u32 s=(h&0x8000)<<16,e=(h&0x7C00)>>10,m=(h&0x03FF),out;
-    if (e == 0){
-        if (m == 0) out = s;
-        else { // normalize subnormal
-            e = 1;
-            while ((m & 0x0400) == 0) { m <<= 1; e--; }
-            m &= 0x03FF; e+=(127 - 15);
-            out = s | (e << 23) | (m << 13);
-        }
-    } else if (e == 31) { out = s | 0x7F800000 | (m << 13); }
-    else { e = e + (127 - 15); out = s | (e << 23) | (m << 13); }
-    float f; CopyMemoryFromBtoAForNBytes(&f,&out,4);
-    return f;
-}
-
-#include "ray.c"
-#include "trigger.c"
-extern u16 loadedModelsMaxIndex,modelTriangleCounts[MODEL_IDX_MAX]; extern u8** modelVertices; extern u16** modelTriangles;
-extern u32 modelVertexCounts[MODEL_IDX_MAX]; extern float modelMatrices[INSTANCE_COUNT*16],modelBounds[MODEL_IDX_MAX];
-extern u32 gridCellStates[ARRSIZE];
 #define MAX_CONTACTS_PER_PAIR 4
 #define MAX_MESH_CONTACTS MAX_CONTACTS_PER_PAIR
 #define MAX_MANIFOLDS 2048
@@ -48,13 +24,12 @@ extern u32 gridCellStates[ARRSIZE];
 #define SLOPE_FRICTION_ACCEL_BOOST 0.3f
 typedef struct { float depth; Vector3 normal; } CapsuleContact;
 typedef struct { Vector3 center,halfExtents; Quaternion rot; } ShapeBox;
-typedef struct { Vector3 center; float radius; }               ShapeSphere;
-typedef struct { Vector3 tip,base; float radius; }             ShapeCapsule;
+typedef struct { Vector3 center; float radius; } ShapeSphere;
+typedef struct { Vector3 tip,base; float radius; } ShapeCapsule;
 typedef struct { Vector3 pointWorld,normal; float depth,lambdaN,lambdaT; } Contact;
 typedef struct { u16 idxA,idxB; u8 count; Contact contacts[MAX_CONTACTS_PER_PAIR]; } ContactManifold;
 typedef struct { u16 idx[CELL_BUCKET_CAP]; u8 count; } CellBucket;
-ContactManifold g_manifolds[MAX_MANIFOLDS];
-u16 g_manifoldCount = 0;
+ContactManifold g_manifolds[MAX_MANIFOLDS]; u16 g_manifoldCount = 0;
 static CellBucket g_cellBuckets[ARRSIZE];
 static void BuildCellBuckets(u16 n) {
     MemSetToValueForNBytes(g_cellBuckets,0,sizeof(g_cellBuckets));
@@ -89,7 +64,6 @@ static ContactManifold* FindOrCreateManifold(u16 idxA,u16 idxB) {
 }
 
 static void ResetManifoldTable(void) { MemSetToValueForNBytes(g_manifoldHT,0,sizeof(g_manifoldHT)); g_manifoldCount=0; }
-
 static inline Vector3 ClosestPointOnSegment(Vector3 p,Vector3 q,Vector3 a) {
     Vector3 pq=Vector3_A_minus_B(q,p), pa=Vector3_A_minus_B(a,p);
     float len2=dot_vector3(pq,pq);
@@ -472,92 +446,8 @@ static inline float DefaultInertia(const Entity *e) {
     return m*(hx*hx+hy*hy+hz*hz)*(1.0f/3.0f);
 }
 void Physics_InitEntityInertia(u16 idx) { Entity *e=&Sys_Global.instances[idx]; if (e->inertia<0.0001f) e->inertia=DefaultInertia(e); }
-
-void SetDebugLineColor(float r,float g,float b);
-#define DBG_IDLE  0.0f,0.4f,0.0f
-#define DBG_STAY  0.0f,1.0f,0.0f
-#define DBG_ENTER 1.0f,0.1f,0.1f
-#define DBG_NORM  0.1f,0.3f,1.0f
-#define DEBUG_NORMAL_LEN 0.16f
-
-static void DebugDrawBox(ShapeBox b) {
-    Vector3 ax,ay,az; obb_axes(b.rot,&ax,&ay,&az); Vector3 c[8];
-    for (int i=0; i<8; ++i) { float sx=(i&1)?1.0f:-1.0f,sy=(i&2)?1.0f:-1.0f,sz=(i&4)?1.0f:-1.0f; c[i]=Vector3_A_plus_B(b.center,Vector3_A_plus_B(Vector3_A_plus_B(scale_vector3(ax,b.halfExtents.x*sx),scale_vector3(ay,b.halfExtents.y*sy)),scale_vector3(az,b.halfExtents.z*sz))); }
-    int edges[12][2]={{0,1},{2,3},{4,5},{6,7},{0,2},{1,3},{4,6},{5,7},{0,4},{1,5},{2,6},{3,7}};
-    for (int e=0; e<12; ++e) AddDebugLine(c[edges[e][0]],c[edges[e][1]]);
-}
-static void DebugDrawSphere(ShapeSphere s) {
-    float r=s.radius, d=r*0.57735026f; Vector3 o=s.center;
-    AddDebugLine(o,(Vector3){o.x+r,o.y,o.z}); AddDebugLine(o,(Vector3){o.x-r,o.y,o.z});
-    AddDebugLine(o,(Vector3){o.x,o.y+r,o.z}); AddDebugLine(o,(Vector3){o.x,o.y-r,o.z});
-    AddDebugLine(o,(Vector3){o.x,o.y,o.z+r}); AddDebugLine(o,(Vector3){o.x,o.y,o.z-r});
-    for (int sx=-1; sx<=1; sx+=2) for (int sy=-1; sy<=1; sy+=2) for (int sz=-1; sz<=1; sz+=2) AddDebugLine(o,(Vector3){o.x+sx*d,o.y+sy*d,o.z+sz*d});
-}
-static void DebugDrawCapsule(ShapeCapsule cap) { AddDebugLine(cap.base,cap.tip); DebugDrawSphere((ShapeSphere){cap.base,cap.radius}); DebugDrawSphere((ShapeSphere){cap.tip,cap.radius}); }
-
-static void DebugDrawCollider(u16 idx,float r,float g,float b) {
-    Entity *e=&Sys_Global.instances[idx]; SetDebugLineColor(r,g,b);
-    switch (e->collider) {
-        case COLLIDER_TYPE_BOX:     { ShapeBox box; Entity_GetBox(e,&box); DebugDrawBox(box); break; }
-        case COLLIDER_TYPE_SPHERE:  { ShapeSphere sph; Entity_GetSphere(e,&sph); DebugDrawSphere(sph); break; }
-        case COLLIDER_TYPE_CAPSULE: { ShapeCapsule cap; Entity_GetCapsule(e,&cap); DebugDrawCapsule(cap); break; }
-        case COLLIDER_TYPE_MESH: case COLLIDER_TYPE_CONVEXMESH: {
-            u16 mi=e->modelIndex; if (mi>=loadedModelsMaxIndex) break;
-            u32 tc=modelTriangleCounts[mi]; float M[16]; CopyMemoryFromBtoAForNBytes(M,&modelMatrices[idx*16],64);
-            float m00=M[0],m10=M[1],m20=M[2],m01=M[4],m11=M[5],m21=M[6],m02=M[8],m12=M[9],m22=M[10],tx=M[12],ty=M[13],tz=M[14];
-            u32 step=(tc>256)?(tc/256):1;
-            #define LTW(l) (Vector3){m00*(l).x+m01*(l).y+m02*(l).z+tx,m10*(l).x+m11*(l).y+m12*(l).z+ty,m20*(l).x+m21*(l).y+m22*(l).z+tz}
-            for (u32 j=0; j<tc; j+=step) {
-                u32 bA=(u32)modelTriangles[mi][j*3+0]*VERTEX_ATTRIBUTES_SIZE, bB=(u32)modelTriangles[mi][j*3+1]*VERTEX_ATTRIBUTES_SIZE, bC=(u32)modelTriangles[mi][j*3+2]*VERTEX_ATTRIBUTES_SIZE;
-                Vector3 lA={half_to_float(*(half*)(modelVertices[mi]+bA+0)),half_to_float(*(half*)(modelVertices[mi]+bA+2)),half_to_float(*(half*)(modelVertices[mi]+bA+4))};
-                Vector3 lB={half_to_float(*(half*)(modelVertices[mi]+bB+0)),half_to_float(*(half*)(modelVertices[mi]+bB+2)),half_to_float(*(half*)(modelVertices[mi]+bB+4))};
-                Vector3 lC={half_to_float(*(half*)(modelVertices[mi]+bC+0)),half_to_float(*(half*)(modelVertices[mi]+bC+2)),half_to_float(*(half*)(modelVertices[mi]+bC+4))};
-                Vector3 wA=LTW(lA),wB=LTW(lB),wC=LTW(lC); AddDebugLine(wA,wB); AddDebugLine(wB,wC); AddDebugLine(wC,wA);
-            }
-            #undef LTW
-            break;
-        }
-        default: break;
-    }
-}
-
-#define MAX_DEBUG_MANIFOLD_IDS MAX_MANIFOLDS
-static u32 g_prevManifoldIDs[MAX_DEBUG_MANIFOLD_IDS];
-static u16 g_prevManifoldCount=0;
-static inline u32 ManifoldID(u16 a,u16 b) { return (a<b)?((u32)a<<16)|b:((u32)b<<16)|a; }
-static inline bool IDInPrevSet(u32 id) { for (u16 i=0; i<g_prevManifoldCount; ++i) if (g_prevManifoldIDs[i]==id) return true; return false; }
-
-void Physics_DrawDebug(void) {
-    if (Sys_Global.physicsDebug<=0) return;
-    u16 n=Sys_Global.loadedInstances;
-    u32 curIDs[MAX_DEBUG_MANIFOLD_IDS]; u16 curCount=0;
-    for (u16 m=0; m<g_manifoldCount&&curCount<MAX_DEBUG_MANIFOLD_IDS; ++m) curIDs[curCount++]=ManifoldID(g_manifolds[m].idxA,g_manifolds[m].idxB);
-    static u8 g_contactState[INSTANCE_COUNT];
-    MemSetToValueForNBytes(g_contactState,0,n);
-    for (u16 m=0; m<g_manifoldCount; ++m) {
-        u16 a=g_manifolds[m].idxA, b=g_manifolds[m].idxB;
-        u8 state=IDInPrevSet(ManifoldID(a,b))?1:2;
-        if (Sys_Global.instances[a].entflags&ENTFLAG_RIGIDBODY&&state>g_contactState[a]) g_contactState[a]=state;
-        if (Sys_Global.instances[b].entflags&ENTFLAG_RIGIDBODY&&state>g_contactState[b]) g_contactState[b]=state;
-    }
-    for (u16 i=START_INDEX_LEVEL_INSTANCES; i<n; ++i) {
-        Entity *e=&Sys_Global.instances[i];
-        if (!(e->entflags&ENTFLAG_ACTIVE)||e->collider==COLLIDER_TYPE_NONE) continue;
-        u8 cs=g_contactState[i];
-        if      (cs==2) DebugDrawCollider(i,DBG_ENTER);
-        else if (cs==1) DebugDrawCollider(i,DBG_STAY);
-        else            DebugDrawCollider(i,DBG_IDLE);
-    }
-    for (u16 m=0; m<g_manifoldCount; ++m) {
-        SetDebugLineColor(DBG_NORM);
-        for (int ci=0; ci<(int)g_manifolds[m].count; ++ci) { const Contact *c=&g_manifolds[m].contacts[ci]; AddDebugLine(c->pointWorld,Vector3_A_plus_B(c->pointWorld,scale_vector3(c->normal,DEBUG_NORMAL_LEN))); }
-    }
-    CopyMemoryFromBtoAForNBytes(g_prevManifoldIDs,curIDs,curCount*sizeof(u32)); g_prevManifoldCount=curCount;
-}
-
-#define NO_CONTACT ((CapsuleContact){.depth=-1.0f,.normal={0,1,0}})
 static CapsuleContact QueryCapsuleContact(Vector3 start,Vector3 end,float capsuleRadius,u32 layerMask) {
-    CapsuleContact worst=NO_CONTACT;
+    CapsuleContact worst=(CapsuleContact){.depth=-1.0f,.normal={0,1,0}};
     i32 cxMin=vmax(0,vmin(WORLDX-1,PosGetCellCoordX(vmin(start.x,end.x)-capsuleRadius)));
     i32 cxMax=vmax(0,vmin(WORLDX-1,PosGetCellCoordX(vmax(start.x,end.x)+capsuleRadius)));
     i32 czMin=vmax(0,vmin(WORLDZ-1,PosGetCellCoordZ(vmin(start.z,end.z)-capsuleRadius)));
@@ -625,7 +515,7 @@ static CapsuleContact QueryRigidbodyWorldContact(u16 i,Vector3 pos) {
         }
         case COLLIDER_TYPE_BOX: {
             ShapeBox b; b.center=Vector3_A_plus_B(pos,quat_rotate_vector(e->rotation,e->colliderCenter)); b.halfExtents=scale_vector3(e->colliderSize,0.5f); b.rot=e->rotation;
-            Vector3 ax,ay,az; obb_axes(b.rot,&ax,&ay,&az); CapsuleContact worst=NO_CONTACT;
+            Vector3 ax,ay,az; obb_axes(b.rot,&ax,&ay,&az); CapsuleContact worst=(CapsuleContact){.depth=-1.0f,.normal={0,1,0}};
             for (int cx=-1; cx<=1; cx+=2) for (int cy=-1; cy<=1; cy+=2) for (int cz=-1; cz<=1; cz+=2) {
                 Vector3 corner=Vector3_A_plus_B(b.center,Vector3_A_plus_B(Vector3_A_plus_B(scale_vector3(ax,b.halfExtents.x*(float)cx),scale_vector3(ay,b.halfExtents.y*(float)cy)),scale_vector3(az,b.halfExtents.z*(float)cz)));
                 CapsuleContact c=QueryCapsuleContact(corner,corner,0.004f,mask);
@@ -638,11 +528,7 @@ static CapsuleContact QueryRigidbodyWorldContact(u16 i,Vector3 pos) {
 }
 
 ENGINE_TO_MOD bool CheckCapsule(Vector3 start,Vector3 end,float capsuleRadius,float capsuleHeight,u32 layerMask) { (void)capsuleHeight; return QueryCapsuleContact(start,end,capsuleRadius,layerMask).depth>0.0f; }
-
-static inline void CapsuleTipsFromEye(Vector3 eye,Vector3 *start,Vector3 *end) {
-    float hi=(PLAYER_HEIGHT-2.0f*PLAYER_RADIUS)*0.5f, cy=eye.y-PLAYER_CAM_OFFSET_Y;
-    *start=(Vector3){eye.x,cy-hi,eye.z}; *end=(Vector3){eye.x,cy+hi,eye.z};
-}
+static inline void CapsuleTipsFromEye(Vector3 eye,Vector3 *start,Vector3 *end) { float hi=(PLAYER_HEIGHT-2.0f*PLAYER_RADIUS)*0.5f,cy=eye.y-PLAYER_CAM_OFFSET_Y; *start=(Vector3){eye.x,cy-hi,eye.z}; *end=(Vector3){eye.x,cy+hi,eye.z}; }
 static float SnapEyeAboveFloor(float ex,float ey,float ez,u32 mask) {
     float corrected=ey, pushed=0.0f;
     while (pushed<SNAP_MAX) {
@@ -651,11 +537,6 @@ static float SnapEyeAboveFloor(float ex,float ey,float ez,u32 mask) {
         corrected+=SNAP_STEP; pushed+=SNAP_STEP;
     }
     return corrected;
-}
-void BuildPlayerCapsule(u16 playerIdx,Vector3 *start,Vector3 *end) {
-    Vector3 eye=Sys_Global.instances[playerIdx].position;
-    float hi=(PLAYER_HEIGHT-2.0f*PLAYER_RADIUS)*0.5f, cy=eye.y-PLAYER_CAM_OFFSET_Y;
-    start->x=eye.x; start->y=cy-hi; start->z=eye.z; end->x=eye.x; end->y=cy+hi; end->z=eye.z;
 }
 
 ENGINE_TO_MOD void AddForce(u16 idx,Vector3 force,bool isImpulse) {
@@ -692,12 +573,6 @@ void UpdateVelocityFromGravity(void) {
     }
 }
 
-void ApplyCorpseFriction(u16 idx) {
-    Sys_Global.instances[idx].dynamicFriction=10.0f; Sys_Global.instances[idx].staticFriction=10.0f; Sys_Global.instances[idx].bounciness=0.0f;
-    Sys_Global.instances[idx].frictionCombine=PHYS_COMBINE_MUL; Sys_Global.instances[idx].bounceCombine=PHYS_COMBINE_MAX;
-}
-
-bool GridCellBlock(u16 i,Vector3 pos,Vector3 newPos);
 static void IntegrateRigidbody(u16 i,float dt) {
     Entity *e=&Sys_Global.instances[i];
     if (!(e->entflags&ENTFLAG_ACTIVE)||!(e->entflags&ENTFLAG_RIGIDBODY)||e->entflags&ENTFLAG_ASLEEP||e->entflags&ENTFLAG_KINEMATIC) return;
@@ -795,30 +670,27 @@ static void IntegratePlayer(u16 i,float dt) {
     e->lastPosition=pos; e->position=Vector3_A_plus_B(pos,scale_vector3(vel,dt)); Sys_Global.dirtyInstances[i]=true;
 }
 
-void SetPlayerListenerPos(void);
-void UpdatePositions(void) {
+static void UpdatePositions(void) {
     float dt=vclamp((float)Sys_Global.timeSinceLastPhysicsTick,0.0005f,0.027777778f);
     for (u32 i=PLAYER1; i<=PLAYER2; ++i) IntegratePlayer((u16)i,dt);
     for (u32 i=START_INDEX_LEVEL_INSTANCES; i<(u32)Sys_Global.loadedInstances; ++i) {
         if (Sys_Global.instances[i].entflags&ENTFLAG_RIGIDBODY) IntegrateRigidbody((u16)i,dt);
     }
-    SetPlayerListenerPos();
 }
 
-void ClampVelocity(void) {
+static void ClampVelocity(void) {
     for (i32 i=START_INDEX_LEVEL_INSTANCES; i<Sys_Global.loadedInstances; ++i) {
         Vector3 v=Sys_Global.instances[i].velocity;
         if (magnitude_vector3(v)>TERMINAL_VELOCITY) Sys_Global.instances[i].velocity=scale_vector3(normalize_vector3(v),TERMINAL_VELOCITY);
     }
 }
 
-void UpdateTriggers(void);
-void Physics(void) {
+static void Physics(void) {
 //     UpdateVelocityFromGravity();
     float dt = (float)Sys_Global.timeSinceLastPhysicsTick;
     if (dt>SUB_STEP_DT_MAX*4.0f) dt=SUB_STEP_DT_MAX*4.0f;
     if (dt>SUB_STEP_DT_MAX) { float h=dt*0.5f; Physics_PrimitiveStep(h); Physics_PrimitiveStep(h); }
     else Physics_PrimitiveStep(dt);
     
-    ClampVelocity(); UpdatePositions(); UpdateTriggers(); Physics_DrawDebug();
+    ClampVelocity(); UpdatePositions(); UpdateTriggers();
 }

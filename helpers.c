@@ -1,7 +1,4 @@
 // helpers.c - Helper Functions for various things, mostly libc avoidance
-#include "os.h"
-#include "gl.h"
-#include "voxen.h"
 void stbi_write_bmp(char const *filename, int x, int y, const void *data) {
     OsFileHandle f = OS_OpenWriteonly(filename);
     if (f == OS_INVALID_HANDLE) { DualLogError("Failed to open %s for writing\n", filename); return; }
@@ -183,9 +180,7 @@ bool StringIsEmpty(const char* a) { // C# String.IsNullOrWhiteSpace replacement
 }
 
 bool StringsEqual(const char* a, const char* b) { // !strcmp replacement (hated its inverted logic)
-    size_t size  = GetStringLength(a);
-    size_t size2 = GetStringLength(b);
-    if (size != size2) return false;
+    size_t size = GetStringLength(a), size2 = GetStringLength(b); if (size != size2) return false;
     
     for (size_t i=0;i<size;++i) {
         if (a[i] != b[i]) return false;
@@ -195,27 +190,9 @@ bool StringsEqual(const char* a, const char* b) { // !strcmp replacement (hated 
     return true;
 }
 
-int StringCompareUpToLength(const char* s1, const char* s2, size_t n) { // !strncmp replacement
-    if (n == 0) return 0;
-
-    const unsigned char* p1 = (const unsigned char*)s1;
-    const unsigned char* p2 = (const unsigned char*)s2;
-    while (n-- > 0) {
-        if (*p1 != *p2) {
-            return (*p1 < *p2) ? -1 : 1;
-        }
-        if (*p1 == '\0') {
-            break;
-        }
-        p1++;
-        p2++;
-    }
-    return 0;
-}
-
+int StringCompareUpToLength(const char* s1, const char* s2, size_t n) { const unsigned char *p1 = (const unsigned char*)s1, *p2 = (const unsigned char*)s2; while (n-- > 0) { if (*p1 != *p2) {return (*p1 < *p2) ? -1 : 1;}  if (*p1 == '\0') {break;} p1++; p2++; } return 0; } // !strncmp replacement (yes inverted for sanity)
 void StringCopyInto_A_From_B(char* a, const char* b, size_t bufferSize) { // strcpy replacement
-    size_t size2=GetStringLength(b);
-    if (size2>=bufferSize) { DualLogError("Error attempting string copy from B into A but B is bigger than buffer limit %u! A: ",bufferSize); DualLogError("%s, B: %s\n",a,b); OS_Exit(1); }
+    size_t size2=GetStringLength(b); if (size2>=bufferSize) { DualLogError("Error attempting string copy from B into A but B is bigger than buffer limit %u! A: ",bufferSize); DualLogError("%s, B: %s\n",a,b); OS_Exit(1); }
     
     for (size_t i=0;i<size2;++i) a[i] = b[i];
     a[size2] = '\0';

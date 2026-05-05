@@ -1,6 +1,3 @@
-#include "voxen.h"
-extern u16 loadedModelsMaxIndex; extern float modelBounds[MODEL_IDX_MAX]; extern u8** modelVertices; extern u16** modelTriangles; extern u32 gridCellStates[ARRSIZE];
-extern u32 modelVertexCounts[MODEL_IDX_MAX]; extern u16 modelTriangleCounts[MODEL_IDX_MAX]; extern float modelMatrices[INSTANCE_COUNT * 16];
 RaycastHit RayTriangle(Vector3 origin, Vector3 dir, Vector3 posA, Vector3 posB, Vector3 posC, Vector3 normA, Vector3 normB, Vector3 normC) {
     Vector3 edgeAB = Vector3_A_minus_B(posB,posA);
     Vector3 edgeAC = Vector3_A_minus_B(posC,posA);
@@ -21,7 +18,6 @@ RaycastHit RayTriangle(Vector3 origin, Vector3 dir, Vector3 posA, Vector3 posB, 
     return hitInfo;
 }
  
-extern u16 playerCellIdx; bool SkyIsVisible(void); bool LevelSpecificHacksForClosedCellsThatProbablyShouldntBeBecauseOfInsetMeshes(u32 instCellIdx, u16 constIndex);
 ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, u32 layerMask) {
     u32 numMeshesCheckedForRaycast = 0, numTrisCastAgainst = 0;
     RaycastHit result = { .hit = false, .distance = maxDist, .point = {0.0f, 0.0f, 0.0f}, .normal = {0.0f, 0.0f, 0.0f}, .hitInstanceIndex = INSTANCE_COUNT };

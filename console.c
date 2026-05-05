@@ -1,7 +1,4 @@
 // console.c - Console Emulator
-#include "os.h"
-#include "voxen.h"
-#include "gl.h"
 #define MAX_HISTORY 7
 static i32 currentEntryLength=0, numHistory=0, historyPos=0;
 char consoleEntryText[TEXT_BUFFER_SIZE]="Enter a command...",history[MAX_HISTORY][TEXT_BUFFER_SIZE]={0};

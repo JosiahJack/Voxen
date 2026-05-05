@@ -218,7 +218,7 @@ typedef struct _GLFWfbconfig _GLFWfbconfig; typedef struct _GLFWcontext _GLFWcon
     typedef const char* (*PFNGLXQUERYEXTENSIONSSTRINGPROC)(Display*,int);
     typedef GLXFBConfig* (*PFNGLXGETFBCONFIGSPROC)(Display*,int,int*);
     typedef GLXContext (*PFNGLXCREATENEWCONTEXTPROC)(Display*,GLXFBConfig,int,GLXContext,Bool);
-    typedef __GLXextproc (* PFNGLXGETPROCADDRESSPROC)(const GLubyte *procName);
+    typedef __GLXextproc (* PFNGLXGETPROCADDRESSPROC)(const u8 *procName);
     typedef void (*PFNGLXSWAPINTERVALEXTPROC)(Display*,GLXDrawable,int);
     typedef XVisualInfo* (*PFNGLXGETVISUALFROMFBCONFIGPROC)(Display*,GLXFBConfig);
     typedef GLXWindow (*PFNGLXCREATEWINDOWPROC)(Display*,GLXFBConfig,Window,const int*);
@@ -1359,7 +1359,7 @@ static void createKeyTables(void) {
     static void makeContextCurrentGLX(_GLFWwindow* window) { _glfw.glx.MakeCurrent(_glfw.x11.display,window->context.glx.window,window->context.glx.handle); /*_glfwPlatformSetTls(&_glfw.contextSlot,window);*/ }
     static void swapBuffersGLX(_GLFWwindow* window) { _glfw.glx.SwapBuffers(_glfw.x11.display, window->context.glx.window); }
     static void swapIntervalGLX(int interval) { _GLFWwindow* handle = (_GLFWwindow*)window; _glfw.glx.SwapIntervalEXT(_glfw.x11.display,handle->context.glx.window,interval); }
-    static GLFWglproc getProcAddressGLX(const char* procname) { return _glfw.glx.GetProcAddress((const GLubyte*) procname); }
+    static GLFWglproc getProcAddressGLX(const char* procname) { return _glfw.glx.GetProcAddress((const u8*) procname); }
     #define PLATFORM_getCursorPos(w,x,y)            _glfwGetCursorPosX11(w,x,y)
     #define PLATFORM_setCursorPos(w,x,y)            _glfwSetCursorPosX11(w,x,y)
     #define PLATFORM_setCursorMode(w)               _glfwSetCursorModeX11(w)
@@ -1764,7 +1764,6 @@ void quat_from_yaw_pitch_roll(Quaternion* q, float yaw_deg, float pitch_deg, flo
     q->z = cy * cp * sr - sy * sp * cr; // Z-axis (roll)
 } // Skipping quat normalization, not needed
 
-void SetPlayerListenerOrientation(void);
 void _glfwInputCursorPos(_GLFWwindow* window,double xpos,double ypos) {
     if (window->virtualCursorPosX == xpos && window->virtualCursorPosY == ypos) return;
     window->virtualCursorPosX = xpos; window->virtualCursorPosY = ypos;
@@ -1794,7 +1793,6 @@ void _glfwInputCursorPos(_GLFWwindow* window,double xpos,double ypos) {
         float y2 = rot.y * rot.y;  float xz = rot.x * rot.z;  float wy = rot.w * rot.y;
         Sys_Global.instances[PLAYER1].forward = normalize_vector3((Vector3){ 2.0f * (xz + wy), 2.0f * (rot.y * rot.z - rot.w * rot.x), 1.0f - 2.0f * (rot.x * rot.x + y2) });
         Sys_Global.instances[PLAYER1].right = normalize_vector3((Vector3){ 1.0f - 2.0f * (y2 + rot.z * rot.z), 2.0f * (rot.x * rot.y + rot.w * rot.z), 2.0f * (xz - wy) });
-        SetPlayerListenerOrientation();
     }
 }
 

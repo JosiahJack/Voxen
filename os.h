@@ -13,7 +13,7 @@ typedef __INT64_TYPE__ i64;
 typedef __UINT64_TYPE__ u64;
 #define UINT_MAX 0xffffffffU
 #define INT_MAX 2147483647
-#define bool _Bool
+#define bool unsigned char
 #define true 1
 #define false 0
 #define likely(x)   __builtin_expect(!!(x), 1)
@@ -77,6 +77,8 @@ static inline __attribute__((always_inline)) long OS_Open(const char* path, i32 
     #include <xinput.h>
     #include <dbt.h>
     #include <wchar.h>
+    #include <mmdeviceapi.h>
+    #include <audioclient.h>
     typedef HANDLE OsFileHandle;
     #define OS_INVALID_HANDLE INVALID_HANDLE_VALUE
     #define OS_MakeFolder(path) _mkdir(path)
@@ -159,9 +161,9 @@ static inline __attribute__((always_inline)) long OS_Open(const char* path, i32 
     static char win_err_buf[512];
 #else
     #define LINUX
-    void *dlopen(const char *filename, int flags);
-    void *dlsym(void *handle, const char *symbol);
-    char *dlerror(void);
+    #include <sys/ioctl.h>
+    #include <sound/asound.h>
+    void *dlopen(const char *filename, int flags); void *dlsym(void *handle, const char *symbol);
     #define RTLD_LOCAL 0x00000
     #define RTLD_LAZY 0x00001
     #define RTLD_NOW 0x00002

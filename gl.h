@@ -1,11 +1,7 @@
 // gl.h - Combined gl,glad,glfw3.5 declarations
 #pragma once
-typedef void (*GLADapiproc)(void);
-typedef GLADapiproc (*GLADloadfunc)(const char *name);
-typedef GLADapiproc (*GLADuserptrloadfunc)(void *userptr, const char *name);
 #define GL_ARRAY_BUFFER 0x8892
 #define GL_BLEND 0x0BE2
-#define GL_CCW 0x0901
 #define GL_COLOR_ATTACHMENT0 0x8CE0
 #define GL_COLOR_ATTACHMENT1 0x8CE1
 #define GL_COLOR_ATTACHMENT2 0x8CE2
@@ -16,13 +12,10 @@ typedef GLADapiproc (*GLADuserptrloadfunc)(void *userptr, const char *name);
 #define GL_DEPTH_BUFFER_BIT 0x00000100
 #define GL_DEPTH_TEST 0x0B71
 #define GL_DYNAMIC_DRAW 0x88E8
-#define GL_DYNAMIC_STORAGE_BIT 0x0100
 #define GL_ELEMENT_ARRAY_BUFFER 0x8893
-#define GL_EQUAL 0x0202
 #define GL_FALSE 0
 #define GL_FLOAT 0x1406
 #define GL_FRAMEBUFFER 0x8D40
-#define GL_NEAREST 0x2600
 #define GL_READ_WRITE 0x88BA
 #define GL_RGB 0x1907
 #define GL_RG16F 0x822F
@@ -40,92 +33,28 @@ typedef GLADapiproc (*GLADuserptrloadfunc)(void *userptr, const char *name);
 #define GL_TEXTURE5 0x84C5
 #define GL_TEXTURE6 0x84C6
 #define GL_TEXTURE_2D 0x0DE1
-#define GL_TRIANGLES 0x0004
-#define GL_HALF_FLOAT 0x140B
 #define GL_UNSIGNED_BYTE 0x1401
 #define GL_UNSIGNED_SHORT 0x1403
-typedef unsigned int GLenum,GLbitfield; typedef unsigned char GLboolean; typedef int GLint;
-typedef u32 GLuint; typedef int GLsizei; typedef float GLfloat; typedef u8 GLubyte;
-typedef char GLchar; typedef intptr_t GLintptr; typedef size_t GLsizeiptr;
-typedef void (  *PFNGLACTIVETEXTUREPROC)(GLenum texture);
-typedef void (  *PFNGLATTACHSHADERPROC)(GLuint program, GLuint shader);
-typedef void (  *PFNGLBINDBUFFERPROC)(GLenum target, GLuint buffer);
-typedef void (  *PFNGLBINDBUFFERBASEPROC)(GLenum target, GLuint index, GLuint buffer);
-typedef void (  *PFNGLBINDFRAMEBUFFERPROC)(GLenum target, GLuint framebuffer);
-typedef void (  *PFNGLBINDIMAGETEXTUREPROC)(GLuint unit, GLuint texture, GLint level, GLboolean layered, GLint layer, GLenum access, GLenum format);
-typedef void (  *PFNGLBINDTEXTUREPROC)(GLenum target, GLuint texture);
-typedef void (  *PFNGLBINDTEXTUREUNITPROC)(GLuint unit, GLuint texture);
-typedef void (  *PFNGLBINDVERTEXARRAYPROC)(GLuint array);
-typedef void (  *PFNGLBINDVERTEXBUFFERPROC)(GLuint bindingindex, GLuint buffer, GLintptr offset, GLsizei stride);
-typedef void (  *PFNGLBLENDFUNCSEPARATEPROC)(GLenum sfactorRGB, GLenum dfactorRGB, GLenum sfactorAlpha, GLenum dfactorAlpha);
-typedef void (  *PFNGLBUFFERDATAPROC)(GLenum target, GLsizeiptr size, const void * data, GLenum usage);
-typedef GLenum (  *PFNGLCHECKFRAMEBUFFERSTATUSPROC)(GLenum target);
-typedef void (  *PFNGLCLEARPROC)(GLbitfield mask);
-typedef void (  *PFNGLCLEARCOLORPROC)(GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha);
-typedef void (  *PFNGLCOLORMASKPROC)(GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha);
-typedef void (  *PFNGLCOMPILESHADERPROC)(GLuint shader);
-typedef void (  *PFNGLCOPYTEXSUBIMAGE2DPROC)(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint x, GLint y, GLsizei width, GLsizei height);
-typedef void (  *PFNGLCREATEBUFFERSPROC)(GLsizei n, GLuint * buffers);
-typedef GLuint (  *PFNGLCREATEPROGRAMPROC)(void);
-typedef GLuint (  *PFNGLCREATESHADERPROC)(GLenum type);
-typedef void (  *PFNGLCREATETEXTURESPROC)(GLenum target, GLsizei n, GLuint * textures);
-typedef void (  *PFNGLCREATEVERTEXARRAYSPROC)(GLsizei n, GLuint * arrays);
-typedef void (  *PFNGLCULLFACEPROC)(GLenum mode);
-typedef void (  *PFNGLDEPTHFUNCPROC)(GLenum func);
-typedef void (  *PFNGLDEPTHMASKPROC)(GLboolean flag);
-typedef void (  *PFNGLDISABLEPROC)(GLenum cap);
-typedef void (  *PFNGLDISPATCHCOMPUTEPROC)(GLuint num_groups_x, GLuint num_groups_y, GLuint num_groups_z);
-typedef void (  *PFNGLDRAWARRAYSPROC)(GLenum mode, GLint first, GLsizei count);
-typedef void (  *PFNGLDRAWBUFFERSPROC)(GLsizei n, const GLenum * bufs);
-typedef void (  *PFNGLDRAWELEMENTSPROC)(GLenum mode, GLsizei count, GLenum type, const void * indices);
-typedef void (  *PFNGLENABLEPROC)(GLenum cap);
-typedef void (  *PFNGLENABLEVERTEXARRAYATTRIBPROC)(GLuint vaobj, GLuint index);
-typedef void (  *PFNGLFINISHPROC)(void);
-typedef void (  *PFNGLFLUSHPROC)(void);
-typedef void (  *PFNGLFRAMEBUFFERTEXTURE2DPROC)(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level);
-typedef void (  *PFNGLFRONTFACEPROC)(GLenum mode);
-typedef void (  *PFNGLGENBUFFERSPROC)(GLsizei n, GLuint * buffers);
-typedef void (  *PFNGLGENFRAMEBUFFERSPROC)(GLsizei n, GLuint * framebuffers);
-typedef void (  *PFNGLGENTEXTURESPROC)(GLsizei n, GLuint * textures);
-typedef GLenum (  *PFNGLGETERRORPROC)(void);
-typedef void (  *PFNGLGETINTEGERVPROC)(GLenum pname, GLint * data);
-typedef void (  *PFNGLGETPROGRAMIVPROC)(GLuint program, GLenum pname, GLint * params);
-typedef void (  *PFNGLGETSHADERINFOLOGPROC)(GLuint shader, GLsizei bufSize, GLsizei * length, GLchar * infoLog);
-typedef void (  *PFNGLGETSHADERIVPROC)(GLuint shader, GLenum pname, GLint * params);
-typedef void (  *PFNGLLINEWIDTHPROC)(GLfloat width);
-typedef void (  *PFNGLLINKPROGRAMPROC)(GLuint program);
-typedef void * (  *PFNGLMAPBUFFERRANGEPROC)(GLenum target, GLintptr offset, GLsizeiptr length, GLbitfield access);
-typedef void (  *PFNGLNAMEDBUFFERDATAPROC)(GLuint buffer, GLsizeiptr size, const void * data, GLenum usage);
-typedef void (  *PFNGLNAMEDBUFFERSTORAGEPROC)(GLuint buffer, GLsizeiptr size, const void * data, GLbitfield flags);
-typedef void (  *PFNGLNAMEDBUFFERSUBDATAPROC)(GLuint buffer, GLintptr offset, GLsizeiptr size, const void * data);
-typedef void (  *PFNGLPUSHDEBUGGROUPPROC)(GLenum source, GLuint id, GLsizei length, const GLchar * message);
-typedef void (  *PFNGLREADBUFFERPROC)(GLenum src);
-typedef void (  *PFNGLREADPIXELSPROC)(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, void * pixels);
-typedef void (  *PFNGLSHADERBINARYPROC)(GLsizei count, const GLuint * shaders, GLenum binaryFormat, const void * binary, GLsizei length);
-typedef void (  *PFNGLSHADERSOURCEPROC)(GLuint shader, GLsizei count, const GLchar *const* string, const GLint * length);
-typedef void (  *PFNGLSHADERSTORAGEBLOCKBINDINGPROC)(GLuint program, GLuint storageBlockIndex, GLuint storageBlockBinding);
-typedef void (  *PFNGLTEXIMAGE2DPROC)(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const void * pixels);
-typedef void (  *PFNGLTEXPARAMETERIPROC)(GLenum target, GLenum pname, GLint param);
-typedef void (  *PFNGLTEXTUREPARAMETERIPROC)(GLuint texture, GLenum pname, GLint param);
-typedef void (  *PFNGLTEXTURESTORAGE2DPROC)(GLuint texture, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height);
-typedef void (  *PFNGLTEXTURESUBIMAGE2DPROC)(GLuint texture, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const void * pixels);
-typedef void (  *PFNGLTEXTUREVIEWPROC)(GLuint texture, GLenum target, GLuint origtexture, GLenum internalformat, GLuint minlevel, GLuint numlevels, GLuint minlayer, GLuint numlayers);
-typedef void (  *PFNGLUNIFORM1FPROC)(GLint location, GLfloat v0);
-typedef void (  *PFNGLUNIFORM1IPROC)(GLint location, GLint v0);
-typedef void (  *PFNGLUNIFORM1UIPROC)(GLint location, GLuint v0);
-typedef void (  *PFNGLUNIFORM2FPROC)(GLint location, GLfloat v0, GLfloat v1);
-typedef void (  *PFNGLUNIFORM2UIPROC)(GLint location, GLuint v0, GLuint v1);
-typedef void (  *PFNGLUNIFORM3FPROC)(GLint location, GLfloat v0, GLfloat v1, GLfloat v2);
-typedef void (  *PFNGLUNIFORM4FPROC)(GLint location, GLfloat v0, GLfloat v1, GLfloat v2, GLfloat v3);
-typedef void (  *PFNGLUNIFORMMATRIX3FVPROC)(GLint location, GLsizei count, GLboolean transpose, const GLfloat * value);
-typedef void (  *PFNGLUNIFORMMATRIX4FVPROC)(GLint location, GLsizei count, GLboolean transpose, const GLfloat * value);
-typedef GLboolean (  *PFNGLUNMAPBUFFERPROC)(GLenum target);
-typedef void (  *PFNGLUSEPROGRAMPROC)(GLuint program);
-typedef void (  *PFNGLVERTEXARRAYATTRIBBINDINGPROC)(GLuint vaobj, GLuint attribindex, GLuint bindingindex);
-typedef void (  *PFNGLVERTEXARRAYATTRIBFORMATPROC)(GLuint vaobj, GLuint attribindex, GLint size, GLenum type, GLboolean normalized, GLuint relativeoffset);
-typedef void (  *PFNGLVERTEXARRAYVERTEXBUFFERPROC)(GLuint vaobj, GLuint bindingindex, GLuint buffer, GLintptr offset, GLsizei stride);
-typedef void (  *PFNGLVIEWPORTPROC)(GLint x, GLint y, GLsizei width, GLsizei height);
-typedef void (  *PFNGLCLEARBUFFERFVPROC)(GLenum buffer, GLint drawbuffer, const GLfloat * value);
+typedef void(*PFNGLACTIVETEXTUREPROC)(u32),(*PFNGLATTACHSHADERPROC)(u32,u32),(*PFNGLBINDBUFFERPROC)(u32,u32),(*PFNGLBINDBUFFERBASEPROC)(u32,u32,u32),(*PFNGLBINDFRAMEBUFFERPROC)(u32,u32);
+typedef void(*PFNGLBINDIMAGETEXTUREPROC)(u32,u32,i32,bool,i32,u32,u32),(*PFNGLBINDTEXTUREPROC)(u32,u32),(*PFNGLBINDTEXTUREUNITPROC)(u32,u32),(*PFNGLBINDVERTEXARRAYPROC)(u32);
+typedef void(*PFNGLBINDVERTEXBUFFERPROC)(u32,u32,intptr_t,i32),(*PFNGLBLENDFUNCSEPARATEPROC)(u32,u32,u32,u32),(*PFNGLBUFFERDATAPROC)(u32,size_t,const void*,u32),(*PFNGLCLEARPROC)(u32);
+typedef void(*PFNGLCLEARCOLORPROC)(float,float,float,float),(*PFNGLCOLORMASKPROC)(bool,bool,bool,bool),(*PFNGLCOMPILESHADERPROC)(u32),(*PFNGLCOPYTEXSUBIMAGE2DPROC)(u32,i32,i32,i32,i32,i32,i32,i32);
+typedef void(*PFNGLCREATEBUFFERSPROC)(i32,u32*),(*PFNGLCREATETEXTURESPROC)(u32,i32,u32*),(*PFNGLCREATEVERTEXARRAYSPROC)(i32,u32*),(*PFNGLCULLFACEPROC)(u32),(*PFNGLDEPTHFUNCPROC)(u32),(*PFNGLDEPTHMASKPROC)(bool);
+typedef void(*PFNGLDISABLEPROC)(u32),(*PFNGLDISPATCHCOMPUTEPROC)(u32,u32,u32),(*PFNGLDRAWARRAYSPROC)(u32,i32,i32),(*PFNGLDRAWBUFFERSPROC)(i32,const u32*),(*PFNGLDRAWELEMENTSPROC)(u32,i32,u32,const void*);
+typedef void(*PFNGLENABLEPROC)(u32),(*PFNGLENABLEVERTEXARRAYATTRIBPROC)(u32,u32),(*PFNGLFINISHPROC)(void),(*PFNGLFLUSHPROC)(void),(*PFNGLFRAMEBUFFERTEXTURE2DPROC)(u32,u32,u32,u32,i32),(*PFNGLFRONTFACEPROC)(u32);
+typedef void(*PFNGLGENBUFFERSPROC)(i32,u32*),(*PFNGLGENFRAMEBUFFERSPROC)(i32,u32*),(*PFNGLGENTEXTURESPROC)(i32,u32*),(*PFNGLGETINTEGERVPROC)(u32,i32*),(*PFNGLGETPROGRAMIVPROC)(u32,u32,i32*);
+typedef void(*PFNGLGETSHADERINFOLOGPROC)(u32,i32,i32*,char*),(*PFNGLGETSHADERIVPROC)(u32,u32,i32*),(*PFNGLLINEWIDTHPROC)(float),(*PFNGLLINKPROGRAMPROC)(u32),(*PFNGLNAMEDBUFFERDATAPROC)(u32,size_t,const void*,u32);
+typedef void(*PFNGLNAMEDBUFFERSTORAGEPROC)(u32,size_t,const void*,u32),(*PFNGLNAMEDBUFFERSUBDATAPROC)(u32,intptr_t,size_t,const void*),(*PFNGLPUSHDEBUGGROUPPROC)(u32,u32,i32,const char*),(*PFNGLREADBUFFERPROC)(u32);
+typedef void(*PFNGLREADPIXELSPROC)(i32,i32,i32,i32,u32,u32,void*),(*PFNGLSHADERBINARYPROC)(i32,const u32*,u32,const void*,i32),(*PFNGLSHADERSOURCEPROC)(u32,i32,const char*const*,const i32*);
+typedef void(*PFNGLSHADERSTORAGEBLOCKBINDINGPROC)(u32,u32,u32),(*PFNGLTEXIMAGE2DPROC)(u32,i32,i32,i32,i32,i32,u32,u32,const void*),(*PFNGLTEXPARAMETERIPROC)(u32,u32,i32),(*PFNGLTEXTUREPARAMETERIPROC)(u32,u32,i32);
+typedef void(*PFNGLTEXTURESTORAGE2DPROC)(u32,i32,u32,i32,i32),(*PFNGLTEXTURESUBIMAGE2DPROC)(u32,i32,i32,i32,i32,i32,u32,u32,const void*),(*PFNGLTEXTUREVIEWPROC)(u32,u32,u32,u32,u32,u32,u32,u32);
+typedef void(*PFNGLUNIFORM1FPROC)(i32,float),(*PFNGLUNIFORM1IPROC)(i32,i32),(*PFNGLUNIFORM1UIPROC)(i32,u32),(*PFNGLUNIFORM2FPROC)(i32,float,float),(*PFNGLUNIFORM2UIPROC)(i32,u32,u32);
+typedef void(*PFNGLUNIFORM3FPROC)(i32,float,float,float),(*PFNGLUNIFORM4FPROC)(i32,float,float,float,float),(*PFNGLUNIFORMMATRIX3FVPROC)(i32,i32,bool,const float*);
+typedef void(*PFNGLUNIFORMMATRIX4FVPROC)(i32,i32,bool,const float*),(*PFNGLUSEPROGRAMPROC)(u32),(*PFNGLVERTEXARRAYATTRIBBINDINGPROC)(u32,u32,u32),(*PFNGLVERTEXARRAYATTRIBFORMATPROC)(u32,u32,i32,u32,bool,u32);
+typedef void(*PFNGLVERTEXARRAYVERTEXBUFFERPROC)(u32,u32,u32,intptr_t,i32),(*PFNGLVIEWPORTPROC)(i32,i32,i32,i32),(*PFNGLCLEARBUFFERFVPROC)(u32,i32,const float*);
+typedef u32(*PFNGLCHECKFRAMEBUFFERSTATUSPROC)(u32),(*PFNGLCREATEPROGRAMPROC)(void),(*PFNGLCREATESHADERPROC)(u32),(*PFNGLGETERRORPROC)(void);
+typedef void*(*PFNGLMAPBUFFERRANGEPROC)(u32,intptr_t,size_t,u32);
+typedef bool(*PFNGLUNMAPBUFFERPROC)(u32);
 PFNGLACTIVETEXTUREPROC glActiveTexture;
 PFNGLATTACHSHADERPROC glAttachShader;
 PFNGLBINDBUFFERPROC glBindBuffer;

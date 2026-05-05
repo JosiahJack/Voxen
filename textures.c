@@ -1,10 +1,5 @@
-#include "os.h"
-#include "gl.h"
-#include "voxen.h"
-extern u16 loadedTexturesMaxIndex;
 u32 totalPixels;
 u32 totalPaletteColors;
-#define STBI_ARENA_SIZE 16*1024*1024
 typedef struct { u16 index; bool transparent; bool doublesided; char path[128]; } TextureData;
 typedef struct { TextureData* entries; u32 count; u32 capacity; } TextureDataParser;
 typedef struct { const char* data; int size; } RawTexture;
@@ -14,13 +9,11 @@ typedef struct { stbi__context* s; u8* idata, *expanded, *out; } stbi__png;
 enum { STBI__F_none = 0, STBI__F_sub = 1, STBI__F_up = 2, STBI__F_avg = 3, STBI__F_paeth = 4, STBI__F_avg_first, STBI__F_paeth_first };
 typedef struct { u16 fast[1<<9], firstcode[16], firstsymbol[16], value[288]; i32 maxcode[17]; u8 size[288]; } stbi__zhuffman;
 typedef struct { u8 *zbuffer, *zbuffer_end, *zout, *zout_start; i32 num_bits; u32 code_buffer; stbi__zhuffman z_length, z_distance; } stbi__zbuf;
-static int num_parse_threads = 0;
 u8* stbi_load_from_memory(const u8* buffer, i32 len, i32* x, i32* y);
 StbiArena stbi_arena_main;
 static StbiArena* thread_stbi_arenas = NULL;
 static u8** textureIndexBuffers = NULL; static u32** texturePaletteBuffers = NULL; static u32* texturePaletteSizes = NULL;
 static i32* textureWidths = NULL; static i32* textureHeights = NULL;
-
 void stbi__arena_init_thread(StbiArena* arena) {if (!arena->base) { arena->base = OS_Alloc(STBI_ARENA_SIZE); arena->cursor = arena->base; arena->end = arena->base + STBI_ARENA_SIZE; } }
 void* stbi__arena_alloc_thread(StbiArena* a, size_t s) { if(!a->base||a->cursor+s>a->end)return NULL; void* p=a->cursor; a->cursor+=s; return p; }
 void* stbi__arena_alloc(size_t s) { return stbi__arena_alloc_thread(&stbi_arena_main, s); }

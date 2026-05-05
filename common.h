@@ -14,7 +14,7 @@ typedef __SIZE_TYPE__ size_t;
 #ifndef U16_MAX
     #define U16_MAX 65535
 #endif
-#define bool _Bool
+#define bool unsigned char
 #define true 1
 #define false 0
 typedef struct { float r,g,b; } Color3;
@@ -263,287 +263,49 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define COLLIDER_CAPSULE_DIRECTION_X_F 0.0f // X-Axis
 #define COLLIDER_CAPSULE_DIRECTION_Y_F 1.0f // Y-Axis
 #define COLLIDER_CAPSULE_DIRECTION_Z_F 2.0f // Z-Axis
-
-// BodyState
 typedef u8 BodyState;
-static const u8 BodyState_Standing = 0;
-static const u8 BodyState_Crouch = 1;
-static const u8 BodyState_CrouchingDown = 2;
-static const u8 BodyState_StandingUp = 3;
-static const u8 BodyState_Prone = 4;
-static const u8 BodyState_ProningDown = 5;
-static const u8 BodyState_ProningUp = 6;
-
-// Handedness
+static const u8 BodyState_Standing=0,BodyState_Crouch=1,BodyState_CrouchingDown=2,BodyState_StandingUp=3,BodyState_Prone=4,BodyState_ProningDown=5,BodyState_ProningUp=6;
 typedef u8 Handedness;
-static const u8 Handedness_Center = 0;
-static const u8 Handedness_LH = 1;
-static const u8 Handedness_RH = 2;
-
-// AttackType
+static const u8 Handedness_Center=0,Handedness_LH=1,Handedness_RH=2;
 typedef u8 AttackType;
-static const u8 AttackType_None = 0;
-static const u8 AttackType_Melee = 1;
-static const u8 AttackType_MeleeEnergy = 2;
-static const u8 AttackType_EnergyBeam = 3;
-static const u8 AttackType_Magnetic = 4;
-static const u8 AttackType_Projectile = 5;
-static const u8 AttackType_ProjectileNeedle = 6;
-static const u8 AttackType_ProjectileEnergyBeam = 7;
-static const u8 AttackType_ProjectileLaunched = 8;
-static const u8 AttackType_Gas = 9;
-static const u8 AttackType_Tranq = 10;
-static const u8 AttackType_Drill = 11;
-
-// NPCType
+static const u8 AttackType_None=0,AttackType_Melee=1,AttackType_MeleeEnergy=2,AttackType_EnergyBeam=3,AttackType_Magnetic=4,AttackType_Projectile=5,AttackType_ProjectileNeedle=6,AttackType_ProjectileEnergyBeam=7,AttackType_ProjectileLaunched=8,AttackType_Gas=9,AttackType_Tranq=10,AttackType_Drill=11;
 typedef u8 NPCType;
-static const u8 NPCType_Mutant = 0;
-static const u8 NPCType_Supermutant = 1;
-static const u8 NPCType_Robot = 2;
-static const u8 NPCType_Cyborg = 3;
-static const u8 NPCType_Supercyborg = 4;
-static const u8 NPCType_Cyber = 5;
-static const u8 NPCType_MutantCyborg = 6;
-
-// PerceptionLevel
+static const u8 NPCType_Mutant=0,NPCType_Supermutant=1,NPCType_Robot=2,NPCType_Cyborg=3,NPCType_Supercyborg=4,NPCType_Cyber=5,NPCType_MutantCyborg=6;
 typedef u8 PerceptionLevel;
-static const u8 PerceptionLevel_Low = 0;
-static const u8 PerceptionLevel_Medium = 1;
-static const u8 PerceptionLevel_High = 2;
-static const u8 PerceptionLevel_Omniscient = 3;
-
-// AIState
+static const u8 PerceptionLevel_Low=0,PerceptionLevel_Medium=1,PerceptionLevel_High=2,PerceptionLevel_Omniscient=3;
 typedef u8 AIState;
-static const u8 AIState_Idle = 0;
-static const u8 AIState_Walk = 1;
-static const u8 AIState_Run = 2;
-static const u8 AIState_Attack1 = 3;
-static const u8 AIState_Attack2 = 4;
-static const u8 AIState_Attack3 = 5;
-static const u8 AIState_Pain = 6;
-static const u8 AIState_Dying = 7;
-static const u8 AIState_Dead = 8;
-static const u8 AIState_Inspect = 9;
-static const u8 AIState_Interacting = 10;
-
-// AIMoveType
+static const u8 AIState_Idle=0,AIState_Walk=1,AIState_Run=2,AIState_Attack1=3,AIState_Attack2=4,AIState_Attack3=5,AIState_Pain=6,AIState_Dying=7,AIState_Dead=8,AIState_Inspect=9,AIState_Interacting=10;
 typedef u8 AIMoveType;
-static const u8 AIMoveType_Walk = 0;
-static const u8 AIMoveType_Fly = 1;
-static const u8 AIMoveType_Swim = 2;
-static const u8 AIMoveType_Cyber = 3;
-static const u8 AIMoveType_None = 4;
-
-// DoorState
+static const u8 AIMoveType_Walk=0,AIMoveType_Fly=1,AIMoveType_Swim=2,AIMoveType_Cyber=3,AIMoveType_None=4;
 typedef u8 DoorState;
-static const u8 DoorState_Closed = 0;
-static const u8 DoorState_Open = 1;
-static const u8 DoorState_Closing = 2;
-static const u8 DoorState_Opening = 3;
-
-// FuncStates
+static const u8 DoorState_Closed=0,DoorState_Open=1,DoorState_Closing=2,DoorState_Opening=3;
 typedef u8 FuncStates;
-static const u8 FuncStates_Start = 0;
-static const u8 FuncStates_Target = 1;
-static const u8 FuncStates_MovingStart = 2;
-static const u8 FuncStates_MovingTarget = 3;
-static const u8 FuncStates_AjarMovingStart = 4;
-static const u8 FuncStates_AjarMovingTarget = 5;
-
-// SoftwareType
+static const u8 FuncStates_Start=0,FuncStates_Target=1,FuncStates_MovingStart=2,FuncStates_MovingTarget=3,FuncStates_AjarMovingStart=4,FuncStates_AjarMovingTarget=5;
 typedef u8 SoftwareType;
-static const u8 SoftwareType_None = 0;
-static const u8 SoftwareType_Drill = 1;
-static const u8 SoftwareType_Pulser = 2;
-static const u8 SoftwareType_CShield = 3;
-static const u8 SoftwareType_Decoy = 4;
-static const u8 SoftwareType_Recall = 5;
-static const u8 SoftwareType_Turbo = 6;
-static const u8 SoftwareType_Game = 7;
-static const u8 SoftwareType_Data = 8;
-static const u8 SoftwareType_Integrity = 9;
-static const u8 SoftwareType_Keycard = 10;
-
-// AccessCardType
+static const u8 SoftwareType_None=0,SoftwareType_Drill=1,SoftwareType_Pulser=2,SoftwareType_CShield=3,SoftwareType_Decoy=4,SoftwareType_Recall=5,SoftwareType_Turbo=6,SoftwareType_Game=7,SoftwareType_Data=8,SoftwareType_Integrity=9,SoftwareType_Keycard=10;
 typedef u8 AccessCardType;
-static const u8 AccessCardType_None = 0;
-static const u8 AccessCardType_Standard = 1;
-static const u8 AccessCardType_Medical = 2;
-static const u8 AccessCardType_Science = 3;
-static const u8 AccessCardType_Admin = 4;
-static const u8 AccessCardType_Group1 = 5;
-static const u8 AccessCardType_Group2 = 6;
-static const u8 AccessCardType_Group3 = 7;
-static const u8 AccessCardType_Group4 = 8;
-static const u8 AccessCardType_GroupA = 9;
-static const u8 AccessCardType_GroupB = 10;
-static const u8 AccessCardType_Storage = 11;
-static const u8 AccessCardType_Engineering = 12;
-static const u8 AccessCardType_Maintenance = 13;
-static const u8 AccessCardType_Security = 14;
-static const u8 AccessCardType_Per1 = 15;
-static const u8 AccessCardType_Per2 = 16;
-static const u8 AccessCardType_Per3 = 17;
-static const u8 AccessCardType_Per4 = 18;
-static const u8 AccessCardType_Per5 = 19;
-
-// MusicType
+static const u8 AccessCardType_None=0,AccessCardType_Standard=1,AccessCardType_Medical=2,AccessCardType_Science=3,AccessCardType_Admin=4,AccessCardType_Group1=5,AccessCardType_Group2=6,AccessCardType_Group3=7,AccessCardType_Group4=8,AccessCardType_GroupA=9,AccessCardType_GroupB=10,AccessCardType_Storage=11,AccessCardType_Engineering=12,AccessCardType_Maintenance=13,AccessCardType_Security=14,AccessCardType_Per1=15,AccessCardType_Per2=16,AccessCardType_Per3=17,AccessCardType_Per4=18,AccessCardType_Per5=19;
 typedef u8 MusicType;
-static const u8 MusicType_None     = 0;
-static const u8 MusicType_Walking  = 1;
-static const u8 MusicType_Combat   = 2;
-static const u8 MusicType_Override = 3;
-
-// TrackType
+static const u8 MusicType_None=0,MusicType_Walking=1,MusicType_Combat=2,MusicType_Override=3;
 typedef u8 TrackType;
-static const u8 TrackType_None       = 0;
-static const u8 TrackType_Walking    = 1;
-static const u8 TrackType_Combat     = 2;
-static const u8 TrackType_Revive     = 3;
-static const u8 TrackType_Death      = 4;
-static const u8 TrackType_Cybertube  = 5;
-static const u8 TrackType_Elevator   = 6;
-static const u8 TrackType_Distortion = 7;
-
-// BloodType
+static const u8 TrackType_None=0,TrackType_Walking=1,TrackType_Combat=2,TrackType_Revive=3,TrackType_Death=4,TrackType_Cybertube=5,TrackType_Elevator=6,TrackType_Distortion=7;
 typedef u8 BloodType;
-static const u8 BloodType_None = 0;
-static const u8 BloodType_Red = 1;
-static const u8 BloodType_Yellow = 2;
-static const u8 BloodType_Green = 3;
-static const u8 BloodType_Robot = 4;
-static const u8 BloodType_Leaf = 5;
-static const u8 BloodType_Mutation = 6;
-static const u8 BloodType_GrayMutation = 7;
-
-// SecurityType
+static const u8 BloodType_None=0,BloodType_Red=1,BloodType_Yellow=2,BloodType_Green=3,BloodType_Robot=4,BloodType_Leaf=5,BloodType_Mutation=6,BloodType_GrayMutation=7;
 typedef u8 SecurityType;
-static const u8 SecurityType_None = 0;
-static const u8 SecurityType_Camera = 1;
-static const u8 SecurityType_NodeSmall = 2;
-static const u8 SecurityType_NodeLarge = 3;
-
-// AudioLogType
+static const u8 SecurityType_None=0,SecurityType_Camera=1,SecurityType_NodeSmall=2,SecurityType_NodeLarge=3;
 typedef u8 AudioLogType;
-static const u8 AudioLogType_TextOnly = 0;
-static const u8 AudioLogType_Normal = 1;
-static const u8 AudioLogType_Email = 2;
-static const u8 AudioLogType_Papers = 3;
-static const u8 AudioLogType_Vmail = 4;
-static const u8 AudioLogType_Game = 5;
-
-// EnergyType
+static const u8 AudioLogType_TextOnly=0,AudioLogType_Normal=1,AudioLogType_Email=2,AudioLogType_Papers=3,AudioLogType_Vmail=4,AudioLogType_Game=5;
 typedef u8 EnergyType;
-static const u8 EnergyType_Battery = 0;
-static const u8 EnergyType_ChargeStation = 1;
-
-// FootStepType
+static const u8 EnergyType_Battery=0,EnergyType_ChargeStation=1;
 typedef u8 FootStepType;
-static const u8 FootStepType_None = 0;
-static const u8 FootStepType_Carpet = 1;
-static const u8 FootStepType_Concrete = 2;
-static const u8 FootStepType_GrittyCrete = 3;
-static const u8 FootStepType_Grass = 4;
-static const u8 FootStepType_Gravel = 5;
-static const u8 FootStepType_Rock = 6;
-static const u8 FootStepType_Glass = 7;
-static const u8 FootStepType_Marble = 8;
-static const u8 FootStepType_Metal = 9;
-static const u8 FootStepType_Grate = 10;
-static const u8 FootStepType_Metal2 = 11;
-static const u8 FootStepType_Metpanel = 12;
-static const u8 FootStepType_Panel = 13;
-static const u8 FootStepType_Plaster = 14;
-static const u8 FootStepType_Plastic = 15;
-static const u8 FootStepType_Plastic2 = 16;
-static const u8 FootStepType_Rubber = 17;
-static const u8 FootStepType_Sand = 18;
-static const u8 FootStepType_Squish = 19;
-static const u8 FootStepType_Vent = 20;
-static const u8 FootStepType_Water = 21;
-static const u8 FootStepType_Wood = 22;
-static const u8 FootStepType_Wood2 = 23;
-
-// MusicResourceType
-typedef u8 MusicResourceType;
-static const u8 MusicResourceType_Menu = 0;
-static const u8 MusicResourceType_Medical = 1;
-static const u8 MusicResourceType_Science = 2;
-static const u8 MusicResourceType_Reactor = 3;
-static const u8 MusicResourceType_Executive = 4;
-static const u8 MusicResourceType_Grove = 5;
-static const u8 MusicResourceType_Cyber = 6;
-static const u8 MusicResourceType_Security = 7;
-static const u8 MusicResourceType_Revive = 8;
-static const u8 MusicResourceType_Death = 9;
-static const u8 MusicResourceType_Elevator = 10;
-static const u8 MusicResourceType_Distortion = 11;
-static const u8 MusicResourceType_Looped = 12;
-static const u8 MusicResourceType_Level = 13;
-
-// HUDColor
-typedef u8 HUDColor;
-static const u8 HUDColor_White = 0;
-static const u8 HUDColor_Red = 1;
-static const u8 HUDColor_Orange = 2;
-static const u8 HUDColor_Yellow = 3;
-static const u8 HUDColor_Green = 4;
-static const u8 HUDColor_Blue = 5;
-static const u8 HUDColor_Purple = 6;
-static const u8 HUDColor_Gray = 7;
-
-// ForceFieldColor
-typedef u8 ForceFieldColor;
-static const u8 ForceFieldColor_Red = 0;
-static const u8 ForceFieldColor_Green = 1;
-static const u8 ForceFieldColor_Blue = 2;
-static const u8 ForceFieldColor_Purple = 3;
-static const u8 ForceFieldColor_RedFaint = 4;
-
-// ButtonType
-typedef u8 ButtonType;
-static const u8 ButtonType_Generic = 0;
-static const u8 ButtonType_GeneralInv = 1;
-static const u8 ButtonType_Patch = 2;
-static const u8 ButtonType_Grenade = 3;
-static const u8 ButtonType_Weapon = 4;
-static const u8 ButtonType_Search = 5;
-static const u8 ButtonType_None = 6;
-static const u8 ButtonType_PGrid = 7;
-static const u8 ButtonType_PWire = 8;
-static const u8 ButtonType_Vaporize = 9;
-static const u8 ButtonType_ShootMode = 10;
-static const u8 ButtonType_GrenadeTimerSlider = 11;
-
-// TabMSG
-typedef u8 TabMSG;
-static const u8 TabMSG_None = 0;
-static const u8 TabMSG_Search = 1;
-static const u8 TabMSG_AudioLog = 2;
-static const u8 TabMSG_Keypad = 3;
-static const u8 TabMSG_Elevator = 4;
-static const u8 TabMSG_GridPuzzle = 5;
-static const u8 TabMSG_WirePuzzle = 6;
-static const u8 TabMSG_EReader = 7;
-static const u8 TabMSG_Weapon = 8;
-static const u8 TabMSG_SystemAnalyzer = 9;
-
-// PuzzleCellType
-typedef u8 PuzzleCellType;
-static const u8 PuzzleCellType_Off = 0;
-static const u8 PuzzleCellType_Standard = 1;
-static const u8 PuzzleCellType_And = 2;
-static const u8 PuzzleCellType_Bypass = 3;
-
-// PuzzleGridType
-typedef u8 PuzzleGridType;
-static const u8 PuzzleGridType_King = 0;
-static const u8 PuzzleGridType_Queen = 1;
-static const u8 PuzzleGridType_Knight = 2;
-static const u8 PuzzleGridType_Rook = 3;
-static const u8 PuzzleGridType_Bishop = 4;
-static const u8 PuzzleGridType_Pawn = 5;
-
+static const u8 FootStepType_None=0,FootStepType_Carpet=1,FootStepType_Concrete=2,FootStepType_GrittyCrete=3,FootStepType_Grass=4,FootStepType_Gravel=5,FootStepType_Rock=6,FootStepType_Glass=7,FootStepType_Marble=8,FootStepType_Metal=9,FootStepType_Grate=10,FootStepType_Metal2=11,FootStepType_Metpanel=12,FootStepType_Panel=13,FootStepType_Plaster=14,FootStepType_Plastic=15,FootStepType_Plastic2=16,FootStepType_Rubber=17,FootStepType_Sand=18,FootStepType_Squish=19,FootStepType_Vent=20,FootStepType_Water=21,FootStepType_Wood=22,FootStepType_Wood2=23;
+typedef u8 MusicResourceType;static const u8 MusicResourceType_Menu=0,MusicResourceType_Medical=1,MusicResourceType_Science=2,MusicResourceType_Reactor=3,MusicResourceType_Executive=4,MusicResourceType_Grove=5,MusicResourceType_Cyber=6,MusicResourceType_Security=7,MusicResourceType_Revive=8,MusicResourceType_Death=9,MusicResourceType_Elevator=10,MusicResourceType_Distortion=11,MusicResourceType_Looped=12,MusicResourceType_Level=13;
+typedef u8 HUDColor;static const u8 HUDColor_White=0,HUDColor_Red=1,HUDColor_Orange=2,HUDColor_Yellow=3,HUDColor_Green=4,HUDColor_Blue=5,HUDColor_Purple=6,HUDColor_Gray=7;
+typedef u8 ForceFieldColor;static const u8 ForceFieldColor_Red=0,ForceFieldColor_Green=1,ForceFieldColor_Blue=2,ForceFieldColor_Purple=3,ForceFieldColor_RedFaint=4;
+typedef u8 ButtonType;static const u8 ButtonType_Generic=0,ButtonType_GeneralInv=1,ButtonType_Patch=2,ButtonType_Grenade=3,ButtonType_Weapon=4,ButtonType_Search=5,ButtonType_None=6,ButtonType_PGrid=7,ButtonType_PWire=8,ButtonType_Vaporize=9,ButtonType_ShootMode=10,ButtonType_GrenadeTimerSlider=11;
+typedef u8 TabMSG;static const u8 TabMSG_None=0,TabMSG_Search=1,TabMSG_AudioLog=2,TabMSG_Keypad=3,TabMSG_Elevator=4,TabMSG_GridPuzzle=5,TabMSG_WirePuzzle=6,TabMSG_EReader=7,TabMSG_Weapon=8,TabMSG_SystemAnalyzer=9;
+typedef u8 PuzzleCellType;static const u8 PuzzleCellType_Off=0,PuzzleCellType_Standard=1,PuzzleCellType_And=2,PuzzleCellType_Bypass=3;
+typedef u8 PuzzleGridType;static const u8 PuzzleGridType_King=0,PuzzleGridType_Queen=1,PuzzleGridType_Knight=2,PuzzleGridType_Rook=3,PuzzleGridType_Bishop=4,PuzzleGridType_Pawn=5;
 typedef u32 PhysicsLayer;
 static const u32 PhysicsLayer_Default          = (1u << 0);
 static const u32 PhysicsLayer_TransparentFX    = (1u << 1);
@@ -609,133 +371,44 @@ static const u32 PhysicsLayer_NULL             = (1u << 31);
                              | PhysicsLayer_InterDebris | PhysicsLayer_PhysObjects | PhysicsLayer_Player | PhysicsLayer_Player2 | PhysicsLayer_CorpseSearchable)
 
 #define LAYER_MASK_PLAYER_FEET (PhysicsLayer_Default | PhysicsLayer_Geometry)
-
 typedef struct {
 	i32 InputCodeSettings[42];
-	u16 ScreenWidth;
-	u16 ScreenHeight;
-    float ScreenCenterX;
-    float ScreenCenterY;
+	u16 ScreenWidth,ScreenHeight;
+    float ScreenCenterX,ScreenCenterY;
 	bool Fullscreen;
-	u8 FOV;
-	u8 Brightness;
-	u8 Gamma;
-	u8 FXAA;
-	u8 Shadows;
-	u8 Reflections;
-	u8 Vsync;
-	u8 ModelDetail;
-	u8 GI;
-	u8 SpeakerMode;
-	u8 Reverb;
-	u8 VolumeMaster;
-	u8 VolumeMusic;
-	u8 VolumeMessage;
-	u8 VolumeEffects;
-	u8 Language;
-	u8 DynamicMusic;
-	u8 Footsteps;
-	u8 InvertLook;
-	u8 InvertInventoryCycling;
-	u8 InvertCyberspaceLook;
-	u8 QuickItemPickup;
-	u8 QuickReloadWeapons;
-	u8 MouseSensitivity;
-	u8 NoShootMode;
-	u8 HeadBob;
-	u8 SSR_RES;
-    u8 CurrentMonitor;
+	u8 FOV,Brightness,Gamma,FXAA,Shadows,Reflections,Vsync,ModelDetail,GI,SpeakerMode,Reverb,VolumeMaster,VolumeMusic,VolumeMessage,VolumeEffects,Language,DynamicMusic;
+	u8 Footsteps,InvertLook,InvertInventoryCycling,InvertCyberspaceLook,QuickItemPickup,QuickReloadWeapons,MouseSensitivity,NoShootMode,HeadBob,SSR_RES,CurrentMonitor;
 } SettingsSystem;
-extern SettingsSystem Sys_Settings;
-
+typedef struct { bool god,noclip,notarget,bottomless,superoverride,fatigueCheat,redbull,consoleActive,noHUD,showLocation,showFPS,editMode; u8 dizzyLevel; } CheatsSystem;
 typedef struct {
-	bool god;
-	bool noclip;
-	bool notarget;
-	bool bottomless;
-	bool superoverride;
-	bool fatigueCheat;
-	bool redbull;
-	bool consoleActive;
-	bool noHUD;
-	bool showLocation;
-	bool showFPS;
-	bool editMode;
-	u8 dizzyLevel;
-} CheatsSystem;
-extern CheatsSystem Sys_Cheats;
-
-typedef u8 MenuPages;
-static const u8 MenuPages_FrontPage = 0;
-static const u8 MenuPages_Singleplayer = 1;
-static const u8 MenuPages_Multiplayer = 2;
-static const u8 MenuPages_NewGame = 3;
-static const u8 MenuPages_Load = 4;
-static const u8 MenuPages_Options = 5;
-static const u8 MenuPages_Save = 6;
-static const u8 MenuPages_IntroVideo = 7;
-static const u8 MenuPages_CreditsVideo = 8;
-typedef struct {
-	int lastMultiMediaTabOpened;
-	bool lastWeaponSideRH;
-	bool lastItemSideRH;
-	bool lastAutomapSideRH;
-	bool lastTargetSideRH;
-	bool lastDataSideRH;
-	bool lastSearchSideRH;
-	bool lastLogSideRH;
-	bool lastLogSecondarySideRH;
-	bool lastMinigameSideRH;
+	i32 lastMultiMediaTabOpened;
+	bool lastWeaponSideRH,lastItemSideRH,lastAutomapSideRH,lastTargetSideRH,lastDataSideRH,lastSearchSideRH,lastLogSideRH,lastLogSecondarySideRH,lastMinigameSideRH;
 	double logFinished;
 	bool logActive;
 	AudioLogType logType;
 	u16 linkedElevatorDoor;
 	Vector3 objectInUsePos;
-	u16 tetheredPGP;
-	u16 tetheredPWP;
-	u16 tetheredSearchable;
-	u16 tetheredKeypadElevator;
-	u16 tetheredKeypadKeycode;
-	bool paperLogInUse;
-	bool usingObject;
-	int applyButtonReferenceIndex;
-	int curCenterTab;
-    bool isBlocking;
-	bool isRH;
-	int wep16index;
-	int tempSpriteIndex;
-	float lastEnergy;
-	float lastHealth;
+	u16 tetheredPGP,tetheredPWP,tetheredSearchable,tetheredKeypadElevator,tetheredKeypadKeycode;
+	bool paperLogInUse,usingObject;
+	i32 applyButtonReferenceIndex,curCenterTab;
+    bool isBlocking,isRH;
+	i32 wep16index,tempSpriteIndex;
+	float lastEnergy,lastHealth;
 	double tickFinished; // Visual only, Time.time controlled
-	int count;
+	i32 count;
 	bool centerTabNotified[4];
 	double centerTabsTickFinished; // Visual only, Time.time controlled
 	bool highlightStatus[4];
 	u8 highlightTickCount[4];
-	double blinkFinished;
-	double beepFinished;
+	double blinkFinished,beepFinished;
 	u8 beepCount;
-	bool audPaused;
-    bool mouseClickHeldOverGUI;
+	bool audPaused,mouseClickHeldOverGUI;
     u8 elevButtonLevelIdx[8];
     u16 elevButtonSpawnIdx[8];
-    bool buttonsEnabled[8];
-    bool buttonsDarkened[8];
+    bool buttonsEnabled[8],buttonsDarkened[8];
     u8 elevCurrentFloor;
 } SystemUI;
-
-typedef struct {	
-	char stringTable[TEXT_STRING_COUNT][TEXT_LOCALIZATION_MAX_LENGTH]; // Hefty table for localization support.
-	u16 audioLogImagesRefIndicesLH[TEXT_LOGS_COUNT];
-	u16 audioLogImagesRefIndicesRH[TEXT_LOGS_COUNT];
-	u8 audioLogType[TEXT_LOGS_COUNT];
-	u8 audioLogLevelFound[TEXT_LOGS_COUNT];
-	size_t file_size,filelog_size;
-	u8* file_data;
-	u8* filelog_data;
-} TextSystem;
-extern TextSystem Sys_Text;
-
+typedef struct { char stringTable[TEXT_STRING_COUNT][TEXT_LOCALIZATION_MAX_LENGTH]; u16 audioLogImagesRefIndicesLH[TEXT_LOGS_COUNT],audioLogImagesRefIndicesRH[TEXT_LOGS_COUNT]; u8 audioLogType[TEXT_LOGS_COUNT],audioLogLevelFound[TEXT_LOGS_COUNT]; size_t file_size,filelog_size; u8* file_data,*filelog_data; } TextSystem; // Hefty table for localization support.
 #define PATCH_BERSERK   1
 #define PATCH_DETOX     2
 #define PATCH_GENIUS    4
@@ -787,7 +460,6 @@ extern TextSystem Sys_Text;
 #define HW_BST_IDX    9 // Turbo Motion Booster
 #define HW_JET_IDX   10 // Jump Jet Boots
 #define HW_INF_IDX   11 // Infrared Night Sight Enhancement
-
 #define SW_DRILL  0
 #define SW_PULSER 1
 #define SW_SHIELD 2
@@ -795,7 +467,6 @@ extern TextSystem Sys_Text;
 #define SW_DECOY  4
 #define SW_RECALL 5
 #define SW_GAMES  6
-
 #define MINIGAME_PING        1
 #define MINIGAME_15          2
 #define MINIGAME_WING0       4
@@ -803,7 +474,6 @@ extern TextSystem Sys_Text;
 #define MINIGAME_EEL_ZAPPER 16
 #define MINIGAME_ROAD       32
 #define MINIGAME_TRIOPTOE   64
-
 // Hw referenceIndex, ref14Index
 // Sys 21,0
 // Nav 22,1
@@ -914,21 +584,18 @@ typedef /*FAT*/ struct  {
     SoftwareType type;
     float delay,damage,itemLifeTime,minutes,seconds,randomMin,randomMax;
     double timeInterval,cyberTimer,intervalFinished,delayFireFinished,delayResetFinished;
-    bool searchableInUse,generateContents,generationDone,dontReset,onlyOnce,ignoreSecondaryTriggers,allDone,currentTexture,useRandomTimes,active; // Lawdy, we'll make these bitflags someday
+    bool searchableInUse,generateContents,dontReset,onlyOnce,ignoreSecondaryTriggers,allDone,currentTexture,useRandomTimes,active; // Lawdy, we'll make these bitflags someday
     bool touchEnabled,broken,stayOpen,startOpen,ajar,blocked,targetAlreadyDone,accessCardUsedByPlayer,toggleLasers,targettingOnlyUnlocks;
     bool changeLayerOnOpenClose,despawnInstead,doSelfAfterList,destroyAfterListInsteadOfDeactivate,iceActive;
     bool forceFieldDirectionX,forceFieldDirectionY,forceFieldDirectionZ,heldObjectLoadedAlternate,changeTexOnActive,blinkTexOnActive;
     i16 numPlayers;
-    u16 recentMostActivator;
-    u16 countToTrigger;
-    u16 counter;
+    u16 recentMostActivator,countToTrigger,counter,activateSFX,lockedSFX,messageLingdex,lockedMessageLingdex;
     u8 maxRandomItems; // [0 4]
     u16 lookUpIndex,contents[4],customIndex[4],useableItemIndex,usableCustomIndex,randomItem[4],randomItemCustomIndex[4];
     float randomItemDropChance[4];
     float fireworkWaitMinMin;
     AttackType attackType;
     i16 ammo,ammo2;
-    u16 activateSFX,lockedSFX,messageLingdex,lockedMessageLingdex;
     AccessCardType requiredAccessCard;
     double delayFinished,tickFinished,tickTime,useFinished,waitBeforeClose,lasersFinished;
     float amount,resetTime,minSecurityLevel,ajarPercentage,useTimeDelay,timeBeforeLasersOn,force,strength;
@@ -992,15 +659,10 @@ typedef struct {
 	double screenshotTimeout, pauseRelativeTime, absoluteTime, statusTextDecayFinished, justSavedTimeStamp;
 	bool levelCurrentlyLoading;
     double shakeFinished;
-	char global_modname[256];
 	char global_dllname[256];
 	char global_winicon[256];
     bool introNotPlayed;
-    u8 levelSecurity[14];
-	u8 startLevel;
-	u8 numLevels; // Can be set by gamedata.txt
-	u8 currentLevel;
-	u8 difficultyCombat,difficultyPuzzle,difficultyMission,difficultyCyber;
+    u8 levelSecurity[14],startLevel,numLevels,currentLevel,difficultyCombat,difficultyPuzzle,difficultyMission,difficultyCyber;
 	bool gamePaused,menuActive,gameFinished;
 	u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels;
 	u32 shotsFired,grenadesThrown;

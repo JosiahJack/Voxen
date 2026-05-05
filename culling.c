@@ -1,12 +1,6 @@
 // dynamic_culling.c - Culling functions for x,z grid based culling system ala System Shock 1 / Underworld style
-#include "os.h"
-#include "voxen.h"
 typedef struct { u16 x,z; } PortalCell;
 typedef struct { PortalCell cellA,cellB,cellA2,cellB2; bool portalNS,open,dirty,isBulkhead;} Portal;
-u8 *stbi_load_from_memory(const u8* buffer, i32 len, i32* x, i32* y);
-void stbi__arena_init_thread(StbiArena* arena);
-extern StbiArena stbi_arena_main;
-#define STBI_ARENA_SIZE 16 * 1024 * 1024
 u32 gridCellStates[ARRSIZE];
 u32 precomputedVisibleCellsFromHere[524288]; // 4096 * 4096 / 32
 u16 playerCellIdx = 0u;
@@ -17,14 +11,7 @@ static u8 numActivePortals = 0;
 __attribute__((pure)) bool get_cull_bit(const u32* arr, int idx) { return (arr[idx >> 5] >> (idx & 31)) & 1; }
 static inline __attribute__((always_inline)) void set_cull_bit(u32* arr, int idx, bool val) {u32* w = arr + (idx >> 5); u32 m = 1U << (idx & 31); *w = val ? (*w | m) : (*w & ~m);}
 ENGINE_TO_MOD i32 PosGetCellCoords(float x, float z) { return (PosGetCellCoordZ(z) * WORLDX) + PosGetCellCoordX(x); }
-extern u16 playerCellIdx;
-ENGINE_TO_MOD bool PositionVisibleFromPlayerCell(float x, float z) {
-    i32 subIdx = PosGetCellCoords(x,z);
-    int cellIdx = (playerCellIdx * ARRSIZE);
-    int flat_idx = cellIdx + subIdx;
-    return (get_cull_bit(precomputedVisibleCellsFromHere,flat_idx));
-}
-
+ENGINE_TO_MOD bool PositionVisibleFromPlayerCell(float x, float z) { return (get_cull_bit(precomputedVisibleCellsFromHere,((playerCellIdx * ARRSIZE)/*cellIdx*/ + PosGetCellCoords(x,z)/*subIdx*/)/*flat_idx*/)); }
 static inline __attribute__((always_inline)) bool XZPairInBounds(i32 x, i32 z) { return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0); }
 bool SkyIsVisible(void) { return ((gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || Sys_Global.currentLevel == LEVEL_CYBERSPACE); }
 bool SkySunIsVisible(void) { return ((gridCellStates[playerCellIdx] & CELL_SEES_SUN) && Sys_Global.currentLevel != LEVEL_CYBERSPACE); }

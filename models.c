@@ -1,7 +1,4 @@
 // data_models.c - Load 3D Models
-#include "os.h"
-#include "gl.h"
-#include "voxen.h"
 void qsort(void* base, size_t nmemb, size_t size, int (*cmp)(const void*, const void*));
 u8** modelVertices = NULL; u16** modelTriangles = NULL;
 u32 modelVertexCounts[MODEL_IDX_MAX] = {0}; u16 modelTriangleCounts[MODEL_IDX_MAX] = {0};
@@ -9,7 +6,7 @@ float modelBounds[MODEL_IDX_MAX] = {0}; u16 loadedModelsMaxIndex = 0;
 #define MAX_VERT_ELEMENT_SIZE 6964
 #define MAX_OUTPUT_VERTS      20892
 static float **thread_temp_pos = NULL, **thread_temp_nrm = NULL, **thread_temp_uv = NULL, **thread_out_verts = NULL;
-static u16** thread_out_tris = NULL; static int num_parse_threads = 0;
+static u16** thread_out_tris = NULL;
 typedef struct { const char* data; int size; } RawOBJ;
 typedef u16 half;
 typedef struct { u16 index; bool animated; u8 animationNum; char path[128]; } ModelData;
@@ -209,7 +206,7 @@ bool ParseModelData(ModelDataParser *p, u16 maxSz, const char *fn) {
         if (c - s > 5) {
             while (CharacterIsEmpty(*s)) ++s;
             char* col = StringFindFirstCharWithin(s, ':');
-            if (col && StringCompareUpToLength(s, "index", col-s) == 0) {
+            if (col && StringCompareUpToLength(s, "index", col - s) == 0) {
                 u32 idx = parse_numberu32(col+1, s, ln);
                 if (idx > maxidx) maxidx = idx;
             }
