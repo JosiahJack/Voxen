@@ -1114,8 +1114,8 @@ void TextureChangerInitAfterLoad(u16 self) {
 void TextureChangerToggle(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->currentTexture) {
-        e->texIndex = EntityDefinitions[e->index].texIndex;
-        e->glowIndex = EntityDefinitions[e->index].glowIndex;
+        e->texIndex = EDefs[e->index].texIndex;
+        e->glowIndex = EDefs[e->index].glowIndex;
     } else {
         e->texIndex = e->altTexIndex;
         if (e->altGlowIndex < MAX_VALID_TEXTURE) e->glowIndex = e->altGlowIndex;
@@ -3406,7 +3406,7 @@ static inline __attribute__((always_inline)) void Frob(Vector3 pos, Vector3 forw
     Eng_Global->debugLineFinished = Eng_Global->pauseRelativeTime + 3.0;
     if (!tempHit.hit) { CenterStatusPrint("%s",Eng_Text->stringTable[30]); return; }
     Eng_Global->debugLine_end = tempHit.point;
-    DualLog("Raycast hit!  Hit object %u named of entity type %s(%u) at hit point %f %f %f\n",tempHit.hitInstanceIndex,EntityDefinitions[Eng_Global->instances[tempHit.hitInstanceIndex].index].path,Eng_Global->instances[tempHit.hitInstanceIndex].index,tempHit.point.x,tempHit.point.y,tempHit.point.z);
+    DualLog("Raycast hit!  Hit object %u named of entity type %s(%u) at hit point %f %f %f\n",tempHit.hitInstanceIndex,EDefs[Eng_Global->instances[tempHit.hitInstanceIndex].index].path,Eng_Global->instances[tempHit.hitInstanceIndex].index,tempHit.point.x,tempHit.point.y,tempHit.point.z);
     UseEntity(PLAYER1,tempHit.hitInstanceIndex);
 }
 
@@ -3599,7 +3599,6 @@ MOD_TO_ENGINE void PlayerInit(u16 i) {
     Eng_Global->instances[i].colliderCenter.y = 0.84f;
     Eng_Global->instances[i].colliderSize = (Vector3){0.48f,2.0f,1.0f}; // Radius, Overall height including end radii (Unity convention, blech), Direction, 1.0 == Y-Axis
     Eng_Global->instances[i].mass = 1.0f;
-    Eng_Global->instances[i].linearDrag = 8.0f;
     Eng_Global->instances[i].velocity = (Vector3){0.0f,0.0f,0.0f};
     Eng_Global->instances[i].gravity = 1.0f;
     Eng_Global->instances[i].dynamicFriction = 0.6f;

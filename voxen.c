@@ -1574,7 +1574,7 @@ static inline __attribute__((always_inline)) void DrawDebugLines(float* viewProj
     glUseProgram(Sys_Render.debugUnlitShaderProgram);
     glUniformMatrix4fv(0,1,GL_FALSE,viewProj);
     glUniform3f(1, g_debugLineColorR,g_debugLineColorG,g_debugLineColorB);
-    glLineWidth(10.0f);
+    glLineWidth(4.0f);
     glDisable(GL_DEPTH_TEST);
     glBindVertexArray(Sys_Render.debugLinesVAO);
     glDrawArrays(0x0001/*GL_LINES*/,0,Sys_Global.debugLineVertCount / 3);
@@ -1584,6 +1584,7 @@ static inline __attribute__((always_inline)) void DrawDebugLines(float* viewProj
 }
 
 ENGINE_TO_MOD void AddDebugLine(Vector3 start, Vector3 end) {
+    if (Sys_Global.debugLineVertCount >= MAX_DEBUG_LINE_VERTS - 6) return;
     i32 i = Sys_Global.debugLineVertCount;
     debugLineBuffer[i++] = start.x; debugLineBuffer[i++] = start.y; debugLineBuffer[i++] = start.z;
     debugLineBuffer[i++] =   end.x; debugLineBuffer[i++] =   end.y; debugLineBuffer[i++] =   end.z;
@@ -1672,7 +1673,7 @@ static inline __attribute__((always_inline)) double RenderUI(void) {
     if (Sys_Cheats.showLocation && !Sys_Global.menuActive) RenderFormattedText(16, debugTextStartY, TEXT_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f",Sys_Global.instances[PLAYER1].position.x,Sys_Global.instances[PLAYER1].position.y,Sys_Global.instances[PLAYER1].position.z,Sys_Global.instances[PLAYER1].rotation.x,Sys_Global.instances[PLAYER1].rotation.y,Sys_Global.instances[PLAYER1].rotation.z,Sys_Global.instances[PLAYER1].rotation.w);
     i16 lineSpacing = 18;
     if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 1),TEXT_WHITE,FONT_NORMAL,1.0f,"playerCellIdx: %u, Shadow cpu ms: %.3f",playerCellIdx,voxen_Shadow_System.shadowTime * 1000);
-    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 2),TEXT_WHITE,FONT_NORMAL,1.0f,"Player velocity: %.2f, %.2f, %.2f",Sys_Global.instances[PLAYER1].velocity.x,Sys_Global.instances[PLAYER1].velocity.y,Sys_Global.instances[PLAYER1].velocity.z);
+    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 2),TEXT_WHITE,FONT_NORMAL,1.0f,"Player velocity: %.2f, %.2f, %.2f, Grounded: %u",Sys_Global.instances[PLAYER1].velocity.x,Sys_Global.instances[PLAYER1].velocity.y,Sys_Global.instances[PLAYER1].velocity.z,Sys_Global.instances[PLAYER1].entflags & ENTFLAG_GROUNDED);
     RenderFormattedText(16,debugTextStartY + (lineSpacing * 4),TEXT_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d  dx:%d dy:%d",Sys_Global.cursorPosition_x,Sys_Global.cursorPosition_y,Sys_Input.currentMouse_dx,Sys_Input.currentMouse_dy);
     if (Sys_Cheats.consoleActive) RenderFormattedText(16,0,TEXT_WHITE,FONT_NORMAL,1.0f, "] %s",consoleEntryText);
     if (Sys_Global.statusTextDecayFinished > Sys_Global.current_time) RenderFormattedText(479,114,TEXT_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
@@ -1867,6 +1868,10 @@ void qsort(void* base, size_t nmemb, size_t size, int (*cmp)(const void*, const 
     }
 #define DRAW_ENTITY(i,curN,curT,curG,curS,curM) \
     {Entity*e=&Sys_Global.instances[i];u16 tex=e->texIndex,glow=e->glowIndex,norm=e->normIndex,spec=e->specIndex; \
+     if (e->collider == COLLIDER_TYPE_BOX) DrawBoxCollider(e); \
+     else if (e->collider == COLLIDER_TYPE_SPHERE) DrawSphereCollider(e); \
+     else if (e->collider == COLLIDER_TYPE_CONVEXMESH) DrawConvexMeshCollider(e); \
+     else if (e->collider == COLLIDER_TYPE_CAPSULE) DrawCapsuleCollider(e); \
      u32 ci=e->index; \
      glUniform1ui(17,tex==316?1u:0u); \
      glUniform1ui(25,ci); \
@@ -1878,6 +1883,145 @@ void qsort(void* base, size_t nmemb, size_t size, int (*cmp)(const void*, const 
      u32 vc=modelTriangleCounts[curM]*3; \
      glDrawElements(0x0004,vc,GL_UNSIGNED_SHORT,0);drawCallsRenderedThisFrame++;verticesRenderedThisFrame+=vc;}
 
+static void DrawBoxCollider(Entity* e) {
+    ShapeBox b; Entity_GetBox(e, &b);
+    Vector3 ax,ay,az; obb_axes(b.rot,&ax,&ay,&az);
+    Vector3 px = scale_vector3(ax,b.halfExtents.x); // Scale axes to half extents
+    Vector3 py = scale_vector3(ay,b.halfExtents.y);
+    Vector3 pz = scale_vector3(az,b.halfExtents.z);
+    Vector3 c[8]; // 8 corners
+    for (int s = 0; s < 8; s++) {
+        float sx = (s&1) ? 1.f : -1.f;
+        float sy = (s&2) ? 1.f : -1.f;
+        float sz = (s&4) ? 1.f : -1.f;
+        c[s] = Vector3_A_plus_B(b.center,Vector3_A_plus_B(Vector3_A_plus_B(scale_vector3(px, sx),scale_vector3(py, sy)),scale_vector3(pz, sz)));
+    }
+
+    AddDebugLine(c[0],c[1]); AddDebugLine(c[2],c[3]); // 12 edges
+    AddDebugLine(c[4],c[5]); AddDebugLine(c[6],c[7]);
+    AddDebugLine(c[0],c[2]); AddDebugLine(c[1],c[3]);
+    AddDebugLine(c[4],c[6]); AddDebugLine(c[5],c[7]);
+    AddDebugLine(c[0],c[4]); AddDebugLine(c[1],c[5]);
+    AddDebugLine(c[2],c[6]); AddDebugLine(c[3],c[7]);
+}
+
+static void DrawSphereCollider(Entity *e) {
+    ShapeSphere s; Entity_GetSphere(e,&s);
+    float step = 6.28318530f / 12;
+    for (int seg = 0; seg < 12; seg++) {
+        float a0 = seg * step, a1 = a0 + step;
+        float c0 = vcosf(a0), s0 = vsinf(a0);
+        float c1 = vcosf(a1), s1 = vsinf(a1);
+        AddDebugLine(Vector3_A_plus_B(s.center, (Vector3){c0*s.radius, 0, s0*s.radius}),Vector3_A_plus_B(s.center, (Vector3){c1*s.radius, 0, s1*s.radius})); // XZ plane
+        AddDebugLine(Vector3_A_plus_B(s.center, (Vector3){c0*s.radius, s0*s.radius, 0}),Vector3_A_plus_B(s.center, (Vector3){c1*s.radius, s1*s.radius, 0})); // XY plane
+        AddDebugLine(Vector3_A_plus_B(s.center, (Vector3){0, c0*s.radius, s0*s.radius}),Vector3_A_plus_B(s.center, (Vector3){0, c1*s.radius, s1*s.radius})); // YZ plane
+    }
+}
+
+static void DrawConvexMeshCollider(Entity *e) {
+    u16 mi = e->colliderMeshIndex;
+    if (mi == MODEL_IDX_MAX || mi >= loadedModelsMaxIndex) return;
+    u32 triCount = modelTriangleCounts[mi];
+    if (!triCount) return;
+
+    float M[16];
+    u16 idx = (u16)(e - Sys_Global.instances);
+    CopyMemoryFromBtoAForNBytes(M, &modelMatrices[idx * 16], 64);
+
+    float m00=M[0],m10=M[1],m20=M[2];
+    float m01=M[4],m11=M[5],m21=M[6];
+    float m02=M[8],m12=M[9],m22=M[10];
+    float tx=M[12],ty=M[13],tz=M[14];
+
+    for (u32 j = 0; j < triCount; j++) {
+        u32 bA = (u32)modelTriangles[mi][j*3+0] * VERTEX_ATTRIBUTES_SIZE;
+        u32 bB = (u32)modelTriangles[mi][j*3+1] * VERTEX_ATTRIBUTES_SIZE;
+        u32 bC = (u32)modelTriangles[mi][j*3+2] * VERTEX_ATTRIBUTES_SIZE;
+
+        Vector3 lA = {half_to_float(*(half*)(modelVertices[mi]+bA+0)), half_to_float(*(half*)(modelVertices[mi]+bA+2)), half_to_float(*(half*)(modelVertices[mi]+bA+4))};
+        Vector3 lB = {half_to_float(*(half*)(modelVertices[mi]+bB+0)), half_to_float(*(half*)(modelVertices[mi]+bB+2)), half_to_float(*(half*)(modelVertices[mi]+bB+4))};
+        Vector3 lC = {half_to_float(*(half*)(modelVertices[mi]+bC+0)), half_to_float(*(half*)(modelVertices[mi]+bC+2)), half_to_float(*(half*)(modelVertices[mi]+bC+4))};
+
+        #define XFORM(v) (Vector3){ \
+            m00*(v).x + m01*(v).y + m02*(v).z + tx, \
+            m10*(v).x + m11*(v).y + m12*(v).z + ty, \
+            m20*(v).x + m21*(v).y + m22*(v).z + tz  \
+        }
+
+        Vector3 wA = XFORM(lA), wB = XFORM(lB), wC = XFORM(lC);
+        #undef XFORM
+
+        AddDebugLine(wA, wB);
+        AddDebugLine(wB, wC);
+        AddDebugLine(wC, wA);
+    }
+}
+
+static void DrawCapsuleCollider(Entity *e) {
+    ShapeCapsule cap;
+    Entity_GetCapsule(e, &cap);
+
+    // Capsule axis direction and perpendiculars
+    Vector3 axis = normalize_vector3(Vector3_A_minus_B(cap.tip, cap.base));
+    
+    // Build two vectors perpendicular to axis
+    Vector3 perp0, perp1;
+    Vector3 ref = (vabs(axis.y) < 0.9f) ? (Vector3){0,1,0} : (Vector3){1,0,0};
+    perp0 = normalize_vector3(cross_vector3(axis, ref));
+    perp1 = cross_vector3(axis, perp0);
+
+    #define CAPS_SEGS 12
+    float step = 6.28318530f / CAPS_SEGS;
+    float r = cap.radius;
+
+    // Full circle around capsule axis at base and tip (the "belt" lines)
+    for (int seg = 0; seg < CAPS_SEGS; seg++) {
+        float a0 = seg * step, a1 = a0 + step;
+        float c0 = vcosf(a0), s0 = vsinf(a0);
+        float c1 = vcosf(a1), s1 = vsinf(a1);
+        Vector3 r0 = Vector3_A_plus_B(scale_vector3(perp0, c0*r), scale_vector3(perp1, s0*r));
+        Vector3 r1 = Vector3_A_plus_B(scale_vector3(perp0, c1*r), scale_vector3(perp1, s1*r));
+        // Belt at base
+        AddDebugLine(Vector3_A_plus_B(cap.base, r0), Vector3_A_plus_B(cap.base, r1));
+        // Belt at tip
+        AddDebugLine(Vector3_A_plus_B(cap.tip,  r0), Vector3_A_plus_B(cap.tip,  r1));
+    }
+
+    // Hemisphere arcs — half circle only (pi), 2 perpendicular planes per end
+    #define HEMI_SEGS 6  // half of 12
+    for (int seg = 0; seg < HEMI_SEGS; seg++) {
+        float a0 = seg * step, a1 = a0 + step;
+        float c0 = vcosf(a0), s0 = vsinf(a0);
+        float c1 = vcosf(a1), s1 = vsinf(a1);
+
+        // Base hemisphere — arc curves away from tip (negative axis)
+        Vector3 bA0 = Vector3_A_plus_B(scale_vector3(perp0, c0*r), scale_vector3(axis, -s0*r));
+        Vector3 bA1 = Vector3_A_plus_B(scale_vector3(perp0, c1*r), scale_vector3(axis, -s1*r));
+        Vector3 bB0 = Vector3_A_plus_B(scale_vector3(perp1, c0*r), scale_vector3(axis, -s0*r));
+        Vector3 bB1 = Vector3_A_plus_B(scale_vector3(perp1, c1*r), scale_vector3(axis, -s1*r));
+        AddDebugLine(Vector3_A_plus_B(cap.base, bA0), Vector3_A_plus_B(cap.base, bA1));
+        AddDebugLine(Vector3_A_plus_B(cap.base, bB0), Vector3_A_plus_B(cap.base, bB1));
+
+        // Tip hemisphere — arc curves away from base (positive axis)
+        Vector3 tA0 = Vector3_A_plus_B(scale_vector3(perp0, c0*r), scale_vector3(axis, s0*r));
+        Vector3 tA1 = Vector3_A_plus_B(scale_vector3(perp0, c1*r), scale_vector3(axis, s1*r));
+        Vector3 tB0 = Vector3_A_plus_B(scale_vector3(perp1, c0*r), scale_vector3(axis, s0*r));
+        Vector3 tB1 = Vector3_A_plus_B(scale_vector3(perp1, c1*r), scale_vector3(axis, s1*r));
+        AddDebugLine(Vector3_A_plus_B(cap.tip, tA0), Vector3_A_plus_B(cap.tip, tA1));
+        AddDebugLine(Vector3_A_plus_B(cap.tip, tB0), Vector3_A_plus_B(cap.tip, tB1));
+    }
+    #undef HEMI_SEGS
+
+    // 4 spine lines connecting base belt to tip belt
+    for (int seg = 0; seg < 4; seg++) {
+        float a = seg * (6.28318530f / 4.0f);
+        Vector3 off = Vector3_A_plus_B(scale_vector3(perp0, vcosf(a)*r), scale_vector3(perp1, vsinf(a)*r));
+        AddDebugLine(Vector3_A_plus_B(cap.base, off), Vector3_A_plus_B(cap.tip, off));
+    }
+
+    #undef CAPS_SEGS
+}
+     
 static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     u16 swidth = camView ? camViews[camViewIdx].width : Sys_Settings.ScreenWidth, sheight = camView ? camViews[camViewIdx].height : Sys_Settings.ScreenHeight;
     float sfov = camView ? (float)camViews[camViewIdx].fov : (float)Sys_Settings.FOV;
@@ -1966,7 +2110,6 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
         if (transparentTexture[tex]) continue;
         else if (doubleSidedTexture[tex] || e->scale.x < 0.0f || e->scale.y < 0.0f || e->scale.z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided (either)
         else { glEnable(GL_CULL_FACE); glDisable(GL_BLEND); } // Opaque
-       
         DRAW_ENTITY(i,currentNormIndex,currentTexIndex,currentGlowIndex,currentSpecIndex,currentModelType)
     }
 
@@ -1982,10 +2125,9 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
         u32 constIndex = e->index;
         if ((constIndex >= 561 && constIndex <= 565) || (constIndex >= 568 && constIndex <= 573)) glDepthFunc(0x0202/*GL_EQUAL*/); // Cutouts
         else glDepthFunc(0x0203/*GL_LEQUAL*/); // Actual alphas
-       
         DRAW_ENTITY(i,currentNormIndex,currentTexIndex,currentGlowIndex,currentSpecIndex,currentModelType)
     }
-   
+    
     if (camView) {
         glBindFramebuffer(0x8CA8/*GL_READ_FRAMEBUFFER*/,Sys_Render.gBufferFBO);
         glReadBuffer(GL_COLOR_ATTACHMENT0);

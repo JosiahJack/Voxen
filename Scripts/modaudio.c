@@ -89,7 +89,7 @@ MOD_TO_ENGINE void ResetLevelAudio(void) {
             loadedAmbients++;
             if (loadedAmbients >= MAX_AMBIENT_NOISES) { DualLogError("%u exceeded max number of ambient noises %u!\n",loadedAmbients,MAX_AMBIENT_NOISES); break; }
             
-            Eng_Global->instances[i].volume = EntityDefinitions[Eng_Global->instances[i].index].volume * 0.5f;
+            Eng_Global->instances[i].volume = EDefs[Eng_Global->instances[i].index].volume * 0.5f;
         }
     }
 }

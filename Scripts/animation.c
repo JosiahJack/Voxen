@@ -313,7 +313,7 @@ static const TextureAnimClip textureAnimClips[NUM_TEXTURE_CLIPS] = {
 void TextureSequenceInit(u16 self, char* trimmed_value) {
     Entity* e = &Eng_Global->instances[self];
     if (e->index == 526) return; // Skip prop_console02 for now, will need to split its screen off.
-    if (trimmed_value[0] == '\0') { e->textureAnimating = false; e->modelIndex = EntityDefinitions[e->index].modelIndex; return; }
+    if (trimmed_value[0] == '\0') { e->textureAnimating = false; e->modelIndex = EDefs[e->index].modelIndex; return; }
     
     e->textureAnimating = true; e->textureGlowAnimating = false; e->texAnimLight = U16_MAX; e->texAnimLight2 = U16_MAX;
     e->texFrame = e->texGlowFrame = 0;

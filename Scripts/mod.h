@@ -131,7 +131,7 @@ extern int lev3SecCode;
 extern int lev4SecCode;
 extern int lev5SecCode;
 extern int lev6SecCode;
-extern Entity EntityDefinitions[MAX_ENTITIES];
+extern Entity EDefs[MAX_ENTITIES];
 extern bool vmailActive;
 extern const AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS_PER_MODEL];
 extern const char* sounds[SOUNDS_COUNT];

@@ -45,7 +45,7 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define MAX_UNIQUE_COLORS 1048576u
 #define MAX_ANIMATED_MODELS 64
 #define MAX_ANIMATION_CLIPS_PER_MODEL 32
-#define MAX_DEBUG_LINE_VERTS 8
+#define MAX_DEBUG_LINE_VERTS 512000
 #define MAX_PORTALS 64 // Max is 49 on Citadel level 7
 #define DOUBLE_CLICK_TIME 0.5f
 #define PLAYER_MAX_WALK_SPEED 3.2f
@@ -563,7 +563,7 @@ typedef /*FAT*/ struct  {
     Vector3 topPoint,targetPosition,startPosition,activatedScale,direction;
     float targetPositionY,speed,percentAjar,percentMoved;
     FuncStates startState,funcState;
-    float mass,linearDrag,angularDrag,inertia;
+    float mass,angularDrag,inertia;
     Vector3 accumulatedForce,accumulatedTorque;
     float dynamicFriction,staticFriction,bounciness;
     PhysCombineType frictionCombine,bounceCombine;

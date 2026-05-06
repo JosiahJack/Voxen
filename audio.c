@@ -1230,7 +1230,7 @@ typedef struct { drmp3 dec; bool open; float fade_vol,fade_target,fade_step; u32
 static wav_channel_t wav_ch[MAX_CHANNELS],*ext_ch[MAX_CHANNELS];
 static u32 wav_count,ext_count,mp3_slot,log_frame_count,log_frame_pos;
 static mp3_channel_t mp3_ch[2];
-static float        *log_samples;
+static float *log_samples;
 static size_t log_allocSize=0;
 static bool log_playing,mp3_paused = false;
 static float sfx_scale(void)     { return (Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeEffects/100.0f); }
