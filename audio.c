@@ -9,30 +9,20 @@
     #define PCM_NONBLOCK (1<<1)
     #define PCM_FORMAT_S16_LE 2
     #define PCM_ACCESS_RW     3
-    #define SNDRV_PCM_SYNC_PTR_HWSYNC 0
     typedef struct { int format,access,rate,channels,period_frames,periods; } pcm_params_t;
     typedef struct { snd_pcm_uframes_t hw_ptr; }  pcm_status_t;
     typedef struct { snd_pcm_uframes_t appl_ptr; } pcm_control_t;
     typedef struct { pcm_status_t status; pcm_control_t control; } pcm_sync_t;
     typedef enum { PCM_FORMAT=0,PCM_ACCESS,PCM_RATE,PCM_CHANNELS,PCM_PERIOD_SIZE,PCM_PERIODS,PCM_INTERRUPT } pcm_param_t;
-    #define MAX_WASAPI_DEVICES 8
-    typedef struct {
-        IAudioClient       *client;
-        IAudioRenderClient *render;
-        UINT32              buffer_frames;
-        int                 rate,channels,period_frames;
-        bool                open;
-    } wasapi_dev_t;
-    static wasapi_dev_t wasapi_devs[MAX_WASAPI_DEVICES];
-    static int          wasapi_dev_count = 0;
+    typedef struct {IAudioClient *client; IAudioRenderClient *render; u32 buffer_frames; i32 rate,channels,period_frames; bool open; } wasapi_dev_t;
+    static wasapi_dev_t wasapi_devs[8/*MAX_WASAPI_DEVICES*/];
+    static int wasapi_dev_count = 0;
     #define FD_TO_IDX(fd) ((int)(intptr_t)(fd)-100)
     #define IDX_TO_FD(i)  ((OsFileHandle)(intptr_t)((i)+100))
-    static const CLSID CLSID_MMDeviceEnumerator_ = {0xBCDE0395,0xE52F,0x467C,{0x8E,0x3D,0xC4,0x57,0x92,0x91,0x69,0x2E}};
-    static const IID   IID_IMMDeviceEnumerator_  = {0xA95664D2,0x9614,0x4F35,{0xA7,0x46,0xDE,0x8D,0xB6,0x36,0x17,0xE6}};
-    static const IID   IID_IAudioClient_         = {0x1CB9AD4C,0xDBFA,0x4C32,{0xB1,0x78,0xC2,0xF5,0x68,0xA7,0x03,0xB2}};
-    static const IID   IID_IAudioRenderClient_   = {0xF294ACFC,0x3146,0x4483,{0xA7,0xBF,0xAD,0xDC,0xA7,0xC2,0x60,0xE2}};
+    static const IID IID_IAudioClient_         = {0x1CB9AD4C,0xDBFA,0x4C32,{0xB1,0x78,0xC2,0xF5,0x68,0xA7,0x03,0xB2}};
+    static const IID IID_IAudioRenderClient_   = {0xF294ACFC,0x3146,0x4483,{0xA7,0xBF,0xAD,0xDC,0xA7,0xC2,0x60,0xE2}};
     static int wasapi_init_device(IMMDevice *dev,int rate,int channels,int period_frames,int periods) {
-        if (wasapi_dev_count>=MAX_WASAPI_DEVICES) return -1;
+        if (wasapi_dev_count>=8/*MAX_WASAPI_DEVICES*/) return -1;
         wasapi_dev_t *w = &wasapi_devs[wasapi_dev_count];
         HRESULT hr = dev->lpVtbl->Activate(dev,&IID_IAudioClient_,CLSCTX_ALL,NULL,(void**)&w->client);
         if (FAILED(hr)) return -1;
@@ -47,7 +37,9 @@
         w->rate=rate; w->channels=channels; w->period_frames=period_frames; w->open=true;
         return wasapi_dev_count++;
     }
-
+    
+    static const CLSID CLSID_MMDeviceEnumerator_ = {0xBCDE0395,0xE52F,0x467C,{0x8E,0x3D,0xC4,0x57,0x92,0x91,0x69,0x2E}};
+    static const IID IID_IMMDeviceEnumerator_  = {0xA95664D2,0x9614,0x4F35,{0xA7,0x46,0xDE,0x8D,0xB6,0x36,0x17,0xE6}};
     OsFileHandle pcm_open_all(int rate,int channels,int period_frames,int periods) {
         CoInitializeEx(NULL,COINIT_MULTITHREADED);
         IMMDeviceEnumerator *en = NULL;
@@ -1235,17 +1227,12 @@ static void WavUnInit(WaveFile *w) { if (w && w->fp != OS_INVALID_HANDLE) { OS_C
 
 typedef struct { float *samples; u32 frame_count,frame_pos; float volume; bool looping,positional,playing; Vector3 pos; size_t allocSize; } wav_channel_t;
 typedef struct { drmp3 dec; bool open; float fade_vol,fade_target,fade_step; u32 src_rate; u64 frames_decoded,total_frames; } mp3_channel_t;
-static wav_channel_t wav_ch[MAX_CHANNELS];
-static i32           wav_count = 0;
-static wav_channel_t *ext_ch[MAX_CHANNELS];
-static i32            ext_count = 0;
+static wav_channel_t wav_ch[MAX_CHANNELS],*ext_ch[MAX_CHANNELS];
+static u32 wav_count,ext_count,mp3_slot,log_frame_count,log_frame_pos;
 static mp3_channel_t mp3_ch[2];
-static i32           mp3_slot = 0;
 static float        *log_samples;
 static size_t log_allocSize=0;
-static u32           log_frame_count,log_frame_pos;
-static bool          log_playing;
-static bool mp3_paused = false;
+static bool log_playing,mp3_paused = false;
 static float sfx_scale(void)     { return (Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeEffects/100.0f); }
 static float music_scale(void)   { return (Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeMusic/100.0f); }
 static float message_scale(void) { return (Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeMessage/100.0f); }
@@ -1289,7 +1276,7 @@ static float *load_wav(const char *path,u32 *out_frames, size_t* allocSize) {
 static void audio_mix_period(i16 *out) {
     float mix[AUDIO_FRAMES*AUDIO_CHANNELS];
     MemSetToValueForNBytes(mix,0,sizeof(mix));
-    for (i32 c = 0; c < wav_count; c++) {
+    for (u32 c = 0; c < wav_count; c++) {
         wav_channel_t *w = &wav_ch[c];
         if (!w->playing || !w->samples) continue;
         float vol = w->volume*sfx_scale();
@@ -1302,7 +1289,7 @@ static void audio_mix_period(i16 *out) {
         }
     }
     
-    for (i32 c=0;c<ext_count;c++) {
+    for (u32 c=0;c<ext_count;c++) {
         wav_channel_t *w=ext_ch[c];
         if (!w->playing||!w->samples) continue;
         float vol=w->volume*sfx_scale();
@@ -1326,7 +1313,7 @@ static void audio_mix_period(i16 *out) {
     }
 
     if (!mp3_paused) {
-        for (i32 s = 0; s < 2; s++) {
+        for (u32 s = 0; s < 2; s++) {
             mp3_channel_t *m = &mp3_ch[s];
             if (!m->open) continue;
             u32 src_rate = m->src_rate ? m->src_rate : AUDIO_RATE;
@@ -1354,12 +1341,12 @@ static void audio_mix_period(i16 *out) {
         }
     }
 
-    for (i32 i = 0; i < AUDIO_FRAMES*AUDIO_CHANNELS; i++) out[i] = f32_to_s16(mix[i]);
+    for (u32 i = 0; i < AUDIO_FRAMES*AUDIO_CHANNELS; i++) out[i] = f32_to_s16(mix[i]);
 }
 
 ENGINE_TO_MOD void play_wav(const char *path,float volume,Vector3 pos,bool positional) {
     i32 slot = -1;
-    for (i32 i = 0; i < wav_count; i++) if (!wav_ch[i].playing && wav_ch[i].samples) { OS_DeallocateRAM(wav_ch[i].samples,wav_ch[i].allocSize); wav_ch[i].samples=NULL; wav_ch[i].allocSize=0; slot=i; break; }
+    for (u32 i = 0; i < wav_count; i++) if (!wav_ch[i].playing && wav_ch[i].samples) { OS_DeallocateRAM(wav_ch[i].samples,wav_ch[i].allocSize); wav_ch[i].samples=NULL; wav_ch[i].allocSize=0; slot=i; break; }
     if (slot==-1 && wav_count<MAX_CHANNELS) slot=wav_count++;
     if (slot==-1) { DualLog("WARNING: Max WAV channels (%d) reached\n",MAX_CHANNELS); return; }
     u32 frames; size_t allocSize=0; float *buf = load_wav(path,&frames,&allocSize);
@@ -1379,7 +1366,7 @@ ENGINE_TO_MOD void play_message(const char *path) {
 ENGINE_TO_MOD i32 SoundInit(const char *path,ma_sound *pSound) { wav_channel_t *w=(wav_channel_t*)pSound; u32 frames; size_t allocSize=0; float *buf=load_wav(path,&frames,&allocSize); if (!buf) return -1; w->samples=buf; w->allocSize=allocSize; w->frame_count=frames; w->frame_pos=0; w->volume=1.0f; w->looping=false; w->positional=false; w->playing=false; return 0; }
 ENGINE_TO_MOD i32 SoundStart(ma_sound *pSound) {
     wav_channel_t *w=(wav_channel_t*)pSound; w->frame_pos=0; w->playing=true;
-    for (i32 i=0;i<ext_count;i++) if (ext_ch[i]==w) return 0;
+    for (u32 i=0;i<ext_count;i++) if (ext_ch[i]==w) return 0;
     if (ext_count<MAX_CHANNELS) ext_ch[ext_count++]=w;
     return 0;
 }
@@ -1387,7 +1374,7 @@ ENGINE_TO_MOD i32 SoundStop(ma_sound *pSound) { ((wav_channel_t*)pSound)->playin
 ENGINE_TO_MOD void SoundUninit(ma_sound *pSound) {
     wav_channel_t *w=(wav_channel_t*)pSound;
     if (w->samples){OS_DeallocateRAM(w->samples,w->allocSize);w->samples=NULL;w->allocSize=0;} w->playing=false;
-    for (i32 i=0;i<ext_count;i++) if (ext_ch[i]==w) { ext_ch[i]=ext_ch[--ext_count]; break; }
+    for (u32 i=0;i<ext_count;i++) if (ext_ch[i]==w) { ext_ch[i]=ext_ch[--ext_count]; break; }
 }
 ENGINE_TO_MOD void SoundSetVolume(ma_sound *pSound,float volume) { ((wav_channel_t*)pSound)->volume=volume; }
 ENGINE_TO_MOD void SoundSetLooping(ma_sound *pSound,ma_bool32 loop) { ((wav_channel_t*)pSound)->looping=(bool)loop; }
@@ -1459,7 +1446,7 @@ void InitAudio(void) {
 void AudioUpdate(void) {
     if (pcm_fd_count==0) return;
     i16 buf[AUDIO_FRAMES*AUDIO_CHANNELS]; pcm_sync_t sync;
-    if (pcm_sync(pcm_fds[0],&sync,SNDRV_PCM_SYNC_PTR_HWSYNC)<0) return;
+    if (pcm_sync(pcm_fds[0],&sync,0/*SNDRV_PCM_SYNC_PTR_HWSYNC*/)<0) return;
     u32 hw=sync.status.hw_ptr,appl=sync.control.appl_ptr;
     u32 buffer_size=AUDIO_FRAMES*AUDIO_PERIODS,queued=appl-hw;
     if (queued>buffer_size) queued=0;

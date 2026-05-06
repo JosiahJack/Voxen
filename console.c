@@ -1,7 +1,7 @@
 // console.c - Console Emulator
 #define MAX_HISTORY 7
 static i32 currentEntryLength=0, numHistory=0, historyPos=0;
-char consoleEntryText[TEXT_BUFFER_SIZE]="Enter a command...",history[MAX_HISTORY][TEXT_BUFFER_SIZE]={0};
+char consoleEntryText[TEXT_BUFFER_SIZE],history[MAX_HISTORY][TEXT_BUFFER_SIZE];
 ENGINE_TO_MOD void ToggleConsole(void) {
     static bool inventoryModeWasActivePriorToConsole = false;
     if (!Sys_Cheats.consoleActive) inventoryModeWasActivePriorToConsole = Sys_Global.inventoryMode;
@@ -147,7 +147,7 @@ static int ParseLevelArg(const char* arg) {
     return -1; // Invalid
 }
 
-static Vector3 ressurectionLocations[13] = {
+static Vector3 ressurectionLocations[10] = {
     {-27.386f, -55.488f, 26.5941f}, // 0/R
     {40.903f, -42.372f, -30.78f}, // 1
     {30.67407f, -25.832f, 10.21412f}, // 2
@@ -157,21 +157,18 @@ static Vector3 ressurectionLocations[13] = {
     {-22.3568f, 33.7845f, -30.728f}, // 6
     {2.228084f, 50.95243f, 7.532025f}, // 7
     {10.068f, 58.897f, 13.973f}, // 8
-    {2.303f, 106.77f, -38.554f}, // 9
-    {-22.3568f, 33.7845f, -30.728f}, // 10
-    {-22.3568f, 33.7845f, -30.728f}, // 11
-    {-22.3568f, 33.7845f, -30.728f} // 12
+    {2.303f, 106.77f, -38.554f} // 9
 };
 
 static Vector3 cyberSpaceEntryLocations[8] = {
-    {210.68340f,   2.81200f, -24.37800f}, // 0
-    {195.42000f, -13.44000f,  33.28000f}, // 1
-    {157.16080f, -15.53000f,  47.33100f}, // 2a, if cyberport localPosition.x < -26.0f
-    {256.04160f,  -0.71600f,  62.48789f}, // 2b level 2 secondary cyberport position
-    {126.43000f,  29.56733f,  34.24000f}, // 5
-    {177.61200f,   3.29494f, 108.77250f}, // 6
-    {244.73500f,  41.99257f, -19.69500f}, // 8
-    {185.16100f,  84.50200f, -46.04246f}, // 9
+    {210.6834f,2.812f,-24.378f}, // 0
+    {195.42f,-13.44f,33.28f}, // 1
+    {157.1608f,-15.53f,47.331f}, // 2a, if cyberport localPosition.x < -26.0f
+    {256.0416f,-0.716f,62.48789f}, // 2b level 2 secondary cyberport position
+    {126.43f,29.56733f,34.24f}, // 5
+    {177.612f,3.29494f,108.7725f}, // 6
+    {244.735f,41.99257f,-19.695f}, // 8
+    {185.161f,84.502f,-46.04246f}, // 9
 };
 
 extern u8 queuedLevelToLoad;
@@ -181,12 +178,13 @@ static void cmd_loadlevel(const char* arg) {
     int level = ParseLevelArg(arg);
     if (level >= 0) {
         if (level == -2) return; // Already printed g3 message
-        if (level < 0) { CenterStatusPrint("Invalid level argument"); return; }
+        if (level < 0 || level > 12) { CenterStatusPrint("cmd_loadlevel invalid level argument %u",level); return; }
         
         CenterStatusPrint("Loading level %u", level);
         queuedLevelToLoad = level;
         LoadLevel(level);
-        Sys_Global.instances[PLAYER1].position = level == LEVEL_CYBERSPACE ? cyberSpaceEntryLocations[1] : ressurectionLocations[level];
+        if (level > 9) level = 6;
+        Sys_Global.instances[PLAYER1].position = ressurectionLocations[level];
     }
 }
 
@@ -246,36 +244,39 @@ static void cmd_damonhill(void)      { CenterStatusPrint("Nice try, there are no
 static void cmd_michaelschumacher(void) { CenterStatusPrint("Nice try, there are no go carts to give ludicrous speed here"); }
 static void cmd_tonyday(void)        { CenterStatusPrint("Ok, now I want a hamburger"); }
 static void cmd_katiebrayshaw(void)  { CenterStatusPrint("Hi there! Hello! Hey! Howdy!"); }
-
 static void cmd_sudo(void)           { CenterStatusPrint("Super user access granted...ERROR: access restricted by SHODAN"); }
-
-const char* StringFindLastChar(const char* str, const char c);
+// static void cmd_git(const char* arg) {
+//     if (!arg) arg = "";
+//     if (StringFindSubstring(arg, "pull") || StringFindSubstring(arg, "fetch")) CenterStatusPrint("remote: Enumerating objects: 24601, done. Failed, could not connect with origin/triop.");
+//     else if (StringFindSubstring(arg, "status")) CenterStatusPrint("Your branch is up to date with origin/triop. Working directory clean.");
+//     else if (StringFindSubstring(arg, "log"))    CenterStatusPrint("<Merge pull request #451 from SHODAN/NeuralLinkBugfix> 6 months ago...");
+//     else if (StringFindSubstring(arg, "reflog")) CenterStatusPrint("dc51440 HEAD0 -> master: commit: Establish neural connection ... ERROR: invalid ID `2-4601`");
+//     else if (StringFindSubstring(arg, "merge"))  CenterStatusPrint("Failed, could not connect with origin/triop");
+//     else if (StringFindSubstring(arg, "push"))   CenterStatusPrint("Could not find Username for 'triopttp://192.168.1.451'");
+//     else if (StringFindSubstring(arg, "clone"))  CenterStatusPrint("Failed, connection blocked by SHODAN. Employee ID invalid.");
+//     else if (StringFindSubstring(arg, "branch") || StringFindSubstring(arg,"-b")) { const char *last = StringFindLastChar(arg,' '), *name = last ? last + 1 : "unknown"; CenterStatusPrint("Created new branch %s",name); }
+//     else CenterStatusPrint("Branch name not recognized. Contact your TriopBucket representative.");
+// } 1.03kb
 static void cmd_git(const char* arg) {
     if (!arg) arg = "";
-    if (StringFindSubstring(arg, "pull") || StringFindSubstring(arg, "fetch")) {
-        CenterStatusPrint("remote: Enumerating objects: 24601, done. Failed, could not connect with origin/triop.");
-    } else if (StringFindSubstring(arg, "status")) {
-        CenterStatusPrint("Your branch is up to date with origin/triop. Working directory clean.");
-    } else if (StringFindSubstring(arg, "log")) {
-        CenterStatusPrint("<Merge pull request #451 from SHODAN/NeuralLinkBugfix> 6 months ago...");
-    } else if (StringFindSubstring(arg, "reflog")) {
-        CenterStatusPrint("dc51440 HEAD0 -> master: commit: Establish neural connection ... ERROR: invalid ID `2-4601`");
-    } else if (StringFindSubstring(arg, "merge")) {
-        CenterStatusPrint("Failed, could not connect with origin/triop");
-    } else if (StringFindSubstring(arg, "push")) {
-        CenterStatusPrint("Could not find Username for 'triopttp://192.168.1.451'");
-    } else if (StringFindSubstring(arg, "clone")) {
-        CenterStatusPrint("Failed, connection blocked by SHODAN. Employee ID invalid.");
-    } else if (StringFindSubstring(arg, "branch") || StringFindSubstring(arg,"-b")) {
-        const char* last = StringFindLastChar(arg,' ');
-        const char* name = last ? last + 1 : "unknown";
-        CenterStatusPrint("Created new branch %s",name);
-    } else if (StringFindSubstring(arg, "checkout")) {
-        CenterStatusPrint("Branch name not recognized. Contact your TriopBucket representative.");
-    } else {
-        CenterStatusPrint("Branch name not recognized. Contact your TriopBucket representative.");
+    static const char* cmds[] = {
+        "pull", "remote: Enumerating objects: 24601, done. Failed, could not connect with origin/triop.",
+        "fetch", "remote: Enumerating objects: 24601, done. Failed, could not connect with origin/triop.",
+        "status", "Your branch is up to date with origin/triop. Working directory clean.",
+        "log", "<Merge pull request #451 from SHODAN/NeuralLinkBugfix> 6 months ago...",
+        "reflog", "dc51440 HEAD0 -> master: commit: Establish neural connection ... ERROR: invalid ID `2-4601`.",
+        "merge", "Failed, could not connect with origin/triop.",
+        "push", "Could not find Username for 'triopttp://192.168.1.451'.",
+        "clone", "Failed, connection blocked by SHODAN. Employee ID invalid."
+    };
+
+    for (int i = 0; i < 16; i += 2) {
+        if (StringFindSubstring(arg, cmds[i])) { CenterStatusPrint(cmds[i+1]); return; }
     }
-}
+
+    if (StringFindSubstring(arg, "branch") || StringFindSubstring(arg, "-b")) { const char *last = StringFindLastChar(arg, ' '); CenterStatusPrint("Created new branch %s", last ? last + 1 : "unknown"); }
+    else CenterStatusPrint("Branch name not recognized. Contact your TriopBucket representative.");
+} // 334 b
 
 static void cmd_restart(void)        { CenterStatusPrint("Yeah...better not"); }
 static void cmd_quit(void)           { OS_Exit(0); }

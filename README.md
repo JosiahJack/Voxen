@@ -391,3 +391,6 @@ Init 1.529secs
 
 CPU: 0.23ms
 GPU: 1.83ms
+
+To see binary size impacts:
+../bloaty/build/bloaty ./voxen -d symbols -s file -n 50

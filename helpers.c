@@ -179,7 +179,7 @@ bool StringIsEmpty(const char* a) { // C# String.IsNullOrWhiteSpace replacement
     return true;
 }
 
-bool StringsEqual(const char* a, const char* b) { // !strcmp replacement (hated its inverted logic)
+bool __attribute__((noinline)) StringsEqual(const char* a, const char* b) { // !strcmp replacement (hated its inverted logic)
     size_t size = GetStringLength(a), size2 = GetStringLength(b); if (size != size2) return false;
     
     for (size_t i=0;i<size;++i) {

@@ -298,7 +298,7 @@ static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
 }
 
 void glfwSetWindowIcon(GLFWwindow* handle, const GLFWimage* images); extern GLFWwindow* window;
-void LoadTextures(void) {
+static void LoadTextures(void) {
     double start_time = get_time();
     loadedTexturesMaxIndex = totalPixels = totalPaletteColors = 0u;
     TextureDataParser texture_parser;
@@ -344,10 +344,10 @@ void LoadTextures(void) {
         tasks[t] = (TextureParseTask){.start_tex=start,.end_tex=clamp(start+chunk,0,loadedTexturesMaxIndex),.raw_textures=rawTextures,.parsIdx=parsIdx,.parser=&texture_parser,.tid=t};
     }
 
-//     pthread_t workers[32];
-//     for (int t = 0; t < num_parse_threads; ++t) pthread_create(&workers[t], NULL, TextureParsingWorker, &tasks[t]);
-//     for (int t = 0; t < num_parse_threads; ++t) pthread_join(workers[t], NULL);
-    for (int t = 0; t < num_parse_threads; ++t) TextureParsingWorker(&tasks[t]);
+    pthread_t workers[32];
+    for (int t = 0; t < num_parse_threads; ++t) pthread_create(&workers[t], NULL, TextureParsingWorker, &tasks[t]);
+    for (int t = 0; t < num_parse_threads; ++t) pthread_join(workers[t], NULL);
+//     for (int t = 0; t < num_parse_threads; ++t) TextureParsingWorker(&tasks[t]); // Single threaded alternative
     totalPixels = totalPaletteColors = 0u;
     for (u16 i = 0; i < loadedTexturesMaxIndex; ++i) {
         if (textureIndexBuffers[i]) { totalPixels += (u32)textureWidths[i] * textureHeights[i]; totalPaletteColors += texturePaletteSizes[i]; }

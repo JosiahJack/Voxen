@@ -4,13 +4,28 @@ u8** modelVertices = NULL; u16** modelTriangles = NULL;
 u32 modelVertexCounts[MODEL_IDX_MAX] = {0}; u16 modelTriangleCounts[MODEL_IDX_MAX] = {0};
 float modelBounds[MODEL_IDX_MAX] = {0}; u16 loadedModelsMaxIndex = 0;
 #define MAX_VERT_ELEMENT_SIZE 6964
-#define MAX_OUTPUT_VERTS      20892
-static float **thread_temp_pos = NULL, **thread_temp_nrm = NULL, **thread_temp_uv = NULL, **thread_out_verts = NULL;
-static u16** thread_out_tris = NULL;
+#define MAX_OUTPUT_VERTS      36364
+static float **thread_temp_pos = NULL, **thread_temp_nrm = NULL, **thread_temp_uv = NULL, **thread_out_verts = NULL; static u16** thread_out_tris = NULL;
 typedef struct { const char* data; int size; } RawOBJ;
-typedef u16 half;
 typedef struct { u16 index; bool animated; u8 animationNum; char path[128]; } ModelData;
 typedef struct { ModelData* entries; u32 count; u32 capacity; } ModelDataParser;
+typedef u16 half;
+static float half_to_float(half h){
+    u32 s=(h&0x8000)<<16,e=(h&0x7C00)>>10,m=(h&0x03FF),out;
+    if (e == 0){
+        if (m == 0) out = s;
+        else {
+            e = 1;
+            while ((m & 0x0400) == 0) { m <<= 1; e--; }
+            m &= 0x03FF; e+=(127 - 15);
+            out = s | (e << 23) | (m << 13);
+        }
+    } else if (e == 31) { out = s | 0x7F800000 | (m << 13); }
+    else { e = e + (127 - 15); out = s | (e << 23) | (m << 13); }
+    float f; CopyMemoryFromBtoAForNBytes(&f,&out,4);
+    return f;
+}
+
 static inline __attribute__((always_inline)) half float_to_half(float f) {
     u32 x; CopyMemoryFromBtoAForNBytes(&x,&f,4);
     u32 s = x>>31, ue = (x>>23)&0xff; i32 e = (i32)ue-127; u32 m = x&0x7fffff;
@@ -23,7 +38,7 @@ static inline __attribute__((always_inline)) half float_to_half(float f) {
 }
 
 static inline __attribute__((always_inline)) float fast_atof(const char** p) {
-    float v = 0, s = 1; while (**p == ' ' || **p == '\t') (*p)++;
+    float v=0,s=1; while (**p == ' ' || **p == '\t') (*p)++;
     if (**p == '-') { s = -1; (*p)++; }
     while (**p >= '0' && **p <= '9') v = v*10 + (*(*p)++ - '0');
     if (**p == '.') { (*p)++; float sub = 0.1f; while (**p >= '0' && **p <= '9') { v += (*(*p)++ - '0')*sub; sub *= 0.1f; } }
@@ -39,7 +54,6 @@ static inline __attribute__((always_inline)) i32 fast_atoi(const char** p) {
 
 typedef struct { u32 idx; u32 key; } TriSort;
 int cmp(const void* a, const void* b) { u32 ka=((const TriSort*)a)->key, kb=((const TriSort*)b)->key; return ka<kb?-1:ka>kb; }
-
 static void OptimizeVertexCache(u16* idx, u32 ic, u32 vc) {
     if (ic < 3 || !vc) return;
     u32 tc = ic/3;
@@ -115,7 +129,7 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(const char* _
             }
             if (nv < 3) goto skip;
             for (int k=1; k<nv-1; ++k) {
-                if (unlikely(ec + 3 > MAX_OUTPUT_VERTS)) return false;
+                if (unlikely(ec + 3 > MAX_OUTPUT_VERTS)) {DualLogError("vert overflow!\n"); return false;}
                 u32 tri[3] = {0, (u32)k, (u32)(k+1)};
                 for (int t=0; t<3; ++t) {
                     int ix = tri[t];
@@ -141,7 +155,7 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(const char* _
     }
     if (unlikely(!ec)) return false;
 
-    #define HASH_SIZE 32768
+    #define HASH_SIZE 65536
     u32 ht[HASH_SIZE]; MemSetToValueForNBytes(ht, 0xFF, sizeof(ht));
     u32* rem = (u32*)st; u32 ucnt = 0;
     for (u32 i=0; i<ec; ++i) {
@@ -176,7 +190,6 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(const char* _
 }
 
 typedef struct { u32 start, end; RawOBJ* raw; i32* map; const ModelDataParser* parser; int tid; } ModelParseTask;
-
 static void* ModelParsingWorker(void* arg) {
     ModelParseTask* t = arg;
     for (u32 i = t->start; i < t->end; ++i) {
@@ -185,16 +198,10 @@ static void* ModelParsingWorker(void* arg) {
         RawOBJ r = t->raw[i];
         if (unlikely(!r.data || r.size <= 0)) continue;
         float mx,my,mz,Mx,My,Mz;
-        if (!ParseOBJ(r.data, r.size,
-            thread_temp_pos[t->tid], thread_temp_nrm[t->tid], thread_temp_uv[t->tid],
-            thread_out_verts[t->tid], thread_out_tris[t->tid],
-            &modelVertices[i], &modelVertexCounts[i], &modelTriangles[i], &modelTriangleCounts[i],
-            &mx,&my,&mz,&Mx,&My,&Mz)) continue;
-
+        if (!ParseOBJ(r.data,r.size,thread_temp_pos[t->tid],thread_temp_nrm[t->tid],thread_temp_uv[t->tid],thread_out_verts[t->tid],thread_out_tris[t->tid],&modelVertices[i],&modelVertexCounts[i],&modelTriangles[i],&modelTriangleCounts[i],&mx,&my,&mz,&Mx,&My,&Mz)) continue;
         float rad = vmax(vabs(mx), vmax(vabs(my), vmax(vabs(mz), vmax(Mx, vmax(My, Mz)))));
         modelBounds[i] = rad;
     }
-    
     return NULL;
 }
 
@@ -246,10 +253,9 @@ bool ParseModelData(ModelDataParser *p, u16 maxSz, const char *fn) {
             char k[256]={0}, v[256]={0};
             StringCopyInto_A_SubstringFrom_B(k, col-s, s, 256);
             StringCopyInto_A_SubstringFrom_B(v, le-col, col+1, 256);
-            // trim would be nice but we keep it minimal
-            if (StringsEqual(k, "index"))        cur.index = parse_numberu16(v, s, ln);
-            else if (StringsEqual(k, "animationNum")) cur.animationNum = parse_numberu16(v, s, ln);
-            else if (StringsEqual(k, "animated"))     cur.animated = parse_numberu8(v, s, ln);
+            if (StringsEqual(k,"index"))             cur.index = parse_numberu16(v, s, ln);
+            else if (StringsEqual(k,"animationNum")) cur.animationNum = parse_numberu16(v, s, ln);
+            else if (StringsEqual(k,"animated"))     cur.animated = parse_numberu8(v, s, ln);
         }
         next:
         if (c < e && *c == '\r') ++c; if (c < e && *c == '\n') ++c;
@@ -313,10 +319,10 @@ void LoadModels(void) {
             raw, idxmap, &mp, i};
     }
 
-//     pthread_t th[32];
-//     for (int i=0;i<num_parse_threads;++i) pthread_create(&th[i],NULL,ModelParsingWorker,&tasks[i]);
-//     for (int i=0;i<num_parse_threads;++i) pthread_join(th[i],NULL);
-    for (int t=0;t<num_parse_threads;++t) ModelParsingWorker(&tasks[t]);
+    pthread_t th[32];
+    for (int i=0;i<num_parse_threads;++i) pthread_create(&th[i],NULL,ModelParsingWorker,&tasks[i]);
+    for (int i=0;i<num_parse_threads;++i) pthread_join(th[i],NULL);
+    //for (int t=0;t<num_parse_threads;++t) ModelParsingWorker(&tasks[t]); // Single threaded alternative
 
     for (u32 i=0;i<loadedModelsMaxIndex;++i) { if (raw[i].data) OS_DeallocateRAM((void*)raw[i].data,raw[i].size); }
     OS_DeallocateRAM(arena_base, arena);

@@ -1978,7 +1978,7 @@ void PlayerEnergyUpdate(void) {
 #define GREN_FLAG_EXPLODE_CONTACT (1ull << 59)
 #define GREN_FLAG_USE_TIMER       (1ull << 58)
 #define GREN_FLAG_USE_PROX        (1ull << 57)
-static bool GrenadeIsNPCMine(u16 self) { return Eng_Global->instances[self].layer != PhysicsLayer_PlayerBullets; }
+static bool GrenadeIsNPCMine(u16 self) { return Eng_Global->instances[self].layer != Layer_PlayerBullets; }
 void GrenadeExplode(u16 self) {
     DualLog("Grenade exploded");
     Entity* e = &Eng_Global->instances[self];
@@ -3152,7 +3152,7 @@ static void DoorSetClipFrame(u16 self, u8 clip, u16 frame) {
 static void DoorSyncLayer(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (!e->changeLayerOnOpenClose) return;
-    e->layer = DoorIsAjar(e) ? PhysicsLayer_InterDebris : PhysicsLayer_Door;
+    e->layer = DoorIsAjar(e) ? Layer_InterDebris : Layer_Door;
 }
 
 static void DoorOpen(u16 self) {
@@ -3590,7 +3590,7 @@ void InventoryInit(InventorySystem* inv) {
 
 MOD_TO_ENGINE void PlayerInit(u16 i) {
     Eng_Global->instances[i].index = 767;
-    Eng_Global->instances[i].layer = PhysicsLayer_Player;
+    Eng_Global->instances[i].layer = Layer_Player;
     Eng_Global->instances[i].position = (Vector3){10.52f,-43.792f + 0.84f,20.2908f}; // Start Actual: Puts player on Medical Level in actual game start position.  Added 0.84f
     Eng_Global->instances[i].scale = (Vector3){1.0f,1.0f,1.0f};
     Eng_Global->instances[i].rotation = (Quaternion){0.0f,0.7071f,0.0f,0.7071f}; // 90deg rotation CW about Y axis as viewed from the top looking down onto player
@@ -3612,17 +3612,19 @@ MOD_TO_ENGINE void PlayerInit(u16 i) {
     else if (i == PLAYER2) InventoryInit(&Eng_Global->invP2);
 }
 
+#include "credits.h"
+MOD_TO_ENGINE const char** GetCreditsText(void) { return creditPages; }
 MOD_TO_ENGINE void ModInitAfterLoad(void) {
     for (int i=PLAYER1;i<Eng_Global->loadedInstances;++i) {
         Entity* e = &Eng_Global->instances[i];
         u16 constIndex = e->index;
         if (i == PLAYER1 || i == PLAYER2 || ConstIndexIsDynamicObject(constIndex)) e->gravity = 1.0f;
         else e->gravity = 0.0f;
-        if (ConstIndexIsGeometry(constIndex)) e->layer = PhysicsLayer_Geometry;
-        else if (ConstIndexIsDoor(constIndex)) e->layer = PhysicsLayer_Door;
+        if (ConstIndexIsGeometry(constIndex)) e->layer = Layer_Geometry;
+        else if (ConstIndexIsDoor(constIndex)) e->layer = Layer_Door;
         else if (ConstIndexIsUsableObject(constIndex)) UsableInit(i);
         else if (ConstIndexIsDoor(e->index)) DoorInitAfterLoad(i);
-        else if (ConstIndexIsNPC(constIndex)) { e->layer = PhysicsLayer_NPC; /* TODO AIInit funcion */ }
+        else if (ConstIndexIsNPC(constIndex)) { e->layer = Layer_NPC; /* TODO AIInit funcion */ }
         else if (ConstIndexIsSearchable(constIndex)) SearchableInit(i);
         else if (constIndex == 515) func_forcebridge(i); // func_forcebridge
         else if (constIndex == 517) FuncWallInitAfterLoad(i);

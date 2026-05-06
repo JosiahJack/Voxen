@@ -76,7 +76,7 @@ void SetHuntFinished(u16 i) {
 
 MOD_TO_ENGINE void InitializeAIAfterLoad(u16 i) {
     Entity* e = &Eng_Global->instances[i];
-    e->layer = PhysicsLayer_NPC;
+    e->layer = Layer_NPC;
     u16 npcID = e->index - 419;
     e->idleTime = Eng_Global->pauseRelativeTime + (double)random_range(npcTable[npcID].timeIdleSFXMin,npcTable[npcID].timeIdleSFXMax);
     e->attack1SoundTime = e->attack2SoundTime = e->attack3SoundTime = Eng_Global->pauseRelativeTime;
@@ -292,7 +292,7 @@ static bool AICheckIfEnemyInSight(Entity* self) {
     u16 eidx = self->enemy;
     if (!eidx || !ai_has_health(self)) return false;
     Entity* en = &Eng_Global->instances[eidx];
-    bool enIsNPC = (en->layer & PhysicsLayer_NPC) != 0;
+    bool enIsNPC = (en->layer & Layer_NPC) != 0;
     int diff = ai_is_cyber(self) ? Eng_Global->difficultyCyber : Eng_Global->difficultyCombat;
     if (!ai_is_cyber(self) && !enIsNPC && !PositionVisibleFromPlayerCell(self->position.x, self->position.z)) return false;
     if (diff == 0 && (self->index - 419) != 28) return false;
@@ -453,7 +453,7 @@ bool AICheckPain(Entity* self) {
     if (atkIdx && self->timeTillEnemyChangeFinished < Eng_Global->pauseRelativeTime) {
         self->timeTillEnemyChangeFinished = Eng_Global->pauseRelativeTime + npcTable[self->index - 419].timeToChangeEnemy;
         Entity* atk = &Eng_Global->instances[atkIdx];
-        bool atkIsPlayer = (atk->layer & PhysicsLayer_Player) != 0;
+        bool atkIsPlayer = (atk->layer & Layer_Player) != 0;
         if (!atkIsPlayer && ConstIndexIsNPC(atk->index)) {
             NPCType mt = npcTable[self->index - 419].type, at = npcTable[atk->index - 419].type;
             bool canFight = false;
@@ -757,12 +757,12 @@ static void AIDyingSetup(Entity* self) {
     }
 
     flag_set(&self->entflags, ENTFLAG_ASLEEP, false);
-    self->layer = PhysicsLayer_Corpse;
+    self->layer = Layer_Corpse;
     flag_set(&self->entflags, ENTFLAG_FIRST_SIGHTING, true);
     self->timeTillDeadFinished = Eng_Global->pauseRelativeTime + npc->timeTillDead;
 //     if (npc->switchMaterialOnDeath && self->dyingTexture) self->texIndex = self->dyingTexture; // TODO Handle hopper and zerog texture changes
     if (self->index == 428 || self->index == 439) self->velocity = (Vector3){0.0f, self->velocity.z, 0.0f}; // Index-specific velocity patch (Exec bot and Zero-G mutant)
-    if (self->index == 433) self->layer = PhysicsLayer_Corpse; // Hopper: enable capsule collider (implicit in layer change)
+    if (self->index == 433) self->layer = Layer_Corpse; // Hopper: enable capsule collider (implicit in layer change)
     flag_set(&self->entflags, ENTFLAG_DYING_SETUP, true);
 }
 
@@ -775,7 +775,7 @@ static void AIDying(Entity* self) {
     }
 
     if (AIDeactivatesVisibleMeshWhileDying(self)) self->modelIndex = MODEL_IDX_MAX;
-    if (self->index == 439) self->layer = PhysicsLayer_Corpse | PhysicsLayer_CorpseSearchable; // Zero-G mutant enables search collider while still dying
+    if (self->index == 439) self->layer = Layer_Corpse | Layer_CorpseSearchable; // Zero-G mutant enables search collider while still dying
 }
 
 static void AIDead(u16 idx) {
@@ -788,7 +788,7 @@ static void AIDead(u16 idx) {
 
     if (AIDeactivatesVisibleMeshWhileDying(self)) self->modelIndex = MODEL_IDX_MAX;
     self->currentState = AIState_Dead;
-    self->layer = PhysicsLayer_Corpse;
+    self->layer = Layer_Corpse;
     if (self->entflags & ENTFLAG_TELEPORT_ON_DEATH) {
         self->gravity = 1.0f;
         self->modelIndex = MODEL_IDX_MAX;
@@ -800,7 +800,7 @@ static void AIDead(u16 idx) {
         DeleteInstance(idx);
     } else {
         // Enable search collider for non-gib corpses (Avian Mutant index 2 always searchable)
-        self->layer = PhysicsLayer_Corpse | PhysicsLayer_CorpseSearchable;
+        self->layer = Layer_Corpse | Layer_CorpseSearchable;
         self->velocity.x = 0.0f; self->velocity.z = 0.0f;
         if (self->index != 433) self->gravity = 1.0f;// Hopper deactivates itself
     }
@@ -936,7 +936,7 @@ static void ProjectileLaunched(Entity* self, int n) {
     if (!bb || bb >= INSTANCE_COUNT) return;
 
     Entity* proj   = &Eng_Global->instances[bb];
-    proj->layer    = PhysicsLayer_NPCBullet;
+    proj->layer    = Layer_NPCBullet;
     proj->position = spos;
     proj->forward  = dir;
     // TODO: store damage data into projectile entity fields for deferred impact

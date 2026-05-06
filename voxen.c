@@ -8,6 +8,7 @@ GLFWwindow* window;
 #endif
 #include "common.h"
 #include "interop.h"
+#include "Shaders/shaders.h"
 #define MAX_KEYS 512
 #define MAX_MOUSE_BUTTONS 8
 #define VERTEX_ATTRIBUTES_SIZE 16 // Was 32ls
@@ -35,30 +36,11 @@ typedef struct {
     u32 vbos[MODEL_IDX_MAX],tbos[MODEL_IDX_MAX];
 } RenderSystem;
 #define STBI_ARENA_SIZE 16*1024*1024
-#include "Shaders/shaders.h"
-#include "credits.h"
 u8 queuedLevelToLoad = 255u; static float berserkSeedTime,cam_pitch,cam_yaw=90.0f,cam_roll,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
 float modelMatrices[INSTANCE_COUNT*16];
 bool mouseMovementThisFrame,returnToPause=false,fovSliderActive=false,gammaSliderActive=false,masterVolumeSliderActive=false,musicVolumeSliderActive=false,messageVolumeSliderActive=false,sfxVolumeSliderActive=false,enteringPlayerName=false;
 u8 currentPlayerNameLength=0; i8 currentMenuItem=0, currentMenuTab=0, menuItemCount=4, menuTabCount=1;
 static int num_parse_threads = 0;
-typedef u16 half;
-static inline __attribute__((always_inline)) float half_to_float(half h){
-    u32 s=(h&0x8000)<<16,e=(h&0x7C00)>>10,m=(h&0x03FF),out;
-    if (e == 0){
-        if (m == 0) out = s;
-        else { // normalize subnormal
-            e = 1;
-            while ((m & 0x0400) == 0) { m <<= 1; e--; }
-            m &= 0x03FF; e+=(127 - 15);
-            out = s | (e << 23) | (m << 13);
-        }
-    } else if (e == 31) { out = s | 0x7F800000 | (m << 13); }
-    else { e = e + (127 - 15); out = s | (e << 23) | (m << 13); }
-    float f; CopyMemoryFromBtoAForNBytes(&f,&out,4);
-    return f;
-}
-
 #define CHECK_GL_ERROR() do { u32 err = glGetError(); if (err != 0) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
 #define SHADOW_MAP_SIZE 128u
 #define MAX_SHADOWMAPS 256u
@@ -121,7 +103,6 @@ ENGINE_TO_MOD void DualLogError(const char* fmt, ...) { va_list args; __builtin_
 #include "models.c"
 #include "culling.c"
 #include "ray.c"
-#include "trigger.c"
 #include "physics.c"
 #include "audio.c"
 static inline __attribute__((always_inline)) void LogShaderError(u32 s, const char* name) { char er[512]; glGetShaderInfoLog(s,512,NULL,er); DualLogError("%s Compilation Failed: %s\n",name,er); OS_Exit(1); }
@@ -173,7 +154,7 @@ ENGINE_TO_MOD void InitializeEntity(Entity* entry) { // Blank entity, no index y
     entry->index = U16_MAX; // memset here would be harmful as only a handful of fields are the same.
     entry->entflags = (ENTFLAG_KINEMATIC | ENTFLAG_ACTIVE); // Zeroes the rest out.
     entry->modelIndex = MODEL_IDX_MAX;
-    entry->layer = PhysicsLayer_Default;
+    entry->layer = Layer_Default;
     entry->texIndex = entry->glowIndex = entry->specIndex = entry->normIndex = MAX_VALID_TEXTURE;
     entry->lodIndex  = MODEL_IDX_MAX;
     entry->camView = 255;
@@ -204,44 +185,44 @@ ENGINE_TO_MOD i32 AddLight(Light* lit, LightAnimation* lanim) {
 
 ENGINE_TO_MOD void TurnLightOff(u16 litIdx) { if (litIdx < Sys_Global.loadedLights) {flag_setu32(&lights[litIdx].lflags,LIGHTON,false);} }
 bool alreadyReadLightOnOnce[LIGHT_COUNT] = {0};
-ENGINE_TO_MOD void LoadFieldIntoLight(char* trimmed_key, char* trimmed_value, char* initialLine, u32 lineNum, Light* lit, LightAnimation* lam, u16 lightIdx) {
-    char buffer[32];
-    for (int i=0;i <32;++i) {
-        StringFormat(buffer,sizeof(buffer),"intervalSteps[%d]",i);
-        if (StringsEqual(trimmed_key,buffer)) { lam->intervalSteps[i] = parse_float(trimmed_value,initialLine,lineNum); return; }
+ENGINE_TO_MOD void LoadFieldIntoLight(char* k, char* v, char* il, u32 ln, Light* lit, LightAnimation* lam, u16 lIdx) {
+    char* br = StringFindFirstCharWithin(k,'[');
+    if (br) {
+        int i = parse_numberu32(br + 1,il,ln);
+        if (i >= 0 && i < 32) { // "intervalSteps[" index 12 is 's', "intervalStepisLerping[" index 12 is 'i'
+            if (k[12] == 's') lam->intervalSteps[i] = parse_float(v,il,ln);
+            else              lam->stepIsLerping[i] = parse_float(v,il,ln);
+        }
+        return;
     }
-    
-    for (int i=0;i <32;++i) {
-        StringFormat(buffer,sizeof(buffer),"intervalStepisLerping[%d]",i);
-        if (StringsEqual(trimmed_key,buffer)) { lam->stepIsLerping[i] = parse_float(trimmed_value,initialLine,lineNum); return; }
+
+    static const struct { const char* key; u16 offset; u8 type; } map[] = {
+        {"currentStep",__builtin_offsetof(LightAnimation,currentStep),1},{"lerpValue",__builtin_offsetof(LightAnimation,lerpValue),0},
+        {"intervalSteps.Length",__builtin_offsetof(LightAnimation,numIntervalSteps),1},{"intervalStepisLerping.Length",__builtin_offsetof(LightAnimation, numLerpSteps),1},
+        {"localPosition.x",__builtin_offsetof(Light,pos.x),0},{"localPosition.y",__builtin_offsetof(Light,pos.y),0},{"localPosition.z",__builtin_offsetof(Light,pos.z),0},
+        {"localRotation.x",__builtin_offsetof(Light,spotDir.x),0},{"localRotation.y",__builtin_offsetof(Light,spotDir.y),0},{"localRotation.z",__builtin_offsetof(Light,spotDir.z),0},{"localRotation.w",__builtin_offsetof(Light,spotDir.w),0},
+        {"range",__builtin_offsetof(Light,range),0},{"spotAngle",__builtin_offsetof(Light,spotAng),0},{"minIntensity",__builtin_offsetof(Light,minIntensity),0},{"maxIntensity",__builtin_offsetof(Light,maxIntensity),0},
+        {"color.r",__builtin_offsetof(Light,col.r),0},{"color.g",__builtin_offsetof(Light,col.g),0},{"color.b",__builtin_offsetof(Light,col.b),0}
+    };
+
+    for (int i = 0; i < (int)(sizeof(map)/sizeof(map[0])); i++) {
+        if (StringsEqual(k, map[i].key)) { // Types: 0 = float, 1 = u8.  Check key prefix to decide if pointing at 'lit' or 'lam'
+            void* dest = (k[0] == 'l' && k[1] == 'o') ? (void*)lit : (void*)lam;
+            if (k[0] == 'r' || k[0] == 's' || k[0] == 'm' || k[0] == 'c') {
+                if (k[1] != 'u') dest = (void*)lit; // range, spot, max, color (not currentStep)
+            }
+            
+            char* ptr = (char*)dest + map[i].offset;
+            if (map[i].type == 0) *(float*)ptr = parse_float(v,il,ln);
+            else                  *(u8*)ptr = parse_numberu8(v,il,ln);
+            return;
+        }
     }
-         if (StringsEqual(trimmed_key,"currentStep"))                  lam->currentStep = parse_numberu8(trimmed_value,initialLine,lineNum);
-    else if (StringsEqual(trimmed_key,"lerpValue"))                    lam->lerpValue = parse_float(trimmed_value,initialLine,lineNum);
-    else if (StringsEqual(trimmed_key,"intervalSteps.Length"))         lam->numIntervalSteps = parse_numberu8(trimmed_value,initialLine,lineNum);
-    else if (StringsEqual(trimmed_key,"intervalStepisLerping.Length")) lam->numLerpSteps = parse_numberu8(trimmed_value,initialLine,lineNum);
-    else if (StringsEqual(trimmed_key,"localPosition.x")) lit->pos.x = parse_float(trimmed_value,initialLine,lineNum);
-    else if (StringsEqual(trimmed_key,"localPosition.y")) lit->pos.y = parse_float(trimmed_value,initialLine,lineNum);
-    else if (StringsEqual(trimmed_key,"localPosition.z")) lit->pos.z = parse_float(trimmed_value,initialLine,lineNum);
-    else if (StringsEqual(trimmed_key,"localRotation.x")) lit->spotDir.x = parse_float(trimmed_value,initialLine,lineNum);
-    else if (StringsEqual(trimmed_key,"localRotation.y")) lit->spotDir.y = parse_float(trimmed_value,initialLine,lineNum);
-    else if (StringsEqual(trimmed_key,"localRotation.z")) lit->spotDir.z = parse_float(trimmed_value,initialLine,lineNum);
-    else if (StringsEqual(trimmed_key,"localRotation.w")) lit->spotDir.w = parse_float(trimmed_value,initialLine,lineNum);
-    else if (StringsEqual(trimmed_key,"intensity"))    lit->intensity = lit->maxIntensity = parse_float(trimmed_value,initialLine,lineNum) * 0.35f;
-    else if (StringsEqual(trimmed_key,"range"))        lit->range = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsEqual(trimmed_key,"spotAngle"))    lit->spotAng = parse_float(trimmed_value, initialLine, lineNum);
-    else if (StringsEqual(trimmed_key,"type")) {
-             if (StringsEqual(trimmed_value,"Spot"))        flag_setu32(&lit->lflags,LSPOT,true);
-        else if (StringsEqual(trimmed_value,"Directional")) flag_setu32(&lit->lflags,LDIR,true);
-    }
-    else if (StringsEqual(trimmed_key,"minIntensity")) lit->minIntensity = parse_float(trimmed_value,initialLine,lineNum);
-    else if (StringsEqual(trimmed_key,"maxIntensity")) lit->maxIntensity = parse_float(trimmed_value,initialLine,lineNum);
-    else if (StringsEqual(trimmed_key,"color.r"))      lit->col.r = parse_float(trimmed_value,initialLine,lineNum);
-    else if (StringsEqual(trimmed_key,"color.g"))      lit->col.g = parse_float(trimmed_value,initialLine,lineNum);
-    else if (StringsEqual(trimmed_key,"color.b"))      lit->col.b = parse_float(trimmed_value,initialLine,lineNum);
-    else if (StringsEqual(trimmed_key,"lightOn")) { // This exact value is duplicated from the Unity TargetIO class, ugh.
-        if (!alreadyReadLightOnOnce[lightIdx]) { alreadyReadLightOnOnce[lightIdx] = true; bool on = parse_bool(trimmed_value,initialLine,lineNum); flag_setu32(&lit->lflags,LIGHTON,on); }
-    }
-    else if (StringsEqual(trimmed_key,"lerpOn"))       flag_setu32(&lit->lflags,LERPON,parse_bool(trimmed_value,initialLine,lineNum));
+
+    if (StringsEqual(k,"intensity")) lit->intensity = lit->maxIntensity = parse_float(v,il,ln) * 0.35f;
+    else if (StringsEqual(k,"type")) flag_setu32(&lit->lflags, (v[0] == 'S') ? LSPOT : LDIR, true);
+    else if (StringsEqual(k,"lightOn") && !alreadyReadLightOnOnce[lIdx]) { alreadyReadLightOnOnce[lIdx] = true; flag_setu32(&lit->lflags,LIGHTON,parse_bool(v,il,ln)); }
+    else if (StringsEqual(k,"lerpOn")) flag_setu32(&lit->lflags,LERPON,parse_bool(v,il,ln));
 }
 
 static inline __attribute__((always_inline)) void mul_mat4(float *out, const float *a, const float *b) { // out = a * b
@@ -722,8 +703,8 @@ static int GetGlyphAndFont(u32 cp,stbtt_fontinfo**outFont,u8 fontID){
     return 0;
 }
 
-void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, unsigned char* bmp);
-void InitFontAtlasses(void){
+static void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, unsigned char* bmp);
+static void InitFontAtlasses(void){
     double t0=get_time();DualLog("Loading    5 fonts...");
     OsFileHandle fd1,fd2;int sz1,sz2;
     fontData[0]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[0],&fd1,&sz1);
@@ -1006,7 +987,7 @@ bool GetKeyRiseEdgeOrHeld(int settingIndex, bool risingEdge) {
 ENGINE_TO_MOD bool GetKey(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,false); }  // True while held down.
 ENGINE_TO_MOD bool GetKeyPressed(int settingIndex) { return (settingIndex < 0) ? Sys_Input.keyStates[GLFW_KEY_GRAVE_ACCENT].pressed : GetKeyRiseEdgeOrHeld(settingIndex,true); } // True 1st frame down.
 ENGINE_TO_MOD void IgnoreNextMouseDelta(void) { Sys_Input.ignore_next_mouse_delta = true; }
-OsFileHandle levelFileHandle; void CullInit(void); extern float modelBounds[MODEL_IDX_MAX];
+OsFileHandle levelFileHandle; const char** creditPages = NULL;
 ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
     double start_time = get_time();
     DebugRAM("start of LoadLevel");
@@ -1033,7 +1014,7 @@ ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
         e->shadRadius = e->radius * 1.41;
     }
     
-    ModInitAfterLoad(); ResetLevelAudio(); ResetLevelMusic();
+    ModInitAfterLoad(); ResetLevelAudio(); ResetLevelMusic(); creditPages = GetCreditsText();
     DualLog("Entity instances initialized after load\n");
     RenderLoadingProgress(110,"Loading cull system...");
     CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
@@ -1089,47 +1070,45 @@ __attribute__((cold)) void NewGame(void) { // Reset World States
     ModNewGame();
 }
 
-void GoIntoGame(void) { NewGame(); PlayGameMusic(); DualLog("Player named \"%s\" started the game!\n", Sys_Global.playerName); }
-
-void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, unsigned char* bmp) {
+static void GoIntoGame(void) { NewGame(); PlayGameMusic(); DualLog("Player named \"%s\" started the game!\n", Sys_Global.playerName); }
+static __attribute__((noinline)) void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, unsigned char* bmp) {
     if (*id == 0) {glGenTextures(1,id);} glBindTexture(GL_TEXTURE_2D,*id);
     glTexImage2D(GL_TEXTURE_2D,0,internalFormat,width,height,0,format,type,bmp);
     glTexParameteri(GL_TEXTURE_2D,0x2801/*GL_TEXTURE_MIN_FILTER*/,filt); glTexParameteri(GL_TEXTURE_2D,0x2800/*GL_TEXTURE_MAG_FILTER*/,filt);
 }
-
-void UpdateScreenSize(i32 width, i32 height) {
+static void GenBTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt) { GenerateAndBindTexture(id,internalFormat,width,height,format,type,filt,NULL); }
+static void UpdateScreenSize(i32 width, i32 height) {
     u16 w = Sys_Settings.ScreenWidth = vmax(vmin((u16)width,7680u),320u), h = Sys_Settings.ScreenHeight = vmax(vmin((u16)height,4320u),200u); // Cap at minimum Quake resolution and maximum 8k.
     float wf = (float)w, hf = (float)h; Sys_Settings.ScreenCenterX = wf * 0.5f; Sys_Settings.ScreenCenterY = hf * 0.5f;
-    glViewport(0,0,w,h);
-    glUseProgram(Sys_Render.imageBlitShaderProgram); glUniform1ui(2,w); glUniform1ui(3,h); glUniform1i(26,Sys_Settings.SSR_RES);
-    glUseProgram(Sys_Render.chunkShaderProgram); glUniform1ui(6,w); glUniform1ui(7,h);
-    glUseProgram(Sys_Render.ssrShaderProgram); glUniform1ui(0,w / Sys_Settings.SSR_RES); glUniform1ui(1,h / Sys_Settings.SSR_RES); glUniform1i(2,Sys_Settings.SSR_RES);
-    GenerateAndBindTexture(&Sys_Render.inputImageID,     GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/,NULL); // Lit Raster
-    GenerateAndBindTexture(&Sys_Render.inputWorldPosID,GL_RGBA32F,w,h,GL_RGBA,        GL_FLOAT,0x2600/*GL_NEAREST*/,NULL); // Raster World Positions
-    GenerateAndBindTexture(&Sys_Render.inputSpecID,      GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/,NULL); // Specular Colors
-    GenerateAndBindTexture(&Sys_Render.inputNormalID,    GL_RG16F,w,h, GL_RGB,        GL_FLOAT,0x2600/*GL_NEAREST*/,NULL); // Normal XYZ
-    GenerateAndBindTexture(&Sys_Render.inputDepthID,0x81A7/*GL_DEPTH_COMPONENT32*/,w,h,0x1902/*GL_DEPTH_COMPONENT*/,GL_FLOAT,0x2600/*GL_NEAREST*/,NULL); // Raster Depth
-    GenerateAndBindTexture(&Sys_Render.outputImageID,GL_RGBA8,w / Sys_Settings.SSR_RES,h / Sys_Settings.SSR_RES,GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,NULL);
-    glBindFramebuffer(GL_FRAMEBUFFER,Sys_Render.gBufferFBO);
-    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,Sys_Render.inputImageID,0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT1,GL_TEXTURE_2D,Sys_Render.inputWorldPosID,0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT2,GL_TEXTURE_2D,Sys_Render.inputSpecID,0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT3,GL_TEXTURE_2D,Sys_Render.inputNormalID,0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER,0x8D00/*GL_DEPTH_ATTACHMENT*/,GL_TEXTURE_2D,Sys_Render.inputDepthID,0);
-    glBindImageTexture(0,Sys_Render.inputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);      // Main Rendered Color
-    glBindImageTexture(1,Sys_Render.inputWorldPosID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA32F); // World Position XYZ
-    glBindImageTexture(2,Sys_Render.inputSpecID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);       // Specular
-    glBindImageTexture(4,Sys_Render.outputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);     // SSR result
-    glBindImageTexture(5,Sys_Render.inputNormalID,0,GL_FALSE,0,GL_READ_WRITE,GL_RG16F);     // Normal XYZ
+    glViewport(0,0,w,h); RenderSystem* rs = &Sys_Render;
+    glUseProgram(rs->imageBlitShaderProgram); glUniform1ui(2,w); glUniform1ui(3,h); glUniform1i(26,Sys_Settings.SSR_RES);
+    glUseProgram(rs->chunkShaderProgram); glUniform1ui(6,w); glUniform1ui(7,h);
+    glUseProgram(rs->ssrShaderProgram); glUniform1ui(0,w / Sys_Settings.SSR_RES); glUniform1ui(1,h / Sys_Settings.SSR_RES); glUniform1i(2,Sys_Settings.SSR_RES);
+    GenBTexture(&rs->inputImageID,     GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/); // Lit Raster
+    GenBTexture(&rs->inputWorldPosID,GL_RGBA32F,w,h,GL_RGBA,        GL_FLOAT,0x2600/*GL_NEAREST*/); // Raster World Positions
+    GenBTexture(&rs->inputSpecID,      GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/); // Specular Colors
+    GenBTexture(&rs->inputNormalID,    GL_RG16F,w,h, GL_RGB,        GL_FLOAT,0x2600/*GL_NEAREST*/); // Normal XYZ
+    GenBTexture(&rs->inputDepthID,0x81A7/*GL_DEPTH_COMPONENT32*/,w,h,0x1902/*GL_DEPTH_COMPONENT*/,GL_FLOAT,0x2600/*GL_NEAREST*/); // Raster Depth
+    GenBTexture(&rs->outputImageID,GL_RGBA8,w / Sys_Settings.SSR_RES,h / Sys_Settings.SSR_RES,GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/);
+    glBindFramebuffer(GL_FRAMEBUFFER,rs->gBufferFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,rs->inputImageID,0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT1,GL_TEXTURE_2D,rs->inputWorldPosID,0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT2,GL_TEXTURE_2D,rs->inputSpecID,0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT3,GL_TEXTURE_2D,rs->inputNormalID,0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER,0x8D00/*GL_DEPTH_ATTACHMENT*/,GL_TEXTURE_2D,rs->inputDepthID,0);
+    glBindImageTexture(0,rs->inputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);      // Main Rendered Color
+    glBindImageTexture(1,rs->inputWorldPosID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA32F); // World Position XYZ
+    glBindImageTexture(2,rs->inputSpecID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);       // Specular
+    glBindImageTexture(4,rs->outputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);     // SSR result
+    glBindImageTexture(5,rs->inputNormalID,0,GL_FALSE,0,GL_READ_WRITE,GL_RG16F);     // Normal XYZ
     glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_2D,Sys_Render.outputImageID);
+    glBindTexture(GL_TEXTURE_2D,rs->outputImageID);
     glBindFramebuffer(GL_FRAMEBUFFER,0);
-    glfwSwapBuffers();
 }
 
 ENGINE_TO_MOD void AddCamView(Vector3 pos, Quaternion rot, u8 fov, u16 width, u16 height, float near, float far) {    
     camViews[camViewCount] = (CamView){pos,rot,fov,width,height,near,far,Sys_Global.pauseRelativeTime + (camViewCount * 0.05f) + 0.5f,false}; // Staggered starts so not all at once for performance.
-    GenerateAndBindTexture(&camViewTextures[camViewCount],GL_RGBA8,width,height,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/,NULL); camViewCount++;
+    GenBTexture(&camViewTextures[camViewCount],GL_RGBA8,width,height,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/); camViewCount++;
 }
 
 static i32 initJoysticks(void) { if (!_glfw.joysticksInitialized && !PLATFORM_initJoysticks()) {return 0;} return _glfw.joysticksInitialized =  1; }

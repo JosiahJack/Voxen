@@ -58,6 +58,7 @@ static inline __attribute__((always_inline)) long OS_Open(const char* path, i32 
     return rax;
 }
 
+#include <pthread.h>
 #if defined(_WIN32) || defined(_WIN64)
     #define WINDOWS
     #define WIN32_LEAN_AND_MEAN // Let 'er rip, tater chip

@@ -94,35 +94,15 @@ static inline Vector3 ClosestPointOnTriangle(Vector3 a,Vector3 b,Vector3 c,Vecto
 
 static u32 GetCollisionMask(u32 layer) {
     switch (layer) {
-        case PhysicsLayer_Default:           return PhysicsLayer_Default|PhysicsLayer_TransparentFX|PhysicsLayer_IgnoreRaycast|PhysicsLayer_Geometry|PhysicsLayer_NPC|PhysicsLayer_PlayerBullets|PhysicsLayer_Player|PhysicsLayer_Corpse|PhysicsLayer_PhysObjects|PhysicsLayer_Sky|PhysicsLayer_Trigger|PhysicsLayer_Door|PhysicsLayer_InterDebris|PhysicsLayer_Player2|PhysicsLayer_Player3|PhysicsLayer_Player4|PhysicsLayer_NPCBullet|PhysicsLayer_Clip|PhysicsLayer_CorpseSearchable;
-        case PhysicsLayer_TransparentFX:     return PhysicsLayer_Default|PhysicsLayer_TransparentFX|PhysicsLayer_IgnoreRaycast|PhysicsLayer_Geometry|PhysicsLayer_NPC|PhysicsLayer_PlayerBullets|PhysicsLayer_Player|PhysicsLayer_PhysObjects|PhysicsLayer_Trigger|PhysicsLayer_Door|PhysicsLayer_InterDebris|PhysicsLayer_Player2|PhysicsLayer_NPCBullet|PhysicsLayer_Clip;
-        case PhysicsLayer_IgnoreRaycast:     return PhysicsLayer_Default|PhysicsLayer_TransparentFX|PhysicsLayer_IgnoreRaycast|PhysicsLayer_Geometry|PhysicsLayer_NPC|PhysicsLayer_PlayerBullets|PhysicsLayer_Player|PhysicsLayer_PhysObjects|PhysicsLayer_Trigger|PhysicsLayer_Door|PhysicsLayer_InterDebris|PhysicsLayer_Player2|PhysicsLayer_NPCBullet|PhysicsLayer_Clip;
-        case PhysicsLayer_Water:             return 0u;
-        case PhysicsLayer_UI:                return 0u;
-        case PhysicsLayer_GunViewModel:      return 0u;
-        case PhysicsLayer_Geometry:          return PhysicsLayer_Default|PhysicsLayer_TransparentFX|PhysicsLayer_IgnoreRaycast|PhysicsLayer_Geometry|PhysicsLayer_NPC|PhysicsLayer_PlayerBullets|PhysicsLayer_Player|PhysicsLayer_PhysObjects|PhysicsLayer_Trigger|PhysicsLayer_Door|PhysicsLayer_InterDebris|PhysicsLayer_Player2|PhysicsLayer_Clip;
-        case PhysicsLayer_NPC:               return PhysicsLayer_Default|PhysicsLayer_TransparentFX|PhysicsLayer_IgnoreRaycast|PhysicsLayer_Geometry|PhysicsLayer_NPC|PhysicsLayer_PlayerBullets|PhysicsLayer_Player|PhysicsLayer_PhysObjects|PhysicsLayer_Trigger|PhysicsLayer_NPCTrigger|PhysicsLayer_Door|PhysicsLayer_InterDebris|PhysicsLayer_Player2|PhysicsLayer_NPCBullet|PhysicsLayer_NPCClip|PhysicsLayer_Clip;
-        case PhysicsLayer_PlayerBullets:     return PhysicsLayer_Default|PhysicsLayer_TransparentFX|PhysicsLayer_IgnoreRaycast|PhysicsLayer_Geometry|PhysicsLayer_NPC|PhysicsLayer_PlayerBullets|PhysicsLayer_Player|PhysicsLayer_Corpse|PhysicsLayer_PhysObjects|PhysicsLayer_Door|PhysicsLayer_InterDebris|PhysicsLayer_Player2|PhysicsLayer_NPCBullet|PhysicsLayer_Clip|PhysicsLayer_CorpseSearchable;
-        case PhysicsLayer_Player:            return PhysicsLayer_Default|PhysicsLayer_TransparentFX|PhysicsLayer_IgnoreRaycast|PhysicsLayer_Geometry|PhysicsLayer_NPC|PhysicsLayer_PhysObjects|PhysicsLayer_PlayerTriggerOnly|PhysicsLayer_Trigger|PhysicsLayer_Door|PhysicsLayer_Player2|PhysicsLayer_NPCBullet|PhysicsLayer_Clip;
-        case PhysicsLayer_Corpse:            return PhysicsLayer_Default|PhysicsLayer_Geometry|PhysicsLayer_PlayerBullets|PhysicsLayer_PhysObjects|PhysicsLayer_Door|PhysicsLayer_NPCBullet|PhysicsLayer_Clip;
-        case PhysicsLayer_PhysObjects:       return PhysicsLayer_Default|PhysicsLayer_TransparentFX|PhysicsLayer_IgnoreRaycast|PhysicsLayer_Geometry|PhysicsLayer_NPC|PhysicsLayer_PlayerBullets|PhysicsLayer_Player|PhysicsLayer_Corpse|PhysicsLayer_PhysObjects|PhysicsLayer_Door|PhysicsLayer_InterDebris|PhysicsLayer_NPCBullet|PhysicsLayer_Clip;
-        case PhysicsLayer_Sky:               return PhysicsLayer_Default|PhysicsLayer_Player;
-        case PhysicsLayer_PlayerTriggerOnly: return PhysicsLayer_Player|PhysicsLayer_Player2|PhysicsLayer_Player3;
-        case PhysicsLayer_Trigger:           return PhysicsLayer_Default|PhysicsLayer_Geometry|PhysicsLayer_NPC|PhysicsLayer_PlayerBullets|PhysicsLayer_Player|PhysicsLayer_PhysObjects|PhysicsLayer_Door|PhysicsLayer_InterDebris|PhysicsLayer_Clip;
-        case PhysicsLayer_Door:              return PhysicsLayer_Default|PhysicsLayer_TransparentFX|PhysicsLayer_IgnoreRaycast|PhysicsLayer_Geometry|PhysicsLayer_NPC|PhysicsLayer_PlayerBullets|PhysicsLayer_Player|PhysicsLayer_Corpse|PhysicsLayer_PhysObjects|PhysicsLayer_Trigger|PhysicsLayer_Door|PhysicsLayer_InterDebris|PhysicsLayer_Player2|PhysicsLayer_NPCBullet|PhysicsLayer_Clip;
-        case PhysicsLayer_InterDebris:       return PhysicsLayer_Default|PhysicsLayer_Geometry|PhysicsLayer_NPC|PhysicsLayer_PlayerBullets|PhysicsLayer_PhysObjects|PhysicsLayer_Trigger|PhysicsLayer_Door|PhysicsLayer_NPCBullet|PhysicsLayer_Clip;
-        case PhysicsLayer_Player2:           return PhysicsLayer_Default|PhysicsLayer_TransparentFX|PhysicsLayer_IgnoreRaycast|PhysicsLayer_Geometry|PhysicsLayer_NPC|PhysicsLayer_PlayerBullets|PhysicsLayer_Player|PhysicsLayer_PhysObjects|PhysicsLayer_PlayerTriggerOnly|PhysicsLayer_Trigger|PhysicsLayer_Door|PhysicsLayer_InterDebris|PhysicsLayer_Player2|PhysicsLayer_NPCBullet|PhysicsLayer_Clip;
-        case PhysicsLayer_Player3:           return PhysicsLayer_Default|PhysicsLayer_TransparentFX|PhysicsLayer_IgnoreRaycast|PhysicsLayer_Geometry|PhysicsLayer_NPC|PhysicsLayer_PlayerBullets|PhysicsLayer_Player|PhysicsLayer_PhysObjects|PhysicsLayer_PlayerTriggerOnly|PhysicsLayer_Trigger|PhysicsLayer_Door|PhysicsLayer_InterDebris|PhysicsLayer_Player3|PhysicsLayer_NPCBullet|PhysicsLayer_Clip;
-        case PhysicsLayer_Player4:           return PhysicsLayer_Default|PhysicsLayer_TransparentFX|PhysicsLayer_IgnoreRaycast|PhysicsLayer_Geometry|PhysicsLayer_NPC|PhysicsLayer_PlayerBullets|PhysicsLayer_Player|PhysicsLayer_PhysObjects|PhysicsLayer_PlayerTriggerOnly|PhysicsLayer_Trigger|PhysicsLayer_Door|PhysicsLayer_InterDebris|PhysicsLayer_Player4|PhysicsLayer_NPCBullet|PhysicsLayer_Clip;
-        case PhysicsLayer_NPCTrigger:        return PhysicsLayer_NPC;
-        case PhysicsLayer_NPCBullet:         return PhysicsLayer_Default|PhysicsLayer_TransparentFX|PhysicsLayer_IgnoreRaycast|PhysicsLayer_Geometry|PhysicsLayer_PlayerBullets|PhysicsLayer_Player|PhysicsLayer_Corpse|PhysicsLayer_PhysObjects|PhysicsLayer_Door|PhysicsLayer_InterDebris|PhysicsLayer_Player2|PhysicsLayer_Clip|PhysicsLayer_CorpseSearchable;
-        case PhysicsLayer_NPCClip:           return PhysicsLayer_NPC;
-        case PhysicsLayer_Clip:              return PhysicsLayer_Player|PhysicsLayer_Player2|PhysicsLayer_Player3|PhysicsLayer_Player4|PhysicsLayer_NPC;
-        case PhysicsLayer_Automap:           return 0u;
-        case PhysicsLayer_Culling:           return 0u;
-        case PhysicsLayer_CorpseSearchable:  return PhysicsLayer_Default|PhysicsLayer_PlayerBullets;
-        default:                             return 0u;
-    }
+        case Layer_Default:         return 629079559u; case Layer_TransparentFX:    return 85876231u;  case Layer_IgnoreRaycast:return 85876231u;
+        case Layer_Geometry:        return 69099015u;  case Layer_NPC:              return 127819271u; case Layer_PlayerBullets:return 622624263u;
+        case Layer_Player:          return 85411335u;  case Layer_Corpse:           return 84167169u;  case Layer_PhysObjects:  return 84704775u;
+        case Layer_Sky:             return 4097u;      case Layer_PlayerTriggerOnly:return 3149824u;   case Layer_Trigger:      return 67919361u;
+        case Layer_Door:            return 85884423u;  case Layer_InterDebris:      return 84299265u;  case Layer_Player2:      return 85941767u;
+        case Layer_Player3:         return 86990343u;  case Layer_Player4:          return 89087495u;  case Layer_NPCTrigger:   return 1024u;
+        case Layer_NPCBullet:       return 605846023u; case Layer_NPCClip:          return 1024u;      case Layer_Clip:         return 7345152u;
+        case Layer_CorpseSearchable:return 2049u;
+    } return 0u;
 }
 
 static inline void obb_axes(Quaternion q,Vector3 *ax,Vector3 *ay,Vector3 *az) { *ax=quat_rotate_vector(q,(Vector3){1,0,0}); *ay=quat_rotate_vector(q,(Vector3){0,1,0}); *az=quat_rotate_vector(q,(Vector3){0,0,1}); }
@@ -210,15 +190,15 @@ static bool TestBoxBox(ShapeBox a,ShapeBox b,Contact *c) {
     return true;
 }
 
-static inline void Entity_GetCapsule(const Entity *e,ShapeCapsule *out) {
+static void Entity_GetCapsule(const Entity *e,ShapeCapsule *out) {
     float r=e->colliderSize.x, hi=vmax(0.0f,(e->colliderSize.y*0.5f)-r);
     Vector3 wc=Vector3_A_plus_B(e->position,quat_rotate_vector(e->rotation,e->colliderCenter));
     Vector3 axis=(e->colliderSize.z<0.5f)?quat_rotate_vector(e->rotation,(Vector3){1,0,0}):(e->colliderSize.z<1.5f)?quat_rotate_vector(e->rotation,(Vector3){0,1,0}):quat_rotate_vector(e->rotation,(Vector3){0,0,1});
     out->radius=r; out->base=Vector3_A_minus_B(wc,scale_vector3(axis,hi)); out->tip=Vector3_A_plus_B(wc,scale_vector3(axis,hi));
 }
-static inline void Entity_GetBox(const Entity *e,ShapeBox *out) { out->center=Vector3_A_plus_B(e->position,quat_rotate_vector(e->rotation,e->colliderCenter)); out->halfExtents=scale_vector3(e->colliderSize,0.5f); out->rot=e->rotation; }
-static inline void Entity_GetSphere(const Entity *e,ShapeSphere *out) { out->center=Vector3_A_plus_B(e->position,quat_rotate_vector(e->rotation,e->colliderCenter)); out->radius=e->colliderSize.x; }
 
+static void Entity_GetBox(const Entity *e,ShapeBox *out) { out->center=Vector3_A_plus_B(e->position,quat_rotate_vector(e->rotation,e->colliderCenter)); out->halfExtents=scale_vector3(e->colliderSize,0.5f); out->rot=e->rotation; }
+static void Entity_GetSphere(const Entity *e,ShapeSphere *out) { out->center=Vector3_A_plus_B(e->position,quat_rotate_vector(e->rotation,e->colliderCenter)); out->radius=e->colliderSize.x; }
 static u32 g_meshContactCount;
 static Contact g_meshContacts[MAX_MESH_CONTACTS];
 static void TestSphereMeshInstance(ShapeSphere ws,u16 instanceIdx) {
@@ -398,7 +378,7 @@ static void IntegrateAngularVelocity(u16 i,float dt) {
     e->rotation=IntegrateRotation(e->rotation,e->angularVelocity,dt); Sys_Global.dirtyInstances[i]=true;
 }
 
-void Physics_PrimitiveStep(float dt) {
+static void Physics_PrimitiveStep(float dt) {
     u16 n=Sys_Global.loadedInstances;
     ResetManifoldTable(); BuildCellBuckets(n);
     for (u16 i=START_INDEX_LEVEL_INSTANCES; i<n; ++i) {
@@ -434,7 +414,7 @@ void Physics_PrimitiveStep(float dt) {
     for (u16 i=START_INDEX_LEVEL_INSTANCES; i<n; ++i) {if (Sys_Global.instances[i].entflags&ENTFLAG_RIGIDBODY) UpdateSleep(i,dt);}
 }
  
-void Physics_ResetForLevelLoad(void) {
+static void Physics_ResetForLevelLoad(void) {
     MemSetToValueForNBytes(g_manifolds,0,sizeof(g_manifolds)); MemSetToValueForNBytes(g_manifoldHT,0,sizeof(g_manifoldHT)); MemSetToValueForNBytes(g_sleepCounter,0,sizeof(g_sleepCounter));
     g_manifoldCount=0;
 }
@@ -445,7 +425,7 @@ static inline float DefaultInertia(const Entity *e) {
     float hx=e->colliderSize.x*0.5f, hy=e->colliderSize.y*0.5f, hz=e->colliderSize.z*0.5f;
     return m*(hx*hx+hy*hy+hz*hz)*(1.0f/3.0f);
 }
-void Physics_InitEntityInertia(u16 idx) { Entity *e=&Sys_Global.instances[idx]; if (e->inertia<0.0001f) e->inertia=DefaultInertia(e); }
+static void Physics_InitEntityInertia(u16 idx) { Entity *e=&Sys_Global.instances[idx]; if (e->inertia<0.0001f) e->inertia=DefaultInertia(e); }
 static CapsuleContact QueryCapsuleContact(Vector3 start,Vector3 end,float capsuleRadius,u32 layerMask) {
     CapsuleContact worst=(CapsuleContact){.depth=-1.0f,.normal={0,1,0}};
     i32 cxMin=vmax(0,vmin(WORLDX-1,PosGetCellCoordX(vmin(start.x,end.x)-capsuleRadius)));
@@ -563,7 +543,7 @@ ENGINE_TO_MOD void ApplyPlayerMovements(void) {
 }
 
 const Vector3 gravityVelocity={0.0f,-9.81f,0.0f};
-void UpdateVelocityFromGravity(void) {
+static void UpdateVelocityFromGravity(void) {
     if (Sys_Global.pauseRelativeTime<10.0f) return;
     for (u32 i=PLAYER1; i<INSTANCE_COUNT; ++i) {
         if (i>(u32)Sys_Global.loadedInstances) return;
@@ -683,6 +663,10 @@ static void ClampVelocity(void) {
         Vector3 v=Sys_Global.instances[i].velocity;
         if (magnitude_vector3(v)>TERMINAL_VELOCITY) Sys_Global.instances[i].velocity=scale_vector3(normalize_vector3(v),TERMINAL_VELOCITY);
     }
+}
+
+void UpdateTriggers(void) {
+    // Simple AABB checks against center points, not related to rest of physics system
 }
 
 static void Physics(void) {

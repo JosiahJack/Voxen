@@ -306,71 +306,71 @@ typedef u8 ButtonType;static const u8 ButtonType_Generic=0,ButtonType_GeneralInv
 typedef u8 TabMSG;static const u8 TabMSG_None=0,TabMSG_Search=1,TabMSG_AudioLog=2,TabMSG_Keypad=3,TabMSG_Elevator=4,TabMSG_GridPuzzle=5,TabMSG_WirePuzzle=6,TabMSG_EReader=7,TabMSG_Weapon=8,TabMSG_SystemAnalyzer=9;
 typedef u8 PuzzleCellType;static const u8 PuzzleCellType_Off=0,PuzzleCellType_Standard=1,PuzzleCellType_And=2,PuzzleCellType_Bypass=3;
 typedef u8 PuzzleGridType;static const u8 PuzzleGridType_King=0,PuzzleGridType_Queen=1,PuzzleGridType_Knight=2,PuzzleGridType_Rook=3,PuzzleGridType_Bishop=4,PuzzleGridType_Pawn=5;
-typedef u32 PhysicsLayer;
-static const u32 PhysicsLayer_Default          = (1u << 0);
-static const u32 PhysicsLayer_TransparentFX    = (1u << 1);
-static const u32 PhysicsLayer_IgnoreRaycast    = (1u << 2);
-//                                                   (1u << 3)  // unused
-static const u32 PhysicsLayer_Water            = (1u << 4);
-static const u32 PhysicsLayer_BlocksRaycast    = (1u << 4); // same as Water
-static const u32 PhysicsLayer_UI               = (1u << 5);
-//                                                   (1u << 6)  // unused
-//                                                   (1u << 7)  // unused
-static const u32 PhysicsLayer_GunViewModel     = (1u << 8);
-static const u32 PhysicsLayer_Geometry         = (1u << 9);
-static const u32 PhysicsLayer_NPC              = (1u << 10);
-static const u32 PhysicsLayer_PlayerBullets    = (1u << 11);
-static const u32 PhysicsLayer_Player           = (1u << 12);
-static const u32 PhysicsLayer_Corpse           = (1u << 13);
-static const u32 PhysicsLayer_PhysObjects      = (1u << 14);
-static const u32 PhysicsLayer_Sky              = (1u << 15);
-static const u32 PhysicsLayer_PlayerTriggerOnly= (1u << 16);
-static const u32 PhysicsLayer_Trigger          = (1u << 17);
-static const u32 PhysicsLayer_Door             = (1u << 18);
-static const u32 PhysicsLayer_InterDebris      = (1u << 19);
-static const u32 PhysicsLayer_Player2          = (1u << 20);
-static const u32 PhysicsLayer_Player3          = (1u << 21);
-static const u32 PhysicsLayer_Player4          = (1u << 22);
-static const u32 PhysicsLayer_NPCTrigger       = (1u << 23);
-static const u32 PhysicsLayer_NPCBullet        = (1u << 24);
-static const u32 PhysicsLayer_NPCClip          = (1u << 25);
-static const u32 PhysicsLayer_Clip             = (1u << 26);
-static const u32 PhysicsLayer_Automap          = (1u << 27);
-static const u32 PhysicsLayer_Culling          = (1u << 28);
-static const u32 PhysicsLayer_CorpseSearchable = (1u << 29);
-//                                                   (1u << 30) // unused
-static const u32 PhysicsLayer_NULL             = (1u << 31);
+static const u32 Layer_Default          = 1U;
+static const u32 Layer_TransparentFX    = 2U;
+static const u32 Layer_IgnoreRaycast    = 4U;
+//                                               8U  // unused
+static const u32 Layer_Water            = 16U;
+static const u32 Layer_BlocksRaycast    = 16U; // same as Water
+static const u32 Layer_UI               = 32U;
+//                                               64U  // unused
+//                                               128U  // unused
+static const u32 Layer_GunViewModel     = 256U;
+static const u32 Layer_Geometry         = 512U;
+static const u32 Layer_NPC              = 1024U;
+static const u32 Layer_PlayerBullets    = 2048U;
+static const u32 Layer_Player           = 4096U;
+static const u32 Layer_Corpse           = 8192U;
+static const u32 Layer_PhysObjects      = 16384U;
+static const u32 Layer_Sky              = 32768U;
+static const u32 Layer_PlayerTriggerOnly= 65536U;   // Fixed typo
+static const u32 Layer_Trigger          = 131072U;
+static const u32 Layer_Door             = 262144U;
+static const u32 Layer_InterDebris      = 524288U;
+static const u32 Layer_Player2          = 1048576U;
+static const u32 Layer_Player3          = 2097152U;
+static const u32 Layer_Player4          = 4194304U;
+static const u32 Layer_NPCTrigger       = 8388608U;
+static const u32 Layer_NPCBullet        = 16777216U;
+static const u32 Layer_NPCClip          = 33554432U;
+static const u32 Layer_Clip             = 67108864U;
+static const u32 Layer_Automap          = 134217728U;
+static const u32 Layer_Culling          = 268435456U;
+static const u32 Layer_CorpseSearchable = 536870912U;
+//                                               1073741824U // unused
+static const u32 Layer_NULL             = 2147483648U;
 
-#define LAYER_MASK_PLAYER_COLLIDESWITH (PhysicsLayer_Clip | PhysicsLayer_NPCBullet | PhysicsLayer_Player2 | PhysicsLayer_Door \
-                                       | PhysicsLayer_Trigger | PhysicsLayer_PlayerTriggerOnly | PhysicsLayer_Default | PhysicsLayer_TransparentFX \
-                                       | PhysicsLayer_IgnoreRaycast | PhysicsLayer_Geometry | PhysicsLayer_NPC)
 
-#define LAYER_MASK_NPC_COLLIDESWITH (PhysicsLayer_Clip | PhysicsLayer_NPCClip | PhysicsLayer_PlayerBullets | PhysicsLayer_Player2 | PhysicsLayer_Player | PhysicsLayer_Door \
-                                    | PhysicsLayer_Trigger | PhysicsLayer_NPCTrigger | PhysicsLayer_Default | PhysicsLayer_TransparentFX \
-                                    | PhysicsLayer_IgnoreRaycast | PhysicsLayer_Geometry | PhysicsLayer_NPC)
+#define LAYER_MASK_PLAYER_COLLIDESWITH (Layer_Clip | Layer_NPCBullet | Layer_Player2 | Layer_Door \
+                                       | Layer_Trigger | Layer_PlayerTriggerOnly | Layer_Default | Layer_TransparentFX \
+                                       | Layer_IgnoreRaycast | Layer_Geometry | Layer_NPC)
 
-#define LAYER_MASK_NPC_SIGHT (PhysicsLayer_Default | PhysicsLayer_Geometry | PhysicsLayer_Door | PhysicsLayer_InterDebris \
-                             | PhysicsLayer_PhysObjects | PhysicsLayer_Player)
+#define LAYER_MASK_NPC_COLLIDESWITH (Layer_Clip | Layer_NPCClip | Layer_PlayerBullets | Layer_Player2 | Layer_Player | Layer_Door \
+                                    | Layer_Trigger | Layer_NPCTrigger | Layer_Default | Layer_TransparentFX \
+                                    | Layer_IgnoreRaycast | Layer_Geometry | Layer_NPC)
 
-#define LAYER_MASK_NPC_ATTACK (PhysicsLayer_Default | PhysicsLayer_Geometry | PhysicsLayer_NPC | PhysicsLayer_Door \
-                              | PhysicsLayer_InterDebris | PhysicsLayer_PhysObjects | PhysicsLayer_Player)
+#define LAYER_MASK_NPC_SIGHT (Layer_Default | Layer_Geometry | Layer_Door | Layer_InterDebris \
+                             | Layer_PhysObjects | Layer_Player)
 
-#define LAYER_MASK_NPC_COLLISION (PhysicsLayer_Default | PhysicsLayer_TransparentFX | PhysicsLayer_IgnoreRaycast | PhysicsLayer_Geometry \
-                                 | PhysicsLayer_NPC | PhysicsLayer_Door | PhysicsLayer_InterDebris | PhysicsLayer_Player \
-                                 | PhysicsLayer_Clip | PhysicsLayer_NPCClip | PhysicsLayer_PhysObjects)
+#define LAYER_MASK_NPC_ATTACK (Layer_Default | Layer_Geometry | Layer_NPC | Layer_Door \
+                              | Layer_InterDebris | Layer_PhysObjects | Layer_Player)
 
-#define LAYER_MASK_PLAYER_FROB (PhysicsLayer_Default | PhysicsLayer_Geometry | PhysicsLayer_Water | PhysicsLayer_Door \
-                               | PhysicsLayer_InterDebris | PhysicsLayer_PhysObjects | PhysicsLayer_CorpseSearchable)
+#define LAYER_MASK_NPC_COLLISION (Layer_Default | Layer_TransparentFX | Layer_IgnoreRaycast | Layer_Geometry \
+                                 | Layer_NPC | Layer_Door | Layer_InterDebris | Layer_Player \
+                                 | Layer_Clip | Layer_NPCClip | Layer_PhysObjects)
 
-#define LAYER_MASK_PLAYER_TARGET_ID_FROB (PhysicsLayer_Default | PhysicsLayer_Geometry | PhysicsLayer_Door | PhysicsLayer_NPC | PhysicsLayer_CorpseSearchable)
+#define LAYER_MASK_PLAYER_FROB (Layer_Default | Layer_Geometry | Layer_Water | Layer_Door \
+                               | Layer_InterDebris | Layer_PhysObjects | Layer_CorpseSearchable)
 
-#define LAYER_MASK_PLAYER_ATTACK (PhysicsLayer_Default | PhysicsLayer_Geometry | PhysicsLayer_NPC | PhysicsLayer_PlayerBullets \
-                                 | PhysicsLayer_Door | PhysicsLayer_InterDebris | PhysicsLayer_PhysObjects | PhysicsLayer_CorpseSearchable)
+#define LAYER_MASK_PLAYER_TARGET_ID_FROB (Layer_Default | Layer_Geometry | Layer_Door | Layer_NPC | Layer_CorpseSearchable)
 
-#define LAYER_MASK_EXPLOSION (PhysicsLayer_Default | PhysicsLayer_Geometry | PhysicsLayer_NPC | PhysicsLayer_PlayerBullets | PhysicsLayer_Door \
-                             | PhysicsLayer_InterDebris | PhysicsLayer_PhysObjects | PhysicsLayer_Player | PhysicsLayer_Player2 | PhysicsLayer_CorpseSearchable)
+#define LAYER_MASK_PLAYER_ATTACK (Layer_Default | Layer_Geometry | Layer_NPC | Layer_PlayerBullets \
+                                 | Layer_Door | Layer_InterDebris | Layer_PhysObjects | Layer_CorpseSearchable)
 
-#define LAYER_MASK_PLAYER_FEET (PhysicsLayer_Default | PhysicsLayer_Geometry)
+#define LAYER_MASK_EXPLOSION (Layer_Default | Layer_Geometry | Layer_NPC | Layer_PlayerBullets | Layer_Door \
+                             | Layer_InterDebris | Layer_PhysObjects | Layer_Player | Layer_Player2 | Layer_CorpseSearchable)
+
+#define LAYER_MASK_PLAYER_FEET (Layer_Default | Layer_Geometry)
 typedef struct {
 	i32 InputCodeSettings[42];
 	u16 ScreenWidth,ScreenHeight;

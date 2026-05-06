@@ -859,7 +859,7 @@ static void createKeyTables(void) {
     
     i32 _glfwWindowFocusedX11(_GLFWwindow* window) { Window focused; int state; _glfw.x11.xlib.GetInputFocus(_glfw.x11.display,&focused,&state); return window->x11.handle==focused; }
     i32 _glfwWindowVisibleX11(_GLFWwindow* window) { XWindowAttributes wa; _glfw.x11.xlib.GetWindowAttributes(_glfw.x11.display,window->x11.handle,&wa); return wa.map_state==2/*IsViewable*/; }
-    void UpdateScreenSize(i32 width, i32 height);
+    static void UpdateScreenSize(i32 width, i32 height);
     static void processEvent(XEvent* event) {
         unsigned int keycode=0; Bool filtered=0;
         if (event->type==2/*KeyPress*/ || event->type==3/*KeyRelease*/) keycode=event->xkey.keycode;
@@ -1722,7 +1722,7 @@ void TextEntry(i32 k) {
     if (c) { Sys_Global.playerName[currentPlayerNameLength] = c; Sys_Global.playerName[++currentPlayerNameLength] = '\0'; }
 }
 
-void GoIntoGame(void); void ConsoleEmulator(i32 keycode); extern bool enteringPlayerName;
+static void GoIntoGame(void); void ConsoleEmulator(i32 keycode); extern bool enteringPlayerName;
 void _glfwInputKey(_GLFWwindow* window,int key,int action) {
     if (key >= 0 && key <= GLFW_KEY_LAST) {
         i32 repeated = 0;

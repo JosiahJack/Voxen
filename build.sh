@@ -41,34 +41,16 @@ fi
 
 # Convert shaders into string headers
 gh() {
-    local infile="$1"
-    local varname="$2"
-    local outfile="$infile.h"
-    sed 's|//.*||g' "$infile" \
-        | sed 's/\t/ /g' \
-        | awk '
-            /^\s*#/ {
-                gsub(/^\s+|\s+$/, ""); print; next
-            }
-            {
-                gsub(/[ \t]+/, " ")
-                gsub(/^[ \t]+|[ \t]+$/, "")
-                if (NF == 0) next
-                gsub(/ *\* */,"*");  gsub(/ *\/ */,"/");  gsub(/ *\+ */,"+")
-                gsub(/ *- */,"-");   gsub(/ *< */,"<");  gsub(/ *> */,">")
-                gsub(/ *== */,"=="); gsub(/ *!= */,"!=");gsub(/ *<= */,"<=")
-                gsub(/ *>= */,">="); gsub(/ *= */,"=");  gsub(/ *, */,",");
-                gsub(/ *; */,";");   gsub(/ *\{ */,"{"); gsub(/ *\} */,"}")
-                gsub(/ *\(/,"(");    gsub(/ *\) */,")"); gsub(/ *\[/,"[")
-                gsub(/ *\] */,"]");  gsub(/ *\. */,".")
-                printf "%s", $0
-            }
-            END { print "" }
-        ' \
-        | sed 's/"/\\"/g; s/^/"/; s/$/\\n"/' \
-        | sed "1i static const char* $varname =" \
-        | sed '$a ;' \
-        > "$outfile"
+    sed 's|//.*||g' "$1" | awk '
+    /^\s*#/ {gsub(/^\s+|\s+$/,"");printf"%s\\n",$0;next}
+    {gsub(/\/\/.*/,"");gsub(/[ \t\r\n]+/," ");gsub(/^[ \t]+|[ \t]+$/,"");if(NF==0)next
+    gsub(/ *\* */,"*");gsub(/ *\/ */,"/");gsub(/ *\+ */,"+");gsub(/ *- */,"-")
+    gsub(/ *< */,"<");gsub(/ *> */ ,">");gsub(/ *== */,"==");gsub(/ *!= */,"!=")
+    gsub(/ *<= */,"<=");gsub(/ *>= */ ,">=");gsub(/ *= */,"=");gsub(/ *, */ ,",")
+    gsub(/ *; */ ,";");gsub(/ *\{ */,"{");gsub(/ *\} */,"}");gsub(/ *\(/ ,"(")
+    gsub(/ *\) */ ,")");gsub(/ *\[/ ,"[" );gsub(/ *\] */ ,"]");gsub(/ *\. */ ,".")
+    printf"%s",$0} END{print""}' | tr -d '\n' | sed 's/"/\\"/g' | \
+    sed "s|^|static const char* $2 = \"|;s|$|\";|" > "${1%}.h"
 }
 
 # Shaders and their C variable names
@@ -119,13 +101,13 @@ COMMON_CFLAGS="-ferror-limit=500 -fno-exceptions -fno-stack-protector -fno-async
                -fomit-frame-pointer -g0 -fstrict-aliasing -fcommon -Walloca -DMA_USE_STDINT \
                -Wformat=2 -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings -fno-math-errno -fno-sanitize=all \
                -fno-trapping-math -fmerge-all-constants -m64 -Os -march=haswell -fstack-usage"
-COMMON_LFLAGS="-Wl,-z,now -Wl,-z,relro -Wl,--gc-sections -Wl,-z,norelro -Wl,--build-id=none $ZIG_LIBS"
+COMMON_LFLAGS="-Wl,-z,now -Wl,-z,relro -Wl,--gc-sections -Wl,--as-needed -Wl,--strip-all -Wl,-z,norelro -Wl,--build-id=none $ZIG_LIBS"
 if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
     LINKER=$CC
     CFLAGS="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe"
     CFLAGSGC="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe"
-    LDFLAGS="$COMMON_LFLAGS -L. -lgdi32 -lopengl32 -lole32 -lcomdlg32 -Wl,--out-implib=voxen.lib -Xlinker /pdb:none"
+    LDFLAGS="$COMMON_LFLAGS -L. -lgdi32 -lopengl32 -lole32 -Wl,--out-implib=voxen.lib -Xlinker /pdb:none"
     LDFLAGSGC="$COMMON_LFLAGS -Wl,--allow-shlib-undefined -Wl,--entry,DllMainCRTStartup -Wl,--subsystem,windows -Wl,--no-entry -L. -lvoxen -Xlinker /pdb:none"
     BINARY_NAME="voxen.exe"
     BINARY_NAMEGC="Citadel.dll"

@@ -777,7 +777,7 @@ MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(void) { // Global condition
         
         EntityDefinitions[i].rotation = QUAT_IDENTITY;
         EntityDefinitions[i].lodIndex = MODEL_IDX_MAX;
-        if (!EntityDefinitions[i].layer) EntityDefinitions[i].layer = PhysicsLayer_Default;
+        if (!EntityDefinitions[i].layer) EntityDefinitions[i].layer = Layer_Default;
         // TODO REMOVE!  TESTING WITH SPHERES FOR EVERYTHING NON BOX!
         if (EntityDefinitions[i].collider != COLLIDER_TYPE_BOX) {
             EntityDefinitions[i].collider = COLLIDER_TYPE_SPHERE;
