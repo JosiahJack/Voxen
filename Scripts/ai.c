@@ -897,11 +897,7 @@ static void ProjectileRaycast(Entity* self, int n) {
     if (!hit.hit) return;
 
     u16 hi = hit.hitInstanceIndex;
-    // TODO: laser effect SpawnDynamicObject(408) when npc has laser on attack
-
-    // Targeting laser (Cyborg Elite, attack3)
-    if (n == 3 && self->index == 427 && eidx) AddDebugLine(ai_sight_pos(self), Eng_Global->instances[eidx].position);
-
+    if (n == 3 && self->index == 427 && eidx) AddDebugLine(ai_sight_pos(self), Eng_Global->instances[eidx].position,(Color){1.0f,0.15f,0.18f,0.85f}); // Targeting laser (Cyborg Elite, attack3)
     DamageData dd = SetNPCData(self, n);
     dd.hitpoint     = hit.point;
     dd.attacknormal = dir;
@@ -1023,7 +1019,8 @@ static void AIAttack3(Entity* self) {
         AIMakeAttack(self, npc->attackType3, 3);
     }
     
-    if (self->index == 427 && self->enemy) AddDebugLine(ai_sight_pos(self),Eng_Global->instances[self->enemy].position);
+    if (self->index == 427 && self->enemy) AddDebugLine(ai_sight_pos(self),Eng_Global->instances[self->enemy].position,(Color){1.0f,0.15f,0.18f,0.85f});
+    if (self->index == 433 && self->enemy) AddDebugLine(ai_sight_pos(self),Eng_Global->instances[self->enemy].position,(Color){0.96f,1.0f,0.0f,0.88f});
     if (self->attackFinished < Eng_Global->pauseRelativeTime) AITransitionAttackToRun(self, 3);
 }
 

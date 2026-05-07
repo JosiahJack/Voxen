@@ -138,7 +138,7 @@ ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, u32
 ENGINE_TO_MOD void RaycastAll(Vector3 origin, Vector3 dir, float distance, u32 layerMask, RaycastHit* hits, u16 maxCount);
 ENGINE_TO_MOD RaycastHit CapsuleCast(Vector3 start, Vector3 end, float capsuleRadius, float castDist, u32 layerMask, bool hitTriggers);
 ENGINE_TO_MOD bool CheckCapsule(Vector3 start, Vector3 end, float capsuleRadius, float capsuleHeight, u32 layerMask);
-ENGINE_TO_MOD void AddDebugLine(Vector3 start, Vector3 end);
+ENGINE_TO_MOD void AddDebugLine(Vector3 start, Vector3 end, Color col);
 ENGINE_TO_MOD i32 PosGetCellCoords(float pos_x, float pos_z);
 ENGINE_TO_MOD int StringFormatV(char* buffer, size_t bufferSize, const char* format, va_list args); // vsnprintf replacement
 ENGINE_TO_MOD int StringFormat(char* buffer, size_t bufferSize, const char* format, ...); // snprintf replacement

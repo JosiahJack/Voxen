@@ -3421,7 +3421,7 @@ MOD_TO_ENGINE void ModUpdate(bool player1Moved) {
     PatchUpdate(PLAYER1);
     HardwareUpdate(PLAYER1,player1Moved);
     if (Use()) Frob(Eng_Global->instances[PLAYER1].position,Eng_Global->instances[PLAYER1].forward,Eng_Global->instances[PLAYER1].right);
-    if (Eng_Global->pauseRelativeTime < Eng_Global->debugLineFinished && (Eng_Global->debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Eng_Global->debugLine_start,Eng_Global->debugLine_end);
+    if (Eng_Global->pauseRelativeTime < Eng_Global->debugLineFinished && (Eng_Global->debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Eng_Global->debugLine_start,Eng_Global->debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f});
     for (u16 i = START_INDEX_LEVEL_INSTANCES; i < Eng_Global->loadedInstances; ++i) {
         Entity* e = &Eng_Global->instances[i];
         TextureSequenceUpdate(i);
@@ -3615,10 +3615,10 @@ MOD_TO_ENGINE void PlayerInit(u16 i) {
 MOD_TO_ENGINE const char** GetCreditsText(void) { return creditPages; }
 MOD_TO_ENGINE void ModInitAfterLoad(void) {
     for (int i=PLAYER1;i<Eng_Global->loadedInstances;++i) {
-        Entity* e = &Eng_Global->instances[i];
-        u16 constIndex = e->index;
-        if (i == PLAYER1 || i == PLAYER2 || ConstIndexIsDynamicObject(constIndex)) e->gravity = 1.0f;
-        else e->gravity = 0.0f;
+        Entity* e = &Eng_Global->instances[i]; u16 constIndex = e->index;
+//         if (i == PLAYER1 || i == PLAYER2 || ConstIndexIsDynamicObject(constIndex) || (ConstIndexIsNPC(constIndex) && constIndex < 443/*not cyber*/)) e->gravity = 1.0f;
+//         else e->gravity = 0.0f;
+        
         if (ConstIndexIsGeometry(constIndex)) e->layer = Layer_Geometry;
         else if (ConstIndexIsDoor(constIndex)) e->layer = Layer_Door;
         else if (ConstIndexIsUsableObject(constIndex)) UsableInit(i);

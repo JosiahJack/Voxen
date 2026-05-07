@@ -825,7 +825,8 @@ index: 609
 index: 610
 #Models/switch3.obj
 index: 611
-
+#Models/testtube_collider.obj
+index: 612
 #Models/switch5_broken.obj
 index: 613
 #Models/vending2_1.obj

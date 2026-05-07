@@ -1,9 +1,7 @@
 // physics.c
-#include <assert.h>
 #define MAX_CONTACTS_PER_PAIR 4
 #define MAX_MESH_CONTACTS MAX_CONTACTS_PER_PAIR
 #define MAX_MANIFOLDS 2048
-#define CELL_BUCKET_CAP 32
 #define MANIFOLD_HT_SIZE 4096
 #define MANIFOLD_HT_MASK (MANIFOLD_HT_SIZE-1)
 #define SOLVER_ITERATIONS     6
@@ -31,15 +29,8 @@ typedef struct { Vector3 center; float radius; } ShapeSphere;
 typedef struct { Vector3 tip,base; float radius; } ShapeCapsule;
 typedef struct { Vector3 pointWorld,normal; float depth,lambdaN,lambdaT; } Contact;
 typedef struct { u16 idxA,idxB; u8 count; Contact contacts[MAX_CONTACTS_PER_PAIR]; } ContactManifold;
-typedef struct { u16 idx[CELL_BUCKET_CAP]; u8 count; } CellBucket;
 ContactManifold g_manifolds[MAX_MANIFOLDS]; u16 g_manifoldCount = 0;
-static CellBucket g_cellBuckets[ARRSIZE];
-
-
-
-//=========================
-
-
+//========================
 // REMOVE
 // Validation layer
 static inline __attribute__((always_inline)) int isnan(double x) { return x != x; }
@@ -58,40 +49,16 @@ static inline __attribute__((always_inline)) bool IsValidQuaternion(Quaternion q
 static inline __attribute__((always_inline)) void ValidateEntity(u16 idx, const char* context) {
     assert(idx < INSTANCE_COUNT);
     Entity *e = &Sys_Global.instances[idx];
-    assert(e != NULL);
-    DualLog("PHYS ValidateEntity[%d] %s: pos=(%.4f,%.4f,%.4f) vel=(%.4f,%.4f,%.4f) active=%d rigid=%d\n",
-            idx, context, e->position.x, e->position.y, e->position.z,
-            e->velocity.x, e->velocity.y, e->velocity.z,
-            (e->entflags&ENTFLAG_ACTIVE)!=0, (e->entflags&ENTFLAG_RIGIDBODY)!=0);
+    assert(e != NULL); (void)context;
+    //DualLog("PHYS ValidateEntity[%d] %s: pos=(%.4f,%.4f,%.4f) vel=(%.4f,%.4f,%.4f) active=%d rigid=%d\n",
+            //idx, context, e->position.x, e->position.y, e->position.z,
+            //e->velocity.x, e->velocity.y, e->velocity.z,
+            //(e->entflags&ENTFLAG_ACTIVE)!=0, (e->entflags&ENTFLAG_RIGIDBODY)!=0);
     assert(IsValidVector3(e->position));
     assert(IsValidVector3(e->velocity));
     assert(IsValidQuaternion(e->rotation));
 }
-
-//=========================
-
-
-
-
-
-static void BuildCellBuckets(u16 n) {
-    assert(n <= Sys_Global.loadedInstances && "n exceeds loaded count");
-    MemSetToValueForNBytes(g_cellBuckets,0,sizeof(g_cellBuckets));
-    for (u16 i=START_INDEX_LEVEL_INSTANCES; i<n; ++i) {
-        Entity *e=&Sys_Global.instances[i];
-        if (!(e->entflags&ENTFLAG_ACTIVE) || e->collider==COLLIDER_TYPE_NONE) continue;
-        u32 ci=e->cellIndex;
-        assert(ci < ARRSIZE);
-        CellBucket *b=&g_cellBuckets[ci];
-        assert(b->count <= CELL_BUCKET_CAP);
-        if (b->count < CELL_BUCKET_CAP) {
-            b->idx[b->count++]=i;
-        } else {
-            DualLog("PHYS WARNING: CellBucket overflow at cell %u\n", ci);
-        }
-    }
-}
-
+//========================
 static u32 g_manifoldHT[MANIFOLD_HT_SIZE];
 static inline u32 ManifoldKey(u16 a,u16 b) { if (a>b) { u16 t=a; a=b; b=t; } return (u32)a*7681u+b; }
 static ContactManifold* FindOrCreateManifold(u16 idxA,u16 idxB) {
@@ -109,7 +76,7 @@ static ContactManifold* FindOrCreateManifold(u16 idxA,u16 idxB) {
             g_manifoldHT[slot]=(u32)mi+1;
             ContactManifold *m=&g_manifolds[mi];
             m->idxA=idxA; m->idxB=idxB; m->count=0;
-            DualLog("PHYS New manifold %d between %d-%d\n", mi, idxA, idxB);
+            //DualLog("PHYS New manifold %d between %d-%d\n", mi, idxA, idxB);
             return m;
         }
         ContactManifold *m=&g_manifolds[v-1];
@@ -234,6 +201,7 @@ static bool TestSphereBox(ShapeSphere s,ShapeBox box,Contact *c) {
     c->depth=s.radius-dist; c->pointWorld=closest; c->lambdaN=c->lambdaT=0.0f;
     return true;
 }
+
 static bool TestCapsuleBox(ShapeCapsule cap,ShapeBox box,Contact *c) {
     assert(IsValidVector3(cap.base) && IsValidVector3(cap.tip));
     Contact best; best.depth=-1.0f;
@@ -242,36 +210,52 @@ static bool TestCapsuleBox(ShapeCapsule cap,ShapeBox box,Contact *c) {
         Contact ct; Vector3 sp=Vector3_A_plus_B(cap.base,scale_vector3(Vector3_A_minus_B(cap.tip,cap.base),ts[i]));
         if (TestSphereBox((ShapeSphere){sp,cap.radius},box,&ct)&&ct.depth>best.depth) best=ct;
     }
-    assert(!result || best.depth >= 0.0f);
+
     if (best.depth<0.0f) return false;
     *c=best; return true;
 }
-static bool TestBoxBox(ShapeBox a,ShapeBox b,Contact *c) {
-    assert(IsValidVector3(a.center)&&IsValidVector3(b.center)&&IsValidQuaternion(a.rot)&&IsValidQuaternion(b.rot));
-    Vector3 aax,aay,aaz,bax,bay,baz; obb_axes(a.rot,&aax,&aay,&aaz); obb_axes(b.rot,&bax,&bay,&baz);
-    Vector3 axes[15]={aax,aay,aaz,bax,bay,baz,
-        normalize_vector3(cross_vector3(aax,bax)),normalize_vector3(cross_vector3(aax,bay)),normalize_vector3(cross_vector3(aax,baz)),
-        normalize_vector3(cross_vector3(aay,bax)),normalize_vector3(cross_vector3(aay,bay)),normalize_vector3(cross_vector3(aay,baz)),
-        normalize_vector3(cross_vector3(aaz,bax)),normalize_vector3(cross_vector3(aaz,bay)),normalize_vector3(cross_vector3(aaz,baz))};
-    Vector3 D=Vector3_A_minus_B(b.center,a.center);
-    float minPen=1e30f; int minAxis=-1; float minSign=1.0f;
-    for (int i=0; i<15; ++i) {
-        float axLen=dot_vector3(axes[i],axes[i]);
-        if (axLen<1e-8f) continue;
-        Vector3 ax=(axLen<0.999f||axLen>1.001f)?normalize_vector3(axes[i]):axes[i];
-        float overlap=obb_project(a,ax)+obb_project(b,ax)-vabs(dot_vector3(D,ax));
-        if (overlap<=0.0f) return false;
-        if (overlap<minPen) { minPen=overlap; minAxis=i; minSign=(dot_vector3(D,ax)>=0.0f)?1.0f:-1.0f; }
+
+static bool TestBoxBox(ShapeBox a, ShapeBox b, Contact *c) {
+    assert(IsValidVector3(a.center) && IsValidVector3(b.center));
+    assert(IsValidQuaternion(a.rot) && IsValidQuaternion(b.rot));
+    Vector3 aax, aay, aaz, bax, bay, baz;
+    obb_axes(a.rot, &aax, &aay, &aaz);
+    obb_axes(b.rot, &bax, &bay, &baz);
+    Vector3 axes[15] = {
+        aax, aay, aaz, bax, bay, baz,
+        cross_vector3(aax, bax), cross_vector3(aax, bay), cross_vector3(aax, baz),
+        cross_vector3(aay, bax), cross_vector3(aay, bay), cross_vector3(aay, baz),
+        cross_vector3(aaz, bax), cross_vector3(aaz, bay), cross_vector3(aaz, baz)
+    };
+
+    Vector3 D = Vector3_A_minus_B(b.center, a.center);
+    float minPen  = 1e30f, minSign = 1.0f; int minAxis = -1;
+    for (int i = 0; i < 15; ++i) {
+        float axLen2 = dot_vector3(axes[i], axes[i]);
+        if (axLen2 < 1e-8f) continue; // degenerate cross product — parallel edges, skip
+
+        Vector3 ax = scale_vector3(axes[i], 1.0f / vsqrtf(axLen2)); // Normalize unconditionally; face axes are already unit but cheap to renorm
+        float overlap = obb_project(a, ax) + obb_project(b, ax) - vabs(dot_vector3(D, ax));
+        if (overlap <= 0.0f) return false; // separating axis found
+
+        if (overlap < minPen) {
+            minPen  = overlap;
+            minAxis = i;
+            minSign = (dot_vector3(D, ax) >= 0.0f) ? 1.0f : -1.0f;
+            
+            // Store the *normalized* axis at selection time so we don't re-normalize later and don't risk using stale axes[] after the loop
+            c->normal = scale_vector3(ax, minSign);
+        }
     }
+
+    if (minAxis < 0) return false; // shouldn't happen if overlap logic is correct, but be safe
     
-    assert(minAxis >= 0 && "SAT found penetration but no valid axis");
-    assert(minPen > -0.01f);
-    assert(IsValidVector3(c->normal));
-    assert(c->depth > 0.0f);
-    c->depth=minPen; c->normal=scale_vector3(axes[minAxis],minSign);
-    c->pointWorld=closest_point_obb(b,Vector3_A_minus_B(a.center,scale_vector3(c->normal,minPen*0.5f))); c->lambdaN=c->lambdaT=0.0f;
+    c->depth = minPen; // c->normal already written inside loop at selection time (normalized, signed)
+    c->pointWorld = closest_point_obb(b,Vector3_A_minus_B(a.center, scale_vector3(c->normal, minPen * 0.5f)));
+    c->lambdaN = c->lambdaT = 0.0f;
     assert(IsValidVector3(c->normal));
     assert(IsValidVector3(c->pointWorld));
+    assert(c->depth > 0.0f);
     return true;
 }
 
@@ -477,43 +461,28 @@ static void Physics_PrimitiveStep(float dt) {
     u16 n=Sys_Global.loadedInstances;
     ResetManifoldTable();
     assert(g_manifoldCount == 0);
-    BuildCellBuckets(n);
-    for (u16 i=START_INDEX_LEVEL_INSTANCES; i<n; ++i) {
-        Entity *eA=&Sys_Global.instances[i];
-        if (!(eA->entflags&ENTFLAG_ACTIVE)||!(eA->entflags&ENTFLAG_RIGIDBODY)||eA->entflags&ENTFLAG_ASLEEP||eA->collider==COLLIDER_TYPE_NONE) continue;
-        u32 maskA=GetCollisionMask(eA->layer), cellA=eA->cellIndex;
-        i32 acx=(i32)(cellA%WORLDX), acz=(i32)(cellA/WORLDX);
-        for (i32 dz=-1; dz<=1; ++dz) {
-            i32 ncz=acz+dz;
-            if (ncz<0||ncz>=(i32)WORLDZ) continue;
-            for (i32 dx=-1; dx<=1; ++dx) {
-                i32 ncx=acx+dx;
-                if (ncx<0||ncx>=(i32)WORLDX) continue;
-                u32 nc=(u32)ncz*WORLDX+(u32)ncx;
-                if (!(gridCellStates[nc]&CELL_OPEN)) continue;
-                CellBucket *bkt=&g_cellBuckets[nc];
-                for (u8 bi=0; bi<bkt->count; ++bi) {
-                    u16 j=bkt->idx[bi];
-                    if (j==i) continue;
-                    Entity *eB=&Sys_Global.instances[j];
-                    if (!(eB->entflags&ENTFLAG_ACTIVE)||eB->collider==COLLIDER_TYPE_NONE||!(maskA&eB->layer)) continue;
-                    if ((eB->entflags&ENTFLAG_RIGIDBODY)&&j<i) continue;
-                    float dx2=eA->position.x-eB->position.x, dy=eA->position.y-eB->position.y, dz2=eA->position.z-eB->position.z;
-                    if (dx2<-5.12f||dx2>5.12f||dy<-5.12f||dy>5.12f||dz2<-5.12f||dz2>5.12f) continue;
-                    GenerateManifold(i,j);
-                }
-            }
+    for (u16 i=START_INDEX_LEVEL_INSTANCES;i<n;++i) {
+        Entity *eA = &Sys_Global.instances[i];
+        if (!(eA->entflags&ENTFLAG_ACTIVE) || !(eA->entflags&ENTFLAG_RIGIDBODY) || (eA->entflags&ENTFLAG_ASLEEP) || eA->collider == COLLIDER_TYPE_NONE) continue;
+
+        u32 maskA = GetCollisionMask(eA->layer), cellA = eA->cellIndex;
+        i32 acx = (i32)(cellA % WORLDX), acz = (i32)(cellA / WORLDX);
+        for (u16 j=i+1;j<n;++j) {
+            Entity *eB = &Sys_Global.instances[j];
+            if (!(eB->entflags & ENTFLAG_ACTIVE) || eB->collider == COLLIDER_TYPE_NONE || !(maskA & eB->layer)) continue;
+
+            u32 cellB = eB->cellIndex;
+            i32 bcx = (i32)(cellB % WORLDX), bcz = (i32)(cellB / WORLDX);
+            i32 dx = vabs(acx - bcx), dz = vabs(acz - bcz);
+            if (dx > 1 || dz > 1) continue; // Fast cell neighborhood test 3x3
+
+            GenerateManifold(i,j);
         }
     }
     for (u16 i=START_INDEX_LEVEL_INSTANCES; i<n; ++i) {if (Sys_Global.instances[i].entflags&ENTFLAG_RIGIDBODY) SpeculativePreClamp(i,dt);}
     for (int iter=0; iter<SOLVER_ITERATIONS; ++iter) {for (u16 m=0; m<g_manifoldCount; ++m) SolveContact(&g_manifolds[m],dt);}
     for (u16 i=START_INDEX_LEVEL_INSTANCES; i<n; ++i) {if (Sys_Global.instances[i].entflags&ENTFLAG_RIGIDBODY) IntegrateAngularVelocity(i,dt);}
     for (u16 i=START_INDEX_LEVEL_INSTANCES; i<n; ++i) {if (Sys_Global.instances[i].entflags&ENTFLAG_RIGIDBODY) UpdateSleep(i,dt);}
-}
- 
-static void Physics_ResetForLevelLoad(void) {
-    MemSetToValueForNBytes(g_manifolds,0,sizeof(g_manifolds)); MemSetToValueForNBytes(g_manifoldHT,0,sizeof(g_manifoldHT)); MemSetToValueForNBytes(g_sleepCounter,0,sizeof(g_sleepCounter));
-    g_manifoldCount=0;
 }
 
 static inline float DefaultInertia(const Entity *e) {
@@ -523,6 +492,12 @@ static inline float DefaultInertia(const Entity *e) {
     return m*(hx*hx+hy*hy+hz*hz)*(1.0f/3.0f);
 }
 static void Physics_InitEntityInertia(u16 idx) { Entity *e=&Sys_Global.instances[idx]; if (e->inertia<0.0001f) e->inertia=DefaultInertia(e); }
+static void Physics_ResetForLevelLoad(void) {
+    MemSetToValueForNBytes(g_manifolds,0,sizeof(g_manifolds)); MemSetToValueForNBytes(g_manifoldHT,0,sizeof(g_manifoldHT)); MemSetToValueForNBytes(g_sleepCounter,0,sizeof(g_sleepCounter));
+    g_manifoldCount=0;
+    for (u16 i=START_INDEX_LEVEL_INSTANCES; i<Sys_Global.loadedInstances; ++i) Physics_InitEntityInertia(i);
+}
+
 static CapsuleContact QueryCapsuleContact(Vector3 start,Vector3 end,float capsuleRadius,u32 layerMask) {
     CapsuleContact worst=(CapsuleContact){.depth=-1.0f,.normal={0,1,0}};
     i32 cxMin=vmax(0,vmin(WORLDX-1,PosGetCellCoordX(vmin(start.x,end.x)-capsuleRadius)));
@@ -642,10 +617,11 @@ ENGINE_TO_MOD void ApplyPlayerMovements(void) {
 const Vector3 gravityVelocity={0.0f,-9.81f,0.0f};
 static void UpdateVelocityFromGravity(void) {
     if (Sys_Global.pauseRelativeTime<2.0f) return;
-    for (u32 i=PLAYER1; i<INSTANCE_COUNT; ++i) {
+    for (u32 i=PLAYER1;i<INSTANCE_COUNT;++i) {
         if (i>(u32)Sys_Global.loadedInstances) return;
-        if (Sys_Global.instances[i].gravity<0.01f&&Sys_Global.instances[i].gravity>-0.01f) continue;
-        if (i<=(u32)PLAYER2&&Sys_Cheats.noclip) continue;
+        if (Sys_Global.instances[i].gravity < 0.01f && Sys_Global.instances[i].gravity > -0.01f) continue;
+        if (i <= (u32)PLAYER2 && Sys_Cheats.noclip) continue;
+        
         Sys_Global.instances[i].velocity=Vector3_A_plus_B(Sys_Global.instances[i].velocity,scale_vector3(gravityVelocity,Sys_Global.instances[i].gravity*(float)Sys_Global.timeSinceLastPhysicsTick));
         assert(IsValidVector3(Sys_Global.instances[i].velocity));
     }
@@ -687,7 +663,7 @@ static void IntegratePlayer(u16 i,float dt) {
     if (magnitude_vector3(vel)<0.05f) return;
     Vector3 dir=normalize_vector3(vel);
     if (GridCellBlock(i,pos,Vector3_A_plus_B(Vector3_A_plus_B(pos,scale_vector3(dir,PLAYER_RADIUS)),scale_vector3(vel,dt)))) return;
-    u32 mask=GetCollisionMask(e->layer); float innerSpine=PLAYER_HEIGHT-2.0f*PLAYER_RADIUS; bool boosted=Sys_Global.boosterActive;
+    u32 mask=GetCollisionMask(e->layer); float innerSpine=PLAYER_HEIGHT-2.0f*PLAYER_RADIUS; //bool boosted=Sys_Global.boosterActive; TODO apply 25% friction
     {
         Vector3 s,en; CapsuleTipsFromEye(pos,&s,&en); CapsuleContact c=QueryCapsuleContact(s,en,PLAYER_RADIUS,mask);
         if (c.depth>0.0f) {
@@ -774,12 +750,10 @@ static void IntegratePlayer(u16 i,float dt) {
         Vector3 hS,hE;
         CapsuleTipsFromEye((Vector3){pos.x+hVel.x*dt,pos.y,pos.z+hVel.z*dt},&hS,&hE);
         CapsuleContact hc=QueryCapsuleContact(hS,hE,PLAYER_RADIUS,mask);
-
         if (hc.depth>0.0f) {
             // Floor bumps: normal pointing mostly up -> not a wall, skip entirely.
             // Let ground probe + snap handle it next frame.
             bool isWall = hc.normal.y < STEP_MIN_NORMAL_Y;  // y < 0.7
-
             if (!isWall) {
                 // Shallow floor variation on bottom hemisphere — just ignore,
                 // ground snap will correct vertical position next frame.
@@ -815,7 +789,6 @@ static void IntegratePlayer(u16 i,float dt) {
                         CapsuleTipsFromEye((Vector3){pos.x+hVel.x*dt, stepY-SNAP_STEP, pos.z+hVel.z*dt},&dnS,&dnE);
                         CapsuleContact stepFloor = QueryCapsuleContact(dnS,dnE,PLAYER_RADIUS,mask);
                         bool floorWalkable = stepFloor.depth>0.0f && stepFloor.normal.y>=STEP_MIN_NORMAL_Y;
-
                         if (headClear && floorWalkable) {
                             // Snap down onto step surface
                             float landY = stepY;
@@ -829,7 +802,6 @@ static void IntegratePlayer(u16 i,float dt) {
                             e->velocity.y = 0.0f;
                             vel.y = 0.0f;
                             steppedUp = true;
-
                             centreY = pos.y-PLAYER_CAM_OFFSET_Y;
                             curStart = (Vector3){pos.x, centreY-innerSpine*0.5f, pos.z};
                             curEnd   = (Vector3){pos.x, centreY+innerSpine*0.5f, pos.z};
@@ -859,7 +831,6 @@ static void UpdatePositions(void) {
     float dt=vclamp((float)Sys_Global.timeSinceLastPhysicsTick,0.0005f,0.027777778f);
     for (u32 i=PLAYER1; i<=PLAYER2; ++i) IntegratePlayer((u16)i,dt);
     for (u32 i=START_INDEX_LEVEL_INSTANCES; i<(u32)Sys_Global.loadedInstances; ++i) {
-//         AddDebugLine(Sys_Global.instances[i].position,Vector3_A_plus_B(Sys_Global.instances[i].position,(Vector3){0.0f,2.56f,0.0f}));
         if (Sys_Global.instances[i].entflags&ENTFLAG_RIGIDBODY) IntegrateRigidbody((u16)i,dt);
     }
 }
@@ -871,16 +842,13 @@ static void ClampVelocity(void) {
     }
 }
 
-void UpdateTriggers(void) {
-    // Simple AABB checks against center points, not related to rest of physics system
-}
-
+void UpdateTriggers(void) { /* TODO Simple AABB checks against center points, not related to rest of physics system*/ }
 static void Physics(void) {
     UpdateVelocityFromGravity();
     float dt = (float)Sys_Global.timeSinceLastPhysicsTick;
-    if (dt>SUB_STEP_DT_MAX*4.0f) dt=SUB_STEP_DT_MAX*4.0f;
-    if (dt>SUB_STEP_DT_MAX) { float h=dt*0.5f; Physics_PrimitiveStep(h); Physics_PrimitiveStep(h); }
-    else Physics_PrimitiveStep(dt);
-    
+    if (dt > SUB_STEP_DT_MAX * 4.0f) dt = SUB_STEP_DT_MAX * 4.0f;
+    int steps = (int)(dt / SUB_STEP_DT_MAX) + 1;
+    float sub_step = dt / (float)steps; // Calculate how many steps we need. e.g., if dt is 0.055 and MAX is 0.016, this becomes ceil(3.43) = 4 steps
+    for (int i = 0; i < steps; i++) Physics_PrimitiveStep(sub_step);
     ClampVelocity(); UpdatePositions(); UpdateTriggers();
 }
