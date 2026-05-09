@@ -1,5 +1,4 @@
 // Text shader
-#version 430 core
 in vec2 TexCoord;
 layout(location=0) out vec4 outUI;       // GL_COLOR_ATTACHMENT0
 layout(location = 0) uniform mat4 projection; // vert shader uniform only

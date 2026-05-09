@@ -1,5 +1,4 @@
 // ui_frag.glsl: Generic shader for unlit textured UI images (mostly cutouts)
-#version 430 core
 in vec2 TexCoord;
 layout(location=0) uniform uint texIndex;
 layout(location=0) out vec4 outUI; // GL_COLOR_ATTACHMENT0

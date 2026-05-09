@@ -31,7 +31,7 @@ typedef struct { Vector3 normal; float d; } FrustumPlane;
 typedef struct StbiArena { u8*base,*cursor,*end; } StbiArena;
 typedef struct {
     u32 inputImageID,inputUIID,inputDepthID,inputWorldPosID,inputSpecID,inputNormalID,gBufferFBO,uiFBO,outputImageID;
-    u32 depthPrepassShaderProgram,chunkShaderProgram,vao_chunk,uiShaderProgram,debugUnlitShaderProgram;
+    u32 depthPrepassShaderProgram,chunkShaderProgram,chunkVAO,chunkVBO,uiShaderProgram,debugUnlitShaderProgram;
     u32 shadowmapsShaderProgram,shadowmapsClearShaderProgram,shadowMapSSBO,shadowMapsIndirectionID;
     u32 ssrShaderProgram,imageBlitShaderProgram,quadVAO,quadVBO,textShaderProgram,textVAO,textVBO;
     u32 debugLinesVAO,debugLinesVBO,matricesBufferID,cellVisibleDataID,debugLineColors;
@@ -76,6 +76,7 @@ static bool resDropdownOpen = false; static int resDropdownCount=0,resSelectedId
 typedef struct {int w,h;} ResMode;
 static ResMode resModes[8];
 typedef struct { Vector3 position; Quaternion rotation; u8 fov; u16 width,height; float near,far,finished; bool visible; } CamView;
+u16 dynamicEntities[512]; u16 dynamicEntityCount;
 CamView camViews[64]; u32 camViewTextures[64]; u8 camViewCount = 0; // Max is 8 cam views on level 8 + 3 sensaround views = 11.
 OsFileHandle console_log_file=0;
 static inline __attribute__((always_inline)) i32 PosGetCellCoordX(float pos_x) { return (u16)clamp((i32)vfloor((pos_x - Sys_Global.worldMin_x + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
@@ -110,21 +111,21 @@ ENGINE_TO_MOD void DualLogError(const char* fmt, ...) { va_list args; __builtin_
 #include "physics.c"
 #include "audio.c"
 #include "text.c"
-static inline __attribute__((always_inline)) void LogShaderError(u32 s, const char* name) { char er[512]; glGetShaderInfoLog(s,512,NULL,er); DualLogError("%s Compilation Failed: %s\n",name,er); OS_Exit(1); }
+static inline __attribute__((always_inline)) void LogShaderError(u32 s, const char* name) { char er[512]; glGetShaderInfoLog(s,512,NULL,er); DualLogError("%s Comp Fail: %s\n",name,er); OS_Exit(1); }
 static inline __attribute__((always_inline)) u32 CompileShader(u32 type, const char* source, const char* name) { u32 s = glCreateShader(type); glShaderSource(s,1,&source,NULL); glCompileShader(s); i32 ok; glGetShaderiv(s,0x8B81/*GL_COMPILE_STATUS*/,&ok); if (!ok) LogShaderError(s,name); return s; }
 static inline __attribute__((always_inline)) u32 LinkProgram(u32* s, i32 num, const char* name) { u32 p = glCreateProgram(); for (i32 i=0;i<num;++i) { glAttachShader(p,s[i]); } glLinkProgram(p); i32 ok; glGetProgramiv(p,0x8B82/*GL_LINK_STATUS*/,&ok); if (!ok) LogShaderError(p,name); return p; }
 u32 CompileAnyShader(const char* vsrc, const char* src, const char* name) { return (vsrc) ? LinkProgram((u32[]){CompileShader(0x8B31/*GL_VERTEX_SHADER*/,vsrc,name),CompileShader(0x8B30/*GL_FRAGMENT_SHADER*/,src,name)},2,name) : LinkProgram((u32[]){CompileShader(0x91B9/*GL_COMPUTE_SHADER*/,src,name)},1,name); }
 void CompileShaders(void) {
-    Sys_Render.depthPrepassShaderProgram= CompileAnyShader(depthPrepassVertSrc,depthPrepassFragSrc,"Depth Prepass");
+    Sys_Render.depthPrepassShaderProgram= CompileAnyShader(depthPrepassVertSrc,depthPrepassFragSrc,"DPre"); // Depth Prepass
     Sys_Render.chunkShaderProgram       = CompileAnyShader(vertSrc,fragSrc,"Main");
     Sys_Render.uiShaderProgram          = CompileAnyShader(vertUISrc,fragUISrc,"UI");
-    Sys_Render.debugUnlitShaderProgram  = CompileAnyShader(debugUnlitVertSrc,debugUnlitFragSrc,"Debug Unlit");
-    Sys_Render.shadowmapsShaderProgram  = CompileAnyShader(shadowmapVertSrc,shadowmapFragSrc,"Shadowmaps");
-    Sys_Render.textShaderProgram        = CompileAnyShader(textVertSrc,textFragSrc,"Text");
-    Sys_Render.imageBlitShaderProgram   = CompileAnyShader(quadVertSrc,quadFragSrc,"Image Blit");
+    Sys_Render.debugUnlitShaderProgram  = CompileAnyShader(debugUnlitVertSrc,debugUnlitFragSrc,"Ln"); // Line Drawing Unlit
+    Sys_Render.shadowmapsShaderProgram  = CompileAnyShader(shadowmapVertSrc,shadowmapFragSrc,"Shad");
+    Sys_Render.textShaderProgram        = CompileAnyShader(textVertSrc,textFragSrc,"Txt");
+    Sys_Render.imageBlitShaderProgram   = CompileAnyShader(quadVertSrc,quadFragSrc,"Comp"); // Image Blit Composite Pass
     Sys_Render.ssrShaderProgram            = CompileAnyShader(NULL,ssrComputeSrc,"SSR");
-    Sys_Render.voxelUpdateShaderProgram    = CompileAnyShader(NULL,voxelUpdateComputeSrc,"Voxel Update");
-    Sys_Render.shadowmapsClearShaderProgram= CompileAnyShader(NULL,shadowmapsClearComputeSrc,"Shadowmaps Clear");
+    Sys_Render.voxelUpdateShaderProgram    = CompileAnyShader(NULL,voxelUpdateComputeSrc,"Vox"); // Voxel Update
+    Sys_Render.shadowmapsClearShaderProgram= CompileAnyShader(NULL,shadowmapsClearComputeSrc,"ShadCl"); // Shadowmaps Clear
 }
 
 u32 SetupSSBO(u32* id, u32 bindx, size_t sz, const void* d, u32 typ) { glGenBuffers(1,id); glBindBuffer(GL_SSBO,*id); glBufferData(GL_SSBO,sz,d,typ); glBindBufferBase(GL_SSBO,bindx,*id); return *id; }
@@ -157,7 +158,8 @@ void ExtractFrustumPlanes(float* m, FrustumPlane* ps) {
 
 ENGINE_TO_MOD void InitializeEntity(Entity* entry) { // Blank entity, no index yet, for initial list population or temporary Entity.
     entry->index = U16_MAX; // memset here would be harmful as only a handful of fields are the same.
-    entry->entflags = (ENTFLAG_KINEMATIC | ENTFLAG_ACTIVE); // Zeroes the rest out.
+    entry->entflags = ENTFLAG_ACTIVE; // Zeroes the rest out.
+    entry->kinematic = true;
     entry->modelIndex = MODEL_IDX_MAX;
     entry->layer = Layer_Default;
     entry->texIndex = entry->glowIndex = entry->specIndex = entry->normIndex = MAX_VALID_TEXTURE;
@@ -290,7 +292,7 @@ void UpdateLights(void) {
     glDispatchCompute((VOXELS_X+31)/32,(VOXELS_Z+31)/32,1);
 }
 
-void UploadGridCellVisibility(void) { glNamedBufferData(Sys_Render.cellVisibleDataID,ARRSIZE * sizeof(u32),gridCellStates,GL_DYNAMIC_DRAW); }
+void UploadGridCellVisibility(void) { glBindBuffer(GL_SSBO,Sys_Render.cellVisibleDataID); glBufferData(GL_SSBO,ARRSIZE * sizeof(u32),gridCellStates,GL_DYNAMIC_DRAW); }
 #define CHGD(a,b) (vabs((a) - (b)) > 0.0001f)
 ENGINE_TO_MOD void UpdateLight(u16 i, Vector3 pos, Color3 col, float range, float intensity, float max, float min, float spotAng, Quaternion spotDir, bool on, bool shad) {
     bool changed = ((!!(lights[i].lflags & SHADON) - shad) || (!!(lights[i].lflags & LIGHTON) -  on) || CHGD(lights[i].range,range) || CHGD(lights[i].pos.x,pos.x) || CHGD(lights[i].pos.y,pos.y) || CHGD(lights[i].pos.z,pos.z));
@@ -466,7 +468,7 @@ ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
         e->shadRadius = e->radius * 1.41;
     }
     
-    ModInitAfterLoad(); ResetLevelAudio(); ResetLevelMusic(); creditPages = GetCreditsText(); Physics_ResetForLevelLoad();
+    ModInitAfterLoad(); ResetLevelAudio(); ResetLevelMusic(); creditPages = GetCreditsText();
     DualLog("Entity instances initialized after load\n");
     RenderLoadingProgress(110,"Loading cull system...");
     CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
@@ -482,6 +484,17 @@ ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
     for (u16 i = 0; i < Sys_Global.loadedLights; i++) { lightsNewPosition[i] = lights[i].pos; }
     MemSetToValueForNBytes(voxen_Shadow_System.shadowmapIndirectionList,MAX_SHADOWMAPS + 1,Sys_Global.loadedLights * sizeof(u32)); // Set to invalid values for all
     Sys_Global.levelCurrentlyLoading = false;
+    u16 numBox=0,numSphere=0,numMeshConv=0,numMesh=0,numCapsule=0;
+    for (int i=PLAYER1;i<Sys_Global.loadedInstances;++i) {
+        if (ConstIndexIsDynamicObject(Sys_Global.instances[i].index)) continue;
+        
+        if (Sys_Global.instances[i].collider == COLLIDER_TYPE_BOX) numBox++;
+        if (Sys_Global.instances[i].collider == COLLIDER_TYPE_SPHERE) numSphere++;
+        if (Sys_Global.instances[i].collider == COLLIDER_TYPE_CAPSULE) numCapsule++;
+        if (Sys_Global.instances[i].collider == COLLIDER_TYPE_CONVEXMESH) numMeshConv++;
+        if (Sys_Global.instances[i].collider == COLLIDER_TYPE_MESH) numMesh++;
+    }
+    DualLog("Got static collider count of %u, collider type counts box: %u, sphere: %u, capsule: %u, mesh convex: %u, mesh: %u\n",numBox+numSphere+numCapsule+numMeshConv+numMesh,numBox,numSphere,numCapsule,numMeshConv,numMesh);
     DebugRAM("end of LoadLevel");
 }
 
@@ -569,29 +582,6 @@ bool JoystickPresent(int jid) {
     if (!initJoysticks()) return false;
     _GLFWjoystick* js = _glfw.joysticks + jid;
     return js->connected ? PLATFORM_pollJoystick(js) : false;
-}
-
-static inline __attribute__((always_inline)) __attribute__((hot)) void Input_Poll(void) {
-    PLATFORM_pollEvents();
-    for (int jid = GLFW_JOYSTICK_1; jid <= GLFW_JOYSTICK_LAST; ++jid) {
-        if (!JoystickPresent(jid)) continue;
-
-        _GLFWjoystick* js = _glfw.joysticks + jid;
-        if (!js->connected) continue;
-
-        PLATFORM_pollJoystick(js);
-        int totalButtons = js->buttonCount + js->hatCount * 4;
-        for (int i = 0; i < totalButtons && i < 16; ++i) {
-            KeyState* k = &Sys_Input.joystickButtons[jid - GLFW_JOYSTICK_1][i];
-            bool down = js->buttons[i] == GLFW_PRESS;
-            k->pressed  = down && !k->down;
-            k->released = !down && k->down;
-            k->down     = down;
-        }
-
-        for (int i = 0; i < js->hatCount && i < 5; ++i) { Sys_Input.joystickHats[i].down = js->hats[i]; }
-//         for (int i = 0; i < js->axisCount && i < MAX_JOYSTICK_AXES; ++i) { Sys_Input.joystickAxes[jid - GLFW_JOYSTICK_1][i] = js->axes[i]; } TODO??
-    }
 }
 
 void CenterWindowOnMonitor(void) {
@@ -1018,12 +1008,12 @@ void RenderPausedUI(void) {
 
 typedef struct { float x,y,z,r,g,b,a; } DebugLineVertex;
 DebugLineVertex debugLineVerts[MAX_DEBUG_LINE_VERTS * 2];
-//float debugLineBuffer[MAX_DEBUG_LINE_VERTS * 3]; // xyz only
-//float debugLineColors[MAX_DEBUG_LINE_VERTS * 4]; // rgb
 static inline __attribute__((always_inline)) void DrawDebugLines(float* viewProj) {
     if (Sys_Global.debugLineVertCount == 0) return;
 
-    glNamedBufferSubData(Sys_Render.debugLinesVBO,0,Sys_Global.debugLineVertCount * sizeof(DebugLineVertex),debugLineVerts);
+    glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.debugLinesVBO);
+    glBufferSubData(GL_ARRAY_BUFFER,0,Sys_Global.debugLineVertCount * sizeof(DebugLineVertex),debugLineVerts);
+    CHECK_GL_ERROR(); // 1282 here
     glUseProgram(Sys_Render.debugUnlitShaderProgram);
     glUniformMatrix4fv(0,1,GL_FALSE,viewProj);
     glLineWidth(1.0f);
@@ -1031,8 +1021,7 @@ static inline __attribute__((always_inline)) void DrawDebugLines(float* viewProj
     glBindVertexArray(Sys_Render.debugLinesVAO);
     glDrawArrays(0x0001/*GL_LINES*/,0,Sys_Global.debugLineVertCount);
     glEnable(GL_DEPTH_TEST);
-    drawCallsRenderedThisFrame++;
-    verticesRenderedThisFrame += Sys_Global.debugLineVertCount;
+    drawCallsRenderedThisFrame++; verticesRenderedThisFrame += Sys_Global.debugLineVertCount;
     Sys_Global.debugLineVertCount = 0;
 }
 
@@ -1084,7 +1073,7 @@ static inline __attribute__((always_inline)) void CreditsStats(void) {
 }
 
 u8 MFD_LefTab=0,MFD_CenterTab=0,MFD_RightTab=0;
-static inline __attribute__((always_inline)) double RenderUI(void) {
+static double RenderUI(void) {
     drawCallsNormal = drawCallsRenderedThisFrame;
     if (Sys_Global.creditsActive) { // Render Credits
         if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].pressed) {
@@ -1167,7 +1156,7 @@ static inline __attribute__((always_inline,hot)) u16 GetAndBindModel(u16 i, u16 
 
 #define SC_MAX (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS)
 static const u32 groupX_shadClear = ((SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) + 31) / 32;
-static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {    
+static __attribute__((noinline)) __attribute__((hot)) void RenderShadowmaps(void) {    
     double shadowStartTime = get_time();
     u16 candidates[MAX_SHADOWMAPS];
     u16 numShadowsCouldRender = 0;
@@ -1275,7 +1264,7 @@ static inline __attribute__((always_inline,hot)) void RenderShadowmaps(void) {
         }
 
         glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
-        glNamedBufferData(Sys_Render.shadowMapsIndirectionID,Sys_Global.loadedLights * sizeof(u32),voxen_Shadow_System.shadowmapIndirectionList,GL_DYNAMIC_DRAW);
+        glBindBuffer(GL_SSBO,Sys_Render.shadowMapsIndirectionID); glBufferData(GL_SSBO,Sys_Global.loadedLights * sizeof(u32),voxen_Shadow_System.shadowmapIndirectionList,GL_DYNAMIC_DRAW);
     }
 
     voxen_Shadow_System.shadowTime = get_time() - shadowStartTime;
@@ -1475,7 +1464,7 @@ static void DrawCapsuleCollider(Entity *e) {
     #undef CAPS_SEGS
 }
      
-static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
+static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     u16 swidth = camView ? camViews[camViewIdx].width : Sys_Settings.ScreenWidth, sheight = camView ? camViews[camViewIdx].height : Sys_Settings.ScreenHeight;
     float sfov = camView ? (float)camViews[camViewIdx].fov : (float)Sys_Settings.FOV;
     float snear = camView ? camViews[camViewIdx].near : NEAR_PLANE; float sfar = camView ? camViews[camViewIdx].far : Sys_Global.farPlane;
@@ -1503,7 +1492,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
     mul_mat4(viewProj,rasterPerspectiveProjection,view);
     float invViewRot[9] = {view[0],view[4],view[8], view[1],view[5],view[9], view[2],view[6],view[10]};
     ExtractFrustumPlanes(viewProj,playerFrustumPlanes);
-    glBindVertexArray(Sys_Render.vao_chunk); // Common vao for RenderDynamicShadowmaps and Rasterized Geometry
+    glBindVertexArray(Sys_Render.chunkVAO); // Common vao for RenderDynamicShadowmaps and Rasterized Geometry
     glEnable(GL_DEPTH_TEST);
     if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps();
     UpdateLights(); // This is where the voxels get updated!
@@ -1652,8 +1641,7 @@ static inline __attribute__((always_inline)) __attribute__((hot)) void Render(bo
     }
 }
 
-i32 main(void) {
-    double game_start_time = get_time();
+void InitalizeEnvironment(double game_start_time) {
     random_range_rng = (u32)game_start_time; // Seed global rand uniquely with time since system boot.
     console_log_file = OS_OpenWriteonly("./voxen.log"); // Initialize log system for all prints to go to both stdout and voxen.log file
     DebugRAM("program start");
@@ -1684,103 +1672,100 @@ i32 main(void) {
         window = glfwCreateWindow(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight,&global_modname[0]);
         CenterWindowOnMonitor();
         _GLFWwindow* handle = (_GLFWwindow*)window; handle->context.makeCurrent(handle);
-        glClear = (PFNGLCLEARPROC)glfwGetProcAddress("glClear");
-        glClearColor = (PFNGLCLEARCOLORPROC)glfwGetProcAddress("glClearColor");
-        glColorMask = (PFNGLCOLORMASKPROC)glfwGetProcAddress("glColorMask");
-        glDepthFunc = (PFNGLDEPTHFUNCPROC)glfwGetProcAddress("glDepthFunc");
-        glDepthMask = (PFNGLDEPTHMASKPROC)glfwGetProcAddress("glDepthMask");
-        glDisable = (PFNGLDISABLEPROC)glfwGetProcAddress("glDisable");
-        glEnable = (PFNGLENABLEPROC)glfwGetProcAddress("glEnable");
-        glFinish = (PFNGLFINISHPROC)glfwGetProcAddress("glFinish");
-        glFlush = (PFNGLFLUSHPROC)glfwGetProcAddress("glFlush");
-        glFrontFace = (PFNGLFRONTFACEPROC)glfwGetProcAddress("glFrontFace");
-        glGetError = (PFNGLGETERRORPROC)glfwGetProcAddress("glGetError");
-        glGetIntegerv = (PFNGLGETINTEGERVPROC)glfwGetProcAddress("glGetIntegerv");
-        glLineWidth = (PFNGLLINEWIDTHPROC)glfwGetProcAddress("glLineWidth");
-        glReadBuffer = (PFNGLREADBUFFERPROC)glfwGetProcAddress("glReadBuffer");
-        glReadPixels = (PFNGLREADPIXELSPROC)glfwGetProcAddress("glReadPixels");
-        glTexImage2D = (PFNGLTEXIMAGE2DPROC)glfwGetProcAddress("glTexImage2D");
-        glTexParameteri = (PFNGLTEXPARAMETERIPROC)glfwGetProcAddress("glTexParameteri");
-        glViewport = (PFNGLVIEWPORTPROC)glfwGetProcAddress("glViewport");
-        glBindTexture = (PFNGLBINDTEXTUREPROC)glfwGetProcAddress("glBindTexture");
-        glCopyTexSubImage2D = (PFNGLCOPYTEXSUBIMAGE2DPROC)glfwGetProcAddress("glCopyTexSubImage2D");
-        glDrawArrays = (PFNGLDRAWARRAYSPROC)glfwGetProcAddress("glDrawArrays");
-        glDrawElements = (PFNGLDRAWELEMENTSPROC)glfwGetProcAddress("glDrawElements");
-        glGenTextures = (PFNGLGENTEXTURESPROC)glfwGetProcAddress("glGenTextures");
-        glActiveTexture = (PFNGLACTIVETEXTUREPROC)glfwGetProcAddress("glActiveTexture");
-        glBlendFuncSeparate = (PFNGLBLENDFUNCSEPARATEPROC)glfwGetProcAddress("glBlendFuncSeparate");
-        glBindBuffer = (PFNGLBINDBUFFERPROC)glfwGetProcAddress("glBindBuffer");
-        glBufferData = (PFNGLBUFFERDATAPROC)glfwGetProcAddress("glBufferData");
-        glGenBuffers = (PFNGLGENBUFFERSPROC)glfwGetProcAddress("glGenBuffers");
-        glUnmapBuffer = (PFNGLUNMAPBUFFERPROC)glfwGetProcAddress("glUnmapBuffer");
-        glAttachShader = (PFNGLATTACHSHADERPROC)glfwGetProcAddress("glAttachShader");
-        glCompileShader = (PFNGLCOMPILESHADERPROC)glfwGetProcAddress("glCompileShader");
-        glCreateProgram = (PFNGLCREATEPROGRAMPROC)glfwGetProcAddress("glCreateProgram");
-        glCreateShader = (PFNGLCREATESHADERPROC)glfwGetProcAddress("glCreateShader");
-        glDrawBuffers = (PFNGLDRAWBUFFERSPROC)glfwGetProcAddress("glDrawBuffers");
-        glGetProgramiv = (PFNGLGETPROGRAMIVPROC)glfwGetProcAddress("glGetProgramiv");
-        glGetShaderInfoLog = (PFNGLGETSHADERINFOLOGPROC)glfwGetProcAddress("glGetShaderInfoLog");
-        glGetShaderiv = (PFNGLGETSHADERIVPROC)glfwGetProcAddress("glGetShaderiv");
-        glLinkProgram = (PFNGLLINKPROGRAMPROC)glfwGetProcAddress("glLinkProgram");
-        glShaderSource = (PFNGLSHADERSOURCEPROC)glfwGetProcAddress("glShaderSource");
-        glUniform1f = (PFNGLUNIFORM1FPROC)glfwGetProcAddress("glUniform1f");
-        glUniform1i = (PFNGLUNIFORM1IPROC)glfwGetProcAddress("glUniform1i");
-        glUniform2f = (PFNGLUNIFORM2FPROC)glfwGetProcAddress("glUniform2f");
-        glUniform3f = (PFNGLUNIFORM3FPROC)glfwGetProcAddress("glUniform3f");
-        glUniform4f = (PFNGLUNIFORM4FPROC)glfwGetProcAddress("glUniform4f");
-        glUniform1ui = (PFNGLUNIFORM1UIPROC)glfwGetProcAddress("glUniform1ui");
-        glUniform2ui = (PFNGLUNIFORM2UIPROC)glfwGetProcAddress("glUniform2ui");
-        glUniformMatrix3fv = (PFNGLUNIFORMMATRIX3FVPROC)glfwGetProcAddress("glUniformMatrix3fv");
-        glUniformMatrix4fv = (PFNGLUNIFORMMATRIX4FVPROC)glfwGetProcAddress("glUniformMatrix4fv");
-        glUseProgram = (PFNGLUSEPROGRAMPROC)glfwGetProcAddress("glUseProgram");
-        glBindBufferBase = (PFNGLBINDBUFFERBASEPROC)glfwGetProcAddress("glBindBufferBase");
-        glBindFramebuffer = (PFNGLBINDFRAMEBUFFERPROC)glfwGetProcAddress("glBindFramebuffer");
-        glBindVertexArray = (PFNGLBINDVERTEXARRAYPROC)glfwGetProcAddress("glBindVertexArray");
-        glCheckFramebufferStatus = (PFNGLCHECKFRAMEBUFFERSTATUSPROC)glfwGetProcAddress("glCheckFramebufferStatus");
-        glFramebufferTexture2D = (PFNGLFRAMEBUFFERTEXTURE2DPROC)glfwGetProcAddress("glFramebufferTexture2D");
-        glGenFramebuffers = (PFNGLGENFRAMEBUFFERSPROC)glfwGetProcAddress("glGenFramebuffers");
-        glMapBufferRange = (PFNGLMAPBUFFERRANGEPROC)glfwGetProcAddress("glMapBufferRange");
-        glBindImageTexture = (PFNGLBINDIMAGETEXTUREPROC)glfwGetProcAddress("glBindImageTexture");
-        glBindVertexBuffer = (PFNGLBINDVERTEXBUFFERPROC)glfwGetProcAddress("glBindVertexBuffer");
-        glDispatchCompute = (PFNGLDISPATCHCOMPUTEPROC)glfwGetProcAddress("glDispatchCompute");
-        glBindTextureUnit = (PFNGLBINDTEXTUREUNITPROC)glfwGetProcAddress("glBindTextureUnit");
-        glCreateBuffers = (PFNGLCREATEBUFFERSPROC)glfwGetProcAddress("glCreateBuffers");
-        glCreateTextures = (PFNGLCREATETEXTURESPROC)glfwGetProcAddress("glCreateTextures");
-        glCreateVertexArrays = (PFNGLCREATEVERTEXARRAYSPROC)glfwGetProcAddress("glCreateVertexArrays");
-        glEnableVertexArrayAttrib = (PFNGLENABLEVERTEXARRAYATTRIBPROC)glfwGetProcAddress("glEnableVertexArrayAttrib");
-        glNamedBufferData = (PFNGLNAMEDBUFFERDATAPROC)glfwGetProcAddress("glNamedBufferData");
-        glNamedBufferStorage = (PFNGLNAMEDBUFFERSTORAGEPROC)glfwGetProcAddress("glNamedBufferStorage");
-        glNamedBufferSubData = (PFNGLNAMEDBUFFERSUBDATAPROC)glfwGetProcAddress("glNamedBufferSubData");
-        glTextureParameteri = (PFNGLTEXTUREPARAMETERIPROC)glfwGetProcAddress("glTextureParameteri");
-        glTextureStorage2D = (PFNGLTEXTURESTORAGE2DPROC)glfwGetProcAddress("glTextureStorage2D");
-        glTextureSubImage2D = (PFNGLTEXTURESUBIMAGE2DPROC)glfwGetProcAddress("glTextureSubImage2D");
-        glVertexArrayAttribBinding = (PFNGLVERTEXARRAYATTRIBBINDINGPROC)glfwGetProcAddress("glVertexArrayAttribBinding");
-        glVertexArrayAttribFormat = (PFNGLVERTEXARRAYATTRIBFORMATPROC)glfwGetProcAddress("glVertexArrayAttribFormat");
-        glVertexArrayVertexBuffer = (PFNGLVERTEXARRAYVERTEXBUFFERPROC)glfwGetProcAddress("glVertexArrayVertexBuffer");
-        glClearBufferFv = (PFNGLCLEARBUFFERFVPROC)glfwGetProcAddress("glClearBufferFv");
+        glClear = (PFNGLCLEAR)glfwGetProcAddress("glClear");
+        glClearColor = (PFNGLCLEARCOLOR)glfwGetProcAddress("glClearColor");
+        glColorMask = (PFNGLCOLORMASK)glfwGetProcAddress("glColorMask");
+        glDepthFunc = (PFNGLDEPTHFUNC)glfwGetProcAddress("glDepthFunc");
+        glDepthMask = (PFNGLDEPTHMASK)glfwGetProcAddress("glDepthMask");
+        glDisable = (PFNGLDISABLE)glfwGetProcAddress("glDisable");
+        glEnable = (PFNGLENABLE)glfwGetProcAddress("glEnable");
+        glFinish = (PFNGLFINISH)glfwGetProcAddress("glFinish");
+        glFlush = (PFNGLFLUSH)glfwGetProcAddress("glFlush");
+        glFrontFace = (PFNGLFRONTFACE)glfwGetProcAddress("glFrontFace");
+        glGetError = (PFNGLGETERROR)glfwGetProcAddress("glGetError");
+        glGetIntegerv = (PFNGLGETINTEGERV)glfwGetProcAddress("glGetIntegerv");
+        glLineWidth = (PFNGLLINEWIDTH)glfwGetProcAddress("glLineWidth");
+        glReadBuffer = (PFNGLREADBUFFER)glfwGetProcAddress("glReadBuffer");
+        glReadPixels = (PFNGLREADPIXELS)glfwGetProcAddress("glReadPixels");
+        glTexImage2D = (PFNGLTEXIMAGE2D)glfwGetProcAddress("glTexImage2D");
+        glTexParameteri = (PFNGLTEXPARAMETERI)glfwGetProcAddress("glTexParameteri");
+        glViewport = (PFNGLVIEWPORT)glfwGetProcAddress("glViewport");
+        glBindTexture = (PFNGLBINDTEXTURE)glfwGetProcAddress("glBindTexture");
+        glCopyTexSubImage2D = (PFNGLCOPYTEXSUBIMAGE2D)glfwGetProcAddress("glCopyTexSubImage2D");
+        glDrawArrays = (PFNGLDRAWARRAYS)glfwGetProcAddress("glDrawArrays");
+        glDrawElements = (PFNGLDRAWELEMENTS)glfwGetProcAddress("glDrawElements");
+        glGenTextures = (PFNGLGENTEXTURES)glfwGetProcAddress("glGenTextures");
+        glActiveTexture = (PFNGLACTIVETEXTURE)glfwGetProcAddress("glActiveTexture");
+        glBlendFuncSeparate = (PFNGLBLENDFUNCSEPARATE)glfwGetProcAddress("glBlendFuncSeparate");
+        glBindBuffer = (PFNGLBINDBUFFER)glfwGetProcAddress("glBindBuffer");
+        glBufferData = (PFNGLBUFFERDATA)glfwGetProcAddress("glBufferData");
+        glGenBuffers = (PFNGLGENBUFFERS)glfwGetProcAddress("glGenBuffers");
+        glUnmapBuffer = (PFNGLUNMAPBUFFER)glfwGetProcAddress("glUnmapBuffer");
+        glAttachShader = (PFNGLATTACHSHADER)glfwGetProcAddress("glAttachShader");
+        glCompileShader = (PFNGLCOMPILESHADER)glfwGetProcAddress("glCompileShader");
+        glCreateProgram = (PFNGLCREATEPROGRAM)glfwGetProcAddress("glCreateProgram");
+        glCreateShader = (PFNGLCREATESHADER)glfwGetProcAddress("glCreateShader");
+        glDrawBuffers = (PFNGLDRAWBUFFERS)glfwGetProcAddress("glDrawBuffers");
+        glGetProgramiv = (PFNGLGETPROGRAMIV)glfwGetProcAddress("glGetProgramiv");
+        glGetShaderInfoLog = (PFNGLGETSHADERINFOLOG)glfwGetProcAddress("glGetShaderInfoLog");
+        glGetShaderiv = (PFNGLGETSHADERIV)glfwGetProcAddress("glGetShaderiv");
+        glLinkProgram = (PFNGLLINKPROGRAM)glfwGetProcAddress("glLinkProgram");
+        glShaderSource = (PFNGLSHADERSOURCE)glfwGetProcAddress("glShaderSource");
+        glUniform1f = (PFNGLUNIFORM1F)glfwGetProcAddress("glUniform1f");
+        glUniform1i = (PFNGLUNIFORM1I)glfwGetProcAddress("glUniform1i");
+        glUniform2f = (PFNGLUNIFORM2F)glfwGetProcAddress("glUniform2f");
+        glUniform3f = (PFNGLUNIFORM3F)glfwGetProcAddress("glUniform3f");
+        glUniform4f = (PFNGLUNIFORM4F)glfwGetProcAddress("glUniform4f");
+        glUniform1ui = (PFNGLUNIFORM1UI)glfwGetProcAddress("glUniform1ui");
+        glUniform2ui = (PFNGLUNIFORM2UI)glfwGetProcAddress("glUniform2ui");
+        glUniformMatrix3fv = (PFNGLUNIFORMMATRIX3FV)glfwGetProcAddress("glUniformMatrix3fv");
+        glUniformMatrix4fv = (PFNGLUNIFORMMATRIX4FV)glfwGetProcAddress("glUniformMatrix4fv");
+        glUseProgram = (PFNGLUSEPROGRAM)glfwGetProcAddress("glUseProgram");
+        glBindBufferBase = (PFNGLBINDBUFFERBASE)glfwGetProcAddress("glBindBufferBase");
+        glBindFramebuffer = (PFNGLBINDFRAMEBUFFER)glfwGetProcAddress("glBindFramebuffer");
+        glBindVertexArray = (PFNGLBINDVERTEXARRAY)glfwGetProcAddress("glBindVertexArray");
+        glCheckFramebufferStatus = (PFNGLCHECKFRAMEBUFFERSTATUS)glfwGetProcAddress("glCheckFramebufferStatus");
+        glFramebufferTexture2D = (PFNGLFRAMEBUFFERTEXTURE2D)glfwGetProcAddress("glFramebufferTexture2D");
+        glGenFramebuffers = (PFNGLGENFRAMEBUFFERS)glfwGetProcAddress("glGenFramebuffers");
+        glMapBufferRange = (PFNGLMAPBUFFERRANGE)glfwGetProcAddress("glMapBufferRange");
+        glBindImageTexture = (PFNGLBINDIMAGETEXTURE)glfwGetProcAddress("glBindImageTexture");
+        glBindVertexBuffer = (PFNGLBINDVERTEXBUFFER)glfwGetProcAddress("glBindVertexBuffer");
+        glDispatchCompute = (PFNGLDISPATCHCOMPUTE)glfwGetProcAddress("glDispatchCompute");
+        glGenVertexArrays = (PFNGLGENVERTEXARRAYS)glfwGetProcAddress("glGenVertexArrays");
+        glVertexAttribFormat = (PFNGLVERTEXATTRIBFORMAT)glfwGetProcAddress("glVertexAttribFormat");
+        glClearBufferFv = (PFNGLCLEARBUFFERFV)glfwGetProcAddress("glClearBufferFv");
+        glVertexAttribBinding = (PFNGLVERTEXATTRIBBINDING)glfwGetProcAddress("glVertexAttribBinding");
+        glEnableVertexAttribArray = (PFNGLENABLEVERTEXATTRIBARRAY)glfwGetProcAddress("glEnableVertexAttribArray");
+        glBufferSubData = (PFNGLBUFFERSUBDATA)glfwGetProcAddress("glBufferSubData");
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); glfwSwapBuffers(); // Black out the window as early as possible for better presentation.
         i32 major=0,minor=0; glGetIntegerv(0x821B/*GL_MAJOR_VERSION*/,&major); glGetIntegerv(0x821C/*GL_MINOR_VERSION*/,&minor);
         if (major < 4 || (major == 4 && minor < 3)) { DualLogError("Need OpenGL >= 4.3, got %d.%d\n",major,minor); OS_Exit(1); }
         glFrontFace(0x0901/*GL_CCW*/); // Set triangle winding order
         glBlendFuncSeparate(0x0302/*GL_SRC_ALPHA*/,0x0303/*GL_ONE_MINUS_SRC_ALPHA*/,0,1);
         CompileShaders();
-        u32 vaos[4],vbos[4]; glCreateVertexArrays(4,vaos); glCreateBuffers(3,vbos);
-        Sys_Render.quadVAO = vaos[0]; Sys_Render.vao_chunk = vaos[1]; Sys_Render.textVAO = vaos[2]; Sys_Render.debugLinesVAO = vaos[3];
-        Sys_Render.quadVBO = vbos[0]; Sys_Render.textVBO = vbos[1]; Sys_Render.debugLinesVBO = vbos[2];
+        u32 vaos[4],vbos[4]; glGenVertexArrays(4,vaos); glGenBuffers(4,vbos);
+        Sys_Render.quadVAO = vaos[0]; Sys_Render.chunkVAO = vaos[1]; Sys_Render.textVAO = vaos[2]; Sys_Render.debugLinesVAO = vaos[3];
+        Sys_Render.quadVBO = vbos[0]; Sys_Render.chunkVBO  = vbos[1]; Sys_Render.textVBO = vbos[2]; Sys_Render.debugLinesVBO = vbos[3]; 
         float quadBlit_vertices[] = {1.0f,-1.0f,1.0f,0.0f, 1.0f,1.0f,1.0f,1.0f, -1.0f,1.0f,0.0f,1.0f, -1.0f,-1.0f,0.0f,0.0f}; // 4 verts, 4 floats each x,y,u,v
-        glNamedBufferData(Sys_Render.quadVBO,sizeof(quadBlit_vertices),quadBlit_vertices,GL_STATIC_DRAW);
-        glVertexArrayAttribFormat(Sys_Render.quadVAO,0,2,GL_FLOAT,GL_FALSE,0); // DSA: Set position format
-        glVertexArrayAttribFormat(Sys_Render.quadVAO,1,2,GL_FLOAT,GL_FALSE,2 * sizeof(float)); // DSA: Set texcoord format
-        glVertexArrayVertexBuffer(Sys_Render.quadVAO,0,Sys_Render.quadVBO,0,4 * sizeof(float)); // DSA: Link VBO to VAO
-        for (u8 i = 0; i < 2; i++) { glVertexArrayAttribBinding(Sys_Render.quadVAO,i,0); glEnableVertexArrayAttrib(Sys_Render.quadVAO,i); }
-        glVertexArrayAttribFormat(Sys_Render.vao_chunk,0,3,0x140B/*GL_HALF_FLOAT*/,GL_FALSE,0);      // pos xyz half-float @ offset 0
-        glVertexArrayAttribFormat(Sys_Render.vao_chunk,1,3,0x140B/*GL_HALF_FLOAT*/,GL_FALSE,6);      // normal xyz float   @ offset 6  (after 3×2 bytes)
-        glVertexArrayAttribFormat(Sys_Render.vao_chunk,2,2,0x140B/*GL_HALF_FLOAT*/,GL_FALSE,12);     // uv st float
-        for (u8 i = 0; i < 3; i++) { glVertexArrayAttribBinding(Sys_Render.vao_chunk,i,0); glEnableVertexArrayAttrib(Sys_Render.vao_chunk,i); }
-        glVertexArrayAttribFormat(Sys_Render.textVAO,0,3,GL_FLOAT,GL_FALSE,0);             // pos (x,y,z) 4 floats per vertex, stride = 4*sizeof(float)
-        glVertexArrayAttribFormat(Sys_Render.textVAO,1,2,GL_FLOAT,GL_FALSE,3 * sizeof(float));  // uv (s,t)
-        glVertexArrayVertexBuffer(Sys_Render.textVAO,0,Sys_Render.textVBO,0,5 * sizeof(float));
-        for (u8 i = 0; i < 2; i++) { glVertexArrayAttribBinding(Sys_Render.textVAO,i,0); glEnableVertexArrayAttrib(Sys_Render.textVAO,i); }
+        glBindVertexArray(Sys_Render.quadVAO); glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.quadVBO); glBufferData(GL_ARRAY_BUFFER,sizeof(quadBlit_vertices),quadBlit_vertices,GL_STATIC_DRAW);
+        glVertexAttribFormat(0,2,GL_FLOAT,GL_FALSE,0);                 glVertexAttribBinding(0,0); glEnableVertexAttribArray(0); // pos xy float @ offset 0
+        glVertexAttribFormat(1,2,GL_FLOAT,GL_FALSE,2 * sizeof(float)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1); // uv (s,t)
+        glBindVertexBuffer(0,Sys_Render.quadVBO,0,4 * sizeof(float));
+        glBindVertexArray(Sys_Render.chunkVAO); glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.chunkVBO);
+        glVertexAttribFormat(0,3,0x140B/*GL_HALF_FLOAT*/,GL_FALSE,0);  // pos xyz half-float @ offset 0
+        glVertexAttribFormat(1,3,0x140B/*GL_HALF_FLOAT*/,GL_FALSE,6);  // normal xyz float   @ offset 6  (after 3×2 bytes)
+        glVertexAttribFormat(2,2,0x140B/*GL_HALF_FLOAT*/,GL_FALSE,12); // uv st float
+        for (u8 i = 0; i < 3; i++) { glVertexAttribBinding(i, 0); glEnableVertexAttribArray(i); }
+        glBindVertexBuffer(0,Sys_Render.chunkVBO,0,14);
+        glBindVertexArray(Sys_Render.textVAO); glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.textVBO);
+        glVertexAttribFormat(0,3,GL_FLOAT,GL_FALSE,0);                 // pos (x,y,z) 4 floats per vertex, stride = 4*sizeof(float)
+        glVertexAttribFormat(1,2,GL_FLOAT,GL_FALSE,3 * sizeof(float)); // uv (s,t)
+        for (u8 i = 0; i < 2; i++) { glVertexAttribBinding(i,0); glEnableVertexAttribArray(i); }
+        glBindVertexBuffer(0, Sys_Render.textVBO,0,5 * sizeof(float));
+        glBindVertexArray(Sys_Render.debugLinesVAO); glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.debugLinesVBO); glBufferData(GL_ARRAY_BUFFER,MAX_DEBUG_LINE_VERTS * 2 * sizeof(DebugLineVertex),NULL,GL_DYNAMIC_DRAW);
+        glVertexAttribFormat(0,3,GL_FLOAT,GL_FALSE, __builtin_offsetof(DebugLineVertex,x)); glVertexAttribBinding(0,0); glEnableVertexAttribArray(0);
+        glVertexAttribFormat(1,4,GL_FLOAT,GL_FALSE,__builtin_offsetof(DebugLineVertex, r)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1);
+        glBindVertexBuffer(0,Sys_Render.debugLinesVBO,0,sizeof(DebugLineVertex));
         InitFontAtlasses();
         GenerateAndBindTexture(&Sys_Render.inputUIID,GL_RGBA8,1366,768,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/,NULL); // UI Fixed Size Raster
         glGenFramebuffers(1,&Sys_Render.uiFBO);
@@ -1792,12 +1777,6 @@ i32 main(void) {
         glBindImageTexture(0,Sys_Render.inputUIID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8); // UI Rendered Color
         glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,Sys_Render.inputUIID,0);
         RenderLoadingProgress(22,"Loading...");
-        glNamedBufferStorage(Sys_Render.debugLinesVBO,sizeof(debugLineVerts),NULL,0x0100/*GL_DYNAMIC_STORAGE_BIT*/);
-        glVertexArrayAttribFormat(Sys_Render.debugLinesVAO,0,3,GL_FLOAT,GL_FALSE,offsetof(DebugLineVertex,x));
-        glVertexArrayAttribFormat(Sys_Render.debugLinesVAO,1,4,GL_FLOAT,GL_FALSE,offsetof(DebugLineVertex,r));
-        glEnableVertexArrayAttrib(Sys_Render.debugLinesVAO,0); glEnableVertexArrayAttrib(Sys_Render.debugLinesVAO,1);
-        glVertexArrayAttribBinding(Sys_Render.debugLinesVAO,0,0); glVertexArrayAttribBinding(Sys_Render.debugLinesVAO,1,0);
-        glVertexArrayVertexBuffer(Sys_Render.debugLinesVAO,0,Sys_Render.debugLinesVBO,0,sizeof(DebugLineVertex));
         float* m = shadowmapsPerspectiveProjection; float lightRangeMax=15.36f; float viewRange=(lightRangeMax - NEAR_PLANE);
         m[0] = 1.0f; m[1] = 0.0f; m[2] =                                           0.0f; m[3] =  0.0f;
         m[4] = 0.0f; m[5] = 1.0f; m[6] =                                           0.0f; m[7] =  0.0f;
@@ -1856,7 +1835,11 @@ i32 main(void) {
         DebugRAM("InitializeEnvironment end");
         DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
     }
-    
+}
+
+i32 main(void) {
+    double game_start_time = get_time();
+    InitalizeEnvironment(game_start_time);
     while(1) { // Main Loop
         if (((_GLFWwindow*)window)->shouldClose) OS_Exit(0);
         if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad); queuedLevelToLoad = 255u; continue; }
@@ -1868,7 +1851,23 @@ i32 main(void) {
         Sys_Global.last_topframe_time = Sys_Global.current_time;
         if (!Sys_Global.gamePaused && !Sys_Global.menuActive) Sys_Global.pauseRelativeTime += Sys_Global.deltaTime;
         mouseMovementThisFrame = false;
-        Input_Poll();
+        PLATFORM_pollEvents();
+        for (int jid = GLFW_JOYSTICK_1; jid <= GLFW_JOYSTICK_LAST; ++jid) { // Input Poll
+            if (!JoystickPresent(jid)) continue;
+            _GLFWjoystick* js = _glfw.joysticks + jid; if (!js->connected) continue;
+
+            PLATFORM_pollJoystick(js);
+            int totalButtons = js->buttonCount + js->hatCount * 4;
+            for (int i = 0; i < totalButtons && i < 16; ++i) {
+                KeyState* k = &Sys_Input.joystickButtons[jid - GLFW_JOYSTICK_1][i];
+                bool down = js->buttons[i] == GLFW_PRESS;
+                k->pressed = down && !k->down; k->released = !down && k->down; k->down = down;
+            }
+
+            for (int i = 0; i < js->hatCount && i < 5; ++i) { Sys_Input.joystickHats[i].down = js->hats[i]; }
+    //         for (int i = 0; i < js->axisCount && i < MAX_JOYSTICK_AXES; ++i) { Sys_Input.joystickAxes[jid - GLFW_JOYSTICK_1][i] = js->axes[i]; } TODO??
+        }
+    
         if (Sys_Input.keyStates[GLFW_KEY_E].pressed) play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f,(Vector3){},false);
         if (Sys_Input.window_has_focus) {
             if (Sys_Input.keyStates[GLFW_KEY_CAPS_LOCK].pressed) Sys_Input.isCapsLockOn = !Sys_Input.isCapsLockOn; // Change capslock state to match keyboard having toggled.  Must always happen regardless of paused/menu.
@@ -1878,6 +1877,21 @@ i32 main(void) {
         Sys_Global.timeSinceLastPhysicsTick = Sys_Global.pauseRelativeTime - Sys_Global.last_physics_time;
         if (likely(!Sys_Global.gamePaused || Sys_Global.menuActive)) UpdateAnims(); // Changes collision positions
         if (likely(!Sys_Global.gamePaused && !Sys_Global.menuActive)) { // Update Gameplay
+            MemSetToValueForNBytes(dynamicEntities,0,512 * sizeof(u16)); // none
+            dynamicEntityCount = 0;
+            //u16 numBox=0,numSphere=0,numMeshConv=0,numMesh=0,numCapsule=0;
+            for (int i=0;i<Sys_Global.loadedInstances;++i) {
+                if (dynamicEntityCount >= 512) { dynamicEntityCount = 512; assert(false); break; }
+                if (Sys_Global.instances[i].entflags&ENTFLAG_RIGIDBODY && Sys_Global.instances[i].entflags&ENTFLAG_ACTIVE) {
+                    dynamicEntities[dynamicEntityCount] = i; dynamicEntityCount++;
+                    //if (Sys_Global.instances[i].collider == COLLIDER_TYPE_BOX) numBox++;
+                    //if (Sys_Global.instances[i].collider == COLLIDER_TYPE_SPHERE) numSphere++;
+                    //if (Sys_Global.instances[i].collider == COLLIDER_TYPE_CAPSULE) numCapsule++;
+                    //if (Sys_Global.instances[i].collider == COLLIDER_TYPE_CONVEXMESH) numMeshConv++;
+                    //if (Sys_Global.instances[i].collider == COLLIDER_TYPE_MESH) numMesh++;
+                }
+            }
+            //DualLog("Got dynamicEntityCount of %u, collider type counts box: %u, sphere: %u, capsule: %u, mesh convex: %u, mesh: %u\n",numBox,numSphere,numCapsule,numMeshConv,numMesh);
             if (Sys_Global.timeSinceLastPhysicsTick > (1.0 / 2000.0)) { Sys_Global.last_physics_time = Sys_Global.pauseRelativeTime; Physics(); }
             
             Vector3 pDelta = Vector3_A_minus_B(Sys_Global.instances[PLAYER1].lastPosition,Sys_Global.instances[PLAYER1].position);
@@ -1925,7 +1939,7 @@ i32 main(void) {
                     modelMatrices[m+15]= 1.0f;
                 }
             }
-            if (uploadInstances) glNamedBufferData(Sys_Render.matricesBufferID,Sys_Global.loadedInstances * 16 * sizeof(float),modelMatrices,GL_DYNAMIC_DRAW);
+            if (uploadInstances) { glBindBuffer(GL_SSBO,Sys_Render.matricesBufferID); glBufferData(GL_SSBO,Sys_Global.loadedInstances * 16 * sizeof(float),modelMatrices,GL_DYNAMIC_DRAW); }
         }
 
         AudioUpdate();

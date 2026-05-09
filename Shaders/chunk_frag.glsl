@@ -1,16 +1,14 @@
-// chunk_frag.glsl: Generic shader for unlit textured surfaces (all world geometry, items,
-// enemies, doors, etc., without transparency for first pass prior to lighting.
-#version 430 core
-#extension GL_ARB_shading_language_packing : require
-#extension GL_ARB_shader_image_load_store : enable
+// chunk_frag.glsl: Generic shader for all world objects
+// #extension GL_ARB_shading_language_packing : require
+// #extension GL_ARB_shader_image_load_store : enable
 in vec2 TexCoord;
 in vec3 Normal;
 in vec3 FragPos;
 layout(location=0) uniform uint instanceIndex; // start vert shader uniforms
 layout(location=1) uniform uint normInstanceIndex;
 layout(location=2) uniform mat4 viewProjection; /*
-layout(location=3) 
-layout(location=4) 
+layout(location=3) some weird
+layout(location=4) padding apparently, so say some docs anyhow
 layout(location=5) */
 layout(location=6) uniform uint screenWidth;
 layout(location=7) uniform uint screenHeight;

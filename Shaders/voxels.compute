@@ -1,6 +1,5 @@
 // voxels.compute
 // Compute shader for determining light lists for voxels and updating voxel tables 
-#version 430 core
 layout(local_size_x = 32, local_size_y = 32) in;
 struct Light { vec3 pos; float intensity; vec3 col; uint lflags; float range; float spotAng; float maxIntensity; float minIntensity; vec4 spotDir; };
 layout(std430,binding=2) buffer VoxelLightListCounts { uint voxelLightListCounts[]; };
@@ -25,7 +24,6 @@ const int WORLD_X_VOXELCOUNT = 512;
 const float VOXEL_SIZE = 0.32;
 const uint SHADON = 2u;
 const float vhalf = 0.16;
-
 bool CellVisible(float x, float z) {
     int subIdx = (int(clamp(int(floor(((z - worldMin_z) + 1.28) / 2.56)),0,63)) * 64)
                 + int(clamp(int(floor(((x - worldMin_x) + 1.28) / 2.56)),0,63));

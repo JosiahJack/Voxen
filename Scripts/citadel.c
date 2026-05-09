@@ -3616,8 +3616,8 @@ MOD_TO_ENGINE const char** GetCreditsText(void) { return creditPages; }
 MOD_TO_ENGINE void ModInitAfterLoad(void) {
     for (int i=PLAYER1;i<Eng_Global->loadedInstances;++i) {
         Entity* e = &Eng_Global->instances[i]; u16 constIndex = e->index;
-//         if (i == PLAYER1 || i == PLAYER2 || ConstIndexIsDynamicObject(constIndex) || (ConstIndexIsNPC(constIndex) && constIndex < 443/*not cyber*/)) e->gravity = 1.0f;
-//         else e->gravity = 0.0f;
+        if (i == PLAYER1 || i == PLAYER2 || ConstIndexIsDynamicObject(constIndex) || (ConstIndexIsNPC(constIndex) && constIndex < 443/*not cyber*/)) e->gravity = 1.0f;
+        else e->gravity = 0.0f;
         
         if (ConstIndexIsGeometry(constIndex)) e->layer = Layer_Geometry;
         else if (ConstIndexIsDoor(constIndex)) e->layer = Layer_Door;

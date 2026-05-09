@@ -58,7 +58,7 @@ static inline __attribute__((always_inline)) long OS_Open(const char* path, i32 
     return rax;
 }
 
-#include <stddef.h> // For offsetof only
+// #include <stddef.h> // For offsetof only
 #include <pthread.h> // For model and texture loading only
 #if defined(_WIN32) || defined(_WIN64)
     #define WINDOWS

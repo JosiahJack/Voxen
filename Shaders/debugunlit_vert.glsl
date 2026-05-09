@@ -1,5 +1,4 @@
 // debugunlit_vert.glsl
-#version 430 core
 layout(location=0) in vec3 aPos;
 layout(location=1) in vec4 aColor;
 layout(location=0) uniform mat4 u_ViewProj;

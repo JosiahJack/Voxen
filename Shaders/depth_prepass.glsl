@@ -1,7 +1,4 @@
 // depth_prepass.glsl: Renders all opaque objects prior to main forward+ pass
-#version 430 core
-#extension GL_ARB_shading_language_packing : require
-#extension GL_ARB_shader_image_load_store : enable
 in vec2 TexCoord;
 in vec3 FragPos;
 layout(location=0) uniform uint instanceIndex;
@@ -12,7 +9,6 @@ layout(std430,binding=14) buffer TextureOffsets { uint textureOffsets[]; }; // S
 layout(std430,binding=15) buffer TextureSizes { ivec2 textureSizes[]; }; // x,y pairs for width and height of textures
 layout(std430,binding=16) buffer TexturePalettes { uint texturePalettes[]; }; // Palette colors
 layout(std430,binding=17) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; }; // Palette starting indices for each texture
-
 const vec4 BYTE_TO_FLOAT = vec4(1.0/255.0);
 vec4 getTextureColor(uint texIndex, ivec2 texCoord) {
     uint pixelOffset = textureOffsets[texIndex] + uint(texCoord.y) * textureSizes[texIndex].x + uint(texCoord.x);

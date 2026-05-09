@@ -441,6 +441,7 @@ static void InitFontAtlasses(void){
     TempFree(pc2.pack_info);GenerateAndBindTexture(&fontAtlasTexStopD,0x8229/*GL_R8*/,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0x1903/*GL_RED*/,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,bmp);
     
     OS_DeallocateRAM(bmp,FONT_ATLAS_SIZE*FONT_ATLAS_SIZE);
+    glUseProgram(Sys_Render.textShaderProgram); glUniform1i(1,2);
     DualLog(" took %f s\n",get_time()-t0);
 }
 
@@ -527,8 +528,8 @@ void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scaleInput,const 
     va_list args;__builtin_va_start(args,format);StringFormatV(uiTextBuffer,TEXT_BUFFER_SIZE,format,args);__builtin_va_end(args);
     glUseProgram(Sys_Render.textShaderProgram);
     glUniform4f(3,textColors[color].r,textColors[color].g,textColors[color].b,textColors[color].a);
-    glBindTextureUnit(6,fontID==FONT_STOPD?fontAtlasTexStopD:fontAtlasTex);
-    glUniform2f(4,1.0f/(float)FONT_ATLAS_SIZE,1.0f/(float)FONT_ATLAS_SIZE);glUniform1ui(2,fontID);glUniform1i(1,6);
+    glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D,fontID==FONT_STOPD?fontAtlasTexStopD:fontAtlasTex);
+    glUniform2f(4,1.0f/(float)FONT_ATLAS_SIZE,1.0f/(float)FONT_ATLAS_SIZE);glUniform1ui(2,fontID);
     glBindVertexArray(Sys_Render.textVAO);
     size_t vc=0;const char*p=uiTextBuffer;float xpos=x,ypos=y+(16*scale),ls=22*scale;stbtt_aligned_quad q;int cc=0;
     float puv=10.0f/(float)FONT_ATLAS_SIZE,bw=2.0f;
@@ -549,5 +550,6 @@ void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scaleInput,const 
         CopyMemoryFromBtoAForNBytes(textVertexData+vc*30,tv,sizeof(tv));vc++;
         if(cp>='0'&&cp<='9'){if(fontID==FONT_STOPD)xpos=q.x0+fixedNumberAdvanceWidthStopD;else xpos=q.x0+fixedNumberAdvanceWidth;}
     }
-    if(vc){glNamedBufferData(Sys_Render.textVBO,vc*30*sizeof(float),textVertexData,GL_DYNAMIC_DRAW);glDrawArrays(0x0004/*GL_TRIANGLES*/,0,vc*6);}
+    
+    if(vc){ glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.textVBO); glBufferData(GL_ARRAY_BUFFER,vc*30*sizeof(float),textVertexData,GL_DYNAMIC_DRAW);glDrawArrays(0x0004/*GL_TRIANGLES*/,0,vc*6); }
 }

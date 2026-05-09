@@ -419,13 +419,6 @@
 		}
 	}
 
-	void ApplyGravity() {
-// 		if (gravFinished < Eng_Global->pauseRelativeTime) {
-// 			gravFinished = Eng_Global->pauseRelativeTime + 0.01f;
-// 			rbody.AddRelativeForce(Vector3.down * 9.83f * 9.83f);
-// 		}
-	}
-
 	void ApplyGroundFriction() {
 		if (running) {
 			if (!CheatNoclip) {

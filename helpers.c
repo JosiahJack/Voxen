@@ -1,4 +1,5 @@
 // helpers.c - Helper Functions for various things, mostly libc avoidance
+static void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n) { unsigned char *d=(unsigned char *)dst; const unsigned char *s=(const unsigned char *)src; while (n--) {*d++=*s++;} return dst; } // memcpy replacement
 void stbi_write_bmp(char const *filename, int x, int y, const void *data) {
     OsFileHandle f = OS_OpenWriteonly(filename);
     if (f == OS_INVALID_HANDLE) { DualLogError("Failed to open %s for writing\n", filename); return; }

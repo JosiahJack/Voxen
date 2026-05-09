@@ -21,7 +21,6 @@ if [ $# -eq 0 ] || [ "${1:-}" != "ci" ]; then
     if [ ! -f "$CSV" ]; then
         printf "date,builds_today\n" > "$CSV"
     fi
-
     sed -i 's/\r$//' "$CSV" 2>/dev/null || true
     TODAY_COUNT=0
     if grep -q "^$TODAY," "$CSV" 2>/dev/null; then
@@ -41,7 +40,11 @@ fi
 
 # Convert shaders into string headers
 gh() {
-    sed 's|//.*||g' "$1" | awk '
+    local VER="#version 430 core\\n"
+    if [[ "$PLATFORM" == "android" ]]; then
+        VER="#version 310 es\\nprecision mediump float;\\nprecision mediump sampler2D;\\n"
+    fi
+    (echo -e "$VER"; cat "$1") | sed 's|//.*||g' | awk '
     /^\s*#/ {gsub(/^\s+|\s+$/,"");printf"%s\\n",$0;next}
     {gsub(/\/\/.*/,"");gsub(/[ \t\r\n]+/," ");gsub(/^[ \t]+|[ \t]+$/,"");if(NF==0)next
     gsub(/ *\* */,"*");gsub(/ *\/ */,"/");gsub(/ *\+ */,"+");gsub(/ *- */,"-")
@@ -98,10 +101,11 @@ WINDOWS_CC="zig cc -target x86_64-windows-gnu -Wl,--stack,8388608"
 COMMON_CFLAGS="-ferror-limit=500 -fno-exceptions -fno-stack-protector -fno-asynchronous-unwind-tables -fno-unwind-tables -Wno-format-nonliteral \
                -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -fvisibility=hidden -pipe -fno-ident -fdata-sections -Wno-int-to-void-pointer-cast \
                -ffunction-sections -ffast-math -std=c11 -Wall -Wextra -Wno-implicit-fallthrough -fdeclspec -fno-rtti \
-               -fomit-frame-pointer -g0 -fstrict-aliasing -fcommon -Walloca \
+               -fomit-frame-pointer -g -fstrict-aliasing -fcommon -Walloca \
                -Wformat=2 -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings -fno-math-errno -fno-sanitize=all \
                -fno-trapping-math -fmerge-all-constants -m64 -Os -march=haswell -fstack-usage"
-COMMON_LFLAGS="-Wl,-z,now -Wl,-z,relro -Wl,--gc-sections -Wl,--as-needed -Wl,--strip-all -Wl,-z,norelro -Wl,--build-id=none $ZIG_LIBS"
+# COMMON_LFLAGS="-Wl,-z,now -Wl,-z,relro -Wl,--gc-sections -Wl,--as-needed -Wl,--strip-all -Wl,-z,norelro -Wl,--build-id=none $ZIG_LIBS"
+COMMON_LFLAGS="-Wl,-z,now -Wl,-z,relro -Wl,--gc-sections -Wl,--as-needed                 -Wl,-z,norelro -Wl,--build-id=none $ZIG_LIBS"
 if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
     LINKER=$CC
@@ -122,10 +126,10 @@ else
     BINARY_NAMEGC="Citadel.so"
 fi
 
-# Engine Build
+# Engine Build 123.4kb
 $CC voxen.c $CFLAGS $LDFLAGS -rdynamic -o $BINARY_NAME
 
-# Game Code Build
+# Game Code Build 233.5kb
 export CCGC=$CC
 export CFLAGSGC=$CFLAGSGC
 SOURCESGC="animation.c ai.c biomonitor.c weapons.c music.c modaudio.c citadel.c entity.c"
@@ -140,9 +144,9 @@ if ! $IS_CI; then
     case "$PLATFORM" in
         windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; wine ./voxen.exe ;;
 #         windows)  wine ./voxen.exe ;;
-        *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
+#         *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
 #         *)        strip --strip-all --strip-unneeded ./voxen; ./voxen ;;   # linux Alternate build methods to be able to look at symbols and debugging
-#         *)        ./voxen ;;   # linux
+        *)        ./voxen ;;   # linux
     esac
     rm -f ./Shaders/*.h "$TEMP_DIRGC"/*.o ./voxen.upx ./*.lib #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.
 fi

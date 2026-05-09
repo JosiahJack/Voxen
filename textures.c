@@ -298,7 +298,7 @@ static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
 }
 
 void glfwSetWindowIcon(GLFWwindow* handle, const GLFWimage* images); extern GLFWwindow* window;
-static void LoadTextures(void) {
+static __attribute__((noinline)) void LoadTextures(void) {
     double start_time = get_time();
     loadedTexturesMaxIndex = totalPixels = totalPaletteColors = 0u;
     TextureDataParser texture_parser;

@@ -248,7 +248,7 @@ typedef struct _GLFWfbconfig _GLFWfbconfig; typedef struct _GLFWcontext _GLFWcon
     #define GLFW_WIN32_LIBRARY_JOYSTICK_STATE
 #endif
 struct _GLFWfbconfig { int redBits,greenBits,blueBits,alphaBits,depthBits,stencilBits,accumRedBits,accumGreenBits,accumBlueBits,accumAlphaBits; i32 stereo; int samples; i32 sRGB,doublebuffer; uintptr_t handle; };
-struct _GLFWcontext { int client,source,major,minor; PFNGLGETINTEGERVPROC GetIntegerv; void (*makeCurrent)(_GLFWwindow*); void (*swapBuffers)(_GLFWwindow*); void (*swapInterval)(int); GLFWglproc (*getProcAddress)(const char*); GLFW_WGL_CONTEXT_STATE GLFW_GLX_CONTEXT_STATE };
+struct _GLFWcontext { int client,source,major,minor; PFNGLGETINTEGERV GetIntegerv; void (*makeCurrent)(_GLFWwindow*); void (*swapBuffers)(_GLFWwindow*); void (*swapInterval)(int); GLFWglproc (*getProcAddress)(const char*); GLFW_WGL_CONTEXT_STATE GLFW_GLX_CONTEXT_STATE };
 struct _GLFWwindow { i32 decorated,shouldClose,doublebuffer; GLFWvidmode videoMode; int minwidth,minheight,maxwidth,maxheight; int cursorMode; char mouseButtons[GLFW_MOUSE_BUTTON_LAST + 1],keys[GLFW_KEY_LAST + 1]; double virtualCursorPosX,virtualCursorPosY; _GLFWcontext context; GLFW_WIN32_WINDOW_STATE GLFW_X11_WINDOW_STATE };
 struct _GLFWmonitor { char name[128]; int widthMM,heightMM; GLFWvidmode currentMode; GLFW_WIN32_MONITOR_STATE GLFW_X11_MONITOR_STATE };
 struct _GLFWjoystick {
@@ -1526,11 +1526,8 @@ const _GLFWfbconfig* _glfwChooseFBConfig(const _GLFWfbconfig* alts, unsigned int
     unsigned int missing, leastMissing = 2147483647, colorDiff, leastColorDiff = 2147483647, extraDiff, leastExtraDiff = 2147483647;
     const _GLFWfbconfig* closest = NULL;
     for (unsigned int i = 0; i < count; i++) {
-        const _GLFWfbconfig* cur = alts + i;        
-        missing = 0;
-        if (cur->alphaBits == 0) missing++;
-        if (cur->depthBits == 0) missing++;
-        if (cur->stencilBits == 0) missing++;
+        const _GLFWfbconfig* cur = alts + i;        missing = 0;
+        if (cur->alphaBits == 0) {missing++;} if (cur->depthBits == 0) {missing++;} if (cur->stencilBits == 0) {missing++;}
         colorDiff = 0;
         colorDiff += (8 - cur->redBits)   * (8 - cur->redBits);
         colorDiff += (8 - cur->greenBits) * (8 - cur->greenBits);

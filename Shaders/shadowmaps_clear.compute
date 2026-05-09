@@ -1,5 +1,4 @@
 // shadowmaps_clear.compute - Compute shader for clearing the distances for shadowmaps in the SSBO to the light farplane of 15.36f 
-#version 430 core
 layout(local_size_x = 32, local_size_y = 1) in;
 layout(location=0) uniform uint lightIdx;
 layout(location=1) uniform uint shadowMapSize;

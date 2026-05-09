@@ -2,6 +2,7 @@
 #define LINE_LEN_MAX 81920
 Entity EDefs[MAX_ENTITIES];
 #define GEOMETRY_LOD_CARD_MODEL_IDX 178
+void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n) { unsigned char *d=(unsigned char *)dst; const unsigned char *s=(const unsigned char *)src; while (n--) {*d++=*s++;} return dst; } // memcpy replacement
 MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(void) { // Global conditions for all entities.  No sense inflating the table data in entity.c
     MemSetToValueForNBytes(EDefs,0,sizeof(Entity));
     Entity* e; for (int i=0;i<768;++i) EDefs[i].index = i;
@@ -795,7 +796,6 @@ MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(void) { // Global condition
             EDefs[i].tickTime = 1.5;
         }
     }
-    
 }
 
 u16 AddInstance(u16 entIdx, Vector3 pos) {
@@ -816,7 +816,7 @@ u16 AddInstance(u16 entIdx, Vector3 pos) {
     e->specIndex = EDefs[entIdx].specIndex >= MAX_VALID_TEXTURE ? 0 : EDefs[entIdx].specIndex;
     e->normIndex = EDefs[entIdx].normIndex >= MAX_VALID_TEXTURE ? 0 : EDefs[entIdx].normIndex;
     e->lodIndex = EDefs[entIdx].lodIndex;
-    flag_set(&e->entflags,ENTFLAG_KINEMATIC,EDefs[entIdx].entflags & ENTFLAG_KINEMATIC);
+    e->kinematic = EDefs[entIdx].kinematic;
     flag_set(&e->entflags,ENTFLAG_RIGIDBODY,EDefs[entIdx].entflags & ENTFLAG_RIGIDBODY);
     flag_set(&e->entflags,ENTFLAG_NO_SHADOWS, EDefs[entIdx].entflags & ENTFLAG_NO_SHADOWS);
     e->collider = EDefs[entIdx].collider; e->colliderCenter = EDefs[entIdx].colliderCenter; e->colliderSize = EDefs[entIdx].colliderSize;

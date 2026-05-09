@@ -493,7 +493,7 @@ static void AIIdle(Entity* self) {
         self->idleTime = Eng_Global->pauseRelativeTime + random_range(npc->timeIdleSFXMin, npc->timeIdleSFXMax);
     }
 
-    if (self->entflags & ENTFLAG_ASLEEP) { flag_set(&self->entflags, ENTFLAG_KINEMATIC, true); self->velocity = (Vector3){0,0,0}; }
+    if (self->entflags & ENTFLAG_ASLEEP) { self->kinematic=true; self->velocity = (Vector3){0,0,0}; }
     AICheckPain(self);
 }
 
@@ -748,13 +748,8 @@ static void AIDyingSetup(Entity* self) {
         if (sded >= 0 && sded < (i16)SOUNDS_COUNT) play_wav(sounds[sded], self->volume, self->position, true);
     }
 
-    // Physics for death
-    if (ai_is_cyber(self)) {
-        self->gravity = 0.0f;
-    } else {
-        self->gravity = 1.0f;
-        flag_set(&self->entflags, ENTFLAG_KINEMATIC, true);
-    }
+    if (ai_is_cyber(self)) self->gravity = 0.0f; // Physics for death
+    else { self->gravity = 1.0f; self->kinematic=true; }
 
     flag_set(&self->entflags, ENTFLAG_ASLEEP, false);
     self->layer = Layer_Corpse;

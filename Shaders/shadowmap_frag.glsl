@@ -1,5 +1,4 @@
 // Shadowmap Fragment Shader
-#version 430 core
 in vec3 FragPos;
 in vec2 TexCoord;
 layout(std430,binding=5) buffer ShadowMaps { uint depthData[]; };
@@ -14,7 +13,6 @@ layout(std430,binding=14) buffer TextureOffsets { uint textureOffsets[]; }; // S
 layout(std430,binding=15) buffer TextureSizes { ivec2 textureSizes[]; }; // x,y pairs for width and height of textures
 layout(std430,binding=16) buffer TexturePalettes { uint texturePalettes[]; }; // Palette colors
 layout(std430,binding=17) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; }; // Palette starting indices for each texture
-
 void main() {
     if (isTransparent > 0u) {
         vec2 uv = vec2(TexCoord.x,1.0 - TexCoord.y);
