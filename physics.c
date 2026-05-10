@@ -137,24 +137,13 @@ static SweepResult SweepSphereBox(Vector3 sPos, float sRadius, Vector3 sVel, Sha
     return r;
 }
 
-static SweepResult SweepBoxSphere(ShapeBox box, Vector3 bVel,
-                                   Vector3 sPos, float sRadius) {
-    // Swap arguments and call SweepSphereBox
-    return SweepSphereBox(sPos, sRadius, scale_vector3(bVel, -1.0f), box);
-}
-
-// Box vs Box: Sample vertices of moving box, test against static box
+static SweepResult SweepBoxSphere(ShapeBox box, Vector3 bVel, Vector3 sPos, float sRadius) { return SweepSphereBox(sPos, sRadius, scale_vector3(bVel, -1.0f), box); }
 static SweepResult SweepBoxBox(ShapeBox moving, Vector3 vel, ShapeBox stat) {
-    // Test each vertex of moving box against static box via SweepSphereBox(radius=0)
     SweepResult r={0}; float closestToi=2.0f;
-    Quaternion invRot={-stat.rot.x,-stat.rot.y,-stat.rot.z,stat.rot.w};
     Vector3 ax,ay,az; obb_axes(moving.rot,&ax,&ay,&az);
     float ox[]={-1,+1}; float oy[]={-1,+1}; float oz[]={-1,+1};
     for (int ix=0;ix<2;++ix) for (int iy=0;iy<2;++iy) for (int iz=0;iz<2;++iz) {
-        Vector3 vtx=Vector3_A_plus_B(moving.center,
-            Vector3_A_plus_B(scale_vector3(ax,ox[ix]*moving.halfExtents.x),
-            Vector3_A_plus_B(scale_vector3(ay,oy[iy]*moving.halfExtents.y),
-                             scale_vector3(az,oz[iz]*moving.halfExtents.z))));
+        Vector3 vtx=Vector3_A_plus_B(moving.center,Vector3_A_plus_B(scale_vector3(ax,ox[ix]*moving.halfExtents.x),Vector3_A_plus_B(scale_vector3(ay,oy[iy]*moving.halfExtents.y),scale_vector3(az,oz[iz]*moving.halfExtents.z))));
         ShapeBox unit={stat.center,stat.halfExtents,stat.rot};
         SweepResult hit=SweepSphereBox(vtx,0.0f,vel,unit);
         if (hit.hit && hit.toi<closestToi) { closestToi=hit.toi; r=hit; }
@@ -199,190 +188,182 @@ static SweepResult SweepCapsuleCapsule(Vector3 aBase, Vector3 aTip, float aRadiu
     return r;
 }
 
-
-static float SphereTriangleDistance(Vector3 sphereCenter, Vector3 a, Vector3 b, Vector3 c, Vector3 *closestPoint) {
-    Vector3 edge0 = Vector3_A_minus_B(b, a); Vector3 edge1 = Vector3_A_minus_B(c, a);
-    Vector3 toSphere = Vector3_A_minus_B(sphereCenter, a); // Find closest point on triangle to sphere center
-    float d00 = dot_vector3(edge0, edge0);
-    float d01 = dot_vector3(edge0, edge1);
-    float d11 = dot_vector3(edge1, edge1);
-    float d20 = dot_vector3(toSphere, edge0);
-    float d21 = dot_vector3(toSphere, edge1);
-    float denom = d00 * d11 - d01 * d01;
-    if (vabs(denom) < 1e-6f) { // Degenerate triangle
-        *closestPoint = a; return magnitude_vector3(Vector3_A_minus_B(sphereCenter, a));
-    }
-    
-    float u = (d11 * d20 - d01 * d21) / denom; float v = (d00 * d21 - d01 * d20) / denom;
-    u = vclamp(u, 0.0f, 1.0f); v = vclamp(v, 0.0f, 1.0f);
-    if (u + v > 1.0f) { u = vmax(0.0f, 1.0f - v); v = vmax(0.0f, 1.0f - u); }
-    Vector3 p = Vector3_A_plus_B(a, Vector3_A_plus_B(scale_vector3(edge0, u), scale_vector3(edge1, v)));
-    *closestPoint = p; Vector3 delta = Vector3_A_minus_B(sphereCenter,p);
-    return magnitude_vector3(delta);
-}
+// static float SphereTriangleDistance(Vector3 sphereCenter, Vector3 a, Vector3 b, Vector3 c, Vector3 *closestPoint) {
+//     Vector3 edge0 = Vector3_A_minus_B(b, a); Vector3 edge1 = Vector3_A_minus_B(c, a);
+//     Vector3 toSphere = Vector3_A_minus_B(sphereCenter, a); // Find closest point on triangle to sphere center
+//     float d00 = dot_vector3(edge0, edge0);
+//     float d01 = dot_vector3(edge0, edge1);
+//     float d11 = dot_vector3(edge1, edge1);
+//     float d20 = dot_vector3(toSphere, edge0);
+//     float d21 = dot_vector3(toSphere, edge1);
+//     float denom = d00 * d11 - d01 * d01;
+//     if (vabs(denom) < 1e-6f) { // Degenerate triangle
+//         *closestPoint = a; return magnitude_vector3(Vector3_A_minus_B(sphereCenter, a));
+//     }
+//     
+//     float u = (d11 * d20 - d01 * d21) / denom; float v = (d00 * d21 - d01 * d20) / denom;
+//     u = vclamp(u, 0.0f, 1.0f); v = vclamp(v, 0.0f, 1.0f);
+//     if (u + v > 1.0f) { u = vmax(0.0f, 1.0f - v); v = vmax(0.0f, 1.0f - u); }
+//     Vector3 p = Vector3_A_plus_B(a, Vector3_A_plus_B(scale_vector3(edge0, u), scale_vector3(edge1, v)));
+//     *closestPoint = p; Vector3 delta = Vector3_A_minus_B(sphereCenter,p);
+//     return magnitude_vector3(delta);
+// }
 
 // Shared: extract model matrix components. Call once per mesh sweep.
-typedef struct { float m00,m10,m20,m01,m11,m21,m02,m12,m22,tx,ty,tz,sclx,scly,sclz,sclx2,scly2,sclz2; } MeshXform;
-static bool MeshXform_Get(Entity *me, u16 idx, MeshXform *x) {
-    if (me->collider!=COLLIDER_TYPE_MESH||me->modelIndex>=loadedModelsMaxIndex) return false;
-    float M[16]; CopyMemoryFromBtoAForNBytes(M,&modelMatrices[idx*16],16*sizeof(float));
-    x->m00=M[0];x->m10=M[1];x->m20=M[2]; x->m01=M[4];x->m11=M[5];x->m21=M[6]; x->m02=M[8];x->m12=M[9];x->m22=M[10];
-    x->tx=M[12];x->ty=M[13];x->tz=M[14];
-    x->sclx=vsqrtf(x->m00*x->m00+x->m10*x->m10+x->m20*x->m20); x->sclx2=x->sclx*x->sclx;
-    x->scly=vsqrtf(x->m01*x->m01+x->m11*x->m11+x->m21*x->m21); x->scly2=x->scly*x->scly;
-    x->sclz=vsqrtf(x->m02*x->m02+x->m12*x->m12+x->m22*x->m22); x->sclz2=x->sclz*x->sclz;
-    return true;
-}
-static Vector3 MeshXform_ToLocal(const MeshXform *x, Vector3 p) { Vector3 r={p.x-x->tx,p.y-x->ty,p.z-x->tz}; return (Vector3){(r.x*x->m00+r.y*x->m10+r.z*x->m20)/x->sclx2,(r.x*x->m01+r.y*x->m11+r.z*x->m21)/x->scly2,(r.x*x->m02+r.y*x->m12+r.z*x->m22)/x->sclz2}; }
-static Vector3 MeshXform_NormalToWorld(const MeshXform *x, Vector3 n) { return normalize_vector3((Vector3){(x->m00/x->sclx)*n.x+(x->m01/x->scly)*n.y+(x->m02/x->sclz)*n.z,(x->m10/x->sclx)*n.x+(x->m11/x->scly)*n.y+(x->m12/x->sclz)*n.z,(x->m20/x->sclx)*n.x+(x->m21/x->scly)*n.y+(x->m22/x->sclz)*n.z}); }
-static Vector3 MeshXform_PointToWorld(const MeshXform *x, Vector3 p) { return (Vector3){x->m00*p.x+x->m01*p.y+x->m02*p.z+x->tx,x->m10*p.x+x->m11*p.y+x->m12*p.z+x->ty,x->m20*p.x+x->m21*p.y+x->m22*p.z+x->tz}; }
-static void MeshTri_Get(u16 mindex, u32 j, Vector3 *a, Vector3 *b, Vector3 *c) {
-    u32 bA=(u32)modelTriangles[mindex][j*3+0]*VERTEX_ATTRIBUTES_SIZE;
-    u32 bB=(u32)modelTriangles[mindex][j*3+1]*VERTEX_ATTRIBUTES_SIZE;
-    u32 bC=(u32)modelTriangles[mindex][j*3+2]*VERTEX_ATTRIBUTES_SIZE;
-    a->x=half_to_float(*(half*)(modelVertices[mindex]+bA+0)); a->y=half_to_float(*(half*)(modelVertices[mindex]+bA+2)); a->z=half_to_float(*(half*)(modelVertices[mindex]+bA+4));
-    b->x=half_to_float(*(half*)(modelVertices[mindex]+bB+0)); b->y=half_to_float(*(half*)(modelVertices[mindex]+bB+2)); b->z=half_to_float(*(half*)(modelVertices[mindex]+bB+4));
-    c->x=half_to_float(*(half*)(modelVertices[mindex]+bC+0)); c->y=half_to_float(*(half*)(modelVertices[mindex]+bC+2)); c->z=half_to_float(*(half*)(modelVertices[mindex]+bC+4));
-}
+// typedef struct { float m00,m10,m20,m01,m11,m21,m02,m12,m22,tx,ty,tz,sclx,scly,sclz,sclx2,scly2,sclz2; } MeshXform;
+// static bool MeshXform_Get(Entity *me, u16 idx, MeshXform *x) {
+//     if (me->collider!=COLLIDER_TYPE_MESH||me->modelIndex>=loadedModelsMaxIndex) return false;
+//     float M[16]; CopyMemoryFromBtoAForNBytes(M,&modelMatrices[idx*16],16*sizeof(float));
+//     x->m00=M[0];x->m10=M[1];x->m20=M[2]; x->m01=M[4];x->m11=M[5];x->m21=M[6]; x->m02=M[8];x->m12=M[9];x->m22=M[10];
+//     x->tx=M[12];x->ty=M[13];x->tz=M[14];
+//     x->sclx=vsqrtf(x->m00*x->m00+x->m10*x->m10+x->m20*x->m20); x->sclx2=x->sclx*x->sclx;
+//     x->scly=vsqrtf(x->m01*x->m01+x->m11*x->m11+x->m21*x->m21); x->scly2=x->scly*x->scly;
+//     x->sclz=vsqrtf(x->m02*x->m02+x->m12*x->m12+x->m22*x->m22); x->sclz2=x->sclz*x->sclz;
+//     return true;
+// }
+// static Vector3 MeshXform_ToLocal(const MeshXform *x, Vector3 p) { Vector3 r={p.x-x->tx,p.y-x->ty,p.z-x->tz}; return (Vector3){(r.x*x->m00+r.y*x->m10+r.z*x->m20)/x->sclx2,(r.x*x->m01+r.y*x->m11+r.z*x->m21)/x->scly2,(r.x*x->m02+r.y*x->m12+r.z*x->m22)/x->sclz2}; }
+// static Vector3 MeshXform_NormalToWorld(const MeshXform *x, Vector3 n) { return normalize_vector3((Vector3){(x->m00/x->sclx)*n.x+(x->m01/x->scly)*n.y+(x->m02/x->sclz)*n.z,(x->m10/x->sclx)*n.x+(x->m11/x->scly)*n.y+(x->m12/x->sclz)*n.z,(x->m20/x->sclx)*n.x+(x->m21/x->scly)*n.y+(x->m22/x->sclz)*n.z}); }
+// static Vector3 MeshXform_PointToWorld(const MeshXform *x, Vector3 p) { return (Vector3){x->m00*p.x+x->m01*p.y+x->m02*p.z+x->tx,x->m10*p.x+x->m11*p.y+x->m12*p.z+x->ty,x->m20*p.x+x->m21*p.y+x->m22*p.z+x->tz}; }
+// static void MeshTri_Get(u16 mindex, u32 j, Vector3 *a, Vector3 *b, Vector3 *c) {
+//     u32 bA=(u32)modelTriangles[mindex][j*3+0]*VERTEX_ATTRIBUTES_SIZE;
+//     u32 bB=(u32)modelTriangles[mindex][j*3+1]*VERTEX_ATTRIBUTES_SIZE;
+//     u32 bC=(u32)modelTriangles[mindex][j*3+2]*VERTEX_ATTRIBUTES_SIZE;
+//     a->x=half_to_float(*(half*)(modelVertices[mindex]+bA+0)); a->y=half_to_float(*(half*)(modelVertices[mindex]+bA+2)); a->z=half_to_float(*(half*)(modelVertices[mindex]+bA+4));
+//     b->x=half_to_float(*(half*)(modelVertices[mindex]+bB+0)); b->y=half_to_float(*(half*)(modelVertices[mindex]+bB+2)); b->z=half_to_float(*(half*)(modelVertices[mindex]+bB+4));
+//     c->x=half_to_float(*(half*)(modelVertices[mindex]+bC+0)); c->y=half_to_float(*(half*)(modelVertices[mindex]+bC+2)); c->z=half_to_float(*(half*)(modelVertices[mindex]+bC+4));
+// }
+// 
+// static bool MeshCouldOverlap(Entity *me, u16 meIdx, Vector3 pos, float radius) {
+//     float M[16]; CopyMemoryFromBtoAForNBytes(M,&modelMatrices[meIdx*16],16*sizeof(float));
+//     Vector3 meshOrigin={M[12],M[13],M[14]};
+//     float meshBound = me->colliderSize.x > 0.01f ? me->colliderSize.x : 32.0f;
+//     Vector3 d=Vector3_A_minus_B(pos,meshOrigin);
+//     float distSq=dot_vector3(d,d), maxReach=meshBound+radius;
+//     return distSq < maxReach*maxReach;
+// }
 
-static bool MeshCouldOverlap(Entity *me, u16 meIdx, Vector3 pos, float radius) {
-    float M[16]; CopyMemoryFromBtoAForNBytes(M,&modelMatrices[meIdx*16],16*sizeof(float));
-    Vector3 meshOrigin={M[12],M[13],M[14]};
-    float meshBound = me->colliderSize.x > 0.01f ? me->colliderSize.x : 32.0f;
-    Vector3 d=Vector3_A_minus_B(pos,meshOrigin);
-    float distSq=dot_vector3(d,d), maxReach=meshBound+radius;
-    return distSq < maxReach*maxReach;
-}
+// static SweepResult SweepSphereMeshEntity(Vector3 sPos, float sRadius, Entity *me, u16 meIdx) {
+//     SweepResult r={0}; MeshXform x;
+//     if (!MeshXform_Get(me,meIdx,&x)) return r;
+//     if (!MeshCouldOverlap(me,meIdx,sPos,sRadius)) return r;
+//     u16 mindex=me->modelIndex; u32 triCount=modelTriangleCounts[mindex];
+//     if (!triCount) return r;
+// 
+//     Vector3 localSphere=MeshXform_ToLocal(&x,sPos);
+//     float localRadius=sRadius/vmin(x.sclx,vmin(x.scly,x.sclz));
+//     float bestDist=localRadius;
+//     Vector3 bestNormal={0,1,0}, bestPoint=localSphere;
+//     for (u32 j=0; j<triCount; ++j) {
+//         Vector3 a,b,c; MeshTri_Get(mindex,j,&a,&b,&c);
+//         Vector3 cp; float dist=SphereTriangleDistance(localSphere,a,b,c,&cp);
+//         if (dist<bestDist) {
+//             bestDist=dist;
+//             bestPoint=cp;
+//             Vector3 n=normalize_vector3(cross_vector3(Vector3_A_minus_B(b,a),Vector3_A_minus_B(c,a)));
+//             bestNormal = dot_vector3(n,Vector3_A_minus_B(localSphere,cp))>=0.0f ? n : scale_vector3(n,-1.0f);
+//             r.hit=true;
+//         }
+//     }
+//     if (!r.hit) return r;
+//     r.toi=0.0f;
+//     r.normal=MeshXform_NormalToWorld(&x,bestNormal);
+//     r.point=MeshXform_PointToWorld(&x,bestPoint);
+//     return r;
+// }
 
-static SweepResult SweepSphereMeshEntity(Vector3 sPos, float sRadius, Entity *me, u16 meIdx) {
-    SweepResult r={0}; MeshXform x;
-    if (!MeshXform_Get(me,meIdx,&x)) return r;
-    if (!MeshCouldOverlap(me,meIdx,sPos,sRadius)) return r;
-    u16 mindex=me->modelIndex; u32 triCount=modelTriangleCounts[mindex];
-    if (!triCount) return r;
+// static SweepResult SweepCapsuleMeshEntity(Vector3 cBase, Vector3 cTip, float cRadius, Entity *me, u16 meIdx) {
+//     SweepResult r={0}; MeshXform x;
+//     if (!MeshXform_Get(me,meIdx,&x)) return r;
+//     u16 mindex=me->modelIndex; u32 triCount=modelTriangleCounts[mindex];
+//     if (!triCount) return r;
+// 
+//     Vector3 lBase=MeshXform_ToLocal(&x,cBase), lTip=MeshXform_ToLocal(&x,cTip);
+//     float localRadius=cRadius/vmin(x.sclx,vmin(x.scly,x.sclz));
+//     Vector3 capsAxis=Vector3_A_minus_B(lTip,lBase);
+// 
+//     float bestDist=localRadius;
+//     Vector3 bestNormal={0,1,0}, bestPoint=lBase;
+//     // Sample capsule axis and find closest triangle contact across all samples
+//     for (int s=0; s<5; ++s) {
+//         Vector3 sp=Vector3_A_plus_B(lBase,scale_vector3(capsAxis,(float)s*0.25f));
+//         for (u32 j=0; j<triCount; ++j) {
+//             Vector3 a,b,c; MeshTri_Get(mindex,j,&a,&b,&c);
+//             Vector3 cp; float dist=SphereTriangleDistance(sp,a,b,c,&cp);
+//             if (dist<bestDist) {
+//                 bestDist=dist;
+//                 bestPoint=cp;
+//                 Vector3 n=normalize_vector3(cross_vector3(Vector3_A_minus_B(b,a),Vector3_A_minus_B(c,a)));
+//                 bestNormal = dot_vector3(n,Vector3_A_minus_B(sp,cp))>=0.0f ? n : scale_vector3(n,-1.0f);
+//                 r.hit=true;
+//             }
+//         }
+//     }
+//     if (!r.hit) return r;
+//     r.toi=0.0f;
+//     r.normal=MeshXform_NormalToWorld(&x,bestNormal);
+//     r.point=MeshXform_PointToWorld(&x,bestPoint);
+//     return r;
+// }
 
-    Vector3 localSphere=MeshXform_ToLocal(&x,sPos);
-    float localRadius=sRadius/vmin(x.sclx,vmin(x.scly,x.sclz));
-    float bestDist=localRadius;
-    Vector3 bestNormal={0,1,0}, bestPoint=localSphere;
-    for (u32 j=0; j<triCount; ++j) {
-        Vector3 a,b,c; MeshTri_Get(mindex,j,&a,&b,&c);
-        Vector3 cp; float dist=SphereTriangleDistance(localSphere,a,b,c,&cp);
-        if (dist<bestDist) {
-            bestDist=dist;
-            bestPoint=cp;
-            Vector3 n=normalize_vector3(cross_vector3(Vector3_A_minus_B(b,a),Vector3_A_minus_B(c,a)));
-            bestNormal = dot_vector3(n,Vector3_A_minus_B(localSphere,cp))>=0.0f ? n : scale_vector3(n,-1.0f);
-            r.hit=true;
-        }
-    }
-    if (!r.hit) return r;
-    r.toi=0.0f;
-    r.normal=MeshXform_NormalToWorld(&x,bestNormal);
-    r.point=MeshXform_PointToWorld(&x,bestPoint);
-    return r;
-}
-
-static SweepResult SweepCapsuleMeshEntity(Vector3 cBase, Vector3 cTip, float cRadius, Entity *me, u16 meIdx) {
-    SweepResult r={0}; MeshXform x;
-    if (!MeshXform_Get(me,meIdx,&x)) return r;
-    u16 mindex=me->modelIndex; u32 triCount=modelTriangleCounts[mindex];
-    if (!triCount) return r;
-
-    Vector3 lBase=MeshXform_ToLocal(&x,cBase), lTip=MeshXform_ToLocal(&x,cTip);
-    float localRadius=cRadius/vmin(x.sclx,vmin(x.scly,x.sclz));
-    Vector3 capsAxis=Vector3_A_minus_B(lTip,lBase);
-
-    float bestDist=localRadius;
-    Vector3 bestNormal={0,1,0}, bestPoint=lBase;
-    // Sample capsule axis and find closest triangle contact across all samples
-    for (int s=0; s<5; ++s) {
-        Vector3 sp=Vector3_A_plus_B(lBase,scale_vector3(capsAxis,(float)s*0.25f));
-        for (u32 j=0; j<triCount; ++j) {
-            Vector3 a,b,c; MeshTri_Get(mindex,j,&a,&b,&c);
-            Vector3 cp; float dist=SphereTriangleDistance(sp,a,b,c,&cp);
-            if (dist<bestDist) {
-                bestDist=dist;
-                bestPoint=cp;
-                Vector3 n=normalize_vector3(cross_vector3(Vector3_A_minus_B(b,a),Vector3_A_minus_B(c,a)));
-                bestNormal = dot_vector3(n,Vector3_A_minus_B(sp,cp))>=0.0f ? n : scale_vector3(n,-1.0f);
-                r.hit=true;
-            }
-        }
-    }
-    if (!r.hit) return r;
-    r.toi=0.0f;
-    r.normal=MeshXform_NormalToWorld(&x,bestNormal);
-    r.point=MeshXform_PointToWorld(&x,bestPoint);
-    return r;
-}
-
-static SweepResult SweepBoxMesh(Vector3 boxCenter, Vector3 boxHE, Quaternion boxRot, Entity *me, u16 meIdx) {
-    SweepResult r={0}; MeshXform x;
-    if (!MeshXform_Get(me,meIdx,&x)) return r;
-    u16 mindex=me->modelIndex; u32 triCount=modelTriangleCounts[mindex];
-    if (!triCount) return r;
-
-    // Build 8 box vertices in local mesh space
-    Vector3 ax=quat_rotate_vector(boxRot,(Vector3){1,0,0});
-    Vector3 ay=quat_rotate_vector(boxRot,(Vector3){0,1,0});
-    Vector3 az=quat_rotate_vector(boxRot,(Vector3){0,0,1});
-    Vector3 verts[8];
-    for (int i=0;i<8;++i) {
-        float sx=i&1?1.f:-1.f, sy=i&2?1.f:-1.f, sz=i&4?1.f:-1.f;
-        Vector3 w=Vector3_A_plus_B(boxCenter,Vector3_A_plus_B(scale_vector3(ax,sx*boxHE.x),Vector3_A_plus_B(scale_vector3(ay,sy*boxHE.y),scale_vector3(az,sz*boxHE.z))));
-        verts[i]=MeshXform_ToLocal(&x,w);
-    }
-
-    float contactEps=0.01f; // Small epsilon so surface-touching vertices register
-    float bestDist=contactEps;
-    Vector3 bestNormal={0,1,0}, bestPoint=verts[0];
-    for (int v=0;v<8;++v) {
-        for (u32 j=0;j<triCount;++j) {
-            Vector3 a,b,c; MeshTri_Get(mindex,j,&a,&b,&c);
-            Vector3 cp; float dist=SphereTriangleDistance(verts[v],a,b,c,&cp);
-            if (dist<bestDist) {
-                bestDist=dist;
-                bestPoint=cp;
-                Vector3 n=normalize_vector3(cross_vector3(Vector3_A_minus_B(b,a),Vector3_A_minus_B(c,a)));
-                // Normal points from surface toward box vertex
-                bestNormal = dot_vector3(n,Vector3_A_minus_B(verts[v],cp))>=0.0f ? n : scale_vector3(n,-1.0f);
-                r.hit=true;
-            }
-        }
-    }
-    // Also test triangle vertices against box (catches thin tris slipping between box vertices)
-    if (!r.hit) {
-        ShapeBox localBox={MeshXform_ToLocal(&x,boxCenter),
-                           // Scale halfExtents into local space per-axis
-                           {boxHE.x/x.sclx,boxHE.y/x.scly,boxHE.z/x.sclz},
-                           boxRot};
-        // Re-use SweepSphereBox with zero radius and zero vel for each triangle vertex
-        Vector3 zeroVel={0,0,0};
-        for (u32 j=0;j<triCount&&!r.hit;++j) {
-            Vector3 a,b,c; MeshTri_Get(mindex,j,&a,&b,&c);
-            Vector3 triVerts[3]={a,b,c};
-            for (int tv=0;tv<3;++tv) {
-                // Convert tri vert world via inverse: already in local space
-                SweepResult hit=SweepSphereBox(MeshXform_PointToWorld(&x,triVerts[tv]),0.0f,zeroVel,
-                    (ShapeBox){boxCenter,boxHE,boxRot});
-                if (hit.hit) {
-                    r.hit=true;
-                    Vector3 n=normalize_vector3(cross_vector3(Vector3_A_minus_B(b,a),Vector3_A_minus_B(c,a)));
-                    r.normal=MeshXform_NormalToWorld(&x, dot_vector3(n,Vector3_A_minus_B(verts[0],triVerts[tv]))>=0.0f?n:scale_vector3(n,-1.0f));
-                    r.point=MeshXform_PointToWorld(&x,triVerts[tv]);
-                    r.toi=0.0f;
-                    break;
-                }
-            }
-        }
-        return r;
-    }
-    r.toi=0.0f;
-    r.normal=MeshXform_NormalToWorld(&x,bestNormal);
-    r.point=MeshXform_PointToWorld(&x,bestPoint);
-    return r;
-}
+// static SweepResult SweepBoxMesh(Vector3 boxCenter, Vector3 boxHE, Quaternion boxRot, Entity *me, u16 meIdx) {
+//     SweepResult r={0}; MeshXform x;
+//     if (!MeshXform_Get(me,meIdx,&x)) return r;
+//     u16 mindex=me->modelIndex; u32 triCount=modelTriangleCounts[mindex];
+//     if (!triCount) return r;
+// 
+//     // Build 8 box vertices in local mesh space
+//     Vector3 ax=quat_rotate_vector(boxRot,(Vector3){1,0,0});
+//     Vector3 ay=quat_rotate_vector(boxRot,(Vector3){0,1,0});
+//     Vector3 az=quat_rotate_vector(boxRot,(Vector3){0,0,1});
+//     Vector3 verts[8];
+//     for (int i=0;i<8;++i) {
+//         float sx=i&1?1.f:-1.f, sy=i&2?1.f:-1.f, sz=i&4?1.f:-1.f;
+//         Vector3 w=Vector3_A_plus_B(boxCenter,Vector3_A_plus_B(scale_vector3(ax,sx*boxHE.x),Vector3_A_plus_B(scale_vector3(ay,sy*boxHE.y),scale_vector3(az,sz*boxHE.z))));
+//         verts[i]=MeshXform_ToLocal(&x,w);
+//     }
+// 
+//     float contactEps=0.01f;
+//     float bestDist=contactEps;
+//     Vector3 bestNormal={0,1,0}, bestPoint=verts[0];
+//     for (int v=0;v<8;++v) {
+//         for (u32 j=0;j<triCount;++j) {
+//             Vector3 a,b,c; MeshTri_Get(mindex,j,&a,&b,&c);
+//             Vector3 cp; float dist=SphereTriangleDistance(verts[v],a,b,c,&cp);
+//             if (dist<bestDist) {
+//                 bestDist=dist;
+//                 bestPoint=cp;
+//                 Vector3 n=normalize_vector3(cross_vector3(Vector3_A_minus_B(b,a),Vector3_A_minus_B(c,a)));
+//                 bestNormal = dot_vector3(n,Vector3_A_minus_B(verts[v],cp))>=0.0f ? n : scale_vector3(n,-1.0f);
+//                 r.hit=true;
+//             }
+//         }
+//     }
+// 
+//     if (!r.hit) {
+//         Vector3 zeroVel={0,0,0};
+//         for (u32 j=0;j<triCount&&!r.hit;++j) {
+//             Vector3 a,b,c; MeshTri_Get(mindex,j,&a,&b,&c);
+//             Vector3 triVerts[3]={a,b,c};
+//             for (int tv=0;tv<3;++tv) {
+//                 SweepResult hit=SweepSphereBox(MeshXform_PointToWorld(&x,triVerts[tv]),0.0f,zeroVel,
+//                     (ShapeBox){boxCenter,boxHE,boxRot});
+//                 if (hit.hit) {
+//                     r.hit=true;
+//                     Vector3 n=normalize_vector3(cross_vector3(Vector3_A_minus_B(b,a),Vector3_A_minus_B(c,a)));
+//                     r.normal=MeshXform_NormalToWorld(&x, dot_vector3(n,Vector3_A_minus_B(verts[0],triVerts[tv]))>=0.0f?n:scale_vector3(n,-1.0f));
+//                     r.point=MeshXform_PointToWorld(&x,triVerts[tv]);
+//                     r.toi=0.0f;
+//                     break;
+//                 }
+//             }
+//         }
+//         return r;
+//     }
+//     r.toi=0.0f;
+//     r.normal=MeshXform_NormalToWorld(&x,bestNormal);
+//     r.point=MeshXform_PointToWorld(&x,bestPoint);
+//     return r;
+// }
 
 static SweepResult SweepCapsuleBox(Vector3 sBase, Vector3 sTip, float sRadius, Vector3 sVel, ShapeBox box) {
     SweepResult r = {0}; float closestToi=2.0f;
@@ -395,70 +376,70 @@ static SweepResult SweepCapsuleBox(Vector3 sBase, Vector3 sTip, float sRadius, V
     return r;
 }
 
-static SweepResult SweepEntity(Entity *moving, Vector3 moveVel, Entity *stationary, u16 stationaryIdx) {
-    SweepResult r = {0};
-    if (stationary->collider == COLLIDER_TYPE_MESH) { // Handle mesh entities separately
-        ShapeSphere movingSphere; ShapeBox movingBox; ShapeCapsule movingCapsule;
-        switch (moving->collider) {
-            case COLLIDER_TYPE_SPHERE:  Entity_GetSphere(moving,&movingSphere);   return SweepSphereMeshEntity(movingSphere.center,movingSphere.radius,stationary,stationaryIdx);
-            case COLLIDER_TYPE_BOX:     Entity_GetBox(moving,&movingBox);         return SweepBoxMesh(movingBox.center,movingBox.halfExtents,movingBox.rot,stationary,stationaryIdx);
-            case COLLIDER_TYPE_CAPSULE: Entity_GetCapsule(moving,&movingCapsule); return SweepCapsuleMeshEntity(movingCapsule.base,movingCapsule.tip,movingCapsule.radius,stationary,stationaryIdx);
-            default: return r;
-        }
-    }
-    
-    if (moving->collider == COLLIDER_TYPE_NONE || stationary->collider == COLLIDER_TYPE_NONE) return r; // Non-mesh entity dispatch (existing code)
-    
-    ShapeSphere movingSphere,stationarySphere; ShapeBox movingBox,stationaryBox; ShapeCapsule movingCapsule,stationaryCapsule;
-    switch (moving->collider) {
-        case COLLIDER_TYPE_SPHERE:
-            Entity_GetSphere(moving, &movingSphere);
-            switch (stationary->collider) {
-                case COLLIDER_TYPE_SPHERE:  Entity_GetSphere(stationary,&stationarySphere);   return SweepSphereSphere(movingSphere.center,movingSphere.radius,moveVel,stationarySphere.center,stationarySphere.radius);
-                case COLLIDER_TYPE_BOX:     Entity_GetBox(stationary,&stationaryBox);         return SweepSphereBox(movingSphere.center,movingSphere.radius,moveVel,stationaryBox);
-                case COLLIDER_TYPE_CAPSULE: Entity_GetCapsule(stationary,&stationaryCapsule); return SweepSphereCapsule(movingSphere.center,movingSphere.radius,moveVel,stationaryCapsule.base,stationaryCapsule.tip,stationaryCapsule.radius);
-                default: break;
-            }
-            break;
-        case COLLIDER_TYPE_BOX:
-            Entity_GetBox(moving, &movingBox);
-            switch (stationary->collider) {
-                case COLLIDER_TYPE_SPHERE:
-                    Entity_GetSphere(stationary, &stationarySphere);
-                    return SweepBoxSphere(movingBox, moveVel, stationarySphere.center, stationarySphere.radius);
-                case COLLIDER_TYPE_BOX:
-                    Entity_GetBox(stationary, &stationaryBox);
-                    return SweepBoxBox(movingBox, moveVel, stationaryBox);
-                case COLLIDER_TYPE_CAPSULE:
-                    Entity_GetCapsule(stationary, &stationaryCapsule);
-                    return SweepBoxCapsule(movingBox, moveVel, 
-                                          stationaryCapsule.base, stationaryCapsule.tip, stationaryCapsule.radius);
-                default: break;
-            }
-            break;
-        case COLLIDER_TYPE_CAPSULE:
-            Entity_GetCapsule(moving, &movingCapsule);
-            switch (stationary->collider) {
-                case COLLIDER_TYPE_SPHERE:
-                    Entity_GetSphere(stationary, &stationarySphere);
-                    return SweepCapsuleSphere(movingCapsule.base, movingCapsule.tip, movingCapsule.radius, moveVel,
-                                            stationarySphere.center, stationarySphere.radius);
-                case COLLIDER_TYPE_BOX:
-                    Entity_GetBox(stationary, &stationaryBox);
-                    return SweepCapsuleBox(movingCapsule.base, movingCapsule.tip, movingCapsule.radius, 
-                                          moveVel, stationaryBox);
-                case COLLIDER_TYPE_CAPSULE:
-                    Entity_GetCapsule(stationary, &stationaryCapsule);
-                    return SweepCapsuleCapsule(movingCapsule.base, movingCapsule.tip, movingCapsule.radius, moveVel,
-                                             stationaryCapsule.base, stationaryCapsule.tip, stationaryCapsule.radius);
-                default: break;
-            }
-            break;
-        default: break;
-    }
-    
-    return r;
-}
+// static SweepResult SweepEntity(Entity *moving, Vector3 moveVel, Entity *stationary, u16 stationaryIdx) {
+//     SweepResult r = {0};
+//     if (stationary->collider == COLLIDER_TYPE_MESH) { // Handle mesh entities separately
+//         ShapeSphere movingSphere; ShapeBox movingBox; ShapeCapsule movingCapsule;
+//         switch (moving->collider) {
+//             case COLLIDER_TYPE_SPHERE:  Entity_GetSphere(moving,&movingSphere);   return SweepSphereMeshEntity(movingSphere.center,movingSphere.radius,stationary,stationaryIdx);
+//             case COLLIDER_TYPE_BOX:     Entity_GetBox(moving,&movingBox);         return SweepBoxMesh(movingBox.center,movingBox.halfExtents,movingBox.rot,stationary,stationaryIdx);
+//             case COLLIDER_TYPE_CAPSULE: Entity_GetCapsule(moving,&movingCapsule); return SweepCapsuleMeshEntity(movingCapsule.base,movingCapsule.tip,movingCapsule.radius,stationary,stationaryIdx);
+//             default: return r;
+//         }
+//     }
+//     
+//     if (moving->collider == COLLIDER_TYPE_NONE || stationary->collider == COLLIDER_TYPE_NONE) return r; // Non-mesh entity dispatch (existing code)
+//     
+//     ShapeSphere movingSphere,stationarySphere; ShapeBox movingBox,stationaryBox; ShapeCapsule movingCapsule,stationaryCapsule;
+//     switch (moving->collider) {
+//         case COLLIDER_TYPE_SPHERE:
+//             Entity_GetSphere(moving, &movingSphere);
+//             switch (stationary->collider) {
+//                 case COLLIDER_TYPE_SPHERE:  Entity_GetSphere(stationary,&stationarySphere);   return SweepSphereSphere(movingSphere.center,movingSphere.radius,moveVel,stationarySphere.center,stationarySphere.radius);
+//                 case COLLIDER_TYPE_BOX:     Entity_GetBox(stationary,&stationaryBox);         return SweepSphereBox(movingSphere.center,movingSphere.radius,moveVel,stationaryBox);
+//                 case COLLIDER_TYPE_CAPSULE: Entity_GetCapsule(stationary,&stationaryCapsule); return SweepSphereCapsule(movingSphere.center,movingSphere.radius,moveVel,stationaryCapsule.base,stationaryCapsule.tip,stationaryCapsule.radius);
+//                 default: break;
+//             }
+//             break;
+//         case COLLIDER_TYPE_BOX:
+//             Entity_GetBox(moving, &movingBox);
+//             switch (stationary->collider) {
+//                 case COLLIDER_TYPE_SPHERE:
+//                     Entity_GetSphere(stationary, &stationarySphere);
+//                     return SweepBoxSphere(movingBox, moveVel, stationarySphere.center, stationarySphere.radius);
+//                 case COLLIDER_TYPE_BOX:
+//                     Entity_GetBox(stationary, &stationaryBox);
+//                     return SweepBoxBox(movingBox, moveVel, stationaryBox);
+//                 case COLLIDER_TYPE_CAPSULE:
+//                     Entity_GetCapsule(stationary, &stationaryCapsule);
+//                     return SweepBoxCapsule(movingBox, moveVel, 
+//                                           stationaryCapsule.base, stationaryCapsule.tip, stationaryCapsule.radius);
+//                 default: break;
+//             }
+//             break;
+//         case COLLIDER_TYPE_CAPSULE:
+//             Entity_GetCapsule(moving, &movingCapsule);
+//             switch (stationary->collider) {
+//                 case COLLIDER_TYPE_SPHERE:
+//                     Entity_GetSphere(stationary, &stationarySphere);
+//                     return SweepCapsuleSphere(movingCapsule.base, movingCapsule.tip, movingCapsule.radius, moveVel,
+//                                             stationarySphere.center, stationarySphere.radius);
+//                 case COLLIDER_TYPE_BOX:
+//                     Entity_GetBox(stationary, &stationaryBox);
+//                     return SweepCapsuleBox(movingCapsule.base, movingCapsule.tip, movingCapsule.radius, 
+//                                           moveVel, stationaryBox);
+//                 case COLLIDER_TYPE_CAPSULE:
+//                     Entity_GetCapsule(stationary, &stationaryCapsule);
+//                     return SweepCapsuleCapsule(movingCapsule.base, movingCapsule.tip, movingCapsule.radius, moveVel,
+//                                              stationaryCapsule.base, stationaryCapsule.tip, stationaryCapsule.radius);
+//                 default: break;
+//             }
+//             break;
+//         default: break;
+//     }
+//     
+//     return r;
+// }
 
 static ProbeResult ProbeCapsule(Vector3 base, Vector3 tip, float radius, u32 collisionMask) {
     ProbeResult result={0};
@@ -479,7 +460,7 @@ static ProbeResult ProbeCapsule(Vector3 base, Vector3 tip, float radius, u32 col
             case COLLIDER_TYPE_SPHERE: Entity_GetSphere(other,&ss); hit=SweepSphereCapsule(ss.center,ss.radius,(Vector3){0},base,tip,radius); break;
             case COLLIDER_TYPE_BOX: Entity_GetBox(other,&sb); hit=SweepCapsuleBox(base,tip,radius,downVel,sb); break;
             case COLLIDER_TYPE_CAPSULE: Entity_GetCapsule(other,&sc); hit=SweepCapsuleCapsule(base,tip,radius,(Vector3){0},sc.base,sc.tip,sc.radius); break;
-            case COLLIDER_TYPE_MESH: hit=SweepCapsuleMeshEntity(base,tip,radius,other,(u16)i); break;
+            //case COLLIDER_TYPE_MESH: hit=SweepCapsuleMeshEntity(base,tip,radius,other,(u16)i); break;
             default: continue;
         }
         if (hit.hit) { result.depth=radius; result.normal=hit.normal; result.point=hit.point; return result; }

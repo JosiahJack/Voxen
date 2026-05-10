@@ -101,11 +101,11 @@ WINDOWS_CC="zig cc -target x86_64-windows-gnu -Wl,--stack,8388608"
 COMMON_CFLAGS="-ferror-limit=500 -fno-exceptions -fno-stack-protector -fno-asynchronous-unwind-tables -fno-unwind-tables -Wno-format-nonliteral \
                -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -fvisibility=hidden -pipe -fno-ident -fdata-sections -Wno-int-to-void-pointer-cast \
                -ffunction-sections -ffast-math -std=c11 -Wall -Wextra -Wno-implicit-fallthrough -fdeclspec -fno-rtti \
-               -fomit-frame-pointer -g -fstrict-aliasing -fcommon -Walloca \
+               -fomit-frame-pointer -g0 -fstrict-aliasing -fcommon -Walloca \
                -Wformat=2 -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings -fno-math-errno -fno-sanitize=all \
                -fno-trapping-math -fmerge-all-constants -m64 -Os -march=haswell -fstack-usage"
-# COMMON_LFLAGS="-Wl,-z,now -Wl,-z,relro -Wl,--gc-sections -Wl,--as-needed -Wl,--strip-all -Wl,-z,norelro -Wl,--build-id=none $ZIG_LIBS"
-COMMON_LFLAGS="-Wl,-z,now -Wl,-z,relro -Wl,--gc-sections -Wl,--as-needed                 -Wl,-z,norelro -Wl,--build-id=none $ZIG_LIBS"
+COMMON_LFLAGS="-Wl,-z,now -Wl,-z,relro -Wl,--gc-sections -Wl,--as-needed -Wl,--strip-all -Wl,-z,norelro -Wl,--build-id=none $ZIG_LIBS"
+# COMMON_LFLAGS="-Wl,-z,now -Wl,-z,relro -Wl,--gc-sections -Wl,--as-needed                 -Wl,-z,norelro -Wl,--build-id=none $ZIG_LIBS"
 if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
     LINKER=$CC
@@ -144,9 +144,9 @@ if ! $IS_CI; then
     case "$PLATFORM" in
         windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; wine ./voxen.exe ;;
 #         windows)  wine ./voxen.exe ;;
-#         *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
+        *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
 #         *)        strip --strip-all --strip-unneeded ./voxen; ./voxen ;;   # linux Alternate build methods to be able to look at symbols and debugging
-        *)        ./voxen ;;   # linux
+#         *)        ./voxen ;;   # linux
     esac
     rm -f ./Shaders/*.h "$TEMP_DIRGC"/*.o ./voxen.upx ./*.lib #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.
 fi
