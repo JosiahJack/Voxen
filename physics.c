@@ -40,33 +40,31 @@ typedef struct { float depth; Vector3 normal,point; } ProbeResult;
 typedef struct { u32 type; void *shape; } Shape;
 static SweepResult SweepSphereSphere(Vector3 aPos, float aRadius, Vector3 aVel, Vector3 bPos, float bRadius) {
     SweepResult r = {0};
-    float combinedRadius = aRadius + bRadius;
-    Vector3 relPos = Vector3_A_minus_B(aPos, bPos);
-    Vector3 relVel = aVel;  // b is assumed static
-    float a = dot_vector3(relVel, relVel);
-    float b = 2.0f * dot_vector3(relPos, relVel);
-    float c = dot_vector3(relPos, relPos) - combinedRadius * combinedRadius;
-    if (c <= 0.0f) {
-        // Already overlapping - report at t=0 with current separation normal
-        r.hit = true;
-        r.toi = 0.0f;
-        r.normal = (magnitude_vector3(relPos) > 1e-6f) ? normalize_vector3(relPos) : (Vector3){0.0f,1.0f,0.0f};
-        r.point = Vector3_A_plus_B(bPos, scale_vector3(r.normal, bRadius));
+    float cr = aRadius + bRadius;
+    Vector3 rp = Vector3_A_minus_B(aPos, bPos);
+    float c = dot_vector3(rp,rp) - cr*cr;
+    float a = dot_vector3(aVel,aVel);
+    if (a < 1e-8f) { // static overlap only
+        if (c > 0.0f) return r;
+        r.hit=true; r.toi=0.0f;
+        r.normal = magnitude_vector3(rp)>1e-6f ? normalize_vector3(rp) : (Vector3){0,1,0};
+        r.point  = Vector3_A_plus_B(bPos, scale_vector3(r.normal, bRadius));
         return r;
     }
-    
-    float discriminant = b * b - 4.0f * a * c;
-    if (discriminant < 0.0f) return r;  // No collision
-    
-    float sqrtDisc = vsqrtf(discriminant);
-    float t0 = (-b - sqrtDisc) / (2.0f * a);
-    if (t0 < 0.0f || t0 > 1.0f) return r;
-    
-    Vector3 hitPos = Vector3_A_plus_B(aPos, scale_vector3(aVel, t0));
-    r.hit = true;
-    r.toi = t0;
-    r.normal = normalize_vector3(Vector3_A_minus_B(hitPos, bPos));
-    r.point = Vector3_A_minus_B(hitPos, scale_vector3(r.normal, aRadius));
+    float b = 2.0f*dot_vector3(rp,aVel), disc = b*b - 4.0f*a*c;
+    if (c <= 0.0f) { // already overlapping
+        r.hit=true; r.toi=0.0f;
+        r.normal = magnitude_vector3(rp)>1e-6f ? normalize_vector3(rp) : (Vector3){0,1,0};
+        r.point  = Vector3_A_plus_B(bPos, scale_vector3(r.normal, bRadius));
+        return r;
+    }
+    if (disc < 0.0f) return r;
+    float t = (-b - vsqrtf(disc)) / (2.0f*a);
+    if (t < 0.0f || t > 1.0f) return r;
+    Vector3 hp = Vector3_A_plus_B(aPos, scale_vector3(aVel, t));
+    r.hit=true; r.toi=t;
+    r.normal = normalize_vector3(Vector3_A_minus_B(hp, bPos));
+    r.point  = Vector3_A_minus_B(hp, scale_vector3(r.normal, aRadius));
     return r;
 }
 
@@ -92,11 +90,51 @@ static SweepResult SweepSphereCapsule(Vector3 sPos, float sRadius, Vector3 sVel,
 }
 
 static SweepResult SweepSphereBox(Vector3 sPos, float sRadius, Vector3 sVel, ShapeBox box) {
-    Quaternion invRot = (Quaternion){-box.rot.x,-box.rot.y,-box.rot.z,box.rot.w};
-    Vector3 sLocalPos = quat_rotate_vector(invRot, Vector3_A_minus_B(sPos, box.center));
-    Vector3 closestLocal = {vclamp(sLocalPos.x,-box.halfExtents.x,box.halfExtents.x),vclamp(sLocalPos.y,-box.halfExtents.y,box.halfExtents.y),vclamp(sLocalPos.z,-box.halfExtents.z,box.halfExtents.z)};
-    Vector3 closestWorld = Vector3_A_plus_B(box.center,quat_rotate_vector(box.rot, closestLocal));
-    return SweepSphereSphere(sPos, sRadius, sVel, closestWorld, 0.0f);
+    Quaternion invRot={-box.rot.x,-box.rot.y,-box.rot.z,box.rot.w};
+    Vector3 lPos=quat_rotate_vector(invRot,Vector3_A_minus_B(sPos,box.center));
+    Vector3 lVel=quat_rotate_vector(invRot,sVel);
+    Vector3 eHE={box.halfExtents.x+sRadius,box.halfExtents.y+sRadius,box.halfExtents.z+sRadius};
+
+    // Check static overlap first (sphere center inside expanded box)
+    bool inside = lPos.x>=-eHE.x&&lPos.x<=eHE.x&&lPos.y>=-eHE.y&&lPos.y<=eHE.y&&lPos.z>=-eHE.z&&lPos.z<=eHE.z;
+    if (inside) {
+        // Push out on minimum-penetration axis
+        float dx=eHE.x-vabs(lPos.x), dy=eHE.y-vabs(lPos.y), dz=eHE.z-vabs(lPos.z);
+        Vector3 n = dx<dy&&dx<dz ? (Vector3){lPos.x>0?1.f:-1.f,0,0}
+                  : dy<dz       ? (Vector3){0,lPos.y>0?1.f:-1.f,0}
+                                : (Vector3){0,0,lPos.z>0?1.f:-1.f};
+        SweepResult r;
+        r.hit=true; r.toi=0.0f;
+        r.normal=normalize_vector3(quat_rotate_vector(box.rot,n));
+        r.point=Vector3_A_plus_B(sPos,scale_vector3(r.normal,-sRadius));
+        return r;
+    }
+
+    // Slab sweep test
+    float tEnter=0.0f, tExit=1.0f;
+    Vector3 hitNormalLocal={0,1,0};
+    for (int ax=0; ax<3; ++ax) {
+        float pos=ax==0?lPos.x:ax==1?lPos.y:lPos.z;
+        float vel=ax==0?lVel.x:ax==1?lVel.y:lVel.z;
+        float he =ax==0?eHE.x :ax==1?eHE.y :eHE.z;
+        if (vabs(vel)<1e-8f) { if (pos<-he||pos>he) return (SweepResult){0}; continue; }
+        float t0=(-he-pos)/vel, t1=(he-pos)/vel;
+        float tN=vmin(t0,t1), tF=vmax(t0,t1);
+        if (tN>tEnter) {
+            tEnter=tN;
+            float s=vel>0?-1.f:1.f;
+            hitNormalLocal=ax==0?(Vector3){s,0,0}:ax==1?(Vector3){0,s,0}:(Vector3){0,0,s};
+        }
+        tExit=vmin(tExit,tF);
+        if (tEnter>tExit) return (SweepResult){0};
+    }
+    if (tEnter<0.0f||tEnter>1.0f) return (SweepResult){0};
+
+    SweepResult r;
+    r.hit=true; r.toi=tEnter;
+    r.normal=normalize_vector3(quat_rotate_vector(box.rot,hitNormalLocal));
+    r.point=Vector3_A_plus_B(Vector3_A_plus_B(sPos,scale_vector3(sVel,tEnter)),scale_vector3(r.normal,-sRadius));
+    return r;
 }
 
 static SweepResult SweepBoxSphere(ShapeBox box, Vector3 bVel,
@@ -106,29 +144,21 @@ static SweepResult SweepBoxSphere(ShapeBox box, Vector3 bVel,
 }
 
 // Box vs Box: Sample vertices of moving box, test against static box
-static SweepResult SweepBoxBox(ShapeBox movingBox, Vector3 moveVel, ShapeBox staticBox) {
-    SweepResult r = {0};
-    Vector3 ax,ay,az; obb_axes(movingBox.rot,&ax,&ay,&az); // Get axes of moving box
-    Vector3 offsets[]={{-1.0f,-1.0f,-1.0f},{-1.0f,-1.0f,1.0f},{-1.0f,1.0f,-1.0f},{-1.0f,1.0f,1.0f},{1.0f,-1.0f,-1.0f},{1.0f,-1.0f,1.0f},{1.0f,1.0f,-1.0f},{1.0f,1.0f,1.0f}}; // 8 vertices of moving box in local space
-    float closestToi = 2.0f;
-    Vector3 closestNormal = (Vector3){0.0f,1.0f,0.0f}, closestPoint = (Vector3){0.0f,0.0f,0.0f};
-    for (int i=0;i<8;++i) {
-        Vector3 vertex = (Vector3){0.0f,0.0f,0.0f};
-        vertex = Vector3_A_plus_B(vertex, scale_vector3(ax, offsets[i].x * movingBox.halfExtents.x));
-        vertex = Vector3_A_plus_B(vertex, scale_vector3(ay, offsets[i].y * movingBox.halfExtents.y));
-        vertex = Vector3_A_plus_B(vertex, scale_vector3(az, offsets[i].z * movingBox.halfExtents.z));
-        vertex = Vector3_A_plus_B(movingBox.center, vertex);
-        float staticRadius = vmax(staticBox.halfExtents.x,vmax(staticBox.halfExtents.y, staticBox.halfExtents.z));
-        SweepResult hit = SweepSphereSphere(vertex, 0.0f, moveVel, staticBox.center, staticRadius); // Test this vertex against static box (approximate as sphere)
-        if (hit.hit && hit.toi < closestToi) {
-            closestToi = hit.toi;
-            closestNormal = hit.normal;
-            closestPoint = hit.point;
-            r.hit = true;
-        }
+static SweepResult SweepBoxBox(ShapeBox moving, Vector3 vel, ShapeBox stat) {
+    // Test each vertex of moving box against static box via SweepSphereBox(radius=0)
+    SweepResult r={0}; float closestToi=2.0f;
+    Quaternion invRot={-stat.rot.x,-stat.rot.y,-stat.rot.z,stat.rot.w};
+    Vector3 ax,ay,az; obb_axes(moving.rot,&ax,&ay,&az);
+    float ox[]={-1,+1}; float oy[]={-1,+1}; float oz[]={-1,+1};
+    for (int ix=0;ix<2;++ix) for (int iy=0;iy<2;++iy) for (int iz=0;iz<2;++iz) {
+        Vector3 vtx=Vector3_A_plus_B(moving.center,
+            Vector3_A_plus_B(scale_vector3(ax,ox[ix]*moving.halfExtents.x),
+            Vector3_A_plus_B(scale_vector3(ay,oy[iy]*moving.halfExtents.y),
+                             scale_vector3(az,oz[iz]*moving.halfExtents.z))));
+        ShapeBox unit={stat.center,stat.halfExtents,stat.rot};
+        SweepResult hit=SweepSphereBox(vtx,0.0f,vel,unit);
+        if (hit.hit && hit.toi<closestToi) { closestToi=hit.toi; r=hit; }
     }
-    
-    if (r.hit) { r.toi = closestToi; r.normal = closestNormal; r.point = closestPoint; }
     return r;
 }
 
@@ -191,235 +221,177 @@ static float SphereTriangleDistance(Vector3 sphereCenter, Vector3 a, Vector3 b, 
     return magnitude_vector3(delta);
 }
 
-static SweepResult SweepSphereMeshEntity(Vector3 sPos, float sRadius, Entity *meshEntity, u16 meshEntityIdx) {
-    SweepResult r = {0};
-    if (meshEntity->collider != COLLIDER_TYPE_MESH) return r;
-    if (meshEntity->modelIndex >= loadedModelsMaxIndex) return r;
-    u16 mindex = meshEntity->modelIndex;
-    u32 triCount = modelTriangleCounts[mindex];
-    if (triCount < 1) return r;
+// Shared: extract model matrix components. Call once per mesh sweep.
+typedef struct { float m00,m10,m20,m01,m11,m21,m02,m12,m22,tx,ty,tz,sclx,scly,sclz,sclx2,scly2,sclz2; } MeshXform;
+static bool MeshXform_Get(Entity *me, u16 idx, MeshXform *x) {
+    if (me->collider!=COLLIDER_TYPE_MESH||me->modelIndex>=loadedModelsMaxIndex) return false;
+    float M[16]; CopyMemoryFromBtoAForNBytes(M,&modelMatrices[idx*16],16*sizeof(float));
+    x->m00=M[0];x->m10=M[1];x->m20=M[2]; x->m01=M[4];x->m11=M[5];x->m21=M[6]; x->m02=M[8];x->m12=M[9];x->m22=M[10];
+    x->tx=M[12];x->ty=M[13];x->tz=M[14];
+    x->sclx=vsqrtf(x->m00*x->m00+x->m10*x->m10+x->m20*x->m20); x->sclx2=x->sclx*x->sclx;
+    x->scly=vsqrtf(x->m01*x->m01+x->m11*x->m11+x->m21*x->m21); x->scly2=x->scly*x->scly;
+    x->sclz=vsqrtf(x->m02*x->m02+x->m12*x->m12+x->m22*x->m22); x->sclz2=x->sclz*x->sclz;
+    return true;
+}
+static Vector3 MeshXform_ToLocal(const MeshXform *x, Vector3 p) { Vector3 r={p.x-x->tx,p.y-x->ty,p.z-x->tz}; return (Vector3){(r.x*x->m00+r.y*x->m10+r.z*x->m20)/x->sclx2,(r.x*x->m01+r.y*x->m11+r.z*x->m21)/x->scly2,(r.x*x->m02+r.y*x->m12+r.z*x->m22)/x->sclz2}; }
+static Vector3 MeshXform_NormalToWorld(const MeshXform *x, Vector3 n) { return normalize_vector3((Vector3){(x->m00/x->sclx)*n.x+(x->m01/x->scly)*n.y+(x->m02/x->sclz)*n.z,(x->m10/x->sclx)*n.x+(x->m11/x->scly)*n.y+(x->m12/x->sclz)*n.z,(x->m20/x->sclx)*n.x+(x->m21/x->scly)*n.y+(x->m22/x->sclz)*n.z}); }
+static Vector3 MeshXform_PointToWorld(const MeshXform *x, Vector3 p) { return (Vector3){x->m00*p.x+x->m01*p.y+x->m02*p.z+x->tx,x->m10*p.x+x->m11*p.y+x->m12*p.z+x->ty,x->m20*p.x+x->m21*p.y+x->m22*p.z+x->tz}; }
+static void MeshTri_Get(u16 mindex, u32 j, Vector3 *a, Vector3 *b, Vector3 *c) {
+    u32 bA=(u32)modelTriangles[mindex][j*3+0]*VERTEX_ATTRIBUTES_SIZE;
+    u32 bB=(u32)modelTriangles[mindex][j*3+1]*VERTEX_ATTRIBUTES_SIZE;
+    u32 bC=(u32)modelTriangles[mindex][j*3+2]*VERTEX_ATTRIBUTES_SIZE;
+    a->x=half_to_float(*(half*)(modelVertices[mindex]+bA+0)); a->y=half_to_float(*(half*)(modelVertices[mindex]+bA+2)); a->z=half_to_float(*(half*)(modelVertices[mindex]+bA+4));
+    b->x=half_to_float(*(half*)(modelVertices[mindex]+bB+0)); b->y=half_to_float(*(half*)(modelVertices[mindex]+bB+2)); b->z=half_to_float(*(half*)(modelVertices[mindex]+bB+4));
+    c->x=half_to_float(*(half*)(modelVertices[mindex]+bC+0)); c->y=half_to_float(*(half*)(modelVertices[mindex]+bC+2)); c->z=half_to_float(*(half*)(modelVertices[mindex]+bC+4));
+}
 
-    float M[16]; CopyMemoryFromBtoAForNBytes(M, &modelMatrices[meshEntityIdx * 16], 16 * sizeof(float));
-    float m00=M[0], m10=M[1], m20=M[2]; float m01=M[4], m11=M[5], m21=M[6]; float m02=M[8], m12=M[9], m22=M[10]; float tx=M[12], ty=M[13], tz=M[14];
-    float sclx = vsqrtf(m00*m00 + m10*m10 + m20*m20); float sclx2 = sclx * sclx;
-    float scly = vsqrtf(m01*m01 + m11*m11 + m21*m21); float scly2 = scly * scly;
-    float sclz = vsqrtf(m02*m02 + m12*m12 + m22*m22); float sclz2 = sclz * sclz;
-    Vector3 rel = {sPos.x - tx, sPos.y - ty, sPos.z - tz};
-    Vector3 localSpherePos = {(rel.x*m00 + rel.y*m10 + rel.z*m20) / sclx2,(rel.x*m01 + rel.y*m11 + rel.z*m21) / scly2,(rel.x*m02 + rel.y*m12 + rel.z*m22) / sclz2}; // Transform sphere to local space
-    float closestToi = 2.0f;
-    Vector3 closestNormal = {0, 1, 0};
-    Vector3 closestPoint = localSpherePos;
-    for (u32 j = 0; j < triCount; ++j) { // Test against all triangles
-        u32 bA = (u32)modelTriangles[mindex][j*3 + 0] * VERTEX_ATTRIBUTES_SIZE;
-        u32 bB = (u32)modelTriangles[mindex][j*3 + 1] * VERTEX_ATTRIBUTES_SIZE;
-        u32 bC = (u32)modelTriangles[mindex][j*3 + 2] * VERTEX_ATTRIBUTES_SIZE;
-        Vector3 posA = {half_to_float(*(half*)(modelVertices[mindex] + bA + 0)),half_to_float(*(half*)(modelVertices[mindex] + bA + 2)),half_to_float(*(half*)(modelVertices[mindex] + bA + 4))};
-        Vector3 posB = {half_to_float(*(half*)(modelVertices[mindex] + bB + 0)),half_to_float(*(half*)(modelVertices[mindex] + bB + 2)),half_to_float(*(half*)(modelVertices[mindex] + bB + 4))};
-        Vector3 posC = {half_to_float(*(half*)(modelVertices[mindex] + bC + 0)),half_to_float(*(half*)(modelVertices[mindex] + bC + 2)),half_to_float(*(half*)(modelVertices[mindex] + bC + 4))};
-        Vector3 closestTriPoint;
-        float triDist = SphereTriangleDistance(localSpherePos, posA, posB, posC, &closestTriPoint);
-        if (triDist < sRadius) {
-            Vector3 edge0 = Vector3_A_minus_B(posB, posA);
-            Vector3 edge1 = Vector3_A_minus_B(posC, posA);
-            Vector3 triNormal = cross_vector3(edge0, edge1);
-            triNormal = normalize_vector3(triNormal); // Compute normal from triangle
-            if (0.0f < closestToi) { // Sphere overlaps or touches triangle.  Conservative approach: treat as hit at toi=0 (already penetrating).  More sophisticated: binary search for exact TOI
-                closestToi = 0.0f;
-                closestNormal = triNormal;
-                closestPoint = closestTriPoint;
-                r.hit = true;
-            }
+static bool MeshCouldOverlap(Entity *me, u16 meIdx, Vector3 pos, float radius) {
+    float M[16]; CopyMemoryFromBtoAForNBytes(M,&modelMatrices[meIdx*16],16*sizeof(float));
+    Vector3 meshOrigin={M[12],M[13],M[14]};
+    float meshBound = me->colliderSize.x > 0.01f ? me->colliderSize.x : 32.0f;
+    Vector3 d=Vector3_A_minus_B(pos,meshOrigin);
+    float distSq=dot_vector3(d,d), maxReach=meshBound+radius;
+    return distSq < maxReach*maxReach;
+}
+
+static SweepResult SweepSphereMeshEntity(Vector3 sPos, float sRadius, Entity *me, u16 meIdx) {
+    SweepResult r={0}; MeshXform x;
+    if (!MeshXform_Get(me,meIdx,&x)) return r;
+    if (!MeshCouldOverlap(me,meIdx,sPos,sRadius)) return r;
+    u16 mindex=me->modelIndex; u32 triCount=modelTriangleCounts[mindex];
+    if (!triCount) return r;
+
+    Vector3 localSphere=MeshXform_ToLocal(&x,sPos);
+    float localRadius=sRadius/vmin(x.sclx,vmin(x.scly,x.sclz));
+    float bestDist=localRadius;
+    Vector3 bestNormal={0,1,0}, bestPoint=localSphere;
+    for (u32 j=0; j<triCount; ++j) {
+        Vector3 a,b,c; MeshTri_Get(mindex,j,&a,&b,&c);
+        Vector3 cp; float dist=SphereTriangleDistance(localSphere,a,b,c,&cp);
+        if (dist<bestDist) {
+            bestDist=dist;
+            bestPoint=cp;
+            Vector3 n=normalize_vector3(cross_vector3(Vector3_A_minus_B(b,a),Vector3_A_minus_B(c,a)));
+            bestNormal = dot_vector3(n,Vector3_A_minus_B(localSphere,cp))>=0.0f ? n : scale_vector3(n,-1.0f);
+            r.hit=true;
         }
     }
-    
-    if (r.hit) {
-        // Transform normal and point back to world space
-        Vector3 worldNormal = {(m00/sclx)*closestNormal.x + (m01/scly)*closestNormal.y + (m02/sclz)*closestNormal.z,(m10/sclx)*closestNormal.x + (m11/scly)*closestNormal.y + (m12/sclz)*closestNormal.z,(m20/sclx)*closestNormal.x + (m21/scly)*closestNormal.y + (m22/sclz)*closestNormal.z};
-        worldNormal = normalize_vector3(worldNormal);
-        Vector3 worldPoint = {m00*closestPoint.x + m01*closestPoint.y + m02*closestPoint.z + tx,m10*closestPoint.x + m11*closestPoint.y + m12*closestPoint.z + ty,m20*closestPoint.x + m21*closestPoint.y + m22*closestPoint.z + tz};
-        r.toi = closestToi; r.normal = worldNormal; r.point = worldPoint;
-    }
-    
+    if (!r.hit) return r;
+    r.toi=0.0f;
+    r.normal=MeshXform_NormalToWorld(&x,bestNormal);
+    r.point=MeshXform_PointToWorld(&x,bestPoint);
     return r;
 }
 
-static SweepResult SweepBoxMesh(Vector3 boxCenter, Vector3 boxHalfExtents, Quaternion boxRot, Entity *meshEntity, u16 meshEntityIdx) {
-    SweepResult r = {0};
-    if (meshEntity->collider != COLLIDER_TYPE_MESH) return r;
-    if (meshEntity->modelIndex >= loadedModelsMaxIndex) return r;
-    
-    u16 mindex = meshEntity->modelIndex; // Simplified: test box vertices against mesh
-    u32 triCount = modelTriangleCounts[mindex];
-    if (triCount < 1) return r;
-    
-    float M[16];
-    CopyMemoryFromBtoAForNBytes(M, &modelMatrices[meshEntityIdx * 16], 16 * sizeof(float));
-    float m00=M[0], m10=M[1], m20=M[2]; float m01=M[4], m11=M[5], m21=M[6]; float m02=M[8], m12=M[9], m22=M[10]; float tx=M[12], ty=M[13], tz=M[14];
-    float sclx = vsqrtf(m00*m00 + m10*m10 + m20*m20); float sclx2 = sclx * sclx;
-    float scly = vsqrtf(m01*m01 + m11*m11 + m21*m21); float scly2 = scly * scly;
-    float sclz = vsqrtf(m02*m02 + m12*m12 + m22*m22); float sclz2 = sclz * sclz;
-    Vector3 ax = quat_rotate_vector(boxRot, (Vector3){1,0,0}); // Get box axes
-    Vector3 ay = quat_rotate_vector(boxRot, (Vector3){0,1,0});
-    Vector3 az = quat_rotate_vector(boxRot, (Vector3){0,0,1});
-    Vector3 vertices[8]; Vector3 offsets[] = {{-1,-1,-1}, {-1,-1,+1}, {-1,+1,-1}, {-1,+1,+1}, {+1,-1,-1}, {+1,-1,+1}, {+1,+1,-1}, {+1,+1,+1}}; // Box vertices
-    for (int i = 0; i < 8; ++i) {
-        Vector3 v = (Vector3){0.0f,0.0f,0.0f};
-        v = Vector3_A_plus_B(v, scale_vector3(ax, offsets[i].x * boxHalfExtents.x));
-        v = Vector3_A_plus_B(v, scale_vector3(ay, offsets[i].y * boxHalfExtents.y));
-        v = Vector3_A_plus_B(v, scale_vector3(az, offsets[i].z * boxHalfExtents.z));
-        vertices[i] = Vector3_A_plus_B(boxCenter, v);
+static SweepResult SweepCapsuleMeshEntity(Vector3 cBase, Vector3 cTip, float cRadius, Entity *me, u16 meIdx) {
+    SweepResult r={0}; MeshXform x;
+    if (!MeshXform_Get(me,meIdx,&x)) return r;
+    u16 mindex=me->modelIndex; u32 triCount=modelTriangleCounts[mindex];
+    if (!triCount) return r;
+
+    Vector3 lBase=MeshXform_ToLocal(&x,cBase), lTip=MeshXform_ToLocal(&x,cTip);
+    float localRadius=cRadius/vmin(x.sclx,vmin(x.scly,x.sclz));
+    Vector3 capsAxis=Vector3_A_minus_B(lTip,lBase);
+
+    float bestDist=localRadius;
+    Vector3 bestNormal={0,1,0}, bestPoint=lBase;
+    // Sample capsule axis and find closest triangle contact across all samples
+    for (int s=0; s<5; ++s) {
+        Vector3 sp=Vector3_A_plus_B(lBase,scale_vector3(capsAxis,(float)s*0.25f));
+        for (u32 j=0; j<triCount; ++j) {
+            Vector3 a,b,c; MeshTri_Get(mindex,j,&a,&b,&c);
+            Vector3 cp; float dist=SphereTriangleDistance(sp,a,b,c,&cp);
+            if (dist<bestDist) {
+                bestDist=dist;
+                bestPoint=cp;
+                Vector3 n=normalize_vector3(cross_vector3(Vector3_A_minus_B(b,a),Vector3_A_minus_B(c,a)));
+                bestNormal = dot_vector3(n,Vector3_A_minus_B(sp,cp))>=0.0f ? n : scale_vector3(n,-1.0f);
+                r.hit=true;
+            }
+        }
     }
-    
-    float closestToi = 2.0f;
-    Vector3 closestNormal = (Vector3){0.0f,1.0f,0.0f};
-    Vector3 closestPoint = boxCenter;
-    for (int v_idx = 0; v_idx < 8; ++v_idx) { // Transform vertices to mesh local space and test
-        Vector3 rel = {vertices[v_idx].x - tx, vertices[v_idx].y - ty, vertices[v_idx].z - tz};
-        Vector3 localVertex = {(rel.x*m00 + rel.y*m10 + rel.z*m20) / sclx2,(rel.x*m01 + rel.y*m11 + rel.z*m21) / scly2,(rel.x*m02 + rel.y*m12 + rel.z*m22) / sclz2};
-        for (u32 j = 0; j < triCount; ++j) {
-            u32 bA = (u32)modelTriangles[mindex][j*3 + 0] * VERTEX_ATTRIBUTES_SIZE;
-            u32 bB = (u32)modelTriangles[mindex][j*3 + 1] * VERTEX_ATTRIBUTES_SIZE;
-            u32 bC = (u32)modelTriangles[mindex][j*3 + 2] * VERTEX_ATTRIBUTES_SIZE;
-            Vector3 posA = {half_to_float(*(half*)(modelVertices[mindex] + bA + 0)),half_to_float(*(half*)(modelVertices[mindex] + bA + 2)),half_to_float(*(half*)(modelVertices[mindex] + bA + 4))};
-            Vector3 posB = {half_to_float(*(half*)(modelVertices[mindex] + bB + 0)),half_to_float(*(half*)(modelVertices[mindex] + bB + 2)),half_to_float(*(half*)(modelVertices[mindex] + bB + 4))};
-            Vector3 posC = {half_to_float(*(half*)(modelVertices[mindex] + bC + 0)),half_to_float(*(half*)(modelVertices[mindex] + bC + 2)),half_to_float(*(half*)(modelVertices[mindex] + bC + 4))};
-            Vector3 closestTriPoint;
-            float triDist = SphereTriangleDistance(localVertex, posA, posB, posC, &closestTriPoint);
-            if (triDist <= 0.0f) {
-                // Vertex on triangle
-                Vector3 edge0 = Vector3_A_minus_B(posB, posA);
-                Vector3 edge1 = Vector3_A_minus_B(posC, posA);
-                Vector3 triNormal = cross_vector3(edge0, edge1);
-                triNormal = normalize_vector3(triNormal);
-                
-                if (0.0f < closestToi) {
-                    closestToi = 0.0f;
-                    closestNormal = triNormal;
-                    closestPoint = closestTriPoint;
-                    r.hit = true;
+    if (!r.hit) return r;
+    r.toi=0.0f;
+    r.normal=MeshXform_NormalToWorld(&x,bestNormal);
+    r.point=MeshXform_PointToWorld(&x,bestPoint);
+    return r;
+}
+
+static SweepResult SweepBoxMesh(Vector3 boxCenter, Vector3 boxHE, Quaternion boxRot, Entity *me, u16 meIdx) {
+    SweepResult r={0}; MeshXform x;
+    if (!MeshXform_Get(me,meIdx,&x)) return r;
+    u16 mindex=me->modelIndex; u32 triCount=modelTriangleCounts[mindex];
+    if (!triCount) return r;
+
+    // Build 8 box vertices in local mesh space
+    Vector3 ax=quat_rotate_vector(boxRot,(Vector3){1,0,0});
+    Vector3 ay=quat_rotate_vector(boxRot,(Vector3){0,1,0});
+    Vector3 az=quat_rotate_vector(boxRot,(Vector3){0,0,1});
+    Vector3 verts[8];
+    for (int i=0;i<8;++i) {
+        float sx=i&1?1.f:-1.f, sy=i&2?1.f:-1.f, sz=i&4?1.f:-1.f;
+        Vector3 w=Vector3_A_plus_B(boxCenter,Vector3_A_plus_B(scale_vector3(ax,sx*boxHE.x),Vector3_A_plus_B(scale_vector3(ay,sy*boxHE.y),scale_vector3(az,sz*boxHE.z))));
+        verts[i]=MeshXform_ToLocal(&x,w);
+    }
+
+    float contactEps=0.01f; // Small epsilon so surface-touching vertices register
+    float bestDist=contactEps;
+    Vector3 bestNormal={0,1,0}, bestPoint=verts[0];
+    for (int v=0;v<8;++v) {
+        for (u32 j=0;j<triCount;++j) {
+            Vector3 a,b,c; MeshTri_Get(mindex,j,&a,&b,&c);
+            Vector3 cp; float dist=SphereTriangleDistance(verts[v],a,b,c,&cp);
+            if (dist<bestDist) {
+                bestDist=dist;
+                bestPoint=cp;
+                Vector3 n=normalize_vector3(cross_vector3(Vector3_A_minus_B(b,a),Vector3_A_minus_B(c,a)));
+                // Normal points from surface toward box vertex
+                bestNormal = dot_vector3(n,Vector3_A_minus_B(verts[v],cp))>=0.0f ? n : scale_vector3(n,-1.0f);
+                r.hit=true;
+            }
+        }
+    }
+    // Also test triangle vertices against box (catches thin tris slipping between box vertices)
+    if (!r.hit) {
+        ShapeBox localBox={MeshXform_ToLocal(&x,boxCenter),
+                           // Scale halfExtents into local space per-axis
+                           {boxHE.x/x.sclx,boxHE.y/x.scly,boxHE.z/x.sclz},
+                           boxRot};
+        // Re-use SweepSphereBox with zero radius and zero vel for each triangle vertex
+        Vector3 zeroVel={0,0,0};
+        for (u32 j=0;j<triCount&&!r.hit;++j) {
+            Vector3 a,b,c; MeshTri_Get(mindex,j,&a,&b,&c);
+            Vector3 triVerts[3]={a,b,c};
+            for (int tv=0;tv<3;++tv) {
+                // Convert tri vert world via inverse: already in local space
+                SweepResult hit=SweepSphereBox(MeshXform_PointToWorld(&x,triVerts[tv]),0.0f,zeroVel,
+                    (ShapeBox){boxCenter,boxHE,boxRot});
+                if (hit.hit) {
+                    r.hit=true;
+                    Vector3 n=normalize_vector3(cross_vector3(Vector3_A_minus_B(b,a),Vector3_A_minus_B(c,a)));
+                    r.normal=MeshXform_NormalToWorld(&x, dot_vector3(n,Vector3_A_minus_B(verts[0],triVerts[tv]))>=0.0f?n:scale_vector3(n,-1.0f));
+                    r.point=MeshXform_PointToWorld(&x,triVerts[tv]);
+                    r.toi=0.0f;
+                    break;
                 }
             }
         }
+        return r;
     }
-    
-    if (r.hit) {
-        Vector3 worldNormal = {
-            (m00/sclx)*closestNormal.x + (m01/scly)*closestNormal.y + (m02/sclz)*closestNormal.z,
-            (m10/sclx)*closestNormal.x + (m11/scly)*closestNormal.y + (m12/sclz)*closestNormal.z,
-            (m20/sclx)*closestNormal.x + (m21/scly)*closestNormal.y + (m22/sclz)*closestNormal.z
-        };
-        worldNormal = normalize_vector3(worldNormal);
-        
-        Vector3 worldPoint = {
-            m00*closestPoint.x + m01*closestPoint.y + m02*closestPoint.z + tx,
-            m10*closestPoint.x + m11*closestPoint.y + m12*closestPoint.z + ty,
-            m20*closestPoint.x + m21*closestPoint.y + m22*closestPoint.z + tz
-        };
-        
-        r.toi = closestToi;
-        r.normal = worldNormal;
-        r.point = worldPoint;
-    }
-    
+    r.toi=0.0f;
+    r.normal=MeshXform_NormalToWorld(&x,bestNormal);
+    r.point=MeshXform_PointToWorld(&x,bestPoint);
     return r;
 }
 
-static SweepResult SweepCapsuleMeshEntity(Vector3 cBase, Vector3 cTip, float cRadius, Entity *meshEntity, u16 meshEntityIdx) {
-    SweepResult r = {0};
-    if (meshEntity->collider != COLLIDER_TYPE_MESH) return r;
-    if (meshEntity->modelIndex >= loadedModelsMaxIndex) return r;
-    
-    u16 mindex = meshEntity->modelIndex; u32 triCount = modelTriangleCounts[mindex];
-    if (triCount < 1) return r;
-    
-    float M[16]; CopyMemoryFromBtoAForNBytes(M,&modelMatrices[meshEntityIdx * 16], 16 * sizeof(float));
-    float m00=M[0], m10=M[1], m20=M[2]; float m01=M[4], m11=M[5], m21=M[6]; float m02=M[8], m12=M[9], m22=M[10]; float tx=M[12], ty=M[13], tz=M[14];
-    float sclx = vsqrtf(m00*m00 + m10*m10 + m20*m20); float sclx2 = sclx * sclx;
-    float scly = vsqrtf(m01*m01 + m11*m11 + m21*m21); float scly2 = scly * scly;
-    float sclz = vsqrtf(m02*m02 + m12*m12 + m22*m22); float sclz2 = sclz * sclz;
-    Vector3 rel_base = {cBase.x - tx, cBase.y - ty, cBase.z - tz}; // Transform capsule to local space
-    Vector3 rel_tip = {cTip.x - tx, cTip.y - ty, cTip.z - tz};
-    Vector3 localCapsuleBase = {(rel_base.x*m00 + rel_base.y*m10 + rel_base.z*m20) / sclx2,(rel_base.x*m01 + rel_base.y*m11 + rel_base.z*m21) / scly2,(rel_base.x*m02 + rel_base.y*m12 + rel_base.z*m22) / sclz2};
-    Vector3 localCapsuleTip = {(rel_tip.x*m00 + rel_tip.y*m10 + rel_tip.z*m20) / sclx2,(rel_tip.x*m01 + rel_tip.y*m11 + rel_tip.z*m21) / scly2,(rel_tip.x*m02 + rel_tip.y*m12 + rel_tip.z*m22) / sclz2};
-    float closestToi = 2.0f; int samples = 4;
-    Vector3 closestNormal = (Vector3){0.0f,1.0f,0.0f}; Vector3 closestPoint = localCapsuleBase;
-    Vector3 capsuleAxis = Vector3_A_minus_B(localCapsuleTip, localCapsuleBase);
-    for (int s = 0; s < samples; ++s) { // Sample capsule and test each point against all triangles
-        float t = (float)s / (float)(samples - 1);
-        Vector3 samplePos = Vector3_A_plus_B(localCapsuleBase, scale_vector3(capsuleAxis, t));
-        for (u32 j = 0; j < triCount; ++j) {
-            u32 bA = (u32)modelTriangles[mindex][j*3 + 0] * VERTEX_ATTRIBUTES_SIZE;
-            u32 bB = (u32)modelTriangles[mindex][j*3 + 1] * VERTEX_ATTRIBUTES_SIZE;
-            u32 bC = (u32)modelTriangles[mindex][j*3 + 2] * VERTEX_ATTRIBUTES_SIZE;
-            Vector3 posA = {half_to_float(*(half*)(modelVertices[mindex] + bA + 0)),half_to_float(*(half*)(modelVertices[mindex] + bA + 2)),half_to_float(*(half*)(modelVertices[mindex] + bA + 4))};
-            Vector3 posB = {half_to_float(*(half*)(modelVertices[mindex] + bB + 0)),half_to_float(*(half*)(modelVertices[mindex] + bB + 2)),half_to_float(*(half*)(modelVertices[mindex] + bB + 4))};
-            Vector3 posC = {half_to_float(*(half*)(modelVertices[mindex] + bC + 0)),half_to_float(*(half*)(modelVertices[mindex] + bC + 2)),half_to_float(*(half*)(modelVertices[mindex] + bC + 4))};
-            Vector3 closestTriPoint;
-            float triDist = SphereTriangleDistance(samplePos,posA,posB,posC,&closestTriPoint);
-            if (triDist < cRadius) {
-                // Capsule sample overlaps triangle
-                Vector3 edge0 = Vector3_A_minus_B(posB,posA);
-                Vector3 edge1 = Vector3_A_minus_B(posC,posA);
-                Vector3 triNormal = cross_vector3(edge0,edge1);
-                triNormal = normalize_vector3(triNormal);
-                if (0.0f < closestToi) {
-                    closestToi = 0.0f;
-                    closestNormal = triNormal;
-                    closestPoint = closestTriPoint;
-                    r.hit = true;
-                }
-            }
-        }
-    }
-    
-    if (r.hit) {
-        // Transform back to world space
-        Vector3 worldNormal = {
-            (m00/sclx)*closestNormal.x + (m01/scly)*closestNormal.y + (m02/sclz)*closestNormal.z,
-            (m10/sclx)*closestNormal.x + (m11/scly)*closestNormal.y + (m12/sclz)*closestNormal.z,
-            (m20/sclx)*closestNormal.x + (m21/scly)*closestNormal.y + (m22/sclz)*closestNormal.z
-        };
-        worldNormal = normalize_vector3(worldNormal);
-        
-        Vector3 worldPoint = {
-            m00*closestPoint.x + m01*closestPoint.y + m02*closestPoint.z + tx,
-            m10*closestPoint.x + m11*closestPoint.y + m12*closestPoint.z + ty,
-            m20*closestPoint.x + m21*closestPoint.y + m22*closestPoint.z + tz
-        };
-        
-        r.toi = closestToi;
-        r.normal = worldNormal;
-        r.point = worldPoint;
-    }
-    
-    return r;
-}
-
-// Capsule-box sweep (simplified: axis-aligned approach).  For oriented boxes, transform to local space.
 static SweepResult SweepCapsuleBox(Vector3 sBase, Vector3 sTip, float sRadius, Vector3 sVel, ShapeBox box) {
-    SweepResult r = {0};
-    int numSamples = 3;
-    float closestToi = 2.0f;
-    Vector3 closestNormal = {0,1,0};
-    Vector3 closestPoint = {0};
-    for (int i = 0; i < numSamples; ++i) {
-        float t = (float)i / (float)(numSamples - 1);
-        Vector3 samplePos = Vector3_A_plus_B(sBase, scale_vector3(Vector3_A_minus_B(sTip, sBase), t));
-        SweepResult hit = SweepSphereSphere(samplePos, sRadius, sVel, box.center, vmax(box.halfExtents.x, vmax(box.halfExtents.y, box.halfExtents.z)));
-        if (hit.hit && hit.toi < closestToi) {
-            closestToi = hit.toi;
-            closestNormal = hit.normal;
-            closestPoint = hit.point;
-            r.hit = true;
-        }
+    SweepResult r = {0}; float closestToi=2.0f;
+    Vector3 axis=Vector3_A_minus_B(sTip,sBase);
+    for (int i=0; i<4; ++i) {
+        float t=(float)i/3.0f;
+        SweepResult hit=SweepSphereBox(Vector3_A_plus_B(sBase,scale_vector3(axis,t)),sRadius,sVel,box);
+        if (hit.hit && hit.toi<closestToi) { closestToi=hit.toi; r=hit; }
     }
-    
-    if (r.hit) {
-        r.toi = closestToi;
-        r.normal = closestNormal;
-        r.point = closestPoint;
-    }
-    
     return r;
 }
 
@@ -489,26 +461,29 @@ static SweepResult SweepEntity(Entity *moving, Vector3 moveVel, Entity *stationa
 }
 
 static ProbeResult ProbeCapsule(Vector3 base, Vector3 tip, float radius, u32 collisionMask) {
-    ProbeResult result = {0}; (void)tip;
-    for (u32 i = 0; i < Sys_Global.loadedInstances; ++i) {
-        Entity* other = &Sys_Global.instances[i];
-        if (!(other->entflags & ENTFLAG_ACTIVE) || other->collider == COLLIDER_TYPE_NONE) continue;
-        if (!(collisionMask & other->layer)) continue;
+    ProbeResult result={0};
+    Vector3 downVel={0,-0.001f,0};
+    for (u32 i=0; i<Sys_Global.loadedInstances; ++i) {
+        Entity *other=&Sys_Global.instances[i];
+        if (!(other->entflags&ENTFLAG_ACTIVE)||other->collider==COLLIDER_TYPE_NONE) continue;
+        if (!(collisionMask&other->layer)) continue;
         
-        if (other->collider == COLLIDER_TYPE_SPHERE) {
-            Vector3 closestOnCapsule = base;
-            Vector3 toOther = Vector3_A_minus_B(other->position, closestOnCapsule);
-            float dist = magnitude_vector3(toOther);
-            float minDist = radius + other->colliderSize.x;
-            if (dist < minDist) {
-                result.depth = minDist - dist;
-                result.normal = (dist > 1e-6f) ? scale_vector3(toOther, 1.0f / dist) : (Vector3){0,1,0};
-                result.point = Vector3_A_plus_B(other->position, scale_vector3(result.normal, -other->colliderSize.x));
-                return result;
-            }
+        Vector3 toOther=Vector3_A_minus_B(other->position,base);
+        float quickDist=vabs(toOther.x)+vabs(toOther.y)+vabs(toOther.z);
+        float quickMax=radius+vmax(other->colliderSize.x,vmax(other->colliderSize.y,other->colliderSize.z))*2.0f+1.0f;
+        if (quickDist>quickMax) continue;
+
+        SweepResult hit={0};
+        ShapeSphere ss; ShapeBox sb; ShapeCapsule sc;
+        switch (other->collider) {
+            case COLLIDER_TYPE_SPHERE: Entity_GetSphere(other,&ss); hit=SweepSphereCapsule(ss.center,ss.radius,(Vector3){0},base,tip,radius); break;
+            case COLLIDER_TYPE_BOX: Entity_GetBox(other,&sb); hit=SweepCapsuleBox(base,tip,radius,downVel,sb); break;
+            case COLLIDER_TYPE_CAPSULE: Entity_GetCapsule(other,&sc); hit=SweepCapsuleCapsule(base,tip,radius,(Vector3){0},sc.base,sc.tip,sc.radius); break;
+            case COLLIDER_TYPE_MESH: hit=SweepCapsuleMeshEntity(base,tip,radius,other,(u16)i); break;
+            default: continue;
         }
+        if (hit.hit) { result.depth=radius; result.normal=hit.normal; result.point=hit.point; return result; }
     }
-    
     return result;
 }
 
@@ -624,18 +599,17 @@ static void IntegratePlayer(u16 playerIdx, float dt) {
 
 void Physics(void) {
     float dt = vclamp((float)Sys_Global.timeSinceLastPhysicsTick, 0.0005f, 0.027777778f);  // Clamp to reasonable range
-    //if (Sys_Global.pauseRelativeTime > 2.0f) { // Apply Gravity
-        //for (u32 i = 0; i < dynamicEntityCount; ++i) {
-            //u16 entIdx = dynamicEntities[i];
-            //assert(entIdx >= PLAYER1 && entIdx < Sys_Global.loadedInstances);
-            //Entity* e = &Sys_Global.instances[entIdx];
-            //if (vabs(e->gravity - 0.0f) < 0.01f) continue;
-            //if (entIdx <= PLAYER2 && Sys_Cheats.noclip) continue;
+    if (Sys_Global.pauseRelativeTime > 2.0f) { // Apply Gravity
+        for (u32 i = 0; i < dynamicEntityCount; ++i) {
+            u16 entIdx = dynamicEntities[i];
+            Entity* e = &Sys_Global.instances[entIdx];
+            if (vabs(e->gravity - 0.0f) < 0.01f) continue;
+            if (entIdx <= PLAYER2 && Sys_Cheats.noclip) continue;
 
-            //Vector3 gravityAccel = scale_vector3(GRAVITY_VECTOR, e->gravity * dt);
-            //e->velocity = Vector3_A_plus_B(e->velocity, gravityAccel);
-        //}
-    //}
+            Vector3 gravityAccel = scale_vector3(GRAVITY_VECTOR,e->gravity * dt);
+            e->velocity = Vector3_A_plus_B(e->velocity,gravityAccel);
+        }
+    }
     
     IntegratePlayer((u16)PLAYER1,dt);// IntegratePlayer((u16)PLAYER2,dt); // Move Players (separate from normal Rigidbody)
     for (u32 i = 0; i < dynamicEntityCount; ++i) {
@@ -650,14 +624,14 @@ void Physics(void) {
             for (int iteration = 0; iteration < MAX_COLLISION_ITERATIONS; ++iteration) {
                 if (magnitude_vector3(vel) < MIN_VELOCITY_THRESHOLD) break;
                 
-                Vector3 desiredMove = scale_vector3(vel, remainingTime);
+                Vector3 desiredMove = scale_vector3(vel,remainingTime);
                 SweepResult bestCollision = {0};
                 bestCollision.toi = 1.0f;
                 for (u32 i = 0; i < Sys_Global.loadedInstances; ++i) { // Test against all other entities
                     Entity* other = &Sys_Global.instances[i];
                     if (other == e || !(other->entflags&ENTFLAG_ACTIVE) || other->collider == COLLIDER_TYPE_NONE || !(collisionMask&other->layer)) continue;
 
-                    SweepResult hit = SweepEntity(e,desiredMove,other,(u16)i);
+                    SweepResult hit = {0};//SweepEntity(e,desiredMove,other,(u16)i);
                     if (hit.hit && hit.toi < bestCollision.toi) bestCollision = hit;
                 }
                 
@@ -691,16 +665,11 @@ ENGINE_TO_MOD void AddForce(u16 idx,Vector3 force,bool isImpulse) {
 }
 
 ENGINE_TO_MOD void ApplyPlayerMovements(void) {
-    Vector3 fwd=Sys_Global.instances[PLAYER1].forward, right=Sys_Global.instances[PLAYER1].right, input={0};
-    if (Forward())     input=Vector3_A_plus_B(input,(Vector3){fwd.x,0,fwd.z});
-    if (Backpedal())   input=Vector3_A_minus_B(input,(Vector3){fwd.x,0,fwd.z});
-    if (StrafeRight()) input=Vector3_A_plus_B(input,(Vector3){right.x,0,right.z});
-    if (StrafeLeft())  input=Vector3_A_minus_B(input,(Vector3){right.x,0,right.z});
-    if (SwimDn())      input.y-=1.0f;
-    if (SwimUp())      input.y+=1.0f;
-    input=normalize_vector3(input);
+    Entity *p = &Sys_Global.instances[PLAYER1];
+    float h = (float)Forward() - (float)Backpedal(), s = (float)StrafeRight() - (float)StrafeLeft();
+    Vector3 input = normalize_vector3((Vector3){p->forward.x * h + p->right.x * s, (float)SwimUp() - (float)SwimDn(), p->forward.z * h + p->right.z * s});
     float speed=GetBasePlayerSpeed(PLAYER1,magnitude_vector3(input)>0.1f)*1.75f, accel=Sys_Global.boosterActive?1.0f:3.0f;
-    Vector3 cur=Sys_Global.instances[PLAYER1].velocity, dv=Vector3_A_minus_B(scale_vector3(input,speed),cur);
+    Vector3 cur=p->velocity, dv=Vector3_A_minus_B(scale_vector3(input,speed),cur);
     dv.x=vmax(vmin(dv.x,10.0f),-10.0f); dv.y=vmax(vmin(dv.y,10.0f),-10.0f); dv.z=vmax(vmin(dv.z,10.0f),-10.0f);
-    Sys_Global.instances[PLAYER1].velocity=Vector3_A_plus_B(cur,scale_vector3(dv,accel*(float)Sys_Global.timeSinceLastPhysicsTick));
+    p->velocity=Vector3_A_plus_B(cur,scale_vector3(dv,accel*(float)Sys_Global.timeSinceLastPhysicsTick));
 }
