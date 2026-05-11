@@ -104,8 +104,7 @@ COMMON_CFLAGS="-ferror-limit=500 -fno-exceptions -fno-stack-protector -fno-async
                -fomit-frame-pointer -g0 -fstrict-aliasing -fcommon -Walloca \
                -Wformat=2 -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings -fno-math-errno -fno-sanitize=all \
                -fno-trapping-math -fmerge-all-constants -m64 -Os -march=haswell -fstack-usage"
-COMMON_LFLAGS="-Wl,-z,now -Wl,-z,relro -Wl,--gc-sections -Wl,--as-needed -Wl,--strip-all -Wl,-z,norelro -Wl,--build-id=none $ZIG_LIBS"
-# COMMON_LFLAGS="-Wl,-z,now -Wl,-z,relro -Wl,--gc-sections -Wl,--as-needed                 -Wl,-z,norelro -Wl,--build-id=none $ZIG_LIBS"
+COMMON_LFLAGS="-Wl,-z,now -Wl,-z,relro -Wl,--gc-sections -Wl,--as-needed -Wl,-z,norelro -Wl,--build-id=none $ZIG_LIBS"
 if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
     LINKER=$CC
@@ -142,7 +141,8 @@ total_build_time=$((build_end - shader_start))
 echo "Built engine and mod in ${total_build_time} ms"
 if ! $IS_CI; then
     case "$PLATFORM" in
-        windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; wine ./voxen.exe ;;
+#         windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; wine ./voxen.exe ;;
+        windows)  strip --strip-all voxen.exe; wine ./voxen.exe ;;
 #         windows)  wine ./voxen.exe ;;
         *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
 #         *)        strip --strip-all --strip-unneeded ./voxen; ./voxen ;;   # linux Alternate build methods to be able to look at symbols and debugging
