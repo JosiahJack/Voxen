@@ -1,3 +1,19 @@
+static float half_to_float(half h){
+    u32 s=(h&0x8000)<<16,e=(h&0x7C00)>>10,m=(h&0x03FF),out;
+    if (e == 0){
+        if (m == 0) out = s;
+        else {
+            e = 1;
+            while ((m & 0x0400) == 0) { m <<= 1; e--; }
+            m &= 0x03FF; e+=(127 - 15);
+            out = s | (e << 23) | (m << 13);
+        }
+    } else if (e == 31) { out = s | 0x7F800000 | (m << 13); }
+    else { e = e + (127 - 15); out = s | (e << 23) | (m << 13); }
+    float f; CopyMemoryFromBtoAForNBytes(&f,&out,4);
+    return f;
+}
+
 RaycastHit RayTriangle(Vector3 origin, Vector3 dir, Vector3 posA, Vector3 posB, Vector3 posC, Vector3 normA, Vector3 normB, Vector3 normC) {
     Vector3 edgeAB = Vector3_A_minus_B(posB,posA);
     Vector3 edgeAC = Vector3_A_minus_B(posC,posA);

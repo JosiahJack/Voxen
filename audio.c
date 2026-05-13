@@ -1,9 +1,15 @@
 // audio.c - Audio System
+#include "os.h"
+#include "common.h"
+#include "interop.h"
 #define AUDIO_RATE      48000
 #define AUDIO_CHANNELS  2
 #define AUDIO_PERIOD_MS 10
 #define AUDIO_PERIODS   4
 #define AUDIO_FRAMES    ((AUDIO_RATE * AUDIO_PERIOD_MS) / 1000)
+void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n); ENGINE_TO_MOD void DualLog(const char* fmt, ...);
+ENGINE_TO_MOD int StringFormat(char* buffer, size_t bufferSize, const char* format, ...);
+extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
 #ifdef WINDOWS
     typedef u32 snd_pcm_uframes_t; // match nanoalsa
     #define PCM_NONBLOCK (1<<1)
@@ -132,22 +138,7 @@
     };
     typedef enum pcm_param pcm_param_t;
     static inline int pcm_prepare(int fd) { return OS_IOControlSimple(fd,SNDRV_PCM_IOCTL_PREPARE); }
-    static inline int pcm_start(int fd)   { return OS_IOControlSimple(fd,SNDRV_PCM_IOCTL_START); }
-    static inline int pcm_stop(int fd)    { return OS_IOControlSimple(fd,SNDRV_PCM_IOCTL_DROP); }
-    static inline int pcm_drain(int fd)   { return OS_IOControlSimple(fd,SNDRV_PCM_IOCTL_DRAIN); }
-    static inline int pcm_xrun(int fd)    { return OS_IOControlSimple(fd,SNDRV_PCM_IOCTL_XRUN); }
-    static inline int pcm_reset(int fd)   { return OS_IOControlSimple(fd,SNDRV_PCM_IOCTL_RESET); }
-    static inline int pcm_resume(int fd)  { return OS_IOControlSimple(fd,SNDRV_PCM_IOCTL_RESUME); }
-    static inline int pcm_pause(int fd)   { return OS_IOControl(fd,SNDRV_PCM_IOCTL_PAUSE,(void*)1); }
-    static inline int pcm_unpause(int fd) { return OS_IOControl(fd,SNDRV_PCM_IOCTL_PAUSE,(void*)0); }
-    static inline int pcm_mmap_sync_pos(int fd) { return OS_IOControlSimple(fd, SNDRV_PCM_IOCTL_HWSYNC); }
-    static inline int pcm_move_app_pos(int fd, int frames) { return frames < 0 ? OS_IOControl(fd,SNDRV_PCM_IOCTL_REWIND,(void*)-frames) : OS_IOControl(fd,SNDRV_PCM_IOCTL_FORWARD,(void*)frames); }
-    static inline int pcm_link(int fd, int fd2) { return OS_IOControl(fd,SNDRV_PCM_IOCTL_LINK,(void*)fd2); }
-    static inline int pcm_unlink(int fd) { return OS_IOControlSimple(fd,SNDRV_PCM_IOCTL_UNLINK); }
     static inline int pcm_write(int fd, void *buf, int frames) { struct snd_xferi tmp={.buf=buf,.frames=frames,.result=0}; return OS_IOControl(fd, SNDRV_PCM_IOCTL_WRITEI_FRAMES,(void*)&tmp) ? -1 : (int) tmp.result; }
-    static inline int pcm_read(int fd, void *buf, int frames) { struct snd_xferi tmp ={.buf=buf,.frames=frames,.result=0}; return OS_IOControl(fd, SNDRV_PCM_IOCTL_READI_FRAMES,(void*)&tmp) ? -1 : (int)tmp.result; }
-    static inline int pcm_write_scattered(int fd, void **bufs, int frames) { struct snd_xfern tmp={.bufs=bufs,.frames=frames,.result = 0}; return OS_IOControl(fd,SNDRV_PCM_IOCTL_WRITEN_FRAMES,(void*)&tmp) ? -1 : (int)tmp.result; }
-    static inline int pcm_read_scattered(int fd, void **bufs, int frames) { struct snd_xfern tmp={.bufs=bufs,.frames=frames,.result=0}; return OS_IOControl(fd,SNDRV_PCM_IOCTL_READN_FRAMES,(void*)&tmp) ? -1 : (int)tmp.result; }
     static void hw_params_set_mask(struct snd_pcm_hw_params *p, int parameter, unsigned int value);
     static void hw_params_set_interval(struct snd_pcm_hw_params *p, int parameter, unsigned int min, unsigned int max);
     static void hw_params_set(struct snd_pcm_hw_params *p, int parameter, unsigned int value);
@@ -254,8 +245,8 @@
     }
 
     void pcm_get_range(pcm_params_t *params, pcm_param_t parameter, unsigned int *min, unsigned int *max) { hw_params_get_interval(&params->hw_params,parameter,min,max); }
-    static inline unsigned int pcm_get_min(pcm_params_t *params, pcm_param_t parameter) { unsigned int min,max; pcm_get_range(params,parameter,&min,&max); return min; }
-    static inline unsigned int pcm_get_max(pcm_params_t *params, pcm_param_t parameter) { unsigned int min,max; pcm_get_range(params,parameter,&min,&max); return max; }
+//     static inline unsigned int pcm_get_min(pcm_params_t *params, pcm_param_t parameter) { unsigned int min,max; pcm_get_range(params,parameter,&min,&max); return min; }
+//     static inline unsigned int pcm_get_max(pcm_params_t *params, pcm_param_t parameter) { unsigned int min,max; pcm_get_range(params,parameter,&min,&max); return max; }
     int pcm_params_refine(int fd, pcm_params_t *params) { return ioctl(fd,SNDRV_PCM_IOCTL_HW_REFINE,&params->hw_params); }
     int pcm_params_setup(int fd, pcm_params_t *params) {
         if (ioctl(fd, SNDRV_PCM_IOCTL_HW_PARAMS, &params->hw_params) == -1) return -1;

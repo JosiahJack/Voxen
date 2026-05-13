@@ -1896,8 +1896,7 @@ static void TargetIdentifierSenseTargets(void) {
 }
 
 MOD_TO_ENGINE void SetModFatigue(float val) { Eng_Global->invP1.fatigue = val; }
-MOD_TO_ENGINE bool ModRequestsGrayscale(void) {return (/*(Eng_Global->invP1.hasHardware & HW_INF) && */(Eng_Global->invP1.hardwareIsActive & HW_INF)); }
-
+MOD_TO_ENGINE bool ModRequestsGrayscale(void) {return (/*(Eng_Global->invP1.hasHardware & HW_INF) && */(Eng_Global->invP1.hardwareIsActive & HW_INF) > 0); }
 static void DeactivateHardwareOnEnergyDepleted(void) {
     InventorySystem* inv = &Eng_Global->invP1;
     u16* active = &inv->hardwareIsActive;
@@ -2578,13 +2577,13 @@ Vector3 lanternPos;
 float lanternVersionBrightness[3] = {0.875f,1.4f,1.75f};
 void HardwareUpdate(u16 p, bool playerMoved) {
     InventorySystem* inv = Inv(p); (void)playerMoved; // TODO: Only update light while on when player moves?
-    bool infraredOn = /*(inv->hasHardware & HW_INF) && */(inv->hardwareIsActive & HW_INF);
-    bool lanternOn = /*(inv->hasHardware & HW_LAN) && */(inv->hardwareIsActive & HW_LAN);
+    bool infraredOn = /*(inv->hasHardware & HW_INF) && */(inv->hardwareIsActive & HW_INF) > 0;
+    bool lanternOn = /*(inv->hasHardware & HW_LAN) && */(inv->hardwareIsActive & HW_LAN) > 0;
     if (lanternOn || infraredOn) { // Update headmounted lantern/infrared's light (infrared overrides lantern brightness/range)
         Vector3 ppos = Eng_Global->instances[p].position;
         lanternPos = (Vector3){ppos.x + 0.04f,ppos.y + 0.24f,ppos.z + 0.04f};
         float intensity = infraredOn ? 0.8f : lanternVersionBrightness[inv->hardwareVersionSetting[7]];
-        UpdateLight(headmountedLanternLight,lanternPos,lantCol,infraredOn ? INFRARED_RANGE : LANTERN_RANGE,intensity,intensity,0.0f,0.0f,QUAT_IDENTITY,true,false);
+        UpdateLight(headmountedLanternLight,lanternPos,lantCol,infraredOn ? INFRARED_RANGE : LANTERN_RANGE,intensity,intensity,0.0f,0.0f,QUAT_IDENTITY,true,true);
     } else UpdateLight(headmountedLanternLight,lanternPos,lantCol,11.52f,0.0f,0.0f,0.0f,0.0f,QUAT_IDENTITY,false,false);
 }
 //================================================================================

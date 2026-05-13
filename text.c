@@ -326,28 +326,26 @@ void stbtt_MakeGlyphBitmapSubpixel(const stbtt_fontinfo*info,unsigned char*out,i
     if(win){_rasterize(&gbm,win,wl,wc,sx,sy,shx,shy,ix0,iy0,1);TempFree(wl);TempFree(win);}if(v)TempFree(v);
 }
 
-typedef int stbrp_coord;
-typedef struct{int width,height,x,y,bottom_y;}stbrp_context;
-typedef struct{unsigned char x;}stbrp_node;
-typedef struct{stbrp_coord x,y;int id,w,h,was_packed;}stbrp_rect;
+typedef int stbrp_coord; typedef struct{int width,height,x,y,bottom_y;}stbrp_context;
+typedef struct{unsigned char x;}stbrp_node; typedef struct{stbrp_coord x,y;int id,w,h,was_packed;}stbrp_rect;
 static void stbrp_pack_rects(stbrp_context*con,stbrp_rect*rects,int n){
     int i;for(i=0;i<n;++i){if(con->x+rects[i].w>con->width){con->x=0;con->y=con->bottom_y;}if(con->y+rects[i].h>con->height)break;rects[i].x=con->x;rects[i].y=con->y;rects[i].was_packed=1;con->x+=rects[i].w;if(con->y+rects[i].h>con->bottom_y)con->bottom_y=con->y+rects[i].h;}for(;i<n;++i)rects[i].was_packed=0;
 }
 
 typedef struct{unsigned short x0,y0,x1,y1;float xoff,yoff,xadvance,xoff2,yoff2;}stbtt_packedchar;
-typedef struct{float x0,y0,s0,t0,x1,y1,s1,t1;}stbtt_aligned_quad;
+typedef struct{float x0,y0,s0,t0,x1,y1,s1,t1;} aligned_quad;
 typedef struct{void*uac;void*pack_info;int width,height,stride_in_bytes,padding,skip_missing;unsigned int h_oversample,v_oversample;unsigned char*pixels;}stbtt_pack_context;
 typedef struct{float font_size;int first_unicode_codepoint_in_range;int*array_of_unicode_codepoints;int num_chars;stbtt_packedchar*chardata_for_range;unsigned char h_oversample,v_oversample;}FPackRange;
-static void stbtt_GetPackedQuad(const stbtt_packedchar*cd,int pw,int ph,int ci,float*xpos,float*ypos,stbtt_aligned_quad*q,int ai){
+static void stbtt_GetPackedQuad(const stbtt_packedchar*cd, int pw, int ph, int ci, float*xpos, float*ypos, aligned_quad*q, int ai){
     float ipw=1.0f/pw,iph=1.0f/ph;const stbtt_packedchar*b=cd+ci;
     if(ai){float x=vfloor((*xpos+b->xoff)+0.5f),y=vfloor((*ypos+b->yoff)+0.5f);q->x0=x;q->y0=y;q->x1=x+b->xoff2-b->xoff;q->y1=y+b->yoff2-b->yoff;}
     else{q->x0=*xpos+b->xoff;q->y0=*ypos+b->yoff;q->x1=*xpos+b->xoff2;q->y1=*ypos+b->yoff2;}
     q->s0=b->x0*ipw;q->t0=b->y0*iph;q->s1=b->x1*ipw;q->t1=b->y1*iph;*xpos+=b->xadvance;
 }
 
-int stbtt_PackBegin(stbtt_pack_context*spc,unsigned char*px,int pw,int ph,int str,int pad,void*a){
-    stbrp_context*ctx=(stbrp_context*)TempAlloc(sizeof(*ctx));*ctx=(stbrp_context){pw-pad,ph-pad,0,0,0};if(px)MemSetToValueForNBytes(px,0,(size_t)(pw*ph));
-    return *spc=(stbtt_pack_context){a,ctx,pw,ph,str?str:pw,pad,0,1,1,px},1;
+int stbtt_PackBegin(stbtt_pack_context*spc,unsigned char* px, int pw, int ph, int str, int pad, void* a){
+    stbrp_context*ctx=(stbrp_context*)TempAlloc(sizeof(*ctx)); *ctx=(stbrp_context){pw-pad,ph-pad,0,0,0}; if(px) MemSetToValueForNBytes(px,0,(size_t)(pw*ph));
+    return *spc=(stbtt_pack_context){a,ctx,pw,ph,str ? str : pw,pad,0,1,1,px},1;
 }
 
 #define STBTT_MAX_OVERSAMPLE 8
@@ -523,33 +521,38 @@ Color textColors[] = {
 };
 
 float textVertexData[8192];
-void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scaleInput,const char* restrict format,...){
-    float scale=scaleInput;
-    va_list args;__builtin_va_start(args,format);StringFormatV(uiTextBuffer,TEXT_BUFFER_SIZE,format,args);__builtin_va_end(args);
+void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scaleInput,const char* restrict format,...) {
+    va_list args; __builtin_va_start(args,format); StringFormatV(uiTextBuffer,TEXT_BUFFER_SIZE,format,args); __builtin_va_end(args);
     glUseProgram(Sys_Render.textShaderProgram);
-    glUniform4f(3,textColors[color].r,textColors[color].g,textColors[color].b,textColors[color].a);
-    glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D,fontID==FONT_STOPD?fontAtlasTexStopD:fontAtlasTex);
-    glUniform2f(4,1.0f/(float)FONT_ATLAS_SIZE,1.0f/(float)FONT_ATLAS_SIZE);glUniform1ui(2,fontID);
+    glEnable(GL_BLEND);
+    glUniform4f(3,textColors[color].r,textColors[color].g,textColors[color].b,1.0f);
+    glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D,fontID==FONT_STOPD ? fontAtlasTexStopD : fontAtlasTex);
+    float invatsz = 1.0f/(float)FONT_ATLAS_SIZE;
+    glUniform2f(4,invatsz,invatsz); glUniform1ui(2,fontID);
     glBindVertexArray(Sys_Render.textVAO);
-    size_t vc=0;const char*p=uiTextBuffer;float xpos=x,ypos=y+(16*scale),ls=22*scale;stbtt_aligned_quad q;int cc=0;
-    float puv=10.0f/(float)FONT_ATLAS_SIZE,bw=2.0f;
-    while(*p){const unsigned char*s=(const unsigned char*)p;u32 cp=0;
-        if(*s<0x80){cp=*s++;}
-        else if((*s&0xE0)==0xC0){cp=(*s&0x1F)<<6;cp|=(s[1]&0x3F);s+=2;}
-        else if((*s&0xF0)==0xE0){cp=(*s&0x0F)<<12;cp|=(s[1]&0x3F)<<6;cp|=(s[2]&0x3F);s+=3;}
-        else if((*s&0xF8)==0xF0){cp=(*s&0x07)<<18;cp|=(s[1]&0x3F)<<12;cp|=(s[2]&0x3F)<<6;cp|=(s[3]&0x3F);s+=4;}
+    float scale=scaleInput;
+    size_t vc=0; const char*p=uiTextBuffer; float xpos=x,ypos=y+(16*scale),ls=22*scale; aligned_quad q; int cc=0;
+    float puv = 10.0f * invatsz, bw=2.0f;
+    while(*p) {
+        const unsigned char*s=(const unsigned char*)p; u32 cp=0;
+        if (*s<0x80) { cp=*s++; }
+        else if ((*s&0xE0)==0xC0) { cp=(*s&0x1F)<< 6; cp|=(s[1]&0x3F); s+=2; }
+        else if ((*s&0xF0)==0xE0) { cp=(*s&0x0F)<<12; cp|=(s[1]&0x3F)<<6;  cp|=(s[2]&0x3F); s+=3; }
+        else if ((*s&0xF8)==0xF0) { cp=(*s&0x07)<<18; cp|=(s[1]&0x3F)<<12; cp|=(s[2]&0x3F)<<6; cp|=(s[3]&0x3F); s+=4; }
         else s++;
-        p=(const char*)s;cc++;
-        if(cp=='\n'||cc>120){xpos=x;ypos+=ls;cc=0;continue;}
+
+        p = (const char*)s; cc++;
+        if (cp=='\n'||cc>120) { xpos=x; ypos+=ls; cc=0; continue; }
         int idx=CodepointToPackedIndex(cp,fontID);
-        if(fontID==FONT_STOPD)stbtt_GetPackedQuad(fontPackedCharStopD,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,idx,&xpos,&ypos,&q,1);
-        else stbtt_GetPackedQuad(fontPackedChar,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,idx,&xpos,&ypos,&q,1);
+        stbtt_GetPackedQuad((fontID==FONT_STOPD) ? fontPackedCharStopD : fontPackedChar,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,idx,&xpos,&ypos,&q,1);
         float vx0=q.x0*scale-bw,vy0=q.y0*scale-bw,vx1=q.x1*scale+bw,vy1=q.y1*scale+bw;
         float s0=q.s0-puv,t0=q.t0-puv,s1=q.s1+puv,t1=q.t1+puv,z=0.0f;
-        float tv[30]={vx0,vy0,z,s0,t0,vx1,vy1,z,s1,t1,vx1,vy0,z,s1,t0,vx0,vy0,z,s0,t0,vx0,vy1,z,s0,t1,vx1,vy1,z,s1,t1};
-        CopyMemoryFromBtoAForNBytes(textVertexData+vc*30,tv,sizeof(tv));vc++;
-        if(cp>='0'&&cp<='9'){if(fontID==FONT_STOPD)xpos=q.x0+fixedNumberAdvanceWidthStopD;else xpos=q.x0+fixedNumberAdvanceWidth;}
+        float tv[30] = { vx0,vy0,z,s0,t0,vx1,vy1,z,s1,t1,vx1,vy0,z,s1,t0,vx0,vy0,z,s0,t0,vx0,vy1,z,s0,t1,vx1,vy1,z,s1,t1 };
+        CopyMemoryFromBtoAForNBytes(textVertexData+vc*30,tv,sizeof(tv)); vc++;
+        if (cp>='0' && cp<='9') {
+            if (fontID == FONT_STOPD) { xpos=q.x0 + ((fontID == FONT_STOPD) ? fixedNumberAdvanceWidthStopD : fixedNumberAdvanceWidth); }
+        }
     }
     
-    if(vc){ glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.textVBO); glBufferData(GL_ARRAY_BUFFER,vc*30*sizeof(float),textVertexData,GL_DYNAMIC_DRAW);glDrawArrays(0x0004/*GL_TRIANGLES*/,0,vc*6); }
+    if(vc){ glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.textVBO); glBufferData(GL_ARRAY_BUFFER,vc*30*sizeof(float),textVertexData,GL_DYNAMIC_DRAW); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,vc*6); }
 }

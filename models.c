@@ -10,20 +10,48 @@ typedef struct { const char* data; int size; } RawOBJ;
 typedef struct { u16 index; bool animated; u8 animationNum; char path[128]; } ModelData;
 typedef struct { ModelData* entries; u32 count; u32 capacity; } ModelDataParser;
 typedef u16 half;
-static float half_to_float(half h){
-    u32 s=(h&0x8000)<<16,e=(h&0x7C00)>>10,m=(h&0x03FF),out;
-    if (e == 0){
-        if (m == 0) out = s;
-        else {
-            e = 1;
-            while ((m & 0x0400) == 0) { m <<= 1; e--; }
-            m &= 0x03FF; e+=(127 - 15);
-            out = s | (e << 23) | (m << 13);
+static Vector3 normalsTable[256];
+static inline float NormDot(Vector3 a, Vector3 b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
+void BuildNormalTable(void) {
+    int n = 0;
+    normalsTable[n++] = (Vector3){ 1, 0, 0}; // Axis-aligned
+    normalsTable[n++] = (Vector3){-1, 0, 0};
+    normalsTable[n++] = (Vector3){ 0, 1, 0};
+    normalsTable[n++] = (Vector3){ 0,-1, 0};
+    normalsTable[n++] = (Vector3){ 0, 0, 1};
+    normalsTable[n++] = (Vector3){ 0, 0,-1};
+    const float s2 = 0.70710678118f; // 1/sqrt(2)
+    const float edge45[12][3] = { { s2, s2, 0}, { s2,-s2, 0}, {-s2, s2, 0}, {-s2,-s2, 0}, { s2, 0, s2}, { s2, 0,-s2}, {-s2, 0, s2}, {-s2, 0,-s2}, { 0, s2, s2}, { 0, s2,-s2}, { 0,-s2, s2}, { 0,-s2,-s2}, };
+    for (int i = 0; i < 12; i++) normalsTable[n++] = (Vector3){edge45[i][0], edge45[i][1], edge45[i][2]}; // Edge 45° normals
+    for (int sx = -1; sx <= 1; sx += 2) {
+        for (int sy = -1; sy <= 1; sy += 2) {
+            for (int sz = -1; sz <= 1; sz += 2) normalsTable[n++] = (Vector3){sx*0.57735026919f, sy*0.57735026919f, sz*0.57735026919f}; // Corner 45° normals, using 1/sqrt(3)
         }
-    } else if (e == 31) { out = s | 0x7F800000 | (m << 13); }
-    else { e = e + (127 - 15); out = s | (e << 23) | (m << 13); }
-    float f; CopyMemoryFromBtoAForNBytes(&f,&out,4);
-    return f;
+    }
+
+    for (int fi=0;n<256;fi++) { // Fill remaining slots with Fibonacci sphere
+        float z = 1.0f - (2.0f * (fi + 0.5f)) / 256.0f;
+        float r = vsqrtf(1.0f - z * z);
+        float phi = 5.083203757f * (float)fi; // Golden angle in radians: PI * (1 + sqrt(5))
+        Vector3 cand = { r * vcosf(phi), r * vsinf(phi), z };
+        bool tooClose = false;
+        for (int j = 0; j < n; j++) {
+            if (NormDot(cand,normalsTable[j]) > 0.966f) { tooClose = true; break; }
+        }
+        if (!tooClose) normalsTable[n++] = cand;
+    }
+}
+
+// Finds the index of the table entry whose direction best matches (nx,ny,nz).
+// Brute-force linear scan — 256 dot products, trivially fast per-vertex.
+static inline __attribute__((always_inline)) u8 QuantizeNormal(float nx, float ny, float nz) {
+    float best = -2.0f;
+    u8 idx  =  0;
+    for (int i=0;i<256;++i) {
+        float dot = nx * normalsTable[i].x + ny * normalsTable[i].y + nz * normalsTable[i].z;
+        if (dot > best) { best = dot; idx = (u8)i; }
+    }
+    return idx;
 }
 
 static inline __attribute__((always_inline)) half float_to_half(float f) {
@@ -271,6 +299,7 @@ void LoadModels(void) {
     if (!ParseModelData(&mp, MODEL_IDX_MAX,"./Data/models.txt")) { DualLogError("Failed models.txt\n"); OS_Exit(1); }
 
     DualLog("Loading models (%d) ...",mp.count);
+    BuildNormalTable();
     u32 maxid = 0;
     for (u32 i=0; i<mp.count; ++i) { if (mp.entries[i].index != U16_MAX && mp.entries[i].index > maxid) maxid = mp.entries[i].index; }
     loadedModelsMaxIndex = (u16)maxid + 1;

@@ -171,7 +171,6 @@ static Vector3 cyberSpaceEntryLocations[8] = {
     {185.161f,84.502f,-46.04246f}, // 9
 };
 
-extern u8 queuedLevelToLoad;
 static void cmd_loadlevel(const char* arg) {
     if (Sys_Global.menuActive) { CenterStatusPrint("%s", Sys_Text.stringTable[1015]); return; } // "Cannot load levels via cheat while on the main menu!"
 

@@ -1,5 +1,5 @@
 // helpers.c - Helper Functions for various things, mostly libc avoidance
-static void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n) { unsigned char *d=(unsigned char *)dst; const unsigned char *s=(const unsigned char *)src; while (n--) {*d++=*s++;} return dst; } // memcpy replacement
+void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n) { unsigned char *d=(unsigned char *)dst; const unsigned char *s=(const unsigned char *)src; while (n--) {*d++=*s++;} return dst; } // memcpy replacement
 void stbi_write_bmp(char const *filename, int x, int y, const void *data) {
     OsFileHandle f = OS_OpenWriteonly(filename);
     if (f == OS_INVALID_HANDLE) { DualLogError("Failed to open %s for writing\n", filename); return; }
@@ -135,8 +135,7 @@ float smooth_damp(float current, float target, float *current_velocity, float sm
 ENGINE_TO_MOD size_t GetStringLength(const char* s) { // strlen replacement
     if (s == NULL) return 0;
     
-    const char *p = s;
-    while (*(p++));
+    const char *p = s; while (*(p++));
     return (size_t)(p - s - 1);
 }
 
@@ -180,7 +179,7 @@ bool StringIsEmpty(const char* a) { // C# String.IsNullOrWhiteSpace replacement
     return true;
 }
 
-bool __attribute__((noinline)) StringsEqual(const char* a, const char* b) { // !strcmp replacement (hated its inverted logic)
+bool StringsEqual(const char* a, const char* b) { // !strcmp replacement (hated its inverted logic)
     size_t size = GetStringLength(a), size2 = GetStringLength(b); if (size != size2) return false;
     
     for (size_t i=0;i<size;++i) {

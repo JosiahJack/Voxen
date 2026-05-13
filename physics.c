@@ -1,4 +1,6 @@
 // physics.c - Physics System
+#include "common.h"
+#include "interop.h"
 #define MAX_COLLISION_ITERATIONS  4
 #define COLLISION_EPSILON         0.0001f
 #define MIN_VELOCITY_THRESHOLD    0.001f
@@ -7,11 +9,11 @@
 #define GROUND_PROBE_DIST         0.15f
 #define SNAP_STEP                 0.02f
 #define STEP_HEIGHT 0.32f
-static const Vector3 GRAVITY_VECTOR = {0.0f,-9.81f,0.0f};
+bool GridCellBlock(u16 i,Vector3 pos,Vector3 newPos);
+extern GlobalContext Sys_Global; extern CheatsSystem Sys_Cheats; extern u16 dynamicEntityCount; extern u16 dynamicEntities[512];
 static const float GROUNDED_HYSTERESIS_TIME = 0.1f, GROUNDED_PROBE_OFFSET = 0.04f;
-typedef struct { Vector3 center,halfExtents; Quaternion rot; } ShapeBox;
-typedef struct { Vector3 center; float radius; } ShapeSphere;
-typedef struct { Vector3 tip,base; float radius; } ShapeCapsule;
+static inline __attribute__((always_inline)) i32 PosGetCellCoordX(float pos_x) { return (u16)clamp((i32)vfloor((pos_x - Sys_Global.worldMin_x + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
+static inline __attribute__((always_inline)) i32 PosGetCellCoordZ(float pos_z) { return (u16)clamp((i32)vfloor((pos_z - Sys_Global.worldMin_z + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
 static u32 GetCollisionMask(u32 layer) {
     switch (layer) {
         case Layer_Default:         return 629079559u; case Layer_TransparentFX:    return 85876231u;  case Layer_IgnoreRaycast:return 85876231u;
@@ -25,16 +27,16 @@ static u32 GetCollisionMask(u32 layer) {
     } return 0u;
 }
 
-static void Entity_GetCapsule(const Entity *e,ShapeCapsule *out) {
+void Entity_GetCapsule(const Entity *e,ShapeCapsule *out) {
     float r=e->colliderSize.x, hi=vmax(0.0f,(e->colliderSize.y*0.5f)-r);
     Vector3 wc=Vector3_A_plus_B(e->position,quat_rotate_vector(e->rotation,e->colliderCenter));
     Vector3 axis=(e->colliderSize.z<0.5f) ? quat_rotate_vector(e->rotation,(Vector3){1.0f,0.0f,0.0f}) : (e->colliderSize.z<1.5f) ? quat_rotate_vector(e->rotation,(Vector3){0.0f,1.0f,0.0f}) : quat_rotate_vector(e->rotation,(Vector3){0.0f,0.0f,1.0f});
     out->radius=r; out->base=Vector3_A_minus_B(wc,scale_vector3(axis,hi)); out->tip=Vector3_A_plus_B(wc,scale_vector3(axis,hi));
 }
 
-static void Entity_GetBox(const Entity *e,ShapeBox *out) { out->center=Vector3_A_plus_B(e->position,quat_rotate_vector(e->rotation,e->colliderCenter)); out->halfExtents=scale_vector3(e->colliderSize,0.5f); out->rot=e->rotation; }
-static void Entity_GetSphere(const Entity *e,ShapeSphere *out) { out->center=Vector3_A_plus_B(e->position,quat_rotate_vector(e->rotation,e->colliderCenter)); out->radius=e->colliderSize.x; }
-static inline void obb_axes(Quaternion q,Vector3 *ax,Vector3 *ay,Vector3 *az) { *ax=quat_rotate_vector(q,(Vector3){1.0f,0.0f,0.0f}); *ay=quat_rotate_vector(q,(Vector3){0.0f,1.0f,0.0f}); *az=quat_rotate_vector(q,(Vector3){0.0f,0.0f,1.0f}); }
+void Entity_GetBox(const Entity *e,ShapeBox *out) { out->center=Vector3_A_plus_B(e->position,quat_rotate_vector(e->rotation,e->colliderCenter)); out->halfExtents=scale_vector3(e->colliderSize,0.5f); out->rot=e->rotation; }
+void Entity_GetSphere(const Entity *e,ShapeSphere *out) { out->center=Vector3_A_plus_B(e->position,quat_rotate_vector(e->rotation,e->colliderCenter)); out->radius=e->colliderSize.x; }
+void obb_axes(Quaternion q,Vector3 *ax,Vector3 *ay,Vector3 *az) { *ax=quat_rotate_vector(q,(Vector3){1.0f,0.0f,0.0f}); *ay=quat_rotate_vector(q,(Vector3){0.0f,1.0f,0.0f}); *az=quat_rotate_vector(q,(Vector3){0.0f,0.0f,1.0f}); }
 typedef struct { bool hit; float toi; Vector3 point,normal; } SweepResult;
 typedef struct { float depth; Vector3 normal,point; } ProbeResult;
 typedef struct { u32 type; void *shape; } Shape;
@@ -137,41 +139,41 @@ static SweepResult SweepSphereBox(Vector3 sPos, float sRadius, Vector3 sVel, Sha
     return r;
 }
 
-static SweepResult SweepBoxSphere(ShapeBox box, Vector3 bVel, Vector3 sPos, float sRadius) { return SweepSphereBox(sPos, sRadius, scale_vector3(bVel, -1.0f), box); }
-static SweepResult SweepBoxBox(ShapeBox moving, Vector3 vel, ShapeBox stat) {
-    SweepResult r={0}; float closestToi=2.0f;
-    Vector3 ax,ay,az; obb_axes(moving.rot,&ax,&ay,&az);
-    float ox[]={-1,+1}; float oy[]={-1,+1}; float oz[]={-1,+1};
-    for (int ix=0;ix<2;++ix) for (int iy=0;iy<2;++iy) for (int iz=0;iz<2;++iz) {
-        Vector3 vtx=Vector3_A_plus_B(moving.center,Vector3_A_plus_B(scale_vector3(ax,ox[ix]*moving.halfExtents.x),Vector3_A_plus_B(scale_vector3(ay,oy[iy]*moving.halfExtents.y),scale_vector3(az,oz[iz]*moving.halfExtents.z))));
-        ShapeBox unit={stat.center,stat.halfExtents,stat.rot};
-        SweepResult hit=SweepSphereBox(vtx,0.0f,vel,unit);
-        if (hit.hit && hit.toi<closestToi) { closestToi=hit.toi; r=hit; }
-    }
-    return r;
-}
+// static SweepResult SweepBoxSphere(ShapeBox box, Vector3 bVel, Vector3 sPos, float sRadius) { return SweepSphereBox(sPos, sRadius, scale_vector3(bVel, -1.0f), box); }
+// static SweepResult SweepBoxBox(ShapeBox moving, Vector3 vel, ShapeBox stat) {
+//     SweepResult r={0}; float closestToi=2.0f;
+//     Vector3 ax,ay,az; obb_axes(moving.rot,&ax,&ay,&az);
+//     float ox[]={-1,+1}; float oy[]={-1,+1}; float oz[]={-1,+1};
+//     for (int ix=0;ix<2;++ix) for (int iy=0;iy<2;++iy) for (int iz=0;iz<2;++iz) {
+//         Vector3 vtx=Vector3_A_plus_B(moving.center,Vector3_A_plus_B(scale_vector3(ax,ox[ix]*moving.halfExtents.x),Vector3_A_plus_B(scale_vector3(ay,oy[iy]*moving.halfExtents.y),scale_vector3(az,oz[iz]*moving.halfExtents.z))));
+//         ShapeBox unit={stat.center,stat.halfExtents,stat.rot};
+//         SweepResult hit=SweepSphereBox(vtx,0.0f,vel,unit);
+//         if (hit.hit && hit.toi<closestToi) { closestToi=hit.toi; r=hit; }
+//     }
+//     return r;
+// }
 
-static SweepResult SweepBoxCapsule(ShapeBox box, Vector3 boxVel, Vector3 cBase, Vector3 cTip, float cRadius) {
-    SweepResult r = {0};
-    int samples = 5; float closestToi = 2.0f;
-    Vector3 closestNormal = (Vector3){0.0f,1.0f,0.0f}, closestPoint = {0.0f,0.0f,0.0f};
-    for (int i = 0; i < samples; ++i) { // Sample capsule, test each sample against box
-        float t = (float)i / (float)(samples - 1);
-        Vector3 samplePos = Vector3_A_plus_B(cBase,scale_vector3(Vector3_A_minus_B(cTip,cBase),t));
-        SweepResult hit = SweepSphereBox(samplePos,cRadius,boxVel,box);
-        if (hit.hit && hit.toi < closestToi) {
-            closestToi = hit.toi;
-            closestNormal = hit.normal;
-            closestPoint = hit.point;
-            r.hit = true;
-        }
-    }
-    
-    if (r.hit) { r.toi = closestToi; r.normal = closestNormal; r.point = closestPoint; }
-    return r;
-}
+// static SweepResult SweepBoxCapsule(ShapeBox box, Vector3 boxVel, Vector3 cBase, Vector3 cTip, float cRadius) {
+//     SweepResult r = {0};
+//     int samples = 5; float closestToi = 2.0f;
+//     Vector3 closestNormal = (Vector3){0.0f,1.0f,0.0f}, closestPoint = {0.0f,0.0f,0.0f};
+//     for (int i = 0; i < samples; ++i) { // Sample capsule, test each sample against box
+//         float t = (float)i / (float)(samples - 1);
+//         Vector3 samplePos = Vector3_A_plus_B(cBase,scale_vector3(Vector3_A_minus_B(cTip,cBase),t));
+//         SweepResult hit = SweepSphereBox(samplePos,cRadius,boxVel,box);
+//         if (hit.hit && hit.toi < closestToi) {
+//             closestToi = hit.toi;
+//             closestNormal = hit.normal;
+//             closestPoint = hit.point;
+//             r.hit = true;
+//         }
+//     }
+//
+//     if (r.hit) { r.toi = closestToi; r.normal = closestNormal; r.point = closestPoint; }
+//     return r;
+// }
 
-static SweepResult SweepCapsuleSphere(Vector3 cBase, Vector3 cTip, float cRadius, Vector3 cVel, Vector3 sPos, float sRadius) { return SweepSphereCapsule(sPos,sRadius,scale_vector3(cVel,-1.0f), cBase,cTip,cRadius); } // Reverse roles and negate velocity
+// static SweepResult SweepCapsuleSphere(Vector3 cBase, Vector3 cTip, float cRadius, Vector3 cVel, Vector3 sPos, float sRadius) { return SweepSphereCapsule(sPos,sRadius,scale_vector3(cVel,-1.0f), cBase,cTip,cRadius); } // Reverse roles and negate velocity
 static SweepResult SweepCapsuleCapsule(Vector3 aBase, Vector3 aTip, float aRadius, Vector3 aVel, Vector3 bBase, Vector3 bTip, float bRadius) {
     SweepResult r = {0};
     int samples = 4; float closestToi = 2.0f;
@@ -578,19 +580,20 @@ static void IntegratePlayer(u16 playerIdx, float dt) {
     Sys_Global.dirtyInstances[playerIdx] = true;
 }
 
+// static const Vector3 GRAVITY_VECTOR = {0.0f,-9.81f,0.0f};
 void Physics(void) {
     float dt = vclamp((float)Sys_Global.timeSinceLastPhysicsTick, 0.0005f, 0.027777778f);  // Clamp to reasonable range
-    if (Sys_Global.pauseRelativeTime > 2.0f) { // Apply Gravity
-        for (u32 i = 0; i < dynamicEntityCount; ++i) {
-            u16 entIdx = dynamicEntities[i];
-            Entity* e = &Sys_Global.instances[entIdx];
-            if (vabs(e->gravity - 0.0f) < 0.01f) continue;
-            if (entIdx <= PLAYER2 && Sys_Cheats.noclip) continue;
-
-            Vector3 gravityAccel = scale_vector3(GRAVITY_VECTOR,e->gravity * dt);
-            e->velocity = Vector3_A_plus_B(e->velocity,gravityAccel);
-        }
-    }
+//     if (Sys_Global.pauseRelativeTime > 2.0f) { // Apply Gravity
+//         for (u32 i = 0; i < dynamicEntityCount; ++i) {
+//             u16 entIdx = dynamicEntities[i];
+//             Entity* e = &Sys_Global.instances[entIdx];
+//             if (vabs(e->gravity - 0.0f) < 0.01f) continue;
+//             if (entIdx <= PLAYER2 && Sys_Cheats.noclip) continue;
+//
+//             Vector3 gravityAccel = scale_vector3(GRAVITY_VECTOR,e->gravity * dt);
+//             e->velocity = Vector3_A_plus_B(e->velocity,gravityAccel);
+//         }
+//     }
     
     IntegratePlayer((u16)PLAYER1,dt);// IntegratePlayer((u16)PLAYER2,dt); // Move Players (separate from normal Rigidbody)
     for (u32 i = 0; i < dynamicEntityCount; ++i) {
