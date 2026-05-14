@@ -64,28 +64,40 @@ MOD_TO_ENGINE void UpdateAnims(void) {
         Entity* e = &Eng_Global->instances[i];
         if (e->modelIndex >= MODEL_IDX_MAX) continue;
         if (!(e->entflags & ENTFLAG_ACTIVE)) continue;
-        
+
         u16 anim = e->animationNum;
-        if (anim >= MAX_ANIMATED_MODELS) continue; // Invalid animated model index
-        if (e->numclips >= MAX_ANIMATION_CLIPS_PER_MODEL) continue; // Invalid animation clip index
-        if (e->numclips == 0) continue; // Invalid animation clip index
-        
-        AnimationClip currentClip = modelAnimationClips[anim][e->clip];
-        if (e->currentFrameFinished >= Eng_Global->pauseRelativeTime) continue;
-        
-        e->currentFrameFinished = Eng_Global->pauseRelativeTime + ((1.0/(double)currentClip.speed) * (1.0 / (double)currentClip.framerate));
-        e->frame++;
-             if (e->frame > currentClip.frameEnd)   e->frame = currentClip.frameStart;
-        else if (e->frame < currentClip.frameStart) e->frame = currentClip.frameEnd;
+        if (anim >= MAX_ANIMATED_MODELS || e->numclips == 0 || e->clip >= e->numclips) continue;
 
-        e->modelIndex = (currentClip.frameStartModelIndex + (e->frame - currentClip.frameStart));
+        AnimationClip* clip = &modelAnimationClips[anim][e->clip];
+        if (clip->framerate <= 0 || clip->speed <= 0) continue;
+
+        const double timePerFrame = (1.0 / (double)clip->speed) * (1.0 / (double)clip->framerate);
+        double timePassed = Eng_Global->pauseRelativeTime - e->currentFrameFinished;
+        if (timePassed < timePerFrame) continue;
+
+        u32 framesToAdvance = (u32)(timePassed / timePerFrame);           // integer frames
+        double remainder     = timePassed - (framesToAdvance * timePerFrame); // keep fractional part
+        u32 frameCount = clip->frameEnd - clip->frameStart + 1;
+        if (frameCount <= 1) {
+            e->frame = clip->frameStart;
+        } else {
+            u32 newFrame = (e->frame - clip->frameStart + framesToAdvance) % frameCount;
+            e->frame = clip->frameStart + newFrame;
+        }
+
+        e->currentFrameFinished = Eng_Global->pauseRelativeTime - remainder;
+        e->modelIndex = clip->frameStartModelIndex + (e->frame - clip->frameStart);
         Eng_Global->dirtyInstances[i] = true;
-        if (!ConstIndexIsPortalBlockingDoor(e->index)) continue;
-
-        if (ToggleDoorPortal(e->portalIndex,i,modelAnimationClips[anim][ANIM_IDLE_CLOSED].frameStartModelIndex)) portalsNeedUpdated = true;
+        if (ConstIndexIsPortalBlockingDoor(e->index)) {
+            if (ToggleDoorPortal(e->portalIndex, i,
+                modelAnimationClips[anim][ANIM_IDLE_CLOSED].frameStartModelIndex)) {
+                portalsNeedUpdated = true;
+            }
+        }
     }
-    
-    if (portalsNeedUpdated) PortalCulling();
+
+    if (portalsNeedUpdated)
+        PortalCulling();
 }
 
 #define NUM_TEXTURE_CLIPS 48
@@ -147,10 +159,9 @@ u16 sequenceTextures[302]={
 
 // All the original clips from your C# file, but now as compact data:
 static const TextureAnimClip textureAnimClips[NUM_TEXTURE_CLIPS] = {
-    // 0
-    { (u16[]){6,7,8,9,9,8,7,6}, 8, false, NULL, 0, "Bridge11" },
+    /*0*/ { (u16[]){6,7,8,9,9,8,7,6}, 8, false, NULL, 0, "Bridge11" },
 
-    // 1 - BrokenClock
+    /*1 BrokenClock*/
     { (u16[]){10,11}, 2, true,
       (u16[]){12,13}, 2, "BrokenClock" },
 

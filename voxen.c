@@ -1258,7 +1258,44 @@ static void DrawCapsuleCollider(Entity *e) {
     #undef CAPS_SEGS
 }
 
-void GetProjections(float* view, float* viewProj, float* invViewRot, float sfov, float aspect3D, float snear, float sfar) {
+bool mat4_inverse(const float* m, float* out) {
+    float inv[16];
+    float det;
+    int i;
+
+    inv[0] =  m[5]*m[10]*m[15] - m[5]*m[14]*m[11] - m[9]*m[6]*m[15] + m[9]*m[14]*m[7] + m[13]*m[6]*m[11] - m[13]*m[10]*m[7];
+    inv[4] = -m[4]*m[10]*m[15] + m[4]*m[14]*m[11] + m[8]*m[6]*m[15] - m[8]*m[14]*m[7] - m[12]*m[6]*m[11] + m[12]*m[10]*m[7];
+    inv[8] =  m[4]*m[9]*m[15]  - m[4]*m[13]*m[11] - m[8]*m[5]*m[15] + m[8]*m[13]*m[7]  + m[12]*m[5]*m[11] - m[12]*m[9]*m[7];
+    inv[12]= -m[4]*m[9]*m[14]  + m[4]*m[13]*m[10] + m[8]*m[5]*m[14] - m[8]*m[13]*m[6]  - m[12]*m[5]*m[10] + m[12]*m[9]*m[6];
+
+    inv[1] = -m[1]*m[10]*m[15] + m[1]*m[14]*m[11] + m[9]*m[2]*m[15] - m[9]*m[14]*m[3] - m[13]*m[2]*m[11] + m[13]*m[10]*m[3];
+    inv[5] =  m[0]*m[10]*m[15] - m[0]*m[14]*m[11] - m[8]*m[2]*m[15] + m[8]*m[14]*m[3]  + m[12]*m[2]*m[11] - m[12]*m[10]*m[3];
+    inv[9] = -m[0]*m[9]*m[15]  + m[0]*m[13]*m[11] + m[8]*m[1]*m[15] - m[8]*m[13]*m[3]  - m[12]*m[1]*m[11] + m[12]*m[9]*m[3];
+    inv[13]=  m[0]*m[9]*m[14]  - m[0]*m[13]*m[10] - m[8]*m[1]*m[14] + m[8]*m[13]*m[2]  + m[12]*m[1]*m[10] - m[12]*m[9]*m[2];
+
+    inv[2] =  m[1]*m[6]*m[15] - m[1]*m[14]*m[7] - m[5]*m[2]*m[15] + m[5]*m[14]*m[3] + m[13]*m[2]*m[7] - m[13]*m[6]*m[3];
+    inv[6] = -m[0]*m[6]*m[15] + m[0]*m[14]*m[7] + m[4]*m[2]*m[15] - m[4]*m[14]*m[3] - m[12]*m[2]*m[7] + m[12]*m[6]*m[3];
+    inv[10]=  m[0]*m[5]*m[15] - m[0]*m[13]*m[7] - m[4]*m[1]*m[15] + m[4]*m[13]*m[3] + m[12]*m[1]*m[7] - m[12]*m[5]*m[3];
+    inv[14]= -m[0]*m[5]*m[14] + m[0]*m[13]*m[6] + m[4]*m[1]*m[14] - m[4]*m[13]*m[2] - m[12]*m[1]*m[6] + m[12]*m[5]*m[2];
+
+    inv[3] = -m[1]*m[6]*m[11] + m[1]*m[10]*m[7] + m[5]*m[2]*m[11] - m[5]*m[10]*m[3] - m[9]*m[2]*m[7]  + m[9]*m[6]*m[3];
+    inv[7] =  m[0]*m[6]*m[11] - m[0]*m[10]*m[7] - m[4]*m[2]*m[11] + m[4]*m[10]*m[3] + m[8]*m[2]*m[7]  - m[8]*m[6]*m[3];
+    inv[11]= -m[0]*m[5]*m[11] + m[0]*m[9]*m[7]  + m[4]*m[1]*m[11] - m[4]*m[9]*m[3]  - m[8]*m[1]*m[7]  + m[8]*m[5]*m[3];
+    inv[15]=  m[0]*m[5]*m[10] - m[0]*m[9]*m[6]  - m[4]*m[1]*m[10] + m[4]*m[9]*m[2]  + m[8]*m[1]*m[6]  - m[8]*m[5]*m[2];
+
+    det = m[0]*inv[0] + m[1]*inv[4] + m[2]*inv[8] + m[3]*inv[12];
+    if (det == 0.0f) {
+        // Singular matrix - fallback to identity
+        for(i=0; i<16; i++) out[i] = (i%5==0) ? 1.0f : 0.0f;
+        return false;
+    }
+
+    det = 1.0f / det;
+    for (i = 0; i < 16; i++) out[i] = inv[i] * det;
+    return true;
+}
+
+void GetProjections(float* view, float* viewProj, float* invViewRot, float* invViewProj, float sfov, float aspect3D, float snear, float sfar) {
     float f = vcot(sfov * PI / 360.0f);
     float* m = rasterPerspectiveProjection;
     m[0] = f / aspect3D; m[1] = 0.0f; m[2] = 0.0f; m[3] = 0.0f;
@@ -1280,6 +1317,8 @@ void GetProjections(float* view, float* viewProj, float* invViewRot, float sfov,
     invViewRot[0]=view[0]; invViewRot[1]=view[4]; invViewRot[2]=view[8];
     invViewRot[3]=view[1]; invViewRot[4]=view[5]; invViewRot[5]=view[9];
     invViewRot[6]=view[2]; invViewRot[7]=view[6]; invViewRot[8]=view[10];
+    // TODO invViewProj
+    mat4_inverse(viewProj, invViewProj);
 }
      
 static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
@@ -1289,9 +1328,10 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     Vector3 playerPos = Sys_Global.instances[PLAYER1].position;
     float px = playerPos.x, py = playerPos.y, pz = playerPos.z;
     float aspect3D = (float)swidth / (float)sheight;
-    float view[16],viewProj[16],invViewRot[9];
-    GetProjections(view,viewProj,invViewRot,sfov,aspect3D,snear,sfar);
+    float view[16],viewProj[16],invViewRot[9],invViewProj[16];
+    GetProjections(view,viewProj,invViewRot,invViewProj,sfov,aspect3D,snear,sfar);
     ExtractFrustumPlanes(viewProj,playerFrustumPlanes);
+
     glBindVertexArray(Sys_Render.chunkVAO); // Common vao for RenderDynamicShadowmaps and Rasterized Geometry
     glEnable(GL_DEPTH_TEST);
     if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps();
@@ -1334,6 +1374,9 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     }
 
     glUseProgram(Sys_Render.chunkShaderProgram); // Main Pass
+    glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D,Sys_Render.inputDepthID);
+    glUniform1i(31,3);
+    glUniformMatrix4fv(32,1,0,invViewProj);
     glUniformMatrix4fv(2,1,0,viewProj);
     glUniform1ui(25,0u); // default constIndex
     bool grayscaleEnabled = ModRequestsGrayscale();
@@ -1382,6 +1425,8 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     if (unlikely(Sys_Global.debugLineVertCount > 1)) DrawDebugLines(viewProj); // Draw Debug Lines
     if (likely(Sys_Settings.Reflections > 0u)) { // Screen Space Reflections
         glUseProgram(Sys_Render.ssrShaderProgram);
+        glUniform1i(5,3);
+        glUniformMatrix4fv(6,1,0,invViewProj);
         glUniform3f(3,playerPos.x,playerPos.y,playerPos.z);
         glUniformMatrix4fv(4,1,GL_FALSE,viewProj);
         u32 groupX_ssr = ((Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES) + 31) / 32, groupY_ssr = ((Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES) + 31) / 32;
@@ -1657,7 +1702,6 @@ i32 main(void) {
             if (uploadInstances) { glBindBuffer(GL_SSBO,Sys_Render.matricesBufferID); glBufferData(GL_SSBO,Sys_Global.loadedInstances * 16 * sizeof(float),modelMatrices,GL_DYNAMIC_DRAW); }
         }
 
-        AudioUpdate();
         Render(false,0u); // Not a cam view, no camview index.  This is the normal main render.
         CheckAndTakeScreenshot();
         Sys_Global.globalFrameNum++;

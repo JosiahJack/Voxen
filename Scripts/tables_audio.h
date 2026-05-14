@@ -1,5 +1,4 @@
-const char* sounds[SOUNDS_COUNT] = {
-    "./Audio/misc/null.wav",
+const char* sounds[SOUNDS_COUNT] = {    "./Audio/misc/null.wav",
     "./Audio/ambient/ambient_frogs.wav",
     "./Audio/ambient/clicker.wav",
     "./Audio/ambient/compressor.wav",

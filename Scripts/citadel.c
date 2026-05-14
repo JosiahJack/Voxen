@@ -3155,12 +3155,13 @@ static void DoorSyncLayer(u16 self) {
 }
 
 static void DoorOpen(u16 self) {
+    //DualLog("DoorOpen called %u\n",self); // TODO Fix the door sequence in level 1 getting called many times per frame
     Entity* e = &Eng_Global->instances[self];
     DoorSetClipFrame(self,DOOR_CLIP_OPENING,DoorGetClip(e,DOOR_CLIP_OPENING).frameStart);
     e->doorOpen = e->doorState = DoorState_Opening;
     e->waitBeforeClose = Eng_Global->pauseRelativeTime + e->delay;
     DoorSyncLayer(self);
-    if (e->SFXIndex > 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
+    play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
 }
 
 static void DoorClose(u16 self) {
@@ -3168,7 +3169,7 @@ static void DoorClose(u16 self) {
     DoorSetClipFrame(self,DOOR_CLIP_CLOSING,DoorGetClip(e,DOOR_CLIP_CLOSING).frameStart);
     e->doorOpen = e->doorState = DoorState_Closing;
     DoorSyncLayer(self);
-    if (e->SFXIndex > 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
+    play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
 }
 
 void DoorLock(u16 self) { EntitySetLocked(&Eng_Global->instances[self],true); }
@@ -3187,6 +3188,7 @@ void DoorForceClose(u16 self) {
 }
 
 void DoorActuate(u16 self) {
+    DualLog("DoorActuate called %u\n",self);
     Entity* e = &Eng_Global->instances[self];
     if (e->doorOpen == DoorState_Open) { DoorClose(self); return; }
     if (e->doorOpen == DoorState_Closed) { DoorOpen(self); return; }
@@ -3196,7 +3198,7 @@ void DoorActuate(u16 self) {
         DoorSetClipFrame(self,DOOR_CLIP_CLOSING,DoorFrameFromProgress(c,1.0f - t));
         e->doorOpen = e->doorState = DoorState_Closing;
         DoorSyncLayer(self);
-        if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
+        play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
         return;
     }
     if (e->doorOpen == DoorState_Closing) {
@@ -3206,7 +3208,7 @@ void DoorActuate(u16 self) {
         e->doorOpen = e->doorState = DoorState_Opening;
         e->waitBeforeClose = Eng_Global->pauseRelativeTime + e->delay;
         DoorSyncLayer(self);
-        if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
+        play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
     }
 }
 

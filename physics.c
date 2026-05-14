@@ -582,7 +582,7 @@ static void IntegratePlayer(u16 playerIdx, float dt) {
 
 // static const Vector3 GRAVITY_VECTOR = {0.0f,-9.81f,0.0f};
 void Physics(void) {
-    float dt = vclamp((float)Sys_Global.timeSinceLastPhysicsTick, 0.0005f, 0.027777778f);  // Clamp to reasonable range
+    float dt = vclamp((float)Sys_Global.timeSinceLastPhysicsTick, 0.0005f, 0.1f);  // Clamp to reasonable range
 //     if (Sys_Global.pauseRelativeTime > 2.0f) { // Apply Gravity
 //         for (u32 i = 0; i < dynamicEntityCount; ++i) {
 //             u16 entIdx = dynamicEntities[i];

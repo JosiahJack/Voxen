@@ -1,5 +1,6 @@
 // audio.c - Audio System
 #include "os.h"
+#include <pthread.h>
 #include "common.h"
 #include "interop.h"
 #define AUDIO_RATE      48000
@@ -1336,6 +1337,9 @@ static void audio_mix_period(i16 *out) {
 }
 
 ENGINE_TO_MOD void play_wav(const char *path,float volume,Vector3 pos,bool positional) {
+    if (StringsEqual(path,"./Audio/misc/null.wav")) return;
+
+    DualLog("Playing wav:%s\n",path);
     i32 slot = -1;
     for (u32 i = 0; i < wav_count; i++) if (!wav_ch[i].playing && wav_ch[i].samples) { OS_DeallocateRAM(wav_ch[i].samples,wav_ch[i].allocSize); wav_ch[i].samples=NULL; wav_ch[i].allocSize=0; slot=i; break; }
     if (slot==-1 && wav_count<MAX_CHANNELS) slot=wav_count++;
@@ -1419,21 +1423,6 @@ static i32 pcm_fd_count = 0;
     }
 #endif
 
-void InitAudio(void) {
-#ifdef WINDOWS
-    OsFileHandle first = pcm_open_all(AUDIO_RATE,AUDIO_CHANNELS,AUDIO_FRAMES,AUDIO_PERIODS);
-    if (first==OS_INVALID_HANDLE) { DualLog("ERROR: No WASAPI audio device found\n"); return; }
-    pcm_fds[0]=first; pcm_fd_count=1;
-    DualLog("Audio: WASAPI %d device(s) active\n",wasapi_dev_count);
-#else
-    for (i32 card=0;card<8;card++)
-        for (i32 dev=0;dev<8;dev++)
-            init_pcm_device(card,dev);
-    if (pcm_fd_count==0) DualLog("ERROR: No audio output device found\n");
-    else DualLog("Audio: %d device(s) active\n",pcm_fd_count);
-#endif
-}
-
 void AudioUpdate(void) {
     if (pcm_fd_count==0) return;
     i16 buf[AUDIO_FRAMES*AUDIO_CHANNELS]; pcm_sync_t sync;
@@ -1447,4 +1436,22 @@ void AudioUpdate(void) {
         for (i32 i=0;i<pcm_fd_count;i++) if (pcm_write(pcm_fds[i],buf,AUDIO_FRAMES)<0) pcm_prepare(pcm_fds[i]);
         avail-=AUDIO_FRAMES;
     }
+}
+
+pthread_t audThreadID; int usleep(u32 usec);
+void* AudThread(void* arg) { (void)arg; while (1) { AudioUpdate(); usleep(1000); } return NULL; }
+void InitAudio(void) {
+#ifdef WINDOWS
+    OsFileHandle first = pcm_open_all(AUDIO_RATE,AUDIO_CHANNELS,AUDIO_FRAMES,AUDIO_PERIODS);
+    if (first==OS_INVALID_HANDLE) { DualLog("ERROR: No WASAPI audio device found\n"); return; }
+    pcm_fds[0]=first; pcm_fd_count=1;
+    DualLog("Audio: WASAPI %d device(s) active\n",wasapi_dev_count);
+#else
+    for (i32 card=0;card<8;card++)
+        for (i32 dev=0;dev<8;dev++)
+            init_pcm_device(card,dev);
+    if (pcm_fd_count==0) DualLog("ERROR: No audio output device found\n");
+    else DualLog("Audio: %d device(s) active\n",pcm_fd_count);
+#endif
+    pthread_create(&audThreadID,NULL,AudThread,NULL);
 }

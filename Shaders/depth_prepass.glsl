@@ -22,7 +22,6 @@ vec4 getTextureColor(uint texIndex, ivec2 texCoord) {
 }
 
 void main() {
-    vec3 worldPos = FragPos.xyz;
     ivec2 texSize = textureSizes[texIndex];
     vec2 uv = (vec2(TexCoord.x, 1.0 - TexCoord.y)); // Invert V (aka Y), OpenGL convention vs import
     ivec2 texUV = ivec2(int(floor(uv.x * float(texSize.x))), int(floor(uv.y * float(texSize.y))));

@@ -2,7 +2,7 @@
 // #extension GL_ARB_shading_language_packing : require
 // #extension GL_ARB_shader_image_load_store : enable
 in vec2 TexCoord;
-in vec3 Normal;
+in vec3 GeomNormal;
 in vec3 FragPos;
 layout(location=0) uniform uint instanceIndex; // start vert shader uniforms
 layout(location=1) uniform uint normInstanceIndex;
@@ -34,6 +34,11 @@ layout(location=27) uniform float volume;
 layout(location=28) uniform uvec2 camViewSize;
 layout(location=29) uniform sampler2D camViewTex;
 layout(location=30) uniform uint useCamView;
+layout(location=31) uniform sampler2D inputDepthID;
+layout(location=32) uniform mat4 invViewProj; /*
+layout(location=33) some weird
+layout(location=34) padding apparently, so say some docs anyhow
+layout(location=35) */
 struct Light { vec3 pos; float intensity; vec3 col; uint lflags; float range; float spotAng; float maxIntensity; float minIntensity; vec4 spotDir; };
 layout(location=0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location=1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
@@ -137,6 +142,14 @@ void GetCubemapSampleCoord(vec3 toLight, uint shadowIndex, out uint faceOff, out
     tc = uv * shadowMapSizeF;
 }
 
+vec3 reconstructWorldPos(vec2 uv) {
+    float depth = texture(inputDepthID, uv).r;
+    if (depth >= 0.9999) return vec3(0.0); // invalid
+    vec4 clip = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+    vec4 world = invViewProj * clip;
+    return world.xyz / world.w;
+}
+
 float quintic_polynomial_smoothstep( float x ) { return x*x*x*(x*(x*6.0-15.0)+10.0); } // From https://iquilezles.org/articles/smoothsteps/
 const vec3 baseDir = vec3(0.0,0.0,1.0);
 void main() {
@@ -156,7 +169,49 @@ void main() {
     } else albedoColor = getTextureColor(texIndex,texUV,texSize.x);
     if (albedoColor.a < 0.05 && volume < 0.05) discard; // Alpha cutout threshold
 
+    vec3 Normal = normalize(GeomNormal);
+//     vec2 screenUV = gl_FragCoord.xy / vec2(screenWidth, screenHeight);
+//     const int   KERNEL = 1;
+//     const float STEP   = 1.0;
+//     const float BEVEL_STRENGTH = 5.75;    // 0.5 = subtle, 1.0 = strong bevel
+//     vec3 centerPos = reconstructWorldPos(screenUV);
+//     vec3 bevelDelta = vec3(0.0);
+//     float totalBevelW = 0.0;
+//     const float EDGE_SCALE = 0.0095;
+//     const float EDGE_MIN   = 0.04;
+//     float edgeThresh = max(distToPixel * EDGE_SCALE, EDGE_MIN);
+//     for (int y = -KERNEL; y <= KERNEL; ++y) {
+//         for (int x = -KERNEL; x <= KERNEL; ++x) {
+//             if (x == 0 && y == 0) continue;
+//
+//             vec2 offsetUV = screenUV + vec2(float(x), float(y)) * (STEP / vec2(screenWidth, screenHeight));
+//             vec3 p = reconstructWorldPos(offsetUV);
+//             if (dot(p, p) < 0.01) continue;
+//
+//             float distToCenter = length(p - centerPos);
+//             if (distToCenter > edgeThresh) continue;
+//
+//             vec3 r = reconstructWorldPos(offsetUV + vec2( STEP, 0.0)/vec2(screenWidth,screenHeight));
+//             vec3 l = reconstructWorldPos(offsetUV + vec2(-STEP, 0.0)/vec2(screenWidth,screenHeight));
+//             vec3 u = reconstructWorldPos(offsetUV + vec2(0.0,  STEP)/vec2(screenWidth,screenHeight));
+//             vec3 d = reconstructWorldPos(offsetUV + vec2(0.0, -STEP)/vec2(screenWidth,screenHeight));
+//
+//             vec3 depthN = normalize(cross(r - l, u - d));
+//
+//             float w = 1.0 / (1.0 + float(x*x + y*y) * 0.5);
+//             bevelDelta += (depthN - Normal) * w;     // ← Important: take difference
+//             totalBevelW += w;
+//         }
+//     }
+//
+//     if (totalBevelW > 0.001) {
+//         vec3 correction = bevelDelta / totalBevelW;
+//         correction = -correction;
+//         Normal = normalize(Normal + correction * BEVEL_STRENGTH);
+//     }
+
     vec3 adjustedNormal = Normal;
+
     bool hasNormalMap = normInstanceIndex != 0;
     float blend = 0.0;
     float facing = dot(Normal,viewDir);

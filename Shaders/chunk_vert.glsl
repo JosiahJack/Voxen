@@ -6,7 +6,7 @@ layout(std430,binding=1) buffer ModelMatrices { mat4 modelMatrices[]; };
 layout(location=0) uniform uint instanceIndex;
 layout(location=2) uniform mat4 viewProjection;
 out vec3 FragPos;
-out vec3 Normal;
+out vec3 GeomNormal;
 out vec2 TexCoord;
 void main() {
     TexCoord = aTexCoord;
@@ -14,5 +14,5 @@ void main() {
     vec4 worldPos = matrix * vec4(aPos,1.0);
     gl_Position = viewProjection * worldPos;
     FragPos = vec3(worldPos);
-    Normal = mat3(transpose(inverse(matrix))) * aNormal;
+    GeomNormal = mat3(transpose(inverse(matrix))) * aNormal;
 }
