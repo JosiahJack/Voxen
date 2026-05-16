@@ -323,7 +323,6 @@ void LoadModels(void) {
             OsFileHandle dummy; int sz=0;
             raw[i].data = (const char*)OS_OpenAndAllocateFileBufferReadonly(path, &dummy, &sz);
             raw[i].size = sz;
-            DualLog("Alloced:%s[%u]\n",path,sz);
         }
     }
 
@@ -356,9 +355,6 @@ void LoadModels(void) {
     DualLog("Executing model parse thread joins...\n");
     for (int i=0;i<num_parse_threads;++i) pthread_join(th[i],NULL);
     //for (int t=0;t<num_parse_threads;++t) ModelParsingWorker(&tasks[t]); // Single threaded alternative
-
-    for (u32 i=0;i<loadedModelsMaxIndex;++i) { if (raw[i].data) OS_DeallocateRAM((void*)raw[i].data,raw[i].size); }
-    OS_DeallocateRAM(arena_base, arena);
     glGenBuffers(loadedModelsMaxIndex,Sys_Render.vbos); glGenBuffers(loadedModelsMaxIndex,Sys_Render.tbos);
     u32 tv=0,tt=0;
     for (int i=0; i<loadedModelsMaxIndex; ++i) {
@@ -376,6 +372,8 @@ void LoadModels(void) {
         glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
     }
 
+    for (u32 i=0;i<loadedModelsMaxIndex;++i) { if (raw[i].data) OS_DeallocateRAM((void*)raw[i].data,raw[i].size); }
+    OS_DeallocateRAM(arena_base, arena);
     glBindBuffer(GL_ARRAY_BUFFER,0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0);
     glFlush(); glFinish();
