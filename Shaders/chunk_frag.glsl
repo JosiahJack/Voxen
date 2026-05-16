@@ -46,8 +46,8 @@ layout(std430,binding=6) buffer ShadowMapsIndirection { uint shadowMapsIndirecti
 layout(std430,binding=12) buffer ColorBuffer { uint colors[]; }; // 1D color array (RGBA)
 layout(std430,binding=14) buffer TextureOffsets { uint textureOffsets[]; }; // Starting index in colors for each texture
 layout(std430,binding=15) buffer TextureSizes { ivec2 textureSizes[]; }; // x,y pairs for width and height of textures
-layout(std430,binding=16) buffer TexturePalettes { uint texturePalettes[]; }; // Palette colors
-layout(std430,binding=17) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; }; // Palette starting indices for each texture
+layout(std430,binding=8) buffer TexturePalettes { uint texturePalettes[]; }; // Palette colors
+layout(std430,binding=9) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; }; // Palette starting indices for each texture
 
 const uint blueNoise[64] = uint[](
     0x23F1A408u, 0x8C4BDE72u, 0x159D3F66u, 0xB1549A2Du, 0x47C20E89u, 0xD67B1F58u, 0x32A96C17u, 0xE4832B94u,

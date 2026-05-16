@@ -5,8 +5,8 @@ layout(location=0) out vec4 outUI; // GL_COLOR_ATTACHMENT0
 layout(std430,binding=12) buffer ColorBuffer { uint colors[]; }; // 1D color array (RGBA)
 layout(std430,binding=14) buffer TextureOffsets { uint textureOffsets[]; }; // Starting index in colors for each texture
 layout(std430,binding=15) buffer TextureSizes { ivec2 textureSizes[]; }; // x,y pairs for width and height of textures
-layout(std430,binding=16) buffer TexturePalettes { uint texturePalettes[]; }; // Palette colors
-layout(std430,binding=17) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; }; // Palette starting indices for each texture
+layout(std430,binding=8) buffer TexturePalettes { uint texturePalettes[]; }; // Palette colors
+layout(std430,binding=9) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; }; // Palette starting indices for each texture
 const vec4 BYTE_TO_FLOAT = vec4(1.0/255.0);
 vec4 getTextureColor(uint texIndex, ivec2 texCoord, int texSizeX) {
     uint pixelOffset = textureOffsets[texIndex] + uint(texCoord.y) * texSizeX + uint(texCoord.x);
