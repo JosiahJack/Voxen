@@ -102,15 +102,15 @@ COMMON_CFLAGS="-ferror-limit=500 -fno-exceptions -fno-stack-protector -fno-async
                -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -fvisibility=hidden -pipe -fno-ident -fdata-sections -Wno-int-to-void-pointer-cast \
                -ffunction-sections -ffast-math -std=c11 -Wall -Wextra -Wno-implicit-fallthrough -fdeclspec -fno-rtti \
                -fomit-frame-pointer -g0 -fstrict-aliasing -fcommon -Wstrict-prototypes -Wno-overlength-strings -fno-math-errno -fno-sanitize=all \
-               -fno-trapping-math -fmerge-all-constants -m64 -Os -march=haswell"
+               -fno-trapping-math -fmerge-all-constants -m64 -Os -march=x86_64_v2"
 COMMON_LFLAGS="-Wl,-z,now -Wl,-z,relro -Wl,--gc-sections -Wl,--as-needed -Wl,-z,norelro -Wl,--build-id=none $ZIG_LIBS"
 if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
     LINKER=$CC
     CFLAGS="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe"
     CFLAGSGC="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe"
-    LDFLAGS="$COMMON_LFLAGS -L. -lgdi32 -lopengl32 -lole32 -Wl,--out-implib=voxen.lib -Xlinker /pdb:none"
-    LDFLAGSGC="$COMMON_LFLAGS -Wl,--allow-shlib-undefined -Wl,--entry,DllMainCRTStartup -Wl,--subsystem,windows -Wl,--no-entry -L. -lvoxen -Xlinker /pdb:none"
+    LDFLAGS="$COMMON_LFLAGS -L. -lgdi32 -lopengl32 -lole32 -Wl,--out-implib=voxen.lib -Xlinker /pdb:Citadel.pdb"
+    LDFLAGSGC="$COMMON_LFLAGS -Wl,--allow-shlib-undefined -Wl,--entry,DllMainCRTStartup -Wl,--subsystem,windows -Wl,--no-entry -L. -lvoxen -Xlinker /pdb:Citadel.pdb"
     BINARY_NAME="voxen.exe"
     BINARY_NAMEGC="Citadel.dll"
 else
