@@ -50,7 +50,7 @@ static unsigned char* LoadCullPNG(const char* name, int level) {
     OS_Seek(fp,0,SEEK_SET); size_t read_size = OS_Read(fp,cullingFileBuffer,size); OS_Close(fp);
     if (read_size != size) { DualLogError("Failed to read %s\n",path); OS_Exit(1); }
     
-    int w, h; unsigned char* pixels = stbi_load_from_memory(cullingFileBuffer,size,&w,&h);
+    int w, h; unsigned char* pixels = stbi_load_from_memory_arena(cullingFileBuffer,size,&w,&h,&stbi_arena_main);
     if (!pixels) { DualLogError("STB failed: %s\n",path); OS_Exit(1); }
     OS_DeallocateRAM(cullingFileBuffer,MAX_CULL_FILESIZE * sizeof(u8));
     return pixels;

@@ -9,7 +9,6 @@ typedef struct { stbi__context* s; u8* idata, *expanded, *out; } stbi__png;
 enum { STBI__F_none = 0, STBI__F_sub = 1, STBI__F_up = 2, STBI__F_avg = 3, STBI__F_paeth = 4, STBI__F_avg_first, STBI__F_paeth_first };
 typedef struct { u16 fast[1<<9], firstcode[16], firstsymbol[16], value[288]; i32 maxcode[17]; u8 size[288]; } stbi__zhuffman;
 typedef struct { u8 *zbuffer, *zbuffer_end, *zout, *zout_start; i32 num_bits; u32 code_buffer; stbi__zhuffman z_length, z_distance; } stbi__zbuf;
-u8* stbi_load_from_memory(const u8* buffer, i32 len, i32* x, i32* y);
 StbiArena stbi_arena_main;
 static StbiArena* thread_stbi_arenas = NULL;
 static u8** textureIndexBuffers = NULL; static u32** texturePaletteBuffers = NULL; static u32* texturePaletteSizes = NULL;
@@ -153,32 +152,6 @@ static i32 stbi__create_png_image_raw_arena(StbiArena* arena, stbi__png* a, u8* 
     return 1;
 }
 
-static i32 stbi__create_png_image_raw(stbi__png* a, u8* raw, u32 raw_len, i32 out_n, u32 x, u32 y, i32 img_n) {
-    u32 i, j, stride = x * out_n, w_bytes = (img_n * x * 8 + 7) >> 3; i32 k, f;
-    if (raw_len < (w_bytes + 1) * y) return 0; a->out = (u8*)stbi__arena_alloc((size_t)x * y * out_n);
-    for (j = 0; j < y; ++j) {
-        u8 *cur = a->out + stride * j, *prior = (j > 0) ? cur - stride : a->out;
-        if ((f = *raw++) > 4) return 0; if (j == 0) f = first_row_filter[f];
-        for (k = 0; k < img_n; ++k) {
-            if (f == STBI__F_up) cur[k] = raw[k] + prior[k];
-            else if (f == STBI__F_avg) cur[k] = raw[k] + (prior[k] >> 1);
-            else if (f == STBI__F_paeth) cur[k] = raw[k] + stbi__paeth(0, prior[k], 0);
-            else cur[k] = raw[k];
-        }
-        if (img_n != out_n) cur[img_n] = 255; raw += img_n; cur += out_n; prior += out_n;
-        for (i = x - 1; i >= 1; --i, cur[img_n] = (img_n != out_n ? 255 : cur[img_n]), raw += img_n, cur += out_n, prior += out_n)
-            for (k = 0; k < img_n; ++k) {
-                if (f == STBI__F_none) cur[k] = raw[k];
-                else if (f == STBI__F_sub) cur[k] = raw[k] + cur[k - out_n];
-                else if (f == STBI__F_up) cur[k] = raw[k] + prior[k];
-                else if (f == STBI__F_avg) cur[k] = raw[k] + ((prior[k] + cur[k - out_n]) >> 1);
-                else if (f == STBI__F_paeth) cur[k] = raw[k] + stbi__paeth(cur[k - out_n], prior[k], prior[k - out_n]);
-                else if (f == STBI__F_avg_first) cur[k] = raw[k] + (cur[k - out_n] >> 1);
-            }
-    }
-    return 1;
-}
-
 u8* stbi_load_from_memory_arena(const u8* buffer, int len, int* x, int* y, StbiArena* arena) {
     if (arena->base) arena->cursor = arena->base;
     stbi__context s; s.img_n = s.img_out_n = 0; s.img_buffer = (u8*)buffer; s.img_buffer_end = (u8*)buffer + len;
@@ -191,25 +164,6 @@ u8* stbi_load_from_memory_arena(const u8* buffer, int len, int* x, int* y, StbiA
             case 0x49444154: if (!z.idata) { z.idata = (u8*)stbi__arena_alloc_thread(arena, len + 16); ioff = 0; } CopyMemoryFromBtoAForNBytes(z.idata + ioff, s.img_buffer, length); s.img_buffer += length; ioff += length; break;
             case 0x49454E44: { u32 rL = s.img_x * s.img_y * s.img_n + s.img_y; z.expanded = (u8*)stbi_zlib_decode_malloc_guesssize_headerflag_arena(z.idata, ioff, rL, (i32*)(&rL), arena);
                 s.img_out_n = (s.img_n + 1 == 4) ? 4 : s.img_n; stbi__create_png_image_raw_arena(arena, &z, z.expanded, rL, s.img_out_n, s.img_x, s.img_y, s.img_n); stbi__get32be(&s); goto Label_parsesuccess; }
-            default: s.img_buffer += length; break;
-        }
-        stbi__get32be(&s);
-    }
-    Label_parsesuccess: *x = z.s->img_x; *y = z.s->img_y; return z.out;
-}
-
-extern u8* stbi_load_from_memory(const u8* buffer, int len, int* x, int* y) {
-    if (stbi_arena_main.base) stbi_arena_main.cursor = stbi_arena_main.base;
-    stbi__context s; s.img_n = s.img_out_n = 0; s.img_buffer = (u8*)buffer; s.img_buffer_end = (u8*)buffer + len;
-    stbi__png z = {0}; z.s = &s; u32 ioff = 0; z.expanded = z.idata = z.out = NULL;
-    s.img_buffer += 8; s.img_x = s.img_y = 1;
-    for (;;) {
-        u32 length = stbi__get32be(&s), type = stbi__get32be(&s);
-        switch (type) {
-            case 0x49484452: s.img_x = stbi__get32be(&s); s.img_y = stbi__get32be(&s); s.img_buffer++; { i32 color = (*s.img_buffer++); s.img_buffer += 3; s.img_n = (color & 2 ? 3 : 1) + (color & 4 ? 1 : 0); } break;
-            case 0x49444154: if (!z.idata) { z.idata = (u8*)stbi__arena_alloc(len + 16); ioff = 0; } CopyMemoryFromBtoAForNBytes(z.idata + ioff, s.img_buffer, length); s.img_buffer += length; ioff += length; break;
-            case 0x49454E44: { u32 rL = s.img_x * s.img_y * s.img_n + s.img_y; z.expanded = (u8*)stbi_zlib_decode_malloc_guesssize_headerflag(z.idata, ioff, rL, (i32*)(&rL));
-                s.img_out_n = (s.img_n + 1 == 4) ? 4 : s.img_n; stbi__create_png_image_raw(&z, z.expanded, rL, s.img_out_n, s.img_x, s.img_y, s.img_n); stbi__get32be(&s); goto Label_parsesuccess; }
             default: s.img_buffer += length; break;
         }
         stbi__get32be(&s);
@@ -413,7 +367,7 @@ static __attribute__((noinline)) void LoadTextures(void) {
     int windowIconFileSize = OS_FileSize(fp);
     u8* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize,fp,Sys_Global.global_winicon);    
     OS_Close(fp); stbi__arena_init_thread(&stbi_arena_main);
-    int w=1,h=1; unsigned char* pixels = stbi_load_from_memory(file_buffer,windowIconFileSize,&w,&h);
+    int w=1,h=1; unsigned char* pixels = stbi_load_from_memory_arena(file_buffer,windowIconFileSize,&w,&h,&stbi_arena_main);
     if (!pixels) { DualLogError("Failed to load icon: %s\n",Sys_Global.global_winicon); OS_Exit(1); }
     
     GLFWimage image = (GLFWimage){w,h,pixels};
