@@ -114,11 +114,7 @@ static u8* OptimizeVertexFetch(u8* v, u32* vc, u16* idx, u32 ic, size_t stride) 
     return nv;
 }
 
-static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(const char* __restrict d, int fs,
-    float* __restrict tp, float* __restrict tn, float* __restrict tu,
-    float* __restrict sv, u16* __restrict st,
-    u8** ov, u32* ovc, u16** ot, u16* otc,
-    float* minx, float* miny, float* minz, float* maxx, float* maxy, float* maxz) {
+static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, const char* __restrict d, int fs, float* __restrict tp, float* __restrict tn, float* __restrict tu, float* __restrict sv, u16* __restrict st, u8** ov, u32* ovc, u16** ot, u16* otc, float* minx, float* miny, float* minz, float* maxx, float* maxy, float* maxz) {
     *ov = NULL; *ot = NULL; *ovc = *otc = 0;
     if (unlikely(!d || fs <= 0)) return false;
 
@@ -183,6 +179,7 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(const char* _
     }
     if (unlikely(!ec)) return false;
 
+    DualLog("[%u]Finished a main parse OBJ.\n",mindex);
     #define HASH_SIZE 65536
     u32 ht[HASH_SIZE]; MemSetToValueForNBytes(ht, 0xFF, sizeof(ht));
     u32* rem = (u32*)st; u32 ucnt = 0;
@@ -199,6 +196,7 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(const char* _
         ++ucnt; nxt:;
     }
 
+    DualLog("[%u]Finished a parse OBJ copy.\n",mindex);
     u8* fv = OS_Alloc((size_t)ucnt * VERTEX_ATTRIBUTES_SIZE);
     u8* dst = fv;
     for (u32 i=0; i<ucnt; ++i) {
@@ -206,11 +204,14 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(const char* _
         for (u32 j=0; j<8; ++j) { *(half*)dst = float_to_half(src[j]); dst += 2; }
     }
 
+    DualLog("[%u]Finished a parse OBJ float to half (16bit) conversion.\n",mindex);
     u16* ft = OS_Alloc(ec * sizeof(u16));
     for (u32 i=0; i<ec; ++i) ft[i] = (u16)rem[i];
     OptimizeVertexCache(ft, ec, ucnt);
+    DualLog("[%u]Finished a parse OBJ vertex cache optimization.\n",mindex);
     u32 oldc = ucnt;
     u8* optv = OptimizeVertexFetch(fv, &ucnt, ft, ec, VERTEX_ATTRIBUTES_SIZE);
+    DualLog("[%u]Finished a parse OBJ vertex fetch optimization.\n",mindex);
     OS_DeallocateRAM(fv, oldc * VERTEX_ATTRIBUTES_SIZE);
     *ov = optv; *ovc = ucnt; *ot = ft; *otc = ec/3;
     *minx=mx; *miny=my; *minz=mz; *maxx=Mx; *maxy=My; *maxz=Mz;
@@ -226,7 +227,7 @@ static void* ModelParsingWorker(void* arg) {
         RawOBJ r = t->raw[i];
         if (unlikely(!r.data || r.size <= 0)) continue;
         float mx,my,mz,Mx,My,Mz;
-        if (!ParseOBJ(r.data,r.size,thread_temp_pos[t->tid],thread_temp_nrm[t->tid],thread_temp_uv[t->tid],thread_out_verts[t->tid],thread_out_tris[t->tid],&modelVertices[i],&modelVertexCounts[i],&modelTriangles[i],&modelTriangleCounts[i],&mx,&my,&mz,&Mx,&My,&Mz)) continue;
+        if (!ParseOBJ(i,r.data,r.size,thread_temp_pos[t->tid],thread_temp_nrm[t->tid],thread_temp_uv[t->tid],thread_out_verts[t->tid],thread_out_tris[t->tid],&modelVertices[i],&modelVertexCounts[i],&modelTriangles[i],&modelTriangleCounts[i],&mx,&my,&mz,&Mx,&My,&Mz)) continue;
         float rad = vmax(vabs(mx), vmax(vabs(my), vmax(vabs(mz), vmax(Mx, vmax(My, Mz)))));
         modelBounds[i] = rad;
     }
@@ -304,6 +305,7 @@ void LoadModels(void) {
     for (u32 i=0; i<mp.count; ++i) { if (mp.entries[i].index != U16_MAX && mp.entries[i].index > maxid) maxid = mp.entries[i].index; }
     loadedModelsMaxIndex = (u16)maxid + 1;
     num_parse_threads = clamp(OS_GetNumThreads(), 1, 32);
+    DualLog("Model loading using %u threads\n",num_parse_threads);
     modelVertices  = OS_Alloc(loadedModelsMaxIndex * sizeof(u8*));
     modelTriangles = OS_Alloc(loadedModelsMaxIndex * sizeof(u16*));
     size_t n = loadedModelsMaxIndex;
@@ -313,6 +315,7 @@ void LoadModels(void) {
     MemSetToValueForNBytes(idxmap, -1, n*sizeof(i32));
     for (u32 i=0; i<mp.count; ++i) if (mp.entries[i].index != U16_MAX) idxmap[mp.entries[i].index] = (i32)i;
     RawOBJ* raw = (RawOBJ*)p; p += n*sizeof(RawOBJ);
+    DualLog("file allocation loop start...\n");
     for (u32 i=0; i<n; ++i) {
         i32 pi = idxmap[i];
         if (pi >= 0) {
@@ -320,9 +323,11 @@ void LoadModels(void) {
             OsFileHandle dummy; int sz=0;
             raw[i].data = (const char*)OS_OpenAndAllocateFileBufferReadonly(path, &dummy, &sz);
             raw[i].size = sz;
+            DualLog("Alloced:%s[%u]\n",path,sz);
         }
     }
 
+    DualLog("Prep threads...\n");
     float **pos = (float**)p; p += num_parse_threads*sizeof(float*);
     float **nrm = (float**)p; p += num_parse_threads*sizeof(float*);
     float **uv  = (float**)p; p += num_parse_threads*sizeof(float*);
@@ -343,13 +348,12 @@ void LoadModels(void) {
     thread_out_verts = ov; thread_out_tris = ot;
     ModelParseTask tasks[32];
     u32 chunk = (loadedModelsMaxIndex + num_parse_threads - 1) / num_parse_threads;
-    for (int i=0; i<num_parse_threads; ++i) {
-        tasks[i] = (ModelParseTask){i*chunk, (i+1)*chunk > loadedModelsMaxIndex ? loadedModelsMaxIndex : (i+1)*chunk,
-            raw, idxmap, &mp, i};
-    }
-
+    DualLog("Executing model parse tasks...\n");
+    for (int i=0; i<num_parse_threads; ++i) tasks[i] = (ModelParseTask){i*chunk,(i+1)*chunk > loadedModelsMaxIndex ? loadedModelsMaxIndex : (i+1)*chunk,raw,idxmap,&mp,i};
     pthread_t th[32];
+    DualLog("Executing model parse thread creation...\n");
     for (int i=0;i<num_parse_threads;++i) pthread_create(&th[i],NULL,ModelParsingWorker,&tasks[i]);
+    DualLog("Executing model parse thread joins...\n");
     for (int i=0;i<num_parse_threads;++i) pthread_join(th[i],NULL);
     //for (int t=0;t<num_parse_threads;++t) ModelParsingWorker(&tasks[t]); // Single threaded alternative
 
