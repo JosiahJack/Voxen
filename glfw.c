@@ -4,9 +4,29 @@
 // 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
 // 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
 // 3. This notice may not be removed or altered from any source distribution.
+#include "os.h"
+#include "gl.h"
+#include "common.h"
+#include "interop.h"
+extern GLFWwindow* window;
 #define GLFW_CURSOR_DISABLED 0x00034003
-typedef void (*GLFWproc)(void);
-typedef struct _GLFWfbconfig _GLFWfbconfig; typedef struct _GLFWcontext _GLFWcontext; typedef struct _GLFWwindow _GLFWwindow; typedef struct _GLFWlibrary _GLFWlibrary; typedef struct _GLFWmonitor _GLFWmonitor; typedef struct _GLFWjoystick _GLFWjoystick;
+typedef struct { bool down,pressed,released; } KeyState;
+typedef struct {
+	double last_mouse_x,last_mouse_y,scrollDelta;
+	KeyState keyStates[MAX_KEYS],mouseButtons[MAX_MOUSE_BUTTONS],joystickButtons[16][16],joystickHats[5]; // What can I say, I'm a man of many hats. ^^D
+    i32 currentMouse_dx,currentMouse_dy;
+	bool window_has_focus,ignore_next_mouse_delta,lastUse,isCapsLockOn,joystickPresent[16];
+} InputSystem;
+extern InputSystem Sys_Input; extern bool returnToPause; extern GlobalContext Sys_Global; extern u8 currentPlayerNameLength; extern i8 currentMenuItem; extern CheatsSystem Sys_Cheats;
+extern bool mouseMovementThisFrame; extern SettingsSystem Sys_Settings; extern float cam_pitch,cam_yaw,cam_roll;
+typedef struct { const char* name; int value; } InputElement; extern InputElement inputElements[134];
+typedef void (*GLFWproc)(void); typedef struct _GLFWfbconfig _GLFWfbconfig; typedef struct _GLFWcontext _GLFWcontext; typedef struct _GLFWwindow _GLFWwindow; typedef struct _GLFWlibrary _GLFWlibrary; typedef struct _GLFWmonitor _GLFWmonitor; typedef struct _GLFWjoystick _GLFWjoystick;
+void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n);
+void StringCopyInto_A_From_B(char* a, const char* b, size_t bufferSize);
+bool StringsEqual(const char* a, const char* b);
+int StringCompareUpToLength(const char* s1, const char* s2, size_t n);
+ENGINE_TO_MOD int StringFormat(char* buffer, size_t bufferSize, const char* format, ...);
+ENGINE_TO_MOD size_t GetStringLength(const char* s);
 #if defined(WINDOWS)
     #define IsWindows8OrGreater() _glfwIsWindowsVersionOrGreaterWin32(HIBYTE(0x0602),LOBYTE(0x0602), 0)
     #define IsWindows8Point1OrGreater() _glfwIsWindowsVersionOrGreaterWin32(HIBYTE(0x0603),LOBYTE(0x0603), 0)
@@ -859,7 +879,7 @@ static void createKeyTables(void) {
     
     i32 _glfwWindowFocusedX11(_GLFWwindow* window) { Window focused; int state; _glfw.x11.xlib.GetInputFocus(_glfw.x11.display,&focused,&state); return window->x11.handle==focused; }
     i32 _glfwWindowVisibleX11(_GLFWwindow* window) { XWindowAttributes wa; _glfw.x11.xlib.GetWindowAttributes(_glfw.x11.display,window->x11.handle,&wa); return wa.map_state==2/*IsViewable*/; }
-    static void UpdateScreenSize(i32 width, i32 height);
+    void UpdateScreenSize(i32 width, i32 height);
     static void processEvent(XEvent* event) {
         unsigned int keycode=0; Bool filtered=0;
         if (event->type==2/*KeyPress*/ || event->type==3/*KeyRelease*/) keycode=event->xkey.keycode;
@@ -1544,6 +1564,75 @@ const _GLFWfbconfig* _glfwChooseFBConfig(const _GLFWfbconfig* alts, unsigned int
 
 void glfwSwapBuffers(void) { _GLFWwindow* handle = (_GLFWwindow*)window; handle->context.swapBuffers(handle); }
 GLFWglproc glfwGetProcAddress(const char* procname) { _GLFWwindow* handle = (_GLFWwindow*)window; return handle->context.getProcAddress(procname); }
+void SetGLContext_GetFunctionPointers(void) {
+    _GLFWwindow* handle = (_GLFWwindow*)window; handle->context.makeCurrent(handle);
+    glClear = (PFNGLCLEAR)glfwGetProcAddress("glClear");
+    glClearColor = (PFNGLCLEARCOLOR)glfwGetProcAddress("glClearColor");
+    glColorMask = (PFNGLCOLORMASK)glfwGetProcAddress("glColorMask");
+    glDepthFunc = (PFNGLDEPTHFUNC)glfwGetProcAddress("glDepthFunc");
+    glDepthMask = (PFNGLDEPTHMASK)glfwGetProcAddress("glDepthMask");
+    glDisable = (PFNGLDISABLE)glfwGetProcAddress("glDisable");
+    glEnable = (PFNGLENABLE)glfwGetProcAddress("glEnable");
+    glFinish = (PFNGLFINISH)glfwGetProcAddress("glFinish");
+    glFlush = (PFNGLFLUSH)glfwGetProcAddress("glFlush");
+    glFrontFace = (PFNGLFRONTFACE)glfwGetProcAddress("glFrontFace");
+    glGetError = (PFNGLGETERROR)glfwGetProcAddress("glGetError");
+    glGetIntegerv = (PFNGLGETINTEGERV)glfwGetProcAddress("glGetIntegerv");
+    glLineWidth = (PFNGLLINEWIDTH)glfwGetProcAddress("glLineWidth");
+    glReadBuffer = (PFNGLREADBUFFER)glfwGetProcAddress("glReadBuffer");
+    glReadPixels = (PFNGLREADPIXELS)glfwGetProcAddress("glReadPixels");
+    glTexImage2D = (PFNGLTEXIMAGE2D)glfwGetProcAddress("glTexImage2D");
+    glTexParameteri = (PFNGLTEXPARAMETERI)glfwGetProcAddress("glTexParameteri");
+    glViewport = (PFNGLVIEWPORT)glfwGetProcAddress("glViewport");
+    glBindTexture = (PFNGLBINDTEXTURE)glfwGetProcAddress("glBindTexture");
+    glCopyTexSubImage2D = (PFNGLCOPYTEXSUBIMAGE2D)glfwGetProcAddress("glCopyTexSubImage2D");
+    glDrawArrays = (PFNGLDRAWARRAYS)glfwGetProcAddress("glDrawArrays");
+    glDrawElements = (PFNGLDRAWELEMENTS)glfwGetProcAddress("glDrawElements");
+    glGenTextures = (PFNGLGENTEXTURES)glfwGetProcAddress("glGenTextures");
+    glActiveTexture = (PFNGLACTIVETEXTURE)glfwGetProcAddress("glActiveTexture");
+    glBlendFuncSeparate = (PFNGLBLENDFUNCSEPARATE)glfwGetProcAddress("glBlendFuncSeparate");
+    glBindBuffer = (PFNGLBINDBUFFER)glfwGetProcAddress("glBindBuffer");
+    glBufferData = (PFNGLBUFFERDATA)glfwGetProcAddress("glBufferData");
+    glGenBuffers = (PFNGLGENBUFFERS)glfwGetProcAddress("glGenBuffers");
+    glUnmapBuffer = (PFNGLUNMAPBUFFER)glfwGetProcAddress("glUnmapBuffer");
+    glAttachShader = (PFNGLATTACHSHADER)glfwGetProcAddress("glAttachShader");
+    glCompileShader = (PFNGLCOMPILESHADER)glfwGetProcAddress("glCompileShader");
+    glCreateProgram = (PFNGLCREATEPROGRAM)glfwGetProcAddress("glCreateProgram");
+    glCreateShader = (PFNGLCREATESHADER)glfwGetProcAddress("glCreateShader");
+    glDrawBuffers = (PFNGLDRAWBUFFERS)glfwGetProcAddress("glDrawBuffers");
+    glGetProgramiv = (PFNGLGETPROGRAMIV)glfwGetProcAddress("glGetProgramiv");
+    glGetShaderInfoLog = (PFNGLGETSHADERINFOLOG)glfwGetProcAddress("glGetShaderInfoLog");
+    glGetShaderiv = (PFNGLGETSHADERIV)glfwGetProcAddress("glGetShaderiv");
+    glLinkProgram = (PFNGLLINKPROGRAM)glfwGetProcAddress("glLinkProgram");
+    glShaderSource = (PFNGLSHADERSOURCE)glfwGetProcAddress("glShaderSource");
+    glUniform1f = (PFNGLUNIFORM1F)glfwGetProcAddress("glUniform1f");
+    glUniform1i = (PFNGLUNIFORM1I)glfwGetProcAddress("glUniform1i");
+    glUniform2f = (PFNGLUNIFORM2F)glfwGetProcAddress("glUniform2f");
+    glUniform3f = (PFNGLUNIFORM3F)glfwGetProcAddress("glUniform3f");
+    glUniform4f = (PFNGLUNIFORM4F)glfwGetProcAddress("glUniform4f");
+    glUniform1ui = (PFNGLUNIFORM1UI)glfwGetProcAddress("glUniform1ui");
+    glUniform2ui = (PFNGLUNIFORM2UI)glfwGetProcAddress("glUniform2ui");
+    glUniformMatrix3fv = (PFNGLUNIFORMMATRIX3FV)glfwGetProcAddress("glUniformMatrix3fv");
+    glUniformMatrix4fv = (PFNGLUNIFORMMATRIX4FV)glfwGetProcAddress("glUniformMatrix4fv");
+    glUseProgram = (PFNGLUSEPROGRAM)glfwGetProcAddress("glUseProgram");
+    glBindBufferBase = (PFNGLBINDBUFFERBASE)glfwGetProcAddress("glBindBufferBase");
+    glBindFramebuffer = (PFNGLBINDFRAMEBUFFER)glfwGetProcAddress("glBindFramebuffer");
+    glBindVertexArray = (PFNGLBINDVERTEXARRAY)glfwGetProcAddress("glBindVertexArray");
+    glCheckFramebufferStatus = (PFNGLCHECKFRAMEBUFFERSTATUS)glfwGetProcAddress("glCheckFramebufferStatus");
+    glFramebufferTexture2D = (PFNGLFRAMEBUFFERTEXTURE2D)glfwGetProcAddress("glFramebufferTexture2D");
+    glGenFramebuffers = (PFNGLGENFRAMEBUFFERS)glfwGetProcAddress("glGenFramebuffers");
+    glMapBufferRange = (PFNGLMAPBUFFERRANGE)glfwGetProcAddress("glMapBufferRange");
+    glBindImageTexture = (PFNGLBINDIMAGETEXTURE)glfwGetProcAddress("glBindImageTexture");
+    glBindVertexBuffer = (PFNGLBINDVERTEXBUFFER)glfwGetProcAddress("glBindVertexBuffer");
+    glDispatchCompute = (PFNGLDISPATCHCOMPUTE)glfwGetProcAddress("glDispatchCompute");
+    glGenVertexArrays = (PFNGLGENVERTEXARRAYS)glfwGetProcAddress("glGenVertexArrays");
+    glVertexAttribFormat = (PFNGLVERTEXATTRIBFORMAT)glfwGetProcAddress("glVertexAttribFormat");
+    glClearBufferFv = (PFNGLCLEARBUFFERFV)glfwGetProcAddress("glClearBufferFv");
+    glVertexAttribBinding = (PFNGLVERTEXATTRIBBINDING)glfwGetProcAddress("glVertexAttribBinding");
+    glEnableVertexAttribArray = (PFNGLENABLEVERTEXATTRIBARRAY)glfwGetProcAddress("glEnableVertexAttribArray");
+    glBufferSubData = (PFNGLBUFFERSUBDATA)glfwGetProcAddress("glBufferSubData");
+}
+
 size_t monitorAllocationSize = 0;
 void _glfwInputMonitor(_GLFWmonitor* monitor, int action, int placement) {
     if (action == 0x00040001/*connected*/) {
@@ -1719,7 +1808,7 @@ void TextEntry(i32 k) {
     if (c) { Sys_Global.playerName[currentPlayerNameLength] = c; Sys_Global.playerName[++currentPlayerNameLength] = '\0'; }
 }
 
-static void GoIntoGame(void); void ConsoleEmulator(i32 keycode); extern bool enteringPlayerName;
+void GoIntoGame(void); void ConsoleEmulator(i32 keycode); extern bool enteringPlayerName;
 void _glfwInputKey(_GLFWwindow* window,int key,int action) {
     if (key >= 0 && key <= GLFW_KEY_LAST) {
         i32 repeated = 0;
@@ -1831,4 +1920,188 @@ _GLFWjoystick* _glfwAllocJoystick(const char* name,const char* guid,int axisCoun
     return js;
 }
 
+static i32 initJoysticks(void) { if (!_glfw.joysticksInitialized && !PLATFORM_initJoysticks()) {return 0;} return _glfw.joysticksInitialized =  1; }
+bool JoystickPresent(int jid) {
+    if (jid < 0 || jid > GLFW_JOYSTICK_LAST) return false;
+    if (!initJoysticks()) return false;
+    _GLFWjoystick* js = _glfw.joysticks + jid;
+    return js->connected ? PLATFORM_pollJoystick(js) : false;
+}
+
 void _glfwFreeJoystick(_GLFWjoystick* js) { OS_DeallocateRAM(js->axes,js->axesSize); OS_DeallocateRAM(js->buttons,js->buttonsSize); OS_DeallocateRAM(js->hats,js->hatsSize); MemSetToValueForNBytes(js,0,sizeof(_GLFWjoystick)); }
+ENGINE_TO_MOD void play_wav(const char *path,float volume,Vector3 pos,bool positional);
+void InputProcessing(void) {
+    if (((_GLFWwindow*)window)->shouldClose) OS_Exit(0);
+
+    PLATFORM_pollEvents();
+    for (int jid = GLFW_JOYSTICK_1; jid <= GLFW_JOYSTICK_LAST; ++jid) { // Input Poll
+        if (!JoystickPresent(jid)) continue;
+        _GLFWjoystick* js = _glfw.joysticks + jid; if (!js->connected) continue;
+
+        PLATFORM_pollJoystick(js);
+        int totalButtons = js->buttonCount + js->hatCount * 4;
+        for (int i = 0; i < totalButtons && i < 16; ++i) {
+            KeyState* k = &Sys_Input.joystickButtons[jid - GLFW_JOYSTICK_1][i];
+            bool down = js->buttons[i] == GLFW_PRESS;
+            k->pressed = down && !k->down; k->released = !down && k->down; k->down = down;
+        }
+
+        for (int i = 0; i < js->hatCount && i < 5; ++i) { Sys_Input.joystickHats[i].down = js->hats[i]; }
+//         for (int i = 0; i < js->axisCount && i < MAX_JOYSTICK_AXES; ++i) { Sys_Input.joystickAxes[jid - GLFW_JOYSTICK_1][i] = js->axes[i]; } TODO??
+    }
+
+    if (Sys_Input.keyStates[GLFW_KEY_E].pressed) play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f,(Vector3){},false);
+    if (Sys_Input.window_has_focus) {
+        if (Sys_Input.keyStates[GLFW_KEY_CAPS_LOCK].pressed) Sys_Input.isCapsLockOn = !Sys_Input.isCapsLockOn; // Change capslock state to match keyboard having toggled.  Must always happen regardless of paused/menu.
+        ProcessInput(); // Calls ApplyPlayerMovements(), needs called without checking paused state for menus handling.
+    }
+}
+
+KeyState* GetCodeMapping(int settingIndex) {
+    i32 i = Sys_Settings.InputCodeSettings[settingIndex]; // Get table index into all recognized inputs
+    if (i == 148 || i >= MAX_KEYS) return &Sys_Input.keyStates[MAX_KEYS - 1]; // UNUSED NULL (e.g. setting unbound)
+
+    if (i >= 53 && i <= 61) { // Pick subtable of GLFW values that were set by GLFW callbacks
+        return &Sys_Input.mouseButtons[inputElements[i].value];
+    } else if (i >= 62 && i <= 77) {
+        return &Sys_Input.joystickButtons[GLFW_JOYSTICK_1][inputElements[i].value];
+    } else if ((i >= 78 && i <= 79) || (i >= 132 && i <= 133)) {
+        return &Sys_Input.joystickHats[inputElements[i].value];
+    }
+
+    return &Sys_Input.keyStates[inputElements[i].value];
+}
+
+bool GetKeyRiseEdgeOrHeld(int settingIndex, bool risingEdge) {
+    i32 i = Sys_Settings.InputCodeSettings[settingIndex]; // Get table index into all recognized inputs
+         if (i == 128) return Sys_Input.scrollDelta > 0.0; // Mousewheel +
+    else if (i == 129) return Sys_Input.scrollDelta < 0.0; // Mousewheel -
+
+    KeyState* keyOfConcern = GetCodeMapping(settingIndex);
+    bool retval = risingEdge ? keyOfConcern->pressed : keyOfConcern->down;
+    return retval;
+}
+
+void InputClearRisingAndFallingEdges(void) { // Clear keypress rising and falling edge triggers
+    for (i32 i=0;i<MAX_KEYS;++i)          Sys_Input.keyStates[i].pressed = Sys_Input.keyStates[i].released = false;       // Can't memset as we want to preserve down state
+    for (i32 i=0;i<MAX_MOUSE_BUTTONS;i++) Sys_Input.mouseButtons[i].pressed = Sys_Input.mouseButtons[i].released = false; // Can't memset as we want to preserve down state
+    Sys_Input.scrollDelta = 0;
+}
+
+void SetVSync(void) { _GLFWwindow* handle = (_GLFWwindow*)window; handle->context.swapInterval((i32)Sys_Settings.Vsync); }
+void SaveConfig(void);
+void CenterWindowOnMonitor(void) {
+    int monitorCount; GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
+    if (Sys_Settings.CurrentMonitor > (monitorCount - 1)) { Sys_Settings.CurrentMonitor = 0; SaveConfig(); }
+    int mx, my; GLFWmonitor* next = monitors[Sys_Settings.CurrentMonitor];
+    glfwGetMonitorPos(next,&mx,&my);
+    const GLFWvidmode* mode = glfwGetVideoMode(next);
+    int xpos = mx + (mode->width - Sys_Settings.ScreenWidth) / 2;
+    int ypos = my + (mode->height - Sys_Settings.ScreenHeight) / 2;
+    glfwSetWindowPos(window,xpos,ypos);
+    Sys_Input.ignore_next_mouse_delta = true;
+}
+
+extern bool resDropdownOpen; extern int resDropdownCount,resSelectedIdx; typedef struct {int w,h;} ResMode; extern ResMode resModes[8];
+GLFWmonitor* GetCurrentMonitor(void) {
+    int wx=0,wy=0,ww=0,wh=0; PLATFORM_getWindowPos(((_GLFWwindow*)window),&wx,&wy); PLATFORM_getWindowSize(((_GLFWwindow*)window),&ww,&wh);
+    GLFWmonitor* bestMonitor = glfwGetPrimaryMonitor();
+    int bestArea=0,monitorCount; GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
+    for (int i=0;i<monitorCount;++i) {
+        int mx, my;
+        glfwGetMonitorPos(monitors[i], &mx, &my);
+        const GLFWvidmode* mode = glfwGetVideoMode(monitors[i]);
+        int mw = mode->width;
+        int mh = mode->height;
+        int left=vmax(wx,mx), right=vmin(wx + ww,mx + mw), top=vmax(wy,my), bottom=vmin(wy + wh,my + mh);
+        int area = (right > left && bottom > top) ? (right - left) * (bottom - top) : 0;
+        if (area > bestArea) { bestArea = area; bestMonitor = monitors[i]; }
+    }
+    return bestMonitor;
+}
+
+void ChangeResolution(void) {
+    if (resDropdownCount < 1) return;
+
+    resSelectedIdx = (resSelectedIdx + 1) % resDropdownCount;
+    Sys_Settings.ScreenWidth  = (u32)resModes[resSelectedIdx].w;
+    Sys_Settings.ScreenHeight = (u32)resModes[resSelectedIdx].h;
+    GLFWmonitor* monitor = GetCurrentMonitor();
+    if (!monitor) monitor = glfwGetPrimaryMonitor();
+
+    int mx, my;
+    glfwGetMonitorPos(monitor, &mx, &my);
+    const GLFWvidmode* desktop = glfwGetVideoMode(monitor);
+    int xpos = mx + (desktop->width  - (int)Sys_Settings.ScreenWidth)  / 2;
+    int ypos = my + (desktop->height - (int)Sys_Settings.ScreenHeight) / 2;
+    glfwSetWindowSize(window, (int)Sys_Settings.ScreenWidth,(int)Sys_Settings.ScreenHeight);
+    glfwSetWindowPos(window,xpos,ypos);
+    UpdateScreenSize((int)Sys_Settings.ScreenWidth,(int)Sys_Settings.ScreenHeight);
+    Sys_Input.ignore_next_mouse_delta = true;
+    resDropdownOpen = false;
+    SaveConfig();
+}
+
+void ChangeFullScreenWindowed(void); void CycleToNextMonitor(void);
+void GatherResolutionModes(void) {
+    resDropdownCount = 0;
+    GLFWmonitor* monitor = GetCurrentMonitor(); if (!monitor) monitor = glfwGetPrimaryMonitor();
+    const GLFWvidmode* desktop = glfwGetVideoMode(monitor); if (!desktop) return;
+
+    static const struct {int w,h;} commonRes[] = {{320,200}, {640,400}, {640,480}, {800,600}, {1024,768}, {1280,720}, {1280,800}, {1366,768}, {1440,900}, {1600,900}, {1920,1080}, {2560,1440}};
+    int maxW = desktop->width, maxH = desktop->height,j;
+    for (int i = 0; i < (int)(sizeof(commonRes)/sizeof(commonRes[0])) && resDropdownCount < 8; ++i) {
+        int w = commonRes[i].w, h = commonRes[i].h;
+        if (w > maxW || h > maxH || w < 320 || h < 200) continue;
+
+        for (j = 0; j < resDropdownCount; ++j) {
+            if (resModes[j].w == w && resModes[j].h == h) break;
+        }
+        if (j == resDropdownCount) resModes[resDropdownCount++] = (ResMode){w,h};
+    }
+
+    if (resDropdownCount < 8) resModes[resDropdownCount++] = (ResMode){desktop->width,desktop->height};
+    resSelectedIdx = 0;
+    for (int i = 0; i < resDropdownCount; ++i) {
+        if (resModes[i].w == (int)Sys_Settings.ScreenWidth && resModes[i].h == (int)Sys_Settings.ScreenHeight) { resSelectedIdx = i; break; }
+    }
+}
+
+void ChangeFullScreenWindowed(void) {
+    int monitorCount; GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
+    GLFWmonitor* monitor = monitors[Sys_Settings.CurrentMonitor];
+    const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+    if (Sys_Settings.Fullscreen) {
+        ((_GLFWwindow*)window)->decorated = 0; PLATFORM_setWindowDecorated(((_GLFWwindow*)window),0);
+        int x,y,w,h;
+        glfwGetMonitorWorkarea(monitor,&x,&y,&w,&h);
+        glfwSetWindowMonitor(window,x,y,w,h);
+        Sys_Settings.ScreenWidth = w; Sys_Settings.ScreenHeight = h;
+    } else {
+        ((_GLFWwindow*)window)->decorated = 1; PLATFORM_setWindowDecorated(((_GLFWwindow*)window),1);
+        int mx,my; glfwGetMonitorPos(monitor,&mx,&my);
+        int x,y,w,h; glfwGetMonitorWorkarea(monitor,&x,&y,&w,&h);
+        Sys_Settings.ScreenWidth  = vmax(vmin((w*3)/4,1366),320);
+        Sys_Settings.ScreenHeight = vmax(vmin((h*3)/4, 768),200);
+        int xpos = mx + (mode->width - Sys_Settings.ScreenWidth) / 2;
+        int ypos = my + (mode->height - Sys_Settings.ScreenHeight) / 2;
+        glfwSetWindowMonitor(window,xpos,ypos,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
+    }
+
+    UpdateScreenSize(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
+    Sys_Input.ignore_next_mouse_delta = true;
+}
+
+static double monitorSwitchTime;
+void CycleToNextMonitor(void) {
+    if (get_time() < monitorSwitchTime) return;
+
+    monitorSwitchTime = get_time() + 0.5; // Prevent toggling rapidly on accident
+    int monitorCount; GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
+    if (Sys_Settings.CurrentMonitor > (monitorCount - 1)) { Sys_Settings.CurrentMonitor = 0; SaveConfig(); }
+    if (!monitors || monitorCount < 2) return;
+
+    Sys_Settings.CurrentMonitor = (Sys_Settings.CurrentMonitor + 1) % monitorCount;
+    SaveConfig();
+    CenterWindowOnMonitor();
+}

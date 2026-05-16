@@ -28,6 +28,9 @@ typedef u8 ColliderType;
 typedef u16 Text;
 typedef struct { Vector3 point; Vector3 normal; float distance; u16 hitInstanceIndex; bool hit; } RaycastHit;
 typedef struct { float speed; u16 frameStart,frameEnd,frameStartModelIndex; u8 framerate; } AnimationClip;
+typedef struct { Vector3 center,halfExtents; Quaternion rot; } ShapeBox;
+typedef struct { Vector3 center; float radius; } ShapeSphere;
+typedef struct { Vector3 tip,base; float radius; } ShapeCapsule;
 #define LIGHTON 1
 #define SHADON  2
 #define LIGHT_AND_SHADOW_ON 3
@@ -47,6 +50,9 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define MAX_ANIMATION_CLIPS_PER_MODEL 32
 #define MAX_DEBUG_LINE_VERTS 512000
 #define MAX_PORTALS 64 // Max is 49 on Citadel level 7
+#define MAX_KEYS 512
+#define MAX_MOUSE_BUTTONS 8
+#define MAX_CHANNELS 48 // Max concurrent sounds, must keep track of for volume setting
 #define DOUBLE_CLICK_TIME 0.5f
 #define PLAYER_MAX_WALK_SPEED 3.2f
 #define PLAYER_MAX_SPRINT_SPEED 8.8f
@@ -775,7 +781,6 @@ static inline __attribute__((always_inline)) bool ConstIndexIsDynamicObject(u16 
 static inline __attribute__((always_inline)) bool ConstIndexIsStaticObjectSaveable(int c) { return (c == 112 || c == 279 || (c >= 448 && c < 458) || c == 480 || c == 516 || (c >= 518 && c <= 526) || c == 530 || c == 531 || c == 546 || c == 555 || c == 594 || c == 596 || c == 598 || (c >= 600 && c < 603) || (c >= 604 && c < 616) || (c >= 688 && c < 693) || c == 694 || c == 695 || (c >= 699 && c < 704) || (c >= 741 && c < 746)); }
 static inline __attribute__((always_inline)) bool ConstIndexIsStaticObjectImmutable(int c) { return ((c >= 527 && c < 530) || (c >= 532 && c < 546) || (c >= 547 && c < 553) || c == 554 || (c >= 556 && c < 594) || c == 595 || c == 597 || c == 599 || c == 601 || c == 603 || (c >= 616 && c < 688) || c == 693 || c == 696 || c == 697 || c == 698 || (c >= 704 && c < 717) || c == 720 || (c >= 733 && c < 736) || (c >= 737 && c < 739) || c == 746 || c == 747 || (c >= 750 && c <= 759 && c != 755)); }
 static inline __attribute__((always_inline)) void* MemSetToValueForNBytes(void *dst, int c, size_t n) { unsigned char *p=(unsigned char *)dst; unsigned char v=(unsigned char)c; while (n--) {*p++=v;} return dst; } // memset replacement
-// static void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n); // memcpy replacement
 static inline __attribute__((always_inline)) int CompareMemoryForNBytes(const void *s1, const void *s2, size_t n) { const unsigned char *p1 = (const unsigned char *)s1; const unsigned char *p2 = (const unsigned char *)s2; while (n--) { if (*p1 != *p2) {return *p1 - *p2;} p1++; p2++; } return 0; } // memcmp replacement
 static inline __attribute__((always_inline)) void* MoveMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n) {
     unsigned char *d = (unsigned char *)dst; const unsigned char *s = (const unsigned char *)src;

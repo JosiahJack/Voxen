@@ -101,9 +101,8 @@ WINDOWS_CC="zig cc -target x86_64-windows-gnu -Wl,--stack,8388608"
 COMMON_CFLAGS="-ferror-limit=500 -fno-exceptions -fno-stack-protector -fno-asynchronous-unwind-tables -fno-unwind-tables -Wno-format-nonliteral \
                -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -fvisibility=hidden -pipe -fno-ident -fdata-sections -Wno-int-to-void-pointer-cast \
                -ffunction-sections -ffast-math -std=c11 -Wall -Wextra -Wno-implicit-fallthrough -fdeclspec -fno-rtti \
-               -fomit-frame-pointer -g0 -fstrict-aliasing -fcommon -Walloca \
-               -Wformat=2 -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings -fno-math-errno -fno-sanitize=all \
-               -fno-trapping-math -fmerge-all-constants -m64 -Os -march=haswell -fstack-usage"
+               -fomit-frame-pointer -g0 -fstrict-aliasing -fcommon -Wstrict-prototypes -Wno-overlength-strings -fno-math-errno -fno-sanitize=all \
+               -fno-trapping-math -fmerge-all-constants -m64 -Os -march=haswell"
 COMMON_LFLAGS="-Wl,-z,now -Wl,-z,relro -Wl,--gc-sections -Wl,--as-needed -Wl,-z,norelro -Wl,--build-id=none $ZIG_LIBS"
 if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
@@ -126,7 +125,13 @@ else
 fi
 
 # Engine Build 123.4kb
-$CC voxen.c $CFLAGS $LDFLAGS -rdynamic -o $BINARY_NAME
+#$CC voxen.c $CFLAGS $LDFLAGS -rdynamic -o $BINARY_NAME
+export CC=$CC
+export CFLAGS=$CFLAGS
+SOURCES="voxen.c glfw.c audio.c physics.c"
+export TEMP_DIR=temp_build
+printf "%s\n" $SOURCES | xargs -P12 -I{} sh -c "$CC -c {} $CFLAGS -o $TEMP_DIR/\$(basename {}).o"
+$LINKER "$TEMP_DIR"/*.o $LDFLAGS -rdynamic -o $BINARY_NAME
 
 # Game Code Build 233.5kb
 export CCGC=$CC
@@ -141,8 +146,7 @@ total_build_time=$((build_end - shader_start))
 echo "Built engine and mod in ${total_build_time} ms"
 if ! $IS_CI; then
     case "$PLATFORM" in
-#         windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; wine ./voxen.exe ;;
-        windows)  strip --strip-all voxen.exe; wine ./voxen.exe ;;
+        windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; wine ./voxen.exe ;;
 #         windows)  wine ./voxen.exe ;;
         *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
 #         *)        strip --strip-all --strip-unneeded ./voxen; ./voxen ;;   # linux Alternate build methods to be able to look at symbols and debugging

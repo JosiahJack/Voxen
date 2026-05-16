@@ -13,13 +13,10 @@ extern void DualLogError(const char *fmt, ...);
 #include "common.h"
 #include "interop.h"
 #include "Shaders/shaders.h"
-#define MAX_KEYS 512
-#define MAX_MOUSE_BUTTONS 8
 #define VERTEX_ATTRIBUTES_SIZE 16 // Was 32ls
 #define TEXT_BUFFER_SIZE 1024
 #define FONT_ATLAS_SIZE 4672
 #define MAX_GLYPHS 4096
-#define MAX_CHANNELS 48 // Max concurrent sounds, must keep track of for volume setting
 typedef struct {bool down,pressed,released;} KeyState;
 typedef struct {
 	double last_mouse_x,last_mouse_y,scrollDelta;
@@ -30,17 +27,14 @@ typedef struct {
 typedef struct { Vector3 normal; float d; } FrustumPlane;
 typedef struct StbiArena { u8*base,*cursor,*end; } StbiArena;
 typedef struct {
-    u32 inputImageID,inputUIID,inputDepthID,inputWorldPosID,inputSpecID,inputNormalID,gBufferFBO,uiFBO,outputImageID;
-    u32 depthPrepassShaderProgram,chunkShaderProgram,chunkVAO,chunkVBO,uiShaderProgram,debugUnlitShaderProgram;
-    u32 shadowmapsShaderProgram,shadowmapsClearShaderProgram,shadowMapSSBO,shadowMapsIndirectionID;
-    u32 ssrShaderProgram,imageBlitShaderProgram,quadVAO,quadVBO,textShaderProgram,textVAO,textVBO;
-    u32 debugLinesVAO,debugLinesVBO,matricesBufferID,cellVisibleDataID,debugLineColors;
-    u32 colorBufferID,texturePalettesID,texturePaletteOffsetsID,textureOffsetsID,textureSizesID;
-    u32 lightsID,voxelLightListCountsID,voxelLightListsID,voxelUpdateShaderProgram,shadowViewProjID;
-    u32 vbos[MODEL_IDX_MAX],tbos[MODEL_IDX_MAX];
+    u32 inputImageID,inputUIID,inputDepthID,inputWorldPosID,inputSpecID,inputNormalID,gBufferFBO,uiFBO,outputImageID,depthPrepassShaderProgram,chunkShaderProgram,chunkVAO,chunkVBO,uiShaderProgram,debugUnlitShaderProgram;
+    u32 shadowmapsShaderProgram,shadowmapsClearShaderProgram,shadowMapSSBO,shadowMapsIndirectionID,ssrShaderProgram,imageBlitShaderProgram,quadVAO,quadVBO,textShaderProgram,textVAO,textVBO;
+    u32 debugLinesVAO,debugLinesVBO,matricesBufferID,cellVisibleDataID,debugLineColors,colorBufferID,texturePalettesID,texturePaletteOffsetsID,textureOffsetsID,textureSizesID;
+    u32 lightsID,voxelLightListCountsID,voxelLightListsID,voxelUpdateShaderProgram,shadowViewProjID,vbos[MODEL_IDX_MAX],tbos[MODEL_IDX_MAX];
 } RenderSystem;
 #define STBI_ARENA_SIZE 16*1024*1024
-u8 queuedLevelToLoad = 255u; static float berserkSeedTime,cam_pitch,cam_yaw=90.0f,cam_roll,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
+u8 queuedLevelToLoad = 255u; static float berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
+float cam_pitch,cam_yaw=90.0f,cam_roll;
 float modelMatrices[INSTANCE_COUNT*16];
 bool mouseMovementThisFrame,returnToPause=false,fovSliderActive=false,gammaSliderActive=false,masterVolumeSliderActive=false,musicVolumeSliderActive=false,messageVolumeSliderActive=false,sfxVolumeSliderActive=false,enteringPlayerName=false;
 u8 currentPlayerNameLength=0; i8 currentMenuItem=0, currentMenuTab=0, menuItemCount=4, menuTabCount=1;
@@ -50,6 +44,7 @@ static int num_parse_threads = 0;
 #define MAX_SHADOWMAPS 256u
 #define MAX_LIGHTS_PER_VOXEL 64
 #define NEAR_PLANE (0.02f)
+#define ONE_OVER_SQRT2 0.70710678118f
 GlobalContext Sys_Global = {0}; TextSystem Sys_Text; InputSystem Sys_Input; CheatsSystem Sys_Cheats = {.god=false,.noclip=true,.showLocation=true,.showFPS=true,.editMode=true}; RenderSystem Sys_Render; SystemUI Sys_UI;
 SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on first run for potatoes (e.g. won't crash for out of VRAM, or won't take 5min to init).
     .InputCodeSettings = {
@@ -71,10 +66,9 @@ u16 loadedTexturesMaxIndex;
 bool doubleSidedTexture[MAX_VALID_TEXTURE],transparentTexture[MAX_VALID_TEXTURE];
 u32 drawCallsRenderedThisFrame,uiImageDrawCallsRenderedThisFrame,shadowDrawCallsRenderedThisFrame,verticesRenderedThisFrame,drawCallsNormal;
 static const u8 Mpg_FrontPage=0,Mpg_Singleplayer=1,Mpg_Multiplayer=2,Mpg_NewGame=3,Mpg_Load=4,Mpg_Options=5,Mpg_Save=6,Mpg_IntroVideo=7,Mpg_CreditsVideo=8;
-u8 currentMenuPage = Mpg_FrontPage;
-static bool resDropdownOpen = false; static int resDropdownCount=0,resSelectedIdx=0;
+u8 currentMenuPage = Mpg_FrontPage; bool resDropdownOpen = false; int resDropdownCount=0,resSelectedIdx=0;
 typedef struct {int w,h;} ResMode;
-static ResMode resModes[8];
+ResMode resModes[8];
 typedef struct { Vector3 position; Quaternion rotation; u8 fov; u16 width,height; float near,far,finished; bool visible; } CamView;
 u16 dynamicEntities[512]; u16 dynamicEntityCount;
 CamView camViews[64]; u32 camViewTextures[64]; u8 camViewCount = 0; // Max is 8 cam views on level 8 + 3 sensaround views = 11.
@@ -102,14 +96,11 @@ ENGINE_TO_MOD void DualLog(const char* fmt, ...) { va_list args; __builtin_va_st
 ENGINE_TO_MOD void DualLogWarn(const char* fmt, ...) { va_list args; __builtin_va_start(args,fmt); DualLogMain("\033[1;38;5;208mWARN:",fmt,args); __builtin_va_end(args); }
 ENGINE_TO_MOD void DualLogError(const char* fmt, ...) { va_list args; __builtin_va_start(args,fmt); DualLogMain("\033[1;31mERROR:",fmt,args); __builtin_va_end(args); }
 #include "helpers.c"
-#include "glfw.c"
 #include "console.c"
 #include "textures.c"
 #include "models.c"
 #include "culling.c"
 #include "ray.c"
-#include "physics.c"
-#include "audio.c"
 #include "text.c"
 static inline __attribute__((always_inline)) void LogShaderError(u32 s, const char* name) { char er[512]; glGetShaderInfoLog(s,512,NULL,er); DualLogError("%s Comp Fail: %s\n",name,er); OS_Exit(1); }
 static inline __attribute__((always_inline)) u32 CompileShader(u32 type, const char* source, const char* name) { u32 s = glCreateShader(type); glShaderSource(s,1,&source,NULL); glCompileShader(s); i32 ok; glGetShaderiv(s,0x8B81/*GL_COMPILE_STATUS*/,&ok); if (!ok) LogShaderError(s,name); return s; }
@@ -243,8 +234,7 @@ static inline __attribute__((always_inline)) void mul_mat4(float *out, const flo
     out[14] = a[2] * b[12] + a[6] * b[13] + a[10]* b[14] + a[14] * b[15]; out[15] = a[3] * b[12] + a[7] * b[13] + a[11]* b[14] + a[15] * b[15];
 }
 
-#define QTR90 0.707106781f
-Quaternion cubeQuats[6] = {{0.0f,QTR90,0.0f,QTR90}/*+X:Right*/,{0.0f,-QTR90,0.0f,QTR90}/*-X:Left*/,{-QTR90,0.0f,0.0f,QTR90}/*+Y:Up*/,{QTR90,0.0f,0.0f,QTR90}/*-Y:Down*/,{0.0f,0.0f,0.0f,1.0f}/*+Z:Forward*/,{0.0f,1.0f,0.0f,0.0f}/*-Z:Backward*/ };
+Quaternion cubeQuats[6] = {{0.0f,ONE_OVER_SQRT2,0.0f,ONE_OVER_SQRT2}/*+X:Right*/,{0.0f,-ONE_OVER_SQRT2,0.0f,ONE_OVER_SQRT2}/*-X:Left*/,{-ONE_OVER_SQRT2,0.0f,0.0f,ONE_OVER_SQRT2}/*+Y:Up*/,{ONE_OVER_SQRT2,0.0f,0.0f,ONE_OVER_SQRT2}/*-Y:Down*/,{0.0f,0.0f,0.0f,1.0f}/*+Z:Forward*/,{0.0f,1.0f,0.0f,0.0f}/*-Z:Backward*/ };
 bool NeighborhoodInPVS(u16 cellX, u16 cellZ, int r);
 void UpdateLights(void) {
     for (u16 lightIdx = 0; lightIdx < Sys_Global.loadedLights; ++lightIdx) {
@@ -303,6 +293,7 @@ ENGINE_TO_MOD void UpdateLight(u16 i, Vector3 pos, Color3 col, float range, floa
 
 void RenderUIImage(i16 x, i16 y, i16 width, i16 height, u32 texIndex) {
     glUseProgram(Sys_Render.uiShaderProgram);
+    glDisable(GL_BLEND);
     glBindVertexArray(Sys_Render.textVAO);
     glUniform1ui(0,texIndex);
     glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.textVBO);
@@ -315,26 +306,19 @@ void RenderUIImage(i16 x, i16 y, i16 width, i16 height, u32 texIndex) {
 }
 
 void ClearAll(void) {
-    glBindFramebuffer(GL_FRAMEBUFFER,Sys_Render.gBufferFBO);
-    glClearColor(0.0f,0.0f,0.0f,1.0f); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-    glBindFramebuffer(GL_FRAMEBUFFER,Sys_Render.uiFBO);
-    glClearColor(0.0f,0.0f,0.0f,0.0f); glClear(GL_COLOR_BUFFER_BIT);
-    glBindFramebuffer(GL_FRAMEBUFFER,0);
-    glClearColor(0.0f,0.0f,0.0f,1.0f); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+    glBindFramebuffer(GL_FRAMEBUFFER,Sys_Render.gBufferFBO); glClearColor(0.0f,0.0f,0.0f,1.0f); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+    glBindFramebuffer(GL_FRAMEBUFFER,Sys_Render.uiFBO);      glClearColor(0.0f,0.0f,0.0f,0.0f); glClear(GL_COLOR_BUFFER_BIT);
+    glBindFramebuffer(GL_FRAMEBUFFER,0);                     glClearColor(0.0f,0.0f,0.0f,1.0f); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 }
 
-static inline __attribute__((always_inline,pure)) bool CursorIsOverBounds(float startX, float endX, float startY, float endY) { return Sys_Global.cursorPosition_x >= startX && Sys_Global.cursorPosition_x <= endX /* 0 == left */ && Sys_Global.cursorPosition_y >= endY && Sys_Global.cursorPosition_y <= startY; /* 0 == top */ }
-void RenderLoadingProgress(i32 offset, const char * restrict text) { // Only adds 0.01secs to game startup time.
-    ClearAll();
-    RenderFormattedText(Sys_Settings.ScreenWidth / 2 - offset, Sys_Settings.ScreenHeight / 2 - 5, TEXT_WHITE, FONT_NORMAL,1.0f,text);
-    glfwSwapBuffers();
-}
+void glfwSwapBuffers(void);
+void RenderLoadingProgress(i32 offset, const char * restrict text) { ClearAll(); glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); RenderFormattedText(683 - offset,379,TEXT_WHITE,FONT_NORMAL,1.0f,text); glfwSwapBuffers(); }
 
 char statusText[TEXT_BUFFER_SIZE];
 void CenterStatusPrint(const char * restrict fmt, ...) {
     va_list args; __builtin_va_start(args, fmt); StringFormatV(statusText,TEXT_BUFFER_SIZE,fmt,args); __builtin_va_end(args);
     DualLog("%s\n",statusText);
-    Sys_Global.statusTextDecayFinished = get_time() + 2.5; // 2.5 second decay time before text dissappears.
+    Sys_Global.statusTextDecayFinished = get_time() + 2.5; // secs decay time before text dissappears.
 }
 
 typedef struct { const char* name; int value; } InputElement;
@@ -413,31 +397,7 @@ void SaveConfig(void) {
     DualLog("Saved settings to ./Data/Config.ini! framenum %u\n",Sys_Global.globalFrameNum);
 }
 
-KeyState* GetCodeMapping(int settingIndex) {
-    i32 i = Sys_Settings.InputCodeSettings[settingIndex]; // Get table index into all recognized inputs
-    if (i == 148 || i >= MAX_KEYS) return &Sys_Input.keyStates[MAX_KEYS - 1]; // UNUSED NULL (e.g. setting unbound)
-    
-    if (i >= 53 && i <= 61) { // Pick subtable of GLFW values that were set by GLFW callbacks
-        return &Sys_Input.mouseButtons[inputElements[i].value];
-    } else if (i >= 62 && i <= 77) {
-        return &Sys_Input.joystickButtons[GLFW_JOYSTICK_1][inputElements[i].value];        
-    } else if ((i >= 78 && i <= 79) || (i >= 132 && i <= 133)) {
-        return &Sys_Input.joystickHats[inputElements[i].value];        
-    }
-    
-    return &Sys_Input.keyStates[inputElements[i].value];
-}
-
-bool GetKeyRiseEdgeOrHeld(int settingIndex, bool risingEdge) {
-    i32 i = Sys_Settings.InputCodeSettings[settingIndex]; // Get table index into all recognized inputs
-         if (i == 128) return Sys_Input.scrollDelta > 0.0; // Mousewheel +
-    else if (i == 129) return Sys_Input.scrollDelta < 0.0; // Mousewheel -
-    
-    KeyState* keyOfConcern = GetCodeMapping(settingIndex);
-    bool retval = risingEdge ? keyOfConcern->pressed : keyOfConcern->down;
-    return retval;
-}
-
+bool GetKeyRiseEdgeOrHeld(int settingIndex, bool risingEdge);
 ENGINE_TO_MOD bool GetKey(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,false); }  // True while held down.
 ENGINE_TO_MOD bool GetKeyPressed(int settingIndex) { return (settingIndex < 0) ? Sys_Input.keyStates[GLFW_KEY_GRAVE_ACCENT].pressed : GetKeyRiseEdgeOrHeld(settingIndex,true); } // True 1st frame down.
 ENGINE_TO_MOD void IgnoreNextMouseDelta(void) { Sys_Input.ignore_next_mouse_delta = true; }
@@ -498,12 +458,7 @@ ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
     DebugRAM("end of LoadLevel");
 }
 
-void InputClearRisingAndFallingEdges(void) { // Clear keypress rising and falling edge triggers
-    for (i32 i=0;i<MAX_KEYS;++i)          Sys_Input.keyStates[i].pressed = Sys_Input.keyStates[i].released = false;       // Can't memset as we want to preserve down state
-    for (i32 i=0;i<MAX_MOUSE_BUTTONS;i++) Sys_Input.mouseButtons[i].pressed = Sys_Input.mouseButtons[i].released = false; // Can't memset as we want to preserve down state
-    Sys_Input.scrollDelta = 0;
-}
-
+void InputClearRisingAndFallingEdges(void);
 __attribute__((cold)) void NewGame(void) { // Reset World States
     DualLog("Loading new game...\n");
     RenderLoadingProgress(100,"Loading new game...");
@@ -535,14 +490,14 @@ __attribute__((cold)) void NewGame(void) { // Reset World States
     ModNewGame();
 }
 
-static void GoIntoGame(void) { NewGame(); PlayGameMusic(); DualLog("Player named \"%s\" started the game!\n", Sys_Global.playerName); }
+void GoIntoGame(void) { NewGame(); PlayGameMusic(); DualLog("Player named \"%s\" started the game!\n", Sys_Global.playerName); }
 static __attribute__((noinline)) void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, unsigned char* bmp) {
     if (*id == 0) {glGenTextures(1,id);} glBindTexture(GL_TEXTURE_2D,*id);
     glTexImage2D(GL_TEXTURE_2D,0,internalFormat,width,height,0,format,type,bmp);
     glTexParameteri(GL_TEXTURE_2D,0x2801/*GL_TEXTURE_MIN_FILTER*/,filt); glTexParameteri(GL_TEXTURE_2D,0x2800/*GL_TEXTURE_MAG_FILTER*/,filt);
 }
 static void GenBTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt) { GenerateAndBindTexture(id,internalFormat,width,height,format,type,filt,NULL); }
-static void UpdateScreenSize(i32 width, i32 height) {
+void UpdateScreenSize(i32 width, i32 height) {
     u16 w = Sys_Settings.ScreenWidth = vmax(vmin((u16)width,7680u),320u), h = Sys_Settings.ScreenHeight = vmax(vmin((u16)height,4320u),200u); // Cap at minimum Quake resolution and maximum 8k.
     float wf = (float)w, hf = (float)h; Sys_Settings.ScreenCenterX = wf * 0.5f; Sys_Settings.ScreenCenterY = hf * 0.5f;
     glViewport(0,0,w,h); RenderSystem* rs = &Sys_Render;
@@ -576,133 +531,9 @@ ENGINE_TO_MOD void AddCamView(Vector3 pos, Quaternion rot, u8 fov, u16 width, u1
     GenBTexture(&camViewTextures[camViewCount],GL_RGBA8,width,height,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/); camViewCount++;
 }
 
-static i32 initJoysticks(void) { if (!_glfw.joysticksInitialized && !PLATFORM_initJoysticks()) {return 0;} return _glfw.joysticksInitialized =  1; }
-bool JoystickPresent(int jid) {
-    if (jid < 0 || jid > GLFW_JOYSTICK_LAST) return false;
-    if (!initJoysticks()) return false;
-    _GLFWjoystick* js = _glfw.joysticks + jid;
-    return js->connected ? PLATFORM_pollJoystick(js) : false;
-}
-
-void CenterWindowOnMonitor(void) {
-    int monitorCount; GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
-    if (Sys_Settings.CurrentMonitor > (monitorCount - 1)) { Sys_Settings.CurrentMonitor = 0; SaveConfig(); }
-    int mx, my; GLFWmonitor* next = monitors[Sys_Settings.CurrentMonitor];
-    glfwGetMonitorPos(next,&mx,&my);
-    const GLFWvidmode* mode = glfwGetVideoMode(next);
-    int xpos = mx + (mode->width - Sys_Settings.ScreenWidth) / 2;
-    int ypos = my + (mode->height - Sys_Settings.ScreenHeight) / 2;
-    glfwSetWindowPos(window,xpos,ypos);
-    Sys_Input.ignore_next_mouse_delta = true;
-}
-
-double monitorSwitchTime;
-void CycleToNextMonitor(void) {
-    if (get_time() < monitorSwitchTime) return;
-    
-    monitorSwitchTime = get_time() + 0.5; // Prevent toggling rapidly on accident
-    int monitorCount; GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
-    if (Sys_Settings.CurrentMonitor > (monitorCount - 1)) { Sys_Settings.CurrentMonitor = 0; SaveConfig(); }
-    if (!monitors || monitorCount < 2) return;
-
-    Sys_Settings.CurrentMonitor = (Sys_Settings.CurrentMonitor + 1) % monitorCount;
-    SaveConfig();
-    CenterWindowOnMonitor();
-}
-
-GLFWmonitor* GetCurrentMonitor(void) {
-    int wx=0,wy=0,ww=0,wh=0; PLATFORM_getWindowPos(((_GLFWwindow*)window),&wx,&wy); PLATFORM_getWindowSize(((_GLFWwindow*)window),&ww,&wh);
-    GLFWmonitor* bestMonitor = glfwGetPrimaryMonitor();
-    int bestArea=0,monitorCount; GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
-    for (int i=0;i<monitorCount;++i) {
-        int mx, my;
-        glfwGetMonitorPos(monitors[i], &mx, &my);
-        const GLFWvidmode* mode = glfwGetVideoMode(monitors[i]);
-        int mw = mode->width;
-        int mh = mode->height;
-        int left=vmax(wx,mx), right=vmin(wx + ww,mx + mw), top=vmax(wy,my), bottom=vmin(wy + wh,my + mh);
-        int area = (right > left && bottom > top) ? (right - left) * (bottom - top) : 0;
-        if (area > bestArea) { bestArea = area; bestMonitor = monitors[i]; }
-    }
-    return bestMonitor;
-}
-
-void GatherResolutionModes(void) {
-    resDropdownCount = 0;
-    GLFWmonitor* monitor = GetCurrentMonitor(); if (!monitor) monitor = glfwGetPrimaryMonitor();
-    const GLFWvidmode* desktop = glfwGetVideoMode(monitor); if (!desktop) return;
-
-    static const struct {int w,h;} commonRes[] = {{320,200}, {640,400}, {640,480}, {800,600}, {1024,768}, {1280,720}, {1280,800}, {1366,768}, {1440,900}, {1600,900}, {1920,1080}, {2560,1440}};
-    int maxW = desktop->width, maxH = desktop->height,j;
-    for (int i = 0; i < (int)(sizeof(commonRes)/sizeof(commonRes[0])) && resDropdownCount < 8; ++i) {
-        int w = commonRes[i].w, h = commonRes[i].h;
-        if (w > maxW || h > maxH || w < 320 || h < 200) continue;
-
-        for (j = 0; j < resDropdownCount; ++j) {
-            if (resModes[j].w == w && resModes[j].h == h) break;
-        }
-        if (j == resDropdownCount) resModes[resDropdownCount++] = (ResMode){w,h};
-    }
-
-    if (resDropdownCount < 8) resModes[resDropdownCount++] = (ResMode){desktop->width,desktop->height};
-    resSelectedIdx = 0;
-    for (int i = 0; i < resDropdownCount; ++i) {
-        if (resModes[i].w == (int)Sys_Settings.ScreenWidth && resModes[i].h == (int)Sys_Settings.ScreenHeight) { resSelectedIdx = i; break; }
-    }
-}
-
+void CenterWindowOnMonitor(void); GLFWmonitor* GetCurrentMonitor(void); void GatherResolutionModes(void);
 void SetSkyRotateSpeed(void) { static const float skyRotateSpeeds[] = { 0.05f, 1.0f, 2.5f, 3.75f, 6.25f }; glUseProgram(Sys_Render.imageBlitShaderProgram); glUniform1f(30,skyRotateSpeeds[Sys_Cheats.dizzyLevel]); }
-void ChangeResolution(void) {
-    if (resDropdownCount < 1) return;
-
-    resSelectedIdx = (resSelectedIdx + 1) % resDropdownCount;
-    Sys_Settings.ScreenWidth  = (u32)resModes[resSelectedIdx].w;
-    Sys_Settings.ScreenHeight = (u32)resModes[resSelectedIdx].h;
-    GLFWmonitor* monitor = GetCurrentMonitor();
-    if (!monitor) monitor = glfwGetPrimaryMonitor();
-
-    int mx, my;
-    glfwGetMonitorPos(monitor, &mx, &my);
-    const GLFWvidmode* desktop = glfwGetVideoMode(monitor);
-    int xpos = mx + (desktop->width  - (int)Sys_Settings.ScreenWidth)  / 2;
-    int ypos = my + (desktop->height - (int)Sys_Settings.ScreenHeight) / 2;
-    glfwSetWindowSize(window, (int)Sys_Settings.ScreenWidth, (int)Sys_Settings.ScreenHeight);
-    glfwSetWindowPos(window,xpos,ypos);
-    UpdateScreenSize((int)Sys_Settings.ScreenWidth, (int)Sys_Settings.ScreenHeight);
-    Sys_Input.ignore_next_mouse_delta = true;
-    resDropdownOpen = false;
-    SaveConfig();
-}
-
-void ChangeFullScreenWindowed(void) {
-    int monitorCount; GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
-    GLFWmonitor* monitor = monitors[Sys_Settings.CurrentMonitor];
-    const GLFWvidmode* mode = glfwGetVideoMode(monitor);
-    if (Sys_Settings.Fullscreen) {
-        ((_GLFWwindow*)window)->decorated = 0; PLATFORM_setWindowDecorated(((_GLFWwindow*)window),0);
-        int x,y,w,h;
-        glfwGetMonitorWorkarea(monitor,&x,&y,&w,&h);
-        glfwSetWindowMonitor(window,x,y,w,h);
-        Sys_Settings.ScreenWidth = w;
-        Sys_Settings.ScreenHeight = h;
-    } else {
-        ((_GLFWwindow*)window)->decorated = 1; PLATFORM_setWindowDecorated(((_GLFWwindow*)window),1);
-        int mx, my; 
-        glfwGetMonitorPos(monitor,&mx,&my);
-        int x,y,w,h;
-        glfwGetMonitorWorkarea(monitor,&x,&y,&w,&h);
-        Sys_Settings.ScreenWidth  = vmax(vmin((w*3)/4,1366),320);
-        Sys_Settings.ScreenHeight = vmax(vmin((h*3)/4, 768),200);
-        int xpos = mx + (mode->width - Sys_Settings.ScreenWidth) / 2;
-        int ypos = my + (mode->height - Sys_Settings.ScreenHeight) / 2;
-        glfwSetWindowMonitor(window,xpos,ypos,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
-    }
-    
-    UpdateScreenSize(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
-    Sys_Input.ignore_next_mouse_delta = true;
-}
-
-void SetVSync(void) { _GLFWwindow* handle = (_GLFWwindow*)window; handle->context.swapInterval((i32)Sys_Settings.Vsync); }
+void ChangeResolution(void); void ChangeFullScreenWindowed(void); void SetVSync(void);
 void SetGI(void) { }// TODO: Set needed Voxel GI uniforms from Sys_Settings.GI
 void LoadTextForLanguage(u8),LoadLogTextForLanguage(u8); bool GetKey(int settingIndex),GetKeyPressed(int settingIndex); void* mod_handle = NULL;
 void SetLanguage(void) { LoadTextForLanguage(Sys_Settings.Language); LoadLogTextForLanguage(Sys_Settings.Language); }
@@ -710,8 +541,13 @@ void ApplySettings(void) { ChangeFullScreenWindowed(); SetSkyRotateSpeed(); SetV
 void StringConcatenate(char* a, const char* b, size_t bufferSize);
 void OpenMainMenu(void) { PlayMenuMusic(); Sys_Global.menuActive = true; currentMenuPage = Mpg_FrontPage; }
 bool MenuEnter(void) { return (Sys_Input.keyStates[GLFW_KEY_KP_ENTER].pressed || Sys_Input.keyStates[GLFW_KEY_ENTER].pressed); }
+static inline __attribute__((always_inline,pure)) bool CursorIsOverBounds(float startX, float endX, float startY, float endY) {
+    return    Sys_Global.cursorPosition_x >= startX && Sys_Global.cursorPosition_x <= endX  /* 0 == left */
+           && Sys_Global.cursorPosition_y >= startY && Sys_Global.cursorPosition_y <= endY; /* 0 ==  top */
+}
+
 u8 UI_Interactable(i16 x, i16 y, float w, float h, bool* cursorOver, i8 this, bool sustained) {
-    bool cursorIsOver = CursorIsOverBounds(x,x + w,y + h,y);
+    bool cursorIsOver = CursorIsOverBounds(x, x + w, (float)y - h, (float)y);
     if (cursorIsOver && mouseMovementThisFrame) { currentMenuItem = this; if (cursorOver != NULL) {*cursorOver = cursorIsOver;} }
     if ((sustained ? Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT ].down : Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT ].pressed) && cursorIsOver) return 1u;
     if ((sustained ? Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].down : Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].pressed) && cursorIsOver) return 2u;
@@ -724,7 +560,7 @@ bool UI_Slider(i16 x, i16 y, i16 w, i16 h, i16 sliderPos, i16 xPosForLabel, u8 c
     bool over=false,changed=false; *out = currentValue;
     RenderUIImage(x,y, w,h, 1079); // Slider background
     RenderUIImage(x + sliderPos,y, h,h,1078); // Slider handle
-    if (UI_Interactable(xPosForLabel,y + h,xPosForLabel + w,h,&over,mindex,true)) *sliderActive = true;
+    if (UI_Interactable(xPosForLabel,y,xPosForLabel + w,h,&over,mindex,true)) *sliderActive = true;
     if (*sliderActive && Sys_Input.currentMouse_dx != 0) {
         i32 new = (i32)currentValue + vmin(vmax(Sys_Input.currentMouse_dx,-1),1); *out = (u8)vmin(vmax(new,min),max); if (*out != currentValue) {changed = true;}
     }
@@ -775,6 +611,7 @@ ENGINE_TO_MOD void MenuGoBack(void) {
 }
 
 void ChangeMenuPage(u8 pg) { currentMenuPage = pg; currentMenuItem = currentMenuTab = 0; }
+void glfwSetWindowSize(GLFWwindow* handle, int width, int height); void CycleToNextMonitor(void);
 void RenderMenu(void) {    
     if (currentMenuPage != Mpg_IntroVideo && currentMenuPage != Mpg_CreditsVideo && currentMenuPage != Mpg_Options) RenderUIImage(-417,-384, 2200,1536, 1026); // Menu background
     if (currentMenuPage == Mpg_IntroVideo || currentMenuPage == Mpg_CreditsVideo) RenderUIImage(-417,-384, 2200,1536, 0); // Video blackground
@@ -782,10 +619,10 @@ void RenderMenu(void) {
     if (currentMenuPage == Mpg_FrontPage) {
         menuItemCount = 4; menuTabCount = 1;
         RenderUIImage(282,46, 800,128, 1031); // Title CITADEL with strikethrough effect
-        if (UI_MenuButton(408,340,0,574,84, 304,188,/*"SINGLEPLAYER"*/Sys_Text.stringTable[719],413,276)) ChangeMenuPage(Mpg_Singleplayer);
-        if (UI_MenuButton(408,458,1,574,84, 304,268,/*"MULTIPLAYER"*/Sys_Text.stringTable[720], 413,396)) ChangeMenuPage(Mpg_Multiplayer);
-        if (UI_MenuButton(408,582,2,574,84, 304,350,/*"OPTIONS"*/Sys_Text.stringTable[721],     413,520)) ChangeMenuPage(Mpg_Options);
-        if (UI_MenuButton(408,702,3,574,84, 304,430,/*"QUIT"*/Sys_Text.stringTable[722],        413,638)) OS_Exit(0);
+        if (UI_MenuButton(408,340, 0, 574,84, 304,188,/*"SINGLEPLAYER"*/Sys_Text.stringTable[719],413,276)) ChangeMenuPage(Mpg_Singleplayer);
+        if (UI_MenuButton(408,458, 1, 574,84, 304,268,/*"MULTIPLAYER"*/Sys_Text.stringTable[720], 413,396)) ChangeMenuPage(Mpg_Multiplayer);
+        if (UI_MenuButton(408,582, 2, 574,84, 304,350,/*"OPTIONS"*/Sys_Text.stringTable[721],     413,520)) ChangeMenuPage(Mpg_Options);
+        if (UI_MenuButton(408,702, 3, 574,84, 304,430,/*"QUIT"*/Sys_Text.stringTable[722],        413,638)) OS_Exit(0);
     } else if (currentMenuPage == Mpg_Singleplayer) {
         menuItemCount = 5; menuTabCount = 1;
         UI_HeaderText(250,/*"SINGLEPLAYER"*/Sys_Text.stringTable[719]);
@@ -844,47 +681,6 @@ void RenderMenu(void) {
 
                 RenderUIImage(476, 710, 16, 16, overRes ? 1119 : 1077);
                 RenderFormattedText(200, 710, overRes ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL, 1.0f, "RESOLUTION %s", resBuf);
-                if (resDropdownOpen) { // TODO
-                    for (int i = 0; i < resDropdownCount; ++i) {
-                        i16 itemBaseY = (i16)(710 - (resDropdownCount - i) * 24);
-                        bool overItem = false;
-                        bool clicked = (UI_Button(190, (i16)(itemBaseY + 24),328,24,&overItem,(i8)(10 + i)) != 0);
-                        bool isEnterSelected = (MenuEnter() && currentMenuItem == (i8)(10 + i));
-                        bool isSelected = (i == resSelectedIdx);
-                        u8 color = isSelected ? TEXT_YELLOW : (overItem ? TEXT_GREEN : TEXT_WHITE);
-                        RenderUIImage(190, (i16)(itemBaseY + 24),328,24,1120);
-                        char itemBuf[32];
-                        StringFormat(itemBuf,sizeof(itemBuf),"%dx%d",(u32)resModes[i].w,(u32)resModes[i].h);
-                        RenderFormattedText(200,(i16)(itemBaseY + 4),color,FONT_NORMAL,1.0f,"%s",itemBuf);
-                        if (clicked || isEnterSelected) {
-                            resSelectedIdx = i;
-                            Sys_Settings.ScreenWidth  = (u32)resModes[i].w; Sys_Settings.ScreenHeight = (u32)resModes[i].h;
-                            GLFWmonitor* monitor = GetCurrentMonitor();
-                            if (!monitor) monitor = glfwGetPrimaryMonitor();
-                            int mx,my; glfwGetMonitorPos(monitor,&mx,&my);
-                            const GLFWvidmode* mode = glfwGetVideoMode(monitor);
-                            int xpos = mx + (mode->width  - (int)Sys_Settings.ScreenWidth)  / 2;
-                            int ypos = my + (mode->height - (int)Sys_Settings.ScreenHeight) / 2;
-                            glfwSetWindowSize(window, (int)Sys_Settings.ScreenWidth,(int)Sys_Settings.ScreenHeight);
-                            glfwSetWindowPos(window,xpos,ypos);
-                            UpdateScreenSize((int)Sys_Settings.ScreenWidth,(int)Sys_Settings.ScreenHeight);
-                            Sys_Input.ignore_next_mouse_delta = true;
-                            resDropdownOpen = false;
-                            SaveConfig();
-                            GatherResolutionModes();
-                            break;
-                        }
-                    }
-
-                    if (Sys_Input.keyStates[GLFW_KEY_UP].pressed && currentMenuItem >= 10 && currentMenuItem > 10) currentMenuItem--;
-                    else if (Sys_Input.keyStates[GLFW_KEY_UP].pressed && currentMenuItem == 10) currentMenuItem = (i8)(10 + resDropdownCount - 1);
-                    
-                    if (Sys_Input.keyStates[GLFW_KEY_DOWN].pressed && currentMenuItem >= 10 && currentMenuItem < (i8)(10 + resDropdownCount - 1)) currentMenuItem++;
-                    else if (Sys_Input.keyStates[GLFW_KEY_DOWN].pressed && currentMenuItem == (i8)(10 + resDropdownCount - 1)) currentMenuItem = 10;
-
-                    if (Sys_Input.keyStates[GLFW_KEY_ESCAPE].pressed) resDropdownOpen = false;
-                    if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].pressed && currentMenuItem < 10 && currentMenuItem != 7) resDropdownOpen = false;
-                }
             }
     
             // Fullscreen checkbox
@@ -1009,6 +805,7 @@ void RenderPausedUI(void) {
 typedef struct { float x,y,z,r,g,b,a; } DebugLineVertex;
 DebugLineVertex debugLineVerts[MAX_DEBUG_LINE_VERTS * 2];
 static inline __attribute__((always_inline)) void DrawDebugLines(float* viewProj) {
+    return;
     if (Sys_Global.debugLineVertCount == 0) return;
 
     glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.debugLinesVBO);
@@ -1303,33 +1100,30 @@ void qsort(void* base, size_t nmemb, size_t size, int (*cmp)(const void*, const 
 // Bind textures only on change (norm/tex/glow/spec); cmi<camViewCount handled inline
 #define MAX_VISIBLE 4096
 #define BIND_TEX(slot,cur,next) if((cur)!=(next)||(next)==0){(cur)=(next);glUniform1ui(slot,(u32)(next));}
-#define SET_CAMVIEW(cmi,constIndex,gs) \
-    glUniform1ui(30,(cmi)<camViewCount?1u:0u); \
-    if((cmi)<camViewCount){ \
-        glActiveTexture(GL_TEXTURE6);glBindTexture(GL_TEXTURE_2D,camViewTextures[cmi]); \
-        glUniform2ui(28,camViews[cmi].width,camViews[cmi].height);glUniform1i(29,6); \
-        if(gs){float _h=ConstIndexIsNPC(constIndex)?(( \
-            constIndex==419||constIndex==422||constIndex==424||constIndex==429||constIndex==430|| \
-            constIndex==431||constIndex==433||constIndex==437||constIndex==438||constIndex==441)?1.5f:4.0f):0.0f; \
-            glUniform1f(9,_h);} \
-    }
-#define DRAW_ENTITY(i,curN,curT,curG,curS,curM) \
+#define DRAW_ENTITY(curN,curT,curG,curS,curM) \
     {Entity*e=&Sys_Global.instances[i];u16 tex=e->texIndex,glow=e->glowIndex,norm=e->normIndex,spec=e->specIndex; \
      if (e->collider == COLLIDER_TYPE_BOX) DrawBoxCollider(e); \
      else if (e->collider == COLLIDER_TYPE_SPHERE) DrawSphereCollider(e); \
      else if (e->collider == COLLIDER_TYPE_CONVEXMESH) DrawConvexMeshCollider(e); \
      else if (e->collider == COLLIDER_TYPE_CAPSULE) DrawCapsuleCollider(e); \
-     u32 ci=e->index; \
+     u32 constIndex=e->index; \
      glUniform1ui(17,tex==316?1u:0u); \
-     glUniform1ui(25,ci); \
+     glUniform1ui(25,constIndex); \
      glUniform1f(27,e->volume); \
      glUniform1ui(13,(tex==36||tex==887)?1u:0u); \
-     SET_CAMVIEW(e->camView,ci,grayscaleEnabled) \
+     if (grayscaleEnabled) { float npcHeat = ConstIndexIsNPC(constIndex) ? ((constIndex==419 || constIndex==422 || constIndex==424 || constIndex==429 || constIndex==430 || constIndex==431||constIndex==433||constIndex==437||constIndex==438||constIndex==441) ? 1.5f : 4.0f) : 0.0f; glUniform1f(9,npcHeat); } \
+     glUniform1ui(30,e->camView < camViewCount ? 1u : 0u); \
+     if(e->camView < camViewCount) { \
+         glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D,camViewTextures[e->camView]); \
+         glUniform2ui(28,camViews[e->camView].width,camViews[e->camView].height);glUniform1i(29,6); \
+     } \
      BIND_TEX(1,curN,norm) BIND_TEX(18,curT,tex) BIND_TEX(19,curG,glow) BIND_TEX(20,curS,spec) \
      curM=GetAndBindModel(i,curM); \
      u32 vc=modelTriangleCounts[curM]*3; \
      glDrawElements(0x0004,vc,GL_UNSIGNED_SHORT,0);drawCallsRenderedThisFrame++;verticesRenderedThisFrame+=vc;}
 
+void Entity_GetBox(const Entity *e,ShapeBox *out); void Entity_GetSphere(const Entity *e,ShapeSphere *out); void Entity_GetCapsule(const Entity *e,ShapeCapsule *out);
+void obb_axes(Quaternion q,Vector3 *ax,Vector3 *ay,Vector3 *az);
 static void DrawBoxCollider(Entity* e) {
     ShapeBox b; Entity_GetBox(e,&b);
     Vector3 ax,ay,az; obb_axes(b.rot,&ax,&ay,&az);
@@ -1463,6 +1257,30 @@ static void DrawCapsuleCollider(Entity *e) {
 
     #undef CAPS_SEGS
 }
+
+void GetProjections(float* view, float* viewProj, float* invViewRot, float sfov, float aspect3D, float snear, float sfar) {
+    float f = vcot(sfov * PI / 360.0f);
+    float* m = rasterPerspectiveProjection;
+    m[0] = f / aspect3D; m[1] = 0.0f; m[2] = 0.0f; m[3] = 0.0f;
+    m[4] = 0.0f; m[5] = f; m[6] = 0.0f; m[7] = 0.0f;
+    m[8] = 0.0f; m[9] = 0.0f; m[10]= -(sfar + snear) / (sfar - snear); m[11]= -1.0f;
+    m[12]= 0.0f; m[13]= 0.0f; m[14]= -2.0f * sfar * snear / (sfar - snear); m[15]= 0.0f;
+    voxen_Shadow_System.shadDotThresh = 1.0f / vsqrtf(1.0f + vtan(sfov * PI / 360.0f) * (1.0f + aspect3D * aspect3D));
+    Quaternion r=Sys_Global.instances[PLAYER1].rotation; float x=r.x, y=r.y, z=r.z, w=r.w;
+    float x2=x*x, y2=y*y, z2=z*z, xy=x*y, xz=x*z, yz=y*z, wx=w*x, wy=w*y, wz=w*z;
+    Vector3 right = { 1.0f - 2.0f * (y2 + z2), 2.0f * (xy + wz), 2.0f * (xz - wy) };   // X+ (right)
+    Vector3 up = { 2.0f * (xy - wz), 1.0f - 2.0f * (x2 + z2), 2.0f * (yz + wx) };      // Y+ (up)
+    Vector3 forward = { 2.0f * (xz + wy), 2.0f * (yz - wx), 1.0f - 2.0f * (x2 + y2) }; // Z+ (forward)
+    view[0] = right.x; view[1] = up.x; view[2] = -forward.x; view[3] = 0.0f;
+    view[4] = right.y; view[5] = up.y; view[6] = -forward.y; view[7] = 0.0f;
+    view[8] = right.z; view[9] = up.z; view[10] = -forward.z; view[11] = 0.0f;
+    Vector3 pp=Sys_Global.instances[PLAYER1].position;
+    view[12] = -dot_vector3(right,pp); view[13] = -dot_vector3(up,pp); view[14] = dot_vector3(forward,pp); view[15] = 1.0f;
+    mul_mat4(viewProj,rasterPerspectiveProjection,view);
+    invViewRot[0]=view[0]; invViewRot[1]=view[4]; invViewRot[2]=view[8];
+    invViewRot[3]=view[1]; invViewRot[4]=view[5]; invViewRot[5]=view[9];
+    invViewRot[6]=view[2]; invViewRot[7]=view[6]; invViewRot[8]=view[10];
+}
      
 static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     u16 swidth = camView ? camViews[camViewIdx].width : Sys_Settings.ScreenWidth, sheight = camView ? camViews[camViewIdx].height : Sys_Settings.ScreenHeight;
@@ -1471,26 +1289,8 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     Vector3 playerPos = Sys_Global.instances[PLAYER1].position;
     float px = playerPos.x, py = playerPos.y, pz = playerPos.z;
     float aspect3D = (float)swidth / (float)sheight;
-    float f = vcot(sfov * PI / 360.0f);
-    float* m = rasterPerspectiveProjection;
-    m[0] = f / aspect3D; m[1] = 0.0f; m[2] = 0.0f; m[3] = 0.0f;
-    m[4] = 0.0f; m[5] = f; m[6] = 0.0f; m[7] = 0.0f;
-    m[8] = 0.0f; m[9] = 0.0f; m[10]= -(sfar + snear) / (sfar - snear); m[11]= -1.0f;
-    m[12]= 0.0f; m[13]= 0.0f; m[14]= -2.0f * sfar * snear / (sfar - snear); m[15]= 0.0f;
-    voxen_Shadow_System.shadDotThresh = 1.0f / vsqrtf(1.0f + vtan(sfov * PI / 360.0f) * (1.0f + aspect3D * aspect3D));
-    float x = Sys_Global.instances[PLAYER1].rotation.x, y = Sys_Global.instances[PLAYER1].rotation.y, z = Sys_Global.instances[PLAYER1].rotation.z, w = Sys_Global.instances[PLAYER1].rotation.w;
-    float x2=x*x, y2=y*y, z2=z*z, xy=x*y, xz=x*z, yz=y*z, wx=w*x, wy=w*y, wz=w*z;
-    Vector3 right = { 1.0f - 2.0f * (y2 + z2), 2.0f * (xy + wz), 2.0f * (xz - wy) };   // X+ (right)
-    Vector3 up = { 2.0f * (xy - wz), 1.0f - 2.0f * (x2 + z2), 2.0f * (yz + wx) };      // Y+ (up)
-    Vector3 forward = { 2.0f * (xz + wy), 2.0f * (yz - wx), 1.0f - 2.0f * (x2 + y2) }; // Z+ (forward)
-    float view[16]; // view matrix
-    view[0] = right.x; view[1] = up.x; view[2] = -forward.x; view[3] = 0.0f;
-    view[4] = right.y; view[5] = up.y; view[6] = -forward.y; view[7] = 0.0f;
-    view[8] = right.z; view[9] = up.z; view[10] = -forward.z; view[11] = 0.0f;
-    view[12] = -dot_vector3(right,playerPos); view[13] = -dot_vector3(up,playerPos); view[14] = dot_vector3(forward,playerPos); view[15] = 1.0f;
-    float viewProj[16]; // view-projection matrix
-    mul_mat4(viewProj,rasterPerspectiveProjection,view);
-    float invViewRot[9] = {view[0],view[4],view[8], view[1],view[5],view[9], view[2],view[6],view[10]};
+    float view[16],viewProj[16],invViewRot[9];
+    GetProjections(view,viewProj,invViewRot,sfov,aspect3D,snear,sfar);
     ExtractFrustumPlanes(viewProj,playerFrustumPlanes);
     glBindVertexArray(Sys_Render.chunkVAO); // Common vao for RenderDynamicShadowmaps and Rasterized Geometry
     glEnable(GL_DEPTH_TEST);
@@ -1552,7 +1352,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         if (transparentTexture[tex]) continue;
         else if (doubleSidedTexture[tex] || e->scale.x < 0.0f || e->scale.y < 0.0f || e->scale.z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided (either)
         else { glEnable(GL_CULL_FACE); glDisable(GL_BLEND); } // Opaque
-        DRAW_ENTITY(i,currentNormIndex,currentTexIndex,currentGlowIndex,currentSpecIndex,currentModelType)
+        DRAW_ENTITY(currentNormIndex,currentTexIndex,currentGlowIndex,currentSpecIndex,currentModelType)
     }
 
     glDepthMask(1); currentTexIndex = currentNormIndex = currentGlowIndex = currentSpecIndex = currentModelType = 0; // Transparents Pass
@@ -1567,7 +1367,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         u32 constIndex = e->index;
         if ((constIndex >= 561 && constIndex <= 565) || (constIndex >= 568 && constIndex <= 573)) glDepthFunc(0x0202/*GL_EQUAL*/); // Cutouts
         else glDepthFunc(0x0203/*GL_LEQUAL*/); // Actual alphas
-        DRAW_ENTITY(i,currentNormIndex,currentTexIndex,currentGlowIndex,currentSpecIndex,currentModelType)
+        DRAW_ENTITY(currentNormIndex,currentTexIndex,currentGlowIndex,currentSpecIndex,currentModelType)
     }
     
     if (camView) {
@@ -1588,12 +1388,13 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         glDispatchCompute(groupX_ssr,groupY_ssr,1);
     }
     
-    glBindFramebuffer(GL_FRAMEBUFFER,Sys_Render.uiFBO); glViewport(0,0,1366,768); glDisable(GL_CULL_FACE); glDisable(GL_BLEND); // MUST DISABLE BLEND OR UI DISSAPPEARS!!
+    glBindFramebuffer(GL_FRAMEBUFFER,Sys_Render.uiFBO); glViewport(0,0,1366,768);
+    glDisable(GL_CULL_FACE);
     Sys_Global.last_time = RenderUI();
     if ((Sys_Global.inventoryMode && !Sys_Cheats.noHUD) || Sys_Global.menuActive || Sys_Global.gamePaused) RenderUIImage((i16)(Sys_Global.cursorPosition_x) - 20,(i16)(Sys_Global.cursorPosition_y) - 20,40,40,GetCursorTexture());
     else RenderUIImage(663,371,40,40,GetCursorTexture()); // Centered on UI baseline resolution 1366x768
     glBindFramebuffer(GL_FRAMEBUFFER,0); glViewport(0,0,swidth,sheight); // Restore normal output size for final composite blit
-    
+
     glUseProgram(Sys_Render.imageBlitShaderProgram);
     glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,Sys_Render.inputImageID);
     glUniform1i(4,4); // outputImage texture sampler2D, don't remember why when active texture is texture 0. meh.... oh maybe to not read and write same binding?
@@ -1604,7 +1405,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glUniform1ui(5,Sys_Settings.Reflections);
     glUniform1ui(6,Sys_Settings.FXAA);
     glUniform1f(14,Sys_Settings.FOV);
-    glUniform1f(16,(float)swidth / (float)sheight);
+    glUniform1f(16,aspect3D);
     glUniform1ui(22,Sys_Settings.Shadows);
     glUniform1f(9,(float)berserkTimeRemainingNormalized);
     glUniform1f(10,berserkSeedTime);
@@ -1641,6 +1442,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     }
 }
 
+void SetGLContext_GetFunctionPointers(void); GLFWwindow* glfwCreateWindow(int width, int height, char* title); int WindowInit(void); void InitAudio(void); void AudioUpdate(void);
 void InitalizeEnvironment(double game_start_time) {
     random_range_rng = (u32)game_start_time; // Seed global rand uniquely with time since system boot.
     console_log_file = OS_OpenWriteonly("./voxen.log"); // Initialize log system for all prints to go to both stdout and voxen.log file
@@ -1671,77 +1473,12 @@ void InitalizeEnvironment(double game_start_time) {
         LoadConfig(); // Get settings before setting window size.
         window = glfwCreateWindow(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight,&global_modname[0]);
         CenterWindowOnMonitor();
-        _GLFWwindow* handle = (_GLFWwindow*)window; handle->context.makeCurrent(handle);
-        glClear = (PFNGLCLEAR)glfwGetProcAddress("glClear");
-        glClearColor = (PFNGLCLEARCOLOR)glfwGetProcAddress("glClearColor");
-        glColorMask = (PFNGLCOLORMASK)glfwGetProcAddress("glColorMask");
-        glDepthFunc = (PFNGLDEPTHFUNC)glfwGetProcAddress("glDepthFunc");
-        glDepthMask = (PFNGLDEPTHMASK)glfwGetProcAddress("glDepthMask");
-        glDisable = (PFNGLDISABLE)glfwGetProcAddress("glDisable");
-        glEnable = (PFNGLENABLE)glfwGetProcAddress("glEnable");
-        glFinish = (PFNGLFINISH)glfwGetProcAddress("glFinish");
-        glFlush = (PFNGLFLUSH)glfwGetProcAddress("glFlush");
-        glFrontFace = (PFNGLFRONTFACE)glfwGetProcAddress("glFrontFace");
-        glGetError = (PFNGLGETERROR)glfwGetProcAddress("glGetError");
-        glGetIntegerv = (PFNGLGETINTEGERV)glfwGetProcAddress("glGetIntegerv");
-        glLineWidth = (PFNGLLINEWIDTH)glfwGetProcAddress("glLineWidth");
-        glReadBuffer = (PFNGLREADBUFFER)glfwGetProcAddress("glReadBuffer");
-        glReadPixels = (PFNGLREADPIXELS)glfwGetProcAddress("glReadPixels");
-        glTexImage2D = (PFNGLTEXIMAGE2D)glfwGetProcAddress("glTexImage2D");
-        glTexParameteri = (PFNGLTEXPARAMETERI)glfwGetProcAddress("glTexParameteri");
-        glViewport = (PFNGLVIEWPORT)glfwGetProcAddress("glViewport");
-        glBindTexture = (PFNGLBINDTEXTURE)glfwGetProcAddress("glBindTexture");
-        glCopyTexSubImage2D = (PFNGLCOPYTEXSUBIMAGE2D)glfwGetProcAddress("glCopyTexSubImage2D");
-        glDrawArrays = (PFNGLDRAWARRAYS)glfwGetProcAddress("glDrawArrays");
-        glDrawElements = (PFNGLDRAWELEMENTS)glfwGetProcAddress("glDrawElements");
-        glGenTextures = (PFNGLGENTEXTURES)glfwGetProcAddress("glGenTextures");
-        glActiveTexture = (PFNGLACTIVETEXTURE)glfwGetProcAddress("glActiveTexture");
-        glBlendFuncSeparate = (PFNGLBLENDFUNCSEPARATE)glfwGetProcAddress("glBlendFuncSeparate");
-        glBindBuffer = (PFNGLBINDBUFFER)glfwGetProcAddress("glBindBuffer");
-        glBufferData = (PFNGLBUFFERDATA)glfwGetProcAddress("glBufferData");
-        glGenBuffers = (PFNGLGENBUFFERS)glfwGetProcAddress("glGenBuffers");
-        glUnmapBuffer = (PFNGLUNMAPBUFFER)glfwGetProcAddress("glUnmapBuffer");
-        glAttachShader = (PFNGLATTACHSHADER)glfwGetProcAddress("glAttachShader");
-        glCompileShader = (PFNGLCOMPILESHADER)glfwGetProcAddress("glCompileShader");
-        glCreateProgram = (PFNGLCREATEPROGRAM)glfwGetProcAddress("glCreateProgram");
-        glCreateShader = (PFNGLCREATESHADER)glfwGetProcAddress("glCreateShader");
-        glDrawBuffers = (PFNGLDRAWBUFFERS)glfwGetProcAddress("glDrawBuffers");
-        glGetProgramiv = (PFNGLGETPROGRAMIV)glfwGetProcAddress("glGetProgramiv");
-        glGetShaderInfoLog = (PFNGLGETSHADERINFOLOG)glfwGetProcAddress("glGetShaderInfoLog");
-        glGetShaderiv = (PFNGLGETSHADERIV)glfwGetProcAddress("glGetShaderiv");
-        glLinkProgram = (PFNGLLINKPROGRAM)glfwGetProcAddress("glLinkProgram");
-        glShaderSource = (PFNGLSHADERSOURCE)glfwGetProcAddress("glShaderSource");
-        glUniform1f = (PFNGLUNIFORM1F)glfwGetProcAddress("glUniform1f");
-        glUniform1i = (PFNGLUNIFORM1I)glfwGetProcAddress("glUniform1i");
-        glUniform2f = (PFNGLUNIFORM2F)glfwGetProcAddress("glUniform2f");
-        glUniform3f = (PFNGLUNIFORM3F)glfwGetProcAddress("glUniform3f");
-        glUniform4f = (PFNGLUNIFORM4F)glfwGetProcAddress("glUniform4f");
-        glUniform1ui = (PFNGLUNIFORM1UI)glfwGetProcAddress("glUniform1ui");
-        glUniform2ui = (PFNGLUNIFORM2UI)glfwGetProcAddress("glUniform2ui");
-        glUniformMatrix3fv = (PFNGLUNIFORMMATRIX3FV)glfwGetProcAddress("glUniformMatrix3fv");
-        glUniformMatrix4fv = (PFNGLUNIFORMMATRIX4FV)glfwGetProcAddress("glUniformMatrix4fv");
-        glUseProgram = (PFNGLUSEPROGRAM)glfwGetProcAddress("glUseProgram");
-        glBindBufferBase = (PFNGLBINDBUFFERBASE)glfwGetProcAddress("glBindBufferBase");
-        glBindFramebuffer = (PFNGLBINDFRAMEBUFFER)glfwGetProcAddress("glBindFramebuffer");
-        glBindVertexArray = (PFNGLBINDVERTEXARRAY)glfwGetProcAddress("glBindVertexArray");
-        glCheckFramebufferStatus = (PFNGLCHECKFRAMEBUFFERSTATUS)glfwGetProcAddress("glCheckFramebufferStatus");
-        glFramebufferTexture2D = (PFNGLFRAMEBUFFERTEXTURE2D)glfwGetProcAddress("glFramebufferTexture2D");
-        glGenFramebuffers = (PFNGLGENFRAMEBUFFERS)glfwGetProcAddress("glGenFramebuffers");
-        glMapBufferRange = (PFNGLMAPBUFFERRANGE)glfwGetProcAddress("glMapBufferRange");
-        glBindImageTexture = (PFNGLBINDIMAGETEXTURE)glfwGetProcAddress("glBindImageTexture");
-        glBindVertexBuffer = (PFNGLBINDVERTEXBUFFER)glfwGetProcAddress("glBindVertexBuffer");
-        glDispatchCompute = (PFNGLDISPATCHCOMPUTE)glfwGetProcAddress("glDispatchCompute");
-        glGenVertexArrays = (PFNGLGENVERTEXARRAYS)glfwGetProcAddress("glGenVertexArrays");
-        glVertexAttribFormat = (PFNGLVERTEXATTRIBFORMAT)glfwGetProcAddress("glVertexAttribFormat");
-        glClearBufferFv = (PFNGLCLEARBUFFERFV)glfwGetProcAddress("glClearBufferFv");
-        glVertexAttribBinding = (PFNGLVERTEXATTRIBBINDING)glfwGetProcAddress("glVertexAttribBinding");
-        glEnableVertexAttribArray = (PFNGLENABLEVERTEXATTRIBARRAY)glfwGetProcAddress("glEnableVertexAttribArray");
-        glBufferSubData = (PFNGLBUFFERSUBDATA)glfwGetProcAddress("glBufferSubData");
+        SetGLContext_GetFunctionPointers();
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); glfwSwapBuffers(); // Black out the window as early as possible for better presentation.
         i32 major=0,minor=0; glGetIntegerv(0x821B/*GL_MAJOR_VERSION*/,&major); glGetIntegerv(0x821C/*GL_MINOR_VERSION*/,&minor);
         if (major < 4 || (major == 4 && minor < 3)) { DualLogError("Need OpenGL >= 4.3, got %d.%d\n",major,minor); OS_Exit(1); }
         glFrontFace(0x0901/*GL_CCW*/); // Set triangle winding order
-        glBlendFuncSeparate(0x0302/*GL_SRC_ALPHA*/,0x0303/*GL_ONE_MINUS_SRC_ALPHA*/,0,1);
+        glBlendFuncSeparate(0x0302/*GL_SRC_ALPHA*/, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/, 1, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/);
         CompileShaders();
         u32 vaos[4],vbos[4]; glGenVertexArrays(4,vaos); glGenBuffers(4,vbos);
         Sys_Render.quadVAO = vaos[0]; Sys_Render.chunkVAO = vaos[1]; Sys_Render.textVAO = vaos[2]; Sys_Render.debugLinesVAO = vaos[3];
@@ -1752,8 +1489,8 @@ void InitalizeEnvironment(double game_start_time) {
         glVertexAttribFormat(1,2,GL_FLOAT,GL_FALSE,2 * sizeof(float)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1); // uv (s,t)
         glBindVertexBuffer(0,Sys_Render.quadVBO,0,4 * sizeof(float));
         glBindVertexArray(Sys_Render.chunkVAO); glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.chunkVBO);
-        glVertexAttribFormat(0,3,0x140B/*GL_HALF_FLOAT*/,GL_FALSE,0);  // pos xyz half-float @ offset 0
-        glVertexAttribFormat(1,3,0x140B/*GL_HALF_FLOAT*/,GL_FALSE,6);  // normal xyz float   @ offset 6  (after 3×2 bytes)
+        glVertexAttribFormat(0,3,0x140B/*GL_HALF_FLOAT*/,GL_FALSE,0); // pos xyz half-float @ offset 0
+        glVertexAttribFormat(1,3,0x140B/*GL_HALF_FLOAT*/,GL_FALSE,6);        // normal xyz float   @ offset 6  (after 3×2 bytes)
         glVertexAttribFormat(2,2,0x140B/*GL_HALF_FLOAT*/,GL_FALSE,12); // uv st float
         for (u8 i = 0; i < 3; i++) { glVertexAttribBinding(i, 0); glEnableVertexAttribArray(i); }
         glBindVertexBuffer(0,Sys_Render.chunkVBO,0,14);
@@ -1776,7 +1513,7 @@ void InitalizeEnvironment(double game_start_time) {
         u32 uistatus = glCheckFramebufferStatus(GL_FRAMEBUFFER); if (uistatus != 0x8CD5/*GL_FRAMEBUFFER_COMPLETE*/) DualLogError("UI Framebuffer incomplete: Error code %d\n",uistatus);
         glBindImageTexture(0,Sys_Render.inputUIID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8); // UI Rendered Color
         glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,Sys_Render.inputUIID,0);
-        RenderLoadingProgress(22,"Loading...");
+        RenderLoadingProgress(40,"Loading...");
         float* m = shadowmapsPerspectiveProjection; float lightRangeMax=15.36f; float viewRange=(lightRangeMax - NEAR_PLANE);
         m[0] = 1.0f; m[1] = 0.0f; m[2] =                                           0.0f; m[3] =  0.0f;
         m[4] = 0.0f; m[5] = 1.0f; m[6] =                                           0.0f; m[7] =  0.0f;
@@ -1823,9 +1560,9 @@ void InitalizeEnvironment(double game_start_time) {
         glUseProgram(Sys_Render.shadowmapsClearShaderProgram); glUniform1ui(1,SHADOW_MAP_SIZE);
         glUseProgram(Sys_Render.chunkShaderProgram); glUniform1ui(21,SHADOW_MAP_SIZE); glUniform1f(22,(float)SHADOW_MAP_SIZE); glUniform1ui(23,LIGHT_COUNT); glUniform1ui(24,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);
         glUseProgram(Sys_Render.voxelUpdateShaderProgram); glUniform1ui(6,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(8,SHADOW_MAP_SIZE); glUniform1f(9,(float)SHADOW_MAP_SIZE); glUniform1ui(10,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE); glUniform1ui(11,LIGHT_COUNT);
-        RenderLoadingProgress(52,"Loading textures...");
+        RenderLoadingProgress(100,"Loading textures...");
         LoadTextures();
-        RenderLoadingProgress(38,"Loading models...");
+        RenderLoadingProgress(92,"Loading models...");
         LoadModels();
         if (Sys_Global.introNotPlayed) {} // TODO: Play intro
         Sys_Global.absoluteTime = Sys_Global.last_topframe_time = Sys_Global.current_time = get_time();
@@ -1837,11 +1574,11 @@ void InitalizeEnvironment(double game_start_time) {
     }
 }
 
+void InputProcessing(void); void Physics(void);
 i32 main(void) {
     double game_start_time = get_time();
     InitalizeEnvironment(game_start_time);
     while(1) { // Main Loop
-        if (((_GLFWwindow*)window)->shouldClose) OS_Exit(0);
         if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad); queuedLevelToLoad = 255u; continue; }
 
         drawCallsRenderedThisFrame = uiImageDrawCallsRenderedThisFrame = shadowDrawCallsRenderedThisFrame = verticesRenderedThisFrame = 0; // Reset per frame
@@ -1851,29 +1588,7 @@ i32 main(void) {
         Sys_Global.last_topframe_time = Sys_Global.current_time;
         if (!Sys_Global.gamePaused && !Sys_Global.menuActive) Sys_Global.pauseRelativeTime += Sys_Global.deltaTime;
         mouseMovementThisFrame = false;
-        PLATFORM_pollEvents();
-        for (int jid = GLFW_JOYSTICK_1; jid <= GLFW_JOYSTICK_LAST; ++jid) { // Input Poll
-            if (!JoystickPresent(jid)) continue;
-            _GLFWjoystick* js = _glfw.joysticks + jid; if (!js->connected) continue;
-
-            PLATFORM_pollJoystick(js);
-            int totalButtons = js->buttonCount + js->hatCount * 4;
-            for (int i = 0; i < totalButtons && i < 16; ++i) {
-                KeyState* k = &Sys_Input.joystickButtons[jid - GLFW_JOYSTICK_1][i];
-                bool down = js->buttons[i] == GLFW_PRESS;
-                k->pressed = down && !k->down; k->released = !down && k->down; k->down = down;
-            }
-
-            for (int i = 0; i < js->hatCount && i < 5; ++i) { Sys_Input.joystickHats[i].down = js->hats[i]; }
-    //         for (int i = 0; i < js->axisCount && i < MAX_JOYSTICK_AXES; ++i) { Sys_Input.joystickAxes[jid - GLFW_JOYSTICK_1][i] = js->axes[i]; } TODO??
-        }
-    
-        if (Sys_Input.keyStates[GLFW_KEY_E].pressed) play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f,(Vector3){},false);
-        if (Sys_Input.window_has_focus) {
-            if (Sys_Input.keyStates[GLFW_KEY_CAPS_LOCK].pressed) Sys_Input.isCapsLockOn = !Sys_Input.isCapsLockOn; // Change capslock state to match keyboard having toggled.  Must always happen regardless of paused/menu.
-            ProcessInput(); // Calls ApplyPlayerMovements(), needs called without checking paused state for menus handling.
-        }
-        
+        InputProcessing();
         Sys_Global.timeSinceLastPhysicsTick = Sys_Global.pauseRelativeTime - Sys_Global.last_physics_time;
         if (likely(!Sys_Global.gamePaused || Sys_Global.menuActive)) UpdateAnims(); // Changes collision positions
         if (likely(!Sys_Global.gamePaused && !Sys_Global.menuActive)) { // Update Gameplay
