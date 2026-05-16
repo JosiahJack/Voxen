@@ -627,7 +627,6 @@ typedef /*FAT*/ struct  {
     u8 portalIndex; // If this is a door, index into portal array for toggling state.
     DoorState doorState;
     double currentFrameFinished;
-    double currentFrameStartTime;
     double animSwapFinished;
     bool alternateOn;
     u16 mainSwitchMaterial;

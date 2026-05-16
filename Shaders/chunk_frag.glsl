@@ -36,9 +36,8 @@ layout(location=29) uniform sampler2D camViewTex;
 layout(location=30) uniform uint useCamView;
 struct Light { vec3 pos; float intensity; vec3 col; uint lflags; float range; float spotAng; float maxIntensity; float minIntensity; vec4 spotDir; };
 layout(location=0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
-layout(location=1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
-layout(location=2) out vec4 outSpecular; // GL_COLOR_ATTACHMENT2
-layout(location=3) out vec2 outNormal;   // GL_COLOR_ATTACHMENT3
+layout(location=2) out vec4 outSpecular; // GL_COLOR_ATTACHMENT1
+layout(location=3) out vec2 outNormal;   // GL_COLOR_ATTACHMENT2
 layout(std430,binding=2) buffer VoxelLightListCounts { uint voxelLightListCounts[]; };
 layout(std430,binding=3) buffer UniqueLightLists { uint uniqueLightLists[]; };
 layout(std430,binding=4) buffer LightIndices { Light lights[]; };
@@ -205,7 +204,6 @@ void main() {
 
     if (reflectionsEnabled > 0) {
         outSpecular = specColor;
-        outWorldPos.xyz = FragPos.xyz;
         outNormal = EncodeOctahedral(adjustedNormal) * 0.5 + 0.5;  // Map to [0,1]
     }
 

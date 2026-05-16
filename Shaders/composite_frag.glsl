@@ -1,7 +1,6 @@
 // composite.glsl - Full screen quad blit with compositing pass to combine rendered view with UI overlay.
 in vec2 TexCoord;
 out vec4 FragColor;
-layout(rgba32f,binding=1) readonly uniform image2D inputWorldPos;
 layout(location =  2) uniform uint screenWidth;
 layout(location =  3) uniform uint screenHeight;
 layout(location =  4) uniform sampler2D outputImage;
@@ -30,6 +29,11 @@ layout(location = 28) uniform float staticIntensity;
 layout(location = 29) uniform uint grayscaleEnabled;
 layout(location = 30) uniform float skyRotateSpeed;
 layout(location = 31) uniform sampler2D uiImage;
+layout(location=32) uniform sampler2D inputDepthID;
+layout(location=33) uniform mat4 invViewProj; /*
+layout(location=7) some weird
+layout(location=8) padding apparently, so say some docs anyhow
+layout(location=9) */
 const float vhsBlurAmount = 0.5; // Cannot be overstated just how magical and impactful this setting is.  DO NOT EVER TURN OFF EVER!!  I recant my former statement about avoiding blur at all costs in all scenarios.
 const float vhsRadiusMax = 3.0; // in pixels
 const float staticBandThickness = 0.005;
@@ -43,7 +47,6 @@ const float aaThreshold   = 0.05;
 vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
 vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
 vec3 permute(vec3 x) { return mod289(((x * 34.0) + 1.0) * x); }
-
 float snoise(vec2 v) {
     const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
     vec2 i = floor(v + dot(v, C.yy));
@@ -69,6 +72,14 @@ float snoise(vec2 v) {
 
 float dither(vec2 uv, float scale, float fac, float finalMultiplier) {
     return fract(snoise(uv * vec2(screenWidth, screenHeight) * 0.5) * 0.025) * finalMultiplier;
+}
+
+vec3 reconstructWorldPos(vec2 uv) {
+    float depth = texture(inputDepthID, uv).r;
+    if (depth >= 0.9999) return vec3(0.0); // invalid
+    vec4 clip = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+    vec4 world = invViewProj * clip;
+    return world.xyz / world.w;
 }
 
 // Cellular noise for star field with density and size variation
@@ -203,8 +214,6 @@ vec3 hsv2rgb(vec3 c) {
 }
 
 vec3 applyBerserk(vec3 worldPos, vec3 base) {
-    if (berserkTimeRemaining <= 0.0) return base;
-
     float prog = clamp(1.0 - berserkTimeRemaining, 0.0, 1.0);
     float seed = fract(sin(berserkSeedTimestamp * 91.7) * 43758.5453);
     float hueBase = mix(0.15, 0.75, seed);
@@ -214,12 +223,10 @@ vec3 applyBerserk(vec3 worldPos, vec3 base) {
     float dn = fract(sin(d + n * 37.719) * 15731.743);
     float coverage = mix(dn, 1.0, smoothstep(0.0, 1.0, prog));
     float coverageMask = smoothstep(0.0, 1.0, (coverage - n) * 4.0);
-
     vec3 hsv = rgb2hsv(base);
     hsv.x = fract(hsv.x + hueShift + n * 0.2);
     float fadeIn = smoothstep(0.0, 0.05, prog);
     float fadeOut = smoothstep(0.0, 0.025, berserkTimeRemaining);
-
     vec3 berserkColor = mix(base, hsv2rgb(hsv), coverageMask * fadeIn * fadeOut);
 
     // Inversion fade in final throes
@@ -502,16 +509,18 @@ void main() {
         acc += s * w[i];
         wsum += w[i];
     }
+
     acc /= wsum;
     acc += texture(tex, texCoordUsed + vec2(0.0,-px.y)).rgb * 0.25;
     acc += texture(tex, texCoordUsed + vec2(0.0, px.y)).rgb * 0.25;
     vec3 vhsBlur = acc * (1.0/1.5); // renormalize
     aaColor = mix(aaColor, vhsBlur, clamp(vhsBlurAmount, 0.0, 1.0));
-
     if (staticIntensity > 0.0) aaColor += bandedStatic(texCoordUsed); // Banded Static (pain, emp effects, etc.)
     aaColor.rgb = pow(aaColor.rgb, vec3(1.0 / (float(brightnessSetting + 50) / 100.0))); // Brightness Adjustment Setting
-    ivec2 uv = ivec2(gl_FragCoord.xy);                // pixel centre
-    if (berserkTimeRemaining > 0.0) aaColor = applyBerserk(imageLoad(inputWorldPos,uv).xyz, aaColor); // Berserk last as it's a brain effect not an eye effect
+    if (berserkTimeRemaining > 0.0) {
+        vec3 worldPos = reconstructWorldPos(texCoordUsed);
+        if (worldPos != vec3(0.0)) aaColor = applyBerserk(worldPos,aaColor); // Berserk last as it's a brain effect not an eye effect
+    }
     if (grayscaleEnabled > 0) aaColor = Grayscale(aaColor);
 
     vec4 uiSample = texture(uiImage,texCoordUsed);
