@@ -25,6 +25,7 @@ void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n);
 void StringCopyInto_A_From_B(char* a, const char* b, size_t bufferSize);
 bool StringsEqual(const char* a, const char* b);
 int StringCompareUpToLength(const char* s1, const char* s2, size_t n);
+void UpdateScreenSize(i32 width, i32 height);
 ENGINE_TO_MOD int StringFormat(char* buffer, size_t bufferSize, const char* format, ...);
 ENGINE_TO_MOD size_t GetStringLength(const char* s);
 #if defined(WINDOWS)
@@ -879,7 +880,6 @@ static void createKeyTables(void) {
     
     i32 _glfwWindowFocusedX11(_GLFWwindow* window) { Window focused; int state; _glfw.x11.xlib.GetInputFocus(_glfw.x11.display,&focused,&state); return window->x11.handle==focused; }
     i32 _glfwWindowVisibleX11(_GLFWwindow* window) { XWindowAttributes wa; _glfw.x11.xlib.GetWindowAttributes(_glfw.x11.display,window->x11.handle,&wa); return wa.map_state==2/*IsViewable*/; }
-    void UpdateScreenSize(i32 width, i32 height);
     static void processEvent(XEvent* event) {
         unsigned int keycode=0; Bool filtered=0;
         if (event->type==2/*KeyPress*/ || event->type==3/*KeyRelease*/) keycode=event->xkey.keycode;

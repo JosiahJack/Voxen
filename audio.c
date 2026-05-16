@@ -1265,35 +1265,22 @@ static float *load_wav(const char *path,u32 *out_frames, size_t* allocSize) {
     return resample_stereo(buf,bufSize,out_frames,src_rate,allocSize);
 }
 
+static void wave_mix(wav_channel_t* w, float* mix) {
+    float vol = w->volume*sfx_scale();
+    if (w->positional) vol *= spatial_atten(w->pos);
+    for (i32 f = 0; f < AUDIO_FRAMES; f++) {
+        if (w->frame_pos >= w->frame_count) { if (w->looping) w->frame_pos=0; else { w->playing=false; break; } }
+        mix[f*2+0] += w->samples[w->frame_pos*2+0]*vol;
+        mix[f*2+1] += w->samples[w->frame_pos*2+1]*vol;
+        w->frame_pos++;
+    }
+}
+
 static void audio_mix_period(i16 *out) {
     float mix[AUDIO_FRAMES*AUDIO_CHANNELS];
     MemSetToValueForNBytes(mix,0,sizeof(mix));
-    for (u32 c = 0; c < wav_count; c++) {
-        wav_channel_t *w = &wav_ch[c];
-        if (!w->playing || !w->samples) continue;
-        float vol = w->volume*sfx_scale();
-        if (w->positional) vol *= spatial_atten(w->pos);
-        for (i32 f = 0; f < AUDIO_FRAMES; f++) {
-            if (w->frame_pos >= w->frame_count) { if (w->looping) w->frame_pos=0; else { w->playing=false; break; } }
-            mix[f*2+0] += w->samples[w->frame_pos*2+0]*vol;
-            mix[f*2+1] += w->samples[w->frame_pos*2+1]*vol;
-            w->frame_pos++;
-        }
-    }
-    
-    for (u32 c=0;c<ext_count;c++) {
-        wav_channel_t *w=ext_ch[c];
-        if (!w->playing||!w->samples) continue;
-        float vol=w->volume*sfx_scale();
-        if (w->positional) vol*=spatial_atten(w->pos);
-        for (i32 f=0;f<AUDIO_FRAMES;f++) {
-            if (w->frame_pos>=w->frame_count) { if (w->looping) w->frame_pos=0; else { w->playing=false; break; } }
-            mix[f*2+0]+=w->samples[w->frame_pos*2+0]*vol;
-            mix[f*2+1]+=w->samples[w->frame_pos*2+1]*vol;
-            w->frame_pos++;
-        }
-    }
-
+    for (u32 c=0;c<wav_count;c++) { wav_channel_t* w = &wav_ch[c]; if (w->playing && w->samples) {wave_mix(w,mix);} }
+    for (u32 c=0;c<ext_count;c++) { wav_channel_t* w = ext_ch[c]; if (w->playing && w->samples) {wave_mix(w,mix);} }
     if (log_playing && log_samples) {
         float vol = message_scale();
         for (i32 f = 0; f < AUDIO_FRAMES; f++) {
@@ -1409,23 +1396,129 @@ ENGINE_TO_MOD float GetMP3RemainingTime(void) {
 static OsFileHandle pcm_fds[MAX_PCM_DEVICES];
 static i32 pcm_fd_count = 0;
 #ifndef WINDOWS
-    static void init_pcm_device(i32 card,i32 dev) {
-        OsFileHandle r = pcm_open(card,dev,1|(1 << 1));
-        if (r==OS_INVALID_HANDLE) return;
-        
-        pcm_params_t p; pcm_params_init(&p);
-        pcm_set(&p,PCM_FORMAT,SNDRV_PCM_FORMAT_S16_LE); pcm_set(&p,SNDRV_PCM_HW_PARAM_ACCESS,SNDRV_PCM_ACCESS_RW_INTERLEAVED);
-        pcm_set(&p,PCM_RATE,AUDIO_RATE); pcm_set(&p,PCM_CHANNELS,AUDIO_CHANNELS);
-        pcm_set(&p,PCM_PERIOD_SIZE,AUDIO_FRAMES); pcm_set(&p,SNDRV_PCM_HW_PARAM_PERIODS,AUDIO_PERIODS);
-        if (pcm_params_setup(r,&p)>=0 && pcm_fd_count<MAX_PCM_DEVICES) pcm_fds[pcm_fd_count++]=r;
-        else OS_Close(r);
+typedef void snd_pcm_t;
+typedef int  (*pfn_snd_pcm_open)(snd_pcm_t**, const char*, int, int);
+typedef int  (*pfn_snd_pcm_close)(snd_pcm_t*);
+typedef int  (*pfn_snd_pcm_writei)(snd_pcm_t*, const void*, u32);
+typedef int  (*pfn_snd_pcm_recover)(snd_pcm_t*, int, int);
+typedef int  (*pfn_snd_pcm_prepare)(snd_pcm_t*);
+typedef int  (*pfn_snd_pcm_hw_params_sizeof)(void);
+typedef int  (*pfn_snd_pcm_hw_params_any)(snd_pcm_t*, void*);
+typedef int  (*pfn_snd_pcm_hw_params_set_access)(snd_pcm_t*, void*, unsigned int);
+typedef int  (*pfn_snd_pcm_hw_params_set_format)(snd_pcm_t*, void*, int);
+typedef int  (*pfn_snd_pcm_hw_params_set_channels)(snd_pcm_t*, void*, unsigned int);
+typedef int  (*pfn_snd_pcm_hw_params_set_rate_near)(snd_pcm_t*, void*, unsigned int*, int*);
+typedef int  (*pfn_snd_pcm_hw_params_set_period_size_near)(snd_pcm_t*, void*, unsigned long*, int*);
+typedef int  (*pfn_snd_pcm_hw_params_set_periods_near)(snd_pcm_t*, void*, unsigned int*, int*);
+typedef int  (*pfn_snd_pcm_hw_params)(snd_pcm_t*, void*);
+typedef const char* (*pfn_snd_strerror)(int);
+static snd_pcm_t         *g_alsa_pcm;
+static pfn_snd_pcm_writei g_snd_writei;
+static pfn_snd_pcm_recover g_snd_recover;
+static pfn_snd_pcm_prepare g_snd_prepare;
+static pfn_snd_strerror    g_snd_strerror;
+static bool alsa_try_open_default(void) {
+    void *so = dlopen("libasound.so.2", RTLD_NOW|RTLD_LOCAL);
+    if (!so) so = dlopen("libasound.so", RTLD_NOW|RTLD_LOCAL);
+    if (!so) { DualLog("Audio: libasound not found\n"); return false; }
+    DualLog("Audio: libasound loaded\n");
+
+    pfn_snd_pcm_open                   snd_open      = dlsym(so, "snd_pcm_open");
+    pfn_snd_pcm_hw_params_sizeof       hw_sizeof     = dlsym(so, "snd_pcm_hw_params_sizeof");
+    pfn_snd_pcm_hw_params_any          hw_any        = dlsym(so, "snd_pcm_hw_params_any");
+    pfn_snd_pcm_hw_params_set_access   hw_set_access = dlsym(so, "snd_pcm_hw_params_set_access");
+    pfn_snd_pcm_hw_params_set_format   hw_set_fmt    = dlsym(so, "snd_pcm_hw_params_set_format");
+    pfn_snd_pcm_hw_params_set_channels hw_set_ch     = dlsym(so, "snd_pcm_hw_params_set_channels");
+    pfn_snd_pcm_hw_params_set_rate_near        hw_set_rate   = dlsym(so, "snd_pcm_hw_params_set_rate_near");
+    pfn_snd_pcm_hw_params_set_period_size_near hw_set_period = dlsym(so, "snd_pcm_hw_params_set_period_size_near");
+    pfn_snd_pcm_hw_params_set_periods_near     hw_set_periods= dlsym(so, "snd_pcm_hw_params_set_periods_near");
+    pfn_snd_pcm_hw_params              hw_apply      = dlsym(so, "snd_pcm_hw_params");
+    g_snd_writei  = dlsym(so, "snd_pcm_writei");
+    g_snd_recover = dlsym(so, "snd_pcm_recover");
+    g_snd_prepare = dlsym(so, "snd_pcm_prepare");
+    g_snd_strerror= dlsym(so, "snd_strerror");
+
+    if (!snd_open||!hw_sizeof||!hw_any||!hw_set_access||!hw_set_fmt||!hw_set_ch||
+        !hw_set_rate||!hw_set_period||!hw_set_periods||!hw_apply||
+        !g_snd_writei||!g_snd_recover||!g_snd_prepare) {
+        DualLogError("Audio: libasound missing required symbols\n"); return false;
     }
+
+    int r = snd_open(&g_alsa_pcm, "default", 0/*PLAYBACK*/, 0/*blocking*/);
+    if (r < 0 || !g_alsa_pcm) {
+        DualLogError("Audio: snd_pcm_open('default') failed: %d (%s)\n", r, g_snd_strerror ? g_snd_strerror(r) : "?");
+        return false;
+    }
+    DualLog("Audio: snd_pcm_open('default') OK\n");
+
+    int sz = hw_sizeof();
+    DualLog("Audio: snd_pcm_hw_params_t size = %d\n", sz);
+    u8 hw_params_buf[640];
+    if (sz > (int)sizeof(hw_params_buf)) { DualLogError("Audio: hw_params_t too large (%d)\n", sz); return false; }
+    void *hwp = hw_params_buf;
+
+    if ((r = hw_any(g_alsa_pcm, hwp)) < 0) { DualLogError("Audio: hw_params_any failed: %s\n", g_snd_strerror(r)); return false; }
+    if ((r = hw_set_access(g_alsa_pcm, hwp, 3/*RW_INTERLEAVED*/)) < 0) { DualLogError("Audio: set_access failed: %s\n", g_snd_strerror(r)); return false; }
+    if ((r = hw_set_fmt(g_alsa_pcm, hwp, 2/*S16_LE*/)) < 0) { DualLogError("Audio: set_format S16_LE failed: %s\n", g_snd_strerror(r)); return false; }
+    if ((r = hw_set_ch(g_alsa_pcm, hwp, AUDIO_CHANNELS)) < 0) { DualLogError("Audio: set_channels(%d) failed: %s\n", AUDIO_CHANNELS, g_snd_strerror(r)); return false; }
+
+    unsigned int rate = AUDIO_RATE; int dir = 0;
+    if ((r = hw_set_rate(g_alsa_pcm, hwp, &rate, &dir)) < 0) { DualLogError("Audio: set_rate(%u) failed: %s\n", AUDIO_RATE, g_snd_strerror(r)); return false; }
+    DualLog("Audio: rate set to %u (requested %d)\n", rate, AUDIO_RATE);
+
+    unsigned long period = AUDIO_FRAMES; dir = 0;
+    if ((r = hw_set_period(g_alsa_pcm, hwp, &period, &dir)) < 0) { DualLogError("Audio: set_period_size(%d) failed: %s\n", AUDIO_FRAMES, g_snd_strerror(r)); return false; }
+    DualLog("Audio: period size set to %lu (requested %d)\n", period, AUDIO_FRAMES);
+
+    unsigned int periods = AUDIO_PERIODS; dir = 0;
+    if ((r = hw_set_periods(g_alsa_pcm, hwp, &periods, &dir)) < 0) { DualLogError("Audio: set_periods(%d) failed: %s\n", AUDIO_PERIODS, g_snd_strerror(r)); return false; }
+    DualLog("Audio: periods set to %u (requested %d)\n", periods, AUDIO_PERIODS);
+
+    if ((r = hw_apply(g_alsa_pcm, hwp)) < 0) { DualLogError("Audio: hw_params apply failed: %s\n", g_snd_strerror(r)); return false; }
+    DualLog("Audio: hw_params applied OK\n");
+
+    if ((r = g_snd_prepare(g_alsa_pcm)) < 0) { DualLogError("Audio: snd_pcm_prepare failed: %s\n", g_snd_strerror(r)); return false; }
+    DualLog("Audio: snd_pcm_prepare OK — libasound path active\n");
+    return true;
+}
+
+static void init_pcm_device(i32 card, i32 dev) {
+    OsFileHandle r = pcm_open(card, dev, 1|(1<<1));
+    if (r == OS_INVALID_HANDLE) return;
+    DualLog("Audio: trying raw device card=%d dev=%d fd=%d\n", card, dev, r);
+    pcm_params_t p; pcm_params_init(&p);
+    pcm_set(&p, PCM_FORMAT, SNDRV_PCM_FORMAT_S16_LE);
+    pcm_set(&p, SNDRV_PCM_HW_PARAM_ACCESS, SNDRV_PCM_ACCESS_RW_INTERLEAVED);
+    pcm_set(&p, PCM_RATE, AUDIO_RATE); pcm_set(&p, PCM_CHANNELS, AUDIO_CHANNELS);
+    pcm_set(&p, PCM_PERIOD_SIZE, AUDIO_FRAMES); pcm_set(&p, SNDRV_PCM_HW_PARAM_PERIODS, AUDIO_PERIODS);
+    if (pcm_params_setup(r, &p) >= 0 && pcm_fd_count < MAX_PCM_DEVICES) {
+        DualLog("Audio: raw device card=%d dev=%d OK\n", card, dev);
+        pcm_fds[pcm_fd_count++] = r;
+    } else {
+        DualLog("Audio: raw device card=%d dev=%d setup failed, closing\n", card, dev);
+        OS_Close(r);
+    }
+}
 #endif
 
 void AudioUpdate(void) {
+#ifndef WINDOWS
+    if (g_alsa_pcm) {
+        i16 buf[AUDIO_FRAMES*AUDIO_CHANNELS];
+        audio_mix_period(buf);
+        int r = g_snd_writei(g_alsa_pcm, buf, (u32)AUDIO_FRAMES);
+        if (r < 0) {
+            DualLog("Audio: snd_pcm_writei underrun %d, recovering\n", r);
+            r = g_snd_recover(g_alsa_pcm, r, 0);
+            if (r < 0) DualLogError("Audio: snd_pcm_recover failed %d\n", r);
+            else g_snd_writei(g_alsa_pcm, buf, (u32)AUDIO_FRAMES);
+        }
+        return;
+    }
+#endif
     if (pcm_fd_count==0) return;
     i16 buf[AUDIO_FRAMES*AUDIO_CHANNELS]; pcm_sync_t sync;
-    if (pcm_sync(pcm_fds[0],&sync,0/*SNDRV_PCM_SYNC_PTR_HWSYNC*/)<0) return;
+    if (pcm_sync(pcm_fds[0],&sync,0)<0) return;
     u32 hw=sync.status.hw_ptr,appl=sync.control.appl_ptr;
     u32 buffer_size=AUDIO_FRAMES*AUDIO_PERIODS,queued=appl-hw;
     if (queued>buffer_size) queued=0;
@@ -1441,16 +1534,21 @@ pthread_t audThreadID; int usleep(u32 usec);
 void* AudThread(void* arg) { (void)arg; while (1) { AudioUpdate(); usleep(1000); } return NULL; }
 void InitAudio(void) {
 #ifdef WINDOWS
-    OsFileHandle first = pcm_open_all(AUDIO_RATE,AUDIO_CHANNELS,AUDIO_FRAMES,AUDIO_PERIODS);
-    if (first==OS_INVALID_HANDLE) { DualLog("ERROR: No WASAPI audio device found\n"); return; }
-    pcm_fds[0]=first; pcm_fd_count=1;
-    DualLog("Audio: WASAPI %d device(s) active\n",wasapi_dev_count);
+    OsFileHandle first = pcm_open_all(AUDIO_RATE, AUDIO_CHANNELS, AUDIO_FRAMES, AUDIO_PERIODS);
+    if (first == OS_INVALID_HANDLE) { DualLog("ERROR: No WASAPI audio device found\n"); return; }
+    pcm_fds[0] = first; pcm_fd_count = 1;
+    DualLog("Audio: WASAPI %d device(s) active\n", wasapi_dev_count);
 #else
-    for (i32 card=0;card<8;card++)
-        for (i32 dev=0;dev<8;dev++)
-            init_pcm_device(card,dev);
-    if (pcm_fd_count==0) DualLog("ERROR: No audio output device found\n");
-    else DualLog("Audio: %d device(s) active\n",pcm_fd_count);
+    if (alsa_try_open_default()) {
+        DualLog("Audio: using libasound 'default' path\n");
+    } else {
+        DualLog("Audio: libasound path failed, trying raw devices\n");
+        for (i32 card = 0; card < 8; card++)
+            for (i32 dev = 0; dev < 8; dev++)
+                init_pcm_device(card, dev);
+        if (pcm_fd_count == 0) DualLogError("Audio: no output device found\n");
+        else DualLog("Audio: %d raw device(s) active\n", pcm_fd_count);
+    }
 #endif
-    pthread_create(&audThreadID,NULL,AudThread,NULL);
+    pthread_create(&audThreadID, NULL, AudThread, NULL);
 }
