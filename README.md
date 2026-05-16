@@ -394,3 +394,6 @@ GPU: 1.83ms
 
 To see binary size impacts:
 ../bloaty/build/bloaty ./voxen -d symbols -s file -n 50 --domain=file
+
+PMD copy-paste-detector usage
+/home/qmaster/Downloads/pmd/bin/pmd cpd --minimum-tokens 100 --language cpp /home/qmaster/Github/Voxen

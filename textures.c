@@ -94,21 +94,6 @@ static int stbi__parse_uncompressed_block(stbi__zbuf* a) {
 }
 
 static u8 stbi__zdef_len(int i) { return (i<144)?8:(i<256)?9:(i<280)?7:8; }
-u8* stbi_zlib_decode_malloc_guesssize_headerflag(const u8* buffer, i32 len, i32 initial_size, i32* outlen) {
-    stbi__zbuf a = {0}; u8* p = (u8*)stbi__arena_alloc(initial_size), d_len[288]; i32 f, t;
-    a.zbuffer = (u8*)buffer; a.zbuffer_end = (u8*)buffer+len; a.zout_start = a.zout = p; a.zbuffer += 2;
-    do {
-        f = stbi__zreceive(&a, 1); t = stbi__zreceive(&a, 2);
-        if (t == 0) stbi__parse_uncompressed_block(&a);
-        else {
-            if (t == 1) { for(int i=0; i<288; ++i) d_len[i]=stbi__zdef_len(i); stbi__zbuild_huffman(&a.z_length, d_len, 288); stbi__zbuild_huffman(&a.z_distance, NULL, 32); }
-            else stbi__compute_huffman_codes(&a);
-            stbi__parse_huffman_block(&a);
-        }
-    } while (!f);
-    if (outlen) *outlen = (i32)(a.zout - a.zout_start); return a.zout_start;
-}
-
 u8* stbi_zlib_decode_malloc_guesssize_headerflag_arena(const u8* buffer, i32 len, i32 initial_size, i32* outlen, StbiArena* arena) {
     stbi__zbuf a = {0}; u8* p = (u8*)stbi__arena_alloc_thread(arena, initial_size), d_len[288]; i32 f, t;
     a.zbuffer = (u8*)buffer; a.zbuffer_end = (u8*)buffer+len; a.zout_start = a.zout = p; a.zbuffer += 2;

@@ -1415,9 +1415,9 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     }
 
     if (unlikely(Sys_Global.debugLineVertCount > 1)) DrawDebugLines(viewProj); // Draw Debug Lines
+    glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D,Sys_Render.inputDepthID);
     if (likely(Sys_Settings.Reflections > 0u)) { // Screen Space Reflections
         glUseProgram(Sys_Render.ssrShaderProgram);
-        glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D,Sys_Render.inputDepthID);
         glUniform3f(3,playerPos.x,playerPos.y,playerPos.z);
         glUniform1i(5,3);
         glUniformMatrix4fv(6,1,0,invViewProj);
@@ -1438,7 +1438,6 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glUniform1i(4,4); // outputImage texture sampler2D, don't remember why when active texture is texture 0. meh.... oh maybe to not read and write same binding?
     glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D,Sys_Render.inputUIID);
     glUniform1i(31,1);
-    glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D, Sys_Render.inputDepthID);
     glUniform1i(32,3);
     glUniformMatrix4fv(33,1,0,invViewProj);
     double berserkTimeRemainingNormalized = Sys_Global.invP1.berserkFinishedTime > 0.0001 ? (Sys_Global.invP1.berserkFinishedTime - Sys_Global.pauseRelativeTime) / BERSERK_TIME : 0.0;
