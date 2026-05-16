@@ -355,9 +355,11 @@ void LoadModels(void) {
     DualLog("Executing model parse thread joins...\n");
     for (int i=0;i<num_parse_threads;++i) pthread_join(th[i],NULL);
     //for (int t=0;t<num_parse_threads;++t) ModelParsingWorker(&tasks[t]); // Single threaded alternative
+    DualLog("Model glGenBuffers...\n");
     glGenBuffers(loadedModelsMaxIndex,Sys_Render.vbos); glGenBuffers(loadedModelsMaxIndex,Sys_Render.tbos);
     u32 tv=0,tt=0;
     for (int i=0; i<loadedModelsMaxIndex; ++i) {
+        DualLog("GPU transfer model %u\n",i);
         if (!modelVertexCounts[i]) continue;
         size_t vs = (size_t)modelVertexCounts[i] * VERTEX_ATTRIBUTES_SIZE;
         size_t ts = (size_t)modelTriangleCounts[i] * 3 * sizeof(u16);
@@ -374,6 +376,7 @@ void LoadModels(void) {
 
     for (u32 i=0;i<loadedModelsMaxIndex;++i) { if (raw[i].data) OS_DeallocateRAM((void*)raw[i].data,raw[i].size); }
     OS_DeallocateRAM(arena_base, arena);
+    DualLog("Model deallocs...\n");
     glBindBuffer(GL_ARRAY_BUFFER,0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0);
     glFlush(); glFinish();
