@@ -180,7 +180,9 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, c
 
     DualLog("[%u]Finished a main parse OBJ.\n",mindex);
     #define HASH_SIZE 65536
-    u32 ht[HASH_SIZE]; MemSetToValueForNBytes(ht, 0xFF, sizeof(ht));
+    //u32 ht[HASH_SIZE]; MemSetToValueForNBytes(ht, 0xFF, sizeof(ht));
+    u32* ht = OS_Alloc(HASH_SIZE * sizeof(u32));
+    MemSetToValueForNBytes(ht,0xFF,HASH_SIZE * sizeof(u32));
     u32* rem = (u32*)st; u32 ucnt = 0;
     for (u32 i=0; i<ec; ++i) {
         const float* v = sv + (i<<3);
@@ -215,6 +217,7 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, c
     *ov = optv; *ovc = ucnt; *ot = ft; *otc = ec/3;
     float rad = vmax(vabs(mx),vmax(vabs(my),vmax(vabs(mz),vmax(Mx,vmax(My,Mz)))));
     modelBounds[mindex] = rad;
+    OS_DeallocateRAM(ht,HASH_SIZE * sizeof(u32));
     return true;
 }
 
@@ -349,7 +352,7 @@ void LoadModels(void) {
     thread_out_verts = ov; thread_out_tris = ot;
     ModelParseTask tasks[32];
     u32 chunk = (loadedModelsMaxIndex + num_parse_threads - 1) / num_parse_threads;
-    DualLog("Executing model parse tasks...\n");
+    DualLog("Executing model parse tasks...\n"); // last printed output
     for (int i=0;i<num_parse_threads;++i) tasks[i] = (ModelParseTask){i*chunk,(i+1)*chunk > loadedModelsMaxIndex ? loadedModelsMaxIndex : (i+1)*chunk,raw,i};
     pthread_t th[32];
     if (num_parse_threads > 3) {
@@ -368,7 +371,7 @@ void LoadModels(void) {
 
         tv += modelVertexCounts[i]; tt += modelTriangleCounts[i];
         UploadMdlBuffer(GL_ARRAY_BUFFER,Sys_Render.vbos[i],modelVertices[i],(size_t)modelVertexCounts[i] * VERTEX_ATTRIBUTES_SIZE);
-        UploadMdlBuffer(GL_ARRAY_BUFFER,Sys_Render.tbos[i],modelTriangles[i],(size_t)modelTriangleCounts[i] * 3 * sizeof(u16));
+        UploadMdlBuffer(GL_ELEMENT_ARRAY_BUFFER,Sys_Render.tbos[i],modelTriangles[i],(size_t)modelTriangleCounts[i] * 3 * sizeof(u16));
     }
 
     for (u32 i=0;i<loadedModelsMaxIndex;++i) { if (raw[i].data) OS_DeallocateRAM((void*)raw[i].data,raw[i].size); }
