@@ -346,7 +346,7 @@ void LoadModels(void) {
     u32 chunk = (loadedModelsMaxIndex + num_parse_threads - 1) / num_parse_threads;
     for (int i=0;i<num_parse_threads;++i) tasks[i] = (ModelParseTask){i*chunk,(i+1)*chunk > loadedModelsMaxIndex ? loadedModelsMaxIndex : (i+1)*chunk,raw,i};
     pthread_t th[32];
-    if (num_parse_threads > 3) {
+    if (num_parse_threads > 1) {
         for (int i=0;i<num_parse_threads;++i) pthread_create(&th[i],NULL,ModelParsingWorker,&tasks[i]);
         for (int i=0;i<num_parse_threads;++i) pthread_join(th[i],NULL);
     } else { for (int t=0;t<num_parse_threads;++t) ModelParsingWorker(&tasks[t]); } // Single threaded fallback
