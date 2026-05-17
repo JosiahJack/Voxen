@@ -41,8 +41,8 @@ u8 currentPlayerNameLength=0; i8 currentMenuItem=0, currentMenuTab=0, menuItemCo
 static int num_parse_threads = 0;
 #define CHECK_GL_ERROR() do { u32 err = glGetError(); if (err != 0) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
 #define SHADOW_MAP_SIZE 128u
-#define MAX_SHADOWMAPS 256u
-#define MAX_LIGHTS_PER_VOXEL 64
+#define MAX_SHADOWMAPS 128u
+#define MAX_LIGHTS_PER_VOXEL 32
 #define NEAR_PLANE (0.02f)
 #define ONE_OVER_SQRT2 0.70710678118f
 GlobalContext Sys_Global = {0}; TextSystem Sys_Text; InputSystem Sys_Input; CheatsSystem Sys_Cheats = {.god=false,.noclip=true,.showLocation=true,.showFPS=true,.editMode=true}; RenderSystem Sys_Render; SystemUI Sys_UI;
@@ -1628,11 +1628,9 @@ i32 main(void) {
         Sys_Global.last_topframe_time = Sys_Global.current_time;
         if (!Sys_Global.gamePaused && !Sys_Global.menuActive) Sys_Global.pauseRelativeTime += Sys_Global.deltaTime;
         mouseMovementThisFrame = false;
-        DualLog("start InputProcessing\n");
         InputProcessing();
         Sys_Global.timeSinceLastPhysicsTick = Sys_Global.pauseRelativeTime - Sys_Global.last_physics_time;
         if (likely(!Sys_Global.gamePaused || Sys_Global.menuActive)) UpdateAnims(); // Changes collision positions
-        DualLog("start Update Gameplay\n");
         if (likely(!Sys_Global.gamePaused && !Sys_Global.menuActive)) { // Update Gameplay
             MemSetToValueForNBytes(dynamicEntities,0,512 * sizeof(u16)); // none
             dynamicEntityCount = 0;
@@ -1657,7 +1655,6 @@ i32 main(void) {
             UpdateAmbientSounds();
         }
 
-        DualLog("start UpdateMusic\n");
         UpdateMusic();
         if (likely(!Sys_Global.gamePaused) && camViewCount > 0) { // Render in-world camera views.  Pops player elsewhere, renders to tiny fbo, pops player back, renders as normal below.
             Vector3 tempPlayerPos = Sys_Global.instances[PLAYER1].position;
@@ -1677,9 +1674,7 @@ i32 main(void) {
         }
         
         if (likely(!Sys_Global.gamePaused || Sys_Global.menuActive)) {
-            DualLog("start CullCore\n");
             CullCore();
-            DualLog("start Matrices update\n");
             bool uploadInstances = false;
             for (u32 i = START_INDEX_LEVEL_INSTANCES; i < Sys_Global.loadedInstances; i++) {
                 if (Sys_Global.dirtyInstances[i]) {
@@ -1702,15 +1697,12 @@ i32 main(void) {
             if (uploadInstances) { glBindBuffer(GL_SSBO,Sys_Render.matricesBufferID); glBufferData(GL_SSBO,Sys_Global.loadedInstances * 16 * sizeof(float),modelMatrices,GL_DYNAMIC_DRAW); }
         }
 
-        DualLog("start Render\n");
         Render(false,0u); // Not a cam view, no camview index.  This is the normal main render.
-        DualLog("final frame stuff\n");
         CheckAndTakeScreenshot();
         Sys_Global.globalFrameNum++;
         InputClearRisingAndFallingEdges();
         Sys_Input.currentMouse_dx = Sys_Input.currentMouse_dy = 0;
         Sys_Global.cpuTime = get_time() - Sys_Global.current_time; // Measure time over everything this frame before GPU swap buffers
-        DualLog("Wait for present...");
         glfwSwapBuffers(); // Present frame
         CHECK_GL_ERROR();
         #ifdef DEBUG_RAM_OUTPUT
@@ -1718,7 +1710,6 @@ i32 main(void) {
             static const char*    dbgLabels[] = {"after 4 frames","after 100 frames","after 200 frames","after 500 frames","after 1000 frames"};
             for (int _d=0;_d<5;_d++) if (Sys_Global.globalFrameNum == dbgFrames[_d]) { DebugRAM(dbgLabels[_d]); break; }
         #endif
-        DualLog("frame %u finished!\n",Sys_Global.globalFrameNum);
     }
     return 0;
 }
