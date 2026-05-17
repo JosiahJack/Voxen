@@ -80,11 +80,12 @@ static inline __attribute__((always_inline)) i32 fast_atoi(const char** p) {
     return v * s;
 }
 
-typedef struct { u32 idx; u32 key; } TriSort;
-int cmp(const void* a, const void* b) { u32 ka=((const TriSort*)a)->key, kb=((const TriSort*)b)->key; return ka<kb?-1:ka>kb; }
+typedef struct { u32 idx,key; } TriSort;
+int cmp(const void* a, const void* b) { u32 ka=((const TriSort*)a)->key, kb=((const TriSort*)b)->key; return (ka > kb) - (ka < kb); } // branchless 1 or -1
 static void OptimizeVertexCache(u16* idx, u32 ic, u32 vc) {
     if (ic < 3 || !vc) return;
-    u32 tc = ic/3;
+    
+    u32 tc = ic / 3;
     TriSort* t = OS_Alloc(tc*sizeof(TriSort));
     for (u32 i=0; i<tc; ++i) {
         u16* p = idx+i*3; u32 m = p[0]<p[1]?p[0]:p[1]; m = m<p[2]?m:p[2];
@@ -100,7 +101,7 @@ static void OptimizeVertexCache(u16* idx, u32 ic, u32 vc) {
 static u8* OptimizeVertexFetch(u8* v, u32* vc, u16* idx, u32 ic, size_t stride) {
     u32 oc = *vc; if (!oc || !ic) return v;
     u32 *remap = OS_Alloc(oc*sizeof(u32)), *first = OS_Alloc(oc*sizeof(u32));
-    MemSetToValueForNBytes(remap, 0xFF, oc*sizeof(u32));
+    MemSetToValueForNBytes(remap,0xFF,oc*sizeof(u32));
     u32 nc = 0;
     for (u32 i=0; i<ic; ++i) {
         u32 id = idx[i];
@@ -110,14 +111,12 @@ static u8* OptimizeVertexFetch(u8* v, u32* vc, u16* idx, u32 ic, size_t stride) 
     for (u32 i=0; i<nc; ++i) CopyMemoryFromBtoAForNBytes(nv+i*stride,v+first[i]*stride,stride);
     for (u32 i=0; i<ic; ++i) if (idx[i] < oc) idx[i] = (u16)remap[idx[i]];
     *vc = nc;
-    OS_DeallocateRAM(remap, oc*sizeof(u32)); OS_DeallocateRAM(first, oc*sizeof(u32));
+    OS_DeallocateRAM(remap,oc*sizeof(u32)); OS_DeallocateRAM(first,oc*sizeof(u32));
     return nv;
 }
 
-static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, const char* __restrict d, int fs, float* __restrict tp, float* __restrict tn, float* __restrict tu, float* __restrict sv, u16* __restrict st, u8** ov, u32* ovc, u16** ot, u16* otc, float* minx, float* miny, float* minz, float* maxx, float* maxy, float* maxz) {
+static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, const char* __restrict d, int fs, float* __restrict tp, float* __restrict tn, float* __restrict tu, float* __restrict sv, u16* __restrict st, u8** ov, u32* ovc, u16** ot, u16* otc) {
     *ov = NULL; *ot = NULL; *ovc = *otc = 0;
-    if (unlikely(!d || fs <= 0)) return false;
-
     u32 pc=0,nc=0,uc=0,ec=0;
     float mx=1e9f,my=1e9f,mz=1e9f,Mx=-1e9f,My=-1e9f,Mz=-1e9f;
     const char *p = d, *e = d+fs;
@@ -214,22 +213,19 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, c
     DualLog("[%u]Finished a parse OBJ vertex fetch optimization.\n",mindex);
     OS_DeallocateRAM(fv, oldc * VERTEX_ATTRIBUTES_SIZE);
     *ov = optv; *ovc = ucnt; *ot = ft; *otc = ec/3;
-    *minx=mx; *miny=my; *minz=mz; *maxx=Mx; *maxy=My; *maxz=Mz;
+    float rad = vmax(vabs(mx),vmax(vabs(my),vmax(vabs(mz),vmax(Mx,vmax(My,Mz)))));
+    modelBounds[mindex] = rad;
     return true;
 }
 
-typedef struct { u32 start, end; RawOBJ* raw; i32* map; const ModelDataParser* parser; int tid; } ModelParseTask;
+typedef struct { u32 start, end; RawOBJ* raw; int tid; } ModelParseTask;
 static void* ModelParsingWorker(void* arg) {
     ModelParseTask* t = arg;
     for (u32 i = t->start; i < t->end; ++i) {
-        i32 pi = t->map[i];
-        if (unlikely(pi < 0 || pi >= (i32)t->parser->count)) continue;
-        RawOBJ r = t->raw[i];
-        if (unlikely(!r.data || r.size <= 0)) continue;
-        float mx,my,mz,Mx,My,Mz;
-        if (!ParseOBJ(i,r.data,r.size,thread_temp_pos[t->tid],thread_temp_nrm[t->tid],thread_temp_uv[t->tid],thread_out_verts[t->tid],thread_out_tris[t->tid],&modelVertices[i],&modelVertexCounts[i],&modelTriangles[i],&modelTriangleCounts[i],&mx,&my,&mz,&Mx,&My,&Mz)) continue;
-        float rad = vmax(vabs(mx), vmax(vabs(my), vmax(vabs(mz), vmax(Mx, vmax(My, Mz)))));
-        modelBounds[i] = rad;
+        RawOBJ obj = t->raw[i];
+        if (unlikely(!obj.data || obj.size <= 0)) continue;
+
+        if (!ParseOBJ(i,obj.data,obj.size,thread_temp_pos[t->tid],thread_temp_nrm[t->tid],thread_temp_uv[t->tid],thread_out_verts[t->tid],thread_out_tris[t->tid],&modelVertices[i],&modelVertexCounts[i],&modelTriangles[i],&modelTriangleCounts[i])) continue;
     }
     return NULL;
 }
@@ -294,8 +290,14 @@ bool ParseModelData(ModelDataParser *p, u16 maxSz, const char *fn) {
     return true;
 }
 
+static void UploadMdlBuffer(u32 target, u32 buf, const void* data, size_t size) {
+    glBindBuffer(target,buf); glBufferData(target,size,NULL,GL_STATIC_DRAW);
+    void* mp = glMapBufferRange(target,0,size,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/);
+    CopyMemoryFromBtoAForNBytes(mp,data,size); glUnmapBuffer(target);
+}
+
 void LoadModels(void) {
-    double t0 = get_time();
+    double startModelTime = get_time();
     ModelDataParser mp = {0};
     if (!ParseModelData(&mp, MODEL_IDX_MAX,"./Data/models.txt")) { DualLogError("Failed models.txt\n"); OS_Exit(1); }
 
@@ -321,7 +323,7 @@ void LoadModels(void) {
         if (pi >= 0) {
             const char* path = mp.entries[pi].path;
             OsFileHandle dummy; int sz=0;
-            raw[i].data = (const char*)OS_OpenAndAllocateFileBufferReadonly(path, &dummy, &sz);
+            raw[i].data = (const char*)OS_OpenAndAllocateFileBufferReadonly(path,&dummy,&sz);
             raw[i].size = sz;
         }
     }
@@ -348,30 +350,25 @@ void LoadModels(void) {
     ModelParseTask tasks[32];
     u32 chunk = (loadedModelsMaxIndex + num_parse_threads - 1) / num_parse_threads;
     DualLog("Executing model parse tasks...\n");
-    for (int i=0; i<num_parse_threads; ++i) tasks[i] = (ModelParseTask){i*chunk,(i+1)*chunk > loadedModelsMaxIndex ? loadedModelsMaxIndex : (i+1)*chunk,raw,idxmap,&mp,i};
+    for (int i=0;i<num_parse_threads;++i) tasks[i] = (ModelParseTask){i*chunk,(i+1)*chunk > loadedModelsMaxIndex ? loadedModelsMaxIndex : (i+1)*chunk,raw,i};
     pthread_t th[32];
-    DualLog("Executing model parse thread creation...\n");
-    for (int i=0;i<num_parse_threads;++i) pthread_create(&th[i],NULL,ModelParsingWorker,&tasks[i]);
-    DualLog("Executing model parse thread joins...\n");
-    for (int i=0;i<num_parse_threads;++i) pthread_join(th[i],NULL);
-    //for (int t=0;t<num_parse_threads;++t) ModelParsingWorker(&tasks[t]); // Single threaded alternative
+    if (num_parse_threads > 3) {
+        DualLog("Executing model parse thread creation...\n");
+        for (int i=0;i<num_parse_threads;++i) pthread_create(&th[i],NULL,ModelParsingWorker,&tasks[i]);
+        DualLog("Executing model parse thread joins...\n");
+        for (int i=0;i<num_parse_threads;++i) pthread_join(th[i],NULL);
+    } else { for (int t=0;t<num_parse_threads;++t) ModelParsingWorker(&tasks[t]); } // Single threaded fallback
+    
     DualLog("Model glGenBuffers...\n");
     glGenBuffers(loadedModelsMaxIndex,Sys_Render.vbos); glGenBuffers(loadedModelsMaxIndex,Sys_Render.tbos);
     u32 tv=0,tt=0;
     for (int i=0; i<loadedModelsMaxIndex; ++i) {
         DualLog("GPU transfer model %u\n",i);
         if (!modelVertexCounts[i]) continue;
-        size_t vs = (size_t)modelVertexCounts[i] * VERTEX_ATTRIBUTES_SIZE;
-        size_t ts = (size_t)modelTriangleCounts[i] * 3 * sizeof(u16);
+
         tv += modelVertexCounts[i]; tt += modelTriangleCounts[i];
-        glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.vbos[i]); glBufferData(GL_ARRAY_BUFFER,vs,NULL,GL_STATIC_DRAW);
-        void* mp = glMapBufferRange(GL_ARRAY_BUFFER,0,vs,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/);
-        CopyMemoryFromBtoAForNBytes(mp,modelVertices[i],vs);
-        glUnmapBuffer(GL_ARRAY_BUFFER);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,Sys_Render.tbos[i]); glBufferData(GL_ELEMENT_ARRAY_BUFFER,ts,NULL,GL_STATIC_DRAW);
-        mp = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER,0,ts,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/);
-        CopyMemoryFromBtoAForNBytes(mp,modelTriangles[i],ts);
-        glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
+        UploadMdlBuffer(GL_ARRAY_BUFFER,Sys_Render.vbos[i],modelVertices[i],(size_t)modelVertexCounts[i] * VERTEX_ATTRIBUTES_SIZE);
+        UploadMdlBuffer(GL_ARRAY_BUFFER,Sys_Render.tbos[i],modelTriangles[i],(size_t)modelTriangleCounts[i] * 3 * sizeof(u16));
     }
 
     for (u32 i=0;i<loadedModelsMaxIndex;++i) { if (raw[i].data) OS_DeallocateRAM((void*)raw[i].data,raw[i].size); }
@@ -381,6 +378,6 @@ void LoadModels(void) {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0);
     glFlush(); glFinish();
     OS_DeallocateRAM(mp.entries,mp.count * sizeof(ModelData));
-    DualLog(" vertices: %u, tris: %u, %f secs\n", tv, tt, get_time()-t0);
+    DualLog(" vertices: %u, tris: %u, %f secs\n",tv,tt,get_time() - startModelTime);
     DebugRAM("After LoadModels");
-}
+} // 391
