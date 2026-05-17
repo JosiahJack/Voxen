@@ -179,7 +179,6 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, c
     if (unlikely(!ec)) return false;
 
     #define HASH_SIZE 65536
-    //u32 ht[HASH_SIZE]; MemSetToValueForNBytes(ht, 0xFF, sizeof(ht));
     u32* ht = OS_Alloc(HASH_SIZE * sizeof(u32));
     MemSetToValueForNBytes(ht,0xFF,HASH_SIZE * sizeof(u32));
     u32* rem = (u32*)st; u32 ucnt = 0;
