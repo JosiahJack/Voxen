@@ -1,4 +1,4 @@
-// data_models.c - Load 3D Models
+// models.c - Load 3D Models
 void qsort(void* base, size_t nmemb, size_t size, int (*cmp)(const void*, const void*));
 u8** modelVertices = NULL; u16** modelTriangles = NULL;
 u32 modelVertexCounts[MODEL_IDX_MAX] = {0}; u16 modelTriangleCounts[MODEL_IDX_MAX] = {0};
@@ -14,12 +14,8 @@ static Vector3 normalsTable[256];
 static inline float NormDot(Vector3 a, Vector3 b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
 void BuildNormalTable(void) {
     int n = 0;
-    normalsTable[n++] = (Vector3){ 1, 0, 0}; // Axis-aligned
-    normalsTable[n++] = (Vector3){-1, 0, 0};
-    normalsTable[n++] = (Vector3){ 0, 1, 0};
-    normalsTable[n++] = (Vector3){ 0,-1, 0};
-    normalsTable[n++] = (Vector3){ 0, 0, 1};
-    normalsTable[n++] = (Vector3){ 0, 0,-1};
+    normalsTable[n++] = (Vector3){ 1, 0, 0}; normalsTable[n++] = (Vector3){-1, 0, 0}; normalsTable[n++] = (Vector3){ 0, 1, 0};
+    normalsTable[n++] = (Vector3){ 0,-1, 0}; normalsTable[n++] = (Vector3){ 0, 0, 1}; normalsTable[n++] = (Vector3){ 0, 0,-1}; // Axis-aligned
     const float s2 = 0.70710678118f; // 1/sqrt(2)
     const float edge45[12][3] = { { s2, s2, 0}, { s2,-s2, 0}, {-s2, s2, 0}, {-s2,-s2, 0}, { s2, 0, s2}, { s2, 0,-s2}, {-s2, 0, s2}, {-s2, 0,-s2}, { 0, s2, s2}, { 0, s2,-s2}, { 0,-s2, s2}, { 0,-s2,-s2}, };
     for (int i = 0; i < 12; i++) normalsTable[n++] = (Vector3){edge45[i][0], edge45[i][1], edge45[i][2]}; // Edge 45° normals
@@ -307,7 +303,7 @@ void LoadModels(void) {
     modelVertices  = OS_Alloc(loadedModelsMaxIndex * sizeof(u8*));
     modelTriangles = OS_Alloc(loadedModelsMaxIndex * sizeof(u16*));
     size_t n = loadedModelsMaxIndex;
-    size_t arena = n*sizeof(i32) + n*sizeof(RawOBJ) + 5*n*sizeof(float*) + (size_t)num_parse_threads * ((MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*2)*sizeof(float) + MAX_OUTPUT_VERTS*8*sizeof(float) + MAX_OUTPUT_VERTS*sizeof(u32));
+    size_t arena = n*sizeof(i32) + n*sizeof(RawOBJ) + 5*num_parse_threads*sizeof(float*) + (size_t)num_parse_threads * ((MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*2)*sizeof(float) + MAX_OUTPUT_VERTS*8*sizeof(float) + MAX_OUTPUT_VERTS*sizeof(u32));
     void* arena_base = OS_Alloc(arena); char* p = arena_base;
     i32* idxmap = (i32*)p; p += n*sizeof(i32);
     MemSetToValueForNBytes(idxmap, -1, n*sizeof(i32));
@@ -358,9 +354,9 @@ void LoadModels(void) {
         tv += modelVertexCounts[i]; tt += modelTriangleCounts[i];
         UploadMdlBuffer(GL_ARRAY_BUFFER,Sys_Render.vbos[i],modelVertices[i],(size_t)modelVertexCounts[i] * VERTEX_ATTRIBUTES_SIZE);
         UploadMdlBuffer(GL_ELEMENT_ARRAY_BUFFER,Sys_Render.tbos[i],modelTriangles[i],(size_t)modelTriangleCounts[i] * 3 * sizeof(u16));
+        if (raw[i].data) OS_DeallocateRAM((void*)raw[i].data,raw[i].size);
     }
 
-    for (u32 i=0;i<loadedModelsMaxIndex;++i) { if (raw[i].data) OS_DeallocateRAM((void*)raw[i].data,raw[i].size); }
     OS_DeallocateRAM(arena_base, arena);
     glBindBuffer(GL_ARRAY_BUFFER,0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0);
@@ -368,4 +364,4 @@ void LoadModels(void) {
     OS_DeallocateRAM(mp.entries,mp.count * sizeof(ModelData));
     DualLog(" vertices: %u, tris: %u, %f secs\n",tv,tt,get_time() - startModelTime);
     DebugRAM("After LoadModels");
-} // 391
+}

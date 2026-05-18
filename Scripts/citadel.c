@@ -960,7 +960,6 @@ void FuncWallTargetted(u16 self, u16 activator, const char* argvalue) {
     if (e->funcState == FuncStates_Start || e->funcState == FuncStates_MovingStart || e->funcState == FuncStates_AjarMovingTarget) FuncWallMoveTarget(self);
     else FuncWallMoveStart(self);
     play_wav(sounds[76],1.0f,e->position,true);
-    flag_set(&e->entflags,ENTFLAG_STOPSOUND_PLAYED,false);
 }
 
 void FuncWallUpdate(u16 self) {
@@ -994,7 +993,7 @@ void func_forcebridge(u16 self) {
     if (e->activatedScale.x <= 0.02f) e->activatedScale.x = 2.56f;
     if (e->activatedScale.y <= 0.02f) e->activatedScale.y = 0.08f;
     if (e->activatedScale.z <= 0.02f) e->activatedScale.z = 2.56f;
-    if (!e->active) { flag_set(&e->entflags,ENTFLAG_VISIBLE,false); e->collider = COLLIDER_TYPE_NONE; }
+    if (!e->active) { e->modelIndex = MODEL_IDX_MAX; e->collider = COLLIDER_TYPE_NONE; }
     switch (e->fieldColor) {
         case ForceFieldColor_Red:      e->texIndex = 38; break;
         case ForceFieldColor_Green:    e->texIndex = 40; break;
@@ -1009,9 +1008,8 @@ void ForceBridgeActivate(u16 self, bool isSilent) {
     if (e->active) return;
     
     if (!isSilent) play_wav(sounds[102],1.0f,e->position,true);
-    flag_set(&e->entflags,ENTFLAG_VISIBLE,true);
+    e->modelIndex = 78; e->collider = COLLIDER_TYPE_BOX;
     e->active = e->lerping = true;
-    e->collider = COLLIDER_TYPE_BOX;
     e->scale = (Vector3){ e->forceFieldDirectionX ? 0.1f : e->activatedScale.x, e->forceFieldDirectionY ? 0.1f : e->activatedScale.y, e->forceFieldDirectionZ ? 0.1f : e->activatedScale.z };
 }
 
@@ -1021,6 +1019,7 @@ void ForceBridgeDeactivate(u16 self, bool isSilent) {
     
     if (!isSilent) play_wav(sounds[102],1.0f,e->position,true);
     e->active = false; e->lerping = true;
+    e->modelIndex = MODEL_IDX_MAX; e->collider = COLLIDER_TYPE_NONE;
 }
 
 void ForceBridgeToggle(u16 self) {
@@ -1133,47 +1132,48 @@ void GravityLiftInitAfterLoad(u16 self) {
     e->topPoint = (Vector3){ 0.0f, e->position.y + (e->colliderSize.y * 0.5f), 0.0f };
 }
 
-void GravityLiftOnTriggerExit(u16 self, u16 other) {
-    (void)self;
-    if (other == PLAYER1) flag_set(&Eng_Global->instances[PLAYER1].entflags,ENTFLAG_GRAV_LIFT_STATE,false);
-}
-
-void GravityLiftOnForce(u16 self, u16 other, bool initial) {
-    Entity* e = &Eng_Global->instances[self];
-    Entity* o = &Eng_Global->instances[other];
-    if (other == PLAYER1) flag_set(&Eng_Global->instances[PLAYER1].entflags,ENTFLAG_GRAV_LIFT_STATE,true);
-    float topY = e->position.y + (e->colliderSize.y * 0.5f);
-    float dist = topY - o->position.y + 0.48f;
-    float velY = o->velocity.y < 0.0f ? 0.0f : o->velocity.y;
-    if (dist < e->distancePaddingToTopPoint) AddForce(other,(Vector3){0.0f,9.81f - velY,0.0f},false); // TODO accel-vs-force parity
-    else if (o->velocity.y < (e->strength * o->mass)) {
-        float yForce = (e->strength * o->mass) - o->velocity.y;
-        if (initial || e->initialBurstFinished > Eng_Global->pauseRelativeTime) yForce *= 2.0f;
-        AddForce(other,(Vector3){0.0f,yForce,0.0f},false);
-    }
-}
-
-void GravityLiftOffForce(u16 self, u16 other, bool initial) {
-    Entity* e = &Eng_Global->instances[self];
-    Entity* o = &Eng_Global->instances[other];
-    if (other == PLAYER1) flag_set(&Eng_Global->instances[PLAYER1].entflags,ENTFLAG_GRAV_LIFT_STATE,true);
-    if (o->velocity.y < e->offStrengthFactor) {
-        float yForce = e->offStrengthFactor - o->velocity.y;
-        if (initial || e->initialBurstFinished > Eng_Global->pauseRelativeTime) yForce *= 2.0f;
-        AddForce(other,(Vector3){0.0f,yForce,0.0f},false);
-    }
-}
-
-void GravityLiftOnTriggerEnter(u16 self, u16 other) {
-    Eng_Global->instances[self].initialBurstFinished = Eng_Global->pauseRelativeTime + 1.0f;
-    if (Eng_Global->instances[self].active) GravityLiftOnForce(self,other,true);
-    else GravityLiftOffForce(self,other,true);
-}
-
-void GravityLiftOnTriggerStay(u16 self, u16 other) {
-    if (Eng_Global->instances[self].active) GravityLiftOnForce(self,other,false);
-    else GravityLiftOffForce(self,other,false);
-}
+// TODO just poll bounds and apply in trigger loop, yeesh
+// void GravityLiftOnTriggerExit(u16 self, u16 other) {
+//     (void)self;
+//     if (other == PLAYER1) Eng_Global->instances[PLAYER1].gravity = 1.0f;
+// }
+// 
+// void GravityLiftOnForce(u16 self, u16 other, bool initial) {
+//     Entity* e = &Eng_Global->instances[self];
+//     Entity* o = &Eng_Global->instances[other];
+//     if (other == PLAYER1) flag_set(&Eng_Global->instances[PLAYER1].entflags,ENTFLAG_GRAV_LIFT_STATE,true);
+//     float topY = e->position.y + (e->colliderSize.y * 0.5f);
+//     float dist = topY - o->position.y + 0.48f;
+//     float velY = o->velocity.y < 0.0f ? 0.0f : o->velocity.y;
+//     if (dist < e->distancePaddingToTopPoint) AddForce(other,(Vector3){0.0f,9.81f - velY,0.0f},false); // TODO accel-vs-force parity
+//     else if (o->velocity.y < (e->strength * o->mass)) {
+//         float yForce = (e->strength * o->mass) - o->velocity.y;
+//         if (initial || e->initialBurstFinished > Eng_Global->pauseRelativeTime) yForce *= 2.0f;
+//         AddForce(other,(Vector3){0.0f,yForce,0.0f},false);
+//     }
+// }
+// 
+// void GravityLiftOffForce(u16 self, u16 other, bool initial) {
+//     Entity* e = &Eng_Global->instances[self];
+//     Entity* o = &Eng_Global->instances[other];
+//     if (other == PLAYER1) flag_set(&Eng_Global->instances[PLAYER1].entflags,ENTFLAG_GRAV_LIFT_STATE,true);
+//     if (o->velocity.y < e->offStrengthFactor) {
+//         float yForce = e->offStrengthFactor - o->velocity.y;
+//         if (initial || e->initialBurstFinished > Eng_Global->pauseRelativeTime) yForce *= 2.0f;
+//         AddForce(other,(Vector3){0.0f,yForce,0.0f},false);
+//     }
+// }
+// 
+// void GravityLiftOnTriggerEnter(u16 self, u16 other) {
+//     Eng_Global->instances[self].initialBurstFinished = Eng_Global->pauseRelativeTime + 1.0f;
+//     if (Eng_Global->instances[self].active) GravityLiftOnForce(self,other,true);
+//     else GravityLiftOffForce(self,other,true);
+// }
+// 
+// void GravityLiftOnTriggerStay(u16 self, u16 other) {
+//     if (Eng_Global->instances[self].active) GravityLiftOnForce(self,other,false);
+//     else GravityLiftOffForce(self,other,false);
+// }
 
 void GravityLiftToggle(u16 self) { Eng_Global->instances[self].active = !Eng_Global->instances[self].active; }
 
@@ -1900,26 +1900,26 @@ MOD_TO_ENGINE bool ModRequestsGrayscale(void) {return (/*(Eng_Global->invP1.hasH
 static void DeactivateHardwareOnEnergyDepleted(void) {
     InventorySystem* inv = &Eng_Global->invP1;
     u16* active = &inv->hardwareIsActive;
-    flag_set((u64*)active, HW_SNS, false);
+    flag_set((u32*)active, HW_SNS, false);
     // TODO: SensaroundOff() — hardware button manager effects
     if ((*active & HW_BIO) && inv->hardwareVersionSetting[HW_BIO_IDX] == 0) {
-        flag_set((u64*)active, HW_BIO, false);
+        flag_set((u32*)active, HW_BIO, false);
         // TODO: BioOff()
     }
     if (*active & HW_SHD) {
-        flag_set((u64*)active, HW_SHD, false);
+        flag_set((u32*)active, HW_SHD, false);
         // TODO: ShieldOffWithEffects()
     }
     if (*active & HW_LAN) {
-        flag_set((u64*)active, HW_LAN, false);
+        flag_set((u32*)active, HW_LAN, false);
         // TODO: LanternOff()
     }
     if (*active & HW_BST) {
-        flag_set((u64*)active, HW_BST, false);
+        flag_set((u32*)active, HW_BST, false);
         // TODO: BoosterOff()
     }
     if (*active & HW_INF) {
-        flag_set((u64*)active, HW_INF, false);
+        flag_set((u32*)active, HW_INF, false);
         // TODO: InfraredOff()
     }
 }
@@ -1984,7 +1984,6 @@ void GrenadeExplode(u16 self) {
     // TODO: DamageData + ApplyImpactForceSphere(damage,attackType,penetration,offense,damage*1.5f,e->position,e->strength,1.0f)
     if (!GrenadeIsNPCMine(self)) {
         Entity* p = &Eng_Global->instances[PLAYER1];
-        flag_set(&p->entflags,ENTFLAG_MAKING_NOISE,true);
         p->noiseFinished = Eng_Global->pauseRelativeTime + 2.0;
     }
     i16 idx = (i16)e->index;
@@ -2008,13 +2007,13 @@ void GrenadeActivate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     i16 idx = (i16)e->index;
     switch (idx) {
-        case 7:  flag_set(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
-        case 8:  flag_set(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
-        case 9:  flag_set(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
-        case 10: e->timerFinished = Eng_Global->pauseRelativeTime + Eng_Global->invP1.earthShakerTimeSetting; flag_set(&e->ioflags,GREN_FLAG_USE_TIMER,true);       break;
-        case 11: flag_set(&e->ioflags,GREN_FLAG_USE_PROX,true); flag_set(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,false);break;
-        case 12: e->timerFinished = Eng_Global->pauseRelativeTime + Eng_Global->invP1.nitroTimeSetting; flag_set(&e->ioflags,GREN_FLAG_USE_TIMER,true);       break;
-        case 13: flag_set(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
+        case 7:  flag_setu64(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
+        case 8:  flag_setu64(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
+        case 9:  flag_setu64(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
+        case 10: e->timerFinished = Eng_Global->pauseRelativeTime + Eng_Global->invP1.earthShakerTimeSetting; flag_setu64(&e->ioflags,GREN_FLAG_USE_TIMER,true);       break;
+        case 11: flag_setu64(&e->ioflags,GREN_FLAG_USE_PROX,true); flag_setu64(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,false);break;
+        case 12: e->timerFinished = Eng_Global->pauseRelativeTime + Eng_Global->invP1.nitroTimeSetting; flag_setu64(&e->ioflags,GREN_FLAG_USE_TIMER,true);       break;
+        case 13: flag_setu64(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
         default: return;
     }
 }
@@ -2023,7 +2022,7 @@ void GrenadeUpdate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if ((i16)e->index == 14) { GrenadeExplode(self); return; } // Plastique
     
-    if (((e->ioflags & GREN_FLAG_USE_TIMER) && e->timerFinished < Eng_Global->pauseRelativeTime) || ((e->ioflags & GREN_FLAG_USE_PROX) && (e->entflags & ENTFLAG_MAKING_NOISE))) GrenadeExplode(self);
+    if ((e->ioflags & GREN_FLAG_USE_TIMER) && e->timerFinished < Eng_Global->pauseRelativeTime) GrenadeExplode(self);
 }
 
 // Called by physics collision callback when grenade touches anything
@@ -2191,8 +2190,9 @@ static void CreateDeathEffects(u16 self,u16 fxPoolType) {
 
 static void HideSelf(u16 self) {
     Entity* e = &Eng_Global->instances[self];
-    if (e->index == 279) return; // screens keep mesh
-    flag_set(&e->entflags,ENTFLAG_VISIBLE,false);
+    if (e->index == 279) return; // screens keep mesh visible
+    
+    e->modelIndex = MODEL_IDX_MAX;
     e->gravity = 0.0f;
 }
 
@@ -2248,7 +2248,7 @@ static void VaporizeCorpse(u16 self,bool energyVaporized) {
     u16 fx = e->deathBurst;
     if (fx == 0) fx = 1; // PoolType_CorpseHit fallback
     if (energyVaporized) fx = 2; // PoolType_Vaporize
-    flag_set(&e->entflags,ENTFLAG_VISIBLE,false);
+    e->modelIndex = MODEL_IDX_MAX;
     bool isNPC = ConstIndexIsNPC(e->index);
     bool isSearchable = ConstIndexIsSearchable(e->index);
     if (isNPC || isSearchable) DeleteInstance(self);
@@ -2263,11 +2263,11 @@ static void Death(u16 self,bool energyVaporized) {
     bool isObj = ConstIndexIsDynamicObject(e->index);
     if (e->entflags & ENTFLAG_ACT_AS_CORPSE_ONLY) { e->entflags |= ENTFLAG_DEAD_CHECKS_DONE; return; }
 //     bool gib        = (e->entflags & ENTFLAG_DEATH_BURST_DONE) != 0;
-    bool vaporize   = (e->entflags & ENTFLAG_VISIBLE) != 0; // vaporizeCorpse maps to VISIBLE being set
+    bool vaporize   = (ConstIndexIsNPC(e->index) && e->health <= 0.0f) || ConstIndexIsCorpse(e->index); // vaporizeCorpse maps to VISIBLE being set
     bool isScreen   = (e->index == 279);
     bool isGrenade  = (e->entflags & ENTFLAG_ISGRENADE) != 0;
     bool isCam      = (e->index == 477);
-    bool doTeleport = (e->entflags & ENTFLAG_REQUIRE_RESET) != 0; // REQUIRE_RESET reused as teleportOnDeath
+    bool doTeleport = (e->entflags & ENTFLAG_TELEPORT_ON_DEATH) != 0; // REQUIRE_RESET reused as teleportOnDeath
     if (e->iceActive) e->collider = COLLIDER_TYPE_NONE;
     if (vaporize && !isCam && !isGrenade) VaporizeCorpse(self,energyVaporized);
     else if (isObj)    ObjectDeath(self);
@@ -2297,9 +2297,7 @@ float TakeDamage(u16 self,DamageData dd) {
     }
     // Dead exceptions — still allow damage to gibs, ice, player, grenades, screens, cameras, teleporters
     if (*hp <= 0.0f) {
-        bool allowPost = (e->entflags & ENTFLAG_DEATH_BURST_DONE) || e->iceActive
-                        || isPlayer || isGrenade || e->index == 279 || isCam
-                        || (e->entflags & ENTFLAG_REQUIRE_RESET);
+        bool allowPost = (isNPC || e->iceActive || isPlayer || isGrenade || e->index == 279 || isCam);
         if (!allowPost) return 0.0f;
     }
 
@@ -3637,8 +3635,8 @@ MOD_TO_ENGINE void ModInitAfterLoad(void) {
         else if (constIndex == 480) CyberMineInitBeforeLoad(i);
         if (!StringIsEmpty(e->targetname) && (e->ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE) && !(e->entflags & TARG_IOFLAGS_DISABLD_ONCE_4EVER)) flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
         if (e->index == 700) {
-            if ((e->ioflags & TARG_IOFLAGS_START_ON_SECOND) || (e->ioflags & TARG_IOFLAGS_ON_SECOND)) { StringCopyInto_A_From_B(e->currenttarget,e->target ,TARGET_STRING_LENGTH); flag_set(&e->ioflags,TARG_IOFLAGS_ON_SECOND,false); }
-            else                                                                                      { StringCopyInto_A_From_B(e->currenttarget,e->target2,TARGET_STRING_LENGTH); flag_set(&e->ioflags,TARG_IOFLAGS_ON_SECOND,true ); }
+            if ((e->ioflags & TARG_IOFLAGS_START_ON_SECOND) || (e->ioflags & TARG_IOFLAGS_ON_SECOND)) { StringCopyInto_A_From_B(e->currenttarget,e->target ,TARGET_STRING_LENGTH); flag_setu64(&e->ioflags,TARG_IOFLAGS_ON_SECOND,false); }
+            else                                                                                      { StringCopyInto_A_From_B(e->currenttarget,e->target2,TARGET_STRING_LENGTH); flag_setu64(&e->ioflags,TARG_IOFLAGS_ON_SECOND,true ); }
         }
     }
 }

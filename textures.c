@@ -1,3 +1,4 @@
+// textures.c - Loads 2D Textures
 u32 totalPixels;
 u32 totalPaletteColors;
 typedef struct { u16 index; bool transparent; bool doublesided; char path[128]; } TextureData;

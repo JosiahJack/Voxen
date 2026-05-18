@@ -1,10 +1,10 @@
 // text.c - Loads font text, heavy reduction of stb_truetype
 typedef struct { void* ptr; size_t sz; } TAlloc;
-static TAlloc ttAllocs[4474]; static int tallocCount=0;
+static TAlloc* ttAllocs = NULL; static int tallocCount=0;
 static void* TempAlloc(size_t n){if(tallocCount>=4474){DualLogError("TempAlloc too many!\n");return NULL;}void*p=OS_Alloc(n);if(!p){DualLogError("TempAlloc: OS_Alloc failed!\n");return NULL;}ttAllocs[tallocCount++]=(TAlloc){p,n};return p;}
 static void  TempFree (void* p){if(!p||tallocCount==0||ttAllocs[tallocCount-1].ptr!=p)return;OS_DeallocateRAM(p,ttAllocs[tallocCount-1].sz);tallocCount--;}
-#define ttBYTE(p)  (*(u8*)(p))
-#define ttCHAR(p)  (*(i8*)(p))
+#define ttBYTE(p) (*(u8*)(p))
+#define ttCHAR(p) (*(i8*)(p))
 static u16 ttUSHORT(u8*p){return p[0]*256+p[1];}
 static i16 ttSHORT (u8*p){return p[0]*256+p[1];}
 static u32 ttULONG (u8*p){return((u32)p[0]<<24)|((u32)p[1]<<16)|((u32)p[2]<<8)|p[3];}
@@ -408,7 +408,9 @@ static int GetGlyphAndFont(u32 cp,stbtt_fontinfo**outFont,u8 fontID){
 
 static void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, unsigned char* bmp);
 static void InitFontAtlasses(void){
+    DebugRAM("start font load");
     double t0=get_time();DualLog("Loading    5 fonts...");
+    ttAllocs = OS_Alloc(4474 * sizeof(TAlloc));
     OsFileHandle fd1,fd2;int sz1,sz2;
     fontData[0]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[0],&fd1,&sz1);
     fontData[1]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[1],&fd2,&sz2);
@@ -439,6 +441,13 @@ static void InitFontAtlasses(void){
     TempFree(pc2.pack_info);GenerateAndBindTexture(&fontAtlasTexStopD,0x8229/*GL_R8*/,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0x1903/*GL_RED*/,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,bmp);
     
     OS_DeallocateRAM(bmp,FONT_ATLAS_SIZE*FONT_ATLAS_SIZE);
+    OS_DeallocateRAM(fontData[0],sz1); fontData[0] = NULL;
+    OS_DeallocateRAM(fontData[1],sz2); fontData[1] = NULL;
+    OS_DeallocateRAM(fontData[2],fallbackFonts[0].size); fontData[2] = NULL;
+    OS_DeallocateRAM(fontData[3],fallbackFonts[1].size); fontData[3] = NULL;
+    OS_DeallocateRAM(fontData[4],fallbackFonts[2].size); fontData[4] = NULL;
+    OS_DeallocateRAM(ttAllocs,4474 * sizeof(TAlloc));
+    DebugRAM("after font load");
     glUseProgram(Sys_Render.textShaderProgram); glUniform1i(1,2);
     DualLog(" took %f s\n",get_time()-t0);
 }

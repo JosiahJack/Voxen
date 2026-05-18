@@ -117,8 +117,6 @@ MOD_TO_ENGINE void InitializeAIAfterLoad(u16 i) {
     e->idealTransformForward = e->forward;
     StringCopyInto_A_From_B(e->targetID,npcTable[npcID].name,TARGET_ID_LENGTH);
     StringFormat(e->targetID,TARGET_ID_LENGTH * sizeof(char),"%s %05u",npcTable[npcID].name,npcCountInWorldPerType[npcID]++);
-    
-    flag_set(&e->entflags,ENTFLAG_ANIM_DEAD_DONE,false);
     u8 c;
     switch (e->currentState) {
         case AIState_Walk:    c = ANIM_WALK;    break;
@@ -245,8 +243,7 @@ static void aiac_run(Entity* self) {
 
 static void aiac_dying(Entity* self) {
     flag_set(&self->entflags, ENTFLAG_ASLEEP, false);
-    if (self->entflags & ENTFLAG_NO_DYING_ANIM) return;
-    
+    // TODO check if it has no death anim and return
 //     aiac_set_clip(self, ANIM_DYING);
 //     AnimationClip cl = modelAnimationClips[self->animationNum][ANIM_DYING];
 //     u16 range = cl.frameEnd > cl.frameStart ? cl.frameEnd - cl.frameStart : 1;
@@ -255,15 +252,10 @@ static void aiac_dying(Entity* self) {
 }
 
 static void aiac_dead(Entity* self) {
-    if (self->entflags & ENTFLAG_NO_DEATH_FREEZE) { aiac_freeze(self); return; }
-    
-    if (!(self->entflags & ENTFLAG_ANIM_DEAD_DONE)) {
-        AnimationClip cl = modelAnimationClips[self->animationNum][ANIM_DYING];
-        self->clip       = ANIM_DYING;
-        self->frame      = cl.frameEnd;
-        self->modelIndex = cl.frameStartModelIndex + (cl.frameEnd - cl.frameStart);
-        flag_set(&self->entflags, ENTFLAG_ANIM_DEAD_DONE, true);
-    }
+    AnimationClip cl = modelAnimationClips[self->animationNum][ANIM_DYING];
+    self->clip       = ANIM_DYING;
+    self->frame      = cl.frameEnd;
+    self->modelIndex = cl.frameStartModelIndex + (cl.frameEnd - cl.frameStart);
     aiac_freeze(self);
 }
 
@@ -388,8 +380,7 @@ static bool AICheckIfPlayerInSight(Entity* self) {
     Vector3 checkN = normalize_vector3(Vector3_A_minus_B(playerPos, spos));
     float cosA = vclamp(dot_vector3(checkN, self->forward), -1.0f, 1.0f);
     float angle = vacosf(cosA) * (180.0f / PI);
-    bool makingNoise = (Eng_Global->instances[PLAYER1].entflags & ENTFLAG_MAKING_NOISE) != 0;
-
+    bool makingNoise = Eng_Global->instances[PLAYER1].noiseFinished > Eng_Global->pauseRelativeTime;
     if (angle < npc->fov * 0.5f) {
         RaycastHit hit = Raycast(spos, checkN, dist + 0.1f, LAYER_MASK_NPC_SIGHT);
         if (hit.hit && hit.hitInstanceIndex == PLAYER1) { flag_set(&self->entflags, ENTFLAG_ENEM_IN_LOS, true); AISetEnemy(self, PLAYER1); AIPlaySightSound(self); return true; }
@@ -855,10 +846,10 @@ static void AITransitionAttackToRun(Entity* self, int n) {
     self->currentState = AIState_Run;
     NPCTable* npc = &npcTable[self->index - 419];
     float chance, wmin, wmax;
-    double* wait;
+    float* wait;
     switch (n) {
-        case 1: chance=npc->timeAttack1WaitChance; wmin=npc->timeAttack1WaitMin; wmax=npc->timeAttack1WaitMax; wait=&self->randomWaitForNextAttack1Finished; break;
-        case 2: chance=npc->timeAttack2WaitChance; wmin=npc->timeAttack2WaitMin; wmax=npc->timeAttack2WaitMax; wait=&self->randomWaitForNextAttack2Finished; break;
+        case 1:  chance=npc->timeAttack1WaitChance; wmin=npc->timeAttack1WaitMin; wmax=npc->timeAttack1WaitMax; wait=&self->randomWaitForNextAttack1Finished; break;
+        case 2:  chance=npc->timeAttack2WaitChance; wmin=npc->timeAttack2WaitMin; wmax=npc->timeAttack2WaitMax; wait=&self->randomWaitForNextAttack2Finished; break;
         default: chance=npc->timeAttack3WaitChance; wmin=npc->timeAttack3WaitMin; wmax=npc->timeAttack3WaitMax; wait=&self->randomWaitForNextAttack3Finished; break;
     }
     *wait = (random_range(0.0f, 1.0f) < chance) ? Eng_Global->pauseRelativeTime + random_range(wmin, wmax) : Eng_Global->pauseRelativeTime;

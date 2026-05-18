@@ -7,8 +7,7 @@ typedef struct { ma_sound sound; u32 loaded; float length_sec; } AmbientSlot;
 typedef struct { u16 index; const char* filename; } AmbientDef;
 u16 ambientRegistry[MAX_AMBIENT_NOISES]; // For ambient_ type entities that play looped sound
 static AmbientSlot ambientSlots[MAX_AMBIENT_NOISES] = {0};
-
-static const AmbientDef g_ambient_defs[MAX_AMBIENT_NOISES] = {
+static const AmbientDef ambientSounds[MAX_AMBIENT_NOISES] = {
     {621, "airhiss.wav"},          {622, "clicker.wav"},
     {623, "compressor.wav"},       {624, "dishwasher.wav"},
     {625, "drip_amb.wav"},         {626, "fan1.wav"},
@@ -30,10 +29,7 @@ static const AmbientDef g_ambient_defs[MAX_AMBIENT_NOISES] = {
 };
 
 static const AmbientDef* ambient_def_by_index(u16 idx) {
-    for (size_t i = 0; i < MAX_AMBIENT_NOISES; ++i) {
-        if (g_ambient_defs[i].index == idx) return &g_ambient_defs[i];
-    }
-    
+    for (size_t i = 0; i < MAX_AMBIENT_NOISES; ++i) { if (ambientSounds[i].index==idx) {return &ambientSounds[i];} }
     return NULL;
 }
 
@@ -49,7 +45,7 @@ MOD_TO_ENGINE void UpdateAmbientSounds(void) {
         const float dist_sq = squareDistance3D(player->x, player->y, player->z, ent->position.x, ent->position.y, ent->position.z);
         const float distance = vsqrtf(dist_sq);
         bool in_range = (dist_sq < max_range_sq) && PositionVisibleFromPlayerCell(ent->position.x,ent->position.z);
-        const size_t slot_idx = (size_t)(def - g_ambient_defs);
+        const size_t slot_idx = (size_t)(def - ambientSounds);
         AmbientSlot* slot = &ambientSlots[slot_idx];
         if (in_range) {
             if (!slot->loaded) {
@@ -68,15 +64,10 @@ MOD_TO_ENGINE void UpdateAmbientSounds(void) {
 
             if (!GetSoundIsPlaying(&slot->sound)) SoundStart(&slot->sound);
             if (slot->length_sec > 0.0f) { u64 cur; SoundGetCurrentFrameCursor(&slot->sound,&cur); } // Time sync
-            float vol_factor = (distance <= 1.0f) ? 1.0f
-                               : (distance >= max_range) ? 0.0f
-                                 : (max_range - distance) / (max_range - 1.0f); // Volume
-                                 
+            float vol_factor = (distance <= 1.0f) ? 1.0f : (distance >= max_range) ? 0.0f : (max_range - distance) / (max_range - 1.0f); // Volume
             float final_vol = ent->volume * vol_factor;
             SoundSetVolume(&slot->sound, final_vol);
-        } else {
-            if (GetSoundIsPlaying(&slot->sound)) SoundStop(&slot->sound);
-        }
+        } else if (GetSoundIsPlaying(&slot->sound)) SoundStop(&slot->sound);
     }
 }
 

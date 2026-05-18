@@ -110,7 +110,6 @@ i32 random_range_i32(i32 a, i32 b) {
 }
 
 float random_range(float a, float b) { return a + (b - a) * ((float)(xs32() >> 8) * (1.0f / (1U << 24))); }
-double random_rangedub(double a, double b) { return a + (b - a) * ((double)(xs32() >> 8) * (1.0 / (1U << 24))); }
 float lerp(float min, float max, float val) { return min + (max - min) * vclamp(val,0.0f,1.0f); }
 float inverse_lerp(float min, float max, float val) { return (min == max) ? 0.0f : vclamp((val - min) / (max - min),0.0f,1.0f); }
 float smooth_damp(float current, float target, float *current_velocity, float smooth_time) { 

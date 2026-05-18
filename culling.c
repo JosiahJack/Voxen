@@ -531,12 +531,11 @@ ENGINE_TO_MOD void PortalCulling(void) { // Called just once at end of animation
     DetermineVisibleCells(playerCellX,playerCellZ); // Recompute full PVS with new closed edges for all portal states.  So much for the precomputed set.
     for (u16 i=0;i<Sys_Global.loadedLights;++i) {
         u16 lcell = (lights[i].pos.z * WORLDX) + lights[i].pos.x;
-        if (!previousLightVisible[i] && (gridCellStates[lcell] & CELL_VISIBLE)) flag_setu32(&lights[i].lflags,LDIRTY,true);
+        if (!previousLightVisible[i] && (gridCellStates[lcell] & CELL_VISIBLE)) flag_set(&lights[i].lflags,LDIRTY,true);
     }
     UploadGridCellVisibility();
 }
 
-static inline __attribute__((always_inline)) void CellCoordsToPos(u16 x, u16 z, float* xf, float* xz) { *xf = Sys_Global.worldMin_x + (x * CELL_SIZE); *xz = Sys_Global.worldMin_z + (z * CELL_SIZE); }
 bool CullCore(void) {
     playerCellIdx = PosGetCellCoords(Sys_Global.instances[PLAYER1].position.x,Sys_Global.instances[PLAYER1].position.z);
     if (Sys_Global.currentLevel >= LEVEL_CYBERSPACE) return false;
@@ -544,7 +543,7 @@ bool CullCore(void) {
     float pos_x,pos_z;
     u16 cellX = (u16)clamp((i32)vfloor((Sys_Global.instances[PLAYER1].position.x - Sys_Global.worldMin_x + CELLXHALF) / CELL_SIZE),0,WORLDX_0BASED);
     u16 cellZ = (u16)clamp((i32)vfloor((Sys_Global.instances[PLAYER1].position.z - Sys_Global.worldMin_z + CELLXHALF) / CELL_SIZE),0,WORLDX_0BASED);
-    CellCoordsToPos(cellX,cellZ,&pos_x,&pos_z);
+    pos_x = Sys_Global.worldMin_x + (cellX * CELL_SIZE); pos_z = Sys_Global.worldMin_z + (cellZ * CELL_SIZE);
     for (int i=0;i<Sys_Global.loadedInstances;++i) {
         float distSqrd = squareDistance2D(Sys_Global.instances[i].position.x,Sys_Global.instances[i].position.z,pos_x,pos_z);
         instanceIsLODArray[i] = (distSqrd >= 655.36f); // 25.6f * 25.6f

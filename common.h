@@ -104,44 +104,35 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define ENTFLAG_ACTIVE               (1ull <<  0) // Instance renders and updates
 #define ENTFLAG_ISGRENADE            (1ull <<  1)
 #define ENTFLAG_GROUNDED             (1ull <<  2)
-
-#define ENTFLAG_RIGIDBODY            (1ull <<  4)
-#define ENTFLAG_NO_SHADOWS           (1ull <<  5)
-#define ENTFLAG_ASLEEP               (1ull <<  6) // Check if enemy starts out asleep such as the sleeping sec-2 bots on level 8 in the maintenance and recharge bays.
-#define ENTFLAG_WALK_PATH_ON_START   (1ull <<  7)
-#define ENTFLAG_TOUCHING_HURTS       (1ull <<  8)
-#define ENTFLAG_ACT_AS_CORPSE_ONLY   (1ull <<  9)
-#define ENTFLAG_DYING                (1ull << 10)
-#define ENTFLAG_DEATH_BURST_DONE     (1ull << 11)
-#define ENTFLAG_DEAD                 (1ull << 12)
-#define ENTFLAG_TELEPORT_ON_DEATH    (1ull << 13)
-#define ENTFLAG_GO_INTO_PAIN         (1ull << 14)
-#define ENTFLAG_DONT_LOOP_WAYPTS     (1ull << 15)
-#define ENTFLAG_VISIT_WAYPTS_RND     (1ull << 16)
-#define ENTFLAG_WANDERING            (1ull << 17)
-#define ENTFLAG_ACT_AS_TURRET        (1ull << 18)
-#define ENTFLAG_TARGID_ATTACHED      (1ull << 19)
-#define ENTFLAG_ENEM_IN_SIGHT        (1ull << 20)
-#define ENTFLAG_ENEM_IN_FRONT        (1ull << 21)
-#define ENTFLAG_ENEM_IN_FOV          (1ull << 22)
-#define ENTFLAG_ENEM_IN_LOS          (1ull << 23)
-#define ENTFLAG_FIRST_SIGHTING       (1ull << 24)
-#define ENTFLAG_DYING_SETUP          (1ull << 25)
-#define ENTFLAG_HAD_ENEMY            (1ull << 26)
-#define ENTFLAG_SHOT_FIRED           (1ull << 27)
-#define ENTFLAG_DEAD_CHECKS_DONE     (1ull << 28)
-#define ENTFLAG_HOP_DONE             (1ull << 29)
-#define ENTFLAG_LOCKED               (1ull << 30)
-#define ENTFLAG_HAS_CAMERA_VIEW      (1ull << 31)
-#define ENTFLAG_REQUIRE_RESET        (1ull << 32)
-#define ENTFLAG_GRAV_LIFT_STATE      (1ull << 33)
-#define ENTFLAG_STOPSOUND_PLAYED     (1ull << 34)
-#define ENTFLAG_DAMAGE_ON_USE        (1ull << 35)
-#define ENTFLAG_MAKING_NOISE         (1ull << 36)
-#define ENTFLAG_VISIBLE              (1ull << 37) // Renders
-#define ENTFLAG_ANIM_DEAD_DONE       (1ull << 38)
-#define ENTFLAG_NO_DYING_ANIM        (1ull << 39)
-#define ENTFLAG_NO_DEATH_FREEZE      (1ull << 40)
+#define ENTFLAG_RIGIDBODY            (1ull <<  3)
+#define ENTFLAG_NO_SHADOWS           (1ull <<  4)
+#define ENTFLAG_ASLEEP               (1ull <<  5) // Check if enemy starts out asleep such as the sleeping sec-2 bots on level 8 in the maintenance and recharge bays.
+#define ENTFLAG_WALK_PATH_ON_START   (1ull <<  6)
+#define ENTFLAG_TOUCHING_HURTS       (1ull <<  7)
+#define ENTFLAG_ACT_AS_CORPSE_ONLY   (1ull <<  8)
+#define ENTFLAG_DYING                (1ull <<  9)
+#define ENTFLAG_DEATH_BURST_DONE     (1ull << 10)
+#define ENTFLAG_DEAD                 (1ull << 11)
+#define ENTFLAG_TELEPORT_ON_DEATH    (1ull << 12)
+#define ENTFLAG_GO_INTO_PAIN         (1ull << 13)
+#define ENTFLAG_DONT_LOOP_WAYPTS     (1ull << 14)
+#define ENTFLAG_VISIT_WAYPTS_RND     (1ull << 15)
+#define ENTFLAG_WANDERING            (1ull << 16)
+#define ENTFLAG_ACT_AS_TURRET        (1ull << 17)
+#define ENTFLAG_TARGID_ATTACHED      (1ull << 18)
+#define ENTFLAG_ENEM_IN_SIGHT        (1ull << 19)
+#define ENTFLAG_ENEM_IN_FRONT        (1ull << 20)
+#define ENTFLAG_ENEM_IN_FOV          (1ull << 21)
+#define ENTFLAG_ENEM_IN_LOS          (1ull << 22)
+#define ENTFLAG_FIRST_SIGHTING       (1ull << 23)
+#define ENTFLAG_DYING_SETUP          (1ull << 24)
+#define ENTFLAG_HAD_ENEMY            (1ull << 25)
+#define ENTFLAG_SHOT_FIRED           (1ull << 26)
+#define ENTFLAG_DEAD_CHECKS_DONE     (1ull << 27)
+#define ENTFLAG_HOP_DONE             (1ull << 28)
+#define ENTFLAG_LOCKED               (1ull << 29)
+#define ENTFLAG_HAS_CAMERA_VIEW      (1ull << 30)
+#define ENTFLAG_DAMAGE_ON_USE        (1ull << 31)
 #define QUESTBIT_ROBOT_SPAWN_DEACTIVATED      (1ull <<  0)
 #define QUESTBIT_ISOTOPE_INSTALLED            (1ull <<  1)
 #define QUESTBIT_SHIELD_ACTIVATED             (1ull <<  2)
@@ -545,7 +536,7 @@ typedef struct {
 typedef struct { float damage,penetration,offense,armorvalue,defense,impactVelocity; Vector3 attacknormal,hitpoint; AttackType attackType; u16 owner,hitIdx; bool isOtherNPC,berserkActive; } DamageData;
 
 typedef /*FAT*/ struct  {
-    u64 entflags;
+    u32 entflags;
     u16 index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
     Vector3 position;
     float radius,shadRadius;
@@ -590,7 +581,7 @@ typedef /*FAT*/ struct  {
     i16 version,SFXIndex,SFXLockedIndex,textIndex,emailIndex;
     SoftwareType type;
     float delay,damage,itemLifeTime,minutes,seconds,randomMin,randomMax;
-    double timeInterval,cyberTimer,intervalFinished,delayFireFinished,delayResetFinished;
+    float timeInterval,cyberTimer,intervalFinished,delayFireFinished,delayResetFinished;
     bool searchableInUse,generateContents,dontReset,onlyOnce,ignoreSecondaryTriggers,allDone,currentTexture,useRandomTimes,active; // Lawdy, we'll make these bitflags someday
     bool touchEnabled,broken,stayOpen,startOpen,ajar,blocked,targetAlreadyDone,accessCardUsedByPlayer,toggleLasers,targettingOnlyUnlocks;
     bool changeLayerOnOpenClose,despawnInstead,doSelfAfterList,destroyAfterListInsteadOfDeactivate,iceActive;
@@ -604,11 +595,11 @@ typedef /*FAT*/ struct  {
     AttackType attackType;
     i16 ammo,ammo2;
     AccessCardType requiredAccessCard;
-    double delayFinished,tickFinished,tickTime,useFinished,waitBeforeClose,lasersFinished;
+    float delayFinished,tickFinished,tickTime,useFinished,waitBeforeClose,lasersFinished;
     float amount,resetTime,minSecurityLevel,ajarPercentage,useTimeDelay,timeBeforeLasersOn,force,strength;
     float offStrengthFactor;
     float distancePaddingToTopPoint;
-    double initialBurstFinished,justUsed,timerFinished;
+    float initialBurstFinished,justUsed,timerFinished;
     BloodType bloodType;
     DoorState doorOpen;
     ForceFieldColor fieldColor;
@@ -626,17 +617,17 @@ typedef /*FAT*/ struct  {
     i16 cellX,cellZ;
     u8 portalIndex; // If this is a door, index into portal array for toggling state.
     DoorState doorState;
-    double currentFrameFinished;
-    double animSwapFinished;
+    float currentFrameFinished;
+    float animSwapFinished;
     bool alternateOn;
     u16 mainSwitchMaterial;
     AIState currentState; // NPC logic
     u16 deathBurst;
     u8 walkWaypointsLength,currentWaypoint;
-    double timeForTranquilization,gracePeriodFinished,meleeDamageFinished,idleTime,attack1SoundTime,attack2SoundTime,attack3SoundTime;
-    double timeTillEnemyChangeFinished,timeTillDeadFinished,timeTillPainFinished,huntFinished;
-    double randomWaitForNextAttack1Finished,randomWaitForNextAttack2Finished,randomWaitForNextAttack3Finished;
-    double attackFinished,attack2Finished,attack3Finished,deathBurstFinished,tranquilizeFinished,wanderFinished,timeSinceMovedEnough,posCheckFinished;
+    float timeForTranquilization,gracePeriodFinished,meleeDamageFinished,idleTime,attack1SoundTime,attack2SoundTime,attack3SoundTime;
+    float timeTillEnemyChangeFinished,timeTillDeadFinished,timeTillPainFinished,huntFinished;
+    float randomWaitForNextAttack1Finished,randomWaitForNextAttack2Finished,randomWaitForNextAttack3Finished;
+    float attackFinished,attack2Finished,attack3Finished,deathBurstFinished,tranquilizeFinished,wanderFinished,timeSinceMovedEnough,posCheckFinished;
     Vector3 currentDestination,lastKnownEnemyPos,targettingPosition,idealTransformForward,idealPos,walkWaypoints[MAX_WAYPOINTS];
     char targetID[TARGET_ID_LENGTH],texAnimResourceFolder[TARGET_STRING_LENGTH],path[TARGET_STRING_LENGTH];
     // phew what a porker of a struct, it's been a eatin!
@@ -694,8 +685,8 @@ typedef struct {
 } GlobalContext;
 
 static inline __attribute__((always_inline)) void flag_setu16(u16 *flags, u16 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
-static inline __attribute__((always_inline)) void flag_setu32(u32 *flags, u32 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
-static inline __attribute__((always_inline)) void flag_set(u64 *flags, u64 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
+static inline __attribute__((always_inline)) void flag_set(u32 *flags, u32 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
+static inline __attribute__((always_inline)) void flag_setu64(u64 *flags, u64 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
 
 // Math, Vectors, Quaternions
 #define vabs(x) ((x) < 0 ? -(x) : (x))
@@ -770,6 +761,7 @@ static inline __attribute__((always_inline)) bool ConstIndexIsDoor(int c) { retu
 static inline __attribute__((always_inline)) bool ConstIndexIsLightStaticSaveable(int c) { return c == 748; }
 static inline __attribute__((always_inline)) bool ConstIndexIsGenericTransform(int c) { return c == 749; }
 static inline __attribute__((always_inline)) bool ConstIndexIsNPC(int c) { return (c >= 419 && c < 448); }
+static inline __attribute__((always_inline)) bool ConstIndexIsCorpse(int c) { return (c >= 465 && c < 472); }
 static inline __attribute__((always_inline)) bool ConstIndexIsHardware(int c) { return (c >= 328) && (c <= 339); }
 static inline __attribute__((always_inline)) bool ConstIndexIsAmbient(int c) { return (c >= 621 && c <= 655); }
 static inline __attribute__((always_inline)) bool ConstIndexIsButtonSwitch(int c) { return ((c >= 688 && c <= 692) || c == 694 || c == 695); }

@@ -68,7 +68,7 @@ MOD_TO_ENGINE void UpdateAnims(void) {
         u16 anim = e->animationNum;
         if (anim >= MAX_ANIMATED_MODELS || e->numclips == 0 || e->clip >= e->numclips) continue;
 
-        AnimationClip* clip = &modelAnimationClips[anim][e->clip];
+        AnimationClip* clip = (AnimationClip*)&modelAnimationClips[anim][e->clip];
         if (clip->framerate <= 0 || clip->speed <= 0) continue;
 
         const double timePerFrame = (1.0 / (double)clip->speed) * (1.0 / (double)clip->framerate);

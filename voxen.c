@@ -8,7 +8,7 @@ extern void DualLogError(const char *fmt, ...);
 } while(0)
 #define MOD_INTEROP_ENGINE
 #if defined(LINUX)
-//     #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
+    #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
 #endif
 #include "common.h"
 #include "interop.h"
@@ -57,7 +57,7 @@ SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on f
     .ScreenWidth=800u,.ScreenHeight=600u,.Fullscreen=0u,.FOV=65u,.Brightness=50u,.Gamma=50u,.FXAA=0u,.Shadows=0u,.Reflections=0u,.Vsync=0u,.ModelDetail=0u,.CurrentMonitor=0u,
     .GI=0u,.SpeakerMode=1u,.Reverb=0u,.VolumeMaster=100u,.VolumeMusic=25u,.VolumeMessage=75u,.VolumeEffects=100u,.Language=0u,.DynamicMusic=1u,.Footsteps=1u,.InvertLook=0u,
     .InvertCyberspaceLook=0u,.QuickItemPickup=0u,.QuickReloadWeapons=0u,.MouseSensitivity=10u,.NoShootMode=0u,.HeadBob=1u,.SSR_RES=4u};/*Ratio is (1 / SSR_RES) * res*/
-Light lights[LIGHT_COUNT]; LightAnimation lanims[LIGHT_COUNT];
+Light lights[LIGHT_COUNT]; LightAnimation lanims[LIGHT_COUNT]; static bool shadowBuffersCreated = false;
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6],playerFrustumPlanes[6];
 u16 editModeSelection,editModeTestEntityDefinition=0; // Test instance and its model index
 typedef struct { double shadowTime; u32 shadowmapIndirectionList[LIGHT_COUNT]; float shadDotThresh; } VoxenShadowSystem;
@@ -177,11 +177,11 @@ ENGINE_TO_MOD i32 AddLight(Light* lit, LightAnimation* lanim) {
     CopyMemoryFromBtoAForNBytes(&lights[i],lit,sizeof(Light));
     CopyMemoryFromBtoAForNBytes(&lanims[i],lanim,sizeof(LightAnimation));
     lightsNewPosition[i] = lit->pos;
-    flag_setu32(&lights[i].lflags,LDIRTY,true);
+    flag_set(&lights[i].lflags,LDIRTY,true);
     return i;
 }
 
-ENGINE_TO_MOD void TurnLightOff(u16 litIdx) { if (litIdx < Sys_Global.loadedLights) {flag_setu32(&lights[litIdx].lflags,LIGHTON,false);} }
+ENGINE_TO_MOD void TurnLightOff(u16 litIdx) { if (litIdx < Sys_Global.loadedLights) {flag_set(&lights[litIdx].lflags,LIGHTON,false);} }
 bool alreadyReadLightOnOnce[LIGHT_COUNT] = {0};
 ENGINE_TO_MOD void LoadFieldIntoLight(char* k, char* v, char* il, u32 ln, Light* lit, LightAnimation* lam, u16 lIdx) {
     char* br = StringFindFirstCharWithin(k,'[');
@@ -218,9 +218,9 @@ ENGINE_TO_MOD void LoadFieldIntoLight(char* k, char* v, char* il, u32 ln, Light*
     }
 
     if (StringsEqual(k,"intensity")) lit->intensity = lit->maxIntensity = parse_float(v,il,ln) * 0.35f;
-    else if (StringsEqual(k,"type")) flag_setu32(&lit->lflags, (v[0] == 'S') ? LSPOT : LDIR, true);
-    else if (StringsEqual(k,"lightOn") && !alreadyReadLightOnOnce[lIdx]) { alreadyReadLightOnOnce[lIdx] = true; flag_setu32(&lit->lflags,LIGHTON,parse_bool(v,il,ln)); }
-    else if (StringsEqual(k,"lerpOn")) flag_setu32(&lit->lflags,LERPON,parse_bool(v,il,ln));
+    else if (StringsEqual(k,"type")) flag_set(&lit->lflags, (v[0] == 'S') ? LSPOT : LDIR, true);
+    else if (StringsEqual(k,"lightOn") && !alreadyReadLightOnOnce[lIdx]) { alreadyReadLightOnOnce[lIdx] = true; flag_set(&lit->lflags,LIGHTON,parse_bool(v,il,ln)); }
+    else if (StringsEqual(k,"lerpOn")) flag_set(&lit->lflags,LERPON,parse_bool(v,il,ln));
 }
 
 static inline __attribute__((always_inline)) void mul_mat4(float *out, const float *a, const float *b) { // out = a * b
@@ -241,7 +241,7 @@ void UpdateLights(void) {
         Vector3 lightPos = lightsNewPosition[lightIdx];
         lights[lightIdx].pos = lightPos;
         if (lights[lightIdx].lflags & LDIRTY) { // Marked all as true at level load.
-            flag_setu32(&lights[lightIdx].lflags,LDIRTY,false);
+            flag_set(&lights[lightIdx].lflags,LDIRTY,false);
             #pragma GCC unroll 6
             for (int j=0;j<6;++j) { // Update to new position
                 mat4_lookat_from((float*)lightView[lightIdx][j],&cubeQuats[j],lightPos);
@@ -287,7 +287,7 @@ void UploadGridCellVisibility(void) { glBindBuffer(GL_SSBO,Sys_Render.cellVisibl
 ENGINE_TO_MOD void UpdateLight(u16 i, Vector3 pos, Color3 col, float range, float intensity, float max, float min, float spotAng, Quaternion spotDir, bool on, bool shad) {
     bool changed = ((!!(lights[i].lflags & SHADON) - shad) || (!!(lights[i].lflags & LIGHTON) -  on) || CHGD(lights[i].range,range) || CHGD(lights[i].pos.x,pos.x) || CHGD(lights[i].pos.y,pos.y) || CHGD(lights[i].pos.z,pos.z));
     lights[i].intensity=intensity; lights[i].minIntensity=min; lights[i].maxIntensity=max; lights[i].spotAng=spotAng; lights[i].spotDir=spotDir; lights[i].col=col; lights[i].pos=lightsNewPosition[i]=pos; lights[i].range=range;
-    flag_setu32(&lights[i].lflags,19,(lights[i].lflags&LDIRTY)|changed<<4|on|shad<<1);
+    flag_set(&lights[i].lflags,19,(lights[i].lflags&LDIRTY)|changed<<4|on|shad<<1);
 }
 #undef CHGD
 
@@ -406,16 +406,20 @@ ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
     double start_time = get_time();
     DebugRAM("start of LoadLevel");
     Sys_Global.levelCurrentlyLoading = true; Sys_Global.gamePaused = false; Sys_Global.menuActive = false;
+    DualLog("Loading level...\n");
     RenderLoadingProgress(100,"Loading level...");
     MemSetToValueForNBytes(lights,0,LIGHT_COUNT * sizeof(Light)); MemSetToValueForNBytes(lanims,0,LIGHT_COUNT * sizeof(LightAnimation));
     MemSetToValueForNBytes(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
     MemSetToValueForNBytes(modelMatrices,0,INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
     MemSetToValueForNBytes(camViews,0,64 * sizeof(CamView)); camViewCount = 0;
     MemSetToValueForNBytes(Sys_Global.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
+    DualLog("Loading level: memsets done\n");
     char filename[20]; // Minimum size for 0 through 13.
     StringFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel);
     levelFileHandle = OS_OpenReadonly(filename);
+    DualLog("Loading level: LoadLevelMod...\n");
     LoadLevelMod(curlevel);
+    DualLog("Loading level: LoadLevelMod...done\n");
     OS_Close(levelFileHandle);
     for (int i=0;i<Sys_Global.loadedLights;++i) {/* lights[i].maxIntensity *= 2.0f; */lightsNewPosition[i]=lights[i].pos; }
     DualLog("Loaded %d entities, %u static lights for Level %d... took %f secs\n",Sys_Global.loadedInstances,Sys_Global.loadedLights,curlevel,get_time() - start_time);
@@ -428,10 +432,14 @@ ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
         e->shadRadius = e->radius * 1.41;
     }
     
+    DualLog("Loading level: ModInitAfterLoad, Audio Resets...\n");
     ModInitAfterLoad(); ResetLevelAudio(); ResetLevelMusic(); creditPages = GetCreditsText();
+    DualLog("Loading level: ModInitAfterLoad, Audio Resets...done!\n");
     DualLog("Entity instances initialized after load\n");
     RenderLoadingProgress(110,"Loading cull system...");
+    DualLog("Loading level: CullInit...\n");
     CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
+    DualLog("Loading level: CullInit...done!\n");
     glUseProgram(Sys_Render.voxelUpdateShaderProgram);
     glUniform1f(0,Sys_Global.voxelMinCenterX);
     glUniform1f(1,Sys_Global.voxelMinCenterZ);
@@ -607,6 +615,12 @@ ENGINE_TO_MOD void MenuGoBack(void) {
     else if (currentMenuPage == Mpg_Load || currentMenuPage == Mpg_NewGame || currentMenuPage == Mpg_IntroVideo || currentMenuPage == Mpg_CreditsVideo) currentMenuPage = Mpg_Singleplayer;
 }
 
+void CreateShadowBuffers(void) {
+    Sys_Render.shadowMapSSBO           = SetupSSBO(&Sys_Render.shadowMapSSBO,           5,(MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(u32), NULL, GL_STATIC_DRAW);    
+    Sys_Render.shadowMapsIndirectionID = SetupSSBO(&Sys_Render.shadowMapsIndirectionID, 6,LIGHT_COUNT * sizeof(u32),NULL,GL_STATIC_DRAW);
+    shadowBuffersCreated = true;
+}
+
 void ChangeMenuPage(u8 pg) { currentMenuPage = pg; currentMenuItem = currentMenuTab = 0; }
 void glfwSetWindowSize(GLFWwindow* handle, int width, int height); void CycleToNextMonitor(void);
 void RenderMenu(void) {    
@@ -659,7 +673,7 @@ void RenderMenu(void) {
             menuItemCount = 11; // Graphics
             if (UI_Checkbox(200,500,0,Sys_Settings.ModelDetail ? /*High*/915 : /*No Detail Level Models*/914,Sys_Settings.ModelDetail)) { Sys_Settings.ModelDetail = Sys_Settings.ModelDetail ? 0u : 1u; SaveConfig(); }
             if (UI_Checkbox(200,530,1,/*"FXAA"*/780,Sys_Settings.FXAA)) { Sys_Settings.FXAA = Sys_Settings.FXAA ? 0u : 1u; SaveConfig(); }
-            if (UI_Checkbox(200,560,2,Sys_Settings.Shadows ? /*Soft*/787 : /*No Shadows*/785,Sys_Settings.Shadows)) { Sys_Settings.Shadows = Sys_Settings.Shadows ? 0u : 1u; SaveConfig(); }
+            if (UI_Checkbox(200,560,2,Sys_Settings.Shadows ? /*Soft*/787 : /*No Shadows*/785,Sys_Settings.Shadows)) { Sys_Settings.Shadows = Sys_Settings.Shadows ? 0u : 1u; if (!shadowBuffersCreated) {CreateShadowBuffers();} SaveConfig(); }
             if (UI_Checkbox(200,590,3,/*SSR*/788,Sys_Settings.Reflections)) { Sys_Settings.Reflections = Sys_Settings.Reflections ? 0u : 1u; SaveConfig(); }
             if (UI_Checkbox(200,620,4,/*VSYNC*/1026,Sys_Settings.Vsync)) { Sys_Settings.Vsync = Sys_Settings.Vsync ? 0u : 1u; SetVSync(); SaveConfig(); }
             RenderFormattedText(310,620,TEXT_GREEN,FONT_NORMAL,1.0f,"(FPS: %d)", Sys_Global.framesPerLastSecond); // Helper to see vsync take effect.
@@ -936,7 +950,6 @@ static double RenderUI(void) {
 #define SHADOW_NEARMESH_MAX 1024
 typedef struct {float depth; u16 index; } DepthSort;
 DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX];
-float shadows_nearMeshRadii[SHADOW_NEARMESH_MAX];
 static inline __attribute__((always_inline)) bool EntNotVisible(u16 i, bool otherCondition) { Entity* e = &Sys_Global.instances[i]; return e->texIndex > loadedTexturesMaxIndex || !(e->entflags & ENTFLAG_ACTIVE) || e->index >= MAX_ENTITIES || e->modelIndex >= MODEL_IDX_MAX || e->texIndex >= MAX_VALID_TEXTURE || otherCondition; }
 static inline __attribute__((always_inline,hot)) u16 GetAndBindModel(u16 i, u16 currentModelType) {
     glUniform1ui(0,i);
@@ -949,10 +962,11 @@ static inline __attribute__((always_inline,hot)) u16 GetAndBindModel(u16 i, u16 
 }
 
 #define SC_MAX (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS)
+u16 shadowCasterIndices[SC_MAX],candidates[MAX_SHADOWMAPS];
 static const u32 groupX_shadClear = ((SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) + 31) / 32;
 static __attribute__((noinline)) __attribute__((hot)) void RenderShadowmaps(void) {    
     double shadowStartTime = get_time();
-    u16 candidates[MAX_SHADOWMAPS];
+    MemSetToValueForNBytes(candidates,0,MAX_SHADOWMAPS*sizeof(u16));
     u16 numShadowsCouldRender = 0;
     Vector3 playerPos = Sys_Global.instances[PLAYER1].position;
     Vector3 pf = Sys_Global.instances[PLAYER1].forward;
@@ -996,7 +1010,7 @@ static __attribute__((noinline)) __attribute__((hot)) void RenderShadowmaps(void
         glViewport(0,0,SHADOW_MAP_SIZE,SHADOW_MAP_SIZE);
         glUseProgram(Sys_Render.shadowmapsShaderProgram);
         u32 shadowmapOffsetHead = 0U;
-        u16 shadowCasterIndices[SC_MAX];
+        MemSetToValueForNBytes(shadowCasterIndices,0,SC_MAX*sizeof(u16));
         u32 numShadowCasters = 0;
         for (int i=START_INDEX_LEVEL_INSTANCES;i<INSTANCE_COUNT;++i) {
             if (EntNotVisible(i,(Sys_Global.instances[i].entflags & ENTFLAG_NO_SHADOWS))) continue;
@@ -1165,12 +1179,10 @@ static void DrawConvexMeshCollider(Entity *e) {
     float M[16];
     u16 idx = (u16)(e - Sys_Global.instances);
     CopyMemoryFromBtoAForNBytes(M, &modelMatrices[idx * 16], 64);
-
     float m00=M[0],m10=M[1],m20=M[2];
     float m01=M[4],m11=M[5],m21=M[6];
     float m02=M[8],m12=M[9],m22=M[10];
     float tx=M[12],ty=M[13],tz=M[14];
-
     for (u32 j = 0; j < triCount; j++) {
         u32 bA = (u32)modelTriangles[mi][j*3+0] * VERTEX_ATTRIBUTES_SIZE;
         u32 bB = (u32)modelTriangles[mi][j*3+1] * VERTEX_ATTRIBUTES_SIZE;
@@ -1322,8 +1334,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     float sfov = camView ? (float)camViews[camViewIdx].fov : (float)Sys_Settings.FOV;
     float snear = camView ? camViews[camViewIdx].near : NEAR_PLANE; float sfar = camView ? camViews[camViewIdx].far : Sys_Global.farPlane;
     Vector3 playerPos = Sys_Global.instances[PLAYER1].position;
-    float px = playerPos.x, py = playerPos.y, pz = playerPos.z;
-    float aspect3D = (float)swidth / (float)sheight;
+    float px=playerPos.x, py=playerPos.y, pz=playerPos.z, aspect3D=(float)swidth / (float)sheight;
     float view[16],viewProj[16],invViewRot[9],invViewProj[16];
     GetProjections(view,viewProj,invViewRot,invViewProj,sfov,aspect3D,snear,sfar);
     ExtractFrustumPlanes(viewProj,playerFrustumPlanes);
@@ -1331,7 +1342,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glEnable(GL_DEPTH_TEST);
     if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps();
     UpdateLights(); // This is where the voxels get updated!
-    for (int i=0;i<LIGHT_COUNT;++i) flag_setu32(&lights[i].lflags,LDIRTY,false);
+    for (int i=0;i<LIGHT_COUNT;++i) flag_set(&lights[i].lflags,LDIRTY,false);
     MemSetToValueForNBytes(Sys_Global.dirtyInstances,0,Sys_Global.loadedInstances * sizeof(bool));
     glViewport(0,0,swidth,sheight);
     ClearAll();
@@ -1588,8 +1599,7 @@ void InitalizeEnvironment(double game_start_time) {
         Sys_Render.voxelLightListCountsID  = SetupSSBO(&Sys_Render.voxelLightListCountsID,  2,VOXEL_COUNT * sizeof(u32),NULL,GL_STATIC_DRAW);
         Sys_Render.voxelLightListsID       = SetupSSBO(&Sys_Render.voxelLightListsID,       3,VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(u32),NULL,GL_STATIC_DRAW);
         Sys_Render.lightsID                = SetupSSBO(&Sys_Render.lightsID,                4,LIGHT_COUNT * sizeof(Light),NULL,GL_STATIC_DRAW);
-        Sys_Render.shadowMapSSBO           = SetupSSBO(&Sys_Render.shadowMapSSBO,           5,(MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(u32), NULL, GL_STATIC_DRAW);    
-        Sys_Render.shadowMapsIndirectionID = SetupSSBO(&Sys_Render.shadowMapsIndirectionID, 6,LIGHT_COUNT * sizeof(u32),NULL,GL_STATIC_DRAW);
+        if (Sys_Settings.Shadows) CreateShadowBuffers();                               // 5,6
         Sys_Render.cellVisibleDataID       = SetupSSBO(&Sys_Render.cellVisibleDataID,       7,ARRSIZE * sizeof(u32),NULL,GL_STATIC_DRAW);
         Sys_Render.colorBufferID           = SetupSSBO(&Sys_Render.colorBufferID,          12,MAX_TOTAL_PIXELS * sizeof(u8),NULL,GL_STATIC_DRAW);
         Sys_Render.textureOffsetsID        = SetupSSBO(&Sys_Render.textureOffsetsID,       14,MAX_VALID_TEXTURE * sizeof(u32),NULL,GL_STATIC_DRAW);

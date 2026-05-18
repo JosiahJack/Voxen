@@ -119,7 +119,6 @@ ENGINE_TO_MOD u8 random_range_u8(u8 a, u8 b);
 ENGINE_TO_MOD u32 random_range_u32(u32 a, u32 b);
 ENGINE_TO_MOD i32 random_range_i32(i32 a, i32 b);
 ENGINE_TO_MOD float random_range(float a, float b);
-ENGINE_TO_MOD double random_rangedub(double a, double b);
 ENGINE_TO_MOD double get_time(void);
 ENGINE_TO_MOD float lerp(float min, float max, float val);
 ENGINE_TO_MOD float inverse_lerp(float min, float max, float val);
