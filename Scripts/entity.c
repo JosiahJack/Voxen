@@ -848,6 +848,7 @@ Entity entsFromFile[INSTANCE_COUNT];
 Light lightsFromFile[LIGHT_COUNT];
 LightAnimation lanimsFromFile[LIGHT_COUNT];
 MOD_TO_ENGINE void LoadLevelMod(u8 curlevel) {
+    DualLog("LevelLoadMod start...\n");
     Eng_Global->levelCurrentlyLoading = true;
     Eng_Global->currentLevel = curlevel;
     Eng_Global->loadedInstances = 3; // 0 == NULL, 1 == Player1, 2 == Player2
@@ -870,6 +871,7 @@ MOD_TO_ENGINE void LoadLevelMod(u8 curlevel) {
     MemSetToValueForNBytes(entsFromFile,0,INSTANCE_COUNT * sizeof(Entity));
     MemSetToValueForNBytes(lightsFromFile,0,LIGHT_COUNT * sizeof(Light));
     MemSetToValueForNBytes(lanimsFromFile,0,LIGHT_COUNT * sizeof(LightAnimation));
+    DualLog("LevelLoadMod: memsets and constants set for world\n");
     for (int i = 0; i < LIGHT_COUNT; ++i) lightsFromFile[i].lflags = LIGHT_AND_SHADOW_ON;
     u32 lineNum = 0;
     i32 entCount = -1;  // incremented to 0 on first entity line
@@ -889,6 +891,7 @@ MOD_TO_ENGINE void LoadLevelMod(u8 curlevel) {
         else { entCount++; if (entCount >= INSTANCE_COUNT){DualLogError("Too many instances %u in level%d.txt!\n",entCount,curlevel);continue;} }
         
         bool activeStateRead = false;
+        DualLog("Loading level %u line %u...\n",curlevel,lineNum);
         while (line[0] != '\0') {
             char* pipe = StringFindFirstCharWithin(line, '|');
             char* kvString = line;
@@ -1018,6 +1021,7 @@ MOD_TO_ENGINE void LoadLevelMod(u8 curlevel) {
         if (!isLight && !activeStateRead) flag_set(&entsFromFile[entCount].entflags, ENTFLAG_ACTIVE, true); // Default active if not specified
     }
 
+    DualLog("LevelLoadMod: finished level data file parse\n");
     i32 totalEnts = entCount + 1;
     for (i32 e=0;e<totalEnts;++e) {
         Entity* src = &entsFromFile[e];
@@ -1099,7 +1103,9 @@ MOD_TO_ENGINE void LoadLevelMod(u8 curlevel) {
         TextureSequenceInit(parent,par->texAnimResourceFolder);
     }
     
+    DualLog("LevelLoadMod: finished entity definition post-load copies to entities loaded\n");
     for (int i = 0; i < lightsIdx; ++i) { if (!(lightsFromFile[i].lflags & LSPOT)){lightsFromFile[i].spotAng=0.0f;} AddLight(&lightsFromFile[i],&lanimsFromFile[i]); } // Add all level lights
+    DualLog("LevelLoadMod: lights added\n");
     if (curlevel == 1 || curlevel == 2 || curlevel == 5 || curlevel == 6 || curlevel == 7) { // Shield generators
         u16 shd1 = AddInstance(754, (Vector3){-51.30664f,  -47.42f,  56.42651f}); Eng_Global->instances[shd1].rotation = (Quaternion){0.0f,0.0f,0.0f,1.0f};
         u16 shd2 = AddInstance(754, (Vector3){ 71.5f,      -47.42f, -66.6f    }); Eng_Global->instances[shd2].rotation = (Quaternion){0.0f,0.0f,0.0f,1.0f};
@@ -1112,4 +1118,5 @@ MOD_TO_ENGINE void LoadLevelMod(u8 curlevel) {
     headmountedLanternLight = AddLight(&hl,&lam); lightsIdx++;
     Color c = fogLUT[curlevel]; c.a *= 3.8f;
     Eng_Global->fogColor = c;
+    DualLog("LevelLoadMod: done!\n");
 }
