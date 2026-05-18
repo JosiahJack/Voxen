@@ -108,17 +108,16 @@ if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
     LINKER=$CC
     CFLAGS="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe -Wl,-Bstatic -lmingw32 -lmingwex"
-    CFLAGSGC="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe -fPIC"
+    CFLAGSGC="-D_WIN32 -DWINDOWS $COMMON_CFLAGS -mno-stack-arg-probe -fPIC -ffreestanding -nostdlib -fno-builtin -D__NO_INLINE__"
     LDFLAGS="$COMMON_LFLAGS -L. -lgdi32 -lopengl32 -lole32 -static-libgcc -static-libstdc++ -Wl,--out-implib=voxen.lib -Xlinker /pdb:Citadel.pdb"
-    LDFLAGSGC="-shared -Wl,--subsystem,windows -Wl,-Bstatic -static-libgcc -static-libstdc++ -Wl,--gc-sections -Wl,--export-all-symbols -L. -lvoxen -lkernel32 -lgdi32 -luser32 -lole32 -lopengl32"
-#     LDFLAGSGC="$COMMON_LFLAGS -Wl,--allow-shlib-undefined -Wl,--entry,DllMainCRTStartup -Wl,--subsystem,windows -Wl,--no-entry -L. -lvoxen -Xlinker /pdb:Citadel.pdb"
+    LDFLAGSGC="$COMMON_LFLAGS -shared -Wl,-Bstatic -Wl,--allow-shlib-undefined -Wl,--subsystem,windows -nostdlib -Wl,--entry,DllMain -L. -lvoxen -Xlinker /pdb:Citadel.pdb"
     BINARY_NAME="voxen.exe"
     BINARY_NAMEGC="Citadel.dll"
 else
     CC=$LINUX_CC
     LINKER=$CC
     CFLAGS="$COMMON_CFLAGS -fno-plt -fno-semantic-interposition -D_GNU_SOURCE -ffreestanding -fno-builtin"
-    CFLAGSGC="$COMMON_CFLAGS -fno-plt -fno-semantic-interposition"
+    CFLAGSGC="$COMMON_CFLAGS -DLINUX -fno-plt -fno-semantic-interposition"
     LDFLAGS="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -ldl"
     LDFLAGSGC="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -nostdlib"
     BINARY_NAME="voxen"

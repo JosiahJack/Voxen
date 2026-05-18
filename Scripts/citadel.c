@@ -16,6 +16,24 @@ GlobalContext* Eng_Global; CheatsSystem*  Eng_Cheats; SettingsSystem* Eng_Settin
 MOD_TO_ENGINE void ModLink(GlobalContext* g,CheatsSystem* c,SettingsSystem* s,TextSystem* t,SystemUI* ui){Eng_Global=g;Eng_Cheats=c;Eng_Settings=s;Eng_Text=t;Eng_UI=ui;}
 int lev1SecCode,lev2SecCode,lev3SecCode,lev4SecCode,lev5SecCode,lev6SecCode;
 
+#ifdef WINDOWS
+typedef int BOOL; typedef void* HINSTANCE; typedef unsigned long DWORD; typedef void* LPVOID;
+#define WINAPI __stdcall
+#define TRUE  1
+#define FALSE 0
+MOD_TO_ENGINE BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved) {
+    (void)hinstDLL;
+    (void)lpReserved;
+    switch (fdwReason) {
+//         case DLL_PROCESS_ATTACH: break;
+//         case DLL_PROCESS_DETACH: break;
+    }
+    return TRUE;
+}
+
+void* memset(void* dst, int c, size_t n) { return MemSetToValueForNBytes(dst,c,n); }
+#endif
+
 MOD_TO_ENGINE void ModNewGame(void) {
     lev1SecCode = random_range_u8(0u,9u); lev2SecCode = random_range_u8(0u,9u);
     lev3SecCode = random_range_u8(0u,9u); lev4SecCode = random_range_u8(0u,9u);

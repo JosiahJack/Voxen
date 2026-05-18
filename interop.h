@@ -112,6 +112,7 @@
         #define ENGINE_TO_MOD __attribute__((visibility("default")))
     #endif
 #endif
+ENGINE_TO_MOD void* MemSetToValueForNBytes(void *dst, int c, size_t n);
 ENGINE_TO_MOD void DualLog(const char* fmt, ...);
 ENGINE_TO_MOD void DualLogWarn(const char* fmt, ...);
 ENGINE_TO_MOD void DualLogError(const char* fmt, ...);

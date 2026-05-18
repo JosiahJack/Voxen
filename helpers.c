@@ -1,4 +1,5 @@
 // helpers.c - Helper Functions for various things, mostly libc avoidance
+void* MemSetToValueForNBytes(void *dst, int c, size_t n) { unsigned char *p=(unsigned char *)dst; unsigned char v=(unsigned char)c; while (n--) {*p++=v;} return dst; } // memset replacement
 void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n) { unsigned char *d=(unsigned char *)dst; const unsigned char *s=(const unsigned char *)src; while (n--) {*d++=*s++;} return dst; } // memcpy replacement
 void stbi_write_bmp(char const *filename, int x, int y, const void *data) {
     OsFileHandle f = OS_OpenWriteonly(filename);
