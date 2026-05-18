@@ -107,10 +107,11 @@ COMMON_LFLAGS="-Wl,-z,now -Wl,-z,relro -Wl,--gc-sections -Wl,--as-needed -Wl,-z,
 if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
     LINKER=$CC
-    CFLAGS="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe"
-    CFLAGSGC="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe"
-    LDFLAGS="$COMMON_LFLAGS -L. -lgdi32 -lopengl32 -lole32 -Wl,--out-implib=voxen.lib -Xlinker /pdb:Citadel.pdb"
-    LDFLAGSGC="$COMMON_LFLAGS -Wl,--allow-shlib-undefined -Wl,--entry,DllMainCRTStartup -Wl,--subsystem,windows -Wl,--no-entry -L. -lvoxen -Xlinker /pdb:Citadel.pdb"
+    CFLAGS="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe -Wl,-Bstatic -lmingw32 -lmingwex"
+    CFLAGSGC="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe -fPIC"
+    LDFLAGS="$COMMON_LFLAGS -L. -lgdi32 -lopengl32 -lole32 -static-libgcc -static-libstdc++ -Wl,--out-implib=voxen.lib -Xlinker /pdb:Citadel.pdb"
+    LDFLAGSGC="-shared -Wl,--subsystem,windows -Wl,-Bstatic -static-libgcc -static-libstdc++ -Wl,--gc-sections -Wl,--export-all-symbols -L. -lvoxen -lkernel32 -lgdi32 -luser32 -lole32 -lopengl32"
+#     LDFLAGSGC="$COMMON_LFLAGS -Wl,--allow-shlib-undefined -Wl,--entry,DllMainCRTStartup -Wl,--subsystem,windows -Wl,--no-entry -L. -lvoxen -Xlinker /pdb:Citadel.pdb"
     BINARY_NAME="voxen.exe"
     BINARY_NAMEGC="Citadel.dll"
 else

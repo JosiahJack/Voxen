@@ -1582,6 +1582,13 @@ void InitalizeEnvironment(double game_start_time) {
             if(!name) DualLogError("Failed to load mod function: %s", #name);
         MOD_FUNCTION_LIST(X)
         #undef X
+#ifdef WINDOWS
+        if (!LoadLevelMod) {
+            DWORD err = GetLastError();
+            DualLogError("Failed to load LoadLevelMod! GetLastError = %lu", err);
+            // Also print the full path of the DLL you're loading
+        } else DualLog("Seemed to load LoadLevelMod just fine\n");
+#endif
         ModLink(&Sys_Global,&Sys_Cheats,&Sys_Settings,&Sys_Text,&Sys_UI); // Link engine to mod
         Sys_Global.GetKey = GetKey; Sys_Global.GetKeyPressed = GetKeyPressed; // Link mod to engine
         DualLog("done!\n");
