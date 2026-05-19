@@ -72,7 +72,7 @@
 #ifdef MOD_INTEROP_MOD  // mod.h usage:
     // Interop - To Engine
     #if defined(_WIN32) || defined(__CYGWIN__)
-        #define MOD_TO_ENGINE __declspec(dllexport)
+        #define MOD_TO_ENGINE __declspec(dllexport) __cdecl
     #else
         #define MOD_TO_ENGINE __attribute__((visibility("default")))
     #endif
@@ -107,7 +107,7 @@
 #else                             // voxen.h usage, MOD_INTEROP_ENGINE:
     // Interop - To Mod
     #if defined(_WIN32) || defined(__CYGWIN__)
-        #define ENGINE_TO_MOD __declspec(dllexport)
+        #define ENGINE_TO_MOD __declspec(dllexport) __cdecl
     #else
         #define ENGINE_TO_MOD __attribute__((visibility("default")))
     #endif

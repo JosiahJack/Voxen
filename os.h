@@ -42,7 +42,7 @@ typedef __UINT64_TYPE__ u64;
 #define O_DIRECTORY     00200000
 // Interop - To Mod (keep the same as interop.h!!)
 #if defined(_WIN32) || defined(__CYGWIN__)
-    #define ENGINE_TO_MOD __declspec(dllexport)
+    #define ENGINE_TO_MOD __declspec(dllexport) __cdecl
 #else
     #define ENGINE_TO_MOD __attribute__((visibility("default")))
 #endif
@@ -158,8 +158,8 @@ static inline __attribute__((always_inline)) long OS_Open(const char* path, i32 
         
     // Gamecode loading:
     #define MOD_EXTENSION ".dll" // e.g. Citadel.dll
-    #define PLATFORM_DLOPEN(path)        LoadLibraryA(path)
-    #define PLATFORM_DLSYM(handle, name) GetProcAddress((handle), (name))
+    #define OS_DlOpen(path)       LoadLibraryA(path)
+    #define OS_DlSym(handle,name) GetProcAddress((handle),(name))
     static char win_err_buf[512];
 #else
     #define LINUX
@@ -325,8 +325,8 @@ static inline __attribute__((always_inline)) long OS_Open(const char* path, i32 
 
     // Gamecode loading:
     #define MOD_EXTENSION ".so" // e.g. Citadel.so
-    #define PLATFORM_DLOPEN(path)        dlopen((path), RTLD_NOW)
-    #define PLATFORM_DLSYM(handle, name) dlsym((handle), (name))
+    #define OS_DlOpen(path)       dlopen((path),RTLD_NOW)
+    #define OS_DlSym(handle,name) dlsym((handle),(name))
 #endif
 static inline __attribute__((always_inline)) void* OS_Alloc(size_t amount) { return OS_AllocateRAM(NULL,amount,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE); }
 static inline __attribute__((always_inline)) void* OS_Calloc(size_t amount, size_t count) { return OS_AllocateRAM(NULL,amount * count,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE); }

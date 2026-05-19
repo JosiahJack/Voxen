@@ -356,8 +356,7 @@ static __attribute__((noinline)) void LoadTextures(void) {
     int w=1,h=1; unsigned char* pixels = stbi_load_from_memory_arena(file_buffer,windowIconFileSize,&w,&h,&stbi_arena_main);
     if (!pixels) { DualLogError("Failed to load icon: %s\n",Sys_Global.global_winicon); OS_Exit(1); }
     
-    GLFWimage image = (GLFWimage){w,h,pixels};
-    glfwSetWindowIcon(window,&image);
+    GLFWimage image = (GLFWimage){w,h,pixels}; glfwSetWindowIcon(window,&image);
     OS_DeallocateRAM(file_buffer,windowIconFileSize);
     OS_DeallocateRAM(stbi_arena_main.base,STBI_ARENA_SIZE); stbi_arena_main.base = NULL;
     DualLog(" took %.6f secs\n",get_time() - start_time);

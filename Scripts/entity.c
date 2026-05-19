@@ -871,7 +871,6 @@ MOD_TO_ENGINE void LoadLevelMod(u8 curlevel) {
     MemSetToValueForNBytes(entsFromFile,0,INSTANCE_COUNT * sizeof(Entity));
     MemSetToValueForNBytes(lightsFromFile,0,LIGHT_COUNT * sizeof(Light));
     MemSetToValueForNBytes(lanimsFromFile,0,LIGHT_COUNT * sizeof(LightAnimation));
-    DualLog("LevelLoadMod: memsets and constants set for world\n");
     for (int i = 0; i < LIGHT_COUNT; ++i) lightsFromFile[i].lflags = LIGHT_AND_SHADOW_ON;
     u32 lineNum = 0;
     i32 entCount = -1;  // incremented to 0 on first entity line
@@ -891,7 +890,6 @@ MOD_TO_ENGINE void LoadLevelMod(u8 curlevel) {
         else { entCount++; if (entCount >= INSTANCE_COUNT){DualLogError("Too many instances %u in level%d.txt!\n",entCount,curlevel);continue;} }
         
         bool activeStateRead = false;
-        DualLog("Loading level %u line %u...\n",curlevel,lineNum);
         while (line[0] != '\0') {
             char* pipe = StringFindFirstCharWithin(line, '|');
             char* kvString = line;

@@ -529,6 +529,7 @@ void UpdateScreenSize(i32 width, i32 height) {
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_2D,rs->outputImageID);
     glBindFramebuffer(GL_FRAMEBUFFER,0);
+    Sys_Input.ignore_next_mouse_delta = true;
 }
 
 ENGINE_TO_MOD void AddCamView(Vector3 pos, Quaternion rot, u8 fov, u16 width, u16 height, float near, float far) {    
@@ -536,7 +537,7 @@ ENGINE_TO_MOD void AddCamView(Vector3 pos, Quaternion rot, u8 fov, u16 width, u1
     GenBTexture(&camViewTextures[camViewCount],GL_RGBA8,width,height,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/); camViewCount++;
 }
 
-void CenterWindowOnMonitor(void); GLFWmonitor* GetCurrentMonitor(void); void GatherResolutionModes(void);
+void CenterWindowOnMonitor(void); void GatherResolutionModes(void);
 void SetSkyRotateSpeed(void) { static const float skyRotateSpeeds[] = { 0.05f, 1.0f, 2.5f, 3.75f, 6.25f }; glUseProgram(Sys_Render.imageBlitShaderProgram); glUniform1f(30,skyRotateSpeeds[Sys_Cheats.dizzyLevel]); }
 void ChangeResolution(void); void ChangeFullScreenWindowed(void); void SetVSync(void);
 void SetGI(void) { }// TODO: Set needed Voxel GI uniforms from Sys_Settings.GI
@@ -1574,16 +1575,16 @@ void InitalizeEnvironment(double game_start_time) {
         DualLog("Loading mod code...");
         char mod_path[256];
         StringCopyInto_A_From_B(mod_path,"./",256); StringConcatenate(mod_path,global_dllname,256); StringConcatenate(mod_path,MOD_EXTENSION,256);
-        mod_handle = PLATFORM_DLOPEN(mod_path);
+        mod_handle = OS_DlOpen(mod_path);
         if (!mod_handle) { DualLogError("Failed to load mod at:%s",mod_path); OS_Exit(1); }
-        
+
         #define X(ret, name, params) \
-            name = (ret (*) params)PLATFORM_DLSYM(mod_handle, #name); \
-            if(!name) DualLogError("Failed to load mod function: %s", #name);
+            name = (ret (*) params)OS_DlSym(mod_handle,#name); \
+            if(!name) DualLogError("Failed to load mod function: %s",#name);
         MOD_FUNCTION_LIST(X)
         #undef X
         ModLink(&Sys_Global,&Sys_Cheats,&Sys_Settings,&Sys_Text,&Sys_UI); // Link engine to mod
-        Sys_Global.GetKey = GetKey; Sys_Global.GetKeyPressed = GetKeyPressed; // Link mod to engine
+        Sys_Global.GetKey=GetKey; Sys_Global.GetKeyPressed=GetKeyPressed; // Link mod to engine
         DualLog("done!\n");
         ModEntityDefinitionsInitAfterLoad();
         glGenFramebuffers(1,&Sys_Render.gBufferFBO);
