@@ -498,7 +498,7 @@ void CullInit(void) {
     DualLog(" took %f secs\n",get_time() - start_time);
 }
 
-extern Light lights[LIGHT_COUNT]; void UploadGridCellVisibility(void);
+void UploadGridCellVisibility(void);
 ENGINE_TO_MOD void PortalCulling(void) { // Called just once at end of animation loop for the frame after each frame perfect change to door models becoming either closed or not closed.
     u16 playerCellX = PosGetCellCoordX(Sys_Global.instances[PLAYER1].position.x);
     u16 playerCellZ = PosGetCellCoordZ(Sys_Global.instances[PLAYER1].position.z);

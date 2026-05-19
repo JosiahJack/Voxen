@@ -21,8 +21,7 @@ extern InputSystem Sys_Input; extern bool returnToPause; extern GlobalContext Sy
 extern bool mouseMovementThisFrame; extern SettingsSystem Sys_Settings; extern float cam_pitch,cam_yaw,cam_roll;
 typedef struct { const char* name; int value; } InputElement; extern InputElement inputElements[134];
 typedef void (*GLFWproc)(void); typedef struct _GLFWfbconfig _GLFWfbconfig; typedef struct _GLFWcontext _GLFWcontext; typedef struct _GLFWwindow _GLFWwindow; typedef struct _GLFWlibrary _GLFWlibrary; typedef struct _GLFWmonitor _GLFWmonitor; typedef struct _GLFWjoystick _GLFWjoystick;
-void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n); void StringCopyInto_A_From_B(char* a, const char* b, size_t bufferSize); bool StringsEqual(const char* a, const char* b); int StringCompareUpToLength(const char* s1, const char* s2, size_t n);
-void UpdateScreenSize(i32 width, i32 height); ENGINE_TO_MOD int StringFormat(char* buffer, size_t bufferSize, const char* format, ...); ENGINE_TO_MOD size_t GetStringLength(const char* s);
+void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n); int StringCompareUpToLength(const char* s1, const char* s2, size_t n); void UpdateScreenSize(i32 width, i32 height);
 #if defined(WINDOWS)
     typedef DWORD (WINAPI * PFN_XInputGetCapabilities)(DWORD,DWORD,XINPUT_CAPABILITIES*);
     typedef DWORD (WINAPI * PFN_XInputGetState)(DWORD,XINPUT_STATE*);
@@ -1221,7 +1220,6 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     void glfwSetWindowPosition(GLFWwindow* handle, int xpos, int ypos) { _GLFWwindow* window = (_GLFWwindow*)handle; SetWindowPos(window,xpos,ypos); }
 #endif
 _GLFWlibrary _glfw={0};
-void* MemSetToValueForNBytes(void *dst, int c, size_t n);
 int WindowInit(void) {
     MemSetToValueForNBytes(&_glfw,0,sizeof(_glfw));
     #if defined(WINDOWS)
@@ -1756,7 +1754,6 @@ bool JoystickPresent(int jid) {
 }
 
 void _glfwFreeJoystick(_GLFWjoystick* js) { OS_DeallocateRAM(js->axes,js->axesSize); OS_DeallocateRAM(js->buttons,js->buttonsSize); OS_DeallocateRAM(js->hats,js->hatsSize); MemSetToValueForNBytes(js,0,sizeof(_GLFWjoystick)); }
-ENGINE_TO_MOD void play_wav(const char *path,float volume,Vector3 pos,bool positional);
 void InputProcessing(void) {
     PollEvents();
     for (int jid = GLFW_JOYSTICK_1; jid <= GLFW_JOYSTICK_LAST; ++jid) { // Input Poll

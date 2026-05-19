@@ -2,7 +2,6 @@
 #include "os.h" // Operating System calls shim layer.
 #include "gl.h"
 GLFWwindow* window;
-extern void DualLogError(const char *fmt, ...);
 #define assert(cond) do { \
     if (!(cond)) { DualLogError("[%s:%d]:%s(): Assert fail:%s\n",__FILE__,__LINE__,__func__,#cond); *(volatile int*)0 = 0; /* Force a crash/segfault for the debugger */ } \
 } while(0)
@@ -235,7 +234,6 @@ static inline __attribute__((always_inline)) void mul_mat4(float *out, const flo
 }
 
 Quaternion cubeQuats[6] = {{0.0f,ONE_OVER_SQRT2,0.0f,ONE_OVER_SQRT2}/*+X:Right*/,{0.0f,-ONE_OVER_SQRT2,0.0f,ONE_OVER_SQRT2}/*-X:Left*/,{-ONE_OVER_SQRT2,0.0f,0.0f,ONE_OVER_SQRT2}/*+Y:Up*/,{ONE_OVER_SQRT2,0.0f,0.0f,ONE_OVER_SQRT2}/*-Y:Down*/,{0.0f,0.0f,0.0f,1.0f}/*+Z:Forward*/,{0.0f,1.0f,0.0f,0.0f}/*-Z:Backward*/ };
-bool NeighborhoodInPVS(u16 cellX, u16 cellZ, int r);
 void UpdateLights(void) {
     for (u16 lightIdx = 0; lightIdx < Sys_Global.loadedLights; ++lightIdx) {
         Vector3 lightPos = lightsNewPosition[lightIdx];
@@ -359,9 +357,9 @@ const Setting configTable[] = {
     S_IN("Weapon +",28),S_IN("Weapon -",29),S_IN("Grenade",30),S_IN("Grenade +",31),S_IN("Grenade -",32),S_IN("Ammo Type",33),S_IN("Patch Use",34),
     S_IN("Patch +",35),S_IN("Patch -",36),S_IN("Full Map",37),S_IN("Swim Up",38),S_IN("Swim Down",39),S_IN("Screenshot",40)
 };
+
 const int configTableSize = sizeof(configTable) / sizeof(Setting);
 static inline __attribute__((always_inline)) i32 GetGLFWIndirectionIndexForAnInput(const char* val) { for (int i=0;i<134;++i) {if (StringsEqual(val,inputElements[i].name)) return i;} return 148; }
-char *GetNextStringUpToNewlineOrEOF(char*,int,OsFileHandle),*data_parser_trim(char*); i32 StringToInt(const char*);
 void LoadConfig(void) {
     OsFileHandle f = OS_OpenReadonly("./Data/Config.ini");
     char line[512];
@@ -384,7 +382,6 @@ void LoadConfig(void) {
     OS_Close(f);
 }
 
-void FilePrintString(OsFileHandle f, const char* fmt, ...);
 void SaveConfig(void) {
     OsFileHandle f = OS_OpenWriteonly("./Data/Config.ini");
     for (int i=0;i<configTableSize;++i) {
@@ -541,10 +538,9 @@ void CenterWindowOnMonitor(void); void GatherResolutionModes(void);
 void SetSkyRotateSpeed(void) { static const float skyRotateSpeeds[] = { 0.05f, 1.0f, 2.5f, 3.75f, 6.25f }; glUseProgram(Sys_Render.imageBlitShaderProgram); glUniform1f(30,skyRotateSpeeds[Sys_Cheats.dizzyLevel]); }
 void ChangeResolution(void); void ChangeFullScreenWindowed(void); void SetVSync(void);
 void SetGI(void) { }// TODO: Set needed Voxel GI uniforms from Sys_Settings.GI
-void LoadTextForLanguage(u8),LoadLogTextForLanguage(u8); bool GetKey(int settingIndex),GetKeyPressed(int settingIndex); void* mod_handle = NULL;
+void* mod_handle = NULL;
 void SetLanguage(void) { LoadTextForLanguage(Sys_Settings.Language); LoadLogTextForLanguage(Sys_Settings.Language); }
 void ApplySettings(void) { ChangeFullScreenWindowed(); SetSkyRotateSpeed(); SetVSync(); SetGI(); SetLanguage(); }
-void StringConcatenate(char* a, const char* b, size_t bufferSize);
 void OpenMainMenu(void) { PlayMenuMusic(); Sys_Global.menuActive = true; currentMenuPage = Mpg_FrontPage; }
 bool MenuEnter(void) { return (Sys_Input.keyStates[GLFW_KEY_KP_ENTER].pressed || Sys_Input.keyStates[GLFW_KEY_ENTER].pressed); }
 static inline __attribute__((always_inline,pure)) bool CursorIsOverBounds(float startX, float endX, float startY, float endY) {
@@ -1092,8 +1088,7 @@ static inline __attribute__((always_inline)) bool DetermineIfInstanceVisible(u16
     
     if (ConstIndexIsPortalBlockingDoor(entIdx)) { // Extra checks only needed for opaque portal blocking doors.
         bool inPVS = (gridCellStates[instCellIdx] & CELL_VISIBLE);
-        if (!inPVS) inPVS = NeighborhoodInPVS(e->cellX,e->cellZ,2);
-        if (!inPVS) return false;
+        if (!inPVS) {inPVS = NeighborhoodInPVS(e->cellX,e->cellZ,2);} if (!inPVS) return false;
     } else {
         if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (entIdx != 754 || !skyVisible)) return false;
         if (!(gridCellStates[instCellIdx] & CELL_OPEN) && *distSqrd >= 943.7184f && (entIdx != 754 || !skyVisible)) return false; // 30.72 * 30.72, 12 cells
@@ -1105,11 +1100,8 @@ static inline __attribute__((always_inline)) bool DetermineIfInstanceVisible(u16
 
 float GetPainStatic(void) { return 0.0f; } // TODO: Hook into pain/health management and shield impact effect
 Color GetPainStaticColor(void) { return (Color){1.0f,0.0f,0.0f,1.0f}; } // TODO: Hook staticColor up to red or blue for pain or shield impact.
-
 __attribute__((pure)) i32 dsort(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (db > da) - (db < da); }
 __attribute__((pure)) i32 dsortInv(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (da > db) - (da < db); }
-void qsort(void* base, size_t nmemb, size_t size, int (*cmp)(const void*, const void*));
-// Bind textures only on change (norm/tex/glow/spec); cmi<camViewCount handled inline
 #define MAX_VISIBLE 4096
 #define BIND_TEX(slot,cur,next) if((cur)!=(next)||(next)==0){(cur)=(next);glUniform1ui(slot,(u32)(next));}
 #define DRAW_ENTITY(curN,curT,curG,curS,curM) \

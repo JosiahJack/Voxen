@@ -337,26 +337,23 @@ Binary size eval:
 ```
 
 ```
-ls *.* | grep -vE 'miniaudio\.h|gl\.h|glad\.c|glfw3\.h|Citadel.dll|voxen.upx|README.md|glfw_defines.h|voxen.lib|builds.csv|voxen.exe|Citadel.so|voxen.log|glfw3.dll|build.sh' | xargs wc -l 2>/dev/null | sort -nr | head -n 50
- 12176 total
-  2611 stb_truetype.h
-  2248 voxen.c
-  1438 common.h
-   943 data_textures.c
-   678 dynamic_culling.c
-   621 physics.c
-   582 helpers.c
-   542 data_models.c
-   498 console.c
-   386 credits.h
-   372 voxen.h
-   289 os.h
-   265 data_fonts.c
-   230 input.c
-   200 data_text.c
-   164 interop.h
-    88 level.c
-    21 miniaudio.c
+❯ ls *.* | grep -vE 'Citadel.dll|README.md|builds.csv|voxen.exe|Citadel.so|voxen.log|glfw3.dll|build.sh|Citadel.pdb|clang_results.txt' | xargs wc -l 2>/dev/null | sort -nr | head -n 50
+ 10337 total
+  1909 glfw.c
+  1718 voxen.c
+  1546 audio.c
+   781 common.h
+   659 physics.c
+   567 text.c
+   554 culling.c
+   470 console.c
+   424 helpers.c
+   367 models.c
+   364 os.h
+   363 textures.c
+   270 interop.h
+   232 gl.h
+   113 ray.c
 ```
 
 Helper bash commands to generate frame sequences in models.txt:

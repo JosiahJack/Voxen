@@ -157,7 +157,6 @@ u8* stbi_load_from_memory_arena(const u8* buffer, int len, int* x, int* y, StbiA
     Label_parsesuccess: *x = z.s->img_x; *y = z.s->img_y; return z.out;
 }
 
-extern bool doubleSidedTexture[MAX_VALID_TEXTURE], transparentTexture[MAX_VALID_TEXTURE];
 static void* TextureParsingWorker(void* arg) {
     TextureParseTask* t = (TextureParseTask*)arg;
     for (u32 i = t->start_tex; i < t->end_tex; ++i) {
@@ -237,7 +236,7 @@ static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
     OS_DeallocateRAM(data, sz); return true;
 }
 
-void glfwSetWindowIcon(GLFWwindow* handle, const GLFWimage* images); extern GLFWwindow* window;
+void glfwSetWindowIcon(GLFWwindow* handle, const GLFWimage* images);
 static __attribute__((noinline)) void LoadTextures(void) {
     double start_time = get_time();
     loadedTexturesMaxIndex = totalPixels = totalPaletteColors = 0u;
