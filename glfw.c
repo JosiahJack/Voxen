@@ -232,7 +232,7 @@ void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n); int Str
     void SetCursorPosV(_GLFWwindow* window, double xpos, double ypos);
     #define GLFW_LINUX_JOYSTICK_STATE _GLFWjoystickLinux linjs;
     #define GLFW_LINUX_LIBRARY_JOYSTICK_STATE _GLFWlibraryLinux  linjs;
-    typedef struct _GLFWjoystickLinux { OsFileHandle fd; char path[4096]; int keyMap[KEY_CNT - BTN_MISC],absMap[ABS_CNT]; struct input_absinfo absInfo[ABS_CNT]; int hats[4][2]; } _GLFWjoystickLinux;
+    typedef struct _GLFWjoystickLinux { OsFileHandle fd; char path[260]; int keyMap[0x300/*KEY_CNT*/ - 0x100/*BTN_MISC*/],absMap[0x40/*ABS_CNT*/]; struct input_absinfo absInfo[0x40/*ABS_CNT*/]; int hats[4][2]; } _GLFWjoystickLinux;
     typedef struct _GLFWlibraryLinux { int inotify,watch; i32 dropped; } _GLFWlibraryLinux;
     #define GLFW_WIN32_JOYSTICK_STATE
     #define GLFW_WIN32_LIBRARY_JOYSTICK_STATE
@@ -493,8 +493,8 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
         for (int scancode=0;scancode<512;scancode++) { if (_glfw.win32.keycodes[scancode] > 0) {_glfw.win32.scancodes[_glfw.win32.keycodes[scancode]] = scancode;} }
     }
 
-    WCHAR* _glfwCreateWideStringFromUTF8Win32(const char* source) { WCHAR* target; int count = MultiByteToWideChar(CP_UTF8,0,source,-1,NULL,0); target = calloc(count,sizeof(WCHAR)); MultiByteToWideChar(CP_UTF8,0,source,-1,target,count); return target; }
-    char* _glfwCreateUTF8FromWideStringWin32(const WCHAR* source) { int size = WideCharToMultiByte(CP_UTF8,0,source,-1,NULL,0,NULL,NULL); char* target = calloc(size,1); WideCharToMultiByte(CP_UTF8,0,source,-1,target,size,NULL,NULL); return target; }
+    WCHAR* _glfwCreateWideStringFromUTF8Win32(const char* source) { WCHAR* target; int count = MultiByteToWideChar(CP_UTF8,0,source,-1,NULL,0); target = OS_Calloc(count,sizeof(WCHAR)); MultiByteToWideChar(CP_UTF8,0,source,-1,target,count); return target; }
+    char* _glfwCreateUTF8FromWideStringWin32(const WCHAR* source, int* size) { *size = WideCharToMultiByte(CP_UTF8,0,source,-1,NULL,0,NULL,NULL); char* target = OS_Calloc(*size,1); WideCharToMultiByte(CP_UTF8,0,source,-1,target,*size,NULL,NULL); return target; }
     BOOL _glfwIsWindowsVersionOrGreaterWin32(WORD major,WORD minor,WORD sp) {
         OSVERSIONINFOEXW osvi={0}; osvi.dwOSVersionInfoSize=sizeof(osvi), osvi.dwMajorVersion=major, osvi.dwMinorVersion=minor, osvi.wServicePackMajor=sp;
         DWORD mask=VER_MAJORVERSION|VER_MINORVERSION|VER_SERVICEPACKMAJOR;
@@ -528,7 +528,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     i32 InitJoysticks(void) { _glfwDetectJoystickConnectionWin32(); return  1; }
     i32 PollJoystick(_GLFWjoystick* js) {
         DWORD result; XINPUT_STATE xis;
-        const WORD buttons[10] = {XINPUT_GAMEPAD_A,XINPUT_GAMEPAD_B,XINPUT_GAMEPAD_X,XINPUT_GAMEPAD_Y,XINPUT_GAMEPAD_LEFT_SHOULDER,XINPUT_GAMEPAD_RIGHT_SHOULDER,XINPUT_GAMEPAD_BACK,XINPUT_GAMEPAD_START,XINPUT_GAMEPAD_LEFT_THUMB,XINPUT_GAMEPAD_RIGHT_THUMB};
+        const WORD buttons[14] = {XINPUT_GAMEPAD_DPAD_UP,XINPUT_GAMEPAD_DPAD_DOWN,XINPUT_GAMEPAD_DPAD_RIGHT,XINPUT_GAMEPAD_DPAD_LEFT,XINPUT_GAMEPAD_A,XINPUT_GAMEPAD_B,XINPUT_GAMEPAD_X,XINPUT_GAMEPAD_Y,XINPUT_GAMEPAD_LEFT_SHOULDER,XINPUT_GAMEPAD_RIGHT_SHOULDER,XINPUT_GAMEPAD_BACK,XINPUT_GAMEPAD_START,XINPUT_GAMEPAD_LEFT_THUMB,XINPUT_GAMEPAD_RIGHT_THUMB};
         result = _glfw.win32.xinput.GetState(js->win32.index, &xis);
         if (result != ERROR_SUCCESS) { if (result == ERROR_DEVICE_NOT_CONNECTED) {closeJoystick(js);} return 0; }
 
@@ -557,15 +557,15 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     }
 
     static _GLFWmonitor* createMonitor(DISPLAY_DEVICEW* adapter, DISPLAY_DEVICEW* display) {
-        _GLFWmonitor* monitor; int widthMM, heightMM; char* name; HDC dc; DEVMODEW dm; RECT rect;
-        name = display ? _glfwCreateUTF8FromWideStringWin32(display->DeviceString) : _glfwCreateUTF8FromWideStringWin32(adapter->DeviceString);
+        _GLFWmonitor* monitor; int widthMM,heightMM,nameSize=0; HDC dc; DEVMODEW dm; RECT rect;
+        char* name = _glfwCreateUTF8FromWideStringWin32(display ? display->DeviceString : adapter->DeviceString,&nameSize);
         ZeroMemory(&dm,sizeof(dm)); dm.dmSize = sizeof(dm);
         EnumDisplaySettingsW(adapter->DeviceName, ENUM_CURRENT_SETTINGS, &dm);
         dc = CreateDCW(L"DISPLAY", adapter->DeviceName, NULL, NULL);
         if (_glfwIsWindowsVersionOrGreaterWin32(HIBYTE(0x0603),LOBYTE(0x0603),0)) { widthMM  = GetDeviceCaps(dc, HORZSIZE); heightMM = GetDeviceCaps(dc, VERTSIZE); } // Is Windows 8.10 or greater
         else { widthMM  = (int) (dm.dmPelsWidth * 25.4f / GetDeviceCaps(dc, LOGPIXELSX)); heightMM = (int) (dm.dmPelsHeight * 25.4f / GetDeviceCaps(dc, LOGPIXELSY)); }
 
-        DeleteDC(dc); monitor = _glfwAllocMonitor(name,widthMM,heightMM); /*free(name);*/
+        DeleteDC(dc); monitor = _glfwAllocMonitor(name,widthMM,heightMM); OS_DeallocateRAM(name,nameSize);
         if (adapter->StateFlags & DISPLAY_DEVICE_MODESPRUNED) monitor->win32.modesPruned =  1;
         wcscpy(monitor->win32.adapterName, adapter->DeviceName);
         if (display) wcscpy(monitor->win32.displayName,display->DeviceName);
@@ -640,7 +640,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
         attribs[attribCount++] = 0x2010/*support opengl*/; attribs[attribCount++] = 0x2001/*draw to window*/; attribs[attribCount++] = 0x2013/*pixel type*/; attribs[attribCount++] = 0x2003/*accelaration*/;
         attribs[attribCount++] = 0x2011/*double buffer*/; attribs[attribCount++] = 0x2015/*r bits*/; attribs[attribCount++] = 0x2017/*g bits*/;
         attribs[attribCount++] = 0x2019/*b bits*/; attribs[attribCount++] = 0x201b/*a bits*/; attribs[attribCount++] = 0x2022/*depth bits*/; attribs[attribCount++] = 0x2023/*stencil bits*/;
-        _GLFWfbconfig* usableConfigs = calloc(nativeCount,sizeof(_GLFWfbconfig));
+        _GLFWfbconfig* usableConfigs = OS_Calloc(nativeCount,sizeof(_GLFWfbconfig));
         for (i = 0; i < nativeCount; i++) {
             _GLFWfbconfig* u = usableConfigs + usableCount; pixelFormat = i + 1;
             _glfw.wgl.GetPixelFormatAttribivARB(window->context.wgl.dc,pixelFormat,0,attribCount,attribs,values);
@@ -650,41 +650,27 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
         }
 
         const _GLFWfbconfig* closest = _glfwChooseFBConfig(usableConfigs,usableCount);
-        pixelFormat = (int)closest->handle; free(usableConfigs);
+        pixelFormat = (int)closest->handle; OS_DeallocateRAM(usableConfigs,nativeCount * sizeof(_GLFWfbconfig));
         return pixelFormat;
     }
 
     static void makeContextCurrentWGL(_GLFWwindow* window) { wglMakeCurrent(window->context.wgl.dc,window->context.wgl.handle); }
     static void swapBuffersWGL(_GLFWwindow* window) {
-        if (!_glfwIsWindowsVersionOrGreaterWin32(HIBYTE(0x0602),LOBYTE(0x0602),0)) { // Is Windows 8.0 or greater
-            BOOL enabled = FALSE;
-            if (SUCCEEDED(_glfw.win32.dwmapi.IsCompositionEnabled(&enabled)) && enabled) {
-                int count = abs(window->context.wgl.interval); while (count--) _glfw.win32.dwmapi.Flush();
-            }
-        }
-
+        if (!_glfwIsWindowsVersionOrGreaterWin32(HIBYTE(0x0602),LOBYTE(0x0602),0)) { BOOL enabled = FALSE; if (SUCCEEDED(_glfw.win32.dwmapi.IsCompositionEnabled(&enabled)) && enabled) { int count = vabs(window->context.wgl.interval); while (count--) {_glfw.win32.dwmapi.Flush();} } } // Is Windows 8.0 or greater
         SwapBuffers(window->context.wgl.dc);
     }
 
     static void swapIntervalWGL(int interval) {
         _GLFWwindow* handle = (_GLFWwindow*)window;
         handle->context.wgl.interval = interval;
-        if (!_glfwIsWindowsVersionOrGreaterWin32(HIBYTE(0x0602),LOBYTE(0x0602),0)) { // Is Windows 8.0 or greater
-            BOOL enabled = FALSE; if (SUCCEEDED(_glfw.win32.dwmapi.IsCompositionEnabled(&enabled)) && enabled) interval = 0;
-        }
-
+        if (!_glfwIsWindowsVersionOrGreaterWin32(HIBYTE(0x0602),LOBYTE(0x0602),0)) { BOOL enabled = FALSE; if (SUCCEEDED(_glfw.win32.dwmapi.IsCompositionEnabled(&enabled)) && enabled) interval = 0; } // Is Windows 8.0 or greater
         _glfw.wgl.SwapIntervalEXT(interval);
     }
 
     static GLFWglproc getProcAddressWGL(const char* procname) { const GLFWglproc proc = (GLFWglproc)wglGetProcAddress(procname); if (proc) {return proc;} return (GLFWglproc)_glfwPlatformGetModuleSymbol(_glfw.wgl.instance,procname); }
-    void glfwSetWindowPosition(GLFWwindow* handle, int xpos, int ypos) {
-        _GLFWwindow* window = (_GLFWwindow*)handle;
-        RECT rect = {xpos, ypos, xpos, ypos};
-        AdjustWindowRectEx(&rect, getWindowStyle(window), FALSE, WS_EX_APPWINDOW);
-        SetWindowPos(window->win32.handle,HWND_TOP,rect.left, rect.top,0, 0,SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOSIZE | SWP_NOZORDER);
-    }
+    void glfwSetWindowPosition(GLFWwindow* handle, int xpos, int ypos) { _GLFWwindow* window = (_GLFWwindow*)handle; RECT rect = {xpos,ypos,xpos,ypos}; AdjustWindowRectEx(&rect, getWindowStyle(window), FALSE, WS_EX_APPWINDOW); SetWindowPos(window->win32.handle,HWND_TOP,rect.left,rect.top,0,0,SWP_NOACTIVATE|SWP_NOOWNERZORDER|SWP_NOSIZE|SWP_NOZORDER); }
 #else // LINUX
-    void* _glfwPlatformLoadModule(const char* path) { return dlopen(path, RTLD_LAZY | RTLD_LOCAL); }
+    void* _glfwPlatformLoadModule(const char* path) { return dlopen(path,2); }
     GLFWproc _glfwPlatformGetModuleSymbol(void* module, const char* name) { return dlsym(module,name); }
     unsigned long _glfwGetWindowPropertyX11(Window window,Atom property,Atom type,unsigned char** value) {
         Atom actualType; int actualFormat; unsigned long itemCount,bytesAfter;
@@ -931,9 +917,9 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
             if (_glfwGetWindowPropertyX11(_glfw.x11.root,_glfw.x11.NET_CURRENT_DESKTOP,((Atom) 6),(unsigned char**) &desktop) > 0) {
                 if (extentCount >= 4 && *desktop < extentCount / 4) {
                     const int gx = extents[*desktop * 4 + 0], gy = extents[*desktop * 4 + 1], gw = extents[*desktop * 4 + 2], gh = extents[*desktop * 4 + 3];
-                    if (areaX < gx) { areaWidth -= gx - areaX, areaX = gx; }
+                    if (areaX < gx) { areaWidth  -= gx - areaX, areaX = gx; }
                     if (areaY < gy) { areaHeight -= gy - areaY, areaY = gy; }
-                    if (areaX + areaWidth > gx + gw) areaWidth = gx - areaX + gw;
+                    if (areaX +  areaWidth > gx + gw)  areaWidth = gx - areaX + gw;
                     if (areaY + areaHeight > gy + gh) areaHeight = gy - areaY + gh;
                 }
             }
@@ -1005,12 +991,12 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     }
 
     static Atom getAtomIfSupported(Atom* atoms, unsigned long count, const char* name) { const Atom atom=_glfw.x11.xlib.InternAtom(_glfw.x11.display,name,0); for (unsigned long i=0;i<count;i++) {if (atoms[i] == atom) {return atom;}} return 0L; }
-    static void handleKeyEvent(_GLFWjoystick* js, int code, int value) { _glfwInputJoystickButton(js,js->linjs.keyMap[code - BTN_MISC],value ? GLFW_PRESS : GLFW_RELEASE); }
+    static void handleKeyEvent(_GLFWjoystick* js, int code, int value) { _glfwInputJoystickButton(js,js->linjs.keyMap[code - 0x100/*BTN_MISC*/],value ? GLFW_PRESS : GLFW_RELEASE); }
     static void handleAbsEvent(_GLFWjoystick* js, int code, int value) {
         const int index = js->linjs.absMap[code];
-        if (code >= ABS_HAT0X && code <= ABS_HAT3Y) {
+        if (code >= 0x10/*ABS_HAT0X*/ && code <= 0x17/*ABS_HAT3Y*/) {
             static const char stateMap[3][3] = {{GLFW_HAT_CENTERED,GLFW_HAT_UP,GLFW_HAT_DOWN},{GLFW_HAT_LEFT,GLFW_HAT_LEFT_UP,GLFW_HAT_LEFT_DOWN},{GLFW_HAT_RIGHT,GLFW_HAT_RIGHT_UP,GLFW_HAT_RIGHT_DOWN},};
-            const int hat = (code - ABS_HAT0X) / 2, axis = (code - ABS_HAT0X) % 2;
+            const int hat = (code - 0x10/*ABS_HAT0X*/) / 2, axis = (code - 0x10/*ABS_HAT0X*/) % 2;
             int* state = js->linjs.hats[hat];
             state[axis] = (value == 0) ? 0 : value < 0 ? 1 : value > 0 ? 2 : state[axis];
             _glfwInputJoystickHat(js, index, stateMap[state[0]][state[1]]);
@@ -1023,8 +1009,9 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
         }
     }
 
+    #define EVIOCGABS(abs) (0x80184540 + (abs))
     static void pollAbsState(_GLFWjoystick* js) {
-        for (int code = 0;  code < ABS_CNT;  code++) {
+        for (int code=0;code<0x40/*ABS_CNT*/;code++) {
             if (js->linjs.absMap[code] < 0) continue;
 
             struct input_absinfo* info = &js->linjs.absInfo[code];
@@ -1035,38 +1022,38 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     }
 
     #define isBitSet(bit, arr) (arr[(bit) / 8] & (1 << ((bit) % 8)))
+    #define EVIOCGBIT(ev, len) (0x80004520 + (ev) + ((len) << 16))
     static i32 openJoystickDevice(const char* path) {
         for (int jid = 0;  jid <= GLFW_JOYSTICK_LAST;  jid++) {
             if (!_glfw.joysticks[jid].connected) continue;
             if (StringsEqual(_glfw.joysticks[jid].linjs.path,path)) return 0;
         }
 
-        _GLFWjoystickLinux linjs = {0};
-        linjs.fd = OS_Open(path,O_RDONLY|O_NONBLOCK|O_CLOEXEC,0); if (linjs.fd == -1) return 0;
+        _GLFWjoystickLinux linjs = {0}; linjs.fd = OS_Open(path,00004000|02000000,0); if (linjs.fd == -1) return 0;
 
-        char evBits[(EV_CNT + 7) / 8] = {0},keyBits[(KEY_CNT + 7) / 8] = {0},absBits[(ABS_CNT + 7) / 8] = {0};
-        struct input_id id; if (OS_IOControl(linjs.fd,EVIOCGBIT(0,sizeof(evBits)),evBits) < 0 || OS_IOControl(linjs.fd,EVIOCGBIT(EV_KEY,sizeof(keyBits)),keyBits) < 0 || OS_IOControl(linjs.fd,EVIOCGBIT(EV_ABS,sizeof(absBits)),absBits) < 0 || OS_IOControl(linjs.fd,EVIOCGID,&id) < 0) { OS_Close(linjs.fd); return 0; }
-        if (!isBitSet(EV_ABS,evBits)) { OS_Close(linjs.fd); return 0; }
+        char evBits[(0x20/*EV_CNT*/ + 7) / 8] = {0},keyBits[(0x300/*KEY_CNT*/ + 7) / 8] = {0},absBits[(0x40/*ABS_CNT*/ + 7) / 8] = {0};
+        struct input_id id; if (OS_IOControl(linjs.fd,EVIOCGBIT(0,sizeof(evBits)),evBits) < 0 || OS_IOControl(linjs.fd,EVIOCGBIT(0x01/*EV_KEY*/,sizeof(keyBits)),keyBits) < 0 || OS_IOControl(linjs.fd,EVIOCGBIT(0x03/*EV_ABS*/,sizeof(absBits)),absBits) < 0 || OS_IOControl(linjs.fd,0x80084501/*EVIOCGID*/,&id) < 0) { OS_Close(linjs.fd); return 0; }
+        if (!isBitSet(0x03/*EV_ABS*/,evBits)) { OS_Close(linjs.fd); return 0; }
 
         char name[256] = "";
-        if (OS_IOControl(linjs.fd, EVIOCGNAME(sizeof(name)),name) < 0) StringCopyInto_A_From_B(name,"Unknown",sizeof(name));
+        if (OS_IOControl(linjs.fd,(0x80004506 | (((sizeof(name)) & 0x1fff) << 16)),name) < 0) StringCopyInto_A_From_B(name,"Unknown",sizeof(name));
         char guid[33] = "";
         if (id.vendor && id.product && id.version) StringFormat(guid,sizeof(guid),"%02x%02x0000%02x%02x0000%02x%02x0000%02x%02x0000",id.bustype & 0xff, id.bustype >> 8,id.vendor & 0xff,  id.vendor >> 8,id.product & 0xff, id.product >> 8,id.version & 0xff, id.version >> 8);
         else StringFormat(guid,sizeof(guid),"%02x%02x0000%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x00",id.bustype & 0xff, id.bustype >> 8,name[0], name[1], name[2], name[3],name[4], name[5], name[6], name[7],name[8], name[9], name[10]);
 
         int axisCount = 0, buttonCount = 0, hatCount = 0;
-        for (int code = BTN_MISC;  code < KEY_CNT;  code++) {
+        for (int code=0x100/*BTN_MISC*/;code<0x300/*KEY_CNT*/;code++) {
             if (!isBitSet(code,keyBits)) continue;
 
-            linjs.keyMap[code - BTN_MISC] = buttonCount;
+            linjs.keyMap[code - 0x100/*BTN_MISC*/] = buttonCount;
             buttonCount++;
         }
 
-        for (int code = 0;  code < ABS_CNT;  code++) {
+        for (int code=0;code<0x40/*ABS_CNT*/;code++) {
             linjs.absMap[code] = -1;
             if (!isBitSet(code,absBits)) continue;
 
-            if (code >= ABS_HAT0X && code <= ABS_HAT3Y) {
+            if (code >= 0x10/*ABS_HAT0X*/ && code <= 0x17/*ABS_HAT3Y*/) {
                 linjs.absMap[code] = hatCount;
                 hatCount++;
                 code++; // Skip the Y axis
@@ -1104,9 +1091,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     }
 
     static void iterateInputDevices(void (*callback)(const char* fullpath)) {
-        const char* dirname = "/dev/input";
-        OsFileHandle fd = OS_Open(dirname,O_RDONLY|O_DIRECTORY|O_CLOEXEC,0);
-        if (fd < 0) return;
+        const char* dirname = "/dev/input"; OsFileHandle fd = OS_Open(dirname,00200000|02000000,0); if (fd < 0) return;
 
         char buf[8192];
         for (;;) {
@@ -1122,8 +1107,8 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
                 struct linux_dirent64* d = (struct linux_dirent64*)(buf + offset);
 
                 if (d->d_name[0] != '.' && isEventDevice(d->d_name)) {
-                    char path[4096];
-                    StringFormat(path, sizeof(path), "%s/%s", dirname, d->d_name);
+                    char path[260];
+                    StringFormat(path, sizeof(path),"%s/%s",dirname,d->d_name);
                     callback(path);
                 }
 
@@ -1135,26 +1120,22 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     }
 
     static void openJoystickCallback(const char* path) { openJoystickDevice(path); }
+    static char joyConbuffer[16384],joyPath[260];
     void _glfwDetectJoystickConnectionLinux(void) {
         if (_glfw.linjs.inotify <= 0) return;
-
-        char buffer[16384];
-        ssize_t size;
-        size = OS_Read(_glfw.linjs.inotify, buffer, sizeof(buffer));
-        if (size <= 0) return;
-
-        ssize_t offset = 0;
-        while (size > offset) {
-            const struct inotify_event* e = (struct inotify_event*)(buffer + offset);
-            offset += sizeof(struct inotify_event) + e->len;
+        i32 size = OS_Read(_glfw.linjs.inotify,joyConbuffer,sizeof(joyConbuffer)); if (size <= 0) return;
+        
+        i32 offset = 0;
+        while (size >= offset + (i32)sizeof(struct inotify_event)) {
+            const struct inotify_event* e = (struct inotify_event*)(joyConbuffer + offset);
+            offset += (i32)sizeof(struct inotify_event) + e->len;
             if (e->len == 0 || !isEventDevice(e->name)) continue;
 
-            char path[4096];
-            StringFormat(path, sizeof(path), "/dev/input/%s", e->name);
-            if (e->mask & (0x00000100/*IN_CREATE*/|0x00000004/*IN_ATTRIB*/)) openJoystickDevice(path);
+            StringFormat(joyPath,sizeof(joyPath), "/dev/input/%s", e->name);
+            if (e->mask & (0x00000100/*IN_CREATE*/|0x00000004/*IN_ATTRIB*/)) openJoystickDevice(joyPath);
             else if (e->mask & 0x00000200/*IN_DELETE*/) {
                 for (int jid = 0; jid <= GLFW_JOYSTICK_LAST; jid++) {
-                    if (StringsEqual(_glfw.joysticks[jid].linjs.path, path)) { closeJoystick(_glfw.joysticks + jid); break; }
+                    if (StringsEqual(_glfw.joysticks[jid].linjs.path,joyPath)) { closeJoystick(_glfw.joysticks + jid); break; }
                 }
             }
         }
@@ -1187,15 +1168,15 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
             if (n == 0) { break; }
             if (n < (long)sizeof(e)) { closeJoystick(js); break; }
 
-            if (e.type == EV_SYN) {
-                if (e.code == SYN_DROPPED) _glfw.linjs.dropped = 1;
-                else if (e.code == SYN_REPORT) { _glfw.linjs.dropped = 0; pollAbsState(js); }
+            if (e.type == 0x00/*EV_SYN*/) {
+                if (e.code == 3/*SYN_DROPPED*/) _glfw.linjs.dropped = 1;
+                else if (e.code == 0/*SYN_REPORT*/) { _glfw.linjs.dropped = 0; pollAbsState(js); }
             }
 
             if (_glfw.linjs.dropped) continue;
 
-            if (e.type == EV_KEY) handleKeyEvent(js,e.code,e.value);
-            else if (e.type == EV_ABS) handleAbsEvent(js,e.code,e.value);
+                 if (e.type == 0x01/*EV_KEY*/) handleKeyEvent(js,e.code,e.value);
+            else if (e.type == 0x03/*EV_ABS*/) handleAbsEvent(js,e.code,e.value);
         }
 
         return js->connected;
@@ -1520,7 +1501,7 @@ GLFWwindow* glfwCreateWindow(int width, int height, char* title) {
     wp.showCmd=SW_HIDE; 
     SetWindowPlacement(window->win32.handle,&wp);
     GetWindowSize(window,&window->win32.width,&window->win32.height);
-    PIXELFORMATDESCRIPTOR pfd; HGLRC prc,rc; HDC pdc,dc;
+    PIXELFORMATDESCRIPTOR pfd; HGLRC prc; HGLRC rc; HDC pdc; HDC dc;
     _glfw.wgl.instance = LoadLibraryA("opengl32.dll");
     _glfw.wgl.CreateContext = (PFN_wglCreateContext)_glfwPlatformGetModuleSymbol(_glfw.wgl.instance,"wglCreateContext");
     _glfw.wgl.GetProcAddress = (PFN_wglGetProcAddress)_glfwPlatformGetModuleSymbol(_glfw.wgl.instance,"wglGetProcAddress");
@@ -1782,23 +1763,16 @@ void InputProcessing(void) {
 KeyState* GetCodeMapping(int settingIndex) {
     i32 i = Sys_Settings.InputCodeSettings[settingIndex]; // Get table index into all recognized inputs
     if (i == 148 || i >= MAX_KEYS) return &Sys_Input.keyStates[MAX_KEYS - 1]; // UNUSED NULL (e.g. setting unbound)
-
-    if (i >= 53 && i <= 61) { // Pick subtable of GLFW values that were set by GLFW callbacks
-        return &Sys_Input.mouseButtons[inputElements[i].value];
-    } else if (i >= 62 && i <= 77) {
-        return &Sys_Input.joystickButtons[GLFW_JOYSTICK_1][inputElements[i].value];
-    } else if ((i >= 78 && i <= 79) || (i >= 132 && i <= 133)) {
-        return &Sys_Input.joystickHats[inputElements[i].value];
-    }
-
+    if (i >= 53 && i <= 61) return &Sys_Input.mouseButtons[inputElements[i].value];
+    if (i >= 62 && i <= 77) return &Sys_Input.joystickButtons[GLFW_JOYSTICK_1][inputElements[i].value];
+    if ((i >= 78 && i <= 79) || (i >= 132 && i <= 133)) return &Sys_Input.joystickHats[inputElements[i].value];
     return &Sys_Input.keyStates[inputElements[i].value];
 }
 
 bool GetKeyRiseEdgeOrHeld(int settingIndex, bool risingEdge) {
     i32 i = Sys_Settings.InputCodeSettings[settingIndex]; // Get table index into all recognized inputs
-         if (i == 128) return Sys_Input.scrollDelta > 0.0; // Mousewheel +
-    else if (i == 129) return Sys_Input.scrollDelta < 0.0; // Mousewheel -
-
+    if (i == 128) return Sys_Input.scrollDelta > 0.0; // Mousewheel +
+    if (i == 129) return Sys_Input.scrollDelta < 0.0; // Mousewheel -
     KeyState* keyOfConcern = GetCodeMapping(settingIndex);
     bool retval = risingEdge ? keyOfConcern->pressed : keyOfConcern->down;
     return retval;

@@ -1,197 +1,33 @@
-3 warnings generated.
-/home/qmaster/Github/Voxen/Scripts/biomonitor.c:318:38: warning: repeated branch in conditional chain [bugprone-branch-clone]
-                if (distPerc < 0.0f) distPerc = fadeDist;
-                                     ^
-/home/qmaster/Github/Voxen/Scripts/biomonitor.c:318:57: note: end of the original
-                if (distPerc < 0.0f) distPerc = fadeDist;
-                                                        ^
-/home/qmaster/Github/Voxen/Scripts/biomonitor.c:319:47: note: clone 1 starts here
-                else if (distPerc > fadeDist) distPerc = fadeDist;
-                                              ^
-/home/qmaster/Github/Voxen/Scripts/biomonitor.c:332:38: warning: repeated branch in conditional chain [bugprone-branch-clone]
-                if (distPerc < 0.0f) distPerc = fadeDist;
-                                     ^
-/home/qmaster/Github/Voxen/Scripts/biomonitor.c:332:57: note: end of the original
-                if (distPerc < 0.0f) distPerc = fadeDist;
-                                                        ^
-/home/qmaster/Github/Voxen/Scripts/biomonitor.c:333:47: note: clone 1 starts here
-                else if (distPerc > fadeDist) distPerc = fadeDist;
-                                              ^
-/home/qmaster/Github/Voxen/Scripts/biomonitor.c:346:38: warning: repeated branch in conditional chain [bugprone-branch-clone]
-                if (distPerc < 0.0f) distPerc = fadeDist;
-                                     ^
-/home/qmaster/Github/Voxen/Scripts/biomonitor.c:346:57: note: end of the original
-                if (distPerc < 0.0f) distPerc = fadeDist;
-                                                        ^
-/home/qmaster/Github/Voxen/Scripts/biomonitor.c:347:47: note: clone 1 starts here
-                else if (distPerc > fadeDist) distPerc = fadeDist;
-                                              ^
-1 warning generated.
-/home/qmaster/Github/Voxen/physics.c:19:56: warning: switch has 2 consecutive identical branches [bugprone-branch-clone]
-        case Layer_Default:         return 629079559u; case Layer_TransparentFX:    return 85876231u;  case Layer_IgnoreRaycast:return 85876231u;
-                                                       ^
-/home/qmaster/Github/Voxen/physics.c:19:145: note: last of these clones ends here
-        case Layer_Default:         return 629079559u; case Layer_TransparentFX:    return 85876231u;  case Layer_IgnoreRaycast:return 85876231u;
-                                                                                                                                                ^
-8 warnings generated.
-./interop.h:118:20: warning: redundant 'DualLogError' declaration [readability-redundant-declaration]
-ENGINE_TO_MOD void DualLogError(const char* fmt, ...);
-                   ^
-./os.h:49:20: note: previously declared here
-ENGINE_TO_MOD void DualLogError(const char* fmt, ...);
-                   ^
-./os.h:216:238: warning: integer to pointer cast pessimizes optimization opportunities [performance-no-int-to-ptr]
-    static inline __attribute__((always_inline)) void* OS_Brk(void* addr) { register long rax __asm__("rax") = 12; register void* rdi __asm__("rdi") = addr; __asm__ __volatile__("syscall":"+r"(rax):"r"(rdi):"rcx","r11","memory"); return (void*)rax; }
-                                                                                                                                                                                                                                             ^
-./os.h:232:16: warning: integer to pointer cast pessimizes optimization opportunities [performance-no-int-to-ptr]
-        return (void*)rax;
-               ^
-./os.h:276:32: warning: integer to pointer cast pessimizes optimization opportunities [performance-no-int-to-ptr]
-        if (ramSpacePointer == MAP_FAILED) { DualLogError("Failed to allocate %s\n", filePath); return NULL; }
-                               ^
-./os.h:31:23: note: expanded from macro 'MAP_FAILED'
-#define MAP_FAILED   ((void *)-1)
-                      ^
-./os.h:308:52: warning: integer to pointer cast pessimizes optimization opportunities [performance-no-int-to-ptr]
-        if (!ramSpacePointer || ramSpacePointer == MAP_FAILED) { DualLogError("Attempting to double free!\n"); OS_Exit(1); }
-                                                   ^
-./os.h:31:23: note: expanded from macro 'MAP_FAILED'
-#define MAP_FAILED   ((void *)-1)
-                      ^
-./os.h:314:13: warning: integer to pointer cast pessimizes optimization opportunities [performance-no-int-to-ptr]
-        if ((void *)(i64)rax == MAP_FAILED) DualLogError("munmap failed\n");
-            ^
-./os.h:314:33: warning: integer to pointer cast pessimizes optimization opportunities [performance-no-int-to-ptr]
-        if ((void *)(i64)rax == MAP_FAILED) DualLogError("munmap failed\n");
-                                ^
-./os.h:31:23: note: expanded from macro 'MAP_FAILED'
-#define MAP_FAILED   ((void *)-1)
-                      ^
-/home/qmaster/Github/Voxen/glfw.c:1590:72: warning: integer to pointer cast pessimizes optimization opportunities [performance-no-int-to-ptr]
-    closest = _glfwChooseFBConfig(usableConfigs,usableCount); native = (GLXFBConfig)closest->handle;
-                                                                       ^
 2 warnings generated.
-/home/qmaster/Github/Voxen/Scripts/ai.c:451:58: warning: repeated branch in conditional chain [bugprone-branch-clone]
-                 if (mt == NPCType_Robot && self->enemy) canFight = false;
-                                                         ^
-/home/qmaster/Github/Voxen/Scripts/ai.c:451:74: note: end of the original
-                 if (mt == NPCType_Robot && self->enemy) canFight = false;
-                                                                         ^
-/home/qmaster/Github/Voxen/Scripts/ai.c:452:177: note: clone 1 starts here
-            else if ((mt == NPCType_Cyborg || mt == NPCType_Supercyborg || mt == NPCType_Robot) && (at == NPCType_Cyborg || at == NPCType_Supercyborg || at == NPCType_Robot))  canFight = false;
-                                                                                                                                                                                ^
-/home/qmaster/Github/Voxen/Scripts/ai.c:453:130: warning: repeated branch in conditional chain [bugprone-branch-clone]
-            else if ((mt == NPCType_Mutant || mt == NPCType_Supermutant) && (at == NPCType_Mutant || at == NPCType_Supermutant)) canFight = atk->index != self->index;
-                                                                                                                                 ^
-/home/qmaster/Github/Voxen/Scripts/ai.c:453:166: note: end of the original
-            else if ((mt == NPCType_Mutant || mt == NPCType_Supermutant) && (at == NPCType_Mutant || at == NPCType_Supermutant)) canFight = atk->index != self->index;
-                                                                                                                                                                     ^
-/home/qmaster/Github/Voxen/Scripts/ai.c:454:18: note: clone 1 starts here
-            else canFight = atk->index != self->index;
-                 ^
-6 warnings generated.
-/home/qmaster/Github/Voxen/Scripts/citadel.c:561:9: warning: switch has 2 consecutive identical branches [bugprone-branch-clone]
-        case 15: return  3.0f;
-        ^
-/home/qmaster/Github/Voxen/Scripts/citadel.c:562:30: note: last of these clones ends here
-        default: return  3.0f;
-                             ^
-/home/qmaster/Github/Voxen/Scripts/citadel.c:2028:9: warning: switch has 3 consecutive identical branches [bugprone-branch-clone]
-        case 7:  flag_setu64(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
-        ^
-/home/qmaster/Github/Voxen/Scripts/citadel.c:2030:80: note: last of these clones ends here
-        case 9:  flag_setu64(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
-                                                                               ^
-/home/qmaster/Github/Voxen/Scripts/citadel.c:3342:9: warning: switch has 2 consecutive identical branches [bugprone-branch-clone]
-        case BodyState_Crouch:        retval = PLAYER_MAX_CROUCH_SPEED; break;
-        ^
-/home/qmaster/Github/Voxen/Scripts/citadel.c:3343:78: note: last of these clones ends here
-        case BodyState_CrouchingDown: retval = PLAYER_MAX_CROUCH_SPEED; break;
-                                                                             ^
-/home/qmaster/Github/Voxen/Scripts/citadel.c:3345:9: warning: switch has 3 consecutive identical branches [bugprone-branch-clone]
-        case BodyState_Prone:         retval = PLAYER_MAX_PRONE_SPEED;  break;
-        ^
-/home/qmaster/Github/Voxen/Scripts/citadel.c:3347:78: note: last of these clones ends here
-        case BodyState_ProningUp:     retval = PLAYER_MAX_PRONE_SPEED;  break;
-                                                                             ^
-/home/qmaster/Github/Voxen/Scripts/citadel.c:3669:9: warning: switch has 2 consecutive identical branches [bugprone-branch-clone]
-        case 41: return 1166; // orange
-        ^
-/home/qmaster/Github/Voxen/Scripts/citadel.c:3670:29: note: last of these clones ends here
-        case 42: return 1166; // orange
-                            ^
-/home/qmaster/Github/Voxen/Scripts/citadel.c:3695:9: warning: switch has 2 consecutive identical branches [bugprone-branch-clone]
-        case 312: return 605; // item_arm
-        ^
-/home/qmaster/Github/Voxen/Scripts/citadel.c:3696:29: note: last of these clones ends here
-        case 313: return 605; // item_audiolog
-                            ^
-7 warnings generated.
+/home/qmaster/Github/Voxen/Scripts/music.c:75:7: warning: do not use 'else' after 'return' [readability-else-after-return]
+    } else if (Eng_Global->currentLevel == 1) { // 1  MEDICAL
+      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/qmaster/Github/Voxen/Scripts/music.c:99:9: warning: do not use 'else' after 'return' [readability-else-after-return]
+        else                                return cyberMusic[8];
+        ^~~~
+note: this fix will not be applied because it overlaps with another fix
+1 warning generated.
 ./interop.h:118:20: warning: redundant 'DualLogError' declaration [readability-redundant-declaration]
 ENGINE_TO_MOD void DualLogError(const char* fmt, ...);
                    ^
-./os.h:49:20: note: previously declared here
+./os.h:25:20: note: previously declared here
 ENGINE_TO_MOD void DualLogError(const char* fmt, ...);
                    ^
-./os.h:216:238: warning: integer to pointer cast pessimizes optimization opportunities [performance-no-int-to-ptr]
-    static inline __attribute__((always_inline)) void* OS_Brk(void* addr) { register long rax __asm__("rax") = 12; register void* rdi __asm__("rdi") = addr; __asm__ __volatile__("syscall":"+r"(rax):"r"(rdi):"rcx","r11","memory"); return (void*)rax; }
-                                                                                                                                                                                                                                             ^
-./os.h:232:16: warning: integer to pointer cast pessimizes optimization opportunities [performance-no-int-to-ptr]
-        return (void*)rax;
-               ^
-./os.h:276:32: warning: integer to pointer cast pessimizes optimization opportunities [performance-no-int-to-ptr]
-        if (ramSpacePointer == MAP_FAILED) { DualLogError("Failed to allocate %s\n", filePath); return NULL; }
-                               ^
-./os.h:31:23: note: expanded from macro 'MAP_FAILED'
-#define MAP_FAILED   ((void *)-1)
-                      ^
-./os.h:308:52: warning: integer to pointer cast pessimizes optimization opportunities [performance-no-int-to-ptr]
-        if (!ramSpacePointer || ramSpacePointer == MAP_FAILED) { DualLogError("Attempting to double free!\n"); OS_Exit(1); }
-                                                   ^
-./os.h:31:23: note: expanded from macro 'MAP_FAILED'
-#define MAP_FAILED   ((void *)-1)
-                      ^
-./os.h:314:13: warning: integer to pointer cast pessimizes optimization opportunities [performance-no-int-to-ptr]
-        if ((void *)(i64)rax == MAP_FAILED) DualLogError("munmap failed\n");
-            ^
-./os.h:314:33: warning: integer to pointer cast pessimizes optimization opportunities [performance-no-int-to-ptr]
-        if ((void *)(i64)rax == MAP_FAILED) DualLogError("munmap failed\n");
-                                ^
-./os.h:31:23: note: expanded from macro 'MAP_FAILED'
-#define MAP_FAILED   ((void *)-1)
-                      ^
-17 warnings generated.
-./console.c:56:6: warning: redundant 'CharToLower' declaration [readability-redundant-declaration]
-char CharToLower(const char c);
-     ^
-./helpers.c:224:6: note: previously declared here
-char CharToLower(const char c) { return c + ((c >= 'A' && c <= 'Z') ? 32 : 0); } // If uppercase 'A'-'Z' (65-90), +32 into 'a'-'z' (97-122)
-     ^
-./console.c:123:5: warning: redundant 'StringToInt' declaration [readability-redundant-declaration]
-i32 StringToInt(const char *str);
-    ^
-./helpers.c:152:5: note: previously declared here
-i32 StringToInt(const char *str) { // atoi replacement
-    ^
-./helpers.c:39:31: warning: integer to pointer cast pessimizes optimization opportunities [performance-no-int-to-ptr]
-    static void* heap_start = (void*)-1;
-                              ^
-./helpers.c:40:23: warning: integer to pointer cast pessimizes optimization opportunities [performance-no-int-to-ptr]
-    if (heap_start == (void*)-1) heap_start = OS_Brk(NULL);
-                      ^
-./helpers.c:54:72: warning: repeated branch in conditional chain [bugprone-branch-clone]
-            if (p[0]=='C'&&p[1]=='l'&&p[2]=='e'&&p[3]=='a'&&p[4]=='n') { /* Clean */ }
-                                                                       ^
-./helpers.c:54:87: note: end of the original
-            if (p[0]=='C'&&p[1]=='l'&&p[2]=='e'&&p[3]=='a'&&p[4]=='n') { /* Clean */ }
-                                                                                      ^
-./helpers.c:55:77: note: clone 1 starts here
-            else if (p[0]=='D'&&p[1]=='i'&&p[2]=='r'&&p[3]=='t'&&p[4]=='y') { /* Dirty */ }
-                                                                            ^
+2 warnings generated.
 ./interop.h:118:20: warning: redundant 'DualLogError' declaration [readability-redundant-declaration]
 ENGINE_TO_MOD void DualLogError(const char* fmt, ...);
                    ^
-./os.h:49:20: note: previously declared here
+./os.h:25:20: note: previously declared here
+ENGINE_TO_MOD void DualLogError(const char* fmt, ...);
+                   ^
+/home/qmaster/Github/Voxen/audio.c:896:11: warning: do not use 'else' after 'break' [readability-else-after-return]
+        } else if (info.frame_bytes==0) {
+          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+3 warnings generated.
+./interop.h:118:20: warning: redundant 'DualLogError' declaration [readability-redundant-declaration]
+ENGINE_TO_MOD void DualLogError(const char* fmt, ...);
+                   ^
+./os.h:25:20: note: previously declared here
 ENGINE_TO_MOD void DualLogError(const char* fmt, ...);
                    ^
 ./models.c:2:6: warning: redundant 'qsort' declaration [readability-redundant-declaration]
@@ -200,66 +36,6 @@ void qsort(void* base, size_t nmemb, size_t size, int (*cmp)(const void*, const 
 /usr/include/stdlib.h:838:13: note: previously declared here
 extern void qsort (void *__base, size_t __nmemb, size_t __size,
             ^
-./os.h:216:238: warning: integer to pointer cast pessimizes optimization opportunities [performance-no-int-to-ptr]
-    static inline __attribute__((always_inline)) void* OS_Brk(void* addr) { register long rax __asm__("rax") = 12; register void* rdi __asm__("rdi") = addr; __asm__ __volatile__("syscall":"+r"(rax):"r"(rdi):"rcx","r11","memory"); return (void*)rax; }
-                                                                                                                                                                                                                                             ^
-./os.h:232:16: warning: integer to pointer cast pessimizes optimization opportunities [performance-no-int-to-ptr]
-        return (void*)rax;
-               ^
-./os.h:276:32: warning: integer to pointer cast pessimizes optimization opportunities [performance-no-int-to-ptr]
-        if (ramSpacePointer == MAP_FAILED) { DualLogError("Failed to allocate %s\n", filePath); return NULL; }
-                               ^
-./os.h:31:23: note: expanded from macro 'MAP_FAILED'
-#define MAP_FAILED   ((void *)-1)
-                      ^
-./os.h:308:52: warning: integer to pointer cast pessimizes optimization opportunities [performance-no-int-to-ptr]
-        if (!ramSpacePointer || ramSpacePointer == MAP_FAILED) { DualLogError("Attempting to double free!\n"); OS_Exit(1); }
-                                                   ^
-./os.h:31:23: note: expanded from macro 'MAP_FAILED'
-#define MAP_FAILED   ((void *)-1)
-                      ^
-./os.h:314:13: warning: integer to pointer cast pessimizes optimization opportunities [performance-no-int-to-ptr]
-        if ((void *)(i64)rax == MAP_FAILED) DualLogError("munmap failed\n");
-            ^
-./os.h:314:33: warning: integer to pointer cast pessimizes optimization opportunities [performance-no-int-to-ptr]
-        if ((void *)(i64)rax == MAP_FAILED) DualLogError("munmap failed\n");
-                                ^
-./os.h:31:23: note: expanded from macro 'MAP_FAILED'
-#define MAP_FAILED   ((void *)-1)
-                      ^
-./text.c:248:40: warning: repeated branch in conditional chain [bugprone-branch-clone]
-                else if(x0<x1f&&x3>x1f){_hce(sl,x,e,x0,y0,x1f,y1);_hce(sl,x,e,x1f,y1,x3,y3);}
-                                       ^
-./text.c:248:94: note: end of the original
-                else if(x0<x1f&&x3>x1f){_hce(sl,x,e,x0,y0,x1f,y1);_hce(sl,x,e,x1f,y1,x3,y3);}
-                                                                                             ^
-./text.c:249:40: note: clone 1 starts here
-                else if(x3<x1f&&x0>x1f){_hce(sl,x,e,x0,y0,x1f,y1);_hce(sl,x,e,x1f,y1,x3,y3);}
-                                       ^
-./text.c:250:40: warning: repeated branch in conditional chain [bugprone-branch-clone]
-                else if(x0<x2f&&x3>x2f){_hce(sl,x,e,x0,y0,x2f,y2);_hce(sl,x,e,x2f,y2,x3,y3);}
-                                       ^
-./text.c:250:94: note: end of the original
-                else if(x0<x2f&&x3>x2f){_hce(sl,x,e,x0,y0,x2f,y2);_hce(sl,x,e,x2f,y2,x3,y3);}
-                                                                                             ^
-./text.c:251:40: note: clone 1 starts here
-                else if(x3<x2f&&x0>x2f){_hce(sl,x,e,x0,y0,x2f,y2);_hce(sl,x,e,x2f,y2,x3,y3);}
-                                       ^
-./text.c:366:1287: warning: repeated branch in conditional chain [bugprone-branch-clone]
-            if(r->was_packed&&r->w&&r->h){stbtt_packedchar*bc=&ranges[i].chardata_for_range[j];int adv,lsb,x0,y0,x1,y1,cp=ranges[i].array_of_unicode_codepoints?ranges[i].array_of_unicode_codepoints[j]:ranges[i].first_unicode_codepoint_in_range+j,g=stbtt_FindGlyphIndex(info,cp);stbrp_coord pad=(stbrp_coord)spc->padding;r->x+=pad;r->y+=pad;r->w-=pad;r->h-=pad;stbtt_GetGlyphHMetrics(info,g,&adv,&lsb);stbtt_GetGlyphBitmapBox(info,g,sc*(float)spc->h_oversample,sc*(float)spc->v_oversample,&x0,&y0,&x1,&y1);stbtt_MakeGlyphBitmapSubpixel(info,spc->pixels+r->x+r->y*spc->stride_in_bytes,r->w-(int)spc->h_oversample+1,r->h-(int)spc->v_oversample+1,spc->stride_in_bytes,sc*(float)spc->h_oversample,sc*(float)spc->v_oversample,0,0,g);if(spc->h_oversample>1)_hpre(spc->pixels+r->x+r->y*spc->stride_in_bytes,r->w,r->h,spc->stride_in_bytes,spc->h_oversample);if(spc->v_oversample>1)_vpre(spc->pixels+r->x+r->y*spc->stride_in_bytes,r->w,r->h,spc->stride_in_bytes,spc->v_oversample);bc->x0=(unsigned short)r->x;bc->y0=(unsigned short)r->y;bc->x1=(unsigned short)(r->x+r->w);bc->y1=(unsigned short)(r->y+r->h);bc->xadvance=sc*(float)adv;bc->xoff=(float)x0*rh+sbx;bc->yoff=(float)y0*rv2+sby;bc->xoff2=(float)(x0+r->w)*rh+sbx;bc->yoff2=(float)(y0+r->h)*rv2+sby;if(g==0)mg=j;}else if(spc->skip_missing){rv=0;}else if(r->was_packed&&!r->w&&!r->h&&mg>=0){ranges[i].chardata_for_range[j]=ranges[i].chardata_for_range[mg];}else rv=0;++k;}}
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      ^
-./text.c:366:1294: note: end of the original
-            if(r->was_packed&&r->w&&r->h){stbtt_packedchar*bc=&ranges[i].chardata_for_range[j];int adv,lsb,x0,y0,x1,y1,cp=ranges[i].array_of_unicode_codepoints?ranges[i].array_of_unicode_codepoints[j]:ranges[i].first_unicode_codepoint_in_range+j,g=stbtt_FindGlyphIndex(info,cp);stbrp_coord pad=(stbrp_coord)spc->padding;r->x+=pad;r->y+=pad;r->w-=pad;r->h-=pad;stbtt_GetGlyphHMetrics(info,g,&adv,&lsb);stbtt_GetGlyphBitmapBox(info,g,sc*(float)spc->h_oversample,sc*(float)spc->v_oversample,&x0,&y0,&x1,&y1);stbtt_MakeGlyphBitmapSubpixel(info,spc->pixels+r->x+r->y*spc->stride_in_bytes,r->w-(int)spc->h_oversample+1,r->h-(int)spc->v_oversample+1,spc->stride_in_bytes,sc*(float)spc->h_oversample,sc*(float)spc->v_oversample,0,0,g);if(spc->h_oversample>1)_hpre(spc->pixels+r->x+r->y*spc->stride_in_bytes,r->w,r->h,spc->stride_in_bytes,spc->h_oversample);if(spc->v_oversample>1)_vpre(spc->pixels+r->x+r->y*spc->stride_in_bytes,r->w,r->h,spc->stride_in_bytes,spc->v_oversample);bc->x0=(unsigned short)r->x;bc->y0=(unsigned short)r->y;bc->x1=(unsigned short)(r->x+r->w);bc->y1=(unsigned short)(r->y+r->h);bc->xadvance=sc*(float)adv;bc->xoff=(float)x0*rh+sbx;bc->yoff=(float)y0*rv2+sby;bc->xoff2=(float)(x0+r->w)*rh+sbx;bc->yoff2=(float)(y0+r->h)*rv2+sby;if(g==0)mg=j;}else if(spc->skip_missing){rv=0;}else if(r->was_packed&&!r->w&&!r->h&&mg>=0){ranges[i].chardata_for_range[j]=ranges[i].chardata_for_range[mg];}else rv=0;++k;}}
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             ^
-./text.c:366:1409: note: clone 1 starts here
-            if(r->was_packed&&r->w&&r->h){stbtt_packedchar*bc=&ranges[i].chardata_for_range[j];int adv,lsb,x0,y0,x1,y1,cp=ranges[i].array_of_unicode_codepoints?ranges[i].array_of_unicode_codepoints[j]:ranges[i].first_unicode_codepoint_in_range+j,g=stbtt_FindGlyphIndex(info,cp);stbrp_coord pad=(stbrp_coord)spc->padding;r->x+=pad;r->y+=pad;r->w-=pad;r->h-=pad;stbtt_GetGlyphHMetrics(info,g,&adv,&lsb);stbtt_GetGlyphBitmapBox(info,g,sc*(float)spc->h_oversample,sc*(float)spc->v_oversample,&x0,&y0,&x1,&y1);stbtt_MakeGlyphBitmapSubpixel(info,spc->pixels+r->x+r->y*spc->stride_in_bytes,r->w-(int)spc->h_oversample+1,r->h-(int)spc->v_oversample+1,spc->stride_in_bytes,sc*(float)spc->h_oversample,sc*(float)spc->v_oversample,0,0,g);if(spc->h_oversample>1)_hpre(spc->pixels+r->x+r->y*spc->stride_in_bytes,r->w,r->h,spc->stride_in_bytes,spc->h_oversample);if(spc->v_oversample>1)_vpre(spc->pixels+r->x+r->y*spc->stride_in_bytes,r->w,r->h,spc->stride_in_bytes,spc->v_oversample);bc->x0=(unsigned short)r->x;bc->y0=(unsigned short)r->y;bc->x1=(unsigned short)(r->x+r->w);bc->y1=(unsigned short)(r->y+r->h);bc->xadvance=sc*(float)adv;bc->xoff=(float)x0*rh+sbx;bc->yoff=(float)y0*rv2+sby;bc->xoff2=(float)(x0+r->w)*rh+sbx;bc->yoff2=(float)(y0+r->h)*rv2+sby;if(g==0)mg=j;}else if(spc->skip_missing){rv=0;}else if(r->was_packed&&!r->w&&!r->h&&mg>=0){ranges[i].chardata_for_range[j]=ranges[i].chardata_for_range[mg];}else rv=0;++k;}}
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                ^
-/home/qmaster/Github/Voxen/voxen.c:768:51: warning: repeated branch in conditional chain [bugprone-branch-clone]
-    } else if (currentMenuPage == Mpg_IntroVideo) {
-                                                  ^
-/home/qmaster/Github/Voxen/voxen.c:771:6: note: end of the original
-    } else if (currentMenuPage == Mpg_CreditsVideo) {
-     ^
-/home/qmaster/Github/Voxen/voxen.c:771:53: note: clone 1 starts here
-    } else if (currentMenuPage == Mpg_CreditsVideo) {
-                                                    ^
+/home/qmaster/Github/Voxen/voxen.c:1357:9: warning: do not use 'else' after 'continue' [readability-else-after-return]
+        else if (doubleSidedTexture[tex] || e->scale.x < 0.0f || e->scale.y < 0.0f || e->scale.z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided (either)
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

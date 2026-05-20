@@ -1,6 +1,6 @@
 // voxels.compute
 // Compute shader for determining light lists for voxels and updating voxel tables 
-layout(local_size_x = 32, local_size_y = 32) in;
+layout(local_size_x = 16, local_size_y = 16) in;
 struct Light { vec3 pos; float intensity; vec3 col; uint lflags; float range; float spotAng; float maxIntensity; float minIntensity; vec4 spotDir; };
 layout(std430,binding=2) buffer VoxelLightListCounts { uint voxelLightListCounts[]; };
 layout(std430,binding=3) buffer UniqueLightLists { uint uniqueLightLists[]; };
@@ -8,28 +8,18 @@ layout(std430,binding=4) buffer LightIndices { Light lights[]; };
 layout(std430,binding=5) buffer ShadowMaps { uint shadowMaps[]; };
 layout(std430,binding=6) buffer ShadowMapsIndirection { uint shadowMapsIndirection[]; };
 layout(std430,binding=7) buffer CullingData { uint gridCellStates[]; };
-layout(location=0) uniform float voxelMinCenterX;
-layout(location=1) uniform float voxelMinCenterZ;
+layout(location=0) uniform vec2 voxelMinCenter;
+layout(location=1) uniform float farPlaneSqd;
 layout(location=2) uniform uint loadedLights;
-layout(location=3) uniform float worldMin_x;
-layout(location=4) uniform float worldMin_z;
+layout(location=3) uniform vec2 worldMin;
+layout(location=4) uniform uint shadowMapSize;
 layout(location=5) uniform vec3 camPos;
 layout(location=6) uniform uint maxLightsPerVoxel;
-layout(location=7) uniform float farPlaneSqd;
-layout(location=8) uniform uint shadowMapSize;
-layout(location=9) uniform float shadowMapSizeF;
-layout(location=10) uniform uint shadSizeSqd;
-layout(location=11) uniform uint lightCount;
 const int WORLD_X_VOXELCOUNT = 512;
 const float VOXEL_SIZE = 0.32;
 const uint SHADON = 2u;
 const float vhalf = 0.16;
-bool CellVisible(float x, float z) {
-    int subIdx = (int(clamp(int(floor(((z - worldMin_z) + 1.28) / 2.56)),0,63)) * 64)
-                + int(clamp(int(floor(((x - worldMin_x) + 1.28) / 2.56)),0,63));
-    return (gridCellStates[subIdx] & 1) > 0;
-}
-
+bool CellVisible(float x, float z){ ivec2 p=ivec2(clamp((vec2(x,z) - worldMin + 1.28)/2.56,0.0,63.0)); return (gridCellStates[p.y*64+p.x]&1)>0; }
 bool VoxelOrNeighborVisible(float x, float z) {
     if (CellVisible(x,z)) return true;
     if (CellVisible(x + 1.30,z)) return true;
@@ -56,36 +46,9 @@ void GetCubemapSampleCoord(vec3 toLight, uint shadowIndex, out uint faceOff, out
     float fmy = step(a.x,a.y)*step(a.z,a.y);
     vec2 uv = fmx * uvx + fmy * uvy + (1.0 - fmx - fmy) * uvz;
     uv = uv * 0.5 + 0.5;
+    uint shadSizeSqd = shadowMapSize * shadowMapSize;
     faceOff = (shadowIndex * shadSizeSqd * 6u) + (face * shadSizeSqd);
-    tc = uv * shadowMapSizeF;
-}
-
-bool IsPointLitByLight(uint lightIdx, vec3 worldPos) {
-    return true;
-//     uint shadowIndex = shadowMapsIndirection[lightIdx];
-//     bool lightHasShadows = (lights[lightIdx].lflags & SHADON) != 0u;
-//     if (!lightHasShadows || shadowIndex >= lightCount) return true;
-// 
-//     vec3 toLight = lights[lightIdx].pos - worldPos;
-//     float dist = length(toLight);
-//     float intensity = lights[lightIdx].intensity;
-//     float range = lights[lightIdx].range;
-//     float invRange = 1.0 / range;
-//     vec3 lightDir = toLight * (1.0 / dist);
-//     uint faceOff; vec2 tc; GetCubemapSampleCoord(toLight,shadowIndex,faceOff,tc);
-//     float shadSizeMaxUV = shadowMapSizeF - 1.0;
-//     vec2 halfTc = (tc - 0.5);
-//     vec2 stc = fract(halfTc);
-//     vec2 basec = floor(halfTc);
-//     vec2 coordc = clamp(basec,0.0,shadSizeMaxUV);
-//     uint ssbo_idx_center = faceOff + uint(coordc.y) * shadowMapSize + uint(coordc.x);
-//     float sum = 0.0;
-//     vec2 halfT = (tc - 0.5);
-//     vec2 base = floor(halfT);
-//     vec2 coord = clamp(base,0.0,shadSizeMaxUV);
-//     uint ssbo_idx = faceOff + uint(coord.y) * shadowMapSize + uint(coord.x);
-//     float d = float(shadowMaps[ssbo_idx]) * 0.00001;
-//     return (dist <= (d + 0.01)) || d < 0.04;
+    tc = uv * float(shadowMapSize);
 }
 
 void main() {
@@ -94,8 +57,8 @@ void main() {
     uint voxelIndex = (gl_GlobalInvocationID.y * WORLD_X_VOXELCOUNT) + gl_GlobalInvocationID.x;
     uint baseOffset = voxelIndex * maxLightsPerVoxel;
 
-    float vx = voxelMinCenterX + float(gl_GlobalInvocationID.x) * VOXEL_SIZE;
-    float vz = voxelMinCenterZ + float(gl_GlobalInvocationID.y) * VOXEL_SIZE;
+    float vx = voxelMinCenter.x + float(gl_GlobalInvocationID.x) * VOXEL_SIZE;
+    float vz = voxelMinCenter.y + float(gl_GlobalInvocationID.y) * VOXEL_SIZE;
     float vy = 0.0; // adjust if your voxels have varying Y height
 
     float cdx = vx - camPos.x;
@@ -110,18 +73,6 @@ void main() {
         return;
     }
 
-    // Precompute the 8 corner offsets once (small voxels → cheap)
-    vec3 corners[8] = vec3[](
-        vec3(vx - vhalf, vy - vhalf, vz - vhalf),
-        vec3(vx - vhalf, vy - vhalf, vz + vhalf),
-        vec3(vx - vhalf, vy + vhalf, vz - vhalf),
-        vec3(vx - vhalf, vy + vhalf, vz + vhalf),
-        vec3(vx + vhalf, vy - vhalf, vz - vhalf),
-        vec3(vx + vhalf, vy - vhalf, vz + vhalf),
-        vec3(vx + vhalf, vy + vhalf, vz - vhalf),
-        vec3(vx + vhalf, vy + vhalf, vz + vhalf)
-    );
-
     uint count = 0u;
     uint weakestSlot = 0u;
     float weakestScore = 1e38;
@@ -129,7 +80,6 @@ void main() {
         vec3 lpos = lights[lightIdx].pos;
         float lx = lpos.x;
         float lz = lpos.z;
-
         float dx = lx - vx;
         float dz = lz - vz;
         float range = lights[lightIdx].range;
@@ -139,13 +89,6 @@ void main() {
         float intensity = lights[lightIdx].intensity;
         if (intensity < 0.1) continue;
         if (!CellVisible(lx, lz)) continue;
-
-        bool voxelLit = false;
-        for (int c = 0; c < 8; ++c) {
-            if (IsPointLitByLight(lightIdx, corners[c])) { voxelLit = true; break; }
-        }
-
-        if (!voxelLit) continue;   // all 8 corners in shadow → skip this light
 
         if (count < maxLightsPerVoxel) {
             uniqueLightLists[baseOffset + count] = lightIdx;

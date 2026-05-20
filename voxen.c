@@ -7,7 +7,7 @@ GLFWwindow* window;
 } while(0)
 #define MOD_INTEROP_ENGINE
 #if defined(LINUX)
-    #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
+    //#define DEBUG_RAM_OUTPUT // Debug and Compile Flags
 #endif
 #include "common.h"
 #include "interop.h"
@@ -277,7 +277,7 @@ void UpdateLights(void) {
     glBindBuffer(GL_SSBO,Sys_Render.lightsID); glBufferData(GL_SSBO,Sys_Global.loadedLights * sizeof(Light),lights,GL_DYNAMIC_DRAW);
     glUseProgram(Sys_Render.voxelUpdateShaderProgram);
     glUniform3f(5,Sys_Global.instances[PLAYER1].position.x,Sys_Global.instances[PLAYER1].position.y,Sys_Global.instances[PLAYER1].position.z);
-    glDispatchCompute((VOXELS_X+31)/32,(VOXELS_Z+31)/32,1);
+    glDispatchCompute((VOXELS_X+15)/16,(VOXELS_Z+15)/16,1);
 }
 
 void UploadGridCellVisibility(void) { glBindBuffer(GL_SSBO,Sys_Render.cellVisibleDataID); glBufferData(GL_SSBO,ARRSIZE * sizeof(u32),gridCellStates,GL_DYNAMIC_DRAW); }
@@ -403,20 +403,16 @@ ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
     double start_time = get_time();
     DebugRAM("start of LoadLevel");
     Sys_Global.levelCurrentlyLoading = true; Sys_Global.gamePaused = false; Sys_Global.menuActive = false;
-    DualLog("Loading level...\n");
     RenderLoadingProgress(100,"Loading level...");
     MemSetToValueForNBytes(lights,0,LIGHT_COUNT * sizeof(Light)); MemSetToValueForNBytes(lanims,0,LIGHT_COUNT * sizeof(LightAnimation));
     MemSetToValueForNBytes(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
     MemSetToValueForNBytes(modelMatrices,0,INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
     MemSetToValueForNBytes(camViews,0,64 * sizeof(CamView)); camViewCount = 0;
     MemSetToValueForNBytes(Sys_Global.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
-    DualLog("Loading level: memsets done\n");
     char filename[20]; // Minimum size for 0 through 13.
     StringFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel);
     levelFileHandle = OS_OpenReadonly(filename);
-    DualLog("Loading level: LoadLevelMod (attempt 3)git...\n");
     LoadLevelMod(curlevel);
-    DualLog("Loading level: LoadLevelMod...done\n");
     OS_Close(levelFileHandle);
     for (int i=0;i<Sys_Global.loadedLights;++i) {/* lights[i].maxIntensity *= 2.0f; */lightsNewPosition[i]=lights[i].pos; }
     DualLog("Loaded %d entities, %u static lights for Level %d... took %f secs\n",Sys_Global.loadedInstances,Sys_Global.loadedLights,curlevel,get_time() - start_time);
@@ -429,21 +425,14 @@ ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
         e->shadRadius = e->radius * 1.41;
     }
     
-    DualLog("Loading level: ModInitAfterLoad, Audio Resets...\n");
     ModInitAfterLoad(); ResetLevelAudio(); ResetLevelMusic(); creditPages = GetCreditsText();
-    DualLog("Loading level: ModInitAfterLoad, Audio Resets...done!\n");
-    DualLog("Entity instances initialized after load\n");
     RenderLoadingProgress(110,"Loading cull system...");
-    DualLog("Loading level: CullInit...\n");
     CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
-    DualLog("Loading level: CullInit...done!\n");
     glUseProgram(Sys_Render.voxelUpdateShaderProgram);
-    glUniform1f(0,Sys_Global.voxelMinCenterX);
-    glUniform1f(1,Sys_Global.voxelMinCenterZ);
+    glUniform2f(0,Sys_Global.voxelMinCenterX,Sys_Global.voxelMinCenterZ);
+    glUniform1f(1,Sys_Global.farPlane * Sys_Global.farPlane);
     glUniform1ui(2,Sys_Global.loadedLights);
-    glUniform1f(3,Sys_Global.worldMin_x);
-    glUniform1f(4,Sys_Global.worldMin_z);
-    glUniform1f(7,Sys_Global.farPlane * Sys_Global.farPlane);
+    glUniform2f(3,Sys_Global.worldMin_x,Sys_Global.worldMin_z); 
     RenderLoadingProgress(120,"Loading voxel lighting data...");
     for (u16 i = START_INDEX_LEVEL_INSTANCES; i < Sys_Global.loadedInstances; i++) Sys_Global.dirtyInstances[i] = true;
     for (u16 i = 0; i < Sys_Global.loadedLights; i++) { lightsNewPosition[i] = lights[i].pos; }
@@ -765,10 +754,7 @@ void RenderMenu(void) {
         overBack = overBack || currentMenuItem == 6;
         RenderUIImage(1060,724,84,36,1252); // Back Button background
         RenderFormattedText(1076,732,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_RED_MENU,FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]);
-    } else if (currentMenuPage == Mpg_IntroVideo) {
-        menuItemCount = menuTabCount = 1;
-        if (MenuEnter()) MenuGoBack();
-    } else if (currentMenuPage == Mpg_CreditsVideo) {
+    } else if (currentMenuPage == Mpg_IntroVideo || currentMenuPage == Mpg_CreditsVideo) {
         menuItemCount = menuTabCount = 1;
         if (MenuEnter()) MenuGoBack();
     }
@@ -1261,39 +1247,27 @@ static void DrawCapsuleCollider(Entity *e) {
 }
 
 bool mat4_inverse(const float* m, float* out) {
-    float inv[16];
-    float det;
-    int i;
-
+    float inv[16],det; int i;
     inv[0] =  m[5]*m[10]*m[15] - m[5]*m[14]*m[11] - m[9]*m[6]*m[15] + m[9]*m[14]*m[7] + m[13]*m[6]*m[11] - m[13]*m[10]*m[7];
     inv[4] = -m[4]*m[10]*m[15] + m[4]*m[14]*m[11] + m[8]*m[6]*m[15] - m[8]*m[14]*m[7] - m[12]*m[6]*m[11] + m[12]*m[10]*m[7];
     inv[8] =  m[4]*m[9]*m[15]  - m[4]*m[13]*m[11] - m[8]*m[5]*m[15] + m[8]*m[13]*m[7]  + m[12]*m[5]*m[11] - m[12]*m[9]*m[7];
     inv[12]= -m[4]*m[9]*m[14]  + m[4]*m[13]*m[10] + m[8]*m[5]*m[14] - m[8]*m[13]*m[6]  - m[12]*m[5]*m[10] + m[12]*m[9]*m[6];
-
     inv[1] = -m[1]*m[10]*m[15] + m[1]*m[14]*m[11] + m[9]*m[2]*m[15] - m[9]*m[14]*m[3] - m[13]*m[2]*m[11] + m[13]*m[10]*m[3];
     inv[5] =  m[0]*m[10]*m[15] - m[0]*m[14]*m[11] - m[8]*m[2]*m[15] + m[8]*m[14]*m[3]  + m[12]*m[2]*m[11] - m[12]*m[10]*m[3];
     inv[9] = -m[0]*m[9]*m[15]  + m[0]*m[13]*m[11] + m[8]*m[1]*m[15] - m[8]*m[13]*m[3]  - m[12]*m[1]*m[11] + m[12]*m[9]*m[3];
     inv[13]=  m[0]*m[9]*m[14]  - m[0]*m[13]*m[10] - m[8]*m[1]*m[14] + m[8]*m[13]*m[2]  + m[12]*m[1]*m[10] - m[12]*m[9]*m[2];
-
     inv[2] =  m[1]*m[6]*m[15] - m[1]*m[14]*m[7] - m[5]*m[2]*m[15] + m[5]*m[14]*m[3] + m[13]*m[2]*m[7] - m[13]*m[6]*m[3];
     inv[6] = -m[0]*m[6]*m[15] + m[0]*m[14]*m[7] + m[4]*m[2]*m[15] - m[4]*m[14]*m[3] - m[12]*m[2]*m[7] + m[12]*m[6]*m[3];
     inv[10]=  m[0]*m[5]*m[15] - m[0]*m[13]*m[7] - m[4]*m[1]*m[15] + m[4]*m[13]*m[3] + m[12]*m[1]*m[7] - m[12]*m[5]*m[3];
     inv[14]= -m[0]*m[5]*m[14] + m[0]*m[13]*m[6] + m[4]*m[1]*m[14] - m[4]*m[13]*m[2] - m[12]*m[1]*m[6] + m[12]*m[5]*m[2];
-
     inv[3] = -m[1]*m[6]*m[11] + m[1]*m[10]*m[7] + m[5]*m[2]*m[11] - m[5]*m[10]*m[3] - m[9]*m[2]*m[7]  + m[9]*m[6]*m[3];
     inv[7] =  m[0]*m[6]*m[11] - m[0]*m[10]*m[7] - m[4]*m[2]*m[11] + m[4]*m[10]*m[3] + m[8]*m[2]*m[7]  - m[8]*m[6]*m[3];
     inv[11]= -m[0]*m[5]*m[11] + m[0]*m[9]*m[7]  + m[4]*m[1]*m[11] - m[4]*m[9]*m[3]  - m[8]*m[1]*m[7]  + m[8]*m[5]*m[3];
     inv[15]=  m[0]*m[5]*m[10] - m[0]*m[9]*m[6]  - m[4]*m[1]*m[10] + m[4]*m[9]*m[2]  + m[8]*m[1]*m[6]  - m[8]*m[5]*m[2];
-
     det = m[0]*inv[0] + m[1]*inv[4] + m[2]*inv[8] + m[3]*inv[12];
-    if (det == 0.0f) {
-        // Singular matrix - fallback to identity
-        for(i=0; i<16; i++) out[i] = (i%5==0) ? 1.0f : 0.0f;
-        return false;
-    }
+    if (det == 0.0f) { for(i=0;i<16;++i) {out[i] = (i%5==0) ? 1.0f : 0.0f;} return false; }
 
-    det = 1.0f / det;
-    for (i = 0; i < 16; i++) out[i] = inv[i] * det;
+    det = 1.0f / det; for (int i=0;i<16;++i) out[i] = inv[i] * det;
     return true;
 }
 
@@ -1305,16 +1279,7 @@ void GetProjections(float* view, float* viewProj, float* invViewRot, float* invV
     m[8] = 0.0f; m[9] = 0.0f; m[10]= -(sfar + snear) / (sfar - snear); m[11]= -1.0f;
     m[12]= 0.0f; m[13]= 0.0f; m[14]= -2.0f * sfar * snear / (sfar - snear); m[15]= 0.0f;
     voxen_Shadow_System.shadDotThresh = 1.0f / vsqrtf(1.0f + vtan(sfov * PI / 360.0f) * (1.0f + aspect3D * aspect3D));
-    Quaternion r=Sys_Global.instances[PLAYER1].rotation; float x=r.x, y=r.y, z=r.z, w=r.w;
-    float x2=x*x, y2=y*y, z2=z*z, xy=x*y, xz=x*z, yz=y*z, wx=w*x, wy=w*y, wz=w*z;
-    Vector3 right = { 1.0f - 2.0f * (y2 + z2), 2.0f * (xy + wz), 2.0f * (xz - wy) };   // X+ (right)
-    Vector3 up = { 2.0f * (xy - wz), 1.0f - 2.0f * (x2 + z2), 2.0f * (yz + wx) };      // Y+ (up)
-    Vector3 forward = { 2.0f * (xz + wy), 2.0f * (yz - wx), 1.0f - 2.0f * (x2 + y2) }; // Z+ (forward)
-    view[0] = right.x; view[1] = up.x; view[2] = -forward.x; view[3] = 0.0f;
-    view[4] = right.y; view[5] = up.y; view[6] = -forward.y; view[7] = 0.0f;
-    view[8] = right.z; view[9] = up.z; view[10] = -forward.z; view[11] = 0.0f;
-    Vector3 pp=Sys_Global.instances[PLAYER1].position;
-    view[12] = -dot_vector3(right,pp); view[13] = -dot_vector3(up,pp); view[14] = dot_vector3(forward,pp); view[15] = 1.0f;
+    mat4_lookat_from(view,&Sys_Global.instances[PLAYER1].rotation,Sys_Global.instances[PLAYER1].position);
     mul_mat4(viewProj,rasterPerspectiveProjection,view);
     invViewRot[0]=view[0]; invViewRot[1]=view[4]; invViewRot[2]=view[8];
     invViewRot[3]=view[1]; invViewRot[4]=view[5]; invViewRot[5]=view[9];
@@ -1569,7 +1534,6 @@ void InitalizeEnvironment(double game_start_time) {
         StringCopyInto_A_From_B(mod_path,"./",256); StringConcatenate(mod_path,global_dllname,256); StringConcatenate(mod_path,MOD_EXTENSION,256);
         mod_handle = OS_DlOpen(mod_path);
         if (!mod_handle) { DualLogError("Failed to load mod at:%s",mod_path); OS_Exit(1); }
-
         #define X(ret, name, params) \
             name = (ret (*) params)OS_DlSym(mod_handle,#name); \
             if(!name) DualLogError("Failed to load mod function: %s",#name);
@@ -1602,7 +1566,7 @@ void InitalizeEnvironment(double game_start_time) {
         glUseProgram(Sys_Render.shadowmapsShaderProgram); glUniform1ui(9,SHADOW_MAP_SIZE);
         glUseProgram(Sys_Render.shadowmapsClearShaderProgram); glUniform1ui(1,SHADOW_MAP_SIZE);
         glUseProgram(Sys_Render.chunkShaderProgram); glUniform1ui(21,SHADOW_MAP_SIZE); glUniform1f(22,(float)SHADOW_MAP_SIZE); glUniform1ui(23,LIGHT_COUNT); glUniform1ui(24,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);
-        glUseProgram(Sys_Render.voxelUpdateShaderProgram); glUniform1ui(6,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(8,SHADOW_MAP_SIZE); glUniform1f(9,(float)SHADOW_MAP_SIZE); glUniform1ui(10,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE); glUniform1ui(11,LIGHT_COUNT);
+        glUseProgram(Sys_Render.voxelUpdateShaderProgram); glUniform1ui(4,SHADOW_MAP_SIZE); glUniform1ui(6,(u32)MAX_LIGHTS_PER_VOXEL);
         RenderLoadingProgress(100,"Loading textures...");
         LoadTextures();
         RenderLoadingProgress(92,"Loading models...");
@@ -1637,21 +1601,14 @@ i32 main(void) {
         if (likely(!Sys_Global.gamePaused && !Sys_Global.menuActive)) { // Update Gameplay
             MemSetToValueForNBytes(dynamicEntities,0,512 * sizeof(u16)); // none
             dynamicEntityCount = 0;
-            //u16 numBox=0,numSphere=0,numMeshConv=0,numMesh=0,numCapsule=0;
             for (int i=0;i<Sys_Global.loadedInstances;++i) {
                 if (dynamicEntityCount >= 512) { dynamicEntityCount = 512; assert(false); break; }
                 if (Sys_Global.instances[i].entflags&ENTFLAG_RIGIDBODY && Sys_Global.instances[i].entflags&ENTFLAG_ACTIVE) {
                     dynamicEntities[dynamicEntityCount] = i; dynamicEntityCount++;
-                    //if (Sys_Global.instances[i].collider == COLLIDER_TYPE_BOX) numBox++;
-                    //if (Sys_Global.instances[i].collider == COLLIDER_TYPE_SPHERE) numSphere++;
-                    //if (Sys_Global.instances[i].collider == COLLIDER_TYPE_CAPSULE) numCapsule++;
-                    //if (Sys_Global.instances[i].collider == COLLIDER_TYPE_CONVEXMESH) numMeshConv++;
-                    //if (Sys_Global.instances[i].collider == COLLIDER_TYPE_MESH) numMesh++;
                 }
             }
-            //DualLog("Got dynamicEntityCount of %u, collider type counts box: %u, sphere: %u, capsule: %u, mesh convex: %u, mesh: %u\n",numBox,numSphere,numCapsule,numMeshConv,numMesh);
+
             if (Sys_Global.timeSinceLastPhysicsTick > (1.0 / 2000.0)) { Sys_Global.last_physics_time = Sys_Global.pauseRelativeTime; Physics(); }
-            
             Vector3 pDelta = Vector3_A_minus_B(Sys_Global.instances[PLAYER1].lastPosition,Sys_Global.instances[PLAYER1].position);
             bool playerMoved = ((vabs(pDelta.x) + vabs(pDelta.y) + vabs(pDelta.z)) > 0.02f);
             ModUpdate(playerMoved);

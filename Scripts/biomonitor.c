@@ -1,6 +1,5 @@
 // biomonotor.c - Biomonitor Graph and Text displays.
 #include "mod.h"
-
 #define BIOM_ERG 0
 #define BIOM_CHI 1
 #define BIOM_ECG 2
@@ -52,13 +51,12 @@ typedef struct {
     Color col2;
 } BioMonitorSystem;
 BioMonitorSystem bioMonitor;
-
 void BioMonitorClearGraphs(void) {
-//     for (int x=0;x<BIOM_GRAPH_W;x++) {
-//         for (int y=0; y<BIOM_GRAPH_H;y++) {
+    for (int x=0;x<BIOM_GRAPH_W;x++) {
+        for (int y=0; y<BIOM_GRAPH_H;y++) {
 //             tex.SetPixel(x,y,bioMonitor.backgroundColor); // TODO, clear texture
-//         }
-//     }
+        }
+    }
     for (int y=0;y<BIOM_GRAPH_H;y++) bioMonitor.currentColors[y] = bioMonitor.backgroundColor;
     bioMonitor.ymax = (BIOM_GRAPH_H - 1);
     bioMonitor.beatFinished  = Eng_Global->pauseRelativeTime;
@@ -78,6 +76,9 @@ void BioMonitorClearGraphs(void) {
     }
 }
 
+static void IncrementERG(void) { bioMonitor.currentIndex0++; if (bioMonitor.currentIndex0 >= BIOM_GRAPH_W) {bioMonitor.currentIndex0 = 0;} }
+static void IncrementCHI(void) { bioMonitor.currentIndex1++; if (bioMonitor.currentIndex1 >= BIOM_GRAPH_W) {bioMonitor.currentIndex1 = 0;} }
+static void IncrementECG(void) { bioMonitor.currentIndex2++; if (bioMonitor.currentIndex2 >= BIOM_GRAPH_W) {bioMonitor.currentIndex2 = 0;} }
 void BioMonitorInit(void) {
     bioMonitor.beatFinished = get_time() + 0.5; // Half second beat tick
     bioMonitor.widthPerc = 0.4f; bioMonitor.heightPerc = 0.1f;
@@ -89,22 +90,6 @@ void BioMonitorInit(void) {
     bioMonitor.max[BIOM_ERG] =  1.0f; bioMonitor.max[BIOM_CHI] =  2.0f; bioMonitor.max[BIOM_ECG] =  1.0f;
     BioMonitorClearGraphs();
 }
-
-static void IncrementERG(void) {
-    bioMonitor.currentIndex0++;
-    if (bioMonitor.currentIndex0 >= BIOM_GRAPH_W) bioMonitor.currentIndex0 = 0;
-}
-
-static void IncrementCHI(void) {
-    bioMonitor.currentIndex1++;
-    if (bioMonitor.currentIndex1 >= BIOM_GRAPH_W) bioMonitor.currentIndex1 = 0;
-}
-
-static void IncrementECG(void) {
-    bioMonitor.currentIndex2++;
-    if (bioMonitor.currentIndex2 >= BIOM_GRAPH_W) bioMonitor.currentIndex2 = 0;
-}
-
 
 // Add a data point to the beginning of the graph
 static void Push(int index, float val) {
@@ -129,19 +114,12 @@ static void Push(int index, float val) {
             bioMonitor.currentColors[y0] = bioMonitor.ergColor;
             bioMonitor.colorsERG[bioMonitor.currentIndex0][y0] = bioMonitor.ergColor;
             if (vabs(bioMonitor.lastERG - y0) > 2) {
-                dist = bioMonitor.lastERG;
-                if (bioMonitor.lastERG > y0) {
-                    dist = bioMonitor.lastERG - 1;
-                    down = true;
-                } else {
-                    dist = bioMonitor.lastERG + 1;
-                    down = false;
-                }
-
+                dist = bioMonitor.lastERG + ((bioMonitor.lastERG > y0) ? -1 : 1);
+                down = (bioMonitor.lastERG > y0);
                 while (dist != y0) {
                     if (dist > bioMonitor.ymax || dist < 0) break;
 
-                    bioMonitor.currentColors[dist] = bioMonitor.ergColor;
+                    bioMonitor.currentColors[dist]                       = bioMonitor.ergColor;
                     bioMonitor.colorsERG[bioMonitor.currentIndex0][dist] = bioMonitor.ergColor;
                     if (down) dist--;
                     else dist++;
@@ -161,19 +139,12 @@ static void Push(int index, float val) {
             bioMonitor.currentColors[y0] = bioMonitor.chiColor;
             bioMonitor.colorsCHI[bioMonitor.currentIndex1][y0] = bioMonitor.chiColor;
             if (vabs(bioMonitor.lastCHI - y0) > 2) {
-                dist = bioMonitor.lastCHI;
-                if (bioMonitor.lastCHI > y0) {
-                    dist = bioMonitor.lastCHI - 1;
-                    down = true;
-                } else {
-                    dist = bioMonitor.lastCHI + 1;
-                    down = false;
-                }
-
+                dist = bioMonitor.lastCHI + ((bioMonitor.lastCHI > y0) ? -1 : 1);
+                down = (bioMonitor.lastCHI > y0);
                 while (dist != y0) {
                     if (dist > bioMonitor.ymax || dist < 0) break;
 
-                    bioMonitor.currentColors[dist] = bioMonitor.chiColor;
+                    bioMonitor.currentColors[dist]                       = bioMonitor.chiColor;
                     bioMonitor.colorsCHI[bioMonitor.currentIndex1][dist] = bioMonitor.chiColor;
                     if (down) dist--;
                     else dist++;
@@ -194,19 +165,12 @@ static void Push(int index, float val) {
             bioMonitor.currentColors[y0] = bioMonitor.ecgColor;
             bioMonitor.colorsECG[bioMonitor.currentIndex2][y0] = bioMonitor.ecgColor;
             if (vabs(bioMonitor.lastECG - y0) > 2) {
-                dist = bioMonitor.lastECG;
-                if (bioMonitor.lastECG > y0) {
-                    dist = bioMonitor.lastECG - 1;
-                    down = true;
-                } else {
-                    dist = bioMonitor.lastECG + 1;
-                    down = false;
-                }
-
+                dist =bioMonitor.lastECG + ((bioMonitor.lastECG > y0) ? -1 : 1);
+                down = (bioMonitor.lastECG > y0);
                 while (dist != y0) {
                     if (dist > bioMonitor.ymax || dist < 0) break;
 
-                    bioMonitor.currentColors[dist]            = bioMonitor.ecgColor;
+                    bioMonitor.currentColors[dist]                       = bioMonitor.ecgColor;
                     bioMonitor.colorsECG[bioMonitor.currentIndex2][dist] = bioMonitor.ecgColor;
                     if (down) dist--;
                     else dist++;
@@ -238,11 +202,8 @@ void BioMonitorUpdate(u16 p) {
     InventorySystem* inv = Inv(p);
     if (!(inv->hasHardware & HW_BIO) || !(inv->hardwareIsActive & HW_BIO)) return;
 
-    bioMonitor.header = 526;
-    bioMonitor.heartRateText = 527;
-    bioMonitor.bpmText = 529;
-    bioMonitor.fatigueDetailText = 531;
-    bioMonitor.fatigue = 534; // Low
+    bioMonitor.header = 526; bioMonitor.heartRateText = 527; bioMonitor.bpmText = 529; bioMonitor.fatigueDetailText = 531;
+                                                            bioMonitor.fatigue = 534; // Low
          if (inv->fatigue >= 80.0f)                         bioMonitor.fatigue = 532; // High!
     else if (inv->fatigue <  80.0f && inv->fatigue > 30.0f) bioMonitor.fatigue = 533; // Moderate
 
@@ -293,7 +254,7 @@ void BioMonitorUpdate(u16 p) {
 
     if (bioMonitor.tick1Finished < Eng_Global->pauseRelativeTime) {
         if (Eng_Cheats->showFPS) bioMonitor.tick1Finished = Eng_Global->pauseRelativeTime + bioMonitor.tick2;
-        else                                    bioMonitor.tick1Finished = Eng_Global->pauseRelativeTime + bioMonitor.tick1;
+        else                     bioMonitor.tick1Finished = Eng_Global->pauseRelativeTime + bioMonitor.tick1;
 
         Push(1,bioMonitor.chiValue); IncrementCHI();
         Push(1,bioMonitor.chiValue); IncrementCHI();
@@ -315,13 +276,8 @@ void BioMonitorUpdate(u16 p) {
                 fadeDist = 200.0f;
                 distPerc = (bioMonitor.currentIndex0 - x);
                 if ((BIOM_GRAPH_W - x) < fadeDist && bioMonitor.currentIndex0 < fadeDist) distPerc += BIOM_GRAPH_W;
-                if (distPerc < 0.0f) distPerc = fadeDist;
-                else if (distPerc > fadeDist) distPerc = fadeDist;
-
-                distPerc = (fadeDist - distPerc) / fadeDist;
-                if (distPerc > 1.0f) distPerc = 1.0f;
-                else if (distPerc < 0.0f) distPerc = 0.0f;
-
+                if (distPerc < 0.0f || distPerc > fadeDist) distPerc = fadeDist;
+                distPerc = vclamp((fadeDist - distPerc) / fadeDist,0.0f,1.0f);
                 if (distPerc == 0.0f) bioMonitor.colorsERG[x][y] = bioMonitor.backgroundColor;
                 bioMonitor.col0.a = distPerc;
 //                 tex.SetPixel(x,y,bioMonitor.col0); TODO
@@ -329,13 +285,8 @@ void BioMonitorUpdate(u16 p) {
                 fadeDist = 180.0f;
                 distPerc = (bioMonitor.currentIndex1 - x);
                 if ((BIOM_GRAPH_W - x) < fadeDist && bioMonitor.currentIndex1 < fadeDist) distPerc += BIOM_GRAPH_W;
-                if (distPerc < 0.0f) distPerc = fadeDist;
-                else if (distPerc > fadeDist) distPerc = fadeDist;
-
-                distPerc = (fadeDist - distPerc) / fadeDist;
-                if (distPerc > 1.0f) distPerc = 1.0f;
-                else if (distPerc < 0.0f) distPerc = 0.0f;
-
+                if (distPerc < 0.0f || distPerc > fadeDist) distPerc = fadeDist;
+                distPerc = vclamp((fadeDist - distPerc) / fadeDist,0.0f,1.0f);
                 if (distPerc == 0.0f) bioMonitor.colorsCHI[x][y] = bioMonitor.backgroundColor;
                 bioMonitor.col1.a = distPerc;
 //                 tex.SetPixel(x,y,bioMonitor.col1); TODO
@@ -343,13 +294,8 @@ void BioMonitorUpdate(u16 p) {
                 fadeDist = 275.0f;
                 distPerc = (bioMonitor.currentIndex2 - x);
                 if ((BIOM_GRAPH_W - x) < fadeDist && bioMonitor.currentIndex2 < fadeDist) distPerc +=  BIOM_GRAPH_W;
-                if (distPerc < 0.0f) distPerc = fadeDist;
-                else if (distPerc > fadeDist) distPerc = fadeDist;
-
-                distPerc = (fadeDist - distPerc) / fadeDist;
-                if (distPerc > 1.0f) distPerc = 1.0f;
-                else if (distPerc < 0.0f) distPerc = 0.0f;
-
+                if (distPerc < 0.0f || distPerc > fadeDist) distPerc = fadeDist;
+                distPerc = vclamp((fadeDist - distPerc) / fadeDist,0.0f,1.0f);
                 if (distPerc == 0.0f) bioMonitor.colorsECG[x][y] = bioMonitor.backgroundColor;
                 bioMonitor.col2.a = distPerc;
 //                 tex.SetPixel(x,y,bioMonitor.col2); TODO

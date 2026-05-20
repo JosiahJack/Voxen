@@ -286,25 +286,19 @@ void CheckAttackInput(u16 p) {
         if (Eng_Global->currentLevel == LEVEL_CYBERSPACE) { /*FireCyberWeapon();*/ return; }
 
         if (inv->holdingObject && !Eng_Global->mouseClickHeldOverGUI) { // !Just clicked
-            if (!Eng_Global->uiIsBlocking) {
-                    
-                DropHeldItem(p); // Drop it
-                return;
-            } else {
-                AddItemToInventory(p,inv->heldObjectIndex,inv->heldObjectCustomIndex);
-                ResetHeldItem(p);
-                return;
-            }
+            if (!Eng_Global->uiIsBlocking) { DropHeldItem(p); return; }
+
+            AddItemToInventory(p,inv->heldObjectIndex,inv->heldObjectCustomIndex); ResetHeldItem(p); return;
         }
     }
 
     int wepdex = Get16WeaponIndexFromConstIndex(inv->weaponIndex);
     if (wepdex == -1) return; // No weapon.
-// 		if (Eng_Global->uiIsBlocking) return;
+    //if (Eng_Global->uiIsBlocking) return;
     if (inv->holdingObject) return;
     if (Eng_Global->mouseClickHeldOverGUI) return;
 
-// 		StartNormalAttack(wepdex);
+    //StartNormalAttack(wepdex);
 }
 	
 void WeaponsUpdate(void) {

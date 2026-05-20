@@ -296,11 +296,11 @@ static __attribute__((noinline)) void LoadTextures(void) {
     size_t palettes_size = totalPaletteColors * sizeof(u32);
     size_t indices_size = totalPixels;
     size_t arena_size = offsets_size + palettes_size + indices_size;
-    void* arena = OS_AllocateRAM(NULL,arena_size,PROT_READ|PROT_WRITE,MAP_ANONYMOUS|MAP_PRIVATE|MAP_POPULATE,OS_INVALID_HANDLE);
+    void* arena = OS_AllocateRAM(NULL,arena_size,0x1|0x2,0x20|0x02|0x08000,OS_INVALID_HANDLE);
     u8* cur = (u8*)arena;
     u32* textureOffsets = (u32*)cur; cur += offsets_size;
-    i32* textureSizes = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * 2 * sizeof(i32),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
-    u32* texturePaletteOffsets = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * sizeof(u32),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,OS_INVALID_HANDLE);
+    i32* textureSizes = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * 2 * sizeof(i32),0x1|0x2,0x02|0x20,OS_INVALID_HANDLE);
+    u32* texturePaletteOffsets = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * sizeof(u32),0x1|0x2,0x02|0x20,OS_INVALID_HANDLE);
     u32* texturePalettes = (u32*)cur; cur += palettes_size;
     u8* all_indices = cur;
     u32 pixel_base = 0, color_base = 0;

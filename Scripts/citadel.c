@@ -546,23 +546,8 @@ bool AddSoftwareItem(u16 p,SoftwareType type,int vers) {
     return false;
 }
 
-void RemoveWeapon(u16 p,int slot) {
-    InventorySystem* inv = Inv(p);
-    inv->weaponInventoryIndices[slot]    = -1;
-    inv->weaponInventoryAmmoIndices[slot] = -1;
-}
-
-static float DefaultEnergySettingForWeapon(int wep16Index) {
-    switch(wep16Index) {
-        case  1: return  3.0f;
-        case  4: return  5.0f;
-        case 10: return 13.0f;
-        case 14: return  2.0f;
-        case 15: return  3.0f;
-        default: return  3.0f;
-    }
-}
-
+void RemoveWeapon(u16 p,int slot) { InventorySystem* inv =Inv(p); inv->weaponInventoryIndices[slot]=-1; inv->weaponInventoryAmmoIndices[slot]=-1; }
+static float DefaultEnergySettingForWeapon(int wep16Index) { return (wep16Index == 4) ? 5.0f : (wep16Index == 10) ? 13.0f : (wep16Index == 14) ? 2.0f : 3.0f; }
 void UpdateAmmoCount(u16 p) {
     InventorySystem* inv = Inv(p);
     inv->numweapons = 0;
@@ -1793,7 +1778,7 @@ void GeneralInvDoubleClick(int buttonIdx,int customIdx) { Eng_UI->mouseClickHeld
 float TargetIDGetSensingRange(bool manual) {
     u8 ver = Eng_Global->invP1.hardwareVersion[HW_TID_IDX];
     if (manual) return (ver >= 4) ? 18.0f : 13.0f;
-    else return (ver <= 2) ? 0.0f : ((ver == 3) ? 13.0f : 20.0f);
+    return (ver <= 2) ? 0.0f : ((ver == 3) ? 13.0f : 20.0f);
 }
 
 float TargetIDGetTetherRange(void) { return (Eng_Global->invP1.hardwareVersion[HW_TID_IDX] >= 4) ? 22.0f : 15.0f; }
@@ -1997,24 +1982,19 @@ void PlayerEnergyUpdate(void) {
 #define GREN_FLAG_USE_PROX        (1ull << 57)
 static bool GrenadeIsNPCMine(u16 self) { return Eng_Global->instances[self].layer != Layer_PlayerBullets; }
 void GrenadeExplode(u16 self) {
-    DualLog("Grenade exploded");
     Entity* e = &Eng_Global->instances[self];
     // TODO: DamageData + ApplyImpactForceSphere(damage,attackType,penetration,offense,damage*1.5f,e->position,e->strength,1.0f)
-    if (!GrenadeIsNPCMine(self)) {
-        Entity* p = &Eng_Global->instances[PLAYER1];
-        p->noiseFinished = Eng_Global->pauseRelativeTime + 2.0;
-    }
+    if (!GrenadeIsNPCMine(self)) { Entity* p = &Eng_Global->instances[PLAYER1]; p->noiseFinished = Eng_Global->pauseRelativeTime + 2.0; }
     i16 idx = (i16)e->index;
     int soundIndex = 60;
     switch (idx) {
-        case 7:  soundIndex = 64; Eng_Global->fogFac += 5;  break; // frag
-        case 8:  soundIndex = 60; Eng_Global->fogFac += 7;  break; // conc
+        case 7: case 11: soundIndex = 64; Eng_Global->fogFac += 5;  break; // frag, mine
+        case 8: case 10: soundIndex = 60; Eng_Global->fogFac += 7;  break; // conc, earth
         case 9:  soundIndex = 67;                           break; // emp
-        case 10: soundIndex = 60; Eng_Global->fogFac += 7;  break; // earth
-        case 11: soundIndex = 64; Eng_Global->fogFac += 5;  break; // mine
         case 12: soundIndex = 60; Eng_Global->fogFac += 6;  break; // nitro
         case 13: soundIndex = 63; Eng_Global->fogFac += 10; break; // gas
     }
+    
     play_wav(sounds[soundIndex],1.0f,e->position,true);
     // TODO: SpawnExplosionEffect(e->position, explosionType)
     // TODO: Shake(-1,-1) — screen shake system
@@ -2025,9 +2005,7 @@ void GrenadeActivate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     i16 idx = (i16)e->index;
     switch (idx) {
-        case 7:  flag_setu64(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
-        case 8:  flag_setu64(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
-        case 9:  flag_setu64(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
+        case 7: case 8: case 9: flag_setu64(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
         case 10: e->timerFinished = Eng_Global->pauseRelativeTime + Eng_Global->invP1.earthShakerTimeSetting; flag_setu64(&e->ioflags,GREN_FLAG_USE_TIMER,true);       break;
         case 11: flag_setu64(&e->ioflags,GREN_FLAG_USE_PROX,true); flag_setu64(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,false);break;
         case 12: e->timerFinished = Eng_Global->pauseRelativeTime + Eng_Global->invP1.nitroTimeSetting; flag_setu64(&e->ioflags,GREN_FLAG_USE_TIMER,true);       break;
@@ -3333,23 +3311,18 @@ MOD_TO_ENGINE float GetBasePlayerSpeed(u16 p, bool running) {
     if (Eng_Cheats->noclip) return PLAYER_MAX_CYBER_SPEED * 1.5f;
     if (Eng_Global->currentLevel == LEVEL_CYBERSPACE) return PLAYER_MAX_CYBER_SPEED; //Cyber space speed
 
-    float retval = PLAYER_MAX_WALK_SPEED;
-    float bonus = 0.0f;
+    float retval = PLAYER_MAX_WALK_SPEED, bonus = 0.0f;
     if (Eng_Global->boosterActive) bonus = PLAYER_BOOSTER_SPEED_BOOST;
     BodyState bodyState = Eng_Global->instances[PLAYER1].bodyState;
     switch (bodyState) {
-        case BodyState_Standing:      retval = PLAYER_MAX_WALK_SPEED;   break;
-        case BodyState_Crouch:        retval = PLAYER_MAX_CROUCH_SPEED; break;
-        case BodyState_CrouchingDown: retval = PLAYER_MAX_CROUCH_SPEED; break;
-        case BodyState_StandingUp:    retval = PLAYER_MAX_WALK_SPEED;   break;
-        case BodyState_Prone:         retval = PLAYER_MAX_PRONE_SPEED;  break;
-        case BodyState_ProningDown:   retval = PLAYER_MAX_PRONE_SPEED;  break;
-        case BodyState_ProningUp:     retval = PLAYER_MAX_PRONE_SPEED;  break;
+        case BodyState_StandingUp   : case BodyState_Standing:  retval = PLAYER_MAX_WALK_SPEED;   break;
+        case BodyState_CrouchingDown: case BodyState_Crouch:    retval = PLAYER_MAX_CROUCH_SPEED; break;
+        case BodyState_Prone:         case BodyState_ProningDown: case BodyState_ProningUp: retval = PLAYER_MAX_PRONE_SPEED; break;
     }
 
     if ((isSprinting || Eng_Global->boosterActive) && running) {
         if (inv->fatigue > 80.0f && Eng_Global->boosterActive) retval = PLAYER_MAX_SPRINT_SPEED_FATIGUED;
-        else                                                                retval = PLAYER_MAX_SPRINT_SPEED;
+        else                                                   retval = PLAYER_MAX_SPRINT_SPEED;
 
         if (bodyState == BodyState_Standing || bodyState == BodyState_Crouch || bodyState == BodyState_CrouchingDown) {
             retval -= ((PLAYER_MAX_WALK_SPEED - PLAYER_MAX_CROUCH_SPEED) * 1.5f); // Subtract off the difference in speed between walking and crouching from the sprint speed
@@ -3661,22 +3634,11 @@ MOD_TO_ENGINE void ModInitAfterLoad(void) {
 
 u16 GetCrosshairTexture(void) {
     switch(Eng_Global->invP1.weaponIndex) {
-        case 36: return 1121; // red
-        case 37: return 1253; // blue
-        case 38: return 1121; // red
-        case 39: return 1260; // green
-        case 40: return 1253; // blue
-        case 41: return 1166; // orange
-        case 42: return 1166; // orange
-        case 43: return 1121; // red
-        case 44: return 1122; // yellow
-        case 45: return 1121; // red
-        case 46: return 1161; // teal
-        case 47: return 1122; // yellow
-        case 48: return 1121; // red
-        case 49: return 1260; // green
-        case 50: return 1253; // blue
-        case 51: return 1161; // teal
+        case 36: case 38: case 43: case 45: case 48: return 1121; // red
+        case 37: case 40: case 50: return 1253; // blue
+        case 41: case 42: return 1166; // orange
+        case 44: case 47: return 1122; // yellow
+        case 46: case 51: return 1161; // teal
         default: return 1260; // green
     }
     
@@ -3687,13 +3649,11 @@ u16 GetCursorTexture(void) {
     if (Eng_Global->gamePaused || Eng_Global->menuActive) return 1261; // Red standard cursor
     if (!Eng_Global->invP1.holdingObject) return GetCrosshairTexture();
     switch(Eng_Global->invP1.heldObjectIndex) {
-        case 307: return 1250; // item_paper_wad
         case 308: return 838; // item_paper_wad
         case 309: return 764; // item_beaker
         case 310: return 767; // item_beverage
         case 311: return 981; // item_skull
-        case 312: return 605; // item_arm
-        case 313: return 605; // item_audiolog
+        case 312: case 313: return 605; // item_arm, item_audiolog
         case 314: return 853; // weapon_grenadefrag
         case 315: return 849; // weapon_grenadeconc
         case 316: return 851; // weapon_grenadeemp

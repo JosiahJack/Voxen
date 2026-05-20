@@ -59,7 +59,6 @@ int sfxAttack2[NUM_AI_TYPES] =        {  -1, 256,  -1,148, 50, 50, 50, 50, 50,25
 int sfxAttack3[NUM_AI_TYPES] =        {  -1,  -1,  -1, -1, -1,244,244,244,245, -1, -1,149, -1, -1, -1, -1, -1, -1, -1,244, -1, -1, -1, -1,258,258,258,258,258};
 int sfxDeath[NUM_AI_TYPES] =          {  -1,  48, 110,143, 48,145, 48, 51, 47, 47,142,143,144, 47,162,123,120,134,144,144,120,117,144,124, -1, -1, -1, -1, -1};
 float deathBurstTimer[NUM_AI_TYPES] = {0.0f,0.0f, 0.1f,0.0f,0.1f,0.1f,0.2f,0.1f,0.1f,0.1f,0.0f,0.45f,0.75f,0.1f,0.0f,0.0f,0.1f,0.224f,0.9f,0.0f,0.1f,0.1f,0.1f,0.2f,0.1f,0.1f,0.1f,0.1f,0.1f};
-
 void SetHuntFinished(u16 i) {
     u16 npcID = Eng_Global->instances[i].index - 419;
     Eng_Global->instances[i].huntFinished = Eng_Global->pauseRelativeTime;
@@ -425,19 +424,17 @@ static void AIFace(Entity* self, Vector3 goal) {
 static bool AIWithinAngleToTarget(Entity* self) {
     if (ai_is_cyber(self)) return true;
     if (dot_vector3(self->idealTransformForward, self->idealTransformForward) <= 1e-6f) return false;
-    Quaternion lr  = quat_look_rotation(self->idealTransformForward, (Vector3){0.0f, 1.0f, 0.0f});
-    float ang      = quat_angle_deg(self->rotation, lr);
-    float fovMov   = npcTable[self->index - 419].fovStartMovement;
+    
+    Quaternion lr = quat_look_rotation(self->idealTransformForward,(Vector3){0,1,0});
+    float ang = quat_angle_deg(self->rotation, lr);
+    float fovMov = npcTable[self->index - 419].fovStartMovement;
     if (ang < fovMov) return true;
     if (ang < fovMov * 1.5f && random_range(0.0f, 1.0f) < 0.5f) return true;
     return false;
 }
 
 bool AICheckPain(Entity* self) {
-    if (ai_is_cyber(self)) return false;
-    if (self->entflags & ENTFLAG_ASLEEP) return false;
-    if (npcTable[self->index - 419].timeBetweenPain <= 0.0f) return false;
-    if (!(self->entflags & ENTFLAG_GO_INTO_PAIN) || self->timeTillPainFinished >= Eng_Global->pauseRelativeTime) return false;
+    if (ai_is_cyber(self) || (self->entflags & ENTFLAG_ASLEEP) || (npcTable[self->index - 419].timeBetweenPain <= 0.0f) || (!(self->entflags & ENTFLAG_GO_INTO_PAIN) || self->timeTillPainFinished >= Eng_Global->pauseRelativeTime)) return false;
 
     self->currentState = AIState_Pain;
     u16 atkIdx = self->recentMostActivator;
@@ -447,16 +444,10 @@ bool AICheckPain(Entity* self) {
         bool atkIsPlayer = (atk->layer & Layer_Player) != 0;
         if (!atkIsPlayer && ConstIndexIsNPC(atk->index)) {
             NPCType mt = npcTable[self->index - 419].type, at = npcTable[atk->index - 419].type;
-            bool canFight = false;
-                 if (mt == NPCType_Robot && self->enemy) canFight = false;
-            else if ((mt == NPCType_Cyborg || mt == NPCType_Supercyborg || mt == NPCType_Robot) && (at == NPCType_Cyborg || at == NPCType_Supercyborg || at == NPCType_Robot))  canFight = false;
-            else if ((mt == NPCType_Mutant || mt == NPCType_Supermutant) && (at == NPCType_Mutant || at == NPCType_Supermutant)) canFight = atk->index != self->index;
-            else canFight = atk->index != self->index;
-            
+            bool canFight = atk->index != self->index;
+            if ((mt == NPCType_Robot && self->enemy) || ((mt == NPCType_Cyborg || mt == NPCType_Supercyborg || mt == NPCType_Robot) && (at == NPCType_Cyborg || at == NPCType_Supercyborg || at == NPCType_Robot))) canFight = false;            
             if (canFight) self->enemy = atkIdx;
-        } else {
-            self->enemy = atkIdx;
-        }
+        } else self->enemy = atkIdx;
         
         self->posCheckFinished = Eng_Global->pauseRelativeTime + AI_POS_CHECK_DELAY;
         flag_set(&self->entflags, ENTFLAG_WANDERING, false);

@@ -48,13 +48,11 @@ void DebugRAM(const char *context) {
     if (bytes_read > 0) { buf[bytes_read] = '\0'; } else buf[0] = '\0';
     OS_Close(fd); char* p = buf;
     while (*p) {
-        if (p[0]=='P'&&p[1]=='r'&&p[2]=='i'&&p[3]=='v'&&p[4]=='a'&&p[5]=='t'&&p[6]=='e'&&p[7]=='_') {
+        if (CompareMemoryForNBytes(p,"Private_",8) == 0) {
             p += 8;
             size_t val = 0;
-            if (p[0]=='C'&&p[1]=='l'&&p[2]=='e'&&p[3]=='a'&&p[4]=='n') { /* Clean */ }
-            else if (p[0]=='D'&&p[1]=='i'&&p[2]=='r'&&p[3]=='t'&&p[4]=='y') { /* Dirty */ }
-            else { p++; continue; }
-
+            if (CompareMemoryForNBytes(p,"Clean",5) !=0 && CompareMemoryForNBytes(p,"Dirty",5) != 0) { p++; continue; }
+            
             while (*p && *p != ':') p++;
             if (*p != ':') { p++; continue; }
             

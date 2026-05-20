@@ -3,44 +3,47 @@ typedef struct { void* ptr; size_t sz; } TAlloc;
 static TAlloc* ttAllocs = NULL; static int tallocCount=0;
 static void* TempAlloc(size_t n){if(tallocCount>=4474){DualLogError("TempAlloc too many!\n");return NULL;}void*p=OS_Alloc(n);if(!p){DualLogError("TempAlloc: OS_Alloc failed!\n");return NULL;}ttAllocs[tallocCount++]=(TAlloc){p,n};return p;}
 static void  TempFree (void* p){if(!p||tallocCount==0||ttAllocs[tallocCount-1].ptr!=p)return;OS_DeallocateRAM(p,ttAllocs[tallocCount-1].sz);tallocCount--;}
-#define ttBYTE(p) (*(u8*)(p))
-#define ttCHAR(p) (*(i8*)(p))
 static u16 ttUSHORT(u8*p){return p[0]*256+p[1];}
 static i16 ttSHORT (u8*p){return p[0]*256+p[1];}
 static u32 ttULONG (u8*p){return((u32)p[0]<<24)|((u32)p[1]<<16)|((u32)p[2]<<8)|p[3];}
 static i32 ttLONG  (u8*p){return((i32)p[0]<<24)|((i32)p[1]<<16)|((i32)p[2]<<8)|p[3];}
 #define stbtt_tag4(p,a,b,c,d) ((p)[0]==(a)&&(p)[1]==(b)&&(p)[2]==(c)&&(p)[3]==(d))
-#define stbtt_tag(p,s)         stbtt_tag4(p,s[0],s[1],s[2],s[3])
+#define stbtt_tag(p,s) stbtt_tag4(p,s[0],s[1],s[2],s[3])
 typedef struct { unsigned char*data; int cursor,size; } stbtt__buf;
 static stbtt__buf stbtt__new_buf(const void*p,size_t s){stbtt__buf r;r.data=(u8*)p;r.size=(int)s;r.cursor=0;return r;}
 static u8  _bg8(stbtt__buf*b){return b->cursor>=b->size?0:b->data[b->cursor++];}
 static u8  _bp8(stbtt__buf*b){return b->cursor>=b->size?0:b->data[b->cursor];}
-static void _bsk(stbtt__buf*b,int o){b->cursor=(o>b->size||o<0)?b->size:o;}
+static void _bsk(stbtt__buf*b,int o) { b->cursor = (o>b->size||o<0) ? b->size : o; }
 static void _bskip(stbtt__buf*b,int o){_bsk(b,b->cursor+o);}
 static u32 _bg(stbtt__buf*b,int n){u32 v=0;for(int i=0;i<n;i++)v=(v<<8)|_bg8(b);return v;}
-#define _bg16(b) _bg(b,2)
-#define _bg32(b) _bg(b,4)
 static stbtt__buf _brange(const stbtt__buf*b,int o,int s){stbtt__buf r=stbtt__new_buf(NULL,0);if(o<0||s<0||o>b->size||s>b->size-o)return r;r.data=b->data+o;r.size=s;return r;}
-static stbtt__buf _cff_idx(stbtt__buf*b){int c=b->cursor,n=_bg16(b);if(n){int os=_bg8(b);_bskip(b,os*n);_bskip(b,_bg(b,os)-1);}return _brange(b,c,b->cursor-c);}
-static u32 _cff_int(stbtt__buf*b){int b0=_bg8(b);if(b0>=32&&b0<=246)return b0-139;if(b0>=247&&b0<=250)return(b0-247)*256+_bg8(b)+108;if(b0>=251&&b0<=254)return-(b0-251)*256-_bg8(b)-108;if(b0==28)return _bg16(b);if(b0==29)return _bg32(b);return 0;}
+static stbtt__buf _cff_idx(stbtt__buf*b){int c=b->cursor,n=_bg(b,2);if(n){int os=_bg8(b);_bskip(b,os*n);_bskip(b,_bg(b,os)-1);}return _brange(b,c,b->cursor-c);}
+static u32 _cff_int(stbtt__buf*b){int b0=_bg8(b);if(b0>=32&&b0<=246)return b0-139;if(b0>=247&&b0<=250)return(b0-247)*256+_bg8(b)+108;if(b0>=251&&b0<=254)return-(b0-251)*256-_bg8(b)-108;if(b0==28)return _bg(b,2);if(b0==29)return _bg(b,4);return 0;}
 static void _cff_skip_op(stbtt__buf*b){if(_bp8(b)==30){_bskip(b,1);while(b->cursor<b->size){int v=_bg8(b);if((v&0xF)==0xF||(v>>4)==0xF)break;}}else _cff_int(b);}
-static stbtt__buf _dict_get(stbtt__buf*b,int key){_bsk(b,0);while(b->cursor<b->size){int s=b->cursor,e,op;while(_bp8(b)>=28)_cff_skip_op(b);e=b->cursor;op=_bg8(b);if(op==12)op=_bg8(b)|0x100;if(op==key)return _brange(b,s,e-s);}return _brange(b,0,0);}
-static void _dict_ints(stbtt__buf*b,int key,int n,u32*out){stbtt__buf op=_dict_get(b,key);for(int i=0;i<n&&op.cursor<op.size;++i)out[i]=(u32)_cff_int(&op);}
-static int  _cff_idx_cnt(stbtt__buf*b){_bsk(b,0);return _bg16(b);}
-static stbtt__buf _cff_idx_get(stbtt__buf b,int i){_bsk(&b,0);int n=_bg16(&b),os=_bg8(&b);_bskip(&b,i*os);int s=_bg(&b,os),e=_bg(&b,os);return _brange(&b,2+(n+1)*os+s,e-s);}
+static stbtt__buf _dict_get(stbtt__buf*b, int key) {
+    b->cursor = (0 > b->size) ? b->size : 0;
+    while(b->cursor < b->size) {
+        int e,op,s=b->cursor;
+        while(_bp8(b) >= 28) _cff_skip_op(b);
+        e = b->cursor; op = _bg8(b);
+        if(op==12) op = _bg8(b) | 0x100;
+        if(op==key) return _brange(b,s,e-s);
+    } return _brange(b,0,0);
+}
+
+static void _dict_ints(stbtt__buf*b,int key,int n,u32*out) { stbtt__buf op = _dict_get(b,key); for (int i=0;i<n && op.cursor<op.size;++i) {out[i] = (u32)_cff_int(&op);} }
+static stbtt__buf _cff_idx_get(stbtt__buf b,int i){_bsk(&b,0);int n=_bg(&b,2),os=_bg8(&b);_bskip(&b,i*os);int s=_bg(&b,os),e=_bg(&b,os);return _brange(&b,2+(n+1)*os+s,e-s);}
 enum{STBTT_vmove=1,STBTT_vline,STBTT_vcurve,STBTT_vcubic};
-#define stbtt_vertex_type short
-typedef struct{stbtt_vertex_type x,y,cx,cy,cx1,cy1;unsigned char type,padding;}stbtt_vertex;
-typedef struct{void*userdata;unsigned char*data;int fontstart,numGlyphs,loca,head,glyf,hhea,hmtx,kern,gpos,svg,index_map,indexToLocFormat;stbtt__buf cff,charstrings,gsubrs,subrs,fontdicts,fdselect;}stbtt_fontinfo;
+typedef struct{i16 x,y,cx,cy,cx1,cy1;unsigned char type,padding;}stbtt_vertex;
+typedef struct{void*userdata;unsigned char*data;int fontstart,numGlyphs,loca,head,glyf,hhea,hmtx,index_map,indexToLocFormat;stbtt__buf cff,charstrings,gsubrs,subrs,fontdicts,fdselect;}stbtt_fontinfo;
 static u32 _find_table(u8*d,u32 fs,const char*tag){i32 n=ttUSHORT(d+fs+4);u32 td=fs+12;for(i32 i=0;i<n;++i){u32 l=td+16*i;if(stbtt_tag(d+l+0,tag))return ttULONG(d+l+8);}return 0;}
 static stbtt__buf _get_subrs(stbtt__buf cff,stbtt__buf fd){u32 so=0,pl[2]={0,0};_dict_ints(&fd,18,2,pl);if(!pl[1]||!pl[0])return stbtt__new_buf(NULL,0);stbtt__buf pd=_brange(&cff,pl[1],pl[0]);_dict_ints(&pd,19,1,&so);if(!so)return stbtt__new_buf(NULL,0);_bsk(&cff,pl[1]+so);return _cff_idx(&cff);}
-static int stbtt_InitFont_internal(stbtt_fontinfo*info,unsigned char*data,int fs){
+static int stbtt_InitFont_internal(stbtt_fontinfo* info, unsigned char* data, int fs) {
     u32 cmap,t,i,nt;info->data=data;info->fontstart=fs;info->cff=stbtt__new_buf(NULL,0);
-    cmap=_find_table(data,fs,"cmap");info->loca=_find_table(data,fs,"loca");info->head=_find_table(data,fs,"head");
-    info->glyf=_find_table(data,fs,"glyf");info->hhea=_find_table(data,fs,"hhea");info->hmtx=_find_table(data,fs,"hmtx");
-    info->kern=_find_table(data,fs,"kern");info->gpos=_find_table(data,fs,"GPOS");
-    if(!cmap||!info->head||!info->hhea||!info->hmtx)return 0;
-    if(info->glyf){if(!info->loca)return 0;}
+    cmap=_find_table(data,fs,"cmap"); info->loca=_find_table(data,fs,"loca"); info->head=_find_table(data,fs,"head");
+    info->glyf=_find_table(data,fs,"glyf"); info->hhea=_find_table(data,fs,"hhea"); info->hmtx=_find_table(data,fs,"hmtx");
+    if(!cmap || !info->head || !info->hhea || !info->hmtx) return 0;
+    if(info->glyf){ if(!info->loca)return 0; }
     else{
         u32 cs=2,chstr=0,fda=0,fds=0,cff=_find_table(data,fs,"CFF ");if(!cff)return 0;
         info->fontdicts=stbtt__new_buf(NULL,0);info->fdselect=stbtt__new_buf(NULL,0);
@@ -49,12 +52,13 @@ static int stbtt_InitFont_internal(stbtt_fontinfo*info,unsigned char*data,int fs
         stbtt__buf tdi=_cff_idx(&b),td=_cff_idx_get(tdi,0);_cff_idx(&b);info->gsubrs=_cff_idx(&b);
         _dict_ints(&td,17,1,&chstr);_dict_ints(&td,0x100|6,1,&cs);_dict_ints(&td,0x100|36,1,&fda);_dict_ints(&td,0x100|37,1,&fds);
         info->subrs=_get_subrs(b,td);
-        if(cs!=2||chstr==0)return 0;
-        if(fda){if(!fds)return 0;_bsk(&b,fda);info->fontdicts=_cff_idx(&b);info->fdselect=_brange(&b,fds,b.size-fds);}
+        if (cs!=2||chstr==0) return 0;
+        if (fda) { if(!fds) {return 0;} _bsk(&b,fda);info->fontdicts=_cff_idx(&b);info->fdselect=_brange(&b,fds,b.size-fds); }
         _bsk(&b,chstr);info->charstrings=_cff_idx(&b);
     }
+    
     t=_find_table(data,fs,"maxp");info->numGlyphs=t?ttUSHORT(data+t+4):0xffff;
-    info->svg=-1;nt=ttUSHORT(data+cmap+2);info->index_map=0;
+    nt=ttUSHORT(data+cmap+2);info->index_map=0;
     for(i=0;i<nt;++i){u32 er=cmap+4+8*i;switch(ttUSHORT(data+er)){case 3:switch(ttUSHORT(data+er+2)){case 1:case 10:info->index_map=cmap+ttULONG(data+er+4);}break;case 0:info->index_map=cmap+ttULONG(data+er+4);break;}}
     if(!info->index_map)return 0;
     info->indexToLocFormat=ttUSHORT(data+info->head+50);return 1;
@@ -69,14 +73,14 @@ static int _font_offset(unsigned char*d,int idx){
 static __attribute__((pure)) int stbtt_GetFontOffsetForIndex(const unsigned char*d,int i){return _font_offset((unsigned char*)d,i);}
 static __attribute__((pure)) int stbtt_FindGlyphIndex(const stbtt_fontinfo*info,int cp){
     u8*d=info->data;u32 im=info->index_map;u16 fmt=ttUSHORT(d+im);
-    if(fmt==0){i32 b=ttUSHORT(d+im+2);return cp<b-6?ttBYTE(d+im+6+cp):0;}
-    if(fmt==6){u32 f=ttUSHORT(d+im+6),n=ttUSHORT(d+im+8);return(u32)cp>=f&&(u32)cp<f+n?ttUSHORT(d+im+10+(cp-f)*2):0;}
+    if(fmt==0) { i32 b=ttUSHORT(d+im+2); return cp<b-6 ? (*(u8*)(d+im+6+cp)) : 0; }
+    if(fmt==6) { u32 f=ttUSHORT(d+im+6),n=ttUSHORT(d+im+8); return(u32)cp>=f&&(u32)cp<f+n?ttUSHORT(d+im+10+(cp-f)*2):0;}
     if(fmt==2)return 0;
     if(fmt==4){
         u16 sc=ttUSHORT(d+im+6)>>1,sr=ttUSHORT(d+im+8)>>1,es=ttUSHORT(d+im+10),rs=ttUSHORT(d+im+12)>>1;
         u32 ec=im+14,s=ec;if(cp>0xffff)return 0;
-        if(cp>=ttUSHORT(d+s+rs*2))s+=rs*2;s-=2;
-        while(es){sr>>=1;u16 e=ttUSHORT(d+s+sr*2);if(cp>e)s+=sr*2;--es;}
+        if (cp>=ttUSHORT(d+s+rs*2)) s+=rs*2;s-=2;
+        while(es) { sr>>=1; u16 e=ttUSHORT(d+s+sr*2); if(cp>e) {s+=sr*2;} --es; }
         s+=2;{u16 it=(u16)((s-ec)>>1),st=ttUSHORT(d+im+14+sc*2+2+2*it),la=ttUSHORT(d+ec+2*it);
         if(cp<st||cp>la)return 0;u16 off=ttUSHORT(d+im+14+sc*6+2+2*it);
         return off?ttUSHORT(d+off+(cp-st)*2+im+14+sc*6+2+2*it):(u16)(cp+ttSHORT(d+im+14+sc*4+2+2*it));}
@@ -118,20 +122,24 @@ static int _GetGlyphShapeTT(const stbtt_fontinfo*info,int gi,stbtt_vertex**pv){
             if(nm==i){if(i)nv=_close_shape(verts,nv,wo,so,sx,sy,scx,scy,cx,cy);so=!(fl&1);
                 if(so){scx=x;scy=y;if(!(verts[off+i+1].type&1)){sx=(x+(i32)verts[off+i+1].x)>>1;sy=(y+(i32)verts[off+i+1].y)>>1;}else{sx=verts[off+i+1].x;sy=verts[off+i+1].y;++i;}}else{sx=x;sy=y;}
                 _sv(&verts[nv++],STBTT_vmove,sx,sy,0,0);wo=0;nm=1+ttUSHORT(ep+j++*2);
-            }else{if(!(fl&1)){if(wo)_sv(&verts[nv++],STBTT_vcurve,(cx+x)>>1,(cy+y)>>1,cx,cy);cx=x;cy=y;wo=1;}
-                else{_sv(&verts[nv++],wo?STBTT_vcurve:STBTT_vline,x,y,wo?cx:0,wo?cy:0);wo=0;}}}
+            }else{
+                if(!(fl&1)){
+                    if(wo)_sv(&verts[nv++],STBTT_vcurve,(cx+x)>>1,(cy+y)>>1,cx,cy);cx=x;cy=y;wo=1;
+                } else { _sv(&verts[nv++],wo ? STBTT_vcurve : STBTT_vline,x,y,wo ? cx : 0, wo ? cy : 0); wo=0; }
+            }
+        }
         nv=_close_shape(verts,nv,wo,so,sx,sy,scx,scy,cx,cy);
     }else if(nc<0){
         u8*comp=d+g+10;int more=1;
         while(more){stbtt_vertex*cv=0,*tmp=0;float mtx[6]={1,0,0,1,0,0};
             u16 fl=ttSHORT(comp);comp+=2;u16 gidx=ttSHORT(comp);comp+=2;
-            if(fl&2){if(fl&1){mtx[4]=ttSHORT(comp);comp+=2;mtx[5]=ttSHORT(comp);comp+=2;}else{mtx[4]=ttCHAR(comp);comp++;mtx[5]=ttCHAR(comp);comp++;}}
+            if(fl&2) { if(fl&1) { mtx[4] = ttSHORT(comp); comp+=2; mtx[5]=ttSHORT(comp); comp+=2; } else { mtx[4]=(*(i8*)(comp)); comp++; mtx[5]=(*(i8*)(comp)); comp++; }}
             if(fl&(1<<3)){mtx[0]=mtx[3]=ttSHORT(comp)/16384.0f;comp+=2;mtx[1]=mtx[2]=0;}
             else if(fl&(1<<6)){mtx[0]=ttSHORT(comp)/16384.0f;comp+=2;mtx[1]=mtx[2]=0;mtx[3]=ttSHORT(comp)/16384.0f;comp+=2;}
             else if(fl&(1<<7)){mtx[0]=ttSHORT(comp)/16384.0f;comp+=2;mtx[1]=ttSHORT(comp)/16384.0f;comp+=2;mtx[2]=ttSHORT(comp)/16384.0f;comp+=2;mtx[3]=ttSHORT(comp)/16384.0f;comp+=2;}
             float fm=vsqrtf(mtx[0]*mtx[0]+mtx[1]*mtx[1]),fn=vsqrtf(mtx[2]*mtx[2]+mtx[3]*mtx[3]);
             int cn=stbtt_GetGlyphShape(info,gidx,&cv);
-            if(cn>0){for(int i=0;i<cn;++i){stbtt_vertex*v=&cv[i];stbtt_vertex_type vx=v->x,vy=v->y;v->x=(stbtt_vertex_type)(fm*(mtx[0]*vx+mtx[2]*vy+mtx[4]));v->y=(stbtt_vertex_type)(fn*(mtx[1]*vx+mtx[3]*vy+mtx[5]));vx=v->cx;vy=v->cy;v->cx=(stbtt_vertex_type)(fm*(mtx[0]*vx+mtx[2]*vy+mtx[4]));v->cy=(stbtt_vertex_type)(fn*(mtx[1]*vx+mtx[3]*vy+mtx[5]));}
+            if(cn>0){for(int i=0;i<cn;++i){stbtt_vertex*v=&cv[i];i16 vx=v->x,vy=v->y;v->x=(i16)(fm*(mtx[0]*vx+mtx[2]*vy+mtx[4]));v->y=(i16)(fn*(mtx[1]*vx+mtx[3]*vy+mtx[5]));vx=v->cx;vy=v->cy;v->cx=(i16)(fm*(mtx[0]*vx+mtx[2]*vy+mtx[4]));v->cy=(i16)(fn*(mtx[1]*vx+mtx[3]*vy+mtx[5]));}
                 tmp=(stbtt_vertex*)TempAlloc((nv+cn)*sizeof(stbtt_vertex));if(!tmp){TempFree(verts);TempFree(cv);return 0;}
                 if(nv>0&&verts) CopyMemoryFromBtoAForNBytes(tmp,verts,nv*sizeof(stbtt_vertex)); CopyMemoryFromBtoAForNBytes(tmp+nv,cv,cn*sizeof(stbtt_vertex));TempFree(verts);TempFree(cv);verts=tmp;nv+=cn;}
             more=fl&(1<<5);}
@@ -147,10 +155,14 @@ static void _csclose(stbtt__csctx*c){if(c->first_x!=c->x||c->first_y!=c->y)_csv(
 static void _csmove(stbtt__csctx*c,float dx,float dy){_csclose(c);c->first_x=c->x=c->x+dx;c->first_y=c->y=c->y+dy;_csv(c,STBTT_vmove,(int)c->x,(int)c->y,0,0,0,0);}
 static void _csline(stbtt__csctx*c,float dx,float dy){c->x+=dx;c->y+=dy;_csv(c,STBTT_vline,(int)c->x,(int)c->y,0,0,0,0);}
 static void _cscurve(stbtt__csctx*c,float d1,float e1,float d2,float e2,float d3,float e3){float cx1=c->x+d1,cy1=c->y+e1,cx2=cx1+d2,cy2=cy1+e2;c->x=cx2+d3;c->y=cy2+e3;_csv(c,STBTT_vcubic,(int)c->x,(int)c->y,(int)cx1,(int)cy1,(int)cx2,(int)cy2);}
-static stbtt__buf _subr(stbtt__buf idx,int n){int c=_cff_idx_cnt(&idx),bias=c>=33900?32768:c>=1240?1131:107;n+=bias;return(n<0||n>=c)?stbtt__new_buf(NULL,0):_cff_idx_get(idx,n);}
+static stbtt__buf _subr(stbtt__buf idx,int n){
+    _bsk(&idx,0); int c = _bg(&idx,2);
+    int bias = (c >= 33900) ? 32768 : ((c >= 1240) ? 1131 : 107); n+=bias;
+    return (n<0 || n>=c) ? stbtt__new_buf(NULL,0) : _cff_idx_get(idx,n);
+}
 static stbtt__buf _cid_subrs(const stbtt_fontinfo*info,int gi){stbtt__buf fd=info->fdselect;int nr,st,end,v,fmt,sel=-1,i;_bsk(&fd,0);fmt=_bg8(&fd);
     if(fmt==0){_bskip(&fd,gi);sel=_bg8(&fd);}
-    else if(fmt==3){nr=_bg16(&fd);st=_bg16(&fd);for(i=0;i<nr;i++){v=_bg8(&fd);end=_bg16(&fd);if(gi>=st&&gi<end){sel=v;break;}st=end;}}
+    else if(fmt==3){nr=_bg(&fd,2);st=_bg(&fd,2);for(i=0;i<nr;i++){v=_bg8(&fd);end=_bg(&fd,2);if(gi>=st&&gi<end){sel=v;break;}st=end;}}
     if(sel==-1)return stbtt__new_buf(NULL,0);return _get_subrs(info->cff,_cff_idx_get(info->fontdicts,sel));}
 
 static int _run_cs(const stbtt_fontinfo*info,int gi,stbtt__csctx*c){
@@ -184,7 +196,7 @@ static int _run_cs(const stbtt_fontinfo*info,int gi,stbtt__csctx*c){
             case 0x24:CHK(9);_cscurve(c,s[0],s[1],s[2],s[3],s[4],0);_cscurve(c,s[5],0,s[6],s[7],s[8],-(s[1]+s[3]+s[7]));break;
             case 0x25:CHK(11);{float dx=s[0]+s[2]+s[4]+s[6]+s[8],dy=s[1]+s[3]+s[5]+s[7]+s[9],d6x=s[10],d6y=s[10];if(vabs(dx)>vabs(dy))d6y=-dy;else d6x=-dx;_cscurve(c,s[0],s[1],s[2],s[3],s[4],s[5]);_cscurve(c,s[6],s[7],s[8],s[9],d6x,d6y);}break;
             default:ERR("escape");}}break;
-        default:if(b0!=255&&b0!=28&&b0<32)ERR("reserved");f=(b0==255)?(float)(i32)_bg32(&b)/0x10000:(_bskip(&b,-1),(float)(i16)_cff_int(&b));if(sp>=48)ERR("overflow");s[sp++]=f;cs=0;break;}
+        default:if(b0!=255&&b0!=28&&b0<32)ERR("reserved");f=(b0==255)?(float)(i32)_bg(&b,4)/0x10000:(_bskip(&b,-1),(float)(i16)_cff_int(&b));if(sp>=48)ERR("overflow");s[sp++]=f;cs=0;break;}
         if(cs)sp=0;}ERR("no endchar");
 #undef ERR
 #undef CHK
@@ -212,7 +224,6 @@ static void stbtt_GetGlyphBitmapBoxSubpixel(const stbtt_fontinfo*font,int g,floa
     else{if(ix0)*ix0=(int)vfloor(x0*sx+shx);if(iy0)*iy0=(int)vfloor(-y1*sy+shy);if(ix1)*ix1=(int)vceil(x1*sx+shx);if(iy1)*iy1=(int)vceil(-y0*sy+shy);}
 }
 
-static void stbtt_GetGlyphBitmapBox(const stbtt_fontinfo*f,int g,float sx,float sy,int*ix0,int*iy0,int*ix1,int*iy1){stbtt_GetGlyphBitmapBoxSubpixel(f,g,sx,sy,0,0,ix0,iy0,ix1,iy1);}
 typedef struct{int w,h,stride;unsigned char*pixels;}stbtt__bitmap;
 typedef struct stbtt__hheap_chunk{ struct stbtt__hheap_chunk* next; }stbtt__hheap_chunk;
 typedef struct{ stbtt__hheap_chunk* head; void* first_free; int num_remaining_in_head_chunk; }stbtt__hheap;
@@ -227,8 +238,8 @@ static void _hce(float*sl,int x,stbtt__active_edge*e,float x0,float y0,float x1,
 
 static float _ptz(float h,float t0,float t1,float b0,float b1){ return ((t1-t0)+(b1-b0))/2.0f*h; }
 static void _fae(float*sl,float*sf,int len,stbtt__active_edge*e,float yt){
-    float yb=yt+1;
-    while(e){
+    float yb = yt + 1;
+    while(e) {
         if(e->fdx==0){float x0=e->fx;if(x0<len){if(x0>=0){_hce(sl,(int)x0,e,x0,yt,x0,yb);_hce(sf-1,(int)x0+1,e,x0,yt,x0,yb);}else _hce(sf-1,0,e,x0,yt,x0,yb);}}
         else{float x0=e->fx,dx=e->fdx,dy=e->fdy,xb=x0+dx,xt,xbt,sy0,sy1;
             if(e->sy>yt){xt=x0+dx*(e->sy-yt);sy0=e->sy;}else{xt=x0;sy0=yt;}
@@ -245,10 +256,8 @@ static void _fae(float*sl,float*sf,int len,stbtt__active_edge*e,float yt){
             }else{for(int x=0;x<len;++x){float y0=yt,x1f=(float)x,x2f=(float)(x+1),x3=xb,y3=yb;float y1=((float)x-x0)/dx+yt,y2=((float)(x+1)-x0)/dx+yt;
                 if(x0<x1f&&x3>x2f){_hce(sl,x,e,x0,y0,x1f,y1);_hce(sl,x,e,x1f,y1,x2f,y2);_hce(sl,x,e,x2f,y2,x3,y3);}
                 else if(x3<x1f&&x0>x2f){_hce(sl,x,e,x0,y0,x2f,y2);_hce(sl,x,e,x2f,y2,x1f,y1);_hce(sl,x,e,x1f,y1,x3,y3);}
-                else if(x0<x1f&&x3>x1f){_hce(sl,x,e,x0,y0,x1f,y1);_hce(sl,x,e,x1f,y1,x3,y3);}
-                else if(x3<x1f&&x0>x1f){_hce(sl,x,e,x0,y0,x1f,y1);_hce(sl,x,e,x1f,y1,x3,y3);}
-                else if(x0<x2f&&x3>x2f){_hce(sl,x,e,x0,y0,x2f,y2);_hce(sl,x,e,x2f,y2,x3,y3);}
-                else if(x3<x2f&&x0>x2f){_hce(sl,x,e,x0,y0,x2f,y2);_hce(sl,x,e,x2f,y2,x3,y3);}
+                else if ((x0<x1f&&x3>x1f) || (x3<x1f&&x0>x1f)) {_hce(sl,x,e,x0,y0,x1f,y1);_hce(sl,x,e,x1f,y1,x3,y3);}
+                else if ((x0<x2f&&x3>x2f) || (x3<x2f&&x0>x2f)) {_hce(sl,x,e,x0,y0,x2f,y2);_hce(sl,x,e,x2f,y2,x3,y3);}
                 else _hce(sl,x,e,x0,y0,x3,y3);}}
         }e=e->next;}
 }
@@ -359,12 +368,39 @@ static int stbtt_PackFontRangesGatherRects(stbtt_pack_context*spc,const stbtt_fo
             if(g==0&&(spc->skip_missing||mga)){rects[k].w=rects[k].h=0;}else{stbtt_GetGlyphBitmapBoxSubpixel(info,g,sc*(float)spc->h_oversample,sc*(float)spc->v_oversample,0,0,&x0,&y0,&x1,&y1);rects[k].w=(stbrp_coord)(x1-x0+spc->padding+(int)spc->h_oversample-1);rects[k].h=(stbrp_coord)(y1-y0+spc->padding+(int)spc->v_oversample-1);if(g==0)mga=1;}++k;}}return k;
 }
 
-static int stbtt_PackFontRangesRenderIntoRects(stbtt_pack_context*spc,const stbtt_fontinfo*info,FPackRange*ranges,int nr,stbrp_rect*rects){
-    int i,j,k=0,mg=-1,rv=1,oh=(int)spc->h_oversample,ov=(int)spc->v_oversample;
-    for(i=0;i<nr;++i){float fh=ranges[i].font_size,sc=fh>0?stbtt_ScaleForPixelHeight(info,fh):stbtt_ScaleForMappingEmToPixels(info,-fh),rh,rv2,sbx,sby;spc->h_oversample=ranges[i].h_oversample;spc->v_oversample=ranges[i].v_oversample;rh=1.0f/(float)spc->h_oversample;rv2=1.0f/(float)spc->v_oversample;sbx=(float)_oshift((int)spc->h_oversample);sby=(float)_oshift((int)spc->v_oversample);
-        for(j=0;j<ranges[i].num_chars;++j){stbrp_rect*r=&rects[k];
-            if(r->was_packed&&r->w&&r->h){stbtt_packedchar*bc=&ranges[i].chardata_for_range[j];int adv,lsb,x0,y0,x1,y1,cp=ranges[i].array_of_unicode_codepoints?ranges[i].array_of_unicode_codepoints[j]:ranges[i].first_unicode_codepoint_in_range+j,g=stbtt_FindGlyphIndex(info,cp);stbrp_coord pad=(stbrp_coord)spc->padding;r->x+=pad;r->y+=pad;r->w-=pad;r->h-=pad;stbtt_GetGlyphHMetrics(info,g,&adv,&lsb);stbtt_GetGlyphBitmapBox(info,g,sc*(float)spc->h_oversample,sc*(float)spc->v_oversample,&x0,&y0,&x1,&y1);stbtt_MakeGlyphBitmapSubpixel(info,spc->pixels+r->x+r->y*spc->stride_in_bytes,r->w-(int)spc->h_oversample+1,r->h-(int)spc->v_oversample+1,spc->stride_in_bytes,sc*(float)spc->h_oversample,sc*(float)spc->v_oversample,0,0,g);if(spc->h_oversample>1)_hpre(spc->pixels+r->x+r->y*spc->stride_in_bytes,r->w,r->h,spc->stride_in_bytes,spc->h_oversample);if(spc->v_oversample>1)_vpre(spc->pixels+r->x+r->y*spc->stride_in_bytes,r->w,r->h,spc->stride_in_bytes,spc->v_oversample);bc->x0=(unsigned short)r->x;bc->y0=(unsigned short)r->y;bc->x1=(unsigned short)(r->x+r->w);bc->y1=(unsigned short)(r->y+r->h);bc->xadvance=sc*(float)adv;bc->xoff=(float)x0*rh+sbx;bc->yoff=(float)y0*rv2+sby;bc->xoff2=(float)(x0+r->w)*rh+sbx;bc->yoff2=(float)(y0+r->h)*rv2+sby;if(g==0)mg=j;}else if(spc->skip_missing){rv=0;}else if(r->was_packed&&!r->w&&!r->h&&mg>=0){ranges[i].chardata_for_range[j]=ranges[i].chardata_for_range[mg];}else rv=0;++k;}}
-    spc->h_oversample=(unsigned int)oh;spc->v_oversample=(unsigned int)ov;return rv;
+static int stbtt_PackFontRangesRenderIntoRects(stbtt_pack_context* spc, const stbtt_fontinfo* info, FPackRange* ranges, int nr, stbrp_rect* rects) {
+    int i, j, k = 0, mg = -1, rv = 1, oh = spc->h_oversample, ov = spc->v_oversample;
+    for (i = 0; i < nr; ++i) {
+        FPackRange* rng = &ranges[i];
+        float sc = rng->font_size > 0 ? stbtt_ScaleForPixelHeight(info, rng->font_size) : stbtt_ScaleForMappingEmToPixels(info, -rng->font_size);
+        spc->h_oversample = rng->h_oversample; spc->v_oversample = rng->v_oversample;
+        for (j = 0; j < rng->num_chars; ++j, ++k) {
+            stbrp_rect* r = &rects[k];
+            if (r->was_packed && r->w && r->h) {
+                int cp = rng->array_of_unicode_codepoints ? rng->array_of_unicode_codepoints[j] : rng->first_unicode_codepoint_in_range + j;
+                int g = stbtt_FindGlyphIndex(info, cp);
+                stbtt_packedchar* bc = &rng->chardata_for_range[j];
+                r->x += spc->padding; r->y += spc->padding; r->w -= spc->padding; r->h -= spc->padding;
+                int adv,lsb; stbtt_GetGlyphHMetrics(info, g, &adv, &lsb);
+                int x0,y0,x1,y1;
+                stbtt_GetGlyphBitmapBoxSubpixel(info,g,sc * spc->h_oversample,sc * spc->v_oversample,0,0,&x0,&y0,&x1,&y1);
+                unsigned char* p_pixels = spc->pixels + r->x + r->y * spc->stride_in_bytes;
+                stbtt_MakeGlyphBitmapSubpixel(info, p_pixels, r->w - spc->h_oversample + 1, r->h - spc->v_oversample + 1, spc->stride_in_bytes, sc * spc->h_oversample, sc * spc->v_oversample, 0, 0, g);
+                if (spc->h_oversample > 1) _hpre(p_pixels, r->w, r->h, spc->stride_in_bytes, spc->h_oversample);
+                if (spc->v_oversample > 1) _vpre(p_pixels, r->w, r->h, spc->stride_in_bytes, spc->v_oversample);
+                bc->x0 = r->x; bc->y0 = r->y; bc->x1 = r->x + r->w; bc->y1 = r->y + r->h;
+                bc->xadvance = sc * adv;
+                bc->xoff  = x0 * (1.0f / spc->h_oversample) + _oshift(spc->h_oversample);
+                bc->yoff  = y0 * (1.0f / spc->v_oversample) + _oshift(spc->v_oversample);
+                bc->xoff2 = (x0 + r->w) * (1.0f / spc->h_oversample) + _oshift(spc->h_oversample);
+                bc->yoff2 = (y0 + r->h) * (1.0f / spc->v_oversample) + _oshift(spc->v_oversample);
+                if (!g) mg = j;
+            } else if (r->was_packed && !r->w && !r->h && mg >= 0) rng->chardata_for_range[j] = rng->chardata_for_range[mg];
+            else if (!spc->skip_missing) rv = 0;
+        }
+    }
+    spc->h_oversample = oh; spc->v_oversample = ov;
+    return rv;
 }
 
 static int stbtt_PackFontRanges(stbtt_pack_context*spc,const unsigned char*fontdata,int fi,FPackRange*ranges,int nr){
@@ -422,7 +458,7 @@ static void InitFontAtlasses(void){
     unsigned char*bmp=OS_Alloc(FONT_ATLAS_SIZE*FONT_ATLAS_SIZE);
 
     // Primary atlas
-    stbtt_pack_context pc;stbtt_PackBegin(&pc,bmp,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0,16,NULL);pc.h_oversample=4;pc.v_oversample=4;pc.skip_missing=1;numPackedGlyphs=0;
+    stbtt_pack_context pc;stbtt_PackBegin(&pc,bmp,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0,16,NULL);pc.h_oversample=3;pc.v_oversample=3;pc.skip_missing=1;numPackedGlyphs=0;
     for(int r=0;r<numFontRanges;++r){fontRanges[r].startIndex=numPackedGlyphs;
         for(int i=0;i<fontRanges[r].count;++i){if(numPackedGlyphs>=MAX_GLYPHS)break;u32 cp=fontRanges[r].first+i;stbtt_fontinfo*font=&fontInfo[0];unsigned char*data=fontData[0];
             int g=stbtt_FindGlyphIndex(font,cp);if(!g){g=GetGlyphAndFont(cp,&font,FONT_NORMAL);if(!g)continue;data=(font==&fontInfo[0])?fontData[0]:((LoadedFont*)((char*)font-__builtin_offsetof(LoadedFont,info)))->data;}
@@ -432,7 +468,7 @@ static void InitFontAtlasses(void){
 
     // Secondary atlas
     MemSetToValueForNBytes(bmp,0,FONT_ATLAS_SIZE*FONT_ATLAS_SIZE);
-    stbtt_pack_context pc2;stbtt_PackBegin(&pc2,bmp,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0,16,NULL);pc2.h_oversample=4;pc2.v_oversample=4;pc2.skip_missing=1;numPackedGlyphsStopD=0;
+    stbtt_pack_context pc2;stbtt_PackBegin(&pc2,bmp,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0,16,NULL);pc2.h_oversample=3;pc2.v_oversample=3;pc2.skip_missing=1;numPackedGlyphsStopD=0;
     for(int r=0;r<numFontRanges;++r){fontRangesStopD[r].startIndex=numPackedGlyphsStopD;
         for(int i=0;i<fontRangesStopD[r].count;++i){if(numPackedGlyphsStopD>=MAX_GLYPHS)break;u32 cp=fontRangesStopD[r].first+i;stbtt_fontinfo*font=&fontInfo[1];unsigned char*data=fontData[1];
             int g=stbtt_FindGlyphIndex(font,cp);if(!g){g=GetGlyphAndFont(cp,&font,FONT_STOPD);if(!g)continue;data=(font==&fontInfo[0])?fontData[0]:((LoadedFont*)((char*)font-__builtin_offsetof(LoadedFont,info)))->data;}
@@ -441,11 +477,11 @@ static void InitFontAtlasses(void){
     TempFree(pc2.pack_info);GenerateAndBindTexture(&fontAtlasTexStopD,0x8229/*GL_R8*/,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0x1903/*GL_RED*/,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,bmp);
     
     OS_DeallocateRAM(bmp,FONT_ATLAS_SIZE*FONT_ATLAS_SIZE);
-    OS_DeallocateRAM(fontData[0],sz1); fontData[0] = NULL;
-    OS_DeallocateRAM(fontData[1],sz2); fontData[1] = NULL;
-    OS_DeallocateRAM(fontData[2],fallbackFonts[0].size); fontData[2] = NULL;
-    OS_DeallocateRAM(fontData[3],fallbackFonts[1].size); fontData[3] = NULL;
-    OS_DeallocateRAM(fontData[4],fallbackFonts[2].size); fontData[4] = NULL;
+    OS_DeallocateRAM(fontData[0],sz1);
+    OS_DeallocateRAM(fontData[1],sz2);
+    OS_DeallocateRAM(fontData[2],fallbackFonts[0].size);
+    OS_DeallocateRAM(fontData[3],fallbackFonts[1].size);
+    OS_DeallocateRAM(fontData[4],fallbackFonts[2].size);
     OS_DeallocateRAM(ttAllocs,4474 * sizeof(TAlloc));
     DebugRAM("after font load");
     glUseProgram(Sys_Render.textShaderProgram); glUniform1i(1,2);
@@ -514,19 +550,19 @@ void LoadLogTextForLanguage(u8 lang){
 }
 
 Color textColors[] = {
-    {         1.0f,         1.0f,          1.0f, 1.0f}, // 0 White                       TEXT_WHITE
-    { 0.890196078f, 0.874509804f,          0.0f, 1.0f}, // 1 Yellow                      TEXT_YELLOW
-    { 0.623529412f, 0.611764706f,          0.0f, 1.0f}, // 2 Dark Yellow (Yellow * 0.7f) TEXT_DARK_YELLOW
-    { 0.372549020f, 0.654901961f,  0.168627451f, 1.0f}, // 3 Green                       TEXT_GREEN
-    { 0.917647059f, 0.137254902f,  0.168627451f, 1.0f}, // 4 Red                         TEXT_RED
-    {         1.0f, 0.498039216f,          0.0f, 1.0f}, // 5 Orange                      TEXT_ORANGE
-    { 0.674509804f, 0.058823529f,  0.070588235f, 1.0f}, // 6 StopD Red                   TEXT_STOPD_RED
-    { 0.941176471f, 0.282352941f,  0.298039216f, 1.0f}, // 7 StopD Red Highlight         TEXT_STOPD_RED_HIGHLIGHT
-    { 0.909803922f, 0.203921569f,  0.219607843f, 1.0f}, // 8 StopD Red Pause Title       TEXT_STOPD_RED_PAUSETITLE
-    { 0.470588235f, 0.721568627f,  0.172549020f, 1.0f}, // 9 Green Menu Title            TEXT_GREEN_MENU
-    { 0.137254902f, 0.356862745f,  0.109803922f, 1.0f}, // 10 Green Menu Title Shadow    TEXT_GREEN_MENU_SHADOW
-    { 0.239215686f, 0.466666667f,  0.129411765f, 1.0f}, // 11 Green Menu Title Glow      TEXT_GREEN_MENU_GLOW
-    { 0.392156863f, 0.031372549f,  0.039215686f, 1.0f}  // 12 Red Menu Text Dark         TEXT_RED_MENU
+    {        1.0f,        1.0f,        1.0f,1.0f}, // 0 White                       TEXT_WHITE
+    {0.890196078f,0.874509804f,        0.0f,1.0f}, // 1 Yellow                      TEXT_YELLOW
+    {0.623529412f,0.611764706f,        0.0f,1.0f}, // 2 Dark Yellow (Yellow * 0.7f) TEXT_DARK_YELLOW
+    {0.372549020f,0.654901961f,0.168627451f,1.0f}, // 3 Green                       TEXT_GREEN
+    {0.917647059f,0.137254902f,0.168627451f,1.0f}, // 4 Red                         TEXT_RED
+    {        1.0f,0.498039216f,        0.0f,1.0f}, // 5 Orange                      TEXT_ORANGE
+    {0.674509804f,0.058823529f,0.070588235f,1.0f}, // 6 StopD Red                   TEXT_STOPD_RED
+    {0.941176471f,0.282352941f,0.298039216f,1.0f}, // 7 StopD Red Highlight         TEXT_STOPD_RED_HIGHLIGHT
+    {0.909803922f,0.203921569f,0.219607843f,1.0f}, // 8 StopD Red Pause Title       TEXT_STOPD_RED_PAUSETITLE
+    {0.470588235f,0.721568627f,0.172549020f,1.0f}, // 9 Green Menu Title            TEXT_GREEN_MENU
+    {0.137254902f,0.356862745f,0.109803922f,1.0f}, // 10 Green Menu Title Shadow    TEXT_GREEN_MENU_SHADOW
+    {0.239215686f,0.466666667f,0.129411765f,1.0f}, // 11 Green Menu Title Glow      TEXT_GREEN_MENU_GLOW
+    {0.392156863f,0.031372549f,0.039215686f,1.0f}  // 12 Red Menu Text Dark         TEXT_RED_MENU
 };
 
 float textVertexData[8192];

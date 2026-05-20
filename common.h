@@ -1,13 +1,8 @@
 // common.h - Shared items between engine and gamecode (e.g. enums)
-typedef __INT8_TYPE__    i8;
-typedef __UINT8_TYPE__   u8;
-typedef __INT16_TYPE__  i16;
-typedef __UINT16_TYPE__ u16;
-typedef __INT32_TYPE__  i32;
-typedef __UINT32_TYPE__ u32;
-typedef __INT64_TYPE__  i64;
-typedef __UINT64_TYPE__ u64;
-typedef __SIZE_TYPE__ size_t;
+typedef __INT8_TYPE__   i8; typedef  __UINT8_TYPE__  u8; //  8bit types
+typedef __INT16_TYPE__ i16; typedef __UINT16_TYPE__ u16; // 16bit types
+typedef __INT32_TYPE__ i32; typedef __UINT32_TYPE__ u32; // 32bit types
+typedef __INT64_TYPE__ i64; typedef __UINT64_TYPE__ u64; typedef __SIZE_TYPE__ size_t; // 64bit types
 #ifndef U8_MAX
     #define U8_MAX 255
 #endif
@@ -17,20 +12,14 @@ typedef __SIZE_TYPE__ size_t;
 #define bool unsigned char
 #define true 1
 #define false 0
-typedef struct { float r,g,b; } Color3;
-typedef struct { float r,g,b,a; } Color;
-typedef struct { float x,y; } Vector2;
-typedef struct { float x,y,z; } Vector3;
-typedef struct { float x,y,z,w; } Quaternion;
+typedef struct { float r,g,b; } Color3; typedef struct { float r,g,b,a; } Color;
+typedef struct { float x,y; } Vector2;  typedef struct { float x,y,z; } Vector3; typedef struct { float x,y,z,w; } Quaternion;
 #define QUAT_IDENTITY ((Quaternion){0.0f,0.0f,0.0f,1.0f})
-typedef u8 PhysCombineType;
-typedef u8 ColliderType;
+typedef u8 PhysCombineType,ColliderType;
 typedef u16 Text;
-typedef struct { Vector3 point; Vector3 normal; float distance; u16 hitInstanceIndex; bool hit; } RaycastHit;
-typedef struct { float speed; u16 frameStart,frameEnd,frameStartModelIndex; u8 framerate; } AnimationClip;
-typedef struct { Vector3 center,halfExtents; Quaternion rot; } ShapeBox;
-typedef struct { Vector3 center; float radius; } ShapeSphere;
-typedef struct { Vector3 tip,base; float radius; } ShapeCapsule;
+typedef struct {Vector3 point; Vector3 normal; float distance; u16 hitInstanceIndex; bool hit;} RaycastHit;
+typedef struct {float speed; u16 frameStart,frameEnd,frameStartModelIndex; u8 framerate;} AnimationClip;
+typedef struct {Vector3 center,halfExtents; Quaternion rot;} ShapeBox; typedef struct {Vector3 center; float radius;} ShapeSphere; typedef struct {Vector3 tip,base; float radius;} ShapeCapsule;
 #define LIGHTON 1
 #define SHADON  2
 #define LIGHT_AND_SHADOW_ON 3
@@ -306,12 +295,12 @@ typedef u8 PuzzleGridType;static const u8 PuzzleGridType_King=0,PuzzleGridType_Q
 static const u32 Layer_Default          = 1U;
 static const u32 Layer_TransparentFX    = 2U;
 static const u32 Layer_IgnoreRaycast    = 4U;
-//                                               8U  // unused
+//                                        8U    // unused
 static const u32 Layer_Water            = 16U;
-static const u32 Layer_BlocksRaycast    = 16U; // same as Water
+static const u32 Layer_BlocksRaycast    = 16U;  // same as Water
 static const u32 Layer_UI               = 32U;
-//                                               64U  // unused
-//                                               128U  // unused
+//                                        64U   // unused
+//                                        128U  // unused
 static const u32 Layer_GunViewModel     = 256U;
 static const u32 Layer_Geometry         = 512U;
 static const u32 Layer_NPC              = 1024U;
@@ -334,10 +323,8 @@ static const u32 Layer_Clip             = 67108864U;
 static const u32 Layer_Automap          = 134217728U;
 static const u32 Layer_Culling          = 268435456U;
 static const u32 Layer_CorpseSearchable = 536870912U;
-//                                               1073741824U // unused
+//                                        1073741824U // unused
 static const u32 Layer_NULL             = 2147483648U;
-
-
 #define LAYER_MASK_PLAYER_COLLIDESWITH (Layer_Clip | Layer_NPCBullet | Layer_Player2 | Layer_Door \
                                        | Layer_Trigger | Layer_PlayerTriggerOnly | Layer_Default | Layer_TransparentFX \
                                        | Layer_IgnoreRaycast | Layer_Geometry | Layer_NPC)
@@ -472,18 +459,9 @@ typedef struct { char stringTable[TEXT_STRING_COUNT][TEXT_LOCALIZATION_MAX_LENGT
 #define MINIGAME_ROAD       32
 #define MINIGAME_TRIOPTOE   64
 // Hw referenceIndex, ref14Index
-// Sys 21,0
-// Nav 22,1
-// Ere 23,2
-// Sen 24,3
-// Trg 25,4
-// Shi 26,5
-// Bio 27,6
-// Lan 28,7
-// Env 29,8
-// Boo 30,9
-// Jum 31,10
-// Nig 32,11
+// Sys 21,0 // Nav 22,1 // Ere 23,2  // Sen 24,3
+// Trg 25,4 // Shi 26,5 // Bio 27,6  // Lan 28,7
+// Env 29,8 // Boo 30,9 // Jum 31,10 // Nig 32,11
 typedef struct {
     u32 accessCardOwned;
     u8 hasSoft,softVersions[7];
@@ -696,7 +674,7 @@ static inline __attribute__((always_inline)) void flag_setu64(u64 *flags, u64 bi
 #define TAU 6.2831853f
 static inline __attribute__((always_inline)) float vfloor(float x) { int i = (int)x; return (float)(i > x ? i - 1 : i); }
 static inline __attribute__((always_inline)) float vceil(float x) { int i = (int)x; return (float)(x > 0 && x > (float)i ? i + 1 : i); }
-#define vclamp(x,a,b) __builtin_fminf(__builtin_fmaxf(x, a), b)
+#define vclamp(x,a,b) vmin(vmax(x,a),b)
 #define vsqrtf(x) __builtin_sqrtf(x)
 static inline __attribute__((always_inline)) float vsign(float x) { return x < 0.0f ? -1.0f : 1.0f; } // Follow Unity Sign convention where 0 = 1.0f sign.
 static inline __attribute__((always_inline)) float vsinf(float x) { x -= TAU * vfloor(x / TAU); if (x > PI) { x -= TAU; } float s = (4/PI)*x - (4/(PI*PI))*x*vabs(x); return 0.225f*(s*vabs(s) - s) + s; }

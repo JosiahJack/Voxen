@@ -30,13 +30,8 @@ void main() {
             vec2 n = grad / gradLen;
             float vertical = n.y; // +1 = bottom edge (highlight), -1 = top edge (shadow)
             if (abs(vertical) > 0.12) {
-                if (vertical > 0.0) { // soft highlight on top edges
-                    color = mix(color,vec3(1.0),0.18);
-                    alpha *= 0.92;
-                } else { // soft shadow on bottom edges
-                    color *= 0.58;
-                    alpha *= 0.90;
-                }
+                if (vertical > 0.0) { color = mix(color,vec3(1.0),0.18); alpha *= 0.92; } // soft highlight on top edges
+                else { color *= 0.58; alpha *= 0.90; } // soft shadow on bottom edges
             }
         }
 

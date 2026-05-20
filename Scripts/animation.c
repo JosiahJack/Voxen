@@ -63,35 +63,22 @@ MOD_TO_ENGINE void UpdateAnims(void) {
         Entity* e = &Eng_Global->instances[i];
         if (e->modelIndex >= MODEL_IDX_MAX) continue;
         if (!(e->entflags & ENTFLAG_ACTIVE)) continue;
-
-        u16 anim = e->animationNum;
-        if (anim >= MAX_ANIMATED_MODELS || e->numclips == 0 || e->clip >= e->numclips) continue;
-
-        AnimationClip* clip = (AnimationClip*)&modelAnimationClips[anim][e->clip];
-        if (clip->framerate <= 0 || clip->speed <= 0) continue;
+        u16 anim = e->animationNum; if (anim >= MAX_ANIMATED_MODELS || e->numclips == 0 || e->clip >= e->numclips) continue;
+        AnimationClip* clip = (AnimationClip*)&modelAnimationClips[anim][e->clip]; if (clip->framerate <= 0 || clip->speed <= 0) continue;
 
         const double timePerFrame = (1.0 / (double)clip->speed) * (1.0 / (double)clip->framerate);
         double timePassed = Eng_Global->pauseRelativeTime - e->currentFrameFinished;
         if (timePassed < timePerFrame) continue;
 
-        u32 framesToAdvance = (u32)(timePassed / timePerFrame);           // integer frames
-        double remainder     = timePassed - (framesToAdvance * timePerFrame); // keep fractional part
-        u32 frameCount = clip->frameEnd - clip->frameStart + 1;
-        if (frameCount <= 1) {
-            e->frame = clip->frameStart;
-        } else {
-            u32 newFrame = (e->frame - clip->frameStart + framesToAdvance) % frameCount;
-            e->frame = clip->frameStart + newFrame;
-        }
-
+        u32 framesToAdvance = (u32)(timePassed / timePerFrame), frameCount = clip->frameEnd - clip->frameStart + 1;
+        double remainder = timePassed - (framesToAdvance * timePerFrame);
+        if (frameCount <= 1) e->frame = clip->frameStart;
+        else { u32 newFrame = (e->frame - clip->frameStart + framesToAdvance) % frameCount; e->frame = clip->frameStart + newFrame; }
         e->currentFrameFinished = Eng_Global->pauseRelativeTime - remainder;
         e->modelIndex = clip->frameStartModelIndex + (e->frame - clip->frameStart);
         Eng_Global->dirtyInstances[i] = true;
         if (ConstIndexIsPortalBlockingDoor(e->index)) {
-            if (ToggleDoorPortal(e->portalIndex, i,
-                modelAnimationClips[anim][ANIM_IDLE_CLOSED].frameStartModelIndex)) {
-                portalsNeedUpdated = true;
-            }
+            if (ToggleDoorPortal(e->portalIndex,i,modelAnimationClips[anim][ANIM_IDLE_CLOSED].frameStartModelIndex)) portalsNeedUpdated = true;
         }
     }
 
