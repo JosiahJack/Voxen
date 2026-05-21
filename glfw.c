@@ -36,48 +36,23 @@ void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n); int Str
     typedef HDC (WINAPI * PFN_wglGetCurrentDC)(void);
     typedef HGLRC (WINAPI * PFN_wglGetCurrentContext)(void);
     typedef BOOL (WINAPI * PFN_wglMakeCurrent)(HDC,HGLRC);
-    #define GLFW_WIN32_WINDOW_STATE         _GLFWwindowWin32  win32;
-    #define GLFW_WIN32_LIBRARY_WINDOW_STATE _GLFWlibraryWin32 win32;
-    #define GLFW_WIN32_MONITOR_STATE        _GLFWmonitorWin32 win32;
-    #define GLFW_WGL_CONTEXT_STATE          _GLFWcontextWGL wgl;
-    #define GLFW_WGL_LIBRARY_CONTEXT_STATE  _GLFWlibraryWGL wgl;
     typedef struct _GLFWcontextWGL { HDC dc; HGLRC handle; int interval; } _GLFWcontextWGL;
     typedef struct _GLFWlibraryWGL { HINSTANCE instance; PFN_wglCreateContext CreateContext; PFN_wglGetProcAddress GetProcAddress; PFN_wglGetCurrentDC GetCurrentDC; PFN_wglGetCurrentContext GetCurrentContext; PFN_wglMakeCurrent MakeCurrent; PFNWGLSWAPINTERVALEXTPROC SwapIntervalEXT; PFNWGLGETPIXELFORMATATTRIBIVARBPROC GetPixelFormatAttribivARB; PFNWGLCREATECONTEXTATTRIBSARBPROC CreateContextAttribsARB; } _GLFWlibraryWGL;
     typedef struct _GLFWwindowWin32 { HWND handle; i32 cursorTracked,frameAction,keymenu; int width,height,lastCursorPosX,lastCursorPosY; } _GLFWwindowWin32;
-    typedef struct _GLFWlibraryWin32 {
-        HINSTANCE instance; HWND helperWindowHandle;
-        ATOM helperWindowClass,mainWindowClass;
-        HDEVNOTIFY deviceNotificationHandle;
-        short int keycodes[512],scancodes[GLFW_KEY_LAST + 1];
-        double restoreCurPosX,restoreCurPosY;
-        _GLFWwindow *disabledCursorWindow, *capturedCursorWindow;
-        HCURSOR blankCursor;
-        struct { HINSTANCE instance; PFN_XInputGetCapabilities GetCapabilities; PFN_XInputGetState GetState; } xinput;
-        struct { HINSTANCE instance; PFN_DwmIsCompositionEnabled IsCompositionEnabled; PFN_DwmFlush Flush; } dwmapi;
-        struct { HINSTANCE instance; PFN_RtlVerifyVersionInfo RtlVerifyVersionInfo; } ntdll;
-    } _GLFWlibraryWin32;
+    typedef struct _GLFWlibraryWin32 { HINSTANCE instance; HWND helperWindowHandle; ATOM helperWindowClass,mainWindowClass; HDEVNOTIFY deviceNotificationHandle; short int keycodes[512],scancodes[GLFW_KEY_LAST + 1]; double restoreCurPosX,restoreCurPosY; _GLFWwindow *disabledCursorWindow, *capturedCursorWindow; HCURSOR blankCursor; struct { HINSTANCE instance; PFN_XInputGetCapabilities GetCapabilities; PFN_XInputGetState GetState; } xinput; struct { HINSTANCE instance; PFN_DwmIsCompositionEnabled IsCompositionEnabled; PFN_DwmFlush Flush; } dwmapi; struct { HINSTANCE instance; PFN_RtlVerifyVersionInfo RtlVerifyVersionInfo; } ntdll; } _GLFWlibraryWin32;
     typedef struct _GLFWmonitorWin32 { HMONITOR handle; WCHAR adapterName[32],displayName[32]; char publicAdapterName[32],publicDisplayName[32]; i32 modesPruned,modeChanged; } _GLFWmonitorWin32;
+    typedef struct _GLFWjoystickWin32{ int objectCount; DWORD index; GUID guid; } _GLFWjoystickWin32;
     WCHAR* _glfwCreateWideStringFromUTF8Win32(const char* source);
     BOOL _glfwIsWindowsVersionOrGreaterWin32(WORD major, WORD minor, WORD sp);
     void _glfwPollMonitorsWin32(void);
     void GetWindowSize(_GLFWwindow* window, int* width, int* height);
     void _glfwGetVideoModeWin32(_GLFWmonitor* monitor, GLFWvidmode* mode);
-    #define GLFW_X11_WINDOW_STATE
-    #define GLFW_X11_MONITOR_STATE
-    #define GLFW_X11_LIBRARY_WINDOW_STATE
-    #define GLFW_GLX_CONTEXT_STATE
-    #define GLFW_GLX_LIBRARY_CONTEXT_STATE
-    #define GLFW_WIN32_JOYSTICK_STATE _GLFWjoystickWin32 win32;
-    #define GLFW_WIN32_LIBRARY_JOYSTICK_STATE
-    typedef struct _GLFWjoystickWin32{ int objectCount; DWORD index; GUID guid; } _GLFWjoystickWin32;
-    #define GLFW_LINUX_JOYSTICK_STATE
-    #define GLFW_LINUX_LIBRARY_JOYSTICK_STATE
+    struct _GLFWjoystick { i32 allocated,connected; size_t axesSize,buttonsSize,hatsSize; float*  axes; int axisCount; unsigned char* buttons; int buttonCount; unsigned char* hats; int hatCount; char name[128],guid[33]; _GLFWjoystickWin32 win32; };
+    struct _GLFWlibrary { _GLFWmonitor** monitors; int monitorCount; i32 joysticksInitialized; _GLFWjoystick joysticks[GLFW_JOYSTICK_LAST + 1]; _GLFWlibraryWin32 win32; _GLFWlibraryWGL wgl; };
+    struct _GLFWcontext { int client,source,major,minor; PFNGLGETINTEGERV GetIntegerv; void (*makeCurrent)(_GLFWwindow*); void (*swapBuffers)(_GLFWwindow*); void (*swapInterval)(int); GLFWglproc (*getProcAddress)(const char*); _GLFWcontextWGL wgl; };
+    struct _GLFWwindow { i32 decorated,doublebuffer; GLFWvidmode videoMode; int minwidth,minheight,maxwidth,maxheight,cursorMode; char mouseButtons[GLFW_MOUSE_BUTTON_LAST + 1],keys[GLFW_KEY_LAST + 1]; double virtualCursorPosX,virtualCursorPosY; _GLFWcontext context; _GLFWwindowWin32 win32; };
+    struct _GLFWmonitor { char name[128]; int widthMM,heightMM; GLFWvidmode currentMode; _GLFWmonitorWin32 win32; };
 #else // LINUX
-    #define GLFW_WIN32_WINDOW_STATE
-    #define GLFW_WIN32_MONITOR_STATE
-    #define GLFW_WIN32_LIBRARY_WINDOW_STATE
-    #define GLFW_WGL_CONTEXT_STATE
-    #define GLFW_WGL_LIBRARY_CONTEXT_STATE
     typedef unsigned char KeyCode; typedef int Bool; typedef int Status; typedef unsigned long Atom; typedef unsigned long KeySym;
     typedef char *XPointer;
     typedef unsigned int XcursorUInt; typedef struct _XcursorImage { XcursorUInt version; XcursorUInt size,width,height,xhot,yhot; XcursorUInt delay; XcursorUInt *pixels; } XcursorImage;
@@ -141,8 +116,7 @@ void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n); int Str
     typedef struct _XRROutputInfo { Time timestamp; RRCrtc crtc; char *name; int nameLen; unsigned long mm_width; unsigned long mm_height; Connection connection; SubpixelOrder subpixel_order; int ncrtc; RRCrtc *crtcs; int nclone; RROutput *clones; int nmode; int npreferred; RRMode *modes; } XRROutputInfo;
     typedef struct _XRRCrtcInfo { Time timestamp; int x, y; unsigned int width, height; RRMode mode; Rotation rotation; int noutput; RROutput *outputs; Rotation rotations; int npossible; RROutput *possible; } XRRCrtcInfo;
     typedef XID GLXWindow,GLXDrawable;
-    typedef struct __GLXFBConfig* GLXFBConfig;
-    typedef struct __GLXcontext* GLXContext;
+    typedef struct __GLXFBConfig* GLXFBConfig; typedef struct __GLXcontext* GLXContext;
     typedef void (*__GLXextproc)(void);
     typedef XSizeHints* (* PFN_XAllocSizeHints)(void);
     typedef int (* PFN_XChangeProperty)(Display*,Window,Atom,Atom,int,int,const unsigned char*,int);
@@ -211,46 +185,23 @@ void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n); int Str
     typedef XVisualInfo* (*PFNGLXGETVISUALFROMFBCONFIGPROC)(Display*,GLXFBConfig);
     typedef GLXWindow (*PFNGLXCREATEWINDOWPROC)(Display*,GLXFBConfig,Window,const int*);
     typedef GLXContext (*PFNGLXCREATECONTEXTATTRIBSARBPROC)(Display*,GLXFBConfig,GLXContext,Bool,const int*);
-    #define GLFW_X11_WINDOW_STATE           _GLFWwindowX11 x11;
-    #define GLFW_X11_LIBRARY_WINDOW_STATE   _GLFWlibraryX11 x11;
-    #define GLFW_X11_MONITOR_STATE          _GLFWmonitorX11 x11;
-    #define GLFW_GLX_CONTEXT_STATE          _GLFWcontextGLX glx;
-    #define GLFW_GLX_LIBRARY_CONTEXT_STATE  _GLFWlibraryGLX glx;
     typedef struct _GLFWcontextGLX { GLXContext handle; GLXWindow window; GLXFBConfig fbconfig; } _GLFWcontextGLX;
     typedef struct _GLFWlibraryGLX { int major,minor,eventBase,errorBase; void* handle; PFNGLXGETFBCONFIGSPROC GetFBConfigs; PFNGLXGETFBCONFIGATTRIBPROC GetFBConfigAttrib; PFNGLXQUERYEXTENSIONPROC QueryExtension; PFNGLXQUERYVERSIONPROC QueryVersion; PFNGLXMAKECURRENTPROC MakeCurrent; PFNGLXSWAPBUFFERSPROC SwapBuffers; PFNGLXQUERYEXTENSIONSSTRINGPROC QueryExtensionsString; PFNGLXCREATENEWCONTEXTPROC CreateNewContext; PFNGLXGETVISUALFROMFBCONFIGPROC GetVisualFromFBConfig; PFNGLXCREATEWINDOWPROC CreateWindow; PFNGLXGETPROCADDRESSPROC GetProcAddress; PFNGLXSWAPINTERVALEXTPROC SwapIntervalEXT; PFNGLXCREATECONTEXTATTRIBSARBPROC CreateContextAttribsARB; } _GLFWlibraryGLX;
     typedef struct _GLFWwindowX11 { Colormap colormap; Window handle,parent; XIC ic; i32 overrideRedirect; int width,height,xpos,ypos,lastCursorPosX,lastCursorPosY,warpCursorPosX,warpCursorPosY; } _GLFWwindowX11;
-    typedef struct _GLFWlibraryX11 {
-        Display* display; int screen; Window root; Cursor hiddenCursorHandle; XContext context; short int keycodes[256],scancodes[GLFW_KEY_LAST + 1]; double restoreCurPosX, restoreCurPosY; _GLFWwindow* disabledCursorWindow;
-        Atom NET_SUPPORTED,NET_SUPPORTING_WM_CHECK,WM_PROTOCOLS,WM_STATE,WM_DELETE_WINDOW,NET_WM_NAME,NET_WM_ICON,NET_WM_PING,NET_WM_WINDOW_TYPE,NET_WM_WINDOW_TYPE_NORMAL,NET_WM_STATE,NET_WM_STATE_FULLSCREEN,NET_WM_BYPASS_COMPOSITOR,NET_WORKAREA,NET_CURRENT_DESKTOP,NET_ACTIVE_WINDOW,MOTIF_WM_HINTS,UTF8_STRING;
-        struct { void* handle; i32 utf8; PFN_XAllocSizeHints AllocSizeHints; PFN_XChangeProperty ChangeProperty; PFN_XChangeWindowAttributes ChangeWindowAttributes; PFN_XCheckTypedWindowEvent CheckTypedWindowEvent; PFN_XCreateColormap CreateColormap; PFN_XCreateWindow CreateWindow; PFN_XDefineCursor DefineCursor; PFN_XDeleteProperty DeleteProperty; PFN_XDisplayKeycodes DisplayKeycodes; PFN_XFilterEvent FilterEvent; PFN_XFindContext FindContext; PFN_XFree Free; PFN_XFreeEventData FreeEventData; PFN_XGetInputFocus GetInputFocus; PFN_XGetKeyboardMapping GetKeyboardMapping; PFN_XGetWMNormalHints GetWMNormalHints; PFN_XGetWindowAttributes GetWindowAttributes; PFN_XGetWindowProperty GetWindowProperty; PFN_XGrabPointer GrabPointer; PFN_XInternAtom InternAtom; PFN_XMapWindow MapWindow; PFN_XMoveResizeWindow MoveResizeWindow; PFN_XMoveWindow MoveWindow; PFN_XPending Pending; PFN_XQueryExtension QueryExtension; PFN_XQueryPointer QueryPointer; PFN_XRaiseWindow RaiseWindow; PFN_XResizeWindow ResizeWindow; PFN_XSaveContext SaveContext; PFN_XSendEvent SendEvent; PFN_XSetICFocus SetICFocus; PFN_XSetInputFocus SetInputFocus; PFN_XSetWMNormalHints SetWMNormalHints; PFN_XSetWMProtocols SetWMProtocols; PFN_XTranslateCoordinates TranslateCoordinates; PFN_XUndefineCursor UndefineCursor; PFN_XUngrabPointer UngrabPointer; PFN_XUnsetICFocus UnsetICFocus; PFN_XWarpPointer WarpPointer; } xlib;
-        struct { void* handle; int eventBase,errorBase,major,minor; PFN_XRRFreeCrtcInfo FreeCrtcInfo; PFN_XRRFreeOutputInfo FreeOutputInfo; PFN_XRRFreeScreenResources FreeScreenResources; PFN_XRRGetCrtcInfo GetCrtcInfo; PFN_XRRGetOutputInfo GetOutputInfo; PFN_XRRGetOutputPrimary GetOutputPrimary; PFN_XRRGetScreenResourcesCurrent GetScreenResourcesCurrent; PFN_XRRSelectInput SelectInput; PFN_XRRUpdateConfiguration UpdateConfiguration; } randr;
-        struct { void* handle; PFN_XcursorImageCreate ImageCreate; PFN_XcursorImageDestroy ImageDestroy; PFN_XcursorImageLoadCursor ImageLoadCursor; } xcursor;
-    } _GLFWlibraryX11;
+    typedef struct _GLFWlibraryX11 { Display* display; int screen; Window root; Cursor hiddenCursorHandle; XContext context; short int keycodes[256],scancodes[GLFW_KEY_LAST + 1]; double restoreCurPosX, restoreCurPosY; _GLFWwindow* disabledCursorWindow; Atom NET_SUPPORTED,NET_SUPPORTING_WM_CHECK,WM_PROTOCOLS,WM_STATE,WM_DELETE_WINDOW,NET_WM_NAME,NET_WM_ICON,NET_WM_PING,NET_WM_WINDOW_TYPE,NET_WM_WINDOW_TYPE_NORMAL,NET_WM_STATE,NET_WM_STATE_FULLSCREEN,NET_WM_BYPASS_COMPOSITOR,NET_WORKAREA,NET_CURRENT_DESKTOP,NET_ACTIVE_WINDOW,MOTIF_WM_HINTS,UTF8_STRING; struct { void* handle; i32 utf8; PFN_XAllocSizeHints AllocSizeHints; PFN_XChangeProperty ChangeProperty; PFN_XChangeWindowAttributes ChangeWindowAttributes; PFN_XCheckTypedWindowEvent CheckTypedWindowEvent; PFN_XCreateColormap CreateColormap; PFN_XCreateWindow CreateWindow; PFN_XDefineCursor DefineCursor; PFN_XDeleteProperty DeleteProperty; PFN_XDisplayKeycodes DisplayKeycodes; PFN_XFilterEvent FilterEvent; PFN_XFindContext FindContext; PFN_XFree Free; PFN_XFreeEventData FreeEventData; PFN_XGetInputFocus GetInputFocus; PFN_XGetKeyboardMapping GetKeyboardMapping; PFN_XGetWMNormalHints GetWMNormalHints; PFN_XGetWindowAttributes GetWindowAttributes; PFN_XGetWindowProperty GetWindowProperty; PFN_XGrabPointer GrabPointer; PFN_XInternAtom InternAtom; PFN_XMapWindow MapWindow; PFN_XMoveResizeWindow MoveResizeWindow; PFN_XMoveWindow MoveWindow; PFN_XPending Pending; PFN_XQueryExtension QueryExtension; PFN_XQueryPointer QueryPointer; PFN_XRaiseWindow RaiseWindow; PFN_XResizeWindow ResizeWindow; PFN_XSaveContext SaveContext; PFN_XSendEvent SendEvent; PFN_XSetICFocus SetICFocus; PFN_XSetInputFocus SetInputFocus; PFN_XSetWMNormalHints SetWMNormalHints; PFN_XSetWMProtocols SetWMProtocols; PFN_XTranslateCoordinates TranslateCoordinates; PFN_XUndefineCursor UndefineCursor; PFN_XUngrabPointer UngrabPointer; PFN_XUnsetICFocus UnsetICFocus; PFN_XWarpPointer WarpPointer; } xlib; struct { void* handle; int eventBase,errorBase,major,minor; PFN_XRRFreeCrtcInfo FreeCrtcInfo; PFN_XRRFreeOutputInfo FreeOutputInfo; PFN_XRRFreeScreenResources FreeScreenResources; PFN_XRRGetCrtcInfo GetCrtcInfo; PFN_XRRGetOutputInfo GetOutputInfo; PFN_XRRGetOutputPrimary GetOutputPrimary; PFN_XRRGetScreenResourcesCurrent GetScreenResourcesCurrent; PFN_XRRSelectInput SelectInput; PFN_XRRUpdateConfiguration UpdateConfiguration; } randr; struct { void* handle; PFN_XcursorImageCreate ImageCreate; PFN_XcursorImageDestroy ImageDestroy; PFN_XcursorImageLoadCursor ImageLoadCursor; } xcursor; } _GLFWlibraryX11; 
     PFN_XNextEvent XNextEvent;
     typedef struct _GLFWmonitorX11 { RROutput output; RRCrtc crtc; int index; } _GLFWmonitorX11;
-    void GetCursorPosV(_GLFWwindow* window, double* xpos, double* ypos);
-    void SetCursorPosV(_GLFWwindow* window, double xpos, double ypos);
-    #define GLFW_LINUX_JOYSTICK_STATE _GLFWjoystickLinux linjs;
-    #define GLFW_LINUX_LIBRARY_JOYSTICK_STATE _GLFWlibraryLinux  linjs;
     typedef struct _GLFWjoystickLinux { OsFileHandle fd; char path[260]; int keyMap[0x300/*KEY_CNT*/ - 0x100/*BTN_MISC*/],absMap[0x40/*ABS_CNT*/]; struct input_absinfo absInfo[0x40/*ABS_CNT*/]; int hats[4][2]; } _GLFWjoystickLinux;
     typedef struct _GLFWlibraryLinux { int inotify,watch; i32 dropped; } _GLFWlibraryLinux;
-    #define GLFW_WIN32_JOYSTICK_STATE
-    #define GLFW_WIN32_LIBRARY_JOYSTICK_STATE
+    void GetCursorPosV(_GLFWwindow* window, double* xpos, double* ypos);
+    void SetCursorPosV(_GLFWwindow* window, double xpos, double ypos);
+    struct _GLFWjoystick { i32 allocated,connected; size_t axesSize,buttonsSize,hatsSize; float*  axes; int axisCount; unsigned char* buttons; int buttonCount; unsigned char* hats; int hatCount; char name[128],guid[33]; _GLFWjoystickLinux linjs; };
+    struct _GLFWlibrary { _GLFWmonitor** monitors; int monitorCount; i32 joysticksInitialized; _GLFWjoystick joysticks[GLFW_JOYSTICK_LAST + 1]; _GLFWlibraryX11 x11; _GLFWlibraryGLX glx; _GLFWlibraryLinux linjs; };
+    struct _GLFWcontext { int client,source,major,minor; PFNGLGETINTEGERV GetIntegerv; void (*makeCurrent)(_GLFWwindow*); void (*swapBuffers)(_GLFWwindow*); void (*swapInterval)(int); GLFWglproc (*getProcAddress)(const char*); _GLFWcontextGLX glx; };
+    struct _GLFWwindow { i32 decorated,doublebuffer; GLFWvidmode videoMode; int minwidth,minheight,maxwidth,maxheight,cursorMode; char mouseButtons[GLFW_MOUSE_BUTTON_LAST + 1],keys[GLFW_KEY_LAST + 1]; double virtualCursorPosX,virtualCursorPosY; _GLFWcontext context; _GLFWwindowX11 x11; };
+    struct _GLFWmonitor { char name[128]; int widthMM,heightMM; GLFWvidmode currentMode; _GLFWmonitorX11 x11; };
 #endif
 struct _GLFWfbconfig { int redBits,greenBits,blueBits,alphaBits,depthBits,stencilBits,accumRedBits,accumGreenBits,accumBlueBits,accumAlphaBits; i32 stereo; int samples; i32 sRGB,doublebuffer; uintptr_t handle; };
-struct _GLFWcontext { int client,source,major,minor; PFNGLGETINTEGERV GetIntegerv; void (*makeCurrent)(_GLFWwindow*); void (*swapBuffers)(_GLFWwindow*); void (*swapInterval)(int); GLFWglproc (*getProcAddress)(const char*); GLFW_WGL_CONTEXT_STATE GLFW_GLX_CONTEXT_STATE };
-struct _GLFWwindow { i32 decorated,doublebuffer; GLFWvidmode videoMode; int minwidth,minheight,maxwidth,maxheight,cursorMode; char mouseButtons[GLFW_MOUSE_BUTTON_LAST + 1],keys[GLFW_KEY_LAST + 1]; double virtualCursorPosX,virtualCursorPosY; _GLFWcontext context; GLFW_WIN32_WINDOW_STATE GLFW_X11_WINDOW_STATE };
-struct _GLFWmonitor { char name[128]; int widthMM,heightMM; GLFWvidmode currentMode; GLFW_WIN32_MONITOR_STATE GLFW_X11_MONITOR_STATE };
-struct _GLFWjoystick {
-    i32 allocated,connected; size_t axesSize,buttonsSize,hatsSize; float*  axes; int axisCount; unsigned char* buttons; int buttonCount; unsigned char* hats; int hatCount; char name[128],guid[33];
-    #if defined(LINUX)
-        GLFW_LINUX_JOYSTICK_STATE
-    #else
-        GLFW_WIN32_JOYSTICK_STATE
-    #endif
-};
-
-struct _GLFWlibrary { _GLFWmonitor** monitors; int monitorCount; i32 joysticksInitialized; _GLFWjoystick joysticks[GLFW_JOYSTICK_LAST + 1]; GLFW_WIN32_LIBRARY_WINDOW_STATE GLFW_X11_LIBRARY_WINDOW_STATE GLFW_WGL_LIBRARY_CONTEXT_STATE GLFW_GLX_LIBRARY_CONTEXT_STATE GLFW_WIN32_LIBRARY_JOYSTICK_STATE GLFW_LINUX_LIBRARY_JOYSTICK_STATE };
 extern _GLFWlibrary _glfw;
 void* _glfwPlatformLoadModule(const char* path);
 GLFWproc _glfwPlatformGetModuleSymbol(void* module, const char* name);
@@ -293,40 +244,18 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     static LRESULT CALLBACK windowProc(HWND hWnd,UINT uMsg,WPARAM wParam,LPARAM lParam) {
         _GLFWwindow* window=GetPropW(hWnd,L"GLFW"); if (!window) return DefWindowProcW(hWnd,uMsg,wParam,lParam);
         switch (uMsg) {
-            case WM_MOUSEACTIVATE:
-                if (HIWORD(lParam)==WM_LBUTTONDOWN && LOWORD(lParam)!=HTCLIENT) window->win32.frameAction= 1;
-                break;
-            case WM_CAPTURECHANGED:
-                if (lParam==0&&window->win32.frameAction) {
-                    if (window->cursorMode==GLFW_CURSOR_DISABLED) disableCursor(window);
-                    window->win32.frameAction=0;
-                }
-                break;
-            case WM_SETFOCUS:
-                _glfwInputWindowFocus(window, 1);
-                if (window->win32.frameAction) break;
-                if (window->cursorMode==GLFW_CURSOR_DISABLED) disableCursor(window);
-                return 0;
-            case WM_KILLFOCUS:
-                if (window->cursorMode==GLFW_CURSOR_DISABLED) enableCursor(window);
-                _glfwInputWindowFocus(window,0);
-                return 0;
-            case WM_SYSCOMMAND:
-                switch (wParam&0xfff0) {
-                    case SC_SCREENSAVE:
-                    case SC_MONITORPOWER: break;
-                    case SC_KEYMENU: if (!window->win32.keymenu) return 0; break;
-                }
-                break;
-            case WM_CLOSE: OS_Exit(0);
+            case WM_MOUSEACTIVATE:  if (HIWORD(lParam)==WM_LBUTTONDOWN && LOWORD(lParam)!=HTCLIENT) {window->win32.frameAction= 1;} break;
+            case WM_CAPTURECHANGED: if (lParam==0&&window->win32.frameAction) { if (window->cursorMode==GLFW_CURSOR_DISABLED) {disableCursor(window);} window->win32.frameAction=0; } break;
+            case WM_SETFOCUS:       _glfwInputWindowFocus(window, 1); if (window->win32.frameAction) {break;} if (window->cursorMode==GLFW_CURSOR_DISABLED) {disableCursor(window);} return 0;
+            case WM_KILLFOCUS:      if (window->cursorMode==GLFW_CURSOR_DISABLED) {enableCursor(window);} _glfwInputWindowFocus(window,0); return 0;
+            case WM_SYSCOMMAND:     switch (wParam&0xfff0) { case SC_SCREENSAVE: case SC_MONITORPOWER: break;   case SC_KEYMENU: if (!window->win32.keymenu) return 0; break; } break;
+            case WM_CLOSE:          OS_Exit(0);
             case WM_KEYDOWN: case WM_SYSKEYDOWN: case WM_KEYUP: case WM_SYSKEYUP: {
                 int key,scancode;
                 const int action=(HIWORD(lParam)&KF_UP)?GLFW_RELEASE:GLFW_PRESS;
                 scancode=(HIWORD(lParam)&(KF_EXTENDED|0xff));
                 if (!scancode) scancode=MapVirtualKeyW((UINT)wParam,MAPVK_VK_TO_VSC);
-                if (scancode==0x54) scancode=0x137;
-                if (scancode==0x146) scancode=0x45;
-                if (scancode==0x136) scancode=0x36;
+                if (scancode==0x54) {scancode=0x137;}   if (scancode==0x146) {scancode=0x45;}   if (scancode==0x136) {scancode=0x36;}
                 key=_glfw.win32.keycodes[scancode];
                 if (wParam==VK_CONTROL) {
                     if (HIWORD(lParam)&KF_EXTENDED) key=GLFW_KEY_RIGHT_CONTROL;
@@ -337,16 +266,13 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
                                 if (next.wParam==VK_MENU&&(HIWORD(next.lParam)&KF_EXTENDED)&&next.time==time) break;
                             }
                         }
+                        
                         key=GLFW_KEY_LEFT_CONTROL;
                     }
                 } else if (wParam==VK_PROCESSKEY) break;
-                if (action==GLFW_RELEASE&&wParam==VK_SHIFT) {
-                    _glfwInputKey(window,GLFW_KEY_LEFT_SHIFT,action);
-                    _glfwInputKey(window,GLFW_KEY_RIGHT_SHIFT,action);
-                } else if (wParam==VK_SNAPSHOT) {
-                    _glfwInputKey(window,key,GLFW_PRESS);
-                    _glfwInputKey(window,key,GLFW_RELEASE);
-                } else _glfwInputKey(window,key,action);
+                if (action==GLFW_RELEASE&&wParam==VK_SHIFT) { _glfwInputKey(window,GLFW_KEY_LEFT_SHIFT,action); _glfwInputKey(window,GLFW_KEY_RIGHT_SHIFT,action); }
+                else if (wParam==VK_SNAPSHOT) { _glfwInputKey(window,key,GLFW_PRESS); _glfwInputKey(window,key,GLFW_RELEASE); }
+                else _glfwInputKey(window,key,action);
                 break;
             }
             case WM_LBUTTONDOWN: case WM_RBUTTONDOWN: case WM_MBUTTONDOWN: case WM_XBUTTONDOWN:
@@ -356,7 +282,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
                 else if (uMsg==WM_RBUTTONDOWN||uMsg==WM_RBUTTONUP) button=GLFW_MOUSE_BUTTON_RIGHT;
                 else if (uMsg==WM_MBUTTONDOWN||uMsg==WM_MBUTTONUP) button=GLFW_MOUSE_BUTTON_MIDDLE;
                 else if (GET_XBUTTON_WPARAM(wParam)==XBUTTON1)     button=GLFW_MOUSE_BUTTON_4;
-                else                                                button=GLFW_MOUSE_BUTTON_5;
+                else                                               button=GLFW_MOUSE_BUTTON_5;
                 action=(uMsg==WM_LBUTTONDOWN||uMsg==WM_RBUTTONDOWN||uMsg==WM_MBUTTONDOWN||uMsg==WM_XBUTTONDOWN)?GLFW_PRESS:GLFW_RELEASE;
                 for (i=0;i<=GLFW_MOUSE_BUTTON_LAST;i++) { if (window->mouseButtons[i]==GLFW_PRESS) break; }
                 if (i>GLFW_MOUSE_BUTTON_LAST) SetCapture(hWnd);
@@ -374,11 +300,13 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
                     TrackMouseEvent(&tme);
                     window->win32.cursorTracked= 1;
                 }
+                
                 if (window->cursorMode==GLFW_CURSOR_DISABLED) {
                     const int dx=x-window->win32.lastCursorPosX,dy=y-window->win32.lastCursorPosY;
                     if (_glfw.win32.disabledCursorWindow!=window) break;
                     _glfwInputCursorPos(window,window->virtualCursorPosX+dx,window->virtualCursorPosY+dy);
                 }
+                
                 window->win32.lastCursorPosX=x; window->win32.lastCursorPosY=y;
                 return 0;
             }
@@ -413,6 +341,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
             case WM_NCACTIVATE: case WM_NCPAINT: { if (!window->decorated) return TRUE; break; }
             case WM_SETCURSOR: { if (LOWORD(lParam)==HTCLIENT) { updateCursorImage(window); return TRUE; } break; }
         }
+        
         return DefWindowProcW(hWnd,uMsg,wParam,lParam);
     }
 

@@ -1,6 +1,5 @@
 // audio.c - Audio System
 #include "os.h"
-#include <pthread.h>
 #include "common.h"
 #include "interop.h"
 #define AUDIO_RATE      48000
@@ -33,7 +32,7 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
         if (wasapi_dev_count>=8/*MAX_WASAPI_DEVICES*/) return -1;
         wasapi_dev_t *w = &wasapi_devs[wasapi_dev_count];
         HRESULT hr = dev->lpVtbl->Activate(dev,&IID_IAudioClient_,23,NULL,(void**)&w->client);
-        if (FAILED(hr)) return -1;
+        if (FAILED(hr)) { DualLogError("WASAPI Activate failed, %u\n",hr); return -1; }
         WAVEFORMATEX fmt = {1,(WORD)channels,(DWORD)rate,(DWORD)(rate*channels*2),(WORD)(channels*2),16,0};
         REFERENCE_TIME buf_dur = (REFERENCE_TIME)(period_frames*periods)*10000000LL/rate;
         hr = w->client->lpVtbl->Initialize(w->client,0,524288,buf_dur,0,&fmt,NULL);
@@ -51,7 +50,7 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
     OsFileHandle pcm_open_all(int rate,int channels,int period_frames,int periods) {
         CoInitializeEx(NULL,0);
         IMMDeviceEnumerator *en = NULL;
-        if (FAILED(CoCreateInstance(&CLSID_MMDeviceEnumerator_,NULL,23,&IID_IMMDeviceEnumerator_,(void**)&en))) return OS_INVALID_HANDLE;
+        if (FAILED(CoCreateInstance(&CLSID_MMDeviceEnumerator_,NULL,23,&IID_IMMDeviceEnumerator_,(void**)&en))) { DualLogError("CoCreateInstance fail\n"); return OS_INVALID_HANDLE; }
         IMMDevice *dev = NULL;
         HRESULT hr = en->lpVtbl->GetDefaultAudioEndpoint(en,eRender,eConsole,&dev);
         en->lpVtbl->Release(en);
@@ -76,7 +75,6 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
     OsFileHandle pcm_open(int card,int dev,int flags) { (void)card;(void)dev;(void)flags; return OS_INVALID_HANDLE; }
     int pcm_params_setup(OsFileHandle fd,pcm_params_t *p) { (void)fd;(void)p; return -1; }
     int pcm_params_refine(OsFileHandle fd,pcm_params_t *p) { (void)fd;(void)p; return 0; }
-
     int pcm_sync(OsFileHandle fd,pcm_sync_t *sync,unsigned int flags) {
         (void)flags;
         int idx=FD_TO_IDX(fd);
@@ -112,6 +110,71 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
     int pcm_pause(OsFileHandle fd)   { return pcm_stop(fd); }
     int pcm_unpause(OsFileHandle fd) { int i=FD_TO_IDX(fd); if(i>=0&&i<wasapi_dev_count) wasapi_devs[i].client->lpVtbl->Start(wasapi_devs[i].client); return 0; }
 #else
+    int ioctl(int fd, unsigned long request, ...);
+    #define _IOC_NRBITS     8
+    #define _IOC_TYPEBITS   8
+    #define _IOC_SIZEBITS   14
+    #define _IOC_DIRBITS    2
+    #define _IOC_NRSHIFT    0
+    #define _IOC_TYPESHIFT  (_IOC_NRSHIFT + _IOC_NRBITS)
+    #define _IOC_SIZESHIFT  (_IOC_TYPESHIFT + _IOC_TYPEBITS)
+    #define _IOC_DIRSHIFT   (_IOC_SIZESHIFT + _IOC_SIZEBITS)
+    #define _IOC_NONE       0U
+    #define _IOC_WRITE      1U
+    #define _IOC_READ       2U
+    #define _IOC(dir, type, nr, size) (((dir) << _IOC_DIRSHIFT) | ((type) << _IOC_TYPESHIFT) | ((nr) << _IOC_NRSHIFT) | ((size) << _IOC_SIZESHIFT))
+    #define _IO(type, nr) _IOC(_IOC_NONE, (type), (nr), 0)
+    #define _IOR(type, nr, size) _IOC(_IOC_READ, (type), (nr), sizeof(size))
+    #define _IOW(type, nr, size) _IOC(_IOC_WRITE, (type), (nr), sizeof(size))
+    #define _IOWR(type, nr, size) _IOC(_IOC_READ | _IOC_WRITE, (type), (nr), sizeof(size))
+    typedef unsigned long snd_pcm_uframes_t;
+    typedef long          snd_pcm_sframes_t;
+    #define SNDRV_PCM_HW_PARAM_ACCESS        0
+    #define SNDRV_PCM_HW_PARAM_FORMAT        1
+    #define SNDRV_PCM_HW_PARAM_SUBFORMAT     2
+    #define SNDRV_PCM_HW_PARAM_FIRST_MASK    SNDRV_PCM_HW_PARAM_ACCESS
+    #define SNDRV_PCM_HW_PARAM_LAST_MASK     SNDRV_PCM_HW_PARAM_SUBFORMAT
+    #define SNDRV_PCM_HW_PARAM_SAMPLE_BITS   8
+    #define SNDRV_PCM_HW_PARAM_FRAME_BITS    9
+    #define SNDRV_PCM_HW_PARAM_CHANNELS      10
+    #define SNDRV_PCM_HW_PARAM_RATE          11
+    #define SNDRV_PCM_HW_PARAM_PERIOD_TIME   12
+    #define SNDRV_PCM_HW_PARAM_PERIOD_SIZE   13
+    #define SNDRV_PCM_HW_PARAM_PERIOD_BYTES  14
+    #define SNDRV_PCM_HW_PARAM_PERIODS       15
+    #define SNDRV_PCM_HW_PARAM_BUFFER_TIME   16
+    #define SNDRV_PCM_HW_PARAM_BUFFER_SIZE   17
+    #define SNDRV_PCM_HW_PARAM_BUFFER_BYTES  18
+    #define SNDRV_PCM_HW_PARAM_TICK_TIME     19
+    #define SNDRV_PCM_HW_PARAM_FIRST_INTERVAL SNDRV_PCM_HW_PARAM_SAMPLE_BITS
+    #define SNDRV_PCM_HW_PARAM_LAST_INTERVAL  SNDRV_PCM_HW_PARAM_TICK_TIME
+    #define SNDRV_PCM_HW_PARAMS_NO_PERIOD_WAKEUP (1<<2)
+    #define SNDRV_PCM_FORMAT_S16_LE              2
+    #define SNDRV_PCM_ACCESS_RW_INTERLEAVED      3
+    #define SNDRV_PCM_TSTAMP_ENABLE              1
+    #define SNDRV_PCM_TSTAMP_TYPE_GETTIMEOFDAY   0
+    #define SNDRV_PCM_TSTAMP_TYPE_MONOTONIC      1
+    #define SNDRV_PCM_TSTAMP_TYPE_MONOTONIC_RAW  2
+    #define SNDRV_PCM_SYNC_PTR_HWSYNC            1
+    #define SNDRV_PCM_SYNC_PTR_APPL              2
+    #define SNDRV_PCM_SYNC_PTR_AVAIL_MIN         4
+    struct snd_mask { u32 bits[8]; };
+    struct snd_interval { unsigned int min,max; unsigned int openmin:1, openmax:1, integer:1, empty:1; };
+    struct snd_pcm_hw_params { unsigned int flags; struct snd_mask masks[3]; struct snd_mask mres[5]; struct snd_interval intervals[12]; struct snd_interval ires[9]; unsigned int rmask,cmask,info,msbits,rate_num,rate_den; snd_pcm_uframes_t fifo_size; unsigned char reserved[64]; };
+    struct snd_pcm_sw_params { int tstamp_mode; unsigned int period_step,sleep_min; snd_pcm_uframes_t avail_min,xfer_align,start_threshold,stop_threshold,silence_threshold,silence_size,boundary; unsigned int proto,tstamp_type; unsigned char reserved[56]; }; 
+    struct snd_pcm_mmap_status { int state,pad1; snd_pcm_uframes_t hw_ptr; struct timespec tstamp; int suspended_state; struct timespec audio_tstamp; };
+    struct snd_pcm_mmap_control { snd_pcm_uframes_t appl_ptr; snd_pcm_uframes_t avail_min; };
+    struct snd_pcm_sync_ptr { unsigned int flags; union { struct snd_pcm_mmap_status  status; unsigned char reserved[64]; } s; union { struct snd_pcm_mmap_control control; unsigned char reserved[64]; } c; };
+    struct snd_pcm_status { int state; struct timespec trigger_tstamp; struct timespec tstamp; snd_pcm_uframes_t appl_ptr,hw_ptr; snd_pcm_sframes_t delay; snd_pcm_uframes_t avail,avail_max,overrange; int suspended_state; unsigned int audio_tstamp_data; struct timespec audio_tstamp; struct timespec driver_tstamp; unsigned int audio_tstamp_accuracy; unsigned char reserved[20]; };
+    struct snd_xferi { snd_pcm_sframes_t result; void *buf; snd_pcm_uframes_t frames; };
+    #define SNDRV_PCM_IOCTL_TTSTAMP        _IOW( 'A', 0x03, int)
+    #define SNDRV_PCM_IOCTL_HW_REFINE      _IOWR('A', 0x10, struct snd_pcm_hw_params)
+    #define SNDRV_PCM_IOCTL_HW_PARAMS      _IOWR('A', 0x11, struct snd_pcm_hw_params)
+    #define SNDRV_PCM_IOCTL_SW_PARAMS      _IOWR('A', 0x13, struct snd_pcm_sw_params)
+    #define SNDRV_PCM_IOCTL_STATUS         _IOR( 'A', 0x20, struct snd_pcm_status)
+    #define SNDRV_PCM_IOCTL_SYNC_PTR       _IOWR('A', 0x23, struct snd_pcm_sync_ptr)
+    #define SNDRV_PCM_IOCTL_PREPARE        _IO(  'A', 0x40)
+    #define SNDRV_PCM_IOCTL_WRITEI_FRAMES  _IOW( 'A', 0x50, struct snd_xferi)
     typedef struct snd_pcm_mmap_status  pcm_status_t;
     typedef struct snd_pcm_mmap_control pcm_control_t;
     struct pcm_sync { pcm_status_t status; pcm_control_t control; };
@@ -849,161 +912,140 @@ static int drmp3dec_decode_frame(drmp3dec *dec, const u8 *mp3, int mp3_bytes, vo
     return success*drmp3_hdr_frame_samples(dec->header);
 }
 
-#include <stdio.h>
-static size_t drmp3__on_read_stdio(void *ud, void *buf, size_t n) { return fread(buf,1,n,(FILE*)ud); }
-static bool drmp3__on_seek_stdio(void *ud, int offset, u8 origin) { u8 w = origin; return fseek((FILE*)ud,offset,w)==0; }
-static size_t drmp3__on_read(drmp3 *p, void *buf, size_t n){ size_t r=p->onRead(p->pUserData,buf,n); p->streamCursor+=r; return r; }
-static size_t drmp3__on_read_clamped(drmp3 *p, void *buf, size_t n){
-    if (p->streamLength == DRMP3_UINT64_MAX) return drmp3__on_read(p,buf,n);
-    u64 rem=p->streamLength-p->streamCursor; if(n>rem)n=(size_t)rem;
-    return drmp3__on_read(p,buf,n);
-}
-
-static bool drmp3__on_seek(drmp3 *p, int offset, u8 origin){
-    if (!p->onSeek(p->pUserData,offset,origin)) return 0;
-    if (origin == 0) p->streamCursor=(u64)offset; else p->streamCursor+=offset;
-    return 1;
-}
-
+static size_t drmp3__on_read_os(void *ud, void *buf, size_t n) { OsFileHandle f = (OsFileHandle)(uintptr_t)ud; if (f == OS_INVALID_HANDLE) {return 0;} long result = OS_Read(f,buf,n); return (result > 0) ? (size_t)result : 0; }
+static bool drmp3__on_seek_os(void *ud, int offset, u8 origin) { OsFileHandle f = (OsFileHandle)(uintptr_t)ud; if (f == OS_INVALID_HANDLE) {return false;} int whence = origin; return OS_Seek(f,(i64)offset,whence) >= 0; }
+static size_t drmp3__on_read(drmp3 *p, void *buf, size_t n) { size_t r = p->onRead(p->pUserData,buf,n); p->streamCursor += r; return r; }
+static size_t drmp3__on_read_clamped(drmp3 *p, void *buf, size_t n) { if (p->streamLength == DRMP3_UINT64_MAX) {return drmp3__on_read(p,buf,n);} u64 rem = p->streamLength - p->streamCursor; if (n > rem) n = (size_t)rem; return drmp3__on_read(p,buf,n); }
+static bool drmp3__on_seek(drmp3 *p, int offset, u8 origin) { if (!p->onSeek(p->pUserData,offset,origin)) {return false;} if (origin == 0) {p->streamCursor = (u64)offset;}else{p->streamCursor += (u64)offset;} return true; }
 static u32 drmp3_decode_next_frame_ex(drmp3 *p, drmp3d_sample_t *pPCMFrames, drmp3dec_frame_info *pInfo) {
-    u32 pcmFramesRead=0;
-    if (p->atEnd) return 0;
-    for(;;){
+    u32 pcmFramesRead = 0; if (p->atEnd) return 0;
+
+    for (;;) {
         drmp3dec_frame_info info;
-        if (p->dataSize<16384){
-            if(p->pData) DRMP3_MOVE_MEMORY(p->pData,p->pData+p->dataConsumed,p->dataSize);
-            p->dataConsumed=0;
-            if(p->dataCapacity<(16384*4)){ u8 *nd=(u8*)OS_Realloc(p->pData,p->dataCapacity,16384*4); p->pData=nd; p->dataCapacity=16384*4; }
-            size_t bytesRead = drmp3__on_read_clamped(p,p->pData+p->dataSize,p->dataCapacity-p->dataSize);
-            if(!bytesRead&&p->dataSize==0){p->atEnd=1;return 0;}
-            
-            p->dataSize+=bytesRead;
-        }
-        if (p->dataSize>I32_MAX) { p->atEnd=1; return 0; }
-        if (!p->pData) return 0;
-        
-        pcmFramesRead=drmp3dec_decode_frame(&p->decoder,p->pData+p->dataConsumed,(int)p->dataSize,pPCMFrames,&info);
-        p->dataConsumed+=(size_t)info.frame_bytes;
-        p->dataSize    -=(size_t)info.frame_bytes;
-        if(pcmFramesRead>0){
-            pcmFramesRead=drmp3_hdr_frame_samples(p->decoder.header);
-            p->pcmFramesConsumedInMP3Frame=0;
-            p->pcmFramesRemainingInMP3Frame=pcmFramesRead;
-            p->mp3FrameChannels=info.channels;
-            p->mp3FrameSampleRate=info.sample_rate;
-            if(pInfo) *pInfo=info;
-            break;
-        } else if (info.frame_bytes==0) {
-            DRMP3_MOVE_MEMORY(p->pData,p->pData+p->dataConsumed,p->dataSize);
-            p->dataConsumed=0;
-            if(p->dataCapacity==p->dataSize){
-                size_t needed = p->dataCapacity+16384*4;
-                u8 *nd=(u8*)OS_Realloc(p->pData,p->dataCapacity,needed);
-                p->pData=nd; p->dataCapacity=needed;
+        if (p->dataSize < 16384) {
+            if (p->pData) DRMP3_MOVE_MEMORY(p->pData, p->pData + p->dataConsumed, p->dataSize);
+            p->dataConsumed = 0;
+            if (p->dataCapacity < (16384 * 4)) {
+                u8 *nd = (u8*)OS_Realloc(p->pData, p->dataCapacity, 16384 * 4);
+                p->pData = nd;
+                p->dataCapacity = 16384 * 4;
             }
-            
-            size_t bytesRead=drmp3__on_read_clamped(p,p->pData+p->dataSize,p->dataCapacity-p->dataSize);
-            if(!bytesRead){p->atEnd=1;return 0;}
-            
-            p->dataSize+=bytesRead;
+
+            size_t bytesRead = drmp3__on_read_clamped(p, p->pData + p->dataSize, p->dataCapacity - p->dataSize);
+            if (!bytesRead && p->dataSize == 0) { p->atEnd = 1; return 0; }
+            p->dataSize += bytesRead;
+        }
+
+        if (p->dataSize > I32_MAX) { p->atEnd = 1; return 0; }
+        if (!p->pData) return 0;
+
+        pcmFramesRead = drmp3dec_decode_frame(&p->decoder, p->pData + p->dataConsumed, (int)p->dataSize, pPCMFrames, &info);
+        p->dataConsumed += (size_t)info.frame_bytes;
+        p->dataSize     -= (size_t)info.frame_bytes;
+        if (pcmFramesRead > 0) {
+            pcmFramesRead = drmp3_hdr_frame_samples(p->decoder.header);
+            p->pcmFramesConsumedInMP3Frame = 0;
+            p->pcmFramesRemainingInMP3Frame = pcmFramesRead;
+            p->mp3FrameChannels = info.channels;
+            p->mp3FrameSampleRate = info.sample_rate;
+            if (pInfo) *pInfo = info;
+            break;
+        } else if (info.frame_bytes == 0) {
+            DRMP3_MOVE_MEMORY(p->pData, p->pData + p->dataConsumed, p->dataSize);
+            p->dataConsumed = 0;
+            if (p->dataCapacity == p->dataSize) {
+                size_t needed = p->dataCapacity + 16384 * 4;
+                u8 *nd = (u8*)OS_Realloc(p->pData, p->dataCapacity, needed);
+                p->pData = nd;
+                p->dataCapacity = needed;
+            }
+
+            size_t bytesRead = drmp3__on_read_clamped(p, p->pData + p->dataSize, p->dataCapacity - p->dataSize);
+            if (!bytesRead) { p->atEnd = 1; return 0; }
+            p->dataSize += bytesRead;
         }
     }
     return pcmFramesRead;
 }
+
 static u32 drmp3_decode_next_frame(drmp3 *p) { return drmp3_decode_next_frame_ex(p,(drmp3d_sample_t*)p->pcmFrames,NULL); }
 static void drmp3__skip_id3v2(drmp3 *p) {
-    char h[10];
-    if(p->onRead(p->pUserData,h,10)!=10) return;
-    if(h[0]=='I'&&h[1]=='D'&&h[2]=='3'){
-        u32 sz=(((u32)h[6]&0x7F)<<21)|(((u32)h[7]&0x7F)<<14)|(((u32)h[8]&0x7F)<<7)|((u32)h[9]&0x7F);
-        if(h[5]&0x10) sz+=10;
-        p->onSeek(p->pUserData,(int)sz,1);
-        p->streamStartOffset+=10+sz;
-        p->streamCursor=p->streamStartOffset;
-    } else p->onSeek(p->pUserData,0,0);
+    char h[10]; if (p->onRead(p->pUserData, h, 10) != 10) return;
+
+    if (h[0] == 'I' && h[1] == 'D' && h[2] == '3') {
+        u32 sz = (((u32)h[6] & 0x7F) << 21) | (((u32)h[7] & 0x7F) << 14) | (((u32)h[8] & 0x7F) << 7) | ((u32)h[9] & 0x7F);
+        if (h[5] & 0x10) sz += 10;
+        p->onSeek(p->pUserData, (int)sz,1); // SEEK_CUR
+        p->streamStartOffset += 10 + sz;
+        p->streamCursor = p->streamStartOffset;
+    } else p->onSeek(p->pUserData,0,0); // SEEK_SET
 }
 
-static bool drmp3_init_internal(drmp3 *p, drmp3_read_proc onRead, drmp3_seek_proc onSeek){
+static bool drmp3_init_internal(drmp3 *p, drmp3_read_proc onRead, drmp3_seek_proc onSeek) {
     drmp3dec_frame_info firstFrameInfo;
     u32 firstFramePCMFrameCount;
     drmp3dec_init(&p->decoder);
-    p->onRead=onRead; p->onSeek=onSeek;
-    p->streamCursor=0; p->streamLength=DRMP3_UINT64_MAX;
-    p->streamStartOffset=0;
-    p->delayInPCMFrames=0; p->paddingInPCMFrames=0;
-    p->totalPCMFrameCount=DRMP3_UINT64_MAX;
-    if(onSeek){ /* detect stream length via seek-to-end (skip ID3v1/APE quietly) */
-        if(onSeek(p->pUserData,0,2)){
-            long slen=(long)ftell((FILE*)p->pUserData);
-            if(slen>0){
-                if(slen>128){ /* check for ID3v1 tag (128 bytes at end) */
+    p->onRead = onRead;
+    p->onSeek = onSeek;
+    p->streamCursor = 0;
+    p->streamLength = DRMP3_UINT64_MAX;
+    p->streamStartOffset = 0;
+    p->delayInPCMFrames = 0;
+    p->paddingInPCMFrames = 0;
+    p->totalPCMFrameCount = DRMP3_UINT64_MAX;
+    if (onSeek) {
+        if (onSeek(p->pUserData, 0, 2)) { // SEEK_END
+            i64 slen = OS_Tell((OsFileHandle)(uintptr_t)p->pUserData);
+            if (slen > 0) {
+                if (slen > 128) {
                     char tag[3];
-                    fseek((FILE*)p->pUserData,-128,2);
-                    if(fread(tag,1,3,(FILE*)p->pUserData)==3&&tag[0]=='T'&&tag[1]=='A'&&tag[2]=='G') slen-=128;
+                    onSeek(p->pUserData, -128, 2);
+                    if (drmp3__on_read(p, tag, 3) == 3 && tag[0]=='T' && tag[1]=='A' && tag[2]=='G') slen -= 128;
                 }
-                p->streamLength=(u64)slen;
+                
+                p->streamLength = (u64)slen;
             }
-            onSeek(p->pUserData,0,0);
-            p->streamCursor=0;
+            
+            onSeek(p->pUserData, 0, 0);
+            p->streamCursor = 0;
         }
     }
 
     drmp3__skip_id3v2(p);
-    firstFramePCMFrameCount=drmp3_decode_next_frame_ex(p,(drmp3d_sample_t*)p->pcmFrames,&firstFrameInfo);
-    if(firstFramePCMFrameCount==0){ OS_DeallocateRAM(p->pData,p->dataCapacity); p->pData=NULL; p->dataCapacity=0; return 0; }
-
-    drmp3_bs bs; drmp3_L3_gr_info grInfo[4];
-    const u8 *pFirstFrameData=(const u8*)p->pData+(p->dataConsumed-(size_t)firstFrameInfo.frame_bytes);
-    bs.buf=pFirstFrameData+DRMP3_HDR_SIZE; bs.pos=0; bs.limit=(firstFrameInfo.frame_bytes-DRMP3_HDR_SIZE) * 8;
-    if(DRMP3_HDR_IS_CRC(pFirstFrameData)) drmp3_bs_get_bits(&bs,16);
-    if(drmp3_L3_read_side_info(&bs,grInfo,pFirstFrameData)>=0){
-        const u8 *td=pFirstFrameData+DRMP3_HDR_SIZE+(bs.pos/8);
-        if((size_t)(firstFrameInfo.frame_bytes-(td-pFirstFrameData))>=8){
-            int isXing=(td[0]=='X'&&td[1]=='i'&&td[2]=='n'&&td[3]=='g');
-            int isInfo=(td[0]=='I'&&td[1]=='n'&&td[2]=='f'&&td[3]=='o');
-            if(isXing||isInfo){
-                u32 flags=td[7]; td+=8;
-                if(flags&0x01&&(size_t)(firstFrameInfo.frame_bytes-(td-pFirstFrameData))>=4){
-                    u32 mp3fc=(u32)td[0]<<24|(u32)td[1]<<16|(u32)td[2]<<8|(u32)td[3];
-                    p->totalPCMFrameCount=(u64)mp3fc*firstFramePCMFrameCount;
-                    td+=4;
-                }
-                if(flags&0x02&&(size_t)(firstFrameInfo.frame_bytes-(td-pFirstFrameData))>=4) td+=4;
-                if(flags&0x04&&(size_t)(firstFrameInfo.frame_bytes-(td-pFirstFrameData))>=100) td+=100;
-                if(flags&0x08&&(size_t)(firstFrameInfo.frame_bytes-(td-pFirstFrameData))>=4) td+=4;
-                if(td[0]&&(size_t)(firstFrameInfo.frame_bytes-(td-pFirstFrameData))>=36){ /* LAME delay/padding */
-                    int d,pad; td+=21;
-                    d  =(((u32)td[0]<<4)|((u32)td[1]>>4))+(528+1);
-                    pad=((((u32)td[1]&0xF)<<8)|((u32)td[2]))  -(528+1);
-                    if(pad<0) pad=0;
-                    p->delayInPCMFrames=(u32)d; p->paddingInPCMFrames=(u32)pad;
-                }
-               
-                p->pcmFramesRemainingInMP3Frame=0;
-                p->streamStartOffset+=(u32)firstFrameInfo.frame_bytes;
-                p->streamCursor=p->streamStartOffset;
-                drmp3dec_init(&p->decoder);
-            }
-        }
+    firstFramePCMFrameCount = drmp3_decode_next_frame_ex(p, (drmp3d_sample_t*)p->pcmFrames, &firstFrameInfo);
+    if (firstFramePCMFrameCount == 0) {
+        OS_DeallocateRAM(p->pData, p->dataCapacity);
+        p->pData = NULL;
+        p->dataCapacity = 0;
+        return false;
     }
 
-    p->channels  =p->mp3FrameChannels;
-    p->sampleRate=p->mp3FrameSampleRate;
-    return 1;
+    p->channels   = p->mp3FrameChannels;
+    p->sampleRate = p->mp3FrameSampleRate;
+    return true;
 }
 
-static bool drmp3_init_file(drmp3 *pMP3, const char *pFilePath){
-    FILE *f; bool result;
-    if(!pMP3||!pFilePath) return 0;
+static bool drmp3_init_file(drmp3 *pMP3, const char *pFilePath) {
+    if (!pMP3 || !pFilePath) return false;
+
     DRMP3_ZERO_OBJECT(pMP3);
-    f=fopen(pFilePath,"rb"); if(!f) return 0;
-    pMP3->pUserData=(void*)f;
-    result=drmp3_init_internal(pMP3,drmp3__on_read_stdio,drmp3__on_seek_stdio);
-    if(!result){ fclose(f); return 0; }
-    return 1;
+    OsFileHandle f = OS_OpenReadonly(pFilePath);
+    if (f == OS_INVALID_HANDLE) return false;
+
+    pMP3->pUserData = (void*)(uintptr_t)f;
+    bool result = drmp3_init_internal(pMP3, drmp3__on_read_os, drmp3__on_seek_os);
+    if (!result) { OS_Close(f); return false; }
+    return true;
 }
 
-static void drmp3_uninit(drmp3 *pMP3){ if(!pMP3) {return;} if(pMP3->pUserData){ fclose((FILE*)pMP3->pUserData); pMP3->pUserData=NULL; } OS_DeallocateRAM(pMP3->pData,pMP3->dataCapacity); pMP3->pData=NULL; pMP3->dataCapacity=0; }
+static void drmp3_uninit(drmp3 *pMP3) {
+    if (!pMP3) return;
+
+    if (pMP3->pUserData) { OS_Close((OsFileHandle)(uintptr_t)pMP3->pUserData); pMP3->pUserData = NULL; }
+    OS_DeallocateRAM(pMP3->pData, pMP3->dataCapacity);
+    pMP3->pData = NULL;
+    pMP3->dataCapacity = 0;
+}
 static void drmp3_reset(drmp3 *p) { p->pcmFramesConsumedInMP3Frame=0; p->pcmFramesRemainingInMP3Frame=0; p->currentPCMFrame=0; p->dataSize=0; p->atEnd=0; drmp3dec_init(&p->decoder); }
 static bool drmp3_seek_to_start_of_stream(drmp3 *p){u64 o=p->streamStartOffset;if(!drmp3__on_seek(p,o<=0x7FFFFFFF?(int)o:0x7FFFFFFF,0))return 0;if(o>0x7FFFFFFF){o-=0x7FFFFFFF;while(o>0){int c=(o<=0x7FFFFFFF)?(int)o:0x7FFFFFFF;if(!drmp3__on_seek(p,c,1))return 0;o-=c;}}drmp3_reset(p);return 1;}
 static u64 drmp3_read_pcm_frames_raw(drmp3 *p, u64 framesToRead, void *pBufferOut){
@@ -1457,7 +1499,7 @@ pthread_t audThreadID; int usleep(u32 usec);
 void* AudThread(void* arg) { (void)arg; while (1) { AudioUpdate(); usleep(1000); } return NULL; }
 void InitAudio(void) {
 #ifdef WINDOWS
-    OsFileHandle first = pcm_open_all(AUDIO_RATE, AUDIO_CHANNELS, AUDIO_FRAMES, AUDIO_PERIODS);
+    OsFileHandle first = pcm_open_all(AUDIO_RATE,AUDIO_CHANNELS,AUDIO_FRAMES,AUDIO_PERIODS);
     if (first == OS_INVALID_HANDLE) { DualLog("ERROR: No WASAPI audio device found\n"); return; }
     pcm_fds[0] = first; pcm_fd_count = 1;
     DualLog("Audio: WASAPI %d device(s) active\n", wasapi_dev_count);

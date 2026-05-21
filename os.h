@@ -25,27 +25,18 @@ typedef __UINT64_TYPE__ u64;
 ENGINE_TO_MOD void DualLogError(const char* fmt, ...);
 char* StringFindSubstring(const char* haystack, const char* needle);
 void DebugRAM(const char *context);
-#include <pthread.h> // For model and texture loading only
 #if defined(_WIN32) || defined(_WIN64)
     #define WINDOWS
-    #define WIN32_LEAN_AND_MEAN // Let 'er rip, tater chip
-    #define NOMINMAX
-    #define VC_EXTRALEAN
-    #define UNICODE
-    #define OEMRESOURCE // OEM cursor resources for win init
-    #define OCR_NORMAL 32512
-    #define WINVER 0x0601 // Windows 7 or later
-    #define _MINWINDEF_
-    #define STRICT 1
-    #define WIN32
-    #define BASETYPES
-    typedef unsigned __LONG32 ULONG;
+    #define __LONG32 long
+    #define __int64 long long
+    typedef unsigned int ULONG;
     typedef ULONG *PULONG;
     typedef unsigned short USHORT;
     typedef USHORT *PUSHORT;
     typedef unsigned char UCHAR;
     typedef UCHAR *PUCHAR;
     typedef char *PSZ;
+    typedef unsigned short wchar_t;
     #define MAX_PATH 260
     #define FALSE 0
     #define TRUE 1
@@ -64,6 +55,7 @@ void DebugRAM(const char *context);
     #define APIPRIVATE __stdcall
     #define PASCAL __stdcall
     #define WINAPI_INLINE WINAPI
+    #define __MSABI_LONG(x) x
     #undef FAR
     #undef NEAR
     #define FAR
@@ -98,7 +90,51 @@ void DebugRAM(const char *context);
     typedef int INT;
     typedef unsigned int UINT;
     typedef unsigned int *PUINT;
-    #include <winnt.h>
+    typedef unsigned int UINT32,*PUINT32;
+    typedef __int64 INT_PTR,*PINT_PTR;
+    typedef unsigned __int64 UINT_PTR,*PUINT_PTR;
+    typedef __int64 LONG_PTR,*PLONG_PTR;
+    typedef unsigned __int64 ULONG_PTR,*PULONG_PTR;
+    typedef ULONG_PTR DWORD_PTR,*PDWORD_PTR;
+    typedef ULONG_PTR SIZE_T,*PSIZE_T;
+    #define DECLSPEC_IMPORT __declspec (dllimport)
+    #define DECLSPEC_NORETURN __declspec (noreturn)
+    #define NTSYSAPI DECLSPEC_IMPORT
+    #define NTAPI __stdcall
+    #define MAKEINTRESOURCE(r) ((ULONG_PTR) (USHORT) r)
+    #define VER_MINORVERSION 0x0000001
+    #define VER_MAJORVERSION 0x0000002
+    #define VER_SERVICEPACKMAJOR 0x0000020
+    #define VER_GREATER_EQUAL 3
+    #define VOID void
+    typedef wchar_t WCHAR;
+    typedef char CHAR;
+    typedef short SHORT;
+    typedef __LONG32 LONG;
+    typedef void *HANDLE;
+    typedef void *PVOID;
+    typedef CHAR *NPSTR,*LPSTR,*PSTR;
+    typedef CONST CHAR *LPCSTR,*PCSTR;
+    typedef CONST WCHAR *LPCWSTR,*PCWSTR;
+    typedef WCHAR *NWPSTR,*LPWSTR,*PWSTR;
+    typedef CONST WCHAR *LPCWCH,*PCWCH;
+    typedef CONST CHAR *LPCCH,*PCCH;
+    typedef LPWSTR PTSTR,LPTSTR;
+    typedef struct _GUID { unsigned __LONG32 Data1; unsigned short Data2,Data3; unsigned char Data4[8]; } GUID; typedef GUID IID,CLSID;
+    typedef __int64 LONGLONG;
+    typedef unsigned __int64 ULONGLONG;
+    typedef LONG HRESULT;
+    #if defined (__WIDL__)
+    typedef struct _LARGE_INTEGER {
+    #else
+        typedef union _LARGE_INTEGER {
+        struct { DWORD LowPart; LONG HighPart; } DUMMYSTRUCTNAME;
+        struct { DWORD LowPart; LONG HighPart; } u;
+    #endif
+        LONGLONG QuadPart;
+    } LARGE_INTEGER;
+    typedef LARGE_INTEGER *PLARGE_INTEGER;
+    #define DECLARE_HANDLE(name) struct name##__ { int unused; }; typedef struct name##__ *name
     typedef UINT_PTR WPARAM;
     typedef LONG_PTR LPARAM;
     typedef LONG_PTR LRESULT;
@@ -116,9 +152,9 @@ void DebugRAM(const char *context);
     typedef HANDLE HLOCAL;
     typedef HANDLE GLOBALHANDLE;
     typedef HANDLE LOCALHANDLE;
-    typedef INT_PTR(WINAPI *FARPROC)(void);
-    typedef INT_PTR(WINAPI *NEARPROC)(void);
-    typedef INT_PTR(WINAPI *PROC)(void);
+    typedef INT_PTR (WINAPI *FARPROC)(void);
+    typedef INT_PTR (WINAPI *NEARPROC)(void);
+    typedef INT_PTR (WINAPI *PROC)(void);
     typedef WORD ATOM;
     typedef int HFILE;
     DECLARE_HANDLE(HINSTANCE);
@@ -166,9 +202,14 @@ void DebugRAM(const char *context);
     typedef struct tagSIZE { LONG cx; LONG cy; } SIZE,*PSIZE,*LPSIZE;
     typedef SIZE SIZEL;
     typedef struct tagPOINTS { SHORT x; SHORT y; } POINTS,*PPOINTS,*LPPOINTS;
+    typedef struct _OSVERSIONINFOEXW { DWORD dwOSVersionInfoSize; DWORD dwMajorVersion; DWORD dwMinorVersion; DWORD dwBuildNumber; DWORD dwPlatformId; WCHAR szCSDVersion[128]; WORD wServicePackMajor; WORD wServicePackMinor; WORD wSuiteMask; BYTE wProductType; BYTE wReserved; } OSVERSIONINFOEXW,*POSVERSIONINFOEXW,*LPOSVERSIONINFOEXW,RTL_OSVERSIONINFOEXW,*PRTL_OSVERSIONINFOEXW;
     DECLARE_HANDLE(DPI_AWARENESS_CONTEXT);
-    #include <apisetcconv.h>
-    #include <minwinbase.h>
+    #define WINBASEAPI DECLSPEC_IMPORT
+    #define WINUSERAPI DECLSPEC_IMPORT
+    #define RtlZeroMemory(Destination,Length) MemSetToValueForNBytes((Destination),0,(Length))
+    #define ZeroMemory RtlZeroMemory
+    typedef struct _SECURITY_ATTRIBUTES { DWORD nLength; LPVOID lpSecurityDescriptor; WINBOOL bInheritHandle; } SECURITY_ATTRIBUTES, *PSECURITY_ATTRIBUTES, *LPSECURITY_ATTRIBUTES;
+    typedef struct _OVERLAPPED { ULONG_PTR Internal; ULONG_PTR InternalHigh; union {struct {DWORD Offset; DWORD OffsetHigh;} DUMMYSTRUCTNAME; PVOID Pointer;} DUMMYUNIONNAME; HANDLE hEvent; } OVERLAPPED, *LPOVERLAPPED;
     WINBASEAPI HANDLE WINAPI CreateFileA (LPCSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes, HANDLE hTemplateFile);
     WINBASEAPI WINBOOL WINAPI ReadFile (HANDLE hFile, LPVOID lpBuffer, DWORD nNumberOfBytesToRead, LPDWORD lpNumberOfBytesRead, LPOVERLAPPED lpOverlapped);
     WINBASEAPI WINBOOL WINAPI WriteFile (HANDLE hFile, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfBytesWritten, LPOVERLAPPED lpOverlapped);
@@ -187,8 +228,10 @@ void DebugRAM(const char *context);
     WINBASEAPI DECLSPEC_NORETURN VOID WINAPI ExitProcess (UINT uExitCode);
     WINBASEAPI WINBOOL WINAPI QueryPerformanceCounter (LARGE_INTEGER *lpPerformanceCount);
     WINBASEAPI WINBOOL WINAPI QueryPerformanceFrequency (LARGE_INTEGER *lpFrequency);
-    typedef struct _SYSTEM_INFO { __C89_NAMELESS union { DWORD dwOemId; __C89_NAMELESS struct { WORD wProcessorArchitecture; WORD wReserved; } DUMMYSTRUCTNAME; } DUMMYUNIONNAME; DWORD dwPageSize; LPVOID lpMinimumApplicationAddress; LPVOID lpMaximumApplicationAddress; DWORD_PTR dwActiveProcessorMask; DWORD dwNumberOfProcessors; DWORD dwProcessorType; DWORD dwAllocationGranularity; WORD wProcessorLevel; WORD wProcessorRevision; } SYSTEM_INFO, *LPSYSTEM_INFO;
+    typedef struct _SYSTEM_INFO { union { DWORD dwOemId; struct { WORD wProcessorArchitecture; WORD wReserved; } DUMMYSTRUCTNAME; } DUMMYUNIONNAME; DWORD dwPageSize; LPVOID lpMinimumApplicationAddress; LPVOID lpMaximumApplicationAddress; DWORD_PTR dwActiveProcessorMask; DWORD dwNumberOfProcessors; DWORD dwProcessorType; DWORD dwAllocationGranularity; WORD wProcessorLevel; WORD wProcessorRevision; } SYSTEM_INFO, *LPSYSTEM_INFO;
     WINBASEAPI VOID WINAPI GetSystemInfo (LPSYSTEM_INFO lpSystemInfo);
+    int __cdecl wcscmp(const wchar_t *_Str1,const wchar_t *_Str2);
+    wchar_t* wcscpy(wchar_t* restrict destination, const wchar_t* restrict source);
     #define MAKEINTATOM(i) (LPTSTR) ((ULONG_PTR)((WORD)(i)))
     #define ERROR_SUCCESS __MSABI_LONG(0)
     #define ERROR_DEVICE_NOT_CONNECTED __MSABI_LONG(1167)
@@ -229,8 +272,8 @@ void DebugRAM(const char *context);
     typedef struct tagBITMAPINFO { BITMAPINFOHEADER bmiHeader; RGBQUAD bmiColors[1]; } BITMAPINFO,*LPBITMAPINFO,*PBITMAPINFO;
     typedef struct _devicemodeW {
         WCHAR dmDeviceName[CCHDEVICENAME]; WORD dmSpecVersion; WORD dmDriverVersion; WORD dmSize; WORD dmDriverExtra; DWORD dmFields;
-        __C89_NAMELESS union { __C89_NAMELESS struct { short dmOrientation,dmPaperSize,dmPaperLength,dmPaperWidth,dmScale,dmCopies,dmDefaultSource,dmPrintQuality; }; __C89_NAMELESS struct { POINTL dmPosition; DWORD dmDisplayOrientation; DWORD dmDisplayFixedOutput; }; };
-        short dmColor,dmDuplex,dmYResolution,dmTTOption,dmCollate; WCHAR dmFormName[CCHFORMNAME]; WORD dmLogPixels; DWORD dmBitsPerPel; DWORD dmPelsWidth; DWORD dmPelsHeight; __C89_NAMELESS union { DWORD dmDisplayFlags; DWORD dmNup; };
+        union { struct { short dmOrientation,dmPaperSize,dmPaperLength,dmPaperWidth,dmScale,dmCopies,dmDefaultSource,dmPrintQuality; }; struct { POINTL dmPosition; DWORD dmDisplayOrientation; DWORD dmDisplayFixedOutput; }; };
+        short dmColor,dmDuplex,dmYResolution,dmTTOption,dmCollate; WCHAR dmFormName[CCHFORMNAME]; WORD dmLogPixels; DWORD dmBitsPerPel; DWORD dmPelsWidth; DWORD dmPelsHeight; union { DWORD dmDisplayFlags; DWORD dmNup; };
         DWORD dmDisplayFrequency; DWORD dmICMMethod; DWORD dmICMIntent; DWORD dmMediaType; DWORD dmDitherType; DWORD dmReserved1; DWORD dmReserved2; DWORD dmPanningWidth; DWORD dmPanningHeight;
     } DEVMODEW,*PDEVMODEW,*NPDEVMODEW,*LPDEVMODEW;
     #define WINGDIAPI DECLSPEC_IMPORT
@@ -251,16 +294,19 @@ void DebugRAM(const char *context);
     WINGDIAPI WINBOOL WINAPI SwapBuffers(HDC);
     WINGDIAPI int WINAPI GetDeviceCaps(HDC hdc,int index);
     WINGDIAPI HDC WINAPI CreateDCW(LPCWSTR pwszDriver,LPCWSTR pwszDevice,LPCWSTR pszPort,CONST DEVMODEW *pdm);
-    #include <_mingw_unicode.h>
-    #include <libloaderapi.h>
+    #define GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT (0x2)
+    #define GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS (0x4)
+    WINBASEAPI FARPROC WINAPI GetProcAddress (HMODULE hModule, LPCSTR lpProcName);
+    WINBASEAPI WINBOOL WINAPI GetModuleHandleExW (DWORD dwFlags, LPCWSTR lpModuleName, HMODULE *phModule);
+    WINBASEAPI HMODULE WINAPI LoadLibraryA(LPCSTR lpLibFileName);
     typedef LRESULT (__stdcall *WNDPROC)(HWND, UINT, WPARAM, LPARAM);
     typedef BOOL (__stdcall *MONITORENUMPROC)(HMONITOR, HDC, LPRECT, LPARAM);
-    #define WS_POPUP __MSABI_LONG(0x80000000)
-    #define WS_CLIPSIBLINGS __MSABI_LONG(0x04000000)
-    #define WS_CLIPCHILDREN __MSABI_LONG(0x02000000)
-    #define WS_SYSMENU __MSABI_LONG(0x00080000)
-    #define WS_MINIMIZEBOX __MSABI_LONG(0x00020000)
-    #define WS_CAPTION __MSABI_LONG(0x00C00000)
+    #define WS_POPUP (0x80000000)
+    #define WS_CLIPSIBLINGS (0x04000000)
+    #define WS_CLIPCHILDREN (0x02000000)
+    #define WS_SYSMENU (0x00080000)
+    #define WS_MINIMIZEBOX (0x00020000)
+    #define WS_CAPTION (0x00C00000)
     #define CP_UTF8 65001
     #define WM_SIZE 0x0005
     #define WM_MOUSEACTIVATE 0x0021
@@ -317,15 +363,12 @@ void DebugRAM(const char *context);
     #define VK_LWIN 0x5B
     #define VK_RWIN 0x5C
     #define PM_NOREMOVE 0x0000
-    #define MAKEINTRESOURCEA(i) ((LPSTR)((ULONG_PTR)((WORD)(i))))
-    #define MAKEINTRESOURCEW(i) ((LPWSTR)((ULONG_PTR)((WORD)(i))))
-    #define MAKEINTRESOURCE __MINGW_NAME_AW(MAKEINTRESOURCE)
     #define IDC_ARROW MAKEINTRESOURCE(32512)
     #define GET_XBUTTON_WPARAM(wParam) (HIWORD(wParam))
     #define TME_LEAVE 0x00000002
     #define SIZE_MINIMIZED 1
     #define MONITOR_DEFAULTTONEAREST 0x00000002
-    #define WS_EX_APPWINDOW __MSABI_LONG(0x00040000)
+    #define WS_EX_APPWINDOW (0x00040000)
     #define WM_SETICON 0x0080
     #define ICON_SMALL 0
     #define ICON_BIG 1
@@ -343,14 +386,13 @@ void DebugRAM(const char *context);
     #define SW_SHOWNA 8
     #define CCHDEVICENAME 32
     #define GWL_STYLE (-16)
-    #define WS_OVERLAPPED __MSABI_LONG(0x00000000)
-    #define WS_CAPTION __MSABI_LONG(0x00C00000)
-    #define WS_SYSMENU __MSABI_LONG(0x00080000)
-    #define WS_THICKFRAME __MSABI_LONG(0x00040000)
-    #define WS_MINIMIZEBOX __MSABI_LONG(0x00020000)
-    #define WS_MAXIMIZEBOX __MSABI_LONG(0x00010000)
-    #define WS_EX_WINDOWEDGE __MSABI_LONG(0x00000100)
-    #define WS_EX_CLIENTEDGE __MSABI_LONG(0x00000200)
+    #define WS_OVERLAPPED (0x00000000)
+    #define WS_SYSMENU (0x00080000)
+    #define WS_THICKFRAME (0x00040000)
+    #define WS_MINIMIZEBOX (0x00020000)
+    #define WS_MAXIMIZEBOX (0x00010000)
+    #define WS_EX_WINDOWEDGE (0x00000100)
+    #define WS_EX_CLIENTEDGE (0x00000200)
     #define CW_USEDEFAULT ((int)0x80000000)
     #define CS_VREDRAW 0x0001
     #define CS_HREDRAW 0x0002
@@ -410,6 +452,7 @@ void DebugRAM(const char *context);
     WINUSERAPI ATOM WINAPI RegisterClassExW (CONST WNDCLASSEXW *);
     WINUSERAPI HDEVNOTIFY WINAPI RegisterDeviceNotificationW(HANDLE hRecipient,LPVOID NotificationFilter,DWORD Flags);
     WINUSERAPI WINBOOL WINAPI EnumDisplayMonitors(HDC hdc,LPCRECT lprcClip,MONITORENUMPROC lpfnEnum,LPARAM dwData);
+    NTSYSAPI ULONGLONG NTAPI VerSetConditionMask(ULONGLONG ConditionMask, ULONG TypeMask, UCHAR Condition);
     int __cdecl _mkdir(const char* dirname);
     #define XINPUT_GAMEPAD_DPAD_UP          0x0001
     #define XINPUT_GAMEPAD_DPAD_DOWN        0x0002
@@ -435,11 +478,10 @@ void DebugRAM(const char *context);
     #define DEVICE_NOTIFY_WINDOW_HANDLE 0x00000000
     typedef struct { unsigned long dbch_size,dbch_devicetype,dbch_reserved; } DEV_BROADCAST_HDR;
     typedef struct { unsigned long dbcc_size,dbcc_devicetype,dbcc_reserved; GUID dbcc_classguid; wchar_t dbcc_name[1]; } DEV_BROADCAST_DEVICEINTERFACE_W;
-    //__declspec(dllimport) void* __stdcall RegisterDeviceNotificationW(void* hRecipient, void* NotificationFilter, unsigned long Flags);
     #define eRender 0
     #define eConsole 0
     typedef struct IMMDevice IMMDevice; typedef struct IMMDeviceEnumerator IMMDeviceEnumerator;
-    typedef struct{HRESULT(__stdcall*q)(void*,const void*,void**);ULONG(__stdcall*a)(void*);ULONG(__stdcall*Release)(void*);HRESULT(__stdcall*Activate)(void*,const void*,DWORD,void*,void**);}IMMDeviceVtbl;struct IMMDevice{IMMDeviceVtbl*lpVtbl;};
+    typedef struct{HRESULT(__stdcall*q)(void*,const void*,void**);ULONG(__stdcall*a)(void*);ULONG(__stdcall*Release)(void*);HRESULT(__stdcall* Activate)(void*,const void*,DWORD,void*,void**);}IMMDeviceVtbl;struct IMMDevice{IMMDeviceVtbl*lpVtbl;};
     typedef struct{HRESULT(__stdcall*q)(void*,const void*,void**);ULONG(__stdcall*a)(void*);ULONG(__stdcall*Release)(void*);HRESULT(__stdcall*e)(void*,int,DWORD,void**);HRESULT(__stdcall*GetDefaultAudioEndpoint)(void*,int,int,IMMDevice**);}IMMDeviceEnumeratorVtbl;struct IMMDeviceEnumerator{IMMDeviceEnumeratorVtbl*lpVtbl;};
     typedef long long REFERENCE_TIME;
     typedef struct IAudioClient IAudioClient;
@@ -453,8 +495,14 @@ void DebugRAM(const char *context);
     struct IAudioClient { IAudioClientVtbl* lpVtbl; };
     typedef struct IAudioRenderClientVtbl { HRESULT (__stdcall *QueryInterface)(void*, const void*, void**); ULONG (__stdcall *AddRef)(void*); ULONG (__stdcall *Release)(void*); HRESULT (__stdcall *GetBuffer)(void*, DWORD, BYTE**); HRESULT (__stdcall *ReleaseBuffer)(void*, DWORD, DWORD); } IAudioRenderClientVtbl;
     struct IAudioRenderClient { IAudioRenderClientVtbl* lpVtbl; };
-    __declspec(dllimport) HRESULT __stdcall CoInitializeEx(void*, DWORD);
-    __declspec(dllimport) HRESULT __stdcall CoCreateInstance(const void*, void*, DWORD, const void*, void**);
+    #define STDAPI extern HRESULT WINAPI
+    #define WINOLEAPI STDAPI
+    #define REFIID const IID *const
+    typedef struct IUnknown IUnknown;
+    typedef struct IUnknownVtbl { HRESULT (__stdcall *QueryInterface)(IUnknown* This, const IID* riid, void** ppvObject); ULONG   (__stdcall *AddRef)(IUnknown* This); ULONG   (__stdcall *Release)(IUnknown* This); } IUnknownVtbl;
+    struct IUnknown { const IUnknownVtbl* lpVtbl; };
+    WINOLEAPI CoInitializeEx(LPVOID pvReserved, DWORD dwCoInit);
+    WINOLEAPI CoCreateInstance(const IID *const rclsid, IUnknown* pUnkOuter, DWORD dwClsContext, REFIID riid, LPVOID *ppv);
     typedef HANDLE OsFileHandle;
     #define OS_INVALID_HANDLE INVALID_HANDLE_VALUE
     #undef near
@@ -478,10 +526,16 @@ void DebugRAM(const char *context);
     #define OS_DlOpen(path)       LoadLibraryA(path)
     #define OS_DlSym(handle,name) GetProcAddress((handle),(name))
     static char win_err_buf[512];
+    typedef __int64	__time64_t;
+    typedef __time64_t time_t;
+    struct timespec { time_t tv_sec; long tv_nsec; };
+    struct sched_param { int sched_priority; };
+    typedef uintptr_t pthread_t;
+    typedef struct pthread_attr_t { unsigned p_state; void *stack; size_t s_size; struct sched_param param; } pthread_attr_t;
+    int pthread_create(pthread_t *th, const pthread_attr_t *attr, void *(* func)(void *), void *arg);
+    int pthread_join(pthread_t t, void **res);
 #else
     #define LINUX
-    #include <sys/ioctl.h>
-    #include <sound/asound.h>
     void *dlopen(const char *filename, int flags); void *dlsym(void *handle, const char *symbol);
     typedef unsigned int mode_t; typedef long off_t; typedef u64 dev_t,ino_t; typedef long unsigned int nlink_t; typedef u32 uid_t,gid_t; typedef i64 blksize_t,blkcnt_t;
     struct input_id { u16 bustype,vendor,product,version;};
@@ -490,6 +544,8 @@ void DebugRAM(const char *context);
     typedef int OsFileHandle;
     #define OS_INVALID_HANDLE -1
     typedef int wchar_t;
+    typedef long time_t;
+    typedef unsigned long int pthread_t;
     static inline int OS_IOControl(int fd, unsigned long req, void* arg) { long r = 16; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(req),"d"(arg):"rcx","r11","memory"); return (int)r; }
     static inline int OS_IOControlSimple(int fd, unsigned long request) { return OS_IOControl(fd,request,0); }
     static inline __attribute__((always_inline)) int OS_MakeFolder(const char* path) { long r = 83; __asm__ __volatile__("syscall":"+a"(r):"D"(path),"S"(0755LL):"rcx","r11","memory"); return (int)r; }
@@ -511,6 +567,10 @@ void DebugRAM(const char *context);
     #define MOD_EXTENSION ".so" // e.g. Citadel.so
     #define OS_DlOpen(path)       dlopen((path),2)
     #define OS_DlSym(handle,name) dlsym((handle),(name))
+    struct timespec { time_t tv_sec; long tv_nsec; };
+    typedef struct { unsigned int flags; void* stack; } pthread_attr_t;
+    int pthread_create(pthread_t* restrict thread, const pthread_attr_t* restrict attr, void* (*start_routine)(void*), void* restrict arg);
+    int pthread_join(pthread_t thread, void** retval);
 #endif
 static inline __attribute__((always_inline)) void* OS_Alloc(size_t amount) { return OS_AllocateRAM(NULL,amount,0x1|0x2,0x02|0x20,OS_INVALID_HANDLE); }
 static inline __attribute__((always_inline)) void* OS_Calloc(size_t amount, size_t count) { return OS_AllocateRAM(NULL,amount * count,0x1|0x2,0x02|0x20,OS_INVALID_HANDLE); }

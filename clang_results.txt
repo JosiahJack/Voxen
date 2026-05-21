@@ -20,22 +20,16 @@ ENGINE_TO_MOD void DualLogError(const char* fmt, ...);
 ./os.h:25:20: note: previously declared here
 ENGINE_TO_MOD void DualLogError(const char* fmt, ...);
                    ^
-/home/qmaster/Github/Voxen/audio.c:896:11: warning: do not use 'else' after 'break' [readability-else-after-return]
-        } else if (info.frame_bytes==0) {
-          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-3 warnings generated.
+/home/qmaster/Github/Voxen/audio.c:953:11: warning: do not use 'else' after 'break' [readability-else-after-return]
+        } else if (info.frame_bytes == 0) {
+          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+2 warnings generated.
 ./interop.h:118:20: warning: redundant 'DualLogError' declaration [readability-redundant-declaration]
 ENGINE_TO_MOD void DualLogError(const char* fmt, ...);
                    ^
 ./os.h:25:20: note: previously declared here
 ENGINE_TO_MOD void DualLogError(const char* fmt, ...);
                    ^
-./models.c:2:6: warning: redundant 'qsort' declaration [readability-redundant-declaration]
-void qsort(void* base, size_t nmemb, size_t size, int (*cmp)(const void*, const void*));
-     ^
-/usr/include/stdlib.h:838:13: note: previously declared here
-extern void qsort (void *__base, size_t __nmemb, size_t __size,
-            ^
 /home/qmaster/Github/Voxen/voxen.c:1357:9: warning: do not use 'else' after 'continue' [readability-else-after-return]
         else if (doubleSidedTexture[tex] || e->scale.x < 0.0f || e->scale.y < 0.0f || e->scale.z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided (either)
         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
