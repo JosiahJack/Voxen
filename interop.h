@@ -71,7 +71,7 @@
 
 #ifdef MOD_INTEROP_MOD  // mod.h usage:
     // Interop - To Engine
-    #if defined(_WIN32) || defined(__CYGWIN__)
+    #if defined(_WIN32)
         #define MOD_TO_ENGINE __declspec(dllexport) __cdecl
     #else
         #define MOD_TO_ENGINE __attribute__((visibility("default")))
@@ -81,7 +81,7 @@
     #undef X
 #else                              // voxen.h usage:
     // Interop - From Mod
-    #if defined(_WIN32) || defined(__CYGWIN__)
+    #if defined(_WIN32)
         #define MOD_TO_ENGINE
         #define CALL_CONV     __cdecl
         #define X(ret, name, params) MOD_TO_ENGINE ret (CALL_CONV *name) params;
@@ -106,7 +106,7 @@
     #define ENGINE_TO_MOD extern
 #else                             // voxen.h usage, MOD_INTEROP_ENGINE:
     // Interop - To Mod
-    #if defined(_WIN32) || defined(__CYGWIN__)
+    #if defined(_WIN32)
         #define ENGINE_TO_MOD __declspec(dllexport) __cdecl
     #else
         #define ENGINE_TO_MOD __attribute__((visibility("default")))
@@ -145,7 +145,7 @@ ENGINE_TO_MOD int StringFormat(char* buffer, size_t bufferSize, const char* form
 ENGINE_TO_MOD bool PositionVisibleFromPlayerCell(float x, float z);
 ENGINE_TO_MOD void SoundUninit(ma_sound* snd);
 ENGINE_TO_MOD i32 SoundInit(const char* path, ma_sound* pSound);
-ENGINE_TO_MOD void SoundSetLooping(ma_sound* pSound, ma_bool32 isLooping);
+ENGINE_TO_MOD void SoundSetLooping(ma_sound* pSound, i32 isLooping);
 ENGINE_TO_MOD void SoundSetVolume(ma_sound* pSound, float volume);
 ENGINE_TO_MOD i32 SoundStart(ma_sound* pSound);
 ENGINE_TO_MOD i32 SoundStop(ma_sound* pSound);

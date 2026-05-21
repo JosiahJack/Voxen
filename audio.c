@@ -65,9 +65,9 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
     void pcm_params_init(pcm_params_t *p) { MemSetToValueForNBytes(p,0,sizeof(*p)); }
     void pcm_set(pcm_params_t *p,pcm_param_t param,unsigned long v) {
         switch(param) {
-        case PCM_FORMAT:      p->format=v; break;       case PCM_ACCESS:   p->access=v; break;
-        case PCM_RATE:        p->rate=v; break;          case PCM_CHANNELS: p->channels=v; break;
-        case PCM_PERIOD_SIZE: p->period_frames=v; break; case PCM_PERIODS:  p->periods=v; break;
+        case PCM_FORMAT:      p->format=v;        break; case PCM_ACCESS:   p->access=v;   break;
+        case PCM_RATE:        p->rate=v;          break; case PCM_CHANNELS: p->channels=v; break;
+        case PCM_PERIOD_SIZE: p->period_frames=v; break; case PCM_PERIODS:  p->periods=v;  break;
         default: break;
         }
     }
@@ -81,7 +81,7 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
         if (idx<0||idx>=wasapi_dev_count||!wasapi_devs[idx].open) return -1;
         wasapi_dev_t *w=&wasapi_devs[idx];
         DWORD padding=0; w->client->lpVtbl->GetCurrentPadding(w->client,&padding);
-        snd_pcm_uframes_t base = (w->buffer_frames>(UINT32)(w->period_frames*4)) ? w->buffer_frames-(UINT32)(w->period_frames*4) : 0;
+        snd_pcm_uframes_t base = (w->buffer_frames>(u32)(w->period_frames*4)) ? w->buffer_frames-(u32)(w->period_frames*4) : 0;
         sync->status.hw_ptr=base; sync->control.appl_ptr=base+padding;
         return 0;
     }
@@ -97,18 +97,12 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
         for (int i=0;i<wasapi_dev_count;i++) {
             wasapi_dev_t *w=&wasapi_devs[i]; if (!w->open) continue;
             BYTE *data=NULL;
-            if (FAILED(w->render->lpVtbl->GetBuffer(w->render,(UINT32)frames,&data))) { pcm_prepare(IDX_TO_FD(i)); continue; }
+            if (FAILED(w->render->lpVtbl->GetBuffer(w->render,(u32)frames,&data))) { pcm_prepare(IDX_TO_FD(i)); continue; }
             CopyMemoryFromBtoAForNBytes(data,buf,frames*w->channels*2);
-            w->render->lpVtbl->ReleaseBuffer(w->render,(UINT32)frames,0);
+            w->render->lpVtbl->ReleaseBuffer(w->render,(u32)frames,0);
         }
         return frames;
     }
-
-    int pcm_start(OsFileHandle fd)   { (void)fd; return 0; }
-    int pcm_stop(OsFileHandle fd)    { int i=FD_TO_IDX(fd); if(i>=0&&i<wasapi_dev_count) wasapi_devs[i].client->lpVtbl->Stop(wasapi_devs[i].client); return 0; }
-    int pcm_drain(OsFileHandle fd)   { (void)fd; return 0; }
-    int pcm_pause(OsFileHandle fd)   { return pcm_stop(fd); }
-    int pcm_unpause(OsFileHandle fd) { int i=FD_TO_IDX(fd); if(i>=0&&i<wasapi_dev_count) wasapi_devs[i].client->lpVtbl->Start(wasapi_devs[i].client); return 0; }
 #else
     int ioctl(int fd, unsigned long request, ...);
     #define _IOC_NRBITS     8
@@ -261,13 +255,6 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
         return 0;
     }
 
-    int pcm_action_timestamp(int fd, struct timespec *ts) {
-        struct snd_pcm_status status;
-        if (OS_IOControl(fd, SNDRV_PCM_IOCTL_STATUS,(void*)&status) == -1) return -1;
-        *ts = status.trigger_tstamp;
-        return 0;
-    }
-
     void pcm_params_init(pcm_params_t *p) {
         hw_params_fill(&p->hw_params);
         pcm_sw_params_t *sw = &p->sw_params;
@@ -289,11 +276,6 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
         }
     }
 
-    void pcm_set_range(pcm_params_t *params, pcm_param_t parameter, unsigned int min, unsigned int max) {
-        if (parameter <= SNDRV_PCM_HW_PARAM_LAST_MASK || parameter > SNDRV_PCM_HW_PARAM_LAST_INTERVAL) pcm_set(params,parameter,min);
-        else hw_params_set_interval(&params->hw_params,parameter,min,max);
-    }
-
     unsigned long pcm_get(pcm_params_t *params, pcm_param_t parameter, unsigned int value) {
         pcm_hw_params_t *hw = &params->hw_params;
         pcm_sw_params_t *sw = &params->sw_params;
@@ -309,7 +291,6 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
         }
     }
 
-    void pcm_get_range(pcm_params_t *params, pcm_param_t parameter, unsigned int *min, unsigned int *max) { hw_params_get_interval(&params->hw_params,parameter,min,max); }
     int pcm_params_refine(int fd, pcm_params_t *params) { return ioctl(fd,SNDRV_PCM_IOCTL_HW_REFINE,&params->hw_params); }
     int pcm_params_setup(int fd, pcm_params_t *params) {
         if (ioctl(fd, SNDRV_PCM_IOCTL_HW_PARAMS, &params->hw_params) == -1) return -1;
@@ -323,11 +304,7 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
     int pcm_open(int card, int device, int flags) { char path[4096]; StringFormat(path,sizeof(path),"/dev/snd/pcmC%uD%u%c",card,device,(flags & 1) == 0 ? 'c' : 'p'); return OS_Open(path,00000002 | (flags & (1 << 1) ? 00004000 : 0),0); }
 #endif
 
-// MP3 parsing
-#define DRMP3_UINT64_MAX            (((u64)0xFFFFFFFF << 32) | (u64)0xFFFFFFFF)
-#define DRMP3_MAX_PCM_FRAMES_PER_MP3_FRAME  1152
-#define DRMP3_MAX_SAMPLES_PER_FRAME         (DRMP3_MAX_PCM_FRAMES_PER_MP3_FRAME * 2)
-#define DRMP3_HDR_SIZE                      4
+#define DRMP3_UINT64_MAX (((u64)0xFFFFFFFF << 32) | (u64)0xFFFFFFFF)
 #define DRMP3_HDR_IS_MONO(h)             (((h[3]) & 0xC0) == 0xC0)
 #define DRMP3_HDR_IS_MS_STEREO(h)        (((h[3]) & 0xE0) == 0x60)
 #define DRMP3_HDR_IS_FREE_FORMAT(h)      (((h[2]) & 0xF0) == 0)
@@ -345,12 +322,8 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
 #define DRMP3_HDR_GET_MY_SAMPLE_RATE(h)  (DRMP3_HDR_GET_SAMPLE_RATE(h) + (((h[1]>>3)&1)+((h[1]>>4)&1))*3)
 #define DRMP3_HDR_IS_FRAME_576(h)        ((h[1] & 14) == 2)
 #define DRMP3_HDR_IS_LAYER_1(h)          ((h[1] & 6) == 6)
-#define DRMP3_COPY_MEMORY(dst,src,sz) CopyMemoryFromBtoAForNBytes((dst),(src),(sz))
-#define DRMP3_MOVE_MEMORY(dst,src,sz) MoveMemoryFromBtoAForNBytes((dst),(src),(sz))
-#define DRMP3_ZERO_MEMORY(p,sz)       MemSetToValueForNBytes((p),0,(sz))
-#define DRMP3_ZERO_OBJECT(p)          DRMP3_ZERO_MEMORY((p),sizeof(*(p)))
 #define DRMP3_OFFSET_PTR(p,offset) ((void*)((u8*)(p)+(offset)))
-typedef struct { int frame_bytes, channels, sample_rate, layer, bitrate_kbps; } drmp3dec_frame_info;
+typedef struct { int frame_bytes,channels,sample_rate,layer,bitrate_kbps; } drmp3dec_frame_info;
 typedef struct { const u8 *buf; int pos,limit; } drmp3_bs;
 typedef struct { const u8 *sfbtab; u16 part_23_length,big_values,scalefac_compress; u8 global_gain,block_type,mixed_block_flag,n_long_sfb,n_short_sfb,table_select[3],region_count[3],subblock_gain[3],preflag,scalefac_scale,count1_table,scfsi; } drmp3_L3_gr_info;
 typedef struct { drmp3_bs bs; u8 maindata[511 + 2304]; drmp3_L3_gr_info gr_info[4]; float grbuf[2][576],scf[40],syn[18+15][2*32]; u8 ist_pos[2][39]; } drmp3dec_scratch;
@@ -360,10 +333,9 @@ typedef bool (*drmp3_seek_proc)(void*, int, u8);
 typedef struct {
     drmp3dec decoder;
     u32 channels,sampleRate,mp3FrameChannels,mp3FrameSampleRate,pcmFramesConsumedInMP3Frame,pcmFramesRemainingInMP3Frame,delayInPCMFrames,paddingInPCMFrames;
-    drmp3_read_proc onRead;
-    drmp3_seek_proc onSeek;
+    drmp3_read_proc onRead; drmp3_seek_proc onSeek;
     void *pUserData;
-    u8 pcmFrames[sizeof(float)*DRMP3_MAX_SAMPLES_PER_FRAME];
+    u8 pcmFrames[sizeof(float) * (1152 * 2)]; // Max Samples per frame
     u64 currentPCMFrame,streamCursor,streamLength,streamStartOffset,totalPCMFrameCount;
     bool atEnd;
     size_t dataSize,dataCapacity,dataConsumed;
@@ -387,6 +359,7 @@ static unsigned drmp3_hdr_bitrate_kbps(const u8 *h) {
         {{0,4,8,12,16,20,24,28,32,40,48,56,64,72,80},{0,4,8,12,16,20,24,28,32,40,48,56,64,72,80},{0,16,24,28,32,40,48,56,64,72,80,88,96,112,128}},
         {{0,16,20,24,28,32,40,48,56,64,80,96,112,128,160},{0,16,24,28,32,40,48,56,64,80,96,112,128,160,192},{0,16,32,48,64,80,96,112,128,144,160,176,192,208,224}}
     };
+    
     return 2*halfrate[!!DRMP3_HDR_TEST_MPEG1(h)][DRMP3_HDR_GET_LAYER(h)-1][DRMP3_HDR_GET_BITRATE(h)];
 }
 static unsigned drmp3_hdr_sample_rate_hz(const u8 *h) { static const unsigned g_hz[3]={44100,48000,32000}; return g_hz[DRMP3_HDR_GET_SAMPLE_RATE(h)]>>(int)!DRMP3_HDR_TEST_MPEG1(h)>>(int)!DRMP3_HDR_TEST_NOT_MPEG25(h); }
@@ -402,6 +375,7 @@ static int drmp3_L3_read_side_info(drmp3_bs *bs, drmp3_L3_gr_info *gr, const u8 
         {SCF_LONG_ROW_A},{12,12,12,12,12,12,16,20,24,28,32,40,48,56,64,76,90,2,2,2,2,2,0},{SCF_LONG_ROW_A},{6,6,6,6,6,6,8,10,12,14,16,18,22,26,32,38,46,54,62,70,76,36,0},
         {SCF_LONG_ROW_A},{SCF_START,8,8,10,12,16,20,24,28,34,42,50,54,76,158,0},{SCF_START,6,8,10,12,16,18,22,28,34,40,46,54,54,192,0},{SCF_START,8,10,12,16,20,24,30,38,46,56,68,84,102,26,0}
     };
+    
     static const u8 g_scf_short[8][40]={ {SCF_SHORT_ROW_A},{8,8,8,8,8,8,8,8,8,12,12,12,16,16,16,20,20,20,24,24,24,28,28,28,36,36,36,2,2,2,2,2,2,2,2,2,26,26,26,0},
         {4,4,4,SCF_START,6,6,6,6,8,8,8,10,10,10,14,14,14,18,18,18,26,26,26,32,32,32,42,42,42,18,18,18,0},
         {4,4,4,SCF_START,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,32,32,32,44,44,44,12,12,12,0},
@@ -409,6 +383,7 @@ static int drmp3_L3_read_side_info(drmp3_bs *bs, drmp3_L3_gr_info *gr, const u8 
         {4,4,4,4,4,4,SCF_START,6,6,6,6,10,10,10,12,12,12,14,14,14,16,16,16,20,20,20,26,26,26,66,66,66,0},
         {4,4,4,4,4,4,SCF_START,6,8,8,8,12,12,12,16,16,16,20,20,20,26,26,26,34,34,34,42,42,42,12,12,12,0}
     };
+    
     static const u8 g_scf_mixed[8][40]={
         {6,6,6,6,6,6,6,6,6,SCF_MIXED_ROW_A}, {12,12,12,4,4,4,8,8,8,12,12,12,16,16,16,20,20,20,24,24,24,28,28,28,36,36,36,2,2,2,2,2,2,2,2,2,26,26,26,0},
         {6,6,6,6,6,6,6,6,6,6,6,6,8,8,8,10,10,10,14,14,14,18,18,18,26,26,26,32,32,32,42,42,42,18,18,18,0},
@@ -417,15 +392,11 @@ static int drmp3_L3_read_side_info(drmp3_bs *bs, drmp3_L3_gr_info *gr, const u8 
         {SCF_START,4,4,4,6,6,6,6,6,6,10,10,10,12,12,12,14,14,14,16,16,16,20,20,20,26,26,26,66,66,66,0},
         {SCF_START,4,4,4,6,6,6,8,8,8,12,12,12,16,16,16,20,20,20,26,26,26,34,34,34,42,42,42,12,12,12,0}
     };
-    unsigned tables, scfsi=0;
-    int main_data_begin, part_23_sum=0;
-    int gr_count=DRMP3_HDR_IS_MONO(hdr)?1:2;
-    int sr_idx=DRMP3_HDR_GET_MY_SAMPLE_RATE(hdr); sr_idx-=(sr_idx!=0);
-    if (DRMP3_HDR_TEST_MPEG1(hdr)) {
-        gr_count*=2;
-        main_data_begin=drmp3_bs_get_bits(bs,9);
-        scfsi=drmp3_bs_get_bits(bs,7+gr_count);
-    } else main_data_begin=drmp3_bs_get_bits(bs,8+gr_count)>>gr_count;
+    
+    unsigned tables,scfsi=0;
+    int main_data_begin,part_23_sum=0,gr_count=DRMP3_HDR_IS_MONO(hdr)?1:2,sr_idx=DRMP3_HDR_GET_MY_SAMPLE_RATE(hdr); sr_idx-=(sr_idx!=0);
+    if (DRMP3_HDR_TEST_MPEG1(hdr)) { gr_count*=2; main_data_begin=drmp3_bs_get_bits(bs,9); scfsi=drmp3_bs_get_bits(bs,7+gr_count); }
+    else main_data_begin = drmp3_bs_get_bits(bs,8+gr_count)>>gr_count;
     do {
         if (DRMP3_HDR_IS_MONO(hdr)) scfsi<<=4;
         gr->part_23_length=(u16)drmp3_bs_get_bits(bs,12);
@@ -454,19 +425,13 @@ static int drmp3_L3_read_side_info(drmp3_bs *bs, drmp3_L3_gr_info *gr, const u8 
                 }
             }
             tables=drmp3_bs_get_bits(bs,10)<<5;
-            gr->subblock_gain[0]=(u8)drmp3_bs_get_bits(bs,3);
-            gr->subblock_gain[1]=(u8)drmp3_bs_get_bits(bs,3);
-            gr->subblock_gain[2]=(u8)drmp3_bs_get_bits(bs,3);
+            gr->subblock_gain[0]=(u8)drmp3_bs_get_bits(bs,3); gr->subblock_gain[1]=(u8)drmp3_bs_get_bits(bs,3); gr->subblock_gain[2]=(u8)drmp3_bs_get_bits(bs,3);
         } else {
             gr->block_type=0; gr->mixed_block_flag=0;
             tables=drmp3_bs_get_bits(bs,15);
-            gr->region_count[0]=(u8)drmp3_bs_get_bits(bs,4);
-            gr->region_count[1]=(u8)drmp3_bs_get_bits(bs,3);
-            gr->region_count[2]=255;
+            gr->region_count[0]=(u8)drmp3_bs_get_bits(bs,4); gr->region_count[1]=(u8)drmp3_bs_get_bits(bs,3); gr->region_count[2]=255;
         }
-        gr->table_select[0]=(u8)(tables>>10);
-        gr->table_select[1]=(u8)((tables>>5)&31);
-        gr->table_select[2]=(u8)((tables)&31);
+        gr->table_select[0]=(u8)(tables>>10); gr->table_select[1]=(u8)((tables>>5)&31); gr->table_select[2]=(u8)((tables)&31);
         gr->preflag=(u8)(DRMP3_HDR_TEST_MPEG1(hdr)?drmp3_bs_get_bits(bs,1):(gr->scalefac_compress>=500));
         gr->scalefac_scale=(u8)drmp3_bs_get_bits(bs,1);
         gr->count1_table=(u8)drmp3_bs_get_bits(bs,1);
@@ -484,30 +449,26 @@ static void drmp3_L3_read_scalefactors(u8 *scf, u8 *ist_pos, const u8 *scf_size,
         if (scfsi&8) CopyMemoryFromBtoAForNBytes(scf,ist_pos,cnt);
         else {
             int bits=scf_size[i];
-            if (!bits) { DRMP3_ZERO_MEMORY(scf,cnt); DRMP3_ZERO_MEMORY(ist_pos,cnt); }
+            if (!bits) { MemSetToValueForNBytes(scf,0,cnt); MemSetToValueForNBytes(ist_pos,0,cnt); }
             else {
                 int max_scf=(scfsi<0)?((1<<bits)-1):-1;
-                for (k=0;k<cnt;k++) {
-                    int s=drmp3_bs_get_bits(bs,bits);
-                    ist_pos[k]=(u8)(s==max_scf?-1:s);
-                    scf[k]=(u8)s;
-                }
+                for (k=0;k<cnt;k++) { int s=drmp3_bs_get_bits(bs,bits); ist_pos[k]=(u8)(s==max_scf?-1:s); scf[k]=(u8)s; }
             }
         }
+        
         ist_pos+=cnt; scf+=cnt;
     }
+    
     scf[0]=scf[1]=scf[2]=0;
 }
 
 static float drmp3_L3_ldexp_q2(float y, int exp_q2) {
     static const float g_expfrac[4]={9.31322575e-10f,7.83145814e-10f,6.58544508e-10f,5.53767716e-10f};
-    int e;
-    do { e=vmin(30*4,exp_q2); y*=g_expfrac[e&3]*(1<<30>>(e>>2)); } while ((exp_q2-=e)>0);
+    int e; do { e=vmin(30*4,exp_q2); y*=g_expfrac[e&3]*(1<<30>>(e>>2)); } while ((exp_q2-=e)>0);
     return y;
 }
 
-#define DRMP3_BITS_DEQUANTIZER_OUT -1
-#define DRMP3_MAX_SCF  (255+DRMP3_BITS_DEQUANTIZER_OUT*4-210)
+#define DRMP3_MAX_SCF  (255+-1*4-210)
 #define DRMP3_MAX_SCFI ((DRMP3_MAX_SCF+3)&~3)
 static void drmp3_L3_decode_scalefactors(const u8 *hdr, u8 *ist_pos, drmp3_bs *bs, const drmp3_L3_gr_info *gr, float *scf, int ch) {
     static const u8 g_scf_partitions[3][28]={
@@ -545,7 +506,7 @@ static void drmp3_L3_decode_scalefactors(const u8 *hdr, u8 *ist_pos, drmp3_bs *b
         static const u8 g_preamp[10]={1,1,1,1,2,2,3,3,3,2};
         for (i=0;i<10;i++) iscf[11+i]=(u8)(iscf[11+i]+g_preamp[i]);
     }
-    gain_exp=gr->global_gain+DRMP3_BITS_DEQUANTIZER_OUT*4-210-(DRMP3_HDR_IS_MS_STEREO(hdr)?2:0);
+    gain_exp=gr->global_gain+-1*4-210-(DRMP3_HDR_IS_MS_STEREO(hdr)?2:0);
     gain=drmp3_L3_ldexp_q2(1<<(DRMP3_MAX_SCFI/4),DRMP3_MAX_SCFI-gain_exp);
     for (i=0;i<(int)(gr->n_long_sfb+gr->n_short_sfb);i++) scf[i]=drmp3_L3_ldexp_q2(gain,iscf[i]<<scf_shift);
 }
@@ -687,7 +648,7 @@ static void drmp3_L3_intensity_stereo(float *left, u8 *ist_pos, const drmp3_L3_g
 static void drmp3_L3_reorder(float *grbuf, float *scratch, const u8 *sfb) {
     int i,len; float *src=grbuf,*dst=scratch;
     for(;0!=(len=*sfb);sfb+=3,src+=2*len){for(i=0;i<len;i++,src++){*dst++=src[0*len];*dst++=src[1*len];*dst++=src[2*len];}}
-    DRMP3_COPY_MEMORY(grbuf,scratch,(dst-scratch)*sizeof(float));
+    CopyMemoryFromBtoAForNBytes(grbuf,scratch,(dst-scratch)*sizeof(float));
 }
 static void drmp3_L3_antialias(float *grbuf, int nbands) {
     static const float g_aa[2][8]={{0.85749293f,0.88174200f,0.94962865f,0.98331459f,0.99551782f,0.99916056f,0.99989920f,0.99999316f},{0.51449576f,0.47173197f,0.31337745f,0.18191320f,0.09457419f,0.04096558f,0.01419856f,0.00369997f}};
@@ -721,17 +682,13 @@ static void drmp3_L3_imdct36(float *grbuf, float *overlap, const float *window, 
     }
 }
 static void drmp3_L3_idct3(float x0,float x1,float x2,float *dst){float m1=x1*0.86602540f,a1=x0-x2*0.5f;dst[1]=x0+x2;dst[0]=a1+m1;dst[2]=a1-m1;}
-static void drmp3_L3_imdct12(float *x,float *dst,float *overlap){
+static void imdct12(float *x,float *dst,float *overlap){
     static const float g_twid3[6]={0.79335334f,0.92387953f,0.99144486f,0.60876143f,0.38268343f,0.13052619f};
-    float co[3],si[3]; int i;
-    drmp3_L3_idct3(-x[0],x[6]+x[3],x[12]+x[9],co);
-    drmp3_L3_idct3(x[15],x[12]-x[9],x[6]-x[3],si);
+    float co[3],si[3]; int i; drmp3_L3_idct3(-x[0],x[6]+x[3],x[12]+x[9],co); drmp3_L3_idct3(x[15],x[12]-x[9],x[6]-x[3],si);
     si[1]=-si[1];
     for(i=0;i<3;i++){float ovl=overlap[i],sum=co[i]*g_twid3[3+i]+si[i]*g_twid3[i];overlap[i]=co[i]*g_twid3[i]-si[i]*g_twid3[3+i];dst[i]=ovl*g_twid3[2-i]-sum*g_twid3[5-i];dst[5-i]=ovl*g_twid3[5-i]+sum*g_twid3[2-i];}
 }
-static void drmp3_L3_imdct_short(float *grbuf,float *overlap,int nbands){
-    for(;nbands>0;nbands--,overlap+=9,grbuf+=18){float tmp[18];DRMP3_COPY_MEMORY(tmp,grbuf,sizeof(tmp));DRMP3_COPY_MEMORY(grbuf,overlap,6*sizeof(float));drmp3_L3_imdct12(tmp,grbuf+6,overlap+6);drmp3_L3_imdct12(tmp+1,grbuf+12,overlap+6);drmp3_L3_imdct12(tmp+2,overlap,overlap+6);}
-}
+static void drmp3_L3_imdct_short(float *grbuf,float *overlap,int nbands){ for(;nbands>0;nbands--,overlap+=9,grbuf+=18){float tmp[18]; CopyMemoryFromBtoAForNBytes(tmp,grbuf,sizeof(tmp)); CopyMemoryFromBtoAForNBytes(grbuf,overlap,6*sizeof(float)); imdct12(tmp,grbuf+6,overlap+6); imdct12(tmp+1,grbuf+12,overlap+6); imdct12(tmp+2,overlap,overlap+6);} }
 static void drmp3_L3_change_sign(float *grbuf){int b,i;for(b=0,grbuf+=18;b<32;b+=2,grbuf+=36)for(i=1;i<18;i+=2)grbuf[i]=-grbuf[i];}
 static void drmp3_L3_imdct_gr(float *grbuf,float *overlap,unsigned block_type,unsigned n_long_bands){
     static const float g_mdct_window[2][18]={
@@ -746,20 +703,19 @@ static void drmp3_L3_imdct_gr(float *grbuf,float *overlap,unsigned block_type,un
 static void drmp3_L3_save_reservoir(drmp3dec *h, drmp3dec_scratch *s){
     int pos=(s->bs.pos+7)/8u,remains=s->bs.limit/8u-pos;
     if (remains>511){pos+=remains-511;remains=511;}
-    if (remains>0) DRMP3_MOVE_MEMORY(h->reserv_buf,s->maindata+pos,remains);
+    if (remains>0) MoveMemoryFromBtoAForNBytes(h->reserv_buf,s->maindata+pos,remains);
     h->reserv=remains;
 }
 static int drmp3_L3_restore_reservoir(drmp3dec *h, drmp3_bs *bs, drmp3dec_scratch *s, int main_data_begin){
     int frame_bytes=(bs->limit-bs->pos)/8,bytes_have=vmin(h->reserv,main_data_begin);
-    DRMP3_COPY_MEMORY(s->maindata,h->reserv_buf+vmax(0,h->reserv-main_data_begin),vmin(h->reserv,main_data_begin));
-    DRMP3_COPY_MEMORY(s->maindata+bytes_have,bs->buf+bs->pos/8,frame_bytes);
+    CopyMemoryFromBtoAForNBytes(s->maindata,h->reserv_buf+vmax(0,h->reserv-main_data_begin),vmin(h->reserv,main_data_begin));
+    CopyMemoryFromBtoAForNBytes(s->maindata+bytes_have,bs->buf+bs->pos/8,frame_bytes);
     s->bs.buf=s->maindata; s->bs.pos=0; s->bs.limit=(bytes_have+frame_bytes) * 8;
     return h->reserv>=main_data_begin;
 }
 
 static void drmp3_L3_decode(drmp3dec *h, drmp3dec_scratch *s, drmp3_L3_gr_info *gr_info, int nch){
-    int ch;
-    for(ch=0;ch<nch;ch++){
+    int ch; for(ch=0;ch<nch;ch++){
         int limit=s->bs.pos+gr_info[ch].part_23_length;
         drmp3_L3_decode_scalefactors(h->header,s->ist_pos[ch],&s->bs,gr_info+ch,s->scf,ch);
         drmp3_L3_huffman(s->grbuf[ch],&s->bs,gr_info+ch,s->scf,limit);
@@ -789,7 +745,6 @@ static void drmp3d_DCT_II(float *grbuf, int n){
 
 static float drmp3d_scale_pcm(float sample) { return sample*(1.f/32768.f); }
 typedef float drmp3d_sample_t;
-
 static void drmp3d_synth_pair(drmp3d_sample_t *pcm, int nch, const float *z){
     float a;
     a =(z[14*64]-z[    0])*29; a+=(z[ 1*64]+z[13*64])*213; a+=(z[12*64]-z[ 2*64])*459;
@@ -843,28 +798,28 @@ static void drmp3d_synth(float *xl, drmp3d_sample_t *dstl, int nch, float *lins)
 static void drmp3d_synth_granule(float *qmf_state, float *grbuf, int nbands, int nch, drmp3d_sample_t *pcm, float *lins){
     int i;
     for(i=0;i<nch;i++) drmp3d_DCT_II(grbuf+576*i,nbands);
-    DRMP3_COPY_MEMORY(lins,qmf_state,sizeof(float)*15*64);
+    CopyMemoryFromBtoAForNBytes(lins,qmf_state,sizeof(float)*15*64);
     for(i=0;i<nbands;i+=2) drmp3d_synth(grbuf+i,pcm+32*nch*i,nch,lins+i*64);
-    DRMP3_COPY_MEMORY(qmf_state,lins+nbands*64,sizeof(float)*15*64);
+    CopyMemoryFromBtoAForNBytes(qmf_state,lins+nbands*64,sizeof(float)*15*64);
 }
 
 static int drmp3d_match_frame(const u8 *hdr, int mp3_bytes, int frame_bytes){
     int i,nmatch;
     for(i=0,nmatch=0;nmatch<10;nmatch++){
         i+=drmp3_hdr_frame_bytes(hdr+i,frame_bytes)+drmp3_hdr_padding(hdr+i);
-        if (i+DRMP3_HDR_SIZE>mp3_bytes) return nmatch>0;
+        if (i + 4 > mp3_bytes) return nmatch>0;
         if (!drmp3_hdr_compare(hdr,hdr+i)) return 0;
     }
     return 1;
 }
 static int drmp3d_find_frame(const u8 *mp3, int mp3_bytes, int *free_format_bytes, int *ptr_frame_bytes){
     int i,k;
-    for(i=0;i<mp3_bytes-DRMP3_HDR_SIZE;i++,mp3++){
+    for(i=0;i<mp3_bytes-4;i++,mp3++){
         if (drmp3_hdr_valid(mp3)){
             int frame_bytes=drmp3_hdr_frame_bytes(mp3,*free_format_bytes);
             int frame_and_padding=frame_bytes+drmp3_hdr_padding(mp3);
-            for(k=DRMP3_HDR_SIZE;!frame_bytes&&k<2304&&i+2*k<mp3_bytes-DRMP3_HDR_SIZE;k++){
-                if(drmp3_hdr_compare(mp3,mp3+k)){int fb=k-drmp3_hdr_padding(mp3),nextfb=fb+drmp3_hdr_padding(mp3+k);if(i+k+nextfb+DRMP3_HDR_SIZE>mp3_bytes||!drmp3_hdr_compare(mp3,mp3+k+nextfb))continue;frame_and_padding=k;frame_bytes=fb;*free_format_bytes=fb;}
+            for(k=4;!frame_bytes&&k<2304&&i+2*k<mp3_bytes - 4;k++){
+                if(drmp3_hdr_compare(mp3,mp3+k)){int fb=k-drmp3_hdr_padding(mp3),nextfb=fb+drmp3_hdr_padding(mp3+k);if(i + k + nextfb + 4 > mp3_bytes || !drmp3_hdr_compare(mp3,mp3+k+nextfb)) continue; frame_and_padding=k;frame_bytes=fb;*free_format_bytes=fb;}
             }
             if((frame_bytes&&i+frame_and_padding<=mp3_bytes&&drmp3d_match_frame(mp3,mp3_bytes-i,frame_bytes))||(!i&&frame_and_padding==mp3_bytes)){*ptr_frame_bytes=frame_and_padding;return i;}
             *free_format_bytes=0;
@@ -879,21 +834,21 @@ static int drmp3dec_decode_frame(drmp3dec *dec, const u8 *mp3, int mp3_bytes, vo
     const u8 *hdr; drmp3_bs bs_frame[1];
     if (mp3_bytes>4&&dec->header[0]==0xff&&drmp3_hdr_compare(dec->header,mp3)){
         frame_size=drmp3_hdr_frame_bytes(mp3,dec->free_format_bytes)+drmp3_hdr_padding(mp3);
-        if(frame_size!=mp3_bytes&&(frame_size+DRMP3_HDR_SIZE>mp3_bytes||!drmp3_hdr_compare(mp3,mp3+frame_size))) frame_size=0;
+        if(frame_size!=mp3_bytes&&(frame_size + 4>mp3_bytes||!drmp3_hdr_compare(mp3,mp3+frame_size))) frame_size=0;
     }
     if (!frame_size){
-        DRMP3_ZERO_MEMORY(dec,sizeof(drmp3dec));
+        MemSetToValueForNBytes(dec,0,sizeof(drmp3dec));
         i=drmp3d_find_frame(mp3,mp3_bytes,&dec->free_format_bytes,&frame_size);
         if(!frame_size||i+frame_size>mp3_bytes){info->frame_bytes=i;return 0;}
     }
     hdr=mp3+i;
-    DRMP3_COPY_MEMORY(dec->header,hdr,DRMP3_HDR_SIZE);
+    CopyMemoryFromBtoAForNBytes(dec->header,hdr,4);
     info->frame_bytes=i+frame_size;
-    info->channels=DRMP3_HDR_IS_MONO(hdr)?1:2;
+    info->channels=DRMP3_HDR_IS_MONO(hdr) ? 1 : 2;
     info->sample_rate=drmp3_hdr_sample_rate_hz(hdr);
-    info->layer=4-DRMP3_HDR_GET_LAYER(hdr);
+    info->layer = 4 - DRMP3_HDR_GET_LAYER(hdr);
     info->bitrate_kbps=drmp3_hdr_bitrate_kbps(hdr);
-    bs_frame[0].buf=hdr+DRMP3_HDR_SIZE; bs_frame[0].pos=0; bs_frame[0].limit=(frame_size-DRMP3_HDR_SIZE) * 8;
+    bs_frame[0].buf=hdr + 4; bs_frame[0].pos=0; bs_frame[0].limit=(frame_size - 4) * 8;
     if(DRMP3_HDR_IS_CRC(hdr)) drmp3_bs_get_bits(bs_frame,16);
     if(info->layer!=3) return 0;  /* Layer 1/2 not supported */
     {
@@ -902,7 +857,7 @@ static int drmp3dec_decode_frame(drmp3dec *dec, const u8 *mp3, int mp3_bytes, vo
         success=drmp3_L3_restore_reservoir(dec,bs_frame,&dec->scratch,main_data_begin);
         if(success&&pcm!=NULL){
             for(igr=0;igr<(DRMP3_HDR_TEST_MPEG1(hdr)?2:1);igr++,pcm=DRMP3_OFFSET_PTR(pcm,sizeof(drmp3d_sample_t)*576*info->channels)){
-                DRMP3_ZERO_MEMORY(dec->scratch.grbuf[0],576*2*sizeof(float));
+                MemSetToValueForNBytes(dec->scratch.grbuf[0],0,576 * 2 * sizeof(float));
                 drmp3_L3_decode(dec,&dec->scratch,dec->scratch.gr_info+igr*info->channels,info->channels);
                 drmp3d_synth_granule(dec->qmf_state,dec->scratch.grbuf[0],18,info->channels,(drmp3d_sample_t*)pcm,dec->scratch.syn[0]);
             }
@@ -923,7 +878,7 @@ static u32 drmp3_decode_next_frame_ex(drmp3 *p, drmp3d_sample_t *pPCMFrames, drm
     for (;;) {
         drmp3dec_frame_info info;
         if (p->dataSize < 16384) {
-            if (p->pData) DRMP3_MOVE_MEMORY(p->pData, p->pData + p->dataConsumed, p->dataSize);
+            if (p->pData) MoveMemoryFromBtoAForNBytes(p->pData, p->pData + p->dataConsumed, p->dataSize);
             p->dataConsumed = 0;
             if (p->dataCapacity < (16384 * 4)) {
                 u8 *nd = (u8*)OS_Realloc(p->pData, p->dataCapacity, 16384 * 4);
@@ -951,7 +906,7 @@ static u32 drmp3_decode_next_frame_ex(drmp3 *p, drmp3d_sample_t *pPCMFrames, drm
             if (pInfo) *pInfo = info;
             break;
         } else if (info.frame_bytes == 0) {
-            DRMP3_MOVE_MEMORY(p->pData, p->pData + p->dataConsumed, p->dataSize);
+            MoveMemoryFromBtoAForNBytes(p->pData, p->pData + p->dataConsumed, p->dataSize);
             p->dataConsumed = 0;
             if (p->dataCapacity == p->dataSize) {
                 size_t needed = p->dataCapacity + 16384 * 4;
@@ -1028,7 +983,7 @@ static bool drmp3_init_internal(drmp3 *p, drmp3_read_proc onRead, drmp3_seek_pro
 static bool drmp3_init_file(drmp3 *pMP3, const char *pFilePath) {
     if (!pMP3 || !pFilePath) return false;
 
-    DRMP3_ZERO_OBJECT(pMP3);
+    MemSetToValueForNBytes(pMP3,0,sizeof(drmp3));
     OsFileHandle f = OS_OpenReadonly(pFilePath);
     if (f == OS_INVALID_HANDLE) return false;
 
@@ -1068,7 +1023,7 @@ static u64 drmp3_read_pcm_frames_raw(drmp3 *p, u64 framesToRead, void *pBufferOu
         if(pBufferOut){
             float *out=(float*)DRMP3_OFFSET_PTR(pBufferOut,sizeof(float)*totalFramesRead*p->channels);
             float *in =(float*)DRMP3_OFFSET_PTR(&p->pcmFrames[0],sizeof(float)*p->pcmFramesConsumedInMP3Frame*p->mp3FrameChannels);
-            DRMP3_COPY_MEMORY(out,in,sizeof(float)*framesToConsume*p->channels);
+            CopyMemoryFromBtoAForNBytes(out,in,sizeof(float)*framesToConsume*p->channels);
         }
         p->currentPCMFrame+=framesToConsume; p->pcmFramesConsumedInMP3Frame+=framesToConsume;
         p->pcmFramesRemainingInMP3Frame-=framesToConsume;
@@ -1179,7 +1134,7 @@ static u64 WavReadPCMFrames(WaveFile *w, u64 framesToRead, float *out) {
     while (framesToRead > 0) {
         u64 batchFrames=framesToRead; u64 batchBytes=batchFrames * bpf;
         if (batchBytes > sizeof(tmp)) { batchFrames = sizeof(tmp) / bpf; batchBytes  = batchFrames * bpf; }
-        size_t got = OS_Read(w->fp, tmp, (size_t)batchBytes);
+        size_t got = OS_Read(w->fp,tmp,(size_t)batchBytes);
         u64 gotFrames = got / bpf;
         u64 samples   = gotFrames * w->channels;
         if (bps == 8) {
@@ -1197,28 +1152,10 @@ static u64 WavReadPCMFrames(WaveFile *w, u64 framesToRead, float *out) {
     return totalRead;
 }
 
-static void WavUnInit(WaveFile *w) { if (w && w->fp != OS_INVALID_HANDLE) { OS_Close(w->fp); w->fp = OS_INVALID_HANDLE; } }
-
 typedef struct { float *samples; u32 frame_count,frame_pos; float volume; bool looping,positional,playing; Vector3 pos; size_t allocSize; } wav_channel_t;
 typedef struct { drmp3 dec; bool open; float fade_vol,fade_target,fade_step; u32 src_rate; u64 frames_decoded,total_frames; } mp3_channel_t;
-static wav_channel_t wav_ch[MAX_CHANNELS],*ext_ch[MAX_CHANNELS];
-static u32 wav_count,ext_count,mp3_slot,log_frame_count,log_frame_pos;
-static mp3_channel_t mp3_ch[2];
-static float *log_samples;
-static size_t log_allocSize=0;
-static bool log_playing,mp3_paused = false;
-static float sfx_scale(void)     { return (Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeEffects/100.0f); }
-static float music_scale(void)   { return (Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeMusic/100.0f); }
-static float message_scale(void) { return (Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeMessage/100.0f); }
-static float spatial_atten(Vector3 pos) {
-    Vector3 d = {pos.x-Sys_Global.instances[PLAYER1].position.x, pos.y-Sys_Global.instances[PLAYER1].position.y, pos.z-Sys_Global.instances[PLAYER1].position.z};
-    float dist = vsqrtf(d.x*d.x+d.y*d.y+d.z*d.z);
-    if (dist <= 1.0f) return 1.0f;
-    if (dist >= 64.0f) return 0.0f;
-    return 1.0f-(dist-1.0f)/63.0f;
-}
-
-static inline i16 f32_to_s16(float s) { s = s>1.0f?1.0f:(s<-1.0f?-1.0f:s); return (i16)(s*32767.0f); }
+static wav_channel_t wav_ch[MAX_CHANNELS],*ext_ch[MAX_CHANNELS]; static u32 wav_count,ext_count,mp3_slot,log_frame_count,log_frame_pos; 
+static mp3_channel_t mp3_ch[2]; static float *log_samples; static size_t log_allocSize=0; static bool log_playing,mp3_paused = false;
 static float *resample_stereo(float *src, size_t srcSize, u32 *frames, u32 src_rate, size_t* allocSize) {
     if (src_rate == AUDIO_RATE) return src;
     
@@ -1227,12 +1164,12 @@ static float *resample_stereo(float *src, size_t srcSize, u32 *frames, u32 src_r
     float ratio = (float)sf/(float)df;
     for (u32 i = 0; i < df; i++) {
         float pos = i*ratio; u32 a = (u32)pos, b = a+1<sf?a+1:a; float t = pos-(float)a;
-        dst[i*2+0] = src[a*2+0]+t*(src[b*2+0]-src[a*2+0]);
-        dst[i*2+1] = src[a*2+1]+t*(src[b*2+1]-src[a*2+1]);
+        dst[i*2+0] = src[a*2+0]+t*(src[b*2+0]-src[a*2+0]); dst[i*2+1] = src[a*2+1]+t*(src[b*2+1]-src[a*2+1]);
     }
     OS_DeallocateRAM(src,srcSize); *frames = df; return dst;
 }
 
+static void WavUnInit(WaveFile *w) { if (w->fp != OS_INVALID_HANDLE) { OS_Close(w->fp); w->fp = OS_INVALID_HANDLE; } }
 static float *load_wav(const char *path,u32 *out_frames, size_t* allocSize) {
     WaveFile wav; if (!WavInit(&wav,path)) return NULL;
     if (wav.channels > 2) { WavUnInit(&wav); return NULL; }
@@ -1248,12 +1185,14 @@ static float *load_wav(const char *path,u32 *out_frames, size_t* allocSize) {
 }
 
 static void wave_mix(wav_channel_t* w, float* mix) {
-    float vol = w->volume*sfx_scale();
-    if (w->positional) vol *= spatial_atten(w->pos);
+    float vol = w->volume * (Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeEffects/100.0f); Vector3 pos = w->pos;
+    Vector3 d = {pos.x-Sys_Global.instances[PLAYER1].position.x,pos.y-Sys_Global.instances[PLAYER1].position.y,pos.z-Sys_Global.instances[PLAYER1].position.z};
+    float dist = vsqrtf(d.x*d.x+d.y*d.y+d.z*d.z);
+    float spatial_atten = (dist >= 64.0f) ? 0.0f : ((dist <= 1.0f) ? 1.0f : 1.0f-(dist-1.0f)/63.0f);
+    if (w->positional) vol *= spatial_atten;
     for (i32 f = 0; f < AUDIO_FRAMES; f++) {
         if (w->frame_pos >= w->frame_count) { if (w->looping) w->frame_pos=0; else { w->playing=false; break; } }
-        mix[f*2+0] += w->samples[w->frame_pos*2+0]*vol;
-        mix[f*2+1] += w->samples[w->frame_pos*2+1]*vol;
+        mix[f*2+0] += w->samples[w->frame_pos*2+0]*vol; mix[f*2+1] += w->samples[w->frame_pos*2+1]*vol;
         w->frame_pos++;
     }
 }
@@ -1262,13 +1201,13 @@ static void audio_mix_period(i16 *out) {
     float mix[AUDIO_FRAMES*AUDIO_CHANNELS];
     MemSetToValueForNBytes(mix,0,sizeof(mix));
     for (u32 c=0;c<wav_count;c++) { wav_channel_t* w = &wav_ch[c]; if (w->playing && w->samples) {wave_mix(w,mix);} }
-    for (u32 c=0;c<ext_count;c++) { wav_channel_t* w = ext_ch[c]; if (w->playing && w->samples) {wave_mix(w,mix);} }
+    for (u32 c=0;c<ext_count;c++) { wav_channel_t* w =  ext_ch[c]; if (w->playing && w->samples) {wave_mix(w,mix);} }
     if (log_playing && log_samples) {
-        float vol = message_scale();
+        float vol = (Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeMessage/100.0f);
         for (i32 f = 0; f < AUDIO_FRAMES; f++) {
             if (log_frame_pos >= log_frame_count) { log_playing=false; break; }
-            mix[f*2+0] += log_samples[log_frame_pos*2+0]*vol;
-            mix[f*2+1] += log_samples[log_frame_pos*2+1]*vol;
+            mix[f*2+0] += log_samples[log_frame_pos*2+0] * vol;
+            mix[f*2+1] += log_samples[log_frame_pos*2+1] * vol;
             log_frame_pos++;
         }
     }
@@ -1282,13 +1221,11 @@ static void audio_mix_period(i16 *out) {
             float raw[AUDIO_FRAMES*4];
             u64 got = drmp3_read_pcm_frames_f32(&m->dec,frames_to_read,raw);
             if (got == 0) { drmp3_uninit(&m->dec); m->open=false; continue; }
-            float vol = m->fade_vol*music_scale();
-            m->frames_decoded += got;
-            float ratio = (float)got/(float)AUDIO_FRAMES;
+            float vol = m->fade_vol * (Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeMusic/100.0f);
+            m->frames_decoded += got; float ratio = (float)got/(float)AUDIO_FRAMES;
             for (i32 f = 0; f < AUDIO_FRAMES; f++) {
                 float pos = f*ratio; u32 a=(u32)pos, b=(a+1<(u32)got)?a+1:a; float t=pos-(float)a;
-                float l = raw[a*2+0]+t*(raw[b*2+0]-raw[a*2+0]);
-                float r = raw[a*2+1]+t*(raw[b*2+1]-raw[a*2+1]);
+                float l = raw[a*2+0]+t*(raw[b*2+0]-raw[a*2+0]), r = raw[a*2+1]+t*(raw[b*2+1]-raw[a*2+1]);
                 mix[f*2+0] += l*vol; mix[f*2+1] += r*vol;
                 if (m->fade_step != 0.0f) {
                     m->fade_vol += m->fade_step;
@@ -1302,7 +1239,7 @@ static void audio_mix_period(i16 *out) {
         }
     }
 
-    for (u32 i = 0; i < AUDIO_FRAMES*AUDIO_CHANNELS; i++) out[i] = f32_to_s16(mix[i]);
+    for (u32 i = 0; i < AUDIO_FRAMES * AUDIO_CHANNELS; i++) { float s = mix[i]; s = s > 1.0f ? 1.0f : (s < -1.0f ? -1.0f : s); out[i] = (i16)(s * 32767.0f); }
 }
 
 ENGINE_TO_MOD void play_wav(const char *path,float volume,Vector3 pos,bool positional) {
@@ -1340,8 +1277,8 @@ ENGINE_TO_MOD void SoundUninit(ma_sound *pSound) {
     if (w->samples){OS_DeallocateRAM(w->samples,w->allocSize);w->samples=NULL;w->allocSize=0;} w->playing=false;
     for (u32 i=0;i<ext_count;i++) if (ext_ch[i]==w) { ext_ch[i]=ext_ch[--ext_count]; break; }
 }
-ENGINE_TO_MOD void SoundSetVolume(ma_sound *pSound,float volume) { ((wav_channel_t*)pSound)->volume=volume; }
-ENGINE_TO_MOD void SoundSetLooping(ma_sound *pSound,ma_bool32 loop) { ((wav_channel_t*)pSound)->looping=(bool)loop; }
+ENGINE_TO_MOD void SoundSetVolume(ma_sound *pSound, float volume) { ((wav_channel_t*)pSound)->volume=volume; }
+ENGINE_TO_MOD void SoundSetLooping(ma_sound *pSound, i32 loop) { ((wav_channel_t*)pSound)->looping=(bool)loop; }
 ENGINE_TO_MOD bool GetSoundIsPlaying(ma_sound *pSound)  { return ((wav_channel_t*)pSound)->playing; }
 ENGINE_TO_MOD i32 SoundGetCurrentFrameCursor(const ma_sound *pSound,u64 *pCursor) { *pCursor=((wav_channel_t*)pSound)->frame_pos; return 0; }
 ENGINE_TO_MOD float SoundGetLength(ma_sound *pSound) { wav_channel_t *w=(wav_channel_t*)pSound; return (w->samples&&AUDIO_RATE)?(float)w->frame_count/(float)AUDIO_RATE:0.0f; }
@@ -1376,94 +1313,83 @@ ENGINE_TO_MOD float GetMP3RemainingTime(void) {
     return (float)(m->total_frames-m->frames_decoded)/(float)(m->src_rate?m->src_rate:AUDIO_RATE);
 }
 
-#define MAX_PCM_DEVICES 8
-static OsFileHandle pcm_fds[MAX_PCM_DEVICES];
-static i32 pcm_fd_count = 0;
+static OsFileHandle pcm_fds[8]; static i32 pcm_fd_count = 0;
 #ifndef WINDOWS
-typedef void snd_pcm_t;
-typedef int  (*pfn_snd_pcm_open)(snd_pcm_t**, const char*, int, int);
-typedef int  (*pfn_snd_pcm_close)(snd_pcm_t*);
-typedef int  (*pfn_snd_pcm_writei)(snd_pcm_t*, const void*, u32);
-typedef int  (*pfn_snd_pcm_recover)(snd_pcm_t*, int, int);
-typedef int  (*pfn_snd_pcm_prepare)(snd_pcm_t*);
-typedef int  (*pfn_snd_pcm_hw_params_sizeof)(void);
-typedef int  (*pfn_snd_pcm_hw_params_any)(snd_pcm_t*, void*);
-typedef int  (*pfn_snd_pcm_hw_params_set_access)(snd_pcm_t*, void*, unsigned int);
-typedef int  (*pfn_snd_pcm_hw_params_set_format)(snd_pcm_t*, void*, int);
-typedef int  (*pfn_snd_pcm_hw_params_set_channels)(snd_pcm_t*, void*, unsigned int);
-typedef int  (*pfn_snd_pcm_hw_params_set_rate_near)(snd_pcm_t*, void*, unsigned int*, int*);
-typedef int  (*pfn_snd_pcm_hw_params_set_period_size_near)(snd_pcm_t*, void*, unsigned long*, int*);
-typedef int  (*pfn_snd_pcm_hw_params_set_periods_near)(snd_pcm_t*, void*, unsigned int*, int*);
-typedef int  (*pfn_snd_pcm_hw_params)(snd_pcm_t*, void*);
-typedef const char* (*pfn_snd_strerror)(int);
-static snd_pcm_t         *g_alsa_pcm;
-static pfn_snd_pcm_writei g_snd_writei;
-static pfn_snd_pcm_recover g_snd_recover;
-static pfn_snd_pcm_prepare g_snd_prepare;
-static pfn_snd_strerror    g_snd_strerror;
-static bool alsa_try_open_default(void) {
-    void *so = dlopen("libasound.so.2",2);
-    if (!so) so = dlopen("libasound.so",2);
-    if (!so) { DualLog("Audio: libasound not found\n"); return false; }
+    typedef void snd_pcm_t;
+    typedef int (*pfn_snd_pcm_open)(snd_pcm_t**, const char*, int, int);
+    typedef int (*pfn_snd_pcm_close)(snd_pcm_t*);
+    typedef int (*pfn_snd_pcm_writei)(snd_pcm_t*, const void*, u32);
+    typedef int (*pfn_snd_pcm_recover)(snd_pcm_t*, int, int);
+    typedef int (*pfn_snd_pcm_prepare)(snd_pcm_t*);
+    typedef int (*pfn_snd_pcm_hw_params_sizeof)(void);
+    typedef int (*pfn_snd_pcm_hw_params_any)(snd_pcm_t*, void*);
+    typedef int (*pfn_snd_pcm_hw_params_set_access)(snd_pcm_t*, void*, unsigned int);
+    typedef int (*pfn_snd_pcm_hw_params_set_format)(snd_pcm_t*, void*, int);
+    typedef int (*pfn_snd_pcm_hw_params_set_channels)(snd_pcm_t*, void*, unsigned int);
+    typedef int (*pfn_snd_pcm_hw_params_set_rate_near)(snd_pcm_t*, void*, unsigned int*, int*);
+    typedef int (*pfn_snd_pcm_hw_params_set_period_size_near)(snd_pcm_t*, void*, unsigned long*, int*);
+    typedef int (*pfn_snd_pcm_hw_params_set_periods_near)(snd_pcm_t*, void*, unsigned int*, int*);
+    typedef int (*pfn_snd_pcm_hw_params)(snd_pcm_t*, void*);
+    typedef const char* (*pfn_snd_strerror)(int);
+    static snd_pcm_t *g_alsa_pcm; static pfn_snd_pcm_writei g_snd_writei; static pfn_snd_pcm_recover g_snd_recover; static pfn_snd_pcm_prepare g_snd_prepare; static pfn_snd_strerror g_snd_strerror;
+    static bool alsa_try_open_default(void) {
+        void *so = dlopen("libasound.so.2",2);
+        if (!so) so = dlopen("libasound.so",2);
+        if (!so) { DualLog("Audio: libasound not found\n"); return false; }
 
-    pfn_snd_pcm_open                   snd_open      = dlsym(so, "snd_pcm_open");
-    pfn_snd_pcm_hw_params_sizeof       hw_sizeof     = dlsym(so, "snd_pcm_hw_params_sizeof");
-    pfn_snd_pcm_hw_params_any          hw_any        = dlsym(so, "snd_pcm_hw_params_any");
-    pfn_snd_pcm_hw_params_set_access   hw_set_access = dlsym(so, "snd_pcm_hw_params_set_access");
-    pfn_snd_pcm_hw_params_set_format   hw_set_fmt    = dlsym(so, "snd_pcm_hw_params_set_format");
-    pfn_snd_pcm_hw_params_set_channels hw_set_ch     = dlsym(so, "snd_pcm_hw_params_set_channels");
-    pfn_snd_pcm_hw_params_set_rate_near        hw_set_rate   = dlsym(so, "snd_pcm_hw_params_set_rate_near");
-    pfn_snd_pcm_hw_params_set_period_size_near hw_set_period = dlsym(so, "snd_pcm_hw_params_set_period_size_near");
-    pfn_snd_pcm_hw_params_set_periods_near     hw_set_periods= dlsym(so, "snd_pcm_hw_params_set_periods_near");
-    pfn_snd_pcm_hw_params              hw_apply      = dlsym(so, "snd_pcm_hw_params");
-    g_snd_writei  = dlsym(so, "snd_pcm_writei");
-    g_snd_recover = dlsym(so, "snd_pcm_recover");
-    g_snd_prepare = dlsym(so, "snd_pcm_prepare");
-    g_snd_strerror= dlsym(so, "snd_strerror");
-    if (!snd_open||!hw_sizeof||!hw_any||!hw_set_access||!hw_set_fmt||!hw_set_ch|| !hw_set_rate||!hw_set_period||!hw_set_periods||!hw_apply|| !g_snd_writei||!g_snd_recover||!g_snd_prepare) { DualLogError("Audio: libasound missing required symbols\n"); return false; }
+        pfn_snd_pcm_open                   snd_open      = dlsym(so, "snd_pcm_open");
+        pfn_snd_pcm_hw_params_sizeof       hw_sizeof     = dlsym(so, "snd_pcm_hw_params_sizeof");
+        pfn_snd_pcm_hw_params_any          hw_any        = dlsym(so, "snd_pcm_hw_params_any");
+        pfn_snd_pcm_hw_params_set_access   hw_set_access = dlsym(so, "snd_pcm_hw_params_set_access");
+        pfn_snd_pcm_hw_params_set_format   hw_set_fmt    = dlsym(so, "snd_pcm_hw_params_set_format");
+        pfn_snd_pcm_hw_params_set_channels hw_set_ch     = dlsym(so, "snd_pcm_hw_params_set_channels");
+        pfn_snd_pcm_hw_params_set_rate_near        hw_set_rate   = dlsym(so, "snd_pcm_hw_params_set_rate_near");
+        pfn_snd_pcm_hw_params_set_period_size_near hw_set_period = dlsym(so, "snd_pcm_hw_params_set_period_size_near");
+        pfn_snd_pcm_hw_params_set_periods_near     hw_set_periods= dlsym(so, "snd_pcm_hw_params_set_periods_near");
+        pfn_snd_pcm_hw_params              hw_apply      = dlsym(so, "snd_pcm_hw_params");
+        g_snd_writei  = dlsym(so, "snd_pcm_writei");
+        g_snd_recover = dlsym(so, "snd_pcm_recover");
+        g_snd_prepare = dlsym(so, "snd_pcm_prepare");
+        g_snd_strerror= dlsym(so, "snd_strerror");
+        if (!snd_open||!hw_sizeof||!hw_any||!hw_set_access||!hw_set_fmt||!hw_set_ch|| !hw_set_rate||!hw_set_period||!hw_set_periods||!hw_apply|| !g_snd_writei||!g_snd_recover||!g_snd_prepare) { DualLogError("Audio: libasound missing required symbols\n"); return false; }
 
-    int r = snd_open(&g_alsa_pcm, "default", 0/*PLAYBACK*/, 0/*blocking*/);
-    if (r < 0 || !g_alsa_pcm) { DualLogError("Audio: snd_pcm_open('default') failed: %d (%s)\n", r, g_snd_strerror ? g_snd_strerror(r) : "?"); return false; }
+        int r = snd_open(&g_alsa_pcm, "default", 0/*PLAYBACK*/, 0/*blocking*/);
+        if (r < 0 || !g_alsa_pcm) { DualLogError("Audio: snd_pcm_open('default') failed: %d (%s)\n", r, g_snd_strerror ? g_snd_strerror(r) : "?"); return false; }
 
-    int sz = hw_sizeof();
-    u8 hw_params_buf[640];
-    if (sz > (int)sizeof(hw_params_buf)) { DualLogError("Audio: hw_params_t too large (%d)\n", sz); return false; }
-    void *hwp = hw_params_buf;
-    if ((r = hw_any(g_alsa_pcm, hwp)) < 0) { DualLogError("Audio: hw_params_any failed: %s\n", g_snd_strerror(r)); return false; }
-    if ((r = hw_set_access(g_alsa_pcm, hwp, 3/*RW_INTERLEAVED*/)) < 0) { DualLogError("Audio: set_access failed: %s\n", g_snd_strerror(r)); return false; }
-    if ((r = hw_set_fmt(g_alsa_pcm, hwp, 2/*S16_LE*/)) < 0) { DualLogError("Audio: set_format S16_LE failed: %s\n", g_snd_strerror(r)); return false; }
-    if ((r = hw_set_ch(g_alsa_pcm, hwp, AUDIO_CHANNELS)) < 0) { DualLogError("Audio: set_channels(%d) failed: %s\n", AUDIO_CHANNELS, g_snd_strerror(r)); return false; }
+        int sz = hw_sizeof();
+        u8 hw_params_buf[640];
+        if (sz > (int)sizeof(hw_params_buf)) { DualLogError("Audio: hw_params_t too large (%d)\n", sz); return false; }
+        void *hwp = hw_params_buf;
+        if ((r = hw_any(g_alsa_pcm, hwp)) < 0) { DualLogError("Audio: hw_params_any failed: %s\n", g_snd_strerror(r)); return false; }
+        if ((r = hw_set_access(g_alsa_pcm, hwp, 3/*RW_INTERLEAVED*/)) < 0) { DualLogError("Audio: set_access failed: %s\n", g_snd_strerror(r)); return false; }
+        if ((r = hw_set_fmt(g_alsa_pcm, hwp, 2/*S16_LE*/)) < 0) { DualLogError("Audio: set_format S16_LE failed: %s\n", g_snd_strerror(r)); return false; }
+        if ((r = hw_set_ch(g_alsa_pcm, hwp, AUDIO_CHANNELS)) < 0) { DualLogError("Audio: set_channels(%d) failed: %s\n", AUDIO_CHANNELS, g_snd_strerror(r)); return false; }
 
-    unsigned int rate = AUDIO_RATE; int dir = 0;
-    if ((r = hw_set_rate(g_alsa_pcm, hwp, &rate, &dir)) < 0) { DualLogError("Audio: set_rate(%u) failed: %s\n", AUDIO_RATE, g_snd_strerror(r)); return false; }
+        unsigned int rate = AUDIO_RATE; int dir = 0;
+        if ((r = hw_set_rate(g_alsa_pcm, hwp, &rate, &dir)) < 0) { DualLogError("Audio: set_rate(%u) failed: %s\n", AUDIO_RATE, g_snd_strerror(r)); return false; }
 
-    unsigned long period = AUDIO_FRAMES; dir = 0;
-    if ((r = hw_set_period(g_alsa_pcm, hwp, &period, &dir)) < 0) { DualLogError("Audio: set_period_size(%d) failed: %s\n", AUDIO_FRAMES, g_snd_strerror(r)); return false; }
+        unsigned long period = AUDIO_FRAMES; dir = 0;
+        if ((r = hw_set_period(g_alsa_pcm, hwp, &period, &dir)) < 0) { DualLogError("Audio: set_period_size(%d) failed: %s\n", AUDIO_FRAMES, g_snd_strerror(r)); return false; }
 
-    unsigned int periods = AUDIO_PERIODS; dir = 0;
-    if ((r = hw_set_periods(g_alsa_pcm, hwp, &periods, &dir)) < 0) { DualLogError("Audio: set_periods(%d) failed: %s\n", AUDIO_PERIODS, g_snd_strerror(r)); return false; }
-    if ((r = hw_apply(g_alsa_pcm, hwp)) < 0) { DualLogError("Audio: hw_params apply failed: %s\n", g_snd_strerror(r)); return false; }
-    if ((r = g_snd_prepare(g_alsa_pcm)) < 0) { DualLogError("Audio: snd_pcm_prepare failed: %s\n", g_snd_strerror(r)); return false; }
-    return true;
-}
-
-static void init_pcm_device(i32 card, i32 dev) {
-    OsFileHandle r = pcm_open(card, dev, 1|(1<<1));
-    if (r == OS_INVALID_HANDLE) return;
-    DualLog("Audio: trying raw device card=%d dev=%d fd=%d\n", card, dev, r);
-    pcm_params_t p; pcm_params_init(&p);
-    pcm_set(&p, PCM_FORMAT, SNDRV_PCM_FORMAT_S16_LE);
-    pcm_set(&p, SNDRV_PCM_HW_PARAM_ACCESS, SNDRV_PCM_ACCESS_RW_INTERLEAVED);
-    pcm_set(&p, PCM_RATE, AUDIO_RATE); pcm_set(&p, PCM_CHANNELS, AUDIO_CHANNELS);
-    pcm_set(&p, PCM_PERIOD_SIZE, AUDIO_FRAMES); pcm_set(&p, SNDRV_PCM_HW_PARAM_PERIODS, AUDIO_PERIODS);
-    if (pcm_params_setup(r, &p) >= 0 && pcm_fd_count < MAX_PCM_DEVICES) {
-        DualLog("Audio: raw device card=%d dev=%d OK\n", card, dev);
-        pcm_fds[pcm_fd_count++] = r;
-    } else {
-        DualLog("Audio: raw device card=%d dev=%d setup failed, closing\n", card, dev);
-        OS_Close(r);
+        unsigned int periods = AUDIO_PERIODS; dir = 0;
+        if ((r = hw_set_periods(g_alsa_pcm, hwp, &periods, &dir)) < 0) { DualLogError("Audio: set_periods(%d) failed: %s\n", AUDIO_PERIODS, g_snd_strerror(r)); return false; }
+        if ((r = hw_apply(g_alsa_pcm, hwp)) < 0) { DualLogError("Audio: hw_params apply failed: %s\n", g_snd_strerror(r)); return false; }
+        if ((r = g_snd_prepare(g_alsa_pcm)) < 0) { DualLogError("Audio: snd_pcm_prepare failed: %s\n", g_snd_strerror(r)); return false; }
+        return true;
     }
-}
+
+    static void init_pcm_device(i32 card, i32 dev) {
+        OsFileHandle r = pcm_open(card, dev, 1|(1<<1));
+        if (r == OS_INVALID_HANDLE) return;
+        DualLog("Audio: trying raw device card=%d dev=%d fd=%d\n", card, dev, r);
+        pcm_params_t p; pcm_params_init(&p);
+        pcm_set(&p, PCM_FORMAT, SNDRV_PCM_FORMAT_S16_LE);
+        pcm_set(&p, SNDRV_PCM_HW_PARAM_ACCESS, SNDRV_PCM_ACCESS_RW_INTERLEAVED);
+        pcm_set(&p, PCM_RATE, AUDIO_RATE); pcm_set(&p, PCM_CHANNELS, AUDIO_CHANNELS);
+        pcm_set(&p, PCM_PERIOD_SIZE, AUDIO_FRAMES); pcm_set(&p, SNDRV_PCM_HW_PARAM_PERIODS, AUDIO_PERIODS);
+        if (pcm_params_setup(r, &p) >= 0 && pcm_fd_count < 8) { DualLog("Audio: raw device card=%d dev=%d OK\n",card,dev); pcm_fds[pcm_fd_count++] = r; }
+        else { DualLog("Audio: raw device card=%d dev=%d setup failed, closing\n",card,dev); OS_Close(r); }
+    }
 #endif
 
 void AudioUpdate(void) {
@@ -1502,17 +1428,15 @@ void InitAudio(void) {
     OsFileHandle first = pcm_open_all(AUDIO_RATE,AUDIO_CHANNELS,AUDIO_FRAMES,AUDIO_PERIODS);
     if (first == OS_INVALID_HANDLE) { DualLog("ERROR: No WASAPI audio device found\n"); return; }
     pcm_fds[0] = first; pcm_fd_count = 1;
-    DualLog("Audio: WASAPI %d device(s) active\n", wasapi_dev_count);
+    DualLog("Audio: WASAPI %d device(s) active\n",wasapi_dev_count);
 #else
     if (alsa_try_open_default()) {
         DualLog("Audio: using libasound 'default' path\n");
     } else {
         DualLog("Audio: libasound path failed, trying raw devices\n");
-        for (i32 card = 0; card < 8; card++)
-            for (i32 dev = 0; dev < 8; dev++)
-                init_pcm_device(card, dev);
+        for (i32 card = 0; card < 8; card++) { for (i32 dev = 0; dev < 8; dev++) init_pcm_device(card, dev); }
         if (pcm_fd_count == 0) DualLogError("Audio: no output device found\n");
-        else DualLog("Audio: %d raw device(s) active\n", pcm_fd_count);
+        else DualLog("Audio: %d raw device(s) active\n",pcm_fd_count);
     }
 #endif
     pthread_create(&audThreadID,NULL,AudThread,NULL);

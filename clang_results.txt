@@ -20,7 +20,7 @@ ENGINE_TO_MOD void DualLogError(const char* fmt, ...);
 ./os.h:25:20: note: previously declared here
 ENGINE_TO_MOD void DualLogError(const char* fmt, ...);
                    ^
-/home/qmaster/Github/Voxen/audio.c:953:11: warning: do not use 'else' after 'break' [readability-else-after-return]
+/home/qmaster/Github/Voxen/audio.c:908:11: warning: do not use 'else' after 'break' [readability-else-after-return]
         } else if (info.frame_bytes == 0) {
           ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 2 warnings generated.

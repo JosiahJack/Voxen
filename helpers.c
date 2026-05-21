@@ -18,11 +18,9 @@ void stbi_write_bmp(char const *filename, int x, int y, const void *data) {
 
 double get_time(void) {
     #ifdef WINDOWS
-        static LARGE_INTEGER frequency;
-        static BOOL initialized = FALSE;
-        if (!initialized) { QueryPerformanceFrequency(&frequency); initialized = TRUE; }
-        LARGE_INTEGER counter;
-        QueryPerformanceCounter(&counter);
+        static LARGE_INTEGER frequency; static i32 initialized = 0;
+        if (!initialized) { QueryPerformanceFrequency(&frequency); initialized = 1; }
+        LARGE_INTEGER counter; QueryPerformanceCounter(&counter);
         return (double)counter.QuadPart / frequency.QuadPart;
     #else
         struct { long tv_sec; long tv_nsec; } ts;

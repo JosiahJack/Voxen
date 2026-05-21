@@ -58,8 +58,8 @@ MOD_TO_ENGINE void UpdateAmbientSounds(void) {
                 slot->length_sec = SoundGetLength(&slot->sound);
                 if (slot->length_sec <= 0.0f) { SoundUninit(&slot->sound); continue; }
 
-                SoundSetLooping(&slot->sound,MA_TRUE);
-                slot->loaded = MA_TRUE;
+                SoundSetLooping(&slot->sound,1);
+                slot->loaded = 1;
             }
 
             if (!GetSoundIsPlaying(&slot->sound)) SoundStart(&slot->sound);

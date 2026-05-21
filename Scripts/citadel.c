@@ -17,18 +17,14 @@ MOD_TO_ENGINE void ModLink(GlobalContext* g,CheatsSystem* c,SettingsSystem* s,Te
 int lev1SecCode,lev2SecCode,lev3SecCode,lev4SecCode,lev5SecCode,lev6SecCode;
 
 #ifdef WINDOWS
-typedef int BOOL; typedef void* HINSTANCE; typedef unsigned long DWORD; typedef void* LPVOID;
-#define WINAPI __stdcall
-#define TRUE  1
-#define FALSE 0
-MOD_TO_ENGINE BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved) {
+MOD_TO_ENGINE i32 __stdcall DllMain(void* hinstDLL, unsigned long fdwReason, void* lpReserved) {
     (void)hinstDLL;
     (void)lpReserved;
     switch (fdwReason) {
 //         case DLL_PROCESS_ATTACH: break;
 //         case DLL_PROCESS_DETACH: break;
     }
-    return TRUE;
+    return 1;
 }
 
 void* memset(void* dst, int c, size_t n) { return MemSetToValueForNBytes(dst,c,n); }

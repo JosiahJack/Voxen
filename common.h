@@ -614,10 +614,7 @@ typedef /*FAT*/ struct  {
 typedef struct { Entity* entries; u32 count; u32 capacity; } DataParser;
 typedef struct { u8 dataType; const char* fieldName; } EntityField;
 typedef __builtin_va_list va_list;
-typedef struct { char _opaque[128]; } ma_sound;
-typedef int ma_bool32;
-#define MA_TRUE  1
-#define MA_FALSE 0
+typedef struct { char soundPath[128]; } ma_sound;
 typedef struct {
     u32 globalFrameNum;
     u16 loadedInstances,loadedLights; // Numbers of instances of entities and lights loaded (always for just the current level)
