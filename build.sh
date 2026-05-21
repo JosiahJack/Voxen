@@ -94,8 +94,7 @@ cat > Shaders/shaders.h <<'EOF'
 #include "voxels.compute.h"
 #include "shadowmaps_clear.compute.h"
 EOF
-# Clang-Tidy checks
-printf "%s\n" voxen.c glfw.c audio.c physics.c Scripts/animation.c Scripts/ai.c Scripts/biomonitor.c Scripts/weapons.c Scripts/music.c Scripts/modaudio.c Scripts/citadel.c Scripts/entity.c | xargs -P12 -I{} clang-tidy {} -header-filter=.* -checks="-*,*unused*,*redundant*,*unreachable*,*simplify*,bugprone-branch-clone,bugprone-macro-repeated-side-effects,readability-else-after-return,bugprone-switch-missing-default,bugprone-unused-local-non-trivial-variable,performance-padding-within-memory-structure,bugprone-sizeof-expression,readability-static-definition-in-anonymous-namespace,-performance-no-int-to-ptr" -- -std=c11 -I. -IScripts > clang_results.txt 2>&1 || true
+
 ZIG_LIBS="-L/usr/lib/x86_64-linux-gnu -L/usr/lib64"
 LINUX_CC="zig cc -target x86_64-linux-gnu.2.7"
 WINDOWS_CC="zig cc -target x86_64-windows-gnu -Wl,--stack,8388608"

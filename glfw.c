@@ -23,6 +23,86 @@ typedef struct { const char* name; int value; } InputElement; extern InputElemen
 typedef void (*GLFWproc)(void); typedef struct _GLFWfbconfig _GLFWfbconfig; typedef struct _GLFWcontext _GLFWcontext; typedef struct _GLFWwindow _GLFWwindow; typedef struct _GLFWlibrary _GLFWlibrary; typedef struct _GLFWmonitor _GLFWmonitor; typedef struct _GLFWjoystick _GLFWjoystick;
 void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n); int StringCompareUpToLength(const char* s1, const char* s2, size_t n); void UpdateScreenSize(i32 width, i32 height);
 #if defined(WINDOWS)
+    typedef ULONG *PULONG;
+    typedef unsigned short USHORT;
+    typedef USHORT *PUSHORT;
+    typedef char *PSZ;
+    #define __MSABI_LONG(x) x
+    typedef i32 *PBOOL,*LPBOOL;
+    typedef UCHAR *PUCHAR;
+    typedef float *PFLOAT;
+    typedef BYTE *PBYTE,*LPBYTE;
+    typedef i32 *PINT,*LPINT;
+    typedef long *LPLONG;
+    typedef unsigned int *PUINT,*PUINT32;
+    #define MAKEINTRESOURCE(r) ((ULONG_PTR) (USHORT) r)
+    typedef short SHORT;
+    typedef CHAR *NPSTR,*LPSTR,*PSTR;
+    typedef WCHAR *NWPSTR,*LPWSTR,*PWSTR;
+    typedef const WCHAR *LPCWCH,*PCWCH;
+    typedef LPWSTR PTSTR,LPTSTR;
+    typedef unsigned long long ULONGLONG;
+    typedef UINT_PTR WPARAM;
+    typedef LONG_PTR LPARAM;
+    typedef LONG_PTR LRESULT;
+    #define max(a, b) (((a) > (b)) ? (a) : (b))
+    #define min(a, b) (((a) < (b)) ? (a) : (b))
+    #define MAKEWORD(a,b) ((WORD) (((BYTE) (((DWORD_PTR) (a)) & 0xff)) | ((WORD) ((BYTE) (((DWORD_PTR) (b)) & 0xff))) << 8))
+    #define MAKELONG(a, b) ((LONG) (((WORD) (((DWORD_PTR) (a)) & 0xffff)) | ((DWORD) ((WORD) (((DWORD_PTR) (b)) & 0xffff))) << 16))
+    #define LOWORD(l) ((WORD) (((DWORD_PTR) (l)) & 0xffff))
+    #define HIWORD(l) ((WORD) ((((DWORD_PTR) (l)) >> 16) & 0xffff))
+    #define LOBYTE(w) ((BYTE) (((DWORD_PTR) (w)) & 0xff))
+    #define HIBYTE(w) ((BYTE) ((((DWORD_PTR) (w)) >> 8) & 0xff))
+    typedef HANDLE *SPHANDLE,*LPHANDLE,HGLOBAL,HLOCAL;
+    typedef HANDLE GLOBALHANDLE;
+    typedef HANDLE LOCALHANDLE;
+    typedef WORD ATOM;
+    typedef int HFILE;
+    DECLARE_HANDLE(HKEY);
+    typedef HKEY *PHKEY;
+    typedef struct _FILETIME { DWORD dwLowDateTime; DWORD dwHighDateTime; } FILETIME,*PFILETIME,*LPFILETIME;
+    typedef void *HGDIOBJ;
+    DECLARE_HANDLE(HWND);
+    DECLARE_HANDLE(HBITMAP);
+    DECLARE_HANDLE(HBRUSH);
+    DECLARE_HANDLE(HDC);
+    DECLARE_HANDLE(HGLRC);
+    DECLARE_HANDLE(HICON);
+    DECLARE_HANDLE(HMENU);
+    DECLARE_HANDLE(HMONITOR);
+    typedef HICON HCURSOR;
+    typedef struct tagPOINT { LONG x; LONG y; } POINT,*PPOINT,*NPPOINT,*LPPOINT;
+    typedef struct _POINTL { LONG x; LONG y; } POINTL,*PPOINTL;
+    typedef struct tagRECT { LONG left; LONG top; LONG right; LONG bottom; } RECT,*PRECT,*NPRECT,*LPRECT;
+    typedef const RECT *LPCRECT;
+    typedef struct _RECTL { LONG left; LONG top; LONG right; LONG bottom; } RECTL,*PRECTL,*LPRECTL;
+    typedef struct tagSIZE { LONG cx; LONG cy; } SIZE,*PSIZE,*LPSIZE;
+    typedef SIZE SIZEL;
+    typedef struct tagPOINTS { SHORT x; SHORT y; } POINTS,*PPOINTS,*LPPOINTS;
+    typedef struct _OSVERSIONINFOEXW { DWORD dwOSVersionInfoSize; DWORD dwMajorVersion; DWORD dwMinorVersion; DWORD dwBuildNumber; DWORD dwPlatformId; WCHAR szCSDVersion[128]; WORD wServicePackMajor; WORD wServicePackMinor; WORD wSuiteMask; BYTE wProductType; BYTE wReserved; } OSVERSIONINFOEXW,*POSVERSIONINFOEXW,*LPOSVERSIONINFOEXW,RTL_OSVERSIONINFOEXW,*PRTL_OSVERSIONINFOEXW;
+    DECLARE_HANDLE(DPI_AWARENESS_CONTEXT);
+    int __cdecl wcscmp(const wchar_t *_Str1,const wchar_t *_Str2);
+    wchar_t* wcscpy(wchar_t* restrict destination, const wchar_t* restrict source);
+    #define MAKEINTATOM(i) (LPTSTR) ((ULONG_PTR)((WORD)(i)))
+    typedef struct _devicemodeW {
+        WCHAR dmDeviceName[32]; WORD dmSpecVersion; WORD dmDriverVersion; WORD dmSize; WORD dmDriverExtra; DWORD dmFields;
+        union { struct { short dmOrientation,dmPaperSize,dmPaperLength,dmPaperWidth,dmScale,dmCopies,dmDefaultSource,dmPrintQuality; }; struct { POINTL dmPosition; DWORD dmDisplayOrientation; DWORD dmDisplayFixedOutput; }; };
+        short dmColor,dmDuplex,dmYResolution,dmTTOption,dmCollate; WCHAR dmFormName[32]; WORD dmLogPixels; DWORD dmBitsPerPel; DWORD dmPelsWidth; DWORD dmPelsHeight; union { DWORD dmDisplayFlags; DWORD dmNup; };
+        DWORD dmDisplayFrequency; DWORD dmICMMethod; DWORD dmICMIntent; DWORD dmMediaType; DWORD dmDitherType; DWORD dmReserved1; DWORD dmReserved2; DWORD dmPanningWidth; DWORD dmPanningHeight;
+    } DEVMODEW,*PDEVMODEW,*NPDEVMODEW,*LPDEVMODEW;
+    DECLSPEC_IMPORT HDC WINAPI CreateDCW(LPCWSTR pwszDriver,LPCWSTR pwszDevice,LPCWSTR pszPort,const DEVMODEW *pdm);
+    DECLSPEC_IMPORT i32 WINAPI GetModuleHandleExW (DWORD dwFlags, LPCWSTR lpModuleName, HMODULE *phModule);
+    typedef LRESULT (__stdcall *WNDPROC)(HWND, u32, WPARAM, LPARAM);
+    typedef i32 (__stdcall *MONITORENUMPROC)(HMONITOR, HDC, LPRECT, LPARAM);
+    typedef PVOID HDEVNOTIFY;
+    typedef struct _ICONINFO { i32 fIcon; DWORD xHotspot; DWORD yHotspot; HBITMAP hbmMask; HBITMAP hbmColor; } ICONINFO; typedef ICONINFO *PICONINFO;
+    typedef struct tagMSG { HWND hwnd; u32 message; WPARAM wParam; LPARAM lParam; DWORD time; POINT pt; } MSG,*PMSG,*NPMSG,*LPMSG;
+    typedef struct tagTRACKMOUSEEVENT { DWORD cbSize; DWORD dwFlags; HWND hwndTrack; DWORD dwHoverTime; } TRACKMOUSEEVENT,*LPTRACKMOUSEEVENT;
+    typedef struct tagMINMAXINFO { POINT ptReserved; POINT ptMaxSize; POINT ptMaxPosition; POINT ptMinTrackSize; POINT ptMaxTrackSize; } MINMAXINFO,*PMINMAXINFO,*LPMINMAXINFO;
+    typedef struct tagMONITORINFO { DWORD cbSize; RECT rcMonitor; RECT rcWork; DWORD dwFlags; } MONITORINFO,*LPMONITORINFO;
+    typedef struct tagMONITORINFOEXW { DWORD cbSize; RECT rcMonitor; RECT rcWork; DWORD dwFlags; WCHAR szDevice[32]; } MONITORINFOEXW, *LPMONITORINFOEXW;
+    typedef struct tagWINDOWPLACEMENT { u32 length; u32 flags; u32 showCmd; POINT ptMinPosition; POINT ptMaxPosition; RECT rcNormalPosition; } WINDOWPLACEMENT;
+    typedef struct tagWNDCLASSEXW { u32 cbSize; u32 style; WNDPROC lpfnWndProc; int cbClsExtra; int cbWndExtra; HINSTANCE hInstance; HICON hIcon; HCURSOR hCursor; HBRUSH hbrBackground; LPCWSTR lpszMenuName; LPCWSTR lpszClassName; HICON hIconSm; } WNDCLASSEXW,*PWNDCLASSEXW,*NPWNDCLASSEXW,*LPWNDCLASSEXW;
     #define WS_POPUP (0x80000000)
     #define WS_CLIPSIBLINGS (0x04000000)
     #define WS_CLIPCHILDREN (0x02000000)
@@ -85,7 +165,6 @@ void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n); int Str
     #define VK_LWIN 0x5B
     #define VK_RWIN 0x5C
     #define PM_NOREMOVE 0x0000
-    #define IDC_ARROW MAKEINTRESOURCE(32512)
     #define GET_XBUTTON_WPARAM(wParam) (HIWORD(wParam))
     #define TME_LEAVE 0x00000002
     #define SIZE_MINIMIZED 1
@@ -134,8 +213,32 @@ void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n); int Str
     #define LOGPIXELSY 90
     #define HORZSIZE 4
     #define VERTSIZE 6
+    #define XINPUT_GAMEPAD_DPAD_UP          0x0001
+    #define XINPUT_GAMEPAD_DPAD_DOWN        0x0002
+    #define XINPUT_GAMEPAD_DPAD_LEFT        0x0004
+    #define XINPUT_GAMEPAD_DPAD_RIGHT       0x0008
+    #define XINPUT_GAMEPAD_START            0x0010
+    #define XINPUT_GAMEPAD_BACK             0x0020
+    #define XINPUT_GAMEPAD_LEFT_THUMB       0x0040
+    #define XINPUT_GAMEPAD_RIGHT_THUMB      0x0080
+    #define XINPUT_GAMEPAD_LEFT_SHOULDER    0x0100
+    #define XINPUT_GAMEPAD_RIGHT_SHOULDER   0x0200
+    #define XINPUT_GAMEPAD_A                0x1000
+    #define XINPUT_GAMEPAD_B                0x2000
+    #define XINPUT_GAMEPAD_X                0x4000
+    #define XINPUT_GAMEPAD_Y                0x8000
+    #define DBT_DEVICEARRIVAL          0x8000
+    #define DBT_DEVICEREMOVECOMPLETE   0x8004
+    #define DBT_DEVTYP_DEVICEINTERFACE 0x0005
+    #define DEVICE_NOTIFY_WINDOW_HANDLE 0x00000000
+    typedef struct { WORD wButtons; BYTE bLeftTrigger; BYTE bRightTrigger; SHORT sThumbLX; SHORT sThumbLY; SHORT sThumbRX; SHORT sThumbRY; } XINPUT_GAMEPAD;
+    typedef struct { WORD wLeftMotorSpeed; WORD wRightMotorSpeed; } XINPUT_VIBRATION;
+    typedef struct { BYTE Type; BYTE SubType; WORD Flags; XINPUT_GAMEPAD Gamepad; XINPUT_VIBRATION Vibration; } XINPUT_CAPABILITIES;
+    typedef struct { DWORD dwPacketNumber; XINPUT_GAMEPAD Gamepad; } XINPUT_STATE;
     typedef DWORD (WINAPI * PFN_XInputGetCapabilities)(DWORD,DWORD,XINPUT_CAPABILITIES*);
     typedef DWORD (WINAPI * PFN_XInputGetState)(DWORD,XINPUT_STATE*);
+    typedef struct { unsigned long dbch_size,dbch_devicetype,dbch_reserved; } DEV_BROADCAST_HDR;
+    typedef struct { unsigned long dbcc_size,dbcc_devicetype,dbcc_reserved; GUID dbcc_classguid; wchar_t dbcc_name[1]; } DEV_BROADCAST_DEVICEINTERFACE_W;
     typedef HRESULT (WINAPI * PFN_DwmIsCompositionEnabled)(i32*);
     typedef HRESULT (WINAPI * PFN_DwmFlush)(void);
     typedef LONG (WINAPI * PFN_RtlVerifyVersionInfo)(OSVERSIONINFOEXW*,ULONG,ULONGLONG);
@@ -153,6 +256,83 @@ void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n); int Str
     typedef struct _GLFWlibraryWin32 { HINSTANCE instance; HWND helperWindowHandle; ATOM helperWindowClass,mainWindowClass; HDEVNOTIFY deviceNotificationHandle; short int keycodes[512],scancodes[GLFW_KEY_LAST + 1]; double restoreCurPosX,restoreCurPosY; _GLFWwindow *disabledCursorWindow, *capturedCursorWindow; HCURSOR blankCursor; struct { HINSTANCE instance; PFN_XInputGetCapabilities GetCapabilities; PFN_XInputGetState GetState; } xinput; struct { HINSTANCE instance; PFN_DwmIsCompositionEnabled IsCompositionEnabled; PFN_DwmFlush Flush; } dwmapi; struct { HINSTANCE instance; PFN_RtlVerifyVersionInfo RtlVerifyVersionInfo; } ntdll; } _GLFWlibraryWin32;
     typedef struct _GLFWmonitorWin32 { HMONITOR handle; WCHAR adapterName[32],displayName[32]; char publicAdapterName[32],publicDisplayName[32]; i32 modesPruned,modeChanged; } _GLFWmonitorWin32;
     typedef struct _GLFWjoystickWin32{ int objectCount; DWORD index; GUID guid; } _GLFWjoystickWin32;
+    DECLSPEC_IMPORT int WINAPI MultiByteToWideChar (u32 CodePage, DWORD dwFlags, LPCCH lpMultiByteStr, int cbMultiByte, LPWSTR lpWideCharStr, int cchWideChar);
+    DECLSPEC_IMPORT int WINAPI WideCharToMultiByte (u32 CodePage, DWORD dwFlags, LPCWCH lpWideCharStr, int cchWideChar, LPSTR lpMultiByteStr, int cbMultiByte, LPCCH lpDefaultChar, LPBOOL lpUsedDefaultChar);
+    DECLSPEC_IMPORT HDC WINAPI GetDC(HWND hWnd);
+    DECLSPEC_IMPORT int WINAPI ReleaseDC(HWND hWnd,HDC hDC);
+    DECLSPEC_IMPORT HICON WINAPI CreateIconIndirect(PICONINFO piconinfo);
+    DECLSPEC_IMPORT i32 WINAPI SetCursorPos(int X,int Y);
+    DECLSPEC_IMPORT HCURSOR WINAPI SetCursor(HCURSOR hCursor);
+    DECLSPEC_IMPORT i32 WINAPI GetCursorPos(LPPOINT lpPoint);
+    DECLSPEC_IMPORT i32 WINAPI ClipCursor(const RECT *lpRect);
+    DECLSPEC_IMPORT i32 WINAPI ClientToScreen(HWND hWnd,LPPOINT lpPoint);
+    DECLSPEC_IMPORT HANDLE WINAPI GetPropW(HWND hWnd,LPCWSTR lpString);
+    DECLSPEC_IMPORT LRESULT WINAPI DefWindowProcW (HWND hWnd, u32 Msg, WPARAM wParam, LPARAM lParam);
+    DECLSPEC_IMPORT HCURSOR WINAPI LoadCursorW(HINSTANCE hInstance,LPCWSTR lpCursorName);
+    DECLSPEC_IMPORT i32 WINAPI GetClientRect(HWND hWnd,LPRECT lpRect); // Haha get rect!
+    DECLSPEC_IMPORT u32 WINAPI MapVirtualKeyW(u32 uCode, u32 uMapType);
+    DECLSPEC_IMPORT LONG WINAPI GetMessageTime(void);
+    DECLSPEC_IMPORT i32 WINAPI PeekMessageW(LPMSG lpMsg,HWND hWnd, u32 wMsgFilterMin, u32 wMsgFilterMax, u32 wRemoveMsg);
+    DECLSPEC_IMPORT HWND WINAPI SetCapture(HWND hWnd);
+    DECLSPEC_IMPORT i32 WINAPI ReleaseCapture(void);
+    DECLSPEC_IMPORT i32 WINAPI TrackMouseEvent(LPTRACKMOUSEEVENT lpEventTrack);
+    DECLSPEC_IMPORT i32 WINAPI AdjustWindowRect(LPRECT lpRect, DWORD dwStyle, i32 bMenu);
+    DECLSPEC_IMPORT i32 WINAPI AdjustWindowRectEx(LPRECT lpRect, DWORD dwStyle, i32 bMenu,DWORD dwExStyle);
+    DECLSPEC_IMPORT HMONITOR WINAPI MonitorFromWindow(HWND hwnd, DWORD dwFlags);
+    DECLSPEC_IMPORT i32 WINAPI GetMonitorInfoW(HMONITOR hMonitor, LPMONITORINFO lpmi);
+    DECLSPEC_IMPORT LRESULT WINAPI SendMessageW(HWND hWnd, u32 Msg, WPARAM wParam, LPARAM lParam);
+    DECLSPEC_IMPORT i32 WINAPI SetWindowPos(HWND hWnd, HWND hWndInsertAfter, int X, int Y, int cx, int cy, u32 uFlags);
+    DECLSPEC_IMPORT LONG WINAPI GetWindowLongW(HWND hWnd, int nIndex);
+    DECLSPEC_IMPORT LONG WINAPI SetWindowLongW(HWND hWnd, int nIndex,LONG dwNewLong);
+    DECLSPEC_IMPORT HWND WINAPI GetActiveWindow(void);
+    DECLSPEC_IMPORT i32 WINAPI TranslateMessage(const MSG *lpMsg);
+    DECLSPEC_IMPORT SHORT WINAPI GetKeyState(int nVirtKey);
+    DECLSPEC_IMPORT LRESULT WINAPI DispatchMessageW(const MSG *lpMsg);
+    DECLSPEC_IMPORT i32 WINAPI ShowWindow(HWND hWnd,int nCmdShow);
+    DECLSPEC_IMPORT i32 WINAPI BringWindowToTop (HWND hWnd);
+    DECLSPEC_IMPORT i32 WINAPI SetForegroundWindow(HWND hWnd);
+    DECLSPEC_IMPORT HWND WINAPI SetFocus(HWND hWnd);
+    DECLSPEC_IMPORT i32 WINAPI GetWindowPlacement(HWND hWnd, WINDOWPLACEMENT *lpwndpl);
+    DECLSPEC_IMPORT i32 WINAPI SetWindowPlacement(HWND hWnd, const WINDOWPLACEMENT *lpwndpl);
+    DECLSPEC_IMPORT HWND WINAPI CreateWindowExW(DWORD dwExStyle,LPCWSTR lpClassName,LPCWSTR lpWindowName,DWORD dwStyle,int X,int Y,int nWidth,int nHeight,HWND hWndParent,HMENU hMenu,HINSTANCE hInstance,LPVOID lpParam);
+    DECLSPEC_IMPORT i32 WINAPI SetPropW(HWND hWnd,LPCWSTR lpString,HANDLE hData);
+    DECLSPEC_IMPORT i32 WINAPI OffsetRect(LPRECT lprc,int dx,int dy);
+    DECLSPEC_IMPORT ATOM WINAPI RegisterClassExW (const WNDCLASSEXW *);
+    DECLSPEC_IMPORT HDEVNOTIFY WINAPI RegisterDeviceNotificationW(HANDLE hRecipient,LPVOID NotificationFilter,DWORD Flags);
+    DECLSPEC_IMPORT i32 WINAPI EnumDisplayMonitors(HDC hdc,LPCRECT lprcClip,MONITORENUMPROC lpfnEnum,LPARAM dwData);
+    DECLSPEC_IMPORT ULONGLONG __stdcall VerSetConditionMask(ULONGLONG ConditionMask, ULONG TypeMask, UCHAR Condition);
+    typedef long FXPT2DOT30,*LPFXPT2DOT30;
+    typedef struct tagCIEXYZ { FXPT2DOT30 ciexyzX; FXPT2DOT30 ciexyzY; FXPT2DOT30 ciexyzZ; } CIEXYZ;
+    typedef struct tagICEXYZTRIPLE { CIEXYZ ciexyzRed; CIEXYZ ciexyzGreen; CIEXYZ ciexyzBlue; } CIEXYZTRIPLE;
+    typedef struct _DISPLAY_DEVICEW { DWORD cb; WCHAR DeviceName[32]; WCHAR DeviceString[128]; DWORD StateFlags; WCHAR DeviceID[128]; WCHAR DeviceKey[128]; } DISPLAY_DEVICEW,*PDISPLAY_DEVICEW,*LPDISPLAY_DEVICEW;
+    typedef struct tagPIXELFORMATDESCRIPTOR {
+        WORD nSize; WORD nVersion; DWORD dwFlags; BYTE iPixelType; BYTE cColorBits; BYTE cRedBits; BYTE cRedShift; BYTE cGreenBits; BYTE cGreenShift; BYTE cBlueBits; BYTE cBlueShift;
+        BYTE cAlphaBits; BYTE cAlphaShift; BYTE cAccumBits; BYTE cAccumRedBits; BYTE cAccumGreenBits; BYTE cAccumBlueBits; BYTE cAccumAlphaBits; BYTE cDepthBits; BYTE cStencilBits;
+        BYTE cAuxBuffers; BYTE iLayerType; BYTE bReserved; DWORD dwLayerMask; DWORD dwVisibleMask; DWORD dwDamageMask;
+    } PIXELFORMATDESCRIPTOR,*PPIXELFORMATDESCRIPTOR,*LPPIXELFORMATDESCRIPTOR;
+    typedef struct { DWORD bV5Size; LONG bV5Width; LONG bV5Height; WORD bV5Planes; WORD bV5BitCount; DWORD bV5Compression; DWORD bV5SizeImage; LONG bV5XPelsPerMeter;
+        LONG bV5YPelsPerMeter; DWORD bV5ClrUsed; DWORD bV5ClrImportant; DWORD bV5RedMask; DWORD bV5GreenMask; DWORD bV5BlueMask; DWORD bV5AlphaMask; DWORD bV5CSType;
+        CIEXYZTRIPLE bV5Endpoints; DWORD bV5GammaRed; DWORD bV5GammaGreen; DWORD bV5GammaBlue; DWORD bV5Intent;DWORD bV5ProfileData; DWORD bV5ProfileSize; DWORD bV5Reserved;
+    } BITMAPV5HEADER,*LPBITMAPV5HEADER,*PBITMAPV5HEADER;
+    typedef struct tagRGBQUAD { BYTE rgbBlue; BYTE rgbGreen; BYTE rgbRed; BYTE rgbReserved; } RGBQUAD;
+    typedef struct tagBITMAPINFOHEADER { DWORD biSize; LONG biWidth; LONG biHeight; WORD biPlanes; WORD biBitCount; DWORD biCompression; DWORD biSizeImage; LONG biXPelsPerMeter; LONG biYPelsPerMeter; DWORD biClrUsed; DWORD biClrImportant; } BITMAPINFOHEADER,*LPBITMAPINFOHEADER,*PBITMAPINFOHEADER;
+    typedef struct tagBITMAPINFO { BITMAPINFOHEADER bmiHeader; RGBQUAD bmiColors[1]; } BITMAPINFO,*LPBITMAPINFO,*PBITMAPINFO;
+    DECLSPEC_IMPORT i32 WINAPI EnumDisplaySettingsW(LPCWSTR lpszDeviceName,DWORD iModeNum,LPDEVMODEW lpDevMode);
+    DECLSPEC_IMPORT i32 WINAPI EnumDisplayDevicesW(LPCWSTR lpDevice,DWORD iDevNum,PDISPLAY_DEVICEW lpDisplayDevice,DWORD dwFlags);
+    DECLSPEC_IMPORT i32 WINAPI EnumDisplaySettingsExW(LPCWSTR lpszDeviceName,DWORD iModeNum,LPDEVMODEW lpDevMode,DWORD dwFlags);
+    DECLSPEC_IMPORT i32 WINAPI SetPixelFormat(HDC hdc, i32 format,const PIXELFORMATDESCRIPTOR *ppfd);
+    DECLSPEC_IMPORT i32 WINAPI ChoosePixelFormat(HDC hdc,const PIXELFORMATDESCRIPTOR *ppfd);
+    DECLSPEC_IMPORT i32 WINAPI DescribePixelFormat(HDC hdc, i32 iPixelFormat, u32 nBytes,LPPIXELFORMATDESCRIPTOR ppfd);
+    DECLSPEC_IMPORT HBITMAP WINAPI CreateBitmap(i32 nWidth, i32 nHeight, u32 nPlanes, u32 nBitCount, const void *lpBits);
+    DECLSPEC_IMPORT HDC WINAPI wglGetCurrentDC(void);
+    DECLSPEC_IMPORT HGLRC WINAPI wglGetCurrentContext(void);
+    DECLSPEC_IMPORT PROC WINAPI wglGetProcAddress(LPCSTR);
+    DECLSPEC_IMPORT i32 WINAPI wglMakeCurrent(HDC,HGLRC);
+    DECLSPEC_IMPORT HBITMAP WINAPI CreateDIBSection(HDC hdc, const BITMAPINFO *lpbmi, u32 usage, void **ppvBits, HANDLE hSection, DWORD offset);
+    DECLSPEC_IMPORT i32 WINAPI DeleteObject(HGDIOBJ ho);
+    DECLSPEC_IMPORT i32 WINAPI DeleteDC(HDC hdc);
+    DECLSPEC_IMPORT i32 WINAPI SwapBuffers(HDC);
+    DECLSPEC_IMPORT i32 WINAPI GetDeviceCaps(HDC hdc, i32 index);
     WCHAR* _glfwCreateWideStringFromUTF8Win32(const char* source);
     i32 _glfwIsWindowsVersionOrGreaterWin32(WORD major, WORD minor, WORD sp);
     void _glfwPollMonitorsWin32(void);
@@ -346,7 +526,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
         handle=CreateIconIndirect(&ii); DeleteObject(color); DeleteObject(mask); return handle;
     }
 
-    static void updateCursorImage(_GLFWwindow* window) { if (window->cursorMode==0x00034001/*GLFW_CURSOR_NORMAL*/) {SetCursor(LoadCursorW(NULL,(LPCWSTR)IDC_ARROW));} else {SetCursor(_glfw.win32.blankCursor);} }
+    static void updateCursorImage(_GLFWwindow* window) { if (window->cursorMode==0x00034001/*GLFW_CURSOR_NORMAL*/) {SetCursor(LoadCursorW(NULL,(LPCWSTR)MAKEINTRESOURCE(32512)));} else {SetCursor(_glfw.win32.blankCursor);} }
     static void captureCursor(_GLFWwindow* window) { RECT clipRect; GetClientRect(window->win32.handle,&clipRect); ClientToScreen(window->win32.handle,(POINT*)&clipRect.left); ClientToScreen(window->win32.handle,(POINT*)&clipRect.right); ClipCursor(&clipRect); _glfw.win32.capturedCursorWindow=window; }
     static void releaseCursor(void) { ClipCursor(NULL); _glfw.win32.capturedCursorWindow=NULL; }
     static void disableCursor(_GLFWwindow* window) { _glfw.win32.disabledCursorWindow = window; POINT pos; GetCursorPos(&pos); _glfw.win32.restoreCurPosX = pos.x; _glfw.win32.restoreCurPosY = pos.y; updateCursorImage(window); captureCursor(window); }
@@ -1244,7 +1424,7 @@ _GLFWlibrary _glfw={0};
 int WindowInit(void) {
     MemSetToValueForNBytes(&_glfw,0,sizeof(_glfw));
     #if defined(WINDOWS)
-        GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,(const WCHAR*)&_glfw,(HMODULE*)&_glfw.win32.instance);
+        GetModuleHandleExW(0x4|0x2,(const WCHAR*)&_glfw,(HMODULE*)&_glfw.win32.instance);
         const char* names[] = {"xinput1_4.dll","xinput1_3.dll","xinput9_1_0.dll","xinput1_2.dll","xinput1_1.dll",NULL};
         for (int i=0;names[i];++i) {
             _glfw.win32.xinput.instance = LoadLibraryA(names[i]);

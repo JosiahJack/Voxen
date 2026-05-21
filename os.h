@@ -27,111 +27,40 @@ char* StringFindSubstring(const char* haystack, const char* needle);
 void DebugRAM(const char *context);
 #if defined(_WIN32)
     #define WINDOWS
-    #define __LONG32 long
-    #define __int64 long long
-    typedef unsigned int ULONG;
-    typedef ULONG *PULONG;
-    typedef unsigned short USHORT;
-    typedef USHORT *PUSHORT;
-    typedef char *PSZ;
-    typedef unsigned short wchar_t;
-    #define WINAPI __stdcall
-    #define __MSABI_LONG(x) x
-    typedef i32 *PBOOL,*LPBOOL;
-    typedef unsigned char BYTE,UCHAR;
-    typedef UCHAR *PUCHAR;
-    typedef unsigned short WORD;
-    typedef unsigned __LONG32 DWORD;
-    typedef float *PFLOAT;
-    typedef BYTE *PBYTE,*LPBYTE;
-    typedef i32 *PINT,*LPINT;
-    typedef WORD *PWORD,*LPWORD;
-    typedef __LONG32 *LPLONG;
-    typedef DWORD *PDWORD,*LPDWORD;
-    typedef void *LPVOID;
-    typedef const void *LPCVOID;
-    typedef unsigned int *PUINT,*PUINT32;
-    typedef __int64 INT_PTR,*PINT_PTR,LONG_PTR,*PLONG_PTR;
-    typedef unsigned __int64 ULONG_PTR,*PULONG_PTR,UINT_PTR,*PUINT_PTR;
-    typedef ULONG_PTR DWORD_PTR,*PDWORD_PTR,SIZE_T,*PSIZE_T;
     #define DECLSPEC_IMPORT __declspec (dllimport)
-    #define MAKEINTRESOURCE(r) ((ULONG_PTR) (USHORT) r)
-    typedef wchar_t WCHAR;
-    typedef char CHAR;
-    typedef short SHORT;
-    typedef __LONG32 LONG;
-    typedef void *HANDLE;
-    typedef void *PVOID;
-    typedef CHAR *NPSTR,*LPSTR,*PSTR;
-    typedef const CHAR *LPCSTR,*PCSTR,*LPCCH,*PCCH;
-    typedef const WCHAR *LPCWSTR,*PCWSTR;
-    typedef WCHAR *NWPSTR,*LPWSTR,*PWSTR;
-    typedef const WCHAR *LPCWCH,*PCWCH;
-    typedef LPWSTR PTSTR,LPTSTR;
-    typedef struct _GUID { unsigned __LONG32 Data1; unsigned short Data2,Data3; unsigned char Data4[8]; } GUID; typedef GUID IID,CLSID;
-    typedef __int64 LONGLONG;
-    typedef unsigned __int64 ULONGLONG;
-    typedef LONG HRESULT;
+    #define WINAPI __stdcall
+    #define OS_INVALID_HANDLE INVALID_HANDLE_VALUE
+    #define ERROR_SUCCESS __MSABI_LONG(0)
+    #define ERROR_DEVICE_NOT_CONNECTED __MSABI_LONG(1167)
+    #define SUCCEEDED(hr) ((HRESULT)(hr) >= 0)
+    #define FAILED(hr) ((HRESULT)(hr) < 0)
+    typedef char CHAR; typedef unsigned char BYTE,UCHAR; typedef unsigned short WORD; typedef unsigned int ULONG; typedef long LONG; typedef long long LONGLONG; typedef long long INT_PTR,*PINT_PTR,LONG_PTR,*PLONG_PTR;
+    typedef void *HANDLE,*LPVOID,*PVOID; typedef const void *LPCVOID; typedef const CHAR *LPCSTR,*PCSTR,*LPCCH,*PCCH;
+    typedef unsigned long long ULONG_PTR,*PULONG_PTR,UINT_PTR,*PUINT_PTR; typedef unsigned short wchar_t; typedef wchar_t WCHAR; typedef const WCHAR *LPCWSTR,*PCWSTR;
+    typedef unsigned long DWORD; typedef WORD *PWORD,*LPWORD; typedef ULONG_PTR DWORD_PTR,*PDWORD_PTR,SIZE_T,*PSIZE_T; typedef DWORD *PDWORD,*LPDWORD; typedef LONG HRESULT; typedef long long REFERENCE_TIME;
+    typedef struct _GUID { unsigned long Data1; unsigned short Data2,Data3; unsigned char Data4[8]; } GUID; typedef GUID IID,CLSID;
+    #define DECLARE_HANDLE(name) struct name##__ { int unused; }; typedef struct name##__ *name
+    DECLARE_HANDLE(HINSTANCE);
+    typedef HINSTANCE HMODULE;
+    typedef INT_PTR (WINAPI *FARPROC)(void);
+    typedef INT_PTR (WINAPI *NEARPROC)(void);
+    typedef INT_PTR (WINAPI *PROC)(void);
     #if defined (__WIDL__)
     typedef struct _LARGE_INTEGER {
     #else
         typedef union _LARGE_INTEGER {
-        struct { DWORD LowPart; LONG HighPart; } DUMMYSTRUCTNAME;
-        struct { DWORD LowPart; LONG HighPart; } u;
+        struct {DWORD LowPart; LONG HighPart;} DUMMYSTRUCTNAME; struct {DWORD LowPart; LONG HighPart;} u;
     #endif
         LONGLONG QuadPart;
     } LARGE_INTEGER;
-    typedef LARGE_INTEGER *PLARGE_INTEGER;
-    #define DECLARE_HANDLE(name) struct name##__ { int unused; }; typedef struct name##__ *name
-    typedef UINT_PTR WPARAM;
-    typedef LONG_PTR LPARAM;
-    typedef LONG_PTR LRESULT;
-    #define max(a, b) (((a) > (b)) ? (a) : (b))
-    #define min(a, b) (((a) < (b)) ? (a) : (b))
-    #define MAKEWORD(a,b) ((WORD) (((BYTE) (((DWORD_PTR) (a)) & 0xff)) | ((WORD) ((BYTE) (((DWORD_PTR) (b)) & 0xff))) << 8))
-    #define MAKELONG(a, b) ((LONG) (((WORD) (((DWORD_PTR) (a)) & 0xffff)) | ((DWORD) ((WORD) (((DWORD_PTR) (b)) & 0xffff))) << 16))
-    #define LOWORD(l) ((WORD) (((DWORD_PTR) (l)) & 0xffff))
-    #define HIWORD(l) ((WORD) ((((DWORD_PTR) (l)) >> 16) & 0xffff))
-    #define LOBYTE(w) ((BYTE) (((DWORD_PTR) (w)) & 0xff))
-    #define HIBYTE(w) ((BYTE) ((((DWORD_PTR) (w)) >> 8) & 0xff))
-    typedef HANDLE *SPHANDLE;
-    typedef HANDLE *LPHANDLE;
-    typedef HANDLE HGLOBAL;
-    typedef HANDLE HLOCAL;
-    typedef HANDLE GLOBALHANDLE;
-    typedef HANDLE LOCALHANDLE;
-    typedef INT_PTR (WINAPI *FARPROC)(void);
-    typedef INT_PTR (WINAPI *NEARPROC)(void);
-    typedef INT_PTR (WINAPI *PROC)(void);
-    typedef WORD ATOM;
-    typedef int HFILE;
-    DECLARE_HANDLE(HINSTANCE);
-    DECLARE_HANDLE(HKEY);
-    typedef HKEY *PHKEY;
-    typedef HINSTANCE HMODULE;
-    typedef struct _FILETIME { DWORD dwLowDateTime; DWORD dwHighDateTime; } FILETIME,*PFILETIME,*LPFILETIME;
-    typedef void *HGDIOBJ;
-    DECLARE_HANDLE(HWND);
-    DECLARE_HANDLE(HBITMAP);
-    DECLARE_HANDLE(HBRUSH);
-    DECLARE_HANDLE(HDC);
-    DECLARE_HANDLE(HGLRC);
-    DECLARE_HANDLE(HICON);
-    DECLARE_HANDLE(HMENU);
-    DECLARE_HANDLE(HMONITOR);
-    typedef HICON HCURSOR;
-    typedef struct tagPOINT { LONG x; LONG y; } POINT,*PPOINT,*NPPOINT,*LPPOINT;
-    typedef struct _POINTL { LONG x; LONG y; } POINTL,*PPOINTL;
-    typedef struct tagRECT { LONG left; LONG top; LONG right; LONG bottom; } RECT,*PRECT,*NPRECT,*LPRECT;
-    typedef const RECT *LPCRECT;
-    typedef struct _RECTL { LONG left; LONG top; LONG right; LONG bottom; } RECTL,*PRECTL,*LPRECTL;
-    typedef struct tagSIZE { LONG cx; LONG cy; } SIZE,*PSIZE,*LPSIZE;
-    typedef SIZE SIZEL;
-    typedef struct tagPOINTS { SHORT x; SHORT y; } POINTS,*PPOINTS,*LPPOINTS;
-    typedef struct _OSVERSIONINFOEXW { DWORD dwOSVersionInfoSize; DWORD dwMajorVersion; DWORD dwMinorVersion; DWORD dwBuildNumber; DWORD dwPlatformId; WCHAR szCSDVersion[128]; WORD wServicePackMajor; WORD wServicePackMinor; WORD wSuiteMask; BYTE wProductType; BYTE wReserved; } OSVERSIONINFOEXW,*POSVERSIONINFOEXW,*LPOSVERSIONINFOEXW,RTL_OSVERSIONINFOEXW,*PRTL_OSVERSIONINFOEXW;
-    DECLARE_HANDLE(DPI_AWARENESS_CONTEXT);
+    typedef LARGE_INTEGER *PLARGE_INTEGER; typedef HANDLE OsFileHandle;
     typedef struct _SECURITY_ATTRIBUTES { DWORD nLength; LPVOID lpSecurityDescriptor; i32 bInheritHandle; } SECURITY_ATTRIBUTES, *PSECURITY_ATTRIBUTES, *LPSECURITY_ATTRIBUTES;
     typedef struct _OVERLAPPED { ULONG_PTR Internal; ULONG_PTR InternalHigh; union {struct {DWORD Offset; DWORD OffsetHigh;} DUMMYSTRUCTNAME; PVOID Pointer;} DUMMYUNIONNAME; HANDLE hEvent; } OVERLAPPED, *LPOVERLAPPED;
+    typedef struct _SYSTEM_INFO { union { DWORD dwOemId; struct { WORD wProcessorArchitecture; WORD wReserved; } DUMMYSTRUCTNAME; } DUMMYUNIONNAME; DWORD dwPageSize; LPVOID lpMinimumApplicationAddress; LPVOID lpMaximumApplicationAddress; DWORD_PTR dwActiveProcessorMask; DWORD dwNumberOfProcessors; DWORD dwProcessorType; DWORD dwAllocationGranularity; WORD wProcessorLevel; WORD wProcessorRevision; } SYSTEM_INFO, *LPSYSTEM_INFO;
+    DECLSPEC_IMPORT __declspec (noreturn) void WINAPI ExitProcess (u32 uExitCode);
+    DECLSPEC_IMPORT HANDLE WINAPI CreateFileMappingA (HANDLE hFile, LPSECURITY_ATTRIBUTES lpFileMappingAttributes, DWORD flProtect, DWORD dwMaximumSizeHigh, DWORD dwMaximumSizeLow, LPCSTR lpName);
+    DECLSPEC_IMPORT i32 WINAPI VirtualFree (LPVOID lpAddress, SIZE_T dwSize, DWORD dwFreeType);
+    DECLSPEC_IMPORT LPVOID WINAPI VirtualAlloc (LPVOID lpAddress, SIZE_T dwSize, DWORD flAllocationType, DWORD flProtect);
     DECLSPEC_IMPORT HANDLE WINAPI CreateFileA (LPCSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes, HANDLE hTemplateFile);
     DECLSPEC_IMPORT i32 WINAPI ReadFile (HANDLE hFile, LPVOID lpBuffer, DWORD nNumberOfBytesToRead, LPDWORD lpNumberOfBytesRead, LPOVERLAPPED lpOverlapped);
     DECLSPEC_IMPORT i32 WINAPI WriteFile (HANDLE hFile, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfBytesWritten, LPOVERLAPPED lpOverlapped);
@@ -139,185 +68,21 @@ void DebugRAM(const char *context);
     DECLSPEC_IMPORT i32 WINAPI SetFilePointerEx (HANDLE hFile, LARGE_INTEGER liDistanceToMove, PLARGE_INTEGER lpNewFilePointer, DWORD dwMoveMethod);
     #define INVALID_HANDLE_VALUE ((HANDLE) (LONG_PTR)-1)
     DECLSPEC_IMPORT i32 WINAPI CloseHandle (HANDLE hObject);
-    DECLSPEC_IMPORT i32 WINAPI VirtualFree (LPVOID lpAddress, SIZE_T dwSize, DWORD dwFreeType);
-    DECLSPEC_IMPORT LPVOID WINAPI VirtualAlloc (LPVOID lpAddress, SIZE_T dwSize, DWORD flAllocationType, DWORD flProtect);
     DECLSPEC_IMPORT LPVOID WINAPI MapViewOfFile (HANDLE hFileMappingObject, DWORD dwDesiredAccess, DWORD dwFileOffsetHigh, DWORD dwFileOffsetLow, SIZE_T dwNumberOfBytesToMap);
     DECLSPEC_IMPORT LPVOID WINAPI MapViewOfFileEx (HANDLE hFileMappingObject, DWORD dwDesiredAccess, DWORD dwFileOffsetHigh, DWORD dwFileOffsetLow, SIZE_T dwNumberOfBytesToMap, LPVOID lpBaseAddress);
     DECLSPEC_IMPORT i32 WINAPI UnmapViewOfFile (LPCVOID lpBaseAddress);
     DECLSPEC_IMPORT HANDLE WINAPI CreateFileMappingW (HANDLE hFile, LPSECURITY_ATTRIBUTES lpFileMappingAttributes, DWORD flProtect, DWORD dwMaximumSizeHigh, DWORD dwMaximumSizeLow, LPCWSTR lpName);
-    #define CreateFileMapping CreateFileMappingW
-    DECLSPEC_IMPORT HANDLE WINAPI GetStdHandle (DWORD nStdHandle);
-    DECLSPEC_IMPORT __declspec (noreturn) void WINAPI ExitProcess (u32 uExitCode);
+    DECLSPEC_IMPORT HANDLE WINAPI GetStdHandle(DWORD nStdHandle);
     DECLSPEC_IMPORT i32 WINAPI QueryPerformanceCounter (LARGE_INTEGER *lpPerformanceCount);
     DECLSPEC_IMPORT i32 WINAPI QueryPerformanceFrequency (LARGE_INTEGER *lpFrequency);
-    typedef struct _SYSTEM_INFO { union { DWORD dwOemId; struct { WORD wProcessorArchitecture; WORD wReserved; } DUMMYSTRUCTNAME; } DUMMYUNIONNAME; DWORD dwPageSize; LPVOID lpMinimumApplicationAddress; LPVOID lpMaximumApplicationAddress; DWORD_PTR dwActiveProcessorMask; DWORD dwNumberOfProcessors; DWORD dwProcessorType; DWORD dwAllocationGranularity; WORD wProcessorLevel; WORD wProcessorRevision; } SYSTEM_INFO, *LPSYSTEM_INFO;
     DECLSPEC_IMPORT void WINAPI GetSystemInfo (LPSYSTEM_INFO lpSystemInfo);
-    int __cdecl wcscmp(const wchar_t *_Str1,const wchar_t *_Str2);
-    wchar_t* wcscpy(wchar_t* restrict destination, const wchar_t* restrict source);
-    #define MAKEINTATOM(i) (LPTSTR) ((ULONG_PTR)((WORD)(i)))
-    #define ERROR_SUCCESS __MSABI_LONG(0)
-    #define ERROR_DEVICE_NOT_CONNECTED __MSABI_LONG(1167)
-    #define SUCCEEDED(hr) ((HRESULT)(hr) >= 0)
-    #define FAILED(hr) ((HRESULT)(hr) < 0)
-    DECLSPEC_IMPORT HANDLE WINAPI CreateFileMappingA (HANDLE hFile, LPSECURITY_ATTRIBUTES lpFileMappingAttributes, DWORD flProtect, DWORD dwMaximumSizeHigh, DWORD dwMaximumSizeLow, LPCSTR lpName);
-    typedef __LONG32 FXPT2DOT30,*LPFXPT2DOT30;
-    typedef struct tagCIEXYZ { FXPT2DOT30 ciexyzX; FXPT2DOT30 ciexyzY; FXPT2DOT30 ciexyzZ; } CIEXYZ;
-    typedef struct tagICEXYZTRIPLE { CIEXYZ ciexyzRed; CIEXYZ ciexyzGreen; CIEXYZ ciexyzBlue; } CIEXYZTRIPLE;
-    typedef struct _DISPLAY_DEVICEW { DWORD cb; WCHAR DeviceName[32]; WCHAR DeviceString[128]; DWORD StateFlags; WCHAR DeviceID[128]; WCHAR DeviceKey[128]; } DISPLAY_DEVICEW,*PDISPLAY_DEVICEW,*LPDISPLAY_DEVICEW;
-    typedef struct tagPIXELFORMATDESCRIPTOR {
-        WORD nSize; WORD nVersion; DWORD dwFlags; BYTE iPixelType; BYTE cColorBits; BYTE cRedBits; BYTE cRedShift; BYTE cGreenBits; BYTE cGreenShift; BYTE cBlueBits; BYTE cBlueShift;
-        BYTE cAlphaBits; BYTE cAlphaShift; BYTE cAccumBits; BYTE cAccumRedBits; BYTE cAccumGreenBits; BYTE cAccumBlueBits; BYTE cAccumAlphaBits; BYTE cDepthBits; BYTE cStencilBits;
-        BYTE cAuxBuffers; BYTE iLayerType; BYTE bReserved; DWORD dwLayerMask; DWORD dwVisibleMask; DWORD dwDamageMask;
-    } PIXELFORMATDESCRIPTOR,*PPIXELFORMATDESCRIPTOR,*LPPIXELFORMATDESCRIPTOR;
-    typedef struct { DWORD bV5Size; LONG bV5Width; LONG bV5Height; WORD bV5Planes; WORD bV5BitCount; DWORD bV5Compression; DWORD bV5SizeImage; LONG bV5XPelsPerMeter;
-        LONG bV5YPelsPerMeter; DWORD bV5ClrUsed; DWORD bV5ClrImportant; DWORD bV5RedMask; DWORD bV5GreenMask; DWORD bV5BlueMask; DWORD bV5AlphaMask; DWORD bV5CSType;
-        CIEXYZTRIPLE bV5Endpoints; DWORD bV5GammaRed; DWORD bV5GammaGreen; DWORD bV5GammaBlue; DWORD bV5Intent;DWORD bV5ProfileData; DWORD bV5ProfileSize; DWORD bV5Reserved;
-    } BITMAPV5HEADER,*LPBITMAPV5HEADER,*PBITMAPV5HEADER;
-    typedef struct tagRGBQUAD { BYTE rgbBlue; BYTE rgbGreen; BYTE rgbRed; BYTE rgbReserved; } RGBQUAD;
-    typedef struct tagBITMAPINFOHEADER { DWORD biSize; LONG biWidth; LONG biHeight; WORD biPlanes; WORD biBitCount; DWORD biCompression; DWORD biSizeImage; LONG biXPelsPerMeter; LONG biYPelsPerMeter; DWORD biClrUsed; DWORD biClrImportant; } BITMAPINFOHEADER,*LPBITMAPINFOHEADER,*PBITMAPINFOHEADER;
-    typedef struct tagBITMAPINFO { BITMAPINFOHEADER bmiHeader; RGBQUAD bmiColors[1]; } BITMAPINFO,*LPBITMAPINFO,*PBITMAPINFO;
-    typedef struct _devicemodeW {
-        WCHAR dmDeviceName[32]; WORD dmSpecVersion; WORD dmDriverVersion; WORD dmSize; WORD dmDriverExtra; DWORD dmFields;
-        union { struct { short dmOrientation,dmPaperSize,dmPaperLength,dmPaperWidth,dmScale,dmCopies,dmDefaultSource,dmPrintQuality; }; struct { POINTL dmPosition; DWORD dmDisplayOrientation; DWORD dmDisplayFixedOutput; }; };
-        short dmColor,dmDuplex,dmYResolution,dmTTOption,dmCollate; WCHAR dmFormName[32]; WORD dmLogPixels; DWORD dmBitsPerPel; DWORD dmPelsWidth; DWORD dmPelsHeight; union { DWORD dmDisplayFlags; DWORD dmNup; };
-        DWORD dmDisplayFrequency; DWORD dmICMMethod; DWORD dmICMIntent; DWORD dmMediaType; DWORD dmDitherType; DWORD dmReserved1; DWORD dmReserved2; DWORD dmPanningWidth; DWORD dmPanningHeight;
-    } DEVMODEW,*PDEVMODEW,*NPDEVMODEW,*LPDEVMODEW;
-    DECLSPEC_IMPORT i32 WINAPI EnumDisplaySettingsW(LPCWSTR lpszDeviceName,DWORD iModeNum,LPDEVMODEW lpDevMode);
-    DECLSPEC_IMPORT i32 WINAPI EnumDisplayDevicesW(LPCWSTR lpDevice,DWORD iDevNum,PDISPLAY_DEVICEW lpDisplayDevice,DWORD dwFlags);
-    DECLSPEC_IMPORT i32 WINAPI EnumDisplaySettingsExW(LPCWSTR lpszDeviceName,DWORD iModeNum,LPDEVMODEW lpDevMode,DWORD dwFlags);
-    DECLSPEC_IMPORT i32 WINAPI SetPixelFormat(HDC hdc, i32 format,const PIXELFORMATDESCRIPTOR *ppfd);
-    DECLSPEC_IMPORT i32 WINAPI ChoosePixelFormat(HDC hdc,const PIXELFORMATDESCRIPTOR *ppfd);
-    DECLSPEC_IMPORT i32 WINAPI DescribePixelFormat(HDC hdc, i32 iPixelFormat, u32 nBytes,LPPIXELFORMATDESCRIPTOR ppfd);
-    DECLSPEC_IMPORT HBITMAP WINAPI CreateBitmap(i32 nWidth, i32 nHeight, u32 nPlanes, u32 nBitCount, const void *lpBits);
-    DECLSPEC_IMPORT HDC WINAPI wglGetCurrentDC(void);
-    DECLSPEC_IMPORT HGLRC WINAPI wglGetCurrentContext(void);
-    DECLSPEC_IMPORT PROC WINAPI wglGetProcAddress(LPCSTR);
-    DECLSPEC_IMPORT i32 WINAPI wglMakeCurrent(HDC,HGLRC);
-    DECLSPEC_IMPORT HBITMAP WINAPI CreateDIBSection(HDC hdc, const BITMAPINFO *lpbmi, u32 usage, void **ppvBits, HANDLE hSection, DWORD offset);
-    DECLSPEC_IMPORT i32 WINAPI DeleteObject(HGDIOBJ ho);
-    DECLSPEC_IMPORT i32 WINAPI DeleteDC(HDC hdc);
-    DECLSPEC_IMPORT i32 WINAPI SwapBuffers(HDC);
-    DECLSPEC_IMPORT i32 WINAPI GetDeviceCaps(HDC hdc, i32 index);
-    DECLSPEC_IMPORT HDC WINAPI CreateDCW(LPCWSTR pwszDriver,LPCWSTR pwszDevice,LPCWSTR pszPort,const DEVMODEW *pdm);
-    #define GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT (0x2)
-    #define GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS (0x4)
-    DECLSPEC_IMPORT FARPROC WINAPI GetProcAddress (HMODULE hModule, LPCSTR lpProcName);
-    DECLSPEC_IMPORT i32 WINAPI GetModuleHandleExW (DWORD dwFlags, LPCWSTR lpModuleName, HMODULE *phModule);
     DECLSPEC_IMPORT HMODULE WINAPI LoadLibraryA(LPCSTR lpLibFileName);
-    typedef LRESULT (__stdcall *WNDPROC)(HWND, u32, WPARAM, LPARAM);
-    typedef i32 (__stdcall *MONITORENUMPROC)(HMONITOR, HDC, LPRECT, LPARAM);
-    typedef PVOID HDEVNOTIFY;
-    typedef struct _ICONINFO { i32 fIcon; DWORD xHotspot; DWORD yHotspot; HBITMAP hbmMask; HBITMAP hbmColor; } ICONINFO; typedef ICONINFO *PICONINFO;
-    typedef struct tagMSG { HWND hwnd; u32 message; WPARAM wParam; LPARAM lParam; DWORD time; POINT pt; } MSG,*PMSG,*NPMSG,*LPMSG;
-    typedef struct tagTRACKMOUSEEVENT { DWORD cbSize; DWORD dwFlags; HWND hwndTrack; DWORD dwHoverTime; } TRACKMOUSEEVENT,*LPTRACKMOUSEEVENT;
-    typedef struct tagMINMAXINFO { POINT ptReserved; POINT ptMaxSize; POINT ptMaxPosition; POINT ptMinTrackSize; POINT ptMaxTrackSize; } MINMAXINFO,*PMINMAXINFO,*LPMINMAXINFO;
-    typedef struct tagMONITORINFO { DWORD cbSize; RECT rcMonitor; RECT rcWork; DWORD dwFlags; } MONITORINFO,*LPMONITORINFO;
-    typedef struct tagMONITORINFOEXW { DWORD cbSize; RECT rcMonitor; RECT rcWork; DWORD dwFlags; WCHAR szDevice[32]; } MONITORINFOEXW, *LPMONITORINFOEXW;
-    typedef struct tagWINDOWPLACEMENT { u32 length; u32 flags; u32 showCmd; POINT ptMinPosition; POINT ptMaxPosition; RECT rcNormalPosition; } WINDOWPLACEMENT;
-    typedef struct tagWNDCLASSEXW { u32 cbSize; u32 style; WNDPROC lpfnWndProc; int cbClsExtra; int cbWndExtra; HINSTANCE hInstance; HICON hIcon; HCURSOR hCursor; HBRUSH hbrBackground; LPCWSTR lpszMenuName; LPCWSTR lpszClassName; HICON hIconSm; } WNDCLASSEXW,*PWNDCLASSEXW,*NPWNDCLASSEXW,*LPWNDCLASSEXW;
-    DECLSPEC_IMPORT int WINAPI MultiByteToWideChar (u32 CodePage, DWORD dwFlags, LPCCH lpMultiByteStr, int cbMultiByte, LPWSTR lpWideCharStr, int cchWideChar);
-    DECLSPEC_IMPORT int WINAPI WideCharToMultiByte (u32 CodePage, DWORD dwFlags, LPCWCH lpWideCharStr, int cchWideChar, LPSTR lpMultiByteStr, int cbMultiByte, LPCCH lpDefaultChar, LPBOOL lpUsedDefaultChar);
-    DECLSPEC_IMPORT HDC WINAPI GetDC(HWND hWnd);
-    DECLSPEC_IMPORT int WINAPI ReleaseDC(HWND hWnd,HDC hDC);
-    DECLSPEC_IMPORT HICON WINAPI CreateIconIndirect(PICONINFO piconinfo);
-    DECLSPEC_IMPORT i32 WINAPI SetCursorPos(int X,int Y);
-    DECLSPEC_IMPORT HCURSOR WINAPI SetCursor(HCURSOR hCursor);
-    DECLSPEC_IMPORT i32 WINAPI GetCursorPos(LPPOINT lpPoint);
-    DECLSPEC_IMPORT i32 WINAPI ClipCursor(const RECT *lpRect);
-    DECLSPEC_IMPORT i32 WINAPI ClientToScreen(HWND hWnd,LPPOINT lpPoint);
-    DECLSPEC_IMPORT HANDLE WINAPI GetPropW(HWND hWnd,LPCWSTR lpString);
-    DECLSPEC_IMPORT LRESULT WINAPI DefWindowProcW (HWND hWnd, u32 Msg, WPARAM wParam, LPARAM lParam);
-    DECLSPEC_IMPORT HCURSOR WINAPI LoadCursorW(HINSTANCE hInstance,LPCWSTR lpCursorName);
-    DECLSPEC_IMPORT i32 WINAPI GetClientRect(HWND hWnd,LPRECT lpRect); // Haha get rect!
-    DECLSPEC_IMPORT u32 WINAPI MapVirtualKeyW(u32 uCode, u32 uMapType);
-    DECLSPEC_IMPORT LONG WINAPI GetMessageTime(void);
-    DECLSPEC_IMPORT i32 WINAPI PeekMessageW(LPMSG lpMsg,HWND hWnd, u32 wMsgFilterMin, u32 wMsgFilterMax, u32 wRemoveMsg);
-    DECLSPEC_IMPORT HWND WINAPI SetCapture(HWND hWnd);
-    DECLSPEC_IMPORT i32 WINAPI ReleaseCapture(void);
-    DECLSPEC_IMPORT i32 WINAPI TrackMouseEvent(LPTRACKMOUSEEVENT lpEventTrack);
-    DECLSPEC_IMPORT i32 WINAPI AdjustWindowRect(LPRECT lpRect, DWORD dwStyle, i32 bMenu);
-    DECLSPEC_IMPORT i32 WINAPI AdjustWindowRectEx(LPRECT lpRect, DWORD dwStyle, i32 bMenu,DWORD dwExStyle);
-    DECLSPEC_IMPORT HMONITOR WINAPI MonitorFromWindow(HWND hwnd, DWORD dwFlags);
-    DECLSPEC_IMPORT i32 WINAPI GetMonitorInfoW(HMONITOR hMonitor, LPMONITORINFO lpmi);
-    DECLSPEC_IMPORT LRESULT WINAPI SendMessageW(HWND hWnd, u32 Msg, WPARAM wParam, LPARAM lParam);
-    DECLSPEC_IMPORT i32 WINAPI SetWindowPos(HWND hWnd, HWND hWndInsertAfter, int X, int Y, int cx, int cy, u32 uFlags);
-    DECLSPEC_IMPORT LONG WINAPI GetWindowLongW(HWND hWnd, int nIndex);
-    DECLSPEC_IMPORT LONG WINAPI SetWindowLongW(HWND hWnd, int nIndex,LONG dwNewLong);
-    DECLSPEC_IMPORT HWND WINAPI GetActiveWindow(void);
-    DECLSPEC_IMPORT i32 WINAPI TranslateMessage(const MSG *lpMsg);
-    DECLSPEC_IMPORT SHORT WINAPI GetKeyState(int nVirtKey);
-    DECLSPEC_IMPORT LRESULT WINAPI DispatchMessageW(const MSG *lpMsg);
-    DECLSPEC_IMPORT i32 WINAPI ShowWindow(HWND hWnd,int nCmdShow);
-    DECLSPEC_IMPORT i32 WINAPI BringWindowToTop (HWND hWnd);
-    DECLSPEC_IMPORT i32 WINAPI SetForegroundWindow(HWND hWnd);
-    DECLSPEC_IMPORT HWND WINAPI SetFocus(HWND hWnd);
-    DECLSPEC_IMPORT i32 WINAPI GetWindowPlacement(HWND hWnd, WINDOWPLACEMENT *lpwndpl);
-    DECLSPEC_IMPORT i32 WINAPI SetWindowPlacement(HWND hWnd, const WINDOWPLACEMENT *lpwndpl);
-    DECLSPEC_IMPORT HWND WINAPI CreateWindowExW(DWORD dwExStyle,LPCWSTR lpClassName,LPCWSTR lpWindowName,DWORD dwStyle,int X,int Y,int nWidth,int nHeight,HWND hWndParent,HMENU hMenu,HINSTANCE hInstance,LPVOID lpParam);
-    DECLSPEC_IMPORT i32 WINAPI SetPropW(HWND hWnd,LPCWSTR lpString,HANDLE hData);
-    DECLSPEC_IMPORT i32 WINAPI OffsetRect(LPRECT lprc,int dx,int dy);
-    DECLSPEC_IMPORT ATOM WINAPI RegisterClassExW (const WNDCLASSEXW *);
-    DECLSPEC_IMPORT HDEVNOTIFY WINAPI RegisterDeviceNotificationW(HANDLE hRecipient,LPVOID NotificationFilter,DWORD Flags);
-    DECLSPEC_IMPORT i32 WINAPI EnumDisplayMonitors(HDC hdc,LPCRECT lprcClip,MONITORENUMPROC lpfnEnum,LPARAM dwData);
-    DECLSPEC_IMPORT ULONGLONG __stdcall VerSetConditionMask(ULONGLONG ConditionMask, ULONG TypeMask, UCHAR Condition);
+    DECLSPEC_IMPORT FARPROC WINAPI GetProcAddress (HMODULE hModule, LPCSTR lpProcName);
     int __cdecl _mkdir(const char* dirname);
-    #define XINPUT_GAMEPAD_DPAD_UP          0x0001
-    #define XINPUT_GAMEPAD_DPAD_DOWN        0x0002
-    #define XINPUT_GAMEPAD_DPAD_LEFT        0x0004
-    #define XINPUT_GAMEPAD_DPAD_RIGHT       0x0008
-    #define XINPUT_GAMEPAD_START            0x0010
-    #define XINPUT_GAMEPAD_BACK             0x0020
-    #define XINPUT_GAMEPAD_LEFT_THUMB       0x0040
-    #define XINPUT_GAMEPAD_RIGHT_THUMB      0x0080
-    #define XINPUT_GAMEPAD_LEFT_SHOULDER    0x0100
-    #define XINPUT_GAMEPAD_RIGHT_SHOULDER   0x0200
-    #define XINPUT_GAMEPAD_A                0x1000
-    #define XINPUT_GAMEPAD_B                0x2000
-    #define XINPUT_GAMEPAD_X                0x4000
-    #define XINPUT_GAMEPAD_Y                0x8000
-    typedef struct { WORD wButtons; BYTE bLeftTrigger; BYTE bRightTrigger; SHORT sThumbLX; SHORT sThumbLY; SHORT sThumbRX; SHORT sThumbRY; } XINPUT_GAMEPAD;
-    typedef struct { WORD wLeftMotorSpeed; WORD wRightMotorSpeed; } XINPUT_VIBRATION;
-    typedef struct { BYTE Type; BYTE SubType; WORD Flags; XINPUT_GAMEPAD Gamepad; XINPUT_VIBRATION Vibration; } XINPUT_CAPABILITIES;
-    typedef struct { DWORD dwPacketNumber; XINPUT_GAMEPAD Gamepad; } XINPUT_STATE;
-    #define DBT_DEVICEARRIVAL          0x8000
-    #define DBT_DEVICEREMOVECOMPLETE   0x8004
-    #define DBT_DEVTYP_DEVICEINTERFACE 0x0005
-    #define DEVICE_NOTIFY_WINDOW_HANDLE 0x00000000
-    typedef struct { unsigned long dbch_size,dbch_devicetype,dbch_reserved; } DEV_BROADCAST_HDR;
-    typedef struct { unsigned long dbcc_size,dbcc_devicetype,dbcc_reserved; GUID dbcc_classguid; wchar_t dbcc_name[1]; } DEV_BROADCAST_DEVICEINTERFACE_W;
-    #define eRender 0
-    #define eConsole 0
-    typedef struct IMMDevice IMMDevice; typedef struct IMMDeviceEnumerator IMMDeviceEnumerator;
-    typedef struct{HRESULT(__stdcall*q)(void*,const void*,void**);ULONG(__stdcall*a)(void*);ULONG(__stdcall*Release)(void*);HRESULT(__stdcall* Activate)(void*,const void*,DWORD,void*,void**);}IMMDeviceVtbl;struct IMMDevice{IMMDeviceVtbl*lpVtbl;};
-    typedef struct{HRESULT(__stdcall*q)(void*,const void*,void**);ULONG(__stdcall*a)(void*);ULONG(__stdcall*Release)(void*);HRESULT(__stdcall*e)(void*,int,DWORD,void**);HRESULT(__stdcall*GetDefaultAudioEndpoint)(void*,int,int,IMMDevice**);}IMMDeviceEnumeratorVtbl;struct IMMDeviceEnumerator{IMMDeviceEnumeratorVtbl*lpVtbl;};
-    typedef long long REFERENCE_TIME;
-    typedef struct IAudioClient IAudioClient;
-    typedef struct IAudioRenderClient IAudioRenderClient;
-    typedef struct { WORD t, n; DWORD s, a; WORD b, w, c; } WAVEFORMATEX;
-    typedef struct IAudioClientVtbl { HRESULT (__stdcall *QueryInterface)(void*, const void*, void**); ULONG (__stdcall *AddRef)(void*); ULONG (__stdcall *Release)(void*); HRESULT (__stdcall *Initialize)(void*, int, DWORD, REFERENCE_TIME, REFERENCE_TIME, const WAVEFORMATEX*, const void*); 
-        HRESULT (__stdcall *GetBufferSize)(void*, DWORD*); HRESULT (__stdcall *GetStreamLength)(void*, REFERENCE_TIME*); HRESULT (__stdcall *GetCurrentPadding)(void*, DWORD*); HRESULT (__stdcall *IsFormatSupported)(void*, int, const WAVEFORMATEX*, WAVEFORMATEX**); 
-        HRESULT (__stdcall *GetMixFormat)(void*, WAVEFORMATEX**); HRESULT (__stdcall *GetDevicePeriod)(void*, REFERENCE_TIME*, REFERENCE_TIME*); HRESULT (__stdcall *Start)(void*); HRESULT (__stdcall *Stop)(void*); HRESULT (__stdcall *Reset)(void*); HRESULT (__stdcall *SetEventHandle)(void*, void*);
-        HRESULT (__stdcall *GetService)(void*, const void*, void**);
-    } IAudioClientVtbl;
-    struct IAudioClient { IAudioClientVtbl* lpVtbl; };
-    typedef struct IAudioRenderClientVtbl { HRESULT (__stdcall *QueryInterface)(void*, const void*, void**); ULONG (__stdcall *AddRef)(void*); ULONG (__stdcall *Release)(void*); HRESULT (__stdcall *GetBuffer)(void*, DWORD, BYTE**); HRESULT (__stdcall *ReleaseBuffer)(void*, DWORD, DWORD); } IAudioRenderClientVtbl;
-    struct IAudioRenderClient { IAudioRenderClientVtbl* lpVtbl; };
-    #define STDAPI extern HRESULT WINAPI
-    #define WINOLEAPI STDAPI
-    #define REFIID const IID *const
-    typedef struct IUnknown IUnknown;
-    typedef struct IUnknownVtbl { HRESULT (__stdcall *QueryInterface)(IUnknown* This, const IID* riid, void** ppvObject); ULONG   (__stdcall *AddRef)(IUnknown* This); ULONG   (__stdcall *Release)(IUnknown* This); } IUnknownVtbl;
-    struct IUnknown { const IUnknownVtbl* lpVtbl; };
-    WINOLEAPI CoInitializeEx(LPVOID pvReserved, DWORD dwCoInit);
-    WINOLEAPI CoCreateInstance(const IID *const rclsid, IUnknown* pUnkOuter, DWORD dwClsContext, REFIID riid, LPVOID *ppv);
-    typedef HANDLE OsFileHandle;
-    #define OS_INVALID_HANDLE INVALID_HANDLE_VALUE
-    #undef near
-    #undef far
     static inline __attribute__((always_inline, noreturn)) void OS_Exit(i64 exitCode) { ExitProcess((unsigned int)exitCode); __builtin_unreachable(); }
     static inline __attribute__((always_inline)) long OS_Open(const char* path, i32 flags, i32 m) { (void)m; void* h = CreateFileA(path,flags ? 0x40000000L : 0x80000000L, flags ? 0 : 1,0,flags ? 2 : 3,128,0); return h==(void*)-1 ? -1 : (long)(uintptr_t)h; }
     static inline __attribute__((always_inline)) void OS_Close(OsFileHandle fileDescriptor) { CloseHandle(fileDescriptor); }
-    static inline __attribute__((always_inline)) void* OS_AllocateRAM(void* a,size_t l,i32 p,i32 f,OsFileHandle fd) { (void)f; if (fd==(HANDLE)-1) return VirtualAlloc(a,l,0x3000,(p&2)?4:2); HANDLE m = CreateFileMapping(fd,NULL,(p&2) ? 4 : 2,(DWORD)(l>>32),(DWORD)l,NULL); void* r=MapViewOfFileEx(m,(p&2)?2:4,0,0,l,a); return CloseHandle(m),r;}    
+    static inline __attribute__((always_inline)) void* OS_AllocateRAM(void* a,size_t l,i32 p,i32 f,OsFileHandle fd) { (void)f; if (fd==(HANDLE)-1) return VirtualAlloc(a,l,0x3000,(p&2)?4:2); HANDLE m = CreateFileMappingW(fd,NULL,(p&2) ? 4 : 2,(DWORD)(l>>32),(DWORD)l,NULL); void* r=MapViewOfFileEx(m,(p&2)?2:4,0,0,l,a); return CloseHandle(m),r;}    
     #define OS_MakeFolder(path) _mkdir(path)
     static inline __attribute__((always_inline)) long OS_Read(OsFileHandle fd, void* buf, size_t count) { DWORD bytesRead = 0; return (ReadFile((HANDLE)fd,buf,(DWORD)count,&bytesRead,NULL)) ? (long)bytesRead : (long)-1; }
     static inline __attribute__((always_inline)) OsFileHandle OS_OpenReadonly(const char* path) { HANDLE f = CreateFileA(path,0x80000000L,1,NULL,3,0x08000080,NULL); return f == (HANDLE)-1 ? DualLogError("Could not open file %s for reading\n",path), (HANDLE)-1 : f; }
@@ -333,7 +98,7 @@ void DebugRAM(const char *context);
     #define OS_DlOpen(path)       LoadLibraryA(path)
     #define OS_DlSym(handle,name) GetProcAddress((handle),(name))
     static char win_err_buf[512];
-    typedef __int64	__time64_t;
+    typedef long long	__time64_t;
     typedef __time64_t time_t;
     struct timespec { time_t tv_sec; long tv_nsec; };
     struct sched_param { int sched_priority; };

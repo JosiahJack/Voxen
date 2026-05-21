@@ -12,16 +12,35 @@
 void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n);
 extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
 #ifdef WINDOWS
+    typedef struct IMMDevice IMMDevice; typedef struct IMMDeviceEnumerator IMMDeviceEnumerator;
+    typedef struct{HRESULT(__stdcall*q)(void*,const void*,void**);ULONG(__stdcall*a)(void*);ULONG(__stdcall*Release)(void*);HRESULT(__stdcall* Activate)(void*,const void*,DWORD,void*,void**);}IMMDeviceVtbl;struct IMMDevice{IMMDeviceVtbl*lpVtbl;};
+    typedef struct{HRESULT(__stdcall*q)(void*,const void*,void**);ULONG(__stdcall*a)(void*);ULONG(__stdcall*Release)(void*);HRESULT(__stdcall*e)(void*,int,DWORD,void**);HRESULT(__stdcall*GetDefaultAudioEndpoint)(void*,int,int,IMMDevice**);}IMMDeviceEnumeratorVtbl;struct IMMDeviceEnumerator{IMMDeviceEnumeratorVtbl*lpVtbl;};
+    typedef struct IAudioClient IAudioClient;
+    typedef struct IAudioRenderClient IAudioRenderClient;
+    typedef struct { WORD t, n; DWORD s, a; WORD b, w, c; } WAVEFORMATEX;
+    typedef struct IAudioClientVtbl { HRESULT (__stdcall *QueryInterface)(void*, const void*, void**); ULONG (__stdcall *AddRef)(void*); ULONG (__stdcall *Release)(void*); HRESULT (__stdcall *Initialize)(void*, int, DWORD, REFERENCE_TIME, REFERENCE_TIME, const WAVEFORMATEX*, const void*); 
+        HRESULT (__stdcall *GetBufferSize)(void*, DWORD*); HRESULT (__stdcall *GetStreamLength)(void*, REFERENCE_TIME*); HRESULT (__stdcall *GetCurrentPadding)(void*, DWORD*); HRESULT (__stdcall *IsFormatSupported)(void*, int, const WAVEFORMATEX*, WAVEFORMATEX**); 
+        HRESULT (__stdcall *GetMixFormat)(void*, WAVEFORMATEX**); HRESULT (__stdcall *GetDevicePeriod)(void*, REFERENCE_TIME*, REFERENCE_TIME*); HRESULT (__stdcall *Start)(void*); HRESULT (__stdcall *Stop)(void*); HRESULT (__stdcall *Reset)(void*); HRESULT (__stdcall *SetEventHandle)(void*, void*);
+        HRESULT (__stdcall *GetService)(void*, const void*, void**);
+    } IAudioClientVtbl;
+    struct IAudioClient { IAudioClientVtbl* lpVtbl; };
+    typedef struct IAudioRenderClientVtbl { HRESULT (__stdcall *QueryInterface)(void*, const void*, void**); ULONG (__stdcall *AddRef)(void*); ULONG (__stdcall *Release)(void*); HRESULT (__stdcall *GetBuffer)(void*, DWORD, BYTE**); HRESULT (__stdcall *ReleaseBuffer)(void*, DWORD, DWORD); } IAudioRenderClientVtbl;
+    struct IAudioRenderClient { IAudioRenderClientVtbl* lpVtbl; };
+    typedef struct IUnknown IUnknown;
+    typedef struct IUnknownVtbl { HRESULT (__stdcall *QueryInterface)(IUnknown* This, const IID* riid, void** ppvObject); ULONG   (__stdcall *AddRef)(IUnknown* This); ULONG   (__stdcall *Release)(IUnknown* This); } IUnknownVtbl;
+    struct IUnknown { const IUnknownVtbl* lpVtbl; };
     typedef u32 snd_pcm_uframes_t; // match nanoalsa
     #define PCM_NONBLOCK (1<<1)
     #define PCM_FORMAT_S16_LE 2
-    #define PCM_ACCESS_RW     3
+    #define REFIID const IID *const
     typedef struct { int format,access,rate,channels,period_frames,periods; } pcm_params_t;
     typedef struct { snd_pcm_uframes_t hw_ptr; }  pcm_status_t;
     typedef struct { snd_pcm_uframes_t appl_ptr; } pcm_control_t;
     typedef struct { pcm_status_t status; pcm_control_t control; } pcm_sync_t;
     typedef enum { PCM_FORMAT=0,PCM_ACCESS,PCM_RATE,PCM_CHANNELS,PCM_PERIOD_SIZE,PCM_PERIODS,PCM_INTERRUPT } pcm_param_t;
     typedef struct {IAudioClient *client; IAudioRenderClient *render; DWORD buffer_frames; i32 rate,channels,period_frames; bool open; } wasapi_dev_t;
+    extern HRESULT WINAPI CoInitializeEx(LPVOID pvReserved, DWORD dwCoInit);
+    extern HRESULT WINAPI CoCreateInstance(const IID *const rclsid, IUnknown* pUnkOuter, DWORD dwClsContext, REFIID riid, LPVOID *ppv);
     static wasapi_dev_t wasapi_devs[8/*MAX_WASAPI_DEVICES*/];
     static int wasapi_dev_count = 0;
     #define FD_TO_IDX(fd) ((int)(intptr_t)(fd)-100)
@@ -52,7 +71,7 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
         IMMDeviceEnumerator *en = NULL;
         if (FAILED(CoCreateInstance(&CLSID_MMDeviceEnumerator_,NULL,23,&IID_IMMDeviceEnumerator_,(void**)&en))) { DualLogError("CoCreateInstance fail\n"); return OS_INVALID_HANDLE; }
         IMMDevice *dev = NULL;
-        HRESULT hr = en->lpVtbl->GetDefaultAudioEndpoint(en,eRender,eConsole,&dev);
+        HRESULT hr = en->lpVtbl->GetDefaultAudioEndpoint(en,0,0,&dev);
         en->lpVtbl->Release(en);
         if (FAILED(hr)||!dev) return OS_INVALID_HANDLE;
         int idx = wasapi_init_device(dev,rate,channels,period_frames,periods);
@@ -105,54 +124,12 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
     }
 #else
     int ioctl(int fd, unsigned long request, ...);
-    #define _IOC_NRBITS     8
-    #define _IOC_TYPEBITS   8
-    #define _IOC_SIZEBITS   14
-    #define _IOC_DIRBITS    2
-    #define _IOC_NRSHIFT    0
-    #define _IOC_TYPESHIFT  (_IOC_NRSHIFT + _IOC_NRBITS)
-    #define _IOC_SIZESHIFT  (_IOC_TYPESHIFT + _IOC_TYPEBITS)
-    #define _IOC_DIRSHIFT   (_IOC_SIZESHIFT + _IOC_SIZEBITS)
-    #define _IOC_NONE       0U
-    #define _IOC_WRITE      1U
-    #define _IOC_READ       2U
-    #define _IOC(dir, type, nr, size) (((dir) << _IOC_DIRSHIFT) | ((type) << _IOC_TYPESHIFT) | ((nr) << _IOC_NRSHIFT) | ((size) << _IOC_SIZESHIFT))
-    #define _IO(type, nr) _IOC(_IOC_NONE, (type), (nr), 0)
-    #define _IOR(type, nr, size) _IOC(_IOC_READ, (type), (nr), sizeof(size))
-    #define _IOW(type, nr, size) _IOC(_IOC_WRITE, (type), (nr), sizeof(size))
-    #define _IOWR(type, nr, size) _IOC(_IOC_READ | _IOC_WRITE, (type), (nr), sizeof(size))
-    typedef unsigned long snd_pcm_uframes_t;
-    typedef long          snd_pcm_sframes_t;
-    #define SNDRV_PCM_HW_PARAM_ACCESS        0
-    #define SNDRV_PCM_HW_PARAM_FORMAT        1
-    #define SNDRV_PCM_HW_PARAM_SUBFORMAT     2
-    #define SNDRV_PCM_HW_PARAM_FIRST_MASK    SNDRV_PCM_HW_PARAM_ACCESS
-    #define SNDRV_PCM_HW_PARAM_LAST_MASK     SNDRV_PCM_HW_PARAM_SUBFORMAT
-    #define SNDRV_PCM_HW_PARAM_SAMPLE_BITS   8
-    #define SNDRV_PCM_HW_PARAM_FRAME_BITS    9
-    #define SNDRV_PCM_HW_PARAM_CHANNELS      10
-    #define SNDRV_PCM_HW_PARAM_RATE          11
-    #define SNDRV_PCM_HW_PARAM_PERIOD_TIME   12
-    #define SNDRV_PCM_HW_PARAM_PERIOD_SIZE   13
-    #define SNDRV_PCM_HW_PARAM_PERIOD_BYTES  14
-    #define SNDRV_PCM_HW_PARAM_PERIODS       15
-    #define SNDRV_PCM_HW_PARAM_BUFFER_TIME   16
-    #define SNDRV_PCM_HW_PARAM_BUFFER_SIZE   17
-    #define SNDRV_PCM_HW_PARAM_BUFFER_BYTES  18
-    #define SNDRV_PCM_HW_PARAM_TICK_TIME     19
-    #define SNDRV_PCM_HW_PARAM_FIRST_INTERVAL SNDRV_PCM_HW_PARAM_SAMPLE_BITS
-    #define SNDRV_PCM_HW_PARAM_LAST_INTERVAL  SNDRV_PCM_HW_PARAM_TICK_TIME
-    #define SNDRV_PCM_HW_PARAMS_NO_PERIOD_WAKEUP (1<<2)
-    #define SNDRV_PCM_FORMAT_S16_LE              2
-    #define SNDRV_PCM_ACCESS_RW_INTERLEAVED      3
-    #define SNDRV_PCM_TSTAMP_ENABLE              1
-    #define SNDRV_PCM_TSTAMP_TYPE_GETTIMEOFDAY   0
-    #define SNDRV_PCM_TSTAMP_TYPE_MONOTONIC      1
-    #define SNDRV_PCM_TSTAMP_TYPE_MONOTONIC_RAW  2
-    #define SNDRV_PCM_SYNC_PTR_HWSYNC            1
-    #define SNDRV_PCM_SYNC_PTR_APPL              2
-    #define SNDRV_PCM_SYNC_PTR_AVAIL_MIN         4
-    struct snd_mask { u32 bits[8]; };
+    #define _IOC(dir, type, nr, size) (((dir) << 30) | ((type) << 8) | ((nr) << 0) | ((size) << 16))
+    #define _IO(type, nr) _IOC(0U, (type), (nr), 0)
+    #define _IOR(type, nr, size) _IOC(2U, (type), (nr), sizeof(size))
+    #define _IOW(type, nr, size) _IOC(1U, (type), (nr), sizeof(size))
+    #define _IOWR(type, nr, size) _IOC(2U | 1U, (type), (nr), sizeof(size))
+    typedef unsigned long snd_pcm_uframes_t; typedef long snd_pcm_sframes_t; struct snd_mask { u32 bits[8]; };
     struct snd_interval { unsigned int min,max; unsigned int openmin:1, openmax:1, integer:1, empty:1; };
     struct snd_pcm_hw_params { unsigned int flags; struct snd_mask masks[3]; struct snd_mask mres[5]; struct snd_interval intervals[12]; struct snd_interval ires[9]; unsigned int rmask,cmask,info,msbits,rate_num,rate_den; snd_pcm_uframes_t fifo_size; unsigned char reserved[64]; };
     struct snd_pcm_sw_params { int tstamp_mode; unsigned int period_step,sleep_min; snd_pcm_uframes_t avail_min,xfer_align,start_threshold,stop_threshold,silence_threshold,silence_size,boundary; unsigned int proto,tstamp_type; unsigned char reserved[56]; }; 
@@ -160,44 +137,13 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
     struct snd_pcm_mmap_control { snd_pcm_uframes_t appl_ptr; snd_pcm_uframes_t avail_min; };
     struct snd_pcm_sync_ptr { unsigned int flags; union { struct snd_pcm_mmap_status  status; unsigned char reserved[64]; } s; union { struct snd_pcm_mmap_control control; unsigned char reserved[64]; } c; };
     struct snd_pcm_status { int state; struct timespec trigger_tstamp; struct timespec tstamp; snd_pcm_uframes_t appl_ptr,hw_ptr; snd_pcm_sframes_t delay; snd_pcm_uframes_t avail,avail_max,overrange; int suspended_state; unsigned int audio_tstamp_data; struct timespec audio_tstamp; struct timespec driver_tstamp; unsigned int audio_tstamp_accuracy; unsigned char reserved[20]; };
-    struct snd_xferi { snd_pcm_sframes_t result; void *buf; snd_pcm_uframes_t frames; };
-    #define SNDRV_PCM_IOCTL_TTSTAMP        _IOW( 'A', 0x03, int)
-    #define SNDRV_PCM_IOCTL_HW_REFINE      _IOWR('A', 0x10, struct snd_pcm_hw_params)
-    #define SNDRV_PCM_IOCTL_HW_PARAMS      _IOWR('A', 0x11, struct snd_pcm_hw_params)
-    #define SNDRV_PCM_IOCTL_SW_PARAMS      _IOWR('A', 0x13, struct snd_pcm_sw_params)
-    #define SNDRV_PCM_IOCTL_STATUS         _IOR( 'A', 0x20, struct snd_pcm_status)
-    #define SNDRV_PCM_IOCTL_SYNC_PTR       _IOWR('A', 0x23, struct snd_pcm_sync_ptr)
-    #define SNDRV_PCM_IOCTL_PREPARE        _IO(  'A', 0x40)
-    #define SNDRV_PCM_IOCTL_WRITEI_FRAMES  _IOW( 'A', 0x50, struct snd_xferi)
-    typedef struct snd_pcm_mmap_status  pcm_status_t;
-    typedef struct snd_pcm_mmap_control pcm_control_t;
-    struct pcm_sync { pcm_status_t status; pcm_control_t control; };
-    typedef struct pcm_sync pcm_sync_t;
-    typedef struct snd_pcm_hw_params pcm_hw_params_t;
-    typedef struct snd_pcm_sw_params pcm_sw_params_t;
-    struct pcm_params { pcm_hw_params_t hw_params; pcm_sw_params_t sw_params; };
-    typedef struct pcm_params pcm_params_t;
-    enum pcm_clock_type_t { PCM_CLOCK_REALTIME = SNDRV_PCM_TSTAMP_TYPE_GETTIMEOFDAY, PCM_CLOCK_MONOTONIC = SNDRV_PCM_TSTAMP_TYPE_MONOTONIC, PCM_CLOCK_MONOTONIC_RAW = SNDRV_PCM_TSTAMP_TYPE_MONOTONIC_RAW};
-    typedef enum pcm_clock_type_t pcm_clock_type_t;
-    enum pcm_param {
-        PCM_ACCESS       = SNDRV_PCM_HW_PARAM_ACCESS,       // mask (pcm_access_t)
-        PCM_FORMAT       = SNDRV_PCM_HW_PARAM_FORMAT,       // mask (pcm_format_t)
-        PCM_RATE         = SNDRV_PCM_HW_PARAM_RATE,         // interval
-        PCM_CHANNELS     = SNDRV_PCM_HW_PARAM_CHANNELS,     // interval
-        PCM_PERIOD_SIZE  = SNDRV_PCM_HW_PARAM_PERIOD_SIZE,  // interval
-        PCM_BUFFER_SIZE  = SNDRV_PCM_HW_PARAM_BUFFER_SIZE,  // interval
-        PCM_PERIODS      = SNDRV_PCM_HW_PARAM_PERIODS,      // interval (variant of BUFFER_SIZE)
-        PCM_INTERRUPT         = SNDRV_PCM_HW_PARAM_LAST_INTERVAL + 1, // flag (in hw_params)
-        PCM_TSTAMP_TYPE       = SNDRV_PCM_HW_PARAM_LAST_INTERVAL + 2, // value (in sw_params)
-        PCM_AVAIL_MIN         = SNDRV_PCM_HW_PARAM_LAST_INTERVAL + 3, // value (in sw_params)
-        PCM_START_THRESHOLD   = SNDRV_PCM_HW_PARAM_LAST_INTERVAL + 4, // value (in sw_params)
-        PCM_XRUN_THRESHOLD    = SNDRV_PCM_HW_PARAM_LAST_INTERVAL + 5, // value (in sw_params)
-        PCM_SILENCE_THRESHOLD = SNDRV_PCM_HW_PARAM_LAST_INTERVAL + 6, // value (in sw_params)
-        PCM_SILENCE_SIZE      = SNDRV_PCM_HW_PARAM_LAST_INTERVAL + 7, // value (in sw_params)
-    };
+    struct snd_xferi { snd_pcm_sframes_t result; void *buf; snd_pcm_uframes_t frames; }; typedef struct snd_pcm_mmap_status  pcm_status_t; typedef struct snd_pcm_mmap_control pcm_control_t;
+    struct pcm_sync { pcm_status_t status; pcm_control_t control; }; typedef struct pcm_sync pcm_sync_t; typedef struct snd_pcm_hw_params pcm_hw_params_t; typedef struct snd_pcm_sw_params pcm_sw_params_t;
+    struct pcm_params { pcm_hw_params_t hw_params; pcm_sw_params_t sw_params; }; typedef struct pcm_params pcm_params_t;
+    enum pcm_param{PCM_ACCESS=0,PCM_FORMAT=1,PCM_RATE=11,PCM_CHANNELS=10,PCM_PERIOD_SIZE=13,PCM_BUFFER_SIZE=17,PCM_PERIODS=15,PCM_INTERRUPT=20,PCM_TSTAMP_TYPE=21,PCM_AVAIL_MIN=22,PCM_START_THRESHOLD=23,PCM_XRUN_THRESHOLD=24,PCM_SILENCE_THRESHOLD=25,PCM_SILENCE_SIZE=26};
     typedef enum pcm_param pcm_param_t;
-    static inline int pcm_prepare(int fd) { return OS_IOControlSimple(fd,SNDRV_PCM_IOCTL_PREPARE); }
-    static inline int pcm_write(int fd, void *buf, int frames) { struct snd_xferi tmp={.buf=buf,.frames=frames,.result=0}; return OS_IOControl(fd, SNDRV_PCM_IOCTL_WRITEI_FRAMES,(void*)&tmp) ? -1 : (int) tmp.result; }
+    static inline int pcm_prepare(int fd) { return OS_IOControlSimple(fd,_IO('A',0x40)); }
+    static inline int pcm_write(int fd, void *buf, int frames) { struct snd_xferi tmp={.buf=buf,.frames=frames,.result=0}; return OS_IOControl(fd,_IOW('A',0x50,struct snd_xferi),(void*)&tmp) ? -1 : (int) tmp.result; }
     static void hw_params_set_mask(struct snd_pcm_hw_params *p, int parameter, unsigned int value);
     static void hw_params_set_interval(struct snd_pcm_hw_params *p, int parameter, unsigned int min, unsigned int max);
     static void hw_params_set(struct snd_pcm_hw_params *p, int parameter, unsigned int value);
@@ -207,72 +153,42 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
     static void hw_params_fill(struct snd_pcm_hw_params *p);
     #define get_index(i)       ((i) / 32)
     #define get_mask(i)  (1 << ((i) % 32))
-    #define is_mask(parameter) (parameter >= SNDRV_PCM_HW_PARAM_FIRST_MASK && parameter <= SNDRV_PCM_HW_PARAM_LAST_MASK)
-    #define is_interval(parameter) (parameter >= SNDRV_PCM_HW_PARAM_FIRST_INTERVAL && parameter <= SNDRV_PCM_HW_PARAM_LAST_INTERVAL)
-    static inline struct snd_mask* get_mask_struct(struct snd_pcm_hw_params *p, unsigned int parameter) { return &p->masks[parameter - SNDRV_PCM_HW_PARAM_FIRST_MASK]; }
-    static inline struct snd_interval* get_interval_struct(struct snd_pcm_hw_params *p, unsigned int parameter) { return &p->intervals[parameter - SNDRV_PCM_HW_PARAM_FIRST_INTERVAL]; }
+    #define is_mask(parameter) (parameter >= 0 && parameter <= 2)
+    #define is_interval(parameter) (parameter >= 8 && parameter <= 19)
+    static inline struct snd_mask* get_mask_struct(struct snd_pcm_hw_params *p, unsigned int parameter) { return &p->masks[parameter - 0]; }
+    static inline struct snd_interval* get_interval_struct(struct snd_pcm_hw_params *p, unsigned int parameter) { return &p->intervals[parameter - 8]; }
     static void hw_params_set_mask(struct snd_pcm_hw_params *p, int parameter, unsigned int value) { struct snd_mask *m = get_mask_struct(p,parameter); if (m->bits[get_index(value)] & get_mask(value)) {MemSetToValueForNBytes(m, 0x00, sizeof(*m));} m->bits[get_index(value)] |= get_mask(value); }
     static void hw_params_set_interval(struct snd_pcm_hw_params *p, int parameter, unsigned int min, unsigned int max) { struct snd_interval *i = get_interval_struct(p,parameter); i->openmin = i->openmax = 0; i->integer = 1; i->min = min; i->max = max; }
-    static void hw_params_set(struct snd_pcm_hw_params *p, int parameter, unsigned int value) {
-        if (is_mask(parameter)) hw_params_set_mask(p,parameter,value);
-        else if (is_interval(parameter)) hw_params_set_interval(p,parameter,value,value);
-    }
-
+    static void hw_params_set(struct snd_pcm_hw_params *p, int parameter, unsigned int value) { if (is_mask(parameter)) hw_params_set_mask(p,parameter,value); else if (is_interval(parameter)) hw_params_set_interval(p,parameter,value,value); }
     static unsigned int hw_params_get_mask(struct snd_pcm_hw_params *p, int parameter, unsigned int value) { struct snd_mask *m=get_mask_struct(p,parameter); return m->bits[get_index(value)]&get_mask(value); }
-    static void hw_params_get_interval(struct snd_pcm_hw_params *p, int parameter, unsigned int *min, unsigned int *max) {
-        struct snd_interval *i = get_interval_struct(p, parameter);
-        *min = i->min + i->openmin;
-        *max = i->max - i->openmax;
-    }
-
-    static unsigned int hw_params_get(struct snd_pcm_hw_params *p, int parameter, unsigned int value) {
-        unsigned int ret, tmp;
-        if (is_mask(parameter)) ret = hw_params_get_mask(p, parameter, value);
-        else if (is_interval(parameter)) hw_params_get_interval(p, parameter, &ret, &tmp);
-        else return 0;
-        return ret;
-    }
-
-    static const int INTERVAL_COUNT = SNDRV_PCM_HW_PARAM_LAST_INTERVAL - SNDRV_PCM_HW_PARAM_FIRST_INTERVAL;
+    static void hw_params_get_interval(struct snd_pcm_hw_params *p, int parameter, unsigned int *min, unsigned int *max) { struct snd_interval *i = get_interval_struct(p,parameter); *min = i->min + i->openmin; *max = i->max - i->openmax; }
+    static unsigned int hw_params_get(struct snd_pcm_hw_params *p, int parameter, unsigned int value) { unsigned int r, t; return is_mask(parameter) ? hw_params_get_mask(p,parameter,value) : (is_interval(parameter) ? (hw_params_get_interval(p,parameter,&r,&t),r) : 0); }
     static void hw_params_fill(struct snd_pcm_hw_params *p) {
-        int i;
         MemSetToValueForNBytes(p,0,sizeof(*p));
         MemSetToValueForNBytes(p->masks,0xff,sizeof(p->masks));
-        for (i = 0; i <= INTERVAL_COUNT; i++) { p->intervals[i].min = 0; p->intervals[i].max = U32_MAX; }
-        p->rmask = p->info = U32_MAX;
-        p->cmask = 0;
-        p->msbits = 0;   // sample bits
-        p->rate_num = 0; // rate
-        p->rate_den = 0; // always 1
+        for (int i=0;i<=11;i++) { p->intervals[i].min = 0; p->intervals[i].max = U32_MAX; }
+        p->rmask = p->info = U32_MAX; p->cmask = 0; p->msbits = 0; p->rate_num = 0; p->rate_den = 0;
     }
 
     int pcm_sync(int fd, struct pcm_sync *sync, unsigned int flags) {
-        struct snd_pcm_sync_ptr tmp;
-        flags^=SNDRV_PCM_SYNC_PTR_APPL|SNDRV_PCM_SYNC_PTR_AVAIL_MIN;
-        tmp.flags=flags;
-        if (OS_IOControl(fd,SNDRV_PCM_IOCTL_SYNC_PTR,(void*)&tmp) == -1) return -1;
+        struct snd_pcm_sync_ptr tmp; flags^=2|4; tmp.flags=flags;
+        if (OS_IOControl(fd,_IOWR('A',0x23,struct snd_pcm_sync_ptr),(void*)&tmp) == -1) return -1;
         sync->control = tmp.c.control; sync->status = tmp.s.status;
         return 0;
     }
 
-    void pcm_params_init(pcm_params_t *p) {
-        hw_params_fill(&p->hw_params);
-        pcm_sw_params_t *sw = &p->sw_params;
-        MemSetToValueForNBytes(sw,0,sizeof(*sw));
-        sw->start_threshold = 1; sw->period_step = 1;
-    }
-
+    void pcm_params_init(pcm_params_t *p) { hw_params_fill(&p->hw_params); pcm_sw_params_t *sw = &p->sw_params; MemSetToValueForNBytes(sw,0,sizeof(*sw)); sw->start_threshold = 1; sw->period_step = 1; }
     void pcm_set(pcm_params_t *params, pcm_param_t parameter, unsigned long value) {
         pcm_hw_params_t *hw = &params->hw_params; pcm_sw_params_t *sw = &params->sw_params;
         switch (parameter) {
         default: hw_params_set(hw, parameter, value); break;
-        case SNDRV_PCM_HW_PARAM_LAST_INTERVAL + 1: hw->flags = value ? hw->flags|SNDRV_PCM_HW_PARAMS_NO_PERIOD_WAKEUP : hw->flags & ~SNDRV_PCM_HW_PARAMS_NO_PERIOD_WAKEUP; break;
-        case SNDRV_PCM_HW_PARAM_LAST_INTERVAL + 2: sw->tstamp_mode = SNDRV_PCM_TSTAMP_ENABLE; sw->tstamp_type = value; break;
-        case SNDRV_PCM_HW_PARAM_LAST_INTERVAL + 3:         sw->avail_min         = value; break;
-        case SNDRV_PCM_HW_PARAM_LAST_INTERVAL + 4:   sw->start_threshold   = value; break;
-        case SNDRV_PCM_HW_PARAM_LAST_INTERVAL + 5:    sw->stop_threshold    = value; break;
-        case SNDRV_PCM_HW_PARAM_LAST_INTERVAL + 6: sw->silence_threshold = value; break;
-        case SNDRV_PCM_HW_PARAM_LAST_INTERVAL + 7:      sw->silence_size      = value; break;
+        case 19 + 1: hw->flags = value ? hw->flags|(1<<2) : hw->flags & ~(1<<2); break;
+        case 19 + 2: sw->tstamp_mode = 1; sw->tstamp_type = value; break;
+        case 19 + 3:         sw->avail_min         = value; break;
+        case 19 + 4:   sw->start_threshold   = value; break;
+        case 19 + 5:    sw->stop_threshold    = value; break;
+        case 19 + 6: sw->silence_threshold = value; break;
+        case 19 + 7:      sw->silence_size      = value; break;
         }
     }
 
@@ -281,24 +197,24 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
         pcm_sw_params_t *sw = &params->sw_params;
         switch (parameter) {
         default:                    return hw_params_get(hw, parameter, value);
-        case SNDRV_PCM_HW_PARAM_LAST_INTERVAL + 1:         return hw->flags & SNDRV_PCM_HW_PARAMS_NO_PERIOD_WAKEUP;
-        case SNDRV_PCM_HW_PARAM_LAST_INTERVAL + 2:       return sw->tstamp_mode ? sw->tstamp_type : U32_MAX;
-        case SNDRV_PCM_HW_PARAM_LAST_INTERVAL + 3:         return sw->avail_min;
-        case SNDRV_PCM_HW_PARAM_LAST_INTERVAL + 4:   return sw->start_threshold;
-        case SNDRV_PCM_HW_PARAM_LAST_INTERVAL + 5:    return sw->stop_threshold;
-        case SNDRV_PCM_HW_PARAM_LAST_INTERVAL + 6: return sw->silence_threshold;
-        case SNDRV_PCM_HW_PARAM_LAST_INTERVAL + 7:      return sw->silence_size;
+        case 19 + 1:         return hw->flags & (1<<2);
+        case 19 + 2:       return sw->tstamp_mode ? sw->tstamp_type : U32_MAX;
+        case 19 + 3:         return sw->avail_min;
+        case 19 + 4:   return sw->start_threshold;
+        case 19 + 5:    return sw->stop_threshold;
+        case 19 + 6: return sw->silence_threshold;
+        case 19 + 7:      return sw->silence_size;
         }
     }
 
-    int pcm_params_refine(int fd, pcm_params_t *params) { return ioctl(fd,SNDRV_PCM_IOCTL_HW_REFINE,&params->hw_params); }
+    int pcm_params_refine(int fd, pcm_params_t *params) { return ioctl(fd,_IOWR('A',0x10,struct snd_pcm_hw_params),&params->hw_params); }
     int pcm_params_setup(int fd, pcm_params_t *params) {
-        if (ioctl(fd, SNDRV_PCM_IOCTL_HW_PARAMS, &params->hw_params) == -1) return -1;
-        if (!pcm_get(params, PCM_AVAIL_MIN, 0)) pcm_set(params, PCM_AVAIL_MIN, pcm_get(params, PCM_PERIOD_SIZE, 0));
-        if (!pcm_get(params, PCM_XRUN_THRESHOLD, 0)) pcm_set(params, PCM_XRUN_THRESHOLD, pcm_get(params, PCM_BUFFER_SIZE, 0));
-        if (ioctl(fd, SNDRV_PCM_IOCTL_TTSTAMP, &params->sw_params.tstamp_type) == -1) return -1; // Support ancient kernels
-        if (ioctl(fd, SNDRV_PCM_IOCTL_SW_PARAMS, &params->sw_params) == -1) return -1;
-        return ioctl(fd, SNDRV_PCM_IOCTL_PREPARE);
+        if (ioctl(fd,_IOWR('A',0x11,struct snd_pcm_hw_params),&params->hw_params) == -1) return -1;
+        if (!pcm_get(params,PCM_AVAIL_MIN,0)) pcm_set(params,PCM_AVAIL_MIN,pcm_get(params,PCM_PERIOD_SIZE,0));
+        if (!pcm_get(params,PCM_XRUN_THRESHOLD,0)) pcm_set(params,PCM_XRUN_THRESHOLD,pcm_get(params,PCM_BUFFER_SIZE,0));
+        if (ioctl(fd,_IOW('A',0x03,int),&params->sw_params.tstamp_type) == -1) return -1; // Support ancient kernels
+        if (ioctl(fd,_IOWR('A',0x13,struct snd_pcm_sw_params),&params->sw_params) == -1) return -1;
+        return ioctl(fd,_IO('A',0x40));
     }
 
     int pcm_open(int card, int device, int flags) { char path[4096]; StringFormat(path,sizeof(path),"/dev/snd/pcmC%uD%u%c",card,device,(flags & 1) == 0 ? 'c' : 'p'); return OS_Open(path,00000002 | (flags & (1 << 1) ? 00004000 : 0),0); }
@@ -1264,131 +1180,71 @@ ENGINE_TO_MOD void play_message(const char *path) {
 }
 
 ENGINE_TO_MOD i32 SoundInit(const char *path,ma_sound *pSound) { wav_channel_t *w=(wav_channel_t*)pSound; u32 frames; size_t allocSize=0; float *buf=load_wav(path,&frames,&allocSize); if (!buf) return -1; w->samples=buf; w->allocSize=allocSize; w->frame_count=frames; w->frame_pos=0; w->volume=1.0f; w->looping=false; w->positional=false; w->playing=false; return 0; }
-ENGINE_TO_MOD i32 SoundStart(ma_sound *pSound) {
-    wav_channel_t *w=(wav_channel_t*)pSound; w->frame_pos=0; w->playing=true;
-    for (u32 i=0;i<ext_count;i++) { if (ext_ch[i]==w) return 0; }
-    
-    if (ext_count<MAX_CHANNELS) ext_ch[ext_count++]=w;
-    return 0;
-}
+ENGINE_TO_MOD i32 SoundStart(ma_sound *pSound) { wav_channel_t *w = (wav_channel_t*)pSound; w->frame_pos = 0; w->playing = true; for (u32 i=0;i<ext_count;++i) if (ext_ch[i] == w) return 0; if (ext_count < MAX_CHANNELS) ext_ch[ext_count++] = w; return 0; }
 ENGINE_TO_MOD i32 SoundStop(ma_sound *pSound) { ((wav_channel_t*)pSound)->playing=false; return 0; }
-ENGINE_TO_MOD void SoundUninit(ma_sound *pSound) {
-    wav_channel_t *w=(wav_channel_t*)pSound;
-    if (w->samples){OS_DeallocateRAM(w->samples,w->allocSize);w->samples=NULL;w->allocSize=0;} w->playing=false;
-    for (u32 i=0;i<ext_count;i++) if (ext_ch[i]==w) { ext_ch[i]=ext_ch[--ext_count]; break; }
-}
+ENGINE_TO_MOD void SoundUninit(ma_sound *s) { wav_channel_t *w = (wav_channel_t*)s; if (w->samples) { OS_DeallocateRAM(w->samples,w->allocSize); w->samples = NULL; w->allocSize = 0; } w->playing = false; for (u32 i=0;i<ext_count;++i) if (ext_ch[i] == w) { ext_ch[i] = ext_ch[--ext_count]; break; } }
 ENGINE_TO_MOD void SoundSetVolume(ma_sound *pSound, float volume) { ((wav_channel_t*)pSound)->volume=volume; }
 ENGINE_TO_MOD void SoundSetLooping(ma_sound *pSound, i32 loop) { ((wav_channel_t*)pSound)->looping=(bool)loop; }
 ENGINE_TO_MOD bool GetSoundIsPlaying(ma_sound *pSound)  { return ((wav_channel_t*)pSound)->playing; }
 ENGINE_TO_MOD i32 SoundGetCurrentFrameCursor(const ma_sound *pSound,u64 *pCursor) { *pCursor=((wav_channel_t*)pSound)->frame_pos; return 0; }
 ENGINE_TO_MOD float SoundGetLength(ma_sound *pSound) { wav_channel_t *w=(wav_channel_t*)pSound; return (w->samples&&AUDIO_RATE)?(float)w->frame_count/(float)AUDIO_RATE:0.0f; }
-static void mp3_open_slot(i32 s,const char *path,float fade_from,float fade_to,i32 fade_ms) {
-    mp3_channel_t *m = &mp3_ch[s];
-    if (m->open) { drmp3_uninit(&m->dec); m->open=false; }
-    if (!drmp3_init_file(&m->dec,path)) { DualLog("ERROR: Failed to load MP3 %s\n",path); return; }
-    
-    m->src_rate=m->dec.sampleRate;
-    m->total_frames=drmp3_get_pcm_frame_count(&m->dec);
-    drmp3_seek_to_pcm_frame(&m->dec,0);
-    m->frames_decoded=0; m->open=true; m->fade_vol=fade_from; m->fade_target=fade_to;
-    m->fade_step=(fade_ms>0)?(fade_to-fade_from)/((float)AUDIO_RATE*fade_ms/1000.0f):0.0f;
-    if (m->fade_step==0.0f) m->fade_vol=fade_to;
+static void mp3_open_slot(i32 s, const char *path, float fade_from, float fade_to, i32 fade_ms) {
+    mp3_channel_t *m = &mp3_ch[s]; if (m->open) { drmp3_uninit(&m->dec); m->open=false; } if (!drmp3_init_file(&m->dec,path)) { DualLog("ERROR: Failed to load MP3 %s\n",path); return; }
+    m->src_rate = m->dec.sampleRate; m->total_frames = drmp3_get_pcm_frame_count(&m->dec); drmp3_seek_to_pcm_frame(&m->dec,0); m->frames_decoded = 0; m->open = true; m->fade_target = fade_to;
+    m->fade_vol = (m->fade_step = (fade_ms > 0) ? (fade_to - fade_from) / (AUDIO_RATE * fade_ms / 1000.0f) : 0.0f) == 0.0f ? fade_to : fade_from;
 }
 
-void play_mp3(const char *path,i32 fade_in_ms) {
-    i32 old=mp3_slot, next=mp3_slot?0:1;
-    if (mp3_ch[old].open) { mp3_ch[old].fade_target=0.0f; mp3_ch[old].fade_step=(fade_in_ms>0)?-mp3_ch[old].fade_vol/((float)AUDIO_RATE*fade_in_ms/1000.0f):-1.0f; }
-    mp3_open_slot(next,path,0.0f,1.0f,fade_in_ms);
-    mp3_slot=next;
-}
-
+void play_mp3(const char *path, i32 fade_ms) { i32 old = mp3_slot, next = mp3_slot ? 0 : 1; if (mp3_ch[old].open) { mp3_ch[old].fade_target = 0.0f; mp3_ch[old].fade_step = (fade_ms > 0) ? -mp3_ch[old].fade_vol / (AUDIO_RATE * fade_ms / 1000.0f) : -1.0f; } mp3_open_slot(mp3_slot = next,path,0.0f,1.0f,fade_ms); }
 void mp3_clear(void) { for (i32 i=0;i<2;i++) if (mp3_ch[i].open) { drmp3_uninit(&mp3_ch[i].dec); mp3_ch[i].open=false; } mp3_slot=0; }
 ENGINE_TO_MOD void MP3Pause(void) { mp3_paused = true; }
 ENGINE_TO_MOD void MP3Resume(void) { mp3_paused = false; }
-ENGINE_TO_MOD float GetMP3RemainingTime(void) {
-    mp3_channel_t *m = &mp3_ch[mp3_slot];
-    if (!m->open) return 0.0f;
-    if (m->total_frames==0) return 1.0f;
-    if (m->frames_decoded>=m->total_frames) return 0.0f;
-    return (float)(m->total_frames-m->frames_decoded)/(float)(m->src_rate?m->src_rate:AUDIO_RATE);
-}
-
+ENGINE_TO_MOD float GetMP3RemainingTime(void) { mp3_channel_t *m = &mp3_ch[mp3_slot]; return (!m->open || m->frames_decoded >= m->total_frames) ? 0.0f : (!m->total_frames ? 1.0f : (float)(m->total_frames - m->frames_decoded) / (m->src_rate ? m->src_rate : AUDIO_RATE)); }
 static OsFileHandle pcm_fds[8]; static i32 pcm_fd_count = 0;
 #ifndef WINDOWS
     typedef void snd_pcm_t;
-    typedef int (*pfn_snd_pcm_open)(snd_pcm_t**, const char*, int, int);
-    typedef int (*pfn_snd_pcm_close)(snd_pcm_t*);
-    typedef int (*pfn_snd_pcm_writei)(snd_pcm_t*, const void*, u32);
-    typedef int (*pfn_snd_pcm_recover)(snd_pcm_t*, int, int);
-    typedef int (*pfn_snd_pcm_prepare)(snd_pcm_t*);
-    typedef int (*pfn_snd_pcm_hw_params_sizeof)(void);
-    typedef int (*pfn_snd_pcm_hw_params_any)(snd_pcm_t*, void*);
-    typedef int (*pfn_snd_pcm_hw_params_set_access)(snd_pcm_t*, void*, unsigned int);
-    typedef int (*pfn_snd_pcm_hw_params_set_format)(snd_pcm_t*, void*, int);
-    typedef int (*pfn_snd_pcm_hw_params_set_channels)(snd_pcm_t*, void*, unsigned int);
-    typedef int (*pfn_snd_pcm_hw_params_set_rate_near)(snd_pcm_t*, void*, unsigned int*, int*);
-    typedef int (*pfn_snd_pcm_hw_params_set_period_size_near)(snd_pcm_t*, void*, unsigned long*, int*);
-    typedef int (*pfn_snd_pcm_hw_params_set_periods_near)(snd_pcm_t*, void*, unsigned int*, int*);
-    typedef int (*pfn_snd_pcm_hw_params)(snd_pcm_t*, void*);
-    typedef const char* (*pfn_snd_strerror)(int);
+    typedef int (*pfn_snd_pcm_open)(snd_pcm_t**, const char*, int, int);  typedef int (*pfn_snd_pcm_close)(snd_pcm_t*);   typedef int (*pfn_snd_pcm_writei)(snd_pcm_t*, const void*, u32);
+    typedef int (*pfn_snd_pcm_recover)(snd_pcm_t*, int, int);             typedef int (*pfn_snd_pcm_prepare)(snd_pcm_t*); typedef int (*pfn_snd_pcm_hw_params_sizeof)(void);
+    typedef int (*pfn_snd_pcm_hw_params_any)(snd_pcm_t*, void*);          typedef int (*pfn_snd_pcm_hw_params_set_access)(snd_pcm_t*, void*, unsigned int); typedef int (*pfn_snd_pcm_hw_params_set_format)(snd_pcm_t*, void*, int);
+    typedef int (*pfn_snd_pcm_hw_params)(snd_pcm_t*, void*);              typedef const char* (*pfn_snd_strerror)(int);
+    typedef int (*pfn_snd_pcm_hw_params_set_channels)(snd_pcm_t*, void*, unsigned int);                 typedef int (*pfn_snd_pcm_hw_params_set_rate_near)(snd_pcm_t*, void*, unsigned int*, int*);
+    typedef int (*pfn_snd_pcm_hw_params_set_period_size_near)(snd_pcm_t*, void*, unsigned long*, int*); typedef int (*pfn_snd_pcm_hw_params_set_periods_near)(snd_pcm_t*, void*, unsigned int*, int*);
     static snd_pcm_t *g_alsa_pcm; static pfn_snd_pcm_writei g_snd_writei; static pfn_snd_pcm_recover g_snd_recover; static pfn_snd_pcm_prepare g_snd_prepare; static pfn_snd_strerror g_snd_strerror;
     static bool alsa_try_open_default(void) {
         void *so = dlopen("libasound.so.2",2);
         if (!so) so = dlopen("libasound.so",2);
         if (!so) { DualLog("Audio: libasound not found\n"); return false; }
 
-        pfn_snd_pcm_open                   snd_open      = dlsym(so, "snd_pcm_open");
-        pfn_snd_pcm_hw_params_sizeof       hw_sizeof     = dlsym(so, "snd_pcm_hw_params_sizeof");
-        pfn_snd_pcm_hw_params_any          hw_any        = dlsym(so, "snd_pcm_hw_params_any");
-        pfn_snd_pcm_hw_params_set_access   hw_set_access = dlsym(so, "snd_pcm_hw_params_set_access");
-        pfn_snd_pcm_hw_params_set_format   hw_set_fmt    = dlsym(so, "snd_pcm_hw_params_set_format");
-        pfn_snd_pcm_hw_params_set_channels hw_set_ch     = dlsym(so, "snd_pcm_hw_params_set_channels");
-        pfn_snd_pcm_hw_params_set_rate_near        hw_set_rate   = dlsym(so, "snd_pcm_hw_params_set_rate_near");
-        pfn_snd_pcm_hw_params_set_period_size_near hw_set_period = dlsym(so, "snd_pcm_hw_params_set_period_size_near");
-        pfn_snd_pcm_hw_params_set_periods_near     hw_set_periods= dlsym(so, "snd_pcm_hw_params_set_periods_near");
-        pfn_snd_pcm_hw_params              hw_apply      = dlsym(so, "snd_pcm_hw_params");
-        g_snd_writei  = dlsym(so, "snd_pcm_writei");
-        g_snd_recover = dlsym(so, "snd_pcm_recover");
-        g_snd_prepare = dlsym(so, "snd_pcm_prepare");
-        g_snd_strerror= dlsym(so, "snd_strerror");
+        pfn_snd_pcm_open snd_open = dlsym(so,"snd_pcm_open"); pfn_snd_pcm_hw_params_any hw_any = dlsym(so,"snd_pcm_hw_params_any");
+        pfn_snd_pcm_hw_params_sizeof hw_sizeof = dlsym(so,"snd_pcm_hw_params_sizeof");          pfn_snd_pcm_hw_params_set_access hw_set_access = dlsym(so,"snd_pcm_hw_params_set_access");
+        pfn_snd_pcm_hw_params_set_format hw_set_fmt = dlsym(so,"snd_pcm_hw_params_set_format"); pfn_snd_pcm_hw_params_set_channels hw_set_ch = dlsym(so,"snd_pcm_hw_params_set_channels");
+        pfn_snd_pcm_hw_params_set_rate_near hw_set_rate = dlsym(so,"snd_pcm_hw_params_set_rate_near");         pfn_snd_pcm_hw_params_set_period_size_near hw_set_period = dlsym(so,"snd_pcm_hw_params_set_period_size_near");
+        pfn_snd_pcm_hw_params_set_periods_near hw_set_periods= dlsym(so,"snd_pcm_hw_params_set_periods_near"); pfn_snd_pcm_hw_params hw_apply = dlsym(so,"snd_pcm_hw_params");
+        g_snd_writei  = dlsym(so,"snd_pcm_writei");  g_snd_recover = dlsym(so,"snd_pcm_recover"); g_snd_prepare = dlsym(so,"snd_pcm_prepare"); g_snd_strerror= dlsym(so,"snd_strerror");
         if (!snd_open||!hw_sizeof||!hw_any||!hw_set_access||!hw_set_fmt||!hw_set_ch|| !hw_set_rate||!hw_set_period||!hw_set_periods||!hw_apply|| !g_snd_writei||!g_snd_recover||!g_snd_prepare) { DualLogError("Audio: libasound missing required symbols\n"); return false; }
 
         int r = snd_open(&g_alsa_pcm, "default", 0/*PLAYBACK*/, 0/*blocking*/);
-        if (r < 0 || !g_alsa_pcm) { DualLogError("Audio: snd_pcm_open('default') failed: %d (%s)\n", r, g_snd_strerror ? g_snd_strerror(r) : "?"); return false; }
-
-        int sz = hw_sizeof();
-        u8 hw_params_buf[640];
-        if (sz > (int)sizeof(hw_params_buf)) { DualLogError("Audio: hw_params_t too large (%d)\n", sz); return false; }
-        void *hwp = hw_params_buf;
-        if ((r = hw_any(g_alsa_pcm, hwp)) < 0) { DualLogError("Audio: hw_params_any failed: %s\n", g_snd_strerror(r)); return false; }
-        if ((r = hw_set_access(g_alsa_pcm, hwp, 3/*RW_INTERLEAVED*/)) < 0) { DualLogError("Audio: set_access failed: %s\n", g_snd_strerror(r)); return false; }
-        if ((r = hw_set_fmt(g_alsa_pcm, hwp, 2/*S16_LE*/)) < 0) { DualLogError("Audio: set_format S16_LE failed: %s\n", g_snd_strerror(r)); return false; }
-        if ((r = hw_set_ch(g_alsa_pcm, hwp, AUDIO_CHANNELS)) < 0) { DualLogError("Audio: set_channels(%d) failed: %s\n", AUDIO_CHANNELS, g_snd_strerror(r)); return false; }
-
-        unsigned int rate = AUDIO_RATE; int dir = 0;
-        if ((r = hw_set_rate(g_alsa_pcm, hwp, &rate, &dir)) < 0) { DualLogError("Audio: set_rate(%u) failed: %s\n", AUDIO_RATE, g_snd_strerror(r)); return false; }
-
-        unsigned long period = AUDIO_FRAMES; dir = 0;
-        if ((r = hw_set_period(g_alsa_pcm, hwp, &period, &dir)) < 0) { DualLogError("Audio: set_period_size(%d) failed: %s\n", AUDIO_FRAMES, g_snd_strerror(r)); return false; }
-
-        unsigned int periods = AUDIO_PERIODS; dir = 0;
-        if ((r = hw_set_periods(g_alsa_pcm, hwp, &periods, &dir)) < 0) { DualLogError("Audio: set_periods(%d) failed: %s\n", AUDIO_PERIODS, g_snd_strerror(r)); return false; }
-        if ((r = hw_apply(g_alsa_pcm, hwp)) < 0) { DualLogError("Audio: hw_params apply failed: %s\n", g_snd_strerror(r)); return false; }
+        if (r < 0 || !g_alsa_pcm) { DualLogError("Audio: snd_pcm_open('default') failed: %d (%s)\n",r,g_snd_strerror ? g_snd_strerror(r) : "?"); return false; }
+        int sz = hw_sizeof(); u8 hw_params_buf[640]; if (sz > (int)sizeof(hw_params_buf)) { DualLogError("Audio: hw_params_t too large (%d)\n",sz); return false; }
+        void *hwp = hw_params_buf; if ((r = hw_any(g_alsa_pcm,hwp)) < 0) { DualLogError("Audio: hw_params_any failed: %s\n",g_snd_strerror(r)); return false; }
+        if ((r = hw_set_access(g_alsa_pcm,hwp,3/*RW_INTERLEAVED*/)) < 0) { DualLogError("Audio: set_access failed: %s\n", g_snd_strerror(r)); return false; }
+        if ((r = hw_set_fmt(g_alsa_pcm,hwp,2/*S16_LE*/)) < 0) { DualLogError("Audio: set_format S16_LE failed: %s\n", g_snd_strerror(r)); return false; }
+        if ((r = hw_set_ch(g_alsa_pcm,hwp,AUDIO_CHANNELS)) < 0) { DualLogError("Audio: set_channels(%d) failed: %s\n", AUDIO_CHANNELS, g_snd_strerror(r)); return false; }
+        unsigned int rate =   AUDIO_RATE; int dir = 0; if ((r = hw_set_rate(g_alsa_pcm,hwp,&rate,&dir)) < 0) { DualLogError("Audio: set_rate(%u) failed: %s\n", AUDIO_RATE, g_snd_strerror(r)); return false; }
+        unsigned long period =  AUDIO_FRAMES; dir = 0; if ((r = hw_set_period(g_alsa_pcm,hwp,&period,&dir)) < 0) { DualLogError("Audio: set_period_size(%d) failed: %s\n", AUDIO_FRAMES, g_snd_strerror(r)); return false; }
+        unsigned int periods = AUDIO_PERIODS; dir = 0; if ((r = hw_set_periods(g_alsa_pcm,hwp,&periods,&dir)) < 0) { DualLogError("Audio: set_periods(%d) failed: %s\n", AUDIO_PERIODS, g_snd_strerror(r)); return false; }
+        if ((r = hw_apply(g_alsa_pcm,hwp)) < 0) { DualLogError("Audio: hw_params apply failed: %s\n", g_snd_strerror(r)); return false; }
         if ((r = g_snd_prepare(g_alsa_pcm)) < 0) { DualLogError("Audio: snd_pcm_prepare failed: %s\n", g_snd_strerror(r)); return false; }
         return true;
     }
 
     static void init_pcm_device(i32 card, i32 dev) {
-        OsFileHandle r = pcm_open(card, dev, 1|(1<<1));
-        if (r == OS_INVALID_HANDLE) return;
-        DualLog("Audio: trying raw device card=%d dev=%d fd=%d\n", card, dev, r);
-        pcm_params_t p; pcm_params_init(&p);
-        pcm_set(&p, PCM_FORMAT, SNDRV_PCM_FORMAT_S16_LE);
-        pcm_set(&p, SNDRV_PCM_HW_PARAM_ACCESS, SNDRV_PCM_ACCESS_RW_INTERLEAVED);
-        pcm_set(&p, PCM_RATE, AUDIO_RATE); pcm_set(&p, PCM_CHANNELS, AUDIO_CHANNELS);
-        pcm_set(&p, PCM_PERIOD_SIZE, AUDIO_FRAMES); pcm_set(&p, SNDRV_PCM_HW_PARAM_PERIODS, AUDIO_PERIODS);
-        if (pcm_params_setup(r, &p) >= 0 && pcm_fd_count < 8) { DualLog("Audio: raw device card=%d dev=%d OK\n",card,dev); pcm_fds[pcm_fd_count++] = r; }
-        else { DualLog("Audio: raw device card=%d dev=%d setup failed, closing\n",card,dev); OS_Close(r); }
+        OsFileHandle r = pcm_open(card,dev,1|(1<<1)); if (r == OS_INVALID_HANDLE) return;
+        
+        pcm_params_t p; pcm_params_init(&p);      pcm_set(&p,PCM_FORMAT,2/*s16 LE*/); pcm_set(&p,0,3);
+        pcm_set(&p,PCM_RATE,AUDIO_RATE);          pcm_set(&p,PCM_CHANNELS,AUDIO_CHANNELS);
+        pcm_set(&p,PCM_PERIOD_SIZE,AUDIO_FRAMES); pcm_set(&p,15,AUDIO_PERIODS);
+        if (pcm_params_setup(r,&p) >= 0 && pcm_fd_count < 8) pcm_fds[pcm_fd_count++] = r;
+        else { DualLogError("Audio: raw device card=%d dev=%d setup failed, closing\n",card,dev); OS_Close(r); }
     }
 #endif
 
@@ -1397,12 +1253,12 @@ void AudioUpdate(void) {
     if (g_alsa_pcm) {
         i16 buf[AUDIO_FRAMES*AUDIO_CHANNELS];
         audio_mix_period(buf);
-        int r = g_snd_writei(g_alsa_pcm, buf, (u32)AUDIO_FRAMES);
+        int r = g_snd_writei(g_alsa_pcm,buf,(u32)AUDIO_FRAMES);
         if (r < 0) {
-            DualLog("Audio: snd_pcm_writei underrun %d, recovering\n", r);
-            r = g_snd_recover(g_alsa_pcm, r, 0);
-            if (r < 0) DualLogError("Audio: snd_pcm_recover failed %d\n", r);
-            else g_snd_writei(g_alsa_pcm, buf, (u32)AUDIO_FRAMES);
+            DualLog("Audio: snd_pcm_writei underrun %d, recovering\n",r);
+            r = g_snd_recover(g_alsa_pcm,r,0);
+            if (r < 0) DualLogError("Audio: snd_pcm_recover failed %d\n",r);
+            else g_snd_writei(g_alsa_pcm,buf,(u32)AUDIO_FRAMES);
         }
         return;
     }
@@ -1434,7 +1290,7 @@ void InitAudio(void) {
         DualLog("Audio: using libasound 'default' path\n");
     } else {
         DualLog("Audio: libasound path failed, trying raw devices\n");
-        for (i32 card = 0; card < 8; card++) { for (i32 dev = 0; dev < 8; dev++) init_pcm_device(card, dev); }
+        for (i32 card = 0; card < 8; card++) { for (i32 dev = 0; dev < 8; dev++) init_pcm_device(card,dev); }
         if (pcm_fd_count == 0) DualLogError("Audio: no output device found\n");
         else DualLog("Audio: %d raw device(s) active\n",pcm_fd_count);
     }
