@@ -97,7 +97,7 @@ static void OptimizeVertexCache(u16* idx, u32 ic, u32 vc) {
 static u8* OptimizeVertexFetch(u8* v, u32* vc, u16* idx, u32 ic, size_t stride) {
     u32 oc = *vc; if (!oc || !ic) return v;
     u32 *remap = OS_Alloc(oc*sizeof(u32)), *first = OS_Alloc(oc*sizeof(u32));
-    MemSetToValueForNBytes(remap,0xFF,oc*sizeof(u32));
+    MemSetToVForNBytes(remap,0xFF,oc*sizeof(u32));
     u32 nc = 0;
     for (u32 i=0; i<ic; ++i) {
         u32 id = idx[i];
@@ -176,7 +176,7 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, c
 
     #define HASH_SIZE 65536
     u32* ht = OS_Alloc(HASH_SIZE * sizeof(u32));
-    MemSetToValueForNBytes(ht,0xFF,HASH_SIZE * sizeof(u32));
+    MemSetToVForNBytes(ht,0xFF,HASH_SIZE * sizeof(u32));
     u32* rem = (u32*)st; u32 ucnt = 0;
     for (u32 i=0; i<ec; ++i) {
         const float* v = sv + (i<<3);
@@ -224,7 +224,7 @@ static void* ModelParsingWorker(void* arg) {
 }
 
 bool ParseModelData(ModelDataParser *p, u16 maxSz, const char *fn) {
-    OsFileHandle fd; int sz; char* buf = OS_OpenAndAllocateFileBufferReadonly(fn, &fd, &sz);
+    FHandle fd; int sz; char* buf = OS_OpenAndAllocateFileBufferReadonly(fn, &fd, &sz);
     char *c = buf, *e = buf + sz; u32 maxidx = 0, ln = 0;
     while (c < e) {  // first pass - find max index
         char* s = c; while (c < e && *c != '\n' && *c != '\r') ++c;
@@ -306,14 +306,14 @@ void LoadModels(void) {
     size_t arena = n*sizeof(i32) + n*sizeof(RawOBJ) + 5*num_parse_threads*sizeof(float*) + (size_t)num_parse_threads * ((MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*2)*sizeof(float) + MAX_OUTPUT_VERTS*8*sizeof(float) + MAX_OUTPUT_VERTS*sizeof(u32));
     void* arena_base = OS_Alloc(arena); char* p = arena_base;
     i32* idxmap = (i32*)p; p += n*sizeof(i32);
-    MemSetToValueForNBytes(idxmap, -1, n*sizeof(i32));
+    MemSetToVForNBytes(idxmap, -1, n*sizeof(i32));
     for (u32 i=0; i<mp.count; ++i) if (mp.entries[i].index != U16_MAX) idxmap[mp.entries[i].index] = (i32)i;
     RawOBJ* raw = (RawOBJ*)p; p += n*sizeof(RawOBJ);
     for (u32 i=0; i<n; ++i) {
         i32 pi = idxmap[i];
         if (pi >= 0) {
             const char* path = mp.entries[pi].path;
-            OsFileHandle dummy; int sz=0;
+            FHandle dummy; int sz=0;
             raw[i].data = (const char*)OS_OpenAndAllocateFileBufferReadonly(path,&dummy,&sz);
             raw[i].size = sz;
         }

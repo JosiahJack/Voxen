@@ -71,21 +71,21 @@ ResMode resModes[8];
 typedef struct { Vector3 position; Quaternion rotation; u8 fov; u16 width,height; float near,far,finished; bool visible; } CamView;
 u16 dynamicEntities[512]; u16 dynamicEntityCount;
 CamView camViews[64]; u32 camViewTextures[64]; u8 camViewCount = 0; // Max is 8 cam views on level 8 + 3 sensaround views = 11.
-OsFileHandle console_log_file=0;
+FHandle console_log_file=0;
 static inline __attribute__((always_inline)) i32 PosGetCellCoordX(float pos_x) { return (u16)clamp((i32)vfloor((pos_x - Sys_Global.worldMin_x + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
 static inline __attribute__((always_inline)) i32 PosGetCellCoordZ(float pos_z) { return (u16)clamp((i32)vfloor((pos_z - Sys_Global.worldMin_z + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
 static void DualLogMain(const char *prefix, const char *fmt, va_list args) { // Logs both to log file and console, usage same as printf
     char buf[4096]; va_list copy; __builtin_va_copy(copy,args); StringFormatV(buf,sizeof(buf),fmt,copy); __builtin_va_end(copy);
     #ifdef WINDOWS // Write to console (stdout / stderr)
-        OsFileHandle out = GetStdHandle((prefix && prefix[0] == '\033') ? (DWORD)-12 : (DWORD)-11);
+        FHandle out = GetStdHandle((prefix && prefix[0] == '\033') ? (u32)-12 : (u32)-11);
         if (prefix) OS_RawWrite(out, prefix, GetStringLength(prefix));
         OS_RawWrite(out, buf, GetStringLength(buf));
     #else // Linux - write to stdout (fd 1) or stderr (fd 2)
-        OsFileHandle out = (prefix && prefix[0] == '\033') ? 2 : 1;  // use stderr for colored warnings/errors
+        FHandle out = (prefix && prefix[0] == '\033') ? 2 : 1;  // use stderr for colored warnings/errors
         if (prefix) { OS_RawWrite(out, prefix, GetStringLength(prefix)); OS_RawWrite(out,"\033[0m ", 5); }
         OS_RawWrite(out, buf, GetStringLength(buf));
     #endif
-    if (console_log_file != OS_INVALID_HANDLE) { // Write to console_log_file
+    if (console_log_file != INVALID_FHANDLE) { // Write to console_log_file
         if (prefix) { OS_Write(console_log_file, prefix, GetStringLength(prefix), "console.log"); OS_Write(console_log_file,"\033[0m ",5,"console.log"); }
         OS_Write(console_log_file, buf, GetStringLength(buf), "console.log");
     }
@@ -99,8 +99,107 @@ ENGINE_TO_MOD void DualLogError(const char* fmt, ...) { va_list args; __builtin_
 #include "textures.c"
 #include "models.c"
 #include "culling.c"
-#include "ray.c"
 #include "text.c"
+static float half_to_float(half h){
+    u32 s=(h&0x8000)<<16,e=(h&0x7C00)>>10,m=(h&0x03FF),out;
+    if (e == 0){
+        if (m == 0) out = s;
+        else {
+            e = 1;
+            while ((m & 0x0400) == 0) { m <<= 1; e--; }
+            m &= 0x03FF; e+=(127 - 15);
+            out = s | (e << 23) | (m << 13);
+        }
+    } else if (e == 31) { out = s | 0x7F800000 | (m << 13); }
+    else { e = e + (127 - 15); out = s | (e << 23) | (m << 13); }
+    float f; CopyMemoryFromBtoAForNBytes(&f,&out,4);
+    return f;
+}
+
+RaycastHit RayTriangle(Vector3 origin, Vector3 dir, Vector3 posA, Vector3 posB, Vector3 posC, Vector3 normA, Vector3 normB, Vector3 normC) {
+    Vector3 edgeAB = Vector3_A_minus_B(posB,posA), edgeAC = Vector3_A_minus_B(posC,posA); Vector3 normalVector = cross_vector3(edgeAB,edgeAC);
+    Vector3 ao = Vector3_A_minus_B(origin,posA);
+    Vector3 dao = cross_vector3(ao,dir);
+    float determinant = -dot_vector3(dir,normalVector);
+    float invDet = 1.0f / determinant;
+    float dst = dot_vector3(ao, normalVector) * invDet;
+    float u = dot_vector3(edgeAC,dao) * invDet, v = -dot_vector3(edgeAB,dao) * invDet; float w = 1.0f - u - v;
+    return (RaycastHit){.point=Vector3_A_plus_B(origin,scale_vector3(dir,dst)), .normal=normalize_vector3(Vector3_A_plus_B(Vector3_A_plus_B(scale_vector3(normA,w),scale_vector3(normB,u)),scale_vector3(normC,v))), .distance=dst, .hitInstanceIndex=INSTANCE_COUNT, .hit=vabs(determinant) >= 1E-8f && dst >= 0 && u >= 0 && v >= 0 && w >= 0};
+}
+ 
+ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, u32 layerMask) {
+    u32 numMeshesCheckedForRaycast = 0, numTrisCastAgainst = 0;
+    RaycastHit result = { .hit = false, .distance = maxDist, .point = {0.0f, 0.0f, 0.0f}, .normal = {0.0f, 0.0f, 0.0f}, .hitInstanceIndex = INSTANCE_COUNT };
+    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
+        if (!(layerMask & Sys_Global.instances[i].layer)) continue;
+        u16 mindex = Sys_Global.instances[i].modelIndex;
+        if (mindex >= loadedModelsMaxIndex) continue;
+        Vector3 objPos = Sys_Global.instances[i].position;
+        u16 instCellIdx = PosGetCellCoords(objPos.x,objPos.z);
+        Vector3 delta = Vector3_A_minus_B(objPos,origin);
+        float distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
+        float radBounds = vmax(modelBounds[mindex], 1.81f);
+        float maxDistToObj = vmax(maxDist - radBounds,maxDist);
+        if (distSqrd >= (maxDistToObj * maxDistToObj)) continue;
+        if (!ConstIndexIsPortalBlockingDoor(Sys_Global.instances[i].index)) {
+            if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (Sys_Global.instances[i].index != 754 || !SkyIsVisible())) continue;
+        }
+        
+        u32 triCount = modelTriangleCounts[mindex];
+        if (triCount < 1) continue;
+        float M[16];
+        CopyMemoryFromBtoAForNBytes(M,&modelMatrices[i * 16],16 * sizeof(float));
+        float m00=M[0], m10=M[1], m20=M[2];
+        float m01=M[4], m11=M[5], m21=M[6];
+        float m02=M[8], m12=M[9], m22=M[10];
+        float tx=M[12], ty=M[13], tz=M[14];
+        float sclx = vsqrtf(m00*m00 + m10*m10 + m20*m20); float sclx2 = sclx * sclx;
+        float scly = vsqrtf(m01*m01 + m11*m11 + m21*m21); float scly2 = scly * scly;
+        float sclz = vsqrtf(m02*m02 + m12*m12 + m22*m22); float sclz2 = sclz * sclz;
+        Vector3 rel = {origin.x - tx, origin.y - ty, origin.z - tz};
+        Vector3 localOrigin = {(rel.x*m00 + rel.y*m10 + rel.z*m20) / sclx2, (rel.x*m01 + rel.y*m11 + rel.z*m21) / scly2, (rel.x*m02 + rel.y*m12 + rel.z*m22) / sclz2};
+        Vector3 localDir =    {(dir.x*m00 + dir.y*m10 + dir.z*m20) / sclx2, (dir.x*m01 + dir.y*m11 + dir.z*m21) / scly2, (dir.x*m02 + dir.y*m12 + dir.z*m22) / sclz2};
+        localDir = normalize_vector3(localDir);
+        numMeshesCheckedForRaycast++;
+        for (u32 j=0;j<triCount;++j) {
+            u32 bA = (u32)modelTriangles[mindex][j*3 + 0] * VERTEX_ATTRIBUTES_SIZE, bB = (u32)modelTriangles[mindex][j*3 + 1] * VERTEX_ATTRIBUTES_SIZE, bC = (u32)modelTriangles[mindex][j*3 + 2] * VERTEX_ATTRIBUTES_SIZE;
+            Vector3 posA = {half_to_float( *(half*)(modelVertices[mindex] + bA + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 4) )};
+            Vector3 posB = {half_to_float( *(half*)(modelVertices[mindex] + bB + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 4) )};
+            Vector3 posC = {half_to_float( *(half*)(modelVertices[mindex] + bC + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 4) )};
+            Vector3 normA ={half_to_float( *(half*)(modelVertices[mindex] + bA + 6) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 8) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 10) )};
+            Vector3 normB ={half_to_float( *(half*)(modelVertices[mindex] + bB + 6) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 8) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 10) )};
+            Vector3 normC ={half_to_float( *(half*)(modelVertices[mindex] + bC + 6) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 8) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 10) )};
+            RaycastHit tryTri = RayTriangle(localOrigin,localDir,posA,posB,posC,normA,normB,normC);
+            numTrisCastAgainst++;
+            if (!tryTri.hit) continue;
+            Vector3 worldPoint = {
+                m00*tryTri.point.x + m01*tryTri.point.y + m02*tryTri.point.z + tx,
+                m10*tryTri.point.x + m11*tryTri.point.y + m12*tryTri.point.z + ty,
+                m20*tryTri.point.x + m21*tryTri.point.y + m22*tryTri.point.z + tz
+            };
+            Vector3 toHit = Vector3_A_minus_B(worldPoint, origin);
+            float worldDist = vsqrtf(toHit.x*toHit.x + toHit.y*toHit.y + toHit.z*toHit.z);
+            if (worldDist >= result.distance) continue;
+            Vector3 worldNormal = {
+                (m00/sclx)*tryTri.normal.x + (m01/scly)*tryTri.normal.y + (m02/sclz)*tryTri.normal.z,
+                (m10/sclx)*tryTri.normal.x + (m11/scly)*tryTri.normal.y + (m12/sclz)*tryTri.normal.z,
+                (m20/sclx)*tryTri.normal.x + (m21/scly)*tryTri.normal.y + (m22/sclz)*tryTri.normal.z
+            };
+            worldNormal = normalize_vector3(worldNormal);
+            result.hit              = true;
+            result.point            = worldPoint;
+            result.normal           = normalize_vector3(worldNormal);
+            result.distance         = worldDist;
+            result.hitInstanceIndex = i;
+        }
+    }
+    if (result.hit) DualLog("[HIT] Raycast with org %f %f %f and dir %f %f %f, range %f, mask %u, tested against %u instances, tris %u, hit %u, layer %u\n",origin.x,origin.y,origin.z,dir.x,dir.y,dir.z,maxDist,layerMask,numMeshesCheckedForRaycast,numTrisCastAgainst,result.hitInstanceIndex,Sys_Global.instances[result.hitInstanceIndex].layer);
+    else            DualLog("[MISS] Raycast with org %f %f %f and dir %f %f %f, range %f, mask %u, tested against %u instances, tris %u\n",origin.x,origin.y,origin.z,dir.x,dir.y,dir.z,maxDist,layerMask,numMeshesCheckedForRaycast,numTrisCastAgainst);
+    return result;
+}
+ 
+ENGINE_TO_MOD void RaycastAll(Vector3 origin, Vector3 dir, float distance, u32 layerMask, RaycastHit* hits, u16 maxCount) { for (int i=0;i<maxCount;++i) {hits[i].hit = false;} (void)origin; (void)dir; (void)distance; (void)layerMask; }
+ENGINE_TO_MOD RaycastHit CapsuleCast(Vector3 start, Vector3 end, float capsuleRadius, float castDist, u32 layerMask, bool hitTriggers) { RaycastHit result = { .hit = false }; (void)start; (void)end; (void)capsuleRadius; (void)castDist; (void)layerMask; (void)hitTriggers; return result; }
 static inline __attribute__((always_inline)) void LogShaderError(u32 s, const char* name) { char er[512]; glGetShaderInfoLog(s,512,NULL,er); DualLogError("%s Comp Fail: %s\n",name,er); OS_Exit(1); }
 static inline __attribute__((always_inline)) u32 CompileShader(u32 type, const char* source, const char* name) { u32 s = glCreateShader(type); glShaderSource(s,1,&source,NULL); glCompileShader(s); i32 ok; glGetShaderiv(s,0x8B81/*GL_COMPILE_STATUS*/,&ok); if (!ok) LogShaderError(s,name); return s; }
 static inline __attribute__((always_inline)) u32 LinkProgram(u32* s, i32 num, const char* name) { u32 p = glCreateProgram(); for (i32 i=0;i<num;++i) { glAttachShader(p,s[i]); } glLinkProgram(p); i32 ok; glGetProgramiv(p,0x8B82/*GL_LINK_STATUS*/,&ok); if (!ok) LogShaderError(p,name); return p; }
@@ -327,7 +426,7 @@ InputElement inputElements[134] = {
     { "5", GLFW_KEY_5 }, { "6", GLFW_KEY_6 }, { "7", GLFW_KEY_7 }, { "8", GLFW_KEY_8 }, { "9", GLFW_KEY_9 }, { "0", GLFW_KEY_0 }, { "UP ARROW", GLFW_KEY_UP }, { "DN ARROW", GLFW_KEY_DOWN }, { "LF ARROW", GLFW_KEY_LEFT }, { "RT ARROW", GLFW_KEY_RIGHT },
     { "NUM 1", GLFW_KEY_KP_1 }, { "NUM 2", GLFW_KEY_KP_2 }, { "NUM 3", GLFW_KEY_KP_3 }, { "NUM +", GLFW_KEY_KP_ADD }, { "ENTER", GLFW_KEY_ENTER }, { "RIGHT SHIFT", GLFW_KEY_RIGHT_SHIFT }, { "LEFT SHIFT", GLFW_KEY_LEFT_SHIFT }, { "RIGHT CTRL", GLFW_KEY_RIGHT_CONTROL }, { "LEFT CTRL", GLFW_KEY_LEFT_CONTROL }, { "RIGHT ALT", GLFW_KEY_RIGHT_ALT },
     { "LEFT ALT", GLFW_KEY_LEFT_ALT }, { "RIGHT CMD", GLFW_KEY_RIGHT_SUPER }, { "LEFT CMD", GLFW_KEY_LEFT_SUPER }, { "LMB", GLFW_MOUSE_BUTTON_1 }, { "RMB", GLFW_MOUSE_BUTTON_2 }, { "MMB", GLFW_MOUSE_BUTTON_3 }, { "MB 3", GLFW_MOUSE_BUTTON_4 }, { "MB 4", GLFW_MOUSE_BUTTON_5 }, { "MB 5", GLFW_MOUSE_BUTTON_6 }, { "MB 6", GLFW_MOUSE_BUTTON_7 },
-    { "MB 7", GLFW_MOUSE_BUTTON_8 }, { "MB 8", GLFW_MOUSE_BUTTON_LAST }, { "JOY 0", GLFW_JOYSTICK_1 }, { "JOY 1", GLFW_JOYSTICK_2 }, { "JOY 2", GLFW_JOYSTICK_3 }, { "JOY 3", GLFW_JOYSTICK_4 }, { "JOY 4", GLFW_JOYSTICK_5 }, { "JOY 5", GLFW_JOYSTICK_6 }, { "JOY 6", GLFW_JOYSTICK_7 }, { "JOY 7", GLFW_JOYSTICK_8 },
+    { "MB 7", GLFW_MOUSE_BUTTON_8 }, { "JOY 0", GLFW_JOYSTICK_1 }, { "JOY 1", GLFW_JOYSTICK_2 }, { "JOY 2", GLFW_JOYSTICK_3 }, { "JOY 3", GLFW_JOYSTICK_4 }, { "JOY 4", GLFW_JOYSTICK_5 }, { "JOY 5", GLFW_JOYSTICK_6 }, { "JOY 6", GLFW_JOYSTICK_7 }, { "JOY 7", GLFW_JOYSTICK_8 },
     { "JOY 8", GLFW_JOYSTICK_9 }, { "JOY 9", GLFW_JOYSTICK_10 }, { "JOY 10", GLFW_JOYSTICK_11 }, { "JOY 11", GLFW_JOYSTICK_12 }, { "JOY 12", GLFW_JOYSTICK_13 }, { "JOY 13", GLFW_JOYSTICK_14 }, { "JOY 14", GLFW_JOYSTICK_15 }, { "JOY 15", GLFW_JOYSTICK_16 }, { "JOY 16", GLFW_HAT_UP }, { "JOY 17", GLFW_HAT_RIGHT },
     { "BACKSPACE", GLFW_KEY_BACKSPACE }, { "TAB", GLFW_KEY_TAB }, { "NUM ENTER", GLFW_KEY_KP_ENTER }, { "ESCAPE", GLFW_KEY_ESCAPE }, { "SPACE", GLFW_KEY_SPACE }, { "DELETE", GLFW_KEY_DELETE }, { "INSERT", GLFW_KEY_INSERT }, { "HOME", GLFW_KEY_HOME }, { "END", GLFW_KEY_END }, { "PAGE UP", GLFW_KEY_PAGE_UP },
     { "PAGE DN", GLFW_KEY_PAGE_DOWN }, { "F1", GLFW_KEY_F1 }, { "F2", GLFW_KEY_F2 }, { "F3", GLFW_KEY_F3 }, { "F4", GLFW_KEY_F4 }, { "F5", GLFW_KEY_F5 }, { "F6", GLFW_KEY_F6 }, { "F7", GLFW_KEY_F7 }, { "F8", GLFW_KEY_F8 }, { "F9", GLFW_KEY_F9 },
@@ -361,7 +460,7 @@ const Setting configTable[] = {
 const int configTableSize = sizeof(configTable) / sizeof(Setting);
 static inline __attribute__((always_inline)) i32 GetGLFWIndirectionIndexForAnInput(const char* val) { for (int i=0;i<134;++i) {if (StringsEqual(val,inputElements[i].name)) return i;} return 148; }
 void LoadConfig(void) {
-    OsFileHandle f = OS_OpenReadonly("./Data/Config.ini");
+    FHandle f = OS_OpenReadonly("./Data/Config.ini");
     char line[512];
     while (GetNextStringUpToNewlineOrEOF(line,sizeof(line),f)) {
         char* s = data_parser_trim(line); if (*s == 0 || (s[0] == '/' && s[1] == '/')) continue;
@@ -383,7 +482,7 @@ void LoadConfig(void) {
 }
 
 void SaveConfig(void) {
-    OsFileHandle f = OS_OpenWriteonly("./Data/Config.ini");
+    FHandle f = OS_OpenWriteonly("./Data/Config.ini");
     for (int i=0;i<configTableSize;++i) {
         if (configTable[i].type == SETTING_U8)         FilePrintString(f,"%s = %u\n",configTable[i].name,*(u8*)configTable[i].ptr);
         else if (configTable[i].type == SETTING_U16)   FilePrintString(f,"%s = %u\n",configTable[i].name,*(u16*)configTable[i].ptr);
@@ -398,17 +497,17 @@ bool GetKeyRiseEdgeOrHeld(int settingIndex, bool risingEdge);
 ENGINE_TO_MOD bool GetKey(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,false); }  // True while held down.
 ENGINE_TO_MOD bool GetKeyPressed(int settingIndex) { return (settingIndex < 0) ? Sys_Input.keyStates[GLFW_KEY_GRAVE_ACCENT].pressed : GetKeyRiseEdgeOrHeld(settingIndex,true); } // True 1st frame down.
 ENGINE_TO_MOD void IgnoreNextMouseDelta(void) { Sys_Input.ignore_next_mouse_delta = true; }
-OsFileHandle levelFileHandle; const char** creditPages = NULL;
+FHandle levelFileHandle; const char** creditPages = NULL;
 ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
     double start_time = get_time();
     DebugRAM("start of LoadLevel");
     Sys_Global.levelCurrentlyLoading = true; Sys_Global.gamePaused = false; Sys_Global.menuActive = false;
     RenderLoadingProgress(100,"Loading level...");
-    MemSetToValueForNBytes(lights,0,LIGHT_COUNT * sizeof(Light)); MemSetToValueForNBytes(lanims,0,LIGHT_COUNT * sizeof(LightAnimation));
-    MemSetToValueForNBytes(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
-    MemSetToValueForNBytes(modelMatrices,0,INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
-    MemSetToValueForNBytes(camViews,0,64 * sizeof(CamView)); camViewCount = 0;
-    MemSetToValueForNBytes(Sys_Global.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
+    MemSetToVForNBytes(lights,0,LIGHT_COUNT * sizeof(Light)); MemSetToVForNBytes(lanims,0,LIGHT_COUNT * sizeof(LightAnimation));
+    MemSetToVForNBytes(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
+    MemSetToVForNBytes(modelMatrices,0,INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
+    MemSetToVForNBytes(camViews,0,64 * sizeof(CamView)); camViewCount = 0;
+    MemSetToVForNBytes(Sys_Global.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
     char filename[20]; // Minimum size for 0 through 13.
     StringFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel);
     levelFileHandle = OS_OpenReadonly(filename);
@@ -436,7 +535,7 @@ ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
     RenderLoadingProgress(120,"Loading voxel lighting data...");
     for (u16 i = START_INDEX_LEVEL_INSTANCES; i < Sys_Global.loadedInstances; i++) Sys_Global.dirtyInstances[i] = true;
     for (u16 i = 0; i < Sys_Global.loadedLights; i++) { lightsNewPosition[i] = lights[i].pos; }
-    MemSetToValueForNBytes(voxen_Shadow_System.shadowmapIndirectionList,MAX_SHADOWMAPS + 1,Sys_Global.loadedLights * sizeof(u32)); // Set to invalid values for all
+    MemSetToVForNBytes(voxen_Shadow_System.shadowmapIndirectionList,MAX_SHADOWMAPS + 1,Sys_Global.loadedLights * sizeof(u32)); // Set to invalid values for all
     Sys_Global.levelCurrentlyLoading = false;
     u16 numBox=0,numSphere=0,numMeshConv=0,numMesh=0,numCapsule=0;
     for (int i=PLAYER1;i<Sys_Global.loadedInstances;++i) {
@@ -460,7 +559,7 @@ __attribute__((cold)) void NewGame(void) { // Reset World States
     currentMenuItem = currentMenuTab = 0; currentMenuPage = Mpg_FrontPage;
     Sys_Global.pauseRelativeTime = Sys_Global.last_physics_time = 0.0;
     Sys_Global.inventoryMode = false;
-    MemSetToValueForNBytes(Sys_Global.instances,0,2 * sizeof(Entity)); // Blank out player entities
+    MemSetToVForNBytes(Sys_Global.instances,0,2 * sizeof(Entity)); // Blank out player entities
     PlayerInit(PLAYER1); PlayerInit(PLAYER2);
     Sys_Global.instances[WORLD].ioflags = 0u;
     cam_yaw = 90.0f; cam_pitch = 0.0f; cam_roll = 0.0f;
@@ -949,7 +1048,7 @@ u16 shadowCasterIndices[SC_MAX],candidates[MAX_SHADOWMAPS];
 static const u32 groupX_shadClear = ((SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) + 31) / 32;
 static __attribute__((noinline)) __attribute__((hot)) void RenderShadowmaps(void) {    
     double shadowStartTime = get_time();
-    MemSetToValueForNBytes(candidates,0,MAX_SHADOWMAPS*sizeof(u16));
+    MemSetToVForNBytes(candidates,0,MAX_SHADOWMAPS*sizeof(u16));
     u16 numShadowsCouldRender = 0;
     Vector3 playerPos = Sys_Global.instances[PLAYER1].position;
     Vector3 pf = Sys_Global.instances[PLAYER1].forward;
@@ -993,7 +1092,7 @@ static __attribute__((noinline)) __attribute__((hot)) void RenderShadowmaps(void
         glViewport(0,0,SHADOW_MAP_SIZE,SHADOW_MAP_SIZE);
         glUseProgram(Sys_Render.shadowmapsShaderProgram);
         u32 shadowmapOffsetHead = 0U;
-        MemSetToValueForNBytes(shadowCasterIndices,0,SC_MAX*sizeof(u16));
+        MemSetToVForNBytes(shadowCasterIndices,0,SC_MAX*sizeof(u16));
         u32 numShadowCasters = 0;
         for (int i=START_INDEX_LEVEL_INSTANCES;i<INSTANCE_COUNT;++i) {
             if (EntNotVisible(i,(Sys_Global.instances[i].entflags & ENTFLAG_NO_SHADOWS))) continue;
@@ -1301,7 +1400,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps();
     UpdateLights(); // This is where the voxels get updated!
     for (int i=0;i<LIGHT_COUNT;++i) flag_set(&lights[i].lflags,LDIRTY,false);
-    MemSetToValueForNBytes(Sys_Global.dirtyInstances,0,Sys_Global.loadedInstances * sizeof(bool));
+    MemSetToVForNBytes(Sys_Global.dirtyInstances,0,Sys_Global.loadedInstances * sizeof(bool));
     glViewport(0,0,swidth,sheight);
     ClearAll();
     glBindFramebuffer(GL_FRAMEBUFFER,Sys_Render.gBufferFBO);
@@ -1451,7 +1550,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     }
 }
 
-void SetGLContext_GetFunctionPointers(void); GLFWwindow* glfwCreateWindow(int width, int height, char* title); int WindowInit(void); void InitAudio(void); void AudioUpdate(void);
+void SetGLContext_GetFunctionPointers(void); GLFWwindow* VCreateWindow(int width, int height, char* title); int WindowInit(void); void InitAudio(void); void AudioUpdate(void);
 void InitalizeEnvironment(double game_start_time) {
     random_range_rng = (u32)game_start_time; // Seed global rand uniquely with time since system boot.
     console_log_file = OS_OpenWriteonly("./voxen.log"); // Initialize log system for all prints to go to both stdout and voxen.log file
@@ -1461,7 +1560,7 @@ void InitalizeEnvironment(double game_start_time) {
     WindowInit();
     Sys_Global.globalFrameNum=0,Sys_Global.menuActive=true,Sys_Global.screenshotTimeout=1.0,Sys_Global.creditsPageIndex=1,Sys_Global.difficultyCombat=Sys_Global.difficultyCyber=Sys_Global.difficultyPuzzle=Sys_Global.difficultyMission=2,Sys_Global.deaths=0,Sys_Global.worstFPS=0,Sys_Global.cursorPosition_x=680,Sys_Global.cursorPosition_y=384;
     DualLog("Loading game definition...");
-    OsFileHandle gmFP = OS_OpenReadonly("./Data/gamedata.txt");
+    FHandle gmFP = OS_OpenReadonly("./Data/gamedata.txt");
     if (!gmFP) { DualLogError("\nCannot open ./Data/gamedata.txt\n"); OS_Exit(1);  }
     { // [BLOCK] Initialization (wrapped to free temporaries from stack)
         char gmLine[512],global_modname[256],global_dllname[256]; u32 lineNum = 0;
@@ -1480,7 +1579,7 @@ void InitalizeEnvironment(double game_start_time) {
         
         OS_Close(gmFP); DualLog(" %s:: num levels: %d, start level: %d\n",global_modname,Sys_Global.numLevels,Sys_Global.startLevel);
         LoadConfig(); // Get settings before setting window size.
-        window = glfwCreateWindow(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight,&global_modname[0]);
+        window = VCreateWindow(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight,&global_modname[0]);
         CenterWindowOnMonitor();
         SetGLContext_GetFunctionPointers();
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); glfwSwapBuffers(); // Black out the window as early as possible for better presentation.
@@ -1599,7 +1698,7 @@ i32 main(void) {
         Sys_Global.timeSinceLastPhysicsTick = Sys_Global.pauseRelativeTime - Sys_Global.last_physics_time;
         if (likely(!Sys_Global.gamePaused || Sys_Global.menuActive)) UpdateAnims(); // Changes collision positions
         if (likely(!Sys_Global.gamePaused && !Sys_Global.menuActive)) { // Update Gameplay
-            MemSetToValueForNBytes(dynamicEntities,0,512 * sizeof(u16)); // none
+            MemSetToVForNBytes(dynamicEntities,0,512 * sizeof(u16)); // none
             dynamicEntityCount = 0;
             for (int i=0;i<Sys_Global.loadedInstances;++i) {
                 if (dynamicEntityCount >= 512) { dynamicEntityCount = 512; assert(false); break; }

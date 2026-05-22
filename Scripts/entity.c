@@ -2,9 +2,9 @@
 #define LINE_LEN_MAX 81920
 Entity EDefs[MAX_ENTITIES];
 #define GEOMETRY_LOD_CARD_MODEL_IDX 178
-void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n) { unsigned char *d=(unsigned char *)dst; const unsigned char *s=(const unsigned char *)src; while (n--) {*d++=*s++;} return dst; } // memcpy replacement
+void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n) { u8 *d=(u8 *)dst; const u8 *s=(const u8 *)src; while (n--) {*d++=*s++;} return dst; } // memcpy replacement
 MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(void) { // Global conditions for all entities.  No sense inflating the table data in entity.c
-    MemSetToValueForNBytes(EDefs,0,sizeof(Entity));
+    MemSetToVForNBytes(EDefs,0,sizeof(Entity));
     Entity* e; for (int i=0;i<768;++i) { EDefs[i].index = i; EDefs[i].modelIndex=MODEL_IDX_MAX; EDefs[i].rotation = QUAT_IDENTITY; EDefs[i].lodIndex = MODEL_IDX_MAX; }
     e = &EDefs[0];  CopyMemoryFromBtoAForNBytes(e->path,"chunk_black",12);       e->modelIndex=178;  e->cardchunk=true;  e->texIndex=0;
     e = &EDefs[1];  CopyMemoryFromBtoAForNBytes(e->path,"chunk_blocker",14);     e->modelIndex=178;  e->cardchunk=true;  e->texIndex=1230; e->normIndex=160;  e->specIndex=1230;
@@ -867,9 +867,9 @@ MOD_TO_ENGINE void LoadLevelMod(u8 curlevel) {
     if (curlevel >= Eng_Global->numLevels) { DualLogError("Cannot load world geometry, level number %d out of bounds 0 to %d\n", curlevel, Eng_Global->numLevels - 1); return; }
 
     for (u16 idx = START_INDEX_LEVEL_INSTANCES; idx < INSTANCE_COUNT; idx++) { InitializeEntity(&Eng_Global->instances[idx]); Eng_Global->dirtyInstances[idx] = true; }
-    MemSetToValueForNBytes(entsFromFile,0,INSTANCE_COUNT * sizeof(Entity));
-    MemSetToValueForNBytes(lightsFromFile,0,LIGHT_COUNT * sizeof(Light));
-    MemSetToValueForNBytes(lanimsFromFile,0,LIGHT_COUNT * sizeof(LightAnimation));
+    MemSetToVForNBytes(entsFromFile,0,INSTANCE_COUNT * sizeof(Entity));
+    MemSetToVForNBytes(lightsFromFile,0,LIGHT_COUNT * sizeof(Light));
+    MemSetToVForNBytes(lanimsFromFile,0,LIGHT_COUNT * sizeof(LightAnimation));
     for (int i = 0; i < LIGHT_COUNT; ++i) lightsFromFile[i].lflags = LIGHT_AND_SHADOW_ON;
     u32 lineNum = 0;
     i32 entCount = -1;  // incremented to 0 on first entity line

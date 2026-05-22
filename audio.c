@@ -12,110 +12,84 @@
 void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n);
 extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
 #ifdef WINDOWS
-    typedef struct IMMDevice IMMDevice; typedef struct IMMDeviceEnumerator IMMDeviceEnumerator;
-    typedef struct{HRESULT(__stdcall*q)(void*,const void*,void**);ULONG(__stdcall*a)(void*);ULONG(__stdcall*Release)(void*);HRESULT(__stdcall* Activate)(void*,const void*,DWORD,void*,void**);}IMMDeviceVtbl;struct IMMDevice{IMMDeviceVtbl*lpVtbl;};
-    typedef struct{HRESULT(__stdcall*q)(void*,const void*,void**);ULONG(__stdcall*a)(void*);ULONG(__stdcall*Release)(void*);HRESULT(__stdcall*e)(void*,int,DWORD,void**);HRESULT(__stdcall*GetDefaultAudioEndpoint)(void*,int,int,IMMDevice**);}IMMDeviceEnumeratorVtbl;struct IMMDeviceEnumerator{IMMDeviceEnumeratorVtbl*lpVtbl;};
-    typedef struct IAudioClient IAudioClient;
-    typedef struct IAudioRenderClient IAudioRenderClient;
-    typedef struct { WORD t, n; DWORD s, a; WORD b, w, c; } WAVEFORMATEX;
-    typedef struct IAudioClientVtbl { HRESULT (__stdcall *QueryInterface)(void*, const void*, void**); ULONG (__stdcall *AddRef)(void*); ULONG (__stdcall *Release)(void*); HRESULT (__stdcall *Initialize)(void*, int, DWORD, REFERENCE_TIME, REFERENCE_TIME, const WAVEFORMATEX*, const void*); 
-        HRESULT (__stdcall *GetBufferSize)(void*, DWORD*); HRESULT (__stdcall *GetStreamLength)(void*, REFERENCE_TIME*); HRESULT (__stdcall *GetCurrentPadding)(void*, DWORD*); HRESULT (__stdcall *IsFormatSupported)(void*, int, const WAVEFORMATEX*, WAVEFORMATEX**); 
-        HRESULT (__stdcall *GetMixFormat)(void*, WAVEFORMATEX**); HRESULT (__stdcall *GetDevicePeriod)(void*, REFERENCE_TIME*, REFERENCE_TIME*); HRESULT (__stdcall *Start)(void*); HRESULT (__stdcall *Stop)(void*); HRESULT (__stdcall *Reset)(void*); HRESULT (__stdcall *SetEventHandle)(void*, void*);
-        HRESULT (__stdcall *GetService)(void*, const void*, void**);
-    } IAudioClientVtbl;
-    struct IAudioClient { IAudioClientVtbl* lpVtbl; };
-    typedef struct IAudioRenderClientVtbl { HRESULT (__stdcall *QueryInterface)(void*, const void*, void**); ULONG (__stdcall *AddRef)(void*); ULONG (__stdcall *Release)(void*); HRESULT (__stdcall *GetBuffer)(void*, DWORD, BYTE**); HRESULT (__stdcall *ReleaseBuffer)(void*, DWORD, DWORD); } IAudioRenderClientVtbl;
-    struct IAudioRenderClient { IAudioRenderClientVtbl* lpVtbl; };
-    typedef struct IUnknown IUnknown;
-    typedef struct IUnknownVtbl { HRESULT (__stdcall *QueryInterface)(IUnknown* This, const IID* riid, void** ppvObject); ULONG   (__stdcall *AddRef)(IUnknown* This); ULONG   (__stdcall *Release)(IUnknown* This); } IUnknownVtbl;
-    struct IUnknown { const IUnknownVtbl* lpVtbl; };
-    typedef u32 snd_pcm_uframes_t; // match nanoalsa
+    #define FAILED(hr)    ((i32)(hr) <  0)
     #define PCM_NONBLOCK (1<<1)
     #define PCM_FORMAT_S16_LE 2
-    #define REFIID const IID *const
-    typedef struct { int format,access,rate,channels,period_frames,periods; } pcm_params_t;
-    typedef struct { snd_pcm_uframes_t hw_ptr; }  pcm_status_t;
-    typedef struct { snd_pcm_uframes_t appl_ptr; } pcm_control_t;
-    typedef struct { pcm_status_t status; pcm_control_t control; } pcm_sync_t;
-    typedef enum { PCM_FORMAT=0,PCM_ACCESS,PCM_RATE,PCM_CHANNELS,PCM_PERIOD_SIZE,PCM_PERIODS,PCM_INTERRUPT } pcm_param_t;
-    typedef struct {IAudioClient *client; IAudioRenderClient *render; DWORD buffer_frames; i32 rate,channels,period_frames; bool open; } wasapi_dev_t;
-    extern HRESULT WINAPI CoInitializeEx(LPVOID pvReserved, DWORD dwCoInit);
-    extern HRESULT WINAPI CoCreateInstance(const IID *const rclsid, IUnknown* pUnkOuter, DWORD dwClsContext, REFIID riid, LPVOID *ppv);
-    static wasapi_dev_t wasapi_devs[8/*MAX_WASAPI_DEVICES*/];
-    static int wasapi_dev_count = 0;
+    #define REFIID const GUID *const
+    typedef struct IMMDevice IMMDevice; typedef struct IMMDeviceEnumerator IMMDeviceEnumerator;
+    typedef struct{ i32(__stdcall*q)(void*,const void*,void**); u32(__stdcall*a)(void*); u32(__stdcall*Release)(void*); i32(__stdcall* Activate)(void*,const void*,u32,void*,void**);} IMMDeviceVtbl; struct IMMDevice{IMMDeviceVtbl*lpVtbl;};
+    typedef struct{ i32(__stdcall*q)(void*,const void*,void**); u32(__stdcall*a)(void*); u32(__stdcall*Release)(void*); i32(__stdcall*e)(void*,int,u32,void**); i32(__stdcall*GetDefaultAudioEndpoint)(void*,int,int,IMMDevice**);}IMMDeviceEnumeratorVtbl;struct IMMDeviceEnumerator{IMMDeviceEnumeratorVtbl*lpVtbl;};
+    typedef struct IAudioClient IAudioClient; typedef struct IAudioRenderClient IAudioRenderClient; typedef struct { u16 t,n; u32 s, a; u16 b,w,c; } WAVEFORMATEX;
+    typedef struct IAudioClientVtbl { i32 (__stdcall *QueryInterface)(void*, const void*,void**); u32 (__stdcall *AddRef)(void*); u32 (__stdcall *Release)(void*); i32 (__stdcall *Initialize)(void*,int,u32,i64,i64,const WAVEFORMATEX*,const void*); 
+        i32 (__stdcall *GetBufferSize)(void*,u32*); i32 (__stdcall *GetStreamLength)(void*,i64*); i32 (__stdcall *GetCurrentPadding)(void*,u32*); i32 (__stdcall *IsFormatSupported)(void*, int, const WAVEFORMATEX*, WAVEFORMATEX**); 
+        i32 (__stdcall *GetMixFormat)(void*,WAVEFORMATEX**); i32 (__stdcall *GetDevicePeriod)(void*,i64*,i64*); i32 (__stdcall *Start)(void*); i32 (__stdcall *Stop)(void*); i32 (__stdcall *Reset)(void*); i32 (__stdcall *SetEventHandle)(void*,void*);
+        i32 (__stdcall *GetService)(void*,const void*,void**);
+    } IAudioClientVtbl;
+    struct IAudioClient { IAudioClientVtbl* lpVtbl; };
+    typedef struct IAudioRenderClientVtbl { i32 (__stdcall *QueryInterface)(void*,const void*,void**); u32 (__stdcall *AddRef)(void*); u32 (__stdcall *Release)(void*); i32 (__stdcall *GetBuffer)(void*,u32,u8**); i32 (__stdcall *ReleaseBuffer)(void*,u32,u32); } IAudioRenderClientVtbl;
+    struct IAudioRenderClient { IAudioRenderClientVtbl* lpVtbl; };
+    typedef struct IUnknown IUnknown; typedef struct IUnknownVtbl { i32 (__stdcall *QueryInterface)(IUnknown* This, const GUID* riid, void** ppvObject); u32 (__stdcall *AddRef)(IUnknown* This); u32 (__stdcall *Release)(IUnknown* This); } IUnknownVtbl; struct IUnknown { const IUnknownVtbl* lpVtbl; };
+    typedef u32 snd_pcm_uframes_t; typedef struct { int format,access,rate,channels,period_frames,periods; } pcm_params_t; typedef struct { snd_pcm_uframes_t hw_ptr; }  pcm_status_t; typedef struct { snd_pcm_uframes_t appl_ptr; } pcm_control_t;
+    typedef struct { pcm_status_t status; pcm_control_t control; } pcm_sync_t; typedef enum { PCM_FORMAT=0,PCM_ACCESS,PCM_RATE,PCM_CHANNELS,PCM_PERIOD_SIZE,PCM_PERIODS,PCM_INTERRUPT } pcm_param_t; 
+    typedef struct {IAudioClient *client; IAudioRenderClient *render; u32 buffer_frames; i32 rate,channels,period_frames; bool open; } wasapi_dev_t;
+    extern i32 WINAPI CoInitializeEx(void*,u32); extern i32 WINAPI CoCreateInstance(const GUID*,IUnknown*,u32,REFIID,void**);
+    static wasapi_dev_t wasapi_devs[8]; static int wasapi_dev_count = 0;
     #define FD_TO_IDX(fd) ((int)(intptr_t)(fd)-100)
-    #define IDX_TO_FD(i)  ((OsFileHandle)(intptr_t)((i)+100))
-    static const IID IID_IAudioClient_         = {0x1CB9AD4C,0xDBFA,0x4C32,{0xB1,0x78,0xC2,0xF5,0x68,0xA7,0x03,0xB2}};
-    static const IID IID_IAudioRenderClient_   = {0xF294ACFC,0x3146,0x4483,{0xA7,0xBF,0xAD,0xDC,0xA7,0xC2,0x60,0xE2}};
+    #define IDX_TO_FD(i)  ((FHandle)(intptr_t)((i)+100))
+    static const GUID IID_IAudioClient_       = {0x1CB9AD4C,0xDBFA,0x4C32,{0xB1,0x78,0xC2,0xF5,0x68,0xA7,0x03,0xB2}}; static const GUID IID_IAudioRenderClient_ = {0xF294ACFC,0x3146,0x4483,{0xA7,0xBF,0xAD,0xDC,0xA7,0xC2,0x60,0xE2}};
     static int wasapi_init_device(IMMDevice *dev,int rate,int channels,int period_frames,int periods) {
-        if (wasapi_dev_count>=8/*MAX_WASAPI_DEVICES*/) return -1;
+        if (wasapi_dev_count>=8) return -1;
+        
         wasapi_dev_t *w = &wasapi_devs[wasapi_dev_count];
-        HRESULT hr = dev->lpVtbl->Activate(dev,&IID_IAudioClient_,23,NULL,(void**)&w->client);
-        if (FAILED(hr)) { DualLogError("WASAPI Activate failed, %u\n",hr); return -1; }
-        WAVEFORMATEX fmt = {1,(WORD)channels,(DWORD)rate,(DWORD)(rate*channels*2),(WORD)(channels*2),16,0};
-        REFERENCE_TIME buf_dur = (REFERENCE_TIME)(period_frames*periods)*10000000LL/rate;
-        hr = w->client->lpVtbl->Initialize(w->client,0,524288,buf_dur,0,&fmt,NULL);
-        if (FAILED(hr)) { w->client->lpVtbl->Release(w->client); return -1; }
+        i32 hr = dev->lpVtbl->Activate(dev,&IID_IAudioClient_,23,NULL,(void**)&w->client); if (FAILED(hr)) { DualLogError("WASAPI Activate failed, %u\n",hr); return -1; }
+        
+        WAVEFORMATEX fmt = {1,(u16)channels,(u32)rate,(u32)(rate*channels*2),(u16)(channels*2),16,0}; i64 buf_dur = (i64)(period_frames*periods)*10000000LL/rate;
+        hr = w->client->lpVtbl->Initialize(w->client,0,524288,buf_dur,0,&fmt,NULL); if (FAILED(hr)) { w->client->lpVtbl->Release(w->client); return -1; }
+        
         w->client->lpVtbl->GetBufferSize(w->client,&w->buffer_frames);
-        hr = w->client->lpVtbl->GetService(w->client,&IID_IAudioRenderClient_,(void**)&w->render);
-        if (FAILED(hr)) { w->client->lpVtbl->Release(w->client); return -1; }
-        w->client->lpVtbl->Start(w->client);
-        w->rate=rate; w->channels=channels; w->period_frames=period_frames; w->open=true;
+        hr = w->client->lpVtbl->GetService(w->client,&IID_IAudioRenderClient_,(void**)&w->render); if (FAILED(hr)) { w->client->lpVtbl->Release(w->client); return -1; }
+        
+        w->client->lpVtbl->Start(w->client);w->rate=rate; w->channels=channels; w->period_frames=period_frames; w->open=true;
         return wasapi_dev_count++;
     }
     
-    static const CLSID CLSID_MMDeviceEnumerator_ = {0xBCDE0395,0xE52F,0x467C,{0x8E,0x3D,0xC4,0x57,0x92,0x91,0x69,0x2E}};
-    static const IID IID_IMMDeviceEnumerator_  = {0xA95664D2,0x9614,0x4F35,{0xA7,0x46,0xDE,0x8D,0xB6,0x36,0x17,0xE6}};
-    OsFileHandle pcm_open_all(int rate,int channels,int period_frames,int periods) {
-        CoInitializeEx(NULL,0);
-        IMMDeviceEnumerator *en = NULL;
-        if (FAILED(CoCreateInstance(&CLSID_MMDeviceEnumerator_,NULL,23,&IID_IMMDeviceEnumerator_,(void**)&en))) { DualLogError("CoCreateInstance fail\n"); return OS_INVALID_HANDLE; }
-        IMMDevice *dev = NULL;
-        HRESULT hr = en->lpVtbl->GetDefaultAudioEndpoint(en,0,0,&dev);
-        en->lpVtbl->Release(en);
-        if (FAILED(hr)||!dev) return OS_INVALID_HANDLE;
-        int idx = wasapi_init_device(dev,rate,channels,period_frames,periods);
-        dev->lpVtbl->Release(dev);
-        if (idx<0) return OS_INVALID_HANDLE;
+    static const GUID CLSID_MMDeviceEnumerator_ = {0xBCDE0395,0xE52F,0x467C,{0x8E,0x3D,0xC4,0x57,0x92,0x91,0x69,0x2E}}; static const GUID IID_IMMDeviceEnumerator_  = {0xA95664D2,0x9614,0x4F35,{0xA7,0x46,0xDE,0x8D,0xB6,0x36,0x17,0xE6}};
+    FHandle pcm_open_all(int rate,int channels,int period_frames,int periods) {
+        CoInitializeEx(NULL,0); IMMDeviceEnumerator *en = NULL; if (FAILED(CoCreateInstance(&CLSID_MMDeviceEnumerator_,NULL,23,&IID_IMMDeviceEnumerator_,(void**)&en))) { DualLogError("CoCreateInstance fail\n"); return INVALID_FHANDLE; }
+        
+        IMMDevice *dev = NULL; i32 hr = en->lpVtbl->GetDefaultAudioEndpoint(en,0,0,&dev); en->lpVtbl->Release(en); if (FAILED(hr)||!dev) return INVALID_FHANDLE;
+        
+        int idx = wasapi_init_device(dev,rate,channels,period_frames,periods); dev->lpVtbl->Release(dev); if (idx<0) return INVALID_FHANDLE;
+        
         DualLog("Audio: WASAPI default device opened\n");
         return IDX_TO_FD(0);
     }
 
-    void pcm_params_init(pcm_params_t *p) { MemSetToValueForNBytes(p,0,sizeof(*p)); }
+    void pcm_params_init(pcm_params_t *p) { MemSetToVForNBytes(p,0,sizeof(*p)); }
     void pcm_set(pcm_params_t *p,pcm_param_t param,unsigned long v) {
         switch(param) {
-        case PCM_FORMAT:      p->format=v;        break; case PCM_ACCESS:   p->access=v;   break;
-        case PCM_RATE:        p->rate=v;          break; case PCM_CHANNELS: p->channels=v; break;
-        case PCM_PERIOD_SIZE: p->period_frames=v; break; case PCM_PERIODS:  p->periods=v;  break;
-        default: break;
+            case PCM_FORMAT:      p->format=v;        break; case PCM_ACCESS:   p->access=v;   break; case PCM_RATE:        p->rate=v;          break; case PCM_CHANNELS: p->channels=v; break;
+            case PCM_PERIOD_SIZE: p->period_frames=v; break; case PCM_PERIODS:  p->periods=v;  break; 
+            default: break;
         }
     }
 
-    OsFileHandle pcm_open(int card,int dev,int flags) { (void)card;(void)dev;(void)flags; return OS_INVALID_HANDLE; }
-    int pcm_params_setup(OsFileHandle fd,pcm_params_t *p) { (void)fd;(void)p; return -1; }
-    int pcm_params_refine(OsFileHandle fd,pcm_params_t *p) { (void)fd;(void)p; return 0; }
-    int pcm_sync(OsFileHandle fd,pcm_sync_t *sync,unsigned int flags) {
-        (void)flags;
-        int idx=FD_TO_IDX(fd);
-        if (idx<0||idx>=wasapi_dev_count||!wasapi_devs[idx].open) return -1;
+    int pcm_sync(FHandle fd,pcm_sync_t *sync,unsigned int flags) {
+        (void)flags; int idx=FD_TO_IDX(fd); if (idx<0||idx>=wasapi_dev_count||!wasapi_devs[idx].open) return -1;
+        
         wasapi_dev_t *w=&wasapi_devs[idx];
-        DWORD padding=0; w->client->lpVtbl->GetCurrentPadding(w->client,&padding);
+        u32 padding=0; w->client->lpVtbl->GetCurrentPadding(w->client,&padding);
         snd_pcm_uframes_t base = (w->buffer_frames>(u32)(w->period_frames*4)) ? w->buffer_frames-(u32)(w->period_frames*4) : 0;
         sync->status.hw_ptr=base; sync->control.appl_ptr=base+padding;
         return 0;
     }
 
-    int pcm_prepare(OsFileHandle fd) {
-        int idx=FD_TO_IDX(fd); if (idx<0||idx>=wasapi_dev_count) return -1;
-        wasapi_dev_t *w=&wasapi_devs[idx];
-        w->client->lpVtbl->Stop(w->client); w->client->lpVtbl->Reset(w->client); w->client->lpVtbl->Start(w->client); return 0;
-    }
-
-    int pcm_write(OsFileHandle fd,void *buf,int frames) {
+    int pcm_prepare(FHandle fd) { int i = FD_TO_IDX(fd); if (i < 0 || i >= wasapi_dev_count) return -1; wasapi_dev_t *w = &wasapi_devs[i]; return w->client->lpVtbl->Stop(w->client),w->client->lpVtbl->Reset(w->client),w->client->lpVtbl->Start(w->client), 0; }
+    int pcm_write(FHandle fd, void *buf, int frames) {
         (void)fd;
         for (int i=0;i<wasapi_dev_count;i++) {
             wasapi_dev_t *w=&wasapi_devs[i]; if (!w->open) continue;
-            BYTE *data=NULL;
+            u8* data = NULL;
             if (FAILED(w->render->lpVtbl->GetBuffer(w->render,(u32)frames,&data))) { pcm_prepare(IDX_TO_FD(i)); continue; }
             CopyMemoryFromBtoAForNBytes(data,buf,frames*w->channels*2);
             w->render->lpVtbl->ReleaseBuffer(w->render,(u32)frames,0);
@@ -123,20 +97,20 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
         return frames;
     }
 #else
-    int ioctl(int fd, unsigned long request, ...);
+    int ioctl(int fd, u64 request, ...);
     #define _IOC(dir, type, nr, size) (((dir) << 30) | ((type) << 8) | ((nr) << 0) | ((size) << 16))
     #define _IO(type, nr) _IOC(0U, (type), (nr), 0)
     #define _IOR(type, nr, size) _IOC(2U, (type), (nr), sizeof(size))
     #define _IOW(type, nr, size) _IOC(1U, (type), (nr), sizeof(size))
     #define _IOWR(type, nr, size) _IOC(2U | 1U, (type), (nr), sizeof(size))
-    typedef unsigned long snd_pcm_uframes_t; typedef long snd_pcm_sframes_t; struct snd_mask { u32 bits[8]; };
-    struct snd_interval { unsigned int min,max; unsigned int openmin:1, openmax:1, integer:1, empty:1; };
-    struct snd_pcm_hw_params { unsigned int flags; struct snd_mask masks[3]; struct snd_mask mres[5]; struct snd_interval intervals[12]; struct snd_interval ires[9]; unsigned int rmask,cmask,info,msbits,rate_num,rate_den; snd_pcm_uframes_t fifo_size; unsigned char reserved[64]; };
-    struct snd_pcm_sw_params { int tstamp_mode; unsigned int period_step,sleep_min; snd_pcm_uframes_t avail_min,xfer_align,start_threshold,stop_threshold,silence_threshold,silence_size,boundary; unsigned int proto,tstamp_type; unsigned char reserved[56]; }; 
+    typedef u64 snd_pcm_uframes_t; typedef i64 snd_pcm_sframes_t; struct snd_mask { u32 bits[8]; };
+    struct snd_interval { u32 min,max,openmin:1, openmax:1, integer:1, empty:1; };
+    struct snd_pcm_hw_params { u32 flags; struct snd_mask masks[3]; struct snd_mask mres[5]; struct snd_interval intervals[12]; struct snd_interval ires[9]; unsigned int rmask,cmask,info,msbits,rate_num,rate_den; snd_pcm_uframes_t fifo_size; u8 reserved[64]; };
+    struct snd_pcm_sw_params { int tstamp_mode; unsigned int period_step,sleep_min; snd_pcm_uframes_t avail_min,xfer_align,start_threshold,stop_threshold,silence_threshold,silence_size,boundary; unsigned int proto,tstamp_type; u8 reserved[56]; }; 
     struct snd_pcm_mmap_status { int state,pad1; snd_pcm_uframes_t hw_ptr; struct timespec tstamp; int suspended_state; struct timespec audio_tstamp; };
     struct snd_pcm_mmap_control { snd_pcm_uframes_t appl_ptr; snd_pcm_uframes_t avail_min; };
-    struct snd_pcm_sync_ptr { unsigned int flags; union { struct snd_pcm_mmap_status  status; unsigned char reserved[64]; } s; union { struct snd_pcm_mmap_control control; unsigned char reserved[64]; } c; };
-    struct snd_pcm_status { int state; struct timespec trigger_tstamp; struct timespec tstamp; snd_pcm_uframes_t appl_ptr,hw_ptr; snd_pcm_sframes_t delay; snd_pcm_uframes_t avail,avail_max,overrange; int suspended_state; unsigned int audio_tstamp_data; struct timespec audio_tstamp; struct timespec driver_tstamp; unsigned int audio_tstamp_accuracy; unsigned char reserved[20]; };
+    struct snd_pcm_sync_ptr { u32 flags; union { struct snd_pcm_mmap_status  status; u8 reserved[64]; } s; union { struct snd_pcm_mmap_control control; u8 reserved[64]; } c; };
+    struct snd_pcm_status { int state; struct timespec trigger_tstamp; struct timespec tstamp; snd_pcm_uframes_t appl_ptr,hw_ptr; snd_pcm_sframes_t delay; snd_pcm_uframes_t avail,avail_max,overrange; int suspended_state; u32 audio_tstamp_data; struct timespec audio_tstamp; struct timespec driver_tstamp; u32 audio_tstamp_accuracy; u8 reserved[20]; };
     struct snd_xferi { snd_pcm_sframes_t result; void *buf; snd_pcm_uframes_t frames; }; typedef struct snd_pcm_mmap_status  pcm_status_t; typedef struct snd_pcm_mmap_control pcm_control_t;
     struct pcm_sync { pcm_status_t status; pcm_control_t control; }; typedef struct pcm_sync pcm_sync_t; typedef struct snd_pcm_hw_params pcm_hw_params_t; typedef struct snd_pcm_sw_params pcm_sw_params_t;
     struct pcm_params { pcm_hw_params_t hw_params; pcm_sw_params_t sw_params; }; typedef struct pcm_params pcm_params_t;
@@ -144,70 +118,56 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
     typedef enum pcm_param pcm_param_t;
     static inline int pcm_prepare(int fd) { return OS_IOControlSimple(fd,_IO('A',0x40)); }
     static inline int pcm_write(int fd, void *buf, int frames) { struct snd_xferi tmp={.buf=buf,.frames=frames,.result=0}; return OS_IOControl(fd,_IOW('A',0x50,struct snd_xferi),(void*)&tmp) ? -1 : (int) tmp.result; }
-    static void hw_params_set_mask(struct snd_pcm_hw_params *p, int parameter, unsigned int value);
-    static void hw_params_set_interval(struct snd_pcm_hw_params *p, int parameter, unsigned int min, unsigned int max);
-    static void hw_params_set(struct snd_pcm_hw_params *p, int parameter, unsigned int value);
-    static unsigned int hw_params_get_mask(struct snd_pcm_hw_params *p, int parameter, unsigned int value);
-    static void hw_params_get_interval(struct snd_pcm_hw_params *p, int parameter, unsigned int *min, unsigned int *max);
-    static unsigned int hw_params_get(struct snd_pcm_hw_params *p, int parameter, unsigned int value);
+    static void hw_params_set_mask(struct snd_pcm_hw_params *p, int parameter, u32 value);
+    static void hw_params_set_interval(struct snd_pcm_hw_params *p, int parameter, u32 min, u32 max);
+    static void hw_params_set(struct snd_pcm_hw_params *p, int parameter, u32 value);
+    static u32 hw_params_get_mask(struct snd_pcm_hw_params *p, int parameter, u32 value);
+    static void hw_params_get_interval(struct snd_pcm_hw_params *p, int parameter, u32 *min, u32 *max);
+    static u32 hw_params_get(struct snd_pcm_hw_params *p, int parameter, u32 value);
     static void hw_params_fill(struct snd_pcm_hw_params *p);
     #define get_index(i)       ((i) / 32)
     #define get_mask(i)  (1 << ((i) % 32))
     #define is_mask(parameter) (parameter >= 0 && parameter <= 2)
     #define is_interval(parameter) (parameter >= 8 && parameter <= 19)
-    static inline struct snd_mask* get_mask_struct(struct snd_pcm_hw_params *p, unsigned int parameter) { return &p->masks[parameter - 0]; }
-    static inline struct snd_interval* get_interval_struct(struct snd_pcm_hw_params *p, unsigned int parameter) { return &p->intervals[parameter - 8]; }
-    static void hw_params_set_mask(struct snd_pcm_hw_params *p, int parameter, unsigned int value) { struct snd_mask *m = get_mask_struct(p,parameter); if (m->bits[get_index(value)] & get_mask(value)) {MemSetToValueForNBytes(m, 0x00, sizeof(*m));} m->bits[get_index(value)] |= get_mask(value); }
-    static void hw_params_set_interval(struct snd_pcm_hw_params *p, int parameter, unsigned int min, unsigned int max) { struct snd_interval *i = get_interval_struct(p,parameter); i->openmin = i->openmax = 0; i->integer = 1; i->min = min; i->max = max; }
-    static void hw_params_set(struct snd_pcm_hw_params *p, int parameter, unsigned int value) { if (is_mask(parameter)) hw_params_set_mask(p,parameter,value); else if (is_interval(parameter)) hw_params_set_interval(p,parameter,value,value); }
-    static unsigned int hw_params_get_mask(struct snd_pcm_hw_params *p, int parameter, unsigned int value) { struct snd_mask *m=get_mask_struct(p,parameter); return m->bits[get_index(value)]&get_mask(value); }
-    static void hw_params_get_interval(struct snd_pcm_hw_params *p, int parameter, unsigned int *min, unsigned int *max) { struct snd_interval *i = get_interval_struct(p,parameter); *min = i->min + i->openmin; *max = i->max - i->openmax; }
-    static unsigned int hw_params_get(struct snd_pcm_hw_params *p, int parameter, unsigned int value) { unsigned int r, t; return is_mask(parameter) ? hw_params_get_mask(p,parameter,value) : (is_interval(parameter) ? (hw_params_get_interval(p,parameter,&r,&t),r) : 0); }
+    static inline struct snd_mask* get_mask_struct(struct snd_pcm_hw_params *p, u32 parameter) { return &p->masks[parameter - 0]; }
+    static inline struct snd_interval* get_interval_struct(struct snd_pcm_hw_params *p, u32 parameter) { return &p->intervals[parameter - 8]; }
+    static void hw_params_set_mask(struct snd_pcm_hw_params *p, int parameter, u32 value) { struct snd_mask *m = get_mask_struct(p,parameter); if (m->bits[get_index(value)] & get_mask(value)) {MemSetToVForNBytes(m, 0x00, sizeof(*m));} m->bits[get_index(value)] |= get_mask(value); }
+    static void hw_params_set_interval(struct snd_pcm_hw_params *p, int parameter, u32 min, u32 max) { struct snd_interval *i = get_interval_struct(p,parameter); i->openmin = i->openmax = 0; i->integer = 1; i->min = min; i->max = max; }
+    static void hw_params_set(struct snd_pcm_hw_params *p, int parameter, u32 value) { if (is_mask(parameter)) hw_params_set_mask(p,parameter,value); else if (is_interval(parameter)) hw_params_set_interval(p,parameter,value,value); }
+    static u32 hw_params_get_mask(struct snd_pcm_hw_params *p, int parameter, u32 value) { struct snd_mask *m=get_mask_struct(p,parameter); return m->bits[get_index(value)]&get_mask(value); }
+    static void hw_params_get_interval(struct snd_pcm_hw_params *p, int parameter, u32 *min, u32 *max) { struct snd_interval *i = get_interval_struct(p,parameter); *min = i->min + i->openmin; *max = i->max - i->openmax; }
+    static u32 hw_params_get(struct snd_pcm_hw_params *p, int parameter, u32 value) { u32 r, t; return is_mask(parameter) ? hw_params_get_mask(p,parameter,value) : (is_interval(parameter) ? (hw_params_get_interval(p,parameter,&r,&t),r) : 0); }
     static void hw_params_fill(struct snd_pcm_hw_params *p) {
-        MemSetToValueForNBytes(p,0,sizeof(*p));
-        MemSetToValueForNBytes(p->masks,0xff,sizeof(p->masks));
+        MemSetToVForNBytes(p,0,sizeof(*p));
+        MemSetToVForNBytes(p->masks,0xff,sizeof(p->masks));
         for (int i=0;i<=11;i++) { p->intervals[i].min = 0; p->intervals[i].max = U32_MAX; }
         p->rmask = p->info = U32_MAX; p->cmask = 0; p->msbits = 0; p->rate_num = 0; p->rate_den = 0;
     }
 
-    int pcm_sync(int fd, struct pcm_sync *sync, unsigned int flags) {
+    int pcm_sync(int fd, struct pcm_sync *sync, u32 flags) {
         struct snd_pcm_sync_ptr tmp; flags^=2|4; tmp.flags=flags;
         if (OS_IOControl(fd,_IOWR('A',0x23,struct snd_pcm_sync_ptr),(void*)&tmp) == -1) return -1;
         sync->control = tmp.c.control; sync->status = tmp.s.status;
         return 0;
     }
 
-    void pcm_params_init(pcm_params_t *p) { hw_params_fill(&p->hw_params); pcm_sw_params_t *sw = &p->sw_params; MemSetToValueForNBytes(sw,0,sizeof(*sw)); sw->start_threshold = 1; sw->period_step = 1; }
-    void pcm_set(pcm_params_t *params, pcm_param_t parameter, unsigned long value) {
-        pcm_hw_params_t *hw = &params->hw_params; pcm_sw_params_t *sw = &params->sw_params;
-        switch (parameter) {
-        default: hw_params_set(hw, parameter, value); break;
-        case 19 + 1: hw->flags = value ? hw->flags|(1<<2) : hw->flags & ~(1<<2); break;
-        case 19 + 2: sw->tstamp_mode = 1; sw->tstamp_type = value; break;
-        case 19 + 3:         sw->avail_min         = value; break;
-        case 19 + 4:   sw->start_threshold   = value; break;
-        case 19 + 5:    sw->stop_threshold    = value; break;
-        case 19 + 6: sw->silence_threshold = value; break;
-        case 19 + 7:      sw->silence_size      = value; break;
-        }
+    void pcm_params_init(pcm_params_t *p) { hw_params_fill(&p->hw_params); pcm_sw_params_t *sw = &p->sw_params; MemSetToVForNBytes(sw,0,sizeof(*sw)); sw->start_threshold = 1; sw->period_step = 1; }
+    void pcm_set(pcm_params_t *p, pcm_param_t param, u64 val) {
+        pcm_hw_params_t *hw = &p->hw_params; pcm_sw_params_t *sw = &p->sw_params;
+        if (param >= 22 && param <= 26) { ((u64*)&sw->avail_min)[param - 22] = val; return; }
+        if (param == 20) hw->flags = val ? hw->flags | (1<<2) : hw->flags & ~(1<<2);
+        else if (param == 21) { sw->tstamp_mode = 1; sw->tstamp_type = val; }
+        else hw_params_set(hw, param, val);
     }
 
-    unsigned long pcm_get(pcm_params_t *params, pcm_param_t parameter, unsigned int value) {
-        pcm_hw_params_t *hw = &params->hw_params;
-        pcm_sw_params_t *sw = &params->sw_params;
-        switch (parameter) {
-        default:                    return hw_params_get(hw, parameter, value);
-        case 19 + 1:         return hw->flags & (1<<2);
-        case 19 + 2:       return sw->tstamp_mode ? sw->tstamp_type : U32_MAX;
-        case 19 + 3:         return sw->avail_min;
-        case 19 + 4:   return sw->start_threshold;
-        case 19 + 5:    return sw->stop_threshold;
-        case 19 + 6: return sw->silence_threshold;
-        case 19 + 7:      return sw->silence_size;
-        }
+    unsigned long pcm_get(pcm_params_t *p, pcm_param_t param, unsigned int val) {
+        pcm_hw_params_t *hw = &p->hw_params; pcm_sw_params_t *sw = &p->sw_params;
+        if (param >= 22 && param <= 26) return ((u64*)&sw->avail_min)[param - 22];
+        if (param == 20) return hw->flags & (1<<2);
+        if (param == 21) return sw->tstamp_mode ? sw->tstamp_type : U32_MAX;
+        return hw_params_get(hw, param, val);
     }
 
-    int pcm_params_refine(int fd, pcm_params_t *params) { return ioctl(fd,_IOWR('A',0x10,struct snd_pcm_hw_params),&params->hw_params); }
     int pcm_params_setup(int fd, pcm_params_t *params) {
         if (ioctl(fd,_IOWR('A',0x11,struct snd_pcm_hw_params),&params->hw_params) == -1) return -1;
         if (!pcm_get(params,PCM_AVAIL_MIN,0)) pcm_set(params,PCM_AVAIL_MIN,pcm_get(params,PCM_PERIOD_SIZE,0));
@@ -365,7 +325,7 @@ static void drmp3_L3_read_scalefactors(u8 *scf, u8 *ist_pos, const u8 *scf_size,
         if (scfsi&8) CopyMemoryFromBtoAForNBytes(scf,ist_pos,cnt);
         else {
             int bits=scf_size[i];
-            if (!bits) { MemSetToValueForNBytes(scf,0,cnt); MemSetToValueForNBytes(ist_pos,0,cnt); }
+            if (!bits) { MemSetToVForNBytes(scf,0,cnt); MemSetToVForNBytes(ist_pos,0,cnt); }
             else {
                 int max_scf=(scfsi<0)?((1<<bits)-1):-1;
                 for (k=0;k<cnt;k++) { int s=drmp3_bs_get_bits(bs,bits); ist_pos[k]=(u8)(s==max_scf?-1:s); scf[k]=(u8)s; }
@@ -753,7 +713,7 @@ static int drmp3dec_decode_frame(drmp3dec *dec, const u8 *mp3, int mp3_bytes, vo
         if(frame_size!=mp3_bytes&&(frame_size + 4>mp3_bytes||!drmp3_hdr_compare(mp3,mp3+frame_size))) frame_size=0;
     }
     if (!frame_size){
-        MemSetToValueForNBytes(dec,0,sizeof(drmp3dec));
+        MemSetToVForNBytes(dec,0,sizeof(drmp3dec));
         i=drmp3d_find_frame(mp3,mp3_bytes,&dec->free_format_bytes,&frame_size);
         if(!frame_size||i+frame_size>mp3_bytes){info->frame_bytes=i;return 0;}
     }
@@ -773,7 +733,7 @@ static int drmp3dec_decode_frame(drmp3dec *dec, const u8 *mp3, int mp3_bytes, vo
         success=drmp3_L3_restore_reservoir(dec,bs_frame,&dec->scratch,main_data_begin);
         if(success&&pcm!=NULL){
             for(igr=0;igr<(DRMP3_HDR_TEST_MPEG1(hdr)?2:1);igr++,pcm=DRMP3_OFFSET_PTR(pcm,sizeof(drmp3d_sample_t)*576*info->channels)){
-                MemSetToValueForNBytes(dec->scratch.grbuf[0],0,576 * 2 * sizeof(float));
+                MemSetToVForNBytes(dec->scratch.grbuf[0],0,576 * 2 * sizeof(float));
                 drmp3_L3_decode(dec,&dec->scratch,dec->scratch.gr_info+igr*info->channels,info->channels);
                 drmp3d_synth_granule(dec->qmf_state,dec->scratch.grbuf[0],18,info->channels,(drmp3d_sample_t*)pcm,dec->scratch.syn[0]);
             }
@@ -783,8 +743,8 @@ static int drmp3dec_decode_frame(drmp3dec *dec, const u8 *mp3, int mp3_bytes, vo
     return success*drmp3_hdr_frame_samples(dec->header);
 }
 
-static size_t drmp3__on_read_os(void *ud, void *buf, size_t n) { OsFileHandle f = (OsFileHandle)(uintptr_t)ud; if (f == OS_INVALID_HANDLE) {return 0;} long result = OS_Read(f,buf,n); return (result > 0) ? (size_t)result : 0; }
-static bool drmp3__on_seek_os(void *ud, int offset, u8 origin) { OsFileHandle f = (OsFileHandle)(uintptr_t)ud; if (f == OS_INVALID_HANDLE) {return false;} int whence = origin; return OS_Seek(f,(i64)offset,whence) >= 0; }
+static size_t drmp3__on_read_os(void *ud, void *buf, size_t n) { FHandle f = (FHandle)(uintptr_t)ud; if (f == INVALID_FHANDLE) {return 0;} long result = OS_Read(f,buf,n); return (result > 0) ? (size_t)result : 0; }
+static bool drmp3__on_seek_os(void *ud, int offset, u8 origin) { FHandle f = (FHandle)(uintptr_t)ud; if (f == INVALID_FHANDLE) {return false;} int whence = origin; return OS_Seek(f,(i64)offset,whence) >= 0; }
 static size_t drmp3__on_read(drmp3 *p, void *buf, size_t n) { size_t r = p->onRead(p->pUserData,buf,n); p->streamCursor += r; return r; }
 static size_t drmp3__on_read_clamped(drmp3 *p, void *buf, size_t n) { if (p->streamLength == DRMP3_UINT64_MAX) {return drmp3__on_read(p,buf,n);} u64 rem = p->streamLength - p->streamCursor; if (n > rem) n = (size_t)rem; return drmp3__on_read(p,buf,n); }
 static bool drmp3__on_seek(drmp3 *p, int offset, u8 origin) { if (!p->onSeek(p->pUserData,offset,origin)) {return false;} if (origin == 0) {p->streamCursor = (u64)offset;}else{p->streamCursor += (u64)offset;} return true; }
@@ -866,7 +826,7 @@ static bool drmp3_init_internal(drmp3 *p, drmp3_read_proc onRead, drmp3_seek_pro
     p->totalPCMFrameCount = DRMP3_UINT64_MAX;
     if (onSeek) {
         if (onSeek(p->pUserData, 0, 2)) { // SEEK_END
-            i64 slen = OS_Tell((OsFileHandle)(uintptr_t)p->pUserData);
+            i64 slen = OS_Tell((FHandle)(uintptr_t)p->pUserData);
             if (slen > 0) {
                 if (slen > 128) {
                     char tag[3];
@@ -899,9 +859,9 @@ static bool drmp3_init_internal(drmp3 *p, drmp3_read_proc onRead, drmp3_seek_pro
 static bool drmp3_init_file(drmp3 *pMP3, const char *pFilePath) {
     if (!pMP3 || !pFilePath) return false;
 
-    MemSetToValueForNBytes(pMP3,0,sizeof(drmp3));
-    OsFileHandle f = OS_OpenReadonly(pFilePath);
-    if (f == OS_INVALID_HANDLE) return false;
+    MemSetToVForNBytes(pMP3,0,sizeof(drmp3));
+    FHandle f = OS_OpenReadonly(pFilePath);
+    if (f == INVALID_FHANDLE) return false;
 
     pMP3->pUserData = (void*)(uintptr_t)f;
     bool result = drmp3_init_internal(pMP3, drmp3__on_read_os, drmp3__on_seek_os);
@@ -912,7 +872,7 @@ static bool drmp3_init_file(drmp3 *pMP3, const char *pFilePath) {
 static void drmp3_uninit(drmp3 *pMP3) {
     if (!pMP3) return;
 
-    if (pMP3->pUserData) { OS_Close((OsFileHandle)(uintptr_t)pMP3->pUserData); pMP3->pUserData = NULL; }
+    if (pMP3->pUserData) { OS_Close((FHandle)(uintptr_t)pMP3->pUserData); pMP3->pUserData = NULL; }
     OS_DeallocateRAM(pMP3->pData, pMP3->dataCapacity);
     pMP3->pData = NULL;
     pMP3->dataCapacity = 0;
@@ -987,13 +947,13 @@ static u64 drmp3_get_pcm_frame_count(drmp3 *pMP3){
 }
 
 // Wav parsing
-typedef struct { OsFileHandle fp; u16 channels,bitsPerSample,fmtTag; u32 sampleRate; u64 totalPCMFrameCount,dataChunkDataPos,bytesRemaining; } WaveFile;
+typedef struct { FHandle fp; u16 channels,bitsPerSample,fmtTag; u32 sampleRate; u64 totalPCMFrameCount,dataChunkDataPos,bytesRemaining; } WaveFile;
 static u16 WavU16LE(const u8 *d) { return (u16)(d[0]|(d[1]<<8)); }
 static u32 WavU32LE(const u8 *d) { return (u32)(d[0]|(d[1]<<8)|(d[2]<<16)|(d[3]<<24)); }
 static bool WavInit(WaveFile *w, const char *path) {
-    u8 buf[36]; MemSetToValueForNBytes(w,0,sizeof(*w));
+    u8 buf[36]; MemSetToVForNBytes(w,0,sizeof(*w));
     w->fp = OS_OpenReadonly(path);
-    if (w->fp == OS_INVALID_HANDLE) return false;
+    if (w->fp == INVALID_FHANDLE) return false;
     if (OS_Read(w->fp, buf, 12) != 12) goto fail;
     if (CompareMemoryForNBytes(buf,"RIFF",4) != 0) goto fail;
     if (CompareMemoryForNBytes(buf+8,"WAVE",4) != 0) goto fail;
@@ -1036,7 +996,7 @@ static bool WavInit(WaveFile *w, const char *path) {
 
     if (got_fmt && got_data) return true;
     fail:
-    if (w->fp != OS_INVALID_HANDLE) { OS_Close(w->fp); w->fp = OS_INVALID_HANDLE; }
+    if (w->fp != INVALID_FHANDLE) { OS_Close(w->fp); w->fp = INVALID_FHANDLE; }
     return false;
 }
 
@@ -1085,7 +1045,7 @@ static float *resample_stereo(float *src, size_t srcSize, u32 *frames, u32 src_r
     OS_DeallocateRAM(src,srcSize); *frames = df; return dst;
 }
 
-static void WavUnInit(WaveFile *w) { if (w->fp != OS_INVALID_HANDLE) { OS_Close(w->fp); w->fp = OS_INVALID_HANDLE; } }
+static void WavUnInit(WaveFile *w) { if (w->fp != INVALID_FHANDLE) { OS_Close(w->fp); w->fp = INVALID_FHANDLE; } }
 static float *load_wav(const char *path,u32 *out_frames, size_t* allocSize) {
     WaveFile wav; if (!WavInit(&wav,path)) return NULL;
     if (wav.channels > 2) { WavUnInit(&wav); return NULL; }
@@ -1115,7 +1075,7 @@ static void wave_mix(wav_channel_t* w, float* mix) {
 
 static void audio_mix_period(i16 *out) {
     float mix[AUDIO_FRAMES*AUDIO_CHANNELS];
-    MemSetToValueForNBytes(mix,0,sizeof(mix));
+    MemSetToVForNBytes(mix,0,sizeof(mix));
     for (u32 c=0;c<wav_count;c++) { wav_channel_t* w = &wav_ch[c]; if (w->playing && w->samples) {wave_mix(w,mix);} }
     for (u32 c=0;c<ext_count;c++) { wav_channel_t* w =  ext_ch[c]; if (w->playing && w->samples) {wave_mix(w,mix);} }
     if (log_playing && log_samples) {
@@ -1199,7 +1159,7 @@ void mp3_clear(void) { for (i32 i=0;i<2;i++) if (mp3_ch[i].open) { drmp3_uninit(
 ENGINE_TO_MOD void MP3Pause(void) { mp3_paused = true; }
 ENGINE_TO_MOD void MP3Resume(void) { mp3_paused = false; }
 ENGINE_TO_MOD float GetMP3RemainingTime(void) { mp3_channel_t *m = &mp3_ch[mp3_slot]; return (!m->open || m->frames_decoded >= m->total_frames) ? 0.0f : (!m->total_frames ? 1.0f : (float)(m->total_frames - m->frames_decoded) / (m->src_rate ? m->src_rate : AUDIO_RATE)); }
-static OsFileHandle pcm_fds[8]; static i32 pcm_fd_count = 0;
+static FHandle pcm_fds[8]; static i32 pcm_fd_count = 0;
 #ifndef WINDOWS
     typedef void snd_pcm_t;
     typedef int (*pfn_snd_pcm_open)(snd_pcm_t**, const char*, int, int);  typedef int (*pfn_snd_pcm_close)(snd_pcm_t*);   typedef int (*pfn_snd_pcm_writei)(snd_pcm_t*, const void*, u32);
@@ -1238,7 +1198,7 @@ static OsFileHandle pcm_fds[8]; static i32 pcm_fd_count = 0;
     }
 
     static void init_pcm_device(i32 card, i32 dev) {
-        OsFileHandle r = pcm_open(card,dev,1|(1<<1)); if (r == OS_INVALID_HANDLE) return;
+        FHandle r = pcm_open(card,dev,1|(1<<1)); if (r == INVALID_FHANDLE) return;
         
         pcm_params_t p; pcm_params_init(&p);      pcm_set(&p,PCM_FORMAT,2/*s16 LE*/); pcm_set(&p,0,3);
         pcm_set(&p,PCM_RATE,AUDIO_RATE);          pcm_set(&p,PCM_CHANNELS,AUDIO_CHANNELS);
@@ -1270,19 +1230,15 @@ void AudioUpdate(void) {
     u32 buffer_size=AUDIO_FRAMES*AUDIO_PERIODS,queued=appl-hw;
     if (queued>buffer_size) queued=0;
     u32 avail=buffer_size-queued;
-    while (avail>=(u32)AUDIO_FRAMES) {
-        audio_mix_period(buf);
-        for (i32 i=0;i<pcm_fd_count;i++) if (pcm_write(pcm_fds[i],buf,AUDIO_FRAMES)<0) pcm_prepare(pcm_fds[i]);
-        avail-=AUDIO_FRAMES;
-    }
+    while (avail>=(u32)AUDIO_FRAMES) { audio_mix_period(buf); for (i32 i=0;i<pcm_fd_count;i++) { if (pcm_write(pcm_fds[i],buf,AUDIO_FRAMES)<0) {pcm_prepare(pcm_fds[i]);} } avail-=AUDIO_FRAMES; }
 }
 
 pthread_t audThreadID; int usleep(u32 usec);
 void* AudThread(void* arg) { (void)arg; while (1) { AudioUpdate(); usleep(1000); } return NULL; }
 void InitAudio(void) {
 #ifdef WINDOWS
-    OsFileHandle first = pcm_open_all(AUDIO_RATE,AUDIO_CHANNELS,AUDIO_FRAMES,AUDIO_PERIODS);
-    if (first == OS_INVALID_HANDLE) { DualLog("ERROR: No WASAPI audio device found\n"); return; }
+    FHandle first = pcm_open_all(AUDIO_RATE,AUDIO_CHANNELS,AUDIO_FRAMES,AUDIO_PERIODS);
+    if (first == INVALID_FHANDLE) { DualLog("ERROR: No WASAPI audio device found\n"); return; }
     pcm_fds[0] = first; pcm_fd_count = 1;
     DualLog("Audio: WASAPI %d device(s) active\n",wasapi_dev_count);
 #else

@@ -1,9 +1,9 @@
 // helpers.c - Helper Functions for various things, mostly libc avoidance
-void* MemSetToValueForNBytes(void *dst, int c, size_t n) { unsigned char *p=(unsigned char *)dst; unsigned char v=(unsigned char)c; while (n--) {*p++=v;} return dst; } // memset replacement
+void* MemSetToVForNBytes(void *dst, int c, size_t n) { unsigned char *p=(unsigned char *)dst; unsigned char v=(unsigned char)c; while (n--) {*p++=v;} return dst; } // memset replacement
 void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n) { unsigned char *d=(unsigned char *)dst; const unsigned char *s=(const unsigned char *)src; while (n--) {*d++=*s++;} return dst; } // memcpy replacement
 void stbi_write_bmp(char const *filename, int x, int y, const void *data) {
-    OsFileHandle f = OS_OpenWriteonly(filename);
-    if (f == OS_INVALID_HANDLE) { DualLogError("Failed to open %s for writing\n", filename); return; }
+    FHandle f = OS_OpenWriteonly(filename);
+    if (f == INVALID_FHANDLE) { DualLogError("Failed to open %s for writing\n", filename); return; }
 
     u32 fileSize = 14 + 108 + (u32)x * y * 4; // BMP file header (14 bytes)
     unsigned char fileHeader[14] = {'B','M',fileSize & 0xFF,(fileSize >> 8) & 0xFF,(fileSize >> 16) & 0xFF,(fileSize >> 24) & 0xFF,0,0,0,0,14 + 108,0,0,0};
@@ -40,7 +40,7 @@ void DebugRAM(const char *context) {
     size_t heap_bytes = (size_t)((char*)current_brk - (char*)heap_start);
     size_t uss_bytes = 0;
     long fd = OS_OpenReadonly("/proc/self/smaps_rollup");
-    if (fd == OS_INVALID_HANDLE) { DualLogError("Failed to open /proc/self/smaps_rollup\n"); return; }
+    if (fd == INVALID_FHANDLE) { DualLogError("Failed to open /proc/self/smaps_rollup\n"); return; }
 
     char buf[4096]; long bytes_read = OS_Read(fd,buf,sizeof(buf)-1);
     if (bytes_read > 0) { buf[bytes_read] = '\0'; } else buf[0] = '\0';
@@ -376,7 +376,7 @@ ENGINE_TO_MOD int StringFormatV(char* buffer, size_t bufferSize, const char* for
 }
 
 ENGINE_TO_MOD int StringFormat(char* buffer, size_t bufferSize, const char* format, ...) { va_list args; __builtin_va_start(args,format); int ret = StringFormatV(buffer,bufferSize,format,args); __builtin_va_end(args); return ret; } // snprintf replacement
-char* GetNextStringUpToNewlineOrEOF(char* buf, int size, OsFileHandle fd) { // fgets replacement, not thread safe but we don't do multithreading
+char* GetNextStringUpToNewlineOrEOF(char* buf, int size, FHandle fd) { // fgets replacement, not thread safe but we don't do multithreading
     if (size <= 1 || buf == NULL) return NULL;
 
     char* p = buf;
@@ -400,9 +400,9 @@ char* GetNextStringUpToNewlineOrEOF(char* buf, int size, OsFileHandle fd) { // f
     return buf;
 }
 
-extern OsFileHandle levelFileHandle;
+extern FHandle levelFileHandle;
 ENGINE_TO_MOD char* GetLevelFileNextStringUpToNewlineOrEOF(char* buf, int size) { return GetNextStringUpToNewlineOrEOF(buf,size,levelFileHandle); }
-void FilePrintString(OsFileHandle f, const char* fmt, ...) {
+void FilePrintString(FHandle f, const char* fmt, ...) {
     va_list args; __builtin_va_start(args,fmt);
     char buf[128]; va_list copy;
     __builtin_va_copy(copy,args);

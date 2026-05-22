@@ -267,7 +267,7 @@ static void _rse(stbtt__bitmap*res,stbtt__edge*e,int n,int ox,int oy){
     float sd[129],*sl,*sl2;if(res->w>64)sl=(float*)TempAlloc((size_t)(res->w*2+1)*sizeof(float));else sl=sd;
     sl2=sl+res->w;y=oy;e[n].y0=(float)(oy+res->h)+1;
     while(j<res->h){float syt=(float)y,syb=(float)y+1;stbtt__active_edge**step=&active;
-        MemSetToValueForNBytes(sl,0,(size_t)res->w*sizeof(sl[0]));MemSetToValueForNBytes(sl2,0,((size_t)res->w+1)*sizeof(sl[0]));
+        MemSetToVForNBytes(sl,0,(size_t)res->w*sizeof(sl[0]));MemSetToVForNBytes(sl2,0,((size_t)res->w+1)*sizeof(sl[0]));
         while(*step){stbtt__active_edge*z=*step;if(z->ey<=syt){*step=z->next;z->direction=0;_hhf(&hh,z);}else step=&(*step)->next;}
         while(e->y0<=syb){
             if(e->y0!=e->y1){
@@ -353,7 +353,7 @@ static void stbtt_GetPackedQuad(const stbtt_packedchar*cd, int pw, int ph, int c
 }
 
 int stbtt_PackBegin(stbtt_pack_context*spc,unsigned char* px, int pw, int ph, int str, int pad, void* a){
-    stbrp_context*ctx=(stbrp_context*)TempAlloc(sizeof(*ctx)); *ctx=(stbrp_context){pw-pad,ph-pad,0,0,0}; if(px) MemSetToValueForNBytes(px,0,(size_t)(pw*ph));
+    stbrp_context*ctx=(stbrp_context*)TempAlloc(sizeof(*ctx)); *ctx=(stbrp_context){pw-pad,ph-pad,0,0,0}; if(px) MemSetToVForNBytes(px,0,(size_t)(pw*ph));
     return *spc=(stbtt_pack_context){a,ctx,pw,ph,str ? str : pw,pad,0,1,1,px},1;
 }
 
@@ -431,7 +431,7 @@ __attribute__((pure)) i32 CodepointToPackedIndex(i32 cp,int fontID){
     return 0;
 }
 static LoadedFont LoadFallbackFont(const char*path,int fii,int ci){
-    OsFileHandle fd;int fsz;fontData[fii]=OS_OpenAndAllocateFileBufferReadonly(path,&fd,&fsz);
+    FHandle fd;int fsz;fontData[fii]=OS_OpenAndAllocateFileBufferReadonly(path,&fd,&fsz);
     int off=stbtt_GetFontOffsetForIndex(fontData[fii],ci);if(off<0){DualLogError("Invalid collection index %d for font %s\n",ci,path);OS_Exit(1);}
     if(!stbtt_InitFont_internal(&fontInfo[fii],fontData[fii],off)){DualLogError("Failed to init font at index %d in %s\n",ci,path);OS_Exit(1);}
     return (LoadedFont){(char*)path,fontData[fii],fsz,fontInfo[fii]};
@@ -447,7 +447,7 @@ static void InitFontAtlasses(void){
     DebugRAM("start font load");
     double t0=get_time();DualLog("Loading    5 fonts...");
     ttAllocs = OS_Alloc(4474 * sizeof(TAlloc));
-    OsFileHandle fd1,fd2;int sz1,sz2;
+    FHandle fd1,fd2;int sz1,sz2;
     fontData[0]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[0],&fd1,&sz1);
     fontData[1]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[1],&fd2,&sz2);
     if(!stbtt_InitFont_internal(&fontInfo[0],fontData[0],0)){DualLogError("%s font init failed\n",fontPaths[0]);OS_Exit(1);}
@@ -467,7 +467,7 @@ static void InitFontAtlasses(void){
     TempFree(pc.pack_info);GenerateAndBindTexture(&fontAtlasTex,0x8229/*GL_R8*/,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0x1903/*GL_RED*/,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,bmp);
 
     // Secondary atlas
-    MemSetToValueForNBytes(bmp,0,FONT_ATLAS_SIZE*FONT_ATLAS_SIZE);
+    MemSetToVForNBytes(bmp,0,FONT_ATLAS_SIZE*FONT_ATLAS_SIZE);
     stbtt_pack_context pc2;stbtt_PackBegin(&pc2,bmp,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0,16,NULL);pc2.h_oversample=3;pc2.v_oversample=3;pc2.skip_missing=1;numPackedGlyphsStopD=0;
     for(int r=0;r<numFontRanges;++r){fontRangesStopD[r].startIndex=numPackedGlyphsStopD;
         for(int i=0;i<fontRangesStopD[r].count;++i){if(numPackedGlyphsStopD>=MAX_GLYPHS)break;u32 cp=fontRangesStopD[r].first+i;stbtt_fontinfo*font=&fontInfo[1];unsigned char*data=fontData[1];
@@ -502,7 +502,7 @@ size_t utf16le_to_utf8(const u8*src,size_t slen,char*dst,size_t dlen){
 static const char* localizations[8]={"./Data/text_english.txt","./Data/text_espanol.txt","./Data/text_deutsch.txt","./Data/text_francais.txt","./Data/text_nihongo.txt","./Data/text_russkiy.txt","./Data/text_italiano.txt","./Data/text_portugues.txt"};
 void LoadTextForLanguage(u8 lang){
     char tf[256]={0};strncpy(tf,localizations[lang<8?lang:0],255);
-    OsFileHandle dfd=OS_INVALID_HANDLE;int asz=0;
+    FHandle dfd=INVALID_FHANDLE;int asz=0;
     if(Sys_Text.file_data){OS_DeallocateRAM(Sys_Text.file_data,Sys_Text.file_size);Sys_Text.file_data=NULL;Sys_Text.file_size=0;}
     Sys_Text.file_data=(u8*)OS_OpenAndAllocateFileBufferReadonly(tf,&dfd,&asz);if(!Sys_Text.file_data||asz<=0){DualLogError("Failed to load text file: %s\n",tf);return;}
     Sys_Text.file_size=(size_t)asz;
@@ -524,9 +524,9 @@ void LoadTextForLanguage(u8 lang){
 static inline __attribute__((always_inline)) int StringToIntLen(const char*str,size_t len){int v=0;for(size_t i=0;i<len&&str[i]>='0'&&str[i]<='9';++i)v=v*10+(str[i]-'0');return v;}
 static const char* logLocalizations[8]={"./Data/logs_text_english.txt","./Data/logs_text_espanol.txt","./Data/logs_text_deutsch.txt","./Data/logs_text_francais.txt","./Data/logs_text_nihongo.txt","./Data/logs_text_russkiy.txt","./Data/logs_text_italiano.txt","./Data/logs_text_portugues.txt"};
 void LoadLogTextForLanguage(u8 lang){
-    MemSetToValueForNBytes(Sys_Text.audioLogImagesRefIndicesLH,0,TEXT_LOGS_COUNT*sizeof(u16));MemSetToValueForNBytes(Sys_Text.audioLogImagesRefIndicesRH,0,TEXT_LOGS_COUNT*sizeof(u16));MemSetToValueForNBytes(Sys_Text.audioLogType,0,TEXT_LOGS_COUNT*sizeof(u8));MemSetToValueForNBytes(Sys_Text.audioLogLevelFound,0,TEXT_LOGS_COUNT*sizeof(u8));
+    MemSetToVForNBytes(Sys_Text.audioLogImagesRefIndicesLH,0,TEXT_LOGS_COUNT*sizeof(u16));MemSetToVForNBytes(Sys_Text.audioLogImagesRefIndicesRH,0,TEXT_LOGS_COUNT*sizeof(u16));MemSetToVForNBytes(Sys_Text.audioLogType,0,TEXT_LOGS_COUNT*sizeof(u8));MemSetToVForNBytes(Sys_Text.audioLogLevelFound,0,TEXT_LOGS_COUNT*sizeof(u8));
     char tf[256]={0};strncpy(tf,logLocalizations[lang<8?lang:0],255);
-    OsFileHandle dfd=OS_INVALID_HANDLE;int asz=0;
+    FHandle dfd=INVALID_FHANDLE;int asz=0;
     if(Sys_Text.filelog_data){OS_DeallocateRAM(Sys_Text.filelog_data,Sys_Text.filelog_size);Sys_Text.filelog_data=NULL;Sys_Text.filelog_size=0;}
     Sys_Text.filelog_data=(u8*)OS_OpenAndAllocateFileBufferReadonly(tf,&dfd,&asz);if(!Sys_Text.filelog_data||asz<=0){DualLogError("Failed to load log text file: %s\n",tf);return;}
     Sys_Text.filelog_size=(size_t)asz;

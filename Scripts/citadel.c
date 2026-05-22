@@ -27,7 +27,7 @@ MOD_TO_ENGINE i32 __stdcall DllMain(void* hinstDLL, unsigned long fdwReason, voi
     return 1;
 }
 
-void* memset(void* dst, int c, size_t n) { return MemSetToValueForNBytes(dst,c,n); }
+void* memset(void* dst, int c, size_t n) { return MemSetToVForNBytes(dst,c,n); }
 #endif
 
 MOD_TO_ENGINE void ModNewGame(void) {

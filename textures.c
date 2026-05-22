@@ -18,20 +18,13 @@ void stbi__arena_init_thread(StbiArena* arena) {if (!arena->base) { arena->base 
 void* stbi__arena_alloc_thread(StbiArena* a, size_t s) { if(!a->base||a->cursor+s>a->end)return NULL; void* p=a->cursor; a->cursor+=s; return p; }
 void* stbi__arena_alloc(size_t s) { return stbi__arena_alloc_thread(&stbi_arena_main, s); }
 static u32 stbi__get32be(stbi__context* s) { const u8* p = s->img_buffer; s->img_buffer += 4; return (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3]; }
-static i32 stbi__bit_reverse(i32 n, i32 b) {
-    n=((n&0xAAAA)>>1)|((n&0x5555)<<1); n=((n&0xCCCC)>>2)|((n&0x3333)<<2);
-    n=((n&0xF0F0)>>4)|((n&0x0F0F)<<4); n=((n&0xFF00)>>8)|((n&0x00FF)<<8);
-    return n>>(16-b);
-}
-
+static i32 stbi__bit_reverse(i32 n, i32 b) { n=((n&0xAAAA)>>1)|((n&0x5555)<<1); n=((n&0xCCCC)>>2)|((n&0x3333)<<2); n=((n&0xF0F0)>>4)|((n&0x0F0F)<<4); n=((n&0xFF00)>>8)|((n&0x00FF)<<8); return n>>(16-b); }
 static i32 stbi__zbuild_huffman(stbi__zhuffman* z, const u8* sl, i32 num) {
-    i32 i, k=0, code=0, nc[16], sz[17]={0}; MemSetToValueForNBytes(z->fast, 0, sizeof(z->fast));
+    i32 i, k=0, code=0, nc[16], sz[17]={0}; MemSetToVForNBytes(z->fast, 0, sizeof(z->fast));
     if(num!=32){ for(i=0;i<num;++i)++sz[sl[i]]; } sz[0]=0;
     for(i=1;i<16;++i){
         if(sz[i]>(1<<i))return 0;
-        
-        nc[i]=code; z->firstcode[i]=(u16)code; z->firstsymbol[i]=(u16)k; code+=sz[i];
-        if(sz[i]&&code-1>=(1<<i))return 0;
+        nc[i]=code; z->firstcode[i]=(u16)code; z->firstsymbol[i]=(u16)k; code+=sz[i]; if(sz[i]&&code-1>=(1<<i))return 0;
         
         z->maxcode[i]=code<<(16-i); code<<=1; k+=sz[i];
     }
@@ -54,10 +47,8 @@ static u32 stbi__zhuffman_decode(stbi__zbuf* a, stbi__zhuffman* z) {
 
 static int stbi__parse_huffman_block(stbi__zbuf* a) {
     u8* o=a->zout;
-    static const int lb[]={3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258},
-                     le[]={0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0},
-                     db[]={1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577},
-                     de[]={0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13};
+    static const int lb[]={3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258}, le[]={0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0},
+                     db[]={1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577}, de[]={0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13};
     for(;;){
         int z=stbi__zhuffman_decode(a,&a->z_length); if(z<256)*o++=(u8)z; else if(z==256){ a->zout=o; return 1; }
         else { z-=257; int l=lb[z]+(le[z]?stbi__zreceive(a,le[z]):0); z=stbi__zhuffman_decode(a,&a->z_distance); int d=db[z]+(de[z]?stbi__zreceive(a,de[z]):0); u8* p=o-d; while(l--)*o++=*p++; }
@@ -75,7 +66,7 @@ static int stbi__compute_huffman_codes(stbi__zbuf* a) {
             if(c==16){c=stbi__zreceive(a,2)+3; f=lc[n-1];}
             else if(c==17)c=stbi__zreceive(a,3)+3;
             else if(c==18)c=stbi__zreceive(a,7)+11;
-            else return 0; MemSetToValueForNBytes(lc+n,f,c); n+=c;
+            else return 0; MemSetToVForNBytes(lc+n,f,c); n+=c;
         }
     } return stbi__zbuild_huffman(&a->z_length,lc,hl) && stbi__zbuild_huffman(&a->z_distance,lc+hl,hd);
 }
@@ -186,7 +177,7 @@ static void* TextureParsingWorker(void* arg) {
 }
 
 static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
-    OsFileHandle fd; int sz; char *data = OS_OpenAndAllocateFileBufferReadonly(fn, &fd, &sz), *cur = data, *end = data + sz;
+    FHandle fd; int sz; char *data = OS_OpenAndAllocateFileBufferReadonly(fn, &fd, &sz), *cur = data, *end = data + sz;
     u32 line = 0, m_idx = 0;
     while (cur < end) {
         char *s = cur; while (cur < end && *cur != '\n' && *cur != '\r') cur++;
@@ -251,18 +242,18 @@ static __attribute__((noinline)) void LoadTextures(void) {
     if (loadedTexturesMaxIndex == 0) { DualLogError("No textures found in textures.txt\n"); OS_Exit(1); }
 
     i32* parsIdx = OS_Alloc(loadedTexturesMaxIndex * sizeof(i32));
-    MemSetToValueForNBytes(parsIdx, -1, loadedTexturesMaxIndex * sizeof(i32));
+    MemSetToVForNBytes(parsIdx, -1, loadedTexturesMaxIndex * sizeof(i32));
     for (u32 k = 0; k < texture_parser.count; ++k) {
         if (texture_parser.entries[k].index < loadedTexturesMaxIndex) parsIdx[texture_parser.entries[k].index] = (i32)k;
     }
 
     DualLog("Loading textures (%u) ... ", texture_parser.count);
     RawTexture* rawTextures = OS_Alloc(loadedTexturesMaxIndex * sizeof(RawTexture));
-    MemSetToValueForNBytes(rawTextures,0,loadedTexturesMaxIndex * sizeof(RawTexture));
+    MemSetToVForNBytes(rawTextures,0,loadedTexturesMaxIndex * sizeof(RawTexture));
     for (u32 i = 0; i < loadedTexturesMaxIndex; ++i) {
         i32 p = parsIdx[i]; if (p < 0) continue;
         const char* path = texture_parser.entries[p].path;
-        OsFileHandle dummy_fd;
+        FHandle dummy_fd;
         int size = 0; rawTextures[i].data = (const char*)OS_OpenAndAllocateFileBufferReadonly(path,&dummy_fd,&size);
         rawTextures[i].size = size;
     }
@@ -296,11 +287,11 @@ static __attribute__((noinline)) void LoadTextures(void) {
     size_t palettes_size = totalPaletteColors * sizeof(u32);
     size_t indices_size = totalPixels;
     size_t arena_size = offsets_size + palettes_size + indices_size;
-    void* arena = OS_AllocateRAM(NULL,arena_size,0x1|0x2,0x20|0x02|0x08000,OS_INVALID_HANDLE);
+    void* arena = OS_AllocateRAM(NULL,arena_size,0x1|0x2,0x20|0x02|0x08000,INVALID_FHANDLE);
     u8* cur = (u8*)arena;
     u32* textureOffsets = (u32*)cur; cur += offsets_size;
-    i32* textureSizes = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * 2 * sizeof(i32),0x1|0x2,0x02|0x20,OS_INVALID_HANDLE);
-    u32* texturePaletteOffsets = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * sizeof(u32),0x1|0x2,0x02|0x20,OS_INVALID_HANDLE);
+    i32* textureSizes = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * 2 * sizeof(i32),0x1|0x2,0x02|0x20,INVALID_FHANDLE);
+    u32* texturePaletteOffsets = OS_AllocateRAM(NULL,loadedTexturesMaxIndex * sizeof(u32),0x1|0x2,0x02|0x20,INVALID_FHANDLE);
     u32* texturePalettes = (u32*)cur; cur += palettes_size;
     u8* all_indices = cur;
     u32 pixel_base = 0, color_base = 0;
@@ -348,7 +339,7 @@ static __attribute__((noinline)) void LoadTextures(void) {
     OS_DeallocateRAM(textureHeights,loadedTexturesMaxIndex * sizeof(i32));
     for (int t=0;t<num_parse_threads;++t) OS_DeallocateRAM(thread_stbi_arenas[t].base,STBI_ARENA_SIZE);
     OS_DeallocateRAM(thread_stbi_arenas,(size_t)num_parse_threads * sizeof(StbiArena));
-    OsFileHandle fp = OS_OpenReadonly(Sys_Global.global_winicon); // Load window icon
+    FHandle fp = OS_OpenReadonly(Sys_Global.global_winicon); // Load window icon
     int windowIconFileSize = OS_FileSize(fp);
     u8* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize,fp,Sys_Global.global_winicon);    
     OS_Close(fp); stbi__arena_init_thread(&stbi_arena_main);

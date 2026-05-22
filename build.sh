@@ -128,7 +128,7 @@ fi
 #$CC voxen.c $CFLAGS $LDFLAGS -rdynamic -o $BINARY_NAME
 export CC=$CC
 export CFLAGS=$CFLAGS
-SOURCES="voxen.c glfw.c audio.c physics.c"
+SOURCES="voxen.c winput.c audio.c physics.c"
 export TEMP_DIR=temp_build
 printf "%s\n" $SOURCES | xargs -P12 -I{} sh -c "$CC -c {} $CFLAGS -o $TEMP_DIR/\$(basename {}).o"
 $LINKER "$TEMP_DIR"/*.o $LDFLAGS -rdynamic -o $BINARY_NAME

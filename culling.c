@@ -42,7 +42,7 @@ bool GridCellBlock(u16 i,Vector3 pos,Vector3 newPos) {
 
 static unsigned char* LoadCullPNG(const char* name, int level) {
     char path[256]; StringFormat(path, sizeof(path),"./Data/%s_%d.png",name,level);
-    OsFileHandle fp = OS_OpenReadonly(path);
+    FHandle fp = OS_OpenReadonly(path);
     OS_Seek(fp,0,2); size_t size = OS_Tell(fp);
     if (size > MAX_CULL_FILESIZE) { DualLogError("PNG too large: %s\n",path); OS_Exit(1); }
     
@@ -503,7 +503,7 @@ ENGINE_TO_MOD void PortalCulling(void) { // Called just once at end of animation
     u16 playerCellX = PosGetCellCoordX(Sys_Global.instances[PLAYER1].position.x);
     u16 playerCellZ = PosGetCellCoordZ(Sys_Global.instances[PLAYER1].position.z);
     bool previousLightVisible[LIGHT_COUNT];
-    MemSetToValueForNBytes(previousLightVisible,false,LIGHT_COUNT * sizeof(bool));
+    MemSetToVForNBytes(previousLightVisible,false,LIGHT_COUNT * sizeof(bool));
     for (u16 i=0;i<Sys_Global.loadedLights;++i) {
         u16 lcell = (lights[i].pos.z * WORLDX) + lights[i].pos.x;
         if (gridCellStates[lcell] & CELL_VISIBLE) previousLightVisible[i] = true;
