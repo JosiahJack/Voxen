@@ -47,35 +47,25 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
         i16 dmColor,dmDuplex,dmYResolution,dmTTOption,dmCollate; u16 dmFormName[32],dmLogPixels; u32 dmBitsPerPel,dmPelsWidth,dmPelsHeight; union { u32 dmDisplayFlags,dmNup; };
         u32 dmDisplayFrequency,dmICMMethod,dmICMIntent,dmMediaType,dmDitherType,dmReserved1,dmReserved2,dmPanningWidth,dmPanningHeight;
     } DEVMODEW,*LPDEVMODEW;
-    typedef i64 (__stdcall *WNDPROC)(HWND,u32,u64,i64);
-    typedef i32 (__stdcall *MONITORENUMPROC)(HMONITOR,HDC,LPRECT,i64);
+    typedef i64 (__stdcall *WNDPROC)(HWND,u32,u64,i64); typedef i32 (__stdcall *MONITORENUMPROC)(HMONITOR,HDC,LPRECT,i64);
     typedef struct _ICONINFO { i32 fIcon; u32 xHotspot,yHotspot; HBITMAP hbmMask,hbmColor; } ICONINFO; typedef ICONINFO *PICONINFO;
     typedef struct tagMSG { HWND hwnd; u32 message; u64 wParam; i64 lParam; u32 time; POINT pt; } MSG,*PMSG,*NPMSG,*LPMSG;
     typedef struct tagMONITORINFO { u32 cbSize; RECT rcMonitor; RECT rcWork; u32 dwFlags; } MONITORINFO,*LPMONITORINFO;
     typedef struct tagMONITORINFOEXW { u32 cbSize; RECT rcMonitor; RECT rcWork; u32 dwFlags; u16 szDevice[32]; } MONITORINFOEXW;
     typedef struct tagWINDOWPLACEMENT { u32 length; u32 flags; u32 showCmd; POINT ptMinPosition; POINT ptMaxPosition; RECT rcNormalPosition; } WINDOWPLACEMENT;
     typedef struct tagWNDCLASSEXW { u32 cbSize,style; WNDPROC lpfnWndProc; i32 cbClsExtra,cbWndExtra; HINSTANCE hInstance; HICON hIcon,hCursor; HBRUSH hbrBackground; u16 *lpszMenuName,*lpszClassName; HICON hIconSm; } WNDCLASSEXW;
-    typedef struct {u16 wButtons; u8 bLeftTrigger,bRightTrigger; i16 sThumbLX,sThumbLY,sThumbRX,sThumbRY; } XINPUT_GAMEPAD;
-    typedef struct {u16 wLeftMotorSpeed, wRightMotorSpeed;} XINPUT_VIBRATION;
-    typedef struct {u8 Type,SubType; u16 Flags; XINPUT_GAMEPAD Gamepad; XINPUT_VIBRATION Vibration;} XINPUT_CAPABILITIES;
-    typedef struct {u32 dwPacketNumber; XINPUT_GAMEPAD Gamepad;} XINPUT_STATE;
-    typedef u32 (WINAPI * PFN_XInputGetCapabilities)(u32,u32,XINPUT_CAPABILITIES*);
-    typedef u32 (WINAPI * PFN_XInputGetState)(u32,XINPUT_STATE*);
-    typedef struct { u32 dbch_size,dbch_devicetype,dbch_reserved; } DEV_BROADCAST_HDR;
-    typedef struct { u32 dbcc_size,dbcc_devicetype,dbcc_reserved; GUID dbcc_classguid; u16 dbcc_name[1]; } DEV_BROADCAST_DEVICEINTERFACE_W;
-    typedef i32 (WINAPI * PFN_DwmIsCompositionEnabled)(i32*);
-    typedef i32 (WINAPI * PFN_DwmFlush)(void);
-    typedef i32 (WINAPI * PFN_RtlVerifyVersionInfo)(OSVERSIONINFOEXW*,u32,u64);
-    typedef i32 (WINAPI * PFNWGLSWAPINTERVALEXTPROC)(int);
-    typedef i32 (WINAPI * PFNWGLGETPIXELFORMATATTRIBIVARBPROC)(HDC,int,int,u32,const int*,int*);
-    typedef HGLRC (WINAPI * PFNWGLCREATECONTEXTATTRIBSARBPROC)(HDC,HGLRC,const int*);
-    typedef HGLRC (WINAPI * PFN_wglCreateContext)(HDC);
-    typedef PROC (WINAPI * PFN_wglGetProcAddress)(const char*);
-    typedef HDC (WINAPI * PFN_wglGetCurrentDC)(void);
-    typedef HGLRC (WINAPI * PFN_wglGetCurrentContext)(void);
+    typedef struct {u16 wButtons; u8 bLeftTrigger,bRightTrigger; i16 sThumbLX,sThumbLY,sThumbRX,sThumbRY; } XINPUT_GAMEPAD; typedef struct {u16 wLeftMotorSpeed, wRightMotorSpeed;} XINPUT_VIBRATION;
+    typedef struct {u8 Type,SubType; u16 Flags; XINPUT_GAMEPAD Gamepad; XINPUT_VIBRATION Vibration;} XINPUT_CAPABILITIES;   typedef struct {u32 dwPacketNumber; XINPUT_GAMEPAD Gamepad;} XINPUT_STATE;
+    typedef u32 (WINAPI * PFN_XInputGetCapabilities)(u32,u32,XINPUT_CAPABILITIES*);                                         typedef u32 (WINAPI * PFN_XInputGetState)(u32,XINPUT_STATE*);
+    typedef struct { u32 dbch_size,dbch_devicetype,dbch_reserved; } DEV_BROADCAST_HDR;                                      typedef struct { u32 dbcc_size,dbcc_devicetype,dbcc_reserved; GUID dbcc_classguid; u16 dbcc_name[1]; } DEV_BROADCAST_DEVICEINTERFACE_W;
+    typedef i32 (WINAPI * PFN_DwmIsCompositionEnabled)(i32*);                   typedef i32 (WINAPI * PFN_DwmFlush)(void);
+    typedef i32 (WINAPI * PFN_RtlVerifyVersionInfo)(OSVERSIONINFOEXW*,u32,u64); typedef i32 (WINAPI * PFN_SWE)(int);
+    typedef i32 (WINAPI * PFN_GPFAIVA)(HDC,int,int,u32,const int*,int*);        typedef HGLRC (WINAPI * FP_CCAA)(HDC,HGLRC,const int*);
+    typedef HGLRC (WINAPI * PFN_CC)(HDC);                                       typedef PROC (WINAPI * PFN_wglGetProcAddress)(const char*);
+    typedef HDC (WINAPI * PFN_wglGetCurrentDC)(void);                           typedef HGLRC (WINAPI * PFN_wglGetCurrentContext)(void);
     typedef i32 (WINAPI * PFN_wglMakeCurrent)(HDC,HGLRC);
     typedef struct _GLFWcontextWGL { HDC dc; HGLRC handle; int interval; } _GLFWcontextWGL;
-    typedef struct _GLFWlibraryWGL { HINSTANCE instance; PFN_wglCreateContext CreateContext; PFN_wglGetProcAddress GetProcAddress; PFN_wglGetCurrentDC GetCurrentDC; PFN_wglGetCurrentContext GetCurrentContext; PFN_wglMakeCurrent MakeCurrent; PFNWGLSWAPINTERVALEXTPROC SwapIntervalEXT; PFNWGLGETPIXELFORMATATTRIBIVARBPROC GetPixelFormatAttribivARB; PFNWGLCREATECONTEXTATTRIBSARBPROC CreateContextAttribsARB; } _GLFWlibraryWGL;
+    typedef struct _GLFWlibraryWGL { HINSTANCE instance; PFN_CC CreateContext; PFN_wglGetProcAddress GetProcAddress; PFN_wglGetCurrentDC GetCurrentDC; PFN_wglGetCurrentContext GetCurrentContext; PFN_wglMakeCurrent MakeCurrent; PFN_SWE SwapIntervalEXT; PFN_GPFAIVA GetPixelFormatAttribivARB; FP_CCAA CreateContextAttribsARB; } _GLFWlibraryWGL;
     typedef struct _GLFWwindowWin32 { HWND handle; i32 cursorTracked,frameAction,keymenu; int width,height,lastCursorPosX,lastCursorPosY; } _GLFWwindowWin32;
     typedef struct _GLFWlibraryWin32 { HINSTANCE instance; HWND helperWindowHandle; u16 helperWindowClass,mainWindowClass; void* deviceNotificationHandle; short int keycodes[512],scancodes[349]; double restoreCurPosX,restoreCurPosY; _GLFWwindow *disabledCursorWindow, *capturedCursorWindow; HICON blankCursor; struct {HINSTANCE instance; PFN_XInputGetCapabilities GetCapabilities; PFN_XInputGetState GetState;} xinput; struct {HINSTANCE instance; PFN_DwmIsCompositionEnabled IsCompositionEnabled; PFN_DwmFlush Flush;} dwmapi; struct {HINSTANCE instance; PFN_RtlVerifyVersionInfo RtlVerifyVersionInfo;} ntdll;} _GLFWlibraryWin32;
     typedef struct _GLFWmonitorWin32 { HMONITOR handle; u16 adapterName[32],displayName[32]; char publicAdapterName[32],publicDisplayName[32]; i32 modesPruned,modeChanged; } _GLFWmonitorWin32;
@@ -111,7 +101,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     DECLSPEC_IMPORT HBITMAP WINAPI CreateDIBSection(HDC,const BITMAPINFO*,u32,void**,void*,u32); DECLSPEC_IMPORT i32 WINAPI GetDeviceCaps(HDC,i32);
     u16* CreateWideStringFromUTF8Win32(const char* source); i32 IsWindowsVersionOrGreaterWin32(u16 major, u16 minor, u16 sp); void _glfwPollMonitorsWin32(void);
     struct _GLFWjoystick { i32 allocated,connected; size_t axesSize,buttonsSize,hatsSize; float*  axes; int axisCount; unsigned char* buttons; int buttonCount; unsigned char* hats; int hatCount; char name[128],guid[33]; _GLFWjoystickWin32 win32; };
-    struct _GLFWlibrary { _GLFWmonitor** monitors; int monitorCount; i32 joysticksInitialized; _GLFWjoystick joysticks[GLFW_JOYSTICK_LAST + 1]; _GLFWlibraryWin32 win32; _GLFWlibraryWGL wgl; };
+    struct _GLFWlibrary { _GLFWmonitor** monitors; int monitorCount; i32 joysticksInitialized; _GLFWjoystick joysticks[JOYSTICK_LAST + 1]; _GLFWlibraryWin32 win32; _GLFWlibraryWGL wgl; };
     struct _GLFWcontext { int client,source,major,minor; PFNGLGETINTEGERV GetIntegerv; void (*makeCurrent)(_GLFWwindow*); void (*swapBuffers)(_GLFWwindow*); void (*swapInterval)(int); GLFWglproc (*getProcAddress)(const char*); _GLFWcontextWGL wgl; };
     struct _GLFWwindow { i32 decorated,doublebuffer; GLFWvidmode videoMode; int cursorMode; char mouseButtons[8],keys[349]; double virtualCursorPosX,virtualCursorPosY; _GLFWcontext context; _GLFWwindowWin32 win32; };
     struct _GLFWmonitor { char name[128]; int widthMM,heightMM; GLFWvidmode currentMode; _GLFWmonitorWin32 win32; };
@@ -153,7 +143,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
                 if (scancode==0x54) {scancode=0x137;}   if (scancode==0x146) {scancode=0x45;}   if (scancode==0x136) {scancode=0x36;}
                 int key = _glfw.win32.keycodes[scancode];
                 if (wParam==0x11/*VK_CONTROL*/) {
-                    if (HIWORD(lParam)&0x0100) key=GLFW_KEY_RIGHT_CONTROL;
+                    if (HIWORD(lParam)&0x0100) key=KEY_RIGHT_CONTROL;
                     else {
                         MSG next; const u32 time=GetMessageTime();
                         if (PeekMessageW(&next,NULL,0,0,0)) {
@@ -162,17 +152,17 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
                             }
                         }
                         
-                        key=GLFW_KEY_LEFT_CONTROL;
+                        key=KEY_LEFT_CONTROL;
                     }
                 } else if (wParam == 0xE5/*VK_PROCESSKEY*/) break;
-                if (action == GLFW_RELEASE && wParam == 0x10/*VK_SHIFT*/) { InputKey(window,GLFW_KEY_LEFT_SHIFT,action); InputKey(window,GLFW_KEY_RIGHT_SHIFT,action); }
+                if (action == GLFW_RELEASE && wParam == 0x10/*VK_SHIFT*/) { InputKey(window,KEY_LEFT_SHIFT,action); InputKey(window,KEY_RIGHT_SHIFT,action); }
                 else if (wParam == 0x2C/*VK_SNAPSHOT*/) { InputKey(window,key,GLFW_PRESS); InputKey(window,key,GLFW_RELEASE); }
                 else InputKey(window,key,action);
                 break;
             }
             case 0x0201/*WM_LBUTTONDOWN*/: case 0x0204/*WM_RBUTTONDOWN*/: case 0x0207/*WM_MBUTTONDOWN*/: case 0x020B/*WM_XBUTTONDOWN*/:
             case 0x0202/*WM_LBUTTONUP*/:   case 0x0205/*WM_RBUTTONUP*/:   case 0x0208/*WM_MBUTTONUP*/:   case 0x020C/*WM_XBUTTONUP*/: {
-                int i,action,button = (uMsg==0x0201/*WM_LBUTTONDOWN*/ || uMsg == 0x0202/*WM_LBUTTONUP*/) ? GLFW_MOUSE_BUTTON_LEFT : ((uMsg == 0x0204/*WM_RBUTTONDOWN*/ || uMsg == 0x0205/*WM_RBUTTONUP*/) ? GLFW_MOUSE_BUTTON_RIGHT : ((uMsg == 0x0207/*WM_MBUTTONDOWN*/ || uMsg == 0x0208/*WM_MBUTTONUP*/) ? GLFW_MOUSE_BUTTON_MIDDLE : (((HIWORD(wParam)) == 0x0001/*XBUTTON1*/) ? GLFW_MOUSE_BUTTON_4 : GLFW_MOUSE_BUTTON_5)));
+                int i,action,button = (uMsg==0x0201/*WM_LBUTTONDOWN*/ || uMsg == 0x0202/*WM_LBUTTONUP*/) ? MOUSE_BUTTON_LEFT : ((uMsg == 0x0204/*WM_RBUTTONDOWN*/ || uMsg == 0x0205/*WM_RBUTTONUP*/) ? MOUSE_BUTTON_RIGHT : ((uMsg == 0x0207/*WM_MBUTTONDOWN*/ || uMsg == 0x0208/*WM_MBUTTONUP*/) ? MOUSE_BUTTON_MIDDLE : (((HIWORD(wParam)) == 0x0001/*XBUTTON1*/) ? MOUSE_BUTTON_4 : MOUSE_BUTTON_5)));
                 action=(uMsg == 0x0201/*WM_LBUTTONDOWN*/ || uMsg == 0x0204/*WM_RBUTTONDOWN*/ || uMsg == 0x0207/*WM_MBUTTONDOWN*/ || uMsg == 0x020B/*WM_XBUTTONDOWN*/) ? GLFW_PRESS : GLFW_RELEASE;
                 for (i=0;i<=7;i++) { if (window->mouseButtons[i]==GLFW_PRESS) break; }
                 if (i>7) {SetCapture(hWnd);} InputMouseClick(window,button,action);
@@ -228,7 +218,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
         HWND handle = GetActiveWindow();
         _GLFWwindow* window = GetPropW(handle,L"GLFW"); MSG msg;
         while (PeekMessageW(&msg,NULL,0,0,0x0001)) { if (msg.message==0x0012/*WM_QUIT*/) { OS_Exit(0); } else { TranslateMessage(&msg); DispatchMessageW(&msg); } }
-        const int keys[4][2]={{0xA0/*VK_LSHIFT*/,GLFW_KEY_LEFT_SHIFT},{0xA1/*VK_RSHIFT*/,GLFW_KEY_RIGHT_SHIFT},{0x5B/*VK_LWIN*/,GLFW_KEY_LEFT_SUPER},{0x5C/*VK_RWIN*/,GLFW_KEY_RIGHT_SUPER}};
+        const int keys[4][2]={{0xA0/*VK_LSHIFT*/,KEY_LEFT_SHIFT},{0xA1/*VK_RSHIFT*/,KEY_RIGHT_SHIFT},{0x5B/*VK_LWIN*/,KEY_LEFT_SUPER},{0x5C/*VK_RWIN*/,KEY_RIGHT_SUPER}};
         for (int i=0;i<4;i++) { const int vk=keys[i][0],key=keys[i][1]; if ((GetKeyState(vk)&0x8000)||window->keys[key]!=GLFW_PRESS) {continue;} InputKey(window,key,GLFW_RELEASE); }
         window=_glfw.win32.disabledCursorWindow;
         if (window) { int width,height; GetWindowSize(window,&width,&height); if (window->win32.lastCursorPosX!=width/2||window->win32.lastCursorPosY!=height/2) {SetCursorPosV(window,width/2,height/2);} }
@@ -245,16 +235,16 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     GLFWproc PlatformGetModuleSymbol(void* module, const char* name) { return (GLFWproc)GetProcAddress((HMODULE)module,name); }
     typedef struct {u16 index; i32 vkey;} WinKeyRemap;
     static const WinKeyRemap winkeyRemapTable[] = {
-        {0x00B,GLFW_KEY_0},{0x002,GLFW_KEY_1},{0x003,GLFW_KEY_2},{0x004,GLFW_KEY_3},{0x005,GLFW_KEY_4},{0x006,GLFW_KEY_5},{0x007,GLFW_KEY_6},{0x008,GLFW_KEY_7},{0x009,GLFW_KEY_8},{0x00A,GLFW_KEY_9},{0x01E,GLFW_KEY_A},{0x030,GLFW_KEY_B},{0x02E,GLFW_KEY_C},
-        {0x020,GLFW_KEY_D},{0x012,GLFW_KEY_E},{0x021,GLFW_KEY_F},{0x022,GLFW_KEY_G},{0x023,GLFW_KEY_H},{0x017,GLFW_KEY_I},{0x024,GLFW_KEY_J},{0x025,GLFW_KEY_K},{0x026,GLFW_KEY_L},{0x032,GLFW_KEY_M},{0x031,GLFW_KEY_N},{0x018,GLFW_KEY_O},{0x019,GLFW_KEY_P},
-        {0x010,GLFW_KEY_Q},{0x013,GLFW_KEY_R},{0x01F,GLFW_KEY_S},{0x014,GLFW_KEY_T},{0x016,GLFW_KEY_U},{0x02F,GLFW_KEY_V},{0x011,GLFW_KEY_W},{0x02D,GLFW_KEY_X},{0x015,GLFW_KEY_Y},{0x02C,GLFW_KEY_Z},{0x028,GLFW_KEY_APOSTROPHE},{0x02B,GLFW_KEY_BACKSLASH},
-        {0x033,GLFW_KEY_COMMA},{0x00D,GLFW_KEY_EQUAL},{0x029,GLFW_KEY_GRAVE_ACCENT},{0x01A,GLFW_KEY_LEFT_BRACKET},{0x00C,GLFW_KEY_MINUS},{0x034,GLFW_KEY_PERIOD},{0x01B,GLFW_KEY_RIGHT_BRACKET},{0x027,GLFW_KEY_SEMICOLON},{0x035,GLFW_KEY_SLASH},
-        {0x00E,GLFW_KEY_BACKSPACE},{0x153,GLFW_KEY_DELETE},{0x14F,GLFW_KEY_END},{0x01C,GLFW_KEY_ENTER},{0x001,GLFW_KEY_ESCAPE},{0x147,GLFW_KEY_HOME},{0x152,GLFW_KEY_INSERT},{0x15D,GLFW_KEY_MENU},{0x151,GLFW_KEY_PAGE_DOWN},{0x149,GLFW_KEY_PAGE_UP},
-        {0x045,GLFW_KEY_PAUSE},{0x039,GLFW_KEY_SPACE},{0x00F,GLFW_KEY_TAB},{0x03A,GLFW_KEY_CAPS_LOCK},{0x145,GLFW_KEY_NUM_LOCK},{0x046,GLFW_KEY_SCROLL_LOCK},{0x03B,GLFW_KEY_F1},{0x03C,GLFW_KEY_F2},{0x03D,GLFW_KEY_F3},{0x03E,GLFW_KEY_F4},
-        {0x03F,GLFW_KEY_F5},{0x040,GLFW_KEY_F6},{0x041,GLFW_KEY_F7},{0x042,GLFW_KEY_F8},{0x043,GLFW_KEY_F9},{0x044,GLFW_KEY_F10},{0x057,GLFW_KEY_F11},{0x058,GLFW_KEY_F12},{0x038,GLFW_KEY_LEFT_ALT},{0x01D,GLFW_KEY_LEFT_CONTROL},{0x02A,GLFW_KEY_LEFT_SHIFT},
-        {0x15B,GLFW_KEY_LEFT_SUPER},{0x137,GLFW_KEY_PRINT_SCREEN},{0x138,GLFW_KEY_RIGHT_ALT},{0x11D,GLFW_KEY_RIGHT_CONTROL},{0x036,GLFW_KEY_RIGHT_SHIFT},{0x15C,GLFW_KEY_RIGHT_SUPER},{0x150,GLFW_KEY_DOWN},{0x14B,GLFW_KEY_LEFT},{0x14D,GLFW_KEY_RIGHT},
-        {0x148,GLFW_KEY_UP},{0x052,GLFW_KEY_KP_0},{0x04F,GLFW_KEY_KP_1},{0x050,GLFW_KEY_KP_2},{0x051,GLFW_KEY_KP_3},{0x04B,GLFW_KEY_KP_4},{0x04C,GLFW_KEY_KP_5},{0x04D,GLFW_KEY_KP_6},{0x047,GLFW_KEY_KP_7},{0x048,GLFW_KEY_KP_8},{0x049,GLFW_KEY_KP_9},
-        {0x04E,GLFW_KEY_KP_ADD},{0x053,GLFW_KEY_KP_DECIMAL},{0x135,GLFW_KEY_KP_DIVIDE},{0x11C,GLFW_KEY_KP_ENTER},{0x059,GLFW_KEY_KP_EQUAL},{0x037,GLFW_KEY_KP_MULTIPLY},{0x04A,GLFW_KEY_KP_SUBTRACT}
+        {0x00B,KEY_0},{0x002,KEY_1},{0x003,KEY_2},{0x004,KEY_3},{0x005,KEY_4},{0x006,KEY_5},{0x007,KEY_6},{0x008,KEY_7},{0x009,KEY_8},{0x00A,KEY_9},{0x01E,KEY_A},{0x030,KEY_B},{0x02E,KEY_C},
+        {0x020,KEY_D},{0x012,KEY_E},{0x021,KEY_F},{0x022,KEY_G},{0x023,KEY_H},{0x017,KEY_I},{0x024,KEY_J},{0x025,KEY_K},{0x026,KEY_L},{0x032,KEY_M},{0x031,KEY_N},{0x018,KEY_O},{0x019,KEY_P},
+        {0x010,KEY_Q},{0x013,KEY_R},{0x01F,KEY_S},{0x014,KEY_T},{0x016,KEY_U},{0x02F,KEY_V},{0x011,KEY_W},{0x02D,KEY_X},{0x015,KEY_Y},{0x02C,KEY_Z},{0x028,KEY_APOSTROPHE},{0x02B,KEY_BACKSLASH},
+        {0x033,KEY_COMMA},{0x00D,KEY_EQUAL},{0x029,KEY_GRAVE_ACCENT},{0x01A,KEY_LEFT_BRACKET},{0x00C,KEY_MINUS},{0x034,KEY_PERIOD},{0x01B,KEY_RIGHT_BRACKET},{0x027,KEY_SEMICOLON},{0x035,KEY_SLASH},
+        {0x00E,KEY_BACKSPACE},{0x153,KEY_DELETE},{0x14F,KEY_END},{0x01C,KEY_ENTER},{0x001,KEY_ESCAPE},{0x147,KEY_HOME},{0x152,KEY_INSERT},{0x15D,KEY_MENU},{0x151,KEY_PAGE_DOWN},{0x149,KEY_PAGE_UP},
+        {0x045,KEY_PAUSE},{0x039,KEY_SPACE},{0x00F,KEY_TAB},{0x03A,KEY_CAPS_LOCK},{0x145,KEY_NUM_LOCK},{0x046,KEY_SCROLL_LOCK},{0x03B,KEY_F1},{0x03C,KEY_F2},{0x03D,KEY_F3},{0x03E,KEY_F4},
+        {0x03F,KEY_F5},{0x040,KEY_F6},{0x041,KEY_F7},{0x042,KEY_F8},{0x043,KEY_F9},{0x044,KEY_F10},{0x057,KEY_F11},{0x058,KEY_F12},{0x038,KEY_LEFT_ALT},{0x01D,KEY_LEFT_CONTROL},{0x02A,KEY_LEFT_SHIFT},
+        {0x15B,KEY_LEFT_SUPER},{0x137,KEY_PRINT_SCREEN},{0x138,KEY_RIGHT_ALT},{0x11D,KEY_RIGHT_CONTROL},{0x036,KEY_RIGHT_SHIFT},{0x15C,KEY_RIGHT_SUPER},{0x150,KEY_DOWN},{0x14B,KEY_LEFT},{0x14D,KEY_RIGHT},
+        {0x148,KEY_UP},{0x052,KEY_KP_0},{0x04F,KEY_KP_1},{0x050,KEY_KP_2},{0x051,KEY_KP_3},{0x04B,KEY_KP_4},{0x04C,KEY_KP_5},{0x04D,KEY_KP_6},{0x047,KEY_KP_7},{0x048,KEY_KP_8},{0x049,KEY_KP_9},
+        {0x04E,KEY_KP_ADD},{0x053,KEY_KP_DECIMAL},{0x135,KEY_KP_DIVIDE},{0x11C,KEY_KP_ENTER},{0x059,KEY_KP_EQUAL},{0x037,KEY_KP_MULTIPLY},{0x04A,KEY_KP_SUBTRACT}
     };
     
     static void createKeyTables(void) {
@@ -277,11 +267,11 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
         if (_glfw.win32.xinput.instance) {
             for (u32 index=0;index<4;index++) {
                 int jid; char guid[33]; XINPUT_CAPABILITIES xic; _GLFWjoystick* js;
-                for (jid = 0;  jid <= GLFW_JOYSTICK_LAST;  jid++) {
+                for (jid = 0;  jid <= JOYSTICK_LAST;  jid++) {
                     if (_glfw.joysticks[jid].connected && _glfw.joysticks[jid].win32.index == index) break;
                 }
 
-                if (jid <= GLFW_JOYSTICK_LAST) continue;
+                if (jid <= JOYSTICK_LAST) continue;
                 if (_glfw.win32.xinput.GetCapabilities(index,0,&xic) != 0) continue;
 
                 StringFormat(guid,sizeof(guid),"78696e707574%02x000000000000000000",xic.SubType & 0xff);
@@ -312,7 +302,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
         return  1;
     }
     
-    void _glfwDetectJoystickDisconnectionWin32(void) { for (int jid = 0;  jid <= GLFW_JOYSTICK_LAST;  jid++) { _GLFWjoystick* js = _glfw.joysticks + jid; if (js->connected) {PollJoystick(js);} } }
+    void _glfwDetectJoystickDisconnectionWin32(void) { for (int jid = 0;  jid <= JOYSTICK_LAST;  jid++) { _GLFWjoystick* js = _glfw.joysticks + jid; if (js->connected) {PollJoystick(js);} } }
     static i32 __stdcall monitorCallback(HMONITOR handle, HDC dc, RECT* rect, i64 data) {
         MONITORINFOEXW mi; (void)dc; (void)rect;
         MemSetToVForNBytes(&mi,0,sizeof(mi));
@@ -439,66 +429,35 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     static GLFWglproc getProcAddressWGL(const char* procname) { const GLFWglproc proc = (GLFWglproc)wglGetProcAddress(procname); if (proc) {return proc;} return (GLFWglproc)PlatformGetModuleSymbol(_glfw.wgl.instance,procname); }
     void glfwSetWindowPosition(GLFWwindow* handle, int xpos, int ypos) { _GLFWwindow* window = (_GLFWwindow*)handle; RECT rect = {xpos,ypos,xpos,ypos}; AdjustWindowRectEx(&rect,getWindowStyle(window),0,0x00040000/*WS_EX_APPWINDOW*/); SetWindowPos(window->win32.handle,((HWND)0),rect.left,rect.top,0,0,0x0010|0x0200|0x0001|0x0004); }
 #else // LINUX
-    typedef unsigned char KeyCode; typedef int Bool; typedef int Status; typedef unsigned long Atom; typedef unsigned long KeySym;
-    typedef char *XPointer;
-    typedef unsigned int XcursorUInt; typedef struct _XcursorImage { XcursorUInt version; XcursorUInt size,width,height,xhot,yhot; XcursorUInt delay; XcursorUInt *pixels; } XcursorImage;
-    typedef unsigned short Rotation,SubpixelOrder,Connection;
-    typedef struct { long flags; int x,y, width,height,min_width,min_height,max_width,max_height,width_inc,height_inc; struct {int x; int y;} min_aspect,max_aspect; int base_width, base_height; int win_gravity; } XSizeHints;
-    typedef unsigned long XID,Mask,Atom,VisualID,Time;
+    typedef u8 KeyCode; typedef u16 Rotation,SubpixelOrder,Connection; typedef i32 Bool; typedef int Status; typedef u64 XID,Mask,Atom,VisualID,Time,KeySym; typedef char *XPointer; typedef u32 XcursorUInt;
+    typedef struct _XcursorImage { XcursorUInt version; XcursorUInt size,width,height,xhot,yhot; XcursorUInt delay; XcursorUInt *pixels; } XcursorImage;
+    typedef struct { i64 flags; int x,y, width,height,min_width,min_height,max_width,max_height,width_inc,height_inc; struct {int x; int y;} min_aspect,max_aspect; int base_width, base_height; int win_gravity; } XSizeHints;
     typedef XID Window,Drawable,Font,Pixmap,Cursor,Colormap;
     typedef struct _XExtData { int number; struct _XExtData *next; int (*free_private)(struct _XExtData*); XPointer private_data; } XExtData;
-    typedef struct { int extension, major_opcode, first_event, first_error; } XExtCodes;
-    typedef struct { int depth, bits_per_pixel, scanline_pad; } XPixmapFormatValues;
-    typedef struct _XGC *GC;
-    typedef struct { XExtData *ext_data; VisualID visualid; int class; u64 red_mask, green_mask, blue_mask; int bits_per_rgb; int map_entries;} Visual;
+    typedef struct { int extension, major_opcode, first_event, first_error; } XExtCodes; typedef struct { int depth, bits_per_pixel, scanline_pad; } XPixmapFormatValues;
+    typedef struct _XGC *GC; typedef struct { XExtData *ext_data; VisualID visualid; int class; u64 red_mask, green_mask, blue_mask; int bits_per_rgb; int map_entries;} Visual; 
     typedef struct { int depth,nvisuals; Visual *visuals; } Depth;
     typedef struct { XExtData *ext_data; struct _XDisplay *display; Window root; int width,height,mwidth,mheight,ndepths; Depth *depths; int root_depth; Visual *root_visual; GC default_gc; Colormap cmap; u64 white_pixel, black_pixel; int max_maps, min_maps, backing_store; int save_unders; i64 root_input_mask; } Screen;
     typedef struct { XExtData *ext_data; int depth, bits_per_pixel, scanline_pad; } ScreenFormat;
     typedef struct { Pixmap background_pixmap; u64 background_pixel; Pixmap border_pixmap; u64 border_pixel; int bit_gravity, win_gravity, backing_store; u64 backing_planes, backing_pixel; int save_under; i64 event_mask, do_not_propagate_mask; int override_redirect; Colormap colormap; Cursor cursor; } XSetWindowAttributes;
-    typedef struct { int x,y,width,height,border_width,depth; Visual *visual; Window root; int class,bit_gravity,win_gravity,backing_store; unsigned long backing_planes, backing_pixel; int save_under; Colormap colormap; int map_installed; int map_state; i64 all_event_masks, your_event_mask, do_not_propagate_mask; Bool override_redirect; Screen *screen; } XWindowAttributes;
+    typedef struct { int x,y,width,height,border_width,depth; Visual *visual; Window root; int class,bit_gravity,win_gravity,backing_store; u64 backing_planes,backing_pixel; int save_under; Colormap colormap; int map_installed,map_state; i64 all_event_masks,your_event_mask,do_not_propagate_mask; i32 override_redirect; Screen *screen; } XWindowAttributes;
     typedef struct _XDisplay Display;
-    typedef struct { XExtData *ext_data; struct _XPrivate *private1; int fd, private2, proto_major_version, proto_minor_version; char *vendor; XID private3, private4, private5; int private6; XID (*resource_alloc)(struct _XDisplay*); int byte_order, bitmap_unit, bitmap_pad, bitmap_bit_order, nformats; ScreenFormat *pixmap_format; int private8; struct _XPrivate *private9, *private10; int qlen; unsigned long last_request_read, request; XPointer private11, private12, private13, private14; unsigned max_request_size; struct _XrmHashBucketRec *db; int (*private15)(struct _XDisplay*); char *display_name; int default_screen, nscreens; Screen *screens; unsigned long motion_buffer, private16; int min_keycode, max_keycode; XPointer private17, private18; int private19; char *xdefaults; } *_XPrivDisplay;
-    typedef struct { int a; u64 b; int c; void *d; u64 e,f,g,h; int i,j,k,l; u32 m,keycode; int n; } XKeyEvent;
-    typedef struct { int a; u64 b; int c; Display *d; Window e,f,g; Time h; int i,j,k,l; u32 m,button; int n; } XButtonEvent;
-    typedef struct { int a; u64 b; int c; Display *d; Window e, f, g; Time h; int x,y,i,j; u32 k; char l; int m; } XMotionEvent;
-    typedef struct { int type; u64 serial; int send_event; Display *display; Window window, root, subwindow; Time time; int x,y,x_root,y_root,mode,detail; int same_screen, focus; u32 state; } XCrossingEvent;
-    typedef struct { int type; u64 serial; int send_event; Display *display; Window window; int mode, detail; } XFocusChangeEvent;
-    typedef struct { int type; u64 serial; int send_event; Display *display; Window window; char key_vector[32]; } XKeymapEvent;
-    typedef struct { int type; u64 serial; Bool send_event; Display *display; Window window; int x, y, width, height, count; } XExposeEvent;
-    typedef struct { int type; u64 serial; Bool send_event; Display *display; Drawable drawable; int x, y, width, height, count, major_code, minor_code; } XGraphicsExposeEvent;
-    typedef struct { int type; u64 serial; Bool send_event; Display *display; Drawable drawable; int major_code, minor_code; } XNoExposeEvent;
-    typedef struct { int type; u64 serial; Bool send_event; Display *display; Window window; int state; } XVisibilityEvent;
-    typedef struct { int type; u64 serial; Bool send_event; Display *display; Window parent, window; int x, y, width, height, border_width; int override_redirect; } XCreateWindowEvent;
-    typedef struct { int type; unsigned long serial; Bool send_event; Display *display; Window event, window; } XDestroyWindowEvent;
-    typedef struct { int type; unsigned long serial; Bool send_event; Display *display; Window event, window; int from_configure; } XUnmapEvent;
-    typedef struct { int type; unsigned long serial; Bool send_event; Display *display; Window event, window; int override_redirect; } XMapEvent;
-    typedef struct { int type; unsigned long serial; Bool send_event; Display *display; Window parent, window; } XMapRequestEvent;
-    typedef struct { int type; unsigned long serial; Bool send_event; Display *display; Window event, window, parent; int x, y; int override_redirect; } XReparentEvent;
-    typedef struct { int type; unsigned long serial; Bool send_event; Display *display; Window event, window; int x, y, width, height, border_width; Window above; int override_redirect; } XConfigureEvent;
-    typedef struct { int type; unsigned long serial; Bool send_event; Display *display; Window event, window; int x, y; } XGravityEvent;
-    typedef struct { int type; unsigned long serial; Bool send_event; Display *display; Window window; int width, height; } XResizeRequestEvent;
-    typedef struct { int type; unsigned long serial; Bool send_event; Display *display; Window parent, window; int x, y, width, height, border_width; Window above; int detail; unsigned long value_mask; } XConfigureRequestEvent;
-    typedef struct { int type; unsigned long serial; int send_event; Display *display; Window event, window; int place; } XCirculateEvent;
-    typedef struct { int type; unsigned long serial; int send_event; Display *display; Window parent, window; int place; } XCirculateRequestEvent;
-    typedef struct { int type; unsigned long serial; int send_event; Display *display; Window window; Atom atom; Time time; int state; } XPropertyEvent;
-    typedef struct { int type; unsigned long serial; int send_event; Display *display; Window window; Atom selection; Time time; } XSelectionClearEvent;
-    typedef struct { int type; unsigned long serial; int send_event; Display *display; Window owner, requestor; Atom selection, target, property; Time time; } XSelectionRequestEvent;
-    typedef struct { int type; unsigned long serial; int send_event; Display *display; Window requestor; Atom selection, target, property; Time time; } XSelectionEvent;
-    typedef struct { int type; u64 serial; int send_event; Display *display; Window window; Colormap colormap; int new; int state; } XColormapEvent;
-    typedef struct { int type; u64 serial; int send_event; Display *display; Window window; Atom message_type; int format; union { char b[20]; short s[10]; long l[5]; } data; } XClientMessageEvent;
-    typedef struct { int type; u64 serial; int send_event; Display *display; Window window; int request, first_keycode, count; } XMappingEvent;
-    typedef struct { int type; Display *display; XID resourceid; u64 serial; unsigned char error_code, request_code, minor_code; } XErrorEvent;
+    typedef struct { XExtData *ext_data; struct _XPrivate *private1; int fd, private2, proto_major_version, proto_minor_version; char *vendor; XID private3, private4, private5; int private6; XID (*resource_alloc)(struct _XDisplay*); int byte_order, bitmap_unit, bitmap_pad, bitmap_bit_order, nformats; ScreenFormat *pixmap_format; int private8; struct _XPrivate *private9, *private10; int qlen; u64 last_request_read,request; XPointer private11,private12,private13,private14; unsigned max_request_size; struct _XrmHashBucketRec *db; int (*private15)(struct _XDisplay*); char *display_name; i32 default_screen, nscreens; Screen *screens; u64 motion_buffer, private16; i32 min_keycode,max_keycode; XPointer private17,private18; i32 private19; char *xdefaults; } *_XPrivDisplay;
+    typedef struct { int a; u64 b; int c; void *d; u64 e,f,g,h; int i,j,k,l; u32 m,keycode; int n; } XKeyEvent; // Don't care the names of the unused fields here, so just stuff alphabet in there
+    typedef struct { int a; u64 b; int c; Display *d; Window e,f,g; Time h; int i,j,k,l; u32 m,button; int n; } XButtonEvent;  typedef struct { int a; u64 b; int c; Display *d; Window e,f,g; Time h; int x,y,i,j; u32 k; char l; int m; } XMotionEvent;
+    typedef struct { int a; u64 b; int c; Display *d; Window e,f,g; Time h; int x,y,i,j,k,l; int m,n; u32 o; } XCrossingEvent; typedef struct { int a; u64 b; i32 c; Display *d; Window e; int mode,f; } XFocusChangeEvent;
+    typedef struct { int a; u64 b; i32 c; Display *d; Window e,f,parent; int g,h,i; } XReparentEvent;                          typedef struct { int a; u64 b; i32 c; Display *d; Window e,f; int x,y,width,height,g; Window h; int i; } XConfigureEvent;
+    typedef struct { int a; u64 b; int c; Display *d; Window window; Atom message_type; int format; union { char b[20]; short s[10]; long l[5]; } data; } XClientMessageEvent;
     typedef struct { int a; u64 b; int send_event; Display *c; Window window; } XAnyEvent;
-    typedef struct { int type; u64 serial; int send_event; Display *display; int extension, evtype; } XGenericEvent;
     typedef struct { int type; u64 serial; int send_event; Display *display; int extension, evtype; u32 cookie; void *data; } XGenericEventCookie;
-    typedef union _XEvent { int type; XAnyEvent xany; XKeyEvent xkey; XButtonEvent xbutton; XMotionEvent xmotion; XCrossingEvent xcrossing; XFocusChangeEvent xfocus; XExposeEvent xexpose; XGraphicsExposeEvent xgraphicsexpose; XNoExposeEvent xnoexpose; XVisibilityEvent xvisibility; XCreateWindowEvent xcreatewindow; XDestroyWindowEvent xdestroywindow; XUnmapEvent xunmap; XMapEvent xmap; XMapRequestEvent xmaprequest; XReparentEvent xreparent; XConfigureEvent xconfigure; XGravityEvent xgravity; XResizeRequestEvent xresizerequest; XConfigureRequestEvent xconfigurerequest; XCirculateEvent xcirculate; XCirculateRequestEvent xcirculaterequest; XPropertyEvent xproperty; XSelectionClearEvent xselectionclear; XSelectionRequestEvent xselectionrequest; XSelectionEvent xselection; XColormapEvent xcolormap; XClientMessageEvent xclient; XMappingEvent xmapping; XErrorEvent xerror; XKeymapEvent xkeymap; XGenericEvent xgeneric; XGenericEventCookie xcookie; long pad[24]; } XEvent;
+    typedef union _XEvent { int type; XAnyEvent xany; XKeyEvent xkey; XButtonEvent xbutton; XMotionEvent xmotion; XCrossingEvent xcrossing; XFocusChangeEvent xfocus; u8 p0[528]; XReparentEvent xreparent; XConfigureEvent xconfigure; u8 p1[648]; XClientMessageEvent xclient; u8 p2[224]; } XEvent;
     typedef struct _XIC *XIC;
     typedef struct { Visual *visual; VisualID visualid; int screen,depth; int class; u64 red_mask,green_mask,blue_mask; int colormap_size,bits_per_rgb; } XVisualInfo;
     typedef int XContext; typedef XID RROutput,RRCrtc,RRMode; typedef u64 XRRModeFlags;
-    typedef struct _XRRModeInfo { RRMode id; u32 width,height; u64 dotClock; u32 hSyncStart,hSyncEnd,hTotal,hSkew,vSyncStart,vSyncEnd,vTotal; char *name; u32 nameLength; XRRModeFlags modeFlags; } XRRModeInfo;
-    typedef struct _XRRScreenResources { Time timestamp; Time configTimestamp; int ncrtc; RRCrtc *crtcs; int noutput; RROutput *outputs; int nmode; XRRModeInfo *modes; } XRRScreenResources;
-    typedef struct _XRROutputInfo { Time timestamp; RRCrtc crtc; char *name; int nameLen; unsigned long mm_width; unsigned long mm_height; Connection connection; SubpixelOrder subpixel_order; int ncrtc; RRCrtc *crtcs; int nclone; RROutput *clones; int nmode; int npreferred; RRMode *modes; } XRROutputInfo;
-    typedef struct _XRRCrtcInfo { Time timestamp; int x, y; unsigned int width, height; RRMode mode; Rotation rotation; int noutput; RROutput *outputs; Rotation rotations; int npossible; RROutput *possible; } XRRCrtcInfo;
+    typedef struct { RRMode id; u32 width,height; u64 dotClock; u32 hSyncStart,hSyncEnd,hTotal,hSkew,vSyncStart,vSyncEnd,vTotal; char *name; u32 nameLength; XRRModeFlags modeFlags; } XRRModeInfo;
+    typedef struct { Time timestamp; Time configTimestamp; int ncrtc; RRCrtc *crtcs; int noutput; RROutput *outputs; int nmode; XRRModeInfo *modes; } XRRScreenResources;
+    typedef struct { Time timestamp; RRCrtc crtc; char *name; int nameLen; unsigned long mm_width; unsigned long mm_height; Connection connection; SubpixelOrder subpixel_order; i32 ncrtc; RRCrtc *crtcs; i32 nclone; RROutput *clones; i32 nmode,npreferred; RRMode *modes; } XRROutputInfo;
+    typedef struct { Time timestamp; i32 x,y; u32 width,height; RRMode mode; Rotation rotation; i32 noutput; RROutput *outputs; Rotation rotations; i32 npossible; RROutput *possible; } XRRCrtcInfo;
     typedef XID GLXWindow,GLXDrawable; typedef struct __GLXFBConfig* GLXFBConfig; typedef struct __GLXcontext* GLXContext;
     typedef void(*__GLXextproc)(void);                                      typedef XSizeHints*(*PFN_XAllocSizeHints)(void);                           typedef int(*PFN_XChangeProperty)(Display*,Window,Atom,Atom,int,int,const unsigned char*,int);
     typedef Bool(*PFN_XCheckTypedWindowEvent)(Display*,Window,int,XEvent*); typedef void(*PFN_XRRFreeOutputInfo)(XRROutputInfo*);                      typedef Colormap(*PFN_XCreateColormap)(Display*,Window,Visual*,int);
@@ -546,7 +505,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     void GetCursorPosV(_GLFWwindow* window, double* xpos, double* ypos);
     void SetCursorPosV(_GLFWwindow* window, double xpos, double ypos);
     struct _GLFWjoystick { i32 allocated,connected; size_t axesSize,buttonsSize,hatsSize; float*  axes; int axisCount; unsigned char* buttons; int buttonCount; unsigned char* hats; int hatCount; char name[128],guid[33]; _GLFWjoystickLinux linjs; };
-    struct _GLFWlibrary { _GLFWmonitor** monitors; int monitorCount; i32 joysticksInitialized; _GLFWjoystick joysticks[GLFW_JOYSTICK_LAST + 1]; _GLFWlibraryX11 x11; _GLFWlibraryGLX glx; _GLFWlibraryLinux linjs; };
+    struct _GLFWlibrary { _GLFWmonitor** monitors; int monitorCount; i32 joysticksInitialized; _GLFWjoystick joysticks[JOYSTICK_LAST + 1]; _GLFWlibraryX11 x11; _GLFWlibraryGLX glx; _GLFWlibraryLinux linjs; };
     struct _GLFWcontext { int client,source,major,minor; PFNGLGETINTEGERV GetIntegerv; void (*makeCurrent)(_GLFWwindow*); void (*swapBuffers)(_GLFWwindow*); void (*swapInterval)(int); GLFWglproc (*getProcAddress)(const char*); _GLFWcontextGLX glx; };
     struct _GLFWwindow { i32 decorated,doublebuffer; GLFWvidmode videoMode; int minwidth,minheight,maxwidth,maxheight,cursorMode; char mouseButtons[8],keys[349]; double virtualCursorPosX,virtualCursorPosY; _GLFWcontext context; _GLFWwindowX11 x11; };
     struct _GLFWmonitor { char name[128]; int widthMM,heightMM; GLFWvidmode currentMode; _GLFWmonitorX11 x11; };
@@ -558,7 +517,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
         return itemCount;
     }
 
-    static int translateKey(int scancode) { return (scancode<0||scancode>255) ? GLFW_KEY_UNKNOWN : _glfw.x11.keycodes[scancode]; }
+    static int translateKey(int scancode) { return (scancode<0||scancode>255) ? KEY_UNKNOWN : _glfw.x11.keycodes[scancode]; }
     static void sendEventToWM(_GLFWwindow* window,Atom type,long a,long b,long c,long d,long e) {
         XEvent event={33/*ClientMessage*/};
         event.xclient.window=window->x11.handle; event.xclient.format=32; event.xclient.message_type=type;
@@ -704,22 +663,22 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
             case 2/*KeyPress*/:
             case 3/*KeyRelease*/: {
                 const int key=translateKey(keycode),action=(event->type==2/*KeyPress*/)?GLFW_PRESS:GLFW_RELEASE;
-                if (key!=GLFW_KEY_UNKNOWN) InputKey(window,key,action);
+                if (key!=KEY_UNKNOWN) InputKey(window,key,action);
                 return;
             }
             case 4/*ButtonPress*/: {
-                if      (event->xbutton.button==1) InputMouseClick(window,GLFW_MOUSE_BUTTON_LEFT,GLFW_PRESS);
-                else if (event->xbutton.button==2) InputMouseClick(window,GLFW_MOUSE_BUTTON_MIDDLE,GLFW_PRESS);
-                else if (event->xbutton.button==3) InputMouseClick(window,GLFW_MOUSE_BUTTON_RIGHT,GLFW_PRESS);
+                if      (event->xbutton.button==1) InputMouseClick(window,MOUSE_BUTTON_LEFT,GLFW_PRESS);
+                else if (event->xbutton.button==2) InputMouseClick(window,MOUSE_BUTTON_MIDDLE,GLFW_PRESS);
+                else if (event->xbutton.button==3) InputMouseClick(window,MOUSE_BUTTON_RIGHT,GLFW_PRESS);
                 else if (event->xbutton.button==4) Sys_Input.scrollDelta += 1.0;
                 else if (event->xbutton.button==5) Sys_Input.scrollDelta += -1.0;
                 else InputMouseClick(window,event->xbutton.button - 1 - 4,GLFW_PRESS);
                 return;
             }
             case 5/*ButtonRelease*/: {
-                if      (event->xbutton.button==1) InputMouseClick(window,GLFW_MOUSE_BUTTON_LEFT,GLFW_RELEASE);
-                else if (event->xbutton.button==2) InputMouseClick(window,GLFW_MOUSE_BUTTON_MIDDLE,GLFW_RELEASE);
-                else if (event->xbutton.button==3) InputMouseClick(window,GLFW_MOUSE_BUTTON_RIGHT,GLFW_RELEASE);
+                if      (event->xbutton.button==1) InputMouseClick(window,MOUSE_BUTTON_LEFT,GLFW_RELEASE);
+                else if (event->xbutton.button==2) InputMouseClick(window,MOUSE_BUTTON_MIDDLE,GLFW_RELEASE);
+                else if (event->xbutton.button==3) InputMouseClick(window,MOUSE_BUTTON_RIGHT,GLFW_RELEASE);
                 else if (event->xbutton.button>7)  InputMouseClick(window,event->xbutton.button - 1 - 4,GLFW_RELEASE);
                 return;
             }
@@ -818,42 +777,42 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
 
     static int translateKeySyms(const KeySym* keysyms, int width) {
         if (width > 1) { // Numpad with numlock ON (keysyms[1]) - contiguous 0xffb0..0xffb9
-            if (keysyms[1] >= 0xffb0 && keysyms[1] <= 0xffb9) return GLFW_KEY_KP_0 + (keysyms[1] - 0xffb0);
+            if (keysyms[1] >= 0xffb0 && keysyms[1] <= 0xffb9) return KEY_KP_0 + (keysyms[1] - 0xffb0);
             switch (keysyms[1]) {
-                case 0xffac: case 0xffae: return GLFW_KEY_KP_DECIMAL; // KP_Separator, KP_Decimal
-                case 0xffbd:              return GLFW_KEY_KP_EQUAL;   // KP_Equal
-                case 0xff8d:              return GLFW_KEY_KP_ENTER;   // KP_Enter
+                case 0xffac: case 0xffae: return KEY_KP_DECIMAL; // KP_Separator, KP_Decimal
+                case 0xffbd:              return KEY_KP_EQUAL;   // KP_Equal
+                case 0xff8d:              return KEY_KP_ENTER;   // KP_Enter
                 default: break;
             }
         }
 
         KeySym k = keysyms[0];
-        if (k >= 0x0061 && k <= 0x007a) return GLFW_KEY_A + (k - 0x0061);  // a-z
-        if (k >= 0x0030 && k <= 0x0039) return GLFW_KEY_0 + (k - 0x0030);  // 0-9
-        if (k >= 0xffbe && k <= 0xffd6) return GLFW_KEY_F1 + (k - 0xffbe); // F1..F25: 0xffbe..0xffd6
+        if (k >= 0x0061 && k <= 0x007a) return KEY_A + (k - 0x0061);  // a-z
+        if (k >= 0x0030 && k <= 0x0039) return KEY_0 + (k - 0x0030);  // 0-9
+        if (k >= 0xffbe && k <= 0xffd6) return KEY_F1 + (k - 0xffbe); // F1..F25: 0xffbe..0xffd6
         if (k >= 0xff95 && k <= 0xff9f) { // KP numpad with numlock OFF (cursor keys): 0xff95..0xff9f
-            static const int kp_off[] = {GLFW_KEY_KP_7,GLFW_KEY_KP_4,GLFW_KEY_KP_8,GLFW_KEY_KP_6,GLFW_KEY_KP_2,GLFW_KEY_KP_9,GLFW_KEY_KP_3,GLFW_KEY_KP_1,-1,GLFW_KEY_KP_0,GLFW_KEY_KP_DECIMAL };
+            static const int kp_off[] = {KEY_KP_7,KEY_KP_4,KEY_KP_8,KEY_KP_6,KEY_KP_2,KEY_KP_9,KEY_KP_3,KEY_KP_1,-1,KEY_KP_0,KEY_KP_DECIMAL };
             int r = kp_off[k - 0xff95];
             if (r != -1) return r;
         }
         switch (k) {
-            case 0xff1b: return GLFW_KEY_ESCAPE; case 0xff09: return GLFW_KEY_TAB; case 0xff0d: return GLFW_KEY_ENTER;
-            case 0xff08: return GLFW_KEY_BACKSPACE; case 0xffff: return GLFW_KEY_DELETE; case 0xff50: return GLFW_KEY_HOME;
-            case 0xff57: return GLFW_KEY_END; case 0xff55: return GLFW_KEY_PAGE_UP; case 0xff56: return GLFW_KEY_PAGE_DOWN;
-            case 0xff63: return GLFW_KEY_INSERT; case 0xff51: return GLFW_KEY_LEFT; case 0xff53: return GLFW_KEY_RIGHT;
-            case 0xff54: return GLFW_KEY_DOWN; case 0xff52: return GLFW_KEY_UP; case 0xff13: return GLFW_KEY_PAUSE;
-            case 0xff14: return GLFW_KEY_SCROLL_LOCK; case 0xff61: return GLFW_KEY_PRINT_SCREEN; case 0xff7f: return GLFW_KEY_NUM_LOCK;
-            case 0xffe5: return GLFW_KEY_CAPS_LOCK; case 0xff67: return GLFW_KEY_MENU; case 0xffe1: return GLFW_KEY_LEFT_SHIFT;
-            case 0xffe2: return GLFW_KEY_RIGHT_SHIFT; case 0xffe3: return GLFW_KEY_LEFT_CONTROL; case 0xffe4: return GLFW_KEY_RIGHT_CONTROL;
-            case 0xffe7: case 0xffe9: return GLFW_KEY_LEFT_ALT;   // Meta_L, Alt_L
-            case 0xff7e: case 0xfe03: case 0xffe8: case 0xffea: return GLFW_KEY_RIGHT_ALT; // Mode_switch, ISO_Level3_Shift, Meta_R, Alt_R
-            case 0xffeb: return GLFW_KEY_LEFT_SUPER; case 0xffec: return GLFW_KEY_RIGHT_SUPER; case 0xffaa: return GLFW_KEY_KP_MULTIPLY;
-            case 0xffab: return GLFW_KEY_KP_ADD; case 0xffad: return GLFW_KEY_KP_SUBTRACT; case 0xffaf: return GLFW_KEY_KP_DIVIDE;
-            case 0xffbd: return GLFW_KEY_KP_EQUAL; case 0xff8d: return GLFW_KEY_KP_ENTER; case 0x0020: return GLFW_KEY_SPACE;
-            case 0x0027: return GLFW_KEY_APOSTROPHE; case 0x002c: return GLFW_KEY_COMMA; case 0x002d: return GLFW_KEY_MINUS;
-            case 0x002e: return GLFW_KEY_PERIOD; case 0x002f: return GLFW_KEY_SLASH; case 0x003b: return GLFW_KEY_SEMICOLON;
-            case 0x003d: return GLFW_KEY_EQUAL; case 0x005b: return GLFW_KEY_LEFT_BRACKET; case 0x005c: return GLFW_KEY_BACKSLASH;
-            case 0x005d: return GLFW_KEY_RIGHT_BRACKET; case 0x0060: return GLFW_KEY_GRAVE_ACCENT; default: return GLFW_KEY_UNKNOWN;
+            case 0xff1b: return KEY_ESCAPE;        case 0xff09: return KEY_TAB;          case 0xff0d: return KEY_ENTER;
+            case 0xff08: return KEY_BACKSPACE;     case 0xffff: return KEY_DELETE;       case 0xff50: return KEY_HOME;
+            case 0xff57: return KEY_END;           case 0xff55: return KEY_PAGE_UP;      case 0xff56: return KEY_PAGE_DOWN;
+            case 0xff63: return KEY_INSERT;        case 0xff51: return KEY_LEFT;         case 0xff53: return KEY_RIGHT;
+            case 0xff54: return KEY_DOWN;          case 0xff52: return KEY_UP;           case 0xff13: return KEY_PAUSE;
+            case 0xff14: return KEY_SCROLL_LOCK;   case 0xff61: return KEY_PRINT_SCREEN; case 0xff7f: return KEY_NUM_LOCK;
+            case 0xffe5: return KEY_CAPS_LOCK;     case 0xff67: return KEY_MENU;         case 0xffe1: return KEY_LEFT_SHIFT;
+            case 0xffe2: return KEY_RIGHT_SHIFT;   case 0xffe3: return KEY_LEFT_CONTROL; case 0xffe4: return KEY_RIGHT_CONTROL;
+            case 0xffe7: case 0xffe9: return KEY_LEFT_ALT;   // Meta_L, Alt_L
+            case 0xff7e: case 0xfe03: case 0xffe8: case 0xffea: return KEY_RIGHT_ALT; // Mode_switch, ISO_Level3_Shift, Meta_R, Alt_R
+            case 0xffeb: return KEY_LEFT_SUPER;    case 0xffec: return KEY_RIGHT_SUPER;  case 0xffaa: return KEY_KP_MULTIPLY;
+            case 0xffab: return KEY_KP_ADD;        case 0xffad: return KEY_KP_SUBTRACT;  case 0xffaf: return KEY_KP_DIVIDE;
+            case 0xffbd: return KEY_KP_EQUAL;      case 0xff8d: return KEY_KP_ENTER;     case 0x0020: return KEY_SPACE;
+            case 0x0027: return KEY_APOSTROPHE;    case 0x002c: return KEY_COMMA;        case 0x002d: return KEY_MINUS;
+            case 0x002e: return KEY_PERIOD;        case 0x002f: return KEY_SLASH;        case 0x003b: return KEY_SEMICOLON;
+            case 0x003d: return KEY_EQUAL;         case 0x005b: return KEY_LEFT_BRACKET; case 0x005c: return KEY_BACKSLASH;
+            case 0x005d: return KEY_RIGHT_BRACKET; case 0x0060: return KEY_GRAVE_ACCENT; default: return KEY_UNKNOWN;
         }
     }
 
@@ -903,7 +862,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     #define isBitSet(bit, arr) (arr[(bit) / 8] & (1 << ((bit) % 8)))
     #define EVIOCGBIT(ev, len) (0x80004520 + (ev) + ((len) << 16))
     static i32 openJoystickDevice(const char* path) {
-        for (int jid = 0;  jid <= GLFW_JOYSTICK_LAST;  jid++) {
+        for (int jid = 0;  jid <= JOYSTICK_LAST;  jid++) {
             if (!_glfw.joysticks[jid].connected) continue;
             if (StringsEqual(_glfw.joysticks[jid].linjs.path,path)) return 0;
         }
@@ -984,7 +943,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
             StringFormat(joyPath,sizeof(joyPath), "/dev/input/%s", e->name);
             if (e->mask & (0x00000100/*IN_CREATE*/|0x00000004/*IN_ATTRIB*/)) openJoystickDevice(joyPath);
             else if (e->mask & 0x00000200/*IN_DELETE*/) {
-                for (int jid = 0; jid <= GLFW_JOYSTICK_LAST; jid++) {
+                for (int jid = 0; jid <= JOYSTICK_LAST; jid++) {
                     if (StringsEqual(_glfw.joysticks[jid].linjs.path,joyPath)) { closeJoystick(_glfw.joysticks + jid); break; }
                 }
             }
@@ -1248,7 +1207,7 @@ GLFWwindow* VCreateWindow(int width, int height, char* title) {
     GetWindowSize(window,&window->win32.width,&window->win32.height);
     PIXELFORMATDESCRIPTOR pfd; HGLRC prc,rc; HDC pdc,dc;
     _glfw.wgl.instance = LoadLibraryA("opengl32.dll");
-    _glfw.wgl.CreateContext = (PFN_wglCreateContext)PlatformGetModuleSymbol(_glfw.wgl.instance,"wglCreateContext");
+    _glfw.wgl.CreateContext = (PFN_CC)PlatformGetModuleSymbol(_glfw.wgl.instance,"wglCreateContext");
     _glfw.wgl.GetProcAddress = (PFN_wglGetProcAddress)PlatformGetModuleSymbol(_glfw.wgl.instance,"wglGetProcAddress");
     _glfw.wgl.GetCurrentDC = (PFN_wglGetCurrentDC)PlatformGetModuleSymbol(_glfw.wgl.instance,"wglGetCurrentDC");
     _glfw.wgl.GetCurrentContext = (PFN_wglGetCurrentContext)PlatformGetModuleSymbol(_glfw.wgl.instance,"wglGetCurrentContext");
@@ -1256,9 +1215,9 @@ GLFWwindow* VCreateWindow(int width, int height, char* title) {
     dc = GetDC(_glfw.win32.helperWindowHandle);
     MemSetToVForNBytes(&pfd,0,sizeof(pfd)); pfd.nSize = sizeof(pfd); pfd.dwFlags=0x25; SetPixelFormat(dc,ChoosePixelFormat(dc,&pfd),&pfd);
     rc = _glfw.wgl.CreateContext(dc); pdc=wglGetCurrentDC(); prc=wglGetCurrentContext(); wglMakeCurrent(dc,rc);
-    _glfw.wgl.CreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");
-    _glfw.wgl.SwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)wglGetProcAddress("wglSwapIntervalEXT");
-    _glfw.wgl.GetPixelFormatAttribivARB = (PFNWGLGETPIXELFORMATATTRIBIVARBPROC)wglGetProcAddress("wglGetPixelFormatAttribivARB");
+    _glfw.wgl.CreateContextAttribsARB = (FP_CCAA)wglGetProcAddress("wglCreateContextAttribsARB");
+    _glfw.wgl.SwapIntervalEXT = (PFN_SWE)wglGetProcAddress("wglSwapIntervalEXT");
+    _glfw.wgl.GetPixelFormatAttribivARB = (PFN_GPFAIVA)wglGetProcAddress("wglGetPixelFormatAttribivARB");
     wglMakeCurrent(pdc,prc);
     int attribs[40],pixelFormat; PIXELFORMATDESCRIPTOR pfd2;
     window->context.wgl.dc = GetDC(window->win32.handle);
@@ -1311,9 +1270,7 @@ GLFWwindow* VCreateWindow(int width, int height, char* title) {
     Visual* visual=result->visual; int depth = result->depth; _glfw.x11.xlib.Free(result);
     int xpos=0,ypos=0;
     window->x11.colormap=_glfw.x11.xlib.CreateColormap(_glfw.x11.display,_glfw.x11.root,visual,0);
-    XSetWindowAttributes wa={0};
-    wa.colormap=window->x11.colormap;
-    wa.event_mask=(1L<<17)|(1L<<0)|(1L<<1)|(1L<<6)|(1L<<2)|(1L<<3)|(1L<<15)|(1L<<21)|(1L<<16)|(1L<<4)|(1L<<5)|(1L<<22);
+    XSetWindowAttributes wa = {0}; wa.colormap = window->x11.colormap; wa.event_mask = 0x63807F;
     window->x11.parent=_glfw.x11.root;
     window->x11.handle=_glfw.x11.xlib.CreateWindow(_glfw.x11.display,_glfw.x11.root,xpos,ypos,width,height,0,depth,1/*output only*/,visual,(1L<<3)/*border pixel*/|(1L<<13)/*colormap*/|(1L<<11)/*event mask*/,&wa);
     _glfw.x11.xlib.SaveContext(_glfw.x11.display,window->x11.handle,_glfw.x11.context,(XPointer)window); // Needed to allow input.
@@ -1328,12 +1285,9 @@ GLFWwindow* VCreateWindow(int width, int height, char* title) {
     _glfw.x11.xlib.ChangeProperty(_glfw.x11.display,window->x11.handle,_glfw.x11.NET_WM_NAME,_glfw.x11.UTF8_STRING,8,0/*PropModeReplace*/,(unsigned char*)title,GetStringLength(title)); // Set title
     GetWindowPos(window,&window->x11.xpos,&window->x11.ypos); GetWindowSize(window,&window->x11.width,&window->x11.height);
     int attribs[40],index=0; attribs[index++] = 0x2091/*major*/; attribs[index++] = 4; attribs[index++] = 0x2092/*minor*/; attribs[index++] = 3; /*OpenGL 4.3*/ attribs[index++] = 0x9126/*profile mask arb*/; attribs[index++] = 1/*core profile*/; attribs[index++] = 0L; attribs[index++] = 0L;
-    window->context.glx.handle     = _glfw.glx.CreateContextAttribsARB(_glfw.x11.display,native,NULL,1,attribs);
-    window->context.glx.window     = _glfw.glx.CreateWindow(_glfw.x11.display,native,window->x11.handle,NULL);
-    window->context.glx.fbconfig   = native; window->context.makeCurrent = makeContextCurrentGLX;
-    window->context.swapBuffers    = swapBuffersGLX; window->context.swapInterval = swapIntervalGLX;
-    window->context.getProcAddress = getProcAddressGLX;
-    _glfw.x11.xlib.MapWindow(_glfw.x11.display,window->x11.handle);
+    window->context.glx.handle     = _glfw.glx.CreateContextAttribsARB(_glfw.x11.display,native,NULL,1,attribs); window->context.glx.window  = _glfw.glx.CreateWindow(_glfw.x11.display,native,window->x11.handle,NULL);
+    window->context.glx.fbconfig   = native; window->context.makeCurrent = makeContextCurrentGLX;                window->context.swapBuffers = swapBuffersGLX; window->context.swapInterval = swapIntervalGLX;
+    window->context.getProcAddress = getProcAddressGLX; _glfw.x11.xlib.MapWindow(_glfw.x11.display,window->x11.handle);
     if (_glfw.x11.NET_ACTIVE_WINDOW) sendEventToWM(window,_glfw.x11.NET_ACTIVE_WINDOW,1,0,0,0,0);
     else if (WindowVisible(window)) { _glfw.x11.xlib.RaiseWindow(_glfw.x11.display,window->x11.handle); _glfw.x11.xlib.SetInputFocus(_glfw.x11.display,window->x11.handle,2/*RevertToParent*/,0L); }
 #endif
@@ -1344,11 +1298,11 @@ void glfwSetWindowIcon(GLFWwindow* handle, const GLFWimage* images) { _GLFWwindo
 void glfwSetWindowSize(GLFWwindow* handle, int width, int height) { _GLFWwindow* window = (_GLFWwindow*)handle; window->videoMode.width=width; window->videoMode.height=height; SetWindowSize(window,width,height); }
 void glfwSetWindowMonitor(GLFWwindow* wh, int xpos, int ypos, int width, int height) { _GLFWwindow* window = (_GLFWwindow*)wh; window->videoMode.width=width; window->videoMode.height=height; SetWindowMonitor(window,xpos,ypos,width,height); }
 void TextEntry(i32 k) {
-    if (k == GLFW_KEY_U && Sys_Input.keyStates[GLFW_KEY_LEFT_CONTROL].down) { Sys_Global.playerName[0] = '\0'; currentPlayerNameLength = 0; return; }
-    if (k == GLFW_KEY_ENTER || k == GLFW_KEY_KP_ENTER) { currentMenuItem++; return; }
-    if (k == GLFW_KEY_BACKSPACE && currentPlayerNameLength > 0) { Sys_Global.playerName[--currentPlayerNameLength] = '\0'; return; }
+    if (k == KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { Sys_Global.playerName[0] = '\0'; currentPlayerNameLength = 0; return; }
+    if (k == KEY_ENTER || k == KEY_KP_ENTER) { currentMenuItem++; return; }
+    if (k == KEY_BACKSPACE && currentPlayerNameLength > 0) { Sys_Global.playerName[--currentPlayerNameLength] = '\0'; return; }
     if (currentPlayerNameLength >= 26) return;
-    char c = (k >= GLFW_KEY_A && k <= GLFW_KEY_Z) ? 'a' + (k - GLFW_KEY_A) : ((k >= GLFW_KEY_1 && k <= GLFW_KEY_9) ? '1' + (k - GLFW_KEY_1) : ((k == GLFW_KEY_0) ? '0' : ((k == GLFW_KEY_SPACE) ? ' ' : 0)));
+    char c = (k >= KEY_A && k <= KEY_Z) ? 'a' + (k - KEY_A) : ((k >= KEY_1 && k <= KEY_9) ? '1' + (k - KEY_1) : ((k == KEY_0) ? '0' : ((k == KEY_SPACE) ? ' ' : 0)));
     if (c) { Sys_Global.playerName[currentPlayerNameLength] = c; Sys_Global.playerName[++currentPlayerNameLength] = '\0'; }
 }
 
@@ -1363,13 +1317,13 @@ void InputKey(_GLFWwindow* window,int key,int action) {
 
     if (!Sys_Input.window_has_focus) return;
     
-    if (key == GLFW_KEY_F10 && action) OS_Exit(0); // Suppress warnings about unused parameters forced upon me by glfw3 dependency deadweight anchor.
+    if (key == KEY_F10 && action) OS_Exit(0); // Suppress warnings about unused parameters forced upon me by glfw3 dependency deadweight anchor.
     if (Sys_Global.menuActive && !returnToPause) {
-        if ((key == GLFW_KEY_RIGHT_ALT || key == GLFW_KEY_LEFT_ALT) && action && Sys_Input.keyStates[GLFW_KEY_ENTER].down)                    GoIntoGame();
-        if (key == GLFW_KEY_ENTER && action && (Sys_Input.keyStates[GLFW_KEY_LEFT_ALT].down || Sys_Input.keyStates[GLFW_KEY_RIGHT_ALT].down)) GoIntoGame();
+        if ((key == KEY_RIGHT_ALT || key == KEY_LEFT_ALT) && action && Sys_Input.keyStates[KEY_ENTER].down)                    GoIntoGame();
+        if (key == KEY_ENTER && action && (Sys_Input.keyStates[KEY_LEFT_ALT].down || Sys_Input.keyStates[KEY_RIGHT_ALT].down)) GoIntoGame();
     }
 
-    if (key >=0 && key < MAX_KEYS && (action == GLFW_PRESS || (action == GLFW_REPEAT && !(key == GLFW_KEY_KP_ENTER || key == GLFW_KEY_ENTER || key == GLFW_KEY_TAB || key == GLFW_KEY_ESCAPE)))) {
+    if (key >=0 && key < MAX_KEYS && (action == GLFW_PRESS || (action == GLFW_REPEAT && !(key == KEY_KP_ENTER || key == KEY_ENTER || key == KEY_TAB || key == KEY_ESCAPE)))) {
         Sys_Input.keyStates[key].pressed = Sys_Input.keyStates[key].down = true;
         if (Sys_Cheats.consoleActive) ConsoleEmulator(key);
         else if (enteringPlayerName && Sys_Global.menuActive) TextEntry(key);
@@ -1409,7 +1363,7 @@ void InputCursorPos(_GLFWwindow* window,double xpos,double ypos) { // static con
 
 void JoystickConnection(_GLFWjoystick* js, int e) {
     js->connected = (e == 0x00040001/*connected*/) ? 1 : (e == 0x00040002/*disconnected*/) ? 0 : js->connected;    
-    int jid = (int)(js - _glfw.joysticks); if (jid > GLFW_JOYSTICK_LAST) return;
+    int jid = (int)(js - _glfw.joysticks); if (jid > JOYSTICK_LAST) return;
     
     Sys_Input.joystickPresent[jid] = (e == 0x00040001/*connected*/);
     if (!Sys_Input.joystickPresent[jid]) { MemSetToVForNBytes(Sys_Input.joystickButtons,0,sizeof(Sys_Input.joystickButtons)); MemSetToVForNBytes(Sys_Input.joystickHats,0,sizeof(Sys_Input.joystickHats)); } // Clear
@@ -1426,8 +1380,8 @@ void InputJoystickHat(_GLFWjoystick* js,int hat,char value) {
 
 _GLFWjoystick* _glfwAllocJoystick(const char* name,const char* guid,int axisCount,int buttonCount,int hatCount) {
     int jid; _GLFWjoystick* js;
-    for (jid = 0; jid <= GLFW_JOYSTICK_LAST; jid++) { if (!_glfw.joysticks[jid].allocated) break; }
-    if (jid > GLFW_JOYSTICK_LAST) return NULL;
+    for (jid = 0; jid <= JOYSTICK_LAST; jid++) { if (!_glfw.joysticks[jid].allocated) break; }
+    if (jid > JOYSTICK_LAST) return NULL;
     js = _glfw.joysticks + jid;
     js->allocated = 1; js->axisCount = axisCount; js->buttonCount = buttonCount; js->hatCount = hatCount;
     js->axesSize = axisCount*sizeof(float); js->axes = OS_Calloc(axisCount,sizeof(float)); js->buttonsSize = (buttonCount + (size_t)hatCount * 4);
@@ -1437,7 +1391,7 @@ _GLFWjoystick* _glfwAllocJoystick(const char* name,const char* guid,int axisCoun
 }
 
 bool JoystickPresent(int jid) {
-    if (jid < 0 || jid > GLFW_JOYSTICK_LAST || (!_glfw.joysticksInitialized && !InitJoysticks())) return false;
+    if (jid < 0 || jid > JOYSTICK_LAST || (!_glfw.joysticksInitialized && !InitJoysticks())) return false;
     
     _glfw.joysticksInitialized = 1; _GLFWjoystick* js = _glfw.joysticks + jid; return js->connected ? PollJoystick(js) : false;
 }
@@ -1445,25 +1399,25 @@ bool JoystickPresent(int jid) {
 void _glfwFreeJoystick(_GLFWjoystick* js) { OS_DeallocateRAM(js->axes,js->axesSize); OS_DeallocateRAM(js->buttons,js->buttonsSize); OS_DeallocateRAM(js->hats,js->hatsSize); MemSetToVForNBytes(js,0,sizeof(_GLFWjoystick)); }
 void InputProcessing(void) {
     PollEvents();
-    for (int jid = GLFW_JOYSTICK_1; jid <= GLFW_JOYSTICK_LAST; ++jid) { // Input Poll
+    for (int jid = JOYSTICK_1; jid <= JOYSTICK_LAST; ++jid) { // Input Poll
         if (!JoystickPresent(jid)) continue;
         _GLFWjoystick* js = _glfw.joysticks + jid; if (!js->connected) continue;
 
         PollJoystick(js);
         int totalButtons = js->buttonCount + js->hatCount * 4;
         for (int i = 0; i < totalButtons && i < 16; ++i) {
-            KeyState* k = &Sys_Input.joystickButtons[jid - GLFW_JOYSTICK_1][i];
+            KeyState* k = &Sys_Input.joystickButtons[jid - JOYSTICK_1][i];
             bool down = js->buttons[i] == GLFW_PRESS;
             k->pressed = down && !k->down; k->released = !down && k->down; k->down = down;
         }
 
         for (int i = 0; i < js->hatCount && i < 5; ++i) { Sys_Input.joystickHats[i].down = js->hats[i]; }
-//         for (int i = 0; i < js->axisCount && i < MAX_JOYSTICK_AXES; ++i) { Sys_Input.joystickAxes[jid - GLFW_JOYSTICK_1][i] = js->axes[i]; } TODO??
+//         for (int i = 0; i < js->axisCount && i < MAX_JOYSTICK_AXES; ++i) { Sys_Input.joystickAxes[jid - JOYSTICK_1][i] = js->axes[i]; } TODO??
     }
 
-    if (Sys_Input.keyStates[GLFW_KEY_E].pressed) play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f,(Vector3){},false);
+    if (Sys_Input.keyStates[KEY_E].pressed) play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f,(Vector3){},false);
     if (Sys_Input.window_has_focus) {
-        if (Sys_Input.keyStates[GLFW_KEY_CAPS_LOCK].pressed) Sys_Input.isCapsLockOn = !Sys_Input.isCapsLockOn; // Change capslock state to match keyboard having toggled.  Must always happen regardless of paused/menu.
+        if (Sys_Input.keyStates[KEY_CAPS_LOCK].pressed) Sys_Input.isCapsLockOn = !Sys_Input.isCapsLockOn; // Change capslock state to match keyboard having toggled.  Must always happen regardless of paused/menu.
         ProcessInput(); // Calls ApplyPlayerMovements(), needs called without checking paused state for menus handling.
     }
 }
@@ -1472,7 +1426,7 @@ KeyState* GetCodeMapping(int settingIndex) {
     i32 i = Sys_Settings.InputCodeSettings[settingIndex]; // Get table index into all recognized inputs
     if (i == 148 || i >= MAX_KEYS) return &Sys_Input.keyStates[MAX_KEYS - 1]; // UNUSED NULL (e.g. setting unbound)
     if (i >= 53 && i <= 61) return &Sys_Input.mouseButtons[inputElements[i].value];
-    if (i >= 62 && i <= 77) return &Sys_Input.joystickButtons[GLFW_JOYSTICK_1][inputElements[i].value];
+    if (i >= 62 && i <= 77) return &Sys_Input.joystickButtons[JOYSTICK_1][inputElements[i].value];
     if ((i >= 78 && i <= 79) || (i >= 132 && i <= 133)) return &Sys_Input.joystickHats[inputElements[i].value];
     return &Sys_Input.keyStates[inputElements[i].value];
 }

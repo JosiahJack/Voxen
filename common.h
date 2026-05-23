@@ -616,46 +616,25 @@ typedef struct { u8 dataType; const char* fieldName; } EntityField;
 typedef __builtin_va_list va_list;
 typedef struct { char soundPath[128]; } ma_sound;
 typedef struct {
-    u32 globalFrameNum;
-    u16 loadedInstances,loadedLights; // Numbers of instances of entities and lights loaded (always for just the current level)
-    float farPlane;
-	double cpuTime, thisFrameTime, cpuFrameTime, lastFrameSecCountTime;
-	u32 lastFrameSecCount, framesPerLastSecond, worstFPS;
-    i32 cursorPosition_x, cursorPosition_y; // Separate internal cursor from system cursor.  This gets relatively pushed around by real cursor movement to give consistent platform behavior.
-	Vector3 debugLine_start;
-	Vector3 debugLine_end;
-	double debugLineFinished;
-	u32 debugLineVertCount;
-	bool inventoryMode;
-	double last_time, last_topframe_time, last_physics_time, deltaTime, current_time, timeSinceLastPhysicsTick;
-	double screenshotTimeout, pauseRelativeTime, absoluteTime, statusTextDecayFinished, justSavedTimeStamp;
-	bool levelCurrentlyLoading;
-    double shakeFinished;
-	char global_dllname[256];
-	char global_winicon[256];
+    u32 globalFrameNum,lastFrameSecCount,framesPerLastSecond,worstFPS,debugLineVertCount,shotsFired,grenadesThrown,savesScummed;
+    u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,loadedInstances,loadedLights; // Numbers of instances of entities and lights loaded (always for just the current level)
+    float farPlane,damageDealt,damageReceived,timeScale,worldMin_x,worldMin_z,voxelMinCenterX,voxelMinCenterZ;
+	double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,debugLineFinished,shakeFinished,last_time,last_topframe_time,last_physics_time,deltaTime,current_time,timeSinceLastPhysicsTick,screenshotTimeout,pauseRelativeTime,absoluteTime,statusTextDecayFinished,justSavedTimeStamp;
+    i32 fogFac,cursorPosition_x,cursorPosition_y; // Separate internal cursor from system cursor.  This gets relatively pushed around by real cursor movement to give consistent platform behavior.
+	Vector3 debugLine_start,debugLine_end,cyberspaceRecallPoint;
+	bool inventoryMode,levelCurrentlyLoading;
     bool introNotPlayed;
-    u8 levelSecurity[14],startLevel,numLevels,currentLevel,difficultyCombat,difficultyPuzzle,difficultyMission,difficultyCyber;
+    u8 levelSecurity[14],startLevel,numLevels,currentLevel,difficultyCombat,difficultyPuzzle,difficultyMission,difficultyCyber,creditsPageIndex;
 	bool gamePaused,menuActive,gameFinished;
-	u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels;
-	u32 shotsFired,grenadesThrown;
-	float damageDealt,damageReceived;
-	u32 savesScummed;
-	u8 creditsPageIndex;
-	bool creditsActive,decoyActive,boosterActive,uiIsBlocking,mouseClickHeldOverGUI;
-	char playerName[27];
-    int fogFac;
-    bool (*GetKey)(int settingIndex);
-    bool (*GetKeyPressed)(int settingIndex);
+	bool creditsActive,decoyActive,boosterActive,uiIsBlocking,mouseClickHeldOverGUI,geniusActive;
+    bool (*GetKey)(i32 settingIndex);
+    bool (*GetKeyPressed)(i32 settingIndex);
     InventorySystem invP1,invP2;
-    float timeScale;
-    bool  geniusActive;
-    Vector3 cyberspaceRecallPoint;
     Entity instances[INSTANCE_COUNT];
     u8 dirtyInstances[INSTANCE_COUNT];
     Color fogColor;
-    char audiologNames[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH],audiologSubjects[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
-    char audiologSenders[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH],audioLogSpeech2Text[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
-    float worldMin_x,worldMin_z,voxelMinCenterX,voxelMinCenterZ;
+	char global_dllname[256],global_winicon[256],playerName[27];
+    char audiologNames[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH],audiologSubjects[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH],audiologSenders[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH],audioLogSpeech2Text[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
     u8 physicsDebug;
 } GlobalContext;
 

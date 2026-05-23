@@ -326,29 +326,29 @@ void ProcessConsoleCommand(const char* command) {
 }
 
 void ConsoleEmulator(i32 keycode) {
-    if (keycode == GLFW_KEY_UP || keycode == GLFW_KEY_DOWN) { RecallHistory(keycode == GLFW_KEY_UP ? 1 : -1); return; }
-    if (keycode == GLFW_KEY_U && Sys_Input.keyStates[GLFW_KEY_LEFT_CONTROL].down) { consoleEntryText[0]='\0'; currentEntryLength=0; return; } // Clear the input
+    if (keycode == KEY_UP || keycode == KEY_DOWN) { RecallHistory(keycode == KEY_UP ? 1 : -1); return; }
+    if (keycode == KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { consoleEntryText[0]='\0'; currentEntryLength=0; return; } // Clear the input
     
-    if (keycode >= GLFW_KEY_A && keycode <= GLFW_KEY_Z) { // Handle alphabet keys
+    if (keycode >= KEY_A && keycode <= KEY_Z) { // Handle alphabet keys
         if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) { // Ensure we don't overflow the buffer
-            char c = 'a' + (keycode - GLFW_KEY_A); // Map keycode to lowercase character
+            char c = 'a' + (keycode - KEY_A); // Map keycode to lowercase character
             consoleEntryText[currentEntryLength] = c;
             consoleEntryText[currentEntryLength + 1] = '\0';
             currentEntryLength++;
         }
-    } else if (keycode >= GLFW_KEY_1 && keycode <= GLFW_KEY_9) { // Handle number keys 1-9
+    } else if (keycode >= KEY_1 && keycode <= KEY_9) { // Handle number keys 1-9
         if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) {
-            char c = '1' + (keycode - GLFW_KEY_1); // Map to '1'-'9'
+            char c = '1' + (keycode - KEY_1); // Map to '1'-'9'
             consoleEntryText[currentEntryLength] = c;
             consoleEntryText[currentEntryLength + 1] = '\0';
             currentEntryLength++;
         }
-    } else if (keycode == GLFW_KEY_0) { // Handle '0'
+    } else if (keycode == KEY_0) { // Handle '0'
         if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]='0'; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; }
-    } else if (keycode == GLFW_KEY_MINUS || keycode == GLFW_KEY_KP_SUBTRACT) {
-        if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]=(Sys_Input.keyStates[GLFW_KEY_LEFT_SHIFT].down || Sys_Input.keyStates[GLFW_KEY_RIGHT_SHIFT].down) ? '_' : '-'; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; }
-    } else if (keycode == GLFW_KEY_BACKSPACE && currentEntryLength > 0) { currentEntryLength--; consoleEntryText[currentEntryLength]='\0'; } // Handle backspace
-    else if (keycode == GLFW_KEY_SPACE) { // Handle space
+    } else if (keycode == KEY_MINUS || keycode == KEY_KP_SUBTRACT) {
+        if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]=(Sys_Input.keyStates[KEY_LEFT_SHIFT].down || Sys_Input.keyStates[KEY_RIGHT_SHIFT].down) ? '_' : '-'; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; }
+    } else if (keycode == KEY_BACKSPACE && currentEntryLength > 0) { currentEntryLength--; consoleEntryText[currentEntryLength]='\0'; } // Handle backspace
+    else if (keycode == KEY_SPACE) { // Handle space
         if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]=' '; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; }
-    } else if (keycode == GLFW_KEY_ENTER || keycode == GLFW_KEY_KP_ENTER) { DualLog("Console command: %s\n",consoleEntryText); ProcessConsoleCommand(consoleEntryText); }
+    } else if (keycode == KEY_ENTER || keycode == KEY_KP_ENTER) { DualLog("Console command: %s\n",consoleEntryText); ProcessConsoleCommand(consoleEntryText); }
 }

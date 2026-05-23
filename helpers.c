@@ -16,20 +16,11 @@ void stbi_write_bmp(char const *filename, int x, int y, const void *data) {
     OS_Close(f);
 }
 
-double get_time(void) {
-    #ifdef WINDOWS
-        static LARGE_INTEGER frequency; static i32 initialized = 0;
-        if (!initialized) { QueryPerformanceFrequency(&frequency); initialized = 1; }
-        LARGE_INTEGER counter; QueryPerformanceCounter(&counter);
-        return (double)counter.QuadPart / frequency.QuadPart;
-    #else
-        struct { long tv_sec; long tv_nsec; } ts;
-        long ret;
-        __asm__ __volatile__("syscall" : "=a" (ret) : "a" (228), "D" (1), "S" (&ts) : "rcx", "r11", "memory"); // 1 == MONOTONIC
-        if (ret != 0) { DualLogError("get_time failed\n"); return 0.0; }
-        return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9; // Full time in seconds
-    #endif
-}
+#ifdef WINDOWS
+double get_time(void) { static LARGE_INTEGER frequency,counter; static i32 init=0; if (!init) { QueryPerformanceFrequency(&frequency); init=1; } QueryPerformanceCounter(&counter); return (double)counter.QuadPart / frequency.QuadPart; }
+#else
+double get_time(void) { struct {i64 s,ns;} ts; i64 ret; __asm__ __volatile__("syscall":"=a"(ret):"a"(228),"D"(1),"S"(&ts):"rcx","r11","memory"); if (ret != 0) {return 0.0;} return (double)ts.s + (double)ts.ns * 1e-9; } // Full time in seconds, 1 for MONOTONIC
+#endif
 
 // Get USS aka the total RAM uniquely allocated for the process (btop shows RSS so pulls in shared libs and double counts shared RAM).
 void DebugRAM(const char *context) {
@@ -50,9 +41,7 @@ void DebugRAM(const char *context) {
             p += 8;
             size_t val = 0;
             if (CompareMemoryForNBytes(p,"Clean",5) !=0 && CompareMemoryForNBytes(p,"Dirty",5) != 0) { p++; continue; }
-            
-            while (*p && *p != ':') p++;
-            if (*p != ':') { p++; continue; }
+            while (*p && *p != ':') p++; if (*p != ':') { p++; continue; }
             
             p++;
             while (*p == ' ' || *p == '\t') p++;
@@ -63,7 +52,7 @@ void DebugRAM(const char *context) {
         p++;
     }
 
-    DualLog("Memory at %s: Heap %u bytes (%u KB | %.2f MB), USS %u bytes (%u KB | %.2f MB)\n",context,heap_bytes,heap_bytes / 1024,heap_bytes / 1024.0 / 1024.0,uss_bytes,uss_bytes / 1024,uss_bytes / 1024.0 / 1024.0);
+    DualLog("Memory at %s: Heap %u b (%u KB | %.2f MB), USS %u b (%u KB | %.2f MB)\n",context,heap_bytes,heap_bytes / 1024,heap_bytes / 1024.0 / 1024.0,uss_bytes,uss_bytes / 1024,uss_bytes / 1024.0 / 1024.0);
 #else
     (void)context;
 #endif

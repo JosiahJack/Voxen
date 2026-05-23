@@ -1,10 +1,7 @@
 // os.h - starts most translation units and defines the shim layer between Voxen and the OS as well as defining project wide OS defines.
 #pragma once
-typedef __INT8_TYPE__ i8;     typedef __UINT8_TYPE__ u8;   
-typedef __INT16_TYPE__ i16;   typedef __UINT16_TYPE__ u16;
-typedef __INT32_TYPE__ i32;   typedef __UINT32_TYPE__ u32;
-typedef __INT64_TYPE__ i64;   typedef __UINT64_TYPE__ u64;
-typedef __SIZE_TYPE__ size_t; typedef __UINTPTR_TYPE__ uintptr_t; typedef __INTPTR_TYPE__ intptr_t;
+typedef __INT8_TYPE__ i8;     typedef __UINT8_TYPE__ u8;   typedef __INT16_TYPE__ i16;   typedef __UINT16_TYPE__ u16;        typedef __INT32_TYPE__ i32;   typedef __UINT32_TYPE__ u32;
+typedef __INT64_TYPE__ i64;   typedef __UINT64_TYPE__ u64; typedef __SIZE_TYPE__ size_t; typedef __UINTPTR_TYPE__ uintptr_t; typedef __INTPTR_TYPE__ intptr_t;
 #define bool unsigned char
 #define true 1
 #define false 0
@@ -16,7 +13,7 @@ typedef __SIZE_TYPE__ size_t; typedef __UINTPTR_TYPE__ uintptr_t; typedef __INTP
 #else
     #define ENGINE_TO_MOD __attribute__((visibility("default")))
 #endif
-ENGINE_TO_MOD void DualLogError(const char* fmt, ...); char* StringFindSubstring(const char* haystack, const char* needle); void DebugRAM(const char *context);
+ENGINE_TO_MOD void DualLogError(const char* fmt, ...); char* StringFindSubstring(const char* haystack, const char* needle);
 #if defined(_WIN32)
     #define WINDOWS
     #define MOD_EXTENSION ".dll" // e.g. Citadel.dll
@@ -83,6 +80,31 @@ ENGINE_TO_MOD void DualLogError(const char* fmt, ...); char* StringFindSubstring
     static inline __attribute__((always_inline)) int OS_GetNumThreads(void) { unsigned long m[16]; long r=204; __asm__ __volatile__("syscall":"+a"(r):"D"(0LL),"S"(128LL),"d"(m):"rcx","r11","memory"); int c = 0; for(int i=0;i<(r/8);i++) {c+=__builtin_popcountll(m[i]);} return r < 0 ? 1 : c; }
     static inline __attribute__((always_inline)) void OS_DeallocateRAM(void* p,size_t s){ long r=11; if(!p || p == (void*)-1) { DualLogError("Attempting to double free!\n"); OS_Exit(1); } __asm__ __volatile__("syscall":"+a"(r):"D"(p),"S"(s):"rcx","r11","memory"); if(r<0) DualLogError("munmap failed\n"); }
     static inline __attribute__((always_inline)) i64 OS_RawWrite(FHandle fd, const void* buf, size_t cnt) { i64 r=1; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(buf),"d"(cnt):"rcx","r11","memory"); return r; }
+
+    #define THREAD_FLAGS (CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID)
+    //int pthread_create(pthread_t* thread, const pthread_attr_t* attr, void* (*start_routine)(void*), void* arg) {
+        //const size_t STACK_SIZE = 1024*1024; void* stack = (attr && attr->stack) ? attr->stack : OS_Alloc(STACK_SIZE); if (!stack) return -1;
+
+        //char* sp = (char*)stack + STACK_SIZE - 32; ((void**)sp)[0] = start_routine; ((void**)sp)[1] = arg;
+        //i64 ret = 56;  // SYS_clone
+        //__asm__ __volatile__("syscall":"+a"(ret):"D"(THREAD_FLAGS),"S"(sp),"d"(*thread),"r"((long)0),"r"((long)thread):"rcx","r11","memory");
+        //if (ret == 0) {
+            //void* (*fn)(void*) = ((void**)sp)[0]; void* a = ((void**)sp)[1]; void* result = fn(a);
+            //i64 exit_code = (i64)result;
+            //__asm__ __volatile__("syscall":"+a"(exit_code):"D"(exit_code) :"rcx","r11","memory"); // SYS_exit = 60, but we reuse rax
+        //}
+
+        //if (ret > 0) { *thread = ret; return 0; }
+        //if (!(attr && attr->stack)) OS_DeallocateRAM(stack,STACK_SIZE);
+        //return (int)ret;
+    //}
+
+    //int pthread_join(pthread_t thread, void** retval) {
+        //i64 ret = 61; int status = 0;
+        //__asm__ __volatile__("syscall":"+a"(ret):"D"(thread),"S"(&status),"d"(__WALL | __WEXITED):"rcx","r11","memory");
+        //if (ret >= 0) { if (retval) {*retval = NULL;} return 0; }
+        //return (int)ret;
+    //}
 #endif
 static inline __attribute__((always_inline)) void* OS_Alloc(size_t amount) { return OS_AllocateRAM(NULL,amount,0x1|0x2,0x02|0x20,INVALID_FHANDLE); }
 static inline __attribute__((always_inline)) void* OS_Calloc(size_t amount, size_t count) { return OS_AllocateRAM(NULL,amount * count,0x1|0x2,0x02|0x20,INVALID_FHANDLE); }

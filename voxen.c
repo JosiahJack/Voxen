@@ -245,37 +245,23 @@ void ExtractFrustumPlanes(float* m, FrustumPlane* ps) {
     }
 }
 
-ENGINE_TO_MOD void InitializeEntity(Entity* entry) { // Blank entity, no index yet, for initial list population or temporary Entity.
-    entry->index = U16_MAX; // memset here would be harmful as only a handful of fields are the same.
-    entry->entflags = ENTFLAG_ACTIVE; // Zeroes the rest out.
-    entry->kinematic = true;
-    entry->modelIndex = MODEL_IDX_MAX;
-    entry->layer = Layer_Default;
-    entry->texIndex = entry->glowIndex = entry->specIndex = entry->normIndex = MAX_VALID_TEXTURE;
-    entry->lodIndex  = MODEL_IDX_MAX;
-    entry->camView = 255;
-    entry->rotation = QUAT_IDENTITY;
-    entry->scale.x = entry->scale.y = entry->scale.z = 1.0f;
-    entry->collider = COLLIDER_TYPE_NONE;
-    entry->colliderMeshIndex = MODEL_IDX_MAX;
-    entry->tickTime = 0.35f;
-    entry->mass = 1.0f;
-    entry->angularDrag = 0.05f;
-    entry->dynamicFriction = entry->staticFriction = 0.6f;
-    entry->frictionCombine = entry->bounceCombine = PHYS_COMBINE_AVG;
-    entry->volume = 1.0f;
+ENGINE_TO_MOD void InitializeEntity(Entity* entry) { // Blank entity, no index yet, for initial list population or temporary Entity. memset here would be harmful as only a handful of fields are the same.
+    entry->index = U16_MAX;               entry->entflags = ENTFLAG_ACTIVE; entry->kinematic = true;
+    entry->layer = Layer_Default;         entry->camView = 255;             entry->rotation = QUAT_IDENTITY;
+    entry->collider = COLLIDER_TYPE_NONE; entry->tickTime = 0.35f;          entry->angularDrag = 0.05f;
+    entry->modelIndex = entry->lodIndex  = entry->colliderMeshIndex            = MODEL_IDX_MAX;
+    entry->texIndex   = entry->glowIndex = entry->specIndex = entry->normIndex = MAX_VALID_TEXTURE;
+    entry->scale.x    = entry->scale.y   = entry->scale.z   = entry->mass      = entry->volume = 1.0f;
+    entry->dynamicFriction = entry->staticFriction = 0.6f;    entry->frictionCombine = entry->bounceCombine = PHYS_COMBINE_AVG;
 }
 
 Vector3 lightsNewPosition[LIGHT_COUNT];
 ENGINE_TO_MOD i32 AddLight(Light* lit, LightAnimation* lanim) {
-    i32 i = Sys_Global.loadedLights;
-    Sys_Global.loadedLights++;
+    i32 i = Sys_Global.loadedLights; Sys_Global.loadedLights++;
     if (Sys_Global.loadedLights >= LIGHT_COUNT) { DualLogError("Too many lights %u added in level %d!\n",i,Sys_Global.currentLevel); OS_Exit(1); }
 
-    CopyMemoryFromBtoAForNBytes(&lights[i],lit,sizeof(Light));
-    CopyMemoryFromBtoAForNBytes(&lanims[i],lanim,sizeof(LightAnimation));
-    lightsNewPosition[i] = lit->pos;
-    flag_set(&lights[i].lflags,LDIRTY,true);
+    CopyMemoryFromBtoAForNBytes(&lights[i],lit,sizeof(Light)); CopyMemoryFromBtoAForNBytes(&lanims[i],lanim,sizeof(LightAnimation));
+    lightsNewPosition[i] = lit->pos; flag_set(&lights[i].lflags,LDIRTY,true);
     return i;
 }
 
@@ -420,20 +406,20 @@ void CenterStatusPrint(const char * restrict fmt, ...) {
 
 typedef struct { const char* name; int value; } InputElement;
 InputElement inputElements[134] = {
-    { "A", GLFW_KEY_A }, { "B", GLFW_KEY_B }, { "C", GLFW_KEY_C }, { "D", GLFW_KEY_D }, { "E", GLFW_KEY_E }, { "F", GLFW_KEY_F }, { "G", GLFW_KEY_G }, { "H", GLFW_KEY_H }, { "I", GLFW_KEY_I }, { "J", GLFW_KEY_J },
-    { "K", GLFW_KEY_K }, { "L", GLFW_KEY_L }, { "M", GLFW_KEY_M }, { "N", GLFW_KEY_N }, { "O", GLFW_KEY_O }, { "P", GLFW_KEY_P }, { "Q", GLFW_KEY_Q }, { "R", GLFW_KEY_R }, { "S", GLFW_KEY_S }, { "T", GLFW_KEY_T },
-    { "U", GLFW_KEY_U }, { "V", GLFW_KEY_V }, { "W", GLFW_KEY_W }, { "X", GLFW_KEY_X }, { "Y", GLFW_KEY_Y }, { "Z", GLFW_KEY_Z }, { "1", GLFW_KEY_1 }, { "2", GLFW_KEY_2 }, { "3", GLFW_KEY_3 }, { "4", GLFW_KEY_4 },
-    { "5", GLFW_KEY_5 }, { "6", GLFW_KEY_6 }, { "7", GLFW_KEY_7 }, { "8", GLFW_KEY_8 }, { "9", GLFW_KEY_9 }, { "0", GLFW_KEY_0 }, { "UP ARROW", GLFW_KEY_UP }, { "DN ARROW", GLFW_KEY_DOWN }, { "LF ARROW", GLFW_KEY_LEFT }, { "RT ARROW", GLFW_KEY_RIGHT },
-    { "NUM 1", GLFW_KEY_KP_1 }, { "NUM 2", GLFW_KEY_KP_2 }, { "NUM 3", GLFW_KEY_KP_3 }, { "NUM +", GLFW_KEY_KP_ADD }, { "ENTER", GLFW_KEY_ENTER }, { "RIGHT SHIFT", GLFW_KEY_RIGHT_SHIFT }, { "LEFT SHIFT", GLFW_KEY_LEFT_SHIFT }, { "RIGHT CTRL", GLFW_KEY_RIGHT_CONTROL }, { "LEFT CTRL", GLFW_KEY_LEFT_CONTROL }, { "RIGHT ALT", GLFW_KEY_RIGHT_ALT },
-    { "LEFT ALT", GLFW_KEY_LEFT_ALT }, { "RIGHT CMD", GLFW_KEY_RIGHT_SUPER }, { "LEFT CMD", GLFW_KEY_LEFT_SUPER }, { "LMB", GLFW_MOUSE_BUTTON_1 }, { "RMB", GLFW_MOUSE_BUTTON_2 }, { "MMB", GLFW_MOUSE_BUTTON_3 }, { "MB 3", GLFW_MOUSE_BUTTON_4 }, { "MB 4", GLFW_MOUSE_BUTTON_5 }, { "MB 5", GLFW_MOUSE_BUTTON_6 }, { "MB 6", GLFW_MOUSE_BUTTON_7 },
-    { "MB 7", GLFW_MOUSE_BUTTON_8 }, { "JOY 0", GLFW_JOYSTICK_1 }, { "JOY 1", GLFW_JOYSTICK_2 }, { "JOY 2", GLFW_JOYSTICK_3 }, { "JOY 3", GLFW_JOYSTICK_4 }, { "JOY 4", GLFW_JOYSTICK_5 }, { "JOY 5", GLFW_JOYSTICK_6 }, { "JOY 6", GLFW_JOYSTICK_7 }, { "JOY 7", GLFW_JOYSTICK_8 },
-    { "JOY 8", GLFW_JOYSTICK_9 }, { "JOY 9", GLFW_JOYSTICK_10 }, { "JOY 10", GLFW_JOYSTICK_11 }, { "JOY 11", GLFW_JOYSTICK_12 }, { "JOY 12", GLFW_JOYSTICK_13 }, { "JOY 13", GLFW_JOYSTICK_14 }, { "JOY 14", GLFW_JOYSTICK_15 }, { "JOY 15", GLFW_JOYSTICK_16 }, { "JOY 16", GLFW_HAT_UP }, { "JOY 17", GLFW_HAT_RIGHT },
-    { "BACKSPACE", GLFW_KEY_BACKSPACE }, { "TAB", GLFW_KEY_TAB }, { "NUM ENTER", GLFW_KEY_KP_ENTER }, { "ESCAPE", GLFW_KEY_ESCAPE }, { "SPACE", GLFW_KEY_SPACE }, { "DELETE", GLFW_KEY_DELETE }, { "INSERT", GLFW_KEY_INSERT }, { "HOME", GLFW_KEY_HOME }, { "END", GLFW_KEY_END }, { "PAGE UP", GLFW_KEY_PAGE_UP },
-    { "PAGE DN", GLFW_KEY_PAGE_DOWN }, { "F1", GLFW_KEY_F1 }, { "F2", GLFW_KEY_F2 }, { "F3", GLFW_KEY_F3 }, { "F4", GLFW_KEY_F4 }, { "F5", GLFW_KEY_F5 }, { "F6", GLFW_KEY_F6 }, { "F7", GLFW_KEY_F7 }, { "F8", GLFW_KEY_F8 }, { "F9", GLFW_KEY_F9 },
-    { "F10", GLFW_KEY_F10 }, { "F11", GLFW_KEY_F11 }, { "F12", GLFW_KEY_F12 }, { "GRAVE", GLFW_KEY_GRAVE_ACCENT }, { "-", GLFW_KEY_MINUS }, { "=", GLFW_KEY_EQUAL }, { "[", GLFW_KEY_LEFT_BRACKET }, { "]", GLFW_KEY_RIGHT_BRACKET }, { "\\", GLFW_KEY_BACKSLASH }, { "/", GLFW_KEY_SLASH },
-    { ".", GLFW_KEY_PERIOD }, { ",", GLFW_KEY_COMMA }, { ";", GLFW_KEY_SEMICOLON }, { "'", GLFW_KEY_APOSTROPHE }, { "CAPSLOCK", GLFW_KEY_CAPS_LOCK }, { "NUM 0", GLFW_KEY_KP_0 }, { "NUM 4", GLFW_KEY_KP_4 }, { "NUM 5", GLFW_KEY_KP_5 }, { "NUM 6", GLFW_KEY_KP_6 }, { "NUM 7", GLFW_KEY_KP_7 },
-    { "NUM 8", GLFW_KEY_KP_8 }, { "NUM 9", GLFW_KEY_KP_9 }, { "NUM *", GLFW_KEY_KP_MULTIPLY }, { "NUM -", GLFW_KEY_KP_SUBTRACT }, { "NUM .", GLFW_KEY_KP_DECIMAL }, { "MENU", GLFW_KEY_MENU }, { "PAUSE", GLFW_KEY_PAUSE }, { "NUMLOCK", GLFW_KEY_NUM_LOCK }, { "MWHEEL +", 128 }, { "MWHEEL -", 129 }, // 128, 129, Handled special case for mouse wheel + / - respectively
-    { "PRINT", GLFW_KEY_PRINT_SCREEN }, { "JOY 18", GLFW_HAT_DOWN }, { "JOY 19", GLFW_HAT_LEFT },{ "UNUSED", 0 } //, {}
+    { "A", KEY_A }, { "B", KEY_B }, { "C", KEY_C }, { "D", KEY_D }, { "E", KEY_E }, { "F", KEY_F }, { "G", KEY_G }, { "H", KEY_H }, { "I", KEY_I }, { "J", KEY_J },
+    { "K", KEY_K }, { "L", KEY_L }, { "M", KEY_M }, { "N", KEY_N }, { "O", KEY_O }, { "P", KEY_P }, { "Q", KEY_Q }, { "R", KEY_R }, { "S", KEY_S }, { "T", KEY_T },
+    { "U", KEY_U }, { "V", KEY_V }, { "W", KEY_W }, { "X", KEY_X }, { "Y", KEY_Y }, { "Z", KEY_Z }, { "1", KEY_1 }, { "2", KEY_2 }, { "3", KEY_3 }, { "4", KEY_4 },
+    { "5", KEY_5 }, { "6", KEY_6 }, { "7", KEY_7 }, { "8", KEY_8 }, { "9", KEY_9 }, { "0", KEY_0 }, { "UP ARROW", KEY_UP }, { "DN ARROW", KEY_DOWN }, { "LF ARROW", KEY_LEFT }, { "RT ARROW", KEY_RIGHT },
+    { "NUM 1", KEY_KP_1 }, { "NUM 2", KEY_KP_2 }, { "NUM 3", KEY_KP_3 }, { "NUM +", KEY_KP_ADD }, { "ENTER", KEY_ENTER }, { "RIGHT SHIFT", KEY_RIGHT_SHIFT }, { "LEFT SHIFT", KEY_LEFT_SHIFT }, { "RIGHT CTRL", KEY_RIGHT_CONTROL }, { "LEFT CTRL", KEY_LEFT_CONTROL }, { "RIGHT ALT", KEY_RIGHT_ALT },
+    { "LEFT ALT", KEY_LEFT_ALT }, { "RIGHT CMD", KEY_RIGHT_SUPER }, { "LEFT CMD", KEY_LEFT_SUPER }, { "LMB", MOUSE_BUTTON_1 }, { "RMB", MOUSE_BUTTON_2 }, { "MMB", MOUSE_BUTTON_3 }, { "MB 3", MOUSE_BUTTON_4 }, { "MB 4", MOUSE_BUTTON_5 }, { "MB 5", MOUSE_BUTTON_6 }, { "MB 6", MOUSE_BUTTON_7 },
+    { "MB 7", MOUSE_BUTTON_8 }, { "JOY 0", JOYSTICK_1 }, { "JOY 1", JOYSTICK_2 }, { "JOY 2", JOYSTICK_3 }, { "JOY 3", JOYSTICK_4 }, { "JOY 4", JOYSTICK_5 }, { "JOY 5", JOYSTICK_6 }, { "JOY 6", JOYSTICK_7 }, { "JOY 7", JOYSTICK_8 },
+    { "JOY 8", JOYSTICK_9 }, { "JOY 9", JOYSTICK_10 }, { "JOY 10", JOYSTICK_11 }, { "JOY 11", JOYSTICK_12 }, { "JOY 12", JOYSTICK_13 }, { "JOY 13", JOYSTICK_14 }, { "JOY 14", JOYSTICK_15 }, { "JOY 15", JOYSTICK_16 }, { "JOY 16", GLFW_HAT_UP }, { "JOY 17", GLFW_HAT_RIGHT },
+    { "BACKSPACE", KEY_BACKSPACE }, { "TAB", KEY_TAB }, { "NUM ENTER", KEY_KP_ENTER }, { "ESCAPE", KEY_ESCAPE }, { "SPACE", KEY_SPACE }, { "DELETE", KEY_DELETE }, { "INSERT", KEY_INSERT }, { "HOME", KEY_HOME }, { "END", KEY_END }, { "PAGE UP", KEY_PAGE_UP },
+    { "PAGE DN", KEY_PAGE_DOWN }, { "F1", KEY_F1 }, { "F2", KEY_F2 }, { "F3", KEY_F3 }, { "F4", KEY_F4 }, { "F5", KEY_F5 }, { "F6", KEY_F6 }, { "F7", KEY_F7 }, { "F8", KEY_F8 }, { "F9", KEY_F9 },
+    { "F10", KEY_F10 }, { "F11", KEY_F11 }, { "F12", KEY_F12 }, { "GRAVE", KEY_GRAVE_ACCENT }, { "-", KEY_MINUS }, { "=", KEY_EQUAL }, { "[", KEY_LEFT_BRACKET }, { "]", KEY_RIGHT_BRACKET }, { "\\", KEY_BACKSLASH }, { "/", KEY_SLASH },
+    { ".", KEY_PERIOD }, { ",", KEY_COMMA }, { ";", KEY_SEMICOLON }, { "'", KEY_APOSTROPHE }, { "CAPSLOCK", KEY_CAPS_LOCK }, { "NUM 0", KEY_KP_0 }, { "NUM 4", KEY_KP_4 }, { "NUM 5", KEY_KP_5 }, { "NUM 6", KEY_KP_6 }, { "NUM 7", KEY_KP_7 },
+    { "NUM 8", KEY_KP_8 }, { "NUM 9", KEY_KP_9 }, { "NUM *", KEY_KP_MULTIPLY }, { "NUM -", KEY_KP_SUBTRACT }, { "NUM .", KEY_KP_DECIMAL }, { "MENU", KEY_MENU }, { "PAUSE", KEY_PAUSE }, { "NUMLOCK", KEY_NUM_LOCK }, { "MWHEEL +", 128 }, { "MWHEEL -", 129 }, // 128, 129, Handled special case for mouse wheel + / - respectively
+    { "PRINT", KEY_PRINT_SCREEN }, { "JOY 18", GLFW_HAT_DOWN }, { "JOY 19", GLFW_HAT_LEFT },{ "UNUSED", 0 } //, {}
 };
 
 typedef enum { SETTING_U8, SETTING_U16, SETTING_INPUT } SettingType;
@@ -495,7 +481,7 @@ void SaveConfig(void) {
 
 bool GetKeyRiseEdgeOrHeld(int settingIndex, bool risingEdge);
 ENGINE_TO_MOD bool GetKey(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,false); }  // True while held down.
-ENGINE_TO_MOD bool GetKeyPressed(int settingIndex) { return (settingIndex < 0) ? Sys_Input.keyStates[GLFW_KEY_GRAVE_ACCENT].pressed : GetKeyRiseEdgeOrHeld(settingIndex,true); } // True 1st frame down.
+ENGINE_TO_MOD bool GetKeyPressed(int settingIndex) { return (settingIndex < 0) ? Sys_Input.keyStates[KEY_GRAVE_ACCENT].pressed : GetKeyRiseEdgeOrHeld(settingIndex,true); } // True 1st frame down.
 ENGINE_TO_MOD void IgnoreNextMouseDelta(void) { Sys_Input.ignore_next_mouse_delta = true; }
 FHandle levelFileHandle; const char** creditPages = NULL;
 ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
@@ -630,7 +616,7 @@ void* mod_handle = NULL;
 void SetLanguage(void) { LoadTextForLanguage(Sys_Settings.Language); LoadLogTextForLanguage(Sys_Settings.Language); }
 void ApplySettings(void) { ChangeFullScreenWindowed(); SetSkyRotateSpeed(); SetVSync(); SetGI(); SetLanguage(); }
 void OpenMainMenu(void) { PlayMenuMusic(); Sys_Global.menuActive = true; currentMenuPage = Mpg_FrontPage; }
-bool MenuEnter(void) { return (Sys_Input.keyStates[GLFW_KEY_KP_ENTER].pressed || Sys_Input.keyStates[GLFW_KEY_ENTER].pressed); }
+bool MenuEnter(void) { return (Sys_Input.keyStates[KEY_KP_ENTER].pressed || Sys_Input.keyStates[KEY_ENTER].pressed); }
 static inline __attribute__((always_inline,pure)) bool CursorIsOverBounds(float startX, float endX, float startY, float endY) {
     return    Sys_Global.cursorPosition_x >= startX && Sys_Global.cursorPosition_x <= endX  /* 0 == left */
            && Sys_Global.cursorPosition_y >= startY && Sys_Global.cursorPosition_y <= endY; /* 0 ==  top */
@@ -639,13 +625,13 @@ static inline __attribute__((always_inline,pure)) bool CursorIsOverBounds(float 
 u8 UI_Interactable(i16 x, i16 y, float w, float h, bool* cursorOver, i8 this, bool sustained) {
     bool cursorIsOver = CursorIsOverBounds(x, x + w, (float)y - h, (float)y);
     if (cursorIsOver && mouseMovementThisFrame) { currentMenuItem = this; if (cursorOver != NULL) {*cursorOver = cursorIsOver;} }
-    if ((sustained ? Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT ].down : Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT ].pressed) && cursorIsOver) return 1u;
-    if ((sustained ? Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].down : Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].pressed) && cursorIsOver) return 2u;
+    if ((sustained ? Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT ].down : Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT ].pressed) && cursorIsOver) return 1u;
+    if ((sustained ? Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down : Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed) && cursorIsOver) return 2u;
     return 0u;
 }
 
 u8 UI_Button(i16 x, i16 y, float w, float h, bool* cursorOver, i8 this) { return UI_Interactable(x,y,w,h,cursorOver,this,false); }
-bool AnyLeftRightMouseDown(void) { return (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].down); }
+bool AnyLeftRightMouseDown(void) { return (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down); }
 bool UI_Slider(i16 x, i16 y, i16 w, i16 h, i16 sliderPos, i16 xPosForLabel, u8 currentValue, u8* out, bool* sliderActive, u8 min, u8 max, u8 step, u8 mindex, u16 lingdex) {
     bool over=false,changed=false; *out = currentValue;
     RenderUIImage(x,y, w,h, 1079); // Slider background
@@ -657,7 +643,7 @@ bool UI_Slider(i16 x, i16 y, i16 w, i16 h, i16 sliderPos, i16 xPosForLabel, u8 c
     
     if (!AnyLeftRightMouseDown()) { if (*sliderActive) { *sliderActive = false; SaveConfig(); } }
     if (MenuEnter() && currentMenuItem == mindex) {
-        bool shiftHeld = Sys_Input.keyStates[GLFW_KEY_LEFT_SHIFT].down || Sys_Input.keyStates[GLFW_KEY_RIGHT_SHIFT].down;
+        bool shiftHeld = Sys_Input.keyStates[KEY_LEFT_SHIFT].down || Sys_Input.keyStates[KEY_RIGHT_SHIFT].down;
         if (shiftHeld) *out = *out <=  ((min + step) - 1) ? max : *out - step;
         else           *out = *out >= ((max - step) + 1) ?  min : *out + step;
         changed = true;
@@ -861,8 +847,8 @@ void RenderMenu(void) {
     if (menuTabCount <= currentMenuTab) currentMenuTab = 0;
     if (menuItemCount <= currentMenuItem) currentMenuItem = 0;
     static const i8 ngSwap[7] = {0,3,4,1,2,6,5};
-    if (Sys_Input.keyStates[GLFW_KEY_RIGHT].pressed || Sys_Input.keyStates[GLFW_KEY_LEFT].pressed) {
-        int dir = Sys_Input.keyStates[GLFW_KEY_RIGHT].pressed ? 1 : -1;
+    if (Sys_Input.keyStates[KEY_RIGHT].pressed || Sys_Input.keyStates[KEY_LEFT].pressed) {
+        int dir = Sys_Input.keyStates[KEY_RIGHT].pressed ? 1 : -1;
         currentMenuTab = (currentMenuTab + menuTabCount + dir) % menuTabCount;
         if (currentMenuPage == Mpg_NewGame && currentMenuItem < 7) currentMenuItem = ngSwap[currentMenuItem];
     }
@@ -966,7 +952,7 @@ u8 MFD_LefTab=0,MFD_CenterTab=0,MFD_RightTab=0;
 static double RenderUI(void) {
     drawCallsNormal = drawCallsRenderedThisFrame;
     if (Sys_Global.creditsActive) { // Render Credits
-        if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].pressed) {
+        if (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed) {
             ++Sys_Global.creditsPageIndex;
             if (Sys_Global.creditsPageIndex > CREDITS_PAGES) {Sys_Global.creditsActive = false; return get_time(); } // Finished with Erthang!  That's it, go home.
         }
@@ -979,11 +965,11 @@ static double RenderUI(void) {
     if (Sys_Global.menuActive) RenderMenu();
     else if (Sys_Global.gamePaused) RenderPausedUI();
     if ((Sys_Global.menuActive || Sys_Global.gamePaused)) {
-        if (Sys_Input.keyStates[GLFW_KEY_DOWN].pressed) currentMenuItem = (currentMenuItem + 1) >= menuItemCount ? 0 : (currentMenuItem + 1);
-        else if (Sys_Input.keyStates[GLFW_KEY_UP].pressed) currentMenuItem = (currentMenuItem - 1) < 0 ? (menuItemCount - 1) : (currentMenuItem - 1);
+        if (Sys_Input.keyStates[KEY_DOWN].pressed) currentMenuItem = (currentMenuItem + 1) >= menuItemCount ? 0 : (currentMenuItem + 1);
+        else if (Sys_Input.keyStates[KEY_UP].pressed) currentMenuItem = (currentMenuItem - 1) < 0 ? (menuItemCount - 1) : (currentMenuItem - 1);
     } else {
         if (!Sys_Global.gamePaused && !Sys_Cheats.noHUD) RenderUIImage(672,0,22,22,1020); // Shoot mode button
-        bool mouseReleased = Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].pressed;
+        bool mouseReleased = Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed;
         if (Sys_Global.inventoryMode && mouseReleased && CursorIsOverBounds(672,694,22,0)) ForceShootMode();
         
         // Left MFD
@@ -1741,16 +1727,14 @@ i32 main(void) {
                     if (mdx >= loadedModelsMaxIndex || modelVertexCounts[mdx] < 1) { Sys_Global.dirtyInstances[i] = false; continue; } // No model or empty model
 
                     uploadInstances = true;
-                    float x=e->rotation.x, y = e->rotation.y, z = e->rotation.z, w = e->rotation.w;
+                    float x=e->rotation.x, y = e->rotation.y, z = e->rotation.z, w = e->rotation.w; 
                     float x2 = x*x, y2 = y*y, z2 = z*z, xy = x*y, xz = x*z, yz = y*z, wx = w*x, wy = w*y, wz = w*z;
-                    float sclx = e->scale.x; float scly = e->scale.y; float sclz = e->scale.z;
+                    float sclx = e->scale.x, scly = e->scale.y, sclz = e->scale.z;
                     u32 m = i*16;
-                    modelMatrices[m+0] = (1.0f - 2.0f * (y2 + z2)) * sclx;/*Right X*/ modelMatrices[m+1] = (2.0f * (xy + wz)) * sclx;/*Right Y*/ modelMatrices[m+2] = (2.0f * (xz - wy)) * sclx;/*Right Z*/
-                    modelMatrices[m+3] = modelMatrices[m + 7] = modelMatrices[m + 11] = 0.0f;
-                    modelMatrices[m+4] = (2.0f * (xy - wz)) * scly;/*Up X*/      modelMatrices[m+5] = (1.0f - 2.0f * (x2 + z2)) * scly;/*Up Y*/      modelMatrices[m+6] =        (2.0f * (yz + wx)) * scly;/*Up Z*/
-                    modelMatrices[m+8] = (2.0f * (xz + wy)) * sclz;/*Forward X*/ modelMatrices[m+9] =        (2.0f * (yz - wx)) * sclz;/*Forward Y*/ modelMatrices[m+10]= (1.0f - 2.0f * (x2 + y2)) * sclz;/*Forward Z*/
-                    modelMatrices[m+12]= e->position.x; modelMatrices[m + 13] = e->position.y; modelMatrices[m + 14] = e->position.z;
-                    modelMatrices[m+15]= 1.0f;
+                    modelMatrices[m+0] = (1.0f - 2.0f * (y2 + z2)) * sclx;/*Right X*/   modelMatrices[m+1] =        (2.0f * (xy + wz)) * sclx;/*Right Y*/   modelMatrices[m+2] =        (2.0f * (xz - wy)) * sclx;/*Right Z*/
+                    modelMatrices[m+4] =        (2.0f * (xy - wz)) * scly;/*Up X*/      modelMatrices[m+5] = (1.0f - 2.0f * (x2 + z2)) * scly;/*Up Y*/      modelMatrices[m+6] =        (2.0f * (yz + wx)) * scly;/*Up Z*/
+                    modelMatrices[m+8] =        (2.0f * (xz + wy)) * sclz;/*Forward X*/ modelMatrices[m+9] =        (2.0f * (yz - wx)) * sclz;/*Forward Y*/ modelMatrices[m+10]= (1.0f - 2.0f * (x2 + y2)) * sclz;/*Forward Z*/
+                    modelMatrices[m+12]= e->position.x;                                 modelMatrices[m + 13] = e->position.y;                              modelMatrices[m + 14] = e->position.z;   modelMatrices[m+15]= 1.0f;
                 }
             }
             if (uploadInstances) { glBindBuffer(GL_SSBO,Sys_Render.matricesBufferID); glBufferData(GL_SSBO,Sys_Global.loadedInstances * 16 * sizeof(float),modelMatrices,GL_DYNAMIC_DRAW); }
