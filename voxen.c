@@ -519,7 +519,7 @@ ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
     for (u16 i = 0; i < Sys_Global.loadedLights; i++) { lightsNewPosition[i] = lights[i].pos; }
     MemSetToVForNBytes(voxen_Shadow_System.shadowmapIndirectionList,MAX_SHADOWMAPS + 1,Sys_Global.loadedLights * sizeof(u32)); // Set to invalid values for all
     Sys_Global.levelCurrentlyLoading = false;
-    u16 numBox=0,numSphere=0,numMeshConv=0,numMesh=0,numCapsule=0;
+    u16 numBox=0,numSphere=0,numMeshConv=0,numMesh=0,numCapsule=0,dynCount=0;
     for (int i=PLAYER1;i<Sys_Global.loadedInstances;++i) {
         if (ConstIndexIsDynamicObject(Sys_Global.instances[i].index)) continue;
         
@@ -528,8 +528,9 @@ ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
         if (Sys_Global.instances[i].collider == COLLIDER_TYPE_CAPSULE) numCapsule++;
         if (Sys_Global.instances[i].collider == COLLIDER_TYPE_CONVEXMESH) numMeshConv++;
         if (Sys_Global.instances[i].collider == COLLIDER_TYPE_MESH) numMesh++;
+        if (Sys_Global.instances[i].entflags&ENTFLAG_RIGIDBODY && Sys_Global.instances[i].entflags&ENTFLAG_ACTIVE) dynCount++;
     }
-    DualLog("Got static collider count of %u, collider type counts box: %u, sphere: %u, capsule: %u, mesh convex: %u, mesh: %u\n",numBox+numSphere+numCapsule+numMeshConv+numMesh,numBox,numSphere,numCapsule,numMeshConv,numMesh);
+    DualLog("Got static collider count of %u, dynamic %u, collider type counts box: %u, sphere: %u, capsule: %u, mesh convex: %u, mesh: %u\n",numBox+numSphere+numCapsule+numMeshConv+numMesh,dynCount,numBox,numSphere,numCapsule,numMeshConv,numMesh);
     DebugRAM("end of LoadLevel");
 }
 
@@ -1659,7 +1660,7 @@ void InitalizeEnvironment(double game_start_time) {
     }
 }
 
-void InputProcessing(void); void PhysicsUpdateAsync(float dt);
+void InputProcessing(void); void PhysicsUpdateAndWait(float dt);
 i32 main(void) {
     double game_start_time = get_time();
     InitalizeEnvironment(game_start_time);
@@ -1686,7 +1687,7 @@ i32 main(void) {
                 }
             }
 
-            /*if (Sys_Global.timeSinceLastPhysicsTick > (1.0 / 144.0)) { */Sys_Global.last_physics_time = Sys_Global.pauseRelativeTime; PhysicsUpdateAsync(vclamp((float)Sys_Global.timeSinceLastPhysicsTick, 0.0005f, 0.1f));// }
+            Sys_Global.last_physics_time = Sys_Global.pauseRelativeTime; PhysicsUpdateAndWait(vclamp((float)Sys_Global.timeSinceLastPhysicsTick, 0.0005f, 0.1f));// }
             Vector3 pDelta = Vector3_A_minus_B(Sys_Global.instances[PLAYER1].lastPosition,Sys_Global.instances[PLAYER1].position);
             bool playerMoved = ((vabs(pDelta.x) + vabs(pDelta.y) + vabs(pDelta.z)) > 0.02f);
             ModUpdate(playerMoved);

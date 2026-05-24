@@ -1,5 +1,4 @@
 // models.c - Load 3D Models
-//void qsort(void* base, size_t nmemb, size_t size, int (*cmp)(const void*, const void*));
 u8** modelVertices = NULL; u16** modelTriangles = NULL;
 u32 modelVertexCounts[MODEL_IDX_MAX] = {0}; u16 modelTriangleCounts[MODEL_IDX_MAX] = {0};
 float modelBounds[MODEL_IDX_MAX] = {0}; u16 loadedModelsMaxIndex = 0;

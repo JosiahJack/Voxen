@@ -1,417 +1,317 @@
-// physics.c - Physics System
+// physics.c - Discrete parallel physics with substep safety.  Threading model: persistent worker threads, single mutex+condvar pair for dispatch (main->workers) and a separate pair for completion (workers->main).  Workers read a snapshot of ALL entity positions taken before dispatch (no cross-worker position races), write results of current entity and affecting entities only into their own complete copy of the world in g_phys[] then each writes their slice back to Sys_Global.instances[] at the end.
 #include "os.h"
 #include "common.h"
 #include "interop.h"
 #define MAX_COLLISION_ITERATIONS  4
+#define RESTITUTION               0.5f
+#define FRICTION                  0.2f
+#define STEP_MIN_NORMAL_Y         0.7f
 #define COLLISION_EPSILON         0.0001f
-#define MIN_VELOCITY_THRESHOLD    0.001f
-#define STEP_MIN_NORMAL_Y         0.7f // Normals above this are walkable (vcos(45°))
-#define SLOPE_CLIMB_MAX_DEG       45.0f
-#define GROUND_PROBE_DIST         0.15f
-#define SNAP_STEP                 0.02f
-#define STEP_HEIGHT 0.32f
-bool GridCellBlock(u16 i,Vector3 pos,Vector3 newPos);
-extern GlobalContext Sys_Global; extern CheatsSystem Sys_Cheats; extern u16 dynamicEntityCount; extern u16 dynamicEntities[512];
-static const float GROUNDED_HYSTERESIS_TIME = 0.1f, GROUNDED_PROBE_OFFSET = 0.04f;
-static inline __attribute__((always_inline)) i32 PosGetCellCoordX(float pos_x) { return (u16)clamp((i32)vfloor((pos_x - Sys_Global.worldMin_x + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
-static inline __attribute__((always_inline)) i32 PosGetCellCoordZ(float pos_z) { return (u16)clamp((i32)vfloor((pos_z - Sys_Global.worldMin_z + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
+#define MAX_SUBSTEPS              10
+#define MIN_DIAMETER               0.1f // m
+#define MAX_SPEED                 10.0f // m/s
+#define MAX_STEP_SIZE            (MIN_DIAMETER / MAX_SPEED) // 0.01 s
+typedef struct { bool hit; Vector3 point, normal; } OverlapResult;
+typedef struct { Vector3 pos, vel, lastPos; float gravity,mass; } PhysicsState;
+static PhysicsState g_phys[INSTANCE_COUNT]; int g_running = 0;
+static Vector3 g_posSnapshot[INSTANCE_COUNT]; // Snapshot of entity positions taken on the main thread before each substep.  Workers read this for neighbour lookups so there are no write-write or read-write races between worker threads.
+extern GlobalContext Sys_Global; extern CheatsSystem Sys_Cheats; extern u16 loadedModelsMaxIndex,dynamicEntityCount,dynamicEntities[512]; extern float modelBounds[MODEL_IDX_MAX];
+static pthread_mutex_t g_dispatchMutex; static pthread_cond_t  g_dispatchCond; static pthread_mutex_t g_doneMutex; static pthread_cond_t  g_doneCond; // Dispatch gate: main raises g_dispatchGen, workers wake, process, then atomically decrement g_workRemaining.  When it hits 0 the last worker signals the completion condvar so the main thread can proceed.
+static volatile u32 g_dispatchGen = 0; static volatile u32 g_workRemaining = 0; // Generation counter — each substep the main thread increments this under g_dispatchMutex and broadcasts.  Workers compare against the generation they last processed so spurious wakeups are harmless.
+typedef struct { u16 start,end; float dt; } WorkerSlice;
+#define MAX_WORKERS 10
+static WorkerSlice g_slices[MAX_WORKERS];
+static u32         g_workerCnt = 0;
+static inline OverlapResult SphereSphere(Vector3 aPos, float aRad, Vector3 bPos, float bRad) {
+    OverlapResult r = {0};
+    Vector3 delta = Vector3_A_minus_B(aPos, bPos);
+    float dist2 = dot_vector3(delta, delta);
+    float radSum = aRad + bRad;
+    if (dist2 < radSum * radSum) {
+        r.hit = true;
+        float dist = vsqrtf(dist2);
+        r.normal = (dist < COLLISION_EPSILON) ? (Vector3){0,1,0} : scale_vector3(delta, 1.0f / dist);
+        r.point  = Vector3_A_plus_B(bPos, scale_vector3(r.normal, bRad));
+    }
+    return r;
+}
+
+static inline OverlapResult CapsuleCapsule(ShapeCapsule a, ShapeCapsule b) {
+    OverlapResult r = {0};
+    Vector3 aAxis = Vector3_A_minus_B(a.tip, a.base);
+    Vector3 bAxis = Vector3_A_minus_B(b.tip, b.base);
+    for (int i = 0; i < 3; ++i) {
+        Vector3 aPoint = Vector3_A_plus_B(a.base, scale_vector3(aAxis, (float)i * 0.5f));
+        for (int j = 0; j < 3; ++j) {
+            Vector3 bPoint = Vector3_A_plus_B(b.base, scale_vector3(bAxis, (float)j * 0.5f));
+            OverlapResult hit = SphereSphere(aPoint, a.radius, bPoint, b.radius);
+            if (hit.hit) { return hit; }
+        }
+    }
+    return r;
+}
+
+static inline OverlapResult BoxBox(ShapeBox a, ShapeBox b) {
+    float aRad = vmax(a.halfExtents.x, vmax(a.halfExtents.y, a.halfExtents.z));
+    float bRad = vmax(b.halfExtents.x, vmax(b.halfExtents.y, b.halfExtents.z));
+    return SphereSphere(a.center, aRad, b.center, bRad);
+}
+
+static inline OverlapResult CapsuleBox(ShapeCapsule c, ShapeBox b) {
+    float bRad = vmax(b.halfExtents.x, vmax(b.halfExtents.y, b.halfExtents.z));
+    OverlapResult r = {0};
+    Vector3 axis = Vector3_A_minus_B(c.tip, c.base);
+    for (int i = 0; i < 4; ++i) {
+        Vector3 point = Vector3_A_plus_B(c.base, scale_vector3(axis, (float)i * (1.0f/3.0f)));
+        OverlapResult hit = SphereSphere(point, c.radius, b.center, bRad);
+        if (hit.hit) { return hit; }
+    }
+    return r;
+}
+
 static u32 GetCollisionMask(u32 layer) {
     if (layer == Layer_NPCTrigger || layer == Layer_NPCClip) return Layer_NPC;
-    if (layer == Layer_TransparentFX || layer == Layer_IgnoreRaycast) return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_NPCBullet|Layer_Clip;
+    if (layer == Layer_TransparentFX || layer == Layer_IgnoreRaycast)
+        return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|
+               Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_Trigger|Layer_Door|
+               Layer_InterDebris|Layer_Player2|Layer_NPCBullet|Layer_Clip;
     switch (layer) {
-        case Layer_Default:           return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_Corpse|Layer_PhysObjects|Layer_Sky|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_Player3|Layer_Player4|Layer_NPCBullet|Layer_Clip|Layer_CorpseSearchable;
-        case Layer_Geometry:          return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_Clip;
-        case Layer_NPC:               return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_Trigger|Layer_NPCTrigger|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_NPCBullet|Layer_NPCClip|Layer_Clip;
-        case Layer_PlayerBullets:     return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_Corpse|Layer_PhysObjects|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_NPCBullet|Layer_Clip|Layer_CorpseSearchable;
-        case Layer_Player:            return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PhysObjects|Layer_PlayerTriggerOnly|Layer_Trigger|Layer_Door|Layer_Player2|Layer_NPCBullet|Layer_Clip;
-        case Layer_Corpse:            return Layer_Default|Layer_Geometry|Layer_PlayerBullets|Layer_PhysObjects|Layer_Door|Layer_NPCBullet|Layer_Clip;
-        case Layer_PhysObjects:       return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_Corpse|Layer_PhysObjects|Layer_Door|Layer_InterDebris|Layer_NPCBullet|Layer_Clip;
-        case Layer_Sky:               return Layer_Default|Layer_Player;
+        case Layer_Default:     return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_Corpse|Layer_PhysObjects|Layer_Sky|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_Player3|Layer_Player4|Layer_NPCBullet|Layer_Clip|Layer_CorpseSearchable;
+        case Layer_Geometry:    return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_Clip;
+        case Layer_NPC:         return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_Trigger|Layer_NPCTrigger|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_NPCBullet|Layer_NPCClip|Layer_Clip;
+        case Layer_PlayerBullets: return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_Corpse|Layer_PhysObjects|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_NPCBullet|Layer_Clip|Layer_CorpseSearchable;
+        case Layer_Player:      return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PhysObjects|Layer_PlayerTriggerOnly|Layer_Trigger|Layer_Door|Layer_Player2|Layer_NPCBullet|Layer_Clip;
+        case Layer_Corpse:      return Layer_Default|Layer_Geometry|Layer_PlayerBullets|Layer_PhysObjects|Layer_Door|Layer_NPCBullet|Layer_Clip;
+        case Layer_PhysObjects: return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_Corpse|Layer_PhysObjects|Layer_Door|Layer_InterDebris|Layer_NPCBullet|Layer_Clip;
+        case Layer_Sky:         return Layer_Default|Layer_Player;
         case Layer_PlayerTriggerOnly: return Layer_Player|Layer_Player2|Layer_Player3;
-        case Layer_Trigger:           return Layer_Default|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_Door|Layer_InterDebris|Layer_Clip;
-        case Layer_Door:              return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_Corpse|Layer_PhysObjects|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_NPCBullet|Layer_Clip;
-        case Layer_InterDebris:       return Layer_Default|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_PhysObjects|Layer_Trigger|Layer_Door|Layer_NPCBullet|Layer_Clip;
-        case Layer_Player2:           return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_PlayerTriggerOnly|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_NPCBullet|Layer_Clip;
-        case Layer_Player3:           return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_PlayerTriggerOnly|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player3|Layer_NPCBullet|Layer_Clip;
-        case Layer_Player4:           return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_PlayerTriggerOnly|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player4|Layer_NPCBullet|Layer_Clip;
-        case Layer_NPCBullet:         return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_PlayerBullets|Layer_Player|Layer_Corpse|Layer_PhysObjects|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_Clip|Layer_CorpseSearchable;
-        case Layer_Clip:              return Layer_Player|Layer_Player2|Layer_Player3|Layer_Player4|Layer_NPC;
-        case Layer_CorpseSearchable:  return Layer_Default|Layer_PlayerBullets;
-        default:                             return 0u;
+        case Layer_Trigger:     return Layer_Default|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_Door|Layer_InterDebris|Layer_Clip;
+        case Layer_Door:        return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_Corpse|Layer_PhysObjects|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_NPCBullet|Layer_Clip;
+        case Layer_InterDebris: return Layer_Default|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_PhysObjects|Layer_Trigger|Layer_Door|Layer_NPCBullet|Layer_Clip;
+        case Layer_Player2:     return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_PlayerTriggerOnly|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_NPCBullet|Layer_Clip;
+        case Layer_Player3:     return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_PlayerTriggerOnly|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player3|Layer_NPCBullet|Layer_Clip;
+        case Layer_Player4:     return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_PlayerTriggerOnly|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player4|Layer_NPCBullet|Layer_Clip;
+        case Layer_NPCBullet:   return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_PlayerBullets|Layer_Player|Layer_Corpse|Layer_PhysObjects|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_Clip|Layer_CorpseSearchable;
+        case Layer_Clip:        return Layer_Player|Layer_Player2|Layer_Player3|Layer_Player4|Layer_NPC;
+        case Layer_CorpseSearchable: return Layer_Default|Layer_PlayerBullets;
+        default:                return 0u;
     }
 }
 
-void Entity_GetCapsule(const Entity *e,ShapeCapsule *out) {
-    float r=e->colliderSize.x, hi=vmax(0.0f,(e->colliderSize.y*0.5f)-r);
-    Vector3 wc=Vector3_A_plus_B(e->position,quat_rotate_vector(e->rotation,e->colliderCenter));
-    Vector3 axis=(e->colliderSize.z<0.5f) ? quat_rotate_vector(e->rotation,(Vector3){1.0f,0.0f,0.0f}) : (e->colliderSize.z<1.5f) ? quat_rotate_vector(e->rotation,(Vector3){0.0f,1.0f,0.0f}) : quat_rotate_vector(e->rotation,(Vector3){0.0f,0.0f,1.0f});
-    out->radius=r; out->base=Vector3_A_minus_B(wc,scale_vector3(axis,hi)); out->tip=Vector3_A_plus_B(wc,scale_vector3(axis,hi));
+void Entity_GetCapsule(const Entity *e, ShapeCapsule *out) {
+    float r = e->colliderSize.x, hi = vmax(0.0f, (e->colliderSize.y * 0.5f) - r);
+    Vector3 wc  = Vector3_A_plus_B(e->position, quat_rotate_vector(e->rotation, e->colliderCenter));
+    Vector3 axis = (e->colliderSize.z < 0.5f) ? quat_rotate_vector(e->rotation, (Vector3){1,0,0})
+                 : (e->colliderSize.z < 1.5f) ? quat_rotate_vector(e->rotation, (Vector3){0,1,0})
+                 :                              quat_rotate_vector(e->rotation, (Vector3){0,0,1});
+    out->radius = r;
+    out->base   = Vector3_A_minus_B(wc, scale_vector3(axis, hi));
+    out->tip    = Vector3_A_plus_B (wc, scale_vector3(axis, hi));
+}
+void Entity_GetBox   (const Entity *e, ShapeBox    *out) { out->center = Vector3_A_plus_B(e->position, quat_rotate_vector(e->rotation, e->colliderCenter)); out->halfExtents = scale_vector3(e->colliderSize, 0.5f); out->rot = e->rotation; }
+void Entity_GetSphere(const Entity *e, ShapeSphere *out) { out->center = Vector3_A_plus_B(e->position, quat_rotate_vector(e->rotation, e->colliderCenter)); out->radius = e->colliderSize.x; }
+void obb_axes(Quaternion q, Vector3 *ax, Vector3 *ay, Vector3 *az) { *ax=quat_rotate_vector(q,(Vector3){1,0,0}); *ay=quat_rotate_vector(q,(Vector3){0,1,0}); *az=quat_rotate_vector(q,(Vector3){0,0,1}); }
+float GetCollisionRadius(Entity *e) {
+    if (e->collider == COLLIDER_TYPE_BOX)     return vmax(e->colliderSize.x, vmax(e->colliderSize.y, e->colliderSize.z));
+    if (e->collider == COLLIDER_TYPE_CAPSULE) return e->colliderSize.x;
+    return e->colliderSize.x;
 }
 
-void Entity_GetBox(const Entity *e,ShapeBox *out) { out->center=Vector3_A_plus_B(e->position,quat_rotate_vector(e->rotation,e->colliderCenter)); out->halfExtents=scale_vector3(e->colliderSize,0.5f); out->rot=e->rotation; }
-void Entity_GetSphere(const Entity *e,ShapeSphere *out) { out->center=Vector3_A_plus_B(e->position,quat_rotate_vector(e->rotation,e->colliderCenter)); out->radius=e->colliderSize.x; }
-void obb_axes(Quaternion q,Vector3 *ax,Vector3 *ay,Vector3 *az) { *ax=quat_rotate_vector(q,(Vector3){1.0f,0.0f,0.0f}); *ay=quat_rotate_vector(q,(Vector3){0.0f,1.0f,0.0f}); *az=quat_rotate_vector(q,(Vector3){0.0f,0.0f,1.0f}); }
-typedef struct { bool hit; float toi; Vector3 point,normal; } SweepResult;
-typedef struct { float depth; Vector3 normal,point; } ProbeResult;
-typedef struct { u32 type; void *shape; } Shape;
-static SweepResult SweepSphereSphere(Vector3 aPos, float aRadius, Vector3 aVel, Vector3 bPos, float bRadius) {
-    SweepResult r = {0};
-    float cr = aRadius + bRadius;
-    Vector3 rp = Vector3_A_minus_B(aPos, bPos);
-    float c = dot_vector3(rp,rp) - cr*cr;
-    float a = dot_vector3(aVel,aVel);
-    if (a < 1e-8f) { // static overlap only
-        if (c > 0.0f) return r;
-        r.hit=true; r.toi=0.0f;
-        r.normal = magnitude_vector3(rp)>1e-6f ? normalize_vector3(rp) : (Vector3){0,1,0};
-        r.point  = Vector3_A_plus_B(bPos, scale_vector3(r.normal, bRadius));
-        return r;
-    }
-    float b = 2.0f*dot_vector3(rp,aVel), disc = b*b - 4.0f*a*c;
-    if (c <= 0.0f) { // already overlapping
-        r.hit=true; r.toi=0.0f;
-        r.normal = magnitude_vector3(rp)>1e-6f ? normalize_vector3(rp) : (Vector3){0,1,0};
-        r.point  = Vector3_A_plus_B(bPos, scale_vector3(r.normal, bRadius));
-        return r;
-    }
-    if (disc < 0.0f) return r;
-    float t = (-b - vsqrtf(disc)) / (2.0f*a);
-    if (t < 0.0f || t > 1.0f) return r;
-    Vector3 hp = Vector3_A_plus_B(aPos, scale_vector3(aVel, t));
-    r.hit=true; r.toi=t;
-    r.normal = normalize_vector3(Vector3_A_minus_B(hp, bPos));
-    r.point  = Vector3_A_minus_B(hp, scale_vector3(r.normal, aRadius));
-    return r;
-}
+static inline Vector3 ApplyGravity(Vector3 vel, float selfGravity, float dt) { vel.y += (-9.81f * selfGravity) * dt; return vel; }
+static void* PhysicsWorkerFunc(void *arg) {
+    u32 workerIdx   = (u32)(uintptr_t)arg;
+    u32 lastGen     = 0;
 
-static SweepResult SweepSphereCapsule(Vector3 sPos, float sRadius, Vector3 sVel, Vector3 cBase, Vector3 cTip, float cRadius) {
-    SweepResult r = {0};
-    Vector3 capsuleAxis = Vector3_A_minus_B(cTip, cBase);
-    int samples = 4; float closestToi = 2.0f;
-    Vector3 closestNormal = (Vector3){0.0f,1.0f,0.0f}, closestPoint = (Vector3){0.0f,0.0f,0.0f};
-    for (int i = 0; i < samples; ++i) {
-        float t = (float)i / (float)(samples - 1);
-        Vector3 pointOnCapsule = Vector3_A_plus_B(cBase, scale_vector3(capsuleAxis, t));
-        SweepResult hit = SweepSphereSphere(sPos, sRadius, sVel, pointOnCapsule, cRadius);
-        if (hit.hit && hit.toi < closestToi) {
-            closestToi = hit.toi;
-            closestNormal = hit.normal;
-            closestPoint = hit.point;
-            r.hit = true;
-        }
-    }
-    
-    if (r.hit) { r.toi = closestToi; r.normal = closestNormal; r.point = closestPoint; }
-    return r;
-}
-
-static SweepResult SweepSphereBox(Vector3 sPos, float sRadius, Vector3 sVel, ShapeBox box) {
-    Quaternion invRot={-box.rot.x,-box.rot.y,-box.rot.z,box.rot.w};
-    Vector3 lPos=quat_rotate_vector(invRot,Vector3_A_minus_B(sPos,box.center));
-    Vector3 lVel=quat_rotate_vector(invRot,sVel);
-    Vector3 eHE={box.halfExtents.x+sRadius,box.halfExtents.y+sRadius,box.halfExtents.z+sRadius};
-
-    // Check static overlap first (sphere center inside expanded box)
-    bool inside = lPos.x>=-eHE.x&&lPos.x<=eHE.x&&lPos.y>=-eHE.y&&lPos.y<=eHE.y&&lPos.z>=-eHE.z&&lPos.z<=eHE.z;
-    if (inside) {
-        // Push out on minimum-penetration axis
-        float dx=eHE.x-vabs(lPos.x), dy=eHE.y-vabs(lPos.y), dz=eHE.z-vabs(lPos.z);
-        Vector3 n = dx<dy&&dx<dz ? (Vector3){lPos.x>0?1.f:-1.f,0,0}
-                  : dy<dz       ? (Vector3){0,lPos.y>0?1.f:-1.f,0}
-                                : (Vector3){0,0,lPos.z>0?1.f:-1.f};
-        SweepResult r;
-        r.hit=true; r.toi=0.0f;
-        r.normal=normalize_vector3(quat_rotate_vector(box.rot,n));
-        r.point=Vector3_A_plus_B(sPos,scale_vector3(r.normal,-sRadius));
-        return r;
-    }
-
-    // Slab sweep test
-    float tEnter=0.0f, tExit=1.0f;
-    Vector3 hitNormalLocal={0,1,0};
-    for (int ax=0; ax<3; ++ax) {
-        float pos=ax==0?lPos.x:ax==1?lPos.y:lPos.z;
-        float vel=ax==0?lVel.x:ax==1?lVel.y:lVel.z;
-        float he =ax==0?eHE.x :ax==1?eHE.y :eHE.z;
-        if (vabs(vel)<1e-8f) { if (pos<-he||pos>he) return (SweepResult){0}; continue; }
-        float t0=(-he-pos)/vel, t1=(he-pos)/vel;
-        float tN=vmin(t0,t1), tF=vmax(t0,t1);
-        if (tN>tEnter) {
-            tEnter=tN;
-            float s=vel>0?-1.f:1.f;
-            hitNormalLocal=ax==0?(Vector3){s,0,0}:ax==1?(Vector3){0,s,0}:(Vector3){0,0,s};
-        }
-        tExit=vmin(tExit,tF);
-        if (tEnter>tExit) return (SweepResult){0};
-    }
-    if (tEnter<0.0f||tEnter>1.0f) return (SweepResult){0};
-
-    SweepResult r;
-    r.hit=true; r.toi=tEnter;
-    r.normal=normalize_vector3(quat_rotate_vector(box.rot,hitNormalLocal));
-    r.point=Vector3_A_plus_B(Vector3_A_plus_B(sPos,scale_vector3(sVel,tEnter)),scale_vector3(r.normal,-sRadius));
-    return r;
-}
-
-// static SweepResult SweepCapsuleSphere(Vector3 cBase, Vector3 cTip, float cRadius, Vector3 cVel, Vector3 sPos, float sRadius) { return SweepSphereCapsule(sPos,sRadius,scale_vector3(cVel,-1.0f), cBase,cTip,cRadius); } // Reverse roles and negate velocity
-static SweepResult SweepCapsuleCapsule(Vector3 aBase, Vector3 aTip, float aRadius, Vector3 aVel, Vector3 bBase, Vector3 bTip, float bRadius) {
-    SweepResult r = {0};
-    int samples = 4; float closestToi = 2.0f;
-    Vector3 closestNormal = (Vector3){0.0f,1.0f,0.0f}; Vector3 closestPoint = (Vector3){0.0f,0.0f,0.0f};
-    Vector3 aAxis = Vector3_A_minus_B(aTip, aBase);
-    for (int i=0;i<samples;++i) { // Sample both capsules and test sphere samples
-        float t = (float)i / (float)(samples - 1);
-        Vector3 aPoint = Vector3_A_plus_B(aBase, scale_vector3(aAxis, t));
-        SweepResult hit = SweepSphereCapsule(aPoint, aRadius, aVel, bBase, bTip, bRadius); // Test this point against capsule B
-        if (hit.hit && hit.toi < closestToi) { closestToi = hit.toi; closestNormal = hit.normal; closestPoint = hit.point; r.hit = true; }
-    }
-    
-    if (r.hit) { r.toi = closestToi; r.normal = closestNormal; r.point = closestPoint; }
-    return r;
-}
-
-static SweepResult SweepCapsuleBox(Vector3 sBase, Vector3 sTip, float sRadius, Vector3 sVel, ShapeBox box) {
-    SweepResult r = {0}; float closestToi=2.0f;
-    Vector3 axis=Vector3_A_minus_B(sTip,sBase);
-    for (int i=0; i<4; ++i) {
-        float t=(float)i/3.0f;
-        SweepResult hit=SweepSphereBox(Vector3_A_plus_B(sBase,scale_vector3(axis,t)),sRadius,sVel,box);
-        if (hit.hit && hit.toi<closestToi) { closestToi=hit.toi; r=hit; }
-    }
-    return r;
-}
-
-
-static ProbeResult ProbeCapsule(Vector3 base, Vector3 tip, float radius, u32 collisionMask) {
-    ProbeResult result={0};
-    Vector3 downVel={0,-0.001f,0};
-    for (u32 i=0; i<Sys_Global.loadedInstances; ++i) {
-        Entity *other=&Sys_Global.instances[i];
-        if (!(other->entflags&ENTFLAG_ACTIVE)||other->collider==COLLIDER_TYPE_NONE) continue;
-        if (!(collisionMask&other->layer)) continue;
+    while (__atomic_load_n(&g_running,__ATOMIC_ACQUIRE)) {
+        pthread_mutex_lock(&g_dispatchMutex);
+        while (__atomic_load_n(&g_dispatchGen,__ATOMIC_ACQUIRE) == lastGen && __atomic_load_n(&g_running,__ATOMIC_ACQUIRE)) 
+            pthread_cond_wait(&g_dispatchCond,&g_dispatchMutex);
+        u32 myGen = __atomic_load_n(&g_dispatchGen,__ATOMIC_ACQUIRE);
+        pthread_mutex_unlock(&g_dispatchMutex);
+        if (!__atomic_load_n(&g_running,__ATOMIC_ACQUIRE)) break;
         
-        Vector3 toOther=Vector3_A_minus_B(other->position,base);
-        float quickDist=vabs(toOther.x)+vabs(toOther.y)+vabs(toOther.z);
-        float quickMax=radius+vmax(other->colliderSize.x,vmax(other->colliderSize.y,other->colliderSize.z))*2.0f+1.0f;
-        if (quickDist>quickMax) continue;
+        lastGen = myGen;
+        WorkerSlice *sl = &g_slices[workerIdx];
+        for (u16 i = sl->start; i < sl->end; ++i) {
+            u16 idx = dynamicEntities[i];
+            if (idx >= INSTANCE_COUNT) continue;
 
-        SweepResult hit={0};
-        ShapeSphere ss; ShapeBox sb; ShapeCapsule sc;
-        switch (other->collider) {
-            case COLLIDER_TYPE_SPHERE: Entity_GetSphere(other,&ss); hit=SweepSphereCapsule(ss.center,ss.radius,(Vector3){0},base,tip,radius); break;
-            case COLLIDER_TYPE_BOX: Entity_GetBox(other,&sb); hit=SweepCapsuleBox(base,tip,radius,downVel,sb); break;
-            case COLLIDER_TYPE_CAPSULE: Entity_GetCapsule(other,&sc); hit=SweepCapsuleCapsule(base,tip,radius,(Vector3){0},sc.base,sc.tip,sc.radius); break;
-            //case COLLIDER_TYPE_MESH: hit=SweepCapsuleMeshEntity(base,tip,radius,other,(u16)i); break;
-            default: continue;
+            Entity *e = &Sys_Global.instances[idx];
+            if (e->collider == COLLIDER_TYPE_NONE || (Sys_Cheats.noclip && idx != PLAYER1)) continue;
+
+            PhysicsState *ps = &g_phys[idx];
+            float mass = e->mass > 0.001f ? e->mass : 1.0f;
+            Vector3 baseVel = ps->vel;
+            Vector3 vel = ApplyGravity(baseVel,ps->gravity,sl->dt);
+            vel = Vector3_A_plus_B(vel, scale_vector3(e->accumulatedForce, sl->dt / mass));
+            Vector3 newPos = Vector3_A_plus_B(ps->pos, scale_vector3(vel, sl->dt));
+            
+            // Check for collision and get the normal if we hit
+            u32 mask = GetCollisionMask(e->layer);
+            bool hit = false;
+            Vector3 hitNormal = {0,1,0};
+            
+            for (u16 j = 0; j < INSTANCE_COUNT && !hit; ++j) {
+                if (j == idx) continue;
+                Entity *o = &Sys_Global.instances[j];
+                if (o->collider == COLLIDER_TYPE_NONE || !(mask & o->layer)) continue;
+                
+                Vector3 savedPos = e->position;
+                e->position = newPos;
+                Vector3 oSavedPos = o->position;
+                o->position = g_posSnapshot[j];
+                
+                ShapeCapsule capA, capB; ShapeBox boxA, boxB;
+                OverlapResult r = {0};
+                if (e->collider==COLLIDER_TYPE_CAPSULE && o->collider==COLLIDER_TYPE_CAPSULE) {
+                    Entity_GetCapsule(e,&capA); Entity_GetCapsule(o,&capB);
+                    r = CapsuleCapsule(capA,capB);
+                } else if (e->collider==COLLIDER_TYPE_CAPSULE && o->collider==COLLIDER_TYPE_BOX) {
+                    Entity_GetCapsule(e,&capA); Entity_GetBox(o,&boxB);
+                    r = CapsuleBox(capA,boxB);
+                } else if (e->collider==COLLIDER_TYPE_BOX && o->collider==COLLIDER_TYPE_CAPSULE) {
+                    Entity_GetBox(e,&boxA); Entity_GetCapsule(o,&capB);
+                    r = CapsuleBox(capB,boxA);
+                } else if (e->collider==COLLIDER_TYPE_BOX && o->collider==COLLIDER_TYPE_BOX) {
+                    Entity_GetBox(e,&boxA); Entity_GetBox(o,&boxB);
+                    r = BoxBox(boxA,boxB);
+                } else {
+                    r = SphereSphere(newPos, GetCollisionRadius(e), g_posSnapshot[j], GetCollisionRadius(o));
+                }
+                
+                if (r.hit) {
+                    hit = true;
+                    hitNormal = r.normal;
+                }
+                
+                o->position = oSavedPos;
+                e->position = savedPos;
+            }
+            
+            if (!hit) {
+                ps->lastPos = ps->pos;
+                ps->pos = newPos;
+                ps->vel = vel;
+            } else {
+                // Simple response: cancel velocity into the surface, keep tangential
+                float vdn = dot_vector3(vel, hitNormal);
+                if (vdn < 0) {
+                    // Remove the component going into the surface
+                    vel = Vector3_A_minus_B(vel, scale_vector3(hitNormal, vdn));
+                    // Small friction on tangential movement
+                    Vector3 tangent = Vector3_A_minus_B(vel, scale_vector3(hitNormal, dot_vector3(vel, hitNormal)));
+                    float tangentSpeed = magnitude_vector3(tangent);
+                    if (tangentSpeed > COLLISION_EPSILON) {
+                        float frictionScale = 0.95f; // 5% friction per hit
+                        vel = Vector3_A_plus_B(scale_vector3(tangent, frictionScale), 
+                                               scale_vector3(hitNormal, dot_vector3(vel, hitNormal)));
+                    }
+                }
+                // Stay at last safe position
+                ps->vel = vel;
+            }
+            e->accumulatedForce = (Vector3){0, 0, 0};
         }
-        if (hit.hit) { result.depth=radius; result.normal=hit.normal; result.point=hit.point; return result; }
-    }
-    return result;
-}
 
-static double g_groundedLostTime[PLAYER2 + 1];
-static void UpdatePlayerGrounding(u16 playerIdx, Vector3 pos, u32 collisionMask) {
-    Entity* e = &Sys_Global.instances[playerIdx];
-    bool wasGrounded = (e->entflags & ENTFLAG_GROUNDED) != 0;
-    float probeRange = GROUND_PROBE_DIST;
-    Vector3 probeBase = pos;
-    Vector3 probeTip = {pos.x, pos.y - probeRange, pos.z};
-    ProbeResult probe = ProbeCapsule(probeBase, probeTip, PLAYER_RADIUS, collisionMask);
-    bool isGrounded = false;
-    float slopeDegrees = 91.0f;  // Default: too steep
-    if (probe.depth > 0.0f && probe.normal.y > 0.1f) {
-        isGrounded = true;
-        slopeDegrees = (180.0f / 3.14159265f) * vacosf(vmax(-1.0f, vmin(1.0f, probe.normal.y)));
-    }
-    
-    bool withinClimbAngle = isGrounded && (slopeDegrees <= SLOPE_CLIMB_MAX_DEG);
-    if (withinClimbAngle) { g_groundedLostTime[playerIdx] = 0.0f; flag_set(&e->entflags, ENTFLAG_GROUNDED, true); } // Ground state machine with hysteresis
-    else {
-        if (!isGrounded && wasGrounded) { // Lost ground: check hysteresis band (slightly lower probe)
-            Vector3 hProbeBase = {pos.x, pos.y - GROUNDED_PROBE_OFFSET, pos.z};
-            Vector3 hProbeTip = {pos.x, pos.y - GROUNDED_PROBE_OFFSET - probeRange, pos.z};
-            ProbeResult hProbe = ProbeCapsule(hProbeBase, hProbeTip, PLAYER_RADIUS, collisionMask);
-            float hSlopeDeg = 91.0f;
-            if (hProbe.depth > 0.0f && hProbe.normal.y > 0.1f) hSlopeDeg = (180.0f / 3.14159265f) * vacosf(vmax(-1.0f, vmin(1.0f, hProbe.normal.y)));
-            if (hProbe.depth > 0.0f && hSlopeDeg <= SLOPE_CLIMB_MAX_DEG) {
-                // Within hysteresis band - stay grounded
-                g_groundedLostTime[playerIdx] = 0.0f;
-                flag_set(&e->entflags, ENTFLAG_GROUNDED, true);
-            } else if (g_groundedLostTime[playerIdx] <= 0.0f) g_groundedLostTime[playerIdx] = Sys_Global.pauseRelativeTime; // Start off-delay timer
+        if (__atomic_sub_fetch(&g_workRemaining, 1, __ATOMIC_RELEASE) == 0) {
+            pthread_mutex_lock(&g_doneMutex);
+            pthread_cond_broadcast(&g_doneCond);
+            pthread_mutex_unlock(&g_doneMutex);
         }
-        
-        // Apply off-delay grace period
-        if (!withinClimbAngle && g_groundedLostTime[playerIdx] > 0.0f) {
-            float elapsed = Sys_Global.pauseRelativeTime - g_groundedLostTime[playerIdx];
-            if (elapsed < GROUNDED_HYSTERESIS_TIME) flag_set(&e->entflags, ENTFLAG_GROUNDED, true);  // Still in grace period
-            else { g_groundedLostTime[playerIdx] = 0.0f; flag_set(&e->entflags, ENTFLAG_GROUNDED, false); }
-        } else if (!withinClimbAngle && g_groundedLostTime[playerIdx] <= 0.0f && wasGrounded) flag_set(&e->entflags, ENTFLAG_GROUNDED, false);
-    }
-}
-
-static void SnapPlayerToFloor(Vector3* pos, u32 collisionMask) {
-    for (float d = SNAP_STEP; d <= GROUND_PROBE_DIST; d += SNAP_STEP) {
-        Vector3 probePos = {pos->x, pos->y - d, pos->z};
-        ProbeResult probe = ProbeCapsule(probePos,(Vector3){probePos.x,probePos.y - SNAP_STEP,probePos.z},PLAYER_RADIUS,collisionMask);
-        if (probe.depth > 0.0f && probe.normal.y > STEP_MIN_NORMAL_Y) { pos->y = probePos.y; return; }
-    }
-}
-
-static bool AttemptStepClimb(Vector3* pos, Vector3 moveDir, Vector3* vel, u32 collisionMask) {
-    Vector3 stepPos = *pos;
-    stepPos.y += STEP_HEIGHT; // Check if we can fit at step height
-    ProbeResult stepProbe = ProbeCapsule(stepPos,(Vector3){stepPos.x,stepPos.y - PLAYER_HEIGHT, stepPos.z},PLAYER_RADIUS,collisionMask);
-    if (stepProbe.depth > 0.0f) return false;  // Can't fit at step height
-    
-    // Check if there's walkable ground at step height
-    Vector3 stepFloorPos = {stepPos.x + moveDir.x * 0.5f, stepPos.y, stepPos.z + moveDir.z * 0.5f};
-    ProbeResult floorProbe = ProbeCapsule(stepFloorPos,(Vector3){stepFloorPos.x,stepFloorPos.y - STEP_HEIGHT,stepFloorPos.z},PLAYER_RADIUS,collisionMask);
-    if (floorProbe.depth > 0.0f && floorProbe.normal.y >= STEP_MIN_NORMAL_Y) {
-        SnapPlayerToFloor(&stepFloorPos,collisionMask);
-        *pos = stepFloorPos;
-        vel->y = 0.0f;
-        return true;
-    }
-    
-    return false;
-}
-
-static void IntegratePlayer(u16 playerIdx, float dt) {
-    Entity* e = &Sys_Global.instances[playerIdx];
-    Vector3 pos=e->position, vel=e->velocity, newPos=Vector3_A_plus_B(pos,scale_vector3(vel,dt));
-    u32 collisionMask = GetCollisionMask(e->layer);
-    if (Sys_Cheats.noclip) { e->position = newPos; return; } // Noclip mode
-    if (magnitude_vector3(vel) < MIN_VELOCITY_THRESHOLD) { UpdatePlayerGrounding(playerIdx,pos,collisionMask); return; } // Skip if nearly stationary
-    if (GridCellBlock(playerIdx,pos,newPos)) return;
-    
-    Vector3 moveDir = normalize_vector3(vel);
-    if (vabs(vel.y) > 1e-6f) { // ---- VERTICAL MOVEMENT ----
-        bool movingDown = vel.y < 0.0f;
-        Vector3 vProbeBase = pos, vProbeTip = {pos.x, pos.y + vel.y * dt, pos.z};
-        ProbeResult vProbe = ProbeCapsule(vProbeBase, vProbeTip, PLAYER_RADIUS, collisionMask);
-        bool blockVertical = false;
-        if (movingDown) blockVertical = (vProbe.depth > 0.0f && vProbe.normal.y > 0.1f); // Check if movement is blocked
-        else blockVertical = (vProbe.depth > 0.0f && vProbe.normal.y < -0.1f);
-        
-        if (blockVertical) vel.y = 0.0f;
-        else pos.y += vel.y * dt;
-    }
-
-    Vector3 hVel = {vel.x, 0.0f, vel.z};
-    if (magnitude_vector3(hVel) > 1e-6f) { // ---- HORIZONTAL MOVEMENT ----
-        Vector3 hProbeBase = pos, hProbeTip = {pos.x + hVel.x * dt, pos.y, pos.z + hVel.z * dt};
-        ProbeResult hProbe = ProbeCapsule(hProbeBase, hProbeTip, PLAYER_RADIUS, collisionMask);
-        if (hProbe.depth > 0.0f) {
-            bool isWall = hProbe.normal.y < STEP_MIN_NORMAL_Y;
-            if (isWall && hProbe.normal.y > -0.3f) { // Try step climb
-                float vdn = dot_vector3(hVel,hProbe.normal);
-                if (vdn < 0.0f) { vel.x -= hProbe.normal.x * vdn; vel.z -= hProbe.normal.z * vdn; }
-            } else if (!isWall) {} // Floor variation - let snap handle it next frame, ignore for now
-        } else { pos.x += hVel.x * dt; pos.z += hVel.z * dt; }
-    }
-    
-    SnapPlayerToFloor(&pos,collisionMask);
-    UpdatePlayerGrounding(playerIdx,pos,collisionMask);
-    e->lastPosition = e->position; e->position = pos; e->velocity = vel;
-    e->cellX = PosGetCellCoordX(pos.x); e->cellZ = PosGetCellCoordZ(pos.z); e->cellIndex = (e->cellZ * WORLDX) + e->cellX;
-    Sys_Global.dirtyInstances[playerIdx] = true;
-}
-
-extern float modelBounds[MODEL_IDX_MAX]; u16 loadedModelsMaxIndex;
-float GetCollisionRadius(Entity* e) {
-    if ((e->collider == COLLIDER_TYPE_CONVEXMESH || e->collider == COLLIDER_TYPE_MESH) && e->modelIndex < loadedModelsMaxIndex) return modelBounds[e->modelIndex];
-    return (e->collider == COLLIDER_TYPE_BOX ? vmax(e->colliderSize.x,vmax(e->colliderSize.y,e->colliderSize.z)) : e->colliderSize.x);
-}
-
-typedef struct{Vector3 pos,vel,lastPos;bool dirty;}PhysicsState;
-typedef struct{PhysicsState states[INSTANCE_COUNT][2];volatile u32 writeBuf,frameCnt;}PhysicsBuffers;
-static PhysicsBuffers g_phys={0};
-static volatile bool g_physRunning=false;
-static u32 g_readBuf=0;
-typedef struct{volatile bool working;u16 start,end;float dt;}PhysicsWorker;
-static PhysicsWorker g_workers[10];
-static u32 g_workerCnt=0;
-
-void* PhysicsWorkerFunc(void* arg){
-    PhysicsWorker*w=(PhysicsWorker*)arg;
-    while(g_physRunning){
-        if(!w->working){OS_USleep(100);continue;}
-        u32 wbuf=g_phys.writeBuf;
-        for(u16 i=w->start;i<w->end;++i){
-            u16 idx=dynamicEntities[i];
-            if(idx>=INSTANCE_COUNT)continue;
-            Entity*e=&Sys_Global.instances[idx];
-            if(e->collider==COLLIDER_TYPE_NONE)continue;
-            Vector3 oldPos=g_phys.states[idx][1-wbuf].pos;
-            Vector3 newPos=Vector3_A_plus_B(oldPos,scale_vector3(e->velocity,w->dt));
-            g_phys.states[idx][wbuf].pos=newPos;
-            g_phys.states[idx][wbuf].vel=e->velocity;
-            g_phys.states[idx][wbuf].dirty=true;
-        }
-        w->working=false;
     }
     return NULL;
 }
 
-static inline void PhysicsSwapBuffers(void){
-    u32 newWrite=1-g_phys.writeBuf;
-    g_phys.writeBuf=newWrite;
-    g_readBuf=1-newWrite;
-    g_phys.frameCnt++;
-}
-static inline bool PhysicsIsDone(void){for(u32 i=0;i<g_workerCnt;++i)if(g_workers[i].working)return false;return true;}
-static inline void PhysicsStart(float dt){
-    u8 subs=vclamp((u8)(dt*100.0f),2,10);
-    float dtsub=dt/(float)subs;
-    u16 total=dynamicEntityCount,per=total/g_workerCnt,rem=total%g_workerCnt,start=1;
-    for(u32 i=0;i<g_workerCnt;++i){
-        g_workers[i].dt=dtsub;
-        g_workers[i].start=start;
-        g_workers[i].end=start+per+(i<rem?1:0);
-        start=g_workers[i].end;
-        g_workers[i].working=true;
-    }
-}
-void PhysicsUpdateAsync(float dt){
-    static u32 lastFrame=0;
-    if(PhysicsIsDone()){PhysicsSwapBuffers();PhysicsStart(dt);lastFrame=g_phys.frameCnt;}
-}
-static inline Vector3 GetEntityPosition(u16 idx){return g_phys.states[idx][g_readBuf].pos;}
-static inline Vector3 GetEntityVelocity(u16 idx){return g_phys.states[idx][g_readBuf].vel;}
-void InitPhysics(void){
-    u32 cores=OS_GetNumThreads();
-    g_workerCnt=(cores<=2)?1:cores-2;
-    for(u16 i=0;i<INSTANCE_COUNT;++i){
-        g_phys.states[i][0].pos=Sys_Global.instances[i].position;
-        g_phys.states[i][0].vel=Sys_Global.instances[i].velocity;
-        g_phys.states[i][1].pos=Sys_Global.instances[i].position;
-        g_phys.states[i][1].vel=Sys_Global.instances[i].velocity;
-    }
-    g_phys.writeBuf=0; g_readBuf=1; g_physRunning=true;
-    for(u32 i=0;i<g_workerCnt;++i){
-        pthread_t t;
-        g_workers[i].working=false;
-        pthread_create(&t,NULL,PhysicsWorkerFunc,&g_workers[i]);
-        pthread_detach(t);
-    }
-    DualLog("Physics: %u lock-free workers\n",g_workerCnt);
+void InitPhysics(void) {
+    u32 cores   = (u32)OS_GetNumThreads();
+    g_workerCnt = (cores <= 2) ? 1u : (cores - 2 < MAX_WORKERS ? cores - 2 : MAX_WORKERS); g_running = 1;
+    pthread_mutex_init(&g_dispatchMutex, NULL);
+    pthread_cond_init (&g_dispatchCond,  NULL);
+    pthread_mutex_init(&g_doneMutex,     NULL);
+    pthread_cond_init (&g_doneCond,      NULL);
+    for (u32 i = 0; i < g_workerCnt; ++i) { pthread_t t; pthread_create(&t,NULL,PhysicsWorkerFunc,(void*)(uintptr_t)i); pthread_detach(t); }
+    DualLog("Physics: %u workers, substep size %.4fs\n", g_workerCnt, MAX_STEP_SIZE);
 }
 
-ENGINE_TO_MOD bool CheckCapsule(Vector3 start,Vector3 end,float capsuleRadius,float capsuleHeight,u32 layerMask) { (void)capsuleHeight; (void)start; (void)end; (void)capsuleRadius; (void)layerMask; return false; /*TODO*/ }
-ENGINE_TO_MOD void AddForce(u16 idx,Vector3 force,bool isImpulse) {
-    if (idx>=INSTANCE_COUNT) return;
-    Entity *e=&Sys_Global.instances[idx]; float mass=e->mass>0.0001f?e->mass:1.0f;
-    e->accumulatedForce=Vector3_A_plus_B(e->accumulatedForce,force);
-    if (isImpulse) e->velocity=Vector3_A_plus_B(e->velocity,scale_vector3(force,1.0f/mass));
-    else           e->velocity=Vector3_A_plus_B(e->velocity,scale_vector3(force,(float)Sys_Global.timeSinceLastPhysicsTick/mass));
+void PhysicsUpdateAndWait(float dt) {
+    if (dynamicEntityCount == 0) return;
+    
+    for (u16 i = 0; i < dynamicEntityCount; ++i) {
+        u16 idx = dynamicEntities[i];
+        if (idx >= INSTANCE_COUNT) continue;
+        Entity *e = &Sys_Global.instances[idx];
+        g_phys[idx].pos     = e->position;
+        g_phys[idx].gravity = e->gravity;
+        g_phys[idx].lastPos = e->lastPosition;
+        g_phys[idx].vel     = e->velocity;
+        g_phys[idx].mass    = e->mass;
+    }
+    
+    DualLog("Physics start: player vel = %f %f %f\n", g_phys[PLAYER1].vel.x, g_phys[PLAYER1].vel.y, g_phys[PLAYER1].vel.z);
+
+    
+    u8    substeps = (u8)vclamp((u32)(dt / MAX_STEP_SIZE + 0.5f), 2u, (u32)MAX_SUBSTEPS); // Substep count: at least 2, at most MAX_SUBSTEPS, sized so no object travels more than MIN_DIAMETER of smallest object in a single substep at MAX_SPEED.
+    float dtsub    = dt / (float)substeps;
+
+    for (u8 s = 0; s < substeps; ++s) {
+        // Snapshot all entity positions so workers share a consistent read view.
+        for (u16 i = 0; i < INSTANCE_COUNT; ++i) g_posSnapshot[i] = Sys_Global.instances[i].position;
+
+        // Partition dynamicEntities[0..dynamicEntityCount) across workers.
+        // NOTE: index 0 IS included (bug in original skipped it by starting at 1).
+        u16 total = dynamicEntityCount;
+        u16 per   = total / g_workerCnt;
+        u16 rem   = total % g_workerCnt;
+        u16 start = 0;
+        for (u32 i = 0; i < g_workerCnt; ++i) {
+            g_slices[i].start = start;
+            g_slices[i].end   = start + per + (i < rem ? 1 : 0);
+            g_slices[i].dt    = dtsub;
+            start             = g_slices[i].end;
+        }
+
+        // Arm the completion counter before waking workers to avoid the race
+        // where a fast worker completes and signals done before we start waiting.
+        __atomic_store_n(&g_workRemaining, g_workerCnt, __ATOMIC_RELEASE);
+
+        // Wake all workers by incrementing the generation counter.
+        pthread_mutex_lock(&g_dispatchMutex);
+        __atomic_fetch_add(&g_dispatchGen, 1, __ATOMIC_RELEASE);
+        pthread_cond_broadcast(&g_dispatchCond);
+        pthread_mutex_unlock(&g_dispatchMutex);
+
+        // Block until every worker has decremented g_workRemaining to 0.
+        pthread_mutex_lock(&g_doneMutex);
+        while (__atomic_load_n(&g_workRemaining, __ATOMIC_ACQUIRE) != 0)
+            pthread_cond_wait(&g_doneCond, &g_doneMutex);
+        pthread_mutex_unlock(&g_doneMutex);
+
+        // Flush physics results -> live entity positions (main thread only).
+        for (u16 i = 0; i < dynamicEntityCount; ++i) {
+            u16 idx = dynamicEntities[i];
+            Sys_Global.instances[idx].position = g_phys[idx].pos;
+            Sys_Global.instances[idx].velocity  = g_phys[idx].vel;
+        }
+    }
+}
+
+ENGINE_TO_MOD void AddForce(u16 idx, Vector3 force, bool impulse) {
+    if (idx >= INSTANCE_COUNT) return;
+    Entity *e   = &Sys_Global.instances[idx];
+    float  mass = e->mass > 0.001f ? e->mass : 1.0f;
+    if (impulse) e->velocity           = Vector3_A_plus_B(e->velocity, scale_vector3(force, 1.0f / mass));
+    else         e->accumulatedForce   = Vector3_A_plus_B(e->accumulatedForce, force);
 }
 
 ENGINE_TO_MOD void ApplyPlayerMovements(void) {
     Entity *p = &Sys_Global.instances[PLAYER1];
     float h = (float)Forward() - (float)Backpedal(), s = (float)StrafeRight() - (float)StrafeLeft();
-    Vector3 input = normalize_vector3((Vector3){p->forward.x * h + p->right.x * s, (float)SwimUp() - (float)SwimDn(), p->forward.z * h + p->right.z * s});
-    float speed=GetBasePlayerSpeed(PLAYER1,magnitude_vector3(input)>0.1f)*1.75f, accel=Sys_Global.boosterActive?1.0f:3.0f;
-    Vector3 cur=p->velocity, dv=Vector3_A_minus_B(scale_vector3(input,speed),cur);
-    dv.x=vmax(vmin(dv.x,10.0f),-10.0f); dv.y=vmax(vmin(dv.y,10.0f),-10.0f); dv.z=vmax(vmin(dv.z,10.0f),-10.0f);
-    p->velocity=Vector3_A_plus_B(cur,scale_vector3(dv,accel*(float)Sys_Global.timeSinceLastPhysicsTick));
+    Vector3 input = normalize_vector3((Vector3){p->forward.x*h + p->right.x*s, (float)SwimUp() - (float)SwimDn(), p->forward.z*h + p->right.z*s});
+    float speed = GetBasePlayerSpeed(PLAYER1, magnitude_vector3(input) > 0.1f) * 1.75f;
+    float accel = Sys_Global.boosterActive ? 1.0f : 3.0f;
+    Vector3 cur = p->velocity;
+    Vector3 dv  = Vector3_A_minus_B(scale_vector3(input, speed), cur);
+    dv.x = vclamp(dv.x, -10, 10); dv.y = vclamp(dv.y, -10, 10); dv.z = vclamp(dv.z, -10, 10);
+    p->velocity = Vector3_A_plus_B(cur, scale_vector3(dv, accel * vclamp((float)Sys_Global.timeSinceLastPhysicsTick, 0.0005f, 0.1f)));
+    DualLog("Applied velocity from player movemnt: %f %f %f, frame %u\n",p->velocity.x,p->velocity.y,p->velocity.z,Sys_Global.globalFrameNum);
 }

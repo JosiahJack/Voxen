@@ -1024,6 +1024,7 @@ MOD_TO_ENGINE void LoadLevelMod(u8 curlevel) {
         u16 entIdx = src->index;
         u16 parent = AddInstance(entIdx,src->position);
         Entity* par = &Eng_Global->instances[parent];
+        par->lastPosition          = par->position;
         par->rotation              = src->rotation;
         par->scale                 = src->scale;
         par->entflags             |= src->entflags; // bitor `|` since AddInstance already set flags from entity definitions.
