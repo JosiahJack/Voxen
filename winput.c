@@ -8,10 +8,9 @@
 #include "gl.h"
 #include "common.h"
 #include "interop.h"
-extern GLFWwindow* window;
 typedef struct { bool down,pressed,released; } KeyState;
 typedef struct { double last_mouse_x,last_mouse_y,scrollDelta; KeyState keyStates[MAX_KEYS],mouseButtons[MAX_MOUSE_BUTTONS],joystickButtons[16][16],joystickHats[5]; /* What can I say, I'm a man of many hats. ^^D*/ i32 currentMouse_dx,currentMouse_dy; bool window_has_focus,ignore_next_mouse_delta,lastUse,isCapsLockOn,joystickPresent[16]; } InputSystem;
-extern InputSystem Sys_Input; extern bool returnToPause; extern GlobalContext Sys_Global; extern u8 currentPlayerNameLength; extern i8 currentMenuItem; extern CheatsSystem Sys_Cheats;
+extern GLFWwindow* window; extern InputSystem Sys_Input; extern bool returnToPause; extern GlobalContext Sys_Global; extern u8 currentPlayerNameLength; extern i8 currentMenuItem; extern CheatsSystem Sys_Cheats;
 extern bool mouseMovementThisFrame; extern SettingsSystem Sys_Settings; extern float cam_pitch,cam_yaw,cam_roll;
 typedef struct { const char* name; int value; } InputElement; extern InputElement inputElements[134];
 typedef void (*GLFWproc)(void); typedef struct _GLFWfbconfig _GLFWfbconfig; typedef struct _GLFWcontext _GLFWcontext; typedef struct _GLFWwindow _GLFWwindow; typedef struct _GLFWlibrary _GLFWlibrary; typedef struct _GLFWmonitor _GLFWmonitor; typedef struct _GLFWjoystick _GLFWjoystick;

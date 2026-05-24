@@ -96,7 +96,7 @@ cat > Shaders/shaders.h <<'EOF'
 EOF
 
 ZIG_LIBS="-L/usr/lib/x86_64-linux-gnu -L/usr/lib64"
-LINUX_CC="zig cc -target x86_64-linux-gnu.2.7"
+LINUX_CC="zig cc"
 WINDOWS_CC="zig cc -target x86_64-windows-gnu -Wl,--stack,8388608"
 COMMON_CFLAGS="-ferror-limit=500 -fno-exceptions -fno-stack-protector -fno-asynchronous-unwind-tables -fno-unwind-tables -Wno-format-nonliteral \
                -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -fvisibility=hidden -pipe -fno-ident -fdata-sections -Wno-int-to-void-pointer-cast \
@@ -116,7 +116,7 @@ if [ "$PLATFORM" = "windows" ]; then
 else
     CC=$LINUX_CC
     LINKER=$CC
-    CFLAGS="$COMMON_CFLAGS -fno-plt -fno-semantic-interposition -D_GNU_SOURCE -ffreestanding -fno-builtin"
+    CFLAGS="$COMMON_CFLAGS -fno-plt -fno-semantic-interposition -fno-builtin"
     CFLAGSGC="$COMMON_CFLAGS -DLINUX -fno-plt -fno-semantic-interposition"
     LDFLAGS="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -ldl -nostdlib"
     LDFLAGSGC="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -nostdlib"

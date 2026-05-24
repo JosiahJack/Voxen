@@ -16,13 +16,8 @@ GLFWwindow* window;
 #define TEXT_BUFFER_SIZE 1024
 #define FONT_ATLAS_SIZE 4672
 #define MAX_GLYPHS 4096
-typedef struct {bool down,pressed,released;} KeyState;
-typedef struct {
-	double last_mouse_x,last_mouse_y,scrollDelta;
-	KeyState keyStates[MAX_KEYS],mouseButtons[MAX_MOUSE_BUTTONS],joystickButtons[16][16],joystickHats[5]; // What can I say, I'm a man of many hats. ^^D
-    i32 currentMouse_dx,currentMouse_dy;
-	bool window_has_focus,ignore_next_mouse_delta,lastUse,isCapsLockOn,joystickPresent[16];
-} InputSystem;
+typedef struct { bool down,pressed,released; } KeyState;
+typedef struct { double last_mouse_x,last_mouse_y,scrollDelta; KeyState keyStates[MAX_KEYS],mouseButtons[MAX_MOUSE_BUTTONS],joystickButtons[16][16],joystickHats[5]; /* What can I say, I'm a man of many hats. ^^D*/ i32 currentMouse_dx,currentMouse_dy; bool window_has_focus,ignore_next_mouse_delta,lastUse,isCapsLockOn,joystickPresent[16]; } InputSystem;
 typedef struct { Vector3 normal; float d; } FrustumPlane;
 typedef struct StbiArena { u8*base,*cursor,*end; } StbiArena;
 typedef struct {
@@ -44,7 +39,7 @@ static int num_parse_threads = 0;
 #define MAX_LIGHTS_PER_VOXEL 32
 #define NEAR_PLANE (0.02f)
 #define ONE_OVER_SQRT2 0.70710678118f
-GlobalContext Sys_Global = {0}; TextSystem Sys_Text; InputSystem Sys_Input; CheatsSystem Sys_Cheats = {.god=false,.noclip=true,.showLocation=true,.showFPS=true,.editMode=true}; RenderSystem Sys_Render; SystemUI Sys_UI;
+GlobalContext Sys_Global = {0}; TextSystem Sys_Text; InputSystem Sys_Input; CheatsSystem Sys_Cheats = {.god=false,.noclip=false,.showLocation=true,.showFPS=true,.editMode=false}; RenderSystem Sys_Render; SystemUI Sys_UI;
 SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on first run for potatoes (e.g. won't crash for out of VRAM, or won't take 5min to init).
     .InputCodeSettings = {
         5,  /* Forward    = F */     0,/* Strafe Left= A */         18,/* Backpedal  = S */        3,/* Strafe Right= D */       100,/* Jump    = SPACE */      2,/* Crouch   = C        */ 23,/* Prone     = X */ 16,/* Lean Left = Q  */
@@ -467,6 +462,7 @@ void LoadConfig(void) {
     OS_Close(f);
 }
 
+void FilePrintString(FHandle f, const char* fmt, ...) { va_list a; __builtin_va_start(a,fmt); char b[128]; va_list c; __builtin_va_copy(c,a); StringFormatV(b,sizeof(b),fmt,c); __builtin_va_end(c); OS_RawWrite(f,b,GetStringLength(b)); __builtin_va_end(a); }
 void SaveConfig(void) {
     FHandle f = OS_OpenWriteonly("./Data/Config.ini");
     for (int i=0;i<configTableSize;++i) {
@@ -884,7 +880,7 @@ void RenderPausedUI(void) {
 typedef struct { float x,y,z,r,g,b,a; } DebugLineVertex;
 DebugLineVertex debugLineVerts[MAX_DEBUG_LINE_VERTS * 2];
 static inline __attribute__((always_inline)) void DrawDebugLines(float* viewProj) {
-    return;
+    if (Sys_Cheats.noclip) return;
     if (Sys_Global.debugLineVertCount == 0) return;
 
     glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.debugLinesVBO);
@@ -1050,22 +1046,18 @@ static __attribute__((noinline)) __attribute__((hot)) void RenderShadowmaps(void
         float luminosity = (intensity / (range * range));
         if (luminosity < 0.008f && (range < 8.0f || intensity < 0.5f)) continue;
         
-        u16 cellX = (u16)clamp((i32)vfloor((lightPos.x - minx + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED);
-        u16 cellZ = (u16)clamp((i32)vfloor((lightPos.z - minz + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED);
-        int lightCellIdx = (cellZ * WORLDX) + cellX;
-        int r = vceil(range * (1.0f / CELL_SIZE));
+        u16 cellX = (u16)clamp((i32)vfloor((lightPos.x - minx + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED), cellZ = (u16)clamp((i32)vfloor((lightPos.z - minz + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED);
+        int lightCellIdx = (cellZ * WORLDX) + cellX; u8 r = vceil(range * (1.0f / CELL_SIZE));
         bool inPVS = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
         if (likely(!inPVS)) inPVS = NeighborhoodInPVS(cellX,cellZ,r);
         if (!inPVS) continue;
         
-        float dx = lightPos.x - playerPos.x; float dy = lightPos.y - playerPos.y; float dz = lightPos.z - playerPos.z;
+        float dx = lightPos.x - playerPos.x, dy = lightPos.y - playerPos.y, dz = lightPos.z - playerPos.z;
         float distSqrdToPlayer = dx*dx + dy*dy + dz*dz;
         float dotResult = (dx*pf.x + dy*pf.y + dz*pf.z);
         if (dotResult < 0.0f && distSqrdToPlayer > (range * range)) continue;
 
-        candidates[numShadowsCouldRender] = i;
-        numShadowsCouldRender++;
-        if (numShadowsCouldRender >= MAX_SHADOWMAPS) break;
+        candidates[numShadowsCouldRender] = i; numShadowsCouldRender++; if (numShadowsCouldRender >= MAX_SHADOWMAPS) break;
     }
 
     if (numShadowsCouldRender > 0) { // Added since there is now work between here and the for loop so this is beneficial to check.
@@ -1159,7 +1151,7 @@ static inline __attribute__((always_inline)) bool DetermineIfInstanceVisible(u16
     
     if (ConstIndexIsPortalBlockingDoor(entIdx)) { // Extra checks only needed for opaque portal blocking doors.
         bool inPVS = (gridCellStates[instCellIdx] & CELL_VISIBLE);
-        if (!inPVS) {inPVS = NeighborhoodInPVS(e->cellX,e->cellZ,2);} if (!inPVS) return false;
+        if (!inPVS) {inPVS = NeighborhoodInPVS(e->cellX,e->cellZ,2u);} if (!inPVS) return false;
     } else {
         if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (entIdx != 754 || !skyVisible)) return false;
         if (!(gridCellStates[instCellIdx] & CELL_OPEN) && *distSqrd >= 943.7184f && (entIdx != 754 || !skyVisible)) return false; // 30.72 * 30.72, 12 cells
@@ -1407,8 +1399,8 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glUseProgram(Sys_Render.depthPrepassShaderProgram); // Depth Prepass - Eliminates some overdraw for ~6.1% performance improvement in spite of added draw calls
     glUniformMatrix4fv(2,1,0,viewProj);
     glEnable(GL_DEPTH_TEST); glColorMask(0,0,0,0); glDepthMask(1); glDepthFunc(0x0201/*GL_LESS*/); glDisable(GL_BLEND);
-    if (opaqueCount > 1) qsort(visibleInstances,opaqueCount,sizeof(DepthSort),dsortInv);
-    if (tcnt > 1) qsort(visibleInstances + opaqueCount,tcnt,sizeof(DepthSort),dsort);
+    if (opaqueCount > 1) qsort_new(visibleInstances,opaqueCount,sizeof(DepthSort),dsortInv);
+    if (tcnt > 1) qsort_new(visibleInstances + opaqueCount,tcnt,sizeof(DepthSort),dsort);
     for (u16 visibleIndex = 0; visibleIndex < visibleCount; ++visibleIndex) {
         u16 i = visibleInstances[visibleIndex].index;
         Entity* e = &Sys_Global.instances[i]; u16 tex = e->texIndex;
@@ -1693,7 +1685,7 @@ i32 main(void) {
                 }
             }
 
-            if (Sys_Global.timeSinceLastPhysicsTick > (1.0 / 2000.0)) { Sys_Global.last_physics_time = Sys_Global.pauseRelativeTime; Physics(); }
+            /*if (Sys_Global.timeSinceLastPhysicsTick > (1.0 / 144.0)) { */Sys_Global.last_physics_time = Sys_Global.pauseRelativeTime; Physics();// }
             Vector3 pDelta = Vector3_A_minus_B(Sys_Global.instances[PLAYER1].lastPosition,Sys_Global.instances[PLAYER1].position);
             bool playerMoved = ((vabs(pDelta.x) + vabs(pDelta.y) + vabs(pDelta.z)) > 0.02f);
             ModUpdate(playerMoved);
@@ -1749,9 +1741,8 @@ i32 main(void) {
         glfwSwapBuffers(); // Present frame
         CHECK_GL_ERROR();
         #ifdef DEBUG_RAM_OUTPUT
-            static const u32 dbgFrames[] = {4,100,200,500,1000};
-            static const char*    dbgLabels[] = {"after 4 frames","after 100 frames","after 200 frames","after 500 frames","after 1000 frames"};
-            for (int _d=0;_d<5;_d++) if (Sys_Global.globalFrameNum == dbgFrames[_d]) { DebugRAM(dbgLabels[_d]); break; }
+            {static const u32 dbgFrames[] = {4,100,200,500,1000}; static const char* dbgLabels[] = {"after 4 frames","after 100 frames","after 200 frames","after 500 frames","after 1000 frames"};
+             for (int d=0;d<5;d++) if (Sys_Global.globalFrameNum == dbgFrames[d]) { DebugRAM(dbgLabels[d]); break; }  }
         #endif
     }
     return 0;

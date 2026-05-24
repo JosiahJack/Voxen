@@ -593,62 +593,118 @@ static void IntegratePlayer(u16 playerIdx, float dt) {
     Sys_Global.dirtyInstances[playerIdx] = true;
 }
 
-// static const Vector3 GRAVITY_VECTOR = {0.0f,-9.81f,0.0f};
+extern float modelBounds[MODEL_IDX_MAX]; u16 loadedModelsMaxIndex;
+float GetCollisionRadius(Entity* e) {
+    if ((e->collider == COLLIDER_TYPE_CONVEXMESH || e->collider == COLLIDER_TYPE_MESH) && e->modelIndex < loadedModelsMaxIndex) return modelBounds[e->modelIndex];
+    return (e->collider == COLLIDER_TYPE_BOX ? vmax(e->colliderSize.x,vmax(e->colliderSize.y,e->colliderSize.z)) : e->colliderSize.x);
+}
+
+//bool NeighborhoodInVelocityAffectationRange(u16 cellX, u16 cellZ, u8 r) {
+    //u32 cellIdx = (cellZ * WORLDX) + cellX;
+    //for (int ix = (int)cellX-r; ix <= (int)cellX+r; ++ix) {
+        //for (int iz = (int)cellZ-r; iz <= (int)cellZ+r; ++iz) {
+            //if (unlikely(!XZPairInBounds(ix,iz))) continue;
+
+            //int subIdx = iz * WORLDX + ix;
+            //if (get_cull_bit(precomputedVisibleCellsFromHere, cellIdx * ARRSIZE + subIdx) && (gridCellStates[subIdx] & CELL_VISIBLE)) return true;
+        //}
+    //}
+    //return false;
+//}
+
+bool BodyBody(Entity* self, Entity* other) { (void)self; (void)other; return false; }
+
 void Physics(void) {
-    float dt = vclamp((float)Sys_Global.timeSinceLastPhysicsTick, 0.0005f, 0.1f);  // Clamp to reasonable range
-//     if (Sys_Global.pauseRelativeTime > 2.0f) { // Apply Gravity
-//         for (u32 i = 0; i < dynamicEntityCount; ++i) {
-//             u16 entIdx = dynamicEntities[i];
-//             Entity* e = &Sys_Global.instances[entIdx];
-//             if (vabs(e->gravity - 0.0f) < 0.01f) continue;
-//             if (entIdx <= PLAYER2 && Sys_Cheats.noclip) continue;
-//
-//             Vector3 gravityAccel = scale_vector3(GRAVITY_VECTOR,e->gravity * dt);
-//             e->velocity = Vector3_A_plus_B(e->velocity,gravityAccel);
-//         }
-//     }
-    
-    IntegratePlayer((u16)PLAYER1,dt);// IntegratePlayer((u16)PLAYER2,dt); // Move Players (separate from normal Rigidbody)
-    for (u32 i = 0; i < dynamicEntityCount; ++i) {
-        u16 entIdx = dynamicEntities[i];
-        if (entIdx == PLAYER1 || entIdx == PLAYER2) continue;
-        
-        Entity* e = &Sys_Global.instances[entIdx];
-        if (e->entflags & ENTFLAG_ACTIVE && magnitude_vector3(e->velocity) >= MIN_VELOCITY_THRESHOLD) { // Move Rigidbody
-            Vector3 pos = e->position, vel = e->velocity;
-            u32 collisionMask = GetCollisionMask(e->layer);
-            float remainingTime = dt;
-            for (int iteration = 0; iteration < MAX_COLLISION_ITERATIONS; ++iteration) {
-                if (magnitude_vector3(vel) < MIN_VELOCITY_THRESHOLD) break;
+    float    dt = vclamp((float)Sys_Global.timeSinceLastPhysicsTick,0.0005f,0.1f); // Clamp to reasonable range
+    u8 substeps = vclamp((u8)(dt * 100.0f),2,10); // (dt * maxSpeed) / minObjectDiameter = (0.016666s * 10.0m/s) / 0.1m, capped at least 2 every frame and no more than 11 (what you'd need at 10fps).
+    float dtsub = dt / (float)substeps;             // Could do 1 every frame at 100fps but epsilon could tunnel, pesky floats.
+    for (int i=0;i<substeps;++i) {
+        for (u16 i=1/*skip 0 for world*/;i<dynamicEntityCount;++i) { // Each iteration is responsible for one entity.  Handle its little subworld, move it, rotate it, update its velocity and angular velocity.
+            u16 entIdx = dynamicEntities[i]; Entity* e = &Sys_Global.instances[entIdx]; if (e->collider == COLLIDER_TYPE_NONE) continue; if (Sys_Cheats.noclip) {if (entIdx != PLAYER1) continue; IntegratePlayer((u16)PLAYER1,dt); }
+            float selfSpeed = (magnitude_vector3(e->velocity));
+            Vector3 pos = e->position; float selfRadius = GetCollisionRadius(e); float searchRadiusSelf = selfSpeed * dtsub + selfRadius;
+            //u16 cellX = (u16)clamp((i32)vfloor((pos.x - minx + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED), cellZ = (u16)clamp((i32)vfloor((pos.z - minz + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED);
+            //int selfCellIdx = (cellZ * WORLDX) + cellX;
+            u16 affectingInstances[128]; for (u8 j=0;j<64;++j) affectingInstances[j] = INSTANCE_COUNT; u8 head = 0;
+            for (u16 j=0;j<INSTANCE_COUNT;++j) {
+                Entity* o = &Sys_Global.instances[j]; if (j == i || o->collider == COLLIDER_TYPE_NONE) continue;
                 
-                Vector3 desiredMove = scale_vector3(vel,remainingTime);
-                SweepResult bestCollision = {0};
-                bestCollision.toi = 1.0f;
-                for (u32 i = 0; i < Sys_Global.loadedInstances; ++i) { // Test against all other entities
-                    Entity* other = &Sys_Global.instances[i];
-                    if (other == e || !(other->entflags&ENTFLAG_ACTIVE) || other->collider == COLLIDER_TYPE_NONE || !(collisionMask&other->layer)) continue;
-
-                    SweepResult hit = {0};//SweepEntity(e,desiredMove,other,(u16)i);
-                    if (hit.hit && hit.toi < bestCollision.toi) bestCollision = hit;
-                }
-                
-                if (!bestCollision.hit) { pos=Vector3_A_plus_B(pos,desiredMove); break; }
-
-                float safeTOI = vmax(bestCollision.toi - COLLISION_EPSILON,0.0f);
-                pos = Vector3_A_plus_B(pos,scale_vector3(desiredMove,safeTOI));
-                float vn = dot_vector3(vel,bestCollision.normal);
-                if (vn < 0.0f) vel = Vector3_A_minus_B(vel,scale_vector3(bestCollision.normal,vn));
-                remainingTime *= (1.0f - safeTOI);
-                if (remainingTime < 0.0001f) break;
+                float oSpeed = (magnitude_vector3(o->velocity)), oRadius = GetCollisionRadius(o);
+                float searchRadiusOther = oSpeed * dtsub + oRadius; float searchRadius = vmax(searchRadiusSelf,searchRadiusOther);
+                if (distance_vector3(pos,o->position) < searchRadius) { affectingInstances[head] = j; head++; }
             }
             
-            e->lastPosition = e->position;
-            e->position = pos; e->velocity = vel;
-            e->cellX = PosGetCellCoordX(pos.x); e->cellZ = PosGetCellCoordZ(pos.z); e->cellIndex = (e->cellZ * WORLDX) + e->cellX;
-            Sys_Global.dirtyInstances[entIdx] = true;
+            Vector3 newPos = Vector3_A_plus_B(e->position, scale_vector3(e->velocity, dtsub));
+            bool anyOverlap = false;
+            for (u8 j=0;j<head;++j) {
+                u16 otherIdx = affectingInstances[j];
+                
+                Entity* o = &Sys_Global.instances[otherIdx];
+                Vector3 savedPos = e->position;
+                e->position = newPos;
+                bool overlapped = BodyBody(e,o);
+                e->position = savedPos;
+                if (overlapped) { anyOverlap = true; break; }
+            }
+
+            if (!anyOverlap) { e->lastPosition = e->position; e->position = newPos; }
+            else { e->position = e->lastPosition; e->velocity = (Vector3){0.0f, 0.0f, 0.0f}; }
         }
         
-        Vector3 v = e->velocity; float mag=magnitude_vector3(v); if (mag > TERMINAL_VELOCITY) e->velocity = scale_vector3(normalize_vector3(v),TERMINAL_VELOCITY); // Clamp velocity after bounces
+        // OLD
+        //if (Sys_Global.pauseRelativeTime > 2.0f) { // Apply Gravity
+            //for (u32 i = 0; i < dynamicEntityCount; ++i) {
+                //u16 entIdx = dynamicEntities[i];
+                //Entity* e = &Sys_Global.instances[entIdx];
+                //if (vabs(e->gravity - 0.0f) < 0.01f || (entIdx <= PLAYER2 && Sys_Cheats.noclip)) continue;
+    
+                //Vector3 gravityAccel = scale_vector3((Vector3){0.0f,-9.81f,0.0f},e->gravity * dt);
+                //e->velocity = Vector3_A_plus_B(e->velocity,gravityAccel);
+            //}
+        //}
+        
+        //IntegratePlayer((u16)PLAYER1,dt);// IntegratePlayer((u16)PLAYER2,dt); // Move Players (separate from normal Rigidbody)
+        //for (u32 i = 0; i < dynamicEntityCount; ++i) {
+            //u16 entIdx = dynamicEntities[i];
+            //if (entIdx == PLAYER1 || entIdx == PLAYER2) continue;
+            
+            //Entity* e = &Sys_Global.instances[entIdx];
+            //if (e->entflags & ENTFLAG_ACTIVE && magnitude_vector3(e->velocity) >= MIN_VELOCITY_THRESHOLD) { // Move Rigidbody
+                //Vector3 pos = e->position, vel = e->velocity;
+                //u32 collisionMask = GetCollisionMask(e->layer);
+                //float remainingTime = dt;
+                //for (int iteration = 0; iteration < MAX_COLLISION_ITERATIONS; ++iteration) {
+                    //if (magnitude_vector3(vel) < MIN_VELOCITY_THRESHOLD) break;
+                    
+                    //Vector3 desiredMove = scale_vector3(vel,remainingTime);
+                    //SweepResult bestCollision = {0};
+                    //bestCollision.toi = 1.0f;
+                    //for (u32 i = 0; i < Sys_Global.loadedInstances; ++i) { // Test against all other entities
+                        //Entity* other = &Sys_Global.instances[i];
+                        //if (other == e || !(other->entflags&ENTFLAG_ACTIVE) || other->collider == COLLIDER_TYPE_NONE || !(collisionMask&other->layer)) continue;
+
+                        //SweepResult hit = {0};//SweepEntity(e,desiredMove,other,(u16)i);
+                        //if (hit.hit && hit.toi < bestCollision.toi) bestCollision = hit;
+                    //}
+                    
+                    //if (!bestCollision.hit) { pos=Vector3_A_plus_B(pos,desiredMove); break; }
+
+                    //float safeTOI = vmax(bestCollision.toi - COLLISION_EPSILON,0.0f);
+                    //pos = Vector3_A_plus_B(pos,scale_vector3(desiredMove,safeTOI));
+                    //float vn = dot_vector3(vel,bestCollision.normal);
+                    //if (vn < 0.0f) vel = Vector3_A_minus_B(vel,scale_vector3(bestCollision.normal,vn));
+                    //remainingTime *= (1.0f - safeTOI);
+                    //if (remainingTime < 0.0001f) break;
+                //}
+                
+                //e->lastPosition = e->position;
+                //e->position = pos; e->velocity = vel;
+                //e->cellX = PosGetCellCoordX(pos.x); e->cellZ = PosGetCellCoordZ(pos.z); e->cellIndex = (e->cellZ * WORLDX) + e->cellX;
+                //Sys_Global.dirtyInstances[entIdx] = true;
+            //}
+            
+            //Vector3 v = e->velocity; float mag=magnitude_vector3(v); if (mag > TERMINAL_VELOCITY) e->velocity = scale_vector3(normalize_vector3(v),TERMINAL_VELOCITY); // Clamp velocity after bounces
+        //}
     }
 }
 

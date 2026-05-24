@@ -1,5 +1,5 @@
 // models.c - Load 3D Models
-void qsort(void* base, size_t nmemb, size_t size, int (*cmp)(const void*, const void*));
+//void qsort(void* base, size_t nmemb, size_t size, int (*cmp)(const void*, const void*));
 u8** modelVertices = NULL; u16** modelTriangles = NULL;
 u32 modelVertexCounts[MODEL_IDX_MAX] = {0}; u16 modelTriangleCounts[MODEL_IDX_MAX] = {0};
 float modelBounds[MODEL_IDX_MAX] = {0}; u16 loadedModelsMaxIndex = 0;
@@ -87,7 +87,7 @@ static void OptimizeVertexCache(u16* idx, u32 ic, u32 vc) {
         u16* p = idx+i*3; u32 m = p[0]<p[1]?p[0]:p[1]; m = m<p[2]?m:p[2];
         t[i].idx = i; t[i].key = m;
     }
-    qsort(t, tc, sizeof(TriSort), cmp);
+    qsort_new(t, tc, sizeof(TriSort), cmp);
     u16* n = OS_Alloc(ic*sizeof(u16));
     for (u32 i=0; i<tc; ++i) { u16* s=idx+t[i].idx*3; u16* d=n+i*3; d[0]=s[0];d[1]=s[1];d[2]=s[2]; }
     CopyMemoryFromBtoAForNBytes(idx,n,ic*sizeof(u16));
@@ -340,10 +340,10 @@ void LoadModels(void) {
     ModelParseTask tasks[32];
     u32 chunk = (loadedModelsMaxIndex + num_parse_threads - 1) / num_parse_threads;
     for (int i=0;i<num_parse_threads;++i) tasks[i] = (ModelParseTask){i*chunk,(i+1)*chunk > loadedModelsMaxIndex ? loadedModelsMaxIndex : (i+1)*chunk,raw,i};
-    pthread_t th[32];
+    OS_Thread th[32];
     if (num_parse_threads > 1) {
-        for (int i=0;i<num_parse_threads;++i) pthread_create(&th[i],NULL,ModelParsingWorker,&tasks[i]);
-        for (int i=0;i<num_parse_threads;++i) pthread_join(th[i],NULL);
+        for (int i=0;i<num_parse_threads;++i) OS_ThreadCreate(&th[i],ModelParsingWorker,&tasks[i]);
+        for (int i=0;i<num_parse_threads;++i) OS_ThreadJoin(&th[i]);
     } else { for (int t=0;t<num_parse_threads;++t) ModelParsingWorker(&tasks[t]); } // Single threaded fallback
     
     glGenBuffers(loadedModelsMaxIndex,Sys_Render.vbos); glGenBuffers(loadedModelsMaxIndex,Sys_Render.tbos);

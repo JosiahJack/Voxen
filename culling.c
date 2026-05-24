@@ -15,7 +15,7 @@ ENGINE_TO_MOD bool PositionVisibleFromPlayerCell(float x, float z) { return (get
 static inline __attribute__((always_inline)) bool XZPairInBounds(i32 x, i32 z) { return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0); }
 bool SkyIsVisible(void) { return ((gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || Sys_Global.currentLevel == LEVEL_CYBERSPACE); }
 bool SkySunIsVisible(void) { return ((gridCellStates[playerCellIdx] & CELL_SEES_SUN) && Sys_Global.currentLevel != LEVEL_CYBERSPACE); }
-bool NeighborhoodInPVS(u16 cellX, u16 cellZ, int r) {
+bool NeighborhoodInPVS(u16 cellX, u16 cellZ, u8 r) {
     u32 cellIdx = (cellZ * WORLDX) + cellX;
     for (int ix = (int)cellX-r; ix <= (int)cellX+r; ++ix) {
         for (int iz = (int)cellZ-r; iz <= (int)cellZ+r; ++iz) {

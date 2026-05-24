@@ -53,7 +53,7 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define PLAYER_BOOSTER_SPEED_BOOST 1.2f
 #define PLAYER_CROUCH_RATIO 0.6f
 #define PLAYER_PRONE_RATIO 0.2f
-#define PLAYER_TRANSITION_TO_PRONE_ADD 0.1f
+#define PLAYER_TRANSITION_TO_PRONE_ADD 0.10f
 #define PLAYER_RADIUS 0.48f
 #define PLAYER_HEIGHT 2.00f
 #define PLAYER_CAM_OFFSET_Y 0.84f // Split capsule shape in the middle, camera is thus 0.16 away from top of the capsule ((2 / 2 = 1) - 0.84)

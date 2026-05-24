@@ -13,7 +13,7 @@ typedef __INT64_TYPE__ i64;   typedef __UINT64_TYPE__ u64; typedef __SIZE_TYPE__
 #else
     #define ENGINE_TO_MOD __attribute__((visibility("default")))
 #endif
-ENGINE_TO_MOD void DualLogError(const char* fmt, ...); char* StringFindSubstring(const char* haystack, const char* needle);
+ENGINE_TO_MOD void DualLogError(const char* fmt, ...); ENGINE_TO_MOD void DualLog(const char* fmt, ...); char* StringFindSubstring(const char* haystack, const char* needle);
 #if defined(_WIN32)
     #define WINDOWS
     #define MOD_EXTENSION ".dll" // e.g. Citadel.dll
@@ -62,13 +62,13 @@ ENGINE_TO_MOD void DualLogError(const char* fmt, ...); char* StringFindSubstring
     typedef int FHandle;
     struct timespec { i64 tv_sec,tv_nsec; }; typedef u64 pthread_t; typedef struct { unsigned int flags; void* stack; } pthread_attr_t;
     int pthread_create(pthread_t* restrict,const pthread_attr_t* restrict,void*(*start_routine)(void*),void* restrict); int pthread_join(pthread_t,void**); void *dlopen(const char*,int); void *dlsym(void*,const char *);
-    static inline int OS_IOControl(int fd, unsigned long req, void* arg) { long r = 16; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(req),"d"(arg):"rcx","r11","memory"); return (int)r; }
-    static inline int OS_IOControlSimple(int fd, unsigned long request) { return OS_IOControl(fd,request,0); }
+    static inline __attribute__((always_inline)) int OS_IOControl(int fd, unsigned long req, void* arg) { long r = 16; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(req),"d"(arg):"rcx","r11","memory"); return (int)r; }
+    static inline __attribute__((always_inline)) int OS_IOControlSimple(int fd, unsigned long request) { return OS_IOControl(fd,request,0); }
     static inline __attribute__((always_inline)) int OS_MakeFolder(const char* path) { long r = 83; __asm__ __volatile__("syscall":"+a"(r):"D"(path),"S"(0755LL):"rcx","r11","memory"); return (int)r; }
-    static inline __attribute__((always_inline)) void* OS_Brk(void* addr) { register uintptr_t rax __asm__("rax") = 12; register void* rdi __asm__("rdi") = addr; __asm__ __volatile__("syscall":"+r"(rax):"r"(rdi):"rcx","r11","memory"); return (void*)rax; }
+    static inline __attribute__((always_inline)) void* OS_Brk(void* addr) { long r = 12; __asm__ __volatile__("syscall":"+a"(r):"D"(addr):"rcx","r11","memory"); return (void*)r; }
     static inline __attribute__((always_inline)) long OS_Read(long f,void*b,size_t c) { long r = 0; __asm__ __volatile__("syscall":"+a"(r):"D"(f),"S"(b),"d"(c):"rcx","r11","memory"); return r; }
-    static inline __attribute__((always_inline, noreturn)) void OS_Exit(i64 exitCode) { register i64 rax __asm__("rax") = 231; register i64 rdi __asm__("rdi") = exitCode; __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi) : "rcx", "r11", "memory"); __builtin_unreachable(); }
-    static inline __attribute__((always_inline)) void OS_Close(FHandle fileDescriptor) { register long rax __asm__("rax") = 3; register long rdi __asm__("rdi") = fileDescriptor; __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi) : "rcx", "r11", "memory"); }
+    static inline __attribute__((always_inline, noreturn)) void OS_Exit(i64 exitCode) { long r = 231; __asm__ __volatile__("syscall":"+a"(r):"D"(exitCode):"rcx","r11","memory"); __builtin_unreachable(); }
+    static inline __attribute__((always_inline)) void OS_Close(FHandle fileDescriptor) { long r = 3; __asm__ __volatile__("syscall":"+a"(r):"D"(fileDescriptor):"rcx","r11","memory"); }
     static inline __attribute__((always_inline)) long OS_Open(const char* path, i32 flags, i32 mode) { long r = 2; __asm__ __volatile__("syscall":"+a"(r):"D"(path),"S"((long)flags),"d"((long)mode):"rcx","r11","memory"); return r; }
     static inline __attribute__((always_inline)) void* OS_AllocateRAM(void* addr, size_t len, i32 prot, i32 flags, FHandle fd){ long r=9; register int r10 __asm__("r10")=flags; register int r8 __asm__("r8")=fd; register long r9 __asm__("r9")=0; __asm__ __volatile__("syscall":"+a"(r):"D"(addr),"S"(len),"d"(prot),"r"(r10),"r"(r8),"r"(r9):"rcx","r11","memory"); return (void*)r; }
     static inline __attribute__((always_inline)) FHandle OS_OpenReadonly(const char* path) { FHandle f=OS_Open(path,0,0); return f < 0 ? DualLogError("Could not open file %s for reading\n",path), -1 : f; }
@@ -80,31 +80,38 @@ ENGINE_TO_MOD void DualLogError(const char* fmt, ...); char* StringFindSubstring
     static inline __attribute__((always_inline)) int OS_GetNumThreads(void) { unsigned long m[16]; long r=204; __asm__ __volatile__("syscall":"+a"(r):"D"(0LL),"S"(128LL),"d"(m):"rcx","r11","memory"); int c = 0; for(int i=0;i<(r/8);i++) {c+=__builtin_popcountll(m[i]);} return r < 0 ? 1 : c; }
     static inline __attribute__((always_inline)) void OS_DeallocateRAM(void* p,size_t s){ long r=11; if(!p || p == (void*)-1) { DualLogError("Attempting to double free!\n"); OS_Exit(1); } __asm__ __volatile__("syscall":"+a"(r):"D"(p),"S"(s):"rcx","r11","memory"); if(r<0) DualLogError("munmap failed\n"); }
     static inline __attribute__((always_inline)) i64 OS_RawWrite(FHandle fd, const void* buf, size_t cnt) { i64 r=1; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(buf),"d"(cnt):"rcx","r11","memory"); return r; }
+    // Multithreading taken from https://github.com/skeeto/scratch/blob/master/misc/stack_head.c Ref: https://nullprogram.com/blog/2023/03/23/ This is free and unencumbered software released into the public domain.
+    #define SYSCALL1(n, a) syscall6(n,(long)(a),0,0,0,0,0)
+    #define SYSCALL2(n, a, b) syscall6(n,(long)(a),(long)(b),0,0,0,0)
+    #define SYSCALL3(n, a, b, c) syscall6(n,(long)(a),(long)(b),(long)(c),0,0,0)
+    #define SYSCALL4(n, a, b, c, d) syscall6(n,(long)(a),(long)(b),(long)(c),(long)(d),0,0)
+    #define THREAD_STACK_SIZE (8 * 1024 * 1024)
+    static inline __attribute__((always_inline)) long syscall6(long n, long a, long b, long c, long d, long e, long f) { register long r=n; register long r10 __asm__("r10") = d; register long r8  __asm__("r8")  = e; register long r9  __asm__("r9")  = f; __asm__ __volatile__("syscall":"+a"(r):"D"(a),"S"(b),"d"(c),"r"(r10),"r"(r8),"r"(r9):"rcx","r11","memory"); return r; }
+    typedef struct __attribute__((aligned(16))) OS_ThreadHead { void(*trampoline)(struct OS_ThreadHead*),*(*fn)(void*),*arg; int join_futex,_pad; } OS_ThreadHead;
+    typedef struct { struct OS_ThreadHead* head; void* stack_base; } OS_Thread;
+    __attribute__((naked)) static long OS_CloneSyscall(struct OS_ThreadHead* stack) { __asm__ volatile ("mov %%rdi, %%rsi\nmov $0x50f00, %%edi\nmov $56, %%eax\nsyscall\nmov  %%rsp, %%rdi\nret\n":::"rax","rcx","rsi","rdi","r11","memory"); }
+    __attribute__((noreturn)) static void OS_ThreadTrampoline(struct OS_ThreadHead* head) { head->fn(head->arg); __atomic_store_n(&head->join_futex,1,__ATOMIC_SEQ_CST); SYSCALL3(202,&head->join_futex,1,0x7fffffff);/*futex wake*/  SYSCALL1(60,0); __builtin_unreachable(); }
+    static inline __attribute__((always_inline)) int OS_ThreadCreate(OS_Thread* out, void* (*fn)(void*), void* arg) {
+        void* base = OS_AllocateRAM(NULL, THREAD_STACK_SIZE, 0x1|0x2, 0x02|0x20, INVALID_FHANDLE);
+        if (!base || base == (void*)-1) return -1;
 
-    #define THREAD_FLAGS (CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID)
-    //int pthread_create(pthread_t* thread, const pthread_attr_t* attr, void* (*start_routine)(void*), void* arg) {
-        //const size_t STACK_SIZE = 1024*1024; void* stack = (attr && attr->stack) ? attr->stack : OS_Alloc(STACK_SIZE); if (!stack) return -1;
+        struct OS_ThreadHead* head = (struct OS_ThreadHead*)((char*)base + THREAD_STACK_SIZE) - 1;
+        head->trampoline = OS_ThreadTrampoline;  // child's ret target
+        head->fn=fn; head->arg=arg; head->join_futex=0; head->_pad=0;
+        long tid = OS_CloneSyscall(head); if (tid < 0) { OS_DeallocateRAM(base,THREAD_STACK_SIZE); return (int)tid; }
 
-        //char* sp = (char*)stack + STACK_SIZE - 32; ((void**)sp)[0] = start_routine; ((void**)sp)[1] = arg;
-        //i64 ret = 56;  // SYS_clone
-        //__asm__ __volatile__("syscall":"+a"(ret):"D"(THREAD_FLAGS),"S"(sp),"d"(*thread),"r"((long)0),"r"((long)thread):"rcx","r11","memory");
-        //if (ret == 0) {
-            //void* (*fn)(void*) = ((void**)sp)[0]; void* a = ((void**)sp)[1]; void* result = fn(a);
-            //i64 exit_code = (i64)result;
-            //__asm__ __volatile__("syscall":"+a"(exit_code):"D"(exit_code) :"rcx","r11","memory"); // SYS_exit = 60, but we reuse rax
-        //}
+        out->head=head; out->stack_base=base;
+        return 0;
+    }
 
-        //if (ret > 0) { *thread = ret; return 0; }
-        //if (!(attr && attr->stack)) OS_DeallocateRAM(stack,STACK_SIZE);
-        //return (int)ret;
-    //}
-
-    //int pthread_join(pthread_t thread, void** retval) {
-        //i64 ret = 61; int status = 0;
-        //__asm__ __volatile__("syscall":"+a"(ret):"D"(thread),"S"(&status),"d"(__WALL | __WEXITED):"rcx","r11","memory");
-        //if (ret >= 0) { if (retval) {*retval = NULL;} return 0; }
-        //return (int)ret;
-    //}
+    static inline __attribute__((always_inline)) void OS_ThreadJoin(OS_Thread* t) {
+        int v;
+        while ((v = __atomic_load_n(&t->head->join_futex, __ATOMIC_SEQ_CST)) == 0) SYSCALL4(202, &t->head->join_futex, 0 /*FUTEX_WAIT*/, v, 0);
+        OS_DeallocateRAM(t->stack_base,THREAD_STACK_SIZE);
+        t->head = NULL; t->stack_base = NULL;
+    }
+    
+    static inline __attribute__((always_inline))  void OS_USleep(u32 usec) { long ts[2] = {usec / 1000000,(usec % 1000000) * 1000L}; SYSCALL2(35,ts,ts); }
 #endif
 static inline __attribute__((always_inline)) void* OS_Alloc(size_t amount) { return OS_AllocateRAM(NULL,amount,0x1|0x2,0x02|0x20,INVALID_FHANDLE); }
 static inline __attribute__((always_inline)) void* OS_Calloc(size_t amount, size_t count) { return OS_AllocateRAM(NULL,amount * count,0x1|0x2,0x02|0x20,INVALID_FHANDLE); }
@@ -112,3 +119,6 @@ static inline __attribute__((always_inline)) void OS_Write(FHandle f,const void*
 static inline __attribute__((always_inline)) void* OS_OpenAndAllocateFileBufferReadonly(const char* p,FHandle* f,int* s){void* r;return((*f=OS_OpenReadonly(p))==(FHandle)-1)?*s=0,(void*)0:((*s=OS_FileSize(*f))<=0)?DualLogError("Skipping empty:%s\n",p),OS_Close(*f),OS_Exit(1),NULL:(r=OS_AllocateFileBackedRAMReadonly(*s,*f,(char*)p))?(OS_Close(*f),r):NULL;}
 static inline __attribute__((always_inline)) void* OSCopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n) { unsigned char *d=(unsigned char *)dst; const unsigned char *s=(const unsigned char *)src; while (n--) {*d++=*s++;} return dst; } // memcpy replacement
 static inline __attribute__((always_inline)) void* OS_Realloc(void* old, size_t olds, size_t news) { void* n; return !old ? OS_Alloc(news) : news <= olds ? old : (n=OS_Alloc(news)) ? (OSCopyMemoryFromBtoAForNBytes(n,old,olds),OS_DeallocateRAM(old,olds),n) : 0; }
+typedef int (*cmpfun)(const void*, const void*);
+typedef int (*cmpfun_r)(const void*, const void*, void*);
+void qsort_new(void* base, size_t nel, size_t w, cmpfun cmp);

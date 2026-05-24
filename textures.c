@@ -215,9 +215,9 @@ static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
                     StringCopyInto_A_SubstringFrom_B(tk, kL, k, 256); StringCopyInto_A_SubstringFrom_B(tv,vL,v,256);
                     char *ke = tk + GetStringLength(tk) - 1, *ve = tv + GetStringLength(tv) - 1;
                     while (ke > tk && CharacterIsEmpty(*ke)) *ke-- = 0; while (ve > tv && CharacterIsEmpty(*ve)) *ve-- = 0;
-                         if (StringsEqual(tk,       "index")) e.index       = parse_numberu16(tv,s,line);
-                    else if (StringsEqual(tk, "transparent")) e.transparent = parse_bool(tv,s,line);
-                    else if (StringsEqual(tk, "doublesided")) e.doublesided = parse_bool(tv,s,line);
+                         if (StringsEqual(tk,      "index")) e.index       = parse_numberu16(tv,s,line);
+                    else if (StringsEqual(tk,"transparent")) e.transparent = parse_bool(tv,s,line);
+                    else if (StringsEqual(tk,"doublesided")) e.doublesided = parse_bool(tv,s,line);
                 }
             }
         }
@@ -274,9 +274,9 @@ static __attribute__((noinline)) void LoadTextures(void) {
         tasks[t] = (TextureParseTask){.start_tex=start,.end_tex=clamp(start+chunk,0,loadedTexturesMaxIndex),.raw_textures=rawTextures,.parsIdx=parsIdx,.parser=&texture_parser,.tid=t};
     }
 
-    pthread_t workers[32];
-    for (int t = 0; t < num_parse_threads; ++t) pthread_create(&workers[t], NULL, TextureParsingWorker, &tasks[t]);
-    for (int t = 0; t < num_parse_threads; ++t) pthread_join(workers[t], NULL);
+    OS_Thread workers[32];
+    for (int t = 0; t < num_parse_threads; ++t) OS_ThreadCreate(&workers[t],TextureParsingWorker,&tasks[t]);
+    for (int t = 0; t < num_parse_threads; ++t) OS_ThreadJoin(&workers[t]);
 //     for (int t = 0; t < num_parse_threads; ++t) TextureParsingWorker(&tasks[t]); // Single threaded alternative
     totalPixels = totalPaletteColors = 0u;
     for (u16 i = 0; i < loadedTexturesMaxIndex; ++i) {

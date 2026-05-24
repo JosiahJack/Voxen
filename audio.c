@@ -1215,7 +1215,7 @@ void AudioUpdate(void) {
         audio_mix_period(buf);
         int r = g_snd_writei(g_alsa_pcm,buf,(u32)AUDIO_FRAMES);
         if (r < 0) {
-            DualLog("Audio: snd_pcm_writei underrun %d, recovering\n",r);
+            DualLogWarn("Audio: snd_pcm_writei underrun %d, recovering\n",r);
             r = g_snd_recover(g_alsa_pcm,r,0);
             if (r < 0) DualLogError("Audio: snd_pcm_recover failed %d\n",r);
             else g_snd_writei(g_alsa_pcm,buf,(u32)AUDIO_FRAMES);
@@ -1233,8 +1233,8 @@ void AudioUpdate(void) {
     while (avail>=(u32)AUDIO_FRAMES) { audio_mix_period(buf); for (i32 i=0;i<pcm_fd_count;i++) { if (pcm_write(pcm_fds[i],buf,AUDIO_FRAMES)<0) {pcm_prepare(pcm_fds[i]);} } avail-=AUDIO_FRAMES; }
 }
 
-pthread_t audThreadID; int usleep(u32 usec);
-void* AudThread(void* arg) { (void)arg; while (1) { AudioUpdate(); usleep(1000); } return NULL; }
+pthread_t audThreadID;
+void* AudThread(void* arg) { (void)arg; while (1) { AudioUpdate(); OS_USleep(1000); } return NULL; }
 void InitAudio(void) {
 #ifdef WINDOWS
     FHandle first = pcm_open_all(AUDIO_RATE,AUDIO_CHANNELS,AUDIO_FRAMES,AUDIO_PERIODS);
