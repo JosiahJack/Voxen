@@ -34,8 +34,9 @@ ENGINE_TO_MOD void DualLogError(const char* fmt, ...); ENGINE_TO_MOD void DualLo
     DECLSPEC_IMPORT i32 WINAPI QueryPerformanceFrequency(LARGE_INTEGER*);                                 DECLSPEC_IMPORT void WINAPI GetSystemInfo(LPSYSTEM_INFO);               DECLSPEC_IMPORT HINSTANCE WINAPI LoadLibraryA(const char*);
     DECLSPEC_IMPORT FARPROC WINAPI GetProcAddress(HINSTANCE,const char*);                                 DECLSPEC_IMPORT __declspec (noreturn) void WINAPI ExitProcess(u32);
     static char win_err_buf[512];
-    struct timespec { i64 tv_sec; i32 tv_nsec; }; struct sched_param { int sched_priority; }; typedef uintptr_t pthread_t; typedef struct pthread_attr_t { unsigned p_state; void *stack; size_t s_size; struct sched_param param; } pthread_attr_t;
-    int pthread_create(pthread_t*,const pthread_attr_t*,void*(*func)(void*),void*); int pthread_join(pthread_t,void**);
+    struct timespec { i64 tv_sec; i32 tv_nsec; }; struct sched_param { int sched_priority; }; typedef uintptr_t pthread_t; typedef intptr_t pthread_mutex_t,pthread_cond_t; typedef int pthread_condattr_t; typedef u32 pthread_mutexattr_t; typedef struct pthread_attr_t { unsigned p_state; void *stack; size_t s_size; struct sched_param param; } pthread_attr_t;
+    int pthread_create(pthread_t*,const pthread_attr_t*,void*(*func)(void*),void*); int pthread_join(pthread_t,void**); int pthread_detach(pthread_t t);
+    int pthread_mutex_lock(pthread_mutex_t*); int pthread_cond_wait(pthread_cond_t*,pthread_mutex_t*); int pthread_mutex_unlock(pthread_mutex_t*); int pthread_mutex_init(pthread_mutex_t*,const pthread_mutexattr_t*); int pthread_cond_init(pthread_cond_t*,const pthread_condattr_t*); int pthread_cond_signal(pthread_cond_t*);
     int __cdecl _mkdir(const char* dirname);
     static inline __attribute__((always_inline, noreturn)) void OS_Exit(i64 exitCode) { ExitProcess((unsigned int)exitCode); __builtin_unreachable(); }
     static inline __attribute__((always_inline)) long OS_Open(const char* path, i32 flags, i32 m) { (void)m; void* h = CreateFileA(path,flags ? 0x40000000L : 0x80000000L, flags ? 0 : 1,0,flags ? 2 : 3,128,0); return h==(void*)-1 ? -1 : (long)(uintptr_t)h; }
@@ -52,6 +53,23 @@ ENGINE_TO_MOD void DualLogError(const char* fmt, ...); ENGINE_TO_MOD void DualLo
     static inline __attribute__((always_inline)) int OS_GetNumThreads(void) { SYSTEM_INFO si; GetSystemInfo(&si); return (int)si.dwNumberOfProcessors; }
     static inline __attribute__((always_inline)) void OS_DeallocateRAM(void* p, size_t s) { (void)s; if(!p) { DualLogError("Attempting to double free!\n"); OS_Exit(1); } if(!UnmapViewOfFile(p) && !VirtualFree(p,0,0x00008000)) DualLogError("VirtualFree failed\n"); }
     static inline __attribute__((always_inline)) i64 OS_RawWrite(FHandle fd, const void* buf, size_t count) { u32 w; return WriteFile((void*)fd,(void*)buf,(u32)count,&w,NULL) ? (i64)w : -1; }
+    #define THREAD_STACK_SIZE (8 * 1024 * 1024)
+    typedef struct { void* handle; } OS_Thread;
+    void* __stdcall GetProcessHeap(void); void* __stdcall HeapAlloc(void* hHeap, u32 dwFlags, size_t dwBytes); i32 __stdcall HeapFree(void* hHeap, u32 dwFlags, void* lpMem); void __stdcall Sleep(u32 dwMilliseconds); u32 __stdcall WaitForSingleObject(void* hHandle, u32 dwMilliseconds);
+    typedef u32 (__stdcall *LPTHREAD_START_ROUTINE)(void* lpParameter);
+    void* __stdcall CreateThread(void* lpThreadAttributes, size_t dwStackSize, LPTHREAD_START_ROUTINE lpStartAddress, void* lpParameter, u32 dwCreationFlags, u32* lpThreadId);
+    static u32 WINAPI OS_ThreadTrampoline(void* arg) { void** bundle = (void**)arg; void*(*fn)(void*) = (void*(*)(void*))bundle[0]; void* real_arg = bundle[1]; HeapFree(GetProcessHeap(), 0, bundle); fn(real_arg); return 0; }
+    static inline __attribute__((always_inline)) int OS_ThreadCreate(OS_Thread* out, void*(*fn)(void*), void* arg) {
+        void** bundle = (void**)HeapAlloc(GetProcessHeap(), 0, 2 * sizeof(void*));
+        if (!bundle) return -1;
+        bundle[0] = (void*)fn; bundle[1] = arg;
+        out->handle = CreateThread(NULL, THREAD_STACK_SIZE, OS_ThreadTrampoline,bundle,0,NULL);
+        if (!out->handle) { HeapFree(GetProcessHeap(), 0, bundle); return -1; }
+        return 0;
+    }
+
+    static inline __attribute__((always_inline)) void OS_ThreadJoin(OS_Thread* t) { WaitForSingleObject(t->handle,0xFFFFFFFFUL); CloseHandle(t->handle); t->handle = NULL; }
+    static inline __attribute__((always_inline)) void OS_USleep(u32 usec) { Sleep((usec + 999) / 1000); }
 #else
     #define LINUX
     #define MOD_EXTENSION ".so" // e.g. Citadel.so
@@ -60,8 +78,9 @@ ENGINE_TO_MOD void DualLogError(const char* fmt, ...); ENGINE_TO_MOD void DualLo
     #define INVALID_FHANDLE -1
     struct input_id { u16 bustype,vendor,product,version;}; struct input_absinfo {i32 value,minimum,maximum,fuzz,flat,resolution;}; struct input_event { struct { long tv_sec,tv_usec; } time; u16 type,code; i32 value; };
     typedef int FHandle;
-    struct timespec { i64 tv_sec,tv_nsec; }; typedef u64 pthread_t; typedef struct { unsigned int flags; void* stack; } pthread_attr_t;
-    int pthread_create(pthread_t* restrict,const pthread_attr_t* restrict,void*(*start_routine)(void*),void* restrict); int pthread_join(pthread_t,void**); void *dlopen(const char*,int); void *dlsym(void*,const char *);
+    struct timespec { i64 tv_sec,tv_nsec; }; typedef u64 pthread_t; typedef u32 pthread_mutexattr_t; typedef struct { u8 _[40]; } pthread_mutex_t; typedef struct { u8 _[48]; } pthread_cond_t; typedef int pthread_condattr_t; typedef struct { unsigned int flags; void* stack; } pthread_attr_t;
+    int pthread_create(pthread_t* restrict,const pthread_attr_t* restrict,void*(*start_routine)(void*),void* restrict); int pthread_join(pthread_t,void**); void *dlopen(const char*,int); void *dlsym(void*,const char *); int pthread_detach(pthread_t t);
+    int pthread_mutex_lock(pthread_mutex_t*); int pthread_cond_wait(pthread_cond_t*,pthread_mutex_t*); int pthread_mutex_unlock(pthread_mutex_t*); int pthread_mutex_init(pthread_mutex_t*,const pthread_mutexattr_t*); int pthread_cond_init(pthread_cond_t*,const pthread_condattr_t*); int pthread_cond_signal(pthread_cond_t*);
     static inline __attribute__((always_inline)) int OS_IOControl(int fd, unsigned long req, void* arg) { long r = 16; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(req),"d"(arg):"rcx","r11","memory"); return (int)r; }
     static inline __attribute__((always_inline)) int OS_IOControlSimple(int fd, unsigned long request) { return OS_IOControl(fd,request,0); }
     static inline __attribute__((always_inline)) int OS_MakeFolder(const char* path) { long r = 83; __asm__ __volatile__("syscall":"+a"(r):"D"(path),"S"(0755LL):"rcx","r11","memory"); return (int)r; }

@@ -665,10 +665,10 @@ static void drmp3d_synth(float *xl, drmp3d_sample_t *dstl, int nch, float *lins)
         zlin[4*i]=xl[18*(31-i)];zlin[4*i+1]=xr[18*(31-i)];zlin[4*i+2]=xl[1+18*(31-i)];zlin[4*i+3]=xr[1+18*(31-i)];
         zlin[4*(i+16)]=xl[1+18*(1+i)];zlin[4*(i+16)+1]=xr[1+18*(1+i)];zlin[4*(i-16)+2]=xl[18*(1+i)];zlin[4*(i-16)+3]=xr[18*(1+i)];
         DRMP3_S0(0) DRMP3_S2(1) DRMP3_S1(2) DRMP3_S2(3) DRMP3_S1(4) DRMP3_S2(5) DRMP3_S1(6) DRMP3_S2(7)
-        dstr[(15-i)*nch]=drmp3d_scale_pcm(a[1]);dstr[(17+i)*nch]=drmp3d_scale_pcm(b[1]);
-        dstl[(15-i)*nch]=drmp3d_scale_pcm(a[0]);dstl[(17+i)*nch]=drmp3d_scale_pcm(b[0]);
-        dstr[(47-i)*nch]=drmp3d_scale_pcm(a[3]);dstr[(49+i)*nch]=drmp3d_scale_pcm(b[3]);
-        dstl[(47-i)*nch]=drmp3d_scale_pcm(a[2]);dstl[(49+i)*nch]=drmp3d_scale_pcm(b[2]);
+        dstr[(15-i)*nch]=drmp3d_scale_pcm(a[1]); dstr[(17+i)*nch]=drmp3d_scale_pcm(b[1]);
+        dstl[(15-i)*nch]=drmp3d_scale_pcm(a[0]); dstl[(17+i)*nch]=drmp3d_scale_pcm(b[0]);
+        dstr[(47-i)*nch]=drmp3d_scale_pcm(a[3]); dstr[(49+i)*nch]=drmp3d_scale_pcm(b[3]);
+        dstl[(47-i)*nch]=drmp3d_scale_pcm(a[2]); dstl[(49+i)*nch]=drmp3d_scale_pcm(b[2]);
     }
 }
 static void drmp3d_synth_granule(float *qmf_state, float *grbuf, int nbands, int nch, drmp3d_sample_t *pcm, float *lins){

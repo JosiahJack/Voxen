@@ -19,7 +19,7 @@ void stbi_write_bmp(char const *filename, int x, int y, const void *data) {
 #ifdef WINDOWS
 double get_time(void) { static LARGE_INTEGER frequency,counter; static i32 init=0; if (!init) { QueryPerformanceFrequency(&frequency); init=1; } QueryPerformanceCounter(&counter); return (double)counter.QuadPart / frequency.QuadPart; }
 #else
-double get_time(void) { struct {i64 s,ns;} ts; i64 ret; __asm__ __volatile__("syscall":"=a"(ret):"a"(228),"D"(1),"S"(&ts):"rcx","r11","memory"); if (ret != 0) {return 0.0;} return (double)ts.s + (double)ts.ns * 1e-9; } // Full time in seconds, 1 for MONOTONIC
+double get_time(void) { struct {i64 s,ns;} ts; i64 ret; __asm__ __volatile__("syscall":"=a"(ret):"a"(228),"D"(1),"S"(&ts):"rcx","r11","memory"); if (ret != 0) {return 0.0;} return (double)ts.s + (double)ts.ns * 1e-9; } // Full time in seconds, 1 for MONOTONIC, Note that using clock_gettime wasn't any better for performance.
 #endif
 
 // Get USS aka the total RAM uniquely allocated for the process (btop shows RSS so pulls in shared libs and double counts shared RAM).
@@ -28,8 +28,7 @@ void DebugRAM(const char *context) {
     static void* heap_start = (void*)-1;
     if (heap_start == (void*)-1) heap_start = OS_Brk(NULL);
     void* current_brk = OS_Brk(NULL);
-    size_t heap_bytes = (size_t)((char*)current_brk - (char*)heap_start);
-    size_t uss_bytes = 0;
+    size_t heap_bytes = (size_t)((char*)current_brk - (char*)heap_start); size_t uss_bytes = 0;
     long fd = OS_OpenReadonly("/proc/self/smaps_rollup");
     if (fd == INVALID_FHANDLE) { DualLogError("Failed to open /proc/self/smaps_rollup\n"); return; }
 

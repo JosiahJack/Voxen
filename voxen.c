@@ -1528,7 +1528,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     }
 }
 
-void SetGLContext_GetFunctionPointers(void); GLFWwindow* VCreateWindow(int width, int height, char* title); int WindowInit(void); void InitAudio(void); void AudioUpdate(void);
+void SetGLContext_GetFunctionPointers(void); GLFWwindow* VCreateWindow(int width, int height, char* title); int WindowInit(void); void InitAudio(void); void InitPhysics(void); void AudioUpdate(void);
 void InitalizeEnvironment(double game_start_time) {
     random_range_rng = (u32)game_start_time; // Seed global rand uniquely with time since system boot.
     console_log_file = OS_OpenWriteonly("./voxen.log"); // Initialize log system for all prints to go to both stdout and voxen.log file
@@ -1648,6 +1648,7 @@ void InitalizeEnvironment(double game_start_time) {
         LoadTextures();
         RenderLoadingProgress(92,"Loading models...");
         LoadModels();
+        InitPhysics();
         if (Sys_Global.introNotPlayed) {} // TODO: Play intro
         Sys_Global.absoluteTime = Sys_Global.last_topframe_time = Sys_Global.current_time = get_time();
         Sys_Global.pauseRelativeTime = Sys_Global.last_physics_time = 0.0;
@@ -1658,7 +1659,7 @@ void InitalizeEnvironment(double game_start_time) {
     }
 }
 
-void InputProcessing(void); void Physics(void);
+void InputProcessing(void); void PhysicsUpdateAsync(float dt);
 i32 main(void) {
     double game_start_time = get_time();
     InitalizeEnvironment(game_start_time);
@@ -1685,7 +1686,7 @@ i32 main(void) {
                 }
             }
 
-            /*if (Sys_Global.timeSinceLastPhysicsTick > (1.0 / 144.0)) { */Sys_Global.last_physics_time = Sys_Global.pauseRelativeTime; Physics();// }
+            /*if (Sys_Global.timeSinceLastPhysicsTick > (1.0 / 144.0)) { */Sys_Global.last_physics_time = Sys_Global.pauseRelativeTime; PhysicsUpdateAsync(vclamp((float)Sys_Global.timeSinceLastPhysicsTick, 0.0005f, 0.1f));// }
             Vector3 pDelta = Vector3_A_minus_B(Sys_Global.instances[PLAYER1].lastPosition,Sys_Global.instances[PLAYER1].position);
             bool playerMoved = ((vabs(pDelta.x) + vabs(pDelta.y) + vabs(pDelta.z)) > 0.02f);
             ModUpdate(playerMoved);
