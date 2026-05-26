@@ -3580,7 +3580,7 @@ MOD_TO_ENGINE void PlayerInit(u16 i) {
     Eng_Global->instances[i].rotation = (Quaternion){0.0f,0.7071f,0.0f,0.7071f}; // 90deg rotation CW about Y axis as viewed from the top looking down onto player
     Eng_Global->instances[i].entflags = ENTFLAG_ACTIVE|ENTFLAG_RIGIDBODY;
     Eng_Global->instances[i].collider = COLLIDER_TYPE_CAPSULE;
-    Eng_Global->instances[i].colliderCenter.y = 0.84f;
+    Eng_Global->instances[i].colliderCenter.y = -0.84f;
     Eng_Global->instances[i].colliderSize = (Vector3){0.48f,2.0f,1.0f}; // Radius, Overall height including end radii (Unity convention, blech), Direction, 1.0 == Y-Axis
     Eng_Global->instances[i].mass = 1.0f;
     Eng_Global->instances[i].velocity = (Vector3){0.0f,0.0f,0.0f};

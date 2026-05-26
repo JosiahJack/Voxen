@@ -397,19 +397,9 @@ ENGINE_TO_MOD Vector3 GetEntityLocalSpawnPointFromUnrotatedOffsetVector(Entity* 
     return result;
 }
 
-static inline int pntz(size_t p[2]) {
-    if (p[0] != 1) return __builtin_ctzll(p[0] - 1);
-    if (p[1])      return 8*sizeof(size_t) + __builtin_ctzll(p[1]);
-    return 0;
-}
-static inline void shl(size_t p[2], int n) {
-    if (n >= 8*(int)sizeof(size_t)) { p[1]=p[0]; p[0]=0; n-=8*sizeof(size_t); if(!n)return; }
-    p[1]=(p[1]<<n)|(p[0]>>(8*sizeof(size_t)-n)); p[0]<<=n;
-}
-static inline void shr(size_t p[2], int n) {
-    if (n >= 8*(int)sizeof(size_t)) { p[0]=p[1]; p[1]=0; n-=8*sizeof(size_t); if(!n)return; }
-    p[0]=(p[0]>>n)|(p[1]<<(8*sizeof(size_t)-n)); p[1]>>=n;
-}
+static inline int pntz(size_t p[2]) { return (p[0] != 1) ? __builtin_ctzll(p[0] - 1) : (p[1] ? 8 * sizeof(size_t) + __builtin_ctzll(p[1]) : 0); }
+static inline void shl(size_t p[2], int n) { if (n >= 8 * (int)sizeof(size_t)) { p[1] = p[0]; p[0] = 0; n -= 8 * sizeof(size_t); } if (n) { p[1] = (p[1] << n) | (p[0] >> (8 * sizeof(size_t) - n)); p[0] <<= n; } }
+static inline void shr(size_t p[2], int n) { if (n >= 8 * (int)sizeof(size_t)) { p[0] = p[1]; p[1] = 0; n -= 8 * sizeof(size_t); } if (n) { p[0] = (p[0] >> n) | (p[1] << (8 * sizeof(size_t) - n)); p[1] >>= n; } }
 static void cycle(size_t w, unsigned char* ar[], int n) {
     unsigned char tmp[256]; size_t l;
     if (n<2) return;
@@ -427,34 +417,34 @@ static void sift(unsigned char* head, size_t w, cmpfun_r cmp, void* arg, int ps,
     cycle(w,ar,i&(AL-1));
 }
 static void trinkle(unsigned char* head, size_t w, cmpfun_r cmp, void* arg, size_t pp[2], int ps, int trusty, size_t lp[]) {
-    unsigned char* ar[AL]; int i=1; ar[0]=head;
-    size_t p[2]={pp[0],pp[1]};
+    unsigned char* ar[AL]; int i=1; ar[0]=head; size_t p[2]={pp[0],pp[1]};
     while (p[0]!=1||p[1]!=0) {
         unsigned char* ss=head-lp[ps];
         if (cmp(ss,ar[0],arg)<=0) break;
         if (!trusty&&ps>1) { unsigned char* rt=head-w,*lf=rt-lp[ps-2]; if(cmp(rt,ss,arg)>=0||cmp(lf,ss,arg)>=0) break; }
+        
         ar[i++&(AL-1)]=ss; head=ss; int t=pntz(p); shr(p,t); ps+=t; trusty=0;
     }
+    
     if (!trusty) { cycle(w,ar,i&(AL-1)); sift(head,w,cmp,arg,ps,lp); }
 }
 void qsort_new(void* base, size_t nel, size_t w, cmpfun cmp) {
-    // wrap 2-arg cmp into 3-arg inline — no separate wrapper_cmp needed
-    // by casting: cmpfun and cmpfun_r differ only in the void* arg which we pass as NULL
-    // and a well-behaved cmp never touches it, so this cast is safe in practice
-    size_t lp[12*sizeof(size_t)], p[2]={1,0}, size=w*nel; int ps=1,trail;
-    if (!size) return;
+    size_t lp[12*sizeof(size_t)], p[2]={1,0}, size=w*nel; int ps=1,trail; if (!size) return;
+    
     unsigned char* head=base, *high=head+size-w;
-    for (size_t i=2; lp[0]=lp[1]=w, (lp[i]=lp[i-2]+lp[i-1]+w)<size; i++);
+    for (size_t i=2;lp[0]=lp[1]=w,(lp[i]=lp[i-2]+lp[i-1]+w)<size;i++);
     cmpfun_r cmp_r=(cmpfun_r)(void*)cmp; void* arg=NULL;
     while (head<high) {
-        if ((p[0]&3)==3)                      { sift(head,w,cmp_r,arg,ps,lp); shr(p,2); ps+=2; }
+        if ((p[0]&3)==3) { sift(head,w,cmp_r,arg,ps,lp); shr(p,2); ps+=2; }
         else {
             if (lp[ps-1]>=((size_t)(high-head))) trinkle(head,w,cmp_r,arg,p,ps,0,lp);
             else                                  sift(head,w,cmp_r,arg,ps,lp);
             if (ps==1) { shl(p,1); ps=0; } else { shl(p,ps-1); ps=1; }
         }
+        
         p[0]|=1; head+=w;
     }
+    
     trinkle(head,w,cmp_r,arg,p,ps,0,lp);
     while (ps!=1||p[0]!=1||p[1]!=0) {
         if (ps<=1) { trail=pntz(p); shr(p,trail); ps+=trail; }

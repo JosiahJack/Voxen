@@ -513,7 +513,6 @@ typedef struct {
 } InventorySystem;
 
 typedef struct { float damage,penetration,offense,armorvalue,defense,impactVelocity; Vector3 attacknormal,hitpoint; AttackType attackType; u16 owner,hitIdx; bool isOtherNPC,berserkActive; } DamageData;
-
 typedef /*FAT*/ struct  {
     u32 entflags;
     u16 index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
