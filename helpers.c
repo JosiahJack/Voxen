@@ -462,3 +462,20 @@ void qsort_new(void* base, size_t nel, size_t w, cmpfun cmp) {
         head-=w;
     }
 }
+
+typedef u16 half;
+float half_to_float(half h) {
+    u32 s=(h&0x8000)<<16,e=(h&0x7C00)>>10,m=(h&0x03FF),out;
+    if (e == 0){
+        if (m == 0) out = s;
+        else {
+            e = 1;
+            while ((m & 0x0400) == 0) { m <<= 1; e--; }
+            m &= 0x03FF; e+=(127 - 15);
+            out = s | (e << 23) | (m << 13);
+        }
+    } else if (e == 31) { out = s | 0x7F800000 | (m << 13); }
+    else { e = e + (127 - 15); out = s | (e << 23) | (m << 13); }
+    float f; CopyMemoryFromBtoAForNBytes(&f,&out,4);
+    return f;
+}

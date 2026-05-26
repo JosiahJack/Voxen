@@ -14,6 +14,9 @@ typedef __INT64_TYPE__ i64;   typedef __UINT64_TYPE__ u64; typedef __SIZE_TYPE__
     #define ENGINE_TO_MOD __attribute__((visibility("default")))
 #endif
 ENGINE_TO_MOD void DualLogError(const char* fmt, ...); ENGINE_TO_MOD void DualLog(const char* fmt, ...); char* StringFindSubstring(const char* haystack, const char* needle);
+#define assert(cond) do { \
+    if (!(cond)) { DualLogError("[%s:%d]:%s(): Assert fail:%s\n",__FILE__,__LINE__,__func__,#cond); *(volatile int*)0 = 0; /* Force a crash/segfault for the debugger */ } \
+} while(0)
 #if defined(_WIN32)
     #define WINDOWS
     #define MOD_EXTENSION ".dll" // e.g. Citadel.dll

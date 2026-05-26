@@ -2,9 +2,6 @@
 #include "os.h" // Operating System calls shim layer.
 #include "gl.h"
 GLFWwindow* window;
-#define assert(cond) do { \
-    if (!(cond)) { DualLogError("[%s:%d]:%s(): Assert fail:%s\n",__FILE__,__LINE__,__func__,#cond); *(volatile int*)0 = 0; /* Force a crash/segfault for the debugger */ } \
-} while(0)
 #define MOD_INTEROP_ENGINE
 #if defined(LINUX)
     //#define DEBUG_RAM_OUTPUT // Debug and Compile Flags
@@ -12,7 +9,6 @@ GLFWwindow* window;
 #include "common.h"
 #include "interop.h"
 #include "Shaders/shaders.h"
-#define VERTEX_ATTRIBUTES_SIZE 16 // Was 32ls
 #define TEXT_BUFFER_SIZE 1024
 #define FONT_ATLAS_SIZE 4672
 #define MAX_GLYPHS 4096
@@ -64,7 +60,6 @@ u8 currentMenuPage = Mpg_FrontPage; bool resDropdownOpen = false; int resDropdow
 typedef struct {int w,h;} ResMode;
 ResMode resModes[8];
 typedef struct { Vector3 position; Quaternion rotation; u8 fov; u16 width,height; float near,far,finished; bool visible; } CamView;
-u16 dynamicEntities[512]; u16 dynamicEntityCount;
 CamView camViews[64]; u32 camViewTextures[64]; u8 camViewCount = 0; // Max is 8 cam views on level 8 + 3 sensaround views = 11.
 FHandle console_log_file=0;
 static inline __attribute__((always_inline)) i32 PosGetCellCoordX(float pos_x) { return (u16)clamp((i32)vfloor((pos_x - Sys_Global.worldMin_x + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
@@ -95,22 +90,7 @@ ENGINE_TO_MOD void DualLogError(const char* fmt, ...) { va_list args; __builtin_
 #include "models.c"
 #include "culling.c"
 #include "text.c"
-static float half_to_float(half h){
-    u32 s=(h&0x8000)<<16,e=(h&0x7C00)>>10,m=(h&0x03FF),out;
-    if (e == 0){
-        if (m == 0) out = s;
-        else {
-            e = 1;
-            while ((m & 0x0400) == 0) { m <<= 1; e--; }
-            m &= 0x03FF; e+=(127 - 15);
-            out = s | (e << 23) | (m << 13);
-        }
-    } else if (e == 31) { out = s | 0x7F800000 | (m << 13); }
-    else { e = e + (127 - 15); out = s | (e << 23) | (m << 13); }
-    float f; CopyMemoryFromBtoAForNBytes(&f,&out,4);
-    return f;
-}
-
+float half_to_float(half h);
 RaycastHit RayTriangle(Vector3 origin, Vector3 dir, Vector3 posA, Vector3 posB, Vector3 posC, Vector3 normA, Vector3 normB, Vector3 normC) {
     Vector3 edgeAB = Vector3_A_minus_B(posB,posA), edgeAC = Vector3_A_minus_B(posC,posA); Vector3 normalVector = cross_vector3(edgeAB,edgeAC);
     Vector3 ao = Vector3_A_minus_B(origin,posA);
@@ -519,18 +499,6 @@ ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
     for (u16 i = 0; i < Sys_Global.loadedLights; i++) { lightsNewPosition[i] = lights[i].pos; }
     MemSetToVForNBytes(voxen_Shadow_System.shadowmapIndirectionList,MAX_SHADOWMAPS + 1,Sys_Global.loadedLights * sizeof(u32)); // Set to invalid values for all
     Sys_Global.levelCurrentlyLoading = false;
-    u16 numBox=0,numSphere=0,numMeshConv=0,numMesh=0,numCapsule=0,dynCount=0;
-    for (int i=PLAYER1;i<Sys_Global.loadedInstances;++i) {
-        if (ConstIndexIsDynamicObject(Sys_Global.instances[i].index)) continue;
-        
-        if (Sys_Global.instances[i].collider == COLLIDER_TYPE_BOX) numBox++;
-        if (Sys_Global.instances[i].collider == COLLIDER_TYPE_SPHERE) numSphere++;
-        if (Sys_Global.instances[i].collider == COLLIDER_TYPE_CAPSULE) numCapsule++;
-        if (Sys_Global.instances[i].collider == COLLIDER_TYPE_CONVEXMESH) numMeshConv++;
-        if (Sys_Global.instances[i].collider == COLLIDER_TYPE_MESH) numMesh++;
-        if (Sys_Global.instances[i].entflags&ENTFLAG_RIGIDBODY && Sys_Global.instances[i].entflags&ENTFLAG_ACTIVE) dynCount++;
-    }
-    DualLog("Got static collider count of %u, dynamic %u, collider type counts box: %u, sphere: %u, capsule: %u, mesh convex: %u, mesh: %u\n",numBox+numSphere+numCapsule+numMeshConv+numMesh,dynCount,numBox,numSphere,numCapsule,numMeshConv,numMesh);
     DebugRAM("end of LoadLevel");
 }
 
@@ -1166,6 +1134,7 @@ float GetPainStatic(void) { return 0.0f; } // TODO: Hook into pain/health manage
 Color GetPainStaticColor(void) { return (Color){1.0f,0.0f,0.0f,1.0f}; } // TODO: Hook staticColor up to red or blue for pain or shield impact.
 __attribute__((pure)) i32 dsort(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (db > da) - (db < da); }
 __attribute__((pure)) i32 dsortInv(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (da > db) - (da < db); }
+void DrawCapsuleCollider(Entity *e); void DrawConvexMeshCollider(Entity *e); void DrawSphereCollider(Entity *e); void DrawBoxCollider(Entity* e);
 #define MAX_VISIBLE 4096
 #define BIND_TEX(slot,cur,next) if((cur)!=(next)||(next)==0){(cur)=(next);glUniform1ui(slot,(u32)(next));}
 #define DRAW_ENTITY(curN,curT,curG,curS,curM) \
@@ -1192,137 +1161,7 @@ __attribute__((pure)) i32 dsortInv(const void* a, const void* b) { float da = ((
 
 void Entity_GetBox(const Entity *e,ShapeBox *out); void Entity_GetSphere(const Entity *e,ShapeSphere *out); void Entity_GetCapsule(const Entity *e,ShapeCapsule *out);
 void obb_axes(Quaternion q,Vector3 *ax,Vector3 *ay,Vector3 *az);
-static void DrawBoxCollider(Entity* e) {
-    ShapeBox b; Entity_GetBox(e,&b);
-    Vector3 ax,ay,az; obb_axes(b.rot,&ax,&ay,&az);
-    Vector3 px = scale_vector3(ax,b.halfExtents.x); // Scale axes to half extents
-    Vector3 py = scale_vector3(ay,b.halfExtents.y);
-    Vector3 pz = scale_vector3(az,b.halfExtents.z);
-    Vector3 c[8]; // 8 corners
-    for (int s = 0; s < 8; s++) {
-        float sx = (s&1) ? 1.f : -1.f;
-        float sy = (s&2) ? 1.f : -1.f;
-        float sz = (s&4) ? 1.f : -1.f;
-        c[s] = Vector3_A_plus_B(b.center,Vector3_A_plus_B(Vector3_A_plus_B(scale_vector3(px, sx),scale_vector3(py, sy)),scale_vector3(pz, sz)));
-    }
 
-    AddDebugLine(c[0],c[1],textColors[TEXT_GREEN]); AddDebugLine(c[2],c[3],textColors[TEXT_GREEN]); // 12 edges
-    AddDebugLine(c[4],c[5],textColors[TEXT_GREEN]); AddDebugLine(c[6],c[7],textColors[TEXT_GREEN]);
-    AddDebugLine(c[0],c[2],textColors[TEXT_GREEN]); AddDebugLine(c[1],c[3],textColors[TEXT_GREEN]);
-    AddDebugLine(c[4],c[6],textColors[TEXT_GREEN]); AddDebugLine(c[5],c[7],textColors[TEXT_GREEN]);
-    AddDebugLine(c[0],c[4],textColors[TEXT_GREEN]); AddDebugLine(c[1],c[5],textColors[TEXT_GREEN]);
-    AddDebugLine(c[2],c[6],textColors[TEXT_GREEN]); AddDebugLine(c[3],c[7],textColors[TEXT_GREEN]);
-}
-
-static void DrawSphereCollider(Entity *e) {
-    ShapeSphere s; Entity_GetSphere(e,&s);
-    float step = 6.28318530f / 12;
-    for (int seg = 0; seg < 12; seg++) {
-        float a0 = seg * step, a1 = a0 + step;
-        float c0 = vcosf(a0), s0 = vsinf(a0);
-        float c1 = vcosf(a1), s1 = vsinf(a1);
-        AddDebugLine(Vector3_A_plus_B(s.center, (Vector3){c0*s.radius, 0, s0*s.radius}),Vector3_A_plus_B(s.center, (Vector3){c1*s.radius, 0, s1*s.radius}),textColors[TEXT_DARK_YELLOW]); // XZ plane
-        AddDebugLine(Vector3_A_plus_B(s.center, (Vector3){c0*s.radius, s0*s.radius, 0}),Vector3_A_plus_B(s.center, (Vector3){c1*s.radius, s1*s.radius, 0}),textColors[TEXT_DARK_YELLOW]); // XY plane
-        AddDebugLine(Vector3_A_plus_B(s.center, (Vector3){0, c0*s.radius, s0*s.radius}),Vector3_A_plus_B(s.center, (Vector3){0, c1*s.radius, s1*s.radius}),textColors[TEXT_DARK_YELLOW]); // YZ plane
-    }
-}
-
-static void DrawConvexMeshCollider(Entity *e) {
-    u16 mi = e->colliderMeshIndex;
-    if (mi == MODEL_IDX_MAX || mi >= loadedModelsMaxIndex) return;
-    u32 triCount = modelTriangleCounts[mi];
-    if (!triCount) return;
-
-    float M[16];
-    u16 idx = (u16)(e - Sys_Global.instances);
-    CopyMemoryFromBtoAForNBytes(M, &modelMatrices[idx * 16], 64);
-    float m00=M[0],m10=M[1],m20=M[2];
-    float m01=M[4],m11=M[5],m21=M[6];
-    float m02=M[8],m12=M[9],m22=M[10];
-    float tx=M[12],ty=M[13],tz=M[14];
-    for (u32 j = 0; j < triCount; j++) {
-        u32 bA = (u32)modelTriangles[mi][j*3+0] * VERTEX_ATTRIBUTES_SIZE;
-        u32 bB = (u32)modelTriangles[mi][j*3+1] * VERTEX_ATTRIBUTES_SIZE;
-        u32 bC = (u32)modelTriangles[mi][j*3+2] * VERTEX_ATTRIBUTES_SIZE;
-        Vector3 lA = {half_to_float(*(half*)(modelVertices[mi]+bA+0)), half_to_float(*(half*)(modelVertices[mi]+bA+2)), half_to_float(*(half*)(modelVertices[mi]+bA+4))};
-        Vector3 lB = {half_to_float(*(half*)(modelVertices[mi]+bB+0)), half_to_float(*(half*)(modelVertices[mi]+bB+2)), half_to_float(*(half*)(modelVertices[mi]+bB+4))};
-        Vector3 lC = {half_to_float(*(half*)(modelVertices[mi]+bC+0)), half_to_float(*(half*)(modelVertices[mi]+bC+2)), half_to_float(*(half*)(modelVertices[mi]+bC+4))};
-        #define XFORM(v) (Vector3){ \
-            m00*(v).x + m01*(v).y + m02*(v).z + tx, \
-            m10*(v).x + m11*(v).y + m12*(v).z + ty, \
-            m20*(v).x + m21*(v).y + m22*(v).z + tz  \
-        }
-
-        Vector3 wA = XFORM(lA), wB = XFORM(lB), wC = XFORM(lC);
-        #undef XFORM
-        AddDebugLine(wA,wB,textColors[TEXT_GREEN]);
-        AddDebugLine(wB,wC,textColors[TEXT_GREEN]);
-        AddDebugLine(wC,wA,textColors[TEXT_GREEN]);
-    }
-}
-
-static void DrawCapsuleCollider(Entity *e) {
-    ShapeCapsule cap;
-    Entity_GetCapsule(e, &cap);
-
-    // Capsule axis direction and perpendiculars
-    Vector3 axis = normalize_vector3(Vector3_A_minus_B(cap.tip, cap.base));
-    
-    // Build two vectors perpendicular to axis
-    Vector3 perp0, perp1;
-    Vector3 ref = (vabs(axis.y) < 0.9f) ? (Vector3){0,1,0} : (Vector3){1,0,0};
-    perp0 = normalize_vector3(cross_vector3(axis, ref));
-    perp1 = cross_vector3(axis, perp0);
-
-    #define CAPS_SEGS 12
-    float step = 6.28318530f / CAPS_SEGS;
-    float r = cap.radius;
-
-    // Full circle around capsule axis at base and tip (the "belt" lines)
-    for (int seg = 0; seg < CAPS_SEGS; seg++) {
-        float a0 = seg * step, a1 = a0 + step;
-        float c0 = vcosf(a0), s0 = vsinf(a0);
-        float c1 = vcosf(a1), s1 = vsinf(a1);
-        Vector3 r0 = Vector3_A_plus_B(scale_vector3(perp0,c0*r),scale_vector3(perp1,s0*r));
-        Vector3 r1 = Vector3_A_plus_B(scale_vector3(perp0,c1*r),scale_vector3(perp1,s1*r));
-        AddDebugLine(Vector3_A_plus_B(cap.base,r0),Vector3_A_plus_B(cap.base,r1),textColors[TEXT_GREEN]); // Belt at base
-        AddDebugLine(Vector3_A_plus_B(cap.tip, r0),Vector3_A_plus_B(cap.tip, r1),textColors[TEXT_GREEN]); // Belt at tip
-    }
-
-    // Hemisphere arcs — half circle only (pi), 2 perpendicular planes per end
-    #define HEMI_SEGS 6  // half of 12
-    for (int seg = 0; seg < HEMI_SEGS; seg++) {
-        float a0 = seg * step, a1 = a0 + step;
-        float c0 = vcosf(a0), s0 = vsinf(a0);
-        float c1 = vcosf(a1), s1 = vsinf(a1);
-
-        // Base hemisphere — arc curves away from tip (negative axis)
-        Vector3 bA0 = Vector3_A_plus_B(scale_vector3(perp0, c0*r), scale_vector3(axis, -s0*r));
-        Vector3 bA1 = Vector3_A_plus_B(scale_vector3(perp0, c1*r), scale_vector3(axis, -s1*r));
-        Vector3 bB0 = Vector3_A_plus_B(scale_vector3(perp1, c0*r), scale_vector3(axis, -s0*r));
-        Vector3 bB1 = Vector3_A_plus_B(scale_vector3(perp1, c1*r), scale_vector3(axis, -s1*r));
-        AddDebugLine(Vector3_A_plus_B(cap.base, bA0), Vector3_A_plus_B(cap.base, bA1),textColors[TEXT_GREEN]);
-        AddDebugLine(Vector3_A_plus_B(cap.base, bB0), Vector3_A_plus_B(cap.base, bB1),textColors[TEXT_GREEN]);
-
-        // Tip hemisphere — arc curves away from base (positive axis)
-        Vector3 tA0 = Vector3_A_plus_B(scale_vector3(perp0, c0*r), scale_vector3(axis, s0*r));
-        Vector3 tA1 = Vector3_A_plus_B(scale_vector3(perp0, c1*r), scale_vector3(axis, s1*r));
-        Vector3 tB0 = Vector3_A_plus_B(scale_vector3(perp1, c0*r), scale_vector3(axis, s0*r));
-        Vector3 tB1 = Vector3_A_plus_B(scale_vector3(perp1, c1*r), scale_vector3(axis, s1*r));
-        AddDebugLine(Vector3_A_plus_B(cap.tip, tA0), Vector3_A_plus_B(cap.tip, tA1),textColors[TEXT_GREEN]);
-        AddDebugLine(Vector3_A_plus_B(cap.tip, tB0), Vector3_A_plus_B(cap.tip, tB1),textColors[TEXT_GREEN]);
-    }
-    #undef HEMI_SEGS
-
-    // 4 spine lines connecting base belt to tip belt
-    for (int seg = 0; seg < 4; seg++) {
-        float a = seg * (6.28318530f / 4.0f);
-        Vector3 off = Vector3_A_plus_B(scale_vector3(perp0, vcosf(a)*r), scale_vector3(perp1, vsinf(a)*r));
-        AddDebugLine(Vector3_A_plus_B(cap.base, off), Vector3_A_plus_B(cap.tip, off),textColors[TEXT_GREEN]);
-    }
-
-    #undef CAPS_SEGS
-}
 
 bool mat4_inverse(const float* m, float* out) {
     float inv[16],det; int i;
@@ -1660,7 +1499,7 @@ void InitalizeEnvironment(double game_start_time) {
     }
 }
 
-void InputProcessing(void); void PhysicsUpdateAndWait(float dt);
+void InputProcessing(void); void Physics(bool*);
 i32 main(void) {
     double game_start_time = get_time();
     InitalizeEnvironment(game_start_time);
@@ -1675,25 +1514,10 @@ i32 main(void) {
         if (!Sys_Global.gamePaused && !Sys_Global.menuActive) Sys_Global.pauseRelativeTime += Sys_Global.deltaTime;
         mouseMovementThisFrame = false;
         InputProcessing();
-        Sys_Global.timeSinceLastPhysicsTick = Sys_Global.pauseRelativeTime - Sys_Global.last_physics_time;
+        bool playerMoved = false;
         if (likely(!Sys_Global.gamePaused || Sys_Global.menuActive)) UpdateAnims(); // Changes collision positions
-        if (likely(!Sys_Global.gamePaused && !Sys_Global.menuActive)) { // Update Gameplay
-            MemSetToVForNBytes(dynamicEntities,0,512 * sizeof(u16)); // none
-            dynamicEntityCount = 0;
-            for (int i=0;i<Sys_Global.loadedInstances;++i) {
-                if (dynamicEntityCount >= 512) { dynamicEntityCount = 512; assert(false); break; }
-                if (Sys_Global.instances[i].entflags&ENTFLAG_RIGIDBODY && Sys_Global.instances[i].entflags&ENTFLAG_ACTIVE) {
-                    dynamicEntities[dynamicEntityCount] = i; dynamicEntityCount++;
-                }
-            }
-
-            Sys_Global.last_physics_time = Sys_Global.pauseRelativeTime; PhysicsUpdateAndWait(vclamp((float)Sys_Global.timeSinceLastPhysicsTick, 0.0005f, 0.1f));// }
-            Vector3 pDelta = Vector3_A_minus_B(Sys_Global.instances[PLAYER1].lastPosition,Sys_Global.instances[PLAYER1].position);
-            bool playerMoved = ((vabs(pDelta.x) + vabs(pDelta.y) + vabs(pDelta.z)) > 0.02f);
-            ModUpdate(playerMoved);
-            UpdateAmbientSounds();
-        }
-
+        Physics(&playerMoved);
+        if (likely(!Sys_Global.gamePaused && !Sys_Global.menuActive)) { ModUpdate(playerMoved); UpdateAmbientSounds(); } // Update Gameplay
         UpdateMusic();
         if (likely(!Sys_Global.gamePaused) && camViewCount > 0) { // Render in-world camera views.  Pops player elsewhere, renders to tiny fbo, pops player back, renders as normal below.
             Vector3 tempPlayerPos = Sys_Global.instances[PLAYER1].position;
@@ -1701,8 +1525,7 @@ i32 main(void) {
             for (int cm=0;cm<camViewCount;++cm) {
                 if (camViews[cm].finished < Sys_Global.pauseRelativeTime && camViews[cm].visible) {
                     camViews[cm].finished = Sys_Global.pauseRelativeTime + 0.5f;
-                    Sys_Global.instances[PLAYER1].position = camViews[cm].position;
-                    Sys_Global.instances[PLAYER1].rotation = camViews[cm].rotation;
+                    Sys_Global.instances[PLAYER1].position = camViews[cm].position; Sys_Global.instances[PLAYER1].rotation = camViews[cm].rotation;
                     CullCore();
                     Render(true,cm); // Ok culling and light clusters (in voxels) have been updated, now render the view.
                 }

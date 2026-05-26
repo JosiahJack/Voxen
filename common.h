@@ -42,6 +42,7 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define MAX_KEYS 512
 #define MAX_MOUSE_BUTTONS 8
 #define MAX_CHANNELS 48 // Max concurrent sounds, must keep track of for volume setting
+#define VERTEX_ATTRIBUTES_SIZE 16
 #define DOUBLE_CLICK_TIME 0.5f
 #define PLAYER_MAX_WALK_SPEED 3.2f
 #define PLAYER_MAX_SPRINT_SPEED 8.8f
@@ -532,7 +533,6 @@ typedef /*FAT*/ struct  {
     float gravity;
     BodyState bodyState;
     ColliderType collider;
-    Vector3 wishPos;
     Vector3 colliderCenter; // Offset relative to .position's global worldspace xyz location
     Vector3 colliderSize; // x,y,z for Box, x for Sphere radius, else x, y, z for Capsule radius, height, and direction (0.0f = X-Axis, 1.0f = Y-Axis, 2.0f = Z-Axis respectively, default 1.0f)
     u16 colliderMeshIndex;
