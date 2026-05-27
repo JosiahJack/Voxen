@@ -397,3 +397,6 @@ PMD copy-paste-detector usage
 
 Quick command to print out all unused .obj files in ./Models that aren't specified in ./Data/models.txt
 ls ./Models/*.obj | grep -vFf <(sed -n 's/^#//p' ./Data/models.txt)
+
+Quick command to clean out Blender comments from obj file:
+sed -i '/^#/d' ./Models/*.obj
