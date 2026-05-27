@@ -691,15 +691,30 @@ void Physics(bool* playerMoved) {
                         else if (e->collider == COLLIDER_TYPE_SPHERE && o->collider == COLLIDER_TYPE_BOX) { ShapeSphere s; ShapeBox b; Entity_GetSphere(e,&s); Entity_GetBox(o,&b); r = SphereOBB(s.center,s.radius,b,&pen); }
                         else if (e->collider == COLLIDER_TYPE_BOX && o->collider == COLLIDER_TYPE_SPHERE) { ShapeSphere s; ShapeBox b; Entity_GetSphere(o,&s); Entity_GetBox(e,&b); r = SphereOBB(s.center,s.radius,b, &pen); if (r.hit) {r.normal=scale_vector3(r.normal,-1.0f);} } 
                         else if (e->collider == COLLIDER_TYPE_SPHERE && o->collider == COLLIDER_TYPE_SPHERE) { ShapeSphere sa, sb; Entity_GetSphere(e,&sa); Entity_GetSphere(o,&sb); r = SphereSphere(sa.center,sa.radius,sb.center,sb.radius); if (r.hit) {pen = (sa.radius + sb.radius) - magnitude_vector3(Vector3_A_minus_B(sa.center, sb.center));} } 
-                        else if (e->collider == COLLIDER_TYPE_CONVEXMESH && o->collider == COLLIDER_TYPE_CONVEXMESH) { 
-                            float matA[16], matB[16];
-                            CopyMemoryFromBtoAForNBytes(matA,&modelMatrices[idx*16],64);
-                            CopyMemoryFromBtoAForNBytes(matB,&modelMatrices[j*16],64);
-                            r = ConvexMeshOverlap(e->colliderMeshIndex,o->colliderMeshIndex,matA,matB);
-                            if (r.hit) {pen=0.05f;}
-                        } 
                         else if (e->collider == COLLIDER_TYPE_SPHERE && o->collider == COLLIDER_TYPE_CONVEXMESH) { float rad = modelBounds[o->colliderMeshIndex]; r = SphereSphere(e->position,e->colliderSize.x,o->position,rad); if (r.hit) {pen=(e->colliderSize.x + rad) - magnitude_vector3(Vector3_A_minus_B(e->position,o->position));} } 
                         else if (e->collider == COLLIDER_TYPE_CONVEXMESH && o->collider == COLLIDER_TYPE_SPHERE) { float rad = modelBounds[e->colliderMeshIndex]; r = SphereSphere(e->position,rad,o->position,o->colliderSize.x); if (r.hit) {pen=(rad + o->colliderSize.x) - magnitude_vector3(Vector3_A_minus_B(e->position,o->position));} } 
+                        else if ((e->collider == COLLIDER_TYPE_CONVEXMESH || e->collider == COLLIDER_TYPE_MESH) && (o->collider == COLLIDER_TYPE_CONVEXMESH || o->collider == COLLIDER_TYPE_MESH)) {
+                            float matA[16], matB[16];
+                            CopyMemoryFromBtoAForNBytes(matA,&modelMatrices[idx*16], 64);
+                            CopyMemoryFromBtoAForNBytes(matB,&modelMatrices[j*16], 64);
+                            u16 mA = (e->collider == COLLIDER_TYPE_MESH) ? e->modelIndex : e->colliderMeshIndex;
+                            u16 mB = (o->collider == COLLIDER_TYPE_MESH) ? o->modelIndex : o->colliderMeshIndex;
+                            r = ConvexMeshOverlap(mA, mB, matA, matB);
+                            if (r.hit) pen = 0.05f;
+                        }
+                        else if ((e->collider == COLLIDER_TYPE_SPHERE || e->collider == COLLIDER_TYPE_CAPSULE) && (o->collider == COLLIDER_TYPE_CONVEXMESH || o->collider == COLLIDER_TYPE_MESH)) {
+                            u16 mIdx = (o->collider == COLLIDER_TYPE_MESH) ? o->modelIndex : o->colliderMeshIndex;
+                            float rad = modelBounds[mIdx];
+                            r = SphereSphere(e->position, GetCollisionRadius(e), o->position, rad);
+                            if (r.hit) pen = (GetCollisionRadius(e) + rad) - magnitude_vector3(Vector3_A_minus_B(e->position, o->position));
+                        } 
+                        else if ((e->collider == COLLIDER_TYPE_CONVEXMESH || e->collider == COLLIDER_TYPE_MESH) && (o->collider == COLLIDER_TYPE_SPHERE || o->collider == COLLIDER_TYPE_CAPSULE)) {
+                            u16 mIdx = (e->collider == COLLIDER_TYPE_MESH) ? e->modelIndex : e->colliderMeshIndex;
+                            float rad = modelBounds[mIdx];
+                            r = SphereSphere(e->position, rad, o->position, GetCollisionRadius(o));
+                            if (r.hit) pen = (rad + GetCollisionRadius(o)) - magnitude_vector3(Vector3_A_minus_B(e->position, o->position));
+                            if (r.hit) r.normal = scale_vector3(r.normal, -1.0f);
+                        }
                         else { r = SphereSphere(e->position,GetCollisionRadius(e),o->position,GetCollisionRadius(o)); if (r.hit) {pen = (GetCollisionRadius(e) + GetCollisionRadius(o)) - magnitude_vector3(Vector3_A_minus_B(e->position, o->position));} }
 
                         if (r.hit && pen > deepestPen) {
