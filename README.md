@@ -394,3 +394,6 @@ To see binary size impacts:
 
 PMD copy-paste-detector usage
 /home/qmaster/Downloads/pmd/bin/pmd cpd --minimum-tokens 100 --language cpp /home/qmaster/Github/Voxen
+
+Quick command to print out all unused .obj files in ./Models that aren't specified in ./Data/models.txt
+ls ./Models/*.obj | grep -vFf <(sed -n 's/^#//p' ./Data/models.txt)

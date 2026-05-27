@@ -2565,8 +2565,8 @@ Color3 lantCol = (Color3){1.0f,1.0f,1.0f};
 u16 headmountedLanternLight;
 Vector3 lanternPos;
 float lanternVersionBrightness[3] = {0.875f,1.4f,1.75f};
-void HardwareUpdate(u16 p, bool playerMoved) {
-    InventorySystem* inv = Inv(p); (void)playerMoved; // TODO: Only update light while on when player moves?
+void HardwareUpdate(u16 p) {
+    InventorySystem* inv = Inv(p);
     bool infraredOn = /*(inv->hasHardware & HW_INF) && */(inv->hardwareIsActive & HW_INF) > 0;
     bool lanternOn = /*(inv->hasHardware & HW_LAN) && */(inv->hardwareIsActive & HW_LAN) > 0;
     if (lanternOn || infraredOn) { // Update headmounted lantern/infrared's light (infrared overrides lantern brightness/range)
@@ -3400,10 +3400,10 @@ bool FrobWithHeldObject(void) {
 }
 //================================================================================
 // Update
-MOD_TO_ENGINE void ModUpdate(bool player1Moved) {
+MOD_TO_ENGINE void ModUpdate(void) {
     WeaponsUpdate();
     PatchUpdate(PLAYER1);
-    HardwareUpdate(PLAYER1,player1Moved);
+    HardwareUpdate(PLAYER1);
     if (Use()) Frob(Eng_Global->instances[PLAYER1].position,Eng_Global->instances[PLAYER1].forward,Eng_Global->instances[PLAYER1].right);
     if (Eng_Global->pauseRelativeTime < Eng_Global->debugLineFinished && (Eng_Global->debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Eng_Global->debugLine_start,Eng_Global->debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f});
     for (u16 i = START_INDEX_LEVEL_INSTANCES; i < Eng_Global->loadedInstances; ++i) {

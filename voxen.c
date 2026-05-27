@@ -1499,7 +1499,7 @@ void InitalizeEnvironment(double game_start_time) {
     }
 }
 
-void InputProcessing(void); void Physics(bool*);
+void InputProcessing(void); void Physics(void);
 i32 main(void) {
     double game_start_time = get_time();
     InitalizeEnvironment(game_start_time);
@@ -1514,10 +1514,9 @@ i32 main(void) {
         if (!Sys_Global.gamePaused && !Sys_Global.menuActive) Sys_Global.pauseRelativeTime += Sys_Global.deltaTime;
         mouseMovementThisFrame = false;
         InputProcessing();
-        bool playerMoved = false;
         if (likely(!Sys_Global.gamePaused || Sys_Global.menuActive)) UpdateAnims(); // Changes collision positions
-        Physics(&playerMoved);
-        if (likely(!Sys_Global.gamePaused && !Sys_Global.menuActive)) { ModUpdate(playerMoved); UpdateAmbientSounds(); } // Update Gameplay
+        Physics();
+        if (likely(!Sys_Global.gamePaused && !Sys_Global.menuActive)) { ModUpdate(); UpdateAmbientSounds(); } // Update Gameplay
         UpdateMusic();
         if (likely(!Sys_Global.gamePaused) && camViewCount > 0) { // Render in-world camera views.  Pops player elsewhere, renders to tiny fbo, pops player back, renders as normal below.
             Vector3 tempPlayerPos = Sys_Global.instances[PLAYER1].position;

@@ -162,6 +162,16 @@ index: 77
 index: 78
 #Models/us_retinalscanner_pnl14.obj
 index: 79
+#Models/cyber_switch_000001.obj
+index: 80
+animated: 1
+animationNum: 52
+#Models/cyber_switch_000002.obj
+index: 81
+#Models/cyber_switch_000003.obj
+index: 82
+#Models/cyber_switch_000004.obj
+index: 83
 
 #Models/eng1_1d.obj
 index: 95
@@ -605,6 +615,8 @@ index: 495
 index: 496
 #Models/pumpkin.obj
 index: 497
+#Models/sci1_4.obj
+index: 498
 
 #Models/rad1_1.obj
 index: 501
@@ -684,7 +696,8 @@ index: 537
 index: 538
 #Models/reac6_3.obj
 index: 539
-
+#Models/sci1_1.obj
+index: 540
 #Models/sci1_1d.obj
 index: 541
 #Models/sci1_1_slice45_top_lh.obj

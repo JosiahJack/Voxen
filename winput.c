@@ -32,7 +32,6 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     #define HIWORD(l) ((u16) ((((u64) (l)) >> 16) & 0xffff))
     #define LOBYTE(w) ((u8) (((u64) (w)) & 0xff))
     #define HIBYTE(w) ((u8) ((((u64) (w)) >> 8) & 0xff))
-    #define SUCCEEDED(hr) ((i32)(hr) >= 0)
     typedef struct HWND__ { int unused; } *HWND;   typedef struct HBITMAP__ { int unused; } *HBITMAP; typedef struct HBRUSH__ { int unused; } *HBRUSH; typedef struct HDC__ { int unused; } *HDC;
     typedef struct HGLRC__ { int unused; } *HGLRC; typedef struct HICON__ { int unused; } *HICON;     typedef struct HMENU__ { int unused; } *HMENU;   typedef struct HMONITOR__ { int unused; } *HMONITOR;
     typedef struct tagPOINT { i32 x,y; } POINT,*PPOINT,*NPPOINT,*LPPOINT;              typedef struct _POINTL { i32 x,y; } POINTL,*PPOINTL;
@@ -414,14 +413,14 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
 
     static void makeContextCurrentWGL(_GLFWwindow* window) { wglMakeCurrent(window->context.wgl.dc,window->context.wgl.handle); }
     static void swapBuffersWGL(_GLFWwindow* window) {
-        if (!IsWindowsVersionOrGreaterWin32(HIBYTE(0x0602),LOBYTE(0x0602),0)) { i32 enabled = 0; if (SUCCEEDED(_glfw.win32.dwmapi.IsCompositionEnabled(&enabled)) && enabled) { int count = vabs(window->context.wgl.interval); while (count--) {_glfw.win32.dwmapi.Flush();} } } // Is Windows 8.0 or greater
+        if (!IsWindowsVersionOrGreaterWin32(HIBYTE(0x0602),LOBYTE(0x0602),0)) { i32 enabled = 0; if ((i32)(_glfw.win32.dwmapi.IsCompositionEnabled(&enabled) >= 0) && enabled) { int count = vabs(window->context.wgl.interval); while (count--) {_glfw.win32.dwmapi.Flush();} } } // Is Windows 8.0 or greater
         SwapBuffers(window->context.wgl.dc);
     }
 
     static void swapIntervalWGL(int interval) {
         _GLFWwindow* handle = (_GLFWwindow*)window;
         handle->context.wgl.interval = interval;
-        if (!IsWindowsVersionOrGreaterWin32(HIBYTE(0x0602),LOBYTE(0x0602),0)) { i32 enabled = 0; if (SUCCEEDED(_glfw.win32.dwmapi.IsCompositionEnabled(&enabled)) && enabled) interval = 0; } // Is Windows 8.0 or greater
+        if (!IsWindowsVersionOrGreaterWin32(HIBYTE(0x0602),LOBYTE(0x0602),0)) { i32 enabled = 0; if ((i32)(_glfw.win32.dwmapi.IsCompositionEnabled(&enabled) >= 0) && enabled) interval = 0; } // Is Windows 8.0 or greater
         _glfw.wgl.SwapIntervalEXT(interval);
     }
 

@@ -2,7 +2,7 @@
 #pragma once
 #define MOD_FUNCTION_LIST(X) \
     X(void, ModLink, (GlobalContext* ctx, CheatsSystem* cheats, SettingsSystem* settings, TextSystem* text, SystemUI* ui)) \
-    X(void, ModUpdate, (bool)) \
+    X(void, ModUpdate, (void)) \
     X(bool, Forward, (void)) \
     X(bool, StrafeLeft, (void)) \
     X(bool, Backpedal, (void)) \
