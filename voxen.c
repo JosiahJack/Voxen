@@ -15,14 +15,14 @@ GLFWwindow* window;
 typedef struct { bool down,pressed,released; } KeyState;
 typedef struct { double last_mouse_x,last_mouse_y,scrollDelta; KeyState keyStates[MAX_KEYS],mouseButtons[MAX_MOUSE_BUTTONS],joystickButtons[16][16],joystickHats[5]; /* What can I say, I'm a man of many hats. ^^D*/ i32 currentMouse_dx,currentMouse_dy; bool window_has_focus,ignore_next_mouse_delta,lastUse,isCapsLockOn,joystickPresent[16]; } InputSystem;
 typedef struct { Vector3 normal; float d; } FrustumPlane;
-typedef struct StbiArena { u8*base,*cursor,*end; } StbiArena;
+typedef struct PngArena { u8*base,*cursor,*end; } PngArena;
 typedef struct {
     u32 inputImageID,inputUIID,inputDepthID,inputWorldPosID,inputSpecID,inputNormalID,gBufferFBO,uiFBO,outputImageID,depthPrepassShaderProgram,chunkShaderProgram,chunkVAO,chunkVBO,uiShaderProgram,debugUnlitShaderProgram;
     u32 shadowmapsShaderProgram,shadowmapsClearShaderProgram,shadowMapSSBO,shadowMapsIndirectionID,ssrShaderProgram,imageBlitShaderProgram,quadVAO,quadVBO,textShaderProgram,textVAO,textVBO;
     u32 debugLinesVAO,debugLinesVBO,matricesBufferID,cellVisibleDataID,debugLineColors,colorBufferID,texturePalettesID,texturePaletteOffsetsID,textureOffsetsID,textureSizesID;
     u32 lightsID,voxelLightListCountsID,voxelLightListsID,voxelUpdateShaderProgram,shadowViewProjID,vbos[MODEL_IDX_MAX],tbos[MODEL_IDX_MAX];
 } RenderSystem;
-#define STBI_ARENA_SIZE 16*1024*1024
+#define PNG_ARENA_SIZE 16*1024*1024
 u8 queuedLevelToLoad = 255u; static float berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
 float cam_pitch,cam_yaw=90.0f,cam_roll;
 float modelMatrices[INSTANCE_COUNT*16];
@@ -64,20 +64,17 @@ CamView camViews[64]; u32 camViewTextures[64]; u8 camViewCount = 0; // Max is 8 
 FHandle console_log_file=0;
 static inline __attribute__((always_inline)) i32 PosGetCellCoordX(float pos_x) { return (u16)clamp((i32)vfloor((pos_x - Sys_Global.worldMin_x + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
 static inline __attribute__((always_inline)) i32 PosGetCellCoordZ(float pos_z) { return (u16)clamp((i32)vfloor((pos_z - Sys_Global.worldMin_z + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
-static void DualLogMain(const char *prefix, const char *fmt, va_list args) { // Logs both to log file and console, usage same as printf
-    char buf[4096]; va_list copy; __builtin_va_copy(copy,args); StringFormatV(buf,sizeof(buf),fmt,copy); __builtin_va_end(copy);
-    #ifdef WINDOWS // Write to console (stdout / stderr)
-        FHandle out = GetStdHandle((prefix && prefix[0] == '\033') ? (u32)-12 : (u32)-11);
-        if (prefix) OS_RawWrite(out, prefix, GetStringLength(prefix));
-        OS_RawWrite(out, buf, GetStringLength(buf));
-    #else // Linux - write to stdout (fd 1) or stderr (fd 2)
-        FHandle out = (prefix && prefix[0] == '\033') ? 2 : 1;  // use stderr for colored warnings/errors
-        if (prefix) { OS_RawWrite(out, prefix, GetStringLength(prefix)); OS_RawWrite(out,"\033[0m ", 5); }
-        OS_RawWrite(out, buf, GetStringLength(buf));
+static void DualLogMain(const char *prefix, const char *fmt, va_list args) {
+    char buf[4096]; va_list c; __builtin_va_copy(c,args); StringFormatV(buf,sizeof(buf),fmt,c); __builtin_va_end(c); bool color = (prefix && prefix[0] == '\033');
+    #ifdef WINDOWS
+        FHandle out = GetStdHandle(color ? (u32)-12 : (u32)-11);
+    #else
+        FHandle out = color ? 2 : 1;
     #endif
-    if (console_log_file != INVALID_FHANDLE) { // Write to console_log_file
-        if (prefix) { OS_Write(console_log_file, prefix, GetStringLength(prefix), "console.log"); OS_Write(console_log_file,"\033[0m ",5,"console.log"); }
-        OS_Write(console_log_file, buf, GetStringLength(buf), "console.log");
+    if (prefix) { OS_RawWrite(out,prefix,GetStringLength(prefix)); OS_RawWrite(out,"\033[0m ",5); } OS_RawWrite(out,buf,GetStringLength(buf));
+    if (console_log_file != INVALID_FHANDLE) {
+        if (prefix) { OS_Write(console_log_file, prefix, GetStringLength(prefix),"console.log"); OS_Write(console_log_file,"\033[0m ",5,"console.log"); }
+        OS_Write(console_log_file, buf, GetStringLength(buf),"console.log");
     }
 }
 
@@ -92,14 +89,14 @@ ENGINE_TO_MOD void DualLogError(const char* fmt, ...) { va_list args; __builtin_
 #include "text.c"
 float half_to_float(half h);
 RaycastHit RayTriangle(Vector3 origin, Vector3 dir, Vector3 posA, Vector3 posB, Vector3 posC, Vector3 normA, Vector3 normB, Vector3 normC) {
-    Vector3 edgeAB = Vector3_A_minus_B(posB,posA), edgeAC = Vector3_A_minus_B(posC,posA); Vector3 normalVector = cross_vector3(edgeAB,edgeAC);
-    Vector3 ao = Vector3_A_minus_B(origin,posA);
-    Vector3 dao = cross_vector3(ao,dir);
-    float determinant = -dot_vector3(dir,normalVector);
+    Vector3 edgeAB = V3_AsubB(posB,posA), edgeAC = V3_AsubB(posC,posA); Vector3 normalVector = V3_Cross(edgeAB,edgeAC);
+    Vector3 ao = V3_AsubB(origin,posA);
+    Vector3 dao = V3_Cross(ao,dir);
+    float determinant = -V3_dot(dir,normalVector);
     float invDet = 1.0f / determinant;
-    float dst = dot_vector3(ao, normalVector) * invDet;
-    float u = dot_vector3(edgeAC,dao) * invDet, v = -dot_vector3(edgeAB,dao) * invDet; float w = 1.0f - u - v;
-    return (RaycastHit){.point=Vector3_A_plus_B(origin,scale_vector3(dir,dst)), .normal=normalize_vector3(Vector3_A_plus_B(Vector3_A_plus_B(scale_vector3(normA,w),scale_vector3(normB,u)),scale_vector3(normC,v))), .distance=dst, .hitInstanceIndex=INSTANCE_COUNT, .hit=vabs(determinant) >= 1E-8f && dst >= 0 && u >= 0 && v >= 0 && w >= 0};
+    float dst = V3_dot(ao, normalVector) * invDet;
+    float u = V3_dot(edgeAC,dao) * invDet, v = -V3_dot(edgeAB,dao) * invDet; float w = 1.0f - u - v;
+    return (RaycastHit){.point=V3_AplusB(origin,V3_ScaleByF(dir,dst)), .normal=V3_Normalize(V3_AplusB(V3_AplusB(V3_ScaleByF(normA,w),V3_ScaleByF(normB,u)),V3_ScaleByF(normC,v))), .distance=dst, .hitInstanceIndex=INSTANCE_COUNT, .hit=vabs(determinant) >= 1E-8f && dst >= 0 && u >= 0 && v >= 0 && w >= 0};
 }
  
 ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, u32 layerMask) {
@@ -111,7 +108,7 @@ ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, u32
         if (mindex >= loadedModelsMaxIndex) continue;
         Vector3 objPos = Sys_Global.instances[i].position;
         u16 instCellIdx = PosGetCellCoords(objPos.x,objPos.z);
-        Vector3 delta = Vector3_A_minus_B(objPos,origin);
+        Vector3 delta = V3_AsubB(objPos,origin);
         float distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
         float radBounds = vmax(modelBounds[mindex], 1.81f);
         float maxDistToObj = vmax(maxDist - radBounds,maxDist);
@@ -134,7 +131,7 @@ ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, u32
         Vector3 rel = {origin.x - tx, origin.y - ty, origin.z - tz};
         Vector3 localOrigin = {(rel.x*m00 + rel.y*m10 + rel.z*m20) / sclx2, (rel.x*m01 + rel.y*m11 + rel.z*m21) / scly2, (rel.x*m02 + rel.y*m12 + rel.z*m22) / sclz2};
         Vector3 localDir =    {(dir.x*m00 + dir.y*m10 + dir.z*m20) / sclx2, (dir.x*m01 + dir.y*m11 + dir.z*m21) / scly2, (dir.x*m02 + dir.y*m12 + dir.z*m22) / sclz2};
-        localDir = normalize_vector3(localDir);
+        localDir = V3_Normalize(localDir);
         numMeshesCheckedForRaycast++;
         for (u32 j=0;j<triCount;++j) {
             u32 bA = (u32)modelTriangles[mindex][j*3 + 0] * VERTEX_ATTRIBUTES_SIZE, bB = (u32)modelTriangles[mindex][j*3 + 1] * VERTEX_ATTRIBUTES_SIZE, bC = (u32)modelTriangles[mindex][j*3 + 2] * VERTEX_ATTRIBUTES_SIZE;
@@ -152,7 +149,7 @@ ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, u32
                 m10*tryTri.point.x + m11*tryTri.point.y + m12*tryTri.point.z + ty,
                 m20*tryTri.point.x + m21*tryTri.point.y + m22*tryTri.point.z + tz
             };
-            Vector3 toHit = Vector3_A_minus_B(worldPoint, origin);
+            Vector3 toHit = V3_AsubB(worldPoint, origin);
             float worldDist = vsqrtf(toHit.x*toHit.x + toHit.y*toHit.y + toHit.z*toHit.z);
             if (worldDist >= result.distance) continue;
             Vector3 worldNormal = {
@@ -160,10 +157,10 @@ ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, u32
                 (m10/sclx)*tryTri.normal.x + (m11/scly)*tryTri.normal.y + (m12/sclz)*tryTri.normal.z,
                 (m20/sclx)*tryTri.normal.x + (m21/scly)*tryTri.normal.y + (m22/sclz)*tryTri.normal.z
             };
-            worldNormal = normalize_vector3(worldNormal);
+            worldNormal = V3_Normalize(worldNormal);
             result.hit              = true;
             result.point            = worldPoint;
-            result.normal           = normalize_vector3(worldNormal);
+            result.normal           = V3_Normalize(worldNormal);
             result.distance         = worldDist;
             result.hitInstanceIndex = i;
         }
@@ -204,10 +201,10 @@ void mat4_lookat_from(float* m, Quaternion* camRotation, Vector3 eye) { // Kept 
     m[0]  = right.x;   m[1]  = up.x;   m[2]  = -forward.x;// m[3]  = 0.0f;
     m[4]  = right.y;   m[5]  = up.y;   m[6]  = -forward.y;// m[7]  = 0.0f;
     m[8]  = right.z;   m[9]  = up.z;   m[10] = -forward.z;// m[11] = 0.0f;
-    m[12] = -dot_vector3(right, eye); m[13] = -dot_vector3(up, eye); m[14] = dot_vector3(forward, eye); m[15] = 1.0f;
+    m[12] = -V3_dot(right, eye); m[13] = -V3_dot(up, eye); m[14] = V3_dot(forward, eye); m[15] = 1.0f;
 }
 
-__attribute__((pure,always_inline)) bool SphereInFrustum(FrustumPlane* ps, Vector3 c, float radius) { for (int i=0;i<6;++i) { if ((dot_vector3(ps[i].normal,c) + ps[i].d) < -radius) return false; } return true; }
+__attribute__((pure,always_inline)) bool SphereInFrustum(FrustumPlane* ps, Vector3 c, float radius) { for (int i=0;i<6;++i) { if ((V3_dot(ps[i].normal,c) + ps[i].d) < -radius) return false; } return true; }
 void ExtractFrustumPlanes(float* m, FrustumPlane* ps) {
     ps[0].normal.x = m[3] + m[0]; ps[0].normal.y = m[7] + m[4]; ps[0].normal.z = m[11] + m[8];  ps[0].d = m[15] + m[12]; // Left
     ps[1].normal.x = m[3] - m[0]; ps[1].normal.y = m[7] - m[4]; ps[1].normal.z = m[11] - m[8];  ps[1].d = m[15] - m[12]; // Right
@@ -216,7 +213,7 @@ void ExtractFrustumPlanes(float* m, FrustumPlane* ps) {
     ps[4].normal.x = m[3] + m[2]; ps[4].normal.y = m[7] + m[6]; ps[4].normal.z = m[11] + m[10]; ps[4].d = m[15] + m[14]; // Near
     ps[5].normal.x = m[3] - m[2]; ps[5].normal.y = m[7] - m[6]; ps[5].normal.z = m[11] - m[10]; ps[5].d = m[15] - m[14]; // Far
     for (int i=0;i<6;i++) {
-        float len = magnitude_vector3(ps[i].normal); if (len > 1e-6f) { ps[i].normal.x /= len; ps[i].normal.y /= len; ps[i].normal.z /= len; ps[i].d /= len; } // Normalize (could use normalize_vector3 but need len for d term of FrustumPlane).
+        float len = V3_Mag(ps[i].normal); if (len > 1e-6f) { ps[i].normal.x /= len; ps[i].normal.y /= len; ps[i].normal.z /= len; ps[i].d /= len; } // Normalize (could use V3_Normalize but need len for d term of FrustumPlane).
     }
 }
 
@@ -1057,14 +1054,14 @@ static __attribute__((noinline)) __attribute__((hot)) void RenderShadowmaps(void
             u16 nearbyMeshCount = 0;
             Vector3 lpos = lights[lightIdx].pos;
             float cellCenterX=vround(lpos.x / CELL_SIZE) * CELL_SIZE, cellCenterZ=vround(lpos.z / CELL_SIZE) * CELL_SIZE;
-            Vector3 deltaCellCenter = Vector3_A_minus_B((Vector3){lpos.x,0.0f,lpos.z},(Vector3){cellCenterX,0.0f,cellCenterZ});
-            float distToCenterSqrd = dot_vector3(deltaCellCenter,deltaCellCenter);
+            Vector3 deltaCellCenter = V3_AsubB((Vector3){lpos.x,0.0f,lpos.z},(Vector3){cellCenterX,0.0f,cellCenterZ});
+            float distToCenterSqrd = V3_dot(deltaCellCenter,deltaCellCenter);
             bool skipNPCs = (distToCenterSqrd < 0.4096f); // 0.64 * 0.64
             for (u16 shadowCasterInstanceIdx = 0; shadowCasterInstanceIdx < numShadowCasters; shadowCasterInstanceIdx++) {
                 u16 j = shadowCasterIndices[shadowCasterInstanceIdx];
                 Entity* e = &Sys_Global.instances[j];
-                Vector3 d = Vector3_A_minus_B(e->position,lpos);
-                float distToLightSqrd = dot_vector3(d,d);
+                Vector3 d = V3_AsubB(e->position,lpos);
+                float distToLightSqrd = V3_dot(d,d);
                 float radSum = (effectiveRadius + e->radius);
                 if (distToLightSqrd >= radSum * radSum) continue;
                 if (skipNPCs && ConstIndexIsNPC(e->index)) continue;
@@ -1113,7 +1110,7 @@ static inline __attribute__((always_inline)) bool DetermineIfInstanceVisible(u16
     
     Entity* e = &Sys_Global.instances[i];
     u16 instCellIdx = e->cellIndex; u16 entIdx = e->index;
-    Vector3 delta = Vector3_A_minus_B(e->position,playerPos);
+    Vector3 delta = V3_AsubB(e->position,playerPos);
     *distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
     float radius = modelBounds[e->modelIndex] * 2.0f * vmax(vmax(e->scale.x,e->scale.y),e->scale.z);
     if (!SphereInFrustum(playerFrustumPlanes,e->position,radius) && (entIdx != 754 || !skyVisible) && i != editModeSelection) return false;
@@ -1159,10 +1156,6 @@ void DrawCapsuleCollider(Entity *e); void DrawConvexMeshCollider(Entity *e); voi
      u32 vc=modelTriangleCounts[curM]*3; \
      glDrawElements(0x0004,vc,GL_UNSIGNED_SHORT,0);drawCallsRenderedThisFrame++;verticesRenderedThisFrame+=vc;}
 
-void Entity_GetBox(const Entity *e,ShapeBox *out); void Entity_GetSphere(const Entity *e,ShapeSphere *out); void Entity_GetCapsule(const Entity *e,ShapeCapsule *out);
-void obb_axes(Quaternion q,Vector3 *ax,Vector3 *ay,Vector3 *az);
-
-
 bool mat4_inverse(const float* m, float* out) {
     float inv[16],det; int i;
     inv[0] =  m[5]*m[10]*m[15] - m[5]*m[14]*m[11] - m[9]*m[6]*m[15] + m[9]*m[14]*m[7] + m[13]*m[6]*m[11] - m[13]*m[10]*m[7];
@@ -1191,16 +1184,13 @@ bool mat4_inverse(const float* m, float* out) {
 void GetProjections(float* view, float* viewProj, float* invViewRot, float* invViewProj, float sfov, float aspect3D, float snear, float sfar) {
     float f = vcot(sfov * PI / 360.0f);
     float* m = rasterPerspectiveProjection;
-    m[0] = f / aspect3D; m[1] = 0.0f; m[2] = 0.0f; m[3] = 0.0f;
-    m[4] = 0.0f; m[5] = f; m[6] = 0.0f; m[7] = 0.0f;
+    m[0] = f / aspect3D; m[1] = 0.0f; m[2] = 0.0f; m[3] = 0.0f; m[4] = 0.0f; m[5] = f; m[6] = 0.0f; m[7] = 0.0f;
     m[8] = 0.0f; m[9] = 0.0f; m[10]= -(sfar + snear) / (sfar - snear); m[11]= -1.0f;
     m[12]= 0.0f; m[13]= 0.0f; m[14]= -2.0f * sfar * snear / (sfar - snear); m[15]= 0.0f;
     voxen_Shadow_System.shadDotThresh = 1.0f / vsqrtf(1.0f + vtan(sfov * PI / 360.0f) * (1.0f + aspect3D * aspect3D));
     mat4_lookat_from(view,&Sys_Global.instances[PLAYER1].rotation,Sys_Global.instances[PLAYER1].position);
     mul_mat4(viewProj,rasterPerspectiveProjection,view);
-    invViewRot[0]=view[0]; invViewRot[1]=view[4]; invViewRot[2]=view[8];
-    invViewRot[3]=view[1]; invViewRot[4]=view[5]; invViewRot[5]=view[9];
-    invViewRot[6]=view[2]; invViewRot[7]=view[6]; invViewRot[8]=view[10];
+    invViewRot[0]=view[0]; invViewRot[1]=view[4]; invViewRot[2]=view[8]; invViewRot[3]=view[1]; invViewRot[4]=view[5]; invViewRot[5]=view[9]; invViewRot[6]=view[2]; invViewRot[7]=view[6]; invViewRot[8]=view[10];
     mat4_inverse(viewProj,invViewProj);
 }
 
@@ -1224,8 +1214,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glBindFramebuffer(GL_FRAMEBUFFER,Sys_Render.gBufferFBO);
     glEnable(GL_CULL_FACE); glDisable(GL_BLEND); // Opaques
     u16 visibleCount = 0, currentTexIndex = 0, currentNormIndex = 0, currentGlowIndex = 0, currentSpecIndex = 0, currentModelType = 0, opaqueCount = 0;
-    bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX);
-    float distSqrd = sfar * sfar;
+    bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX); float distSqrd = sfar * sfar;
     DepthSort tmpTransparent[MAX_VISIBLE]; u16 tcnt = 0;
     for (u16 i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) { // Determine base visibility
         if (!DetermineIfInstanceVisible(i,false,skyVisible,playerPos,&distSqrd)) continue;
@@ -1254,17 +1243,12 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         glDrawElements(0x0004/*GL_TRIANGLES*/,vertCount,GL_UNSIGNED_SHORT,0); drawCallsRenderedThisFrame++; verticesRenderedThisFrame += vertCount;
     }
 
-    glUseProgram(Sys_Render.chunkShaderProgram); // Main Pass
-    glUniformMatrix4fv(2,1,0,viewProj);
-    glUniform1ui(25,0u); // default constIndex
-    bool grayscaleEnabled = ModRequestsGrayscale();
-    glUniform1ui(26,(u32)grayscaleEnabled);
+    glUseProgram(Sys_Render.chunkShaderProgram); /*Main Pass*/ glUniformMatrix4fv(2,1,0,viewProj); glUniform1ui(25,0u); // default constIndex
+    bool grayscaleEnabled = ModRequestsGrayscale(), refOn = Sys_Settings.Reflections;              glUniform1ui(26,(u32)grayscaleEnabled);
     float fogActual = Sys_Global.fogColor.a + (float)(Sys_Global.fogFac / 255u); // Alpha is base density for level.
     glUniform3f(12,Sys_Global.fogColor.r * fogActual,Sys_Global.fogColor.g * fogActual,Sys_Global.fogColor.b * fogActual); // Fog Color(which is density)
-    glUniform1ui(14,Sys_Settings.Reflections); glUniform1ui(15,Sys_Settings.Shadows);
-    glUniform2f(8,Sys_Global.worldMin_x,Sys_Global.worldMin_z); glUniform3f(10,playerPos.x,playerPos.y,playerPos.z);
-   
-    glColorMask(1,1,1,1); glDepthMask(0); glDepthFunc(0x0203/*GL_LEQUAL*/); // Opaque Pass
+    glUniform1ui(14,refOn); glUniform1ui(15,Sys_Settings.Shadows); glUniform2f(8,Sys_Global.worldMin_x,Sys_Global.worldMin_z); glUniform3f(10,playerPos.x,playerPos.y,playerPos.z);
+    glColorMask(1,1,1,1);   glDepthMask(0);                        glDepthFunc(0x0203/*GL_LEQUAL*/); // Opaque Pass
     visibleCount = currentTexIndex = currentNormIndex = currentGlowIndex = currentSpecIndex = currentModelType = 0;
     glUniform1f(9,0.0f); // Reset heat for infrared vision
     for (u16 visibleIndex = 0; visibleIndex < opaqueCount; ++visibleIndex) { // Opaques (already front-to-back)
@@ -1302,12 +1286,9 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
 
     if (unlikely(Sys_Global.debugLineVertCount > 1)) DrawDebugLines(viewProj); // Draw Debug Lines
     glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D,Sys_Render.inputDepthID);
-    if (likely(Sys_Settings.Reflections > 0u)) { // Screen Space Reflections
-        glUseProgram(Sys_Render.ssrShaderProgram);
-        glUniform3f(3,playerPos.x,playerPos.y,playerPos.z);
-        glUniform1i(5,3);
-        glUniformMatrix4fv(6,1,0,invViewProj);
-        glUniformMatrix4fv(4,1,GL_FALSE,viewProj);
+    if (likely(refOn > 0u)) { // Screen Space Reflections
+        glUseProgram(Sys_Render.ssrShaderProgram); glUniform3f(3,playerPos.x,playerPos.y,playerPos.z); glUniform1i(5,3);
+        glUniformMatrix4fv(6,1,0,invViewProj);     glUniformMatrix4fv(4,1,GL_FALSE,viewProj);
         u32 groupX_ssr = ((Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES) + 31) / 32, groupY_ssr = ((Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES) + 31) / 32;
         glDispatchCompute(groupX_ssr,groupY_ssr,1);
     }
@@ -1323,22 +1304,13 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,Sys_Render.inputImageID);
     glUniform1i(4,4); // outputImage texture sampler2D, don't remember why when active texture is texture 0. meh.... oh maybe to not read and write same binding?
     glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D,Sys_Render.inputUIID);
-    glUniform1i(31,1);
-    glUniform1i(32,3);
-    glUniformMatrix4fv(33,1,0,invViewProj);
+    glUniform1i(31,1); glUniform1i(32,3); glUniformMatrix4fv(33,1,0,invViewProj);
     double berserkTimeRemainingNormalized = Sys_Global.invP1.berserkFinishedTime > 0.0001 ? (Sys_Global.invP1.berserkFinishedTime - Sys_Global.pauseRelativeTime) / BERSERK_TIME : 0.0;
     if (Sys_Global.invP1.berserkFinishedTime < Sys_Global.pauseRelativeTime && Sys_Global.invP1.berserkFinishedTime > 0.0001) Sys_Global.invP1.berserkFinishedTime = berserkTimeRemainingNormalized = 0.0;
-    glUniform1ui(5,Sys_Settings.Reflections);
-    glUniform1ui(6,Sys_Settings.FXAA);
-    glUniform1f(14,Sys_Settings.FOV);
-    glUniform1f(16,aspect3D);
-    glUniform1ui(22,Sys_Settings.Shadows);
-    glUniform1f(9,(float)berserkTimeRemainingNormalized);
-    glUniform1f(10,berserkSeedTime);
-    glUniform1ui(11,Sys_Settings.Brightness);
-    glUniform3f(12,deg2rad(cam_yaw),deg2rad(cam_pitch),deg2rad(cam_roll));
-    glUniform3f(13,px,py,pz);
-    glUniform1f(15,(float)Sys_Global.pauseRelativeTime * 0.1f);
+    glUniform1ui(5,refOn);           glUniform1ui(6,Sys_Settings.FXAA);                          glUniform1f(14,Sys_Settings.FOV);
+    glUniform1f(16,aspect3D);        glUniform1ui(22,Sys_Settings.Shadows);                      glUniform1f(9,(float)berserkTimeRemainingNormalized);
+    glUniform1f(10,berserkSeedTime); glUniform1ui(11,Sys_Settings.Brightness);                   glUniform3f(12,deg2rad(cam_yaw),deg2rad(cam_pitch),deg2rad(cam_roll));
+    glUniform3f(13,px,py,pz);        glUniform1f(15,(float)Sys_Global.pauseRelativeTime * 0.1f); 
     glUniform1ui(17,(gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || Sys_Global.currentLevel == LEVEL_CYBERSPACE);
     glUniform1ui(18,(gridCellStates[playerCellIdx] & CELL_SEES_SUN) && Sys_Global.currentLevel != LEVEL_CYBERSPACE);
     glUniform1ui(19,((Sys_Global.currentLevel >= 10 && Sys_Global.currentLevel < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
@@ -1349,13 +1321,9 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     }
    
     glUniform1ui(20,shieldOnType);
-    Color painStaticColor = GetPainStaticColor();
-    glUniform3f(23,painStaticColor.r,painStaticColor.g,painStaticColor.b);
-    glUniformMatrix4fv(24,1,0,viewProj);
-    glUniformMatrix3fv(25,1,0,invViewRot);
-    glUniform1i(27,0); // Texture 0 for the rendered geometry color buffer
-    glUniform1f(28,GetPainStatic());
-    glUniform1ui(29,(u32)ModRequestsGrayscale()); // Grayscale
+    Color painStaticColor = GetPainStaticColor(); glUniform3f(23,painStaticColor.r,painStaticColor.g,painStaticColor.b);
+    glUniformMatrix4fv(24,1,0,viewProj);          glUniformMatrix3fv(25,1,0,invViewRot);        glUniform1i(27,0); // Texture 0 for the rendered geometry color buffer
+    glUniform1f(28,GetPainStatic());              glUniform1ui(29,(u32)ModRequestsGrayscale()); // Grayscale
     glBindVertexArray(Sys_Render.quadVAO);
     glDisable(GL_DEPTH_TEST);
     glDrawArrays(0x0006/*GL_TRIANGLE_FAN*/,0,4);

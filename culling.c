@@ -36,7 +36,7 @@ bool GridCellBlock(u16 i,Vector3 pos,Vector3 newPos) {
     if (ncz<ccz && (gridCellStates[cc]&CELL_CLOSEDSOUTH)) { Sys_Global.instances[i].velocity.z= 0.1f; return true; }
     if (ncx>ccx && (gridCellStates[cc]&CELL_CLOSEDEAST))  { Sys_Global.instances[i].velocity.x=-0.1f; return true; }
     if (ncx<ccx && (gridCellStates[cc]&CELL_CLOSEDWEST))  { Sys_Global.instances[i].velocity.x= 0.1f; return true; }
-    if (!(gridCellStates[nc]&CELL_OPEN)) { Vector3 dir=normalize_vector3(Sys_Global.instances[i].velocity); Sys_Global.instances[i].velocity=scale_vector3(dir,-0.1f); return true; }
+    if (!(gridCellStates[nc]&CELL_OPEN)) { Vector3 dir=V3_Normalize(Sys_Global.instances[i].velocity); Sys_Global.instances[i].velocity=V3_ScaleByF(dir,-0.1f); return true; }
     return false;
 }
 
@@ -50,15 +50,15 @@ static unsigned char* LoadCullPNG(const char* name, int level) {
     OS_Seek(fp,0,0); size_t read_size = OS_Read(fp,cullingFileBuffer,size); OS_Close(fp);
     if (read_size != size) { DualLogError("Failed to read %s\n",path); OS_Exit(1); }
     
-    int w, h; unsigned char* pixels = stbi_load_from_memory_arena(cullingFileBuffer,size,&w,&h,&stbi_arena_main);
+    int w, h; unsigned char* pixels = PngLoad(cullingFileBuffer,size,&w,&h,&png_arena_main);
     if (!pixels) { DualLogError("STB failed: %s\n",path); OS_Exit(1); }
     OS_DeallocateRAM(cullingFileBuffer,MAX_CULL_FILESIZE * sizeof(u8));
     return pixels;
 }
 
-#define PIXEL_IDX(x, z) ((x) + ((WORLDZ - 1 - (z)) * WORLDX)) * 4 // 4 channels, flip z to have desired bottom-left origin 0,0 vs stbi_load's top-left
+#define PIXEL_IDX(x, z) ((x) + ((WORLDZ - 1 - (z)) * WORLDX)) * 4 // 4 channels, flip z to have desired bottom-left origin 0,0 vs png's top-left
 void DetermineClosedEdges(void) {
-    stbi__arena_init_thread(&stbi_arena_main); u16 totalOpenCells = 0;
+    PngArenaInit(&png_arena_main); u16 totalOpenCells = 0;
     unsigned char* openPixels = LoadCullPNG("worldcellopen",Sys_Global.currentLevel);
     for (i32 x=0;x<WORLDX;++x) {
         for (i32 z=0;z<WORLDZ;++z) {
@@ -98,7 +98,7 @@ void DetermineClosedEdges(void) {
         }
     }
     
-    OS_DeallocateRAM(stbi_arena_main.base, STBI_ARENA_SIZE); stbi_arena_main.base = NULL;
+    OS_DeallocateRAM(png_arena_main.base, PNG_ARENA_SIZE); png_arena_main.base = NULL;
     DualLog("found %d open cells...",totalOpenCells);
 }
 

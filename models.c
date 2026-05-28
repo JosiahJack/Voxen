@@ -8,7 +8,6 @@ static float **thread_temp_pos = NULL, **thread_temp_nrm = NULL, **thread_temp_u
 typedef struct { const char* data; int size; } RawOBJ;
 typedef struct { u16 index; bool animated; u8 animationNum; char path[128]; } ModelData;
 typedef struct { ModelData* entries; u32 count; u32 capacity; } ModelDataParser;
-typedef u16 half;
 static Vector3 normalsTable[256];
 static inline float NormDot(Vector3 a, Vector3 b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
 void BuildNormalTable(void) {

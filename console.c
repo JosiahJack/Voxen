@@ -1,7 +1,10 @@
 // console.c - Console Emulator
 #define MAX_HISTORY 7
-static i32 currentEntryLength=0, numHistory=0, historyPos=0;
-char consoleEntryText[TEXT_BUFFER_SIZE],history[MAX_HISTORY][TEXT_BUFFER_SIZE];
+static i32 currentEntryLength=0, numHistory=0, historyPos=0; char consoleEntryText[TEXT_BUFFER_SIZE],history[MAX_HISTORY][TEXT_BUFFER_SIZE];
+static Vector3 ressurectionLocations[10] = { {-27.386f, -55.488f, 26.5941f},/*0/R*/ {40.903f, -42.372f, -30.78f},/*1*/      {30.67407f, -25.832f, 10.21412f},/*2*/ {38.26813f, -15.498f, 20.37825f},/*3*/ {-19.48f, -7.928f, 22.954f},/*4*/ {-24.358f, 12.5956f, 31.8497f},/*5*/
+                                             {-22.3568f, 33.7845f, -30.728f},/*6*/  {2.228084f, 50.95243f, 7.532025f},/*7*/ {10.068f, 58.897f, 13.973f},/*8*/      {2.303f, 106.77f, -38.554f}/*9*/ };
+static Vector3 cyberSpaceEntryLocations[8] = { {210.6834f,2.812f,-24.378f},/*0*/ {195.42f,-13.44f,33.28f},/*1*/      {157.1608f,-15.53f,47.331f},/*2a, if cyberport localPosition.x < -26.0f*/ {256.0416f,-0.716f,62.48789f},/*2b level 2 secondary cyberport position*/
+                                               {126.43f,29.56733f,34.24f},/*5*/  {177.612f,3.29494f,108.7725f},/*6*/ {244.735f,41.99257f,-19.695f},/*8*/                                       {185.161f,84.502f,-46.04246f},/*9*/ };
 ENGINE_TO_MOD void ToggleConsole(void) {
     static bool inventoryModeWasActivePriorToConsole = false;
     if (!Sys_Cheats.consoleActive) inventoryModeWasActivePriorToConsole = Sys_Global.inventoryMode;
@@ -12,34 +15,22 @@ ENGINE_TO_MOD void ToggleConsole(void) {
 
 static void AddToHistory(const char* entry) {
     if (GetStringLength(entry) == 0) return;
-    if (numHistory > 0 && StringsEqual(entry, history[numHistory - 1])) return;
+    if (numHistory > 0 && StringsEqual(entry,history[numHistory - 1])) return;
     
-    if (numHistory < MAX_HISTORY) {
-        StringCopyInto_A_From_B(history[numHistory], entry, TEXT_BUFFER_SIZE);
-        numHistory++;
-    } else {
-        for (int i = 0; i < MAX_HISTORY - 1; i++) StringCopyInto_A_From_B(history[i], history[i + 1], TEXT_BUFFER_SIZE); // Shift list toward 0
-        StringCopyInto_A_From_B(history[MAX_HISTORY - 1], entry, TEXT_BUFFER_SIZE);
+    if (numHistory < MAX_HISTORY) { StringCopyInto_A_From_B(history[numHistory],entry,TEXT_BUFFER_SIZE); numHistory++; }
+    else {
+        for (int i = 0; i < MAX_HISTORY - 1; i++) StringCopyInto_A_From_B(history[i],history[i + 1],TEXT_BUFFER_SIZE); // Shift list toward 0
+        StringCopyInto_A_From_B(history[MAX_HISTORY - 1], entry,TEXT_BUFFER_SIZE);
     }
 }
 
 static void RecallHistory(int direction) { // direction 1 up (older), -1 down (newer)
     if (direction == 1) { // up
-        if (historyPos > 0) {
-            historyPos--;
-            StringCopyInto_A_From_B(consoleEntryText, history[historyPos], TEXT_BUFFER_SIZE);
-            currentEntryLength = GetStringLength(consoleEntryText);
-        }
+        if (historyPos > 0) { historyPos--; StringCopyInto_A_From_B(consoleEntryText,history[historyPos],TEXT_BUFFER_SIZE); currentEntryLength = GetStringLength(consoleEntryText); }
     } else if (direction == -1) { // down
         if (historyPos < numHistory) {
             historyPos++;
-            if (historyPos == numHistory) {
-                consoleEntryText[0] = '\0';
-                currentEntryLength = 0;
-            } else {
-                StringCopyInto_A_From_B(consoleEntryText, history[historyPos], TEXT_BUFFER_SIZE);
-                currentEntryLength = GetStringLength(consoleEntryText);
-            }
+            if (historyPos == numHistory) { consoleEntryText[0] = currentEntryLength = 0; } else { StringCopyInto_A_From_B(consoleEntryText,history[historyPos],TEXT_BUFFER_SIZE); currentEntryLength = GetStringLength(consoleEntryText); }
         }
     }
 }
@@ -48,135 +39,55 @@ typedef void (*ConsoleCmdFuncNoArg)(void); typedef void (*ConsoleCmdFuncInt)(int
 typedef struct { const char* name; union {ConsoleCmdFuncNoArg noArg; ConsoleCmdFuncInt withInt; ConsoleCmdFuncStr withStr; void* raw;} func; enum {CMD_NOARG,CMD_INT,CMD_STR}type;} ConsoleCommand;
 __attribute__((pure)) static int CommandMatch(const char* input, const char* cmd) {
     while (*cmd && *input) {
-        char c1 = CharToLower((unsigned char)*input++); char c2 = CharToLower((unsigned char)*cmd++);
-        if (c1 == ' ' || c1 == '_') {c1 = ' ';} if (c2 == ' ' || c2 == '_') {c2 = ' ';}
-        if (c1 != c2) return 0;
+        char c1 = CharToLower((u8)*input++); char c2 = CharToLower((u8)*cmd++);
+        if (c1 == ' ' || c1 == '_') {c1 = ' ';} if (c2 == ' ' || c2 == '_') {c2 = ' ';} if (c1 != c2) return 0;
     }
 
-    return *cmd == '\0' && (*input == '\0' || CharacterIsEmpty((unsigned char)*input) || *input == '_');
+    return *cmd == '\0' && (*input == '\0' || CharacterIsEmpty((u8)*input) || *input == '_');
 }
 
 static void cmd_noclip(void) {
     Sys_Cheats.noclip = !Sys_Cheats.noclip;
-    if (Sys_Cheats.noclip) {
-        CenterStatusPrint("noclip: %s", Sys_Text.stringTable[1000]); // "ACTIVATED"
-        Sys_Global.instances[PLAYER1].velocity = (Vector3){ 0.0f, 0.0f, 0.0f };
-    } else CenterStatusPrint("noclip: %s", Sys_Text.stringTable[717]); // "DISABLED"
+    if (Sys_Cheats.noclip) { Sys_Global.instances[PLAYER1].velocity = (Vector3){ 0.0f, 0.0f, 0.0f }; CenterStatusPrint("noclip: %s", Sys_Text.stringTable[1000]); } // "ACTIVATED"
+    else CenterStatusPrint("noclip: %s", Sys_Text.stringTable[717]); // "DISABLED"
 }
 
 void EnableCheatArsenal(u8 level) { (void)level; } // TODO
 void cmd_kill(void) { CenterStatusPrint("%s", Sys_Text.stringTable[1011]); } // "Player decides to become a cyborg."  TakeDamage(...) // TODO
-void cmd_undo(void) {
-    if (Sys_Cheats.editMode) {
-        // Utils.SafeDestroy(lastSpawnedGO); lastSpawnedGO = NULL;
-        CenterStatusPrint("Last spawned object removed");
-    } else {
-        CenterStatusPrint("Cannot undo when not in Edit Mode");
-    }
-}
-
-void ScreenShake(float force, double duration) {
-    Sys_Global.shakeFinished = Sys_Global.pauseRelativeTime + duration;
-    float shakeForce = (force < 0.48f) ? force : 0.48f;
-    (void)shakeForce;
-    // TODO actually shake
-}
-
-void Shake(float force) {
-    float forc = (force <= 0.0f) ? 1.0f : force;
-    ScreenShake(forc,1.0); // The whole station is a shakin' and a movin'!
-}
-
+void cmd_undo(void) { if (Sys_Cheats.editMode) { CenterStatusPrint("Last spawned object removed"); } else { CenterStatusPrint("Cannot undo when not in Edit Mode"); } } // TODO actually track and despawn last
+void ScreenShake(float force, double duration) { Sys_Global.shakeFinished = Sys_Global.pauseRelativeTime + duration; float shakeForce = (force < 0.48f) ? force : 0.48f; (void)shakeForce; } // TODO actually shake
+void Shake(float force) { float forc = (force <= 0.0f) ? 1.0f : force; ScreenShake(forc,1.0); }// The whole station is a shakin' and a movin'!
 void cmd_shake(void) { Shake(-1); CenterStatusPrint("SHAKIN LIKE A LEAF!"); }
 static void cmd_edit(void) {
     Sys_Cheats.editMode = !Sys_Cheats.editMode;
-    if (Sys_Cheats.editMode) {
-        CenterStatusPrint("edit mode: %s", Sys_Text.stringTable[998]); // "Edit Mode activated! The current level can be shaped to your heart's content!"
-        Sys_Cheats.noclip = true;
-        Sys_Cheats.notarget = true;
-    } else {
-        CenterStatusPrint("%s", Sys_Text.stringTable[999]); // "Edit Mode deactivated, normal play"
-        Sys_Cheats.noclip = false;
-        Sys_Cheats.notarget = false;
-    }
+    if (Sys_Cheats.editMode) { Sys_Cheats.noclip = Sys_Cheats.notarget = true; CenterStatusPrint("edit mode: %s", Sys_Text.stringTable[998]); } // "Edit Mode activated! The current level can be shaped to your heart's content!"
+    else { Sys_Cheats.noclip = Sys_Cheats.notarget = false; CenterStatusPrint("%s", Sys_Text.stringTable[999]); } // "Edit Mode deactivated, normal play"
 }
 
 static int ParseLevelArg(const char* arg) {
     if (!arg || !*arg) return -1;
 
-    char clean[64] = {0};
-    int j = 0;
-    for (int i = 0; arg[i] && j < 60; i++) {
-        if (arg[i] != ' ' && arg[i] != '_') clean[j++] = CharToLower((unsigned char)arg[i]);
-    }
-    
-    clean[j] = '\0';
-
-    // Special cases
+    char clean[64] = {0}; int j = 0;
+    for (int i = 0; arg[i] && j < 60; i++) { if (arg[i] != ' ' && arg[i] != '_') clean[j++] = CharToLower((unsigned char)arg[i]); }   clean[j] = '\0';
     if (StringsEqual(clean, "r")      || StringFindSubstring(clean, "reactor")) return 0;
     if (StringFindSubstring(clean, "g1") || StringFindSubstring(clean, "10")) return 10;
     if (StringFindSubstring(clean, "g2") || StringFindSubstring(clean, "11")) return 11;
     if (StringFindSubstring(clean, "g4") || StringFindSubstring(clean, "12")) return 12;
-    if (StringFindSubstring(clean, "g3")) {
-        CenterStatusPrint("%s", Sys_Text.stringTable[1001]); // "Gamma grove already jettisoned! Those poor arrogant people."
-        return -2; // Special code: do not load
-    }
-
-    int level = StringToInt(clean);
-    if (level >= 0 && level < Sys_Global.numLevels) return level;
+    if (StringFindSubstring(clean, "g3")) { CenterStatusPrint("%s", Sys_Text.stringTable[1001]); return -2; }// "Gamma grove already jettisoned! Those poor arrogant people."
+    int level = StringToInt(clean); if (level >= 0 && level < Sys_Global.numLevels) return level;
     return -1; // Invalid
 }
 
-static Vector3 ressurectionLocations[10] = {
-    {-27.386f, -55.488f, 26.5941f},    // 0/R
-    {40.903f, -42.372f, -30.78f},      // 1
-    {30.67407f, -25.832f, 10.21412f},  // 2
-    {38.26813f, -15.498f, 20.37825f},  // 3
-    {-19.48f, -7.928f, 22.954f},       // 4
-    {-24.358f, 12.5956f, 31.8497f},    // 5
-    {-22.3568f, 33.7845f, -30.728f},   // 6
-    {2.228084f, 50.95243f, 7.532025f}, // 7
-    {10.068f, 58.897f, 13.973f},       // 8
-    {2.303f, 106.77f, -38.554f}        // 9
-};
-
-static Vector3 cyberSpaceEntryLocations[8] = {
-    {210.6834f,2.812f,-24.378f},   // 0
-    {195.42f,-13.44f,33.28f},      // 1
-    {157.1608f,-15.53f,47.331f},   // 2a, if cyberport localPosition.x < -26.0f
-    {256.0416f,-0.716f,62.48789f}, // 2b level 2 secondary cyberport position
-    {126.43f,29.56733f,34.24f},    // 5
-    {177.612f,3.29494f,108.7725f}, // 6
-    {244.735f,41.99257f,-19.695f}, // 8
-    {185.161f,84.502f,-46.04246f}, // 9
-};
-
 static void cmd_loadlevel(const char* arg) {
     if (Sys_Global.menuActive) { CenterStatusPrint("%s", Sys_Text.stringTable[1015]); return; } // "Cannot load levels via cheat while on the main menu!"
+    int level = ParseLevelArg(arg); if (level == -2) return; // Already printed g3 message
+    if (level < 0 || level > 12) { CenterStatusPrint("cmd_loadlevel invalid level argument %u",level); return; }
 
-    int level = ParseLevelArg(arg);
-    if (level >= 0) {
-        if (level == -2) return; // Already printed g3 message
-        if (level < 0 || level > 12) { CenterStatusPrint("cmd_loadlevel invalid level argument %u",level); return; }
-        
-        CenterStatusPrint("Loading level %u", level);
-        queuedLevelToLoad = level;
-        LoadLevel(level);
-        if (level > 9) level = 6;
-        Sys_Global.instances[PLAYER1].position = ressurectionLocations[level];
-    }
+    CenterStatusPrint("Loading level %u",level); queuedLevelToLoad = level; LoadLevel(level); Sys_Global.instances[PLAYER1].position = ressurectionLocations[level > 9 ? 6 : level];
 }
 
 static void cmd_loadarsenal(const char* arg) { int level = ParseLevelArg(arg); if (level >= 0 && level < Sys_Global.numLevels) { EnableCheatArsenal(level); } }
-static void cmd_summon(int itemConstIndex) {
-    if (!ConstIndexInBounds(itemConstIndex)) {
-        SpawnDynamicObject(itemConstIndex, true);
-        CenterStatusPrint("Summoned object ID %d", itemConstIndex);
-    } else {
-        CenterStatusPrint("Invalid object ID: %s", itemConstIndex);
-    }
-}
-
+static void cmd_summon(int itemConstIndex) { if (!ConstIndexInBounds(itemConstIndex)) { SpawnDynamicObject(itemConstIndex, true); CenterStatusPrint("Summoned object ID %d", itemConstIndex); } else { CenterStatusPrint("Invalid object ID: %s", itemConstIndex); } }
 static void cmd_notarget(void) { Sys_Cheats.notarget = !Sys_Cheats.notarget; CenterStatusPrint("notarget: %s", Sys_Cheats.notarget ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
 static void cmd_showfps(void) { Sys_Cheats.showFPS = !Sys_Cheats.showFPS; }
 static void cmd_showlocation(void) { Sys_Cheats.showLocation = !Sys_Cheats.showLocation; }
@@ -193,23 +104,20 @@ void SetSkyRotateSpeed(void);
 static void cmd_dizzy(void) { Sys_Cheats.dizzyLevel = (Sys_Cheats.dizzyLevel >= 3) ? 0 : Sys_Cheats.dizzyLevel + 1; SetSkyRotateSpeed(); }
 static void cmd_bottomless(void) {
     Sys_Cheats.bottomless = !Sys_Cheats.bottomless;
-    if (Sys_Cheats.bottomless) CenterStatusPrint("bottomlessclip! %s", Sys_Text.stringTable[1002]); // "Bring it!"
-    else CenterStatusPrint("%s", Sys_Text.stringTable[1003]); // "Hose disconnected from interdimensional wormhole. Normal ammo operation restored."
+    if (Sys_Cheats.bottomless) CenterStatusPrint("bottomlessclip! %s",Sys_Text.stringTable[1002]); // "Bring it!"
+    else                       CenterStatusPrint("%s",Sys_Text.stringTable[1003]); // "Hose disconnected from interdimensional wormhole. Normal ammo operation restored."
 }
 
 static void cmd_nohud(void) {
     Sys_Cheats.noHUD = !Sys_Cheats.noHUD;
-    if (Sys_Cheats.noHUD) CenterStatusPrint("%s", Sys_Text.stringTable[1004]); // "No HUD! Enjoy the cinematic screenshot experience!"
-    else CenterStatusPrint("HUD %s", Sys_Text.stringTable[1000]); // "ACTIVATED"
+    if (Sys_Cheats.noHUD) CenterStatusPrint("%s",Sys_Text.stringTable[1004]); // "No HUD! Enjoy the cinematic screenshot experience!"
+    else                  CenterStatusPrint("HUD %s",Sys_Text.stringTable[1000]); // "ACTIVATED"
 }
 
 static void cmd_iamshodan(void) {
     Sys_Cheats.superoverride = !Sys_Cheats.superoverride;
-    if (Sys_Cheats.superoverride) {
-        CenterStatusPrint("%s", Sys_Text.stringTable[1010]); // "Full security override enabled!"
-    } else {
-        CenterStatusPrint("%s", Sys_Text.stringTable[1009]); // "SHODAN has regained control of security from you"
-    }
+    if (Sys_Cheats.superoverride) CenterStatusPrint("%s",Sys_Text.stringTable[1010]); // "Full security override enabled!"
+    else                          CenterStatusPrint("%s",Sys_Text.stringTable[1009]); // "SHODAN has regained control of security from you"
 }
 
 static void cmd_mrbean(void)         { CenterStatusPrint("Nice try, there are no go carts to slow down here"); }
@@ -258,7 +166,7 @@ static void cmd_staminup(void) {
     if (Sys_Cheats.fatigueCheat) { CenterStatusPrint("Stamin-Up! %s",Sys_Text.stringTable[1013]); SetModFatigue(0.0f); } else CenterStatusPrint("%s",Sys_Text.stringTable[1012]);
 }
 
-static const ConsoleCommand g_ConsoleCommands[] = {
+static const ConsoleCommand consoleCmds[] = {
     { "noclip",  {.noArg=cmd_noclip}, CMD_NOARG},{"idclip",      {.noArg=cmd_noclip},CMD_NOARG},      {"no clip",       {.noArg = cmd_noclip},      CMD_NOARG},
     { "god",     {.noArg=cmd_god}, CMD_NOARG},   {"overwhelming",{.noArg=cmd_god},   CMD_NOARG},      {"whosyourdaddy", {.noArg = cmd_god},         CMD_NOARG},
     { "iddqd",   {.noArg=cmd_god}, CMD_NOARG},   {"notarget",    {.noArg=cmd_notarget},CMD_NOARG},    {"no target",     {.noArg = cmd_notarget},    CMD_NOARG},
@@ -292,36 +200,27 @@ static const ConsoleCommand g_ConsoleCommands[] = {
 void ProcessConsoleCommand(const char* command) {
     if (command == NULL || GetStringLength(command) == 0) { ToggleConsole(); return; }
 
-    char ts[TEXT_BUFFER_SIZE];
-    StringCopyInto_A_SubstringFrom_B(ts, sizeof(ts)-1, command, TEXT_BUFFER_SIZE);
+    char ts[TEXT_BUFFER_SIZE]; StringCopyInto_A_SubstringFrom_B(ts,sizeof(ts)-1,command,TEXT_BUFFER_SIZE);
     ts[sizeof(ts)-1] = '\0';
-    const char* command_trimmed = ts;
-    while (*command_trimmed && CharacterIsEmpty((unsigned char)*command_trimmed)) command_trimmed++;
-    const char* space = command_trimmed;
-    while (*space && !CharacterIsEmpty((unsigned char)*space)) space++;
-    const char* arg_start = space;
-    while (*arg_start && CharacterIsEmpty((unsigned char)*arg_start)) arg_start++;
+    const char* command_trimmed = ts;    while (*command_trimmed && CharacterIsEmpty((unsigned char)*command_trimmed)) command_trimmed++;
+    const char* space = command_trimmed; while (*space && !CharacterIsEmpty((unsigned char)*space)) space++;
+    const char* arg_start = space;       while (*arg_start && CharacterIsEmpty((unsigned char)*arg_start)) arg_start++;
     AddToHistory(command);
     bool commandProcessed = false;
-    for (u16 i = 0; g_ConsoleCommands[i].name != NULL; ++i) {
-        const ConsoleCommand* cmd = &g_ConsoleCommands[i];
-        if (CommandMatch(command_trimmed, cmd->name)) {
-            if (cmd->type == CMD_NOARG) {      cmd->func.noArg();                              commandProcessed = true;
+    for (u16 i=0;consoleCmds[i].name!=NULL;++i) {
+        const ConsoleCommand* cmd = &consoleCmds[i];
+        if (CommandMatch(command_trimmed,cmd->name)) {
+                   if (cmd->type == CMD_NOARG) {             cmd->func.noArg();                              commandProcessed = true;
             } else if (cmd->type == CMD_STR && *arg_start) { cmd->func.withStr(*arg_start ? arg_start : ""); commandProcessed = true;
             } else { // CMD_INT
-                if (!*arg_start) {
-                    CenterStatusPrint("Missing argument, usage: %s <number>", cmd->name);
-                } else {
-                    cmd->func.withInt(StringToInt(arg_start));                                 commandProcessed = true;
-                }
+                if (!*arg_start) CenterStatusPrint("Missing argument, usage: %s <number>",cmd->name);
+                else { cmd->func.withInt(StringToInt(arg_start)); commandProcessed = true; }
             }
         }
     }
 
     if (!commandProcessed) CenterStatusPrint("%s%s",Sys_Text.stringTable[1014],command_trimmed); // "Unknown command or function: "
-    consoleEntryText[0] = '\0';
-    currentEntryLength = 0;
-    historyPos = numHistory; // Position beyond newest for empty
+    consoleEntryText[0] = currentEntryLength = 0; historyPos = numHistory; // Position beyond newest for empty
     ToggleConsole();
 }
 

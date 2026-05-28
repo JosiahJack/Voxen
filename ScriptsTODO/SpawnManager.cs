@@ -118,7 +118,7 @@ public class SpawnManager : MonoBehaviour {
 
 	bool AreaHidden(Vector3 spot) {
 		Vector3 plyPos = Const.a.player1Capsule.Eng_Global->instances[i].position;
-		if (distance_vector3(plyPos,spot) > 50.0f) return true;
+		if (V3_Dist(plyPos,spot) > 50.0f) return true;
 
 		int mask = Const.a.layerMaskNPCAttack;
 		Vector3 ray = (plyPos - spot).normalized;

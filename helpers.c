@@ -1,7 +1,7 @@
 // helpers.c - Helper Functions for various things, mostly libc avoidance
 void* MemSetToVForNBytes(void *dst, int c, size_t n) { unsigned char *p=(unsigned char *)dst; unsigned char v=(unsigned char)c; while (n--) {*p++=v;} return dst; } // memset replacement
 void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n) { unsigned char *d=(unsigned char *)dst; const unsigned char *s=(const unsigned char *)src; while (n--) {*d++=*s++;} return dst; } // memcpy replacement
-void stbi_write_bmp(char const *filename, int x, int y, const void *data) {
+void BmpWrite(char const *filename, int x, int y, const void *data) {
     FHandle f = OS_OpenWriteonly(filename);
     if (f == INVALID_FHANDLE) { DualLogError("Failed to open %s for writing\n", filename); return; }
 
@@ -66,7 +66,7 @@ ENGINE_TO_MOD void Screenshot(void) {
     glReadPixels(0,0,w,h,GL_RGBA,GL_UNSIGNED_BYTE,pixels);
     Vector3 p = Sys_Global.instances[PLAYER1].position;
     char filename[96]; StringFormat(filename,sizeof(filename),"Screenshots/%.2f_x%.1f_y%.1f_z%.1f.bmp",get_time(),p.x,p.y,p.z);
-    stbi_write_bmp(filename,w,h,pixels); DualLog("Saved screenshot %s\n",filename);
+    BmpWrite(filename,w,h,pixels); DualLog("Saved screenshot %s\n",filename);
     OS_DeallocateRAM(pixels,w * h * 4 * sizeof(char));
 }
 
@@ -116,13 +116,7 @@ float smooth_damp(float current, float target, float *current_velocity, float sm
     return output;
 }
 
-ENGINE_TO_MOD size_t GetStringLength(const char* s) { // strlen replacement
-    if (s == NULL) return 0;
-    
-    const char *p = s; while (*(p++));
-    return (size_t)(p - s - 1);
-}
-
+ENGINE_TO_MOD size_t GetStringLength(const char* s) { if (s == NULL) {return 0;} const char *p = s; while (*(p++)); return (size_t)(p - s - 1); } // strlen replacement
 char* data_parser_trim(char* s) {
     while (CharacterIsEmpty((unsigned char)*s)) s++;
     if (*s == 0) return s;
@@ -133,22 +127,11 @@ char* data_parser_trim(char* s) {
     return s;
 }
 
-i32 StringToInt(const char *str) { // atoi replacement
-    while (CharacterIsEmpty(*str)) str++;
-    int sign = 1;
-         if (*str == '-') { sign = -1; str++; }
-    else if (*str == '+') str++;
-
-    if (*str < '0' || *str > '9') return 0;
+i32 StringToInt(const char *str) { // atoi replacement, needed separately from fast_atoi for user console input
+    while (CharacterIsEmpty(*str)) {str++;} int sign = 1; if (*str == '-') { sign = -1; str++; } else if (*str == '+') {str++;} if (*str < '0' || *str > '9') return 0;
+    
     i64 result = 0;
-    while (*str >= '0' && *str <= '9') {
-        int digit = *str - '0';
-        if (result > (2147483647 - digit) / 10) return (sign == 1) ? 2147483647 : -2147483648;
-
-        result = result * 10 + digit;
-        str++;
-    }
-
+    while (*str >= '0' && *str <= '9') { int digit = *str - '0'; if (result > (2147483647 - digit) / 10) {return (sign == 1) ? 2147483647 : -2147483648;} result = result * 10 + digit; str++; }
     return (i32)(sign * result);
 }
 
@@ -176,22 +159,17 @@ bool StringsEqual(const char* a, const char* b) { // !strcmp replacement (hated 
 
 int StringCompareUpToLength(const char* s1, const char* s2, size_t n) { const unsigned char *p1 = (const unsigned char*)s1, *p2 = (const unsigned char*)s2; while (n-- > 0) { if (*p1 != *p2) {return (*p1 < *p2) ? -1 : 1;}  if (*p1 == '\0') {break;} p1++; p2++; } return 0; } // !strncmp replacement (yes inverted for sanity)
 void StringCopyInto_A_From_B(char* a, const char* b, size_t bufferSize) { // strcpy replacement
-    size_t size2=GetStringLength(b); if (size2>=bufferSize) { DualLogError("Error attempting string copy from B into A but B is bigger than buffer limit %u! A: ",bufferSize); DualLogError("%s, B: %s\n",a,b); OS_Exit(1); }
+    size_t size2=GetStringLength(b); if (size2>=bufferSize) { DualLogError("B is bigger than buffer limit %u! A: ",bufferSize); DualLogError("%s, B: %s\n",a,b); OS_Exit(1); }
     
     for (size_t i=0;i<size2;++i) a[i] = b[i];
     a[size2] = '\0';
 }
 
 void StringCopyInto_A_SubstringFrom_B(char* a, size_t substringSize, const char* b, size_t bufferSize) { // strncpy replacement (hopefully my mnemonic "SubstringFrom_B" will help me remember substringSize comes before be in the args passed)
-    if (substringSize >= bufferSize) { DualLogError("Substring too large for buffer! %u >= %u\n", substringSize, bufferSize);  OS_Exit(1); }
+    if (substringSize >= bufferSize) { DualLogError("Substring too large for buffer! %u >= %u\n",substringSize,bufferSize); OS_Exit(1); }
     
     bool reachedEndB = false;
-    for (size_t i= 0;i<substringSize;++i) {
-        if (!reachedEndB && b[i] == '\0') reachedEndB = true;
-        if (reachedEndB) a[i] = '\0';
-        else a[i] = b[i]; // Normal copy
-    }
-    
+    for (size_t i= 0;i<substringSize;++i) { if (!reachedEndB && b[i] == '\0') {reachedEndB = true;} if (reachedEndB) {a[i] = '\0';} else {a[i] = b[i];/*Normal copy*/} }
     a[substringSize] = '\0'; 
 }
 
@@ -225,70 +203,33 @@ char* StringFindSubstring(const char* haystack, const char* needle) { // strstr 
     return NULL; // No match found
 }
 
-const char* StringFindLastChar(const char* str, const char c) { // strrchr replacement
-    const char* lastSeen = NULL;
-    do {
-        if (*str == c) lastSeen = str;
-    } while (*str++);
-    return lastSeen;
-}
-
-ENGINE_TO_MOD char* StringFindFirstCharWithin(const char *s, char c) { // strchr replacement
-    char* stringwalker = (char*)s;
-    while (*stringwalker != c) {
-        if (!*stringwalker) return NULL;
-        stringwalker++;
-    }
-    return stringwalker;
-}
-
+const char* StringFindLastChar(const char* str, const char c) { const char* lastSeen = NULL; do { if (*str == c) lastSeen = str; } while (*str++); return lastSeen; } // strrchr replacement
+ENGINE_TO_MOD char* StringFindFirstCharWithin(const char *s, char c) { char* stringwalker = (char*)s; while (*stringwalker != c) { if (!*stringwalker) {return NULL;} stringwalker++; } return stringwalker; } // strchr replacement
 void DoubleToStringFixed(char* dest, double value, int decimalPlaces, size_t bufferSize) {
     if (decimalPlaces < 0 || decimalPlaces > 9) { DualLogError("DoubleToStringFixed: decimalPlaces out of range\n"); OS_Exit(1); }
-
-    if (value < 0.0) {
-        if (bufferSize < 2) OS_Exit(1);
-        
-        *dest++ = '-';
-        bufferSize--;
-        value = -value;
-    }
-
+    if (value < 0.0) { if (bufferSize < 2) {OS_Exit(1);} *dest++ = '-'; bufferSize--; value = -value; }
     u64 intPart = (u64)value;
     char temp[32];
     size_t len = 0;
     if (intPart == 0) temp[len++] = '0';
-    else {
-        while (intPart > 0) {
-            temp[len++] = '0' + (intPart % 10);
-            intPart /= 10;
-        }
-    }
+    else { while (intPart > 0) { temp[len++] = '0' + (intPart % 10); intPart /= 10; } }
 
     if (len >= bufferSize) OS_Exit(1);
     for (size_t i = 0; i < len; ++i) dest[i] = temp[len - 1 - i];
-    dest += len;
-    bufferSize -= len;
+    dest += len; bufferSize -= len;
     if (decimalPlaces == 0) { *dest = '\0'; return; }
     if (bufferSize < 1) OS_Exit(1);
     
-    *dest++ = '.';
-    bufferSize--;
-    double frac = value - (u64)value;
-    double scale = 1.0;
+    *dest++ = '.'; bufferSize--;
+    double frac = value - (u64)value, scale = 1.0;
     for (int i = 0; i < decimalPlaces; ++i) scale *= 10.0;
     u64 fracPart = (u64)(frac * scale + 0.5);
-    for (int i = decimalPlaces - 1; i >= 0; --i) {
-        if (bufferSize < 1) OS_Exit(1);
-        dest[i] = '0' + (fracPart % 10);
-        fracPart /= 10;
-    }
-
+    for (int i = decimalPlaces - 1; i >= 0; --i) { if (bufferSize < 1) {OS_Exit(1);} dest[i] = '0' + (fracPart % 10); fracPart /= 10; }
     dest[decimalPlaces] = '\0';
 }
 
 void StringAppendLiteral(char* dest, const char* literal, size_t bufferSize) {
-    size_t curLen = GetStringLength(dest);
-    size_t litLen = GetStringLength(literal);
+    size_t curLen = GetStringLength(dest), litLen = GetStringLength(literal);
     if (curLen + litLen >= bufferSize) { DualLogError("StringAppendLiteral overflow\n"); OS_Exit(1); }
     
     for (size_t i = 0; i < litLen; ++i) dest[curLen + i] = literal[i];
@@ -378,9 +319,7 @@ char* GetNextStringUpToNewlineOrEOF(char* buf, int size, FHandle fd) { // fgets 
             pos = 0; end = (int)n;
         }
 
-        while (remaining > 0 && pos < end) {
-            char c = buffer[pos++]; *p++ = c; remaining--; if (c == '\n') goto done;
-        }
+        while (remaining > 0 && pos < end) { char c = buffer[pos++]; *p++ = c; remaining--; if (c == '\n') goto done; }
     }
 
     done:
@@ -393,7 +332,7 @@ ENGINE_TO_MOD char* GetLevelFileNextStringUpToNewlineOrEOF(char* buf, int size) 
 ENGINE_TO_MOD Vector3 GetEntityLocalSpawnPointFromUnrotatedOffsetVector(Entity* originator, Vector3 offsetFromOriginator) {
     Vector3 scaledOfs = mul_v3_v3_elementwise(offsetFromOriginator, originator->scale);
     Vector3 rotatedOfs = quat_rotate_vector(originator->rotation, scaledOfs);
-    Vector3 result = Vector3_A_plus_B(originator->position, rotatedOfs);
+    Vector3 result = V3_AplusB(originator->position, rotatedOfs);
     return result;
 }
 
@@ -453,7 +392,6 @@ void qsort_new(void* base, size_t nel, size_t w, cmpfun cmp) {
     }
 }
 
-typedef u16 half;
 float half_to_float(half h) {
     u32 s=(h&0x8000)<<16,e=(h&0x7C00)>>10,m=(h&0x03FF),out;
     if (e == 0){

@@ -102,7 +102,7 @@ COMMON_CFLAGS="-ferror-limit=500 -fno-exceptions -fno-stack-protector -fno-async
                -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -fvisibility=hidden -pipe -fno-ident -fdata-sections -Wno-int-to-void-pointer-cast \
                -ffunction-sections -ffast-math -std=c11 -Wall -Wextra -Wno-implicit-fallthrough -fdeclspec -fno-rtti \
                -fomit-frame-pointer -g0 -fstrict-aliasing -fcommon -Wstrict-prototypes -Wno-overlength-strings -fno-math-errno -fno-sanitize=all \
-               -fno-trapping-math -fmerge-all-constants -m64 -Os -march=x86_64_v2 -Wbool-conversion"
+               -fno-trapping-math -fmerge-all-constants -m64 -Os -march=x86_64_v2 -Wbool-conversion -Wno-empty-body"
 COMMON_LFLAGS="-Wl,-z,now -Wl,-z,relro -Wl,--gc-sections -Wl,--as-needed -Wl,-z,norelro -Wl,--build-id=none $ZIG_LIBS"
 if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC

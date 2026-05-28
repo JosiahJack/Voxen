@@ -1,149 +1,126 @@
 // textures.c - Loads 2D Textures
-u32 totalPixels;
-u32 totalPaletteColors;
-typedef struct { u16 index; bool transparent; bool doublesided; char path[128]; } TextureData;
-typedef struct { TextureData* entries; u32 count; u32 capacity; } TextureDataParser;
-typedef struct { const char* data; int size; } RawTexture;
-typedef struct TextureParseTask { u32 start_tex; u32 end_tex; RawTexture* raw_textures; i32* parsIdx; const TextureDataParser* parser; int tid; } TextureParseTask;
-typedef struct { u32 img_x, img_y; i32 img_n, img_out_n; u8* img_buffer, *img_buffer_end; } stbi__context;
-typedef struct { stbi__context* s; u8* idata, *expanded, *out; } stbi__png;
-enum { STBI__F_none = 0, STBI__F_sub = 1, STBI__F_up = 2, STBI__F_avg = 3, STBI__F_paeth = 4, STBI__F_avg_first, STBI__F_paeth_first };
-typedef struct { u16 fast[1<<9], firstcode[16], firstsymbol[16], value[288]; i32 maxcode[17]; u8 size[288]; } stbi__zhuffman;
-typedef struct { u8 *zbuffer, *zbuffer_end, *zout, *zout_start; i32 num_bits; u32 code_buffer; stbi__zhuffman z_length, z_distance; } stbi__zbuf;
-StbiArena stbi_arena_main;
-static StbiArena* thread_stbi_arenas = NULL;
-static u8** textureIndexBuffers = NULL; static u32** texturePaletteBuffers = NULL; static u32* texturePaletteSizes = NULL;
-static i32* textureWidths = NULL; static i32* textureHeights = NULL;
-void stbi__arena_init_thread(StbiArena* arena) {if (!arena->base) { arena->base = OS_Alloc(STBI_ARENA_SIZE); arena->cursor = arena->base; arena->end = arena->base + STBI_ARENA_SIZE; } }
-void* stbi__arena_alloc_thread(StbiArena* a, size_t s) { if(!a->base||a->cursor+s>a->end)return NULL; void* p=a->cursor; a->cursor+=s; return p; }
-void* stbi__arena_alloc(size_t s) { return stbi__arena_alloc_thread(&stbi_arena_main, s); }
-static u32 stbi__get32be(stbi__context* s) { const u8* p = s->img_buffer; s->img_buffer += 4; return (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3]; }
-static i32 stbi__bit_reverse(i32 n, i32 b) { n=((n&0xAAAA)>>1)|((n&0x5555)<<1); n=((n&0xCCCC)>>2)|((n&0x3333)<<2); n=((n&0xF0F0)>>4)|((n&0x0F0F)<<4); n=((n&0xFF00)>>8)|((n&0x00FF)<<8); return n>>(16-b); }
-static i32 stbi__zbuild_huffman(stbi__zhuffman* z, const u8* sl, i32 num) {
-    i32 i, k=0, code=0, nc[16], sz[17]={0}; MemSetToVForNBytes(z->fast, 0, sizeof(z->fast));
-    if(num!=32){ for(i=0;i<num;++i)++sz[sl[i]]; } sz[0]=0;
+u32 totalPixels,totalPaletteColors; void VSetWindowIcon(GLFWwindow*,const GLFWimage*);
+typedef struct { u16 index; bool transparent; bool doublesided; char path[128]; } TextureData; typedef struct { TextureData* entries; u32 count; u32 capacity; } TextureDataParser; typedef struct { const char* data; int size; } RawTexture;
+typedef struct TextureParseTask { u32 start_tex; u32 end_tex; RawTexture* raw_textures; i32* parsIdx; const TextureDataParser* parser; int tid; } TextureParseTask;                 typedef struct { u32 img_x, img_y; i32 img_n, img_out_n; u8* img_buffer, *img_buffer_end; } PngContext;
+typedef struct { PngContext* s; u8* idata, *expanded, *out; } PngData; typedef struct { u16 fast[1<<9], firstcode[16], firstsymbol[16], value[288]; i32 maxcode[17]; u8 size[288]; } PngHuffman; typedef struct { u8 *zbuffer, *zbuffer_end, *zout, *zout_start; i32 num_bits; u32 code_buffer; PngHuffman z_length, z_distance; } pngzbuf;
+enum { PNGFmt_none=0, PNGFmt_sub=1, PNGFmt_up=2, PNGFmt_avg=3, PNGFmt_paeth=4, PNGFmt_avg_first, PNGFmt_paeth_first };
+PngArena png_arena_main; static PngArena* thread_png_arenas = NULL; static u8** textureIndexBuffers = NULL; static u32** texturePaletteBuffers = NULL; static u32* texturePaletteSizes = NULL; static i32* textureWidths = NULL; static i32* textureHeights = NULL;
+void PngArenaInit(PngArena* arena) {if (!arena->base) { arena->base = OS_Alloc(PNG_ARENA_SIZE); arena->cursor = arena->base; arena->end = arena->base + PNG_ARENA_SIZE; } }
+void* PngArenaAlloc(PngArena* a, size_t s) { if(!a->base||a->cursor+s>a->end)return NULL; void* p=a->cursor; a->cursor+=s; return p; }
+static u32 PngGet32be(PngContext* s) { const u8* p = s->img_buffer; s->img_buffer += 4; return (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3]; }
+static i32 BitReverse(i32 n, i32 b) { n=((n&0xAAAA)>>1)|((n&0x5555)<<1); n=((n&0xCCCC)>>2)|((n&0x3333)<<2); n=((n&0xF0F0)>>4)|((n&0x0F0F)<<4); n=((n&0xFF00)>>8)|((n&0x00FF)<<8); return n>>(16-b); }
+static i32 PngZBuildHuffman(PngHuffman* z, const u8* sl, i32 num) {
+    i32 i,k=0,code=0,nc[16],sz[17]={0}; MemSetToVForNBytes(z->fast,0,sizeof(z->fast)); if(num != 32) { for(i=0;i<num;++i)++sz[sl[i]]; } sz[0]=0;
     for(i=1;i<16;++i){
         if(sz[i]>(1<<i))return 0;
         nc[i]=code; z->firstcode[i]=(u16)code; z->firstsymbol[i]=(u16)k; code+=sz[i]; if(sz[i]&&code-1>=(1<<i))return 0;
-        
         z->maxcode[i]=code<<(16-i); code<<=1; k+=sz[i];
     }
     z->maxcode[16]=0x10000;
     for(i=0;i<num;++i){ 
         int s=(num==32)?5:sl[i]; if(!s)continue;
         int c=nc[s]-z->firstcode[s]+z->firstsymbol[s]; u16 fv=(u16)((s<<9)|i); z->size[c]=(u8)s; z->value[c]=(u16)i;
-        if(s<=9){ int j=stbi__bit_reverse(nc[s],s); while(j<(1<<9)){z->fast[j]=fv; j+=(1<<s);} } ++nc[s];
+        if(s<=9){ int j=BitReverse(nc[s],s); while(j<(1<<9)){z->fast[j]=fv; j+=(1<<s);} } ++nc[s];
     } return 1;
 }
 
 #define REFILL(z) if(z->num_bits<16){do{z->code_buffer|=(unsigned int)(*z->zbuffer++)<<z->num_bits;z->num_bits+=8;}while(z->num_bits<=24);}
-static u32 stbi__zreceive(stbi__zbuf* z, int n) { REFILL(z); u32 k=z->code_buffer&((1u<<n)-1); z->code_buffer>>=n; z->num_bits-=n; return k; }
-static u32 stbi__zhuffman_decode(stbi__zbuf* a, stbi__zhuffman* z) {
-    REFILL(a); int b=z->fast[a->code_buffer&511], s;
-    if(b){ s=b>>9; a->code_buffer>>=s; a->num_bits-=s; return b&511; }
-    int k=stbi__bit_reverse(a->code_buffer,16); for(s=10; k>=z->maxcode[s]; ++s);
-    b=(k>>(16-s))-z->firstcode[s]+z->firstsymbol[s]; a->code_buffer>>=s; a->num_bits-=s; return z->value[b];
-}
-
-static int stbi__parse_huffman_block(stbi__zbuf* a) {
+static u32 PngZReceive(pngzbuf* z, int n) { REFILL(z); u32 k=z->code_buffer&((1u<<n)-1); z->code_buffer>>=n; z->num_bits-=n; return k; }
+static u32 PngHuffman_decode(pngzbuf* a, PngHuffman* z) { REFILL(a); int b=z->fast[a->code_buffer&511], s; if(b){ s=b>>9; a->code_buffer>>=s; a->num_bits-=s; return b&511; } int k=BitReverse(a->code_buffer,16); for(s=10; k>=z->maxcode[s]; ++s); b=(k>>(16-s))-z->firstcode[s]+z->firstsymbol[s]; a->code_buffer>>=s; a->num_bits-=s; return z->value[b]; }
+static int PngParseHuffmanBlock(pngzbuf* a) {
     u8* o=a->zout;
-    static const int lb[]={3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258}, le[]={0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0},
-                     db[]={1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577}, de[]={0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13};
+    static const int lb[]={3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258}, le[]={0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0}, db[]={1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577}, de[]={0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13};
     for(;;){
-        int z=stbi__zhuffman_decode(a,&a->z_length); if(z<256)*o++=(u8)z; else if(z==256){ a->zout=o; return 1; }
-        else { z-=257; int l=lb[z]+(le[z]?stbi__zreceive(a,le[z]):0); z=stbi__zhuffman_decode(a,&a->z_distance); int d=db[z]+(de[z]?stbi__zreceive(a,de[z]):0); u8* p=o-d; while(l--)*o++=*p++; }
+        int z=PngHuffman_decode(a,&a->z_length);
+        if(z<256)*o++=(u8)z; else if(z==256){ a->zout=o; return 1; } else { z-=257; int l=lb[z]+(le[z]?PngZReceive(a,le[z]):0); z=PngHuffman_decode(a,&a->z_distance); int d=db[z]+(de[z]?PngZReceive(a,de[z]):0); u8* p=o-d; while(l--)*o++=*p++; }
     }
 }
 
-static int stbi__compute_huffman_codes(stbi__zbuf* a) {
+static int PngComputeHuffmans(pngzbuf* a) {
     static const u8 dz[]={16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15}; u8 lc[286+32+137], cs[19]={0};
-    u32 hl=stbi__zreceive(a,5)+257, hd=stbi__zreceive(a,5)+1, hc=stbi__zreceive(a,4)+4, nt=hl+hd, n=0;
-    for(u32 i=0;i<hc;++i) cs[dz[i]]=(u8)stbi__zreceive(a,3); stbi__zbuild_huffman(&a->z_length,cs,19);
+    u32 hl=PngZReceive(a,5)+257, hd=PngZReceive(a,5)+1, hc=PngZReceive(a,4)+4, nt=hl+hd, n=0;
+    for(u32 i=0;i<hc;++i) cs[dz[i]]=(u8)PngZReceive(a,3); PngZBuildHuffman(&a->z_length,cs,19);
     while(n<nt){
-        u32 c=stbi__zhuffman_decode(a,&a->z_length);
+        u32 c=PngHuffman_decode(a,&a->z_length);
         if(c<16)lc[n++]=(u8)c;
         else { u8 f=0;
-            if(c==16){c=stbi__zreceive(a,2)+3; f=lc[n-1];}
-            else if(c==17)c=stbi__zreceive(a,3)+3;
-            else if(c==18)c=stbi__zreceive(a,7)+11;
+            if(c==16){c=PngZReceive(a,2)+3; f=lc[n-1];}
+            else if(c==17)c=PngZReceive(a,3)+3;
+            else if(c==18)c=PngZReceive(a,7)+11;
             else return 0; MemSetToVForNBytes(lc+n,f,c); n+=c;
         }
-    } return stbi__zbuild_huffman(&a->z_length,lc,hl) && stbi__zbuild_huffman(&a->z_distance,lc+hl,hd);
+    } return PngZBuildHuffman(&a->z_length,lc,hl) && PngZBuildHuffman(&a->z_distance,lc+hl,hd);
 }
 
-static int stbi__parse_uncompressed_block(stbi__zbuf* a) {
-    u8 header[4]; i32 k = 0;
-    if (a->num_bits & 7) stbi__zreceive(a, a->num_bits & 7);
+static int PngParseUncompressedBlock(pngzbuf* a) {
+    u8 header[4]; i32 k = 0; if (a->num_bits & 7) PngZReceive(a, a->num_bits & 7);
     while (a->num_bits > 0) { header[k] = (u8)(a->code_buffer & 255); a->code_buffer >>= 8; a->num_bits -= 8; ++k; }
     if (k <= 0) header[0] = *a->zbuffer++;
     if (k <= 1) header[1] = *a->zbuffer++;
     if (k <= 2) header[2] = *a->zbuffer++;
     if (k <= 3) header[3] = *a->zbuffer++;
     i32 len = header[1] * 256 + header[0];
-    CopyMemoryFromBtoAForNBytes(a->zout, a->zbuffer, len);
-    a->zbuffer += len; a->zout += len;
+    CopyMemoryFromBtoAForNBytes(a->zout,a->zbuffer,len); a->zbuffer += len; a->zout += len;
     return 1;
 }
 
-static u8 stbi__zdef_len(int i) { return (i<144)?8:(i<256)?9:(i<280)?7:8; }
-u8* stbi_zlib_decode_malloc_guesssize_headerflag_arena(const u8* buffer, i32 len, i32 initial_size, i32* outlen, StbiArena* arena) {
-    stbi__zbuf a = {0}; u8* p = (u8*)stbi__arena_alloc_thread(arena, initial_size), d_len[288]; i32 f, t;
+static u8 PngZDefLen(int i) { return (i<144)?8:(i<256)?9:(i<280)?7:8; }
+u8* PngDecode(const u8* buffer, i32 len, i32 initial_size, i32* outlen, PngArena* arena) {
+    pngzbuf a = {0}; u8* p = (u8*)PngArenaAlloc(arena, initial_size), d_len[288]; i32 f, t;
     a.zbuffer = (u8*)buffer; a.zbuffer_end = (u8*)buffer+len; a.zout_start = a.zout = p; a.zbuffer += 2;
     do {
-        f = stbi__zreceive(&a, 1); t = stbi__zreceive(&a, 2);
-        if (t == 0) stbi__parse_uncompressed_block(&a);
+        f = PngZReceive(&a, 1); t = PngZReceive(&a, 2);
+        if (t == 0) PngParseUncompressedBlock(&a);
         else {
-            if (t == 1) { for(int i=0; i<288; ++i) d_len[i]=stbi__zdef_len(i); stbi__zbuild_huffman(&a.z_length, d_len, 288); stbi__zbuild_huffman(&a.z_distance, NULL, 32); }
-            else stbi__compute_huffman_codes(&a);
-            stbi__parse_huffman_block(&a);
+            if (t == 1) { for(int i=0; i<288; ++i) d_len[i]=PngZDefLen(i); PngZBuildHuffman(&a.z_length, d_len, 288); PngZBuildHuffman(&a.z_distance, NULL, 32); }
+            else PngComputeHuffmans(&a);
+            PngParseHuffmanBlock(&a);
         }
     } while (!f);
     if (outlen) *outlen = (i32)(a.zout - a.zout_start); return a.zout_start;
 }
 
-static u8 first_row_filter[5] = {STBI__F_none, STBI__F_sub, STBI__F_none, STBI__F_avg_first, STBI__F_paeth_first};
-inline static i32 stbi__paeth(i32 a, i32 b, i32 c) { i32 p = a+b-c, pa = vabs(p-a), pb = vabs(p-b), pc = vabs(p-c); return (pa <= pb && pa <= pc) ? a : (pb <= pc ? b : c); }
-static i32 stbi__create_png_image_raw_arena(StbiArena* arena, stbi__png* a, u8* raw, u32 raw_len, i32 out_n, u32 x, u32 y, i32 img_n) {
+static u8 first_row_filter[5] = {PNGFmt_none, PNGFmt_sub, PNGFmt_none, PNGFmt_avg_first, PNGFmt_paeth_first};
+inline static i32 PngPaeth(i32 a, i32 b, i32 c) { i32 p = a+b-c, pa = vabs(p-a), pb = vabs(p-b), pc = vabs(p-c); return (pa <= pb && pa <= pc) ? a : (pb <= pc ? b : c); }
+static i32 CreatePngImageArena(PngArena* arena, PngData* a, u8* raw, u32 raw_len, i32 out_n, u32 x, u32 y, i32 img_n) {
     u32 i, j, stride = x * out_n, w_bytes = (img_n * x * 8 + 7) >> 3; i32 k, f;
-    if (raw_len < (w_bytes + 1) * y) return 0; a->out = (u8*)stbi__arena_alloc_thread(arena, (size_t)x * y * out_n);
+    if (raw_len < (w_bytes + 1) * y) return 0; a->out = (u8*)PngArenaAlloc(arena, (size_t)x * y * out_n);
     for (j = 0; j < y; ++j) {
         u8 *cur = a->out + stride * j, *prior = (j > 0) ? cur - stride : a->out;
         if ((f = *raw++) > 4) return 0; if (j == 0) f = first_row_filter[f];
         for (k = 0; k < img_n; ++k) {
-            if (f == STBI__F_up) cur[k] = raw[k] + prior[k];
-            else if (f == STBI__F_avg) cur[k] = raw[k] + (prior[k] >> 1);
-            else if (f == STBI__F_paeth) cur[k] = raw[k] + stbi__paeth(0, prior[k], 0);
+            if (f == PNGFmt_up) cur[k] = raw[k] + prior[k];
+            else if (f == PNGFmt_avg) cur[k] = raw[k] + (prior[k] >> 1);
+            else if (f == PNGFmt_paeth) cur[k] = raw[k] + PngPaeth(0, prior[k], 0);
             else cur[k] = raw[k];
         }
         if (img_n != out_n) cur[img_n] = 255; raw += img_n; cur += out_n; prior += out_n;
         for (i = x - 1; i >= 1; --i, cur[img_n] = (img_n != out_n ? 255 : cur[img_n]), raw += img_n, cur += out_n, prior += out_n)
             for (k = 0; k < img_n; ++k) {
-                if (f == STBI__F_none) cur[k] = raw[k];
-                else if (f == STBI__F_sub) cur[k] = raw[k] + cur[k - out_n];
-                else if (f == STBI__F_up) cur[k] = raw[k] + prior[k];
-                else if (f == STBI__F_avg) cur[k] = raw[k] + ((prior[k] + cur[k - out_n]) >> 1);
-                else if (f == STBI__F_paeth) cur[k] = raw[k] + stbi__paeth(cur[k - out_n], prior[k], prior[k - out_n]);
-                else if (f == STBI__F_avg_first) cur[k] = raw[k] + (cur[k - out_n] >> 1);
+                if (f == PNGFmt_none) cur[k] = raw[k];
+                else if (f == PNGFmt_sub) cur[k] = raw[k] + cur[k - out_n];
+                else if (f == PNGFmt_up) cur[k] = raw[k] + prior[k];
+                else if (f == PNGFmt_avg) cur[k] = raw[k] + ((prior[k] + cur[k - out_n]) >> 1);
+                else if (f == PNGFmt_paeth) cur[k] = raw[k] + PngPaeth(cur[k - out_n], prior[k], prior[k - out_n]);
+                else if (f == PNGFmt_avg_first) cur[k] = raw[k] + (cur[k - out_n] >> 1);
             }
     }
     return 1;
 }
 
-u8* stbi_load_from_memory_arena(const u8* buffer, int len, int* x, int* y, StbiArena* arena) {
+u8* PngLoad(const u8* buffer, int len, int* x, int* y, PngArena* arena) {
     if (arena->base) arena->cursor = arena->base;
-    stbi__context s; s.img_n = s.img_out_n = 0; s.img_buffer = (u8*)buffer; s.img_buffer_end = (u8*)buffer + len;
-    stbi__png z = {0}; z.s = &s; u32 ioff = 0; z.expanded = z.idata = z.out = NULL;
-    s.img_buffer += 8; s.img_x = s.img_y = 1;
+    PngContext s; s.img_n = s.img_out_n = 0; s.img_buffer = (u8*)buffer; s.img_buffer_end = (u8*)buffer + len;
+    PngData z = {0}; z.s = &s; u32 ioff = 0; z.expanded = z.idata = z.out = NULL; s.img_buffer += 8; s.img_x = s.img_y = 1;
     for (;;) {
-        u32 length = stbi__get32be(&s), type = stbi__get32be(&s);
+        u32 length = PngGet32be(&s), type = PngGet32be(&s);
         switch (type) {
-            case 0x49484452: s.img_x = stbi__get32be(&s); s.img_y = stbi__get32be(&s); s.img_buffer++; { i32 color = (*s.img_buffer++); s.img_buffer += 3; s.img_n = (color & 2 ? 3 : 1) + (color & 4 ? 1 : 0); } break;
-            case 0x49444154: if (!z.idata) { z.idata = (u8*)stbi__arena_alloc_thread(arena, len + 16); ioff = 0; } CopyMemoryFromBtoAForNBytes(z.idata + ioff, s.img_buffer, length); s.img_buffer += length; ioff += length; break;
-            case 0x49454E44: { u32 rL = s.img_x * s.img_y * s.img_n + s.img_y; z.expanded = (u8*)stbi_zlib_decode_malloc_guesssize_headerflag_arena(z.idata, ioff, rL, (i32*)(&rL), arena);
-                s.img_out_n = (s.img_n + 1 == 4) ? 4 : s.img_n; stbi__create_png_image_raw_arena(arena, &z, z.expanded, rL, s.img_out_n, s.img_x, s.img_y, s.img_n); stbi__get32be(&s); goto Label_parsesuccess; }
+            case 0x49484452: s.img_x = PngGet32be(&s); s.img_y = PngGet32be(&s); s.img_buffer++; { i32 color = (*s.img_buffer++); s.img_buffer += 3; s.img_n = (color & 2 ? 3 : 1) + (color & 4 ? 1 : 0); } break;
+            case 0x49444154: if (!z.idata) { z.idata = (u8*)PngArenaAlloc(arena, len + 16); ioff = 0; } CopyMemoryFromBtoAForNBytes(z.idata + ioff, s.img_buffer, length); s.img_buffer += length; ioff += length; break;
+            case 0x49454E44: { u32 rL = s.img_x * s.img_y * s.img_n + s.img_y; z.expanded = (u8*)PngDecode(z.idata, ioff, rL, (i32*)(&rL), arena); s.img_out_n = (s.img_n + 1 == 4) ? 4 : s.img_n; CreatePngImageArena(arena,&z,z.expanded, rL,s.img_out_n,s.img_x,s.img_y,s.img_n); PngGet32be(&s); goto Label_parsesuccess; }
             default: s.img_buffer += length; break;
         }
-        stbi__get32be(&s);
+        PngGet32be(&s);
     }
     Label_parsesuccess: *x = z.s->img_x; *y = z.s->img_y; return z.out;
 }
@@ -154,7 +131,7 @@ static void* TextureParsingWorker(void* arg) {
         i32 pIdx = t->parsIdx[i]; if (unlikely(pIdx < 0 || pIdx >= (i32)t->parser->count)) continue;
         doubleSidedTexture[i] = t->parser->entries[pIdx].doublesided; transparentTexture[i] = t->parser->entries[pIdx].transparent;
         const char* d = t->raw_textures[i].data; int sz = t->raw_textures[i].size; if (unlikely(!d || sz <= 0)) continue;
-        int w=0, h=0; u8 *pix = stbi_load_from_memory_arena((const u8*)d, sz, &w, &h, &thread_stbi_arenas[t->tid]);
+        int w=0, h=0; u8 *pix = PngLoad((const u8*)d, sz, &w, &h, &thread_png_arenas[t->tid]);
         if (!pix || w < 1 || h < 1) { OS_DeallocateRAM((void*)d, (size_t)sz); continue; }
         u32 nP = (u32)w * h, pSz = 0, *pal = (u32*)OS_Alloc(1024); u8 *idx = (u8*)OS_Alloc(nP), hash[1024] = {0};
         for (u32 p = 0; p < nP; ++p) {
@@ -227,26 +204,17 @@ static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
     OS_DeallocateRAM(data, sz); return true;
 }
 
-void glfwSetWindowIcon(GLFWwindow* handle, const GLFWimage* images);
 static __attribute__((noinline)) void LoadTextures(void) {
     double start_time = get_time();
     loadedTexturesMaxIndex = totalPixels = totalPaletteColors = 0u;
-    TextureDataParser texture_parser;
-    if (unlikely(!ParseTextureData(&texture_parser, MAX_VALID_TEXTURE, "./Data/textures.txt"))) { DualLogError("Could not parse ./Data/textures.txt!\n"); OS_Exit(1); }
+    TextureDataParser texture_parser; if (unlikely(!ParseTextureData(&texture_parser,MAX_VALID_TEXTURE, "./Data/textures.txt"))) { DualLogError("Could not parse ./Data/textures.txt!\n"); OS_Exit(1); }
 
     i32 maxIndex = -1;
-    for (u32 k = 0; k < texture_parser.count; ++k) {
-        if (texture_parser.entries[k].index > maxIndex && texture_parser.entries[k].index != U16_MAX) maxIndex = texture_parser.entries[k].index;
-    }
+    for (u32 k = 0; k < texture_parser.count; ++k) { if (texture_parser.entries[k].index > maxIndex && texture_parser.entries[k].index != U16_MAX) maxIndex = texture_parser.entries[k].index; }
     loadedTexturesMaxIndex = (u16)(maxIndex + 1);
-    if (loadedTexturesMaxIndex == 0) { DualLogError("No textures found in textures.txt\n"); OS_Exit(1); }
-
     i32* parsIdx = OS_Alloc(loadedTexturesMaxIndex * sizeof(i32));
     MemSetToVForNBytes(parsIdx, -1, loadedTexturesMaxIndex * sizeof(i32));
-    for (u32 k = 0; k < texture_parser.count; ++k) {
-        if (texture_parser.entries[k].index < loadedTexturesMaxIndex) parsIdx[texture_parser.entries[k].index] = (i32)k;
-    }
-
+    for (u32 k = 0; k < texture_parser.count; ++k) { if (texture_parser.entries[k].index < loadedTexturesMaxIndex) parsIdx[texture_parser.entries[k].index] = (i32)k; }
     DualLog("Loading textures (%u) ... ", texture_parser.count);
     RawTexture* rawTextures = OS_Alloc(loadedTexturesMaxIndex * sizeof(RawTexture));
     MemSetToVForNBytes(rawTextures,0,loadedTexturesMaxIndex * sizeof(RawTexture));
@@ -258,34 +226,20 @@ static __attribute__((noinline)) void LoadTextures(void) {
         rawTextures[i].size = size;
     }
 
-    num_parse_threads = OS_GetNumThreads();
-    if (num_parse_threads < 1) num_parse_threads = 1;
-    if (num_parse_threads > 32) num_parse_threads = 32;
-    thread_stbi_arenas = (StbiArena*)OS_Alloc((size_t)num_parse_threads * sizeof(StbiArena));
-    for (int t = 0; t < num_parse_threads; ++t) { thread_stbi_arenas[t].base = NULL; stbi__arena_init_thread(&thread_stbi_arenas[t]); }
-    textureIndexBuffers = OS_Alloc(loadedTexturesMaxIndex * sizeof(u8*));
-    texturePaletteBuffers = OS_Alloc(loadedTexturesMaxIndex * sizeof(u32*));
-    texturePaletteSizes = OS_Alloc(loadedTexturesMaxIndex * sizeof(u32));
-    textureWidths = OS_Alloc(loadedTexturesMaxIndex * sizeof(i32));
-    textureHeights = OS_Alloc(loadedTexturesMaxIndex * sizeof(i32));
+    num_parse_threads = OS_GetNumThreads(); if (num_parse_threads < 1) {num_parse_threads = 1;} if (num_parse_threads > 32) {num_parse_threads = 32;}
+    thread_png_arenas = (PngArena*)OS_Alloc((size_t)num_parse_threads * sizeof(PngArena));
+    for (int t = 0; t < num_parse_threads; ++t) { thread_png_arenas[t].base = NULL; PngArenaInit(&thread_png_arenas[t]); }
+    textureIndexBuffers = OS_Alloc(loadedTexturesMaxIndex * sizeof(u8*)); texturePaletteBuffers = OS_Alloc(loadedTexturesMaxIndex * sizeof(u32*));
+    texturePaletteSizes = OS_Alloc(loadedTexturesMaxIndex * sizeof(u32));         textureWidths = OS_Alloc(loadedTexturesMaxIndex * sizeof(i32));
+    textureHeights      = OS_Alloc(loadedTexturesMaxIndex * sizeof(i32));
     TextureParseTask tasks[32]; u32 chunk = (loadedTexturesMaxIndex + (u32)num_parse_threads - 1U) / (u32)num_parse_threads;
-    for (int t = 0; t < num_parse_threads; ++t) {
-        u32 start = ((u32)t * chunk);
-        tasks[t] = (TextureParseTask){.start_tex=start,.end_tex=clamp(start+chunk,0,loadedTexturesMaxIndex),.raw_textures=rawTextures,.parsIdx=parsIdx,.parser=&texture_parser,.tid=t};
-    }
-
+    for (int t = 0; t < num_parse_threads; ++t) { u32 start = ((u32)t * chunk); tasks[t] = (TextureParseTask){.start_tex=start,.end_tex=clamp(start+chunk,0,loadedTexturesMaxIndex),.raw_textures=rawTextures,.parsIdx=parsIdx,.parser=&texture_parser,.tid=t}; }
     OS_Thread workers[32];
     for (int t = 0; t < num_parse_threads; ++t) OS_ThreadCreate(&workers[t],TextureParsingWorker,&tasks[t]);
-    for (int t = 0; t < num_parse_threads; ++t) OS_ThreadJoin(&workers[t]);
-//     for (int t = 0; t < num_parse_threads; ++t) TextureParsingWorker(&tasks[t]); // Single threaded alternative
+    for (int t = 0; t < num_parse_threads; ++t) OS_ThreadJoin(&workers[t]); //     for (int t = 0; t < num_parse_threads; ++t) TextureParsingWorker(&tasks[t]); // Single threaded alternative
     totalPixels = totalPaletteColors = 0u;
-    for (u16 i = 0; i < loadedTexturesMaxIndex; ++i) {
-        if (textureIndexBuffers[i]) { totalPixels += (u32)textureWidths[i] * textureHeights[i]; totalPaletteColors += texturePaletteSizes[i]; }
-    }
-
-    size_t offsets_size = loadedTexturesMaxIndex * sizeof(u32);
-    size_t palettes_size = totalPaletteColors * sizeof(u32);
-    size_t indices_size = totalPixels;
+    for (u16 i = 0; i < loadedTexturesMaxIndex; ++i) { if (textureIndexBuffers[i]) { totalPixels += (u32)textureWidths[i] * textureHeights[i]; totalPaletteColors += texturePaletteSizes[i]; } }
+    size_t offsets_size = loadedTexturesMaxIndex * sizeof(u32), palettes_size = totalPaletteColors * sizeof(u32), indices_size = totalPixels;
     size_t arena_size = offsets_size + palettes_size + indices_size;
     void* arena = OS_AllocateRAM(NULL,arena_size,0x1|0x2,0x20|0x02|0x08000,INVALID_FHANDLE);
     u8* cur = (u8*)arena;
@@ -297,58 +251,42 @@ static __attribute__((noinline)) void LoadTextures(void) {
     u32 pixel_base = 0, color_base = 0;
     for (u16 i=0;i<loadedTexturesMaxIndex;++i) {
         if (!textureIndexBuffers[i]) continue;
-        u32 numP = (u32)textureWidths[i] * textureHeights[i];
-        u32 palS = texturePaletteSizes[i];
-        textureOffsets[i] = pixel_base;
-        texturePaletteOffsets[i] = color_base;
-        textureSizes[i*2]     = textureWidths[i];
-        textureSizes[i*2 + 1] = textureHeights[i];
+        
+        u32 numP = (u32)textureWidths[i] * textureHeights[i]; u32 palS = texturePaletteSizes[i];
+        textureOffsets[i] = pixel_base; texturePaletteOffsets[i] = color_base;
+        textureSizes[i*2]     = textureWidths[i]; textureSizes[i*2 + 1] = textureHeights[i];
         CopyMemoryFromBtoAForNBytes(all_indices + pixel_base,textureIndexBuffers[i],numP);
         CopyMemoryFromBtoAForNBytes(texturePalettes + color_base,texturePaletteBuffers[i],palS * sizeof(u32));
-        pixel_base += numP;
-        color_base += palS;
-        OS_DeallocateRAM(textureIndexBuffers[i],numP);
-        OS_DeallocateRAM(texturePaletteBuffers[i],palS * sizeof(u32));
+        pixel_base += numP; color_base += palS;
+        OS_DeallocateRAM(textureIndexBuffers[i],numP); OS_DeallocateRAM(texturePaletteBuffers[i],palS * sizeof(u32));
     }
 
     DualLog("total palette colors: %u, total pixels: %u...", totalPaletteColors,totalPixels);
     i32 packed_size = ((i32)totalPixels + 3) / 4 * sizeof(u32);
     glBindBuffer(GL_SSBO,Sys_Render.colorBufferID);
     void* dst = glMapBufferRange(GL_SSBO,0,packed_size,0x0002/*GL_MAP_WRITE_BIT*/|0x0004/*GL_MAP_INVALIDATE_RANGE_BIT*/);
-    CopyMemoryFromBtoAForNBytes(dst,all_indices,packed_size);
+    CopyMemoryFromBtoAForNBytes(dst,all_indices,packed_size); 
     glUnmapBuffer(GL_SSBO);
-    glBindBuffer(GL_SSBO,Sys_Render.texturePalettesID);
-    glBufferData(GL_SSBO,totalPaletteColors * sizeof(u32),texturePalettes,GL_STATIC_DRAW);
-    glBindBuffer(GL_SSBO,Sys_Render.textureOffsetsID);
-    glBufferData(GL_SSBO,loadedTexturesMaxIndex * sizeof(u32),textureOffsets,GL_STATIC_DRAW);
-    glBindBuffer(GL_SSBO,Sys_Render.textureSizesID);
-    glBufferData(GL_SSBO,loadedTexturesMaxIndex * 2 * sizeof(i32),textureSizes,GL_STATIC_DRAW);
-    glBindBuffer(GL_SSBO,Sys_Render.texturePaletteOffsetsID);
-    glBufferData(GL_SSBO,loadedTexturesMaxIndex * sizeof(u32),texturePaletteOffsets,GL_STATIC_DRAW);
-    glBindBuffer(GL_SSBO,0);
-    OS_DeallocateRAM(texture_parser.entries,texture_parser.count * sizeof(TextureData));
-    OS_DeallocateRAM(arena,arena_size);
-    OS_DeallocateRAM(rawTextures,loadedTexturesMaxIndex * sizeof(RawTexture));
-    OS_DeallocateRAM(parsIdx,loadedTexturesMaxIndex * sizeof(i32));
-    OS_DeallocateRAM(textureIndexBuffers,loadedTexturesMaxIndex * sizeof(u8*));
-    OS_DeallocateRAM(textureSizes,loadedTexturesMaxIndex * 2 * sizeof(i32));
-    OS_DeallocateRAM(texturePaletteBuffers,loadedTexturesMaxIndex * sizeof(u32*));
-    OS_DeallocateRAM(texturePaletteSizes,loadedTexturesMaxIndex * sizeof(u32));
-    OS_DeallocateRAM(texturePaletteOffsets,loadedTexturesMaxIndex * sizeof(u32));
-    OS_DeallocateRAM(textureWidths,loadedTexturesMaxIndex * sizeof(i32));
-    OS_DeallocateRAM(textureHeights,loadedTexturesMaxIndex * sizeof(i32));
-    for (int t=0;t<num_parse_threads;++t) OS_DeallocateRAM(thread_stbi_arenas[t].base,STBI_ARENA_SIZE);
-    OS_DeallocateRAM(thread_stbi_arenas,(size_t)num_parse_threads * sizeof(StbiArena));
+    glBindBuffer(GL_SSBO,Sys_Render.texturePalettesID);       glBufferData(GL_SSBO,totalPaletteColors * sizeof(u32),texturePalettes,GL_STATIC_DRAW);
+    glBindBuffer(GL_SSBO,Sys_Render.textureOffsetsID);        glBufferData(GL_SSBO,loadedTexturesMaxIndex * sizeof(u32),textureOffsets,GL_STATIC_DRAW);
+    glBindBuffer(GL_SSBO,Sys_Render.textureSizesID);          glBufferData(GL_SSBO,loadedTexturesMaxIndex * 2 * sizeof(i32),textureSizes,GL_STATIC_DRAW);
+    glBindBuffer(GL_SSBO,Sys_Render.texturePaletteOffsetsID); glBufferData(GL_SSBO,loadedTexturesMaxIndex * sizeof(u32),texturePaletteOffsets,GL_STATIC_DRAW); glBindBuffer(GL_SSBO,0);
+    OS_DeallocateRAM(texture_parser.entries,texture_parser.count * sizeof(TextureData)); OS_DeallocateRAM(arena,arena_size);
+    OS_DeallocateRAM(rawTextures,loadedTexturesMaxIndex * sizeof(RawTexture));           OS_DeallocateRAM(parsIdx,loadedTexturesMaxIndex * sizeof(i32));
+    OS_DeallocateRAM(textureIndexBuffers,loadedTexturesMaxIndex * sizeof(u8*));          OS_DeallocateRAM(textureSizes,loadedTexturesMaxIndex * 2 * sizeof(i32));
+    OS_DeallocateRAM(texturePaletteBuffers,loadedTexturesMaxIndex * sizeof(u32*));       OS_DeallocateRAM(texturePaletteSizes,loadedTexturesMaxIndex * sizeof(u32));
+    OS_DeallocateRAM(texturePaletteOffsets,loadedTexturesMaxIndex * sizeof(u32));        OS_DeallocateRAM(textureWidths,loadedTexturesMaxIndex * sizeof(i32));
+    OS_DeallocateRAM(textureHeights,loadedTexturesMaxIndex * sizeof(i32));               for (int t=0;t<num_parse_threads;++t) OS_DeallocateRAM(thread_png_arenas[t].base,PNG_ARENA_SIZE);
+    OS_DeallocateRAM(thread_png_arenas,(size_t)num_parse_threads * sizeof(PngArena));
     FHandle fp = OS_OpenReadonly(Sys_Global.global_winicon); // Load window icon
     int windowIconFileSize = OS_FileSize(fp);
     u8* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize,fp,Sys_Global.global_winicon);    
-    OS_Close(fp); stbi__arena_init_thread(&stbi_arena_main);
-    int w=1,h=1; unsigned char* pixels = stbi_load_from_memory_arena(file_buffer,windowIconFileSize,&w,&h,&stbi_arena_main);
+    OS_Close(fp); PngArenaInit(&png_arena_main);
+    int w=1,h=1; unsigned char* pixels = PngLoad(file_buffer,windowIconFileSize,&w,&h,&png_arena_main);
     if (!pixels) { DualLogError("Failed to load icon: %s\n",Sys_Global.global_winicon); OS_Exit(1); }
     
-    GLFWimage image = (GLFWimage){w,h,pixels}; glfwSetWindowIcon(window,&image);
-    OS_DeallocateRAM(file_buffer,windowIconFileSize);
-    OS_DeallocateRAM(stbi_arena_main.base,STBI_ARENA_SIZE); stbi_arena_main.base = NULL;
+    GLFWimage image = (GLFWimage){w,h,pixels}; VSetWindowIcon(window,&image);
+    OS_DeallocateRAM(file_buffer,windowIconFileSize); OS_DeallocateRAM(png_arena_main.base,PNG_ARENA_SIZE); png_arena_main.base = NULL;
     DualLog(" took %.6f secs\n",get_time() - start_time);
     DebugRAM("After LoadTextures and after deallocation");
 }

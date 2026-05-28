@@ -649,7 +649,7 @@
 				if (prefID == null) { Utils.PlayOneShotSavable(SFX,SFXJump,jumpSFXVolume); return; }
 				
 				FootStepType fstep = GetFootstepTypeForPrefab(prefID.constIndex);
-				play_wav(sounds[JumpSound(fstep)],jumpSFXVolume,Vector3_A_minus_B(Eng_Global->instances[i].position,feetOffset),true);
+				play_wav(sounds[JumpSound(fstep)],jumpSFXVolume,V3_AsubB(Eng_Global->instances[i].position,feetOffset),true);
 			}
 			justJumped = false;
 		}
@@ -804,7 +804,7 @@
 			
 			FootStepType fstep = GetFootstepTypeForPrefab(prefID.constIndex);
 			float vol = vmax(vmin(1f - ((fallDamageSpeed - velChange) / fallDamageSpeed),1f),0.5f);
-			play_wav(sounds[JumpLandSound(fstep)],vol,Vector3_A_minus_B(Eng_Global->instances[i].position,feetOffset),true);
+			play_wav(sounds[JumpLandSound(fstep)],vol,V3_AsubB(Eng_Global->instances[i].position,feetOffset),true);
 		}
 	}
 

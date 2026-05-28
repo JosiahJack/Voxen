@@ -1199,7 +1199,7 @@ void WeaponsUpdate(void) {
 // 			if (hm == null) continue;
 // 			if (!hm.gameObject.activeInHierarchy) continue;
 // 
-// 			if (distance_vector3(hm.Eng_Global->instances[i].position,
+// 			if (V3_Dist(hm.Eng_Global->instances[i].position,
 // 								 playerCapsule.Eng_Global->instances[i].position)
 // 				>= meleescanDistance) {
 // 

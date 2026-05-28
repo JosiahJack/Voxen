@@ -53,9 +53,9 @@ Vector3 ScreenPointToRay(Vector3 fwd, Vector3 rt) {
     float tanFov = vtan((float)Eng_Settings->FOV * 0.5f * PI / 180.0f);
     float aspect3D = (float)swidth / (float)sheight;
     Vector3 view = (Vector3){ndcX * tanFov * aspect3D,ndcY * tanFov,-1.0f};
-    view = normalize_vector3(view);
+    view = V3_Normalize(view);
     Vector3 flipForward = (Vector3){-fwd.x,-fwd.y,-fwd.z};
-    Vector3 up = normalize_vector3(cross_vector3(rt,flipForward));
+    Vector3 up = V3_Normalize(V3_Cross(rt,flipForward));
     return (Vector3){view.x * rt.x + view.y * up.x + view.z * flipForward.x,view.x * rt.y + view.y * up.y + view.z * flipForward.y,view.x * rt.z + view.y * up.z + view.z * flipForward.z};
 }
 
@@ -73,7 +73,7 @@ void DropHeldItem(u16 p) {
     tossObject->heldObjectLoadedAlternate = inv->heldObjectLoadedAlternate;
     tossObject->position = Eng_Global->instances[p].position;
     Vector3 tossDir = ScreenPointToRay(Eng_Global->instances[p].forward,Eng_Global->instances[p].right);
-    tossObject->velocity = scale_vector3(tossDir,10.0f);
+    tossObject->velocity = V3_ScaleByF(tossDir,10.0f);
     DualLog("Dropping held object type %u at pos %f %f %f, with force %f %f %f\n",tossObject->index,tossObject->position.x,tossObject->position.y,tossObject->position.z,tossObject->velocity.x,tossObject->velocity.y,tossObject->velocity.z);
     ResetHeldItem(p);
 }
@@ -782,7 +782,7 @@ void CyberIceOnTriggerEnter(u16 self, u16 other) {
     Entity* e = &Eng_Global->instances[other];
     if (!(e->entflags & ENTFLAG_RIGIDBODY)) return;
     e->layer = 24;
-    e->velocity = scale_vector3(e->velocity,-1.0f);
+    e->velocity = V3_ScaleByF(e->velocity,-1.0f);
 }
 //=============================================================================
 // CyberMine
@@ -808,7 +808,7 @@ void CyberPushOnTriggerStay(u16 self, u16 other) {
     Entity* player = &Eng_Global->instances[PLAYER1];
     if (Eng_Global->difficultyCyber < 1 || other != PLAYER1) return;
     player->inCyberTube = true;
-    AddForce(PLAYER1,scale_vector3(e->direction,e->force * (float)Eng_Global->deltaTime),false);
+    AddForce(PLAYER1,V3_ScaleByF(e->direction,e->force * (float)Eng_Global->deltaTime),false);
     Sys_Music.cyberTube = true;
 }
 
@@ -940,14 +940,14 @@ void DelayedSpawnUpdate(u16 self) {
 // FuncWall
 void FuncWallInitAfterLoad(u16 self) {
     Entity* e = &Eng_Global->instances[self];
-    Vector3 tempVec = Vector3_A_minus_B(e->position,e->targetPosition);
-    float distTotal = distance_vector3(e->startPosition,e->targetPosition);
-    tempVec = scale_vector3(normalize_vector3(tempVec),-1.0f);
-    if (e->funcState == FuncStates_AjarMovingTarget) tempVec = scale_vector3(tempVec,distTotal * e->percentAjar);
-    else if (e->funcState == FuncStates_AjarMovingStart) tempVec = scale_vector3(tempVec,distTotal * (1.0f - e->percentAjar));
-    else if (e->funcState == FuncStates_MovingStart) tempVec = scale_vector3(tempVec,distTotal * (1.0f - e->percentMoved));
-    else tempVec = scale_vector3(tempVec,distTotal * e->percentMoved);
-    e->position = Vector3_A_plus_B(e->position,tempVec);
+    Vector3 tempVec = V3_AsubB(e->position,e->targetPosition);
+    float distTotal = V3_Dist(e->startPosition,e->targetPosition);
+    tempVec = V3_ScaleByF(V3_Normalize(tempVec),-1.0f);
+    if (e->funcState == FuncStates_AjarMovingTarget) tempVec = V3_ScaleByF(tempVec,distTotal * e->percentAjar);
+    else if (e->funcState == FuncStates_AjarMovingStart) tempVec = V3_ScaleByF(tempVec,distTotal * (1.0f - e->percentAjar));
+    else if (e->funcState == FuncStates_MovingStart) tempVec = V3_ScaleByF(tempVec,distTotal * (1.0f - e->percentMoved));
+    else tempVec = V3_ScaleByF(tempVec,distTotal * e->percentMoved);
+    e->position = V3_AplusB(e->position,tempVec);
 }
 
 void FuncWallMoveStart(u16 self) { Eng_Global->instances[self].funcState = FuncStates_MovingStart; Eng_Global->instances[self].tickFinished = Eng_Global->pauseRelativeTime + 10.0f; }
@@ -968,9 +968,9 @@ void FuncWallUpdate(u16 self) {
     if (e->funcState == FuncStates_Start) { e->position = e->startPosition; e->velocity = (Vector3){0.0f,0.0f,0.0f}; e->percentMoved = 0.0f; return; }
     if (e->funcState == FuncStates_Target) { e->position = e->targetPosition; e->velocity = (Vector3){0.0f,0.0f,0.0f}; e->percentMoved = 1.0f; return; }
     if (e->funcState != FuncStates_MovingStart && e->funcState != FuncStates_MovingTarget) return;
-    Vector3 delta = Vector3_A_minus_B(goal,e->position);
-    float distanceLeft = magnitude_vector3(delta);
-    float total = distance_vector3(e->startPosition,e->targetPosition);
+    Vector3 delta = V3_AsubB(goal,e->position);
+    float distanceLeft = V3_Mag(delta);
+    float total = V3_Dist(e->startPosition,e->targetPosition);
     float dist = e->speed * (float)Eng_Global->deltaTime;
     if (distanceLeft <= dist || e->tickFinished < Eng_Global->pauseRelativeTime) {
         e->position = goal;
@@ -979,8 +979,8 @@ void FuncWallUpdate(u16 self) {
         e->velocity = (Vector3){0.0f,0.0f,0.0f};
         return;
     }
-    if (distanceLeft > 0.0001f) e->position = Vector3_A_plus_B(e->position,scale_vector3(normalize_vector3(delta),dist));
-    if (total > 0.0001f) e->percentMoved = distance_vector3(e->startPosition,e->position) / total;
+    if (distanceLeft > 0.0001f) e->position = V3_AplusB(e->position,V3_ScaleByF(V3_Normalize(delta),dist));
+    if (total > 0.0001f) e->percentMoved = V3_Dist(e->startPosition,e->position) / total;
 }
 //=============================================================================
 // ForceBridge
@@ -1495,7 +1495,7 @@ void ElevatorButtonClick(u16 self) {
     }
     Entity* door = &Eng_Global->instances[Eng_UI->linkedElevatorDoor];
     bool doorClosed = door->doorOpen == DoorState_Closed;
-    float dist = distance_vector3(Eng_UI->objectInUsePos,Eng_Global->instances[PLAYER1].position);
+    float dist = V3_Dist(Eng_UI->objectInUsePos,Eng_Global->instances[PLAYER1].position);
     if (dist > ELEVATOR_PAD_TETHER_DIST && !doorClosed) {
         CenterStatusPrint("%s",Eng_Text->stringTable[6]); // Too far away from that.
         return;
@@ -1817,7 +1817,7 @@ void TargetIDUpdate(u16 self) {
     if (e->enemy == NULLENT)                                          { TargetIDDeactivate(self); return; }
     Entity* npc = &Eng_Global->instances[e->enemy];
     if (npc->health <= 0.0f)                                           { TargetIDDeactivate(self); return; }
-    if (distance_vector3(e->position,Eng_Global->instances[PLAYER1].position)
+    if (V3_Dist(e->position,Eng_Global->instances[PLAYER1].position)
         > TARGETID_LINK_DIST)                                          { TargetIDDeactivate(self); return; }
     if (e->tickFinished < Eng_Global->pauseRelativeTime)               { TargetIDDeactivate(self); return; }
 
@@ -1845,7 +1845,7 @@ void TargetIDUpdate(u16 self) {
     // e->ioflags TARGID_DISPLAY_* flags — pass to HUD/world-space text renderer:
     //   TARGID_DISPLAY_NAME    → npc->targetID string
     //   TARGID_DISPLAY_HEALTH  → vfloor(npc->health)
-    //   TARGID_DISPLAY_RANGE   → distance_vector3(PLAYER1.pos, npc->pos)
+    //   TARGID_DISPLAY_RANGE   → V3_Dist(PLAYER1.pos, npc->pos)
     //   TARGID_DISPLAY_ATTITUD → map npc->currentState to stringTable indices:
     //     ENTFLAG_ASLEEP                             → 519 Asleep
     //     Run/Attack1/Attack2/Attack3/Pain           → 518 Hostile
@@ -1889,7 +1889,7 @@ static void TargetIdentifierSenseTargets(void) {
         if (!ConstIndexIsNPC(e->index))              continue;
         if (e->entflags & ENTFLAG_DEAD)              continue;
         if (e->entflags & ENTFLAG_TARGID_ATTACHED)   continue;
-        if (distance_vector3(e->position,Eng_Global->instances[PLAYER1].position) > TargetIDGetSensingRange(false))        continue;
+        if (V3_Dist(e->position,Eng_Global->instances[PLAYER1].position) > TargetIDGetSensingRange(false))        continue;
         // TODO: CreateTargetIDInstance — weapon/targetting system
     }
 }
@@ -2175,7 +2175,7 @@ static void CreateDeathEffects(u16 self,u16 fxPoolType) {
     Vector3 pos = e->position;
     // Use collider center offset if present
     if (e->collider != COLLIDER_TYPE_NONE) {
-        pos = Vector3_A_plus_B(pos,e->colliderCenter);
+        pos = V3_AplusB(pos,e->colliderCenter);
     }
     // TODO: SpawnEffectFromPool(fxPoolType, pos)
 }
