@@ -3108,15 +3108,13 @@ void UseGrenade(u16 playerIndex, int index) { // TODO
 //================================================================================
 // Doors
 enum { DOOR_CLIP_IDLE_CLOSED = 0, DOOR_CLIP_OPENING = 1, DOOR_CLIP_IDLE_OPEN = 2, DOOR_CLIP_CLOSING = 3 };
-
+void ChangeAnim(Entity* e, u8 clip);
 static AnimationClip DoorGetClip(const Entity* e, u8 clip) { return modelAnimationClips[e->animationNum][clip]; }
 static float DoorClamp01(float v) { if (v < 0.0f) return 0.0f; if (v > 1.0f) return 1.0f; return v; }
 static bool DoorInventoryHasAccessCard(AccessCardType card) { return card == AccessCardType_None || (Eng_Global->invP1.accessCardOwned & (1u << card)); }
 static bool DoorIsAjar(const Entity* e) { return e->doorOpen == DoorState_Open || e->doorOpen == DoorState_Opening; }
-
 static float DoorGetProgress(const Entity* e, u8 clip) {
-    AnimationClip c = DoorGetClip(e,clip);
-    if (c.frameEnd <= c.frameStart) return 1.0f;
+    AnimationClip c = DoorGetClip(e,clip); if (c.frameEnd <= c.frameStart) return 1.0f;
     return DoorClamp01((float)(e->frame - c.frameStart) / (float)(c.frameEnd - c.frameStart));
 }
 
@@ -3126,18 +3124,7 @@ static u16 DoorFrameFromProgress(AnimationClip c, float t) {
     return (u16)(c.frameStart + (u16)(DoorClamp01(t) * (float)span));
 }
 
-static void DoorSetClipFrame(u16 self, u8 clip, u16 frame) {
-    Entity* e = &Eng_Global->instances[self];
-    AnimationClip c = DoorGetClip(e,clip);
-    if (c.framerate == 0) return;
-    if (frame < c.frameStart) frame = c.frameStart;
-    if (frame > c.frameEnd) frame = c.frameEnd;
-    e->clip = clip;
-    e->frame = frame;
-    e->modelIndex = c.frameStartModelIndex + (frame - c.frameStart);
-    e->currentFrameFinished = Eng_Global->current_time + ((1.0 / (double)c.speed) * (1.0 / (double)c.framerate));
-}
-
+static void DoorSetClipFrame(u16 self, u8 clip, u16 frame) { ChangeAnim(&Eng_Global->instances[self],clip); (void)frame; }
 static void DoorSyncLayer(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (!e->changeLayerOnOpenClose) return;
@@ -3165,17 +3152,8 @@ void DoorLock(u16 self) { EntitySetLocked(&Eng_Global->instances[self],true); }
 void DoorUnlock(u16 self) { Entity* e = &Eng_Global->instances[self]; EntitySetLocked(e,false); e->accessCardUsedByPlayer = true; }
 void DoorToggleLocked(u16 self) { if (EntityLocked(&Eng_Global->instances[self])) DoorUnlock(self); else DoorLock(self); }
 void DoorToggleAccessCardOverride(u16 self) { Eng_Global->instances[self].accessCardUsedByPlayer = !Eng_Global->instances[self].accessCardUsedByPlayer; }
-
-void DoorForceOpen(u16 self) {
-    if (Eng_Global->instances[self].doorOpen == DoorState_Open) return;
-    DoorOpen(self);
-}
-
-void DoorForceClose(u16 self) {
-    if (Eng_Global->instances[self].doorOpen == DoorState_Closed) return;
-    DoorClose(self);
-}
-
+void DoorForceOpen(u16 self) { if (Eng_Global->instances[self].doorOpen == DoorState_Open) {return;} DoorOpen(self); }
+void DoorForceClose(u16 self) { if (Eng_Global->instances[self].doorOpen == DoorState_Closed) {return;} DoorClose(self); }
 void DoorActuate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->doorOpen == DoorState_Open) { DoorClose(self); return; }
@@ -3401,6 +3379,8 @@ bool FrobWithHeldObject(void) {
 //================================================================================
 // Update
 MOD_TO_ENGINE void ModUpdate(void) {
+    if (Eng_Global->gamePaused || Eng_Global->menuActive) return;
+    
     WeaponsUpdate();
     PatchUpdate(PLAYER1);
     HardwareUpdate(PLAYER1);

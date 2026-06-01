@@ -34,6 +34,8 @@ static const AmbientDef* ambient_def_by_index(u16 idx) {
 }
 
 MOD_TO_ENGINE void UpdateAmbientSounds(void) {
+    if (Eng_Global->gamePaused || Eng_Global->menuActive) return;
+    
     const Vector3* player = &Eng_Global->instances[PLAYER1].position;
     const float max_range = 7.68f, max_range_sq = 7.68f * 7.68f;
     for (u16 i = 0; i < loadedAmbients; ++i) {

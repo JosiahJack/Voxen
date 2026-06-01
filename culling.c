@@ -454,7 +454,7 @@ void DetermineVisibleCells(i32 startX, i32 startZ) {
     }
 }
 
-bool CullCore(void);
+void CullCore(void);
 void CullInit(void) {
     double start_time = get_time();    
     DualLog("Culling ");
@@ -536,9 +536,11 @@ ENGINE_TO_MOD void PortalCulling(void) { // Called just once at end of animation
     UploadGridCellVisibility();
 }
 
-bool CullCore(void) {
+void CullCore(void) {
+    if (unlikely(Sys_Global.gamePaused || Sys_Global.menuActive)) return;
+        
     playerCellIdx = PosGetCellCoords(Sys_Global.instances[PLAYER1].position.x,Sys_Global.instances[PLAYER1].position.z);
-    if (Sys_Global.currentLevel >= LEVEL_CYBERSPACE) return false;
+    if (Sys_Global.currentLevel >= LEVEL_CYBERSPACE) return;
 
     float pos_x,pos_z;
     u16 cellX = (u16)clamp((i32)vfloor((Sys_Global.instances[PLAYER1].position.x - Sys_Global.worldMin_x + CELLXHALF) / CELL_SIZE),0,WORLDX_0BASED);
@@ -550,5 +552,4 @@ bool CullCore(void) {
     }
     
     PortalCulling(); // Update based on portal states.
-    return true;
 }

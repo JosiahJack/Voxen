@@ -286,7 +286,7 @@ static void _rse(stbtt__bitmap*res,stbtt__edge*e,int n,int ox,int oy){
         if(active)_fae(sl,sl2+1,res->w,active,syt);
         {float sum=0;for(i=0;i<res->w;++i){float k;int m;sum+=sl2[i];k=(float)vabs(sl[i]+sum)*255.0f+0.5f;m=(int)k;if(m>255)m=255;res->pixels[j*res->stride+i]=(unsigned char)m;}}
         step=&active;while(*step){stbtt__active_edge*z=*step;z->fx+=z->fdx;step=&(*step)->next;}++y;++j;}
-    stbtt__hheap_chunk* c = hh.head; while(c){ stbtt__hheap_chunk* n = c->next; TempFree(c); c = n;} if(sl != sd) TempFree(sl);
+    stbtt__hheap_chunk* c = hh.head; while(c){ stbtt__hheap_chunk* hp = c->next; TempFree(c); c = hp;} if(sl != sd) TempFree(sl);
 }
 
 #define _CMP(a,b) ((a)->y0<(b)->y0)

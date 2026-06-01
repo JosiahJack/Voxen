@@ -1,7 +1,5 @@
 ﻿// animation.c - Animation System for both models and textures (in world and UI)
 #include "mod.h"
-// static const float textureSequenceFrameDelay = 0.35f;
-// static const float textureSequenceFrameDelayVmail = 0.09f; // TODO
 const AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS_PER_MODEL] = { // speed, frameStart, frameEnd, frameStartModelIndex, framerate
     [0]={[ANIM_IDLE_CLOSED]={1.0f,2,2,699,24},[ANIM_OPENING]={1.0f,2,11,699,24},[ANIM_IDLE_OPEN]={1.0f,11,11,708,24},[ANIM_CLOSING]={1.0f,12,21,709,24}}, // doorB (door2)
     [1]={[ANIM_IDLE_CLOSED]={1.0f,2,2,719,24},[ANIM_OPENING]={1.0f,2,12,719,24},[ANIM_IDLE_OPEN]={1.0f,12,12,729,24},[ANIM_CLOSING]={1.0f,14,24,731,24}}, // doorA (door1)
@@ -58,32 +56,34 @@ const AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS
 };
 
 MOD_TO_ENGINE void UpdateAnims(void) {
+    if (Eng_Global->gamePaused || Eng_Global->menuActive) return;
+    
+    static double lastPauseTime = 0.0; if (lastPauseTime == 0.0) lastPauseTime = Eng_Global->pauseRelativeTime;
+    double animDT = Eng_Global->pauseRelativeTime - lastPauseTime; lastPauseTime = Eng_Global->pauseRelativeTime;
+    if (animDT > 0.1) animDT = 0.1; if (animDT <= 0.0) return;
+    
     bool portalsNeedUpdated = false;
     for (u16 i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
         Entity* e = &Eng_Global->instances[i];
-        if (e->modelIndex >= MODEL_IDX_MAX) continue;
-        if (!(e->entflags & ENTFLAG_ACTIVE)) continue;
-        u16 anim = e->animationNum; if (anim >= MAX_ANIMATED_MODELS || e->numclips == 0 || e->clip >= e->numclips) continue;
-        AnimationClip* clip = (AnimationClip*)&modelAnimationClips[anim][e->clip]; if (clip->framerate <= 0 || clip->speed <= 0) continue;
+        if (e->modelIndex >= MODEL_IDX_MAX || !(e->entflags & ENTFLAG_ACTIVE) || e->animationNum >= MAX_ANIMATED_MODELS || e->numclips == 0 || e->clip >= e->numclips) continue;
+        AnimationClip* clip = (AnimationClip*)&modelAnimationClips[e->animationNum][e->clip]; if (clip->framerate <= 0 || clip->speed <= 0) continue;
 
-        const double timePerFrame = (1.0 / (double)clip->speed) * (1.0 / (double)clip->framerate);
-        double timePassed = Eng_Global->pauseRelativeTime - e->currentFrameFinished;
-        if (timePassed < timePerFrame) continue;
-
-        u32 framesToAdvance = (u32)(timePassed / timePerFrame), frameCount = clip->frameEnd - clip->frameStart + 1;
-        double remainder = timePassed - (framesToAdvance * timePerFrame);
-        if (frameCount <= 1) e->frame = clip->frameStart;
-        else { u32 newFrame = (e->frame - clip->frameStart + framesToAdvance) % frameCount; e->frame = clip->frameStart + newFrame; }
-        e->currentFrameFinished = Eng_Global->pauseRelativeTime - remainder;
-        e->modelIndex = clip->frameStartModelIndex + (e->frame - clip->frameStart);
-        Eng_Global->dirtyInstances[i] = true;
-        if (ConstIndexIsPortalBlockingDoor(e->index)) {
-            if (ToggleDoorPortal(e->portalIndex,i,modelAnimationClips[anim][ANIM_IDLE_CLOSED].frameStartModelIndex)) portalsNeedUpdated = true;
+        e->currentFrameFinished += animDT * clip->speed;
+        double timePerFrame = 1.0 / (double)clip->framerate;
+        if (e->currentFrameFinished >= timePerFrame) {
+            u32 framesToAdvance = (u32)(e->currentFrameFinished / timePerFrame), frameCount = clip->frameEnd - clip->frameStart + 1;
+            e->currentFrameFinished -= (double)framesToAdvance * timePerFrame;
+            e->frame = (frameCount <= 1) ? clip->frameStart : clip->frameStart + ((e->frame - clip->frameStart + framesToAdvance) % frameCount);
+            e->modelIndex = clip->frameStartModelIndex + (e->frame - clip->frameStart);
+            Eng_Global->dirtyInstances[i] = true;
+            if (ConstIndexIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, modelAnimationClips[e->animationNum][ANIM_IDLE_CLOSED].frameStartModelIndex)) portalsNeedUpdated = true;
         }
     }
-
+    
     if (portalsNeedUpdated) PortalCulling();
 }
+
+void ChangeAnim(Entity* e, u8 clip) { e->clip = clip; e->currentFrameFinished = 0.0; AnimationClip* c = (AnimationClip*)&modelAnimationClips[e->animationNum][e->clip]; e->frame = c->frameStart; } // TODO actually use this!
 
 #define NUM_TEXTURE_CLIPS 48
 typedef struct {

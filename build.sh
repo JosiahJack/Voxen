@@ -95,21 +95,18 @@ cat > Shaders/shaders.h <<'EOF'
 #include "shadowmaps_clear.compute.h"
 EOF
 
-ZIG_LIBS="-L/usr/lib/x86_64-linux-gnu -L/usr/lib64"
 LINUX_CC="zig cc"
 WINDOWS_CC="zig cc -target x86_64-windows-gnu -Wl,--stack,8388608"
-COMMON_CFLAGS="-ferror-limit=500 -fno-exceptions -fno-stack-protector -fno-asynchronous-unwind-tables -fno-unwind-tables -Wno-format-nonliteral \
-               -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -fvisibility=hidden -pipe -fno-ident -fdata-sections -Wno-int-to-void-pointer-cast \
-               -ffunction-sections -ffast-math -std=c11 -Wall -Wextra -Wno-implicit-fallthrough -fdeclspec -fno-rtti \
-               -fomit-frame-pointer -g0 -fstrict-aliasing -fcommon -Wstrict-prototypes -Wno-overlength-strings -fno-math-errno -fno-sanitize=all \
-               -fno-trapping-math -fmerge-all-constants -m64 -Os -march=x86_64_v2 -Wbool-conversion -Wno-empty-body"
-COMMON_LFLAGS="-Wl,-z,now -Wl,-z,relro -Wl,--gc-sections -Wl,--as-needed -Wl,-z,norelro -Wl,--build-id=none $ZIG_LIBS"
+COMMON_CFLAGS="-ferror-limit=500 -fno-stack-protector -fno-unwind-tables -Wno-format-nonliteral -fvisibility=hidden -pipe -fno-ident -fdata-sections -Wno-int-to-void-pointer-cast \
+               -Wshadow -ffunction-sections -ffast-math -std=c11 -Wall -Wextra -Wno-implicit-fallthrough -fdeclspec -fomit-frame-pointer -g0 -fstrict-aliasing -fcommon \
+               -Wstrict-prototypes -Wno-overlength-strings -fno-math-errno -fno-sanitize=all -fno-trapping-math -fmerge-all-constants -m64 -Os -march=x86_64_v2 -Wbool-conversion -Wno-empty-body -nostdinc"
+COMMON_LFLAGS="-Wl,-z,relro,-z,now,--gc-sections,--as-needed,--build-id=none"
 if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
     LINKER=$CC
     CFLAGS="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe -Wl,-Bstatic -lmingw32 -lmingwex"
-    CFLAGSGC="-D_WIN32 -DWINDOWS $COMMON_CFLAGS -mno-stack-arg-probe -fPIC -ffreestanding -nostdlib -fno-builtin -D__NO_INLINE__ -mstackrealign"
-    LDFLAGS="$COMMON_LFLAGS -L. -lgdi32 -lopengl32 -lole32 -static-libgcc -static-libstdc++ -Wl,--out-implib=voxen.lib -Xlinker /pdb:Citadel.pdb"
+    CFLAGSGC="-D_WIN32 -DWINDOWS $COMMON_CFLAGS -mno-stack-arg-probe -nostdlib -D__NO_INLINE__ -mstackrealign"
+    LDFLAGS="$COMMON_LFLAGS -L. -lgdi32 -lopengl32 -lole32 -static-libgcc -Wl,--out-implib=voxen.lib -Xlinker /pdb:Citadel.pdb"
     LDFLAGSGC="$COMMON_LFLAGS -shared -Wl,-Bstatic -Wl,--allow-shlib-undefined -Wl,--subsystem,windows -nostdlib -Wl,--entry,DllMain -L. -lvoxen -Xlinker /pdb:Citadel.pdb"
     BINARY_NAME="voxen.exe"
     BINARY_NAMEGC="Citadel.dll"
@@ -117,11 +114,11 @@ else
     CC=$LINUX_CC
     LINKER=$CC
     CFLAGS="$COMMON_CFLAGS -fno-plt -fno-semantic-interposition -fno-builtin"
-    CFLAGSGC="$COMMON_CFLAGS -DLINUX -fno-plt -fno-semantic-interposition"
+    CFLAGSGC="$COMMON_CFLAGS -DLINUX -fno-plt -fPIC -fno-semantic-interposition"
     LDFLAGS="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -ldl -nostdlib"
-    LDFLAGSGC="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -nostdlib"
     BINARY_NAME="voxen"
     BINARY_NAMEGC="Citadel.so"
+    LDFLAGSGC="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -nostdlib -Wl,-soname,$BINARY_NAMEGC"
 fi
 
 # Engine Build 123.4kb
@@ -139,18 +136,18 @@ export CFLAGSGC=$CFLAGSGC
 SOURCESGC="animation.c ai.c biomonitor.c weapons.c music.c modaudio.c citadel.c entity.c"
 export TEMP_DIRGC=temp_build_gc
 export SCRIPT_DIR="./Scripts"
-printf "%s\n" $SOURCESGC | xargs -P12 -I{} $CCGC -c $SCRIPT_DIR/{} $CFLAGSGC -I. -nostdinc -fPIC -ffreestanding -fno-builtin -Wshadow -o "$TEMP_DIRGC"/{}.o
-$LINKER "$TEMP_DIRGC"/*.o $LDFLAGSGC -Wl,-soname,$BINARY_NAMEGC -shared -o $BINARY_NAMEGC
+printf "%s\n" $SOURCESGC | xargs -P12 -I{} $CCGC -c $SCRIPT_DIR/{} $CFLAGSGC -I. -ffreestanding -fno-builtin -o "$TEMP_DIRGC"/{}.o
+$LINKER "$TEMP_DIRGC"/*.o $LDFLAGSGC -shared -o $BINARY_NAMEGC
 build_end=$(now_ms)
 total_build_time=$((build_end - shader_start))
 echo "Built engine and mod in ${total_build_time} ms"
 if ! $IS_CI; then
     case "$PLATFORM" in
-        windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; wine ./voxen.exe ;;
-#         windows)  wine ./voxen.exe ;;
-        *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
+#         windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; wine ./voxen.exe ;;
+        windows)  wine ./voxen.exe ;;
+#         *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
 #         *)        strip --strip-all --strip-unneeded ./voxen; ./voxen ;;   # linux Alternate build methods to be able to look at symbols and debugging
-#         *)        ./voxen ;;   # linux
+        *)        ./voxen ;;   # linux
     esac
     rm -f ./Shaders/*.h "$TEMP_DIRGC"/*.o ./voxen.upx ./*.lib #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.
 fi

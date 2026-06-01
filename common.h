@@ -297,8 +297,7 @@ static const u32 Layer_Default          = 1U;
 static const u32 Layer_TransparentFX    = 2U;
 static const u32 Layer_IgnoreRaycast    = 4U;
 //                                        8U    // unused
-static const u32 Layer_Water            = 16U;
-static const u32 Layer_BlocksRaycast    = 16U;  // same as Water
+static const u32 Layer_Water            = 16U; static const u32 Layer_BlocksRaycast = 16U;  // same as Water
 static const u32 Layer_UI               = 32U;
 //                                        64U   // unused
 //                                        128U  // unused
@@ -310,7 +309,7 @@ static const u32 Layer_Player           = 4096U;
 static const u32 Layer_Corpse           = 8192U;
 static const u32 Layer_PhysObjects      = 16384U;
 static const u32 Layer_Sky              = 32768U;
-static const u32 Layer_PlayerTriggerOnly= 65536U;   // Fixed typo
+static const u32 Layer_PlayerTriggerOnly= 65536U;
 static const u32 Layer_Trigger          = 131072U;
 static const u32 Layer_Door             = 262144U;
 static const u32 Layer_InterDebris      = 524288U;
@@ -514,15 +513,19 @@ typedef struct {
 
 typedef struct { float damage,penetration,offense,armorvalue,defense,impactVelocity; Vector3 attacknormal,hitpoint; AttackType attackType; u16 owner,hitIdx; bool isOtherNPC,berserkActive; } DamageData;
 typedef /*FAT*/ struct  {
+    u64 ioflags;
     u32 entflags;
+    
+    u16 modelIndex;
     u16 index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
+    
     Vector3 position;
     float radius,shadRadius;
     Vector3 scale,forward,right;
     Quaternion rotation;
     
     // Rendering
-    u16 modelIndex,texIndex,glowIndex,specIndex,normIndex,lodIndex;
+    u16 texIndex,glowIndex,specIndex,normIndex,lodIndex,colliderMeshIndex;
     bool cardchunk,kinematic,shadows;
     u8 camView;
     
@@ -530,14 +533,15 @@ typedef /*FAT*/ struct  {
     u32 layer;
     Vector3 velocity,angularVelocity,lastPosition;
     float gravity;
-    BodyState bodyState;
-    ColliderType collider;
+    
     Vector3 colliderCenter; // Offset relative to .position's global worldspace xyz location
     Vector3 colliderSize; // x,y,z for Box, x for Sphere radius, else x, y, z for Capsule radius, height, and direction (0.0f = X-Axis, 1.0f = Y-Axis, 2.0f = Z-Axis respectively, default 1.0f)
-    u16 colliderMeshIndex;
     Vector3 topPoint,targetPosition,startPosition,activatedScale,direction;
+    ColliderType/*u8*/ collider;
+    FuncStates/*u8*/ startState,funcState;
+    BodyState/*u8*/ bodyState;
+
     float targetPositionY,speed,percentAjar,percentMoved;
-    FuncStates startState,funcState;
     float mass,angularDrag,inertia;
     Vector3 accumulatedForce,accumulatedTorque;
     float dynamicFriction,staticFriction,bounciness;
@@ -545,7 +549,6 @@ typedef /*FAT*/ struct  {
     float volume; // Audio
     
     // Logic and I/O
-    u64 ioflags;
     float health,lastHealth,cyberHealth;
     u8 securityThreshold,lerpUp;
     char targetname[TARGET_STRING_LENGTH];

@@ -157,8 +157,9 @@ void Entity_GetCapsule(const Entity *e, ShapeCapsule *out) {
     out->base = V3_AsubB(wc, V3_ScaleByF(axis, hi));
     out->tip  = V3_AplusB(wc, V3_ScaleByF(axis, hi));
 }
-void Entity_GetBox   (const Entity *e, ShapeBox    *out) { out->center = V3_AplusB(e->position, quat_rotate_vector(e->rotation, e->colliderCenter)); out->halfExtents = V3_ScaleByF(e->colliderSize, 0.5f); out->rot = e->rotation; }
-void Entity_GetSphere(const Entity *e, ShapeSphere *out) { out->center = V3_AplusB(e->position, quat_rotate_vector(e->rotation, e->colliderCenter)); out->radius = e->colliderSize.x; }
+
+void Entity_GetBox(const Entity *e, ShapeBox *out) { out->center = V3_AplusB(e->position,quat_rotate_vector(e->rotation,e->colliderCenter)); out->halfExtents = (Vector3){ e->colliderSize.x * 0.5f * e->scale.x,e->colliderSize.y * 0.5f * e->scale.y,e->colliderSize.z * 0.5f * e->scale.z }; out->rot = e->rotation; }
+void Entity_GetSphere(const Entity *e, ShapeSphere *out) { out->center = V3_AplusB(e->position, quat_rotate_vector(e->rotation, e->colliderCenter)); out->radius = e->colliderSize.x * vmax(e->scale.x,vmax(e->scale.y,e->scale.z)); }
 void DrawBoxCollider(Entity* e) {
     ShapeBox b; Entity_GetBox(e,&b); Vector3 ax,ay,az,c[8],px,py,pz; obb_axes(b.rot,&ax,&ay,&az);
     px = V3_ScaleByF(ax,b.halfExtents.x); py = V3_ScaleByF(ay,b.halfExtents.y); pz = V3_ScaleByF(az,b.halfExtents.z);
@@ -266,8 +267,7 @@ static void ApplyVelocity(Entity *e, float dt) {
 }
 
 static OverlapResult BoxBoxSAT(ShapeBox a, ShapeBox b) {
-    OverlapResult r = {0}; 
-    r.overlapAmount = 0.0f;
+    OverlapResult r = {0}; r.overlapAmount = 0.0f;
     Vector3 aAxes[3], bAxes[3];
     obb_axes(a.rot, &aAxes[0], &aAxes[1], &aAxes[2]);
     obb_axes(b.rot, &bAxes[0], &bAxes[1], &bAxes[2]);
@@ -277,7 +277,7 @@ static OverlapResult BoxBoxSAT(ShapeBox a, ShapeBox b) {
     float R[3][3], AbsR[3][3];
     for (int i = 0; i < 3; i++) {
         for (int j = 0; j < 3; j++) {
-            R[i][j] = V3_dot(aAxes[i], bAxes[j]);
+            R[i][j] = V3_dot(aAxes[i],bAxes[j]);
             AbsR[i][j] = vabs(R[i][j]) + 1e-6f; // Add epsilon to handle parallel edges safely
         }
     }
@@ -371,217 +371,453 @@ static OverlapResult BoxBoxSAT(ShapeBox a, ShapeBox b) {
     return r;
 }
 
-static Vector3 TransformVertex(float* M, Vector3 local) {
-    float m00=M[0],m10=M[1],m20=M[2], m01=M[4],m11=M[5],m21=M[6],
-          m02=M[8],m12=M[9],m22=M[10], tx=M[12],ty=M[13],tz=M[14];
-    return (Vector3){
-        m00*local.x + m01*local.y + m02*local.z + tx,
-        m10*local.x + m11*local.y + m12*local.z + ty,
-        m20*local.x + m21*local.y + m22*local.z + tz
-    };
+static inline Vector3 MvVert(const float* M, Vector3 v) { return (Vector3){ M[0]*v.x + M[4]*v.y + M[8]*v.z  + M[12], M[1]*v.x + M[5]*v.y + M[9]*v.z  + M[13], M[2]*v.x + M[6]*v.y + M[10]*v.z + M[14] }; }
+static Vector3 MeshSupport(u16 m, const float* M, Vector3 d) {
+    u32 n = modelVertexCounts[m]; if (!n) {return (Vector3){0};} 
+    const u8* vb = modelVertices[m]; Vector3 b={0}; float top=-1e9f;
+    for (u32 i=0;i<n;++i) {const u8* p=vb + i*VERTEX_ATTRIBUTES_SIZE; Vector3 w=MvVert(M,(Vector3){half_to_float(*(half*)(p+0)),half_to_float(*(half*)(p+2)),half_to_float(*(half*)(p+4))}); float dot=V3_dot(w,d); b=(dot>top) ? (top=dot,w) : b;}
+    return b;
 }
 
-static Vector3 MeshSupport(u16 meshIdx, float* M, Vector3 dir) {
-    if (meshIdx >= MODEL_IDX_MAX) return (Vector3){0,0,0};
-    u32 vCount = modelVertexCounts[meshIdx]; if (vCount == 0) return (Vector3){0,0,0};
-    Vector3 best = {0}; float maxDot = -1e9f;
-    for (u32 i = 0; i < vCount; ++i) {
-        u32 b = (u32)i * VERTEX_ATTRIBUTES_SIZE;
-        Vector3 v = { half_to_float(*(half*)(modelVertices[meshIdx] + b + 0)), half_to_float(*(half*)(modelVertices[meshIdx] + b + 2)), half_to_float(*(half*)(modelVertices[meshIdx] + b + 4)) };
-        Vector3 w = TransformVertex(M, v);
-        float d = V3_dot(w, dir);
-        if (d > maxDot) { maxDot = d; best = w; }
-    }
-    return best;
+typedef struct { Vector3 v[4]; int n; } Simplex3D;
+static inline Vector3 MinkowskiSupport(u16 mA, const float* mxA, u16 mB, const float* mxB, Vector3 d) { return V3_AsubB(MeshSupport(mA,mxA,d), MeshSupport(mB,mxB,(Vector3){-d.x,-d.y,-d.z})); }
+static inline Vector3 TP(Vector3 a, Vector3 b, Vector3 c) { return V3_Cross(V3_Cross(a,b),c); }
+
+// ── Capsule support for GJK: returns the support point of a capsule in direction d ──
+static inline Vector3 CapsuleSupport(ShapeCapsule cap, Vector3 d) {
+    // Farthest endpoint along d, then offset by radius
+    float db = V3_dot(cap.base, d), dt = V3_dot(cap.tip, d);
+    Vector3 best = (dt > db) ? cap.tip : cap.base;
+    float L = V3_dot(d,d); // avoid sqrt: normalize only if needed
+    if (L < COLLISION_EPSILON) return best;
+    return V3_AplusB(best, V3_ScaleByF(d, cap.radius / vsqrtf(L)));
 }
 
-// ---- GJK + EPA (3D, proper simplex management) ----
-typedef struct { Vector3 verts[4]; int count; } Simplex3D;
-
-static Vector3 MinkowskiSupport(u16 meshA, float* matA, u16 meshB, float* matB, Vector3 dir) {
-    return V3_AsubB(MeshSupport(meshA, matA, dir), MeshSupport(meshB, matB, V3_ScaleByF(dir, -1.0f)));
+// ── Minkowski support: capsule minus convex mesh ──
+static inline Vector3 MinkowskiSupportCapsuleMesh(ShapeCapsule cap, u16 mesh, const float* mx, Vector3 d) {
+    return V3_AsubB(CapsuleSupport(cap, d), MeshSupport(mesh, mx, (Vector3){-d.x,-d.y,-d.z}));
 }
 
-// Returns true and updates simplex + dir if we should keep searching; false if we passed origin.
-// Implements the full 3D GJK nearest-feature case analysis.
-static bool GJKNextSimplex(Simplex3D *s, Vector3 *dir) {
-    // References: Erin Catto GDC 2010, dyn4j GJK implementation
-    Vector3 A = s->verts[s->count-1]; // Most recently added point
-    Vector3 AO = V3_ScaleByF(A, -1.0f); // Direction toward origin from A
+static bool GJKNextSimplex(Simplex3D* s, Vector3* dir) {
+    Vector3 A = s->v[s->n-1], AO = (Vector3){-A.x,-A.y,-A.z};
 
-    if (s->count == 2) {
-        Vector3 B = s->verts[0];
-        Vector3 AB = V3_AsubB(B, A);
-        // Origin along AB?
-        if (V3_dot(AB, AO) > 0.0f) *dir = V3_AsubB(V3_AsubB(AB, V3_ScaleByF(AO, V3_dot(AB,AO)/V3_dot(AO,AO))), AB); // triple product (AB x AO) x AB
-        else { s->verts[0] = A; s->count = 1; *dir = AO; }
-        // Proper triple product: (AB x AO) x AB
-        *dir = V3_Cross(V3_Cross(AB, AO), AB);
-        if (V3_Mag(*dir) < COLLISION_EPSILON) { // AB parallel to AO, pick perpendicular
-            Vector3 perp = (vabs(AB.x) > 0.9f) ? (Vector3){0,1,0} : (Vector3){1,0,0};
-            *dir = V3_Cross(AB, perp);
-        }
-        return true;
-    }
-
-    if (s->count == 3) {
-        Vector3 B = s->verts[1], C = s->verts[0];
-        Vector3 AB = V3_AsubB(B, A), AC = V3_AsubB(C, A);
-        Vector3 ABC = V3_Cross(AB, AC); // Triangle normal
-        Vector3 ABperp = V3_Cross(AB, ABC), ACperp = V3_Cross(ABC, AC);
-        if (V3_dot(ACperp, AO) > 0.0f) {
-            if (V3_dot(AC, AO) > 0.0f) { s->verts[0]=C; s->verts[1]=A; s->count=2; *dir=V3_Cross(V3_Cross(AC,AO),AC); }
-            else if (V3_dot(AB, AO) > 0.0f) { s->verts[0]=B; s->verts[1]=A; s->count=2; *dir=V3_Cross(V3_Cross(AB,AO),AB); }
-            else { s->verts[0]=A; s->count=1; *dir=AO; }
-        } else if (V3_dot(ABperp, AO) > 0.0f) {
-            if (V3_dot(AB, AO) > 0.0f) { s->verts[0]=B; s->verts[1]=A; s->count=2; *dir=V3_Cross(V3_Cross(AB,AO),AB); }
-            else { s->verts[0]=A; s->count=1; *dir=AO; }
+    if (s->n == 2) {
+        Vector3 AB = V3_AsubB(s->v[0], A); // Captured before any mutation
+        if (V3_dot(AB,AO) > 0.f) {
+            *dir = TP(AB,AO,AB);
         } else {
-            // Origin above or below triangle
-            if (V3_dot(ABC, AO) > 0.0f) *dir = ABC;
-            else { Vector3 tmp=s->verts[0]; s->verts[0]=s->verts[1]; s->verts[1]=tmp; *dir=V3_ScaleByF(ABC,-1.0f); } // Flip winding
+            s->n=1; s->v[0]=A; *dir=AO;
+            // AB is valid here (captured above), use it for degenerate check
+        }
+        if (V3_dot(*dir,*dir) < COLLISION_EPSILON) {
+            Vector3 px = (vabs(AB.x)>0.9f) ? (Vector3){0,1,0} : (Vector3){1,0,0};
+            *dir = V3_Cross(AB, px);
         }
         return true;
     }
 
-    if (s->count == 4) {
-        // Tetrahedron — check if origin is inside all 4 faces
-        Vector3 B=s->verts[2], C=s->verts[1], D=s->verts[0];
-        Vector3 AB=V3_AsubB(B,A), AC=V3_AsubB(C,A), AD=V3_AsubB(D,A);
-        Vector3 nABC=V3_Cross(AB,AC), nACD=V3_Cross(AC,AD), nADB=V3_Cross(AD,AB);
-        // Ensure normals point outward from tetrahedron
-        if (V3_dot(nABC, AD) > 0.0f) nABC=V3_ScaleByF(nABC,-1.0f);
-        if (V3_dot(nACD, AB) > 0.0f) nACD=V3_ScaleByF(nACD,-1.0f);
-        if (V3_dot(nADB, AC) > 0.0f) nADB=V3_ScaleByF(nADB,-1.0f);
-        if (V3_dot(nABC,AO)>0.0f) { s->verts[0]=C; s->verts[1]=B; s->verts[2]=A; s->count=3; *dir=nABC; return true; }
-        if (V3_dot(nACD,AO)>0.0f) { s->verts[0]=D; s->verts[1]=C; s->verts[2]=A; s->count=3; *dir=nACD; return true; }
-        if (V3_dot(nADB,AO)>0.0f) { s->verts[0]=B; s->verts[1]=D; s->verts[2]=A; s->count=3; *dir=nADB; return true; }
-        return false; // Origin inside tetrahedron — intersection confirmed
+    if (s->n == 3) {
+        Vector3 B=s->v[1], C=s->v[0];
+        Vector3 AB=V3_AsubB(B,A), AC=V3_AsubB(C,A);
+        Vector3 ABC=V3_Cross(AB,AC);
+        // Outside AC edge?
+        if (V3_dot(V3_Cross(ABC,AC), AO) > 0.f) {
+            if (V3_dot(AC,AO) > 0.f) { s->v[1]=A; s->n=2; *dir=TP(AC,AO,AC); }
+            else goto line_AB;
+        // Outside AB edge?
+        } else if (V3_dot(V3_Cross(AB,ABC), AO) > 0.f) {
+            line_AB: if (V3_dot(AB,AO) > 0.f) { s->v[0]=B; s->v[1]=A; s->n=2; *dir=TP(AB,AO,AB); }
+                     else { s->v[0]=A; s->n=1; *dir=AO; }
+        } else {
+            // On triangle — pick face side
+            if (V3_dot(ABC,AO) > 0.f) *dir = ABC;
+            else { Vector3 t=s->v[0]; s->v[0]=s->v[1]; s->v[1]=t; *dir=(Vector3){-ABC.x,-ABC.y,-ABC.z}; }
+        }
+        return true;
     }
-    return true;
+
+    // n==4: tetrahedron
+    Vector3 B=s->v[2], C=s->v[1], D=s->v[0];
+    Vector3 AB=V3_AsubB(B,A), AC=V3_AsubB(C,A), AD=V3_AsubB(D,A);
+    Vector3 nABC=V3_Cross(AB,AC), nACD=V3_Cross(AC,AD), nADB=V3_Cross(AD,AB);
+    nABC = V3_dot(nABC,AD)>0.f ? (Vector3){-nABC.x,-nABC.y,-nABC.z} : nABC;
+    nACD = V3_dot(nACD,AB)>0.f ? (Vector3){-nACD.x,-nACD.y,-nACD.z} : nACD;
+    nADB = V3_dot(nADB,AC)>0.f ? (Vector3){-nADB.x,-nADB.y,-nADB.z} : nADB;
+    if (V3_dot(nABC,AO)>0.f){s->v[0]=C;s->v[1]=B;s->v[2]=A;s->n=3;*dir=nABC;return true;}
+    if (V3_dot(nACD,AO)>0.f){s->v[0]=D;s->v[1]=C;s->v[2]=A;s->n=3;*dir=nACD;return true;}
+    if (V3_dot(nADB,AO)>0.f){s->v[0]=B;s->v[1]=D;s->v[2]=A;s->n=3;*dir=nADB;return true;}
+    return false; // Origin enclosed
 }
 
-// EPA polytope face
-typedef struct { int a,b,c; Vector3 normal; float dist; } EPAFace;
 #define EPA_MAX_FACES  64
 #define EPA_MAX_VERTS  32
+#define EPA_MAX_EDGES  (EPA_MAX_FACES*3)
+typedef struct { int a,b,c; Vector3 n; float d; } EPAFace;
+static inline EPAFace MakeEPAFace(const Vector3* vb, int a, int b, int c) {
+    Vector3 n = V3_Cross(V3_AsubB(vb[b],vb[a]), V3_AsubB(vb[c],vb[a]));
+    float L = V3_Mag(n);
+    if (L < COLLISION_EPSILON) return (EPAFace){a,b,c,{0},0.f};
+    n = V3_ScaleByF(n, 1.f/L);
+    float d = V3_dot(n, vb[a]);
+    // Ensure outward
+    if (d < 0.f) { n=(Vector3){-n.x,-n.y,-n.z}; d=-d; int t=b;b=c;c=t; }
+    return (EPAFace){a,b,c,n,d};
+}
 
-static OverlapResult ConvexMeshOverlap(u16 meshA, u16 meshB, float* matA, float* matB) {
-    OverlapResult r = {0};
-    if (meshA >= MODEL_IDX_MAX || meshB >= MODEL_IDX_MAX) return r;
+static OverlapResult ConvexMeshOverlap(u16 meshA, u16 meshB, const float* matA, const float* matB) {
+    OverlapResult r = {0}; if (meshA >= MODEL_IDX_MAX || meshB >= MODEL_IDX_MAX) return r;
 
-    // --- GJK phase ---
-    Simplex3D s = {0};
-    Vector3 dir = {0,1,0};
-    s.verts[0] = MinkowskiSupport(meshA,matA,meshB,matB,dir); s.count=1;
-    dir = V3_ScaleByF(s.verts[0], -1.0f);
-    if (V3_Mag(dir) < COLLISION_EPSILON) dir = (Vector3){0,1,0};
-
-    for (int iter=0; iter<64; ++iter) {
-        Vector3 support = MinkowskiSupport(meshA,matA,meshB,matB,dir);
-        if (V3_dot(support,dir) < COLLISION_EPSILON) return r; // No intersection
-        s.verts[s.count++] = support;
-        if (!GJKNextSimplex(&s, &dir)) { r.hit=true; break; }
-        if (V3_Mag(dir) < COLLISION_EPSILON) { r.hit=true; break; }
+    Simplex3D s = {0}; Vector3 dir = {0,1,0};
+    s.v[s.n++] = MinkowskiSupport(meshA,matA,meshB,matB,dir);
+    dir = (Vector3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
+    if (V3_dot(dir,dir) < COLLISION_EPSILON) dir=(Vector3){0,1,0};
+    for (int it=0; it<64; ++it) { // ── GJK ──
+        Vector3 sup = MinkowskiSupport(meshA,matA,meshB,matB,dir);
+        if (V3_dot(sup,dir) < COLLISION_EPSILON) return r;
+        s.v[s.n++] = sup;
+        if (!GJKNextSimplex(&s,&dir)) { r.hit=true; break; }
+        if (V3_dot(dir,dir) < COLLISION_EPSILON) { r.hit=true; break; }
     }
     if (!r.hit) return r;
 
-    // Ensure we have a tetrahedron for EPA; if simplex is degenerate, expand it
-    while (s.count < 4) {
-        // Pick axis not parallel to existing simplex
-        Vector3 expand_dirs[6] = {{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
-        bool added = false;
-        for (int d=0;d<6&&!added;d++) {
-            Vector3 sup = MinkowskiSupport(meshA,matA,meshB,matB,expand_dirs[d]);
-            // Check if not already in simplex
-            bool dup = false;
-            for (int k=0;k<s.count;k++) { Vector3 diff=V3_AsubB(sup,s.verts[k]); if(V3_dot(diff,diff)<COLLISION_EPSILON*COLLISION_EPSILON){dup=true;break;} }
-            if (!dup) { s.verts[s.count++]=sup; added=true; }
-        }
-        if (!added) break;
+    // ── Expand simplex to tetrahedron for EPA ──
+    static const Vector3 kAxes[6] = {{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
+    for (int d=0; s.n<4 && d<6; ++d) {
+        Vector3 sup = MinkowskiSupport(meshA,matA,meshB,matB,kAxes[d]);
+        bool dup=false;
+        for (int k=0;k<s.n;k++) { Vector3 dv=V3_AsubB(sup,s.v[k]); dup|=(V3_dot(dv,dv)<COLLISION_EPSILON*COLLISION_EPSILON); }
+        if (!dup) s.v[s.n++]=sup;
     }
-    if (s.count < 4) { r.hit=true; return r; } // Degenerate — return hit without depth
+    if (s.n < 4) { r.hit=true; return r; }
 
-    // --- EPA phase: expand polytope to find penetration depth ---
-    Vector3 epaVerts[EPA_MAX_VERTS];
-    EPAFace epFaces[EPA_MAX_FACES];
-    int nVerts=0, nFaces=0;
+    Vector3 ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0, nf=0;
+    for (int i=0;i<4;i++) ev[nv++]=s.v[i];
+    static const int kTetFaces[4][3] = {{0,1,2},{0,3,1},{0,2,3},{1,3,2}};
+    for (int f=0;f<4;f++) { EPAFace face = MakeEPAFace(ev, kTetFaces[f][0], kTetFaces[f][1], kTetFaces[f][2]); if (face.d >= 0.f && nf < EPA_MAX_FACES) {ef[nf++]=face;} }
+    for (int it=0; it<32; ++it) { // EPA, Closest face to origin (min distance)
+        int bf=-1; float bd=1e9f;
+        for (int f=0;f<nf;f++) { if(ef[f].d<bd){bd=ef[f].d;bf=f;} }
+        if (bf<0) break;
 
-    // Seed polytope from tetrahedron, ensure consistent outward winding
-    for (int i=0;i<4&&nVerts<EPA_MAX_VERTS;i++) epaVerts[nVerts++]=s.verts[i];
-    // 4 faces of tetrahedron (indices into epaVerts): ensure normal points outward
-    int tetFaces[4][3] = {{0,1,2},{0,3,1},{0,2,3},{1,3,2}};
-    for (int f=0;f<4&&nFaces<EPA_MAX_FACES;f++) {
-        int ia=tetFaces[f][0], ib=tetFaces[f][1], ic=tetFaces[f][2];
-        Vector3 n = V3_Cross(V3_AsubB(epaVerts[ib],epaVerts[ia]), V3_AsubB(epaVerts[ic],epaVerts[ia]));
-        float nLen = V3_Mag(n); if(nLen<COLLISION_EPSILON) continue;
-        n = V3_ScaleByF(n, 1.0f/nLen);
-        float d = V3_dot(n, epaVerts[ia]);
-        if (d < 0.0f) { // Normal points inward — flip winding
-            int tmp=ib; ib=ic; ic=tmp; n=V3_ScaleByF(n,-1.0f); d=-d;
-        }
-        epFaces[nFaces++] = (EPAFace){ia,ib,ic,n,d};
-    }
-
-    for (int iter=0;iter<32;++iter) {
-        // Find face closest to origin
-        int bestFace=-1; float bestDist=1e9f;
-        for (int f=0;f<nFaces;f++) if(epFaces[f].dist < bestDist){bestDist=epFaces[f].dist; bestFace=f;}
-        if (bestFace<0) break;
-
-        Vector3 bestNormal = epFaces[bestFace].normal;
-        Vector3 support = MinkowskiSupport(meshA,matA,meshB,matB,bestNormal);
-        float sUpDot = V3_dot(bestNormal, support);
-
-        if (sUpDot - bestDist < COLLISION_EPSILON) {
-            // Converged
-            r.normal = bestNormal;
-            r.point  = V3_ScaleByF(bestNormal, bestDist);
-            r.hit    = true;
-            return r;
-        }
-
-        if (nVerts >= EPA_MAX_VERTS) break; // Polytope full
-        int newVert = nVerts; epaVerts[nVerts++] = support;
-
-        // Remove faces visible from support, collect silhouette edges
-        // Edge represented as (a,b); silhouette = edges seen exactly once
-        int edges[EPA_MAX_FACES*3][2]; int edgeCount=0;
-        int newFaces[EPA_MAX_FACES]; int newFaceCount=0;
-        for (int f=0;f<nFaces;f++) {
-            if (V3_dot(epFaces[f].normal, V3_AsubB(support, epaVerts[epFaces[f].a])) > 0.0f) {
-                // Visible — add its edges to silhouette candidate list
-                int fverts[3] = {epFaces[f].a, epFaces[f].b, epFaces[f].c};
+        Vector3 bn=ef[bf].n; Vector3 sup=MinkowskiSupport(meshA,matA,meshB,matB,bn);
+        float sdot = V3_dot(bn,sup); if (sdot - bd < COLLISION_EPSILON) { r.normal = bn; r.point = V3_ScaleByF(bn, bd); r.overlapAmount = bd; return r; }
+        if (nv >= EPA_MAX_VERTS) break;
+        
+        ev[nv]=sup; int edges[EPA_MAX_EDGES][2],ne=0,keep[EPA_MAX_FACES],nk=0; // Silhouette edges — remove visible faces, collect unique boundary
+        for (int f=0;f<nf;f++) {
+            if (V3_dot(ef[f].n, V3_AsubB(sup,ev[ef[f].a])) > 0.f) {
+                // Visible: add edges to silhouette (XOR)
+                int fv[3]={ef[f].a,ef[f].b,ef[f].c};
                 for (int e=0;e<3;e++) {
-                    int ea=fverts[e], eb=fverts[(e+1)%3];
-                    // Check if reverse edge already in list (shared edge — remove both)
-                    bool found=false;
-                    for (int k=0;k<edgeCount;k++) {
-                        if(edges[k][0]==eb && edges[k][1]==ea){ // Remove it by swapping with last
-                            edges[k][0]=edges[edgeCount-1][0]; edges[k][1]=edges[edgeCount-1][1]; edgeCount--; found=true; break;
-                        }
-                    }
-                    if (!found && edgeCount < EPA_MAX_FACES*3) { edges[edgeCount][0]=ea; edges[edgeCount][1]=eb; edgeCount++; }
+                    int ea=fv[e], eb=fv[(e+1)%3]; bool found=false;
+                    for (int k=0;k<ne;k++) if(edges[k][0]==eb&&edges[k][1]==ea){ edges[k][0]=edges[--ne][0]; edges[k][1]=edges[ne][1]; found=true; break; }
+                    if (!found && ne<EPA_MAX_EDGES) { edges[ne][0]=ea; edges[ne++][1]=eb; }
                 }
-            } else {
-                newFaces[newFaceCount++]=f; // Keep this face
+            } else keep[nk++]=f;
+        }
+        // Rebuild face list
+        nf=0;
+        for (int k=0;k<nk;k++) ef[nf++]=ef[keep[k]];
+        for (int k=0;k<ne&&nf<EPA_MAX_FACES;k++) { EPAFace face = MakeEPAFace(ev,edges[k][0],edges[k][1],nv); if (face.d >= 0.f) {ef[nf++]=face;} }
+        nv++;
+    }
+
+    r.hit=true;
+    return r;
+}
+
+// GJK+EPA: capsule vs convex mesh.  Normal convention: points from mesh toward capsule (from o toward e).
+static OverlapResult CapsuleConvexMesh(ShapeCapsule cap, u16 mesh, const float* mx) {
+    OverlapResult r = {0};
+    if (mesh >= MODEL_IDX_MAX || !modelVertexCounts[mesh]) return r;
+
+    #define CSUP(d) MinkowskiSupportCapsuleMesh(cap, mesh, mx, d)
+
+    Simplex3D s = {0}; Vector3 dir = {0,1,0};
+    s.v[s.n++] = CSUP(dir);
+    dir = (Vector3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
+    if (V3_dot(dir,dir) < COLLISION_EPSILON) dir = (Vector3){0,1,0};
+
+    for (int it=0; it<64; ++it) {
+        Vector3 sup = CSUP(dir);
+        if (V3_dot(sup,dir) < COLLISION_EPSILON) { return r; }
+        s.v[s.n++] = sup;
+        if (!GJKNextSimplex(&s,&dir)) { r.hit=true; break; }
+        if (V3_dot(dir,dir) < COLLISION_EPSILON) { r.hit=true; break; }
+    }
+    if (!r.hit) return r;
+
+    static const Vector3 kAx[6] = {{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
+    for (int d=0; s.n<4 && d<6; ++d) {
+        Vector3 sup = CSUP(kAx[d]); bool dup = false;
+        for (int k=0;k<s.n;k++) { Vector3 dv=V3_AsubB(sup,s.v[k]); dup|=(V3_dot(dv,dv)<COLLISION_EPSILON*COLLISION_EPSILON); }
+        if (!dup) s.v[s.n++] = sup;
+    }
+    if (s.n < 4) { r.hit=true; return r; }
+
+    Vector3 ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0, nf=0;
+    for (int i=0;i<4;i++) ev[nv++] = s.v[i];
+    static const int kTF[4][3] = {{0,1,2},{0,3,1},{0,2,3},{1,3,2}};
+    for (int f=0;f<4;f++) { EPAFace face=MakeEPAFace(ev,kTF[f][0],kTF[f][1],kTF[f][2]); if(face.d>=0.f && nf<EPA_MAX_FACES) ef[nf++]=face; }
+
+    for (int it=0; it<32; ++it) {
+        int bf=-1; float bd=1e9f;
+        for (int f=0;f<nf;f++) if(ef[f].d<bd){bd=ef[f].d;bf=f;}
+        if (bf<0) break;
+        Vector3 bn=ef[bf].n, sup=CSUP(bn);
+        if (V3_dot(bn,sup)-bd < COLLISION_EPSILON) { r.normal=bn; r.point=V3_ScaleByF(bn,bd); r.overlapAmount=bd; return r; }
+        if (nv>=EPA_MAX_VERTS) break;
+        ev[nv]=sup;
+        int edges[EPA_MAX_EDGES][2], ne=0, keep[EPA_MAX_FACES], nk=0;
+        for (int f=0;f<nf;f++) {
+            if (V3_dot(ef[f].n, V3_AsubB(sup,ev[ef[f].a])) > 0.f) {
+                int fv[3]={ef[f].a,ef[f].b,ef[f].c};
+                for (int e=0;e<3;e++) { int ea=fv[e],eb=fv[(e+1)%3]; bool found=false;
+                    for (int k=0;k<ne;k++) if(edges[k][0]==eb&&edges[k][1]==ea){edges[k][0]=edges[--ne][0];edges[k][1]=edges[ne][1];found=true;break;}
+                    if (!found&&ne<EPA_MAX_EDGES){edges[ne][0]=ea;edges[ne++][1]=eb;} }
+            } else keep[nk++]=f;
+        }
+        nf=0; for(int k=0;k<nk;k++) ef[nf++]=ef[keep[k]];
+        for(int k=0;k<ne&&nf<EPA_MAX_FACES;k++){EPAFace face=MakeEPAFace(ev,edges[k][0],edges[k][1],nv);if(face.d>=0.f)ef[nf++]=face;}
+        nv++;
+    }
+    #undef CSUP
+    r.hit=true; return r;
+}
+
+// Triangle-soup mesh support: test sphere/capsule against all triangles of a static mesh.
+// Returns deepest penetrating triangle result.  Normal points from mesh toward mover.
+static OverlapResult SphereTriMesh(Vector3 sc, float sr, u16 mesh, const float* mx) {
+    OverlapResult r = {0};
+    if (mesh >= MODEL_IDX_MAX) return r;
+    u32 triCount = modelTriangleCounts[mesh]; if (!triCount) return r;
+
+    for (u32 ti = 0; ti < triCount; ++ti) {
+        u32 i0 = modelTriangles[mesh][ti*3+0];
+        u32 i1 = modelTriangles[mesh][ti*3+1];
+        u32 i2 = modelTriangles[mesh][ti*3+2];
+        #define RV(i) MvVert(mx,(Vector3){half_to_float(*(half*)(modelVertices[mesh]+(i)*VERTEX_ATTRIBUTES_SIZE+0)), \
+                                          half_to_float(*(half*)(modelVertices[mesh]+(i)*VERTEX_ATTRIBUTES_SIZE+2)), \
+                                          half_to_float(*(half*)(modelVertices[mesh]+(i)*VERTEX_ATTRIBUTES_SIZE+4))})
+        Vector3 a=RV(i0), b=RV(i1), c=RV(i2);
+        #undef RV
+
+        // Closest point on triangle to sphere center
+        Vector3 ab=V3_AsubB(b,a), ac=V3_AsubB(c,a), ap=V3_AsubB(sc,a);
+        float d1=V3_dot(ab,ap), d2=V3_dot(ac,ap);
+        if (d1<=0.f && d2<=0.f) { // Vertex A region
+            Vector3 delta=V3_AsubB(sc,a); float dist2=V3_dot(delta,delta);
+            if (dist2 < sr*sr) { float dist=vsqrtf(vmax(dist2,0.f)); OverlapResult t={true,a,(dist>COLLISION_EPSILON)?V3_ScaleByF(delta,1.f/dist):(Vector3){0,1,0},sr-dist}; if(t.overlapAmount>r.overlapAmount) r=t; }
+            continue;
+        }
+        Vector3 bp=V3_AsubB(sc,b);
+        float d3=V3_dot(ab,bp), d4=V3_dot(ac,bp);
+        if (d3>=0.f && d4<=d3) { // Vertex B region
+            Vector3 delta=V3_AsubB(sc,b); float dist2=V3_dot(delta,delta);
+            if (dist2 < sr*sr) { float dist=vsqrtf(vmax(dist2,0.f)); OverlapResult t={true,b,(dist>COLLISION_EPSILON)?V3_ScaleByF(delta,1.f/dist):(Vector3){0,1,0},sr-dist}; if(t.overlapAmount>r.overlapAmount) r=t; }
+            continue;
+        }
+        Vector3 cp=V3_AsubB(sc,c);
+        float d5=V3_dot(ab,cp), d6=V3_dot(ac,cp);
+        if (d6>=0.f && d5<=d6) { // Vertex C region
+            Vector3 delta=V3_AsubB(sc,c); float dist2=V3_dot(delta,delta);
+            if (dist2 < sr*sr) { float dist=vsqrtf(vmax(dist2,0.f)); OverlapResult t={true,c,(dist>COLLISION_EPSILON)?V3_ScaleByF(delta,1.f/dist):(Vector3){0,1,0},sr-dist}; if(t.overlapAmount>r.overlapAmount) r=t; }
+            continue;
+        }
+        float vc=d1*d4-d3*d2;
+        if (vc<=0.f && d1>=0.f && d3<=0.f) { // Edge AB region
+            float v=d1/(d1-d3); Vector3 pt=V3_AplusB(a,V3_ScaleByF(ab,v));
+            Vector3 delta=V3_AsubB(sc,pt); float dist2=V3_dot(delta,delta);
+            if (dist2 < sr*sr) { float dist=vsqrtf(vmax(dist2,0.f)); OverlapResult t={true,pt,(dist>COLLISION_EPSILON)?V3_ScaleByF(delta,1.f/dist):(Vector3){0,1,0},sr-dist}; if(t.overlapAmount>r.overlapAmount) r=t; }
+            continue;
+        }
+        float vb=d5*d2-d1*d6;
+        if (vb<=0.f && d2>=0.f && d6<=0.f) { // Edge AC region
+            float w=d2/(d2-d6); Vector3 pt=V3_AplusB(a,V3_ScaleByF(ac,w));
+            Vector3 delta=V3_AsubB(sc,pt); float dist2=V3_dot(delta,delta);
+            if (dist2 < sr*sr) { float dist=vsqrtf(vmax(dist2,0.f)); OverlapResult t={true,pt,(dist>COLLISION_EPSILON)?V3_ScaleByF(delta,1.f/dist):(Vector3){0,1,0},sr-dist}; if(t.overlapAmount>r.overlapAmount) r=t; }
+            continue;
+        }
+        float va=d3*d6-d5*d4;
+        if (va<=0.f && (d4-d3)>=0.f && (d5-d6)>=0.f) { // Edge BC region
+            float w=(d4-d3)/((d4-d3)+(d5-d6)); Vector3 bc=V3_AsubB(c,b); Vector3 pt=V3_AplusB(b,V3_ScaleByF(bc,w));
+            Vector3 delta=V3_AsubB(sc,pt); float dist2=V3_dot(delta,delta);
+            if (dist2 < sr*sr) { float dist=vsqrtf(vmax(dist2,0.f)); OverlapResult t={true,pt,(dist>COLLISION_EPSILON)?V3_ScaleByF(delta,1.f/dist):(Vector3){0,1,0},sr-dist}; if(t.overlapAmount>r.overlapAmount) r=t; }
+            continue;
+        }
+        // Face region — project onto triangle plane
+        Vector3 n = V3_Cross(ab,ac); float nLen=V3_Mag(n); if(nLen<COLLISION_EPSILON) continue;
+        n=V3_ScaleByF(n,1.f/nLen);
+        float dist=V3_dot(n,ap); // signed distance from plane (positive = above)
+        float absDist=vabs(dist);
+        if (absDist < sr) {
+            // Back-face: if sphere is below the triangle, flip normal so response pushes it out correctly
+            Vector3 fn = (dist >= 0.f) ? n : (Vector3){-n.x,-n.y,-n.z};
+            OverlapResult t={true,V3_AsubB(sc,V3_ScaleByF(fn,absDist)),fn,sr-absDist};
+            if(t.overlapAmount>r.overlapAmount) r=t;
+        }
+    }
+    return r;
+}
+
+// Capsule vs triangle-soup: sweep the two hemisphere centers, pick deepest triangle hit.
+static OverlapResult CapsuleTriMesh(ShapeCapsule cap, u16 mesh, const float* mx) {
+    OverlapResult rb = SphereTriMesh(cap.base, cap.radius, mesh, mx);
+    OverlapResult rt = SphereTriMesh(cap.tip,  cap.radius, mesh, mx);
+    return (rt.overlapAmount > rb.overlapAmount) ? rt : rb;
+}
+
+static OverlapResult SphereConvexMesh(Vector3 sc, float sr, u16 mesh, const float* mx) {
+    OverlapResult r = {0};
+    if (mesh >= MODEL_IDX_MAX || !modelVertexCounts[mesh]) return r;
+
+    // Support: normalize d before inflating by radius so the sphere contribution is correct
+    #define SPHSUP(d) ({ Vector3 _d=(d); float _L=V3_dot(_d,_d); V3_AplusB(sc, (_L>COLLISION_EPSILON) ? V3_ScaleByF(_d, sr/vsqrtf(_L)) : (Vector3){0,sr,0}); })
+    #define MSKSUP(d) V3_AsubB(SPHSUP(d), MeshSupport(mesh, mx, (Vector3){-(d).x,-(d).y,-(d).z}))
+    Simplex3D s = {0}; Vector3 dir = {0,1,0};
+    s.v[s.n++] = MSKSUP(dir);
+    dir = (Vector3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
+    if (V3_dot(dir,dir) < COLLISION_EPSILON) dir=(Vector3){0,1,0};
+    for (int it=0; it<32; ++it) {
+        Vector3 sup=MSKSUP(dir);
+        if (V3_dot(sup,dir) < COLLISION_EPSILON) return r;
+        s.v[s.n++]=sup;
+        if (!GJKNextSimplex(&s,&dir)) { r.hit=true; break; }
+        if (V3_dot(dir,dir) < COLLISION_EPSILON) { r.hit=true; break; }
+    }
+    if (!r.hit) return r;
+
+    static const Vector3 kAx[6]={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
+    for (int d=0; s.n<4&&d<6; ++d) {
+        Vector3 sup=MSKSUP(kAx[d]); bool dup=false;
+        for(int k=0;k<s.n;k++){Vector3 dv=V3_AsubB(sup,s.v[k]);dup|=V3_dot(dv,dv)<COLLISION_EPSILON*COLLISION_EPSILON;}
+        if(!dup) s.v[s.n++]=sup;
+    }
+    if (s.n<4){r.hit=true;return r;}
+
+    Vector3 ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0,nf=0;
+    for(int i=0;i<4;i++) ev[nv++]=s.v[i];
+    static const int kTF[4][3]={{0,1,2},{0,3,1},{0,2,3},{1,3,2}};
+    for(int f=0;f<4;f++){EPAFace face=MakeEPAFace(ev,kTF[f][0],kTF[f][1],kTF[f][2]);if(face.d>=0.f&&nf<EPA_MAX_FACES)ef[nf++]=face;}
+    for(int it=0;it<24;++it){
+        int bf=-1; float bd=1e9f;
+        for(int f=0;f<nf;f++) if(ef[f].d<bd){bd=ef[f].d;bf=f;}
+        if(bf<0) break;
+        Vector3 bn=ef[bf].n, sup=MSKSUP(bn);
+        if(V3_dot(bn,sup)-bd<COLLISION_EPSILON){r.normal=bn;r.point=V3_ScaleByF(bn,bd);r.overlapAmount=bd;return r;}
+        if(nv>=EPA_MAX_VERTS) break;
+        ev[nv]=sup;
+        int edges[EPA_MAX_EDGES][2],ne=0,keep[EPA_MAX_FACES],nk=0;
+        for(int f=0;f<nf;f++){
+            if(V3_dot(ef[f].n,V3_AsubB(sup,ev[ef[f].a]))>0.f){
+                int fv[3]={ef[f].a,ef[f].b,ef[f].c};
+                for(int e=0;e<3;e++){int ea=fv[e],eb=fv[(e+1)%3];bool found=false;
+                    for(int k=0;k<ne;k++)if(edges[k][0]==eb&&edges[k][1]==ea){edges[k][0]=edges[--ne][0];edges[k][1]=edges[ne][1];found=true;break;}
+                    if(!found&&ne<EPA_MAX_EDGES){edges[ne][0]=ea;edges[ne++][1]=eb;}}
+            } else keep[nk++]=f;
+        }
+        nf=0; for(int k=0;k<nk;k++) ef[nf++]=ef[keep[k]];
+        for(int k=0;k<ne&&nf<EPA_MAX_FACES;k++){EPAFace face=MakeEPAFace(ev,edges[k][0],edges[k][1],nv);if(face.d>=0.f)ef[nf++]=face;}
+        nv++;
+    }
+    #undef SPHSUP
+    #undef MSKSUP
+    r.hit=true; return r;
+}
+
+// OBB of hull for per-triangle AABB reject — compute once, reuse per triangle
+typedef struct { Vector3 mn, mx; } AABB3;
+static inline AABB3 HullWorldAABB(u16 hullMesh, const float* hullMx) {
+    AABB3 b = { {1e9f,1e9f,1e9f}, {-1e9f,-1e9f,-1e9f} };
+    u32 n = modelVertexCounts[hullMesh]; const u8* vb = modelVertices[hullMesh];
+    for (u32 i=0;i<n;++i) {
+        const u8* p = vb + i*VERTEX_ATTRIBUTES_SIZE;
+        Vector3 w = MvVert(hullMx,(Vector3){half_to_float(*(half*)(p+0)),half_to_float(*(half*)(p+2)),half_to_float(*(half*)(p+4))});
+        b.mn.x=vmin(b.mn.x,w.x); b.mn.y=vmin(b.mn.y,w.y); b.mn.z=vmin(b.mn.z,w.z);
+        b.mx.x=vmax(b.mx.x,w.x); b.mx.y=vmax(b.mx.y,w.y); b.mx.z=vmax(b.mx.z,w.z);
+    }
+    return b;
+}
+
+static OverlapResult ConvexMeshVsTriMesh(u16 hullMesh, const float* hullMx, u16 triMesh,  const float* triMx) {
+    OverlapResult r = {0};
+    if (hullMesh>=MODEL_IDX_MAX || triMesh>=MODEL_IDX_MAX) return r;
+    u32 hullVerts = modelVertexCounts[hullMesh];
+    u32 triCount  = modelTriangleCounts[triMesh];
+    if (!hullVerts || !triCount) return r;
+
+    // Hull world AABB — one pass over hull verts, O(V), done once
+    AABB3 hb = HullWorldAABB(hullMesh, hullMx);
+    // Expand by a small skin to catch near-misses on the face test below
+    float skin = 0.05f;
+    hb.mn.x-=skin; hb.mn.y-=skin; hb.mn.z-=skin;
+    hb.mx.x+=skin; hb.mx.y+=skin; hb.mx.z+=skin;
+
+    // For each triangle: AABB reject, then two-sided test:
+    //   (a) any tri vertex behind a hull face  → tri-into-hull penetration
+    //   (b) hull centroid distance to tri plane → hull-into-tri penetration
+    // Pick deepest across all triangles.
+
+    // Hull centroid (average of AABB) — good enough for plane-side test
+    Vector3 hullCen = { (hb.mn.x+hb.mx.x)*0.5f, (hb.mn.y+hb.mx.y)*0.5f, (hb.mn.z+hb.mx.z)*0.5f };
+    float   hullRad = V3_Mag(V3_AsubB(hb.mx, hullCen)); // conservative bounding radius
+
+    for (u32 ti=0; ti<triCount; ++ti) {
+        u32 i0=modelTriangles[triMesh][ti*3+0],i1=modelTriangles[triMesh][ti*3+1],i2=modelTriangles[triMesh][ti*3+2];
+        #define TRV(i) MvVert(triMx,(Vector3){half_to_float(*(half*)(modelVertices[triMesh]+(i)*VERTEX_ATTRIBUTES_SIZE+0)), \
+                                               half_to_float(*(half*)(modelVertices[triMesh]+(i)*VERTEX_ATTRIBUTES_SIZE+2)), \
+                                               half_to_float(*(half*)(modelVertices[triMesh]+(i)*VERTEX_ATTRIBUTES_SIZE+4))})
+        Vector3 ta=TRV(i0),tb=TRV(i1),tc=TRV(i2);
+        #undef TRV
+
+        // AABB pre-reject: skip triangle if its AABB doesn't overlap hull's AABB
+        Vector3 tMn={vmin(ta.x,vmin(tb.x,tc.x)),vmin(ta.y,vmin(tb.y,tc.y)),vmin(ta.z,vmin(tb.z,tc.z))};
+        Vector3 tMx={vmax(ta.x,vmax(tb.x,tc.x)),vmax(ta.y,vmax(tb.y,tc.y)),vmax(ta.z,vmax(tb.z,tc.z))};
+        if (tMn.x>hb.mx.x||tMx.x<hb.mn.x||tMn.y>hb.mx.y||tMx.y<hb.mn.y||tMn.z>hb.mx.z||tMx.z<hb.mn.z) continue;
+
+        Vector3 ab=V3_AsubB(tb,ta), ac=V3_AsubB(tc,ta);
+        Vector3 n=V3_Cross(ab,ac); float nLen=V3_Mag(n); if(nLen<COLLISION_EPSILON) continue;
+        n=V3_ScaleByF(n,1.f/nLen);
+
+        // Primary test: hull centroid signed distance to triangle plane
+        float cenDist = V3_dot(n, V3_AsubB(hullCen, ta));
+        // If centroid is more than hullRad above the plane, no penetration possible
+        if (cenDist > hullRad) continue;
+
+        // Use SphereTriMesh logic for the hull's bounding sphere vs this triangle —
+        // this is the tunnel-proof path: catches the hull face crossing the tri plane
+        // even when no hull vertex has crossed yet.
+        {
+            Vector3 ap=V3_AsubB(hullCen,ta);
+            float d1=V3_dot(ab,ap),d2=V3_dot(ac,ap);
+            Vector3 bp=V3_AsubB(hullCen,tb); float d3=V3_dot(ab,bp),d4=V3_dot(ac,bp);
+            Vector3 cp=V3_AsubB(hullCen,tc); float d5=V3_dot(ab,cp),d6=V3_dot(ac,cp);
+            // Determine voronoi region and get closest point on triangle
+            Vector3 closest; bool inFace=false;
+            float vc_=d1*d4-d3*d2, vb_=d5*d2-d1*d6, va_=d3*d6-d5*d4;
+            if (d1<=0.f&&d2<=0.f)                               { closest=ta; }
+            else if (d3>=0.f&&d4<=d3)                           { closest=tb; }
+            else if (d6>=0.f&&d5<=d6)                           { closest=tc; }
+            else if (vc_<=0.f&&d1>=0.f&&d3<=0.f)               { float v=d1/(d1-d3); closest=V3_AplusB(ta,V3_ScaleByF(ab,v)); }
+            else if (vb_<=0.f&&d2>=0.f&&d6<=0.f)               { float w=d2/(d2-d6); closest=V3_AplusB(ta,V3_ScaleByF(ac,w)); }
+            else if (va_<=0.f&&(d4-d3)>=0.f&&(d5-d6)>=0.f)    { float w=(d4-d3)/((d4-d3)+(d5-d6)); closest=V3_AplusB(tb,V3_ScaleByF(V3_AsubB(tc,tb),w)); }
+            else                                                 { closest=V3_AsubB(hullCen,V3_ScaleByF(n,cenDist)); inFace=true; }
+
+            Vector3 delta=V3_AsubB(hullCen,closest);
+            float dist2=V3_dot(delta,delta);
+            if (dist2 < hullRad*hullRad) {
+                float dist=vsqrtf(vmax(dist2,0.f));
+                float pen = hullRad-dist;
+                // For face region use signed plane distance for penetration depth
+                if (inFace) { float absDist=vabs(cenDist); pen=hullRad-absDist; }
+                if (pen > r.overlapAmount) {
+                    Vector3 fn = inFace ? ((cenDist>=0.f)?n:(Vector3){-n.x,-n.y,-n.z})
+                                        : ((dist>COLLISION_EPSILON)?V3_ScaleByF(delta,1.f/dist):(Vector3){0,1,0});
+                    r=(OverlapResult){true,closest,fn,pen};
+                }
             }
         }
-        // Rebuild face list: keep non-visible faces, add new faces from silhouette
-        nFaces=0;
-        for (int k=0;k<newFaceCount;k++) epFaces[nFaces++]=epFaces[newFaces[k]];
-        for (int k=0;k<edgeCount&&nFaces<EPA_MAX_FACES;k++) {
-            int ia=edges[k][0], ib=edges[k][1], ic=newVert;
-            Vector3 n = V3_Cross(V3_AsubB(epaVerts[ib],epaVerts[ia]), V3_AsubB(epaVerts[ic],epaVerts[ia]));
-            float nLen=V3_Mag(n); if(nLen<COLLISION_EPSILON) continue;
-            n=V3_ScaleByF(n,1.0f/nLen);
-            float d=V3_dot(n,epaVerts[ia]);
-            if(d<0.0f){n=V3_ScaleByF(n,-1.0f);d=-d;}
-            epFaces[nFaces++]=(EPAFace){ia,ib,ic,n,d};
-        }
     }
-
-    r.hit=true; // Hit confirmed by GJK even if EPA didn't fully converge
     return r;
 }
 
@@ -653,31 +889,112 @@ void Physics(void) {
                     for (u16 k = 0; k < cellCounts[cell]; ++k) {
                         u16 j = cellLists[cell][k]; if (j == idx) continue;
                         Entity *o = &Sys_Global.instances[j]; if (!(mask & o->layer)) continue;
+                        
+                        Vector3 deltaPos = V3_AsubB(e->position, o->position);
+                        float distSq = V3_dot(deltaPos, deltaPos);
+                        float combinedRadius = e->radius*2 + o->radius*2;
+                        if (distSq > combinedRadius * combinedRadius) continue;
 
                         OverlapResult r = {0};
-                        if (e->collider == COLLIDER_TYPE_CAPSULE && o->collider == COLLIDER_TYPE_CAPSULE) { ShapeCapsule ca,cb; Entity_GetCapsule(e,&ca); Entity_GetCapsule(o,&cb); r = CapsuleCapsule(ca,cb); } 
-                        else if (e->collider == COLLIDER_TYPE_CAPSULE && o->collider == COLLIDER_TYPE_BOX) { ShapeCapsule ca; ShapeBox bb; Entity_GetCapsule(e,&ca); Entity_GetBox(o,&bb); r = CapsuleBox(ca,bb); }
-                        else if (e->collider == COLLIDER_TYPE_BOX && o->collider == COLLIDER_TYPE_CAPSULE) { ShapeCapsule ca; ShapeBox bb; Entity_GetCapsule(o,&ca); Entity_GetBox(e,&bb); r = CapsuleBox(ca,bb); } 
-                        else if (e->collider == COLLIDER_TYPE_BOX && o->collider == COLLIDER_TYPE_BOX) { ShapeBox ba,bb; Entity_GetBox(e,&ba); Entity_GetBox(o,&bb); r = BoxBoxSAT(ba,bb); }
-                        else if (e->collider == COLLIDER_TYPE_SPHERE && o->collider == COLLIDER_TYPE_BOX) { ShapeSphere s; ShapeBox b; Entity_GetSphere(e,&s); Entity_GetBox(o,&b); r = SphereOBB(s.center,s.radius,b); }
-                        else if (e->collider == COLLIDER_TYPE_BOX && o->collider == COLLIDER_TYPE_SPHERE) { ShapeSphere s; ShapeBox b; Entity_GetSphere(o,&s); Entity_GetBox(e,&b); r = SphereOBB(s.center,s.radius,b); }
-                        else if (e->collider == COLLIDER_TYPE_SPHERE && o->collider == COLLIDER_TYPE_SPHERE) { ShapeSphere sa, sb; Entity_GetSphere(e,&sa); Entity_GetSphere(o,&sb); r = SphereSphere(sa.center,sa.radius,sb.center,sb.radius); }
-                        else if ((e->collider == COLLIDER_TYPE_CONVEXMESH || e->collider == COLLIDER_TYPE_MESH) && (o->collider == COLLIDER_TYPE_CONVEXMESH || o->collider == COLLIDER_TYPE_MESH)) {
-                            float matA[16],matB[16];
-                            CopyMemoryFromBtoAForNBytes(matA,&modelMatrices[idx*16], 64);
-                            CopyMemoryFromBtoAForNBytes(matB,&modelMatrices[j*16], 64);
-                            u16 mA = (e->collider == COLLIDER_TYPE_MESH) ? e->modelIndex : e->colliderMeshIndex;
-                            u16 mB = (o->collider == COLLIDER_TYPE_MESH) ? o->modelIndex : o->colliderMeshIndex;
-                            r = ConvexMeshOverlap(mA, mB, matA, matB);
+                        bool eMesh=(e->collider==COLLIDER_TYPE_CONVEXMESH||e->collider==COLLIDER_TYPE_MESH);
+                        bool oMesh=(o->collider==COLLIDER_TYPE_CONVEXMESH||o->collider==COLLIDER_TYPE_MESH);
+                        // Plain COLLIDER_TYPE_MESH = triangle soup (static only); CONVEXMESH = convex hull (dynamic ok)
+                        bool eTriSoup=(e->collider==COLLIDER_TYPE_MESH);
+                        bool oTriSoup=(o->collider==COLLIDER_TYPE_MESH);
+
+                        if      (e->collider==COLLIDER_TYPE_CAPSULE && o->collider==COLLIDER_TYPE_CAPSULE) { ShapeCapsule ca,cb; Entity_GetCapsule(e,&ca); Entity_GetCapsule(o,&cb); r=CapsuleCapsule(ca,cb); }
+                        else if (e->collider==COLLIDER_TYPE_CAPSULE && o->collider==COLLIDER_TYPE_BOX)     { ShapeCapsule ca; ShapeBox bb; Entity_GetCapsule(e,&ca); Entity_GetBox(o,&bb); r=CapsuleBox(ca,bb); }
+                        else if (e->collider==COLLIDER_TYPE_BOX     && o->collider==COLLIDER_TYPE_CAPSULE) { ShapeCapsule ca; ShapeBox bb; Entity_GetCapsule(o,&ca); Entity_GetBox(e,&bb); r=CapsuleBox(ca,bb); }
+                        else if (e->collider==COLLIDER_TYPE_BOX     && o->collider==COLLIDER_TYPE_BOX)     { ShapeBox ba,bb; Entity_GetBox(e,&ba); Entity_GetBox(o,&bb); r=BoxBoxSAT(ba,bb); }
+                        else if (e->collider==COLLIDER_TYPE_SPHERE  && o->collider==COLLIDER_TYPE_BOX)     { ShapeSphere sph; ShapeBox b; Entity_GetSphere(e,&sph); Entity_GetBox(o,&b); r=SphereOBB(sph.center,sph.radius,b); }
+                        else if (e->collider==COLLIDER_TYPE_BOX     && o->collider==COLLIDER_TYPE_SPHERE)  { ShapeSphere sph; ShapeBox b; Entity_GetSphere(o,&sph); Entity_GetBox(e,&b); r=SphereOBB(sph.center,sph.radius,b); }
+                        else if (e->collider==COLLIDER_TYPE_SPHERE  && o->collider==COLLIDER_TYPE_SPHERE)  { ShapeSphere sa,sb; Entity_GetSphere(e,&sa); Entity_GetSphere(o,&sb); r=SphereSphere(sa.center,sa.radius,sb.center,sb.radius); }
+                        // Triangle-soup (MESH) as static obstacle: use per-triangle sphere sweep, never GJK
+                        else if (e->collider==COLLIDER_TYPE_CAPSULE && oTriSoup) {
+                            float mxB[16]; CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64);
+                            ShapeCapsule ca; Entity_GetCapsule(e,&ca);
+                            r=CapsuleTriMesh(ca,o->modelIndex,mxB); // normal: mesh→capsule ✓
                         }
-                        else if ((e->collider == COLLIDER_TYPE_SPHERE || e->collider == COLLIDER_TYPE_CAPSULE) && (o->collider == COLLIDER_TYPE_CONVEXMESH || o->collider == COLLIDER_TYPE_MESH)) { u16 mIdx = (o->collider == COLLIDER_TYPE_MESH) ? o->modelIndex : o->colliderMeshIndex; float rad = modelBounds[mIdx]; r = SphereSphere(e->position,GetCollisionRadius(e),o->position,rad); } 
-                        else if ((e->collider == COLLIDER_TYPE_CONVEXMESH || e->collider == COLLIDER_TYPE_MESH) && (o->collider == COLLIDER_TYPE_SPHERE || o->collider == COLLIDER_TYPE_CAPSULE)) { u16 mIdx = (e->collider == COLLIDER_TYPE_MESH) ? e->modelIndex : e->colliderMeshIndex; float rad = modelBounds[mIdx]; r = SphereSphere(e->position,rad,o->position,GetCollisionRadius(o)); } 
-                        else { r = SphereSphere(e->position,GetCollisionRadius(e),o->position,GetCollisionRadius(o)); }
-                        if (r.hit && r.overlapAmount > largestOverlap) {
-                            largestOverlap = r.overlapAmount;
-                            largestO = r;
-                            deepestOther = j;
+                        else if (eTriSoup && o->collider==COLLIDER_TYPE_CAPSULE) {
+                            float mxA[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64);
+                            ShapeCapsule cb; Entity_GetCapsule(o,&cb);
+                            r=CapsuleTriMesh(cb,e->modelIndex,mxA);
+                            r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z}; // flip: o→e ✓
                         }
+                        else if (e->collider==COLLIDER_TYPE_SPHERE && oTriSoup) {
+                            float mxB[16]; CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64);
+                            ShapeSphere sa; Entity_GetSphere(e,&sa);
+                            r=SphereTriMesh(sa.center,sa.radius,o->modelIndex,mxB);
+                        }
+                        else if (eTriSoup && o->collider==COLLIDER_TYPE_SPHERE) {
+                            float mxA[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64);
+                            ShapeSphere sb; Entity_GetSphere(o,&sb);
+                            r=SphereTriMesh(sb.center,sb.radius,e->modelIndex,mxA);
+                            r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};
+                        }
+                        // ConvexMesh vs triangle-soup: bound the convex hull with its radius, run per-triangle sphere sweep
+                        else if (e->collider==COLLIDER_TYPE_CONVEXMESH && oTriSoup) {
+                            float mxA[16],mxB[16];
+                            CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64);
+                            CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64);
+                            r=ConvexMeshVsTriMesh(e->colliderMeshIndex,mxA,o->modelIndex,mxB);
+                            // normal from ConvexMeshVsTriMesh points along tri face outward (+n away from solid)
+                            // that is mesh(o)→hull(e): correct ✓
+                        }
+                        else if (eTriSoup && o->collider==COLLIDER_TYPE_CONVEXMESH) {
+                            float mxA[16],mxB[16];
+                            CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64);
+                            CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64);
+                            r=ConvexMeshVsTriMesh(o->colliderMeshIndex,mxB,e->modelIndex,mxA);
+                            r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z}; // flip: o→e ✓
+                        }
+                        // TriSoup vs TriSoup: both static, skip
+                        else if (eTriSoup && oTriSoup) { /* static vs static, no response needed */ }
+                        // ConvexMesh vs ConvexMesh and ConvexMesh vs sphere/capsule: GJK/EPA on hull
+                        else if (eMesh && oMesh) {
+                            float mxA[16],mxB[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64); CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64);
+                            u16 mA=e->colliderMeshIndex, mB=o->colliderMeshIndex;
+                            r=ConvexMeshOverlap(mA,mB,mxA,mxB);
+                        }
+                        else if (e->collider==COLLIDER_TYPE_CAPSULE && o->collider==COLLIDER_TYPE_CONVEXMESH) {
+                            float mxB[16]; CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64);
+                            ShapeCapsule ca; Entity_GetCapsule(e,&ca);
+                            r=CapsuleConvexMesh(ca,o->colliderMeshIndex,mxB);
+                        }
+                        else if (e->collider==COLLIDER_TYPE_CONVEXMESH && o->collider==COLLIDER_TYPE_CAPSULE) {
+                            float mxA[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64);
+                            ShapeCapsule cb; Entity_GetCapsule(o,&cb);
+                            r=CapsuleConvexMesh(cb,e->colliderMeshIndex,mxA);
+                            r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};
+                        }
+                        else if (e->collider==COLLIDER_TYPE_SPHERE && o->collider==COLLIDER_TYPE_CONVEXMESH) {
+                            float mxB[16]; CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64);
+                            ShapeSphere sa; Entity_GetSphere(e,&sa);
+                            r=SphereConvexMesh(sa.center,sa.radius,o->colliderMeshIndex,mxB);
+                        }
+                        else if (e->collider==COLLIDER_TYPE_CONVEXMESH && o->collider==COLLIDER_TYPE_SPHERE) {
+                            float mxA[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64);
+                            ShapeSphere sb; Entity_GetSphere(o,&sb);
+                            r=SphereConvexMesh(sb.center,sb.radius,e->colliderMeshIndex,mxA);
+                            r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};
+                        }
+                        else if (e->collider==COLLIDER_TYPE_BOX && oTriSoup) {
+                            float mxB[16]; CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64);
+                            ShapeBox ba; Entity_GetBox(e,&ba);
+                            // Represent OBB as sphere for trisoup test (conservative but sound)
+                            float br=vmax(ba.halfExtents.x,vmax(ba.halfExtents.y,ba.halfExtents.z));
+                            r=SphereTriMesh(ba.center,br,o->modelIndex,mxB);
+                        }
+                        else if (eTriSoup && o->collider==COLLIDER_TYPE_BOX) {
+                            float mxA[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64);
+                            ShapeBox bb; Entity_GetBox(o,&bb);
+                            float br=vmax(bb.halfExtents.x,vmax(bb.halfExtents.y,bb.halfExtents.z));
+                            r=SphereTriMesh(bb.center,br,e->modelIndex,mxA);
+                            r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};
+                        }
+                        else { r=SphereSphere(e->position,GetCollisionRadius(e),o->position,GetCollisionRadius(o)); }
+                        
+                        if (r.hit && r.overlapAmount > largestOverlap) { largestOverlap = r.overlapAmount; largestO = r; deepestOther = j; }
                     }
                 }
             }
@@ -685,11 +1002,7 @@ void Physics(void) {
             if (largestO.hit && largestOverlap > COLLISION_EPSILON) {
                 Entity *o = (deepestOther < INSTANCE_COUNT) ? &Sys_Global.instances[deepestOther] : NULL;
                 if (o && (o->entflags & ENTFLAG_RIGIDBODY)) ApplyCollisionResponse(e, o, largestO.normal, largestOverlap);
-                else {
-                    Entity staticProxy = {0};
-                    staticProxy.mass = 0.0f; staticProxy.dynamicFriction = 0.4f; staticProxy.collider = COLLIDER_TYPE_NONE;
-                    ApplyCollisionResponse(e,&staticProxy,largestO.normal,largestOverlap);
-                }
+                else { Entity staticProxy = {0}; staticProxy.mass = 0.0f; staticProxy.dynamicFriction = 0.4f; staticProxy.collider = COLLIDER_TYPE_NONE; ApplyCollisionResponse(e,&staticProxy,largestO.normal,largestOverlap); }
             }
 
             e->accumulatedForce = (Vector3){0,0,0};
