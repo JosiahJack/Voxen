@@ -546,6 +546,7 @@ typedef /*FAT*/ struct  {
     Vector3 accumulatedForce,accumulatedTorque;
     float dynamicFriction,staticFriction,bounciness;
     PhysCombineType frictionCombine,bounceCombine;
+    bool colliding;
     float volume; // Audio
     
     // Logic and I/O

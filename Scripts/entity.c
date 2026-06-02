@@ -16,7 +16,7 @@ MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(void) { // Global condition
     EDefs[177].cardchunk = EDefs[179].cardchunk = EDefs[182].cardchunk = EDefs[191].cardchunk = EDefs[192].cardchunk = EDefs[193].cardchunk = EDefs[200].cardchunk = EDefs[210].cardchunk = false;
     EDefs[211].cardchunk = EDefs[212].cardchunk = EDefs[213].cardchunk = EDefs[219].cardchunk = EDefs[233].cardchunk = EDefs[242].cardchunk = EDefs[243].cardchunk = EDefs[246].cardchunk = false;
     EDefs[247].cardchunk = EDefs[248].cardchunk = EDefs[249].cardchunk = EDefs[255].cardchunk = EDefs[263].cardchunk = EDefs[264].cardchunk = EDefs[283].cardchunk = EDefs[284].cardchunk = false;
-    EDefs[285].cardchunk = EDefs[291].cardchunk = EDefs[298].cardchunk = EDefs[299].cardchunk = EDefs[300].cardchunk = EDefs[301].cardchunk = EDefs[303].cardchunk                        = false;
+    EDefs[285].cardchunk = EDefs[291].cardchunk = EDefs[298].cardchunk = EDefs[299].cardchunk = EDefs[300].cardchunk = EDefs[301].cardchunk = EDefs[303].cardchunk = EDefs[188].cardchunk = false;
     /*  0 chunk_black*/                 EDefs[  0].modelIndex=178; EDefs[  0].texIndex=0;
     /*  1 chunk_blocker*/               EDefs[  1].modelIndex=178; EDefs[  1].texIndex=1230;EDefs[  1].normIndex=160; EDefs[  1].specIndex=1230;
     /*  2 chunk_bridg1_1*/              EDefs[  2].modelIndex=661; EDefs[  2].texIndex=44;  EDefs[  2].normIndex=43;
@@ -205,7 +205,7 @@ MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(void) { // Global condition
     /*185 chunk_med2_3d*/               EDefs[185].modelIndex=285; EDefs[185].texIndex=519; EDefs[185].glowIndex=518; EDefs[185].specIndex=1242;
     /*186 chunk_med2_4*/                EDefs[186].modelIndex=287; EDefs[186].texIndex=523; EDefs[186].glowIndex=522; EDefs[186].specIndex=1242;
     /*187 chunk_med2_5*/                EDefs[187].modelIndex=288; EDefs[187].texIndex=527; EDefs[187].glowIndex=526; EDefs[187].specIndex=539; EDefs[187].collider=COLLIDER_TYPE_BOX; EDefs[187].colliderCenter=(Vector3){0.0f,1.44f,0.0f}; EDefs[187].colliderSize=(Vector3){2.56f,0.32f,2.56f}; EDefs[187].colliderMeshIndex=U16_MAX;
-    /*188 chunk_med2_6*/                EDefs[188].modelIndex=289; EDefs[188].texIndex=528; EDefs[188].specIndex=1271;
+    /*188 chunk_med2_6*/                EDefs[188].modelIndex=289; EDefs[188].texIndex=528; EDefs[188].specIndex=1271;                          EDefs[188].collider=COLLIDER_TYPE_MESH; EDefs[188].colliderMeshIndex=289;
     /*189 chunk_med2_7*/                EDefs[189].modelIndex=290; EDefs[189].texIndex=530; EDefs[189].glowIndex=529; EDefs[189].specIndex=1245;
     /*190 chunk_med2_8*/                EDefs[190].modelIndex=291; EDefs[190].texIndex=531; EDefs[190].specIndex=1242;
     /*191 chunk_med2_8_half_top*/       EDefs[191].modelIndex=292; EDefs[191].texIndex=531; EDefs[191].specIndex=1242;

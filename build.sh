@@ -9,8 +9,9 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 $IS_CI || clear
+TEMP_DIR=temp_build
 TEMP_DIRGC=temp_build_gc
-rm -f ./Shaders/*.h "$TEMP_DIRGC"/*.o
+rm -f ./Shaders/*.h "$TEMP_DIR"/*.o "$TEMP_DIRGC"/*.o
 export TMPDIR=/dev/shm
 mkdir -p $TEMP_DIRGC
 now_ms() { date +%s%3N; }
@@ -125,7 +126,7 @@ fi
 #$CC voxen.c $CFLAGS $LDFLAGS -rdynamic -o $BINARY_NAME
 export CC=$CC
 export CFLAGS=$CFLAGS
-SOURCES="voxen.c winput.c audio.c physics.c"
+SOURCES="voxen.c"
 export TEMP_DIR=temp_build
 printf "%s\n" $SOURCES | xargs -P12 -I{} sh -c "$CC -c {} $CFLAGS -o $TEMP_DIR/\$(basename {}).o"
 $LINKER "$TEMP_DIR"/*.o $LDFLAGS -rdynamic -o $BINARY_NAME
@@ -143,11 +144,11 @@ total_build_time=$((build_end - shader_start))
 echo "Built engine and mod in ${total_build_time} ms"
 if ! $IS_CI; then
     case "$PLATFORM" in
-#         windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; wine ./voxen.exe ;;
-        windows)  wine ./voxen.exe ;;
-#         *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
+        windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; wine ./voxen.exe ;;
+#         windows)  wine ./voxen.exe ;;
+        *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
 #         *)        strip --strip-all --strip-unneeded ./voxen; ./voxen ;;   # linux Alternate build methods to be able to look at symbols and debugging
-        *)        ./voxen ;;   # linux
+#         *)        ./voxen ;;   # linux
     esac
     rm -f ./Shaders/*.h "$TEMP_DIRGC"/*.o ./voxen.upx ./*.lib #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.
 fi
