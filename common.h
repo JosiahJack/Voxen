@@ -295,12 +295,12 @@ typedef u8 PuzzleCellType;static const u8 PuzzleCellType_Off=0,PuzzleCellType_St
 typedef u8 PuzzleGridType;static const u8 PuzzleGridType_King=0,PuzzleGridType_Queen=1,PuzzleGridType_Knight=2,PuzzleGridType_Rook=3,PuzzleGridType_Bishop=4,PuzzleGridType_Pawn=5;
 static const u32 Layer_Default          = 1U;
 static const u32 Layer_TransparentFX    = 2U;
-static const u32 Layer_IgnoreRaycast    = 4U;
-//                                        8U    // unused
+//                                        4U   // unused (formerly IgnoreRaycast)
+//                                        8U   // unused
 static const u32 Layer_Water            = 16U; static const u32 Layer_BlocksRaycast = 16U;  // same as Water
 static const u32 Layer_UI               = 32U;
-//                                        64U   // unused
-//                                        128U  // unused
+//                                        64U  // unused
+//                                        128U // unused
 static const u32 Layer_GunViewModel     = 256U;
 static const u32 Layer_Geometry         = 512U;
 static const u32 Layer_NPC              = 1024U;
@@ -308,14 +308,14 @@ static const u32 Layer_PlayerBullets    = 2048U;
 static const u32 Layer_Player           = 4096U;
 static const u32 Layer_Corpse           = 8192U;
 static const u32 Layer_PhysObjects      = 16384U;
-static const u32 Layer_Sky              = 32768U;
+//                                        32768U // unused (formerly Sky)
 static const u32 Layer_PlayerTriggerOnly= 65536U;
 static const u32 Layer_Trigger          = 131072U;
 static const u32 Layer_Door             = 262144U;
 static const u32 Layer_InterDebris      = 524288U;
 static const u32 Layer_Player2          = 1048576U;
-static const u32 Layer_Player3          = 2097152U;
-static const u32 Layer_Player4          = 4194304U;
+//                                        2097152U // unused (formerly Player3)
+//                                        4194304U // unused (formerly Player4)
 static const u32 Layer_NPCTrigger       = 8388608U;
 static const u32 Layer_NPCBullet        = 16777216U;
 static const u32 Layer_NPCClip          = 33554432U;
@@ -325,36 +325,16 @@ static const u32 Layer_Culling          = 268435456U;
 static const u32 Layer_CorpseSearchable = 536870912U;
 //                                        1073741824U // unused
 static const u32 Layer_NULL             = 2147483648U;
-#define LAYER_MASK_PLAYER_COLLIDESWITH (Layer_Clip | Layer_NPCBullet | Layer_Player2 | Layer_Door \
-                                       | Layer_Trigger | Layer_PlayerTriggerOnly | Layer_Default | Layer_TransparentFX \
-                                       | Layer_IgnoreRaycast | Layer_Geometry | Layer_NPC)
-
-#define LAYER_MASK_NPC_COLLIDESWITH (Layer_Clip | Layer_NPCClip | Layer_PlayerBullets | Layer_Player2 | Layer_Player | Layer_Door \
-                                    | Layer_Trigger | Layer_NPCTrigger | Layer_Default | Layer_TransparentFX \
-                                    | Layer_IgnoreRaycast | Layer_Geometry | Layer_NPC)
-
-#define LAYER_MASK_NPC_SIGHT (Layer_Default | Layer_Geometry | Layer_Door | Layer_InterDebris \
-                             | Layer_PhysObjects | Layer_Player)
-
-#define LAYER_MASK_NPC_ATTACK (Layer_Default | Layer_Geometry | Layer_NPC | Layer_Door \
-                              | Layer_InterDebris | Layer_PhysObjects | Layer_Player)
-
-#define LAYER_MASK_NPC_COLLISION (Layer_Default | Layer_TransparentFX | Layer_IgnoreRaycast | Layer_Geometry \
-                                 | Layer_NPC | Layer_Door | Layer_InterDebris | Layer_Player \
-                                 | Layer_Clip | Layer_NPCClip | Layer_PhysObjects)
-
-#define LAYER_MASK_PLAYER_FROB (Layer_Default | Layer_Geometry | Layer_Water | Layer_Door \
-                               | Layer_InterDebris | Layer_PhysObjects | Layer_CorpseSearchable)
-
-#define LAYER_MASK_PLAYER_TARGET_ID_FROB (Layer_Default | Layer_Geometry | Layer_Door | Layer_NPC | Layer_CorpseSearchable)
-
-#define LAYER_MASK_PLAYER_ATTACK (Layer_Default | Layer_Geometry | Layer_NPC | Layer_PlayerBullets \
-                                 | Layer_Door | Layer_InterDebris | Layer_PhysObjects | Layer_CorpseSearchable)
-
-#define LAYER_MASK_EXPLOSION (Layer_Default | Layer_Geometry | Layer_NPC | Layer_PlayerBullets | Layer_Door \
-                             | Layer_InterDebris | Layer_PhysObjects | Layer_Player | Layer_Player2 | Layer_CorpseSearchable)
-
-#define LAYER_MASK_PLAYER_FEET (Layer_Default | Layer_Geometry)
+#define LAYER_MASK_PLAYER_COLLIDESWITH   (Layer_Clip|Layer_NPCBullet|Layer_Player2|Layer_Door|Layer_Trigger|Layer_PlayerTriggerOnly|Layer_Default|Layer_TransparentFX|Layer_Geometry|Layer_NPC)
+#define LAYER_MASK_NPC_COLLIDESWITH      (Layer_Clip|Layer_NPCClip|Layer_PlayerBullets|Layer_Player2|Layer_Player|Layer_Door|Layer_Trigger|Layer_NPCTrigger|Layer_Default|Layer_TransparentFX|Layer_Geometry|Layer_NPC)
+#define LAYER_MASK_NPC_SIGHT             (Layer_Default|Layer_Geometry|Layer_Door|Layer_InterDebris|Layer_PhysObjects|Layer_Player)
+#define LAYER_MASK_NPC_ATTACK            (Layer_Default|Layer_Geometry|Layer_NPC|Layer_Door|Layer_InterDebris|Layer_PhysObjects|Layer_Player)
+#define LAYER_MASK_NPC_COLLISION         (Layer_Default|Layer_TransparentFX|Layer_Geometry|Layer_NPC|Layer_Door|Layer_InterDebris|Layer_Player|Layer_Clip|Layer_NPCClip|Layer_PhysObjects)
+#define LAYER_MASK_PLAYER_FROB           (Layer_Default|Layer_Geometry|Layer_Water|Layer_Door|Layer_InterDebris|Layer_PhysObjects|Layer_CorpseSearchable)
+#define LAYER_MASK_PLAYER_TARGET_ID_FROB (Layer_Default|Layer_Geometry|Layer_Door|Layer_NPC|Layer_CorpseSearchable)
+#define LAYER_MASK_PLAYER_ATTACK         (Layer_Default|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Door|Layer_InterDebris|Layer_PhysObjects|Layer_CorpseSearchable)
+#define LAYER_MASK_EXPLOSION             (Layer_Default|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Door|Layer_InterDebris|Layer_PhysObjects|Layer_Player|Layer_Player2|Layer_CorpseSearchable)
+#define LAYER_MASK_PLAYER_FEET           (Layer_Default|Layer_Geometry)
 typedef struct {
 	i32 InputCodeSettings[42];
 	u16 ScreenWidth,ScreenHeight;
@@ -516,8 +496,7 @@ typedef /*FAT*/ struct  {
     u64 ioflags;
     u32 entflags;
     
-    u16 modelIndex;
-    u16 index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
+    u16 modelIndex,index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
     
     Vector3 position;
     float radius,shadRadius;
@@ -619,7 +598,7 @@ typedef struct { u8 dataType; const char* fieldName; } EntityField;
 typedef __builtin_va_list va_list;
 typedef struct { char soundPath[128]; } ma_sound;
 typedef struct {
-    u32 globalFrameNum,lastFrameSecCount,framesPerLastSecond,worstFPS,debugLineVertCount,shotsFired,grenadesThrown,savesScummed;
+    u32 frame,lastFrameSecCount,framesPerLastSecond,worstFPS,debugLineVertCount,shotsFired,grenadesThrown,savesScummed;
     u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,loadedInstances,loadedLights; // Numbers of instances of entities and lights loaded (always for just the current level)
     float farPlane,damageDealt,damageReceived,timeScale,worldMin_x,worldMin_z,voxelMinCenterX,voxelMinCenterZ;
 	double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,debugLineFinished,shakeFinished,last_time,last_topframe_time,last_physics_time,deltaTime,current_time,timeSinceLastPhysicsTick,screenshotTimeout,pauseRelativeTime,absoluteTime,statusTextDecayFinished,justSavedTimeStamp;

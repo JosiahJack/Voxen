@@ -1,0 +1,8 @@
+ActivateButton: -
+AIAnimationController:
+bool useDeadAnimForDeath,playDeathAnim,playDyingAnim,dying,checkVisWithSMR,pauseStateUpdated,firstUpdateAfterLoad,doneDidDead;
+float minWalkSpeedToAnimate,currentClipPercentage,animSwapFinished;
+u8 clipName,loadedClip;
+
+AIController:
+u16 index;

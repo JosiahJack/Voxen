@@ -249,7 +249,7 @@ typedef struct { double shadowTime; u32 shadowmapIndirectionList[LIGHT_COUNT]; f
 VoxenShadowSystem voxen_Shadow_System;
 u16 loadedTexturesMaxIndex;
 bool doubleSidedTexture[MAX_VALID_TEXTURE],transparentTexture[MAX_VALID_TEXTURE];
-u32 drawCallsRenderedThisFrame,uiImageDrawCallsRenderedThisFrame,shadowDrawCallsRenderedThisFrame,verticesRenderedThisFrame,drawCallsNormal;
+u32 drawCalls,uiDrawCalls,shadDrawCalls,vertsRendered,drawCallsNormal;
 static const u8 Mpg_FrontPage=0,Mpg_Singleplayer=1,Mpg_Multiplayer=2,Mpg_NewGame=3,Mpg_Load=4,Mpg_Options=5,Mpg_Save=6,Mpg_IntroVideo=7,Mpg_CreditsVideo=8;
 u8 currentMenuPage = Mpg_FrontPage; bool resDropdownOpen = false; int resDropdownCount=0,resSelectedIdx=0;
 typedef struct {int w,h;} ResMode;
@@ -4171,23 +4171,21 @@ static Vector3 ClosestPointOBB(Vector3 p, ShapeBox b) {
 
 static OverlapResult SphereOBB(Vector3 center, float radius, ShapeBox box) {
     OverlapResult r = {0};
-    Vector3 closest = ClosestPointOBB(center, box);
-    Vector3 delta = V3_AsubB(center, closest);
-    float distSq = V3_dot(delta, delta);
+    Vector3 closest = ClosestPointOBB(center,box);
+    Vector3 delta = V3_AsubB(center,closest);
+    float distSq = V3_dot(delta,delta);
     if (distSq >= radius * radius) return r;
 
-    float dist = vsqrtf(vmax(distSq, 0.0f));
-    r.hit = true;
+    r.hit = true; float dist = vsqrtf(vmax(distSq, 0.0f));
     if (dist > COLLISION_EPSILON) { r.normal = V3_ScaleByF(delta, 1.0f / dist); r.overlapAmount = radius - dist; }
-    else {
-        // Center is inside OBB — find minimum penetration axis
-        Vector3 ax, ay, az; obb_axes(box.rot, &ax, &ay, &az);
-        Vector3 local = V3_AsubB(center, box.center);
-        float lx = V3_dot(local, ax), ly = V3_dot(local, ay), lz = V3_dot(local, az);
+    else { // Center is inside OBB — find minimum penetration axis
+        Vector3 ax,ay,az; obb_axes(box.rot,&ax,&ay,&az);
+        Vector3 local = V3_AsubB(center,box.center);
+        float lx = V3_dot(local,ax), ly = V3_dot(local,ay), lz = V3_dot(local,az);
         float dx = box.halfExtents.x - vabs(lx), dy = box.halfExtents.y - vabs(ly), dz = box.halfExtents.z - vabs(lz);
-        if (dx < dy && dx < dz) { r.normal = V3_ScaleByF(ax, lx > 0 ? 1.f : -1.f); r.overlapAmount = radius + dx; }
-        else if (dy < dz)       { r.normal = V3_ScaleByF(ay, ly > 0 ? 1.f : -1.f); r.overlapAmount = radius + dy; }
-        else                    { r.normal = V3_ScaleByF(az, lz > 0 ? 1.f : -1.f); r.overlapAmount = radius + dz; }
+        if (dx < dy && dx < dz) { r.normal = V3_ScaleByF(ax,lx > 0 ? 1.f : -1.f); r.overlapAmount = radius + dx; }
+        else if (dy < dz)       { r.normal = V3_ScaleByF(ay,ly > 0 ? 1.f : -1.f); r.overlapAmount = radius + dy; }
+        else                    { r.normal = V3_ScaleByF(az,lz > 0 ? 1.f : -1.f); r.overlapAmount = radius + dz; }
     }
     r.point = closest;
     return r;
@@ -4195,58 +4193,43 @@ static OverlapResult SphereOBB(Vector3 center, float radius, ShapeBox box) {
 
 static u32 GetCollisionMask(u32 layer) {
     if (layer == Layer_NPCTrigger || layer == Layer_NPCClip) return Layer_NPC;
-    if (layer == Layer_TransparentFX || layer == Layer_IgnoreRaycast) return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_NPCBullet|Layer_Clip;
     switch (layer) {
-        case Layer_Default:           return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_Corpse|Layer_PhysObjects|Layer_Sky|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_Player3|Layer_Player4|Layer_NPCBullet|Layer_Clip|Layer_CorpseSearchable;
-        case Layer_Geometry:          return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_Clip;
-        case Layer_NPC:               return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_Trigger|Layer_NPCTrigger|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_NPCBullet|Layer_NPCClip|Layer_Clip;
-        case Layer_PlayerBullets:     return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_Corpse|Layer_PhysObjects|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_NPCBullet|Layer_Clip|Layer_CorpseSearchable;
-        case Layer_Player:            return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PhysObjects|Layer_PlayerTriggerOnly|Layer_Trigger|Layer_Door|Layer_Player2|Layer_NPCBullet|Layer_Clip;
+        case Layer_Default:           return Layer_Default|Layer_TransparentFX|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_Corpse|Layer_PhysObjects|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_NPCBullet|Layer_Clip|Layer_CorpseSearchable;
+        case Layer_TransparentFX:     return Layer_Default|Layer_TransparentFX|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_NPCBullet|Layer_Clip;
+        case Layer_Geometry:          return Layer_Default|Layer_TransparentFX|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_Clip;
+        case Layer_NPC:               return Layer_Default|Layer_TransparentFX|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_Trigger|Layer_NPCTrigger|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_NPCBullet|Layer_NPCClip|Layer_Clip;
+        case Layer_PlayerBullets:     return Layer_Default|Layer_TransparentFX|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_Corpse|Layer_PhysObjects|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_NPCBullet|Layer_Clip|Layer_CorpseSearchable;
+        case Layer_Player:            return Layer_Default|Layer_TransparentFX|Layer_Geometry|Layer_NPC|Layer_PhysObjects|Layer_PlayerTriggerOnly|Layer_Trigger|Layer_Door|Layer_Player2|Layer_NPCBullet|Layer_Clip;
         case Layer_Corpse:            return Layer_Default|Layer_Geometry|Layer_PlayerBullets|Layer_PhysObjects|Layer_Door|Layer_NPCBullet|Layer_Clip;
-        case Layer_PhysObjects:       return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_Corpse|Layer_PhysObjects|Layer_Door|Layer_InterDebris|Layer_NPCBullet|Layer_Clip;
-        case Layer_Sky:               return Layer_Default|Layer_Player;
-        case Layer_PlayerTriggerOnly: return Layer_Player|Layer_Player2|Layer_Player3;
+        case Layer_PhysObjects:       return Layer_Default|Layer_TransparentFX|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_Corpse|Layer_PhysObjects|Layer_Door|Layer_InterDebris|Layer_NPCBullet|Layer_Clip;
+        case Layer_PlayerTriggerOnly: return Layer_Player|Layer_Player2;
         case Layer_Trigger:           return Layer_Default|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_Door|Layer_InterDebris|Layer_Clip;
-        case Layer_Door:              return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_Corpse|Layer_PhysObjects|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_NPCBullet|Layer_Clip;
+        case Layer_Door:              return Layer_Default|Layer_TransparentFX|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_Corpse|Layer_PhysObjects|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_NPCBullet|Layer_Clip;
         case Layer_InterDebris:       return Layer_Default|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_PhysObjects|Layer_Trigger|Layer_Door|Layer_NPCBullet|Layer_Clip;
-        case Layer_Player2:           return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_PlayerTriggerOnly|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_NPCBullet|Layer_Clip;
-        case Layer_Player3:           return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_PlayerTriggerOnly|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player3|Layer_NPCBullet|Layer_Clip;
-        case Layer_Player4:           return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_PlayerTriggerOnly|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player4|Layer_NPCBullet|Layer_Clip;
-        case Layer_NPCBullet:         return Layer_Default|Layer_TransparentFX|Layer_IgnoreRaycast|Layer_Geometry|Layer_PlayerBullets|Layer_Player|Layer_Corpse|Layer_PhysObjects|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_Clip|Layer_CorpseSearchable;
-        case Layer_Clip:              return Layer_Player|Layer_Player2|Layer_Player3|Layer_Player4|Layer_NPC;
+        case Layer_Player2:           return Layer_Default|Layer_TransparentFX|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_PlayerTriggerOnly|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_NPCBullet|Layer_Clip;
+        case Layer_NPCBullet:         return Layer_Default|Layer_TransparentFX|Layer_Geometry|Layer_PlayerBullets|Layer_Player|Layer_Corpse|Layer_PhysObjects|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_Clip|Layer_CorpseSearchable;
+        case Layer_Clip:              return Layer_Player|Layer_Player2|Layer_NPC;
         case Layer_CorpseSearchable:  return Layer_Default|Layer_PlayerBullets;
         default:                      return 0u;
     }
 }
 
 void Entity_GetCapsule(const Entity *e, ShapeCapsule *out) {
-    float r = e->colliderSize.x;
-    float hi = vmax(0.0f, (e->colliderSize.y * 0.5f) - r);
+    float r = e->colliderSize.x; float hi = vmax(0.0f, (e->colliderSize.y * 0.5f) - r);
     Vector3 wc = V3_AplusB(e->position, quat_rotate_vector(e->rotation, e->colliderCenter));
-    Vector3 axis = (e->colliderSize.z < 0.5f) ? quat_rotate_vector(e->rotation, (Vector3){1,0,0})
-                 : (e->colliderSize.z < 1.5f) ? quat_rotate_vector(e->rotation, (Vector3){0,1,0})
-                 : quat_rotate_vector(e->rotation, (Vector3){0,0,1});
-    out->radius = r;
-    out->base = V3_AsubB(wc, V3_ScaleByF(axis, hi));
-    out->tip  = V3_AplusB(wc, V3_ScaleByF(axis, hi));
+    Vector3 axis = (e->colliderSize.z < 0.5f) ? quat_rotate_vector(e->rotation,(Vector3){1,0,0}) : (e->colliderSize.z < 1.5f) ? quat_rotate_vector(e->rotation,(Vector3){0,1,0}) : quat_rotate_vector(e->rotation,(Vector3){0,0,1});
+    out->radius = r; out->base = V3_AsubB(wc,V3_ScaleByF(axis,hi)); out->tip  = V3_AplusB(wc,V3_ScaleByF(axis,hi));
 }
 
-void Entity_GetBox(const Entity *e, ShapeBox *out) { out->center = V3_AplusB(e->position,quat_rotate_vector(e->rotation,e->colliderCenter)); out->halfExtents = (Vector3){ e->colliderSize.x * 0.5f * e->scale.x,e->colliderSize.y * 0.5f * e->scale.y,e->colliderSize.z * 0.5f * e->scale.z }; out->rot = e->rotation; }
-void Entity_GetSphere(const Entity *e, ShapeSphere *out) { out->center = V3_AplusB(e->position, quat_rotate_vector(e->rotation, e->colliderCenter)); out->radius = e->colliderSize.x * vmax(e->scale.x,vmax(e->scale.y,e->scale.z)); }
-static inline Color ColliderColor(Entity *e) {
-    if (!(e->entflags & ENTFLAG_RIGIDBODY)) return textColors[TEXT_GREEN_MENU_SHADOW];
-    return (e->colliding) ? textColors[TEXT_RED] : textColors[TEXT_GREEN];
-}
+void Entity_GetBox(const Entity *e, ShapeBox *out) { out->center=V3_AplusB(e->position,quat_rotate_vector(e->rotation,e->colliderCenter)); out->halfExtents=(Vector3){e->colliderSize.x*0.5f * e->scale.x,e->colliderSize.y*0.5f * e->scale.y,e->colliderSize.z*0.5f * e->scale.z}; out->rot=e->rotation; }
+void Entity_GetSphere(const Entity *e, ShapeSphere *out) { out->center = V3_AplusB(e->position,quat_rotate_vector(e->rotation,e->colliderCenter)); out->radius = e->colliderSize.x * vmax(e->scale.x,vmax(e->scale.y,e->scale.z)); }
+static inline Color ColliderColor(Entity *e) { return (!(e->entflags & ENTFLAG_RIGIDBODY)) ? textColors[TEXT_GREEN_MENU_SHADOW] : ((e->colliding) ? textColors[TEXT_RED] : textColors[TEXT_GREEN]); }
 static void DrawVelocityVector(Entity *e) {
     if (!(e->entflags & ENTFLAG_RIGIDBODY)) return;
-    float spd = V3_Mag(e->velocity); if (spd < 0.01f) return;
-    Vector3 tip = V3_AplusB(e->position, V3_ScaleByF(e->velocity, 0.25f)); // scale so it's readable
-    AddDebugLine(e->position, tip, textColors[TEXT_ORANGE]);
-    // Small cross at tip so zero-length vecs are still visible when barely moving
-    Vector3 ref = (vabs(e->velocity.y/spd) < 0.9f) ? (Vector3){0,1,0} : (Vector3){1,0,0};
-    Vector3 perp = V3_Normalize(V3_Cross(e->velocity, ref));
-    float tickLen = 0.05f;
-    AddDebugLine(V3_AplusB(tip,V3_ScaleByF(perp, tickLen)), V3_AsubB(tip,V3_ScaleByF(perp, tickLen)), textColors[TEXT_ORANGE]);
+
+    Vector3 tip = V3_AplusB(e->position,V3_ScaleByF(e->velocity,0.25f)); AddDebugLine(e->position,tip,textColors[TEXT_ORANGE]);
+    Vector3 perp = V3_Normalize(V3_Cross(e->velocity,(vabs(e->velocity.y/V3_Mag(e->velocity)) < 0.9f) ? (Vector3){0,1,0} : (Vector3){1,0,0}));
+    AddDebugLine(V3_AplusB(tip,V3_ScaleByF(perp,0.05f)),V3_AsubB(tip,V3_ScaleByF(perp,0.05f)),textColors[TEXT_ORANGE]); // Small cross at tip so zero-length vecs are still visible when barely moving
 }
 
 void DrawBoxCollider(Entity *e) {
@@ -4261,22 +4244,22 @@ void DrawBoxCollider(Entity *e) {
 }
 
 void DrawSphereCollider(Entity *e) {
-    Color col = ColliderColor(e);
-    ShapeSphere s; Entity_GetSphere(e,&s); float step=6.28318530f/12;
+    Color col = ColliderColor(e); ShapeSphere s; Entity_GetSphere(e,&s); float step=6.28318530f/12;
     for (int seg=0;seg<12;seg++) {
         float a0=seg*step,a1=a0+step,c0=vcosf(a0),s0=vsinf(a0),c1=vcosf(a1),s1=vsinf(a1);
         AddDebugLine(V3_AplusB(s.center,(Vector3){c0*s.radius,0,s0*s.radius}),V3_AplusB(s.center,(Vector3){c1*s.radius,0,s1*s.radius}),col);
         AddDebugLine(V3_AplusB(s.center,(Vector3){c0*s.radius,s0*s.radius,0}),V3_AplusB(s.center,(Vector3){c1*s.radius,s1*s.radius,0}),col);
         AddDebugLine(V3_AplusB(s.center,(Vector3){0,c0*s.radius,s0*s.radius}),V3_AplusB(s.center,(Vector3){0,c1*s.radius,s1*s.radius}),col);
     }
+    
     DrawVelocityVector(e);
 }
 
-void DrawConvexMeshCollider(Entity *e) {
-    Color col = ColliderColor(e);
-    u16 mi=e->colliderMeshIndex; if (mi==MODEL_IDX_MAX||mi>=loadedModelsMaxIndex) return;
+void DrawMeshCollider(Entity *e) {
+    Color col = ColliderColor(e); u16 mi= (e->collider == COLLIDER_TYPE_CONVEXMESH) ? e->colliderMeshIndex : e->modelIndex; if (mi >= MODEL_IDX_MAX || mi >= loadedModelsMaxIndex) return;
     u32 triCount=modelTriangleCounts[mi]; if (!triCount) return;
-    u16 idx=(u16)(e-Sys_Global.instances);
+    
+    u16 idx = (u16)(e - Sys_Global.instances);
     float M[16]; CopyMemoryFromBtoAForNBytes(M,&modelMatrices[idx*16],64);
     float m00=M[0],m10=M[1],m20=M[2],m01=M[4],m11=M[5],m21=M[6],m02=M[8],m12=M[9],m22=M[10],tx=M[12],ty=M[13],tz=M[14];
     for (u32 j=0;j<triCount;j++) {
@@ -4318,114 +4301,72 @@ void DrawCapsuleCollider(Entity *e) {
     DrawVelocityVector(e);
 }
 
-static u16 cellLists[WORLDX*WORLDX][128];
-static u16 cellCounts[WORLDX*WORLDX];
-float GetCollisionRadius(Entity *e) {
-    if (e->collider == COLLIDER_TYPE_BOX) {
-        float hx = e->colliderSize.x * 0.5f * e->scale.x;
-        float hy = e->colliderSize.y * 0.5f * e->scale.y;
-        float hz = e->colliderSize.z * 0.5f * e->scale.z;
-        return vsqrtf(hx*hx + hy*hy + hz*hz);
-    }
-    return e->colliderSize.x;
-}
+static u16 cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX];
+float GetCollisionRadius(Entity *e) { if (e->collider == COLLIDER_TYPE_BOX) { float hx = e->colliderSize.x * 0.5f * e->scale.x, hy = e->colliderSize.y * 0.5f * e->scale.y, hz = e->colliderSize.z * 0.5f * e->scale.z; return vsqrtf(hx*hx + hy*hy + hz*hz); } return e->colliderSize.x; }
 Quaternion quat_from_axis_angle(Vector3 axis, float angle) { float half = angle * 0.5f; float s = vsinf(half); return (Quaternion){axis.x * s,axis.y * s,axis.z * s,vcosf(half)}; }
-Quaternion quat_normalize(Quaternion q) {
-    float len2 = q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w;
-    if (len2 < COLLISION_EPSILON) return (Quaternion){0,0,0,1};
-    float inv = 1.0f / vsqrtf(len2); q.x *= inv; q.y *= inv; q.z *= inv; q.w *= inv; return q;
-}
-
-static void ConstrainCapsuleAngularVelocity(Entity *e) {
-    if (e->collider != COLLIDER_TYPE_CAPSULE) return;
-
-    // Get the capsule's permitted rotation axis in world space
-    Vector3 localAxis = (e->colliderSize.z < 0.5f)  ? (Vector3){1,0,0}   // X
-                      : (e->colliderSize.z < 1.5f)  ? (Vector3){0,1,0}   // Y
-                      :                               (Vector3){0,0,1};  // Z
-    Vector3 worldAxis = quat_rotate_vector(e->rotation, localAxis);
-
-    // Project angularVelocity onto that axis only — discard all other components
-    float proj = V3_dot(e->angularVelocity, worldAxis);
-    e->angularVelocity = V3_ScaleByF(worldAxis, proj);
-}
-
+Quaternion quat_normalize(Quaternion q) { float len2 = q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w; if (len2 < COLLISION_EPSILON) {return (Quaternion){0,0,0,1};} float inv = 1.0f / vsqrtf(len2); q.x *= inv; q.y *= inv; q.z *= inv; q.w *= inv; return q; }
 static void ApplyVelocity(Entity *e, float dt) {
-    Vector3 acc = {0, -9.81f * e->gravity, 0};
-    acc = V3_AplusB(acc, V3_ScaleByF(e->accumulatedForce, 1.f / e->mass));
-    e->velocity = V3_AplusB(e->velocity, V3_ScaleByF(acc, dt));
-
+    Vector3 acc = {0,-9.81f*e->gravity,0};
+    acc = V3_AplusB(acc,V3_ScaleByF(e->accumulatedForce,1.f / e->mass));
+    e->velocity = V3_AplusB(e->velocity,V3_ScaleByF(acc,dt));
     float speed = V3_Mag(e->velocity);
-    if (speed > MAX_SPEED)
-        e->velocity = V3_ScaleByF(V3_ScaleByF(e->velocity, 1.f / speed), MAX_SPEED);
-
-    // Linear drag: tuned coefficient (was -0.05 ≈ no drag; use ~2.0 for noticeable air resistance)
+    if (speed > MAX_SPEED) e->velocity = V3_ScaleByF(V3_ScaleByF(e->velocity, 1.f / speed),MAX_SPEED);
     float linDrag = vexp(-2.0f * dt);
-    e->velocity = V3_ScaleByF(e->velocity, linDrag);
-
-    e->position = V3_AplusB(e->position, V3_ScaleByF(e->velocity, dt));
-
-    // Clamp angular speed BEFORE applying drag so the limit is enforced on the raw value
-    float avel = V3_Mag(e->angularVelocity);
-    if (avel > MAX_ANGULAR_SPEED) {
-        e->angularVelocity = V3_ScaleByF(V3_ScaleByF(e->angularVelocity, 1.f / avel), MAX_ANGULAR_SPEED);
-        avel = MAX_ANGULAR_SPEED;
-    }
-
-    float dragFactor = vexp(-e->angularDrag * dt);
-    e->angularVelocity = V3_ScaleByF(e->angularVelocity, dragFactor);
-    ConstrainCapsuleAngularVelocity(e);
-    avel = V3_Mag(e->angularVelocity);
-    if (avel > COLLISION_EPSILON) {
-        Quaternion dq = quat_from_axis_angle(V3_ScaleByF(e->angularVelocity, 1.f / avel), avel * dt);
-        e->rotation = quat_normalize(quat_multiply(dq, e->rotation));
-    }
+    e->velocity = V3_ScaleByF(e->velocity,linDrag);
+    e->position = V3_AplusB(e->position,V3_ScaleByF(e->velocity,dt));
+    if (e->collider != COLLIDER_TYPE_CAPSULE) {
+        float avel = V3_Mag(e->angularVelocity);
+        if (avel > MAX_ANGULAR_SPEED) { e->angularVelocity = V3_ScaleByF(V3_ScaleByF(e->angularVelocity,1.f / avel),MAX_ANGULAR_SPEED); avel = MAX_ANGULAR_SPEED; }
+        float dragFactor = vexp(-e->angularDrag * dt);
+        e->angularVelocity = V3_ScaleByF(e->angularVelocity,dragFactor);
+        avel = V3_Mag(e->angularVelocity);
+        if (avel > COLLISION_EPSILON) { Quaternion dq = quat_from_axis_angle(V3_ScaleByF(e->angularVelocity,1.f / avel),avel * dt); e->rotation = quat_normalize(quat_multiply(dq,e->rotation)); }
+    } else e->angularVelocity = (Vector3){0.0f,0.0f,0.0f};
 }
 
 static OverlapResult BoxBoxSAT(ShapeBox a, ShapeBox b) {
-    OverlapResult r = {0};
-    Vector3 aAxes[3], bAxes[3];
-    obb_axes(a.rot, &aAxes[0], &aAxes[1], &aAxes[2]);
-    obb_axes(b.rot, &bAxes[0], &bAxes[1], &bAxes[2]);
-    Vector3 T = V3_AsubB(b.center, a.center);
-    float R[3][3], AbsR[3][3];
+    OverlapResult r = {0}; Vector3 aAxes[3],bAxes[3];
+    obb_axes(a.rot,&aAxes[0],&aAxes[1],&aAxes[2]);
+    obb_axes(b.rot,&bAxes[0],&bAxes[1],&bAxes[2]);
+    Vector3 T = V3_AsubB(b.center,a.center);
+    float R[3][3],AbsR[3][3];
     for (int i=0;i<3;i++) for (int j=0;j<3;j++) { R[i][j]=V3_dot(aAxes[i],bAxes[j]); AbsR[i][j]=vabs(R[i][j])+1e-6f; }
     float minOverlap=1e9f; int bestAxis=-1; bool flipNormal=false; Vector3 bestEdgeAxis={0,1,0};
-    // Face axes A
-    for (int i=0;i<3;i++) {
+    for (int i=0;i<3;i++) { // Face axes A
         float ra=((float*)&a.halfExtents)[i], rb=b.halfExtents.x*AbsR[i][0]+b.halfExtents.y*AbsR[i][1]+b.halfExtents.z*AbsR[i][2];
         float t=vabs(V3_dot(T,aAxes[i])); if (t>ra+rb) return r;
+        
         float ov=(ra+rb)-t; if (ov<minOverlap) { minOverlap=ov; bestAxis=i; flipNormal=(V3_dot(T,aAxes[i])<0.f); }
     }
-    // Face axes B
-    for (int i=0;i<3;i++) {
+   
+    for (int i=0;i<3;i++) { // Face axes B
         float ra=a.halfExtents.x*AbsR[0][i]+a.halfExtents.y*AbsR[1][i]+a.halfExtents.z*AbsR[2][i], rb=((float*)&b.halfExtents)[i];
         float t=vabs(V3_dot(T,bAxes[i])); if (t>ra+rb) return r;
+        
         float ov=(ra+rb)-t; if (ov<minOverlap) { minOverlap=ov; bestAxis=3+i; flipNormal=(V3_dot(T,bAxes[i])<0.f); }
     }
-    // Edge-edge cross products — store winning edgeAxis when it becomes the best
-    for (int i=0;i<3;i++) for (int j=0;j<3;j++) {
+   
+    for (int i=0;i<3;i++) for (int j=0;j<3;j++) { // Edge-edge cross products — store winning edgeAxis when it becomes the best
         int i1=(i+1)%3, i2=(i+2)%3, j1=(j+1)%3, j2=(j+2)%3;
         float t=vabs(V3_dot(T,aAxes[i2])*R[i1][j] - V3_dot(T,aAxes[i1])*R[i2][j]);
         float ra=((float*)&a.halfExtents)[i1]*AbsR[i2][j]+((float*)&a.halfExtents)[i2]*AbsR[i1][j];
         float rb=((float*)&b.halfExtents)[j1]*AbsR[i][j2]+((float*)&b.halfExtents)[j2]*AbsR[i][j1];
         if (t>ra+rb) return r;
+        
         float axLenSq=1.f-(R[i][j]*R[i][j]);
         if (axLenSq>1e-4f) {
             float ov=((ra+rb)-t)/vsqrtf(axLenSq);
-            if (ov<minOverlap) {
-                Vector3 ea=V3_Cross(aAxes[i],bAxes[j]);
-                minOverlap=ov; bestAxis=6+i*3+j; bestEdgeAxis=ea; flipNormal=(V3_dot(T,ea)<0.f);
-            }
+            if (ov<minOverlap) { Vector3 ea=V3_Cross(aAxes[i],bAxes[j]); minOverlap=ov; bestAxis=6+i*3+j; bestEdgeAxis=ea; flipNormal=(V3_dot(T,ea)<0.f); }
         }
     }
+    
     if (bestAxis<0) return r;
+    
     r.hit=true; r.overlapAmount=minOverlap;
-    // Normal: points from B toward A (push A out)
-    if      (bestAxis<3) r.normal=flipNormal ? aAxes[bestAxis]               : V3_ScaleByF(aAxes[bestAxis],-1.f);
-    else if (bestAxis<6) r.normal=flipNormal ? bAxes[bestAxis-3]             : V3_ScaleByF(bAxes[bestAxis-3],-1.f);
-    else                 r.normal=flipNormal ? V3_Normalize(bestEdgeAxis)     : V3_ScaleByF(V3_Normalize(bestEdgeAxis),-1.f);
-    // Support point of A deepest into B
+    if      (bestAxis<3) r.normal=flipNormal ? aAxes[bestAxis]            : V3_ScaleByF(aAxes[bestAxis],-1.f);
+    else if (bestAxis<6) r.normal=flipNormal ? bAxes[bestAxis-3]          : V3_ScaleByF(bAxes[bestAxis-3],-1.f);
+    else                 r.normal=flipNormal ? V3_Normalize(bestEdgeAxis) : V3_ScaleByF(V3_Normalize(bestEdgeAxis),-1.f);
+    
     Vector3 sA=a.center;
     sA=V3_AplusB(sA,V3_ScaleByF(aAxes[0],(V3_dot(aAxes[0],r.normal)<0.f?1.f:-1.f)*a.halfExtents.x));
     sA=V3_AplusB(sA,V3_ScaleByF(aAxes[1],(V3_dot(aAxes[1],r.normal)<0.f?1.f:-1.f)*a.halfExtents.y));
@@ -4445,50 +4386,30 @@ static Vector3 MeshSupport(u16 m, const float* M, Vector3 d) {
 typedef struct { Vector3 v[4]; int n; } Simplex3D;
 static inline Vector3 MinkowskiSupport(u16 mA, const float* mxA, u16 mB, const float* mxB, Vector3 d) { return V3_AsubB(MeshSupport(mA,mxA,d), MeshSupport(mB,mxB,(Vector3){-d.x,-d.y,-d.z})); }
 static inline Vector3 TP(Vector3 a, Vector3 b, Vector3 c) { return V3_Cross(V3_Cross(a,b),c); }
-
-// ── Capsule support for GJK: returns the support point of a capsule in direction d ──
-static inline Vector3 CapsuleSupport(ShapeCapsule cap, Vector3 d) {
-    // Farthest endpoint along d, then offset by radius
-    float db = V3_dot(cap.base, d), dt = V3_dot(cap.tip, d);
-    Vector3 best = (dt > db) ? cap.tip : cap.base;
-    float L = V3_dot(d,d); // avoid sqrt: normalize only if needed
-    if (L < COLLISION_EPSILON) return best;
-    return V3_AplusB(best, V3_ScaleByF(d, cap.radius / vsqrtf(L)));
-}
-
-// ── Minkowski support: capsule minus convex mesh ──
-static inline Vector3 MinkowskiSupportCapsuleMesh(ShapeCapsule cap, u16 mesh, const float* mx, Vector3 d) {
-    return V3_AsubB(CapsuleSupport(cap, d), MeshSupport(mesh, mx, (Vector3){-d.x,-d.y,-d.z}));
-}
-
+static inline Vector3 CapsuleSupport(ShapeCapsule cap, Vector3 d) { float db = V3_dot(cap.base,d),dt = V3_dot(cap.tip,d); Vector3 best = (dt > db) ? cap.tip : cap.base; float L = V3_dot(d,d); if (L < COLLISION_EPSILON) {return best;} return V3_AplusB(best,V3_ScaleByF(d,cap.radius / vsqrtf(L))); }
+static inline Vector3 MinkowskiSupportCapsuleMesh(ShapeCapsule cap, u16 mesh, const float* mx, Vector3 d) { return V3_AsubB(CapsuleSupport(cap, d), MeshSupport(mesh, mx, (Vector3){-d.x,-d.y,-d.z})); }
 static bool GJKNextSimplex(Simplex3D *s, Vector3 *dir) {
     Vector3 A=s->v[s->n-1], AO={-A.x,-A.y,-A.z};
     if (s->n==2) {
         Vector3 AB=V3_AsubB(s->v[0],A);
         if (V3_dot(AB,AO)>0.f) *dir=TP(AB,AO,AB);
         else { s->n=1; s->v[0]=A; *dir=AO; }
-        // Degenerate check applies regardless of which branch was taken
-        if (V3_dot(*dir,*dir)<COLLISION_EPSILON) {
-            Vector3 px=(vabs(AB.x)>0.9f)?(Vector3){0,1,0}:(Vector3){1,0,0};
-            *dir=V3_Cross(AB,px);
-        }
+
+        if (V3_dot(*dir,*dir)<COLLISION_EPSILON) { Vector3 px = (vabs(AB.x)>0.9f) ? (Vector3){0,1,0} : (Vector3){1,0,0}; *dir=V3_Cross(AB,px); } // Degenerate check applies regardless of which branch was taken
         return true;
     }
     if (s->n==3) {
         Vector3 B=s->v[1],C=s->v[0], AB=V3_AsubB(B,A),AC=V3_AsubB(C,A), ABC=V3_Cross(AB,AC);
         if (V3_dot(V3_Cross(ABC,AC),AO)>0.f) {
-            if (V3_dot(AC,AO)>0.f) { s->v[1]=A; s->n=2; *dir=TP(AC,AO,AC); }
-            else goto line_AB3;
+            if (V3_dot(AC,AO)>0.f) { s->v[1]=A; s->n=2; *dir=TP(AC,AO,AC); } else goto line_AB3;
         } else if (V3_dot(V3_Cross(AB,ABC),AO)>0.f) {
-            line_AB3: if (V3_dot(AB,AO)>0.f) { s->v[0]=B; s->v[1]=A; s->n=2; *dir=TP(AB,AO,AB); }
-                      else { s->v[0]=A; s->n=1; *dir=AO; }
+            line_AB3: if (V3_dot(AB,AO)>0.f) { s->v[0]=B; s->v[1]=A; s->n=2; *dir=TP(AB,AO,AB); } else { s->v[0]=A; s->n=1; *dir=AO; }
         } else {
-            if (V3_dot(ABC,AO)>0.f) *dir=ABC;
-            else { Vector3 t=s->v[0]; s->v[0]=s->v[1]; s->v[1]=t; *dir=(Vector3){-ABC.x,-ABC.y,-ABC.z}; }
+            if (V3_dot(ABC,AO)>0.f) {*dir=ABC;} else { Vector3 t=s->v[0]; s->v[0]=s->v[1]; s->v[1]=t; *dir=(Vector3){-ABC.x,-ABC.y,-ABC.z}; }
         }
         return true;
     }
-    // n==4 tetrahedron — unchanged from original
+
     Vector3 B=s->v[2],C=s->v[1],D=s->v[0];
     Vector3 AB=V3_AsubB(B,A),AC=V3_AsubB(C,A),AD=V3_AsubB(D,A);
     Vector3 nABC=V3_Cross(AB,AC),nACD=V3_Cross(AC,AD),nADB=V3_Cross(AD,AB);
@@ -4501,17 +4422,16 @@ static bool GJKNextSimplex(Simplex3D *s, Vector3 *dir) {
     return false;
 }
 
-#define EPA_MAX_FACES  64
-#define EPA_MAX_VERTS  32
+#define EPA_MAX_FACES  256
+#define EPA_MAX_VERTS  128
 #define EPA_MAX_EDGES  (EPA_MAX_FACES*3)
 typedef struct { int a,b,c; Vector3 n; float d; } EPAFace;
 static inline EPAFace MakeEPAFace(const Vector3* vb, int a, int b, int c) {
-    Vector3 n = V3_Cross(V3_AsubB(vb[b],vb[a]), V3_AsubB(vb[c],vb[a]));
-    float L = V3_Mag(n);
-    if (L < COLLISION_EPSILON) return (EPAFace){a,b,c,{0},0.f};
-    n = V3_ScaleByF(n, 1.f/L);
-    float d = V3_dot(n, vb[a]);
-    // Ensure outward
+    Vector3 n = V3_Cross(V3_AsubB(vb[b],vb[a]),V3_AsubB(vb[c],vb[a]));
+    float L = V3_Mag(n); if (L < COLLISION_EPSILON) return (EPAFace){a,b,c,{0},0.f};
+    
+    n = V3_ScaleByF(n,1.f/L);
+    float d = V3_dot(n,vb[a]);
     if (d < 0.f) { n=(Vector3){-n.x,-n.y,-n.z}; d=-d; int t=b;b=c;c=t; }
     return (EPAFace){a,b,c,n,d};
 }
@@ -4526,10 +4446,12 @@ static OverlapResult ConvexMeshOverlap(u16 meshA, u16 meshB, const float* matA, 
     for (int it=0; it<64; ++it) { // ── GJK ──
         Vector3 sup = MinkowskiSupport(meshA,matA,meshB,matB,dir);
         if (V3_dot(sup,dir) < COLLISION_EPSILON) return r;
+        
         s.v[s.n++] = sup;
         if (!GJKNextSimplex(&s,&dir)) { r.hit=true; break; }
         if (V3_dot(dir,dir) < COLLISION_EPSILON) { r.hit=true; break; }
     }
+    
     if (!r.hit) return r;
 
     // ── Expand simplex to tetrahedron for EPA ──
@@ -4540,6 +4462,7 @@ static OverlapResult ConvexMeshOverlap(u16 meshA, u16 meshB, const float* matA, 
         for (int k=0;k<s.n;k++) { Vector3 dv=V3_AsubB(sup,s.v[k]); dup|=(V3_dot(dv,dv)<COLLISION_EPSILON*COLLISION_EPSILON); }
         if (!dup) s.v[s.n++]=sup;
     }
+    
     if (s.n < 4) { r.hit=true; return r; }
 
     Vector3 ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0, nf=0;
@@ -4558,19 +4481,18 @@ static OverlapResult ConvexMeshOverlap(u16 meshA, u16 meshB, const float* matA, 
         ev[nv]=sup; int edges[EPA_MAX_EDGES][2],ne=0,keep[EPA_MAX_FACES],nk=0; // Silhouette edges — remove visible faces, collect unique boundary
         for (int f=0;f<nf;f++) {
             if (V3_dot(ef[f].n, V3_AsubB(sup,ev[ef[f].a])) > 0.f) {
-                // Visible: add edges to silhouette (XOR)
                 int fv[3]={ef[f].a,ef[f].b,ef[f].c};
-                for (int e=0;e<3;e++) {
+                for (int e=0;e<3;e++) { // Add edges to silhouette (XOR)
                     int ea=fv[e], eb=fv[(e+1)%3]; bool found=false;
                     for (int k=0;k<ne;k++) if(edges[k][0]==eb&&edges[k][1]==ea){ edges[k][0]=edges[--ne][0]; edges[k][1]=edges[ne][1]; found=true; break; }
                     if (!found && ne<EPA_MAX_EDGES) { edges[ne][0]=ea; edges[ne++][1]=eb; }
                 }
             } else keep[nk++]=f;
         }
-        // Rebuild face list
+       
         nf=0;
         for (int k=0;k<nk;k++) ef[nf++]=ef[keep[k]];
-        for (int k=0;k<ne&&nf<EPA_MAX_FACES;k++) { EPAFace face = MakeEPAFace(ev,edges[k][0],edges[k][1],nv); if (face.d >= 0.f) {ef[nf++]=face;} }
+        for (int k=0;k<ne&&nf<EPA_MAX_FACES;k++) { EPAFace face = MakeEPAFace(ev,edges[k][0],edges[k][1],nv); if (face.d >= 0.f) {ef[nf++]=face;} } // Rebuild face list
         nv++;
     }
 
@@ -4578,18 +4500,15 @@ static OverlapResult ConvexMeshOverlap(u16 meshA, u16 meshB, const float* matA, 
     return r;
 }
 
-// GJK+EPA: capsule vs convex mesh.  Normal convention: points from mesh toward capsule (from o toward e).
-static OverlapResult CapsuleConvexMesh(ShapeCapsule cap, u16 mesh, const float* mx) {
+static OverlapResult CapsuleConvexMesh(ShapeCapsule cap, u16 mesh, const float* mx) { // GJK+EPA: capsule vs convex mesh.  Normal convention: points from mesh toward capsule (from o toward e).
     OverlapResult r = {0};
     if (mesh >= MODEL_IDX_MAX || !modelVertexCounts[mesh]) return r;
 
     #define CSUP(d) MinkowskiSupportCapsuleMesh(cap, mesh, mx, d)
-
     Simplex3D s = {0}; Vector3 dir = {0,1,0};
     s.v[s.n++] = CSUP(dir);
     dir = (Vector3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
     if (V3_dot(dir,dir) < COLLISION_EPSILON) dir = (Vector3){0,1,0};
-
     for (int it=0; it<64; ++it) {
         Vector3 sup = CSUP(dir);
         if (V3_dot(sup,dir) < COLLISION_EPSILON) { return r; }
@@ -4637,20 +4556,13 @@ static OverlapResult CapsuleConvexMesh(ShapeCapsule cap, u16 mesh, const float* 
     r.hit=true; return r;
 }
 
-// Triangle-soup mesh support: test sphere/capsule against all triangles of a static mesh.
-// Returns deepest penetrating triangle result.  Normal points from mesh toward mover.
-static OverlapResult SphereTriMesh(Vector3 sc, float sr, u16 mesh, const float* mx) {
-    OverlapResult r = {0};
-    if (mesh >= MODEL_IDX_MAX) return r;
+static OverlapResult SphereTriMesh(Vector3 sc, float sr, u16 mesh, const float* mx) { // Triangle-soup mesh support: test sphere/capsule against all triangles of a static mesh.  Returns deepest overlapping triangle result.  Normal points from mesh toward mover.
+    OverlapResult r = {0}; if (mesh >= MODEL_IDX_MAX) return r;
     u32 triCount = modelTriangleCounts[mesh]; if (!triCount) return r;
 
     for (u32 ti = 0; ti < triCount; ++ti) {
-        u32 i0 = modelTriangles[mesh][ti*3+0];
-        u32 i1 = modelTriangles[mesh][ti*3+1];
-        u32 i2 = modelTriangles[mesh][ti*3+2];
-        #define RV(i) MvVert(mx,(Vector3){half_to_float(*(half*)(modelVertices[mesh]+(i)*VERTEX_ATTRIBUTES_SIZE+0)), \
-                                          half_to_float(*(half*)(modelVertices[mesh]+(i)*VERTEX_ATTRIBUTES_SIZE+2)), \
-                                          half_to_float(*(half*)(modelVertices[mesh]+(i)*VERTEX_ATTRIBUTES_SIZE+4))})
+        u32 i0 = modelTriangles[mesh][ti*3+0], i1 = modelTriangles[mesh][ti*3+1], i2 = modelTriangles[mesh][ti*3+2];
+        #define RV(i) MvVert(mx,(Vector3){half_to_float(*(half*)(modelVertices[mesh]+(i)*VERTEX_ATTRIBUTES_SIZE+0)), half_to_float(*(half*)(modelVertices[mesh]+(i)*VERTEX_ATTRIBUTES_SIZE+2)), half_to_float(*(half*)(modelVertices[mesh]+(i)*VERTEX_ATTRIBUTES_SIZE+4))})
         Vector3 a=RV(i0), b=RV(i1), c=RV(i2);
         #undef RV
 
@@ -4662,6 +4574,7 @@ static OverlapResult SphereTriMesh(Vector3 sc, float sr, u16 mesh, const float* 
             if (dist2 < sr*sr) { float dist=vsqrtf(vmax(dist2,0.f)); OverlapResult t={true,a,(dist>COLLISION_EPSILON)?V3_ScaleByF(delta,1.f/dist):(Vector3){0,1,0},sr-dist}; if(t.overlapAmount>r.overlapAmount) r=t; }
             continue;
         }
+        
         Vector3 bp=V3_AsubB(sc,b);
         float d3=V3_dot(ab,bp), d4=V3_dot(ac,bp);
         if (d3>=0.f && d4<=d3) { // Vertex B region
@@ -4669,6 +4582,7 @@ static OverlapResult SphereTriMesh(Vector3 sc, float sr, u16 mesh, const float* 
             if (dist2 < sr*sr) { float dist=vsqrtf(vmax(dist2,0.f)); OverlapResult t={true,b,(dist>COLLISION_EPSILON)?V3_ScaleByF(delta,1.f/dist):(Vector3){0,1,0},sr-dist}; if(t.overlapAmount>r.overlapAmount) r=t; }
             continue;
         }
+        
         Vector3 cp=V3_AsubB(sc,c);
         float d5=V3_dot(ab,cp), d6=V3_dot(ac,cp);
         if (d6>=0.f && d5<=d6) { // Vertex C region
@@ -4676,6 +4590,7 @@ static OverlapResult SphereTriMesh(Vector3 sc, float sr, u16 mesh, const float* 
             if (dist2 < sr*sr) { float dist=vsqrtf(vmax(dist2,0.f)); OverlapResult t={true,c,(dist>COLLISION_EPSILON)?V3_ScaleByF(delta,1.f/dist):(Vector3){0,1,0},sr-dist}; if(t.overlapAmount>r.overlapAmount) r=t; }
             continue;
         }
+        
         float vc=d1*d4-d3*d2;
         if (vc<=0.f && d1>=0.f && d3<=0.f) { // Edge AB region
             float v=d1/(d1-d3); Vector3 pt=V3_AplusB(a,V3_ScaleByF(ab,v));
@@ -4683,6 +4598,7 @@ static OverlapResult SphereTriMesh(Vector3 sc, float sr, u16 mesh, const float* 
             if (dist2 < sr*sr) { float dist=vsqrtf(vmax(dist2,0.f)); OverlapResult t={true,pt,(dist>COLLISION_EPSILON)?V3_ScaleByF(delta,1.f/dist):(Vector3){0,1,0},sr-dist}; if(t.overlapAmount>r.overlapAmount) r=t; }
             continue;
         }
+        
         float vb=d5*d2-d1*d6;
         if (vb<=0.f && d2>=0.f && d6<=0.f) { // Edge AC region
             float w=d2/(d2-d6); Vector3 pt=V3_AplusB(a,V3_ScaleByF(ac,w));
@@ -4690,6 +4606,7 @@ static OverlapResult SphereTriMesh(Vector3 sc, float sr, u16 mesh, const float* 
             if (dist2 < sr*sr) { float dist=vsqrtf(vmax(dist2,0.f)); OverlapResult t={true,pt,(dist>COLLISION_EPSILON)?V3_ScaleByF(delta,1.f/dist):(Vector3){0,1,0},sr-dist}; if(t.overlapAmount>r.overlapAmount) r=t; }
             continue;
         }
+        
         float va=d3*d6-d5*d4;
         if (va<=0.f && (d4-d3)>=0.f && (d5-d6)>=0.f) { // Edge BC region
             float w=(d4-d3)/((d4-d3)+(d5-d6)); Vector3 bc=V3_AsubB(c,b); Vector3 pt=V3_AplusB(b,V3_ScaleByF(bc,w));
@@ -4697,13 +4614,12 @@ static OverlapResult SphereTriMesh(Vector3 sc, float sr, u16 mesh, const float* 
             if (dist2 < sr*sr) { float dist=vsqrtf(vmax(dist2,0.f)); OverlapResult t={true,pt,(dist>COLLISION_EPSILON)?V3_ScaleByF(delta,1.f/dist):(Vector3){0,1,0},sr-dist}; if(t.overlapAmount>r.overlapAmount) r=t; }
             continue;
         }
+        
         // Face region — project onto triangle plane
         Vector3 n = V3_Cross(ab,ac); float nLen=V3_Mag(n); if(nLen<COLLISION_EPSILON) continue;
-        n=V3_ScaleByF(n,1.f/nLen);
-        float dist=V3_dot(n,ap); // signed distance from plane (positive = above)
+        n=V3_ScaleByF(n,1.f/nLen); float dist=V3_dot(n,ap); // signed distance from plane (positive = above)
         float absDist=vabs(dist);
-        if (absDist < sr) {
-            // Back-face: if sphere is below the triangle, flip normal so response pushes it out correctly
+        if (absDist < sr) { // Back-face: if sphere is below the triangle, flip normal so response pushes it out correctly
             Vector3 fn = (dist >= 0.f) ? n : (Vector3){-n.x,-n.y,-n.z};
             OverlapResult t={true,V3_AsubB(sc,V3_ScaleByF(fn,absDist)),fn,sr-absDist};
             if(t.overlapAmount>r.overlapAmount) r=t;
@@ -4712,18 +4628,15 @@ static OverlapResult SphereTriMesh(Vector3 sc, float sr, u16 mesh, const float* 
     return r;
 }
 
-// Capsule vs triangle-soup: sweep the two hemisphere centers, pick deepest triangle hit.
 static OverlapResult CapsuleTriMesh(ShapeCapsule cap, u16 mesh, const float* mx) {
     OverlapResult rb = SphereTriMesh(cap.base, cap.radius, mesh, mx);
-    OverlapResult rt = SphereTriMesh(cap.tip,  cap.radius, mesh, mx);
+    OverlapResult rt = SphereTriMesh(cap.tip,  cap.radius, mesh, mx); // TODO: Connectivity needed or is snowman ala System Shock 1 fine enough?  Might prove funny if player can get stuck with top and bottom on either side of door while leaning like in original.
     return (rt.overlapAmount > rb.overlapAmount) ? rt : rb;
 }
 
 static OverlapResult SphereConvexMesh(Vector3 sc, float sr, u16 mesh, const float* mx) {
-    OverlapResult r = {0};
-    if (mesh >= MODEL_IDX_MAX || !modelVertexCounts[mesh]) return r;
+    OverlapResult r = {0}; if (mesh >= MODEL_IDX_MAX || !modelVertexCounts[mesh]) return r;
 
-    // Support: normalize d before inflating by radius so the sphere contribution is correct
     #define SPHSUP(d) ({ Vector3 _d=(d); float _L=V3_dot(_d,_d); V3_AplusB(sc, (_L>COLLISION_EPSILON) ? V3_ScaleByF(_d, sr/vsqrtf(_L)) : (Vector3){0,sr,0}); })
     #define MSKSUP(d) V3_AsubB(SPHSUP(d), MeshSupport(mesh, mx, (Vector3){-(d).x,-(d).y,-(d).z}))
     Simplex3D s = {0}; Vector3 dir = {0,1,0};
@@ -4733,18 +4646,21 @@ static OverlapResult SphereConvexMesh(Vector3 sc, float sr, u16 mesh, const floa
     for (int it=0; it<32; ++it) {
         Vector3 sup=MSKSUP(dir);
         if (V3_dot(sup,dir) < COLLISION_EPSILON) return r;
+        
         s.v[s.n++]=sup;
         if (!GJKNextSimplex(&s,&dir)) { r.hit=true; break; }
         if (V3_dot(dir,dir) < COLLISION_EPSILON) { r.hit=true; break; }
     }
+    
     if (!r.hit) return r;
 
     static const Vector3 kAx[6]={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
     for (int d=0; s.n<4&&d<6; ++d) {
         Vector3 sup=MSKSUP(kAx[d]); bool dup=false;
-        for(int k=0;k<s.n;k++){Vector3 dv=V3_AsubB(sup,s.v[k]);dup|=V3_dot(dv,dv)<COLLISION_EPSILON*COLLISION_EPSILON;}
+        for(int k=0;k<s.n;k++) { Vector3 dv = V3_AsubB(sup,s.v[k]); dup |= V3_dot(dv,dv) < COLLISION_EPSILON * COLLISION_EPSILON; }
         if(!dup) s.v[s.n++]=sup;
     }
+    
     if (s.n<4){r.hit=true;return r;}
 
     Vector3 ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0,nf=0;
@@ -4755,9 +4671,11 @@ static OverlapResult SphereConvexMesh(Vector3 sc, float sr, u16 mesh, const floa
         int bf=-1; float bd=1e9f;
         for(int f=0;f<nf;f++) if(ef[f].d<bd){bd=ef[f].d;bf=f;}
         if(bf<0) break;
+        
         Vector3 bn=ef[bf].n, sup=MSKSUP(bn);
         if(V3_dot(bn,sup)-bd<COLLISION_EPSILON){r.normal=bn;r.point=V3_ScaleByF(bn,bd);r.overlapAmount=bd;return r;}
         if(nv>=EPA_MAX_VERTS) break;
+        
         ev[nv]=sup;
         int edges[EPA_MAX_EDGES][2],ne=0,keep[EPA_MAX_FACES],nk=0;
         for(int f=0;f<nf;f++){
@@ -4768,16 +4686,17 @@ static OverlapResult SphereConvexMesh(Vector3 sc, float sr, u16 mesh, const floa
                     if(!found&&ne<EPA_MAX_EDGES){edges[ne][0]=ea;edges[ne++][1]=eb;}}
             } else keep[nk++]=f;
         }
+
         nf=0; for(int k=0;k<nk;k++) ef[nf++]=ef[keep[k]];
         for(int k=0;k<ne&&nf<EPA_MAX_FACES;k++){EPAFace face=MakeEPAFace(ev,edges[k][0],edges[k][1],nv);if(face.d>=0.f)ef[nf++]=face;}
         nv++;
     }
+
     #undef SPHSUP
     #undef MSKSUP
     r.hit=true; return r;
 }
 
-// OBB of hull for per-triangle AABB reject — compute once, reuse per triangle
 typedef struct { Vector3 mn, mx; } AABB3;
 static inline AABB3 HullWorldAABB(u16 hullMesh, const float* hullMx) {
     AABB3 b = { {1e9f,1e9f,1e9f}, {-1e9f,-1e9f,-1e9f} };
@@ -4785,8 +4704,7 @@ static inline AABB3 HullWorldAABB(u16 hullMesh, const float* hullMx) {
     for (u32 i=0;i<n;++i) {
         const u8* p = vb + i*VERTEX_ATTRIBUTES_SIZE;
         Vector3 w = MvVert(hullMx,(Vector3){half_to_float(*(half*)(p+0)),half_to_float(*(half*)(p+2)),half_to_float(*(half*)(p+4))});
-        b.mn.x=vmin(b.mn.x,w.x); b.mn.y=vmin(b.mn.y,w.y); b.mn.z=vmin(b.mn.z,w.z);
-        b.mx.x=vmax(b.mx.x,w.x); b.mx.y=vmax(b.mx.y,w.y); b.mx.z=vmax(b.mx.z,w.z);
+        b.mn.x=vmin(b.mn.x,w.x); b.mn.y=vmin(b.mn.y,w.y); b.mn.z=vmin(b.mn.z,w.z); b.mx.x=vmax(b.mx.x,w.x); b.mx.y=vmax(b.mx.y,w.y); b.mx.z=vmax(b.mx.z,w.z);
     }
     return b;
 }
@@ -4794,68 +4712,53 @@ static inline AABB3 HullWorldAABB(u16 hullMesh, const float* hullMx) {
 static OverlapResult ConvexMeshVsTriMesh(u16 hullMesh, const float* hullMx, u16 triMesh, const float* triMx) {
     OverlapResult r = {0};
     if (hullMesh>=MODEL_IDX_MAX || triMesh>=MODEL_IDX_MAX) return r;
-    u32 hullVerts=modelVertexCounts[hullMesh], triCount=modelTriangleCounts[triMesh];
-    if (!hullVerts || !triCount) return r;
+    u32 hullVerts=modelVertexCounts[hullMesh],triCount=modelTriangleCounts[triMesh]; if (!hullVerts || !triCount) return r;
 
-    // World AABB of hull for triangle pre-reject
     AABB3 hb=HullWorldAABB(hullMesh,hullMx);
-    float skin=0.02f;
-    hb.mn.x-=skin; hb.mn.y-=skin; hb.mn.z-=skin;
-    hb.mx.x+=skin; hb.mx.y+=skin; hb.mx.z+=skin;
-
+    float skin=0.02f; hb.mn.x-=skin; hb.mn.y-=skin; hb.mn.z-=skin; hb.mx.x+=skin; hb.mx.y+=skin; hb.mx.z+=skin;
     const u8* vb=modelVertices[hullMesh];
     for (u32 vi=0; vi<hullVerts; ++vi) {
         const u8* p=vb+vi*VERTEX_ATTRIBUTES_SIZE;
         Vector3 wv=MvVert(hullMx,(Vector3){half_to_float(*(half*)(p+0)),half_to_float(*(half*)(p+2)),half_to_float(*(half*)(p+4))});
-        // Broadphase: skip hull verts outside AABB (they can't penetrate anything the AABB misses)
-        // Actually test all verts — AABB is of the hull itself so all verts are inside it by definition.
-        // Use per-triangle AABB reject instead:
         for (u32 ti=0; ti<triCount; ++ti) {
             u32 i0=modelTriangles[triMesh][ti*3+0], i1=modelTriangles[triMesh][ti*3+1], i2=modelTriangles[triMesh][ti*3+2];
-            #define TRV(i) MvVert(triMx,(Vector3){half_to_float(*(half*)(modelVertices[triMesh]+(i)*VERTEX_ATTRIBUTES_SIZE+0)), \
-                                                   half_to_float(*(half*)(modelVertices[triMesh]+(i)*VERTEX_ATTRIBUTES_SIZE+2)), \
-                                                   half_to_float(*(half*)(modelVertices[triMesh]+(i)*VERTEX_ATTRIBUTES_SIZE+4))})
+            #define TRV(i) MvVert(triMx,(Vector3){half_to_float(*(half*)(modelVertices[triMesh]+(i)*VERTEX_ATTRIBUTES_SIZE+0)),half_to_float(*(half*)(modelVertices[triMesh]+(i)*VERTEX_ATTRIBUTES_SIZE+2)),half_to_float(*(half*)(modelVertices[triMesh]+(i)*VERTEX_ATTRIBUTES_SIZE+4))})
             Vector3 ta=TRV(i0),tb=TRV(i1),tc=TRV(i2);
             #undef TRV
-            // Triangle AABB vs hull AABB pre-reject
-            if (vmin(ta.x,vmin(tb.x,tc.x))>hb.mx.x || vmax(ta.x,vmax(tb.x,tc.x))<hb.mn.x ||
-                vmin(ta.y,vmin(tb.y,tc.y))>hb.mx.y || vmax(ta.y,vmax(tb.y,tc.y))<hb.mn.y ||
-                vmin(ta.z,vmin(tb.z,tc.z))>hb.mx.z || vmax(ta.z,vmax(tb.z,tc.z))<hb.mn.z) continue;
+            if (vmin(ta.x,vmin(tb.x,tc.x))>hb.mx.x || vmax(ta.x,vmax(tb.x,tc.x))<hb.mn.x || vmin(ta.y,vmin(tb.y,tc.y))>hb.mx.y || vmax(ta.y,vmax(tb.y,tc.y))<hb.mn.y || vmin(ta.z,vmin(tb.z,tc.z))>hb.mx.z || vmax(ta.z,vmax(tb.z,tc.z))<hb.mn.z) continue;
 
-            // Closest point on triangle to hull vertex (Christer Ericson §5.1.5)
-            Vector3 ab=V3_AsubB(tb,ta), ac=V3_AsubB(tc,ta), ap=V3_AsubB(wv,ta);
+            Vector3 ab=V3_AsubB(tb,ta), ac=V3_AsubB(tc,ta), ap=V3_AsubB(wv,ta); // Closest point on triangle to hull vertex (Christer Ericson §5.1.5)
             float d1=V3_dot(ab,ap), d2=V3_dot(ac,ap);
             Vector3 bp=V3_AsubB(wv,tb); float d3=V3_dot(ab,bp), d4=V3_dot(ac,bp);
             Vector3 cp=V3_AsubB(wv,tc); float d5=V3_dot(ab,cp), d6=V3_dot(ac,cp);
             float vc=d1*d4-d3*d2, vb_=d5*d2-d1*d6, va=d3*d6-d5*d4;
             Vector3 closest; bool inFace=false;
-            if      (d1<=0.f&&d2<=0.f)                            closest=ta;
-            else if (d3>=0.f&&d4<=d3)                            closest=tb;
-            else if (d6>=0.f&&d5<=d6)                            closest=tc;
-            else if (vc<=0.f&&d1>=0.f&&d3<=0.f)                 { float v=d1/(d1-d3); closest=V3_AplusB(ta,V3_ScaleByF(ab,v)); }
-            else if (vb_<=0.f&&d2>=0.f&&d6<=0.f)                { float w=d2/(d2-d6); closest=V3_AplusB(ta,V3_ScaleByF(ac,w)); }
-            else if (va<=0.f&&(d4-d3)>=0.f&&(d5-d6)>=0.f)      { float w=(d4-d3)/((d4-d3)+(d5-d6)); closest=V3_AplusB(tb,V3_ScaleByF(V3_AsubB(tc,tb),w)); }
-            else                                                  { inFace=true; Vector3 n_=V3_Cross(ab,ac); float L=V3_Mag(n_); if(L<COLLISION_EPSILON) continue; n_=V3_ScaleByF(n_,1.f/L); closest=V3_AsubB(wv,V3_ScaleByF(n_,V3_dot(n_,ap))); }
+            if      (d1 <= 0.0f && d2 <= 0.0f)closest=ta;
+            else if (d3 >= 0.0f && d4 <= d3)  closest=tb;
+            else if (d6 >= 0.0f &&d5 <= d6)   closest=tc;
+            else if (vc <= 0.0f &&d1 >= 0.0f && d3 <= 0.0f)            { float v=d1/(d1-d3);                closest=V3_AplusB(ta,V3_ScaleByF(ab,v)); }
+            else if (vb_ <= 0.0f &&d2 >= 0.0f && d6 <= 0.0f)           { float w=d2/(d2-d6);                closest=V3_AplusB(ta,V3_ScaleByF(ac,w)); }
+            else if (va <= 0.0f && (d4-d3) >= 0.0f && (d5-d6) >= 0.0f) { float w=(d4-d3)/((d4-d3)+(d5-d6)); closest=V3_AplusB(tb,V3_ScaleByF(V3_AsubB(tc,tb),w)); }
+            else { inFace=true; Vector3 n_=V3_Cross(ab,ac); float L=V3_Mag(n_); if(L<COLLISION_EPSILON) continue; n_=V3_ScaleByF(n_,1.f/L); closest=V3_AsubB(wv,V3_ScaleByF(n_,V3_dot(n_,ap))); }
 
-            Vector3 delta=V3_AsubB(wv,closest);
-            float dist2=V3_dot(delta,delta);
-            float pen=0.f; Vector3 fn;
+            Vector3 delta=V3_AsubB(wv,closest); float dist2=V3_dot(delta,delta); float pen=0.f; Vector3 fn;
             if (inFace) {
-                // Signed plane distance — works for back-face too
                 Vector3 n_=V3_Cross(ab,ac); float L=V3_Mag(n_); if(L<COLLISION_EPSILON) continue;
                 n_=V3_ScaleByF(n_,1.f/L);
-                float sd=V3_dot(n_,ap); // positive = above plane
+                float sd=V3_dot(n_,ap); // positive == above plane
                 if (vabs(sd)<COLLISION_EPSILON) continue; // exactly on plane, no response needed
+                
                 pen=vabs(sd); fn=(sd>0.f)?n_:(Vector3){-n_.x,-n_.y,-n_.z};
             } else {
                 if (dist2<COLLISION_EPSILON*COLLISION_EPSILON) continue;
+                
                 float dist=vsqrtf(dist2);
-                // Only respond if vertex is on the wrong side of the triangle (inside the solid)
-                // Use winding: check if vertex is below the triangle plane
-                Vector3 n_=V3_Cross(ab,ac); float L=V3_Mag(n_); if(L<COLLISION_EPSILON) continue;
+                Vector3 n_=V3_Cross(ab,ac); float L=V3_Mag(n_); if(L<COLLISION_EPSILON) continue; // Only respond if vertex is on the wrong side of the triangle (inside the solid)
+                
                 n_=V3_ScaleByF(n_,1.f/L);
                 float sd=V3_dot(n_,ap);
                 if (sd>=0.f) continue; // vertex above or on plane — edge/vertex proximity, not penetration
+                
                 pen=dist; fn=V3_ScaleByF(delta,1.f/dist); // push vertex back out toward closest point
             }
             if (pen>r.overlapAmount) r=(OverlapResult){true,closest,fn,pen};
@@ -4868,33 +4771,23 @@ static void ApplyCollisionResponse(Entity *e, Entity *o, Vector3 n, float overla
     if (overlap < COLLISION_EPSILON) return;
 
     bool oStatic = (!(o->entflags & ENTFLAG_RIGIDBODY) || (o->mass < 0.001f) || (o->collider == COLLIDER_TYPE_NONE));
-
-    // Moment of inertia (uniform sphere approximation): I = 2/5 * m * r^2
-    float rA = GetCollisionRadius(e);
+    float rA = GetCollisionRadius(e); // Moment of inertia (uniform sphere approximation): I = 2/5 * m * r^2
     float rB = oStatic ? 1.f : GetCollisionRadius(o);
     float iA = (2.f / 5.f) * e->mass * rA * rA;
     float iB = oStatic ? 0.f : (2.f / 5.f) * o->mass * rB * rB;
     float invIA = (iA > COLLISION_EPSILON) ? 1.f / iA : 0.f;
     float invIB = (iB > COLLISION_EPSILON && !oStatic) ? 1.f / iB : 0.f;
+    Vector3 rAarm = V3_AsubB(contactPoint, e->position); // Angle arms from center of mass to contact point
+    Vector3 rBarm = oStatic ? (Vector3){0,0,0} : V3_AsubB(contactPoint,o->position);
+    Vector3 vAtA = V3_AplusB(e->velocity, V3_Cross(e->angularVelocity,rAarm)); // Velocity at contact point (linear + angular contribution)
+    Vector3 vAtB = oStatic ? (Vector3){0,0,0} : V3_AplusB(o->velocity,V3_Cross(o->angularVelocity,rBarm));
+    Vector3 relVel = V3_AsubB(vAtA,vAtB);
+    float vn = V3_dot(relVel, n); if (vn > 0.01f) return; // already separating
 
-    // Arms from center of mass to contact point
-    Vector3 rAarm = V3_AsubB(contactPoint, e->position);
-    Vector3 rBarm = oStatic ? (Vector3){0,0,0} : V3_AsubB(contactPoint, o->position);
-
-    // Velocity at contact point (linear + angular contribution)
-    Vector3 vAtA = V3_AplusB(e->velocity, V3_Cross(e->angularVelocity, rAarm));
-    Vector3 vAtB = oStatic ? (Vector3){0,0,0} : V3_AplusB(o->velocity, V3_Cross(o->angularVelocity, rBarm));
-    Vector3 relVel = V3_AsubB(vAtA, vAtB);
-
-    float vn = V3_dot(relVel, n);
-    if (vn > 0.01f) return; // already separating
-
-    // Angular contribution to effective mass: (rA×n)²/IA + (rB×n)²/IB
-    Vector3 rAxN = V3_Cross(rAarm, n);
-    Vector3 rBxN = V3_Cross(rBarm, n);
+    Vector3 rAxN = V3_Cross(rAarm,n); // Angular contribution to effective mass: (rA×n)²/IA + (rB×n)²/IB
+    Vector3 rBxN = V3_Cross(rBarm,n);
     float angTermA = V3_dot(rAxN, rAxN) * invIA;
     float angTermB = oStatic ? 0.f : V3_dot(rBxN, rBxN) * invIB;
-
     float invMassA = 1.f / e->mass;
     float invMassB = oStatic ? 0.f : 1.f / o->mass;
     float invSum = invMassA + invMassB + angTermA + angTermB;
@@ -4903,92 +4796,58 @@ static void ApplyCollisionResponse(Entity *e, Entity *o, Vector3 n, float overla
     float e_r = vmax(e->bounciness, oStatic ? 0.f : o->bounciness);
     float j = -(1.f + e_r) * vn / invSum;
 
-    // Linear impulse
-    e->velocity = V3_AplusB(e->velocity, V3_ScaleByF(n, j * invMassA));
-    if (!oStatic) o->velocity = V3_AsubB(o->velocity, V3_ScaleByF(n, j * invMassB));
-
-    // Angular impulse: ω += I⁻¹ * (r × J)
-    Vector3 Jn = V3_ScaleByF(n, j);
-    e->angularVelocity = V3_AplusB(e->angularVelocity, V3_ScaleByF(V3_Cross(rAarm, Jn), invIA));
-    if (!oStatic) o->angularVelocity = V3_AsubB(o->angularVelocity, V3_ScaleByF(V3_Cross(rBarm, Jn), invIB));
-
-    // Friction
-    // Recompute relVel with updated velocities at contact
-    Vector3 vAtA2 = V3_AplusB(e->velocity, V3_Cross(e->angularVelocity, rAarm));
-    Vector3 vAtB2 = oStatic ? (Vector3){0,0,0} : V3_AplusB(o->velocity, V3_Cross(o->angularVelocity, rBarm));
-    Vector3 relVel2 = V3_AsubB(vAtA2, vAtB2);
-
-    Vector3 tangent = V3_AsubB(relVel2, V3_ScaleByF(n, V3_dot(relVel2, n)));
+    e->velocity = V3_AplusB(e->velocity,V3_ScaleByF(n,j * invMassA)); // Linear impulse
+    if (!oStatic) o->velocity = V3_AsubB(o->velocity,V3_ScaleByF(n,j * invMassB));
+    Vector3 Jn = V3_ScaleByF(n, j); // Angular impulse: ω += I⁻¹ * (r × J)
+    if (e->collider != COLLIDER_TYPE_CAPSULE)             e->angularVelocity = V3_AplusB(e->angularVelocity,V3_ScaleByF(V3_Cross(rAarm,Jn),invIA));
+    if (!oStatic && o->collider != COLLIDER_TYPE_CAPSULE) o->angularVelocity =  V3_AsubB(o->angularVelocity,V3_ScaleByF(V3_Cross(rBarm,Jn),invIB));
+    Vector3 vAtA2 = V3_AplusB(e->velocity,V3_Cross(e->angularVelocity,rAarm)); // Friction, recompute relVel with updated velocities at contact
+    Vector3 vAtB2 = oStatic ? (Vector3){0,0,0} : V3_AplusB(o->velocity,V3_Cross(o->angularVelocity,rBarm));
+    Vector3 relVel2 = V3_AsubB(vAtA2,vAtB2);
+    Vector3 tangent = V3_AsubB(relVel2,V3_ScaleByF(n,V3_dot(relVel2,n)));
     float tLen = V3_Mag(tangent);
     if (tLen > 0.001f) {
         tangent = V3_ScaleByF(tangent, 1.f / tLen);
-
         Vector3 rAxT = V3_Cross(rAarm, tangent);
         Vector3 rBxT = V3_Cross(rBarm, tangent);
         float angTermAT = V3_dot(rAxT, rAxT) * invIA;
         float angTermBT = oStatic ? 0.f : V3_dot(rBxT, rBxT) * invIB;
         float invSumT = invMassA + invMassB + angTermAT + angTermBT;
-
         float mu = (e->dynamicFriction + (oStatic ? 0.4f : o->dynamicFriction)) * 0.5f;
         float jt = -V3_dot(relVel2, tangent) / invSumT;
         jt = vclamp(jt, -mu * vabs(j), mu * vabs(j));
-
         Vector3 Jt = V3_ScaleByF(tangent, jt);
         e->velocity = V3_AplusB(e->velocity, V3_ScaleByF(tangent, jt * invMassA));
-        e->angularVelocity = V3_AplusB(e->angularVelocity, V3_ScaleByF(V3_Cross(rAarm, Jt), invIA));
+        if (e->collider != COLLIDER_TYPE_CAPSULE) e->angularVelocity = V3_AplusB(e->angularVelocity, V3_ScaleByF(V3_Cross(rAarm, Jt), invIA));
         if (!oStatic) {
             o->velocity = V3_AsubB(o->velocity, V3_ScaleByF(tangent, jt * invMassB));
-            o->angularVelocity = V3_AsubB(o->angularVelocity, V3_ScaleByF(V3_Cross(rBarm, Jt), invIB));
+            if (o->collider != COLLIDER_TYPE_CAPSULE) o->angularVelocity = V3_AsubB(o->angularVelocity, V3_ScaleByF(V3_Cross(rBarm, Jt), invIB));
         }
     }
     
-    if (!oStatic && o->collider == COLLIDER_TYPE_CAPSULE) ConstrainCapsuleAngularVelocity(o);
-
-    // Positional correction (Baumgarte)
-    float correction = vmax(overlap - 0.001f, 0.f) * 0.4f;
+    float correction = vmax(overlap - 0.001f, 0.f) * 0.4f; // Positional correction (Baumgarte)
     float corrA = correction * invMassA / (invMassA + invMassB + COLLISION_EPSILON);
     float corrB = correction * invMassB / (invMassA + invMassB + COLLISION_EPSILON);
-    e->position = V3_AplusB(e->position, V3_ScaleByF(n, corrA));
-    if (!oStatic) o->position = V3_AsubB(o->position, V3_ScaleByF(n, corrB));
+    e->position = V3_AplusB(e->position, V3_ScaleByF(n, corrA)); if (!oStatic) o->position = V3_AsubB(o->position,V3_ScaleByF(n,corrB));
 }
 
 static OverlapResult CapsuleBox(ShapeCapsule cap, ShapeBox box) {
-    OverlapResult best = SphereOBB(cap.base, cap.radius, box);
-    OverlapResult rt   = SphereOBB(cap.tip,  cap.radius, box);
-    if (rt.hit && rt.overlapAmount > best.overlapAmount) best = rt;
+    OverlapResult best = SphereOBB(cap.base,cap.radius,box), rt = SphereOBB(cap.tip,cap.radius,box); if (rt.hit && rt.overlapAmount > best.overlapAmount) best = rt;
 
-    Vector3 ax, ay, az;
-    obb_axes(box.rot, &ax, &ay, &az);
-    Vector3 d = V3_AsubB(cap.tip, cap.base);
-    float segLen = V3_Mag(d);
-    if (segLen < COLLISION_EPSILON) return best;
+    Vector3 ax,ay,az; obb_axes(box.rot,&ax,&ay,&az);
+    Vector3 d = V3_AsubB(cap.tip,cap.base);
+    float segLen = V3_Mag(d); if (segLen < COLLISION_EPSILON) return best;
+    
     Vector3 dUnit = V3_ScaleByF(d, 1.f / segLen);
     Vector3 toBase = V3_AsubB(cap.base, box.center);
-
     float ts[6]; int nt = 0;
-    float dax = V3_dot(dUnit, ax) * segLen, day = V3_dot(dUnit, ay) * segLen, daz = V3_dot(dUnit, az) * segLen;
-    float bax = V3_dot(toBase, ax),          bay = V3_dot(toBase, ay),          baz = V3_dot(toBase, az);
-
-    #define SLABS(da, ba, he)                                                        \
-        if (vabs(da) > COLLISION_EPSILON) {                                          \
-            float t0 = (-(he) - (ba)) / (da), t1 = ((he) - (ba)) / (da);           \
-            if (t0 > t1) { float tmp = t0; t0 = t1; t1 = tmp; }                     \
-            t0 = vclamp(t0, 0.f, 1.f); t1 = vclamp(t1, 0.f, 1.f);                  \
-            ts[nt++] = t0; ts[nt++] = t1;                                           \
-        }
-    SLABS(dax, bax, box.halfExtents.x)
-    SLABS(day, bay, box.halfExtents.y)
-    SLABS(daz, baz, box.halfExtents.z)
+    float dax = V3_dot(dUnit,ax) * segLen, day = V3_dot(dUnit,ay) * segLen, daz = V3_dot(dUnit,az) * segLen;
+    float bax = V3_dot(toBase,ax),         bay = V3_dot(toBase,ay),         baz = V3_dot(toBase,az);
+    #define SLABS(da,ba,he) if (vabs(da) > COLLISION_EPSILON) { float t0 = (-(he) - (ba)) / (da), t1 = ((he) - (ba)) / (da); if (t0 > t1) { float tmp = t0; t0 = t1; t1 = tmp; } t0 = vclamp(t0, 0.f, 1.f); t1 = vclamp(t1, 0.f, 1.f); ts[nt++] = t0; ts[nt++] = t1; }
+    SLABS(dax,bax,box.halfExtents.x) SLABS(day,bay,box.halfExtents.y) SLABS(daz,baz,box.halfExtents.z)
     #undef SLABS
-
-    // Only add midpoint if no slab candidates were generated (fully degenerate segment)
-    if (nt == 0) ts[nt++] = 0.5f;
-
-    for (int k = 0; k < nt; k++) {
-        Vector3 pt = V3_AplusB(cap.base, V3_ScaleByF(d, ts[k]));
-        OverlapResult rk = SphereOBB(pt, cap.radius, box);
-        if (rk.hit && rk.overlapAmount > best.overlapAmount) best = rk;
-    }
+    if (nt == 0) ts[nt++] = 0.5f; // Only add midpoint if no slab candidates were generated (fully degenerate segment)
+    for (int k = 0; k < nt; k++) { Vector3 pt = V3_AplusB(cap.base,V3_ScaleByF(d,ts[k])); OverlapResult rk = SphereOBB(pt,cap.radius,box); if (rk.hit && rk.overlapAmount > best.overlapAmount) {best = rk;} }
     return best;
 }
 
@@ -4998,60 +4857,27 @@ void Physics(void) {
     float dt = vclamp((float)(Sys_Global.pauseRelativeTime - Sys_Global.last_physics_time), 0.0005f, 0.1f);
     Sys_Global.last_physics_time = Sys_Global.pauseRelativeTime;
     u8 substeps = (u8)vclamp((u32)(dt / MAX_STEP_SIZE + 0.5f), 1u, (u32)MAX_SUBSTEPS);
-    float dtsub = dt / (float)substeps;
-
-    dynamicEntityCount = 0;
-    for (int i = 0; i < Sys_Global.loadedInstances && dynamicEntityCount < 512; ++i) {
-        Entity *e = &Sys_Global.instances[i];
-        if ((e->entflags & ENTFLAG_RIGIDBODY) && (e->entflags & ENTFLAG_ACTIVE))
-            dynamicEntities[dynamicEntityCount++] = i;
-    }
-
+    float dtsub = dt / (float)substeps; dynamicEntityCount = 0;
+    for (int i = 0; i < Sys_Global.loadedInstances && dynamicEntityCount < 512; ++i) { Entity *e = &Sys_Global.instances[i]; if ((e->entflags & ENTFLAG_RIGIDBODY) && (e->entflags & ENTFLAG_ACTIVE)) {dynamicEntities[dynamicEntityCount++] = i;} }
     for (int i = 0; i < Sys_Global.loadedInstances; ++i) {
         Entity *e = &Sys_Global.instances[i];
-        e->cellX     = (i16)PosGetCellCoordX(e->position.x);
-        e->cellZ     = (i16)PosGetCellCoordZ(e->position.z);
-        e->cellIndex = PosGetCellCoordsP(e->cellX, e->cellZ);
-        e->radius    = (e->modelIndex < MODEL_IDX_MAX) ? modelBounds[e->modelIndex] * vmax(vmax(e->scale.x, e->scale.y), e->scale.z) : GetCollisionRadius(e);
-        e->colliding = false; // reset each frame
+        e->cellX = (i16)PosGetCellCoordX(e->position.x); e->cellZ = (i16)PosGetCellCoordZ(e->position.z); e->cellIndex = PosGetCellCoordsP(e->cellX, e->cellZ);
+        e->radius = (e->modelIndex < MODEL_IDX_MAX) ? modelBounds[e->modelIndex] * vmax(vmax(e->scale.x,e->scale.y),e->scale.z) : GetCollisionRadius(e);
+        e->colliding = false;
     }
 
     for (u8 s = 0; s < substeps; ++s) {
-        // Build broadphase grid
         MemSetToVForNBytes(cellCounts, 0, sizeof(cellCounts));
-        for (int i = 0; i < Sys_Global.loadedInstances; ++i) {
-            Entity *e = &Sys_Global.instances[i];
-            u32 cell = (u32)e->cellIndex;
-            if (cell < WORLDX*WORLDX && cellCounts[cell] < 127)
-                cellLists[cell][cellCounts[cell]++] = i;
-        }
+        for (int i = 0; i < Sys_Global.loadedInstances; ++i) { Entity *e = &Sys_Global.instances[i]; u32 cell = (u32)e->cellIndex; if (cell < WORLDX*WORLDX && cellCounts[cell] < 127) {cellLists[cell][cellCounts[cell]++] = i;} } // Build broadphase grid
+        for (u16 i = 0; i < dynamicEntityCount; ++i) { u16 idx = dynamicEntities[i]; Entity *e = &Sys_Global.instances[idx]; ApplyVelocity(e, dtsub); } // Integrate all dynamic bodies
+        for (u16 i = 0; i < dynamicEntityCount; ++i) { // Collision detection and resolution
+            u16 idx = dynamicEntities[i]; Entity *e = &Sys_Global.instances[idx]; if (e->collider == COLLIDER_TYPE_NONE || (Sys_Cheats.noclip && idx == PLAYER1)) continue;
 
-        // Integrate all dynamic bodies
-        for (u16 i = 0; i < dynamicEntityCount; ++i) {
-            u16 idx = dynamicEntities[i];
-            Entity *e = &Sys_Global.instances[idx];
-            ApplyVelocity(e, dtsub);
-        }
-
-        // Collision detection and resolution
-        for (u16 i = 0; i < dynamicEntityCount; ++i) {
-            u16 idx = dynamicEntities[i];
-            Entity *e = &Sys_Global.instances[idx];
-            if (e->collider == COLLIDER_TYPE_NONE || (Sys_Cheats.noclip && idx == PLAYER1)) continue;
-
-            i32 cx = PosGetCellCoordX(e->position.x);
-            i32 cz = PosGetCellCoordZ(e->position.z);
-            float searchRad = e->radius + V3_Mag(e->velocity) * dtsub + 0.5f;
-            i32 radCells = (i32)(searchRad / CELL_SIZE) + 2;
-            u32 mask = GetCollisionMask(e->layer);
-
-            // Collect all overlaps this substep (up to 16) and resolve each
-            #define MAX_CONTACTS 16
+            i32 cx = PosGetCellCoordX(e->position.x); i32 cz = PosGetCellCoordZ(e->position.z); u32 mask = GetCollisionMask(e->layer);
+            float searchRad = e->radius + V3_Mag(e->velocity) * dtsub + 0.5f; i32 radCells = (i32)(searchRad / CELL_SIZE) + 2;
             typedef struct { OverlapResult r; u16 otherIdx; } Contact;
-            Contact contacts[MAX_CONTACTS];
-            int contactCount = 0;
-
-            for (i32 dx = -radCells; dx <= radCells; ++dx) {
+            Contact contacts[16]; int contactCount = 0;
+            for (i32 dx = -radCells; dx <= radCells; ++dx) { // Collect all overlaps this substep  and resolve each
                 for (i32 dz = -radCells; dz <= radCells; ++dz) {
                     u32 cell = PosGetCellCoordsP(cx + dx, cz + dz);
                     if (cell >= WORLDX*WORLDX) continue;
@@ -5095,56 +4921,33 @@ void Physics(void) {
                         else if (eTriSoup && o->collider==COLLIDER_TYPE_BOX) { float mxA[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64); ShapeBox bb; Entity_GetBox(o,&bb); float br=vmax(bb.halfExtents.x,vmax(bb.halfExtents.y,bb.halfExtents.z)); r=SphereTriMesh(bb.center,br,e->modelIndex,mxA); r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z}; }
                         else { r=SphereSphere(e->position,GetCollisionRadius(e),o->position,GetCollisionRadius(o)); }
 
-                        if (r.hit && r.overlapAmount > COLLISION_EPSILON && contactCount < MAX_CONTACTS) {
-                            contacts[contactCount++] = (Contact){r, j};
-                        }
+                        if (r.hit && r.overlapAmount > COLLISION_EPSILON && contactCount < 16) contacts[contactCount++] = (Contact){r,j};
                     }
                 }
             }
 
-            // Resolve all contacts, largest overlap first (simple insertion sort for MAX_CONTACTS=16)
-            for (int a = 0; a < contactCount - 1; ++a) {
-                for (int b = a + 1; b < contactCount; ++b) {
-                    if (contacts[b].r.overlapAmount > contacts[a].r.overlapAmount) {
-                        Contact tmp = contacts[a]; contacts[a] = contacts[b]; contacts[b] = tmp;
-                    }
-                }
+            for (int a = 0; a < contactCount - 1; ++a) { // Resolve all contacts, largest overlap first, simple insertion sort
+                for (int b = a + 1; b < contactCount; ++b) { if (contacts[b].r.overlapAmount > contacts[a].r.overlapAmount) {Contact tmp=contacts[a]; contacts[a]=contacts[b]; contacts[b]=tmp;} }
             }
 
             for (int c = 0; c < contactCount; ++c) {
-                OverlapResult *ov = &contacts[c].r;
-                u16 j = contacts[c].otherIdx;
-                Entity *o = (j < INSTANCE_COUNT) ? &Sys_Global.instances[j] : NULL;
-                e->colliding = true;
-                if (o) o->colliding = true;
-
-                if (o && (o->entflags & ENTFLAG_RIGIDBODY)) {
-                    ApplyCollisionResponse(e, o, ov->normal, ov->overlapAmount, ov->point);
-                } else {
-                    Entity staticProxy = {0};
-                    staticProxy.mass           = 0.0f;
-                    staticProxy.dynamicFriction = 0.4f;
-                    staticProxy.collider       = COLLIDER_TYPE_NONE;
-                    ApplyCollisionResponse(e, &staticProxy, ov->normal, ov->overlapAmount, ov->point);
-                }
+                OverlapResult *ov = &contacts[c].r; u16 j = contacts[c].otherIdx;
+                Entity *o = (j < INSTANCE_COUNT) ? &Sys_Global.instances[j] : NULL; e->colliding = true; if (o) o->colliding = true;
+                if (o && (o->entflags & ENTFLAG_RIGIDBODY)) ApplyCollisionResponse(e,o,ov->normal,ov->overlapAmount,ov->point);
+                else { Entity staticProxy = {0}; staticProxy.mass=0.0f; staticProxy.dynamicFriction=0.4f; staticProxy.collider=COLLIDER_TYPE_NONE; ApplyCollisionResponse(e,&staticProxy,ov->normal,ov->overlapAmount,ov->point); }
             }
-            #undef MAX_CONTACTS
 
             e->accumulatedForce = (Vector3){0, 0, 0};
         }
 
         // Update cells for next substep
-        for (int i = 0; i < Sys_Global.loadedInstances; ++i) {
-            Entity *e = &Sys_Global.instances[i];
-            e->cellX     = (i16)PosGetCellCoordX(e->position.x);
-            e->cellZ     = (i16)PosGetCellCoordZ(e->position.z);
-            e->cellIndex = PosGetCellCoordsP(e->cellX, e->cellZ);
-        }
+        for (int i = 0; i < Sys_Global.loadedInstances; ++i) { Entity *e = &Sys_Global.instances[i]; e->cellX = (i16)PosGetCellCoordX(e->position.x); e->cellZ = (i16)PosGetCellCoordZ(e->position.z); e->cellIndex = PosGetCellCoordsP(e->cellX, e->cellZ); }
     }
 }
 
 ENGINE_TO_MOD void AddForce(u16 idx, Vector3 force, bool impulse) {
     if (idx >= INSTANCE_COUNT) return;
+    
     Entity *e = &Sys_Global.instances[idx]; float mass = e->mass > 0.001f ? e->mass : 1.0f;
     if (impulse) e->velocity         = V3_AplusB(e->velocity, V3_ScaleByF(force, 1.0f / mass));
     else         e->accumulatedForce = V3_AplusB(e->accumulatedForce, force);
@@ -5190,24 +4993,24 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
     struct IAudioRenderClient { IAudioRenderClientVtbl* lpVtbl; };
     typedef struct IUnknown IUnknown; typedef struct IUnknownVtbl { i32 (__stdcall *QueryInterface)(IUnknown* This, const GUID* riid, void** ppvObject); u32 (__stdcall *AddRef)(IUnknown* This); u32 (__stdcall *Release)(IUnknown* This); } IUnknownVtbl; struct IUnknown { const IUnknownVtbl* lpVtbl; };
     typedef u32 snd_pcm_uframes_t; typedef struct { int format,access,rate,channels,period_frames,periods; } pcm_params_t; typedef struct { snd_pcm_uframes_t hw_ptr; }  pcm_status_t; typedef struct { snd_pcm_uframes_t appl_ptr; } pcm_control_t;
-    typedef struct { pcm_status_t status; pcm_control_t control; } pcm_sync_t; //typedef enum { PCM_FORMAT=0,PCM_ACCESS,PCM_RATE,PCM_CHANNELS,PCM_PERIOD_SIZE,PCM_PERIODS,PCM_INTERRUPT } pcm_param_t; 
+    typedef struct { pcm_status_t status; pcm_control_t control; } pcm_sync_t; 
     typedef struct {IAudioClient *client; IAudioRenderClient *render; u32 buffer_frames; i32 rate,channels,period_frames; bool open; } wasapi_dev_t;
     extern i32 WINAPI CoInitializeEx(void*,u32); extern i32 WINAPI CoCreateInstance(const GUID*,IUnknown*,u32,REFIID,void**);
     static wasapi_dev_t wasapi_devs[8]; static int wasapi_dev_count = 0;
     #define FD_TO_IDX(fd) ((int)(intptr_t)(fd)-100)
     #define IDX_TO_FD(i)  ((FHandle)(intptr_t)((i)+100))
-    static const GUID IID_IAudioClient_       = {0x1CB9AD4C,0xDBFA,0x4C32,{0xB1,0x78,0xC2,0xF5,0x68,0xA7,0x03,0xB2}}; static const GUID IID_IAudioRenderClient_ = {0xF294ACFC,0x3146,0x4483,{0xA7,0xBF,0xAD,0xDC,0xA7,0xC2,0x60,0xE2}};
+    static const GUID IID_IAudioClient = {0x1CB9AD4C,0xDBFA,0x4C32,{0xB1,0x78,0xC2,0xF5,0x68,0xA7,0x03,0xB2}}; static const GUID IID_IAudioRenderClient = {0xF294ACFC,0x3146,0x4483,{0xA7,0xBF,0xAD,0xDC,0xA7,0xC2,0x60,0xE2}};
     static int wasapi_init_device(IMMDevice *dev,int rate,int channels,int period_frames,int periods) {
         if (wasapi_dev_count>=8) return -1;
         
-        wasapi_dev_t *w = &wasapi_devs[wasapi_dev_count];
-        i32 hr = dev->lpVtbl->Activate(dev,&IID_IAudioClient_,23,NULL,(void**)&w->client); if (FAILED(hr)) { DualLogError("WASAPI Activate failed, %u\n",hr); return -1; }
+        wasapi_dev_t *w = &wasapi_devs[wasapi_dev_count]; 
+        i32 hr = dev->lpVtbl->Activate(dev,&IID_IAudioClient,23,NULL,(void**)&w->client); if (FAILED(hr)) { DualLogError("WASAPI Activate failed, %u\n",hr); return -1; }
         
         WAVEFORMATEX fmt = {1,(u16)channels,(u32)rate,(u32)(rate*channels*2),(u16)(channels*2),16,0}; i64 buf_dur = (i64)(period_frames*periods)*10000000LL/rate;
         hr = w->client->lpVtbl->Initialize(w->client,0,524288,buf_dur,0,&fmt,NULL); if (FAILED(hr)) { w->client->lpVtbl->Release(w->client); return -1; }
         
         w->client->lpVtbl->GetBufferSize(w->client,&w->buffer_frames);
-        hr = w->client->lpVtbl->GetService(w->client,&IID_IAudioRenderClient_,(void**)&w->render); if (FAILED(hr)) { w->client->lpVtbl->Release(w->client); return -1; }
+        hr = w->client->lpVtbl->GetService(w->client,&IID_IAudioRenderClient,(void**)&w->render); if (FAILED(hr)) { w->client->lpVtbl->Release(w->client); return -1; }
         
         w->client->lpVtbl->Start(w->client);w->rate=rate; w->channels=channels; w->period_frames=period_frames; w->open=true;
         return wasapi_dev_count++;
@@ -5216,16 +5019,11 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
     static const GUID CLSID_MMDeviceEnumerator_ = {0xBCDE0395,0xE52F,0x467C,{0x8E,0x3D,0xC4,0x57,0x92,0x91,0x69,0x2E}}; static const GUID IID_IMMDeviceEnumerator_  = {0xA95664D2,0x9614,0x4F35,{0xA7,0x46,0xDE,0x8D,0xB6,0x36,0x17,0xE6}};
     FHandle pcm_open_all(int rate,int channels,int period_frames,int periods) {
         CoInitializeEx(NULL,0); IMMDeviceEnumerator *en = NULL; if (FAILED(CoCreateInstance(&CLSID_MMDeviceEnumerator_,NULL,23,&IID_IMMDeviceEnumerator_,(void**)&en))) { DualLogError("CoCreateInstance fail\n"); return INVALID_FHANDLE; }
-        
         IMMDevice *dev = NULL; i32 hr = en->lpVtbl->GetDefaultAudioEndpoint(en,0,0,&dev); en->lpVtbl->Release(en); if (FAILED(hr)||!dev) return INVALID_FHANDLE;
-        
         int idx = wasapi_init_device(dev,rate,channels,period_frames,periods); dev->lpVtbl->Release(dev); if (idx<0) return INVALID_FHANDLE;
-        
-        DualLog("Audio: WASAPI default device opened\n");
         return IDX_TO_FD(0);
     }
 
-    void pcm_params_init(pcm_params_t *p) { MemSetToVForNBytes(p,0,sizeof(*p)); }
     int pcm_sync(FHandle fd,pcm_sync_t *sync,unsigned int flags) {
         (void)flags; int idx=FD_TO_IDX(fd); if (idx<0||idx>=wasapi_dev_count||!wasapi_devs[idx].open) return -1;
         
@@ -5241,8 +5039,10 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
         (void)fd;
         for (int i=0;i<wasapi_dev_count;i++) {
             wasapi_dev_t *w=&wasapi_devs[i]; if (!w->open) continue;
+            
             u8* data = NULL;
             if (FAILED(w->render->lpVtbl->GetBuffer(w->render,(u32)frames,&data))) { pcm_prepare(IDX_TO_FD(i)); continue; }
+            
             CopyMemoryFromBtoAForNBytes(data,buf,frames*w->channels*2);
             w->render->lpVtbl->ReleaseBuffer(w->render,(u32)frames,0);
         }
@@ -5262,7 +5062,7 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
     struct snd_pcm_mmap_control { snd_pcm_uframes_t appl_ptr; snd_pcm_uframes_t avail_min; };
     struct snd_pcm_sync_ptr { u32 flags; union { struct snd_pcm_mmap_status  status; u8 reserved[64]; } s; union { struct snd_pcm_mmap_control control; u8 reserved[64]; } c; };
     struct snd_pcm_status { int state; struct timespec trigger_tstamp; struct timespec tstamp; snd_pcm_uframes_t appl_ptr,hw_ptr; snd_pcm_sframes_t delay; snd_pcm_uframes_t avail,avail_max,overrange; int suspended_state; u32 audio_tstamp_data; struct timespec audio_tstamp; struct timespec driver_tstamp; u32 audio_tstamp_accuracy; u8 reserved[20]; };
-    struct snd_xferi { snd_pcm_sframes_t result; void *buf; snd_pcm_uframes_t frames; }; typedef struct snd_pcm_mmap_status  pcm_status_t; typedef struct snd_pcm_mmap_control pcm_control_t;
+    typedef struct snd_pcm_mmap_status  pcm_status_t; typedef struct snd_pcm_mmap_control pcm_control_t;
     struct pcm_sync { pcm_status_t status; pcm_control_t control; }; typedef struct pcm_sync pcm_sync_t; typedef struct snd_pcm_hw_params pcm_hw_params_t; typedef struct snd_pcm_sw_params pcm_sw_params_t;
     struct pcm_params { pcm_hw_params_t hw_params; pcm_sw_params_t sw_params; }; typedef struct pcm_params pcm_params_t;
     typedef enum pcm_param {PCM_ACCESS=0,PCM_FORMAT=1,PCM_RATE=11,PCM_CHANNELS=10,PCM_PERIOD_SIZE=13,PCM_BUFFER_SIZE=17,PCM_PERIODS=15,PCM_INTERRUPT=20,PCM_TSTAMP_TYPE=21,PCM_AVAIL_MIN=22,PCM_START_THRESHOLD=23,PCM_XRUN_THRESHOLD=24,PCM_SILENCE_THRESHOLD=25,PCM_SILENCE_SIZE=26} pcm_param_t;
@@ -6492,7 +6292,7 @@ void RenderUIImage(i16 x, i16 y, i16 width, i16 height, u32 texIndex) {
     float vertices[30] = {x,y1,z,0.0f,0.0f,x1,y,z,1.0f,1.0f,x1,y1,z,1.0f,0.0f,x,y1,z,0.0f,0.0f,x,y,z,0.0f,1.0f,x1,y,z,1.0f,1.0f};
     glBufferData(GL_ARRAY_BUFFER,30 * sizeof(float),vertices,GL_DYNAMIC_DRAW);
     glDrawArrays(0x0004/*GL_TRIANGLES*/,0,6);
-    drawCallsRenderedThisFrame++; uiImageDrawCallsRenderedThisFrame++; verticesRenderedThisFrame += 6;    
+    drawCalls++; uiDrawCalls++; vertsRendered += 6;    
     glBindBuffer(GL_ARRAY_BUFFER,0);
 }
 
@@ -6584,7 +6384,7 @@ void SaveConfig(void) {
     }
 
     OS_Close(f);
-    DualLog("Saved settings to ./Data/Config.ini! framenum %u\n",Sys_Global.globalFrameNum);
+    DualLog("Saved settings to ./Data/Config.ini! framenum %u\n",Sys_Global.frame);
 }
 // ========================================================================================================================================================================================================================================================================================================
 // Credits System
@@ -6949,7 +6749,7 @@ static inline __attribute__((always_inline)) void DrawDebugLines(float* viewProj
     glBindVertexArray(Sys_Render.debugLinesVAO);
     glDrawArrays(0x0001/*GL_LINES*/,0,Sys_Global.debugLineVertCount);
     glEnable(GL_DEPTH_TEST);
-    drawCallsRenderedThisFrame++; verticesRenderedThisFrame += Sys_Global.debugLineVertCount;
+    drawCalls++; vertsRendered += Sys_Global.debugLineVertCount;
     Sys_Global.debugLineVertCount = 0;
 }
 
@@ -6968,7 +6768,7 @@ ENGINE_TO_MOD void AddDebugLine(Vector3 start, Vector3 end, Color col) {
 
 u8 MFD_LefTab=0,MFD_CenterTab=0,MFD_RightTab=0;
 static double RenderUI(void) {
-    drawCallsNormal = drawCallsRenderedThisFrame;
+    drawCallsNormal = drawCalls;
     if (Sys_Global.creditsActive) { // Render Credits
         if (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed) {
             ++Sys_Global.creditsPageIndex;
@@ -7025,9 +6825,9 @@ static double RenderUI(void) {
         u8 timingColor = TEXT_WHITE;
         if (vabs(Sys_Global.thisFrameTime - Sys_Global.cpuFrameTime) < 0.451) timingColor = TEXT_GREEN;
         if (Sys_Global.thisFrameTime > 6.944444) timingColor = TEXT_RED;
-        drawCallsRenderedThisFrame += 2; // Add two more for this text render ;)
+        drawCalls += 2; // Add two more for this text render ;)
         RenderFormattedText(16, debugTextStartY - lineSpacing, timingColor, FONT_NORMAL,1.0f, "ms: %.2f, CPU %.2f", Sys_Global.thisFrameTime,Sys_Global.cpuFrameTime);
-        RenderFormattedText(16 + 230.0f, debugTextStartY - lineSpacing, TEXT_WHITE, FONT_NORMAL,1.0f, "(FPS:%d, Worst:%d),Drwclls:%d [G:%d UI:%d Sh:%d] Vrt:%d E:%u|M:%u|P:%u",Sys_Global.framesPerLastSecond,Sys_Global.worstFPS,drawCallsRenderedThisFrame,drawCallsNormal,uiImageDrawCallsRenderedThisFrame,shadowDrawCallsRenderedThisFrame,verticesRenderedThisFrame,Sys_Cheats.editMode,Sys_Global.menuActive,Sys_Global.gamePaused);
+        RenderFormattedText(16 + 230.0f, debugTextStartY - lineSpacing, TEXT_WHITE, FONT_NORMAL,1.0f, "(FPS:%d, Worst:%d),Drwclls:%d [G:%d UI:%d Sh:%d] Vrt:%d E:%u|M:%u|P:%u",Sys_Global.framesPerLastSecond,Sys_Global.worstFPS,drawCalls,drawCallsNormal,uiDrawCalls,shadDrawCalls,vertsRendered,Sys_Cheats.editMode,Sys_Global.menuActive,Sys_Global.gamePaused);
     }
     
     return time_now;
@@ -7088,7 +6888,7 @@ static __attribute__((noinline)) __attribute__((hot)) void RenderShadowmaps(void
             glUniform1ui(0,c); glDispatchCompute(groupX_shadClear,6,1);
         }
 
-        shadowDrawCallsRenderedThisFrame = 0;
+        shadDrawCalls = 0;
         glViewport(0,0,SHADOW_MAP_SIZE,SHADOW_MAP_SIZE);
         glUseProgram(Sys_Render.shadowmapsShaderProgram);
         u32 shadowmapOffsetHead = 0U;
@@ -7146,7 +6946,7 @@ static __attribute__((noinline)) __attribute__((hot)) void RenderShadowmaps(void
                     if (currentTexIndex != e->texIndex) { currentTexIndex = e->texIndex; glUniform1ui(6,e->texIndex); }
                     bool texIsTransparent = transparentTexture[e->texIndex];
                     if (currentIsTransparent != texIsTransparent) { currentIsTransparent = texIsTransparent; glUniform1ui(8,currentIsTransparent ? 1u : 0u); }
-                    glDrawElements(0x0004/*GL_TRIANGLES*/,modelTriangleCounts[currentModelType]*3,GL_UNSIGNED_SHORT,0); drawCallsRenderedThisFrame++; shadowDrawCallsRenderedThisFrame++; verticesRenderedThisFrame += modelTriangleCounts[currentModelType] * 3;
+                    glDrawElements(0x0004/*GL_TRIANGLES*/,modelTriangleCounts[currentModelType]*3,GL_UNSIGNED_SHORT,0); drawCalls++; shadDrawCalls++; vertsRendered += modelTriangleCounts[currentModelType] * 3;
                 }
             }
             
@@ -7194,7 +6994,8 @@ void DrawCapsuleCollider(Entity *e); void DrawConvexMeshCollider(Entity *e); voi
     {u16 glow=e->glowIndex,norm=e->normIndex,spec=e->specIndex; \
      if (e->collider == COLLIDER_TYPE_BOX) DrawBoxCollider(e); \
      else if (e->collider == COLLIDER_TYPE_SPHERE) DrawSphereCollider(e); \
-     else if (e->collider == COLLIDER_TYPE_CONVEXMESH) DrawConvexMeshCollider(e); \
+     else if (e->collider == COLLIDER_TYPE_CONVEXMESH) DrawMeshCollider(e); \
+     else if (e->collider == COLLIDER_TYPE_MESH) DrawMeshCollider(e); \
      else if (e->collider == COLLIDER_TYPE_CAPSULE) DrawCapsuleCollider(e); \
      glUniform1ui(17,tex==316?1u:0u); glUniform1ui(25,constIndex); glUniform1f(27,e->volume); glUniform1ui(13,(tex==36||tex==887)?1u:0u); \
      if (grayscaleEnabled) { float npcHeat = ConstIndexIsNPC(constIndex) ? ((constIndex==419 || constIndex==422 || constIndex==424 || constIndex==429 || constIndex==430 || constIndex==431||constIndex==433||constIndex==437||constIndex==438||constIndex==441) ? 1.5f : 4.0f) : 0.0f; glUniform1f(9,npcHeat); } \
@@ -7206,7 +7007,7 @@ void DrawCapsuleCollider(Entity *e); void DrawConvexMeshCollider(Entity *e); voi
      BIND_TEX(1,curN,norm) BIND_TEX(18,curT,tex) BIND_TEX(19,curG,glow) BIND_TEX(20,curS,spec) \
      curM=GetAndBindModel(i,curM); \
      u32 vc=modelTriangleCounts[curM]*3; \
-     glDrawElements(0x0004,vc,GL_UNSIGNED_SHORT,0);drawCallsRenderedThisFrame++;verticesRenderedThisFrame+=vc;}
+     glDrawElements(0x0004,vc,GL_UNSIGNED_SHORT,0);drawCalls++;vertsRendered+=vc;}
 
 bool mat4_inverse(const float* m, float* out) {
     float inv[16],det;
@@ -7292,7 +7093,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         currentModelType = GetAndBindModel(i,currentModelType);
         glUniform1ui(3,(u32)tex);
         u32 vertCount = modelTriangleCounts[currentModelType] * 3;
-        glDrawElements(0x0004/*GL_TRIANGLES*/,vertCount,GL_UNSIGNED_SHORT,0); drawCallsRenderedThisFrame++; verticesRenderedThisFrame += vertCount;
+        glDrawElements(0x0004/*GL_TRIANGLES*/,vertCount,GL_UNSIGNED_SHORT,0); drawCalls++; vertsRendered += vertCount;
     }
 
     glUseProgram(Sys_Render.chunkShaderProgram); /*Main Pass*/ glUniformMatrix4fv(2,1,0,viewProj); glUniform1ui(25,0u); // default constIndex
@@ -7378,12 +7179,12 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glBindVertexArray(Sys_Render.quadVAO);
     glDisable(GL_DEPTH_TEST);
     glDrawArrays(0x0006/*GL_TRIANGLE_FAN*/,0,4);
-    drawCallsRenderedThisFrame++; verticesRenderedThisFrame += 4;
+    drawCalls++; vertsRendered += 4;
     if ((Sys_Global.last_time - Sys_Global.lastFrameSecCountTime) >= 1.00) { // Update Diagnostic Poll
         Sys_Global.lastFrameSecCountTime = Sys_Global.last_time;
-        Sys_Global.framesPerLastSecond = Sys_Global.globalFrameNum - Sys_Global.lastFrameSecCount;
-        if (Sys_Global.framesPerLastSecond < Sys_Global.worstFPS && Sys_Global.globalFrameNum > 2000) Sys_Global.worstFPS = Sys_Global.framesPerLastSecond; // After startup, keep track of worst framerate seen.
-        Sys_Global.lastFrameSecCount = Sys_Global.globalFrameNum;
+        Sys_Global.framesPerLastSecond = Sys_Global.frame - Sys_Global.lastFrameSecCount;
+        if (Sys_Global.framesPerLastSecond < Sys_Global.worstFPS && Sys_Global.frame > 2000) Sys_Global.worstFPS = Sys_Global.framesPerLastSecond; // After startup, keep track of worst framerate seen.
+        Sys_Global.lastFrameSecCount = Sys_Global.frame;
     }
 }
 
@@ -7514,7 +7315,6 @@ __attribute__((cold)) void NewGame(void) { // Reset World States
 void GoIntoGame(void) { NewGame(); PlayGameMusic(); DualLog("Player named \"%s\" started the game!\n", Sys_Global.playerName); }
 // ========================================================================================================================================================================================================================================================================================================
 // Init System
-void SetGLContext_GetFunctionPointers(void); GLFWwindow* VCreateWindow(int width, int height, char* title); int WindowInit(void); void InitAudio(void); void AudioUpdate(void);
 void InitalizeEnvironment(void) {
     double game_start_time = get_time();
     random_range_rng = (u32)game_start_time; // Seed global rand uniquely with time since system boot.
@@ -7523,10 +7323,11 @@ void InitalizeEnvironment(void) {
     DualLog("Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed\n");
     DualLog("Entity size: %u\n",sizeof(Entity));
     WindowInit();
-    Sys_Global.globalFrameNum=0,Sys_Global.menuActive=true,Sys_Global.screenshotTimeout=1.0,Sys_Global.creditsPageIndex=1,Sys_Global.difficultyCombat=Sys_Global.difficultyCyber=Sys_Global.difficultyPuzzle=Sys_Global.difficultyMission=2,Sys_Global.deaths=0,Sys_Global.worstFPS=0,Sys_Global.cursorPosition_x=680,Sys_Global.cursorPosition_y=384;
+    Sys_Global.frame=0,Sys_Global.menuActive=true,Sys_Global.screenshotTimeout=1.0,Sys_Global.creditsPageIndex=1,Sys_Global.difficultyCombat=Sys_Global.difficultyCyber=Sys_Global.difficultyPuzzle=Sys_Global.difficultyMission=2,Sys_Global.deaths=0,Sys_Global.worstFPS=0,Sys_Global.cursorPosition_x=680,Sys_Global.cursorPosition_y=384;
     DualLog("Loading game definition...");
     FHandle gmFP = OS_OpenReadonly("./Data/gamedata.txt");
     if (!gmFP) { DualLogError("\nCannot open ./Data/gamedata.txt\n"); OS_Exit(1);  }
+    
     char gmLine[512],global_modname[256],global_dllname[256]; u32 lineNum = 0;
     while (GetNextStringUpToNewlineOrEOF(gmLine,sizeof(gmLine),gmFP)) {
         lineNum++;
@@ -7549,6 +7350,7 @@ void InitalizeEnvironment(void) {
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); glfwSwapBuffers(); // Black out the window as early as possible for better presentation.
     i32 major=0,minor=0; glGetIntegerv(0x821B/*GL_MAJOR_VERSION*/,&major); glGetIntegerv(0x821C/*GL_MINOR_VERSION*/,&minor);
     if (major < 4 || (major == 4 && minor < 3)) { DualLogError("Need OpenGL >= 4.3, got %d.%d\n",major,minor); OS_Exit(1); }
+    
     glFrontFace(0x0901/*GL_CCW*/); // Set triangle winding order
     glBlendFuncSeparate(0x0302/*GL_SRC_ALPHA*/, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/, 1, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/);
     CompileShaders();
@@ -7592,19 +7394,14 @@ void InitalizeEnvironment(void) {
     m[8] = 0.0f; m[9] = 0.0f; m[10]=      -(lightRangeMax + NEAR_PLANE) / viewRange; m[11]= -1.0f;
     m[12]= 0.0f; m[13]= 0.0f; m[14]= -2.0f * lightRangeMax * NEAR_PLANE / viewRange; m[15]=  0.0f;
     InitAudio();
-    DualLog("Loading mod code...");
-    char mod_path[256];
-    StringCopyInto_A_From_B(mod_path,"./",256); StringConcatenate(mod_path,global_dllname,256); StringConcatenate(mod_path,MOD_EXTENSION,256);
-    mod_handle = OS_DlOpen(mod_path);
-    if (!mod_handle) { DualLogError("Failed to load mod at:%s",mod_path); OS_Exit(1); }
-    #define X(ret, name, params) \
-        name = (ret (*) params)OS_DlSym(mod_handle,#name); \
-        if(!name) DualLogError("Failed to load mod function: %s",#name);
+    char mod_path[256]; StringCopyInto_A_From_B(mod_path,"./",256); StringConcatenate(mod_path,global_dllname,256); StringConcatenate(mod_path,MOD_EXTENSION,256);
+    mod_handle = OS_DlOpen(mod_path); if (!mod_handle) { DualLogError("Failed to load mod at:%s",mod_path); OS_Exit(1); }
+    
+    #define X(ret, name, params) name = (ret (*) params)OS_DlSym(mod_handle,#name); if(!name) DualLogError("Failed to load mod function: %s",#name);
     MOD_FUNCTION_LIST(X)
     #undef X
     ModLink(&Sys_Global,&Sys_Cheats,&Sys_Settings,&Sys_Text,&Sys_UI); // Link engine to mod
     Sys_Global.GetKey=GetKey; Sys_Global.GetKeyPressed=GetKeyPressed; // Link mod to engine
-    DualLog("done!\n");
     ModEntityDefinitionsInitAfterLoad();
     glGenFramebuffers(1,&Sys_Render.gBufferFBO);
     ApplySettings(); // After loading of text and game data.
@@ -7637,8 +7434,8 @@ void InitalizeEnvironment(void) {
     if (Sys_Global.introNotPlayed) {} // TODO: Play intro
     Sys_Global.absoluteTime = Sys_Global.last_topframe_time = Sys_Global.current_time = get_time();
     Sys_Global.pauseRelativeTime = Sys_Global.last_physics_time = 0.0;
-//     NewGame(); // Almost works, just causes GL errors once entering game and SSR doesn't appear to work.  Needed to fix bug where you can't see options take effect on config menu unless returned to from after starting a game.
-    OpenMainMenu();
+    NewGame();
+    //OpenMainMenu(); // Comment out for immediate testing
     DebugRAM("InitializeEnvironment end");
     DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
 }
@@ -7650,10 +7447,8 @@ i32 main(void) {
     while(1) {
         if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad); queuedLevelToLoad = 255u; continue; }
 
-        Sys_Global.current_time       = get_time();
-        Sys_Global.deltaTime          = Sys_Global.current_time - Sys_Global.last_topframe_time;
-        Sys_Global.absoluteTime      += Sys_Global.deltaTime;
-        Sys_Global.last_topframe_time = Sys_Global.current_time;
+        Sys_Global.current_time  = get_time();              Sys_Global.deltaTime          = Sys_Global.current_time - Sys_Global.last_topframe_time;
+        Sys_Global.absoluteTime += Sys_Global.deltaTime;    Sys_Global.last_topframe_time = Sys_Global.current_time;
         if (!Sys_Global.gamePaused && !Sys_Global.menuActive) Sys_Global.pauseRelativeTime += Sys_Global.deltaTime;
         InputProcessing(); // Before anims and physics to allow them to respond immediately.
         UpdateAnims();     // Before physics to allow model swap out to affect physics state immediately.  Before rendering to affect shadowmaps immediately.
@@ -7661,19 +7456,19 @@ i32 main(void) {
         ModUpdate();       // After physics so mod/gamecode can modify velocities before next frame.
         UpdateAmbientSounds();
         UpdateMusic();
-        drawCallsRenderedThisFrame = uiImageDrawCallsRenderedThisFrame = shadowDrawCallsRenderedThisFrame = verticesRenderedThisFrame = 0; // Reset per frame
+        drawCalls = uiDrawCalls = shadDrawCalls = vertsRendered = 0;
         RenderCameraViews();
         CullCore();
         UpdateInstanceMatrix4x4s();
         Render(false/*!camview*/,0u);
         CheckAndTakeScreenshot();
-        Sys_Global.globalFrameNum++;
+        Sys_Global.frame++;
         InputClearRisingAndFallingEdges();
         Sys_Global.cpuTime = get_time() - Sys_Global.current_time; // Measure time over everything this frame before GPU swap buffers for diagnostic text.
         glfwSwapBuffers(); // Present frame (almost always waiting for GPU since GPU bound).
         CHECK_GL_ERROR();  // Lone catch for issues, I sprinkle this around when troubleshooting introduced issues.
         #ifdef DEBUG_RAM_OUTPUT
-            { static const u32 dbgFrames[] = {4,100,200,500,1000}; static const char* dbgLabels[] = {"frame 4","frame 100","frame 200","frame 500","frame 1000"}; for (int d=0;d<5;d++) if (Sys_Global.globalFrameNum == dbgFrames[d]) {DebugRAM(dbgLabels[d]); break;} }
+        { static const u32 dbgFrm[] = {4,100,200,500,1000}; static const char* dbgLbl[] = {"frame 4","frame 100","frame 200","frame 500","frame 1000"}; for (int d=0;d<5;d++) if (Sys_Global.frame == dbgFrm[d]) {DebugRAM(dbgLbl[d]); break;} }
         #endif
     }
     return 0;
