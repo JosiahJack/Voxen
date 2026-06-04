@@ -123,6 +123,7 @@ ENGINE_TO_MOD float random_range(float a, float b);
 ENGINE_TO_MOD double get_time(void);
 ENGINE_TO_MOD float lerp(float min, float max, float val);
 ENGINE_TO_MOD float inverse_lerp(float min, float max, float val);
+ENGINE_TO_MOD float smooth_damp(float current, float target, float *current_velocity, float smooth_time);
 ENGINE_TO_MOD void play_wav(const char* path, float volume, Vector3 pos, bool positional);
 ENGINE_TO_MOD void play_message(const char* path);
 ENGINE_TO_MOD void play_mp3(const char* path, i32 fade_in_ms);

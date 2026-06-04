@@ -295,9 +295,9 @@ void BmpWrite(char const *filename, int x, int y, const void *data) {
 }
 
 #ifdef WINDOWS
-double get_time(void) { static LARGE_INTEGER frequency,counter; static i32 init=0; if (!init) { QueryPerformanceFrequency(&frequency); init=1; } QueryPerformanceCounter(&counter); return (double)counter.QuadPart / frequency.QuadPart; }
+ENGINE_TO_MOD double get_time(void) { static LARGE_INTEGER frequency,counter; static i32 init=0; if (!init) { QueryPerformanceFrequency(&frequency); init=1; } QueryPerformanceCounter(&counter); return (double)counter.QuadPart / frequency.QuadPart; }
 #else
-double get_time(void) { struct {i64 s,ns;} ts; i64 ret; __asm__ __volatile__("syscall":"=a"(ret):"a"(228),"D"(1),"S"(&ts):"rcx","r11","memory"); if (ret != 0) {return 0.0;} return (double)ts.s + (double)ts.ns * 1e-9; } // Full time in seconds, 1 for MONOTONIC, Note that using clock_gettime wasn't any better for performance.
+ENGINE_TO_MOD double get_time(void) { struct {i64 s,ns;} ts; i64 ret; __asm__ __volatile__("syscall":"=a"(ret):"a"(228),"D"(1),"S"(&ts):"rcx","r11","memory"); if (ret != 0) {return 0.0;} return (double)ts.s + (double)ts.ns * 1e-9; } // Full time in seconds, 1 for MONOTONIC, Note that using clock_gettime wasn't any better for performance.
 #endif
 
 // Get USS aka the total RAM uniquely allocated for the process (btop shows RSS so pulls in shared libs and double counts shared RAM).
@@ -351,31 +351,13 @@ ENGINE_TO_MOD void Screenshot(void) {
 u32 random_range_rng = 0x12345678u;
 u32 xs32(void) { u32 x = random_range_rng; x ^= x << 13; x ^= x >> 17; x ^= x << 5; return random_range_rng = x ? x : 0xdeadbeefu; }
 u32 random_u32(void) { return xs32(); }
-u8 random_range_u8(u8 a, u8 b) {
-    if (a == b) return a;
-    if (a > b) { u8 temp = a; a = b; b = temp; }
-    u32 r = (u32)b - a; if (!r) return a; if (r == 256) return (u8)xs32();
-    u32 t = 256u - (256u % r), v; do v = (u8)xs32(); while (v >= t); return a + (v % r);
-}
-
-u32 random_range_u32(u32 a, u32 b) {
-    if (a == b) return a;
-    if (a > b) { u32 temp = a; a = b; b = temp; }
-    u64 r = (u64)b - a; if (!r) return a;
-    return a + (u32)(((u64)xs32() * r) >> 32);
-}
-
-i32 random_range_i32(i32 a, i32 b) {
-    if (a == b) return a;
-    if (a > b) { i32 temp = a; a = b; b = temp; }
-    u32 r = (u32)b - (u32)a;
-    return a + (i32)(((u64)xs32() * r) >> 32);
-}
-
-float random_range(float a, float b) { return a + (b - a) * ((float)(xs32() >> 8) * (1.0f / (1U << 24))); }
-float lerp(float min, float max, float val) { return min + (max - min) * vclamp(val,0.0f,1.0f); }
-float inverse_lerp(float min, float max, float val) { return (min == max) ? 0.0f : vclamp((val - min) / (max - min),0.0f,1.0f); }
-float smooth_damp(float current, float target, float *current_velocity, float smooth_time) { 
+ENGINE_TO_MOD u8 random_range_u8(u8 a, u8 b) { if (a > b) { u8 temp = a; a = b; b = temp; } u32 r = (u32)b - a; u32 t = 256u - (256u % r), v; do v = (u8)xs32(); while (v >= t); return (a==b) ? a : a + (v % r); }
+ENGINE_TO_MOD u32 random_range_u32(u32 a, u32 b) { if (a > b) { u32 temp = a; a = b; b = temp; } return (a==b) ? a : a + (u32)(((u64)xs32() * ((u64)b - a)) >> 32); }
+ENGINE_TO_MOD i32 random_range_i32(i32 a, i32 b) { if (a > b) { i32 temp = a; a = b; b = temp; } return (a==b) ? a : a + (i32)(((u64)xs32() * ((u32)b - (u32)a)) >> 32); }
+ENGINE_TO_MOD float random_range(float a, float b) { return a + (b - a) * ((float)(xs32() >> 8) * (1.0f / (1U << 24))); }
+ENGINE_TO_MOD float lerp(float min, float max, float val) { return min + (max - min) * vclamp(val,0.0f,1.0f); }
+ENGINE_TO_MOD float inverse_lerp(float min, float max, float val) { return (min == max) ? 0.0f : vclamp((val - min) / (max - min),0.0f,1.0f); }
+ENGINE_TO_MOD float smooth_damp(float current, float target, float *current_velocity, float smooth_time) { 
     if (smooth_time < 0.0001f) smooth_time = 0.0001f;
     float omega = 2.0f / smooth_time;
     float x = omega * (float)Sys_Global.timeSinceLastPhysicsTick;
@@ -386,11 +368,7 @@ float smooth_damp(float current, float target, float *current_velocity, float sm
     float temp = (*current_velocity + omega * change) * (float)Sys_Global.timeSinceLastPhysicsTick;
     *current_velocity = (*current_velocity - omega * temp) * exp;
     float output = target + (change + temp) * exp;
-    if ((original_to - current > 0.0f) == (output > original_to)) {
-        output = original_to;
-        *current_velocity = (output - original_to) / (float)Sys_Global.timeSinceLastPhysicsTick;
-    }
-
+    if ((original_to - current > 0.0f) == (output > original_to)) { output = original_to; *current_velocity = (output - original_to) / (float)Sys_Global.timeSinceLastPhysicsTick; }
     return output;
 }
 
@@ -401,8 +379,7 @@ char* data_parser_trim(char* s) {
 
     char* e = s + GetStringLength(s) - 1;
     while (e > s && CharacterIsEmpty((unsigned char)*e)) e--;
-    e[1] = 0;
-    return s;
+    e[1] = 0; return s;
 }
 
 i32 StringToInt(const char *str) { // atoi replacement, needed separately from fast_atoi for user console input
@@ -414,24 +391,10 @@ i32 StringToInt(const char *str) { // atoi replacement, needed separately from f
 }
 
 ENGINE_TO_MOD bool CharacterIsEmpty(const char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r'; } // isspace replacement
-bool StringIsEmpty(const char* a) { // C# String.IsNullOrWhiteSpace replacement
-    size_t size = GetStringLength(a);
-    for(size_t i=0;i < size;++i) {
-        if (a[i] == '\0') break;
-        if (!CharacterIsEmpty(a[i])) return false;
-    }
-    
-    return true;
-}
-
+ENGINE_TO_MOD bool StringIsEmpty(const char* a) { size_t size = GetStringLength(a); for(size_t i=0;i<size;++i) { if (a[i] == '\0') {break;} if (!CharacterIsEmpty(a[i])) {return false;} } return true; } // C# String.IsNullOrWhiteSpace replacement
 bool StringsEqual(const char* a, const char* b) { // !strcmp replacement (hated its inverted logic)
-    size_t size = GetStringLength(a), size2 = GetStringLength(b); if (size != size2) return false;
-    
-    for (size_t i=0;i<size;++i) {
-        if (a[i] != b[i]) return false;
-        if (a[i] == '\0') break;
-    }
-    
+    size_t size = GetStringLength(a); if (size != GetStringLength(b)) return false;
+    for (size_t i=0;i<size;++i) { if (a[i] != b[i]) {return false;} if (a[i] == '\0') {break;} }
     return true;
 }
 
@@ -452,8 +415,7 @@ void StringCopyInto_A_SubstringFrom_B(char* a, size_t substringSize, const char*
 }
 
 void StringConcatenate(char* a, const char* b, size_t bufferSize) { // strcat replacement
-    size_t size  = GetStringLength(a);
-    size_t size2 = GetStringLength(b);
+    size_t size  = GetStringLength(a), size2 = GetStringLength(b);
     if (size + size2 >= bufferSize) { DualLogError("Strings to large to concat, will overflow buffer: GetStringLength(%s{%u} + %s{%u} > %u)\n",a,size,b,size2,bufferSize); OS_Exit(1); }
 
     char* dest = a + size;
@@ -467,13 +429,8 @@ char* StringFindSubstring(const char* haystack, const char* needle) { // strstr 
 
     for (size_t i = 0; haystack[i] != '\0'; ++i) {
         if (haystack[i] == needle[0]) { // If the first character matches, check the rest of the needle
-            size_t h_idx = i;
-            size_t n_idx = 0;
-            while (haystack[h_idx] != '\0' && needle[n_idx] != '\0' && haystack[h_idx] == needle[n_idx]) {
-                h_idx++;
-                n_idx++;
-            }
-
+            size_t h_idx = i, n_idx = 0;
+            while (haystack[h_idx] != '\0' && needle[n_idx] != '\0' && haystack[h_idx] == needle[n_idx]) { h_idx++; n_idx++; }
             if (needle[n_idx] == '\0') return (char*)&haystack[i];
         }
     }
@@ -617,7 +574,7 @@ ENGINE_TO_MOD Vector3 GetEntityLocalSpawnPointFromUnrotatedOffsetVector(Entity* 
 static inline int pntz(size_t p[2]) { return (p[0] != 1) ? __builtin_ctzll(p[0] - 1) : (p[1] ? 8 * sizeof(size_t) + __builtin_ctzll(p[1]) : 0); }
 static inline void shl(size_t p[2], int n) { if (n >= 8 * (int)sizeof(size_t)) { p[1] = p[0]; p[0] = 0; n -= 8 * sizeof(size_t); } if (n) { p[1] = (p[1] << n) | (p[0] >> (8 * sizeof(size_t) - n)); p[0] <<= n; } }
 static inline void shr(size_t p[2], int n) { if (n >= 8 * (int)sizeof(size_t)) { p[0] = p[1]; p[1] = 0; n -= 8 * sizeof(size_t); } if (n) { p[0] = (p[0] >> n) | (p[1] << (8 * sizeof(size_t) - n)); p[1] >>= n; } }
-static void cycle(size_t w, unsigned char* ar[], int n) {
+static void scycle(size_t w, unsigned char* ar[], int n) {
     unsigned char tmp[256]; size_t l;
     if (n<2) return;
     ar[n]=tmp;
@@ -634,7 +591,7 @@ static void sift(unsigned char* head, size_t w, cmpfun_r cmp, void* arg, int ps,
         if (cmp(ar[0],lf,arg)>=0 && cmp(ar[0],rt,arg)>=0) break;
         if (cmp(lf,rt,arg)>=0) { ar[i++&(AL-1)]=lf; head=lf; ps--; } else { ar[i++&(AL-1)]=rt; head=rt; ps-=2; }
     }
-    cycle(w,ar,i&(AL-1));
+    scycle(w,ar,i&(AL-1));
 }
 static void trinkle(unsigned char* head, size_t w, cmpfun_r cmp, void* arg, size_t pp[2], int ps, int trusty, size_t lp[]) {
     unsigned char* ar[AL]; int i=1; ar[0]=head; size_t p[2]={pp[0],pp[1]};
@@ -646,7 +603,7 @@ static void trinkle(unsigned char* head, size_t w, cmpfun_r cmp, void* arg, size
         ar[i++&(AL-1)]=ss; head=ss; int t=pntz(p); shr(p,t); ps+=t; trusty=0;
     }
     
-    if (!trusty) { cycle(w,ar,i&(AL-1)); sift(head,w,cmp,arg,ps,lp); }
+    if (!trusty) { scycle(w,ar,i&(AL-1)); sift(head,w,cmp,arg,ps,lp); }
 }
 
 void qsort_new(void* base, size_t nel, size_t w, cmpfun cmp) {
@@ -691,8 +648,7 @@ float half_to_float(half h) {
 }
 // ========================================================================================================================================================================================================================================================================================================
 // Console Emulator System - CHEATS!
-#define MAX_HISTORY 7
-static i32 currentEntryLength=0, numHistory=0, historyPos=0; char consoleEntryText[TEXT_BUFFER_SIZE],history[MAX_HISTORY][TEXT_BUFFER_SIZE];
+static i32 currentEntryLength=0, numHistory=0, historyPos=0; char consoleEntryText[TEXT_BUFFER_SIZE],history[7][TEXT_BUFFER_SIZE];
 static Vector3 ressurectionLocations[10] = { {-27.386f, -55.488f, 26.5941f},/*0/R*/ {40.903f, -42.372f, -30.78f},/*1*/      {30.67407f, -25.832f, 10.21412f},/*2*/ {38.26813f, -15.498f, 20.37825f},/*3*/ {-19.48f, -7.928f, 22.954f},/*4*/ {-24.358f, 12.5956f, 31.8497f},/*5*/
                                              {-22.3568f, 33.7845f, -30.728f},/*6*/  {2.228084f, 50.95243f, 7.532025f},/*7*/ {10.068f, 58.897f, 13.973f},/*8*/      {2.303f, 106.77f, -38.554f}/*9*/ };
 static Vector3 cyberSpaceEntryLocations[8] = { {210.6834f,2.812f,-24.378f},/*0*/ {195.42f,-13.44f,33.28f},/*1*/      {157.1608f,-15.53f,47.331f},/*2a, if cyberport localPosition.x < -26.0f*/ {256.0416f,-0.716f,62.48789f},/*2b level 2 secondary cyberport position*/
@@ -709,10 +665,10 @@ static void AddToHistory(const char* entry) {
     if (GetStringLength(entry) == 0) return;
     if (numHistory > 0 && StringsEqual(entry,history[numHistory - 1])) return;
     
-    if (numHistory < MAX_HISTORY) { StringCopyInto_A_From_B(history[numHistory],entry,TEXT_BUFFER_SIZE); numHistory++; }
+    if (numHistory < 7) { StringCopyInto_A_From_B(history[numHistory],entry,TEXT_BUFFER_SIZE); numHistory++; }
     else {
-        for (int i = 0; i < MAX_HISTORY - 1; i++) StringCopyInto_A_From_B(history[i],history[i + 1],TEXT_BUFFER_SIZE); // Shift list toward 0
-        StringCopyInto_A_From_B(history[MAX_HISTORY - 1], entry,TEXT_BUFFER_SIZE);
+        for (int i = 0; i < 7 - 1; i++) StringCopyInto_A_From_B(history[i],history[i + 1],TEXT_BUFFER_SIZE); // Shift list toward 0
+        StringCopyInto_A_From_B(history[7 - 1], entry,TEXT_BUFFER_SIZE);
     }
 }
 
@@ -1358,33 +1314,26 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, c
     u32* rem = (u32*)st; u32 ucnt = 0;
     for (u32 i=0; i<ec; ++i) {
         const float* v = sv + (i<<3);
-        u64 h = *(u32*)(v+0) ^ *(u32*)(v+2) ^ *(u32*)(v+4) ^ *(u32*)(v+6);
-        u32 s = (u32)(h ^ (h>>32)) & (HASH_SIZE-1);
-        while (ht[s] != 0xFFFFFFFFU) {
-            if (CompareMemoryForNBytes(sv+(ht[s]<<3), v, 32) == 0) { rem[i] = ht[s]; goto nxt; }
-            s = (s+1) & (HASH_SIZE-1);
-        }
+        u64 h = *(u32*)(v+0) ^ *(u32*)(v+2) ^ *(u32*)(v+4) ^ *(u32*)(v+6); u32 s = (u32)(h ^ (h>>32)) & (HASH_SIZE-1);
+        while (ht[s] != 0xFFFFFFFFU) { if (CompareMemoryForNBytes(sv+(ht[s]<<3), v, 32) == 0) { rem[i] = ht[s]; goto nxt; } s = (s+1) & (HASH_SIZE-1); }
         ht[s] = ucnt; rem[i] = ucnt;
         CopyMemoryFromBtoAForNBytes(sv+(ucnt<<3), v, 32);
         ++ucnt; nxt:;
     }
 
-    u8* fv = OS_Alloc((size_t)ucnt * VERTEX_ATTRIBUTES_SIZE);
-    u8* dst = fv;
-    for (u32 i=0; i<ucnt; ++i) {
+    u8* fv = OS_Alloc((size_t)ucnt * VERTEX_ATTRIBUTES_SIZE); u8* dst = fv;
+    for (u32 i=0; i<ucnt; ++i) { 
         const float* src = sv + (i<<3);
         for (u32 j=0; j<8; ++j) { *(half*)dst = float_to_half(src[j]); dst += 2; }
     }
 
     u16* ft = OS_Alloc(ec * sizeof(u16));
     for (u32 i=0; i<ec; ++i) ft[i] = (u16)rem[i];
-    OptimizeVertexCache(ft, ec, ucnt);
-    u32 oldc = ucnt;
-    u8* optv = OptimizeVertexFetch(fv, &ucnt, ft, ec, VERTEX_ATTRIBUTES_SIZE);
-    OS_DeallocateRAM(fv, oldc * VERTEX_ATTRIBUTES_SIZE);
+    OptimizeVertexCache(ft,ec,ucnt);
+    u32 oldc = ucnt; u8* optv = OptimizeVertexFetch(fv,&ucnt,ft,ec,VERTEX_ATTRIBUTES_SIZE); // Allocates and returns new buffer; safe to free fv after.
+    OS_DeallocateRAM(fv,oldc * VERTEX_ATTRIBUTES_SIZE);
     *ov = optv; *ovc = ucnt; *ot = ft; *otc = ec/3;
-    float rad = vmax(vabs(mx),vmax(vabs(my),vmax(vabs(mz),vmax(Mx,vmax(My,Mz)))));
-    modelBounds[mindex] = rad;
+    modelBounds[mindex] = vmax(vabs(mx),vmax(vabs(my),vmax(vabs(mz),vmax(Mx,vmax(My,Mz))))); 
     OS_DeallocateRAM(ht,HASH_SIZE * sizeof(u32));
     return true;
 }
@@ -3693,28 +3642,17 @@ void glfwSwapBuffers(void) { _GLFWwindow* handle = (_GLFWwindow*)window; handle-
 void SetGLContext_GetFunctionPointers(void) {
     _GLFWwindow* handle=(_GLFWwindow*)window; handle->context.makeCurrent(handle);
     #define X(n,t) n=(t)handle->context.getProcAddress(#n);
-    X(glClear,PFNGLCLEAR)                           X(glClearColor,PFNGLCLEARCOLOR)                     X(glColorMask,PFNGLCOLORMASK)
-    X(glDepthFunc,PFNGLDEPTHFUNC)                   X(glDepthMask,PFNGLDEPTHMASK)                       X(glDisable,PFNGLDISABLE)
-    X(glEnable,PFNGLENABLE)                         X(glFinish,PFNGLFINISH)                             X(glFlush,PFNGLFLUSH)
-    X(glFrontFace,PFNGLFRONTFACE)                   X(glGetError,PFNGLGETERROR)                         X(glGetIntegerv,PFNGLGETINTEGERV)
-    X(glLineWidth,PFNGLLINEWIDTH)                   X(glReadBuffer,PFNGLREADBUFFER)                     X(glReadPixels,PFNGLREADPIXELS)
-    X(glTexImage2D,PFNGLTEXIMAGE2D)                 X(glViewport,PFNGLVIEWPORT)                         X(glBindTexture,PFNGLBINDTEXTURE)
-    X(glCopyTexSubImage2D,PFNGLCOPYTEXSUBIMAGE2D)   X(glDrawArrays,PFNGLDRAWARRAYS)                     X(glDrawElements,PFNGLDRAWELEMENTS)
-    X(glGenTextures,PFNGLGENTEXTURES)               X(glActiveTexture,PFNGLACTIVETEXTURE)               X(glBlendFuncSeparate,PFNGLBLENDFUNCSEPARATE)
-    X(glBindBuffer,PFNGLBINDBUFFER)                 X(glBufferData,PFNGLBUFFERDATA)                     X(glGenBuffers,PFNGLGENBUFFERS)
-    X(glUnmapBuffer,PFNGLUNMAPBUFFER)               X(glAttachShader,PFNGLATTACHSHADER)                 X(glCompileShader,PFNGLCOMPILESHADER)
-    X(glCreateProgram,PFNGLCREATEPROGRAM)           X(glCreateShader,PFNGLCREATESHADER)                 X(glDrawBuffers,PFNGLDRAWBUFFERS)
-    X(glGetProgramiv,PFNGLGETPROGRAMIV)             X(glGetShaderInfoLog,PFNGLGETSHADERINFOLOG)         X(glGetShaderiv,PFNGLGETSHADERIV)
-    X(glLinkProgram,PFNGLLINKPROGRAM)               X(glShaderSource,PFNGLSHADERSOURCE)                 X(glUniform1f,PFNGLUNIFORM1F)
-    X(glUniform1i,PFNGLUNIFORM1I)                   X(glUniform2f,PFNGLUNIFORM2F)                       X(glUniform3f,PFNGLUNIFORM3F)
-    X(glUniform4f,PFNGLUNIFORM4F)                   X(glTexParameteri,PFNGLTEXPARAMETERI)               X(glUniform1ui,PFNGLUNIFORM1UI)
-    X(glUniform2ui,PFNGLUNIFORM2UI)                 X(glUniformMatrix3fv,PFNGLUNIFORMMATRIX3FV)         X(glUniformMatrix4fv,PFNGLUNIFORMMATRIX4FV)
-    X(glUseProgram,PFNGLUSEPROGRAM)                 X(glBindBufferBase,PFNGLBINDBUFFERBASE)             X(glBindFramebuffer,PFNGLBINDFRAMEBUFFER)
-    X(glGenFramebuffers,PFNGLGENFRAMEBUFFERS)       X(glMapBufferRange,PFNGLMAPBUFFERRANGE)             X(glBindImageTexture,PFNGLBINDIMAGETEXTURE)
-    X(glBindVertexBuffer,PFNGLBINDVERTEXBUFFER)     X(glDispatchCompute,PFNGLDISPATCHCOMPUTE)           X(glGenVertexArrays,PFNGLGENVERTEXARRAYS)
-    X(glVertexAttribFormat,PFNGLVERTEXATTRIBFORMAT) X(glFramebufferTexture2D,PFNGLFRAMEBUFFERTEXTURE2D) X(glBufferSubData,PFNGLBUFFERSUBDATA)
-    X(glClearBufferFv,PFNGLCLEARBUFFERFV)           X(glVertexAttribBinding,PFNGLVERTEXATTRIBBINDING)   X(glEnableVertexAttribArray,PFNGLENABLEVERTEXATTRIBARRAY)
-    X(glBindVertexArray,PFNGLBINDVERTEXARRAY)       X(glCheckFramebufferStatus,PFNGLCHECKFRAMEBUFFERSTATUS)
+    X(glClear,PFNGLCLEAR)                         X(glClearColor,PFNGLCLEARCOLOR)                   X(glColorMask,PFNGLCOLORMASK)              X(glDepthFunc,PFNGLDEPTHFUNC)                   X(glDepthMask,PFNGLDEPTHMASK)                       X(glDisable,PFNGLDISABLE)
+    X(glEnable,PFNGLENABLE)                       X(glFinish,PFNGLFINISH)                           X(glFlush,PFNGLFLUSH)                      X(glFrontFace,PFNGLFRONTFACE)                   X(glGetError,PFNGLGETERROR)                         X(glGetIntegerv,PFNGLGETINTEGERV)
+    X(glLineWidth,PFNGLLINEWIDTH)                 X(glReadBuffer,PFNGLREADBUFFER)                   X(glReadPixels,PFNGLREADPIXELS)            X(glTexImage2D,PFNGLTEXIMAGE2D)                 X(glViewport,PFNGLVIEWPORT)                         X(glBindTexture,PFNGLBINDTEXTURE)
+    X(glCopyTexSubImage2D,PFNGLCOPYTEXSUBIMAGE2D) X(glDrawArrays,PFNGLDRAWARRAYS)                   X(glDrawElements,PFNGLDRAWELEMENTS)        X(glGenTextures,PFNGLGENTEXTURES)               X(glActiveTexture,PFNGLACTIVETEXTURE)               X(glBlendFuncSeparate,PFNGLBLENDFUNCSEPARATE)
+    X(glBindBuffer,PFNGLBINDBUFFER)               X(glBufferData,PFNGLBUFFERDATA)                   X(glGenBuffers,PFNGLGENBUFFERS)            X(glUnmapBuffer,PFNGLUNMAPBUFFER)               X(glAttachShader,PFNGLATTACHSHADER)                 X(glCompileShader,PFNGLCOMPILESHADER)
+    X(glCreateProgram,PFNGLCREATEPROGRAM)         X(glCreateShader,PFNGLCREATESHADER)               X(glDrawBuffers,PFNGLDRAWBUFFERS)          X(glGetProgramiv,PFNGLGETPROGRAMIV)             X(glGetShaderInfoLog,PFNGLGETSHADERINFOLOG)         X(glGetShaderiv,PFNGLGETSHADERIV)
+    X(glLinkProgram,PFNGLLINKPROGRAM)             X(glShaderSource,PFNGLSHADERSOURCE)               X(glUniform1f,PFNGLUNIFORM1F)              X(glUniform1i,PFNGLUNIFORM1I)                   X(glUniform2f,PFNGLUNIFORM2F)                       X(glUniform3f,PFNGLUNIFORM3F)
+    X(glUniform4f,PFNGLUNIFORM4F)                 X(glTexParameteri,PFNGLTEXPARAMETERI)             X(glUniform1ui,PFNGLUNIFORM1UI)            X(glUniform2ui,PFNGLUNIFORM2UI)                 X(glUniformMatrix3fv,PFNGLUNIFORMMATRIX3FV)         X(glUniformMatrix4fv,PFNGLUNIFORMMATRIX4FV)
+    X(glUseProgram,PFNGLUSEPROGRAM)               X(glBindBufferBase,PFNGLBINDBUFFERBASE)           X(glBindFramebuffer,PFNGLBINDFRAMEBUFFER)  X(glGenFramebuffers,PFNGLGENFRAMEBUFFERS)       X(glMapBufferRange,PFNGLMAPBUFFERRANGE)             X(glBindImageTexture,PFNGLBINDIMAGETEXTURE)
+    X(glBindVertexBuffer,PFNGLBINDVERTEXBUFFER)   X(glDispatchCompute,PFNGLDISPATCHCOMPUTE)         X(glGenVertexArrays,PFNGLGENVERTEXARRAYS)  X(glVertexAttribFormat,PFNGLVERTEXATTRIBFORMAT) X(glFramebufferTexture2D,PFNGLFRAMEBUFFERTEXTURE2D) X(glBufferSubData,PFNGLBUFFERSUBDATA)
+    X(glClearBufferFv,PFNGLCLEARBUFFERFV)         X(glVertexAttribBinding,PFNGLVERTEXATTRIBBINDING)  X(glBindVertexArray,PFNGLBINDVERTEXARRAY) X(glCheckFramebufferStatus,PFNGLCHECKFRAMEBUFFERSTATUS)             X(glEnableVertexAttribArray,PFNGLENABLEVERTEXATTRIBARRAY)
     #undef X
 }
 
@@ -3728,11 +3666,7 @@ void InputMonitor(_GLFWmonitor* monitor, int action, int placement) {
         else _glfw.monitors[_glfw.monitorCount - 1] = monitor;
     } else if (action == 0x00040002/*disconnected*/) {
         for (int i=0;i<_glfw.monitorCount;++i) {
-            if (_glfw.monitors[i] == monitor) {
-                _glfw.monitorCount--;
-                MoveMemoryFromBtoAForNBytes(_glfw.monitors + i, _glfw.monitors + i + 1,((size_t) _glfw.monitorCount - i) * sizeof(_GLFWmonitor*));
-                break;
-            }
+            if (_glfw.monitors[i] == monitor) { _glfw.monitorCount--; MoveMemoryFromBtoAForNBytes(_glfw.monitors + i, _glfw.monitors + i + 1,((size_t) _glfw.monitorCount - i) * sizeof(_GLFWmonitor*)); break; }
         }
     }
 }
@@ -4314,6 +4248,7 @@ static void ApplyVelocity(Entity *e, float dt) {
     float linDrag = vexp(-2.0f * dt);
     e->velocity = V3_ScaleByF(e->velocity,linDrag);
     e->position = V3_AplusB(e->position,V3_ScaleByF(e->velocity,dt));
+    u16 edx = (u16)(e - Sys_Global.instances); Sys_Global.dirtyInstances[edx] = true;
     if (e->collider != COLLIDER_TYPE_CAPSULE) {
         float avel = V3_Mag(e->angularVelocity);
         if (avel > MAX_ANGULAR_SPEED) { e->angularVelocity = V3_ScaleByF(V3_ScaleByF(e->angularVelocity,1.f / avel),MAX_ANGULAR_SPEED); avel = MAX_ANGULAR_SPEED; }
@@ -4386,6 +4321,11 @@ static Vector3 MeshSupport(u16 m, const float* M, Vector3 d) {
 typedef struct { Vector3 v[4]; int n; } Simplex3D;
 static inline Vector3 MinkowskiSupport(u16 mA, const float* mxA, u16 mB, const float* mxB, Vector3 d) { return V3_AsubB(MeshSupport(mA,mxA,d), MeshSupport(mB,mxB,(Vector3){-d.x,-d.y,-d.z})); }
 static inline Vector3 TP(Vector3 a, Vector3 b, Vector3 c) { return V3_Cross(V3_Cross(a,b),c); }
+static inline Vector3 BoxSupport(ShapeBox b, Vector3 d) {
+    Vector3 ax,ay,az; obb_axes(b.rot,&ax,&ay,&az); float kx = V3_dot(d,ax) >= 0.0f ? 1.0f : -1.0f, ky = V3_dot(d,ay) >= 0.0f ? 1.0f : -1.0f, kz = V3_dot(d,az) >= 0.0f ? 1.0f : -1.0f;
+    return V3_AplusB(V3_AplusB(V3_AplusB(b.center,V3_ScaleByF(ax,kx * b.halfExtents.x)),V3_ScaleByF(ay,ky * b.halfExtents.y)),V3_ScaleByF(az,kz * b.halfExtents.z));
+}
+
 static inline Vector3 CapsuleSupport(ShapeCapsule cap, Vector3 d) { float db = V3_dot(cap.base,d),dt = V3_dot(cap.tip,d); Vector3 best = (dt > db) ? cap.tip : cap.base; float L = V3_dot(d,d); if (L < COLLISION_EPSILON) {return best;} return V3_AplusB(best,V3_ScaleByF(d,cap.radius / vsqrtf(L))); }
 static inline Vector3 MinkowskiSupportCapsuleMesh(ShapeCapsule cap, u16 mesh, const float* mx, Vector3 d) { return V3_AsubB(CapsuleSupport(cap, d), MeshSupport(mesh, mx, (Vector3){-d.x,-d.y,-d.z})); }
 static bool GJKNextSimplex(Simplex3D *s, Vector3 *dir) {
@@ -4556,6 +4496,67 @@ static OverlapResult CapsuleConvexMesh(ShapeCapsule cap, u16 mesh, const float* 
     r.hit=true; return r;
 }
 
+static inline Vector3 MinkowskiSupportBoxMesh(ShapeBox box, u16 mesh, const float* mx, Vector3 d) { return V3_AsubB(BoxSupport(box,d),MeshSupport(mesh,mx,(Vector3){-d.x,-d.y,-d.z})); }
+static OverlapResult BoxConvexMesh(ShapeBox box, u16 mesh, const float* mx) {
+    OverlapResult r = {0}; if (mesh >= MODEL_IDX_MAX || !modelVertexCounts[mesh]) return r;
+
+    #define BOXSUP(d) MinkowskiSupportBoxMesh(box, mesh, mx, d)
+    Simplex3D s = {0}; Vector3 dir = {0,1,0};
+    s.v[s.n++] = BOXSUP(dir);
+    dir = (Vector3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
+    if (V3_dot(dir,dir) < COLLISION_EPSILON) dir = (Vector3){0,1,0};
+    for (int it=0; it<64; ++it) {
+        Vector3 sup = BOXSUP(dir); if (V3_dot(sup,dir) < COLLISION_EPSILON) return r;
+        s.v[s.n++] = sup;
+        if (!GJKNextSimplex(&s,&dir)) { r.hit=true; break; }
+        if (V3_dot(dir,dir) < COLLISION_EPSILON) { r.hit=true; break; }
+    }
+    if (!r.hit) return r;
+
+    static const Vector3 kAx[6] = {{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
+    for (int d=0; s.n<4 && d<6; ++d) {
+        Vector3 sup = BOXSUP(kAx[d]); bool dup = false;
+        for (int k=0;k<s.n;k++) { Vector3 dv=V3_AsubB(sup,s.v[k]); dup|=(V3_dot(dv,dv)<COLLISION_EPSILON*COLLISION_EPSILON); }
+        if (!dup) s.v[s.n++] = sup;
+    }
+    if (s.n < 4) { r.hit=true; return r; }
+
+    Vector3 ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0, nf=0;
+    for (int i=0;i<4;i++) ev[nv++] = s.v[i];
+    static const int kTF[4][3] = {{0,1,2},{0,3,1},{0,2,3},{1,3,2}};
+    for (int f=0;f<4;f++) { EPAFace face=MakeEPAFace(ev,kTF[f][0],kTF[f][1],kTF[f][2]); if(face.d>=0.f && nf<EPA_MAX_FACES) ef[nf++]=face; }
+
+    for (int it=0; it<32; ++it) {
+        int bf=-1; float bd=1e9f;
+        for (int f=0;f<nf;f++) if(ef[f].d<bd){bd=ef[f].d;bf=f;}
+        if (bf<0) break;
+        Vector3 bn=ef[bf].n, sup=BOXSUP(bn);
+        if (V3_dot(bn,sup) - bd < COLLISION_EPSILON) { r.normal = bn; r.point = MeshSupport(mesh,mx,(Vector3){-bn.x,-bn.y,-bn.z}); r.overlapAmount = bd; return r; }
+        if (nv>=EPA_MAX_VERTS) break;
+
+        ev[nv]=sup;
+        int edges[EPA_MAX_EDGES][2], ne=0, keep[EPA_MAX_FACES], nk=0;
+        for (int f=0;f<nf;f++) {
+            if (V3_dot(ef[f].n, V3_AsubB(sup,ev[ef[f].a])) > 0.f) {
+                int fv[3]={ef[f].a,ef[f].b,ef[f].c};
+                for (int e=0;e<3;e++) { int ea=fv[e],eb=fv[(e+1)%3]; bool found=false;
+                    for (int k=0;k<ne;k++) if(edges[k][0]==eb&&edges[k][1]==ea){edges[k][0]=edges[--ne][0];edges[k][1]=edges[ne][1];found=true;break;}
+                    if (!found&&ne<EPA_MAX_EDGES){edges[ne][0]=ea;edges[ne++][1]=eb;} }
+            } else keep[nk++]=f;
+        }
+        nf=0; for(int k=0;k<nk;k++) ef[nf++]=ef[keep[k]];
+        for(int k=0;k<ne&&nf<EPA_MAX_FACES;k++){EPAFace face=MakeEPAFace(ev,edges[k][0],edges[k][1],nv);if(face.d>=0.f)ef[nf++]=face;}
+        nv++;
+    }
+    #undef BOXSUP
+    return r;
+}
+
+static void inline FeatureOverlap(Vector3 sc, float sr, Vector3 pt, OverlapResult* r) {
+    Vector3 delta=V3_AsubB(sc,pt); float dist2=V3_dot(delta,delta);
+    if (dist2 < sr*sr) { float dist=vsqrtf(vmax(dist2,0.0f)); OverlapResult t={true,pt,(dist>COLLISION_EPSILON) ? V3_ScaleByF(delta,1.0f/dist) : (Vector3){0.0f,1.0f,0.0f},sr - dist}; if(t.overlapAmount>r->overlapAmount) *r=t; }
+}
+
 static OverlapResult SphereTriMesh(Vector3 sc, float sr, u16 mesh, const float* mx) { // Triangle-soup mesh support: test sphere/capsule against all triangles of a static mesh.  Returns deepest overlapping triangle result.  Normal points from mesh toward mover.
     OverlapResult r = {0}; if (mesh >= MODEL_IDX_MAX) return r;
     u32 triCount = modelTriangleCounts[mesh]; if (!triCount) return r;
@@ -4565,72 +4566,38 @@ static OverlapResult SphereTriMesh(Vector3 sc, float sr, u16 mesh, const float* 
         #define RV(i) MvVert(mx,(Vector3){half_to_float(*(half*)(modelVertices[mesh]+(i)*VERTEX_ATTRIBUTES_SIZE+0)), half_to_float(*(half*)(modelVertices[mesh]+(i)*VERTEX_ATTRIBUTES_SIZE+2)), half_to_float(*(half*)(modelVertices[mesh]+(i)*VERTEX_ATTRIBUTES_SIZE+4))})
         Vector3 a=RV(i0), b=RV(i1), c=RV(i2);
         #undef RV
-
-        // Closest point on triangle to sphere center
-        Vector3 ab=V3_AsubB(b,a), ac=V3_AsubB(c,a), ap=V3_AsubB(sc,a);
+        Vector3 ab=V3_AsubB(b,a), ac=V3_AsubB(c,a), ap=V3_AsubB(sc,a); // Closest point on triangle to sphere center
         float d1=V3_dot(ab,ap), d2=V3_dot(ac,ap);
-        if (d1<=0.f && d2<=0.f) { // Vertex A region
-            Vector3 delta=V3_AsubB(sc,a); float dist2=V3_dot(delta,delta);
-            if (dist2 < sr*sr) { float dist=vsqrtf(vmax(dist2,0.f)); OverlapResult t={true,a,(dist>COLLISION_EPSILON)?V3_ScaleByF(delta,1.f/dist):(Vector3){0,1,0},sr-dist}; if(t.overlapAmount>r.overlapAmount) r=t; }
-            continue;
-        }
+        if (d1 <= 0.0f && d2 <= 0.0f) { FeatureOverlap(sc,sr,a,&r); continue; } // Vertex A region
         
         Vector3 bp=V3_AsubB(sc,b);
         float d3=V3_dot(ab,bp), d4=V3_dot(ac,bp);
-        if (d3>=0.f && d4<=d3) { // Vertex B region
-            Vector3 delta=V3_AsubB(sc,b); float dist2=V3_dot(delta,delta);
-            if (dist2 < sr*sr) { float dist=vsqrtf(vmax(dist2,0.f)); OverlapResult t={true,b,(dist>COLLISION_EPSILON)?V3_ScaleByF(delta,1.f/dist):(Vector3){0,1,0},sr-dist}; if(t.overlapAmount>r.overlapAmount) r=t; }
-            continue;
-        }
+        if (d3 >= 0.0f && d4 <= d3)   { FeatureOverlap(sc,sr,b,&r); continue; } // Vertex B region
         
         Vector3 cp=V3_AsubB(sc,c);
         float d5=V3_dot(ab,cp), d6=V3_dot(ac,cp);
-        if (d6>=0.f && d5<=d6) { // Vertex C region
-            Vector3 delta=V3_AsubB(sc,c); float dist2=V3_dot(delta,delta);
-            if (dist2 < sr*sr) { float dist=vsqrtf(vmax(dist2,0.f)); OverlapResult t={true,c,(dist>COLLISION_EPSILON)?V3_ScaleByF(delta,1.f/dist):(Vector3){0,1,0},sr-dist}; if(t.overlapAmount>r.overlapAmount) r=t; }
-            continue;
-        }
+        if (d6>=0.f && d5<=d6) { FeatureOverlap(sc,sr,c,&r); continue; } // Vertex C region
         
         float vc=d1*d4-d3*d2;
-        if (vc<=0.f && d1>=0.f && d3<=0.f) { // Edge AB region
-            float v=d1/(d1-d3); Vector3 pt=V3_AplusB(a,V3_ScaleByF(ab,v));
-            Vector3 delta=V3_AsubB(sc,pt); float dist2=V3_dot(delta,delta);
-            if (dist2 < sr*sr) { float dist=vsqrtf(vmax(dist2,0.f)); OverlapResult t={true,pt,(dist>COLLISION_EPSILON)?V3_ScaleByF(delta,1.f/dist):(Vector3){0,1,0},sr-dist}; if(t.overlapAmount>r.overlapAmount) r=t; }
-            continue;
-        }
+        if (vc<=0.f && d1>=0.f && d3<=0.f) { float v=d1/(d1-d3); Vector3 pt=V3_AplusB(a,V3_ScaleByF(ab,v)); FeatureOverlap(sc,sr,pt,&r); continue; } // Edge AB region
         
         float vb=d5*d2-d1*d6;
-        if (vb<=0.f && d2>=0.f && d6<=0.f) { // Edge AC region
-            float w=d2/(d2-d6); Vector3 pt=V3_AplusB(a,V3_ScaleByF(ac,w));
-            Vector3 delta=V3_AsubB(sc,pt); float dist2=V3_dot(delta,delta);
-            if (dist2 < sr*sr) { float dist=vsqrtf(vmax(dist2,0.f)); OverlapResult t={true,pt,(dist>COLLISION_EPSILON)?V3_ScaleByF(delta,1.f/dist):(Vector3){0,1,0},sr-dist}; if(t.overlapAmount>r.overlapAmount) r=t; }
-            continue;
-        }
+        if (vb<=0.f && d2>=0.f && d6<=0.f) { float w=d2/(d2-d6); Vector3 pt=V3_AplusB(a,V3_ScaleByF(ac,w)); FeatureOverlap(sc,sr,pt,&r); continue; } // Edge AC region
         
         float va=d3*d6-d5*d4;
-        if (va<=0.f && (d4-d3)>=0.f && (d5-d6)>=0.f) { // Edge BC region
-            float w=(d4-d3)/((d4-d3)+(d5-d6)); Vector3 bc=V3_AsubB(c,b); Vector3 pt=V3_AplusB(b,V3_ScaleByF(bc,w));
-            Vector3 delta=V3_AsubB(sc,pt); float dist2=V3_dot(delta,delta);
-            if (dist2 < sr*sr) { float dist=vsqrtf(vmax(dist2,0.f)); OverlapResult t={true,pt,(dist>COLLISION_EPSILON)?V3_ScaleByF(delta,1.f/dist):(Vector3){0,1,0},sr-dist}; if(t.overlapAmount>r.overlapAmount) r=t; }
-            continue;
-        }
-        
-        // Face region — project onto triangle plane
-        Vector3 n = V3_Cross(ab,ac); float nLen=V3_Mag(n); if(nLen<COLLISION_EPSILON) continue;
+        if (va<=0.f && (d4-d3)>=0.f && (d5-d6)>=0.f) { float w=(d4-d3)/((d4-d3)+(d5-d6)); Vector3 bc=V3_AsubB(c,b); Vector3 pt=V3_AplusB(b,V3_ScaleByF(bc,w)); FeatureOverlap(sc,sr,pt,&r); continue; } // Edge BC region
+        Vector3 n = V3_Cross(ab,ac); float nLen=V3_Mag(n); if(nLen<COLLISION_EPSILON) continue; // Face region — project onto triangle plane
+
         n=V3_ScaleByF(n,1.f/nLen); float dist=V3_dot(n,ap); // signed distance from plane (positive = above)
         float absDist=vabs(dist);
-        if (absDist < sr) { // Back-face: if sphere is below the triangle, flip normal so response pushes it out correctly
-            Vector3 fn = (dist >= 0.f) ? n : (Vector3){-n.x,-n.y,-n.z};
-            OverlapResult t={true,V3_AsubB(sc,V3_ScaleByF(fn,absDist)),fn,sr-absDist};
-            if(t.overlapAmount>r.overlapAmount) r=t;
-        }
+        if (absDist < sr) { Vector3 fn = (dist >= 0.f) ? n : (Vector3){-n.x,-n.y,-n.z}; OverlapResult t={true,V3_AsubB(sc,V3_ScaleByF(fn,absDist)),fn,sr-absDist}; if(t.overlapAmount>r.overlapAmount) {r=t;} } // Back-face: if sphere is below the triangle, flip normal so response pushes it out correctly
     }
     return r;
 }
 
 static OverlapResult CapsuleTriMesh(ShapeCapsule cap, u16 mesh, const float* mx) {
-    OverlapResult rb = SphereTriMesh(cap.base, cap.radius, mesh, mx);
-    OverlapResult rt = SphereTriMesh(cap.tip,  cap.radius, mesh, mx); // TODO: Connectivity needed or is snowman ala System Shock 1 fine enough?  Might prove funny if player can get stuck with top and bottom on either side of door while leaning like in original.
+    OverlapResult rb = SphereTriMesh(cap.base,cap.radius,mesh,mx);
+    OverlapResult rt = SphereTriMesh(cap.tip, cap.radius,mesh,mx); // TODO: Connectivity needed or is snowman ala System Shock 1 fine enough?  Might prove funny if player can get stuck with top and bottom on either side of door while leaning like in original.
     return (rt.overlapAmount > rb.overlapAmount) ? rt : rb;
 }
 
@@ -4697,7 +4664,7 @@ static OverlapResult SphereConvexMesh(Vector3 sc, float sr, u16 mesh, const floa
     r.hit=true; return r;
 }
 
-typedef struct { Vector3 mn, mx; } AABB3;
+typedef struct {Vector3 mn,mx;} AABB3;
 static inline AABB3 HullWorldAABB(u16 hullMesh, const float* hullMx) {
     AABB3 b = { {1e9f,1e9f,1e9f}, {-1e9f,-1e9f,-1e9f} };
     u32 n = modelVertexCounts[hullMesh]; const u8* vb = modelVertices[hullMesh];
@@ -4767,68 +4734,61 @@ static OverlapResult ConvexMeshVsTriMesh(u16 hullMesh, const float* hullMx, u16 
     return r;
 }
 
-static void ApplyCollisionResponse(Entity *e, Entity *o, Vector3 n, float overlap, Vector3 contactPoint) {
-    if (overlap < COLLISION_EPSILON) return;
+AABB3 BoxWorldAABB(ShapeBox b) { Vector3 x,y,z; obb_axes(b.rot,&x,&y,&z); Vector3 hx=V3_ScaleByF(x,b.halfExtents.x), hy=V3_ScaleByF(y,b.halfExtents.y), hz=V3_ScaleByF(z,b.halfExtents.z); Vector3 e ={vabs(hx.x)+vabs(hy.x)+vabs(hz.x),vabs(hx.y)+vabs(hy.y)+vabs(hz.y),vabs(hx.z)+vabs(hy.z)+vabs(hz.z)}; return (AABB3){V3_AsubB(b.center,e),V3_AplusB(b.center,e)}; } 
+static OverlapResult BoxVsTriMesh(ShapeBox box, u16 triMesh, const float* triMx) {
+    OverlapResult r = {0}; if (triMesh >= MODEL_IDX_MAX) return r;
+    u32 triCount = modelTriangleCounts[triMesh]; if (!triCount) return r;
 
-    bool oStatic = (!(o->entflags & ENTFLAG_RIGIDBODY) || (o->mass < 0.001f) || (o->collider == COLLIDER_TYPE_NONE));
-    float rA = GetCollisionRadius(e); // Moment of inertia (uniform sphere approximation): I = 2/5 * m * r^2
-    float rB = oStatic ? 1.f : GetCollisionRadius(o);
-    float iA = (2.f / 5.f) * e->mass * rA * rA;
-    float iB = oStatic ? 0.f : (2.f / 5.f) * o->mass * rB * rB;
-    float invIA = (iA > COLLISION_EPSILON) ? 1.f / iA : 0.f;
-    float invIB = (iB > COLLISION_EPSILON && !oStatic) ? 1.f / iB : 0.f;
-    Vector3 rAarm = V3_AsubB(contactPoint, e->position); // Angle arms from center of mass to contact point
-    Vector3 rBarm = oStatic ? (Vector3){0,0,0} : V3_AsubB(contactPoint,o->position);
-    Vector3 vAtA = V3_AplusB(e->velocity, V3_Cross(e->angularVelocity,rAarm)); // Velocity at contact point (linear + angular contribution)
-    Vector3 vAtB = oStatic ? (Vector3){0,0,0} : V3_AplusB(o->velocity,V3_Cross(o->angularVelocity,rBarm));
-    Vector3 relVel = V3_AsubB(vAtA,vAtB);
-    float vn = V3_dot(relVel, n); if (vn > 0.01f) return; // already separating
+    AABB3 hb = BoxWorldAABB(box);
+    float skin = 0.02f; hb.mn.x-=skin; hb.mn.y-=skin; hb.mn.z-=skin; hb.mx.x+=skin; hb.mx.y+=skin; hb.mx.z+=skin;
 
-    Vector3 rAxN = V3_Cross(rAarm,n); // Angular contribution to effective mass: (rA×n)²/IA + (rB×n)²/IB
-    Vector3 rBxN = V3_Cross(rBarm,n);
-    float angTermA = V3_dot(rAxN, rAxN) * invIA;
-    float angTermB = oStatic ? 0.f : V3_dot(rBxN, rBxN) * invIB;
-    float invMassA = 1.f / e->mass;
-    float invMassB = oStatic ? 0.f : 1.f / o->mass;
-    float invSum = invMassA + invMassB + angTermA + angTermB;
-    if (invSum < COLLISION_EPSILON) return;
+    Vector3 ax, ay, az; obb_axes(box.rot, &ax, &ay, &az);
+    Vector3 hx = V3_ScaleByF(ax, box.halfExtents.x), hy = V3_ScaleByF(ay, box.halfExtents.y), hz = V3_ScaleByF(az, box.halfExtents.z);
+    Vector3 verts[8] = {
+        V3_AplusB(V3_AplusB(V3_AplusB(box.center, hx), hy), hz), V3_AplusB(V3_AsubB(V3_AplusB(box.center, hx), hy), hz),
+        V3_AplusB(V3_AplusB(V3_AsubB(box.center, hx), hy), hz), V3_AplusB(V3_AsubB(V3_AsubB(box.center, hx), hy), hz),
+        V3_AsubB(V3_AplusB(V3_AplusB(box.center, hx), hy), hz), V3_AsubB(V3_AsubB(V3_AplusB(box.center, hx), hy), hz),
+        V3_AsubB(V3_AplusB(V3_AsubB(box.center, hx), hy), hz), V3_AsubB(V3_AsubB(V3_AsubB(box.center, hx), hy), hz)
+    };
 
-    float e_r = vmax(e->bounciness, oStatic ? 0.f : o->bounciness);
-    float j = -(1.f + e_r) * vn / invSum;
+    for (u32 vi = 0; vi < 8; ++vi) {
+        Vector3 wv = verts[vi];
+        for (u32 ti = 0; ti < triCount; ++ti) {
+            u32 i0 = modelTriangles[triMesh][ti*3+0], i1 = modelTriangles[triMesh][ti*3+1], i2 = modelTriangles[triMesh][ti*3+2];
+            #define TRV(i) MvVert(triMx,(Vector3){half_to_float(*(half*)(modelVertices[triMesh]+(i)*VERTEX_ATTRIBUTES_SIZE+0)),half_to_float(*(half*)(modelVertices[triMesh]+(i)*VERTEX_ATTRIBUTES_SIZE+2)),half_to_float(*(half*)(modelVertices[triMesh]+(i)*VERTEX_ATTRIBUTES_SIZE+4))})
+            Vector3 ta=TRV(i0),tb=TRV(i1),tc=TRV(i2);
+            #undef TRV
+            if (vmin(ta.x,vmin(tb.x,tc.x))>hb.mx.x || vmax(ta.x,vmax(tb.x,tc.x))<hb.mn.x || vmin(ta.y,vmin(tb.y,tc.y))>hb.mx.y || vmax(ta.y,vmax(tb.y,tc.y))<hb.mn.y || vmin(ta.z,vmin(tb.z,tc.z))>hb.mx.z || vmax(ta.z,vmax(tb.z,tc.z))<hb.mn.z) continue;
 
-    e->velocity = V3_AplusB(e->velocity,V3_ScaleByF(n,j * invMassA)); // Linear impulse
-    if (!oStatic) o->velocity = V3_AsubB(o->velocity,V3_ScaleByF(n,j * invMassB));
-    Vector3 Jn = V3_ScaleByF(n, j); // Angular impulse: ω += I⁻¹ * (r × J)
-    if (e->collider != COLLIDER_TYPE_CAPSULE)             e->angularVelocity = V3_AplusB(e->angularVelocity,V3_ScaleByF(V3_Cross(rAarm,Jn),invIA));
-    if (!oStatic && o->collider != COLLIDER_TYPE_CAPSULE) o->angularVelocity =  V3_AsubB(o->angularVelocity,V3_ScaleByF(V3_Cross(rBarm,Jn),invIB));
-    Vector3 vAtA2 = V3_AplusB(e->velocity,V3_Cross(e->angularVelocity,rAarm)); // Friction, recompute relVel with updated velocities at contact
-    Vector3 vAtB2 = oStatic ? (Vector3){0,0,0} : V3_AplusB(o->velocity,V3_Cross(o->angularVelocity,rBarm));
-    Vector3 relVel2 = V3_AsubB(vAtA2,vAtB2);
-    Vector3 tangent = V3_AsubB(relVel2,V3_ScaleByF(n,V3_dot(relVel2,n)));
-    float tLen = V3_Mag(tangent);
-    if (tLen > 0.001f) {
-        tangent = V3_ScaleByF(tangent, 1.f / tLen);
-        Vector3 rAxT = V3_Cross(rAarm, tangent);
-        Vector3 rBxT = V3_Cross(rBarm, tangent);
-        float angTermAT = V3_dot(rAxT, rAxT) * invIA;
-        float angTermBT = oStatic ? 0.f : V3_dot(rBxT, rBxT) * invIB;
-        float invSumT = invMassA + invMassB + angTermAT + angTermBT;
-        float mu = (e->dynamicFriction + (oStatic ? 0.4f : o->dynamicFriction)) * 0.5f;
-        float jt = -V3_dot(relVel2, tangent) / invSumT;
-        jt = vclamp(jt, -mu * vabs(j), mu * vabs(j));
-        Vector3 Jt = V3_ScaleByF(tangent, jt);
-        e->velocity = V3_AplusB(e->velocity, V3_ScaleByF(tangent, jt * invMassA));
-        if (e->collider != COLLIDER_TYPE_CAPSULE) e->angularVelocity = V3_AplusB(e->angularVelocity, V3_ScaleByF(V3_Cross(rAarm, Jt), invIA));
-        if (!oStatic) {
-            o->velocity = V3_AsubB(o->velocity, V3_ScaleByF(tangent, jt * invMassB));
-            if (o->collider != COLLIDER_TYPE_CAPSULE) o->angularVelocity = V3_AsubB(o->angularVelocity, V3_ScaleByF(V3_Cross(rBarm, Jt), invIB));
+            Vector3 ab=V3_AsubB(tb,ta), ac=V3_AsubB(tc,ta), ap=V3_AsubB(wv,ta);
+            float d1=V3_dot(ab,ap), d2=V3_dot(ac,ap);
+            Vector3 bp=V3_AsubB(wv,tb); float d3=V3_dot(ab,bp), d4=V3_dot(ac,bp);
+            Vector3 cp=V3_AsubB(wv,tc); float d5=V3_dot(ab,cp), d6=V3_dot(ac,cp);
+            float vc=d1*d4-d3*d2, vb_=d5*d2-d1*d6, va=d3*d6-d5*d4;
+            Vector3 closest; bool inFace=false;
+            if      (d1 <= 0.0f && d2 <= 0.0f) closest=ta;
+            else if (d3 >= 0.0f && d4 <= d3)   closest=tb;
+            else if (d6 >= 0.0f && d5 <= d6)   closest=tc;
+            else if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f)           { float v=d1/(d1-d3); closest=V3_AplusB(ta,V3_ScaleByF(ab,v)); }
+            else if (vb_ <= 0.0f && d2 >= 0.0f && d6 <= 0.0f)          { float w=d2/(d2-d6); closest=V3_AplusB(ta,V3_ScaleByF(ac,w)); }
+            else if (va <= 0.0f && (d4-d3) >= 0.0f && (d5-d6) >= 0.0f) { float w=(d4-d3)/((d4-d3)+(d5-d6)); closest=V3_AplusB(tb,V3_ScaleByF(V3_AsubB(tc,tb),w)); }
+            else { inFace=true; Vector3 n_=V3_Cross(ab,ac); float L=V3_Mag(n_); if(L<COLLISION_EPSILON) continue; n_=V3_ScaleByF(n_,1.f/L); closest=V3_AsubB(wv,V3_ScaleByF(n_,V3_dot(n_,ap))); }
+
+            Vector3 delta=V3_AsubB(wv,closest); float dist2=V3_dot(delta,delta); float pen=0.f; Vector3 fn;
+            if (inFace) {
+                Vector3 n_=V3_Cross(ab,ac); float L=V3_Mag(n_); if(L<COLLISION_EPSILON) continue;
+                n_=V3_ScaleByF(n_,1.f/L); float sd=V3_dot(n_,ap); if (vabs(sd)<COLLISION_EPSILON) continue;
+                pen=vabs(sd); fn=(sd>0.f)?n_:(Vector3){-n_.x,-n_.y,-n_.z};
+            } else {
+                if (dist2<COLLISION_EPSILON*COLLISION_EPSILON) continue;
+                float dist=vsqrtf(dist2); Vector3 n_=V3_Cross(ab,ac); float L=V3_Mag(n_); if(L<COLLISION_EPSILON) continue;
+                n_=V3_ScaleByF(n_,1.f/L); float sd=V3_dot(n_,ap); if (sd>=0.f) continue;
+                pen=dist; fn=V3_ScaleByF(delta,1.f/dist);
+            }
+            if (pen>r.overlapAmount) r=(OverlapResult){true,closest,fn,pen};
         }
     }
-    
-    float correction = vmax(overlap - 0.001f, 0.f) * 0.4f; // Positional correction (Baumgarte)
-    float corrA = correction * invMassA / (invMassA + invMassB + COLLISION_EPSILON);
-    float corrB = correction * invMassB / (invMassA + invMassB + COLLISION_EPSILON);
-    e->position = V3_AplusB(e->position, V3_ScaleByF(n, corrA)); if (!oStatic) o->position = V3_AsubB(o->position,V3_ScaleByF(n,corrB));
+    return r;
 }
 
 static OverlapResult CapsuleBox(ShapeCapsule cap, ShapeBox box) {
@@ -4849,6 +4809,77 @@ static OverlapResult CapsuleBox(ShapeCapsule cap, ShapeBox box) {
     if (nt == 0) ts[nt++] = 0.5f; // Only add midpoint if no slab candidates were generated (fully degenerate segment)
     for (int k = 0; k < nt; k++) { Vector3 pt = V3_AplusB(cap.base,V3_ScaleByF(d,ts[k])); OverlapResult rk = SphereOBB(pt,cap.radius,box); if (rk.hit && rk.overlapAmount > best.overlapAmount) {best = rk;} }
     return best;
+}
+
+static void ApplyCollisionResponse(Entity *e, Entity *o, Vector3 n, float overlap, Vector3 contactPoint) {
+    if (overlap < COLLISION_EPSILON) return;
+
+    bool oStatic = (!(o->entflags & ENTFLAG_RIGIDBODY) || (o->mass < 0.001f) || (o->collider == COLLIDER_TYPE_NONE));
+    #define ENTRADIUS(ent) ((ent)->collider == COLLIDER_TYPE_MESH ? modelBounds[(ent)->modelIndex] : (ent)->collider == COLLIDER_TYPE_CONVEXMESH ? modelBounds[(ent)->colliderMeshIndex] : GetCollisionRadius(ent))
+    float rA = ENTRADIUS(e);
+    float rB = oStatic ? 1.f : ENTRADIUS(o);
+    #undef ENTRADIUS
+    float iA = (2.f / 5.f) * e->mass * rA * rA;
+    float iB = oStatic ? 0.f : (2.f / 5.f) * o->mass * rB * rB;
+    float invIA = (iA > COLLISION_EPSILON) ? 1.f / iA : 0.f;
+    float invIB = (iB > COLLISION_EPSILON && !oStatic) ? 1.f / iB : 0.f;
+    bool eIsConvex = (e->collider == COLLIDER_TYPE_CONVEXMESH || e->collider == COLLIDER_TYPE_MESH);
+    bool oIsConvex = (!oStatic && (o->collider == COLLIDER_TYPE_CONVEXMESH || o->collider == COLLIDER_TYPE_MESH));
+    Vector3 rAarm = V3_AsubB(contactPoint, e->position);
+    Vector3 rBarm = oStatic ? (Vector3){0,0,0} : V3_AsubB(contactPoint, o->position);
+    Vector3 vAtA = V3_AplusB(e->velocity, V3_Cross(e->angularVelocity, rAarm));
+    Vector3 vAtB = oStatic ? (Vector3){0,0,0} : V3_AplusB(o->velocity, V3_Cross(o->angularVelocity, rBarm));
+    Vector3 relVel = V3_AsubB(vAtA, vAtB);
+    float vn = V3_dot(relVel, n); if (vn > 0.01f) return;
+
+    Vector3 rAxN = V3_Cross(rAarm, n);
+    Vector3 rBxN = V3_Cross(rBarm, n);
+    float angTermA = eIsConvex ? 0.f : V3_dot(rAxN, rAxN) * invIA;
+    float angTermB = (oStatic || oIsConvex) ? 0.f : V3_dot(rBxN, rBxN) * invIB;
+    float invMassA = 1.f / e->mass;
+    float invMassB = oStatic ? 0.f : 1.f / o->mass;
+    float invSum = invMassA + invMassB + angTermA + angTermB;
+    if (invSum < COLLISION_EPSILON) return;
+
+    float e_r = vmax(e->bounciness, oStatic ? 0.f : o->bounciness);
+    float j = -(1.f + e_r) * vn / invSum;
+
+    e->velocity = V3_AplusB(e->velocity, V3_ScaleByF(n, j * invMassA));
+    if (!oStatic) o->velocity = V3_AsubB(o->velocity, V3_ScaleByF(n, j * invMassB));
+    Vector3 Jn = V3_ScaleByF(n, j);
+    if (e->collider != COLLIDER_TYPE_CAPSULE && !eIsConvex)             e->angularVelocity = V3_AplusB(e->angularVelocity, V3_ScaleByF(V3_Cross(rAarm, Jn), invIA));
+    if (!oStatic && o->collider != COLLIDER_TYPE_CAPSULE && !oIsConvex) o->angularVelocity = V3_AsubB(o->angularVelocity, V3_ScaleByF(V3_Cross(rBarm, Jn), invIB));
+
+    Vector3 vAtA2 = V3_AplusB(e->velocity, V3_Cross(e->angularVelocity, rAarm));
+    Vector3 vAtB2 = oStatic ? (Vector3){0,0,0} : V3_AplusB(o->velocity, V3_Cross(o->angularVelocity, rBarm));
+    Vector3 relVel2 = V3_AsubB(vAtA2, vAtB2);
+    Vector3 tangent = V3_AsubB(relVel2, V3_ScaleByF(n, V3_dot(relVel2, n)));
+    float tLen = V3_Mag(tangent);
+    if (tLen > 0.001f) {
+        tangent = V3_ScaleByF(tangent, 1.f / tLen);
+        Vector3 rAxT = V3_Cross(rAarm, tangent);
+        Vector3 rBxT = V3_Cross(rBarm, tangent);
+        float angTermAT = eIsConvex ? 0.f : V3_dot(rAxT, rAxT) * invIA;
+        float angTermBT = (oStatic || oIsConvex) ? 0.f : V3_dot(rBxT, rBxT) * invIB;
+        float invSumT = invMassA + invMassB + angTermAT + angTermBT;
+        float mu = (e->dynamicFriction + (oStatic ? 0.4f : o->dynamicFriction)) * 0.5f;
+        float jt = -V3_dot(relVel2, tangent) / invSumT;
+        jt = vclamp(jt, -mu * vabs(j), mu * vabs(j));
+        Vector3 Jt = V3_ScaleByF(tangent, jt);
+        e->velocity = V3_AplusB(e->velocity, V3_ScaleByF(tangent, jt * invMassA));
+        if (e->collider != COLLIDER_TYPE_CAPSULE && !eIsConvex) e->angularVelocity = V3_AplusB(e->angularVelocity, V3_ScaleByF(V3_Cross(rAarm, Jt), invIA));
+        if (!oStatic) {
+            o->velocity = V3_AsubB(o->velocity, V3_ScaleByF(tangent, jt * invMassB));
+            if (o->collider != COLLIDER_TYPE_CAPSULE && !oIsConvex) o->angularVelocity = V3_AsubB(o->angularVelocity, V3_ScaleByF(V3_Cross(rBarm, Jt), invIB));
+        }
+    }
+
+    float correction = vmax(overlap - 0.005f, 0.f) * 0.2f;
+    correction = vmin(correction, 0.05f);
+    float corrA = correction * invMassA / (invMassA + invMassB + COLLISION_EPSILON);
+    float corrB = correction * invMassB / (invMassA + invMassB + COLLISION_EPSILON);
+    e->position = V3_AplusB(e->position, V3_ScaleByF(n, corrA)); u16 edx = (u16)(e - Sys_Global.instances); Sys_Global.dirtyInstances[edx] = true;
+    if (!oStatic) { o->position = V3_AsubB(o->position, V3_ScaleByF(n, corrB)); u16 odx = (u16)(o - Sys_Global.instances); Sys_Global.dirtyInstances[odx] = true; }
 }
 
 void Physics(void) {
@@ -4882,44 +4913,43 @@ void Physics(void) {
                     u32 cell = PosGetCellCoordsP(cx + dx, cz + dz);
                     if (cell >= WORLDX*WORLDX) continue;
                     for (u16 k = 0; k < cellCounts[cell]; ++k) {
-                        u16 j = cellLists[cell][k];
-                        if (j == idx) continue;
-                        Entity *o = &Sys_Global.instances[j];
-                        if (!(mask & o->layer)) continue;
-
-                        Vector3 deltaPos = V3_AsubB(e->position, o->position);
-                        float distSq = V3_dot(deltaPos, deltaPos);
-                        float combinedRadius = e->radius * 2.f + o->radius * 2.f;
-                        if (distSq > combinedRadius * combinedRadius) continue;
+                        u16 j = cellLists[cell][k]; if (j == idx) continue;
+                        Entity *o = &Sys_Global.instances[j]; if (!(mask & o->layer)) continue;
+                        Vector3 deltaPos = V3_AsubB(e->position,o->position); float distSq = V3_dot(deltaPos, deltaPos), combinedRadius = e->radius * 2.f + o->radius * 2.f; if (distSq > combinedRadius * combinedRadius) continue;
 
                         OverlapResult r = {0};
-                        bool eMesh    = (e->collider == COLLIDER_TYPE_CONVEXMESH || e->collider == COLLIDER_TYPE_MESH);
-                        bool oMesh    = (o->collider == COLLIDER_TYPE_CONVEXMESH || o->collider == COLLIDER_TYPE_MESH);
-                        bool eTriSoup = (e->collider == COLLIDER_TYPE_MESH);
-                        bool oTriSoup = (o->collider == COLLIDER_TYPE_MESH);
+                        if      (e->collider == COLLIDER_TYPE_CAPSULE    && o->collider == COLLIDER_TYPE_CAPSULE) { ShapeCapsule ca,cb; Entity_GetCapsule(e,&ca); Entity_GetCapsule(o,&cb); r=CapsuleCapsule(ca,cb); }
+                        else if (e->collider == COLLIDER_TYPE_CAPSULE    && o->collider == COLLIDER_TYPE_BOX)     { ShapeCapsule ca; ShapeBox bb; Entity_GetCapsule(e,&ca); Entity_GetBox(o,&bb); r=CapsuleBox(ca,bb); }
+                        else if (e->collider == COLLIDER_TYPE_BOX        && o->collider == COLLIDER_TYPE_CAPSULE) { ShapeCapsule ca; ShapeBox bb; Entity_GetCapsule(o,&ca); Entity_GetBox(e,&bb); r=CapsuleBox(ca,bb); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
+                        else if (e->collider == COLLIDER_TYPE_BOX        && o->collider == COLLIDER_TYPE_BOX)     { ShapeBox ba,bb; Entity_GetBox(e,&ba); Entity_GetBox(o,&bb); r=BoxBoxSAT(ba,bb); }
+                        else if (e->collider == COLLIDER_TYPE_SPHERE     && o->collider == COLLIDER_TYPE_BOX)     { ShapeSphere sph; ShapeBox b; Entity_GetSphere(e,&sph); Entity_GetBox(o,&b); r=SphereOBB(sph.center,sph.radius,b); }
+                        else if (e->collider == COLLIDER_TYPE_BOX        && o->collider == COLLIDER_TYPE_SPHERE)  { ShapeSphere sph; ShapeBox b; Entity_GetSphere(o,&sph); Entity_GetBox(e,&b); r=SphereOBB(sph.center,sph.radius,b); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
+                        else if (e->collider == COLLIDER_TYPE_SPHERE     && o->collider == COLLIDER_TYPE_SPHERE)  { ShapeSphere sa,sb; Entity_GetSphere(e,&sa); Entity_GetSphere(o,&sb); r=SphereSphere(sa.center,sa.radius,sb.center,sb.radius); }
 
-                        if      (e->collider==COLLIDER_TYPE_CAPSULE && o->collider==COLLIDER_TYPE_CAPSULE) { ShapeCapsule ca,cb; Entity_GetCapsule(e,&ca); Entity_GetCapsule(o,&cb); r=CapsuleCapsule(ca,cb); }
-                        else if (e->collider==COLLIDER_TYPE_CAPSULE && o->collider==COLLIDER_TYPE_BOX)     { ShapeCapsule ca; ShapeBox bb; Entity_GetCapsule(e,&ca); Entity_GetBox(o,&bb); r=CapsuleBox(ca,bb); }
-                        else if (e->collider==COLLIDER_TYPE_BOX     && o->collider==COLLIDER_TYPE_CAPSULE) { ShapeCapsule ca; ShapeBox bb; Entity_GetCapsule(o,&ca); Entity_GetBox(e,&bb); r=CapsuleBox(ca,bb); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
-                        else if (e->collider==COLLIDER_TYPE_BOX     && o->collider==COLLIDER_TYPE_BOX)     { ShapeBox ba,bb; Entity_GetBox(e,&ba); Entity_GetBox(o,&bb); r=BoxBoxSAT(ba,bb); }
-                        else if (e->collider==COLLIDER_TYPE_SPHERE  && o->collider==COLLIDER_TYPE_BOX)     { ShapeSphere sph; ShapeBox b; Entity_GetSphere(e,&sph); Entity_GetBox(o,&b); r=SphereOBB(sph.center,sph.radius,b); }
-                        else if (e->collider==COLLIDER_TYPE_BOX     && o->collider==COLLIDER_TYPE_SPHERE)  { ShapeSphere sph; ShapeBox b; Entity_GetSphere(o,&sph); Entity_GetBox(e,&b); r=SphereOBB(sph.center,sph.radius,b); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
-                        else if (e->collider==COLLIDER_TYPE_SPHERE  && o->collider==COLLIDER_TYPE_SPHERE)  { ShapeSphere sa,sb; Entity_GetSphere(e,&sa); Entity_GetSphere(o,&sb); r=SphereSphere(sa.center,sa.radius,sb.center,sb.radius); }
-                        else if (e->collider==COLLIDER_TYPE_CAPSULE && oTriSoup) { float mxB[16]; CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64); ShapeCapsule ca; Entity_GetCapsule(e,&ca); r=CapsuleTriMesh(ca,o->modelIndex,mxB); }
-                        else if (eTriSoup && o->collider==COLLIDER_TYPE_CAPSULE) { float mxA[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64); ShapeCapsule cb; Entity_GetCapsule(o,&cb); r=CapsuleTriMesh(cb,e->modelIndex,mxA); r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z}; }
-                        else if (e->collider==COLLIDER_TYPE_SPHERE  && oTriSoup) { float mxB[16]; CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64); ShapeSphere sa; Entity_GetSphere(e,&sa); r=SphereTriMesh(sa.center,sa.radius,o->modelIndex,mxB); }
-                        else if (eTriSoup && o->collider==COLLIDER_TYPE_SPHERE)  { float mxA[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64); ShapeSphere sb; Entity_GetSphere(o,&sb); r=SphereTriMesh(sb.center,sb.radius,e->modelIndex,mxA); r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z}; }
-                        else if (e->collider==COLLIDER_TYPE_CONVEXMESH && oTriSoup) { float mxA[16],mxB[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64); CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64); r=ConvexMeshVsTriMesh(e->colliderMeshIndex,mxA,o->modelIndex,mxB); }
-                        else if (eTriSoup && o->collider==COLLIDER_TYPE_CONVEXMESH) { float mxA[16],mxB[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64); CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64); r=ConvexMeshVsTriMesh(o->colliderMeshIndex,mxB,e->modelIndex,mxA); r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z}; }
-                        else if (eTriSoup && oTriSoup) { /* static vs static */ }
-                        else if (eMesh && oMesh) { float mxA[16],mxB[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64); CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64); r=ConvexMeshOverlap(e->colliderMeshIndex,o->colliderMeshIndex,mxA,mxB); }
-                        else if (e->collider==COLLIDER_TYPE_CAPSULE && o->collider==COLLIDER_TYPE_CONVEXMESH) { float mxB[16]; CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64); ShapeCapsule ca; Entity_GetCapsule(e,&ca); r=CapsuleConvexMesh(ca,o->colliderMeshIndex,mxB); }
-                        else if (e->collider==COLLIDER_TYPE_CONVEXMESH && o->collider==COLLIDER_TYPE_CAPSULE) { float mxA[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64); ShapeCapsule cb; Entity_GetCapsule(o,&cb); r=CapsuleConvexMesh(cb,e->colliderMeshIndex,mxA); r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z}; }
-                        else if (e->collider==COLLIDER_TYPE_SPHERE && o->collider==COLLIDER_TYPE_CONVEXMESH) { float mxB[16]; CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64); ShapeSphere sa; Entity_GetSphere(e,&sa); r=SphereConvexMesh(sa.center,sa.radius,o->colliderMeshIndex,mxB); }
-                        else if (e->collider==COLLIDER_TYPE_CONVEXMESH && o->collider==COLLIDER_TYPE_SPHERE) { float mxA[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64); ShapeSphere sb; Entity_GetSphere(o,&sb); r=SphereConvexMesh(sb.center,sb.radius,e->colliderMeshIndex,mxA); r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z}; }
-                        else if (e->collider==COLLIDER_TYPE_BOX && oTriSoup) { float mxB[16]; CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64); ShapeBox ba; Entity_GetBox(e,&ba); float br=vmax(ba.halfExtents.x,vmax(ba.halfExtents.y,ba.halfExtents.z)); r=SphereTriMesh(ba.center,br,o->modelIndex,mxB); }
-                        else if (eTriSoup && o->collider==COLLIDER_TYPE_BOX) { float mxA[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64); ShapeBox bb; Entity_GetBox(o,&bb); float br=vmax(bb.halfExtents.x,vmax(bb.halfExtents.y,bb.halfExtents.z)); r=SphereTriMesh(bb.center,br,e->modelIndex,mxA); r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z}; }
-                        else { r=SphereSphere(e->position,GetCollisionRadius(e),o->position,GetCollisionRadius(o)); }
+                        // Static Mesh vs Primitives
+                        else if (e->collider == COLLIDER_TYPE_CAPSULE    && o->collider == COLLIDER_TYPE_MESH) { float mxB[16]; CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64); ShapeCapsule ca; Entity_GetCapsule(e,&ca); r=CapsuleTriMesh(ca,o->modelIndex,mxB); }
+                        else if (e->collider == COLLIDER_TYPE_MESH       && o->collider == COLLIDER_TYPE_CAPSULE) { float mxA[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64); ShapeCapsule cb; Entity_GetCapsule(o,&cb); r=CapsuleTriMesh(cb,e->modelIndex,mxA); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
+                        else if (e->collider == COLLIDER_TYPE_SPHERE     && o->collider == COLLIDER_TYPE_MESH) { float mxB[16]; CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64); ShapeSphere sa; Entity_GetSphere(e,&sa); r=SphereTriMesh(sa.center,sa.radius,o->modelIndex,mxB); }
+                        else if (e->collider == COLLIDER_TYPE_MESH       && o->collider == COLLIDER_TYPE_SPHERE)  { float mxA[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64); ShapeSphere sb; Entity_GetSphere(o,&sb); r=SphereTriMesh(sb.center,sb.radius,e->modelIndex,mxA); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
+                        else if (e->collider == COLLIDER_TYPE_BOX        && o->collider == COLLIDER_TYPE_MESH) { float mxB[16]; CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64); ShapeBox ba; Entity_GetBox(e,&ba); r=BoxVsTriMesh(ba,o->modelIndex,mxB); }
+                        else if (e->collider == COLLIDER_TYPE_MESH       && o->collider == COLLIDER_TYPE_BOX)  { float mxA[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64); ShapeBox bb; Entity_GetBox(o,&bb); r=BoxVsTriMesh(bb,e->modelIndex,mxA); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
+
+                        // Convex Mesh vs Static Mesh
+                        else if (e->collider == COLLIDER_TYPE_CONVEXMESH && o->collider == COLLIDER_TYPE_MESH) { float mxA[16],mxB[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64); CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64); r=ConvexMeshVsTriMesh(e->colliderMeshIndex,mxA,o->modelIndex,mxB); }
+                        else if (e->collider == COLLIDER_TYPE_MESH       && o->collider == COLLIDER_TYPE_CONVEXMESH) { float mxA[16],mxB[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64); CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64); r=ConvexMeshVsTriMesh(o->colliderMeshIndex,mxB,e->modelIndex,mxA); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
+                        else if (e->collider == COLLIDER_TYPE_MESH       && o->collider == COLLIDER_TYPE_MESH) { /* static vs static - ignore */ }
+
+                        // Convex Mesh vs Primitives
+                        else if (e->collider == COLLIDER_TYPE_CAPSULE    && o->collider == COLLIDER_TYPE_CONVEXMESH) { float mxB[16]; CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64); ShapeCapsule ca; Entity_GetCapsule(e,&ca); r=CapsuleConvexMesh(ca,o->colliderMeshIndex,mxB); }
+                        else if (e->collider == COLLIDER_TYPE_CONVEXMESH && o->collider == COLLIDER_TYPE_CAPSULE)    { float mxA[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64); ShapeCapsule cb; Entity_GetCapsule(o,&cb); r=CapsuleConvexMesh(cb,e->colliderMeshIndex,mxA); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
+                        else if (e->collider == COLLIDER_TYPE_SPHERE     && o->collider == COLLIDER_TYPE_CONVEXMESH) { float mxB[16]; CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64); ShapeSphere sa; Entity_GetSphere(e,&sa); r=SphereConvexMesh(sa.center,sa.radius,o->colliderMeshIndex,mxB); }
+                        else if (e->collider == COLLIDER_TYPE_CONVEXMESH && o->collider == COLLIDER_TYPE_SPHERE)     { float mxA[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64); ShapeSphere sb; Entity_GetSphere(o,&sb); r=SphereConvexMesh(sb.center,sb.radius,e->colliderMeshIndex,mxA); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
+                        else if (e->collider == COLLIDER_TYPE_BOX        && o->collider == COLLIDER_TYPE_CONVEXMESH) { float mxB[16]; CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64); ShapeBox ba; Entity_GetBox(e,&ba); r=BoxConvexMesh(ba,o->colliderMeshIndex,mxB); }
+                        else if (e->collider == COLLIDER_TYPE_CONVEXMESH && o->collider == COLLIDER_TYPE_BOX)        { float mxA[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64); ShapeBox bb; Entity_GetBox(o,&bb); r=BoxConvexMesh(bb,e->colliderMeshIndex,mxA); }
+
+                        // Convex Mesh vs Convex Mesh
+                        else if (e->collider == COLLIDER_TYPE_CONVEXMESH && o->collider == COLLIDER_TYPE_CONVEXMESH) { float mxA[16],mxB[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64); CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64); r=ConvexMeshOverlap(e->colliderMeshIndex,o->colliderMeshIndex,mxA,mxB); }
+                        else { r=SphereSphere(e->position,GetCollisionRadius(e),o->position,GetCollisionRadius(o)); } // Fallback
 
                         if (r.hit && r.overlapAmount > COLLISION_EPSILON && contactCount < 16) contacts[contactCount++] = (Contact){r,j};
                     }
@@ -4940,8 +4970,7 @@ void Physics(void) {
             e->accumulatedForce = (Vector3){0, 0, 0};
         }
 
-        // Update cells for next substep
-        for (int i = 0; i < Sys_Global.loadedInstances; ++i) { Entity *e = &Sys_Global.instances[i]; e->cellX = (i16)PosGetCellCoordX(e->position.x); e->cellZ = (i16)PosGetCellCoordZ(e->position.z); e->cellIndex = PosGetCellCoordsP(e->cellX, e->cellZ); }
+        for (int i = 0; i < Sys_Global.loadedInstances; ++i) { Entity *e = &Sys_Global.instances[i]; e->cellX = (i16)PosGetCellCoordX(e->position.x); e->cellZ = (i16)PosGetCellCoordZ(e->position.z); e->cellIndex = PosGetCellCoordsP(e->cellX, e->cellZ); } // Update cells for next substep
     }
 }
 
@@ -5024,8 +5053,8 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
         return IDX_TO_FD(0);
     }
 
-    int pcm_sync(FHandle fd,pcm_sync_t *sync,unsigned int flags) {
-        (void)flags; int idx=FD_TO_IDX(fd); if (idx<0||idx>=wasapi_dev_count||!wasapi_devs[idx].open) return -1;
+    int pcm_sync(FHandle fd, pcm_sync_t *sync) {
+        int idx=FD_TO_IDX(fd); if (idx<0||idx>=wasapi_dev_count||!wasapi_devs[idx].open) return -1;
         
         wasapi_dev_t *w=&wasapi_devs[idx];
         u32 padding=0; w->client->lpVtbl->GetCurrentPadding(w->client,&padding);
@@ -5035,16 +5064,12 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
     }
 
     int pcm_prepare(FHandle fd) { int i = FD_TO_IDX(fd); if (i < 0 || i >= wasapi_dev_count) return -1; wasapi_dev_t *w = &wasapi_devs[i]; return w->client->lpVtbl->Stop(w->client),w->client->lpVtbl->Reset(w->client),w->client->lpVtbl->Start(w->client), 0; }
-    int pcm_write(FHandle fd, void *buf, int frames) {
-        (void)fd;
+    int pcm_write(void *buf, int frames) {
         for (int i=0;i<wasapi_dev_count;i++) {
             wasapi_dev_t *w=&wasapi_devs[i]; if (!w->open) continue;
+            u8* data = NULL; if (FAILED(w->render->lpVtbl->GetBuffer(w->render,(u32)frames,&data))) { pcm_prepare(IDX_TO_FD(i)); continue; }
             
-            u8* data = NULL;
-            if (FAILED(w->render->lpVtbl->GetBuffer(w->render,(u32)frames,&data))) { pcm_prepare(IDX_TO_FD(i)); continue; }
-            
-            CopyMemoryFromBtoAForNBytes(data,buf,frames*w->channels*2);
-            w->render->lpVtbl->ReleaseBuffer(w->render,(u32)frames,0);
+            CopyMemoryFromBtoAForNBytes(data,buf,frames*w->channels*2); w->render->lpVtbl->ReleaseBuffer(w->render,(u32)frames,0);
         }
         return frames;
     }
@@ -5062,8 +5087,7 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
     struct snd_pcm_mmap_control { snd_pcm_uframes_t appl_ptr; snd_pcm_uframes_t avail_min; };
     struct snd_pcm_sync_ptr { u32 flags; union { struct snd_pcm_mmap_status  status; u8 reserved[64]; } s; union { struct snd_pcm_mmap_control control; u8 reserved[64]; } c; };
     struct snd_pcm_status { int state; struct timespec trigger_tstamp; struct timespec tstamp; snd_pcm_uframes_t appl_ptr,hw_ptr; snd_pcm_sframes_t delay; snd_pcm_uframes_t avail,avail_max,overrange; int suspended_state; u32 audio_tstamp_data; struct timespec audio_tstamp; struct timespec driver_tstamp; u32 audio_tstamp_accuracy; u8 reserved[20]; };
-    typedef struct snd_pcm_mmap_status  pcm_status_t; typedef struct snd_pcm_mmap_control pcm_control_t;
-    struct pcm_sync { pcm_status_t status; pcm_control_t control; }; typedef struct pcm_sync pcm_sync_t; typedef struct snd_pcm_hw_params pcm_hw_params_t; typedef struct snd_pcm_sw_params pcm_sw_params_t;
+    typedef struct snd_pcm_mmap_status  pcm_status_t; typedef struct snd_pcm_mmap_control pcm_control_t; typedef struct snd_pcm_hw_params pcm_hw_params_t; typedef struct snd_pcm_sw_params pcm_sw_params_t;
     struct pcm_params { pcm_hw_params_t hw_params; pcm_sw_params_t sw_params; }; typedef struct pcm_params pcm_params_t;
     typedef enum pcm_param {PCM_ACCESS=0,PCM_FORMAT=1,PCM_RATE=11,PCM_CHANNELS=10,PCM_PERIOD_SIZE=13,PCM_BUFFER_SIZE=17,PCM_PERIODS=15,PCM_INTERRUPT=20,PCM_TSTAMP_TYPE=21,PCM_AVAIL_MIN=22,PCM_START_THRESHOLD=23,PCM_XRUN_THRESHOLD=24,PCM_SILENCE_THRESHOLD=25,PCM_SILENCE_SIZE=26} pcm_param_t;
     static inline struct snd_mask* get_mask_struct(struct snd_pcm_hw_params *p, u32 parameter) { return &p->masks[parameter - 0]; }
@@ -5075,13 +5099,6 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
     static void hw_params_get_interval(struct snd_pcm_hw_params *p, int parameter, u32 *min, u32 *max) { struct snd_interval *i = get_interval_struct(p,parameter); *min = i->min + i->openmin; *max = i->max - i->openmax; }
     static u32 hw_params_get(struct snd_pcm_hw_params *p, int parameter, u32 value) { u32 r, t; return (parameter >= 0 && parameter <= 2) ? hw_params_get_mask(p,parameter,value) : ((parameter >= 8 && parameter <= 19) ? (hw_params_get_interval(p,parameter,&r,&t),r) : 0); }
     static void hw_params_fill(struct snd_pcm_hw_params *p) { MemSetToVForNBytes(p,0,sizeof(*p)); MemSetToVForNBytes(p->masks,0xff,sizeof(p->masks)); p->rmask = p->info = U32_MAX; for (int i=0;i<=11;i++) { p->intervals[i].min = 0; p->intervals[i].max = U32_MAX; } }
-    int pcm_sync(int fd, struct pcm_sync *sync, u32 flags) {
-        struct snd_pcm_sync_ptr tmp; flags^=2|4; tmp.flags=flags;
-        if (OS_IOControl(fd,_IOWR('A',0x23,struct snd_pcm_sync_ptr),(void*)&tmp) == -1) return -1;
-        sync->control = tmp.c.control; sync->status = tmp.s.status;
-        return 0;
-    }
-
     unsigned long pcm_gethw(pcm_params_t *p, pcm_param_t param, unsigned int val) { return hw_params_get(&p->hw_params,param,val); } 
     unsigned long pcm_getsw(pcm_params_t *p, pcm_param_t param) { pcm_sw_params_t *sw = &p->sw_params; return ((u64*)&sw->avail_min)[param - 22]; }
     int pcm_params_setup(int fd, pcm_params_t *p) {
@@ -5121,85 +5138,46 @@ typedef struct { const u8 *sfbtab; u16 part_23_length,big_values,scalefac_compre
 typedef struct { drmp3_bs bs; u8 maindata[511 + 2304]; drmp3_L3_gr_info gr_info[4]; float grbuf[2][576],scf[40],syn[18+15][2*32]; u8 ist_pos[2][39]; } drmp3dec_scratch;
 typedef struct { float mdct_overlap[2][9*32], qmf_state[15*2*32]; int reserv,free_format_bytes; u8 header[4],reserv_buf[511]; drmp3dec_scratch scratch; } drmp3dec;
 typedef struct { drmp3dec decoder; u32 channels,sampleRate,mp3FChan,mp3FrameSampleRate,pcmFConsInMP3F,pcmFRemInMP3F,delayInPCMFrames,paddingInPCMFrames; void *pUserData; u8 pcmFrames[sizeof(float) * (1152 * 2)]; u64 currentPCMFrame,streamCursor,streamLength,streamStartOffset,totalPCMFrameCount; bool atEnd; size_t dataSize,dataCapacity,dataConsumed; u8 *pData; } drmp3;
-static u32 drmp3_bs_get_bits(drmp3_bs *bs, int n) {
-    u32 next,cache=0, s=bs->pos&7; int shl=n+s; const u8 *p=bs->buf+(bs->pos>>3);
-    if ((bs->pos+=n)>bs->limit) return 0;
-    
-    next=*p++&(255>>s); while ((shl-=8)>0) { cache|=next<<shl; next=*p++; }
-    return cache|(next>>-shl);
-}
-
+static u32 drmp3_bs_get_bits(drmp3_bs *bs, int n) { u32 next,cache=0, s=bs->pos&7; int shl=n+s; const u8 *p=bs->buf+(bs->pos>>3); if ((bs->pos+=n)>bs->limit) {return 0;} next=*p++&(255>>s); while ((shl-=8)>0) { cache|=next<<shl; next=*p++; } return cache|(next>>-shl); }
 static int drmp3_hdr_valid(const u8 *h) { return h[0]==0xff && ((h[1]&0xF0)==0xf0||(h[1]&0xFE)==0xe2) && (DRMP3_HDR_GET_LAYER(h)!=0) && (DRMP3_HDR_GET_BITRATE(h)!=15) && (DRMP3_HDR_GET_SAMPLE_RATE(h)!=3); }
 static int drmp3_hdr_compare(const u8 *h1, const u8 *h2) { return drmp3_hdr_valid(h2) && ((h1[1]^h2[1])&0xFE)==0 && ((h1[2]^h2[2])&0x0C)==0 && !(DRMP3_HDR_IS_FREE_FORMAT(h1)^DRMP3_HDR_IS_FREE_FORMAT(h2)); }
 static unsigned drmp3_hdr_bitrate_kbps(const u8 *h) {
-    static const u8 halfrate[2][3][15]={
-        {{0,4,8,12,16,20,24,28,32,40,48,56,64,72,80},{0,4,8,12,16,20,24,28,32,40,48,56,64,72,80},{0,16,24,28,32,40,48,56,64,72,80,88,96,112,128}},
-        {{0,16,20,24,28,32,40,48,56,64,80,96,112,128,160},{0,16,24,28,32,40,48,56,64,80,96,112,128,160,192},{0,16,32,48,64,80,96,112,128,144,160,176,192,208,224}}
-    };
-    
+    static const u8 halfrate[2][3][15]={ {{0,4,8,12,16,20,24,28,32,40,48,56,64,72,80},{0,4,8,12,16,20,24,28,32,40,48,56,64,72,80},{0,16,24,28,32,40,48,56,64,72,80,88,96,112,128}},
+                                         {{0,16,20,24,28,32,40,48,56,64,80,96,112,128,160},{0,16,24,28,32,40,48,56,64,80,96,112,128,160,192},{0,16,32,48,64,80,96,112,128,144,160,176,192,208,224}} };
     return 2*halfrate[!!DRMP3_HDR_TEST_MPEG1(h)][DRMP3_HDR_GET_LAYER(h)-1][DRMP3_HDR_GET_BITRATE(h)];
 }
 static unsigned drmp3_hdr_sample_rate_hz(const u8 *h) { static const unsigned g_hz[3]={44100,48000,32000}; return g_hz[DRMP3_HDR_GET_SAMPLE_RATE(h)]>>(int)!DRMP3_HDR_TEST_MPEG1(h)>>(int)!DRMP3_HDR_TEST_NOT_MPEG25(h); }
 static unsigned drmp3_hdr_frame_samples(const u8 *h) { return ((h[1]&6) == 6) ? 384 : (1152>>(int)DRMP3_HDR_IS_FRAME_576(h)); }
 static int drmp3_hdr_frame_bytes(const u8 *h, int free_format_size) { int fb=drmp3_hdr_frame_samples(h)*drmp3_hdr_bitrate_kbps(h)*125/drmp3_hdr_sample_rate_hz(h); if (DRMP3_HDR_IS_LAYER_1(h)) {fb&=~3;} return fb?fb:free_format_size; }
 static int drmp3_hdr_padding(const u8 *h) { return DRMP3_HDR_TEST_PADDING(h)?(DRMP3_HDR_IS_LAYER_1(h)?4:1):0; }
-#define SCF_START 4,4,4,4,4,4,6,6
-#define SCF_MIXED_ROW_A 8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,30,30,30,40,40,40,18,18,18,0
-#define SCF_SHORT_ROW_A 4,4,4,SCF_START,6,SCF_MIXED_ROW_A
-#define SCF_LONG_ROW_A 6,6,6,6,6,6,8,10,12,14,16,20,24,28,32,38,46,52,60,68,58,54,0
+static u8 g_scf_long[8][23] = {{0},{12,12,12,12,12,12,16,20,24,28,32,40,48,56,64,76,90,2,2,2,2,2,0},{0},{6,6,6,6,6,6,8,10,12,14,16,18,22,26,32,38,46,54,62,70,76,36,0},{0},{4,4,4,4,4,4,6,6,8,8,10,12,16,20,24,28,34,42,50,54,76,158,0},{4,4,4,4,4,4,6,6,6,8,10,12,16,18,22,28,34,40,46,54,54,192,0},{4,4,4,4,4,4,6,6,8,10,12,16,20,24,30,38,46,56,68,84,102,26,0}};
+static u8 g_scf_short[8][40] = { { 4,4,4,4,4,4,4,4,4,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,30,30,30,40,40,40,18,18,18,0 }, { 8,8,8,8,8,8,8,8,8,12,12,12,16,16,16,20,20,20,24,24,24,28,28,28,36,36,36,2,2,2,2,2,2,2,2,2,26,26,26,0 },
+                                        { 4,4,4,4,4,4,4,4,4,6,6,6,6,6,6,8,8,8,10,10,10,14,14,14,18,18,18,26,26,26,32,32,32,42,42,42,18,18,18,0 },    { 4,4,4,4,4,4,4,4,4,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,32,32,32,44,44,44,12,12,12,0 },
+                                        { 4,4,4,4,4,4,4,4,4,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,30,30,30,40,40,40,18,18,18,0 }, { 4,4,4,4,4,4,4,4,4,4,4,4,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,22,22,22,30,30,30,56,56,56,0 },
+                                        { 4,4,4,4,4,4,4,4,4,4,4,4,6,6,6,6,6,6,10,10,10,12,12,12,14,14,14,16,16,16,20,20,20,26,26,26,66,66,66,0 }, { 4,4,4,4,4,4,4,4,4,4,4,4,6,6,6,8,8,8,12,12,12,16,16,16,20,20,20,26,26,26,34,34,34,42,42,42,12,12,12,0 } };
+static u8 g_scf_mixed[8][40] = { { 6,6,6,6,6,6,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,30,30,30,40,40,40,18,18,18,0 }, { 12,12,12,4,4,4,8,8,8,12,12,12,16,16,16,20,20,20,24,24,24,28,28,28,36,36,36,2,2,2,2,2,2,2,2,2,26,26,26,0 },
+                                        { 6,6,6,6,6,6,6,6,6,6,6,6,8,8,8,10,10,10,14,14,14,18,18,18,26,26,26,32,32,32,42,42,42,18,18,18,0 }, { 6,6,6,6,6,6,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,32,32,32,44,44,44,12,12,12,0 },
+                                        { 6,6,6,6,6,6,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,30,30,30,40,40,40,18,18,18,0 }, { 4,4,4,4,4,4,6,6,4,4,4,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,22,22,22,30,30,30,56,56,56,0 },
+                                        { 4,4,4,4,4,4,6,6,4,4,4,6,6,6,6,6,6,10,10,10,12,12,12,14,14,14,16,16,16,20,20,20,26,26,26,66,66,66,0 }, { 4,4,4,4,4,4,6,6,4,4,4,6,6,6,8,8,8,12,12,12,16,16,16,20,20,20,26,26,26,34,34,34,42,42,42,12,12,12,0 } };
+static const u8 g_sfc_long_024[23] = { 6,6,6,6,6,6,8,10,12,14,16,20,24,28,32,38,46,52,60,68,58,54,0 };
+void InitSCFTables(void) { for (int i=0;i<23;++i) g_scf_long[0][i] = g_scf_long[1][i] = g_scf_long[2][i] = g_sfc_long_024[i]; }
 static int drmp3_L3_read_side_info(drmp3_bs *bs, drmp3_L3_gr_info *gr, const u8 *hdr) {
-    static const u8 g_scf_long[8][23]={
-        {SCF_LONG_ROW_A},{12,12,12,12,12,12,16,20,24,28,32,40,48,56,64,76,90,2,2,2,2,2,0},{SCF_LONG_ROW_A},{6,6,6,6,6,6,8,10,12,14,16,18,22,26,32,38,46,54,62,70,76,36,0},
-        {SCF_LONG_ROW_A},{SCF_START,8,8,10,12,16,20,24,28,34,42,50,54,76,158,0},{SCF_START,6,8,10,12,16,18,22,28,34,40,46,54,54,192,0},{SCF_START,8,10,12,16,20,24,30,38,46,56,68,84,102,26,0}
-    };
-    
-    static const u8 g_scf_short[8][40]={ {SCF_SHORT_ROW_A},{8,8,8,8,8,8,8,8,8,12,12,12,16,16,16,20,20,20,24,24,24,28,28,28,36,36,36,2,2,2,2,2,2,2,2,2,26,26,26,0},
-        {4,4,4,SCF_START,6,6,6,6,8,8,8,10,10,10,14,14,14,18,18,18,26,26,26,32,32,32,42,42,42,18,18,18,0},
-        {4,4,4,SCF_START,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,32,32,32,44,44,44,12,12,12,0},
-        {SCF_SHORT_ROW_A}, {4,4,4,4,4,4,SCF_START,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,22,22,22,30,30,30,56,56,56,0},
-        {4,4,4,4,4,4,SCF_START,6,6,6,6,10,10,10,12,12,12,14,14,14,16,16,16,20,20,20,26,26,26,66,66,66,0},
-        {4,4,4,4,4,4,SCF_START,6,8,8,8,12,12,12,16,16,16,20,20,20,26,26,26,34,34,34,42,42,42,12,12,12,0}
-    };
-    
-    static const u8 g_scf_mixed[8][40]={
-        {6,6,6,6,6,6,6,6,6,SCF_MIXED_ROW_A}, {12,12,12,4,4,4,8,8,8,12,12,12,16,16,16,20,20,20,24,24,24,28,28,28,36,36,36,2,2,2,2,2,2,2,2,2,26,26,26,0},
-        {6,6,6,6,6,6,6,6,6,6,6,6,8,8,8,10,10,10,14,14,14,18,18,18,26,26,26,32,32,32,42,42,42,18,18,18,0},
-        {6,6,6,6,6,6,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,32,32,32,44,44,44,12,12,12,0},
-        {6,6,6,6,6,6,6,6,6,SCF_MIXED_ROW_A}, {SCF_START,4,4,4,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,22,22,22,30,30,30,56,56,56,0},
-        {SCF_START,4,4,4,6,6,6,6,6,6,10,10,10,12,12,12,14,14,14,16,16,16,20,20,20,26,26,26,66,66,66,0},
-        {SCF_START,4,4,4,6,6,6,8,8,8,12,12,12,16,16,16,20,20,20,26,26,26,34,34,34,42,42,42,12,12,12,0}
-    };
-    
-    unsigned tables,scfsi=0;
-    int main_data_begin,part_23_sum=0,gr_count=DRMP3_HDR_IS_MONO(hdr)?1:2,sr_idx=DRMP3_HDR_GET_MY_SAMPLE_RATE(hdr); sr_idx-=(sr_idx!=0);
+    unsigned tables,scfsi=0; int main_data_begin,part_23_sum = 0, gr_count=DRMP3_HDR_IS_MONO(hdr) ? 1 : 2, sr_idx=DRMP3_HDR_GET_MY_SAMPLE_RATE(hdr); sr_idx-=(sr_idx!=0);
     if (DRMP3_HDR_TEST_MPEG1(hdr)) { gr_count*=2; main_data_begin=drmp3_bs_get_bits(bs,9); scfsi=drmp3_bs_get_bits(bs,7+gr_count); }
     else main_data_begin = drmp3_bs_get_bits(bs,8+gr_count)>>gr_count;
     do {
         if (DRMP3_HDR_IS_MONO(hdr)) scfsi<<=4;
-        gr->part_23_length=(u16)drmp3_bs_get_bits(bs,12);
-        part_23_sum+=gr->part_23_length;
-        gr->big_values=(u16)drmp3_bs_get_bits(bs,9);
-        if (gr->big_values>288) return -1;
-        gr->global_gain=(u8)drmp3_bs_get_bits(bs,8);
-        gr->scalefac_compress=(u16)drmp3_bs_get_bits(bs,DRMP3_HDR_TEST_MPEG1(hdr)?4:9);
-        gr->sfbtab=g_scf_long[sr_idx];
-        gr->n_long_sfb=22; gr->n_short_sfb=0;
+        gr->part_23_length=(u16)drmp3_bs_get_bits(bs,12); part_23_sum+=gr->part_23_length; gr->big_values=(u16)drmp3_bs_get_bits(bs,9); if (gr->big_values>288) return -1;
+        
+        gr->global_gain=(u8)drmp3_bs_get_bits(bs,8); gr->scalefac_compress=(u16)drmp3_bs_get_bits(bs,DRMP3_HDR_TEST_MPEG1(hdr)?4:9); gr->sfbtab=g_scf_long[sr_idx]; gr->n_long_sfb=22; gr->n_short_sfb=0;
         if (drmp3_bs_get_bits(bs,1)) {
-            gr->block_type=(u8)drmp3_bs_get_bits(bs,2);
-            if (!gr->block_type) return -1;
-            gr->mixed_block_flag=(u8)drmp3_bs_get_bits(bs,1);
-            gr->region_count[0]=7; gr->region_count[1]=255;
+            gr->block_type = (u8)drmp3_bs_get_bits(bs,2); if (!gr->block_type) return -1;
+            
+            gr->mixed_block_flag = (u8)drmp3_bs_get_bits(bs,1); gr->region_count[0] = 7; gr->region_count[1] = 255;
             if (gr->block_type==2) {
                 scfsi&=0x0F0F;
-                if (!gr->mixed_block_flag) {
-                    gr->region_count[0]=8;
-                    gr->sfbtab=g_scf_short[sr_idx];
-                    gr->n_long_sfb=0; gr->n_short_sfb=39;
-                } else {
-                    gr->sfbtab=g_scf_mixed[sr_idx];
-                    gr->n_long_sfb=DRMP3_HDR_TEST_MPEG1(hdr)?8:6;
-                    gr->n_short_sfb=30;
-                }
+                if (!gr->mixed_block_flag) { gr->region_count[0] = 8; gr->sfbtab = g_scf_short[sr_idx]; gr->n_long_sfb = 0; gr->n_short_sfb = 39; }
+                else                       { gr->sfbtab = g_scf_mixed[sr_idx]; gr->n_long_sfb=DRMP3_HDR_TEST_MPEG1(hdr) ? 8 : 6; gr->n_short_sfb = 30; }
             }
             tables=drmp3_bs_get_bits(bs,10)<<5;
             gr->subblock_gain[0]=(u8)drmp3_bs_get_bits(bs,3); gr->subblock_gain[1]=(u8)drmp3_bs_get_bits(bs,3); gr->subblock_gain[2]=(u8)drmp3_bs_get_bits(bs,3);
@@ -5209,11 +5187,9 @@ static int drmp3_L3_read_side_info(drmp3_bs *bs, drmp3_L3_gr_info *gr, const u8 
             gr->region_count[0]=(u8)drmp3_bs_get_bits(bs,4); gr->region_count[1]=(u8)drmp3_bs_get_bits(bs,3); gr->region_count[2]=255;
         }
         gr->table_select[0]=(u8)(tables>>10); gr->table_select[1]=(u8)((tables>>5)&31); gr->table_select[2]=(u8)((tables)&31);
-        gr->preflag=(u8)(DRMP3_HDR_TEST_MPEG1(hdr)?drmp3_bs_get_bits(bs,1):(gr->scalefac_compress>=500));
-        gr->scalefac_scale=(u8)drmp3_bs_get_bits(bs,1);
-        gr->count1_table=(u8)drmp3_bs_get_bits(bs,1);
-        gr->scfsi=(u8)((scfsi>>12)&15);
-        scfsi<<=4; gr++;
+        gr->preflag=(u8)(DRMP3_HDR_TEST_MPEG1(hdr) ? drmp3_bs_get_bits(bs,1) : (gr->scalefac_compress>=500));
+        gr->scalefac_scale=(u8)drmp3_bs_get_bits(bs,1); gr->count1_table=(u8)drmp3_bs_get_bits(bs,1); gr->scfsi=(u8)((scfsi>>12)&15);
+        scfsi <<= 4; gr++;
     } while(--gr_count);
     if (part_23_sum+bs->pos > bs->limit+main_data_begin*8) return -1;
     return main_data_begin;
@@ -5221,8 +5197,8 @@ static int drmp3_L3_read_side_info(drmp3_bs *bs, drmp3_L3_gr_info *gr, const u8 
 
 static void drmp3_L3_read_scalefactors(u8 *scf, u8 *ist_pos, const u8 *scf_size, const u8 *scf_count, drmp3_bs *bs, int scfsi) {
     for (int i=0; i<4&&scf_count[i]; i++,scfsi*=2) {
-        int cnt=scf_count[i];
-        if (scfsi&8) CopyMemoryFromBtoAForNBytes(scf,ist_pos,cnt);
+        int cnt = scf_count[i];
+        if (scfsi & 8) CopyMemoryFromBtoAForNBytes(scf,ist_pos,cnt);
         else {
             int bits=scf_size[i];
             if (!bits) { MemSetToVForNBytes(scf,0,cnt); MemSetToVForNBytes(ist_pos,0,cnt); }
@@ -5301,10 +5277,8 @@ static void drmp3_L3_huffman(float *dst, drmp3_bs *bs, const drmp3_L3_gr_info *g
         -251,-892,-2058,-2620,-2828,-2957,-3023,-3039,1041,1041,1040,1040,769,769,769,769,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,-511,-527,-543,-559,1530,-575,-591,1528,1527,1407,1526,1391,1023,1023,1023,1023,1525,1375,1268,1268,1103,1103,1087,1087,1039,1039,1523,-604,815,815,815,815,510,495,509,479,508,463,507,447,431,505,415,399,-734,-782,1262,-815,1259,1244,-831,1258,1228,-847,-863,1196,-879,1253,987,987,748,-767,493,493,462,477,414,414,686,669,478,446,461,445,474,429,487,458,412,471,1266,1264,1009,1009,799,799,-1019,-1276,-1452,-1581,-1677,-1757,-1821,-1886,-1933,-1997,1257,1257,1483,1468,1512,1422,1497,1406,1467,1496,1421,1510,1134,1134,1225,1225,1466,1451,1374,1405,1252,1252,1358,1480,1164,1164,1251,1251,1238,1238,1389,1465,-1407,1054,1101,-1423,1207,-1439,830,830,1248,1038,1237,1117,1223,1148,1236,1208,411,426,395,410,379,269,1193,1222,1132,1235,1221,1116,976,976,1192,1162,1177,1220,1131,1191,963,963,-1647,961,780,-1663,558,558,994,993,437,408,393,407,829,978,813,797,947,-1743,721,721,377,392,844,950,828,890,706,706,812,859,796,960,948,843,934,874,571,571,-1919,690,555,689,421,346,539,539,944,779,918,873,932,842,903,888,570,570,931,917,674,674,-2575,1562,-2591,1609,-2607,1654,1322,1322,1441,1441,1696,1546,1683,1593,1669,1624,1426,1426,1321,1321,1639,1680,1425,1425,1305,1305,1545,1668,1608,1623,1667,1592,1638,1666,1320,1320,1652,1607,1409,1409,1304,1304,1288,1288,1664,1637,1395,1395,1335,1335,1622,1636,1394,1394,1319,1319,1606,1621,1392,1392,1137,1137,1137,1137,345,390,360,375,404,373,1047,-2751,-2767,-2783,1062,1121,1046,-2799,1077,-2815,1106,1061,789,789,1105,1104,263,355,310,340,325,354,352,262,339,324,1091,1076,1029,1090,1060,1075,833,833,788,788,1088,1028,818,818,803,803,561,561,531,531,816,771,546,546,289,274,288,258,
         -253,-317,-381,-446,-478,-509,1279,1279,-811,-1179,-1451,-1756,-1900,-2028,-2189,-2253,-2333,-2414,-2445,-2511,-2526,1313,1298,-2559,1041,1041,1040,1040,1025,1025,1024,1024,1022,1007,1021,991,1020,975,1019,959,687,687,1018,1017,671,671,655,655,1016,1015,639,639,758,758,623,623,757,607,756,591,755,575,754,559,543,543,1009,783,-575,-621,-685,-749,496,-590,750,749,734,748,974,989,1003,958,988,973,1002,942,987,957,972,1001,926,986,941,971,956,1000,910,985,925,999,894,970,-1071,-1087,-1102,1390,-1135,1436,1509,1451,1374,-1151,1405,1358,1480,1420,-1167,1507,1494,1389,1342,1465,1435,1450,1326,1505,1310,1493,1373,1479,1404,1492,1464,1419,428,443,472,397,736,526,464,464,486,457,442,471,484,482,1357,1449,1434,1478,1388,1491,1341,1490,1325,1489,1463,1403,1309,1477,1372,1448,1418,1433,1476,1356,1462,1387,-1439,1475,1340,1447,1402,1474,1324,1461,1371,1473,269,448,1432,1417,1308,1460,-1711,1459,-1727,1441,1099,1099,1446,1386,1431,1401,-1743,1289,1083,1083,1160,1160,1458,1445,1067,1067,1370,1457,1307,1430,1129,1129,1098,1098,268,432,267,416,266,400,-1887,1144,1187,1082,1173,1113,1186,1066,1050,1158,1128,1143,1172,1097,1171,1081,420,391,1157,1112,1170,1142,1127,1065,1169,1049,1156,1096,1141,1111,1155,1080,1126,1154,1064,1153,1140,1095,1048,-2159,1125,1110,1137,-2175,823,823,1139,1138,807,807,384,264,368,263,868,838,853,791,867,822,852,837,866,806,865,790,-2319,851,821,836,352,262,850,805,849,-2399,533,533,835,820,336,261,578,548,563,577,532,532,832,772,562,562,547,547,305,275,560,515,290,290,288,258
     };
-    static const u8 tab32[]={130,162,193,209,44,28,76,140,9,9,9,9,9,9,9,9,190,254,222,238,126,94,157,157,109,61,173,205};
-    static const u8 tab33[]={252,236,220,204,188,172,156,140,124,108,92,76,60,44,28,12};
-    static const i16 tabindex[2*16]={0,32,64,98,0,132,180,218,292,364,426,538,648,746,0,1126,1460,1460,1460,1460,1460,1460,1460,1460,1842,1842,1842,1842,1842,1842,1842,1842};
-    static const u8 g_linbits[]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,3,4,6,8,10,13,4,5,6,7,8,9,11,13};
+    static const u8 tab32[]={130,162,193,209,44,28,76,140,9,9,9,9,9,9,9,9,190,254,222,238,126,94,157,157,109,61,173,205}; static const u8 tab33[]={252,236,220,204,188,172,156,140,124,108,92,76,60,44,28,12};
+    static const i16 tabindex[2*16]={0,32,64,98,0,132,180,218,292,364,426,538,648,746,0,1126,1460,1460,1460,1460,1460,1460,1460,1460,1842,1842,1842,1842,1842,1842,1842,1842}; static const u8 g_linbits[]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,3,4,6,8,10,13,4,5,6,7,8,9,11,13};
 #define DRMP3_PEEK_BITS(n)  (bs_cache>>(32-(n)))
 #define DRMP3_FLUSH_BITS(n) { bs_cache<<=(n); bs_sh+=(n); }
 #define DRMP3_CHECK_BITS    while(bs_sh>=0){bs_cache|=(u32)*bs_next_ptr++<<bs_sh;bs_sh-=8;}
@@ -5369,16 +5343,9 @@ static void drmp3_L3_huffman(float *dst, drmp3_bs *bs, const drmp3_L3_gr_info *g
     bs->pos=layer3gr_limit;
 }
 
-static void drmp3_L3_midside_stereo(float *left, int n) {
-    int i=0; float *right=left+576;
-    for (; i<n; i++) { float a=left[i],b=right[i]; left[i]=a+b; right[i]=a-b; }
-}
-static void drmp3_L3_intensity_stereo_band(float *left, int n, float kl, float kr)
-{ int i; for(i=0;i<n;i++){left[i+576]=left[i]*kr;left[i]=left[i]*kl;} }
-static void drmp3_L3_stereo_top_band(const float *right, const u8 *sfb, int nbands, int max_band[3]) {
-    int i,k; max_band[0]=max_band[1]=max_band[2]=-1;
-    for (i=0;i<nbands;i++){for(k=0;k<sfb[i];k+=2){if(right[k]!=0||right[k+1]!=0){max_band[i%3]=i;break;}}right+=sfb[i];}
-}
+static void drmp3_L3_midside_stereo(float *left, int n) { int i=0; float *right=left+576; for (; i<n; i++) { float a=left[i],b=right[i]; left[i]=a+b; right[i]=a-b; } }
+static void drmp3_L3_intensity_stereo_band(float *left, int n, float kl, float kr) { int i; for(i=0;i<n;i++){left[i+576]=left[i]*kr;left[i]=left[i]*kl;} }
+static void drmp3_L3_stereo_top_band(const float *right, const u8 *sfb, int nbands, int max_band[3]) { int i,k; max_band[0]=max_band[1]=max_band[2]=-1; for (i=0;i<nbands;i++){for(k=0;k<sfb[i];k+=2){if(right[k]!=0||right[k+1]!=0){max_band[i%3]=i;break;}}right+=sfb[i];} }
 static void drmp3_L3_stereo_process(float *left, const u8 *ist_pos, const u8 *sfb, const u8 *hdr, int max_band[3], int mpeg2_sh) {
     static const float g_pan[7*2]={0,1,0.21132487f,0.78867513f,0.36602540f,0.63397460f,0.5f,0.5f,0.63397460f,0.36602540f,0.78867513f,0.21132487f,1,0};
     unsigned i,max_pos=DRMP3_HDR_TEST_MPEG1(hdr)?7:64;
@@ -5397,10 +5364,7 @@ static void drmp3_L3_intensity_stereo(float *left, u8 *ist_pos, const drmp3_L3_g
     int max_band[3],n_sfb=gr->n_long_sfb+gr->n_short_sfb,i,max_blocks=gr->n_short_sfb?3:1;
     drmp3_L3_stereo_top_band(left+576,gr->sfbtab,n_sfb,max_band);
     if (gr->n_long_sfb) max_band[0]=max_band[1]=max_band[2]=vmax(vmax(max_band[0],max_band[1]),max_band[2]);
-    for (i=0;i<max_blocks;i++){
-        int default_pos=DRMP3_HDR_TEST_MPEG1(hdr)?3:0,itop=n_sfb-max_blocks+i,prev=itop-max_blocks;
-        ist_pos[itop]=(u8)(max_band[i]>=prev?default_pos:ist_pos[prev]);
-    }
+    for (i=0;i<max_blocks;i++){ int default_pos = DRMP3_HDR_TEST_MPEG1(hdr) ? 3 : 0, itop = n_sfb-max_blocks + i, prev = itop - max_blocks; ist_pos[itop] = (u8)(max_band[i] >= prev ? default_pos : ist_pos[prev]); }
     drmp3_L3_stereo_process(left,ist_pos,gr->sfbtab,hdr,max_band,gr[1].scalefac_compress&1);
 }
 
@@ -5417,15 +5381,14 @@ static void drmp3_L3_antialias(float *grbuf, int nbands) {
     }
 }
 static void drmp3_L3_dct3_9(float *y) {
-    float s0,s1,s2,s3,s4,s5,s6,s7,s8,t0,t2,t4;
-    s0=y[0];s2=y[2];s4=y[4];s6=y[6];s8=y[8];
-    t0=s0+s6*0.5f;s0-=s6;t4=(s4+s2)*0.93969262f;t2=(s8+s2)*0.76604444f;
-    s6=(s4-s8)*0.17364818f;s4+=s8-s2;s2=s0-s4*0.5f;y[4]=s4+s0;
-    s8=t0-t2+s6;s0=t0-t4+t2;s4=t0+t4-s6;
-    s1=y[1];s3=y[3];s5=y[5];s7=y[7];
-    s3*=0.86602540f;t0=(s5+s1)*0.98480775f;t4=(s5-s7)*0.34202014f;t2=(s1+s7)*0.64278761f;
-    s1=(s1-s5-s7)*0.86602540f;s5=t0-s3-t2;s7=t4-s3-t0;s3=t4+s3-t2;
-    y[0]=s4-s7;y[1]=s2+s1;y[2]=s0-s3;y[3]=s8+s5;y[5]=s8-s5;y[6]=s0+s3;y[7]=s2-s1;y[8]=s4+s7;
+    float s1,s3,s5,s7,t0,t2,t4,s0=y[0],s2=y[2],s4=y[4],s6=y[6],s8=y[8];
+    t0=s0+s6*0.5f; s0-=s6; t4=(s4+s2)*0.93969262f; t2=(s8+s2)*0.76604444f;
+    s6=(s4-s8)*0.17364818f; s4+=s8-s2; s2=s0-s4*0.5f; y[4]=s4+s0;
+    s8=t0-t2+s6; s0=t0-t4+t2; s4=t0+t4-s6;
+    s1=y[1]; s3=y[3]; s5=y[5]; s7=y[7];
+    s3*=0.86602540f; t0=(s5+s1)*0.98480775f; t4=(s5-s7)*0.34202014f; t2=(s1+s7)*0.64278761f;
+    s1=(s1-s5-s7)*0.86602540f; s5=t0-s3-t2; s7=t4-s3-t0; s3=t4+s3-t2;
+    y[0]=s4-s7; y[1]=s2+s1; y[2]=s0-s3; y[3]=s8+s5; y[5]=s8-s5; y[6]=s0+s3; y[7]=s2-s1; y[8]=s4+s7;
 }
 static void drmp3_L3_imdct36(float *grbuf, float *overlap, const float *win, int nbands) {
     int i,j;
@@ -5459,13 +5422,8 @@ static void drmp3_L3_imdct_gr(float *grbuf,float *overlap,unsigned block_type,un
     else drmp3_L3_imdct36(grbuf,overlap,g_mdct_window[block_type==3],32-n_long_bands);
 }
 
-static void drmp3_L3_save_reservoir(drmp3dec *h, drmp3dec_scratch *s){
-    int pos=(s->bs.pos+7)/8u,remains=s->bs.limit/8u-pos;
-    if (remains>511){pos+=remains-511;remains=511;}
-    if (remains>0) MoveMemoryFromBtoAForNBytes(h->reserv_buf,s->maindata+pos,remains);
-    h->reserv=remains;
-}
-static int drmp3_L3_restore_reservoir(drmp3dec *h, drmp3_bs *bs, drmp3dec_scratch *s, int main_data_begin){
+static void drmp3_L3_save_reservoir(drmp3dec *h, drmp3dec_scratch *s) { int pos=(s->bs.pos+7)/8u,remains=s->bs.limit/8u-pos; if (remains>511){pos+=remains-511;remains=511;} if (remains>0) {MoveMemoryFromBtoAForNBytes(h->reserv_buf,s->maindata+pos,remains);} h->reserv=remains; }
+static int drmp3_L3_restore_reservoir(drmp3dec *h, drmp3_bs *bs, drmp3dec_scratch *s, int main_data_begin) { 
     int frame_bytes=(bs->limit-bs->pos)/8,bytes_have=vmin(h->reserv,main_data_begin);
     CopyMemoryFromBtoAForNBytes(s->maindata,h->reserv_buf+vmax(0,h->reserv-main_data_begin),vmin(h->reserv,main_data_begin));
     CopyMemoryFromBtoAForNBytes(s->maindata+bytes_have,bs->buf+bs->pos/8,frame_bytes);
@@ -5474,11 +5432,7 @@ static int drmp3_L3_restore_reservoir(drmp3dec *h, drmp3_bs *bs, drmp3dec_scratc
 }
 
 static void drmp3_L3_decode(drmp3dec *h, drmp3dec_scratch *s, drmp3_L3_gr_info *gr_info, int nch){
-    int ch; for(ch=0;ch<nch;ch++){
-        int limit=s->bs.pos+gr_info[ch].part_23_length;
-        drmp3_L3_decode_scalefactors(h->header,s->ist_pos[ch],&s->bs,gr_info+ch,s->scf,ch);
-        drmp3_L3_huffman(s->grbuf[ch],&s->bs,gr_info+ch,s->scf,limit);
-    }
+    int ch; for(ch=0;ch<nch;ch++) { int limit=s->bs.pos+gr_info[ch].part_23_length; drmp3_L3_decode_scalefactors(h->header,s->ist_pos[ch],&s->bs,gr_info+ch,s->scf,ch); drmp3_L3_huffman(s->grbuf[ch],&s->bs,gr_info+ch,s->scf,limit); }
     if (DRMP3_HDR_TEST_I_STEREO(h->header)) drmp3_L3_intensity_stereo(s->grbuf[0],s->ist_pos[1],gr_info,h->header);
     else if (DRMP3_HDR_IS_MS_STEREO(h->header)) drmp3_L3_midside_stereo(s->grbuf[0],576);
     for(ch=0;ch<nch;ch++,gr_info++){
@@ -5515,6 +5469,7 @@ static void drmp3d_synth_pair(drmp3d_sample_t *pcm, int nch, const float *z){
     a+=z[6*64]*-9975; a+=z[4*64]*-45; a+=z[2*64]*146; a+=z[0*64]*-5;
     pcm[16*nch]=drmp3d_scale_pcm(a);
 }
+
 static void drmp3d_synth(float *xl, drmp3d_sample_t *dstl, int nch, float *lins){
     int i; float *xr=xl+576*(nch-1); drmp3d_sample_t *dstr=dstl+(nch-1);
     static const float g_win[]={ -1,26,-31,208,218,401,-519,2063,2000,4788,-5517,7134,5959,35640,-39336,74992,  -1,24,-35,202,222,347,-581,2080,1952,4425,-5879,7640,5288,33791,-41176,74856,
@@ -5546,6 +5501,7 @@ static void drmp3d_synth(float *xl, drmp3d_sample_t *dstl, int nch, float *lins)
         dstl[(47-i)*nch]=drmp3d_scale_pcm(a[2]); dstl[(49+i)*nch]=drmp3d_scale_pcm(b[2]);
     }
 }
+
 static void drmp3d_synth_granule(float *qmf_state, float *grbuf, int nbands, int nch, drmp3d_sample_t *pcm, float *lins){
     for(int i=0;i<nch;i++) {drmp3d_DCT_II(grbuf+576*i,nbands);} CopyMemoryFromBtoAForNBytes(lins,qmf_state,sizeof(float)*15*64);
     for(int i=0;i<nbands;i+=2) {drmp3d_synth(grbuf+i,pcm+32*nch*i,nch,lins+i*64);} CopyMemoryFromBtoAForNBytes(qmf_state,lins+nbands*64,sizeof(float)*15*64);
@@ -5560,6 +5516,7 @@ static int drmp3d_match_frame(const u8 *hdr, int mp3_bytes, int frame_bytes){
     }
     return 1;
 }
+
 static int drmp3d_find_frame(const u8 *mp3, int mp3_bytes, int *free_format_bytes, int *ptr_frame_bytes){
     int i,k;
     for(i=0;i<mp3_bytes-4;i++,mp3++){
@@ -5639,14 +5596,10 @@ static u32 drmp3_decode_next_frame_ex(drmp3 *p, drmp3d_sample_t *pPCMFrames, drm
         if (!p->pData) return 0;
 
         pcmFramesRead = drmp3dec_decode_frame(&p->decoder,p->pData + p->dataConsumed,(int)p->dataSize,pPCMFrames,&info);
-        p->dataConsumed += (size_t)info.frame_bytes;
-        p->dataSize     -= (size_t)info.frame_bytes;
+        p->dataConsumed += (size_t)info.frame_bytes; p->dataSize -= (size_t)info.frame_bytes;
         if (pcmFramesRead > 0) {
             pcmFramesRead = drmp3_hdr_frame_samples(p->decoder.header);
-            p->pcmFConsInMP3F = 0;
-            p->pcmFRemInMP3F = pcmFramesRead;
-            p->mp3FChan = info.channels;
-            p->mp3FrameSampleRate = info.sample_rate;
+            p->pcmFConsInMP3F = 0; p->pcmFRemInMP3F = pcmFramesRead; p->mp3FChan = info.channels; p->mp3FrameSampleRate = info.sample_rate; 
             if (pInfo) *pInfo = info;
             break;
         } else if (info.frame_bytes == 0) {
@@ -5682,22 +5635,18 @@ static bool drmp3_init_internal(drmp3 *p) {
         i64 slen = OS_Tell((FHandle)(uintptr_t)p->pUserData);
         if (slen > 0) {
             if (slen > 128) {
-                char tag[3];
-                drmp3__on_seek_os(p->pUserData, -128, 2);
-                if (drmp3__on_read(p, tag, 3) == 3 && tag[0]=='T' && tag[1]=='A' && tag[2]=='G') slen -= 128;
+                char tag[3]; drmp3__on_seek_os(p->pUserData,-128,2); if (drmp3__on_read(p, tag, 3) == 3 && tag[0]=='T' && tag[1]=='A' && tag[2]=='G') slen -= 128;
             }
             
             p->streamLength = (u64)slen;
         }
         
-        drmp3__on_seek_os(p->pUserData, 0, 0);
-        p->streamCursor = 0;
+        drmp3__on_seek_os(p->pUserData,0,0); p->streamCursor = 0;
     }
 
-    drmp3__skip_id3v2(p);
-    drmp3dec_frame_info firstFrameInfo;
-    u32 firstFramePCMFrameCount = drmp3_decode_next_frame_ex(p, (drmp3d_sample_t*)p->pcmFrames, &firstFrameInfo);
-    if (firstFramePCMFrameCount == 0) { OS_DeallocateRAM(p->pData, p->dataCapacity); p->pData = NULL; p->dataCapacity = 0; return false; }
+    drmp3__skip_id3v2(p); drmp3dec_frame_info firstFrameInfo;
+    u32 firstFramePCMFrameCount = drmp3_decode_next_frame_ex(p,(drmp3d_sample_t*)p->pcmFrames,&firstFrameInfo);
+    if (firstFramePCMFrameCount == 0) { OS_DeallocateRAM(p->pData,p->dataCapacity); p->pData = NULL; p->dataCapacity = 0; return false; }
 
     p->channels=p->mp3FChan; p->sampleRate=p->mp3FrameSampleRate;
     return true;
@@ -5780,8 +5729,7 @@ static bool WavInit(WaveFile *w, const char *path) {
     if (CompareMemoryForNBytes(buf+8,"WAVE",4) != 0) goto fail;
     bool got_fmt=false,got_data=false;
     for (;;) {
-        u8 chunkId[4],szBuf[4];
-        if ((OS_Read(w->fp,chunkId,4) != 4) || (OS_Read(w->fp,szBuf,4) != 4)) break;
+        u8 chunkId[4],szBuf[4]; if ((OS_Read(w->fp,chunkId,4) != 4) || (OS_Read(w->fp,szBuf,4) != 4)) break;
         
         u32 chunkSize = WavU32LE(szBuf);
         if (CompareMemoryForNBytes(chunkId, "fmt ", 4) == 0) {
@@ -5794,8 +5742,7 @@ static bool WavInit(WaveFile *w, const char *path) {
             if (w->fmtTag == 0xFFFE && toRead >= 18) {
                 u16 cbSize = WavU16LE(fmt + 16);
                 if (cbSize >= 22) {
-                    u8 ext[22];
-                    if (OS_Read(w->fp,ext,22) == 22) w->fmtTag = WavU16LE(ext + 6);
+                    u8 ext[22]; if (OS_Read(w->fp,ext,22) == 22) w->fmtTag = WavU16LE(ext + 6);
                 }
             }
             if (w->fmtTag != 0x1) goto fail; // PCM format
@@ -5809,9 +5756,7 @@ static bool WavInit(WaveFile *w, const char *path) {
             w->totalPCMFrameCount = w->bytesRemaining / bpf;
             got_data = true;
             break; /* data chunk is last thing we need */
-        } else {
-            OS_Seek(w->fp,(i64)(chunkSize + (chunkSize & 1)),1);
-        }
+        } else OS_Seek(w->fp,(i64)(chunkSize + (chunkSize & 1)),1);
     }
 
     if (got_fmt && got_data) return true;
@@ -5877,8 +5822,7 @@ static void wave_mix(wav_channel_t* w, float* mix) {
     if (w->positional) vol *= spatial_atten;
     for (i32 f = 0; f < AUDIO_FRAMES; f++) {
         if (w->frame_pos >= w->frame_count) { if (w->looping) w->frame_pos=0; else { w->playing=false; break; } }
-        mix[f*2+0] += w->samples[w->frame_pos*2+0]*vol; mix[f*2+1] += w->samples[w->frame_pos*2+1]*vol;
-        w->frame_pos++;
+        mix[f*2+0] += w->samples[w->frame_pos*2+0]*vol; mix[f*2+1] += w->samples[w->frame_pos*2+1]*vol; w->frame_pos++;
     }
 }
 
@@ -5891,9 +5835,7 @@ static void audio_mix_period(i16 *out) {
         float vol = (Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeMessage/100.0f);
         for (i32 f = 0; f < AUDIO_FRAMES; f++) {
             if (log_frame_pos >= log_frame_count) { log_playing=false; break; }
-            mix[f*2+0] += log_samples[log_frame_pos*2+0] * vol; 
-            mix[f*2+1] += log_samples[log_frame_pos*2+1] * vol;
-            log_frame_pos++;
+            mix[f*2+0] += log_samples[log_frame_pos*2+0] * vol; mix[f*2+1] += log_samples[log_frame_pos*2+1] * vol; log_frame_pos++;
         }
     }
 
@@ -5916,8 +5858,7 @@ static void audio_mix_period(i16 *out) {
                     m->fade_vol += m->fade_step;
                     if (m->fade_step>0.0f && m->fade_vol>=m->fade_target) { m->fade_vol=m->fade_target; m->fade_step=0.0f; }
                     else if (m->fade_step<0.0f && m->fade_vol<=m->fade_target) {
-                        m->fade_vol=m->fade_target; m->fade_step=0.0f;
-                        if (m->fade_target==0.0f) { drmp3_uninit(&m->dec); m->open=false; }
+                        m->fade_vol=m->fade_target; m->fade_step=0.0f; if (m->fade_target==0.0f) { drmp3_uninit(&m->dec); m->open=false; }
                     }
                 }
             }
@@ -5972,11 +5913,11 @@ static FHandle pcm_fds[8]; static i32 pcm_fd_count = 0;
 pthread_t audThreadID; void* AudThread(void* arg); 
 #ifdef WINDOWS
     void AudioUpdate(void) {
-        if (pcm_fd_count==0) return;
-        i16 buf[AUDIO_FRAMES*AUDIO_CHANNELS]; pcm_sync_t sync; if (pcm_sync(pcm_fds[0],&sync,0)<0) return;
+        if (pcm_fd_count==0) {return;} 
+        i16 buf[AUDIO_FRAMES*AUDIO_CHANNELS]; pcm_sync_t sync; if (pcm_sync(pcm_fds[0],&sync) < 0) {return;}
         
-        u32 hw=sync.status.hw_ptr,appl=sync.control.appl_ptr; u32 avail = AUDBUF_SIZE - ((appl-hw>AUDBUF_SIZE) ? 0 : appl-hw);
-        while (avail>=(u32)AUDIO_FRAMES) { audio_mix_period(buf); for (i32 i=0;i<pcm_fd_count;i++) { if (pcm_write(pcm_fds[i],buf,AUDIO_FRAMES)<0) {pcm_prepare(pcm_fds[i]);} } avail-=AUDIO_FRAMES; }
+        u32 avail = AUDBUF_SIZE - ((sync.control.appl_ptr - sync.status.hw_ptr > AUDBUF_SIZE) ? 0 : sync.control.appl_ptr - sync.status.hw_ptr);
+        while (avail>=(u32)AUDIO_FRAMES) { audio_mix_period(buf); for (i32 i=0;i<pcm_fd_count;i++) { if (pcm_write(buf,AUDIO_FRAMES)<0) {pcm_prepare(pcm_fds[i]);} } avail-=AUDIO_FRAMES; }
     }
     
     void InitAudio(void) { FHandle first = pcm_open_all(AUDIO_RATE,AUDIO_CHANNELS,AUDIO_FRAMES,AUDIO_PERIODS); if (first == INVALID_FHANDLE) { DualLog("ERROR: No WASAPI audio device found\n"); return; } pcm_fds[0] = first; pcm_fd_count = 1; pthread_create(&audThreadID,NULL,AudThread,NULL); }
@@ -6030,11 +5971,8 @@ void* AudThread(void* arg) { (void)arg; while (1) { AudioUpdate(); OS_USleep(100
 float half_to_float(half h);
 RaycastHit RayTriangle(Vector3 origin, Vector3 dir, Vector3 posA, Vector3 posB, Vector3 posC, Vector3 normA, Vector3 normB, Vector3 normC) {
     Vector3 edgeAB = V3_AsubB(posB,posA), edgeAC = V3_AsubB(posC,posA); Vector3 normalVector = V3_Cross(edgeAB,edgeAC);
-    Vector3 ao = V3_AsubB(origin,posA);
-    Vector3 dao = V3_Cross(ao,dir);
-    float determinant = -V3_dot(dir,normalVector);
-    float invDet = 1.0f / determinant;
-    float dst = V3_dot(ao, normalVector) * invDet;
+    Vector3 ao = V3_AsubB(origin,posA); Vector3 dao = V3_Cross(ao,dir);
+    float determinant = -V3_dot(dir,normalVector); float invDet = 1.0f / determinant; float dst = V3_dot(ao, normalVector) * invDet;
     float u = V3_dot(edgeAC,dao) * invDet, v = -V3_dot(edgeAB,dao) * invDet; float w = 1.0f - u - v;
     return (RaycastHit){.point=V3_AplusB(origin,V3_ScaleByF(dir,dst)), .normal=V3_Normalize(V3_AplusB(V3_AplusB(V3_ScaleByF(normA,w),V3_ScaleByF(normB,u)),V3_ScaleByF(normC,v))), .distance=dst, .hitInstanceIndex=INSTANCE_COUNT, .hit=vabs(determinant) >= 1E-8f && dst >= 0 && u >= 0 && v >= 0 && w >= 0};
 }
@@ -6043,17 +5981,13 @@ ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, u32
     RaycastHit result = { .hit = false, .distance = maxDist, .point = {0.0f, 0.0f, 0.0f}, .normal = {0.0f, 0.0f, 0.0f}, .hitInstanceIndex = INSTANCE_COUNT };
     for (u16 i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
         if (!(layerMask & Sys_Global.instances[i].layer)) continue;
-        
-        u16 mindex = Sys_Global.instances[i].modelIndex;
-        if (mindex >= loadedModelsMaxIndex) continue;
+        u16 mindex = Sys_Global.instances[i].modelIndex; if (mindex >= loadedModelsMaxIndex) continue;
         
         Vector3 objPos = Sys_Global.instances[i].position;
         u16 instCellIdx = PosGetCellCoords(objPos.x,objPos.z);
         Vector3 delta = V3_AsubB(objPos,origin);
-        float distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
-        float radBounds = vmax(modelBounds[mindex], 1.81f);
-        float maxDistToObj = vmax(maxDist - radBounds,maxDist);
-        if (distSqrd >= (maxDistToObj * maxDistToObj)) continue;
+        float distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z, radBounds = vmax(modelBounds[mindex], 1.81f); 
+        float maxDistToObj = vmax(maxDist - radBounds,maxDist); if (distSqrd >= (maxDistToObj * maxDistToObj)) continue;
         
         if (!ConstIndexIsPortalBlockingDoor(Sys_Global.instances[i].index)) {
             if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (Sys_Global.instances[i].index != 754 || !SkyIsVisible())) continue;
@@ -6086,20 +6020,12 @@ ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, u32
             RaycastHit tryTri = RayTriangle(localOrigin,localDir,posA,posB,posC,normA,normB,normC);
             if (!tryTri.hit) continue;
             
-            Vector3 worldPoint = {
-                m00*tryTri.point.x + m01*tryTri.point.y + m02*tryTri.point.z + tx,
-                m10*tryTri.point.x + m11*tryTri.point.y + m12*tryTri.point.z + ty,
-                m20*tryTri.point.x + m21*tryTri.point.y + m22*tryTri.point.z + tz
-            };
+            Vector3 worldPoint = { m00*tryTri.point.x + m01*tryTri.point.y + m02*tryTri.point.z + tx, m10*tryTri.point.x + m11*tryTri.point.y + m12*tryTri.point.z + ty, m20*tryTri.point.x + m21*tryTri.point.y + m22*tryTri.point.z + tz };
             Vector3 toHit = V3_AsubB(worldPoint, origin);
             float worldDist = vsqrtf(toHit.x*toHit.x + toHit.y*toHit.y + toHit.z*toHit.z);
             if (worldDist >= result.distance) continue;
             
-            Vector3 worldNormal = {
-                (m00/sclx)*tryTri.normal.x + (m01/scly)*tryTri.normal.y + (m02/sclz)*tryTri.normal.z,
-                (m10/sclx)*tryTri.normal.x + (m11/scly)*tryTri.normal.y + (m12/sclz)*tryTri.normal.z,
-                (m20/sclx)*tryTri.normal.x + (m21/scly)*tryTri.normal.y + (m22/sclz)*tryTri.normal.z
-            };
+            Vector3 worldNormal = { (m00/sclx)*tryTri.normal.x + (m01/scly)*tryTri.normal.y + (m02/sclz)*tryTri.normal.z, (m10/sclx)*tryTri.normal.x + (m11/scly)*tryTri.normal.y + (m12/sclz)*tryTri.normal.z, (m20/sclx)*tryTri.normal.x + (m21/scly)*tryTri.normal.y + (m22/sclz)*tryTri.normal.z };
             worldNormal = V3_Normalize(worldNormal);
             result.hit              = true;
             result.point            = worldPoint;
@@ -6117,10 +6043,10 @@ ENGINE_TO_MOD RaycastHit CapsuleCast(Vector3 start, Vector3 end, float capsuleRa
 // ========================================================================================================================================================================================================================================================================================================
 // Shaders System
 #include "Shaders/shaders.h"
-static inline __attribute__((always_inline)) void LogShaderError(u32 s, const char* name) { char er[512]; glGetShaderInfoLog(s,512,NULL,er); DualLogError("%s Comp Fail: %s\n",name,er); OS_Exit(1); }
-static inline __attribute__((always_inline)) u32 CompileShader(u32 type, const char* source, const char* name) { u32 s = glCreateShader(type); glShaderSource(s,1,&source,NULL); glCompileShader(s); i32 ok; glGetShaderiv(s,0x8B81/*GL_COMPILE_STATUS*/,&ok); if (!ok) LogShaderError(s,name); return s; }
-static inline __attribute__((always_inline)) u32 LinkProgram(u32* s, i32 num, const char* name) { u32 p = glCreateProgram(); for (i32 i=0;i<num;++i) { glAttachShader(p,s[i]); } glLinkProgram(p); i32 ok; glGetProgramiv(p,0x8B82/*GL_LINK_STATUS*/,&ok); if (!ok) LogShaderError(p,name); return p; }
-u32 CompileAnyShader(const char* vsrc, const char* src, const char* name) { return (vsrc) ? LinkProgram((u32[]){CompileShader(0x8B31/*GL_VERTEX_SHADER*/,vsrc,name),CompileShader(0x8B30/*GL_FRAGMENT_SHADER*/,src,name)},2,name) : LinkProgram((u32[]){CompileShader(0x91B9/*GL_COMPUTE_SHADER*/,src,name)},1,name); }
+static inline __attribute__((always_inline)) void ShaderError(u32 s, const char* name) { char er[512]; glGetShaderInfoLog(s,512,NULL,er); DualLogError("%s Comp Fail: %s\n",name,er); OS_Exit(1); }
+static inline __attribute__((always_inline)) u32 CompileShader(u32 type, const char* source, const char* name) { u32 s = glCreateShader(type); glShaderSource(s,1,&source,NULL); glCompileShader(s); i32 ok; glGetShaderiv(s,0x8B81/*GL_COMPILE_STATUS*/,&ok); if (!ok) ShaderError(s,name); return s; }
+static inline __attribute__((always_inline)) u32 LinkProgram(u32* s, i32 num, const char* name) { u32 p = glCreateProgram(); for (i32 i=0;i<num;++i) { glAttachShader(p,s[i]); } glLinkProgram(p); i32 ok; glGetProgramiv(p,0x8B82/*GL_LINK_STATUS*/,&ok); if (!ok) ShaderError(p,name); return p; }
+u32 CompileAnyShader(const char* v, const char* s, const char* name) { return (v) ? LinkProgram((u32[]){CompileShader(0x8B31/*GL_VERTEX_SHADER*/,v,name),CompileShader(0x8B30/*GL_FRAGMENT_SHADER*/,s,name)},2,name) : LinkProgram((u32[]){CompileShader(0x91B9/*GL_COMPUTE_SHADER*/,s,name)},1,name); }
 void CompileShaders(void) {
     Sys_Render.depthPrepassShaderProgram= CompileAnyShader(depthPrepassVertSrc,depthPrepassFragSrc,"DPre"); // Depth Prepass
     Sys_Render.chunkShaderProgram       = CompileAnyShader(vertSrc,fragSrc,"Main");
@@ -6329,8 +6255,7 @@ InputElement inputElements[134] = {
     { "PRINT", KEY_PRINT_SCREEN }, { "JOY 18", JOYHAT_DOWN }, { "JOY 19", JOYHAT_LEFT },{ "UNUSED", 0 } //, {}
 };
 
-typedef enum { SETTING_U8, SETTING_U16, SETTING_INPUT } SettingType;
-typedef struct { const char* name; void* ptr; SettingType type; } Setting;
+typedef enum { SETTING_U8, SETTING_U16, SETTING_INPUT } SettingType; typedef struct { const char* name; void* ptr; SettingType type; } Setting;
 #define S_U8(n, v)  { n, &Sys_Settings.v, SETTING_U8 }
 #define S_U16(n, v) { n, &Sys_Settings.v, SETTING_U16 }
 #define S_IN(n, i)  { n, &Sys_Settings.InputCodeSettings[i], SETTING_INPUT }
@@ -6400,11 +6325,7 @@ static inline __attribute__((always_inline)) float GetScore(float stupid, bool i
     return vfloor(score);
 }
 
-static inline __attribute__((always_inline)) void DecomposeTime(double t, u32* h, u32* m, double* s) {
-    double tb = vfloor(t / 3600.0); *h = (u32)tb; t -= tb * 3600.0;
-    tb = vfloor(t / 60.0);          *m = (u32)tb; *s = t - tb * 60.0;
-}
-
+static inline __attribute__((always_inline)) void DecomposeTime(double t, u32* h, u32* m, double* s) { double tb = vfloor(t / 3600.0); *h = (u32)tb; t -= tb * 3600.0; tb = vfloor(t / 60.0); *m = (u32)tb; *s = t - tb * 60.0; }
 static inline __attribute__((always_inline)) void CreditsStats(void) {
     size_t off = 0;
     off += StringFormat(creditStats + off, sizeof(creditStats),"================================================================================\nCITADEL\n================================================================================\nCONGRATULATIONS %s\n",Sys_Global.playerName);
@@ -6461,10 +6382,7 @@ ENGINE_TO_MOD void AddCamView(Vector3 pos, Quaternion rot, u8 fov, u16 width, u1
     GenBTexture(&camViewTextures[camViewCount],GL_RGBA8,width,height,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/); camViewCount++;
 }
 
-void CenterWindowOnMonitor(void); void GatherResolutionModes(void);
-void ChangeResolution(void); void ChangeFullScreenWindowed(void); void SetVSync(void);
 void SetGI(void) { }// TODO: Set needed Voxel GI uniforms from Sys_Settings.GI
-void* mod_handle = NULL;
 void SetLanguage(void) { LoadTextForLanguage(Sys_Settings.Language); LoadLogTextForLanguage(Sys_Settings.Language); }
 void ApplySettings(void) { ChangeFullScreenWindowed(); SetSkyRotateSpeed(); SetVSync(); SetGI(); SetLanguage(); }
 void OpenMainMenu(void) { PlayMenuMusic(); Sys_Global.menuActive = true; currentMenuPage = Mpg_FrontPage; }
@@ -6545,7 +6463,6 @@ void CreateShadowBuffers(void) {
 }
 
 void ChangeMenuPage(u8 pg) { currentMenuPage = pg; currentMenuItem = currentMenuTab = 0; }
-void glfwSetWindowSize(GLFWwindow* handle, int width, int height); void CycleToNextMonitor(void);
 void RenderMenu(void) {    
     if (currentMenuPage != Mpg_IntroVideo && currentMenuPage != Mpg_CreditsVideo && currentMenuPage != Mpg_Options) RenderUIImage(-417,-384, 2200,1536, 1026); // Menu background
     if (currentMenuPage == Mpg_IntroVideo || currentMenuPage == Mpg_CreditsVideo) RenderUIImage(-417,-384, 2200,1536, 0); // Video blackground
@@ -6969,7 +6886,7 @@ static inline __attribute__((always_inline)) bool DetermineIfInstanceVisible(u16
     Vector3 delta = V3_AsubB(e->position,playerPos);
     *distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
     float radius = modelBounds[e->modelIndex] * 2.0f * vmax(vmax(e->scale.x,e->scale.y),e->scale.z);
-    if (!SphereInFrustum(playerFrustumPlanes,e->position,radius) && (entIdx != 754 || !skyVisible) && i != editModeSelection) return false;
+    //if (!SphereInFrustum(playerFrustumPlanes,e->position,radius) && (entIdx != 754 || !skyVisible) && i != editModeSelection) return false; // TEMPORARILY DISABLE FRUSTUM CULLING UNTIL I FIGURE OUT WHY THEY ARE FLICKERING NOW THAT PHYSICS ARE ACTIVE
     
     if (ConstIndexIsPortalBlockingDoor(entIdx)) { // Extra checks only needed for opaque portal blocking doors.
         bool inPVS = (gridCellStates[instCellIdx] & CELL_VISIBLE);
@@ -6992,7 +6909,7 @@ void DrawCapsuleCollider(Entity *e); void DrawConvexMeshCollider(Entity *e); voi
 #define BIND_TEX(slot,cur,next) if((cur)!=(next)||(next)==0){(cur)=(next);glUniform1ui(slot,(u32)(next));}
 #define DRAW_ENTITY(curN,curT,curG,curS,curM) \
     {u16 glow=e->glowIndex,norm=e->normIndex,spec=e->specIndex; \
-     if (e->collider == COLLIDER_TYPE_BOX) DrawBoxCollider(e); \
+          if (e->collider == COLLIDER_TYPE_BOX) DrawBoxCollider(e); \
      else if (e->collider == COLLIDER_TYPE_SPHERE) DrawSphereCollider(e); \
      else if (e->collider == COLLIDER_TYPE_CONVEXMESH) DrawMeshCollider(e); \
      else if (e->collider == COLLIDER_TYPE_MESH) DrawMeshCollider(e); \
@@ -7000,14 +6917,9 @@ void DrawCapsuleCollider(Entity *e); void DrawConvexMeshCollider(Entity *e); voi
      glUniform1ui(17,tex==316?1u:0u); glUniform1ui(25,constIndex); glUniform1f(27,e->volume); glUniform1ui(13,(tex==36||tex==887)?1u:0u); \
      if (grayscaleEnabled) { float npcHeat = ConstIndexIsNPC(constIndex) ? ((constIndex==419 || constIndex==422 || constIndex==424 || constIndex==429 || constIndex==430 || constIndex==431||constIndex==433||constIndex==437||constIndex==438||constIndex==441) ? 1.5f : 4.0f) : 0.0f; glUniform1f(9,npcHeat); } \
      glUniform1ui(30,e->camView < camViewCount ? 1u : 0u); \
-     if(e->camView < camViewCount) { \
-         glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D,camViewTextures[e->camView]); \
-         glUniform2ui(28,camViews[e->camView].width,camViews[e->camView].height);glUniform1i(29,6); \
-     } \
+     if(e->camView < camViewCount) { glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D,camViewTextures[e->camView]); glUniform2ui(28,camViews[e->camView].width,camViews[e->camView].height);glUniform1i(29,6); } \
      BIND_TEX(1,curN,norm) BIND_TEX(18,curT,tex) BIND_TEX(19,curG,glow) BIND_TEX(20,curS,spec) \
-     curM=GetAndBindModel(i,curM); \
-     u32 vc=modelTriangleCounts[curM]*3; \
-     glDrawElements(0x0004,vc,GL_UNSIGNED_SHORT,0);drawCalls++;vertsRendered+=vc;}
+     curM=GetAndBindModel(i,curM); u32 vc=modelTriangleCounts[curM]*3; glDrawElements(0x0004,vc,GL_UNSIGNED_SHORT,0);drawCalls++;vertsRendered+=vc;}
 
 bool mat4_inverse(const float* m, float* out) {
     float inv[16],det;
@@ -7228,7 +7140,6 @@ void UpdateInstanceMatrix4x4s(void) {
 }
 // ========================================================================================================================================================================================================================================================================================================
 // Level Load System
-FHandle levelFileHandle;
 ENGINE_TO_MOD void InitializeEntity(Entity* entry) { // Blank entity, no index yet, for initial list population or temporary Entity. memset here would be harmful as only a handful of fields are the same.
     entry->index = U16_MAX;               entry->entflags = ENTFLAG_ACTIVE; entry->kinematic = true;
     entry->layer = Layer_Default;         entry->camView = 255;             entry->rotation = QUAT_IDENTITY;
@@ -7239,6 +7150,7 @@ ENGINE_TO_MOD void InitializeEntity(Entity* entry) { // Blank entity, no index y
     entry->dynamicFriction = entry->staticFriction = 0.6f;    entry->frictionCombine = entry->bounceCombine = PHYS_COMBINE_AVG;
 }
 
+FHandle levelFileHandle;
 ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
     double start_time = get_time();
     DebugRAM("start of LoadLevel");
@@ -7315,6 +7227,7 @@ __attribute__((cold)) void NewGame(void) { // Reset World States
 void GoIntoGame(void) { NewGame(); PlayGameMusic(); DualLog("Player named \"%s\" started the game!\n", Sys_Global.playerName); }
 // ========================================================================================================================================================================================================================================================================================================
 // Init System
+void* mod_handle = NULL;
 void InitalizeEnvironment(void) {
     double game_start_time = get_time();
     random_range_rng = (u32)game_start_time; // Seed global rand uniquely with time since system boot.
@@ -7393,7 +7306,7 @@ void InitalizeEnvironment(void) {
     m[4] = 0.0f; m[5] = 1.0f; m[6] =                                           0.0f; m[7] =  0.0f;
     m[8] = 0.0f; m[9] = 0.0f; m[10]=      -(lightRangeMax + NEAR_PLANE) / viewRange; m[11]= -1.0f;
     m[12]= 0.0f; m[13]= 0.0f; m[14]= -2.0f * lightRangeMax * NEAR_PLANE / viewRange; m[15]=  0.0f;
-    InitAudio();
+    InitSCFTables(); InitAudio();
     char mod_path[256]; StringCopyInto_A_From_B(mod_path,"./",256); StringConcatenate(mod_path,global_dllname,256); StringConcatenate(mod_path,MOD_EXTENSION,256);
     mod_handle = OS_DlOpen(mod_path); if (!mod_handle) { DualLogError("Failed to load mod at:%s",mod_path); OS_Exit(1); }
     
@@ -7441,7 +7354,6 @@ void InitalizeEnvironment(void) {
 }
 // ========================================================================================================================================================================================================================================================================================================
 // Write the Code That Just Does the Thing(TM)
-void InputProcessing(void); void Physics(void);
 i32 main(void) {
     InitalizeEnvironment();
     while(1) {
@@ -7472,4 +7384,4 @@ i32 main(void) {
         #endif
     }
     return 0;
-}
+} // 7475

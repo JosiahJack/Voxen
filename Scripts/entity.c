@@ -330,9 +330,9 @@ MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(void) { // Global condition
     /*308 item_warecasing*/ EDefs[308].modelIndex=637; EDefs[308].texIndex=1251;  EDefs[308].mass=0.8f; EDefs[308].angularDrag=0.05f; EDefs[308].dynamicFriction=0.6f;  EDefs[308].staticFriction=0.6f;
     /*309 item_beaker*/     EDefs[309].modelIndex=14; EDefs[309].collider=COLLIDER_TYPE_CONVEXMESH;  EDefs[309].colliderMeshIndex=682;  EDefs[309].texIndex=36;  EDefs[309].specIndex=1242;  EDefs[309].mass=0.28f; EDefs[309].angularDrag=0.05f; EDefs[309].dynamicFriction=0.6f;  EDefs[309].staticFriction=0.6f;
     /*310 item_beverage*/   EDefs[310].modelIndex=18;  EDefs[310].collider=COLLIDER_TYPE_CONVEXMESH;  EDefs[310].colliderMeshIndex=683;  EDefs[310].texIndex=37;  EDefs[310].mass=0.12f; EDefs[310].angularDrag=0.05f; EDefs[310].dynamicFriction=0.6f;  EDefs[310].staticFriction=0.6f;
-    CopyMemoryFromBtoAForNBytes(EDefs[311].path,"item_skull",11); EDefs[311].modelIndex=593;  EDefs[311].mass=0.451f; EDefs[311].angularDrag=0.05f; EDefs[311].dynamicFriction=0.6f;  EDefs[311].staticFriction=0.6f;
-    CopyMemoryFromBtoAForNBytes(EDefs[312].path,"item_arm",9); EDefs[312].modelIndex=7;  EDefs[312].texIndex=28;  EDefs[312].collider=COLLIDER_TYPE_CONVEXMESH;  EDefs[312].colliderMeshIndex=678;  EDefs[312].mass=1.0f; EDefs[312].angularDrag=0.05f; EDefs[312].dynamicFriction=0.6f;  EDefs[312].staticFriction=0.6f;
-    CopyMemoryFromBtoAForNBytes(EDefs[313].path,"item_audiolog",14); EDefs[313].modelIndex=11;  EDefs[313].collider=COLLIDER_TYPE_CONVEXMESH;  EDefs[313].colliderMeshIndex=679;  EDefs[313].texIndex=52;  EDefs[313].glowIndex=80;  EDefs[313].mass=0.2f; EDefs[313].angularDrag=0.05f; EDefs[313].dynamicFriction=0.6f;  EDefs[313].staticFriction=0.6f;
+    /*311 item_skull*/ EDefs[311].modelIndex=593;  EDefs[311].mass=0.451f; EDefs[311].angularDrag=0.05f; EDefs[311].dynamicFriction=0.6f;  EDefs[311].staticFriction=0.6f;
+    /*312 item_arm*/ EDefs[312].modelIndex=7;  EDefs[312].texIndex=28;  EDefs[312].collider=COLLIDER_TYPE_CONVEXMESH;  EDefs[312].colliderMeshIndex=678;  EDefs[312].mass=1.0f; EDefs[312].angularDrag=0.05f; EDefs[312].dynamicFriction=0.6f;  EDefs[312].staticFriction=0.6f;
+    /*313 item_audiolog*/ EDefs[313].modelIndex=11;  EDefs[313].collider=COLLIDER_TYPE_CONVEXMESH;  EDefs[313].colliderMeshIndex=679;  EDefs[313].texIndex=52;  EDefs[313].glowIndex=80;  EDefs[313].mass=0.2f; EDefs[313].angularDrag=0.05f; EDefs[313].dynamicFriction=0.6f;  EDefs[313].staticFriction=0.6f;
     CopyMemoryFromBtoAForNBytes(EDefs[314].path,"weapon_grenadefrag",19); EDefs[314].modelIndex=182;  EDefs[314].mass=1.0f; EDefs[314].angularDrag=0.05f; EDefs[314].dynamicFriction=0.6f;  EDefs[314].staticFriction=0.6f;
     CopyMemoryFromBtoAForNBytes(EDefs[315].path,"weapon_grenadeconc",19); EDefs[315].modelIndex=165;  EDefs[315].mass=1.0f; EDefs[315].angularDrag=0.05f; EDefs[315].dynamicFriction=0.6f;  EDefs[315].staticFriction=0.6f;
     CopyMemoryFromBtoAForNBytes(EDefs[316].path,"weapon_grenadeemp",18); EDefs[316].modelIndex=168;  EDefs[316].mass=1.0f; EDefs[316].angularDrag=0.05f; EDefs[316].dynamicFriction=0.6f;  EDefs[316].staticFriction=0.6f;
@@ -368,27 +368,27 @@ MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(void) { // Global condition
     CopyMemoryFromBtoAForNBytes(EDefs[346].path,"weapon_flechette",17); EDefs[346].modelIndex=642;  EDefs[346].mass=0.4f; EDefs[346].angularDrag=0.05f; EDefs[346].dynamicFriction=0.6f;  EDefs[346].staticFriction=0.6f;
     CopyMemoryFromBtoAForNBytes(EDefs[347].path,"weapon_ionrifle",16); EDefs[347].modelIndex=643;  EDefs[347].mass=0.8f; EDefs[347].angularDrag=0.05f; EDefs[347].dynamicFriction=0.6f;  EDefs[347].staticFriction=0.6f;
     CopyMemoryFromBtoAForNBytes(EDefs[348].path,"weapon_rapier",14); EDefs[348].modelIndex=653;  EDefs[348].mass=0.3f;  EDefs[348].angularDrag=0.05f; EDefs[348].dynamicFriction=0.6f;  EDefs[348].staticFriction=0.6f;
-    CopyMemoryFromBtoAForNBytes(EDefs[349].path,"weapon_pipe",12); EDefs[349].modelIndex=649;  EDefs[349].texIndex=887;  EDefs[349].mass=0.85f; EDefs[349].angularDrag=0.05f;  EDefs[349].dynamicFriction=0.6f;  EDefs[349].staticFriction=0.6f;
-    CopyMemoryFromBtoAForNBytes(EDefs[350].path,"weapon_magnum",14); EDefs[350].modelIndex=644;  EDefs[350].mass=0.6f; EDefs[350].angularDrag=0.05f; EDefs[350].dynamicFriction=0.6f;  EDefs[350].staticFriction=0.6f;
-    CopyMemoryFromBtoAForNBytes(EDefs[351].path,"weapon_magpulse",16); EDefs[351].modelIndex=645;  EDefs[351].mass=0.65f; EDefs[351].angularDrag=0.05f; EDefs[351].dynamicFriction=0.6f;  EDefs[351].staticFriction=0.6f;
-    CopyMemoryFromBtoAForNBytes(EDefs[352].path,"weapon_pistol",14); EDefs[352].modelIndex=650;  EDefs[352].texIndex=878;  EDefs[352].mass=0.3f; EDefs[352].angularDrag=0.05f; EDefs[352].dynamicFriction=0.6f;  EDefs[352].staticFriction=0.6f;
-    CopyMemoryFromBtoAForNBytes(EDefs[353].path,"weapon_plasma",14); EDefs[353].modelIndex=651;  EDefs[353].mass=1.2f; EDefs[353].angularDrag=0.05f; EDefs[353].dynamicFriction=0.6f;  EDefs[353].staticFriction=0.6f;
-    CopyMemoryFromBtoAForNBytes(EDefs[354].path,"weapon_railgun",15); EDefs[354].modelIndex=652;  EDefs[354].mass=1.0f; EDefs[354].angularDrag=0.05f; EDefs[354].dynamicFriction=0.6f;  EDefs[354].staticFriction=0.6f;
-    CopyMemoryFromBtoAForNBytes(EDefs[355].path,"weapon_riotgun",15); EDefs[355].modelIndex=654;  EDefs[355].mass=0.55f; EDefs[355].angularDrag=0.05f; EDefs[355].dynamicFriction=0.6f;  EDefs[355].staticFriction=0.6f;
-    CopyMemoryFromBtoAForNBytes(EDefs[356].path,"weapon_skorpion",16); EDefs[356].modelIndex=655;  EDefs[356].mass=1.3f;  EDefs[356].angularDrag=0.05f; EDefs[356].dynamicFriction=0.6f;  EDefs[356].staticFriction=0.6f;
-    CopyMemoryFromBtoAForNBytes(EDefs[357].path,"weapon_sparqbeam",17); EDefs[357].modelIndex=656;  EDefs[357].mass=0.3f; EDefs[357].angularDrag=0.05f; EDefs[357].dynamicFriction=0.6f;  EDefs[357].staticFriction=0.6f;
-    CopyMemoryFromBtoAForNBytes(EDefs[358].path,"weapon_stungun",15); EDefs[358].modelIndex=657;  EDefs[358].mass=0.3f; EDefs[358].angularDrag=0.05f; EDefs[358].dynamicFriction=0.6f;  EDefs[358].staticFriction=0.6f;
-    CopyMemoryFromBtoAForNBytes(EDefs[359].path,"item_battery",13); EDefs[359].modelIndex=13;  EDefs[359].collider=COLLIDER_TYPE_CONVEXMESH;  EDefs[359].colliderMeshIndex=680;  EDefs[359].mass=0.3f; EDefs[359].angularDrag=0.05f;  EDefs[359].gravity=1.0f;  EDefs[359].kinematic=false;  EDefs[359].dynamicFriction=0.6f;  EDefs[359].staticFriction=0.6f;  EDefs[359].bounciness=0.0f;  EDefs[359].frictionCombine=PHYS_COMBINE_AVG;  EDefs[359].bounceCombine=PHYS_COMBINE_AVG; 
-    CopyMemoryFromBtoAForNBytes(EDefs[360].path,"item_battery_icad",18); EDefs[360].modelIndex=13;  EDefs[360].collider=COLLIDER_TYPE_CONVEXMESH;  EDefs[360].colliderMeshIndex=680;  EDefs[360].mass=0.35f;  EDefs[360].angularDrag=0.05f;  EDefs[360].gravity=1.0f;  EDefs[360].kinematic=false;  EDefs[360].dynamicFriction=0.6f;  EDefs[360].staticFriction=0.6f;  EDefs[360].bounciness=0.0f;  EDefs[360].frictionCombine=PHYS_COMBINE_AVG;  EDefs[360].bounceCombine=PHYS_COMBINE_AVG; 
+    /*weapon_pipe*/                EDefs[349].modelIndex=649;  EDefs[349].texIndex=887;  EDefs[349].mass=0.85f; EDefs[349].angularDrag=0.05f;  EDefs[349].dynamicFriction=0.6f;  EDefs[349].staticFriction=0.6f;
+    /*weapon_magnum*/              EDefs[350].modelIndex=644;  EDefs[350].mass=0.6f; EDefs[350].angularDrag=0.05f; EDefs[350].dynamicFriction=0.6f;  EDefs[350].staticFriction=0.6f;
+    /*weapon_magpulse*/            EDefs[351].modelIndex=645;  EDefs[351].mass=0.65f; EDefs[351].angularDrag=0.05f; EDefs[351].dynamicFriction=0.6f;  EDefs[351].staticFriction=0.6f;
+    /*weapon_pistol*/              EDefs[352].modelIndex=650;  EDefs[352].texIndex=878;  EDefs[352].mass=0.3f; EDefs[352].angularDrag=0.05f; EDefs[352].dynamicFriction=0.6f;  EDefs[352].staticFriction=0.6f;
+    /*weapon_plasma*/              EDefs[353].modelIndex=651;  EDefs[353].mass=1.2f; EDefs[353].angularDrag=0.05f; EDefs[353].dynamicFriction=0.6f;  EDefs[353].staticFriction=0.6f;
+    /*weapon_railgun*/             EDefs[354].modelIndex=652;  EDefs[354].mass=1.0f; EDefs[354].angularDrag=0.05f; EDefs[354].dynamicFriction=0.6f;  EDefs[354].staticFriction=0.6f;
+    /*weapon_riotgun*/             EDefs[355].modelIndex=654;  EDefs[355].mass=0.55f; EDefs[355].angularDrag=0.05f; EDefs[355].dynamicFriction=0.6f;  EDefs[355].staticFriction=0.6f;
+    /*weapon_skorpion*/            EDefs[356].modelIndex=655;  EDefs[356].mass=1.3f;  EDefs[356].angularDrag=0.05f; EDefs[356].dynamicFriction=0.6f;  EDefs[356].staticFriction=0.6f;
+    /*weapon_sparqbeam*/           EDefs[357].modelIndex=656;  EDefs[357].mass=0.3f; EDefs[357].angularDrag=0.05f; EDefs[357].dynamicFriction=0.6f;  EDefs[357].staticFriction=0.6f;
+    /*weapon_stungun*/             EDefs[358].modelIndex=657;  EDefs[358].mass=0.3f; EDefs[358].angularDrag=0.05f; EDefs[358].dynamicFriction=0.6f;  EDefs[358].staticFriction=0.6f;
+    /*item_battery*/               EDefs[359].modelIndex=13;  EDefs[359].collider=COLLIDER_TYPE_CONVEXMESH;  EDefs[359].colliderMeshIndex=680;  EDefs[359].mass=0.3f; EDefs[359].angularDrag=0.05f;  EDefs[359].gravity=1.0f;  EDefs[359].kinematic=false;  EDefs[359].dynamicFriction=0.6f;  EDefs[359].staticFriction=0.6f;  EDefs[359].bounciness=0.0f;  EDefs[359].frictionCombine=PHYS_COMBINE_AVG;  EDefs[359].bounceCombine=PHYS_COMBINE_AVG; 
+    /*item_battery_icad*/          EDefs[360].modelIndex=13;  EDefs[360].collider=COLLIDER_TYPE_CONVEXMESH;  EDefs[360].colliderMeshIndex=680;  EDefs[360].mass=0.35f;  EDefs[360].angularDrag=0.05f;  EDefs[360].gravity=1.0f;  EDefs[360].kinematic=false;  EDefs[360].dynamicFriction=0.6f;  EDefs[360].staticFriction=0.6f;  EDefs[360].bounciness=0.0f;  EDefs[360].frictionCombine=PHYS_COMBINE_AVG;  EDefs[360].bounceCombine=PHYS_COMBINE_AVG; 
     /*item_logic_probe*/           EDefs[361].modelIndex=217; EDefs[361].texIndex=427;  EDefs[361].mass=0.15f; EDefs[361].angularDrag=0.05f;  EDefs[361].gravity=1.0f;  EDefs[361].kinematic=false;  EDefs[361].dynamicFriction=0.6f;  EDefs[361].staticFriction=0.6f;  EDefs[361].bounciness=0.0f;  EDefs[361].frictionCombine=PHYS_COMBINE_AVG;  EDefs[361].bounceCombine=PHYS_COMBINE_AVG; 
     /*item_healthkit*/             EDefs[362].modelIndex=196; EDefs[362].collider=COLLIDER_TYPE_CONVEXMESH;  EDefs[362].colliderMeshIndex=688;  EDefs[362].mass=0.25f;  EDefs[362].angularDrag=0.05f;  EDefs[362].gravity=1.0f;  EDefs[362].kinematic=false;  EDefs[362].dynamicFriction=0.6f;  EDefs[362].staticFriction=0.6f;  EDefs[362].bounciness=0.0f;  EDefs[362].frictionCombine=PHYS_COMBINE_AVG;  EDefs[362].bounceCombine=PHYS_COMBINE_AVG; 
     /*item_plastique*/             EDefs[363].modelIndex=492; EDefs[363].mass=1.4f; EDefs[363].angularDrag=0.05f;  EDefs[363].gravity=1.0f;  EDefs[363].kinematic=false;  EDefs[363].dynamicFriction=0.6f;  EDefs[363].staticFriction=0.6f;  EDefs[363].bounciness=0.0f;
     /*item_chipset_interfacedemod*/EDefs[364].modelIndex=45;  EDefs[364].collider=COLLIDER_TYPE_BOX;  EDefs[364].colliderCenter=(Vector3){0.003744498f,0.0001704991f,0.03192701f};  EDefs[364].colliderSize=(Vector3){0.459303f,0.3412231f,0.06385402f};  EDefs[364].colliderMeshIndex=U16_MAX;  EDefs[364].mass=0.3f;  EDefs[364].angularDrag=0.05f;  EDefs[364].gravity=1.0f;  EDefs[364].kinematic=false;  EDefs[364].dynamicFriction=0.6f;  EDefs[364].staticFriction=0.6f;  EDefs[364].bounciness=0.0f;  EDefs[364].frictionCombine=PHYS_COMBINE_AVG;  EDefs[364].bounceCombine=PHYS_COMBINE_AVG; 
-    CopyMemoryFromBtoAForNBytes(EDefs[365].path,"item_flask",11); EDefs[365].modelIndex=145;  EDefs[365].collider=COLLIDER_TYPE_CONVEXMESH;  EDefs[365].colliderMeshIndex=685;  EDefs[365].texIndex=36;  EDefs[365].specIndex=1242;  EDefs[365].mass=0.22f;  EDefs[365].angularDrag=0.05f;  EDefs[365].gravity=1.0f;  EDefs[365].kinematic=false;  EDefs[365].dynamicFriction=0.6f;  EDefs[365].staticFriction=0.6f;  EDefs[365].bounciness=0.0f;  EDefs[365].frictionCombine=PHYS_COMBINE_AVG;  EDefs[365].bounceCombine=PHYS_COMBINE_AVG; 
-    CopyMemoryFromBtoAForNBytes(EDefs[366].path,"item_chipset_bitflag",21); EDefs[366].modelIndex=45;  EDefs[366].collider=COLLIDER_TYPE_BOX;  EDefs[366].colliderCenter=(Vector3){0.003744498f,0.0001704991f,0.03192701f};  EDefs[366].colliderSize=(Vector3){0.459303f,0.3412231f,0.06385402f};  EDefs[366].colliderMeshIndex=U16_MAX;  EDefs[366].mass=0.3f;  EDefs[366].angularDrag=0.05f;  EDefs[366].gravity=1.0f;  EDefs[366].kinematic=false;  EDefs[366].dynamicFriction=0.6f;  EDefs[366].staticFriction=0.6f;  EDefs[366].bounciness=0.0f;  EDefs[366].frictionCombine=PHYS_COMBINE_AVG;  EDefs[366].bounceCombine=PHYS_COMBINE_AVG; 
-    CopyMemoryFromBtoAForNBytes(EDefs[367].path,"item_ammo_rubber",17); EDefs[367].modelIndex=8; EDefs[367].collider=COLLIDER_TYPE_CONVEXMESH;  EDefs[367].colliderMeshIndex=676;  EDefs[367].mass=0.25f;  EDefs[367].angularDrag=0.05f;  EDefs[367].gravity=1.0f;  EDefs[367].kinematic=false;  EDefs[367].dynamicFriction=0.6f;  EDefs[367].staticFriction=0.6f;  EDefs[367].bounciness=0.0f;  EDefs[367].frictionCombine=PHYS_COMBINE_AVG;  EDefs[367].bounceCombine=PHYS_COMBINE_AVG; 
-    CopyMemoryFromBtoAForNBytes(EDefs[368].path,"item_isotopex22",16); EDefs[368].modelIndex=209;  EDefs[368].mass=1.2f;  EDefs[368].angularDrag=0.05f;  EDefs[368].gravity=1.0f;  EDefs[368].kinematic=false;  EDefs[368].dynamicFriction=0.6f;  EDefs[368].staticFriction=0.6f;
-    /*item_testtube*/ EDefs[369].modelIndex=622; EDefs[369].texIndex=36; EDefs[369].specIndex=1242; EDefs[369].collider=COLLIDER_TYPE_CONVEXMESH; EDefs[369].colliderMeshIndex=612; EDefs[369].mass=0.21f; EDefs[369].angularDrag=0.05f; EDefs[369].gravity=1.0f; EDefs[369].dynamicFriction=0.6f; EDefs[369].staticFriction=0.6f;
+    /*item_flask*/                 EDefs[365].modelIndex=145;  EDefs[365].collider=COLLIDER_TYPE_CONVEXMESH;  EDefs[365].colliderMeshIndex=685;  EDefs[365].texIndex=36;  EDefs[365].specIndex=1242;  EDefs[365].mass=0.22f;  EDefs[365].angularDrag=0.05f;  EDefs[365].gravity=1.0f;  EDefs[365].kinematic=false;  EDefs[365].dynamicFriction=0.6f;  EDefs[365].staticFriction=0.6f;  EDefs[365].bounciness=0.0f;  EDefs[365].frictionCombine=PHYS_COMBINE_AVG;  EDefs[365].bounceCombine=PHYS_COMBINE_AVG; 
+    /*item_chipset_bitflag*/       EDefs[366].modelIndex=45;  EDefs[366].collider=COLLIDER_TYPE_BOX;  EDefs[366].colliderCenter=(Vector3){0.003744498f,0.0001704991f,0.03192701f};  EDefs[366].colliderSize=(Vector3){0.459303f,0.3412231f,0.06385402f};  EDefs[366].colliderMeshIndex=U16_MAX;  EDefs[366].mass=0.3f;  EDefs[366].angularDrag=0.05f;  EDefs[366].gravity=1.0f;  EDefs[366].kinematic=false;  EDefs[366].dynamicFriction=0.6f;  EDefs[366].staticFriction=0.6f;  EDefs[366].bounciness=0.0f;  EDefs[366].frictionCombine=PHYS_COMBINE_AVG;  EDefs[366].bounceCombine=PHYS_COMBINE_AVG; 
+    /*item_ammo_rubber*/           EDefs[367].modelIndex=8; EDefs[367].collider=COLLIDER_TYPE_CONVEXMESH;  EDefs[367].colliderMeshIndex=676;  EDefs[367].mass=0.25f;  EDefs[367].angularDrag=0.05f;  EDefs[367].gravity=1.0f;  EDefs[367].kinematic=false;  EDefs[367].dynamicFriction=0.6f;  EDefs[367].staticFriction=0.6f;  EDefs[367].bounciness=0.0f;  EDefs[367].frictionCombine=PHYS_COMBINE_AVG;  EDefs[367].bounceCombine=PHYS_COMBINE_AVG; 
+    /*item_isotopex22*/            EDefs[368].modelIndex=209;  EDefs[368].mass=1.2f;  EDefs[368].angularDrag=0.05f;  EDefs[368].gravity=1.0f;  EDefs[368].kinematic=false;  EDefs[368].dynamicFriction=0.6f;  EDefs[368].staticFriction=0.6f;
+    /*item_testtube*/              EDefs[369].modelIndex=622; EDefs[369].texIndex=36; EDefs[369].specIndex=1242; EDefs[369].collider=COLLIDER_TYPE_CONVEXMESH; EDefs[369].colliderMeshIndex=612; EDefs[369].mass=0.21f; EDefs[369].angularDrag=0.05f; EDefs[369].gravity=1.0f; EDefs[369].dynamicFriction=0.6f; EDefs[369].staticFriction=0.6f;
     CopyMemoryFromBtoAForNBytes(EDefs[370].path,"weapon_grenadefrag_live",24); EDefs[370].modelIndex=182;  EDefs[370].mass=1.0f;   EDefs[370].angularDrag=0.05f;  EDefs[370].gravity=1.0f;  EDefs[370].kinematic=false;  EDefs[370].dynamicFriction=0.6f;  EDefs[370].staticFriction=0.6f;
     CopyMemoryFromBtoAForNBytes(EDefs[371].path,"item_chipset_isolinear",23); EDefs[371].modelIndex=46;  EDefs[371].collider=COLLIDER_TYPE_BOX;  EDefs[371].colliderCenter=(Vector3){-0.0009825006f,-0.0129465f,0.0148115f};  EDefs[371].colliderSize=(Vector3){0.223635f,0.4175691f,0.02912301f};  EDefs[371].colliderMeshIndex=U16_MAX;  EDefs[371].mass=0.26f;  EDefs[371].angularDrag=0.05f;  EDefs[371].gravity=1.0f;  EDefs[371].kinematic=false;  EDefs[371].dynamicFriction=0.6f;  EDefs[371].staticFriction=0.6f;  EDefs[371].bounciness=0.0f;  EDefs[371].frictionCombine=PHYS_COMBINE_AVG;  EDefs[371].bounceCombine=PHYS_COMBINE_AVG; 
     CopyMemoryFromBtoAForNBytes(EDefs[372].path,"weapon_grenadeconc_live",24); EDefs[372].modelIndex=165;  EDefs[372].mass=1.0f; EDefs[372].angularDrag=0.05f;  EDefs[372].gravity=1.0f;  EDefs[372].kinematic=false;  EDefs[372].dynamicFriction=0.6f;  EDefs[372].staticFriction=0.6f;
@@ -458,7 +458,7 @@ MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(void) { // Global condition
     /*434 npc_humanoid_mutant*/     EDefs[434].modelIndex=323; EDefs[434].texIndex=563; EDefs[434].numclips=6;  EDefs[434].animationNum=2;                                            EDefs[434].colliderSize.x=0.38f; EDefs[434].colliderSize.y=2.00f; EDefs[434].mass=1.4f; EDefs[434].angularDrag=2.0f;
     /*435 npc_invisomut*/           EDefs[435].modelIndex=324; EDefs[435].texIndex=565; EDefs[435].numclips=5;  EDefs[435].animationNum=33; EDefs[435].colliderCenter.y=-0.28938290f; EDefs[435].colliderSize=(Vector3){1.5f,1.078766f,0.8f};           EDefs[435].mass=1.3f; EDefs[435].angularDrag=0.8f; EDefs[435].collider=COLLIDER_TYPE_BOX;
     /*436 npc_virus_mutant*/        EDefs[436].modelIndex=330; EDefs[436].texIndex=576; EDefs[436].numclips=6;  EDefs[436].animationNum=41; EDefs[436].colliderCenter.y=-0.05f;       EDefs[436].colliderSize.x=0.40f; EDefs[436].colliderSize.y=1.90f; EDefs[436].mass=1.4f; EDefs[436].angularDrag=2.0f;
-    /*437 npc_servbot*/             EDefs[437].modelIndex=5153;EDefs[437].texIndex=575; EDefs[437].numclips=5;  EDefs[437].animationNum=40; EDefs[437].colliderMeshIndex=5153; EDefs[437].mass=2.50f; EDefs[437].angularDrag=1.0f; EDefs[437].collider=COLLIDER_TYPE_MESH;
+    /*437 npc_servbot*/             EDefs[437].modelIndex=5153;EDefs[437].texIndex=575; EDefs[437].numclips=5;  EDefs[437].animationNum=40; EDefs[437].colliderMeshIndex=54; EDefs[437].mass=2.50f; EDefs[437].angularDrag=1.0f; EDefs[437].collider=COLLIDER_TYPE_CONVEXMESH;
     /*438 npc_flier_bot*/           EDefs[438].modelIndex=318; EDefs[438].texIndex=558; EDefs[438].numclips=5;  EDefs[438].animationNum=30; EDefs[438].mass=1.75f; EDefs[438].angularDrag=0.8f;
     /*439 npc_zerog_mutant*/        EDefs[439].modelIndex=395; EDefs[439].texIndex=1170;EDefs[439].numclips=3;  EDefs[439].animationNum=42; EDefs[439].mass=1.30f; EDefs[439].angularDrag=1.0f;
     /*440 npc_gorilla_tiger_mutant*/EDefs[440].modelIndex=320; EDefs[440].texIndex=560; EDefs[440].numclips=7;  EDefs[440].animationNum=31; EDefs[440].mass=2.00f;
@@ -746,26 +746,26 @@ MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(void) { // Global condition
     CopyMemoryFromBtoAForNBytes(EDefs[718].path,"ef_fragexplosion",17);
     CopyMemoryFromBtoAForNBytes(EDefs[719].path,"ef_line_sparqbeam",18);
     CopyMemoryFromBtoAForNBytes(EDefs[720].path,"ef_mist",8);
-    CopyMemoryFromBtoAForNBytes(EDefs[721].path,"ef_particle_bloodspurtsmall",28);
-    CopyMemoryFromBtoAForNBytes(EDefs[722].path,"ef_particle_bloodspurtsmallgreen",33);
-    CopyMemoryFromBtoAForNBytes(EDefs[723].path,"ef_particle_bloodspurtsmallyellow",34);
-    CopyMemoryFromBtoAForNBytes(EDefs[724].path,"ef_particle_bloodspurttiny",27);
-    CopyMemoryFromBtoAForNBytes(EDefs[725].path,"ef_particle_camerahit",22);
-    CopyMemoryFromBtoAForNBytes(EDefs[726].path,"ef_particle_darthit",20);
-    CopyMemoryFromBtoAForNBytes(EDefs[727].path,"ef_particle_sec2muzburst",25);
-    CopyMemoryFromBtoAForNBytes(EDefs[728].path,"ef_particle_sec2rotmuzburst",28);
-    CopyMemoryFromBtoAForNBytes(EDefs[729].path,"ef_particle_sparksmall",23);
-    CopyMemoryFromBtoAForNBytes(EDefs[730].path,"ef_particle_sparksmallblue",27);
-    CopyMemoryFromBtoAForNBytes(EDefs[731].path,"ef_particle_sparqhit",21);
-    CopyMemoryFromBtoAForNBytes(EDefs[732].path,"ef_sparkspits",14);
-    CopyMemoryFromBtoAForNBytes(EDefs[733].path,"ef_spraydrips",14);
-    CopyMemoryFromBtoAForNBytes(EDefs[734].path,"ef_steam",9);
-    CopyMemoryFromBtoAForNBytes(EDefs[735].path,"env_sparksmall",15);
-    CopyMemoryFromBtoAForNBytes(EDefs[736].path,"TargetIDInstance",17);
-    CopyMemoryFromBtoAForNBytes(EDefs[737].path,"prop_papers01",14); EDefs[737].modelIndex=484;  EDefs[737].texIndex=580; 
-    CopyMemoryFromBtoAForNBytes(EDefs[738].path,"prop_papers02",14); EDefs[738].modelIndex=485;  EDefs[738].texIndex=580; 
-    CopyMemoryFromBtoAForNBytes(EDefs[739].path,"ef_particle_blasterhit",23);
-    CopyMemoryFromBtoAForNBytes(EDefs[740].path,"ef_particle_ionhit",19);
+    /*721 ef_particle_bloodspurtsmall*/
+    /*722 ef_particle_bloodspurtsmallgreen*/
+    /*723 ef_particle_bloodspurtsmallyellow*/
+    /*724 ef_particle_bloodspurttiny*/
+    /*725 ef_particle_camerahit*/
+    /*726 ef_particle_darthit*/
+    /*727 ef_particle_sec2muzburst*/
+    /*728 ef_particle_sec2rotmuzburst*/
+    /*729 ef_particle_sparksmall*/
+    /*730 ef_particle_sparksmallblue*/
+    /*731 ef_particle_sparqhit*/
+    /*732 ef_sparkspits*/
+    /*733 ef_spraydrips*/
+    /*734 ef_steam*/
+    /*735 env_sparksmall*/
+    /*736 TargetIDInstance*/
+    /*737 prop_papers01*/ EDefs[737].modelIndex=484;  EDefs[737].texIndex=580; 
+    /*738 prop_papers02*/ EDefs[738].modelIndex=485;  EDefs[738].texIndex=580; 
+    /*739 ef_particle_blasterhit*/
+    /*740 ef_particle_ionhit*/
     /*741 us_puz_panel_blue_wire*/       EDefs[741].modelIndex=0;  EDefs[741].texIndex=604;  EDefs[741].numclips=3;  EDefs[741].animationNum=43; 
     /*742 us_puz_panel_brown_wire*/      EDefs[742].modelIndex=0;  EDefs[742].texIndex=631;  EDefs[742].numclips=3;  EDefs[742].animationNum=43; 
     /*743 us_puz_panel_gray_wire*/       EDefs[743].modelIndex=0;  EDefs[743].texIndex=634;  EDefs[743].numclips=3;  EDefs[743].animationNum=43; 
@@ -773,18 +773,25 @@ MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(void) { // Global condition
     /*745 us_puz_panel_teal_wire*/       EDefs[745].modelIndex=0;  EDefs[745].texIndex=601;  EDefs[745].numclips=3;  EDefs[745].animationNum=43; 
     /*746 weapon_grenadeenergmine_live*/ EDefs[746].modelIndex=169;  EDefs[746].texIndex=852; 
     /*747 decal_logo_storage*/           EDefs[747].modelIndex=77;  EDefs[747].texIndex=169;  EDefs[747].shadows=false; 
-    CopyMemoryFromBtoAForNBytes(EDefs[748].path,"748 light_animated",15);
-    CopyMemoryFromBtoAForNBytes(EDefs[749].path,"749 generic_transform",18);
-    CopyMemoryFromBtoAForNBytes(EDefs[750].path,"750 chunk_crate_impenetrable2",26); EDefs[750].modelIndex=61;  EDefs[750].texIndex=147; 
-    CopyMemoryFromBtoAForNBytes(EDefs[751].path,"751 chunk_crate_impenetrable3",26); EDefs[751].modelIndex=61;  EDefs[751].texIndex=148; 
-    CopyMemoryFromBtoAForNBytes(EDefs[752].path,"752 chunk_crate_impenetrable4",26); EDefs[752].modelIndex=61;  EDefs[752].texIndex=149; 
-    CopyMemoryFromBtoAForNBytes(EDefs[753].path,"753 npc_sec3_bot",13); EDefs[753].modelIndex=681;  EDefs[753].texIndex=553; 
-    CopyMemoryFromBtoAForNBytes(EDefs[754].path,"754 prop_shieldgenerator",21); EDefs[754].modelIndex=143;  EDefs[754].texIndex=316; 
-
-    CopyMemoryFromBtoAForNBytes(EDefs[756].path,"756 ef_particle_leafburst",22);
-    CopyMemoryFromBtoAForNBytes(EDefs[757].path,"757 ef_particle_mutationburst",26);
-    CopyMemoryFromBtoAForNBytes(EDefs[758].path,"758 ef_particle_graytationburst",28);
-
+    /*748 light_animated*/
+    /*749 generic_transform*/
+    /*750 chunk_crate_impenetrable2*/    EDefs[750].modelIndex=61;  EDefs[750].texIndex=147; 
+    /*751 chunk_crate_impenetrable3*/    EDefs[751].modelIndex=61;  EDefs[751].texIndex=148; 
+    /*752 chunk_crate_impenetrable4*/    EDefs[752].modelIndex=61;  EDefs[752].texIndex=149; 
+    /*753 npc_sec3_bot*/                 EDefs[753].modelIndex=681;  EDefs[753].texIndex=553; 
+    /*754 prop_shieldgenerator*/         EDefs[754].modelIndex=143;  EDefs[754].texIndex=316; 
+    /*755 unused*/
+    /*756 ef_particle_leafburst*/
+    /*757 ef_particle_mutationburst*/
+    /*758 ef_particle_graytationburst*/
+    /*759 unused*/
+    /*760 unused*/
+    /*761 unused*/
+    /*762 unused*/
+    /*763 unused*/
+    /*764 unused*/
+    /*765 unused*/
+    /*766 unused*/
     /*767 player*/
     for (i32 i = 0; i < MAX_ENTITIES; i++) {
         if (EDefs[i].index == U16_MAX) continue;
@@ -810,7 +817,7 @@ u16 AddInstance(u16 entIdx, Vector3 pos) {
     u16 i = Eng_Global->loadedInstances;
     Entity* e = &Eng_Global->instances[i];
     e->index = entIdx;
-    e->position = pos;
+    e->position = pos; Eng_Global->dirtyInstances[i] = true;
     if (ConstIndexIsNPC(entIdx)) InitializeAIAfterLoad(i);
     e->cardchunk = EDefs[entIdx].cardchunk;
     e->modelIndex = EDefs[entIdx].modelIndex;
@@ -828,7 +835,6 @@ u16 AddInstance(u16 entIdx, Vector3 pos) {
     e->collider = EDefs[entIdx].collider; e->colliderCenter = EDefs[entIdx].colliderCenter; e->colliderSize = EDefs[entIdx].colliderSize;
     e->mass = EDefs[entIdx].mass > 0.0f ? EDefs[entIdx].mass : 1.0f; e->angularDrag = EDefs[entIdx].angularDrag > 0.0f ? EDefs[entIdx].angularDrag : 0.05f;    
     Eng_Global->instances[i].lockedMessageLingdex = EDefs[entIdx].lockedMessageLingdex;
-    Eng_Global->dirtyInstances[i] = true;
     Eng_Global->loadedInstances++;
     return i;
 }

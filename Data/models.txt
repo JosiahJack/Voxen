@@ -12,6 +12,8 @@
 // All other systems reference what model to use by index (e.g. entity 
 // definition for a pickup item will specify model by index)
 // example: index: 451
+//
+// For Blender .obj export use -Y Forward, Z Up, and check: Write Normals, Include UVs, Keep Vertex Order, Scale 1.00, and for animated meshes check Animation. 
 #Models/access_card.obj
 index: 0
 #Models/a_hornet.obj
@@ -120,7 +122,8 @@ index: 51
 index: 52
 #Models/corpse_eaten.obj
 index: 53
-
+#Models/npc_servbot_collider.obj
+index: 54
 #Models/corpse_labcoat.obj
 index: 55
 #Models/corpse_security.obj
