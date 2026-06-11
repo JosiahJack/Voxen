@@ -217,4 +217,4 @@ void TakeEnergy(float drain);
 void GiveEnergy(float give, EnergyType type);
 void BioMonitorInit(void);
 void BioMonitorUpdate(u16 p);
-void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n); // memcpy replacement
+void* MemCpyFromBtoAForNBytes(void *dst, const void *src, size_t n); // memcpy replacement

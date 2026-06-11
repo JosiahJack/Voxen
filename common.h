@@ -241,12 +241,12 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define PHYS_COMBINE_MIN 1
 #define PHYS_COMBINE_MUL 2
 #define PHYS_COMBINE_MAX 3
-#define COLLIDER_TYPE_NONE 0
-#define COLLIDER_TYPE_BOX 1
-#define COLLIDER_TYPE_SPHERE 2
-#define COLLIDER_TYPE_CAPSULE 3
-#define COLLIDER_TYPE_CONVEXMESH 4
-#define COLLIDER_TYPE_MESH 5
+#define COLTYPE_NONE 0
+#define COLTYPE_BOX 1
+#define COLTYPE_SPH 2
+#define COLTYPE_CAP 3
+#define COLTYPE_CVX 4
+#define COLTYPE_MSH 5
 #define COLLIDER_CAPSULE_DIRECTION_X_F 0.0f // X-Axis
 #define COLLIDER_CAPSULE_DIRECTION_Y_F 1.0f // Y-Axis
 #define COLLIDER_CAPSULE_DIRECTION_Z_F 2.0f // Z-Axis
@@ -512,6 +512,8 @@ typedef /*FAT*/ struct  {
     u32 layer;
     Vector3 velocity,angularVelocity,lastPosition;
     float gravity;
+    float inertiaTensor[6];
+    bool  inertiaTensorValid;
     
     Vector3 colliderCenter; // Offset relative to .position's global worldspace xyz location
     Vector3 colliderSize; // x,y,z for Box, x for Sphere radius, else x, y, z for Capsule radius, height, and direction (0.0f = X-Axis, 1.0f = Y-Axis, 2.0f = Z-Axis respectively, default 1.0f)
@@ -613,7 +615,6 @@ typedef struct {
     bool (*GetKeyPressed)(i32 settingIndex);
     InventorySystem invP1,invP2;
     Entity instances[INSTANCE_COUNT];
-    u8 dirtyInstances[INSTANCE_COUNT];
     Color fogColor;
 	char global_dllname[256],global_winicon[256],playerName[27];
     char audiologNames[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH],audiologSubjects[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH],audiologSenders[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH],audioLogSpeech2Text[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];

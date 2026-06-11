@@ -947,12 +947,12 @@ void FuncWallInitAfterLoad(u16 self) {
     else if (e->funcState == FuncStates_AjarMovingStart) tempVec = V3_ScaleByF(tempVec,distTotal * (1.0f - e->percentAjar));
     else if (e->funcState == FuncStates_MovingStart) tempVec = V3_ScaleByF(tempVec,distTotal * (1.0f - e->percentMoved));
     else tempVec = V3_ScaleByF(tempVec,distTotal * e->percentMoved);
-    e->position = V3_AplusB(e->position,tempVec);
+    
+    SetPosition(e,V3_AplusB(e->position,tempVec),true); // Force it like a teleport
 }
 
 void FuncWallMoveStart(u16 self) { Eng_Global->instances[self].funcState = FuncStates_MovingStart; Eng_Global->instances[self].tickFinished = Eng_Global->pauseRelativeTime + 10.0f; }
 void FuncWallMoveTarget(u16 self) { Eng_Global->instances[self].funcState = FuncStates_MovingTarget; Eng_Global->instances[self].tickFinished = Eng_Global->pauseRelativeTime + 10.0f; }
-
 void FuncWallTargetted(u16 self, u16 activator, const char* argvalue) {
     (void)activator; (void)argvalue;
     Entity* e = &Eng_Global->instances[self];
@@ -965,21 +965,21 @@ void FuncWallUpdate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     Vector3 goal = e->funcState == FuncStates_MovingStart ? e->startPosition : e->targetPosition;
     FuncStates doneState = e->funcState == FuncStates_MovingStart ? FuncStates_Start : FuncStates_Target;
-    if (e->funcState == FuncStates_Start) { e->position = e->startPosition; e->velocity = (Vector3){0.0f,0.0f,0.0f}; e->percentMoved = 0.0f; return; }
-    if (e->funcState == FuncStates_Target) { e->position = e->targetPosition; e->velocity = (Vector3){0.0f,0.0f,0.0f}; e->percentMoved = 1.0f; return; }
+    if (e->funcState == FuncStates_Start) { SetPosition(e,e->startPosition,true); e->velocity = (Vector3){0.0f,0.0f,0.0f}; e->percentMoved = 0.0f; return; }
+    if (e->funcState == FuncStates_Target) { SetPosition(e,e->targetPosition,true); e->velocity = (Vector3){0.0f,0.0f,0.0f}; e->percentMoved = 1.0f; return; }
     if (e->funcState != FuncStates_MovingStart && e->funcState != FuncStates_MovingTarget) return;
     Vector3 delta = V3_AsubB(goal,e->position);
     float distanceLeft = V3_Mag(delta);
     float total = V3_Dist(e->startPosition,e->targetPosition);
     float dist = e->speed * (float)Eng_Global->deltaTime;
     if (distanceLeft <= dist || e->tickFinished < Eng_Global->pauseRelativeTime) {
-        e->position = goal;
+        SetPosition(e,goal,true);
         e->funcState = doneState;
         e->percentMoved = doneState == FuncStates_Target ? 1.0f : 0.0f;
         e->velocity = (Vector3){0.0f,0.0f,0.0f};
         return;
     }
-    if (distanceLeft > 0.0001f) e->position = V3_AplusB(e->position,V3_ScaleByF(V3_Normalize(delta),dist));
+    if (distanceLeft > 0.0001f) SetPosition(e,V3_AplusB(e->position,V3_ScaleByF(V3_Normalize(delta),dist)),true);
     if (total > 0.0001f) e->percentMoved = V3_Dist(e->startPosition,e->position) / total;
 }
 //=============================================================================
@@ -992,7 +992,7 @@ void func_forcebridge(u16 self) {
     if (e->activatedScale.x <= 0.02f) e->activatedScale.x = 2.56f;
     if (e->activatedScale.y <= 0.02f) e->activatedScale.y = 0.08f;
     if (e->activatedScale.z <= 0.02f) e->activatedScale.z = 2.56f;
-    if (!e->active) { e->modelIndex = MODEL_IDX_MAX; e->collider = COLLIDER_TYPE_NONE; }
+    if (!e->active) { e->modelIndex = MODEL_IDX_MAX; e->collider = COLTYPE_NONE; }
     switch (e->fieldColor) {
         case ForceFieldColor_Red:      e->texIndex = 38; break;
         case ForceFieldColor_Green:    e->texIndex = 40; break;
@@ -1007,7 +1007,7 @@ void ForceBridgeActivate(u16 self, bool isSilent) {
     if (e->active) return;
     
     if (!isSilent) play_wav(sounds[102],1.0f,e->position,true);
-    e->modelIndex = 78; e->collider = COLLIDER_TYPE_BOX;
+    e->modelIndex = 78; e->collider = COLTYPE_BOX;
     e->active = e->lerping = true;
     e->scale = (Vector3){ e->forceFieldDirectionX ? 0.1f : e->activatedScale.x, e->forceFieldDirectionY ? 0.1f : e->activatedScale.y, e->forceFieldDirectionZ ? 0.1f : e->activatedScale.z };
 }
@@ -1018,7 +1018,7 @@ void ForceBridgeDeactivate(u16 self, bool isSilent) {
     
     if (!isSilent) play_wav(sounds[102],1.0f,e->position,true);
     e->active = false; e->lerping = true;
-    e->modelIndex = MODEL_IDX_MAX; e->collider = COLLIDER_TYPE_NONE;
+    e->modelIndex = MODEL_IDX_MAX; e->collider = COLTYPE_NONE;
 }
 
 void ForceBridgeToggle(u16 self) {
@@ -1042,7 +1042,7 @@ void ForceBridgeUpdate(u16 self) {
         float sy = e->forceFieldDirectionY ? lerp(e->scale.y,0.0f,e->tickTime * 2.0f) : e->scale.y;
         float sz = e->forceFieldDirectionZ ? lerp(e->scale.z,0.0f,e->tickTime * 2.0f) : e->scale.z;
         e->scale = (Vector3){sx,sy,sz};
-        if (sx < 0.08f || sy < 0.08f || sz < 0.08f) { flag_set(&e->entflags,ENTFLAG_ACTIVE,false); e->collider = COLLIDER_TYPE_NONE; e->lerping = false; }
+        if (sx < 0.08f || sy < 0.08f || sz < 0.08f) { flag_set(&e->entflags,ENTFLAG_ACTIVE,false); e->collider = COLTYPE_NONE; e->lerping = false; }
     }
 }
 
@@ -1814,29 +1814,20 @@ void TargetIDUpdate(u16 self) {
     if (!(e->entflags & ENTFLAG_ACTIVE)) return;
 
     // Deactivation checks
-    if (e->enemy == NULLENT)                                          { TargetIDDeactivate(self); return; }
+    if (e->enemy == NULLENT) { TargetIDDeactivate(self); return; }
     Entity* npc = &Eng_Global->instances[e->enemy];
-    if (npc->health <= 0.0f)                                           { TargetIDDeactivate(self); return; }
-    if (V3_Dist(e->position,Eng_Global->instances[PLAYER1].position)
-        > TARGETID_LINK_DIST)                                          { TargetIDDeactivate(self); return; }
-    if (e->tickFinished < Eng_Global->pauseRelativeTime)               { TargetIDDeactivate(self); return; }
+    if (npc->health <= 0.0f) { TargetIDDeactivate(self); return; }
+    if (V3_Dist(e->position,Eng_Global->instances[PLAYER1].position) > TARGETID_LINK_DIST) { TargetIDDeactivate(self); return; }
+    if (e->tickFinished < Eng_Global->pauseRelativeTime) { TargetIDDeactivate(self); return; }
 
-    // Track parent NPC position
-    e->position = npc->position;
-
-    // Stunned state
+    SetPosition(e,npc->position,true); // Track parent NPC position
     bool stunned = npc->tranquilizeFinished > Eng_Global->pauseRelativeTime;
     flag_set(&e->entflags,ENTFLAG_ASLEEP,stunned);
-
-    // Damage text expiry / stunned override
     if (e->textIndex >= 0) {
-        if (stunned && e->animSwapFinished < Eng_Global->pauseRelativeTime) {
-            e->textIndex = 536; // STUNNED
-        } else if (e->animSwapFinished < Eng_Global->pauseRelativeTime) {
+        if (stunned && e->animSwapFinished < Eng_Global->pauseRelativeTime) e->textIndex = 536; // STUNNED
+        else if (e->animSwapFinished < Eng_Global->pauseRelativeTime) {
             e->textIndex = -1;
-            if (!(Eng_Global->invP1.hasHardware & HW_TID)) {
-                TargetIDDeactivate(self); return;
-            }
+            if (!(Eng_Global->invP1.hasHardware & HW_TID)) { TargetIDDeactivate(self); return; }
         }
     }
 
@@ -2146,7 +2137,7 @@ static void TeleportAway(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->entflags & ENTFLAG_TELEPORT_ON_DEATH) return; // already done, flag reused as teleportDone
     flag_set(&e->entflags,ENTFLAG_TELEPORT_ON_DEATH,true);
-    e->collider        = COLLIDER_TYPE_NONE;
+    e->collider        = COLTYPE_NONE;
     e->gravity         = 0.0f;
     e->velocity        = (Vector3){0,0,0};
     e->angularVelocity = (Vector3){0,0,0};
@@ -2174,7 +2165,7 @@ static void CreateDeathEffects(u16 self,u16 fxPoolType) {
     Entity* e = &Eng_Global->instances[self];
     Vector3 pos = e->position;
     // Use collider center offset if present
-    if (e->collider != COLLIDER_TYPE_NONE) {
+    if (e->collider != COLTYPE_NONE) {
         pos = V3_AplusB(pos,e->colliderCenter);
     }
     // TODO: SpawnEffectFromPool(fxPoolType, pos)
@@ -2205,10 +2196,10 @@ static void ObjectDeath(u16 self) {
         // Gib path
         CreateDeathEffects(self,e->deathBurst);
         DropSearchables(self);
-        if (e->index != 279) e->collider = COLLIDER_TYPE_NONE;
+        if (e->index != 279) e->collider = COLTYPE_NONE;
         HideSelf(self);
     } else {
-        e->collider = COLLIDER_TYPE_NONE;
+        e->collider = COLTYPE_NONE;
         DropSearchables(self);
         CreateDeathEffects(self,e->deathBurst);
     }
@@ -2260,7 +2251,7 @@ static void Death(u16 self,bool energyVaporized) {
     bool isGrenade  = (e->entflags & ENTFLAG_ISGRENADE) != 0;
     bool isCam      = (e->index == 477);
     bool doTeleport = (e->entflags & ENTFLAG_TELEPORT_ON_DEATH) != 0; // REQUIRE_RESET reused as teleportOnDeath
-    if (e->iceActive) e->collider = COLLIDER_TYPE_NONE;
+    if (e->iceActive) e->collider = COLTYPE_NONE;
     if (vaporize && !isCam && !isGrenade) VaporizeCorpse(self,energyVaporized);
     else if (isObj)    ObjectDeath(self);
     else if (isScreen) ScreenDeath(self);
@@ -3559,7 +3550,7 @@ MOD_TO_ENGINE void PlayerInit(u16 i) {
     Eng_Global->instances[i].scale = (Vector3){1.0f,1.0f,1.0f};
     Eng_Global->instances[i].rotation = (Quaternion){0.0f,0.7071f,0.0f,0.7071f}; // 90deg rotation CW about Y axis as viewed from the top looking down onto player
     Eng_Global->instances[i].entflags = ENTFLAG_ACTIVE|ENTFLAG_RIGIDBODY;
-    Eng_Global->instances[i].collider = COLLIDER_TYPE_CAPSULE;
+    Eng_Global->instances[i].collider = COLTYPE_CAP;
     Eng_Global->instances[i].colliderCenter.y = -0.84f;
     Eng_Global->instances[i].colliderSize = (Vector3){0.48f,2.0f,1.0f}; // Radius, Overall height including end radii (Unity convention, blech), Direction, 1.0 == Y-Axis
     Eng_Global->instances[i].mass = 1.0f;

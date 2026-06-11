@@ -140,8 +140,8 @@ static inline __attribute__((always_inline)) void* OS_Alloc(size_t amount) { ret
 static inline __attribute__((always_inline)) void* OS_Calloc(size_t amount, size_t count) { return OS_AllocateRAM(NULL,amount * count,0x1|0x2,0x02|0x20,INVALID_FHANDLE); }
 static inline __attribute__((always_inline)) void OS_Write(FHandle f,const void* buf, size_t s, const char* p) { size_t total=0; while(total < s) { i64 w=OS_RawWrite(f,(const char*)buf + total,s - total); if(w < 0) { DualLogError("Write error to %s: %s[%d]\n",p,w,(i32)-w); OS_Exit(1); } total += (size_t)w; } }
 static inline __attribute__((always_inline)) void* OS_OpenAndAllocateFileBufferReadonly(const char* p,FHandle* f,int* s){void* r;return((*f=OS_OpenReadonly(p))==(FHandle)-1)?*s=0,(void*)0:((*s=OS_FileSize(*f))<=0)?DualLogError("Skipping empty:%s\n",p),OS_Close(*f),OS_Exit(1),NULL:(r=OS_AllocateFileBackedRAMReadonly(*s,*f,(char*)p))?(OS_Close(*f),r):NULL;}
-void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n) { unsigned char *d=(unsigned char *)dst; const unsigned char *s=(const unsigned char *)src; while (n--) {*d++=*s++;} return dst; } // memcpy replacement
-static inline __attribute__((always_inline)) void* OS_Realloc(void* old, size_t olds, size_t news) { void* n; return !old ? OS_Alloc(news) : news <= olds ? old : (n=OS_Alloc(news)) ? (CopyMemoryFromBtoAForNBytes(n,old,olds),OS_DeallocateRAM(old,olds),n) : 0; }
+void* MemCpyFromBtoAForNBytes(void *dst, const void *src, size_t n) { unsigned char *d=(unsigned char *)dst; const unsigned char *s=(const unsigned char *)src; while (n--) {*d++=*s++;} return dst; } // memcpy replacement
+static inline __attribute__((always_inline)) void* OS_Realloc(void* old, size_t olds, size_t news) { void* n; return !old ? OS_Alloc(news) : news <= olds ? old : (n=OS_Alloc(news)) ? (MemCpyFromBtoAForNBytes(n,old,olds),OS_DeallocateRAM(old,olds),n) : 0; }
 // ========================================================================================================================================================================================================================================================================================================
 // GL Definitions
 enum { GL_ARRAY_BUFFER=0x8892,      GL_DEPTH_BUFFER_BIT=0x00000100, GL_READ_WRITE=0x88BA, GL_SSBO=0x90D2,                 GL_CULL_FACE=0x0B44,                          
@@ -578,7 +578,7 @@ static void scycle(size_t w, unsigned char* ar[], int n) {
     unsigned char tmp[256]; size_t l;
     if (n<2) return;
     ar[n]=tmp;
-    while (w) { l=w<256?w:256; CopyMemoryFromBtoAForNBytes(ar[n],ar[0],l); for(int i=0;i<n;i++){CopyMemoryFromBtoAForNBytes(ar[i],ar[i+1],l);ar[i]+=l;} w-=l; }
+    while (w) { l=w<256?w:256; MemCpyFromBtoAForNBytes(ar[n],ar[0],l); for(int i=0;i<n;i++){MemCpyFromBtoAForNBytes(ar[i],ar[i+1],l);ar[i]+=l;} w-=l; }
 }
 
 typedef int (*cmpfun)(const void*, const void*);
@@ -643,242 +643,8 @@ float half_to_float(half h) {
         }
     } else if (e == 31) { out = s | 0x7F800000 | (m << 13); }
     else { e = e + (127 - 15); out = s | (e << 23) | (m << 13); }
-    float f; CopyMemoryFromBtoAForNBytes(&f,&out,4);
+    float f; MemCpyFromBtoAForNBytes(&f,&out,4);
     return f;
-}
-// ========================================================================================================================================================================================================================================================================================================
-// Console Emulator System - CHEATS!
-static i32 currentEntryLength=0, numHistory=0, historyPos=0; char consoleEntryText[TEXT_BUFFER_SIZE],history[7][TEXT_BUFFER_SIZE];
-static Vector3 ressurectionLocations[10] = { {-27.386f, -55.488f, 26.5941f},/*0/R*/ {40.903f, -42.372f, -30.78f},/*1*/      {30.67407f, -25.832f, 10.21412f},/*2*/ {38.26813f, -15.498f, 20.37825f},/*3*/ {-19.48f, -7.928f, 22.954f},/*4*/ {-24.358f, 12.5956f, 31.8497f},/*5*/
-                                             {-22.3568f, 33.7845f, -30.728f},/*6*/  {2.228084f, 50.95243f, 7.532025f},/*7*/ {10.068f, 58.897f, 13.973f},/*8*/      {2.303f, 106.77f, -38.554f}/*9*/ };
-static Vector3 cyberSpaceEntryLocations[8] = { {210.6834f,2.812f,-24.378f},/*0*/ {195.42f,-13.44f,33.28f},/*1*/      {157.1608f,-15.53f,47.331f},/*2a, if cyberport localPosition.x < -26.0f*/ {256.0416f,-0.716f,62.48789f},/*2b level 2 secondary cyberport position*/
-                                               {126.43f,29.56733f,34.24f},/*5*/  {177.612f,3.29494f,108.7725f},/*6*/ {244.735f,41.99257f,-19.695f},/*8*/                                       {185.161f,84.502f,-46.04246f},/*9*/ };
-ENGINE_TO_MOD void ToggleConsole(void) {
-    static bool inventoryModeWasActivePriorToConsole = false;
-    if (!Sys_Cheats.consoleActive) inventoryModeWasActivePriorToConsole = Sys_Global.inventoryMode;
-    Sys_Cheats.consoleActive = !Sys_Cheats.consoleActive; // Tilde
-    if (Sys_Cheats.consoleActive) Sys_Global.inventoryMode = true;
-    else if (!inventoryModeWasActivePriorToConsole && Sys_Global.inventoryMode) ForceShootMode();
-}
-
-static void AddToHistory(const char* entry) {
-    if (GetStringLength(entry) == 0) return;
-    if (numHistory > 0 && StringsEqual(entry,history[numHistory - 1])) return;
-    
-    if (numHistory < 7) { StringCopyInto_A_From_B(history[numHistory],entry,TEXT_BUFFER_SIZE); numHistory++; }
-    else {
-        for (int i = 0; i < 7 - 1; i++) StringCopyInto_A_From_B(history[i],history[i + 1],TEXT_BUFFER_SIZE); // Shift list toward 0
-        StringCopyInto_A_From_B(history[7 - 1], entry,TEXT_BUFFER_SIZE);
-    }
-}
-
-static void RecallHistory(int direction) { // direction 1 up (older), -1 down (newer)
-    if (direction == 1) { // up
-        if (historyPos > 0) { historyPos--; StringCopyInto_A_From_B(consoleEntryText,history[historyPos],TEXT_BUFFER_SIZE); currentEntryLength = GetStringLength(consoleEntryText); }
-    } else if (direction == -1) { // down
-        if (historyPos < numHistory) {
-            historyPos++;
-            if (historyPos == numHistory) { consoleEntryText[0] = currentEntryLength = 0; } else { StringCopyInto_A_From_B(consoleEntryText,history[historyPos],TEXT_BUFFER_SIZE); currentEntryLength = GetStringLength(consoleEntryText); }
-        }
-    }
-}
-
-typedef void (*ConsoleCmdFuncNoArg)(void); typedef void (*ConsoleCmdFuncInt)(int); typedef void (*ConsoleCmdFuncStr)(const char*);
-typedef struct { const char* name; union {ConsoleCmdFuncNoArg noArg; ConsoleCmdFuncInt withInt; ConsoleCmdFuncStr withStr; void* raw;} func; enum {CMD_NOARG,CMD_INT,CMD_STR}type;} ConsoleCommand;
-__attribute__((pure)) static int CommandMatch(const char* input, const char* cmd) {
-    while (*cmd && *input) {
-        char c1 = CharToLower((u8)*input++); char c2 = CharToLower((u8)*cmd++);
-        if (c1 == ' ' || c1 == '_') {c1 = ' ';} if (c2 == ' ' || c2 == '_') {c2 = ' ';} if (c1 != c2) return 0;
-    }
-
-    return *cmd == '\0' && (*input == '\0' || CharacterIsEmpty((u8)*input) || *input == '_');
-}
-
-static void cmd_noclip(void) {
-    Sys_Cheats.noclip = !Sys_Cheats.noclip;
-    if (Sys_Cheats.noclip) { Sys_Global.instances[PLAYER1].velocity = (Vector3){ 0.0f, 0.0f, 0.0f }; CenterStatusPrint("noclip: %s", Sys_Text.stringTable[1000]); } // "ACTIVATED"
-    else CenterStatusPrint("noclip: %s", Sys_Text.stringTable[717]); // "DISABLED"
-}
-
-void EnableCheatArsenal(u8 level) { (void)level; } // TODO
-void cmd_kill(void) { Sys_Global.instances[PLAYER1].health = Sys_Global.instances[PLAYER1].cyberHealth = 0.0f; CenterStatusPrint("%s", Sys_Text.stringTable[1011]); } // "Player decides to become a cyborg."
-void cmd_undo(void) { if (Sys_Cheats.editMode) { CenterStatusPrint("Last spawned object removed"); } else { CenterStatusPrint("Cannot undo when not in Edit Mode"); } } // TODO actually track and despawn last
-void ScreenShake(float force, double duration) { Sys_Global.shakeFinished = Sys_Global.pauseRelativeTime + duration; float shakeForce = (force < 0.48f) ? force : 0.48f; (void)shakeForce; } // TODO actually shake
-void Shake(float force) { float forc = (force <= 0.0f) ? 1.0f : force; ScreenShake(forc,1.0); }// The whole station is a shakin' and a movin'!
-void cmd_shake(void) { Shake(-1); CenterStatusPrint("SHAKIN LIKE A LEAF!"); }
-static void cmd_edit(void) {
-    Sys_Cheats.editMode = !Sys_Cheats.editMode;
-    if (Sys_Cheats.editMode) { Sys_Cheats.noclip = Sys_Cheats.notarget = true; CenterStatusPrint("edit mode: %s","Edit Mode activated! The current level\ncan be shaped to your heart's content!"); }
-    else { Sys_Cheats.noclip = Sys_Cheats.notarget = false; CenterStatusPrint("%s", Sys_Text.stringTable[999]); } // "Edit Mode deactivated, normal play"
-}
-
-static int ParseLevelArg(const char* arg) {
-    if (!arg || !*arg) return -1;
-
-    char clean[64] = {0}; int j = 0;
-    for (int i = 0; arg[i] && j < 60; i++) { if (arg[i] != ' ' && arg[i] != '_') clean[j++] = CharToLower((unsigned char)arg[i]); }   clean[j] = '\0';
-    if (StringsEqual(clean, "r")      || StringFindSubstring(clean, "reactor")) return 0;
-    if (StringFindSubstring(clean, "g1") || StringFindSubstring(clean, "10")) return 10;
-    if (StringFindSubstring(clean, "g2") || StringFindSubstring(clean, "11")) return 11;
-    if (StringFindSubstring(clean, "g4") || StringFindSubstring(clean, "12")) return 12;
-    if (StringFindSubstring(clean, "g3")) { CenterStatusPrint("%s", Sys_Text.stringTable[1001]); return -2; }// "Gamma grove already jettisoned! Those poor arrogant people."
-    int level = StringToInt(clean); if (level >= 0 && level < Sys_Global.numLevels) return level;
-    return -1; // Invalid
-}
-
-static void cmd_loadlevel(const char* arg) {
-    if (Sys_Global.menuActive) { CenterStatusPrint("%s", Sys_Text.stringTable[1015]); return; } // "Cannot load levels via cheat while on the main menu!"
-    int level = ParseLevelArg(arg); if (level == -2) return; // Already printed g3 message
-    if (level < 0 || level > 12) { CenterStatusPrint("cmd_loadlevel invalid level argument %u",level); return; }
-
-    CenterStatusPrint("Loading level %u",level); queuedLevelToLoad = level; LoadLevel(level); Sys_Global.instances[PLAYER1].position = ressurectionLocations[level > 9 ? 6 : level]; (void)cyberSpaceEntryLocations;
-}
-
-static void cmd_loadarsenal(const char* arg) { int level = ParseLevelArg(arg); if (level >= 0 && level < Sys_Global.numLevels) { EnableCheatArsenal(level); } }
-static void cmd_summon(int itemConstIndex) { if (!ConstIndexInBounds(itemConstIndex)) { SpawnDynamicObject(itemConstIndex, true); CenterStatusPrint("Summoned object ID %d", itemConstIndex); } else { CenterStatusPrint("Invalid object ID: %s", itemConstIndex); } }
-static void cmd_notarget(void) { Sys_Cheats.notarget = !Sys_Cheats.notarget; CenterStatusPrint("notarget: %s", Sys_Cheats.notarget ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
-static void cmd_showfps(void) { Sys_Cheats.showFPS = !Sys_Cheats.showFPS; }
-static void cmd_showlocation(void) { Sys_Cheats.showLocation = !Sys_Cheats.showLocation; }
-static void cmd_help(void) { CenterStatusPrint("There's no one to save you now Hacker!"); }
-static void cmd_nomoney(void) { CenterStatusPrint("Nice try, there's no money here."); }
-static void cmd_god(void) { Sys_Cheats.god = !Sys_Cheats.god; CenterStatusPrint("god mode: %s", Sys_Cheats.god ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
-static void cmd_energy(void) {
-    Sys_Cheats.redbull = !Sys_Cheats.redbull; 
-    if (Sys_Cheats.redbull) CenterStatusPrint("%s", Sys_Text.stringTable[1006]); // "I feel the power! 0 energy consumption!"
-    else CenterStatusPrint("%s", Sys_Text.stringTable[1005]); // Energy usage normal
-}
-
-void SetSkyRotateSpeed(void) { static const float skyRotateSpeeds[] = { 0.05f, 1.0f, 2.5f, 3.75f, 6.25f }; glUseProgram(Sys_Render.imageBlitShaderProgram); glUniform1f(30,skyRotateSpeeds[Sys_Cheats.dizzyLevel]); }
-static void cmd_dizzy(void) { Sys_Cheats.dizzyLevel = (Sys_Cheats.dizzyLevel >= 3) ? 0 : Sys_Cheats.dizzyLevel + 1; SetSkyRotateSpeed(); }
-static void cmd_bottomless(void) {
-    Sys_Cheats.bottomless = !Sys_Cheats.bottomless;
-    if (Sys_Cheats.bottomless) CenterStatusPrint("bottomlessclip! %s",Sys_Text.stringTable[1002]); // "Bring it!"
-    else                       CenterStatusPrint("%s",Sys_Text.stringTable[1003]); // "Hose disconnected from interdimensional wormhole. Normal ammo operation restored."
-}
-
-static void cmd_nohud(void) { Sys_Cheats.noHUD = !Sys_Cheats.noHUD; if (Sys_Cheats.noHUD) {CenterStatusPrint("%s",Sys_Text.stringTable[1004]);/*"No HUD! Enjoy the cinematic screenshot experience!"*/} else { CenterStatusPrint("HUD %s",Sys_Text.stringTable[1000]);/*"ACTIVATED"*/} }
-static void cmd_iamshodan(void) { Sys_Cheats.superoverride = !Sys_Cheats.superoverride; if (Sys_Cheats.superoverride) {CenterStatusPrint("%s",Sys_Text.stringTable[1010]);/*"Full security override enabled!"*/ } else {CenterStatusPrint("%s",Sys_Text.stringTable[1009]);/*"SHODAN has regained control of security from you"*/} }
-static void cmd_mrbean(void)         { CenterStatusPrint("Nice try, there are no go carts to slow down here"); }                                      static void cmd_simonfoster(void)    { CenterStatusPrint("Nice try, nothing to paint here"); }
-static void cmd_richardbranson(void) { CenterStatusPrint("Nice try, there's no money here. You do realize this isn't Rollercoaster Tycoon right?"); } static void cmd_johnwardley(void)    { CenterStatusPrint("WOW!"); }
-static void cmd_johnmace(void)       { CenterStatusPrint("Nice try, there's nothing to pay double for here"); }                                       static void cmd_melaniewarn(void)    { CenterStatusPrint("I feel happy!!!"); }
-static void cmd_damonhill(void)      { CenterStatusPrint("Nice try, there are no go carts to speed up here"); }                                       static void cmd_michaelschumacher(void) { CenterStatusPrint("Nice try, there are no go carts to give ludicrous speed here"); }
-static void cmd_tonyday(void)        { CenterStatusPrint("Ok, now I want a hamburger"); }                                                             static void cmd_katiebrayshaw(void)  { CenterStatusPrint("Hi there! Hello! Hey! Howdy!"); }
-static void cmd_sudo(void)           { CenterStatusPrint("Super user access granted...ERROR: access restricted by SHODAN"); }
-static void cmd_git(const char* arg) {
-    if (!arg) arg = "";
-    static const char* cmds[] = {
-        "pull",  "remote: Enumerating objects: 24601, done.\nFailed, could not connect with origin/triop.",
-        "fetch", "remote: Enumerating objects: 24601, done.\nFailed, could not connect with origin/triop.",
-        "status","Your branch is up to date with origin/triop.\nWorking directory clean.",
-        "log",   "<Merge pull request #451 from SHODAN/NeuralLinkBugfix> 6 months ago...",
-        "reflog","dc51440 HEAD0 -> master: commit: Establish neural connection ... ERROR: invalid ID `2-4601`.",
-        "merge", "Failed, could not connect with origin/triop.",
-        "push",  "Could not find Username for 'triopttp://192.168.1.451'.",
-        "clone", "Failed, connection blocked by SHODAN. Employee ID invalid."
-    };
-
-    for (int i = 0; i < 16; i += 2) { if (StringFindSubstring(arg, cmds[i])) { CenterStatusPrint(cmds[i+1]); return; } }
-    if (StringFindSubstring(arg, "branch") || StringFindSubstring(arg, "-b")) { const char *last = StringFindLastChar(arg, ' '); CenterStatusPrint("Created new branch %s", last ? last + 1 : "unknown"); }
-    else CenterStatusPrint("Branch name not recognized. Contact your TriopBucket representative.");
-}
-
-static void cmd_restart(void)        { CenterStatusPrint("Yeah...better not"); }
-static void cmd_quit(void)           { OS_Exit(0); }
-static void cmd_cd(void)             { CenterStatusPrint("Attempting to access directory... already at root"); }
-static void cmd_justinbailey(void)   { CenterStatusPrint("Well, you don't have a suit already so..."); }
-static void cmd_woodstock(void)      { CenterStatusPrint("How much wood could a woodchuck chuck...there's no wood in SPACE!"); }
-static void cmd_quarry(void)         { CenterStatusPrint("There's obsidian on levels 6 and 8 if you want to feel decadent,\notherwise we are lacking in the stone department."); }
-static void cmd_zelda(void)          { CenterStatusPrint("Too late, already been to level 1"); }
-static void cmd_allyourbase(void)    { CenterStatusPrint("ERROR: SHODAN has overriden your command, remove SHODAN first."); }
-static void cmd_iamironman(void)     { CenterStatusPrint("That's nice dear."); }
-static void cmd_idkfa(void)          { CenterStatusPrint("I can only hold 7 weapons!! Nice try dearies!"); }
-static void cmd_ai(void)             { CenterStatusPrint("Only AI allowed around here is SHODAN"); }
-static void cmd_aireal(void)         { CenterStatusPrint("In my magnificence, I shape clay, crafting new lifeforms..."); }
-static void cmd_staminup(void) {
-    Sys_Cheats.fatigueCheat = !Sys_Cheats.fatigueCheat;
-    if (Sys_Cheats.fatigueCheat) { CenterStatusPrint("Stamin-Up! %s",Sys_Text.stringTable[1013]); SetModFatigue(0.0f); } else CenterStatusPrint("%s",Sys_Text.stringTable[1012]);
-}
-
-static const ConsoleCommand consoleCmds[] = {
-    { "noclip",  {.noArg=cmd_noclip}, CMD_NOARG},{"idclip",      {.noArg=cmd_noclip},CMD_NOARG},      {"no clip",       {.noArg = cmd_noclip},      CMD_NOARG},
-    { "god",     {.noArg=cmd_god}, CMD_NOARG},   {"overwhelming",{.noArg=cmd_god},   CMD_NOARG},      {"whosyourdaddy", {.noArg = cmd_god},         CMD_NOARG},
-    { "iddqd",   {.noArg=cmd_god}, CMD_NOARG},   {"notarget",    {.noArg=cmd_notarget},CMD_NOARG},    {"no target",     {.noArg = cmd_notarget},    CMD_NOARG},
-    { "editmode",{.noArg=cmd_edit},CMD_NOARG},   {"edit",        {.noArg=cmd_edit},  CMD_NOARG},      {"edit mode",     {.noArg = cmd_edit},        CMD_NOARG},
-    { "editor",  {.noArg=cmd_edit},CMD_NOARG},   {"undo",        {.noArg=cmd_undo},  CMD_NOARG},      {"showfps",       {.noArg = cmd_showfps},     CMD_NOARG},
-    { "show fps",{.noArg=cmd_showfps},CMD_NOARG},{"showlocation",{.noArg=cmd_showlocation},CMD_NOARG},{"show location", {.noArg = cmd_showlocation},CMD_NOARG},
-    { "nohud",   {.noArg=cmd_nohud},CMD_NOARG},  {"no hud",      {.noArg=cmd_nohud}, CMD_NOARG},      {"bottomlessclip",{.noArg = cmd_bottomless},  CMD_NOARG},
-    { "bottomless clip",{.noArg=cmd_bottomless},CMD_NOARG},{"load",{.withStr=cmd_loadlevel},CMD_STR}, {"loadarsenal",   {.withStr = cmd_loadarsenal}, CMD_STR}, 
-    { "load arsenal", {.withStr = cmd_loadarsenal}, CMD_STR}, { "summon_obj", {.withInt = cmd_summon}, CMD_INT}, {"summonobj",{.withInt = cmd_summon},CMD_INT},
-    { "motherlode",    {.noArg=cmd_nomoney},        CMD_NOARG},{"rosebud",           {.noArg=cmd_nomoney},          CMD_NOARG},{"kaching",        {.noArg=cmd_nomoney},       CMD_NOARG},
-    { "money",         {.noArg=cmd_nomoney},        CMD_NOARG},{"dizzy",             {.noArg=cmd_dizzy},            CMD_NOARG},{"help",           {.noArg=cmd_help},          CMD_NOARG},
-    { "ifeelthepower", {.noArg = cmd_energy},       CMD_NOARG},{ "power",            {.noArg=cmd_energy},           CMD_NOARG},{"energy",         {.noArg=cmd_energy},        CMD_NOARG},
-    { "i feel the power",{.noArg = cmd_energy},     CMD_NOARG},{"i am shodan",       {.noArg=cmd_iamshodan},        CMD_NOARG},{"iamshodan",      {.noArg=cmd_iamshodan},     CMD_NOARG},
-    { "mr. bean",      {.noArg = cmd_mrbean},       CMD_NOARG},{"simon foster",      {.noArg=cmd_simonfoster},      CMD_NOARG},{"richard branson",{.noArg=cmd_richardbranson},CMD_NOARG},
-    { "john wardley",  {.noArg = cmd_johnwardley},  CMD_NOARG},{"john mace",         {.noArg=cmd_johnmace},         CMD_NOARG},{"melanie warn",   {.noArg=cmd_melaniewarn},   CMD_NOARG},
-    { "damon hill",    {.noArg = cmd_damonhill},    CMD_NOARG},{"michael schumacher",{.noArg=cmd_michaelschumacher},CMD_NOARG},{"tony day",       {.noArg=cmd_tonyday},       CMD_NOARG},
-    { "katie brayshaw",{.noArg = cmd_katiebrayshaw},CMD_NOARG},{"sudo",              {.noArg=cmd_sudo},             CMD_NOARG},{"admin",          {.noArg=cmd_sudo},          CMD_NOARG},
-    { "git",           {.withStr=cmd_git},            CMD_STR},{"restart",           {.noArg=cmd_restart},          CMD_NOARG},{"quit",           {.noArg=cmd_quit},          CMD_NOARG},
-    { "exit",          {.noArg = cmd_quit},         CMD_NOARG},{"cd",                {.noArg=cmd_cd},               CMD_NOARG},{"./",             {.noArg=cmd_cd},            CMD_NOARG},
-    { "kill",          {.noArg = cmd_kill},         CMD_NOARG},{"suicide",           {.noArg=cmd_kill},             CMD_NOARG},{"die",            {.noArg=cmd_kill},          CMD_NOARG},
-    { "justinbailey",  {.noArg = cmd_justinbailey}, CMD_NOARG},{"woodstock",         {.noArg=cmd_woodstock},        CMD_NOARG},{"quarry",         {.noArg=cmd_quarry},        CMD_NOARG},
-    { "zelda",         {.noArg = cmd_zelda},        CMD_NOARG},{"allyourbasearebelongtous",{.noArg=cmd_allyourbase},CMD_NOARG},{"all your base",  {.noArg=cmd_allyourbase},   CMD_NOARG},
-    { "i am iron man", {.noArg = cmd_iamironman},   CMD_NOARG},{"i am amazing",      {.noArg=cmd_iamironman},       CMD_NOARG},{"i am cool",      {.noArg=cmd_iamironman},    CMD_NOARG},
-    { "i am best",     {.noArg = cmd_iamironman},   CMD_NOARG},{"idkfa",             {.noArg=cmd_idkfa},            CMD_NOARG},{"impulse 9",      {.noArg=cmd_idkfa},         CMD_NOARG},
-    { "undo",          {.noArg = cmd_undo},         CMD_NOARG},{"shake",             {.noArg=cmd_shake},            CMD_NOARG},{"tired",          {.noArg=cmd_staminup},      CMD_NOARG},
-    { "staminup",      {.noArg = cmd_staminup},     CMD_NOARG},{"grok",              {.noArg=cmd_ai},               CMD_NOARG},{"chatgpt",        {.noArg=cmd_ai},            CMD_NOARG},
-    { "claude",        {.noArg = cmd_ai},           CMD_NOARG},{"gemini",            {.noArg=cmd_ai},               CMD_NOARG},{"shodan",         {.noArg=cmd_aireal},        CMD_NOARG},
-    { NULL, {.raw = NULL}, CMD_NOARG } // sizeof helper
-};
-
-void ProcessConsoleCommand(const char* command) {
-    if (command == NULL || GetStringLength(command) == 0) { ToggleConsole(); return; }
-
-    char ts[TEXT_BUFFER_SIZE]; StringCopyInto_A_SubstringFrom_B(ts,sizeof(ts)-1,command,TEXT_BUFFER_SIZE);
-    ts[sizeof(ts)-1] = '\0';
-    const char* command_trimmed = ts;    while (*command_trimmed && CharacterIsEmpty((unsigned char)*command_trimmed)) command_trimmed++;
-    const char* space = command_trimmed; while (*space && !CharacterIsEmpty((unsigned char)*space)) space++;
-    const char* arg_start = space;       while (*arg_start && CharacterIsEmpty((unsigned char)*arg_start)) arg_start++;
-    AddToHistory(command);
-    bool commandProcessed = false;
-    for (u16 i=0;consoleCmds[i].name!=NULL;++i) {
-        const ConsoleCommand* cmd = &consoleCmds[i];
-        if (CommandMatch(command_trimmed,cmd->name)) {
-                   if (cmd->type == CMD_NOARG) {             cmd->func.noArg();                              commandProcessed = true;
-            } else if (cmd->type == CMD_STR && *arg_start) { cmd->func.withStr(*arg_start ? arg_start : ""); commandProcessed = true;
-            } else { // CMD_INT
-                if (!*arg_start) CenterStatusPrint("Missing argument, usage: %s <number>",cmd->name);
-                else { cmd->func.withInt(StringToInt(arg_start)); commandProcessed = true; }
-            }
-        }
-    }
-
-    if (!commandProcessed) CenterStatusPrint("%s%s",Sys_Text.stringTable[1014],command_trimmed); // "Unknown command or function: "
-    consoleEntryText[0] = currentEntryLength = 0; historyPos = numHistory; // Position beyond newest for empty
-    ToggleConsole();
-}
-
-void ConsoleEmulator(i32 keycode) {
-    if (keycode == KEY_UP || keycode == KEY_DOWN) { RecallHistory(keycode == KEY_UP ? 1 : -1); return; }
-    if (keycode == KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { consoleEntryText[0]='\0'; currentEntryLength=0; return; } // Clear the input
-    
-    if (keycode >= KEY_A && keycode <= KEY_Z) { // Handle alphabet keys
-        if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) { // Ensure we don't overflow the buffer
-            char c = 'a' + (keycode - KEY_A); // Map keycode to lowercase character
-            consoleEntryText[currentEntryLength] = c; consoleEntryText[currentEntryLength + 1] = '\0'; currentEntryLength++;
-        }
-    } else if (keycode >= KEY_1 && keycode <= KEY_9) { // Handle number keys 1-9
-        if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) {
-            char c = '1' + (keycode - KEY_1); // Map to '1'-'9'
-            consoleEntryText[currentEntryLength] = c; consoleEntryText[currentEntryLength + 1] = '\0'; currentEntryLength++;
-        }
-    } else if (keycode == KEY_0) { // Handle '0'
-        if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]='0'; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; }
-    } else if (keycode == KEY_MINUS || keycode == KEY_KP_SUBTRACT) {
-        if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]=(Sys_Input.keyStates[KEY_LEFT_SHIFT].down || Sys_Input.keyStates[KEY_RIGHT_SHIFT].down) ? '_' : '-'; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; }
-    } else if (keycode == KEY_BACKSPACE && currentEntryLength > 0) { currentEntryLength--; consoleEntryText[currentEntryLength]='\0'; } // Handle backspace
-    else if (keycode == KEY_SPACE) { // Handle space
-        if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]=' '; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; }
-    } else if (keycode == KEY_ENTER || keycode == KEY_KP_ENTER) { DualLog("Console command: %s\n",consoleEntryText); ProcessConsoleCommand(consoleEntryText); }
 }
 // ========================================================================================================================================================================================================================================================================================================
 // 2D Textures Loading System
@@ -943,7 +709,7 @@ static int PngParseUncompressedBlock(pngzbuf* a) {
     if (k <= 2) header[2] = *a->zbuffer++;
     if (k <= 3) header[3] = *a->zbuffer++;
     i32 len = header[1] * 256 + header[0];
-    CopyMemoryFromBtoAForNBytes(a->zout,a->zbuffer,len); a->zbuffer += len; a->zout += len;
+    MemCpyFromBtoAForNBytes(a->zout,a->zbuffer,len); a->zbuffer += len; a->zout += len;
     return 1;
 }
 
@@ -999,7 +765,7 @@ u8* PngLoad(const u8* buffer, int len, int* x, int* y, PngArena* arena) {
         u32 length = PngGet32be(&s), type = PngGet32be(&s);
         switch (type) {
             case 0x49484452: s.img_x = PngGet32be(&s); s.img_y = PngGet32be(&s); s.img_buffer++; { i32 color = (*s.img_buffer++); s.img_buffer += 3; s.img_n = (color & 2 ? 3 : 1) + (color & 4 ? 1 : 0); } break;
-            case 0x49444154: if (!z.idata) { z.idata = (u8*)PngArenaAlloc(arena, len + 16); ioff = 0; } CopyMemoryFromBtoAForNBytes(z.idata + ioff, s.img_buffer, length); s.img_buffer += length; ioff += length; break;
+            case 0x49444154: if (!z.idata) { z.idata = (u8*)PngArenaAlloc(arena, len + 16); ioff = 0; } MemCpyFromBtoAForNBytes(z.idata + ioff, s.img_buffer, length); s.img_buffer += length; ioff += length; break;
             case 0x49454E44: { u32 rL = s.img_x * s.img_y * s.img_n + s.img_y; z.expanded = (u8*)PngDecode(z.idata, ioff, rL, (i32*)(&rL), arena); s.img_out_n = (s.img_n + 1 == 4) ? 4 : s.img_n; CreatePngImageArena(arena,&z,z.expanded, rL,s.img_out_n,s.img_x,s.img_y,s.img_n); PngGet32be(&s); goto Label_parsesuccess; }
             default: s.img_buffer += length; break;
         }
@@ -1064,7 +830,7 @@ static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
         if (*s == '#') {
             if (e.path[0] && e.index < p->capacity) p->entries[e.index] = e;
             e = (TextureData){.index = U16_MAX}; size_t aL = le - s;
-            if (aL >= sizeof(e.path)) aL = sizeof(e.path) - 1; CopyMemoryFromBtoAForNBytes(e.path,s + 1,aL); e.path[aL] = 0;
+            if (aL >= sizeof(e.path)) aL = sizeof(e.path) - 1; MemCpyFromBtoAForNBytes(e.path,s + 1,aL); e.path[aL] = 0;
         } else {
             char *col = StringFindFirstCharWithin(s, ':');
             if (col) {
@@ -1138,8 +904,8 @@ static __attribute__((noinline)) void LoadTextures(void) {
         u32 numP = (u32)textureWidths[i] * textureHeights[i]; u32 palS = texturePaletteSizes[i];
         textureOffsets[i] = pixel_base; texturePaletteOffsets[i] = color_base;
         textureSizes[i*2]     = textureWidths[i]; textureSizes[i*2 + 1] = textureHeights[i];
-        CopyMemoryFromBtoAForNBytes(all_indices + pixel_base,textureIndexBuffers[i],numP);
-        CopyMemoryFromBtoAForNBytes(texturePalettes + color_base,texturePaletteBuffers[i],palS * sizeof(u32));
+        MemCpyFromBtoAForNBytes(all_indices + pixel_base,textureIndexBuffers[i],numP);
+        MemCpyFromBtoAForNBytes(texturePalettes + color_base,texturePaletteBuffers[i],palS * sizeof(u32));
         pixel_base += numP; color_base += palS;
         OS_DeallocateRAM(textureIndexBuffers[i],numP); OS_DeallocateRAM(texturePaletteBuffers[i],palS * sizeof(u32));
     }
@@ -1148,7 +914,7 @@ static __attribute__((noinline)) void LoadTextures(void) {
     i32 packed_size = ((i32)totalPixels + 3) / 4 * sizeof(u32);
     glBindBuffer(GL_SSBO,Sys_Render.colorBufferID);
     void* dst = glMapBufferRange(GL_SSBO,0,packed_size,0x0002/*GL_MAP_WRITE_BIT*/|0x0004/*GL_MAP_INVALIDATE_RANGE_BIT*/);
-    CopyMemoryFromBtoAForNBytes(dst,all_indices,packed_size); 
+    MemCpyFromBtoAForNBytes(dst,all_indices,packed_size); 
     glUnmapBuffer(GL_SSBO);
     glBindBuffer(GL_SSBO,Sys_Render.texturePalettesID);       glBufferData(GL_SSBO,totalPaletteColors * sizeof(u32),texturePalettes,GL_STATIC_DRAW);
     glBindBuffer(GL_SSBO,Sys_Render.textureOffsetsID);        glBufferData(GL_SSBO,loadedTexturesMaxIndex * sizeof(u32),textureOffsets,GL_STATIC_DRAW);
@@ -1185,7 +951,7 @@ typedef struct { const char* data; int size; } RawOBJ;
 typedef struct { u16 index; bool animated; u8 animationNum; char path[128]; } ModelData;
 typedef struct { ModelData* entries; u32 count; u32 capacity; } ModelDataParser;
 static inline __attribute__((always_inline)) half float_to_half(float f) {
-    u32 x; CopyMemoryFromBtoAForNBytes(&x,&f,4);
+    u32 x; MemCpyFromBtoAForNBytes(&x,&f,4);
     u32 s = x>>31, ue = (x>>23)&0xff; i32 e = (i32)ue-127; u32 m = x&0x7fffff;
     if (ue == 0xff) return m ? (half)(0x7e00|(m>>13)|(s<<15)) : (half)((s<<15)|0x7c00);
     if (!ue && !m) return (half)(s<<15);
@@ -1224,7 +990,7 @@ static void OptimizeVertexCache(u16* idx, u32 ic, u32 vc) {
     qsort_new(t, tc, sizeof(TriSort), cmp);
     u16* n = OS_Alloc(ic*sizeof(u16));
     for (u32 i=0; i<tc; ++i) { u16* s=idx+t[i].idx*3; u16* d=n+i*3; d[0]=s[0];d[1]=s[1];d[2]=s[2]; }
-    CopyMemoryFromBtoAForNBytes(idx,n,ic*sizeof(u16));
+    MemCpyFromBtoAForNBytes(idx,n,ic*sizeof(u16));
     OS_DeallocateRAM(n, ic*sizeof(u16)); OS_DeallocateRAM(t, tc*sizeof(TriSort));
 }
 
@@ -1238,7 +1004,7 @@ static u8* OptimizeVertexFetch(u8* v, u32* vc, u16* idx, u32 ic, size_t stride) 
         if (id < oc && remap[id] == 0xFFFFFFFFU) { remap[id] = nc; first[nc] = id; ++nc; }
     }
     u8* nv = OS_Alloc(nc*stride);
-    for (u32 i=0; i<nc; ++i) CopyMemoryFromBtoAForNBytes(nv+i*stride,v+first[i]*stride,stride);
+    for (u32 i=0; i<nc; ++i) MemCpyFromBtoAForNBytes(nv+i*stride,v+first[i]*stride,stride);
     for (u32 i=0; i<ic; ++i) if (idx[i] < oc) idx[i] = (u16)remap[idx[i]];
     *vc = nc;
     OS_DeallocateRAM(remap,oc*sizeof(u32)); OS_DeallocateRAM(first,oc*sizeof(u32));
@@ -1317,7 +1083,7 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, c
         u64 h = *(u32*)(v+0) ^ *(u32*)(v+2) ^ *(u32*)(v+4) ^ *(u32*)(v+6); u32 s = (u32)(h ^ (h>>32)) & (HASH_SIZE-1);
         while (ht[s] != 0xFFFFFFFFU) { if (CompareMemoryForNBytes(sv+(ht[s]<<3), v, 32) == 0) { rem[i] = ht[s]; goto nxt; } s = (s+1) & (HASH_SIZE-1); }
         ht[s] = ucnt; rem[i] = ucnt;
-        CopyMemoryFromBtoAForNBytes(sv+(ucnt<<3), v, 32);
+        MemCpyFromBtoAForNBytes(sv+(ucnt<<3), v, 32);
         ++ucnt; nxt:;
     }
 
@@ -1388,7 +1154,7 @@ bool ParseModelData(ModelDataParser *p, u16 maxSz, const char *fn) {
             cur = (ModelData){U16_MAX, false, 255, {0}};
             if (le > s) {
                 size_t pl = le - s; if (pl >= sizeof(cur.path)) pl = sizeof(cur.path)-1;
-                CopyMemoryFromBtoAForNBytes(cur.path,s+1,pl); cur.path[pl] = 0;
+                MemCpyFromBtoAForNBytes(cur.path,s+1,pl); cur.path[pl] = 0;
             }
             goto next;
         }
@@ -1413,7 +1179,7 @@ bool ParseModelData(ModelDataParser *p, u16 maxSz, const char *fn) {
 static void UploadMdlBuffer(u32 target, u32 buf, const void* data, size_t size) {
     glBindBuffer(target,buf); glBufferData(target,size,NULL,GL_STATIC_DRAW);
     void* mp = glMapBufferRange(target,0,size,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/);
-    CopyMemoryFromBtoAForNBytes(mp,data,size); glUnmapBuffer(target);
+    MemCpyFromBtoAForNBytes(mp,data,size); glUnmapBuffer(target);
 }
 
 void LoadModels(void) {
@@ -2085,7 +1851,7 @@ static int _GetGlyphShapeTT(const stbtt_fontinfo*info,int gi,stbtt_vertex**pv){
             int cn=stbtt_GetGlyphShape(info,gidx,&cv);
             if(cn>0){for(int i=0;i<cn;++i){stbtt_vertex*v=&cv[i];i16 vx=v->x,vy=v->y;v->x=(i16)(fm*(mtx[0]*vx+mtx[2]*vy+mtx[4]));v->y=(i16)(fn*(mtx[1]*vx+mtx[3]*vy+mtx[5]));vx=v->cx;vy=v->cy;v->cx=(i16)(fm*(mtx[0]*vx+mtx[2]*vy+mtx[4]));v->cy=(i16)(fn*(mtx[1]*vx+mtx[3]*vy+mtx[5]));}
                 tmp=(stbtt_vertex*)TempAlloc((nv+cn)*sizeof(stbtt_vertex));if(!tmp){TempFree(verts);TempFree(cv);return 0;}
-                if(nv>0&&verts) CopyMemoryFromBtoAForNBytes(tmp,verts,nv*sizeof(stbtt_vertex)); CopyMemoryFromBtoAForNBytes(tmp+nv,cv,cn*sizeof(stbtt_vertex));TempFree(verts);TempFree(cv);verts=tmp;nv+=cn;}
+                if(nv>0&&verts) MemCpyFromBtoAForNBytes(tmp,verts,nv*sizeof(stbtt_vertex)); MemCpyFromBtoAForNBytes(tmp+nv,cv,cn*sizeof(stbtt_vertex));TempFree(verts);TempFree(cv);verts=tmp;nv+=cn;}
             more=fl&(1<<5);}
     }
     *pv=verts;return nv;
@@ -2459,10 +2225,10 @@ void LoadTextForLanguage(u8 lang){
         if(utf16){while(dp+1<Sys_Text.file_size){u16 ch=Sys_Text.file_data[dp]|(Sys_Text.file_data[dp+1]<<8);dp+=2;if(ch=='\r'||ch=='\n'){if(ch=='\r'&&dp+1<Sys_Text.file_size){u16 nx=Sys_Text.file_data[dp]|(Sys_Text.file_data[dp+1]<<8);if(nx=='\n')dp+=2;}break;}}}
         else{while(dp<Sys_Text.file_size){u8 c=Sys_Text.file_data[dp];if(c=='\r'||c=='\n'){if(c=='\r'&&dp+1<Sys_Text.file_size&&Sys_Text.file_data[dp+1]=='\n')++dp;++dp;break;}++dp;}}
         size_t ll=dp-ls;if(ll==0){if(ln<TEXT_STRING_COUNT)Sys_Text.stringTable[ln][0]='\0';++ln;continue;}
-        if(utf16)utf16le_to_utf8(&Sys_Text.file_data[ls],ll,line,sizeof(line));else{if(ll>=sizeof(line))ll=sizeof(line)-1; CopyMemoryFromBtoAForNBytes(line,&Sys_Text.file_data[ls],ll);line[ll]='\0';}
+        if(utf16)utf16le_to_utf8(&Sys_Text.file_data[ls],ll,line,sizeof(line));else{if(ll>=sizeof(line))ll=sizeof(line)-1; MemCpyFromBtoAForNBytes(line,&Sys_Text.file_data[ls],ll);line[ll]='\0';}
         size_t sl=GetStringLength(line);while(sl>0&&(line[sl-1]=='\r'||line[sl-1]=='\n'))line[--sl]='\0';
         if(sl==0){if(ln<TEXT_STRING_COUNT)Sys_Text.stringTable[ln][0]='\0';++ln;continue;}
-        if(ln<TEXT_STRING_COUNT) {CopyMemoryFromBtoAForNBytes(Sys_Text.stringTable[ln],line,sl);Sys_Text.stringTable[ln][sl]='\0';++ln;} }
+        if(ln<TEXT_STRING_COUNT) {MemCpyFromBtoAForNBytes(Sys_Text.stringTable[ln],line,sl);Sys_Text.stringTable[ln][sl]='\0';++ln;} }
 }
 
 static inline __attribute__((always_inline)) int StringToIntLen(const char*str,size_t len){int v=0;for(size_t i=0;i<len&&str[i]>='0'&&str[i]<='9';++i)v=v*10+(str[i]-'0');return v;}
@@ -2483,7 +2249,7 @@ void LoadLogTextForLanguage(u8 lang){
         if(utf16){while(dp+1<Sys_Text.filelog_size){u16 ch=Sys_Text.filelog_data[dp]|(Sys_Text.filelog_data[dp+1]<<8);dp+=2;if(ch=='\r'||ch=='\n'){if(ch=='\r'&&dp+1<Sys_Text.filelog_size){u16 nx=Sys_Text.filelog_data[dp]|(Sys_Text.filelog_data[dp+1]<<8);if(nx=='\n')dp+=2;}break;}}}
         else{while(dp<Sys_Text.filelog_size){u8 c=Sys_Text.filelog_data[dp];if(c=='\r'||c=='\n'){if(c=='\r'&&dp+1<Sys_Text.filelog_size&&Sys_Text.filelog_data[dp+1]=='\n')++dp;++dp;break;}++dp;}}
         size_t ll=dp-ls;if(!ll)continue;
-        if(utf16)utf16le_to_utf8(&Sys_Text.filelog_data[ls],ll,line,sizeof(line));else{if(ll>=sizeof(line))ll=sizeof(line)-1;CopyMemoryFromBtoAForNBytes(line,&Sys_Text.filelog_data[ls],ll);line[ll]='\0';}
+        if(utf16)utf16le_to_utf8(&Sys_Text.filelog_data[ls],ll,line,sizeof(line));else{if(ll>=sizeof(line))ll=sizeof(line)-1;MemCpyFromBtoAForNBytes(line,&Sys_Text.filelog_data[ls],ll);line[ll]='\0';}
         size_t sl=GetStringLength(line);while(sl>0&&(line[sl-1]=='\r'||line[sl-1]=='\n'))line[--sl]='\0';if(!sl)continue;
         int li=-1,ilh=-1,irh=-1,lt=0,lf=0,fi=0;char*pos=line;
         while(*pos&&fi<32){while(*pos==' ')++pos;char*st=pos;int q=(*pos=='"');if(q)++pos;while(*pos){if(*pos==','&&!q)break;if(*pos=='"'&&q){if(pos[1]==','){pos++;break;}if(pos[1]=='"'){pos+=2;continue;}}++pos;}char*en=pos;if(q&&*en=='"')--en;size_t tl=(size_t)(en-st);if(!tl){if(*pos==',')++pos;fi++;continue;}
@@ -2537,7 +2303,7 @@ void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scaleInput,const 
         float vx0=q.x0*scale-bw,vy0=q.y0*scale-bw,vx1=q.x1*scale+bw,vy1=q.y1*scale+bw;
         float s0=q.s0-puv,t0=q.t0-puv,s1=q.s1+puv,t1=q.t1+puv,z=0.0f;
         float tv[30] = { vx0,vy0,z,s0,t0,vx1,vy1,z,s1,t1,vx1,vy0,z,s1,t0,vx0,vy0,z,s0,t0,vx0,vy1,z,s0,t1,vx1,vy1,z,s1,t1 };
-        CopyMemoryFromBtoAForNBytes(textVertexData+vc*30,tv,sizeof(tv)); vc++;
+        MemCpyFromBtoAForNBytes(textVertexData+vc*30,tv,sizeof(tv)); vc++;
         if (cp>='0' && cp<='9') {
             if (fontID == FONT_STOPD) { xpos=q.x0 + ((fontID == FONT_STOPD) ? fixedNumberAdvanceWidthStopD : fixedNumberAdvanceWidth); }
         }
@@ -2554,7 +2320,7 @@ void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scaleInput,const 
 // 3. This notice may not be removed or altered from any source distribution.
 extern InputElement inputElements[134];
 typedef void (*GLFWproc)(void); typedef struct _GLFWfbconfig _GLFWfbconfig; typedef struct _GLFWcontext _GLFWcontext; typedef struct _GLFWwindow _GLFWwindow; typedef struct _GLFWlibrary _GLFWlibrary; typedef struct _GLFWmonitor _GLFWmonitor; typedef struct _GLFWjoystick _GLFWjoystick;
-void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n); int StringCompareUpToLength(const char* s1, const char* s2, size_t n); void UpdateScreenSize(i32 width, i32 height); void SaveConfig(void);
+void* MemCpyFromBtoAForNBytes(void *dst, const void *src, size_t n); int StringCompareUpToLength(const char* s1, const char* s2, size_t n); void UpdateScreenSize(i32 width, i32 height); void SaveConfig(void);
 struct _GLFWfbconfig { int redBits,greenBits,blueBits,alphaBits,depthBits,stencilBits,accumRedBits,accumGreenBits,accumBlueBits,accumAlphaBits; i32 samples,stereo,sRGB,doublebuffer; uintptr_t handle; };
 extern _GLFWlibrary _glfw;
 GLFWproc PlatformGetModuleSymbol(void* module, const char* name);
@@ -2868,7 +2634,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
 
     void _glfwPollMonitorsWin32(void) {
         int i, disconnectedCount = _glfw.monitorCount; _GLFWmonitor** disconnected = NULL; u32 adapterIndex,displayIndex; DISPLAY_DEVICEW adapter, display; _GLFWmonitor* monitor;
-        if (disconnectedCount) { disconnected = OS_Calloc(_glfw.monitorCount,sizeof(_GLFWmonitor*)); CopyMemoryFromBtoAForNBytes(disconnected,_glfw.monitors,_glfw.monitorCount * sizeof(_GLFWmonitor*)); }
+        if (disconnectedCount) { disconnected = OS_Calloc(_glfw.monitorCount,sizeof(_GLFWmonitor*)); MemCpyFromBtoAForNBytes(disconnected,_glfw.monitors,_glfw.monitorCount * sizeof(_GLFWmonitor*)); }
         for (adapterIndex = 0;;adapterIndex++) {
             int type = 1; MemSetToVForNBytes(&adapter,0,sizeof(adapter)); adapter.cb = sizeof(adapter);
             if (!EnumDisplayDevicesW(NULL, adapterIndex, &adapter, 0)) break;
@@ -3135,7 +2901,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
         XRRScreenResources* sr = _glfw.x11.randr.GetScreenResourcesCurrent(_glfw.x11.display,_glfw.x11.root);
         RROutput primary = _glfw.x11.randr.GetOutputPrimary(_glfw.x11.display,_glfw.x11.root);
         disconnectedCount = _glfw.monitorCount;
-        if (disconnectedCount) { disconnected = OS_Calloc(_glfw.monitorCount,sizeof(_GLFWmonitor*)); CopyMemoryFromBtoAForNBytes(disconnected,_glfw.monitors,_glfw.monitorCount * sizeof(_GLFWmonitor*)); }
+        if (disconnectedCount) { disconnected = OS_Calloc(_glfw.monitorCount,sizeof(_GLFWmonitor*)); MemCpyFromBtoAForNBytes(disconnected,_glfw.monitors,_glfw.monitorCount * sizeof(_GLFWmonitor*)); }
         for (int i = 0;  i < sr->noutput;  i++) {
             int j, type, widthMM, heightMM;
             XRROutputInfo* oi = _glfw.x11.randr.GetOutputInfo(_glfw.x11.display, sr, sr->outputs[i]);
@@ -3414,7 +3180,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
         if (!js) { OS_Close(linjs.fd); return 0; }
 
         StringCopyInto_A_From_B(linjs.path,path,sizeof(linjs.path));
-        CopyMemoryFromBtoAForNBytes(&js->linjs,&linjs,sizeof(linjs));
+        MemCpyFromBtoAForNBytes(&js->linjs,&linjs,sizeof(linjs));
         pollAbsState(js); JoystickConnection(js,0x00040001/*connected*/);
         return  1;
     }
@@ -3861,9 +3627,6 @@ void InputCursorPos(_GLFWwindow* win, double xpos, double ypos) { // static cons
     cam_yaw += (float)Sys_Input.currentMouse_dx * s; if (cam_yaw >= 360.0f) {cam_yaw -= 360.0f;} if (cam_yaw < 0.0f)     {cam_yaw  += 360.0f;}
     cam_pitch+=(float)Sys_Input.currentMouse_dy * s; if (cam_pitch > 89.0f) {cam_pitch = 89.0f;} if (cam_pitch < -89.0f) {cam_pitch = -89.0f;} // Avoid gimbal lock at pure 90deg
     quat_from_yaw_pitch_roll(&Sys_Global.instances[PLAYER1].rotation,cam_yaw,cam_pitch,(Sys_Global.currentLevel == LEVEL_CYBERSPACE) ? cam_roll : 0.0f);
-    Quaternion rot = Sys_Global.instances[PLAYER1].rotation; float y2 = rot.y * rot.y;  float xz = rot.x * rot.z;  float wy = rot.w * rot.y;
-    Sys_Global.instances[PLAYER1].forward = V3_Normalize((Vector3){ 2.0f * (xz + wy), 2.0f * (rot.y * rot.z - rot.w * rot.x), 1.0f - 2.0f * (rot.x * rot.x + y2) });
-    Sys_Global.instances[PLAYER1].right = V3_Normalize((Vector3){ 1.0f - 2.0f * (y2 + rot.z * rot.z), 2.0f * (rot.x * rot.y + rot.w * rot.z), 2.0f * (xz - wy) });
 }
 
 void JoystickConnection(_GLFWjoystick* js, int e) {
@@ -4040,15 +3803,15 @@ void CycleToNextMonitor(void) {
 #define STEP_MIN_NORMAL_Y 0.7f
 #define COLLISION_EPSILON 0.0001f
 #define MAX_SUBSTEPS 10
-#define MIN_DIAMETER 0.1f // m
 #define MAX_SPEED 10.0f // m/s
 #define MAX_STEP_SIZE (MIN_DIAMETER / MAX_SPEED) // 0.01 s
+#define MIN_DIAMETER 0.1f // m
 #define MAX_ANGULAR_SPEED 5.0f
-u16 dynamicEntities[512], dynamicEntityCount; //extern GlobalContext Sys_Global; extern CheatsSystem Sys_Cheats; extern u16 loadedModelsMaxIndex; extern float modelBounds[MODEL_IDX_MAX]; extern Color textColors[];
-//void* MemSetToVForNBytes(void *dst, int c, size_t n); void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n); float half_to_float(half h);
+ENGINE_TO_MOD void SetPosition(Entity* e, Vector3 newpos, bool teleport) { float d = V3_Dist(e->position,newpos); if ((d > 0.001f && d < MIN_DIAMETER) || teleport) {e->position = newpos;} }
+u16 dynamicEntities[512], dynamicEntityCount;
 typedef struct { bool hit; Vector3 point,normal; float overlapAmount; } OverlapResult;
 static inline __attribute__((always_inline)) u32 PosGetCellCoordsP(i32 cx, i32 cz) { cx = clamp(cx,0,WORLDX_0BASED); cz = clamp(cz,0,WORLDX_0BASED); return (u32)cz * WORLDX + (u32)cx; }
-static inline OverlapResult SphereSphere(Vector3 a, float ar, Vector3 b, float br) {
+static inline OverlapResult SphSph(Vector3 a, float ar, Vector3 b, float br) {
     Vector3 delta = V3_AsubB(a,b); float dist = V3_Mag(delta), radSum = (ar + br); Vector3 n = (dist < COLLISION_EPSILON) ? (Vector3){0,1,0} : V3_ScaleByF(delta,1.0f / dist);
     return (dist < radSum) ? (OverlapResult){true,V3_AplusB(b,V3_ScaleByF(n,br)),n,radSum - dist} : (OverlapResult){0,{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f},0.0f};
 }
@@ -4073,7 +3836,7 @@ static float ClosestSegmentSegment(Vector3 a0, Vector3 a1, Vector3 b0, Vector3 b
     return V3_dot(diff,diff);
 }
 
-static OverlapResult CapsuleCapsule(ShapeCapsule a, ShapeCapsule b) {
+static OverlapResult CapCap(ShapeCapsule a, ShapeCapsule b) {
     OverlapResult r = {0};
     float sc, tc; float distSq = ClosestSegmentSegment(a.base, a.tip, b.base, b.tip, &sc, &tc);
     float radSum = a.radius + b.radius; if (distSq >= radSum * radSum) return r;
@@ -4103,7 +3866,7 @@ static Vector3 ClosestPointOBB(Vector3 p, ShapeBox b) {
     return q;
 }
 
-static OverlapResult SphereOBB(Vector3 center, float radius, ShapeBox box) {
+static OverlapResult SphBox(Vector3 center, float radius, ShapeBox box) {
     OverlapResult r = {0};
     Vector3 closest = ClosestPointOBB(center,box);
     Vector3 delta = V3_AsubB(center,closest);
@@ -4148,15 +3911,16 @@ static u32 GetCollisionMask(u32 layer) {
     }
 }
 
-void Entity_GetCapsule(const Entity *e, ShapeCapsule *out) {
-    float r = e->colliderSize.x; float hi = vmax(0.0f, (e->colliderSize.y * 0.5f) - r);
-    Vector3 wc = V3_AplusB(e->position, quat_rotate_vector(e->rotation, e->colliderCenter));
-    Vector3 axis = (e->colliderSize.z < 0.5f) ? quat_rotate_vector(e->rotation,(Vector3){1,0,0}) : (e->colliderSize.z < 1.5f) ? quat_rotate_vector(e->rotation,(Vector3){0,1,0}) : quat_rotate_vector(e->rotation,(Vector3){0,0,1});
+void Entity_GetCap(const Entity *e, ShapeCapsule *out) {
+    float r = e->colliderSize.x; float hi = vmax(0.0f, (e->colliderSize.y * 0.5f) - r); Vector3 wc,axis;
+    u16 edx = (u16)(e - Sys_Global.instances);
+    if (edx == PLAYER1 || edx == PLAYER2 || e->layer == Layer_NPC) { wc = V3_AplusB(e->position, e->colliderCenter); axis = (Vector3){0.0f,1.0f,0.0f}; } // Force player capsules to remain strictly upright, ignoring camera pitch/roll
+    else { wc = V3_AplusB(e->position, quat_rotate_vector(e->rotation, e->colliderCenter)); axis = (e->colliderSize.z < 0.5f) ? quat_rotate_vector(e->rotation,(Vector3){1,0,0}) : (e->colliderSize.z < 1.5f) ? quat_rotate_vector(e->rotation,(Vector3){0,1,0}) : quat_rotate_vector(e->rotation,(Vector3){0,0,1}); }
     out->radius = r; out->base = V3_AsubB(wc,V3_ScaleByF(axis,hi)); out->tip  = V3_AplusB(wc,V3_ScaleByF(axis,hi));
 }
 
 void Entity_GetBox(const Entity *e, ShapeBox *out) { out->center=V3_AplusB(e->position,quat_rotate_vector(e->rotation,e->colliderCenter)); out->halfExtents=(Vector3){e->colliderSize.x*0.5f * e->scale.x,e->colliderSize.y*0.5f * e->scale.y,e->colliderSize.z*0.5f * e->scale.z}; out->rot=e->rotation; }
-void Entity_GetSphere(const Entity *e, ShapeSphere *out) { out->center = V3_AplusB(e->position,quat_rotate_vector(e->rotation,e->colliderCenter)); out->radius = e->colliderSize.x * vmax(e->scale.x,vmax(e->scale.y,e->scale.z)); }
+void Entity_GetSph(const Entity *e, ShapeSphere *out) { out->center = V3_AplusB(e->position,quat_rotate_vector(e->rotation,e->colliderCenter)); out->radius = e->colliderSize.x * vmax(e->scale.x,vmax(e->scale.y,e->scale.z)); }
 static inline Color ColliderColor(Entity *e) { return (!(e->entflags & ENTFLAG_RIGIDBODY)) ? textColors[TEXT_GREEN_MENU_SHADOW] : ((e->colliding) ? textColors[TEXT_RED] : textColors[TEXT_GREEN]); }
 static void DrawVelocityVector(Entity *e) {
     if (!(e->entflags & ENTFLAG_RIGIDBODY)) return;
@@ -4178,7 +3942,7 @@ void DrawBoxCollider(Entity *e) {
 }
 
 void DrawSphereCollider(Entity *e) {
-    Color col = ColliderColor(e); ShapeSphere s; Entity_GetSphere(e,&s); float step=6.28318530f/12;
+    Color col = ColliderColor(e); ShapeSphere s; Entity_GetSph(e,&s); float step=6.28318530f/12;
     for (int seg=0;seg<12;seg++) {
         float a0=seg*step,a1=a0+step,c0=vcosf(a0),s0=vsinf(a0),c1=vcosf(a1),s1=vsinf(a1);
         AddDebugLine(V3_AplusB(s.center,(Vector3){c0*s.radius,0,s0*s.radius}),V3_AplusB(s.center,(Vector3){c1*s.radius,0,s1*s.radius}),col);
@@ -4190,11 +3954,11 @@ void DrawSphereCollider(Entity *e) {
 }
 
 void DrawMeshCollider(Entity *e) {
-    Color col = ColliderColor(e); u16 mi= (e->collider == COLLIDER_TYPE_CONVEXMESH) ? e->colliderMeshIndex : e->modelIndex; if (mi >= MODEL_IDX_MAX || mi >= loadedModelsMaxIndex) return;
+    Color col = ColliderColor(e); u16 mi= (e->collider == COLTYPE_CVX) ? e->colliderMeshIndex : e->modelIndex; if (mi >= MODEL_IDX_MAX || mi >= loadedModelsMaxIndex) return;
     u32 triCount=modelTriangleCounts[mi]; if (!triCount) return;
     
     u16 idx = (u16)(e - Sys_Global.instances);
-    float M[16]; CopyMemoryFromBtoAForNBytes(M,&modelMatrices[idx*16],64);
+    float M[16]; MemCpyFromBtoAForNBytes(M,&modelMatrices[idx*16],64);
     float m00=M[0],m10=M[1],m20=M[2],m01=M[4],m11=M[5],m21=M[6],m02=M[8],m12=M[9],m22=M[10],tx=M[12],ty=M[13],tz=M[14];
     for (u32 j=0;j<triCount;j++) {
         u32 bA=(u32)modelTriangles[mi][j*3+0]*VERTEX_ATTRIBUTES_SIZE,bB=(u32)modelTriangles[mi][j*3+1]*VERTEX_ATTRIBUTES_SIZE,bC=(u32)modelTriangles[mi][j*3+2]*VERTEX_ATTRIBUTES_SIZE;
@@ -4210,7 +3974,7 @@ void DrawMeshCollider(Entity *e) {
 
 void DrawCapsuleCollider(Entity *e) {
     Color col = ColliderColor(e);
-    ShapeCapsule cap; Entity_GetCapsule(e,&cap);
+    ShapeCapsule cap; Entity_GetCap(e,&cap);
     Vector3 axis=V3_Normalize(V3_AsubB(cap.tip,cap.base));
     Vector3 ref=(vabs(axis.y)<0.9f)?(Vector3){0,1,0}:(Vector3){1,0,0};
     Vector3 perp0=V3_Normalize(V3_Cross(axis,ref)),perp1=V3_Cross(axis,perp0);
@@ -4236,7 +4000,7 @@ void DrawCapsuleCollider(Entity *e) {
 }
 
 static u16 cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX];
-float GetCollisionRadius(Entity *e) { if (e->collider == COLLIDER_TYPE_BOX) { float hx = e->colliderSize.x * 0.5f * e->scale.x, hy = e->colliderSize.y * 0.5f * e->scale.y, hz = e->colliderSize.z * 0.5f * e->scale.z; return vsqrtf(hx*hx + hy*hy + hz*hz); } return e->colliderSize.x; }
+float GetCollisionRadius(Entity *e) { if (e->collider == COLTYPE_BOX) { float hx = e->colliderSize.x * 0.5f * e->scale.x, hy = e->colliderSize.y * 0.5f * e->scale.y, hz = e->colliderSize.z * 0.5f * e->scale.z; return vsqrtf(hx*hx + hy*hy + hz*hz); } return e->colliderSize.x; }
 Quaternion quat_from_axis_angle(Vector3 axis, float angle) { float half = angle * 0.5f; float s = vsinf(half); return (Quaternion){axis.x * s,axis.y * s,axis.z * s,vcosf(half)}; }
 Quaternion quat_normalize(Quaternion q) { float len2 = q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w; if (len2 < COLLISION_EPSILON) {return (Quaternion){0,0,0,1};} float inv = 1.0f / vsqrtf(len2); q.x *= inv; q.y *= inv; q.z *= inv; q.w *= inv; return q; }
 static void ApplyVelocity(Entity *e, float dt) {
@@ -4247,9 +4011,8 @@ static void ApplyVelocity(Entity *e, float dt) {
     if (speed > MAX_SPEED) e->velocity = V3_ScaleByF(V3_ScaleByF(e->velocity, 1.f / speed),MAX_SPEED);
     float linDrag = vexp(-2.0f * dt);
     e->velocity = V3_ScaleByF(e->velocity,linDrag);
-    e->position = V3_AplusB(e->position,V3_ScaleByF(e->velocity,dt));
-    u16 edx = (u16)(e - Sys_Global.instances); Sys_Global.dirtyInstances[edx] = true;
-    if (e->collider != COLLIDER_TYPE_CAPSULE) {
+    SetPosition(e,V3_AplusB(e->position,V3_ScaleByF(e->velocity,dt)),false); // pos += (d = v*t)
+    if (e->collider != COLTYPE_CAP) {
         float avel = V3_Mag(e->angularVelocity);
         if (avel > MAX_ANGULAR_SPEED) { e->angularVelocity = V3_ScaleByF(V3_ScaleByF(e->angularVelocity,1.f / avel),MAX_ANGULAR_SPEED); avel = MAX_ANGULAR_SPEED; }
         float dragFactor = vexp(-e->angularDrag * dt);
@@ -4259,7 +4022,59 @@ static void ApplyVelocity(Entity *e, float dt) {
     } else e->angularVelocity = (Vector3){0.0f,0.0f,0.0f};
 }
 
-static OverlapResult BoxBoxSAT(ShapeBox a, ShapeBox b) {
+// Accumulate inertia tensor of a tetrahedron (origin, v0, v1, v2) into acc[6].  Uses the covariance-integral formula — sign handles winding/concavities.
+static void AccumTetraInertia(float acc[6], Vector3 v0, Vector3 v1, Vector3 v2) {
+    float det = V3_dot(v0, V3_Cross(v1, v2)); // signed tet volume * 6
+    acc[0] += det * (v0.y*v0.y + v0.y*v1.y + v1.y*v1.y + v0.y*v2.y + v1.y*v2.y + v2.y*v2.y + v0.z*v0.z + v0.z*v1.z + v1.z*v1.z + v0.z*v2.z + v1.z*v2.z + v2.z*v2.z); // Diagonal: integral of (y²+z²), (x²+z²), (x²+y²) over tet
+    acc[1] += det * (v0.x*v0.x + v0.x*v1.x + v1.x*v1.x + v0.x*v2.x + v1.x*v2.x + v2.x*v2.x + v0.z*v0.z + v0.z*v1.z + v1.z*v1.z + v0.z*v2.z + v1.z*v2.z + v2.z*v2.z);
+    acc[2] += det * (v0.x*v0.x + v0.x*v1.x + v1.x*v1.x + v0.x*v2.x + v1.x*v2.x + v2.x*v2.x + v0.y*v0.y + v0.y*v1.y + v1.y*v1.y + v0.y*v2.y + v1.y*v2.y + v2.y*v2.y);
+    acc[3] += det * (2*v0.x*v0.y + v0.x*v1.y + v0.x*v2.y + v1.x*v0.y + 2*v1.x*v1.y + v1.x*v2.y + v2.x*v0.y + v2.x*v1.y + 2*v2.x*v2.y); // Off-diagonal: integral of -xy, -xz, -yz (products of inertia)
+    acc[4] += det * (2*v0.x*v0.z + v0.x*v1.z + v0.x*v2.z + v1.x*v0.z + 2*v1.x*v1.z + v1.x*v2.z + v2.x*v0.z + v2.x*v1.z + 2*v2.x*v2.z);
+    acc[5] += det * (2*v0.y*v0.z + v0.y*v1.z + v0.y*v2.z + v1.y*v0.z + 2*v1.y*v1.z + v1.y*v2.z + v2.y*v0.z + v2.y*v1.z + 2*v2.y*v2.z);
+}
+
+void ComputeConvexMeshInertiaTensor(Entity *e) {
+    u16 mi = e->colliderMeshIndex; e->inertiaTensorValid = false;
+    if (mi >= MODEL_IDX_MAX || !modelTriangleCounts[mi] || !modelVertexCounts[mi]) return;
+    float acc[6] = {0}; float volAcc = 0.f; u32 triCount = modelTriangleCounts[mi];
+    for (u32 ti = 0; ti < triCount; ++ti) {
+        u32 i0=modelTriangles[mi][ti*3+0], i1=modelTriangles[mi][ti*3+1], i2=modelTriangles[mi][ti*3+2];
+        #define LV(i) (Vector3){half_to_float(*(half*)(modelVertices[mi]+(i)*VERTEX_ATTRIBUTES_SIZE+0)), half_to_float(*(half*)(modelVertices[mi]+(i)*VERTEX_ATTRIBUTES_SIZE+2)), half_to_float(*(half*)(modelVertices[mi]+(i)*VERTEX_ATTRIBUTES_SIZE+4))}
+        Vector3 v0=LV(i0), v1=LV(i1), v2=LV(i2);
+        #undef LV
+        volAcc += V3_dot(v0, V3_Cross(v1, v2));
+        AccumTetraInertia(acc, v0, v1, v2);
+    }
+    if (vabs(volAcc) < COLLISION_EPSILON) return;
+    float s = e->mass / (volAcc * 60.f), so = e->mass / (volAcc * 120.f);
+    float mn = e->mass * 0.0001f;
+    e->inertiaTensor[0] = vmax(( acc[1]+acc[2])*s, mn); // Ixx = (Iyy+Izz terms)
+    e->inertiaTensor[1] = vmax(( acc[0]+acc[2])*s, mn); // Iyy
+    e->inertiaTensor[2] = vmax(( acc[0]+acc[1])*s, mn); // Izz
+    e->inertiaTensor[3] = -acc[3]*so;                   // Ixy (product of inertia, negated)
+    e->inertiaTensor[4] = -acc[4]*so;                   // Ixz
+    e->inertiaTensor[5] = -acc[5]*so;                   // Iyz
+    e->inertiaTensorValid = true;
+}
+
+// Returns moment of inertia about world-space axis 'n' for entity e.
+// Falls back to sphere approximation only if tensor wasn't computed.
+static float GetMomentOfInertia(Entity *e, Vector3 n) {
+    if (e->collider != COLTYPE_CVX || !e->inertiaTensorValid) {
+        float r = (e->collider == COLTYPE_MSH) ? modelBounds[e->modelIndex] : (e->collider == COLTYPE_CVX) ? modelBounds[e->colliderMeshIndex] : GetCollisionRadius(e);
+        return (2.f / 5.f) * e->mass * r * r;
+    }
+    // Rotate n into entity local space, then apply I·n, dot with n: gives I_n = nᵀ·I·n
+    Vector3 ln = quat_rotate_vector((Quaternion){-e->rotation.x,-e->rotation.y,-e->rotation.z,e->rotation.w},n); // Use quat conjugate
+    float Ixx=e->inertiaTensor[0], Iyy=e->inertiaTensor[1], Izz=e->inertiaTensor[2];
+    float Ixy=e->inertiaTensor[3], Ixz=e->inertiaTensor[4], Iyz=e->inertiaTensor[5];
+    // I·ln (matrix-vector with symmetric I, products of inertia are negative off-diag)
+    Vector3 In = {Ixx*ln.x - Ixy*ln.y - Ixz*ln.z,-Ixy*ln.x + Iyy*ln.y - Iyz*ln.z,-Ixz*ln.x - Iyz*ln.y + Izz*ln.z};
+    float moment = V3_dot(ln,In);
+    return vmax(moment, COLLISION_EPSILON);
+}
+
+static OverlapResult BoxBox(ShapeBox a, ShapeBox b) {
     OverlapResult r = {0}; Vector3 aAxes[3],bAxes[3];
     obb_axes(a.rot,&aAxes[0],&aAxes[1],&aAxes[2]);
     obb_axes(b.rot,&bAxes[0],&bAxes[1],&bAxes[2]);
@@ -4327,7 +4142,6 @@ static inline Vector3 BoxSupport(ShapeBox b, Vector3 d) {
 }
 
 static inline Vector3 CapsuleSupport(ShapeCapsule cap, Vector3 d) { float db = V3_dot(cap.base,d),dt = V3_dot(cap.tip,d); Vector3 best = (dt > db) ? cap.tip : cap.base; float L = V3_dot(d,d); if (L < COLLISION_EPSILON) {return best;} return V3_AplusB(best,V3_ScaleByF(d,cap.radius / vsqrtf(L))); }
-static inline Vector3 MinkowskiSupportCapsuleMesh(ShapeCapsule cap, u16 mesh, const float* mx, Vector3 d) { return V3_AsubB(CapsuleSupport(cap, d), MeshSupport(mesh, mx, (Vector3){-d.x,-d.y,-d.z})); }
 static bool GJKNextSimplex(Simplex3D *s, Vector3 *dir) {
     Vector3 A=s->v[s->n-1], AO={-A.x,-A.y,-A.z};
     if (s->n==2) {
@@ -4366,125 +4180,68 @@ static bool GJKNextSimplex(Simplex3D *s, Vector3 *dir) {
 #define EPA_MAX_VERTS  128
 #define EPA_MAX_EDGES  (EPA_MAX_FACES*3)
 typedef struct { int a,b,c; Vector3 n; float d; } EPAFace;
-static inline EPAFace MakeEPAFace(const Vector3* vb, int a, int b, int c) {
-    Vector3 n = V3_Cross(V3_AsubB(vb[b],vb[a]),V3_AsubB(vb[c],vb[a]));
+typedef struct { Vector3 v, wA, wB; } EPAVert;
+static inline EPAFace MakeEPAFace(const EPAVert* vb, int a, int b, int c) {
+    Vector3 n = V3_Cross(V3_AsubB(vb[b].v,vb[a].v),V3_AsubB(vb[c].v,vb[a].v));
     float L = V3_Mag(n); if (L < COLLISION_EPSILON) return (EPAFace){a,b,c,{0},0.f};
     
-    n = V3_ScaleByF(n,1.f/L);
-    float d = V3_dot(n,vb[a]);
+    n = V3_ScaleByF(n,1.f/L); float d = V3_dot(n,vb[a].v);
     if (d < 0.f) { n=(Vector3){-n.x,-n.y,-n.z}; d=-d; int t=b;b=c;c=t; }
     return (EPAFace){a,b,c,n,d};
 }
 
-static OverlapResult ConvexMeshOverlap(u16 meshA, u16 meshB, const float* matA, const float* matB) {
-    OverlapResult r = {0}; if (meshA >= MODEL_IDX_MAX || meshB >= MODEL_IDX_MAX) return r;
+static inline Vector3 EPAContactPoint(const EPAVert* ev, int a, int b, int c, Vector3 n, float d) { // Barycentric projection of origin onto triangle (a,b,c) -> interpolate wA for contact point
+    Vector3 pa=ev[a].v, pb=ev[b].v, pc=ev[c].v; Vector3 proj = V3_ScaleByF(n, d); // origin projected onto face plane
+    Vector3 v0=V3_AsubB(pb,pa), v1=V3_AsubB(pc,pa), v2=V3_AsubB(proj,pa);
+    float d00=V3_dot(v0,v0), d01=V3_dot(v0,v1), d11=V3_dot(v1,v1), d20=V3_dot(v2,v0), d21=V3_dot(v2,v1);
+    float inv=1.f/(d00*d11-d01*d01+COLLISION_EPSILON);
+    float v=(d11*d20-d01*d21)*inv, w=(d00*d21-d01*d20)*inv, u=1.f-v-w;
+    return (Vector3){u*ev[a].wA.x+v*ev[b].wA.x+w*ev[c].wA.x, u*ev[a].wA.y+v*ev[b].wA.y+w*ev[c].wA.y, u*ev[a].wA.z+v*ev[b].wA.z+w*ev[c].wA.z};
+}
 
-    Simplex3D s = {0}; Vector3 dir = {0,1,0};
+static OverlapResult CvxCvx(u16 meshA, u16 meshB, const float* matA, const float* matB) {
+    OverlapResult r = {0}; if (meshA >= MODEL_IDX_MAX || meshB >= MODEL_IDX_MAX) return r;
+    Simplex3D s = {0}; Vector3 dir = {0.0f,1.0f,0.0f};
     s.v[s.n++] = MinkowskiSupport(meshA,matA,meshB,matB,dir);
     dir = (Vector3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
-    if (V3_dot(dir,dir) < COLLISION_EPSILON) dir=(Vector3){0,1,0};
-    for (int it=0; it<64; ++it) { // ── GJK ──
+    if (V3_dot(dir,dir) < COLLISION_EPSILON) dir=(Vector3){0.0f,1.0f,0.0f};
+    for (int it=0;it<64;++it) {
         Vector3 sup = MinkowskiSupport(meshA,matA,meshB,matB,dir);
         if (V3_dot(sup,dir) < COLLISION_EPSILON) return r;
-        
         s.v[s.n++] = sup;
-        if (!GJKNextSimplex(&s,&dir)) { r.hit=true; break; }
-        if (V3_dot(dir,dir) < COLLISION_EPSILON) { r.hit=true; break; }
+        if (!GJKNextSimplex(&s,&dir) || (V3_dot(dir,dir) < COLLISION_EPSILON)) { r.hit=true; break; }
     }
-    
     if (!r.hit) return r;
 
-    // ── Expand simplex to tetrahedron for EPA ──
     static const Vector3 kAxes[6] = {{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
-    for (int d=0; s.n<4 && d<6; ++d) {
-        Vector3 sup = MinkowskiSupport(meshA,matA,meshB,matB,kAxes[d]);
-        bool dup=false;
+    for (int d=0;s.n<4 && d<6;++d) {
+        Vector3 sup = MinkowskiSupport(meshA,matA,meshB,matB,kAxes[d]); bool dup=false;
         for (int k=0;k<s.n;k++) { Vector3 dv=V3_AsubB(sup,s.v[k]); dup|=(V3_dot(dv,dv)<COLLISION_EPSILON*COLLISION_EPSILON); }
         if (!dup) s.v[s.n++]=sup;
     }
-    
     if (s.n < 4) { r.hit=true; return r; }
 
-    Vector3 ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0, nf=0;
-    for (int i=0;i<4;i++) ev[nv++]=s.v[i];
+    EPAVert ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0, nf=0;
+    for (int i=0;i<4;i++) { ev[nv].wA=MeshSupport(meshA,matA,s.v[i]); ev[nv].wB=MeshSupport(meshB,matB,(Vector3){-s.v[i].x,-s.v[i].y,-s.v[i].z}); ev[nv].v=s.v[i]; nv++; }
     static const int kTetFaces[4][3] = {{0,1,2},{0,3,1},{0,2,3},{1,3,2}};
-    for (int f=0;f<4;f++) { EPAFace face = MakeEPAFace(ev, kTetFaces[f][0], kTetFaces[f][1], kTetFaces[f][2]); if (face.d >= 0.f && nf < EPA_MAX_FACES) {ef[nf++]=face;} }
-    for (int it=0; it<32; ++it) { // EPA, Closest face to origin (min distance)
-        int bf=-1; float bd=1e9f;
-        for (int f=0;f<nf;f++) { if(ef[f].d<bd){bd=ef[f].d;bf=f;} }
-        if (bf<0) break;
-
-        Vector3 bn=ef[bf].n; Vector3 sup=MinkowskiSupport(meshA,matA,meshB,matB,bn);
-        float sdot = V3_dot(bn,sup); if (sdot - bd < COLLISION_EPSILON) { r.normal = bn; r.point = V3_ScaleByF(bn, bd); r.overlapAmount = bd; return r; }
-        if (nv >= EPA_MAX_VERTS) break;
-        
-        ev[nv]=sup; int edges[EPA_MAX_EDGES][2],ne=0,keep[EPA_MAX_FACES],nk=0; // Silhouette edges — remove visible faces, collect unique boundary
-        for (int f=0;f<nf;f++) {
-            if (V3_dot(ef[f].n, V3_AsubB(sup,ev[ef[f].a])) > 0.f) {
-                int fv[3]={ef[f].a,ef[f].b,ef[f].c};
-                for (int e=0;e<3;e++) { // Add edges to silhouette (XOR)
-                    int ea=fv[e], eb=fv[(e+1)%3]; bool found=false;
-                    for (int k=0;k<ne;k++) if(edges[k][0]==eb&&edges[k][1]==ea){ edges[k][0]=edges[--ne][0]; edges[k][1]=edges[ne][1]; found=true; break; }
-                    if (!found && ne<EPA_MAX_EDGES) { edges[ne][0]=ea; edges[ne++][1]=eb; }
-                }
-            } else keep[nk++]=f;
-        }
-       
-        nf=0;
-        for (int k=0;k<nk;k++) ef[nf++]=ef[keep[k]];
-        for (int k=0;k<ne&&nf<EPA_MAX_FACES;k++) { EPAFace face = MakeEPAFace(ev,edges[k][0],edges[k][1],nv); if (face.d >= 0.f) {ef[nf++]=face;} } // Rebuild face list
-        nv++;
-    }
-
-    r.hit=true;
-    return r;
-}
-
-static OverlapResult CapsuleConvexMesh(ShapeCapsule cap, u16 mesh, const float* mx) { // GJK+EPA: capsule vs convex mesh.  Normal convention: points from mesh toward capsule (from o toward e).
-    OverlapResult r = {0};
-    if (mesh >= MODEL_IDX_MAX || !modelVertexCounts[mesh]) return r;
-
-    #define CSUP(d) MinkowskiSupportCapsuleMesh(cap, mesh, mx, d)
-    Simplex3D s = {0}; Vector3 dir = {0,1,0};
-    s.v[s.n++] = CSUP(dir);
-    dir = (Vector3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
-    if (V3_dot(dir,dir) < COLLISION_EPSILON) dir = (Vector3){0,1,0};
-    for (int it=0; it<64; ++it) {
-        Vector3 sup = CSUP(dir);
-        if (V3_dot(sup,dir) < COLLISION_EPSILON) { return r; }
-        s.v[s.n++] = sup;
-        if (!GJKNextSimplex(&s,&dir)) { r.hit=true; break; }
-        if (V3_dot(dir,dir) < COLLISION_EPSILON) { r.hit=true; break; }
-    }
-    if (!r.hit) return r;
-
-    static const Vector3 kAx[6] = {{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
-    for (int d=0; s.n<4 && d<6; ++d) {
-        Vector3 sup = CSUP(kAx[d]); bool dup = false;
-        for (int k=0;k<s.n;k++) { Vector3 dv=V3_AsubB(sup,s.v[k]); dup|=(V3_dot(dv,dv)<COLLISION_EPSILON*COLLISION_EPSILON); }
-        if (!dup) s.v[s.n++] = sup;
-    }
-    if (s.n < 4) { r.hit=true; return r; }
-
-    Vector3 ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0, nf=0;
-    for (int i=0;i<4;i++) ev[nv++] = s.v[i];
-    static const int kTF[4][3] = {{0,1,2},{0,3,1},{0,2,3},{1,3,2}};
-    for (int f=0;f<4;f++) { EPAFace face=MakeEPAFace(ev,kTF[f][0],kTF[f][1],kTF[f][2]); if(face.d>=0.f && nf<EPA_MAX_FACES) ef[nf++]=face; }
-
+    for (int f=0;f<4;f++) { EPAFace face = MakeEPAFace(ev, kTetFaces[f][0], kTetFaces[f][1], kTetFaces[f][2]); if (face.d >= 0.f && nf < EPA_MAX_FACES) ef[nf++]=face; }
     for (int it=0; it<32; ++it) {
         int bf=-1; float bd=1e9f;
         for (int f=0;f<nf;f++) if(ef[f].d<bd){bd=ef[f].d;bf=f;}
         if (bf<0) break;
-        Vector3 bn=ef[bf].n, sup=CSUP(bn);
-        if (V3_dot(bn,sup)-bd < COLLISION_EPSILON) { r.normal=bn; r.point=V3_ScaleByF(bn,bd); r.overlapAmount=bd; return r; }
-        if (nv>=EPA_MAX_VERTS) break;
-        ev[nv]=sup;
-        int edges[EPA_MAX_EDGES][2], ne=0, keep[EPA_MAX_FACES], nk=0;
+        Vector3 bn=ef[bf].n; Vector3 wA=MeshSupport(meshA,matA,bn); Vector3 wB=MeshSupport(meshB,matB,(Vector3){-bn.x,-bn.y,-bn.z}); Vector3 sup=V3_AsubB(wA,wB);
+        float sdot = V3_dot(bn,sup);
+        if (sdot - bd < COLLISION_EPSILON) { r.normal=bn; r.overlapAmount=bd; r.point=EPAContactPoint(ev,ef[bf].a,ef[bf].b,ef[bf].c,bn,bd); return r; }
+        if (nv >= EPA_MAX_VERTS) break;
+        
+        ev[nv].v=sup; ev[nv].wA=wA; ev[nv].wB=wB;
+        int edges[EPA_MAX_EDGES][2],ne=0,keep[EPA_MAX_FACES],nk=0;
         for (int f=0;f<nf;f++) {
-            if (V3_dot(ef[f].n, V3_AsubB(sup,ev[ef[f].a])) > 0.f) {
+            if (V3_dot(ef[f].n, V3_AsubB(sup,ev[ef[f].a].v)) > 0.f) {
                 int fv[3]={ef[f].a,ef[f].b,ef[f].c};
                 for (int e=0;e<3;e++) { int ea=fv[e],eb=fv[(e+1)%3]; bool found=false;
                     for (int k=0;k<ne;k++) if(edges[k][0]==eb&&edges[k][1]==ea){edges[k][0]=edges[--ne][0];edges[k][1]=edges[ne][1];found=true;break;}
+                    
                     if (!found&&ne<EPA_MAX_EDGES){edges[ne][0]=ea;edges[ne++][1]=eb;} }
             } else keep[nk++]=f;
         }
@@ -4492,64 +4249,112 @@ static OverlapResult CapsuleConvexMesh(ShapeCapsule cap, u16 mesh, const float* 
         for(int k=0;k<ne&&nf<EPA_MAX_FACES;k++){EPAFace face=MakeEPAFace(ev,edges[k][0],edges[k][1],nv);if(face.d>=0.f)ef[nf++]=face;}
         nv++;
     }
+    r.hit=true; return r;
+}
+
+static OverlapResult CapCvx(ShapeCapsule cap, u16 mesh, const float* mx) {
+    OverlapResult r = {0}; if (mesh >= MODEL_IDX_MAX || !modelVertexCounts[mesh]) return r;
+    
+    #define CSUP_A(d) CapsuleSupport(cap, d)
+    #define CSUP_B(d) MeshSupport(mesh, mx, (Vector3){-(d).x,-(d).y,-(d).z})
+    #define CSUP(d)   V3_AsubB(CSUP_A(d), CSUP_B(d))
+    Simplex3D s = {0}; Vector3 dir = {0,1,0};
+    s.v[s.n++] = CSUP(dir); dir = (Vector3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
+    if (V3_dot(dir,dir) < COLLISION_EPSILON) dir=(Vector3){0,1,0};
+    for (int it=0; it<64; ++it) {
+        Vector3 sup=CSUP(dir); if (V3_dot(sup,dir)<COLLISION_EPSILON) return r;
+        
+        s.v[s.n++]=sup;
+        if (!GJKNextSimplex(&s,&dir)) { r.hit=true; break; }
+        if (V3_dot(dir,dir)<COLLISION_EPSILON) { r.hit=true; break; }
+    }
+    if (!r.hit) return r;
+    static const Vector3 kAx[6]={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
+    for (int d=0;s.n<4&&d<6;++d) {
+        Vector3 sup=CSUP(kAx[d]); bool dup=false;
+        for (int k=0;k<s.n;k++){Vector3 dv=V3_AsubB(sup,s.v[k]);dup|=(V3_dot(dv,dv)<COLLISION_EPSILON*COLLISION_EPSILON);}
+        if (!dup) s.v[s.n++]=sup;
+    }
+    if (s.n<4){r.hit=true;return r;}
+    EPAVert ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0,nf=0;
+    for (int i=0;i<4;i++){ev[nv].wA=CSUP_A(s.v[i]);ev[nv].wB=CSUP_B(s.v[i]);ev[nv].v=s.v[i];nv++;}
+    static const int kTF[4][3]={{0,1,2},{0,3,1},{0,2,3},{1,3,2}};
+    for (int f=0;f<4;f++){EPAFace face=MakeEPAFace(ev,kTF[f][0],kTF[f][1],kTF[f][2]);if(face.d>=0.f&&nf<EPA_MAX_FACES)ef[nf++]=face;}
+    for (int it=0;it<32;++it){
+        int bf=-1; float bd=1e9f;
+        for (int f=0;f<nf;f++) if(ef[f].d<bd){bd=ef[f].d;bf=f;}
+        if (bf<0) break;
+        Vector3 bn=ef[bf].n; Vector3 wA=CSUP_A(bn); Vector3 wB=CSUP_B(bn); Vector3 sup=V3_AsubB(wA,wB);
+        if (V3_dot(bn,sup)-bd<COLLISION_EPSILON){r.normal=bn;r.overlapAmount=bd;r.point=EPAContactPoint(ev,ef[bf].a,ef[bf].b,ef[bf].c,bn,bd);return r;}
+        if (nv>=EPA_MAX_VERTS) break;
+        
+        ev[nv].v=sup; ev[nv].wA=wA; ev[nv].wB=wB;
+        int edges[EPA_MAX_EDGES][2],ne=0,keep[EPA_MAX_FACES],nk=0;
+        for (int f=0;f<nf;f++){
+            if (V3_dot(ef[f].n,V3_AsubB(sup,ev[ef[f].a].v))>0.f){
+                int fv[3]={ef[f].a,ef[f].b,ef[f].c};
+                for (int e=0;e<3;e++){int ea=fv[e],eb=fv[(e+1)%3];bool found=false;
+                    for (int k=0;k<ne;k++)if(edges[k][0]==eb&&edges[k][1]==ea){edges[k][0]=edges[--ne][0];edges[k][1]=edges[ne][1];found=true;break;}
+                    if (!found&&ne<EPA_MAX_EDGES){edges[ne][0]=ea;edges[ne++][1]=eb;}}
+            } else keep[nk++]=f;
+        }
+        nf=0;for(int k=0;k<nk;k++)ef[nf++]=ef[keep[k]];
+        for(int k=0;k<ne&&nf<EPA_MAX_FACES;k++){EPAFace face=MakeEPAFace(ev,edges[k][0],edges[k][1],nv);if(face.d>=0.f)ef[nf++]=face;}
+        nv++;
+    }
+    #undef CSUP_A
+    #undef CSUP_B
     #undef CSUP
     r.hit=true; return r;
 }
 
-static inline Vector3 MinkowskiSupportBoxMesh(ShapeBox box, u16 mesh, const float* mx, Vector3 d) { return V3_AsubB(BoxSupport(box,d),MeshSupport(mesh,mx,(Vector3){-d.x,-d.y,-d.z})); }
-static OverlapResult BoxConvexMesh(ShapeBox box, u16 mesh, const float* mx) {
+static OverlapResult BoxCvx(ShapeBox box, u16 mesh, const float* mx) {
     OverlapResult r = {0}; if (mesh >= MODEL_IDX_MAX || !modelVertexCounts[mesh]) return r;
-
-    #define BOXSUP(d) MinkowskiSupportBoxMesh(box, mesh, mx, d)
-    Simplex3D s = {0}; Vector3 dir = {0,1,0};
-    s.v[s.n++] = BOXSUP(dir);
-    dir = (Vector3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
-    if (V3_dot(dir,dir) < COLLISION_EPSILON) dir = (Vector3){0,1,0};
-    for (int it=0; it<64; ++it) {
-        Vector3 sup = BOXSUP(dir); if (V3_dot(sup,dir) < COLLISION_EPSILON) return r;
-        s.v[s.n++] = sup;
-        if (!GJKNextSimplex(&s,&dir)) { r.hit=true; break; }
-        if (V3_dot(dir,dir) < COLLISION_EPSILON) { r.hit=true; break; }
+    #define BSUP(d)   V3_AsubB(BoxSupport(box,d),MeshSupport(mesh,mx,(Vector3){-(d).x,-(d).y,-(d).z}))
+    Simplex3D s={0}; Vector3 dir={0,1,0};
+    s.v[s.n++]=BSUP(dir); dir=(Vector3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
+    if (V3_dot(dir,dir)<COLLISION_EPSILON) dir=(Vector3){0,1,0};
+    for (int it=0;it<64;++it){
+        Vector3 sup=BSUP(dir); if (V3_dot(sup,dir)<COLLISION_EPSILON) return r;
+        s.v[s.n++]=sup;
+        if (!GJKNextSimplex(&s,&dir)){r.hit=true;break;}
+        if (V3_dot(dir,dir)<COLLISION_EPSILON){r.hit=true;break;}
     }
     if (!r.hit) return r;
-
-    static const Vector3 kAx[6] = {{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
-    for (int d=0; s.n<4 && d<6; ++d) {
-        Vector3 sup = BOXSUP(kAx[d]); bool dup = false;
-        for (int k=0;k<s.n;k++) { Vector3 dv=V3_AsubB(sup,s.v[k]); dup|=(V3_dot(dv,dv)<COLLISION_EPSILON*COLLISION_EPSILON); }
-        if (!dup) s.v[s.n++] = sup;
+    static const Vector3 kAx[6]={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
+    for (int d=0;s.n<4&&d<6;++d){
+        Vector3 sup=BSUP(kAx[d]); bool dup=false;
+        for (int k=0;k<s.n;k++){Vector3 dv=V3_AsubB(sup,s.v[k]);dup|=(V3_dot(dv,dv)<COLLISION_EPSILON*COLLISION_EPSILON);}
+        if (!dup) s.v[s.n++]=sup;
     }
-    if (s.n < 4) { r.hit=true; return r; }
-
-    Vector3 ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0, nf=0;
-    for (int i=0;i<4;i++) ev[nv++] = s.v[i];
-    static const int kTF[4][3] = {{0,1,2},{0,3,1},{0,2,3},{1,3,2}};
-    for (int f=0;f<4;f++) { EPAFace face=MakeEPAFace(ev,kTF[f][0],kTF[f][1],kTF[f][2]); if(face.d>=0.f && nf<EPA_MAX_FACES) ef[nf++]=face; }
-
-    for (int it=0; it<32; ++it) {
+    if (s.n<4){r.hit=true;return r;}
+    EPAVert ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0,nf=0;
+    for (int i=0;i<4;i++){ev[nv].wA=BoxSupport(box,s.v[i]);ev[nv].wB=MeshSupport(mesh,mx,(Vector3){-s.v[i].x,-s.v[i].y,-s.v[i].z});ev[nv].v=s.v[i];nv++;}
+    static const int kTF[4][3]={{0,1,2},{0,3,1},{0,2,3},{1,3,2}};
+    for (int f=0;f<4;f++){EPAFace face=MakeEPAFace(ev,kTF[f][0],kTF[f][1],kTF[f][2]);if(face.d>=0.f&&nf<EPA_MAX_FACES)ef[nf++]=face;}
+    for (int it=0;it<32;++it){
         int bf=-1; float bd=1e9f;
         for (int f=0;f<nf;f++) if(ef[f].d<bd){bd=ef[f].d;bf=f;}
         if (bf<0) break;
-        Vector3 bn=ef[bf].n, sup=BOXSUP(bn);
-        if (V3_dot(bn,sup) - bd < COLLISION_EPSILON) { r.normal = bn; r.point = MeshSupport(mesh,mx,(Vector3){-bn.x,-bn.y,-bn.z}); r.overlapAmount = bd; return r; }
+        Vector3 bn=ef[bf].n; Vector3 wA=BoxSupport(box,bn); Vector3 wB=MeshSupport(mesh,mx,(Vector3){-bn.x,-bn.y,-bn.z}); Vector3 sup=V3_AsubB(wA,wB);
+        if (V3_dot(bn,sup)-bd<COLLISION_EPSILON){r.normal=bn;r.overlapAmount=bd;r.point=EPAContactPoint(ev,ef[bf].a,ef[bf].b,ef[bf].c,bn,bd);return r;}
         if (nv>=EPA_MAX_VERTS) break;
-
-        ev[nv]=sup;
-        int edges[EPA_MAX_EDGES][2], ne=0, keep[EPA_MAX_FACES], nk=0;
-        for (int f=0;f<nf;f++) {
-            if (V3_dot(ef[f].n, V3_AsubB(sup,ev[ef[f].a])) > 0.f) {
+        ev[nv].v=sup; ev[nv].wA=wA; ev[nv].wB=wB;
+        int edges[EPA_MAX_EDGES][2],ne=0,keep[EPA_MAX_FACES],nk=0;
+        for (int f=0;f<nf;f++){
+            if (V3_dot(ef[f].n,V3_AsubB(sup,ev[ef[f].a].v))>0.f){
                 int fv[3]={ef[f].a,ef[f].b,ef[f].c};
-                for (int e=0;e<3;e++) { int ea=fv[e],eb=fv[(e+1)%3]; bool found=false;
-                    for (int k=0;k<ne;k++) if(edges[k][0]==eb&&edges[k][1]==ea){edges[k][0]=edges[--ne][0];edges[k][1]=edges[ne][1];found=true;break;}
-                    if (!found&&ne<EPA_MAX_EDGES){edges[ne][0]=ea;edges[ne++][1]=eb;} }
+                for (int e=0;e<3;e++){int ea=fv[e],eb=fv[(e+1)%3];bool found=false;
+                    for (int k=0;k<ne;k++)if(edges[k][0]==eb&&edges[k][1]==ea){edges[k][0]=edges[--ne][0];edges[k][1]=edges[ne][1];found=true;break;}
+                    if (!found&&ne<EPA_MAX_EDGES){edges[ne][0]=ea;edges[ne++][1]=eb;}}
             } else keep[nk++]=f;
         }
-        nf=0; for(int k=0;k<nk;k++) ef[nf++]=ef[keep[k]];
+        nf=0;for(int k=0;k<nk;k++)ef[nf++]=ef[keep[k]];
         for(int k=0;k<ne&&nf<EPA_MAX_FACES;k++){EPAFace face=MakeEPAFace(ev,edges[k][0],edges[k][1],nv);if(face.d>=0.f)ef[nf++]=face;}
         nv++;
     }
-    #undef BOXSUP
-    return r;
+    #undef BSUP
+    r.hit=true; return r;
 }
 
 static void inline FeatureOverlap(Vector3 sc, float sr, Vector3 pt, OverlapResult* r) {
@@ -4557,7 +4362,7 @@ static void inline FeatureOverlap(Vector3 sc, float sr, Vector3 pt, OverlapResul
     if (dist2 < sr*sr) { float dist=vsqrtf(vmax(dist2,0.0f)); OverlapResult t={true,pt,(dist>COLLISION_EPSILON) ? V3_ScaleByF(delta,1.0f/dist) : (Vector3){0.0f,1.0f,0.0f},sr - dist}; if(t.overlapAmount>r->overlapAmount) *r=t; }
 }
 
-static OverlapResult SphereTriMesh(Vector3 sc, float sr, u16 mesh, const float* mx) { // Triangle-soup mesh support: test sphere/capsule against all triangles of a static mesh.  Returns deepest overlapping triangle result.  Normal points from mesh toward mover.
+static OverlapResult SphMsh(Vector3 sc, float sr, u16 mesh, const float* mx) { // Triangle-soup mesh support: test sphere/capsule against all triangles of a static mesh.  Returns deepest overlapping triangle result.  Normal points from mesh toward mover. Voronoi region closest point.
     OverlapResult r = {0}; if (mesh >= MODEL_IDX_MAX) return r;
     u32 triCount = modelTriangleCounts[mesh]; if (!triCount) return r;
 
@@ -4590,78 +4395,68 @@ static OverlapResult SphereTriMesh(Vector3 sc, float sr, u16 mesh, const float* 
 
         n=V3_ScaleByF(n,1.f/nLen); float dist=V3_dot(n,ap); // signed distance from plane (positive = above)
         float absDist=vabs(dist);
-        if (absDist < sr) { Vector3 fn = (dist >= 0.f) ? n : (Vector3){-n.x,-n.y,-n.z}; OverlapResult t={true,V3_AsubB(sc,V3_ScaleByF(fn,absDist)),fn,sr-absDist}; if(t.overlapAmount>r.overlapAmount) {r=t;} } // Back-face: if sphere is below the triangle, flip normal so response pushes it out correctly
+        if (absDist < sr) { Vector3 fn = (dist >= 0.0f) ? n : (Vector3){-n.x,-n.y,-n.z}; OverlapResult t={true,V3_AsubB(sc,V3_ScaleByF(fn,absDist)),fn,sr-absDist}; if(t.overlapAmount>r.overlapAmount) {r=t;} } // Back-face: if sphere is below the triangle, flip normal so response pushes it out correctly
     }
     return r;
 }
 
-static OverlapResult CapsuleTriMesh(ShapeCapsule cap, u16 mesh, const float* mx) {
-    OverlapResult rb = SphereTriMesh(cap.base,cap.radius,mesh,mx);
-    OverlapResult rt = SphereTriMesh(cap.tip, cap.radius,mesh,mx); // TODO: Connectivity needed or is snowman ala System Shock 1 fine enough?  Might prove funny if player can get stuck with top and bottom on either side of door while leaning like in original.
+static OverlapResult CapMsh(ShapeCapsule cap, u16 mesh, const float* mx) {
+    OverlapResult rb = SphMsh(cap.base,cap.radius,mesh,mx);
+    OverlapResult rt = SphMsh(cap.tip, cap.radius,mesh,mx); // TODO: Connectivity needed or is snowman ala System Shock 1 fine enough?  Might prove funny if player can get stuck with top and bottom on either side of door while leaning like in original.
     return (rt.overlapAmount > rb.overlapAmount) ? rt : rb;
 }
 
-static OverlapResult SphereConvexMesh(Vector3 sc, float sr, u16 mesh, const float* mx) {
+static OverlapResult SphCvx(Vector3 sc, float sr, u16 mesh, const float* mx) {
     OverlapResult r = {0}; if (mesh >= MODEL_IDX_MAX || !modelVertexCounts[mesh]) return r;
-
-    #define SPHSUP(d) ({ Vector3 _d=(d); float _L=V3_dot(_d,_d); V3_AplusB(sc, (_L>COLLISION_EPSILON) ? V3_ScaleByF(_d, sr/vsqrtf(_L)) : (Vector3){0,sr,0}); })
-    #define MSKSUP(d) V3_AsubB(SPHSUP(d), MeshSupport(mesh, mx, (Vector3){-(d).x,-(d).y,-(d).z}))
-    Simplex3D s = {0}; Vector3 dir = {0,1,0};
-    s.v[s.n++] = MSKSUP(dir);
-    dir = (Vector3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
-    if (V3_dot(dir,dir) < COLLISION_EPSILON) dir=(Vector3){0,1,0};
-    for (int it=0; it<32; ++it) {
-        Vector3 sup=MSKSUP(dir);
-        if (V3_dot(sup,dir) < COLLISION_EPSILON) return r;
-        
+    #define SPHSUP_A(d) ({ Vector3 _d=(d); float _L=V3_dot(_d,_d); V3_AplusB(sc,(_L>COLLISION_EPSILON)?V3_ScaleByF(_d,sr/vsqrtf(_L)):(Vector3){0,sr,0}); })
+    #define SPHSUP_B(d) MeshSupport(mesh,mx,(Vector3){-(d).x,-(d).y,-(d).z})
+    #define MSKSUP(d)   V3_AsubB(SPHSUP_A(d),SPHSUP_B(d))
+    Simplex3D s={0}; Vector3 dir={0,1,0};
+    s.v[s.n++]=MSKSUP(dir); dir=(Vector3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
+    if (V3_dot(dir,dir)<COLLISION_EPSILON) dir=(Vector3){0,1,0};
+    for (int it=0;it<32;++it) {
+        Vector3 sup=MSKSUP(dir); if (V3_dot(sup,dir)<COLLISION_EPSILON) return r;
         s.v[s.n++]=sup;
-        if (!GJKNextSimplex(&s,&dir)) { r.hit=true; break; }
-        if (V3_dot(dir,dir) < COLLISION_EPSILON) { r.hit=true; break; }
+        if (!GJKNextSimplex(&s,&dir)){r.hit=true;break;}
+        if (V3_dot(dir,dir)<COLLISION_EPSILON){r.hit=true;break;}
     }
-    
     if (!r.hit) return r;
-
     static const Vector3 kAx[6]={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
-    for (int d=0; s.n<4&&d<6; ++d) {
+    for (int d=0;s.n<4&&d<6;++d) {
         Vector3 sup=MSKSUP(kAx[d]); bool dup=false;
-        for(int k=0;k<s.n;k++) { Vector3 dv = V3_AsubB(sup,s.v[k]); dup |= V3_dot(dv,dv) < COLLISION_EPSILON * COLLISION_EPSILON; }
-        if(!dup) s.v[s.n++]=sup;
+        for (int k=0;k<s.n;k++){Vector3 dv=V3_AsubB(sup,s.v[k]);dup|=V3_dot(dv,dv)<COLLISION_EPSILON*COLLISION_EPSILON;}
+        if (!dup) s.v[s.n++]=sup;
     }
-    
     if (s.n<4){r.hit=true;return r;}
-
-    Vector3 ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0,nf=0;
-    for(int i=0;i<4;i++) ev[nv++]=s.v[i];
+    EPAVert ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0,nf=0;
+    for (int i=0;i<4;i++){ev[nv].v=s.v[i];ev[nv].wA=SPHSUP_A(s.v[i]);ev[nv].wB=SPHSUP_B(s.v[i]);nv++;}
     static const int kTF[4][3]={{0,1,2},{0,3,1},{0,2,3},{1,3,2}};
-    for(int f=0;f<4;f++){EPAFace face=MakeEPAFace(ev,kTF[f][0],kTF[f][1],kTF[f][2]);if(face.d>=0.f&&nf<EPA_MAX_FACES)ef[nf++]=face;}
-    for(int it=0;it<24;++it){
+    for (int f=0;f<4;f++){EPAFace face=MakeEPAFace(ev,kTF[f][0],kTF[f][1],kTF[f][2]);if(face.d>=0.f&&nf<EPA_MAX_FACES)ef[nf++]=face;}
+    for (int it=0;it<24;++it){
         int bf=-1; float bd=1e9f;
-        for(int f=0;f<nf;f++) if(ef[f].d<bd){bd=ef[f].d;bf=f;}
-        if(bf<0) break;
-        
-        Vector3 bn=ef[bf].n, sup=MSKSUP(bn);
-        if(V3_dot(bn,sup)-bd<COLLISION_EPSILON){r.normal=bn;r.point=V3_ScaleByF(bn,bd);r.overlapAmount=bd;return r;}
-        if(nv>=EPA_MAX_VERTS) break;
-        
-        ev[nv]=sup;
+        for (int f=0;f<nf;f++) if(ef[f].d<bd){bd=ef[f].d;bf=f;}
+        if (bf<0) break;
+        Vector3 bn=ef[bf].n; Vector3 wA=SPHSUP_A(bn); Vector3 wB=SPHSUP_B(bn); Vector3 sup=V3_AsubB(wA,wB);
+        if (V3_dot(bn,sup)-bd<COLLISION_EPSILON){r.normal=bn;r.overlapAmount=bd;r.point=wB;return r;}
+        if (nv>=EPA_MAX_VERTS) break;
+        ev[nv].v=sup;ev[nv].wA=wA;ev[nv].wB=wB;
         int edges[EPA_MAX_EDGES][2],ne=0,keep[EPA_MAX_FACES],nk=0;
-        for(int f=0;f<nf;f++){
-            if(V3_dot(ef[f].n,V3_AsubB(sup,ev[ef[f].a]))>0.f){
+        for (int f=0;f<nf;f++){
+            if (V3_dot(ef[f].n,V3_AsubB(sup,ev[ef[f].a].v))>0.f){
                 int fv[3]={ef[f].a,ef[f].b,ef[f].c};
-                for(int e=0;e<3;e++){int ea=fv[e],eb=fv[(e+1)%3];bool found=false;
-                    for(int k=0;k<ne;k++)if(edges[k][0]==eb&&edges[k][1]==ea){edges[k][0]=edges[--ne][0];edges[k][1]=edges[ne][1];found=true;break;}
-                    if(!found&&ne<EPA_MAX_EDGES){edges[ne][0]=ea;edges[ne++][1]=eb;}}
+                for (int e=0;e<3;e++){int ea=fv[e],eb=fv[(e+1)%3];bool found=false;
+                    for (int k=0;k<ne;k++)if(edges[k][0]==eb&&edges[k][1]==ea){edges[k][0]=edges[--ne][0];edges[k][1]=edges[ne][1];found=true;break;}
+                    if (!found&&ne<EPA_MAX_EDGES){edges[ne][0]=ea;edges[ne++][1]=eb;}}
             } else keep[nk++]=f;
         }
-
-        nf=0; for(int k=0;k<nk;k++) ef[nf++]=ef[keep[k]];
+        nf=0;for(int k=0;k<nk;k++)ef[nf++]=ef[keep[k]];
         for(int k=0;k<ne&&nf<EPA_MAX_FACES;k++){EPAFace face=MakeEPAFace(ev,edges[k][0],edges[k][1],nv);if(face.d>=0.f)ef[nf++]=face;}
         nv++;
     }
-
-    #undef SPHSUP
+    #undef SPHSUP_A
+    #undef SPHSUP_B
     #undef MSKSUP
-    r.hit=true; return r;
+    r.hit=true;return r;
 }
 
 typedef struct {Vector3 mn,mx;} AABB3;
@@ -4676,81 +4471,97 @@ static inline AABB3 HullWorldAABB(u16 hullMesh, const float* hullMx) {
     return b;
 }
 
-static OverlapResult ConvexMeshVsTriMesh(u16 hullMesh, const float* hullMx, u16 triMesh, const float* triMx) {
-    OverlapResult r = {0};
-    if (hullMesh>=MODEL_IDX_MAX || triMesh>=MODEL_IDX_MAX) return r;
-    u32 hullVerts=modelVertexCounts[hullMesh],triCount=modelTriangleCounts[triMesh]; if (!hullVerts || !triCount) return r;
+static inline Vector3 TriSupport(Vector3 ta, Vector3 tb, Vector3 tc, Vector3 d) { float d1 = V3_dot(ta,d), d2 = V3_dot(tb,d), d3 = V3_dot(tc,d); return d1 > d2 ? (d1 > d3 ? ta : tc) : (d2 > d3 ? tb : tc); }
+#define HTSUP_A(d) MeshSupport(hullMesh,hullMx,d)
+#define HTSUP_B(d) TriSupport(ta,tb,tc,(Vector3){-(d).x,-(d).y,-(d).z})
+#define HTSUP(d)   V3_AsubB(HTSUP_A(d),HTSUP_B(d))
+static OverlapResult CvxMsh(u16 hullMesh, const float* hullMx, u16 triMesh, const float* triMx) {
+    OverlapResult best_r = {0};
+    if (hullMesh >= MODEL_IDX_MAX || triMesh >= MODEL_IDX_MAX) return best_r;
+    AABB3 hb = HullWorldAABB(hullMesh, hullMx);
+    u32 triCount = modelTriangleCounts[triMesh]; if (!triCount) return best_r;
 
-    AABB3 hb=HullWorldAABB(hullMesh,hullMx);
-    float skin=0.02f; hb.mn.x-=skin; hb.mn.y-=skin; hb.mn.z-=skin; hb.mx.x+=skin; hb.mx.y+=skin; hb.mx.z+=skin;
-    const u8* vb=modelVertices[hullMesh];
-    for (u32 vi=0; vi<hullVerts; ++vi) {
-        const u8* p=vb+vi*VERTEX_ATTRIBUTES_SIZE;
-        Vector3 wv=MvVert(hullMx,(Vector3){half_to_float(*(half*)(p+0)),half_to_float(*(half*)(p+2)),half_to_float(*(half*)(p+4))});
-        for (u32 ti=0; ti<triCount; ++ti) {
-            u32 i0=modelTriangles[triMesh][ti*3+0], i1=modelTriangles[triMesh][ti*3+1], i2=modelTriangles[triMesh][ti*3+2];
-            #define TRV(i) MvVert(triMx,(Vector3){half_to_float(*(half*)(modelVertices[triMesh]+(i)*VERTEX_ATTRIBUTES_SIZE+0)),half_to_float(*(half*)(modelVertices[triMesh]+(i)*VERTEX_ATTRIBUTES_SIZE+2)),half_to_float(*(half*)(modelVertices[triMesh]+(i)*VERTEX_ATTRIBUTES_SIZE+4))})
-            Vector3 ta=TRV(i0),tb=TRV(i1),tc=TRV(i2);
-            #undef TRV
-            if (vmin(ta.x,vmin(tb.x,tc.x))>hb.mx.x || vmax(ta.x,vmax(tb.x,tc.x))<hb.mn.x || vmin(ta.y,vmin(tb.y,tc.y))>hb.mx.y || vmax(ta.y,vmax(tb.y,tc.y))<hb.mn.y || vmin(ta.z,vmin(tb.z,tc.z))>hb.mx.z || vmax(ta.z,vmax(tb.z,tc.z))<hb.mn.z) continue;
+    for (u32 ti = 0; ti < triCount; ++ti) {
+        u32 i0=modelTriangles[triMesh][ti*3+0],i1=modelTriangles[triMesh][ti*3+1],i2=modelTriangles[triMesh][ti*3+2];
+        #define TRV(i) MvVert(triMx,(Vector3){half_to_float(*(half*)(modelVertices[triMesh]+(i)*VERTEX_ATTRIBUTES_SIZE+0)),half_to_float(*(half*)(modelVertices[triMesh]+(i)*VERTEX_ATTRIBUTES_SIZE+2)),half_to_float(*(half*)(modelVertices[triMesh]+(i)*VERTEX_ATTRIBUTES_SIZE+4))})
+        Vector3 ta=TRV(i0),tb=TRV(i1),tc=TRV(i2); 
+        #undef TRV
+        if (vmin(ta.x,vmin(tb.x,tc.x))>hb.mx.x||vmax(ta.x,vmax(tb.x,tc.x))<hb.mn.x || vmin(ta.y,vmin(tb.y,tc.y))>hb.mx.y||vmax(ta.y,vmax(tb.y,tc.y))<hb.mn.y|| vmin(ta.z,vmin(tb.z,tc.z))>hb.mx.z||vmax(ta.z,vmax(tb.z,tc.z))<hb.mn.z) continue;
 
-            Vector3 ab=V3_AsubB(tb,ta), ac=V3_AsubB(tc,ta), ap=V3_AsubB(wv,ta); // Closest point on triangle to hull vertex (Christer Ericson §5.1.5)
-            float d1=V3_dot(ab,ap), d2=V3_dot(ac,ap);
-            Vector3 bp=V3_AsubB(wv,tb); float d3=V3_dot(ab,bp), d4=V3_dot(ac,bp);
-            Vector3 cp=V3_AsubB(wv,tc); float d5=V3_dot(ab,cp), d6=V3_dot(ac,cp);
-            float vc=d1*d4-d3*d2, vb_=d5*d2-d1*d6, va=d3*d6-d5*d4;
-            Vector3 closest; bool inFace=false;
-            if      (d1 <= 0.0f && d2 <= 0.0f)closest=ta;
-            else if (d3 >= 0.0f && d4 <= d3)  closest=tb;
-            else if (d6 >= 0.0f &&d5 <= d6)   closest=tc;
-            else if (vc <= 0.0f &&d1 >= 0.0f && d3 <= 0.0f)            { float v=d1/(d1-d3);                closest=V3_AplusB(ta,V3_ScaleByF(ab,v)); }
-            else if (vb_ <= 0.0f &&d2 >= 0.0f && d6 <= 0.0f)           { float w=d2/(d2-d6);                closest=V3_AplusB(ta,V3_ScaleByF(ac,w)); }
-            else if (va <= 0.0f && (d4-d3) >= 0.0f && (d5-d6) >= 0.0f) { float w=(d4-d3)/((d4-d3)+(d5-d6)); closest=V3_AplusB(tb,V3_ScaleByF(V3_AsubB(tc,tb),w)); }
-            else { inFace=true; Vector3 n_=V3_Cross(ab,ac); float L=V3_Mag(n_); if(L<COLLISION_EPSILON) continue; n_=V3_ScaleByF(n_,1.f/L); closest=V3_AsubB(wv,V3_ScaleByF(n_,V3_dot(n_,ap))); }
-
-            Vector3 delta=V3_AsubB(wv,closest); float dist2=V3_dot(delta,delta); float pen=0.f; Vector3 fn;
-            if (inFace) {
-                Vector3 n_=V3_Cross(ab,ac); float L=V3_Mag(n_); if(L<COLLISION_EPSILON) continue;
-                n_=V3_ScaleByF(n_,1.f/L);
-                float sd=V3_dot(n_,ap); // positive == above plane
-                if (vabs(sd)<COLLISION_EPSILON) continue; // exactly on plane, no response needed
-                
-                pen=vabs(sd); fn=(sd>0.f)?n_:(Vector3){-n_.x,-n_.y,-n_.z};
-            } else {
-                if (dist2<COLLISION_EPSILON*COLLISION_EPSILON) continue;
-                
-                float dist=vsqrtf(dist2);
-                Vector3 n_=V3_Cross(ab,ac); float L=V3_Mag(n_); if(L<COLLISION_EPSILON) continue; // Only respond if vertex is on the wrong side of the triangle (inside the solid)
-                
-                n_=V3_ScaleByF(n_,1.f/L);
-                float sd=V3_dot(n_,ap);
-                if (sd>=0.f) continue; // vertex above or on plane — edge/vertex proximity, not penetration
-                
-                pen=dist; fn=V3_ScaleByF(delta,1.f/dist); // push vertex back out toward closest point
-            }
-            if (pen>r.overlapAmount) r=(OverlapResult){true,closest,fn,pen};
+        Simplex3D s={0}; Vector3 dir={0,1,0};
+        s.v[s.n++]=HTSUP(dir); dir=(Vector3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
+        if (V3_dot(dir,dir)<COLLISION_EPSILON) dir=(Vector3){0,1,0};
+        bool hit=false;
+        for (int it=0;it<32;++it) {
+            Vector3 sup=HTSUP(dir); if (V3_dot(sup,dir)<COLLISION_EPSILON) break;
+            s.v[s.n++]=sup;
+            if (!GJKNextSimplex(&s,&dir)){hit=true;break;}
+            if (V3_dot(dir,dir)<COLLISION_EPSILON){hit=true;break;}
         }
+        
+        
+        if (!hit) continue;
+
+        static const Vector3 kAxes[6]={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
+        for (int d=0;s.n<4&&d<6;++d) {
+            Vector3 sup=HTSUP(kAxes[d]); bool dup=false;
+            for (int k=0;k<s.n;k++){Vector3 dv=V3_AsubB(sup,s.v[k]);dup|=(V3_dot(dv,dv)<COLLISION_EPSILON*COLLISION_EPSILON);}
+            if (!dup) s.v[s.n++]=sup;
+        }
+        
+        if (s.n<4 && 0.01f > best_r.overlapAmount) { best_r=(OverlapResult){true,ta,{0,1,0},0.01f}; continue; }
+
+        EPAVert ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0,nf=0;
+        for (int i=0;i<4;i++){ev[nv].v=s.v[i];ev[nv].wA=HTSUP_A(s.v[i]);ev[nv].wB=HTSUP_B(s.v[i]);nv++;}
+        static const int kTF[4][3]={{0,1,2},{0,3,1},{0,2,3},{1,3,2}};
+        for (int f=0;f<4;f++){EPAFace face=MakeEPAFace(ev,kTF[f][0],kTF[f][1],kTF[f][2]);if(face.d>=0.f&&nf<EPA_MAX_FACES)ef[nf++]=face;}
+
+        OverlapResult r={0};
+        for (int it=0;it<32;++it) {
+            int bf=-1; float bd=1e9f;
+            for (int f=0;f<nf;f++) if(ef[f].d<bd){bd=ef[f].d;bf=f;}
+            if (bf<0) break;
+            Vector3 bn=ef[bf].n; Vector3 wA=HTSUP_A(bn); Vector3 wB=HTSUP_B(bn); Vector3 sup=V3_AsubB(wA,wB);
+            if (V3_dot(bn,sup)-bd<COLLISION_EPSILON){
+                r.normal=bn; r.overlapAmount=bd; r.hit=true;
+                r.point=EPAContactPoint(ev,ef[bf].a,ef[bf].b,ef[bf].c,bn,bd);
+                break;
+            }
+            if (nv>=EPA_MAX_VERTS) break;
+            ev[nv].v=sup; ev[nv].wA=wA; ev[nv].wB=wB;
+            int edges[EPA_MAX_EDGES][2],ne=0,keep[EPA_MAX_FACES],nk=0;
+            for (int f=0;f<nf;f++){
+                if (V3_dot(ef[f].n,V3_AsubB(sup,ev[ef[f].a].v))>0.f){
+                    int fv[3]={ef[f].a,ef[f].b,ef[f].c};
+                    for (int e=0;e<3;e++){int ea=fv[e],eb=fv[(e+1)%3];bool found=false;
+                        for (int k=0;k<ne;k++)if(edges[k][0]==eb&&edges[k][1]==ea){edges[k][0]=edges[--ne][0];edges[k][1]=edges[ne][1];found=true;break;}
+                        if (!found&&ne<EPA_MAX_EDGES){edges[ne][0]=ea;edges[ne++][1]=eb;}}
+                } else keep[nk++]=f;
+            }
+            nf=0;for(int k=0;k<nk;k++)ef[nf++]=ef[keep[k]];
+            for(int k=0;k<ne&&nf<EPA_MAX_FACES;k++){EPAFace face=MakeEPAFace(ev,edges[k][0],edges[k][1],nv);if(face.d>=0.f)ef[nf++]=face;}
+            nv++;
+        }
+
+        if (r.hit && (!best_r.hit || r.overlapAmount > best_r.overlapAmount + 0.002f || (vabs(r.overlapAmount - best_r.overlapAmount) <= 0.002f && V3_dot(r.normal,(Vector3){0.0f,1.0f,0.0f}) > V3_dot(best_r.normal,(Vector3){0.0f,1.0f,0.0f})))) best_r = r;
     }
-    return r;
+    return best_r;
 }
+#undef HTSUP_A
+#undef HTSUP_B
+#undef HTSUP
 
 AABB3 BoxWorldAABB(ShapeBox b) { Vector3 x,y,z; obb_axes(b.rot,&x,&y,&z); Vector3 hx=V3_ScaleByF(x,b.halfExtents.x), hy=V3_ScaleByF(y,b.halfExtents.y), hz=V3_ScaleByF(z,b.halfExtents.z); Vector3 e ={vabs(hx.x)+vabs(hy.x)+vabs(hz.x),vabs(hx.y)+vabs(hy.y)+vabs(hz.y),vabs(hx.z)+vabs(hy.z)+vabs(hz.z)}; return (AABB3){V3_AsubB(b.center,e),V3_AplusB(b.center,e)}; } 
-static OverlapResult BoxVsTriMesh(ShapeBox box, u16 triMesh, const float* triMx) {
+static OverlapResult BoxMsh(ShapeBox box, u16 triMesh, const float* triMx) {
     OverlapResult r = {0}; if (triMesh >= MODEL_IDX_MAX) return r;
     u32 triCount = modelTriangleCounts[triMesh]; if (!triCount) return r;
 
     AABB3 hb = BoxWorldAABB(box);
     float skin = 0.02f; hb.mn.x-=skin; hb.mn.y-=skin; hb.mn.z-=skin; hb.mx.x+=skin; hb.mx.y+=skin; hb.mx.z+=skin;
-
     Vector3 ax, ay, az; obb_axes(box.rot, &ax, &ay, &az);
     Vector3 hx = V3_ScaleByF(ax, box.halfExtents.x), hy = V3_ScaleByF(ay, box.halfExtents.y), hz = V3_ScaleByF(az, box.halfExtents.z);
-    Vector3 verts[8] = {
-        V3_AplusB(V3_AplusB(V3_AplusB(box.center, hx), hy), hz), V3_AplusB(V3_AsubB(V3_AplusB(box.center, hx), hy), hz),
-        V3_AplusB(V3_AplusB(V3_AsubB(box.center, hx), hy), hz), V3_AplusB(V3_AsubB(V3_AsubB(box.center, hx), hy), hz),
-        V3_AsubB(V3_AplusB(V3_AplusB(box.center, hx), hy), hz), V3_AsubB(V3_AsubB(V3_AplusB(box.center, hx), hy), hz),
-        V3_AsubB(V3_AplusB(V3_AsubB(box.center, hx), hy), hz), V3_AsubB(V3_AsubB(V3_AsubB(box.center, hx), hy), hz)
-    };
-
+    Vector3 verts[8] = {V3_AplusB(V3_AplusB(V3_AplusB(box.center,hx),hy),hz), V3_AplusB(V3_AsubB(V3_AplusB(box.center,hx),hy),hz), V3_AplusB(V3_AplusB(V3_AsubB(box.center,hx),hy),hz), V3_AplusB(V3_AsubB(V3_AsubB(box.center,hx),hy),hz),
+                         V3_AsubB(V3_AplusB(V3_AplusB(box.center,hx),hy),hz),  V3_AsubB(V3_AsubB(V3_AplusB(box.center,hx),hy),hz),  V3_AsubB(V3_AplusB(V3_AsubB(box.center,hx),hy),hz), V3_AsubB(V3_AsubB(V3_AsubB(box.center,hx),hy),hz)  };
     for (u32 vi = 0; vi < 8; ++vi) {
         Vector3 wv = verts[vi];
         for (u32 ti = 0; ti < triCount; ++ti) {
@@ -4791,8 +4602,8 @@ static OverlapResult BoxVsTriMesh(ShapeBox box, u16 triMesh, const float* triMx)
     return r;
 }
 
-static OverlapResult CapsuleBox(ShapeCapsule cap, ShapeBox box) {
-    OverlapResult best = SphereOBB(cap.base,cap.radius,box), rt = SphereOBB(cap.tip,cap.radius,box); if (rt.hit && rt.overlapAmount > best.overlapAmount) best = rt;
+static OverlapResult CapBox(ShapeCapsule cap, ShapeBox box) {
+    OverlapResult best = SphBox(cap.base,cap.radius,box), rt = SphBox(cap.tip,cap.radius,box); if (rt.hit && rt.overlapAmount > best.overlapAmount) best = rt;
 
     Vector3 ax,ay,az; obb_axes(box.rot,&ax,&ay,&az);
     Vector3 d = V3_AsubB(cap.tip,cap.base);
@@ -4803,83 +4614,75 @@ static OverlapResult CapsuleBox(ShapeCapsule cap, ShapeBox box) {
     float ts[6]; int nt = 0;
     float dax = V3_dot(dUnit,ax) * segLen, day = V3_dot(dUnit,ay) * segLen, daz = V3_dot(dUnit,az) * segLen;
     float bax = V3_dot(toBase,ax),         bay = V3_dot(toBase,ay),         baz = V3_dot(toBase,az);
-    #define SLABS(da,ba,he) if (vabs(da) > COLLISION_EPSILON) { float t0 = (-(he) - (ba)) / (da), t1 = ((he) - (ba)) / (da); if (t0 > t1) { float tmp = t0; t0 = t1; t1 = tmp; } t0 = vclamp(t0, 0.f, 1.f); t1 = vclamp(t1, 0.f, 1.f); ts[nt++] = t0; ts[nt++] = t1; }
-    SLABS(dax,bax,box.halfExtents.x) SLABS(day,bay,box.halfExtents.y) SLABS(daz,baz,box.halfExtents.z)
-    #undef SLABS
+    if (vabs(dax) > COLLISION_EPSILON) { float t0 = (-box.halfExtents.x - bax) / dax, t1 = (box.halfExtents.x - bax) / dax; if (t0 > t1) { float tmp = t0; t0 = t1; t1 = tmp; } t0 = vclamp(t0,0.0f,1.0f); t1 = vclamp(t1,0.0f,1.f); ts[nt++] = t0; ts[nt++] = t1; }
+    if (vabs(day) > COLLISION_EPSILON) { float t0 = (-box.halfExtents.y - bay) / day, t1 = (box.halfExtents.y - bay) / day; if (t0 > t1) { float tmp = t0; t0 = t1; t1 = tmp; } t0 = vclamp(t0,0.0f,1.0f); t1 = vclamp(t1,0.0f,1.f); ts[nt++] = t0; ts[nt++] = t1; }
+    if (vabs(daz) > COLLISION_EPSILON) { float t0 = (-box.halfExtents.z - baz) / daz, t1 = (box.halfExtents.z - baz) / daz; if (t0 > t1) { float tmp = t0; t0 = t1; t1 = tmp; } t0 = vclamp(t0,0.0f,1.0f); t1 = vclamp(t1,0.0f,1.f); ts[nt++] = t0; ts[nt++] = t1; }
     if (nt == 0) ts[nt++] = 0.5f; // Only add midpoint if no slab candidates were generated (fully degenerate segment)
-    for (int k = 0; k < nt; k++) { Vector3 pt = V3_AplusB(cap.base,V3_ScaleByF(d,ts[k])); OverlapResult rk = SphereOBB(pt,cap.radius,box); if (rk.hit && rk.overlapAmount > best.overlapAmount) {best = rk;} }
+    for (int k = 0; k < nt; k++) { Vector3 pt = V3_AplusB(cap.base,V3_ScaleByF(d,ts[k])); OverlapResult rk = SphBox(pt,cap.radius,box); if (rk.hit && rk.overlapAmount > best.overlapAmount) {best = rk;} }
     return best;
 }
 
 static void ApplyCollisionResponse(Entity *e, Entity *o, Vector3 n, float overlap, Vector3 contactPoint) {
     if (overlap < COLLISION_EPSILON) return;
 
-    bool oStatic = (!(o->entflags & ENTFLAG_RIGIDBODY) || (o->mass < 0.001f) || (o->collider == COLLIDER_TYPE_NONE));
-    #define ENTRADIUS(ent) ((ent)->collider == COLLIDER_TYPE_MESH ? modelBounds[(ent)->modelIndex] : (ent)->collider == COLLIDER_TYPE_CONVEXMESH ? modelBounds[(ent)->colliderMeshIndex] : GetCollisionRadius(ent))
-    float rA = ENTRADIUS(e);
-    float rB = oStatic ? 1.f : ENTRADIUS(o);
-    #undef ENTRADIUS
-    float iA = (2.f / 5.f) * e->mass * rA * rA;
-    float iB = oStatic ? 0.f : (2.f / 5.f) * o->mass * rB * rB;
-    float invIA = (iA > COLLISION_EPSILON) ? 1.f / iA : 0.f;
-    float invIB = (iB > COLLISION_EPSILON && !oStatic) ? 1.f / iB : 0.f;
-    bool eIsConvex = (e->collider == COLLIDER_TYPE_CONVEXMESH || e->collider == COLLIDER_TYPE_MESH);
-    bool oIsConvex = (!oStatic && (o->collider == COLLIDER_TYPE_CONVEXMESH || o->collider == COLLIDER_TYPE_MESH));
-    Vector3 rAarm = V3_AsubB(contactPoint, e->position);
-    Vector3 rBarm = oStatic ? (Vector3){0,0,0} : V3_AsubB(contactPoint, o->position);
-    Vector3 vAtA = V3_AplusB(e->velocity, V3_Cross(e->angularVelocity, rAarm));
-    Vector3 vAtB = oStatic ? (Vector3){0,0,0} : V3_AplusB(o->velocity, V3_Cross(o->angularVelocity, rBarm));
+    bool oStatic = (!(o->entflags & ENTFLAG_RIGIDBODY) || o->mass < 0.001f || o->collider == COLTYPE_NONE || o->collider == COLTYPE_MSH);
+    bool eStatic = (!(e->entflags & ENTFLAG_RIGIDBODY) || e->mass < 0.001f || e->collider == COLTYPE_NONE);
+    if ((oStatic && eStatic) || (o->collider == COLTYPE_MSH && e->collider == COLTYPE_MSH)) return;
+    
+    float iA = GetMomentOfInertia(e,n);
+    float iB = oStatic ? 0.0f : GetMomentOfInertia(o,n);
+    float invIA = (iA > COLLISION_EPSILON) ? 1.0f / iA : 0.0f;
+    float invIB = (iB > COLLISION_EPSILON && !oStatic) ? 1.0f / iB : 0.0f;
+    Vector3 rAarm = V3_AsubB(contactPoint,e->position);
+    Vector3 rBarm = oStatic ? (Vector3){0,0,0} : V3_AsubB(contactPoint,o->position);
+    Vector3 vAtA = V3_AplusB(e->velocity,V3_Cross(e->angularVelocity,rAarm));
+    Vector3 vAtB = oStatic ? (Vector3){0,0,0} : V3_AplusB(o->velocity,V3_Cross(o->angularVelocity,rBarm));
     Vector3 relVel = V3_AsubB(vAtA, vAtB);
-    float vn = V3_dot(relVel, n); if (vn > 0.01f) return;
+    float vn = V3_dot(relVel,n); if (vn > 0.01f) return;
 
-    Vector3 rAxN = V3_Cross(rAarm, n);
-    Vector3 rBxN = V3_Cross(rBarm, n);
-    float angTermA = eIsConvex ? 0.f : V3_dot(rAxN, rAxN) * invIA;
-    float angTermB = (oStatic || oIsConvex) ? 0.f : V3_dot(rBxN, rBxN) * invIB;
-    float invMassA = 1.f / e->mass;
-    float invMassB = oStatic ? 0.f : 1.f / o->mass;
+    Vector3 rAxN = V3_Cross(rAarm,n), rBxN = V3_Cross(rBarm,n);
+    float angTermA = eStatic || ConstIndexIsNPC(e->index) ? 0.0f : V3_dot(rAxN,rAxN) * invIA, angTermB = oStatic || ConstIndexIsNPC(o->index) ? 0.0f : V3_dot(rBxN,rBxN) * invIB;
+    float invMassA = e->mass < 0.001f ? 1.0f : 1.0f / e->mass, invMassB = oStatic || o->mass < 0.001f ? 0.0f : 1.0f / o->mass;
     float invSum = invMassA + invMassB + angTermA + angTermB;
     if (invSum < COLLISION_EPSILON) return;
 
-    float e_r = vmax(e->bounciness, oStatic ? 0.f : o->bounciness);
-    float j = -(1.f + e_r) * vn / invSum;
-
-    e->velocity = V3_AplusB(e->velocity, V3_ScaleByF(n, j * invMassA));
-    if (!oStatic) o->velocity = V3_AsubB(o->velocity, V3_ScaleByF(n, j * invMassB));
-    Vector3 Jn = V3_ScaleByF(n, j);
-    if (e->collider != COLLIDER_TYPE_CAPSULE && !eIsConvex)             e->angularVelocity = V3_AplusB(e->angularVelocity, V3_ScaleByF(V3_Cross(rAarm, Jn), invIA));
-    if (!oStatic && o->collider != COLLIDER_TYPE_CAPSULE && !oIsConvex) o->angularVelocity = V3_AsubB(o->angularVelocity, V3_ScaleByF(V3_Cross(rBarm, Jn), invIB));
-
+    float e_r = vmax(e->bounciness, oStatic ? 0.0f : o->bounciness);
+    float j = -(1.0f + e_r) * vn / invSum;
+    e->velocity = V3_AplusB(e->velocity, V3_ScaleByF(n,j * invMassA));
+    if (!oStatic) o->velocity = V3_AsubB(o->velocity,V3_ScaleByF(n,j * invMassB));
+    Vector3 Jn = V3_ScaleByF(n,j);
+    if (e->collider != COLTYPE_CAP && !(eStatic || ConstIndexIsNPC(e->index))) e->angularVelocity = V3_AplusB(e->angularVelocity,V3_ScaleByF(V3_Cross(rAarm,Jn),invIA));
+    if (!oStatic && !ConstIndexIsNPC(o->index)) o->angularVelocity = V3_AsubB(o->angularVelocity,V3_ScaleByF(V3_Cross(rBarm,Jn),invIB));
     Vector3 vAtA2 = V3_AplusB(e->velocity, V3_Cross(e->angularVelocity, rAarm));
     Vector3 vAtB2 = oStatic ? (Vector3){0,0,0} : V3_AplusB(o->velocity, V3_Cross(o->angularVelocity, rBarm));
-    Vector3 relVel2 = V3_AsubB(vAtA2, vAtB2);
-    Vector3 tangent = V3_AsubB(relVel2, V3_ScaleByF(n, V3_dot(relVel2, n)));
+    Vector3 relVel2 = V3_AsubB(vAtA2,vAtB2);
+    Vector3 tangent = V3_AsubB(relVel2,V3_ScaleByF(n,V3_dot(relVel2,n)));
     float tLen = V3_Mag(tangent);
     if (tLen > 0.001f) {
         tangent = V3_ScaleByF(tangent, 1.f / tLen);
         Vector3 rAxT = V3_Cross(rAarm, tangent);
         Vector3 rBxT = V3_Cross(rBarm, tangent);
-        float angTermAT = eIsConvex ? 0.f : V3_dot(rAxT, rAxT) * invIA;
-        float angTermBT = (oStatic || oIsConvex) ? 0.f : V3_dot(rBxT, rBxT) * invIB;
+        float angTermAT = eStatic || ConstIndexIsNPC(e->index) ? 0.0f : V3_dot(rAxT, rAxT) / GetMomentOfInertia(e,tangent);
+        float angTermBT = oStatic || ConstIndexIsNPC(o->index) ? 0.0f : V3_dot(rBxT, rBxT) / GetMomentOfInertia(o,tangent);
         float invSumT = invMassA + invMassB + angTermAT + angTermBT;
         float mu = (e->dynamicFriction + (oStatic ? 0.4f : o->dynamicFriction)) * 0.5f;
-        float jt = -V3_dot(relVel2, tangent) / invSumT;
+        float jt = -V3_dot(relVel2,tangent) / invSumT;
         jt = vclamp(jt, -mu * vabs(j), mu * vabs(j));
         Vector3 Jt = V3_ScaleByF(tangent, jt);
-        e->velocity = V3_AplusB(e->velocity, V3_ScaleByF(tangent, jt * invMassA));
-        if (e->collider != COLLIDER_TYPE_CAPSULE && !eIsConvex) e->angularVelocity = V3_AplusB(e->angularVelocity, V3_ScaleByF(V3_Cross(rAarm, Jt), invIA));
+        e->velocity = V3_AplusB(e->velocity,V3_ScaleByF(tangent,jt * invMassA));
+        if (e->collider != COLTYPE_CAP && !(eStatic || ConstIndexIsNPC(e->index))) e->angularVelocity = V3_AplusB(e->angularVelocity,V3_ScaleByF(V3_Cross(rAarm,Jt),invIA));
         if (!oStatic) {
             o->velocity = V3_AsubB(o->velocity, V3_ScaleByF(tangent, jt * invMassB));
-            if (o->collider != COLLIDER_TYPE_CAPSULE && !oIsConvex) o->angularVelocity = V3_AsubB(o->angularVelocity, V3_ScaleByF(V3_Cross(rBarm, Jt), invIB));
+            if (o->collider != COLTYPE_CAP) o->angularVelocity = V3_AsubB(o->angularVelocity,V3_ScaleByF(V3_Cross(rBarm,Jt),invIB));
         }
     }
 
-    float correction = vmax(overlap - 0.005f, 0.f) * 0.2f;
+    float correction = vmax(overlap - 0.01f, 0.0f) * 1.0f;
     correction = vmin(correction, 0.05f);
     float corrA = correction * invMassA / (invMassA + invMassB + COLLISION_EPSILON);
     float corrB = correction * invMassB / (invMassA + invMassB + COLLISION_EPSILON);
-    e->position = V3_AplusB(e->position, V3_ScaleByF(n, corrA)); u16 edx = (u16)(e - Sys_Global.instances); Sys_Global.dirtyInstances[edx] = true;
-    if (!oStatic) { o->position = V3_AsubB(o->position, V3_ScaleByF(n, corrB)); u16 odx = (u16)(o - Sys_Global.instances); Sys_Global.dirtyInstances[odx] = true; }
+    SetPosition(e,V3_AplusB(e->position, V3_ScaleByF(n,corrA)),false);
+    if (!oStatic) SetPosition(o,V3_AsubB(o->position,V3_ScaleByF(n,corrB)),false);
 }
 
 void Physics(void) {
@@ -4889,85 +4692,76 @@ void Physics(void) {
     Sys_Global.last_physics_time = Sys_Global.pauseRelativeTime;
     u8 substeps = (u8)vclamp((u32)(dt / MAX_STEP_SIZE + 0.5f), 1u, (u32)MAX_SUBSTEPS);
     float dtsub = dt / (float)substeps; dynamicEntityCount = 0;
-    for (int i = 0; i < Sys_Global.loadedInstances && dynamicEntityCount < 512; ++i) { Entity *e = &Sys_Global.instances[i]; if ((e->entflags & ENTFLAG_RIGIDBODY) && (e->entflags & ENTFLAG_ACTIVE)) {dynamicEntities[dynamicEntityCount++] = i;} }
+    for (int i = 0; i < Sys_Global.loadedInstances && dynamicEntityCount < 512; ++i) { Entity *e = &Sys_Global.instances[i]; if ((e->entflags & ENTFLAG_RIGIDBODY) && (e->entflags & ENTFLAG_ACTIVE) && e->collider != COLTYPE_NONE) {dynamicEntities[dynamicEntityCount++] = i;} }
+    
+    // Update cell index for all entities
     for (int i = 0; i < Sys_Global.loadedInstances; ++i) {
         Entity *e = &Sys_Global.instances[i];
-        e->cellX = (i16)PosGetCellCoordX(e->position.x); e->cellZ = (i16)PosGetCellCoordZ(e->position.z); e->cellIndex = PosGetCellCoordsP(e->cellX, e->cellZ);
+        e->cellX = (i16)PosGetCellCoordX(e->position.x); e->cellZ = (i16)PosGetCellCoordZ(e->position.z); e->cellIndex = PosGetCellCoordsP(e->cellX,e->cellZ);
         e->radius = (e->modelIndex < MODEL_IDX_MAX) ? modelBounds[e->modelIndex] * vmax(vmax(e->scale.x,e->scale.y),e->scale.z) : GetCollisionRadius(e);
         e->colliding = false;
     }
 
+    // dynamicEntityCount found to be only 335 on level 1
     for (u8 s = 0; s < substeps; ++s) {
-        MemSetToVForNBytes(cellCounts, 0, sizeof(cellCounts));
-        for (int i = 0; i < Sys_Global.loadedInstances; ++i) { Entity *e = &Sys_Global.instances[i]; u32 cell = (u32)e->cellIndex; if (cell < WORLDX*WORLDX && cellCounts[cell] < 127) {cellLists[cell][cellCounts[cell]++] = i;} } // Build broadphase grid
-        for (u16 i = 0; i < dynamicEntityCount; ++i) { u16 idx = dynamicEntities[i]; Entity *e = &Sys_Global.instances[idx]; ApplyVelocity(e, dtsub); } // Integrate all dynamic bodies
-        for (u16 i = 0; i < dynamicEntityCount; ++i) { // Collision detection and resolution
-            u16 idx = dynamicEntities[i]; Entity *e = &Sys_Global.instances[idx]; if (e->collider == COLLIDER_TYPE_NONE || (Sys_Cheats.noclip && idx == PLAYER1)) continue;
+        MemSetToVForNBytes(cellCounts,0,sizeof(cellCounts));
+        for (u16 i = 0; i < Sys_Global.loadedInstances; ++i) { Entity *e = &Sys_Global.instances[i]; u32 cell = (u32)e->cellIndex; if (cell < WORLDX*WORLDX && cellCounts[cell] < 127) cellLists[cell][cellCounts[cell]++] = i; } // Build broadphase grid (~0.013ms)        
+        for (u16 i = 0; i < dynamicEntityCount; ++i) { u16 idx = dynamicEntities[i]; Entity *e = &Sys_Global.instances[idx]; ApplyVelocity(e,dtsub); } // Integrate all dynamic bodies (~0.005ms)
+        ShapeSphere sa,sb; ShapeBox ba,bb; ShapeCapsule ca,cb;
+        for (u16 i = 0; i < dynamicEntityCount; ++i) { // Collision detection and resolution (~32.9ms)
+            u16 a = dynamicEntities[i]; Entity *e = &Sys_Global.instances[a]; if (e->collider == COLTYPE_MSH || (Sys_Cheats.noclip && a == PLAYER1)) continue;
 
             i32 cx = PosGetCellCoordX(e->position.x); i32 cz = PosGetCellCoordZ(e->position.z); u32 mask = GetCollisionMask(e->layer);
             float searchRad = e->radius + V3_Mag(e->velocity) * dtsub + 0.5f; i32 radCells = (i32)(searchRad / CELL_SIZE) + 2;
             typedef struct { OverlapResult r; u16 otherIdx; } Contact;
             Contact contacts[16]; int contactCount = 0;
-            for (i32 dx = -radCells; dx <= radCells; ++dx) { // Collect all overlaps this substep  and resolve each
+            for (i32 dx = -radCells; dx <= radCells; ++dx) { // Collect all overlaps this substep and resolve each, found radCells to be 3 or less, mostly 2
                 for (i32 dz = -radCells; dz <= radCells; ++dz) {
-                    u32 cell = PosGetCellCoordsP(cx + dx, cz + dz);
-                    if (cell >= WORLDX*WORLDX) continue;
+                    u32 cell = PosGetCellCoordsP(cx + dx,cz + dz); if (cell >= WORLDX*WORLDX) continue;
+                    
                     for (u16 k = 0; k < cellCounts[cell]; ++k) {
-                        u16 j = cellLists[cell][k]; if (j == idx) continue;
-                        Entity *o = &Sys_Global.instances[j]; if (!(mask & o->layer)) continue;
-                        Vector3 deltaPos = V3_AsubB(e->position,o->position); float distSq = V3_dot(deltaPos, deltaPos), combinedRadius = e->radius * 2.f + o->radius * 2.f; if (distSq > combinedRadius * combinedRadius) continue;
+                        u16 b = cellLists[cell][k]; if (b == a) continue; // Skip self
+                        Entity *o = &Sys_Global.instances[b]; if (!(mask & o->layer) || o->collider == COLTYPE_NONE) continue;
+                        Vector3 deltaPos = V3_AsubB(e->position,o->position); float distSq = V3_dot(deltaPos,deltaPos), combinedRadius = e->radius * 2.f + o->radius * 2.f; if (distSq > combinedRadius * combinedRadius) continue;
 
                         OverlapResult r = {0};
-                        if      (e->collider == COLLIDER_TYPE_CAPSULE    && o->collider == COLLIDER_TYPE_CAPSULE) { ShapeCapsule ca,cb; Entity_GetCapsule(e,&ca); Entity_GetCapsule(o,&cb); r=CapsuleCapsule(ca,cb); }
-                        else if (e->collider == COLLIDER_TYPE_CAPSULE    && o->collider == COLLIDER_TYPE_BOX)     { ShapeCapsule ca; ShapeBox bb; Entity_GetCapsule(e,&ca); Entity_GetBox(o,&bb); r=CapsuleBox(ca,bb); }
-                        else if (e->collider == COLLIDER_TYPE_BOX        && o->collider == COLLIDER_TYPE_CAPSULE) { ShapeCapsule ca; ShapeBox bb; Entity_GetCapsule(o,&ca); Entity_GetBox(e,&bb); r=CapsuleBox(ca,bb); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
-                        else if (e->collider == COLLIDER_TYPE_BOX        && o->collider == COLLIDER_TYPE_BOX)     { ShapeBox ba,bb; Entity_GetBox(e,&ba); Entity_GetBox(o,&bb); r=BoxBoxSAT(ba,bb); }
-                        else if (e->collider == COLLIDER_TYPE_SPHERE     && o->collider == COLLIDER_TYPE_BOX)     { ShapeSphere sph; ShapeBox b; Entity_GetSphere(e,&sph); Entity_GetBox(o,&b); r=SphereOBB(sph.center,sph.radius,b); }
-                        else if (e->collider == COLLIDER_TYPE_BOX        && o->collider == COLLIDER_TYPE_SPHERE)  { ShapeSphere sph; ShapeBox b; Entity_GetSphere(o,&sph); Entity_GetBox(e,&b); r=SphereOBB(sph.center,sph.radius,b); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
-                        else if (e->collider == COLLIDER_TYPE_SPHERE     && o->collider == COLLIDER_TYPE_SPHERE)  { ShapeSphere sa,sb; Entity_GetSphere(e,&sa); Entity_GetSphere(o,&sb); r=SphereSphere(sa.center,sa.radius,sb.center,sb.radius); }
+                        if      (e->collider == COLTYPE_CAP && o->collider == COLTYPE_CAP) { Entity_GetCap(e,&ca); Entity_GetCap(o,&cb); r=CapCap(ca,cb); }
+                        else if (e->collider == COLTYPE_CAP && o->collider == COLTYPE_BOX) { Entity_GetCap(e,&ca); Entity_GetBox(o,&bb); r=CapBox(ca,bb); }
+                        else if (e->collider == COLTYPE_BOX && o->collider == COLTYPE_CAP) { Entity_GetBox(e,&bb); Entity_GetCap(o,&ca); r=CapBox(ca,bb); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
+                        else if (e->collider == COLTYPE_BOX && o->collider == COLTYPE_BOX) { Entity_GetBox(e,&ba); Entity_GetBox(o,&bb); r=BoxBox(ba,bb); }
+                        else if (e->collider == COLTYPE_SPH && o->collider == COLTYPE_BOX) { Entity_GetSph(e,&sa); Entity_GetBox(o,&ba); r=SphBox(sa.center,sa.radius,ba); }
+                        else if (e->collider == COLTYPE_BOX && o->collider == COLTYPE_SPH) { Entity_GetBox(e,&ba); Entity_GetSph(o,&sa); r=SphBox(sa.center,sa.radius,ba); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
+                        else if (e->collider == COLTYPE_SPH && o->collider == COLTYPE_SPH) { Entity_GetSph(e,&sa); Entity_GetSph(o,&sb); r=SphSph(sa.center,sa.radius,sb.center,sb.radius); }
+                        else if (e->collider == COLTYPE_CAP && o->collider == COLTYPE_MSH) { Entity_GetCap(e,&ca);                       r=CapMsh(ca,o->modelIndex,&modelMatrices[b*16]); }
+                        else if (e->collider == COLTYPE_SPH && o->collider == COLTYPE_MSH) { Entity_GetSph(e,&sa);                       r=SphMsh(sa.center,sa.radius,o->modelIndex,&modelMatrices[b*16]); }
+                        else if (e->collider == COLTYPE_BOX && o->collider == COLTYPE_MSH) { Entity_GetBox(e,&ba);                       r=BoxMsh(ba,o->modelIndex,&modelMatrices[b*16]); }
+                        else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_MSH) {                                             r=CvxMsh(e->colliderMeshIndex,&modelMatrices[a*16],o->modelIndex,&modelMatrices[b*16]); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
+                        else if (e->collider == COLTYPE_CAP && o->collider == COLTYPE_CVX) { Entity_GetCap(e,&ca);                       r=CapCvx(ca,o->colliderMeshIndex,&modelMatrices[b*16]); }
+                        else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_CAP) { Entity_GetCap(o,&cb);                       r=CapCvx(cb,e->colliderMeshIndex,&modelMatrices[a*16]); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
+                        else if (e->collider == COLTYPE_SPH && o->collider == COLTYPE_CVX) { Entity_GetSph(e,&sa);                       r=SphCvx(sa.center,sa.radius,o->colliderMeshIndex,&modelMatrices[b*16]); }
+                        else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_SPH) { Entity_GetSph(o,&sb);                       r=SphCvx(sb.center,sb.radius,e->colliderMeshIndex,&modelMatrices[a*16]); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
+                        else if (e->collider == COLTYPE_BOX && o->collider == COLTYPE_CVX) { Entity_GetBox(e,&ba);                       r=BoxCvx(ba,o->colliderMeshIndex,&modelMatrices[b*16]); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
+                        else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_BOX) { Entity_GetBox(o,&bb);                       r=BoxCvx(bb,e->colliderMeshIndex,&modelMatrices[a*16]); }
+                        else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_CVX) {                                             r=CvxCvx(e->colliderMeshIndex,o->colliderMeshIndex,&modelMatrices[a*16],&modelMatrices[b*16]); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
+                        else { r=SphSph(e->position,GetCollisionRadius(e),o->position,GetCollisionRadius(o)); } // Fallback
 
-                        // Static Mesh vs Primitives
-                        else if (e->collider == COLLIDER_TYPE_CAPSULE    && o->collider == COLLIDER_TYPE_MESH) { float mxB[16]; CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64); ShapeCapsule ca; Entity_GetCapsule(e,&ca); r=CapsuleTriMesh(ca,o->modelIndex,mxB); }
-                        else if (e->collider == COLLIDER_TYPE_MESH       && o->collider == COLLIDER_TYPE_CAPSULE) { float mxA[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64); ShapeCapsule cb; Entity_GetCapsule(o,&cb); r=CapsuleTriMesh(cb,e->modelIndex,mxA); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
-                        else if (e->collider == COLLIDER_TYPE_SPHERE     && o->collider == COLLIDER_TYPE_MESH) { float mxB[16]; CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64); ShapeSphere sa; Entity_GetSphere(e,&sa); r=SphereTriMesh(sa.center,sa.radius,o->modelIndex,mxB); }
-                        else if (e->collider == COLLIDER_TYPE_MESH       && o->collider == COLLIDER_TYPE_SPHERE)  { float mxA[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64); ShapeSphere sb; Entity_GetSphere(o,&sb); r=SphereTriMesh(sb.center,sb.radius,e->modelIndex,mxA); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
-                        else if (e->collider == COLLIDER_TYPE_BOX        && o->collider == COLLIDER_TYPE_MESH) { float mxB[16]; CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64); ShapeBox ba; Entity_GetBox(e,&ba); r=BoxVsTriMesh(ba,o->modelIndex,mxB); }
-                        else if (e->collider == COLLIDER_TYPE_MESH       && o->collider == COLLIDER_TYPE_BOX)  { float mxA[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64); ShapeBox bb; Entity_GetBox(o,&bb); r=BoxVsTriMesh(bb,e->modelIndex,mxA); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
-
-                        // Convex Mesh vs Static Mesh
-                        else if (e->collider == COLLIDER_TYPE_CONVEXMESH && o->collider == COLLIDER_TYPE_MESH) { float mxA[16],mxB[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64); CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64); r=ConvexMeshVsTriMesh(e->colliderMeshIndex,mxA,o->modelIndex,mxB); }
-                        else if (e->collider == COLLIDER_TYPE_MESH       && o->collider == COLLIDER_TYPE_CONVEXMESH) { float mxA[16],mxB[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64); CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64); r=ConvexMeshVsTriMesh(o->colliderMeshIndex,mxB,e->modelIndex,mxA); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
-                        else if (e->collider == COLLIDER_TYPE_MESH       && o->collider == COLLIDER_TYPE_MESH) { /* static vs static - ignore */ }
-
-                        // Convex Mesh vs Primitives
-                        else if (e->collider == COLLIDER_TYPE_CAPSULE    && o->collider == COLLIDER_TYPE_CONVEXMESH) { float mxB[16]; CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64); ShapeCapsule ca; Entity_GetCapsule(e,&ca); r=CapsuleConvexMesh(ca,o->colliderMeshIndex,mxB); }
-                        else if (e->collider == COLLIDER_TYPE_CONVEXMESH && o->collider == COLLIDER_TYPE_CAPSULE)    { float mxA[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64); ShapeCapsule cb; Entity_GetCapsule(o,&cb); r=CapsuleConvexMesh(cb,e->colliderMeshIndex,mxA); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
-                        else if (e->collider == COLLIDER_TYPE_SPHERE     && o->collider == COLLIDER_TYPE_CONVEXMESH) { float mxB[16]; CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64); ShapeSphere sa; Entity_GetSphere(e,&sa); r=SphereConvexMesh(sa.center,sa.radius,o->colliderMeshIndex,mxB); }
-                        else if (e->collider == COLLIDER_TYPE_CONVEXMESH && o->collider == COLLIDER_TYPE_SPHERE)     { float mxA[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64); ShapeSphere sb; Entity_GetSphere(o,&sb); r=SphereConvexMesh(sb.center,sb.radius,e->colliderMeshIndex,mxA); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
-                        else if (e->collider == COLLIDER_TYPE_BOX        && o->collider == COLLIDER_TYPE_CONVEXMESH) { float mxB[16]; CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64); ShapeBox ba; Entity_GetBox(e,&ba); r=BoxConvexMesh(ba,o->colliderMeshIndex,mxB); }
-                        else if (e->collider == COLLIDER_TYPE_CONVEXMESH && o->collider == COLLIDER_TYPE_BOX)        { float mxA[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64); ShapeBox bb; Entity_GetBox(o,&bb); r=BoxConvexMesh(bb,e->colliderMeshIndex,mxA); }
-
-                        // Convex Mesh vs Convex Mesh
-                        else if (e->collider == COLLIDER_TYPE_CONVEXMESH && o->collider == COLLIDER_TYPE_CONVEXMESH) { float mxA[16],mxB[16]; CopyMemoryFromBtoAForNBytes(mxA,&modelMatrices[idx*16],64); CopyMemoryFromBtoAForNBytes(mxB,&modelMatrices[j*16],64); r=ConvexMeshOverlap(e->colliderMeshIndex,o->colliderMeshIndex,mxA,mxB); }
-                        else { r=SphereSphere(e->position,GetCollisionRadius(e),o->position,GetCollisionRadius(o)); } // Fallback
-
-                        if (r.hit && r.overlapAmount > COLLISION_EPSILON && contactCount < 16) contacts[contactCount++] = (Contact){r,j};
+                        if (r.hit && r.overlapAmount > COLLISION_EPSILON && contactCount < 16) contacts[contactCount++] = (Contact){r,b};
                     }
                 }
             }
-
-            for (int a = 0; a < contactCount - 1; ++a) { // Resolve all contacts, largest overlap first, simple insertion sort
-                for (int b = a + 1; b < contactCount; ++b) { if (contacts[b].r.overlapAmount > contacts[a].r.overlapAmount) {Contact tmp=contacts[a]; contacts[a]=contacts[b]; contacts[b]=tmp;} }
+            
+            for (int cta=0;cta<contactCount-1;++cta) { // Resolve all contacts, largest overlap first, simple insertion sort
+                for (int ctb=cta+1;ctb<contactCount;++ctb) { if (contacts[ctb].r.overlapAmount > contacts[cta].r.overlapAmount) {Contact tmp=contacts[cta]; contacts[cta]=contacts[ctb]; contacts[ctb]=tmp;} }
             }
 
             for (int c = 0; c < contactCount; ++c) {
                 OverlapResult *ov = &contacts[c].r; u16 j = contacts[c].otherIdx;
                 Entity *o = (j < INSTANCE_COUNT) ? &Sys_Global.instances[j] : NULL; e->colliding = true; if (o) o->colliding = true;
-                if (o && (o->entflags & ENTFLAG_RIGIDBODY)) ApplyCollisionResponse(e,o,ov->normal,ov->overlapAmount,ov->point);
-                else { Entity staticProxy = {0}; staticProxy.mass=0.0f; staticProxy.dynamicFriction=0.4f; staticProxy.collider=COLLIDER_TYPE_NONE; ApplyCollisionResponse(e,&staticProxy,ov->normal,ov->overlapAmount,ov->point); }
+                if (o && (o->entflags & ENTFLAG_RIGIDBODY) && o->collider != COLTYPE_MSH) ApplyCollisionResponse(e,o,ov->normal,ov->overlapAmount,ov->point);
+                else { Entity staticProxy = {0}; staticProxy.mass=0.0f; staticProxy.dynamicFriction=0.4f; staticProxy.collider=COLTYPE_NONE; ApplyCollisionResponse(e,&staticProxy,ov->normal,ov->overlapAmount,ov->point); }
             }
 
-            e->accumulatedForce = (Vector3){0, 0, 0};
+            e->accumulatedForce = (Vector3){0.0f,0.0f,0.0f};
         }
 
         for (int i = 0; i < Sys_Global.loadedInstances; ++i) { Entity *e = &Sys_Global.instances[i]; e->cellX = (i16)PosGetCellCoordX(e->position.x); e->cellZ = (i16)PosGetCellCoordZ(e->position.z); e->cellIndex = PosGetCellCoordsP(e->cellX, e->cellZ); } // Update cells for next substep
@@ -4985,11 +4779,252 @@ ENGINE_TO_MOD void AddForce(u16 idx, Vector3 force, bool impulse) {
 ENGINE_TO_MOD void ApplyPlayerMovements(void) {
     Entity *p = &Sys_Global.instances[PLAYER1];
     float h = (float)Forward() - (float)Backpedal(), s = (float)StrafeRight() - (float)StrafeLeft();
-    Vector3 input = V3_Normalize((Vector3){p->forward.x*h + p->right.x*s, (float)SwimUp() - (float)SwimDn(), p->forward.z*h + p->right.z*s});
+    float vertInput = (float)SwimUp() - (float)SwimDn();
+    Quaternion rot = p->rotation; float y2 = rot.y * rot.y;  float xz = rot.x * rot.z;  float wy = rot.w * rot.y;
+    p->forward = V3_Normalize((Vector3){ 2.0f * (xz + wy), 2.0f * (rot.y * rot.z - rot.w * rot.x), 1.0f - 2.0f * (rot.x * rot.x + y2) });
+    p->right   = V3_Normalize((Vector3){ 1.0f - 2.0f * (y2 + rot.z * rot.z), 2.0f * (rot.x * rot.y + rot.w * rot.z), 2.0f * (xz - wy) });
+    Vector3 input = V3_Normalize((Vector3){p->forward.x*h + p->right.x*s, vertInput, p->forward.z*h + p->right.z*s});
     float speed = GetBasePlayerSpeed(PLAYER1, V3_Mag(input) > 0.1f) * 1.75f, accel = Sys_Global.boosterActive ? 1.0f : 3.0f;
-    Vector3 cur = p->velocity; Vector3 dv = V3_AsubB(V3_ScaleByF(input,speed),cur);
-    dv.x = vclamp(dv.x,-10,10); dv.y = vclamp(dv.y,-10,10); dv.z = vclamp(dv.z,-10,10);
+    Vector3 cur = p->velocity; 
+    Vector3 targetVel = V3_ScaleByF(input, speed);
+    if (vabs(vertInput) < 0.001f) targetVel.y = cur.y;
+    Vector3 dv = V3_AsubB(targetVel, cur);
+    dv = (Vector3){vclamp(dv.x,-10.0f,10.0f), vclamp(dv.y,-10.0f,10.0f), vclamp(dv.z,-10.0f,10.0f)};
     p->velocity = V3_AplusB(cur, V3_ScaleByF(dv, accel * vclamp((float)Sys_Global.timeSinceLastPhysicsTick,0.0005f,0.1f)));
+}
+// ========================================================================================================================================================================================================================================================================================================
+// Console Emulator System - CHEATS!
+static i32 currentEntryLength=0, numHistory=0, historyPos=0; char consoleEntryText[TEXT_BUFFER_SIZE],history[7][TEXT_BUFFER_SIZE];
+static Vector3 ressurectionLocations[10] = { {-27.386f, -55.488f, 26.5941f},/*0/R*/ {40.903f, -42.372f, -30.78f},/*1*/      {30.67407f, -25.832f, 10.21412f},/*2*/ {38.26813f, -15.498f, 20.37825f},/*3*/ {-19.48f, -7.928f, 22.954f},/*4*/ {-24.358f, 12.5956f, 31.8497f},/*5*/
+                                             {-22.3568f, 33.7845f, -30.728f},/*6*/  {2.228084f, 50.95243f, 7.532025f},/*7*/ {10.068f, 58.897f, 13.973f},/*8*/      {2.303f, 106.77f, -38.554f}/*9*/ };
+static Vector3 cyberSpaceEntryLocations[8] = { {210.6834f,2.812f,-24.378f},/*0*/ {195.42f,-13.44f,33.28f},/*1*/      {157.1608f,-15.53f,47.331f},/*2a, if cyberport localPosition.x < -26.0f*/ {256.0416f,-0.716f,62.48789f},/*2b level 2 secondary cyberport position*/
+                                               {126.43f,29.56733f,34.24f},/*5*/  {177.612f,3.29494f,108.7725f},/*6*/ {244.735f,41.99257f,-19.695f},/*8*/                                       {185.161f,84.502f,-46.04246f},/*9*/ };
+ENGINE_TO_MOD void ToggleConsole(void) {
+    static bool inventoryModeWasActivePriorToConsole = false;
+    if (!Sys_Cheats.consoleActive) inventoryModeWasActivePriorToConsole = Sys_Global.inventoryMode;
+    Sys_Cheats.consoleActive = !Sys_Cheats.consoleActive; // Tilde
+    if (Sys_Cheats.consoleActive) Sys_Global.inventoryMode = true;
+    else if (!inventoryModeWasActivePriorToConsole && Sys_Global.inventoryMode) ForceShootMode();
+}
+
+static void AddToHistory(const char* entry) {
+    if (GetStringLength(entry) == 0) return;
+    if (numHistory > 0 && StringsEqual(entry,history[numHistory - 1])) return;
+    
+    if (numHistory < 7) { StringCopyInto_A_From_B(history[numHistory],entry,TEXT_BUFFER_SIZE); numHistory++; }
+    else {
+        for (int i = 0; i < 7 - 1; i++) StringCopyInto_A_From_B(history[i],history[i + 1],TEXT_BUFFER_SIZE); // Shift list toward 0
+        StringCopyInto_A_From_B(history[7 - 1], entry,TEXT_BUFFER_SIZE);
+    }
+}
+
+static void RecallHistory(int direction) { // direction 1 up (older), -1 down (newer)
+    if (direction == 1) { // up
+        if (historyPos > 0) { historyPos--; StringCopyInto_A_From_B(consoleEntryText,history[historyPos],TEXT_BUFFER_SIZE); currentEntryLength = GetStringLength(consoleEntryText); }
+    } else if (direction == -1) { // down
+        if (historyPos < numHistory) {
+            historyPos++;
+            if (historyPos == numHistory) { consoleEntryText[0] = currentEntryLength = 0; } else { StringCopyInto_A_From_B(consoleEntryText,history[historyPos],TEXT_BUFFER_SIZE); currentEntryLength = GetStringLength(consoleEntryText); }
+        }
+    }
+}
+
+typedef void (*ConsoleCmdFuncNoArg)(void); typedef void (*ConsoleCmdFuncInt)(int); typedef void (*ConsoleCmdFuncStr)(const char*);
+typedef struct { const char* name; union {ConsoleCmdFuncNoArg noArg; ConsoleCmdFuncInt withInt; ConsoleCmdFuncStr withStr; void* raw;} func; enum {CMD_NOARG,CMD_INT,CMD_STR}type;} ConsoleCommand;
+__attribute__((pure)) static int CommandMatch(const char* input, const char* cmd) {
+    while (*cmd && *input) {
+        char c1 = CharToLower((u8)*input++); char c2 = CharToLower((u8)*cmd++);
+        if (c1 == ' ' || c1 == '_') {c1 = ' ';} if (c2 == ' ' || c2 == '_') {c2 = ' ';} if (c1 != c2) return 0;
+    }
+
+    return *cmd == '\0' && (*input == '\0' || CharacterIsEmpty((u8)*input) || *input == '_');
+}
+
+static void cmd_noclip(void) {
+    Sys_Cheats.noclip = !Sys_Cheats.noclip;
+    if (Sys_Cheats.noclip) { Sys_Global.instances[PLAYER1].velocity = (Vector3){ 0.0f, 0.0f, 0.0f }; CenterStatusPrint("noclip: %s", Sys_Text.stringTable[1000]); } // "ACTIVATED"
+    else CenterStatusPrint("noclip: %s", Sys_Text.stringTable[717]); // "DISABLED"
+}
+
+void EnableCheatArsenal(u8 level) { (void)level; } // TODO
+void cmd_kill(void) { Sys_Global.instances[PLAYER1].health = Sys_Global.instances[PLAYER1].cyberHealth = 0.0f; CenterStatusPrint("%s", Sys_Text.stringTable[1011]); } // "Player decides to become a cyborg."
+void cmd_undo(void) { if (Sys_Cheats.editMode) { CenterStatusPrint("Last spawned object removed"); } else { CenterStatusPrint("Cannot undo when not in Edit Mode"); } } // TODO actually track and despawn last
+void ScreenShake(float force, double duration) { Sys_Global.shakeFinished = Sys_Global.pauseRelativeTime + duration; float shakeForce = (force < 0.48f) ? force : 0.48f; (void)shakeForce; } // TODO actually shake
+void Shake(float force) { float forc = (force <= 0.0f) ? 1.0f : force; ScreenShake(forc,1.0); }// The whole station is a shakin' and a movin'!
+void cmd_shake(void) { Shake(-1); CenterStatusPrint("SHAKIN LIKE A LEAF!"); }
+static void cmd_edit(void) {
+    Sys_Cheats.editMode = !Sys_Cheats.editMode;
+    if (Sys_Cheats.editMode) { Sys_Cheats.noclip = Sys_Cheats.notarget = true; CenterStatusPrint("edit mode: %s","Edit Mode activated! The current level\ncan be shaped to your heart's content!"); }
+    else { Sys_Cheats.noclip = Sys_Cheats.notarget = false; CenterStatusPrint("%s", Sys_Text.stringTable[999]); } // "Edit Mode deactivated, normal play"
+}
+
+static int ParseLevelArg(const char* arg) {
+    if (!arg || !*arg) return -1;
+
+    char clean[64] = {0}; int j = 0;
+    for (int i = 0; arg[i] && j < 60; i++) { if (arg[i] != ' ' && arg[i] != '_') clean[j++] = CharToLower((unsigned char)arg[i]); }   clean[j] = '\0';
+    if (StringsEqual(clean, "r")      || StringFindSubstring(clean, "reactor")) return 0;
+    if (StringFindSubstring(clean, "g1") || StringFindSubstring(clean, "10")) return 10;
+    if (StringFindSubstring(clean, "g2") || StringFindSubstring(clean, "11")) return 11;
+    if (StringFindSubstring(clean, "g4") || StringFindSubstring(clean, "12")) return 12;
+    if (StringFindSubstring(clean, "g3")) { CenterStatusPrint("%s", Sys_Text.stringTable[1001]); return -2; }// "Gamma grove already jettisoned! Those poor arrogant people."
+    int level = StringToInt(clean); if (level >= 0 && level < Sys_Global.numLevels) return level;
+    return -1; // Invalid
+}
+
+static void cmd_loadlevel(const char* arg) {
+    if (Sys_Global.menuActive) { CenterStatusPrint("%s", Sys_Text.stringTable[1015]); return; } // "Cannot load levels via cheat while on the main menu!"
+    int level = ParseLevelArg(arg); if (level == -2) return; // Already printed g3 message
+    if (level < 0 || level > 12) { CenterStatusPrint("cmd_loadlevel invalid level argument %u",level); return; }
+
+    CenterStatusPrint("Loading level %u",level); queuedLevelToLoad = level; LoadLevel(level); SetPosition(&Sys_Global.instances[PLAYER1],ressurectionLocations[level > 9 ? 6 : level],true); (void)cyberSpaceEntryLocations;
+}
+
+static void cmd_loadarsenal(const char* arg) { int level = ParseLevelArg(arg); if (level >= 0 && level < Sys_Global.numLevels) { EnableCheatArsenal(level); } }
+static void cmd_summon(int itemConstIndex) { if (!ConstIndexInBounds(itemConstIndex)) { SpawnDynamicObject(itemConstIndex, true); CenterStatusPrint("Summoned object ID %d", itemConstIndex); } else { CenterStatusPrint("Invalid object ID: %s", itemConstIndex); } }
+static void cmd_notarget(void) { Sys_Cheats.notarget = !Sys_Cheats.notarget; CenterStatusPrint("notarget: %s", Sys_Cheats.notarget ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
+static void cmd_showfps(void) { Sys_Cheats.showFPS = !Sys_Cheats.showFPS; }
+static void cmd_showlocation(void) { Sys_Cheats.showLocation = !Sys_Cheats.showLocation; }
+static void cmd_help(void) { CenterStatusPrint("There's no one to save you now Hacker!"); }
+static void cmd_nomoney(void) { CenterStatusPrint("Nice try, there's no money here."); }
+static void cmd_god(void) { Sys_Cheats.god = !Sys_Cheats.god; CenterStatusPrint("god mode: %s", Sys_Cheats.god ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
+static void cmd_energy(void) {
+    Sys_Cheats.redbull = !Sys_Cheats.redbull; 
+    if (Sys_Cheats.redbull) CenterStatusPrint("%s", Sys_Text.stringTable[1006]); // "I feel the power! 0 energy consumption!"
+    else CenterStatusPrint("%s", Sys_Text.stringTable[1005]); // Energy usage normal
+}
+
+void SetSkyRotateSpeed(void) { static const float skyRotateSpeeds[] = { 0.05f, 1.0f, 2.5f, 3.75f, 6.25f }; glUseProgram(Sys_Render.imageBlitShaderProgram); glUniform1f(30,skyRotateSpeeds[Sys_Cheats.dizzyLevel]); }
+static void cmd_dizzy(void) { Sys_Cheats.dizzyLevel = (Sys_Cheats.dizzyLevel >= 3) ? 0 : Sys_Cheats.dizzyLevel + 1; SetSkyRotateSpeed(); }
+static void cmd_bottomless(void) {
+    Sys_Cheats.bottomless = !Sys_Cheats.bottomless;
+    if (Sys_Cheats.bottomless) CenterStatusPrint("bottomlessclip! %s",Sys_Text.stringTable[1002]); // "Bring it!"
+    else                       CenterStatusPrint("%s",Sys_Text.stringTable[1003]); // "Hose disconnected from interdimensional wormhole. Normal ammo operation restored."
+}
+
+static void cmd_nohud(void) { Sys_Cheats.noHUD = !Sys_Cheats.noHUD; if (Sys_Cheats.noHUD) {CenterStatusPrint("%s",Sys_Text.stringTable[1004]);/*"No HUD! Enjoy the cinematic screenshot experience!"*/} else { CenterStatusPrint("HUD %s",Sys_Text.stringTable[1000]);/*"ACTIVATED"*/} }
+static void cmd_iamshodan(void) { Sys_Cheats.superoverride = !Sys_Cheats.superoverride; if (Sys_Cheats.superoverride) {CenterStatusPrint("%s",Sys_Text.stringTable[1010]);/*"Full security override enabled!"*/ } else {CenterStatusPrint("%s",Sys_Text.stringTable[1009]);/*"SHODAN has regained control of security from you"*/} }
+static void cmd_mrbean(void)         { CenterStatusPrint("Nice try, there are no go carts to slow down here"); }                                      static void cmd_simonfoster(void)    { CenterStatusPrint("Nice try, nothing to paint here"); }
+static void cmd_richardbranson(void) { CenterStatusPrint("Nice try, there's no money here. You do realize this isn't Rollercoaster Tycoon right?"); } static void cmd_johnwardley(void)    { CenterStatusPrint("WOW!"); }
+static void cmd_johnmace(void)       { CenterStatusPrint("Nice try, there's nothing to pay double for here"); }                                       static void cmd_melaniewarn(void)    { CenterStatusPrint("I feel happy!!!"); }
+static void cmd_damonhill(void)      { CenterStatusPrint("Nice try, there are no go carts to speed up here"); }                                       static void cmd_michaelschumacher(void) { CenterStatusPrint("Nice try, there are no go carts to give ludicrous speed here"); }
+static void cmd_tonyday(void)        { CenterStatusPrint("Ok, now I want a hamburger"); }                                                             static void cmd_katiebrayshaw(void)  { CenterStatusPrint("Hi there! Hello! Hey! Howdy!"); }
+static void cmd_sudo(void)           { CenterStatusPrint("Super user access granted...ERROR: access restricted by SHODAN"); }
+static void cmd_git(const char* arg) {
+    if (!arg) arg = "";
+    static const char* cmds[] = {
+        "pull",  "remote: Enumerating objects: 24601, done.\nFailed, could not connect with origin/triop.",
+        "fetch", "remote: Enumerating objects: 24601, done.\nFailed, could not connect with origin/triop.",
+        "status","Your branch is up to date with origin/triop.\nWorking directory clean.",
+        "log",   "<Merge pull request #451 from SHODAN/NeuralLinkBugfix> 6 months ago...",
+        "reflog","dc51440 HEAD0 -> master: commit: Establish neural connection ... ERROR: invalid ID `2-4601`.",
+        "merge", "Failed, could not connect with origin/triop.",
+        "push",  "Could not find Username for 'triopttp://192.168.1.451'.",
+        "clone", "Failed, connection blocked by SHODAN. Employee ID invalid."
+    };
+
+    for (int i = 0; i < 16; i += 2) { if (StringFindSubstring(arg, cmds[i])) { CenterStatusPrint(cmds[i+1]); return; } }
+    if (StringFindSubstring(arg, "branch") || StringFindSubstring(arg, "-b")) { const char *last = StringFindLastChar(arg, ' '); CenterStatusPrint("Created new branch %s", last ? last + 1 : "unknown"); }
+    else CenterStatusPrint("Branch name not recognized. Contact your TriopBucket representative.");
+}
+
+static void cmd_restart(void)        { CenterStatusPrint("Yeah...better not"); }
+static void cmd_quit(void)           { OS_Exit(0); }
+static void cmd_cd(void)             { CenterStatusPrint("Attempting to access directory... already at root"); }
+static void cmd_justinbailey(void)   { CenterStatusPrint("Well, you don't have a suit already so..."); }
+static void cmd_woodstock(void)      { CenterStatusPrint("How much wood could a woodchuck chuck...there's no wood in SPACE!"); }
+static void cmd_quarry(void)         { CenterStatusPrint("There's obsidian on levels 6 and 8 if you want to feel decadent,\notherwise we are lacking in the stone department."); }
+static void cmd_zelda(void)          { CenterStatusPrint("Too late, already been to level 1"); }
+static void cmd_allyourbase(void)    { CenterStatusPrint("ERROR: SHODAN has overriden your command, remove SHODAN first."); }
+static void cmd_iamironman(void)     { CenterStatusPrint("That's nice dear."); }
+static void cmd_idkfa(void)          { CenterStatusPrint("I can only hold 7 weapons!! Nice try dearies!"); }
+static void cmd_ai(void)             { CenterStatusPrint("Only AI allowed around here is SHODAN"); }
+static void cmd_aireal(void)         { CenterStatusPrint("In my magnificence, I shape clay, crafting new lifeforms..."); }
+static void cmd_staminup(void) {
+    Sys_Cheats.fatigueCheat = !Sys_Cheats.fatigueCheat;
+    if (Sys_Cheats.fatigueCheat) { CenterStatusPrint("Stamin-Up! %s",Sys_Text.stringTable[1013]); SetModFatigue(0.0f); } else CenterStatusPrint("%s",Sys_Text.stringTable[1012]);
+}
+
+static const ConsoleCommand consoleCmds[] = {
+    { "noclip",  {.noArg=cmd_noclip}, CMD_NOARG},{"idclip",      {.noArg=cmd_noclip},CMD_NOARG},      {"no clip",       {.noArg = cmd_noclip},      CMD_NOARG},
+    { "god",     {.noArg=cmd_god}, CMD_NOARG},   {"overwhelming",{.noArg=cmd_god},   CMD_NOARG},      {"whosyourdaddy", {.noArg = cmd_god},         CMD_NOARG},
+    { "iddqd",   {.noArg=cmd_god}, CMD_NOARG},   {"notarget",    {.noArg=cmd_notarget},CMD_NOARG},    {"no target",     {.noArg = cmd_notarget},    CMD_NOARG},
+    { "editmode",{.noArg=cmd_edit},CMD_NOARG},   {"edit",        {.noArg=cmd_edit},  CMD_NOARG},      {"edit mode",     {.noArg = cmd_edit},        CMD_NOARG},
+    { "editor",  {.noArg=cmd_edit},CMD_NOARG},   {"undo",        {.noArg=cmd_undo},  CMD_NOARG},      {"showfps",       {.noArg = cmd_showfps},     CMD_NOARG},
+    { "show fps",{.noArg=cmd_showfps},CMD_NOARG},{"showlocation",{.noArg=cmd_showlocation},CMD_NOARG},{"show location", {.noArg = cmd_showlocation},CMD_NOARG},
+    { "nohud",   {.noArg=cmd_nohud},CMD_NOARG},  {"no hud",      {.noArg=cmd_nohud}, CMD_NOARG},      {"bottomlessclip",{.noArg = cmd_bottomless},  CMD_NOARG},
+    { "bottomless clip",{.noArg=cmd_bottomless},CMD_NOARG},{"load",{.withStr=cmd_loadlevel},CMD_STR}, {"loadarsenal",   {.withStr = cmd_loadarsenal}, CMD_STR}, 
+    { "load arsenal", {.withStr = cmd_loadarsenal}, CMD_STR}, { "summon_obj", {.withInt = cmd_summon}, CMD_INT}, {"summonobj",{.withInt = cmd_summon},CMD_INT},
+    { "motherlode",    {.noArg=cmd_nomoney},        CMD_NOARG},{"rosebud",           {.noArg=cmd_nomoney},          CMD_NOARG},{"kaching",        {.noArg=cmd_nomoney},       CMD_NOARG},
+    { "money",         {.noArg=cmd_nomoney},        CMD_NOARG},{"dizzy",             {.noArg=cmd_dizzy},            CMD_NOARG},{"help",           {.noArg=cmd_help},          CMD_NOARG},
+    { "ifeelthepower", {.noArg = cmd_energy},       CMD_NOARG},{ "power",            {.noArg=cmd_energy},           CMD_NOARG},{"energy",         {.noArg=cmd_energy},        CMD_NOARG},
+    { "i feel the power",{.noArg = cmd_energy},     CMD_NOARG},{"i am shodan",       {.noArg=cmd_iamshodan},        CMD_NOARG},{"iamshodan",      {.noArg=cmd_iamshodan},     CMD_NOARG},
+    { "mr. bean",      {.noArg = cmd_mrbean},       CMD_NOARG},{"simon foster",      {.noArg=cmd_simonfoster},      CMD_NOARG},{"richard branson",{.noArg=cmd_richardbranson},CMD_NOARG},
+    { "john wardley",  {.noArg = cmd_johnwardley},  CMD_NOARG},{"john mace",         {.noArg=cmd_johnmace},         CMD_NOARG},{"melanie warn",   {.noArg=cmd_melaniewarn},   CMD_NOARG},
+    { "damon hill",    {.noArg = cmd_damonhill},    CMD_NOARG},{"michael schumacher",{.noArg=cmd_michaelschumacher},CMD_NOARG},{"tony day",       {.noArg=cmd_tonyday},       CMD_NOARG},
+    { "katie brayshaw",{.noArg = cmd_katiebrayshaw},CMD_NOARG},{"sudo",              {.noArg=cmd_sudo},             CMD_NOARG},{"admin",          {.noArg=cmd_sudo},          CMD_NOARG},
+    { "git",           {.withStr=cmd_git},            CMD_STR},{"restart",           {.noArg=cmd_restart},          CMD_NOARG},{"quit",           {.noArg=cmd_quit},          CMD_NOARG},
+    { "exit",          {.noArg = cmd_quit},         CMD_NOARG},{"cd",                {.noArg=cmd_cd},               CMD_NOARG},{"./",             {.noArg=cmd_cd},            CMD_NOARG},
+    { "kill",          {.noArg = cmd_kill},         CMD_NOARG},{"suicide",           {.noArg=cmd_kill},             CMD_NOARG},{"die",            {.noArg=cmd_kill},          CMD_NOARG},
+    { "justinbailey",  {.noArg = cmd_justinbailey}, CMD_NOARG},{"woodstock",         {.noArg=cmd_woodstock},        CMD_NOARG},{"quarry",         {.noArg=cmd_quarry},        CMD_NOARG},
+    { "zelda",         {.noArg = cmd_zelda},        CMD_NOARG},{"allyourbasearebelongtous",{.noArg=cmd_allyourbase},CMD_NOARG},{"all your base",  {.noArg=cmd_allyourbase},   CMD_NOARG},
+    { "i am iron man", {.noArg = cmd_iamironman},   CMD_NOARG},{"i am amazing",      {.noArg=cmd_iamironman},       CMD_NOARG},{"i am cool",      {.noArg=cmd_iamironman},    CMD_NOARG},
+    { "i am best",     {.noArg = cmd_iamironman},   CMD_NOARG},{"idkfa",             {.noArg=cmd_idkfa},            CMD_NOARG},{"impulse 9",      {.noArg=cmd_idkfa},         CMD_NOARG},
+    { "undo",          {.noArg = cmd_undo},         CMD_NOARG},{"shake",             {.noArg=cmd_shake},            CMD_NOARG},{"tired",          {.noArg=cmd_staminup},      CMD_NOARG},
+    { "staminup",      {.noArg = cmd_staminup},     CMD_NOARG},{"grok",              {.noArg=cmd_ai},               CMD_NOARG},{"chatgpt",        {.noArg=cmd_ai},            CMD_NOARG},
+    { "claude",        {.noArg = cmd_ai},           CMD_NOARG},{"gemini",            {.noArg=cmd_ai},               CMD_NOARG},{"shodan",         {.noArg=cmd_aireal},        CMD_NOARG},
+    { NULL, {.raw = NULL}, CMD_NOARG } // sizeof helper
+};
+
+void ProcessConsoleCommand(const char* command) {
+    if (command == NULL || GetStringLength(command) == 0) { ToggleConsole(); return; }
+
+    char ts[TEXT_BUFFER_SIZE]; StringCopyInto_A_SubstringFrom_B(ts,sizeof(ts)-1,command,TEXT_BUFFER_SIZE);
+    ts[sizeof(ts)-1] = '\0';
+    const char* command_trimmed = ts;    while (*command_trimmed && CharacterIsEmpty((unsigned char)*command_trimmed)) command_trimmed++;
+    const char* space = command_trimmed; while (*space && !CharacterIsEmpty((unsigned char)*space)) space++;
+    const char* arg_start = space;       while (*arg_start && CharacterIsEmpty((unsigned char)*arg_start)) arg_start++;
+    AddToHistory(command);
+    bool commandProcessed = false;
+    for (u16 i=0;consoleCmds[i].name!=NULL;++i) {
+        const ConsoleCommand* cmd = &consoleCmds[i];
+        if (CommandMatch(command_trimmed,cmd->name)) {
+                   if (cmd->type == CMD_NOARG) {             cmd->func.noArg();                              commandProcessed = true;
+            } else if (cmd->type == CMD_STR && *arg_start) { cmd->func.withStr(*arg_start ? arg_start : ""); commandProcessed = true;
+            } else { // CMD_INT
+                if (!*arg_start) CenterStatusPrint("Missing argument, usage: %s <number>",cmd->name);
+                else { cmd->func.withInt(StringToInt(arg_start)); commandProcessed = true; }
+            }
+        }
+    }
+
+    if (!commandProcessed) CenterStatusPrint("%s%s",Sys_Text.stringTable[1014],command_trimmed); // "Unknown command or function: "
+    consoleEntryText[0] = currentEntryLength = 0; historyPos = numHistory; // Position beyond newest for empty
+    ToggleConsole();
+}
+
+void ConsoleEmulator(i32 keycode) {
+    if (keycode == KEY_UP || keycode == KEY_DOWN) { RecallHistory(keycode == KEY_UP ? 1 : -1); return; }
+    if (keycode == KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { consoleEntryText[0]='\0'; currentEntryLength=0; return; } // Clear the input
+    
+    if (keycode >= KEY_A && keycode <= KEY_Z) { // Handle alphabet keys
+        if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) { // Ensure we don't overflow the buffer
+            char c = 'a' + (keycode - KEY_A); // Map keycode to lowercase character
+            consoleEntryText[currentEntryLength] = c; consoleEntryText[currentEntryLength + 1] = '\0'; currentEntryLength++;
+        }
+    } else if (keycode >= KEY_1 && keycode <= KEY_9) { // Handle number keys 1-9
+        if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) {
+            char c = '1' + (keycode - KEY_1); // Map to '1'-'9'
+            consoleEntryText[currentEntryLength] = c; consoleEntryText[currentEntryLength + 1] = '\0'; currentEntryLength++;
+        }
+    } else if (keycode == KEY_0) { // Handle '0'
+        if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]='0'; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; }
+    } else if (keycode == KEY_MINUS || keycode == KEY_KP_SUBTRACT) {
+        if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]=(Sys_Input.keyStates[KEY_LEFT_SHIFT].down || Sys_Input.keyStates[KEY_RIGHT_SHIFT].down) ? '_' : '-'; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; }
+    } else if (keycode == KEY_BACKSPACE && currentEntryLength > 0) { currentEntryLength--; consoleEntryText[currentEntryLength]='\0'; } // Handle backspace
+    else if (keycode == KEY_SPACE) { // Handle space
+        if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]=' '; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; }
+    } else if (keycode == KEY_ENTER || keycode == KEY_KP_ENTER) { DualLog("Console command: %s\n",consoleEntryText); ProcessConsoleCommand(consoleEntryText); }
 }
 // ========================================================================================================================================================================================================================================================================================================
 // Audio System
@@ -5001,7 +5036,7 @@ ENGINE_TO_MOD void ApplyPlayerMovements(void) {
 #define AUDBUF_SIZE (AUDIO_FRAMES*AUDIO_PERIODS)
 #define U32_MAX 0xffffffffU
 #define I32_MAX 2147483647
-void* CopyMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n);
+void* MemCpyFromBtoAForNBytes(void *dst, const void *src, size_t n);
 extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
 #ifdef WINDOWS
     #define FAILED(hr)    ((i32)(hr) <  0)
@@ -5069,7 +5104,7 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
             wasapi_dev_t *w=&wasapi_devs[i]; if (!w->open) continue;
             u8* data = NULL; if (FAILED(w->render->lpVtbl->GetBuffer(w->render,(u32)frames,&data))) { pcm_prepare(IDX_TO_FD(i)); continue; }
             
-            CopyMemoryFromBtoAForNBytes(data,buf,frames*w->channels*2); w->render->lpVtbl->ReleaseBuffer(w->render,(u32)frames,0);
+            MemCpyFromBtoAForNBytes(data,buf,frames*w->channels*2); w->render->lpVtbl->ReleaseBuffer(w->render,(u32)frames,0);
         }
         return frames;
     }
@@ -5198,7 +5233,7 @@ static int drmp3_L3_read_side_info(drmp3_bs *bs, drmp3_L3_gr_info *gr, const u8 
 static void drmp3_L3_read_scalefactors(u8 *scf, u8 *ist_pos, const u8 *scf_size, const u8 *scf_count, drmp3_bs *bs, int scfsi) {
     for (int i=0; i<4&&scf_count[i]; i++,scfsi*=2) {
         int cnt = scf_count[i];
-        if (scfsi & 8) CopyMemoryFromBtoAForNBytes(scf,ist_pos,cnt);
+        if (scfsi & 8) MemCpyFromBtoAForNBytes(scf,ist_pos,cnt);
         else {
             int bits=scf_size[i];
             if (!bits) { MemSetToVForNBytes(scf,0,cnt); MemSetToVForNBytes(ist_pos,0,cnt); }
@@ -5371,7 +5406,7 @@ static void drmp3_L3_intensity_stereo(float *left, u8 *ist_pos, const drmp3_L3_g
 static void drmp3_L3_reorder(float *grbuf, float *scratch, const u8 *sfb) {
     int i,len; float *src=grbuf,*dst=scratch;
     for(;0!=(len=*sfb);sfb+=3,src+=2*len){for(i=0;i<len;i++,src++){*dst++=src[0*len];*dst++=src[1*len];*dst++=src[2*len];}}
-    CopyMemoryFromBtoAForNBytes(grbuf,scratch,(dst-scratch)*sizeof(float));
+    MemCpyFromBtoAForNBytes(grbuf,scratch,(dst-scratch)*sizeof(float));
 }
 static void drmp3_L3_antialias(float *grbuf, int nbands) {
     static const float g_aa[2][8]={{0.85749293f,0.88174200f,0.94962865f,0.98331459f,0.99551782f,0.99916056f,0.99989920f,0.99999316f},{0.51449576f,0.47173197f,0.31337745f,0.18191320f,0.09457419f,0.04096558f,0.01419856f,0.00369997f}};
@@ -5410,7 +5445,7 @@ static void imdct12(float *x,float *dst,float *overlap){
     si[1]=-si[1];
     for(i=0;i<3;i++){float ovl=overlap[i],sum=co[i]*g_twid3[3+i]+si[i]*g_twid3[i];overlap[i]=co[i]*g_twid3[i]-si[i]*g_twid3[3+i];dst[i]=ovl*g_twid3[2-i]-sum*g_twid3[5-i];dst[5-i]=ovl*g_twid3[5-i]+sum*g_twid3[2-i];}
 }
-static void drmp3_L3_imdct_short(float *grbuf,float *overlap,int nbands){ for(;nbands>0;nbands--,overlap+=9,grbuf+=18){float tmp[18]; CopyMemoryFromBtoAForNBytes(tmp,grbuf,sizeof(tmp)); CopyMemoryFromBtoAForNBytes(grbuf,overlap,6*sizeof(float)); imdct12(tmp,grbuf+6,overlap+6); imdct12(tmp+1,grbuf+12,overlap+6); imdct12(tmp+2,overlap,overlap+6);} }
+static void drmp3_L3_imdct_short(float *grbuf,float *overlap,int nbands){ for(;nbands>0;nbands--,overlap+=9,grbuf+=18){float tmp[18]; MemCpyFromBtoAForNBytes(tmp,grbuf,sizeof(tmp)); MemCpyFromBtoAForNBytes(grbuf,overlap,6*sizeof(float)); imdct12(tmp,grbuf+6,overlap+6); imdct12(tmp+1,grbuf+12,overlap+6); imdct12(tmp+2,overlap,overlap+6);} }
 static void drmp3_L3_change_sign(float *grbuf){int b,i;for(b=0,grbuf+=18;b<32;b+=2,grbuf+=36)for(i=1;i<18;i+=2)grbuf[i]=-grbuf[i];}
 static void drmp3_L3_imdct_gr(float *grbuf,float *overlap,unsigned block_type,unsigned n_long_bands){
     static const float g_mdct_window[2][18]={
@@ -5425,8 +5460,8 @@ static void drmp3_L3_imdct_gr(float *grbuf,float *overlap,unsigned block_type,un
 static void drmp3_L3_save_reservoir(drmp3dec *h, drmp3dec_scratch *s) { int pos=(s->bs.pos+7)/8u,remains=s->bs.limit/8u-pos; if (remains>511){pos+=remains-511;remains=511;} if (remains>0) {MoveMemoryFromBtoAForNBytes(h->reserv_buf,s->maindata+pos,remains);} h->reserv=remains; }
 static int drmp3_L3_restore_reservoir(drmp3dec *h, drmp3_bs *bs, drmp3dec_scratch *s, int main_data_begin) { 
     int frame_bytes=(bs->limit-bs->pos)/8,bytes_have=vmin(h->reserv,main_data_begin);
-    CopyMemoryFromBtoAForNBytes(s->maindata,h->reserv_buf+vmax(0,h->reserv-main_data_begin),vmin(h->reserv,main_data_begin));
-    CopyMemoryFromBtoAForNBytes(s->maindata+bytes_have,bs->buf+bs->pos/8,frame_bytes);
+    MemCpyFromBtoAForNBytes(s->maindata,h->reserv_buf+vmax(0,h->reserv-main_data_begin),vmin(h->reserv,main_data_begin));
+    MemCpyFromBtoAForNBytes(s->maindata+bytes_have,bs->buf+bs->pos/8,frame_bytes);
     s->bs.buf=s->maindata; s->bs.pos=0; s->bs.limit=(bytes_have+frame_bytes) * 8;
     return h->reserv>=main_data_begin;
 }
@@ -5503,8 +5538,8 @@ static void drmp3d_synth(float *xl, drmp3d_sample_t *dstl, int nch, float *lins)
 }
 
 static void drmp3d_synth_granule(float *qmf_state, float *grbuf, int nbands, int nch, drmp3d_sample_t *pcm, float *lins){
-    for(int i=0;i<nch;i++) {drmp3d_DCT_II(grbuf+576*i,nbands);} CopyMemoryFromBtoAForNBytes(lins,qmf_state,sizeof(float)*15*64);
-    for(int i=0;i<nbands;i+=2) {drmp3d_synth(grbuf+i,pcm+32*nch*i,nch,lins+i*64);} CopyMemoryFromBtoAForNBytes(qmf_state,lins+nbands*64,sizeof(float)*15*64);
+    for(int i=0;i<nch;i++) {drmp3d_DCT_II(grbuf+576*i,nbands);} MemCpyFromBtoAForNBytes(lins,qmf_state,sizeof(float)*15*64);
+    for(int i=0;i<nbands;i+=2) {drmp3d_synth(grbuf+i,pcm+32*nch*i,nch,lins+i*64);} MemCpyFromBtoAForNBytes(qmf_state,lins+nbands*64,sizeof(float)*15*64);
 }
 
 static int drmp3d_match_frame(const u8 *hdr, int mp3_bytes, int frame_bytes){
@@ -5547,7 +5582,7 @@ static int drmp3dec_decode_frame(drmp3dec *dec, const u8 *mp3, int mp3_bytes, vo
         if(!frame_size||i+frame_size>mp3_bytes){info->frame_bytes=i;return 0;}
     }
     hdr=mp3+i;
-    CopyMemoryFromBtoAForNBytes(dec->header,hdr,4);
+    MemCpyFromBtoAForNBytes(dec->header,hdr,4);
     info->frame_bytes=i+frame_size;
     info->channels=DRMP3_HDR_IS_MONO(hdr) ? 1 : 2;
     info->sample_rate=drmp3_hdr_sample_rate_hz(hdr);
@@ -5677,7 +5712,7 @@ static u64 drmp3_read_pcm_frames_raw(drmp3 *p, u64 framesToRead, void *pBufferOu
         if(pBufferOut){
             float *out=(float*)DRMP3_OFFSET_PTR(pBufferOut,sizeof(float)*totalFramesRead*p->channels);
             float *in =(float*)DRMP3_OFFSET_PTR(&p->pcmFrames[0],sizeof(float)*p->pcmFConsInMP3F*p->mp3FChan);
-            CopyMemoryFromBtoAForNBytes(out,in,sizeof(float)*framesToConsume*p->channels);
+            MemCpyFromBtoAForNBytes(out,in,sizeof(float)*framesToConsume*p->channels);
         }
         p->currentPCMFrame+=framesToConsume; p->pcmFConsInMP3F+=framesToConsume;
         p->pcmFRemInMP3F-=framesToConsume;
@@ -5778,7 +5813,7 @@ static u64 WavReadPCMFrames(WaveFile *w, u64 framesToRead, float *out) {
         u64 gotFrames = got / bpf;
         u64 samples   = gotFrames * w->channels;
         if (bps == 8) { for (u64 i = 0; i < samples; i++) {*out++ = (tmp[i] / 255.0f) * 2.0f - 1.0f;} }
-        else { for (u64 i = 0; i < samples; i++) {i16 s; CopyMemoryFromBtoAForNBytes(&s,tmp + i*2,2); *out++ = s * (1.0f / 32768.0f);} } // 16bit LE
+        else { for (u64 i = 0; i < samples; i++) {i16 s; MemCpyFromBtoAForNBytes(&s,tmp + i*2,2); *out++ = s * (1.0f / 32768.0f);} } // 16bit LE
 
         w->bytesRemaining -= gotFrames * bpf; framesToRead -= gotFrames; totalRead += gotFrames; if (gotFrames < batchFrames) break;
     }
@@ -5997,7 +6032,7 @@ ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, u32
         if (triCount < 1) continue;
         
         float M[16];
-        CopyMemoryFromBtoAForNBytes(M,&modelMatrices[i * 16],16 * sizeof(float));
+        MemCpyFromBtoAForNBytes(M,&modelMatrices[i * 16],16 * sizeof(float));
         float m00=M[0], m10=M[1], m20=M[2];
         float m01=M[4], m11=M[5], m21=M[6];
         float m02=M[8], m12=M[9], m22=M[10];
@@ -6094,7 +6129,7 @@ ENGINE_TO_MOD i32 AddLight(Light* lit, LightAnimation* lanim) {
     i32 i = Sys_Global.loadedLights; Sys_Global.loadedLights++;
     if (Sys_Global.loadedLights >= LIGHT_COUNT) { DualLogError("Too many lights %u added in level %d!\n",i,Sys_Global.currentLevel); OS_Exit(1); }
 
-    CopyMemoryFromBtoAForNBytes(&lights[i],lit,sizeof(Light)); CopyMemoryFromBtoAForNBytes(&lanims[i],lanim,sizeof(LightAnimation));
+    MemCpyFromBtoAForNBytes(&lights[i],lit,sizeof(Light)); MemCpyFromBtoAForNBytes(&lanims[i],lanim,sizeof(LightAnimation));
     lightsNewPosition[i] = lit->pos; flag_set(&lights[i].lflags,LDIRTY,true);
     return i;
 }
@@ -6909,11 +6944,11 @@ void DrawCapsuleCollider(Entity *e); void DrawConvexMeshCollider(Entity *e); voi
 #define BIND_TEX(slot,cur,next) if((cur)!=(next)||(next)==0){(cur)=(next);glUniform1ui(slot,(u32)(next));}
 #define DRAW_ENTITY(curN,curT,curG,curS,curM) \
     {u16 glow=e->glowIndex,norm=e->normIndex,spec=e->specIndex; \
-          if (e->collider == COLLIDER_TYPE_BOX) DrawBoxCollider(e); \
-     else if (e->collider == COLLIDER_TYPE_SPHERE) DrawSphereCollider(e); \
-     else if (e->collider == COLLIDER_TYPE_CONVEXMESH) DrawMeshCollider(e); \
-     else if (e->collider == COLLIDER_TYPE_MESH) DrawMeshCollider(e); \
-     else if (e->collider == COLLIDER_TYPE_CAPSULE) DrawCapsuleCollider(e); \
+          if (e->collider == COLTYPE_BOX) DrawBoxCollider(e); \
+     else if (e->collider == COLTYPE_SPH) DrawSphereCollider(e); \
+     else if (e->collider == COLTYPE_CVX) DrawMeshCollider(e); \
+     else if (e->collider == COLTYPE_MSH) DrawMeshCollider(e); \
+     else if (e->collider == COLTYPE_CAP) DrawCapsuleCollider(e); \
      glUniform1ui(17,tex==316?1u:0u); glUniform1ui(25,constIndex); glUniform1f(27,e->volume); glUniform1ui(13,(tex==36||tex==887)?1u:0u); \
      if (grayscaleEnabled) { float npcHeat = ConstIndexIsNPC(constIndex) ? ((constIndex==419 || constIndex==422 || constIndex==424 || constIndex==429 || constIndex==430 || constIndex==431||constIndex==433||constIndex==437||constIndex==438||constIndex==441) ? 1.5f : 4.0f) : 0.0f; glUniform1f(9,npcHeat); } \
      glUniform1ui(30,e->camView < camViewCount ? 1u : 0u); \
@@ -6973,7 +7008,6 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps();
     UpdateLights(); // This is where the voxels get updated!
     for (int i=0;i<LIGHT_COUNT;++i) flag_set(&lights[i].lflags,LDIRTY,false);
-    MemSetToVForNBytes(Sys_Global.dirtyInstances,0,Sys_Global.loadedInstances * sizeof(bool));
     glViewport(0,0,swidth,sheight);
     ClearAll();
     glBindFramebuffer(GL_FRAMEBUFFER,Sys_Render.gBufferFBO);
@@ -6988,7 +7022,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         else { visibleInstances[opaqueCount].index = i; visibleInstances[opaqueCount].depth = distSqrd; opaqueCount++; }
     }
 
-    CopyMemoryFromBtoAForNBytes(visibleInstances + opaqueCount,tmpTransparent,tcnt * sizeof(DepthSort));
+    MemCpyFromBtoAForNBytes(visibleInstances + opaqueCount,tmpTransparent,tcnt * sizeof(DepthSort));
     visibleCount = opaqueCount + tcnt;
     glUseProgram(Sys_Render.depthPrepassShaderProgram); // Depth Prepass - Eliminates some overdraw for ~6.1% performance improvement in spite of added draw calls
     glUniformMatrix4fv(2,1,0,viewProj);
@@ -7118,32 +7152,33 @@ void RenderCameraViews(void) { // Render in-world camera views.  Pops player pos
 
 void UpdateInstanceMatrix4x4s(void) {
     if (unlikely(Sys_Global.gamePaused || Sys_Global.menuActive)) return;
-
-    bool uploadInstances = false;
-    for (u32 i = START_INDEX_LEVEL_INSTANCES; i < Sys_Global.loadedInstances; i++) {
-        if (Sys_Global.dirtyInstances[i]) {
-            Entity* e = &Sys_Global.instances[i]; u16 mdx = e->modelIndex;
-            if (mdx >= loadedModelsMaxIndex || modelVertexCounts[mdx] < 1) { Sys_Global.dirtyInstances[i] = false; continue; } // No model or empty model
-
-            uploadInstances = true;
-            float x=e->rotation.x, y = e->rotation.y, z = e->rotation.z, w = e->rotation.w; 
-            float x2 = x*x, y2 = y*y, z2 = z*z, xy = x*y, xz = x*z, yz = y*z, wx = w*x, wy = w*y, wz = w*z;
-            float sclx = e->scale.x, scly = e->scale.y, sclz = e->scale.z;
-            u32 m = i*16;
-            modelMatrices[m+0] = (1.0f - 2.0f * (y2 + z2)) * sclx;/*Right X*/   modelMatrices[m+1] =        (2.0f * (xy + wz)) * sclx;/*Right Y*/   modelMatrices[m+2] =        (2.0f * (xz - wy)) * sclx;/*Right Z*/
-            modelMatrices[m+4] =        (2.0f * (xy - wz)) * scly;/*Up X*/      modelMatrices[m+5] = (1.0f - 2.0f * (x2 + z2)) * scly;/*Up Y*/      modelMatrices[m+6] =        (2.0f * (yz + wx)) * scly;/*Up Z*/
-            modelMatrices[m+8] =        (2.0f * (xz + wy)) * sclz;/*Forward X*/ modelMatrices[m+9] =        (2.0f * (yz - wx)) * sclz;/*Forward Y*/ modelMatrices[m+10]= (1.0f - 2.0f * (x2 + y2)) * sclz;/*Forward Z*/
-            modelMatrices[m+12]= e->position.x;                                 modelMatrices[m + 13] = e->position.y;                              modelMatrices[m + 14] = e->position.z;   modelMatrices[m+15]= 1.0f;
-        }
+    
+    i32 dirtyMin = -1, dirtyMax = -1;
+    for (u32 i = START_INDEX_LEVEL_INSTANCES; i < Sys_Global.loadedInstances; i++) {        
+        Entity *e = &Sys_Global.instances[i];
+        float x=e->rotation.x, y=e->rotation.y, z=e->rotation.z, w=e->rotation.w;
+        float x2=x*x, y2=y*y, z2=z*z, xy=x*y, xz=x*z, yz=y*z, wx=w*x, wy=w*y, wz=w*z;
+        float sclx=e->scale.x, scly=e->scale.y, sclz=e->scale.z;
+        u32 m = i*16;
+        modelMatrices[m+0] =(1.0f-2.0f*(y2+z2))*sclx; modelMatrices[m+1] =      (2.0f*(xy+wz))*sclx; modelMatrices[m+2] =      (2.0f*(xz-wy))*sclx;
+        modelMatrices[m+4] =      (2.0f*(xy-wz))*scly; modelMatrices[m+5] =(1.0f-2.0f*(x2+z2))*scly; modelMatrices[m+6] =      (2.0f*(yz+wx))*scly;
+        modelMatrices[m+8] =      (2.0f*(xz+wy))*sclz; modelMatrices[m+9] =      (2.0f*(yz-wx))*sclz; modelMatrices[m+10]=(1.0f-2.0f*(x2+y2))*sclz;
+        modelMatrices[m+12]=e->position.x; modelMatrices[m+13]=e->position.y; modelMatrices[m+14]=e->position.z; modelMatrices[m+15]=1.0f;
+        if (dirtyMin < 0) dirtyMin = (i32)i;
+        dirtyMax = (i32)i;
     }
-    if (uploadInstances) { glBindBuffer(GL_SSBO,Sys_Render.matricesBufferID); glBufferSubData(GL_SSBO,0,Sys_Global.loadedInstances * 16 * sizeof(float),modelMatrices); }
+    if (dirtyMin < 0) return;
+    glBindBuffer(GL_SSBO,Sys_Render.matricesBufferID);
+    u32 offsetFloats = (u32)dirtyMin * 16;
+    u32 countFloats  = ((u32)dirtyMax - (u32)dirtyMin + 1) * 16;
+    glBufferSubData(GL_SSBO, offsetFloats * sizeof(float), countFloats * sizeof(float), modelMatrices + offsetFloats);
 }
 // ========================================================================================================================================================================================================================================================================================================
 // Level Load System
 ENGINE_TO_MOD void InitializeEntity(Entity* entry) { // Blank entity, no index yet, for initial list population or temporary Entity. memset here would be harmful as only a handful of fields are the same.
     entry->index = U16_MAX;               entry->entflags = ENTFLAG_ACTIVE; entry->kinematic = true;
     entry->layer = Layer_Default;         entry->camView = 255;             entry->rotation = QUAT_IDENTITY;
-    entry->collider = COLLIDER_TYPE_NONE; entry->tickTime = 0.35f;          entry->angularDrag = 0.05f;
+    entry->collider = COLTYPE_NONE; entry->tickTime = 0.35f;          entry->angularDrag = 0.05f;
     entry->modelIndex = entry->lodIndex  = entry->colliderMeshIndex            = MODEL_IDX_MAX;
     entry->texIndex   = entry->glowIndex = entry->specIndex = entry->normIndex = MAX_VALID_TEXTURE;
     entry->scale.x    = entry->scale.y   = entry->scale.z   = entry->mass      = entry->volume = 1.0f;
@@ -7175,6 +7210,7 @@ ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
         e->cellIndex = cellIdx; e->cellX=PosGetCellCoordX(e->position.x); e->cellZ=PosGetCellCoordZ(e->position.z);
         e->radius = modelBounds[e->modelIndex]*vmax(vmax(e->scale.x,e->scale.y),e->scale.z);
         e->shadRadius = e->radius * 1.41;
+        ComputeConvexMeshInertiaTensor(e);
     }
     
     ModInitAfterLoad(); ResetLevelAudio(); ResetLevelMusic(); creditPages = GetCreditsText();
@@ -7186,7 +7222,6 @@ ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
     glUniform1ui(2,Sys_Global.loadedLights);
     glUniform2f(3,Sys_Global.worldMin_x,Sys_Global.worldMin_z); 
     RenderLoadingProgress(120,"Loading voxel lighting data...");
-    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < Sys_Global.loadedInstances; i++) Sys_Global.dirtyInstances[i] = true;
     for (u16 i = 0; i < Sys_Global.loadedLights; i++) { lightsNewPosition[i] = lights[i].pos; }
     MemSetToVForNBytes(voxen_Shadow_System.shadowmapIndirectionList,MAX_SHADOWMAPS + 1,Sys_Global.loadedLights * sizeof(u32)); // Set to invalid values for all
     Sys_Global.levelCurrentlyLoading = false;
@@ -7324,7 +7359,7 @@ void InitalizeEnvironment(void) {
     u32 status = glCheckFramebufferStatus(GL_FRAMEBUFFER); if (status != 0x8CD5/*GL_FRAMEBUFFER_COMPLETE*/) DualLogError("Framebuffer incomplete: Error code %d\n",status);
     glBindFramebuffer(GL_FRAMEBUFFER,0);
     float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
-    CopyMemoryFromBtoAForNBytes(&modelMatrices[0],mat,16 * sizeof(float)); // Null instance matrix used for UI
+    MemCpyFromBtoAForNBytes(&modelMatrices[0],mat,16 * sizeof(float)); // Null instance matrix used for UI
     Sys_Render.matricesBufferID        = SetupSSBO(&Sys_Render.matricesBufferID,        1,INSTANCE_COUNT * 16 * sizeof(float),modelMatrices, GL_STATIC_DRAW);
     Sys_Render.voxelLightListCountsID  = SetupSSBO(&Sys_Render.voxelLightListCountsID,  2,VOXEL_COUNT * sizeof(u32),NULL,GL_STATIC_DRAW);
     Sys_Render.voxelLightListsID       = SetupSSBO(&Sys_Render.voxelLightListsID,       3,VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(u32),NULL,GL_STATIC_DRAW);
@@ -7384,4 +7419,4 @@ i32 main(void) {
         #endif
     }
     return 0;
-} // 7475
+}

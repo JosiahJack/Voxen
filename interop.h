@@ -174,6 +174,7 @@ ENGINE_TO_MOD bool ToggleDoorPortal(u8 portalIdx, u16 doorIdx, u16 closedModelIn
 ENGINE_TO_MOD Vector3 GetEntityLocalSpawnPointFromUnrotatedOffsetVector(Entity* originator, Vector3 offsetFromOriginator);
 ENGINE_TO_MOD void TurnLightOff(u16 litIdx);
 ENGINE_TO_MOD void AddCamView(Vector3 pos, Quaternion rot, u8 fov, u16 width, u16 height, float near, float far);
+ENGINE_TO_MOD void SetPosition(Entity* e, Vector3 newpos, bool teleport);
 
 // Common inlines that need to span both engine and gamecode
 static inline __attribute__((always_inline)) u32 parse_numberu32(const char* str, const char* line, u32 lineNum) {

@@ -90,10 +90,7 @@ public class SpawnManager : MonoBehaviour {
 		if (spot.x == 0 && spot.y == 0 && spot.z == 0) return;
 
 		u16 instGO = SpawnDynamicObject(index,Eng_Global->currentLevel,false,null,-1);
-        instGO.Eng_Global->instances[i].position = spot;
-        AIController aic = instGO.GetComponent<AIController>();
-        if (aic == null) return;
-
+        SetPosition(&Eng_Global->instances[instGO],spot,true);
         if (!alertEnemiesOnAwake) {
             if (aic.index != 14) aic.wandering = true;
             return;

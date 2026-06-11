@@ -75,7 +75,6 @@ MOD_TO_ENGINE void UpdateAnims(void) {
             e->currentFrameFinished -= (double)framesToAdvance * timePerFrame;
             e->frame = (frameCount <= 1) ? clip->frameStart : clip->frameStart + ((e->frame - clip->frameStart + framesToAdvance) % frameCount);
             e->modelIndex = clip->frameStartModelIndex + (e->frame - clip->frameStart);
-            Eng_Global->dirtyInstances[i] = true;
             if (ConstIndexIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, modelAnimationClips[e->animationNum][ANIM_IDLE_CLOSED].frameStartModelIndex)) portalsNeedUpdated = true;
         }
     }
