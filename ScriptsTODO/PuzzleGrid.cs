@@ -69,7 +69,7 @@ public class PuzzleGrid : MonoBehaviour {
 		// No longer in use, reset reset!
 		puzzleSolved = false;
 		progressBar.value = 0;
-		flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
+		flag_set(&SELF.entflags, EF_ACTIVE, false);
 	}
 
 	public void SendGrid(bool[] states, PuzzleCellType[] types,

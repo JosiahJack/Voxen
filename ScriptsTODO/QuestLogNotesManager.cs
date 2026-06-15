@@ -34,7 +34,7 @@
 		}
 
 		if (Eng_Global->difficultyMission == 0) {
-			flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
+			flag_set(&SELF.entflags, EF_ACTIVE, false);
 			return;
 		}
 		a.labels[6].text = Eng_Text->stringTable[554]; // Set:Escape neurosurgery suite.

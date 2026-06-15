@@ -15,7 +15,7 @@ typedef __INT64_TYPE__ i64; typedef __UINT64_TYPE__ u64; typedef __SIZE_TYPE__ s
 typedef struct { float r,g,b; } Color3; typedef struct { float r,g,b,a; } Color;
 typedef struct { float x,y; } Vector2;  typedef struct { float x,y,z; } Vector3; typedef struct { float x,y,z,w; } Quaternion;
 #define QUAT_IDENTITY ((Quaternion){0.0f,0.0f,0.0f,1.0f})
-typedef u8 PhysCombineType,ColliderType;
+typedef u8 ColliderType;
 typedef u16 Text;
 typedef struct {Vector3 point; Vector3 normal; float distance; u16 hitInstanceIndex; bool hit;} RaycastHit;
 typedef struct {float speed; u16 frameStart,frameEnd,frameStartModelIndex; u8 framerate;} AnimationClip;
@@ -91,38 +91,38 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define CELL_CLOSEDWEST   32u
 #define CELL_SEES_SUN     64u
 #define CELL_SEES_SKYBOX 128u
-#define ENTFLAG_ACTIVE               (1ull <<  0) // Instance renders and updates
-#define ENTFLAG_ISGRENADE            (1ull <<  1)
-#define ENTFLAG_GROUNDED             (1ull <<  2)
-#define ENTFLAG_RIGIDBODY            (1ull <<  3)
-#define ENTFLAG_NO_SHADOWS           (1ull <<  4)
-#define ENTFLAG_ASLEEP               (1ull <<  5) // Check if enemy starts out asleep such as the sleeping sec-2 bots on level 8 in the maintenance and recharge bays.
-#define ENTFLAG_WALK_PATH_ON_START   (1ull <<  6)
-#define ENTFLAG_TOUCHING_HURTS       (1ull <<  7)
-#define ENTFLAG_ACT_AS_CORPSE_ONLY   (1ull <<  8)
-#define ENTFLAG_DYING                (1ull <<  9)
-#define ENTFLAG_DEATH_BURST_DONE     (1ull << 10)
-#define ENTFLAG_DEAD                 (1ull << 11)
-#define ENTFLAG_TELEPORT_ON_DEATH    (1ull << 12)
-#define ENTFLAG_GO_INTO_PAIN         (1ull << 13)
-#define ENTFLAG_DONT_LOOP_WAYPTS     (1ull << 14)
-#define ENTFLAG_VISIT_WAYPTS_RND     (1ull << 15)
-#define ENTFLAG_WANDERING            (1ull << 16)
-#define ENTFLAG_ACT_AS_TURRET        (1ull << 17)
-#define ENTFLAG_TARGID_ATTACHED      (1ull << 18)
-#define ENTFLAG_ENEM_IN_SIGHT        (1ull << 19)
-#define ENTFLAG_ENEM_IN_FRONT        (1ull << 20)
-#define ENTFLAG_ENEM_IN_FOV          (1ull << 21)
-#define ENTFLAG_ENEM_IN_LOS          (1ull << 22)
-#define ENTFLAG_FIRST_SIGHTING       (1ull << 23)
-#define ENTFLAG_DYING_SETUP          (1ull << 24)
-#define ENTFLAG_HAD_ENEMY            (1ull << 25)
-#define ENTFLAG_SHOT_FIRED           (1ull << 26)
-#define ENTFLAG_DEAD_CHECKS_DONE     (1ull << 27)
-#define ENTFLAG_HOP_DONE             (1ull << 28)
-#define ENTFLAG_LOCKED               (1ull << 29)
-#define ENTFLAG_HAS_CAMERA_VIEW      (1ull << 30)
-#define ENTFLAG_DAMAGE_ON_USE        (1ull << 31)
+#define EF_ACTIVE               (1ull <<  0) // Instance renders and updates
+#define EF_ISGRENADE            (1ull <<  1)
+#define EF_GROUNDED             (1ull <<  2)
+#define EF_RIGIDBODY            (1ull <<  3)
+#define EF_NO_SHADOWS           (1ull <<  4)
+#define EF_ASLEEP               (1ull <<  5) // Check if enemy starts out asleep such as the sleeping sec-2 bots on level 8 in the maintenance and recharge bays.
+#define EF_WALK_PATH_ON_START   (1ull <<  6)
+#define EF_TOUCHING_HURTS       (1ull <<  7)
+#define EF_ACT_AS_CORPSE_ONLY   (1ull <<  8)
+#define EF_DYING                (1ull <<  9)
+#define EF_DEATH_BURST_DONE     (1ull << 10)
+#define EF_DEAD                 (1ull << 11)
+#define EF_TELEPORT_ON_DEATH    (1ull << 12)
+#define EF_GO_INTO_PAIN         (1ull << 13)
+#define EF_DONT_LOOP_WAYPTS     (1ull << 14)
+#define EF_VISIT_WAYPTS_RND     (1ull << 15)
+#define EF_WANDERING            (1ull << 16)
+#define EF_ACT_AS_TURRET        (1ull << 17)
+#define EF_TARGID_ATTACHED      (1ull << 18)
+#define EF_ENEM_IN_SIGHT        (1ull << 19)
+#define EF_ENEM_IN_FRONT        (1ull << 20)
+#define EF_ENEM_IN_FOV          (1ull << 21)
+#define EF_ENEM_IN_LOS          (1ull << 22)
+#define EF_FIRST_SIGHTING       (1ull << 23)
+#define EF_DYING_SETUP          (1ull << 24)
+#define EF_HAD_ENEMY            (1ull << 25)
+#define EF_SHOT_FIRED           (1ull << 26)
+#define EF_DEAD_CHECKS_DONE     (1ull << 27)
+#define EF_HOP_DONE             (1ull << 28)
+#define EF_LOCKED               (1ull << 29)
+#define EF_HAS_CAMERA_VIEW      (1ull << 30)
+#define EF_DAMAGE_ON_USE        (1ull << 31)
 #define QUESTBIT_ROBOT_SPAWN_DEACTIVATED      (1ull <<  0)
 #define QUESTBIT_ISOTOPE_INSTALLED            (1ull <<  1)
 #define QUESTBIT_SHIELD_ACTIVATED             (1ull <<  2)
@@ -153,8 +153,8 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define TARG_IOFLAGS_DOOROPEN           (1ull << 1)
 #define TARG_IOFLAGS_DOOROPENIFUNLOCKED (1ull << 2)
 #define TARG_IOFLAGS_DOORCLOSE          (1ull << 3)
-#define TARG_IOFLAGS_DOORLOCK           (1ull << 4)
-#define TARG_IOFLAGS_DOORUNLOCK         (1ull << 5)
+#define TARG_IOFLAGS_LOCK               (1ull << 4)
+#define TARG_IOFLAGS_UNLOCK             (1ull << 5)
 #define TARG_IOFLAGS_SWITCHTRIGGER      (1ull << 6)
 #define TARG_IOFLAGS_CHGSTAT_RECHARGE   (1ull << 7)
 #define TARG_IOFLAGS_ENEMY_ALERT        (1ull << 8)
@@ -170,44 +170,17 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define TARG_IOFLAGS_MISSION_BIT_ON     (1ull << 18)
 #define TARG_IOFLAGS_MISSION_BIT_OFF    (1ull << 19)
 #define TARG_IOFLAGS_MISSION_BIT_TOGGLE (1ull << 20)
-#define TARG_IOFLAGS_TXFER2LOGIC_RELAY  (1ull << 21)
-#define TARG_IOFLAGS_SEND_EMAIL         (1ull << 22)
-#define TARG_IOFLAGS_SWITCH_LOCK_TOGGLE (1ull << 23)
-#define TARG_IOFLAGS_LOCK_CODE_SCREEN   (1ull << 24)
-#define TARG_IOFLAGS_SPAWNER_ACTIVATE   (1ull << 25)
-#define TARG_IOFLAGS_SPAWNER_ACTALERTED (1ull << 26)
-#define TARG_IOFLAGS_CYBORG_CONV_TOGGLE (1ull << 27)
-#define TARG_IOFLAGS_INST_ACTIVATE      (1ull << 28)
-#define TARG_IOFLAGS_INST_DEACTIVATE    (1ull << 29)
-#define TARG_IOFLAGS_INST_TOGGLE        (1ull << 30)
-#define TARG_IOFLAGS_TOGGLE_RADIATION   (1ull << 31)
-#define TARG_IOFLAGS_TOGGLE_PUZPNL_LOCK (1ull << 32)
-#define TARG_IOFLAGS_TEST_QUESTBIT_ON   (1ull << 33)
-#define TARG_IOFLAGS_TEST_QUESTBIT_OFF  (1ull << 34)
-#define TARG_IOFLAGS_PLAY_SOUND_ONCE    (1ull << 35)
-#define TARG_IOFLAGS_STOP_SOUND         (1ull << 36)
-#define TARG_IOFLAGS_SEND_CENTERPRINT   (1ull << 37)
-#define TARG_IOFLAGS_RADIATION_TREATMNT (1ull << 38)
-#define TARG_IOFLAGS_START_FLASHING_TEX (1ull << 39)
-#define TARG_IOFLAGS_STOP_FLASHING_TEX  (1ull << 40)
-#define TARG_IOFLAGS_UNLOCK_ELEVATORPAD (1ull << 41)
-#define TARG_IOFLAGS_UNLOCK_KEYPAD      (1ull << 42)
-#define TARG_IOFLAGS_UNLOCK_PUZPAD      (1ull << 43)
-#define TARG_IOFLAGS_SCREENSHAKE        (1ull << 44)
-#define TARG_IOFLAGS_AWAKE_SLEEPING_NPC (1ull << 45)
-#define TARG_IOFLAGS_BRANCH_FLIP        (1ull << 46)
-#define TARG_IOFLAGS_BRANCH_FLIPONLY    (1ull << 47)
-#define TARG_IOFLAGS_TOG_DORACESOVERIDE (1ull << 48)
-#define TARG_IOFLAGS_UNLOCK_SWITCH      (1ull << 49)
-#define TARG_IOFLAGS_LOCK_ELEVATORPAD   (1ull << 50)
-#define TARG_IOFLAGS_DOOR_TOGGLE        (1ull << 51)
-#define TARG_IOFLAGS_ONCE_EVER          (1ull << 52)
-#define TARG_IOFLAGS_ALREADY_DONE       (1ull << 53)
-#define TARG_IOFLAGS_START_ON_SECOND    (1ull << 54)
-#define TARG_IOFLAGS_ON_SECOND          (1ull << 55) // No he's on third
-#define TARG_IOFLAGS_AUTOFLIP_ON_TARGET (1ull << 56)
-#define TARG_IOFLAGS_DISABLE_ON_AWAKE   (1ull << 57)
-#define TARG_IOFLAGS_DISABLD_ONCE_4EVER (1ull << 58)
+#define TARG_IOFLAGS_SWITCH_LOCK_TOGGLE (1ull << 21)
+#define TARG_IOFLAGS_INST_ACTIVATE      (1ull << 22)
+#define TARG_IOFLAGS_INST_DEACTIVATE    (1ull << 23)
+#define TARG_IOFLAGS_INST_TOGGLE        (1ull << 24)
+#define TARG_IOFLAGS_PLAY_SOUND_ONCE    (1ull << 25)
+#define TARG_IOFLAGS_STOP_SOUND         (1ull << 26)
+#define TARG_IOFLAGS_START_FLASHING_TEX (1ull << 27)
+#define TARG_IOFLAGS_STOP_FLASHING_TEX  (1ull << 28)
+#define TARG_IOFLAGS_BRANCH_FLIP        (1ull << 29)
+#define TARG_IOFLAGS_BRANCH_FLIPONLY    (1ull << 30)
+#define TARG_IOFLAGS_DISABLE_ON_AWAKE   (1ull << 31)
 #define TARGET_STRING_LENGTH 38
 #define CURSOR_SCREEN_PERCENTAGE 0.02f
 #define FONT_NORMAL 0
@@ -237,10 +210,6 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define MAX_DYNAMIC_ENTITIES 512
 #define TERMINAL_VELOCITY 10.0f
 #define PHYS_FLOAT_TO_INT_SCALEF 100.0f
-#define PHYS_COMBINE_AVG 0 // All the same for both frictionCombine and bounceCombine
-#define PHYS_COMBINE_MIN 1
-#define PHYS_COMBINE_MUL 2
-#define PHYS_COMBINE_MAX 3
 #define COLTYPE_NONE 0
 #define COLTYPE_BOX 1
 #define COLTYPE_SPH 2
@@ -493,11 +462,8 @@ typedef struct {
 
 typedef struct { float damage,penetration,offense,armorvalue,defense,impactVelocity; Vector3 attacknormal,hitpoint; AttackType attackType; u16 owner,hitIdx; bool isOtherNPC,berserkActive; } DamageData;
 typedef /*FAT*/ struct  {
-    u64 ioflags;
     u32 entflags;
-    
     u16 modelIndex,index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
-    
     Vector3 position;
     float radius,shadRadius;
     Vector3 scale,forward,right;
@@ -505,14 +471,14 @@ typedef /*FAT*/ struct  {
     
     // Rendering
     u16 texIndex,glowIndex,specIndex,normIndex,lodIndex,colliderMeshIndex;
-    bool cardchunk,kinematic,shadows;
     u8 camView;
     
     // Physics
     u32 layer;
-    Vector3 velocity,angularVelocity,lastPosition;
+    Vector3 velocity,angularVelocity,lastPosition,lastAngularVelocity;
     float gravity;
     float inertiaTensor[6];
+    float invInertiaTensor[6];
     bool  inertiaTensorValid;
     
     Vector3 colliderCenter; // Offset relative to .position's global worldspace xyz location
@@ -524,13 +490,13 @@ typedef /*FAT*/ struct  {
 
     float targetPositionY,speed,percentAjar,percentMoved;
     float mass,angularDrag,inertia;
-    Vector3 accumulatedForce,accumulatedTorque;
+    Vector3 accumulatedForce;
     float dynamicFriction,staticFriction,bounciness;
-    PhysCombineType frictionCombine,bounceCombine;
-    bool colliding;
+    bool colliding,cardchunk,kinematic;
     float volume; // Audio
     
     // Logic and I/O
+    u32 ioflags;
     float health,lastHealth,cyberHealth;
     u8 securityThreshold,lerpUp;
     char targetname[TARGET_STRING_LENGTH];
@@ -545,7 +511,7 @@ typedef /*FAT*/ struct  {
     float delay,damage,itemLifeTime,minutes,seconds,randomMin,randomMax;
     float timeInterval,cyberTimer,intervalFinished,delayFireFinished,delayResetFinished;
     bool searchableInUse,generateContents,dontReset,onlyOnce,ignoreSecondaryTriggers,allDone,currentTexture,useRandomTimes,active; // Lawdy, we'll make these bitflags someday
-    bool touchEnabled,broken,stayOpen,startOpen,ajar,blocked,targetAlreadyDone,accessCardUsedByPlayer,toggleLasers,targettingOnlyUnlocks;
+    bool touchEnabled,broken,stayOpen,startOpen,ajar,blocked,targetAlreadyDone,toggleLasers,targettingOnlyUnlocks;
     bool changeLayerOnOpenClose,despawnInstead,doSelfAfterList,destroyAfterListInsteadOfDeactivate,iceActive;
     bool forceFieldDirectionX,forceFieldDirectionY,forceFieldDirectionZ,heldObjectLoadedAlternate,changeTexOnActive,blinkTexOnActive;
     i16 numPlayers;
@@ -603,7 +569,7 @@ typedef struct {
     u32 frame,lastFrameSecCount,framesPerLastSecond,worstFPS,debugLineVertCount,shotsFired,grenadesThrown,savesScummed;
     u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,loadedInstances,loadedLights; // Numbers of instances of entities and lights loaded (always for just the current level)
     float farPlane,damageDealt,damageReceived,timeScale,worldMin_x,worldMin_z,voxelMinCenterX,voxelMinCenterZ;
-	double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,debugLineFinished,shakeFinished,last_time,last_topframe_time,last_physics_time,deltaTime,current_time,timeSinceLastPhysicsTick,screenshotTimeout,pauseRelativeTime,absoluteTime,statusTextDecayFinished,justSavedTimeStamp;
+	double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,debugLineFinished,shakeFinished,last_time,last_topframe_time,last_physics_time,deltaTime,current_time,screenshotTimeout,pauseRelativeTime,absoluteTime,statusTextDecayFinished,justSavedTimeStamp;
     i32 fogFac,cursorPosition_x,cursorPosition_y; // Separate internal cursor from system cursor.  This gets relatively pushed around by real cursor movement to give consistent platform behavior.
 	Vector3 debugLine_start,debugLine_end,cyberspaceRecallPoint;
 	bool inventoryMode,levelCurrentlyLoading;
@@ -623,7 +589,6 @@ typedef struct {
 
 static inline __attribute__((always_inline)) void flag_setu16(u16 *flags, u16 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
 static inline __attribute__((always_inline)) void flag_set(u32 *flags, u32 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
-static inline __attribute__((always_inline)) void flag_setu64(u64 *flags, u64 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
 
 // Math, Vectors, Quaternions
 #define vabs(x) ((x) < 0 ? -(x) : (x))

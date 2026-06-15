@@ -97,19 +97,19 @@ MOD_TO_ENGINE void InitializeAIAfterLoad(u16 i) {
     e->posCheckFinished = Eng_Global->pauseRelativeTime;
     e->lastPosition = e->position;
     e->timeSinceMovedEnough = 0.0;
-    if (e->walkWaypointsLength > 0 && (e->entflags & ENTFLAG_WALK_PATH_ON_START) && !(e->entflags & ENTFLAG_ASLEEP)) {
+    if (e->walkWaypointsLength > 0 && (e->entflags & EF_WALK_PATH_ON_START) && !(e->entflags & EF_ASLEEP)) {
         e->currentDestination = e->walkWaypoints[e->currentWaypoint];
         e->currentState = AIState_Walk; // If waypoints are set, start walking
     } else {
         e->currentState = AIState_Idle; // No waypoints, stay put
     }
 
-    if ((e->entflags & ENTFLAG_WANDERING) && (random_range(0.0f,1.0f) < 0.5f)) e->currentState = AIState_Walk;
-    else flag_set(&e->entflags, ENTFLAG_WANDERING, false);
+    if ((e->entflags & EF_WANDERING) && (random_range(0.0f,1.0f) < 0.5f)) e->currentState = AIState_Walk;
+    else flag_set(&e->entflags, EF_WANDERING, false);
 
-    if (e->entflags & ENTFLAG_ASLEEP) {
+    if (e->entflags & EF_ASLEEP) {
         e->currentState = AIState_Idle;
-//         flag_set(&Eng_Global->instances[e->sleepingCables].entflags, ENTFLAG_ACTIVE, true); // TODO
+//         flag_set(&Eng_Global->instances[e->sleepingCables].entflags, EF_ACTIVE, true); // TODO
     }
 
     e->attackFinished = Eng_Global->pauseRelativeTime + 1.0;
@@ -216,14 +216,14 @@ static void aiac_freeze(Entity* self) {
 }
 
 static void aiac_idle(Entity* self) {
-    if ((self->entflags & ENTFLAG_ASLEEP) || self->tranquilizeFinished >= Eng_Global->current_time) {
+    if ((self->entflags & EF_ASLEEP) || self->tranquilizeFinished >= Eng_Global->current_time) {
         aiac_freeze(self); return;
     }
     aiac_set_clip(self, ANIM_IDLE);
 }
 
 static void aiac_walk(Entity* self) {
-    if (self->entflags & ENTFLAG_ACT_AS_TURRET) { aiac_idle(self); return; }
+    if (self->entflags & EF_ACT_AS_TURRET) { aiac_idle(self); return; }
     
     float spdsq = self->velocity.x*self->velocity.x + self->velocity.z*self->velocity.z;
     if (spdsq > MIN_WALK_SPEED_SQ) { aiac_set_clip(self, ANIM_WALK); return; }
@@ -235,19 +235,19 @@ static void aiac_walk(Entity* self) {
 }
 
 static void aiac_run(Entity* self) {
-    if (self->entflags & ENTFLAG_ACT_AS_TURRET) { aiac_idle(self); return; }
+    if (self->entflags & EF_ACT_AS_TURRET) { aiac_idle(self); return; }
     
     aiac_set_clip(self, ANIM_RUN);
 }
 
 static void aiac_dying(Entity* self) {
-    flag_set(&self->entflags, ENTFLAG_ASLEEP, false);
+    flag_set(&self->entflags, EF_ASLEEP, false);
     // TODO check if it has no death anim and return
 //     aiac_set_clip(self, ANIM_DYING);
 //     AnimationClip cl = modelAnimationClips[self->animationNum][ANIM_DYING];
 //     u16 range = cl.frameEnd > cl.frameStart ? cl.frameEnd - cl.frameStart : 1;
 //     self->animatorPlaybackTime = (float)(self->frame - cl.frameStart) / (float)range; // TODO
-//     if (self->animatorPlaybackTime > 0.99f) flag_set(&self->entflags,ENTFLAG_DYING,false);
+//     if (self->animatorPlaybackTime > 0.99f) flag_set(&self->entflags,EF_DYING,false);
 }
 
 static void aiac_dead(Entity* self) {
@@ -260,11 +260,11 @@ static void aiac_dead(Entity* self) {
 
 void AIAnimationControllerUpdate(u16 idx) {
     Entity* self = &Eng_Global->instances[idx];
-    if (!(self->entflags & ENTFLAG_ACTIVE))        return;
+    if (!(self->entflags & EF_ACTIVE))        return;
     if (self->animationNum >= MAX_ANIMATED_MODELS)  return;
     if (self->currentState == AIState_Dying) { aiac_dying(self); return; }
     if (self->currentState == AIState_Dead)  { aiac_dead(self);  return; }
-    if (self->entflags & ENTFLAG_ASLEEP)     { aiac_idle(self);  return; }
+    if (self->entflags & EF_ASLEEP)     { aiac_idle(self);  return; }
     if (self->currentState == AIState_Run && self->tranquilizeFinished >= Eng_Global->current_time) { aiac_idle(self); return; }
     
     switch (self->currentState) {
@@ -291,10 +291,10 @@ static bool AICheckIfEnemyInSight(Entity* self) {
         self->enemy = 0;
         self->posCheckFinished = Eng_Global->pauseRelativeTime + AI_POS_CHECK_DELAY;
         self->lastPosition = self->position;
-        flag_set(&self->entflags, ENTFLAG_ENEM_IN_LOS, false);
+        flag_set(&self->entflags, EF_ENEM_IN_LOS, false);
         return false;
     }
-    if (ai_is_cyber(self) && Eng_Global->decoyActive) { flag_set(&self->entflags, ENTFLAG_ENEM_IN_LOS, false); return false; }
+    if (ai_is_cyber(self) && Eng_Global->decoyActive) { flag_set(&self->entflags, EF_ENEM_IN_LOS, false); return false; }
 
     float dist = V3_Dist(en->position, ai_sight_pos(self));
     if (dist > npcTable[self->index - 419].sightRange) return false;
@@ -304,23 +304,18 @@ static bool AICheckIfEnemyInSight(Entity* self) {
     Vector3 lineN = V3_Normalize(V3_AsubB(en->position, spos));
     RaycastHit hit = Raycast(spos, lineN, npcTable[self->index - 419].sightRange, LAYER_MASK_NPC_SIGHT);
     if (hit.hit) {
-        if (hit.hitInstanceIndex == eidx) { flag_set(&self->entflags, ENTFLAG_ENEM_IN_LOS, true); return true; }
+        if (hit.hitInstanceIndex == eidx) { flag_set(&self->entflags, EF_ENEM_IN_LOS, true); return true; }
         // Smart NPCs try to open doors blocking line-of-sight
         NPCType t = npcTable[self->index - 419].type;
         if (t != NPCType_Mutant && t != NPCType_Supermutant && t != NPCType_Cyber) {
             u16 hi = hit.hitInstanceIndex;
             if (hi && V3_SqDist(hit.point, spos) < 4.0f && ConstIndexIsDoor(Eng_Global->instances[hi].index)) {
                 Entity* dr = &Eng_Global->instances[hi];
-                if ((dr->doorOpen == DoorState_Closed || (dr->doorOpen == DoorState_Closing && Eng_Global->difficultyCombat > 2))
-                    && !(dr->entflags & ENTFLAG_LOCKED)
-                    && GetCurrentLevelSecurity() <= dr->securityThreshold
-                    && (dr->requiredAccessCard == AccessCardType_None || dr->accessCardUsedByPlayer)) {
-                    DoorActuate(hi);
-                }
+                if ((dr->doorOpen == DoorState_Closed || (dr->doorOpen == DoorState_Closing && Eng_Global->difficultyCombat > 2)) && !(dr->entflags & EF_LOCKED) && GetCurrentLevelSecurity() <= dr->securityThreshold && (dr->requiredAccessCard == AccessCardType_None)) DoorActuate(hi);
             }
         }
     }
-    flag_set(&self->entflags, ENTFLAG_ENEM_IN_LOS, false);
+    flag_set(&self->entflags, EF_ENEM_IN_LOS, false);
     return false;
 }
 
@@ -339,7 +334,7 @@ static void AISetEnemy(Entity* self, u16 eidx) {
     
     self->enemy = eidx;
     self->posCheckFinished = Eng_Global->pauseRelativeTime + AI_POS_CHECK_DELAY;
-    flag_set(&self->entflags, ENTFLAG_WANDERING, false);
+    flag_set(&self->entflags, EF_WANDERING, false);
     self->wanderFinished  = Eng_Global->pauseRelativeTime;
     self->lastPosition    = self->position;
     Entity* en            = &Eng_Global->instances[eidx];
@@ -349,11 +344,11 @@ static void AISetEnemy(Entity* self, u16 eidx) {
 }
 
 static void AIPlaySightSound(Entity* self) {
-    if (!(self->entflags & ENTFLAG_FIRST_SIGHTING)) return;
+    if (!(self->entflags & EF_FIRST_SIGHTING)) return;
     if (!ai_has_health(self)) return;
-    if (self->entflags & ENTFLAG_ACT_AS_CORPSE_ONLY) return;
+    if (self->entflags & EF_ACT_AS_CORPSE_ONLY) return;
     
-    flag_set(&self->entflags, ENTFLAG_FIRST_SIGHTING, false);
+    flag_set(&self->entflags, EF_FIRST_SIGHTING, false);
     i16 sfx = sfxSightSound[self->index - 419];
     if (sfx >= 0 && sfx < (i16)SOUNDS_COUNT) play_wav(sounds[sfx], self->volume, self->position, true);
 }
@@ -364,7 +359,7 @@ static bool AICheckIfPlayerInSight(Entity* self) {
     if (diff == 0 && (self->index - 419) != 28) return false;
     if (self->enemy) return AICheckIfEnemyInSight(self);
 
-    flag_set(&self->entflags,ENTFLAG_ENEM_IN_LOS,false);
+    flag_set(&self->entflags,EF_ENEM_IN_LOS,false);
     if (ai_is_cyber(self) && Eng_Global->decoyActive) return false;
     if (Eng_Cheats->notarget) return false;
 
@@ -382,12 +377,12 @@ static bool AICheckIfPlayerInSight(Entity* self) {
     bool makingNoise = Eng_Global->instances[PLAYER1].noiseFinished > Eng_Global->pauseRelativeTime;
     if (angle < npc->fov * 0.5f) {
         RaycastHit hit = Raycast(spos, checkN, dist + 0.1f, LAYER_MASK_NPC_SIGHT);
-        if (hit.hit && hit.hitInstanceIndex == PLAYER1) { flag_set(&self->entflags, ENTFLAG_ENEM_IN_LOS, true); AISetEnemy(self, PLAYER1); AIPlaySightSound(self); return true; }
+        if (hit.hit && hit.hitInstanceIndex == PLAYER1) { flag_set(&self->entflags, EF_ENEM_IN_LOS, true); AISetEnemy(self, PLAYER1); AIPlaySightSound(self); return true; }
         if (!hit.hit && makingNoise && dist < npc->hearingRange) { AISetEnemy(self, PLAYER1); AIPlaySightSound(self); return true; }
     } else {
         if (dist < npc->distToSeeBehind) {
             RaycastHit hit = Raycast(spos, checkN, dist + 0.1f, LAYER_MASK_NPC_SIGHT);
-            if (hit.hit && hit.hitInstanceIndex == PLAYER1) { flag_set(&self->entflags, ENTFLAG_ENEM_IN_LOS, true); AISetEnemy(self, PLAYER1); AIPlaySightSound(self); return true; }
+            if (hit.hit && hit.hitInstanceIndex == PLAYER1) { flag_set(&self->entflags, EF_ENEM_IN_LOS, true); AISetEnemy(self, PLAYER1); AIPlaySightSound(self); return true; }
         }
         if (makingNoise && dist < npc->hearingRange) { AISetEnemy(self, PLAYER1); AIPlaySightSound(self); return true; }
     }
@@ -395,15 +390,15 @@ static bool AICheckIfPlayerInSight(Entity* self) {
 }
 
 static void AIEnemyInFrontChecks(Entity* self, u16 eidx) {
-    if (!eidx) { flag_set(&self->entflags,ENTFLAG_ENEM_IN_FOV,false); flag_set(&self->entflags,ENTFLAG_ENEM_IN_FRONT,false);  return; }
-    if (ai_is_cyber(self)) { flag_set(&self->entflags,ENTFLAG_ENEM_IN_FOV,true); flag_set(&self->entflags,ENTFLAG_ENEM_IN_FRONT,true); return; }
+    if (!eidx) { flag_set(&self->entflags,EF_ENEM_IN_FOV,false); flag_set(&self->entflags,EF_ENEM_IN_FRONT,false);  return; }
+    if (ai_is_cyber(self)) { flag_set(&self->entflags,EF_ENEM_IN_FOV,true); flag_set(&self->entflags,EF_ENEM_IN_FRONT,true); return; }
     Vector3 spos=ai_sight_pos(self), epos=Eng_Global->instances[eidx].position;
     Vector3 iv = V3_Normalize((Vector3){epos.x - spos.x,0.0f,epos.z - spos.z}); float d = V3_dot(iv,self->forward);
-    flag_set(&self->entflags,ENTFLAG_ENEM_IN_FOV,d > 0.800f); flag_set(&self->entflags,ENTFLAG_ENEM_IN_FRONT,d > 0.300f);
+    flag_set(&self->entflags,EF_ENEM_IN_FOV,d > 0.800f); flag_set(&self->entflags,EF_ENEM_IN_FRONT,d > 0.300f);
 }
 
 static void AIFace(Entity* self, Vector3 goal) {
-    if (self->entflags & ENTFLAG_ASLEEP) return;
+    if (self->entflags & EF_ASLEEP) return;
     Vector3 fv = V3_AsubB(goal, self->position);
     if (!ai_is_cyber(self)) fv.y = 0.0f;
     if (fv.x == 0.0f && fv.y == 0.0f && fv.z == 0.0f) return;
@@ -434,7 +429,7 @@ static bool AIWithinAngleToTarget(Entity* self) {
 }
 
 bool AICheckPain(Entity* self) {
-    if (ai_is_cyber(self) || (self->entflags & ENTFLAG_ASLEEP) || (npcTable[self->index - 419].timeBetweenPain <= 0.0f) || (!(self->entflags & ENTFLAG_GO_INTO_PAIN) || self->timeTillPainFinished >= Eng_Global->pauseRelativeTime)) return false;
+    if (ai_is_cyber(self) || (self->entflags & EF_ASLEEP) || (npcTable[self->index - 419].timeBetweenPain <= 0.0f) || (!(self->entflags & EF_GO_INTO_PAIN) || self->timeTillPainFinished >= Eng_Global->pauseRelativeTime)) return false;
 
     self->currentState = AIState_Pain;
     u16 atkIdx = self->recentMostActivator;
@@ -450,7 +445,7 @@ bool AICheckPain(Entity* self) {
         } else self->enemy = atkIdx;
         
         self->posCheckFinished = Eng_Global->pauseRelativeTime + AI_POS_CHECK_DELAY;
-        flag_set(&self->entflags, ENTFLAG_WANDERING, false);
+        flag_set(&self->entflags, EF_WANDERING, false);
         self->wanderFinished = Eng_Global->pauseRelativeTime;
         self->lastPosition   = self->position;
         if (self->enemy) {
@@ -460,7 +455,7 @@ bool AICheckPain(Entity* self) {
         }
     }
     
-    flag_set(&self->entflags, ENTFLAG_GO_INTO_PAIN, false);
+    flag_set(&self->entflags, EF_GO_INTO_PAIN, false);
     self->timeTillPainFinished = Eng_Global->pauseRelativeTime + npcTable[self->index - 419].timeToPain;
     return true;
 }
@@ -475,7 +470,7 @@ static void AIIdle(Entity* self) {
         self->idleTime = Eng_Global->pauseRelativeTime + random_range(npc->timeIdleSFXMin, npc->timeIdleSFXMax);
     }
 
-    if (self->entflags & ENTFLAG_ASLEEP) { self->kinematic=true; self->velocity = (Vector3){0,0,0}; }
+    if (self->entflags & EF_ASLEEP) { self->kinematic=true; self->velocity = (Vector3){0,0,0}; }
     AICheckPain(self);
 }
 
@@ -510,30 +505,30 @@ static Vector3 AIGetSearchPoint(Entity* self) {
 }
 
 static void AIHopMove(Entity* self) {
-    if (self->entflags & ENTFLAG_ACT_AS_TURRET) return;
+    if (self->entflags & EF_ACT_AS_TURRET) return;
     
 //     if (self->animatorPlaybackTime > 0.1395f) { // TODO
-//         if (!(self->entflags & ENTFLAG_HOP_DONE)) {
-//             flag_set(&self->entflags, ENTFLAG_HOP_DONE, true);
+//         if (!(self->entflags & EF_HOP_DONE)) {
+//             flag_set(&self->entflags, EF_HOP_DONE, true);
 //             AddForce(ai_self_idx(self), V3_ScaleByF(self->forward, 500.0f), true);
 //             AddForce(ai_self_idx(self), (Vector3){0, 5.0f, 0}, true);
 //         }
 //     } else {
-//         flag_set(&self->entflags, ENTFLAG_HOP_DONE, false);
+//         flag_set(&self->entflags, EF_HOP_DONE, false);
 //     }
 }
 
 static void AIWalk(Entity* self) {
     if (AICheckPain(self)) return;
-    if (self->entflags & ENTFLAG_ASLEEP) return;
-    if ((self->entflags & ENTFLAG_ENEM_IN_SIGHT) || self->enemy) { self->currentState = AIState_Run; return; }
-    if (self->entflags & ENTFLAG_ACT_AS_TURRET) { self->currentState = AIState_Idle; return; }
+    if (self->entflags & EF_ASLEEP) return;
+    if ((self->entflags & EF_ENEM_IN_SIGHT) || self->enemy) { self->currentState = AIState_Run; return; }
+    if (self->entflags & EF_ACT_AS_TURRET) { self->currentState = AIState_Idle; return; }
     if (npcTable[self->index - 419].moveType == AIMoveType_None) return;
     if (self->tranquilizeFinished >= Eng_Global->pauseRelativeTime) return;
     if (!PositionVisibleFromPlayerCell(self->position.x, self->position.z)) return;
 
     float dist = V3_Dist(ai_sight_pos(self), self->currentDestination);
-    if (self->entflags & ENTFLAG_WANDERING) {
+    if (self->entflags & EF_WANDERING) {
         if (self->wanderFinished < Eng_Global->pauseRelativeTime || dist < AI_STOP_DIST * 0.5f) {
             self->wanderFinished = Eng_Global->pauseRelativeTime + random_range(3.0f, 8.0f);
             self->currentDestination = AIGetWanderPoint(self);
@@ -560,11 +555,11 @@ static void AIWalk(Entity* self) {
     }
 
     if (self->walkWaypointsLength < 1) {
-        if (!(self->entflags & ENTFLAG_WANDERING)) self->currentState = AIState_Idle;
+        if (!(self->entflags & EF_WANDERING)) self->currentState = AIState_Idle;
         return;
     }
 
-    if (self->entflags & ENTFLAG_VISIT_WAYPTS_RND) {
+    if (self->entflags & EF_VISIT_WAYPTS_RND) {
         self->currentWaypoint = random_range_i32(0, self->walkWaypointsLength);
     } else {
         self->currentWaypoint++;
@@ -572,14 +567,14 @@ static void AIWalk(Entity* self) {
     if (self->currentWaypoint < 0) self->currentWaypoint = 0;
     if (self->currentWaypoint >= (self->walkWaypointsLength - 1)) {
         self->currentWaypoint = 0;
-        if (self->entflags & ENTFLAG_DONT_LOOP_WAYPTS) { self->currentState = AIState_Idle; return; }
+        if (self->entflags & EF_DONT_LOOP_WAYPTS) { self->currentState = AIState_Idle; return; }
     }
     if (self->currentWaypoint < self->walkWaypointsLength)
         self->currentDestination = self->walkWaypoints[self->currentWaypoint];
 }
 
 static void AIRunMove(Entity* self) {
-    if (self->entflags & ENTFLAG_ACT_AS_TURRET) return;
+    if (self->entflags & EF_ACT_AS_TURRET) return;
     
     float rs = npcTable[self->index - 419].runSpeed;
     self->velocity = (Vector3){
@@ -594,7 +589,7 @@ static void AIHunt(Entity* self) {
     if (!eidx) return;
     self->currentDestination = ai_is_cyber(self) ? Eng_Global->instances[eidx].position : AIGetSearchPoint(self);
     if (npcTable[self->index - 419].moveType == AIMoveType_None) return;
-    if (self->entflags & ENTFLAG_ACT_AS_TURRET) return;
+    if (self->entflags & EF_ACT_AS_TURRET) return;
     if (npcTable[self->index - 419].runSpeed <= 0.0f) return;
     if (V3_SqDist(ai_sight_pos(self), self->currentDestination) <= AI_STOP_DIST_SQ) return;
     if (!AIWithinAngleToTarget(self)) return;
@@ -624,8 +619,8 @@ static bool AICanAttack(u16 selfIdx, float dsq, u8 type, float* rangeToEnemy) {
         }
     }
     if (ai_is_cyber(self)) return true; // Cyber enemies are dumb but aggressive.
-    if (!(self->entflags & ENTFLAG_ENEM_IN_FRONT)) return false;
-    if (type >= 2 && !(self->entflags & ENTFLAG_ENEM_IN_FOV)) return false;
+    if (!(self->entflags & EF_ENEM_IN_FRONT)) return false;
+    if (type >= 2 && !(self->entflags & EF_ENEM_IN_FOV)) return false;
     float wait = type == 3 ? self->randomWaitForNextAttack3Finished : (type == 2 ? self->randomWaitForNextAttack2Finished : self->randomWaitForNextAttack1Finished);
     return wait < Eng_Global->pauseRelativeTime;
 }
@@ -655,7 +650,7 @@ static void AIStartAttack(Entity* self, int n) {
 static void AIRun(u16 selfIdx) {
     Entity* self = &Eng_Global->instances[selfIdx];
     if (AICheckPain(self)) return;
-    if (self->entflags & ENTFLAG_ASLEEP) return;
+    if (self->entflags & EF_ASLEEP) return;
     if (!self->enemy) { self->currentState = AIState_Idle; return; }
     if (self->tranquilizeFinished >= Eng_Global->pauseRelativeTime && !ai_is_cyber(self)) return;
 
@@ -664,27 +659,27 @@ static void AIRun(u16 selfIdx) {
         float dToEn   = V3_Dist(ai_sight_pos(self), Eng_Global->instances[self->enemy].position);
         float dToLast = V3_Dist(self->position, self->lastPosition);
         self->lastPosition = self->position;
-        if (dToLast < 0.48f && dToEn > AI_STOP_DIST && !(self->entflags & ENTFLAG_WANDERING)) {
+        if (dToLast < 0.48f && dToEn > AI_STOP_DIST && !(self->entflags & EF_WANDERING)) {
             self->wanderFinished = Eng_Global->pauseRelativeTime + AI_SEARCH_TIME;
-            flag_set(&self->entflags, ENTFLAG_WANDERING, true);
+            flag_set(&self->entflags, EF_WANDERING, true);
             self->currentDestination = AIGetSearchPoint(self);
-        } else flag_set(&self->entflags, ENTFLAG_WANDERING, false);
+        } else flag_set(&self->entflags, EF_WANDERING, false);
     }
 
-    if (!(self->entflags & ENTFLAG_ENEM_IN_SIGHT)) {
+    if (!(self->entflags & EF_ENEM_IN_SIGHT)) {
         if (self->huntFinished > Eng_Global->pauseRelativeTime) { AIHunt(self); }
-        else { self->enemy = 0; flag_set(&self->entflags,ENTFLAG_WANDERING,true); self->wanderFinished = Eng_Global->pauseRelativeTime + 1.0; self->currentState = AIState_Walk; }
+        else { self->enemy = 0; flag_set(&self->entflags,EF_WANDERING,true); self->wanderFinished = Eng_Global->pauseRelativeTime + 1.0; self->currentState = AIState_Walk; }
         return;
     }
 
-    if (self->enemy && !(self->entflags & ENTFLAG_WANDERING)) {
+    if (self->enemy && !(self->entflags & EF_WANDERING)) {
         Entity* en = &Eng_Global->instances[self->enemy];
         self->targettingPosition = (Vector3){en->position.x,en->position.y + AI_TARGET_OFFSET_Y,en->position.z};
         self->currentDestination = self->targettingPosition;
         self->lastKnownEnemyPos  = self->targettingPosition;
     }
 
-    flag_set(&self->entflags, ENTFLAG_SHOT_FIRED, false);
+    flag_set(&self->entflags, EF_SHOT_FIRED, false);
     AISetHuntFinished(self);
     NPCTable* ndat = &npcTable[self->index - 419];
     float nr = ndat->range, near = nr * nr;
@@ -708,12 +703,12 @@ static void AIRun(u16 selfIdx) {
 static void AIPain(Entity* self) {
     if (self->timeTillPainFinished < Eng_Global->pauseRelativeTime) {
         self->currentState = AIState_Run;
-        flag_set(&self->entflags, ENTFLAG_GO_INTO_PAIN, false);
+        flag_set(&self->entflags, EF_GO_INTO_PAIN, false);
         self->timeTillPainFinished = Eng_Global->pauseRelativeTime + npcTable[self->index - 419].timeBetweenPain;
     }
 }
 
-static bool AIDeactivatesVisibleMeshWhileDying(Entity* self) { return self->index == 419 || self->index == 433 || self->index == 439 || (self->entflags & ENTFLAG_TELEPORT_ON_DEATH); }
+static bool AIDeactivatesVisibleMeshWhileDying(Entity* self) { return self->index == 419 || self->index == 433 || self->index == 439 || (self->entflags & EF_TELEPORT_ON_DEATH); }
 
 static void AIDyingSetup(Entity* self) {
     self->enemy = 0;
@@ -721,11 +716,11 @@ static void AIDyingSetup(Entity* self) {
     float dbt = deathBurstTimer[self->index - 419];
     if (dbt > 0.0f) {
         self->deathBurstFinished = Eng_Global->pauseRelativeTime + dbt;
-    } else if (!(self->entflags & ENTFLAG_DEATH_BURST_DONE)) {
+    } else if (!(self->entflags & EF_DEATH_BURST_DONE)) {
         // TODO Enable deathburst effects
     }
 
-    if (!(self->entflags & ENTFLAG_ACT_AS_CORPSE_ONLY) && !(self->entflags & ENTFLAG_TELEPORT_ON_DEATH)) {
+    if (!(self->entflags & EF_ACT_AS_CORPSE_ONLY) && !(self->entflags & EF_TELEPORT_ON_DEATH)) {
         int sded = sfxDeath[self->index - 419];
         if (sded >= 0 && sded < (i16)SOUNDS_COUNT) play_wav(sounds[sded], self->volume, self->position, true);
     }
@@ -733,21 +728,21 @@ static void AIDyingSetup(Entity* self) {
     if (ai_is_cyber(self)) self->gravity = 0.0f; // Physics for death
     else { self->gravity = 1.0f; self->kinematic=true; }
 
-    flag_set(&self->entflags, ENTFLAG_ASLEEP, false);
+    flag_set(&self->entflags, EF_ASLEEP, false);
     self->layer = Layer_Corpse;
-    flag_set(&self->entflags, ENTFLAG_FIRST_SIGHTING, true);
+    flag_set(&self->entflags, EF_FIRST_SIGHTING, true);
     self->timeTillDeadFinished = Eng_Global->pauseRelativeTime + npc->timeTillDead;
 //     if (npc->switchMaterialOnDeath && self->dyingTexture) self->texIndex = self->dyingTexture; // TODO Handle hopper and zerog texture changes
     if (self->index == 428 || self->index == 439) self->velocity = (Vector3){0.0f, self->velocity.z, 0.0f}; // Index-specific velocity patch (Exec bot and Zero-G mutant)
     if (self->index == 433) self->layer = Layer_Corpse; // Hopper: enable capsule collider (implicit in layer change)
-    flag_set(&self->entflags, ENTFLAG_DYING_SETUP, true);
+    flag_set(&self->entflags, EF_DYING_SETUP, true);
 }
 
 static void AIDying(Entity* self) {
-    if (!(self->entflags & ENTFLAG_DYING_SETUP)) AIDyingSetup(self);
+    if (!(self->entflags & EF_DYING_SETUP)) AIDyingSetup(self);
     if (self->timeTillDeadFinished < Eng_Global->pauseRelativeTime) {
-        flag_set(&self->entflags, ENTFLAG_DEAD,   true);
-        flag_set(&self->entflags, ENTFLAG_DYING,  false);
+        flag_set(&self->entflags, EF_DEAD,   true);
+        flag_set(&self->entflags, EF_DYING,  false);
         self->currentState = AIState_Dead;
     }
 
@@ -757,16 +752,16 @@ static void AIDying(Entity* self) {
 
 static void AIDead(u16 idx) {
     Entity* self = &Eng_Global->instances[idx];   
-    flag_set(&self->entflags, ENTFLAG_ASLEEP,       false);
-    flag_set(&self->entflags, ENTFLAG_DEAD,         true);
-    flag_set(&self->entflags, ENTFLAG_DYING,        false);
-    flag_set(&self->entflags, ENTFLAG_DYING_SETUP,  false);
-    if (self->entflags & ENTFLAG_DEAD_CHECKS_DONE) return;
+    flag_set(&self->entflags, EF_ASLEEP,       false);
+    flag_set(&self->entflags, EF_DEAD,         true);
+    flag_set(&self->entflags, EF_DYING,        false);
+    flag_set(&self->entflags, EF_DYING_SETUP,  false);
+    if (self->entflags & EF_DEAD_CHECKS_DONE) return;
 
     if (AIDeactivatesVisibleMeshWhileDying(self)) self->modelIndex = MODEL_IDX_MAX;
     self->currentState = AIState_Dead;
     self->layer = Layer_Corpse;
-    if (self->entflags & ENTFLAG_TELEPORT_ON_DEATH) {
+    if (self->entflags & EF_TELEPORT_ON_DEATH) {
         self->gravity = 1.0f;
         self->modelIndex = MODEL_IDX_MAX;
         // TODO: TeleportAway(ai_self_idx(self)), DeleteInstance(idx);
@@ -782,7 +777,7 @@ static void AIDead(u16 idx) {
         if (self->index != 433) self->gravity = 1.0f;// Hopper deactivates itself
     }
 
-    flag_set(&self->entflags, ENTFLAG_DEAD_CHECKS_DONE, true);
+    flag_set(&self->entflags, EF_DEAD_CHECKS_DONE, true);
 }
 
 static DamageData SetNPCData(Entity* self, int n) {
@@ -817,14 +812,14 @@ static void ai_apply_damage(DamageData dd, u16 hitIdx) {
         t->health -= dd.damage;
         if (t->health < 0.0f) t->health = 0.0f;
         t->recentMostActivator = dd.owner;
-        flag_set(&t->entflags, ENTFLAG_GO_INTO_PAIN, true);
+        flag_set(&t->entflags, EF_GO_INTO_PAIN, true);
     }
 }
 
 static void AIApplyAttackMovement(Entity* self, float speed) {
     u16 eidx = self->enemy;
     if (!eidx) return;
-    if (self->entflags & ENTFLAG_ACT_AS_TURRET) { self->currentDestination = ai_sight_pos(self); return; }
+    if (self->entflags & EF_ACT_AS_TURRET) { self->currentDestination = ai_sight_pos(self); return; }
     if (speed <= 0.0f || self->tranquilizeFinished >= Eng_Global->pauseRelativeTime) return;
     self->currentDestination = Eng_Global->instances[eidx].position;
     if (V3_SqDist(ai_sight_pos(self), self->currentDestination) <= AI_STOP_DIST_SQ) return;
@@ -833,7 +828,7 @@ static void AIApplyAttackMovement(Entity* self, float speed) {
 }
 
 static void AITransitionAttackToRun(Entity* self, int n) {
-    flag_set(&self->entflags, ENTFLAG_GO_INTO_PAIN, false);
+    flag_set(&self->entflags, EF_GO_INTO_PAIN, false);
     self->currentState = AIState_Run;
     NPCTable* npc = &npcTable[self->index - 419];
     float chance, wmin, wmax;
@@ -917,7 +912,7 @@ static void ProjectileLaunched(Entity* self, int n) {
     if (vabs(self->gravity) > 0.05f) { shove.x += self->velocity.x; shove.z += self->velocity.z; }
     proj->velocity = (Vector3){0,0,0};
     AddForce(bb, shove, true);
-    flag_set(&proj->entflags, ENTFLAG_ACTIVE | ENTFLAG_RIGIDBODY, true);
+    flag_set(&proj->entflags, EF_ACTIVE | EF_RIGIDBODY, true);
 }
 
 static void AIExplodeAttack(Entity* self) {
@@ -926,7 +921,7 @@ static void AIExplodeAttack(Entity* self) {
     DamageData dd = SetNPCData(self, 3);
     for (u16 i = START_INDEX_LEVEL_INSTANCES; i < Eng_Global->loadedInstances; ++i) {
         Entity* t = &Eng_Global->instances[i];
-        if (!(t->entflags & ENTFLAG_ACTIVE)) continue;
+        if (!(t->entflags & EF_ACTIVE)) continue;
         
         float dsq = V3_SqDist(epos, t->position);
         if (dsq >= radius * radius) continue;
@@ -953,8 +948,8 @@ static void AIMakeAttack(Entity* self, AttackType att, int ind) {
 static void AIAttack1(Entity* self) {
     NPCTable* npc = &npcTable[self->index - 419];
     AIApplyAttackMovement(self, npc->attack1Speed);
-    if (self->gracePeriodFinished < Eng_Global->pauseRelativeTime && !(self->entflags & ENTFLAG_SHOT_FIRED)) {
-        flag_set(&self->entflags, ENTFLAG_SHOT_FIRED, true);
+    if (self->gracePeriodFinished < Eng_Global->pauseRelativeTime && !(self->entflags & EF_SHOT_FIRED)) {
+        flag_set(&self->entflags, EF_SHOT_FIRED, true);
         int sat = sfxAttack1[self->index - 419];
         if (self->attack1SoundTime < Eng_Global->pauseRelativeTime && sat >= 0 && sat < (i16)SOUNDS_COUNT) {
             play_wav(sounds[sat], self->volume, self->position, true);
@@ -969,8 +964,8 @@ static void AIAttack1(Entity* self) {
 static void AIAttack2(Entity* self) {
     NPCTable* npc = &npcTable[self->index - 419];
     AIApplyAttackMovement(self, npc->attack2Speed);
-    if (self->gracePeriodFinished < Eng_Global->pauseRelativeTime && !(self->entflags & ENTFLAG_SHOT_FIRED)) {
-        flag_set(&self->entflags, ENTFLAG_SHOT_FIRED, true);
+    if (self->gracePeriodFinished < Eng_Global->pauseRelativeTime && !(self->entflags & EF_SHOT_FIRED)) {
+        flag_set(&self->entflags, EF_SHOT_FIRED, true);
         int sat2 = sfxAttack2[self->index - 419];
         if (self->attack2SoundTime < Eng_Global->pauseRelativeTime && sat2 >= 0 && sat2 < (i16)SOUNDS_COUNT) {
             play_wav(sounds[sat2],self->volume,self->position,true);
@@ -985,8 +980,8 @@ static void AIAttack3(Entity* self) {
     NPCTable* npc = &npcTable[self->index - 419];
     if (npc->explodeOnAttack3) { Eng_Global->fogFac += 5; AIExplodeAttack(self); return; }
     AIApplyAttackMovement(self, npc->attack3Speed);
-    if (self->gracePeriodFinished < Eng_Global->pauseRelativeTime && !(self->entflags & ENTFLAG_SHOT_FIRED)) {
-        flag_set(&self->entflags, ENTFLAG_SHOT_FIRED, true);
+    if (self->gracePeriodFinished < Eng_Global->pauseRelativeTime && !(self->entflags & EF_SHOT_FIRED)) {
+        flag_set(&self->entflags, EF_SHOT_FIRED, true);
         int sat3 = sfxAttack3[self->index - 419];
         if (self->attack3SoundTime < Eng_Global->pauseRelativeTime && sat3 >= 0 && sat3 < (i16)SOUNDS_COUNT) {
             play_wav(sounds[sat3], self->volume, self->position, true);
@@ -1042,30 +1037,30 @@ void AIAlert(u16 idx) {
     Entity* self = &Eng_Global->instances[idx];
     AISetEnemy(self, PLAYER1);
     self->currentDestination = Eng_Global->instances[PLAYER1].position;
-    flag_set(&self->entflags, ENTFLAG_ENEM_IN_SIGHT, false);
+    flag_set(&self->entflags, EF_ENEM_IN_SIGHT, false);
 }
 
 void AIAwakeFromSleep(u16 idx) {
     Entity* self = &Eng_Global->instances[idx];
-    flag_set(&self->entflags, ENTFLAG_ASLEEP, false);
+    flag_set(&self->entflags, EF_ASLEEP, false);
     // TODO deactivate sleeping cables
     AIAlert(idx);
 }
 
 static void AIThink(u16 idx) {
     Entity* self = &Eng_Global->instances[idx];   
-    if ((self->entflags & ENTFLAG_DYING_SETUP) && self->deathBurstFinished < Eng_Global->pauseRelativeTime && !(self->entflags & ENTFLAG_DEATH_BURST_DONE)) {
+    if ((self->entflags & EF_DYING_SETUP) && self->deathBurstFinished < Eng_Global->pauseRelativeTime && !(self->entflags & EF_DEATH_BURST_DONE)) {
         // TODO activate death burst effect
-        flag_set(&self->entflags, ENTFLAG_DEATH_BURST_DONE, true);
+        flag_set(&self->entflags, EF_DEATH_BURST_DONE, true);
     }
 
     if (!ai_has_health(self)) {
-        if (!(self->entflags & ENTFLAG_DYING) && !(self->entflags & ENTFLAG_DEAD)) {
-            flag_set(&self->entflags, ENTFLAG_DYING, true);
+        if (!(self->entflags & EF_DYING) && !(self->entflags & EF_DEAD)) {
+            flag_set(&self->entflags, EF_DYING, true);
             self->currentState = AIState_Dying;
-        } else if ((self->entflags & ENTFLAG_DEAD) && self->currentState != AIState_Dead) {
+        } else if ((self->entflags & EF_DEAD) && self->currentState != AIState_Dead) {
             self->currentState = AIState_Dead;
-        } else if ((self->entflags & ENTFLAG_DYING) && self->currentState != AIState_Dying) {
+        } else if ((self->entflags & EF_DYING) && self->currentState != AIState_Dying) {
             self->currentState = AIState_Dying;
         }
     }
@@ -1088,10 +1083,10 @@ static void AIThink(u16 idx) {
 
 void AIControllerUpdate(u16 idx) {
     Entity* self = &Eng_Global->instances[idx];
-    if (!(self->entflags & ENTFLAG_ACTIVE)) return;
+    if (!(self->entflags & EF_ACTIVE)) return;
 
     if (!ai_is_cyber(self) && npcTable[self->index - 419].moveType != AIMoveType_Fly && self->currentState != AIState_Dead && self->currentState != AIState_Dying) self->gravity = 1.0f;
-    flag_set(&self->entflags,ENTFLAG_ENEM_IN_SIGHT,AICheckIfPlayerInSight(self));
+    flag_set(&self->entflags,EF_ENEM_IN_SIGHT,AICheckIfPlayerInSight(self));
     u16 eidx = self->enemy;
     if (eidx && ai_has_health(self)) {
         Entity* en = &Eng_Global->instances[eidx];
@@ -1100,7 +1095,7 @@ void AIControllerUpdate(u16 idx) {
             if (ai_is_cyber(self)) {
                 self->currentState = AIState_Idle;
             } else {
-                flag_set(&self->entflags, ENTFLAG_WANDERING, true);
+                flag_set(&self->entflags, EF_WANDERING, true);
                 self->wanderFinished = Eng_Global->pauseRelativeTime + random_range(3.0f, 8.0f);
                 self->currentState = AIState_Walk;
             }
@@ -1111,7 +1106,7 @@ void AIControllerUpdate(u16 idx) {
 
     if (self->tickFinished < Eng_Global->pauseRelativeTime) { self->tickFinished = Eng_Global->pauseRelativeTime + AI_TICK_TIME; AIThink(idx); }
     if (self->currentState != AIState_Dead && self->currentState != AIState_Idle) {
-        if ((self->entflags & ENTFLAG_ACT_AS_TURRET) && eidx) {
+        if ((self->entflags & EF_ACT_AS_TURRET) && eidx) {
             Entity* en = &Eng_Global->instances[eidx];
             self->currentDestination = (Vector3){ en->position.x, en->position.y + AI_TARGET_OFFSET_Y, en->position.z };
         }

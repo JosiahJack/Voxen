@@ -481,10 +481,10 @@ static const float camMaxAmount = 0.2548032f
 // 	public void AutomapGoSide() {
 // 		automapSideButtonTextLH.text = Eng_Text->stringTable[887];
 // 		automapSideButtonTextRH.text = Eng_Text->stringTable[887];
-// 		automapInnerCircleLH.flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
-// 		automapInnerCircleRH.flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
-// 		automapOuterCircleLH.flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
-// 		automapOuterCircleRH.flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
+// 		automapInnerCircleLH.flag_set(&SELF.entflags, EF_ACTIVE, false);
+// 		automapInnerCircleRH.flag_set(&SELF.entflags, EF_ACTIVE, false);
+// 		automapOuterCircleLH.flag_set(&SELF.entflags, EF_ACTIVE, false);
+// 		automapOuterCircleRH.flag_set(&SELF.entflags, EF_ACTIVE, false);
 // 		automapTopLH.SetActive(false);
 // 		automapTopRH.SetActive(false);
 // 		automapNormalPlayerIconGOLH.SetActive(false);

@@ -182,7 +182,7 @@ public class Minigame15 : MonoBehaviour {
                     || (slidingUp    && cury >= position[i].y)
                     || (slidingDown  && cury <= position[i].y)) {
 
-                    sliderButton.flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
+                    sliderButton.flag_set(&SELF.entflags, EF_ACTIVE, false);
                     sliderButtonText.text = "";
                     tileImage[i].color = plainColor;
                     numText[i].text = curNum[i].ToString();

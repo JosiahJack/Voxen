@@ -142,8 +142,7 @@ typedef struct {
 } TargetArgs;
 
 // Mod Inlines
-static inline __attribute__((always_inline)) bool EntityLocked(const Entity* e) { return (e->entflags & ENTFLAG_LOCKED) != 0; }
-static inline __attribute__((always_inline)) void EntitySetLocked(Entity* e, bool locked) { flag_set(&e->entflags,ENTFLAG_LOCKED,locked); }
+static inline __attribute__((always_inline)) void EntitySetLocked(Entity* e, bool locked) { DualLog("Unlocking entity with index %u\n",(u16)(e - Eng_Global->instances)); flag_set(&e->entflags,EF_LOCKED,locked); }
 static inline __attribute__((always_inline)) void UIBlockedBySecurity(Vector3 tetherPoint) { (void)tetherPoint; CenterStatusPrint("%s",Eng_Text->stringTable[25]); }
 static inline __attribute__((always_inline)) void UICyberSprint(u16 textIndex) { CenterStatusPrint("%s",Eng_Text->stringTable[textIndex]); }
 static inline __attribute__((always_inline)) void UIExitCyberspace(void) { CenterStatusPrint("%s",Eng_Text->stringTable[601]); }
@@ -164,10 +163,6 @@ void DoorTargetted(u16 self, u16 activator, const char* argvalue);
 void DoorActuate(u16 self);
 void DoorForceOpen(u16 self);
 void DoorForceClose(u16 self);
-void DoorLock(u16 self);
-void DoorUnlock(u16 self);
-void DoorToggleLocked(u16 self);
-void DoorToggleAccessCardOverride(u16 self);
 void TriggerTargetted(u16 self, u16 activator);
 void TriggerCounterTargetted(u16 self, u16 activator, const char* argvalue);
 void FuncWallTargetted(u16 self, u16 activator, const char* argvalue);

@@ -65,7 +65,7 @@ MOD_TO_ENGINE void UpdateAnims(void) {
     bool portalsNeedUpdated = false;
     for (u16 i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
         Entity* e = &Eng_Global->instances[i];
-        if (e->modelIndex >= MODEL_IDX_MAX || !(e->entflags & ENTFLAG_ACTIVE) || e->animationNum >= MAX_ANIMATED_MODELS || e->numclips == 0 || e->clip >= e->numclips) continue;
+        if (e->modelIndex >= MODEL_IDX_MAX || !(e->entflags & EF_ACTIVE) || e->animationNum >= MAX_ANIMATED_MODELS || e->numclips == 0 || e->clip >= e->numclips) continue;
         AnimationClip* clip = (AnimationClip*)&modelAnimationClips[e->animationNum][e->clip]; if (clip->framerate <= 0 || clip->speed <= 0) continue;
 
         e->currentFrameFinished += animDT * clip->speed;

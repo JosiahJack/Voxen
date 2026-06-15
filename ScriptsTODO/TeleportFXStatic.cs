@@ -43,7 +43,7 @@ public class TeleportFXStatic : MonoBehaviour {
 
 	void Deactivate () {
 		MouseCursor.a.cursorImage = cursorTexture; //return to previous cursor
-		flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
+		flag_set(&SELF.entflags, EF_ACTIVE, false);
 	}
 
 	void Update() {

@@ -100,7 +100,7 @@ public class PuzzleWire : MonoBehaviour {
 		ChangeAppearance();
 		DisableAllSelectedIndicators();
 		DisableGeniusHints();
-		flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
+		flag_set(&SELF.entflags, EF_ACTIVE, false);
 	}
 
 	Color GetColor(HUDColor index) {

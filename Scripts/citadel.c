@@ -61,18 +61,21 @@ Vector3 ScreenPointToRay(Vector3 fwd, Vector3 rt) {
 
 void DropHeldItem(u16 p) {
     InventorySystem* inv = Inv(p);
+    Entity* ply = &Eng_Global->instances[p];
     if (inv->heldObjectIndex >= Eng_Global->loadedInstances) { ResetHeldItem(p); return; }
     if (inv->dropFinished > Eng_Global->pauseRelativeTime) return;
     
     inv->dropFinished = Eng_Global->pauseRelativeTime + 0.2; // Prevent immediate regrab at high fps
-    u16 newent = AddInstance(inv->heldObjectIndex,Eng_Global->instances[p].position);
+    u16 newent = AddInstance(inv->heldObjectIndex,ply->position);
     Entity* tossObject = &Eng_Global->instances[newent];
     tossObject->usableCustomIndex = inv->heldObjectCustomIndex;
     tossObject->ammo = inv->heldObjectAmmo;
     tossObject->ammo2 = inv->heldObjectAmmo2;
     tossObject->heldObjectLoadedAlternate = inv->heldObjectLoadedAlternate;
-    tossObject->position = Eng_Global->instances[p].position;
-    Vector3 tossDir = ScreenPointToRay(Eng_Global->instances[p].forward,Eng_Global->instances[p].right);
+    tossObject->position = ply->position;
+    flag_set(&tossObject->entflags,EF_RIGIDBODY,true);
+    Vector3 tossDir = V3_Normalize(ScreenPointToRay(ply->forward,ply->right));
+    tossObject->position = V3_AplusB(ply->position,V3_ScaleByF(tossDir,0.48f));
     tossObject->velocity = V3_ScaleByF(tossDir,10.0f);
     DualLog("Dropping held object type %u at pos %f %f %f, with force %f %f %f\n",tossObject->index,tossObject->position.x,tossObject->position.y,tossObject->position.z,tossObject->velocity.x,tossObject->velocity.y,tossObject->velocity.z);
     ResetHeldItem(p);
@@ -766,21 +769,21 @@ void CyberDataFragmentOnTriggerEnter(u16 self, u16 other) {
 // CyberItem
 void CyberItemInitBeforeLoad(u16 self) {
     Entity* e = &Eng_Global->instances[self];
-    if (Eng_Global->difficultyMission == 0 && e->type == SoftwareType_Data) flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
+    if (Eng_Global->difficultyMission == 0 && e->type == SoftwareType_Data) flag_set(&e->entflags,EF_ACTIVE,false);
 }
 
 void CyberItemOnTriggerEnter(u16 self, u16 other) {
     Entity* e = &Eng_Global->instances[self];
     if (other != PLAYER1) return;
     if (!AddSoftwareItem(PLAYER1,e->type,e->version)) return;
-    flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
+    flag_set(&e->entflags,EF_ACTIVE,false);
 }
 //=============================================================================
 // CyberIce
 void CyberIceOnTriggerEnter(u16 self, u16 other) {
     (void)self;
     Entity* e = &Eng_Global->instances[other];
-    if (!(e->entflags & ENTFLAG_RIGIDBODY)) return;
+    if (!(e->entflags & EF_RIGIDBODY)) return;
     e->layer = 24;
     e->velocity = V3_ScaleByF(e->velocity,-1.0f);
 }
@@ -789,9 +792,9 @@ void CyberIceOnTriggerEnter(u16 self, u16 other) {
 void CyberMineInitBeforeLoad(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     e->damage = 55.0f;
-    if (Eng_Global->difficultyCyber < 3) { if (random_range(0.0f,1.0f) < 0.2f) flag_set(&e->entflags,ENTFLAG_ACTIVE,false); e->damage = 33.0f; }
-    if (Eng_Global->difficultyCyber < 2) { if (random_range(0.0f,1.0f) < 0.33f) flag_set(&e->entflags,ENTFLAG_ACTIVE,false); e->damage = 22.0f; }
-    if (Eng_Global->difficultyCyber < 1) { if (random_range(0.0f,1.0f) < 0.50f) flag_set(&e->entflags,ENTFLAG_ACTIVE,false); e->damage = 11.0f; }
+    if (Eng_Global->difficultyCyber < 3) { if (random_range(0.0f,1.0f) < 0.2f) flag_set(&e->entflags,EF_ACTIVE,false); e->damage = 33.0f; }
+    if (Eng_Global->difficultyCyber < 2) { if (random_range(0.0f,1.0f) < 0.33f) flag_set(&e->entflags,EF_ACTIVE,false); e->damage = 22.0f; }
+    if (Eng_Global->difficultyCyber < 1) { if (random_range(0.0f,1.0f) < 0.50f) flag_set(&e->entflags,EF_ACTIVE,false); e->damage = 11.0f; }
 }
 
 void CyberMineOnTriggerEnter(u16 self, u16 other) {
@@ -799,7 +802,7 @@ void CyberMineOnTriggerEnter(u16 self, u16 other) {
     if (other != PLAYER1) return;
     PlayerTakeDamage(PLAYER1,e->damage);
     play_wav(sounds[67],1.0f,e->position,false);
-    flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
+    flag_set(&e->entflags,EF_ACTIVE,false);
 }
 //=============================================================================
 // CyberPush
@@ -830,7 +833,7 @@ void CyberDoorOnCollisionEnter(u16 self, u16 other) {
 // CyberSwitch
 void CyberSwitchInitAfterLoad(u16 self) {
     Entity* e = &Eng_Global->instances[self];
-    if (e->iceActive) flag_set(&e->entflags,ENTFLAG_ACTIVE,true); // TODO Visual subobject parity removed with hierarchy removal.
+    if (e->iceActive) flag_set(&e->entflags,EF_ACTIVE,true); // TODO Visual subobject parity removed with hierarchy removal.
 }
 
 void CyberSwitchOnTriggerEnter(u16 self, u16 other) {
@@ -899,7 +902,7 @@ void SearchFXResetEnable(u16 self) {
 void SearchFXResetUpdate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->delayFinished >= Eng_Global->pauseRelativeTime) return;
-    flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
+    flag_set(&e->entflags,EF_ACTIVE,false);
 }
 //=============================================================================
 // ExplosionLife
@@ -912,8 +915,8 @@ void ExplosionLifeInitAfterLoad(u16 self) {
 
 void ExplosionLifeUpdate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
-    if (!(e->entflags & ENTFLAG_ACTIVE) || e->delayFinished >= Eng_Global->pauseRelativeTime) return;
-    if (e->dontReset) flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
+    if (!(e->entflags & EF_ACTIVE) || e->delayFinished >= Eng_Global->pauseRelativeTime) return;
+    if (e->dontReset) flag_set(&e->entflags,EF_ACTIVE,false);
     else DeleteInstance(self);
 }
 //=============================================================================
@@ -933,8 +936,8 @@ void DelayedSpawnUpdate(u16 self) {
     
     if (e->despawnInstead) {
         if (e->destroyAfterListInsteadOfDeactivate) DeleteInstance(self);
-        else flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
-    } else flag_set(&e->entflags,ENTFLAG_ACTIVE,true);
+        else flag_set(&e->entflags,EF_ACTIVE,false);
+    } else flag_set(&e->entflags,EF_ACTIVE,true);
 }
 //=============================================================================
 // FuncWall
@@ -1042,7 +1045,7 @@ void ForceBridgeUpdate(u16 self) {
         float sy = e->forceFieldDirectionY ? lerp(e->scale.y,0.0f,e->tickTime * 2.0f) : e->scale.y;
         float sz = e->forceFieldDirectionZ ? lerp(e->scale.z,0.0f,e->tickTime * 2.0f) : e->scale.z;
         e->scale = (Vector3){sx,sy,sz};
-        if (sx < 0.08f || sy < 0.08f || sz < 0.08f) { flag_set(&e->entflags,ENTFLAG_ACTIVE,false); e->collider = COLTYPE_NONE; e->lerping = false; }
+        if (sx < 0.08f || sy < 0.08f || sz < 0.08f) { flag_set(&e->entflags,EF_ACTIVE,false); e->collider = COLTYPE_NONE; e->lerping = false; }
     }
 }
 
@@ -1140,7 +1143,7 @@ void GravityLiftInitAfterLoad(u16 self) {
 // void GravityLiftOnForce(u16 self, u16 other, bool initial) {
 //     Entity* e = &Eng_Global->instances[self];
 //     Entity* o = &Eng_Global->instances[other];
-//     if (other == PLAYER1) flag_set(&Eng_Global->instances[PLAYER1].entflags,ENTFLAG_GRAV_LIFT_STATE,true);
+//     if (other == PLAYER1) flag_set(&Eng_Global->instances[PLAYER1].entflags,EF_GRAV_LIFT_STATE,true);
 //     float topY = e->position.y + (e->colliderSize.y * 0.5f);
 //     float dist = topY - o->position.y + 0.48f;
 //     float velY = o->velocity.y < 0.0f ? 0.0f : o->velocity.y;
@@ -1155,7 +1158,7 @@ void GravityLiftInitAfterLoad(u16 self) {
 // void GravityLiftOffForce(u16 self, u16 other, bool initial) {
 //     Entity* e = &Eng_Global->instances[self];
 //     Entity* o = &Eng_Global->instances[other];
-//     if (other == PLAYER1) flag_set(&Eng_Global->instances[PLAYER1].entflags,ENTFLAG_GRAV_LIFT_STATE,true);
+//     if (other == PLAYER1) flag_set(&Eng_Global->instances[PLAYER1].entflags,EF_GRAV_LIFT_STATE,true);
 //     if (o->velocity.y < e->offStrengthFactor) {
 //         float yForce = e->offStrengthFactor - o->velocity.y;
 //         if (initial || e->initialBurstFinished > Eng_Global->pauseRelativeTime) yForce *= 2.0f;
@@ -1207,6 +1210,7 @@ void ButtonSwitchInitAfterLoad(u16 self) {
 
 void ButtonSwitchUseTargets(u16 self, u16 activator, const char* argvalue) {
     Entity* e = &Eng_Global->instances[self];
+    DualLog("ButtonSwitchUseTargets, targeting:%s,ioflags:%u\n",e->target,e->ioflags);
     UseTargets(activator,argvalue,e->target);
     e->active = !e->active;
     e->alternateOn = e->active;
@@ -1220,7 +1224,7 @@ void ButtonSwitchUse(u16 self, u16 activator, const char* argvalue) {
     Entity* e = &Eng_Global->instances[self];
     if (Eng_Cheats->superoverride || Eng_Global->difficultyMission == 0) EntitySetLocked(e,false);
     else if (GetCurrentLevelSecurity() > e->securityThreshold) { UIBlockedBySecurity(e->position); return; }
-    if (EntityLocked(e)) {
+    if ((e->entflags & EF_LOCKED) != 0) {
         CenterStatusPrint("%s",Eng_Text->stringTable[e->lockedMessageLingdex]);
         if (e->SFXLockedIndex >= 0 && e->SFXLockedIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXLockedIndex],1.0f,e->position,true);
         return;
@@ -1258,10 +1262,13 @@ void HealingBedUse(u16 self, u16 owner) {
 //=============================================================================
 // TargetIO
 void UseTargets(u16 activator, const char* argvalue, const char* targetname) {
-    bool succeeded = false;
     if (StringIsEmpty(targetname)) return;
+    
+    bool succeeded = false;
     for (u16 i = START_INDEX_LEVEL_INSTANCES; i < Eng_Global->loadedInstances; i++) {
         if (!StringsEqual(Eng_Global->instances[i].targetname,targetname)) continue;
+        
+        DualLog("Successfully found matching targetname %s for entity %u and activator ioflags:%u\n",targetname,i,Eng_Global->instances[activator].ioflags);
         Targetted(activator,i,argvalue);
         succeeded = true;
     }
@@ -1271,34 +1278,37 @@ void UseTargets(u16 activator, const char* argvalue, const char* targetname) {
 void Targetted(u16 activator, u16 self, const char* argvalue) {
     Entity* e = &Eng_Global->instances[self];
     Entity* a = &Eng_Global->instances[activator];
+    DualLog("Targetted running with a->ioflags:%u, e->index:%u, door conditions:%u\n",a->ioflags,e->index,((a->ioflags & TARG_IOFLAGS_DOOROPEN) && ConstIndexIsDoor(e->index)));
     if (argvalue && !StringIsEmpty(argvalue)) StringCopyInto_A_From_B(e->argvalue,argvalue,TARGET_STRING_LENGTH);
     if (e->index == 709) { CenterStatusPrint("%s",Eng_Text->stringTable[e->messageLingdex]); return; } // info_message
     if (e->index == 708) { Eng_Global->gameFinished = true; return; }
     
-    if ((a->ioflags & TARG_IOFLAGS_SEND_EMAIL) && e->index == 707 /*info_email*/) EmailTargetted(self,activator,argvalue);
+    if (e->index == 707 /*info_email*/) EmailTargetted(self,activator,argvalue);
     if (a->ioflags & TARG_IOFLAGS_TRIPTRIGGER) {
         if (e->index == 598 || e->index == 600) TriggerTargetted(self,activator);
         else if (e->index == 594) TriggerCounterTargetted(self,activator,argvalue);
     }
-    if ((a->ioflags & TARG_IOFLAGS_SWITCHTRIGGER) && ConstIndexIsButtonSwitch(e->index)) ButtonSwitchTargetted(self,activator,argvalue);
-    if ((a->ioflags & TARG_IOFLAGS_DOOROPEN) && ConstIndexIsDoor(e->index)) DoorForceOpen(self);
-    if ((a->ioflags & TARG_IOFLAGS_DOOROPENIFUNLOCKED) && ConstIndexIsDoor(e->index) && !EntityLocked(e) && (e->requiredAccessCard == AccessCardType_None || e->accessCardUsedByPlayer || (Eng_Global->invP1.accessCardOwned & (1u << e->requiredAccessCard)))) DoorForceOpen(self);
-    if ((a->ioflags & TARG_IOFLAGS_DOOR_TOGGLE) && ConstIndexIsDoor(e->index)) DoorActuate(self);
-    if ((a->ioflags & TARG_IOFLAGS_DOORCLOSE) && ConstIndexIsDoor(e->index)) DoorForceClose(self);
-    if ((a->ioflags & TARG_IOFLAGS_DOORLOCK) && ConstIndexIsDoor(e->index)) DoorLock(self);
-    if ((a->ioflags & TARG_IOFLAGS_DOORUNLOCK) && ConstIndexIsDoor(e->index)) DoorUnlock(self);
-    if ((a->ioflags & TARG_IOFLAGS_TOG_DORACESOVERIDE) && ConstIndexIsDoor(e->index)) DoorToggleAccessCardOverride(self);
+    
+    if (a->ioflags & TARG_IOFLAGS_UNLOCK) EntitySetLocked(e,false);
+    if ((a->ioflags & TARG_IOFLAGS_LOCK) && ConstIndexIsDoor(e->index)) EntitySetLocked(e,true);
+    
+    if (ConstIndexIsButtonSwitch(e->index)) ButtonSwitchTargetted(self,activator,argvalue);
+    if ((a->ioflags & TARG_IOFLAGS_DOOROPEN) && ConstIndexIsDoor(e->index)) { DualLog("Running DoorForceOpen from ioflag DOOROPEN on entity %u\n",self); DoorForceOpen(self); }
+    else if ((a->ioflags & TARG_IOFLAGS_DOOROPENIFUNLOCKED) && ConstIndexIsDoor(e->index) && ((e->entflags & EF_LOCKED) == 0) && (e->requiredAccessCard == AccessCardType_None || (Eng_Global->invP1.accessCardOwned & (1u << e->requiredAccessCard)))) DoorForceOpen(self);
+    else if ((a->ioflags & TARG_IOFLAGS_DOORCLOSE) && ConstIndexIsDoor(e->index)) DoorForceClose(self);
+    else if (ConstIndexIsDoor(e->index)) DoorTargetted(self,activator,argvalue);
+    
     if (a->ioflags & TARG_IOFLAGS_FBRIDGE_ACTIVATE) ForceBridgeActivate(self,false);
-    if (a->ioflags & TARG_IOFLAGS_FBRIDGE_DEACTIVATE) ForceBridgeDeactivate(self,false);
-    if (a->ioflags & TARG_IOFLAGS_FBRIDGE_TOGGLE) ForceBridgeToggle(self);
+    else if (a->ioflags & TARG_IOFLAGS_FBRIDGE_DEACTIVATE) ForceBridgeDeactivate(self,false);
+    else if (a->ioflags & TARG_IOFLAGS_FBRIDGE_TOGGLE) ForceBridgeToggle(self);
+    
     if (a->ioflags & TARG_IOFLAGS_GRAVLIFT_TOGGLE) GravityLiftToggle(self);
     if (a->ioflags & TARG_IOFLAGS_TEXTURE_CHG_TOGGLE) TextureChangerToggle(self);
     if (a->ioflags & TARG_IOFLAGS_FUNCWALL_MOVE) FuncWallTargetted(self,activator,argvalue);
-    if (a->ioflags & TARG_IOFLAGS_SWITCH_LOCK_TOGGLE) EntitySetLocked(e,!EntityLocked(e));
-    if (a->ioflags & TARG_IOFLAGS_UNLOCK_SWITCH) EntitySetLocked(e,false);
-    if (a->ioflags & TARG_IOFLAGS_INST_ACTIVATE) flag_set(&e->entflags,ENTFLAG_ACTIVE,true);
-    if (a->ioflags & TARG_IOFLAGS_INST_DEACTIVATE) flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
-    if (a->ioflags & TARG_IOFLAGS_INST_TOGGLE) flag_set(&e->entflags,ENTFLAG_ACTIVE,!(e->entflags & ENTFLAG_ACTIVE));
+    if (a->ioflags & TARG_IOFLAGS_SWITCH_LOCK_TOGGLE) EntitySetLocked(e,(e->entflags & EF_LOCKED) == 0);
+    if (a->ioflags & TARG_IOFLAGS_INST_ACTIVATE) flag_set(&e->entflags,EF_ACTIVE,true);
+    else if (a->ioflags & TARG_IOFLAGS_INST_DEACTIVATE) flag_set(&e->entflags,EF_ACTIVE,false);
+    else if (a->ioflags & TARG_IOFLAGS_INST_TOGGLE) flag_set(&e->entflags,EF_ACTIVE,!(e->entflags & EF_ACTIVE));
 }
 //=============================================================================
 // VaporizeButton
@@ -1504,7 +1514,7 @@ void ElevatorButtonClick(u16 self) {
         CenterStatusPrint("%s",Eng_Text->stringTable[7]); // Door not closed.
         return;
     }
-    if (!(e->entflags & ENTFLAG_ACTIVE)) {
+    if (!(e->entflags & EF_ACTIVE)) {
         CenterStatusPrint("%s",Eng_Text->stringTable[8]); // Floor not accessible.
         return;
     }
@@ -1583,7 +1593,7 @@ void RenderElevatorKeypadUI(void) {
 //             Entity tmp = Eng_Global->instances[Eng_UI->tetheredKeypadElevator];
 //             tmp.teleportID         = Eng_UI->elevButtonLevelIdx[i];
 //             tmp.targetDestinationID = Eng_UI->elevButtonSpawnIdx[i];
-//             flag_set(&tmp.entflags,ENTFLAG_ACTIVE,true);
+//             flag_set(&tmp.entflags,EF_ACTIVE,true);
 //             // Push tmp index into a scratch instance slot — TODO: confirm scratch slot
 //             // convention, or refactor ElevatorButtonClick to take level+spawn directly.
 //             ElevatorButtonClick(Eng_UI->tetheredKeypadElevator); // TODO: pass slot params
@@ -1782,11 +1792,11 @@ static void TargetIDDeactivate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->enemy != WORLD) {
         Entity* npc = &Eng_Global->instances[e->enemy];
-        flag_set(&npc->entflags,ENTFLAG_TARGID_ATTACHED,false);
+        flag_set(&npc->entflags,EF_TARGID_ATTACHED,false);
         e->enemy = NULLENT;
     }
     e->textIndex  = -1;
-    flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
+    flag_set(&e->entflags,EF_ACTIVE,false);
 }
 
 void TargetIDSendDamageReceive(u16 self,float damage,AttackType attackType) {
@@ -1811,7 +1821,7 @@ void TargetIDSendDamageReceive(u16 self,float damage,AttackType attackType) {
 
 void TargetIDUpdate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
-    if (!(e->entflags & ENTFLAG_ACTIVE)) return;
+    if (!(e->entflags & EF_ACTIVE)) return;
 
     // Deactivation checks
     if (e->enemy == NULLENT) { TargetIDDeactivate(self); return; }
@@ -1822,7 +1832,7 @@ void TargetIDUpdate(u16 self) {
 
     SetPosition(e,npc->position,true); // Track parent NPC position
     bool stunned = npc->tranquilizeFinished > Eng_Global->pauseRelativeTime;
-    flag_set(&e->entflags,ENTFLAG_ASLEEP,stunned);
+    flag_set(&e->entflags,EF_ASLEEP,stunned);
     if (e->textIndex >= 0) {
         if (stunned && e->animSwapFinished < Eng_Global->pauseRelativeTime) e->textIndex = 536; // STUNNED
         else if (e->animSwapFinished < Eng_Global->pauseRelativeTime) {
@@ -1838,7 +1848,7 @@ void TargetIDUpdate(u16 self) {
     //   TARGID_DISPLAY_HEALTH  → vfloor(npc->health)
     //   TARGID_DISPLAY_RANGE   → V3_Dist(PLAYER1.pos, npc->pos)
     //   TARGID_DISPLAY_ATTITUD → map npc->currentState to stringTable indices:
-    //     ENTFLAG_ASLEEP                             → 519 Asleep
+    //     EF_ASLEEP                             → 519 Asleep
     //     Run/Attack1/Attack2/Attack3/Pain           → 518 Hostile
     //     Walk/Inspect/Interacting                   → 517 Cautious
     //     default                                    → 516 Idle
@@ -1850,7 +1860,7 @@ void TargetIDInitAfterLoad(u16 self) {
     e->enemy        = NULLENT;
     e->tickFinished  = 0.0;
     e->animSwapFinished = 0.0;
-    flag_set(&e->entflags,ENTFLAG_ACTIVE,false); // starts pooled
+    flag_set(&e->entflags,EF_ACTIVE,false); // starts pooled
 }
 //=============================================================================
 // PlayerEnergy
@@ -1876,10 +1886,10 @@ static const u16 hwDrainJPM[12][4] = {
 static void TargetIdentifierSenseTargets(void) {
     for (u16 i = START_INDEX_LEVEL_INSTANCES; i < Eng_Global->loadedInstances; i++) {
         Entity* e = &Eng_Global->instances[i];
-        if (!(e->entflags & ENTFLAG_ACTIVE))         continue;
+        if (!(e->entflags & EF_ACTIVE))         continue;
         if (!ConstIndexIsNPC(e->index))              continue;
-        if (e->entflags & ENTFLAG_DEAD)              continue;
-        if (e->entflags & ENTFLAG_TARGID_ATTACHED)   continue;
+        if (e->entflags & EF_DEAD)              continue;
+        if (e->entflags & EF_TARGID_ATTACHED)   continue;
         if (V3_Dist(e->position,Eng_Global->instances[PLAYER1].position) > TargetIDGetSensingRange(false))        continue;
         // TODO: CreateTargetIDInstance — weapon/targetting system
     }
@@ -1964,9 +1974,6 @@ void PlayerEnergyUpdate(void) {
 }
 //=============================================================================
 // GrenadeActivate
-#define GREN_FLAG_EXPLODE_CONTACT (1ull << 59)
-#define GREN_FLAG_USE_TIMER       (1ull << 58)
-#define GREN_FLAG_USE_PROX        (1ull << 57)
 static bool GrenadeIsNPCMine(u16 self) { return Eng_Global->instances[self].layer != Layer_PlayerBullets; }
 void GrenadeExplode(u16 self) {
     Entity* e = &Eng_Global->instances[self];
@@ -1992,11 +1999,11 @@ void GrenadeActivate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     i16 idx = (i16)e->index;
     switch (idx) {
-        case 7: case 8: case 9: flag_setu64(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
-        case 10: e->timerFinished = Eng_Global->pauseRelativeTime + Eng_Global->invP1.earthShakerTimeSetting; flag_setu64(&e->ioflags,GREN_FLAG_USE_TIMER,true);       break;
-        case 11: flag_setu64(&e->ioflags,GREN_FLAG_USE_PROX,true); flag_setu64(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,false);break;
-        case 12: e->timerFinished = Eng_Global->pauseRelativeTime + Eng_Global->invP1.nitroTimeSetting; flag_setu64(&e->ioflags,GREN_FLAG_USE_TIMER,true);       break;
-        case 13: flag_setu64(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
+//         case 7: case 8: case 9: flag_set(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
+//         case 10: e->timerFinished = Eng_Global->pauseRelativeTime + Eng_Global->invP1.earthShakerTimeSetting; flag_set(&e->ioflags,GREN_FLAG_USE_TIMER,true); break;
+//         case 11: flag_set(&e->ioflags,GREN_FLAG_USE_PROX,true); flag_set(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,false);                                        break;
+//         case 12: e->timerFinished = Eng_Global->pauseRelativeTime + Eng_Global->invP1.nitroTimeSetting; flag_set(&e->ioflags,GREN_FLAG_USE_TIMER,true);       break;
+//         case 13: flag_set(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
         default: return;
     }
 }
@@ -2005,12 +2012,12 @@ void GrenadeUpdate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if ((i16)e->index == 14) { GrenadeExplode(self); return; } // Plastique
     
-    if ((e->ioflags & GREN_FLAG_USE_TIMER) && e->timerFinished < Eng_Global->pauseRelativeTime) GrenadeExplode(self);
+//     if ((e->ioflags & GREN_FLAG_USE_TIMER) && e->timerFinished < Eng_Global->pauseRelativeTime) GrenadeExplode(self); TODO
 }
 
 // Called by physics collision callback when grenade touches anything
-void GrenadeOnCollision(u16 self) {
-    if (Eng_Global->instances[self].ioflags & GREN_FLAG_EXPLODE_CONTACT) GrenadeExplode(self);
+void GrenadeOnCollision(u16 self) { (void)self;
+//     if (Eng_Global->instances[self].ioflags & GREN_FLAG_EXPLODE_CONTACT) GrenadeExplode(self); TODO
 }
 //=============================================================================
 // ProjectileEffectImpact
@@ -2062,7 +2069,7 @@ static void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, Vector3 hitPo
         float dmgFinal  = 0.0f; // placeholder until TakeDamage implemented
 //         float tranq     = -1.0f;
         if (dd.isOtherNPC) {
-            if (!(hit->entflags & ENTFLAG_ASLEEP)) Sys_Music.inCombat = true;
+            if (!(hit->entflags & EF_ASLEEP)) Sys_Music.inCombat = true;
             if (dd.attackType == AttackType_Tranq) {
 //                 float stunAmount = vclamp(3.0f + (Eng_Global->invP1.stungunSetting
 //                                           / 100.0f) * 7.0f, 3.0f, 10.0f);
@@ -2077,7 +2084,7 @@ static void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, Vector3 hitPo
     if (e->counter >= e->countToTrigger) {
         // TODO: SpawnImpactEffect(e->lookUpIndex, hitPos)
         if (e->despawnInstead) DeleteInstance(self);
-        else flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
+        else flag_set(&e->entflags,EF_ACTIVE,false);
     }
 }
 #pragma GCC diagnostic pop
@@ -2135,8 +2142,8 @@ static void UseDeathTargets(u16 self) {
 
 static void TeleportAway(u16 self) {
     Entity* e = &Eng_Global->instances[self];
-    if (e->entflags & ENTFLAG_TELEPORT_ON_DEATH) return; // already done, flag reused as teleportDone
-    flag_set(&e->entflags,ENTFLAG_TELEPORT_ON_DEATH,true);
+    if (e->entflags & EF_TELEPORT_ON_DEATH) return; // already done, flag reused as teleportDone
+    flag_set(&e->entflags,EF_TELEPORT_ON_DEATH,true);
     e->collider        = COLTYPE_NONE;
     e->gravity         = 0.0f;
     e->velocity        = (Vector3){0,0,0};
@@ -2181,8 +2188,8 @@ static void HideSelf(u16 self) {
 
 static void NPCDeath(u16 self) {
     Entity* e = &Eng_Global->instances[self];
-    if (e->entflags & ENTFLAG_DEAD_CHECKS_DONE) return;
-    flag_set(&e->entflags,ENTFLAG_DEAD_CHECKS_DONE,true);
+    if (e->entflags & EF_DEAD_CHECKS_DONE) return;
+    flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true);
     CreateDeathEffects(self,e->deathBurst);
     if (e->index == 419) play_wav(sounds[64],1.0f,e->position,true); // npc_autobomb: explosion1
     if (npcTable[e->index - 419].type == NPCType_Cyber) DeleteInstance(self);
@@ -2191,8 +2198,8 @@ static void NPCDeath(u16 self) {
 
 static void ObjectDeath(u16 self) {
     Entity* e = &Eng_Global->instances[self];
-    if (e->entflags & ENTFLAG_DEAD_CHECKS_DONE) return;
-    if (e->entflags & ENTFLAG_DEATH_BURST_DONE) { // gibOnDeath reuses DEATH_BURST_DONE
+    if (e->entflags & EF_DEAD_CHECKS_DONE) return;
+    if (e->entflags & EF_DEATH_BURST_DONE) { // gibOnDeath reuses DEATH_BURST_DONE
         // Gib path
         CreateDeathEffects(self,e->deathBurst);
         DropSearchables(self);
@@ -2203,7 +2210,7 @@ static void ObjectDeath(u16 self) {
         DropSearchables(self);
         CreateDeathEffects(self,e->deathBurst);
     }
-    flag_set(&e->entflags,ENTFLAG_DEAD_CHECKS_DONE,true);
+    flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true);
     // TODO: disable automap overlay for this instance
     if (e->securityThreshold > 0) {
         // TODO: ReduceCurrentLevelSecurity(e->securityThreshold) — security system
@@ -2217,16 +2224,16 @@ static void ObjectDeath(u16 self) {
 
 static void ScreenDeath(u16 self) {
     Entity* e = &Eng_Global->instances[self];
-    if (e->entflags & ENTFLAG_DEAD_CHECKS_DONE) return;
-    flag_set(&e->entflags,ENTFLAG_DEAD_CHECKS_DONE,true);
+    if (e->entflags & EF_DEAD_CHECKS_DONE) return;
+    flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true);
     play_wav(sounds[69],1.0f,e->position,true); // screen_destroy
     // TODO: stop ImageSequenceTextureArray animation for this instance
-    if (e->entflags & ENTFLAG_DEATH_BURST_DONE) ObjectDeath(self); // gib path
+    if (e->entflags & EF_DEATH_BURST_DONE) ObjectDeath(self); // gib path
 }
 
 static void VaporizeCorpse(u16 self,bool energyVaporized) {
     Entity* e = &Eng_Global->instances[self];
-    flag_set(&e->entflags,ENTFLAG_DEAD_CHECKS_DONE,true);
+    flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true);
     DropSearchables(self);
     u16 fx = e->deathBurst;
     if (fx == 0) fx = 1; // PoolType_CorpseHit fallback
@@ -2240,17 +2247,17 @@ static void VaporizeCorpse(u16 self,bool energyVaporized) {
 
 static void Death(u16 self,bool energyVaporized) {
     Entity* e = &Eng_Global->instances[self];
-    if (e->entflags & ENTFLAG_DEAD_CHECKS_DONE) return;
+    if (e->entflags & EF_DEAD_CHECKS_DONE) return;
     UseDeathTargets(self);
     bool isNPC = ConstIndexIsNPC(e->index);
     bool isObj = ConstIndexIsDynamicObject(e->index);
-    if (e->entflags & ENTFLAG_ACT_AS_CORPSE_ONLY) { e->entflags |= ENTFLAG_DEAD_CHECKS_DONE; return; }
-//     bool gib        = (e->entflags & ENTFLAG_DEATH_BURST_DONE) != 0;
+    if (e->entflags & EF_ACT_AS_CORPSE_ONLY) { e->entflags |= EF_DEAD_CHECKS_DONE; return; }
+//     bool gib        = (e->entflags & EF_DEATH_BURST_DONE) != 0;
     bool vaporize   = (ConstIndexIsNPC(e->index) && e->health <= 0.0f) || ConstIndexIsCorpse(e->index); // vaporizeCorpse maps to VISIBLE being set
     bool isScreen   = (e->index == 279);
-    bool isGrenade  = (e->entflags & ENTFLAG_ISGRENADE) != 0;
+    bool isGrenade  = (e->entflags & EF_ISGRENADE) != 0;
     bool isCam      = (e->index == 477);
-    bool doTeleport = (e->entflags & ENTFLAG_TELEPORT_ON_DEATH) != 0; // REQUIRE_RESET reused as teleportOnDeath
+    bool doTeleport = (e->entflags & EF_TELEPORT_ON_DEATH) != 0; // REQUIRE_RESET reused as teleportOnDeath
     if (e->iceActive) e->collider = COLTYPE_NONE;
     if (vaporize && !isCam && !isGrenade) VaporizeCorpse(self,energyVaporized);
     else if (isObj)    ObjectDeath(self);
@@ -2259,7 +2266,7 @@ static void Death(u16 self,bool energyVaporized) {
     else if (isGrenade) GrenadeExplode(self);
     if (isNPC && !doTeleport) NPCDeath(self);
     else if (self == PLAYER1 || self == PLAYER2) Eng_Global->deaths++;
-    flag_set(&e->entflags,ENTFLAG_DEAD_CHECKS_DONE,true);
+    flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true);
 }
 
 float TakeDamage(u16 self,DamageData dd) {
@@ -2270,7 +2277,7 @@ float TakeDamage(u16 self,DamageData dd) {
     bool isNPC   = ConstIndexIsNPC(e->index);
     bool isPlayer = (self == PLAYER1 || self == PLAYER2);
 //     bool isObj   = ConstIndexIsDynamicObject(e->index);
-    bool isGrenade = (e->entflags & ENTFLAG_ISGRENADE) != 0;
+    bool isGrenade = (e->entflags & EF_ISGRENADE) != 0;
 //     bool isScreen  = (e->index == 279);
     bool isCam     = (e->index == 477);
 
@@ -2354,7 +2361,7 @@ float TakeDamage(u16 self,DamageData dd) {
     }
 
     if (isNPC && (e->health > 0.0f || (isCyber && e->cyberHealth > 0.0f))) {
-        if (npcTable[e->index - 419].timeBetweenPain > 0.0f) flag_set(&e->entflags,ENTFLAG_GO_INTO_PAIN,true);
+        if (npcTable[e->index - 419].timeBetweenPain > 0.0f) flag_set(&e->entflags,EF_GO_INTO_PAIN,true);
         e->recentMostActivator = dd.owner; // Pass attacker to NPC
         TargetIDSendDamageReceive(self,take,dd.attackType);
         AICheckPain(e); // setup enemy with NPC
@@ -2391,10 +2398,10 @@ void HealthManagerInitAfterLoad(u16 self) {
             if (e->health < 0.0f) e->health = npcTable[e->index - 419].health;
         }
         if (Eng_Global->difficultyCombat == 0) { e->health = 1.0f; }
-        if (e->entflags & ENTFLAG_ACT_AS_CORPSE_ONLY) {
+        if (e->entflags & EF_ACT_AS_CORPSE_ONLY) {
             e->health = 0.0f; e->cyberHealth = 0.0f;
             UseDeathTargets(self);
-            if (e->entflags & ENTFLAG_TELEPORT_ON_DEATH) TeleportAway(self);
+            if (e->entflags & EF_TELEPORT_ON_DEATH) TeleportAway(self);
             else NPCDeath(self);
         }
     }
@@ -3075,26 +3082,26 @@ void UseGrenade(u16 playerIndex, int index) { // TODO
 // }
 // 
 // void TestBits(bool testIfTrue, UseData ud, TargetIO tio) {
-//     if (RobotSpawnDeactivated && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.RobotSpawnDeactivated, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (IsotopeInstalled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.IsotopeInstalled, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (ShieldActivated && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.ShieldActivated, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (LaserSafetyOverriden && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.LaserSafetyOverriden, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (LaserDestroyed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.LaserDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (BetaGroveCyberUnlocked && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.BetaGroveCyberUnlocked, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (GroveAlphaJettisonEnabled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.GroveAlphaJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (GroveBetaJettisonEnabled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.GroveBetaJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (GroveDeltaJettisonEnabled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.GroveDeltaJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (MasterJettisonBroken && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.MasterJettisonBroken, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (Relay428Fixed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.Relay428Fixed, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (MasterJettisonEnabled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.MasterJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (BetaGroveJettisoned && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.BetaGroveJettisoned, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (AntennaNorthDestroyed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.AntennaNorthDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (AntennaSouthDestroyed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.AntennaSouthDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (AntennaEastDestroyed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.AntennaEastDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (AntennaWestDestroyed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.AntennaWestDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (SelfDestructActivated && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.SelfDestructActivated, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (BridgeSeparated && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.BridgeSeparated, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (IsolinearChipsetInstalled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.IsolinearChipsetInstalled, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (RobotSpawnDeactivated && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.RobotSpawnDeactivated, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (IsotopeInstalled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.IsotopeInstalled, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (ShieldActivated && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.ShieldActivated, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (LaserSafetyOverriden && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.LaserSafetyOverriden, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (LaserDestroyed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.LaserDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (BetaGroveCyberUnlocked && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.BetaGroveCyberUnlocked, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (GroveAlphaJettisonEnabled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.GroveAlphaJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (GroveBetaJettisonEnabled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.GroveBetaJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (GroveDeltaJettisonEnabled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.GroveDeltaJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (MasterJettisonBroken && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse)))TargetOnGatePassed(Const.a.questData.MasterJettisonBroken, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (Relay428Fixed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.Relay428Fixed, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (MasterJettisonEnabled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.MasterJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (BetaGroveJettisoned && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.BetaGroveJettisoned, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (AntennaNorthDestroyed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.AntennaNorthDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (AntennaSouthDestroyed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.AntennaSouthDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (AntennaEastDestroyed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.AntennaEastDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (AntennaWestDestroyed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.AntennaWestDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (SelfDestructActivated && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.SelfDestructActivated, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (BridgeSeparated && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.BridgeSeparated, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (IsolinearChipsetInstalled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.IsolinearChipsetInstalled, testIfTrue, ud, tio, target, targetIfFalse);
 // }
 //================================================================================
 // Doors
@@ -3123,6 +3130,7 @@ static void DoorSyncLayer(u16 self) {
 }
 
 static void DoorOpen(u16 self) {
+    DualLog("opening door %u\n",self);
     Entity* e = &Eng_Global->instances[self];
     DoorSetClipFrame(self,DOOR_CLIP_OPENING,DoorGetClip(e,DOOR_CLIP_OPENING).frameStart);
     e->doorOpen = e->doorState = DoorState_Opening;
@@ -3132,6 +3140,7 @@ static void DoorOpen(u16 self) {
 }
 
 static void DoorClose(u16 self) {
+    DualLog("closing door %u\n",self);
     Entity* e = &Eng_Global->instances[self];
     DoorSetClipFrame(self,DOOR_CLIP_CLOSING,DoorGetClip(e,DOOR_CLIP_CLOSING).frameStart);
     e->doorOpen = e->doorState = DoorState_Closing;
@@ -3139,16 +3148,13 @@ static void DoorClose(u16 self) {
     if (e->SFXIndex > 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
 }
 
-void DoorLock(u16 self) { EntitySetLocked(&Eng_Global->instances[self],true); }
-void DoorUnlock(u16 self) { Entity* e = &Eng_Global->instances[self]; EntitySetLocked(e,false); e->accessCardUsedByPlayer = true; }
-void DoorToggleLocked(u16 self) { if (EntityLocked(&Eng_Global->instances[self])) DoorUnlock(self); else DoorLock(self); }
-void DoorToggleAccessCardOverride(u16 self) { Eng_Global->instances[self].accessCardUsedByPlayer = !Eng_Global->instances[self].accessCardUsedByPlayer; }
-void DoorForceOpen(u16 self) { if (Eng_Global->instances[self].doorOpen == DoorState_Open) {return;} DoorOpen(self); }
+void DoorForceOpen(u16 self) { Eng_Global->instances[self].requiredAccessCard = AccessCardType_None; EntitySetLocked(&Eng_Global->instances[self],false); DoorOpen(self); }
 void DoorForceClose(u16 self) { if (Eng_Global->instances[self].doorOpen == DoorState_Closed) {return;} DoorClose(self); }
 void DoorActuate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->doorOpen == DoorState_Open) { DoorClose(self); return; }
     if (e->doorOpen == DoorState_Closed) { DoorOpen(self); return; }
+    
     if (e->doorOpen == DoorState_Opening) {
         float t = DoorGetProgress(e,DOOR_CLIP_OPENING);
         AnimationClip c = DoorGetClip(e,DOOR_CLIP_CLOSING);
@@ -3158,6 +3164,7 @@ void DoorActuate(u16 self) {
         if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
         return;
     }
+    
     if (e->doorOpen == DoorState_Closing) {
         float t = DoorGetProgress(e,DOOR_CLIP_CLOSING);
         AnimationClip c = DoorGetClip(e,DOOR_CLIP_OPENING);
@@ -3171,7 +3178,6 @@ void DoorActuate(u16 self) {
 
 void DoorInitAfterLoad(u16 self) {
     Entity* e = &Eng_Global->instances[self];
-    if (e->requiredAccessCard == AccessCardType_None) e->accessCardUsedByPlayer = true;
     if (e->startOpen) e->stayOpen = true;
     if (e->useTimeDelay <= 0.0f) e->useTimeDelay = 0.15f;
     if (e->lockedMessageLingdex <= 0) e->lockedMessageLingdex = 3;
@@ -3185,60 +3191,49 @@ void DoorInitAfterLoad(u16 self) {
         DoorSyncLayer(self);
         return;
     }
+    
     switch (e->doorOpen) {
         case DoorState_Open:    DoorSetClipFrame(self,DOOR_CLIP_IDLE_OPEN,DoorGetClip(e,DOOR_CLIP_IDLE_OPEN).frameStart); break;
         case DoorState_Opening: DoorSetClipFrame(self,DOOR_CLIP_OPENING,DoorFrameFromProgress(DoorGetClip(e,DOOR_CLIP_OPENING),0.0f/*TODO percent of anim*/)); break;
         case DoorState_Closing: DoorSetClipFrame(self,DOOR_CLIP_CLOSING,DoorFrameFromProgress(DoorGetClip(e,DOOR_CLIP_CLOSING),0.0f/*TODO percent of anim*/)); break;
         default:                DoorSetClipFrame(self,DOOR_CLIP_IDLE_CLOSED,DoorGetClip(e,DOOR_CLIP_IDLE_CLOSED).frameStart); break;
     }
+    
     DoorSyncLayer(self);
 }
 
 void DoorUse(u16 self, u16 activator, const char* argvalue) {
+    DualLog("Door use called by activator %u\n",activator);
     (void)argvalue;
     Entity* e = &Eng_Global->instances[self];
     if (activator == NULLENT) return;
     if (GetCurrentLevelSecurity() > e->securityThreshold) { UIBlockedBySecurity(e->position); return; }
-    if (Eng_Cheats->superoverride || Eng_Global->difficultyMission <= 0) {
-        EntitySetLocked(e,false);
-        e->requiredAccessCard = AccessCardType_None;
-        e->accessCardUsedByPlayer = true;
-    }
-    if (Eng_Global->difficultyMission <= 1) {
-        e->requiredAccessCard = AccessCardType_None;
-        e->accessCardUsedByPlayer = true;
-    }
+    
+    if (Eng_Cheats->superoverride || Eng_Global->difficultyMission <= 0) { EntitySetLocked(e,false); e->requiredAccessCard = AccessCardType_None; }
+    if (Eng_Global->difficultyMission <= 1) { e->requiredAccessCard = AccessCardType_None; }
     if (e->useFinished >= Eng_Global->pauseRelativeTime) return;
+    
     e->useFinished = Eng_Global->pauseRelativeTime + e->useTimeDelay;
-    if (e->requiredAccessCard != AccessCardType_None && !e->accessCardUsedByPlayer && !DoorInventoryHasAccessCard(e->requiredAccessCard)) {
-        CenterStatusPrint("%s",Eng_Text->stringTable[2]); // TODO Access-card-specific status text.
-        if (e->SFXLockedIndex >= 0 && e->SFXLockedIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXLockedIndex],0.7f,e->position,true);
-        return;
-    }
-    if (EntityLocked(e)) {
-        if (e->requiredAccessCard != AccessCardType_None && DoorInventoryHasAccessCard(e->requiredAccessCard)) {
-            e->accessCardUsedByPlayer = true; // TODO Access-card granted status text.
+    if (e->requiredAccessCard != AccessCardType_None) {
+        if (!DoorInventoryHasAccessCard(e->requiredAccessCard)) {
+            CenterStatusPrint("%s",Eng_Text->stringTable[2]); // TODO Access-card-specific status text.
+            if (e->SFXLockedIndex >= 0 && e->SFXLockedIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXLockedIndex],0.7f,e->position,true);
             return;
-        }
+        } else e->requiredAccessCard = AccessCardType_None; // TODO Access-card granted status text.
+    }
+    
+    if ((e->entflags & EF_LOCKED) != 0) {        
         CenterStatusPrint("%s",Eng_Text->stringTable[e->lockedMessageLingdex]);
         if (e->SFXLockedIndex >= 0 && e->SFXLockedIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXLockedIndex],0.55f,e->position,true);
         return;
     }
-    if (e->requiredAccessCard != AccessCardType_None && DoorInventoryHasAccessCard(e->requiredAccessCard)) e->accessCardUsedByPlayer = true;
-    if ((e->onlyTargetOnce && !e->targetAlreadyDone) || !e->onlyTargetOnce) {
-        e->targetAlreadyDone = true;
-        UseTargets(activator,e->argvalue,e->target);
-    }
+
+    if ((e->onlyTargetOnce && !e->targetAlreadyDone) || !e->onlyTargetOnce) { e->targetAlreadyDone = true; UseTargets(activator,e->argvalue,e->target); }
     if (e->ajar) e->ajar = false;
     DoorActuate(self);
 }
 
-void DoorTargetted(u16 self, u16 activator, const char* argvalue) {
-    (void)argvalue;
-    if (EntityLocked(&Eng_Global->instances[self])) DoorUnlock(self);
-    if (!Eng_Global->instances[self].targettingOnlyUnlocks) DoorUse(self,activator,argvalue);
-}
-
+void DoorTargetted(u16 self, u16 activator, const char* argvalue) { (void)argvalue; if ((Eng_Global->instances[self].entflags & EF_LOCKED) != 0) EntitySetLocked(&Eng_Global->instances[self],false); if (!Eng_Global->instances[self].targettingOnlyUnlocks) DoorUse(self,activator,argvalue); }
 void DoorUpdate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->blocked) return; // TODO frame-pause blocked doors instead of fully skipping.
@@ -3315,11 +3310,7 @@ void SearchObject(int searchable, bool first) {
 void UseEntity(u16 p, u16 i) {
     InventorySystem* inv = Inv(p);
     Entity* ent = &Eng_Global->instances[i];
-    if (ConstIndexIsSearchable(ent->index)) {
-        inv->currentSearchItem = i;
-        SearchObject(i,firstTimeSearch);
-        DualLog("Search\n");
-    }
+    if (ConstIndexIsSearchable(ent->index)) { inv->currentSearchItem = i; SearchObject(i,firstTimeSearch); DualLog("Search\n"); }
     else if (ConstIndexIsDoor(ent->index)) DoorUse(i,PLAYER1,ent->argvalue);
     else if (ConstIndexIsNPC(ent->index)) DualLog("Can't use NPC\n");
     else if (ConstIndexIsButtonSwitch(ent->index)) ButtonSwitchUse(i,PLAYER1,ent->argvalue);
@@ -3336,7 +3327,7 @@ void UseEntity(u16 p, u16 i) {
             ResetHeldItem(p);
 		} else {
             ForceInventoryMode(); // Inventory mode is turned on when picking something up
-            CenterStatusPrint("%s%s",Eng_Text->stringTable[ent->useableItemIndex + 326],Eng_Text->stringTable[319]); // picked up.
+            CenterStatusPrint("%s%s",Eng_Text->stringTable[inv->heldObjectIndex - 307 + 326],Eng_Text->stringTable[319]); // picked up.
 		}
 		
 		DeleteInstance(i);
@@ -3549,16 +3540,14 @@ MOD_TO_ENGINE void PlayerInit(u16 i) {
     Eng_Global->instances[i].position = (Vector3){10.52f,-43.792f + 0.84f,20.2908f}; // Start Actual: Puts player on Medical Level in actual game start position.  Added 0.84f
     Eng_Global->instances[i].scale = (Vector3){1.0f,1.0f,1.0f};
     Eng_Global->instances[i].rotation = (Quaternion){0.0f,0.7071f,0.0f,0.7071f}; // 90deg rotation CW about Y axis as viewed from the top looking down onto player
-    Eng_Global->instances[i].entflags = ENTFLAG_ACTIVE|ENTFLAG_RIGIDBODY;
+    Eng_Global->instances[i].entflags = EF_ACTIVE|EF_RIGIDBODY;
     Eng_Global->instances[i].collider = COLTYPE_CAP;
     Eng_Global->instances[i].colliderCenter.y = -0.84f;
     Eng_Global->instances[i].colliderSize = (Vector3){0.48f,2.0f,1.0f}; // Radius, Overall height including end radii (Unity convention, blech), Direction, 1.0 == Y-Axis
     Eng_Global->instances[i].mass = 1.0f;
     Eng_Global->instances[i].velocity = (Vector3){0.0f,0.0f,0.0f};
     Eng_Global->instances[i].gravity = 1.0f;
-    Eng_Global->instances[i].dynamicFriction = 0.6f;
-    Eng_Global->instances[i].staticFriction = 0.8f;
-    Eng_Global->instances[i].frictionCombine = PHYS_COMBINE_MUL;
+    Eng_Global->instances[i].dynamicFriction = 0.6f; Eng_Global->instances[i].staticFriction = 0.8f;
     Eng_Global->instances[i].health = 200.0f;
     Eng_Global->instances[i].lastHealth = Eng_Global->instances[i].health;
     Eng_Global->instances[i].noiseFinished = Eng_Global->pauseRelativeTime;
@@ -3591,11 +3580,7 @@ MOD_TO_ENGINE void ModInitAfterLoad(void) {
         else if (ConstIndexIsButtonSwitch(e->index)) ButtonSwitchInitAfterLoad(i);
         else if (constIndex >= 448 && constIndex <= 457) CyberItemInitBeforeLoad(i);
         else if (constIndex == 480) CyberMineInitBeforeLoad(i);
-        if (!StringIsEmpty(e->targetname) && (e->ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE) && !(e->entflags & TARG_IOFLAGS_DISABLD_ONCE_4EVER)) flag_set(&e->entflags,ENTFLAG_ACTIVE,false);
-        if (e->index == 700) {
-            if ((e->ioflags & TARG_IOFLAGS_START_ON_SECOND) || (e->ioflags & TARG_IOFLAGS_ON_SECOND)) { StringCopyInto_A_From_B(e->currenttarget,e->target ,TARGET_STRING_LENGTH); flag_setu64(&e->ioflags,TARG_IOFLAGS_ON_SECOND,false); }
-            else                                                                                      { StringCopyInto_A_From_B(e->currenttarget,e->target2,TARGET_STRING_LENGTH); flag_setu64(&e->ioflags,TARG_IOFLAGS_ON_SECOND,true ); }
-        }
+        if (!StringIsEmpty(e->targetname) && (e->ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE)) flag_set(&e->entflags,EF_ACTIVE,false);
     }
 }
 

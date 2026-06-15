@@ -1,14 +1,13 @@
 // voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake
 #if defined(LINUX)
-    //#define DEBUG_RAM_OUTPUT // Uncomment to print lots of RAM states at different points during init for when I'm attacking RAM.
+    //#define DEBUG_RAM_OUTPUT // Uncomment for when attacking RAM.
 #endif
-// ========================================================================================================================================================================================================================================================================================================
+#include "common.h"
+#define MOD_INTEROP_ENGINE
+#include "interop.h"
+// ====================
 // OS Shim Layer System
-typedef __INT8_TYPE__ i8;     typedef __UINT8_TYPE__ u8;   typedef __INT16_TYPE__ i16;   typedef __UINT16_TYPE__ u16;        typedef __INT32_TYPE__ i32;   typedef __UINT32_TYPE__ u32;
-typedef __INT64_TYPE__ i64;   typedef __UINT64_TYPE__ u64; typedef __SIZE_TYPE__ size_t; typedef __UINTPTR_TYPE__ uintptr_t; typedef __INTPTR_TYPE__ intptr_t;
-#define bool unsigned char
-#define true 1
-#define false 0
+typedef __UINTPTR_TYPE__ uintptr_t; typedef __INTPTR_TYPE__ intptr_t;
 #define likely(x)   __builtin_expect(!!(x),1)
 #define unlikely(x) __builtin_expect(!!(x),0)
 #define NULL ((void *)0)
@@ -17,10 +16,8 @@ typedef __INT64_TYPE__ i64;   typedef __UINT64_TYPE__ u64; typedef __SIZE_TYPE__
 #else
     #define ENGINE_TO_MOD __attribute__((visibility("default")))
 #endif
+#define assert(cond) do { if (!(cond)) { DualLogError("[%s:%d]:%s(): Assert fail:%s\n",__FILE__,__LINE__,__func__,#cond); *(volatile int*)0 = 0; } } while(0) // Force a crash/segfault for the debugger
 ENGINE_TO_MOD void DualLogError(const char* fmt, ...); ENGINE_TO_MOD void DualLog(const char* fmt, ...); char* StringFindSubstring(const char* haystack, const char* needle);
-#define assert(cond) do { \
-    if (!(cond)) { DualLogError("[%s:%d]:%s(): Assert fail:%s\n",__FILE__,__LINE__,__func__,#cond); *(volatile int*)0 = 0; /* Force a crash/segfault for the debugger */ } \
-} while(0)
 #if defined(_WIN32)
     #define WINDOWS
     #define MOD_EXTENSION ".dll" // e.g. Citadel.dll
@@ -142,7 +139,7 @@ static inline __attribute__((always_inline)) void OS_Write(FHandle f,const void*
 static inline __attribute__((always_inline)) void* OS_OpenAndAllocateFileBufferReadonly(const char* p,FHandle* f,int* s){void* r;return((*f=OS_OpenReadonly(p))==(FHandle)-1)?*s=0,(void*)0:((*s=OS_FileSize(*f))<=0)?DualLogError("Skipping empty:%s\n",p),OS_Close(*f),OS_Exit(1),NULL:(r=OS_AllocateFileBackedRAMReadonly(*s,*f,(char*)p))?(OS_Close(*f),r):NULL;}
 void* MemCpyFromBtoAForNBytes(void *dst, const void *src, size_t n) { unsigned char *d=(unsigned char *)dst; const unsigned char *s=(const unsigned char *)src; while (n--) {*d++=*s++;} return dst; } // memcpy replacement
 static inline __attribute__((always_inline)) void* OS_Realloc(void* old, size_t olds, size_t news) { void* n; return !old ? OS_Alloc(news) : news <= olds ? old : (n=OS_Alloc(news)) ? (MemCpyFromBtoAForNBytes(n,old,olds),OS_DeallocateRAM(old,olds),n) : 0; }
-// ========================================================================================================================================================================================================================================================================================================
+// ==============
 // GL Definitions
 enum { GL_ARRAY_BUFFER=0x8892,      GL_DEPTH_BUFFER_BIT=0x00000100, GL_READ_WRITE=0x88BA, GL_SSBO=0x90D2,                 GL_CULL_FACE=0x0B44,                          
        GL_BLEND=0x0BE2,             GL_DEPTH_TEST=0x0B71,           GL_RGB=0x1907,        GL_TEXTURE0=0x84C0,             GL_TEXTURE5=0x84C5,
@@ -177,8 +174,8 @@ typedef void*(*PFNGLMAPBUFFERRANGE)(u32,intptr_t,size_t,u32); typedef bool(*PFNG
                 PFNGLUNIFORM1I glUniform1i;           PFNGLUNIFORM1UI glUniform1ui;                   PFNGLUNIFORM2F glUniform2f;                 PFNGLUNIFORM3F glUniform3f;             PFNGLUNIFORM4F glUniform4f;             PFNGLUNIFORMMATRIX3FV glUniformMatrix3fv;
   PFNGLUNIFORMMATRIX4FV glUniformMatrix4fv;         PFNGLUNMAPBUFFER glUnmapBuffer;                 PFNGLUSEPROGRAM glUseProgram;                   PFNGLVIEWPORT glViewport;         PFNGLGETINTEGERV glGetIntegerv;                         PFNGLUNIFORM2UI glUniform2ui;
               PFNGLCLEARCOLOR glClearColor;     PFNGLBUFFERSUBDATA glBufferSubData; PFNGLVERTEXATTRIBFORMAT glVertexAttribFormat;   PFNGLBINDVERTEXBUFFER glBindVertexBuffer;     PFNGLCLEARBUFFERFV glClearBufferFv;       PFNGLVERTEXATTRIBBINDING glVertexAttribBinding; PFNGLENABLEVERTEXATTRIBARRAY glEnableVertexAttribArray;
-// ========================================================================================================================================================================================================================================================================================================
-// Input Declarations
+// ==================
+// Declarations
 #define GLFW_RELEASE                0
 #define GLFW_PRESS                  1
 #define GLFW_REPEAT                 2
@@ -191,19 +188,12 @@ typedef enum {KEY_UNKNOWN=-1,KEY_SPACE=32,KEY_APOSTROPHE=39/* ' */,KEY_COMMA=44/
              KEY_LEFT_CONTROL=341,KEY_LEFT_ALT=342,KEY_LEFT_SUPER=343,KEY_RIGHT_SHIFT=344,KEY_RIGHT_CONTROL=345,KEY_RIGHT_ALT=346,KEY_RIGHT_SUPER=347,KEY_MENU=348} KeyId;
 typedef enum {MOUSE_BUTTON_1=0,MOUSE_BUTTON_2=1,MOUSE_BUTTON_3=2,MOUSE_BUTTON_4=3,MOUSE_BUTTON_5=4,MOUSE_BUTTON_6=5,MOUSE_BUTTON_7=6,MOUSE_BUTTON_8=7,MOUSE_BUTTON_LEFT=0,MOUSE_BUTTON_RIGHT=1,MOUSE_BUTTON_MIDDLE=2} MouseButtonId;
 typedef enum {JOYSTICK_1=0,JOYSTICK_2=1,JOYSTICK_3=2,JOYSTICK_4=3,JOYSTICK_5=4,JOYSTICK_6=5,JOYSTICK_7=6,JOYSTICK_8=7,JOYSTICK_9=8,JOYSTICK_10=9,JOYSTICK_11=10,JOYSTICK_12=11,JOYSTICK_13=12,JOYSTICK_14=13,JOYSTICK_15=14,JOYSTICK_16=15,JOYSTICK_LAST=15} JoystickId;
-// ========================================================================================================================================================================================================================================================================================================
-// Windowing Declarations
 typedef void (*GLFWglproc)(void);
 typedef struct Monitor Monitor; typedef struct GLFWwindow GLFWwindow;
 typedef struct { int width,height,redBits,greenBits,blueBits,refreshRate; } GLFWvidmode;
 typedef struct { int width,height; unsigned char* pixels; } GLFWimage;
 typedef struct { unsigned char buttons[15]; float axes[6]; } GLFWgamepadstate;
 GLFWwindow* window;
-// ========================================================================================================================================================================================================================================================================================================
-// Interop System
-#include "common.h"
-#define MOD_INTEROP_ENGINE
-#include "interop.h"
 #define TEXT_BUFFER_SIZE 1024
 #define FONT_ATLAS_SIZE 4672
 #define MAX_GLYPHS 4096
@@ -272,8 +262,7 @@ static void DualLogMain(const char *prefix, const char *fmt, va_list args) {
         OS_Write(console_log_file, buf, GetStringLength(buf),"console.log");
     }
 }
-
-// ========================================================================================================================================================================================================================================================================================================
+// ===========================================================
 // Miscellaneous Helper Functions (and some libc replacements)
 ENGINE_TO_MOD void DualLog(const char* fmt, ...) { va_list args; __builtin_va_start(args,fmt); DualLogMain(NULL,fmt,args); __builtin_va_end(args); }
 ENGINE_TO_MOD void DualLogWarn(const char* fmt, ...) { va_list args; __builtin_va_start(args,fmt); DualLogMain("\033[1;38;5;208mWARN:",fmt,args); __builtin_va_end(args); }
@@ -295,9 +284,9 @@ void BmpWrite(char const *filename, int x, int y, const void *data) {
 }
 
 #ifdef WINDOWS
-ENGINE_TO_MOD double get_time(void) { static LARGE_INTEGER frequency,counter; static i32 init=0; if (!init) { QueryPerformanceFrequency(&frequency); init=1; } QueryPerformanceCounter(&counter); return (double)counter.QuadPart / frequency.QuadPart; }
+    ENGINE_TO_MOD double get_time(void) { static LARGE_INTEGER frequency,counter; static i32 init=0; if (!init) { QueryPerformanceFrequency(&frequency); init=1; } QueryPerformanceCounter(&counter); return (double)counter.QuadPart / frequency.QuadPart; }
 #else
-ENGINE_TO_MOD double get_time(void) { struct {i64 s,ns;} ts; i64 ret; __asm__ __volatile__("syscall":"=a"(ret):"a"(228),"D"(1),"S"(&ts):"rcx","r11","memory"); if (ret != 0) {return 0.0;} return (double)ts.s + (double)ts.ns * 1e-9; } // Full time in seconds, 1 for MONOTONIC, Note that using clock_gettime wasn't any better for performance.
+    ENGINE_TO_MOD double get_time(void) { struct {i64 s,ns;} ts; i64 ret; __asm__ __volatile__("syscall":"=a"(ret):"a"(228),"D"(1),"S"(&ts):"rcx","r11","memory"); if (ret != 0) {return 0.0;} return (double)ts.s + (double)ts.ns * 1e-9; } // Full time in seconds, 1 for MONOTONIC, Note that using clock_gettime wasn't any better for performance.
 #endif
 
 // Get USS aka the total RAM uniquely allocated for the process (btop shows RSS so pulls in shared libs and double counts shared RAM).
@@ -360,15 +349,15 @@ ENGINE_TO_MOD float inverse_lerp(float min, float max, float val) { return (min 
 ENGINE_TO_MOD float smooth_damp(float current, float target, float *current_velocity, float smooth_time) { 
     if (smooth_time < 0.0001f) smooth_time = 0.0001f;
     float omega = 2.0f / smooth_time;
-    float x = omega * (float)Sys_Global.timeSinceLastPhysicsTick;
+    float x = omega * (float)Sys_Global.deltaTime;
     float exp = 1.0f / (1.0f + x + 0.48f * x * x + 0.235f * x * x * x);
     float change = current - target;
     float original_to = target;
     target = current - change;
-    float temp = (*current_velocity + omega * change) * (float)Sys_Global.timeSinceLastPhysicsTick;
+    float temp = (*current_velocity + omega * change) * (float)Sys_Global.deltaTime;
     *current_velocity = (*current_velocity - omega * temp) * exp;
     float output = target + (change + temp) * exp;
-    if ((original_to - current > 0.0f) == (output > original_to)) { output = original_to; *current_velocity = (output - original_to) / (float)Sys_Global.timeSinceLastPhysicsTick; }
+    if ((original_to - current > 0.0f) == (output > original_to)) { output = original_to; *current_velocity = (output - original_to) / (float)Sys_Global.deltaTime; }
     return output;
 }
 
@@ -518,13 +507,13 @@ ENGINE_TO_MOD int StringFormatV(char* buffer, size_t bufferSize, const char* for
                 while (i-- > 0 && pos < bufferSize - 1) buffer[pos++] = num[i];
             } break;
             case 's': {
-                const char* s = __builtin_va_arg(args, const char*);
+                const char* s = __builtin_va_arg(args,const char*);
                 size_t len = GetStringLength(s);
                 if (pos + len >= bufferSize) len = bufferSize - pos - 1;
                 for (size_t i = 0; i < len; ++i) buffer[pos++] = s[i];
             } break;
             case 'f': {
-                double val = __builtin_va_arg(args, double);
+                double val = __builtin_va_arg(args,double);
                 char num[64];
                 DoubleToStringFixed(num, val, decimals, sizeof(num));
                 size_t len = GetStringLength(num);
@@ -543,10 +532,7 @@ ENGINE_TO_MOD int StringFormat(char* buffer, size_t bufferSize, const char* form
 char* GetNextStringUpToNewlineOrEOF(char* buf, int size, FHandle fd) { // fgets replacement, not thread safe but we don't do multithreading
     if (size <= 1 || buf == NULL) return NULL;
 
-    char* p = buf;
-    int remaining = size - 1;
-    static int pos = 0, end = 0;
-    static char buffer[4096];
+    char* p = buf; int remaining = size - 1; static int pos = 0, end = 0; static char buffer[4096];
     while (remaining > 0) {
         if (pos >= end) {
             long n = OS_Read(fd,buffer,sizeof(buffer)); if (n <= 0 && p == buf) return NULL;
@@ -646,7 +632,7 @@ float half_to_float(half h) {
     float f; MemCpyFromBtoAForNBytes(&f,&out,4);
     return f;
 }
-// ========================================================================================================================================================================================================================================================================================================
+// ==========================
 // 2D Textures Loading System
 u32 totalPixels,totalPaletteColors; void VSetWindowIcon(GLFWwindow*,const GLFWimage*);
 typedef struct { u16 index; bool transparent; bool doublesided; char path[128]; } TextureData; typedef struct { TextureData* entries; u32 count; u32 capacity; } TextureDataParser; typedef struct { const char* data; int size; } RawTexture;
@@ -939,7 +925,7 @@ static __attribute__((noinline)) void LoadTextures(void) {
     DualLog(" took %.6f secs\n",get_time() - start_time);
     DebugRAM("After LoadTextures and after deallocation");
 }
-// ========================================================================================================================================================================================================================================================================================================
+// ========================
 // 3D Models Loading System
 u8** modelVertices = NULL; u16** modelTriangles = NULL;
 u32 modelVertexCounts[MODEL_IDX_MAX] = {0}; u16 modelTriangleCounts[MODEL_IDX_MAX] = {0};
@@ -1257,7 +1243,7 @@ void LoadModels(void) {
     DualLog(" vertices: %u, tris: %u, %f secs\n",tv,tt,get_time() - startModelTime);
     DebugRAM("After LoadModels");
 }
-// ========================================================================================================================================================================================================================================================================================================
+// ==============
 // Culling System
 typedef struct { u16 x,z; } PortalCell;
 typedef struct { PortalCell cellA,cellB,cellA2,cellB2; bool portalNS,open,dirty,isBulkhead;} Portal;
@@ -1707,7 +1693,7 @@ void CullCore(void) {
     
     PortalCulling(); // Update based on portal states.
 }
-// ========================================================================================================================================================================================================================================================================================================
+// =====================
 // Fonts and Text System
 typedef struct { void* ptr; size_t sz; } TAlloc;
 static TAlloc* ttAllocs = NULL; static int tallocCount=0;
@@ -2311,13 +2297,8 @@ void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scaleInput,const 
     
     if(vc){ glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.textVBO); glBufferData(GL_ARRAY_BUFFER,vc*30*sizeof(float),textVertexData,GL_DYNAMIC_DRAW); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,vc*6); }
 }
-// ========================================================================================================================================================================================================================================================================================================
-// Windowing and Input System
-// GLFW 3.5 This software is provided 'as-is', without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
-// Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
-// 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
-// 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
-// 3. This notice may not be removed or altered from any source distribution.
+// ======================================================================================
+// Windowing and Input System (Heavily stripped and flattened GLFW 3.5, see for original)
 extern InputElement inputElements[134];
 typedef void (*GLFWproc)(void); typedef struct _GLFWfbconfig _GLFWfbconfig; typedef struct _GLFWcontext _GLFWcontext; typedef struct _GLFWwindow _GLFWwindow; typedef struct _GLFWlibrary _GLFWlibrary; typedef struct _GLFWmonitor _GLFWmonitor; typedef struct _GLFWjoystick _GLFWjoystick;
 void* MemCpyFromBtoAForNBytes(void *dst, const void *src, size_t n); int StringCompareUpToLength(const char* s1, const char* s2, size_t n); void UpdateScreenSize(i32 width, i32 height); void SaveConfig(void);
@@ -3562,7 +3543,7 @@ GLFWwindow* VCreateWindow(int width, int height, char* title) {
 void VSetWindowIcon(GLFWwindow* handle, const GLFWimage* images) { _GLFWwindow* win = (_GLFWwindow*) handle; SetWindowIcon(win,images); }
 void glfwSetWindowSize(GLFWwindow* handle, int width, int height) { _GLFWwindow* win = (_GLFWwindow*)handle; win->videoMode.width=width; win->videoMode.height=height; SetWindowSize(win,width,height); }
 void glfwSetWindowMonitor(GLFWwindow* wh, int xpos, int ypos, int width, int height) { _GLFWwindow* win = (_GLFWwindow*)wh; win->videoMode.width=width; win->videoMode.height=height; SetWindowMonitor(win,xpos,ypos,width,height); }
-// ========================================================================================================================================================================================================================================================================================================
+// ============
 // Input System
 bool GetKeyRiseEdgeOrHeld(int settingIndex, bool risingEdge);
 ENGINE_TO_MOD bool GetKey(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,false); }  // True while held down.
@@ -3795,13 +3776,13 @@ void CycleToNextMonitor(void) {
     Sys_Settings.CurrentMonitor = (Sys_Settings.CurrentMonitor + 1) % monitorCount;
     SaveConfig(); CenterWindowOnMonitor();
 }
-// ========================================================================================================================================================================================================================================================================================================
+// ==============
 // Physics System
 #define MAX_COLLISION_ITERATIONS 4
 #define RESTITUTION 0.5f
 #define FRICTION 0.2f
 #define STEP_MIN_NORMAL_Y 0.7f
-#define COLLISION_EPSILON 0.0001f
+#define PHY_EPSILON 0.0001f
 #define MAX_SUBSTEPS 10
 #define MAX_SPEED 10.0f // m/s
 #define MAX_STEP_SIZE (MIN_DIAMETER / MAX_SPEED) // 0.01 s
@@ -3812,26 +3793,27 @@ u16 dynamicEntities[512], dynamicEntityCount;
 typedef struct { bool hit; Vector3 point,normal; float overlapAmount; } OverlapResult;
 static inline __attribute__((always_inline)) u32 PosGetCellCoordsP(i32 cx, i32 cz) { cx = clamp(cx,0,WORLDX_0BASED); cz = clamp(cz,0,WORLDX_0BASED); return (u32)cz * WORLDX + (u32)cx; }
 static inline OverlapResult SphSph(Vector3 a, float ar, Vector3 b, float br) {
-    Vector3 delta = V3_AsubB(a,b); float dist = V3_Mag(delta), radSum = (ar + br); Vector3 n = (dist < COLLISION_EPSILON) ? (Vector3){0,1,0} : V3_ScaleByF(delta,1.0f / dist);
+    Vector3 delta = V3_AsubB(a,b); float dist = V3_Mag(delta), radSum = (ar + br); Vector3 n = (dist < PHY_EPSILON) ? (Vector3){0,1,0} : V3_ScaleByF(delta,1.0f / dist);
     return (dist < radSum) ? (OverlapResult){true,V3_AplusB(b,V3_ScaleByF(n,br)),n,radSum - dist} : (OverlapResult){0,{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f},0.0f};
 }
 
 static float ClosestSegmentSegment(Vector3 a0, Vector3 a1, Vector3 b0, Vector3 b1, float *sc, float *tc) { // Closest point between two line segments A0-A1 and B0-B1.  Returns squared distance and writes sc, tc (parameters on each segment).
     Vector3 d1 = V3_AsubB(a1,a0), d2 = V3_AsubB(b1,b0), r = V3_AsubB(a0,b0);
     float a = V3_dot(d1,d1), e = V3_dot(d2,d2), f = V3_dot(d2,r);
-    if (a < COLLISION_EPSILON && e < COLLISION_EPSILON) { *sc = *tc = 0.0f; return V3_dot(r,r); }
-    if (a < COLLISION_EPSILON) { *sc = 0.0f; *tc = vclamp(f/e, 0.0f, 1.0f); }
+    if (a < PHY_EPSILON && e < PHY_EPSILON) { *sc = *tc = 0.0f; return V3_dot(r,r); }
+    if (a < PHY_EPSILON) { *sc = 0.0f; *tc = vclamp(f/e, 0.0f, 1.0f); }
     else {
         float c = V3_dot(d1,r);
-        if (e < COLLISION_EPSILON) { *tc = 0.0f; *sc = vclamp(-c/a, 0.0f, 1.0f); }
+        if (e < PHY_EPSILON) { *tc = 0.0f; *sc = vclamp(-c/a, 0.0f, 1.0f); }
         else {
             float b = V3_dot(d1,d2), denom = a*e - b*b;
-            *sc = (denom > COLLISION_EPSILON) ? vclamp((b*f - c*e)/denom, 0.0f, 1.0f) : 0.0f;
+            *sc = (denom > PHY_EPSILON) ? vclamp((b*f - c*e)/denom, 0.0f, 1.0f) : 0.0f;
             *tc = (b * (*sc) + f) / e;
             if (*tc < 0.0f) { *tc = 0.0f; *sc = vclamp(-c/a, 0.0f, 1.0f); }
             else if (*tc > 1.0f) { *tc = 1.0f; *sc = vclamp((b-c)/a, 0.0f, 1.0f); }
         }
     }
+    
     Vector3 diff = V3_AsubB(V3_AplusB(a0, V3_ScaleByF(d1,*sc)), V3_AplusB(b0, V3_ScaleByF(d2,*tc)));
     return V3_dot(diff,diff);
 }
@@ -3846,7 +3828,7 @@ static OverlapResult CapCap(ShapeCapsule a, ShapeCapsule b) {
     Vector3 ptA = V3_AplusB(a.base,V3_ScaleByF(V3_AsubB(a.tip,a.base),sc)); 
     Vector3 ptB = V3_AplusB(b.base,V3_ScaleByF(V3_AsubB(b.tip,b.base),tc));
     Vector3 delta = V3_AsubB(ptA,ptB);
-    r.normal = (dist < COLLISION_EPSILON) ? (Vector3){0,1,0} : V3_ScaleByF(delta, 1.0f/dist);
+    r.normal = (dist < PHY_EPSILON) ? (Vector3){0,1,0} : V3_ScaleByF(delta, 1.0f/dist);
     r.point  = V3_AplusB(ptB, V3_ScaleByF(r.normal, b.radius));
     return r;
 }
@@ -3874,7 +3856,7 @@ static OverlapResult SphBox(Vector3 center, float radius, ShapeBox box) {
     if (distSq >= radius * radius) return r;
 
     r.hit = true; float dist = vsqrtf(vmax(distSq, 0.0f));
-    if (dist > COLLISION_EPSILON) { r.normal = V3_ScaleByF(delta, 1.0f / dist); r.overlapAmount = radius - dist; }
+    if (dist > PHY_EPSILON) { r.normal = V3_ScaleByF(delta, 1.0f / dist); r.overlapAmount = radius - dist; }
     else { // Center is inside OBB — find minimum penetration axis
         Vector3 ax,ay,az; obb_axes(box.rot,&ax,&ay,&az);
         Vector3 local = V3_AsubB(center,box.center);
@@ -3921,9 +3903,9 @@ void Entity_GetCap(const Entity *e, ShapeCapsule *out) {
 
 void Entity_GetBox(const Entity *e, ShapeBox *out) { out->center=V3_AplusB(e->position,quat_rotate_vector(e->rotation,e->colliderCenter)); out->halfExtents=(Vector3){e->colliderSize.x*0.5f * e->scale.x,e->colliderSize.y*0.5f * e->scale.y,e->colliderSize.z*0.5f * e->scale.z}; out->rot=e->rotation; }
 void Entity_GetSph(const Entity *e, ShapeSphere *out) { out->center = V3_AplusB(e->position,quat_rotate_vector(e->rotation,e->colliderCenter)); out->radius = e->colliderSize.x * vmax(e->scale.x,vmax(e->scale.y,e->scale.z)); }
-static inline Color ColliderColor(Entity *e) { return (!(e->entflags & ENTFLAG_RIGIDBODY)) ? textColors[TEXT_GREEN_MENU_SHADOW] : ((e->colliding) ? textColors[TEXT_RED] : textColors[TEXT_GREEN]); }
+static inline Color ColliderColor(Entity *e) { return (!(e->entflags & EF_RIGIDBODY)) ? textColors[TEXT_GREEN_MENU_SHADOW] : ((e->colliding) ? textColors[TEXT_RED] : textColors[TEXT_GREEN]); }
 static void DrawVelocityVector(Entity *e) {
-    if (!(e->entflags & ENTFLAG_RIGIDBODY)) return;
+    if (!(e->entflags & EF_RIGIDBODY)) return;
 
     Vector3 tip = V3_AplusB(e->position,V3_ScaleByF(e->velocity,0.25f)); AddDebugLine(e->position,tip,textColors[TEXT_ORANGE]);
     Vector3 perp = V3_Normalize(V3_Cross(e->velocity,(vabs(e->velocity.y/V3_Mag(e->velocity)) < 0.9f) ? (Vector3){0,1,0} : (Vector3){1,0,0}));
@@ -3951,6 +3933,16 @@ void DrawSphereCollider(Entity *e) {
     }
     
     DrawVelocityVector(e);
+}
+
+void DrawSphereContact(Vector3 pos, float rad) {
+    Color col = (Color){0.0f,0.0f,1.0f,1.0f}; ShapeSphere s = (ShapeSphere){pos,rad}; float step=6.28318530f/12;
+    for (int seg=0;seg<12;seg++) {
+        float a0=seg*step,a1=a0+step,c0=vcosf(a0),s0=vsinf(a0),c1=vcosf(a1),s1=vsinf(a1);
+        AddDebugLine(V3_AplusB(s.center,(Vector3){c0*s.radius,0,s0*s.radius}),V3_AplusB(s.center,(Vector3){c1*s.radius,0,s1*s.radius}),col);
+        AddDebugLine(V3_AplusB(s.center,(Vector3){c0*s.radius,s0*s.radius,0}),V3_AplusB(s.center,(Vector3){c1*s.radius,s1*s.radius,0}),col);
+        AddDebugLine(V3_AplusB(s.center,(Vector3){0,c0*s.radius,s0*s.radius}),V3_AplusB(s.center,(Vector3){0,c1*s.radius,s1*s.radius}),col);
+    }
 }
 
 void DrawMeshCollider(Entity *e) {
@@ -3999,32 +3991,71 @@ void DrawCapsuleCollider(Entity *e) {
     DrawVelocityVector(e);
 }
 
+static void DrawAngularVelocity(Entity *e) {
+    if (!(e->entflags & EF_RIGIDBODY)) return;
+    if (V3_Mag(e->angularVelocity) < 0.0001f) return; // skip near-zero
+
+    Color purple = (Color){0.5f, 0.0f, 1.0f, 1.0f};
+
+    // === Arrow (line vector) ===
+    float scale = 0.35f; // tune as needed - similar visual weight to velocity *0.25
+    Vector3 dir = V3_Normalize(e->angularVelocity);
+    Vector3 tip = V3_AplusB(e->position, V3_ScaleByF(e->angularVelocity, scale));
+    AddDebugLine(e->position, tip, purple);
+
+    // Small cross at tip so zero-length vectors are still visible
+    Vector3 ref = (vabs(dir.y) < 0.9f) ? (Vector3){0,1,0} : (Vector3){1,0,0};
+    Vector3 perp = V3_Normalize(V3_Cross(dir, ref));
+    Vector3 perp2 = V3_Cross(dir, perp);
+    AddDebugLine(V3_AplusB(tip, V3_ScaleByF(perp,  0.05f)),V3_AplusB(tip, V3_ScaleByF(perp, -0.05f)), purple);
+    AddDebugLine(V3_AplusB(tip, V3_ScaleByF(perp2, 0.05f)),V3_AplusB(tip, V3_ScaleByF(perp2,-0.05f)), purple);
+
+    // === Quarter circle arc (visualizes rotation plane + sense) ===
+    float radius = 0.6f; // tune to look good relative to your objects
+    float step = 1.57079632679f / 8.0f; // quarter circle divided into 8 segments
+
+    // Find two vectors perpendicular to angular axis
+    Vector3 axis = dir;
+    Vector3 p1 = V3_Normalize(V3_Cross(axis, ref));
+    Vector3 p2 = V3_Cross(axis, p1);
+    Vector3 prev = V3_AplusB(e->position, V3_ScaleByF(p1, radius));
+    for (int i = 1; i <= 8; ++i) {
+        float a = i * step;
+        float c = vcosf(a);
+        float s = vsinf(a);
+        Vector3 cur = V3_AplusB(e->position,V3_AplusB(V3_ScaleByF(p1, c * radius),V3_ScaleByF(p2, s * radius)));
+        AddDebugLine(prev,cur,purple);
+        prev = cur;
+    }
+}
+
 static u16 cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX];
 float GetCollisionRadius(Entity *e) { if (e->collider == COLTYPE_BOX) { float hx = e->colliderSize.x * 0.5f * e->scale.x, hy = e->colliderSize.y * 0.5f * e->scale.y, hz = e->colliderSize.z * 0.5f * e->scale.z; return vsqrtf(hx*hx + hy*hy + hz*hz); } return e->colliderSize.x; }
 Quaternion quat_from_axis_angle(Vector3 axis, float angle) { float half = angle * 0.5f; float s = vsinf(half); return (Quaternion){axis.x * s,axis.y * s,axis.z * s,vcosf(half)}; }
-Quaternion quat_normalize(Quaternion q) { float len2 = q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w; if (len2 < COLLISION_EPSILON) {return (Quaternion){0,0,0,1};} float inv = 1.0f / vsqrtf(len2); q.x *= inv; q.y *= inv; q.z *= inv; q.w *= inv; return q; }
+Quaternion quat_normalize(Quaternion q) { float len2 = q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w; if (len2 < PHY_EPSILON) {return (Quaternion){0,0,0,1};} float inv = 1.0f / vsqrtf(len2); q.x *= inv; q.y *= inv; q.z *= inv; q.w *= inv; return q; }
 static void ApplyVelocity(Entity *e, float dt) {
-    Vector3 acc = {0,-9.81f*e->gravity,0};
-    acc = V3_AplusB(acc,V3_ScaleByF(e->accumulatedForce,1.f / e->mass));
+    Vector3 acc = {0.0f,-9.81f*e->gravity,0.0f};
+    u16 edx = (u16)(e - Sys_Global.instances);
+    if ((edx == PLAYER1 || edx == PLAYER2) && Sys_Cheats.noclip) acc.y = 0.0f;
+    acc = V3_AplusB(acc,V3_ScaleByF(e->accumulatedForce,1.0f / e->mass));
     e->velocity = V3_AplusB(e->velocity,V3_ScaleByF(acc,dt));
     float speed = V3_Mag(e->velocity);
-    if (speed > MAX_SPEED) e->velocity = V3_ScaleByF(V3_ScaleByF(e->velocity, 1.f / speed),MAX_SPEED);
+    if (speed > MAX_SPEED) e->velocity = V3_ScaleByF(V3_ScaleByF(e->velocity, 1.0f / speed),MAX_SPEED);
     float linDrag = vexp(-2.0f * dt);
     e->velocity = V3_ScaleByF(e->velocity,linDrag);
     SetPosition(e,V3_AplusB(e->position,V3_ScaleByF(e->velocity,dt)),false); // pos += (d = v*t)
     if (e->collider != COLTYPE_CAP) {
-        float avel = V3_Mag(e->angularVelocity);
-        if (avel > MAX_ANGULAR_SPEED) { e->angularVelocity = V3_ScaleByF(V3_ScaleByF(e->angularVelocity,1.f / avel),MAX_ANGULAR_SPEED); avel = MAX_ANGULAR_SPEED; }
-        float dragFactor = vexp(-e->angularDrag * dt);
-        e->angularVelocity = V3_ScaleByF(e->angularVelocity,dragFactor);
-        avel = V3_Mag(e->angularVelocity);
-        if (avel > COLLISION_EPSILON) { Quaternion dq = quat_from_axis_angle(V3_ScaleByF(e->angularVelocity,1.f / avel),avel * dt); e->rotation = quat_normalize(quat_multiply(dq,e->rotation)); }
+        float angDrag = vexp(-e->angularDrag * dt);
+        e->angularVelocity = V3_ScaleByF(e->angularVelocity, angDrag); // 1. Apply continuous angular drag over time
+        float avel = V3_Mag(e->angularVelocity); 
+        if (avel > MAX_ANGULAR_SPEED) { e->angularVelocity = V3_ScaleByF(e->angularVelocity, MAX_ANGULAR_SPEED / avel); avel = MAX_ANGULAR_SPEED; }
+        if (avel > PHY_EPSILON) { Quaternion dq = quat_from_axis_angle(V3_ScaleByF(e->angularVelocity, 1.f / avel), avel * dt); e->rotation = quat_normalize(quat_multiply(dq, e->rotation)); } // 2. Integrate rotation
     } else e->angularVelocity = (Vector3){0.0f,0.0f,0.0f};
 }
 
 // Accumulate inertia tensor of a tetrahedron (origin, v0, v1, v2) into acc[6].  Uses the covariance-integral formula — sign handles winding/concavities.
 static void AccumTetraInertia(float acc[6], Vector3 v0, Vector3 v1, Vector3 v2) {
-    float det = V3_dot(v0, V3_Cross(v1, v2)); // signed tet volume * 6
+    float det = V3_dot(v0,V3_Cross(v1,v2)); // signed tet volume * 6
     acc[0] += det * (v0.y*v0.y + v0.y*v1.y + v1.y*v1.y + v0.y*v2.y + v1.y*v2.y + v2.y*v2.y + v0.z*v0.z + v0.z*v1.z + v1.z*v1.z + v0.z*v2.z + v1.z*v2.z + v2.z*v2.z); // Diagonal: integral of (y²+z²), (x²+z²), (x²+y²) over tet
     acc[1] += det * (v0.x*v0.x + v0.x*v1.x + v1.x*v1.x + v0.x*v2.x + v1.x*v2.x + v2.x*v2.x + v0.z*v0.z + v0.z*v1.z + v1.z*v1.z + v0.z*v2.z + v1.z*v2.z + v2.z*v2.z);
     acc[2] += det * (v0.x*v0.x + v0.x*v1.x + v1.x*v1.x + v0.x*v2.x + v1.x*v2.x + v2.x*v2.x + v0.y*v0.y + v0.y*v1.y + v1.y*v1.y + v0.y*v2.y + v1.y*v2.y + v2.y*v2.y);
@@ -4033,7 +4064,7 @@ static void AccumTetraInertia(float acc[6], Vector3 v0, Vector3 v1, Vector3 v2) 
     acc[5] += det * (2*v0.y*v0.z + v0.y*v1.z + v0.y*v2.z + v1.y*v0.z + 2*v1.y*v1.z + v1.y*v2.z + v2.y*v0.z + v2.y*v1.z + 2*v2.y*v2.z);
 }
 
-void ComputeConvexMeshInertiaTensor(Entity *e) {
+void ComputeConvexMeshInertiaTensor(Entity *e) { // Called for each entity in loop after LevelLoad() has loaded all entities.
     u16 mi = e->colliderMeshIndex; e->inertiaTensorValid = false;
     if (mi >= MODEL_IDX_MAX || !modelTriangleCounts[mi] || !modelVertexCounts[mi]) return;
     float acc[6] = {0}; float volAcc = 0.f; u32 triCount = modelTriangleCounts[mi];
@@ -4045,33 +4076,36 @@ void ComputeConvexMeshInertiaTensor(Entity *e) {
         volAcc += V3_dot(v0, V3_Cross(v1, v2));
         AccumTetraInertia(acc, v0, v1, v2);
     }
-    if (vabs(volAcc) < COLLISION_EPSILON) return;
+    if (vabs(volAcc) < PHY_EPSILON) return;
     float s = e->mass / (volAcc * 60.f), so = e->mass / (volAcc * 120.f);
-    float mn = e->mass * 0.0001f;
-    e->inertiaTensor[0] = vmax(( acc[1]+acc[2])*s, mn); // Ixx = (Iyy+Izz terms)
-    e->inertiaTensor[1] = vmax(( acc[0]+acc[2])*s, mn); // Iyy
-    e->inertiaTensor[2] = vmax(( acc[0]+acc[1])*s, mn); // Izz
-    e->inertiaTensor[3] = -acc[3]*so;                   // Ixy (product of inertia, negated)
-    e->inertiaTensor[4] = -acc[4]*so;                   // Ixz
-    e->inertiaTensor[5] = -acc[5]*so;                   // Iyz
-    e->inertiaTensorValid = true;
-}
+    
+    // Calculate raw local inertia tensor bounds
+    float r = modelBounds[mi] * vmax(vmax(e->scale.x, e->scale.y), e->scale.z);
+    float sphericalI = (2.0f / 5.0f) * e->mass * r * r, mn = sphericalI * 0.1f;
+    float Ixx = vmax((acc[1]+acc[2])*s, mn), Iyy = vmax((acc[0]+acc[2])*s, mn), Izz = vmax((acc[0]+acc[1])*s, mn);
+    float Ixy = -acc[3]*so, Ixz = -acc[4]*so, Iyz = -acc[5]*so;
 
-// Returns moment of inertia about world-space axis 'n' for entity e.
-// Falls back to sphere approximation only if tensor wasn't computed.
-static float GetMomentOfInertia(Entity *e, Vector3 n) {
-    if (e->collider != COLTYPE_CVX || !e->inertiaTensorValid) {
-        float r = (e->collider == COLTYPE_MSH) ? modelBounds[e->modelIndex] : (e->collider == COLTYPE_CVX) ? modelBounds[e->colliderMeshIndex] : GetCollisionRadius(e);
-        return (2.f / 5.f) * e->mass * r * r;
-    }
-    // Rotate n into entity local space, then apply I·n, dot with n: gives I_n = nᵀ·I·n
-    Vector3 ln = quat_rotate_vector((Quaternion){-e->rotation.x,-e->rotation.y,-e->rotation.z,e->rotation.w},n); // Use quat conjugate
-    float Ixx=e->inertiaTensor[0], Iyy=e->inertiaTensor[1], Izz=e->inertiaTensor[2];
-    float Ixy=e->inertiaTensor[3], Ixz=e->inertiaTensor[4], Iyz=e->inertiaTensor[5];
-    // I·ln (matrix-vector with symmetric I, products of inertia are negative off-diag)
-    Vector3 In = {Ixx*ln.x - Ixy*ln.y - Ixz*ln.z,-Ixy*ln.x + Iyy*ln.y - Iyz*ln.z,-Ixz*ln.x - Iyz*ln.y + Izz*ln.z};
-    float moment = V3_dot(ln,In);
-    return vmax(moment, COLLISION_EPSILON);
+    // Apply entity transforms to the tensor elements before running matrix inversion
+    // Solid rule: I_scaled_xy = I_raw_xy * scale.x * scale.y
+    float sx = e->scale.x, sy = e->scale.y, sz = e->scale.z;
+    Ixx *= (sy * sy + sz * sz) * 0.5f; Iyy *= (sx * sx + sz * sz) * 0.5f; Izz *= (sx * sx + sy * sy) * 0.5f;
+    Ixy *= sx * sy; Ixz *= sx * sz; Iyz *= sy * sz;
+
+    e->inertiaTensor[0] = Ixx; e->inertiaTensor[1] = Iyy; e->inertiaTensor[2] = Izz;
+    e->inertiaTensor[3] = Ixy; e->inertiaTensor[4] = Ixz; e->inertiaTensor[5] = Iyz;
+
+    // Direct analytic 3x3 symmetric matrix inversion (Cramer's Rule)
+    float det = Ixx * (Iyy * Izz - Iyz * Iyz) - Ixy * (Ixy * Izz - Ixz * Iyz) + Ixz * (Ixy * Iyz - Iyy * Ixz);
+    if (vabs(det) < PHY_EPSILON) return;
+    float invDet = 1.0f / det;
+
+    e->invInertiaTensor[0] = (Iyy * Izz - Iyz * Iyz) * invDet; // invIxx
+    e->invInertiaTensor[1] = (Ixx * Izz - Ixz * Ixz) * invDet; // invIyy
+    e->invInertiaTensor[2] = (Ixx * Iyy - Ixy * Ixy) * invDet; // invIzz
+    e->invInertiaTensor[3] = (Ixz * Iyz - Ixy * Izz) * invDet; // invIxy -> matches m3
+    e->invInertiaTensor[4] = (Ixy * Iyz - Ixz * Iyy) * invDet; // invIxz -> matches m4
+    e->invInertiaTensor[5] = (Ixy * Ixz - Ixx * Iyz) * invDet; // invIyz -> matches m5
+    e->inertiaTensorValid = true;
 }
 
 static OverlapResult BoxBox(ShapeBox a, ShapeBox b) {
@@ -4141,7 +4175,7 @@ static inline Vector3 BoxSupport(ShapeBox b, Vector3 d) {
     return V3_AplusB(V3_AplusB(V3_AplusB(b.center,V3_ScaleByF(ax,kx * b.halfExtents.x)),V3_ScaleByF(ay,ky * b.halfExtents.y)),V3_ScaleByF(az,kz * b.halfExtents.z));
 }
 
-static inline Vector3 CapsuleSupport(ShapeCapsule cap, Vector3 d) { float db = V3_dot(cap.base,d),dt = V3_dot(cap.tip,d); Vector3 best = (dt > db) ? cap.tip : cap.base; float L = V3_dot(d,d); if (L < COLLISION_EPSILON) {return best;} return V3_AplusB(best,V3_ScaleByF(d,cap.radius / vsqrtf(L))); }
+static inline Vector3 CapsuleSupport(ShapeCapsule cap, Vector3 d) { float db = V3_dot(cap.base,d),dt = V3_dot(cap.tip,d); Vector3 best = (dt > db) ? cap.tip : cap.base; float L = V3_dot(d,d); if (L < PHY_EPSILON) {return best;} return V3_AplusB(best,V3_ScaleByF(d,cap.radius / vsqrtf(L))); }
 static bool GJKNextSimplex(Simplex3D *s, Vector3 *dir) {
     Vector3 A=s->v[s->n-1], AO={-A.x,-A.y,-A.z};
     if (s->n==2) {
@@ -4149,7 +4183,7 @@ static bool GJKNextSimplex(Simplex3D *s, Vector3 *dir) {
         if (V3_dot(AB,AO)>0.f) *dir=TP(AB,AO,AB);
         else { s->n=1; s->v[0]=A; *dir=AO; }
 
-        if (V3_dot(*dir,*dir)<COLLISION_EPSILON) { Vector3 px = (vabs(AB.x)>0.9f) ? (Vector3){0,1,0} : (Vector3){1,0,0}; *dir=V3_Cross(AB,px); } // Degenerate check applies regardless of which branch was taken
+        if (V3_dot(*dir,*dir)<PHY_EPSILON) { Vector3 px = (vabs(AB.x)>0.9f) ? (Vector3){0,1,0} : (Vector3){1,0,0}; *dir=V3_Cross(AB,px); } // Degenerate check applies regardless of which branch was taken
         return true;
     }
     if (s->n==3) {
@@ -4176,14 +4210,14 @@ static bool GJKNextSimplex(Simplex3D *s, Vector3 *dir) {
     return false;
 }
 
-#define EPA_MAX_FACES  256
-#define EPA_MAX_VERTS  128
-#define EPA_MAX_EDGES  (EPA_MAX_FACES*3)
+#define EPA_MAX_FACES 128
+#define EPA_MAX_VERTS 64
+#define EPA_MAX_EDGES (EPA_MAX_FACES*3)
 typedef struct { int a,b,c; Vector3 n; float d; } EPAFace;
 typedef struct { Vector3 v, wA, wB; } EPAVert;
 static inline EPAFace MakeEPAFace(const EPAVert* vb, int a, int b, int c) {
     Vector3 n = V3_Cross(V3_AsubB(vb[b].v,vb[a].v),V3_AsubB(vb[c].v,vb[a].v));
-    float L = V3_Mag(n); if (L < COLLISION_EPSILON) return (EPAFace){a,b,c,{0},0.f};
+    float L = V3_Mag(n); if (L < PHY_EPSILON) return (EPAFace){a,b,c,{0},0.f};
     
     n = V3_ScaleByF(n,1.f/L); float d = V3_dot(n,vb[a].v);
     if (d < 0.f) { n=(Vector3){-n.x,-n.y,-n.z}; d=-d; int t=b;b=c;c=t; }
@@ -4194,7 +4228,7 @@ static inline Vector3 EPAContactPoint(const EPAVert* ev, int a, int b, int c, Ve
     Vector3 pa=ev[a].v, pb=ev[b].v, pc=ev[c].v; Vector3 proj = V3_ScaleByF(n, d); // origin projected onto face plane
     Vector3 v0=V3_AsubB(pb,pa), v1=V3_AsubB(pc,pa), v2=V3_AsubB(proj,pa);
     float d00=V3_dot(v0,v0), d01=V3_dot(v0,v1), d11=V3_dot(v1,v1), d20=V3_dot(v2,v0), d21=V3_dot(v2,v1);
-    float inv=1.f/(d00*d11-d01*d01+COLLISION_EPSILON);
+    float inv=1.f/(d00*d11-d01*d01+PHY_EPSILON);
     float v=(d11*d20-d01*d21)*inv, w=(d00*d21-d01*d20)*inv, u=1.f-v-w;
     return (Vector3){u*ev[a].wA.x+v*ev[b].wA.x+w*ev[c].wA.x, u*ev[a].wA.y+v*ev[b].wA.y+w*ev[c].wA.y, u*ev[a].wA.z+v*ev[b].wA.z+w*ev[c].wA.z};
 }
@@ -4204,19 +4238,19 @@ static OverlapResult CvxCvx(u16 meshA, u16 meshB, const float* matA, const float
     Simplex3D s = {0}; Vector3 dir = {0.0f,1.0f,0.0f};
     s.v[s.n++] = MinkowskiSupport(meshA,matA,meshB,matB,dir);
     dir = (Vector3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
-    if (V3_dot(dir,dir) < COLLISION_EPSILON) dir=(Vector3){0.0f,1.0f,0.0f};
+    if (V3_dot(dir,dir) < PHY_EPSILON) dir=(Vector3){0.0f,1.0f,0.0f};
     for (int it=0;it<64;++it) {
         Vector3 sup = MinkowskiSupport(meshA,matA,meshB,matB,dir);
-        if (V3_dot(sup,dir) < COLLISION_EPSILON) return r;
+        if (V3_dot(sup,dir) < PHY_EPSILON) return r;
         s.v[s.n++] = sup;
-        if (!GJKNextSimplex(&s,&dir) || (V3_dot(dir,dir) < COLLISION_EPSILON)) { r.hit=true; break; }
+        if (!GJKNextSimplex(&s,&dir) || (V3_dot(dir,dir) < PHY_EPSILON)) { r.hit=true; break; }
     }
     if (!r.hit) return r;
 
     static const Vector3 kAxes[6] = {{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
     for (int d=0;s.n<4 && d<6;++d) {
         Vector3 sup = MinkowskiSupport(meshA,matA,meshB,matB,kAxes[d]); bool dup=false;
-        for (int k=0;k<s.n;k++) { Vector3 dv=V3_AsubB(sup,s.v[k]); dup|=(V3_dot(dv,dv)<COLLISION_EPSILON*COLLISION_EPSILON); }
+        for (int k=0;k<s.n;k++) { Vector3 dv=V3_AsubB(sup,s.v[k]); dup|=(V3_dot(dv,dv)<PHY_EPSILON*PHY_EPSILON); }
         if (!dup) s.v[s.n++]=sup;
     }
     if (s.n < 4) { r.hit=true; return r; }
@@ -4231,7 +4265,7 @@ static OverlapResult CvxCvx(u16 meshA, u16 meshB, const float* matA, const float
         if (bf<0) break;
         Vector3 bn=ef[bf].n; Vector3 wA=MeshSupport(meshA,matA,bn); Vector3 wB=MeshSupport(meshB,matB,(Vector3){-bn.x,-bn.y,-bn.z}); Vector3 sup=V3_AsubB(wA,wB);
         float sdot = V3_dot(bn,sup);
-        if (sdot - bd < COLLISION_EPSILON) { r.normal=bn; r.overlapAmount=bd; r.point=EPAContactPoint(ev,ef[bf].a,ef[bf].b,ef[bf].c,bn,bd); return r; }
+        if (sdot - bd < PHY_EPSILON) { r.normal=bn; r.overlapAmount=bd; r.point=EPAContactPoint(ev,ef[bf].a,ef[bf].b,ef[bf].c,bn,bd); return r; }
         if (nv >= EPA_MAX_VERTS) break;
         
         ev[nv].v=sup; ev[nv].wA=wA; ev[nv].wB=wB;
@@ -4260,19 +4294,19 @@ static OverlapResult CapCvx(ShapeCapsule cap, u16 mesh, const float* mx) {
     #define CSUP(d)   V3_AsubB(CSUP_A(d), CSUP_B(d))
     Simplex3D s = {0}; Vector3 dir = {0,1,0};
     s.v[s.n++] = CSUP(dir); dir = (Vector3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
-    if (V3_dot(dir,dir) < COLLISION_EPSILON) dir=(Vector3){0,1,0};
+    if (V3_dot(dir,dir) < PHY_EPSILON) dir=(Vector3){0,1,0};
     for (int it=0; it<64; ++it) {
-        Vector3 sup=CSUP(dir); if (V3_dot(sup,dir)<COLLISION_EPSILON) return r;
+        Vector3 sup=CSUP(dir); if (V3_dot(sup,dir)<PHY_EPSILON) return r;
         
         s.v[s.n++]=sup;
         if (!GJKNextSimplex(&s,&dir)) { r.hit=true; break; }
-        if (V3_dot(dir,dir)<COLLISION_EPSILON) { r.hit=true; break; }
+        if (V3_dot(dir,dir)<PHY_EPSILON) { r.hit=true; break; }
     }
     if (!r.hit) return r;
     static const Vector3 kAx[6]={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
     for (int d=0;s.n<4&&d<6;++d) {
         Vector3 sup=CSUP(kAx[d]); bool dup=false;
-        for (int k=0;k<s.n;k++){Vector3 dv=V3_AsubB(sup,s.v[k]);dup|=(V3_dot(dv,dv)<COLLISION_EPSILON*COLLISION_EPSILON);}
+        for (int k=0;k<s.n;k++){Vector3 dv=V3_AsubB(sup,s.v[k]);dup|=(V3_dot(dv,dv)<PHY_EPSILON*PHY_EPSILON);}
         if (!dup) s.v[s.n++]=sup;
     }
     if (s.n<4){r.hit=true;return r;}
@@ -4285,7 +4319,7 @@ static OverlapResult CapCvx(ShapeCapsule cap, u16 mesh, const float* mx) {
         for (int f=0;f<nf;f++) if(ef[f].d<bd){bd=ef[f].d;bf=f;}
         if (bf<0) break;
         Vector3 bn=ef[bf].n; Vector3 wA=CSUP_A(bn); Vector3 wB=CSUP_B(bn); Vector3 sup=V3_AsubB(wA,wB);
-        if (V3_dot(bn,sup)-bd<COLLISION_EPSILON){r.normal=bn;r.overlapAmount=bd;r.point=EPAContactPoint(ev,ef[bf].a,ef[bf].b,ef[bf].c,bn,bd);return r;}
+        if (V3_dot(bn,sup)-bd<PHY_EPSILON){r.normal=bn;r.overlapAmount=bd;r.point=EPAContactPoint(ev,ef[bf].a,ef[bf].b,ef[bf].c,bn,bd);return r;}
         if (nv>=EPA_MAX_VERTS) break;
         
         ev[nv].v=sup; ev[nv].wA=wA; ev[nv].wB=wB;
@@ -4313,18 +4347,18 @@ static OverlapResult BoxCvx(ShapeBox box, u16 mesh, const float* mx) {
     #define BSUP(d)   V3_AsubB(BoxSupport(box,d),MeshSupport(mesh,mx,(Vector3){-(d).x,-(d).y,-(d).z}))
     Simplex3D s={0}; Vector3 dir={0,1,0};
     s.v[s.n++]=BSUP(dir); dir=(Vector3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
-    if (V3_dot(dir,dir)<COLLISION_EPSILON) dir=(Vector3){0,1,0};
+    if (V3_dot(dir,dir)<PHY_EPSILON) dir=(Vector3){0,1,0};
     for (int it=0;it<64;++it){
-        Vector3 sup=BSUP(dir); if (V3_dot(sup,dir)<COLLISION_EPSILON) return r;
+        Vector3 sup=BSUP(dir); if (V3_dot(sup,dir)<PHY_EPSILON) return r;
         s.v[s.n++]=sup;
         if (!GJKNextSimplex(&s,&dir)){r.hit=true;break;}
-        if (V3_dot(dir,dir)<COLLISION_EPSILON){r.hit=true;break;}
+        if (V3_dot(dir,dir)<PHY_EPSILON){r.hit=true;break;}
     }
     if (!r.hit) return r;
     static const Vector3 kAx[6]={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
     for (int d=0;s.n<4&&d<6;++d){
         Vector3 sup=BSUP(kAx[d]); bool dup=false;
-        for (int k=0;k<s.n;k++){Vector3 dv=V3_AsubB(sup,s.v[k]);dup|=(V3_dot(dv,dv)<COLLISION_EPSILON*COLLISION_EPSILON);}
+        for (int k=0;k<s.n;k++){Vector3 dv=V3_AsubB(sup,s.v[k]);dup|=(V3_dot(dv,dv)<PHY_EPSILON*PHY_EPSILON);}
         if (!dup) s.v[s.n++]=sup;
     }
     if (s.n<4){r.hit=true;return r;}
@@ -4337,7 +4371,7 @@ static OverlapResult BoxCvx(ShapeBox box, u16 mesh, const float* mx) {
         for (int f=0;f<nf;f++) if(ef[f].d<bd){bd=ef[f].d;bf=f;}
         if (bf<0) break;
         Vector3 bn=ef[bf].n; Vector3 wA=BoxSupport(box,bn); Vector3 wB=MeshSupport(mesh,mx,(Vector3){-bn.x,-bn.y,-bn.z}); Vector3 sup=V3_AsubB(wA,wB);
-        if (V3_dot(bn,sup)-bd<COLLISION_EPSILON){r.normal=bn;r.overlapAmount=bd;r.point=EPAContactPoint(ev,ef[bf].a,ef[bf].b,ef[bf].c,bn,bd);return r;}
+        if (V3_dot(bn,sup)-bd<PHY_EPSILON){r.normal=bn;r.overlapAmount=bd;r.point=EPAContactPoint(ev,ef[bf].a,ef[bf].b,ef[bf].c,bn,bd);return r;}
         if (nv>=EPA_MAX_VERTS) break;
         ev[nv].v=sup; ev[nv].wA=wA; ev[nv].wB=wB;
         int edges[EPA_MAX_EDGES][2],ne=0,keep[EPA_MAX_FACES],nk=0;
@@ -4359,7 +4393,7 @@ static OverlapResult BoxCvx(ShapeBox box, u16 mesh, const float* mx) {
 
 static void inline FeatureOverlap(Vector3 sc, float sr, Vector3 pt, OverlapResult* r) {
     Vector3 delta=V3_AsubB(sc,pt); float dist2=V3_dot(delta,delta);
-    if (dist2 < sr*sr) { float dist=vsqrtf(vmax(dist2,0.0f)); OverlapResult t={true,pt,(dist>COLLISION_EPSILON) ? V3_ScaleByF(delta,1.0f/dist) : (Vector3){0.0f,1.0f,0.0f},sr - dist}; if(t.overlapAmount>r->overlapAmount) *r=t; }
+    if (dist2 < sr*sr) { float dist=vsqrtf(vmax(dist2,0.0f)); OverlapResult t={true,pt,(dist>PHY_EPSILON) ? V3_ScaleByF(delta,1.0f/dist) : (Vector3){0.0f,1.0f,0.0f},sr - dist}; if(t.overlapAmount>r->overlapAmount) *r=t; }
 }
 
 static OverlapResult SphMsh(Vector3 sc, float sr, u16 mesh, const float* mx) { // Triangle-soup mesh support: test sphere/capsule against all triangles of a static mesh.  Returns deepest overlapping triangle result.  Normal points from mesh toward mover. Voronoi region closest point.
@@ -4391,7 +4425,7 @@ static OverlapResult SphMsh(Vector3 sc, float sr, u16 mesh, const float* mx) { /
         
         float va=d3*d6-d5*d4;
         if (va<=0.f && (d4-d3)>=0.f && (d5-d6)>=0.f) { float w=(d4-d3)/((d4-d3)+(d5-d6)); Vector3 bc=V3_AsubB(c,b); Vector3 pt=V3_AplusB(b,V3_ScaleByF(bc,w)); FeatureOverlap(sc,sr,pt,&r); continue; } // Edge BC region
-        Vector3 n = V3_Cross(ab,ac); float nLen=V3_Mag(n); if(nLen<COLLISION_EPSILON) continue; // Face region — project onto triangle plane
+        Vector3 n = V3_Cross(ab,ac); float nLen=V3_Mag(n); if(nLen<PHY_EPSILON) continue; // Face region — project onto triangle plane
 
         n=V3_ScaleByF(n,1.f/nLen); float dist=V3_dot(n,ap); // signed distance from plane (positive = above)
         float absDist=vabs(dist);
@@ -4408,23 +4442,23 @@ static OverlapResult CapMsh(ShapeCapsule cap, u16 mesh, const float* mx) {
 
 static OverlapResult SphCvx(Vector3 sc, float sr, u16 mesh, const float* mx) {
     OverlapResult r = {0}; if (mesh >= MODEL_IDX_MAX || !modelVertexCounts[mesh]) return r;
-    #define SPHSUP_A(d) ({ Vector3 _d=(d); float _L=V3_dot(_d,_d); V3_AplusB(sc,(_L>COLLISION_EPSILON)?V3_ScaleByF(_d,sr/vsqrtf(_L)):(Vector3){0,sr,0}); })
+    #define SPHSUP_A(d) ({ Vector3 _d=(d); float _L=V3_dot(_d,_d); V3_AplusB(sc,(_L>PHY_EPSILON)?V3_ScaleByF(_d,sr/vsqrtf(_L)):(Vector3){0,sr,0}); })
     #define SPHSUP_B(d) MeshSupport(mesh,mx,(Vector3){-(d).x,-(d).y,-(d).z})
     #define MSKSUP(d)   V3_AsubB(SPHSUP_A(d),SPHSUP_B(d))
     Simplex3D s={0}; Vector3 dir={0,1,0};
     s.v[s.n++]=MSKSUP(dir); dir=(Vector3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
-    if (V3_dot(dir,dir)<COLLISION_EPSILON) dir=(Vector3){0,1,0};
+    if (V3_dot(dir,dir)<PHY_EPSILON) dir=(Vector3){0,1,0};
     for (int it=0;it<32;++it) {
-        Vector3 sup=MSKSUP(dir); if (V3_dot(sup,dir)<COLLISION_EPSILON) return r;
+        Vector3 sup=MSKSUP(dir); if (V3_dot(sup,dir)<PHY_EPSILON) return r;
         s.v[s.n++]=sup;
         if (!GJKNextSimplex(&s,&dir)){r.hit=true;break;}
-        if (V3_dot(dir,dir)<COLLISION_EPSILON){r.hit=true;break;}
+        if (V3_dot(dir,dir)<PHY_EPSILON){r.hit=true;break;}
     }
     if (!r.hit) return r;
     static const Vector3 kAx[6]={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
     for (int d=0;s.n<4&&d<6;++d) {
         Vector3 sup=MSKSUP(kAx[d]); bool dup=false;
-        for (int k=0;k<s.n;k++){Vector3 dv=V3_AsubB(sup,s.v[k]);dup|=V3_dot(dv,dv)<COLLISION_EPSILON*COLLISION_EPSILON;}
+        for (int k=0;k<s.n;k++){Vector3 dv=V3_AsubB(sup,s.v[k]);dup|=V3_dot(dv,dv)<PHY_EPSILON*PHY_EPSILON;}
         if (!dup) s.v[s.n++]=sup;
     }
     if (s.n<4){r.hit=true;return r;}
@@ -4437,7 +4471,7 @@ static OverlapResult SphCvx(Vector3 sc, float sr, u16 mesh, const float* mx) {
         for (int f=0;f<nf;f++) if(ef[f].d<bd){bd=ef[f].d;bf=f;}
         if (bf<0) break;
         Vector3 bn=ef[bf].n; Vector3 wA=SPHSUP_A(bn); Vector3 wB=SPHSUP_B(bn); Vector3 sup=V3_AsubB(wA,wB);
-        if (V3_dot(bn,sup)-bd<COLLISION_EPSILON){r.normal=bn;r.overlapAmount=bd;r.point=wB;return r;}
+        if (V3_dot(bn,sup)-bd<PHY_EPSILON){r.normal=bn;r.overlapAmount=bd;r.point=wB;return r;}
         if (nv>=EPA_MAX_VERTS) break;
         ev[nv].v=sup;ev[nv].wA=wA;ev[nv].wB=wB;
         int edges[EPA_MAX_EDGES][2],ne=0,keep[EPA_MAX_FACES],nk=0;
@@ -4472,84 +4506,162 @@ static inline AABB3 HullWorldAABB(u16 hullMesh, const float* hullMx) {
 }
 
 static inline Vector3 TriSupport(Vector3 ta, Vector3 tb, Vector3 tc, Vector3 d) { float d1 = V3_dot(ta,d), d2 = V3_dot(tb,d), d3 = V3_dot(tc,d); return d1 > d2 ? (d1 > d3 ? ta : tc) : (d2 > d3 ? tb : tc); }
-#define HTSUP_A(d) MeshSupport(hullMesh,hullMx,d)
-#define HTSUP_B(d) TriSupport(ta,tb,tc,(Vector3){-(d).x,-(d).y,-(d).z})
-#define HTSUP(d)   V3_AsubB(HTSUP_A(d),HTSUP_B(d))
 static OverlapResult CvxMsh(u16 hullMesh, const float* hullMx, u16 triMesh, const float* triMx) {
     OverlapResult best_r = {0};
     if (hullMesh >= MODEL_IDX_MAX || triMesh >= MODEL_IDX_MAX) return best_r;
+    
     AABB3 hb = HullWorldAABB(hullMesh, hullMx);
     u32 triCount = modelTriangleCounts[triMesh]; if (!triCount) return best_r;
 
     for (u32 ti = 0; ti < triCount; ++ti) {
-        u32 i0=modelTriangles[triMesh][ti*3+0],i1=modelTriangles[triMesh][ti*3+1],i2=modelTriangles[triMesh][ti*3+2];
-        #define TRV(i) MvVert(triMx,(Vector3){half_to_float(*(half*)(modelVertices[triMesh]+(i)*VERTEX_ATTRIBUTES_SIZE+0)),half_to_float(*(half*)(modelVertices[triMesh]+(i)*VERTEX_ATTRIBUTES_SIZE+2)),half_to_float(*(half*)(modelVertices[triMesh]+(i)*VERTEX_ATTRIBUTES_SIZE+4))})
-        Vector3 ta=TRV(i0),tb=TRV(i1),tc=TRV(i2); 
-        #undef TRV
-        if (vmin(ta.x,vmin(tb.x,tc.x))>hb.mx.x||vmax(ta.x,vmax(tb.x,tc.x))<hb.mn.x || vmin(ta.y,vmin(tb.y,tc.y))>hb.mx.y||vmax(ta.y,vmax(tb.y,tc.y))<hb.mn.y|| vmin(ta.z,vmin(tb.z,tc.z))>hb.mx.z||vmax(ta.z,vmax(tb.z,tc.z))<hb.mn.z) continue;
-
-        Simplex3D s={0}; Vector3 dir={0,1,0};
-        s.v[s.n++]=HTSUP(dir); dir=(Vector3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
-        if (V3_dot(dir,dir)<COLLISION_EPSILON) dir=(Vector3){0,1,0};
-        bool hit=false;
-        for (int it=0;it<32;++it) {
-            Vector3 sup=HTSUP(dir); if (V3_dot(sup,dir)<COLLISION_EPSILON) break;
-            s.v[s.n++]=sup;
-            if (!GJKNextSimplex(&s,&dir)){hit=true;break;}
-            if (V3_dot(dir,dir)<COLLISION_EPSILON){hit=true;break;}
-        }
+        u32 i0 = modelTriangles[triMesh][ti * 3 + 0];
+        u32 i1 = modelTriangles[triMesh][ti * 3 + 1];
+        u32 i2 = modelTriangles[triMesh][ti * 3 + 2];
         
+        // Inline expansion of TRV(i) -> vertex extraction and matrix multiplication
+        Vector3 ta = MvVert(triMx, (Vector3){
+            half_to_float(*(half*)(modelVertices[triMesh] + i0 * VERTEX_ATTRIBUTES_SIZE + 0)),
+            half_to_float(*(half*)(modelVertices[triMesh] + i0 * VERTEX_ATTRIBUTES_SIZE + 2)),
+            half_to_float(*(half*)(modelVertices[triMesh] + i0 * VERTEX_ATTRIBUTES_SIZE + 4))
+        });
+        
+        Vector3 tb = MvVert(triMx, (Vector3){
+            half_to_float(*(half*)(modelVertices[triMesh] + i1 * VERTEX_ATTRIBUTES_SIZE + 0)),
+            half_to_float(*(half*)(modelVertices[triMesh] + i1 * VERTEX_ATTRIBUTES_SIZE + 2)),
+            half_to_float(*(half*)(modelVertices[triMesh] + i1 * VERTEX_ATTRIBUTES_SIZE + 4))
+        });
+        
+        Vector3 tc = MvVert(triMx, (Vector3){
+            half_to_float(*(half*)(modelVertices[triMesh] + i2 * VERTEX_ATTRIBUTES_SIZE + 0)),
+            half_to_float(*(half*)(modelVertices[triMesh] + i2 * VERTEX_ATTRIBUTES_SIZE + 2)),
+            half_to_float(*(half*)(modelVertices[triMesh] + i2 * VERTEX_ATTRIBUTES_SIZE + 4))
+        });
+        
+        // Coarse AABB check
+        if (vmin(ta.x, vmin(tb.x, tc.x)) > hb.mx.x || vmax(ta.x, vmax(tb.x, tc.x)) < hb.mn.x || 
+            vmin(ta.y, vmin(tb.y, tc.y)) > hb.mx.y || vmax(ta.y, vmax(tb.y, tc.y)) < hb.mn.y || 
+            vmin(ta.z, vmin(tb.z, tc.z)) > hb.mx.z || vmax(ta.z, vmax(tb.z, tc.z)) < hb.mn.z) {
+            continue;
+        }
+
+        Simplex3D s = {0}; 
+        Vector3 dir = {0.0f, 1.0f, 0.0f};
+        
+        // GJK Initialization (First Point)
+        Vector3 wA0 = MeshSupport(hullMesh, hullMx, dir);
+        Vector3 wB0 = TriSupport(ta, tb, tc, (Vector3){-dir.x, -dir.y, -dir.z});
+        s.v[s.n++] = V3_AsubB(wA0, wB0);
+        
+        dir = (Vector3){-s.v[0].x, -s.v[0].y, -s.v[0].z};
+        if (V3_dot(dir, dir) < PHY_EPSILON) dir = (Vector3){0.0f, 1.0f, 0.0f};
+        
+        bool hit = false;
+        for (int it = 0; it < 32; ++it) {
+            Vector3 wA = MeshSupport(hullMesh, hullMx, dir);
+            Vector3 wB = TriSupport(ta, tb, tc, (Vector3){-dir.x, -dir.y, -dir.z});
+            Vector3 sup = V3_AsubB(wA, wB);
+            
+            if (V3_dot(sup, dir) < PHY_EPSILON) break;
+            s.v[s.n++] = sup;
+            
+            if (!GJKNextSimplex(&s, &dir)) { hit = true; break; }
+            if (V3_dot(dir, dir) < PHY_EPSILON) { hit = true; break; }
+        }
         
         if (!hit) continue;
 
-        static const Vector3 kAxes[6]={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
-        for (int d=0;s.n<4&&d<6;++d) {
-            Vector3 sup=HTSUP(kAxes[d]); bool dup=false;
-            for (int k=0;k<s.n;k++){Vector3 dv=V3_AsubB(sup,s.v[k]);dup|=(V3_dot(dv,dv)<COLLISION_EPSILON*COLLISION_EPSILON);}
-            if (!dup) s.v[s.n++]=sup;
+        while (s.n < 4) { // Construct a proper tetrahedron dynamically from GJK points to prevent injecting skewed world-space boundary values.
+            Vector3 fallbackDir = {0.0f, 1.0f, 0.0f};
+            if (s.n == 1) fallbackDir = (vabs(s.v[0].x) > 0.5f) ? (Vector3){0.0f, 1.0f, 0.0f} : (Vector3){1.0f, 0.0f, 0.0f};
+            else if (s.n == 2) { Vector3 edge = V3_AsubB(s.v[1], s.v[0]); fallbackDir = V3_Cross(edge, (vabs(edge.x) > 0.5f) ? (Vector3){0.0f, 1.0f, 0.0f} : (Vector3){1.0f, 0.0f, 0.0f}); }
+            else if (s.n == 3) { Vector3 e1 = V3_AsubB(s.v[1], s.v[0]); Vector3 e2 = V3_AsubB(s.v[2], s.v[0]); fallbackDir = V3_Cross(e1, e2); }
+            float fLen = V3_Mag(fallbackDir);
+            fallbackDir = (fLen > PHY_EPSILON) ? V3_ScaleByF(fallbackDir, 1.0f / fLen) : (Vector3){0.0f, 1.0f, 0.0f};
+            Vector3 wA = MeshSupport(hullMesh, hullMx, fallbackDir);
+            Vector3 wB = TriSupport(ta, tb, tc, (Vector3){-fallbackDir.x, -fallbackDir.y, -fallbackDir.z});
+            Vector3 sup = V3_AsubB(wA, wB);
+            bool dup = false;
+            for (int k = 0; k < s.n; k++) { Vector3 dv = V3_AsubB(sup, s.v[k]); dup |= (V3_dot(dv, dv) < PHY_EPSILON * PHY_EPSILON); }
+            if (!dup) s.v[s.n++] = sup;
+            else {
+                // Handle a degenerate coplanar shape by flipping vector direction
+                fallbackDir = (Vector3){-fallbackDir.x, -fallbackDir.y, -fallbackDir.z};
+                wA = MeshSupport(hullMesh, hullMx, fallbackDir);
+                wB = TriSupport(ta, tb, tc, (Vector3){-fallbackDir.x, -fallbackDir.y, -fallbackDir.z});
+                s.v[s.n++] = V3_AsubB(wA, wB);
+            }
+        }
+
+        EPAVert ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv = 0, nf = 0;
+        for (int i = 0; i < 4; i++) {
+            ev[nv].v = s.v[i];
+            ev[nv].wA = MeshSupport(hullMesh,hullMx,s.v[i]);
+            ev[nv].wB = TriSupport(ta,tb,tc,(Vector3){-s.v[i].x,-s.v[i].y,-s.v[i].z});
+            nv++;
         }
         
-        if (s.n<4 && 0.01f > best_r.overlapAmount) { best_r=(OverlapResult){true,ta,{0,1,0},0.01f}; continue; }
-
-        EPAVert ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0,nf=0;
-        for (int i=0;i<4;i++){ev[nv].v=s.v[i];ev[nv].wA=HTSUP_A(s.v[i]);ev[nv].wB=HTSUP_B(s.v[i]);nv++;}
-        static const int kTF[4][3]={{0,1,2},{0,3,1},{0,2,3},{1,3,2}};
-        for (int f=0;f<4;f++){EPAFace face=MakeEPAFace(ev,kTF[f][0],kTF[f][1],kTF[f][2]);if(face.d>=0.f&&nf<EPA_MAX_FACES)ef[nf++]=face;}
-
-        OverlapResult r={0};
-        for (int it=0;it<32;++it) {
-            int bf=-1; float bd=1e9f;
-            for (int f=0;f<nf;f++) if(ef[f].d<bd){bd=ef[f].d;bf=f;}
-            if (bf<0) break;
-            Vector3 bn=ef[bf].n; Vector3 wA=HTSUP_A(bn); Vector3 wB=HTSUP_B(bn); Vector3 sup=V3_AsubB(wA,wB);
-            if (V3_dot(bn,sup)-bd<COLLISION_EPSILON){
-                r.normal=bn; r.overlapAmount=bd; r.hit=true;
-                r.point=EPAContactPoint(ev,ef[bf].a,ef[bf].b,ef[bf].c,bn,bd);
+        static const int kTF[4][3] = {{0,1,2}, {0,3,1}, {0,2,3}, {1,3,2}};
+        for (int f = 0; f < 4; f++) {
+            EPAFace face = MakeEPAFace(ev, kTF[f][0], kTF[f][1], kTF[f][2]);
+            if (face.d >= 0.0f && nf < EPA_MAX_FACES) ef[nf++] = face;
+        }
+        
+        OverlapResult r = {0};
+        for (int it = 0; it < 32; ++it) {
+            int bf = -1; float bd = 1e9f;
+            for (int f = 0; f < nf; f++) { if (ef[f].d < bd) { bd = ef[f].d; bf = f; } }
+            if (bf < 0) break;
+            
+            Vector3 bn = ef[bf].n; 
+            Vector3 wA = MeshSupport(hullMesh,hullMx,bn);
+            Vector3 wB = TriSupport(ta,tb,tc,(Vector3){-bn.x,-bn.y,-bn.z});
+            Vector3 sup = V3_AsubB(wA, wB);
+            if (V3_dot(bn, sup) - bd < PHY_EPSILON) {
+                r.normal = bn; r.overlapAmount = bd; r.hit = true;
+                r.point = EPAContactPoint(ev, ef[bf].a, ef[bf].b, ef[bf].c,bn,bd);
                 break;
             }
-            if (nv>=EPA_MAX_VERTS) break;
-            ev[nv].v=sup; ev[nv].wA=wA; ev[nv].wB=wB;
-            int edges[EPA_MAX_EDGES][2],ne=0,keep[EPA_MAX_FACES],nk=0;
-            for (int f=0;f<nf;f++){
-                if (V3_dot(ef[f].n,V3_AsubB(sup,ev[ef[f].a].v))>0.f){
-                    int fv[3]={ef[f].a,ef[f].b,ef[f].c};
-                    for (int e=0;e<3;e++){int ea=fv[e],eb=fv[(e+1)%3];bool found=false;
-                        for (int k=0;k<ne;k++)if(edges[k][0]==eb&&edges[k][1]==ea){edges[k][0]=edges[--ne][0];edges[k][1]=edges[ne][1];found=true;break;}
-                        if (!found&&ne<EPA_MAX_EDGES){edges[ne][0]=ea;edges[ne++][1]=eb;}}
-                } else keep[nk++]=f;
+            
+            if (nv >= EPA_MAX_VERTS) break;
+            ev[nv].v = sup; ev[nv].wA = wA; ev[nv].wB = wB;
+            
+            int edges[EPA_MAX_EDGES][2], ne = 0, keep[EPA_MAX_FACES], nk = 0;
+            for (int f = 0; f < nf; f++) {
+                if (V3_dot(ef[f].n, V3_AsubB(sup, ev[ef[f].a].v)) > 0.0f) {
+                    int fv[3] = {ef[f].a, ef[f].b, ef[f].c};
+                    for (int e = 0; e < 3; e++) {
+                        int ea = fv[e], eb = fv[(e + 1) % 3]; bool found = false;
+                        for (int k = 0; k < ne; k++) {
+                            if (edges[k][0] == eb && edges[k][1] == ea) {
+                                edges[k][0] = edges[--ne][0]; edges[k][1] = edges[ne][1]; found = true; break;
+                            }
+                        }
+                        if (!found && ne < EPA_MAX_EDGES) {
+                            edges[ne][0] = ea; edges[ne++][1] = eb;
+                        }
+                    }
+                } else {
+                    keep[nk++] = f;
+                }
             }
-            nf=0;for(int k=0;k<nk;k++)ef[nf++]=ef[keep[k]];
-            for(int k=0;k<ne&&nf<EPA_MAX_FACES;k++){EPAFace face=MakeEPAFace(ev,edges[k][0],edges[k][1],nv);if(face.d>=0.f)ef[nf++]=face;}
+            
+            nf = 0; for (int k = 0; k < nk; k++) ef[nf++] = ef[keep[k]];
+            for (int k = 0; k < ne && nf < EPA_MAX_FACES; k++) {
+                EPAFace face = MakeEPAFace(ev, edges[k][0], edges[k][1], nv);
+                if (face.d >= 0.0f) ef[nf++] = face;
+            }
             nv++;
         }
 
-        if (r.hit && (!best_r.hit || r.overlapAmount > best_r.overlapAmount + 0.002f || (vabs(r.overlapAmount - best_r.overlapAmount) <= 0.002f && V3_dot(r.normal,(Vector3){0.0f,1.0f,0.0f}) > V3_dot(best_r.normal,(Vector3){0.0f,1.0f,0.0f})))) best_r = r;
+        if (r.hit && (!best_r.hit || r.overlapAmount > best_r.overlapAmount + 0.002f || 
+            (vabs(r.overlapAmount - best_r.overlapAmount) <= 0.002f && 
+            V3_dot(r.normal, (Vector3){0.0f, 1.0f, 0.0f}) > V3_dot(best_r.normal, (Vector3){0.0f, 1.0f, 0.0f})))) {
+            best_r = r;
+        }
     }
+    
     return best_r;
 }
-#undef HTSUP_A
-#undef HTSUP_B
-#undef HTSUP
 
 AABB3 BoxWorldAABB(ShapeBox b) { Vector3 x,y,z; obb_axes(b.rot,&x,&y,&z); Vector3 hx=V3_ScaleByF(x,b.halfExtents.x), hy=V3_ScaleByF(y,b.halfExtents.y), hz=V3_ScaleByF(z,b.halfExtents.z); Vector3 e ={vabs(hx.x)+vabs(hy.x)+vabs(hz.x),vabs(hx.y)+vabs(hy.y)+vabs(hz.y),vabs(hx.z)+vabs(hy.z)+vabs(hz.z)}; return (AABB3){V3_AsubB(b.center,e),V3_AplusB(b.center,e)}; } 
 static OverlapResult BoxMsh(ShapeBox box, u16 triMesh, const float* triMx) {
@@ -4583,16 +4695,16 @@ static OverlapResult BoxMsh(ShapeBox box, u16 triMesh, const float* triMx) {
             else if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f)           { float v=d1/(d1-d3); closest=V3_AplusB(ta,V3_ScaleByF(ab,v)); }
             else if (vb_ <= 0.0f && d2 >= 0.0f && d6 <= 0.0f)          { float w=d2/(d2-d6); closest=V3_AplusB(ta,V3_ScaleByF(ac,w)); }
             else if (va <= 0.0f && (d4-d3) >= 0.0f && (d5-d6) >= 0.0f) { float w=(d4-d3)/((d4-d3)+(d5-d6)); closest=V3_AplusB(tb,V3_ScaleByF(V3_AsubB(tc,tb),w)); }
-            else { inFace=true; Vector3 n_=V3_Cross(ab,ac); float L=V3_Mag(n_); if(L<COLLISION_EPSILON) continue; n_=V3_ScaleByF(n_,1.f/L); closest=V3_AsubB(wv,V3_ScaleByF(n_,V3_dot(n_,ap))); }
+            else { inFace=true; Vector3 n_=V3_Cross(ab,ac); float L=V3_Mag(n_); if(L<PHY_EPSILON) continue; n_=V3_ScaleByF(n_,1.f/L); closest=V3_AsubB(wv,V3_ScaleByF(n_,V3_dot(n_,ap))); }
 
             Vector3 delta=V3_AsubB(wv,closest); float dist2=V3_dot(delta,delta); float pen=0.f; Vector3 fn;
             if (inFace) {
-                Vector3 n_=V3_Cross(ab,ac); float L=V3_Mag(n_); if(L<COLLISION_EPSILON) continue;
-                n_=V3_ScaleByF(n_,1.f/L); float sd=V3_dot(n_,ap); if (vabs(sd)<COLLISION_EPSILON) continue;
+                Vector3 n_=V3_Cross(ab,ac); float L=V3_Mag(n_); if(L<PHY_EPSILON) continue;
+                n_=V3_ScaleByF(n_,1.f/L); float sd=V3_dot(n_,ap); if (vabs(sd)<PHY_EPSILON) continue;
                 pen=vabs(sd); fn=(sd>0.f)?n_:(Vector3){-n_.x,-n_.y,-n_.z};
             } else {
-                if (dist2<COLLISION_EPSILON*COLLISION_EPSILON) continue;
-                float dist=vsqrtf(dist2); Vector3 n_=V3_Cross(ab,ac); float L=V3_Mag(n_); if(L<COLLISION_EPSILON) continue;
+                if (dist2<PHY_EPSILON*PHY_EPSILON) continue;
+                float dist=vsqrtf(dist2); Vector3 n_=V3_Cross(ab,ac); float L=V3_Mag(n_); if(L<PHY_EPSILON) continue;
                 n_=V3_ScaleByF(n_,1.f/L); float sd=V3_dot(n_,ap); if (sd>=0.f) continue;
                 pen=dist; fn=V3_ScaleByF(delta,1.f/dist);
             }
@@ -4607,82 +4719,121 @@ static OverlapResult CapBox(ShapeCapsule cap, ShapeBox box) {
 
     Vector3 ax,ay,az; obb_axes(box.rot,&ax,&ay,&az);
     Vector3 d = V3_AsubB(cap.tip,cap.base);
-    float segLen = V3_Mag(d); if (segLen < COLLISION_EPSILON) return best;
+    float segLen = V3_Mag(d); if (segLen < PHY_EPSILON) return best;
     
     Vector3 dUnit = V3_ScaleByF(d, 1.f / segLen);
     Vector3 toBase = V3_AsubB(cap.base, box.center);
     float ts[6]; int nt = 0;
     float dax = V3_dot(dUnit,ax) * segLen, day = V3_dot(dUnit,ay) * segLen, daz = V3_dot(dUnit,az) * segLen;
     float bax = V3_dot(toBase,ax),         bay = V3_dot(toBase,ay),         baz = V3_dot(toBase,az);
-    if (vabs(dax) > COLLISION_EPSILON) { float t0 = (-box.halfExtents.x - bax) / dax, t1 = (box.halfExtents.x - bax) / dax; if (t0 > t1) { float tmp = t0; t0 = t1; t1 = tmp; } t0 = vclamp(t0,0.0f,1.0f); t1 = vclamp(t1,0.0f,1.f); ts[nt++] = t0; ts[nt++] = t1; }
-    if (vabs(day) > COLLISION_EPSILON) { float t0 = (-box.halfExtents.y - bay) / day, t1 = (box.halfExtents.y - bay) / day; if (t0 > t1) { float tmp = t0; t0 = t1; t1 = tmp; } t0 = vclamp(t0,0.0f,1.0f); t1 = vclamp(t1,0.0f,1.f); ts[nt++] = t0; ts[nt++] = t1; }
-    if (vabs(daz) > COLLISION_EPSILON) { float t0 = (-box.halfExtents.z - baz) / daz, t1 = (box.halfExtents.z - baz) / daz; if (t0 > t1) { float tmp = t0; t0 = t1; t1 = tmp; } t0 = vclamp(t0,0.0f,1.0f); t1 = vclamp(t1,0.0f,1.f); ts[nt++] = t0; ts[nt++] = t1; }
+    if (vabs(dax) > PHY_EPSILON) { float t0 = (-box.halfExtents.x - bax) / dax, t1 = (box.halfExtents.x - bax) / dax; if (t0 > t1) { float tmp = t0; t0 = t1; t1 = tmp; } t0 = vclamp(t0,0.0f,1.0f); t1 = vclamp(t1,0.0f,1.f); ts[nt++] = t0; ts[nt++] = t1; }
+    if (vabs(day) > PHY_EPSILON) { float t0 = (-box.halfExtents.y - bay) / day, t1 = (box.halfExtents.y - bay) / day; if (t0 > t1) { float tmp = t0; t0 = t1; t1 = tmp; } t0 = vclamp(t0,0.0f,1.0f); t1 = vclamp(t1,0.0f,1.f); ts[nt++] = t0; ts[nt++] = t1; }
+    if (vabs(daz) > PHY_EPSILON) { float t0 = (-box.halfExtents.z - baz) / daz, t1 = (box.halfExtents.z - baz) / daz; if (t0 > t1) { float tmp = t0; t0 = t1; t1 = tmp; } t0 = vclamp(t0,0.0f,1.0f); t1 = vclamp(t1,0.0f,1.f); ts[nt++] = t0; ts[nt++] = t1; }
     if (nt == 0) ts[nt++] = 0.5f; // Only add midpoint if no slab candidates were generated (fully degenerate segment)
     for (int k = 0; k < nt; k++) { Vector3 pt = V3_AplusB(cap.base,V3_ScaleByF(d,ts[k])); OverlapResult rk = SphBox(pt,cap.radius,box); if (rk.hit && rk.overlapAmount > best.overlapAmount) {best = rk;} }
     return best;
 }
 
-static void ApplyCollisionResponse(Entity *e, Entity *o, Vector3 n, float overlap, Vector3 contactPoint) {
-    if (overlap < COLLISION_EPSILON) return;
+// Returns moment of inertia about world-space axis 'n' for entity e.  Falls back to sphere approximation only if tensor wasn't computed.
+static float GetMomentOfInertia(Entity *e, Vector3 n) {
+    if (e->collider != COLTYPE_CVX || !e->inertiaTensorValid) {
+        float r = (e->collider == COLTYPE_MSH) ? modelBounds[e->modelIndex] : (e->collider == COLTYPE_CVX) ? modelBounds[e->colliderMeshIndex] : GetCollisionRadius(e);
+        return (2.f / 5.f) * e->mass * r * r;
+    }
+   
+    Vector3 ln = quat_rotate_vector((Quaternion){-e->rotation.x,-e->rotation.y,-e->rotation.z,e->rotation.w},n); // Use quat conjugate to rotate n into entity local space, then apply I * n, dot with n: gives I_n = n^T * I * n
+    float Ixx=e->inertiaTensor[0], Iyy=e->inertiaTensor[1], Izz=e->inertiaTensor[2], Ixy=e->inertiaTensor[3], Ixz=e->inertiaTensor[4], Iyz=e->inertiaTensor[5];
+    Vector3 In = {Ixx*ln.x + Ixy*ln.y + Ixz*ln.z, Ixy*ln.x + Iyy*ln.y + Iyz*ln.z, Ixz*ln.x + Iyz*ln.y + Izz*ln.z}; // I*ln (matrix-vector: products of inertia were already negated at generation)
+    return vmax(V3_dot(ln,In),PHY_EPSILON);
+}
 
-    bool oStatic = (!(o->entflags & ENTFLAG_RIGIDBODY) || o->mass < 0.001f || o->collider == COLTYPE_NONE || o->collider == COLTYPE_MSH);
-    bool eStatic = (!(e->entflags & ENTFLAG_RIGIDBODY) || e->mass < 0.001f || e->collider == COLTYPE_NONE);
-    if ((oStatic && eStatic) || (o->collider == COLTYPE_MSH && e->collider == COLTYPE_MSH)) return;
+static void ApplyCollisionResponse(Entity *e, Entity *o, OverlapResult* ov) {
+    float overlap = ov->overlapAmount; if (overlap < PHY_EPSILON) return;
+    bool oStatic = (!(o->entflags & EF_RIGIDBODY) || o->mass < 0.001f || o->collider == COLTYPE_NONE || o->collider == COLTYPE_MSH); 
+    if ((o->collider == COLTYPE_MSH && e->collider == COLTYPE_MSH)) return;
     
-    float iA = GetMomentOfInertia(e,n);
-    float iB = oStatic ? 0.0f : GetMomentOfInertia(o,n);
-    float invIA = (iA > COLLISION_EPSILON) ? 1.0f / iA : 0.0f;
-    float invIB = (iB > COLLISION_EPSILON && !oStatic) ? 1.0f / iB : 0.0f;
-    Vector3 rAarm = V3_AsubB(contactPoint,e->position);
-    Vector3 rBarm = oStatic ? (Vector3){0,0,0} : V3_AsubB(contactPoint,o->position);
-    Vector3 vAtA = V3_AplusB(e->velocity,V3_Cross(e->angularVelocity,rAarm));
-    Vector3 vAtB = oStatic ? (Vector3){0,0,0} : V3_AplusB(o->velocity,V3_Cross(o->angularVelocity,rBarm));
+    DrawSphereContact(ov->point,0.02f);
+    Vector3 n = ov->normal, contactPoint = ov->point;
+    Vector3 rAarm = V3_AsubB(contactPoint, e->position);
+    Vector3 rBarm = oStatic ? (Vector3){0,0,0} : V3_AsubB(contactPoint, o->position);
+    
+    // Evaluate inertia around the NORMAL torque axis (r x n)
+    Vector3 rAxN = V3_Cross(rAarm, n);
+    float rAxN_lenSq = V3_dot(rAxN, rAxN);
+    float iA = (rAxN_lenSq > PHY_EPSILON) ? GetMomentOfInertia(e, V3_ScaleByF(rAxN, 1.0f / vsqrtf(rAxN_lenSq))) : 1.0f;
+    float invIA = (iA > PHY_EPSILON) ? 1.0f / iA : 0.0f;
+    float angTermA = ConstIndexIsNPC(e->index) ? 0.0f : rAxN_lenSq * invIA;
+    Vector3 rBxN = V3_Cross(rBarm, n);
+    float rBxN_lenSq = V3_dot(rBxN, rBxN);
+    float iB = (oStatic || rBxN_lenSq < PHY_EPSILON) ? 0.0f : GetMomentOfInertia(o, V3_ScaleByF(rBxN, 1.0f / vsqrtf(rBxN_lenSq)));
+    float invIB = (iB > PHY_EPSILON && !oStatic) ? 1.0f / iB : 0.0f;
+    float angTermB = (oStatic || ConstIndexIsNPC(o->index)) ? 0.0f : rBxN_lenSq * invIB;
+    Vector3 vAtA = V3_AplusB(e->velocity, V3_Cross(e->angularVelocity, rAarm));
+    Vector3 vAtB = oStatic ? (Vector3){0,0,0} : V3_AplusB(o->velocity, V3_Cross(o->angularVelocity, rBarm));
     Vector3 relVel = V3_AsubB(vAtA, vAtB);
-    float vn = V3_dot(relVel,n); if (vn > 0.01f) return;
+    float vn = V3_dot(relVel, n); 
+    if (vn > 0.01f) return;
 
-    Vector3 rAxN = V3_Cross(rAarm,n), rBxN = V3_Cross(rBarm,n);
-    float angTermA = eStatic || ConstIndexIsNPC(e->index) ? 0.0f : V3_dot(rAxN,rAxN) * invIA, angTermB = oStatic || ConstIndexIsNPC(o->index) ? 0.0f : V3_dot(rBxN,rBxN) * invIB;
-    float invMassA = e->mass < 0.001f ? 1.0f : 1.0f / e->mass, invMassB = oStatic || o->mass < 0.001f ? 0.0f : 1.0f / o->mass;
+    float invMassA = e->mass < 0.001f ? 1.0f : 1.0f / e->mass;
+    float invMassB = oStatic || o->mass < 0.001f ? 0.0f : 1.0f / o->mass;
     float invSum = invMassA + invMassB + angTermA + angTermB;
-    if (invSum < COLLISION_EPSILON) return;
+    if (invSum < PHY_EPSILON) return;
 
     float e_r = vmax(e->bounciness, oStatic ? 0.0f : o->bounciness);
     float j = -(1.0f + e_r) * vn / invSum;
-    e->velocity = V3_AplusB(e->velocity, V3_ScaleByF(n,j * invMassA));
-    if (!oStatic) o->velocity = V3_AsubB(o->velocity,V3_ScaleByF(n,j * invMassB));
+    
+    // Apply Normal Impulse
+    e->velocity = V3_AplusB(e->velocity, V3_ScaleByF(n, j * invMassA));
+    if (!oStatic) o->velocity = V3_AsubB(o->velocity, V3_ScaleByF(n, j * invMassB));
     Vector3 Jn = V3_ScaleByF(n,j);
-    if (e->collider != COLTYPE_CAP && !(eStatic || ConstIndexIsNPC(e->index))) e->angularVelocity = V3_AplusB(e->angularVelocity,V3_ScaleByF(V3_Cross(rAarm,Jn),invIA));
-    if (!oStatic && !ConstIndexIsNPC(o->index)) o->angularVelocity = V3_AsubB(o->angularVelocity,V3_ScaleByF(V3_Cross(rBarm,Jn),invIB));
+    if (e->collider != COLTYPE_CAP && !ConstIndexIsNPC(e->index)) e->angularVelocity = V3_AplusB(e->angularVelocity, V3_ScaleByF(V3_Cross(rAarm, Jn), invIA));
+    if (!oStatic && o->collider != COLTYPE_CAP && !ConstIndexIsNPC(o->index)) o->angularVelocity = V3_AsubB(o->angularVelocity, V3_ScaleByF(V3_Cross(rBarm, Jn), invIB));
+
+    // Friction calculation
     Vector3 vAtA2 = V3_AplusB(e->velocity, V3_Cross(e->angularVelocity, rAarm));
-    Vector3 vAtB2 = oStatic ? (Vector3){0,0,0} : V3_AplusB(o->velocity, V3_Cross(o->angularVelocity, rBarm));
-    Vector3 relVel2 = V3_AsubB(vAtA2,vAtB2);
-    Vector3 tangent = V3_AsubB(relVel2,V3_ScaleByF(n,V3_dot(relVel2,n)));
+    Vector3 vAtB2 = oStatic ? (Vector3){0.0f,0.0f,0.0f} : V3_AplusB(o->velocity, V3_Cross(o->angularVelocity, rBarm));
+    Vector3 relVel2 = V3_AsubB(vAtA2, vAtB2);
+    Vector3 tangent = V3_AsubB(relVel2, V3_ScaleByF(n, V3_dot(relVel2, n)));
     float tLen = V3_Mag(tangent);
-    if (tLen > 0.001f) {
+    if (tLen > 0.0001f) {
         tangent = V3_ScaleByF(tangent, 1.f / tLen);
+        
+        // Evaluate inertia around the TANGENT torque axis (r x t)
         Vector3 rAxT = V3_Cross(rAarm, tangent);
+        float rAxT_lenSq = V3_dot(rAxT, rAxT);
+        float iAT = (rAxT_lenSq > PHY_EPSILON) ? GetMomentOfInertia(e, V3_ScaleByF(rAxT, 1.0f / vsqrtf(rAxT_lenSq))) : 1.0f;
+        float invIAT = (iAT > PHY_EPSILON) ? 1.0f / iAT : 0.0f;
+        float angTermAT = ConstIndexIsNPC(e->index) ? 0.0f : rAxT_lenSq * invIAT;
         Vector3 rBxT = V3_Cross(rBarm, tangent);
-        float angTermAT = eStatic || ConstIndexIsNPC(e->index) ? 0.0f : V3_dot(rAxT, rAxT) / GetMomentOfInertia(e,tangent);
-        float angTermBT = oStatic || ConstIndexIsNPC(o->index) ? 0.0f : V3_dot(rBxT, rBxT) / GetMomentOfInertia(o,tangent);
+        float rBxT_lenSq = V3_dot(rBxT, rBxT);
+        float iBT = (oStatic || rBxT_lenSq < PHY_EPSILON) ? 0.0f : GetMomentOfInertia(o, V3_ScaleByF(rBxT, 1.0f / vsqrtf(rBxT_lenSq)));
+        float invIBT = (iBT > PHY_EPSILON && !oStatic) ? 1.0f / iBT : 0.0f;
+        float angTermBT = (oStatic || ConstIndexIsNPC(o->index)) ? 0.0f : rBxT_lenSq * invIBT;
         float invSumT = invMassA + invMassB + angTermAT + angTermBT;
         float mu = (e->dynamicFriction + (oStatic ? 0.4f : o->dynamicFriction)) * 0.5f;
-        float jt = -V3_dot(relVel2,tangent) / invSumT;
-        jt = vclamp(jt, -mu * vabs(j), mu * vabs(j));
+        float jt = -V3_dot(relVel2, tangent) / invSumT;
+        jt = vclamp(jt * mu, mu * -vabs(j), mu * vabs(j));
+        
+        // Apply Tangent (Friction) Impulse
         Vector3 Jt = V3_ScaleByF(tangent, jt);
-        e->velocity = V3_AplusB(e->velocity,V3_ScaleByF(tangent,jt * invMassA));
-        if (e->collider != COLTYPE_CAP && !(eStatic || ConstIndexIsNPC(e->index))) e->angularVelocity = V3_AplusB(e->angularVelocity,V3_ScaleByF(V3_Cross(rAarm,Jt),invIA));
+        e->velocity = V3_AplusB(e->velocity, V3_ScaleByF(tangent, jt * invMassA));
+        if (e->collider != COLTYPE_CAP && !ConstIndexIsNPC(e->index)) e->angularVelocity = V3_AplusB(e->angularVelocity, V3_ScaleByF(V3_Cross(rAarm, Jt), invIAT));
         if (!oStatic) {
             o->velocity = V3_AsubB(o->velocity, V3_ScaleByF(tangent, jt * invMassB));
-            if (o->collider != COLTYPE_CAP) o->angularVelocity = V3_AsubB(o->angularVelocity,V3_ScaleByF(V3_Cross(rBarm,Jt),invIB));
+            if (o->collider != COLTYPE_CAP && !ConstIndexIsNPC(o->index)) o->angularVelocity = V3_AsubB(o->angularVelocity, V3_ScaleByF(V3_Cross(rBarm, Jt), invIBT));
         }
     }
+    
+    float angDelta = vabs(V3_Mag(e->angularVelocity) - V3_Mag(e->lastAngularVelocity));
+    e->angularVelocity = V3_ScaleByF(e->angularVelocity,1.0f - angDelta); // Dampen large deltas
+    e->lastAngularVelocity = e->angularVelocity;
 
-    float correction = vmax(overlap - 0.01f, 0.0f) * 1.0f;
-    correction = vmin(correction, 0.05f);
-    float corrA = correction * invMassA / (invMassA + invMassB + COLLISION_EPSILON);
-    float corrB = correction * invMassB / (invMassA + invMassB + COLLISION_EPSILON);
-    SetPosition(e,V3_AplusB(e->position, V3_ScaleByF(n,corrA)),false);
-    if (!oStatic) SetPosition(o,V3_AsubB(o->position,V3_ScaleByF(n,corrB)),false);
+    // Positional correction (Baumgarte Stabilization)
+    float correction = vmin(vmax(overlap - 0.001f, 0.0f) * 0.2f, 0.04f);
+    float corrA = correction * invMassA / (invMassA + invMassB + PHY_EPSILON);
+    float corrB = correction * invMassB / (invMassA + invMassB + PHY_EPSILON);
+    SetPosition(e, V3_AplusB(e->position, V3_ScaleByF(n, corrA)), false);
+    if (!oStatic) SetPosition(o, V3_AsubB(o->position, V3_ScaleByF(n, corrB)), false);
 }
 
 void Physics(void) {
@@ -4692,18 +4843,15 @@ void Physics(void) {
     Sys_Global.last_physics_time = Sys_Global.pauseRelativeTime;
     u8 substeps = (u8)vclamp((u32)(dt / MAX_STEP_SIZE + 0.5f), 1u, (u32)MAX_SUBSTEPS);
     float dtsub = dt / (float)substeps; dynamicEntityCount = 0;
-    for (int i = 0; i < Sys_Global.loadedInstances && dynamicEntityCount < 512; ++i) { Entity *e = &Sys_Global.instances[i]; if ((e->entflags & ENTFLAG_RIGIDBODY) && (e->entflags & ENTFLAG_ACTIVE) && e->collider != COLTYPE_NONE) {dynamicEntities[dynamicEntityCount++] = i;} }
-    
-    // Update cell index for all entities
-    for (int i = 0; i < Sys_Global.loadedInstances; ++i) {
+    for (int i = 0; i < Sys_Global.loadedInstances && dynamicEntityCount < 512; ++i) { Entity *e = &Sys_Global.instances[i]; if ((e->entflags & EF_RIGIDBODY) && (e->entflags & EF_ACTIVE) && e->collider != COLTYPE_NONE) {dynamicEntities[dynamicEntityCount++] = i;} }
+    for (int i = 0; i < Sys_Global.loadedInstances; ++i) { // Update cell index for all entities
         Entity *e = &Sys_Global.instances[i];
         e->cellX = (i16)PosGetCellCoordX(e->position.x); e->cellZ = (i16)PosGetCellCoordZ(e->position.z); e->cellIndex = PosGetCellCoordsP(e->cellX,e->cellZ);
         e->radius = (e->modelIndex < MODEL_IDX_MAX) ? modelBounds[e->modelIndex] * vmax(vmax(e->scale.x,e->scale.y),e->scale.z) : GetCollisionRadius(e);
         e->colliding = false;
     }
 
-    // dynamicEntityCount found to be only 335 on level 1
-    for (u8 s = 0; s < substeps; ++s) {
+    for (u8 s = 0; s < substeps; ++s) { // dynamicEntityCount found to be only 335 on level 1
         MemSetToVForNBytes(cellCounts,0,sizeof(cellCounts));
         for (u16 i = 0; i < Sys_Global.loadedInstances; ++i) { Entity *e = &Sys_Global.instances[i]; u32 cell = (u32)e->cellIndex; if (cell < WORLDX*WORLDX && cellCounts[cell] < 127) cellLists[cell][cellCounts[cell]++] = i; } // Build broadphase grid (~0.013ms)        
         for (u16 i = 0; i < dynamicEntityCount; ++i) { u16 idx = dynamicEntities[i]; Entity *e = &Sys_Global.instances[idx]; ApplyVelocity(e,dtsub); } // Integrate all dynamic bodies (~0.005ms)
@@ -4737,7 +4885,7 @@ void Physics(void) {
                         else if (e->collider == COLTYPE_BOX && o->collider == COLTYPE_MSH) { Entity_GetBox(e,&ba);                       r=BoxMsh(ba,o->modelIndex,&modelMatrices[b*16]); }
                         else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_MSH) {                                             r=CvxMsh(e->colliderMeshIndex,&modelMatrices[a*16],o->modelIndex,&modelMatrices[b*16]); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
                         else if (e->collider == COLTYPE_CAP && o->collider == COLTYPE_CVX) { Entity_GetCap(e,&ca);                       r=CapCvx(ca,o->colliderMeshIndex,&modelMatrices[b*16]); }
-                        else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_CAP) { Entity_GetCap(o,&cb);                       r=CapCvx(cb,e->colliderMeshIndex,&modelMatrices[a*16]); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
+                        else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_CAP) { Entity_GetCap(o,&cb);                       r=CapCvx(cb,e->colliderMeshIndex,&modelMatrices[a*16]); }
                         else if (e->collider == COLTYPE_SPH && o->collider == COLTYPE_CVX) { Entity_GetSph(e,&sa);                       r=SphCvx(sa.center,sa.radius,o->colliderMeshIndex,&modelMatrices[b*16]); }
                         else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_SPH) { Entity_GetSph(o,&sb);                       r=SphCvx(sb.center,sb.radius,e->colliderMeshIndex,&modelMatrices[a*16]); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
                         else if (e->collider == COLTYPE_BOX && o->collider == COLTYPE_CVX) { Entity_GetBox(e,&ba);                       r=BoxCvx(ba,o->colliderMeshIndex,&modelMatrices[b*16]); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
@@ -4745,7 +4893,7 @@ void Physics(void) {
                         else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_CVX) {                                             r=CvxCvx(e->colliderMeshIndex,o->colliderMeshIndex,&modelMatrices[a*16],&modelMatrices[b*16]); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
                         else { r=SphSph(e->position,GetCollisionRadius(e),o->position,GetCollisionRadius(o)); } // Fallback
 
-                        if (r.hit && r.overlapAmount > COLLISION_EPSILON && contactCount < 16) contacts[contactCount++] = (Contact){r,b};
+                        if (r.hit && r.overlapAmount > PHY_EPSILON && contactCount < 16) contacts[contactCount++] = (Contact){r,b};
                     }
                 }
             }
@@ -4757,8 +4905,8 @@ void Physics(void) {
             for (int c = 0; c < contactCount; ++c) {
                 OverlapResult *ov = &contacts[c].r; u16 j = contacts[c].otherIdx;
                 Entity *o = (j < INSTANCE_COUNT) ? &Sys_Global.instances[j] : NULL; e->colliding = true; if (o) o->colliding = true;
-                if (o && (o->entflags & ENTFLAG_RIGIDBODY) && o->collider != COLTYPE_MSH) ApplyCollisionResponse(e,o,ov->normal,ov->overlapAmount,ov->point);
-                else { Entity staticProxy = {0}; staticProxy.mass=0.0f; staticProxy.dynamicFriction=0.4f; staticProxy.collider=COLTYPE_NONE; ApplyCollisionResponse(e,&staticProxy,ov->normal,ov->overlapAmount,ov->point); }
+                if (o && (o->entflags & EF_RIGIDBODY) && o->collider != COLTYPE_MSH) ApplyCollisionResponse(e,o,ov);
+                else { Entity staticProxy = {0}; staticProxy.mass=0.0f; staticProxy.dynamicFriction=0.4f; staticProxy.collider=COLTYPE_NONE; ApplyCollisionResponse(e,&staticProxy,ov); }
             }
 
             e->accumulatedForce = (Vector3){0.0f,0.0f,0.0f};
@@ -4768,18 +4916,11 @@ void Physics(void) {
     }
 }
 
-ENGINE_TO_MOD void AddForce(u16 idx, Vector3 force, bool impulse) {
-    if (idx >= INSTANCE_COUNT) return;
-    
-    Entity *e = &Sys_Global.instances[idx]; float mass = e->mass > 0.001f ? e->mass : 1.0f;
-    if (impulse) e->velocity         = V3_AplusB(e->velocity, V3_ScaleByF(force, 1.0f / mass));
-    else         e->accumulatedForce = V3_AplusB(e->accumulatedForce, force);
-}
-
+ENGINE_TO_MOD void AddForce(u16 i, Vector3 f, bool imp) { Entity *e = &Sys_Global.instances[i]; if (imp) { e->velocity = V3_AplusB(e->velocity,V3_ScaleByF(f,1.0f / vmax(e->mass,0.001f))); } else { e->accumulatedForce = V3_AplusB(e->accumulatedForce,f); } }
 ENGINE_TO_MOD void ApplyPlayerMovements(void) {
-    Entity *p = &Sys_Global.instances[PLAYER1];
     float h = (float)Forward() - (float)Backpedal(), s = (float)StrafeRight() - (float)StrafeLeft();
     float vertInput = (float)SwimUp() - (float)SwimDn();
+    Entity *p = &Sys_Global.instances[PLAYER1];
     Quaternion rot = p->rotation; float y2 = rot.y * rot.y;  float xz = rot.x * rot.z;  float wy = rot.w * rot.y;
     p->forward = V3_Normalize((Vector3){ 2.0f * (xz + wy), 2.0f * (rot.y * rot.z - rot.w * rot.x), 1.0f - 2.0f * (rot.x * rot.x + y2) });
     p->right   = V3_Normalize((Vector3){ 1.0f - 2.0f * (y2 + rot.z * rot.z), 2.0f * (rot.x * rot.y + rot.w * rot.z), 2.0f * (xz - wy) });
@@ -4790,26 +4931,18 @@ ENGINE_TO_MOD void ApplyPlayerMovements(void) {
     if (vabs(vertInput) < 0.001f) targetVel.y = cur.y;
     Vector3 dv = V3_AsubB(targetVel, cur);
     dv = (Vector3){vclamp(dv.x,-10.0f,10.0f), vclamp(dv.y,-10.0f,10.0f), vclamp(dv.z,-10.0f,10.0f)};
-    p->velocity = V3_AplusB(cur, V3_ScaleByF(dv, accel * vclamp((float)Sys_Global.timeSinceLastPhysicsTick,0.0005f,0.1f)));
+    p->velocity = V3_AplusB(cur, V3_ScaleByF(dv, accel * vclamp((float)Sys_Global.deltaTime,0.0005f,0.1f)));
 }
-// ========================================================================================================================================================================================================================================================================================================
+// =================================
 // Console Emulator System - CHEATS!
 static i32 currentEntryLength=0, numHistory=0, historyPos=0; char consoleEntryText[TEXT_BUFFER_SIZE],history[7][TEXT_BUFFER_SIZE];
 static Vector3 ressurectionLocations[10] = { {-27.386f, -55.488f, 26.5941f},/*0/R*/ {40.903f, -42.372f, -30.78f},/*1*/      {30.67407f, -25.832f, 10.21412f},/*2*/ {38.26813f, -15.498f, 20.37825f},/*3*/ {-19.48f, -7.928f, 22.954f},/*4*/ {-24.358f, 12.5956f, 31.8497f},/*5*/
                                              {-22.3568f, 33.7845f, -30.728f},/*6*/  {2.228084f, 50.95243f, 7.532025f},/*7*/ {10.068f, 58.897f, 13.973f},/*8*/      {2.303f, 106.77f, -38.554f}/*9*/ };
-static Vector3 cyberSpaceEntryLocations[8] = { {210.6834f,2.812f,-24.378f},/*0*/ {195.42f,-13.44f,33.28f},/*1*/      {157.1608f,-15.53f,47.331f},/*2a, if cyberport localPosition.x < -26.0f*/ {256.0416f,-0.716f,62.48789f},/*2b level 2 secondary cyberport position*/
-                                               {126.43f,29.56733f,34.24f},/*5*/  {177.612f,3.29494f,108.7725f},/*6*/ {244.735f,41.99257f,-19.695f},/*8*/                                       {185.161f,84.502f,-46.04246f},/*9*/ };
-ENGINE_TO_MOD void ToggleConsole(void) {
-    static bool inventoryModeWasActivePriorToConsole = false;
-    if (!Sys_Cheats.consoleActive) inventoryModeWasActivePriorToConsole = Sys_Global.inventoryMode;
-    Sys_Cheats.consoleActive = !Sys_Cheats.consoleActive; // Tilde
-    if (Sys_Cheats.consoleActive) Sys_Global.inventoryMode = true;
-    else if (!inventoryModeWasActivePriorToConsole && Sys_Global.inventoryMode) ForceShootMode();
-}
-
+static Vector3 cyberSpaceEntryLocations[8] = { {210.6834f,2.812f,-24.378f},/*0*/ {195.420f,-13.44000f, 33.2800f},/*1*/ {157.1608f,-15.53f,47.331f},/*2a, if cyberport localPosition.x < -26.0f*/ {256.0416f,-0.716f,62.48789f},/*2b level 2 secondary cyberport position*/
+                                               {126.43f,29.56733f,34.24f},/*5*/  {177.612f,  3.29494f,108.7725f},/*6*/ {244.735f,41.99257f,-19.695f},/*8*/                                       {185.161f,84.502f,-46.04246f},/*9*/ };
+ENGINE_TO_MOD void ToggleConsole(void) { static bool imWasActPrior = false; if (!Sys_Cheats.consoleActive) {imWasActPrior = Sys_Global.inventoryMode;} Sys_Cheats.consoleActive = !Sys_Cheats.consoleActive; if (Sys_Cheats.consoleActive) { Sys_Global.inventoryMode = true; } else if (!imWasActPrior && Sys_Global.inventoryMode) {ForceShootMode();} }
 static void AddToHistory(const char* entry) {
-    if (GetStringLength(entry) == 0) return;
-    if (numHistory > 0 && StringsEqual(entry,history[numHistory - 1])) return;
+    if (GetStringLength(entry) == 0 || (numHistory > 0 && StringsEqual(entry,history[numHistory - 1]))) return;
     
     if (numHistory < 7) { StringCopyInto_A_From_B(history[numHistory],entry,TEXT_BUFFER_SIZE); numHistory++; }
     else {
@@ -5026,7 +5159,7 @@ void ConsoleEmulator(i32 keycode) {
         if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]=' '; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; }
     } else if (keycode == KEY_ENTER || keycode == KEY_KP_ENTER) { DualLog("Console command: %s\n",consoleEntryText); ProcessConsoleCommand(consoleEntryText); }
 }
-// ========================================================================================================================================================================================================================================================================================================
+// ============
 // Audio System
 #define AUDIO_RATE      48000
 #define AUDIO_CHANNELS  2
@@ -5034,8 +5167,6 @@ void ConsoleEmulator(i32 keycode) {
 #define AUDIO_PERIODS   4
 #define AUDIO_FRAMES    ((AUDIO_RATE * AUDIO_PERIOD_MS) / 1000)
 #define AUDBUF_SIZE (AUDIO_FRAMES*AUDIO_PERIODS)
-#define U32_MAX 0xffffffffU
-#define I32_MAX 2147483647
 void* MemCpyFromBtoAForNBytes(void *dst, const void *src, size_t n);
 extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
 #ifdef WINDOWS
@@ -5133,7 +5264,7 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
     static u32 hw_params_get_mask(struct snd_pcm_hw_params *p, int parameter, u32 value) { struct snd_mask *m=get_mask_struct(p,parameter); return m->bits[((value) / 32)] & (1 << ((value) % 32)); }
     static void hw_params_get_interval(struct snd_pcm_hw_params *p, int parameter, u32 *min, u32 *max) { struct snd_interval *i = get_interval_struct(p,parameter); *min = i->min + i->openmin; *max = i->max - i->openmax; }
     static u32 hw_params_get(struct snd_pcm_hw_params *p, int parameter, u32 value) { u32 r, t; return (parameter >= 0 && parameter <= 2) ? hw_params_get_mask(p,parameter,value) : ((parameter >= 8 && parameter <= 19) ? (hw_params_get_interval(p,parameter,&r,&t),r) : 0); }
-    static void hw_params_fill(struct snd_pcm_hw_params *p) { MemSetToVForNBytes(p,0,sizeof(*p)); MemSetToVForNBytes(p->masks,0xff,sizeof(p->masks)); p->rmask = p->info = U32_MAX; for (int i=0;i<=11;i++) { p->intervals[i].min = 0; p->intervals[i].max = U32_MAX; } }
+    static void hw_params_fill(struct snd_pcm_hw_params *p) { MemSetToVForNBytes(p,0,sizeof(*p)); MemSetToVForNBytes(p->masks,0xff,sizeof(p->masks)); p->rmask = p->info = 0xffffffffU; for (int i=0;i<=11;i++) { p->intervals[i].min = 0; p->intervals[i].max = 0xffffffffU; } }
     unsigned long pcm_gethw(pcm_params_t *p, pcm_param_t param, unsigned int val) { return hw_params_get(&p->hw_params,param,val); } 
     unsigned long pcm_getsw(pcm_params_t *p, pcm_param_t param) { pcm_sw_params_t *sw = &p->sw_params; return ((u64*)&sw->avail_min)[param - 22]; }
     int pcm_params_setup(int fd, pcm_params_t *p) {
@@ -5247,26 +5378,20 @@ static void drmp3_L3_read_scalefactors(u8 *scf, u8 *ist_pos, const u8 *scf_size,
 }
 
 static float drmp3_L3_ldexp_q2(float y, int exp_q2) { static const float g_expfrac[4]={9.31322575e-10f,7.83145814e-10f,6.58544508e-10f,5.53767716e-10f}; int e; do { e=vmin(30*4,exp_q2); y*=g_expfrac[e&3]*(1<<30>>(e>>2)); } while ((exp_q2-=e)>0); return y; }
-#define DRMP3_MAX_SCF  (255+-1*4-210)
-#define DRMP3_MAX_SCFI ((DRMP3_MAX_SCF+3)&~3)
+#define DRMP3_MAX_SCFI (((255+-1*4-210)+3)&~3)
 static void drmp3_L3_decode_scalefactors(const u8 *hdr, u8 *ist_pos, drmp3_bs *bs, const drmp3_L3_gr_info *gr, float *scf, int ch) {
     static const u8 g_scf_partitions[3][28]={{6,5,5,5,6,5,5,5,6,5,7,3,11,10,0,0,7,7,7,0,6,6,6,3,8,8,5,0}, {8,9,6,12,6,9,9,9,6,9,12,6,15,18,0,0,6,15,12,0,6,12,9,6,6,18,9,0}, {9,9,6,12,9,9,9,9,9,9,12,6,18,18,0,0,12,12,12,0,12,9,9,6,15,12,9,0}};
     const u8 *scf_partition=g_scf_partitions[!!gr->n_short_sfb+!gr->n_long_sfb];
-    u8 scf_size[4],iscf[40];
-    int i,scf_shift=gr->scalefac_scale+1,gain_exp,scfsi=gr->scfsi;
-    float gain;
-    if (DRMP3_HDR_TEST_MPEG1(hdr)) {
-        static const u8 g_scfc_decode[16]={0,1,2,3,12,5,6,7,9,10,11,13,14,15,18,19};
-        int part=g_scfc_decode[gr->scalefac_compress];
-        scf_size[1]=scf_size[0]=(u8)(part>>2);
-        scf_size[3]=scf_size[2]=(u8)(part&3);
-    } else {
+    u8 scf_size[4],iscf[40]; int i,scf_shift=gr->scalefac_scale+1,gain_exp,scfsi=gr->scfsi; float gain;
+    if (DRMP3_HDR_TEST_MPEG1(hdr)) { static const u8 g_scfc_decode[16]={0,1,2,3,12,5,6,7,9,10,11,13,14,15,18,19}; int part=g_scfc_decode[gr->scalefac_compress]; scf_size[1]=scf_size[0]=(u8)(part>>2); scf_size[3]=scf_size[2]=(u8)(part&3); }
+    else {
         static const u8 g_mod[6*4]={5,5,4,4,5,5,4,1,4,3,1,1,5,6,6,1,4,4,4,1,4,3,1,1};
         int k,modprod,sfc,ist=DRMP3_HDR_TEST_I_STEREO(hdr)&&ch;
         sfc=gr->scalefac_compress>>ist;
         for (k=ist*3*4; sfc>=0; sfc-=modprod,k+=4) { for (modprod=1,i=3;i>=0;i--) {scf_size[i]=(u8)(sfc/modprod%g_mod[k+i]); modprod*=g_mod[k+i];} }
         scf_partition+=k; scfsi=-16;
     }
+    
     drmp3_L3_read_scalefactors(iscf,ist_pos,scf_size,scf_partition,bs,scfsi);
     if (gr->n_short_sfb) {
         int sh=3-scf_shift;
@@ -5276,21 +5401,20 @@ static void drmp3_L3_decode_scalefactors(const u8 *hdr, u8 *ist_pos, drmp3_bs *b
             iscf[gr->n_long_sfb+i+2]=(u8)(iscf[gr->n_long_sfb+i+2]+(gr->subblock_gain[2]<<sh));
         }
     } else if (gr->preflag) { static const u8 g_preamp[10]={1,1,1,1,2,2,3,3,3,2}; for (i=0;i<10;i++) {iscf[11+i]=(u8)(iscf[11+i]+g_preamp[i]);} }
+    
     gain_exp=gr->global_gain+-1*4-210-(DRMP3_HDR_IS_MS_STEREO(hdr)?2:0);
     gain=drmp3_L3_ldexp_q2(1<<(DRMP3_MAX_SCFI/4),DRMP3_MAX_SCFI-gain_exp);
     for (i=0;i<(int)(gr->n_long_sfb+gr->n_short_sfb);i++) scf[i]=drmp3_L3_ldexp_q2(gain,iscf[i]<<scf_shift);
 }
 
-static const float g_drmp3_pow43[129+16]={
-    0,-1,-2.519842f,-4.326749f,-6.349604f,-8.549880f,-10.902724f,-13.390518f,-16.000000f,-18.720754f,-21.544347f,-24.463781f,-27.473142f,-30.567351f,-33.741992f,-36.993181f,
-    0,1,2.519842f,4.326749f,6.349604f,8.549880f,10.902724f,13.390518f,16.000000f,18.720754f,21.544347f,24.463781f,27.473142f,30.567351f,33.741992f,36.993181f,40.317474f,43.711787f,47.173345f,50.699631f,54.288352f,57.937408f,61.644865f,65.408941f,69.227979f,73.100443f,77.024898f,81.000000f,85.024491f,89.097188f,93.216975f,97.382800f,101.593667f,105.848633f,110.146801f,114.487321f,118.869381f,123.292209f,127.755065f,132.257246f,136.798076f,141.376907f,145.993119f,150.646117f,155.335327f,160.060199f,164.820202f,169.614826f,174.443577f,179.305980f,184.201575f,189.129918f,194.090580f,199.083145f,204.107210f,209.162385f,214.248292f,219.364564f,224.510845f,229.686789f,234.892058f,240.126328f,245.389280f,250.680604f,256.000000f,261.347174f,266.721841f,272.123723f,277.552547f,283.008049f,288.489971f,293.998060f,299.532071f,305.091761f,310.676898f,316.287249f,321.922592f,327.582707f,333.267377f,338.976394f,344.709550f,350.466646f,356.247482f,362.051866f,367.879608f,373.730522f,379.604427f,385.501143f,391.420496f,397.362314f,403.326427f,409.312672f,415.320884f,421.350905f,427.402579f,433.475750f,439.570269f,445.685987f,451.822757f,457.980436f,464.158883f,470.357960f,476.577530f,482.817459f,489.077615f,495.357868f,501.658090f,507.978156f,514.317941f,520.677324f,527.056184f,533.454404f,539.871867f,546.308458f,552.764065f,559.238575f,565.731879f,572.243870f,578.774440f,585.323483f,591.890898f,598.476581f,605.080431f,611.702349f,618.342238f,625.000000f,631.675540f,638.368763f,645.079578f
-};
+static const float g_drmp3_pow43[129+16]={ 0,-1,-2.519842f,-4.326749f,-6.349604f,-8.549880f,-10.902724f,-13.390518f,-16.000000f,-18.720754f,-21.544347f,-24.463781f,-27.473142f,-30.567351f,-33.741992f,-36.993181f,
+                                           0,1,2.519842f,4.326749f,6.349604f,8.549880f,10.902724f,13.390518f,16.000000f,18.720754f,21.544347f,24.463781f,27.473142f,30.567351f,33.741992f,36.993181f,40.317474f,43.711787f,47.173345f,50.699631f,54.288352f,57.937408f,61.644865f,65.408941f,69.227979f,73.100443f,77.024898f,81.000000f,85.024491f,89.097188f,93.216975f,97.382800f,101.593667f,105.848633f,110.146801f,114.487321f,118.869381f,123.292209f,127.755065f,132.257246f,136.798076f,141.376907f,145.993119f,150.646117f,155.335327f,160.060199f,164.820202f,169.614826f,174.443577f,179.305980f,184.201575f,189.129918f,194.090580f,199.083145f,204.107210f,209.162385f,214.248292f,219.364564f,224.510845f,229.686789f,234.892058f,240.126328f,245.389280f,250.680604f,256.000000f,261.347174f,266.721841f,272.123723f,277.552547f,283.008049f,288.489971f,293.998060f,299.532071f,305.091761f,310.676898f,316.287249f,321.922592f,327.582707f,333.267377f,338.976394f,344.709550f,350.466646f,356.247482f,362.051866f,367.879608f,373.730522f,379.604427f,385.501143f,391.420496f,397.362314f,403.326427f,409.312672f,415.320884f,421.350905f,427.402579f,433.475750f,439.570269f,445.685987f,451.822757f,457.980436f,464.158883f,470.357960f,476.577530f,482.817459f,489.077615f,495.357868f,501.658090f,507.978156f,514.317941f,520.677324f,527.056184f,533.454404f,539.871867f,546.308458f,552.764065f,559.238575f,565.731879f,572.243870f,578.774440f,585.323483f,591.890898f,598.476581f,605.080431f,611.702349f,618.342238f,625.000000f,631.675540f,638.368763f,645.079578f };
 static float drmp3_L3_pow_43(int x) {
-    float frac; int sign,mult=256;
     if (x<129) return g_drmp3_pow43[16+x];
-    if (x<1024) { mult=16; x<<=3; }
-    sign=2*x&64;
-    frac=(float)((x&63)-sign)/((x&~63)+sign);
+    
+    int mult=256; if (x<1024) { mult=16; x<<=3; }
+    int sign=2*x&64;
+    float frac=(float)((x&63)-sign)/((x&~63)+sign);
     return g_drmp3_pow43[16+((x+sign)>>6)]*(1.f+frac*((4.f/3)+frac*(2.f/9)))*mult;
 }
 
@@ -5375,6 +5499,7 @@ static void drmp3_L3_huffman(float *dst, drmp3_bs *bs, const drmp3_L3_gr_info *g
         DRMP3_RELOAD_SCALEFACTOR; DRMP3_DEQ_COUNT1(2); DRMP3_DEQ_COUNT1(3);
         DRMP3_CHECK_BITS;
     }
+
     bs->pos=layer3gr_limit;
 }
 
@@ -5392,6 +5517,7 @@ static void drmp3_L3_stereo_process(float *left, const u8 *ist_pos, const u8 *sf
             else{kl=1;kr=drmp3_L3_ldexp_q2(1,(ipos+1)>>1<<mpeg2_sh);if(ipos&1){kl=kr;kr=1;}}
             drmp3_L3_intensity_stereo_band(left,sfb[i],kl*s,kr*s);
         } else if (DRMP3_HDR_TEST_MS_STEREO(hdr)) drmp3_L3_midside_stereo(left,sfb[i]);
+
         left+=sfb[i];
     }
 }
@@ -5408,6 +5534,7 @@ static void drmp3_L3_reorder(float *grbuf, float *scratch, const u8 *sfb) {
     for(;0!=(len=*sfb);sfb+=3,src+=2*len){for(i=0;i<len;i++,src++){*dst++=src[0*len];*dst++=src[1*len];*dst++=src[2*len];}}
     MemCpyFromBtoAForNBytes(grbuf,scratch,(dst-scratch)*sizeof(float));
 }
+
 static void drmp3_L3_antialias(float *grbuf, int nbands) {
     static const float g_aa[2][8]={{0.85749293f,0.88174200f,0.94962865f,0.98331459f,0.99551782f,0.99916056f,0.99989920f,0.99999316f},{0.51449576f,0.47173197f,0.31337745f,0.18191320f,0.09457419f,0.04096558f,0.01419856f,0.00369997f}};
     for(;nbands>0;nbands--,grbuf+=18){
@@ -5415,6 +5542,7 @@ static void drmp3_L3_antialias(float *grbuf, int nbands) {
         for(;i<8;i++){float u=grbuf[18+i],d=grbuf[17-i];grbuf[18+i]=u*g_aa[0][i]-d*g_aa[1][i];grbuf[17-i]=u*g_aa[1][i]+d*g_aa[0][i];}
     }
 }
+
 static void drmp3_L3_dct3_9(float *y) {
     float s1,s3,s5,s7,t0,t2,t4,s0=y[0],s2=y[2],s4=y[4],s6=y[6],s8=y[8];
     t0=s0+s6*0.5f; s0-=s6; t4=(s4+s2)*0.93969262f; t2=(s8+s2)*0.76604444f;
@@ -5425,6 +5553,7 @@ static void drmp3_L3_dct3_9(float *y) {
     s1=(s1-s5-s7)*0.86602540f; s5=t0-s3-t2; s7=t4-s3-t0; s3=t4+s3-t2;
     y[0]=s4-s7; y[1]=s2+s1; y[2]=s0-s3; y[3]=s8+s5; y[5]=s8-s5; y[6]=s0+s3; y[7]=s2-s1; y[8]=s4+s7;
 }
+
 static void drmp3_L3_imdct36(float *grbuf, float *overlap, const float *win, int nbands) {
     int i,j;
     static const float g_twid9[18]={0.73727734f,0.79335334f,0.84339145f,0.88701083f,0.92387953f,0.95371695f,0.97629601f,0.99144486f,0.99904822f,0.67559021f,0.60876143f,0.53729961f,0.46174861f,0.38268343f,0.30070580f,0.21643961f,0.13052619f,0.04361938f};
@@ -5438,6 +5567,7 @@ static void drmp3_L3_imdct36(float *grbuf, float *overlap, const float *win, int
         for(;i<9;i++){float ovl=overlap[i],sum=co[i]*g_twid9[9+i]+si[i]*g_twid9[i];overlap[i]=co[i]*g_twid9[i]-si[i]*g_twid9[9+i];grbuf[i]=ovl*win[i]-sum*win[9+i];grbuf[17-i]=ovl*win[9+i]+sum*win[i];}
     }
 }
+
 static void drmp3_L3_idct3(float x0,float x1,float x2,float *dst){float m1=x1*0.86602540f,a1=x0-x2*0.5f;dst[1]=x0+x2;dst[0]=a1+m1;dst[2]=a1-m1;}
 static void imdct12(float *x,float *dst,float *overlap){
     static const float g_twid3[6]={0.79335334f,0.92387953f,0.99144486f,0.60876143f,0.38268343f,0.13052619f};
@@ -5445,6 +5575,7 @@ static void imdct12(float *x,float *dst,float *overlap){
     si[1]=-si[1];
     for(i=0;i<3;i++){float ovl=overlap[i],sum=co[i]*g_twid3[3+i]+si[i]*g_twid3[i];overlap[i]=co[i]*g_twid3[i]-si[i]*g_twid3[3+i];dst[i]=ovl*g_twid3[2-i]-sum*g_twid3[5-i];dst[5-i]=ovl*g_twid3[5-i]+sum*g_twid3[2-i];}
 }
+
 static void drmp3_L3_imdct_short(float *grbuf,float *overlap,int nbands){ for(;nbands>0;nbands--,overlap+=9,grbuf+=18){float tmp[18]; MemCpyFromBtoAForNBytes(tmp,grbuf,sizeof(tmp)); MemCpyFromBtoAForNBytes(grbuf,overlap,6*sizeof(float)); imdct12(tmp,grbuf+6,overlap+6); imdct12(tmp+1,grbuf+12,overlap+6); imdct12(tmp+2,overlap,overlap+6);} }
 static void drmp3_L3_change_sign(float *grbuf){int b,i;for(b=0,grbuf+=18;b<32;b+=2,grbuf+=36)for(i=1;i<18;i+=2)grbuf[i]=-grbuf[i];}
 static void drmp3_L3_imdct_gr(float *grbuf,float *overlap,unsigned block_type,unsigned n_long_bands){
@@ -5627,7 +5758,7 @@ static u32 drmp3_decode_next_frame_ex(drmp3 *p, drmp3d_sample_t *pPCMFrames, drm
             p->dataSize += bytesRead;
         }
 
-        if (p->dataSize > I32_MAX) { p->atEnd = 1; return 0; }
+        if (p->dataSize > 2147483647) { p->atEnd = 1; return 0; }
         if (!p->pData) return 0;
 
         pcmFramesRead = drmp3dec_decode_frame(&p->decoder,p->pData + p->dataConsumed,(int)p->dataSize,pPCMFrames,&info);
@@ -5750,8 +5881,7 @@ static u64 drmp3_get_pcm_frame_count(drmp3 *pMP3){
     drmp3_seek_to_start_of_stream(pMP3); drmp3_seek_to_pcm_frame(pMP3,savedFrame);
     return total;
 }
-
-// Wav parsing
+// Wav parsing --------------
 typedef struct { FHandle fp; u16 channels,bitsPerSample,fmtTag; u32 sampleRate; u64 totalPCMFrameCount,dataChunkDataPos,bytesRemaining; } WaveFile;
 static u16 WavU16LE(const u8 *d) { return (u16)(d[0]|(d[1]<<8)); }
 static u32 WavU32LE(const u8 *d) { return (u32)(d[0]|(d[1]<<8)|(d[2]<<16)|(d[3]<<24)); }
@@ -6001,7 +6131,7 @@ pthread_t audThreadID; void* AudThread(void* arg);
 #endif
 
 void* AudThread(void* arg) { (void)arg; while (1) { AudioUpdate(); OS_USleep(1000); } return NULL; }
-// ========================================================================================================================================================================================================================================================================================================
+// ==============
 // Raycast System
 float half_to_float(half h);
 RaycastHit RayTriangle(Vector3 origin, Vector3 dir, Vector3 posA, Vector3 posB, Vector3 posC, Vector3 normA, Vector3 normB, Vector3 normC) {
@@ -6075,7 +6205,7 @@ ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, u32
  
 ENGINE_TO_MOD void RaycastAll(Vector3 origin, Vector3 dir, float distance, u32 layerMask, RaycastHit* hits, u16 maxCount) { for (int i=0;i<maxCount;++i) {hits[i].hit = false;} (void)origin; (void)dir; (void)distance; (void)layerMask; }
 ENGINE_TO_MOD RaycastHit CapsuleCast(Vector3 start, Vector3 end, float capsuleRadius, float castDist, u32 layerMask, bool hitTriggers) { RaycastHit result = { .hit = false }; (void)start; (void)end; (void)capsuleRadius; (void)castDist; (void)layerMask; (void)hitTriggers; return result; }
-// ========================================================================================================================================================================================================================================================================================================
+// ==============
 // Shaders System
 #include "Shaders/shaders.h"
 static inline __attribute__((always_inline)) void ShaderError(u32 s, const char* name) { char er[512]; glGetShaderInfoLog(s,512,NULL,er); DualLogError("%s Comp Fail: %s\n",name,er); OS_Exit(1); }
@@ -6109,7 +6239,7 @@ void mat4_lookat_from(float* m, Quaternion* camRotation, Vector3 eye) { // Kept 
     m[8]  = right.z;   m[9]  = up.z;   m[10] = -forward.z;// m[11] = 0.0f;
     m[12] = -V3_dot(right, eye); m[13] = -V3_dot(up, eye); m[14] = V3_dot(forward, eye); m[15] = 1.0f;
 }
-// ========================================================================================================================================================================================================================================================================================================
+// ================
 // Rendering System
 __attribute__((pure,always_inline)) bool SphereInFrustum(FrustumPlane* ps, Vector3 c, float radius) { for (int i=0;i<6;++i) { if ((V3_dot(ps[i].normal,c) + ps[i].d) < -radius) return false; } return true; }
 void ExtractFrustumPlanes(float* m, FrustumPlane* ps) {
@@ -6264,20 +6394,13 @@ void ClearAll(void) {
 }
 
 void RenderLoadingProgress(i32 offset, const char * restrict text) { ClearAll(); glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); RenderFormattedText(683 - offset,379,TEXT_WHITE,FONT_NORMAL,1.0f,text); glfwSwapBuffers(); }
-// ========================================================================================================================================================================================================================================================================================================
-// Configuration Options Settings System (use all the names so I can CTRL+SHIFT+F pop-to at whatever name I feel like calling it at the moment)
+// =====================================
+// Configuration Options Settings System
 char statusText[TEXT_BUFFER_SIZE];
-void CenterStatusPrint(const char * restrict fmt, ...) {
-    va_list args; __builtin_va_start(args, fmt); StringFormatV(statusText,TEXT_BUFFER_SIZE,fmt,args); __builtin_va_end(args);
-    DualLog("%s\n",statusText);
-    Sys_Global.statusTextDecayFinished = get_time() + 3.5; // secs decay time before text dissappears.
-}
-
+void CenterStatusPrint(const char * restrict fmt, ...) { va_list args; __builtin_va_start(args, fmt); StringFormatV(statusText,TEXT_BUFFER_SIZE,fmt,args); __builtin_va_end(args); DualLog("%s\n",statusText); Sys_Global.statusTextDecayFinished = get_time() + 3.5;/*secs decay time before text dissappears.*/ }
 InputElement inputElements[134] = {
-    { "A", KEY_A }, { "B", KEY_B }, { "C", KEY_C }, { "D", KEY_D }, { "E", KEY_E }, { "F", KEY_F }, { "G", KEY_G }, { "H", KEY_H }, { "I", KEY_I }, { "J", KEY_J },
-    { "K", KEY_K }, { "L", KEY_L }, { "M", KEY_M }, { "N", KEY_N }, { "O", KEY_O }, { "P", KEY_P }, { "Q", KEY_Q }, { "R", KEY_R }, { "S", KEY_S }, { "T", KEY_T },
-    { "U", KEY_U }, { "V", KEY_V }, { "W", KEY_W }, { "X", KEY_X }, { "Y", KEY_Y }, { "Z", KEY_Z }, { "1", KEY_1 }, { "2", KEY_2 }, { "3", KEY_3 }, { "4", KEY_4 },
-    { "5", KEY_5 }, { "6", KEY_6 }, { "7", KEY_7 }, { "8", KEY_8 }, { "9", KEY_9 }, { "0", KEY_0 }, { "UP ARROW", KEY_UP }, { "DN ARROW", KEY_DOWN }, { "LF ARROW", KEY_LEFT }, { "RT ARROW", KEY_RIGHT },
+    { "A", KEY_A }, { "B", KEY_B }, { "C", KEY_C }, { "D", KEY_D }, { "E", KEY_E }, { "F", KEY_F }, { "G", KEY_G }, { "H", KEY_H }, { "I", KEY_I }, { "J", KEY_J }, { "K", KEY_K }, { "L", KEY_L }, { "M", KEY_M }, { "N", KEY_N }, { "O", KEY_O }, { "P", KEY_P }, { "Q", KEY_Q }, { "R", KEY_R }, { "S", KEY_S }, { "T", KEY_T },
+    { "U", KEY_U }, { "V", KEY_V }, { "W", KEY_W }, { "X", KEY_X }, { "Y", KEY_Y }, { "Z", KEY_Z }, { "1", KEY_1 }, { "2", KEY_2 }, { "3", KEY_3 }, { "4", KEY_4 }, { "5", KEY_5 }, { "6", KEY_6 }, { "7", KEY_7 }, { "8", KEY_8 }, { "9", KEY_9 }, { "0", KEY_0 }, { "UP ARROW", KEY_UP }, { "DN ARROW", KEY_DOWN }, { "LF ARROW", KEY_LEFT }, { "RT ARROW", KEY_RIGHT },
     { "NUM 1", KEY_KP_1 }, { "NUM 2", KEY_KP_2 }, { "NUM 3", KEY_KP_3 }, { "NUM +", KEY_KP_ADD }, { "ENTER", KEY_ENTER }, { "RIGHT SHIFT", KEY_RIGHT_SHIFT }, { "LEFT SHIFT", KEY_LEFT_SHIFT }, { "RIGHT CTRL", KEY_RIGHT_CONTROL }, { "LEFT CTRL", KEY_LEFT_CONTROL }, { "RIGHT ALT", KEY_RIGHT_ALT },
     { "LEFT ALT", KEY_LEFT_ALT }, { "RIGHT CMD", KEY_RIGHT_SUPER }, { "LEFT CMD", KEY_LEFT_SUPER }, { "LMB", MOUSE_BUTTON_1 }, { "RMB", MOUSE_BUTTON_2 }, { "MMB", MOUSE_BUTTON_3 }, { "MB 3", MOUSE_BUTTON_4 }, { "MB 4", MOUSE_BUTTON_5 }, { "MB 5", MOUSE_BUTTON_6 }, { "MB 6", MOUSE_BUTTON_7 },
     { "MB 7", MOUSE_BUTTON_8 }, { "JOY 0", JOYSTICK_1 }, { "JOY 1", JOYSTICK_2 }, { "JOY 2", JOYSTICK_3 }, { "JOY 3", JOYSTICK_4 }, { "JOY 4", JOYSTICK_5 }, { "JOY 5", JOYSTICK_6 }, { "JOY 6", JOYSTICK_7 }, { "JOY 7", JOYSTICK_8 },
@@ -6295,19 +6418,19 @@ typedef enum { SETTING_U8, SETTING_U16, SETTING_INPUT } SettingType; typedef str
 #define S_U16(n, v) { n, &Sys_Settings.v, SETTING_U16 }
 #define S_IN(n, i)  { n, &Sys_Settings.InputCodeSettings[i], SETTING_INPUT }
 const Setting configTable[] = {
-    S_U16("ResolutionWidth",ScreenWidth),S_U16("ResolutionHeight",ScreenHeight),S_U8("Fullscreen",Fullscreen),S_U8("FOV",FOV),
-    S_U8("Brightness",Brightness),S_U8("Gamma",Gamma),S_U8("AA",FXAA),S_U8("Shadows",Shadows),S_U8("SSR",Reflections),
-    S_U8("VSync",Vsync),S_U8("ModelDetail",ModelDetail),S_U8("GI",GI),S_U8("SpeakerMode",SpeakerMode),S_U8("Reverb",Reverb),
-    S_U8("VolumeMaster",VolumeMaster),S_U8("VolumeMusic",VolumeMusic),S_U8("VolumeMessage",VolumeMessage),S_U8("VolumeEffects",VolumeEffects),
-    S_U8("Language",Language),S_U8("DynamicMusic",DynamicMusic),S_U8("Footsteps",Footsteps),S_U8("InvertLook",InvertLook),S_U8("Monitor",CurrentMonitor),
-    S_U8("InvertCyberspaceLook",InvertCyberspaceLook),S_U8("InvertInventoryCycling",InvertInventoryCycling),S_U8("QuickItemPickup",QuickItemPickup),
-    S_U8("QuickReloadWeapons",QuickReloadWeapons),S_U8("MouseSensitivity",MouseSensitivity),S_U8("NoShootMode",NoShootMode),S_U8("HeadBob",HeadBob),
-    S_IN("Forward",0),S_IN("Strafe Left",1),S_IN("Backpedal",2),S_IN("Strafe Right",3),S_IN("Jump",4),S_IN("Crouch",5),S_IN("Prone",6),S_IN("Lean Left",7),
-    S_IN("Lean Right",8),S_IN("Sprint",9),S_IN("Turn Left",10),S_IN("Turn Right",11),S_IN("Look Up",12),S_IN("Look Down",13),S_IN("Recent Log",14),
-    S_IN("Biomonitor",15),S_IN("Sensaround",16),S_IN("Lantern",17),S_IN("Shield",18),S_IN("Infrared",19),S_IN("Email",20),S_IN("Booster",21),
-    S_IN("Jumpjets",22),S_IN("Attack",23),S_IN("Use",24), S_IN("Menu/Back",25),S_IN("Toggle Mode",26),S_IN("Reload",27),
-    S_IN("Weapon +",28),S_IN("Weapon -",29),S_IN("Grenade",30),S_IN("Grenade +",31),S_IN("Grenade -",32),S_IN("Ammo Type",33),S_IN("Patch Use",34),
-    S_IN("Patch +",35),S_IN("Patch -",36),S_IN("Full Map",37),S_IN("Swim Up",38),S_IN("Swim Down",39),S_IN("Screenshot",40)
+    S_U16("ResolutionWidth",ScreenWidth),S_U16("ResolutionHeight",ScreenHeight),S_U8("Fullscreen",Fullscreen),      S_U8("FOV",FOV),                     S_U8("Brightness",Brightness),
+    S_U8("Gamma",Gamma),S_U8("AA",FXAA),  S_U8("Shadows",Shadows),              S_U8("SSR",Reflections),            S_U8("VSync",Vsync),                 S_U8("ModelDetail",ModelDetail),
+    S_U8("GI",GI),                        S_U8("SpeakerMode",SpeakerMode),      S_U8("Reverb",Reverb),              S_U8("VolumeMaster",VolumeMaster),   S_U8("VolumeMusic",VolumeMusic),
+    S_U8("VolumeMessage",VolumeMessage),  S_U8("VolumeEffects",VolumeEffects),  S_U8("Language",Language),          S_U8("DynamicMusic",DynamicMusic),   S_U8("Footsteps",Footsteps),
+    S_U8("InvertLook",InvertLook),        S_U8("Monitor",CurrentMonitor),       
+    S_U8("InvertCyberspaceLook",InvertCyberspaceLook),  S_U8("InvertInventoryCycling",InvertInventoryCycling),S_U8("QuickItemPickup",QuickItemPickup),
+    S_U8("QuickReloadWeapons",QuickReloadWeapons),      S_U8("MouseSensitivity",MouseSensitivity),            S_U8("NoShootMode",NoShootMode),           S_U8("HeadBob",HeadBob),
+    S_IN("Forward",0),    S_IN("Strafe Left",1),S_IN("Backpedal",2), S_IN("Strafe Right",3),S_IN("Jump",4),        S_IN("Crouch",5),    S_IN("Prone",6),       S_IN("Lean Left",7),
+    S_IN("Lean Right",8), S_IN("Sprint",9),     S_IN("Turn Left",10),S_IN("Turn Right",11), S_IN("Look Up",12),    S_IN("Look Down",13),S_IN("Recent Log",14),
+    S_IN("Biomonitor",15),S_IN("Sensaround",16),S_IN("Lantern",17),  S_IN("Shield",18),     S_IN("Infrared",19),   S_IN("Email",20),    S_IN("Booster",21),
+    S_IN("Jumpjets",22),  S_IN("Attack",23),    S_IN("Use",24),      S_IN("Menu/Back",25),  S_IN("Toggle Mode",26),S_IN("Reload",27),
+    S_IN("Weapon +",28),  S_IN("Weapon -",29),  S_IN("Grenade",30),  S_IN("Grenade +",31),  S_IN("Grenade -",32),  S_IN("Ammo Type",33),S_IN("Patch Use",34),
+    S_IN("Patch +",35),   S_IN("Patch -",36),   S_IN("Full Map",37), S_IN("Swim Up",38),    S_IN("Swim Down",39),  S_IN("Screenshot",40)
 };
 
 const int configTableSize = sizeof(configTable) / sizeof(Setting);
@@ -6329,6 +6452,7 @@ void LoadConfig(void) {
             }
         }
     }
+
     Sys_Settings.ScreenWidth = vmax(Sys_Settings.ScreenWidth,320);
     Sys_Settings.ScreenHeight = vmax(Sys_Settings.ScreenHeight,200);
     OS_Close(f);
@@ -6346,7 +6470,7 @@ void SaveConfig(void) {
     OS_Close(f);
     DualLog("Saved settings to ./Data/Config.ini! framenum %u\n",Sys_Global.frame);
 }
-// ========================================================================================================================================================================================================================================================================================================
+// ==============
 // Credits System
 char creditStats[4096]; const char** creditPages = NULL;
 static inline __attribute__((always_inline)) float GetScore(float stupid, bool isFinal) {
@@ -6363,7 +6487,7 @@ static inline __attribute__((always_inline)) float GetScore(float stupid, bool i
 static inline __attribute__((always_inline)) void DecomposeTime(double t, u32* h, u32* m, double* s) { double tb = vfloor(t / 3600.0); *h = (u32)tb; t -= tb * 3600.0; tb = vfloor(t / 60.0); *m = (u32)tb; *s = t - tb * 60.0; }
 static inline __attribute__((always_inline)) void CreditsStats(void) {
     size_t off = 0;
-    off += StringFormat(creditStats + off, sizeof(creditStats),"================================================================================\nCITADEL\n================================================================================\nCONGRATULATIONS %s\n",Sys_Global.playerName);
+    off += StringFormat(creditStats + off, sizeof(creditStats),"============================================================================\nCITADEL\n============================================================================\nCONGRATULATIONS %s\n",Sys_Global.playerName);
     u32 h,m; double s;
     DecomposeTime(Sys_Global.pauseRelativeTime,&h,&m,&s);
     off += StringFormat(creditStats + off, sizeof(creditStats),"Straight Time: %uh %um %.3fs\n",h,m,s);
@@ -6377,7 +6501,7 @@ static inline __attribute__((always_inline)) void CreditsStats(void) {
     off += StringFormat(creditStats + off,sizeof(creditStats),"Shots Fired: %u\nGrenades Thrown: %u\n",Sys_Global.shotsFired,Sys_Global.grenadesThrown);
     off += StringFormat(creditStats + off,sizeof(creditStats),"Damage Dealt: %f\nDamage Received: %f\nSaves Scummed: %u\n\nClick to continue...\n",Sys_Global.damageDealt,Sys_Global.damageReceived,Sys_Global.savesScummed);
 }
-// ========================================================================================================================================================================================================================================================================================================
+// ================
 // Rendering System
 static __attribute__((noinline)) void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, unsigned char* bmp) {
     if (*id == 0) {glGenTextures(1,id);} glBindTexture(GL_TEXTURE_2D,*id);
@@ -6461,30 +6585,22 @@ bool UI_Slider(i16 x, i16 y, i16 w, i16 h, i16 sliderPos, i16 xPosForLabel, u8 c
 
 u8 UI_MenuButton(i16 bX, i16 bY, u8 menuItem, i16 bW, i16 bH,  i16 tX, i16 tY, const char* text, i16 pX, i16 pY) {
     bool over = false; u8 retvalue = 0u;
-    retvalue = UI_Button(bX,bY, bW,bH, &over, menuItem);
-    if (!retvalue) retvalue = (MenuEnter() && currentMenuItem == menuItem);
+    retvalue = UI_Button(bX,bY,bW,bH,&over,menuItem); if (!retvalue) retvalue = (MenuEnter() && currentMenuItem == menuItem);
     over = over || currentMenuItem == menuItem;
-    RenderFormattedText(tX,tY, over ? TEXT_STOPD_RED : TEXT_RED_MENU,FONT_STOPD,1.5f,text);
-    RenderUIImage(pX,pY, 40,40, over ? 1029 : 1028); // Menu pad
+    RenderFormattedText(tX,tY,over ? TEXT_STOPD_RED : TEXT_RED_MENU,FONT_STOPD,1.5f,text);
+    RenderUIImage(pX,pY, 40,40,over ? 1029 : 1028); // Menu pad
     return retvalue;
 }
 
 bool UI_Checkbox(i16 x, i16 y, i8 mitem, u16 textIdx, bool currentlyOn) {
     RenderUIImage(x,y,16,16,910); // Checkbox background
-    bool over = false;
-    bool changed = (UI_Button(x,y + 16,210,16,&over,mitem) || (MenuEnter() && currentMenuItem == mitem));
-    over = over || currentMenuItem == mitem;
+    bool over = false; bool changed = (UI_Button(x,y + 16,210,16,&over,mitem) || (MenuEnter() && currentMenuItem == mitem)); over = over || currentMenuItem == mitem;
     if (currentlyOn) RenderUIImage(x + 2,y + 2, 12,12, 912); // Checkbox check
     RenderFormattedText(x + 20,y,over ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,Sys_Text.stringTable[textIdx]);
     return changed;
 }
 
-void UI_HeaderText(i16 x, const char* text) {
-    RenderFormattedText(x,50,TEXT_GREEN_MENU_SHADOW,FONT_STOPD,1.75f,text);
-    RenderFormattedText(x,46,TEXT_GREEN_MENU_GLOW,FONT_STOPD,1.75f,text);
-    RenderFormattedText(x,48,TEXT_GREEN_MENU,FONT_STOPD,1.75f,text);
-}
-
+void UI_HeaderText(i16 x, const char* text) { RenderFormattedText(x,50,TEXT_GREEN_MENU_SHADOW,FONT_STOPD,1.75f,text); RenderFormattedText(x,46,TEXT_GREEN_MENU_GLOW,FONT_STOPD,1.75f,text); RenderFormattedText(x,48,TEXT_GREEN_MENU,FONT_STOPD,1.75f,text); }
 ENGINE_TO_MOD void MenuGoBack(void) {
     if (returnToPause) { returnToPause = false; Sys_Global.gamePaused = true; Sys_Global.menuActive = false; PlayGameMusic(); }
     if (currentMenuPage == Mpg_Singleplayer || currentMenuPage == Mpg_Multiplayer || currentMenuPage == Mpg_Options) currentMenuPage = Mpg_FrontPage;//News
@@ -6493,8 +6609,7 @@ ENGINE_TO_MOD void MenuGoBack(void) {
 
 void CreateShadowBuffers(void) {
     Sys_Render.shadowMapSSBO           = SetupSSBO(&Sys_Render.shadowMapSSBO,           5,(MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(u32), NULL, GL_STATIC_DRAW);    
-    Sys_Render.shadowMapsIndirectionID = SetupSSBO(&Sys_Render.shadowMapsIndirectionID, 6,LIGHT_COUNT * sizeof(u32),NULL,GL_STATIC_DRAW);
-    shadowBuffersCreated = true;
+    Sys_Render.shadowMapsIndirectionID = SetupSSBO(&Sys_Render.shadowMapsIndirectionID, 6,LIGHT_COUNT * sizeof(u32),NULL,GL_STATIC_DRAW); shadowBuffersCreated = true;
 }
 
 void ChangeMenuPage(u8 pg) { currentMenuPage = pg; currentMenuItem = currentMenuTab = 0; }
@@ -6571,16 +6686,10 @@ void RenderMenu(void) {
     
             // Fullscreen checkbox
             RenderUIImage(200,740, 16,16, 910); // Checkbox background
-            if (UI_Button(200,756, 210,16, &overFull, 8) || (MenuEnter() && currentMenuItem == 8)) {
-                Sys_Settings.Fullscreen = Sys_Settings.Fullscreen == 1u ? 0u : 1u;
-                ChangeFullScreenWindowed();
-                SaveConfig();
-            }
-            
+            if (UI_Button(200,756, 210,16, &overFull, 8) || (MenuEnter() && currentMenuItem == 8)) { Sys_Settings.Fullscreen = Sys_Settings.Fullscreen == 1u ? 0u : 1u; ChangeFullScreenWindowed(); SaveConfig(); }
             overFull = overFull || currentMenuItem == 8;
             if (Sys_Settings.Fullscreen) RenderUIImage(202,742, 12,12, 912); // Checkbox check
             RenderFormattedText(220,740,overFull ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,/*"Fullscreen"*/Sys_Text.stringTable[773]);
-            
             RenderUIImage(588,730, 210,30, 1079); // Toggle monitor button background
             if (UI_Button(588,760, 210,30, &overChgM, 9) || (MenuEnter() && currentMenuItem == 9)) { CycleToNextMonitor(); }
             overChgM = overChgM || currentMenuItem == 9;
@@ -6737,36 +6846,23 @@ static double RenderUI(void) {
     if ((Sys_Global.menuActive || Sys_Global.gamePaused)) {
         if (Sys_Input.keyStates[KEY_DOWN].pressed) currentMenuItem = (currentMenuItem + 1) >= menuItemCount ? 0 : (currentMenuItem + 1);
         else if (Sys_Input.keyStates[KEY_UP].pressed) currentMenuItem = (currentMenuItem - 1) < 0 ? (menuItemCount - 1) : (currentMenuItem - 1);
-    } else {
-        if (!Sys_Global.gamePaused && !Sys_Cheats.noHUD) RenderUIImage(672,0,22,22,1020); // Shoot mode button
-        bool mouseReleased = Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed;
-        if (Sys_Global.inventoryMode && mouseReleased && CursorIsOverBounds(672,694,22,0)) ForceShootMode();
-        
-        // Left MFD
-        RenderUIImage(-16,552,32,40,MFD_LefTab == 0 ? 1024 : 1022);
-        RenderUIImage(-16,600,32,40,MFD_LefTab == 1 ? 1024 : 1022);
-        RenderUIImage(-16,648,32,40,MFD_LefTab == 2 ? 1024 : 1022);
-        RenderUIImage(-16,696,32,40,MFD_LefTab == 3 ? 1024 : 1022);
-        
-        // Center Tabs
-        RenderUIImage(1350,552,32,40,MFD_RightTab == 0 ? 1024 : 1022);
-        RenderUIImage(1350,600,32,40,MFD_RightTab == 1 ? 1024 : 1022);
-        RenderUIImage(1350,648,32,40,MFD_RightTab == 2 ? 1024 : 1022);
-        RenderUIImage(1350,696,32,40,MFD_RightTab == 3 ? 1024 : 1022);
-        
-        // Right MFD
-        RenderUIImage(400,752,64,32,MFD_CenterTab == 0 ? 1024 : 1021);
-        RenderUIImage(480,752,64,32,MFD_CenterTab == 1 ? 1024 : 1021);
-        RenderUIImage(560,752,64,32,MFD_CenterTab == 2 ? 1024 : 1021);
-        RenderUIImage(902,752,64,32,MFD_CenterTab == 3 ? 1024 : 1021);
+    } else { // Normal UI
+                                                                                                                           if (!Sys_Cheats.noHUD) {RenderUIImage(672,0,22,22,1020);} /*Shoot mode button*/
+                                                                                                                           if (Sys_Global.inventoryMode && Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed && CursorIsOverBounds(672,694,22,0)) ForceShootMode();
+        /*Left Tab Buttons*/                                                                                                                                                                                                                                                                                                                                           /*Right Tab Buttons*/
+        RenderUIImage(-16,552,32,40,MFD_LefTab == 0 ? 1024 : 1022);                                                                                                                                                                                                                                                           RenderUIImage(1350,552,32,40,MFD_RightTab == 0 ? 1024 : 1022);
+        RenderUIImage(-16,600,32,40,MFD_LefTab == 1 ? 1024 : 1022);                                                                                                                                                                                                                                                           RenderUIImage(1350,600,32,40,MFD_RightTab == 1 ? 1024 : 1022);
+        RenderUIImage(-16,648,32,40,MFD_LefTab == 2 ? 1024 : 1022);                                                                                                                                                                                                                                                           RenderUIImage(1350,648,32,40,MFD_RightTab == 2 ? 1024 : 1022);
+        RenderUIImage(-16,696,32,40,MFD_LefTab == 3 ? 1024 : 1022);                                                                                                                                                                                                                                                           RenderUIImage(1350,696,32,40,MFD_RightTab == 3 ? 1024 : 1022);
+                                                                                                                                                                                     /*Center Tab Buttons*/
+                                                                   RenderUIImage(400,752,64,32,MFD_CenterTab == 0 ? 1024 : 1021); RenderUIImage(480,752,64,32,MFD_CenterTab == 1 ? 1024 : 1021); RenderUIImage(560,752,64,32,MFD_CenterTab == 2 ? 1024 : 1021); RenderUIImage(902,752,64,32,MFD_CenterTab == 3 ? 1024 : 1021);
     }
     
-    // Diagnostics / Debugging
-    i16 debugTextStartY = 48;
+    i16 debugTextStartY = 48; // Diagnostics / Debugging
     if (Sys_Cheats.showLocation && !Sys_Global.menuActive) RenderFormattedText(16, debugTextStartY, TEXT_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f",Sys_Global.instances[PLAYER1].position.x,Sys_Global.instances[PLAYER1].position.y,Sys_Global.instances[PLAYER1].position.z,Sys_Global.instances[PLAYER1].rotation.x,Sys_Global.instances[PLAYER1].rotation.y,Sys_Global.instances[PLAYER1].rotation.z,Sys_Global.instances[PLAYER1].rotation.w);
     i16 lineSpacing = 18;
     if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 1),TEXT_WHITE,FONT_NORMAL,1.0f,"playerCellIdx: %u, Shadow cpu ms: %.3f",playerCellIdx,voxen_Shadow_System.shadowTime * 1000);
-    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 2),TEXT_WHITE,FONT_NORMAL,1.0f,"Player velocity: %.2f, %.2f, %.2f, Grounded: %u",Sys_Global.instances[PLAYER1].velocity.x,Sys_Global.instances[PLAYER1].velocity.y,Sys_Global.instances[PLAYER1].velocity.z,Sys_Global.instances[PLAYER1].entflags & ENTFLAG_GROUNDED);
+    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 2),TEXT_WHITE,FONT_NORMAL,1.0f,"Player velocity: %.2f, %.2f, %.2f, Grounded: %u",Sys_Global.instances[PLAYER1].velocity.x,Sys_Global.instances[PLAYER1].velocity.y,Sys_Global.instances[PLAYER1].velocity.z,Sys_Global.instances[PLAYER1].entflags & EF_GROUNDED);
     RenderFormattedText(16,debugTextStartY + (lineSpacing * 4),TEXT_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d  dx:%d dy:%d",Sys_Global.cursorPosition_x,Sys_Global.cursorPosition_y,Sys_Input.currentMouse_dx,Sys_Input.currentMouse_dy);
     if (Sys_Cheats.consoleActive) RenderFormattedText(16,0,TEXT_WHITE,FONT_NORMAL,1.0f, "] %s",consoleEntryText);
     if (Sys_Global.statusTextDecayFinished > Sys_Global.current_time) RenderFormattedText(460,114,TEXT_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
@@ -6788,7 +6884,7 @@ static double RenderUI(void) {
 #define SHADOW_NEARMESH_MAX 1024
 typedef struct {float depth; u16 index; } DepthSort;
 DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX];
-static inline __attribute__((always_inline)) bool EntNotVisible(u16 i, bool otherCondition) { Entity* e = &Sys_Global.instances[i]; return e->texIndex > loadedTexturesMaxIndex || !(e->entflags & ENTFLAG_ACTIVE) || e->index >= MAX_ENTITIES || e->modelIndex >= MODEL_IDX_MAX || e->texIndex >= MAX_VALID_TEXTURE || otherCondition; }
+static inline __attribute__((always_inline)) bool EntNotVisible(u16 i, bool otherCondition) { Entity* e = &Sys_Global.instances[i]; return e->texIndex > loadedTexturesMaxIndex || !(e->entflags & EF_ACTIVE) || e->index >= MAX_ENTITIES || e->modelIndex >= MODEL_IDX_MAX || e->texIndex >= MAX_VALID_TEXTURE || otherCondition; }
 static inline __attribute__((always_inline,hot)) u16 GetAndBindModel(u16 i, u16 currentModelType) {
     glUniform1ui(0,i);
     u16 modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && Sys_Global.instances[i].lodIndex < loadedModelsMaxIndex ? Sys_Global.instances[i].lodIndex : Sys_Global.instances[i].modelIndex;
@@ -6847,7 +6943,7 @@ static __attribute__((noinline)) __attribute__((hot)) void RenderShadowmaps(void
         MemSetToVForNBytes(shadowCasterIndices,0,SC_MAX*sizeof(u16));
         u32 numShadowCasters = 0;
         for (int i=START_INDEX_LEVEL_INSTANCES;i<INSTANCE_COUNT;++i) {
-            if (EntNotVisible(i,(Sys_Global.instances[i].entflags & ENTFLAG_NO_SHADOWS))) continue;
+            if (EntNotVisible(i,(Sys_Global.instances[i].entflags & EF_NO_SHADOWS))) continue;
 
             shadowCasterIndices[numShadowCasters] = i;
             numShadowCasters++;
@@ -6921,7 +7017,7 @@ static inline __attribute__((always_inline)) bool DetermineIfInstanceVisible(u16
     Vector3 delta = V3_AsubB(e->position,playerPos);
     *distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
     float radius = modelBounds[e->modelIndex] * 2.0f * vmax(vmax(e->scale.x,e->scale.y),e->scale.z);
-    //if (!SphereInFrustum(playerFrustumPlanes,e->position,radius) && (entIdx != 754 || !skyVisible) && i != editModeSelection) return false; // TEMPORARILY DISABLE FRUSTUM CULLING UNTIL I FIGURE OUT WHY THEY ARE FLICKERING NOW THAT PHYSICS ARE ACTIVE
+    if (!SphereInFrustum(playerFrustumPlanes,e->position,radius) && (entIdx != 754 || !skyVisible) && i != editModeSelection) return false;
     
     if (ConstIndexIsPortalBlockingDoor(entIdx)) { // Extra checks only needed for opaque portal blocking doors.
         bool inPVS = (gridCellStates[instCellIdx] & CELL_VISIBLE);
@@ -6939,7 +7035,6 @@ float GetPainStatic(void) { return 0.0f; } // TODO: Hook into pain/health manage
 Color GetPainStaticColor(void) { return (Color){1.0f,0.0f,0.0f,1.0f}; } // TODO: Hook staticColor up to red or blue for pain or shield impact.
 __attribute__((pure)) i32 dsort(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (db > da) - (db < da); }
 __attribute__((pure)) i32 dsortInv(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (da > db) - (da < db); }
-void DrawCapsuleCollider(Entity *e); void DrawConvexMeshCollider(Entity *e); void DrawSphereCollider(Entity *e); void DrawBoxCollider(Entity* e);
 #define MAX_VISIBLE 4096
 #define BIND_TEX(slot,cur,next) if((cur)!=(next)||(next)==0){(cur)=(next);glUniform1ui(slot,(u32)(next));}
 #define DRAW_ENTITY(curN,curT,curG,curS,curM) \
@@ -6949,6 +7044,7 @@ void DrawCapsuleCollider(Entity *e); void DrawConvexMeshCollider(Entity *e); voi
      else if (e->collider == COLTYPE_CVX) DrawMeshCollider(e); \
      else if (e->collider == COLTYPE_MSH) DrawMeshCollider(e); \
      else if (e->collider == COLTYPE_CAP) DrawCapsuleCollider(e); \
+     DrawAngularVelocity(e); \
      glUniform1ui(17,tex==316?1u:0u); glUniform1ui(25,constIndex); glUniform1f(27,e->volume); glUniform1ui(13,(tex==36||tex==887)?1u:0u); \
      if (grayscaleEnabled) { float npcHeat = ConstIndexIsNPC(constIndex) ? ((constIndex==419 || constIndex==422 || constIndex==424 || constIndex==429 || constIndex==430 || constIndex==431||constIndex==433||constIndex==437||constIndex==438||constIndex==441) ? 1.5f : 4.0f) : 0.0f; glUniform1f(9,npcHeat); } \
      glUniform1ui(30,e->camView < camViewCount ? 1u : 0u); \
@@ -7015,7 +7111,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     u16 visibleCount = 0, currentTexIndex = 0, currentNormIndex = 0, currentGlowIndex = 0, currentSpecIndex = 0, currentModelType = 0, opaqueCount = 0;
     bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX); float distSqrd = sfar * sfar;
     DepthSort tmpTransparent[MAX_VISIBLE]; u16 tcnt = 0;
-    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) { // Determine base visibility
+    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < Sys_Global.loadedInstances; ++i) { // Determine base visibility
         if (!DetermineIfInstanceVisible(i,false,skyVisible,playerPos,&distSqrd)) continue;
        
         if (transparentTexture[Sys_Global.instances[i].texIndex]) { tmpTransparent[tcnt].index = i; tmpTransparent[tcnt].depth = distSqrd; tcnt++; }
@@ -7095,7 +7191,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glDisable(GL_CULL_FACE);
     Sys_Global.last_time = RenderUI();
     if ((Sys_Global.inventoryMode && !Sys_Cheats.noHUD) || Sys_Global.menuActive || Sys_Global.gamePaused) RenderUIImage((i16)(Sys_Global.cursorPosition_x) - 20,(i16)(Sys_Global.cursorPosition_y) - 20,40,40,GetCursorTexture());
-    else RenderUIImage(663,371,40,40,GetCursorTexture()); // Centered on UI baseline resolution 1366x768
+    else RenderUIImage(663,364,40,40,GetCursorTexture()); // Centered on UI baseline resolution 1366x768
     glBindFramebuffer(GL_FRAMEBUFFER,0); glViewport(0,0,swidth,sheight); // Restore normal output size for final composite blit
 
     glUseProgram(Sys_Render.imageBlitShaderProgram);
@@ -7173,16 +7269,16 @@ void UpdateInstanceMatrix4x4s(void) {
     u32 countFloats  = ((u32)dirtyMax - (u32)dirtyMin + 1) * 16;
     glBufferSubData(GL_SSBO, offsetFloats * sizeof(float), countFloats * sizeof(float), modelMatrices + offsetFloats);
 }
-// ========================================================================================================================================================================================================================================================================================================
+// =================
 // Level Load System
 ENGINE_TO_MOD void InitializeEntity(Entity* entry) { // Blank entity, no index yet, for initial list population or temporary Entity. memset here would be harmful as only a handful of fields are the same.
-    entry->index = U16_MAX;               entry->entflags = ENTFLAG_ACTIVE; entry->kinematic = true;
+    entry->index = U16_MAX;               entry->entflags = EF_ACTIVE; entry->kinematic = true;
     entry->layer = Layer_Default;         entry->camView = 255;             entry->rotation = QUAT_IDENTITY;
     entry->collider = COLTYPE_NONE; entry->tickTime = 0.35f;          entry->angularDrag = 0.05f;
     entry->modelIndex = entry->lodIndex  = entry->colliderMeshIndex            = MODEL_IDX_MAX;
     entry->texIndex   = entry->glowIndex = entry->specIndex = entry->normIndex = MAX_VALID_TEXTURE;
     entry->scale.x    = entry->scale.y   = entry->scale.z   = entry->mass      = entry->volume = 1.0f;
-    entry->dynamicFriction = entry->staticFriction = 0.6f;    entry->frictionCombine = entry->bounceCombine = PHYS_COMBINE_AVG;
+    entry->dynamicFriction = entry->staticFriction = 0.6f;
 }
 
 FHandle levelFileHandle;
@@ -7211,6 +7307,7 @@ ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
         e->radius = modelBounds[e->modelIndex]*vmax(vmax(e->scale.x,e->scale.y),e->scale.z);
         e->shadRadius = e->radius * 1.41;
         ComputeConvexMeshInertiaTensor(e);
+        if (e->mass < 0.001f && e->collider != COLTYPE_NONE && e->collider != COLTYPE_MSH && (e->entflags & EF_RIGIDBODY)) e->mass = 0.2f; // At least something!
     }
     
     ModInitAfterLoad(); ResetLevelAudio(); ResetLevelMusic(); creditPages = GetCreditsText();
@@ -7242,7 +7339,7 @@ __attribute__((cold)) void NewGame(void) { // Reset World States
     Sys_Global.inventoryMode = Sys_Settings.NoShootMode;
     Sys_Global.pauseRelativeTime =  Sys_Global.last_physics_time = 0.0;
     Sys_Global.last_topframe_time = Sys_Global.last_physics_time - 0.05;
-    Sys_Global.timeSinceLastPhysicsTick = 0.0166666666f;
+    Sys_Global.deltaTime = 0.0166666666f;
     Sys_Global.gameFinished = Sys_Global.creditsActive = Sys_Global.decoyActive = false;
 	Sys_Global.ressurections = Sys_Global.deaths = Sys_Global.kills = Sys_Global.cyberkills = 0u;
 	Sys_Global.shotsFired = Sys_Global.grenadesThrown = Sys_Global.savesScummed = 0U;
@@ -7260,7 +7357,7 @@ __attribute__((cold)) void NewGame(void) { // Reset World States
 }
 
 void GoIntoGame(void) { NewGame(); PlayGameMusic(); DualLog("Player named \"%s\" started the game!\n", Sys_Global.playerName); }
-// ========================================================================================================================================================================================================================================================================================================
+// ===========
 // Init System
 void* mod_handle = NULL;
 void InitalizeEnvironment(void) {
@@ -7387,7 +7484,7 @@ void InitalizeEnvironment(void) {
     DebugRAM("InitializeEnvironment end");
     DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
 }
-// ========================================================================================================================================================================================================================================================================================================
+// ===========================================
 // Write the Code That Just Does the Thing(TM)
 i32 main(void) {
     InitalizeEnvironment();
