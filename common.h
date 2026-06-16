@@ -105,24 +105,22 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define EF_DEAD                 (1ull << 11)
 #define EF_TELEPORT_ON_DEATH    (1ull << 12)
 #define EF_GO_INTO_PAIN         (1ull << 13)
-#define EF_DONT_LOOP_WAYPTS     (1ull << 14)
-#define EF_VISIT_WAYPTS_RND     (1ull << 15)
-#define EF_WANDERING            (1ull << 16)
-#define EF_ACT_AS_TURRET        (1ull << 17)
-#define EF_TARGID_ATTACHED      (1ull << 18)
-#define EF_ENEM_IN_SIGHT        (1ull << 19)
-#define EF_ENEM_IN_FRONT        (1ull << 20)
-#define EF_ENEM_IN_FOV          (1ull << 21)
-#define EF_ENEM_IN_LOS          (1ull << 22)
-#define EF_FIRST_SIGHTING       (1ull << 23)
-#define EF_DYING_SETUP          (1ull << 24)
-#define EF_HAD_ENEMY            (1ull << 25)
-#define EF_SHOT_FIRED           (1ull << 26)
-#define EF_DEAD_CHECKS_DONE     (1ull << 27)
-#define EF_HOP_DONE             (1ull << 28)
-#define EF_LOCKED               (1ull << 29)
-#define EF_HAS_CAMERA_VIEW      (1ull << 30)
-#define EF_DAMAGE_ON_USE        (1ull << 31)
+#define EF_WANDERING            (1ull << 14)
+#define EF_ACT_AS_TURRET        (1ull << 15)
+#define EF_TARGID_ATTACHED      (1ull << 16)
+#define EF_ENEM_IN_SIGHT        (1ull << 17)
+#define EF_ENEM_IN_FRONT        (1ull << 18)
+#define EF_ENEM_IN_FOV          (1ull << 19)
+#define EF_ENEM_IN_LOS          (1ull << 20)
+#define EF_FIRST_SIGHTING       (1ull << 21)
+#define EF_DYING_SETUP          (1ull << 22)
+#define EF_HAD_ENEMY            (1ull << 23)
+#define EF_SHOT_FIRED           (1ull << 24)
+#define EF_DEAD_CHECKS_DONE     (1ull << 25)
+#define EF_HOP_DONE             (1ull << 26)
+#define EF_LOCKED               (1ull << 27)
+#define EF_HAS_CAMERA_VIEW      (1ull << 28)
+#define EF_DAMAGE_ON_USE        (1ull << 29)
 #define QUESTBIT_ROBOT_SPAWN_DEACTIVATED      (1ull <<  0)
 #define QUESTBIT_ISOTOPE_INSTALLED            (1ull <<  1)
 #define QUESTBIT_SHIELD_ACTIVATED             (1ull <<  2)
@@ -200,7 +198,6 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define TEXT_RED_MENU            12
 #define SAVE_REMINDER_TIME 7.0f // 7secs ~is human short-term memory length
 #define CREDITS_PAGES 22
-#define MAX_WAYPOINTS 8
 #define TARGET_ID_LENGTH 32 // Max needed 22 + 5 for ID + 1 for space between them = 28
 #define SOUNDS_COUNT 670
 #define TEXT_DATA_FILEBUFFER_SIZE 65536 // 16 pages
@@ -219,49 +216,30 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define COLLIDER_CAPSULE_DIRECTION_X_F 0.0f // X-Axis
 #define COLLIDER_CAPSULE_DIRECTION_Y_F 1.0f // Y-Axis
 #define COLLIDER_CAPSULE_DIRECTION_Z_F 2.0f // Z-Axis
-typedef u8 BodyState;
-static const u8 BodyState_Standing=0,BodyState_Crouch=1,BodyState_CrouchingDown=2,BodyState_StandingUp=3,BodyState_Prone=4,BodyState_ProningDown=5,BodyState_ProningUp=6;
-typedef u8 Handedness;
-static const u8 Handedness_Center=0,Handedness_LH=1,Handedness_RH=2;
-typedef u8 AttackType;
-static const u8 AttackType_None=0,AttackType_Melee=1,AttackType_MeleeEnergy=2,AttackType_EnergyBeam=3,AttackType_Magnetic=4,AttackType_Projectile=5,AttackType_ProjectileNeedle=6,AttackType_ProjectileEnergyBeam=7,AttackType_ProjectileLaunched=8,AttackType_Gas=9,AttackType_Tranq=10,AttackType_Drill=11;
-typedef u8 NPCType;
-static const u8 NPCType_Mutant=0,NPCType_Supermutant=1,NPCType_Robot=2,NPCType_Cyborg=3,NPCType_Supercyborg=4,NPCType_Cyber=5,NPCType_MutantCyborg=6;
-typedef u8 PerceptionLevel;
-static const u8 PerceptionLevel_Low=0,PerceptionLevel_Medium=1,PerceptionLevel_High=2,PerceptionLevel_Omniscient=3;
-typedef u8 AIState;
-static const u8 AIState_Idle=0,AIState_Walk=1,AIState_Run=2,AIState_Attack1=3,AIState_Attack2=4,AIState_Attack3=5,AIState_Pain=6,AIState_Dying=7,AIState_Dead=8,AIState_Inspect=9,AIState_Interacting=10;
-typedef u8 AIMoveType;
-static const u8 AIMoveType_Walk=0,AIMoveType_Fly=1,AIMoveType_Swim=2,AIMoveType_Cyber=3,AIMoveType_None=4;
-typedef u8 DoorState;
-static const u8 DoorState_Closed=0,DoorState_Open=1,DoorState_Closing=2,DoorState_Opening=3;
-typedef u8 FuncStates;
-static const u8 FuncStates_Start=0,FuncStates_Target=1,FuncStates_MovingStart=2,FuncStates_MovingTarget=3,FuncStates_AjarMovingStart=4,FuncStates_AjarMovingTarget=5;
-typedef u8 SoftwareType;
-static const u8 SoftwareType_None=0,SoftwareType_Drill=1,SoftwareType_Pulser=2,SoftwareType_CShield=3,SoftwareType_Decoy=4,SoftwareType_Recall=5,SoftwareType_Turbo=6,SoftwareType_Game=7,SoftwareType_Data=8,SoftwareType_Integrity=9,SoftwareType_Keycard=10;
-typedef u8 AccessCardType;
-static const u8 AccessCardType_None=0,AccessCardType_Standard=1,AccessCardType_Medical=2,AccessCardType_Science=3,AccessCardType_Admin=4,AccessCardType_Group1=5,AccessCardType_Group2=6,AccessCardType_Group3=7,AccessCardType_Group4=8,AccessCardType_GroupA=9,AccessCardType_GroupB=10,AccessCardType_Storage=11,AccessCardType_Engineering=12,AccessCardType_Maintenance=13,AccessCardType_Security=14,AccessCardType_Per1=15,AccessCardType_Per2=16,AccessCardType_Per3=17,AccessCardType_Per4=18,AccessCardType_Per5=19;
-typedef u8 MusicType;
-static const u8 MusicType_None=0,MusicType_Walking=1,MusicType_Combat=2,MusicType_Override=3;
-typedef u8 TrackType;
-static const u8 TrackType_None=0,TrackType_Walking=1,TrackType_Combat=2,TrackType_Revive=3,TrackType_Death=4,TrackType_Cybertube=5,TrackType_Elevator=6,TrackType_Distortion=7;
-typedef u8 BloodType;
-static const u8 BloodType_None=0,BloodType_Red=1,BloodType_Yellow=2,BloodType_Green=3,BloodType_Robot=4,BloodType_Leaf=5,BloodType_Mutation=6,BloodType_GrayMutation=7;
-typedef u8 SecurityType;
-static const u8 SecurityType_None=0,SecurityType_Camera=1,SecurityType_NodeSmall=2,SecurityType_NodeLarge=3;
-typedef u8 AudioLogType;
-static const u8 AudioLogType_TextOnly=0,AudioLogType_Normal=1,AudioLogType_Email=2,AudioLogType_Papers=3,AudioLogType_Vmail=4,AudioLogType_Game=5;
-typedef u8 EnergyType;
-static const u8 EnergyType_Battery=0,EnergyType_ChargeStation=1;
-typedef u8 FootStepType;
-static const u8 FootStepType_None=0,FootStepType_Carpet=1,FootStepType_Concrete=2,FootStepType_GrittyCrete=3,FootStepType_Grass=4,FootStepType_Gravel=5,FootStepType_Rock=6,FootStepType_Glass=7,FootStepType_Marble=8,FootStepType_Metal=9,FootStepType_Grate=10,FootStepType_Metal2=11,FootStepType_Metpanel=12,FootStepType_Panel=13,FootStepType_Plaster=14,FootStepType_Plastic=15,FootStepType_Plastic2=16,FootStepType_Rubber=17,FootStepType_Sand=18,FootStepType_Squish=19,FootStepType_Vent=20,FootStepType_Water=21,FootStepType_Wood=22,FootStepType_Wood2=23;
+typedef u8 BodyState;        static const u8 BodyState_Standing=0,BodyState_Crouch=1,BodyState_CrouchingDown=2,BodyState_StandingUp=3,BodyState_Prone=4,BodyState_ProningDown=5,BodyState_ProningUp=6;
+typedef u8 Handedness;       static const u8 Handedness_Center=0,Handedness_LH=1,Handedness_RH=2;
+typedef u8 AttackType;       static const u8 AttackType_None=0,AttackType_Melee=1,AttackType_MeleeEnergy=2,AttackType_EnergyBeam=3,AttackType_Magnetic=4,AttackType_Projectile=5,AttackType_ProjectileNeedle=6,AttackType_ProjectileEnergyBeam=7,AttackType_ProjectileLaunched=8,AttackType_Gas=9,AttackType_Tranq=10,AttackType_Drill=11;
+typedef u8 NPCType;          static const u8 NPCType_Mutant=0,NPCType_Supermutant=1,NPCType_Robot=2,NPCType_Cyborg=3,NPCType_Supercyborg=4,NPCType_Cyber=5,NPCType_MutantCyborg=6;
+typedef u8 PerceptionLevel;  static const u8 PerceptionLevel_Low=0,PerceptionLevel_Medium=1,PerceptionLevel_High=2,PerceptionLevel_Omniscient=3;
+typedef u8 AIState;          static const u8 AIState_Idle=0,AIState_Walk=1,AIState_Run=2,AIState_Attack1=3,AIState_Attack2=4,AIState_Attack3=5,AIState_Pain=6,AIState_Dying=7,AIState_Dead=8,AIState_Inspect=9,AIState_Interacting=10;
+typedef u8 AIMoveType;       static const u8 AIMoveType_Walk=0,AIMoveType_Fly=1,AIMoveType_Swim=2,AIMoveType_Cyber=3,AIMoveType_None=4;
+typedef u8 DoorState;        static const u8 DoorState_Closed=0,DoorState_Open=1,DoorState_Closing=2,DoorState_Opening=3;
+typedef u8 FuncStates;       static const u8 FuncStates_Start=0,FuncStates_Target=1,FuncStates_MovingStart=2,FuncStates_MovingTarget=3,FuncStates_AjarMovingStart=4,FuncStates_AjarMovingTarget=5;
+typedef u8 AccessCardType;   static const u8 AccessCardType_None=0,AccessCardType_Standard=1,AccessCardType_Medical=2,AccessCardType_Science=3,AccessCardType_Admin=4,AccessCardType_Group1=5,AccessCardType_Group2=6,AccessCardType_Group3=7,AccessCardType_Group4=8,AccessCardType_GroupA=9,AccessCardType_GroupB=10,AccessCardType_Storage=11,AccessCardType_Engineering=12,AccessCardType_Maintenance=13,AccessCardType_Security=14,AccessCardType_Per1=15,AccessCardType_Per2=16,AccessCardType_Per3=17,AccessCardType_Per4=18,AccessCardType_Per5=19;
+typedef u8 MusicType;        static const u8 MusicType_None=0,MusicType_Walking=1,MusicType_Combat=2,MusicType_Override=3;
+typedef u8 TrackType;        static const u8 TrackType_None=0,TrackType_Walking=1,TrackType_Combat=2,TrackType_Revive=3,TrackType_Death=4,TrackType_Cybertube=5,TrackType_Elevator=6,TrackType_Distortion=7;
+typedef u8 BloodType;        static const u8 BloodType_None=0,BloodType_Red=1,BloodType_Yellow=2,BloodType_Green=3,BloodType_Robot=4,BloodType_Leaf=5,BloodType_Mutation=6,BloodType_GrayMutation=7;
+typedef u8 SecurityType;     static const u8 SecurityType_None=0,SecurityType_Camera=1,SecurityType_NodeSmall=2,SecurityType_NodeLarge=3;
+typedef u8 AudioLogType;     static const u8 AudioLogType_TextOnly=0,AudioLogType_Normal=1,AudioLogType_Email=2,AudioLogType_Papers=3,AudioLogType_Vmail=4,AudioLogType_Game=5;
+typedef u8 EnergyType;       static const u8 EnergyType_Battery=0,EnergyType_ChargeStation=1;
+typedef u8 FootStepType;     static const u8 FootStepType_None=0,FootStepType_Carpet=1,FootStepType_Concrete=2,FootStepType_GrittyCrete=3,FootStepType_Grass=4,FootStepType_Gravel=5,FootStepType_Rock=6,FootStepType_Glass=7,FootStepType_Marble=8,FootStepType_Metal=9,FootStepType_Grate=10,FootStepType_Metal2=11,FootStepType_Metpanel=12,FootStepType_Panel=13,FootStepType_Plaster=14,FootStepType_Plastic=15,FootStepType_Plastic2=16,FootStepType_Rubber=17,FootStepType_Sand=18,FootStepType_Squish=19,FootStepType_Vent=20,FootStepType_Water=21,FootStepType_Wood=22,FootStepType_Wood2=23;
 typedef u8 MusicResourceType;static const u8 MusicResourceType_Menu=0,MusicResourceType_Medical=1,MusicResourceType_Science=2,MusicResourceType_Reactor=3,MusicResourceType_Executive=4,MusicResourceType_Grove=5,MusicResourceType_Cyber=6,MusicResourceType_Security=7,MusicResourceType_Revive=8,MusicResourceType_Death=9,MusicResourceType_Elevator=10,MusicResourceType_Distortion=11,MusicResourceType_Looped=12,MusicResourceType_Level=13;
-typedef u8 HUDColor;static const u8 HUDColor_White=0,HUDColor_Red=1,HUDColor_Orange=2,HUDColor_Yellow=3,HUDColor_Green=4,HUDColor_Blue=5,HUDColor_Purple=6,HUDColor_Gray=7;
-typedef u8 ForceFieldColor;static const u8 ForceFieldColor_Red=0,ForceFieldColor_Green=1,ForceFieldColor_Blue=2,ForceFieldColor_Purple=3,ForceFieldColor_RedFaint=4;
-typedef u8 ButtonType;static const u8 ButtonType_Generic=0,ButtonType_GeneralInv=1,ButtonType_Patch=2,ButtonType_Grenade=3,ButtonType_Weapon=4,ButtonType_Search=5,ButtonType_None=6,ButtonType_PGrid=7,ButtonType_PWire=8,ButtonType_Vaporize=9,ButtonType_ShootMode=10,ButtonType_GrenadeTimerSlider=11;
-typedef u8 TabMSG;static const u8 TabMSG_None=0,TabMSG_Search=1,TabMSG_AudioLog=2,TabMSG_Keypad=3,TabMSG_Elevator=4,TabMSG_GridPuzzle=5,TabMSG_WirePuzzle=6,TabMSG_EReader=7,TabMSG_Weapon=8,TabMSG_SystemAnalyzer=9;
-typedef u8 PuzzleCellType;static const u8 PuzzleCellType_Off=0,PuzzleCellType_Standard=1,PuzzleCellType_And=2,PuzzleCellType_Bypass=3;
-typedef u8 PuzzleGridType;static const u8 PuzzleGridType_King=0,PuzzleGridType_Queen=1,PuzzleGridType_Knight=2,PuzzleGridType_Rook=3,PuzzleGridType_Bishop=4,PuzzleGridType_Pawn=5;
+typedef u8 HUDColor;         static const u8 HUDColor_White=0,HUDColor_Red=1,HUDColor_Orange=2,HUDColor_Yellow=3,HUDColor_Green=4,HUDColor_Blue=5,HUDColor_Purple=6,HUDColor_Gray=7;
+typedef u8 ForceFieldColor;  static const u8 ForceFieldColor_Red=0,ForceFieldColor_Green=1,ForceFieldColor_Blue=2,ForceFieldColor_Purple=3,ForceFieldColor_RedFaint=4;
+typedef u8 ButtonType;       static const u8 ButtonType_Generic=0,ButtonType_GeneralInv=1,ButtonType_Patch=2,ButtonType_Grenade=3,ButtonType_Weapon=4,ButtonType_Search=5,ButtonType_None=6,ButtonType_PGrid=7,ButtonType_PWire=8,ButtonType_Vaporize=9,ButtonType_ShootMode=10,ButtonType_GrenadeTimerSlider=11;
+typedef u8 TabMSG;           static const u8 TabMSG_None=0,TabMSG_Search=1,TabMSG_AudioLog=2,TabMSG_Keypad=3,TabMSG_Elevator=4,TabMSG_GridPuzzle=5,TabMSG_WirePuzzle=6,TabMSG_EReader=7,TabMSG_Weapon=8,TabMSG_SystemAnalyzer=9;
+typedef u8 PuzzleCellType;   static const u8 PuzzleCellType_Off=0,PuzzleCellType_Standard=1,PuzzleCellType_And=2,PuzzleCellType_Bypass=3;
+typedef u8 PuzzleGridType;   static const u8 PuzzleGridType_King=0,PuzzleGridType_Queen=1,PuzzleGridType_Knight=2,PuzzleGridType_Rook=3,PuzzleGridType_Bishop=4,PuzzleGridType_Pawn=5;
 static const u32 Layer_Default          = 1U;
 static const u32 Layer_TransparentFX    = 2U;
 //                                        4U   // unused (formerly IgnoreRaycast)
@@ -312,7 +290,7 @@ typedef struct {
 	u8 FOV,Brightness,Gamma,FXAA,Shadows,Reflections,Vsync,ModelDetail,GI,SpeakerMode,Reverb,VolumeMaster,VolumeMusic,VolumeMessage,VolumeEffects,Language,DynamicMusic;
 	u8 Footsteps,InvertLook,InvertInventoryCycling,InvertCyberspaceLook,QuickItemPickup,QuickReloadWeapons,MouseSensitivity,NoShootMode,HeadBob,SSR_RES,CurrentMonitor;
 } SettingsSystem;
-typedef struct { bool god,noclip,notarget,bottomless,superoverride,fatigueCheat,redbull,consoleActive,noHUD,showLocation,showFPS,editMode; u8 dizzyLevel; } CheatsSystem;
+typedef struct { bool god,noclip,notarget,bottomless,superoverride,fatigueCheat,redbull,consoleActive,noHUD,showLocation,showFPS,showPhys,editMode; u8 dizzyLevel; } CheatsSystem;
 typedef struct {
 	i32 lastMultiMediaTabOpened;
 	bool lastWeaponSideRH,lastItemSideRH,lastAutomapSideRH,lastTargetSideRH,lastDataSideRH,lastSearchSideRH,lastLogSideRH,lastLogSecondarySideRH,lastMinigameSideRH;
@@ -326,7 +304,6 @@ typedef struct {
 	i32 applyButtonReferenceIndex,curCenterTab;
     bool isBlocking,isRH;
 	i32 wep16index,tempSpriteIndex;
-	float lastEnergy,lastHealth;
 	double tickFinished; // Visual only, Time.time controlled
 	i32 count;
 	bool centerTabNotified[4];
@@ -497,37 +474,28 @@ typedef /*FAT*/ struct  {
     
     // Logic and I/O
     u32 ioflags;
-    float health,lastHealth,cyberHealth;
+    float health,cyberHealth;
     u8 securityThreshold,lerpUp;
     char targetname[TARGET_STRING_LENGTH];
     char target[TARGET_STRING_LENGTH];
     char target2[TARGET_STRING_LENGTH];
     char currenttarget[TARGET_STRING_LENGTH];
     char targetIfFalse[TARGET_STRING_LENGTH];
-    char argvalue[TARGET_STRING_LENGTH];
     u16 enemy,altTexIndex,altGlowIndex,messageIndex,teleportID,targetDestinationID;
-    i16 version,SFXIndex,SFXLockedIndex,textIndex,emailIndex;
-    SoftwareType type;
+    i16 version,SFXIndex,SFXLockedIndex,textIndex,emailIndex,ammo,ammo2;
     float delay,damage,itemLifeTime,minutes,seconds,randomMin,randomMax;
     float timeInterval,cyberTimer,intervalFinished,delayFireFinished,delayResetFinished;
     bool searchableInUse,generateContents,dontReset,onlyOnce,ignoreSecondaryTriggers,allDone,currentTexture,useRandomTimes,active; // Lawdy, we'll make these bitflags someday
     bool touchEnabled,broken,stayOpen,startOpen,ajar,blocked,targetAlreadyDone,toggleLasers,targettingOnlyUnlocks;
     bool changeLayerOnOpenClose,despawnInstead,doSelfAfterList,destroyAfterListInsteadOfDeactivate,iceActive;
     bool forceFieldDirectionX,forceFieldDirectionY,forceFieldDirectionZ,heldObjectLoadedAlternate,changeTexOnActive,blinkTexOnActive;
-    i16 numPlayers;
     u16 recentMostActivator,countToTrigger,counter,activateSFX,lockedSFX,messageLingdex,lockedMessageLingdex;
     u8 maxRandomItems; // [0 4]
     u16 lookUpIndex,contents[4],customIndex[4],useableItemIndex,usableCustomIndex,randomItem[4],randomItemCustomIndex[4];
     float randomItemDropChance[4];
-    float fireworkWaitMinMin;
     AttackType attackType;
-    i16 ammo,ammo2;
     AccessCardType requiredAccessCard;
-    float delayFinished,tickFinished,tickTime,useFinished,waitBeforeClose,lasersFinished;
-    float amount,resetTime,minSecurityLevel,ajarPercentage,useTimeDelay,timeBeforeLasersOn,force,strength;
-    float offStrengthFactor;
-    float distancePaddingToTopPoint;
-    float initialBurstFinished,justUsed,timerFinished;
+    float delayFinished,tickFinished,tickTime,useFinished,waitBeforeClose,lasersFinished,amount,resetTime,minSecurityLevel,ajarPercentage,useTimeDelay,timeBeforeLasersOn,force,strength,offStrengthFactor,distancePaddingToTopPoint,initialBurstFinished,justUsed,timerFinished;
     BloodType bloodType;
     DoorState doorOpen;
     ForceFieldColor fieldColor;
@@ -539,25 +507,21 @@ typedef /*FAT*/ struct  {
     u8 clip,numclips,texAnimClip;
     u16 animationNum,frame,texFrame,texGlowFrame;
     bool textureAnimating,textureGlowAnimating,textureAnimationStopsAtDead,texAnimInReverse,texAnimRandom;
-    u16 texAnimLight;
-    u16 texAnimLight2;
-    i32 cellIndex;
-    i16 cellX,cellZ;
+    u16 texAnimLight,texAnimLight2;
+    i32 cellIndex; i16 cellX,cellZ;
     u8 portalIndex; // If this is a door, index into portal array for toggling state.
     DoorState doorState;
-    float currentFrameFinished;
-    float animSwapFinished;
+    float currentFrameFinished,animSwapFinished;
     bool alternateOn;
     u16 mainSwitchMaterial;
     AIState currentState; // NPC logic
     u16 deathBurst;
-    u8 walkWaypointsLength,currentWaypoint;
     float timeForTranquilization,gracePeriodFinished,meleeDamageFinished,idleTime,attack1SoundTime,attack2SoundTime,attack3SoundTime;
     float timeTillEnemyChangeFinished,timeTillDeadFinished,timeTillPainFinished,huntFinished;
     float randomWaitForNextAttack1Finished,randomWaitForNextAttack2Finished,randomWaitForNextAttack3Finished;
     float attackFinished,attack2Finished,attack3Finished,deathBurstFinished,tranquilizeFinished,wanderFinished,timeSinceMovedEnough,posCheckFinished;
-    Vector3 currentDestination,lastKnownEnemyPos,targettingPosition,idealTransformForward,idealPos,walkWaypoints[MAX_WAYPOINTS];
-    char targetID[TARGET_ID_LENGTH],texAnimResourceFolder[TARGET_STRING_LENGTH],path[TARGET_STRING_LENGTH];
+    Vector3 currentDestination,lastKnownEnemyPos,targettingPosition,idealTransformForward,idealPos;
+    char texAnimResourceFolder[TARGET_STRING_LENGTH];
     // phew what a porker of a struct, it's been a eatin!
 } Entity;
 

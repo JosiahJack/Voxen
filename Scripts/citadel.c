@@ -15,18 +15,8 @@ __attribute__((used)) AutoSplitterData autoSplitter = {0x1337133713371337,0,fals
 GlobalContext* Eng_Global; CheatsSystem*  Eng_Cheats; SettingsSystem* Eng_Settings; TextSystem* Eng_Text; SystemUI* Eng_UI; // From Engine
 MOD_TO_ENGINE void ModLink(GlobalContext* g,CheatsSystem* c,SettingsSystem* s,TextSystem* t,SystemUI* ui){Eng_Global=g;Eng_Cheats=c;Eng_Settings=s;Eng_Text=t;Eng_UI=ui;}
 int lev1SecCode,lev2SecCode,lev3SecCode,lev4SecCode,lev5SecCode,lev6SecCode;
-
 #ifdef WINDOWS
-MOD_TO_ENGINE i32 __stdcall DllMain(void* hinstDLL, unsigned long fdwReason, void* lpReserved) {
-    (void)hinstDLL;
-    (void)lpReserved;
-    switch (fdwReason) {
-//         case DLL_PROCESS_ATTACH: break;
-//         case DLL_PROCESS_DETACH: break;
-    }
-    return 1;
-}
-
+MOD_TO_ENGINE i32 __stdcall DllMain(void* hinstDLL, unsigned long fdwReason, void* lpReserved) { (void)hinstDLL; (void)lpReserved; switch (fdwReason) {} return 1; }
 void* memset(void* dst, int c, size_t n) { return MemSetToVForNBytes(dst,c,n); }
 #endif
 
@@ -463,12 +453,12 @@ void CycleCyberSpaceItemDn(u16 p) {
     }
 }
 
-bool AddSoftwareItem(u16 p,SoftwareType type,int vers) {
+bool AddSoftwareItem(u16 p,u16 index,int vers) {
     InventorySystem* inv = Inv(p);
     Entity* player       = PE(p);
     float sfxVol         = (float)Eng_Settings->VolumeEffects / 100.0f;
-    switch(type) {
-        case SoftwareType_Drill:
+    switch(index) {
+        case 450/*item_cyber_drill*/:
             if (inv->isPulserNotDrill && !(inv->hasSoft & (1u << SW_PULSER))) inv->isPulserNotDrill = false;
             if (vers > inv->softVersions[SW_DRILL]) inv->softVersions[SW_DRILL] = (u8)vers;
             else CenterStatusPrint("%s",Eng_Text->stringTable[46]);
@@ -476,7 +466,7 @@ bool AddSoftwareItem(u16 p,SoftwareType type,int vers) {
             play_wav(sounds[86],sfxVol,(Vector3){},false);
             CenterStatusPrint("%s%d%s",Eng_Text->stringTable[444],inv->softVersions[SW_DRILL],Eng_Text->stringTable[458]);
             return true;
-        case SoftwareType_Pulser:
+        case 454/*item_cyber_pulser*/:
             if (!inv->isPulserNotDrill && !(inv->hasSoft & (1u << SW_PULSER))) inv->isPulserNotDrill = true;
             if (vers > inv->softVersions[SW_PULSER]) inv->softVersions[SW_PULSER] = (u8)vers;
             else CenterStatusPrint("%s",Eng_Text->stringTable[46]);
@@ -484,35 +474,35 @@ bool AddSoftwareItem(u16 p,SoftwareType type,int vers) {
             play_wav(sounds[86],sfxVol,(Vector3){},false);
             CenterStatusPrint("%s%d%s",Eng_Text->stringTable[445],inv->softVersions[SW_PULSER],Eng_Text->stringTable[458]);
             return true;
-        case SoftwareType_CShield:
+        case 456/*item_cyber_shield*/:
             if (vers > inv->softVersions[SW_SHIELD]) inv->softVersions[SW_SHIELD] = (u8)vers;
             else CenterStatusPrint("%s",Eng_Text->stringTable[46]);
             inv->hasSoft |= (1u << SW_SHIELD);
             play_wav(sounds[86],sfxVol,(Vector3){},false);
             CenterStatusPrint("%s%d%s",Eng_Text->stringTable[446],inv->softVersions[SW_SHIELD],Eng_Text->stringTable[458]);
             return true;
-        case SoftwareType_Turbo:
+        case 457/*item_cyber_turbo*/:
             if (inv->cyberItemIndex < 0) inv->cyberItemIndex = 0;
             inv->softVersions[SW_TURBO]++;
             inv->hasSoft |= (1u << SW_TURBO);
             play_wav(sounds[86],sfxVol,(Vector3){},false);
             CenterStatusPrint("%s",Eng_Text->stringTable[447]);
             return true;
-        case SoftwareType_Decoy:
+        case 449/*item_cyber_decoy*/:
             if (inv->cyberItemIndex < 0) inv->cyberItemIndex = 1;
             inv->softVersions[SW_DECOY]++;
             inv->hasSoft |= (1u << SW_DECOY);
             play_wav(sounds[86],sfxVol,(Vector3){},false);
             CenterStatusPrint("%s",Eng_Text->stringTable[448]);
             return true;
-        case SoftwareType_Recall:
+        case 455/*item_cyber_recall*/:
             if (inv->cyberItemIndex < 0) inv->cyberItemIndex = 2;
             inv->softVersions[SW_RECALL]++;
             inv->hasSoft |= (1u << SW_RECALL);
             play_wav(sounds[86],sfxVol,(Vector3){},false);
             CenterStatusPrint("%s",Eng_Text->stringTable[449]);
             return true;
-        case SoftwareType_Game: {
+        case 451/* ;) item_cyber_game*/: {
             if (vers < 0 || vers >= 7) return false;
             inv->hasNewData  = true;
             inv->hasMinigame |= (u8)(1u << vers);
@@ -521,13 +511,13 @@ bool AddSoftwareItem(u16 p,SoftwareType type,int vers) {
             CenterStatusPrint("%s",Eng_Text->stringTable[gameMsg[vers]]);
             return true;
         }
-        case SoftwareType_Data:
+        case 448/*item_cyber_data*/:
             inv->hasNewData = true;
             if (vers >= 0 && vers < TEXT_LOGS_COUNT) inv->hasLog[vers] = true;
             play_wav(sounds[87],sfxVol,(Vector3){},false);
             CenterStatusPrint("%s",Eng_Text->stringTable[457]);
             return true;
-        case SoftwareType_Integrity:
+        case 452/*item_cyber_integrity*/:
             if (player->cyberHealth >= 255.0f) return false;
             play_wav(sounds[86],sfxVol,(Vector3){},false);
             player->cyberHealth += 77.0f;
@@ -535,7 +525,7 @@ bool AddSoftwareItem(u16 p,SoftwareType type,int vers) {
             // TODO: DrawTicks(true) — HUD cyber health tick refresh
             CenterStatusPrint("%s",Eng_Text->stringTable[459]);
             return true;
-        case SoftwareType_Keycard:
+        case 453/*item_cyber_keycard*/:
             inv->hasNewData = true;
             if (vers < 0 || vers > 110) vers = 81;
             AddAccessCardToInventory(p,vers);
@@ -769,13 +759,13 @@ void CyberDataFragmentOnTriggerEnter(u16 self, u16 other) {
 // CyberItem
 void CyberItemInitBeforeLoad(u16 self) {
     Entity* e = &Eng_Global->instances[self];
-    if (Eng_Global->difficultyMission == 0 && e->type == SoftwareType_Data) flag_set(&e->entflags,EF_ACTIVE,false);
+    if (Eng_Global->difficultyMission == 0 && e->index == 448) flag_set(&e->entflags,EF_ACTIVE,false); // item_cyber_data
 }
 
 void CyberItemOnTriggerEnter(u16 self, u16 other) {
     Entity* e = &Eng_Global->instances[self];
     if (other != PLAYER1) return;
-    if (!AddSoftwareItem(PLAYER1,e->type,e->version)) return;
+    if (!AddSoftwareItem(PLAYER1,e->index,e->version)) return;
     flag_set(&e->entflags,EF_ACTIVE,false);
 }
 //=============================================================================
@@ -841,7 +831,7 @@ void CyberSwitchOnTriggerEnter(u16 self, u16 other) {
     if (e->active || other != PLAYER1) return;
     UICyberSprint((u16)e->textIndex);
     e->active = true;
-    UseTargets(other,e->argvalue,e->target);
+    UseTargets(other,e->target);
 }
 //=============================================================================
 // CyberTimer
@@ -956,8 +946,8 @@ void FuncWallInitAfterLoad(u16 self) {
 
 void FuncWallMoveStart(u16 self) { Eng_Global->instances[self].funcState = FuncStates_MovingStart; Eng_Global->instances[self].tickFinished = Eng_Global->pauseRelativeTime + 10.0f; }
 void FuncWallMoveTarget(u16 self) { Eng_Global->instances[self].funcState = FuncStates_MovingTarget; Eng_Global->instances[self].tickFinished = Eng_Global->pauseRelativeTime + 10.0f; }
-void FuncWallTargetted(u16 self, u16 activator, const char* argvalue) {
-    (void)activator; (void)argvalue;
+void FuncWallTargetted(u16 self, u16 activator) {
+    (void)activator;
     Entity* e = &Eng_Global->instances[self];
     if (e->funcState == FuncStates_Start || e->funcState == FuncStates_MovingStart || e->funcState == FuncStates_AjarMovingTarget) FuncWallMoveTarget(self);
     else FuncWallMoveStart(self);
@@ -1074,33 +1064,29 @@ void TeleportTouchOnTriggerEnter(u16 self, u16 other) {
 
 //=============================================================================
 // Trigger
-void TriggerUseTargets(u16 self, u16 activator) { UseTargets(activator,Eng_Global->instances[self].argvalue,Eng_Global->instances[self].target); }
+void TriggerUseTargets(u16 self, u16 activator) { UseTargets(activator,Eng_Global->instances[self].target); }
 void TriggerDelayedTarget(u16 self, u16 activator) { Eng_Global->instances[self].delayFireFinished = Eng_Global->pauseRelativeTime + Eng_Global->instances[self].delay; TriggerUseTargets(self,activator); }
-
-void TriggerTriggerTripped(u16 self, u16 other, bool initialEntry) {
+void TriggerTriggerTripped(u16 self, u16 other) {
     Entity* e = &Eng_Global->instances[self];
     if (other != PLAYER1 && other != PLAYER2) return;
     if (e->recentMostActivator && e->ignoreSecondaryTriggers) return;
     e->recentMostActivator = other;
-    if (initialEntry) e->numPlayers++;
     if (e->onlyOnce) e->allDone = true;
     if (e->delay <= 0.0f) TriggerUseTargets(self,other); else TriggerDelayedTarget(self,other);
 }
 
-void TriggerOnTriggerEnter(u16 self, u16 other) { if (!Eng_Global->instances[self].allDone) TriggerTriggerTripped(self,other,true); }
-void TriggerOnTriggerStay(u16 self, u16 other) { if (!Eng_Global->instances[self].allDone) TriggerTriggerTripped(self,other,false); }
-void TriggerOnTriggerExit(u16 self, u16 other) { if (!Eng_Global->instances[self].allDone && (other == PLAYER1 || other == PLAYER2)) Eng_Global->instances[self].numPlayers--; }
+void TriggerOnTriggerEnter(u16 self, u16 other) { if (!Eng_Global->instances[self].allDone) TriggerTriggerTripped(self,other); }
+void TriggerOnTriggerStay(u16 self, u16 other) { if (!Eng_Global->instances[self].allDone) TriggerTriggerTripped(self,other); }
 void TriggerTargetted(u16 self, u16 activator) { if (Eng_Global->instances[self].ignoreSecondaryTriggers) Eng_Global->instances[self].recentMostActivator = activator; }
 //=============================================================================
 // TriggerCounter
-void TriggerCounterTarget(u16 self, u16 activator, const char* argvalue) { (void)argvalue; UseTargets(activator,Eng_Global->instances[self].argvalue,Eng_Global->instances[self].target); }
-void TriggerCounterDelayedTarget(u16 self, u16 activator, const char* argvalue) { Eng_Global->instances[self].delayFinished = Eng_Global->pauseRelativeTime + Eng_Global->instances[self].delay; TriggerCounterTarget(self,activator,argvalue); }
-
-void TriggerCounterTargetted(u16 self, u16 activator, const char* argvalue) {
+void TriggerCounterTarget(u16 self, u16 activator) { UseTargets(activator,Eng_Global->instances[self].target); }
+void TriggerCounterDelayedTarget(u16 self, u16 activator) { Eng_Global->instances[self].delayFinished = Eng_Global->pauseRelativeTime + Eng_Global->instances[self].delay; TriggerCounterTarget(self,activator); }
+void TriggerCounterTargetted(u16 self, u16 activator) {
     Entity* e = &Eng_Global->instances[self];
     e->counter++;
     if (e->counter != e->countToTrigger) return;
-    if (e->delay <= 0.0f) TriggerCounterTarget(self,activator,argvalue); else TriggerCounterDelayedTarget(self,activator,argvalue);
+    if (e->delay <= 0.0f) TriggerCounterTarget(self,activator); else TriggerCounterDelayedTarget(self,activator);
     if (!e->dontReset) e->counter = 0;
 }
 //=============================================================================
@@ -1189,8 +1175,7 @@ void LogicTimerInitBeforeLoad(u16 self) {
     e->intervalFinished = Eng_Global->pauseRelativeTime + (e->useRandomTimes ? (double)random_range(e->randomMin,e->randomMax) : (double)e->timeInterval);
 }
 
-void LogicTimerUseTargets(u16 self) { UseTargets(self,Eng_Global->instances[self].argvalue,Eng_Global->instances[self].target); }
-
+void LogicTimerUseTargets(u16 self) { UseTargets(self,Eng_Global->instances[self].target); }
 void LogicTimerUpdate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (!e->active || e->intervalFinished >= Eng_Global->pauseRelativeTime) return;
@@ -1198,8 +1183,7 @@ void LogicTimerUpdate(u16 self) {
     LogicTimerUseTargets(self);
 }
 
-void LogicTimerTargetted(u16 self, u16 activator, const char* argvalue) { (void)activator; (void)argvalue; Eng_Global->instances[self].active = !Eng_Global->instances[self].active; }
-
+void LogicTimerTargetted(u16 self, u16 activator) { (void)activator; Eng_Global->instances[self].active = !Eng_Global->instances[self].active; }
 //=============================================================================
 // ButtonSwitch
 void ButtonSwitchInitAfterLoad(u16 self) {
@@ -1208,10 +1192,10 @@ void ButtonSwitchInitAfterLoad(u16 self) {
     if (e->active) e->tickFinished = Eng_Global->pauseRelativeTime + 1.5 + (double)random_range(0.0f,1.0f);
 }
 
-void ButtonSwitchUseTargets(u16 self, u16 activator, const char* argvalue) {
+void ButtonSwitchUseTargets(u16 self, u16 activator) {
     Entity* e = &Eng_Global->instances[self];
     DualLog("ButtonSwitchUseTargets, targeting:%s,ioflags:%u\n",e->target,e->ioflags);
-    UseTargets(activator,argvalue,e->target);
+    UseTargets(activator,e->target);
     e->active = !e->active;
     e->alternateOn = e->active;
     if (e->changeTexOnActive) {
@@ -1220,7 +1204,7 @@ void ButtonSwitchUseTargets(u16 self, u16 activator, const char* argvalue) {
     }
 }
 
-void ButtonSwitchUse(u16 self, u16 activator, const char* argvalue) {
+void ButtonSwitchUse(u16 self, u16 activator) {
     Entity* e = &Eng_Global->instances[self];
     if (Eng_Cheats->superoverride || Eng_Global->difficultyMission == 0) EntitySetLocked(e,false);
     else if (GetCurrentLevelSecurity() > e->securityThreshold) { UIBlockedBySecurity(e->position); return; }
@@ -1233,12 +1217,12 @@ void ButtonSwitchUse(u16 self, u16 activator, const char* argvalue) {
     if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
     CenterStatusPrint("%s",Eng_Text->stringTable[e->messageIndex]);
     if (e->delay > 0.0f) { e->recentMostActivator = activator; e->delayFinished = Eng_Global->pauseRelativeTime + e->delay; }
-    else ButtonSwitchUseTargets(self,activator,argvalue);
+    else ButtonSwitchUseTargets(self,activator);
 }
 
 void ButtonSwitchUpdate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
-    if (e->delayFinished > 0.0 && e->delayFinished < Eng_Global->pauseRelativeTime) { e->delayFinished = 0.0; ButtonSwitchUseTargets(self,e->recentMostActivator,e->argvalue); }
+    if (e->delayFinished > 0.0 && e->delayFinished < Eng_Global->pauseRelativeTime) { e->delayFinished = 0.0; ButtonSwitchUseTargets(self,e->recentMostActivator); }
     if (e->blinkTexOnActive && e->active && e->tickFinished < Eng_Global->pauseRelativeTime) {
         e->alternateOn = !e->alternateOn;
         e->texIndex = e->alternateOn ? e->altTexIndex : e->mainSwitchMaterial;
@@ -1246,7 +1230,7 @@ void ButtonSwitchUpdate(u16 self) {
     }
 }
 
-void ButtonSwitchTargetted(u16 self, u16 activator, const char* argvalue) { ButtonSwitchUse(self,activator,argvalue); }
+void ButtonSwitchTargetted(u16 self, u16 activator) { ButtonSwitchUse(self,activator); }
 //=============================================================================
 // HealingBed
 void HealingBedUse(u16 self, u16 owner) {
@@ -1261,7 +1245,7 @@ void HealingBedUse(u16 self, u16 owner) {
 }
 //=============================================================================
 // TargetIO
-void UseTargets(u16 activator, const char* argvalue, const char* targetname) {
+void UseTargets(u16 activator, const char* targetname) {
     if (StringIsEmpty(targetname)) return;
     
     bool succeeded = false;
@@ -1269,34 +1253,33 @@ void UseTargets(u16 activator, const char* argvalue, const char* targetname) {
         if (!StringsEqual(Eng_Global->instances[i].targetname,targetname)) continue;
         
         DualLog("Successfully found matching targetname %s for entity %u and activator ioflags:%u\n",targetname,i,Eng_Global->instances[activator].ioflags);
-        Targetted(activator,i,argvalue);
+        Targetted(activator,i);
         succeeded = true;
     }
     if (!succeeded) DualLogWarn("Failed to find a matching targetname for %s\n",targetname);
 }
 
-void Targetted(u16 activator, u16 self, const char* argvalue) {
+void Targetted(u16 activator, u16 self) {
     Entity* e = &Eng_Global->instances[self];
     Entity* a = &Eng_Global->instances[activator];
     DualLog("Targetted running with a->ioflags:%u, e->index:%u, door conditions:%u\n",a->ioflags,e->index,((a->ioflags & TARG_IOFLAGS_DOOROPEN) && ConstIndexIsDoor(e->index)));
-    if (argvalue && !StringIsEmpty(argvalue)) StringCopyInto_A_From_B(e->argvalue,argvalue,TARGET_STRING_LENGTH);
     if (e->index == 709) { CenterStatusPrint("%s",Eng_Text->stringTable[e->messageLingdex]); return; } // info_message
     if (e->index == 708) { Eng_Global->gameFinished = true; return; }
     
-    if (e->index == 707 /*info_email*/) EmailTargetted(self,activator,argvalue);
+    if (e->index == 707 /*info_email*/) EmailTargetted(self,activator);
     if (a->ioflags & TARG_IOFLAGS_TRIPTRIGGER) {
         if (e->index == 598 || e->index == 600) TriggerTargetted(self,activator);
-        else if (e->index == 594) TriggerCounterTargetted(self,activator,argvalue);
+        else if (e->index == 594) TriggerCounterTargetted(self,activator);
     }
     
     if (a->ioflags & TARG_IOFLAGS_UNLOCK) EntitySetLocked(e,false);
     if ((a->ioflags & TARG_IOFLAGS_LOCK) && ConstIndexIsDoor(e->index)) EntitySetLocked(e,true);
     
-    if (ConstIndexIsButtonSwitch(e->index)) ButtonSwitchTargetted(self,activator,argvalue);
+    if (ConstIndexIsButtonSwitch(e->index)) ButtonSwitchTargetted(self,activator);
     if ((a->ioflags & TARG_IOFLAGS_DOOROPEN) && ConstIndexIsDoor(e->index)) { DualLog("Running DoorForceOpen from ioflag DOOROPEN on entity %u\n",self); DoorForceOpen(self); }
     else if ((a->ioflags & TARG_IOFLAGS_DOOROPENIFUNLOCKED) && ConstIndexIsDoor(e->index) && ((e->entflags & EF_LOCKED) == 0) && (e->requiredAccessCard == AccessCardType_None || (Eng_Global->invP1.accessCardOwned & (1u << e->requiredAccessCard)))) DoorForceOpen(self);
     else if ((a->ioflags & TARG_IOFLAGS_DOORCLOSE) && ConstIndexIsDoor(e->index)) DoorForceClose(self);
-    else if (ConstIndexIsDoor(e->index)) DoorTargetted(self,activator,argvalue);
+    else if (ConstIndexIsDoor(e->index)) DoorTargetted(self,activator);
     
     if (a->ioflags & TARG_IOFLAGS_FBRIDGE_ACTIVATE) ForceBridgeActivate(self,false);
     else if (a->ioflags & TARG_IOFLAGS_FBRIDGE_DEACTIVATE) ForceBridgeDeactivate(self,false);
@@ -1304,7 +1287,7 @@ void Targetted(u16 activator, u16 self, const char* argvalue) {
     
     if (a->ioflags & TARG_IOFLAGS_GRAVLIFT_TOGGLE) GravityLiftToggle(self);
     if (a->ioflags & TARG_IOFLAGS_TEXTURE_CHG_TOGGLE) TextureChangerToggle(self);
-    if (a->ioflags & TARG_IOFLAGS_FUNCWALL_MOVE) FuncWallTargetted(self,activator,argvalue);
+    if (a->ioflags & TARG_IOFLAGS_FUNCWALL_MOVE) FuncWallTargetted(self,activator);
     if (a->ioflags & TARG_IOFLAGS_SWITCH_LOCK_TOGGLE) EntitySetLocked(e,(e->entflags & EF_LOCKED) == 0);
     if (a->ioflags & TARG_IOFLAGS_INST_ACTIVATE) flag_set(&e->entflags,EF_ACTIVE,true);
     else if (a->ioflags & TARG_IOFLAGS_INST_DEACTIVATE) flag_set(&e->entflags,EF_ACTIVE,false);
@@ -1528,89 +1511,14 @@ void ElevatorButtonClick(u16 self) {
 //         CenterStatusPrint("%s", Eng_Text->stringTable[8]);
 //     }
 }
-
-// Elevator pad UI — layout for 1366x768, scaled by engine to actual res.
-// Called from RenderUI when TabMSG_Elevator is the active tab.
-void RenderElevatorPadUI(u16 padIdx) {
-    // TODO: full button grid layout once UI primitive set is confirmed.
-    // Expected layout: 14 floor buttons in a vertical or 2-col grid,
-    // each ~84x32, labeled R/1-9/G1/G2/G4/C, greyed out if !floorAccessible.
-    // Active floor highlighted. Click calls ElevatorButtonClick(buttonIdx)
-    // where buttonIdx is the instance index of that floor's elevator button entity.
-    // linkedElevatorDoor and objectInUsePos already set by elevator pad Use() frob.
-    (void)padIdx;
-}
-//=============================================================================
-// ElevatorKeypad
-// All state lives in SystemUI — valid only while TabMSG_Elevator is active.
-// buttonsEnabled[i]     — button exists and should be drawn
-// buttonsDarkened[i]    — button exists but floor is inaccessible
-// elevButtonLevelIdx[i] — destination level index for button i (was teleportID)
-// elevButtonSpawnIdx[i] — destination spawn instance index (was targetDestinationID)
-// elevCurrentFloor      — current floor index 0-10 for indicator sprite
-// tetheredKeypadElevator, linkedElevatorDoor, objectInUsePos already on SystemUI
-
-void SendElevatorKeypadToDataTab(u16 padIdx,u16 linkedDoor,Vector3 tetherPoint,bool isRH) {
-    Entity* pad = &Eng_Global->instances[padIdx];
-    for (int i = 0; i < 8; i++) {
-        // Each button slot on the pad entity is encoded in contents[]/customIndex[]
-        // for up to 4 directly, remainder via children — TODO: confirm slot encoding
-        // with level data format.  For now map contents[i] as level index and
-        // customIndex[i] as spawn point instance index, active flag as accessible.
-        Eng_UI->elevButtonLevelIdx[i]  = pad->contents[i < 4 ? i : 0];     // TODO: slots 4-7
-        Eng_UI->elevButtonSpawnIdx[i]  = pad->customIndex[i < 4 ? i : 0];  // TODO: slots 4-7
-        Eng_UI->buttonsEnabled[i]      = pad->contents[i < 4 ? i : 0] != U16_MAX;
-        Eng_UI->buttonsDarkened[i]     = (Eng_Global->levelSecurity[Eng_UI->elevButtonLevelIdx[i]]
-                                          > GetCurrentLevelSecurity());
-    }
-    Eng_UI->elevCurrentFloor       = pad->numPlayers; // numPlayers reused as currentFloor index
-    Eng_UI->tetheredKeypadElevator = padIdx;
-    Eng_UI->linkedElevatorDoor     = linkedDoor;
-    Eng_UI->objectInUsePos         = tetherPoint;
-    Eng_UI->usingObject            = true;
-    Eng_UI->lastDataSideRH         = isRH;
-//     OpenTab(4,true,TabMSG_Elevator,0,isRH ? Handedness_RH : Handedness_LH); TODO
-}
-
-// Called from RenderElevatorPadUI per frame while TabMSG_Elevator active.
-// elevFloorLabels defined in ElevatorButton section.
-void RenderElevatorKeypadUI(void) {
-    // Current floor indicator — sprite index = elevCurrentFloor, 0-10
-    // TODO: RenderUIImage for indicator at appropriate position using
-    // indicatorSprites[Eng_UI->elevCurrentFloor]
-
-    for (int i = 0; i < 8; i++) {
-        if (!Eng_UI->buttonsEnabled[i]) continue;
-//         bool dark = Eng_UI->buttonsDarkened[i];
-        // TODO: RenderUIImage — dark ? buttonDarkened sprite : buttonNormal sprite
-        // TODO: RenderFormattedText — label elevFloorLabels[Eng_UI->elevButtonLevelIdx[i]]
-        //       color: dark ? textDarkenedColor : textEnabledColor
-//         bool over = false;
-//         if (!dark && UI_Button(/*x,y,w,h — TODO layout*/0,0,84,32,&over,0)) {
-//             // Construct a temporary elevator button entity context on the stack
-//             // and call ElevatorButtonClick with the tethered pad acting as self,
-//             // overriding teleportID and targetDestinationID for this slot.
-//             Entity tmp = Eng_Global->instances[Eng_UI->tetheredKeypadElevator];
-//             tmp.teleportID         = Eng_UI->elevButtonLevelIdx[i];
-//             tmp.targetDestinationID = Eng_UI->elevButtonSpawnIdx[i];
-//             flag_set(&tmp.entflags,EF_ACTIVE,true);
-//             // Push tmp index into a scratch instance slot — TODO: confirm scratch slot
-//             // convention, or refactor ElevatorButtonClick to take level+spawn directly.
-//             ElevatorButtonClick(Eng_UI->tetheredKeypadElevator); // TODO: pass slot params
-//         }
-    }
-}
 //=============================================================================
 // Email
-void EmailTargetted(u16 self,u16 activator,const char* argvalue) {
-    (void)activator; (void)argvalue;
-    Entity* e = &Eng_Global->instances[self];
-    u16 idx = e->emailIndex;
+void EmailTargetted(u16 self, u16 activator) {
+    (void)activator; Entity* e = &Eng_Global->instances[self]; u16 idx = e->emailIndex;
     InventorySystem* inv = &Eng_Global->invP1;
     if (inv->hasLog[idx]) return;
-    inv->hasLog[idx]      = true;
-    inv->hasNewEmail      = true;
-    inv->lastAddedIndex   = idx;
+    
+    inv->hasLog[idx] = inv->hasNewEmail = true; inv->lastAddedIndex = idx;
     if (Eng_Text->audioLogType[idx] == AudioLogType_Email) inv->beepDone = true;
     if (e->autoPlayEmail) (void)0; // TODO: PlayLastAddedLog(idx) — trigger auto-play of log audio
 }
@@ -1657,54 +1565,6 @@ u8 OverloadButtonVisualState(void) {
     if (inv->currentEnergyWeaponHeat[inv->weaponIndex] > OVERLOAD_HEAT_THRESHOLD) return 2;
     if (inv->overloadEnabled) return 1;
     return 0;
-}
-//=============================================================================
-// FireWorkThang
-#define FIREWORK_PHASE_GROWING   0
-#define FIREWORK_PHASE_WAIT_FULL 1
-#define FIREWORK_PHASE_WAIT_MIN  2
-
-void FireWorkThangOnEnable(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
-    if (e->randomMin >= e->randomMax) {
-        e->randomMin = 0.0f;
-        e->randomMax = 1.0f;
-        DualLogWarn("FireWorkThang maxScale not set higher than min");
-    }
-    
-    if (e->speed < 0.001f) e->speed = 0.5f;
-    e->percentMoved  = random_range(e->randomMin,e->randomMax); // curScale
-    e->lerpUp        = FIREWORK_PHASE_GROWING;
-    e->tickFinished  = Eng_Global->pauseRelativeTime;
-}
-
-void FireWorkThangUpdate(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
-    if (e->tickFinished >= Eng_Global->pauseRelativeTime) return;
-    e->tickFinished = Eng_Global->pauseRelativeTime + (1.0/60.0);
-    switch (e->lerpUp) {
-        case FIREWORK_PHASE_WAIT_FULL:
-            e->percentMoved = e->randomMin; // snap to min
-            e->lerpUp       = FIREWORK_PHASE_WAIT_MIN;
-            e->tickFinished = Eng_Global->pauseRelativeTime + random_range(e->fireworkWaitMinMin,e->waitBeforeClose);
-            break;
-        case FIREWORK_PHASE_WAIT_MIN:
-            e->percentMoved += (e->randomMax - e->randomMin) * 0.333f;
-            e->lerpUp        = FIREWORK_PHASE_GROWING;
-            break;
-        default: // FIREWORK_PHASE_GROWING
-            e->percentMoved += (e->speed * (e->randomMax - e->randomMin)) / 60.0f;
-            break;
-    }
-    
-    if (e->percentMoved > e->randomMax) {
-        e->percentMoved = e->randomMax;
-        e->lerpUp       = FIREWORK_PHASE_WAIT_FULL;
-        e->tickFinished = Eng_Global->pauseRelativeTime + e->waitBeforeClose;
-    }
-    
-    float s = e->percentMoved;
-    e->scale = (Vector3){s,s,s};
 }
 //=============================================================================
 // GeneralInventory
@@ -2137,7 +1997,7 @@ static float ApplyAttackTypeAdjustments(u16 self,float take,AttackType at) {
 static void UseDeathTargets(u16 self) {
     if (self == PLAYER1 || self == PLAYER2) return;
     Entity* e = &Eng_Global->instances[self];
-    if (!StringIsEmpty(e->target)) UseTargets(self,NULL,e->target);
+    if (!StringIsEmpty(e->target)) UseTargets(self,e->target);
 }
 
 static void TeleportAway(u16 self) {
@@ -3202,9 +3062,8 @@ void DoorInitAfterLoad(u16 self) {
     DoorSyncLayer(self);
 }
 
-void DoorUse(u16 self, u16 activator, const char* argvalue) {
+void DoorUse(u16 self, u16 activator) {
     DualLog("Door use called by activator %u\n",activator);
-    (void)argvalue;
     Entity* e = &Eng_Global->instances[self];
     if (activator == NULLENT) return;
     if (GetCurrentLevelSecurity() > e->securityThreshold) { UIBlockedBySecurity(e->position); return; }
@@ -3228,12 +3087,12 @@ void DoorUse(u16 self, u16 activator, const char* argvalue) {
         return;
     }
 
-    if ((e->onlyTargetOnce && !e->targetAlreadyDone) || !e->onlyTargetOnce) { e->targetAlreadyDone = true; UseTargets(activator,e->argvalue,e->target); }
+    if ((e->onlyTargetOnce && !e->targetAlreadyDone) || !e->onlyTargetOnce) { e->targetAlreadyDone = true; UseTargets(activator,e->target); }
     if (e->ajar) e->ajar = false;
     DoorActuate(self);
 }
 
-void DoorTargetted(u16 self, u16 activator, const char* argvalue) { (void)argvalue; if ((Eng_Global->instances[self].entflags & EF_LOCKED) != 0) EntitySetLocked(&Eng_Global->instances[self],false); if (!Eng_Global->instances[self].targettingOnlyUnlocks) DoorUse(self,activator,argvalue); }
+void DoorTargetted(u16 self, u16 activator) { if ((Eng_Global->instances[self].entflags & EF_LOCKED) != 0) EntitySetLocked(&Eng_Global->instances[self],false); if (!Eng_Global->instances[self].targettingOnlyUnlocks) DoorUse(self,activator); }
 void DoorUpdate(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->blocked) return; // TODO frame-pause blocked doors instead of fully skipping.
@@ -3311,9 +3170,9 @@ void UseEntity(u16 p, u16 i) {
     InventorySystem* inv = Inv(p);
     Entity* ent = &Eng_Global->instances[i];
     if (ConstIndexIsSearchable(ent->index)) { inv->currentSearchItem = i; SearchObject(i,firstTimeSearch); DualLog("Search\n"); }
-    else if (ConstIndexIsDoor(ent->index)) DoorUse(i,PLAYER1,ent->argvalue);
+    else if (ConstIndexIsDoor(ent->index)) DoorUse(i,PLAYER1);
     else if (ConstIndexIsNPC(ent->index)) DualLog("Can't use NPC\n");
-    else if (ConstIndexIsButtonSwitch(ent->index)) ButtonSwitchUse(i,PLAYER1,ent->argvalue);
+    else if (ConstIndexIsButtonSwitch(ent->index)) ButtonSwitchUse(i,PLAYER1);
     else if (ConstIndexIsGeometry(ent->index)) DualLog("Can't use modular geometry\n");
     else if (ConstIndexIsUsableObject(ent->index)) {
         inv->holdingObject = true;
@@ -3322,14 +3181,9 @@ void UseEntity(u16 p, u16 i) {
         inv->heldObjectAmmo = ent->ammo;
         inv->heldObjectAmmo2 = ent->ammo2;
         inv->heldObjectLoadedAlternate = ent->heldObjectLoadedAlternate;
-        if (Eng_Settings->QuickItemPickup) {
-            AddItemToInventory(p,ent->index,ent->usableCustomIndex);
-            ResetHeldItem(p);
-		} else {
-            ForceInventoryMode(); // Inventory mode is turned on when picking something up
-            CenterStatusPrint("%s%s",Eng_Text->stringTable[inv->heldObjectIndex - 307 + 326],Eng_Text->stringTable[319]); // picked up.
-		}
-		
+        if (Eng_Settings->QuickItemPickup) { AddItemToInventory(p,ent->index,ent->usableCustomIndex); ResetHeldItem(p); }
+		else { CenterStatusPrint("%s%s",Eng_Text->stringTable[inv->heldObjectIndex - 307 + 326],Eng_Text->stringTable[319]); /* picked up.*/ ForceInventoryMode(); } // Inventory mode is turned on when picking something up
+
 		DeleteInstance(i);
     } else CenterStatusPrint("%s%s",Eng_Text->stringTable[29],"name");
 }
@@ -3350,7 +3204,7 @@ static inline __attribute__((always_inline)) void Frob(Vector3 pos, Vector3 forw
     Eng_Global->debugLineFinished = Eng_Global->pauseRelativeTime + 3.0;
     if (!tempHit.hit) { CenterStatusPrint("%s",Eng_Text->stringTable[30]); return; }
     Eng_Global->debugLine_end = tempHit.point;
-    DualLog("Raycast hit!  Hit object %u named of entity type %s(%u) at hit point %f %f %f\n",tempHit.hitInstanceIndex,EDefs[Eng_Global->instances[tempHit.hitInstanceIndex].index].path,Eng_Global->instances[tempHit.hitInstanceIndex].index,tempHit.point.x,tempHit.point.y,tempHit.point.z);
+    DualLog("Raycast hit!  Hit object %u of entity type %u at hit point %f %f %f\n",tempHit.hitInstanceIndex,Eng_Global->instances[tempHit.hitInstanceIndex].index,tempHit.point.x,tempHit.point.y,tempHit.point.z);
     UseEntity(PLAYER1,tempHit.hitInstanceIndex);
 }
 
@@ -3549,7 +3403,6 @@ MOD_TO_ENGINE void PlayerInit(u16 i) {
     Eng_Global->instances[i].gravity = 1.0f;
     Eng_Global->instances[i].dynamicFriction = 0.6f; Eng_Global->instances[i].staticFriction = 0.8f;
     Eng_Global->instances[i].health = 200.0f;
-    Eng_Global->instances[i].lastHealth = Eng_Global->instances[i].health;
     Eng_Global->instances[i].noiseFinished = Eng_Global->pauseRelativeTime;
     if (i == PLAYER1) InventoryInit(&Eng_Global->invP1);
     else if (i == PLAYER2) InventoryInit(&Eng_Global->invP2);

@@ -97,13 +97,7 @@ MOD_TO_ENGINE void InitializeAIAfterLoad(u16 i) {
     e->posCheckFinished = Eng_Global->pauseRelativeTime;
     e->lastPosition = e->position;
     e->timeSinceMovedEnough = 0.0;
-    if (e->walkWaypointsLength > 0 && (e->entflags & EF_WALK_PATH_ON_START) && !(e->entflags & EF_ASLEEP)) {
-        e->currentDestination = e->walkWaypoints[e->currentWaypoint];
-        e->currentState = AIState_Walk; // If waypoints are set, start walking
-    } else {
-        e->currentState = AIState_Idle; // No waypoints, stay put
-    }
-
+    e->currentState = AIState_Idle;
     if ((e->entflags & EF_WANDERING) && (random_range(0.0f,1.0f) < 0.5f)) e->currentState = AIState_Walk;
     else flag_set(&e->entflags, EF_WANDERING, false);
 
@@ -114,8 +108,8 @@ MOD_TO_ENGINE void InitializeAIAfterLoad(u16 i) {
 
     e->attackFinished = Eng_Global->pauseRelativeTime + 1.0;
     e->idealTransformForward = e->forward;
-    StringCopyInto_A_From_B(e->targetID,npcTable[npcID].name,TARGET_ID_LENGTH);
-    StringFormat(e->targetID,TARGET_ID_LENGTH * sizeof(char),"%s %05u",npcTable[npcID].name,npcCountInWorldPerType[npcID]++);
+    //StringCopyInto_A_From_B(e->targetID,npcTable[npcID].name,TARGET_ID_LENGTH);
+    //StringFormat(e->targetID,TARGET_ID_LENGTH * sizeof(char),"%s %05u",npcTable[npcID].name,npcCountInWorldPerType[npcID]++); // TODO
     u8 c;
     switch (e->currentState) {
         case AIState_Walk:    c = ANIM_WALK;    break;
@@ -554,23 +548,8 @@ static void AIWalk(Entity* self) {
         return;
     }
 
-    if (self->walkWaypointsLength < 1) {
-        if (!(self->entflags & EF_WANDERING)) self->currentState = AIState_Idle;
-        return;
-    }
 
-    if (self->entflags & EF_VISIT_WAYPTS_RND) {
-        self->currentWaypoint = random_range_i32(0, self->walkWaypointsLength);
-    } else {
-        self->currentWaypoint++;
-    }
-    if (self->currentWaypoint < 0) self->currentWaypoint = 0;
-    if (self->currentWaypoint >= (self->walkWaypointsLength - 1)) {
-        self->currentWaypoint = 0;
-        if (self->entflags & EF_DONT_LOOP_WAYPTS) { self->currentState = AIState_Idle; return; }
-    }
-    if (self->currentWaypoint < self->walkWaypointsLength)
-        self->currentDestination = self->walkWaypoints[self->currentWaypoint];
+    if (!(self->entflags & EF_WANDERING)) self->currentState = AIState_Idle;
 }
 
 static void AIRunMove(Entity* self) {

@@ -39,21 +39,10 @@ extern AutoSplitterData autoSplitter;
 #define NUM_AI_TYPES 29
 typedef struct {
 	const char* name;
-	AttackType attackType;
-	AttackType attackType2;
-	AttackType attackType3;
-	float damage;
-	float damage2;
-	float damage3;
-	float range;
-	float range2;
-	float range3;
-	float health;
-	float healthForCyberNPC;
+	AttackType attackType,attackType2,attackType3;
+	float damage,damage2,damage3,range,range2,range3,health,healthForCyberNPC;
 	PerceptionLevel perception;
-	float disruptability;
-	float armorvalue;
-	float defense;
+	float disruptability,armorvalue,defense;
 	AIMoveType moveType;
 	float yawSpeed;
 	float fov;
@@ -108,22 +97,10 @@ typedef struct {
 	float timeForTranquilization;
 	bool hopsOnMove;
 	NPCType type;
-	int projectile1Prefab;
-	int projectile2Prefab;
-	int projectile3Prefab;
+	int projectile1Prefab,projectile2Prefab,projectile3Prefab;
 } NPCTable;
 extern NPCTable npcTable[NUM_AI_TYPES];
-typedef struct {
-    bool inCombat;
-    bool inZone;
-    bool twoPlaying;
-    double clipFinished;
-    double combatImpulseFinished;
-    bool distortion;
-    bool cyberTube;
-    bool elevator;
-    bool levelEntry;
-} MusicSystem;
+typedef struct { double clipFinished,combatImpulseFinished; bool inCombat,inZone,twoPlaying,distortion,cyberTube,elevator,levelEntry; } MusicSystem;
 extern MusicSystem Sys_Music;
 extern int lev1SecCode;
 extern int lev2SecCode;
@@ -136,36 +113,31 @@ extern bool vmailActive;
 extern const AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS_PER_MODEL];
 extern const char* sounds[SOUNDS_COUNT];
 
-typedef struct {
-    u16 owner;
-    const char* argvalue;
-} TargetArgs;
-
 // Mod Inlines
 static inline __attribute__((always_inline)) void EntitySetLocked(Entity* e, bool locked) { DualLog("Unlocking entity with index %u\n",(u16)(e - Eng_Global->instances)); flag_set(&e->entflags,EF_LOCKED,locked); }
 static inline __attribute__((always_inline)) void UIBlockedBySecurity(Vector3 tetherPoint) { (void)tetherPoint; CenterStatusPrint("%s",Eng_Text->stringTable[25]); }
 static inline __attribute__((always_inline)) void UICyberSprint(u16 textIndex) { CenterStatusPrint("%s",Eng_Text->stringTable[textIndex]); }
-static inline __attribute__((always_inline)) void UIExitCyberspace(void) { CenterStatusPrint("%s",Eng_Text->stringTable[601]); }
+static inline __attribute__((always_inline)) void UIExitCyberspace() { CenterStatusPrint("%s",Eng_Text->stringTable[601]); }
 static inline __attribute__((always_inline)) void HealthManagerHealingBed(u16 playerIdx, float amount, bool flashBed) { (void)flashBed; Entity* p = &Eng_Global->instances[playerIdx]; p->health = vmin(255.0f,p->health + amount); }
 static inline __attribute__((always_inline)) void PlayerTakeDamage(u16 playerIdx, float damage) { Entity* p = &Eng_Global->instances[playerIdx]; p->health -= damage; if (p->health < 0.0f) p->health = 0.0f; }
 static inline __attribute__((always_inline)) Entity* PE(u16 p) { return &Eng_Global->instances[p]; }
-static inline __attribute__((always_inline)) float SfxVol(void) { return (float)Eng_Settings->VolumeEffects / 100.0f; }
+static inline __attribute__((always_inline)) float SfxVol() { return (float)Eng_Settings->VolumeEffects / 100.0f; }
 static inline __attribute__((always_inline)) InventorySystem* Inv(u16 p) { return p == PLAYER1 ? &Eng_Global->invP1 : &Eng_Global->invP2; }
 
 // Mod Shared Functions across TU's
-void WeaponsUpdate(void);
-void UseTargets(u16 activator, const char* argvalue, const char* targetname);
-void Targetted(u16 activator, u16 self, const char* argvalue);
-void ButtonSwitchTargetted(u16 self, u16 activator, const char* argvalue);
-void ButtonSwitchUse(u16 self, u16 activator, const char* argvalue);
-void DoorUse(u16 self, u16 activator, const char* argvalue);
-void DoorTargetted(u16 self, u16 activator, const char* argvalue);
+void WeaponsUpdate();
+void UseTargets(u16 activator, const char* targetname);
+void Targetted(u16 activator, u16 self);
+void ButtonSwitchTargetted(u16 self, u16 activator);
+void ButtonSwitchUse(u16 self, u16 activator);
+void DoorUse(u16 self, u16 activator);
+void DoorTargetted(u16 self, u16 activator);
 void DoorActuate(u16 self);
 void DoorForceOpen(u16 self);
 void DoorForceClose(u16 self);
 void TriggerTargetted(u16 self, u16 activator);
-void TriggerCounterTargetted(u16 self, u16 activator, const char* argvalue);
-void FuncWallTargetted(u16 self, u16 activator, const char* argvalue);
+void TriggerCounterTargetted(u16 self, u16 activator);
+void FuncWallTargetted(u16 self, u16 activator);
 void ButtonSwitchInitAfterLoad(u16 self);
 void DoorInitAfterLoad(u16 self);
 void FuncWallInitAfterLoad(u16 self);
@@ -181,7 +153,7 @@ void CyberTimerInitAfterLoad(u16 self);
 void CyberSwitchInitAfterLoad(u16 self);
 void ExplosionLifeInitAfterLoad(u16 self);
 void ExplosionLifeUpdate(u16 self);
-void EmailTargetted(u16 self, u16 activator, const char* argvalue);
+void EmailTargetted(u16 self, u16 activator);
 void ForceBridgeActivate(u16 self, bool isSilent);
 void ForceBridgeToggle(u16 self);
 void GravityLiftToggle(u16 self);
@@ -194,8 +166,8 @@ void LogicTimerUpdate(u16 self);
 void DelayedSpawnUpdate(u16 self);
 void SearchFXResetUpdate(u16 self);
 void CyberTimerUpdate(u16 self);
-void GeneralInvApply(int buttonIdx,int customIdx);
-bool InventoryAddSoftwareItem(u16 p,SoftwareType type,int vers);
+void GeneralInvApply(int buttonIdx, int customIdx);
+bool InventoryAddSoftwareItem(u16 p, u16 type, int vers);
 int Get16WeaponIndexFromConstIndex(int index);
 void UseGrenade(u16 playerIndex, int index);
 bool AICheckPain(Entity* self);
@@ -205,11 +177,11 @@ void AddItemToInventory(u16 p, int index, int customIndex);
 void TextureSequenceUpdate(u16 self);
 u16 AddInstance(u16 entIdx, Vector3 pos);
 void DeleteInstance(u16 i);
-u8 GetCurrentLevelSecurity(void);
+u8 GetCurrentLevelSecurity();
 u16 GetImpactType(u16 instanceIdx);
 const char* GetPrefabNameFromIndex(int constIndex);
 void TakeEnergy(float drain);
 void GiveEnergy(float give, EnergyType type);
-void BioMonitorInit(void);
+void BioMonitorInit();
 void BioMonitorUpdate(u16 p);
 void* MemCpyFromBtoAForNBytes(void *dst, const void *src, size_t n); // memcpy replacement
