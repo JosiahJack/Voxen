@@ -545,6 +545,7 @@ typedef struct {
     bool (*GetKeyPressed)(i32 settingIndex);
     InventorySystem invP1,invP2;
     Entity instances[INSTANCE_COUNT];
+    Entity levInstances[14][INSTANCE_COUNT];
     Color fogColor;
 	char global_dllname[256],global_winicon[256],playerName[27];
     char audiologNames[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH],audiologSubjects[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH],audiologSenders[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH],audioLogSpeech2Text[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];

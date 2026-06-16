@@ -7302,11 +7302,11 @@ ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
     MemSetToVForNBytes(camViews,0,64 * sizeof(CamView)); camViewCount = 0;
     MemSetToVForNBytes(Sys_Global.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
     char filename[20]; // Minimum size for 0 through 13.
-    StringFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel);
+    StringFormat(filename,sizeof(filename),"./Data/level%d.txt",curlevel);
     levelFileHandle = OS_OpenReadonly(filename);
     LoadLevelMod(curlevel);
     OS_Close(levelFileHandle);
-    for (int i=0;i<Sys_Global.loadedLights;++i) {/* lights[i].maxIntensity *= 2.0f; */lightsNewPosition[i]=lights[i].pos; }
+    for (int i=0;i<Sys_Global.loadedLights;++i) lightsNewPosition[i]=lights[i].pos;
     DualLog("Loaded %d entities, %u static lights for Level %d... took %f secs\n",Sys_Global.loadedInstances,Sys_Global.loadedLights,curlevel,get_time() - start_time);
     RenderLoadingProgress(110,"Initialize entities...");
     for (int i=PLAYER1;i<Sys_Global.loadedInstances;++i) {

@@ -877,7 +877,8 @@ Light lightsFromFile[LIGHT_COUNT];
 LightAnimation lanimsFromFile[LIGHT_COUNT];
 char lineSpace[LINE_LEN_MAX];
 char initialLine[LINE_LEN_MAX];
-MOD_TO_ENGINE void LoadLevelMod(u8 curlevel) {
+MOD_TO_ENGINE void LoadLevelMod(u8 lev) {    
+    u8 curlevel = vclamp(lev,0,13);
     Eng_Global->levelCurrentlyLoading = true;
     Eng_Global->currentLevel = curlevel;
     Eng_Global->loadedInstances = 3; // 0 == NULL, 1 == Player1, 2 == Player2
@@ -894,8 +895,6 @@ MOD_TO_ENGINE void LoadLevelMod(u8 curlevel) {
     Eng_Global->worldMin_z -= CELL_SIZE;
     Eng_Global->voxelMinCenterX = Eng_Global->worldMin_x + VOXEL_HALF;
     Eng_Global->voxelMinCenterZ = Eng_Global->worldMin_z + VOXEL_HALF;
-    if (curlevel >= Eng_Global->numLevels) { DualLogError("Cannot load world geometry, level number %d out of bounds 0 to %d\n", curlevel, Eng_Global->numLevels - 1); return; }
-
     for (u16 idx = START_INDEX_LEVEL_INSTANCES; idx < INSTANCE_COUNT; idx++) InitializeEntity(&Eng_Global->instances[idx]);
     MemSetToVForNBytes(entsFromFile,0,INSTANCE_COUNT * sizeof(Entity));
     MemSetToVForNBytes(lightsFromFile,0,LIGHT_COUNT * sizeof(Light));
