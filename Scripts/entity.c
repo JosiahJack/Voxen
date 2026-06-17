@@ -17,7 +17,8 @@ MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(void) { // Global condition
     EDefs[211].cardchunk = EDefs[212].cardchunk = EDefs[213].cardchunk = EDefs[219].cardchunk = EDefs[233].cardchunk = EDefs[242].cardchunk = EDefs[243].cardchunk = EDefs[246].cardchunk = false;
     EDefs[247].cardchunk = EDefs[248].cardchunk = EDefs[249].cardchunk = EDefs[255].cardchunk = EDefs[263].cardchunk = EDefs[264].cardchunk = EDefs[283].cardchunk = EDefs[284].cardchunk = false;
     EDefs[285].cardchunk = EDefs[291].cardchunk = EDefs[298].cardchunk = EDefs[299].cardchunk = EDefs[300].cardchunk = EDefs[301].cardchunk = EDefs[303].cardchunk = EDefs[188].cardchunk = false;
-    /*  0 chunk_black*/                EDefs[  0].modelIndex=178; EDefs[  0].texIndex=0;
+    // Note that designated initializer method, e.g. { .modelIndex = 178, .texIndex = 0 } method will cause compiler to add the = 0 assignment for every field ballooning binary size to 11mb!  So we do this.  Straightforward and simple:
+    /*  0 chunk_black*/                EDefs[  0].modelIndex=178; EDefs[  0].texIndex=0; 
     /*  1 chunk_blocker*/              EDefs[  1].modelIndex=178; EDefs[  1].texIndex=1230;EDefs[  1].normIndex=160; EDefs[  1].specIndex=1230;
     /*  2 chunk_bridg1_1*/             EDefs[  2].modelIndex=661; EDefs[  2].texIndex=44;  EDefs[  2].normIndex=43;
     /*  3 chunk_bridg1_1flipx*/        EDefs[  3].modelIndex=667; EDefs[  3].texIndex=44;
@@ -843,58 +844,36 @@ void DeleteInstance(u16 i) {
     --Eng_Global->loadedInstances; // Shift final marker.  It's history!
 }
 
-static const Color fogLUT[] = {
-    {0.3207547f, 0.29200783f, 0.29200783f, 0.07f},
-    {0.34509805f,0.38431373f, 0.49019608f, 0.055f},
-    {0.47058824f,0.3882353f,  0.3928334f,  0.05f},
-    {0.32941177f,0.29411766f, 0.2509804f,  0.065f},
-    {0.3882353f, 0.452415f,   0.47058824f, 0.075f},
-    {0.3882353f, 0.4117647f,  0.47058824f, 0.03f},
-    {0.3f,       0.24f,       0.33f,       0.07f},
-    {0.38679248f,0.3471719f,  0.3302332f, 0.07f},
-    {0.44708973f,0.45681614f, 0.4811321f, 0.04f},
-    {0.4056604f, 0.3992963f,  0.36930403f,0.05f},
-    {0.48235294f,0.58431375f, 0.5176471f, 0.04f},
-    {0.52872473f,0.58431375f, 0.48235294f,0.04f},
-    {0.48235294f,0.58431375f, 0.5176471f, 0.05f},
-    {0.0f,       0.0f,        0.0f,       0.005f},
-};
-
-typedef struct { Vector2 worldMin; Vector2 worldMax; } LevelBounds;
-static const LevelBounds levelBoundsTable[13] = {
-    {{-34.8000f, -50.2000f}, {0.0f, 0.0f}},/*Level 0*/  {{-51.2400f, -61.5200f}, {0.0f, 0.0f}},/*Level 1*/  {{-43.5600f, -53.7800f}, {0.0f, 0.0f}},/*Level 2*/
-    {{-48.7060f, -48.6860f}, {0.0f, 0.0f}},/*Level 3*/  {{-26.9020f, -51.2272f}, {0.0f, 0.0f}},/*Level 4*/  {{-44.8022f, -52.4800f}, {0.0f, 0.0f}},/*Level 5*/
-    {{-63.3800f, -69.1233f}, {0.0f, 0.0f}},/*Level 6*/  {{-64.3389f, -79.4544f}, {0.0f, 0.0f}},/*Level 7*/  {{-41.1856f, -41.4272f}, {0.0f, 0.0f}},/*Level 8*/
-    {{-48.9439f, -66.4706f}, {0.0f, 0.0f}},/*Level 9*/  {{-21.5394f, -37.2372f}, {0.0f, 0.0f}},/*Level 10*/ {{-24.6172f, -25.7794f}, {0.0f, 0.0f}},/*Level 11*/
-    {{-15.4900f, -27.9400f}, {0.0f, 0.0f}} /*Level 12*/
-};
-//                                            R       1      2      3       4       5       6       7       8       9      10      11     12      13
-static const float levelFarPlane[14] = { 56.32f, 56.32f, 51.2f, 51.2f, 40.96f, 58.88f, 79.36f, 56.32f, 69.12f, 53.76f,  51.2f,  51.2f, 38.4f, 71.68f};
-
+static const Color fogLUT[14] = { {0.3207547f, 0.29200783f,0.29200783f,0.07f},/*0*/  {0.34509805f,0.38431373f,0.49019608f,0.055f},/*1*/  {0.47058824f,0.3882353f, 0.3928334f,0.05f},/*2*/  {0.32941177f,0.29411766f,0.2509804f,0.065f},/*3*/ {0.3882353f,0.452415f, 0.47058824f,0.075f},/*4*/
+                                  {0.3882353f, 0.4117647f, 0.47058824f,0.03f},/*5*/  {0.3f,       0.24f,      0.33f,      0.070f},/*6*/  {0.38679248f,0.3471719f, 0.3302332f,0.07f},/*7*/  {0.44708973f,0.45681614f,0.4811321f,0.040f},/*8*/ {0.4056604f,0.3992963f,0.36930403f,0.050f},/*9*/
+                                  {0.48235294f,0.58431375f,0.5176471f, 0.04f},/*10*/ {0.52872473f,0.58431375f,0.48235294f,0.040f},/*11*/ {0.48235294f,0.58431375f,0.5176471f,0.05f},/*12*/ {0.0f,       0.0f,       0.0f,      0.005f},/*13*/ };
+static const Vector2 levMins[14]={{-37.3600f,-52.7600f},/*0*/  {-53.8000f,-64.0800f},/*1*/  {-46.12f,-56.34f},/*2*/  {-51.266f,-51.246f},/*3*/  {-29.462f, -53.7872f},/*4*/ {-47.3622f,-55.04f},/*5*/ {-65.94f,-71.6833f},/*6*/ {-66.8989f,-82.0144f},/*7*/ {-43.7456f,-43.9872f},/*8*/ {-51.5039f,-69.0306f},/*9*/
+                                  {-24.0994f,-39.7972f},/*10*/ {-27.1772f,-28.3394f},/*11*/ {-18.05f,-30.50f},/*12*/ {-64.000f,-60.120f}/*13*/};
+static const float lFars[14] = { 56.32f/*R*/, 56.32f/*1*/, 51.2f/*2*/, 51.2f/*3*/, 40.96f/*4*/, 58.88f/*5*/, 79.36f/*6*/, 56.32f/*7*/, 69.12f/*8*/, 53.76f/*9*/,  51.2f/*10*/,  51.2f/*11*/, 38.4f/*12*/, 71.68f/*13*/};
 extern u16 headmountedLanternLight;
 Entity entsFromFile[INSTANCE_COUNT];
 Light lightsFromFile[LIGHT_COUNT];
 LightAnimation lanimsFromFile[LIGHT_COUNT];
 char lineSpace[LINE_LEN_MAX];
 char initialLine[LINE_LEN_MAX];
-MOD_TO_ENGINE void LoadLevelMod(u8 lev) {    
-    u8 curlevel = vclamp(lev,0,13);
+MOD_TO_ENGINE void SetGlobalsModData() {
+    for (int i=0;i<Eng_Global->numLevels;++i) {
+        Eng_Global->worldMin_x[i] = levMins[i].x; Eng_Global->worldMin_z[i] = levMins[i].y;
+        Eng_Global->voxelMinCenterX[i] = Eng_Global->worldMin_x[i] + VOXEL_HALF; Eng_Global->voxelMinCenterZ[i] = Eng_Global->worldMin_z[i] + VOXEL_HALF;
+        Eng_Global->farPlane[i] = lFars[i];
+        Eng_Global->fogColor[i] = fogLUT[i]; Eng_Global->fogColor[i].a *= 3.8f;
+    }
+}
+
+MOD_TO_ENGINE void LoadLevelMod(u8 lev) {
+    u8 curlevel = vclamp(lev,0,13); Eng_Global->curLev = curlevel;
     Eng_Global->levelCurrentlyLoading = true;
-    Eng_Global->currentLevel = curlevel;
     Eng_Global->loadedInstances = 3; // 0 == NULL, 1 == Player1, 2 == Player2
-    Eng_Global->loadedLights = 0;
-    Eng_Global->worldMin_x = levelBoundsTable[curlevel].worldMin.x;
-    Eng_Global->worldMin_z = levelBoundsTable[curlevel].worldMin.y;
     if (curlevel == 1) {
         AddCamView((Vector3){-19.2301f,-42.6604f,-49.7453f},(Quaternion){0.2375f,0.0008f,-0.0002f,0.9713f},75u,256u,256u,2.21f,11.5f);
         AddCamView((Vector3){7.664583f,-44.88017f,-14.26742f},(Quaternion){0.0f,0.9999f,0.0129f,0.0f},60u,256u,256u,2.192f,20.6f);
-    }
+    } // TODO other level camviews
 
-    Eng_Global->farPlane = levelFarPlane[curlevel];
-    Eng_Global->worldMin_x -= CELL_SIZE;
-    Eng_Global->worldMin_z -= CELL_SIZE;
-    Eng_Global->voxelMinCenterX = Eng_Global->worldMin_x + VOXEL_HALF;
-    Eng_Global->voxelMinCenterZ = Eng_Global->worldMin_z + VOXEL_HALF;
     for (u16 idx = START_INDEX_LEVEL_INSTANCES; idx < INSTANCE_COUNT; idx++) InitializeEntity(&Eng_Global->instances[idx]);
     MemSetToVForNBytes(entsFromFile,0,INSTANCE_COUNT * sizeof(Entity));
     MemSetToVForNBytes(lightsFromFile,0,LIGHT_COUNT * sizeof(Light));
@@ -924,17 +903,15 @@ MOD_TO_ENGINE void LoadLevelMod(u8 lev) {
             if (pipe) { *pipe = '\0'; line = pipe + 1; }
             else { line += GetStringLength(line); }
             if (kvString[0] == '\0' || StringFindFirstCharWithin(kvString,':') == NULL) continue;
-            
             char* colon = StringFindFirstCharWithin(kvString,':'); if (colon[1] == '\0') continue;
             
             *colon = '\0';
-            char* key   = kvString; if (!key) { DualLogError("Invalid key-value pair at line %u: %s\n", lineNum, initialLine); continue; }
+            char* key   = kvString; if (!key) { DualLogError("Invalid key-value pair at line %u: %s\n",lineNum,initialLine); continue; }
             
             char* value = colon + 1;
-            char trimmed_key[64];
-            char trimmed_value[256];
-            StringFormat(trimmed_key,   sizeof(trimmed_key),   "%s", key);
-            StringFormat(trimmed_value, sizeof(trimmed_value), "%s", value);
+            char trimmed_key[64],trimmed_value[256];
+            StringFormat(trimmed_key,  sizeof(trimmed_key),  "%s",key);
+            StringFormat(trimmed_value,sizeof(trimmed_value),"%s",value);
             trimmed_key[sizeof(trimmed_key) - 1]     = '\0';
             trimmed_value[sizeof(trimmed_value) - 1] = '\0';
             if (isLight) LoadFieldIntoLight((char*)&trimmed_key,(char*)&trimmed_value,initialLine,lineNum,&lightsFromFile[lightsIdx],&lanimsFromFile[lightsIdx],lightsIdx);
@@ -1031,7 +1008,7 @@ MOD_TO_ENGINE void LoadLevelMod(u8 lev) {
         }
 
         // Store activeStateRead alongside the parsed entity so the commit pass can use it.  Reuse a spare field or parallel array — here we use a bit in entflags as a sentinel.
-        if (!isLight && !activeStateRead) flag_set(&entsFromFile[entCount].entflags, EF_ACTIVE, true); // Default active if not specified
+        if (!isLight && !activeStateRead) flag_set(&entsFromFile[entCount].entflags,EF_ACTIVE,true); // Default active if not specified
     }
 
     i32 totalEnts = entCount + 1;
@@ -1127,6 +1104,4 @@ MOD_TO_ENGINE void LoadLevelMod(u8 lev) {
     Light hl = (Light){.pos=Eng_Global->instances[PLAYER1].position,.col=(Color3){1.0f,1.0f,1.0f},.range=11.52f,.lflags=LIGHTON,.intensity=0.0f,.minIntensity=0.0f,.maxIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY};
     LightAnimation lam = {0};
     headmountedLanternLight = AddLight(&hl,&lam); lightsIdx++;
-    Color c = fogLUT[curlevel]; c.a *= 3.8f;
-    Eng_Global->fogColor = c;
 }

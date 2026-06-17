@@ -89,7 +89,7 @@ public class SpawnManager : MonoBehaviour {
 		Vector3 spot = GetRandomLocation();
 		if (spot.x == 0 && spot.y == 0 && spot.z == 0) return;
 
-		u16 instGO = SpawnDynamicObject(index,Eng_Global->currentLevel,false,null,-1);
+		u16 instGO = SpawnDynamicObject(index,Eng_Global->curLev,false,null,-1);
         SetPosition(&Eng_Global->instances[instGO],spot,true);
         if (!alertEnemiesOnAwake) {
             if (aic.index != 14) aic.wandering = true;

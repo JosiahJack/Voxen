@@ -5,8 +5,7 @@
 #include "common.h"
 #define MOD_INTEROP_ENGINE
 #include "interop.h"
-// ====================
-// OS Shim Layer System
+// ==================== OS Shim Layer System
 typedef __UINTPTR_TYPE__ uintptr_t; typedef __INTPTR_TYPE__ intptr_t;
 #define likely(x)   __builtin_expect(!!(x),1)
 #define unlikely(x) __builtin_expect(!!(x),0)
@@ -100,7 +99,6 @@ ENGINE_TO_MOD void DualLogError(const char* fmt, ...); ENGINE_TO_MOD void DualLo
     static inline __attribute__((always_inline)) int OS_GetNumThreads() { unsigned long m[16]; long r=204; __asm__ __volatile__("syscall":"+a"(r):"D"(0LL),"S"(128LL),"d"(m):"rcx","r11","memory"); int c = 0; for(int i=0;i<(r/8);i++) {c+=__builtin_popcountll(m[i]);} return r < 0 ? 1 : c; }
     static inline __attribute__((always_inline)) void OS_DeallocateRAM(void* p,size_t s){ long r=11; if(!p || p == (void*)-1) { DualLogError("Attempting to double free!\n"); OS_Exit(1); } __asm__ __volatile__("syscall":"+a"(r):"D"(p),"S"(s):"rcx","r11","memory"); if(r<0) DualLogError("munmap failed\n"); }
     static inline __attribute__((always_inline)) i64 OS_RawWrite(FHandle fd, const void* buf, size_t cnt) { i64 r=1; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(buf),"d"(cnt):"rcx","r11","memory"); return r; }
-    // Multithreading taken from https://github.com/skeeto/scratch/blob/master/misc/stack_head.c Ref: https://nullprogram.com/blog/2023/03/23/ This is free and unencumbered software released into the public domain.
     #define SYSCALL1(n, a) syscall6(n,(long)(a),0,0,0,0,0)
     #define SYSCALL2(n, a, b) syscall6(n,(long)(a),(long)(b),0,0,0,0)
     #define SYSCALL3(n, a, b, c) syscall6(n,(long)(a),(long)(b),(long)(c),0,0,0)
@@ -111,7 +109,7 @@ ENGINE_TO_MOD void DualLogError(const char* fmt, ...); ENGINE_TO_MOD void DualLo
     typedef struct { struct OS_ThreadHead* head; void* stack_base; } OS_Thread;
     __attribute__((naked)) static long OS_CloneSyscall(struct OS_ThreadHead* stack) { __asm__ volatile ("mov %%rdi, %%rsi\nmov $0x50f00, %%edi\nmov $56, %%eax\nsyscall\nmov  %%rsp, %%rdi\nret\n":::"rax","rcx","rsi","rdi","r11","memory"); }
     __attribute__((noreturn)) static void OS_ThreadTrampoline(struct OS_ThreadHead* head) { head->fn(head->arg); __atomic_store_n(&head->join_futex,1,__ATOMIC_SEQ_CST); SYSCALL3(202,&head->join_futex,1,0x7fffffff);/*futex wake*/  SYSCALL1(60,0); __builtin_unreachable(); }
-    static inline __attribute__((always_inline)) int OS_ThreadCreate(OS_Thread* out, void* (*fn)(void*), void* arg) {
+    static inline __attribute__((always_inline)) int OS_ThreadCreate(OS_Thread* out, void* (*fn)(void*), void* arg) { // Multithreading taken from https://github.com/skeeto/scratch/blob/master/misc/stack_head.c Ref: https://nullprogram.com/blog/2023/03/23/ This is free and unencumbered software released into the public domain.
         void* base = OS_AllocateRAM(NULL, THREAD_STACK_SIZE, 0x1|0x2, 0x02|0x20, INVALID_FHANDLE);
         if (!base || base == (void*)-1) return -1;
 
@@ -139,8 +137,7 @@ static inline __attribute__((always_inline)) void OS_Write(FHandle f,const void*
 static inline __attribute__((always_inline)) void* OS_OpenAndAllocateFileBufferReadonly(const char* p,FHandle* f,int* s){void* r;return((*f=OS_OpenReadonly(p))==(FHandle)-1)?*s=0,(void*)0:((*s=OS_FileSize(*f))<=0)?DualLogError("Skipping empty:%s\n",p),OS_Close(*f),OS_Exit(1),NULL:(r=OS_AllocateFileBackedRAMReadonly(*s,*f,(char*)p))?(OS_Close(*f),r):NULL;}
 void* MemCpyFromBtoAForNBytes(void *dst, const void *src, size_t n) { unsigned char *d=(unsigned char *)dst; const unsigned char *s=(const unsigned char *)src; while (n--) {*d++=*s++;} return dst; } // memcpy replacement
 static inline __attribute__((always_inline)) void* OS_Realloc(void* old, size_t olds, size_t news) { void* n; return !old ? OS_Alloc(news) : news <= olds ? old : (n=OS_Alloc(news)) ? (MemCpyFromBtoAForNBytes(n,old,olds),OS_DeallocateRAM(old,olds),n) : 0; }
-// ==============
-// Declarations
+// ============== Declarations
 enum { GL_ARRAY_BUFFER=0x8892,      GL_DEPTH_BUFFER_BIT=0x00000100, GL_READ_WRITE=0x88BA, GL_SSBO=0x90D2,                 GL_CULL_FACE=0x0B44,                          
        GL_BLEND=0x0BE2,             GL_DEPTH_TEST=0x0B71,           GL_RGB=0x1907,        GL_TEXTURE0=0x84C0,             GL_TEXTURE5=0x84C5,
        GL_COLOR_ATTACHMENT0=0x8CE0,                                 GL_RG16F=0x822F,      GL_TEXTURE1=0x84C1,             GL_TEXTURE6=0x84C6,
@@ -205,7 +202,7 @@ static int num_parse_threads = 0;
 #define MAX_LIGHTS_PER_VOXEL 32
 #define NEAR_PLANE (0.02f)
 #define ONE_OVER_SQRT2 0.70710678118f
-GlobalContext Sys_Global = {0}; TextSystem Sys_Text; InputSystem Sys_Input; CheatsSystem Sys_Cheats = {.god=false,.noclip=false,.showLocation=true,.showFPS=true,.editMode=false,.showPhys=false}; RenderSystem Sys_Render; SystemUI Sys_UI;
+GlobalContext Sys_Global = {0}; TextSystem Sys_Text; InputSystem Sys_Input; CheatsSystem Sys_Cheats = {.god=false,.noclip=false,.showLocation=true,.showFPS=true,.editMode=false,.showPhys=true}; RenderSystem Sys_Render; SystemUI Sys_UI;
 SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on first run for potatoes (e.g. won't crash for out of VRAM, or won't take 5min to init).
     .InputCodeSettings = {
         5,  /* Forward    = F */     0,/* Strafe Left= A */         18,/* Backpedal  = S */        3,/* Strafe Right= D */       100,/* Jump    = SPACE */      2,/* Crouch   = C        */ 23,/* Prone     = X */ 16,/* Lean Left = Q  */
@@ -217,7 +214,7 @@ SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on f
     .ScreenWidth=800u,.ScreenHeight=600u,.Fullscreen=0u,.FOV=65u,.Brightness=50u,.Gamma=50u,.FXAA=0u,.Shadows=0u,.Reflections=0u,.Vsync=0u,.ModelDetail=0u,.CurrentMonitor=0u,
     .GI=0u,.SpeakerMode=1u,.Reverb=0u,.VolumeMaster=100u,.VolumeMusic=25u,.VolumeMessage=75u,.VolumeEffects=100u,.Language=0u,.DynamicMusic=1u,.Footsteps=1u,.InvertLook=0u,
     .InvertCyberspaceLook=0u,.QuickItemPickup=0u,.QuickReloadWeapons=0u,.MouseSensitivity=10u,.NoShootMode=0u,.HeadBob=1u,.SSR_RES=4u};/*Ratio is (1 / SSR_RES) * res*/
-Light lights[LIGHT_COUNT]; LightAnimation lanims[LIGHT_COUNT]; static bool shadowBuffersCreated = false;
+Light lights[LIGHT_COUNT]; static u16 loadedLights = 0; LightAnimation lanims[LIGHT_COUNT]; static bool shadowBuffersCreated = false;
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6],playerFrustumPlanes[6];
 u16 editModeSelection,editModeTestEntityDefinition=0; // Test instance and its model index
 typedef struct { double shadowTime; u32 shadowmapIndirectionList[LIGHT_COUNT]; float shadDotThresh; } VoxenShadowSystem;
@@ -232,8 +229,8 @@ ResMode resModes[8];
 typedef struct { Vector3 position; Quaternion rotation; u8 fov; u16 width,height; float near,far,finished; bool visible; } CamView;
 CamView camViews[64]; u32 camViewTextures[64]; u8 camViewCount = 0; // Max is 8 cam views on level 8 + 3 sensaround views = 11.
 FHandle console_log_file=0;
-static inline __attribute__((always_inline)) i32 PosGetCellCoordX(float pos_x) { return (u16)clamp((i32)vfloor((pos_x - Sys_Global.worldMin_x + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
-static inline __attribute__((always_inline)) i32 PosGetCellCoordZ(float pos_z) { return (u16)clamp((i32)vfloor((pos_z - Sys_Global.worldMin_z + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
+static i32 PosGetCellCoordX(float x) { return (u16)clamp((i32)vfloor((x - Sys_Global.worldMin_x[Sys_Global.curLev] + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
+static i32 PosGetCellCoordZ(float z) { return (u16)clamp((i32)vfloor((z - Sys_Global.worldMin_z[Sys_Global.curLev] + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
 static void DualLogMain(const char *prefix, const char *fmt, va_list args) {
     char buf[4096]; va_list c; __builtin_va_copy(c,args); StringFormatV(buf,sizeof(buf),fmt,c); __builtin_va_end(c); bool color = (prefix && prefix[0] == '\033');
     #ifdef WINDOWS
@@ -247,8 +244,7 @@ static void DualLogMain(const char *prefix, const char *fmt, va_list args) {
         OS_Write(console_log_file, buf, GetStringLength(buf),"console.log");
     }
 }
-// ===========================================================
-// Miscellaneous Helper Functions (and some libc replacements)
+// =========================================================== Miscellaneous Helper Functions (and some libc replacements)
 ENGINE_TO_MOD void DualLog(const char* fmt, ...) { va_list args; __builtin_va_start(args,fmt); DualLogMain(NULL,fmt,args); __builtin_va_end(args); }
 ENGINE_TO_MOD void DualLogWarn(const char* fmt, ...) { va_list args; __builtin_va_start(args,fmt); DualLogMain("\033[1;38;5;208mWARN:",fmt,args); __builtin_va_end(args); }
 ENGINE_TO_MOD void DualLogError(const char* fmt, ...) { va_list args; __builtin_va_start(args,fmt); DualLogMain("\033[1;31mERROR:",fmt,args); __builtin_va_end(args); }
@@ -274,8 +270,7 @@ void BmpWrite(char const *filename, int x, int y, const void *data) {
     ENGINE_TO_MOD double get_time() { struct {i64 s,ns;} ts; i64 ret; __asm__ __volatile__("syscall":"=a"(ret):"a"(228),"D"(1),"S"(&ts):"rcx","r11","memory"); if (ret != 0) {return 0.0;} return (double)ts.s + (double)ts.ns * 1e-9; } // Full time in seconds, 1 for MONOTONIC, Note that using clock_gettime wasn't any better for performance.
 #endif
 
-// Get USS aka the total RAM uniquely allocated for the process (btop shows RSS so pulls in shared libs and double counts shared RAM).
-void DebugRAM(const char *context) {
+void DebugRAM(const char *context) { // Get USS aka the total RAM uniquely allocated for the process (btop shows RSS so pulls in shared libs and double counts shared RAM).
 #ifdef DEBUG_RAM_OUTPUT
     static void* heap_start = (void*)-1;
     if (heap_start == (void*)-1) heap_start = OS_Brk(NULL);
@@ -616,8 +611,7 @@ float half_to_float(half h) {
     float f; MemCpyFromBtoAForNBytes(&f,&out,4);
     return f;
 }
-// ==========================
-// 2D Textures Loading System
+// ========================== 2D Textures Loading System
 u32 totalPixels,totalPaletteColors;
 typedef struct { u16 index; bool transparent; bool doublesided; char path[128]; } TextureData; typedef struct { TextureData* entries; u32 count; u32 capacity; } TextureDataParser; typedef struct { const char* data; int size; } RawTexture;
 typedef struct TextureParseTask { u32 start_tex; u32 end_tex; RawTexture* raw_textures; i32* parsIdx; const TextureDataParser* parser; int tid; } TextureParseTask;                 typedef struct { u32 img_x, img_y; i32 img_n, img_out_n; u8* img_buffer, *img_buffer_end; } PngContext;
@@ -911,17 +905,12 @@ static __attribute__((noinline)) void LoadTextures() {
     DualLog(" took %.6f secs\n",get_time() - start_time);
     DebugRAM("After LoadTextures and after deallocation");
 }
-// ========================
-// 3D Models Loading System
-u8** modelVertices = NULL; u16** modelTriangles = NULL;
-u32 modelVertexCounts[MODEL_IDX_MAX] = {0}; u16 modelTriangleCounts[MODEL_IDX_MAX] = {0};
-float modelBounds[MODEL_IDX_MAX] = {0}; u16 loadedModelsMaxIndex = 0;
+// ======================== 3D Models Loading System
+u8** modelVertices = NULL; u16** modelTriangles = NULL; u32 modelVertexCounts[MODEL_IDX_MAX] = {0}; u16 modelTriangleCounts[MODEL_IDX_MAX] = {0}; float modelBounds[MODEL_IDX_MAX] = {0}; u16 loadedModelsMaxIndex = 0;
 #define MAX_VERT_ELEMENT_SIZE 6964
 #define MAX_OUTPUT_VERTS      36364
 static float **thread_temp_pos = NULL, **thread_temp_nrm = NULL, **thread_temp_uv = NULL, **thread_out_verts = NULL; static u16** thread_out_tris = NULL;
-typedef struct { const char* data; int size; } RawOBJ;
-typedef struct { u16 index; bool animated; u8 animationNum; char path[128]; } ModelData;
-typedef struct { ModelData* entries; u32 count; u32 capacity; } ModelDataParser;
+typedef struct { const char* data; int size; } RawOBJ; typedef struct { u16 index; bool animated; u8 animationNum; char path[128]; } ModelData; typedef struct { ModelData* entries; u32 count; u32 capacity; } ModelDataParser;
 static inline __attribute__((always_inline)) half float_to_half(float f) {
     u32 x; MemCpyFromBtoAForNBytes(&x,&f,4);
     u32 s = x>>31, ue = (x>>23)&0xff; i32 e = (i32)ue-127; u32 m = x&0x7fffff;
@@ -933,21 +922,8 @@ static inline __attribute__((always_inline)) half float_to_half(float f) {
     return (half)((s<<15)|0x7c00);
 }
 
-static inline __attribute__((always_inline)) float fast_atof(const char** p) {
-    float v=0,s=1; while (**p == ' ' || **p == '\t') (*p)++;
-    if (**p == '-') { s = -1; (*p)++; }
-    while (**p >= '0' && **p <= '9') v = v*10 + (*(*p)++ - '0');
-    if (**p == '.') { (*p)++; float sub = 0.1f; while (**p >= '0' && **p <= '9') { v += (*(*p)++ - '0')*sub; sub *= 0.1f; } }
-    return s * v;
-}
-
-static inline __attribute__((always_inline)) i32 fast_atoi(const char** p) {
-    i32 v = 0, s = 1; while (**p == ' ' || **p == '\t') (*p)++;
-    if (**p == '-') { s = -1; (*p)++; }
-    while (**p >= '0' && **p <= '9') v = v*10 + (*(*p)++ - '0');
-    return v * s;
-}
-
+static inline __attribute__((always_inline)) float fast_atof(const char** p) { float v=0,s=1; while (**p == ' ' || **p == '\t') {(*p)++;} if (**p == '-') {s = -1; (*p)++;} while (**p >= '0' && **p <= '9') {v = v*10 + (*(*p)++ - '0');} if (**p == '.') {(*p)++; float sub=0.1f; while (**p >= '0' && **p <= '9') {v += (*(*p)++ - '0')*sub; sub *= 0.1f;}} return s * v; }
+static inline __attribute__((always_inline)) i32 fast_atoi(const char** p) { i32 v = 0, s = 1; while (**p == ' ' || **p == '\t') (*p)++; if (**p == '-') { s = -1; (*p)++; } while (**p >= '0' && **p <= '9') {v = v*10 + (*(*p)++ - '0');} return v * s; }
 typedef struct { u32 idx,key; } TriSort;
 int cmp(const void* a, const void* b) { u32 ka=((const TriSort*)a)->key, kb=((const TriSort*)b)->key; return (ka > kb) - (ka < kb); } // branchless 1 or -1
 static void OptimizeVertexCache(u16* idx, u32 ic, u32 vc) {
@@ -955,10 +931,7 @@ static void OptimizeVertexCache(u16* idx, u32 ic, u32 vc) {
     
     u32 tc = ic / 3;
     TriSort* t = OS_Alloc(tc*sizeof(TriSort));
-    for (u32 i=0; i<tc; ++i) {
-        u16* p = idx+i*3; u32 m = p[0]<p[1]?p[0]:p[1]; m = m<p[2]?m:p[2];
-        t[i].idx = i; t[i].key = m;
-    }
+    for (u32 i=0; i<tc; ++i) { u16* p = idx+i*3; u32 m = p[0]<p[1]?p[0]:p[1]; m = m<p[2]?m:p[2]; t[i].idx = i; t[i].key = m; }
     qsort_new(t, tc, sizeof(TriSort), cmp);
     u16* n = OS_Alloc(ic*sizeof(u16));
     for (u32 i=0; i<tc; ++i) { u16* s=idx+t[i].idx*3; u16* d=n+i*3; d[0]=s[0];d[1]=s[1];d[2]=s[2]; }
@@ -971,10 +944,7 @@ static u8* OptimizeVertexFetch(u8* v, u32* vc, u16* idx, u32 ic, size_t stride) 
     u32 *remap = OS_Alloc(oc*sizeof(u32)), *first = OS_Alloc(oc*sizeof(u32));
     MemSetToVForNBytes(remap,0xFF,oc*sizeof(u32));
     u32 nc = 0;
-    for (u32 i=0; i<ic; ++i) {
-        u32 id = idx[i];
-        if (id < oc && remap[id] == 0xFFFFFFFFU) { remap[id] = nc; first[nc] = id; ++nc; }
-    }
+    for (u32 i=0; i<ic; ++i) { u32 id = idx[i]; if (id < oc && remap[id] == 0xFFFFFFFFU) { remap[id] = nc; first[nc] = id; ++nc; } }
     u8* nv = OS_Alloc(nc*stride);
     for (u32 i=0; i<nc; ++i) MemCpyFromBtoAForNBytes(nv+i*stride,v+first[i]*stride,stride);
     for (u32 i=0; i<ic; ++i) if (idx[i] < oc) idx[i] = (u16)remap[idx[i]];
@@ -1080,8 +1050,7 @@ typedef struct { u32 start, end; RawOBJ* raw; int tid; } ModelParseTask;
 static void* ModelParsingWorker(void* arg) {
     ModelParseTask* t = arg;
     for (u32 i = t->start; i < t->end; ++i) {
-        RawOBJ obj = t->raw[i];
-        if (unlikely(!obj.data || obj.size <= 0)) continue;
+        RawOBJ obj = t->raw[i]; if (unlikely(!obj.data || obj.size <= 0)) continue;
 
         if (!ParseOBJ(i,obj.data,obj.size,thread_temp_pos[t->tid],thread_temp_nrm[t->tid],thread_temp_uv[t->tid],thread_out_verts[t->tid],thread_out_tris[t->tid],&modelVertices[i],&modelVertexCounts[i],&modelTriangles[i],&modelTriangleCounts[i])) continue;
     }
@@ -1136,9 +1105,9 @@ bool ParseModelData(ModelDataParser *p, u16 maxSz, const char *fn) {
             char k[256]={0}, v[256]={0};
             StringCopyInto_A_SubstringFrom_B(k, col-s, s, 256);
             StringCopyInto_A_SubstringFrom_B(v, le-col, col+1, 256);
-            if (StringsEqual(k,"index"))             cur.index = parse_numberu16(v, s, ln);
-            else if (StringsEqual(k,"animationNum")) cur.animationNum = parse_numberu16(v, s, ln);
-            else if (StringsEqual(k,"animated"))     cur.animated = parse_numberu8(v, s, ln);
+            if (StringsEqual(k,"index"))             cur.index = parse_numberu16(v,s,ln);
+            else if (StringsEqual(k,"animationNum")) cur.animationNum = parse_numberu16(v,s,ln);
+            else if (StringsEqual(k,"animated"))     cur.animated = parse_numberu8(v,s,ln);
         }
         next:
         if (c < e && *c == '\r') ++c; if (c < e && *c == '\n') ++c;
@@ -1148,12 +1117,7 @@ bool ParseModelData(ModelDataParser *p, u16 maxSz, const char *fn) {
     return true;
 }
 
-static void UploadMdlBuffer(u32 target, u32 buf, const void* data, size_t size) {
-    glBindBuffer(target,buf); glBufferData(target,size,NULL,GL_STATIC_DRAW);
-    void* mp = glMapBufferRange(target,0,size,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/);
-    MemCpyFromBtoAForNBytes(mp,data,size); glUnmapBuffer(target);
-}
-
+static void UploadMdlBuffer(u32 target, u32 buf, const void* data, size_t size) { glBindBuffer(target,buf); glBufferData(target,size,NULL,GL_STATIC_DRAW); void* mp = glMapBufferRange(target,0,size,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/); MemCpyFromBtoAForNBytes(mp,data,size); glUnmapBuffer(target); }
 void LoadModels() {
     double startModelTime = get_time();
     ModelDataParser mp = {0};
@@ -1163,9 +1127,8 @@ void LoadModels() {
     u32 maxid = 0;
     for (u32 i=0; i<mp.count; ++i) { if (mp.entries[i].index != U16_MAX && mp.entries[i].index > maxid) maxid = mp.entries[i].index; }
     loadedModelsMaxIndex = (u16)maxid + 1;
-    num_parse_threads = clamp(OS_GetNumThreads(), 1, 32);
-    modelVertices  = OS_Alloc(loadedModelsMaxIndex * sizeof(u8*));
-    modelTriangles = OS_Alloc(loadedModelsMaxIndex * sizeof(u16*));
+    num_parse_threads = clamp(OS_GetNumThreads(),1,32);
+    modelVertices = OS_Alloc(loadedModelsMaxIndex * sizeof(u8*)); modelTriangles = OS_Alloc(loadedModelsMaxIndex * sizeof(u16*));
     size_t n = loadedModelsMaxIndex;
     size_t arena = n*sizeof(i32) + n*sizeof(RawOBJ) + 5*num_parse_threads*sizeof(float*) + (size_t)num_parse_threads * ((MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*2)*sizeof(float) + MAX_OUTPUT_VERTS*8*sizeof(float) + MAX_OUTPUT_VERTS*sizeof(u32));
     void* arena_base = OS_Alloc(arena); char* p = arena_base;
@@ -1175,12 +1138,7 @@ void LoadModels() {
     RawOBJ* raw = (RawOBJ*)p; p += n*sizeof(RawOBJ);
     for (u32 i=0; i<n; ++i) {
         i32 pi = idxmap[i];
-        if (pi >= 0) {
-            const char* path = mp.entries[pi].path;
-            FHandle dummy; int sz=0;
-            raw[i].data = (const char*)OS_OpenAndAllocateFileBufferReadonly(path,&dummy,&sz);
-            raw[i].size = sz;
-        }
+        if (pi >= 0) { FHandle d; int sz=0; raw[i].data = (const char*)OS_OpenAndAllocateFileBufferReadonly(mp.entries[pi].path,&d,&sz); raw[i].size = sz; }
     }
 
     float **pos = (float**)p; p += num_parse_threads*sizeof(float*);
@@ -1188,9 +1146,7 @@ void LoadModels() {
     float **uv  = (float**)p; p += num_parse_threads*sizeof(float*);
     float **ov  = (float**)p; p += num_parse_threads*sizeof(float*);
     u16  **ot   =   (u16**)p; p += num_parse_threads*sizeof(u16*);
-    size_t psz = MAX_VERT_ELEMENT_SIZE*3*sizeof(float);
-    size_t usz = MAX_OUTPUT_VERTS*8*sizeof(float);
-    size_t tsz = MAX_OUTPUT_VERTS*sizeof(u32);
+    size_t psz = MAX_VERT_ELEMENT_SIZE*3*sizeof(float), usz = MAX_OUTPUT_VERTS*8*sizeof(float), tsz = MAX_OUTPUT_VERTS*sizeof(u32);
     for (int i=0; i<num_parse_threads; ++i) {
         pos[i] = (float*)p; p += psz;
         nrm[i] = (float*)p; p += psz;
@@ -1229,24 +1185,18 @@ void LoadModels() {
     DualLog(" vertices: %u, tris: %u, %f secs\n",tv,tt,get_time() - startModelTime);
     DebugRAM("After LoadModels");
 }
-// ==============
-// Culling System
-typedef struct { u16 x,z; } PortalCell;
-typedef struct { PortalCell cellA,cellB,cellA2,cellB2; bool portalNS,open,dirty,isBulkhead;} Portal;
-u32 gridCellStates[ARRSIZE];
-u32 precomputedVisibleCellsFromHere[524288]; // 4096 * 4096 / 32
-u16 playerCellIdx = 0u;
-bool instanceIsLODArray[INSTANCE_COUNT];
+// ============== Culling System
 #define MAX_CULL_FILESIZE 500000
-Portal activePortals[MAX_PORTALS];
-static u8 numActivePortals = 0;
+typedef struct { u16 x,z; } PortalCell; typedef struct { PortalCell cellA,cellB,cellA2,cellB2; bool portalNS,open,dirty,isBulkhead;} Portal;
+u32 gridCellStates[ARRSIZE],precomputedVisibleCellsFromHere[524288]; // 4096 * 4096 / 32
+u16 playerCellIdx = 0u; bool instanceIsLODArray[INSTANCE_COUNT]; Portal activePortals[MAX_PORTALS]; static u8 numActivePortals = 0;
 __attribute__((pure)) bool get_cull_bit(const u32* arr, int idx) { return (arr[idx >> 5] >> (idx & 31)) & 1; }
 static inline __attribute__((always_inline)) void set_cull_bit(u32* arr, int idx, bool val) {u32* w = arr + (idx >> 5); u32 m = 1U << (idx & 31); *w = val ? (*w | m) : (*w & ~m);}
 ENGINE_TO_MOD i32 PosGetCellCoords(float x, float z) { return (PosGetCellCoordZ(z) * WORLDX) + PosGetCellCoordX(x); }
 ENGINE_TO_MOD bool PositionVisibleFromPlayerCell(float x, float z) { return (get_cull_bit(precomputedVisibleCellsFromHere,((playerCellIdx * ARRSIZE)/*cellIdx*/ + PosGetCellCoords(x,z)/*subIdx*/)/*flat_idx*/)); }
 static inline __attribute__((always_inline)) bool XZPairInBounds(i32 x, i32 z) { return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0); }
-bool SkyIsVisible() { return ((gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || Sys_Global.currentLevel == LEVEL_CYBERSPACE); }
-bool SkySunIsVisible() { return ((gridCellStates[playerCellIdx] & CELL_SEES_SUN) && Sys_Global.currentLevel != LEVEL_CYBERSPACE); }
+bool SkyIsVisible() { return ((gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || Sys_Global.curLev == LEVEL_CYBERSPACE); }
+bool SkySunIsVisible() { return ((gridCellStates[playerCellIdx] & CELL_SEES_SUN) && Sys_Global.curLev != LEVEL_CYBERSPACE); }
 bool NeighborhoodInPVS(u16 cellX, u16 cellZ, u8 r) {
     u32 cellIdx = (cellZ * WORLDX) + cellX;
     for (int ix = (int)cellX-r; ix <= (int)cellX+r; ++ix) {
@@ -1291,7 +1241,7 @@ static unsigned char* LoadCullPNG(const char* name, int level) {
 #define PIXEL_IDX(x, z) ((x) + ((WORLDZ - 1 - (z)) * WORLDX)) * 4 // 4 channels, flip z to have desired bottom-left origin 0,0 vs png's top-left
 void DetermineClosedEdges() {
     PngArenaInit(&png_arena_main); u16 totalOpenCells = 0;
-    unsigned char* openPixels = LoadCullPNG("worldcellopen",Sys_Global.currentLevel);
+    unsigned char* openPixels = LoadCullPNG("worldcellopen",Sys_Global.curLev);
     for (i32 x=0;x<WORLDX;++x) {
         for (i32 z=0;z<WORLDZ;++z) {
             i32 cellIdx = (z * WORLDX) + x;
@@ -1304,7 +1254,7 @@ void DetermineClosedEdges() {
     }
 
     gridCellStates[0] |= CELL_OPEN; // Force the fallback error cell to be open (forced visible later, open is static, visible is transient)
-    unsigned char* edgePixels = LoadCullPNG("worldedgesclosed",Sys_Global.currentLevel);
+    unsigned char* edgePixels = LoadCullPNG("worldedgesclosed",Sys_Global.curLev);
     for (i32 x=0;x<WORLDX;x++) {
         for (i32 z=0;z<WORLDZ;z++) {
             i32 cellIdx = (z * WORLDX) + x;
@@ -1319,7 +1269,7 @@ void DetermineClosedEdges() {
         }
     }
         
-    unsigned char* skyPixels = LoadCullPNG("worldcellskyvis",Sys_Global.currentLevel);
+    unsigned char* skyPixels = LoadCullPNG("worldcellskyvis",Sys_Global.curLev);
     for (i32 x=0;x<WORLDX;++x) {
         for (i32 z=0;z<WORLDZ;++z) {
             i32 cellIdx = (z * WORLDX) + x; i32 pixelIdx = PIXEL_IDX(x,z);
@@ -1570,7 +1520,7 @@ void DetermineVisibleCells(i32 startX, i32 startZ) {
     for (i32 x=0;x<WORLDX;++x) {
         for (i32 z=0;z<WORLDZ;++z) {
             i32 cellIdx_xz = (z * WORLDX) + x;
-            if (Sys_Global.currentLevel == 5) { // Citadel flight level hackarounds for algorithm discrepancies at glancing angles.
+            if (Sys_Global.curLev == 5) { // Citadel flight level hackarounds for algorithm discrepancies at glancing angles.
                 if ((x <= 15 && startX <= 15) || (z <= 9 && startZ <= 9) || (x >= 32 && startX >= 32) || (z == 31 && startZ == 31 && x >= 27 && startX >= 27) ||  x >= 34) gridCellStates[cellIdx_xz] |= CELL_VISIBLE;                
                 if (startX <=12 && x == 14 && z == 31 && startZ >= 24) gridCellStates[cellIdx_xz] |= CELL_VISIBLE;
                 if (startX <=12 && x == 14 && z == 30 && startZ >= 24) gridCellStates[cellIdx_xz] |= CELL_VISIBLE;
@@ -1586,7 +1536,7 @@ ENGINE_TO_MOD void PortalCulling() { // Called just once at end of animation loo
     u16 playerCellZ = PosGetCellCoordZ(Sys_Global.instances[PLAYER1].position.z);
     bool previousLightVisible[LIGHT_COUNT];
     MemSetToVForNBytes(previousLightVisible,false,LIGHT_COUNT * sizeof(bool));
-    for (u16 i=0;i<Sys_Global.loadedLights;++i) {
+    for (u16 i=0;i<loadedLights;++i) {
         u16 lcell = (lights[i].pos.z * WORLDX) + lights[i].pos.x;
         if (gridCellStates[lcell] & CELL_VISIBLE) previousLightVisible[i] = true;
     }
@@ -1611,7 +1561,7 @@ ENGINE_TO_MOD void PortalCulling() { // Called just once at end of animation loo
     }
     
     DetermineVisibleCells(playerCellX,playerCellZ); // Recompute full PVS with new closed edges for all portal states.  So much for the precomputed set.
-    for (u16 i=0;i<Sys_Global.loadedLights;++i) {
+    for (u16 i=0;i<loadedLights;++i) {
         u16 lcell = (lights[i].pos.z * WORLDX) + lights[i].pos.x;
         if (!previousLightVisible[i] && (gridCellStates[lcell] & CELL_VISIBLE)) flag_set(&lights[i].lflags,LDIRTY,true);
     }
@@ -1622,12 +1572,10 @@ void CullCore() {
     if (unlikely(Sys_Global.gamePaused || Sys_Global.menuActive)) return;
         
     playerCellIdx = PosGetCellCoords(Sys_Global.instances[PLAYER1].position.x,Sys_Global.instances[PLAYER1].position.z);
-    if (Sys_Global.currentLevel >= LEVEL_CYBERSPACE) return;
+    if (Sys_Global.curLev >= LEVEL_CYBERSPACE) return;
 
-    float pos_x,pos_z;
-    u16 cellX = (u16)clamp((i32)vfloor((Sys_Global.instances[PLAYER1].position.x - Sys_Global.worldMin_x + CELLXHALF) / CELL_SIZE),0,WORLDX_0BASED);
-    u16 cellZ = (u16)clamp((i32)vfloor((Sys_Global.instances[PLAYER1].position.z - Sys_Global.worldMin_z + CELLXHALF) / CELL_SIZE),0,WORLDX_0BASED);
-    pos_x = Sys_Global.worldMin_x + (cellX * CELL_SIZE); pos_z = Sys_Global.worldMin_z + (cellZ * CELL_SIZE);
+    u16 cellX = PosGetCellCoordX(Sys_Global.instances[PLAYER1].position.x), cellZ = PosGetCellCoordZ(Sys_Global.instances[PLAYER1].position.z);
+    float pos_x = Sys_Global.worldMin_x[Sys_Global.curLev] + (cellX * CELL_SIZE), pos_z = Sys_Global.worldMin_z[Sys_Global.curLev] + (cellZ * CELL_SIZE);
     for (int i=0;i<Sys_Global.loadedInstances;++i) {
         float distSqrd = squareDistance2D(Sys_Global.instances[i].position.x,Sys_Global.instances[i].position.z,pos_x,pos_z);
         instanceIsLODArray[i] = (distSqrd >= 655.36f); // 25.6f * 25.6f
@@ -1639,7 +1587,7 @@ void CullCore() {
 void CullInit() {
     double start_time = get_time();    
     DualLog("Culling ");
-    if (Sys_Global.currentLevel == LEVEL_CYBERSPACE) return;
+    if (Sys_Global.curLev == LEVEL_CYBERSPACE) return;
 
     DetermineClosedEdges(); // For each cell, get the visibility as though player were there and put into gridCellStates.  Then store the visibility of gridCellStates into the table of all visible cells for that cell at the appropriate offset for looking up later when actually re-assigning gridCellStates from this precalculated visibility state for the particular cell.
     for (i32 z=0;z<WORLDZ;z++) {
@@ -1655,7 +1603,7 @@ void CullInit() {
                 }
             }
             
-            if (Sys_Global.currentLevel == 10) {
+            if (Sys_Global.curLev == 10) {
                 if ((x == 15 || x == 16) && z == 23) { // Fix up problem cells at odd angle where ddx doesn't work.
                     size_t flat_idx = (size_t)(cellIdx * ARRSIZE) + ((11 * WORLDX) + 12);
                     set_cull_bit(precomputedVisibleCellsFromHere,flat_idx,true);
@@ -1678,13 +1626,11 @@ void CullInit() {
     CullCore(); // Do first Cull pass, forcing as player moved to new cell.
     DualLog(" took %f secs\n",get_time() - start_time);
 }
-// =====================
-// Fonts and Text System
-typedef struct { void* ptr; size_t sz; } TAlloc;
-static TAlloc* ttAllocs = NULL; static int tallocCount=0;
+// ===================== Fonts and Text System
+typedef struct { void* ptr; size_t sz; } TAlloc; static TAlloc* ttAllocs = NULL; static int tallocCount=0;
 static void* TempAlloc(size_t n){if(tallocCount>=4474){DualLogError("TempAlloc too many!\n");return NULL;}void*p=OS_Alloc(n);if(!p){DualLogError("TempAlloc: OS_Alloc failed!\n");return NULL;}ttAllocs[tallocCount++]=(TAlloc){p,n};return p;}
 static void  TempFree (void* p){if(!p||tallocCount==0||ttAllocs[tallocCount-1].ptr!=p)return;OS_DeallocateRAM(p,ttAllocs[tallocCount-1].sz);tallocCount--;}
-static u16 ttUSHORT(u8*p){return p[0]*256+p[1];}
+static u16 ttUSHORT(u8*p){return p[0]*256+p[1];} 
 static i16 ttSHORT (u8*p){return p[0]*256+p[1];}
 static u32 ttULONG (u8*p){return((u32)p[0]<<24)|((u32)p[1]<<16)|((u32)p[2]<<8)|p[3];}
 static i32 ttLONG  (u8*p){return((i32)p[0]<<24)|((i32)p[1]<<16)|((i32)p[2]<<8)|p[3];}
@@ -2139,9 +2085,7 @@ static void InitFontAtlasses(){
     fallbackFonts[0]=LoadFallbackFont(fallbackFontPaths[0],2,0);
     fallbackFonts[1]=LoadFallbackFont(fallbackFontPaths[1],3,0);
     fallbackFonts[2]=LoadFallbackFont(fallbackFontPaths[2],4,2);
-    unsigned char*bmp=OS_Alloc(FONT_ATLAS_SIZE*FONT_ATLAS_SIZE);
-
-    // Primary atlas
+    unsigned char*bmp=OS_Alloc(FONT_ATLAS_SIZE*FONT_ATLAS_SIZE); // Primary atlas
     stbtt_pack_context pc;stbtt_PackBegin(&pc,bmp,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0,16,NULL);pc.h_oversample=3;pc.v_oversample=3;pc.skip_missing=1;numPackedGlyphs=0;
     for(int r=0;r<numFontRanges;++r){fontRanges[r].startIndex=numPackedGlyphs;
         for(int i=0;i<fontRanges[r].count;++i){if(numPackedGlyphs>=MAX_GLYPHS)break;u32 cp=fontRanges[r].first+i;stbtt_fontinfo*font=&fontInfo[0];unsigned char*data=fontData[0];
@@ -2149,9 +2093,7 @@ static void InitFontAtlasses(){
             float h=20.0f;if(font!=&fontInfo[0])h*=1.2f;FPackRange range={h,cp,NULL,1,&fontPackedChar[numPackedGlyphs],0,0};stbtt_PackFontRanges(&pc,data,0,&range,1);
             int idx=numPackedGlyphs++;if(cp>='0'&&cp<='9')fixedNumberAdvanceWidth=vmax(fixedNumberAdvanceWidth,fontPackedChar[idx].xadvance);}}
     TempFree(pc.pack_info);GenerateAndBindTexture(&fontAtlasTex,0x8229/*GL_R8*/,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0x1903/*GL_RED*/,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,bmp);
-
-    // Secondary atlas
-    MemSetToVForNBytes(bmp,0,FONT_ATLAS_SIZE*FONT_ATLAS_SIZE);
+    MemSetToVForNBytes(bmp,0,FONT_ATLAS_SIZE*FONT_ATLAS_SIZE); // Secondary atlas
     stbtt_pack_context pc2;stbtt_PackBegin(&pc2,bmp,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0,16,NULL);pc2.h_oversample=3;pc2.v_oversample=3;pc2.skip_missing=1;numPackedGlyphsStopD=0;
     for(int r=0;r<numFontRanges;++r){fontRangesStopD[r].startIndex=numPackedGlyphsStopD;
         for(int i=0;i<fontRangesStopD[r].count;++i){if(numPackedGlyphsStopD>=MAX_GLYPHS)break;u32 cp=fontRangesStopD[r].first+i;stbtt_fontinfo*font=&fontInfo[1];unsigned char*data=fontData[1];
@@ -2159,7 +2101,6 @@ static void InitFontAtlasses(){
             float h=54.0f;if(font!=&fontInfo[1])h*=1.2f;FPackRange range={h,cp,NULL,1,&fontPackedCharStopD[numPackedGlyphsStopD],0,0};stbtt_PackFontRanges(&pc2,data,0,&range,1);
             int idx=numPackedGlyphsStopD++;if(cp>='0'&&cp<='9')fixedNumberAdvanceWidthStopD=vmax(fixedNumberAdvanceWidthStopD,fontPackedCharStopD[idx].xadvance);}}
     TempFree(pc2.pack_info);GenerateAndBindTexture(&fontAtlasTexStopD,0x8229/*GL_R8*/,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0x1903/*GL_RED*/,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,bmp);
-    
     OS_DeallocateRAM(bmp,FONT_ATLAS_SIZE*FONT_ATLAS_SIZE);
     OS_DeallocateRAM(fontData[0],sz1);
     OS_DeallocateRAM(fontData[1],sz2);
@@ -2233,22 +2174,11 @@ void LoadLogTextForLanguage(u8 lang){
         nxt:continue;}
 }
 
-Color textColors[] = {
-    {        1.0f,        1.0f,        1.0f,1.0f}, // 0 White                       TEXT_WHITE
-    {0.890196078f,0.874509804f,        0.0f,1.0f}, // 1 Yellow                      TEXT_YELLOW
-    {0.623529412f,0.611764706f,        0.0f,1.0f}, // 2 Dark Yellow (Yellow * 0.7f) TEXT_DARK_YELLOW
-    {0.372549020f,0.654901961f,0.168627451f,1.0f}, // 3 Green                       TEXT_GREEN
-    {0.917647059f,0.137254902f,0.168627451f,1.0f}, // 4 Red                         TEXT_RED
-    {        1.0f,0.498039216f,        0.0f,1.0f}, // 5 Orange                      TEXT_ORANGE
-    {0.674509804f,0.058823529f,0.070588235f,1.0f}, // 6 StopD Red                   TEXT_STOPD_RED
-    {0.941176471f,0.282352941f,0.298039216f,1.0f}, // 7 StopD Red Highlight         TEXT_STOPD_RED_HIGHLIGHT
-    {0.909803922f,0.203921569f,0.219607843f,1.0f}, // 8 StopD Red Pause Title       TEXT_STOPD_RED_PAUSETITLE
-    {0.470588235f,0.721568627f,0.172549020f,1.0f}, // 9 Green Menu Title            TEXT_GREEN_MENU
-    {0.137254902f,0.356862745f,0.109803922f,1.0f}, // 10 Green Menu Title Shadow    TEXT_GREEN_MENU_SHADOW
-    {0.239215686f,0.466666667f,0.129411765f,1.0f}, // 11 Green Menu Title Glow      TEXT_GREEN_MENU_GLOW
-    {0.392156863f,0.031372549f,0.039215686f,1.0f}  // 12 Red Menu Text Dark         TEXT_RED_MENU
-};
-
+Color textColors[] = {{        1.0f,        1.0f,        1.0f,1.0f},/* 0 White                TEXT_WHITE*/       {0.890196078f,0.874509804f,        0.0f,1.0f},/* 1 Yellow                   TEXT_YELLOW*/              {0.623529412f,0.611764706f,        0.0f,1.0f}, /* 2 Dark Yellow (Yellow * 0.7f) TEXT_DARK_YELLOW*/
+                      {0.372549020f,0.654901961f,0.168627451f,1.0f},/* 3 Green                TEXT_GREEN*/       {0.917647059f,0.137254902f,0.168627451f,1.0f},/* 4 Red                      TEXT_RED*/                 {        1.0f,0.498039216f,        0.0f,1.0f}, /* 5 Orange                      TEXT_ORANGE*/
+                      {0.674509804f,0.058823529f,0.070588235f,1.0f},/* 6 StopD Red            TEXT_STOPD_RED*/   {0.941176471f,0.282352941f,0.298039216f,1.0f},/* 7 StopD Red Highlight      TEXT_STOPD_RED_HIGHLIGHT*/ {0.909803922f,0.203921569f,0.219607843f,1.0f}, /* 8 StopD Red Pause Title       TEXT_STOPD_RED_PAUSETITLE*/
+                      {0.470588235f,0.721568627f,0.172549020f,1.0f},/* 9 Green Menu Title     TEXT_GREEN_MENU*/  {0.137254902f,0.356862745f,0.109803922f,1.0f},/* 10 Green Menu Title Shadow TEXT_GREEN_MENU_SHADOW*/   {0.239215686f,0.466666667f,0.129411765f,1.0f}, /* 11 Green Menu Title Glow      TEXT_GREEN_MENU_GLOW*/
+                      {0.392156863f,0.031372549f,0.039215686f,1.0f}  /* 12 Red Menu Text Dark TEXT_RED_MENU*/ };
 float textVertexData[8192];
 void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scaleInput,const char* restrict format,...) {
     va_list args; __builtin_va_start(args,format); StringFormatV(uiTextBuffer,TEXT_BUFFER_SIZE,format,args); __builtin_va_end(args);
@@ -2285,8 +2215,7 @@ void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scaleInput,const 
     
     if(vc){ glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.textVBO); glBufferData(GL_ARRAY_BUFFER,vc*30*sizeof(float),textVertexData,GL_DYNAMIC_DRAW); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,vc*6); }
 }
-// ==========================
-// Windowing and Input System
+// ========================== Windowing and Input System
 typedef void (*GLFWglproc)(void);
 typedef struct GLFWwindow GLFWwindow; GLFWwindow* window;
 typedef struct { int width,height,redBits,greenBits,blueBits,refreshRate; } GLFWvidmode;
@@ -3536,8 +3465,7 @@ GLFWwindow* VCreateWindow(int width, int height, char* title) {
 void VSetWindowIcon(GLFWimage* images) { SetWindowIcon(images); }
 void glfwSetWindowSize(int width, int height) { _GLFWwindow* win = (_GLFWwindow*)window; win->videoMode.width=width; win->videoMode.height=height; SetWindowSize(win,width,height); }
 void glfwSetWindowMonitor(int xpos, int ypos, int width, int height) { _GLFWwindow* win = (_GLFWwindow*)window; win->videoMode.width=width; win->videoMode.height=height; SetWindowMonitor(win,xpos,ypos,width,height); }
-// ============
-// Input System
+// ============ Input System
 InputElement inputElements[134] = {
     { "A", KEY_A }, { "B", KEY_B }, { "C", KEY_C }, { "D", KEY_D }, { "E", KEY_E }, { "F", KEY_F }, { "G", KEY_G }, { "H", KEY_H }, { "I", KEY_I }, { "J", KEY_J }, { "K", KEY_K }, { "L", KEY_L }, { "M", KEY_M }, { "N", KEY_N }, { "O", KEY_O }, { "P", KEY_P }, { "Q", KEY_Q }, { "R", KEY_R }, { "S", KEY_S }, { "T", KEY_T },
     { "U", KEY_U }, { "V", KEY_V }, { "W", KEY_W }, { "X", KEY_X }, { "Y", KEY_Y }, { "Z", KEY_Z }, { "1", KEY_1 }, { "2", KEY_2 }, { "3", KEY_3 }, { "4", KEY_4 }, { "5", KEY_5 }, { "6", KEY_6 }, { "7", KEY_7 }, { "8", KEY_8 }, { "9", KEY_9 }, { "0", KEY_0 }, { "UP ARROW", KEY_UP }, { "DN ARROW", KEY_DOWN }, { "LF ARROW", KEY_LEFT }, { "RT ARROW", KEY_RIGHT },
@@ -3625,7 +3553,7 @@ void InputCursorPos(_GLFWwindow* win, double xpos, double ypos) { // static cons
     float s = vclamp((float)Sys_Settings.MouseSensitivity / 100.0f, 0.01f, 1.0f) * 0.2f;
     cam_yaw += (float)Sys_Input.currentMouse_dx * s; if (cam_yaw >= 360.0f) {cam_yaw -= 360.0f;} if (cam_yaw < 0.0f)     {cam_yaw  += 360.0f;}
     cam_pitch+=(float)Sys_Input.currentMouse_dy * s; if (cam_pitch > 89.0f) {cam_pitch = 89.0f;} if (cam_pitch < -89.0f) {cam_pitch = -89.0f;} // Avoid gimbal lock at pure 90deg
-    quat_from_yaw_pitch_roll(&Sys_Global.instances[PLAYER1].rotation,cam_yaw,cam_pitch,(Sys_Global.currentLevel == LEVEL_CYBERSPACE) ? cam_roll : 0.0f);
+    quat_from_yaw_pitch_roll(&Sys_Global.instances[PLAYER1].rotation,cam_yaw,cam_pitch,(Sys_Global.curLev == LEVEL_CYBERSPACE) ? cam_roll : 0.0f);
 }
 
 void JoystickConnection(_GLFWjoystick* js, int e) {
@@ -3783,15 +3711,14 @@ void CycleToNextMonitor() {
     Sys_Settings.CurrentMonitor = (Sys_Settings.CurrentMonitor + 1) % monitorCount;
     SaveConfig(); CenterWindowOnMonitor();
 }
-// ==============
-// Physics System
+// ============== Physics System
 #define MAX_COLLISION_ITERATIONS 4
 #define RESTITUTION 0.5f
 #define FRICTION 0.2f
 #define STEP_MIN_NORMAL_Y 0.7f
 #define PHY_EPSILON 0.0001f
 #define MAX_SUBSTEPS 10
-#define MAX_SPEED 10.0f // m/s
+#define MAX_SPEED 8.0f // m/s
 #define MAX_STEP_SIZE (MIN_DIAMETER / MAX_SPEED) // 0.01 s
 #define MIN_DIAMETER 0.1f // m
 #define MAX_ANGULAR_SPEED 5.0f
@@ -3912,7 +3839,6 @@ void Entity_GetBox(const Entity *e, ShapeBox *out) { out->center=V3_AplusB(e->po
 void Entity_GetSph(const Entity *e, ShapeSphere *out) { out->center = V3_AplusB(e->position,quat_rotate_vector(e->rotation,e->colliderCenter)); out->radius = e->colliderSize.x * vmax(e->scale.x,vmax(e->scale.y,e->scale.z)); }
 static inline Color ColliderColor(Entity *e) { return (!(e->entflags & EF_RIGIDBODY)) ? textColors[TEXT_GREEN_MENU_SHADOW] : ((e->colliding) ? textColors[TEXT_RED] : textColors[TEXT_GREEN]); }
 static void DrawVelocityVector(Entity *e) {
-    if (!Sys_Cheats.showPhys) return;
     if (!(e->entflags & EF_RIGIDBODY)) return;
 
     Vector3 tip = V3_AplusB(e->position,V3_ScaleByF(e->velocity,0.25f)); AddDebugLine(e->position,tip,textColors[TEXT_ORANGE]);
@@ -3920,9 +3846,7 @@ static void DrawVelocityVector(Entity *e) {
     AddDebugLine(V3_AplusB(tip,V3_ScaleByF(perp,0.05f)),V3_AsubB(tip,V3_ScaleByF(perp,0.05f)),textColors[TEXT_ORANGE]); // Small cross at tip so zero-length vecs are still visible when barely moving
 }
 
-void DrawBoxCollider(Entity *e) {
-    if (!Sys_Cheats.showPhys) return;
-    
+void DrawBoxCollider(Entity *e) {    
     Color col = ColliderColor(e);
     ShapeBox b; Entity_GetBox(e,&b); Vector3 ax,ay,az,c[8],px,py,pz; obb_axes(b.rot,&ax,&ay,&az);
     px=V3_ScaleByF(ax,b.halfExtents.x); py=V3_ScaleByF(ay,b.halfExtents.y); pz=V3_ScaleByF(az,b.halfExtents.z);
@@ -3933,9 +3857,7 @@ void DrawBoxCollider(Entity *e) {
     DrawVelocityVector(e);
 }
 
-void DrawSphereCollider(Entity *e) {
-    if (!Sys_Cheats.showPhys) return;
-    
+void DrawSphereCollider(Entity *e) {    
     Color col = ColliderColor(e); ShapeSphere s; Entity_GetSph(e,&s); float step=6.28318530f/12;
     for (int seg=0;seg<12;seg++) {
         float a0=seg*step,a1=a0+step,c0=vcosf(a0),s0=vsinf(a0),c1=vcosf(a1),s1=vsinf(a1);
@@ -3949,7 +3871,7 @@ void DrawSphereCollider(Entity *e) {
 
 void DrawSphereContact(Vector3 pos, float rad) {
     if (!Sys_Cheats.showPhys) return;
-    
+
     Color col = (Color){0.0f,0.0f,1.0f,1.0f}; ShapeSphere s = (ShapeSphere){pos,rad}; float step=6.28318530f/12;
     for (int seg=0;seg<12;seg++) {
         float a0=seg*step,a1=a0+step,c0=vcosf(a0),s0=vsinf(a0),c1=vcosf(a1),s1=vsinf(a1);
@@ -3959,9 +3881,7 @@ void DrawSphereContact(Vector3 pos, float rad) {
     }
 }
 
-void DrawMeshCollider(Entity *e) {
-    if (!Sys_Cheats.showPhys) return;
-    
+void DrawMeshCollider(Entity *e) {    
     Color col = ColliderColor(e); u16 mi= (e->collider == COLTYPE_CVX) ? e->colliderMeshIndex : e->modelIndex; if (mi >= MODEL_IDX_MAX || mi >= loadedModelsMaxIndex) return;
     u32 triCount=modelTriangleCounts[mi]; if (!triCount) return;
     
@@ -3980,32 +3900,25 @@ void DrawMeshCollider(Entity *e) {
     DrawVelocityVector(e);
 }
 
-void DrawCapsuleCollider(Entity *e) {
-    if (!Sys_Cheats.showPhys) return;
-    
-    Color col = ColliderColor(e);
-    ShapeCapsule cap; Entity_GetCap(e,&cap);
-    Vector3 axis=V3_Normalize(V3_AsubB(cap.tip,cap.base));
-    Vector3 ref=(vabs(axis.y)<0.9f)?(Vector3){0,1,0}:(Vector3){1,0,0};
-    Vector3 perp0=V3_Normalize(V3_Cross(axis,ref)),perp1=V3_Cross(axis,perp0);
-    #define CAPS_SEGS 12
-    float step=6.28318530f/CAPS_SEGS,r=cap.radius;
-    for (int seg=0;seg<CAPS_SEGS;seg++) {
+void DrawCapsuleCollider(Entity *e) {    
+    Color col = ColliderColor(e); ShapeCapsule cap; Entity_GetCap(e,&cap);
+    Vector3 axis=V3_Normalize(V3_AsubB(cap.tip,cap.base)); Vector3 ref=(vabs(axis.y)<0.9f)?(Vector3){0,1,0}:(Vector3){1,0,0}; Vector3 perp0=V3_Normalize(V3_Cross(axis,ref)),perp1=V3_Cross(axis,perp0);
+    float step=6.28318530f/12,r=cap.radius;
+    for (int seg=0;seg<12;seg++) {
         float a0=seg*step,a1=a0+step,c0=vcosf(a0),s0=vsinf(a0),c1=vcosf(a1),s1=vsinf(a1);
-        Vector3 r0=V3_AplusB(V3_ScaleByF(perp0,c0*r),V3_ScaleByF(perp1,s0*r)),r1=V3_AplusB(V3_ScaleByF(perp0,c1*r),V3_ScaleByF(perp1,s1*r));
+        Vector3 r0 = V3_AplusB(V3_ScaleByF(perp0,c0*r),V3_ScaleByF(perp1,s0*r)), r1=V3_AplusB(V3_ScaleByF(perp0,c1*r),V3_ScaleByF(perp1,s1*r));
         AddDebugLine(V3_AplusB(cap.base,r0),V3_AplusB(cap.base,r1),col); AddDebugLine(V3_AplusB(cap.tip,r0),V3_AplusB(cap.tip,r1),col);
     }
-    #define HEMI_SEGS 6
-    for (int seg=0;seg<HEMI_SEGS;seg++) {
+
+    for (int seg=0;seg<6;seg++) {
         float a0=seg*step,a1=a0+step,c0=vcosf(a0),s0=vsinf(a0),c1=vcosf(a1),s1=vsinf(a1);
         AddDebugLine(V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp0,c0*r),V3_ScaleByF(axis,-s0*r))),V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp0,c1*r),V3_ScaleByF(axis,-s1*r))),col);
         AddDebugLine(V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp1,c0*r),V3_ScaleByF(axis,-s0*r))),V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp1,c1*r),V3_ScaleByF(axis,-s1*r))),col);
         AddDebugLine(V3_AplusB(cap.tip, V3_AplusB(V3_ScaleByF(perp0,c0*r),V3_ScaleByF(axis, s0*r))),V3_AplusB(cap.tip, V3_AplusB(V3_ScaleByF(perp0,c1*r),V3_ScaleByF(axis, s1*r))),col);
         AddDebugLine(V3_AplusB(cap.tip, V3_AplusB(V3_ScaleByF(perp1,c0*r),V3_ScaleByF(axis, s0*r))),V3_AplusB(cap.tip, V3_AplusB(V3_ScaleByF(perp1,c1*r),V3_ScaleByF(axis, s1*r))),col);
     }
-    #undef HEMI_SEGS
+
     for (int seg=0;seg<4;seg++) { float a=seg*(6.28318530f/4.f); Vector3 off=V3_AplusB(V3_ScaleByF(perp0,vcosf(a)*r),V3_ScaleByF(perp1,vsinf(a)*r)); AddDebugLine(V3_AplusB(cap.base,off),V3_AplusB(cap.tip,off),col); }
-    #undef CAPS_SEGS
     DrawVelocityVector(e);
 }
 
@@ -4015,37 +3928,20 @@ static void DrawAngularVelocity(Entity *e) {
     if (V3_Mag(e->angularVelocity) < 0.0001f) return; // skip near-zero
 
     Color purple = (Color){0.5f, 0.0f, 1.0f, 1.0f};
-
-    // === Arrow (line vector) ===
-    float scale = 0.35f; // tune as needed - similar visual weight to velocity *0.25
+    float scale = 0.35f;
     Vector3 dir = V3_Normalize(e->angularVelocity);
     Vector3 tip = V3_AplusB(e->position, V3_ScaleByF(e->angularVelocity, scale));
-    AddDebugLine(e->position, tip, purple);
-
-    // Small cross at tip so zero-length vectors are still visible
+    AddDebugLine(e->position, tip, purple); // Arrow (line vector)
     Vector3 ref = (vabs(dir.y) < 0.9f) ? (Vector3){0,1,0} : (Vector3){1,0,0};
     Vector3 perp = V3_Normalize(V3_Cross(dir, ref));
     Vector3 perp2 = V3_Cross(dir, perp);
-    AddDebugLine(V3_AplusB(tip, V3_ScaleByF(perp,  0.05f)),V3_AplusB(tip, V3_ScaleByF(perp, -0.05f)), purple);
+    AddDebugLine(V3_AplusB(tip, V3_ScaleByF(perp,  0.05f)),V3_AplusB(tip, V3_ScaleByF(perp, -0.05f)), purple); // Small cross at tip so zero-length vectors are still visible
     AddDebugLine(V3_AplusB(tip, V3_ScaleByF(perp2, 0.05f)),V3_AplusB(tip, V3_ScaleByF(perp2,-0.05f)), purple);
-
-    // === Quarter circle arc (visualizes rotation plane + sense) ===
-    float radius = 0.6f; // tune to look good relative to your objects
+    float radius = 0.6f; // Quarter circle arc (visualizes rotation plane + sense)
     float step = 1.57079632679f / 8.0f; // quarter circle divided into 8 segments
-
-    // Find two vectors perpendicular to angular axis
-    Vector3 axis = dir;
-    Vector3 p1 = V3_Normalize(V3_Cross(axis, ref));
-    Vector3 p2 = V3_Cross(axis, p1);
-    Vector3 prev = V3_AplusB(e->position, V3_ScaleByF(p1, radius));
-    for (int i = 1; i <= 8; ++i) {
-        float a = i * step;
-        float c = vcosf(a);
-        float s = vsinf(a);
-        Vector3 cur = V3_AplusB(e->position,V3_AplusB(V3_ScaleByF(p1, c * radius),V3_ScaleByF(p2, s * radius)));
-        AddDebugLine(prev,cur,purple);
-        prev = cur;
-    }
+    Vector3 axis = dir; Vector3 p1 = V3_Normalize(V3_Cross(axis,ref)); Vector3 p2 = V3_Cross(axis,p1); // Find two vectors perpendicular to angular axis
+    Vector3 prev = V3_AplusB(e->position, V3_ScaleByF(p1,radius));
+    for (int i = 1; i <= 8; ++i) { float a = i * step; float c = vcosf(a); float s = vsinf(a); Vector3 cur = V3_AplusB(e->position,V3_AplusB(V3_ScaleByF(p1, c * radius),V3_ScaleByF(p2, s * radius))); AddDebugLine(prev,cur,purple); prev = cur; }
 }
 
 static u16 cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX];
@@ -4065,10 +3961,10 @@ static void ApplyVelocity(Entity *e, float dt) {
     SetPosition(e,V3_AplusB(e->position,V3_ScaleByF(e->velocity,dt)),false); // pos += (d = v*t)
     if (e->collider != COLTYPE_CAP) {
         float angDrag = vexp(-e->angularDrag * dt);
-        e->angularVelocity = V3_ScaleByF(e->angularVelocity, angDrag); // 1. Apply continuous angular drag over time
+        e->angularVelocity = V3_ScaleByF(e->angularVelocity,angDrag); // 1. Apply continuous angular drag over time
         float avel = V3_Mag(e->angularVelocity); 
-        if (avel > MAX_ANGULAR_SPEED) { e->angularVelocity = V3_ScaleByF(e->angularVelocity, MAX_ANGULAR_SPEED / avel); avel = MAX_ANGULAR_SPEED; }
-        if (avel > PHY_EPSILON) { Quaternion dq = quat_from_axis_angle(V3_ScaleByF(e->angularVelocity, 1.f / avel), avel * dt); e->rotation = quat_normalize(quat_multiply(dq, e->rotation)); } // 2. Integrate rotation
+        if (avel > MAX_ANGULAR_SPEED) { e->angularVelocity = V3_ScaleByF(e->angularVelocity,MAX_ANGULAR_SPEED / avel); avel = MAX_ANGULAR_SPEED; }
+        if (avel > PHY_EPSILON) { Quaternion dq = quat_from_axis_angle(V3_ScaleByF(e->angularVelocity,1.f / avel),avel * dt); e->rotation = quat_normalize(quat_multiply(dq,e->rotation)); } // 2. Integrate rotation
     } else e->angularVelocity = (Vector3){0.0f,0.0f,0.0f};
 }
 
@@ -4086,38 +3982,32 @@ static void AccumTetraInertia(float acc[6], Vector3 v0, Vector3 v1, Vector3 v2) 
 void ComputeConvexMeshInertiaTensor(Entity *e) { // Called for each entity in loop after LevelLoad() has loaded all entities.
     u16 mi = e->colliderMeshIndex; e->inertiaTensorValid = false;
     if (mi >= MODEL_IDX_MAX || !modelTriangleCounts[mi] || !modelVertexCounts[mi]) return;
+    
     float acc[6] = {0}; float volAcc = 0.f; u32 triCount = modelTriangleCounts[mi];
     for (u32 ti = 0; ti < triCount; ++ti) {
         u32 i0=modelTriangles[mi][ti*3+0], i1=modelTriangles[mi][ti*3+1], i2=modelTriangles[mi][ti*3+2];
-        #define LV(i) (Vector3){half_to_float(*(half*)(modelVertices[mi]+(i)*VERTEX_ATTRIBUTES_SIZE+0)), half_to_float(*(half*)(modelVertices[mi]+(i)*VERTEX_ATTRIBUTES_SIZE+2)), half_to_float(*(half*)(modelVertices[mi]+(i)*VERTEX_ATTRIBUTES_SIZE+4))}
-        Vector3 v0=LV(i0), v1=LV(i1), v2=LV(i2);
-        #undef LV
-        volAcc += V3_dot(v0, V3_Cross(v1, v2));
-        AccumTetraInertia(acc, v0, v1, v2);
+        Vector3 v0 = (Vector3){half_to_float(*(half*)(modelVertices[mi]+(i0)*VERTEX_ATTRIBUTES_SIZE+0)), half_to_float(*(half*)(modelVertices[mi]+(i0)*VERTEX_ATTRIBUTES_SIZE+2)), half_to_float(*(half*)(modelVertices[mi]+(i0)*VERTEX_ATTRIBUTES_SIZE+4))};
+        Vector3 v1 = (Vector3){half_to_float(*(half*)(modelVertices[mi]+(i1)*VERTEX_ATTRIBUTES_SIZE+0)), half_to_float(*(half*)(modelVertices[mi]+(i1)*VERTEX_ATTRIBUTES_SIZE+2)), half_to_float(*(half*)(modelVertices[mi]+(i1)*VERTEX_ATTRIBUTES_SIZE+4))};
+        Vector3 v2 = (Vector3){half_to_float(*(half*)(modelVertices[mi]+(i2)*VERTEX_ATTRIBUTES_SIZE+0)), half_to_float(*(half*)(modelVertices[mi]+(i2)*VERTEX_ATTRIBUTES_SIZE+2)), half_to_float(*(half*)(modelVertices[mi]+(i2)*VERTEX_ATTRIBUTES_SIZE+4))};
+        volAcc += V3_dot(v0,V3_Cross(v1,v2));
+        AccumTetraInertia(acc,v0,v1,v2);
     }
-    if (vabs(volAcc) < PHY_EPSILON) return;
-    float s = e->mass / (volAcc * 60.f), so = e->mass / (volAcc * 120.f);
     
-    // Calculate raw local inertia tensor bounds
-    float r = modelBounds[mi] * vmax(vmax(e->scale.x, e->scale.y), e->scale.z);
+    if (vabs(volAcc) < PHY_EPSILON) return;
+    
+    float s = e->mass / (volAcc * 60.f), so = e->mass / (volAcc * 120.f);
+    float r = modelBounds[mi] * vmax(vmax(e->scale.x, e->scale.y), e->scale.z); // Calculate raw local inertia tensor bounds
     float sphericalI = (2.0f / 5.0f) * e->mass * r * r, mn = sphericalI * 0.1f;
     float Ixx = vmax((acc[1]+acc[2])*s, mn), Iyy = vmax((acc[0]+acc[2])*s, mn), Izz = vmax((acc[0]+acc[1])*s, mn);
     float Ixy = -acc[3]*so, Ixz = -acc[4]*so, Iyz = -acc[5]*so;
-
-    // Apply entity transforms to the tensor elements before running matrix inversion
-    // Solid rule: I_scaled_xy = I_raw_xy * scale.x * scale.y
-    float sx = e->scale.x, sy = e->scale.y, sz = e->scale.z;
+    float sx = e->scale.x, sy = e->scale.y, sz = e->scale.z; // Apply entity transforms to the tensor elements before running matrix inversion.  Solid rule: I_scaled_xy = I_raw_xy * scale.x * scale.y
     Ixx *= (sy * sy + sz * sz) * 0.5f; Iyy *= (sx * sx + sz * sz) * 0.5f; Izz *= (sx * sx + sy * sy) * 0.5f;
     Ixy *= sx * sy; Ixz *= sx * sz; Iyz *= sy * sz;
-
     e->inertiaTensor[0] = Ixx; e->inertiaTensor[1] = Iyy; e->inertiaTensor[2] = Izz;
     e->inertiaTensor[3] = Ixy; e->inertiaTensor[4] = Ixz; e->inertiaTensor[5] = Iyz;
-
-    // Direct analytic 3x3 symmetric matrix inversion (Cramer's Rule)
-    float det = Ixx * (Iyy * Izz - Iyz * Iyz) - Ixy * (Ixy * Izz - Ixz * Iyz) + Ixz * (Ixy * Iyz - Iyy * Ixz);
+    float det = Ixx * (Iyy * Izz - Iyz * Iyz) - Ixy * (Ixy * Izz - Ixz * Iyz) + Ixz * (Ixy * Iyz - Iyy * Ixz); // Direct analytic 3x3 symmetric matrix inversion (Cramer's Rule)
     if (vabs(det) < PHY_EPSILON) return;
     float invDet = 1.0f / det;
-
     e->invInertiaTensor[0] = (Iyy * Izz - Iyz * Iyz) * invDet; // invIxx
     e->invInertiaTensor[1] = (Ixx * Izz - Ixz * Ixz) * invDet; // invIyy
     e->invInertiaTensor[2] = (Ixx * Iyy - Ixy * Ixy) * invDet; // invIzz
@@ -4229,8 +4119,8 @@ static bool GJKNextSimplex(Simplex3D *s, Vector3 *dir) {
     return false;
 }
 
-#define EPA_MAX_FACES 128
-#define EPA_MAX_VERTS 64
+#define EPA_MAX_FACES 16
+#define EPA_MAX_VERTS 48
 #define EPA_MAX_EDGES (EPA_MAX_FACES*3)
 typedef struct { int a,b,c; Vector3 n; float d; } EPAFace;
 typedef struct { Vector3 v, wA, wB; } EPAVert;
@@ -4453,12 +4343,7 @@ static OverlapResult SphMsh(Vector3 sc, float sr, u16 mesh, const float* mx) { /
     return r;
 }
 
-static OverlapResult CapMsh(ShapeCapsule cap, u16 mesh, const float* mx) {
-    OverlapResult rb = SphMsh(cap.base,cap.radius,mesh,mx);
-    OverlapResult rt = SphMsh(cap.tip, cap.radius,mesh,mx); // TODO: Connectivity needed or is snowman ala System Shock 1 fine enough?  Might prove funny if player can get stuck with top and bottom on either side of door while leaning like in original.
-    return (rt.overlapAmount > rb.overlapAmount) ? rt : rb;
-}
-
+static OverlapResult CapMsh(ShapeCapsule cap, u16 mesh, const float* mx) { OverlapResult rb = SphMsh(cap.base,cap.radius,mesh,mx); OverlapResult rt = SphMsh(cap.tip, cap.radius,mesh,mx); return (rt.overlapAmount > rb.overlapAmount) ? rt : rb; } // TODO: Connectivity needed or is snowman ala System Shock 1 fine enough?  Might prove funny if player can get stuck with top and bottom on either side of door while leaning like in original.
 static OverlapResult SphCvx(Vector3 sc, float sr, u16 mesh, const float* mx) {
     OverlapResult r = {0}; if (mesh >= MODEL_IDX_MAX || !modelVertexCounts[mesh]) return r;
     #define SPHSUP_A(d) ({ Vector3 _d=(d); float _L=V3_dot(_d,_d); V3_AplusB(sc,(_L>PHY_EPSILON)?V3_ScaleByF(_d,sr/vsqrtf(_L)):(Vector3){0,sr,0}); })
@@ -4513,82 +4398,45 @@ static OverlapResult SphCvx(Vector3 sc, float sr, u16 mesh, const float* mx) {
 }
 
 typedef struct {Vector3 mn,mx;} AABB3;
-static inline AABB3 HullWorldAABB(u16 hullMesh, const float* hullMx) {
-    AABB3 b = { {1e9f,1e9f,1e9f}, {-1e9f,-1e9f,-1e9f} };
-    u32 n = modelVertexCounts[hullMesh]; const u8* vb = modelVertices[hullMesh];
-    for (u32 i=0;i<n;++i) {
-        const u8* p = vb + i*VERTEX_ATTRIBUTES_SIZE;
-        Vector3 w = MvVert(hullMx,(Vector3){half_to_float(*(half*)(p+0)),half_to_float(*(half*)(p+2)),half_to_float(*(half*)(p+4))});
-        b.mn.x=vmin(b.mn.x,w.x); b.mn.y=vmin(b.mn.y,w.y); b.mn.z=vmin(b.mn.z,w.z); b.mx.x=vmax(b.mx.x,w.x); b.mx.y=vmax(b.mx.y,w.y); b.mx.z=vmax(b.mx.z,w.z);
-    }
-    return b;
-}
-
 static inline Vector3 TriSupport(Vector3 ta, Vector3 tb, Vector3 tc, Vector3 d) { float d1 = V3_dot(ta,d), d2 = V3_dot(tb,d), d3 = V3_dot(tc,d); return d1 > d2 ? (d1 > d3 ? ta : tc) : (d2 > d3 ? tb : tc); }
 static OverlapResult CvxMsh(u16 hullMesh, const float* hullMx, u16 triMesh, const float* triMx) {
-    OverlapResult best_r = {0};
-    if (hullMesh >= MODEL_IDX_MAX || triMesh >= MODEL_IDX_MAX) return best_r;
+    OverlapResult best_r = {0}; if (hullMesh >= MODEL_IDX_MAX || triMesh >= MODEL_IDX_MAX) return best_r;
+    AABB3 hb = { {1e9f,1e9f,1e9f}, {-1e9f,-1e9f,-1e9f} };
+    u32 n = modelVertexCounts[hullMesh]; const u8* vb = modelVertices[hullMesh];
+    for (u32 i=0;i<n;++i) { 
+        const u8* p = vb + i*VERTEX_ATTRIBUTES_SIZE;
+        Vector3 w = MvVert(hullMx,(Vector3){half_to_float(*(half*)(p+0)),half_to_float(*(half*)(p+2)),half_to_float(*(half*)(p+4))});
+        hb.mn.x=vmin(hb.mn.x,w.x); hb.mn.y=vmin(hb.mn.y,w.y); hb.mn.z=vmin(hb.mn.z,w.z); hb.mx.x=vmax(hb.mx.x,w.x); hb.mx.y=vmax(hb.mx.y,w.y); hb.mx.z=vmax(hb.mx.z,w.z);
+    }
     
-    AABB3 hb = HullWorldAABB(hullMesh, hullMx);
     u32 triCount = modelTriangleCounts[triMesh]; if (!triCount) return best_r;
-
     for (u32 ti = 0; ti < triCount; ++ti) {
         u32 i0 = modelTriangles[triMesh][ti * 3 + 0];
         u32 i1 = modelTriangles[triMesh][ti * 3 + 1];
-        u32 i2 = modelTriangles[triMesh][ti * 3 + 2];
-        
-        // Inline expansion of TRV(i) -> vertex extraction and matrix multiplication
-        Vector3 ta = MvVert(triMx, (Vector3){
-            half_to_float(*(half*)(modelVertices[triMesh] + i0 * VERTEX_ATTRIBUTES_SIZE + 0)),
-            half_to_float(*(half*)(modelVertices[triMesh] + i0 * VERTEX_ATTRIBUTES_SIZE + 2)),
-            half_to_float(*(half*)(modelVertices[triMesh] + i0 * VERTEX_ATTRIBUTES_SIZE + 4))
-        });
-        
-        Vector3 tb = MvVert(triMx, (Vector3){
-            half_to_float(*(half*)(modelVertices[triMesh] + i1 * VERTEX_ATTRIBUTES_SIZE + 0)),
-            half_to_float(*(half*)(modelVertices[triMesh] + i1 * VERTEX_ATTRIBUTES_SIZE + 2)),
-            half_to_float(*(half*)(modelVertices[triMesh] + i1 * VERTEX_ATTRIBUTES_SIZE + 4))
-        });
-        
-        Vector3 tc = MvVert(triMx, (Vector3){
-            half_to_float(*(half*)(modelVertices[triMesh] + i2 * VERTEX_ATTRIBUTES_SIZE + 0)),
-            half_to_float(*(half*)(modelVertices[triMesh] + i2 * VERTEX_ATTRIBUTES_SIZE + 2)),
-            half_to_float(*(half*)(modelVertices[triMesh] + i2 * VERTEX_ATTRIBUTES_SIZE + 4))
-        });
-        
-        // Coarse AABB check
-        if (vmin(ta.x, vmin(tb.x, tc.x)) > hb.mx.x || vmax(ta.x, vmax(tb.x, tc.x)) < hb.mn.x || 
-            vmin(ta.y, vmin(tb.y, tc.y)) > hb.mx.y || vmax(ta.y, vmax(tb.y, tc.y)) < hb.mn.y || 
-            vmin(ta.z, vmin(tb.z, tc.z)) > hb.mx.z || vmax(ta.z, vmax(tb.z, tc.z)) < hb.mn.z) {
-            continue;
-        }
+        u32 i2 = modelTriangles[triMesh][ti * 3 + 2];        
+        Vector3 ta = MvVert(triMx,(Vector3){ half_to_float(*(half*)(modelVertices[triMesh] + i0 * VERTEX_ATTRIBUTES_SIZE + 0)), half_to_float(*(half*)(modelVertices[triMesh] + i0 * VERTEX_ATTRIBUTES_SIZE + 2)), half_to_float(*(half*)(modelVertices[triMesh] + i0 * VERTEX_ATTRIBUTES_SIZE + 4)) });
+        Vector3 tb = MvVert(triMx,(Vector3){ half_to_float(*(half*)(modelVertices[triMesh] + i1 * VERTEX_ATTRIBUTES_SIZE + 0)), half_to_float(*(half*)(modelVertices[triMesh] + i1 * VERTEX_ATTRIBUTES_SIZE + 2)), half_to_float(*(half*)(modelVertices[triMesh] + i1 * VERTEX_ATTRIBUTES_SIZE + 4)) });
+        Vector3 tc = MvVert(triMx,(Vector3){ half_to_float(*(half*)(modelVertices[triMesh] + i2 * VERTEX_ATTRIBUTES_SIZE + 0)), half_to_float(*(half*)(modelVertices[triMesh] + i2 * VERTEX_ATTRIBUTES_SIZE + 2)), half_to_float(*(half*)(modelVertices[triMesh] + i2 * VERTEX_ATTRIBUTES_SIZE + 4)) });        
+        if (vmin(ta.x, vmin(tb.x, tc.x)) > hb.mx.x || vmax(ta.x, vmax(tb.x, tc.x)) < hb.mn.x || vmin(ta.y, vmin(tb.y, tc.y)) > hb.mx.y || vmax(ta.y, vmax(tb.y, tc.y)) < hb.mn.y || vmin(ta.z, vmin(tb.z, tc.z)) > hb.mx.z || vmax(ta.z, vmax(tb.z, tc.z)) < hb.mn.z) continue;
 
         Simplex3D s = {0}; 
-        Vector3 dir = {0.0f, 1.0f, 0.0f};
-        
-        // GJK Initialization (First Point)
-        Vector3 wA0 = MeshSupport(hullMesh, hullMx, dir);
-        Vector3 wB0 = TriSupport(ta, tb, tc, (Vector3){-dir.x, -dir.y, -dir.z});
-        s.v[s.n++] = V3_AsubB(wA0, wB0);
-        
+        Vector3 dir = {0.0f,1.0f,0.0f};
+        Vector3 wA0 = MeshSupport(hullMesh,hullMx,dir); // GJK Initialization (First Point)
+        Vector3 wB0 = TriSupport(ta,tb,tc,(Vector3){-dir.x,-dir.y,-dir.z});
+        s.v[s.n++] = V3_AsubB(wA0,wB0);
         dir = (Vector3){-s.v[0].x, -s.v[0].y, -s.v[0].z};
-        if (V3_dot(dir, dir) < PHY_EPSILON) dir = (Vector3){0.0f, 1.0f, 0.0f};
-        
+        if (V3_dot(dir, dir) < PHY_EPSILON) dir = (Vector3){0.0f,1.0f,0.0f};
         bool hit = false;
         for (int it = 0; it < 32; ++it) {
-            Vector3 wA = MeshSupport(hullMesh, hullMx, dir);
-            Vector3 wB = TriSupport(ta, tb, tc, (Vector3){-dir.x, -dir.y, -dir.z});
-            Vector3 sup = V3_AsubB(wA, wB);
+            Vector3 wA = MeshSupport(hullMesh,hullMx,dir), wB = TriSupport(ta,tb,tc,(Vector3){-dir.x,-dir.y,-dir.z});
+            Vector3 sup = V3_AsubB(wA,wB); if (V3_dot(sup, dir) < PHY_EPSILON) break;
             
-            if (V3_dot(sup, dir) < PHY_EPSILON) break;
             s.v[s.n++] = sup;
-            
             if (!GJKNextSimplex(&s, &dir)) { hit = true; break; }
             if (V3_dot(dir, dir) < PHY_EPSILON) { hit = true; break; }
         }
         
         if (!hit) continue;
-
         while (s.n < 4) { // Construct a proper tetrahedron dynamically from GJK points to prevent injecting skewed world-space boundary values.
             Vector3 fallbackDir = {0.0f, 1.0f, 0.0f};
             if (s.n == 1) fallbackDir = (vabs(s.v[0].x) > 0.5f) ? (Vector3){0.0f, 1.0f, 0.0f} : (Vector3){1.0f, 0.0f, 0.0f};
@@ -4596,15 +4444,14 @@ static OverlapResult CvxMsh(u16 hullMesh, const float* hullMx, u16 triMesh, cons
             else if (s.n == 3) { Vector3 e1 = V3_AsubB(s.v[1], s.v[0]); Vector3 e2 = V3_AsubB(s.v[2], s.v[0]); fallbackDir = V3_Cross(e1, e2); }
             float fLen = V3_Mag(fallbackDir);
             fallbackDir = (fLen > PHY_EPSILON) ? V3_ScaleByF(fallbackDir, 1.0f / fLen) : (Vector3){0.0f, 1.0f, 0.0f};
-            Vector3 wA = MeshSupport(hullMesh, hullMx, fallbackDir);
-            Vector3 wB = TriSupport(ta, tb, tc, (Vector3){-fallbackDir.x, -fallbackDir.y, -fallbackDir.z});
-            Vector3 sup = V3_AsubB(wA, wB);
+            Vector3 wA = MeshSupport(hullMesh,hullMx,fallbackDir);
+            Vector3 wB = TriSupport(ta,tb,tc,(Vector3){-fallbackDir.x,-fallbackDir.y,-fallbackDir.z});
+            Vector3 sup = V3_AsubB(wA,wB);
             bool dup = false;
             for (int k = 0; k < s.n; k++) { Vector3 dv = V3_AsubB(sup, s.v[k]); dup |= (V3_dot(dv, dv) < PHY_EPSILON * PHY_EPSILON); }
             if (!dup) s.v[s.n++] = sup;
             else {
-                // Handle a degenerate coplanar shape by flipping vector direction
-                fallbackDir = (Vector3){-fallbackDir.x, -fallbackDir.y, -fallbackDir.z};
+                fallbackDir = (Vector3){-fallbackDir.x, -fallbackDir.y, -fallbackDir.z}; // Handle a degenerate coplanar shape by flipping vector direction
                 wA = MeshSupport(hullMesh, hullMx, fallbackDir);
                 wB = TriSupport(ta, tb, tc, (Vector3){-fallbackDir.x, -fallbackDir.y, -fallbackDir.z});
                 s.v[s.n++] = V3_AsubB(wA, wB);
@@ -4612,19 +4459,15 @@ static OverlapResult CvxMsh(u16 hullMesh, const float* hullMx, u16 triMesh, cons
         }
 
         EPAVert ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv = 0, nf = 0;
-        for (int i = 0; i < 4; i++) {
-            ev[nv].v = s.v[i];
-            ev[nv].wA = MeshSupport(hullMesh,hullMx,s.v[i]);
-            ev[nv].wB = TriSupport(ta,tb,tc,(Vector3){-s.v[i].x,-s.v[i].y,-s.v[i].z});
-            nv++;
-        }
-        
+        ev[nv].v = s.v[0]; ev[nv].wA = MeshSupport(hullMesh,hullMx,s.v[0]); ev[nv].wB = TriSupport(ta,tb,tc,(Vector3){-s.v[0].x,-s.v[0].y,-s.v[0].z}); nv++;
+        ev[nv].v = s.v[1]; ev[nv].wA = MeshSupport(hullMesh,hullMx,s.v[1]); ev[nv].wB = TriSupport(ta,tb,tc,(Vector3){-s.v[1].x,-s.v[1].y,-s.v[1].z}); nv++;
+        ev[nv].v = s.v[2]; ev[nv].wA = MeshSupport(hullMesh,hullMx,s.v[2]); ev[nv].wB = TriSupport(ta,tb,tc,(Vector3){-s.v[2].x,-s.v[2].y,-s.v[2].z}); nv++;
+        ev[nv].v = s.v[3]; ev[nv].wA = MeshSupport(hullMesh,hullMx,s.v[3]); ev[nv].wB = TriSupport(ta,tb,tc,(Vector3){-s.v[3].x,-s.v[3].y,-s.v[3].z}); nv++;
         static const int kTF[4][3] = {{0,1,2}, {0,3,1}, {0,2,3}, {1,3,2}};
-        for (int f = 0; f < 4; f++) {
-            EPAFace face = MakeEPAFace(ev, kTF[f][0], kTF[f][1], kTF[f][2]);
-            if (face.d >= 0.0f && nf < EPA_MAX_FACES) ef[nf++] = face;
-        }
-        
+        EPAFace face0 = MakeEPAFace(ev,kTF[0][0],kTF[0][1],kTF[0][2]); if (face0.d >= 0.0f && nf < EPA_MAX_FACES) ef[nf++] = face0;
+        EPAFace face1 = MakeEPAFace(ev,kTF[1][0],kTF[1][1],kTF[1][2]); if (face1.d >= 0.0f && nf < EPA_MAX_FACES) ef[nf++] = face1;
+        EPAFace face2 = MakeEPAFace(ev,kTF[2][0],kTF[2][1],kTF[2][2]); if (face2.d >= 0.0f && nf < EPA_MAX_FACES) ef[nf++] = face2;
+        EPAFace face3 = MakeEPAFace(ev,kTF[3][0],kTF[3][1],kTF[3][2]); if (face3.d >= 0.0f && nf < EPA_MAX_FACES) ef[nf++] = face3;
         OverlapResult r = {0};
         for (int it = 0; it < 32; ++it) {
             int bf = -1; float bd = 1e9f;
@@ -4634,34 +4477,24 @@ static OverlapResult CvxMsh(u16 hullMesh, const float* hullMx, u16 triMesh, cons
             Vector3 bn = ef[bf].n; 
             Vector3 wA = MeshSupport(hullMesh,hullMx,bn);
             Vector3 wB = TriSupport(ta,tb,tc,(Vector3){-bn.x,-bn.y,-bn.z});
-            Vector3 sup = V3_AsubB(wA, wB);
-            if (V3_dot(bn, sup) - bd < PHY_EPSILON) {
-                r.normal = bn; r.overlapAmount = bd; r.hit = true;
-                r.point = EPAContactPoint(ev, ef[bf].a, ef[bf].b, ef[bf].c,bn,bd);
-                break;
-            }
-            
+            Vector3 sup = V3_AsubB(wA,wB);
+            if (V3_dot(bn, sup) - bd < PHY_EPSILON) { r.normal = bn; r.overlapAmount = bd; r.hit = true; r.point = EPAContactPoint(ev, ef[bf].a, ef[bf].b, ef[bf].c,bn,bd); break; }
             if (nv >= EPA_MAX_VERTS) break;
-            ev[nv].v = sup; ev[nv].wA = wA; ev[nv].wB = wB;
             
+            ev[nv].v = sup; ev[nv].wA = wA; ev[nv].wB = wB;
             int edges[EPA_MAX_EDGES][2], ne = 0, keep[EPA_MAX_FACES], nk = 0;
-            for (int f = 0; f < nf; f++) {
-                if (V3_dot(ef[f].n, V3_AsubB(sup, ev[ef[f].a].v)) > 0.0f) {
+            for (int f=0;f<nf;f++) {
+                if (V3_dot(ef[f].n,V3_AsubB(sup,ev[ef[f].a].v)) > 0.0f) {
                     int fv[3] = {ef[f].a, ef[f].b, ef[f].c};
                     for (int e = 0; e < 3; e++) {
                         int ea = fv[e], eb = fv[(e + 1) % 3]; bool found = false;
                         for (int k = 0; k < ne; k++) {
-                            if (edges[k][0] == eb && edges[k][1] == ea) {
-                                edges[k][0] = edges[--ne][0]; edges[k][1] = edges[ne][1]; found = true; break;
-                            }
+                            if (edges[k][0] == eb && edges[k][1] == ea) { edges[k][0] = edges[--ne][0]; edges[k][1] = edges[ne][1]; found = true; break; }
                         }
-                        if (!found && ne < EPA_MAX_EDGES) {
-                            edges[ne][0] = ea; edges[ne++][1] = eb;
-                        }
+                        
+                        if (!found && ne < EPA_MAX_EDGES) { edges[ne][0] = ea; edges[ne++][1] = eb; }
                     }
-                } else {
-                    keep[nk++] = f;
-                }
+                } else keep[nk++] = f;
             }
             
             nf = 0; for (int k = 0; k < nk; k++) ef[nf++] = ef[keep[k]];
@@ -4672,11 +4505,7 @@ static OverlapResult CvxMsh(u16 hullMesh, const float* hullMx, u16 triMesh, cons
             nv++;
         }
 
-        if (r.hit && (!best_r.hit || r.overlapAmount > best_r.overlapAmount + 0.002f || 
-            (vabs(r.overlapAmount - best_r.overlapAmount) <= 0.002f && 
-            V3_dot(r.normal, (Vector3){0.0f, 1.0f, 0.0f}) > V3_dot(best_r.normal, (Vector3){0.0f, 1.0f, 0.0f})))) {
-            best_r = r;
-        }
+        if (r.hit && (!best_r.hit || r.overlapAmount > best_r.overlapAmount + 0.002f || (vabs(r.overlapAmount - best_r.overlapAmount) <= 0.002f && V3_dot(r.normal, (Vector3){0.0f, 1.0f, 0.0f}) > V3_dot(best_r.normal, (Vector3){0.0f, 1.0f, 0.0f})))) best_r = r;
     }
     
     return best_r;
@@ -4944,7 +4773,7 @@ ENGINE_TO_MOD void ApplyPlayerMovements() {
     p->forward = V3_Normalize((Vector3){ 2.0f * (xz + wy), 2.0f * (rot.y * rot.z - rot.w * rot.x), 1.0f - 2.0f * (rot.x * rot.x + y2) });
     p->right   = V3_Normalize((Vector3){ 1.0f - 2.0f * (y2 + rot.z * rot.z), 2.0f * (rot.x * rot.y + rot.w * rot.z), 2.0f * (xz - wy) });
     Vector3 input = V3_Normalize((Vector3){p->forward.x*h + p->right.x*s, vertInput, p->forward.z*h + p->right.z*s});
-    float speed = GetBasePlayerSpeed(PLAYER1, V3_Mag(input) > 0.1f) * 1.75f, accel = Sys_Global.boosterActive ? 1.0f : 3.0f;
+    float speed = GetBasePlayerSpeed(PLAYER1,V3_Mag(input) > 0.1f) * 1.75f, accel = Sys_Global.boosterActive ? 1.0f : 3.0f;
     Vector3 cur = p->velocity; 
     Vector3 targetVel = V3_ScaleByF(input, speed);
     if (vabs(vertInput) < 0.001f) targetVel.y = cur.y;
@@ -4952,13 +4781,10 @@ ENGINE_TO_MOD void ApplyPlayerMovements() {
     dv = (Vector3){vclamp(dv.x,-10.0f,10.0f), vclamp(dv.y,-10.0f,10.0f), vclamp(dv.z,-10.0f,10.0f)};
     p->velocity = V3_AplusB(cur, V3_ScaleByF(dv, accel * vclamp((float)Sys_Global.deltaTime,0.0005f,0.1f)));
 }
-// =================================
-// Console Emulator System - CHEATS!
+// ================================= Console Emulator System - CHEATS!
 static i32 currentEntryLength=0, numHistory=0, historyPos=0; char consoleEntryText[TEXT_BUFFER_SIZE],history[7][TEXT_BUFFER_SIZE];
-static Vector3 ressurectionLocations[10] = { {-27.386f, -55.488f, 26.5941f},/*0/R*/ {40.903f, -42.372f, -30.78f},/*1*/      {30.67407f, -25.832f, 10.21412f},/*2*/ {38.26813f, -15.498f, 20.37825f},/*3*/ {-19.48f, -7.928f, 22.954f},/*4*/ {-24.358f, 12.5956f, 31.8497f},/*5*/
-                                             {-22.3568f, 33.7845f, -30.728f},/*6*/  {2.228084f, 50.95243f, 7.532025f},/*7*/ {10.068f, 58.897f, 13.973f},/*8*/      {2.303f, 106.77f, -38.554f}/*9*/ };
-static Vector3 cyberSpaceEntryLocations[8] = { {210.6834f,2.812f,-24.378f},/*0*/ {195.420f,-13.44000f, 33.2800f},/*1*/ {157.1608f,-15.53f,47.331f},/*2a, if cyberport localPosition.x < -26.0f*/ {256.0416f,-0.716f,62.48789f},/*2b level 2 secondary cyberport position*/
-                                               {126.43f,29.56733f,34.24f},/*5*/  {177.612f,  3.29494f,108.7725f},/*6*/ {244.735f,41.99257f,-19.695f},/*8*/                                       {185.161f,84.502f,-46.04246f},/*9*/ };
+static Vector3 ressurectionLocations[10] = {{-27.386f,-55.488f,26.5941f},/*0/R*/ {40.903f,-42.372f,-30.78f},/*1*/      {30.67407f,-25.832f,10.21412f},/*2*/ {38.26813f,-15.498f,20.37825f},/*3*/ {-19.48f,-7.928f,22.954f},/*4*/ {-24.358f,12.5956f,31.8497f},/*5*/ {-22.3568f,33.7845f,-30.728f},/*6*/  {2.228084f,50.95243f,7.532025f},/*7*/ {10.068f,58.897f,13.973f},/*8*/ {2.303f,106.77f,-38.554f}/*9*/};
+static Vector3 cyberSpaceEntryLocations[8] = { {210.6834f,2.812f,-24.378f},/*0*/ {195.420f,-13.44000f, 33.2800f},/*1*/ {157.1608f,-15.53f,47.331f},/*2a, if cyberport localPosition.x < -26.0f*/ {256.0416f,-0.716f,62.48789f},/*2b level 2 secondary cyberport position*/ {126.43f,29.56733f,34.24f},/*5*/  {177.612f,  3.29494f,108.7725f},/*6*/ {244.735f,41.99257f,-19.695f},/*8*/                                       {185.161f,84.502f,-46.04246f},/*9*/ };
 ENGINE_TO_MOD void ToggleConsole() { static bool imWasActPrior = false; if (!Sys_Cheats.consoleActive) {imWasActPrior = Sys_Global.inventoryMode;} Sys_Cheats.consoleActive = !Sys_Cheats.consoleActive; if (Sys_Cheats.consoleActive) { Sys_Global.inventoryMode = true; } else if (!imWasActPrior && Sys_Global.inventoryMode) {ForceShootMode();} }
 static void AddToHistory(const char* entry) {
     if (GetStringLength(entry) == 0 || (numHistory > 0 && StringsEqual(entry,history[numHistory - 1]))) return;
@@ -4984,26 +4810,12 @@ static void RecallHistory(int direction) { // direction 1 up (older), -1 down (n
 typedef void (*ConsoleCmdFuncNoArg)(); typedef void (*ConsoleCmdFuncInt)(int); typedef void (*ConsoleCmdFuncStr)(const char*);
 typedef struct { const char* name; union {ConsoleCmdFuncNoArg noArg; ConsoleCmdFuncInt withInt; ConsoleCmdFuncStr withStr; void* raw;} func; enum {CMD_NOARG,CMD_INT,CMD_STR}type;} ConsoleCommand;
 __attribute__((pure)) static int CommandMatch(const char* input, const char* cmd) {
-    while (*cmd && *input) {
-        char c1 = CharToLower((u8)*input++); char c2 = CharToLower((u8)*cmd++);
-        if (c1 == ' ' || c1 == '_') {c1 = ' ';} if (c2 == ' ' || c2 == '_') {c2 = ' ';} if (c1 != c2) return 0;
-    }
-
+    while (*cmd && *input) { char c1 = CharToLower((u8)*input++); char c2 = CharToLower((u8)*cmd++); if (c1 == ' ' || c1 == '_') {c1 = ' ';} if (c2 == ' ' || c2 == '_') {c2 = ' ';} if (c1 != c2) {return 0;} }
     return *cmd == '\0' && (*input == '\0' || CharacterIsEmpty((u8)*input) || *input == '_');
 }
 
-static void cmd_noclip() {
-    Sys_Cheats.noclip = !Sys_Cheats.noclip;
-    if (Sys_Cheats.noclip) { Sys_Global.instances[PLAYER1].velocity = (Vector3){ 0.0f, 0.0f, 0.0f }; CenterStatusPrint("noclip: %s", Sys_Text.stringTable[1000]); } // "ACTIVATED"
-    else CenterStatusPrint("noclip: %s", Sys_Text.stringTable[717]); // "DISABLED"
-}
-
-static void cmd_showphys() {
-    Sys_Cheats.showPhys = !Sys_Cheats.showPhys;
-    if (Sys_Cheats.showPhys) CenterStatusPrint("showPhys: %s", Sys_Text.stringTable[1000]); // "ACTIVATED"
-    else CenterStatusPrint("showPhys: %s", Sys_Text.stringTable[717]); // "DISABLED"
-}
-
+static void cmd_noclip() { Sys_Cheats.noclip = !Sys_Cheats.noclip; if (Sys_Cheats.noclip) { Sys_Global.instances[PLAYER1].velocity = (Vector3){ 0.0f, 0.0f, 0.0f }; CenterStatusPrint("noclip: %s", Sys_Text.stringTable[1000]); /*"ACTIVATED"*/} else {CenterStatusPrint("noclip: %s", Sys_Text.stringTable[717]); /*"DISABLED"*/} }
+static void cmd_showphys() { Sys_Cheats.showPhys = !Sys_Cheats.showPhys; if (Sys_Cheats.showPhys) {CenterStatusPrint("showPhys: %s", Sys_Text.stringTable[1000]); /*"ACTIVATED"*/} else {CenterStatusPrint("showPhys: %s", Sys_Text.stringTable[717]); /*"DISABLED"*/} }
 void EnableCheatArsenal(u8 level) { (void)level; } // TODO
 void cmd_kill() { Sys_Global.instances[PLAYER1].health = Sys_Global.instances[PLAYER1].cyberHealth = 0.0f; CenterStatusPrint("%s", Sys_Text.stringTable[1011]); } // "Player decides to become a cyborg."
 void cmd_undo() { if (Sys_Cheats.editMode) { CenterStatusPrint("Last spawned object removed"); } else { CenterStatusPrint("Cannot undo when not in Edit Mode"); } } // TODO actually track and despawn last
@@ -5047,63 +4859,33 @@ static void cmd_showlocation() { Sys_Cheats.showLocation = !Sys_Cheats.showLocat
 static void cmd_help() { CenterStatusPrint("There's no one to save you now Hacker!"); }
 static void cmd_nomoney() { CenterStatusPrint("Nice try, there's no money here."); }
 static void cmd_god() { Sys_Cheats.god = !Sys_Cheats.god; CenterStatusPrint("god mode: %s", Sys_Cheats.god ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
-static void cmd_energy() {
-    Sys_Cheats.redbull = !Sys_Cheats.redbull; 
-    if (Sys_Cheats.redbull) CenterStatusPrint("%s", Sys_Text.stringTable[1006]); // "I feel the power! 0 energy consumption!"
-    else CenterStatusPrint("%s", Sys_Text.stringTable[1005]); // Energy usage normal
-}
-
-void SetSkyRotateSpeed() { static const float skyRotateSpeeds[] = { 0.05f, 1.0f, 2.5f, 3.75f, 6.25f }; glUseProgram(Sys_Render.imageBlitShaderProgram); glUniform1f(30,skyRotateSpeeds[Sys_Cheats.dizzyLevel]); }
+static void cmd_energy() { Sys_Cheats.redbull = !Sys_Cheats.redbull; if (Sys_Cheats.redbull) {CenterStatusPrint("%s", Sys_Text.stringTable[1006]);/*"I feel the power! 0 energy consumption!"*/} else {CenterStatusPrint("%s", Sys_Text.stringTable[1005]);/*Energy usage normal*/} }
+static void SetSkyRotateSpeed() { static const float skyRotateSpeeds[] = { 0.05f, 1.0f, 2.5f, 3.75f, 6.25f }; glUseProgram(Sys_Render.imageBlitShaderProgram); glUniform1f(30,skyRotateSpeeds[Sys_Cheats.dizzyLevel]); }
 static void cmd_dizzy() { Sys_Cheats.dizzyLevel = (Sys_Cheats.dizzyLevel >= 3) ? 0 : Sys_Cheats.dizzyLevel + 1; SetSkyRotateSpeed(); }
-static void cmd_bottomless() {
-    Sys_Cheats.bottomless = !Sys_Cheats.bottomless;
-    if (Sys_Cheats.bottomless) CenterStatusPrint("bottomlessclip! %s",Sys_Text.stringTable[1002]); // "Bring it!"
-    else                       CenterStatusPrint("%s",Sys_Text.stringTable[1003]); // "Hose disconnected from interdimensional wormhole. Normal ammo operation restored."
-}
-
+static void cmd_bottomless() { Sys_Cheats.bottomless = !Sys_Cheats.bottomless; if (Sys_Cheats.bottomless) {CenterStatusPrint("bottomlessclip! %s",Sys_Text.stringTable[1002]);/*"Bring it!"*/} else {CenterStatusPrint("%s",Sys_Text.stringTable[1003]);/*"Hose disconnected from interdimensional wormhole. Normal ammo operation restored."*/} }
 static void cmd_nohud() { Sys_Cheats.noHUD = !Sys_Cheats.noHUD; if (Sys_Cheats.noHUD) {CenterStatusPrint("%s",Sys_Text.stringTable[1004]);/*"No HUD! Enjoy the cinematic screenshot experience!"*/} else { CenterStatusPrint("HUD %s",Sys_Text.stringTable[1000]);/*"ACTIVATED"*/} }
 static void cmd_iamshodan() { Sys_Cheats.superoverride = !Sys_Cheats.superoverride; if (Sys_Cheats.superoverride) {CenterStatusPrint("%s",Sys_Text.stringTable[1010]);/*"Full security override enabled!"*/ } else {CenterStatusPrint("%s",Sys_Text.stringTable[1009]);/*"SHODAN has regained control of security from you"*/} }
-static void cmd_mrbean()         { CenterStatusPrint("Nice try, there are no go carts to slow down here"); }                                      static void cmd_simonfoster()       { CenterStatusPrint("Nice try, nothing to paint here"); }
-static void cmd_richardbranson() { CenterStatusPrint("Nice try, there's no money here. You do realize this isn't Rollercoaster Tycoon right?"); } static void cmd_johnwardley()       { CenterStatusPrint("WOW!"); }
-static void cmd_johnmace()       { CenterStatusPrint("Nice try, there's nothing to pay double for here"); }                                       static void cmd_melaniewarn()       { CenterStatusPrint("I feel happy!!!"); }
-static void cmd_damonhill()      { CenterStatusPrint("Nice try, there are no go carts to speed up here"); }                                       static void cmd_michaelschumacher() { CenterStatusPrint("Nice try, there are no go carts to give ludicrous speed here"); }
-static void cmd_tonyday()        { CenterStatusPrint("Ok, now I want a hamburger"); }                                                             static void cmd_katiebrayshaw()     { CenterStatusPrint("Hi there! Hello! Hey! Howdy!"); }
-static void cmd_sudo()           { CenterStatusPrint("Super user access granted...ERROR: access restricted by SHODAN"); }
+static void cmd_staminup() { Sys_Cheats.fatigueCheat = !Sys_Cheats.fatigueCheat; if (Sys_Cheats.fatigueCheat) { CenterStatusPrint("Stamin-Up! %s",Sys_Text.stringTable[1013]); SetModFatigue(0.0f); } else {CenterStatusPrint("%s",Sys_Text.stringTable[1012]); } }
+static void cmd_mrbean()  { CenterStatusPrint("Nice try, there are no go carts to slow down here"); } static void cmd_simonfoster()   { CenterStatusPrint("Nice try, nothing to paint here"); } static void cmd_richardbranson() { CenterStatusPrint("Nice try, there's no money here. You do realize this isn't Rollercoaster Tycoon right?"); } static void cmd_johnwardley()       { CenterStatusPrint("WOW!"); }
+static void cmd_johnmace(){ CenterStatusPrint("Nice try, there's nothing to pay double for here"); }  static void cmd_melaniewarn()   { CenterStatusPrint("I feel happy!!!"); }                 static void cmd_damonhill()      { CenterStatusPrint("Nice try, there are no go carts to speed up here"); }                                       static void cmd_michaelschumacher() { CenterStatusPrint("Nice try, there are no go carts to give ludicrous speed here"); }
+static void cmd_tonyday() { CenterStatusPrint("Ok, now I want a hamburger"); }                        static void cmd_katiebrayshaw() { CenterStatusPrint("Hi there! Hello! Hey! Howdy!"); }
+static void cmd_sudo()    { CenterStatusPrint("Super user access granted...ERROR: access restricted by SHODAN!"); }
 static void cmd_git(const char* arg) {
     if (!arg) arg = "";
-    static const char* cmds[] = {
-        "pull",  "remote: Enumerating objects: 24601, done.\nFailed, could not connect with origin/triop.",
-        "fetch", "remote: Enumerating objects: 24601, done.\nFailed, could not connect with origin/triop.",
-        "status","Your branch is up to date with origin/triop.\nWorking directory clean.",
-        "log",   "<Merge pull request #451 from SHODAN/NeuralLinkBugfix> 6 months ago...",
-        "reflog","dc51440 HEAD0 -> master: commit: Establish neural connection ... ERROR: invalid ID `2-4601`.",
-        "merge", "Failed, could not connect with origin/triop.",
-        "push",  "Could not find Username for 'triopttp://192.168.1.451'.",
-        "clone", "Failed, connection blocked by SHODAN. Employee ID invalid."
-    };
-
+    static const char* cmds[] = {"pull",  "remote: Enumerating objects: 24601, done.\nFailed, could not connect with origin/triop.", "fetch", "remote: Enumerating objects: 24601, done.\nFailed, could not connect with origin/triop.",      "status","Your branch is up to date with origin/triop.\nWorking directory clean.",
+                                 "log",   "<Merge pull request #451 from SHODAN/NeuralLinkBugfix> 6 months ago...",                  "reflog","dc51440 HEAD0 -> master: commit: Establish neural connection ... ERROR: invalid ID `2-4601`.", "merge", "Failed, could not connect with origin/triop.",
+                                 "push",  "Could not find Username for 'triopttp://192.168.1.451'.",                                 "clone", "Failed, connection blocked by SHODAN. Employee ID invalid." };
     for (int i = 0; i < 16; i += 2) { if (StringFindSubstring(arg, cmds[i])) { CenterStatusPrint(cmds[i+1]); return; } }
     if (StringFindSubstring(arg, "branch") || StringFindSubstring(arg, "-b")) { const char *last = StringFindLastChar(arg, ' '); CenterStatusPrint("Created new branch %s", last ? last + 1 : "unknown"); }
     else CenterStatusPrint("Branch name not recognized. Contact your TriopBucket representative.");
 }
 
-static void cmd_restart()        { CenterStatusPrint("Yeah...better not"); }
-static void cmd_quit()           { OS_Exit(0); }
-static void cmd_cd()             { CenterStatusPrint("Attempting to access directory... already at root"); }
-static void cmd_justinbailey()   { CenterStatusPrint("Well, you don't have a suit already so..."); }
-static void cmd_woodstock()      { CenterStatusPrint("How much wood could a woodchuck chuck...there's no wood in SPACE!"); }
-static void cmd_quarry()         { CenterStatusPrint("There's obsidian on levels 6 and 8 if you want to feel decadent,\notherwise we are lacking in the stone department."); }
-static void cmd_zelda()          { CenterStatusPrint("Too late, already been to level 1"); }
-static void cmd_allyourbase()    { CenterStatusPrint("ERROR: SHODAN has overriden your command, remove SHODAN first."); }
-static void cmd_iamironman()     { CenterStatusPrint("That's nice dear."); }
-static void cmd_idkfa()          { CenterStatusPrint("I can only hold 7 weapons!! Nice try dearies!"); }
-static void cmd_ai()             { CenterStatusPrint("Only AI allowed around here is SHODAN"); }
-static void cmd_aireal()         { CenterStatusPrint("In my magnificence, I shape clay, crafting new lifeforms..."); }
-static void cmd_staminup() {
-    Sys_Cheats.fatigueCheat = !Sys_Cheats.fatigueCheat;
-    if (Sys_Cheats.fatigueCheat) { CenterStatusPrint("Stamin-Up! %s",Sys_Text.stringTable[1013]); SetModFatigue(0.0f); } else CenterStatusPrint("%s",Sys_Text.stringTable[1012]);
-}
-
+static void cmd_restart()        { CenterStatusPrint("Yeah...better not"); }                                              static void cmd_cd()             { CenterStatusPrint("Attempting to access directory... already at root"); }
+static void cmd_justinbailey()   { CenterStatusPrint("Well, you don't have a suit already so..."); }                      static void cmd_woodstock()      { CenterStatusPrint("How much wood could a woodchuck chuck...there's no wood in SPACE!"); }
+static void cmd_zelda()          { CenterStatusPrint("Too late, already been to level 1"); }                              static void cmd_quarry()         { CenterStatusPrint("There's obsidian on levels 6 and 8 if you want to feel decadent,\notherwise we are lacking in the stone department."); }
+static void cmd_allyourbase()    { CenterStatusPrint("ERROR: SHODAN has overriden your command, remove SHODAN first."); } static void cmd_iamironman()     { CenterStatusPrint("That's nice dear."); }
+static void cmd_idkfa()          { CenterStatusPrint("I can only hold 7 weapons!! Nice try dearies!"); }                  static void cmd_ai()             { CenterStatusPrint("Only AI allowed around here is SHODAN"); }
+static void cmd_aireal()         { CenterStatusPrint("In my magnificence, I shape clay, crafting new lifeforms..."); }    static void cmd_quit()           { OS_Exit(0); }
 static const ConsoleCommand consoleCmds[] = {
     { "noclip",  {.noArg=cmd_noclip}, CMD_NOARG},{"idclip",      {.noArg=cmd_noclip},CMD_NOARG},      {"no clip",       {.noArg = cmd_noclip},      CMD_NOARG}, {"showphys",{.noArg = cmd_showphys},CMD_NOARG},
     { "god",     {.noArg=cmd_god}, CMD_NOARG},   {"overwhelming",{.noArg=cmd_god},   CMD_NOARG},      {"whosyourdaddy", {.noArg = cmd_god},         CMD_NOARG},
@@ -5131,8 +4913,7 @@ static const ConsoleCommand consoleCmds[] = {
     { "i am best",     {.noArg = cmd_iamironman},   CMD_NOARG},{"idkfa",             {.noArg=cmd_idkfa},            CMD_NOARG},{"impulse 9",      {.noArg=cmd_idkfa},         CMD_NOARG},
     { "undo",          {.noArg = cmd_undo},         CMD_NOARG},{"shake",             {.noArg=cmd_shake},            CMD_NOARG},{"tired",          {.noArg=cmd_staminup},      CMD_NOARG},
     { "staminup",      {.noArg = cmd_staminup},     CMD_NOARG},{"grok",              {.noArg=cmd_ai},               CMD_NOARG},{"chatgpt",        {.noArg=cmd_ai},            CMD_NOARG},
-    { "claude",        {.noArg = cmd_ai},           CMD_NOARG},{"gemini",            {.noArg=cmd_ai},               CMD_NOARG},{"shodan",         {.noArg=cmd_aireal},        CMD_NOARG},
-    { NULL, {.raw = NULL}, CMD_NOARG } // sizeof helper
+    { "claude",        {.noArg = cmd_ai},           CMD_NOARG},{"gemini",            {.noArg=cmd_ai},               CMD_NOARG},{"shodan",         {.noArg=cmd_aireal},        CMD_NOARG}, {NULL,{.raw = NULL},CMD_NOARG} // sizeof helper
 };
 
 void ProcessConsoleCommand(const char* command) {
@@ -5185,8 +4966,7 @@ void ConsoleEmulator(i32 keycode) {
         if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]=' '; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; }
     } else if (keycode == KEY_ENTER || keycode == KEY_KP_ENTER) { DualLog("Console command: %s\n",consoleEntryText); ProcessConsoleCommand(consoleEntryText); }
 }
-// ============
-// Audio System
+// ============ Audio System
 #define AUDIO_RATE      48000
 #define AUDIO_CHANNELS  2
 #define AUDIO_PERIOD_MS 10
@@ -5304,8 +5084,6 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
 
     int pcm_open(int card, int device, int flags) { char path[4096]; StringFormat(path,sizeof(path),"/dev/snd/pcmC%uD%u%c",card,device,(flags & 1) == 0 ? 'c' : 'p'); return OS_Open(path,00000002 | (flags & (1 << 1) ? 00004000 : 0),0); }
 #endif
-
-#define DRMP3_UINT64_MAX (((u64)0xFFFFFFFF << 32) | (u64)0xFFFFFFFF)
 #define DRMP3_HDR_IS_MONO(h)             (((h[3]) & 0xC0) == 0xC0)
 #define DRMP3_HDR_IS_MS_STEREO(h)        (((h[3]) & 0xE0) == 0x60)
 #define DRMP3_HDR_IS_FREE_FORMAT(h)      (((h[2]) & 0xF0) == 0)
@@ -5333,24 +5111,15 @@ typedef struct { drmp3dec decoder; u32 channels,sampleRate,mp3FChan,mp3FrameSamp
 static u32 drmp3_bs_get_bits(drmp3_bs *bs, int n) { u32 next,cache=0, s=bs->pos&7; int shl=n+s; const u8 *p=bs->buf+(bs->pos>>3); if ((bs->pos+=n)>bs->limit) {return 0;} next=*p++&(255>>s); while ((shl-=8)>0) { cache|=next<<shl; next=*p++; } return cache|(next>>-shl); }
 static int drmp3_hdr_valid(const u8 *h) { return h[0]==0xff && ((h[1]&0xF0)==0xf0||(h[1]&0xFE)==0xe2) && (DRMP3_HDR_GET_LAYER(h)!=0) && (DRMP3_HDR_GET_BITRATE(h)!=15) && (DRMP3_HDR_GET_SAMPLE_RATE(h)!=3); }
 static int drmp3_hdr_compare(const u8 *h1, const u8 *h2) { return drmp3_hdr_valid(h2) && ((h1[1]^h2[1])&0xFE)==0 && ((h1[2]^h2[2])&0x0C)==0 && !(DRMP3_HDR_IS_FREE_FORMAT(h1)^DRMP3_HDR_IS_FREE_FORMAT(h2)); }
-static unsigned drmp3_hdr_bitrate_kbps(const u8 *h) {
-    static const u8 halfrate[2][3][15]={ {{0,4,8,12,16,20,24,28,32,40,48,56,64,72,80},{0,4,8,12,16,20,24,28,32,40,48,56,64,72,80},{0,16,24,28,32,40,48,56,64,72,80,88,96,112,128}},
-                                         {{0,16,20,24,28,32,40,48,56,64,80,96,112,128,160},{0,16,24,28,32,40,48,56,64,80,96,112,128,160,192},{0,16,32,48,64,80,96,112,128,144,160,176,192,208,224}} };
-    return 2*halfrate[!!DRMP3_HDR_TEST_MPEG1(h)][DRMP3_HDR_GET_LAYER(h)-1][DRMP3_HDR_GET_BITRATE(h)];
-}
+static u8 g_halfrate[2][3][15]={ {{0,4,8,12,16,20,24,28,32,40,48,56,64,72,80},{0,4,8,12,16,20,24,28,32,40,48,56,64,72,80},{0,16,24,28,32,40,48,56,64,72,80,88,96,112,128}},{{0,16,20,24,28,32,40,48,56,64,80,96,112,128,160},{0,16,24,28,32,40,48,56,64,80,96,112,128,160,192},{0,16,32,48,64,80,96,112,128,144,160,176,192,208,224}} };
+static unsigned drmp3_hdr_bitrate_kbps(const u8 *h) { return 2*g_halfrate[!!DRMP3_HDR_TEST_MPEG1(h)][(((h[1]) >> 1) & 3)-1/*layer*/][((h[2]) >> 4)/*bitrate*/]; }
 static unsigned drmp3_hdr_sample_rate_hz(const u8 *h) { static const unsigned g_hz[3]={44100,48000,32000}; return g_hz[DRMP3_HDR_GET_SAMPLE_RATE(h)]>>(int)!DRMP3_HDR_TEST_MPEG1(h)>>(int)!DRMP3_HDR_TEST_NOT_MPEG25(h); }
 static unsigned drmp3_hdr_frame_samples(const u8 *h) { return ((h[1]&6) == 6) ? 384 : (1152>>(int)DRMP3_HDR_IS_FRAME_576(h)); }
 static int drmp3_hdr_frame_bytes(const u8 *h, int free_format_size) { int fb=drmp3_hdr_frame_samples(h)*drmp3_hdr_bitrate_kbps(h)*125/drmp3_hdr_sample_rate_hz(h); if (DRMP3_HDR_IS_LAYER_1(h)) {fb&=~3;} return fb?fb:free_format_size; }
 static int drmp3_hdr_padding(const u8 *h) { return DRMP3_HDR_TEST_PADDING(h)?(DRMP3_HDR_IS_LAYER_1(h)?4:1):0; }
-static u8 g_scf_long[8][23] = {{0},{12,12,12,12,12,12,16,20,24,28,32,40,48,56,64,76,90,2,2,2,2,2,0},{0},{6,6,6,6,6,6,8,10,12,14,16,18,22,26,32,38,46,54,62,70,76,36,0},{0},{4,4,4,4,4,4,6,6,8,8,10,12,16,20,24,28,34,42,50,54,76,158,0},{4,4,4,4,4,4,6,6,6,8,10,12,16,18,22,28,34,40,46,54,54,192,0},{4,4,4,4,4,4,6,6,8,10,12,16,20,24,30,38,46,56,68,84,102,26,0}};
-static u8 g_scf_short[8][40] = { { 4,4,4,4,4,4,4,4,4,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,30,30,30,40,40,40,18,18,18,0 }, { 8,8,8,8,8,8,8,8,8,12,12,12,16,16,16,20,20,20,24,24,24,28,28,28,36,36,36,2,2,2,2,2,2,2,2,2,26,26,26,0 },
-                                        { 4,4,4,4,4,4,4,4,4,6,6,6,6,6,6,8,8,8,10,10,10,14,14,14,18,18,18,26,26,26,32,32,32,42,42,42,18,18,18,0 },    { 4,4,4,4,4,4,4,4,4,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,32,32,32,44,44,44,12,12,12,0 },
-                                        { 4,4,4,4,4,4,4,4,4,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,30,30,30,40,40,40,18,18,18,0 }, { 4,4,4,4,4,4,4,4,4,4,4,4,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,22,22,22,30,30,30,56,56,56,0 },
-                                        { 4,4,4,4,4,4,4,4,4,4,4,4,6,6,6,6,6,6,10,10,10,12,12,12,14,14,14,16,16,16,20,20,20,26,26,26,66,66,66,0 }, { 4,4,4,4,4,4,4,4,4,4,4,4,6,6,6,8,8,8,12,12,12,16,16,16,20,20,20,26,26,26,34,34,34,42,42,42,12,12,12,0 } };
-static u8 g_scf_mixed[8][40] = { { 6,6,6,6,6,6,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,30,30,30,40,40,40,18,18,18,0 }, { 12,12,12,4,4,4,8,8,8,12,12,12,16,16,16,20,20,20,24,24,24,28,28,28,36,36,36,2,2,2,2,2,2,2,2,2,26,26,26,0 },
-                                        { 6,6,6,6,6,6,6,6,6,6,6,6,8,8,8,10,10,10,14,14,14,18,18,18,26,26,26,32,32,32,42,42,42,18,18,18,0 }, { 6,6,6,6,6,6,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,32,32,32,44,44,44,12,12,12,0 },
-                                        { 6,6,6,6,6,6,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,30,30,30,40,40,40,18,18,18,0 }, { 4,4,4,4,4,4,6,6,4,4,4,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,22,22,22,30,30,30,56,56,56,0 },
-                                        { 4,4,4,4,4,4,6,6,4,4,4,6,6,6,6,6,6,10,10,10,12,12,12,14,14,14,16,16,16,20,20,20,26,26,26,66,66,66,0 }, { 4,4,4,4,4,4,6,6,4,4,4,6,6,6,8,8,8,12,12,12,16,16,16,20,20,20,26,26,26,34,34,34,42,42,42,12,12,12,0 } };
+static u8 g_scf_long[8][23]={{0},{12,12,12,12,12,12,16,20,24,28,32,40,48,56,64,76,90,2,2,2,2,2,0},{0},{6,6,6,6,6,6,8,10,12,14,16,18,22,26,32,38,46,54,62,70,76,36,0},{0},{4,4,4,4,4,4,6,6,8,8,10,12,16,20,24,28,34,42,50,54,76,158,0},{4,4,4,4,4,4,6,6,6,8,10,12,16,18,22,28,34,40,46,54,54,192,0},{4,4,4,4,4,4,6,6,8,10,12,16,20,24,30,38,46,56,68,84,102,26,0}};
+static u8 g_scf_short[8][40]={{4,4,4,4,4,4,4,4,4,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,30,30,30,40,40,40,18,18,18,0},{8,8,8,8,8,8,8,8,8,12,12,12,16,16,16,20,20,20,24,24,24,28,28,28,36,36,36,2,2,2,2,2,2,2,2,2,26,26,26,0},{4,4,4,4,4,4,4,4,4,6,6,6,6,6,6,8,8,8,10,10,10,14,14,14,18,18,18,26,26,26,32,32,32,42,42,42,18,18,18,0 },{4,4,4,4,4,4,4,4,4,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,32,32,32,44,44,44,12,12,12,0 }, { 4,4,4,4,4,4,4,4,4,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,30,30,30,40,40,40,18,18,18,0 },{4,4,4,4,4,4,4,4,4,4,4,4,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,22,22,22,30,30,30,56,56,56,0},{4,4,4,4,4,4,4,4,4,4,4,4,6,6,6,6,6,6,10,10,10,12,12,12,14,14,14,16,16,16,20,20,20,26,26,26,66,66,66,0},{4,4,4,4,4,4,4,4,4,4,4,4,6,6,6,8,8,8,12,12,12,16,16,16,20,20,20,26,26,26,34,34,34,42,42,42,12,12,12,0}};
+static u8 g_scf_mixed[8][40]={{6,6,6,6,6,6,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,30,30,30,40,40,40,18,18,18,0},{12,12,12,4,4,4,8,8,8,12,12,12,16,16,16,20,20,20,24,24,24,28,28,28,36,36,36,2,2,2,2,2,2,2,2,2,26,26,26,0},{6,6,6,6,6,6,6,6,6,6,6,6,8,8,8,10,10,10,14,14,14,18,18,18,26,26,26,32,32,32,42,42,42,18,18,18,0},{6,6,6,6,6,6,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,32,32,32,44,44,44,12,12,12,0},{6,6,6,6,6,6,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,30,30,30,40,40,40,18,18,18,0},{4,4,4,4,4,4,6,6,4,4,4,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,22,22,22,30,30,30,56,56,56,0},{4,4,4,4,4,4,6,6,4,4,4,6,6,6,6,6,6,10,10,10,12,12,12,14,14,14,16,16,16,20,20,20,26,26,26,66,66,66,0},{4,4,4,4,4,4,6,6,4,4,4,6,6,6,8,8,8,12,12,12,16,16,16,20,20,20,26,26,26,34,34,34,42,42,42,12,12,12,0}};
 static const u8 g_sfc_long_024[23] = { 6,6,6,6,6,6,8,10,12,14,16,20,24,28,32,38,46,52,60,68,58,54,0 };
 void InitSCFTables() { for (int i=0;i<23;++i) g_scf_long[0][i] = g_scf_long[1][i] = g_scf_long[2][i] = g_sfc_long_024[i]; }
 static int drmp3_L3_read_side_info(drmp3_bs *bs, drmp3_L3_gr_info *gr, const u8 *hdr) {
@@ -5445,29 +5214,19 @@ static float drmp3_L3_pow_43(int x) {
 }
 
 static void drmp3_L3_huffman(float *dst, drmp3_bs *bs, const drmp3_L3_gr_info *gr_info, const float *scf, int layer3gr_limit) {
-    static const i16 tabs[]={ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-        785,785,785,785,784,784,784,784,513,513,513,513,513,513,513,513,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,
-        -255,1313,1298,1282,785,785,785,785,784,784,784,784,769,769,769,769,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,290,288,
-        -255,1313,1298,1282,769,769,769,769,529,529,529,529,529,529,529,529,528,528,528,528,528,528,528,528,512,512,512,512,512,512,512,512,290,288,
-        -253,-318,-351,-367,785,785,785,785,784,784,784,784,769,769,769,769,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,819,818,547,547,275,275,275,275,561,560,515,546,289,274,288,258,
-        -254,-287,1329,1299,1314,1312,1057,1057,1042,1042,1026,1026,784,784,784,784,529,529,529,529,529,529,529,529,769,769,769,769,768,768,768,768,563,560,306,306,291,259,
-        -252,-413,-477,-542,1298,-575,1041,1041,784,784,784,784,769,769,769,769,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,-383,-399,1107,1092,1106,1061,849,849,789,789,1104,1091,773,773,1076,1075,341,340,325,309,834,804,577,577,532,532,516,516,832,818,803,816,561,561,531,531,515,546,289,289,288,258,
-        -252,-429,-493,-559,1057,1057,1042,1042,529,529,529,529,529,529,529,529,784,784,784,784,769,769,769,769,512,512,512,512,512,512,512,512,-382,1077,-415,1106,1061,1104,849,849,789,789,1091,1076,1029,1075,834,834,597,581,340,340,339,324,804,833,532,532,832,772,818,803,817,787,816,771,290,290,290,290,288,258,
-        -253,-349,-414,-447,-463,1329,1299,-479,1314,1312,1057,1057,1042,1042,1026,1026,785,785,785,785,784,784,784,784,769,769,769,769,768,768,768,768,-319,851,821,-335,836,850,805,849,341,340,325,336,533,533,579,579,564,564,773,832,578,548,563,516,321,276,306,291,304,259,
-        -251,-572,-733,-830,-863,-879,1041,1041,784,784,784,784,769,769,769,769,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,-511,-527,-543,1396,1351,1381,1366,1395,1335,1380,-559,1334,1138,1138,1063,1063,1350,1392,1031,1031,1062,1062,1364,1363,1120,1120,1333,1348,881,881,881,881,375,374,359,373,343,358,341,325,791,791,1123,1122,-703,1105,1045,-719,865,865,790,790,774,774,1104,1029,338,293,323,308,-799,-815,833,788,772,818,803,816,322,292,307,320,561,531,515,546,289,274,288,258,
-        -251,-525,-605,-685,-765,-831,-846,1298,1057,1057,1312,1282,785,785,785,785,784,784,784,784,769,769,769,769,512,512,512,512,512,512,512,512,1399,1398,1383,1367,1382,1396,1351,-511,1381,1366,1139,1139,1079,1079,1124,1124,1364,1349,1363,1333,882,882,882,882,807,807,807,807,1094,1094,1136,1136,373,341,535,535,881,775,867,822,774,-591,324,338,-671,849,550,550,866,864,609,609,293,336,534,534,789,835,773,-751,834,804,308,307,833,788,832,772,562,562,547,547,305,275,560,515,290,290,
-        -252,-397,-477,-557,-622,-653,-719,-735,-750,1329,1299,1314,1057,1057,1042,1042,1312,1282,1024,1024,785,785,785,785,784,784,784,784,769,769,769,769,-383,1127,1141,1111,1126,1140,1095,1110,869,869,883,883,1079,1109,882,882,375,374,807,868,838,881,791,-463,867,822,368,263,852,837,836,-543,610,610,550,550,352,336,534,534,865,774,851,821,850,805,593,533,579,564,773,832,578,578,548,548,577,577,307,276,306,291,516,560,259,259,
+    static const i16 tabs[]={ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,785,785,785,785,784,784,784,784,513,513,513,513,513,513,513,513,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,-255,1313,1298,1282,785,785,785,785,784,784,784,784,769,769,769,769,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,290,288,-255,1313,1298,1282,769,769,769,769,529,529,529,529,529,529,529,529,528,528,528,528,528,528,528,528,512,512,512,512,512,512,512,512,290,288,-253,-318,-351,-367,785,785,785,785,784,784,784,784,769,769,769,769,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,819,818,547,547,275,275,275,275,561,560,515,546,289,274,288,258,
+        -254,-287,1329,1299,1314,1312,1057,1057,1042,1042,1026,1026,784,784,784,784,529,529,529,529,529,529,529,529,769,769,769,769,768,768,768,768,563,560,306,306,291,259,-252,-413,-477,-542,1298,-575,1041,1041,784,784,784,784,769,769,769,769,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,-383,-399,1107,1092,1106,1061,849,849,789,789,1104,1091,773,773,1076,1075,341,340,325,309,834,804,577,577,532,532,516,516,832,818,803,816,561,561,531,531,515,546,289,289,288,258,-252,-429,-493,-559,1057,1057,1042,1042,529,529,529,529,529,529,529,529,784,784,784,784,769,769,769,769,512,512,512,512,512,512,512,512,-382,1077,-415,1106,1061,1104,849,849,789,789,1091,1076,1029,1075,834,834,597,581,340,340,339,324,804,833,532,532,832,772,818,803,817,787,816,771,290,290,290,290,288,258,
+        -253,-349,-414,-447,-463,1329,1299,-479,1314,1312,1057,1057,1042,1042,1026,1026,785,785,785,785,784,784,784,784,769,769,769,769,768,768,768,768,-319,851,821,-335,836,850,805,849,341,340,325,336,533,533,579,579,564,564,773,832,578,548,563,516,321,276,306,291,304,259,-251,-572,-733,-830,-863,-879,1041,1041,784,784,784,784,769,769,769,769,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,-511,-527,-543,1396,1351,1381,1366,1395,1335,1380,-559,1334,1138,1138,1063,1063,1350,1392,1031,1031,1062,1062,1364,1363,1120,1120,1333,1348,881,881,881,881,375,374,359,373,343,358,341,325,791,791,1123,1122,-703,1105,1045,-719,865,865,790,790,774,774,1104,1029,338,293,323,308,-799,-815,833,788,772,818,803,816,322,292,307,320,561,531,515,546,289,274,288,258,
+        -251,-525,-605,-685,-765,-831,-846,1298,1057,1057,1312,1282,785,785,785,785,784,784,784,784,769,769,769,769,512,512,512,512,512,512,512,512,1399,1398,1383,1367,1382,1396,1351,-511,1381,1366,1139,1139,1079,1079,1124,1124,1364,1349,1363,1333,882,882,882,882,807,807,807,807,1094,1094,1136,1136,373,341,535,535,881,775,867,822,774,-591,324,338,-671,849,550,550,866,864,609,609,293,336,534,534,789,835,773,-751,834,804,308,307,833,788,832,772,562,562,547,547,305,275,560,515,290,290,-252,-397,-477,-557,-622,-653,-719,-735,-750,1329,1299,1314,1057,1057,1042,1042,1312,1282,1024,1024,785,785,785,785,784,784,784,784,769,769,769,769,-383,1127,1141,1111,1126,1140,1095,1110,869,869,883,883,1079,1109,882,882,375,374,807,868,838,881,791,-463,867,822,368,263,852,837,836,-543,610,610,550,550,352,336,534,534,865,774,851,821,850,805,593,533,579,564,773,832,578,578,548,548,577,577,307,276,306,291,516,560,259,259,
         -250,-2107,-2507,-2764,-2909,-2974,-3007,-3023,1041,1041,1040,1040,769,769,769,769,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,-767,-1052,-1213,-1277,-1358,-1405,-1469,-1535,-1550,-1582,-1614,-1647,-1662,-1694,-1726,-1759,-1774,-1807,-1822,-1854,-1886,1565,-1919,-1935,-1951,-1967,1731,1730,1580,1717,-1983,1729,1564,-1999,1548,-2015,-2031,1715,1595,-2047,1714,-2063,1610,-2079,1609,-2095,1323,1323,1457,1457,1307,1307,1712,1547,1641,1700,1699,1594,1685,1625,1442,1442,1322,1322,-780,-973,-910,1279,1278,1277,1262,1276,1261,1275,1215,1260,1229,-959,974,974,989,989,-943,735,478,478,495,463,506,414,-1039,1003,958,1017,927,942,987,957,431,476,1272,1167,1228,-1183,1256,-1199,895,895,941,941,1242,1227,1212,1135,1014,1014,490,489,503,487,910,1013,985,925,863,894,970,955,1012,847,-1343,831,755,755,984,909,428,366,754,559,-1391,752,486,457,924,997,698,698,983,893,740,740,908,877,739,739,667,667,953,938,497,287,271,271,683,606,590,712,726,574,302,302,738,736,481,286,526,725,605,711,636,724,696,651,589,681,666,710,364,467,573,695,466,466,301,465,379,379,709,604,665,679,316,316,634,633,436,436,464,269,424,394,452,332,438,363,347,408,393,448,331,422,362,407,392,421,346,406,391,376,375,359,1441,1306,-2367,1290,-2383,1337,-2399,-2415,1426,1321,-2431,1411,1336,-2447,-2463,-2479,1169,1169,1049,1049,1424,1289,1412,1352,1319,-2495,1154,1154,1064,1064,1153,1153,416,390,360,404,403,389,344,374,373,343,358,372,327,357,342,311,356,326,1395,1394,1137,1137,1047,1047,1365,1392,1287,1379,1334,1364,1349,1378,1318,1363,792,792,792,792,1152,1152,1032,1032,1121,1121,1046,1046,1120,1120,1030,1030,-2895,1106,1061,1104,849,849,789,789,1091,1076,1029,1090,1060,1075,833,833,309,324,532,532,832,772,818,803,561,561,531,560,515,546,289,274,288,258,
         -250,-1179,-1579,-1836,-1996,-2124,-2253,-2333,-2413,-2477,-2542,-2574,-2607,-2622,-2655,1314,1313,1298,1312,1282,785,785,785,785,1040,1040,1025,1025,768,768,768,768,-766,-798,-830,-862,-895,-911,-927,-943,-959,-975,-991,-1007,-1023,-1039,-1055,-1070,1724,1647,-1103,-1119,1631,1767,1662,1738,1708,1723,-1135,1780,1615,1779,1599,1677,1646,1778,1583,-1151,1777,1567,1737,1692,1765,1722,1707,1630,1751,1661,1764,1614,1736,1676,1763,1750,1645,1598,1721,1691,1762,1706,1582,1761,1566,-1167,1749,1629,767,766,751,765,494,494,735,764,719,749,734,763,447,447,748,718,477,506,431,491,446,476,461,505,415,430,475,445,504,399,460,489,414,503,383,474,429,459,502,502,746,752,488,398,501,473,413,472,486,271,480,270,-1439,-1455,1357,-1471,-1487,-1503,1341,1325,-1519,1489,1463,1403,1309,-1535,1372,1448,1418,1476,1356,1462,1387,-1551,1475,1340,1447,1402,1386,-1567,1068,1068,1474,1461,455,380,468,440,395,425,410,454,364,467,466,464,453,269,409,448,268,432,1371,1473,1432,1417,1308,1460,1355,1446,1459,1431,1083,1083,1401,1416,1458,1445,1067,1067,1370,1457,1051,1051,1291,1430,1385,1444,1354,1415,1400,1443,1082,1082,1173,1113,1186,1066,1185,1050,-1967,1158,1128,1172,1097,1171,1081,-1983,1157,1112,416,266,375,400,1170,1142,1127,1065,793,793,1169,1033,1156,1096,1141,1111,1155,1080,1126,1140,898,898,808,808,897,897,792,792,1095,1152,1032,1125,1110,1139,1079,1124,882,807,838,881,853,791,-2319,867,368,263,822,852,837,866,806,865,-2399,851,352,262,534,534,821,836,594,594,549,549,593,593,533,533,848,773,579,579,564,578,548,563,276,276,577,576,306,291,516,560,305,305,275,259,
         -251,-892,-2058,-2620,-2828,-2957,-3023,-3039,1041,1041,1040,1040,769,769,769,769,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,-511,-527,-543,-559,1530,-575,-591,1528,1527,1407,1526,1391,1023,1023,1023,1023,1525,1375,1268,1268,1103,1103,1087,1087,1039,1039,1523,-604,815,815,815,815,510,495,509,479,508,463,507,447,431,505,415,399,-734,-782,1262,-815,1259,1244,-831,1258,1228,-847,-863,1196,-879,1253,987,987,748,-767,493,493,462,477,414,414,686,669,478,446,461,445,474,429,487,458,412,471,1266,1264,1009,1009,799,799,-1019,-1276,-1452,-1581,-1677,-1757,-1821,-1886,-1933,-1997,1257,1257,1483,1468,1512,1422,1497,1406,1467,1496,1421,1510,1134,1134,1225,1225,1466,1451,1374,1405,1252,1252,1358,1480,1164,1164,1251,1251,1238,1238,1389,1465,-1407,1054,1101,-1423,1207,-1439,830,830,1248,1038,1237,1117,1223,1148,1236,1208,411,426,395,410,379,269,1193,1222,1132,1235,1221,1116,976,976,1192,1162,1177,1220,1131,1191,963,963,-1647,961,780,-1663,558,558,994,993,437,408,393,407,829,978,813,797,947,-1743,721,721,377,392,844,950,828,890,706,706,812,859,796,960,948,843,934,874,571,571,-1919,690,555,689,421,346,539,539,944,779,918,873,932,842,903,888,570,570,931,917,674,674,-2575,1562,-2591,1609,-2607,1654,1322,1322,1441,1441,1696,1546,1683,1593,1669,1624,1426,1426,1321,1321,1639,1680,1425,1425,1305,1305,1545,1668,1608,1623,1667,1592,1638,1666,1320,1320,1652,1607,1409,1409,1304,1304,1288,1288,1664,1637,1395,1395,1335,1335,1622,1636,1394,1394,1319,1319,1606,1621,1392,1392,1137,1137,1137,1137,345,390,360,375,404,373,1047,-2751,-2767,-2783,1062,1121,1046,-2799,1077,-2815,1106,1061,789,789,1105,1104,263,355,310,340,325,354,352,262,339,324,1091,1076,1029,1090,1060,1075,833,833,788,788,1088,1028,818,818,803,803,561,561,531,531,816,771,546,546,289,274,288,258,
         -253,-317,-381,-446,-478,-509,1279,1279,-811,-1179,-1451,-1756,-1900,-2028,-2189,-2253,-2333,-2414,-2445,-2511,-2526,1313,1298,-2559,1041,1041,1040,1040,1025,1025,1024,1024,1022,1007,1021,991,1020,975,1019,959,687,687,1018,1017,671,671,655,655,1016,1015,639,639,758,758,623,623,757,607,756,591,755,575,754,559,543,543,1009,783,-575,-621,-685,-749,496,-590,750,749,734,748,974,989,1003,958,988,973,1002,942,987,957,972,1001,926,986,941,971,956,1000,910,985,925,999,894,970,-1071,-1087,-1102,1390,-1135,1436,1509,1451,1374,-1151,1405,1358,1480,1420,-1167,1507,1494,1389,1342,1465,1435,1450,1326,1505,1310,1493,1373,1479,1404,1492,1464,1419,428,443,472,397,736,526,464,464,486,457,442,471,484,482,1357,1449,1434,1478,1388,1491,1341,1490,1325,1489,1463,1403,1309,1477,1372,1448,1418,1433,1476,1356,1462,1387,-1439,1475,1340,1447,1402,1474,1324,1461,1371,1473,269,448,1432,1417,1308,1460,-1711,1459,-1727,1441,1099,1099,1446,1386,1431,1401,-1743,1289,1083,1083,1160,1160,1458,1445,1067,1067,1370,1457,1307,1430,1129,1129,1098,1098,268,432,267,416,266,400,-1887,1144,1187,1082,1173,1113,1186,1066,1050,1158,1128,1143,1172,1097,1171,1081,420,391,1157,1112,1170,1142,1127,1065,1169,1049,1156,1096,1141,1111,1155,1080,1126,1154,1064,1153,1140,1095,1048,-2159,1125,1110,1137,-2175,823,823,1139,1138,807,807,384,264,368,263,868,838,853,791,867,822,852,837,866,806,865,790,-2319,851,821,836,352,262,850,805,849,-2399,533,533,835,820,336,261,578,548,563,577,532,532,832,772,562,562,547,547,305,275,560,515,290,290,288,258
     };
-    static const u8 tab32[]={130,162,193,209,44,28,76,140,9,9,9,9,9,9,9,9,190,254,222,238,126,94,157,157,109,61,173,205}; static const u8 tab33[]={252,236,220,204,188,172,156,140,124,108,92,76,60,44,28,12};
-    static const i16 tabindex[2*16]={0,32,64,98,0,132,180,218,292,364,426,538,648,746,0,1126,1460,1460,1460,1460,1460,1460,1460,1460,1842,1842,1842,1842,1842,1842,1842,1842}; static const u8 g_linbits[]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,3,4,6,8,10,13,4,5,6,7,8,9,11,13};
-#define DRMP3_PEEK_BITS(n)  (bs_cache>>(32-(n)))
+static const u8 tab32[]={130,162,193,209,44,28,76,140,9,9,9,9,9,9,9,9,190,254,222,238,126,94,157,157,109,61,173,205}; static const u8 tab33[]={252,236,220,204,188,172,156,140,124,108,92,76,60,44,28,12};
+static const i16 tabindex[2*16]={0,32,64,98,0,132,180,218,292,364,426,538,648,746,0,1126,1460,1460,1460,1460,1460,1460,1460,1460,1842,1842,1842,1842,1842,1842,1842,1842}; static const u8 g_linbits[]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,3,4,6,8,10,13,4,5,6,7,8,9,11,13};
 #define DRMP3_FLUSH_BITS(n) { bs_cache<<=(n); bs_sh+=(n); }
 #define DRMP3_CHECK_BITS    while(bs_sh>=0){bs_cache|=(u32)*bs_next_ptr++<<bs_sh;bs_sh-=8;}
-#define DRMP3_BSPOS         ((bs_next_ptr-bs->buf)*8-24+bs_sh)
     float one=0.0f;
     int ireg=0,big_val_cnt=gr_info->big_values;
     const u8 *sfb=gr_info->sfbtab;
@@ -5476,23 +5235,22 @@ static void drmp3_L3_huffman(float *dst, drmp3_bs *bs, const drmp3_L3_gr_info *g
     int pairs_to_decode,np,bs_sh=(bs->pos&7)-8;
     bs_next_ptr+=4;
     while (big_val_cnt>0) {
-        int tab_num=gr_info->table_select[ireg];
-        int sfb_cnt=gr_info->region_count[ireg++];
-        const i16 *codebook=tabs+tabindex[tab_num];
-        int linbits=g_linbits[tab_num];
+        int tab_num=gr_info->table_select[ireg], sfb_cnt=gr_info->region_count[ireg++];
+        const i16 *codebook=tabs+tabindex[tab_num]; int linbits=g_linbits[tab_num];
         if (linbits) {
             do {
                 np=*sfb++/2; pairs_to_decode=vmin(big_val_cnt,np); one=*scf++;
                 do {
-                    int j,w=5,leaf=codebook[DRMP3_PEEK_BITS(w)];
-                    while (leaf<0){DRMP3_FLUSH_BITS(w);w=leaf&7;leaf=codebook[DRMP3_PEEK_BITS(w)-(leaf>>3)];}
+                    int j,w=5,leaf=codebook[(bs_cache>>(32-w))];
+                    while (leaf<0){DRMP3_FLUSH_BITS(w);w=leaf&7;leaf=codebook[(bs_cache>>(32-w))-(leaf>>3)];}
                     DRMP3_FLUSH_BITS(leaf>>8);
                     for (j=0;j<2;j++,dst++,leaf>>=4){
                         int lsb=leaf&0x0F;
-                        if (lsb==15){lsb+=DRMP3_PEEK_BITS(linbits);DRMP3_FLUSH_BITS(linbits);DRMP3_CHECK_BITS;*dst=one*drmp3_L3_pow_43(lsb)*((i32)bs_cache<0?-1:1);}
+                        if (lsb==15) { lsb += (bs_cache>>(32-(linbits))); DRMP3_FLUSH_BITS(linbits); DRMP3_CHECK_BITS; *dst= one * drmp3_L3_pow_43(lsb) * ((i32)bs_cache < 0 ? -1 : 1); }
                         else *dst=g_drmp3_pow43[16+lsb-16*(bs_cache>>31)]*one;
                         DRMP3_FLUSH_BITS(lsb?1:0);
                     }
+
                     DRMP3_CHECK_BITS;
                 } while(--pairs_to_decode);
             } while((big_val_cnt-=np)>0&&--sfb_cnt>=0);
@@ -5500,29 +5258,24 @@ static void drmp3_L3_huffman(float *dst, drmp3_bs *bs, const drmp3_L3_gr_info *g
             do {
                 np=*sfb++/2; pairs_to_decode=vmin(big_val_cnt,np); one=*scf++;
                 do {
-                    int j,w=5,leaf=codebook[DRMP3_PEEK_BITS(w)];
-                    while (leaf<0){DRMP3_FLUSH_BITS(w);w=leaf&7;leaf=codebook[DRMP3_PEEK_BITS(w)-(leaf>>3)];}
+                    int j,w=5,leaf=codebook[(bs_cache>>(32-w))];
+                    while (leaf<0){DRMP3_FLUSH_BITS(w);w=leaf&7;leaf=codebook[(bs_cache>>(32-w))-(leaf>>3)];}
                     DRMP3_FLUSH_BITS(leaf>>8);
-                    for (j=0;j<2;j++,dst++,leaf>>=4){
-                        int lsb=leaf&0x0F;
-                        *dst=g_drmp3_pow43[16+lsb-16*(bs_cache>>31)]*one;
-                        DRMP3_FLUSH_BITS(lsb?1:0);
-                    }
+                    for (j=0;j<2;j++,dst++,leaf>>=4) { int lsb=leaf&0x0F; *dst=g_drmp3_pow43[16+lsb-16*(bs_cache>>31)]*one; DRMP3_FLUSH_BITS(lsb?1:0); }
                     DRMP3_CHECK_BITS;
                 } while(--pairs_to_decode);
             } while((big_val_cnt-=np)>0&&--sfb_cnt>=0);
         }
     }
+
     for (np=1-big_val_cnt;;dst+=4) {
         const u8 *codebook_count1=(gr_info->count1_table)?tab33:tab32;
-        int leaf=codebook_count1[DRMP3_PEEK_BITS(4)];
+        int leaf=codebook_count1[(bs_cache>>28)];
         if (!(leaf&8)) leaf=codebook_count1[(leaf>>3)+(bs_cache<<4>>(32-(leaf&3)))];
         DRMP3_FLUSH_BITS(leaf&7);
-        if (DRMP3_BSPOS>layer3gr_limit) break;
-#define DRMP3_RELOAD_SCALEFACTOR if(!--np){np=*sfb++/2;if(!np)break;one=*scf++;}
-#define DRMP3_DEQ_COUNT1(s) if(leaf&(128>>s)){dst[s]=((i32)bs_cache<0)?-one:one;DRMP3_FLUSH_BITS(1)}
-        DRMP3_RELOAD_SCALEFACTOR; DRMP3_DEQ_COUNT1(0); DRMP3_DEQ_COUNT1(1);
-        DRMP3_RELOAD_SCALEFACTOR; DRMP3_DEQ_COUNT1(2); DRMP3_DEQ_COUNT1(3);
+        if (((bs_next_ptr-bs->buf)*8-24+bs_sh)>layer3gr_limit) break;
+        if(!--np) { np=*sfb++/2; if(!np) {break;} one=*scf++; }; if(leaf&(128>>0)){dst[0]=((i32)bs_cache<0)?-one:one;DRMP3_FLUSH_BITS(1)} if(leaf&(128>>1)){dst[1]=((i32)bs_cache<0)?-one:one;DRMP3_FLUSH_BITS(1)}
+        if(!--np) { np=*sfb++/2; if(!np) {break;} one=*scf++; }; if(leaf&(128>>2)){dst[2]=((i32)bs_cache<0)?-one:one;DRMP3_FLUSH_BITS(1)} if(leaf&(128>>3)){dst[3]=((i32)bs_cache<0)?-one:one;DRMP3_FLUSH_BITS(1)}
         DRMP3_CHECK_BITS;
     }
 
@@ -5604,14 +5357,10 @@ static void imdct12(float *x,float *dst,float *overlap){
 
 static void drmp3_L3_imdct_short(float *grbuf,float *overlap,int nbands){ for(;nbands>0;nbands--,overlap+=9,grbuf+=18){float tmp[18]; MemCpyFromBtoAForNBytes(tmp,grbuf,sizeof(tmp)); MemCpyFromBtoAForNBytes(grbuf,overlap,6*sizeof(float)); imdct12(tmp,grbuf+6,overlap+6); imdct12(tmp+1,grbuf+12,overlap+6); imdct12(tmp+2,overlap,overlap+6);} }
 static void drmp3_L3_change_sign(float *grbuf){int b,i;for(b=0,grbuf+=18;b<32;b+=2,grbuf+=36)for(i=1;i<18;i+=2)grbuf[i]=-grbuf[i];}
+static const float g_mdct_window[2][18]={{0.99904822f,0.99144486f,0.97629601f,0.95371695f,0.92387953f,0.88701083f,0.84339145f,0.79335334f,0.73727734f,0.04361938f,0.13052619f,0.21643961f,0.30070580f,0.38268343f,0.46174861f,0.53729961f,0.60876143f,0.67559021f},{1,1,1,1,1,1,0.99144486f,0.92387953f,0.79335334f,0,0,0,0,0,0,0.13052619f,0.38268343f,0.60876143f}};
 static void drmp3_L3_imdct_gr(float *grbuf,float *overlap,unsigned block_type,unsigned n_long_bands){
-    static const float g_mdct_window[2][18]={
-        {0.99904822f,0.99144486f,0.97629601f,0.95371695f,0.92387953f,0.88701083f,0.84339145f,0.79335334f,0.73727734f,0.04361938f,0.13052619f,0.21643961f,0.30070580f,0.38268343f,0.46174861f,0.53729961f,0.60876143f,0.67559021f},
-        {1,1,1,1,1,1,0.99144486f,0.92387953f,0.79335334f,0,0,0,0,0,0,0.13052619f,0.38268343f,0.60876143f}
-    };
     if (n_long_bands){drmp3_L3_imdct36(grbuf,overlap,g_mdct_window[0],n_long_bands);grbuf+=18*n_long_bands;overlap+=9*n_long_bands;}
-    if (block_type==2) drmp3_L3_imdct_short(grbuf,overlap,32-n_long_bands);
-    else drmp3_L3_imdct36(grbuf,overlap,g_mdct_window[block_type==3],32-n_long_bands);
+    if (block_type==2) {drmp3_L3_imdct_short(grbuf,overlap,32-n_long_bands);} else {drmp3_L3_imdct36(grbuf,overlap,g_mdct_window[block_type==3],32-n_long_bands);}
 }
 
 static void drmp3_L3_save_reservoir(drmp3dec *h, drmp3dec_scratch *s) { int pos=(s->bs.pos+7)/8u,remains=s->bs.limit/8u-pos; if (remains>511){pos+=remains-511;remains=511;} if (remains>0) {MoveMemoryFromBtoAForNBytes(h->reserv_buf,s->maindata+pos,remains);} h->reserv=remains; }
@@ -5636,8 +5385,8 @@ static void drmp3_L3_decode(drmp3dec *h, drmp3dec_scratch *s, drmp3_L3_gr_info *
     }
 }
 
+static const float g_sec[24]={10.19000816f,0.50060302f,0.50241929f,3.40760851f,0.50547093f,0.52249861f,2.05778098f,0.51544732f,0.56694406f,1.48416460f,0.53104258f,0.64682180f,1.16943991f,0.55310392f,0.78815460f,0.97256821f,0.58293498f,1.06067765f,0.83934963f,0.62250412f,1.72244716f,0.74453628f,0.67480832f,5.10114861f};
 static void drmp3d_DCT_II(float *grbuf, int n){
-    static const float g_sec[24]={10.19000816f,0.50060302f,0.50241929f,3.40760851f,0.50547093f,0.52249861f,2.05778098f,0.51544732f,0.56694406f,1.48416460f,0.53104258f,0.64682180f,1.16943991f,0.55310392f,0.78815460f,0.97256821f,0.58293498f,1.06067765f,0.83934963f,0.62250412f,1.72244716f,0.74453628f,0.67480832f,5.10114861f};
     int i,k=0;
     for(;k<n;k++){
         float t[4][8],*x,*y=grbuf+k;
@@ -5662,16 +5411,9 @@ static void drmp3d_synth_pair(drmp3d_sample_t *pcm, int nch, const float *z){
     pcm[16*nch]=drmp3d_scale_pcm(a);
 }
 
+static const float g_win[]={ -1,26,-31,208,218,401,-519,2063,2000,4788,-5517,7134,5959,35640,-39336,74992,-1,24,-35,202,222,347,-581,2080,1952,4425,-5879,7640,5288,33791,-41176,74856,-1,21,-38,196,225,294,-645,2087,1893,4063,-6237,8092,4561,31947,-43006,74630,-1,19,-41,190,227,244,-711,2085,1822,3705,-6589,8492,3776,30112,-44821,74313,-1,17,-45,183,228,197,-779,2075,1739,3351,-6935,8840,2935,28289,-46617,73908,-1,16,-49,176,228,153,-848,2057,1644,3004,-7271,9139,2037,26482,-48390,73415,-2,14,-53,169,227,111,-919,2032,1535,2663,-7597,9389,1082,24694,-50137,72835,-2,13,-58,161,224,72,-991,2001,1414,2330,-7910,9592,70,22929,-51853,72169,-2,11,-63,154,221,36,-1064,1962,1280,2006,-8209,9750,-998,21189,-53534,71420,-2,10,-68,147,215,2,-1137,1919,1131,1692,-8491,9863,-2122,19478,-55178,70590,-3,9,-73,139,208,-29,-1210,1870,970,1388,-8755,9935,-3300,17799,-56778,69679,-3,8,-79,132,200,-57,-1283,1817,794,1095,-8998,9966,-4533,16155,-58333,68692,-4,7,-85,125,189,-83,-1356,1759,605,814,-9219,9959,-5818,14548,-59838,67629,-4,7,-91,117,177,-106,-1428,1698,402,545,-9416,9916,-7154,12980,-61289,66494,-5,6,-97,111,163,-127,-1498,1634,185,288,-9585,9838,-8540,11455,-62684,65290};
 static void drmp3d_synth(float *xl, drmp3d_sample_t *dstl, int nch, float *lins){
     int i; float *xr=xl+576*(nch-1); drmp3d_sample_t *dstr=dstl+(nch-1);
-    static const float g_win[]={ -1,26,-31,208,218,401,-519,2063,2000,4788,-5517,7134,5959,35640,-39336,74992,  -1,24,-35,202,222,347,-581,2080,1952,4425,-5879,7640,5288,33791,-41176,74856,
-                                 -1,21,-38,196,225,294,-645,2087,1893,4063,-6237,8092,4561,31947,-43006,74630,  -1,19,-41,190,227,244,-711,2085,1822,3705,-6589,8492,3776,30112,-44821,74313,
-                                 -1,17,-45,183,228,197,-779,2075,1739,3351,-6935,8840,2935,28289,-46617,73908,  -1,16,-49,176,228,153,-848,2057,1644,3004,-7271,9139,2037,26482,-48390,73415,
-                                 -2,14,-53,169,227,111,-919,2032,1535,2663,-7597,9389,1082,24694,-50137,72835,  -2,13,-58,161,224,72,-991,2001,1414,2330,-7910,9592,70,22929,-51853,72169,
-                                 -2,11,-63,154,221,36,-1064,1962,1280,2006,-8209,9750,-998,21189,-53534,71420,  -2,10,-68,147,215,2,-1137,1919,1131,1692,-8491,9863,-2122,19478,-55178,70590,
-                                 -3,9,-73,139,208,-29,-1210,1870,970,1388,-8755,9935,-3300,17799,-56778,69679,  -3,8,-79,132,200,-57,-1283,1817,794,1095,-8998,9966,-4533,16155,-58333,68692,
-                                 -4,7,-85,125,189,-83,-1356,1759,605,814,-9219,9959,-5818,14548,-59838,67629,   -4,7,-91,117,177,-106,-1428,1698,402,545,-9416,9916,-7154,12980,-61289,66494,
-                                 -5,6,-97,111,163,-127,-1498,1634,185,288,-9585,9838,-8540,11455,-62684,65290};
     float *zlin=lins+15*64; const float *w=g_win;
     zlin[4*15]=xl[18*16];zlin[4*15+1]=xr[18*16];zlin[4*15+2]=xl[0];zlin[4*15+3]=xr[0];
     zlin[4*31]=xl[1+18*16];zlin[4*31+1]=xr[1+18*16];zlin[4*31+2]=xl[1];zlin[4*31+3]=xr[1];
@@ -5693,21 +5435,8 @@ static void drmp3d_synth(float *xl, drmp3d_sample_t *dstl, int nch, float *lins)
     }
 }
 
-static void drmp3d_synth_granule(float *qmf_state, float *grbuf, int nbands, int nch, drmp3d_sample_t *pcm, float *lins){
-    for(int i=0;i<nch;i++) {drmp3d_DCT_II(grbuf+576*i,nbands);} MemCpyFromBtoAForNBytes(lins,qmf_state,sizeof(float)*15*64);
-    for(int i=0;i<nbands;i+=2) {drmp3d_synth(grbuf+i,pcm+32*nch*i,nch,lins+i*64);} MemCpyFromBtoAForNBytes(qmf_state,lins+nbands*64,sizeof(float)*15*64);
-}
-
-static int drmp3d_match_frame(const u8 *hdr, int mp3_bytes, int frame_bytes){
-    int i,nmatch;
-    for(i=0,nmatch=0;nmatch<10;nmatch++){
-        i+=drmp3_hdr_frame_bytes(hdr+i,frame_bytes)+drmp3_hdr_padding(hdr+i);
-        if (i + 4 > mp3_bytes) return nmatch>0;
-        if (!drmp3_hdr_compare(hdr,hdr+i)) return 0;
-    }
-    return 1;
-}
-
+static void drmp3d_synth_granule(float *qmf_state, float *grbuf, int nbands, int nch, drmp3d_sample_t *pcm, float *lins){ for(int i=0;i<nch;i++) {drmp3d_DCT_II(grbuf+576*i,nbands);} MemCpyFromBtoAForNBytes(lins,qmf_state,sizeof(float)*15*64); for(int i=0;i<nbands;i+=2) {drmp3d_synth(grbuf+i,pcm+32*nch*i,nch,lins+i*64);} MemCpyFromBtoAForNBytes(qmf_state,lins+nbands*64,sizeof(float)*15*64); }
+static int drmp3d_match_frame(const u8 *hdr, int mp3_bytes, int frame_bytes){ for(int i=0,nmatch=0;nmatch<10;nmatch++){ i+=drmp3_hdr_frame_bytes(hdr+i,frame_bytes)+drmp3_hdr_padding(hdr+i); if (i + 4 > mp3_bytes) {return nmatch>0;} if (!drmp3_hdr_compare(hdr,hdr+i)) {return 0;} } return 1; }
 static int drmp3d_find_frame(const u8 *mp3, int mp3_bytes, int *free_format_bytes, int *ptr_frame_bytes){
     int i,k;
     for(i=0;i<mp3_bytes-4;i++,mp3++){
@@ -5715,8 +5444,9 @@ static int drmp3d_find_frame(const u8 *mp3, int mp3_bytes, int *free_format_byte
             int frame_bytes=drmp3_hdr_frame_bytes(mp3,*free_format_bytes);
             int frame_and_padding=frame_bytes+drmp3_hdr_padding(mp3);
             for(k=4;!frame_bytes&&k<2304&&i+2*k<mp3_bytes - 4;k++){
-                if(drmp3_hdr_compare(mp3,mp3+k)){int fb=k-drmp3_hdr_padding(mp3),nextfb=fb+drmp3_hdr_padding(mp3+k);if(i + k + nextfb + 4 > mp3_bytes || !drmp3_hdr_compare(mp3,mp3+k+nextfb)) continue; frame_and_padding=k;frame_bytes=fb;*free_format_bytes=fb;}
+                if (drmp3_hdr_compare(mp3,mp3+k)) { int fb=k-drmp3_hdr_padding(mp3),nextfb=fb+drmp3_hdr_padding(mp3+k); if (i + k + nextfb + 4 > mp3_bytes || !drmp3_hdr_compare(mp3,mp3+k+nextfb)) continue; frame_and_padding=k; frame_bytes=fb; *free_format_bytes=fb; }
             }
+
             if((frame_bytes&&i+frame_and_padding<=mp3_bytes&&drmp3d_match_frame(mp3,mp3_bytes-i,frame_bytes))||(!i&&frame_and_padding==mp3_bytes)){*ptr_frame_bytes=frame_and_padding;return i;}
             *free_format_bytes=0;
         }
@@ -5730,13 +5460,10 @@ static int drmp3dec_decode_frame(drmp3dec *dec, const u8 *mp3, int mp3_bytes, vo
     const u8 *hdr; drmp3_bs bs_frame[1];
     if (mp3_bytes>4&&dec->header[0]==0xff&&drmp3_hdr_compare(dec->header,mp3)){
         frame_size=drmp3_hdr_frame_bytes(mp3,dec->free_format_bytes)+drmp3_hdr_padding(mp3);
-        if(frame_size!=mp3_bytes&&(frame_size + 4>mp3_bytes||!drmp3_hdr_compare(mp3,mp3+frame_size))) frame_size=0;
+        if (frame_size!=mp3_bytes&&(frame_size + 4>mp3_bytes||!drmp3_hdr_compare(mp3,mp3+frame_size))) frame_size=0;
     }
-    if (!frame_size){
-        MemSetToVForNBytes(dec,0,sizeof(drmp3dec));
-        i=drmp3d_find_frame(mp3,mp3_bytes,&dec->free_format_bytes,&frame_size);
-        if(!frame_size||i+frame_size>mp3_bytes){info->frame_bytes=i;return 0;}
-    }
+    if (!frame_size){ MemSetToVForNBytes(dec,0,sizeof(drmp3dec)); i=drmp3d_find_frame(mp3,mp3_bytes,&dec->free_format_bytes,&frame_size); if (!frame_size || i + frame_size > mp3_bytes) {info->frame_bytes=i;return 0;} }
+    
     hdr=mp3+i;
     MemCpyFromBtoAForNBytes(dec->header,hdr,4);
     info->frame_bytes=i+frame_size;
@@ -5747,26 +5474,21 @@ static int drmp3dec_decode_frame(drmp3dec *dec, const u8 *mp3, int mp3_bytes, vo
     bs_frame[0].buf=hdr + 4; bs_frame[0].pos=0; bs_frame[0].limit=(frame_size - 4) * 8;
     if(DRMP3_HDR_IS_CRC(hdr)) drmp3_bs_get_bits(bs_frame,16);
     if(info->layer!=3) return 0;  /* Layer 1/2 not supported */
-    {
-        int main_data_begin=drmp3_L3_read_side_info(bs_frame,dec->scratch.gr_info,hdr);
-        if(main_data_begin<0||bs_frame->pos>bs_frame->limit){drmp3dec_init(dec);return 0;}
-        success=drmp3_L3_restore_reservoir(dec,bs_frame,&dec->scratch,main_data_begin);
-        if(success&&pcm!=NULL){
-            for(igr=0;igr<(DRMP3_HDR_TEST_MPEG1(hdr)?2:1);igr++,pcm=DRMP3_OFFSET_PTR(pcm,sizeof(drmp3d_sample_t)*576*info->channels)){
-                MemSetToVForNBytes(dec->scratch.grbuf[0],0,576 * 2 * sizeof(float));
-                drmp3_L3_decode(dec,&dec->scratch,dec->scratch.gr_info+igr*info->channels,info->channels);
-                drmp3d_synth_granule(dec->qmf_state,dec->scratch.grbuf[0],18,info->channels,(drmp3d_sample_t*)pcm,dec->scratch.syn[0]);
-            }
-        }
-        drmp3_L3_save_reservoir(dec,&dec->scratch);
+        
+    int main_data_begin=drmp3_L3_read_side_info(bs_frame,dec->scratch.gr_info,hdr);
+    if(main_data_begin<0||bs_frame->pos>bs_frame->limit){drmp3dec_init(dec);return 0;}
+    success=drmp3_L3_restore_reservoir(dec,bs_frame,&dec->scratch,main_data_begin);
+    if(success&&pcm!=NULL){
+        for(igr=0;igr<(DRMP3_HDR_TEST_MPEG1(hdr)?2:1);igr++,pcm=DRMP3_OFFSET_PTR(pcm,sizeof(drmp3d_sample_t)*576*info->channels)){ MemSetToVForNBytes(dec->scratch.grbuf[0],0,576 * 2 * sizeof(float)); drmp3_L3_decode(dec,&dec->scratch,dec->scratch.gr_info+igr*info->channels,info->channels); drmp3d_synth_granule(dec->qmf_state,dec->scratch.grbuf[0],18,info->channels,(drmp3d_sample_t*)pcm,dec->scratch.syn[0]); }
     }
+    drmp3_L3_save_reservoir(dec,&dec->scratch);
     return success*drmp3_hdr_frame_samples(dec->header);
 }
 
 static size_t drmp3__on_read_os(void *ud, void *buf, size_t n) { FHandle f = (FHandle)(uintptr_t)ud; if (f == INVALID_FHANDLE) {return 0;} long result = OS_Read(f,buf,n); return (result > 0) ? (size_t)result : 0; }
 static bool drmp3__on_seek_os(void *ud, int offset, u8 origin) { FHandle f = (FHandle)(uintptr_t)ud; if (f == INVALID_FHANDLE) {return false;} int whence = origin; return OS_Seek(f,(i64)offset,whence) >= 0; }
 static size_t drmp3__on_read(drmp3 *p, void *buf, size_t n) { size_t r = drmp3__on_read_os(p->pUserData,buf,n); p->streamCursor += r; return r; }
-static size_t drmp3__on_read_clamped(drmp3 *p, void *buf, size_t n) { if (p->streamLength == DRMP3_UINT64_MAX) {return drmp3__on_read(p,buf,n);} u64 rem = p->streamLength - p->streamCursor; if (n > rem) n = (size_t)rem; return drmp3__on_read(p,buf,n); }
+static size_t drmp3__on_read_clamped(drmp3 *p, void *buf, size_t n) { if (p->streamLength == (((u64)0xFFFFFFFF << 32) | (u64)0xFFFFFFFF)) {return drmp3__on_read(p,buf,n);} u64 rem = p->streamLength - p->streamCursor; if (n > rem) n = (size_t)rem; return drmp3__on_read(p,buf,n); }
 static bool drmp3__on_seek(drmp3 *p, int offset, u8 origin) { if (!drmp3__on_seek_os(p->pUserData,offset,origin)) {return false;} if (origin == 0) {p->streamCursor = (u64)offset;}else{p->streamCursor += (u64)offset;} return true; }
 static u32 drmp3_decode_next_frame_ex(drmp3 *p, drmp3d_sample_t *pPCMFrames, drmp3dec_frame_info *pInfo) {
     u32 pcmFramesRead = 0; if (p->atEnd) return 0;
@@ -5820,8 +5542,7 @@ static void drmp3__skip_id3v2(drmp3 *p) {
 
 static bool drmp3_init_internal(drmp3 *p) {
     drmp3dec_init(&p->decoder);
-    p->streamCursor = p->streamStartOffset = 0;      p->streamLength = DRMP3_UINT64_MAX;
-    p->delayInPCMFrames = p->paddingInPCMFrames = 0; p->totalPCMFrameCount = DRMP3_UINT64_MAX;
+    p->streamCursor = p->streamStartOffset=0; p->streamLength = (((u64)0xFFFFFFFF << 32) | (u64)0xFFFFFFFF); p->delayInPCMFrames = p->paddingInPCMFrames=0; p->totalPCMFrameCount = (((u64)0xFFFFFFFF << 32) | (u64)0xFFFFFFFF);
     if (drmp3__on_seek_os(p->pUserData, 0, 2)) { // SEEK_END
         i64 slen = OS_Tell((FHandle)(uintptr_t)p->pUserData);
         if (slen > 0) {
@@ -5862,7 +5583,7 @@ static u64 drmp3_read_pcm_frames_raw(drmp3 *p, u64 framesToRead, void *pBufferOu
         u32 framesToConsume;
         if(p->currentPCMFrame<p->delayInPCMFrames){ u32 skip=(u32)vmin(p->pcmFRemInMP3F,p->delayInPCMFrames-p->currentPCMFrame); p->currentPCMFrame+=skip; p->pcmFConsInMP3F+=skip; p->pcmFRemInMP3F-=skip; }
         framesToConsume=(u32)vmin(p->pcmFRemInMP3F,framesToRead);
-        if(p->totalPCMFrameCount!=DRMP3_UINT64_MAX&&p->totalPCMFrameCount>p->paddingInPCMFrames){
+        if(p->totalPCMFrameCount != (((u64)0xFFFFFFFF << 32) | (u64)0xFFFFFFFF) && p->totalPCMFrameCount > p->paddingInPCMFrames){
             if(p->currentPCMFrame<(p->totalPCMFrameCount-p->paddingInPCMFrames)){ u64 rem=(p->totalPCMFrameCount-p->paddingInPCMFrames)-p->currentPCMFrame; if(framesToConsume>rem) framesToConsume=(u32)rem; } else break;
         }
         if(pBufferOut){
@@ -5874,7 +5595,7 @@ static u64 drmp3_read_pcm_frames_raw(drmp3 *p, u64 framesToRead, void *pBufferOu
         p->pcmFRemInMP3F-=framesToConsume;
         totalFramesRead+=framesToConsume; framesToRead-=framesToConsume;
         if(framesToRead==0) break;
-        if(p->totalPCMFrameCount!=DRMP3_UINT64_MAX&&p->totalPCMFrameCount>p->paddingInPCMFrames&&p->currentPCMFrame>=(p->totalPCMFrameCount-p->paddingInPCMFrames)) break;
+        if(p->totalPCMFrameCount != (((u64)0xFFFFFFFF << 32) | (u64)0xFFFFFFFF) && p->totalPCMFrameCount > p->paddingInPCMFrames && p->currentPCMFrame >= (p->totalPCMFrameCount - p->paddingInPCMFrames)) break;
         if(drmp3_decode_next_frame(p)==0) break;
     }
     return totalFramesRead;
@@ -5892,7 +5613,7 @@ static bool drmp3_seek_to_pcm_frame(drmp3 *pMP3, u64 frameIndex){
 
 static u64 drmp3_get_pcm_frame_count(drmp3 *pMP3){    
     u64 total;
-    if(pMP3->totalPCMFrameCount!=DRMP3_UINT64_MAX){
+    if(pMP3->totalPCMFrameCount != (((u64)0xFFFFFFFF << 32) | (u64)0xFFFFFFFF)){
         total=pMP3->totalPCMFrameCount;
         if(total>=pMP3->delayInPCMFrames)   total-=pMP3->delayInPCMFrames;
         if(total>=pMP3->paddingInPCMFrames) total-=pMP3->paddingInPCMFrames;
@@ -6156,8 +5877,7 @@ pthread_t audThreadID; void* AudThread(void* arg);
 #endif
 
 void* AudThread(void* arg) { (void)arg; while (1) { AudioUpdate(); OS_USleep(1000); } return NULL; }
-// ==============
-// Raycast System
+// ============== Raycast System
 float half_to_float(half h);
 RaycastHit RayTriangle(Vector3 origin, Vector3 dir, Vector3 posA, Vector3 posB, Vector3 posC, Vector3 normA, Vector3 normB, Vector3 normC) {
     Vector3 edgeAB = V3_AsubB(posB,posA), edgeAC = V3_AsubB(posC,posA); Vector3 normalVector = V3_Cross(edgeAB,edgeAC);
@@ -6230,24 +5950,18 @@ ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, u32
  
 ENGINE_TO_MOD void RaycastAll(Vector3 origin, Vector3 dir, float distance, u32 layerMask, RaycastHit* hits, u16 maxCount) { for (int i=0;i<maxCount;++i) {hits[i].hit = false;} (void)origin; (void)dir; (void)distance; (void)layerMask; }
 ENGINE_TO_MOD RaycastHit CapsuleCast(Vector3 start, Vector3 end, float capsuleRadius, float castDist, u32 layerMask, bool hitTriggers) { RaycastHit result = { .hit = false }; (void)start; (void)end; (void)capsuleRadius; (void)castDist; (void)layerMask; (void)hitTriggers; return result; }
-// ==============
-// Shaders System
+// ================ Rendering System
 #include "Shaders/shaders.h"
 static inline __attribute__((always_inline)) void ShaderError(u32 s, const char* name) { char er[512]; glGetShaderInfoLog(s,512,NULL,er); DualLogError("%s Comp Fail: %s\n",name,er); OS_Exit(1); }
 static inline __attribute__((always_inline)) u32 CompileShader(u32 type, const char* source, const char* name) { u32 s = glCreateShader(type); glShaderSource(s,1,&source,NULL); glCompileShader(s); i32 ok; glGetShaderiv(s,0x8B81/*GL_COMPILE_STATUS*/,&ok); if (!ok) ShaderError(s,name); return s; }
 static inline __attribute__((always_inline)) u32 LinkProgram(u32* s, i32 num, const char* name) { u32 p = glCreateProgram(); for (i32 i=0;i<num;++i) { glAttachShader(p,s[i]); } glLinkProgram(p); i32 ok; glGetProgramiv(p,0x8B82/*GL_LINK_STATUS*/,&ok); if (!ok) ShaderError(p,name); return p; }
 u32 CompileAnyShader(const char* v, const char* s, const char* name) { return (v) ? LinkProgram((u32[]){CompileShader(0x8B31/*GL_VERTEX_SHADER*/,v,name),CompileShader(0x8B30/*GL_FRAGMENT_SHADER*/,s,name)},2,name) : LinkProgram((u32[]){CompileShader(0x91B9/*GL_COMPUTE_SHADER*/,s,name)},1,name); }
 void CompileShaders() {
-    Sys_Render.depthPrepassShaderProgram= CompileAnyShader(depthPrepassVertSrc,depthPrepassFragSrc,"DPre"); // Depth Prepass
-    Sys_Render.chunkShaderProgram       = CompileAnyShader(vertSrc,fragSrc,"Main");
-    Sys_Render.uiShaderProgram          = CompileAnyShader(vertUISrc,fragUISrc,"UI");
-    Sys_Render.debugUnlitShaderProgram  = CompileAnyShader(debugUnlitVertSrc,debugUnlitFragSrc,"Ln"); // Line Drawing Unlit
-    Sys_Render.shadowmapsShaderProgram  = CompileAnyShader(shadowmapVertSrc,shadowmapFragSrc,"Shad");
-    Sys_Render.textShaderProgram        = CompileAnyShader(textVertSrc,textFragSrc,"Txt");
-    Sys_Render.imageBlitShaderProgram   = CompileAnyShader(quadVertSrc,quadFragSrc,"Comp"); // Image Blit Composite Pass
-    Sys_Render.ssrShaderProgram            = CompileAnyShader(NULL,ssrComputeSrc,"SSR");
-    Sys_Render.voxelUpdateShaderProgram    = CompileAnyShader(NULL,voxelUpdateComputeSrc,"Vox"); // Voxel Update
-    Sys_Render.shadowmapsClearShaderProgram= CompileAnyShader(NULL,shadowmapsClearComputeSrc,"ShadCl"); // Shadowmaps Clear
+    Sys_Render.depthPrepassShaderProgram= CompileAnyShader(depthPrepassVertSrc,depthPrepassFragSrc,"DPre");/*Depth Prepass*/ Sys_Render.chunkShaderProgram          = CompileAnyShader(vertSrc,fragSrc,"Main");
+    Sys_Render.uiShaderProgram          = CompileAnyShader(vertUISrc,fragUISrc,"UI");                                        Sys_Render.debugUnlitShaderProgram     = CompileAnyShader(debugUnlitVertSrc,debugUnlitFragSrc,"Ln");/*Line Drawing Unlit*/
+    Sys_Render.shadowmapsShaderProgram  = CompileAnyShader(shadowmapVertSrc,shadowmapFragSrc,"Shad");                        Sys_Render.textShaderProgram           = CompileAnyShader(textVertSrc,textFragSrc,"Txt");
+    Sys_Render.imageBlitShaderProgram   = CompileAnyShader(quadVertSrc,quadFragSrc,"Comp"); /*Image Blit Composite Pass*/    Sys_Render.ssrShaderProgram            = CompileAnyShader(NULL,ssrComputeSrc,"SSR");
+    Sys_Render.voxelUpdateShaderProgram = CompileAnyShader(NULL,voxelUpdateComputeSrc,"Vox"); /*Voxel Update*/               Sys_Render.shadowmapsClearShaderProgram= CompileAnyShader(NULL,shadowmapsClearComputeSrc,"ShadCl"); /*Shadowmaps Clear*/
 }
 
 u32 SetupSSBO(u32* id, u32 bindx, size_t sz, const void* d, u32 typ) { glGenBuffers(1,id); glBindBuffer(GL_SSBO,*id); glBufferData(GL_SSBO,sz,d,typ); glBindBufferBase(GL_SSBO,bindx,*id); return *id; }
@@ -6264,8 +5978,7 @@ void mat4_lookat_from(float* m, Quaternion* camRotation, Vector3 eye) { // Kept 
     m[8]  = right.z;   m[9]  = up.z;   m[10] = -forward.z;// m[11] = 0.0f;
     m[12] = -V3_dot(right, eye); m[13] = -V3_dot(up, eye); m[14] = V3_dot(forward, eye); m[15] = 1.0f;
 }
-// ================
-// Rendering System
+
 __attribute__((pure,always_inline)) bool SphereInFrustum(FrustumPlane* ps, Vector3 c, float radius) { for (int i=0;i<6;++i) { if ((V3_dot(ps[i].normal,c) + ps[i].d) < -radius) return false; } return true; }
 void ExtractFrustumPlanes(float* m, FrustumPlane* ps) {
     ps[0].normal.x = m[3] + m[0]; ps[0].normal.y = m[7] + m[4]; ps[0].normal.z = m[11] + m[8];  ps[0].d = m[15] + m[12]; // Left
@@ -6281,15 +5994,14 @@ void ExtractFrustumPlanes(float* m, FrustumPlane* ps) {
 
 Vector3 lightsNewPosition[LIGHT_COUNT];
 ENGINE_TO_MOD i32 AddLight(Light* lit, LightAnimation* lanim) {
-    i32 i = Sys_Global.loadedLights; Sys_Global.loadedLights++;
-    if (Sys_Global.loadedLights >= LIGHT_COUNT) { DualLogError("Too many lights %u added in level %d!\n",i,Sys_Global.currentLevel); OS_Exit(1); }
+    i32 i = loadedLights; loadedLights++; if (loadedLights >= LIGHT_COUNT) { DualLogError("Too many lights %u added in level %d!\n",i,Sys_Global.curLev); OS_Exit(1); }
 
     MemCpyFromBtoAForNBytes(&lights[i],lit,sizeof(Light)); MemCpyFromBtoAForNBytes(&lanims[i],lanim,sizeof(LightAnimation));
     lightsNewPosition[i] = lit->pos; flag_set(&lights[i].lflags,LDIRTY,true);
     return i;
 }
 
-ENGINE_TO_MOD void TurnLightOff(u16 litIdx) { if (litIdx < Sys_Global.loadedLights) {flag_set(&lights[litIdx].lflags,LIGHTON,false);} }
+ENGINE_TO_MOD void TurnLightOff(u16 litIdx) { if (litIdx < loadedLights) {flag_set(&lights[litIdx].lflags,LIGHTON,false);} }
 bool alreadyReadLightOnOnce[LIGHT_COUNT] = {0};
 ENGINE_TO_MOD void LoadFieldIntoLight(char* k, char* v, char* il, u32 ln, Light* lit, LightAnimation* lam, u16 lIdx) {
     char* br = StringFindFirstCharWithin(k,'[');
@@ -6303,12 +6015,10 @@ ENGINE_TO_MOD void LoadFieldIntoLight(char* k, char* v, char* il, u32 ln, Light*
     }
 
     static const struct { const char* key; u16 offset; u8 type; } map[] = {
-        {"currentStep",__builtin_offsetof(LightAnimation,currentStep),1},{"lerpValue",__builtin_offsetof(LightAnimation,lerpValue),0},
-        {"intervalSteps.Length",__builtin_offsetof(LightAnimation,numIntervalSteps),1},{"intervalStepisLerping.Length",__builtin_offsetof(LightAnimation, numLerpSteps),1},
-        {"localPosition.x",__builtin_offsetof(Light,pos.x),0},{"localPosition.y",__builtin_offsetof(Light,pos.y),0},{"localPosition.z",__builtin_offsetof(Light,pos.z),0},
-        {"localRotation.x",__builtin_offsetof(Light,spotDir.x),0},{"localRotation.y",__builtin_offsetof(Light,spotDir.y),0},{"localRotation.z",__builtin_offsetof(Light,spotDir.z),0},{"localRotation.w",__builtin_offsetof(Light,spotDir.w),0},
-        {"range",__builtin_offsetof(Light,range),0},{"spotAngle",__builtin_offsetof(Light,spotAng),0},{"minIntensity",__builtin_offsetof(Light,minIntensity),0},{"maxIntensity",__builtin_offsetof(Light,maxIntensity),0},
-        {"color.r",__builtin_offsetof(Light,col.r),0},{"color.g",__builtin_offsetof(Light,col.g),0},{"color.b",__builtin_offsetof(Light,col.b),0}
+        {"currentStep",    __builtin_offsetof(LightAnimation,currentStep),1},{"lerpValue",      __builtin_offsetof(LightAnimation,lerpValue),0},{"intervalSteps.Length",__builtin_offsetof(LightAnimation,numIntervalSteps),1},{"intervalStepisLerping.Length",__builtin_offsetof(LightAnimation, numLerpSteps),1},
+        {"localPosition.x",__builtin_offsetof(Light,pos.x),0},               {"localPosition.y",__builtin_offsetof(Light,pos.y),0},             {"localPosition.z",     __builtin_offsetof(Light,pos.z),0},                    {"localRotation.x",             __builtin_offsetof(Light,spotDir.x),0},
+        {"localRotation.y",__builtin_offsetof(Light,spotDir.y),0},           {"localRotation.z",__builtin_offsetof(Light,spotDir.z),0},         {"localRotation.w",     __builtin_offsetof(Light,spotDir.w),0},                {"range",                       __builtin_offsetof(Light,range),0},
+        {"spotAngle",      __builtin_offsetof(Light,spotAng),0},             {"minIntensity",   __builtin_offsetof(Light,minIntensity),0},      {"maxIntensity",        __builtin_offsetof(Light,maxIntensity),0},             {"color.r",__builtin_offsetof(Light,col.r),0},{"color.g",__builtin_offsetof(Light,col.g),0},{"color.b",__builtin_offsetof(Light,col.b),0}
     };
 
     for (int i = 0; i < (int)(sizeof(map)/sizeof(map[0])); i++) {
@@ -6344,7 +6054,7 @@ static inline __attribute__((always_inline)) void mul_mat4(float *out, const flo
 
 Quaternion cubeQuats[6] = {{0.0f,ONE_OVER_SQRT2,0.0f,ONE_OVER_SQRT2}/*+X:Right*/,{0.0f,-ONE_OVER_SQRT2,0.0f,ONE_OVER_SQRT2}/*-X:Left*/,{-ONE_OVER_SQRT2,0.0f,0.0f,ONE_OVER_SQRT2}/*+Y:Up*/,{ONE_OVER_SQRT2,0.0f,0.0f,ONE_OVER_SQRT2}/*-Y:Down*/,{0.0f,0.0f,0.0f,1.0f}/*+Z:Forward*/,{0.0f,1.0f,0.0f,0.0f}/*-Z:Backward*/ };
 void UpdateLights() {
-    for (u16 lightIdx = 0; lightIdx < Sys_Global.loadedLights; ++lightIdx) {
+    for (u16 lightIdx = 0; lightIdx < loadedLights; ++lightIdx) {
         Vector3 lightPos = lightsNewPosition[lightIdx];
         lights[lightIdx].pos = lightPos;
         if (lights[lightIdx].lflags & LDIRTY) { // Marked all as true at level load.
@@ -6359,7 +6069,7 @@ void UpdateLights() {
     }
     
     if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
-        for (int i=0;i<Sys_Global.loadedLights;++i) { // Just lerps/flickers in intensity
+        for (int i=0;i<loadedLights;++i) { // Just lerps/flickers in intensity
             if (lanims[i].numIntervalSteps < 1) continue;
             if (!(lights[i].lflags & LIGHTON)) { lights[i].intensity = 0.0f; continue; }
 
@@ -6383,7 +6093,7 @@ void UpdateLights() {
         }
     }
 
-    glBindBuffer(GL_SSBO,Sys_Render.lightsID); glBufferData(GL_SSBO,Sys_Global.loadedLights * sizeof(Light),lights,GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_SSBO,Sys_Render.lightsID); glBufferData(GL_SSBO,loadedLights * sizeof(Light),lights,GL_DYNAMIC_DRAW);
     glUseProgram(Sys_Render.voxelUpdateShaderProgram);
     glUniform3f(5,Sys_Global.instances[PLAYER1].position.x,Sys_Global.instances[PLAYER1].position.y,Sys_Global.instances[PLAYER1].position.z);
     glDispatchCompute((VOXELS_X+15)/16,(VOXELS_Z+15)/16,1);
@@ -6418,8 +6128,7 @@ void ClearAll() {
 }
 
 void RenderLoadingProgress(i32 offset, const char * restrict text) { ClearAll(); glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); RenderFormattedText(683 - offset,379,TEXT_WHITE,FONT_NORMAL,1.0f,text); ((_GLFWwindow*)window)->context.swapBuffers(((_GLFWwindow*)window)); }
-// =====================================
-// Configuration Options Settings System
+// ===================================== Configuration Options Settings System
 char statusText[TEXT_BUFFER_SIZE];
 void CenterStatusPrint(const char * restrict fmt, ...) { va_list args; __builtin_va_start(args, fmt); StringFormatV(statusText,TEXT_BUFFER_SIZE,fmt,args); __builtin_va_end(args); DualLog("%s\n",statusText); Sys_Global.statusTextDecayFinished = get_time() + 3.5;/*secs decay time before text dissappears.*/ }
 typedef enum { SETTING_U8, SETTING_U16, SETTING_INPUT } SettingType; typedef struct { const char* name; void* ptr; SettingType type; } Setting;
@@ -6479,8 +6188,7 @@ void SaveConfig() {
     OS_Close(f);
     DualLog("Saved settings to ./Data/Config.ini! framenum %u\n",Sys_Global.frame);
 }
-// ==============
-// Credits System
+// ============== Credits System
 char creditStats[4096]; const char** creditPages = NULL;
 static inline __attribute__((always_inline)) float GetScore(float stupid, bool isFinal) {
     float victories = (float)(Sys_Global.kills + Sys_Global.cyberkills);
@@ -6510,8 +6218,7 @@ static inline __attribute__((always_inline)) void CreditsStats() {
     off += StringFormat(creditStats + off,sizeof(creditStats),"Shots Fired: %u\nGrenades Thrown: %u\n",Sys_Global.shotsFired,Sys_Global.grenadesThrown);
     off += StringFormat(creditStats + off,sizeof(creditStats),"Damage Dealt: %f\nDamage Received: %f\nSaves Scummed: %u\n\nClick to continue...\n",Sys_Global.damageDealt,Sys_Global.damageReceived,Sys_Global.savesScummed);
 }
-// ================
-// Rendering System
+// ================ Rendering System
 static __attribute__((noinline)) void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, unsigned char* bmp) {
     if (*id == 0) {glGenTextures(1,id);} glBindTexture(GL_TEXTURE_2D,*id);
     glTexImage2D(GL_TEXTURE_2D,0,internalFormat,width,height,0,format,type,bmp);
@@ -6911,10 +6618,8 @@ static __attribute__((hot)) void RenderShadowmaps() {
     double shadowStartTime = get_time();
     MemSetToVForNBytes(candidates,0,MAX_SHADOWMAPS*sizeof(u16));
     u16 numShadowsCouldRender = 0;
-    Vector3 playerPos = Sys_Global.instances[PLAYER1].position;
-    Vector3 pf = Sys_Global.instances[PLAYER1].forward;
-    float minx = Sys_Global.worldMin_x, minz = Sys_Global.worldMin_z;
-    for (u16 i = 0; i < Sys_Global.loadedLights; ++i) { // Collect candidates: only lights that are enabled and in PVS
+    Vector3 playerPos = Sys_Global.instances[PLAYER1].position, pf = Sys_Global.instances[PLAYER1].forward;
+    for (u16 i = 0; i < loadedLights; ++i) { // Collect candidates: only lights that are enabled and in PVS
         if (unlikely(!(lights[i].lflags & SHADON) || !(lights[i].lflags & LIGHTON))) continue;
 
         Vector3 lightPos = lights[i].pos;
@@ -6925,7 +6630,7 @@ static __attribute__((hot)) void RenderShadowmaps() {
         float luminosity = (intensity / (range * range));
         if (luminosity < 0.008f && (range < 8.0f || intensity < 0.5f)) continue;
         
-        u16 cellX = (u16)clamp((i32)vfloor((lightPos.x - minx + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED), cellZ = (u16)clamp((i32)vfloor((lightPos.z - minz + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED);
+        u16 cellX = PosGetCellCoordX(lightPos.x), cellZ = PosGetCellCoordZ(lightPos.z);
         int lightCellIdx = (cellZ * WORLDX) + cellX; u8 r = vceil(range * (1.0f / CELL_SIZE));
         bool inPVS = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
         if (likely(!inPVS)) inPVS = NeighborhoodInPVS(cellX,cellZ,r);
@@ -7011,7 +6716,7 @@ static __attribute__((hot)) void RenderShadowmaps() {
         }
 
         glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
-        glBindBuffer(GL_SSBO,Sys_Render.shadowMapsIndirectionID); glBufferData(GL_SSBO,Sys_Global.loadedLights * sizeof(u32),voxen_Shadow_System.shadowmapIndirectionList,GL_DYNAMIC_DRAW);
+        glBindBuffer(GL_SSBO,Sys_Render.shadowMapsIndirectionID); glBufferData(GL_SSBO,loadedLights * sizeof(u32),voxen_Shadow_System.shadowmapIndirectionList,GL_DYNAMIC_DRAW);
     }
 
     voxen_Shadow_System.shadowTime = get_time() - shadowStartTime;
@@ -7045,21 +6750,20 @@ Color GetPainStaticColor() { return (Color){1.0f,0.0f,0.0f,1.0f}; } // TODO: Hoo
 __attribute__((pure)) i32 dsort(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (db > da) - (db < da); }
 __attribute__((pure)) i32 dsortInv(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (da > db) - (da < db); }
 #define MAX_VISIBLE 4096
-#define BIND_TEX(slot,cur,next) if((cur)!=(next)||(next)==0){(cur)=(next);glUniform1ui(slot,(u32)(next));}
-#define DRAW_ENTITY(curN,curT,curG,curS,curM) \
-    {u16 glow=e->glowIndex,norm=e->normIndex,spec=e->specIndex; \
-          if (e->collider == COLTYPE_BOX) DrawBoxCollider(e); \
-     else if (e->collider == COLTYPE_SPH) DrawSphereCollider(e); \
-     else if (e->collider == COLTYPE_CVX) DrawMeshCollider(e); \
-     else if (e->collider == COLTYPE_MSH) DrawMeshCollider(e); \
-     else if (e->collider == COLTYPE_CAP) DrawCapsuleCollider(e); \
-     DrawAngularVelocity(e); \
-     glUniform1ui(17,tex==316?1u:0u); glUniform1ui(25,constIndex); glUniform1f(27,e->volume); glUniform1ui(13,(tex==36||tex==887)?1u:0u); \
-     if (grayscaleEnabled) { float npcHeat = ConstIndexIsNPC(constIndex) ? ((constIndex==419 || constIndex==422 || constIndex==424 || constIndex==429 || constIndex==430 || constIndex==431||constIndex==433||constIndex==437||constIndex==438||constIndex==441) ? 1.5f : 4.0f) : 0.0f; glUniform1f(9,npcHeat); } \
-     glUniform1ui(30,e->camView < camViewCount ? 1u : 0u); \
-     if(e->camView < camViewCount) { glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D,camViewTextures[e->camView]); glUniform2ui(28,camViews[e->camView].width,camViews[e->camView].height);glUniform1i(29,6); } \
-     BIND_TEX(1,curN,norm) BIND_TEX(18,curT,tex) BIND_TEX(19,curG,glow) BIND_TEX(20,curS,spec) \
-     curM=GetAndBindModel(i,curM); u32 vc=modelTriangleCounts[curM]*3; glDrawElements(0x0004,vc,GL_UNSIGNED_SHORT,0);drawCalls++;vertsRendered+=vc;}
+#define DRAW_ENTITY(curN,curT,curG,curS,curM) { \
+        u16 glow=e->glowIndex,norm=e->normIndex,spec=e->specIndex; \
+        if (Sys_Cheats.showPhys) {if (e->collider == COLTYPE_BOX) {DrawBoxCollider(e);} else if (e->collider == COLTYPE_SPH) {DrawSphereCollider(e);} else if (e->collider == COLTYPE_CVX) {DrawMeshCollider(e);} else if (e->collider == COLTYPE_MSH) {DrawMeshCollider(e);} else if (e->collider == COLTYPE_CAP) {DrawCapsuleCollider(e);}} \
+        DrawAngularVelocity(e); \
+        glUniform1ui(17,tex==316?1u:0u); glUniform1ui(25,constIndex); glUniform1f(27,e->volume); glUniform1ui(13,(tex==36||tex==887) ? 1u : 0u); \
+        if (grayscaleEnabled) { float npcHeat = ConstIndexIsNPC(constIndex) ? ((constIndex==419 || constIndex==422 || constIndex==424 || constIndex==429 || constIndex==430 || constIndex==431||constIndex==433||constIndex==437||constIndex==438||constIndex==441) ? 1.5f : 4.0f) : 0.0f; glUniform1f(9,npcHeat); } \
+        glUniform1ui(30,e->camView < camViewCount ? 1u : 0u); \
+        if(e->camView < camViewCount) { glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D,camViewTextures[e->camView]); glUniform2ui(28,camViews[e->camView].width,camViews[e->camView].height); glUniform1i(29,6); } \
+        if((curN) != (norm) || norm==0) { curN=norm; glUniform1ui( 1,(u32)norm); } \
+        if((curT) != ( tex) ||  tex==0) { curT= tex; glUniform1ui(18,(u32)tex ); } \
+        if((curG) != (glow) || glow==0) { curG=glow; glUniform1ui(19,(u32)glow); } \
+        if((curS) != (spec) || spec==0) { curS=spec; glUniform1ui(20,(u32)spec); } \
+        curM=GetAndBindModel(i,curM); u32 vc=modelTriangleCounts[curM]*3; glDrawElements(0x0004,vc,GL_UNSIGNED_SHORT,0); drawCalls++; vertsRendered+=vc; \
+     }
 
 bool mat4_inverse(const float* m, float* out) {
     float inv[16],det;
@@ -7102,7 +6806,7 @@ void GetProjections(float* view, float* viewProj, float* invViewRot, float* invV
 static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     u16 swidth = camView ? camViews[camViewIdx].width : Sys_Settings.ScreenWidth, sheight = camView ? camViews[camViewIdx].height : Sys_Settings.ScreenHeight;
     float sfov = camView ? (float)camViews[camViewIdx].fov : (float)Sys_Settings.FOV;
-    float snear = camView ? camViews[camViewIdx].near : NEAR_PLANE; float sfar = camView ? camViews[camViewIdx].far : Sys_Global.farPlane;
+    float snear = camView ? camViews[camViewIdx].near : NEAR_PLANE; float sfar = camView ? camViews[camViewIdx].far : Sys_Global.farPlane[Sys_Global.curLev];
     Vector3 playerPos = Sys_Global.instances[PLAYER1].position;
     float px=playerPos.x, py=playerPos.y, pz=playerPos.z, aspect3D=(float)swidth / (float)sheight;
     float view[16],viewProj[16],invViewRot[9],invViewProj[16];
@@ -7149,9 +6853,10 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
 
     glUseProgram(Sys_Render.chunkShaderProgram); /*Main Pass*/ glUniformMatrix4fv(2,1,0,viewProj); glUniform1ui(25,0u); // default constIndex
     bool grayscaleEnabled = ModRequestsGrayscale(), refOn = Sys_Settings.Reflections;              glUniform1ui(26,(u32)grayscaleEnabled);
-    float fogActual = Sys_Global.fogColor.a + (float)(Sys_Global.fogFac / 255u); // Alpha is base density for level.
-    glUniform3f(12,Sys_Global.fogColor.r * fogActual,Sys_Global.fogColor.g * fogActual,Sys_Global.fogColor.b * fogActual); // Fog Color(which is density)
-    glUniform1ui(14,refOn); glUniform1ui(15,Sys_Settings.Shadows); glUniform2f(8,Sys_Global.worldMin_x,Sys_Global.worldMin_z); glUniform3f(10,playerPos.x,playerPos.y,playerPos.z);
+    float fogActual = Sys_Global.fogColor[Sys_Global.curLev].a + (float)(Sys_Global.fogFac / 255u); // Alpha is base density for level.
+    glUniform3f(12,Sys_Global.fogColor[Sys_Global.curLev].r * fogActual,Sys_Global.fogColor[Sys_Global.curLev].g * fogActual,Sys_Global.fogColor[Sys_Global.curLev].b * fogActual); // Fog Color(which is density)
+    glUniform1ui(14,refOn); glUniform1ui(15,Sys_Settings.Shadows); glUniform2f(8,Sys_Global.worldMin_x[Sys_Global.curLev],Sys_Global.worldMin_z[Sys_Global.curLev]); 
+    glUniform3f(10,playerPos.x,playerPos.y,playerPos.z);
     glColorMask(1,1,1,1);   glDepthMask(0);                        glDepthFunc(0x0203/*GL_LEQUAL*/); // Opaque Pass
     visibleCount = currentTexIndex = currentNormIndex = currentGlowIndex = currentSpecIndex = currentModelType = 0;
     glUniform1f(9,0.0f); // Reset heat for infrared vision
@@ -7214,13 +6919,13 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glUniform1f(16,aspect3D);        glUniform1ui(22,Sys_Settings.Shadows);                      glUniform1f(9,(float)berserkTimeRemainingNormalized);
     glUniform1f(10,berserkSeedTime); glUniform1ui(11,Sys_Settings.Brightness);                   glUniform3f(12,deg2rad(cam_yaw),deg2rad(cam_pitch),deg2rad(cam_roll));
     glUniform3f(13,px,py,pz);        glUniform1f(15,(float)Sys_Global.pauseRelativeTime * 0.1f); 
-    glUniform1ui(17,(gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || Sys_Global.currentLevel == LEVEL_CYBERSPACE);
-    glUniform1ui(18,(gridCellStates[playerCellIdx] & CELL_SEES_SUN) && Sys_Global.currentLevel != LEVEL_CYBERSPACE);
-    glUniform1ui(19,((Sys_Global.currentLevel >= 10 && Sys_Global.currentLevel < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
+    glUniform1ui(17,(gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || Sys_Global.curLev == LEVEL_CYBERSPACE);
+    glUniform1ui(18,(gridCellStates[playerCellIdx] & CELL_SEES_SUN) && Sys_Global.curLev != LEVEL_CYBERSPACE);
+    glUniform1ui(19,((Sys_Global.curLev >= 10 && Sys_Global.curLev < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
     u32 shieldOnType = 0u; // No shield green tint.
     if (Sys_Global.instances[WORLD].ioflags & QUESTBIT_SHIELD_ACTIVATED) {
-        if (Sys_Global.currentLevel == 6 || Sys_Global.currentLevel == 7) shieldOnType = 2u; // Shielding only below player for lower levels.
-        else if (Sys_Global.currentLevel <= 5) shieldOnType = 1u; // Shielding everywhere as levels fully within shield.
+        if (Sys_Global.curLev == 6 || Sys_Global.curLev == 7) shieldOnType = 2u; // Shielding only below player for lower levels.
+        else if (Sys_Global.curLev <= 5) shieldOnType = 1u; // Shielding everywhere as levels fully within shield.
     }
    
     glUniform1ui(20,shieldOnType);
@@ -7278,12 +6983,12 @@ void UpdateInstanceMatrix4x4s() {
     u32 countFloats  = ((u32)dirtyMax - (u32)dirtyMin + 1) * 16;
     glBufferSubData(GL_SSBO, offsetFloats * sizeof(float), countFloats * sizeof(float), modelMatrices + offsetFloats);
 }
-// =================
-// Level Load System
+// ================= Initialization && Main
 ENGINE_TO_MOD void InitializeEntity(Entity* entry) { // Blank entity, no index yet, for initial list population or temporary Entity. memset here would be harmful as only a handful of fields are the same.
+    MemSetToVForNBytes(entry,0,sizeof(Entity));
     entry->index = U16_MAX;               entry->entflags = EF_ACTIVE; entry->kinematic = true;
-    entry->layer = Layer_Default;         entry->camView = 255;             entry->rotation = QUAT_IDENTITY;
-    entry->collider = COLTYPE_NONE; entry->tickTime = 0.35f;          entry->angularDrag = 0.05f;
+    entry->layer = Layer_Default;         entry->camView = 255;             entry->rotation.w = 1.0f;
+    entry->tickTime = 0.35f;          entry->angularDrag = 0.05f;
     entry->modelIndex = entry->lodIndex  = entry->colliderMeshIndex            = MODEL_IDX_MAX;
     entry->texIndex   = entry->glowIndex = entry->specIndex = entry->normIndex = MAX_VALID_TEXTURE;
     entry->scale.x    = entry->scale.y   = entry->scale.z   = entry->mass      = entry->volume = 1.0f;
@@ -7296,7 +7001,7 @@ ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
     DebugRAM("start of LoadLevel");
     Sys_Global.levelCurrentlyLoading = true; Sys_Global.gamePaused = false; Sys_Global.menuActive = false;
     RenderLoadingProgress(100,"Loading level...");
-    MemSetToVForNBytes(lights,0,LIGHT_COUNT * sizeof(Light)); MemSetToVForNBytes(lanims,0,LIGHT_COUNT * sizeof(LightAnimation));
+    MemSetToVForNBytes(lights,0,LIGHT_COUNT * sizeof(Light)); MemSetToVForNBytes(lanims,0,LIGHT_COUNT * sizeof(LightAnimation)); loadedLights = 0;
     MemSetToVForNBytes(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
     MemSetToVForNBytes(modelMatrices,0,INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
     MemSetToVForNBytes(camViews,0,64 * sizeof(CamView)); camViewCount = 0;
@@ -7306,8 +7011,8 @@ ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
     levelFileHandle = OS_OpenReadonly(filename);
     LoadLevelMod(curlevel);
     OS_Close(levelFileHandle);
-    for (int i=0;i<Sys_Global.loadedLights;++i) lightsNewPosition[i]=lights[i].pos;
-    DualLog("Loaded %d entities, %u static lights for Level %d... took %f secs\n",Sys_Global.loadedInstances,Sys_Global.loadedLights,curlevel,get_time() - start_time);
+    for (int i=0;i<loadedLights;++i) lightsNewPosition[i]=lights[i].pos;
+    DualLog("Loaded %d entities, %u static lights for Level %d... took %f secs\n",Sys_Global.loadedInstances,loadedLights,curlevel,get_time() - start_time);
     RenderLoadingProgress(110,"Initialize entities...");
     for (int i=PLAYER1;i<Sys_Global.loadedInstances;++i) {
         Entity* e = &Sys_Global.instances[i];
@@ -7323,13 +7028,13 @@ ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
     RenderLoadingProgress(110,"Loading cull system...");
     CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
     glUseProgram(Sys_Render.voxelUpdateShaderProgram);
-    glUniform2f(0,Sys_Global.voxelMinCenterX,Sys_Global.voxelMinCenterZ);
-    glUniform1f(1,Sys_Global.farPlane * Sys_Global.farPlane);
-    glUniform1ui(2,Sys_Global.loadedLights);
-    glUniform2f(3,Sys_Global.worldMin_x,Sys_Global.worldMin_z); 
+    glUniform2f(0,Sys_Global.voxelMinCenterX[Sys_Global.curLev],Sys_Global.voxelMinCenterZ[Sys_Global.curLev]);
+    glUniform1f(1,Sys_Global.farPlane[Sys_Global.curLev] * Sys_Global.farPlane[Sys_Global.curLev]);
+    glUniform1ui(2,loadedLights);
+    glUniform2f(3,Sys_Global.worldMin_x[Sys_Global.curLev],Sys_Global.worldMin_z[Sys_Global.curLev]); 
     RenderLoadingProgress(120,"Loading voxel lighting data...");
-    for (u16 i = 0; i < Sys_Global.loadedLights; i++) { lightsNewPosition[i] = lights[i].pos; }
-    MemSetToVForNBytes(voxen_Shadow_System.shadowmapIndirectionList,MAX_SHADOWMAPS + 1,Sys_Global.loadedLights * sizeof(u32)); // Set to invalid values for all
+    for (u16 i = 0; i < loadedLights; i++) { lightsNewPosition[i] = lights[i].pos; }
+    MemSetToVForNBytes(voxen_Shadow_System.shadowmapIndirectionList,MAX_SHADOWMAPS + 1,loadedLights * sizeof(u32)); // Set to invalid values for all
     Sys_Global.levelCurrentlyLoading = false;
     DebugRAM("end of LoadLevel");
 }
@@ -7338,6 +7043,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     DualLog("Loading new game...\n");
     RenderLoadingProgress(100,"Loading new game...");
     Sys_Global.menuActive = Sys_Global.gamePaused = enteringPlayerName = fovSliderActive = gammaSliderActive = masterVolumeSliderActive = musicVolumeSliderActive = messageVolumeSliderActive = sfxVolumeSliderActive = returnToPause = false;
+    SetGlobalsModData();
     currentMenuItem = currentMenuTab = 0; currentMenuPage = Mpg_FrontPage;
     Sys_Global.pauseRelativeTime = Sys_Global.last_physics_time = 0.0;
     Sys_Global.inventoryMode = false;
@@ -7366,8 +7072,6 @@ __attribute__((cold)) void NewGame() { // Reset World States
 }
 
 void GoIntoGame() { NewGame(); PlayGameMusic(); DualLog("Player named \"%s\" started the game!\n", Sys_Global.playerName); }
-// ===========
-// MAIN
 void* mod_handle = NULL;
 void InitalizeEnvironment() {
     double game_start_time = get_time();
@@ -7388,11 +7092,9 @@ void InitalizeEnvironment() {
         char* colon = StringFindFirstCharWithin(s, ':'); if (!colon) continue;
         *colon = '\0'; char* key = data_parser_trim(s); char* val = data_parser_trim(colon + 1); if (*key == 0 || *val == 0) continue;
 
-        if (StringsEqual(key, "modname")) StringCopyInto_A_From_B(global_modname,val,sizeof(global_modname));
-        else if (StringsEqual(key, "dllname")) StringCopyInto_A_From_B(global_dllname,val,sizeof(global_dllname));
-        else if (StringsEqual(key, "windowicon")) StringCopyInto_A_From_B(Sys_Global.global_winicon,val,sizeof(Sys_Global.global_winicon));
-        else if (StringsEqual(key, "levelcount")) Sys_Global.numLevels = parse_numberu8(val,gmLine,lineNum);
-        else if (StringsEqual(key, "startlevel")) Sys_Global.startLevel = parse_numberu8(val,gmLine,lineNum);
+             if (StringsEqual(key,   "modname")) {  StringCopyInto_A_From_B(global_modname,val,sizeof(global_modname)); }                      else if (StringsEqual(key,   "dllname")) { StringCopyInto_A_From_B(global_dllname,val,sizeof(global_dllname)); }
+        else if (StringsEqual(key,"windowicon")) { StringCopyInto_A_From_B(Sys_Global.global_winicon,val,sizeof(Sys_Global.global_winicon)); } else if (StringsEqual(key,"levelcount")) { Sys_Global.numLevels = parse_numberu8(val,gmLine,lineNum); }
+        else if (StringsEqual(key,"startlevel")) { Sys_Global.startLevel = parse_numberu8(val,gmLine,lineNum); }
     }
     
     OS_Close(gmFP); DualLog(" %s:: num levels: %d, start level: %d\n",global_modname,Sys_Global.numLevels,Sys_Global.startLevel);
@@ -7409,43 +7111,36 @@ void InitalizeEnvironment() {
     CompileShaders();
     u32 vaos[4],vbos[4]; glGenVertexArrays(4,vaos); glGenBuffers(4,vbos);
     Sys_Render.quadVAO = vaos[0]; Sys_Render.chunkVAO = vaos[1]; Sys_Render.textVAO = vaos[2]; Sys_Render.debugLinesVAO = vaos[3];
-    Sys_Render.quadVBO = vbos[0]; Sys_Render.chunkVBO  = vbos[1]; Sys_Render.textVBO = vbos[2]; Sys_Render.debugLinesVBO = vbos[3]; 
+    Sys_Render.quadVBO = vbos[0]; Sys_Render.chunkVBO = vbos[1]; Sys_Render.textVBO = vbos[2]; Sys_Render.debugLinesVBO = vbos[3]; 
     float quadBlit_vertices[] = {1.0f,-1.0f,1.0f,0.0f, 1.0f,1.0f,1.0f,1.0f, -1.0f,1.0f,0.0f,1.0f, -1.0f,-1.0f,0.0f,0.0f}; // 4 verts, 4 floats each x,y,u,v
     glBindVertexArray(Sys_Render.quadVAO); glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.quadVBO); glBufferData(GL_ARRAY_BUFFER,sizeof(quadBlit_vertices),quadBlit_vertices,GL_STATIC_DRAW);
     glVertexAttribFormat(0,2,GL_FLOAT,GL_FALSE,0);                 glVertexAttribBinding(0,0); glEnableVertexAttribArray(0); // pos xy float @ offset 0
     glVertexAttribFormat(1,2,GL_FLOAT,GL_FALSE,2 * sizeof(float)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1); // uv (s,t)
     glBindVertexBuffer(0,Sys_Render.quadVBO,0,4 * sizeof(float));
-    glBindVertexArray(Sys_Render.chunkVAO); glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.chunkVBO);
-    glVertexAttribFormat(0,3,0x140B/*GL_HALF_FLOAT*/,GL_FALSE,0);  // pos xyz half-float @ offset 0
-    glVertexAttribFormat(1,3,0x140B/*GL_HALF_FLOAT*/,GL_FALSE,6);  // normal xyz float   @ offset 6  (after 3×2 bytes)
-    glVertexAttribFormat(2,2,0x140B/*GL_HALF_FLOAT*/,GL_FALSE,12); // uv st float
-    for (u8 i = 0; i < 3; i++) { glVertexAttribBinding(i, 0); glEnableVertexAttribArray(i); }
+    glBindVertexArray(Sys_Render.chunkVAO);
+    glVertexAttribFormat(0,3,0x140B/*GL_HALF_FLOAT*/,GL_FALSE,0);  glVertexAttribBinding(0,0); glEnableVertexAttribArray(0); // pos xyz half-float @ offset 0
+    glVertexAttribFormat(1,3,0x140B/*GL_HALF_FLOAT*/,GL_FALSE,6);  glVertexAttribBinding(1,0); glEnableVertexAttribArray(1); // normal xyz float   @ offset 6  (after 3×2 bytes)
+    glVertexAttribFormat(2,2,0x140B/*GL_HALF_FLOAT*/,GL_FALSE,12); glVertexAttribBinding(2,0); glEnableVertexAttribArray(2); // uv st float
     glBindVertexBuffer(0,Sys_Render.chunkVBO,0,14);
-    glBindVertexArray(Sys_Render.textVAO); glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.textVBO);
-    glVertexAttribFormat(0,3,GL_FLOAT,GL_FALSE,0);                 // pos (x,y,z) 4 floats per vertex, stride = 4*sizeof(float)
-    glVertexAttribFormat(1,2,GL_FLOAT,GL_FALSE,3 * sizeof(float)); // uv (s,t)
-    for (u8 i = 0; i < 2; i++) { glVertexAttribBinding(i,0); glEnableVertexAttribArray(i); }
+    glBindVertexArray(Sys_Render.textVAO);
+    glVertexAttribFormat(0,3,GL_FLOAT,GL_FALSE,0);                 glVertexAttribBinding(0,0); glEnableVertexAttribArray(0); // pos (x,y,z) 4 floats per vertex, stride = 4*sizeof(float)
+    glVertexAttribFormat(1,2,GL_FLOAT,GL_FALSE,3 * sizeof(float)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1); // uv (s,t)
     glBindVertexBuffer(0, Sys_Render.textVBO,0,5 * sizeof(float));
     glBindVertexArray(Sys_Render.debugLinesVAO); glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.debugLinesVBO); glBufferData(GL_ARRAY_BUFFER,MAX_DEBUG_LINE_VERTS * 2 * sizeof(DebugLineVertex),NULL,GL_DYNAMIC_DRAW);
-    glVertexAttribFormat(0,3,GL_FLOAT,GL_FALSE, __builtin_offsetof(DebugLineVertex,x)); glVertexAttribBinding(0,0); glEnableVertexAttribArray(0);
-    glVertexAttribFormat(1,4,GL_FLOAT,GL_FALSE,__builtin_offsetof(DebugLineVertex, r)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1);
+    glVertexAttribFormat(0,3,GL_FLOAT,GL_FALSE,__builtin_offsetof(DebugLineVertex,x)); glVertexAttribBinding(0,0); glEnableVertexAttribArray(0);
+    glVertexAttribFormat(1,4,GL_FLOAT,GL_FALSE,__builtin_offsetof(DebugLineVertex,r)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1);
     glBindVertexBuffer(0,Sys_Render.debugLinesVBO,0,sizeof(DebugLineVertex));
     InitFontAtlasses();
     GenerateAndBindTexture(&Sys_Render.inputUIID,GL_RGBA8,1366,768,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/,NULL); // UI Fixed Size Raster
     glGenFramebuffers(1,&Sys_Render.uiFBO);
     glBindFramebuffer(GL_FRAMEBUFFER,Sys_Render.uiFBO);
-    glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D,Sys_Render.inputUIID);
-    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,Sys_Render.inputUIID,0);
+    glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D,Sys_Render.inputUIID); glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,Sys_Render.inputUIID,0);
     u32 drawBuffersUI[] = {GL_COLOR_ATTACHMENT0}; glDrawBuffers(1,drawBuffersUI);
     u32 uistatus = glCheckFramebufferStatus(GL_FRAMEBUFFER); if (uistatus != 0x8CD5/*GL_FRAMEBUFFER_COMPLETE*/) DualLogError("UI Framebuffer incomplete: Error code %d\n",uistatus);
-    glBindImageTexture(0,Sys_Render.inputUIID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8); // UI Rendered Color
-    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,Sys_Render.inputUIID,0);
+    glBindImageTexture(0,Sys_Render.inputUIID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);/* UI Rendered Color*/ glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,Sys_Render.inputUIID,0);
     RenderLoadingProgress(40,"Loading...");
     float* m = shadowmapsPerspectiveProjection; float lightRangeMax=15.36f; float viewRange=(lightRangeMax - NEAR_PLANE);
-    m[0] = 1.0f; m[1] = 0.0f; m[2] =                                           0.0f; m[3] =  0.0f;
-    m[4] = 0.0f; m[5] = 1.0f; m[6] =                                           0.0f; m[7] =  0.0f;
-    m[8] = 0.0f; m[9] = 0.0f; m[10]=      -(lightRangeMax + NEAR_PLANE) / viewRange; m[11]= -1.0f;
-    m[12]= 0.0f; m[13]= 0.0f; m[14]= -2.0f * lightRangeMax * NEAR_PLANE / viewRange; m[15]=  0.0f;
+    m[0]=1.0f; m[1]=0.0f; m[2]=0.0f; m[3]=0.0f; m[4]=0.0f; m[5]=1.0f; m[6]=0.0f; m[7]=0.0f; m[8]=0.0f; m[9]=0.0f; m[10]=-(lightRangeMax + NEAR_PLANE) / viewRange; m[11]=-1.0f; m[12]=0.0f; m[13]=0.0f; m[14]=-2.0f * lightRangeMax * NEAR_PLANE / viewRange; m[15]=0.0f;
     InitSCFTables(); InitAudio();
     char mod_path[256]; StringCopyInto_A_From_B(mod_path,"./",256); StringConcatenate(mod_path,global_dllname,256); StringConcatenate(mod_path,MOD_EXTENSION,256);
     mod_handle = OS_DlOpen(mod_path); if (!mod_handle) { DualLogError("Failed to load mod at:%s",mod_path); OS_Exit(1); }
@@ -7471,26 +7166,22 @@ void InitalizeEnvironment() {
     Sys_Render.lightsID                = SetupSSBO(&Sys_Render.lightsID,                4,LIGHT_COUNT * sizeof(Light),NULL,GL_STATIC_DRAW);
     if (Sys_Settings.Shadows) CreateShadowBuffers();                               // 5,6
     Sys_Render.cellVisibleDataID       = SetupSSBO(&Sys_Render.cellVisibleDataID,       7,ARRSIZE * sizeof(u32),NULL,GL_STATIC_DRAW);
+    Sys_Render.texturePalettesID       = SetupSSBO(&Sys_Render.texturePalettesID,       8,MAX_UNIQUE_COLORS * sizeof(u32),NULL,GL_STATIC_DRAW);
+    Sys_Render.texturePaletteOffsetsID = SetupSSBO(&Sys_Render.texturePaletteOffsetsID, 9,MAX_VALID_TEXTURE * sizeof(u32),NULL,GL_STATIC_DRAW);
     Sys_Render.colorBufferID           = SetupSSBO(&Sys_Render.colorBufferID,          12,MAX_TOTAL_PIXELS * sizeof(u8),NULL,GL_STATIC_DRAW);
     Sys_Render.textureOffsetsID        = SetupSSBO(&Sys_Render.textureOffsetsID,       14,MAX_VALID_TEXTURE * sizeof(u32),NULL,GL_STATIC_DRAW);
     Sys_Render.textureSizesID          = SetupSSBO(&Sys_Render.textureSizesID,         15,MAX_VALID_TEXTURE * 2 * sizeof(i32),NULL, GL_STATIC_DRAW);
-    Sys_Render.texturePalettesID       = SetupSSBO(&Sys_Render.texturePalettesID,      8,MAX_UNIQUE_COLORS * sizeof(u32),NULL,GL_STATIC_DRAW);
-    Sys_Render.texturePaletteOffsetsID = SetupSSBO(&Sys_Render.texturePaletteOffsetsID,9,MAX_VALID_TEXTURE * sizeof(u32),NULL,GL_STATIC_DRAW);
-    glUseProgram(Sys_Render.shadowmapsShaderProgram); glUniform1ui(9,SHADOW_MAP_SIZE);
-    glUseProgram(Sys_Render.shadowmapsClearShaderProgram); glUniform1ui(1,SHADOW_MAP_SIZE);
-    glUseProgram(Sys_Render.chunkShaderProgram); glUniform1ui(21,SHADOW_MAP_SIZE); glUniform1f(22,(float)SHADOW_MAP_SIZE); glUniform1ui(23,LIGHT_COUNT); glUniform1ui(24,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);
-    glUseProgram(Sys_Render.voxelUpdateShaderProgram); glUniform1ui(4,SHADOW_MAP_SIZE); glUniform1ui(6,(u32)MAX_LIGHTS_PER_VOXEL);
-    RenderLoadingProgress(100,"Loading textures...");
-    LoadTextures();
-    RenderLoadingProgress(92,"Loading models...");
-    LoadModels();
+    glUseProgram(Sys_Render.shadowmapsShaderProgram);  glUniform1ui( 9,SHADOW_MAP_SIZE);     glUseProgram(Sys_Render.shadowmapsClearShaderProgram); glUniform1ui(1,SHADOW_MAP_SIZE);
+    glUseProgram(Sys_Render.chunkShaderProgram);       glUniform1ui(21,SHADOW_MAP_SIZE); glUniform1f(22,(float)SHADOW_MAP_SIZE); glUniform1ui(23,LIGHT_COUNT); glUniform1ui(24,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);
+    glUseProgram(Sys_Render.voxelUpdateShaderProgram); glUniform1ui( 4,SHADOW_MAP_SIZE); glUniform1ui(6,(u32)MAX_LIGHTS_PER_VOXEL);
+    RenderLoadingProgress(100,"Loading textures..."); LoadTextures();
+    RenderLoadingProgress(92,"Loading models...");    LoadModels();
     if (Sys_Global.introNotPlayed) {} // TODO: Play intro
     Sys_Global.absoluteTime = Sys_Global.last_topframe_time = Sys_Global.current_time = get_time();
     Sys_Global.pauseRelativeTime = Sys_Global.last_physics_time = 0.0;
     NewGame();
-    //OpenMainMenu(); // Comment out for immediate testing
-    DebugRAM("InitializeEnvironment end");
-    DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
+    OpenMainMenu(); // Comment out for immediate testing
+    DebugRAM("InitializeEnvironment end"); DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
 }
 
 i32 main() { // Write the Code That Just Does the Thing(TM)
@@ -7505,12 +7196,10 @@ i32 main() { // Write the Code That Just Does the Thing(TM)
         UpdateAnims();     // Before physics to allow model swap out to affect physics state immediately.  Before rendering to affect shadowmaps immediately.
         Physics();
         ModUpdate();       // After physics so mod/gamecode can modify velocities before next frame.
-        UpdateAmbientSounds();
-        UpdateMusic();
+        UpdateAmbientSounds(); UpdateMusic();
         drawCalls = uiDrawCalls = shadDrawCalls = vertsRendered = 0;
         RenderCameraViews();
-        CullCore();
-        UpdateInstanceMatrix4x4s();
+        CullCore(); UpdateInstanceMatrix4x4s();
         Render(false/*!camview*/,0u);
         CheckAndTakeScreenshot();
         Sys_Global.frame++;

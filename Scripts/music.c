@@ -62,37 +62,37 @@ MOD_TO_ENGINE void PlayGameMusic(void) { mp3_clear(); /*play_mp3("./Audio/music/
 
 const char* GetCorrespondingLevelClip(TrackType ttype) {
     switch(ttype) { // Override types, return from these first before special level handling
-        case TrackType_Revive:     return levelMusicRevive[Eng_Global->currentLevel];
-        case TrackType_Death:      return levelMusicDeath[Eng_Global->currentLevel];
-        case TrackType_Elevator:   return levelMusicElevator[Eng_Global->currentLevel];
-        case TrackType_Distortion: return levelMusicDistortion[Eng_Global->currentLevel];
+        case TrackType_Revive:     return levelMusicRevive[Eng_Global->curLev];
+        case TrackType_Death:      return levelMusicDeath[Eng_Global->curLev];
+        case TrackType_Elevator:   return levelMusicElevator[Eng_Global->curLev];
+        case TrackType_Distortion: return levelMusicDistortion[Eng_Global->curLev];
     }
 
-    if (Eng_Global->currentLevel == 0 || Eng_Global->currentLevel == 5 || Eng_Global->currentLevel == 7) { // 0  REACTOR, 5 FLIGHT, 7 ENGINEERING
+    if (Eng_Global->curLev == 0 || Eng_Global->curLev == 5 || Eng_Global->curLev == 7) { // 0  REACTOR, 5 FLIGHT, 7 ENGINEERING
         if (Sys_Music.levelEntry)      return reactorMusic[6];
         if (ttype == TrackType_Combat) return reactorMusic[random_range_u8(0,6)];
         return reactorMusic[random_range_u8(6,13)];
-    } else if (Eng_Global->currentLevel == 1) { // 1  MEDICAL
+    } else if (Eng_Global->curLev == 1) { // 1  MEDICAL
         if (Sys_Music.levelEntry) return medicalMusic[0];
         if (ttype == TrackType_Combat) return medicalMusic[random_range_u8(5,11)];
         return medicalMusic[random_range_u8(1,5)];
-    } else if (Eng_Global->currentLevel == 2 || Eng_Global->currentLevel == 4) { // 2  SCIENCE, 4 STORAGE
+    } else if (Eng_Global->curLev == 2 || Eng_Global->curLev == 4) { // 2  SCIENCE, 4 STORAGE
         if (Sys_Music.levelEntry)      return scienceMusic[0];
         if (ttype == TrackType_Combat) return scienceMusic[random_range_u8(8,10)];
         return scienceMusic[random_range_u8(1,8)];
-    } else if (Eng_Global->currentLevel == 8) { // 8 SECURITY
+    } else if (Eng_Global->curLev == 8) { // 8 SECURITY
         if (Sys_Music.levelEntry)      return securityMusic[9];
         if (ttype == TrackType_Combat) return securityMusic[random_range_u8(0,6)];
         return securityMusic[random_range_u8(6,19)];
-    } else if (Eng_Global->currentLevel == 6) { // 6 EXECUTIVE
+    } else if (Eng_Global->curLev == 6) { // 6 EXECUTIVE
         if (Sys_Music.levelEntry)      return executiveMusic[0];
         if (ttype == TrackType_Combat) return executiveMusic[random_range_u8(9,13)];
         return executiveMusic[random_range_u8(0,10)];
-    } else if (Eng_Global->currentLevel == 10 || Eng_Global->currentLevel == 11 || Eng_Global->currentLevel == 12) { // 10, 12 GROVES
+    } else if (Eng_Global->curLev == 10 || Eng_Global->curLev == 11 || Eng_Global->curLev == 12) { // 10, 12 GROVES
         if (Sys_Music.levelEntry)      return groveMusic[19];
         if (ttype == TrackType_Combat) return groveMusic[random_range_u8(0,9)];
         return executiveMusic[random_range_u8(9,24)];
-    } else if (Eng_Global->currentLevel == 13) { // 13 CYBERSPACE
+    } else if (Eng_Global->curLev == 13) { // 13 CYBERSPACE
         if (Sys_Music.levelEntry)           return cyberMusic[0];
         if (Sys_Music.cyberTube)            return cyberMusic[random_range_u8(4,8)];
         if (random_range(0.0f,1.0f) < 0.5f) return cyberMusic[random_range_u8(1,5)];
@@ -105,11 +105,11 @@ const char* GetCorrespondingLevelClip(TrackType ttype) {
 void PlayTrack(TrackType ttype, MusicType mtype) {
     if (!Eng_Settings->DynamicMusic) { // Looped Music (Dynamic Music off)
         if (mtype == MusicType_Override) {
-                 if (ttype == TrackType_Revive)     play_mp3(levelMusicRevive[Eng_Global->currentLevel],0);
-            else if (ttype == TrackType_Death)      play_mp3(levelMusicDeath[Eng_Global->currentLevel],0);
-            else if (ttype == TrackType_Elevator)   play_mp3(levelMusicElevator[Eng_Global->currentLevel],0);
-            else if (ttype == TrackType_Distortion) play_mp3(levelMusicDistortion[Eng_Global->currentLevel],0);
-        } else play_mp3(levelMusicLooped[Eng_Global->currentLevel],0);
+                 if (ttype == TrackType_Revive)     play_mp3(levelMusicRevive[Eng_Global->curLev],0);
+            else if (ttype == TrackType_Death)      play_mp3(levelMusicDeath[Eng_Global->curLev],0);
+            else if (ttype == TrackType_Elevator)   play_mp3(levelMusicElevator[Eng_Global->curLev],0);
+            else if (ttype == TrackType_Distortion) play_mp3(levelMusicDistortion[Eng_Global->curLev],0);
+        } else play_mp3(levelMusicLooped[Eng_Global->curLev],0);
         
         return;
     }

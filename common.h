@@ -531,26 +531,24 @@ typedef __builtin_va_list va_list;
 typedef struct { char soundPath[128]; } ma_sound;
 typedef struct {
     u32 frame,lastFrameSecCount,framesPerLastSecond,worstFPS,debugLineVertCount,shotsFired,grenadesThrown,savesScummed;
-    u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,loadedInstances,loadedLights; // Numbers of instances of entities and lights loaded (always for just the current level)
-    float farPlane,damageDealt,damageReceived,timeScale,worldMin_x,worldMin_z,voxelMinCenterX,voxelMinCenterZ;
+    u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,loadedInstances; // Numbers of instances of entities and lights loaded (always for just the current level)
+    float farPlane[14],damageDealt,damageReceived,timeScale,worldMin_x[14],worldMin_z[14],voxelMinCenterX[14],voxelMinCenterZ[14];
 	double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,debugLineFinished,shakeFinished,last_time,last_topframe_time,last_physics_time,deltaTime,current_time,screenshotTimeout,pauseRelativeTime,absoluteTime,statusTextDecayFinished,justSavedTimeStamp;
     i32 fogFac,cursorPosition_x,cursorPosition_y; // Separate internal cursor from system cursor.  This gets relatively pushed around by real cursor movement to give consistent platform behavior.
 	Vector3 debugLine_start,debugLine_end,cyberspaceRecallPoint;
 	bool inventoryMode,levelCurrentlyLoading;
     bool introNotPlayed;
-    u8 levelSecurity[14],startLevel,numLevels,currentLevel,difficultyCombat,difficultyPuzzle,difficultyMission,difficultyCyber,creditsPageIndex;
+    u8 levelSecurity[14],startLevel,numLevels,curLev,difficultyCombat,difficultyPuzzle,difficultyMission,difficultyCyber,creditsPageIndex;
 	bool gamePaused,menuActive,gameFinished;
 	bool creditsActive,decoyActive,boosterActive,uiIsBlocking,mouseClickHeldOverGUI,geniusActive;
     bool (*GetKey)(i32 settingIndex);
     bool (*GetKeyPressed)(i32 settingIndex);
     InventorySystem invP1,invP2;
     Entity instances[INSTANCE_COUNT];
-    Entity levInstances[14][INSTANCE_COUNT];
-    Color fogColor;
+    Color fogColor[14];
 	char global_dllname[256],global_winicon[256],playerName[27];
     char audiologNames[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH],audiologSubjects[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH],audiologSenders[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH],audioLogSpeech2Text[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
-    u8 physicsDebug;
-} GlobalContext;
+} GlobalContext; // Savable complete game state data
 
 static inline __attribute__((always_inline)) void flag_setu16(u16 *flags, u16 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
 static inline __attribute__((always_inline)) void flag_set(u32 *flags, u32 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }

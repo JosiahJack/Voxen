@@ -283,7 +283,7 @@ void CheckAttackInput(u16 p) {
     if (Attack()) {
         DualLog("Mouse clicked!\n");
         if (vmailActive) { vmailActive = false; inv->waitTilNextFire = Eng_Global->pauseRelativeTime + 0.8; return; }
-        if (Eng_Global->currentLevel == LEVEL_CYBERSPACE) { /*FireCyberWeapon();*/ return; }
+        if (Eng_Global->curLev == LEVEL_CYBERSPACE) { /*FireCyberWeapon();*/ return; }
 
         if (inv->holdingObject && !Eng_Global->mouseClickHeldOverGUI) { // !Just clicked
             if (!Eng_Global->uiIsBlocking) { DropHeldItem(p); return; }

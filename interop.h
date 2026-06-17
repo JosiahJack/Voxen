@@ -67,7 +67,8 @@
     X(void, SetModFatigue, (float)) \
     X(void, ForceShootMode, (void)) \
     X(bool, ModRequestsGrayscale, (void)) \
-    X(const char**, GetCreditsText, (void))
+    X(const char**, GetCreditsText, (void)) \
+    X(void, SetGlobalsModData, (void)) 
 
 #ifdef MOD_INTEROP_MOD  // mod.h usage:
     // Interop - To Engine

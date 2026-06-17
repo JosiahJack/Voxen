@@ -1177,6 +1177,7 @@ void LogicTimerInitBeforeLoad(u16 self) {
 
 void LogicTimerUseTargets(u16 self) { UseTargets(self,Eng_Global->instances[self].target); }
 void LogicTimerUpdate(u16 self) {
+    return; // TODO for testing!  Was getting annoyed by target i/o troubleshooting messages from lev1 broken door firing constantly.
     Entity* e = &Eng_Global->instances[self];
     if (!e->active || e->intervalFinished >= Eng_Global->pauseRelativeTime) return;
     e->intervalFinished = Eng_Global->pauseRelativeTime + (e->useRandomTimes ? (double)random_range(e->randomMin,e->randomMax) : (double)e->timeInterval);
@@ -1470,9 +1471,9 @@ void CyberWallConwaySignal(u16 self) { // Called when a conway propagation signa
 //=============================================================================
 // CyborgConversionToggle
 void CyborgConversionToggleTargetted(void) {
-    bool active = (Eng_Global->ressurectionActiveLevels >> Eng_Global->currentLevel) & 1u;
-    flag_setu16(&Eng_Global->ressurectionActiveLevels,(1u << Eng_Global->currentLevel),!active);
-    if (Eng_Global->currentLevel == 6) flag_setu16(&Eng_Global->ressurectionActiveLevels, (1u<<10|1u<<11|1u<<12),!active); // Set groves 10,11,12 when 6 gets toggled as they don't have their own switch
+    bool active = (Eng_Global->ressurectionActiveLevels >> Eng_Global->curLev) & 1u;
+    flag_setu16(&Eng_Global->ressurectionActiveLevels,(1u << Eng_Global->curLev),!active);
+    if (Eng_Global->curLev == 6) flag_setu16(&Eng_Global->ressurectionActiveLevels, (1u<<10|1u<<11|1u<<12),!active); // Set groves 10,11,12 when 6 gets toggled as they don't have their own switch
     play_wav(sounds[active ? 183 : 184],Eng_Settings->VolumeMessage,(Vector3){},false); // "vox_cybconvcancelled" : "vox_cybconvenabled"
     CenterStatusPrint("%s",Eng_Text->stringTable[active ? 591 : 592]);
 }
@@ -1921,7 +1922,7 @@ static void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, Vector3 hitPo
         if (e->counter < e->countToTrigger) dd.damage *= 0.85f; // per-hit falloff
         dd.impactVelocity = dd.damage * 1.5f;
         if (e->counter > 0) dd.impactVelocity /= 3.0f;
-        if (Eng_Global->currentLevel != LEVEL_CYBERSPACE
+        if (Eng_Global->curLev != LEVEL_CYBERSPACE
             && e->recentMostActivator == PLAYER1) {
             // TODO: ApplyImpactForce(hitIdx, dd.impactVelocity, dd.attacknormal, hitPos)
         }
@@ -1980,7 +1981,7 @@ static const i16 objectDeathSound[] = {
 };
 
 static bool IsCyberEntity(u16 self) {
-    if (Eng_Global->currentLevel == LEVEL_CYBERSPACE) return true;
+    if (Eng_Global->curLev == LEVEL_CYBERSPACE) return true;
     Entity* e = &Eng_Global->instances[self];
     if (self != PLAYER1 && e->cyberHealth > 0.0f) return true;
     return (ConstIndexIsNPC(e->index) && (e->index - 419) > 23); // 24-28 are cyber enemies
@@ -2564,13 +2565,13 @@ void PatchDisableAll(void) {
 	Vector3[] elevatorTargetDestinations;
     
 	bool RessurectPlayer() {
-		if (!ressurectionActive[Eng_Global->currentLevel]) return false;
+		if (!ressurectionActive[Eng_Global->curLev]) return false;
 
-		if (Eng_Global->currentLevel == 10 || Eng_Global->currentLevel == 11 || Eng_Global->currentLevel == 12) {
+		if (Eng_Global->curLev == 10 || Eng_Global->curLev == 11 || Eng_Global->curLev == 12) {
 			LoadLevel(6,ressurectionLocation[currentLevel].position);
 			ressurectionBayDoor[6].ForceClose();
 		} else {
-			if (Eng_Global->currentLevel >= 0 || Eng_Global->currentLevel < 13) Eng_Global->instances[PLAYER1].position = ressurectionLocation[Eng_Global->currentLevel];
+			if (Eng_Global->curLev >= 0 || Eng_Global->curLev < 13) Eng_Global->instances[PLAYER1].position = ressurectionLocation[Eng_Global->curLev];
 		}
 
 		// Activate death screen and readouts for "BRAIN ACTIVITY SATISFACTORY..." ya debatable right etc. etc.
@@ -3114,7 +3115,7 @@ void DoorUpdate(u16 self) {
 // Misc
 MOD_TO_ENGINE u16 SpawnDynamicObject(int val, bool cheat) {
     if (!ConstIndexInBounds(val)) { DualLogError("Const index out of bounds: %u", val); return NULLENT; }
-    if (cheat) DualLog("Cheat spawn constIndex %u, level: %u, from cheat: %u, name: ", val, Eng_Global->currentLevel, cheat);
+    if (cheat) DualLog("Cheat spawn constIndex %u, level: %u, from cheat: %u, name: ", val, Eng_Global->curLev, cheat);
     if (ConstIndexIsGeometry(val) && !Eng_Cheats->editMode) { CenterStatusPrint("Indices 0 through 306 (level geometry chunks) not possible when not on edit mode!"); return NULLENT; }
     u16 entityIndexInInstanceTable = NULLENT;
     return entityIndexInInstanceTable;
@@ -3128,7 +3129,7 @@ MOD_TO_ENGINE float GetBasePlayerSpeed(u16 p, bool running) {
     bool isSprinting = Sprint();
     if (Eng_Cheats->noclip && isSprinting) return PLAYER_MAX_CYBER_SPEED * 2.5f;
     if (Eng_Cheats->noclip) return PLAYER_MAX_CYBER_SPEED * 1.5f;
-    if (Eng_Global->currentLevel == LEVEL_CYBERSPACE) return PLAYER_MAX_CYBER_SPEED; //Cyber space speed
+    if (Eng_Global->curLev == LEVEL_CYBERSPACE) return PLAYER_MAX_CYBER_SPEED; //Cyber space speed
 
     float retval = PLAYER_MAX_WALK_SPEED, bonus = 0.0f;
     if (Eng_Global->boosterActive) bonus = PLAYER_BOOSTER_SPEED_BOOST;
@@ -3190,7 +3191,7 @@ void UseEntity(u16 p, u16 i) {
 
 #define FROB_DISTANCE 4.9f
 static inline __attribute__((always_inline)) void Frob(Vector3 pos, Vector3 forward, Vector3 right) {
-    if (Eng_Global->currentLevel == LEVEL_CYBERSPACE) return;
+    if (Eng_Global->curLev == LEVEL_CYBERSPACE) return;
     if (vmailActive) { DeactivateVMail(); vmailActive = false; return; }
     if (Eng_Global->uiIsBlocking) return;
     
@@ -3232,7 +3233,7 @@ MOD_TO_ENGINE void ModUpdate(void) {
         if (constdex == 701) LogicTimerUpdate(i);
         if (e->doSelfAfterList || e->despawnInstead || e->destroyAfterListInsteadOfDeactivate) DelayedSpawnUpdate(i);
         if (e->itemLifeTime > 0.0f) SearchFXResetUpdate(i);
-        if (Eng_Global->currentLevel == LEVEL_CYBERSPACE && e->cyberTimer > 0.0f) CyberTimerUpdate(i);
+        if (Eng_Global->curLev == LEVEL_CYBERSPACE && e->cyberTimer > 0.0f) CyberTimerUpdate(i);
         if (constdex == 515) ForceBridgeUpdate(i);
         if (constdex == 517) FuncWallUpdate(i);
         if (constdex == 21 || constdex == 22) CyberWallUpdate(i);
@@ -3316,7 +3317,7 @@ void SearchableInit(u16 i) {
 }
 //================================================================================
 // Entity Init
-u8 GetCurrentLevelSecurity(void) { return (Eng_Global->difficultyMission < 1 || Eng_Cheats->superoverride) ? 0u : Eng_Global->levelSecurity[Eng_Global->currentLevel]; }
+u8 GetCurrentLevelSecurity(void) { return (Eng_Global->difficultyMission < 1 || Eng_Cheats->superoverride) ? 0u : Eng_Global->levelSecurity[Eng_Global->curLev]; }
 u16 GetImpactType(u16 instanceIdx) {
     switch (Eng_Global->instances[instanceIdx].bloodType) {
         case BloodType_None:         return 729; // SparksSmall
