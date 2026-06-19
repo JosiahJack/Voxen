@@ -1,22 +1,22 @@
 // voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake
 #if defined(LINUX)
-    //#define DEBUG_RAM_OUTPUT // Uncomment for when attacking RAM.
+    //#define DEBUG_RAM_OUTPUT
 #endif
 #include "common.h"
 #define MOD_INTEROP_ENGINE
 #include "interop.h"
-// ==================== OS Shim Layer System
+// OS Shim Sys
 typedef __UINTPTR_TYPE__ uintptr_t; typedef __INTPTR_TYPE__ intptr_t;
 #define likely(x)   __builtin_expect(!!(x),1)
 #define unlikely(x) __builtin_expect(!!(x),0)
 #define NULL ((void *)0)
-#if defined(_WIN32) // Interop - To Mod (keep the same as interop.h!!)
+#if defined(_WIN32) // Interop - To Mod (keep same as interop.h!!)
     #define ENGINE_TO_MOD __declspec(dllexport) __cdecl
 #else
     #define ENGINE_TO_MOD __attribute__((visibility("default")))
 #endif
-#define assert(cond) do { if (!(cond)) { DualLogError("[%s:%d]:%s(): Assert fail:%s\n",__FILE__,__LINE__,__func__,#cond); *(volatile int*)0 = 0; } } while(0) // Force a crash/segfault for the debugger
-ENGINE_TO_MOD void DualLogError(const char* fmt, ...); ENGINE_TO_MOD void DualLog(const char* fmt, ...); char* StringFindSubstring(const char* haystack, const char* needle);
+#define assert(cond) do { if (!(cond)) { DualLogError("[%s:%d]:%s(): Assert fail:%s\n",__FILE__,__LINE__,__func__,#cond); *(volatile int*)0 = 0; } } while(0) // Force a crash for debug
+ENGINE_TO_MOD void DualLogError(const char* fmt, ...); ENGINE_TO_MOD void DualLog(const char* fmt, ...); char* sFindSub(const char* haystack, const char* needle);
 #if defined(_WIN32)
     #define WINDOWS
     #define MOD_EXTENSION ".dll" // e.g. Citadel.dll
@@ -51,7 +51,7 @@ ENGINE_TO_MOD void DualLogError(const char* fmt, ...); ENGINE_TO_MOD void DualLo
     static inline __attribute__((always_inline)) i64 OS_Seek(FHandle fd, i64 ofs, int whence /*forth and forsooth pray tell*/) { LARGE_INTEGER l={.QuadPart=ofs},n; return SetFilePointerEx((void*)fd,l,&n,whence) ? n.QuadPart : -1; }
     static inline __attribute__((always_inline)) i64 OS_Tell(FHandle fd) { LARGE_INTEGER l={0},n; return SetFilePointerEx((void*)fd,l,&n,1) ? n.QuadPart : -1; }
     static inline __attribute__((always_inline)) int OS_GetNumThreads() { SYSTEM_INFO si; GetSystemInfo(&si); return (int)si.dwNumberOfProcessors; }
-    static inline __attribute__((always_inline)) void OS_DeallocateRAM(void* p, size_t s) { (void)s; if(!p) { DualLogError("Attempting to double free!\n"); OS_Exit(1); } if(!UnmapViewOfFile(p) && !VirtualFree(p,0,0x00008000)) DualLogError("VirtualFree failed\n"); }
+    static inline __attribute__((always_inline)) void OS_Free(void* p, size_t s) { (void)s; if(!p) { DualLogError("Attempting to double free!\n"); OS_Exit(1); } if(!UnmapViewOfFile(p) && !VirtualFree(p,0,0x00008000)) DualLogError("VirtualFree failed\n"); }
     static inline __attribute__((always_inline)) i64 OS_RawWrite(FHandle fd, const void* buf, size_t count) { u32 w; return WriteFile((void*)fd,(void*)buf,(u32)count,&w,NULL) ? (i64)w : -1; }
     #define THREAD_STACK_SIZE (8 * 1024 * 1024)
     typedef struct { void* handle; } OS_Thread;
@@ -97,7 +97,7 @@ ENGINE_TO_MOD void DualLogError(const char* fmt, ...); ENGINE_TO_MOD void DualLo
     static inline __attribute__((always_inline)) i64 OS_Seek(FHandle fd, i64 ofs, int whence /* forth and forsooth pray tell*/) { i64 r = 8; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(ofs),"d"(whence):"rcx","r11","memory"); return r; }
     static inline __attribute__((always_inline)) i64 OS_Tell(FHandle fd) { i64 r=8; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(0LL),"d"(1):"rcx","r11","memory"); return r; }
     static inline __attribute__((always_inline)) int OS_GetNumThreads() { unsigned long m[16]; long r=204; __asm__ __volatile__("syscall":"+a"(r):"D"(0LL),"S"(128LL),"d"(m):"rcx","r11","memory"); int c = 0; for(int i=0;i<(r/8);i++) {c+=__builtin_popcountll(m[i]);} return r < 0 ? 1 : c; }
-    static inline __attribute__((always_inline)) void OS_DeallocateRAM(void* p,size_t s){ long r=11; if(!p || p == (void*)-1) { DualLogError("Attempting to double free!\n"); OS_Exit(1); } __asm__ __volatile__("syscall":"+a"(r):"D"(p),"S"(s):"rcx","r11","memory"); if(r<0) DualLogError("munmap failed\n"); }
+    static inline __attribute__((always_inline)) void OS_Free(void* p,size_t s){ long r=11; if(!p || p == (void*)-1) { DualLogError("Attempting to double free!\n"); OS_Exit(1); } __asm__ __volatile__("syscall":"+a"(r):"D"(p),"S"(s):"rcx","r11","memory"); if(r<0) DualLogError("munmap failed\n"); }
     static inline __attribute__((always_inline)) i64 OS_RawWrite(FHandle fd, const void* buf, size_t cnt) { i64 r=1; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(buf),"d"(cnt):"rcx","r11","memory"); return r; }
     #define SYSCALL1(n, a) syscall6(n,(long)(a),0,0,0,0,0)
     #define SYSCALL2(n, a, b) syscall6(n,(long)(a),(long)(b),0,0,0,0)
@@ -116,61 +116,42 @@ ENGINE_TO_MOD void DualLogError(const char* fmt, ...); ENGINE_TO_MOD void DualLo
         struct OS_ThreadHead* head = (struct OS_ThreadHead*)((char*)base + THREAD_STACK_SIZE) - 1;
         head->trampoline = OS_ThreadTrampoline;  // child's ret target
         head->fn=fn; head->arg=arg; head->join_futex=0; head->_pad=0;
-        long tid = OS_CloneSyscall(head); if (tid < 0) { OS_DeallocateRAM(base,THREAD_STACK_SIZE); return (int)tid; }
+        long tid = OS_CloneSyscall(head); if (tid < 0) { OS_Free(base,THREAD_STACK_SIZE); return (int)tid; }
 
         out->head=head; out->stack_base=base;
         return 0;
     }
 
-    static inline __attribute__((always_inline)) void OS_ThreadJoin(OS_Thread* t) {
-        int v;
-        while ((v = __atomic_load_n(&t->head->join_futex, __ATOMIC_SEQ_CST)) == 0) SYSCALL4(202, &t->head->join_futex, 0 /*FUTEX_WAIT*/, v, 0);
-        OS_DeallocateRAM(t->stack_base,THREAD_STACK_SIZE);
-        t->head = NULL; t->stack_base = NULL;
-    }
-    
+    static inline __attribute__((always_inline)) void OS_ThreadJoin(OS_Thread* t) { int v; while ((v = __atomic_load_n(&t->head->join_futex, __ATOMIC_SEQ_CST)) == 0) SYSCALL4(202, &t->head->join_futex, 0 /*FUTEX_WAIT*/, v, 0); OS_Free(t->stack_base,THREAD_STACK_SIZE); t->head = NULL; t->stack_base = NULL; }
     static inline __attribute__((always_inline))  void OS_USleep(u32 usec) { long ts[2] = {usec / 1000000,(usec % 1000000) * 1000L}; SYSCALL2(35,ts,ts); }
 #endif
 static inline __attribute__((always_inline)) void* OS_Alloc(size_t amount) { return OS_AllocateRAM(NULL,amount,0x1|0x2,0x02|0x20,INVALID_FHANDLE); }
 static inline __attribute__((always_inline)) void* OS_Calloc(size_t amount, size_t count) { return OS_AllocateRAM(NULL,amount * count,0x1|0x2,0x02|0x20,INVALID_FHANDLE); }
 static inline __attribute__((always_inline)) void OS_Write(FHandle f,const void* buf, size_t s, const char* p) { size_t total=0; while(total < s) { i64 w=OS_RawWrite(f,(const char*)buf + total,s - total); if(w < 0) { DualLogError("Write error to %s: %s[%d]\n",p,w,(i32)-w); OS_Exit(1); } total += (size_t)w; } }
 static inline __attribute__((always_inline)) void* OS_OpenAndAllocateFileBufferReadonly(const char* p,FHandle* f,int* s){void* r;return((*f=OS_OpenReadonly(p))==(FHandle)-1)?*s=0,(void*)0:((*s=OS_FileSize(*f))<=0)?DualLogError("Skipping empty:%s\n",p),OS_Close(*f),OS_Exit(1),NULL:(r=OS_AllocateFileBackedRAMReadonly(*s,*f,(char*)p))?(OS_Close(*f),r):NULL;}
-void* MemCpyFromBtoAForNBytes(void *dst, const void *src, size_t n) { unsigned char *d=(unsigned char *)dst; const unsigned char *s=(const unsigned char *)src; while (n--) {*d++=*s++;} return dst; } // memcpy replacement
-static inline __attribute__((always_inline)) void* OS_Realloc(void* old, size_t olds, size_t news) { void* n; return !old ? OS_Alloc(news) : news <= olds ? old : (n=OS_Alloc(news)) ? (MemCpyFromBtoAForNBytes(n,old,olds),OS_DeallocateRAM(old,olds),n) : 0; }
-// ============== Declarations
-enum { GL_ARRAY_BUFFER=0x8892,      GL_DEPTH_BUFFER_BIT=0x00000100, GL_READ_WRITE=0x88BA, GL_SSBO=0x90D2,                 GL_CULL_FACE=0x0B44,                          
-       GL_BLEND=0x0BE2,             GL_DEPTH_TEST=0x0B71,           GL_RGB=0x1907,        GL_TEXTURE0=0x84C0,             GL_TEXTURE5=0x84C5,
-       GL_COLOR_ATTACHMENT0=0x8CE0,                                 GL_RG16F=0x822F,      GL_TEXTURE1=0x84C1,             GL_TEXTURE6=0x84C6,
-       GL_COLOR_ATTACHMENT1=0x8CE1, GL_ELEMENT_ARRAY_BUFFER=0x8893, GL_RGB16F=0x881B,     GL_TEXTURE2=0x84C2,             GL_TEXTURE_2D=0x0DE1,
-       GL_COLOR_ATTACHMENT2=0x8CE2, GL_FALSE=0,                     GL_RGBA=0x1908,       GL_TEXTURE3=0x84C3,             GL_UNSIGNED_BYTE=0x1401,
-       GL_COLOR_ATTACHMENT3=0x8CE3, GL_FLOAT=0x1406,                GL_RGBA32F=0x8814,    GL_TEXTURE4=0x84C4,             GL_FRAMEBUFFER=0x8D40,
-       GL_COLOR_ATTACHMENT4=0x8CE4, GL_UNSIGNED_SHORT=0x1403,       GL_RGBA8=0x8058,      GL_COLOR_BUFFER_BIT=0x00004000, GL_STATIC_DRAW=0x88E4,   GL_DYNAMIC_DRAW=0x88E8,};
-typedef void(*PFNGLACTIVETEXTURE)(u32),(*PFNGLATTACHSHADER)(u32,u32),(*PFNGLBINDBUFFER)(u32,u32),(*PFNGLBINDBUFFERBASE)(u32,u32,u32),(*PFNGLBINDFRAMEBUFFER)(u32,u32);
-typedef void(*PFNGLBINDIMAGETEXTURE)(u32,u32,i32,bool,i32,u32,u32),(*PFNGLBINDTEXTURE)(u32,u32),(*PFNGLBINDTEXTUREUNIT)(u32,u32),(*PFNGLBINDVERTEXARRAY)(u32),(*PFNGLBUFFERSUBDATA)(u32,intptr_t,intptr_t,const void*);
-typedef void(*PFNGLBINDVERTEXBUFFER)(u32,u32,intptr_t,i32),(*PFNGLBLENDFUNCSEPARATE)(u32,u32,u32,u32),(*PFNGLBUFFERDATA)(u32,size_t,const void*,u32),(*PFNGLCLEAR)(u32);
-typedef void(*PFNGLCLEARCOLOR)(float,float,float,float),(*PFNGLCOLORMASK)(bool,bool,bool,bool),(*PFNGLCOMPILESHADER)(u32),(*PFNGLCOPYTEXSUBIMAGE2D)(u32,i32,i32,i32,i32,i32,i32,i32);
-typedef void(*PFNGLCREATEBUFFERS)(i32,u32*),(*PFNGLGENVERTEXARRAYS)(i32,u32*),(*PFNGLCULLFACE)(u32),(*PFNGLDEPTHFUNC)(u32),(*PFNGLDEPTHMASK)(bool);
-typedef void(*PFNGLDISABLE)(u32),(*PFNGLDISPATCHCOMPUTE)(u32,u32,u32),(*PFNGLDRAWARRAYS)(u32,i32,i32),(*PFNGLDRAWBUFFERS)(i32,const u32*),(*PFNGLDRAWELEMENTS)(u32,i32,u32,const void*);
-typedef void(*PFNGLENABLE)(u32),(*PFNGLFINISH)(),(*PFNGLFLUSH)(),(*PFNGLFRAMEBUFFERTEXTURE2D)(u32,u32,u32,u32,i32),(*PFNGLFRONTFACE)(u32);
-typedef void(*PFNGLGENBUFFERS)(i32,u32*),(*PFNGLGENFRAMEBUFFERS)(i32,u32*),(*PFNGLGENTEXTURES)(i32,u32*),(*PFNGLGETINTEGERV)(u32,i32*),(*PFNGLGETPROGRAMIV)(u32,u32,i32*),(*PFNGLREADPIXELS)(i32,i32,i32,i32,u32,u32,void*);
-typedef void(*PFNGLGETSHADERINFOLOG)(u32,i32,i32*,char*),(*PFNGLGETSHADERIV)(u32,u32,i32*),(*PFNGLLINEWIDTH)(float),(*PFNGLLINKPROGRAM)(u32),(*PFNGLSHADERSOURCE)(u32,i32,const char*const*,const i32*),(*PFNGLREADBUFFER)(u32);
-typedef void(*PFNGLTEXIMAGE2D)(u32,i32,i32,i32,i32,i32,u32,u32,const void*),(*PFNGLTEXPARAMETERI)(u32,u32,i32);
-typedef void(*PFNGLUNIFORM1F)(i32,float),(*PFNGLUNIFORM1I)(i32,i32),(*PFNGLUNIFORM1UI)(i32,u32),(*PFNGLUNIFORM2F)(i32,float,float),(*PFNGLUNIFORM2UI)(i32,u32,u32),(*PFNGLENABLEVERTEXATTRIBARRAY)(u32);
-typedef void(*PFNGLUNIFORM3F)(i32,float,float,float),(*PFNGLUNIFORM4F)(i32,float,float,float,float),(*PFNGLUNIFORMMATRIX3FV)(i32,i32,bool,const float*),(*PFNGLVERTEXATTRIBBINDING)(u32,u32);
-typedef void(*PFNGLUNIFORMMATRIX4FV)(i32,i32,bool,const float*),(*PFNGLUSEPROGRAM)(u32),(*PFNGLVIEWPORT)(i32,i32,i32,i32),(*PFNGLVERTEXATTRIBFORMAT)(u32,i32,u32,bool,u32);
-typedef u32(*PFNGLCHECKFRAMEBUFFERSTATUS)(u32),(*PFNGLCREATEPROGRAM)(),(*PFNGLCREATESHADER)(u32),(*PFNGLGETERROR)(),(*PFNGLCLEARBUFFERFV)(u32,i32,const float*);
-typedef void*(*PFNGLMAPBUFFERRANGE)(u32,intptr_t,size_t,u32); typedef bool(*PFNGLUNMAPBUFFER)(u32);
-        PFNGLACTIVETEXTURE glActiveTexture;       PFNGLATTACHSHADER glAttachShader;                 PFNGLBINDBUFFER glBindBuffer;       PFNGLBINDBUFFERBASE glBindBufferBase; PFNGLBINDFRAMEBUFFER glBindFramebuffer;             PFNGLBINDIMAGETEXTURE glBindImageTexture;
-            PFNGLBINDTEXTURE glBindTexture; PFNGLBINDVERTEXARRAY glBindVertexArray;     PFNGLBINDVERTEXBUFFER glBindVertexBuffer; PFNGLBLENDFUNCSEPARATE glBlendFuncSeparate;           PFNGLBUFFERDATA glBufferData; PFNGLCHECKFRAMEBUFFERSTATUS glCheckFramebufferStatus;
-                        PFNGLCLEAR glClear;             PFNGLCOLORMASK glColorMask;           PFNGLCOMPILESHADER glCompileShader;         PFNGLCREATEPROGRAM glCreateProgram;       PFNGLCREATESHADER glCreateShader;               PFNGLGENVERTEXARRAYS glGenVertexArrays;
-                PFNGLDEPTHFUNC glDepthFunc;             PFNGLDEPTHMASK glDepthMask;                       PFNGLDISABLE glDisable;     PFNGLDISPATCHCOMPUTE glDispatchCompute;           PFNGLDRAWARRAYS glDrawArrays;                       PFNGLDRAWBUFFERS glDrawBuffers;
-          PFNGLDRAWELEMENTS glDrawElements;                   PFNGLENABLE glEnable;                         PFNGLFINISH glFinish;                         PFNGLFLUSH glFlush;             PFNGLFRONTFACE glFrontFace;     PFNGLFRAMEBUFFERTEXTURE2D glFramebufferTexture2D;
-                PFNGLFRONTFACE glFrontFace;           PFNGLGENBUFFERS glGenBuffers;       PFNGLGENFRAMEBUFFERS glGenFramebuffers;             PFNGLGENTEXTURES glGenTextures;               PFNGLGETERROR glGetError;                     PFNGLGETPROGRAMIV glGetProgramiv;
+void* mcpy(void *dst, const void *src, size_t n) { unsigned char *d=(unsigned char *)dst; const unsigned char *s=(const unsigned char *)src; while (n--) {*d++=*s++;} return dst; } // memcpy replacement
+static inline __attribute__((always_inline)) void* OS_Realloc(void* old, size_t olds, size_t news) { void* n; return !old ? OS_Alloc(news) : news <= olds ? old : (n=OS_Alloc(news)) ? (mcpy(n,old,olds),OS_Free(old,olds),n) : 0; }
+enum {GL_ARRAY_BUFFER=0x8892,GL_DEPTH_BUFFER_BIT=0x00000100,GL_READ_WRITE=0x88BA,GL_SSBO=0x90D2,GL_CULL_FACE=0x0B44,GL_BLEND=0x0BE2,GL_DEPTH_TEST=0x0B71,GL_RGB=0x1907,GL_TEXTURE0=0x84C0,GL_TEXTURE5=0x84C5,GL_COLOR_ATTACHMENT0=0x8CE0,GL_RG16F=0x822F,GL_TEXTURE1=0x84C1,GL_TEXTURE6=0x84C6,GL_COLOR_ATTACHMENT1=0x8CE1,GL_ELEMENT_ARRAY_BUFFER=0x8893,GL_RGB16F=0x881B,GL_TEXTURE2=0x84C2,
+      GL_TEXTURE_2D=0x0DE1,GL_COLOR_ATTACHMENT2=0x8CE2,GL_FALSE=0,GL_RGBA=0x1908,GL_TEXTURE3=0x84C3,GL_UNSIGNED_BYTE=0x1401,GL_COLOR_ATTACHMENT3=0x8CE3,GL_FLOAT=0x1406,GL_RGBA32F=0x8814,GL_TEXTURE4=0x84C4,GL_FRAMEBUFFER=0x8D40,GL_COLOR_ATTACHMENT4=0x8CE4,GL_UNSIGNED_SHORT=0x1403,GL_RGBA8=0x8058,GL_COLOR_BUFFER_BIT=0x00004000,GL_STATIC_DRAW=0x88E4,GL_DYNAMIC_DRAW=0x88E8};
+typedef void(*PFNGLACTIVETEXTURE)(u32),                    (*PFNGLATTACHSHADER)(u32,u32),             (*PFNGLBINDBUFFER)(u32,u32),                      (*PFNGLBINDBUFFERBASE)(u32,u32,u32),(*PFNGLBINDFRAMEBUFFER)(u32,u32),            (*PFNGLBINDIMAGETEXTURE)(u32,u32,i32,bool,i32,u32,u32),(*PFNGLBINDTEXTURE)(u32,u32),     (*PFNGLBINDTEXTUREUNIT)(u32,u32);
+typedef void(*PFNGLBINDVERTEXBUFFER)(u32,u32,intptr_t,i32),(*PFNGLBLENDFUNCSEPARATE)(u32,u32,u32,u32),(*PFNGLBUFFERDATA)(u32,size_t,const void*,u32),   (*PFNGLCLEAR)(u32),                 (*PFNGLCLEARCOLOR)(float,float,float,float), (*PFNGLCOLORMASK)(bool,bool,bool,bool),                (*PFNGLCOMPILESHADER)(u32),       (*PFNGLCOPYTEXSUBIMAGE2D)(u32,i32,i32,i32,i32,i32,i32,i32);
+typedef void(*PFNGLGENVERTEXARRAYS)(i32,u32*),             (*PFNGLCULLFACE)(u32),                     (*PFNGLDEPTHFUNC)(u32),                           (*PFNGLDEPTHMASK)(bool),            (*PFNGLDISABLE)(u32),                        (*PFNGLDISPATCHCOMPUTE)(u32,u32,u32),                  (*PFNGLDRAWARRAYS)(u32,i32,i32),  (*PFNGLDRAWBUFFERS)(i32,const u32*);
+typedef void(*PFNGLENABLE)(u32),                           (*PFNGLFINISH)(),                          (*PFNGLFRAMEBUFFERTEXTURE2D)(u32,u32,u32,u32,i32),(*PFNGLFLUSH)(),                    (*PFNGLFRONTFACE)(u32),                      (*PFNGLGENBUFFERS)(i32,u32*),                          (*PFNGLGENFRAMEBUFFERS)(i32,u32*),(*PFNGLGENTEXTURES)(i32,u32*);
+typedef void(*PFNGLGETINTEGERV)(u32,i32*),                 (*PFNGLGETPROGRAMIV)(u32,u32,i32*),        (*PFNGLREADPIXELS)(i32,i32,i32,i32,u32,u32,void*),(*PFNGLGETSHADERIV)(u32,u32,i32*),  (*PFNGLGETSHADERINFOLOG)(u32,i32,i32*,char*),(*PFNGLLINEWIDTH)(float),                              (*PFNGLLINKPROGRAM)(u32),         (*PFNGLSHADERSOURCE)(u32,i32,const char*const*,const i32*);
+typedef void(*PFNGLREADBUFFER)(u32),                       (*PFNGLTEXPARAMETERI)(u32,u32,i32),        (*PFNGLDRAWELEMENTS)(u32,i32,u32,const void*),    (*PFNGLBINDVERTEXARRAY)(u32),       (*PFNGLBUFFERSUBDATA)(u32,intptr_t,intptr_t,const void*),                                           (*PFNGLTEXIMAGE2D)(u32,i32,i32,i32,i32,i32,u32,u32,const void*);
+typedef void(*PFNGLUNIFORM1F)(i32,float),                  (*PFNGLUNIFORM1I)(i32,i32),                (*PFNGLUNIFORM1UI)(i32,u32),                      (*PFNGLUNIFORM2F)(i32,float,float), (*PFNGLUNIFORM2UI)(i32,u32,u32),             (*PFNGLUNIFORM3F)(i32,float,float,float),              (*PFNGLENABLEVERTEXATTRIBARRAY)(u32),(*PFNGLUNIFORM4F)(i32,float,float,float,float);
+typedef void(*PFNGLUNIFORMMATRIX3FV)(i32,i32,bool,const float*),(*PFNGLVERTEXATTRIBBINDING)(u32,u32), (*PFNGLUNIFORMMATRIX4FV)(i32,i32,bool,const float*),(*PFNGLUSEPROGRAM)(u32),          (*PFNGLVIEWPORT)(i32,i32,i32,i32),           (*PFNGLVERTEXATTRIBFORMAT)(u32,i32,u32,bool,u32),     *(*PFNGLMAPBUFFERRANGE)(u32,intptr_t,size_t,u32);
+typedef u32(*PFNGLCHECKFRAMEBUFFERSTATUS)(u32),(*PFNGLCREATEPROGRAM)(),(*PFNGLCREATESHADER)(u32),(*PFNGLGETERROR)(),(*PFNGLCLEARBUFFERFV)(u32,i32,const float*); typedef bool(*PFNGLUNMAPBUFFER)(u32);
+        PFNGLACTIVETEXTURE glActiveTexture;       PFNGLATTACHSHADER glAttachShader;                 PFNGLBINDBUFFER glBindBuffer;       PFNGLBINDBUFFERBASE glBindBufferBase; PFNGLBINDFRAMEBUFFER glBindFramebuffer;             PFNGLBINDIMAGETEXTURE glBindImageTexture; PFNGLENABLEVERTEXATTRIBARRAY glEnableVertexAttribArray;
+            PFNGLBINDTEXTURE glBindTexture; PFNGLBINDVERTEXARRAY glBindVertexArray;     PFNGLBINDVERTEXBUFFER glBindVertexBuffer; PFNGLBLENDFUNCSEPARATE glBlendFuncSeparate;           PFNGLBUFFERDATA glBufferData; PFNGLCHECKFRAMEBUFFERSTATUS glCheckFramebufferStatus; PFNGLVERTEXATTRIBBINDING glVertexAttribBinding;
+                        PFNGLCLEAR glClear;             PFNGLCOLORMASK glColorMask;           PFNGLCOMPILESHADER glCompileShader;         PFNGLCREATEPROGRAM glCreateProgram;       PFNGLCREATESHADER glCreateShader;               PFNGLGENVERTEXARRAYS glGenVertexArrays; PFNGLCLEARBUFFERFV glClearBufferFv; 
+                PFNGLDEPTHFUNC glDepthFunc;             PFNGLDEPTHMASK glDepthMask;                       PFNGLDISABLE glDisable;     PFNGLDISPATCHCOMPUTE glDispatchCompute;           PFNGLDRAWARRAYS glDrawArrays;                       PFNGLDRAWBUFFERS glDrawBuffers; PFNGLCLEARCOLOR glClearColor;
+          PFNGLDRAWELEMENTS glDrawElements;                   PFNGLENABLE glEnable;                         PFNGLFINISH glFinish;                         PFNGLFLUSH glFlush;           PFNGLUNIFORM2UI glUniform2ui;     PFNGLFRAMEBUFFERTEXTURE2D glFramebufferTexture2D; PFNGLVERTEXATTRIBFORMAT glVertexAttribFormat;
+                PFNGLFRONTFACE glFrontFace;           PFNGLGENBUFFERS glGenBuffers;       PFNGLGENFRAMEBUFFERS glGenFramebuffers;             PFNGLGENTEXTURES glGenTextures;               PFNGLGETERROR glGetError;                     PFNGLGETPROGRAMIV glGetProgramiv; PFNGLBUFFERSUBDATA glBufferSubData;
   PFNGLGETSHADERINFOLOG glGetShaderInfoLog;         PFNGLGETSHADERIV glGetShaderiv;                   PFNGLLINEWIDTH glLineWidth;             PFNGLLINKPROGRAM glLinkProgram;   PFNGLMAPBUFFERRANGE glMapBufferRange;                         PFNGLREADBUFFER glReadBuffer;
               PFNGLREADPIXELS glReadPixels;       PFNGLSHADERSOURCE glShaderSource;                 PFNGLTEXIMAGE2D glTexImage2D; PFNGLCOPYTEXSUBIMAGE2D glCopyTexSubImage2D;     PFNGLTEXPARAMETERI glTexParameteri;                           PFNGLUNIFORM1F glUniform1f;
                 PFNGLUNIFORM1I glUniform1i;           PFNGLUNIFORM1UI glUniform1ui;                   PFNGLUNIFORM2F glUniform2f;                 PFNGLUNIFORM3F glUniform3f;             PFNGLUNIFORM4F glUniform4f;             PFNGLUNIFORMMATRIX3FV glUniformMatrix3fv;
-  PFNGLUNIFORMMATRIX4FV glUniformMatrix4fv;         PFNGLUNMAPBUFFER glUnmapBuffer;                 PFNGLUSEPROGRAM glUseProgram;                   PFNGLVIEWPORT glViewport;         PFNGLGETINTEGERV glGetIntegerv;                         PFNGLUNIFORM2UI glUniform2ui;
-              PFNGLCLEARCOLOR glClearColor;     PFNGLBUFFERSUBDATA glBufferSubData; PFNGLVERTEXATTRIBFORMAT glVertexAttribFormat;   PFNGLBINDVERTEXBUFFER glBindVertexBuffer;     PFNGLCLEARBUFFERFV glClearBufferFv;       PFNGLVERTEXATTRIBBINDING glVertexAttribBinding; PFNGLENABLEVERTEXATTRIBARRAY glEnableVertexAttribArray;
+  PFNGLUNIFORMMATRIX4FV glUniformMatrix4fv;         PFNGLUNMAPBUFFER glUnmapBuffer;                 PFNGLUSEPROGRAM glUseProgram;                   PFNGLVIEWPORT glViewport;         PFNGLGETINTEGERV glGetIntegerv;
 typedef enum {JOYHAT_CENTERED=0,JOYHAT_UP=1,JOYHAT_RIGHT=2,JOYHAT_DOWN=4,JOYHAT_LEFT=8,JOYHAT_RIGHT_UP=(2|1),JOYHAT_RIGHT_DOWN=(2|4),JOYHAT_LEFT_UP=(8|1),JOYHAT_LEFT_DOWN=(8|4)} JoyHatId;
 typedef enum {KEY_UNKNOWN=-1,KEY_SPACE=32,KEY_APOSTROPHE=39/* ' */,KEY_COMMA=44/* , */,KEY_MINUS=45/* - */,KEY_PERIOD=46/* . */,KEY_SLASH=47/* / */,KEY_0=48,KEY_1=49,KEY_2=50,KEY_3=51,KEY_4=52,KEY_5=53,KEY_6=54,KEY_7=55,KEY_8=56,KEY_9=57,
              KEY_SEMICOLON=59/* ; */,KEY_EQUAL=61/* = */,KEY_A=65,KEY_B=66,KEY_C=67,KEY_D=68,KEY_E=69,KEY_F=70,KEY_G=71,KEY_H=72,KEY_I=73,KEY_J=74,KEY_K=75,KEY_L=76,KEY_M=77,KEY_N=78,KEY_O=79,KEY_P=80,KEY_Q=81,KEY_R=82,KEY_S=83,KEY_T=84,KEY_U=85,KEY_V=86,KEY_W=87,KEY_X=88,KEY_Y=89,KEY_Z=90,
@@ -181,25 +162,18 @@ typedef enum {KEY_UNKNOWN=-1,KEY_SPACE=32,KEY_APOSTROPHE=39/* ' */,KEY_COMMA=44/
 typedef enum {MOUSE_BUTTON_1=0,MOUSE_BUTTON_2=1,MOUSE_BUTTON_3=2,MOUSE_BUTTON_4=3,MOUSE_BUTTON_5=4,MOUSE_BUTTON_6=5,MOUSE_BUTTON_7=6,MOUSE_BUTTON_8=7,MOUSE_BUTTON_LEFT=0,MOUSE_BUTTON_RIGHT=1,MOUSE_BUTTON_MIDDLE=2} MouseButtonId;
 typedef enum {JOYSTICK_1=0,JOYSTICK_2=1,JOYSTICK_3=2,JOYSTICK_4=3,JOYSTICK_5=4,JOYSTICK_6=5,JOYSTICK_7=6,JOYSTICK_8=7,JOYSTICK_9=8,JOYSTICK_10=9,JOYSTICK_11=10,JOYSTICK_12=11,JOYSTICK_13=12,JOYSTICK_14=13,JOYSTICK_15=14,JOYSTICK_16=15,JOYSTICK_LAST=15} JoystickId;
 typedef struct { bool down,pressed,released; } KeyState; typedef struct { const char* name; int value; } InputElement;
-typedef struct { double last_mouse_x,last_mouse_y,scrollDelta; KeyState keyStates[MAX_KEYS],mouseButtons[MAX_MOUSE_BUTTONS],joystickButtons[16][16],joystickHats[5]; /* What can I say, I'm a man of many hats. ^^D*/ i32 currentMouse_dx,currentMouse_dy; bool window_has_focus,ignore_next_mouse_delta,lastUse,isCapsLockOn,joystickPresent[16]; } InputSystem;
+typedef struct { double scrollDelta; KeyState keyStates[MAX_KEYS],mouseButtons[MAX_MOUSE_BUTTONS],joystickButtons[16][16],joystickHats[5]; /* What can I say, I'm a man of many hats. ^^D*/ bool lastUse,isCapsLockOn,joystickPresent[16]; } InputSystem; double last_mouse_x,last_mouse_y;
 typedef struct { Vector3 normal; float d; } FrustumPlane;
 typedef struct PngArena { u8*base,*cursor,*end; } PngArena;
-typedef struct {
-    u32 inputImageID,inputUIID,inputDepthID,inputWorldPosID,inputSpecID,inputNormalID,gBufferFBO,uiFBO,outputImageID,depthPrepassShaderProgram,chunkShaderProgram,chunkVAO,chunkVBO,uiShaderProgram,debugUnlitShaderProgram;
-    u32 shadowmapsShaderProgram,shadowmapsClearShaderProgram,shadowMapSSBO,shadowMapsIndirectionID,ssrShaderProgram,imageBlitShaderProgram,quadVAO,quadVBO,textShaderProgram,textVAO,textVBO;
-    u32 debugLinesVAO,debugLinesVBO,matricesBufferID,cellVisibleDataID,debugLineColors,colorBufferID,texturePalettesID,texturePaletteOffsetsID,textureOffsetsID,textureSizesID;
-    u32 lightsID,voxelLightListCountsID,voxelLightListsID,voxelUpdateShaderProgram,shadowViewProjID,vbos[MODEL_IDX_MAX],tbos[MODEL_IDX_MAX];
-} RenderSystem;
-#define PNG_ARENA_SIZE 16*1024*1024
+typedef struct { u32 inputImageID,inputUIID,inputDepthID,inputWorldPosID,inputSpecID,inputNormalID,gBufferFBO,uiFBO,outputImageID,depthPrepassSP,chunkSP,chunkVAO,chunkVBO,uiSP,debugUnlitSP,shadowmapsSP,shadowmapsClearSP,shadowMapSSBO,shadowMapsIndirectionID,ssrSP,imageBlitSP,quadVAO,quadVBO,
+                     textSP,textVAO,textVBO,debugLinesVAO,debugLinesVBO,matricesBufferID,cellVisibleDataID,debugLineColors,colorBufferID,texPalID,texPalOfsID,textureOffsetsID,textureSizesID,lightsID,voxListCntsID,voxelLightListsID,voxelUpdateSP,vbos[MAX_MDLS],tbos[MAX_MDLS]; } RenderSystem;
 static float berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
 float modelMatrices[INSTANCE_COUNT*16];
-bool mouseMovementThisFrame,returnToPause=false,fovSliderActive=false,gammaSliderActive=false,masterVolumeSliderActive=false,musicVolumeSliderActive=false,messageVolumeSliderActive=false,sfxVolumeSliderActive=false,enteringPlayerName=false;
-u8 currentPlayerNameLength=0; i8 currentMenuItem=0, currentMenuTab=0, menuItemCount=4, menuTabCount=1;
-static int num_parse_threads = 0;
+bool mouseMovementThisFrame,window_has_focus,ignore_next_mouse_delta,returnToPause=false,fovSliderActive=false,gammaSliderActive=false,masterVolumeSliderActive=false,musicVolumeSliderActive=false,messageVolumeSliderActive=false,sfxVolumeSliderActive=false,enteringPlayerName=false;
+i32 currentMouse_dx,currentMouse_dy; u8 currentPlayerNameLength=0; i8 currentMenuItem=0, currentMenuTab=0, menuItemCount=4, menuTabCount=1; static int num_parse_threads=0; static u32 globalframe=0,globalframesPerLastSecond;
 #define CHECK_GL_ERROR() do { u32 err = glGetError(); if (err != 0) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
 #define SHADOW_MAP_SIZE 128u
 #define MAX_SHADOWMAPS 128u
-#define MAX_LIGHTS_PER_VOXEL 32
 #define NEAR_PLANE (0.02f)
 #define ONE_OVER_SQRT2 0.70710678118f
 GlobalContext Sys_Global = {0}; TextSystem Sys_Text; InputSystem Sys_Input; CheatsSystem Sys_Cheats = {.god=false,.noclip=false,.showLocation=true,.showFPS=true,.editMode=false,.showPhys=true}; RenderSystem Sys_Render; SystemUI Sys_UI;
@@ -217,10 +191,9 @@ SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on f
 Light lights[LIGHT_COUNT]; static u16 loadedLights = 0; LightAnimation lanims[LIGHT_COUNT]; static bool shadowBuffersCreated = false;
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6],playerFrustumPlanes[6];
 u16 editModeSelection,editModeTestEntityDefinition=0; // Test instance and its model index
-typedef struct { double shadowTime; u32 shadowmapIndirectionList[LIGHT_COUNT]; float shadDotThresh; } VoxenShadowSystem;
-VoxenShadowSystem voxen_Shadow_System;
+double shadowTime; u32 shadowmapIndirectionList[LIGHT_COUNT];
 u16 loadedTexturesMaxIndex;
-bool doubleSidedTexture[MAX_VALID_TEXTURE],transparentTexture[MAX_VALID_TEXTURE];
+bool doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS];
 u32 drawCalls,uiDrawCalls,shadDrawCalls,vertsRendered,drawCallsNormal;
 static const u8 Mpg_FrontPage=0,Mpg_Singleplayer=1,Mpg_Multiplayer=2,Mpg_NewGame=3,Mpg_Load=4,Mpg_Options=5,Mpg_Save=6,Mpg_IntroVideo=7,Mpg_CreditsVideo=8;
 u8 currentMenuPage = Mpg_FrontPage; bool resDropdownOpen = false; int resDropdownCount=0,resSelectedIdx=0;
@@ -231,24 +204,99 @@ CamView camViews[64]; u32 camViewTextures[64]; u8 camViewCount = 0; // Max is 8 
 FHandle console_log_file=0;
 static i32 PosGetCellCoordX(float x) { return (u16)clamp((i32)vfloor((x - Sys_Global.worldMin_x[Sys_Global.curLev] + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
 static i32 PosGetCellCoordZ(float z) { return (u16)clamp((i32)vfloor((z - Sys_Global.worldMin_z[Sys_Global.curLev] + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
+ENGINE_TO_MOD size_t slen(const char* s) { if (s == NULL) {return 0;} const char *p=s; while (*(p++)); return (size_t)(p - s - 1); } // strlen replacement
+char* data_parser_trim(char* s) { while(cEmpty((unsigned char)*s)){s++;} if (*s == 0){return s;} char* e=s + slen(s) - 1; while(e > s && cEmpty((unsigned char)*e)){e--;} e[1]=0; return s; }
+i32 s2i32(const char *str) { // atoi replacement, needed separately from fast_atoi for user console input
+    while (cEmpty(*str)) {str++;} int sign = 1; if (*str == '-') { sign = -1; str++; } else if (*str == '+') {str++;} if (*str < '0' || *str > '9') return 0;
+    
+    i64 result = 0;
+    while (*str >= '0' && *str <= '9') { int digit = *str - '0'; if (result > (2147483647 - digit) / 10) {return (sign == 1) ? 2147483647 : -2147483648;} result = result * 10 + digit; str++; }
+    return (i32)(sign * result);
+}
+
+ENGINE_TO_MOD bool cEmpty(const char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r'; } // isspace replacement
+ENGINE_TO_MOD bool sEmpty(const char* a) { if (!a || *a == '\0') {return true;} for (size_t i=0;a[i]!='\0';++i) { if(!cEmpty(a[i])){return false;} } return true; } // C# String.IsNullOrWhiteSpace replacement
+ENGINE_TO_MOD bool sEqual(const char* a, const char* b) { size_t sz = slen(a); if(sz != slen(b)) {return false;} for(size_t i=0;i<sz;++i) { if(a[i] != b[i]){return false;} if(a[i] == '\0'){break;} } return true; } // !strcmp replacement (hated its inverted logic)
+int sCompUpToLen(const char* s1, const char* s2, size_t n) { const unsigned char *p1 = (const unsigned char*)s1, *p2 = (const unsigned char*)s2; while (n-- > 0) { if (*p1 != *p2) {return (*p1 < *p2) ? -1 : 1;}  if (*p1 == '\0') {break;} p1++; p2++; } return 0; } // !strncmp replacement (yes inverted for sanity)
+ENGINE_TO_MOD void scpy_to_a_from_b(char* a, const char* b, size_t bufsz) { size_t szb=slen(b); if (szb>=bufsz) { DualLogError("scpy_to_a_from_b: B bigger than buffer\n"); OS_Exit(1); } for(size_t i=0;i<szb;++i){a[i]=b[i];} a[szb] = '\0'; } // strcpy replacement
+void sCpy2aSubFromb(char* a, size_t subsz, const char* b, size_t bufsz) { if (subsz >= bufsz) { DualLogError("sCpy2aSubFromb substring overflow!\n"); OS_Exit(1); } bool ended=0; for(size_t i= 0;i<subsz;++i){ if(!ended && b[i] == '\0'){ended=1;} if(ended){a[i]='\0';}else{a[i]=b[i];} } a[subsz]='\0'; } // strncpy replacement (hopefully my mnemonic "a_subfrom_b" will help)
+void sCat(char* a, const char* b, size_t bufsz) { size_t sza=slen(a), szb=slen(b); if (sza + szb >= bufsz) { DualLogError("sCat overflow\n"); } char* dest = a + sza; for(size_t i=0;i<szb;++i){dest[i]=b[i];} dest[szb]='\0'; } // strcat replacement
+char c2Lower(const char c) { return c + ((c >= 'A' && c <= 'Z') ? 32 : 0); } // If uppercase 'A'-'Z' (65-90), +32 into 'a'-'z' (97-122)
+char* sFindSub(const char* s, const char* sub) { if (sub[0] == '\0') {return (char*)s;} for (size_t i = 0; s[i] != '\0'; ++i) { if (s[i] == sub[0]/*Only look if first matches*/) { size_t si=i, subi=0; while (s[si] != '\0' && sub[subi] != '\0' && s[si] == sub[subi]){si++; subi++;} if(sub[subi] == '\0'){return (char*)&s[i];} } } return NULL;/*No match*/ } // strstr replacement
+const char* StringFindLastChar(const char* str, const char c) { const char* lastSeen = NULL; do { if (*str == c) lastSeen = str; } while (*str++); return lastSeen; } // strrchr replacement
+ENGINE_TO_MOD char* StringFindFirstCharWithin(const char *s, char c) { char* stringwalker = (char*)s; while (*stringwalker != c) { if (!*stringwalker) {return NULL;} stringwalker++; } return stringwalker; } // strchr replacement
+void double2str(char* dest, double value, int decs, size_t bufsz) {
+    if (decs < 0 || decs > 9) { DualLogError("double2str: too many decimals\n"); OS_Exit(1); }
+    
+    if (value < 0.0) { if (bufsz < 2) {DualLogError("double2str: buffer too small A\n"); OS_Exit(1);} *dest++ = '-'; bufsz--; value = -value; }
+    u64 whole = (u64)value; char temp[32]; size_t len = 0;
+    if(whole == 0){temp[len++] = '0';}else{while (whole > 0) {temp[len++]='0' + (whole%10); whole/=10;} }
+
+    if (len >= bufsz) {DualLogError("double2str: len larger than buffer\n"); OS_Exit(1);}
+    for (size_t i = 0; i < len; ++i) {dest[i] = temp[len - 1 - i];}
+    dest += len; bufsz -= len; if(decs == 0) {*dest = '\0'; return;} 
+    if(bufsz < 1) {DualLogError("double2str: buffer too small B\n"); OS_Exit(1);}
+    
+    *dest++ = '.'; bufsz--; double frac = value - (u64)value, scale = 1.0;
+    for (int i = 0; i < decs; ++i) {scale *= 10.0;}
+    u64 fracs = (u64)(frac * scale + 0.5);
+    for (int i = decs - 1; i >= 0; --i) { if (bufsz < 1) {DualLogError("double2str: buffer too small C\n"); OS_Exit(1);} dest[i]='0' + (fracs%10); fracs/=10; }
+    dest[decs] = '\0';
+}
+
+ENGINE_TO_MOD int sFormatV(char* buf, size_t bufsz, const char* f, va_list args) {
+    if (bufsz == 0) return 0;
+
+    size_t pos = 0;
+    while (*f && pos < bufsz - 1) {
+        if (*f != '%') { buf[pos++] = *f++; continue; } 
+        f++; // skip '%'
+        int width = 0; char padChar = ' '; if (*f == '0') { padChar = '0'; f++; }
+        while (*f >= '0' && *f <= '9') { width = width * 10 + (*f - '0'); f++; }
+        int decimals = 9; if (*f == '.') { f++; if (*f >= '1' && *f <= '9') { decimals = *f - '0'; } f++; }
+        switch (*f) {
+            case 'x': { unsigned int val=__builtin_va_arg(args,unsigned int); char num[32]; int i=0; const char* hexChars="0123456789abcdef"; do {num[i++]=hexChars[val % 16]; val/=16;}while(val); while(i < width && pos < bufsz - 1){buf[pos++]=padChar; width--;} while(i-- > 0 && pos < bufsz - 1){buf[pos++] = num[i];} } break;
+            case 'u': { unsigned int val=__builtin_va_arg(args,unsigned int); char num[32]; int i=0; do{num[i++]='0' + (val % 10); val/=10; }while(val); while(i < width && pos < bufsz - 1){buf[pos++]=padChar; width--;} while(i-- > 0 && pos < bufsz - 1){buf[pos++]=num[i];} } break;
+            case 'c': { char c=(char)__builtin_va_arg(args,int); if(pos < bufsz - 1){buf[pos++]=c;} } break;
+            case 'd': { case 'i': { int val=__builtin_va_arg(args,int); if(val < 0){ if(pos < bufsz - 1){buf[pos++] = '-';} val=-val; } char num[32]; int i=0; do{num[i++]='0' + (val % 10); val/=10;}while(val); while(i < width && pos < bufsz - 1){buf[pos++] = padChar; width--;} while(i-- > 0 && pos < bufsz - 1){buf[pos++] = num[i];} } } break;
+            case 's': { const char* s=__builtin_va_arg(args,const char*); size_t len = slen(s); if(pos + len >= bufsz){len = bufsz - pos - 1;}; for(size_t i=0;i<len;++i){buf[pos++] = s[i];} } break;
+            case 'f': { double val=__builtin_va_arg(args,double); char num[64]; double2str(num,val,decimals,sizeof(num)); size_t len=slen(num); if(pos + len >= bufsz){len=bufsz - pos - 1;} for (size_t i=0;i<len;++i){buf[pos++]=num[i];} } break;
+            case '%': if (pos < bufsz - 1) buf[pos++] = '%'; break;
+        }
+        f++;
+    }
+    
+    buf[pos] = '\0';
+    return (int)pos;
+}
+
+ENGINE_TO_MOD int sFormat(char* buffer, size_t bufsz, const char* format, ...) { va_list args; __builtin_va_start(args,format); int ret = sFormatV(buffer,bufsz,format,args); __builtin_va_end(args); return ret; } // snprintf replacement
+char* sUpToEndLine(char* buf, int sz, FHandle fd) {
+    if (sz <= 1 || buf == NULL) {return NULL;}
+
+    char* p=buf; int rem = sz - 1; static int pos=0, end=0; static char b[4096];
+    while(rem > 0){ if(pos >= end){ long n=OS_Read(fd,b,sizeof(b)); if(n <= 0 && p == buf){return NULL;} pos=0; end=(int)n; } while(rem > 0 && pos < end){ char c=b[pos++]; *p++=c; rem--; if(c == '\n'){goto done;} } }
+    done:
+    *p = '\0'; return buf;
+} // fgets replacement, not thread safe but no multithreading
 static void DualLogMain(const char *prefix, const char *fmt, va_list args) {
-    char buf[4096]; va_list c; __builtin_va_copy(c,args); StringFormatV(buf,sizeof(buf),fmt,c); __builtin_va_end(c); bool color = (prefix && prefix[0] == '\033');
+    char buf[4096]; va_list c; __builtin_va_copy(c,args); sFormatV(buf,sizeof(buf),fmt,c); __builtin_va_end(c); bool color = (prefix && prefix[0] == '\033');
     #ifdef WINDOWS
         FHandle out = GetStdHandle(color ? (u32)-12 : (u32)-11);
     #else
         FHandle out = color ? 2 : 1;
     #endif
-    if (prefix) { OS_RawWrite(out,prefix,GetStringLength(prefix)); OS_RawWrite(out,"\033[0m ",5); } OS_RawWrite(out,buf,GetStringLength(buf));
+    if (prefix) { OS_RawWrite(out,prefix,slen(prefix)); OS_RawWrite(out,"\033[0m ",5); } OS_RawWrite(out,buf,slen(buf));
     if (console_log_file != INVALID_FHANDLE) {
-        if (prefix) { OS_Write(console_log_file, prefix, GetStringLength(prefix),"console.log"); OS_Write(console_log_file,"\033[0m ",5,"console.log"); }
-        OS_Write(console_log_file, buf, GetStringLength(buf),"console.log");
+        if (prefix) { OS_Write(console_log_file, prefix, slen(prefix),"console.log"); OS_Write(console_log_file,"\033[0m ",5,"console.log"); }
+        OS_Write(console_log_file, buf, slen(buf),"console.log");
     }
 }
-// =========================================================== Miscellaneous Helper Functions (and some libc replacements)
+// Misc Helpers
 ENGINE_TO_MOD void DualLog(const char* fmt, ...) { va_list args; __builtin_va_start(args,fmt); DualLogMain(NULL,fmt,args); __builtin_va_end(args); }
 ENGINE_TO_MOD void DualLogWarn(const char* fmt, ...) { va_list args; __builtin_va_start(args,fmt); DualLogMain("\033[1;38;5;208mWARN:",fmt,args); __builtin_va_end(args); }
 ENGINE_TO_MOD void DualLogError(const char* fmt, ...) { va_list args; __builtin_va_start(args,fmt); DualLogMain("\033[1;31mERROR:",fmt,args); __builtin_va_end(args); }
-void* MemSetToVForNBytes(void *dst, int c, size_t n) { unsigned char *p=(unsigned char *)dst; unsigned char v=(unsigned char)c; while (n--) {*p++=v;} return dst; } // memset replacement
+void* mset(void *dst, int c, size_t n) { unsigned char *p=(unsigned char *)dst; unsigned char v=(unsigned char)c; while (n--) {*p++=v;} return dst; } // memset replacement
 void BmpWrite(char const *filename, int x, int y, const void *data) {
     FHandle f = OS_OpenWriteonly(filename);
     if (f == INVALID_FHANDLE) { DualLogError("Failed to open %s for writing\n", filename); return; }
@@ -272,9 +320,7 @@ void BmpWrite(char const *filename, int x, int y, const void *data) {
 
 void DebugRAM(const char *context) { // Get USS aka the total RAM uniquely allocated for the process (btop shows RSS so pulls in shared libs and double counts shared RAM).
 #ifdef DEBUG_RAM_OUTPUT
-    static void* heap_start = (void*)-1;
-    if (heap_start == (void*)-1) heap_start = OS_Brk(NULL);
-    void* current_brk = OS_Brk(NULL);
+    static void* heap_start = (void*)-1; if(heap_start == (void*)-1){heap_start = OS_Brk(NULL);} void* current_brk = OS_Brk(NULL);
     size_t heap_bytes = (size_t)((char*)current_brk - (char*)heap_start); size_t uss_bytes = 0;
     long fd = OS_OpenReadonly("/proc/self/smaps_rollup");
     if (fd == INVALID_FHANDLE) { DualLogError("Failed to open /proc/self/smaps_rollup\n"); return; }
@@ -284,15 +330,11 @@ void DebugRAM(const char *context) { // Get USS aka the total RAM uniquely alloc
     OS_Close(fd); char* p = buf;
     while (*p) {
         if (CompareMemoryForNBytes(p,"Private_",8) == 0) {
-            p += 8;
-            size_t val = 0;
+            p += 8; size_t val = 0;
             if (CompareMemoryForNBytes(p,"Clean",5) !=0 && CompareMemoryForNBytes(p,"Dirty",5) != 0) { p++; continue; }
             while (*p && *p != ':') p++; if (*p != ':') { p++; continue; }
             
-            p++;
-            while (*p == ' ' || *p == '\t') p++;
-            while (*p >= '0' && *p <= '9') { val = val * 10 + (*p - '0'); p++; }
-            uss_bytes += val * 1024;
+            p++; while(*p == ' ' || *p == '\t'){p++;} while(*p >= '0' && *p <= '9'){val=val * 10 + (*p - '0'); p++;} uss_bytes += val * 1024;
         }
         
         p++;
@@ -312,9 +354,9 @@ ENGINE_TO_MOD void Screenshot() {
     unsigned char* pixels = OS_Alloc(w * h * 4 * sizeof(char));
     glReadPixels(0,0,w,h,GL_RGBA,GL_UNSIGNED_BYTE,pixels);
     Vector3 p = Sys_Global.instances[PLAYER1].position;
-    char filename[96]; StringFormat(filename,sizeof(filename),"Screenshots/%.2f_x%.1f_y%.1f_z%.1f.bmp",get_time(),p.x,p.y,p.z);
+    char filename[96]; sFormat(filename,sizeof(filename),"Screenshots/%.2f_x%.1f_y%.1f_z%.1f.bmp",get_time(),p.x,p.y,p.z);
     BmpWrite(filename,w,h,pixels); DualLog("Saved screenshot %s\n",filename);
-    OS_DeallocateRAM(pixels,w * h * 4 * sizeof(char));
+    OS_Free(pixels,w * h * 4 * sizeof(char));
 }
 
 u32 random_range_rng = 0x12345678u;
@@ -330,300 +372,58 @@ ENGINE_TO_MOD float smooth_damp(float current, float target, float *current_velo
     float omega = 2.0f / smooth_time;
     float x = omega * (float)Sys_Global.deltaTime;
     float exp = 1.0f / (1.0f + x + 0.48f * x * x + 0.235f * x * x * x);
-    float change = current - target;
-    float original_to = target;
+    float change = current - target, original_to = target;
     target = current - change;
     float temp = (*current_velocity + omega * change) * (float)Sys_Global.deltaTime;
     *current_velocity = (*current_velocity - omega * temp) * exp;
     float output = target + (change + temp) * exp;
-    if ((original_to - current > 0.0f) == (output > original_to)) { output = original_to; *current_velocity = (output - original_to) / (float)Sys_Global.deltaTime; }
+    if ((original_to - current > 0.0f) == (output > original_to)) { output=original_to; *current_velocity=(output - original_to) / (float)Sys_Global.deltaTime; }
     return output;
 }
 
-ENGINE_TO_MOD size_t GetStringLength(const char* s) { if (s == NULL) {return 0;} const char *p = s; while (*(p++)); return (size_t)(p - s - 1); } // strlen replacement
-char* data_parser_trim(char* s) {
-    while (CharacterIsEmpty((unsigned char)*s)) s++;
-    if (*s == 0) return s;
-
-    char* e = s + GetStringLength(s) - 1;
-    while (e > s && CharacterIsEmpty((unsigned char)*e)) e--;
-    e[1] = 0; return s;
-}
-
-i32 StringToInt(const char *str) { // atoi replacement, needed separately from fast_atoi for user console input
-    while (CharacterIsEmpty(*str)) {str++;} int sign = 1; if (*str == '-') { sign = -1; str++; } else if (*str == '+') {str++;} if (*str < '0' || *str > '9') return 0;
-    
-    i64 result = 0;
-    while (*str >= '0' && *str <= '9') { int digit = *str - '0'; if (result > (2147483647 - digit) / 10) {return (sign == 1) ? 2147483647 : -2147483648;} result = result * 10 + digit; str++; }
-    return (i32)(sign * result);
-}
-
-ENGINE_TO_MOD bool CharacterIsEmpty(const char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r'; } // isspace replacement
-ENGINE_TO_MOD bool StringIsEmpty(const char* a) { size_t size = GetStringLength(a); for(size_t i=0;i<size;++i) { if (a[i] == '\0') {break;} if (!CharacterIsEmpty(a[i])) {return false;} } return true; } // C# String.IsNullOrWhiteSpace replacement
-bool StringsEqual(const char* a, const char* b) { // !strcmp replacement (hated its inverted logic)
-    size_t size = GetStringLength(a); if (size != GetStringLength(b)) return false;
-    for (size_t i=0;i<size;++i) { if (a[i] != b[i]) {return false;} if (a[i] == '\0') {break;} }
-    return true;
-}
-
-int StringCompareUpToLength(const char* s1, const char* s2, size_t n) { const unsigned char *p1 = (const unsigned char*)s1, *p2 = (const unsigned char*)s2; while (n-- > 0) { if (*p1 != *p2) {return (*p1 < *p2) ? -1 : 1;}  if (*p1 == '\0') {break;} p1++; p2++; } return 0; } // !strncmp replacement (yes inverted for sanity)
-ENGINE_TO_MOD void StringCopyInto_A_From_B(char* a, const char* b, size_t bufferSize) { // strcpy replacement
-    size_t size2=GetStringLength(b); if (size2>=bufferSize) { DualLogError("B is bigger than buffer limit %u! B: %s\n",bufferSize,b); OS_Exit(1); }
-    
-    for (size_t i=0;i<size2;++i) a[i] = b[i];
-    a[size2] = '\0';
-}
-
-void StringCopyInto_A_SubstringFrom_B(char* a, size_t substringSize, const char* b, size_t bufferSize) { // strncpy replacement (hopefully my mnemonic "SubstringFrom_B" will help me remember substringSize comes before be in the args passed)
-    if (substringSize >= bufferSize) { DualLogError("Substring too large for buffer! %u >= %u\n",substringSize,bufferSize); OS_Exit(1); }
-    
-    bool reachedEndB = false;
-    for (size_t i= 0;i<substringSize;++i) { if (!reachedEndB && b[i] == '\0') {reachedEndB = true;} if (reachedEndB) {a[i] = '\0';} else {a[i] = b[i];/*Normal copy*/} }
-    a[substringSize] = '\0'; 
-}
-
-void StringConcatenate(char* a, const char* b, size_t bufferSize) { // strcat replacement
-    size_t size  = GetStringLength(a), size2 = GetStringLength(b);
-    if (size + size2 >= bufferSize) { DualLogError("Strings to large to concat, will overflow buffer: GetStringLength(%s{%u} + %s{%u} > %u)\n",a,size,b,size2,bufferSize); OS_Exit(1); }
-
-    char* dest = a + size;
-    for (size_t i=0;i<size2; ++i) dest[i] = b[i];
-    dest[size2] = '\0';
-}
-
-char CharToLower(const char c) { return c + ((c >= 'A' && c <= 'Z') ? 32 : 0); } // If uppercase 'A'-'Z' (65-90), +32 into 'a'-'z' (97-122)
-char* StringFindSubstring(const char* haystack, const char* needle) { // strstr replacement
-    if (needle[0] == '\0') return (char*)haystack;
-
-    for (size_t i = 0; haystack[i] != '\0'; ++i) {
-        if (haystack[i] == needle[0]) { // If the first character matches, check the rest of the needle
-            size_t h_idx = i, n_idx = 0;
-            while (haystack[h_idx] != '\0' && needle[n_idx] != '\0' && haystack[h_idx] == needle[n_idx]) { h_idx++; n_idx++; }
-            if (needle[n_idx] == '\0') return (char*)&haystack[i];
-        }
-    }
-
-    return NULL; // No match found
-}
-
-const char* StringFindLastChar(const char* str, const char c) { const char* lastSeen = NULL; do { if (*str == c) lastSeen = str; } while (*str++); return lastSeen; } // strrchr replacement
-ENGINE_TO_MOD char* StringFindFirstCharWithin(const char *s, char c) { char* stringwalker = (char*)s; while (*stringwalker != c) { if (!*stringwalker) {return NULL;} stringwalker++; } return stringwalker; } // strchr replacement
-void DoubleToStringFixed(char* dest, double value, int decimalPlaces, size_t bufferSize) {
-    if (decimalPlaces < 0 || decimalPlaces > 9) { DualLogError("DoubleToStringFixed: decimalPlaces out of range\n"); OS_Exit(1); }
-    if (value < 0.0) { if (bufferSize < 2) {OS_Exit(1);} *dest++ = '-'; bufferSize--; value = -value; }
-    u64 intPart = (u64)value;
-    char temp[32];
-    size_t len = 0;
-    if (intPart == 0) temp[len++] = '0';
-    else { while (intPart > 0) { temp[len++] = '0' + (intPart % 10); intPart /= 10; } }
-
-    if (len >= bufferSize) OS_Exit(1);
-    for (size_t i = 0; i < len; ++i) dest[i] = temp[len - 1 - i];
-    dest += len; bufferSize -= len;
-    if (decimalPlaces == 0) { *dest = '\0'; return; }
-    if (bufferSize < 1) OS_Exit(1);
-    
-    *dest++ = '.'; bufferSize--;
-    double frac = value - (u64)value, scale = 1.0;
-    for (int i = 0; i < decimalPlaces; ++i) scale *= 10.0;
-    u64 fracPart = (u64)(frac * scale + 0.5);
-    for (int i = decimalPlaces - 1; i >= 0; --i) { if (bufferSize < 1) {OS_Exit(1);} dest[i] = '0' + (fracPart % 10); fracPart /= 10; }
-    dest[decimalPlaces] = '\0';
-}
-
-void StringAppendLiteral(char* dest, const char* literal, size_t bufferSize) {
-    size_t curLen = GetStringLength(dest), litLen = GetStringLength(literal);
-    if (curLen + litLen >= bufferSize) { DualLogError("StringAppendLiteral overflow\n"); OS_Exit(1); }
-    
-    for (size_t i = 0; i < litLen; ++i) dest[curLen + i] = literal[i];
-    dest[curLen + litLen] = '\0';
-}
-
-ENGINE_TO_MOD int StringFormatV(char* buffer, size_t bufferSize, const char* format, va_list args) {
-    if (bufferSize == 0) return 0;
-
-    size_t pos = 0;
-    const char* f = format;
-    while (*f && pos < bufferSize - 1) {
-        if (*f != '%') { buffer[pos++] = *f++; continue; } 
-        f++; // skip '%'
-        int width = 0;
-        char padChar = ' ';
-        if (*f == '0') { padChar = '0'; f++; }
-        while (*f >= '0' && *f <= '9') { width = width * 10 + (*f - '0'); f++; }
-        int decimals = 9;
-        if (*f == '.') { f++; if (*f >= '1' && *f <= '9') { decimals = *f - '0'; } f++; }
-        switch (*f) {
-            case 'x': {
-                unsigned int val = __builtin_va_arg(args, unsigned int);
-                char num[32];
-                int i = 0;
-                const char* hexChars = "0123456789abcdef";
-                do { num[i++] = hexChars[val % 16]; val /= 16; } while (val);
-                while (i < width && pos < bufferSize - 1) { buffer[pos++] = padChar; width--; }
-                while (i-- > 0 && pos < bufferSize - 1) buffer[pos++] = num[i];
-            } break;
-            case 'u': {
-                unsigned int val = __builtin_va_arg(args, unsigned int);
-                char num[32];
-                int i = 0;
-                do { num[i++] = '0' + (val % 10); val /= 10; } while (val);
-                while (i < width && pos < bufferSize - 1) { buffer[pos++] = padChar; width--; }
-                while (i-- > 0 && pos < bufferSize - 1) buffer[pos++] = num[i];
-            } break;
-            case 'c': {
-                char c = (char)__builtin_va_arg(args,int);
-                if (pos < bufferSize - 1) buffer[pos++] = c;
-            } break;
-            case 'd':
-            case 'i': {
-                int val = __builtin_va_arg(args, int);
-                if (val < 0) { if (pos < bufferSize - 1) buffer[pos++] = '-'; val = -val; }
-                char num[32];
-                int i = 0;
-                do { num[i++] = '0' + (val % 10); val /= 10; } while (val);
-                while (i < width && pos < bufferSize - 1) { buffer[pos++] = padChar; width--; }
-                while (i-- > 0 && pos < bufferSize - 1) buffer[pos++] = num[i];
-            } break;
-            case 's': {
-                const char* s = __builtin_va_arg(args,const char*);
-                size_t len = GetStringLength(s);
-                if (pos + len >= bufferSize) len = bufferSize - pos - 1;
-                for (size_t i = 0; i < len; ++i) buffer[pos++] = s[i];
-            } break;
-            case 'f': {
-                double val = __builtin_va_arg(args,double);
-                char num[64];
-                DoubleToStringFixed(num, val, decimals, sizeof(num));
-                size_t len = GetStringLength(num);
-                if (pos + len >= bufferSize) len = bufferSize - pos - 1;
-                for (size_t i = 0; i < len; ++i) buffer[pos++] = num[i];
-            } break;
-            case '%': if (pos < bufferSize - 1) buffer[pos++] = '%'; break;
-        }
-        f++;
-    }
-    buffer[pos] = '\0';
-    return (int)pos;
-}
-
-ENGINE_TO_MOD int StringFormat(char* buffer, size_t bufferSize, const char* format, ...) { va_list args; __builtin_va_start(args,format); int ret = StringFormatV(buffer,bufferSize,format,args); __builtin_va_end(args); return ret; } // snprintf replacement
-char* GetNextStringUpToNewlineOrEOF(char* buf, int size, FHandle fd) { // fgets replacement, not thread safe but we don't do multithreading
-    if (size <= 1 || buf == NULL) return NULL;
-
-    char* p = buf; int remaining = size - 1; static int pos = 0, end = 0; static char buffer[4096];
-    while (remaining > 0) {
-        if (pos >= end) {
-            long n = OS_Read(fd,buffer,sizeof(buffer)); if (n <= 0 && p == buf) return NULL;
-            
-            pos = 0; end = (int)n;
-        }
-
-        while (remaining > 0 && pos < end) { char c = buffer[pos++]; *p++ = c; remaining--; if (c == '\n') goto done; }
-    }
-
-    done:
-    *p = '\0';
-    return buf;
-}
-
-extern FHandle levelFileHandle;
-ENGINE_TO_MOD char* GetLevelFileNextStringUpToNewlineOrEOF(char* buf, int size) { return GetNextStringUpToNewlineOrEOF(buf,size,levelFileHandle); }
-ENGINE_TO_MOD Vector3 GetEntityLocalSpawnPointFromUnrotatedOffsetVector(Entity* originator, Vector3 offsetFromOriginator) {
-    Vector3 scaledOfs = mul_v3_v3_elementwise(offsetFromOriginator, originator->scale);
-    Vector3 rotatedOfs = quat_rotate_vector(originator->rotation, scaledOfs);
-    Vector3 result = V3_AplusB(originator->position, rotatedOfs);
-    return result;
-}
-
+FHandle levelFileHandle;
+ENGINE_TO_MOD char* sLevelFileUpToEndLine(char* buf, int size) { return sUpToEndLine(buf,size,levelFileHandle); }
+ENGINE_TO_MOD Vector3 GetLocalTransformedPos(Entity* originator, Vector3 offsetFromOriginator) { Vector3 scaledOfs = mul_v3_v3_elementwise(offsetFromOriginator,originator->scale); Vector3 rotatedOfs = quat_rot_v3(originator->rotation,scaledOfs); Vector3 result = V3_AplusB(originator->position,rotatedOfs); return result; }
 static inline int pntz(size_t p[2]) { return (p[0] != 1) ? __builtin_ctzll(p[0] - 1) : (p[1] ? 8 * sizeof(size_t) + __builtin_ctzll(p[1]) : 0); }
 static inline void shl(size_t p[2], int n) { if (n >= 8 * (int)sizeof(size_t)) { p[1] = p[0]; p[0] = 0; n -= 8 * sizeof(size_t); } if (n) { p[1] = (p[1] << n) | (p[0] >> (8 * sizeof(size_t) - n)); p[0] <<= n; } }
 static inline void shr(size_t p[2], int n) { if (n >= 8 * (int)sizeof(size_t)) { p[0] = p[1]; p[1] = 0; n -= 8 * sizeof(size_t); } if (n) { p[0] = (p[0] >> n) | (p[1] << (8 * sizeof(size_t) - n)); p[1] >>= n; } }
-static void scycle(size_t w, unsigned char* ar[], int n) {
-    unsigned char tmp[256]; size_t l;
-    if (n<2) return;
-    ar[n]=tmp;
-    while (w) { l=w<256?w:256; MemCpyFromBtoAForNBytes(ar[n],ar[0],l); for(int i=0;i<n;i++){MemCpyFromBtoAForNBytes(ar[i],ar[i+1],l);ar[i]+=l;} w-=l; }
-}
-
-typedef int (*cmpfun)(const void*, const void*);
-typedef int (*cmpfun_r)(const void*, const void*, void*);
-#define AL (16*sizeof(size_t))
-static void sift(unsigned char* head, size_t w, cmpfun_r cmp, void* arg, int ps, size_t lp[]) {
-    unsigned char* ar[AL]; int i=1; ar[0]=head;
-    while (ps>1) {
-        unsigned char* rt=head-w, *lf=rt-lp[ps-2];
-        if (cmp(ar[0],lf,arg)>=0 && cmp(ar[0],rt,arg)>=0) break;
-        if (cmp(lf,rt,arg)>=0) { ar[i++&(AL-1)]=lf; head=lf; ps--; } else { ar[i++&(AL-1)]=rt; head=rt; ps-=2; }
-    }
-    scycle(w,ar,i&(AL-1));
-}
-static void trinkle(unsigned char* head, size_t w, cmpfun_r cmp, void* arg, size_t pp[2], int ps, int trusty, size_t lp[]) {
-    unsigned char* ar[AL]; int i=1; ar[0]=head; size_t p[2]={pp[0],pp[1]};
-    while (p[0]!=1||p[1]!=0) {
-        unsigned char* ss=head-lp[ps];
-        if (cmp(ss,ar[0],arg)<=0) break;
-        if (!trusty&&ps>1) { unsigned char* rt=head-w,*lf=rt-lp[ps-2]; if(cmp(rt,ss,arg)>=0||cmp(lf,ss,arg)>=0) break; }
-        
-        ar[i++&(AL-1)]=ss; head=ss; int t=pntz(p); shr(p,t); ps+=t; trusty=0;
-    }
-    
-    if (!trusty) { scycle(w,ar,i&(AL-1)); sift(head,w,cmp,arg,ps,lp); }
+static void scycle(size_t w, unsigned char* ar[], int n) { unsigned char tmp[256]; size_t l; if (n<2) {return;} ar[n]=tmp; while(w){ l=w<256?w:256; mcpy(ar[n],ar[0],l); for(int i=0;i<n;i++){mcpy(ar[i],ar[i+1],l);ar[i]+=l;} w-=l; } }
+typedef int (*cmpfun)(const void*,const void*); typedef int (*cmpfun_r)(const void*,const void*,void*);
+static void sift(unsigned char* hd, size_t w, cmpfun_r cmp, void* arg, int ps, size_t lp[]) { unsigned char* ar[(16*sizeof(size_t))]; int i=1; ar[0]=hd; while (ps>1) { unsigned char* rt=hd-w, *lf=rt-lp[ps-2]; if(cmp(ar[0],lf,arg)>=0 && cmp(ar[0],rt,arg)>=0){break;} if(cmp(lf,rt,arg)>=0){ar[i++&((16*sizeof(size_t))-1)]=lf; hd=lf; ps--;}else{ar[i++&((16*sizeof(size_t))-1)]=rt; hd=rt; ps-=2;} } scycle(w,ar,i&((16*sizeof(size_t))-1)); }
+static void trinkle(unsigned char* hd, size_t w, cmpfun_r cmp, void* arg, size_t pp[2], int ps, int trusty, size_t lp[]) {
+    unsigned char* ar[(16*sizeof(size_t))]; int i=1; ar[0]=hd; size_t p[2]={pp[0],pp[1]};
+    while (p[0]!=1||p[1]!=0) { unsigned char* ss=hd-lp[ps]; if(cmp(ss,ar[0],arg)<=0){break;} if(!trusty&&ps>1){ unsigned char* rt=hd-w,*lf=rt-lp[ps-2]; if(cmp(rt,ss,arg)>=0||cmp(lf,ss,arg)>=0){break;} } ar[i++&((16*sizeof(size_t))-1)]=ss; hd=ss; int t=pntz(p); shr(p,t); ps+=t; trusty=0; }
+    if (!trusty) { scycle(w,ar,i&((16*sizeof(size_t))-1)); sift(hd,w,cmp,arg,ps,lp); }
 }
 
 void qsort_new(void* base, size_t nel, size_t w, cmpfun cmp) {
     size_t lp[12*sizeof(size_t)], p[2]={1,0}, size=w*nel; int ps=1,trail; if (!size) return;
     
-    unsigned char* head=base, *high=head+size-w;
-    for (size_t i=2;lp[0]=lp[1]=w,(lp[i]=lp[i-2]+lp[i-1]+w)<size;i++);
-    cmpfun_r cmp_r=(cmpfun_r)(void*)cmp; void* arg=NULL;
-    while (head<high) {
-        if ((p[0]&3)==3) { sift(head,w,cmp_r,arg,ps,lp); shr(p,2); ps+=2; }
-        else {
-            if (lp[ps-1]>=((size_t)(high-head))) trinkle(head,w,cmp_r,arg,p,ps,0,lp);
-            else                                  sift(head,w,cmp_r,arg,ps,lp);
-            if (ps==1) { shl(p,1); ps=0; } else { shl(p,ps-1); ps=1; }
-        }
-        
-        p[0]|=1; head+=w;
+    unsigned char* hd=base, *high=hd+size-w; for (size_t i=2;lp[0]=lp[1]=w,(lp[i]=lp[i-2]+lp[i-1]+w)<size;i++)/*empty body*/; cmpfun_r cmp_r=(cmpfun_r)(void*)cmp; void* arg=NULL;
+    while (hd<high) {
+        if ((p[0]&3)==3) { sift(hd,w,cmp_r,arg,ps,lp); shr(p,2); ps+=2; }
+        else { if(lp[ps-1]>=((size_t)(high-hd))){trinkle(hd,w,cmp_r,arg,p,ps,0,lp);}else {sift(hd,w,cmp_r,arg,ps,lp);}    if(ps==1){shl(p,1); ps=0;}else{shl(p,ps-1); ps=1;} }
+        p[0]|=1; hd+=w;
     }
     
-    trinkle(head,w,cmp_r,arg,p,ps,0,lp);
-    while (ps!=1||p[0]!=1||p[1]!=0) {
-        if (ps<=1) { trail=pntz(p); shr(p,trail); ps+=trail; }
-        else { shl(p,2); ps-=2; p[0]^=7; shr(p,1); trinkle(head-lp[ps]-w,w,cmp_r,arg,p,ps+1,1,lp); shl(p,1); p[0]|=1; trinkle(head-w,w,cmp_r,arg,p,ps,1,lp); }
-        head-=w;
-    }
+    trinkle(hd,w,cmp_r,arg,p,ps,0,lp);
+    while (ps!=1||p[0]!=1||p[1]!=0) { if(ps<=1) {trail=pntz(p); shr(p,trail); ps+=trail;}else{shl(p,2); ps-=2; p[0]^=7; shr(p,1); trinkle(hd-lp[ps]-w,w,cmp_r,arg,p,ps+1,1,lp); shl(p,1); p[0]|=1; trinkle(hd-w,w,cmp_r,arg,p,ps,1,lp);} hd-=w; }
 }
 
-float half_to_float(half h) {
-    u32 s=(h&0x8000)<<16,e=(h&0x7C00)>>10,m=(h&0x03FF),out;
-    if (e == 0){
-        if (m == 0) out = s;
-        else {
-            e = 1;
-            while ((m & 0x0400) == 0) { m <<= 1; e--; }
-            m &= 0x03FF; e+=(127 - 15);
-            out = s | (e << 23) | (m << 13);
-        }
-    } else if (e == 31) { out = s | 0x7F800000 | (m << 13); }
-    else { e = e + (127 - 15); out = s | (e << 23) | (m << 13); }
-    float f; MemCpyFromBtoAForNBytes(&f,&out,4);
-    return f;
-}
-// ========================== 2D Textures Loading System
+float half_to_float(half h) { u32 s=(h&0x8000)<<16,e=(h&0x7C00)>>10,m=(h&0x03FF),out; if (e == 0){ if(m == 0){out = s;}else{ e = 1; while((m & 0x0400) == 0){m <<= 1; e--;} m &= 0x03FF; e+=(127 - 15); out = s | (e << 23) | (m << 13); } }else if(e == 31){out = s | 0x7F800000 | (m << 13);}else{e = e + (127 - 15); out = s | (e << 23) | (m << 13);} float f; mcpy(&f,&out,4); return f; }
+// 2D Texture Load Sys
 u32 totalPixels,totalPaletteColors;
 typedef struct { u16 index; bool transparent; bool doublesided; char path[128]; } TextureData; typedef struct { TextureData* entries; u32 count; u32 capacity; } TextureDataParser; typedef struct { const char* data; int size; } RawTexture;
 typedef struct TextureParseTask { u32 start_tex; u32 end_tex; RawTexture* raw_textures; i32* parsIdx; const TextureDataParser* parser; int tid; } TextureParseTask;                 typedef struct { u32 img_x, img_y; i32 img_n, img_out_n; u8* img_buffer, *img_buffer_end; } PngContext;
 typedef struct { PngContext* s; u8* idata, *expanded, *out; } PngData; typedef struct { u16 fast[1<<9], firstcode[16], firstsymbol[16], value[288]; i32 maxcode[17]; u8 size[288]; } PngHuffman; typedef struct { u8 *zbuffer, *zbuffer_end, *zout, *zout_start; i32 num_bits; u32 code_buffer; PngHuffman z_length, z_distance; } pngzbuf;
 enum { PNGFmt_none=0, PNGFmt_sub=1, PNGFmt_up=2, PNGFmt_avg=3, PNGFmt_paeth=4, PNGFmt_avg_first, PNGFmt_paeth_first };
 PngArena png_arena_main; static PngArena* thread_png_arenas = NULL; static u8** textureIndexBuffers = NULL; static u32** texturePaletteBuffers = NULL; static u32* texturePaletteSizes = NULL; static i32* textureWidths = NULL; static i32* textureHeights = NULL;
-void PngArenaInit(PngArena* arena) {if (!arena->base) { arena->base = OS_Alloc(PNG_ARENA_SIZE); arena->cursor = arena->base; arena->end = arena->base + PNG_ARENA_SIZE; } }
+void PngArenaInit(PngArena* arena) { if (!arena->base) { arena->base = OS_Alloc(16777216); arena->cursor = arena->base; arena->end = arena->base + 16777216; } }
 void* PngArenaAlloc(PngArena* a, size_t s) { if(!a->base||a->cursor+s>a->end)return NULL; void* p=a->cursor; a->cursor+=s; return p; }
 static u32 PngGet32be(PngContext* s) { const u8* p = s->img_buffer; s->img_buffer += 4; return (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3]; }
 static i32 BitReverse(i32 n, i32 b) { n=((n&0xAAAA)>>1)|((n&0x5555)<<1); n=((n&0xCCCC)>>2)|((n&0x3333)<<2); n=((n&0xF0F0)>>4)|((n&0x0F0F)<<4); n=((n&0xFF00)>>8)|((n&0x00FF)<<8); return n>>(16-b); }
 static i32 PngZBuildHuffman(PngHuffman* z, const u8* sl, i32 num) {
-    i32 i,k=0,code=0,nc[16],sz[17]={0}; MemSetToVForNBytes(z->fast,0,sizeof(z->fast)); if(num != 32) { for(i=0;i<num;++i)++sz[sl[i]]; } sz[0]=0;
+    i32 i,k=0,code=0,nc[16],sz[17]={0}; mset(z->fast,0,sizeof(z->fast)); if(num != 32) { for(i=0;i<num;++i)++sz[sl[i]]; } sz[0]=0;
     for(i=1;i<16;++i){
         if(sz[i]>(1<<i))return 0;
         nc[i]=code; z->firstcode[i]=(u16)code; z->firstsymbol[i]=(u16)k; code+=sz[i]; if(sz[i]&&code-1>=(1<<i))return 0;
@@ -660,7 +460,7 @@ static int PngComputeHuffmans(pngzbuf* a) {
             if(c==16){c=PngZReceive(a,2)+3; f=lc[n-1];}
             else if(c==17)c=PngZReceive(a,3)+3;
             else if(c==18)c=PngZReceive(a,7)+11;
-            else return 0; MemSetToVForNBytes(lc+n,f,c); n+=c;
+            else return 0; mset(lc+n,f,c); n+=c;
         }
     } return PngZBuildHuffman(&a->z_length,lc,hl) && PngZBuildHuffman(&a->z_distance,lc+hl,hd);
 }
@@ -673,7 +473,7 @@ static int PngParseUncompressedBlock(pngzbuf* a) {
     if (k <= 2) header[2] = *a->zbuffer++;
     if (k <= 3) header[3] = *a->zbuffer++;
     i32 len = header[1] * 256 + header[0];
-    MemCpyFromBtoAForNBytes(a->zout,a->zbuffer,len); a->zbuffer += len; a->zout += len;
+    mcpy(a->zout,a->zbuffer,len); a->zbuffer += len; a->zout += len;
     return 1;
 }
 
@@ -729,7 +529,7 @@ u8* PngLoad(const u8* buffer, int len, int* x, int* y, PngArena* arena) {
         u32 length = PngGet32be(&s), type = PngGet32be(&s);
         switch (type) {
             case 0x49484452: s.img_x = PngGet32be(&s); s.img_y = PngGet32be(&s); s.img_buffer++; { i32 color = (*s.img_buffer++); s.img_buffer += 3; s.img_n = (color & 2 ? 3 : 1) + (color & 4 ? 1 : 0); } break;
-            case 0x49444154: if (!z.idata) { z.idata = (u8*)PngArenaAlloc(arena, len + 16); ioff = 0; } MemCpyFromBtoAForNBytes(z.idata + ioff, s.img_buffer, length); s.img_buffer += length; ioff += length; break;
+            case 0x49444154: if (!z.idata) { z.idata = (u8*)PngArenaAlloc(arena, len + 16); ioff = 0; } mcpy(z.idata + ioff, s.img_buffer, length); s.img_buffer += length; ioff += length; break;
             case 0x49454E44: { u32 rL = s.img_x * s.img_y * s.img_n + s.img_y; z.expanded = (u8*)PngDecode(z.idata, ioff, rL, (i32*)(&rL), arena); s.img_out_n = (s.img_n + 1 == 4) ? 4 : s.img_n; CreatePngImageArena(arena,&z,z.expanded, rL,s.img_out_n,s.img_x,s.img_y,s.img_n); PngGet32be(&s); goto Label_parsesuccess; }
             default: s.img_buffer += length; break;
         }
@@ -745,7 +545,7 @@ static void* TextureParsingWorker(void* arg) {
         doubleSidedTexture[i] = t->parser->entries[pIdx].doublesided; transparentTexture[i] = t->parser->entries[pIdx].transparent;
         const char* d = t->raw_textures[i].data; int sz = t->raw_textures[i].size; if (unlikely(!d || sz <= 0)) continue;
         int w=0, h=0; u8 *pix = PngLoad((const u8*)d, sz, &w, &h, &thread_png_arenas[t->tid]);
-        if (!pix || w < 1 || h < 1) { OS_DeallocateRAM((void*)d, (size_t)sz); continue; }
+        if (!pix || w < 1 || h < 1) { OS_Free((void*)d, (size_t)sz); continue; }
         u32 nP = (u32)w * h, pSz = 0, *pal = (u32*)OS_Alloc(1024); u8 *idx = (u8*)OS_Alloc(nP), hash[1024] = {0};
         for (u32 p = 0; p < nP; ++p) {
             u32 c = ((u32*)pix)[p], s = (c * 0x9e3779b9u) & 1023;
@@ -761,7 +561,7 @@ static void* TextureParsingWorker(void* arg) {
             pal[pSz] = c; idx[p] = pSz; hash[s] = (u8)(++pSz); found:;
         }
         textureIndexBuffers[i] = idx; texturePaletteBuffers[i] = pal; texturePaletteSizes[i] = pSz; textureWidths[i] = w; textureHeights[i] = h;
-        OS_DeallocateRAM((void*)d, (size_t)sz);
+        OS_Free((void*)d, (size_t)sz);
     }
     return NULL;
 }
@@ -772,49 +572,49 @@ static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
     while (cur < end) {
         char *s = cur; while (cur < end && *cur != '\n' && *cur != '\r') cur++;
         size_t len = cur - s; line++; if (len <= 0) { cur++; continue; }
-        while (CharacterIsEmpty(*s)) s++; char *le = s + (cur - s) - 1;
-        while (le > s && CharacterIsEmpty(*le)) le--;
+        while (cEmpty(*s)) s++; char *le = s + (cur - s) - 1;
+        while (le > s && cEmpty(*le)) le--;
         if (*s == '\0' || (s[0] == '/' && s[1] == '/') || s[0] == '#') { if (cur < end && (*cur == '\r' || *cur == '\n')) cur++; continue; }
         char *col = StringFindFirstCharWithin(s, ':');
-        if (col && StringCompareUpToLength(s, "index", col - s) == 0) {
-            char *v = col + 1; while (CharacterIsEmpty(*v)) v++;
+        if (col && sCompUpToLen(s, "index", col - s) == 0) {
+            char *v = col + 1; while (cEmpty(*v)) v++;
             u32 idx = parse_numberu32(v, s, line); if (idx > m_idx) m_idx = idx;
         }
         if (cur < end && (*cur == '\r' || *cur == '\n')) cur++;
     }
-    if (!m_idx || m_idx >= maxS) { if (!m_idx) DualLogWarn("No entries in %s\n", fn); else DualLogWarn("Index %u too large in %s\n", m_idx, fn); OS_DeallocateRAM(data, sz); return true; }
+    if (!m_idx || m_idx >= maxS) { if (!m_idx) DualLogWarn("No entries in %s\n", fn); else DualLogWarn("Index %u too large in %s\n", m_idx, fn); OS_Free(data, sz); return true; }
     p->entries = OS_Alloc((p->count = p->capacity = m_idx + 1) * sizeof(TextureData));
     for (u32 i = 0; i < p->count; ++i) p->entries[i] = (TextureData){.index = U16_MAX};
     TextureData e = {.index = U16_MAX}; line = 0; cur = data;
     while (cur < end) {
         char *s = cur; while (cur < end && *cur != '\n' && *cur != '\r') cur++;
         size_t len = cur - s; line++; if (len < 3) { cur++; continue; }
-        while (CharacterIsEmpty(*s)) s++; char *le = s + (cur - s) - 1; while (le > s && CharacterIsEmpty(*le)) le--;
+        while (cEmpty(*s)) s++; char *le = s + (cur - s) - 1; while (le > s && cEmpty(*le)) le--;
         if (s[0] == '/' && s[1] == '/') { cur++; continue; }
         if (*s == '#') {
             if (e.path[0] && e.index < p->capacity) p->entries[e.index] = e;
             e = (TextureData){.index = U16_MAX}; size_t aL = le - s;
-            if (aL >= sizeof(e.path)) aL = sizeof(e.path) - 1; MemCpyFromBtoAForNBytes(e.path,s + 1,aL); e.path[aL] = 0;
+            if (aL >= sizeof(e.path)) aL = sizeof(e.path) - 1; mcpy(e.path,s + 1,aL); e.path[aL] = 0;
         } else {
             char *col = StringFindFirstCharWithin(s, ':');
             if (col) {
                 char *k = s, *v = col + 1, tk[256] = {0}, tv[256] = {0};
-                while (CharacterIsEmpty(*k) && k < col) k++; while (CharacterIsEmpty(*v) && v <= le) v++;
+                while (cEmpty(*k) && k < col) k++; while (cEmpty(*v) && v <= le) v++;
                 size_t kL = col - k, vL = (le >= v) ? (le - v + 1) : 0;
                 if (kL && vL) {
-                    StringCopyInto_A_SubstringFrom_B(tk, kL, k, 256); StringCopyInto_A_SubstringFrom_B(tv,vL,v,256);
-                    char *ke = tk + GetStringLength(tk) - 1, *ve = tv + GetStringLength(tv) - 1;
-                    while (ke > tk && CharacterIsEmpty(*ke)) *ke-- = 0; while (ve > tv && CharacterIsEmpty(*ve)) *ve-- = 0;
-                         if (StringsEqual(tk,      "index")) e.index       = parse_numberu16(tv,s,line);
-                    else if (StringsEqual(tk,"transparent")) e.transparent = parse_bool(tv,s,line);
-                    else if (StringsEqual(tk,"doublesided")) e.doublesided = parse_bool(tv,s,line);
+                    sCpy2aSubFromb(tk, kL, k, 256); sCpy2aSubFromb(tv,vL,v,256);
+                    char *ke = tk + slen(tk) - 1, *ve = tv + slen(tv) - 1;
+                    while (ke > tk && cEmpty(*ke)) *ke-- = 0; while (ve > tv && cEmpty(*ve)) *ve-- = 0;
+                         if (sEqual(tk,      "index")) e.index       = parse_numberu16(tv,s,line);
+                    else if (sEqual(tk,"transparent")) e.transparent = parse_bool(tv,s,line);
+                    else if (sEqual(tk,"doublesided")) e.doublesided = parse_bool(tv,s,line);
                 }
             }
         }
         if (cur < end && (*cur == '\r' || *cur == '\n')) cur++;
     }
     if (e.path[0] && e.index < p->capacity) p->entries[e.index] = e;
-    OS_DeallocateRAM(data, sz); return true;
+    OS_Free(data, sz); return true;
 }
 
 typedef struct { int width,height; unsigned char* pixels; } GLFWimage;
@@ -822,17 +622,17 @@ void VSetWindowIcon(GLFWimage*);
 static __attribute__((noinline)) void LoadTextures() {
     double start_time = get_time();
     loadedTexturesMaxIndex = totalPixels = totalPaletteColors = 0u;
-    TextureDataParser texture_parser; if (unlikely(!ParseTextureData(&texture_parser,MAX_VALID_TEXTURE, "./Data/textures.txt"))) { DualLogError("Could not parse ./Data/textures.txt!\n"); OS_Exit(1); }
+    TextureDataParser texture_parser; if (unlikely(!ParseTextureData(&texture_parser,MAX_TXRS, "./Data/textures.txt"))) { DualLogError("Could not parse ./Data/textures.txt!\n"); OS_Exit(1); }
 
     i32 maxIndex = -1;
     for (u32 k = 0; k < texture_parser.count; ++k) { if (texture_parser.entries[k].index > maxIndex && texture_parser.entries[k].index != U16_MAX) maxIndex = texture_parser.entries[k].index; }
     loadedTexturesMaxIndex = (u16)(maxIndex + 1);
     i32* parsIdx = OS_Alloc(loadedTexturesMaxIndex * sizeof(i32));
-    MemSetToVForNBytes(parsIdx, -1, loadedTexturesMaxIndex * sizeof(i32));
+    mset(parsIdx, -1, loadedTexturesMaxIndex * sizeof(i32));
     for (u32 k = 0; k < texture_parser.count; ++k) { if (texture_parser.entries[k].index < loadedTexturesMaxIndex) parsIdx[texture_parser.entries[k].index] = (i32)k; }
     DualLog("Loading textures (%u) ... ", texture_parser.count);
     RawTexture* rawTextures = OS_Alloc(loadedTexturesMaxIndex * sizeof(RawTexture));
-    MemSetToVForNBytes(rawTextures,0,loadedTexturesMaxIndex * sizeof(RawTexture));
+    mset(rawTextures,0,loadedTexturesMaxIndex * sizeof(RawTexture));
     for (u32 i = 0; i < loadedTexturesMaxIndex; ++i) {
         i32 p = parsIdx[i]; if (p < 0) continue;
         const char* path = texture_parser.entries[p].path;
@@ -870,29 +670,29 @@ static __attribute__((noinline)) void LoadTextures() {
         u32 numP = (u32)textureWidths[i] * textureHeights[i]; u32 palS = texturePaletteSizes[i];
         textureOffsets[i] = pixel_base; texturePaletteOffsets[i] = color_base;
         textureSizes[i*2]     = textureWidths[i]; textureSizes[i*2 + 1] = textureHeights[i];
-        MemCpyFromBtoAForNBytes(all_indices + pixel_base,textureIndexBuffers[i],numP);
-        MemCpyFromBtoAForNBytes(texturePalettes + color_base,texturePaletteBuffers[i],palS * sizeof(u32));
+        mcpy(all_indices + pixel_base,textureIndexBuffers[i],numP);
+        mcpy(texturePalettes + color_base,texturePaletteBuffers[i],palS * sizeof(u32));
         pixel_base += numP; color_base += palS;
-        OS_DeallocateRAM(textureIndexBuffers[i],numP); OS_DeallocateRAM(texturePaletteBuffers[i],palS * sizeof(u32));
+        OS_Free(textureIndexBuffers[i],numP); OS_Free(texturePaletteBuffers[i],palS * sizeof(u32));
     }
 
     DualLog("total palette colors: %u, total pixels: %u...", totalPaletteColors,totalPixels);
     i32 packed_size = ((i32)totalPixels + 3) / 4 * sizeof(u32);
     glBindBuffer(GL_SSBO,Sys_Render.colorBufferID);
     void* dst = glMapBufferRange(GL_SSBO,0,packed_size,0x0002/*GL_MAP_WRITE_BIT*/|0x0004/*GL_MAP_INVALIDATE_RANGE_BIT*/);
-    MemCpyFromBtoAForNBytes(dst,all_indices,packed_size); 
+    mcpy(dst,all_indices,packed_size); 
     glUnmapBuffer(GL_SSBO);
-    glBindBuffer(GL_SSBO,Sys_Render.texturePalettesID);       glBufferData(GL_SSBO,totalPaletteColors * sizeof(u32),texturePalettes,GL_STATIC_DRAW);
+    glBindBuffer(GL_SSBO,Sys_Render.texPalID);       glBufferData(GL_SSBO,totalPaletteColors * sizeof(u32),texturePalettes,GL_STATIC_DRAW);
     glBindBuffer(GL_SSBO,Sys_Render.textureOffsetsID);        glBufferData(GL_SSBO,loadedTexturesMaxIndex * sizeof(u32),textureOffsets,GL_STATIC_DRAW);
     glBindBuffer(GL_SSBO,Sys_Render.textureSizesID);          glBufferData(GL_SSBO,loadedTexturesMaxIndex * 2 * sizeof(i32),textureSizes,GL_STATIC_DRAW);
-    glBindBuffer(GL_SSBO,Sys_Render.texturePaletteOffsetsID); glBufferData(GL_SSBO,loadedTexturesMaxIndex * sizeof(u32),texturePaletteOffsets,GL_STATIC_DRAW); glBindBuffer(GL_SSBO,0);
-    OS_DeallocateRAM(texture_parser.entries,texture_parser.count * sizeof(TextureData)); OS_DeallocateRAM(arena,arena_size);
-    OS_DeallocateRAM(rawTextures,loadedTexturesMaxIndex * sizeof(RawTexture));           OS_DeallocateRAM(parsIdx,loadedTexturesMaxIndex * sizeof(i32));
-    OS_DeallocateRAM(textureIndexBuffers,loadedTexturesMaxIndex * sizeof(u8*));          OS_DeallocateRAM(textureSizes,loadedTexturesMaxIndex * 2 * sizeof(i32));
-    OS_DeallocateRAM(texturePaletteBuffers,loadedTexturesMaxIndex * sizeof(u32*));       OS_DeallocateRAM(texturePaletteSizes,loadedTexturesMaxIndex * sizeof(u32));
-    OS_DeallocateRAM(texturePaletteOffsets,loadedTexturesMaxIndex * sizeof(u32));        OS_DeallocateRAM(textureWidths,loadedTexturesMaxIndex * sizeof(i32));
-    OS_DeallocateRAM(textureHeights,loadedTexturesMaxIndex * sizeof(i32));               for (int t=0;t<num_parse_threads;++t) OS_DeallocateRAM(thread_png_arenas[t].base,PNG_ARENA_SIZE);
-    OS_DeallocateRAM(thread_png_arenas,(size_t)num_parse_threads * sizeof(PngArena));
+    glBindBuffer(GL_SSBO,Sys_Render.texPalOfsID); glBufferData(GL_SSBO,loadedTexturesMaxIndex * sizeof(u32),texturePaletteOffsets,GL_STATIC_DRAW); glBindBuffer(GL_SSBO,0);
+    OS_Free(texture_parser.entries,texture_parser.count * sizeof(TextureData)); OS_Free(arena,arena_size);
+    OS_Free(rawTextures,loadedTexturesMaxIndex * sizeof(RawTexture));           OS_Free(parsIdx,loadedTexturesMaxIndex * sizeof(i32));
+    OS_Free(textureIndexBuffers,loadedTexturesMaxIndex * sizeof(u8*));          OS_Free(textureSizes,loadedTexturesMaxIndex * 2 * sizeof(i32));
+    OS_Free(texturePaletteBuffers,loadedTexturesMaxIndex * sizeof(u32*));       OS_Free(texturePaletteSizes,loadedTexturesMaxIndex * sizeof(u32));
+    OS_Free(texturePaletteOffsets,loadedTexturesMaxIndex * sizeof(u32));        OS_Free(textureWidths,loadedTexturesMaxIndex * sizeof(i32));
+    OS_Free(textureHeights,loadedTexturesMaxIndex * sizeof(i32));               for (int t=0;t<num_parse_threads;++t) OS_Free(thread_png_arenas[t].base,16777216);
+    OS_Free(thread_png_arenas,(size_t)num_parse_threads * sizeof(PngArena));
     FHandle fp = OS_OpenReadonly(Sys_Global.global_winicon); // Load window icon
     int windowIconFileSize = OS_FileSize(fp);
     u8* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize,fp,Sys_Global.global_winicon);    
@@ -901,18 +701,18 @@ static __attribute__((noinline)) void LoadTextures() {
     if (!pixels) { DualLogError("Failed to load icon: %s\n",Sys_Global.global_winicon); OS_Exit(1); }
     
     GLFWimage image = (GLFWimage){w,h,pixels}; VSetWindowIcon(&image);
-    OS_DeallocateRAM(file_buffer,windowIconFileSize); OS_DeallocateRAM(png_arena_main.base,PNG_ARENA_SIZE); png_arena_main.base = NULL;
+    OS_Free(file_buffer,windowIconFileSize); OS_Free(png_arena_main.base,16777216); png_arena_main.base = NULL;
     DualLog(" took %.6f secs\n",get_time() - start_time);
     DebugRAM("After LoadTextures and after deallocation");
 }
-// ======================== 3D Models Loading System
-u8** modelVertices = NULL; u16** modelTriangles = NULL; u32 modelVertexCounts[MODEL_IDX_MAX] = {0}; u16 modelTriangleCounts[MODEL_IDX_MAX] = {0}; float modelBounds[MODEL_IDX_MAX] = {0}; u16 loadedModelsMaxIndex = 0;
+// 3D Model Load Sys
+u8** modelVertices = NULL; u16** modelTriangles = NULL; u32 modelVertexCounts[MAX_MDLS] = {0}; u16 modelTriangleCounts[MAX_MDLS] = {0}; float modelBounds[MAX_MDLS] = {0}; u16 loadedModelsMaxIndex = 0;
 #define MAX_VERT_ELEMENT_SIZE 6964
 #define MAX_OUTPUT_VERTS      36364
 static float **thread_temp_pos = NULL, **thread_temp_nrm = NULL, **thread_temp_uv = NULL, **thread_out_verts = NULL; static u16** thread_out_tris = NULL;
 typedef struct { const char* data; int size; } RawOBJ; typedef struct { u16 index; bool animated; u8 animationNum; char path[128]; } ModelData; typedef struct { ModelData* entries; u32 count; u32 capacity; } ModelDataParser;
 static inline __attribute__((always_inline)) half float_to_half(float f) {
-    u32 x; MemCpyFromBtoAForNBytes(&x,&f,4);
+    u32 x; mcpy(&x,&f,4);
     u32 s = x>>31, ue = (x>>23)&0xff; i32 e = (i32)ue-127; u32 m = x&0x7fffff;
     if (ue == 0xff) return m ? (half)(0x7e00|(m>>13)|(s<<15)) : (half)((s<<15)|0x7c00);
     if (!ue && !m) return (half)(s<<15);
@@ -935,21 +735,21 @@ static void OptimizeVertexCache(u16* idx, u32 ic, u32 vc) {
     qsort_new(t, tc, sizeof(TriSort), cmp);
     u16* n = OS_Alloc(ic*sizeof(u16));
     for (u32 i=0; i<tc; ++i) { u16* s=idx+t[i].idx*3; u16* d=n+i*3; d[0]=s[0];d[1]=s[1];d[2]=s[2]; }
-    MemCpyFromBtoAForNBytes(idx,n,ic*sizeof(u16));
-    OS_DeallocateRAM(n, ic*sizeof(u16)); OS_DeallocateRAM(t, tc*sizeof(TriSort));
+    mcpy(idx,n,ic*sizeof(u16));
+    OS_Free(n, ic*sizeof(u16)); OS_Free(t, tc*sizeof(TriSort));
 }
 
 static u8* OptimizeVertexFetch(u8* v, u32* vc, u16* idx, u32 ic, size_t stride) {
     u32 oc = *vc; if (!oc || !ic) return v;
     u32 *remap = OS_Alloc(oc*sizeof(u32)), *first = OS_Alloc(oc*sizeof(u32));
-    MemSetToVForNBytes(remap,0xFF,oc*sizeof(u32));
+    mset(remap,0xFF,oc*sizeof(u32));
     u32 nc = 0;
     for (u32 i=0; i<ic; ++i) { u32 id = idx[i]; if (id < oc && remap[id] == 0xFFFFFFFFU) { remap[id] = nc; first[nc] = id; ++nc; } }
     u8* nv = OS_Alloc(nc*stride);
-    for (u32 i=0; i<nc; ++i) MemCpyFromBtoAForNBytes(nv+i*stride,v+first[i]*stride,stride);
+    for (u32 i=0; i<nc; ++i) mcpy(nv+i*stride,v+first[i]*stride,stride);
     for (u32 i=0; i<ic; ++i) if (idx[i] < oc) idx[i] = (u16)remap[idx[i]];
     *vc = nc;
-    OS_DeallocateRAM(remap,oc*sizeof(u32)); OS_DeallocateRAM(first,oc*sizeof(u32));
+    OS_Free(remap,oc*sizeof(u32)); OS_Free(first,oc*sizeof(u32));
     return nv;
 }
 
@@ -993,17 +793,8 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, c
                 if (unlikely(ec + 3 > MAX_OUTPUT_VERTS)) {DualLogError("vert overflow!\n"); return false;}
                 u32 tri[3] = {0, (u32)k, (u32)(k+1)};
                 for (int t=0; t<3; ++t) {
-                    int ix = tri[t];
-                    u32 v = vi[ix] ? vi[ix]-1 : 0;
-                    u32 tex = (ti[ix] && ti[ix] <= uc) ? ti[ix]-1 : 0;
-                    u32 nrm = (ni[ix] && ni[ix] <= nc) ? ni[ix]-1 : 0;
-                    float* dst = sv + (ec<<3);
-                    dst[0] = -tp[v*3];   dst[1] =  tp[v*3+1]; dst[2] =  tp[v*3+2];
-                    dst[3] = (nrm < nc) ? -tn[nrm*3]   : 0;
-                    dst[4] = (nrm < nc) ?  tn[nrm*3+1] : 0;
-                    dst[5] = (nrm < nc) ?  tn[nrm*3+2] : 0;
-                    dst[6] = (tex < uc) ?  tu[tex*2]   : 0;
-                    dst[7] = (tex < uc) ?  tu[tex*2+1] : 0;
+                    int ix = tri[t]; u32 v = vi[ix] ? vi[ix]-1 : 0; u32 tex = (ti[ix] && ti[ix] <= uc) ? ti[ix]-1 : 0; u32 nrm = (ni[ix] && ni[ix] <= nc) ? ni[ix]-1 : 0; float* dst = sv + (ec<<3);
+                    dst[0]=-tp[v*3]; dst[1]=tp[v*3+1]; dst[2]=tp[v*3+2]; dst[3]=(nrm < nc) ? -tn[nrm*3] : 0; dst[4]=(nrm < nc) ? tn[nrm*3+1] : 0; dst[5]=(nrm < nc) ? tn[nrm*3+2] : 0; dst[6]=(tex < uc) ? tu[tex*2] : 0; dst[7]=(tex < uc) ? tu[tex*2+1] : 0;
                     float x=dst[0],y=dst[1],z=dst[2];
                     if (x < mx) mx = x; if (x > Mx) Mx = x;
                     if (y < my) my = y; if (y > My) My = y;
@@ -1018,18 +809,18 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, c
 
     #define HASH_SIZE 65536
     u32* ht = OS_Alloc(HASH_SIZE * sizeof(u32));
-    MemSetToVForNBytes(ht,0xFF,HASH_SIZE * sizeof(u32));
+    mset(ht,0xFF,HASH_SIZE * sizeof(u32));
     u32* rem = (u32*)st; u32 ucnt = 0;
     for (u32 i=0; i<ec; ++i) {
         const float* v = sv + (i<<3);
         u64 h = *(u32*)(v+0) ^ *(u32*)(v+2) ^ *(u32*)(v+4) ^ *(u32*)(v+6); u32 s = (u32)(h ^ (h>>32)) & (HASH_SIZE-1);
         while (ht[s] != 0xFFFFFFFFU) { if (CompareMemoryForNBytes(sv+(ht[s]<<3), v, 32) == 0) { rem[i] = ht[s]; goto nxt; } s = (s+1) & (HASH_SIZE-1); }
         ht[s] = ucnt; rem[i] = ucnt;
-        MemCpyFromBtoAForNBytes(sv+(ucnt<<3), v, 32);
+        mcpy(sv+(ucnt<<3), v, 32);
         ++ucnt; nxt:;
     }
 
-    u8* fv = OS_Alloc((size_t)ucnt * VERTEX_ATTRIBUTES_SIZE); u8* dst = fv;
+    u8* fv = OS_Alloc((size_t)ucnt * VRT_ATT_SZ); u8* dst = fv;
     for (u32 i=0; i<ucnt; ++i) { 
         const float* src = sv + (i<<3);
         for (u32 j=0; j<8; ++j) { *(half*)dst = float_to_half(src[j]); dst += 2; }
@@ -1038,11 +829,11 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, c
     u16* ft = OS_Alloc(ec * sizeof(u16));
     for (u32 i=0; i<ec; ++i) ft[i] = (u16)rem[i];
     OptimizeVertexCache(ft,ec,ucnt);
-    u32 oldc = ucnt; u8* optv = OptimizeVertexFetch(fv,&ucnt,ft,ec,VERTEX_ATTRIBUTES_SIZE); // Allocates and returns new buffer; safe to free fv after.
-    OS_DeallocateRAM(fv,oldc * VERTEX_ATTRIBUTES_SIZE);
+    u32 oldc = ucnt; u8* optv = OptimizeVertexFetch(fv,&ucnt,ft,ec,VRT_ATT_SZ); // Allocates and returns new buffer; safe to free fv after.
+    OS_Free(fv,oldc * VRT_ATT_SZ);
     *ov = optv; *ovc = ucnt; *ot = ft; *otc = ec/3;
     modelBounds[mindex] = vmax(vabs(mx),vmax(vabs(my),vmax(vabs(mz),vmax(Mx,vmax(My,Mz))))); 
-    OS_DeallocateRAM(ht,HASH_SIZE * sizeof(u32));
+    OS_Free(ht,HASH_SIZE * sizeof(u32));
     return true;
 }
 
@@ -1063,9 +854,9 @@ bool ParseModelData(ModelDataParser *p, u16 maxSz, const char *fn) {
     while (c < e) {  // first pass - find max index
         char* s = c; while (c < e && *c != '\n' && *c != '\r') ++c;
         if (c - s > 5) {
-            while (CharacterIsEmpty(*s)) ++s;
+            while (cEmpty(*s)) ++s;
             char* col = StringFindFirstCharWithin(s, ':');
-            if (col && StringCompareUpToLength(s, "index", col - s) == 0) {
+            if (col && sCompUpToLen(s, "index", col - s) == 0) {
                 u32 idx = parse_numberu32(col+1, s, ln);
                 if (idx > maxidx) maxidx = idx;
             }
@@ -1073,8 +864,8 @@ bool ParseModelData(ModelDataParser *p, u16 maxSz, const char *fn) {
         if (c < e && *c == '\r') ++c; if (c < e && *c == '\n') ++c; ++ln;
     }
 
-    if (!maxidx) { DualLogWarn("No entries in %s\n", fn); OS_DeallocateRAM(buf,sz); return true; }
-    if (maxidx >= maxSz) { DualLogWarn("Index too large in %s\n", fn); OS_DeallocateRAM(buf,sz); return true; }
+    if (!maxidx) { DualLogWarn("No entries in %s\n", fn); OS_Free(buf,sz); return true; }
+    if (maxidx >= maxSz) { DualLogWarn("Index too large in %s\n", fn); OS_Free(buf,sz); return true; }
 
     u32 cnt = maxidx + 1;
     ModelData* ents = OS_Alloc(cnt * sizeof(ModelData));
@@ -1087,15 +878,15 @@ bool ParseModelData(ModelDataParser *p, u16 maxSz, const char *fn) {
         size_t len = c - s; ++ln;
         if (len < 3) { if (c<e && (*c=='\r'||*c=='\n')) ++c; continue; }
 
-        while (CharacterIsEmpty(*s)) ++s;
-        char* le = s + len - 1; while (le > s && CharacterIsEmpty(*le)) --le;
+        while (cEmpty(*s)) ++s;
+        char* le = s + len - 1; while (le > s && cEmpty(*le)) --le;
         if (*s == '/' && s[1] == '/') goto next;
         if (*s == '#') {
             if (cur.path[0] && cur.index != U16_MAX && cur.index < cnt) ents[cur.index] = cur;
             cur = (ModelData){U16_MAX, false, 255, {0}};
             if (le > s) {
                 size_t pl = le - s; if (pl >= sizeof(cur.path)) pl = sizeof(cur.path)-1;
-                MemCpyFromBtoAForNBytes(cur.path,s+1,pl); cur.path[pl] = 0;
+                mcpy(cur.path,s+1,pl); cur.path[pl] = 0;
             }
             goto next;
         }
@@ -1103,25 +894,24 @@ bool ParseModelData(ModelDataParser *p, u16 maxSz, const char *fn) {
         char* col = StringFindFirstCharWithin(s, ':');
         if (col) {
             char k[256]={0}, v[256]={0};
-            StringCopyInto_A_SubstringFrom_B(k, col-s, s, 256);
-            StringCopyInto_A_SubstringFrom_B(v, le-col, col+1, 256);
-            if (StringsEqual(k,"index"))             cur.index = parse_numberu16(v,s,ln);
-            else if (StringsEqual(k,"animationNum")) cur.animationNum = parse_numberu16(v,s,ln);
-            else if (StringsEqual(k,"animated"))     cur.animated = parse_numberu8(v,s,ln);
+            sCpy2aSubFromb(k, col-s, s, 256);
+            sCpy2aSubFromb(v, le-col, col+1, 256);
+            if (sEqual(k,"index"))             cur.index = parse_numberu16(v,s,ln);
+            else if (sEqual(k,"animationNum")) cur.animationNum = parse_numberu16(v,s,ln);
+            else if (sEqual(k,"animated"))     cur.animated = parse_numberu8(v,s,ln);
         }
         next:
         if (c < e && *c == '\r') ++c; if (c < e && *c == '\n') ++c;
     }
     if (cur.path[0] && cur.index != U16_MAX && cur.index < cnt) ents[cur.index] = cur;
-    OS_DeallocateRAM(buf, sz);
+    OS_Free(buf, sz);
     return true;
 }
 
-static void UploadMdlBuffer(u32 target, u32 buf, const void* data, size_t size) { glBindBuffer(target,buf); glBufferData(target,size,NULL,GL_STATIC_DRAW); void* mp = glMapBufferRange(target,0,size,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/); MemCpyFromBtoAForNBytes(mp,data,size); glUnmapBuffer(target); }
 void LoadModels() {
     double startModelTime = get_time();
     ModelDataParser mp = {0};
-    if (!ParseModelData(&mp, MODEL_IDX_MAX,"./Data/models.txt")) { DualLogError("Failed models.txt\n"); OS_Exit(1); }
+    if (!ParseModelData(&mp, MAX_MDLS,"./Data/models.txt")) { DualLogError("Failed models.txt\n"); OS_Exit(1); }
 
     DualLog("Loading models (%d) ...",mp.count);
     u32 maxid = 0;
@@ -1133,7 +923,7 @@ void LoadModels() {
     size_t arena = n*sizeof(i32) + n*sizeof(RawOBJ) + 5*num_parse_threads*sizeof(float*) + (size_t)num_parse_threads * ((MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*2)*sizeof(float) + MAX_OUTPUT_VERTS*8*sizeof(float) + MAX_OUTPUT_VERTS*sizeof(u32));
     void* arena_base = OS_Alloc(arena); char* p = arena_base;
     i32* idxmap = (i32*)p; p += n*sizeof(i32);
-    MemSetToVForNBytes(idxmap, -1, n*sizeof(i32));
+    mset(idxmap, -1, n*sizeof(i32));
     for (u32 i=0; i<mp.count; ++i) if (mp.entries[i].index != U16_MAX) idxmap[mp.entries[i].index] = (i32)i;
     RawOBJ* raw = (RawOBJ*)p; p += n*sizeof(RawOBJ);
     for (u32 i=0; i<n; ++i) {
@@ -1171,17 +961,17 @@ void LoadModels() {
     for (int i=0; i<loadedModelsMaxIndex; ++i) {
         if (!modelVertexCounts[i]) continue;
 
-        tv += modelVertexCounts[i]; tt += modelTriangleCounts[i];
-        UploadMdlBuffer(GL_ARRAY_BUFFER,Sys_Render.vbos[i],modelVertices[i],(size_t)modelVertexCounts[i] * VERTEX_ATTRIBUTES_SIZE);
-        UploadMdlBuffer(GL_ELEMENT_ARRAY_BUFFER,Sys_Render.tbos[i],modelTriangles[i],(size_t)modelTriangleCounts[i] * 3 * sizeof(u16));
-        if (raw[i].data) OS_DeallocateRAM((void*)raw[i].data,raw[i].size);
+        tv += modelVertexCounts[i]; tt += modelTriangleCounts[i]; size_t vcz = (size_t)modelVertexCounts[i] * VRT_ATT_SZ, tcz = (size_t)modelTriangleCounts[i] * 3 * sizeof(u16);
+        glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.vbos[i]);         glBufferData(GL_ARRAY_BUFFER,vcz,NULL,GL_STATIC_DRAW);         void* mpv = glMapBufferRange(GL_ARRAY_BUFFER,0,vcz,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/);         mcpy(mpv,modelVertices[i],vcz);  glUnmapBuffer(GL_ARRAY_BUFFER);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,Sys_Render.tbos[i]); glBufferData(GL_ELEMENT_ARRAY_BUFFER,tcz,NULL,GL_STATIC_DRAW); void* mpt = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER,0,tcz,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/); mcpy(mpt,modelTriangles[i],tcz); glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
+        if (raw[i].data) OS_Free((void*)raw[i].data,raw[i].size);
     }
 
-    OS_DeallocateRAM(arena_base, arena);
+    OS_Free(arena_base, arena);
     glBindBuffer(GL_ARRAY_BUFFER,0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0);
     glFlush(); glFinish();
-    OS_DeallocateRAM(mp.entries,mp.count * sizeof(ModelData));
+    OS_Free(mp.entries,mp.count * sizeof(ModelData));
     DualLog(" vertices: %u, tris: %u, %f secs\n",tv,tt,get_time() - startModelTime);
     DebugRAM("After LoadModels");
 }
@@ -1223,7 +1013,7 @@ bool GridCellBlock(u16 i,Vector3 pos,Vector3 newPos) {
 }
 
 static unsigned char* LoadCullPNG(const char* name, int level) {
-    char path[256]; StringFormat(path, sizeof(path),"./Data/%s_%d.png",name,level);
+    char path[256]; sFormat(path, sizeof(path),"./Data/%s_%d.png",name,level);
     FHandle fp = OS_OpenReadonly(path);
     OS_Seek(fp,0,2); size_t size = OS_Tell(fp);
     if (size > MAX_CULL_FILESIZE) { DualLogError("PNG too large: %s\n",path); OS_Exit(1); }
@@ -1234,7 +1024,7 @@ static unsigned char* LoadCullPNG(const char* name, int level) {
     
     int w, h; unsigned char* pixels = PngLoad(cullingFileBuffer,size,&w,&h,&png_arena_main);
     if (!pixels) { DualLogError("STB failed: %s\n",path); OS_Exit(1); }
-    OS_DeallocateRAM(cullingFileBuffer,MAX_CULL_FILESIZE * sizeof(u8));
+    OS_Free(cullingFileBuffer,MAX_CULL_FILESIZE * sizeof(u8));
     return pixels;
 }
 
@@ -1264,7 +1054,7 @@ void DetermineClosedEdges() {
             if (cr > 127) gridCellStates[cellIdx] |= CELL_CLOSEDNORTH;
             if (cg > 127) gridCellStates[cellIdx] |= CELL_CLOSEDEAST;
             if (cb > 127) gridCellStates[cellIdx] |= CELL_CLOSEDSOUTH;
-            if ((cr < 255 && cr > 0) || (cg < 255 && cg > 0) || (cb < 255 && cb > 0)) gridCellStates[cellIdx] |= CELL_CLOSEDWEST; // Anything that has closed west edge will be not at full 255 on at least one channel. Typical for all other edge conditions is to use full brightness 255 on the channel(s). All 4 closed would be 128 128 128 but this doesn't ever happen. None closed is 0 0 0
+            if ((cr < 255 && cr > 0) || (cg < 255 && cg > 0) || (cb < 255 && cb > 0)) gridCellStates[cellIdx] |= CELL_CLOSEDWEST; // Anything that has closed west edge will be not at full 255 on at least one channel. Typical to use full brightness 255 on the channel(s). All 4 closed would be 128 128 128 but this doesn't ever happen. None closed is 0 0 0
             if (ca > 0 && ca < 255) gridCellStates[cellIdx] |= CELL_CLOSEDNORTH|CELL_CLOSEDEAST|CELL_CLOSEDSOUTH|CELL_CLOSEDWEST;
         }
     }
@@ -1280,7 +1070,7 @@ void DetermineClosedEdges() {
         }
     }
     
-    OS_DeallocateRAM(png_arena_main.base, PNG_ARENA_SIZE); png_arena_main.base = NULL;
+    OS_Free(png_arena_main.base, 16777216); png_arena_main.base = NULL;
     DualLog("found %d open cells...",totalOpenCells);
 }
 
@@ -1535,7 +1325,7 @@ ENGINE_TO_MOD void PortalCulling() { // Called just once at end of animation loo
     u16 playerCellX = PosGetCellCoordX(Sys_Global.instances[PLAYER1].position.x);
     u16 playerCellZ = PosGetCellCoordZ(Sys_Global.instances[PLAYER1].position.z);
     bool previousLightVisible[LIGHT_COUNT];
-    MemSetToVForNBytes(previousLightVisible,false,LIGHT_COUNT * sizeof(bool));
+    mset(previousLightVisible,false,LIGHT_COUNT * sizeof(bool));
     for (u16 i=0;i<loadedLights;++i) {
         u16 lcell = (lights[i].pos.z * WORLDX) + lights[i].pos.x;
         if (gridCellStates[lcell] & CELL_VISIBLE) previousLightVisible[i] = true;
@@ -1628,8 +1418,8 @@ void CullInit() {
 }
 // ===================== Fonts and Text System
 typedef struct { void* ptr; size_t sz; } TAlloc; static TAlloc* ttAllocs = NULL; static int tallocCount=0;
-static void* TempAlloc(size_t n){if(tallocCount>=4474){DualLogError("TempAlloc too many!\n");return NULL;}void*p=OS_Alloc(n);if(!p){DualLogError("TempAlloc: OS_Alloc failed!\n");return NULL;}ttAllocs[tallocCount++]=(TAlloc){p,n};return p;}
-static void  TempFree (void* p){if(!p||tallocCount==0||ttAllocs[tallocCount-1].ptr!=p)return;OS_DeallocateRAM(p,ttAllocs[tallocCount-1].sz);tallocCount--;}
+static void* TempAlloc(size_t n){if(tallocCount>=6474){DualLogError("TempAlloc too many!\n");return NULL;}void*p=OS_Alloc(n);if(!p){DualLogError("TempAlloc: OS_Alloc failed!\n");return NULL;}ttAllocs[tallocCount++]=(TAlloc){p,n};return p;}
+static void  TempFree (void* p){if(!p||tallocCount==0||ttAllocs[tallocCount-1].ptr!=p)return;OS_Free(p,ttAllocs[tallocCount-1].sz);tallocCount--;}
 static u16 ttUSHORT(u8*p){return p[0]*256+p[1];} 
 static i16 ttSHORT (u8*p){return p[0]*256+p[1];}
 static u32 ttULONG (u8*p){return((u32)p[0]<<24)|((u32)p[1]<<16)|((u32)p[2]<<8)|p[3];}
@@ -1768,7 +1558,7 @@ static int _GetGlyphShapeTT(const stbtt_fontinfo*info,int gi,stbtt_vertex**pv){
             int cn=stbtt_GetGlyphShape(info,gidx,&cv);
             if(cn>0){for(int i=0;i<cn;++i){stbtt_vertex*v=&cv[i];i16 vx=v->x,vy=v->y;v->x=(i16)(fm*(mtx[0]*vx+mtx[2]*vy+mtx[4]));v->y=(i16)(fn*(mtx[1]*vx+mtx[3]*vy+mtx[5]));vx=v->cx;vy=v->cy;v->cx=(i16)(fm*(mtx[0]*vx+mtx[2]*vy+mtx[4]));v->cy=(i16)(fn*(mtx[1]*vx+mtx[3]*vy+mtx[5]));}
                 tmp=(stbtt_vertex*)TempAlloc((nv+cn)*sizeof(stbtt_vertex));if(!tmp){TempFree(verts);TempFree(cv);return 0;}
-                if(nv>0&&verts) MemCpyFromBtoAForNBytes(tmp,verts,nv*sizeof(stbtt_vertex)); MemCpyFromBtoAForNBytes(tmp+nv,cv,cn*sizeof(stbtt_vertex));TempFree(verts);TempFree(cv);verts=tmp;nv+=cn;}
+                if(nv>0&&verts) mcpy(tmp,verts,nv*sizeof(stbtt_vertex)); mcpy(tmp+nv,cv,cn*sizeof(stbtt_vertex));TempFree(verts);TempFree(cv);verts=tmp;nv+=cn;}
             more=fl&(1<<5);}
     }
     *pv=verts;return nv;
@@ -1846,15 +1636,15 @@ static void stbtt_GetGlyphHMetrics(const stbtt_fontinfo*info,int gi,int*adv,int*
 
 static __attribute__((pure)) float stbtt_ScaleForPixelHeight(const stbtt_fontinfo*info,float h){return h/(float)(ttSHORT(info->data+info->hhea+4)-ttSHORT(info->data+info->hhea+6));}
 static __attribute__((pure)) float stbtt_ScaleForMappingEmToPixels(const stbtt_fontinfo*info,float px){return px/(float)ttUSHORT(info->data+info->head+18);}
-static void stbtt_GetGlyphBitmapBoxSubpixel(const stbtt_fontinfo*font,int g,float sx,float sy,float shx,float shy,int*ix0,int*iy0,int*ix1,int*iy1){
+static void GetGlyphBitmapBoxSubpixel(const stbtt_fontinfo*font,int g,float sx,float sy,float shx,float shy,int*ix0,int*iy0,int*ix1,int*iy1){
     int x0=0,y0=0,x1,y1;if(!stbtt_GetGlyphBox(font,g,&x0,&y0,&x1,&y1)){if(ix0)*ix0=0;if(iy0)*iy0=0;if(ix1)*ix1=0;if(iy1)*iy1=0;}
     else{if(ix0)*ix0=(int)vfloor(x0*sx+shx);if(iy0)*iy0=(int)vfloor(-y1*sy+shy);if(ix1)*ix1=(int)vceil(x1*sx+shx);if(iy1)*iy1=(int)vceil(-y0*sy+shy);}
 }
 
 typedef struct{int w,h,stride;unsigned char*pixels;}stbtt__bitmap;
-typedef struct stbtt__hheap_chunk{ struct stbtt__hheap_chunk* next; }stbtt__hheap_chunk;
-typedef struct{ stbtt__hheap_chunk* head; void* first_free; int num_remaining_in_head_chunk; }stbtt__hheap;
-static void* _hha(stbtt__hheap* hh,size_t sz){ if(hh->first_free){void*p=hh->first_free;hh->first_free=*(void**)p;return p;}if(!hh->num_remaining_in_head_chunk){int c=sz<32?2000:sz<128?800:100;stbtt__hheap_chunk*ck=(stbtt__hheap_chunk*)TempAlloc(sizeof(*ck)+sz*c);if(!ck)return NULL;ck->next=hh->head;hh->head=ck;hh->num_remaining_in_head_chunk=c;}--hh->num_remaining_in_head_chunk;return(char*)hh->head+sizeof(stbtt__hheap_chunk)+sz*hh->num_remaining_in_head_chunk; }
+typedef struct tt_heapchk{ struct tt_heapchk* next; }tt_heapchk;
+typedef struct{ tt_heapchk* head; void* first_free; int remaining; }stbtt__hheap;
+static void* _hha(stbtt__hheap* hh,size_t sz) { if(hh->first_free){void*p=hh->first_free;hh->first_free=*(void**)p;return p;} if(!hh->remaining) {int c=sz<32?2000:sz<128?800:100;tt_heapchk*ck=(tt_heapchk*)TempAlloc(sizeof(*ck)+sz*c); if(!ck){return NULL;} ck->next=hh->head; hh->head=ck; hh->remaining=c;} --hh->remaining; return(char*)hh->head+sizeof(tt_heapchk)+sz*hh->remaining; }
 static void _hhf(stbtt__hheap* hh,void*p) { *(void**)p=hh->first_free;hh->first_free=p; }
 typedef struct{ float x0,y0,x1,y1; int invert; }stbtt__edge;
 typedef struct stbtt__active_edge{ struct stbtt__active_edge*next; float fx,fdx,fdy,direction,sy,ey; }stbtt__active_edge;
@@ -1894,7 +1684,7 @@ static void _rse(stbtt__bitmap*res,stbtt__edge*e,int n,int ox,int oy){
     float sd[129],*sl,*sl2;if(res->w>64)sl=(float*)TempAlloc((size_t)(res->w*2+1)*sizeof(float));else sl=sd;
     sl2=sl+res->w;y=oy;e[n].y0=(float)(oy+res->h)+1;
     while(j<res->h){float syt=(float)y,syb=(float)y+1;stbtt__active_edge**step=&active;
-        MemSetToVForNBytes(sl,0,(size_t)res->w*sizeof(sl[0]));MemSetToVForNBytes(sl2,0,((size_t)res->w+1)*sizeof(sl[0]));
+        mset(sl,0,(size_t)res->w*sizeof(sl[0]));mset(sl2,0,((size_t)res->w+1)*sizeof(sl[0]));
         while(*step){stbtt__active_edge*z=*step;if(z->ey<=syt){*step=z->next;z->direction=0;_hhf(&hh,z);}else step=&(*step)->next;}
         while(e->y0<=syb){
             if(e->y0!=e->y1){
@@ -1913,7 +1703,7 @@ static void _rse(stbtt__bitmap*res,stbtt__edge*e,int n,int ox,int oy){
         if(active)_fae(sl,sl2+1,res->w,active,syt);
         {float sum=0;for(i=0;i<res->w;++i){float k;int m;sum+=sl2[i];k=(float)vabs(sl[i]+sum)*255.0f+0.5f;m=(int)k;if(m>255)m=255;res->pixels[j*res->stride+i]=(unsigned char)m;}}
         step=&active;while(*step){stbtt__active_edge*z=*step;z->fx+=z->fdx;step=&(*step)->next;}++y;++j;}
-    stbtt__hheap_chunk* c = hh.head; while(c){ stbtt__hheap_chunk* hp = c->next; TempFree(c); c = hp;} if(sl != sd) TempFree(sl);
+    tt_heapchk* c = hh.head; while(c){ tt_heapchk* hp = c->next; TempFree(c); c = hp;} if(sl != sd) TempFree(sl);
 }
 
 #define _CMP(a,b) ((a)->y0<(b)->y0)
@@ -1957,7 +1747,7 @@ static void _rasterize(stbtt__bitmap*res,Vector2*pts,int*wc,int nw,float sx,floa
 
 void stbtt_MakeGlyphBitmapSubpixel(const stbtt_fontinfo*info,unsigned char*out,int ow,int oh,int ostr,float sx,float sy,float shx,float shy,int g){
     stbtt_vertex*v;int ix0,iy0,nv=stbtt_GetGlyphShape(info,g,&v);stbtt__bitmap gbm;
-    stbtt_GetGlyphBitmapBoxSubpixel(info,g,sx,sy,shx,shy,&ix0,&iy0,0,0);gbm.pixels=out;gbm.w=ow;gbm.h=oh;gbm.stride=ostr;
+    GetGlyphBitmapBoxSubpixel(info,g,sx,sy,shx,shy,&ix0,&iy0,0,0);gbm.pixels=out;gbm.w=ow;gbm.h=oh;gbm.stride=ostr;
     float scale=sx>sy?sy:sx;int wc=0;int*wl=NULL;Vector2*win=_flatten(v,nv,0.35f/scale,&wl,&wc);
     if(win){_rasterize(&gbm,win,wl,wc,sx,sy,shx,shy,ix0,iy0,1);TempFree(wl);TempFree(win);}if(v)TempFree(v);
 }
@@ -1980,7 +1770,7 @@ static void stbtt_GetPackedQuad(const stbtt_packedchar*cd, int pw, int ph, int c
 }
 
 int stbtt_PackBegin(stbtt_pack_context*spc,unsigned char* px, int pw, int ph, int str, int pad, void* a){
-    stbrp_context*ctx=(stbrp_context*)TempAlloc(sizeof(*ctx)); *ctx=(stbrp_context){pw-pad,ph-pad,0,0,0}; if(px) MemSetToVForNBytes(px,0,(size_t)(pw*ph));
+    stbrp_context*ctx=(stbrp_context*)TempAlloc(sizeof(*ctx)); *ctx=(stbrp_context){pw-pad,ph-pad,0,0,0}; if(px) mset(px,0,(size_t)(pw*ph));
     return *spc=(stbtt_pack_context){a,ctx,pw,ph,str ? str : pw,pad,0,1,1,px},1;
 }
 
@@ -1989,32 +1779,50 @@ int stbtt_PackBegin(stbtt_pack_context*spc,unsigned char* px, int pw, int ph, in
 static void _hpre(unsigned char*p,int w,int h,int str,unsigned int kw){for(int j=0;j<h;++j,p+=str){unsigned char buf[STBTT_MAX_OVERSAMPLE]={0};int tot=0;for(int i=0;i<w;++i){if(i<=w-(int)kw){tot+=p[i]-buf[i&OVER_MASK];buf[(i+kw)&OVER_MASK]=p[i];}else tot-=buf[i&OVER_MASK];p[i]=(unsigned char)(tot/kw);}}}
 static void _vpre(unsigned char*p,int w,int h,int str,unsigned int kw){for(int j=0;j<w;++j,++p){unsigned char buf[STBTT_MAX_OVERSAMPLE]={0};int tot=0;for(int i=0;i<h;++i){if(i<=h-(int)kw){tot+=p[i*str]-buf[i&OVER_MASK];buf[(i+kw)&OVER_MASK]=p[i*str];}else tot-=buf[i&OVER_MASK];p[i*str]=(unsigned char)(tot/kw);}}}
 static float _oshift(int os){return os?-(float)(os-1)/(2.0f*(float)os):0.0f;}
-static int stbtt_PackFontRangesGatherRects(stbtt_pack_context*spc,const stbtt_fontinfo*info,FPackRange*ranges,int nr,stbrp_rect*rects){
-    int mga=0,k=0;for(int i=0;i<nr;++i){float fh=ranges[i].font_size,sc=fh>0?stbtt_ScaleForPixelHeight(info,fh):stbtt_ScaleForMappingEmToPixels(info,-fh);ranges[i].h_oversample=(unsigned char)spc->h_oversample;ranges[i].v_oversample=(unsigned char)spc->v_oversample;
-        for(int j=0;j<ranges[i].num_chars;++j){int x0,y0,x1,y1,cp=ranges[i].array_of_unicode_codepoints?ranges[i].array_of_unicode_codepoints[j]:ranges[i].first_unicode_codepoint_in_range+j,g=stbtt_FindGlyphIndex(info,cp);
-            if(g==0&&(spc->skip_missing||mga)){rects[k].w=rects[k].h=0;}else{stbtt_GetGlyphBitmapBoxSubpixel(info,g,sc*(float)spc->h_oversample,sc*(float)spc->v_oversample,0,0,&x0,&y0,&x1,&y1);rects[k].w=(stbrp_coord)(x1-x0+spc->padding+(int)spc->h_oversample-1);rects[k].h=(stbrp_coord)(y1-y0+spc->padding+(int)spc->v_oversample-1);if(g==0)mga=1;}++k;}}return k;
-}
-
-static int stbtt_PackFontRangesRenderIntoRects(stbtt_pack_context* spc, const stbtt_fontinfo* info, FPackRange* ranges, int nr, stbrp_rect* rects) {
-    int i, j, k = 0, mg = -1, rv = 1, oh = spc->h_oversample, ov = spc->v_oversample;
+static int stbtt_PackFontRanges(stbtt_pack_context*spc,const unsigned char*fontdata,int fi,FPackRange*ranges,int nr){
+    stbtt_fontinfo info;int n=0;stbrp_rect*rects;
+    for (int i=0;i<nr;++i) { for(int j=0;j<ranges[i].num_chars;++j) ranges[i].chardata_for_range[j].x0 = ranges[i].chardata_for_range[j].y0 = ranges[i].chardata_for_range[j].x1 = ranges[i].chardata_for_range[j].y1 = 0; }
+    for (int i=0;i<nr;++i) n+=ranges[i].num_chars;
+    rects=(stbrp_rect*)TempAlloc(sizeof(*rects)*(size_t)n);if(!rects)return 0;
+    info.userdata = spc->uac;
+    stbtt_InitFont_internal(&info,(unsigned char*)fontdata,stbtt_GetFontOffsetForIndex(fontdata,fi));
+    int mga=0,k=0;
+    for (int i=0;i<nr;++i) {
+        float fh=ranges[i].font_size,sc=fh>0 ? stbtt_ScaleForPixelHeight(&info,fh) : stbtt_ScaleForMappingEmToPixels(&info,-fh); ranges[i].h_oversample = (unsigned char)spc->h_oversample; ranges[i].v_oversample=(unsigned char)spc->v_oversample;
+        for (int j=0;j<ranges[i].num_chars;++j){
+            int x0,y0,x1,y1,cp=ranges[i].array_of_unicode_codepoints ? ranges[i].array_of_unicode_codepoints[j] : ranges[i].first_unicode_codepoint_in_range+j, g=stbtt_FindGlyphIndex(&info,cp);
+            if (g == 0 && (spc->skip_missing || mga)) { rects[k].w=rects[k].h=0;
+            } else {
+                GetGlyphBitmapBoxSubpixel(&info,g,sc*(float)spc->h_oversample,sc*(float)spc->v_oversample,0,0,&x0,&y0,&x1,&y1);
+                rects[k].w=(stbrp_coord)(x1-x0+spc->padding+(int)spc->h_oversample-1);
+                rects[k].h=(stbrp_coord)(y1-y0+spc->padding+(int)spc->v_oversample-1);
+                if(g==0)mga=1;
+            }
+            
+            ++k;
+        }
+    }
+    
+    n = k; k=0; stbrp_pack_rects(spc->pack_info,rects,n);
+    int i,j,mg=-1,rv=1,oh=spc->h_oversample,ov=spc->v_oversample;
     for (i = 0; i < nr; ++i) {
         FPackRange* rng = &ranges[i];
-        float sc = rng->font_size > 0 ? stbtt_ScaleForPixelHeight(info, rng->font_size) : stbtt_ScaleForMappingEmToPixels(info, -rng->font_size);
+        float sc = rng->font_size > 0 ? stbtt_ScaleForPixelHeight(&info,rng->font_size) : stbtt_ScaleForMappingEmToPixels(&info,-rng->font_size);
         spc->h_oversample = rng->h_oversample; spc->v_oversample = rng->v_oversample;
         for (j = 0; j < rng->num_chars; ++j, ++k) {
             stbrp_rect* r = &rects[k];
             if (r->was_packed && r->w && r->h) {
                 int cp = rng->array_of_unicode_codepoints ? rng->array_of_unicode_codepoints[j] : rng->first_unicode_codepoint_in_range + j;
-                int g = stbtt_FindGlyphIndex(info, cp);
+                int g = stbtt_FindGlyphIndex(&info,cp);
                 stbtt_packedchar* bc = &rng->chardata_for_range[j];
                 r->x += spc->padding; r->y += spc->padding; r->w -= spc->padding; r->h -= spc->padding;
-                int adv,lsb; stbtt_GetGlyphHMetrics(info, g, &adv, &lsb);
+                int adv,lsb; stbtt_GetGlyphHMetrics(&info,g,&adv,&lsb);
                 int x0,y0,x1,y1;
-                stbtt_GetGlyphBitmapBoxSubpixel(info,g,sc * spc->h_oversample,sc * spc->v_oversample,0,0,&x0,&y0,&x1,&y1);
+                GetGlyphBitmapBoxSubpixel(&info,g,sc * spc->h_oversample,sc * spc->v_oversample,0,0,&x0,&y0,&x1,&y1);
                 unsigned char* p_pixels = spc->pixels + r->x + r->y * spc->stride_in_bytes;
-                stbtt_MakeGlyphBitmapSubpixel(info, p_pixels, r->w - spc->h_oversample + 1, r->h - spc->v_oversample + 1, spc->stride_in_bytes, sc * spc->h_oversample, sc * spc->v_oversample, 0, 0, g);
-                if (spc->h_oversample > 1) _hpre(p_pixels, r->w, r->h, spc->stride_in_bytes, spc->h_oversample);
-                if (spc->v_oversample > 1) _vpre(p_pixels, r->w, r->h, spc->stride_in_bytes, spc->v_oversample);
+                stbtt_MakeGlyphBitmapSubpixel(&info,p_pixels,r->w - spc->h_oversample + 1,r->h - spc->v_oversample + 1,spc->stride_in_bytes,sc * spc->h_oversample,sc * spc->v_oversample,0,0,g);
+                if (spc->h_oversample > 1) _hpre(p_pixels,r->w,r->h,spc->stride_in_bytes,spc->h_oversample);
+                if (spc->v_oversample > 1) _vpre(p_pixels,r->w,r->h,spc->stride_in_bytes,spc->v_oversample);
                 bc->x0 = r->x; bc->y0 = r->y; bc->x1 = r->x + r->w; bc->y1 = r->y + r->h;
                 bc->xadvance = sc * adv;
                 bc->xoff  = x0 * (1.0f / spc->h_oversample) + _oshift(spc->h_oversample);
@@ -2030,15 +1838,7 @@ static int stbtt_PackFontRangesRenderIntoRects(stbtt_pack_context* spc, const st
     return rv;
 }
 
-static int stbtt_PackFontRanges(stbtt_pack_context*spc,const unsigned char*fontdata,int fi,FPackRange*ranges,int nr){
-    stbtt_fontinfo info;int i,j,n=0,rv=1;stbrp_rect*rects;
-    for(i=0;i<nr;++i)for(j=0;j<ranges[i].num_chars;++j)ranges[i].chardata_for_range[j].x0=ranges[i].chardata_for_range[j].y0=ranges[i].chardata_for_range[j].x1=ranges[i].chardata_for_range[j].y1=0;
-    for(i=0;i<nr;++i)n+=ranges[i].num_chars;rects=(stbrp_rect*)TempAlloc(sizeof(*rects)*(size_t)n);if(!rects)return 0;
-    info.userdata=spc->uac;stbtt_InitFont_internal(&info,(unsigned char*)fontdata,stbtt_GetFontOffsetForIndex(fontdata,fi));
-    n=stbtt_PackFontRangesGatherRects(spc,&info,ranges,nr,rects);stbrp_pack_rects(spc->pack_info,rects,n);rv=stbtt_PackFontRangesRenderIntoRects(spc,&info,ranges,nr,rects);TempFree(rects);return rv;
-}
-
-#define TEXT_BUFFER_SIZE 1024
+#define T_BUFFER_SIZE 1024
 #define FONT_ATLAS_SIZE 4672
 #define MAX_GLYPHS 4096
 int numPackedGlyphs=0,numPackedGlyphsStopD=0;
@@ -2046,7 +1846,7 @@ u32 fontAtlasTex,fontAtlasTexStopD;
 stbtt_packedchar fontPackedChar[MAX_GLYPHS],fontPackedCharStopD[MAX_GLYPHS];
 float fixedNumberAdvanceWidth=0.0f,fixedNumberAdvanceWidthStopD=0.0f;
 static const char* fallbackFontPaths[]={"./Fonts/FreeSerifBold.ttf","./Fonts/cambriab.ttf","./Fonts/NotoSansCJK-Bold.ttc"}, *fontPaths[]={"./Fonts/SystemShockText.ttf","./Fonts/StopD.ttf"};
-static stbtt_fontinfo fontInfo[5]; static unsigned char *fontData[5]; static char uiTextBuffer[TEXT_BUFFER_SIZE];
+static stbtt_fontinfo fontInfo[5]; static unsigned char *fontData[5]; static char uiTextBuffer[T_BUFFER_SIZE];
 typedef struct{char*path;unsigned char*data;size_t size;stbtt_fontinfo info;}LoadedFont;
 LoadedFont fallbackFonts[3];
 typedef struct{i32 first,count,startIndex;}GlyphRange;
@@ -2093,7 +1893,7 @@ static void InitFontAtlasses(){
             float h=20.0f;if(font!=&fontInfo[0])h*=1.2f;FPackRange range={h,cp,NULL,1,&fontPackedChar[numPackedGlyphs],0,0};stbtt_PackFontRanges(&pc,data,0,&range,1);
             int idx=numPackedGlyphs++;if(cp>='0'&&cp<='9')fixedNumberAdvanceWidth=vmax(fixedNumberAdvanceWidth,fontPackedChar[idx].xadvance);}}
     TempFree(pc.pack_info);GenerateAndBindTexture(&fontAtlasTex,0x8229/*GL_R8*/,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0x1903/*GL_RED*/,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,bmp);
-    MemSetToVForNBytes(bmp,0,FONT_ATLAS_SIZE*FONT_ATLAS_SIZE); // Secondary atlas
+    mset(bmp,0,FONT_ATLAS_SIZE*FONT_ATLAS_SIZE); // Secondary atlas
     stbtt_pack_context pc2;stbtt_PackBegin(&pc2,bmp,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0,16,NULL);pc2.h_oversample=3;pc2.v_oversample=3;pc2.skip_missing=1;numPackedGlyphsStopD=0;
     for(int r=0;r<numFontRanges;++r){fontRangesStopD[r].startIndex=numPackedGlyphsStopD;
         for(int i=0;i<fontRangesStopD[r].count;++i){if(numPackedGlyphsStopD>=MAX_GLYPHS)break;u32 cp=fontRangesStopD[r].first+i;stbtt_fontinfo*font=&fontInfo[1];unsigned char*data=fontData[1];
@@ -2101,19 +1901,18 @@ static void InitFontAtlasses(){
             float h=54.0f;if(font!=&fontInfo[1])h*=1.2f;FPackRange range={h,cp,NULL,1,&fontPackedCharStopD[numPackedGlyphsStopD],0,0};stbtt_PackFontRanges(&pc2,data,0,&range,1);
             int idx=numPackedGlyphsStopD++;if(cp>='0'&&cp<='9')fixedNumberAdvanceWidthStopD=vmax(fixedNumberAdvanceWidthStopD,fontPackedCharStopD[idx].xadvance);}}
     TempFree(pc2.pack_info);GenerateAndBindTexture(&fontAtlasTexStopD,0x8229/*GL_R8*/,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0x1903/*GL_RED*/,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,bmp);
-    OS_DeallocateRAM(bmp,FONT_ATLAS_SIZE*FONT_ATLAS_SIZE);
-    OS_DeallocateRAM(fontData[0],sz1);
-    OS_DeallocateRAM(fontData[1],sz2);
-    OS_DeallocateRAM(fontData[2],fallbackFonts[0].size);
-    OS_DeallocateRAM(fontData[3],fallbackFonts[1].size);
-    OS_DeallocateRAM(fontData[4],fallbackFonts[2].size);
-    OS_DeallocateRAM(ttAllocs,4474 * sizeof(TAlloc));
+    OS_Free(bmp,FONT_ATLAS_SIZE*FONT_ATLAS_SIZE);
+    OS_Free(fontData[0],sz1);
+    OS_Free(fontData[1],sz2);
+    OS_Free(fontData[2],fallbackFonts[0].size);
+    OS_Free(fontData[3],fallbackFonts[1].size);
+    OS_Free(fontData[4],fallbackFonts[2].size);
+    OS_Free(ttAllocs,4474 * sizeof(TAlloc));
     DebugRAM("after font load");
-    glUseProgram(Sys_Render.textShaderProgram); glUniform1i(1,2);
+    glUseProgram(Sys_Render.textSP); glUniform1i(1,2);
     DualLog(" took %f s\n",get_time()-t0);
 }
 
-char *strncpy(char*dest,const char*src,size_t n); u16 logImages=1272;
 size_t utf16le_to_utf8(const u8*src,size_t slen,char*dst,size_t dlen){
     size_t dp=0,sp=0;
     while(sp<slen&&dp<dlen-4){if(sp+1>=slen)break;u32 c=(u32)src[sp+1]<<8|src[sp];sp+=2;
@@ -2126,33 +1925,33 @@ size_t utf16le_to_utf8(const u8*src,size_t slen,char*dst,size_t dlen){
 
 static const char* localizations[8]={"./Data/text_english.txt","./Data/text_espanol.txt","./Data/text_deutsch.txt","./Data/text_francais.txt","./Data/text_nihongo.txt","./Data/text_russkiy.txt","./Data/text_italiano.txt","./Data/text_portugues.txt"};
 void LoadTextForLanguage(u8 lang){
-    char tf[256]={0};strncpy(tf,localizations[lang<8?lang:0],255);
+    char tf[256]={0}; sCpy2aSubFromb(tf,255,localizations[lang<8?lang:0],256);
     FHandle dfd=INVALID_FHANDLE;int asz=0;
-    if(Sys_Text.file_data){OS_DeallocateRAM(Sys_Text.file_data,Sys_Text.file_size);Sys_Text.file_data=NULL;Sys_Text.file_size=0;}
+    if(Sys_Text.file_data){OS_Free(Sys_Text.file_data,Sys_Text.file_size);Sys_Text.file_data=NULL;Sys_Text.file_size=0;}
     Sys_Text.file_data=(u8*)OS_OpenAndAllocateFileBufferReadonly(tf,&dfd,&asz);if(!Sys_Text.file_data||asz<=0){DualLogError("Failed to load text file: %s\n",tf);return;}
     Sys_Text.file_size=(size_t)asz;
     size_t dp=0;int utf16=0;
     if(Sys_Text.file_size>=2&&Sys_Text.file_data[0]==0xFF&&Sys_Text.file_data[1]==0xFE){dp=2;utf16=1;}
     else if(Sys_Text.file_size>=3&&Sys_Text.file_data[0]==0xEF&&Sys_Text.file_data[1]==0xBB&&Sys_Text.file_data[2]==0xBF){dp=3;}
     else{size_t nl=0;for(size_t i=1;i<Sys_Text.file_size&&i<1024;i+=2)if(Sys_Text.file_data[i]==0)nl++;if(nl*3>Sys_Text.file_size)utf16=1;}
-    char line[TEXT_LOCALIZATION_MAX_LENGTH];int ln=0;
+    char line[T_LOCALIZATION_MAX_LENGTH];int ln=0;
     while(dp<Sys_Text.file_size){size_t ls=dp;
         if(utf16){while(dp+1<Sys_Text.file_size){u16 ch=Sys_Text.file_data[dp]|(Sys_Text.file_data[dp+1]<<8);dp+=2;if(ch=='\r'||ch=='\n'){if(ch=='\r'&&dp+1<Sys_Text.file_size){u16 nx=Sys_Text.file_data[dp]|(Sys_Text.file_data[dp+1]<<8);if(nx=='\n')dp+=2;}break;}}}
         else{while(dp<Sys_Text.file_size){u8 c=Sys_Text.file_data[dp];if(c=='\r'||c=='\n'){if(c=='\r'&&dp+1<Sys_Text.file_size&&Sys_Text.file_data[dp+1]=='\n')++dp;++dp;break;}++dp;}}
-        size_t ll=dp-ls;if(ll==0){if(ln<TEXT_STRING_COUNT)Sys_Text.stringTable[ln][0]='\0';++ln;continue;}
-        if(utf16)utf16le_to_utf8(&Sys_Text.file_data[ls],ll,line,sizeof(line));else{if(ll>=sizeof(line))ll=sizeof(line)-1; MemCpyFromBtoAForNBytes(line,&Sys_Text.file_data[ls],ll);line[ll]='\0';}
-        size_t sl=GetStringLength(line);while(sl>0&&(line[sl-1]=='\r'||line[sl-1]=='\n'))line[--sl]='\0';
-        if(sl==0){if(ln<TEXT_STRING_COUNT)Sys_Text.stringTable[ln][0]='\0';++ln;continue;}
-        if(ln<TEXT_STRING_COUNT) {MemCpyFromBtoAForNBytes(Sys_Text.stringTable[ln],line,sl);Sys_Text.stringTable[ln][sl]='\0';++ln;} }
+        size_t ll=dp-ls;if(ll==0){if(ln<T_STRING_COUNT)Sys_Text.stringTable[ln][0]='\0';++ln;continue;}
+        if(utf16)utf16le_to_utf8(&Sys_Text.file_data[ls],ll,line,sizeof(line));else{if(ll>=sizeof(line))ll=sizeof(line)-1; mcpy(line,&Sys_Text.file_data[ls],ll);line[ll]='\0';}
+        size_t sl=slen(line);while(sl>0&&(line[sl-1]=='\r'||line[sl-1]=='\n'))line[--sl]='\0';
+        if(sl==0){if(ln<T_STRING_COUNT)Sys_Text.stringTable[ln][0]='\0';++ln;continue;}
+        if(ln<T_STRING_COUNT) {mcpy(Sys_Text.stringTable[ln],line,sl);Sys_Text.stringTable[ln][sl]='\0';++ln;} }
 }
 
-static inline __attribute__((always_inline)) int StringToIntLen(const char*str,size_t len){int v=0;for(size_t i=0;i<len&&str[i]>='0'&&str[i]<='9';++i)v=v*10+(str[i]-'0');return v;}
-static const char* logLocalizations[8]={"./Data/logs_text_english.txt","./Data/logs_text_espanol.txt","./Data/logs_text_deutsch.txt","./Data/logs_text_francais.txt","./Data/logs_text_nihongo.txt","./Data/logs_text_russkiy.txt","./Data/logs_text_italiano.txt","./Data/logs_text_portugues.txt"};
+static inline __attribute__((always_inline)) int s2i32Len(const char*str,size_t len){int v=0;for(size_t i=0;i<len&&str[i]>='0'&&str[i]<='9';++i)v=v*10+(str[i]-'0');return v;}
+static const char* logLocalizations[8]={"./Data/logs_english.txt","./Data/logs_espanol.txt","./Data/logs_deutsch.txt","./Data/logs_francais.txt","./Data/logs_nihongo.txt","./Data/logs_russkiy.txt","./Data/logs_italiano.txt","./Data/logs_portugues.txt"};
 void LoadLogTextForLanguage(u8 lang){
-    MemSetToVForNBytes(Sys_Text.audioLogImagesRefIndicesLH,0,TEXT_LOGS_COUNT*sizeof(u16));MemSetToVForNBytes(Sys_Text.audioLogImagesRefIndicesRH,0,TEXT_LOGS_COUNT*sizeof(u16));MemSetToVForNBytes(Sys_Text.audioLogType,0,TEXT_LOGS_COUNT*sizeof(u8));MemSetToVForNBytes(Sys_Text.audioLogLevelFound,0,TEXT_LOGS_COUNT*sizeof(u8));
-    char tf[256]={0};strncpy(tf,logLocalizations[lang<8?lang:0],255);
+    mset(Sys_Text.audioLogImagesRefIndicesLH,0,T_LOGS_COUNT*sizeof(u16));mset(Sys_Text.audioLogImagesRefIndicesRH,0,T_LOGS_COUNT*sizeof(u16));mset(Sys_Text.audioLogType,0,T_LOGS_COUNT*sizeof(u8));mset(Sys_Text.audioLogLevelFound,0,T_LOGS_COUNT*sizeof(u8));
+    char tf[256]={0}; sCpy2aSubFromb(tf,255,logLocalizations[lang<8?lang:0],256);
     FHandle dfd=INVALID_FHANDLE;int asz=0;
-    if(Sys_Text.filelog_data){OS_DeallocateRAM(Sys_Text.filelog_data,Sys_Text.filelog_size);Sys_Text.filelog_data=NULL;Sys_Text.filelog_size=0;}
+    if(Sys_Text.filelog_data){OS_Free(Sys_Text.filelog_data,Sys_Text.filelog_size);Sys_Text.filelog_data=NULL;Sys_Text.filelog_size=0;}
     Sys_Text.filelog_data=(u8*)OS_OpenAndAllocateFileBufferReadonly(tf,&dfd,&asz);if(!Sys_Text.filelog_data||asz<=0){DualLogError("Failed to load log text file: %s\n",tf);return;}
     Sys_Text.filelog_size=(size_t)asz;
     size_t dp=0;int utf16=0;
@@ -2163,33 +1962,39 @@ void LoadLogTextForLanguage(u8 lang){
     while(dp<Sys_Text.filelog_size){size_t ls=dp;
         if(utf16){while(dp+1<Sys_Text.filelog_size){u16 ch=Sys_Text.filelog_data[dp]|(Sys_Text.filelog_data[dp+1]<<8);dp+=2;if(ch=='\r'||ch=='\n'){if(ch=='\r'&&dp+1<Sys_Text.filelog_size){u16 nx=Sys_Text.filelog_data[dp]|(Sys_Text.filelog_data[dp+1]<<8);if(nx=='\n')dp+=2;}break;}}}
         else{while(dp<Sys_Text.filelog_size){u8 c=Sys_Text.filelog_data[dp];if(c=='\r'||c=='\n'){if(c=='\r'&&dp+1<Sys_Text.filelog_size&&Sys_Text.filelog_data[dp+1]=='\n')++dp;++dp;break;}++dp;}}
-        size_t ll=dp-ls;if(!ll)continue;
-        if(utf16)utf16le_to_utf8(&Sys_Text.filelog_data[ls],ll,line,sizeof(line));else{if(ll>=sizeof(line))ll=sizeof(line)-1;MemCpyFromBtoAForNBytes(line,&Sys_Text.filelog_data[ls],ll);line[ll]='\0';}
-        size_t sl=GetStringLength(line);while(sl>0&&(line[sl-1]=='\r'||line[sl-1]=='\n'))line[--sl]='\0';if(!sl)continue;
+        size_t ll=dp-ls; if(!ll)continue;
+        if(utf16)utf16le_to_utf8(&Sys_Text.filelog_data[ls],ll,line,sizeof(line)); else { if (ll>=sizeof(line)) ll=sizeof(line)-1; mcpy(line,&Sys_Text.filelog_data[ls],ll);line[ll]='\0'; }
+        size_t sl=slen(line); while(sl>0&&(line[sl-1]=='\r'||line[sl-1]=='\n'))line[--sl]='\0'; if(!sl)continue;
         int li=-1,ilh=-1,irh=-1,lt=0,lf=0,fi=0;char*pos=line;
         while(*pos&&fi<32){while(*pos==' ')++pos;char*st=pos;int q=(*pos=='"');if(q)++pos;while(*pos){if(*pos==','&&!q)break;if(*pos=='"'&&q){if(pos[1]==','){pos++;break;}if(pos[1]=='"'){pos+=2;continue;}}++pos;}char*en=pos;if(q&&*en=='"')--en;size_t tl=(size_t)(en-st);if(!tl){if(*pos==',')++pos;fi++;continue;}
-            switch(fi){case 0:li=StringToIntLen(st,tl);if(li<0||li>=TEXT_LOGS_COUNT)goto nxt;break;case 1:ilh=StringToIntLen(st,tl);break;case 2:irh=StringToIntLen(st,tl);break;case 3:if(li>=0&&li<TEXT_LOGS_COUNT)StringCopyInto_A_SubstringFrom_B(Sys_Global.audiologNames[li],tl,st,sizeof(Sys_Global.audiologNames[0]));break;case 4:if(li>=0&&li<TEXT_LOGS_COUNT)StringCopyInto_A_SubstringFrom_B(Sys_Global.audiologSenders[li],tl,st,sizeof(Sys_Global.audiologSenders[0]));break;case 5:if(li>=0&&li<TEXT_LOGS_COUNT)StringCopyInto_A_SubstringFrom_B(Sys_Global.audiologSubjects[li],tl,st,sizeof(Sys_Global.audiologSubjects[0]));break;case 6:lt=StringToIntLen(st,tl);break;case 7:lf=StringToIntLen(st,tl);break;default:if(li>=0&&li<TEXT_LOGS_COUNT){char*d=Sys_Global.audioLogSpeech2Text[li];size_t cur=GetStringLength(d);if(cur>0&&cur<TEXT_LOCALIZATION_MAX_LENGTH*4-2){d[cur++]=',';d[cur]='\0';}size_t left=TEXT_LOCALIZATION_MAX_LENGTH*4-cur-1;if(left>0){size_t cl=tl>left?left:tl;StringCopyInto_A_SubstringFrom_B(d+cur,cl,st,left+1);}}break;}
-            if(*pos==',')++pos;fi++;}
-        if(li>=0&&li<TEXT_LOGS_COUNT){Sys_Text.audioLogImagesRefIndicesLH[li]=(u16)ilh;Sys_Text.audioLogImagesRefIndicesRH[li]=(u16)irh;Sys_Text.audioLogType[li]=(u8)lt;Sys_Text.audioLogLevelFound[li]=(u8)lf;}
+            switch(fi){
+                case 0:  li=s2i32Len(st,tl); if (li<0||li>=T_LOGS_COUNT) goto nxt; break;
+                case 1:  ilh=s2i32Len(st,tl); break;
+                case 2:  irh=s2i32Len(st,tl); break;
+                case 3:  if(li>=0&&li<T_LOGS_COUNT) sCpy2aSubFromb(Sys_Global.audiologNames[li],tl,st,sizeof(Sys_Global.audiologNames[0]));       break;
+                case 4:  if(li>=0&&li<T_LOGS_COUNT) sCpy2aSubFromb(Sys_Global.audiologSenders[li],tl,st,sizeof(Sys_Global.audiologSenders[0]));   break;
+                case 5:  if(li>=0&&li<T_LOGS_COUNT) sCpy2aSubFromb(Sys_Global.audiologSubjects[li],tl,st,sizeof(Sys_Global.audiologSubjects[0])); break;
+                case 6:  lt=s2i32Len(st,tl); break;
+                case 7:  lf=s2i32Len(st,tl); break;
+                default: if(li>=0&&li<T_LOGS_COUNT){char*d=Sys_Global.audioLogSpeech2Text[li]; size_t cur=slen(d); if(cur>0&&cur<T_LOCALIZATION_MAX_LENGTH*4-2){d[cur++]=',';d[cur]='\0';} size_t left=T_LOCALIZATION_MAX_LENGTH*4-cur-1; if(left>0){size_t cl=tl>left?left:tl;sCpy2aSubFromb(d+cur,cl,st,left+1);}}break;}
+            if (*pos==',')++pos;fi++;}
+        if (li>=0&&li<T_LOGS_COUNT) {Sys_Text.audioLogImagesRefIndicesLH[li]=(u16)ilh;Sys_Text.audioLogImagesRefIndicesRH[li]=(u16)irh;Sys_Text.audioLogType[li]=(u8)lt;Sys_Text.audioLogLevelFound[li]=(u8)lf;}
         nxt:continue;}
 }
 
-Color textColors[] = {{        1.0f,        1.0f,        1.0f,1.0f},/* 0 White                TEXT_WHITE*/       {0.890196078f,0.874509804f,        0.0f,1.0f},/* 1 Yellow                   TEXT_YELLOW*/              {0.623529412f,0.611764706f,        0.0f,1.0f}, /* 2 Dark Yellow (Yellow * 0.7f) TEXT_DARK_YELLOW*/
-                      {0.372549020f,0.654901961f,0.168627451f,1.0f},/* 3 Green                TEXT_GREEN*/       {0.917647059f,0.137254902f,0.168627451f,1.0f},/* 4 Red                      TEXT_RED*/                 {        1.0f,0.498039216f,        0.0f,1.0f}, /* 5 Orange                      TEXT_ORANGE*/
-                      {0.674509804f,0.058823529f,0.070588235f,1.0f},/* 6 StopD Red            TEXT_STOPD_RED*/   {0.941176471f,0.282352941f,0.298039216f,1.0f},/* 7 StopD Red Highlight      TEXT_STOPD_RED_HIGHLIGHT*/ {0.909803922f,0.203921569f,0.219607843f,1.0f}, /* 8 StopD Red Pause Title       TEXT_STOPD_RED_PAUSETITLE*/
-                      {0.470588235f,0.721568627f,0.172549020f,1.0f},/* 9 Green Menu Title     TEXT_GREEN_MENU*/  {0.137254902f,0.356862745f,0.109803922f,1.0f},/* 10 Green Menu Title Shadow TEXT_GREEN_MENU_SHADOW*/   {0.239215686f,0.466666667f,0.129411765f,1.0f}, /* 11 Green Menu Title Glow      TEXT_GREEN_MENU_GLOW*/
-                      {0.392156863f,0.031372549f,0.039215686f,1.0f}  /* 12 Red Menu Text Dark TEXT_RED_MENU*/ };
+Color textColors[] = {{1.0f,1.0f,1.0f,1.0f},/* 0 White T_WHITE*/ {0.890196078f,0.874509804f,0.0f,1.0f},/* 1 Yellow T_YELLOW*/  {0.623529412f,0.611764706f,0.0f,1.0f},/* 2 Dark Yellow (Yellow * 0.7f) T_DARK_YELLOW*/ {0.372549020f,0.654901961f,0.168627451f,1.0f},/* 3 Green T_GREEN*/ {0.917647059f,0.137254902f,0.168627451f,1.0f},/* 4 Red T_RED*/
+                      {1.0f,0.498039216f,0.0f,1.0f}, /* 5 Orange T_ORANGE*/ {0.674509804f,0.058823529f,0.070588235f,1.0f},/* 6 StopD Red T_STOPD_RED*/ {0.941176471f,0.282352941f,0.298039216f,1.0f},/* 7 StopD Red Highlight T_STOPD_RED_HIGHLIGHT*/ {0.909803922f,0.203921569f,0.219607843f,1.0f}, /* 8 StopD Red Pause Title T_STOPD_RED_PAUSETITLE*/
+                      {0.470588235f,0.721568627f,0.172549020f,1.0f},/* 9 Green Menu Title T_GREEN_MENU*/ {0.137254902f,0.356862745f,0.109803922f,1.0f},/* 10 Green Menu Title Shadow T_GREEN_MENU_SHADOW*/ {0.239215686f,0.466666667f,0.129411765f,1.0f}, /* 11 Green Menu Title Glow T_GREEN_MENU_GLOW*/ {0.392156863f,0.031372549f,0.039215686f,1.0f} /* 12 Red Menu Text Dark T_RED_MENU*/ };
 float textVertexData[8192];
-void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scaleInput,const char* restrict format,...) {
-    va_list args; __builtin_va_start(args,format); StringFormatV(uiTextBuffer,TEXT_BUFFER_SIZE,format,args); __builtin_va_end(args);
-    glUseProgram(Sys_Render.textShaderProgram);
+void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scale,const char* restrict format,...) {
+    va_list args; __builtin_va_start(args,format); sFormatV(uiTextBuffer,T_BUFFER_SIZE,format,args); __builtin_va_end(args);
+    glUseProgram(Sys_Render.textSP);
     glEnable(GL_BLEND);
     glUniform4f(3,textColors[color].r,textColors[color].g,textColors[color].b,1.0f);
     glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D,fontID==FONT_STOPD ? fontAtlasTexStopD : fontAtlasTex);
     float invatsz = 1.0f/(float)FONT_ATLAS_SIZE;
     glUniform2f(4,invatsz,invatsz); glUniform1ui(2,fontID);
     glBindVertexArray(Sys_Render.textVAO);
-    float scale=scaleInput;
     size_t vc=0; const char*p=uiTextBuffer; float xpos=x,ypos=y+(16*scale),ls=22*scale; aligned_quad q; int cc=0;
     float puv = 10.0f * invatsz, bw=2.0f;
     while(*p) {
@@ -2207,7 +2012,7 @@ void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scaleInput,const 
         float vx0=q.x0*scale-bw,vy0=q.y0*scale-bw,vx1=q.x1*scale+bw,vy1=q.y1*scale+bw;
         float s0=q.s0-puv,t0=q.t0-puv,s1=q.s1+puv,t1=q.t1+puv,z=0.0f;
         float tv[30] = { vx0,vy0,z,s0,t0,vx1,vy1,z,s1,t1,vx1,vy0,z,s1,t0,vx0,vy0,z,s0,t0,vx0,vy1,z,s0,t1,vx1,vy1,z,s1,t1 };
-        MemCpyFromBtoAForNBytes(textVertexData+vc*30,tv,sizeof(tv)); vc++;
+        mcpy(textVertexData+vc*30,tv,sizeof(tv)); vc++;
         if (cp>='0' && cp<='9') {
             if (fontID == FONT_STOPD) { xpos=q.x0 + ((fontID == FONT_STOPD) ? fixedNumberAdvanceWidthStopD : fixedNumberAdvanceWidth); }
         }
@@ -2215,7 +2020,7 @@ void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scaleInput,const 
     
     if(vc){ glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.textVBO); glBufferData(GL_ARRAY_BUFFER,vc*30*sizeof(float),textVertexData,GL_DYNAMIC_DRAW); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,vc*6); }
 }
-// ========================== Windowing and Input System
+// Window + Input Sys
 typedef void (*GLFWglproc)(void);
 typedef struct GLFWwindow GLFWwindow; GLFWwindow* window;
 typedef struct { int width,height,redBits,greenBits,blueBits,refreshRate; } GLFWvidmode;
@@ -2241,8 +2046,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     #define HIWORD(l) ((u16) ((((u64) (l)) >> 16) & 0xffff))
     #define LOBYTE(w) ((u8) (((u64) (w)) & 0xff))
     #define HIBYTE(w) ((u8) ((((u64) (w)) >> 8) & 0xff))
-    typedef struct HWND__ { int unused; } *HWND;   typedef struct HBITMAP__ { int unused; } *HBITMAP; typedef struct HBRUSH__ { int unused; } *HBRUSH; typedef struct HDC__ { int unused; } *HDC;
-    typedef struct HGLRC__ { int unused; } *HGLRC; typedef struct HICON__ { int unused; } *HICON;     typedef struct HMENU__ { int unused; } *HMENU;   typedef struct HMONITOR__ { int unused; } *HMONITOR;
+    typedef void *HWND, *HBITMAP, *HBRUSH, *HDC, *HGLRC, *HICON, *HMENU, *HMONITOR;
     typedef struct tagPOINT { i32 x,y; } POINT,*PPOINT,*NPPOINT,*LPPOINT;              typedef struct _POINTL { i32 x,y; } POINTL,*PPOINTL;
     typedef struct tagRECT { i32 left,top,right,bottom; } RECT,*PRECT,*NPRECT,*LPRECT; typedef struct tagSIZE { i32 cx,cy; } SIZE,*PSIZE,*LPSIZE;
     typedef struct _OSVERSIONINFOEXW { u32 dwOSVersionInfoSize,dwMajorVersion,dwMinorVersion,dwBuildNumber,dwPlatformId; u16 szCSDVersion[128]; u16 wServicePackMajor,wServicePackMinor,wSuiteMask; u8 wProductType,wReserved; } OSVERSIONINFOEXW;
@@ -2284,28 +2088,17 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     typedef struct tagRGBQUAD { u8 rgbBlue,rgbGreen,rgbRed,rgbReserved; } RGBQUAD;
     typedef struct tagBITMAPINFOHEADER { u32 biSize; i32 biWidth,biHeight; u16 biPlanes,biBitCount; u32 biCompression; u32 biSizeImage; i32 biXPelsPerMeter; i32 biYPelsPerMeter; u32 biClrUsed; u32 biClrImportant; } BITMAPINFOHEADER,*LPBITMAPINFOHEADER,*PBITMAPINFOHEADER;
     typedef struct tagBITMAPINFO { BITMAPINFOHEADER bmiHeader; RGBQUAD bmiColors[1]; } BITMAPINFO,*LPBITMAPINFO,*PBITMAPINFO;
-    DECLSPEC_IMPORT HICON WINAPI CreateIconIndirect(PICONINFO); DECLSPEC_IMPORT HDC WINAPI GetDC(HWND);                     DECLSPEC_IMPORT i32 WINAPI GetModuleHandleExW(u32,const u16*,HINSTANCE*);
-    DECLSPEC_IMPORT int WINAPI ReleaseDC(HWND,HDC);             DECLSPEC_IMPORT i32 WINAPI SetCursorPos(int,int);           DECLSPEC_IMPORT int WINAPI WideCharToMultiByte(u32,u32,u16*,int,char*,int,const char*,i32*);
-    DECLSPEC_IMPORT HICON WINAPI SetCursor(HICON);              DECLSPEC_IMPORT i32 WINAPI GetCursorPos(LPPOINT);           DECLSPEC_IMPORT int WINAPI MultiByteToWideChar(u32,u32,const char*,int,u16*,int);
-    DECLSPEC_IMPORT i32 WINAPI ClipCursor(const RECT*);         DECLSPEC_IMPORT i32 WINAPI ClientToScreen(HWND,LPPOINT);    DECLSPEC_IMPORT HDC WINAPI CreateDCW(const u16*,const u16*,const u16*,const DEVMODEW*);
-    DECLSPEC_IMPORT void* WINAPI GetPropW(HWND,u16*);           DECLSPEC_IMPORT i32 WINAPI GetMessageTime();                DECLSPEC_IMPORT i32 WINAPI GetClientRect(HWND,LPRECT); // Haha get rect!
-    DECLSPEC_IMPORT HICON WINAPI LoadCursorW(HINSTANCE,u16*);   DECLSPEC_IMPORT u32 WINAPI MapVirtualKeyW(u32,u32);         DECLSPEC_IMPORT i32 WINAPI SetWindowPos(HWND,HWND,int,int,int,int,u32);    
-    DECLSPEC_IMPORT HWND WINAPI SetCapture(HWND hWnd);          DECLSPEC_IMPORT i32 WINAPI ReleaseCapture();                DECLSPEC_IMPORT i32 WINAPI PeekMessageW(LPMSG,HWND,u32,u32,u32);
-    DECLSPEC_IMPORT i32 WINAPI AdjustWindowRect(LPRECT,u32,i32);DECLSPEC_IMPORT i32 WINAPI GetWindowLongW(HWND,int);        DECLSPEC_IMPORT i64 WINAPI DefWindowProcW(HWND,u32,u64,i64);
-    DECLSPEC_IMPORT HMONITOR WINAPI MonitorFromWindow(HWND,u32);DECLSPEC_IMPORT HWND WINAPI GetActiveWindow();              DECLSPEC_IMPORT i32 WINAPI AdjustWindowRectEx(LPRECT,u32,i32,u32);
-    DECLSPEC_IMPORT i64 WINAPI SendMessageW(HWND,u32,u64,i64);  DECLSPEC_IMPORT i32 WINAPI SetWindowLongW(HWND,int,i32);    DECLSPEC_IMPORT i32 WINAPI GetMonitorInfoW(HMONITOR,LPMONITORINFO);
-    DECLSPEC_IMPORT i32 WINAPI TranslateMessage(const MSG*);    DECLSPEC_IMPORT i16 WINAPI GetKeyState(int);                DECLSPEC_IMPORT i64 WINAPI DispatchMessageW(const MSG*);
-    DECLSPEC_IMPORT i32 WINAPI ShowWindow(HWND,int);            DECLSPEC_IMPORT i32 WINAPI BringWindowToTop(HWND);          DECLSPEC_IMPORT i32 WINAPI SetWindowPlacement(HWND,const WINDOWPLACEMENT*);
-    DECLSPEC_IMPORT HWND WINAPI SetFocus(HWND);                 DECLSPEC_IMPORT i32 WINAPI SetForegroundWindow(HWND);       DECLSPEC_IMPORT i32 WINAPI GetWindowPlacement(HWND,WINDOWPLACEMENT*);
-    DECLSPEC_IMPORT i32 WINAPI SetPropW(HWND,u16*,void*);       DECLSPEC_IMPORT i32 WINAPI OffsetRect(LPRECT,int,int);      DECLSPEC_IMPORT HWND WINAPI CreateWindowExW(u32,u16*,u16*,u32,int,int,int,int,HWND,HMENU,HINSTANCE,void*);
-    DECLSPEC_IMPORT u64 WINAPI VerSetConditionMask(u64,u32,u8); DECLSPEC_IMPORT HDC WINAPI wglGetCurrentDC();               DECLSPEC_IMPORT u16 WINAPI RegisterClassExW(const WNDCLASSEXW *);
-    DECLSPEC_IMPORT i32 WINAPI DeleteObject(void*);             DECLSPEC_IMPORT i32 WINAPI DeleteDC(HDC);                   DECLSPEC_IMPORT void* WINAPI RegisterDeviceNotificationW(void*,void*,u32);
-    DECLSPEC_IMPORT i32 WINAPI SwapBuffers(HDC);                DECLSPEC_IMPORT HGLRC WINAPI wglGetCurrentContext();        DECLSPEC_IMPORT i32 WINAPI EnumDisplayMonitors(HDC,const RECT*,MONITORENUMPROC,i64);
-    DECLSPEC_IMPORT i32 WINAPI wglMakeCurrent(HDC,HGLRC);       DECLSPEC_IMPORT PROC WINAPI wglGetProcAddress(const char*); DECLSPEC_IMPORT i32 WINAPI EnumDisplaySettingsW(u16*,u32,LPDEVMODEW); 
-    DECLSPEC_IMPORT i32 WINAPI EnumDisplayDevicesW(u16*,u32,PDISPLAY_DEVICEW,u32);               DECLSPEC_IMPORT i32 WINAPI EnumDisplaySettingsExW(u16*,u32,LPDEVMODEW,u32);
-    DECLSPEC_IMPORT i32 WINAPI SetPixelFormat(HDC,i32,const PIXELFORMATDESCRIPTOR *);            DECLSPEC_IMPORT i32 WINAPI ChoosePixelFormat(HDC hdc,const PIXELFORMATDESCRIPTOR *ppfd);
-    DECLSPEC_IMPORT i32 WINAPI DescribePixelFormat(HDC,i32,u32,LPPIXELFORMATDESCRIPTOR);         DECLSPEC_IMPORT HBITMAP WINAPI CreateBitmap(i32,i32,u32,u32,const void *);
-    DECLSPEC_IMPORT HBITMAP WINAPI CreateDIBSection(HDC,const BITMAPINFO*,u32,void**,void*,u32); DECLSPEC_IMPORT i32 WINAPI GetDeviceCaps(HDC,i32);
+    DECLSPEC_IMPORT HICON WINAPI CreateIconIndirect(PICONINFO); DECLSPEC_IMPORT HDC WINAPI GetDC(HWND);                     DECLSPEC_IMPORT i32 WINAPI GetModuleHandleExW(u32,const u16*,HINSTANCE*);            DECLSPEC_IMPORT int WINAPI ReleaseDC(HWND,HDC);             DECLSPEC_IMPORT i32 WINAPI SetCursorPos(int,int);           DECLSPEC_IMPORT int WINAPI WideCharToMultiByte(u32,u32,u16*,int,char*,int,const char*,i32*);
+    DECLSPEC_IMPORT HICON WINAPI SetCursor(HICON);              DECLSPEC_IMPORT i32 WINAPI GetCursorPos(LPPOINT);           DECLSPEC_IMPORT int WINAPI MultiByteToWideChar(u32,u32,const char*,int,u16*,int);    DECLSPEC_IMPORT i32 WINAPI ClipCursor(const RECT*);         DECLSPEC_IMPORT i32 WINAPI ClientToScreen(HWND,LPPOINT);    DECLSPEC_IMPORT HDC WINAPI CreateDCW(const u16*,const u16*,const u16*,const DEVMODEW*);
+    DECLSPEC_IMPORT void* WINAPI GetPropW(HWND,u16*);           DECLSPEC_IMPORT i32 WINAPI GetMessageTime();                DECLSPEC_IMPORT i32 WINAPI GetClientRect(HWND,LPRECT); /*Haha get rect!*/            DECLSPEC_IMPORT HICON WINAPI LoadCursorW(HINSTANCE,u16*);   DECLSPEC_IMPORT u32 WINAPI MapVirtualKeyW(u32,u32);         DECLSPEC_IMPORT i32 WINAPI SetWindowPos(HWND,HWND,int,int,int,int,u32);    
+    DECLSPEC_IMPORT HWND WINAPI SetCapture(HWND hWnd);          DECLSPEC_IMPORT i32 WINAPI ReleaseCapture();                DECLSPEC_IMPORT i32 WINAPI PeekMessageW(LPMSG,HWND,u32,u32,u32);                     DECLSPEC_IMPORT i32 WINAPI AdjustWindowRect(LPRECT,u32,i32);DECLSPEC_IMPORT i32 WINAPI GetWindowLongW(HWND,int);        DECLSPEC_IMPORT i64 WINAPI DefWindowProcW(HWND,u32,u64,i64);
+    DECLSPEC_IMPORT HMONITOR WINAPI MonitorFromWindow(HWND,u32);DECLSPEC_IMPORT HWND WINAPI GetActiveWindow();              DECLSPEC_IMPORT i32 WINAPI AdjustWindowRectEx(LPRECT,u32,i32,u32);                   DECLSPEC_IMPORT i64 WINAPI SendMessageW(HWND,u32,u64,i64);  DECLSPEC_IMPORT i32 WINAPI SetWindowLongW(HWND,int,i32);    DECLSPEC_IMPORT i32 WINAPI GetMonitorInfoW(HMONITOR,LPMONITORINFO);
+    DECLSPEC_IMPORT i32 WINAPI TranslateMessage(const MSG*);    DECLSPEC_IMPORT i16 WINAPI GetKeyState(int);                DECLSPEC_IMPORT i64 WINAPI DispatchMessageW(const MSG*);                             DECLSPEC_IMPORT i32 WINAPI ShowWindow(HWND,int);            DECLSPEC_IMPORT i32 WINAPI BringWindowToTop(HWND);          DECLSPEC_IMPORT i32 WINAPI SetWindowPlacement(HWND,const WINDOWPLACEMENT*);
+    DECLSPEC_IMPORT HWND WINAPI SetFocus(HWND);                 DECLSPEC_IMPORT i32 WINAPI SetForegroundWindow(HWND);       DECLSPEC_IMPORT i32 WINAPI GetWindowPlacement(HWND,WINDOWPLACEMENT*);                DECLSPEC_IMPORT i32 WINAPI SetPropW(HWND,u16*,void*);       DECLSPEC_IMPORT i32 WINAPI OffsetRect(LPRECT,int,int);      DECLSPEC_IMPORT HWND WINAPI CreateWindowExW(u32,u16*,u16*,u32,int,int,int,int,HWND,HMENU,HINSTANCE,void*);
+    DECLSPEC_IMPORT u64 WINAPI VerSetConditionMask(u64,u32,u8); DECLSPEC_IMPORT HDC WINAPI wglGetCurrentDC();               DECLSPEC_IMPORT u16 WINAPI RegisterClassExW(const WNDCLASSEXW *);                    DECLSPEC_IMPORT i32 WINAPI DeleteObject(void*);             DECLSPEC_IMPORT i32 WINAPI DeleteDC(HDC);                   DECLSPEC_IMPORT void* WINAPI RegisterDeviceNotificationW(void*,void*,u32);
+    DECLSPEC_IMPORT i32 WINAPI SwapBuffers(HDC);                DECLSPEC_IMPORT HGLRC WINAPI wglGetCurrentContext();        DECLSPEC_IMPORT i32 WINAPI EnumDisplayMonitors(HDC,const RECT*,MONITORENUMPROC,i64); DECLSPEC_IMPORT i32 WINAPI wglMakeCurrent(HDC,HGLRC);       DECLSPEC_IMPORT PROC WINAPI wglGetProcAddress(const char*); DECLSPEC_IMPORT i32 WINAPI EnumDisplaySettingsW(u16*,u32,LPDEVMODEW); 
+    DECLSPEC_IMPORT i32 WINAPI EnumDisplayDevicesW(u16*,u32,PDISPLAY_DEVICEW,u32);               DECLSPEC_IMPORT i32 WINAPI EnumDisplaySettingsExW(u16*,u32,LPDEVMODEW,u32); DECLSPEC_IMPORT i32 WINAPI SetPixelFormat(HDC,i32,const PIXELFORMATDESCRIPTOR *);            DECLSPEC_IMPORT i32 WINAPI ChoosePixelFormat(HDC hdc,const PIXELFORMATDESCRIPTOR *ppfd);
+    DECLSPEC_IMPORT i32 WINAPI DescribePixelFormat(HDC,i32,u32,LPPIXELFORMATDESCRIPTOR);         DECLSPEC_IMPORT HBITMAP WINAPI CreateBitmap(i32,i32,u32,u32,const void *);  DECLSPEC_IMPORT HBITMAP WINAPI CreateDIBSection(HDC,const BITMAPINFO*,u32,void**,void*,u32); DECLSPEC_IMPORT i32 WINAPI GetDeviceCaps(HDC,i32);
     u16* CreateWideStringFromUTF8Win32(const char* source); i32 IsWindowsVersionOrGreaterWin32(u16 major, u16 minor, u16 sp); void _glfwPollMonitorsWin32();
     struct _GLFWjoystick { i32 allocated,connected; size_t axesSize,buttonsSize,hatsSize; float*  axes; int axisCount; unsigned char* buttons; int buttonCount; unsigned char* hats; int hatCount; char name[128],guid[33]; _GLFWjoystickWin32 win32; };
     struct _GLFWlibrary { _GLFWmonitor** monitors; int monitorCount; i32 joysticksInitialized; _GLFWjoystick joysticks[JOYSTICK_LAST + 1]; _GLFWlibraryWin32 win32; _GLFWlibraryWGL wgl; };
@@ -2314,18 +2107,11 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     struct _GLFWmonitor { char name[128]; int widthMM,heightMM; GLFWvidmode currentMode; _GLFWmonitorWin32 win32; };
     static u32 getWindowStyle(const _GLFWwindow* w) { return 0x060A0000 | (w->decorated ? 0x00C00000 : 0x80000000); } // clipping,sysmenu,minimize,title,border,and borderless raw
     static HICON createIcon(const GLFWimage* image,int xhot,int yhot,i32 icon) {
-        HDC dc; HICON handle; HBITMAP color,mask; BITMAPV5HEADER bi; ICONINFO ii;
-        unsigned char* target=NULL; unsigned char* source=image->pixels;
-        MemSetToVForNBytes(&bi,0,sizeof(bi));
-        bi.bV5Size=sizeof(bi); bi.bV5Width=image->width; bi.bV5Height=-image->height; bi.bV5Planes=1; bi.bV5BitCount=32; bi.bV5Compression=3; bi.bV5RedMask=0x00ff0000; bi.bV5GreenMask=0x0000ff00; bi.bV5BlueMask=0x000000ff; bi.bV5AlphaMask=0xff000000;
-        dc=GetDC(NULL);
-        color=CreateDIBSection(dc,(BITMAPINFO*)&bi,0,(void**)&target,NULL,(u32)0U);
-        ReleaseDC(NULL,dc);
-        mask=CreateBitmap(image->width,image->height,1,1,NULL);
+        HDC dc; HICON handle; HBITMAP color,mask; unsigned char* target=NULL; unsigned char* source=image->pixels;
+        BITMAPV5HEADER bi={0}; bi.bV5Size=sizeof(bi); bi.bV5Width=image->width; bi.bV5Height=-image->height; bi.bV5Planes=1; bi.bV5BitCount=32; bi.bV5Compression=3; bi.bV5RedMask=0x00ff0000; bi.bV5GreenMask=0x0000ff00; bi.bV5BlueMask=0x000000ff; bi.bV5AlphaMask=0xff000000;
+        dc=GetDC(NULL); color=CreateDIBSection(dc,(BITMAPINFO*)&bi,0,(void**)&target,NULL,(u32)0U); ReleaseDC(NULL,dc); mask=CreateBitmap(image->width,image->height,1,1,NULL);
         for (int i=0;i<image->width*image->height;i++) { target[0]=source[2]; target[1]=source[1]; target[2]=source[0]; target[3]=source[3]; target+=4; source+=4; }
-        MemSetToVForNBytes(&ii,0,sizeof(ii));
-        ii.fIcon=icon; ii.xHotspot=xhot; ii.yHotspot=yhot; ii.hbmMask=mask; ii.hbmColor=color;
-        handle=CreateIconIndirect(&ii); DeleteObject(color); DeleteObject(mask); return handle;
+        ICONINFO ii={0}; ii.fIcon=icon; ii.xHotspot=xhot; ii.yHotspot=yhot; ii.hbmMask=mask; ii.hbmColor=color; handle=CreateIconIndirect(&ii); DeleteObject(color); DeleteObject(mask); return handle;
     }
 
     static void updateCursorImage(_GLFWwindow* win) { if (win->cursorMode==0x00034001/*GLFW_CURSOR_NORMAL*/) {SetCursor(LoadCursorW(NULL,(u16*)((u64)(u16)32512)));} else {SetCursor(_glfw.win32.blankCursor);} }
@@ -2365,18 +2151,15 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
                 if (action == INPUT_RELEASE && wParam == 0x10/*VK_SHIFT*/) { InputKey(win,KEY_LEFT_SHIFT,action); InputKey(win,KEY_RIGHT_SHIFT,action); }
                 else if (wParam == 0x2C/*VK_SNAPSHOT*/) { InputKey(win,key,INPUT_PRESS); InputKey(win,key,INPUT_RELEASE); }
                 else InputKey(win,key,action);
-                break;
-            }
-            case 0x0201/*WM_LBUTTONDOWN*/: case 0x0204/*WM_RBUTTONDOWN*/: case 0x0207/*WM_MBUTTONDOWN*/: case 0x020B/*WM_XBUTTONDOWN*/:
-            case 0x0202/*WM_LBUTTONUP*/:   case 0x0205/*WM_RBUTTONUP*/:   case 0x0208/*WM_MBUTTONUP*/:   case 0x020C/*WM_XBUTTONUP*/: {
+                break; }
+            case 0x0201/*WM_LBUTTONDOWN*/: case 0x0204/*WM_RBUTTONDOWN*/: case 0x0207/*WM_MBUTTONDOWN*/: case 0x020B/*WM_XBUTTONDOWN*/: case 0x0202/*WM_LBUTTONUP*/:   case 0x0205/*WM_RBUTTONUP*/:   case 0x0208/*WM_MBUTTONUP*/:   case 0x020C/*WM_XBUTTONUP*/: {
                 int i,action,button = (uMsg==0x0201/*WM_LBUTTONDOWN*/ || uMsg == 0x0202/*WM_LBUTTONUP*/) ? MOUSE_BUTTON_LEFT : ((uMsg == 0x0204/*WM_RBUTTONDOWN*/ || uMsg == 0x0205/*WM_RBUTTONUP*/) ? MOUSE_BUTTON_RIGHT : ((uMsg == 0x0207/*WM_MBUTTONDOWN*/ || uMsg == 0x0208/*WM_MBUTTONUP*/) ? MOUSE_BUTTON_MIDDLE : (((HIWORD(wParam)) == 0x0001/*XBUTTON1*/) ? MOUSE_BUTTON_4 : MOUSE_BUTTON_5)));
                 action=(uMsg == 0x0201/*WM_LBUTTONDOWN*/ || uMsg == 0x0204/*WM_RBUTTONDOWN*/ || uMsg == 0x0207/*WM_MBUTTONDOWN*/ || uMsg == 0x020B/*WM_XBUTTONDOWN*/) ? INPUT_PRESS : INPUT_RELEASE;
                 for (i=0;i<=7;i++) { if (win->mouseButtons[i]==INPUT_PRESS) break; }
                 if (i>7) {SetCapture(hWnd);} InputMouseClick(win,button,action);
                 for (i=0;i<=7;i++) { if (win->mouseButtons[i]==INPUT_PRESS) break; }
                 if (i>7) {ReleaseCapture();} if (uMsg == 0x020B/*WM_XBUTTONDOWN*/ || uMsg == 0x020C/*WM_XBUTTONUP*/) return 1;
-                return 0;
-            }
+                return 0; }
             case 0x0200/*WM_MOUSEMOVE*/: {                
                 const int x=((int)(short)(lParam & 0xFFFF)), y=((int)(short)(lParam >> 16));
                 if (win->cursorMode==0x00034003/*CURSOR_DISABLED*/) {
@@ -2386,8 +2169,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
                 }
                 
                 win->win32.lastCursorPosX=x; win->win32.lastCursorPosY=y;
-                return 0;
-            }
+                return 0; }
             case 0x02A3/*WM_MOUSELEAVE*/: { win->win32.cursorTracked=0; return 0; }
             case 0x020A/*WM_MOUSEWHEEL*/: { Sys_Input.scrollDelta += (i16)HIWORD(wParam)/(double)120; return 0; }
             case 0x0005/*WM_SIZE*/: if (wParam == 1) {Sys_Global.gamePaused = true;} return 0;
@@ -2396,20 +2178,14 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
             case 0x0020/*WM_SETCURSOR*/: { if (LOWORD(lParam)==1) { updateCursorImage(win); return 1; } break; }
             case 0x0084/*WM_NCHITTEST*/: ;i64 hit = DefWindowProcW(hWnd,uMsg,wParam,lParam); if (hit >= 10 && hit <= 17) { return 1; } return hit;
         }
-        
         return DefWindowProcW(hWnd,uMsg,wParam,lParam);
     }
 
     void SetWindowIcon(const GLFWimage* image) { HICON hIcon = createIcon(image,0,0, 1); SendMessageW(((_GLFWwindow*)window)->win32.handle,0x0080,1,(i64)hIcon); SendMessageW(((_GLFWwindow*)window)->win32.handle,0x0080,0,(i64)hIcon); }
-    void GetWindowPos(_GLFWwindow* win, int* xpos, int* ypos) { POINT pos={0,0}; ClientToScreen(win->win32.handle,&pos); *xpos=pos.x; *ypos=pos.y; }
-    void GetWindowSize(_GLFWwindow* win, int* width, int* height) { RECT area; GetClientRect(win->win32.handle,&area); *width=area.right; *height=area.bottom; }
-    void SetWindowSize(_GLFWwindow* win, int width, int height) { RECT rect={0,0,width,height}; AdjustWindowRectEx(&rect,getWindowStyle(win),0,0); SetWindowPos(win->win32.handle,(HWND)0,0,0,rect.right-rect.left,rect.bottom-rect.top,0x0010|0x0200|0x0002|0x0004); }
-    void SetWindowMonitor(_GLFWwindow* win, int xpos, int ypos, int width, int height) {
-        RECT r = {xpos,ypos,xpos+width,ypos+height}; u32 s = GetWindowLongW(win->win32.handle,-16); u32 f = 0x0010|0x0100;
-        if (win->decorated) { s &= ~0x80000000/*WS_POPUP*/, s |= getWindowStyle(win), SetWindowLongW(win->win32.handle,-16,s), f |= 0x0020; }
-        AdjustWindowRectEx(&r,getWindowStyle(win),0,0); SetWindowPos(win->win32.handle,(HWND)-2,r.left,r.top,r.right-r.left,r.bottom-r.top,f);
-    }
-
+    void GetWindowPos(_GLFWwindow* win, int* x, int* y) { POINT pos={0,0}; ClientToScreen(win->win32.handle,&pos); *x=pos.x; *y=pos.y; }
+    void GetWindowSize(_GLFWwindow* win, int* w, int* h) { RECT area; GetClientRect(win->win32.handle,&area); *w=area.right; *h=area.bottom; }
+    void SetWindowSize(_GLFWwindow* win, int w, int h) { RECT rect={0,0,w,h}; AdjustWindowRectEx(&rect,getWindowStyle(win),0,0); SetWindowPos(win->win32.handle,(HWND)0,0,0,rect.right-rect.left,rect.bottom-rect.top,0x0010|0x0200|0x0002|0x0004); }
+    void SetWindowMonitor(_GLFWwindow* w, int x, int y, int wd, int h) { RECT r = {x,y,x+wd,y+h}; u32 s=GetWindowLongW(w->win32.handle,-16); u32 f=0x0010|0x0100; if (w->decorated) {s&=~0x80000000,s|=getWindowStyle(w),SetWindowLongW(w->win32.handle,-16,s),f|=0x0020;} AdjustWindowRectEx(&r,getWindowStyle(w),0,0); SetWindowPos(w->win32.handle,(HWND)-2,r.left,r.top,r.right-r.left,r.bottom-r.top,f); }
     void SetWindowDecorated(_GLFWwindow* win,i32 enabled) {
         (void)enabled; RECT rect; u32 style=GetWindowLongW(win->win32.handle,-16);
         style &= ~(0x00C00000/*WS_CAPTION*/ | 0x00080000/*WS_SYSMENU*/ | 0x00040000/*WS_THICKFRAME*/ | 0x00020000/*WS_MINIMIZEBOX*/ | 0x00010000/*WS_MAXIMIZEBOX*/ | 0x80000000/*WS_POPUP*/); style |= getWindowStyle(win);
@@ -2427,31 +2203,15 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
         if (win) { int width,height; GetWindowSize(win,&width,&height); if (win->win32.lastCursorPosX != width/2 || win->win32.lastCursorPosY != height/2) {SetCursorPosV(win,width/2,height/2);} }
     }
 
-    void SetCursorMode(GLFWwindow* handle, int value) {
-        _GLFWwindow* win = (_GLFWwindow*)handle; if (win->cursorMode == value) return;
-        
-        win->cursorMode = value; POINT pos; GetCursorPos(&pos);
-        if (win->win32.handle == GetActiveWindow()) { _glfw.win32.restoreCurPosX=pos.x; _glfw.win32.restoreCurPosY=pos.y; captureCursor(win); _glfw.win32.disabledCursorWindow=win; } else Sys_Global.gamePaused = true;
-        updateCursorImage(win);
-    }
-
     GLFWproc PlatformGetModuleSymbol(void* module, const char* name) { return (GLFWproc)GetProcAddress((HMODULE)module,name); }
     typedef struct {u16 index; i32 vkey;} WinKeyRemap;
-    static const WinKeyRemap winkeyRemapTable[] = {
-        {0x00B,KEY_0},{0x002,KEY_1},{0x003,KEY_2},{0x004,KEY_3},{0x005,KEY_4},{0x006,KEY_5},{0x007,KEY_6},{0x008,KEY_7},{0x009,KEY_8},{0x00A,KEY_9},{0x01E,KEY_A},{0x030,KEY_B},{0x02E,KEY_C},
-        {0x020,KEY_D},{0x012,KEY_E},{0x021,KEY_F},{0x022,KEY_G},{0x023,KEY_H},{0x017,KEY_I},{0x024,KEY_J},{0x025,KEY_K},{0x026,KEY_L},{0x032,KEY_M},{0x031,KEY_N},{0x018,KEY_O},{0x019,KEY_P},
-        {0x010,KEY_Q},{0x013,KEY_R},{0x01F,KEY_S},{0x014,KEY_T},{0x016,KEY_U},{0x02F,KEY_V},{0x011,KEY_W},{0x02D,KEY_X},{0x015,KEY_Y},{0x02C,KEY_Z},{0x028,KEY_APOSTROPHE},{0x02B,KEY_BACKSLASH},
-        {0x033,KEY_COMMA},{0x00D,KEY_EQUAL},{0x029,KEY_GRAVE_ACCENT},{0x01A,KEY_LEFT_BRACKET},{0x00C,KEY_MINUS},{0x034,KEY_PERIOD},{0x01B,KEY_RIGHT_BRACKET},{0x027,KEY_SEMICOLON},{0x035,KEY_SLASH},
-        {0x00E,KEY_BACKSPACE},{0x153,KEY_DELETE},{0x14F,KEY_END},{0x01C,KEY_ENTER},{0x001,KEY_ESCAPE},{0x147,KEY_HOME},{0x152,KEY_INSERT},{0x15D,KEY_MENU},{0x151,KEY_PAGE_DOWN},{0x149,KEY_PAGE_UP},
-        {0x045,KEY_PAUSE},{0x039,KEY_SPACE},{0x00F,KEY_TAB},{0x03A,KEY_CAPS_LOCK},{0x145,KEY_NUM_LOCK},{0x046,KEY_SCROLL_LOCK},{0x03B,KEY_F1},{0x03C,KEY_F2},{0x03D,KEY_F3},{0x03E,KEY_F4},
-        {0x03F,KEY_F5},{0x040,KEY_F6},{0x041,KEY_F7},{0x042,KEY_F8},{0x043,KEY_F9},{0x044,KEY_F10},{0x057,KEY_F11},{0x058,KEY_F12},{0x038,KEY_LEFT_ALT},{0x01D,KEY_LEFT_CONTROL},{0x02A,KEY_LEFT_SHIFT},
-        {0x15B,KEY_LEFT_SUPER},{0x137,KEY_PRINT_SCREEN},{0x138,KEY_RIGHT_ALT},{0x11D,KEY_RIGHT_CONTROL},{0x036,KEY_RIGHT_SHIFT},{0x15C,KEY_RIGHT_SUPER},{0x150,KEY_DOWN},{0x14B,KEY_LEFT},{0x14D,KEY_RIGHT},
-        {0x148,KEY_UP},{0x052,KEY_KP_0},{0x04F,KEY_KP_1},{0x050,KEY_KP_2},{0x051,KEY_KP_3},{0x04B,KEY_KP_4},{0x04C,KEY_KP_5},{0x04D,KEY_KP_6},{0x047,KEY_KP_7},{0x048,KEY_KP_8},{0x049,KEY_KP_9},
-        {0x04E,KEY_KP_ADD},{0x053,KEY_KP_DECIMAL},{0x135,KEY_KP_DIVIDE},{0x11C,KEY_KP_ENTER},{0x059,KEY_KP_EQUAL},{0x037,KEY_KP_MULTIPLY},{0x04A,KEY_KP_SUBTRACT}
-    };
-    
+    static const WinKeyRemap winkeyRemapTable[] = {{0x00B,KEY_0},{0x002,KEY_1},{0x003,KEY_2},{0x004,KEY_3},{0x005,KEY_4},{0x006,KEY_5},{0x007,KEY_6},{0x008,KEY_7},{0x009,KEY_8},{0x00A,KEY_9},{0x01E,KEY_A},{0x030,KEY_B},{0x02E,KEY_C},{0x020,KEY_D},{0x012,KEY_E},{0x021,KEY_F},{0x022,KEY_G},{0x023,KEY_H},{0x017,KEY_I},{0x024,KEY_J},{0x025,KEY_K},{0x026,KEY_L},{0x032,KEY_M},{0x031,KEY_N},{0x018,KEY_O},{0x019,KEY_P},
+                                                   {0x010,KEY_Q},{0x013,KEY_R},{0x01F,KEY_S},{0x014,KEY_T},{0x016,KEY_U},{0x02F,KEY_V},{0x011,KEY_W},{0x02D,KEY_X},{0x015,KEY_Y},{0x02C,KEY_Z},{0x028,KEY_APOSTROPHE},{0x02B,KEY_BACKSLASH},{0x033,KEY_COMMA},{0x00D,KEY_EQUAL},{0x029,KEY_GRAVE_ACCENT},{0x01A,KEY_LEFT_BRACKET},{0x00C,KEY_MINUS},{0x034,KEY_PERIOD},{0x01B,KEY_RIGHT_BRACKET},{0x027,KEY_SEMICOLON},{0x035,KEY_SLASH},
+                                                   {0x00E,KEY_BACKSPACE},{0x153,KEY_DELETE},{0x14F,KEY_END},{0x01C,KEY_ENTER},{0x001,KEY_ESCAPE},{0x147,KEY_HOME},{0x152,KEY_INSERT},{0x15D,KEY_MENU},{0x151,KEY_PAGE_DOWN},{0x149,KEY_PAGE_UP},{0x045,KEY_PAUSE},{0x039,KEY_SPACE},{0x00F,KEY_TAB},{0x03A,KEY_CAPS_LOCK},{0x145,KEY_NUM_LOCK},{0x046,KEY_SCROLL_LOCK},{0x03B,KEY_F1},{0x03C,KEY_F2},{0x03D,KEY_F3},{0x03E,KEY_F4},
+                                                   {0x03F,KEY_F5},{0x040,KEY_F6},{0x041,KEY_F7},{0x042,KEY_F8},{0x043,KEY_F9},{0x044,KEY_F10},{0x057,KEY_F11},{0x058,KEY_F12},{0x038,KEY_LEFT_ALT},{0x01D,KEY_LEFT_CONTROL},{0x02A,KEY_LEFT_SHIFT},{0x15B,KEY_LEFT_SUPER},{0x137,KEY_PRINT_SCREEN},{0x138,KEY_RIGHT_ALT},{0x11D,KEY_RIGHT_CONTROL},{0x036,KEY_RIGHT_SHIFT},{0x15C,KEY_RIGHT_SUPER},{0x150,KEY_DOWN},{0x14B,KEY_LEFT},{0x14D,KEY_RIGHT},
+                                                   {0x148,KEY_UP},{0x052,KEY_KP_0},{0x04F,KEY_KP_1},{0x050,KEY_KP_2},{0x051,KEY_KP_3},{0x04B,KEY_KP_4},{0x04C,KEY_KP_5},{0x04D,KEY_KP_6},{0x047,KEY_KP_7},{0x048,KEY_KP_8},{0x049,KEY_KP_9},{0x04E,KEY_KP_ADD},{0x053,KEY_KP_DECIMAL},{0x135,KEY_KP_DIVIDE},{0x11C,KEY_KP_ENTER},{0x059,KEY_KP_EQUAL},{0x037,KEY_KP_MULTIPLY},{0x04A,KEY_KP_SUBTRACT}};
     static void createKeyTables() {
-        MemSetToVForNBytes(_glfw.win32.keycodes,-1,sizeof(_glfw.win32.keycodes)); MemSetToVForNBytes(_glfw.win32.scancodes,-1,sizeof(_glfw.win32.scancodes));
+        mset(_glfw.win32.keycodes,-1,sizeof(_glfw.win32.keycodes)); mset(_glfw.win32.scancodes,-1,sizeof(_glfw.win32.scancodes));
         for (size_t i=0;i<sizeof(winkeyRemapTable)/sizeof(winkeyRemapTable[0]);++i) _glfw.win32.keycodes[winkeyRemapTable[i].index] = winkeyRemapTable[i].vkey;
         for (int scancode=0;scancode<512;scancode++) { if (_glfw.win32.keycodes[scancode] > 0) {_glfw.win32.scancodes[_glfw.win32.keycodes[scancode]] = scancode;} }
     }
@@ -2477,7 +2237,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
                 if (jid <= JOYSTICK_LAST) continue;
                 if (_glfw.win32.xinput.GetCapabilities(index,0,&xic) != 0) continue;
 
-                StringFormat(guid,sizeof(guid),"78696e707574%02x000000000000000000",xic.SubType & 0xff);
+                sFormat(guid,sizeof(guid),"78696e707574%02x000000000000000000",xic.SubType & 0xff);
                 js = _glfwAllocJoystick("Gamepad", guid, 6, 10, 1);
                 if (!js) continue;
 
@@ -2508,7 +2268,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     void _glfwDetectJoystickDisconnectionWin32() { for (int jid = 0;  jid <= JOYSTICK_LAST;  jid++) { _GLFWjoystick* js = _glfw.joysticks + jid; if (js->connected) {PollJoystick(js);} } }
     static i32 __stdcall monitorCallback(HMONITOR handle, HDC dc, RECT* rect, i64 data) {
         MONITORINFOEXW mi; (void)dc; (void)rect;
-        MemSetToVForNBytes(&mi,0,sizeof(mi));
+        mset(&mi,0,sizeof(mi));
         mi.cbSize = sizeof(mi);
         if (GetMonitorInfoW(handle, (MONITORINFO*) &mi)) {
             _GLFWmonitor* monitor = (_GLFWmonitor*) data;
@@ -2521,13 +2281,13 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     static _GLFWmonitor* createMonitor(DISPLAY_DEVICEW* adapter, DISPLAY_DEVICEW* display) {
         _GLFWmonitor* monitor; int widthMM,heightMM,nameSize=0; HDC dc; DEVMODEW dm; RECT rect;
         char* name = CreateUTF8FromWideStringWin32(display ? display->DeviceString : adapter->DeviceString,&nameSize);
-        MemSetToVForNBytes(&dm,0,sizeof(dm)); dm.dmSize = sizeof(dm);
+        mset(&dm,0,sizeof(dm)); dm.dmSize = sizeof(dm);
         EnumDisplaySettingsW(adapter->DeviceName,0xFFFFFFFFU,&dm);
         dc = CreateDCW(L"DISPLAY", adapter->DeviceName,NULL,NULL);
         if (IsWindowsVersionOrGreaterWin32(HIBYTE(0x0603),LOBYTE(0x0603),0)) { widthMM  = GetDeviceCaps(dc,4); heightMM = GetDeviceCaps(dc,6); } // Is Windows 8.10 or greater
         else { widthMM  = (int) (dm.dmPelsWidth * 25.4f / GetDeviceCaps(dc,88)); heightMM = (int) (dm.dmPelsHeight * 25.4f / GetDeviceCaps(dc,90)); }
 
-        DeleteDC(dc); monitor = AllocMonitor(name,widthMM,heightMM); OS_DeallocateRAM(name,nameSize);
+        DeleteDC(dc); monitor = AllocMonitor(name,widthMM,heightMM); OS_Free(name,nameSize);
         if (adapter->StateFlags & 0x08000000/*DISPLAY_DEVICE_MODESPRUNED*/) monitor->win32.modesPruned =  1;
         wcscpy(monitor->win32.adapterName, adapter->DeviceName);
         if (display) wcscpy(monitor->win32.displayName,display->DeviceName);
@@ -2538,15 +2298,15 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
 
     void _glfwPollMonitorsWin32() {
         int i, disconnectedCount = _glfw.monitorCount; _GLFWmonitor** disconnected = NULL; u32 adapterIndex,displayIndex; DISPLAY_DEVICEW adapter, display; _GLFWmonitor* monitor;
-        if (disconnectedCount) { disconnected = OS_Calloc(_glfw.monitorCount,sizeof(_GLFWmonitor*)); MemCpyFromBtoAForNBytes(disconnected,_glfw.monitors,_glfw.monitorCount * sizeof(_GLFWmonitor*)); }
+        if (disconnectedCount) { disconnected = OS_Calloc(_glfw.monitorCount,sizeof(_GLFWmonitor*)); mcpy(disconnected,_glfw.monitors,_glfw.monitorCount * sizeof(_GLFWmonitor*)); }
         for (adapterIndex = 0;;adapterIndex++) {
-            int type = 1; MemSetToVForNBytes(&adapter,0,sizeof(adapter)); adapter.cb = sizeof(adapter);
+            int type = 1; mset(&adapter,0,sizeof(adapter)); adapter.cb = sizeof(adapter);
             if (!EnumDisplayDevicesW(NULL, adapterIndex, &adapter, 0)) break;
             if (!(adapter.StateFlags&1)) continue;
 
             if (adapter.StateFlags & 0x00000004/*DISPLAY_DEVICE_PRIMARY_DEVICE*/) type = 0;
             for (displayIndex=0;;++displayIndex) {
-                MemSetToVForNBytes(&display,0,sizeof(display)); display.cb = sizeof(display);
+                mset(&display,0,sizeof(display)); display.cb = sizeof(display);
                 if (!EnumDisplayDevicesW(adapter.DeviceName, displayIndex, &display, 0)) break;
                 if (!(display.StateFlags&1)) continue;
 
@@ -2559,7 +2319,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
                 }
 
                 if (i < disconnectedCount) continue;
-                monitor = createMonitor(&adapter,&display); if (!monitor) { OS_DeallocateRAM(disconnected,_glfw.monitorCount*sizeof(_GLFWmonitor*)); return; }
+                monitor = createMonitor(&adapter,&display); if (!monitor) { OS_Free(disconnected,_glfw.monitorCount*sizeof(_GLFWmonitor*)); return; }
 
                 InputMonitor(monitor,0x00040001/*connected*/,type); type = 1;
             }
@@ -2567,14 +2327,14 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
             if (displayIndex == 0) {
                 for (i=0;i<disconnectedCount;++i) { if (disconnected[i] && wcscmp(disconnected[i]->win32.adapterName,adapter.DeviceName) == 0) {disconnected[i]=NULL; break;} }
                 if (i < disconnectedCount) continue;
-                monitor = createMonitor(&adapter,NULL); if (!monitor) { OS_DeallocateRAM(disconnected,_glfw.monitorCount*sizeof(_GLFWmonitor*)); return; }
+                monitor = createMonitor(&adapter,NULL); if (!monitor) { OS_Free(disconnected,_glfw.monitorCount*sizeof(_GLFWmonitor*)); return; }
 
                 InputMonitor(monitor, 0x00040001/*connected*/, type);
             }
         }
 
         for (i=0;i<disconnectedCount;++i) { if (disconnected[i]) {InputMonitor(disconnected[i],0x00040002/*disconnected*/,0);} }
-        if (disconnected) OS_DeallocateRAM(disconnected,_glfw.monitorCount*sizeof(_GLFWmonitor*));
+        if (disconnected) OS_Free(disconnected,_glfw.monitorCount*sizeof(_GLFWmonitor*));
     }
     
     static i64 __stdcall helperWindowProc(HWND hWnd, u32 uMsg, u64 wParam, i64 lParam) {
@@ -2593,9 +2353,9 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
         return DefWindowProcW(hWnd,uMsg,wParam,lParam);
     }
 
-    void GetMonitorPos(_GLFWmonitor* monitor, int* xpos, int* ypos) { DEVMODEW dm; MemSetToVForNBytes(&dm,0,sizeof(dm)); dm.dmSize = sizeof(dm); EnumDisplaySettingsExW(monitor->win32.adapterName,0xFFFFFFFFU,&dm,0x00000004); *xpos = dm.dmPosition.x; *ypos = dm.dmPosition.y; }
+    void GetMonitorPos(_GLFWmonitor* monitor, int* xpos, int* ypos) { DEVMODEW dm; mset(&dm,0,sizeof(dm)); dm.dmSize = sizeof(dm); EnumDisplaySettingsExW(monitor->win32.adapterName,0xFFFFFFFFU,&dm,0x00000004); *xpos = dm.dmPosition.x; *ypos = dm.dmPosition.y; }
     void GetMonitorWorkarea(_GLFWmonitor* monitor, int* xpos, int* ypos, int* width, int* height) { MONITORINFO mi = {0}; mi.cbSize = sizeof(mi); GetMonitorInfoW(monitor->win32.handle, &mi); *xpos = mi.rcWork.left; *ypos = mi.rcWork.top; *width = mi.rcWork.right - mi.rcWork.left; *height = mi.rcWork.bottom - mi.rcWork.top; }
-    void GetVideoMode(_GLFWmonitor* monitor, GLFWvidmode* mode) { DEVMODEW dm; MemSetToVForNBytes(&dm,0,sizeof(dm)); dm.dmSize = sizeof(dm); EnumDisplaySettingsW(monitor->win32.adapterName,0xFFFFFFFFU,&dm); mode->width=dm.dmPelsWidth; mode->height=dm.dmPelsHeight; mode->refreshRate=dm.dmDisplayFrequency; }
+    void GetVideoMode(_GLFWmonitor* monitor, GLFWvidmode* mode) { DEVMODEW dm; mset(&dm,0,sizeof(dm)); dm.dmSize = sizeof(dm); EnumDisplaySettingsW(monitor->win32.adapterName,0xFFFFFFFFU,&dm); mode->width=dm.dmPelsWidth; mode->height=dm.dmPelsHeight; mode->refreshRate=dm.dmDisplayFrequency; }
     static int choosePixelFormatWGL(_GLFWwindow* win) {
         int attribs[24],values[24],attribCount=0,i,pixelFormat,nativeCount,usableCount=0;
         const int query = 0x2000/*num pixel formats*/; _glfw.wgl.GetPixelFormatAttribivARB(win->context.wgl.dc,1,0,1,&query,&nativeCount);
@@ -2612,23 +2372,13 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
         }
 
         const _GLFWfbconfig* closest = ChooseFBConfig(usableConfigs,usableCount);
-        pixelFormat = (int)closest->handle; OS_DeallocateRAM(usableConfigs,nativeCount * sizeof(_GLFWfbconfig));
+        pixelFormat = (int)closest->handle; OS_Free(usableConfigs,nativeCount * sizeof(_GLFWfbconfig));
         return pixelFormat;
     }
 
     static void makeContextCurrentWGL(_GLFWwindow* win) { wglMakeCurrent(win->context.wgl.dc,win->context.wgl.handle); }
-    static void swapBuffersWGL(_GLFWwindow* win) {
-        if (!IsWindowsVersionOrGreaterWin32(HIBYTE(0x0602),LOBYTE(0x0602),0)) { i32 enabled = 0; if ((i32)(_glfw.win32.dwmapi.IsCompositionEnabled(&enabled) >= 0) && enabled) { int count = vabs(win->context.wgl.interval); while (count--) {_glfw.win32.dwmapi.Flush();} } } // Is Windows 8.0 or greater
-        SwapBuffers(win->context.wgl.dc);
-    }
-
-    static void swapIntervalWGL(int interval) {
-        _GLFWwindow* handle = (_GLFWwindow*)window;
-        handle->context.wgl.interval = interval;
-        if (!IsWindowsVersionOrGreaterWin32(HIBYTE(0x0602),LOBYTE(0x0602),0)) { i32 enabled = 0; if ((i32)(_glfw.win32.dwmapi.IsCompositionEnabled(&enabled) >= 0) && enabled) interval = 0; } // Is Windows 8.0 or greater
-        _glfw.wgl.SwapIntervalEXT(interval);
-    }
-
+    static void swapBuffersWGL(_GLFWwindow* win) { if (!IsWindowsVersionOrGreaterWin32(HIBYTE(0x0602),LOBYTE(0x0602),0)) { i32 enabled = 0; if ((i32)(_glfw.win32.dwmapi.IsCompositionEnabled(&enabled) >= 0) && enabled) { int count = vabs(win->context.wgl.interval); while (count--) {_glfw.win32.dwmapi.Flush();} } }/*>=Win8.0*/ SwapBuffers(win->context.wgl.dc); }
+    static void swapIntervalWGL(int interval) { ((_GLFWwindow*)window)->context.wgl.interval = interval; if (!IsWindowsVersionOrGreaterWin32(HIBYTE(0x0602),LOBYTE(0x0602),0)) { i32 enabled = 0; if ((i32)(_glfw.win32.dwmapi.IsCompositionEnabled(&enabled) >= 0) && enabled) interval = 0; }/*>=Win8.0*/ _glfw.wgl.SwapIntervalEXT(interval); }
     static GLFWglproc getProcAddressWGL(const char* procname) { const GLFWglproc proc = (GLFWglproc)wglGetProcAddress(procname); if (proc) {return proc;} return (GLFWglproc)PlatformGetModuleSymbol(_glfw.wgl.instance,procname); }
     void glfwSetWindowPosition(GLFWwindow* handle, int xpos, int ypos) { _GLFWwindow* win = (_GLFWwindow*)handle; RECT rect = {xpos,ypos,xpos,ypos}; AdjustWindowRectEx(&rect,getWindowStyle(win),0,0x00040000/*WS_EX_APPWINDOW*/); SetWindowPos(win->win32.handle,((HWND)0),rect.left,rect.top,0,0,0x0010|0x0200|0x0001|0x0004); }
 #else // LINUX
@@ -2679,8 +2429,8 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     typedef void(*PFN_XRRFreeCrtcInfo)(XRRCrtcInfo*);                       typedef int(*PFN_XUngrabPointer)(Display*,Time);                           typedef int(*PFN_XChangeWindowAttributes)(Display*,Window,unsigned long,XSetWindowAttributes*); 
     typedef void(*PFN_XRRFreeScreenResources)(XRRScreenResources*);         typedef Display*(*PFN_XOpenDisplay)(const char*);                          typedef XRROutputInfo*(*PFN_XRRGetOutputInfo)(Display*,XRRScreenResources*,RROutput);
     typedef RROutput(*PFN_XRRGetOutputPrimary)(Display*,Window);            typedef void(*PFN_XRRSelectInput)(Display*,Window,int);                    typedef XRRScreenResources*(*PFN_XRRGetScreenResourcesCurrent)(Display*,Window);
-    typedef int(*PFN_XRRUpdateConfiguration)(XEvent*);                      typedef XcursorImage*(*PFN_XcursorImageCreate)(int,int);                   typedef void(*PFN_XcursorImageDestroy)(XcursorImage*);
-    typedef Bool(*PFNGLXQUERYEXTENSIONPROC)(Display*,int*,int*);            typedef int(*PFNGLXGETFBCONFIGATTRIBPROC)(Display*,GLXFBConfig,int,int*);  typedef Cursor(*PFN_XcursorImageLoadCursor)(Display*,const XcursorImage*);
+    typedef int(*PFN_XRRUpdateConfiguration)(XEvent*);                      typedef XcursorImage*(*PFN_XCIC)(int,int);                   typedef void(*PFN_XCID)(XcursorImage*);
+    typedef Bool(*PFNGLXQUERYEXTENSIONPROC)(Display*,int*,int*);            typedef int(*PFNGLXGETFBCONFIGATTRIBPROC)(Display*,GLXFBConfig,int,int*);  typedef Cursor(*PFN_XCILC)(Display*,const XcursorImage*);
     typedef Bool(*PFNGLXQUERYVERSIONPROC)(Display*,int*,int*);              typedef Bool(*PFNGLXMAKECURRENTPROC)(Display*,GLXDrawable,GLXContext);     typedef void(*PFNGLXSWAPBUFFERSPROC)(Display*,GLXDrawable);
     typedef const char*(*PFNGLXQUERYEXTENSIONSSTRINGPROC)(Display*,int);    typedef GLXFBConfig*(*PFNGLXGETFBCONFIGSPROC)(Display*,int,int*);          typedef GLXContext(*PFNGLXCREATENEWCONTEXTPROC)(Display*,GLXFBConfig,int,GLXContext,Bool);
     typedef __GLXextproc(*PFNGLXGETPROCADDRESSPROC)(const u8*);             typedef void(*PFNGLXSWAPINTERVALEXTPROC)(Display*,GLXDrawable,int);        typedef XVisualInfo*(*PFNGLXGETVISUALFROMFBCONFIGPROC)(Display*,GLXFBConfig);
@@ -2699,8 +2449,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
                                      PFN_XQueryPointer QueryPointer; PFN_XRaiseWindow RaiseWindow; PFN_XResizeWindow ResizeWindow; PFN_XSaveContext SaveContext; PFN_XSendEvent SendEvent; PFN_XSetICFocus SetICFocus; PFN_XSetInputFocus SetInputFocus; PFN_XSetWMNormalHints SetWMNormalHints; PFN_XSetWMProtocols SetWMProtocols;
                                      PFN_XTranslateCoordinates TranslateCoordinates; PFN_XUndefineCursor UndefineCursor; PFN_XUngrabPointer UngrabPointer; PFN_XUnsetICFocus UnsetICFocus; PFN_XWarpPointer WarpPointer; } xlib;
                                      struct {void* handle; int eventBase,errorBase,major,minor; PFN_XRRFreeCrtcInfo FreeCrtcInfo; PFN_XRRFreeOutputInfo FreeOutputInfo; PFN_XRRFreeScreenResources FreeScreenResources; PFN_XRRGetCrtcInfo GetCrtcInfo; PFN_XRRGetOutputInfo GetOutputInfo; PFN_XRRGetOutputPrimary GetOutputPrimary;
-                                             PFN_XRRGetScreenResourcesCurrent GetScreenResourcesCurrent; PFN_XRRSelectInput SelectInput; PFN_XRRUpdateConfiguration UpdateConfiguration;}randr;
-                                     struct { void* handle; PFN_XcursorImageCreate ImageCreate; PFN_XcursorImageDestroy ImageDestroy; PFN_XcursorImageLoadCursor ImageLoadCursor; } xcursor; } _GLFWlibraryX11; 
+                                             PFN_XRRGetScreenResourcesCurrent GetScreenResourcesCurrent; PFN_XRRSelectInput SelectInput; PFN_XRRUpdateConfiguration UpdateConfiguration;}randr; } _GLFWlibraryX11; 
     PFN_XNextEvent XNextEvent;
     typedef struct _GLFWmonitorX11 { RROutput output; RRCrtc crtc; int index; } _GLFWmonitorX11;
     typedef struct _GLFWjoystickLinux { FHandle fd; char path[260]; int keyMap[0x300/*KEY_CNT*/ - 0x100/*BTN_MISC*/],absMap[0x40/*ABS_CNT*/]; struct input_absinfo absInfo[0x40/*ABS_CNT*/]; int hats[4][2]; } _GLFWjoystickLinux;
@@ -2741,7 +2490,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
         *target++=image[0].width; *target++=image[0].height;
         for (int j=0;j<image[0].width*image[0].height;++j) *target++=(((unsigned long)image[0].pixels[j*4+0])<<16)|(((unsigned long)image[0].pixels[j*4+1])<<8)|(((unsigned long)image[0].pixels[j*4+2])<<0)|(((unsigned long)image[0].pixels[j*4+3])<<24);
         _glfw.x11.xlib.ChangeProperty(_glfw.x11.display,((_GLFWwindow*)window)->x11.handle,_glfw.x11.NET_WM_ICON,((Atom) 6),32,0/*PropModeReplace*/,(unsigned char*)icon,longCount);
-        OS_DeallocateRAM(icon,longCount*sizeof(unsigned long));
+        OS_Free(icon,longCount*sizeof(unsigned long));
     }
 
     void GetWindowSize(_GLFWwindow* win, int* width, int* height) { XWindowAttributes attribs; _glfw.x11.xlib.GetWindowAttributes(_glfw.x11.display,win->x11.handle,&attribs); *width=attribs.width; *height=attribs.height; }
@@ -2778,19 +2527,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     }
 
     void GetCursorPosV(_GLFWwindow* win, double* xpos, double* ypos) { Window root,child; int rootX,rootY,childX,childY; unsigned int mask; _glfw.x11.xlib.QueryPointer(_glfw.x11.display,win->x11.handle,&root,&child,&rootX,&rootY,&childX,&childY,&mask); *xpos=childX; *ypos=childY; }
-    void SetCursorPosV(_GLFWwindow* win, double x, double y) { win->x11.warpCursorPosX=(int)x; win->x11.warpCursorPosY=(int)y; _glfw.x11.xlib.WarpPointer(_glfw.x11.display,0L,win->x11.handle,0,0,0,0,(int)x,(int)y); }
-    void SetCursorMode(GLFWwindow* handle, int value) {
-        _GLFWwindow* win = (_GLFWwindow*)handle;
-        if (win->cursorMode != value) {
-            win->cursorMode = value;
-            GetCursorPosV(win,&win->virtualCursorPosX,&win->virtualCursorPosY);
-            if (WindowFocused()) { GetCursorPosV(win,&_glfw.x11.restoreCurPosX,&_glfw.x11.restoreCurPosY); captureCursor(win); _glfw.x11.disabledCursorWindow=win; }
-            else Sys_Global.gamePaused = true;
-            
-            updateCursorImage(win);
-        }
-    }
-    
+    void SetCursorPosV(_GLFWwindow* win, double x, double y) { win->x11.warpCursorPosX=(int)x; win->x11.warpCursorPosY=(int)y; _glfw.x11.xlib.WarpPointer(_glfw.x11.display,0L,win->x11.handle,0,0,0,0,(int)x,(int)y); }    
     static const XRRModeInfo* getModeInfo(const XRRScreenResources* sr, RRMode id) { for (int i = 0;  i < sr->nmode;  i++){ if (sr->modes[i].id == id) {return sr->modes + i;} } return NULL; }
     static GLFWvidmode vidmodeFromModeInfo(const XRRModeInfo* mi, const XRRCrtcInfo* ci) {
         GLFWvidmode mode;
@@ -2805,7 +2542,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
         XRRScreenResources* sr = _glfw.x11.randr.GetScreenResourcesCurrent(_glfw.x11.display,_glfw.x11.root);
         RROutput primary = _glfw.x11.randr.GetOutputPrimary(_glfw.x11.display,_glfw.x11.root);
         disconnectedCount = _glfw.monitorCount;
-        if (disconnectedCount) { disconnected = OS_Calloc(_glfw.monitorCount,sizeof(_GLFWmonitor*)); MemCpyFromBtoAForNBytes(disconnected,_glfw.monitors,_glfw.monitorCount * sizeof(_GLFWmonitor*)); }
+        if (disconnectedCount) { disconnected = OS_Calloc(_glfw.monitorCount,sizeof(_GLFWmonitor*)); mcpy(disconnected,_glfw.monitors,_glfw.monitorCount * sizeof(_GLFWmonitor*)); }
         for (int i = 0;  i < sr->noutput;  i++) {
             int j, type, widthMM, heightMM;
             XRROutputInfo* oi = _glfw.x11.randr.GetOutputInfo(_glfw.x11.display, sr, sr->outputs[i]);
@@ -2831,7 +2568,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
 
         _glfw.x11.randr.FreeScreenResources(sr);
         for (int i = 0;  i < disconnectedCount;  i++) { if (disconnected[i]) {InputMonitor(disconnected[i],0x00040002/*disconnected*/,0);} }
-        if (disconnected) OS_DeallocateRAM(disconnected,_glfw.monitorCount*sizeof(_GLFWmonitor*));
+        if (disconnected) OS_Free(disconnected,_glfw.monitorCount*sizeof(_GLFWmonitor*));
     }
     
     static void processEvent(XEvent* event) {
@@ -2848,8 +2585,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
             case 3/*KeyRelease*/: {
                 const int key=translateKey(keycode),action=(event->type==2/*KeyPress*/)?INPUT_PRESS:INPUT_RELEASE;
                 if (key!=KEY_UNKNOWN) InputKey(win,key,action);
-                return;
-            }
+                return; }
             case 4/*ButtonPress*/: {
                 if      (event->xbutton.button==1) InputMouseClick(win,MOUSE_BUTTON_LEFT,INPUT_PRESS);
                 else if (event->xbutton.button==2) InputMouseClick(win,MOUSE_BUTTON_MIDDLE,INPUT_PRESS);
@@ -2857,21 +2593,18 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
                 else if (event->xbutton.button==4) Sys_Input.scrollDelta += 1.0;
                 else if (event->xbutton.button==5) Sys_Input.scrollDelta += -1.0;
                 else InputMouseClick(win,event->xbutton.button - 1 - 4,INPUT_PRESS);
-                return;
-            }
+                return; }
             case 5/*ButtonRelease*/: {
                 if      (event->xbutton.button==1) InputMouseClick(win,MOUSE_BUTTON_LEFT,INPUT_RELEASE);
                 else if (event->xbutton.button==2) InputMouseClick(win,MOUSE_BUTTON_MIDDLE,INPUT_RELEASE);
                 else if (event->xbutton.button==3) InputMouseClick(win,MOUSE_BUTTON_RIGHT,INPUT_RELEASE);
                 else if (event->xbutton.button>7)  InputMouseClick(win,event->xbutton.button - 1 - 4,INPUT_RELEASE);
-                return;
-            }
+                return; }
             case 7/*EnterNotify*/: {
                 const int x=event->xcrossing.x,y=event->xcrossing.y;
                 InputCursorPos(win,x,y);
                 win->x11.lastCursorPosX=x; win->x11.lastCursorPosY=y;
-                return;
-            }
+                return; }
             case 6/*MotionNotify*/: {
                 const int x=event->xmotion.x,y=event->xmotion.y;
                 if (x!=win->x11.warpCursorPosX || y!=win->x11.warpCursorPosY) {
@@ -2881,8 +2614,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
                     } else InputCursorPos(win,x,y);
                 }
                 win->x11.lastCursorPosX=x; win->x11.lastCursorPosY=y;
-                return;
-            }
+                return; }
             case 22/*ConfigureNotify*/: {
                 if (event->xconfigure.width!=win->x11.width || event->xconfigure.height!=win->x11.height) { win->x11.width=event->xconfigure.width; win->x11.height=event->xconfigure.height; UpdateScreenSize(event->xconfigure.width,event->xconfigure.height); }
                 int xpos=event->xconfigure.x,ypos=event->xconfigure.y;
@@ -2891,8 +2623,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
                     _glfw.x11.xlib.TranslateCoordinates(_glfw.x11.display,win->x11.parent,_glfw.x11.root,xpos,ypos,&xpos,&ypos,&dummy);
                 }
                 if (xpos!=win->x11.xpos || ypos!=win->x11.ypos) { win->x11.xpos=xpos; win->x11.ypos=ypos; }
-                return;
-            }
+                return; }
             case 33/*ClientMessage*/: {
                 if (filtered || event->xclient.message_type==0L) return;
                 
@@ -2901,27 +2632,21 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
                     if (protocol==0L) return;
                     
                     if (protocol == _glfw.x11.WM_DELETE_WINDOW) OS_Exit(0);
-                    if (protocol == _glfw.x11.NET_WM_PING) {
-                        XEvent reply=*event; reply.xclient.window=_glfw.x11.root;
-                        _glfw.x11.xlib.SendEvent(_glfw.x11.display,_glfw.x11.root,0,(1L<<19)|(1L<<20),&reply);
-                    }
+                    if (protocol == _glfw.x11.NET_WM_PING) { XEvent reply=*event; reply.xclient.window=_glfw.x11.root; _glfw.x11.xlib.SendEvent(_glfw.x11.display,_glfw.x11.root,0,(1L<<19)|(1L<<20),&reply); }
                 }
-                return;
-            }
+                return; }
             case 9/*FocusIn*/: {
                 if (event->xfocus.mode==1/*NotifyGrab*/ || event->xfocus.mode==2/*NotifyUngrab*/) return;
                 if (win->cursorMode==0x00034003/*CURSOR_DISABLED*/) disableCursor(win);
                 if (win->x11.ic) _glfw.x11.xlib.SetICFocus(win->x11.ic);
                 InputWindowFocus(1);
-                return;
-            }
+                return; }
             case 10/*FocusOut*/: {
                 if (event->xfocus.mode==1/*NotifyGrab*/ || event->xfocus.mode==2/*NotifyUngrab*/) return;
                 if (win->cursorMode==0x00034003/*CURSOR_DISABLED*/) enableCursor(win);
                 if (win->x11.ic) _glfw.x11.xlib.UnsetICFocus(win->x11.ic);
                 InputWindowFocus(0);
-                return;
-            }
+                return; }
         }
     }
 
@@ -3002,8 +2727,8 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
 
     static void createKeyTables() {
         int scancodeMin, scancodeMax;
-        MemSetToVForNBytes(_glfw.x11.keycodes,-1,sizeof(_glfw.x11.keycodes));
-        MemSetToVForNBytes(_glfw.x11.scancodes,-1,sizeof(_glfw.x11.scancodes));
+        mset(_glfw.x11.keycodes,-1,sizeof(_glfw.x11.keycodes));
+        mset(_glfw.x11.scancodes,-1,sizeof(_glfw.x11.scancodes));
         _glfw.x11.xlib.DisplayKeycodes(_glfw.x11.display,&scancodeMin,&scancodeMax);
         int width; KeySym* keysyms = _glfw.x11.xlib.GetKeyboardMapping(_glfw.x11.display,scancodeMin,scancodeMax - scancodeMin + 1,&width);
         for (int sc = scancodeMin; sc <= scancodeMax; sc++) {
@@ -3048,7 +2773,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     static i32 openJoystickDevice(const char* path) {
         for (int jid = 0;  jid <= JOYSTICK_LAST;  jid++) {
             if (!_glfw.joysticks[jid].connected) continue;
-            if (StringsEqual(_glfw.joysticks[jid].linjs.path,path)) return 0;
+            if (sEqual(_glfw.joysticks[jid].linjs.path,path)) return 0;
         }
 
         _GLFWjoystickLinux linjs = {0}; linjs.fd = OS_Open(path,00004000|02000000,0); if (linjs.fd == -1) return 0;
@@ -3058,9 +2783,9 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
         if (!isBitSet(0x03/*EV_ABS*/,evBits)) { OS_Close(linjs.fd); return 0; }
 
         char name[256] = "",guid[33] = "";
-        if (OS_IOControl(linjs.fd,(0x80004506 | (((sizeof(name)) & 0x1fff) << 16)),name) < 0) StringCopyInto_A_From_B(name,"Unknown",sizeof(name));
-        if (id.vendor && id.product && id.version) StringFormat(guid,sizeof(guid),"%02x%02x0000%02x%02x0000%02x%02x0000%02x%02x0000",id.bustype & 0xff, id.bustype >> 8,id.vendor & 0xff,  id.vendor >> 8,id.product & 0xff, id.product >> 8,id.version & 0xff, id.version >> 8);
-        else StringFormat(guid,sizeof(guid),"%02x%02x0000%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x00",id.bustype & 0xff, id.bustype >> 8,name[0], name[1], name[2], name[3],name[4], name[5], name[6], name[7],name[8], name[9], name[10]);
+        if (OS_IOControl(linjs.fd,(0x80004506 | (((sizeof(name)) & 0x1fff) << 16)),name) < 0) scpy_to_a_from_b(name,"Unknown",sizeof(name));
+        if (id.vendor && id.product && id.version) sFormat(guid,sizeof(guid),"%02x%02x0000%02x%02x0000%02x%02x0000%02x%02x0000",id.bustype & 0xff, id.bustype >> 8,id.vendor & 0xff,  id.vendor >> 8,id.product & 0xff, id.product >> 8,id.version & 0xff, id.version >> 8);
+        else sFormat(guid,sizeof(guid),"%02x%02x0000%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x00",id.bustype & 0xff, id.bustype >> 8,name[0], name[1], name[2], name[3],name[4], name[5], name[6], name[7],name[8], name[9], name[10]);
 
         int axisCount = 0, buttonCount = 0, hatCount = 0;
         for (int code=0x100/*BTN_MISC*/;code<0x300/*KEY_CNT*/;code++) {
@@ -3083,8 +2808,8 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
         _GLFWjoystick* js = _glfwAllocJoystick(name,guid,axisCount,buttonCount,hatCount);
         if (!js) { OS_Close(linjs.fd); return 0; }
 
-        StringCopyInto_A_From_B(linjs.path,path,sizeof(linjs.path));
-        MemCpyFromBtoAForNBytes(&js->linjs,&linjs,sizeof(linjs));
+        scpy_to_a_from_b(linjs.path,path,sizeof(linjs.path));
+        mcpy(&js->linjs,&linjs,sizeof(linjs));
         pollAbsState(js); JoystickConnection(js,0x00040001/*connected*/);
         return  1;
     }
@@ -3092,7 +2817,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     struct linux_dirent64 { u64 d_ino; i64 d_off; unsigned short d_reclen; unsigned char d_type; char d_name[]; };
     struct inotify_event { i32 wd; u32 mask,cookie,len; char name[]; };
     static void closeJoystick(_GLFWjoystick* js) { JoystickConnection(js,0x00040002/*disconnected*/); if (js->linjs.fd > 0) { OS_Close(js->linjs.fd); js->linjs.fd = -1; } _glfwFreeJoystick(js); }    
-    static i32 isEventDevice(const char* name) { if (!name || !StringCompareUpToLength(name, "event", 5) || name[5] == '\0') {return 0;} for (const char* p=name+5;*p;++p) if (*p < '0' || *p > '9') {return 0;} return 1; }
+    static i32 isEventDevice(const char* name) { if (!name || !sCompUpToLen(name, "event", 5) || name[5] == '\0') {return 0;} for (const char* p=name+5;*p;++p) if (*p < '0' || *p > '9') {return 0;} return 1; }
     static void iterateInputDevices(void (*callback)(const char* fullpath)) {
         const char* dirname = "/dev/input"; FHandle fd = OS_Open(dirname,00200000|02000000,0); if (fd < 0) return;
 
@@ -3104,7 +2829,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
             long offset = 0;
             while (offset < rax) {
                 struct linux_dirent64* d = (struct linux_dirent64*)(buf + offset);
-                if (d->d_name[0] != '.' && isEventDevice(d->d_name)) { char path[260]; StringFormat(path,sizeof(path),"%s/%s",dirname,d->d_name); callback(path); }
+                if (d->d_name[0] != '.' && isEventDevice(d->d_name)) { char path[260]; sFormat(path,sizeof(path),"%s/%s",dirname,d->d_name); callback(path); }
                 offset += d->d_reclen;
             }
         }
@@ -3124,11 +2849,11 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
             offset += (i32)sizeof(struct inotify_event) + e->len;
             if (e->len == 0 || !isEventDevice(e->name)) continue;
 
-            StringFormat(joyPath,sizeof(joyPath), "/dev/input/%s", e->name);
+            sFormat(joyPath,sizeof(joyPath), "/dev/input/%s", e->name);
             if (e->mask & (0x00000100/*IN_CREATE*/|0x00000004/*IN_ATTRIB*/)) openJoystickDevice(joyPath);
             else if (e->mask & 0x00000200/*IN_DELETE*/) {
                 for (int jid = 0; jid <= JOYSTICK_LAST; jid++) {
-                    if (StringsEqual(_glfw.joysticks[jid].linjs.path,joyPath)) { closeJoystick(_glfw.joysticks + jid); break; }
+                    if (sEqual(_glfw.joysticks[jid].linjs.path,joyPath)) { closeJoystick(_glfw.joysticks + jid); break; }
                 }
             }
         }
@@ -3194,25 +2919,17 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
 #endif
 _GLFWlibrary _glfw={0};
 int WindowInit() {
-    MemSetToVForNBytes(&_glfw,0,sizeof(_glfw));
+    mset(&_glfw,0,sizeof(_glfw));
     #if defined(WINDOWS)
         GetModuleHandleExW(0x4|0x2,(const u16*)&_glfw,(HMODULE*)&_glfw.win32.instance);
         const char* names[] = {"xinput1_4.dll","xinput1_3.dll","xinput9_1_0.dll","xinput1_2.dll","xinput1_1.dll",NULL};
         for (int i=0;names[i];++i) {
             _glfw.win32.xinput.instance = LoadLibraryA(names[i]);
-            if (_glfw.win32.xinput.instance) {
-                _glfw.win32.xinput.GetCapabilities = (PFN_XInputGetCapabilities)PlatformGetModuleSymbol(_glfw.win32.xinput.instance, "XInputGetCapabilities");
-                _glfw.win32.xinput.GetState = (PFN_XInputGetState)PlatformGetModuleSymbol(_glfw.win32.xinput.instance, "XInputGetState");
-                break;
-            }
+            if (_glfw.win32.xinput.instance) { _glfw.win32.xinput.GetCapabilities = (PFN_XInputGetCapabilities)PlatformGetModuleSymbol(_glfw.win32.xinput.instance, "XInputGetCapabilities"); _glfw.win32.xinput.GetState = (PFN_XInputGetState)PlatformGetModuleSymbol(_glfw.win32.xinput.instance, "XInputGetState"); break; }
         }
 
         _glfw.win32.dwmapi.instance = LoadLibraryA("dwmapi.dll");
-        if (_glfw.win32.dwmapi.instance) {
-            _glfw.win32.dwmapi.IsCompositionEnabled = (PFN_DwmIsCompositionEnabled)PlatformGetModuleSymbol(_glfw.win32.dwmapi.instance, "DwmIsCompositionEnabled");
-            _glfw.win32.dwmapi.Flush = (PFN_DwmFlush)PlatformGetModuleSymbol(_glfw.win32.dwmapi.instance, "DwmFlush");
-        }
-
+        if (_glfw.win32.dwmapi.instance) { _glfw.win32.dwmapi.IsCompositionEnabled = (PFN_DwmIsCompositionEnabled)PlatformGetModuleSymbol(_glfw.win32.dwmapi.instance, "DwmIsCompositionEnabled"); _glfw.win32.dwmapi.Flush = (PFN_DwmFlush)PlatformGetModuleSymbol(_glfw.win32.dwmapi.instance, "DwmFlush"); }
         _glfw.win32.ntdll.instance = LoadLibraryA("ntdll.dll");
         if (_glfw.win32.ntdll.instance) _glfw.win32.ntdll.RtlVerifyVersionInfo = (PFN_RtlVerifyVersionInfo)PlatformGetModuleSymbol(_glfw.win32.ntdll.instance, "RtlVerifyVersionInfo");
         createKeyTables();
@@ -3221,32 +2938,20 @@ int WindowInit() {
         _glfw.win32.helperWindowClass = RegisterClassExW(&wc);
         _glfw.win32.helperWindowHandle = CreateWindowExW(0x00000100/*WS_EX_WINDOWEDGE*/ | 0x00000200/*WS_EX_CLIENTEDGE*/,(u16*)MAKEINTATOM(_glfw.win32.helperWindowClass),L"GLFW message window",0x04000000/*WS_CLIPSIBLINGS*/|0x02000000/*WS_CLIPCHILDREN*/,0,0,1,1,NULL,NULL,_glfw.win32.instance,NULL);
         ShowWindow(_glfw.win32.helperWindowHandle,0);
-        DEV_BROADCAST_DEVICEINTERFACE_W dbi;
-        MemSetToVForNBytes(&dbi,0,sizeof(dbi));
-        dbi.dbcc_size = sizeof(dbi);
-        dbi.dbcc_devicetype = 0x0005/*DBT_DEVTYP_DEVICEINTERFACE*/;
-        dbi.dbcc_classguid = (GUID){0x4d1e55b2,0xf16f,0x11cf,{0x88,0xcb,0x00,0x11,0x11,0x00,0x00,0x30}};
+        DEV_BROADCAST_DEVICEINTERFACE_W dbi={0}; dbi.dbcc_size = sizeof(dbi); dbi.dbcc_devicetype = 0x0005/*DBT_DEVTYP_DEVICEINTERFACE*/; dbi.dbcc_classguid = (GUID){0x4d1e55b2,0xf16f,0x11cf,{0x88,0xcb,0x00,0x11,0x11,0x00,0x00,0x30}};
         _glfw.win32.deviceNotificationHandle = RegisterDeviceNotificationW(_glfw.win32.helperWindowHandle,(DEV_BROADCAST_HDR*)&dbi,0);
         while (PeekMessageW(&msg, _glfw.win32.helperWindowHandle,0,0,0x0001)) { TranslateMessage(&msg); DispatchMessageW(&msg); }
         _glfwPollMonitorsWin32();
     #else
         void* module = _glfwPlatformLoadModule("libX11.so.6");
-        PFN_XInitThreads XInitThreads = (PFN_XInitThreads)PlatformGetModuleSymbol(module,"XInitThreads");
-        PFN_XOpenDisplay XOpenDisplay = (PFN_XOpenDisplay)PlatformGetModuleSymbol(module,"XOpenDisplay");
-        XInitThreads();
-        Display* display = XOpenDisplay(NULL);
-        _glfw.x11.display = display;
-        _glfw.x11.xlib.handle = module;
+        PFN_XInitThreads XInitThreads = (PFN_XInitThreads)PlatformGetModuleSymbol(module,"XInitThreads"); PFN_XOpenDisplay XOpenDisplay = (PFN_XOpenDisplay)PlatformGetModuleSymbol(module,"XOpenDisplay");
+        XInitThreads(); Display* display = XOpenDisplay(NULL);
+        _glfw.x11.display = display; _glfw.x11.xlib.handle = module;
         #define X(n) _glfw.x11.xlib.n = (PFN_X##n)PlatformGetModuleSymbol(_glfw.x11.xlib.handle, "X" #n);
-            X(AllocSizeHints)        X(ChangeProperty)       X(ChangeWindowAttributes) X(CheckTypedWindowEvent) X(CreateColormap)       X(CreateWindow)
-            X(DefineCursor)          X(DeleteProperty)       X(DisplayKeycodes)        X(FilterEvent)           X(FindContext)          X(Free)
-            X(FreeEventData)         X(GetInputFocus)        X(GetKeyboardMapping)     X(GetWMNormalHints)      X(GetWindowAttributes)  X(GetWindowProperty)
-            X(GrabPointer)           X(InternAtom)           X(MapWindow)              X(MoveResizeWindow)      X(MoveWindow)           X(Pending)
-            X(QueryExtension)        X(QueryPointer)         X(RaiseWindow)            X(ResizeWindow)          X(SaveContext)          X(SendEvent)
-            X(SetICFocus)            X(SetInputFocus)        X(SetWMNormalHints)       X(SetWMProtocols)        X(TranslateCoordinates) X(UndefineCursor)
-            X(UngrabPointer)         X(UnsetICFocus)         X(WarpPointer)
+            X(AllocSizeHints) X(ChangeProperty) X(CheckTypedWindowEvent) X(CreateColormap)   X(CreateWindow)        X(ChangeWindowAttributes) X(DefineCursor) X(DeleteProperty) X(DisplayKeycodes)  X(FilterEvent)      X(FindContext)          X(Free)           X(UngrabPointer)
+            X(FreeEventData)  X(GetInputFocus)  X(GetKeyboardMapping)    X(GetWMNormalHints) X(GetWindowAttributes) X(GetWindowProperty)      X(GrabPointer)  X(InternAtom)     X(MapWindow)        X(MoveResizeWindow) X(MoveWindow)           X(Pending)        X(UnsetICFocus)
+            X(QueryExtension) X(QueryPointer)   X(RaiseWindow)           X(ResizeWindow)     X(SaveContext)         X(SendEvent)              X(SetICFocus)   X(SetInputFocus)  X(SetWMNormalHints) X(SetWMProtocols)   X(TranslateCoordinates) X(UndefineCursor) X(WarpPointer)
         #undef X
-            
         XNextEvent = (PFN_XNextEvent)PlatformGetModuleSymbol(_glfw.x11.xlib.handle,"XNextEvent");
         _glfw.x11.screen = ((_XPrivDisplay)(_glfw.x11.display))->default_screen;
         _glfw.x11.root = (&((_XPrivDisplay)(_glfw.x11.display))->screens[_glfw.x11.screen])->root;
@@ -3256,38 +2961,23 @@ int WindowInit() {
         #define X(n) _glfw.x11.randr.n = (PFN_XRR##n)PlatformGetModuleSymbol(_glfw.x11.randr.handle,"XRR"#n);
             X(FreeCrtcInfo) X(FreeOutputInfo) X(FreeScreenResources) X(GetCrtcInfo) X(GetOutputInfo) X(GetOutputPrimary) X(GetScreenResourcesCurrent) X(SelectInput) X(UpdateConfiguration)
         #undef X
-            
         XRRScreenResources* sr = _glfw.x11.randr.GetScreenResourcesCurrent(_glfw.x11.display,_glfw.x11.root);
-        _glfw.x11.randr.FreeScreenResources(sr);
-        _glfw.x11.randr.SelectInput(_glfw.x11.display,_glfw.x11.root,(1L << 2)/*change notify mask*/);
-        _glfw.x11.xcursor.handle = _glfwPlatformLoadModule("libXcursor.so.1");
-        _glfw.x11.xcursor.ImageCreate     = (PFN_XcursorImageCreate)    PlatformGetModuleSymbol(_glfw.x11.xcursor.handle,"XcursorImageCreate");
-        _glfw.x11.xcursor.ImageDestroy    = (PFN_XcursorImageDestroy)   PlatformGetModuleSymbol(_glfw.x11.xcursor.handle,"XcursorImageDestroy");
-        _glfw.x11.xcursor.ImageLoadCursor = (PFN_XcursorImageLoadCursor)PlatformGetModuleSymbol(_glfw.x11.xcursor.handle,"XcursorImageLoadCursor");
+        _glfw.x11.randr.FreeScreenResources(sr); _glfw.x11.randr.SelectInput(_glfw.x11.display,_glfw.x11.root,(1L << 2)/*change notify mask*/); void* xcurhandle = _glfwPlatformLoadModule("libXcursor.so.1");
+        PFN_XCIC ImageCreate = (PFN_XCIC)PlatformGetModuleSymbol(xcurhandle,"XcursorImageCreate"); PFN_XCID ImageDestroy = (PFN_XCID)PlatformGetModuleSymbol(xcurhandle,"XcursorImageDestroy"); PFN_XCILC ImageLoadCursor = (PFN_XCILC)PlatformGetModuleSymbol(xcurhandle,"XcursorImageLoadCursor");
         createKeyTables();
         #define IA(n) _glfw.x11.xlib.InternAtom(_glfw.x11.display,n,0)
-            _glfw.x11.UTF8_STRING     = IA("UTF8_STRING");     _glfw.x11.WM_PROTOCOLS = IA("WM_PROTOCOLS");  _glfw.x11.WM_STATE               = IA("WM_STATE");
-            _glfw.x11.WM_DELETE_WINDOW= IA("WM_DELETE_WINDOW");_glfw.x11.NET_SUPPORTED= IA("_NET_SUPPORTED");_glfw.x11.NET_SUPPORTING_WM_CHECK= IA("_NET_SUPPORTING_WM_CHECK");
-            _glfw.x11.NET_WM_ICON     = IA("_NET_WM_ICON");    _glfw.x11.NET_WM_PING  = IA("_NET_WM_PING");  _glfw.x11.NET_WM_NAME            = IA("_NET_WM_NAME");
-            _glfw.x11.NET_WM_BYPASS_COMPOSITOR = IA("_NET_WM_BYPASS_COMPOSITOR");                            _glfw.x11.MOTIF_WM_HINTS         = IA("_MOTIF_WM_HINTS");
+            _glfw.x11.UTF8_STRING=IA("UTF8_STRING");  _glfw.x11.WM_PROTOCOLS=IA("WM_PROTOCOLS"); _glfw.x11.WM_STATE   =IA("WM_STATE");             _glfw.x11.WM_DELETE_WINDOW=IA("WM_DELETE_WINDOW");          _glfw.x11.NET_SUPPORTED =IA("_NET_SUPPORTED"); _glfw.x11.NET_SUPPORTING_WM_CHECK=IA("_NET_SUPPORTING_WM_CHECK");
+            _glfw.x11.NET_WM_ICON=IA("_NET_WM_ICON"); _glfw.x11.NET_WM_PING =IA("_NET_WM_PING"); _glfw.x11.NET_WM_NAME=IA("_NET_WM_NAME"); _glfw.x11.NET_WM_BYPASS_COMPOSITOR=IA("_NET_WM_BYPASS_COMPOSITOR"); _glfw.x11.MOTIF_WM_HINTS=IA("_MOTIF_WM_HINTS");
         #undef IA
-            
         Window* wfr = NULL; _glfwGetWindowPropertyX11(_glfw.x11.root,_glfw.x11.NET_SUPPORTING_WM_CHECK,((Atom) 33),(unsigned char**)&wfr);
         Window* wfc = NULL; _glfwGetWindowPropertyX11(*wfr,_glfw.x11.NET_SUPPORTING_WM_CHECK,((Atom) 33),(unsigned char**)&wfc);
-        _glfw.x11.xlib.Free(wfr); _glfw.x11.xlib.Free(wfc);
-        Atom* sa = NULL; const unsigned long ac = _glfwGetWindowPropertyX11(_glfw.x11.root,_glfw.x11.NET_SUPPORTED,((Atom) 4),(unsigned char**)&sa);
+        _glfw.x11.xlib.Free(wfr); _glfw.x11.xlib.Free(wfc); Atom* sa = NULL; const unsigned long ac = _glfwGetWindowPropertyX11(_glfw.x11.root,_glfw.x11.NET_SUPPORTED,((Atom) 4),(unsigned char**)&sa);
         #define GA(name) getAtomIfSupported(sa, ac, name)
-            _glfw.x11.NET_WM_STATE              = GA("_NET_WM_STATE");       _glfw.x11.NET_WM_STATE_FULLSCREEN   = GA("_NET_WM_STATE_FULLSCREEN");
-            _glfw.x11.NET_WM_WINDOW_TYPE        = GA("_NET_WM_WINDOW_TYPE"); _glfw.x11.NET_WM_WINDOW_TYPE_NORMAL = GA("_NET_WM_WINDOW_TYPE_NORMAL");
-            _glfw.x11.NET_WORKAREA              = GA("_NET_WORKAREA");       _glfw.x11.NET_CURRENT_DESKTOP       = GA("_NET_CURRENT_DESKTOP");
-            _glfw.x11.NET_ACTIVE_WINDOW         = GA("_NET_ACTIVE_WINDOW");
+            _glfw.x11.NET_WM_STATE=GA("_NET_WM_STATE"); _glfw.x11.NET_WM_STATE_FULLSCREEN=GA("_NET_WM_STATE_FULLSCREEN"); _glfw.x11.NET_WM_WINDOW_TYPE=GA("_NET_WM_WINDOW_TYPE"); _glfw.x11.NET_WM_WINDOW_TYPE_NORMAL=GA("_NET_WM_WINDOW_TYPE_NORMAL"); _glfw.x11.NET_WORKAREA=GA("_NET_WORKAREA"); _glfw.x11.NET_CURRENT_DESKTOP=GA("_NET_CURRENT_DESKTOP"); _glfw.x11.NET_ACTIVE_WINDOW=GA("_NET_ACTIVE_WINDOW");
         #undef GA
-
         if (sa) _glfw.x11.xlib.Free(sa);
-        XSetWindowAttributes wa; wa.event_mask = (1L<<22);
-        _glfw.x11.xlib.CreateWindow(_glfw.x11.display,_glfw.x11.root,0,0,1,1,0,0,2/*input only*/,(&((_XPrivDisplay)(_glfw.x11.display))->screens[_glfw.x11.screen])->root_visual,(1L<<11)/*event mask*/,&wa);
-        XcursorImage* native = _glfw.x11.xcursor.ImageCreate(16,16); MemSetToVForNBytes(native->pixels,0,256*sizeof(XcursorUInt)); native->xhot=native->yhot=0;
-        _glfw.x11.hiddenCursorHandle = _glfw.x11.xcursor.ImageLoadCursor(_glfw.x11.display,native); _glfw.x11.xcursor.ImageDestroy(native);
+        XSetWindowAttributes wa; wa.event_mask = (1L<<22); _glfw.x11.xlib.CreateWindow(_glfw.x11.display,_glfw.x11.root,0,0,1,1,0,0,2/*input only*/,(&((_XPrivDisplay)(_glfw.x11.display))->screens[_glfw.x11.screen])->root_visual,(1L<<11)/*event mask*/,&wa);
+        XcursorImage* native = ImageCreate(16,16); mset(native->pixels,0,256*sizeof(XcursorUInt)); native->xhot=native->yhot=0; _glfw.x11.hiddenCursorHandle = ImageLoadCursor(_glfw.x11.display,native); ImageDestroy(native);
         PollMonitors();
     #endif
     return  1;
@@ -3297,12 +2987,11 @@ const _GLFWfbconfig* ChooseFBConfig(const _GLFWfbconfig* alts, u32 count) {
     u32 missing, leastMissing = 2147483647, colorDiff, leastColorDiff = 2147483647, extraDiff, leastExtraDiff = 2147483647;
     const _GLFWfbconfig* closest = NULL;
     for (u32 i = 0; i < count; i++) {
-        const _GLFWfbconfig* cur = alts + i;        missing = 0;
-        if (cur->alphaBits == 0) {missing++;} if (cur->depthBits == 0) {missing++;} if (cur->stencilBits == 0) {missing++;}
-        colorDiff = 0; colorDiff+=(8-cur->redBits)  *(8-cur->redBits);     colorDiff+=(8-cur->greenBits)*(8-cur->greenBits); colorDiff+=(8-cur->blueBits)   *(8-cur->blueBits);
-        extraDiff = 0; extraDiff+=(8-cur->alphaBits)*(8 - cur->alphaBits); extraDiff+=(8-cur->depthBits)*(8-cur->depthBits); extraDiff+=(8-cur->stencilBits)*(8-cur->stencilBits);
-        if (missing < leastMissing || (missing == leastMissing && (colorDiff < leastColorDiff || (colorDiff == leastColorDiff && extraDiff < leastExtraDiff)))) closest = cur;
-        if (cur == closest) { leastMissing = missing; leastColorDiff = colorDiff; leastExtraDiff = extraDiff; }
+        const _GLFWfbconfig* c = alts + i; missing = (c->alphaBits==0)+(c->depthBits==0)+(c->stencilBits==0);
+        colorDiff = 0; colorDiff+=(8-c->redBits)  *(8-c->redBits);   colorDiff+=(8-c->greenBits)*(8-c->greenBits); colorDiff+=(8-c->blueBits)   *(8-c->blueBits);
+        extraDiff = 0; extraDiff+=(8-c->alphaBits)*(8-c->alphaBits); extraDiff+=(8-c->depthBits)*(8-c->depthBits); extraDiff+=(8-c->stencilBits)*(8-c->stencilBits);
+        if (missing < leastMissing || (missing == leastMissing && (colorDiff < leastColorDiff || (colorDiff == leastColorDiff && extraDiff < leastExtraDiff)))) closest = c;
+        if (c == closest) { leastMissing=missing; leastColorDiff=colorDiff; leastExtraDiff=extraDiff; }
     }
     return closest;
 }
@@ -3310,17 +2999,16 @@ const _GLFWfbconfig* ChooseFBConfig(const _GLFWfbconfig* alts, u32 count) {
 void SetGLContext_GetFunctionPointers() {
     _GLFWwindow* handle=(_GLFWwindow*)window; handle->context.makeCurrent(handle);
     #define X(n,t) n=(t)handle->context.getProcAddress(#n);
-    X(glClear,PFNGLCLEAR)                         X(glClearColor,PFNGLCLEARCOLOR)                   X(glColorMask,PFNGLCOLORMASK)              X(glDepthFunc,PFNGLDEPTHFUNC)                   X(glDepthMask,PFNGLDEPTHMASK)                       X(glDisable,PFNGLDISABLE)
-    X(glEnable,PFNGLENABLE)                       X(glFinish,PFNGLFINISH)                           X(glFlush,PFNGLFLUSH)                      X(glFrontFace,PFNGLFRONTFACE)                   X(glGetError,PFNGLGETERROR)                         X(glGetIntegerv,PFNGLGETINTEGERV)
-    X(glLineWidth,PFNGLLINEWIDTH)                 X(glReadBuffer,PFNGLREADBUFFER)                   X(glReadPixels,PFNGLREADPIXELS)            X(glTexImage2D,PFNGLTEXIMAGE2D)                 X(glViewport,PFNGLVIEWPORT)                         X(glBindTexture,PFNGLBINDTEXTURE)
-    X(glCopyTexSubImage2D,PFNGLCOPYTEXSUBIMAGE2D) X(glDrawArrays,PFNGLDRAWARRAYS)                   X(glDrawElements,PFNGLDRAWELEMENTS)        X(glGenTextures,PFNGLGENTEXTURES)               X(glActiveTexture,PFNGLACTIVETEXTURE)               X(glBlendFuncSeparate,PFNGLBLENDFUNCSEPARATE)
-    X(glBindBuffer,PFNGLBINDBUFFER)               X(glBufferData,PFNGLBUFFERDATA)                   X(glGenBuffers,PFNGLGENBUFFERS)            X(glUnmapBuffer,PFNGLUNMAPBUFFER)               X(glAttachShader,PFNGLATTACHSHADER)                 X(glCompileShader,PFNGLCOMPILESHADER)
+    X(glClear,PFNGLCLEAR)                         X(glClearColor,PFNGLCLEARCOLOR)                   X(glColorMask,PFNGLCOLORMASK)              X(glDepthFunc,PFNGLDEPTHFUNC)                   X(glDepthMask,PFNGLDEPTHMASK)                       X(glDisable,PFNGLDISABLE)                     X(glEnableVertexAttribArray,PFNGLENABLEVERTEXATTRIBARRAY)
+    X(glEnable,PFNGLENABLE)                       X(glFinish,PFNGLFINISH)                           X(glFlush,PFNGLFLUSH)                      X(glFrontFace,PFNGLFRONTFACE)                   X(glGetError,PFNGLGETERROR)                         X(glGetIntegerv,PFNGLGETINTEGERV)             X(glCheckFramebufferStatus,PFNGLCHECKFRAMEBUFFERSTATUS) 
+    X(glLineWidth,PFNGLLINEWIDTH)                 X(glReadBuffer,PFNGLREADBUFFER)                   X(glReadPixels,PFNGLREADPIXELS)            X(glTexImage2D,PFNGLTEXIMAGE2D)                 X(glViewport,PFNGLVIEWPORT)                         X(glBindTexture,PFNGLBINDTEXTURE)             X(glBindVertexArray,PFNGLBINDVERTEXARRAY) 
+    X(glCopyTexSubImage2D,PFNGLCOPYTEXSUBIMAGE2D) X(glDrawArrays,PFNGLDRAWARRAYS)                   X(glDrawElements,PFNGLDRAWELEMENTS)        X(glGenTextures,PFNGLGENTEXTURES)               X(glActiveTexture,PFNGLACTIVETEXTURE)               X(glBlendFuncSeparate,PFNGLBLENDFUNCSEPARATE) X(glVertexAttribBinding,PFNGLVERTEXATTRIBBINDING)
+    X(glBindBuffer,PFNGLBINDBUFFER)               X(glBufferData,PFNGLBUFFERDATA)                   X(glGenBuffers,PFNGLGENBUFFERS)            X(glUnmapBuffer,PFNGLUNMAPBUFFER)               X(glAttachShader,PFNGLATTACHSHADER)                 X(glCompileShader,PFNGLCOMPILESHADER)         X(glClearBufferFv,PFNGLCLEARBUFFERFV)
     X(glCreateProgram,PFNGLCREATEPROGRAM)         X(glCreateShader,PFNGLCREATESHADER)               X(glDrawBuffers,PFNGLDRAWBUFFERS)          X(glGetProgramiv,PFNGLGETPROGRAMIV)             X(glGetShaderInfoLog,PFNGLGETSHADERINFOLOG)         X(glGetShaderiv,PFNGLGETSHADERIV)
     X(glLinkProgram,PFNGLLINKPROGRAM)             X(glShaderSource,PFNGLSHADERSOURCE)               X(glUniform1f,PFNGLUNIFORM1F)              X(glUniform1i,PFNGLUNIFORM1I)                   X(glUniform2f,PFNGLUNIFORM2F)                       X(glUniform3f,PFNGLUNIFORM3F)
     X(glUniform4f,PFNGLUNIFORM4F)                 X(glTexParameteri,PFNGLTEXPARAMETERI)             X(glUniform1ui,PFNGLUNIFORM1UI)            X(glUniform2ui,PFNGLUNIFORM2UI)                 X(glUniformMatrix3fv,PFNGLUNIFORMMATRIX3FV)         X(glUniformMatrix4fv,PFNGLUNIFORMMATRIX4FV)
     X(glUseProgram,PFNGLUSEPROGRAM)               X(glBindBufferBase,PFNGLBINDBUFFERBASE)           X(glBindFramebuffer,PFNGLBINDFRAMEBUFFER)  X(glGenFramebuffers,PFNGLGENFRAMEBUFFERS)       X(glMapBufferRange,PFNGLMAPBUFFERRANGE)             X(glBindImageTexture,PFNGLBINDIMAGETEXTURE)
     X(glBindVertexBuffer,PFNGLBINDVERTEXBUFFER)   X(glDispatchCompute,PFNGLDISPATCHCOMPUTE)         X(glGenVertexArrays,PFNGLGENVERTEXARRAYS)  X(glVertexAttribFormat,PFNGLVERTEXATTRIBFORMAT) X(glFramebufferTexture2D,PFNGLFRAMEBUFFERTEXTURE2D) X(glBufferSubData,PFNGLBUFFERSUBDATA)
-    X(glClearBufferFv,PFNGLCLEARBUFFERFV)         X(glVertexAttribBinding,PFNGLVERTEXATTRIBBINDING)  X(glBindVertexArray,PFNGLBINDVERTEXARRAY) X(glCheckFramebufferStatus,PFNGLCHECKFRAMEBUFFERSTATUS)             X(glEnableVertexAttribArray,PFNGLENABLEVERTEXATTRIBARRAY)
     #undef X
 }
 
@@ -3339,14 +3027,14 @@ void InputMonitor(_GLFWmonitor* monitor, int action, int placement) {
     }
 }
 
-_GLFWmonitor* AllocMonitor(const char* n, int w, int h) { _GLFWmonitor* monitor = OS_Calloc(1, sizeof(_GLFWmonitor)); monitor->widthMM = w; monitor->heightMM = h; StringCopyInto_A_From_B(monitor->name,n,sizeof(monitor->name)); return monitor; }
+_GLFWmonitor* AllocMonitor(const char* n, int w, int h) { _GLFWmonitor* monitor = OS_Calloc(1, sizeof(_GLFWmonitor)); monitor->widthMM = w; monitor->heightMM = h; scpy_to_a_from_b(monitor->name,n,sizeof(monitor->name)); return monitor; }
 _GLFWmonitor** glfwGetMonitors(int* count) { *count = _glfw.monitorCount; return (_GLFWmonitor**) _glfw.monitors; }
 _GLFWmonitor* glfwGetPrimaryMonitor(void) { if (!_glfw.monitorCount) {return NULL;} return (_GLFWmonitor*) _glfw.monitors[0]; }
 void glfwGetMonitorPos(_GLFWmonitor* handle, int* xpos, int* ypos) { *xpos = 0; *ypos = 0; _GLFWmonitor* monitor = (_GLFWmonitor*)handle; GetMonitorPos(monitor,xpos,ypos); }
 void glfwGetMonitorWorkarea(_GLFWmonitor* handle, int* xpos, int* ypos, int* width, int* height) { *xpos=*ypos=*width=*height=0; _GLFWmonitor* monitor = (_GLFWmonitor*)handle; GetMonitorWorkarea(monitor,xpos,ypos,width,height); }
 const GLFWvidmode* glfwGetVideoMode(_GLFWmonitor* handle) { _GLFWmonitor* monitor=(_GLFWmonitor*)handle; GetVideoMode(monitor,&monitor->currentMode); return &monitor->currentMode; }
 void InputWindowFocus(i32 focused) {
-    Sys_Input.window_has_focus = focused != 0; Sys_Input.ignore_next_mouse_delta = true;
+    window_has_focus = focused != 0; ignore_next_mouse_delta = true;
     _GLFWwindow* win = (_GLFWwindow*)window;
     if (!focused) {
         for (int k=0;k<=348;++k) { if (win->keys[k]         == INPUT_PRESS) {       InputKey(win,k,INPUT_RELEASE);} }
@@ -3381,7 +3069,7 @@ GLFWwindow* VCreateWindow(int width, int height, char* title) {
     _glfw.wgl.GetCurrentContext = (PFN_wglGetCurrentContext)PlatformGetModuleSymbol(_glfw.wgl.instance,"wglGetCurrentContext");
     _glfw.wgl.MakeCurrent = (PFN_wglMakeCurrent)PlatformGetModuleSymbol(_glfw.wgl.instance,"wglMakeCurrent");
     dc = GetDC(_glfw.win32.helperWindowHandle);
-    MemSetToVForNBytes(&pfd,0,sizeof(pfd)); pfd.nSize = sizeof(pfd); pfd.dwFlags=0x25; SetPixelFormat(dc,ChoosePixelFormat(dc,&pfd),&pfd);
+    mset(&pfd,0,sizeof(pfd)); pfd.nSize = sizeof(pfd); pfd.dwFlags=0x25; SetPixelFormat(dc,ChoosePixelFormat(dc,&pfd),&pfd);
     rc = _glfw.wgl.CreateContext(dc); pdc=wglGetCurrentDC(); prc=wglGetCurrentContext(); wglMakeCurrent(dc,rc);
     _glfw.wgl.CreateContextAttribsARB = (FP_CCAA)wglGetProcAddress("wglCreateContextAttribsARB");
     _glfw.wgl.SwapIntervalEXT = (PFN_SWE)wglGetProcAddress("wglSwapIntervalEXT");
@@ -3433,7 +3121,7 @@ GLFWwindow* VCreateWindow(int width, int height, char* title) {
     }
 
     closest = ChooseFBConfig(usableConfigs,usableCount); native = (GLXFBConfig)closest->handle;
-    _glfw.x11.xlib.Free(nativeConfigs); if (usableConfigs) OS_DeallocateRAM(usableConfigs,nativeCount*sizeof(_GLFWfbconfig));
+    _glfw.x11.xlib.Free(nativeConfigs); if (usableConfigs) OS_Free(usableConfigs,nativeCount*sizeof(_GLFWfbconfig));
     result = _glfw.glx.GetVisualFromFBConfig(_glfw.x11.display,native);
     Visual* visual=result->visual; int depth = result->depth; _glfw.x11.xlib.Free(result);
     int xpos=0,ypos=0;
@@ -3450,7 +3138,7 @@ GLFWwindow* VCreateWindow(int width, int height, char* title) {
     szhints->flags|=((1L << 4)/*PMinSize*/|(1L << 5)/*PMaxSize*/); szhints->min_width=szhints->max_width=width; szhints->min_height=szhints->max_height=height;
     szhints->flags|=(1L << 9)/*PWinGravity*/; szhints->win_gravity=10/*static gravity*/;
     _glfw.x11.xlib.SetWMNormalHints(_glfw.x11.display,win->x11.handle,szhints); _glfw.x11.xlib.Free(szhints);
-    _glfw.x11.xlib.ChangeProperty(_glfw.x11.display,win->x11.handle,_glfw.x11.NET_WM_NAME,_glfw.x11.UTF8_STRING,8,0/*PropModeReplace*/,(unsigned char*)title,GetStringLength(title)); // Set title
+    _glfw.x11.xlib.ChangeProperty(_glfw.x11.display,win->x11.handle,_glfw.x11.NET_WM_NAME,_glfw.x11.UTF8_STRING,8,0/*PropModeReplace*/,(unsigned char*)title,slen(title)); // Set title
     GetWindowPos(win,&win->x11.xpos,&win->x11.ypos); GetWindowSize(win,&win->x11.width,&win->x11.height);
     int attribs[40],index=0; attribs[index++] = 0x2091/*major*/; attribs[index++] = 4; attribs[index++] = 0x2092/*minor*/; attribs[index++] = 3; /*OpenGL 4.3*/ attribs[index++] = 0x9126/*profile mask arb*/; attribs[index++] = 1/*core profile*/; attribs[index++] = 0L; attribs[index++] = 0L;
     win->context.glx.handle     = _glfw.glx.CreateContextAttribsARB(_glfw.x11.display,native,NULL,1,attribs); win->context.glx.window  = _glfw.glx.CreateWindow(_glfw.x11.display,native,win->x11.handle,NULL);
@@ -3465,22 +3153,15 @@ GLFWwindow* VCreateWindow(int width, int height, char* title) {
 void VSetWindowIcon(GLFWimage* images) { SetWindowIcon(images); }
 void glfwSetWindowSize(int width, int height) { _GLFWwindow* win = (_GLFWwindow*)window; win->videoMode.width=width; win->videoMode.height=height; SetWindowSize(win,width,height); }
 void glfwSetWindowMonitor(int xpos, int ypos, int width, int height) { _GLFWwindow* win = (_GLFWwindow*)window; win->videoMode.width=width; win->videoMode.height=height; SetWindowMonitor(win,xpos,ypos,width,height); }
-// ============ Input System
-InputElement inputElements[134] = {
-    { "A", KEY_A }, { "B", KEY_B }, { "C", KEY_C }, { "D", KEY_D }, { "E", KEY_E }, { "F", KEY_F }, { "G", KEY_G }, { "H", KEY_H }, { "I", KEY_I }, { "J", KEY_J }, { "K", KEY_K }, { "L", KEY_L }, { "M", KEY_M }, { "N", KEY_N }, { "O", KEY_O }, { "P", KEY_P }, { "Q", KEY_Q }, { "R", KEY_R }, { "S", KEY_S }, { "T", KEY_T },
-    { "U", KEY_U }, { "V", KEY_V }, { "W", KEY_W }, { "X", KEY_X }, { "Y", KEY_Y }, { "Z", KEY_Z }, { "1", KEY_1 }, { "2", KEY_2 }, { "3", KEY_3 }, { "4", KEY_4 }, { "5", KEY_5 }, { "6", KEY_6 }, { "7", KEY_7 }, { "8", KEY_8 }, { "9", KEY_9 }, { "0", KEY_0 }, { "UP ARROW", KEY_UP }, { "DN ARROW", KEY_DOWN }, { "LF ARROW", KEY_LEFT }, { "RT ARROW", KEY_RIGHT },
-    { "NUM 1", KEY_KP_1 }, { "NUM 2", KEY_KP_2 }, { "NUM 3", KEY_KP_3 }, { "NUM +", KEY_KP_ADD }, { "ENTER", KEY_ENTER }, { "RIGHT SHIFT", KEY_RIGHT_SHIFT }, { "LEFT SHIFT", KEY_LEFT_SHIFT }, { "RIGHT CTRL", KEY_RIGHT_CONTROL }, { "LEFT CTRL", KEY_LEFT_CONTROL }, { "RIGHT ALT", KEY_RIGHT_ALT },
-    { "LEFT ALT", KEY_LEFT_ALT }, { "RIGHT CMD", KEY_RIGHT_SUPER }, { "LEFT CMD", KEY_LEFT_SUPER }, { "LMB", MOUSE_BUTTON_1 }, { "RMB", MOUSE_BUTTON_2 }, { "MMB", MOUSE_BUTTON_3 }, { "MB 3", MOUSE_BUTTON_4 }, { "MB 4", MOUSE_BUTTON_5 }, { "MB 5", MOUSE_BUTTON_6 }, { "MB 6", MOUSE_BUTTON_7 },
-    { "MB 7", MOUSE_BUTTON_8 }, { "JOY 0", JOYSTICK_1 }, { "JOY 1", JOYSTICK_2 }, { "JOY 2", JOYSTICK_3 }, { "JOY 3", JOYSTICK_4 }, { "JOY 4", JOYSTICK_5 }, { "JOY 5", JOYSTICK_6 }, { "JOY 6", JOYSTICK_7 }, { "JOY 7", JOYSTICK_8 },
-    { "JOY 8", JOYSTICK_9 }, { "JOY 9", JOYSTICK_10 }, { "JOY 10", JOYSTICK_11 }, { "JOY 11", JOYSTICK_12 }, { "JOY 12", JOYSTICK_13 }, { "JOY 13", JOYSTICK_14 }, { "JOY 14", JOYSTICK_15 }, { "JOY 15", JOYSTICK_16 }, { "JOY 16", JOYHAT_UP }, { "JOY 17", JOYHAT_RIGHT },
-    { "BACKSPACE", KEY_BACKSPACE }, { "TAB", KEY_TAB }, { "NUM ENTER", KEY_KP_ENTER }, { "ESCAPE", KEY_ESCAPE }, { "SPACE", KEY_SPACE }, { "DELETE", KEY_DELETE }, { "INSERT", KEY_INSERT }, { "HOME", KEY_HOME }, { "END", KEY_END }, { "PAGE UP", KEY_PAGE_UP },
-    { "PAGE DN", KEY_PAGE_DOWN }, { "F1", KEY_F1 }, { "F2", KEY_F2 }, { "F3", KEY_F3 }, { "F4", KEY_F4 }, { "F5", KEY_F5 }, { "F6", KEY_F6 }, { "F7", KEY_F7 }, { "F8", KEY_F8 }, { "F9", KEY_F9 },
-    { "F10", KEY_F10 }, { "F11", KEY_F11 }, { "F12", KEY_F12 }, { "GRAVE", KEY_GRAVE_ACCENT }, { "-", KEY_MINUS }, { "=", KEY_EQUAL }, { "[", KEY_LEFT_BRACKET }, { "]", KEY_RIGHT_BRACKET }, { "\\", KEY_BACKSLASH }, { "/", KEY_SLASH },
-    { ".", KEY_PERIOD }, { ",", KEY_COMMA }, { ";", KEY_SEMICOLON }, { "'", KEY_APOSTROPHE }, { "CAPSLOCK", KEY_CAPS_LOCK }, { "NUM 0", KEY_KP_0 }, { "NUM 4", KEY_KP_4 }, { "NUM 5", KEY_KP_5 }, { "NUM 6", KEY_KP_6 }, { "NUM 7", KEY_KP_7 },
-    { "NUM 8", KEY_KP_8 }, { "NUM 9", KEY_KP_9 }, { "NUM *", KEY_KP_MULTIPLY }, { "NUM -", KEY_KP_SUBTRACT }, { "NUM .", KEY_KP_DECIMAL }, { "MENU", KEY_MENU }, { "PAUSE", KEY_PAUSE }, { "NUMLOCK", KEY_NUM_LOCK }, { "MWHEEL +", 128 }, { "MWHEEL -", 129 }, // 128, 129, Handled special case for mouse wheel + / - respectively
-    { "PRINT", KEY_PRINT_SCREEN }, { "JOY 18", JOYHAT_DOWN }, { "JOY 19", JOYHAT_LEFT },{ "UNUSED", 0 } //, {}
-};
-
+InputElement inputElements[134]={{"A",KEY_A},{"B",KEY_B},{"C",KEY_C},{"D",KEY_D},{"E",KEY_E},{"F",KEY_F},{"G",KEY_G},{"H",KEY_H},{"I",KEY_I},{"J",KEY_J},{"K",KEY_K},{"L",KEY_L},{"M",KEY_M},{"N",KEY_N},{"O",KEY_O},{"P",KEY_P},{"Q",KEY_Q},{"R",KEY_R},{"S",KEY_S},{"T",KEY_T},{"U",KEY_U},{"V",KEY_V},{"W",KEY_W},{"X",KEY_X},{"Y",KEY_Y},{"Z",KEY_Z},
+                                 {"1",KEY_1},{"2",KEY_2},{"3",KEY_3},{"4",KEY_4},{"5",KEY_5},{"6",KEY_6},{"7",KEY_7},{"8",KEY_8},{"9",KEY_9},{"0",KEY_0},{"UPARROW",KEY_UP},{"DNARROW",KEY_DOWN},{"LFARROW",KEY_LEFT},{"RTARROW",KEY_RIGHT},{"NUM1",KEY_KP_1},{"NUM2",KEY_KP_2},{"NUM3",KEY_KP_3},{"NUM+",KEY_KP_ADD},{"ENTER",KEY_ENTER},
+                                 {"RIGHTSHIFT",KEY_RIGHT_SHIFT},{"LEFTSHIFT",KEY_LEFT_SHIFT},{"RIGHTCTRL",KEY_RIGHT_CONTROL},{"LEFTCTRL",KEY_LEFT_CONTROL},{"RIGHTALT",KEY_RIGHT_ALT},{"LEFTALT",KEY_LEFT_ALT},{"RIGHTCMD",KEY_RIGHT_SUPER},{"LEFTCMD",KEY_LEFT_SUPER},
+                                 {"LMB",MOUSE_BUTTON_1},{"RMB",MOUSE_BUTTON_2},{"MMB",MOUSE_BUTTON_3},{"MB3",MOUSE_BUTTON_4},{"MB4",MOUSE_BUTTON_5},{"MB5",MOUSE_BUTTON_6},{"MB6",MOUSE_BUTTON_7},{"MB7",MOUSE_BUTTON_8},{"JOY0",JOYSTICK_1},{"JOY1",JOYSTICK_2},{"JOY2",JOYSTICK_3},{"JOY3",JOYSTICK_4},{"JOY4",JOYSTICK_5},{"JOY5",JOYSTICK_6},
+                                 {"JOY6",JOYSTICK_7},{"JOY7",JOYSTICK_8},{"JOY8",JOYSTICK_9},{"JOY9",JOYSTICK_10},{"JOY10",JOYSTICK_11},{"JOY11",JOYSTICK_12},{"JOY12",JOYSTICK_13},{"JOY13",JOYSTICK_14},{"JOY14",JOYSTICK_15},{"JOY15",JOYSTICK_16},{"JOY16",JOYHAT_UP},{"JOY17",JOYHAT_RIGHT},
+                                 {"BACKSPACE",KEY_BACKSPACE},{"TAB",KEY_TAB},{"NUMENTER",KEY_KP_ENTER},{"ESCAPE",KEY_ESCAPE},{"SPACE",KEY_SPACE},{"DELETE",KEY_DELETE},{"INSERT",KEY_INSERT},{"HOME",KEY_HOME},{"END",KEY_END},{"PAGEUP",KEY_PAGE_UP},{"PAGEDN",KEY_PAGE_DOWN},
+                                 {"F1",KEY_F1},{"F2",KEY_F2},{"F3",KEY_F3},{"F4",KEY_F4},{"F5",KEY_F5},{"F6",KEY_F6},{"F7",KEY_F7},{"F8",KEY_F8},{"F9",KEY_F9},{"F10",KEY_F10},{"F11",KEY_F11},{"F12",KEY_F12},{"GRAVE",KEY_GRAVE_ACCENT},{"-",KEY_MINUS},{"=",KEY_EQUAL},{"[",KEY_LEFT_BRACKET},{"]",KEY_RIGHT_BRACKET},{"\\",KEY_BACKSLASH},{"/",KEY_SLASH},
+                                 {".",KEY_PERIOD},{",",KEY_COMMA},{";",KEY_SEMICOLON},{"'",KEY_APOSTROPHE},{"CAPSLOCK",KEY_CAPS_LOCK},{"NUM0",KEY_KP_0},{"NUM4",KEY_KP_4},{"NUM5",KEY_KP_5},{"NUM6",KEY_KP_6},{"NUM7",KEY_KP_7},{"NUM8",KEY_KP_8},{"NUM9",KEY_KP_9},{"NUM*",KEY_KP_MULTIPLY},{"NUM-",KEY_KP_SUBTRACT},{"NUM.",KEY_KP_DECIMAL},{"MENU",KEY_MENU},
+                                 {"PAUSE",KEY_PAUSE},{"NUMLOCK",KEY_NUM_LOCK},{"MWHEEL+",128},{"MWHEEL-",129},/*128,129,Handledspecialcaseformousewheel+/-respectively*/{"PRINT",KEY_PRINT_SCREEN},{"JOY18",JOYHAT_DOWN},{"JOY19",JOYHAT_LEFT},{"UNUSED",0}};
 KeyState* GetCodeMapping(int settingIndex) {
     i32 i = Sys_Settings.InputCodeSettings[settingIndex]; // Get table index into all recognized inputs
     if (i == 148 || i >= MAX_KEYS) return &Sys_Input.keyStates[MAX_KEYS - 1]; // UNUSED NULL (e.g. setting unbound)
@@ -3493,7 +3174,7 @@ KeyState* GetCodeMapping(int settingIndex) {
 bool GetKeyRiseEdgeOrHeld(int sI, bool onRise) { i32 i = Sys_Settings.InputCodeSettings[sI]; if (i == 128) {return Sys_Input.scrollDelta > 0;} if (i == 129) {return Sys_Input.scrollDelta < 0;} KeyState* k = GetCodeMapping(sI); return onRise ? k->pressed : k->down; }
 ENGINE_TO_MOD bool GetKey(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,false); }  // True while held down.
 ENGINE_TO_MOD bool GetKeyPressed(int settingIndex) { return (settingIndex < 0) ? Sys_Input.keyStates[KEY_GRAVE_ACCENT].pressed : GetKeyRiseEdgeOrHeld(settingIndex,true); } // True 1st frame down.
-ENGINE_TO_MOD void IgnoreNextMouseDelta() { Sys_Input.ignore_next_mouse_delta = true; }
+ENGINE_TO_MOD void IgnoreNextMouseDelta() { ignore_next_mouse_delta = true; }
 void TextEntry(i32 k) {
     if (k == KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { Sys_Global.playerName[0] = '\0'; currentPlayerNameLength = 0; return; }
     if (k == KEY_ENTER || k == KEY_KP_ENTER) { currentMenuItem++; return; }
@@ -3512,7 +3193,7 @@ void InputKey(_GLFWwindow* win,int key,int action) {
         win->keys[key] = (char)action; if (repeated) action = INPUT_REPEAT;
     }
 
-    if (!Sys_Input.window_has_focus) return;
+    if (!window_has_focus) return;
     
     if (key == KEY_F10 && action) OS_Exit(0); // Suppress warnings about unused parameters forced upon me by glfw3 dependency deadweight anchor.
     if (Sys_Global.menuActive && !returnToPause) {
@@ -3537,22 +3218,19 @@ void quat_from_yaw_pitch_roll(Quaternion* q, float yaw_deg, float pitch_deg, flo
 float cam_pitch,cam_yaw=90.0f,cam_roll;
 void InputCursorPos(_GLFWwindow* win, double xpos, double ypos) { // static const float HeadBobRate   = 0.2f, HeadBobAmount = 0.08f,bobTarget = 0.3f; TODO
     if (win->virtualCursorPosX == xpos && win->virtualCursorPosY == ypos) return;
-    win->virtualCursorPosX = xpos; win->virtualCursorPosY = ypos; if (!Sys_Input.window_has_focus) return;
-    
-    Sys_Input.currentMouse_dx = (i32)(xpos - Sys_Input.last_mouse_x); Sys_Input.currentMouse_dy = (i32)(ypos - Sys_Input.last_mouse_y);
-    Sys_Input.last_mouse_x = xpos; Sys_Input.last_mouse_y = ypos;
-    if (Sys_Input.ignore_next_mouse_delta) { Sys_Input.ignore_next_mouse_delta = mouseMovementThisFrame = false; return; }
+    win->virtualCursorPosX = xpos; win->virtualCursorPosY = ypos; if (!window_has_focus) return;
+    currentMouse_dx = (i32)(xpos - last_mouse_x); currentMouse_dy = (i32)(ypos - last_mouse_y); last_mouse_x = xpos; last_mouse_y = ypos; if (ignore_next_mouse_delta) { ignore_next_mouse_delta = mouseMovementThisFrame = false; return; }
 
     if ((Sys_Global.inventoryMode && !Sys_Cheats.noHUD) || Sys_Global.menuActive || Sys_Global.gamePaused) { // Uses UI baseline resolution 1366x768
-        i32 newX = clamp(Sys_Global.cursorPosition_x + Sys_Input.currentMouse_dx,0,1366); if (newX != Sys_Global.cursorPosition_x) {mouseMovementThisFrame = true;} Sys_Global.cursorPosition_x = newX;
-        i32 newY = clamp(Sys_Global.cursorPosition_y + Sys_Input.currentMouse_dy,0, 768); if (newY != Sys_Global.cursorPosition_y) {mouseMovementThisFrame = true;} Sys_Global.cursorPosition_y = newY;
+        i32 newX = clamp(Sys_Global.cursorPosition_x + currentMouse_dx,0,1366); if (newX != Sys_Global.cursorPosition_x) {mouseMovementThisFrame = true;} Sys_Global.cursorPosition_x = newX;
+        i32 newY = clamp(Sys_Global.cursorPosition_y + currentMouse_dy,0, 768); if (newY != Sys_Global.cursorPosition_y) {mouseMovementThisFrame = true;} Sys_Global.cursorPosition_y = newY;
     }
     
     if (Sys_Global.gamePaused || Sys_Global.menuActive || Sys_Global.inventoryMode) return;
     
     float s = vclamp((float)Sys_Settings.MouseSensitivity / 100.0f, 0.01f, 1.0f) * 0.2f;
-    cam_yaw += (float)Sys_Input.currentMouse_dx * s; if (cam_yaw >= 360.0f) {cam_yaw -= 360.0f;} if (cam_yaw < 0.0f)     {cam_yaw  += 360.0f;}
-    cam_pitch+=(float)Sys_Input.currentMouse_dy * s; if (cam_pitch > 89.0f) {cam_pitch = 89.0f;} if (cam_pitch < -89.0f) {cam_pitch = -89.0f;} // Avoid gimbal lock at pure 90deg
+    cam_yaw += (float)currentMouse_dx * s; if (cam_yaw >= 360.0f) {cam_yaw -= 360.0f;} if (cam_yaw < 0.0f)     {cam_yaw  += 360.0f;}
+    cam_pitch+=(float)currentMouse_dy * s; if (cam_pitch > 89.0f) {cam_pitch = 89.0f;} if (cam_pitch < -89.0f) {cam_pitch = -89.0f;} // Avoid gimbal lock at pure 90deg
     quat_from_yaw_pitch_roll(&Sys_Global.instances[PLAYER1].rotation,cam_yaw,cam_pitch,(Sys_Global.curLev == LEVEL_CYBERSPACE) ? cam_roll : 0.0f);
 }
 
@@ -3560,7 +3238,7 @@ void JoystickConnection(_GLFWjoystick* js, int e) {
     js->connected = (e == 0x00040001/*connected*/) ? 1 : (e == 0x00040002/*disconnected*/) ? 0 : js->connected;    
     int jid = (int)(js - _glfw.joysticks); if (jid > JOYSTICK_LAST) return;
     
-    Sys_Input.joystickPresent[jid] = (e == 0x00040001/*connected*/); if (!Sys_Input.joystickPresent[jid]) { MemSetToVForNBytes(Sys_Input.joystickButtons,0,sizeof(Sys_Input.joystickButtons)); MemSetToVForNBytes(Sys_Input.joystickHats,0,sizeof(Sys_Input.joystickHats)); } // Clear
+    Sys_Input.joystickPresent[jid] = (e == 0x00040001/*connected*/); if (!Sys_Input.joystickPresent[jid]) { mset(Sys_Input.joystickButtons,0,sizeof(Sys_Input.joystickButtons)); mset(Sys_Input.joystickHats,0,sizeof(Sys_Input.joystickHats)); } // Clear
 }
 
 void InputJoystickAxis(_GLFWjoystick* js,int axis,float value) { js->axes[axis] = value; }
@@ -3580,7 +3258,7 @@ _GLFWjoystick* _glfwAllocJoystick(const char* name,const char* guid,int axisCoun
     js->allocated = 1; js->axisCount = axisCount; js->buttonCount = buttonCount; js->hatCount = hatCount;
     js->axesSize = axisCount*sizeof(float); js->axes = OS_Calloc(axisCount,sizeof(float)); js->buttonsSize = (buttonCount + (size_t)hatCount * 4);
     js->buttons = OS_Calloc(buttonCount + (size_t)hatCount * 4,1); js->hatsSize = hatCount; js->hats = OS_Calloc(hatCount,1);
-    StringCopyInto_A_From_B(js->name,name,sizeof(js->name)); StringCopyInto_A_From_B(js->guid,guid,sizeof(js->guid));
+    scpy_to_a_from_b(js->name,name,sizeof(js->name)); scpy_to_a_from_b(js->guid,guid,sizeof(js->guid));
     return js;
 }
 
@@ -3590,7 +3268,7 @@ bool JoystickPresent(int jid) {
     _glfw.joysticksInitialized = 1; _GLFWjoystick* js = _glfw.joysticks + jid; return js->connected ? PollJoystick(js) : false;
 }
 
-void _glfwFreeJoystick(_GLFWjoystick* js) { OS_DeallocateRAM(js->axes,js->axesSize); OS_DeallocateRAM(js->buttons,js->buttonsSize); OS_DeallocateRAM(js->hats,js->hatsSize); MemSetToVForNBytes(js,0,sizeof(_GLFWjoystick)); }
+void _glfwFreeJoystick(_GLFWjoystick* js) { OS_Free(js->axes,js->axesSize); OS_Free(js->buttons,js->buttonsSize); OS_Free(js->hats,js->hatsSize); mset(js,0,sizeof(_GLFWjoystick)); }
 void InputProcessing() {
     mouseMovementThisFrame = false; 
     PollEvents();
@@ -3611,14 +3289,14 @@ void InputProcessing() {
     }
 
     if (Sys_Input.keyStates[KEY_E].pressed) play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f,(Vector3){},false);
-    if (Sys_Input.window_has_focus) {
+    if (window_has_focus) {
         if (Sys_Input.keyStates[KEY_CAPS_LOCK].pressed) Sys_Input.isCapsLockOn = !Sys_Input.isCapsLockOn; // Change capslock state to match keyboard having toggled.  Must always happen regardless of paused/menu.
         ProcessInput(); // Calls ApplyPlayerMovements(), needs called without checking paused state for menus handling.
     }
 }
 
 void SetVSync() { ((_GLFWwindow*)window)->context.swapInterval((i32)Sys_Settings.Vsync); }
-void InputClearRisingAndFallingEdges() { for (i32 i=0;i<MAX_KEYS;++i) {Sys_Input.keyStates[i].pressed = Sys_Input.keyStates[i].released = false;} for (i32 i=0;i<MAX_MOUSE_BUTTONS;i++) {Sys_Input.mouseButtons[i].pressed = Sys_Input.mouseButtons[i].released = false;} Sys_Input.scrollDelta = 0; Sys_Input.currentMouse_dx = Sys_Input.currentMouse_dy = 0; } // Can't memset as we want to preserve down state
+void InputClearRisingAndFallingEdges() { for (i32 i=0;i<MAX_KEYS;++i) {Sys_Input.keyStates[i].pressed = Sys_Input.keyStates[i].released = false;} for (i32 i=0;i<MAX_MOUSE_BUTTONS;i++) {Sys_Input.mouseButtons[i].pressed = Sys_Input.mouseButtons[i].released = false;} Sys_Input.scrollDelta = 0; currentMouse_dx = currentMouse_dy = 0; } // Can't memset as we want to preserve down state
 void CenterWindowOnMonitor() {
     int monitorCount; _GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
     if (Sys_Settings.CurrentMonitor > (monitorCount - 1)) { Sys_Settings.CurrentMonitor = 0; SaveConfig(); }
@@ -3627,7 +3305,7 @@ void CenterWindowOnMonitor() {
     const GLFWvidmode* mode = glfwGetVideoMode(next);
     int xpos = mx + (mode->width - Sys_Settings.ScreenWidth) / 2, ypos = my + (mode->height - Sys_Settings.ScreenHeight) / 2;
     glfwSetWindowPosition(window,xpos,ypos);
-    Sys_Input.ignore_next_mouse_delta = true;
+    ignore_next_mouse_delta = true;
 }
 
 _GLFWmonitor* GetCurrentMonitor() {
@@ -3711,7 +3389,7 @@ void CycleToNextMonitor() {
     Sys_Settings.CurrentMonitor = (Sys_Settings.CurrentMonitor + 1) % monitorCount;
     SaveConfig(); CenterWindowOnMonitor();
 }
-// ============== Physics System
+// Phys Sys
 #define MAX_COLLISION_ITERATIONS 4
 #define RESTITUTION 0.5f
 #define FRICTION 0.2f
@@ -3719,10 +3397,10 @@ void CycleToNextMonitor() {
 #define PHY_EPSILON 0.0001f
 #define MAX_SUBSTEPS 10
 #define MAX_SPEED 8.0f // m/s
-#define MAX_STEP_SIZE (MIN_DIAMETER / MAX_SPEED) // 0.01 s
-#define MIN_DIAMETER 0.1f // m
+#define MAX_STEP_SIZE (0.1f / MAX_SPEED) // 0.01 s
 #define MAX_ANGULAR_SPEED 5.0f
-ENGINE_TO_MOD void SetPosition(Entity* e, Vector3 newpos, bool teleport) { float d = V3_Dist(e->position,newpos); if ((d > 0.001f && d < MIN_DIAMETER) || teleport) {e->position = newpos;} }
+typedef struct {Vector3 ctr,halfExtents; Quaternion rot;} ShapeBox; typedef struct {Vector3 ctr; float radius;} ShapeSphere;/*Et tu brute?*/ typedef struct {Vector3 tip,base; float radius;} ShapeCapsule;
+ENGINE_TO_MOD void SetPosition(Entity* e, Vector3 newpos, bool teleport) { float d = V3_Dist(e->position,newpos); if ((d > 0.001f && d < 0.1f) || teleport) {e->position = newpos;} }
 u16 dynamicEntities[512], dynamicEntityCount;
 typedef struct { bool hit; Vector3 point,normal; float overlapAmount; } OverlapResult;
 static inline __attribute__((always_inline)) u32 PosGetCellCoordsP(i32 cx, i32 cz) { cx = clamp(cx,0,WORLDX_0BASED); cz = clamp(cz,0,WORLDX_0BASED); return (u32)cz * WORLDX + (u32)cx; }
@@ -3759,41 +3437,31 @@ static OverlapResult CapCap(ShapeCapsule a, ShapeCapsule b) {
     
     float dist = vsqrtf(vmax(distSq, 0.0f));
     r.overlapAmount = radSum - dist; r.hit = true;
-    Vector3 ptA = V3_AplusB(a.base,V3_ScaleByF(V3_AsubB(a.tip,a.base),sc)); 
-    Vector3 ptB = V3_AplusB(b.base,V3_ScaleByF(V3_AsubB(b.tip,b.base),tc));
-    Vector3 delta = V3_AsubB(ptA,ptB);
+    Vector3 ptA = V3_AplusB(a.base,V3_ScaleByF(V3_AsubB(a.tip,a.base),sc)); Vector3 ptB = V3_AplusB(b.base,V3_ScaleByF(V3_AsubB(b.tip,b.base),tc)); Vector3 delta = V3_AsubB(ptA,ptB);
     r.normal = (dist < PHY_EPSILON) ? (Vector3){0,1,0} : V3_ScaleByF(delta, 1.0f/dist);
     r.point  = V3_AplusB(ptB, V3_ScaleByF(r.normal, b.radius));
     return r;
 }
 
-void obb_axes(Quaternion q, Vector3 *ax, Vector3 *ay, Vector3 *az) { *ax=quat_rotate_vector(q,(Vector3){1,0,0}); *ay=quat_rotate_vector(q,(Vector3){0,1,0}); *az=quat_rotate_vector(q,(Vector3){0,0,1}); }
+void obb_axes(Quaternion q, Vector3 *ax, Vector3 *ay, Vector3 *az) { *ax=quat_rot_v3(q,(Vector3){1,0,0}); *ay=quat_rot_v3(q,(Vector3){0,1,0}); *az=quat_rot_v3(q,(Vector3){0,0,1}); }
 static Vector3 ClosestPointOBB(Vector3 p, ShapeBox b) {
     Vector3 ax, ay, az; obb_axes(b.rot, &ax, &ay, &az);
-    Vector3 d = V3_AsubB(p, b.center);
+    Vector3 d = V3_AsubB(p, b.ctr);
     float lx = V3_dot(d, ax), ly = V3_dot(d, ay), lz = V3_dot(d, az);
-    lx = vclamp(lx,-b.halfExtents.x,b.halfExtents.x);
-    ly = vclamp(ly,-b.halfExtents.y,b.halfExtents.y);
-    lz = vclamp(lz,-b.halfExtents.z,b.halfExtents.z);
-    Vector3 q = b.center;
-    q = V3_AplusB(q,V3_ScaleByF(ax,lx));
-    q = V3_AplusB(q,V3_ScaleByF(ay,ly));
-    q = V3_AplusB(q,V3_ScaleByF(az,lz));
+    lx = vclamp(lx,-b.halfExtents.x,b.halfExtents.x); ly = vclamp(ly,-b.halfExtents.y,b.halfExtents.y); lz = vclamp(lz,-b.halfExtents.z,b.halfExtents.z);
+    Vector3 q = b.ctr;
+    q = V3_AplusB(q,V3_ScaleByF(ax,lx)); q = V3_AplusB(q,V3_ScaleByF(ay,ly)); q = V3_AplusB(q,V3_ScaleByF(az,lz));
     return q;
 }
 
-static OverlapResult SphBox(Vector3 center, float radius, ShapeBox box) {
-    OverlapResult r = {0};
-    Vector3 closest = ClosestPointOBB(center,box);
-    Vector3 delta = V3_AsubB(center,closest);
-    float distSq = V3_dot(delta,delta);
-    if (distSq >= radius * radius) return r;
+static OverlapResult SphBox(Vector3 ctr, float radius, ShapeBox box) {
+    OverlapResult r = {0}; Vector3 closest = ClosestPointOBB(ctr,box); Vector3 delta = V3_AsubB(ctr,closest); float distSq = V3_dot(delta,delta); if (distSq >= radius * radius) return r;
 
     r.hit = true; float dist = vsqrtf(vmax(distSq, 0.0f));
     if (dist > PHY_EPSILON) { r.normal = V3_ScaleByF(delta, 1.0f / dist); r.overlapAmount = radius - dist; }
     else { // Center is inside OBB — find minimum penetration axis
         Vector3 ax,ay,az; obb_axes(box.rot,&ax,&ay,&az);
-        Vector3 local = V3_AsubB(center,box.center);
+        Vector3 local = V3_AsubB(ctr,box.ctr);
         float lx = V3_dot(local,ax), ly = V3_dot(local,ay), lz = V3_dot(local,az);
         float dx = box.halfExtents.x - vabs(lx), dy = box.halfExtents.y - vabs(ly), dz = box.halfExtents.z - vabs(lz);
         if (dx < dy && dx < dz) { r.normal = V3_ScaleByF(ax,lx > 0 ? 1.f : -1.f); r.overlapAmount = radius + dx; }
@@ -3805,91 +3473,79 @@ static OverlapResult SphBox(Vector3 center, float radius, ShapeBox box) {
 }
 
 static u32 GetCollisionMask(u32 layer) {
-    if (layer == Layer_NPCTrigger || layer == Layer_NPCClip) return Layer_NPC;
+    if (layer == L_NPCTrigger || layer == L_NPCClip) return L_NPC;
     switch (layer) {
-        case Layer_Default:           return Layer_Default|Layer_TransparentFX|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_Corpse|Layer_PhysObjects|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_NPCBullet|Layer_Clip|Layer_CorpseSearchable;
-        case Layer_TransparentFX:     return Layer_Default|Layer_TransparentFX|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_NPCBullet|Layer_Clip;
-        case Layer_Geometry:          return Layer_Default|Layer_TransparentFX|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_Clip;
-        case Layer_NPC:               return Layer_Default|Layer_TransparentFX|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_Trigger|Layer_NPCTrigger|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_NPCBullet|Layer_NPCClip|Layer_Clip;
-        case Layer_PlayerBullets:     return Layer_Default|Layer_TransparentFX|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_Corpse|Layer_PhysObjects|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_NPCBullet|Layer_Clip|Layer_CorpseSearchable;
-        case Layer_Player:            return Layer_Default|Layer_TransparentFX|Layer_Geometry|Layer_NPC|Layer_PhysObjects|Layer_PlayerTriggerOnly|Layer_Trigger|Layer_Door|Layer_Player2|Layer_NPCBullet|Layer_Clip;
-        case Layer_Corpse:            return Layer_Default|Layer_Geometry|Layer_PlayerBullets|Layer_PhysObjects|Layer_Door|Layer_NPCBullet|Layer_Clip;
-        case Layer_PhysObjects:       return Layer_Default|Layer_TransparentFX|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_Corpse|Layer_PhysObjects|Layer_Door|Layer_InterDebris|Layer_NPCBullet|Layer_Clip;
-        case Layer_PlayerTriggerOnly: return Layer_Player|Layer_Player2;
-        case Layer_Trigger:           return Layer_Default|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_Door|Layer_InterDebris|Layer_Clip;
-        case Layer_Door:              return Layer_Default|Layer_TransparentFX|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_Corpse|Layer_PhysObjects|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_NPCBullet|Layer_Clip;
-        case Layer_InterDebris:       return Layer_Default|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_PhysObjects|Layer_Trigger|Layer_Door|Layer_NPCBullet|Layer_Clip;
-        case Layer_Player2:           return Layer_Default|Layer_TransparentFX|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Player|Layer_PhysObjects|Layer_PlayerTriggerOnly|Layer_Trigger|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_NPCBullet|Layer_Clip;
-        case Layer_NPCBullet:         return Layer_Default|Layer_TransparentFX|Layer_Geometry|Layer_PlayerBullets|Layer_Player|Layer_Corpse|Layer_PhysObjects|Layer_Door|Layer_InterDebris|Layer_Player2|Layer_Clip|Layer_CorpseSearchable;
-        case Layer_Clip:              return Layer_Player|Layer_Player2|Layer_NPC;
-        case Layer_CorpseSearchable:  return Layer_Default|Layer_PlayerBullets;
-        default:                      return 0u;
+        case L_Default:          return L_Default|L_TransparentFX|L_Geometry|L_NPC|L_PlayerBullets|L_Player|L_Corpse|L_PhysObjects|L_Trigger|L_Door|L_InterDebris|L_Player2|L_NPCBullet|L_Clip|L_CorpseSearchable;
+        case L_TransparentFX:    return L_Default|L_TransparentFX|L_Geometry|L_NPC|L_PlayerBullets|L_Player|L_PhysObjects|L_Trigger|L_Door|L_InterDebris|L_Player2|L_NPCBullet|L_Clip;
+        case L_Geometry:         return L_Default|L_TransparentFX|L_Geometry|L_NPC|L_PlayerBullets|L_Player|L_PhysObjects|L_Trigger|L_Door|L_InterDebris|L_Player2|L_Clip;
+        case L_NPC:              return L_Default|L_TransparentFX|L_Geometry|L_NPC|L_PlayerBullets|L_Player|L_PhysObjects|L_Trigger|L_NPCTrigger|L_Door|L_InterDebris|L_Player2|L_NPCBullet|L_NPCClip|L_Clip;
+        case L_PlayerBullets:    return L_Default|L_TransparentFX|L_Geometry|L_NPC|L_PlayerBullets|L_Player|L_Corpse|L_PhysObjects|L_Door|L_InterDebris|L_Player2|L_NPCBullet|L_Clip|L_CorpseSearchable;
+        case L_Player:           return L_Default|L_TransparentFX|L_Geometry|L_NPC|L_PhysObjects|L_PlayerTriggerOnly|L_Trigger|L_Door|L_Player2|L_NPCBullet|L_Clip;
+        case L_Corpse:           return L_Default|L_Geometry|L_PlayerBullets|L_PhysObjects|L_Door|L_NPCBullet|L_Clip;
+        case L_PhysObjects:      return L_Default|L_TransparentFX|L_Geometry|L_NPC|L_PlayerBullets|L_Player|L_Corpse|L_PhysObjects|L_Door|L_InterDebris|L_NPCBullet|L_Clip;
+        case L_PlayerTriggerOnly:return  L_Player|L_Player2;
+        case L_Trigger:          return L_Default|L_Geometry|L_NPC|L_PlayerBullets|L_Player|L_PhysObjects|L_Door|L_InterDebris|L_Clip;
+        case L_Door:             return L_Default|L_TransparentFX|L_Geometry|L_NPC|L_PlayerBullets|L_Player|L_Corpse|L_PhysObjects|L_Trigger|L_Door|L_InterDebris|L_Player2|L_NPCBullet|L_Clip;
+        case L_InterDebris:      return L_Default|L_Geometry|L_NPC|L_PlayerBullets|L_PhysObjects|L_Trigger|L_Door|L_NPCBullet|L_Clip;
+        case L_Player2:          return L_Default|L_TransparentFX|L_Geometry|L_NPC|L_PlayerBullets|L_Player|L_PhysObjects|L_PlayerTriggerOnly|L_Trigger|L_Door|L_InterDebris|L_Player2|L_NPCBullet|L_Clip;
+        case L_NPCBullet:        return L_Default|L_TransparentFX|L_Geometry|L_PlayerBullets|L_Player|L_Corpse|L_PhysObjects|L_Door|L_InterDebris|L_Player2|L_Clip|L_CorpseSearchable;
+        case L_Clip:             return  L_Player|L_Player2|L_NPC;
+        case L_CorpseSearchable: return L_Default|L_PlayerBullets;
+        default:                 return 0u;
     }
 }
 
 void Entity_GetCap(const Entity *e, ShapeCapsule *out) {
     float r = e->colliderSize.x; float hi = vmax(0.0f, (e->colliderSize.y * 0.5f) - r); Vector3 wc,axis;
     u16 edx = (u16)(e - Sys_Global.instances);
-    if (edx == PLAYER1 || edx == PLAYER2 || e->layer == Layer_NPC) { wc = V3_AplusB(e->position, e->colliderCenter); axis = (Vector3){0.0f,1.0f,0.0f}; } // Force player capsules to remain strictly upright, ignoring camera pitch/roll
-    else { wc = V3_AplusB(e->position, quat_rotate_vector(e->rotation, e->colliderCenter)); axis = (e->colliderSize.z < 0.5f) ? quat_rotate_vector(e->rotation,(Vector3){1,0,0}) : (e->colliderSize.z < 1.5f) ? quat_rotate_vector(e->rotation,(Vector3){0,1,0}) : quat_rotate_vector(e->rotation,(Vector3){0,0,1}); }
+    if (edx == PLAYER1 || edx == PLAYER2 || e->layer == L_NPC) { wc = V3_AplusB(e->position, e->colliderCenter); axis = (Vector3){0.0f,1.0f,0.0f}; } // Force player capsules to remain strictly upright, ignoring camera pitch/roll
+    else { wc = V3_AplusB(e->position, quat_rot_v3(e->rotation, e->colliderCenter)); axis = (e->colliderSize.z < 0.5f) ? quat_rot_v3(e->rotation,(Vector3){1,0,0}) : (e->colliderSize.z < 1.5f) ? quat_rot_v3(e->rotation,(Vector3){0,1,0}) : quat_rot_v3(e->rotation,(Vector3){0,0,1}); }
     out->radius = r; out->base = V3_AsubB(wc,V3_ScaleByF(axis,hi)); out->tip  = V3_AplusB(wc,V3_ScaleByF(axis,hi));
 }
 
-void Entity_GetBox(const Entity *e, ShapeBox *out) { out->center=V3_AplusB(e->position,quat_rotate_vector(e->rotation,e->colliderCenter)); out->halfExtents=(Vector3){e->colliderSize.x*0.5f * e->scale.x,e->colliderSize.y*0.5f * e->scale.y,e->colliderSize.z*0.5f * e->scale.z}; out->rot=e->rotation; }
-void Entity_GetSph(const Entity *e, ShapeSphere *out) { out->center = V3_AplusB(e->position,quat_rotate_vector(e->rotation,e->colliderCenter)); out->radius = e->colliderSize.x * vmax(e->scale.x,vmax(e->scale.y,e->scale.z)); }
-static inline Color ColliderColor(Entity *e) { return (!(e->entflags & EF_RIGIDBODY)) ? textColors[TEXT_GREEN_MENU_SHADOW] : ((e->colliding) ? textColors[TEXT_RED] : textColors[TEXT_GREEN]); }
+void Entity_GetBox(const Entity *e, ShapeBox *out) { out->ctr=V3_AplusB(e->position,quat_rot_v3(e->rotation,e->colliderCenter)); out->halfExtents=(Vector3){e->colliderSize.x*0.5f * e->scale.x,e->colliderSize.y*0.5f * e->scale.y,e->colliderSize.z*0.5f * e->scale.z}; out->rot=e->rotation; }
+void Entity_GetSph(const Entity *e, ShapeSphere *out) { out->ctr=V3_AplusB(e->position,quat_rot_v3(e->rotation,e->colliderCenter)); out->radius = e->colliderSize.x * vmax(e->scale.x,vmax(e->scale.y,e->scale.z)); }
+static inline Color ColliderColor(Entity *e) { return (!(e->entflags & EF_RIGIDBODY)) ? textColors[T_GREEN_MENU_SHADOW] : ((e->colliding) ? textColors[T_RED] : textColors[T_GREEN]); }
 static void DrawVelocityVector(Entity *e) {
     if (!(e->entflags & EF_RIGIDBODY)) return;
 
-    Vector3 tip = V3_AplusB(e->position,V3_ScaleByF(e->velocity,0.25f)); AddDebugLine(e->position,tip,textColors[TEXT_ORANGE]);
+    Vector3 tip = V3_AplusB(e->position,V3_ScaleByF(e->velocity,0.25f)); AddDebugLine(e->position,tip,textColors[T_ORANGE]);
     Vector3 perp = V3_Normalize(V3_Cross(e->velocity,(vabs(e->velocity.y/V3_Mag(e->velocity)) < 0.9f) ? (Vector3){0,1,0} : (Vector3){1,0,0}));
-    AddDebugLine(V3_AplusB(tip,V3_ScaleByF(perp,0.05f)),V3_AsubB(tip,V3_ScaleByF(perp,0.05f)),textColors[TEXT_ORANGE]); // Small cross at tip so zero-length vecs are still visible when barely moving
+    AddDebugLine(V3_AplusB(tip,V3_ScaleByF(perp,0.05f)),V3_AsubB(tip,V3_ScaleByF(perp,0.05f)),textColors[T_ORANGE]); // Small cross at tip so zero-length vecs are still visible when barely moving
 }
 
 void DrawBoxCollider(Entity *e) {    
     Color col = ColliderColor(e);
     ShapeBox b; Entity_GetBox(e,&b); Vector3 ax,ay,az,c[8],px,py,pz; obb_axes(b.rot,&ax,&ay,&az);
     px=V3_ScaleByF(ax,b.halfExtents.x); py=V3_ScaleByF(ay,b.halfExtents.y); pz=V3_ScaleByF(az,b.halfExtents.z);
-    for (int s=0;s<8;s++) { float sx=(s&1)?1.f:-1.f,sy=(s&2)?1.f:-1.f,sz=(s&4)?1.f:-1.f; c[s]=V3_AplusB(b.center,V3_AplusB(V3_AplusB(V3_ScaleByF(px,sx),V3_ScaleByF(py,sy)),V3_ScaleByF(pz,sz))); }
+    for (int s=0;s<8;s++) { float sx=(s&1)?1.f:-1.f,sy=(s&2)?1.f:-1.f,sz=(s&4)?1.f:-1.f; c[s]=V3_AplusB(b.ctr,V3_AplusB(V3_AplusB(V3_ScaleByF(px,sx),V3_ScaleByF(py,sy)),V3_ScaleByF(pz,sz))); }
     AddDebugLine(c[0],c[1],col); AddDebugLine(c[2],c[3],col); AddDebugLine(c[4],c[5],col); AddDebugLine(c[6],c[7],col);
     AddDebugLine(c[0],c[2],col); AddDebugLine(c[1],c[3],col); AddDebugLine(c[4],c[6],col); AddDebugLine(c[5],c[7],col);
     AddDebugLine(c[0],c[4],col); AddDebugLine(c[1],c[5],col); AddDebugLine(c[2],c[6],col); AddDebugLine(c[3],c[7],col);
     DrawVelocityVector(e);
 }
 
-void DrawSphereCollider(Entity *e) {    
-    Color col = ColliderColor(e); ShapeSphere s; Entity_GetSph(e,&s); float step=6.28318530f/12;
+void DrawSphereWireframe(Color col, ShapeSphere s) {    
+    float step=6.28318530f/12;
     for (int seg=0;seg<12;seg++) {
         float a0=seg*step,a1=a0+step,c0=vcosf(a0),s0=vsinf(a0),c1=vcosf(a1),s1=vsinf(a1);
-        AddDebugLine(V3_AplusB(s.center,(Vector3){c0*s.radius,0,s0*s.radius}),V3_AplusB(s.center,(Vector3){c1*s.radius,0,s1*s.radius}),col);
-        AddDebugLine(V3_AplusB(s.center,(Vector3){c0*s.radius,s0*s.radius,0}),V3_AplusB(s.center,(Vector3){c1*s.radius,s1*s.radius,0}),col);
-        AddDebugLine(V3_AplusB(s.center,(Vector3){0,c0*s.radius,s0*s.radius}),V3_AplusB(s.center,(Vector3){0,c1*s.radius,s1*s.radius}),col);
-    }
-    
-    DrawVelocityVector(e);
-}
-
-void DrawSphereContact(Vector3 pos, float rad) {
-    if (!Sys_Cheats.showPhys) return;
-
-    Color col = (Color){0.0f,0.0f,1.0f,1.0f}; ShapeSphere s = (ShapeSphere){pos,rad}; float step=6.28318530f/12;
-    for (int seg=0;seg<12;seg++) {
-        float a0=seg*step,a1=a0+step,c0=vcosf(a0),s0=vsinf(a0),c1=vcosf(a1),s1=vsinf(a1);
-        AddDebugLine(V3_AplusB(s.center,(Vector3){c0*s.radius,0,s0*s.radius}),V3_AplusB(s.center,(Vector3){c1*s.radius,0,s1*s.radius}),col);
-        AddDebugLine(V3_AplusB(s.center,(Vector3){c0*s.radius,s0*s.radius,0}),V3_AplusB(s.center,(Vector3){c1*s.radius,s1*s.radius,0}),col);
-        AddDebugLine(V3_AplusB(s.center,(Vector3){0,c0*s.radius,s0*s.radius}),V3_AplusB(s.center,(Vector3){0,c1*s.radius,s1*s.radius}),col);
+        AddDebugLine(V3_AplusB(s.ctr,(Vector3){c0*s.radius,0,s0*s.radius}),V3_AplusB(s.ctr,(Vector3){c1*s.radius,0,s1*s.radius}),col); 
+        AddDebugLine(V3_AplusB(s.ctr,(Vector3){c0*s.radius,s0*s.radius,0}),V3_AplusB(s.ctr,(Vector3){c1*s.radius,s1*s.radius,0}),col);
+        AddDebugLine(V3_AplusB(s.ctr,(Vector3){0,c0*s.radius,s0*s.radius}),V3_AplusB(s.ctr,(Vector3){0,c1*s.radius,s1*s.radius}),col);
     }
 }
 
+void DrawSphereCollider(Entity *e) { Color col = ColliderColor(e); ShapeSphere s; Entity_GetSph(e,&s); DrawSphereWireframe(col,s); DrawVelocityVector(e); }
+void DrawSphereContact(Vector3 pos, float rad) { if (Sys_Cheats.showPhys) {Color col = (Color){0.0f,0.0f,1.0f,1.0f}; ShapeSphere s = (ShapeSphere){pos,rad}; DrawSphereWireframe(col,s);} }
 void DrawMeshCollider(Entity *e) {    
-    Color col = ColliderColor(e); u16 mi= (e->collider == COLTYPE_CVX) ? e->colliderMeshIndex : e->modelIndex; if (mi >= MODEL_IDX_MAX || mi >= loadedModelsMaxIndex) return;
+    Color col = ColliderColor(e); u16 mi= (e->collider == COLTYPE_CVX) ? e->colliderMeshIndex : e->modelIndex; if (mi >= MAX_MDLS || mi >= loadedModelsMaxIndex) return;
     u32 triCount=modelTriangleCounts[mi]; if (!triCount) return;
     
     u16 idx = (u16)(e - Sys_Global.instances);
-    float M[16]; MemCpyFromBtoAForNBytes(M,&modelMatrices[idx*16],64);
+    float M[16]; mcpy(M,&modelMatrices[idx*16],64);
     float m00=M[0],m10=M[1],m20=M[2],m01=M[4],m11=M[5],m21=M[6],m02=M[8],m12=M[9],m22=M[10],tx=M[12],ty=M[13],tz=M[14];
     for (u32 j=0;j<triCount;j++) {
-        u32 bA=(u32)modelTriangles[mi][j*3+0]*VERTEX_ATTRIBUTES_SIZE,bB=(u32)modelTriangles[mi][j*3+1]*VERTEX_ATTRIBUTES_SIZE,bC=(u32)modelTriangles[mi][j*3+2]*VERTEX_ATTRIBUTES_SIZE;
+        u32 bA=(u32)modelTriangles[mi][j*3+0]*VRT_ATT_SZ,bB=(u32)modelTriangles[mi][j*3+1]*VRT_ATT_SZ,bC=(u32)modelTriangles[mi][j*3+2]*VRT_ATT_SZ;
         #define LV(b) (Vector3){half_to_float(*(half*)(modelVertices[mi]+(b)+0)),half_to_float(*(half*)(modelVertices[mi]+(b)+2)),half_to_float(*(half*)(modelVertices[mi]+(b)+4))}
         #define XFORM(v) (Vector3){m00*(v).x+m01*(v).y+m02*(v).z+tx,m10*(v).x+m11*(v).y+m12*(v).z+ty,m20*(v).x+m21*(v).y+m22*(v).z+tz}
         Vector3 wA=XFORM(LV(bA)),wB=XFORM(LV(bB)),wC=XFORM(LV(bC));
@@ -3968,29 +3624,24 @@ static void ApplyVelocity(Entity *e, float dt) {
     } else e->angularVelocity = (Vector3){0.0f,0.0f,0.0f};
 }
 
-// Accumulate inertia tensor of a tetrahedron (origin, v0, v1, v2) into acc[6].  Uses the covariance-integral formula — sign handles winding/concavities.
-static void AccumTetraInertia(float acc[6], Vector3 v0, Vector3 v1, Vector3 v2) {
-    float det = V3_dot(v0,V3_Cross(v1,v2)); // signed tet volume * 6
-    acc[0] += det * (v0.y*v0.y + v0.y*v1.y + v1.y*v1.y + v0.y*v2.y + v1.y*v2.y + v2.y*v2.y + v0.z*v0.z + v0.z*v1.z + v1.z*v1.z + v0.z*v2.z + v1.z*v2.z + v2.z*v2.z); // Diagonal: integral of (y²+z²), (x²+z²), (x²+y²) over tet
-    acc[1] += det * (v0.x*v0.x + v0.x*v1.x + v1.x*v1.x + v0.x*v2.x + v1.x*v2.x + v2.x*v2.x + v0.z*v0.z + v0.z*v1.z + v1.z*v1.z + v0.z*v2.z + v1.z*v2.z + v2.z*v2.z);
-    acc[2] += det * (v0.x*v0.x + v0.x*v1.x + v1.x*v1.x + v0.x*v2.x + v1.x*v2.x + v2.x*v2.x + v0.y*v0.y + v0.y*v1.y + v1.y*v1.y + v0.y*v2.y + v1.y*v2.y + v2.y*v2.y);
-    acc[3] += det * (2*v0.x*v0.y + v0.x*v1.y + v0.x*v2.y + v1.x*v0.y + 2*v1.x*v1.y + v1.x*v2.y + v2.x*v0.y + v2.x*v1.y + 2*v2.x*v2.y); // Off-diagonal: integral of -xy, -xz, -yz (products of inertia)
-    acc[4] += det * (2*v0.x*v0.z + v0.x*v1.z + v0.x*v2.z + v1.x*v0.z + 2*v1.x*v1.z + v1.x*v2.z + v2.x*v0.z + v2.x*v1.z + 2*v2.x*v2.z);
-    acc[5] += det * (2*v0.y*v0.z + v0.y*v1.z + v0.y*v2.z + v1.y*v0.z + 2*v1.y*v1.z + v1.y*v2.z + v2.y*v0.z + v2.y*v1.z + 2*v2.y*v2.z);
-}
-
-void ComputeConvexMeshInertiaTensor(Entity *e) { // Called for each entity in loop after LevelLoad() has loaded all entities.
+static void ComputeConvexMeshInertiaTensor(Entity *e) { // Called for each entity in loop after LevelLoad() has loaded all entities.
     u16 mi = e->colliderMeshIndex; e->inertiaTensorValid = false;
-    if (mi >= MODEL_IDX_MAX || !modelTriangleCounts[mi] || !modelVertexCounts[mi]) return;
+    if (mi >= MAX_MDLS || !modelTriangleCounts[mi] || !modelVertexCounts[mi]) return;
     
     float acc[6] = {0}; float volAcc = 0.f; u32 triCount = modelTriangleCounts[mi];
     for (u32 ti = 0; ti < triCount; ++ti) {
         u32 i0=modelTriangles[mi][ti*3+0], i1=modelTriangles[mi][ti*3+1], i2=modelTriangles[mi][ti*3+2];
-        Vector3 v0 = (Vector3){half_to_float(*(half*)(modelVertices[mi]+(i0)*VERTEX_ATTRIBUTES_SIZE+0)), half_to_float(*(half*)(modelVertices[mi]+(i0)*VERTEX_ATTRIBUTES_SIZE+2)), half_to_float(*(half*)(modelVertices[mi]+(i0)*VERTEX_ATTRIBUTES_SIZE+4))};
-        Vector3 v1 = (Vector3){half_to_float(*(half*)(modelVertices[mi]+(i1)*VERTEX_ATTRIBUTES_SIZE+0)), half_to_float(*(half*)(modelVertices[mi]+(i1)*VERTEX_ATTRIBUTES_SIZE+2)), half_to_float(*(half*)(modelVertices[mi]+(i1)*VERTEX_ATTRIBUTES_SIZE+4))};
-        Vector3 v2 = (Vector3){half_to_float(*(half*)(modelVertices[mi]+(i2)*VERTEX_ATTRIBUTES_SIZE+0)), half_to_float(*(half*)(modelVertices[mi]+(i2)*VERTEX_ATTRIBUTES_SIZE+2)), half_to_float(*(half*)(modelVertices[mi]+(i2)*VERTEX_ATTRIBUTES_SIZE+4))};
+        Vector3 v0 = (Vector3){half_to_float(*(half*)(modelVertices[mi]+(i0)*VRT_ATT_SZ+0)), half_to_float(*(half*)(modelVertices[mi]+(i0)*VRT_ATT_SZ+2)), half_to_float(*(half*)(modelVertices[mi]+(i0)*VRT_ATT_SZ+4))};
+        Vector3 v1 = (Vector3){half_to_float(*(half*)(modelVertices[mi]+(i1)*VRT_ATT_SZ+0)), half_to_float(*(half*)(modelVertices[mi]+(i1)*VRT_ATT_SZ+2)), half_to_float(*(half*)(modelVertices[mi]+(i1)*VRT_ATT_SZ+4))};
+        Vector3 v2 = (Vector3){half_to_float(*(half*)(modelVertices[mi]+(i2)*VRT_ATT_SZ+0)), half_to_float(*(half*)(modelVertices[mi]+(i2)*VRT_ATT_SZ+2)), half_to_float(*(half*)(modelVertices[mi]+(i2)*VRT_ATT_SZ+4))};
         volAcc += V3_dot(v0,V3_Cross(v1,v2));
-        AccumTetraInertia(acc,v0,v1,v2);
+        float det = V3_dot(v0,V3_Cross(v1,v2)); // Accumulate inertia tensor of a tetrahedron (origin, v0, v1, v2) into acc[6].  Uses the covariance-integral formula — sign handles winding/concavities.
+        acc[0] += det * (v0.y*v0.y + v0.y*v1.y + v1.y*v1.y + v0.y*v2.y + v1.y*v2.y + v2.y*v2.y + v0.z*v0.z + v0.z*v1.z + v1.z*v1.z + v0.z*v2.z + v1.z*v2.z + v2.z*v2.z); // Diagonal: integral of (y²+z²), (x²+z²), (x²+y²) over tet
+        acc[1] += det * (v0.x*v0.x + v0.x*v1.x + v1.x*v1.x + v0.x*v2.x + v1.x*v2.x + v2.x*v2.x + v0.z*v0.z + v0.z*v1.z + v1.z*v1.z + v0.z*v2.z + v1.z*v2.z + v2.z*v2.z);
+        acc[2] += det * (v0.x*v0.x + v0.x*v1.x + v1.x*v1.x + v0.x*v2.x + v1.x*v2.x + v2.x*v2.x + v0.y*v0.y + v0.y*v1.y + v1.y*v1.y + v0.y*v2.y + v1.y*v2.y + v2.y*v2.y);
+        acc[3] += det * (2*v0.x*v0.y + v0.x*v1.y + v0.x*v2.y + v1.x*v0.y + 2*v1.x*v1.y + v1.x*v2.y + v2.x*v0.y + v2.x*v1.y + 2*v2.x*v2.y); // Off-diagonal: integral of -xy, -xz, -yz (products of inertia)
+        acc[4] += det * (2*v0.x*v0.z + v0.x*v1.z + v0.x*v2.z + v1.x*v0.z + 2*v1.x*v1.z + v1.x*v2.z + v2.x*v0.z + v2.x*v1.z + 2*v2.x*v2.z);
+        acc[5] += det * (2*v0.y*v0.z + v0.y*v1.z + v0.y*v2.z + v1.y*v0.z + 2*v1.y*v1.z + v1.y*v2.z + v2.y*v0.z + v2.y*v1.z + 2*v2.y*v2.z);
     }
     
     if (vabs(volAcc) < PHY_EPSILON) return;
@@ -4021,7 +3672,7 @@ static OverlapResult BoxBox(ShapeBox a, ShapeBox b) {
     OverlapResult r = {0}; Vector3 aAxes[3],bAxes[3];
     obb_axes(a.rot,&aAxes[0],&aAxes[1],&aAxes[2]);
     obb_axes(b.rot,&bAxes[0],&bAxes[1],&bAxes[2]);
-    Vector3 T = V3_AsubB(b.center,a.center);
+    Vector3 T = V3_AsubB(b.ctr,a.ctr);
     float R[3][3],AbsR[3][3];
     for (int i=0;i<3;i++) for (int j=0;j<3;j++) { R[i][j]=V3_dot(aAxes[i],bAxes[j]); AbsR[i][j]=vabs(R[i][j])+1e-6f; }
     float minOverlap=1e9f; int bestAxis=-1; bool flipNormal=false; Vector3 bestEdgeAxis={0,1,0};
@@ -4060,7 +3711,7 @@ static OverlapResult BoxBox(ShapeBox a, ShapeBox b) {
     else if (bestAxis<6) r.normal=flipNormal ? bAxes[bestAxis-3]          : V3_ScaleByF(bAxes[bestAxis-3],-1.f);
     else                 r.normal=flipNormal ? V3_Normalize(bestEdgeAxis) : V3_ScaleByF(V3_Normalize(bestEdgeAxis),-1.f);
     
-    Vector3 sA=a.center;
+    Vector3 sA=a.ctr;
     sA=V3_AplusB(sA,V3_ScaleByF(aAxes[0],(V3_dot(aAxes[0],r.normal)<0.f?1.f:-1.f)*a.halfExtents.x));
     sA=V3_AplusB(sA,V3_ScaleByF(aAxes[1],(V3_dot(aAxes[1],r.normal)<0.f?1.f:-1.f)*a.halfExtents.y));
     sA=V3_AplusB(sA,V3_ScaleByF(aAxes[2],(V3_dot(aAxes[2],r.normal)<0.f?1.f:-1.f)*a.halfExtents.z));
@@ -4072,7 +3723,7 @@ static inline Vector3 MvVert(const float* M, Vector3 v) { return (Vector3){ M[0]
 static Vector3 MeshSupport(u16 m, const float* M, Vector3 d) {
     u32 n = modelVertexCounts[m]; if (!n) {return (Vector3){0};} 
     const u8* vb = modelVertices[m]; Vector3 b={0}; float top=-1e9f;
-    for (u32 i=0;i<n;++i) {const u8* p=vb + i*VERTEX_ATTRIBUTES_SIZE; Vector3 w=MvVert(M,(Vector3){half_to_float(*(half*)(p+0)),half_to_float(*(half*)(p+2)),half_to_float(*(half*)(p+4))}); float dot=V3_dot(w,d); b=(dot>top) ? (top=dot,w) : b;}
+    for (u32 i=0;i<n;++i) {const u8* p=vb + i*VRT_ATT_SZ; Vector3 w=MvVert(M,(Vector3){half_to_float(*(half*)(p+0)),half_to_float(*(half*)(p+2)),half_to_float(*(half*)(p+4))}); float dot=V3_dot(w,d); b=(dot>top) ? (top=dot,w) : b;}
     return b;
 }
 
@@ -4081,7 +3732,7 @@ static inline Vector3 MinkowskiSupport(u16 mA, const float* mxA, u16 mB, const f
 static inline Vector3 TP(Vector3 a, Vector3 b, Vector3 c) { return V3_Cross(V3_Cross(a,b),c); }
 static inline Vector3 BoxSupport(ShapeBox b, Vector3 d) {
     Vector3 ax,ay,az; obb_axes(b.rot,&ax,&ay,&az); float kx = V3_dot(d,ax) >= 0.0f ? 1.0f : -1.0f, ky = V3_dot(d,ay) >= 0.0f ? 1.0f : -1.0f, kz = V3_dot(d,az) >= 0.0f ? 1.0f : -1.0f;
-    return V3_AplusB(V3_AplusB(V3_AplusB(b.center,V3_ScaleByF(ax,kx * b.halfExtents.x)),V3_ScaleByF(ay,ky * b.halfExtents.y)),V3_ScaleByF(az,kz * b.halfExtents.z));
+    return V3_AplusB(V3_AplusB(V3_AplusB(b.ctr,V3_ScaleByF(ax,kx * b.halfExtents.x)),V3_ScaleByF(ay,ky * b.halfExtents.y)),V3_ScaleByF(az,kz * b.halfExtents.z));
 }
 
 static inline Vector3 CapsuleSupport(ShapeCapsule cap, Vector3 d) { float db = V3_dot(cap.base,d),dt = V3_dot(cap.tip,d); Vector3 best = (dt > db) ? cap.tip : cap.base; float L = V3_dot(d,d); if (L < PHY_EPSILON) {return best;} return V3_AplusB(best,V3_ScaleByF(d,cap.radius / vsqrtf(L))); }
@@ -4143,7 +3794,7 @@ static inline Vector3 EPAContactPoint(const EPAVert* ev, int a, int b, int c, Ve
 }
 
 static OverlapResult CvxCvx(u16 meshA, u16 meshB, const float* matA, const float* matB) {
-    OverlapResult r = {0}; if (meshA >= MODEL_IDX_MAX || meshB >= MODEL_IDX_MAX) return r;
+    OverlapResult r = {0}; if (meshA >= MAX_MDLS || meshB >= MAX_MDLS) return r;
     Simplex3D s = {0}; Vector3 dir = {0.0f,1.0f,0.0f};
     s.v[s.n++] = MinkowskiSupport(meshA,matA,meshB,matB,dir);
     dir = (Vector3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
@@ -4196,7 +3847,7 @@ static OverlapResult CvxCvx(u16 meshA, u16 meshB, const float* matA, const float
 }
 
 static OverlapResult CapCvx(ShapeCapsule cap, u16 mesh, const float* mx) {
-    OverlapResult r = {0}; if (mesh >= MODEL_IDX_MAX || !modelVertexCounts[mesh]) return r;
+    OverlapResult r = {0}; if (mesh >= MAX_MDLS || !modelVertexCounts[mesh]) return r;
     
     #define CSUP_A(d) CapsuleSupport(cap, d)
     #define CSUP_B(d) MeshSupport(mesh, mx, (Vector3){-(d).x,-(d).y,-(d).z})
@@ -4252,7 +3903,7 @@ static OverlapResult CapCvx(ShapeCapsule cap, u16 mesh, const float* mx) {
 }
 
 static OverlapResult BoxCvx(ShapeBox box, u16 mesh, const float* mx) {
-    OverlapResult r = {0}; if (mesh >= MODEL_IDX_MAX || !modelVertexCounts[mesh]) return r;
+    OverlapResult r = {0}; if (mesh >= MAX_MDLS || !modelVertexCounts[mesh]) return r;
     #define BSUP(d)   V3_AsubB(BoxSupport(box,d),MeshSupport(mesh,mx,(Vector3){-(d).x,-(d).y,-(d).z}))
     Simplex3D s={0}; Vector3 dir={0,1,0};
     s.v[s.n++]=BSUP(dir); dir=(Vector3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
@@ -4306,12 +3957,12 @@ static void inline FeatureOverlap(Vector3 sc, float sr, Vector3 pt, OverlapResul
 }
 
 static OverlapResult SphMsh(Vector3 sc, float sr, u16 mesh, const float* mx) { // Triangle-soup mesh support: test sphere/capsule against all triangles of a static mesh.  Returns deepest overlapping triangle result.  Normal points from mesh toward mover. Voronoi region closest point.
-    OverlapResult r = {0}; if (mesh >= MODEL_IDX_MAX) return r;
+    OverlapResult r = {0}; if (mesh >= MAX_MDLS) return r;
     u32 triCount = modelTriangleCounts[mesh]; if (!triCount) return r;
 
     for (u32 ti = 0; ti < triCount; ++ti) {
         u32 i0 = modelTriangles[mesh][ti*3+0], i1 = modelTriangles[mesh][ti*3+1], i2 = modelTriangles[mesh][ti*3+2];
-        #define RV(i) MvVert(mx,(Vector3){half_to_float(*(half*)(modelVertices[mesh]+(i)*VERTEX_ATTRIBUTES_SIZE+0)), half_to_float(*(half*)(modelVertices[mesh]+(i)*VERTEX_ATTRIBUTES_SIZE+2)), half_to_float(*(half*)(modelVertices[mesh]+(i)*VERTEX_ATTRIBUTES_SIZE+4))})
+        #define RV(i) MvVert(mx,(Vector3){half_to_float(*(half*)(modelVertices[mesh]+(i)*VRT_ATT_SZ+0)), half_to_float(*(half*)(modelVertices[mesh]+(i)*VRT_ATT_SZ+2)), half_to_float(*(half*)(modelVertices[mesh]+(i)*VRT_ATT_SZ+4))})
         Vector3 a=RV(i0), b=RV(i1), c=RV(i2);
         #undef RV
         Vector3 ab=V3_AsubB(b,a), ac=V3_AsubB(c,a), ap=V3_AsubB(sc,a); // Closest point on triangle to sphere center
@@ -4345,7 +3996,7 @@ static OverlapResult SphMsh(Vector3 sc, float sr, u16 mesh, const float* mx) { /
 
 static OverlapResult CapMsh(ShapeCapsule cap, u16 mesh, const float* mx) { OverlapResult rb = SphMsh(cap.base,cap.radius,mesh,mx); OverlapResult rt = SphMsh(cap.tip, cap.radius,mesh,mx); return (rt.overlapAmount > rb.overlapAmount) ? rt : rb; } // TODO: Connectivity needed or is snowman ala System Shock 1 fine enough?  Might prove funny if player can get stuck with top and bottom on either side of door while leaning like in original.
 static OverlapResult SphCvx(Vector3 sc, float sr, u16 mesh, const float* mx) {
-    OverlapResult r = {0}; if (mesh >= MODEL_IDX_MAX || !modelVertexCounts[mesh]) return r;
+    OverlapResult r = {0}; if (mesh >= MAX_MDLS || !modelVertexCounts[mesh]) return r;
     #define SPHSUP_A(d) ({ Vector3 _d=(d); float _L=V3_dot(_d,_d); V3_AplusB(sc,(_L>PHY_EPSILON)?V3_ScaleByF(_d,sr/vsqrtf(_L)):(Vector3){0,sr,0}); })
     #define SPHSUP_B(d) MeshSupport(mesh,mx,(Vector3){-(d).x,-(d).y,-(d).z})
     #define MSKSUP(d)   V3_AsubB(SPHSUP_A(d),SPHSUP_B(d))
@@ -4370,7 +4021,7 @@ static OverlapResult SphCvx(Vector3 sc, float sr, u16 mesh, const float* mx) {
     for (int i=0;i<4;i++){ev[nv].v=s.v[i];ev[nv].wA=SPHSUP_A(s.v[i]);ev[nv].wB=SPHSUP_B(s.v[i]);nv++;}
     static const int kTF[4][3]={{0,1,2},{0,3,1},{0,2,3},{1,3,2}};
     for (int f=0;f<4;f++){EPAFace face=MakeEPAFace(ev,kTF[f][0],kTF[f][1],kTF[f][2]);if(face.d>=0.f&&nf<EPA_MAX_FACES)ef[nf++]=face;}
-    for (int it=0;it<24;++it){
+    for (int it=0;it<32;++it){
         int bf=-1; float bd=1e9f;
         for (int f=0;f<nf;f++) if(ef[f].d<bd){bd=ef[f].d;bf=f;}
         if (bf<0) break;
@@ -4400,23 +4051,21 @@ static OverlapResult SphCvx(Vector3 sc, float sr, u16 mesh, const float* mx) {
 typedef struct {Vector3 mn,mx;} AABB3;
 static inline Vector3 TriSupport(Vector3 ta, Vector3 tb, Vector3 tc, Vector3 d) { float d1 = V3_dot(ta,d), d2 = V3_dot(tb,d), d3 = V3_dot(tc,d); return d1 > d2 ? (d1 > d3 ? ta : tc) : (d2 > d3 ? tb : tc); }
 static OverlapResult CvxMsh(u16 hullMesh, const float* hullMx, u16 triMesh, const float* triMx) {
-    OverlapResult best_r = {0}; if (hullMesh >= MODEL_IDX_MAX || triMesh >= MODEL_IDX_MAX) return best_r;
+    OverlapResult best_r = {0}; if (hullMesh >= MAX_MDLS || triMesh >= MAX_MDLS) return best_r;
     AABB3 hb = { {1e9f,1e9f,1e9f}, {-1e9f,-1e9f,-1e9f} };
     u32 n = modelVertexCounts[hullMesh]; const u8* vb = modelVertices[hullMesh];
     for (u32 i=0;i<n;++i) { 
-        const u8* p = vb + i*VERTEX_ATTRIBUTES_SIZE;
+        const u8* p = vb + i*VRT_ATT_SZ;
         Vector3 w = MvVert(hullMx,(Vector3){half_to_float(*(half*)(p+0)),half_to_float(*(half*)(p+2)),half_to_float(*(half*)(p+4))});
         hb.mn.x=vmin(hb.mn.x,w.x); hb.mn.y=vmin(hb.mn.y,w.y); hb.mn.z=vmin(hb.mn.z,w.z); hb.mx.x=vmax(hb.mx.x,w.x); hb.mx.y=vmax(hb.mx.y,w.y); hb.mx.z=vmax(hb.mx.z,w.z);
     }
     
     u32 triCount = modelTriangleCounts[triMesh]; if (!triCount) return best_r;
     for (u32 ti = 0; ti < triCount; ++ti) {
-        u32 i0 = modelTriangles[triMesh][ti * 3 + 0];
-        u32 i1 = modelTriangles[triMesh][ti * 3 + 1];
-        u32 i2 = modelTriangles[triMesh][ti * 3 + 2];        
-        Vector3 ta = MvVert(triMx,(Vector3){ half_to_float(*(half*)(modelVertices[triMesh] + i0 * VERTEX_ATTRIBUTES_SIZE + 0)), half_to_float(*(half*)(modelVertices[triMesh] + i0 * VERTEX_ATTRIBUTES_SIZE + 2)), half_to_float(*(half*)(modelVertices[triMesh] + i0 * VERTEX_ATTRIBUTES_SIZE + 4)) });
-        Vector3 tb = MvVert(triMx,(Vector3){ half_to_float(*(half*)(modelVertices[triMesh] + i1 * VERTEX_ATTRIBUTES_SIZE + 0)), half_to_float(*(half*)(modelVertices[triMesh] + i1 * VERTEX_ATTRIBUTES_SIZE + 2)), half_to_float(*(half*)(modelVertices[triMesh] + i1 * VERTEX_ATTRIBUTES_SIZE + 4)) });
-        Vector3 tc = MvVert(triMx,(Vector3){ half_to_float(*(half*)(modelVertices[triMesh] + i2 * VERTEX_ATTRIBUTES_SIZE + 0)), half_to_float(*(half*)(modelVertices[triMesh] + i2 * VERTEX_ATTRIBUTES_SIZE + 2)), half_to_float(*(half*)(modelVertices[triMesh] + i2 * VERTEX_ATTRIBUTES_SIZE + 4)) });        
+        u32 i0 = modelTriangles[triMesh][ti * 3 + 0], i1 = modelTriangles[triMesh][ti * 3 + 1], i2 = modelTriangles[triMesh][ti * 3 + 2];
+        Vector3 ta = MvVert(triMx,(Vector3){ half_to_float(*(half*)(modelVertices[triMesh] + i0 * VRT_ATT_SZ + 0)), half_to_float(*(half*)(modelVertices[triMesh] + i0 * VRT_ATT_SZ + 2)), half_to_float(*(half*)(modelVertices[triMesh] + i0 * VRT_ATT_SZ + 4)) });
+        Vector3 tb = MvVert(triMx,(Vector3){ half_to_float(*(half*)(modelVertices[triMesh] + i1 * VRT_ATT_SZ + 0)), half_to_float(*(half*)(modelVertices[triMesh] + i1 * VRT_ATT_SZ + 2)), half_to_float(*(half*)(modelVertices[triMesh] + i1 * VRT_ATT_SZ + 4)) });
+        Vector3 tc = MvVert(triMx,(Vector3){ half_to_float(*(half*)(modelVertices[triMesh] + i2 * VRT_ATT_SZ + 0)), half_to_float(*(half*)(modelVertices[triMesh] + i2 * VRT_ATT_SZ + 2)), half_to_float(*(half*)(modelVertices[triMesh] + i2 * VRT_ATT_SZ + 4)) });        
         if (vmin(ta.x, vmin(tb.x, tc.x)) > hb.mx.x || vmax(ta.x, vmax(tb.x, tc.x)) < hb.mn.x || vmin(ta.y, vmin(tb.y, tc.y)) > hb.mx.y || vmax(ta.y, vmax(tb.y, tc.y)) < hb.mn.y || vmin(ta.z, vmin(tb.z, tc.z)) > hb.mx.z || vmax(ta.z, vmax(tb.z, tc.z)) < hb.mn.z) continue;
 
         Simplex3D s = {0}; 
@@ -4511,22 +4160,22 @@ static OverlapResult CvxMsh(u16 hullMesh, const float* hullMx, u16 triMesh, cons
     return best_r;
 }
 
-AABB3 BoxWorldAABB(ShapeBox b) { Vector3 x,y,z; obb_axes(b.rot,&x,&y,&z); Vector3 hx=V3_ScaleByF(x,b.halfExtents.x), hy=V3_ScaleByF(y,b.halfExtents.y), hz=V3_ScaleByF(z,b.halfExtents.z); Vector3 e ={vabs(hx.x)+vabs(hy.x)+vabs(hz.x),vabs(hx.y)+vabs(hy.y)+vabs(hz.y),vabs(hx.z)+vabs(hy.z)+vabs(hz.z)}; return (AABB3){V3_AsubB(b.center,e),V3_AplusB(b.center,e)}; } 
+AABB3 BoxWorldAABB(ShapeBox b) { Vector3 x,y,z; obb_axes(b.rot,&x,&y,&z); Vector3 hx=V3_ScaleByF(x,b.halfExtents.x), hy=V3_ScaleByF(y,b.halfExtents.y), hz=V3_ScaleByF(z,b.halfExtents.z); Vector3 e ={vabs(hx.x)+vabs(hy.x)+vabs(hz.x),vabs(hx.y)+vabs(hy.y)+vabs(hz.y),vabs(hx.z)+vabs(hy.z)+vabs(hz.z)}; return (AABB3){V3_AsubB(b.ctr,e),V3_AplusB(b.ctr,e)}; } 
 static OverlapResult BoxMsh(ShapeBox box, u16 triMesh, const float* triMx) {
-    OverlapResult r = {0}; if (triMesh >= MODEL_IDX_MAX) return r;
+    OverlapResult r = {0}; if (triMesh >= MAX_MDLS) return r;
     u32 triCount = modelTriangleCounts[triMesh]; if (!triCount) return r;
 
     AABB3 hb = BoxWorldAABB(box);
     float skin = 0.02f; hb.mn.x-=skin; hb.mn.y-=skin; hb.mn.z-=skin; hb.mx.x+=skin; hb.mx.y+=skin; hb.mx.z+=skin;
-    Vector3 ax, ay, az; obb_axes(box.rot, &ax, &ay, &az);
-    Vector3 hx = V3_ScaleByF(ax, box.halfExtents.x), hy = V3_ScaleByF(ay, box.halfExtents.y), hz = V3_ScaleByF(az, box.halfExtents.z);
-    Vector3 verts[8] = {V3_AplusB(V3_AplusB(V3_AplusB(box.center,hx),hy),hz), V3_AplusB(V3_AsubB(V3_AplusB(box.center,hx),hy),hz), V3_AplusB(V3_AplusB(V3_AsubB(box.center,hx),hy),hz), V3_AplusB(V3_AsubB(V3_AsubB(box.center,hx),hy),hz),
-                         V3_AsubB(V3_AplusB(V3_AplusB(box.center,hx),hy),hz),  V3_AsubB(V3_AsubB(V3_AplusB(box.center,hx),hy),hz),  V3_AsubB(V3_AplusB(V3_AsubB(box.center,hx),hy),hz), V3_AsubB(V3_AsubB(V3_AsubB(box.center,hx),hy),hz)  };
+    Vector3 ax, ay, az; obb_axes(box.rot,&ax,&ay,&az);
+    Vector3 hx = V3_ScaleByF(ax, box.halfExtents.x), hy = V3_ScaleByF(ay,box.halfExtents.y), hz = V3_ScaleByF(az,box.halfExtents.z);
+    Vector3 verts[8] = {V3_AplusB(V3_AplusB(V3_AplusB(box.ctr,hx),hy),hz),V3_AplusB(V3_AsubB(V3_AplusB(box.ctr,hx),hy),hz),V3_AplusB(V3_AplusB(V3_AsubB(box.ctr,hx),hy),hz),V3_AplusB(V3_AsubB(V3_AsubB(box.ctr,hx),hy),hz),
+                         V3_AsubB(V3_AplusB(V3_AplusB(box.ctr,hx),hy),hz), V3_AsubB(V3_AsubB(V3_AplusB(box.ctr,hx),hy),hz), V3_AsubB(V3_AplusB(V3_AsubB(box.ctr,hx),hy),hz), V3_AsubB(V3_AsubB(V3_AsubB(box.ctr,hx),hy),hz)};
     for (u32 vi = 0; vi < 8; ++vi) {
         Vector3 wv = verts[vi];
         for (u32 ti = 0; ti < triCount; ++ti) {
             u32 i0 = modelTriangles[triMesh][ti*3+0], i1 = modelTriangles[triMesh][ti*3+1], i2 = modelTriangles[triMesh][ti*3+2];
-            #define TRV(i) MvVert(triMx,(Vector3){half_to_float(*(half*)(modelVertices[triMesh]+(i)*VERTEX_ATTRIBUTES_SIZE+0)),half_to_float(*(half*)(modelVertices[triMesh]+(i)*VERTEX_ATTRIBUTES_SIZE+2)),half_to_float(*(half*)(modelVertices[triMesh]+(i)*VERTEX_ATTRIBUTES_SIZE+4))})
+            #define TRV(i) MvVert(triMx,(Vector3){half_to_float(*(half*)(modelVertices[triMesh]+(i)*VRT_ATT_SZ+0)),half_to_float(*(half*)(modelVertices[triMesh]+(i)*VRT_ATT_SZ+2)),half_to_float(*(half*)(modelVertices[triMesh]+(i)*VRT_ATT_SZ+4))})
             Vector3 ta=TRV(i0),tb=TRV(i1),tc=TRV(i2);
             #undef TRV
             if (vmin(ta.x,vmin(tb.x,tc.x))>hb.mx.x || vmax(ta.x,vmax(tb.x,tc.x))<hb.mn.x || vmin(ta.y,vmin(tb.y,tc.y))>hb.mx.y || vmax(ta.y,vmax(tb.y,tc.y))<hb.mn.y || vmin(ta.z,vmin(tb.z,tc.z))>hb.mx.z || vmax(ta.z,vmax(tb.z,tc.z))<hb.mn.z) continue;
@@ -4564,13 +4213,12 @@ static OverlapResult BoxMsh(ShapeBox box, u16 triMesh, const float* triMx) {
 
 static OverlapResult CapBox(ShapeCapsule cap, ShapeBox box) {
     OverlapResult best = SphBox(cap.base,cap.radius,box), rt = SphBox(cap.tip,cap.radius,box); if (rt.hit && rt.overlapAmount > best.overlapAmount) best = rt;
-
     Vector3 ax,ay,az; obb_axes(box.rot,&ax,&ay,&az);
     Vector3 d = V3_AsubB(cap.tip,cap.base);
     float segLen = V3_Mag(d); if (segLen < PHY_EPSILON) return best;
     
     Vector3 dUnit = V3_ScaleByF(d, 1.f / segLen);
-    Vector3 toBase = V3_AsubB(cap.base, box.center);
+    Vector3 toBase = V3_AsubB(cap.base,box.ctr);
     float ts[6]; int nt = 0;
     float dax = V3_dot(dUnit,ax) * segLen, day = V3_dot(dUnit,ay) * segLen, daz = V3_dot(dUnit,az) * segLen;
     float bax = V3_dot(toBase,ax),         bay = V3_dot(toBase,ay),         baz = V3_dot(toBase,az);
@@ -4582,14 +4230,10 @@ static OverlapResult CapBox(ShapeCapsule cap, ShapeBox box) {
     return best;
 }
 
-// Returns moment of inertia about world-space axis 'n' for entity e.  Falls back to sphere approximation only if tensor wasn't computed.
-static float GetMomentOfInertia(Entity *e, Vector3 n) {
-    if (e->collider != COLTYPE_CVX || !e->inertiaTensorValid) {
-        float r = (e->collider == COLTYPE_MSH) ? modelBounds[e->modelIndex] : (e->collider == COLTYPE_CVX) ? modelBounds[e->colliderMeshIndex] : GetCollisionRadius(e);
-        return (2.f / 5.f) * e->mass * r * r;
-    }
+static float GetMomentOfInertia(Entity *e, Vector3 n) { // Returns moment of inertia about world-space axis 'n' for entity e.  Falls back to sphere approximation only if tensor wasn't computed.
+    if (e->collider != COLTYPE_CVX || !e->inertiaTensorValid) { float r = (e->collider == COLTYPE_MSH) ? modelBounds[e->modelIndex] : (e->collider == COLTYPE_CVX) ? modelBounds[e->colliderMeshIndex] : GetCollisionRadius(e); return (2.f / 5.f) * e->mass * r * r; }
    
-    Vector3 ln = quat_rotate_vector((Quaternion){-e->rotation.x,-e->rotation.y,-e->rotation.z,e->rotation.w},n); // Use quat conjugate to rotate n into entity local space, then apply I * n, dot with n: gives I_n = n^T * I * n
+    Vector3 ln = quat_rot_v3((Quaternion){-e->rotation.x,-e->rotation.y,-e->rotation.z,e->rotation.w},n); // Use quat conjugate to rotate n into entity local space, then apply I * n, dot with n: gives I_n = n^T * I * n
     float Ixx=e->inertiaTensor[0], Iyy=e->inertiaTensor[1], Izz=e->inertiaTensor[2], Ixy=e->inertiaTensor[3], Ixz=e->inertiaTensor[4], Iyz=e->inertiaTensor[5];
     Vector3 In = {Ixx*ln.x + Ixy*ln.y + Ixz*ln.z, Ixy*ln.x + Iyy*ln.y + Iyz*ln.z, Ixz*ln.x + Iyz*ln.y + Izz*ln.z}; // I*ln (matrix-vector: products of inertia were already negated at generation)
     return vmax(V3_dot(ln,In),PHY_EPSILON);
@@ -4597,16 +4241,12 @@ static float GetMomentOfInertia(Entity *e, Vector3 n) {
 
 static void ApplyCollisionResponse(Entity *e, Entity *o, OverlapResult* ov) {
     float overlap = ov->overlapAmount; if (overlap < PHY_EPSILON) return;
-    bool oStatic = (!(o->entflags & EF_RIGIDBODY) || o->mass < 0.001f || o->collider == COLTYPE_NONE || o->collider == COLTYPE_MSH); 
-    if ((o->collider == COLTYPE_MSH && e->collider == COLTYPE_MSH)) return;
+    bool oStatic = (!(o->entflags & EF_RIGIDBODY) || o->mass < 0.001f || o->collider == COLTYPE_NONE || o->collider == COLTYPE_MSH); if ((o->collider == COLTYPE_MSH && e->collider == COLTYPE_MSH)) return;
     
     DrawSphereContact(ov->point,0.02f);
     Vector3 n = ov->normal, contactPoint = ov->point;
-    Vector3 rAarm = V3_AsubB(contactPoint, e->position);
-    Vector3 rBarm = oStatic ? (Vector3){0,0,0} : V3_AsubB(contactPoint, o->position);
-    
-    // Evaluate inertia around the NORMAL torque axis (r x n)
-    Vector3 rAxN = V3_Cross(rAarm, n);
+    Vector3 rAarm = V3_AsubB(contactPoint, e->position), rBarm = oStatic ? (Vector3){0,0,0} : V3_AsubB(contactPoint, o->position);
+    Vector3 rAxN = V3_Cross(rAarm, n); // Evaluate inertia around the NORMAL torque axis (r x n)
     float rAxN_lenSq = V3_dot(rAxN, rAxN);
     float iA = (rAxN_lenSq > PHY_EPSILON) ? GetMomentOfInertia(e, V3_ScaleByF(rAxN, 1.0f / vsqrtf(rAxN_lenSq))) : 1.0f;
     float invIA = (iA > PHY_EPSILON) ? 1.0f / iA : 0.0f;
@@ -4619,25 +4259,19 @@ static void ApplyCollisionResponse(Entity *e, Entity *o, OverlapResult* ov) {
     Vector3 vAtA = V3_AplusB(e->velocity, V3_Cross(e->angularVelocity, rAarm));
     Vector3 vAtB = oStatic ? (Vector3){0,0,0} : V3_AplusB(o->velocity, V3_Cross(o->angularVelocity, rBarm));
     Vector3 relVel = V3_AsubB(vAtA, vAtB);
-    float vn = V3_dot(relVel, n); 
-    if (vn > 0.01f) return;
+    float vn = V3_dot(relVel, n); if (vn > 0.01f) return;
 
     float invMassA = e->mass < 0.001f ? 1.0f : 1.0f / e->mass;
     float invMassB = oStatic || o->mass < 0.001f ? 0.0f : 1.0f / o->mass;
-    float invSum = invMassA + invMassB + angTermA + angTermB;
-    if (invSum < PHY_EPSILON) return;
+    float invSum = invMassA + invMassB + angTermA + angTermB; if (invSum < PHY_EPSILON) return;
 
     float e_r = vmax(e->bounciness, oStatic ? 0.0f : o->bounciness);
     float j = -(1.0f + e_r) * vn / invSum;
-    
-    // Apply Normal Impulse
-    e->velocity = V3_AplusB(e->velocity, V3_ScaleByF(n, j * invMassA));
+    e->velocity = V3_AplusB(e->velocity, V3_ScaleByF(n, j * invMassA)); // Apply Normal Impulse
     if (!oStatic) o->velocity = V3_AsubB(o->velocity, V3_ScaleByF(n, j * invMassB));
     Vector3 Jn = V3_ScaleByF(n,j);
     if (e->collider != COLTYPE_CAP && !ConstIndexIsNPC(e->index)) e->angularVelocity = V3_AplusB(e->angularVelocity, V3_ScaleByF(V3_Cross(rAarm, Jn), invIA));
     if (!oStatic && o->collider != COLTYPE_CAP && !ConstIndexIsNPC(o->index)) o->angularVelocity = V3_AsubB(o->angularVelocity, V3_ScaleByF(V3_Cross(rBarm, Jn), invIB));
-
-    // Friction calculation
     Vector3 vAtA2 = V3_AplusB(e->velocity, V3_Cross(e->angularVelocity, rAarm));
     Vector3 vAtB2 = oStatic ? (Vector3){0.0f,0.0f,0.0f} : V3_AplusB(o->velocity, V3_Cross(o->angularVelocity, rBarm));
     Vector3 relVel2 = V3_AsubB(vAtA2, vAtB2);
@@ -4645,9 +4279,7 @@ static void ApplyCollisionResponse(Entity *e, Entity *o, OverlapResult* ov) {
     float tLen = V3_Mag(tangent);
     if (tLen > 0.0001f) {
         tangent = V3_ScaleByF(tangent, 1.f / tLen);
-        
-        // Evaluate inertia around the TANGENT torque axis (r x t)
-        Vector3 rAxT = V3_Cross(rAarm, tangent);
+        Vector3 rAxT = V3_Cross(rAarm, tangent); // Evaluate inertia around the TANGENT torque axis (r x t)
         float rAxT_lenSq = V3_dot(rAxT, rAxT);
         float iAT = (rAxT_lenSq > PHY_EPSILON) ? GetMomentOfInertia(e, V3_ScaleByF(rAxT, 1.0f / vsqrtf(rAxT_lenSq))) : 1.0f;
         float invIAT = (iAT > PHY_EPSILON) ? 1.0f / iAT : 0.0f;
@@ -4661,27 +4293,21 @@ static void ApplyCollisionResponse(Entity *e, Entity *o, OverlapResult* ov) {
         float mu = (e->dynamicFriction + (oStatic ? 0.4f : o->dynamicFriction)) * 0.5f;
         float jt = -V3_dot(relVel2, tangent) / invSumT;
         jt = vclamp(jt * mu, mu * -vabs(j), mu * vabs(j));
-        
-        // Apply Tangent (Friction) Impulse
-        Vector3 Jt = V3_ScaleByF(tangent, jt);
+        Vector3 Jt = V3_ScaleByF(tangent, jt); // Apply Tangent (Friction) Impulse
         e->velocity = V3_AplusB(e->velocity, V3_ScaleByF(tangent, jt * invMassA));
-        if (e->collider != COLTYPE_CAP && !ConstIndexIsNPC(e->index)) e->angularVelocity = V3_AplusB(e->angularVelocity, V3_ScaleByF(V3_Cross(rAarm, Jt), invIAT));
+        if (e->collider != COLTYPE_CAP && !ConstIndexIsNPC(e->index)) e->angularVelocity = V3_AplusB(e->angularVelocity,V3_ScaleByF(V3_Cross(rAarm, Jt),invIAT));
         if (!oStatic) {
-            o->velocity = V3_AsubB(o->velocity, V3_ScaleByF(tangent, jt * invMassB));
-            if (o->collider != COLTYPE_CAP && !ConstIndexIsNPC(o->index)) o->angularVelocity = V3_AsubB(o->angularVelocity, V3_ScaleByF(V3_Cross(rBarm, Jt), invIBT));
+            o->velocity = V3_AsubB(o->velocity,V3_ScaleByF(tangent,jt * invMassB));
+            if (o->collider != COLTYPE_CAP && !ConstIndexIsNPC(o->index)) o->angularVelocity = V3_AsubB(o->angularVelocity,V3_ScaleByF(V3_Cross(rBarm,Jt),invIBT));
         }
     }
     
     float angDelta = vabs(V3_Mag(e->angularVelocity) - V3_Mag(e->lastAngularVelocity));
     e->angularVelocity = V3_ScaleByF(e->angularVelocity,1.0f - angDelta); // Dampen large deltas
     e->lastAngularVelocity = e->angularVelocity;
-
-    // Positional correction (Baumgarte Stabilization)
-    float correction = vmin(vmax(overlap - 0.001f, 0.0f) * 0.2f, 0.04f);
-    float corrA = correction * invMassA / (invMassA + invMassB + PHY_EPSILON);
-    float corrB = correction * invMassB / (invMassA + invMassB + PHY_EPSILON);
-    SetPosition(e, V3_AplusB(e->position, V3_ScaleByF(n, corrA)), false);
-    if (!oStatic) SetPosition(o, V3_AsubB(o->position, V3_ScaleByF(n, corrB)), false);
+    float correction = vmin(vmax(overlap - 0.001f, 0.0f) * 0.2f, 0.04f); float corrA = correction * invMassA / (invMassA + invMassB + PHY_EPSILON), corrB = correction * invMassB / (invMassA + invMassB + PHY_EPSILON);
+    SetPosition(e,V3_AplusB(e->position, V3_ScaleByF(n,corrA)), false); // Positional correction (Baumgarte Stabilization)
+    if (!oStatic) SetPosition(o,V3_AsubB(o->position,V3_ScaleByF(n,corrB)), false);
 }
 
 void Physics() {
@@ -4692,15 +4318,9 @@ void Physics() {
     u8 substeps = (u8)vclamp((u32)(dt / MAX_STEP_SIZE + 0.5f), 1u, (u32)MAX_SUBSTEPS);
     float dtsub = dt / (float)substeps; dynamicEntityCount = 0;
     for (int i = 0; i < Sys_Global.loadedInstances && dynamicEntityCount < 512; ++i) { Entity *e = &Sys_Global.instances[i]; if ((e->entflags & EF_RIGIDBODY) && (e->entflags & EF_ACTIVE) && e->collider != COLTYPE_NONE) {dynamicEntities[dynamicEntityCount++] = i;} }
-    for (int i = 0; i < Sys_Global.loadedInstances; ++i) { // Update cell index for all entities
-        Entity *e = &Sys_Global.instances[i];
-        e->cellX = (i16)PosGetCellCoordX(e->position.x); e->cellZ = (i16)PosGetCellCoordZ(e->position.z); e->cellIndex = PosGetCellCoordsP(e->cellX,e->cellZ);
-        e->radius = (e->modelIndex < MODEL_IDX_MAX) ? modelBounds[e->modelIndex] * vmax(vmax(e->scale.x,e->scale.y),e->scale.z) : GetCollisionRadius(e);
-        e->colliding = false;
-    }
-
+    for (int i = 0; i < Sys_Global.loadedInstances; ++i) { Entity *e = &Sys_Global.instances[i]; e->cellX = (i16)PosGetCellCoordX(e->position.x); e->cellZ = (i16)PosGetCellCoordZ(e->position.z); e->cellIndex = PosGetCellCoordsP(e->cellX,e->cellZ); e->radius = (e->modelIndex < MAX_MDLS) ? modelBounds[e->modelIndex] * vmax(vmax(e->scale.x,e->scale.y),e->scale.z) : GetCollisionRadius(e); e->colliding = false; } // Update cell index for all entities
     for (u8 s = 0; s < substeps; ++s) { // dynamicEntityCount found to be only 335 on level 1
-        MemSetToVForNBytes(cellCounts,0,sizeof(cellCounts));
+        mset(cellCounts,0,sizeof(cellCounts));
         for (u16 i = 0; i < Sys_Global.loadedInstances; ++i) { Entity *e = &Sys_Global.instances[i]; u32 cell = (u32)e->cellIndex; if (cell < WORLDX*WORLDX && cellCounts[cell] < 127) cellLists[cell][cellCounts[cell]++] = i; } // Build broadphase grid (~0.013ms)        
         for (u16 i = 0; i < dynamicEntityCount; ++i) { u16 idx = dynamicEntities[i]; Entity *e = &Sys_Global.instances[idx]; ApplyVelocity(e,dtsub); } // Integrate all dynamic bodies (~0.005ms)
         ShapeSphere sa,sb; ShapeBox ba,bb; ShapeCapsule ca,cb;
@@ -4723,22 +4343,22 @@ void Physics() {
                         OverlapResult r = {0};
                         if      (e->collider == COLTYPE_CAP && o->collider == COLTYPE_CAP) { Entity_GetCap(e,&ca); Entity_GetCap(o,&cb); r=CapCap(ca,cb); }
                         else if (e->collider == COLTYPE_CAP && o->collider == COLTYPE_BOX) { Entity_GetCap(e,&ca); Entity_GetBox(o,&bb); r=CapBox(ca,bb); }
-                        else if (e->collider == COLTYPE_BOX && o->collider == COLTYPE_CAP) { Entity_GetBox(e,&bb); Entity_GetCap(o,&ca); r=CapBox(ca,bb); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
+                        else if (e->collider == COLTYPE_BOX && o->collider == COLTYPE_CAP) { Entity_GetBox(e,&bb); Entity_GetCap(o,&ca); r=CapBox(ca,bb); if(r.hit){r.normal=V3_ScaleByF(r.normal,-1.0f);} }
                         else if (e->collider == COLTYPE_BOX && o->collider == COLTYPE_BOX) { Entity_GetBox(e,&ba); Entity_GetBox(o,&bb); r=BoxBox(ba,bb); }
-                        else if (e->collider == COLTYPE_SPH && o->collider == COLTYPE_BOX) { Entity_GetSph(e,&sa); Entity_GetBox(o,&ba); r=SphBox(sa.center,sa.radius,ba); }
-                        else if (e->collider == COLTYPE_BOX && o->collider == COLTYPE_SPH) { Entity_GetBox(e,&ba); Entity_GetSph(o,&sa); r=SphBox(sa.center,sa.radius,ba); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
-                        else if (e->collider == COLTYPE_SPH && o->collider == COLTYPE_SPH) { Entity_GetSph(e,&sa); Entity_GetSph(o,&sb); r=SphSph(sa.center,sa.radius,sb.center,sb.radius); }
+                        else if (e->collider == COLTYPE_SPH && o->collider == COLTYPE_BOX) { Entity_GetSph(e,&sa); Entity_GetBox(o,&ba); r=SphBox(sa.ctr,sa.radius,ba); }
+                        else if (e->collider == COLTYPE_BOX && o->collider == COLTYPE_SPH) { Entity_GetBox(e,&ba); Entity_GetSph(o,&sa); r=SphBox(sa.ctr,sa.radius,ba); if(r.hit){r.normal=V3_ScaleByF(r.normal,-1.0f);} }
+                        else if (e->collider == COLTYPE_SPH && o->collider == COLTYPE_SPH) { Entity_GetSph(e,&sa); Entity_GetSph(o,&sb); r=SphSph(sa.ctr,sa.radius,sb.ctr,sb.radius); }
                         else if (e->collider == COLTYPE_CAP && o->collider == COLTYPE_MSH) { Entity_GetCap(e,&ca);                       r=CapMsh(ca,o->modelIndex,&modelMatrices[b*16]); }
-                        else if (e->collider == COLTYPE_SPH && o->collider == COLTYPE_MSH) { Entity_GetSph(e,&sa);                       r=SphMsh(sa.center,sa.radius,o->modelIndex,&modelMatrices[b*16]); }
+                        else if (e->collider == COLTYPE_SPH && o->collider == COLTYPE_MSH) { Entity_GetSph(e,&sa);                       r=SphMsh(sa.ctr,sa.radius,o->modelIndex,&modelMatrices[b*16]); }
                         else if (e->collider == COLTYPE_BOX && o->collider == COLTYPE_MSH) { Entity_GetBox(e,&ba);                       r=BoxMsh(ba,o->modelIndex,&modelMatrices[b*16]); }
-                        else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_MSH) {                                             r=CvxMsh(e->colliderMeshIndex,&modelMatrices[a*16],o->modelIndex,&modelMatrices[b*16]); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
+                        else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_MSH) {                                             r=CvxMsh(e->colliderMeshIndex,&modelMatrices[a*16],o->modelIndex,&modelMatrices[b*16]); if(r.hit){r.normal=V3_ScaleByF(r.normal,-1.0f);} }
                         else if (e->collider == COLTYPE_CAP && o->collider == COLTYPE_CVX) { Entity_GetCap(e,&ca);                       r=CapCvx(ca,o->colliderMeshIndex,&modelMatrices[b*16]); }
                         else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_CAP) { Entity_GetCap(o,&cb);                       r=CapCvx(cb,e->colliderMeshIndex,&modelMatrices[a*16]); }
-                        else if (e->collider == COLTYPE_SPH && o->collider == COLTYPE_CVX) { Entity_GetSph(e,&sa);                       r=SphCvx(sa.center,sa.radius,o->colliderMeshIndex,&modelMatrices[b*16]); }
-                        else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_SPH) { Entity_GetSph(o,&sb);                       r=SphCvx(sb.center,sb.radius,e->colliderMeshIndex,&modelMatrices[a*16]); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
-                        else if (e->collider == COLTYPE_BOX && o->collider == COLTYPE_CVX) { Entity_GetBox(e,&ba);                       r=BoxCvx(ba,o->colliderMeshIndex,&modelMatrices[b*16]); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
+                        else if (e->collider == COLTYPE_SPH && o->collider == COLTYPE_CVX) { Entity_GetSph(e,&sa);                       r=SphCvx(sa.ctr,sa.radius,o->colliderMeshIndex,&modelMatrices[b*16]); }
+                        else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_SPH) { Entity_GetSph(o,&sb);                       r=SphCvx(sb.ctr,sb.radius,e->colliderMeshIndex,&modelMatrices[a*16]); if(r.hit){r.normal=V3_ScaleByF(r.normal,-1.0f);} }
+                        else if (e->collider == COLTYPE_BOX && o->collider == COLTYPE_CVX) { Entity_GetBox(e,&ba);                       r=BoxCvx(ba,o->colliderMeshIndex,&modelMatrices[b*16]); if(r.hit){r.normal=V3_ScaleByF(r.normal,-1.0f);} }
                         else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_BOX) { Entity_GetBox(o,&bb);                       r=BoxCvx(bb,e->colliderMeshIndex,&modelMatrices[a*16]); }
-                        else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_CVX) {                                             r=CvxCvx(e->colliderMeshIndex,o->colliderMeshIndex,&modelMatrices[a*16],&modelMatrices[b*16]); if(r.hit){r.normal=(Vector3){-r.normal.x,-r.normal.y,-r.normal.z};} }
+                        else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_CVX) {                                             r=CvxCvx(e->colliderMeshIndex,o->colliderMeshIndex,&modelMatrices[a*16],&modelMatrices[b*16]); if(r.hit){r.normal=V3_ScaleByF(r.normal,-1.0f);} }
                         else { r=SphSph(e->position,GetCollisionRadius(e),o->position,GetCollisionRadius(o)); } // Fallback
 
                         if (r.hit && r.overlapAmount > PHY_EPSILON && contactCount < 16) contacts[contactCount++] = (Contact){r,b};
@@ -4759,9 +4379,9 @@ void Physics() {
 
             e->accumulatedForce = (Vector3){0.0f,0.0f,0.0f};
         }
-
-        for (int i = 0; i < Sys_Global.loadedInstances; ++i) { Entity *e = &Sys_Global.instances[i]; e->cellX = (i16)PosGetCellCoordX(e->position.x); e->cellZ = (i16)PosGetCellCoordZ(e->position.z); e->cellIndex = PosGetCellCoordsP(e->cellX, e->cellZ); } // Update cells for next substep
     }
+    
+    for (int i = 0; i < Sys_Global.loadedInstances; ++i) { Entity *e = &Sys_Global.instances[i]; e->cellX = (i16)PosGetCellCoordX(e->position.x); e->cellZ = (i16)PosGetCellCoordZ(e->position.z); e->cellIndex = PosGetCellCoordsP(e->cellX, e->cellZ); } // Update cells for next substep
 }
 
 ENGINE_TO_MOD void AddForce(u16 i, Vector3 f, bool imp) { Entity *e = &Sys_Global.instances[i]; if (imp) { e->velocity = V3_AplusB(e->velocity,V3_ScaleByF(f,1.0f / vmax(e->mass,0.001f))); } else { e->accumulatedForce = V3_AplusB(e->accumulatedForce,f); } }
@@ -4781,28 +4401,28 @@ ENGINE_TO_MOD void ApplyPlayerMovements() {
     dv = (Vector3){vclamp(dv.x,-10.0f,10.0f), vclamp(dv.y,-10.0f,10.0f), vclamp(dv.z,-10.0f,10.0f)};
     p->velocity = V3_AplusB(cur, V3_ScaleByF(dv, accel * vclamp((float)Sys_Global.deltaTime,0.0005f,0.1f)));
 }
-// ================================= Console Emulator System - CHEATS!
-static i32 currentEntryLength=0, numHistory=0, historyPos=0; char consoleEntryText[TEXT_BUFFER_SIZE],history[7][TEXT_BUFFER_SIZE];
+// Console Sys - CHEATS!
+static i32 currentEntryLength=0, numHistory=0, historyPos=0; char consoleEntryText[T_BUFFER_SIZE],history[7][T_BUFFER_SIZE];
 static Vector3 ressurectionLocations[10] = {{-27.386f,-55.488f,26.5941f},/*0/R*/ {40.903f,-42.372f,-30.78f},/*1*/      {30.67407f,-25.832f,10.21412f},/*2*/ {38.26813f,-15.498f,20.37825f},/*3*/ {-19.48f,-7.928f,22.954f},/*4*/ {-24.358f,12.5956f,31.8497f},/*5*/ {-22.3568f,33.7845f,-30.728f},/*6*/  {2.228084f,50.95243f,7.532025f},/*7*/ {10.068f,58.897f,13.973f},/*8*/ {2.303f,106.77f,-38.554f}/*9*/};
 static Vector3 cyberSpaceEntryLocations[8] = { {210.6834f,2.812f,-24.378f},/*0*/ {195.420f,-13.44000f, 33.2800f},/*1*/ {157.1608f,-15.53f,47.331f},/*2a, if cyberport localPosition.x < -26.0f*/ {256.0416f,-0.716f,62.48789f},/*2b level 2 secondary cyberport position*/ {126.43f,29.56733f,34.24f},/*5*/  {177.612f,  3.29494f,108.7725f},/*6*/ {244.735f,41.99257f,-19.695f},/*8*/                                       {185.161f,84.502f,-46.04246f},/*9*/ };
 ENGINE_TO_MOD void ToggleConsole() { static bool imWasActPrior = false; if (!Sys_Cheats.consoleActive) {imWasActPrior = Sys_Global.inventoryMode;} Sys_Cheats.consoleActive = !Sys_Cheats.consoleActive; if (Sys_Cheats.consoleActive) { Sys_Global.inventoryMode = true; } else if (!imWasActPrior && Sys_Global.inventoryMode) {ForceShootMode();} }
 static void AddToHistory(const char* entry) {
-    if (GetStringLength(entry) == 0 || (numHistory > 0 && StringsEqual(entry,history[numHistory - 1]))) return;
+    if (slen(entry) == 0 || (numHistory > 0 && sEqual(entry,history[numHistory - 1]))) return;
     
-    if (numHistory < 7) { StringCopyInto_A_From_B(history[numHistory],entry,TEXT_BUFFER_SIZE); numHistory++; }
+    if (numHistory < 7) { scpy_to_a_from_b(history[numHistory],entry,T_BUFFER_SIZE); numHistory++; }
     else {
-        for (int i = 0; i < 7 - 1; i++) StringCopyInto_A_From_B(history[i],history[i + 1],TEXT_BUFFER_SIZE); // Shift list toward 0
-        StringCopyInto_A_From_B(history[7 - 1], entry,TEXT_BUFFER_SIZE);
+        for (int i = 0; i < 7 - 1; i++) scpy_to_a_from_b(history[i],history[i + 1],T_BUFFER_SIZE); // Shift list toward 0
+        scpy_to_a_from_b(history[7 - 1], entry,T_BUFFER_SIZE);
     }
 }
 
 static void RecallHistory(int direction) { // direction 1 up (older), -1 down (newer)
     if (direction == 1) { // up
-        if (historyPos > 0) { historyPos--; StringCopyInto_A_From_B(consoleEntryText,history[historyPos],TEXT_BUFFER_SIZE); currentEntryLength = GetStringLength(consoleEntryText); }
+        if (historyPos > 0) { historyPos--; scpy_to_a_from_b(consoleEntryText,history[historyPos],T_BUFFER_SIZE); currentEntryLength = slen(consoleEntryText); }
     } else if (direction == -1) { // down
         if (historyPos < numHistory) {
             historyPos++;
-            if (historyPos == numHistory) { consoleEntryText[0] = currentEntryLength = 0; } else { StringCopyInto_A_From_B(consoleEntryText,history[historyPos],TEXT_BUFFER_SIZE); currentEntryLength = GetStringLength(consoleEntryText); }
+            if (historyPos == numHistory) { consoleEntryText[0] = currentEntryLength = 0; } else { scpy_to_a_from_b(consoleEntryText,history[historyPos],T_BUFFER_SIZE); currentEntryLength = slen(consoleEntryText); }
         }
     }
 }
@@ -4810,8 +4430,8 @@ static void RecallHistory(int direction) { // direction 1 up (older), -1 down (n
 typedef void (*ConsoleCmdFuncNoArg)(); typedef void (*ConsoleCmdFuncInt)(int); typedef void (*ConsoleCmdFuncStr)(const char*);
 typedef struct { const char* name; union {ConsoleCmdFuncNoArg noArg; ConsoleCmdFuncInt withInt; ConsoleCmdFuncStr withStr; void* raw;} func; enum {CMD_NOARG,CMD_INT,CMD_STR}type;} ConsoleCommand;
 __attribute__((pure)) static int CommandMatch(const char* input, const char* cmd) {
-    while (*cmd && *input) { char c1 = CharToLower((u8)*input++); char c2 = CharToLower((u8)*cmd++); if (c1 == ' ' || c1 == '_') {c1 = ' ';} if (c2 == ' ' || c2 == '_') {c2 = ' ';} if (c1 != c2) {return 0;} }
-    return *cmd == '\0' && (*input == '\0' || CharacterIsEmpty((u8)*input) || *input == '_');
+    while (*cmd && *input) { char c1 = c2Lower((u8)*input++); char c2 = c2Lower((u8)*cmd++); if (c1 == ' ' || c1 == '_') {c1 = ' ';} if (c2 == ' ' || c2 == '_') {c2 = ' ';} if (c1 != c2) {return 0;} }
+    return *cmd == '\0' && (*input == '\0' || cEmpty((u8)*input) || *input == '_');
 }
 
 static void cmd_noclip() { Sys_Cheats.noclip = !Sys_Cheats.noclip; if (Sys_Cheats.noclip) { Sys_Global.instances[PLAYER1].velocity = (Vector3){ 0.0f, 0.0f, 0.0f }; CenterStatusPrint("noclip: %s", Sys_Text.stringTable[1000]); /*"ACTIVATED"*/} else {CenterStatusPrint("noclip: %s", Sys_Text.stringTable[717]); /*"DISABLED"*/} }
@@ -4832,13 +4452,13 @@ static int ParseLevelArg(const char* arg) {
     if (!arg || !*arg) return -1;
 
     char clean[64] = {0}; int j = 0;
-    for (int i = 0; arg[i] && j < 60; i++) { if (arg[i] != ' ' && arg[i] != '_') clean[j++] = CharToLower((unsigned char)arg[i]); }   clean[j] = '\0';
-    if (StringsEqual(clean, "r")      || StringFindSubstring(clean, "reactor")) return 0;
-    if (StringFindSubstring(clean, "g1") || StringFindSubstring(clean, "10")) return 10;
-    if (StringFindSubstring(clean, "g2") || StringFindSubstring(clean, "11")) return 11;
-    if (StringFindSubstring(clean, "g4") || StringFindSubstring(clean, "12")) return 12;
-    if (StringFindSubstring(clean, "g3")) { CenterStatusPrint("%s", Sys_Text.stringTable[1001]); return -2; }// "Gamma grove already jettisoned! Those poor arrogant people."
-    int level = StringToInt(clean); if (level >= 0 && level < Sys_Global.numLevels) return level;
+    for (int i = 0; arg[i] && j < 60; i++) { if (arg[i] != ' ' && arg[i] != '_') clean[j++] = c2Lower((unsigned char)arg[i]); }   clean[j] = '\0';
+    if (sEqual(clean, "r")      || sFindSub(clean, "reactor")) return 0;
+    if (sFindSub(clean, "g1") || sFindSub(clean, "10")) return 10;
+    if (sFindSub(clean, "g2") || sFindSub(clean, "11")) return 11;
+    if (sFindSub(clean, "g4") || sFindSub(clean, "12")) return 12;
+    if (sFindSub(clean, "g3")) { CenterStatusPrint("%s", Sys_Text.stringTable[1001]); return -2; }// "Gamma grove already jettisoned! Those poor arrogant people."
+    int level = s2i32(clean); if (level >= 0 && level < Sys_Global.numLevels) return level;
     return -1; // Invalid
 }
 
@@ -4860,7 +4480,7 @@ static void cmd_help() { CenterStatusPrint("There's no one to save you now Hacke
 static void cmd_nomoney() { CenterStatusPrint("Nice try, there's no money here."); }
 static void cmd_god() { Sys_Cheats.god = !Sys_Cheats.god; CenterStatusPrint("god mode: %s", Sys_Cheats.god ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
 static void cmd_energy() { Sys_Cheats.redbull = !Sys_Cheats.redbull; if (Sys_Cheats.redbull) {CenterStatusPrint("%s", Sys_Text.stringTable[1006]);/*"I feel the power! 0 energy consumption!"*/} else {CenterStatusPrint("%s", Sys_Text.stringTable[1005]);/*Energy usage normal*/} }
-static void SetSkyRotateSpeed() { static const float skyRotateSpeeds[] = { 0.05f, 1.0f, 2.5f, 3.75f, 6.25f }; glUseProgram(Sys_Render.imageBlitShaderProgram); glUniform1f(30,skyRotateSpeeds[Sys_Cheats.dizzyLevel]); }
+static void SetSkyRotateSpeed() { static const float skyRotateSpeeds[] = { 0.05f, 1.0f, 2.5f, 3.75f, 6.25f }; glUseProgram(Sys_Render.imageBlitSP); glUniform1f(30,skyRotateSpeeds[Sys_Cheats.dizzyLevel]); }
 static void cmd_dizzy() { Sys_Cheats.dizzyLevel = (Sys_Cheats.dizzyLevel >= 3) ? 0 : Sys_Cheats.dizzyLevel + 1; SetSkyRotateSpeed(); }
 static void cmd_bottomless() { Sys_Cheats.bottomless = !Sys_Cheats.bottomless; if (Sys_Cheats.bottomless) {CenterStatusPrint("bottomlessclip! %s",Sys_Text.stringTable[1002]);/*"Bring it!"*/} else {CenterStatusPrint("%s",Sys_Text.stringTable[1003]);/*"Hose disconnected from interdimensional wormhole. Normal ammo operation restored."*/} }
 static void cmd_nohud() { Sys_Cheats.noHUD = !Sys_Cheats.noHUD; if (Sys_Cheats.noHUD) {CenterStatusPrint("%s",Sys_Text.stringTable[1004]);/*"No HUD! Enjoy the cinematic screenshot experience!"*/} else { CenterStatusPrint("HUD %s",Sys_Text.stringTable[1000]);/*"ACTIVATED"*/} }
@@ -4875,8 +4495,8 @@ static void cmd_git(const char* arg) {
     static const char* cmds[] = {"pull",  "remote: Enumerating objects: 24601, done.\nFailed, could not connect with origin/triop.", "fetch", "remote: Enumerating objects: 24601, done.\nFailed, could not connect with origin/triop.",      "status","Your branch is up to date with origin/triop.\nWorking directory clean.",
                                  "log",   "<Merge pull request #451 from SHODAN/NeuralLinkBugfix> 6 months ago...",                  "reflog","dc51440 HEAD0 -> master: commit: Establish neural connection ... ERROR: invalid ID `2-4601`.", "merge", "Failed, could not connect with origin/triop.",
                                  "push",  "Could not find Username for 'triopttp://192.168.1.451'.",                                 "clone", "Failed, connection blocked by SHODAN. Employee ID invalid." };
-    for (int i = 0; i < 16; i += 2) { if (StringFindSubstring(arg, cmds[i])) { CenterStatusPrint(cmds[i+1]); return; } }
-    if (StringFindSubstring(arg, "branch") || StringFindSubstring(arg, "-b")) { const char *last = StringFindLastChar(arg, ' '); CenterStatusPrint("Created new branch %s", last ? last + 1 : "unknown"); }
+    for (int i = 0; i < 16; i += 2) { if (sFindSub(arg, cmds[i])) { CenterStatusPrint(cmds[i+1]); return; } }
+    if (sFindSub(arg, "branch") || sFindSub(arg, "-b")) { const char *last = StringFindLastChar(arg, ' '); CenterStatusPrint("Created new branch %s", last ? last + 1 : "unknown"); }
     else CenterStatusPrint("Branch name not recognized. Contact your TriopBucket representative.");
 }
 
@@ -4917,13 +4537,13 @@ static const ConsoleCommand consoleCmds[] = {
 };
 
 void ProcessConsoleCommand(const char* command) {
-    if (command == NULL || GetStringLength(command) == 0) { ToggleConsole(); return; }
+    if (command == NULL || slen(command) == 0) { ToggleConsole(); return; }
 
-    char ts[TEXT_BUFFER_SIZE]; StringCopyInto_A_SubstringFrom_B(ts,sizeof(ts)-1,command,TEXT_BUFFER_SIZE);
+    char ts[T_BUFFER_SIZE]; sCpy2aSubFromb(ts,sizeof(ts)-1,command,T_BUFFER_SIZE);
     ts[sizeof(ts)-1] = '\0';
-    const char* command_trimmed = ts;    while (*command_trimmed && CharacterIsEmpty((unsigned char)*command_trimmed)) command_trimmed++;
-    const char* space = command_trimmed; while (*space && !CharacterIsEmpty((unsigned char)*space)) space++;
-    const char* arg_start = space;       while (*arg_start && CharacterIsEmpty((unsigned char)*arg_start)) arg_start++;
+    const char* command_trimmed = ts;    while (*command_trimmed && cEmpty((unsigned char)*command_trimmed)) command_trimmed++;
+    const char* space = command_trimmed; while (*space && !cEmpty((unsigned char)*space)) space++;
+    const char* arg_start = space;       while (*arg_start && cEmpty((unsigned char)*arg_start)) arg_start++;
     AddToHistory(command);
     bool commandProcessed = false;
     for (u16 i=0;consoleCmds[i].name!=NULL;++i) {
@@ -4933,7 +4553,7 @@ void ProcessConsoleCommand(const char* command) {
             } else if (cmd->type == CMD_STR && *arg_start) { cmd->func.withStr(*arg_start ? arg_start : ""); commandProcessed = true;
             } else { // CMD_INT
                 if (!*arg_start) CenterStatusPrint("Missing argument, usage: %s <number>",cmd->name);
-                else { cmd->func.withInt(StringToInt(arg_start)); commandProcessed = true; }
+                else { cmd->func.withInt(s2i32(arg_start)); commandProcessed = true; }
             }
         }
     }
@@ -4948,32 +4568,32 @@ void ConsoleEmulator(i32 keycode) {
     if (keycode == KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { consoleEntryText[0]='\0'; currentEntryLength=0; return; } // Clear the input
     
     if (keycode >= KEY_A && keycode <= KEY_Z) { // Handle alphabet keys
-        if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) { // Ensure we don't overflow the buffer
+        if (currentEntryLength < (T_BUFFER_SIZE - 1)) { // Ensure we don't overflow the buffer
             char c = 'a' + (keycode - KEY_A); // Map keycode to lowercase character
             consoleEntryText[currentEntryLength] = c; consoleEntryText[currentEntryLength + 1] = '\0'; currentEntryLength++;
         }
     } else if (keycode >= KEY_1 && keycode <= KEY_9) { // Handle number keys 1-9
-        if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) {
+        if (currentEntryLength < (T_BUFFER_SIZE - 1)) {
             char c = '1' + (keycode - KEY_1); // Map to '1'-'9'
             consoleEntryText[currentEntryLength] = c; consoleEntryText[currentEntryLength + 1] = '\0'; currentEntryLength++;
         }
     } else if (keycode == KEY_0) { // Handle '0'
-        if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]='0'; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; }
+        if (currentEntryLength < (T_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]='0'; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; }
     } else if (keycode == KEY_MINUS || keycode == KEY_KP_SUBTRACT) {
-        if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]=(Sys_Input.keyStates[KEY_LEFT_SHIFT].down || Sys_Input.keyStates[KEY_RIGHT_SHIFT].down) ? '_' : '-'; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; }
+        if (currentEntryLength < (T_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]=(Sys_Input.keyStates[KEY_LEFT_SHIFT].down || Sys_Input.keyStates[KEY_RIGHT_SHIFT].down) ? '_' : '-'; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; }
     } else if (keycode == KEY_BACKSPACE && currentEntryLength > 0) { currentEntryLength--; consoleEntryText[currentEntryLength]='\0'; } // Handle backspace
     else if (keycode == KEY_SPACE) { // Handle space
-        if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]=' '; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; }
+        if (currentEntryLength < (T_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]=' '; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; }
     } else if (keycode == KEY_ENTER || keycode == KEY_KP_ENTER) { DualLog("Console command: %s\n",consoleEntryText); ProcessConsoleCommand(consoleEntryText); }
 }
-// ============ Audio System
+// Aud Sys
 #define AUDIO_RATE      48000
 #define AUDIO_CHANNELS  2
 #define AUDIO_PERIOD_MS 10
 #define AUDIO_PERIODS   4
 #define AUDIO_FRAMES    ((AUDIO_RATE * AUDIO_PERIOD_MS) / 1000)
 #define AUDBUF_SIZE (AUDIO_FRAMES*AUDIO_PERIODS)
-void* MemCpyFromBtoAForNBytes(void *dst, const void *src, size_t n);
+void* mcpy(void *dst, const void *src, size_t n);
 extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
 #ifdef WINDOWS
     #define FAILED(hr)    ((i32)(hr) <  0)
@@ -5041,7 +4661,7 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
             wasapi_dev_t *w=&wasapi_devs[i]; if (!w->open) continue;
             u8* data = NULL; if (FAILED(w->render->lpVtbl->GetBuffer(w->render,(u32)frames,&data))) { pcm_prepare(IDX_TO_FD(i)); continue; }
             
-            MemCpyFromBtoAForNBytes(data,buf,frames*w->channels*2); w->render->lpVtbl->ReleaseBuffer(w->render,(u32)frames,0);
+            mcpy(data,buf,frames*w->channels*2); w->render->lpVtbl->ReleaseBuffer(w->render,(u32)frames,0);
         }
         return frames;
     }
@@ -5064,13 +4684,13 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
     typedef enum pcm_param {PCM_ACCESS=0,PCM_FORMAT=1,PCM_RATE=11,PCM_CHANNELS=10,PCM_PERIOD_SIZE=13,PCM_BUFFER_SIZE=17,PCM_PERIODS=15,PCM_INTERRUPT=20,PCM_TSTAMP_TYPE=21,PCM_AVAIL_MIN=22,PCM_START_THRESHOLD=23,PCM_XRUN_THRESHOLD=24,PCM_SILENCE_THRESHOLD=25,PCM_SILENCE_SIZE=26} pcm_param_t;
     static inline struct snd_mask* get_mask_struct(struct snd_pcm_hw_params *p, u32 parameter) { return &p->masks[parameter - 0]; }
     static inline struct snd_interval* get_interval_struct(struct snd_pcm_hw_params *p, u32 parameter) { return &p->intervals[parameter - 8]; }
-    static void hw_params_set_mask(struct snd_pcm_hw_params *p, int parameter, u32 value) { struct snd_mask *m = get_mask_struct(p,parameter); if (m->bits[((value) / 32)] & (1 << ((value) % 32))) {MemSetToVForNBytes(m, 0x00, sizeof(*m));} m->bits[((value) / 32)] |= (1 << ((value) % 32)); }
+    static void hw_params_set_mask(struct snd_pcm_hw_params *p, int parameter, u32 value) { struct snd_mask *m = get_mask_struct(p,parameter); if (m->bits[((value) / 32)] & (1 << ((value) % 32))) {mset(m, 0x00, sizeof(*m));} m->bits[((value) / 32)] |= (1 << ((value) % 32)); }
     static void hw_params_set_interval(struct snd_pcm_hw_params *p, int parameter, u32 min, u32 max) { struct snd_interval *i = get_interval_struct(p,parameter); i->openmin = i->openmax = 0; i->integer = 1; i->min = min; i->max = max; }
     static void hw_params_set(struct snd_pcm_hw_params *p, int parameter, u32 value) { if ((parameter >= 0 && parameter <= 2)) hw_params_set_mask(p,parameter,value); else if ((parameter >= 8 && parameter <= 19)) hw_params_set_interval(p,parameter,value,value); }
     static u32 hw_params_get_mask(struct snd_pcm_hw_params *p, int parameter, u32 value) { struct snd_mask *m=get_mask_struct(p,parameter); return m->bits[((value) / 32)] & (1 << ((value) % 32)); }
     static void hw_params_get_interval(struct snd_pcm_hw_params *p, int parameter, u32 *min, u32 *max) { struct snd_interval *i = get_interval_struct(p,parameter); *min = i->min + i->openmin; *max = i->max - i->openmax; }
     static u32 hw_params_get(struct snd_pcm_hw_params *p, int parameter, u32 value) { u32 r, t; return (parameter >= 0 && parameter <= 2) ? hw_params_get_mask(p,parameter,value) : ((parameter >= 8 && parameter <= 19) ? (hw_params_get_interval(p,parameter,&r,&t),r) : 0); }
-    static void hw_params_fill(struct snd_pcm_hw_params *p) { MemSetToVForNBytes(p,0,sizeof(*p)); MemSetToVForNBytes(p->masks,0xff,sizeof(p->masks)); p->rmask = p->info = 0xffffffffU; for (int i=0;i<=11;i++) { p->intervals[i].min = 0; p->intervals[i].max = 0xffffffffU; } }
+    static void hw_params_fill(struct snd_pcm_hw_params *p) { mset(p,0,sizeof(*p)); mset(p->masks,0xff,sizeof(p->masks)); p->rmask = p->info = 0xffffffffU; for (int i=0;i<=11;i++) { p->intervals[i].min = 0; p->intervals[i].max = 0xffffffffU; } }
     unsigned long pcm_gethw(pcm_params_t *p, pcm_param_t param, unsigned int val) { return hw_params_get(&p->hw_params,param,val); } 
     unsigned long pcm_getsw(pcm_params_t *p, pcm_param_t param) { pcm_sw_params_t *sw = &p->sw_params; return ((u64*)&sw->avail_min)[param - 22]; }
     int pcm_params_setup(int fd, pcm_params_t *p) {
@@ -5082,88 +4702,88 @@ extern SettingsSystem Sys_Settings; extern GlobalContext Sys_Global;
         return ioctl(fd,_IO('A',0x40));
     }
 
-    int pcm_open(int card, int device, int flags) { char path[4096]; StringFormat(path,sizeof(path),"/dev/snd/pcmC%uD%u%c",card,device,(flags & 1) == 0 ? 'c' : 'p'); return OS_Open(path,00000002 | (flags & (1 << 1) ? 00004000 : 0),0); }
+    int pcm_open(int card, int device, int flags) { char path[4096]; sFormat(path,sizeof(path),"/dev/snd/pcmC%uD%u%c",card,device,(flags & 1) == 0 ? 'c' : 'p'); return OS_Open(path,00000002 | (flags & (1 << 1) ? 00004000 : 0),0); }
 #endif
-#define DRMP3_HDR_IS_MONO(h)             (((h[3]) & 0xC0) == 0xC0)
-#define DRMP3_HDR_IS_MS_STEREO(h)        (((h[3]) & 0xE0) == 0x60)
-#define DRMP3_HDR_IS_FREE_FORMAT(h)      (((h[2]) & 0xF0) == 0)
-#define DRMP3_HDR_IS_CRC(h)              (!((h[1]) & 1))
-#define DRMP3_HDR_TEST_PADDING(h)        ((h[2]) & 0x2)
-#define DRMP3_HDR_TEST_MPEG1(h)          ((h[1]) & 0x8)
-#define DRMP3_HDR_TEST_NOT_MPEG25(h)     ((h[1]) & 0x10)
-#define DRMP3_HDR_TEST_I_STEREO(h)       ((h[3]) & 0x10)
-#define DRMP3_HDR_TEST_MS_STEREO(h)      ((h[3]) & 0x20)
-#define DRMP3_HDR_GET_STEREO_MODE(h)     (((h[3]) >> 6) & 3)
-#define DRMP3_HDR_GET_STEREO_MODE_EXT(h) (((h[3]) >> 4) & 3)
-#define DRMP3_HDR_GET_LAYER(h)           (((h[1]) >> 1) & 3)
-#define DRMP3_HDR_GET_BITRATE(h)         ((h[2]) >> 4)
-#define DRMP3_HDR_GET_SAMPLE_RATE(h)     (((h[2]) >> 2) & 3)
-#define DRMP3_HDR_GET_MY_SAMPLE_RATE(h)  (DRMP3_HDR_GET_SAMPLE_RATE(h) + (((h[1]>>3)&1)+((h[1]>>4)&1))*3)
-#define DRMP3_HDR_IS_FRAME_576(h)        ((h[1] & 14) == 2)
-#define DRMP3_HDR_IS_LAYER_1(h)          ((h[1] & 6) == 6)
-#define DRMP3_OFFSET_PTR(p,offset) ((void*)((u8*)(p)+(offset)))
-typedef struct { int frame_bytes,channels,sample_rate,layer,bitrate_kbps; } drmp3dec_frame_info;
-typedef struct { const u8 *buf; int pos,limit; } drmp3_bs;
-typedef struct { const u8 *sfbtab; u16 part_23_length,big_values,scalefac_compress; u8 global_gain,block_type,mixed_block_flag,n_long_sfb,n_short_sfb,table_select[3],region_count[3],subblock_gain[3],preflag,scalefac_scale,count1_table,scfsi; } drmp3_L3_gr_info;
-typedef struct { drmp3_bs bs; u8 maindata[511 + 2304]; drmp3_L3_gr_info gr_info[4]; float grbuf[2][576],scf[40],syn[18+15][2*32]; u8 ist_pos[2][39]; } drmp3dec_scratch;
-typedef struct { float mdct_overlap[2][9*32], qmf_state[15*2*32]; int reserv,free_format_bytes; u8 header[4],reserv_buf[511]; drmp3dec_scratch scratch; } drmp3dec;
-typedef struct { drmp3dec decoder; u32 channels,sampleRate,mp3FChan,mp3FrameSampleRate,pcmFConsInMP3F,pcmFRemInMP3F,delayInPCMFrames,paddingInPCMFrames; void *pUserData; u8 pcmFrames[sizeof(float) * (1152 * 2)]; u64 currentPCMFrame,streamCursor,streamLength,streamStartOffset,totalPCMFrameCount; bool atEnd; size_t dataSize,dataCapacity,dataConsumed; u8 *pData; } drmp3;
-static u32 drmp3_bs_get_bits(drmp3_bs *bs, int n) { u32 next,cache=0, s=bs->pos&7; int shl=n+s; const u8 *p=bs->buf+(bs->pos>>3); if ((bs->pos+=n)>bs->limit) {return 0;} next=*p++&(255>>s); while ((shl-=8)>0) { cache|=next<<shl; next=*p++; } return cache|(next>>-shl); }
-static int drmp3_hdr_valid(const u8 *h) { return h[0]==0xff && ((h[1]&0xF0)==0xf0||(h[1]&0xFE)==0xe2) && (DRMP3_HDR_GET_LAYER(h)!=0) && (DRMP3_HDR_GET_BITRATE(h)!=15) && (DRMP3_HDR_GET_SAMPLE_RATE(h)!=3); }
-static int drmp3_hdr_compare(const u8 *h1, const u8 *h2) { return drmp3_hdr_valid(h2) && ((h1[1]^h2[1])&0xFE)==0 && ((h1[2]^h2[2])&0x0C)==0 && !(DRMP3_HDR_IS_FREE_FORMAT(h1)^DRMP3_HDR_IS_FREE_FORMAT(h2)); }
+#define MP3_HDR_IS_MONO(h)             (((h[3]) & 0xC0) == 0xC0)
+#define MP3_HDR_IS_MS_STEREO(h)        (((h[3]) & 0xE0) == 0x60)
+#define MP3_HDR_IS_FREE_FORMAT(h)      (((h[2]) & 0xF0) == 0)
+#define MP3_HDR_IS_CRC(h)              (!((h[1]) & 1))
+#define MP3_HDR_TEST_PADDING(h)        ((h[2]) & 0x2)
+#define MP3_HDR_TEST_MPEG1(h)          ((h[1]) & 0x8)
+#define MP3_HDR_TEST_NOT_MPEG25(h)     ((h[1]) & 0x10)
+#define MP3_HDR_TEST_I_STEREO(h)       ((h[3]) & 0x10)
+#define MP3_HDR_TEST_MS_STEREO(h)      ((h[3]) & 0x20)
+#define MP3_HDR_GET_STEREO_MODE(h)     (((h[3]) >> 6) & 3)
+#define MP3_HDR_GET_STEREO_MODE_EXT(h) (((h[3]) >> 4) & 3)
+#define MP3_HDR_GET_LAYER(h)           (((h[1]) >> 1) & 3)
+#define MP3_HDR_GET_BITRATE(h)         ((h[2]) >> 4)
+#define MP3_HDR_GET_SAMPLE_RATE(h)     (((h[2]) >> 2) & 3)
+#define MP3_HDR_GET_SAMPLE_RATEHDR(h)  (MP3_HDR_GET_SAMPLE_RATE(h) + (((h[1]>>3)&1)+((h[1]>>4)&1))*3)
+#define MP3_HDR_IS_FRAME_576(h)        ((h[1] & 14) == 2)
+#define MP3_HDR_IS_LAYER_1(h)          ((h[1] & 6) == 6)
+#define MP3_OFFSET_PTR(p,offset) ((void*)((u8*)(p)+(offset)))
+typedef struct { int frame_bytes,channels,sample_rate,layer,bitrate_kbps; } mp3dec_frame_info;
+typedef struct { const u8 *buf; int pos,limit; } mp3_bs;
+typedef struct { const u8 *sfbtab; u16 part_23_length,big_values,scalefac_compress; u8 global_gain,block_type,mixed_block_flag,n_long_sfb,n_short_sfb,table_select[3],region_count[3],subblock_gain[3],preflag,scalefac_scale,count1_table,scfsi; } mp3L3_gr_info;
+typedef struct { mp3_bs bs; u8 maindata[511 + 2304]; mp3L3_gr_info gr_info[4]; float grbuf[2][576],scf[40],syn[18+15][2*32]; u8 ist_pos[2][39]; } mp3dec_scratch;
+typedef struct { float mdct_overlap[2][9*32], qmf_state[15*2*32]; int reserv,free_format_bytes; u8 header[4],reserv_buf[511]; mp3dec_scratch scratch; } mp3dec;
+typedef struct { mp3dec decoder; u32 channels,sampleRate,mp3FChan,mp3FrameSampleRate,pcmFConsInMP3F,pcmFRemInMP3F,delayInPCMFrames,paddingInPCMFrames; void *pUserData; u8 pcmFrames[sizeof(float) * (1152 * 2)]; u64 currentPCMFrame,streamCursor,streamLength,streamStartOffset,totalPCMFrameCount; bool atEnd; size_t dataSize,dataCapacity,dataConsumed; u8 *pData; } mp3;
+static u32 mp3_bs_get_bits(mp3_bs *bs, int n) { u32 next,cache=0, s=bs->pos&7; int shl=n+s; const u8 *p=bs->buf+(bs->pos>>3); if ((bs->pos+=n)>bs->limit) {return 0;} next=*p++&(255>>s); while ((shl-=8)>0) { cache|=next<<shl; next=*p++; } return cache|(next>>-shl); }
+static int mp3_hdr_valid(const u8 *h) { return h[0]==0xff && ((h[1]&0xF0)==0xf0||(h[1]&0xFE)==0xe2) && (MP3_HDR_GET_LAYER(h)!=0) && (MP3_HDR_GET_BITRATE(h)!=15) && (MP3_HDR_GET_SAMPLE_RATE(h)!=3); }
+static int mp3_hdr_compare(const u8 *h1, const u8 *h2) { return mp3_hdr_valid(h2) && ((h1[1]^h2[1])&0xFE)==0 && ((h1[2]^h2[2])&0x0C)==0 && !(MP3_HDR_IS_FREE_FORMAT(h1)^MP3_HDR_IS_FREE_FORMAT(h2)); }
 static u8 g_halfrate[2][3][15]={ {{0,4,8,12,16,20,24,28,32,40,48,56,64,72,80},{0,4,8,12,16,20,24,28,32,40,48,56,64,72,80},{0,16,24,28,32,40,48,56,64,72,80,88,96,112,128}},{{0,16,20,24,28,32,40,48,56,64,80,96,112,128,160},{0,16,24,28,32,40,48,56,64,80,96,112,128,160,192},{0,16,32,48,64,80,96,112,128,144,160,176,192,208,224}} };
-static unsigned drmp3_hdr_bitrate_kbps(const u8 *h) { return 2*g_halfrate[!!DRMP3_HDR_TEST_MPEG1(h)][(((h[1]) >> 1) & 3)-1/*layer*/][((h[2]) >> 4)/*bitrate*/]; }
-static unsigned drmp3_hdr_sample_rate_hz(const u8 *h) { static const unsigned g_hz[3]={44100,48000,32000}; return g_hz[DRMP3_HDR_GET_SAMPLE_RATE(h)]>>(int)!DRMP3_HDR_TEST_MPEG1(h)>>(int)!DRMP3_HDR_TEST_NOT_MPEG25(h); }
-static unsigned drmp3_hdr_frame_samples(const u8 *h) { return ((h[1]&6) == 6) ? 384 : (1152>>(int)DRMP3_HDR_IS_FRAME_576(h)); }
-static int drmp3_hdr_frame_bytes(const u8 *h, int free_format_size) { int fb=drmp3_hdr_frame_samples(h)*drmp3_hdr_bitrate_kbps(h)*125/drmp3_hdr_sample_rate_hz(h); if (DRMP3_HDR_IS_LAYER_1(h)) {fb&=~3;} return fb?fb:free_format_size; }
-static int drmp3_hdr_padding(const u8 *h) { return DRMP3_HDR_TEST_PADDING(h)?(DRMP3_HDR_IS_LAYER_1(h)?4:1):0; }
+static unsigned mp3_hdr_bitrate_kbps(const u8 *h) { return 2*g_halfrate[!!MP3_HDR_TEST_MPEG1(h)][(((h[1]) >> 1) & 3)-1/*layer*/][((h[2]) >> 4)/*bitrate*/]; }
+static unsigned mp3_hdr_sample_rate_hz(const u8 *h) { static const unsigned g_hz[3]={44100,48000,32000}; return g_hz[MP3_HDR_GET_SAMPLE_RATE(h)]>>(int)!MP3_HDR_TEST_MPEG1(h)>>(int)!MP3_HDR_TEST_NOT_MPEG25(h); }
+static unsigned mp3_hdr_frame_samples(const u8 *h) { return ((h[1]&6) == 6) ? 384 : (1152>>(int)MP3_HDR_IS_FRAME_576(h)); }
+static int mp3_hdr_frame_bytes(const u8 *h, int free_format_size) { int fb=mp3_hdr_frame_samples(h)*mp3_hdr_bitrate_kbps(h)*125/mp3_hdr_sample_rate_hz(h); if (MP3_HDR_IS_LAYER_1(h)) {fb&=~3;} return fb?fb:free_format_size; }
+static int mp3_hdr_padding(const u8 *h) { return MP3_HDR_TEST_PADDING(h)?(MP3_HDR_IS_LAYER_1(h)?4:1):0; }
 static u8 g_scf_long[8][23]={{0},{12,12,12,12,12,12,16,20,24,28,32,40,48,56,64,76,90,2,2,2,2,2,0},{0},{6,6,6,6,6,6,8,10,12,14,16,18,22,26,32,38,46,54,62,70,76,36,0},{0},{4,4,4,4,4,4,6,6,8,8,10,12,16,20,24,28,34,42,50,54,76,158,0},{4,4,4,4,4,4,6,6,6,8,10,12,16,18,22,28,34,40,46,54,54,192,0},{4,4,4,4,4,4,6,6,8,10,12,16,20,24,30,38,46,56,68,84,102,26,0}};
 static u8 g_scf_short[8][40]={{4,4,4,4,4,4,4,4,4,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,30,30,30,40,40,40,18,18,18,0},{8,8,8,8,8,8,8,8,8,12,12,12,16,16,16,20,20,20,24,24,24,28,28,28,36,36,36,2,2,2,2,2,2,2,2,2,26,26,26,0},{4,4,4,4,4,4,4,4,4,6,6,6,6,6,6,8,8,8,10,10,10,14,14,14,18,18,18,26,26,26,32,32,32,42,42,42,18,18,18,0 },{4,4,4,4,4,4,4,4,4,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,32,32,32,44,44,44,12,12,12,0 }, { 4,4,4,4,4,4,4,4,4,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,30,30,30,40,40,40,18,18,18,0 },{4,4,4,4,4,4,4,4,4,4,4,4,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,22,22,22,30,30,30,56,56,56,0},{4,4,4,4,4,4,4,4,4,4,4,4,6,6,6,6,6,6,10,10,10,12,12,12,14,14,14,16,16,16,20,20,20,26,26,26,66,66,66,0},{4,4,4,4,4,4,4,4,4,4,4,4,6,6,6,8,8,8,12,12,12,16,16,16,20,20,20,26,26,26,34,34,34,42,42,42,12,12,12,0}};
 static u8 g_scf_mixed[8][40]={{6,6,6,6,6,6,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,30,30,30,40,40,40,18,18,18,0},{12,12,12,4,4,4,8,8,8,12,12,12,16,16,16,20,20,20,24,24,24,28,28,28,36,36,36,2,2,2,2,2,2,2,2,2,26,26,26,0},{6,6,6,6,6,6,6,6,6,6,6,6,8,8,8,10,10,10,14,14,14,18,18,18,26,26,26,32,32,32,42,42,42,18,18,18,0},{6,6,6,6,6,6,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,32,32,32,44,44,44,12,12,12,0},{6,6,6,6,6,6,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,30,30,30,40,40,40,18,18,18,0},{4,4,4,4,4,4,6,6,4,4,4,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,22,22,22,30,30,30,56,56,56,0},{4,4,4,4,4,4,6,6,4,4,4,6,6,6,6,6,6,10,10,10,12,12,12,14,14,14,16,16,16,20,20,20,26,26,26,66,66,66,0},{4,4,4,4,4,4,6,6,4,4,4,6,6,6,8,8,8,12,12,12,16,16,16,20,20,20,26,26,26,34,34,34,42,42,42,12,12,12,0}};
 static const u8 g_sfc_long_024[23] = { 6,6,6,6,6,6,8,10,12,14,16,20,24,28,32,38,46,52,60,68,58,54,0 };
 void InitSCFTables() { for (int i=0;i<23;++i) g_scf_long[0][i] = g_scf_long[1][i] = g_scf_long[2][i] = g_sfc_long_024[i]; }
-static int drmp3_L3_read_side_info(drmp3_bs *bs, drmp3_L3_gr_info *gr, const u8 *hdr) {
-    unsigned tables,scfsi=0; int main_data_begin,part_23_sum = 0, gr_count=DRMP3_HDR_IS_MONO(hdr) ? 1 : 2, sr_idx=DRMP3_HDR_GET_MY_SAMPLE_RATE(hdr); sr_idx-=(sr_idx!=0);
-    if (DRMP3_HDR_TEST_MPEG1(hdr)) { gr_count*=2; main_data_begin=drmp3_bs_get_bits(bs,9); scfsi=drmp3_bs_get_bits(bs,7+gr_count); }
-    else main_data_begin = drmp3_bs_get_bits(bs,8+gr_count)>>gr_count;
+static int mp3L3_read_side_info(mp3_bs *bs, mp3L3_gr_info *gr, const u8 *hdr) {
+    unsigned tables,scfsi=0; int main_data_begin,part_23_sum = 0, gr_count=MP3_HDR_IS_MONO(hdr) ? 1 : 2, sr_idx=MP3_HDR_GET_SAMPLE_RATEHDR(hdr); sr_idx-=(sr_idx!=0);
+    if (MP3_HDR_TEST_MPEG1(hdr)) { gr_count*=2; main_data_begin=mp3_bs_get_bits(bs,9); scfsi=mp3_bs_get_bits(bs,7+gr_count); }
+    else main_data_begin = mp3_bs_get_bits(bs,8+gr_count)>>gr_count;
     do {
-        if (DRMP3_HDR_IS_MONO(hdr)) scfsi<<=4;
-        gr->part_23_length=(u16)drmp3_bs_get_bits(bs,12); part_23_sum+=gr->part_23_length; gr->big_values=(u16)drmp3_bs_get_bits(bs,9); if (gr->big_values>288) return -1;
+        if (MP3_HDR_IS_MONO(hdr)) scfsi<<=4;
+        gr->part_23_length=(u16)mp3_bs_get_bits(bs,12); part_23_sum+=gr->part_23_length; gr->big_values=(u16)mp3_bs_get_bits(bs,9); if (gr->big_values>288) return -1;
         
-        gr->global_gain=(u8)drmp3_bs_get_bits(bs,8); gr->scalefac_compress=(u16)drmp3_bs_get_bits(bs,DRMP3_HDR_TEST_MPEG1(hdr)?4:9); gr->sfbtab=g_scf_long[sr_idx]; gr->n_long_sfb=22; gr->n_short_sfb=0;
-        if (drmp3_bs_get_bits(bs,1)) {
-            gr->block_type = (u8)drmp3_bs_get_bits(bs,2); if (!gr->block_type) return -1;
+        gr->global_gain=(u8)mp3_bs_get_bits(bs,8); gr->scalefac_compress=(u16)mp3_bs_get_bits(bs,MP3_HDR_TEST_MPEG1(hdr)?4:9); gr->sfbtab=g_scf_long[sr_idx]; gr->n_long_sfb=22; gr->n_short_sfb=0;
+        if (mp3_bs_get_bits(bs,1)) {
+            gr->block_type = (u8)mp3_bs_get_bits(bs,2); if (!gr->block_type) return -1;
             
-            gr->mixed_block_flag = (u8)drmp3_bs_get_bits(bs,1); gr->region_count[0] = 7; gr->region_count[1] = 255;
+            gr->mixed_block_flag = (u8)mp3_bs_get_bits(bs,1); gr->region_count[0] = 7; gr->region_count[1] = 255;
             if (gr->block_type==2) {
                 scfsi&=0x0F0F;
                 if (!gr->mixed_block_flag) { gr->region_count[0] = 8; gr->sfbtab = g_scf_short[sr_idx]; gr->n_long_sfb = 0; gr->n_short_sfb = 39; }
-                else                       { gr->sfbtab = g_scf_mixed[sr_idx]; gr->n_long_sfb=DRMP3_HDR_TEST_MPEG1(hdr) ? 8 : 6; gr->n_short_sfb = 30; }
+                else                       { gr->sfbtab = g_scf_mixed[sr_idx]; gr->n_long_sfb=MP3_HDR_TEST_MPEG1(hdr) ? 8 : 6; gr->n_short_sfb = 30; }
             }
-            tables=drmp3_bs_get_bits(bs,10)<<5;
-            gr->subblock_gain[0]=(u8)drmp3_bs_get_bits(bs,3); gr->subblock_gain[1]=(u8)drmp3_bs_get_bits(bs,3); gr->subblock_gain[2]=(u8)drmp3_bs_get_bits(bs,3);
+            tables=mp3_bs_get_bits(bs,10)<<5;
+            gr->subblock_gain[0]=(u8)mp3_bs_get_bits(bs,3); gr->subblock_gain[1]=(u8)mp3_bs_get_bits(bs,3); gr->subblock_gain[2]=(u8)mp3_bs_get_bits(bs,3);
         } else {
             gr->block_type=0; gr->mixed_block_flag=0;
-            tables=drmp3_bs_get_bits(bs,15);
-            gr->region_count[0]=(u8)drmp3_bs_get_bits(bs,4); gr->region_count[1]=(u8)drmp3_bs_get_bits(bs,3); gr->region_count[2]=255;
+            tables=mp3_bs_get_bits(bs,15);
+            gr->region_count[0]=(u8)mp3_bs_get_bits(bs,4); gr->region_count[1]=(u8)mp3_bs_get_bits(bs,3); gr->region_count[2]=255;
         }
         gr->table_select[0]=(u8)(tables>>10); gr->table_select[1]=(u8)((tables>>5)&31); gr->table_select[2]=(u8)((tables)&31);
-        gr->preflag=(u8)(DRMP3_HDR_TEST_MPEG1(hdr) ? drmp3_bs_get_bits(bs,1) : (gr->scalefac_compress>=500));
-        gr->scalefac_scale=(u8)drmp3_bs_get_bits(bs,1); gr->count1_table=(u8)drmp3_bs_get_bits(bs,1); gr->scfsi=(u8)((scfsi>>12)&15);
+        gr->preflag=(u8)(MP3_HDR_TEST_MPEG1(hdr) ? mp3_bs_get_bits(bs,1) : (gr->scalefac_compress>=500));
+        gr->scalefac_scale=(u8)mp3_bs_get_bits(bs,1); gr->count1_table=(u8)mp3_bs_get_bits(bs,1); gr->scfsi=(u8)((scfsi>>12)&15);
         scfsi <<= 4; gr++;
     } while(--gr_count);
     if (part_23_sum+bs->pos > bs->limit+main_data_begin*8) return -1;
     return main_data_begin;
 }
 
-static void drmp3_L3_read_scalefactors(u8 *scf, u8 *ist_pos, const u8 *scf_size, const u8 *scf_count, drmp3_bs *bs, int scfsi) {
+static void mp3L3_read_scalefactors(u8 *scf, u8 *ist_pos, const u8 *scf_size, const u8 *scf_count, mp3_bs *bs, int scfsi) {
     for (int i=0; i<4&&scf_count[i]; i++,scfsi*=2) {
         int cnt = scf_count[i];
-        if (scfsi & 8) MemCpyFromBtoAForNBytes(scf,ist_pos,cnt);
+        if (scfsi & 8) mcpy(scf,ist_pos,cnt);
         else {
             int bits=scf_size[i];
-            if (!bits) { MemSetToVForNBytes(scf,0,cnt); MemSetToVForNBytes(ist_pos,0,cnt); }
-            else { int max_scf=(scfsi<0)?((1<<bits)-1):-1; for (int k=0;k<cnt;k++) {int s=drmp3_bs_get_bits(bs,bits); ist_pos[k]=(u8)(s==max_scf?-1:s); scf[k]=(u8)s;} }
+            if (!bits) { mset(scf,0,cnt); mset(ist_pos,0,cnt); }
+            else { int max_scf=(scfsi<0)?((1<<bits)-1):-1; for (int k=0;k<cnt;k++) {int s=mp3_bs_get_bits(bs,bits); ist_pos[k]=(u8)(s==max_scf?-1:s); scf[k]=(u8)s;} }
         }
         
         ist_pos+=cnt; scf+=cnt;
@@ -5172,22 +4792,22 @@ static void drmp3_L3_read_scalefactors(u8 *scf, u8 *ist_pos, const u8 *scf_size,
     scf[0]=scf[1]=scf[2]=0;
 }
 
-static float drmp3_L3_ldexp_q2(float y, int exp_q2) { static const float g_expfrac[4]={9.31322575e-10f,7.83145814e-10f,6.58544508e-10f,5.53767716e-10f}; int e; do { e=vmin(30*4,exp_q2); y*=g_expfrac[e&3]*(1<<30>>(e>>2)); } while ((exp_q2-=e)>0); return y; }
-#define DRMP3_MAX_SCFI (((255+-1*4-210)+3)&~3)
-static void drmp3_L3_decode_scalefactors(const u8 *hdr, u8 *ist_pos, drmp3_bs *bs, const drmp3_L3_gr_info *gr, float *scf, int ch) {
+static float mp3L3_ldexp_q2(float y, int exp_q2) { static const float g_expfrac[4]={9.31322575e-10f,7.83145814e-10f,6.58544508e-10f,5.53767716e-10f}; int e; do { e=vmin(30*4,exp_q2); y*=g_expfrac[e&3]*(1<<30>>(e>>2)); } while ((exp_q2-=e)>0); return y; }
+#define MP3_MAX_SCFI (((255+-1*4-210)+3)&~3)
+static void mp3L3_decode_scalefactors(const u8 *hdr, u8 *ist_pos, mp3_bs *bs, const mp3L3_gr_info *gr, float *scf, int ch) {
     static const u8 g_scf_partitions[3][28]={{6,5,5,5,6,5,5,5,6,5,7,3,11,10,0,0,7,7,7,0,6,6,6,3,8,8,5,0}, {8,9,6,12,6,9,9,9,6,9,12,6,15,18,0,0,6,15,12,0,6,12,9,6,6,18,9,0}, {9,9,6,12,9,9,9,9,9,9,12,6,18,18,0,0,12,12,12,0,12,9,9,6,15,12,9,0}};
     const u8 *scf_partition=g_scf_partitions[!!gr->n_short_sfb+!gr->n_long_sfb];
     u8 scf_size[4],iscf[40]; int i,scf_shift=gr->scalefac_scale+1,gain_exp,scfsi=gr->scfsi; float gain;
-    if (DRMP3_HDR_TEST_MPEG1(hdr)) { static const u8 g_scfc_decode[16]={0,1,2,3,12,5,6,7,9,10,11,13,14,15,18,19}; int part=g_scfc_decode[gr->scalefac_compress]; scf_size[1]=scf_size[0]=(u8)(part>>2); scf_size[3]=scf_size[2]=(u8)(part&3); }
+    if (MP3_HDR_TEST_MPEG1(hdr)) { static const u8 g_scfc_decode[16]={0,1,2,3,12,5,6,7,9,10,11,13,14,15,18,19}; int part=g_scfc_decode[gr->scalefac_compress]; scf_size[1]=scf_size[0]=(u8)(part>>2); scf_size[3]=scf_size[2]=(u8)(part&3); }
     else {
         static const u8 g_mod[6*4]={5,5,4,4,5,5,4,1,4,3,1,1,5,6,6,1,4,4,4,1,4,3,1,1};
-        int k,modprod,sfc,ist=DRMP3_HDR_TEST_I_STEREO(hdr)&&ch;
+        int k,modprod,sfc,ist=MP3_HDR_TEST_I_STEREO(hdr)&&ch;
         sfc=gr->scalefac_compress>>ist;
         for (k=ist*3*4; sfc>=0; sfc-=modprod,k+=4) { for (modprod=1,i=3;i>=0;i--) {scf_size[i]=(u8)(sfc/modprod%g_mod[k+i]); modprod*=g_mod[k+i];} }
         scf_partition+=k; scfsi=-16;
     }
     
-    drmp3_L3_read_scalefactors(iscf,ist_pos,scf_size,scf_partition,bs,scfsi);
+    mp3L3_read_scalefactors(iscf,ist_pos,scf_size,scf_partition,bs,scfsi);
     if (gr->n_short_sfb) {
         int sh=3-scf_shift;
         for (i=0;i<gr->n_short_sfb;i+=3) {
@@ -5197,23 +4817,23 @@ static void drmp3_L3_decode_scalefactors(const u8 *hdr, u8 *ist_pos, drmp3_bs *b
         }
     } else if (gr->preflag) { static const u8 g_preamp[10]={1,1,1,1,2,2,3,3,3,2}; for (i=0;i<10;i++) {iscf[11+i]=(u8)(iscf[11+i]+g_preamp[i]);} }
     
-    gain_exp=gr->global_gain+-1*4-210-(DRMP3_HDR_IS_MS_STEREO(hdr)?2:0);
-    gain=drmp3_L3_ldexp_q2(1<<(DRMP3_MAX_SCFI/4),DRMP3_MAX_SCFI-gain_exp);
-    for (i=0;i<(int)(gr->n_long_sfb+gr->n_short_sfb);i++) scf[i]=drmp3_L3_ldexp_q2(gain,iscf[i]<<scf_shift);
+    gain_exp=gr->global_gain+-1*4-210-(MP3_HDR_IS_MS_STEREO(hdr)?2:0);
+    gain=mp3L3_ldexp_q2(1<<(MP3_MAX_SCFI/4),MP3_MAX_SCFI-gain_exp);
+    for (i=0;i<(int)(gr->n_long_sfb+gr->n_short_sfb);i++) scf[i]=mp3L3_ldexp_q2(gain,iscf[i]<<scf_shift);
 }
 
-static const float g_drmp3_pow43[129+16]={ 0,-1,-2.519842f,-4.326749f,-6.349604f,-8.549880f,-10.902724f,-13.390518f,-16.000000f,-18.720754f,-21.544347f,-24.463781f,-27.473142f,-30.567351f,-33.741992f,-36.993181f,
+static const float g_mp3_pow43[129+16]={ 0,-1,-2.519842f,-4.326749f,-6.349604f,-8.549880f,-10.902724f,-13.390518f,-16.000000f,-18.720754f,-21.544347f,-24.463781f,-27.473142f,-30.567351f,-33.741992f,-36.993181f,
                                            0,1,2.519842f,4.326749f,6.349604f,8.549880f,10.902724f,13.390518f,16.000000f,18.720754f,21.544347f,24.463781f,27.473142f,30.567351f,33.741992f,36.993181f,40.317474f,43.711787f,47.173345f,50.699631f,54.288352f,57.937408f,61.644865f,65.408941f,69.227979f,73.100443f,77.024898f,81.000000f,85.024491f,89.097188f,93.216975f,97.382800f,101.593667f,105.848633f,110.146801f,114.487321f,118.869381f,123.292209f,127.755065f,132.257246f,136.798076f,141.376907f,145.993119f,150.646117f,155.335327f,160.060199f,164.820202f,169.614826f,174.443577f,179.305980f,184.201575f,189.129918f,194.090580f,199.083145f,204.107210f,209.162385f,214.248292f,219.364564f,224.510845f,229.686789f,234.892058f,240.126328f,245.389280f,250.680604f,256.000000f,261.347174f,266.721841f,272.123723f,277.552547f,283.008049f,288.489971f,293.998060f,299.532071f,305.091761f,310.676898f,316.287249f,321.922592f,327.582707f,333.267377f,338.976394f,344.709550f,350.466646f,356.247482f,362.051866f,367.879608f,373.730522f,379.604427f,385.501143f,391.420496f,397.362314f,403.326427f,409.312672f,415.320884f,421.350905f,427.402579f,433.475750f,439.570269f,445.685987f,451.822757f,457.980436f,464.158883f,470.357960f,476.577530f,482.817459f,489.077615f,495.357868f,501.658090f,507.978156f,514.317941f,520.677324f,527.056184f,533.454404f,539.871867f,546.308458f,552.764065f,559.238575f,565.731879f,572.243870f,578.774440f,585.323483f,591.890898f,598.476581f,605.080431f,611.702349f,618.342238f,625.000000f,631.675540f,638.368763f,645.079578f };
-static float drmp3_L3_pow_43(int x) {
-    if (x<129) return g_drmp3_pow43[16+x];
+static float mp3L3_pow_43(int x) {
+    if (x<129) return g_mp3_pow43[16+x];
     
     int mult=256; if (x<1024) { mult=16; x<<=3; }
     int sign=2*x&64;
     float frac=(float)((x&63)-sign)/((x&~63)+sign);
-    return g_drmp3_pow43[16+((x+sign)>>6)]*(1.f+frac*((4.f/3)+frac*(2.f/9)))*mult;
+    return g_mp3_pow43[16+((x+sign)>>6)]*(1.f+frac*((4.f/3)+frac*(2.f/9)))*mult;
 }
 
-static void drmp3_L3_huffman(float *dst, drmp3_bs *bs, const drmp3_L3_gr_info *gr_info, const float *scf, int layer3gr_limit) {
+static void mp3L3_huffman(float *dst, mp3_bs *bs, const mp3L3_gr_info *gr_info, const float *scf, int layer3gr_limit) {
     static const i16 tabs[]={ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,785,785,785,785,784,784,784,784,513,513,513,513,513,513,513,513,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,-255,1313,1298,1282,785,785,785,785,784,784,784,784,769,769,769,769,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,290,288,-255,1313,1298,1282,769,769,769,769,529,529,529,529,529,529,529,529,528,528,528,528,528,528,528,528,512,512,512,512,512,512,512,512,290,288,-253,-318,-351,-367,785,785,785,785,784,784,784,784,769,769,769,769,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,819,818,547,547,275,275,275,275,561,560,515,546,289,274,288,258,
         -254,-287,1329,1299,1314,1312,1057,1057,1042,1042,1026,1026,784,784,784,784,529,529,529,529,529,529,529,529,769,769,769,769,768,768,768,768,563,560,306,306,291,259,-252,-413,-477,-542,1298,-575,1041,1041,784,784,784,784,769,769,769,769,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,-383,-399,1107,1092,1106,1061,849,849,789,789,1104,1091,773,773,1076,1075,341,340,325,309,834,804,577,577,532,532,516,516,832,818,803,816,561,561,531,531,515,546,289,289,288,258,-252,-429,-493,-559,1057,1057,1042,1042,529,529,529,529,529,529,529,529,784,784,784,784,769,769,769,769,512,512,512,512,512,512,512,512,-382,1077,-415,1106,1061,1104,849,849,789,789,1091,1076,1029,1075,834,834,597,581,340,340,339,324,804,833,532,532,832,772,818,803,817,787,816,771,290,290,290,290,288,258,
         -253,-349,-414,-447,-463,1329,1299,-479,1314,1312,1057,1057,1042,1042,1026,1026,785,785,785,785,784,784,784,784,769,769,769,769,768,768,768,768,-319,851,821,-335,836,850,805,849,341,340,325,336,533,533,579,579,564,564,773,832,578,548,563,516,321,276,306,291,304,259,-251,-572,-733,-830,-863,-879,1041,1041,784,784,784,784,769,769,769,769,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,-511,-527,-543,1396,1351,1381,1366,1395,1335,1380,-559,1334,1138,1138,1063,1063,1350,1392,1031,1031,1062,1062,1364,1363,1120,1120,1333,1348,881,881,881,881,375,374,359,373,343,358,341,325,791,791,1123,1122,-703,1105,1045,-719,865,865,790,790,774,774,1104,1029,338,293,323,308,-799,-815,833,788,772,818,803,816,322,292,307,320,561,531,515,546,289,274,288,258,
@@ -5225,8 +4845,8 @@ static void drmp3_L3_huffman(float *dst, drmp3_bs *bs, const drmp3_L3_gr_info *g
     };
 static const u8 tab32[]={130,162,193,209,44,28,76,140,9,9,9,9,9,9,9,9,190,254,222,238,126,94,157,157,109,61,173,205}; static const u8 tab33[]={252,236,220,204,188,172,156,140,124,108,92,76,60,44,28,12};
 static const i16 tabindex[2*16]={0,32,64,98,0,132,180,218,292,364,426,538,648,746,0,1126,1460,1460,1460,1460,1460,1460,1460,1460,1842,1842,1842,1842,1842,1842,1842,1842}; static const u8 g_linbits[]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,3,4,6,8,10,13,4,5,6,7,8,9,11,13};
-#define DRMP3_FLUSH_BITS(n) { bs_cache<<=(n); bs_sh+=(n); }
-#define DRMP3_CHECK_BITS    while(bs_sh>=0){bs_cache|=(u32)*bs_next_ptr++<<bs_sh;bs_sh-=8;}
+#define MP3_FLUSH_BITS(n) { bs_cache<<=(n); bs_sh+=(n); }
+#define MP3_CHECK_BITS    while(bs_sh>=0){bs_cache|=(u32)*bs_next_ptr++<<bs_sh;bs_sh-=8;}
     float one=0.0f;
     int ireg=0,big_val_cnt=gr_info->big_values;
     const u8 *sfb=gr_info->sfbtab;
@@ -5242,16 +4862,16 @@ static const i16 tabindex[2*16]={0,32,64,98,0,132,180,218,292,364,426,538,648,74
                 np=*sfb++/2; pairs_to_decode=vmin(big_val_cnt,np); one=*scf++;
                 do {
                     int j,w=5,leaf=codebook[(bs_cache>>(32-w))];
-                    while (leaf<0){DRMP3_FLUSH_BITS(w);w=leaf&7;leaf=codebook[(bs_cache>>(32-w))-(leaf>>3)];}
-                    DRMP3_FLUSH_BITS(leaf>>8);
+                    while (leaf<0){MP3_FLUSH_BITS(w);w=leaf&7;leaf=codebook[(bs_cache>>(32-w))-(leaf>>3)];}
+                    MP3_FLUSH_BITS(leaf>>8);
                     for (j=0;j<2;j++,dst++,leaf>>=4){
                         int lsb=leaf&0x0F;
-                        if (lsb==15) { lsb += (bs_cache>>(32-(linbits))); DRMP3_FLUSH_BITS(linbits); DRMP3_CHECK_BITS; *dst= one * drmp3_L3_pow_43(lsb) * ((i32)bs_cache < 0 ? -1 : 1); }
-                        else *dst=g_drmp3_pow43[16+lsb-16*(bs_cache>>31)]*one;
-                        DRMP3_FLUSH_BITS(lsb?1:0);
+                        if (lsb==15) { lsb += (bs_cache>>(32-(linbits))); MP3_FLUSH_BITS(linbits); MP3_CHECK_BITS; *dst= one * mp3L3_pow_43(lsb) * ((i32)bs_cache < 0 ? -1 : 1); }
+                        else *dst=g_mp3_pow43[16+lsb-16*(bs_cache>>31)]*one;
+                        MP3_FLUSH_BITS(lsb?1:0);
                     }
 
-                    DRMP3_CHECK_BITS;
+                    MP3_CHECK_BITS;
                 } while(--pairs_to_decode);
             } while((big_val_cnt-=np)>0&&--sfb_cnt>=0);
         } else {
@@ -5259,10 +4879,10 @@ static const i16 tabindex[2*16]={0,32,64,98,0,132,180,218,292,364,426,538,648,74
                 np=*sfb++/2; pairs_to_decode=vmin(big_val_cnt,np); one=*scf++;
                 do {
                     int j,w=5,leaf=codebook[(bs_cache>>(32-w))];
-                    while (leaf<0){DRMP3_FLUSH_BITS(w);w=leaf&7;leaf=codebook[(bs_cache>>(32-w))-(leaf>>3)];}
-                    DRMP3_FLUSH_BITS(leaf>>8);
-                    for (j=0;j<2;j++,dst++,leaf>>=4) { int lsb=leaf&0x0F; *dst=g_drmp3_pow43[16+lsb-16*(bs_cache>>31)]*one; DRMP3_FLUSH_BITS(lsb?1:0); }
-                    DRMP3_CHECK_BITS;
+                    while (leaf<0){MP3_FLUSH_BITS(w);w=leaf&7;leaf=codebook[(bs_cache>>(32-w))-(leaf>>3)];}
+                    MP3_FLUSH_BITS(leaf>>8);
+                    for (j=0;j<2;j++,dst++,leaf>>=4) { int lsb=leaf&0x0F; *dst=g_mp3_pow43[16+lsb-16*(bs_cache>>31)]*one; MP3_FLUSH_BITS(lsb?1:0); }
+                    MP3_CHECK_BITS;
                 } while(--pairs_to_decode);
             } while((big_val_cnt-=np)>0&&--sfb_cnt>=0);
         }
@@ -5272,49 +4892,49 @@ static const i16 tabindex[2*16]={0,32,64,98,0,132,180,218,292,364,426,538,648,74
         const u8 *codebook_count1=(gr_info->count1_table)?tab33:tab32;
         int leaf=codebook_count1[(bs_cache>>28)];
         if (!(leaf&8)) leaf=codebook_count1[(leaf>>3)+(bs_cache<<4>>(32-(leaf&3)))];
-        DRMP3_FLUSH_BITS(leaf&7);
+        MP3_FLUSH_BITS(leaf&7);
         if (((bs_next_ptr-bs->buf)*8-24+bs_sh)>layer3gr_limit) break;
-        if(!--np) { np=*sfb++/2; if(!np) {break;} one=*scf++; }; if(leaf&(128>>0)){dst[0]=((i32)bs_cache<0)?-one:one;DRMP3_FLUSH_BITS(1)} if(leaf&(128>>1)){dst[1]=((i32)bs_cache<0)?-one:one;DRMP3_FLUSH_BITS(1)}
-        if(!--np) { np=*sfb++/2; if(!np) {break;} one=*scf++; }; if(leaf&(128>>2)){dst[2]=((i32)bs_cache<0)?-one:one;DRMP3_FLUSH_BITS(1)} if(leaf&(128>>3)){dst[3]=((i32)bs_cache<0)?-one:one;DRMP3_FLUSH_BITS(1)}
-        DRMP3_CHECK_BITS;
+        if(!--np) { np=*sfb++/2; if(!np) {break;} one=*scf++; }; if(leaf&(128>>0)){dst[0]=((i32)bs_cache<0)?-one:one;MP3_FLUSH_BITS(1)} if(leaf&(128>>1)){dst[1]=((i32)bs_cache<0)?-one:one;MP3_FLUSH_BITS(1)}
+        if(!--np) { np=*sfb++/2; if(!np) {break;} one=*scf++; }; if(leaf&(128>>2)){dst[2]=((i32)bs_cache<0)?-one:one;MP3_FLUSH_BITS(1)} if(leaf&(128>>3)){dst[3]=((i32)bs_cache<0)?-one:one;MP3_FLUSH_BITS(1)}
+        MP3_CHECK_BITS;
     }
 
     bs->pos=layer3gr_limit;
 }
 
-static void drmp3_L3_midside_stereo(float *left, int n) { int i=0; float *right=left+576; for (; i<n; i++) { float a=left[i],b=right[i]; left[i]=a+b; right[i]=a-b; } }
-static void drmp3_L3_intensity_stereo_band(float *left, int n, float kl, float kr) { int i; for(i=0;i<n;i++){left[i+576]=left[i]*kr;left[i]=left[i]*kl;} }
-static void drmp3_L3_stereo_top_band(const float *right, const u8 *sfb, int nbands, int max_band[3]) { int i,k; max_band[0]=max_band[1]=max_band[2]=-1; for (i=0;i<nbands;i++){for(k=0;k<sfb[i];k+=2){if(right[k]!=0||right[k+1]!=0){max_band[i%3]=i;break;}}right+=sfb[i];} }
-static void drmp3_L3_stereo_process(float *left, const u8 *ist_pos, const u8 *sfb, const u8 *hdr, int max_band[3], int mpeg2_sh) {
+static void mp3L3_midside_stereo(float *left, int n) { int i=0; float *right=left+576; for (; i<n; i++) { float a=left[i],b=right[i]; left[i]=a+b; right[i]=a-b; } }
+static void mp3L3_intensity_stereo_band(float *left, int n, float kl, float kr) { int i; for(i=0;i<n;i++){left[i+576]=left[i]*kr;left[i]=left[i]*kl;} }
+static void mp3L3_stereo_top_band(const float *right, const u8 *sfb, int nbands, int max_band[3]) { int i,k; max_band[0]=max_band[1]=max_band[2]=-1; for (i=0;i<nbands;i++){for(k=0;k<sfb[i];k+=2){if(right[k]!=0||right[k+1]!=0){max_band[i%3]=i;break;}}right+=sfb[i];} }
+static void mp3L3_stereo_process(float *left, const u8 *ist_pos, const u8 *sfb, const u8 *hdr, int max_band[3], int mpeg2_sh) {
     static const float g_pan[7*2]={0,1,0.21132487f,0.78867513f,0.36602540f,0.63397460f,0.5f,0.5f,0.63397460f,0.36602540f,0.78867513f,0.21132487f,1,0};
-    unsigned i,max_pos=DRMP3_HDR_TEST_MPEG1(hdr)?7:64;
+    unsigned i,max_pos=MP3_HDR_TEST_MPEG1(hdr)?7:64;
     for (i=0;sfb[i];i++){
         unsigned ipos=ist_pos[i];
         if ((int)i>max_band[i%3]&&ipos<max_pos){
-            float kl,kr,s=DRMP3_HDR_TEST_MS_STEREO(hdr)?1.41421356f:1;
-            if(DRMP3_HDR_TEST_MPEG1(hdr)){kl=g_pan[2*ipos];kr=g_pan[2*ipos+1];}
-            else{kl=1;kr=drmp3_L3_ldexp_q2(1,(ipos+1)>>1<<mpeg2_sh);if(ipos&1){kl=kr;kr=1;}}
-            drmp3_L3_intensity_stereo_band(left,sfb[i],kl*s,kr*s);
-        } else if (DRMP3_HDR_TEST_MS_STEREO(hdr)) drmp3_L3_midside_stereo(left,sfb[i]);
+            float kl,kr,s=MP3_HDR_TEST_MS_STEREO(hdr)?1.41421356f:1;
+            if(MP3_HDR_TEST_MPEG1(hdr)){kl=g_pan[2*ipos];kr=g_pan[2*ipos+1];}
+            else{kl=1;kr=mp3L3_ldexp_q2(1,(ipos+1)>>1<<mpeg2_sh);if(ipos&1){kl=kr;kr=1;}}
+            mp3L3_intensity_stereo_band(left,sfb[i],kl*s,kr*s);
+        } else if (MP3_HDR_TEST_MS_STEREO(hdr)) mp3L3_midside_stereo(left,sfb[i]);
 
         left+=sfb[i];
     }
 }
-static void drmp3_L3_intensity_stereo(float *left, u8 *ist_pos, const drmp3_L3_gr_info *gr, const u8 *hdr) {
+static void mp3L3_intensity_stereo(float *left, u8 *ist_pos, const mp3L3_gr_info *gr, const u8 *hdr) {
     int max_band[3],n_sfb=gr->n_long_sfb+gr->n_short_sfb,i,max_blocks=gr->n_short_sfb?3:1;
-    drmp3_L3_stereo_top_band(left+576,gr->sfbtab,n_sfb,max_band);
+    mp3L3_stereo_top_band(left+576,gr->sfbtab,n_sfb,max_band);
     if (gr->n_long_sfb) max_band[0]=max_band[1]=max_band[2]=vmax(vmax(max_band[0],max_band[1]),max_band[2]);
-    for (i=0;i<max_blocks;i++){ int default_pos = DRMP3_HDR_TEST_MPEG1(hdr) ? 3 : 0, itop = n_sfb-max_blocks + i, prev = itop - max_blocks; ist_pos[itop] = (u8)(max_band[i] >= prev ? default_pos : ist_pos[prev]); }
-    drmp3_L3_stereo_process(left,ist_pos,gr->sfbtab,hdr,max_band,gr[1].scalefac_compress&1);
+    for (i=0;i<max_blocks;i++){ int default_pos = MP3_HDR_TEST_MPEG1(hdr) ? 3 : 0, itop = n_sfb-max_blocks + i, prev = itop - max_blocks; ist_pos[itop] = (u8)(max_band[i] >= prev ? default_pos : ist_pos[prev]); }
+    mp3L3_stereo_process(left,ist_pos,gr->sfbtab,hdr,max_band,gr[1].scalefac_compress&1);
 }
 
-static void drmp3_L3_reorder(float *grbuf, float *scratch, const u8 *sfb) {
+static void mp3L3_reorder(float *grbuf, float *scratch, const u8 *sfb) {
     int i,len; float *src=grbuf,*dst=scratch;
     for(;0!=(len=*sfb);sfb+=3,src+=2*len){for(i=0;i<len;i++,src++){*dst++=src[0*len];*dst++=src[1*len];*dst++=src[2*len];}}
-    MemCpyFromBtoAForNBytes(grbuf,scratch,(dst-scratch)*sizeof(float));
+    mcpy(grbuf,scratch,(dst-scratch)*sizeof(float));
 }
 
-static void drmp3_L3_antialias(float *grbuf, int nbands) {
+static void mp3L3_antialias(float *grbuf, int nbands) {
     static const float g_aa[2][8]={{0.85749293f,0.88174200f,0.94962865f,0.98331459f,0.99551782f,0.99916056f,0.99989920f,0.99999316f},{0.51449576f,0.47173197f,0.31337745f,0.18191320f,0.09457419f,0.04096558f,0.01419856f,0.00369997f}};
     for(;nbands>0;nbands--,grbuf+=18){
         int i=0;
@@ -5322,7 +4942,7 @@ static void drmp3_L3_antialias(float *grbuf, int nbands) {
     }
 }
 
-static void drmp3_L3_dct3_9(float *y) {
+static void mp3L3_dct3_9(float *y) {
     float s1,s3,s5,s7,t0,t2,t4,s0=y[0],s2=y[2],s4=y[4],s6=y[6],s8=y[8];
     t0=s0+s6*0.5f; s0-=s6; t4=(s4+s2)*0.93969262f; t2=(s8+s2)*0.76604444f;
     s6=(s4-s8)*0.17364818f; s4+=s8-s2; s2=s0-s4*0.5f; y[4]=s4+s0;
@@ -5333,60 +4953,60 @@ static void drmp3_L3_dct3_9(float *y) {
     y[0]=s4-s7; y[1]=s2+s1; y[2]=s0-s3; y[3]=s8+s5; y[5]=s8-s5; y[6]=s0+s3; y[7]=s2-s1; y[8]=s4+s7;
 }
 
-static void drmp3_L3_imdct36(float *grbuf, float *overlap, const float *win, int nbands) {
+static void mp3L3_imdct36(float *grbuf, float *overlap, const float *win, int nbands) {
     int i,j;
     static const float g_twid9[18]={0.73727734f,0.79335334f,0.84339145f,0.88701083f,0.92387953f,0.95371695f,0.97629601f,0.99144486f,0.99904822f,0.67559021f,0.60876143f,0.53729961f,0.46174861f,0.38268343f,0.30070580f,0.21643961f,0.13052619f,0.04361938f};
     for (j=0;j<nbands;j++,grbuf+=18,overlap+=9){
         float co[9],si[9];
         co[0]=-grbuf[0]; si[0]=grbuf[17];
         for(i=0;i<4;i++){si[8-2*i]=grbuf[4*i+1]-grbuf[4*i+2];co[1+2*i]=grbuf[4*i+1]+grbuf[4*i+2];si[7-2*i]=grbuf[4*i+4]-grbuf[4*i+3];co[2+2*i]=-(grbuf[4*i+3]+grbuf[4*i+4]);}
-        drmp3_L3_dct3_9(co); drmp3_L3_dct3_9(si);
+        mp3L3_dct3_9(co); mp3L3_dct3_9(si);
         si[1]=-si[1];si[3]=-si[3];si[5]=-si[5];si[7]=-si[7];
         i=0;
         for(;i<9;i++){float ovl=overlap[i],sum=co[i]*g_twid9[9+i]+si[i]*g_twid9[i];overlap[i]=co[i]*g_twid9[i]-si[i]*g_twid9[9+i];grbuf[i]=ovl*win[i]-sum*win[9+i];grbuf[17-i]=ovl*win[9+i]+sum*win[i];}
     }
 }
 
-static void drmp3_L3_idct3(float x0,float x1,float x2,float *dst){float m1=x1*0.86602540f,a1=x0-x2*0.5f;dst[1]=x0+x2;dst[0]=a1+m1;dst[2]=a1-m1;}
+static void mp3L3_idct3(float x0,float x1,float x2,float *dst){float m1=x1*0.86602540f,a1=x0-x2*0.5f;dst[1]=x0+x2;dst[0]=a1+m1;dst[2]=a1-m1;}
 static void imdct12(float *x,float *dst,float *overlap){
     static const float g_twid3[6]={0.79335334f,0.92387953f,0.99144486f,0.60876143f,0.38268343f,0.13052619f};
-    float co[3],si[3]; int i; drmp3_L3_idct3(-x[0],x[6]+x[3],x[12]+x[9],co); drmp3_L3_idct3(x[15],x[12]-x[9],x[6]-x[3],si);
+    float co[3],si[3]; int i; mp3L3_idct3(-x[0],x[6]+x[3],x[12]+x[9],co); mp3L3_idct3(x[15],x[12]-x[9],x[6]-x[3],si);
     si[1]=-si[1];
     for(i=0;i<3;i++){float ovl=overlap[i],sum=co[i]*g_twid3[3+i]+si[i]*g_twid3[i];overlap[i]=co[i]*g_twid3[i]-si[i]*g_twid3[3+i];dst[i]=ovl*g_twid3[2-i]-sum*g_twid3[5-i];dst[5-i]=ovl*g_twid3[5-i]+sum*g_twid3[2-i];}
 }
 
-static void drmp3_L3_imdct_short(float *grbuf,float *overlap,int nbands){ for(;nbands>0;nbands--,overlap+=9,grbuf+=18){float tmp[18]; MemCpyFromBtoAForNBytes(tmp,grbuf,sizeof(tmp)); MemCpyFromBtoAForNBytes(grbuf,overlap,6*sizeof(float)); imdct12(tmp,grbuf+6,overlap+6); imdct12(tmp+1,grbuf+12,overlap+6); imdct12(tmp+2,overlap,overlap+6);} }
-static void drmp3_L3_change_sign(float *grbuf){int b,i;for(b=0,grbuf+=18;b<32;b+=2,grbuf+=36)for(i=1;i<18;i+=2)grbuf[i]=-grbuf[i];}
+static void mp3L3_imdct_short(float *grbuf,float *overlap,int nbands){ for(;nbands>0;nbands--,overlap+=9,grbuf+=18){float tmp[18]; mcpy(tmp,grbuf,sizeof(tmp)); mcpy(grbuf,overlap,6*sizeof(float)); imdct12(tmp,grbuf+6,overlap+6); imdct12(tmp+1,grbuf+12,overlap+6); imdct12(tmp+2,overlap,overlap+6);} }
+static void mp3L3_change_sign(float *grbuf){int b,i;for(b=0,grbuf+=18;b<32;b+=2,grbuf+=36)for(i=1;i<18;i+=2)grbuf[i]=-grbuf[i];}
 static const float g_mdct_window[2][18]={{0.99904822f,0.99144486f,0.97629601f,0.95371695f,0.92387953f,0.88701083f,0.84339145f,0.79335334f,0.73727734f,0.04361938f,0.13052619f,0.21643961f,0.30070580f,0.38268343f,0.46174861f,0.53729961f,0.60876143f,0.67559021f},{1,1,1,1,1,1,0.99144486f,0.92387953f,0.79335334f,0,0,0,0,0,0,0.13052619f,0.38268343f,0.60876143f}};
-static void drmp3_L3_imdct_gr(float *grbuf,float *overlap,unsigned block_type,unsigned n_long_bands){
-    if (n_long_bands){drmp3_L3_imdct36(grbuf,overlap,g_mdct_window[0],n_long_bands);grbuf+=18*n_long_bands;overlap+=9*n_long_bands;}
-    if (block_type==2) {drmp3_L3_imdct_short(grbuf,overlap,32-n_long_bands);} else {drmp3_L3_imdct36(grbuf,overlap,g_mdct_window[block_type==3],32-n_long_bands);}
+static void mp3L3_imdct_gr(float *grbuf,float *overlap,unsigned block_type,unsigned n_long_bands){
+    if (n_long_bands){mp3L3_imdct36(grbuf,overlap,g_mdct_window[0],n_long_bands);grbuf+=18*n_long_bands;overlap+=9*n_long_bands;}
+    if (block_type==2) {mp3L3_imdct_short(grbuf,overlap,32-n_long_bands);} else {mp3L3_imdct36(grbuf,overlap,g_mdct_window[block_type==3],32-n_long_bands);}
 }
 
-static void drmp3_L3_save_reservoir(drmp3dec *h, drmp3dec_scratch *s) { int pos=(s->bs.pos+7)/8u,remains=s->bs.limit/8u-pos; if (remains>511){pos+=remains-511;remains=511;} if (remains>0) {MoveMemoryFromBtoAForNBytes(h->reserv_buf,s->maindata+pos,remains);} h->reserv=remains; }
-static int drmp3_L3_restore_reservoir(drmp3dec *h, drmp3_bs *bs, drmp3dec_scratch *s, int main_data_begin) { 
+static void mp3L3_save_reservoir(mp3dec *h, mp3dec_scratch *s) { int pos=(s->bs.pos+7)/8u,remains=s->bs.limit/8u-pos; if (remains>511){pos+=remains-511;remains=511;} if (remains>0) {MoveMemoryFromBtoAForNBytes(h->reserv_buf,s->maindata+pos,remains);} h->reserv=remains; }
+static int mp3L3_restore_reservoir(mp3dec *h, mp3_bs *bs, mp3dec_scratch *s, int main_data_begin) { 
     int frame_bytes=(bs->limit-bs->pos)/8,bytes_have=vmin(h->reserv,main_data_begin);
-    MemCpyFromBtoAForNBytes(s->maindata,h->reserv_buf+vmax(0,h->reserv-main_data_begin),vmin(h->reserv,main_data_begin));
-    MemCpyFromBtoAForNBytes(s->maindata+bytes_have,bs->buf+bs->pos/8,frame_bytes);
+    mcpy(s->maindata,h->reserv_buf+vmax(0,h->reserv-main_data_begin),vmin(h->reserv,main_data_begin));
+    mcpy(s->maindata+bytes_have,bs->buf+bs->pos/8,frame_bytes);
     s->bs.buf=s->maindata; s->bs.pos=0; s->bs.limit=(bytes_have+frame_bytes) * 8;
     return h->reserv>=main_data_begin;
 }
 
-static void drmp3_L3_decode(drmp3dec *h, drmp3dec_scratch *s, drmp3_L3_gr_info *gr_info, int nch){
-    int ch; for(ch=0;ch<nch;ch++) { int limit=s->bs.pos+gr_info[ch].part_23_length; drmp3_L3_decode_scalefactors(h->header,s->ist_pos[ch],&s->bs,gr_info+ch,s->scf,ch); drmp3_L3_huffman(s->grbuf[ch],&s->bs,gr_info+ch,s->scf,limit); }
-    if (DRMP3_HDR_TEST_I_STEREO(h->header)) drmp3_L3_intensity_stereo(s->grbuf[0],s->ist_pos[1],gr_info,h->header);
-    else if (DRMP3_HDR_IS_MS_STEREO(h->header)) drmp3_L3_midside_stereo(s->grbuf[0],576);
+static void mp3L3_decode(mp3dec *h, mp3dec_scratch *s, mp3L3_gr_info *gr_info, int nch){
+    int ch; for(ch=0;ch<nch;ch++) { int limit=s->bs.pos+gr_info[ch].part_23_length; mp3L3_decode_scalefactors(h->header,s->ist_pos[ch],&s->bs,gr_info+ch,s->scf,ch); mp3L3_huffman(s->grbuf[ch],&s->bs,gr_info+ch,s->scf,limit); }
+    if (MP3_HDR_TEST_I_STEREO(h->header)) mp3L3_intensity_stereo(s->grbuf[0],s->ist_pos[1],gr_info,h->header);
+    else if (MP3_HDR_IS_MS_STEREO(h->header)) mp3L3_midside_stereo(s->grbuf[0],576);
     for(ch=0;ch<nch;ch++,gr_info++){
-        int aa_bands=31,n_long_bands=(gr_info->mixed_block_flag?2:0)<<(int)(DRMP3_HDR_GET_MY_SAMPLE_RATE(h->header)==2);
-        if (gr_info->n_short_sfb){aa_bands=n_long_bands-1;drmp3_L3_reorder(s->grbuf[ch]+n_long_bands*18,s->syn[0],gr_info->sfbtab+gr_info->n_long_sfb);}
-        drmp3_L3_antialias(s->grbuf[ch],aa_bands);
-        drmp3_L3_imdct_gr(s->grbuf[ch],h->mdct_overlap[ch],gr_info->block_type,n_long_bands);
-        drmp3_L3_change_sign(s->grbuf[ch]);
+        int aa_bands=31,n_long_bands=(gr_info->mixed_block_flag?2:0)<<(int)(MP3_HDR_GET_SAMPLE_RATEHDR(h->header)==2);
+        if (gr_info->n_short_sfb){aa_bands=n_long_bands-1;mp3L3_reorder(s->grbuf[ch]+n_long_bands*18,s->syn[0],gr_info->sfbtab+gr_info->n_long_sfb);}
+        mp3L3_antialias(s->grbuf[ch],aa_bands);
+        mp3L3_imdct_gr(s->grbuf[ch],h->mdct_overlap[ch],gr_info->block_type,n_long_bands);
+        mp3L3_change_sign(s->grbuf[ch]);
     }
 }
 
 static const float g_sec[24]={10.19000816f,0.50060302f,0.50241929f,3.40760851f,0.50547093f,0.52249861f,2.05778098f,0.51544732f,0.56694406f,1.48416460f,0.53104258f,0.64682180f,1.16943991f,0.55310392f,0.78815460f,0.97256821f,0.58293498f,1.06067765f,0.83934963f,0.62250412f,1.72244716f,0.74453628f,0.67480832f,5.10114861f};
-static void drmp3d_DCT_II(float *grbuf, int n){
+static void mp3d_DCT_II(float *grbuf, int n){
     int i,k=0;
     for(;k<n;k++){
         float t[4][8],*x,*y=grbuf+k;
@@ -5397,110 +5017,110 @@ static void drmp3d_DCT_II(float *grbuf, int n){
     }
 }
 
-static float drmp3d_scale_pcm(float sample) { return sample*(1.f/32768.f); }
-typedef float drmp3d_sample_t;
-static void drmp3d_synth_pair(drmp3d_sample_t *pcm, int nch, const float *z){
+typedef float mp3_sample_t;
+static float mp3d_scale_pcm(float sample) { return sample*(1.f/32768.f); }
+static void mp3d_synth_pair(mp3_sample_t *pcm, int nch, const float *z){
     float a;
     a =(z[14*64]-z[    0])*29; a+=(z[ 1*64]+z[13*64])*213; a+=(z[12*64]-z[ 2*64])*459;
     a+=(z[ 3*64]+z[11*64])*2037; a+=(z[10*64]-z[ 4*64])*5153; a+=(z[ 5*64]+z[ 9*64])*6574;
     a+=(z[ 8*64]-z[ 6*64])*37489; a+=z[7*64]*75038;
-    pcm[0]=drmp3d_scale_pcm(a);
+    pcm[0]=mp3d_scale_pcm(a);
     z+=2;
     a =z[14*64]*104; a+=z[12*64]*1567; a+=z[10*64]*9727; a+=z[8*64]*64019;
     a+=z[6*64]*-9975; a+=z[4*64]*-45; a+=z[2*64]*146; a+=z[0*64]*-5;
-    pcm[16*nch]=drmp3d_scale_pcm(a);
+    pcm[16*nch]=mp3d_scale_pcm(a);
 }
 
 static const float g_win[]={ -1,26,-31,208,218,401,-519,2063,2000,4788,-5517,7134,5959,35640,-39336,74992,-1,24,-35,202,222,347,-581,2080,1952,4425,-5879,7640,5288,33791,-41176,74856,-1,21,-38,196,225,294,-645,2087,1893,4063,-6237,8092,4561,31947,-43006,74630,-1,19,-41,190,227,244,-711,2085,1822,3705,-6589,8492,3776,30112,-44821,74313,-1,17,-45,183,228,197,-779,2075,1739,3351,-6935,8840,2935,28289,-46617,73908,-1,16,-49,176,228,153,-848,2057,1644,3004,-7271,9139,2037,26482,-48390,73415,-2,14,-53,169,227,111,-919,2032,1535,2663,-7597,9389,1082,24694,-50137,72835,-2,13,-58,161,224,72,-991,2001,1414,2330,-7910,9592,70,22929,-51853,72169,-2,11,-63,154,221,36,-1064,1962,1280,2006,-8209,9750,-998,21189,-53534,71420,-2,10,-68,147,215,2,-1137,1919,1131,1692,-8491,9863,-2122,19478,-55178,70590,-3,9,-73,139,208,-29,-1210,1870,970,1388,-8755,9935,-3300,17799,-56778,69679,-3,8,-79,132,200,-57,-1283,1817,794,1095,-8998,9966,-4533,16155,-58333,68692,-4,7,-85,125,189,-83,-1356,1759,605,814,-9219,9959,-5818,14548,-59838,67629,-4,7,-91,117,177,-106,-1428,1698,402,545,-9416,9916,-7154,12980,-61289,66494,-5,6,-97,111,163,-127,-1498,1634,185,288,-9585,9838,-8540,11455,-62684,65290};
-static void drmp3d_synth(float *xl, drmp3d_sample_t *dstl, int nch, float *lins){
-    int i; float *xr=xl+576*(nch-1); drmp3d_sample_t *dstr=dstl+(nch-1);
+static void mp3d_synth(float *xl, mp3_sample_t *dstl, int nch, float *lins){
+    int i; float *xr=xl+576*(nch-1); mp3_sample_t *dstr=dstl+(nch-1);
     float *zlin=lins+15*64; const float *w=g_win;
     zlin[4*15]=xl[18*16];zlin[4*15+1]=xr[18*16];zlin[4*15+2]=xl[0];zlin[4*15+3]=xr[0];
     zlin[4*31]=xl[1+18*16];zlin[4*31+1]=xr[1+18*16];zlin[4*31+2]=xl[1];zlin[4*31+3]=xr[1];
-    drmp3d_synth_pair(dstr,nch,lins+4*15+1);drmp3d_synth_pair(dstr+32*nch,nch,lins+4*15+64+1);
-    drmp3d_synth_pair(dstl,nch,lins+4*15);drmp3d_synth_pair(dstl+32*nch,nch,lins+4*15+64);
+    mp3d_synth_pair(dstr,nch,lins+4*15+1); mp3d_synth_pair(dstr+32*nch,nch,lins+4*15+64+1);
+    mp3d_synth_pair(dstl,nch,lins+4*15);   mp3d_synth_pair(dstl+32*nch,nch,lins+4*15+64);
     for(i=14;i>=0;i--){
-#define DRMP3_LOAD(k) float w0=*w++;float w1=*w++;float *vz=&zlin[4*i-k*64];float *vy=&zlin[4*i-(15-k)*64];
-#define DRMP3_S0(k) {int j;DRMP3_LOAD(k) for(j=0;j<4;j++)b[j]=vz[j]*w1+vy[j]*w0,a[j]=vz[j]*w0-vy[j]*w1;}
-#define DRMP3_S1(k) {int j;DRMP3_LOAD(k) for(j=0;j<4;j++)b[j]+=vz[j]*w1+vy[j]*w0,a[j]+=vz[j]*w0-vy[j]*w1;}
-#define DRMP3_S2(k) {int j;DRMP3_LOAD(k) for(j=0;j<4;j++)b[j]+=vz[j]*w1+vy[j]*w0,a[j]+=vy[j]*w1-vz[j]*w0;}
+#define MP3_LOAD(k) float w0=*w++;float w1=*w++;float *vz=&zlin[4*i-k*64];float *vy=&zlin[4*i-(15-k)*64];
+#define MP3_S0(k) {int j;MP3_LOAD(k) for(j=0;j<4;j++)b[j]=vz[j]*w1+vy[j]*w0,a[j]=vz[j]*w0-vy[j]*w1;}
+#define MP3_S1(k) {int j;MP3_LOAD(k) for(j=0;j<4;j++)b[j]+=vz[j]*w1+vy[j]*w0,a[j]+=vz[j]*w0-vy[j]*w1;}
+#define MP3_S2(k) {int j;MP3_LOAD(k) for(j=0;j<4;j++)b[j]+=vz[j]*w1+vy[j]*w0,a[j]+=vy[j]*w1-vz[j]*w0;}
         float a[4],b[4];
         zlin[4*i]=xl[18*(31-i)];zlin[4*i+1]=xr[18*(31-i)];zlin[4*i+2]=xl[1+18*(31-i)];zlin[4*i+3]=xr[1+18*(31-i)];
         zlin[4*(i+16)]=xl[1+18*(1+i)];zlin[4*(i+16)+1]=xr[1+18*(1+i)];zlin[4*(i-16)+2]=xl[18*(1+i)];zlin[4*(i-16)+3]=xr[18*(1+i)];
-        DRMP3_S0(0) DRMP3_S2(1) DRMP3_S1(2) DRMP3_S2(3) DRMP3_S1(4) DRMP3_S2(5) DRMP3_S1(6) DRMP3_S2(7)
-        dstr[(15-i)*nch]=drmp3d_scale_pcm(a[1]); dstr[(17+i)*nch]=drmp3d_scale_pcm(b[1]);
-        dstl[(15-i)*nch]=drmp3d_scale_pcm(a[0]); dstl[(17+i)*nch]=drmp3d_scale_pcm(b[0]);
-        dstr[(47-i)*nch]=drmp3d_scale_pcm(a[3]); dstr[(49+i)*nch]=drmp3d_scale_pcm(b[3]);
-        dstl[(47-i)*nch]=drmp3d_scale_pcm(a[2]); dstl[(49+i)*nch]=drmp3d_scale_pcm(b[2]);
+        MP3_S0(0) MP3_S2(1) MP3_S1(2) MP3_S2(3) MP3_S1(4) MP3_S2(5) MP3_S1(6) MP3_S2(7)
+        dstr[(15-i)*nch]=mp3d_scale_pcm(a[1]); dstr[(17+i)*nch]=mp3d_scale_pcm(b[1]);
+        dstl[(15-i)*nch]=mp3d_scale_pcm(a[0]); dstl[(17+i)*nch]=mp3d_scale_pcm(b[0]);
+        dstr[(47-i)*nch]=mp3d_scale_pcm(a[3]); dstr[(49+i)*nch]=mp3d_scale_pcm(b[3]);
+        dstl[(47-i)*nch]=mp3d_scale_pcm(a[2]); dstl[(49+i)*nch]=mp3d_scale_pcm(b[2]);
     }
 }
 
-static void drmp3d_synth_granule(float *qmf_state, float *grbuf, int nbands, int nch, drmp3d_sample_t *pcm, float *lins){ for(int i=0;i<nch;i++) {drmp3d_DCT_II(grbuf+576*i,nbands);} MemCpyFromBtoAForNBytes(lins,qmf_state,sizeof(float)*15*64); for(int i=0;i<nbands;i+=2) {drmp3d_synth(grbuf+i,pcm+32*nch*i,nch,lins+i*64);} MemCpyFromBtoAForNBytes(qmf_state,lins+nbands*64,sizeof(float)*15*64); }
-static int drmp3d_match_frame(const u8 *hdr, int mp3_bytes, int frame_bytes){ for(int i=0,nmatch=0;nmatch<10;nmatch++){ i+=drmp3_hdr_frame_bytes(hdr+i,frame_bytes)+drmp3_hdr_padding(hdr+i); if (i + 4 > mp3_bytes) {return nmatch>0;} if (!drmp3_hdr_compare(hdr,hdr+i)) {return 0;} } return 1; }
-static int drmp3d_find_frame(const u8 *mp3, int mp3_bytes, int *free_format_bytes, int *ptr_frame_bytes){
+static void mp3d_synth_granule(float *qmf_state, float *grbuf, int nbands, int nch, mp3_sample_t *pcm, float *lins){ for(int i=0;i<nch;i++) {mp3d_DCT_II(grbuf+576*i,nbands);} mcpy(lins,qmf_state,sizeof(float)*15*64); for(int i=0;i<nbands;i+=2) {mp3d_synth(grbuf+i,pcm+32*nch*i,nch,lins+i*64);} mcpy(qmf_state,lins+nbands*64,sizeof(float)*15*64); }
+static int mp3d_match_frame(const u8 *hdr, int mp3_bytes, int frame_bytes){ for(int i=0,nmatch=0;nmatch<10;nmatch++){ i+=mp3_hdr_frame_bytes(hdr+i,frame_bytes)+mp3_hdr_padding(hdr+i); if (i + 4 > mp3_bytes) {return nmatch>0;} if (!mp3_hdr_compare(hdr,hdr+i)) {return 0;} } return 1; }
+static int mp3d_find_frame(const u8 *mp3, int mp3_bytes, int *free_format_bytes, int *ptr_frame_bytes){
     int i,k;
     for(i=0;i<mp3_bytes-4;i++,mp3++){
-        if (drmp3_hdr_valid(mp3)){
-            int frame_bytes=drmp3_hdr_frame_bytes(mp3,*free_format_bytes);
-            int frame_and_padding=frame_bytes+drmp3_hdr_padding(mp3);
+        if (mp3_hdr_valid(mp3)){
+            int frame_bytes=mp3_hdr_frame_bytes(mp3,*free_format_bytes);
+            int frame_and_padding=frame_bytes+mp3_hdr_padding(mp3);
             for(k=4;!frame_bytes&&k<2304&&i+2*k<mp3_bytes - 4;k++){
-                if (drmp3_hdr_compare(mp3,mp3+k)) { int fb=k-drmp3_hdr_padding(mp3),nextfb=fb+drmp3_hdr_padding(mp3+k); if (i + k + nextfb + 4 > mp3_bytes || !drmp3_hdr_compare(mp3,mp3+k+nextfb)) continue; frame_and_padding=k; frame_bytes=fb; *free_format_bytes=fb; }
+                if (mp3_hdr_compare(mp3,mp3+k)) { int fb=k-mp3_hdr_padding(mp3),nextfb=fb+mp3_hdr_padding(mp3+k); if (i + k + nextfb + 4 > mp3_bytes || !mp3_hdr_compare(mp3,mp3+k+nextfb)) continue; frame_and_padding=k; frame_bytes=fb; *free_format_bytes=fb; }
             }
 
-            if((frame_bytes&&i+frame_and_padding<=mp3_bytes&&drmp3d_match_frame(mp3,mp3_bytes-i,frame_bytes))||(!i&&frame_and_padding==mp3_bytes)){*ptr_frame_bytes=frame_and_padding;return i;}
+            if((frame_bytes&&i+frame_and_padding<=mp3_bytes&&mp3d_match_frame(mp3,mp3_bytes-i,frame_bytes))||(!i&&frame_and_padding==mp3_bytes)){*ptr_frame_bytes=frame_and_padding;return i;}
             *free_format_bytes=0;
         }
     }
     *ptr_frame_bytes=0; return mp3_bytes;
 }
 
-static void drmp3dec_init(drmp3dec *dec) { dec->header[0]=0; }
-static int drmp3dec_decode_frame(drmp3dec *dec, const u8 *mp3, int mp3_bytes, void *pcm, drmp3dec_frame_info *info){
+static void mp3dec_init(mp3dec *dec) { dec->header[0]=0; }
+static int mp3dec_decode_frame(mp3dec *dec, const u8 *mp3, int mp3_bytes, void *pcm, mp3dec_frame_info *info){
     int i=0,igr,frame_size=0,success=1;
-    const u8 *hdr; drmp3_bs bs_frame[1];
-    if (mp3_bytes>4&&dec->header[0]==0xff&&drmp3_hdr_compare(dec->header,mp3)){
-        frame_size=drmp3_hdr_frame_bytes(mp3,dec->free_format_bytes)+drmp3_hdr_padding(mp3);
-        if (frame_size!=mp3_bytes&&(frame_size + 4>mp3_bytes||!drmp3_hdr_compare(mp3,mp3+frame_size))) frame_size=0;
+    const u8 *hdr; mp3_bs bs_frame[1];
+    if (mp3_bytes>4&&dec->header[0]==0xff&&mp3_hdr_compare(dec->header,mp3)){
+        frame_size=mp3_hdr_frame_bytes(mp3,dec->free_format_bytes)+mp3_hdr_padding(mp3);
+        if (frame_size!=mp3_bytes&&(frame_size + 4>mp3_bytes||!mp3_hdr_compare(mp3,mp3+frame_size))) frame_size=0;
     }
-    if (!frame_size){ MemSetToVForNBytes(dec,0,sizeof(drmp3dec)); i=drmp3d_find_frame(mp3,mp3_bytes,&dec->free_format_bytes,&frame_size); if (!frame_size || i + frame_size > mp3_bytes) {info->frame_bytes=i;return 0;} }
+    if (!frame_size){ mset(dec,0,sizeof(mp3dec)); i=mp3d_find_frame(mp3,mp3_bytes,&dec->free_format_bytes,&frame_size); if (!frame_size || i + frame_size > mp3_bytes) {info->frame_bytes=i;return 0;} }
     
     hdr=mp3+i;
-    MemCpyFromBtoAForNBytes(dec->header,hdr,4);
+    mcpy(dec->header,hdr,4);
     info->frame_bytes=i+frame_size;
-    info->channels=DRMP3_HDR_IS_MONO(hdr) ? 1 : 2;
-    info->sample_rate=drmp3_hdr_sample_rate_hz(hdr);
-    info->layer = 4 - DRMP3_HDR_GET_LAYER(hdr);
-    info->bitrate_kbps=drmp3_hdr_bitrate_kbps(hdr);
+    info->channels=MP3_HDR_IS_MONO(hdr) ? 1 : 2;
+    info->sample_rate=mp3_hdr_sample_rate_hz(hdr);
+    info->layer = 4 - MP3_HDR_GET_LAYER(hdr);
+    info->bitrate_kbps=mp3_hdr_bitrate_kbps(hdr);
     bs_frame[0].buf=hdr + 4; bs_frame[0].pos=0; bs_frame[0].limit=(frame_size - 4) * 8;
-    if(DRMP3_HDR_IS_CRC(hdr)) drmp3_bs_get_bits(bs_frame,16);
+    if(MP3_HDR_IS_CRC(hdr)) mp3_bs_get_bits(bs_frame,16);
     if(info->layer!=3) return 0;  /* Layer 1/2 not supported */
         
-    int main_data_begin=drmp3_L3_read_side_info(bs_frame,dec->scratch.gr_info,hdr);
-    if(main_data_begin<0||bs_frame->pos>bs_frame->limit){drmp3dec_init(dec);return 0;}
-    success=drmp3_L3_restore_reservoir(dec,bs_frame,&dec->scratch,main_data_begin);
+    int main_data_begin=mp3L3_read_side_info(bs_frame,dec->scratch.gr_info,hdr);
+    if(main_data_begin<0||bs_frame->pos>bs_frame->limit){mp3dec_init(dec);return 0;}
+    success=mp3L3_restore_reservoir(dec,bs_frame,&dec->scratch,main_data_begin);
     if(success&&pcm!=NULL){
-        for(igr=0;igr<(DRMP3_HDR_TEST_MPEG1(hdr)?2:1);igr++,pcm=DRMP3_OFFSET_PTR(pcm,sizeof(drmp3d_sample_t)*576*info->channels)){ MemSetToVForNBytes(dec->scratch.grbuf[0],0,576 * 2 * sizeof(float)); drmp3_L3_decode(dec,&dec->scratch,dec->scratch.gr_info+igr*info->channels,info->channels); drmp3d_synth_granule(dec->qmf_state,dec->scratch.grbuf[0],18,info->channels,(drmp3d_sample_t*)pcm,dec->scratch.syn[0]); }
+        for(igr=0;igr<(MP3_HDR_TEST_MPEG1(hdr)?2:1);igr++,pcm=MP3_OFFSET_PTR(pcm,sizeof(mp3_sample_t)*576*info->channels)){ mset(dec->scratch.grbuf[0],0,576 * 2 * sizeof(float)); mp3L3_decode(dec,&dec->scratch,dec->scratch.gr_info+igr*info->channels,info->channels); mp3d_synth_granule(dec->qmf_state,dec->scratch.grbuf[0],18,info->channels,(mp3_sample_t*)pcm,dec->scratch.syn[0]); }
     }
-    drmp3_L3_save_reservoir(dec,&dec->scratch);
-    return success*drmp3_hdr_frame_samples(dec->header);
+    mp3L3_save_reservoir(dec,&dec->scratch);
+    return success*mp3_hdr_frame_samples(dec->header);
 }
 
-static size_t drmp3__on_read_os(void *ud, void *buf, size_t n) { FHandle f = (FHandle)(uintptr_t)ud; if (f == INVALID_FHANDLE) {return 0;} long result = OS_Read(f,buf,n); return (result > 0) ? (size_t)result : 0; }
-static bool drmp3__on_seek_os(void *ud, int offset, u8 origin) { FHandle f = (FHandle)(uintptr_t)ud; if (f == INVALID_FHANDLE) {return false;} int whence = origin; return OS_Seek(f,(i64)offset,whence) >= 0; }
-static size_t drmp3__on_read(drmp3 *p, void *buf, size_t n) { size_t r = drmp3__on_read_os(p->pUserData,buf,n); p->streamCursor += r; return r; }
-static size_t drmp3__on_read_clamped(drmp3 *p, void *buf, size_t n) { if (p->streamLength == (((u64)0xFFFFFFFF << 32) | (u64)0xFFFFFFFF)) {return drmp3__on_read(p,buf,n);} u64 rem = p->streamLength - p->streamCursor; if (n > rem) n = (size_t)rem; return drmp3__on_read(p,buf,n); }
-static bool drmp3__on_seek(drmp3 *p, int offset, u8 origin) { if (!drmp3__on_seek_os(p->pUserData,offset,origin)) {return false;} if (origin == 0) {p->streamCursor = (u64)offset;}else{p->streamCursor += (u64)offset;} return true; }
-static u32 drmp3_decode_next_frame_ex(drmp3 *p, drmp3d_sample_t *pPCMFrames, drmp3dec_frame_info *pInfo) {
+static size_t mp3_on_read_os(void *ud, void *buf, size_t n) { FHandle f = (FHandle)(uintptr_t)ud; if (f == INVALID_FHANDLE) {return 0;} long result = OS_Read(f,buf,n); return (result > 0) ? (size_t)result : 0; }
+static bool mp3_on_seek_os(void *ud, int offset, u8 origin) { FHandle f = (FHandle)(uintptr_t)ud; if (f == INVALID_FHANDLE) {return false;} int whence = origin; return OS_Seek(f,(i64)offset,whence) >= 0; }
+static size_t mp3_on_read(mp3 *p, void *buf, size_t n) { size_t r = mp3_on_read_os(p->pUserData,buf,n); p->streamCursor += r; return r; }
+static size_t mp3_on_read_clamped(mp3 *p, void *buf, size_t n) { if (p->streamLength == (((u64)0xFFFFFFFF << 32) | (u64)0xFFFFFFFF)) {return mp3_on_read(p,buf,n);} u64 rem = p->streamLength - p->streamCursor; if (n > rem) n = (size_t)rem; return mp3_on_read(p,buf,n); }
+static bool mp3_on_seek(mp3 *p, int offset, u8 origin) { if (!mp3_on_seek_os(p->pUserData,offset,origin)) {return false;} if (origin == 0) {p->streamCursor = (u64)offset;}else{p->streamCursor += (u64)offset;} return true; }
+static u32 mp3_decode_next_frame_ex(mp3 *p, mp3_sample_t *pPCMFrames, mp3dec_frame_info *pInfo) {
     u32 pcmFramesRead = 0; if (p->atEnd) return 0;
 
     for (;;) {
-        drmp3dec_frame_info info;
+        mp3dec_frame_info info;
         if (p->dataSize < 16384) {
             if (p->pData) MoveMemoryFromBtoAForNBytes(p->pData, p->pData + p->dataConsumed, p->dataSize);
             p->dataConsumed = 0;
             if (p->dataCapacity < (16384 * 4)) { u8 *nd = (u8*)OS_Realloc(p->pData,p->dataCapacity,16384 * 4); p->pData = nd; p->dataCapacity = 16384 * 4; }
 
-            size_t bytesRead = drmp3__on_read_clamped(p, p->pData + p->dataSize, p->dataCapacity - p->dataSize);
+            size_t bytesRead = mp3_on_read_clamped(p, p->pData + p->dataSize, p->dataCapacity - p->dataSize);
             if (!bytesRead && p->dataSize == 0) { p->atEnd = 1; return 0; }
             p->dataSize += bytesRead;
         }
@@ -5508,10 +5128,10 @@ static u32 drmp3_decode_next_frame_ex(drmp3 *p, drmp3d_sample_t *pPCMFrames, drm
         if (p->dataSize > 2147483647) { p->atEnd = 1; return 0; }
         if (!p->pData) return 0;
 
-        pcmFramesRead = drmp3dec_decode_frame(&p->decoder,p->pData + p->dataConsumed,(int)p->dataSize,pPCMFrames,&info);
+        pcmFramesRead = mp3dec_decode_frame(&p->decoder,p->pData + p->dataConsumed,(int)p->dataSize,pPCMFrames,&info);
         p->dataConsumed += (size_t)info.frame_bytes; p->dataSize -= (size_t)info.frame_bytes;
         if (pcmFramesRead > 0) {
-            pcmFramesRead = drmp3_hdr_frame_samples(p->decoder.header);
+            pcmFramesRead = mp3_hdr_frame_samples(p->decoder.header);
             p->pcmFConsInMP3F = 0; p->pcmFRemInMP3F = pcmFramesRead; p->mp3FChan = info.channels; p->mp3FrameSampleRate = info.sample_rate; 
             if (pInfo) *pInfo = info;
             break;
@@ -5519,7 +5139,7 @@ static u32 drmp3_decode_next_frame_ex(drmp3 *p, drmp3d_sample_t *pPCMFrames, drm
             MoveMemoryFromBtoAForNBytes(p->pData, p->pData + p->dataConsumed, p->dataSize);
             p->dataConsumed = 0;
             if (p->dataCapacity == p->dataSize) { size_t needed=p->dataCapacity + 16384*4; u8 *nd=(u8*)OS_Realloc(p->pData,p->dataCapacity,needed); p->pData=nd; p->dataCapacity=needed; }
-            size_t bytesRead = drmp3__on_read_clamped(p,p->pData + p->dataSize,p->dataCapacity - p->dataSize);
+            size_t bytesRead = mp3_on_read_clamped(p,p->pData + p->dataSize,p->dataCapacity - p->dataSize);
             if (!bytesRead) { p->atEnd = 1; return 0; }
             p->dataSize += bytesRead;
         }
@@ -5527,57 +5147,57 @@ static u32 drmp3_decode_next_frame_ex(drmp3 *p, drmp3d_sample_t *pPCMFrames, drm
     return pcmFramesRead;
 }
 
-static u32 drmp3_decode_next_frame(drmp3 *p) { return drmp3_decode_next_frame_ex(p,(drmp3d_sample_t*)p->pcmFrames,NULL); }
-static void drmp3__skip_id3v2(drmp3 *p) {
-    char h[10]; if (drmp3__on_read_os(p->pUserData, h, 10) != 10) return;
+static u32 mp3_decode_next_frame(mp3 *p) { return mp3_decode_next_frame_ex(p,(mp3_sample_t*)p->pcmFrames,NULL); }
+static void mp3_skip_id3v2(mp3 *p) {
+    char h[10]; if (mp3_on_read_os(p->pUserData, h, 10) != 10) return;
 
     if (h[0] == 'I' && h[1] == 'D' && h[2] == '3') {
         u32 sz = (((u32)h[6] & 0x7F) << 21) | (((u32)h[7] & 0x7F) << 14) | (((u32)h[8] & 0x7F) << 7) | ((u32)h[9] & 0x7F);
         if (h[5] & 0x10) sz += 10;
-        drmp3__on_seek_os(p->pUserData,(int)sz,1); // SEEK_CUR
+        mp3_on_seek_os(p->pUserData,(int)sz,1); // SEEK_CUR
         p->streamStartOffset += 10 + sz;
         p->streamCursor = p->streamStartOffset;
-    } else drmp3__on_seek_os(p->pUserData,0,0); // SEEK_SET
+    } else mp3_on_seek_os(p->pUserData,0,0); // SEEK_SET
 }
 
-static bool drmp3_init_internal(drmp3 *p) {
-    drmp3dec_init(&p->decoder);
+static bool mp3_init_internal(mp3 *p) {
+    mp3dec_init(&p->decoder);
     p->streamCursor = p->streamStartOffset=0; p->streamLength = (((u64)0xFFFFFFFF << 32) | (u64)0xFFFFFFFF); p->delayInPCMFrames = p->paddingInPCMFrames=0; p->totalPCMFrameCount = (((u64)0xFFFFFFFF << 32) | (u64)0xFFFFFFFF);
-    if (drmp3__on_seek_os(p->pUserData, 0, 2)) { // SEEK_END
+    if (mp3_on_seek_os(p->pUserData, 0, 2)) { // SEEK_END
         i64 slen = OS_Tell((FHandle)(uintptr_t)p->pUserData);
         if (slen > 0) {
             if (slen > 128) {
-                char tag[3]; drmp3__on_seek_os(p->pUserData,-128,2); if (drmp3__on_read(p, tag, 3) == 3 && tag[0]=='T' && tag[1]=='A' && tag[2]=='G') slen -= 128;
+                char tag[3]; mp3_on_seek_os(p->pUserData,-128,2); if (mp3_on_read(p, tag, 3) == 3 && tag[0]=='T' && tag[1]=='A' && tag[2]=='G') slen -= 128;
             }
             
             p->streamLength = (u64)slen;
         }
         
-        drmp3__on_seek_os(p->pUserData,0,0); p->streamCursor = 0;
+        mp3_on_seek_os(p->pUserData,0,0); p->streamCursor = 0;
     }
 
-    drmp3__skip_id3v2(p); drmp3dec_frame_info firstFrameInfo;
-    u32 firstFramePCMFrameCount = drmp3_decode_next_frame_ex(p,(drmp3d_sample_t*)p->pcmFrames,&firstFrameInfo);
-    if (firstFramePCMFrameCount == 0) { OS_DeallocateRAM(p->pData,p->dataCapacity); p->pData = NULL; p->dataCapacity = 0; return false; }
+    mp3_skip_id3v2(p); mp3dec_frame_info firstFrameInfo;
+    u32 firstFramePCMFrameCount = mp3_decode_next_frame_ex(p,(mp3_sample_t*)p->pcmFrames,&firstFrameInfo);
+    if (firstFramePCMFrameCount == 0) { OS_Free(p->pData,p->dataCapacity); p->pData = NULL; p->dataCapacity = 0; return false; }
 
     p->channels=p->mp3FChan; p->sampleRate=p->mp3FrameSampleRate;
     return true;
 }
 
-static bool drmp3_init_file(drmp3 *pMP3, const char *pFilePath) {
+static bool mp3_init_file(mp3 *pMP3, const char *pFilePath) {
     if (!pMP3 || !pFilePath) return false;
-    MemSetToVForNBytes(pMP3,0,sizeof(drmp3)); FHandle f = OS_OpenReadonly(pFilePath); if (f == INVALID_FHANDLE) return false;
+    mset(pMP3,0,sizeof(mp3)); FHandle f = OS_OpenReadonly(pFilePath); if (f == INVALID_FHANDLE) return false;
 
     pMP3->pUserData = (void*)(uintptr_t)f;
-    bool result = drmp3_init_internal(pMP3);
+    bool result = mp3_init_internal(pMP3);
     if (!result) { OS_Close(f); return false; }
     return true;
 }
 
-static void drmp3_uninit(drmp3 *pMP3) { if (!pMP3) {return;}   if (pMP3->pUserData) {OS_Close((FHandle)(uintptr_t)pMP3->pUserData); pMP3->pUserData=NULL;}   OS_DeallocateRAM(pMP3->pData, pMP3->dataCapacity); pMP3->pData = NULL; pMP3->dataCapacity = 0; }
-static void drmp3_reset(drmp3 *p) { p->pcmFConsInMP3F=0; p->pcmFRemInMP3F=0; p->currentPCMFrame=0; p->dataSize=0; p->atEnd=0; drmp3dec_init(&p->decoder); }
-static bool drmp3_seek_to_start_of_stream(drmp3 *p){u64 o=p->streamStartOffset;if(!drmp3__on_seek(p,o<=0x7FFFFFFF?(int)o:0x7FFFFFFF,0))return 0;if(o>0x7FFFFFFF){o-=0x7FFFFFFF;while(o>0){int c=(o<=0x7FFFFFFF)?(int)o:0x7FFFFFFF;if(!drmp3__on_seek(p,c,1))return 0;o-=c;}}drmp3_reset(p);return 1;}
-static u64 drmp3_read_pcm_frames_raw(drmp3 *p, u64 framesToRead, void *pBufferOut){
+static void mp3_uninit(mp3 *pMP3) { if (!pMP3) {return;}   if (pMP3->pUserData) {OS_Close((FHandle)(uintptr_t)pMP3->pUserData); pMP3->pUserData=NULL;}   OS_Free(pMP3->pData, pMP3->dataCapacity); pMP3->pData = NULL; pMP3->dataCapacity = 0; }
+static void mp3_reset(mp3 *p) { p->pcmFConsInMP3F=0; p->pcmFRemInMP3F=0; p->currentPCMFrame=0; p->dataSize=0; p->atEnd=0; mp3dec_init(&p->decoder); }
+static bool mp3_seek_to_start_of_stream(mp3 *p){u64 o=p->streamStartOffset;if(!mp3_on_seek(p,o<=0x7FFFFFFF?(int)o:0x7FFFFFFF,0))return 0;if(o>0x7FFFFFFF){o-=0x7FFFFFFF;while(o>0){int c=(o<=0x7FFFFFFF)?(int)o:0x7FFFFFFF;if(!mp3_on_seek(p,c,1))return 0;o-=c;}}mp3_reset(p);return 1;}
+static u64 mp3_read_pcm_frames_raw(mp3 *p, u64 framesToRead, void *pBufferOut){
     u64 totalFramesRead=0;
     while(framesToRead>0){
         u32 framesToConsume;
@@ -5587,31 +5207,31 @@ static u64 drmp3_read_pcm_frames_raw(drmp3 *p, u64 framesToRead, void *pBufferOu
             if(p->currentPCMFrame<(p->totalPCMFrameCount-p->paddingInPCMFrames)){ u64 rem=(p->totalPCMFrameCount-p->paddingInPCMFrames)-p->currentPCMFrame; if(framesToConsume>rem) framesToConsume=(u32)rem; } else break;
         }
         if(pBufferOut){
-            float *out=(float*)DRMP3_OFFSET_PTR(pBufferOut,sizeof(float)*totalFramesRead*p->channels);
-            float *in =(float*)DRMP3_OFFSET_PTR(&p->pcmFrames[0],sizeof(float)*p->pcmFConsInMP3F*p->mp3FChan);
-            MemCpyFromBtoAForNBytes(out,in,sizeof(float)*framesToConsume*p->channels);
+            float *out=(float*)MP3_OFFSET_PTR(pBufferOut,sizeof(float)*totalFramesRead*p->channels);
+            float *in =(float*)MP3_OFFSET_PTR(&p->pcmFrames[0],sizeof(float)*p->pcmFConsInMP3F*p->mp3FChan);
+            mcpy(out,in,sizeof(float)*framesToConsume*p->channels);
         }
         p->currentPCMFrame+=framesToConsume; p->pcmFConsInMP3F+=framesToConsume;
         p->pcmFRemInMP3F-=framesToConsume;
         totalFramesRead+=framesToConsume; framesToRead-=framesToConsume;
         if(framesToRead==0) break;
         if(p->totalPCMFrameCount != (((u64)0xFFFFFFFF << 32) | (u64)0xFFFFFFFF) && p->totalPCMFrameCount > p->paddingInPCMFrames && p->currentPCMFrame >= (p->totalPCMFrameCount - p->paddingInPCMFrames)) break;
-        if(drmp3_decode_next_frame(p)==0) break;
+        if(mp3_decode_next_frame(p)==0) break;
     }
     return totalFramesRead;
 }
 
-static u64 drmp3_read_pcm_frames_f32(drmp3 *pMP3, u64 framesToRead, float *pBufferOut){ if(!pMP3) {return 0;} return drmp3_read_pcm_frames_raw(pMP3,framesToRead,pBufferOut); }
-static bool drmp3_seek_to_pcm_frame(drmp3 *pMP3, u64 frameIndex){
+static u64 mp3_read_pcm_frames_f32(mp3 *pMP3, u64 framesToRead, float *pBufferOut){ if(!pMP3) {return 0;} return mp3_read_pcm_frames_raw(pMP3,framesToRead,pBufferOut); }
+static bool mp3_seek_to_pcm_frame(mp3 *pMP3, u64 frameIndex){
     if(!pMP3) return 0;
-    if(frameIndex==0) return drmp3_seek_to_start_of_stream(pMP3);
-    if(frameIndex<pMP3->currentPCMFrame){ if(!drmp3_seek_to_start_of_stream(pMP3)) {return 0;} }
+    if(frameIndex==0) return mp3_seek_to_start_of_stream(pMP3);
+    if(frameIndex<pMP3->currentPCMFrame){ if(!mp3_seek_to_start_of_stream(pMP3)) {return 0;} }
     
-    u64 toSkip=frameIndex-pMP3->currentPCMFrame; u64 skipped=drmp3_read_pcm_frames_f32(pMP3,toSkip,NULL);
+    u64 toSkip=frameIndex-pMP3->currentPCMFrame; u64 skipped=mp3_read_pcm_frames_f32(pMP3,toSkip,NULL);
     return skipped==toSkip;
 }
 
-static u64 drmp3_get_pcm_frame_count(drmp3 *pMP3){    
+static u64 mp3_get_pcm_frame_count(mp3 *pMP3){    
     u64 total;
     if(pMP3->totalPCMFrameCount != (((u64)0xFFFFFFFF << 32) | (u64)0xFFFFFFFF)){
         total=pMP3->totalPCMFrameCount;
@@ -5621,18 +5241,18 @@ static u64 drmp3_get_pcm_frame_count(drmp3 *pMP3){
     }
 
     u64 savedFrame=pMP3->currentPCMFrame;
-    if(!drmp3_seek_to_start_of_stream(pMP3)) return 0;
+    if(!mp3_seek_to_start_of_stream(pMP3)) return 0;
     total=0;
-    for(;;){u32 n=drmp3_decode_next_frame_ex(pMP3,NULL,NULL);if(!n)break;total+=n;}
-    drmp3_seek_to_start_of_stream(pMP3); drmp3_seek_to_pcm_frame(pMP3,savedFrame);
+    for(;;){u32 n=mp3_decode_next_frame_ex(pMP3,NULL,NULL);if(!n)break;total+=n;}
+    mp3_seek_to_start_of_stream(pMP3); mp3_seek_to_pcm_frame(pMP3,savedFrame);
     return total;
 }
-// Wav parsing --------------
+
 typedef struct { FHandle fp; u16 channels,bitsPerSample,fmtTag; u32 sampleRate; u64 totalPCMFrameCount,dataChunkDataPos,bytesRemaining; } WaveFile;
 static u16 WavU16LE(const u8 *d) { return (u16)(d[0]|(d[1]<<8)); }
 static u32 WavU32LE(const u8 *d) { return (u32)(d[0]|(d[1]<<8)|(d[2]<<16)|(d[3]<<24)); }
 static bool WavInit(WaveFile *w, const char *path) {
-    u8 buf[36]; MemSetToVForNBytes(w,0,sizeof(*w));
+    u8 buf[36]; mset(w,0,sizeof(*w));
     w->fp = OS_OpenReadonly(path);
     if (w->fp == INVALID_FHANDLE) return false;
     if (OS_Read(w->fp, buf, 12) != 12) goto fail;
@@ -5689,7 +5309,7 @@ static u64 WavReadPCMFrames(WaveFile *w, u64 framesToRead, float *out) {
         u64 gotFrames = got / bpf;
         u64 samples   = gotFrames * w->channels;
         if (bps == 8) { for (u64 i = 0; i < samples; i++) {*out++ = (tmp[i] / 255.0f) * 2.0f - 1.0f;} }
-        else { for (u64 i = 0; i < samples; i++) {i16 s; MemCpyFromBtoAForNBytes(&s,tmp + i*2,2); *out++ = s * (1.0f / 32768.0f);} } // 16bit LE
+        else { for (u64 i = 0; i < samples; i++) {i16 s; mcpy(&s,tmp + i*2,2); *out++ = s * (1.0f / 32768.0f);} } // 16bit LE
 
         w->bytesRemaining -= gotFrames * bpf; framesToRead -= gotFrames; totalRead += gotFrames; if (gotFrames < batchFrames) break;
     }
@@ -5697,7 +5317,7 @@ static u64 WavReadPCMFrames(WaveFile *w, u64 framesToRead, float *out) {
 }
 
 typedef struct { float *samples; u32 frame_count,frame_pos; float volume; bool looping,positional,playing; Vector3 pos; size_t allocSize; } wav_channel_t;
-typedef struct { drmp3 dec; bool open; float fade_vol,fade_target,fade_step; u32 src_rate; u64 frames_decoded,total_frames; } mp3_channel_t;
+typedef struct { mp3 dec; bool open; float fade_vol,fade_target,fade_step; u32 src_rate; u64 frames_decoded,total_frames; } mp3_channel_t;
 static wav_channel_t wav_ch[MAX_CHANNELS],*ext_ch[MAX_CHANNELS]; static u32 wav_count,ext_count,mp3_slot,log_frame_count,log_frame_pos; 
 static mp3_channel_t mp3_ch[2]; static float *log_samples; static size_t log_allocSize=0; static bool log_playing,mp3_paused = false;
 static float *resample_stereo(float *src, size_t srcSize, u32 *frames, u32 src_rate, size_t* allocSize) {
@@ -5707,7 +5327,7 @@ static float *resample_stereo(float *src, size_t srcSize, u32 *frames, u32 src_r
     float *dst = (float*)OS_Alloc(df*2*sizeof(float)); *allocSize = df*2*sizeof(float);
     float ratio = (float)sf/(float)df;
     for (u32 i = 0; i < df; i++) { float pos = i*ratio; u32 a = (u32)pos, b = a+1<sf?a+1:a; float t = pos-(float)a; dst[i*2+0] = src[a*2+0]+t*(src[b*2+0]-src[a*2+0]); dst[i*2+1] = src[a*2+1]+t*(src[b*2+1]-src[a*2+1]); }
-    OS_DeallocateRAM(src,srcSize); *frames = df; return dst;
+    OS_Free(src,srcSize); *frames = df; return dst;
 }
 
 static void WavUnInit(WaveFile *w) { if (w->fp != INVALID_FHANDLE) { OS_Close(w->fp); w->fp = INVALID_FHANDLE; } }
@@ -5739,7 +5359,7 @@ static void wave_mix(wav_channel_t* w, float* mix) {
 
 static void audio_mix_period(i16 *out) {
     float mix[AUDIO_FRAMES*AUDIO_CHANNELS];
-    MemSetToVForNBytes(mix,0,sizeof(mix));
+    mset(mix,0,sizeof(mix));
     for (u32 c=0;c<wav_count;c++) { wav_channel_t* w = &wav_ch[c]; if (w->playing && w->samples) {wave_mix(w,mix);} }
     for (u32 c=0;c<ext_count;c++) { wav_channel_t* w =  ext_ch[c]; if (w->playing && w->samples) {wave_mix(w,mix);} }
     if (log_playing && log_samples) {
@@ -5757,8 +5377,8 @@ static void audio_mix_period(i16 *out) {
             u32 src_rate = m->src_rate ? m->src_rate : AUDIO_RATE;
             u64 frames_to_read = (src_rate == AUDIO_RATE) ? AUDIO_FRAMES : (u64)((u64)AUDIO_FRAMES*src_rate/AUDIO_RATE)+2;
             float raw[AUDIO_FRAMES*4];
-            u64 got = drmp3_read_pcm_frames_f32(&m->dec,frames_to_read,raw);
-            if (got == 0) { drmp3_uninit(&m->dec); m->open=false; continue; }
+            u64 got = mp3_read_pcm_frames_f32(&m->dec,frames_to_read,raw);
+            if (got == 0) { mp3_uninit(&m->dec); m->open=false; continue; }
             float vol = m->fade_vol * (Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeMusic/100.0f);
             m->frames_decoded += got; float ratio = (float)got/(float)AUDIO_FRAMES;
             for (i32 f = 0; f < AUDIO_FRAMES; f++) {
@@ -5769,7 +5389,7 @@ static void audio_mix_period(i16 *out) {
                     m->fade_vol += m->fade_step;
                     if (m->fade_step>0.0f && m->fade_vol>=m->fade_target) { m->fade_vol=m->fade_target; m->fade_step=0.0f; }
                     else if (m->fade_step<0.0f && m->fade_vol<=m->fade_target) {
-                        m->fade_vol=m->fade_target; m->fade_step=0.0f; if (m->fade_target==0.0f) { drmp3_uninit(&m->dec); m->open=false; }
+                        m->fade_vol=m->fade_target; m->fade_step=0.0f; if (m->fade_target==0.0f) { mp3_uninit(&m->dec); m->open=false; }
                     }
                 }
             }
@@ -5780,10 +5400,10 @@ static void audio_mix_period(i16 *out) {
 }
 
 ENGINE_TO_MOD void play_wav(const char *path,float volume,Vector3 pos,bool positional) {
-    if (StringsEqual(path,"./Audio/misc/null.wav")) return;
+    if (sEqual(path,"./Audio/misc/null.wav")) return;
 
     i32 slot = -1;
-    for (u32 i = 0; i < wav_count; i++) if (!wav_ch[i].playing && wav_ch[i].samples) { OS_DeallocateRAM(wav_ch[i].samples,wav_ch[i].allocSize); wav_ch[i].samples=NULL; wav_ch[i].allocSize=0; slot=i; break; }
+    for (u32 i = 0; i < wav_count; i++) if (!wav_ch[i].playing && wav_ch[i].samples) { OS_Free(wav_ch[i].samples,wav_ch[i].allocSize); wav_ch[i].samples=NULL; wav_ch[i].allocSize=0; slot=i; break; }
     if (slot==-1 && wav_count<MAX_CHANNELS) slot=wav_count++;
     if (slot==-1) { DualLog("WARNING: Max WAV channels (%d) reached\n",MAX_CHANNELS); return; }
     u32 frames; size_t allocSize=0; float *buf = load_wav(path,&frames,&allocSize);
@@ -5794,7 +5414,7 @@ ENGINE_TO_MOD void play_wav(const char *path,float volume,Vector3 pos,bool posit
 }
 
 ENGINE_TO_MOD void play_message(const char *path) {
-    if (log_playing && log_samples && log_allocSize > 0) { log_playing=false; OS_DeallocateRAM(log_samples,log_allocSize); log_samples=NULL; log_allocSize=0; }
+    if (log_playing && log_samples && log_allocSize > 0) { log_playing=false; OS_Free(log_samples,log_allocSize); log_samples=NULL; log_allocSize=0; }
     u32 frames; float *buf = load_wav(path,&frames,&log_allocSize);
     if (!buf) { DualLog("ERROR: Failed to load message WAV %s\n",path); return; }
     log_samples=buf; log_frame_count=frames; log_frame_pos=0; log_playing=true;
@@ -5803,20 +5423,20 @@ ENGINE_TO_MOD void play_message(const char *path) {
 ENGINE_TO_MOD i32 SoundInit(const char *path,ma_sound *pSound) { wav_channel_t *w=(wav_channel_t*)pSound; u32 frames; size_t allocSize=0; float *buf=load_wav(path,&frames,&allocSize); if (!buf) return -1; w->samples=buf; w->allocSize=allocSize; w->frame_count=frames; w->frame_pos=0; w->volume=1.0f; w->looping=false; w->positional=false; w->playing=false; return 0; }
 ENGINE_TO_MOD i32 SoundStart(ma_sound *pSound) { wav_channel_t *w = (wav_channel_t*)pSound; w->frame_pos = 0; w->playing = true; for (u32 i=0;i<ext_count;++i) if (ext_ch[i] == w) return 0; if (ext_count < MAX_CHANNELS) ext_ch[ext_count++] = w; return 0; }
 ENGINE_TO_MOD i32 SoundStop(ma_sound *pSound) { ((wav_channel_t*)pSound)->playing=false; return 0; }
-ENGINE_TO_MOD void SoundUninit(ma_sound *s) { wav_channel_t *w = (wav_channel_t*)s; if (w->samples) { OS_DeallocateRAM(w->samples,w->allocSize); w->samples = NULL; w->allocSize = 0; } w->playing = false; for (u32 i=0;i<ext_count;++i) if (ext_ch[i] == w) { ext_ch[i] = ext_ch[--ext_count]; break; } }
+ENGINE_TO_MOD void SoundUninit(ma_sound *s) { wav_channel_t *w = (wav_channel_t*)s; if (w->samples) { OS_Free(w->samples,w->allocSize); w->samples = NULL; w->allocSize = 0; } w->playing = false; for (u32 i=0;i<ext_count;++i) if (ext_ch[i] == w) { ext_ch[i] = ext_ch[--ext_count]; break; } }
 ENGINE_TO_MOD void SoundSetVolume(ma_sound *pSound, float volume) { ((wav_channel_t*)pSound)->volume=volume; }
 ENGINE_TO_MOD void SoundSetLooping(ma_sound *pSound, i32 loop) { ((wav_channel_t*)pSound)->looping=(bool)loop; }
 ENGINE_TO_MOD bool GetSoundIsPlaying(ma_sound *pSound)  { return ((wav_channel_t*)pSound)->playing; }
 ENGINE_TO_MOD i32 SoundGetCurrentFrameCursor(const ma_sound *pSound,u64 *pCursor) { *pCursor=((wav_channel_t*)pSound)->frame_pos; return 0; }
 ENGINE_TO_MOD float SoundGetLength(ma_sound *pSound) { wav_channel_t *w=(wav_channel_t*)pSound; return (w->samples&&AUDIO_RATE)?(float)w->frame_count/(float)AUDIO_RATE:0.0f; }
 static void mp3_open_slot(i32 s, const char *path, float fade_from, float fade_to, i32 fade_ms) {
-    mp3_channel_t *m = &mp3_ch[s]; if (m->open) { drmp3_uninit(&m->dec); m->open=false; } if (!drmp3_init_file(&m->dec,path)) { DualLog("ERROR: Failed to load MP3 %s\n",path); return; }
-    m->src_rate = m->dec.sampleRate; m->total_frames = drmp3_get_pcm_frame_count(&m->dec); drmp3_seek_to_pcm_frame(&m->dec,0); m->frames_decoded = 0; m->open = true; m->fade_target = fade_to;
+    mp3_channel_t *m = &mp3_ch[s]; if (m->open) { mp3_uninit(&m->dec); m->open=false; } if (!mp3_init_file(&m->dec,path)) { DualLog("ERROR: Failed to load MP3 %s\n",path); return; }
+    m->src_rate = m->dec.sampleRate; m->total_frames = mp3_get_pcm_frame_count(&m->dec); mp3_seek_to_pcm_frame(&m->dec,0); m->frames_decoded = 0; m->open = true; m->fade_target = fade_to;
     m->fade_vol = (m->fade_step = (fade_ms > 0) ? (fade_to - fade_from) / (AUDIO_RATE * fade_ms / 1000.0f) : 0.0f) == 0.0f ? fade_to : fade_from;
 }
 
 void play_mp3(const char *path, i32 fade_ms) { i32 old = mp3_slot, next = mp3_slot ? 0 : 1; if (mp3_ch[old].open) { mp3_ch[old].fade_target = 0.0f; mp3_ch[old].fade_step = (fade_ms > 0) ? -mp3_ch[old].fade_vol / (AUDIO_RATE * fade_ms / 1000.0f) : -1.0f; } mp3_open_slot(mp3_slot = next,path,0.0f,1.0f,fade_ms); }
-void mp3_clear() { for (i32 i=0;i<2;i++) if (mp3_ch[i].open) { drmp3_uninit(&mp3_ch[i].dec); mp3_ch[i].open=false; } mp3_slot=0; }
+void mp3_clear() { for (i32 i=0;i<2;i++) if (mp3_ch[i].open) { mp3_uninit(&mp3_ch[i].dec); mp3_ch[i].open=false; } mp3_slot=0; }
 ENGINE_TO_MOD void MP3Pause() { mp3_paused = true; }
 ENGINE_TO_MOD void MP3Resume() { mp3_paused = false; }
 ENGINE_TO_MOD float GetMP3RemainingTime() { mp3_channel_t *m = &mp3_ch[mp3_slot]; return (!m->open || m->frames_decoded >= m->total_frames) ? 0.0f : (!m->total_frames ? 1.0f : (float)(m->total_frames - m->frames_decoded) / (m->src_rate ? m->src_rate : AUDIO_RATE)); }
@@ -5865,7 +5485,7 @@ pthread_t audThreadID; void* AudThread(void* arg);
     static void init_pcm_device(i32 card, i32 dev) {
         FHandle r = pcm_open(card,dev,1|(1<<1)); if (r == INVALID_FHANDLE) return;
         
-        pcm_params_t p; hw_params_fill(&p.hw_params); pcm_sw_params_t *sw = &p.sw_params; MemSetToVForNBytes(sw,0,sizeof(*sw)); sw->start_threshold = 1; sw->period_step = 1;
+        pcm_params_t p; hw_params_fill(&p.hw_params); pcm_sw_params_t *sw = &p.sw_params; mset(sw,0,sizeof(*sw)); sw->start_threshold = 1; sw->period_step = 1;
         hw_params_set(&p.hw_params,0/*PCM_FORMAT*/,3);                  hw_params_set(&p.hw_params,11/*PCM_RATE*/,AUDIO_RATE); hw_params_set(&p.hw_params,10/*PCM_CHANNELS*/,AUDIO_CHANNELS);
         hw_params_set(&p.hw_params,13/*PCM_PERIOD_SIZE*/,AUDIO_FRAMES); hw_params_set(&p.hw_params,15,AUDIO_PERIODS);
         if (pcm_params_setup(r,&p) >= 0 && pcm_fd_count < 8) pcm_fds[pcm_fd_count++] = r;
@@ -5877,7 +5497,7 @@ pthread_t audThreadID; void* AudThread(void* arg);
 #endif
 
 void* AudThread(void* arg) { (void)arg; while (1) { AudioUpdate(); OS_USleep(1000); } return NULL; }
-// ============== Raycast System
+// Raycast Sys
 float half_to_float(half h);
 RaycastHit RayTriangle(Vector3 origin, Vector3 dir, Vector3 posA, Vector3 posB, Vector3 posC, Vector3 normA, Vector3 normB, Vector3 normC) {
     Vector3 edgeAB = V3_AsubB(posB,posA), edgeAC = V3_AsubB(posC,posA); Vector3 normalVector = V3_Cross(edgeAB,edgeAC);
@@ -5907,7 +5527,7 @@ ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, u32
         if (triCount < 1) continue;
         
         float M[16];
-        MemCpyFromBtoAForNBytes(M,&modelMatrices[i * 16],16 * sizeof(float));
+        mcpy(M,&modelMatrices[i * 16],16 * sizeof(float));
         float m00=M[0], m10=M[1], m20=M[2];
         float m01=M[4], m11=M[5], m21=M[6];
         float m02=M[8], m12=M[9], m22=M[10];
@@ -5920,7 +5540,7 @@ ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, u32
         Vector3 localDir =    {(dir.x*m00 + dir.y*m10 + dir.z*m20) / sclx2, (dir.x*m01 + dir.y*m11 + dir.z*m21) / scly2, (dir.x*m02 + dir.y*m12 + dir.z*m22) / sclz2};
         localDir = V3_Normalize(localDir);
         for (u32 j=0;j<triCount;++j) {
-            u32 bA = (u32)modelTriangles[mindex][j*3 + 0] * VERTEX_ATTRIBUTES_SIZE, bB = (u32)modelTriangles[mindex][j*3 + 1] * VERTEX_ATTRIBUTES_SIZE, bC = (u32)modelTriangles[mindex][j*3 + 2] * VERTEX_ATTRIBUTES_SIZE;
+            u32 bA = (u32)modelTriangles[mindex][j*3 + 0] * VRT_ATT_SZ, bB = (u32)modelTriangles[mindex][j*3 + 1] * VRT_ATT_SZ, bC = (u32)modelTriangles[mindex][j*3 + 2] * VRT_ATT_SZ;
             Vector3 posA = {half_to_float( *(half*)(modelVertices[mindex] + bA + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 4) )};
             Vector3 posB = {half_to_float( *(half*)(modelVertices[mindex] + bB + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 4) )};
             Vector3 posC = {half_to_float( *(half*)(modelVertices[mindex] + bC + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 4) )};
@@ -5950,21 +5570,111 @@ ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, u32
  
 ENGINE_TO_MOD void RaycastAll(Vector3 origin, Vector3 dir, float distance, u32 layerMask, RaycastHit* hits, u16 maxCount) { for (int i=0;i<maxCount;++i) {hits[i].hit = false;} (void)origin; (void)dir; (void)distance; (void)layerMask; }
 ENGINE_TO_MOD RaycastHit CapsuleCast(Vector3 start, Vector3 end, float capsuleRadius, float castDist, u32 layerMask, bool hitTriggers) { RaycastHit result = { .hit = false }; (void)start; (void)end; (void)capsuleRadius; (void)castDist; (void)layerMask; (void)hitTriggers; return result; }
-// ================ Rendering System
+// Configuration Options Settings Sys
+char statusText[T_BUFFER_SIZE];
+void CenterStatusPrint(const char * restrict fmt, ...) { va_list args; __builtin_va_start(args, fmt); sFormatV(statusText,T_BUFFER_SIZE,fmt,args); __builtin_va_end(args); DualLog("%s\n",statusText); Sys_Global.statusTextDecayFinished = get_time() + 3.5;/*secs decay time before text dissappears.*/ }
+typedef enum { SETTING_U8, SETTING_U16, SETTING_INPUT } SettingType; typedef struct { const char* name; void* ptr; SettingType type; } Setting;
+#define S_U8(n, v)  { n, &Sys_Settings.v, SETTING_U8 }
+#define S_U16(n, v) { n, &Sys_Settings.v, SETTING_U16 }
+#define S_IN(n, i)  { n, &Sys_Settings.InputCodeSettings[i], SETTING_INPUT }
+const Setting configTable[] = {
+    S_U16("ResolutionWidth",ScreenWidth),S_U16("ResolutionHeight",ScreenHeight),S_U8("Fullscreen",Fullscreen),      S_U8("FOV",FOV),                     S_U8("Brightness",Brightness),
+    S_U8("Gamma",Gamma),S_U8("AA",FXAA),  S_U8("Shadows",Shadows),              S_U8("SSR",Reflections),            S_U8("VSync",Vsync),                 S_U8("ModelDetail",ModelDetail),
+    S_U8("GI",GI),                        S_U8("SpeakerMode",SpeakerMode),      S_U8("Reverb",Reverb),              S_U8("VolumeMaster",VolumeMaster),   S_U8("VolumeMusic",VolumeMusic),
+    S_U8("VolumeMessage",VolumeMessage),  S_U8("VolumeEffects",VolumeEffects),  S_U8("Language",Language),          S_U8("DynamicMusic",DynamicMusic),   S_U8("Footsteps",Footsteps),
+    S_U8("InvertLook",InvertLook),        S_U8("Monitor",CurrentMonitor),       
+    S_U8("InvertCyberspaceLook",InvertCyberspaceLook),  S_U8("InvertInventoryCycling",InvertInventoryCycling),S_U8("QuickItemPickup",QuickItemPickup),
+    S_U8("QuickReloadWeapons",QuickReloadWeapons),      S_U8("MouseSensitivity",MouseSensitivity),            S_U8("NoShootMode",NoShootMode),           S_U8("HeadBob",HeadBob),
+    S_IN("Forward",0),    S_IN("Strafe Left",1),S_IN("Backpedal",2), S_IN("Strafe Right",3),S_IN("Jump",4),        S_IN("Crouch",5),    S_IN("Prone",6),       S_IN("Lean Left",7),
+    S_IN("Lean Right",8), S_IN("Sprint",9),     S_IN("Turn Left",10),S_IN("Turn Right",11), S_IN("Look Up",12),    S_IN("Look Down",13),S_IN("Recent Log",14),
+    S_IN("Biomonitor",15),S_IN("Sensaround",16),S_IN("Lantern",17),  S_IN("Shield",18),     S_IN("Infrared",19),   S_IN("Email",20),    S_IN("Booster",21),
+    S_IN("Jumpjets",22),  S_IN("Attack",23),    S_IN("Use",24),      S_IN("Menu/Back",25),  S_IN("Toggle Mode",26),S_IN("Reload",27),
+    S_IN("Weapon +",28),  S_IN("Weapon -",29),  S_IN("Grenade",30),  S_IN("Grenade +",31),  S_IN("Grenade -",32),  S_IN("Ammo Type",33),S_IN("Patch Use",34),
+    S_IN("Patch +",35),   S_IN("Patch -",36),   S_IN("Full Map",37), S_IN("Swim Up",38),    S_IN("Swim Down",39),  S_IN("Screenshot",40)
+};
+
+const int configTableSize = sizeof(configTable) / sizeof(Setting);
+static inline __attribute__((always_inline)) i32 GetGLFWIndirectionIndexForAnInput(const char* val) { for (int i=0;i<134;++i) {if (sEqual(val,inputElements[i].name)) return i;} return 148; }
+void LoadConfig() {
+    FHandle f = OS_OpenReadonly("./Data/Config.ini");
+    char line[512];
+    while (sUpToEndLine(line,sizeof(line),f)) {
+        char* s = data_parser_trim(line); if (*s == 0 || (s[0] == '/' && s[1] == '/')) continue;
+        char* eq = StringFindFirstCharWithin(s, '='); if (!eq) continue;
+        
+        *eq = 0; char *key = data_parser_trim(s), *val = data_parser_trim(eq + 1);
+        for (int i = 0; i < configTableSize; i++) {
+            if (sEqual(key,configTable[i].name)) {
+                if (configTable[i].type == SETTING_U8)         *( u8*)configTable[i].ptr = (u8)s2i32(val);
+                else if (configTable[i].type == SETTING_U16)   *(u16*)configTable[i].ptr = (u16)s2i32(val);
+                else if (configTable[i].type == SETTING_INPUT) *(u16*)configTable[i].ptr = GetGLFWIndirectionIndexForAnInput(val);
+                break;
+            }
+        }
+    }
+
+    Sys_Settings.ScreenWidth = vmax(Sys_Settings.ScreenWidth,320);
+    Sys_Settings.ScreenHeight = vmax(Sys_Settings.ScreenHeight,200);
+    OS_Close(f);
+}
+
+void FilePrintString(FHandle f, const char* fmt, ...) { va_list a; __builtin_va_start(a,fmt); char b[128]; va_list c; __builtin_va_copy(c,a); sFormatV(b,sizeof(b),fmt,c); __builtin_va_end(c); OS_RawWrite(f,b,slen(b)); __builtin_va_end(a); }
+void SaveConfig() {
+    FHandle f = OS_OpenWriteonly("./Data/Config.ini");
+    for (int i=0;i<configTableSize;++i) {
+        if (configTable[i].type == SETTING_U8)         FilePrintString(f,"%s = %u\n",configTable[i].name,*(u8*)configTable[i].ptr);
+        else if (configTable[i].type == SETTING_U16)   FilePrintString(f,"%s = %u\n",configTable[i].name,*(u16*)configTable[i].ptr);
+        else if (configTable[i].type == SETTING_INPUT) FilePrintString(f,"%s = %s\n",configTable[i].name,inputElements[*(u16*)configTable[i].ptr].name);
+    }
+
+    OS_Close(f);
+    DualLog("Saved settings to ./Data/Config.ini! framenum %u\n",globalframe);
+}
+// Credits Sys
+char creditStats[4096]; const char** creditPages = NULL;
+static inline __attribute__((always_inline)) float GetScore(float stupid, bool isFinal) {
+    float victories = (float)(Sys_Global.kills + Sys_Global.cyberkills);
+    if (isFinal) victories -= vmin(Sys_Global.ressurections * 10.0f, victories * 0.666f);
+    float secs  = vfloor((float)Sys_Global.pauseRelativeTime / 3600.0f);
+    float score = victories * 10000.0f;
+    score -= vmin(score * 0.666f, secs * 100.0f);
+    score *= (stupid + 1.0f) / 37.0f;
+    if (stupid > 35.0f) score += 2222222.0f;
+    return vfloor(score);
+}
+
+static inline __attribute__((always_inline)) void DecomposeTime(double t, u32* h, u32* m, double* s) { double tb = vfloor(t / 3600.0); *h = (u32)tb; t -= tb * 3600.0; tb = vfloor(t / 60.0); *m = (u32)tb; *s = t - tb * 60.0; }
+static inline __attribute__((always_inline)) void CreditsStats() {
+    size_t off = 0;
+    off += sFormat(creditStats + off, sizeof(creditStats),"============================================================================\nCITADEL\n============================================================================\nCONGRATULATIONS %s\n",Sys_Global.playerName);
+    u32 h,m; double s;
+    DecomposeTime(Sys_Global.pauseRelativeTime,&h,&m,&s);
+    off += sFormat(creditStats + off, sizeof(creditStats),"Straight Time: %uh %um %.3fs\n",h,m,s);
+    DecomposeTime(Sys_Global.absoluteTime,&h,&m,&s);
+    off += sFormat(creditStats + off,sizeof(creditStats),"Total Time (with reload from deaths): %uh %um %.3fs\n",h,m,s);
+    float stupid = ((float)(Sys_Global.diffCbt * Sys_Global.diffCbt)) + ((float)(Sys_Global.diffPuz * Sys_Global.diffPuz)) + ((float)(Sys_Global.diffMis * Sys_Global.diffMis)) + ((float)(Sys_Global.diffCyb * Sys_Global.diffCyb));
+    u32 finalSubscore = GetScore(stupid,false), finalScore = (u32)GetScore(stupid,true);
+    off += sFormat(creditStats + off,sizeof(creditStats),"Kills: %u\nKills in Cyberspace: %u\nScoreSubtotal: %u\nDeaths: %u\nRessurections: %u\n",Sys_Global.kills,Sys_Global.cyberkills,(u32)finalSubscore,Sys_Global.deaths,Sys_Global.ressurections);
+    off += sFormat(creditStats + off,sizeof(creditStats),"Combat: %u | Puzzle: %u | Mission: %u | Cyber: %u\n",Sys_Global.diffCbt,Sys_Global.diffPuz,Sys_Global.diffMis,Sys_Global.diffCyb);
+    off += sFormat(creditStats + off,sizeof(creditStats),"Difficulty Index: %.2f\nFinal Score: %u\n\n",stupid,finalScore);
+    off += sFormat(creditStats + off,sizeof(creditStats),"Shots Fired: %u\nGrenades Thrown: %u\n",Sys_Global.shotsFired,Sys_Global.grenadesThrown);
+    off += sFormat(creditStats + off,sizeof(creditStats),"Damage Dealt: %f\nDamage Received: %f\nSaves Scummed: %u\n\nClick to continue...\n",Sys_Global.damageDealt,Sys_Global.damageReceived,Sys_Global.savesScummed);
+}
+// Rendering Sys
 #include "Shaders/shaders.h"
 static inline __attribute__((always_inline)) void ShaderError(u32 s, const char* name) { char er[512]; glGetShaderInfoLog(s,512,NULL,er); DualLogError("%s Comp Fail: %s\n",name,er); OS_Exit(1); }
 static inline __attribute__((always_inline)) u32 CompileShader(u32 type, const char* source, const char* name) { u32 s = glCreateShader(type); glShaderSource(s,1,&source,NULL); glCompileShader(s); i32 ok; glGetShaderiv(s,0x8B81/*GL_COMPILE_STATUS*/,&ok); if (!ok) ShaderError(s,name); return s; }
 static inline __attribute__((always_inline)) u32 LinkProgram(u32* s, i32 num, const char* name) { u32 p = glCreateProgram(); for (i32 i=0;i<num;++i) { glAttachShader(p,s[i]); } glLinkProgram(p); i32 ok; glGetProgramiv(p,0x8B82/*GL_LINK_STATUS*/,&ok); if (!ok) ShaderError(p,name); return p; }
 u32 CompileAnyShader(const char* v, const char* s, const char* name) { return (v) ? LinkProgram((u32[]){CompileShader(0x8B31/*GL_VERTEX_SHADER*/,v,name),CompileShader(0x8B30/*GL_FRAGMENT_SHADER*/,s,name)},2,name) : LinkProgram((u32[]){CompileShader(0x91B9/*GL_COMPUTE_SHADER*/,s,name)},1,name); }
 void CompileShaders() {
-    Sys_Render.depthPrepassShaderProgram= CompileAnyShader(depthPrepassVertSrc,depthPrepassFragSrc,"DPre");/*Depth Prepass*/ Sys_Render.chunkShaderProgram          = CompileAnyShader(vertSrc,fragSrc,"Main");
-    Sys_Render.uiShaderProgram          = CompileAnyShader(vertUISrc,fragUISrc,"UI");                                        Sys_Render.debugUnlitShaderProgram     = CompileAnyShader(debugUnlitVertSrc,debugUnlitFragSrc,"Ln");/*Line Drawing Unlit*/
-    Sys_Render.shadowmapsShaderProgram  = CompileAnyShader(shadowmapVertSrc,shadowmapFragSrc,"Shad");                        Sys_Render.textShaderProgram           = CompileAnyShader(textVertSrc,textFragSrc,"Txt");
-    Sys_Render.imageBlitShaderProgram   = CompileAnyShader(quadVertSrc,quadFragSrc,"Comp"); /*Image Blit Composite Pass*/    Sys_Render.ssrShaderProgram            = CompileAnyShader(NULL,ssrComputeSrc,"SSR");
-    Sys_Render.voxelUpdateShaderProgram = CompileAnyShader(NULL,voxelUpdateComputeSrc,"Vox"); /*Voxel Update*/               Sys_Render.shadowmapsClearShaderProgram= CompileAnyShader(NULL,shadowmapsClearComputeSrc,"ShadCl"); /*Shadowmaps Clear*/
+    Sys_Render.depthPrepassSP= CompileAnyShader(depthPrepassVertSrc,depthPrepassFragSrc,"DPre");/*Depth Prepass*/ Sys_Render.chunkSP          = CompileAnyShader(vertSrc,fragSrc,"Main");
+    Sys_Render.uiSP          = CompileAnyShader(vertUISrc,fragUISrc,"UI");                                        Sys_Render.debugUnlitSP     = CompileAnyShader(debugUnlitVertSrc,debugUnlitFragSrc,"Ln");/*Line Drawing Unlit*/
+    Sys_Render.shadowmapsSP  = CompileAnyShader(shadowmapVertSrc,shadowmapFragSrc,"Shad");                        Sys_Render.textSP           = CompileAnyShader(textVertSrc,textFragSrc,"Txt");
+    Sys_Render.imageBlitSP   = CompileAnyShader(quadVertSrc,quadFragSrc,"Comp"); /*Image Blit Composite Pass*/    Sys_Render.ssrSP            = CompileAnyShader(NULL,ssrComputeSrc,"SSR");
+    Sys_Render.voxelUpdateSP = CompileAnyShader(NULL,voxelUpdateComputeSrc,"Vox"); /*Voxel Update*/               Sys_Render.shadowmapsClearSP= CompileAnyShader(NULL,shadowmapsClearComputeSrc,"ShadCl"); /*Shadowmaps Clear*/
 }
 
-u32 SetupSSBO(u32* id, u32 bindx, size_t sz, const void* d, u32 typ) { glGenBuffers(1,id); glBindBuffer(GL_SSBO,*id); glBufferData(GL_SSBO,sz,d,typ); glBindBufferBase(GL_SSBO,bindx,*id); return *id; }
+u32 MakeSSBO(u32* id, u32 bindx, size_t sz, const void* d, u32 typ) { glGenBuffers(1,id); glBindBuffer(GL_SSBO,*id); glBufferData(GL_SSBO,sz,d,typ); glBindBufferBase(GL_SSBO,bindx,*id); return *id; }
 void mat4_lookat_from(float* m, Quaternion* camRotation, Vector3 eye) { // Kept around for light views for shadowmap cubemap faces.
     float x = camRotation->x, y = camRotation->y, z = camRotation->z, w = camRotation->w;
     float x2 = x * x, y2 = y * y, z2 = z * z;
@@ -5996,7 +5706,7 @@ Vector3 lightsNewPosition[LIGHT_COUNT];
 ENGINE_TO_MOD i32 AddLight(Light* lit, LightAnimation* lanim) {
     i32 i = loadedLights; loadedLights++; if (loadedLights >= LIGHT_COUNT) { DualLogError("Too many lights %u added in level %d!\n",i,Sys_Global.curLev); OS_Exit(1); }
 
-    MemCpyFromBtoAForNBytes(&lights[i],lit,sizeof(Light)); MemCpyFromBtoAForNBytes(&lanims[i],lanim,sizeof(LightAnimation));
+    mcpy(&lights[i],lit,sizeof(Light)); mcpy(&lanims[i],lanim,sizeof(LightAnimation));
     lightsNewPosition[i] = lit->pos; flag_set(&lights[i].lflags,LDIRTY,true);
     return i;
 }
@@ -6022,7 +5732,7 @@ ENGINE_TO_MOD void LoadFieldIntoLight(char* k, char* v, char* il, u32 ln, Light*
     };
 
     for (int i = 0; i < (int)(sizeof(map)/sizeof(map[0])); i++) {
-        if (StringsEqual(k, map[i].key)) { // Types: 0 = float, 1 = u8.  Check key prefix to decide if pointing at 'lit' or 'lam'
+        if (sEqual(k, map[i].key)) { // Types: 0 = float, 1 = u8.  Check key prefix to decide if pointing at 'lit' or 'lam'
             void* dest = (k[0] == 'l' && k[1] == 'o') ? (void*)lit : (void*)lam;
             if (k[0] == 'r' || k[0] == 's' || k[0] == 'm' || k[0] == 'c') {
                 if (k[1] != 'u') dest = (void*)lit; // range, spot, max, color (not currentStep)
@@ -6035,10 +5745,10 @@ ENGINE_TO_MOD void LoadFieldIntoLight(char* k, char* v, char* il, u32 ln, Light*
         }
     }
 
-    if (StringsEqual(k,"intensity")) lit->intensity = lit->maxIntensity = parse_float(v,il,ln) * 0.35f;
-    else if (StringsEqual(k,"type")) flag_set(&lit->lflags, (v[0] == 'S') ? LSPOT : LDIR, true);
-    else if (StringsEqual(k,"lightOn") && !alreadyReadLightOnOnce[lIdx]) { alreadyReadLightOnOnce[lIdx] = true; flag_set(&lit->lflags,LIGHTON,parse_bool(v,il,ln)); }
-    else if (StringsEqual(k,"lerpOn")) flag_set(&lit->lflags,LERPON,parse_bool(v,il,ln));
+    if (sEqual(k,"intensity")) lit->intensity = lit->maxIntensity = parse_float(v,il,ln) * 0.35f;
+    else if (sEqual(k,"type")) flag_set(&lit->lflags, (v[0] == 'S') ? LSPOT : LDIR, true);
+    else if (sEqual(k,"lightOn") && !alreadyReadLightOnOnce[lIdx]) { alreadyReadLightOnOnce[lIdx] = true; flag_set(&lit->lflags,LIGHTON,parse_bool(v,il,ln)); }
+    else if (sEqual(k,"lerpOn")) flag_set(&lit->lflags,LERPON,parse_bool(v,il,ln));
 }
 
 static inline __attribute__((always_inline)) void mul_mat4(float *out, const float *a, const float *b) { // out = a * b
@@ -6094,7 +5804,7 @@ void UpdateLights() {
     }
 
     glBindBuffer(GL_SSBO,Sys_Render.lightsID); glBufferData(GL_SSBO,loadedLights * sizeof(Light),lights,GL_DYNAMIC_DRAW);
-    glUseProgram(Sys_Render.voxelUpdateShaderProgram);
+    glUseProgram(Sys_Render.voxelUpdateSP);
     glUniform3f(5,Sys_Global.instances[PLAYER1].position.x,Sys_Global.instances[PLAYER1].position.y,Sys_Global.instances[PLAYER1].position.z);
     glDispatchCompute((VOXELS_X+15)/16,(VOXELS_Z+15)/16,1);
 }
@@ -6108,7 +5818,7 @@ ENGINE_TO_MOD void UpdateLight(u16 i, Vector3 pos, Color3 col, float range, floa
 #undef CHGD
 
 void RenderUIImage(i16 x, i16 y, i16 width, i16 height, u32 texIndex) {
-    glUseProgram(Sys_Render.uiShaderProgram);
+    glUseProgram(Sys_Render.uiSP);
     glDisable(GL_BLEND);
     glBindVertexArray(Sys_Render.textVAO);
     glUniform1ui(0,texIndex);
@@ -6127,98 +5837,7 @@ void ClearAll() {
     glBindFramebuffer(GL_FRAMEBUFFER,0);                     glClearColor(0.0f,0.0f,0.0f,1.0f); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 }
 
-void RenderLoadingProgress(i32 offset, const char * restrict text) { ClearAll(); glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); RenderFormattedText(683 - offset,379,TEXT_WHITE,FONT_NORMAL,1.0f,text); ((_GLFWwindow*)window)->context.swapBuffers(((_GLFWwindow*)window)); }
-// ===================================== Configuration Options Settings System
-char statusText[TEXT_BUFFER_SIZE];
-void CenterStatusPrint(const char * restrict fmt, ...) { va_list args; __builtin_va_start(args, fmt); StringFormatV(statusText,TEXT_BUFFER_SIZE,fmt,args); __builtin_va_end(args); DualLog("%s\n",statusText); Sys_Global.statusTextDecayFinished = get_time() + 3.5;/*secs decay time before text dissappears.*/ }
-typedef enum { SETTING_U8, SETTING_U16, SETTING_INPUT } SettingType; typedef struct { const char* name; void* ptr; SettingType type; } Setting;
-#define S_U8(n, v)  { n, &Sys_Settings.v, SETTING_U8 }
-#define S_U16(n, v) { n, &Sys_Settings.v, SETTING_U16 }
-#define S_IN(n, i)  { n, &Sys_Settings.InputCodeSettings[i], SETTING_INPUT }
-const Setting configTable[] = {
-    S_U16("ResolutionWidth",ScreenWidth),S_U16("ResolutionHeight",ScreenHeight),S_U8("Fullscreen",Fullscreen),      S_U8("FOV",FOV),                     S_U8("Brightness",Brightness),
-    S_U8("Gamma",Gamma),S_U8("AA",FXAA),  S_U8("Shadows",Shadows),              S_U8("SSR",Reflections),            S_U8("VSync",Vsync),                 S_U8("ModelDetail",ModelDetail),
-    S_U8("GI",GI),                        S_U8("SpeakerMode",SpeakerMode),      S_U8("Reverb",Reverb),              S_U8("VolumeMaster",VolumeMaster),   S_U8("VolumeMusic",VolumeMusic),
-    S_U8("VolumeMessage",VolumeMessage),  S_U8("VolumeEffects",VolumeEffects),  S_U8("Language",Language),          S_U8("DynamicMusic",DynamicMusic),   S_U8("Footsteps",Footsteps),
-    S_U8("InvertLook",InvertLook),        S_U8("Monitor",CurrentMonitor),       
-    S_U8("InvertCyberspaceLook",InvertCyberspaceLook),  S_U8("InvertInventoryCycling",InvertInventoryCycling),S_U8("QuickItemPickup",QuickItemPickup),
-    S_U8("QuickReloadWeapons",QuickReloadWeapons),      S_U8("MouseSensitivity",MouseSensitivity),            S_U8("NoShootMode",NoShootMode),           S_U8("HeadBob",HeadBob),
-    S_IN("Forward",0),    S_IN("Strafe Left",1),S_IN("Backpedal",2), S_IN("Strafe Right",3),S_IN("Jump",4),        S_IN("Crouch",5),    S_IN("Prone",6),       S_IN("Lean Left",7),
-    S_IN("Lean Right",8), S_IN("Sprint",9),     S_IN("Turn Left",10),S_IN("Turn Right",11), S_IN("Look Up",12),    S_IN("Look Down",13),S_IN("Recent Log",14),
-    S_IN("Biomonitor",15),S_IN("Sensaround",16),S_IN("Lantern",17),  S_IN("Shield",18),     S_IN("Infrared",19),   S_IN("Email",20),    S_IN("Booster",21),
-    S_IN("Jumpjets",22),  S_IN("Attack",23),    S_IN("Use",24),      S_IN("Menu/Back",25),  S_IN("Toggle Mode",26),S_IN("Reload",27),
-    S_IN("Weapon +",28),  S_IN("Weapon -",29),  S_IN("Grenade",30),  S_IN("Grenade +",31),  S_IN("Grenade -",32),  S_IN("Ammo Type",33),S_IN("Patch Use",34),
-    S_IN("Patch +",35),   S_IN("Patch -",36),   S_IN("Full Map",37), S_IN("Swim Up",38),    S_IN("Swim Down",39),  S_IN("Screenshot",40)
-};
-
-const int configTableSize = sizeof(configTable) / sizeof(Setting);
-static inline __attribute__((always_inline)) i32 GetGLFWIndirectionIndexForAnInput(const char* val) { for (int i=0;i<134;++i) {if (StringsEqual(val,inputElements[i].name)) return i;} return 148; }
-void LoadConfig() {
-    FHandle f = OS_OpenReadonly("./Data/Config.ini");
-    char line[512];
-    while (GetNextStringUpToNewlineOrEOF(line,sizeof(line),f)) {
-        char* s = data_parser_trim(line); if (*s == 0 || (s[0] == '/' && s[1] == '/')) continue;
-        char* eq = StringFindFirstCharWithin(s, '='); if (!eq) continue;
-        
-        *eq = 0; char *key = data_parser_trim(s), *val = data_parser_trim(eq + 1);
-        for (int i = 0; i < configTableSize; i++) {
-            if (StringsEqual(key,configTable[i].name)) {
-                if (configTable[i].type == SETTING_U8)         *( u8*)configTable[i].ptr = (u8)StringToInt(val);
-                else if (configTable[i].type == SETTING_U16)   *(u16*)configTable[i].ptr = (u16)StringToInt(val);
-                else if (configTable[i].type == SETTING_INPUT) *(u16*)configTable[i].ptr = GetGLFWIndirectionIndexForAnInput(val);
-                break;
-            }
-        }
-    }
-
-    Sys_Settings.ScreenWidth = vmax(Sys_Settings.ScreenWidth,320);
-    Sys_Settings.ScreenHeight = vmax(Sys_Settings.ScreenHeight,200);
-    OS_Close(f);
-}
-
-void FilePrintString(FHandle f, const char* fmt, ...) { va_list a; __builtin_va_start(a,fmt); char b[128]; va_list c; __builtin_va_copy(c,a); StringFormatV(b,sizeof(b),fmt,c); __builtin_va_end(c); OS_RawWrite(f,b,GetStringLength(b)); __builtin_va_end(a); }
-void SaveConfig() {
-    FHandle f = OS_OpenWriteonly("./Data/Config.ini");
-    for (int i=0;i<configTableSize;++i) {
-        if (configTable[i].type == SETTING_U8)         FilePrintString(f,"%s = %u\n",configTable[i].name,*(u8*)configTable[i].ptr);
-        else if (configTable[i].type == SETTING_U16)   FilePrintString(f,"%s = %u\n",configTable[i].name,*(u16*)configTable[i].ptr);
-        else if (configTable[i].type == SETTING_INPUT) FilePrintString(f,"%s = %s\n",configTable[i].name,inputElements[*(u16*)configTable[i].ptr].name);
-    }
-
-    OS_Close(f);
-    DualLog("Saved settings to ./Data/Config.ini! framenum %u\n",Sys_Global.frame);
-}
-// ============== Credits System
-char creditStats[4096]; const char** creditPages = NULL;
-static inline __attribute__((always_inline)) float GetScore(float stupid, bool isFinal) {
-    float victories = (float)(Sys_Global.kills + Sys_Global.cyberkills);
-    if (isFinal) victories -= vmin(Sys_Global.ressurections * 10.0f, victories * 0.666f);
-    float secs  = vfloor((float)Sys_Global.pauseRelativeTime / 3600.0f);
-    float score = victories * 10000.0f;
-    score -= vmin(score * 0.666f, secs * 100.0f);
-    score *= (stupid + 1.0f) / 37.0f;
-    if (stupid > 35.0f) score += 2222222.0f;
-    return vfloor(score);
-}
-
-static inline __attribute__((always_inline)) void DecomposeTime(double t, u32* h, u32* m, double* s) { double tb = vfloor(t / 3600.0); *h = (u32)tb; t -= tb * 3600.0; tb = vfloor(t / 60.0); *m = (u32)tb; *s = t - tb * 60.0; }
-static inline __attribute__((always_inline)) void CreditsStats() {
-    size_t off = 0;
-    off += StringFormat(creditStats + off, sizeof(creditStats),"============================================================================\nCITADEL\n============================================================================\nCONGRATULATIONS %s\n",Sys_Global.playerName);
-    u32 h,m; double s;
-    DecomposeTime(Sys_Global.pauseRelativeTime,&h,&m,&s);
-    off += StringFormat(creditStats + off, sizeof(creditStats),"Straight Time: %uh %um %.3fs\n",h,m,s);
-    DecomposeTime(Sys_Global.absoluteTime,&h,&m,&s);
-    off += StringFormat(creditStats + off,sizeof(creditStats),"Total Time (with reload from deaths): %uh %um %.3fs\n",h,m,s);
-    float stupid = ((float)(Sys_Global.difficultyCombat * Sys_Global.difficultyCombat)) + ((float)(Sys_Global.difficultyPuzzle * Sys_Global.difficultyPuzzle)) + ((float)(Sys_Global.difficultyMission * Sys_Global.difficultyMission)) + ((float)(Sys_Global.difficultyCyber * Sys_Global.difficultyCyber));
-    u32 finalSubscore = GetScore(stupid,false), finalScore = (u32)GetScore(stupid,true);
-    off += StringFormat(creditStats + off,sizeof(creditStats),"Kills: %u\nKills in Cyberspace: %u\nScoreSubtotal: %u\nDeaths: %u\nRessurections: %u\n",Sys_Global.kills,Sys_Global.cyberkills,(u32)finalSubscore,Sys_Global.deaths,Sys_Global.ressurections);
-    off += StringFormat(creditStats + off,sizeof(creditStats),"Combat: %u | Puzzle: %u | Mission: %u | Cyber: %u\n",Sys_Global.difficultyCombat,Sys_Global.difficultyPuzzle,Sys_Global.difficultyMission,Sys_Global.difficultyCyber);
-    off += StringFormat(creditStats + off,sizeof(creditStats),"Difficulty Index: %.2f\nFinal Score: %u\n\n",stupid,finalScore);
-    off += StringFormat(creditStats + off,sizeof(creditStats),"Shots Fired: %u\nGrenades Thrown: %u\n",Sys_Global.shotsFired,Sys_Global.grenadesThrown);
-    off += StringFormat(creditStats + off,sizeof(creditStats),"Damage Dealt: %f\nDamage Received: %f\nSaves Scummed: %u\n\nClick to continue...\n",Sys_Global.damageDealt,Sys_Global.damageReceived,Sys_Global.savesScummed);
-}
-// ================ Rendering System
+void RenderLoadingProgress(i32 offset, const char * restrict text) { ClearAll(); glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); RenderFormattedText(683 - offset,379,T_WHITE,FONT_NORMAL,1.0f,text); ((_GLFWwindow*)window)->context.swapBuffers(((_GLFWwindow*)window)); }
 static __attribute__((noinline)) void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, unsigned char* bmp) {
     if (*id == 0) {glGenTextures(1,id);} glBindTexture(GL_TEXTURE_2D,*id);
     glTexImage2D(GL_TEXTURE_2D,0,internalFormat,width,height,0,format,type,bmp);
@@ -6229,9 +5848,9 @@ void UpdateScreenSize(i32 width, i32 height) {
     u16 w = Sys_Settings.ScreenWidth = vmax(vmin((u16)width,7680u),320u), h = Sys_Settings.ScreenHeight = vmax(vmin((u16)height,4320u),200u); // Cap at minimum Quake resolution and maximum 8k.
     float wf = (float)w, hf = (float)h; Sys_Settings.ScreenCenterX = wf * 0.5f; Sys_Settings.ScreenCenterY = hf * 0.5f;
     glViewport(0,0,w,h); RenderSystem* rs = &Sys_Render;
-    glUseProgram(rs->imageBlitShaderProgram); glUniform1ui(2,w); glUniform1ui(3,h); glUniform1i(26,Sys_Settings.SSR_RES);
-    glUseProgram(rs->chunkShaderProgram); glUniform1ui(6,w); glUniform1ui(7,h);
-    glUseProgram(rs->ssrShaderProgram); glUniform1ui(0,w / Sys_Settings.SSR_RES); glUniform1ui(1,h / Sys_Settings.SSR_RES); glUniform1i(2,Sys_Settings.SSR_RES);
+    glUseProgram(rs->imageBlitSP); glUniform1ui(2,w); glUniform1ui(3,h); glUniform1i(26,Sys_Settings.SSR_RES);
+    glUseProgram(rs->chunkSP); glUniform1ui(6,w); glUniform1ui(7,h);
+    glUseProgram(rs->ssrSP); glUniform1ui(0,w / Sys_Settings.SSR_RES); glUniform1ui(1,h / Sys_Settings.SSR_RES); glUniform1i(2,Sys_Settings.SSR_RES);
     GenBTexture(&rs->inputImageID,     GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/); // Lit Raster
     GenBTexture(&rs->inputSpecID,      GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/); // Specular Colors
     GenBTexture(&rs->inputNormalID,    GL_RG16F,w,h, GL_RGB,        GL_FLOAT,0x2600/*GL_NEAREST*/); // Normal XYZ
@@ -6249,24 +5868,12 @@ void UpdateScreenSize(i32 width, i32 height) {
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_2D,rs->outputImageID);
     glBindFramebuffer(GL_FRAMEBUFFER,0);
-    Sys_Input.ignore_next_mouse_delta = true;
+    ignore_next_mouse_delta = true;
 }
 
-ENGINE_TO_MOD void AddCamView(Vector3 pos, Quaternion rot, u8 fov, u16 width, u16 height, float near, float far) {    
-    camViews[camViewCount] = (CamView){pos,rot,fov,width,height,near,far,Sys_Global.pauseRelativeTime + (camViewCount * 0.05f) + 0.5f,false}; // Staggered starts so not all at once for performance.
-    GenBTexture(&camViewTextures[camViewCount],GL_RGBA8,width,height,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/); camViewCount++;
-}
-
-void SetGI() { }// TODO: Set needed Voxel GI uniforms from Sys_Settings.GI
-void SetLanguage() { LoadTextForLanguage(Sys_Settings.Language); LoadLogTextForLanguage(Sys_Settings.Language); }
-void ApplySettings() { ChangeFullScreenWindowed(); SetSkyRotateSpeed(); SetVSync(); SetGI(); SetLanguage(); }
-void OpenMainMenu() { PlayMenuMusic(); Sys_Global.menuActive = true; currentMenuPage = Mpg_FrontPage; }
+ENGINE_TO_MOD void AddCamView(Vector3 p, Quaternion r, u8 fv, u16 w, u16 h, float nr, float fr) { camViews[camViewCount] = (CamView){p,r,fv,w,h,nr,fr,Sys_Global.pauseRelativeTime + (camViewCount * 0.05f) + 0.5f,false};/*Staggered for perf*/ GenBTexture(&camViewTextures[camViewCount],GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/); camViewCount++; }
 bool MenuEnter() { return (Sys_Input.keyStates[KEY_KP_ENTER].pressed || Sys_Input.keyStates[KEY_ENTER].pressed); }
-static inline __attribute__((always_inline,pure)) bool CursorIsOverBounds(float startX, float endX, float startY, float endY) {
-    return    Sys_Global.cursorPosition_x >= startX && Sys_Global.cursorPosition_x <= endX  /* 0 == left */
-           && Sys_Global.cursorPosition_y >= startY && Sys_Global.cursorPosition_y <= endY; /* 0 ==  top */
-}
-
+static inline __attribute__((always_inline,pure)) bool CursorIsOverBounds(float startX, float endX, float startY, float endY) { return Sys_Global.cursorPosition_x >= startX && Sys_Global.cursorPosition_x <= endX  /* 0 == left */ && Sys_Global.cursorPosition_y >= startY && Sys_Global.cursorPosition_y <= endY; /* 0 ==  top */ }
 u8 UI_Interactable(i16 x, i16 y, float w, float h, bool* cursorOver, i8 this, bool sustained) {
     bool cursorIsOver = CursorIsOverBounds(x, x + w, (float)y - h, (float)y);
     if (cursorIsOver && mouseMovementThisFrame) { currentMenuItem = this; if (cursorOver != NULL) {*cursorOver = cursorIsOver;} }
@@ -6282,8 +5889,8 @@ bool UI_Slider(i16 x, i16 y, i16 w, i16 h, i16 sliderPos, i16 xPosForLabel, u8 c
     RenderUIImage(x,y, w,h, 1079); // Slider background
     RenderUIImage(x + sliderPos,y, h,h,1078); // Slider handle
     if (UI_Interactable(xPosForLabel,y,xPosForLabel + w,h,&over,mindex,true)) *sliderActive = true;
-    if (*sliderActive && Sys_Input.currentMouse_dx != 0) {
-        i32 new = (i32)currentValue + vmin(vmax(Sys_Input.currentMouse_dx,-1),1); *out = (u8)vmin(vmax(new,min),max); if (*out != currentValue) {changed = true;}
+    if (*sliderActive && currentMouse_dx != 0) {
+        i32 new = (i32)currentValue + vmin(vmax(currentMouse_dx,-1),1); *out = (u8)vmin(vmax(new,min),max); if (*out != currentValue) {changed = true;}
     }
     
     if (!AnyLeftRightMouseDown()) { if (*sliderActive) { *sliderActive = false; SaveConfig(); } }
@@ -6295,7 +5902,7 @@ bool UI_Slider(i16 x, i16 y, i16 w, i16 h, i16 sliderPos, i16 xPosForLabel, u8 c
     }
     
     over = over || currentMenuItem == mindex;
-    RenderFormattedText(xPosForLabel,y,over ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"%s %u",Sys_Text.stringTable[lingdex],*out);
+    RenderFormattedText(xPosForLabel,y,over ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,"%s %u",Sys_Text.stringTable[lingdex],*out);
     return changed;
 }
 
@@ -6303,7 +5910,7 @@ u8 UI_MenuButton(i16 bX, i16 bY, u8 menuItem, i16 bW, i16 bH,  i16 tX, i16 tY, c
     bool over = false; u8 retvalue = 0u;
     retvalue = UI_Button(bX,bY,bW,bH,&over,menuItem); if (!retvalue) retvalue = (MenuEnter() && currentMenuItem == menuItem);
     over = over || currentMenuItem == menuItem;
-    RenderFormattedText(tX,tY,over ? TEXT_STOPD_RED : TEXT_RED_MENU,FONT_STOPD,1.5f,text);
+    RenderFormattedText(tX,tY,over ? T_STOPD_RED : T_RED_MENU,FONT_STOPD,1.5f,text);
     RenderUIImage(pX,pY, 40,40,over ? 1029 : 1028); // Menu pad
     return retvalue;
 }
@@ -6312,11 +5919,11 @@ bool UI_Checkbox(i16 x, i16 y, i8 mitem, u16 textIdx, bool currentlyOn) {
     RenderUIImage(x,y,16,16,910); // Checkbox background
     bool over = false; bool changed = (UI_Button(x,y + 16,210,16,&over,mitem) || (MenuEnter() && currentMenuItem == mitem)); over = over || currentMenuItem == mitem;
     if (currentlyOn) RenderUIImage(x + 2,y + 2, 12,12, 912); // Checkbox check
-    RenderFormattedText(x + 20,y,over ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,Sys_Text.stringTable[textIdx]);
+    RenderFormattedText(x + 20,y,over ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,Sys_Text.stringTable[textIdx]);
     return changed;
 }
 
-void UI_HeaderText(i16 x, const char* text) { RenderFormattedText(x,50,TEXT_GREEN_MENU_SHADOW,FONT_STOPD,1.75f,text); RenderFormattedText(x,46,TEXT_GREEN_MENU_GLOW,FONT_STOPD,1.75f,text); RenderFormattedText(x,48,TEXT_GREEN_MENU,FONT_STOPD,1.75f,text); }
+void UI_HeaderText(i16 x, const char* text) { RenderFormattedText(x,50,T_GREEN_MENU_SHADOW,FONT_STOPD,1.75f,text); RenderFormattedText(x,46,T_GREEN_MENU_GLOW,FONT_STOPD,1.75f,text); RenderFormattedText(x,48,T_GREEN_MENU,FONT_STOPD,1.75f,text); }
 ENGINE_TO_MOD void MenuGoBack() {
     if (returnToPause) { returnToPause = false; Sys_Global.gamePaused = true; Sys_Global.menuActive = false; PlayGameMusic(); }
     if (currentMenuPage == Mpg_Singleplayer || currentMenuPage == Mpg_Multiplayer || currentMenuPage == Mpg_Options) currentMenuPage = Mpg_FrontPage;//News
@@ -6324,8 +5931,8 @@ ENGINE_TO_MOD void MenuGoBack() {
 }
 
 void CreateShadowBuffers() {
-    Sys_Render.shadowMapSSBO           = SetupSSBO(&Sys_Render.shadowMapSSBO,           5,(MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(u32), NULL, GL_STATIC_DRAW);    
-    Sys_Render.shadowMapsIndirectionID = SetupSSBO(&Sys_Render.shadowMapsIndirectionID, 6,LIGHT_COUNT * sizeof(u32),NULL,GL_STATIC_DRAW); shadowBuffersCreated = true;
+    Sys_Render.shadowMapSSBO           = MakeSSBO(&Sys_Render.shadowMapSSBO,           5,(MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(u32), NULL, GL_STATIC_DRAW);    
+    Sys_Render.shadowMapsIndirectionID = MakeSSBO(&Sys_Render.shadowMapsIndirectionID, 6,LIGHT_COUNT * sizeof(u32),NULL,GL_STATIC_DRAW); shadowBuffersCreated = true;
 }
 
 void ChangeMenuPage(u8 pg) { currentMenuPage = pg; currentMenuItem = currentMenuTab = 0; }
@@ -6351,7 +5958,7 @@ void RenderMenu() {
         bool overBack = false;        
         if (UI_Button(1060,758, 84,32, &overBack, 4) || (MenuEnter() && currentMenuItem == 4)) MenuGoBack();
         overBack = overBack || currentMenuItem == 4;
-        RenderFormattedText(1076,732,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_RED_MENU,FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]);
+        RenderFormattedText(1076,732,overBack ? T_STOPD_RED_HIGHLIGHT : T_RED_MENU,FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]);
     } else if (currentMenuPage == Mpg_Multiplayer) {
         menuItemCount = 1; menuTabCount = 1;
         UI_HeaderText(266,/*"MULTIPLAYER"*/Sys_Text.stringTable[720]);
@@ -6359,7 +5966,7 @@ void RenderMenu() {
         bool overBack = false;
         if (UI_Button(1060,758, 84,32, &overBack, 0) || (MenuEnter() && currentMenuItem == 0)) MenuGoBack();
         overBack = overBack || currentMenuItem == 0;
-        RenderFormattedText(1076,732,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_RED_MENU,FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]);
+        RenderFormattedText(1076,732,overBack ? T_STOPD_RED_HIGHLIGHT : T_RED_MENU,FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]);
     } else if (currentMenuPage == Mpg_Options) {
         menuTabCount = 3;
         UI_HeaderText(238,/*"CONFIGURATION"*/Sys_Text.stringTable[745]);
@@ -6367,13 +5974,13 @@ void RenderMenu() {
         if (currentMenuTab == 0) RenderUIImage(179,220, 1001,548, 1033); // Config background graphics (empty alpha center)
         RenderUIImage(520,196, 160,30, currentMenuTab == 2 ? 920 : 921); // Config tab unhighlighted
         if (UI_Button(520,196+30, 160,30, NULL, 2)) currentMenuTab = 2;
-        RenderFormattedText(530,202,currentMenuTab == 2 ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,/*"AUDIO / LANG"*/Sys_Text.stringTable[793]);
+        RenderFormattedText(530,202,currentMenuTab == 2 ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,/*"AUDIO / LANG"*/Sys_Text.stringTable[793]);
         RenderUIImage(354,196, 160,30, currentMenuTab == 1 ? 920 : 921); // Config tab unhighlighted
         if (UI_Button(354,196+30, 160,30, NULL, 1)) currentMenuTab = 1;
-        RenderFormattedText(366,202,currentMenuTab == 1 ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,/*"INPUT"*/Sys_Text.stringTable[792]);
+        RenderFormattedText(366,202,currentMenuTab == 1 ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,/*"INPUT"*/Sys_Text.stringTable[792]);
         RenderUIImage(190,196, 160,30, currentMenuTab == 0 ? 920 : 921); // Config tab highlighted
         if (UI_Button(190,196+30, 160,30, NULL, 0)) currentMenuTab = 0;
-        RenderFormattedText(200,202,currentMenuTab == 0 ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,/*"GRAPHICS"*/Sys_Text.stringTable[791]);
+        RenderFormattedText(200,202,currentMenuTab == 0 ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,/*"GRAPHICS"*/Sys_Text.stringTable[791]);
         if (currentMenuTab == 0) {
             bool overRes = false, overFull = false, overChgM = false;
             menuItemCount = 11; // Graphics
@@ -6382,7 +5989,7 @@ void RenderMenu() {
             if (UI_Checkbox(200,560,2,Sys_Settings.Shadows ? /*Soft*/787 : /*No Shadows*/785,Sys_Settings.Shadows)) { Sys_Settings.Shadows = Sys_Settings.Shadows ? 0u : 1u; if (!shadowBuffersCreated) {CreateShadowBuffers();} SaveConfig(); }
             if (UI_Checkbox(200,590,3,/*SSR*/788,Sys_Settings.Reflections)) { Sys_Settings.Reflections = Sys_Settings.Reflections ? 0u : 1u; SaveConfig(); }
             if (UI_Checkbox(200,620,4,/*VSYNC*/1026,Sys_Settings.Vsync)) { Sys_Settings.Vsync = Sys_Settings.Vsync ? 0u : 1u; SetVSync(); SaveConfig(); }
-            RenderFormattedText(310,620,TEXT_GREEN,FONT_NORMAL,1.0f,"(FPS: %d)", Sys_Global.framesPerLastSecond); // Helper to see vsync take effect.
+            RenderFormattedText(310,620,T_GREEN,FONT_NORMAL,1.0f,"(FPS: %d)", globalframesPerLastSecond); // Helper to see vsync take effect.
             u8 newVal;
             if (UI_Slider(400,650,128,16,(((Sys_Settings.FOV - 45.0f) / 105.0f) * (128 - 16)),200,Sys_Settings.FOV,&newVal,&fovSliderActive,45,150,5,5,/*Field of View*/775)) { Sys_Settings.FOV = newVal; if (!AnyLeftRightMouseDown()) {SaveConfig();} }
             if (UI_Slider(400,680,128,16,((Sys_Settings.Brightness / 100.0f) * (128 - 16)),200,Sys_Settings.Brightness,&newVal,&gammaSliderActive,0,100,2,6,/*Gamma*/774)) { Sys_Settings.Brightness = newVal; if (!AnyLeftRightMouseDown()) {SaveConfig();} }
@@ -6393,11 +6000,11 @@ void RenderMenu() {
                 if (UI_Button(190,726,328,16,&overRes,7) || (MenuEnter() && currentMenuItem == 7)) { resDropdownOpen = !resDropdownOpen; currentMenuItem = 7; }
                 overRes = overRes || currentMenuItem == 7;
                 char resBuf[32];
-                if (resDropdownCount > 0) StringFormat(resBuf, sizeof(resBuf), "%ux%u",(u32)resModes[resSelectedIdx].w,(u32)resModes[resSelectedIdx].h);
-                else StringFormat(resBuf, sizeof(resBuf), "%ux%u",Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
+                if (resDropdownCount > 0) sFormat(resBuf, sizeof(resBuf), "%ux%u",(u32)resModes[resSelectedIdx].w,(u32)resModes[resSelectedIdx].h);
+                else sFormat(resBuf, sizeof(resBuf), "%ux%u",Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
 
                 RenderUIImage(476, 710, 16, 16, overRes ? 1119 : 1077);
-                RenderFormattedText(200, 710, overRes ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL, 1.0f, "RESOLUTION %s", resBuf);
+                RenderFormattedText(200, 710, overRes ? T_YELLOW : T_GREEN,FONT_NORMAL, 1.0f, "RESOLUTION %s", resBuf);
             }
     
             // Fullscreen checkbox
@@ -6405,11 +6012,11 @@ void RenderMenu() {
             if (UI_Button(200,756, 210,16, &overFull, 8) || (MenuEnter() && currentMenuItem == 8)) { Sys_Settings.Fullscreen = Sys_Settings.Fullscreen == 1u ? 0u : 1u; ChangeFullScreenWindowed(); SaveConfig(); }
             overFull = overFull || currentMenuItem == 8;
             if (Sys_Settings.Fullscreen) RenderUIImage(202,742, 12,12, 912); // Checkbox check
-            RenderFormattedText(220,740,overFull ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,/*"Fullscreen"*/Sys_Text.stringTable[773]);
+            RenderFormattedText(220,740,overFull ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,/*"Fullscreen"*/Sys_Text.stringTable[773]);
             RenderUIImage(588,730, 210,30, 1079); // Toggle monitor button background
             if (UI_Button(588,760, 210,30, &overChgM, 9) || (MenuEnter() && currentMenuItem == 9)) { CycleToNextMonitor(); }
             overChgM = overChgM || currentMenuItem == 9;
-            RenderFormattedText(602,735,overChgM ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,/*"CHANGE MONITOR"*/Sys_Text.stringTable[1025]);
+            RenderFormattedText(602,735,overChgM ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,/*"CHANGE MONITOR"*/Sys_Text.stringTable[1025]);
         } else if (currentMenuTab == 1) {
             menuItemCount = 49; // Input
         } else {
@@ -6424,7 +6031,7 @@ void RenderMenu() {
         bool overBack = false;
         if (UI_Button(1087,757, 84,32, &overBack, lastItem) || (MenuEnter() && currentMenuItem == lastItem)) MenuGoBack();
         overBack = overBack || currentMenuItem == lastItem;
-        RenderFormattedText(1103,731,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_RED_MENU,FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]);
+        RenderFormattedText(1103,731,overBack ? T_STOPD_RED_HIGHLIGHT : T_RED_MENU,FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]);
     } else if (currentMenuPage == Mpg_Load || currentMenuPage == Mpg_Save) {
         menuItemCount = 9; menuTabCount = 1;
         bool isSave = currentMenuPage == Mpg_Save;
@@ -6434,7 +6041,7 @@ void RenderMenu() {
         bool overBack = false;
         if (UI_Button(1060,758, 84,32, &overBack, 0) || (MenuEnter() && currentMenuItem == 0)) MenuGoBack();
         overBack = overBack || currentMenuItem == 0;
-        RenderFormattedText(1076,732, overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_RED_MENU, FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]);
+        RenderFormattedText(1076,732, overBack ? T_STOPD_RED_HIGHLIGHT : T_RED_MENU, FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]);
     } else if (currentMenuPage == Mpg_NewGame) {
         menuItemCount = 7; menuTabCount = (currentMenuItem > 0 && currentMenuItem <= 16) ? 2 : 1;
         UI_HeaderText(290,/*"NEW GAME"*/Sys_Text.stringTable[741]);
@@ -6442,32 +6049,32 @@ void RenderMenu() {
         RenderUIImage(136,196,1088,558,1049); // Newgame background
         if (UI_MenuButton(276,270,0,795,74, 226,146,/*"NAME:"*/Sys_Text.stringTable[746],299,214)) { /* Just for highlight */ }
         enteringPlayerName = (currentMenuItem == 0);
-        if (Sys_Global.playerName[0] == '\0') RenderFormattedText(642,232,TEXT_RED_MENU,FONT_STOPD,1.0f,/*"ENTER NAME..."*/Sys_Text.stringTable[748]);
-        else                                  RenderFormattedText(518,232,enteringPlayerName ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,Sys_Global.playerName);
+        if (Sys_Global.playerName[0] == '\0') RenderFormattedText(642,232,T_RED_MENU,FONT_STOPD,1.0f,/*"ENTER NAME..."*/Sys_Text.stringTable[748]);
+        else                                  RenderFormattedText(518,232,enteringPlayerName ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.0f,Sys_Global.playerName);
 
-        if (UI_MenuButton(174,377,1,496,95, 148,202,/*"COMBAT"*/Sys_Text.stringTable[748],185,299)) { Sys_Global.difficultyCombat = Sys_Global.difficultyCombat >= 3 ? 0 : Sys_Global.difficultyCombat + 1; }  if (UI_MenuButton(704,377,3,496,95, 510,202,/*"MISSION"*/Sys_Text.stringTable[749],726,299)) { Sys_Global.difficultyMission = Sys_Global.difficultyMission >= 3 ? 0 : Sys_Global.difficultyMission + 1; }
-        RenderFormattedText(162,270,Sys_Global.difficultyCombat == 0 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"0");    RenderFormattedText(513,270,Sys_Global.difficultyMission == 0 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"0");
-        RenderFormattedText(233,270,Sys_Global.difficultyCombat == 1 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"1");    RenderFormattedText(584,270,Sys_Global.difficultyMission == 1 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"1");
-        RenderFormattedText(307,270,Sys_Global.difficultyCombat == 2 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"2");    RenderFormattedText(658,270,Sys_Global.difficultyMission == 2 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"2");
-        RenderFormattedText(379,270,Sys_Global.difficultyCombat == 3 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"3");    RenderFormattedText(730,270,Sys_Global.difficultyMission == 3 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"3");
-        if (UI_MenuButton(174,568,2,496,92, 149,330,/*"PUZZLE"*/Sys_Text.stringTable[751],185,490)) { Sys_Global.difficultyPuzzle = Sys_Global.difficultyPuzzle >= 3 ? 0 : Sys_Global.difficultyPuzzle + 1; }  if (UI_MenuButton(704,568,4,496,92, 509,330,/*"CYBERSPACE"*/Sys_Text.stringTable[750],726,490)) { Sys_Global.difficultyCyber = Sys_Global.difficultyCyber >= 3 ? 0 : Sys_Global.difficultyCyber + 1; }
-        RenderFormattedText(162,399,Sys_Global.difficultyPuzzle == 0 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"0");    RenderFormattedText(513,399,Sys_Global.difficultyCyber == 0 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"0");
-        RenderFormattedText(233,399,Sys_Global.difficultyPuzzle == 1 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"1");    RenderFormattedText(584,399,Sys_Global.difficultyCyber == 1 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"1");
-        RenderFormattedText(307,399,Sys_Global.difficultyPuzzle == 2 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"2");    RenderFormattedText(658,399,Sys_Global.difficultyCyber == 2 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"2");
-        RenderFormattedText(379,399,Sys_Global.difficultyPuzzle == 3 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"3");    RenderFormattedText(730,399,Sys_Global.difficultyCyber == 3 ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"3");
-        if (UI_Button(221,460,82,79,NULL,1)) {Sys_Global.difficultyCombat =0; currentMenuItem=1; } if (UI_Button(330,460,82,79,NULL,1)) {Sys_Global.difficultyCombat =1; currentMenuItem=1; } if (UI_Button(439,460,82,79,NULL,1)) {Sys_Global.difficultyCombat =2; currentMenuItem=1; } if (UI_Button( 547,460,82,79,NULL,1)) {Sys_Global.difficultyCombat =3; currentMenuItem=1; }
-        if (UI_Button(221,651,82,79,NULL,2)) {Sys_Global.difficultyPuzzle =0; currentMenuItem=2; } if (UI_Button(330,651,82,79,NULL,2)) {Sys_Global.difficultyPuzzle =1; currentMenuItem=2; } if (UI_Button(439,651,82,79,NULL,2)) {Sys_Global.difficultyPuzzle =2; currentMenuItem=2; } if (UI_Button( 547,651,82,79,NULL,2)) {Sys_Global.difficultyPuzzle =3; currentMenuItem=2; }
-        if (UI_Button(748,460,82,79,NULL,3)) {Sys_Global.difficultyMission=0; currentMenuItem=3; } if (UI_Button(857,460,82,79,NULL,3)) {Sys_Global.difficultyMission=1; currentMenuItem=3; } if (UI_Button(966,460,82,79,NULL,3)) {Sys_Global.difficultyMission=2; currentMenuItem=3; } if (UI_Button(1074,460,82,79,NULL,3)) {Sys_Global.difficultyMission=3; currentMenuItem=3; }
-        if (UI_Button(748,651,82,79,NULL,4)) {Sys_Global.difficultyCyber  =0; currentMenuItem=4; } if (UI_Button(857,651,82,79,NULL,4)) {Sys_Global.difficultyCyber  =1; currentMenuItem=4; } if (UI_Button(966,651,82,79,NULL,4)) {Sys_Global.difficultyCyber  =2; currentMenuItem=4; } if (UI_Button(1074,651,82,79,NULL,4)) {Sys_Global.difficultyCyber  =3; currentMenuItem=4; }
+        if (UI_MenuButton(174,377,1,496,95, 148,202,/*"COMBAT"*/Sys_Text.stringTable[748],185,299)) { Sys_Global.diffCbt = Sys_Global.diffCbt >= 3 ? 0 : Sys_Global.diffCbt + 1; }  if (UI_MenuButton(704,377,3,496,95, 510,202,/*"MISSION"*/Sys_Text.stringTable[749],726,299)) { Sys_Global.diffMis = Sys_Global.diffMis >= 3 ? 0 : Sys_Global.diffMis + 1; }
+        RenderFormattedText(162,270,Sys_Global.diffCbt == 0 ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.5f,"0");    RenderFormattedText(513,270,Sys_Global.diffMis == 0 ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.5f,"0");
+        RenderFormattedText(233,270,Sys_Global.diffCbt == 1 ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.5f,"1");    RenderFormattedText(584,270,Sys_Global.diffMis == 1 ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.5f,"1");
+        RenderFormattedText(307,270,Sys_Global.diffCbt == 2 ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.5f,"2");    RenderFormattedText(658,270,Sys_Global.diffMis == 2 ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.5f,"2");
+        RenderFormattedText(379,270,Sys_Global.diffCbt == 3 ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.5f,"3");    RenderFormattedText(730,270,Sys_Global.diffMis == 3 ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.5f,"3");
+        if (UI_MenuButton(174,568,2,496,92, 149,330,/*"PUZZLE"*/Sys_Text.stringTable[751],185,490)) { Sys_Global.diffPuz = Sys_Global.diffPuz >= 3 ? 0 : Sys_Global.diffPuz + 1; }  if (UI_MenuButton(704,568,4,496,92, 509,330,/*"CYBERSPACE"*/Sys_Text.stringTable[750],726,490)) { Sys_Global.diffCyb = Sys_Global.diffCyb >= 3 ? 0 : Sys_Global.diffCyb + 1; }
+        RenderFormattedText(162,399,Sys_Global.diffPuz == 0 ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.5f,"0");    RenderFormattedText(513,399,Sys_Global.diffCyb == 0 ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.5f,"0");
+        RenderFormattedText(233,399,Sys_Global.diffPuz == 1 ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.5f,"1");    RenderFormattedText(584,399,Sys_Global.diffCyb == 1 ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.5f,"1");
+        RenderFormattedText(307,399,Sys_Global.diffPuz == 2 ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.5f,"2");    RenderFormattedText(658,399,Sys_Global.diffCyb == 2 ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.5f,"2");
+        RenderFormattedText(379,399,Sys_Global.diffPuz == 3 ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.5f,"3");    RenderFormattedText(730,399,Sys_Global.diffCyb == 3 ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.5f,"3");
+        if (UI_Button(221,460,82,79,NULL,1)) {Sys_Global.diffCbt =0; currentMenuItem=1; } if (UI_Button(330,460,82,79,NULL,1)) {Sys_Global.diffCbt =1; currentMenuItem=1; } if (UI_Button(439,460,82,79,NULL,1)) {Sys_Global.diffCbt =2; currentMenuItem=1; } if (UI_Button( 547,460,82,79,NULL,1)) {Sys_Global.diffCbt =3; currentMenuItem=1; }
+        if (UI_Button(221,651,82,79,NULL,2)) {Sys_Global.diffPuz =0; currentMenuItem=2; } if (UI_Button(330,651,82,79,NULL,2)) {Sys_Global.diffPuz =1; currentMenuItem=2; } if (UI_Button(439,651,82,79,NULL,2)) {Sys_Global.diffPuz =2; currentMenuItem=2; } if (UI_Button( 547,651,82,79,NULL,2)) {Sys_Global.diffPuz =3; currentMenuItem=2; }
+        if (UI_Button(748,460,82,79,NULL,3)) {Sys_Global.diffMis=0; currentMenuItem=3; } if (UI_Button(857,460,82,79,NULL,3)) {Sys_Global.diffMis=1; currentMenuItem=3; } if (UI_Button(966,460,82,79,NULL,3)) {Sys_Global.diffMis=2; currentMenuItem=3; } if (UI_Button(1074,460,82,79,NULL,3)) {Sys_Global.diffMis=3; currentMenuItem=3; }
+        if (UI_Button(748,651,82,79,NULL,4)) {Sys_Global.diffCyb  =0; currentMenuItem=4; } if (UI_Button(857,651,82,79,NULL,4)) {Sys_Global.diffCyb  =1; currentMenuItem=4; } if (UI_Button(966,651,82,79,NULL,4)) {Sys_Global.diffCyb  =2; currentMenuItem=4; } if (UI_Button(1074,651,82,79,NULL,4)) {Sys_Global.diffCyb  =3; currentMenuItem=4; }
         bool overBack = false, overStart = false;
         if (UI_Button(544,747, 282,68, &overStart, 5) || (MenuEnter() && currentMenuItem == 5)) GoIntoGame(); // TODO reload game.
         overStart = overStart || currentMenuItem == 5;
-        RenderFormattedText(400,464,overStart ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,/*"START"*/Sys_Text.stringTable[886]);
+        RenderFormattedText(400,464,overStart ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.5f,/*"START"*/Sys_Text.stringTable[886]);
         
         if (UI_Button(1060,758, 84,32, &overBack, 6) || (MenuEnter() && currentMenuItem == 6)) MenuGoBack();
         overBack = overBack || currentMenuItem == 6;
         RenderUIImage(1060,724,84,36,1252); // Back Button background
-        RenderFormattedText(1076,732,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_RED_MENU,FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]);
+        RenderFormattedText(1076,732,overBack ? T_STOPD_RED_HIGHLIGHT : T_RED_MENU,FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]);
     } else if (currentMenuPage == Mpg_IntroVideo || currentMenuPage == Mpg_CreditsVideo) {
         menuItemCount = menuTabCount = 1;
         if (MenuEnter()) MenuGoBack();
@@ -6488,30 +6095,30 @@ void RenderPausedUI() {
     bool overResume = false, overLoad /* ;) */ = false, overSave = false, overOptions = false, overQuitMenu = false, overQuit = false;
     RenderUIImage(519,276,328,300,1025); // Pause Menu background
     RenderUIImage(519,276,328,300,1080); // Pause Menu background outline
-    RenderFormattedText(610,210,TEXT_STOPD_RED_PAUSETITLE,FONT_STOPD,1.0f,/*"PAUSED"*/Sys_Text.stringTable[724]);
+    RenderFormattedText(610,210,T_STOPD_RED_PAUSETITLE,FONT_STOPD,1.0f,/*"PAUSED"*/Sys_Text.stringTable[724]);
     if (UI_Button(522,330, 322,52, &overResume, 0) || (MenuEnter() && currentMenuItem == 0)) Sys_Global.gamePaused = false;
     overResume = overResume || currentMenuItem == 0;
-    RenderFormattedText(610,306,overResume ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,/*"RESUME"*/Sys_Text.stringTable[725]);
+    RenderFormattedText(610,306,overResume ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.0f,/*"RESUME"*/Sys_Text.stringTable[725]);
     if (UI_Button(522,390, 322,52, &overLoad, 1) || (MenuEnter() && currentMenuItem == 1)) { currentMenuPage = Mpg_Load; PlayMenuMusic(); Sys_Global.menuActive = true; returnToPause = true; }
     overLoad = overLoad || currentMenuItem == 1;
-    RenderFormattedText(630,364, overLoad ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,/*"LOAD"*/Sys_Text.stringTable[726]);
+    RenderFormattedText(630,364, overLoad ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.0f,/*"LOAD"*/Sys_Text.stringTable[726]);
     if (UI_Button(522,450, 322,60, &overSave, 2) || (MenuEnter() && currentMenuItem == 2)) { currentMenuPage = Mpg_Save; PlayMenuMusic(); Sys_Global.menuActive = true; returnToPause = true; }
     overSave = overSave || currentMenuItem == 2;
-    RenderFormattedText(635,422,overSave ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,/*"SAVE"*/Sys_Text.stringTable[727]);
+    RenderFormattedText(635,422,overSave ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.0f,/*"SAVE"*/Sys_Text.stringTable[727]);
     if (UI_Button(522,510, 322,60, &overOptions, 3) || (MenuEnter() && currentMenuItem == 3)) { currentMenuPage = Mpg_Options; PlayMenuMusic(); Sys_Global.menuActive = true; returnToPause = true; }
     overOptions = overOptions || currentMenuItem == 3;
-    RenderFormattedText(599,480,overOptions ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,/*"OPTIONS"*/Sys_Text.stringTable[721]);
-    if (UI_Button(522,570, 322,60, &overQuitMenu, 4) || (MenuEnter() && currentMenuItem == 4)) OpenMainMenu();
+    RenderFormattedText(599,480,overOptions ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.0f,/*"OPTIONS"*/Sys_Text.stringTable[721]);
+    if (UI_Button(522,570, 322,60, &overQuitMenu, 4) || (MenuEnter() && currentMenuItem == 4)) { PlayMenuMusic(); Sys_Global.menuActive = true; currentMenuPage = Mpg_FrontPage; }
     overQuitMenu = overQuitMenu || currentMenuItem == 4;
-    RenderFormattedText(546,538,overQuitMenu ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,/*"QUIT TO MENU"*/Sys_Text.stringTable[728]);
+    RenderFormattedText(546,538,overQuitMenu ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.0f,/*"QUIT TO MENU"*/Sys_Text.stringTable[728]);
     RenderUIImage(519,672,328,42,1252); // Pause Quit Game background
     if (UI_Button(522,714, 322,42, &overQuit, 5) || (MenuEnter() && currentMenuItem == 5)) OS_Exit(0);
     overQuit = overQuit || currentMenuItem == 5;
-    RenderFormattedText(572,690,overQuit ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,/*"QUIT GAME"*/Sys_Text.stringTable[729]);
+    RenderFormattedText(572,690,overQuit ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.0f,/*"QUIT GAME"*/Sys_Text.stringTable[729]);
 }
 
 typedef struct { float x,y,z,r,g,b,a; } DebugLineVertex;
-DebugLineVertex debugLineVerts[MAX_DEBUG_LINE_VERTS * 2];
+DebugLineVertex debugLineVerts[MAX_WIRELINE_VRTS * 2];
 static inline __attribute__((always_inline)) void DrawDebugLines(float* viewProj) {
     if (Sys_Cheats.noclip) return;
     if (Sys_Global.debugLineVertCount == 0) return;
@@ -6519,7 +6126,7 @@ static inline __attribute__((always_inline)) void DrawDebugLines(float* viewProj
     glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.debugLinesVBO);
     glBufferSubData(GL_ARRAY_BUFFER,0,Sys_Global.debugLineVertCount * sizeof(DebugLineVertex),debugLineVerts);
     CHECK_GL_ERROR(); // 1282 here
-    glUseProgram(Sys_Render.debugUnlitShaderProgram);
+    glUseProgram(Sys_Render.debugUnlitSP);
     glUniformMatrix4fv(0,1,GL_FALSE,viewProj);
     glLineWidth(1.0f);
     glDisable(GL_DEPTH_TEST);
@@ -6531,7 +6138,7 @@ static inline __attribute__((always_inline)) void DrawDebugLines(float* viewProj
 }
 
 ENGINE_TO_MOD void AddDebugLine(Vector3 start, Vector3 end, Color col) {
-    if (Sys_Global.debugLineVertCount >= MAX_DEBUG_LINE_VERTS - 2) return;
+    if (Sys_Global.debugLineVertCount >= MAX_WIRELINE_VRTS - 2) return;
 
     int i = Sys_Global.debugLineVertCount;
     debugLineVerts[i].x = start.x; debugLineVerts[i].y = start.y; debugLineVerts[i].z = start.z;
@@ -6552,8 +6159,8 @@ static double RenderUI() {
             if (Sys_Global.creditsPageIndex > CREDITS_PAGES) {Sys_Global.creditsActive = false; return get_time(); } // Finished with Erthang!  That's it, go home.
         }
 
-        if (Sys_Global.creditsPageIndex == 1) { CreditsStats(); RenderFormattedText(300,10,TEXT_WHITE,FONT_NORMAL,1.0f,(const char*)&creditStats); }
-        else                                                    RenderFormattedText(300,10,TEXT_WHITE,FONT_NORMAL,1.0f,creditPages[Sys_Global.creditsPageIndex]);
+        if (Sys_Global.creditsPageIndex == 1) { CreditsStats(); RenderFormattedText(300,10,T_WHITE,FONT_NORMAL,1.0f,(const char*)&creditStats); }
+        else                                                    RenderFormattedText(300,10,T_WHITE,FONT_NORMAL,1.0f,creditPages[Sys_Global.creditsPageIndex]);
         
         return get_time();
     }
@@ -6575,23 +6182,23 @@ static double RenderUI() {
     }
     
     i16 debugTextStartY = 48; // Diagnostics / Debugging
-    if (Sys_Cheats.showLocation && !Sys_Global.menuActive) RenderFormattedText(16, debugTextStartY, TEXT_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f",Sys_Global.instances[PLAYER1].position.x,Sys_Global.instances[PLAYER1].position.y,Sys_Global.instances[PLAYER1].position.z,Sys_Global.instances[PLAYER1].rotation.x,Sys_Global.instances[PLAYER1].rotation.y,Sys_Global.instances[PLAYER1].rotation.z,Sys_Global.instances[PLAYER1].rotation.w);
+    if (Sys_Cheats.showLocation && !Sys_Global.menuActive) RenderFormattedText(16, debugTextStartY, T_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f",Sys_Global.instances[PLAYER1].position.x,Sys_Global.instances[PLAYER1].position.y,Sys_Global.instances[PLAYER1].position.z,Sys_Global.instances[PLAYER1].rotation.x,Sys_Global.instances[PLAYER1].rotation.y,Sys_Global.instances[PLAYER1].rotation.z,Sys_Global.instances[PLAYER1].rotation.w);
     i16 lineSpacing = 18;
-    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 1),TEXT_WHITE,FONT_NORMAL,1.0f,"playerCellIdx: %u, Shadow cpu ms: %.3f",playerCellIdx,voxen_Shadow_System.shadowTime * 1000);
-    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 2),TEXT_WHITE,FONT_NORMAL,1.0f,"Player velocity: %.2f, %.2f, %.2f, Grounded: %u",Sys_Global.instances[PLAYER1].velocity.x,Sys_Global.instances[PLAYER1].velocity.y,Sys_Global.instances[PLAYER1].velocity.z,Sys_Global.instances[PLAYER1].entflags & EF_GROUNDED);
-    RenderFormattedText(16,debugTextStartY + (lineSpacing * 4),TEXT_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d  dx:%d dy:%d",Sys_Global.cursorPosition_x,Sys_Global.cursorPosition_y,Sys_Input.currentMouse_dx,Sys_Input.currentMouse_dy);
-    if (Sys_Cheats.consoleActive) RenderFormattedText(16,0,TEXT_WHITE,FONT_NORMAL,1.0f, "] %s",consoleEntryText);
-    if (Sys_Global.statusTextDecayFinished > Sys_Global.current_time) RenderFormattedText(460,114,TEXT_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
+    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 1),T_WHITE,FONT_NORMAL,1.0f,"playerCellIdx: %u, Shadow cpu ms: %.3f",playerCellIdx,shadowTime * 1000);
+    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 2),T_WHITE,FONT_NORMAL,1.0f,"Player velocity: %.2f, %.2f, %.2f, Grounded: %u",Sys_Global.instances[PLAYER1].velocity.x,Sys_Global.instances[PLAYER1].velocity.y,Sys_Global.instances[PLAYER1].velocity.z,Sys_Global.instances[PLAYER1].entflags & EF_GROUNDED);
+    RenderFormattedText(16,debugTextStartY + (lineSpacing * 4),T_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d  dx:%d dy:%d",Sys_Global.cursorPosition_x,Sys_Global.cursorPosition_y,currentMouse_dx,currentMouse_dy);
+    if (Sys_Cheats.consoleActive) RenderFormattedText(16,0,T_WHITE,FONT_NORMAL,1.0f, "] %s",consoleEntryText);
+    if (Sys_Global.statusTextDecayFinished > Sys_Global.current_time) RenderFormattedText(460,114,T_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
     double time_now = get_time();
     if (Sys_Cheats.showFPS) {
         Sys_Global.thisFrameTime = (time_now - Sys_Global.last_time) * 1000.0;
         Sys_Global.cpuFrameTime = Sys_Global.cpuTime * 1000.0;
-        u8 timingColor = TEXT_WHITE;
-        if (vabs(Sys_Global.thisFrameTime - Sys_Global.cpuFrameTime) < 0.451) timingColor = TEXT_GREEN;
-        if (Sys_Global.thisFrameTime > 6.944444) timingColor = TEXT_RED;
+        u8 timingColor = T_WHITE;
+        if (vabs(Sys_Global.thisFrameTime - Sys_Global.cpuFrameTime) < 0.451) timingColor = T_GREEN;
+        if (Sys_Global.thisFrameTime > 6.944444) timingColor = T_RED;
         drawCalls += 2; // Add two more for this text render ;)
         RenderFormattedText(16, debugTextStartY - lineSpacing, timingColor, FONT_NORMAL,1.0f, "ms: %.2f, CPU %.2f", Sys_Global.thisFrameTime,Sys_Global.cpuFrameTime);
-        RenderFormattedText(16 + 230.0f, debugTextStartY - lineSpacing, TEXT_WHITE, FONT_NORMAL,1.0f, "(FPS:%d, Worst:%d),Drwclls:%d [G:%d UI:%d Sh:%d] Vrt:%d E:%u|M:%u|P:%u",Sys_Global.framesPerLastSecond,Sys_Global.worstFPS,drawCalls,drawCallsNormal,uiDrawCalls,shadDrawCalls,vertsRendered,Sys_Cheats.editMode,Sys_Global.menuActive,Sys_Global.gamePaused);
+        RenderFormattedText(16 + 230.0f, debugTextStartY - lineSpacing, T_WHITE, FONT_NORMAL,1.0f, "(FPS:%d, Worst:%d),Drwclls:%d [G:%d UI:%d Sh:%d] Vrt:%d E:%u|M:%u|P:%u",globalframesPerLastSecond,Sys_Global.worstFPS,drawCalls,drawCallsNormal,uiDrawCalls,shadDrawCalls,vertsRendered,Sys_Cheats.editMode,Sys_Global.menuActive,Sys_Global.gamePaused);
     }
     
     return time_now;
@@ -6600,13 +6207,13 @@ static double RenderUI() {
 #define SHADOW_NEARMESH_MAX 1024
 typedef struct {float depth; u16 index; } DepthSort;
 DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX];
-static inline __attribute__((always_inline)) bool EntNotVisible(u16 i, bool otherCondition) { Entity* e = &Sys_Global.instances[i]; return e->texIndex > loadedTexturesMaxIndex || !(e->entflags & EF_ACTIVE) || e->index >= MAX_ENTITIES || e->modelIndex >= MODEL_IDX_MAX || e->texIndex >= MAX_VALID_TEXTURE || otherCondition; }
+static inline __attribute__((always_inline)) bool EntNotVisible(u16 i, bool otherCondition) { Entity* e = &Sys_Global.instances[i]; return e->texIndex > loadedTexturesMaxIndex || !(e->entflags & EF_ACTIVE) || e->index >= MAX_ENTITIES || e->modelIndex >= MAX_MDLS || e->texIndex >= MAX_TXRS || otherCondition; }
 static inline __attribute__((always_inline,hot)) u16 GetAndBindModel(u16 i, u16 currentModelType) {
     glUniform1ui(0,i);
     u16 modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && Sys_Global.instances[i].lodIndex < loadedModelsMaxIndex ? Sys_Global.instances[i].lodIndex : Sys_Global.instances[i].modelIndex;
     if (currentModelType == modelType && currentModelType != 0) return currentModelType;
     
-    glBindVertexBuffer(0,Sys_Render.vbos[modelType],0,VERTEX_ATTRIBUTES_SIZE);
+    glBindVertexBuffer(0,Sys_Render.vbos[modelType],0,VRT_ATT_SZ);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,Sys_Render.tbos[modelType]);
     return modelType;
 }
@@ -6616,7 +6223,7 @@ u16 shadowCasterIndices[SC_MAX],candidates[MAX_SHADOWMAPS];
 static const u32 groupX_shadClear = ((SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) + 31) / 32;
 static __attribute__((hot)) void RenderShadowmaps() {    
     double shadowStartTime = get_time();
-    MemSetToVForNBytes(candidates,0,MAX_SHADOWMAPS*sizeof(u16));
+    mset(candidates,0,MAX_SHADOWMAPS*sizeof(u16));
     u16 numShadowsCouldRender = 0;
     Vector3 playerPos = Sys_Global.instances[PLAYER1].position, pf = Sys_Global.instances[PLAYER1].forward;
     for (u16 i = 0; i < loadedLights; ++i) { // Collect candidates: only lights that are enabled and in PVS
@@ -6645,16 +6252,16 @@ static __attribute__((hot)) void RenderShadowmaps() {
     }
 
     if (numShadowsCouldRender > 0) { // Added since there is now work between here and the for loop so this is beneficial to check.
-        glUseProgram(Sys_Render.shadowmapsClearShaderProgram); // Clear shadowmaps.  One might think that this would be less performant than standard shadowmap FBO with gl clears and textures but in fact this is faster on all but the oldest hardware (e.g. 10yrs old is fine, 13yrs suffers a small hit).
+        glUseProgram(Sys_Render.shadowmapsClearSP); // Clear shadowmaps.  One might think that this would be less performant than standard shadowmap FBO with gl clears and textures but in fact this is faster on all but the oldest hardware (e.g. 10yrs old is fine, 13yrs suffers a small hit).
         for (u32 c=0;c<numShadowsCouldRender;++c) {
             glUniform1ui(0,c); glDispatchCompute(groupX_shadClear,6,1);
         }
 
         shadDrawCalls = 0;
         glViewport(0,0,SHADOW_MAP_SIZE,SHADOW_MAP_SIZE);
-        glUseProgram(Sys_Render.shadowmapsShaderProgram);
+        glUseProgram(Sys_Render.shadowmapsSP);
         u32 shadowmapOffsetHead = 0U;
-        MemSetToVForNBytes(shadowCasterIndices,0,SC_MAX*sizeof(u16));
+        mset(shadowCasterIndices,0,SC_MAX*sizeof(u16));
         u32 numShadowCasters = 0;
         for (int i=START_INDEX_LEVEL_INSTANCES;i<INSTANCE_COUNT;++i) {
             if (EntNotVisible(i,(Sys_Global.instances[i].entflags & EF_NO_SHADOWS))) continue;
@@ -6691,7 +6298,7 @@ static __attribute__((hot)) void RenderShadowmaps() {
             if (unlikely(nearbyMeshCount < 1)) continue;
 
             glUniform3f(3,lpos.x,lpos.y,lpos.z);
-            voxen_Shadow_System.shadowmapIndirectionList[lightIdx] = shadowMapIdx;
+            shadowmapIndirectionList[lightIdx] = shadowMapIdx;
             #pragma GCC unroll 6
             for (u8 face = 0; face < 6; face++) {                                            
                 glUniform1ui(2,face);
@@ -6704,10 +6311,10 @@ static __attribute__((hot)) void RenderShadowmaps() {
 
                     glUniform1ui(0,i);
                     u16 modelType = (instanceIsLODArray[i] || useDetail < 1u) && e->lodIndex < loadedModelsMaxIndex ? e->lodIndex : e->modelIndex;
-                    if (currentModelType != modelType || currentModelType == 0) { currentModelType = modelType; glBindVertexBuffer(0,Sys_Render.vbos[modelType],0,VERTEX_ATTRIBUTES_SIZE); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,Sys_Render.tbos[modelType]); }
+                    if (currentModelType != modelType || currentModelType == 0) { currentModelType = modelType; glBindVertexBuffer(0,Sys_Render.vbos[modelType],0,VRT_ATT_SZ); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,Sys_Render.tbos[modelType]); }
                     if (currentTexIndex != e->texIndex) { currentTexIndex = e->texIndex; glUniform1ui(6,e->texIndex); }
                     bool texIsTransparent = transparentTexture[e->texIndex];
-                    if (currentIsTransparent != texIsTransparent) { currentIsTransparent = texIsTransparent; glUniform1ui(8,currentIsTransparent ? 1u : 0u); }
+                    if (currentIsTransparent != texIsTransparent) { currentIsTransparent = texIsTransparent; glUniform1ui(8,(u32)currentIsTransparent); }
                     glDrawElements(0x0004/*GL_TRIANGLES*/,modelTriangleCounts[currentModelType]*3,GL_UNSIGNED_SHORT,0); drawCalls++; shadDrawCalls++; vertsRendered += modelTriangleCounts[currentModelType] * 3;
                 }
             }
@@ -6716,10 +6323,10 @@ static __attribute__((hot)) void RenderShadowmaps() {
         }
 
         glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
-        glBindBuffer(GL_SSBO,Sys_Render.shadowMapsIndirectionID); glBufferData(GL_SSBO,loadedLights * sizeof(u32),voxen_Shadow_System.shadowmapIndirectionList,GL_DYNAMIC_DRAW);
+        glBindBuffer(GL_SSBO,Sys_Render.shadowMapsIndirectionID); glBufferData(GL_SSBO,loadedLights * sizeof(u32),shadowmapIndirectionList,GL_DYNAMIC_DRAW);
     }
 
-    voxen_Shadow_System.shadowTime = get_time() - shadowStartTime;
+    shadowTime = get_time() - shadowStartTime;
 }
 
 DepthSort visibleInstances[INSTANCE_COUNT];
@@ -6796,7 +6403,6 @@ void GetProjections(float* view, float* viewProj, float* invViewRot, float* invV
     m[0] = f / aspect3D; m[1] = 0.0f; m[2] = 0.0f; m[3] = 0.0f; m[4] = 0.0f; m[5] = f; m[6] = 0.0f; m[7] = 0.0f;
     m[8] = 0.0f; m[9] = 0.0f; m[10]= -(sfar + snear) / (sfar - snear); m[11]= -1.0f;
     m[12]= 0.0f; m[13]= 0.0f; m[14]= -2.0f * sfar * snear / (sfar - snear); m[15]= 0.0f;
-    voxen_Shadow_System.shadDotThresh = 1.0f / vsqrtf(1.0f + vtan(sfov * PI / 360.0f) * (1.0f + aspect3D * aspect3D));
     mat4_lookat_from(view,&Sys_Global.instances[PLAYER1].rotation,Sys_Global.instances[PLAYER1].position);
     mul_mat4(viewProj,rasterPerspectiveProjection,view);
     invViewRot[0]=view[0]; invViewRot[1]=view[4]; invViewRot[2]=view[8]; invViewRot[3]=view[1]; invViewRot[4]=view[5]; invViewRot[5]=view[9]; invViewRot[6]=view[2]; invViewRot[7]=view[6]; invViewRot[8]=view[10];
@@ -6831,9 +6437,9 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         else { visibleInstances[opaqueCount].index = i; visibleInstances[opaqueCount].depth = distSqrd; opaqueCount++; }
     }
 
-    MemCpyFromBtoAForNBytes(visibleInstances + opaqueCount,tmpTransparent,tcnt * sizeof(DepthSort));
+    mcpy(visibleInstances + opaqueCount,tmpTransparent,tcnt * sizeof(DepthSort));
     visibleCount = opaqueCount + tcnt;
-    glUseProgram(Sys_Render.depthPrepassShaderProgram); // Depth Prepass - Eliminates some overdraw for ~6.1% performance improvement in spite of added draw calls
+    glUseProgram(Sys_Render.depthPrepassSP); // Depth Prepass - Eliminates some overdraw for ~6.1% performance improvement in spite of added draw calls
     glUniformMatrix4fv(2,1,0,viewProj);
     glEnable(GL_DEPTH_TEST); glColorMask(0,0,0,0); glDepthMask(1); glDepthFunc(0x0201/*GL_LESS*/); glDisable(GL_BLEND);
     if (opaqueCount > 1) qsort_new(visibleInstances,opaqueCount,sizeof(DepthSort),dsortInv);
@@ -6851,7 +6457,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         glDrawElements(0x0004/*GL_TRIANGLES*/,vertCount,GL_UNSIGNED_SHORT,0); drawCalls++; vertsRendered += vertCount;
     }
 
-    glUseProgram(Sys_Render.chunkShaderProgram); /*Main Pass*/ glUniformMatrix4fv(2,1,0,viewProj); glUniform1ui(25,0u); // default constIndex
+    glUseProgram(Sys_Render.chunkSP); /*Main Pass*/ glUniformMatrix4fv(2,1,0,viewProj); glUniform1ui(25,0u); // default constIndex
     bool grayscaleEnabled = ModRequestsGrayscale(), refOn = Sys_Settings.Reflections;              glUniform1ui(26,(u32)grayscaleEnabled);
     float fogActual = Sys_Global.fogColor[Sys_Global.curLev].a + (float)(Sys_Global.fogFac / 255u); // Alpha is base density for level.
     glUniform3f(12,Sys_Global.fogColor[Sys_Global.curLev].r * fogActual,Sys_Global.fogColor[Sys_Global.curLev].g * fogActual,Sys_Global.fogColor[Sys_Global.curLev].b * fogActual); // Fog Color(which is density)
@@ -6870,7 +6476,6 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     }
 
     glDepthMask(1); currentTexIndex = currentNormIndex = currentGlowIndex = currentSpecIndex = currentModelType = 0; // Transparents Pass
-    glUniform1f(9,0.0f); // Reset heat for infrared vision
     for (u16 visibleIndex = opaqueCount; visibleIndex < (opaqueCount + tcnt); ++visibleIndex) {
         u16 i = visibleInstances[visibleIndex].index;
         Entity* e = &Sys_Global.instances[i]; u16 tex = e->texIndex; u32 constIndex = e->index;
@@ -6895,7 +6500,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     if (unlikely(Sys_Global.debugLineVertCount > 1)) DrawDebugLines(viewProj); // Draw Debug Lines
     glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D,Sys_Render.inputDepthID);
     if (likely(refOn > 0u)) { // Screen Space Reflections
-        glUseProgram(Sys_Render.ssrShaderProgram); glUniform3f(3,playerPos.x,playerPos.y,playerPos.z); glUniform1i(5,3);
+        glUseProgram(Sys_Render.ssrSP); glUniform3f(3,playerPos.x,playerPos.y,playerPos.z); glUniform1i(5,3);
         glUniformMatrix4fv(6,1,0,invViewProj);     glUniformMatrix4fv(4,1,GL_FALSE,viewProj);
         u32 groupX_ssr = ((Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES) + 31) / 32, groupY_ssr = ((Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES) + 31) / 32;
         glDispatchCompute(groupX_ssr,groupY_ssr,1);
@@ -6908,7 +6513,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     else RenderUIImage(663,364,40,40,GetCursorTexture()); // Centered on UI baseline resolution 1366x768
     glBindFramebuffer(GL_FRAMEBUFFER,0); glViewport(0,0,swidth,sheight); // Restore normal output size for final composite blit
 
-    glUseProgram(Sys_Render.imageBlitShaderProgram);
+    glUseProgram(Sys_Render.imageBlitSP);
     glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,Sys_Render.inputImageID);
     glUniform1i(4,4); // outputImage texture sampler2D, don't remember why when active texture is texture 0. meh.... oh maybe to not read and write same binding?
     glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D,Sys_Render.inputUIID);
@@ -6938,9 +6543,9 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     drawCalls++; vertsRendered += 4;
     if ((Sys_Global.last_time - Sys_Global.lastFrameSecCountTime) >= 1.00) { // Update Diagnostic Poll
         Sys_Global.lastFrameSecCountTime = Sys_Global.last_time;
-        Sys_Global.framesPerLastSecond = Sys_Global.frame - Sys_Global.lastFrameSecCount;
-        if (Sys_Global.framesPerLastSecond < Sys_Global.worstFPS && Sys_Global.frame > 2000) Sys_Global.worstFPS = Sys_Global.framesPerLastSecond; // After startup, keep track of worst framerate seen.
-        Sys_Global.lastFrameSecCount = Sys_Global.frame;
+        globalframesPerLastSecond = globalframe - Sys_Global.lastFrameSecCount;
+        if (globalframesPerLastSecond < Sys_Global.worstFPS && globalframe > 2000) Sys_Global.worstFPS = globalframesPerLastSecond; // After startup, keep track of worst framerate seen.
+        Sys_Global.lastFrameSecCount = globalframe;
     }
 }
 
@@ -6983,31 +6588,20 @@ void UpdateInstanceMatrix4x4s() {
     u32 countFloats  = ((u32)dirtyMax - (u32)dirtyMin + 1) * 16;
     glBufferSubData(GL_SSBO, offsetFloats * sizeof(float), countFloats * sizeof(float), modelMatrices + offsetFloats);
 }
-// ================= Initialization && Main
-ENGINE_TO_MOD void InitializeEntity(Entity* entry) { // Blank entity, no index yet, for initial list population or temporary Entity. memset here would be harmful as only a handful of fields are the same.
-    MemSetToVForNBytes(entry,0,sizeof(Entity));
-    entry->index = U16_MAX;               entry->entflags = EF_ACTIVE; entry->kinematic = true;
-    entry->layer = Layer_Default;         entry->camView = 255;             entry->rotation.w = 1.0f;
-    entry->tickTime = 0.35f;          entry->angularDrag = 0.05f;
-    entry->modelIndex = entry->lodIndex  = entry->colliderMeshIndex            = MODEL_IDX_MAX;
-    entry->texIndex   = entry->glowIndex = entry->specIndex = entry->normIndex = MAX_VALID_TEXTURE;
-    entry->scale.x    = entry->scale.y   = entry->scale.z   = entry->mass      = entry->volume = 1.0f;
-    entry->dynamicFriction = entry->staticFriction = 0.6f;
-}
-
-FHandle levelFileHandle;
+// Init && Main
+ENGINE_TO_MOD void InitializeEntity(Entity* e) { mset(e,0,sizeof(Entity)); e->index=U16_MAX; e->entflags=EF_ACTIVE; e->kinematic=true; e->layer=L_Default; e->camView=255; e->tickTime = 0.35f; e->angularDrag = 0.05f; e->modelIndex=e->lodIndex=e->colliderMeshIndex=MAX_MDLS; e->texIndex=e->glowIndex=e->specIndex=e->normIndex = MAX_TXRS; e->scale.x=e->scale.y=e->scale.z=e->mass=e->volume=e->rotation.w=1.0f; e->dynamicFriction = e->staticFriction = 0.6f; }
 ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
     double start_time = get_time();
     DebugRAM("start of LoadLevel");
     Sys_Global.levelCurrentlyLoading = true; Sys_Global.gamePaused = false; Sys_Global.menuActive = false;
     RenderLoadingProgress(100,"Loading level...");
-    MemSetToVForNBytes(lights,0,LIGHT_COUNT * sizeof(Light)); MemSetToVForNBytes(lanims,0,LIGHT_COUNT * sizeof(LightAnimation)); loadedLights = 0;
-    MemSetToVForNBytes(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
-    MemSetToVForNBytes(modelMatrices,0,INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
-    MemSetToVForNBytes(camViews,0,64 * sizeof(CamView)); camViewCount = 0;
-    MemSetToVForNBytes(Sys_Global.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
+    mset(lights,0,LIGHT_COUNT * sizeof(Light)); mset(lanims,0,LIGHT_COUNT * sizeof(LightAnimation)); loadedLights = 0;
+    mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
+    mset(modelMatrices,0,INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
+    mset(camViews,0,64 * sizeof(CamView)); camViewCount = 0;
+    mset(Sys_Global.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
     char filename[20]; // Minimum size for 0 through 13.
-    StringFormat(filename,sizeof(filename),"./Data/level%d.txt",curlevel);
+    sFormat(filename,sizeof(filename),"./Data/level%d.txt",curlevel);
     levelFileHandle = OS_OpenReadonly(filename);
     LoadLevelMod(curlevel);
     OS_Close(levelFileHandle);
@@ -7027,14 +6621,14 @@ ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
     ModInitAfterLoad(); ResetLevelAudio(); ResetLevelMusic(); creditPages = GetCreditsText();
     RenderLoadingProgress(110,"Loading cull system...");
     CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
-    glUseProgram(Sys_Render.voxelUpdateShaderProgram);
+    glUseProgram(Sys_Render.voxelUpdateSP);
     glUniform2f(0,Sys_Global.voxelMinCenterX[Sys_Global.curLev],Sys_Global.voxelMinCenterZ[Sys_Global.curLev]);
     glUniform1f(1,Sys_Global.farPlane[Sys_Global.curLev] * Sys_Global.farPlane[Sys_Global.curLev]);
     glUniform1ui(2,loadedLights);
     glUniform2f(3,Sys_Global.worldMin_x[Sys_Global.curLev],Sys_Global.worldMin_z[Sys_Global.curLev]); 
     RenderLoadingProgress(120,"Loading voxel lighting data...");
     for (u16 i = 0; i < loadedLights; i++) { lightsNewPosition[i] = lights[i].pos; }
-    MemSetToVForNBytes(voxen_Shadow_System.shadowmapIndirectionList,MAX_SHADOWMAPS + 1,loadedLights * sizeof(u32)); // Set to invalid values for all
+    mset(shadowmapIndirectionList,MAX_SHADOWMAPS + 1,loadedLights * sizeof(u32)); // Set to invalid values for all
     Sys_Global.levelCurrentlyLoading = false;
     DebugRAM("end of LoadLevel");
 }
@@ -7046,26 +6640,16 @@ __attribute__((cold)) void NewGame() { // Reset World States
     SetGlobalsModData();
     currentMenuItem = currentMenuTab = 0; currentMenuPage = Mpg_FrontPage;
     Sys_Global.pauseRelativeTime = Sys_Global.last_physics_time = 0.0;
-    Sys_Global.inventoryMode = false;
-    MemSetToVForNBytes(Sys_Global.instances,0,2 * sizeof(Entity)); // Blank out player entities
-    PlayerInit(PLAYER1); PlayerInit(PLAYER2);
-    Sys_Global.instances[WORLD].ioflags = 0u;
-    cam_yaw = 90.0f; cam_pitch = 0.0f; cam_roll = 0.0f;
-    Sys_Global.inventoryMode = Sys_Settings.NoShootMode;
-    Sys_Global.pauseRelativeTime =  Sys_Global.last_physics_time = 0.0;
-    Sys_Global.last_topframe_time = Sys_Global.last_physics_time - 0.05;
-    Sys_Global.deltaTime = 0.0166666666f;
-    Sys_Global.gameFinished = Sys_Global.creditsActive = Sys_Global.decoyActive = false;
-	Sys_Global.ressurections = Sys_Global.deaths = Sys_Global.kills = Sys_Global.cyberkills = 0u;
-	Sys_Global.shotsFired = Sys_Global.grenadesThrown = Sys_Global.savesScummed = 0U;
-    Sys_Global.damageDealt = Sys_Global.damageReceived = 0.0f;
-	Sys_Global.creditsPageIndex = 0u;
+    mset(Sys_Global.instances,0,3 * sizeof(Entity)); // Blank out player entities
+    PlayerInit(PLAYER1); PlayerInit(PLAYER2); cam_yaw = 90.0f; cam_pitch = 0.0f; cam_roll = 0.0f; Sys_Global.inventoryMode = Sys_Settings.NoShootMode;
+    Sys_Global.pauseRelativeTime=Sys_Global.last_physics_time=0.0; Sys_Global.last_topframe_time=Sys_Global.last_physics_time-0.05; Sys_Global.deltaTime=0.0166666666f;
+    Sys_Global.gameFinished = Sys_Global.creditsActive = Sys_Global.decoyActive = false; Sys_Global.damageDealt = Sys_Global.damageReceived = 0.0f;
+	Sys_Global.ressurections = Sys_Global.deaths = Sys_Global.kills = Sys_Global.cyberkills = 0u; Sys_Global.shotsFired = Sys_Global.grenadesThrown = Sys_Global.savesScummed = 0U; Sys_Global.creditsPageIndex = 0u;
     for (int i=0;i<14;++i) Sys_Global.levelSecurity[i] = 100u;
     InputClearRisingAndFallingEdges();
-    Sys_Input.currentMouse_dx = Sys_Input.currentMouse_dy = 0;
-    Sys_Input.last_mouse_x = Sys_Input.last_mouse_y = 0;
-    Sys_Input.ignore_next_mouse_delta = true;
-    Sys_Input.isCapsLockOn = false; // As far as we're concerned, don't worry about OS state.
+    currentMouse_dx = currentMouse_dy = 0; last_mouse_x = last_mouse_y = 0;
+    ignore_next_mouse_delta = true;
+    Sys_Input.isCapsLockOn = false; // As far as we're concerned, don't worry about OS actual state.
     Sys_Input.lastUse = false;
     LoadLevel(Sys_Global.startLevel); // Must be after entities!
     ModNewGame();
@@ -7080,21 +6664,21 @@ void InitalizeEnvironment() {
     DebugRAM("program start");
     DualLog("Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed\nEntity size: %u\n",sizeof(Entity));
     WindowInit();
-    Sys_Global.frame=0,Sys_Global.menuActive=true,Sys_Global.screenshotTimeout=1.0,Sys_Global.creditsPageIndex=1,Sys_Global.difficultyCombat=Sys_Global.difficultyCyber=Sys_Global.difficultyPuzzle=Sys_Global.difficultyMission=2,Sys_Global.deaths=0,Sys_Global.worstFPS=0,Sys_Global.cursorPosition_x=680,Sys_Global.cursorPosition_y=384;
+    globalframe=0,Sys_Global.menuActive=true,Sys_Global.screenshotTimeout=1.0,Sys_Global.creditsPageIndex=1,Sys_Global.diffCbt=Sys_Global.diffCyb=Sys_Global.diffPuz=Sys_Global.diffMis=2,Sys_Global.deaths=0,Sys_Global.worstFPS=0,Sys_Global.cursorPosition_x=680,Sys_Global.cursorPosition_y=384;
     DualLog("Loading game definition...");
     FHandle gmFP = OS_OpenReadonly("./Data/gamedata.txt");
     if (!gmFP) { DualLogError("\nCannot open ./Data/gamedata.txt\n"); OS_Exit(1);  }
     
     char gmLine[512],global_modname[256],global_dllname[256]; u32 lineNum = 0;
-    while (GetNextStringUpToNewlineOrEOF(gmLine,sizeof(gmLine),gmFP)) {
+    while (sUpToEndLine(gmLine,sizeof(gmLine),gmFP)) {
         lineNum++;
         char* s = data_parser_trim(gmLine); if (*s == 0 || (s[0] == '/' && s[1] == '/')) continue;
         char* colon = StringFindFirstCharWithin(s, ':'); if (!colon) continue;
         *colon = '\0'; char* key = data_parser_trim(s); char* val = data_parser_trim(colon + 1); if (*key == 0 || *val == 0) continue;
 
-             if (StringsEqual(key,   "modname")) {  StringCopyInto_A_From_B(global_modname,val,sizeof(global_modname)); }                      else if (StringsEqual(key,   "dllname")) { StringCopyInto_A_From_B(global_dllname,val,sizeof(global_dllname)); }
-        else if (StringsEqual(key,"windowicon")) { StringCopyInto_A_From_B(Sys_Global.global_winicon,val,sizeof(Sys_Global.global_winicon)); } else if (StringsEqual(key,"levelcount")) { Sys_Global.numLevels = parse_numberu8(val,gmLine,lineNum); }
-        else if (StringsEqual(key,"startlevel")) { Sys_Global.startLevel = parse_numberu8(val,gmLine,lineNum); }
+             if (sEqual(key,   "modname")) {  scpy_to_a_from_b(global_modname,val,sizeof(global_modname)); }                      else if (sEqual(key,   "dllname")) { scpy_to_a_from_b(global_dllname,val,sizeof(global_dllname)); }
+        else if (sEqual(key,"windowicon")) { scpy_to_a_from_b(Sys_Global.global_winicon,val,sizeof(Sys_Global.global_winicon)); } else if (sEqual(key,"levelcount")) { Sys_Global.numLevels = parse_numberu8(val,gmLine,lineNum); }
+        else if (sEqual(key,"startlevel")) { Sys_Global.startLevel = parse_numberu8(val,gmLine,lineNum); }
     }
     
     OS_Close(gmFP); DualLog(" %s:: num levels: %d, start level: %d\n",global_modname,Sys_Global.numLevels,Sys_Global.startLevel);
@@ -7121,12 +6705,11 @@ void InitalizeEnvironment() {
     glVertexAttribFormat(0,3,0x140B/*GL_HALF_FLOAT*/,GL_FALSE,0);  glVertexAttribBinding(0,0); glEnableVertexAttribArray(0); // pos xyz half-float @ offset 0
     glVertexAttribFormat(1,3,0x140B/*GL_HALF_FLOAT*/,GL_FALSE,6);  glVertexAttribBinding(1,0); glEnableVertexAttribArray(1); // normal xyz float   @ offset 6  (after 3×2 bytes)
     glVertexAttribFormat(2,2,0x140B/*GL_HALF_FLOAT*/,GL_FALSE,12); glVertexAttribBinding(2,0); glEnableVertexAttribArray(2); // uv st float
-    glBindVertexBuffer(0,Sys_Render.chunkVBO,0,14);
     glBindVertexArray(Sys_Render.textVAO);
     glVertexAttribFormat(0,3,GL_FLOAT,GL_FALSE,0);                 glVertexAttribBinding(0,0); glEnableVertexAttribArray(0); // pos (x,y,z) 4 floats per vertex, stride = 4*sizeof(float)
     glVertexAttribFormat(1,2,GL_FLOAT,GL_FALSE,3 * sizeof(float)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1); // uv (s,t)
     glBindVertexBuffer(0, Sys_Render.textVBO,0,5 * sizeof(float));
-    glBindVertexArray(Sys_Render.debugLinesVAO); glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.debugLinesVBO); glBufferData(GL_ARRAY_BUFFER,MAX_DEBUG_LINE_VERTS * 2 * sizeof(DebugLineVertex),NULL,GL_DYNAMIC_DRAW);
+    glBindVertexArray(Sys_Render.debugLinesVAO); glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.debugLinesVBO); glBufferData(GL_ARRAY_BUFFER,MAX_WIRELINE_VRTS * 2 * sizeof(DebugLineVertex),NULL,GL_DYNAMIC_DRAW);
     glVertexAttribFormat(0,3,GL_FLOAT,GL_FALSE,__builtin_offsetof(DebugLineVertex,x)); glVertexAttribBinding(0,0); glEnableVertexAttribArray(0);
     glVertexAttribFormat(1,4,GL_FLOAT,GL_FALSE,__builtin_offsetof(DebugLineVertex,r)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1);
     glBindVertexBuffer(0,Sys_Render.debugLinesVBO,0,sizeof(DebugLineVertex));
@@ -7142,7 +6725,7 @@ void InitalizeEnvironment() {
     float* m = shadowmapsPerspectiveProjection; float lightRangeMax=15.36f; float viewRange=(lightRangeMax - NEAR_PLANE);
     m[0]=1.0f; m[1]=0.0f; m[2]=0.0f; m[3]=0.0f; m[4]=0.0f; m[5]=1.0f; m[6]=0.0f; m[7]=0.0f; m[8]=0.0f; m[9]=0.0f; m[10]=-(lightRangeMax + NEAR_PLANE) / viewRange; m[11]=-1.0f; m[12]=0.0f; m[13]=0.0f; m[14]=-2.0f * lightRangeMax * NEAR_PLANE / viewRange; m[15]=0.0f;
     InitSCFTables(); InitAudio();
-    char mod_path[256]; StringCopyInto_A_From_B(mod_path,"./",256); StringConcatenate(mod_path,global_dllname,256); StringConcatenate(mod_path,MOD_EXTENSION,256);
+    char mod_path[256]; scpy_to_a_from_b(mod_path,"./",256); sCat(mod_path,global_dllname,256); sCat(mod_path,MOD_EXTENSION,256);
     mod_handle = OS_DlOpen(mod_path); if (!mod_handle) { DualLogError("Failed to load mod at:%s",mod_path); OS_Exit(1); }
     
     #define X(ret, name, params) name = (ret (*) params)OS_DlSym(mod_handle,#name); if(!name) DualLogError("Failed to load mod function: %s",#name);
@@ -7152,39 +6735,33 @@ void InitalizeEnvironment() {
     Sys_Global.GetKey=GetKey; Sys_Global.GetKeyPressed=GetKeyPressed; // Link mod to engine
     ModEntityDefinitionsInitAfterLoad();
     glGenFramebuffers(1,&Sys_Render.gBufferFBO);
-    ApplySettings(); // After loading of text and game data.
+    ChangeFullScreenWindowed(); SetSkyRotateSpeed(); SetVSync(); LoadTextForLanguage(Sys_Settings.Language); LoadLogTextForLanguage(Sys_Settings.Language); // Apply settings after loading of text and game data.
     glBindFramebuffer(GL_FRAMEBUFFER,Sys_Render.gBufferFBO);
     u32 drawBuffers[] = {GL_COLOR_ATTACHMENT0,GL_COLOR_ATTACHMENT1,GL_COLOR_ATTACHMENT2};
     glDrawBuffers(3,drawBuffers);
     u32 status = glCheckFramebufferStatus(GL_FRAMEBUFFER); if (status != 0x8CD5/*GL_FRAMEBUFFER_COMPLETE*/) DualLogError("Framebuffer incomplete: Error code %d\n",status);
-    glBindFramebuffer(GL_FRAMEBUFFER,0);
-    float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
-    MemCpyFromBtoAForNBytes(&modelMatrices[0],mat,16 * sizeof(float)); // Null instance matrix used for UI
-    Sys_Render.matricesBufferID        = SetupSSBO(&Sys_Render.matricesBufferID,        1,INSTANCE_COUNT * 16 * sizeof(float),modelMatrices, GL_STATIC_DRAW);
-    Sys_Render.voxelLightListCountsID  = SetupSSBO(&Sys_Render.voxelLightListCountsID,  2,VOXEL_COUNT * sizeof(u32),NULL,GL_STATIC_DRAW);
-    Sys_Render.voxelLightListsID       = SetupSSBO(&Sys_Render.voxelLightListsID,       3,VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(u32),NULL,GL_STATIC_DRAW);
-    Sys_Render.lightsID                = SetupSSBO(&Sys_Render.lightsID,                4,LIGHT_COUNT * sizeof(Light),NULL,GL_STATIC_DRAW);
-    if (Sys_Settings.Shadows) CreateShadowBuffers();                               // 5,6
-    Sys_Render.cellVisibleDataID       = SetupSSBO(&Sys_Render.cellVisibleDataID,       7,ARRSIZE * sizeof(u32),NULL,GL_STATIC_DRAW);
-    Sys_Render.texturePalettesID       = SetupSSBO(&Sys_Render.texturePalettesID,       8,MAX_UNIQUE_COLORS * sizeof(u32),NULL,GL_STATIC_DRAW);
-    Sys_Render.texturePaletteOffsetsID = SetupSSBO(&Sys_Render.texturePaletteOffsetsID, 9,MAX_VALID_TEXTURE * sizeof(u32),NULL,GL_STATIC_DRAW);
-    Sys_Render.colorBufferID           = SetupSSBO(&Sys_Render.colorBufferID,          12,MAX_TOTAL_PIXELS * sizeof(u8),NULL,GL_STATIC_DRAW);
-    Sys_Render.textureOffsetsID        = SetupSSBO(&Sys_Render.textureOffsetsID,       14,MAX_VALID_TEXTURE * sizeof(u32),NULL,GL_STATIC_DRAW);
-    Sys_Render.textureSizesID          = SetupSSBO(&Sys_Render.textureSizesID,         15,MAX_VALID_TEXTURE * 2 * sizeof(i32),NULL, GL_STATIC_DRAW);
-    glUseProgram(Sys_Render.shadowmapsShaderProgram);  glUniform1ui( 9,SHADOW_MAP_SIZE);     glUseProgram(Sys_Render.shadowmapsClearShaderProgram); glUniform1ui(1,SHADOW_MAP_SIZE);
-    glUseProgram(Sys_Render.chunkShaderProgram);       glUniform1ui(21,SHADOW_MAP_SIZE); glUniform1f(22,(float)SHADOW_MAP_SIZE); glUniform1ui(23,LIGHT_COUNT); glUniform1ui(24,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);
-    glUseProgram(Sys_Render.voxelUpdateShaderProgram); glUniform1ui( 4,SHADOW_MAP_SIZE); glUniform1ui(6,(u32)MAX_LIGHTS_PER_VOXEL);
+    float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1}; u32 MAX_LIGHTS_PER_VOXEL = 32;
+    mcpy(&modelMatrices[0],mat,16 * sizeof(float)); // Null instance matrix used for UI
+    Sys_Render.matricesBufferID = MakeSSBO(&Sys_Render.matricesBufferID, 1,INSTANCE_COUNT * 16 * sizeof(float),modelMatrices,GL_STATIC_DRAW);     Sys_Render.cellVisibleDataID= MakeSSBO(&Sys_Render.cellVisibleDataID,7,ARRSIZE * sizeof(u32),NULL,GL_STATIC_DRAW);
+    Sys_Render.voxListCntsID    = MakeSSBO(&Sys_Render.voxListCntsID,    2,VOXEL_COUNT * sizeof(u32),NULL,GL_STATIC_DRAW);                        Sys_Render.texPalID         = MakeSSBO(&Sys_Render.texPalID,         8,MAX_UNIQUE_COLORS * sizeof(u32),NULL,GL_STATIC_DRAW);
+    Sys_Render.voxelLightListsID= MakeSSBO(&Sys_Render.voxelLightListsID,3,VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(u32),NULL,GL_STATIC_DRAW); Sys_Render.texPalOfsID      = MakeSSBO(&Sys_Render.texPalOfsID,      9,MAX_TXRS * sizeof(u32),NULL,GL_STATIC_DRAW);
+    Sys_Render.lightsID         = MakeSSBO(&Sys_Render.lightsID,         4,LIGHT_COUNT * sizeof(Light),NULL,GL_STATIC_DRAW);                      Sys_Render.colorBufferID    = MakeSSBO(&Sys_Render.colorBufferID,   12,MAX_TOTAL_PIXELS * sizeof(u8),NULL,GL_STATIC_DRAW);
+    if (Sys_Settings.Shadows) CreateShadowBuffers();                    /*5,6*/                                                                   Sys_Render.textureOffsetsID = MakeSSBO(&Sys_Render.textureOffsetsID,14,MAX_TXRS * sizeof(u32),NULL,GL_STATIC_DRAW);
+                                                                                                                                                  Sys_Render.textureSizesID   = MakeSSBO(&Sys_Render.textureSizesID,  15,MAX_TXRS * 2 * sizeof(i32),NULL, GL_STATIC_DRAW);
+    glUseProgram(Sys_Render.shadowmapsSP);  glUniform1ui( 9,SHADOW_MAP_SIZE);   glUseProgram(Sys_Render.shadowmapsClearSP); glUniform1ui(1,SHADOW_MAP_SIZE);
+    glUseProgram(Sys_Render.chunkSP);       glUniform1ui(21,SHADOW_MAP_SIZE); glUniform1f(22,(float)SHADOW_MAP_SIZE); glUniform1ui(23,LIGHT_COUNT); glUniform1ui(24,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);
+    glUseProgram(Sys_Render.voxelUpdateSP); glUniform1ui( 4,SHADOW_MAP_SIZE); glUniform1ui(6,(u32)MAX_LIGHTS_PER_VOXEL);
     RenderLoadingProgress(100,"Loading textures..."); LoadTextures();
     RenderLoadingProgress(92,"Loading models...");    LoadModels();
     if (Sys_Global.introNotPlayed) {} // TODO: Play intro
     Sys_Global.absoluteTime = Sys_Global.last_topframe_time = Sys_Global.current_time = get_time();
     Sys_Global.pauseRelativeTime = Sys_Global.last_physics_time = 0.0;
     NewGame();
-    OpenMainMenu(); // Comment out for immediate testing
+    PlayMenuMusic(); Sys_Global.menuActive = true; currentMenuPage = Mpg_FrontPage; // Comment out for immediate testing
     DebugRAM("InitializeEnvironment end"); DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
 }
 
-i32 main() { // Write the Code That Just Does the Thing(TM)
+i32 main() {
     InitalizeEnvironment();
     while(1) {
         if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad); queuedLevelToLoad = 255u; continue; }
@@ -7194,21 +6771,18 @@ i32 main() { // Write the Code That Just Does the Thing(TM)
         if (!Sys_Global.gamePaused && !Sys_Global.menuActive) Sys_Global.pauseRelativeTime += Sys_Global.deltaTime;
         InputProcessing(); // Before anims and physics to allow them to respond immediately.
         UpdateAnims();     // Before physics to allow model swap out to affect physics state immediately.  Before rendering to affect shadowmaps immediately.
-        Physics();
-        ModUpdate();       // After physics so mod/gamecode can modify velocities before next frame.
+        Physics(); ModUpdate(); // After physics so mod/gamecode can modify velocities before next frame.
         UpdateAmbientSounds(); UpdateMusic();
         drawCalls = uiDrawCalls = shadDrawCalls = vertsRendered = 0;
-        RenderCameraViews();
-        CullCore(); UpdateInstanceMatrix4x4s();
+        RenderCameraViews(); CullCore(); UpdateInstanceMatrix4x4s();
         Render(false/*!camview*/,0u);
         CheckAndTakeScreenshot();
-        Sys_Global.frame++;
         InputClearRisingAndFallingEdges();
-        Sys_Global.cpuTime = get_time() - Sys_Global.current_time; // Measure time over everything this frame before GPU swap buffers for diagnostic text.
+        globalframe++; Sys_Global.cpuTime = get_time() - Sys_Global.current_time;           // Measure time over everything this frame before GPU swap buffers for diagnostic text.
         ((_GLFWwindow*)window)->context.swapBuffers(((_GLFWwindow*)window)); // Present frame (almost always waiting for GPU since GPU bound).
-        CHECK_GL_ERROR();  // Lone catch for issues, I sprinkle this around when troubleshooting introduced issues.
+        CHECK_GL_ERROR(); // Lone catch for inadvertent issues.
         #ifdef DEBUG_RAM_OUTPUT
-        { static const u32 dbgFrm[] = {4,100,200,500,1000}; static const char* dbgLbl[] = {"frame 4","frame 100","frame 200","frame 500","frame 1000"}; for (int d=0;d<5;d++) if (Sys_Global.frame == dbgFrm[d]) {DebugRAM(dbgLbl[d]); break;} }
+        { static const u32 dbgFrm[] = {4,100,200,500,1000}; static const char* dbgLbl[] = {"frame 4","frame 100","frame 200","frame 500","frame 1000"}; for (int d=0;d<5;d++) if (globalframe == dbgFrm[d]) {DebugRAM(dbgLbl[d]); break;} }
         #endif
     }
     return 0;

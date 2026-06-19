@@ -1,6 +1,6 @@
 ﻿// animation.c - Animation System for both models and textures (in world and UI)
 #include "mod.h"
-const AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS_PER_MODEL] = { // speed, frameStart, frameEnd, frameStartModelIndex, framerate
+const AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS] = { // speed, frameStart, frameEnd, frameStartModelIndex, framerate
     [0]={[ANIM_IDLE_CLOSED]={1.0f,2,2,699,24},[ANIM_OPENING]={1.0f,2,11,699,24},[ANIM_IDLE_OPEN]={1.0f,11,11,708,24},[ANIM_CLOSING]={1.0f,12,21,709,24}}, // doorB (door2)
     [1]={[ANIM_IDLE_CLOSED]={1.0f,2,2,719,24},[ANIM_OPENING]={1.0f,2,12,719,24},[ANIM_IDLE_OPEN]={1.0f,12,12,729,24},[ANIM_CLOSING]={1.0f,14,24,731,24}}, // doorA (door1)
     [2]={[ANIM_IDLE]={1.0f,0,37,742,30},[ANIM_WALK]={1.0f,50,99,780,30},[ANIM_RUN]={1.1f,50,99,792,30},[ANIM_ATTACK1]={0.75f,111,136,830,30},[ANIM_PAIN]={0.5f,138,150,856,30},[ANIM_DYING]={0.75f,153,176,869,30}}, // npc_humanoid_mutant
@@ -65,7 +65,7 @@ MOD_TO_ENGINE void UpdateAnims(void) {
     bool portalsNeedUpdated = false;
     for (u16 i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
         Entity* e = &Eng_Global->instances[i];
-        if (e->modelIndex >= MODEL_IDX_MAX || !(e->entflags & EF_ACTIVE) || e->animationNum >= MAX_ANIMATED_MODELS || e->numclips == 0 || e->clip >= e->numclips) continue;
+        if (e->modelIndex >= MAX_MDLS || !(e->entflags & EF_ACTIVE) || e->animationNum >= MAX_ANIMS || e->numclips == 0 || e->clip >= e->numclips) continue;
         AnimationClip* clip = (AnimationClip*)&modelAnimationClips[e->animationNum][e->clip]; if (clip->framerate <= 0 || clip->speed <= 0) continue;
 
         e->currentFrameFinished += animDT * clip->speed;
@@ -199,12 +199,12 @@ void TextureSequenceInit(u16 self, char* trimmed_value) {
     
     e->textureAnimating = true; e->textureGlowAnimating = false; e->texAnimLight = U16_MAX; e->texAnimLight2 = U16_MAX;
     e->texFrame = e->texGlowFrame = 0;
-    if (StringsEqual(trimmed_value,"ScreenDestroyed")) { e->texAnimClip = NUM_TEXTURE_CLIPS - 1; return; }
-    if (StringsEqual(trimmed_value,"MedCamView1")) { e->textureAnimating = false; e->camView = 0; return; } // Sensaround occupies slots 0,1,2 for center, left, right respectively.
-    if (StringsEqual(trimmed_value,"MedCamView2")) { e->textureAnimating = false; e->camView = 1; return; }
+    if (sEqual(trimmed_value,"ScreenDestroyed")) { e->texAnimClip = NUM_TEXTURE_CLIPS - 1; return; }
+    if (sEqual(trimmed_value,"MedCamView1")) { e->textureAnimating = false; e->camView = 0; return; } // Sensaround occupies slots 0,1,2 for center, left, right respectively.
+    if (sEqual(trimmed_value,"MedCamView2")) { e->textureAnimating = false; e->camView = 1; return; }
     
     for (int i = 0; i < NUM_TEXTURE_CLIPS; ++i) {
-        if (StringsEqual(trimmed_value,textureAnimClips[i].name)) { e->texAnimClip = i; e->textureGlowAnimating = textureAnimClips[i].hasGlow; return; }
+        if (sEqual(trimmed_value,textureAnimClips[i].name)) { e->texAnimClip = i; e->textureGlowAnimating = textureAnimClips[i].hasGlow; return; }
     }
     
     e->textureAnimating = false; // Couldn't find match, just don't animate.

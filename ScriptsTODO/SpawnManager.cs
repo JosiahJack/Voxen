@@ -23,17 +23,17 @@ public class SpawnManager : MonoBehaviour {
 
 	void Start() {
 		delayFinished = Eng_Global->pauseRelativeTime;
-		if (Eng_Global->difficultyCombat == 1) {
+		if (Eng_Global->diffCbt == 1) {
 			numberToSpawn = (int) vfloor(numberToSpawn*0.5f);
 			if (numberToSpawn < 1) numberToSpawn = 1;
 		}
 
-		if (Eng_Global->difficultyCombat == 3) {
+		if (Eng_Global->diffCbt == 3) {
 			numberToSpawn = (int) vfloor(numberToSpawn*1.5f);
 			if (numberToSpawn < 1) numberToSpawn = 1;
 		}
 
-		if (Eng_Global->difficultyCombat > 3) {
+		if (Eng_Global->diffCbt > 3) {
 			numberToSpawn = (int) vfloor(numberToSpawn*5f); // Hehe :)
 		}
 	}
@@ -82,7 +82,7 @@ public class SpawnManager : MonoBehaviour {
 	}
 
 	void Spawn(int index) {
-		if (Eng_Global->difficultyCombat == 0) return; // Not on combat diff 0
+		if (Eng_Global->diffCbt == 0) return; // Not on combat diff 0
 
 		DualLog("Spawning new enemy " + index.ToString());
 		dynamicObjectsContainer = LevelManager.a.GetCurrentDynamicContainer();

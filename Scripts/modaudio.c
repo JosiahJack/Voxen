@@ -52,7 +52,7 @@ MOD_TO_ENGINE void UpdateAmbientSounds(void) {
         if (in_range) {
             if (!slot->loaded) {
                 char path[512];
-                StringFormat(path, sizeof(path), "./Audio/ambient/%s", def->filename);
+                sFormat(path, sizeof(path), "./Audio/ambient/%s", def->filename);
                 SoundUninit(&slot->sound);
                 int r = SoundInit(path,&slot->sound);
                 if (r != 0) continue;
@@ -75,7 +75,7 @@ MOD_TO_ENGINE void UpdateAmbientSounds(void) {
 
 MOD_TO_ENGINE void ResetLevelAudio(void) {
     loadedAmbients = 0;
-    MemSetToVForNBytes(ambientRegistry, 0, loadedAmbients * sizeof(u16));
+    mset(ambientRegistry, 0, loadedAmbients * sizeof(u16));
     for (u16 i = START_INDEX_LEVEL_INSTANCES; i<Eng_Global->loadedInstances;++i) {
         if (ConstIndexIsAmbient(Eng_Global->instances[i].index)) {
             ambientRegistry[loadedAmbients] = i;

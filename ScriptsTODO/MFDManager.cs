@@ -68,7 +68,7 @@
 		hardwareButtonsContainer.SetActive(false);
 		viewWeaponsContainer.SetActive(false);
 		CyberTimer ct = cyberTimer.GetComponent<CyberTimer>();
-		if (ct != null) ct.Reset(Eng_Global->difficultyCyber);
+		if (ct != null) ct.Reset(Eng_Global->diffCyb);
 		CenterTabButtonClickSilent(3,true);
 		
 	}
@@ -717,7 +717,7 @@
 			kkb.keycode = keycode;
 			kkb.keypad = keypad;
 			kkb.ResetEntry();
-			if (Eng_Global->difficultyMission <= 1) {
+			if (Eng_Global->diffMis <= 1) {
 				kkb.currentEntry = keycode;
 			}
 		} else {
@@ -728,7 +728,7 @@
 			kkb.keycode = keycode;
 			kkb.keypad = keypad;
 			kkb.ResetEntry();
-			if (Eng_Global->difficultyMission <= 1) {
+			if (Eng_Global->diffMis <= 1) {
 				kkb.currentEntry = keycode;
 			}
 		}

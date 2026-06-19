@@ -59,7 +59,7 @@ public class PuzzleGridPuzzle : MonoBehaviour {
 			return;
 		}
 
-		if (Eng_Cheats->superoverride || Eng_Global->difficultyMission == 0) {
+		if (Eng_Cheats->superoverride || Eng_Global->diffMis == 0) {
 			// SHODAN can go anywhere!  Full security override!
 			locked = false;
 		}

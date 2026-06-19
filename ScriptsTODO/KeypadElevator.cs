@@ -33,7 +33,7 @@ public class KeypadElevator : MonoBehaviour {
 	public void Use (UseData ud) {
 		if (GetCurrentLevelSecurity() > securityThreshhold) { BlockedBySecurity(Eng_Global->instances[i].position); return; }
 
-		if (Eng_Cheats->superoverride || Eng_Global->difficultyMission == 0) locked = false; // SHODAN can go anywhere!  Full security override!
+		if (Eng_Cheats->superoverride || Eng_Global->diffMis == 0) locked = false; // SHODAN can go anywhere!  Full security override!
 		if (locked) {
 			CenterStatusPrint(lockedMessageIndex); // Target something because we are locked like an info_message to say hey we are locked, e.g. vox: "Non emergency life pods disabled."
 			UseTargets(gameObject,ud,lockedTarget);

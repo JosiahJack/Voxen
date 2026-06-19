@@ -56,7 +56,7 @@ public class TextWarningsManager : MonoBehaviour {
 		if (Eng_Global->gamePaused || Eng_Global->menuActive) return;
 
 		for (int i=0;i<warningTextGObjects.Length;i++) {
-			if (!StringIsEmpty(warningTexts[i].text)) {
+			if (!sEmpty(warningTexts[i].text)) {
 				if (finishedTime[i] < Eng_Global->pauseRelativeTime) {
 					warningTexts[i].text = System.String.Empty;
 					if (warningTextGObjects[i].activeInHierarchy) warningTextGObjects[i].SetActive(false);

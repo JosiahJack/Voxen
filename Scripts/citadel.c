@@ -17,7 +17,7 @@ MOD_TO_ENGINE void ModLink(GlobalContext* g,CheatsSystem* c,SettingsSystem* s,Te
 int lev1SecCode,lev2SecCode,lev3SecCode,lev4SecCode,lev5SecCode,lev6SecCode;
 #ifdef WINDOWS
 MOD_TO_ENGINE i32 __stdcall DllMain(void* hinstDLL, unsigned long fdwReason, void* lpReserved) { (void)hinstDLL; (void)lpReserved; switch (fdwReason) {} return 1; }
-void* memset(void* dst, int c, size_t n) { return MemSetToVForNBytes(dst,c,n); }
+void* memset(void* dst, int c, size_t n) { return mset(dst,c,n); }
 #endif
 
 MOD_TO_ENGINE void ModNewGame(void) {
@@ -241,7 +241,7 @@ void RemoveGrenade(u16 p,int index) {
 void CheckForUnreadLogs(u16 p) {
     InventorySystem* inv = Inv(p);
     int em = 0, lg = 0;
-    for (int i = TEXT_LOGS_COUNT-1; i >= 0; i--) {
+    for (int i = T_LOGS_COUNT-1; i >= 0; i--) {
         if (inv->hasLog[i] && !inv->readLog[i]) {
             if (Eng_Text->audioLogType[i] == AudioLogType_Email) em++; else lg++;
         }
@@ -252,7 +252,7 @@ void CheckForUnreadLogs(u16 p) {
 
 static int FindNextUnreadLog(u16 p) {
     InventorySystem* inv = Inv(p);
-    for (int i = TEXT_LOGS_COUNT-1; i >= 0; i--) {
+    for (int i = T_LOGS_COUNT-1; i >= 0; i--) {
         if (inv->hasLog[i] && !inv->readLog[i]) return i;
     }
     return -1;
@@ -513,7 +513,7 @@ bool AddSoftwareItem(u16 p,u16 index,int vers) {
         }
         case 448/*item_cyber_data*/:
             inv->hasNewData = true;
-            if (vers >= 0 && vers < TEXT_LOGS_COUNT) inv->hasLog[vers] = true;
+            if (vers >= 0 && vers < T_LOGS_COUNT) inv->hasLog[vers] = true;
             play_wav(sounds[87],sfxVol,(Vector3){},false);
             CenterStatusPrint("%s",Eng_Text->stringTable[457]);
             return true;
@@ -554,38 +554,38 @@ void GetWeaponAmmoText(u16 p,int slot,char* buf,size_t bufSize) {
     float heat   = inv->currentEnergyWeaponHeat[slot];
     switch(wepIdx) {
         case 36: // MK3 Assault Rifle
-            if (alt) StringFormat(buf,bufSize,"%upn | %umg, %upn",mag,inv->wepAmmo[0],inv->wepAmmoSecondary[0]);
-            else     StringFormat(buf,bufSize,"%umg | %umg, %upn",mag,inv->wepAmmo[0],inv->wepAmmoSecondary[0]);
+            if (alt) sFormat(buf,bufSize,"%upn | %umg, %upn",mag,inv->wepAmmo[0],inv->wepAmmoSecondary[0]);
+            else     sFormat(buf,bufSize,"%umg | %umg, %upn",mag,inv->wepAmmo[0],inv->wepAmmoSecondary[0]);
             break;
         case 37: case 40: case 46: case 50: case 51: // Energy weapons
-            StringCopyInto_A_From_B(buf,heat > 80.0f ? Eng_Text->stringTable[14] : Eng_Text->stringTable[15],bufSize);
+            scpy_to_a_from_b(buf,heat > 80.0f ? Eng_Text->stringTable[14] : Eng_Text->stringTable[15],bufSize);
             break;
         case 38: // SV-23 Dartgun
-            if (alt) StringFormat(buf,bufSize,"%utq | %und, %utq",mag,inv->wepAmmo[2],inv->wepAmmoSecondary[2]);
-            else     StringFormat(buf,bufSize,"%und | %und, %utq",mag,inv->wepAmmo[2],inv->wepAmmoSecondary[2]);
+            if (alt) sFormat(buf,bufSize,"%utq | %und, %utq",mag,inv->wepAmmo[2],inv->wepAmmoSecondary[2]);
+            else     sFormat(buf,bufSize,"%und | %und, %utq",mag,inv->wepAmmo[2],inv->wepAmmoSecondary[2]);
             break;
         case 39: // AM-27 Flechette
-            if (alt) StringFormat(buf,bufSize,"%usp | %uhn, %usp",mag,inv->wepAmmo[3],inv->wepAmmoSecondary[3]);
-            else     StringFormat(buf,bufSize,"%uhn | %uhn, %usp",mag,inv->wepAmmo[3],inv->wepAmmoSecondary[3]);
+            if (alt) sFormat(buf,bufSize,"%usp | %uhn, %usp",mag,inv->wepAmmo[3],inv->wepAmmoSecondary[3]);
+            else     sFormat(buf,bufSize,"%uhn | %uhn, %usp",mag,inv->wepAmmo[3],inv->wepAmmoSecondary[3]);
             break;
         case 41: case 42: break; // Laser Rapier / Lead Pipe: no ammo
         case 43: // Magnum 2100
-            if (alt) StringFormat(buf,bufSize,"%usg | %uhw, %usg",mag,inv->wepAmmo[7],inv->wepAmmoSecondary[7]);
-            else     StringFormat(buf,bufSize,"%uhw | %uhw, %usg",mag,inv->wepAmmo[7],inv->wepAmmoSecondary[7]);
+            if (alt) sFormat(buf,bufSize,"%usg | %uhw, %usg",mag,inv->wepAmmo[7],inv->wepAmmoSecondary[7]);
+            else     sFormat(buf,bufSize,"%uhw | %uhw, %usg",mag,inv->wepAmmo[7],inv->wepAmmoSecondary[7]);
             break;
         case 44: // SB-20 Magpulse
-            if (alt) StringFormat(buf,bufSize,"%usu | %ucr, %usu",mag,inv->wepAmmo[8],inv->wepAmmoSecondary[8]);
-            else     StringFormat(buf,bufSize,"%ucr | %ucr, %usu",mag,inv->wepAmmo[8],inv->wepAmmoSecondary[8]);
+            if (alt) sFormat(buf,bufSize,"%usu | %ucr, %usu",mag,inv->wepAmmo[8],inv->wepAmmoSecondary[8]);
+            else     sFormat(buf,bufSize,"%ucr | %ucr, %usu",mag,inv->wepAmmo[8],inv->wepAmmoSecondary[8]);
             break;
         case 45: // ML-41 Pistol
-            if (alt) StringFormat(buf,bufSize,"%utf | %ust, %utf",mag,inv->wepAmmo[9],inv->wepAmmoSecondary[9]);
-            else     StringFormat(buf,bufSize,"%ust | %ust, %utf",mag,inv->wepAmmo[9],inv->wepAmmoSecondary[9]);
+            if (alt) sFormat(buf,bufSize,"%utf | %ust, %utf",mag,inv->wepAmmo[9],inv->wepAmmoSecondary[9]);
+            else     sFormat(buf,bufSize,"%ust | %ust, %utf",mag,inv->wepAmmo[9],inv->wepAmmoSecondary[9]);
             break;
-        case 47: StringFormat(buf,bufSize,"%url | %url",inv->currentMagazineAmount[slot],inv->wepAmmo[11]); break; // MM-76 Railgun
-        case 48: StringFormat(buf,bufSize,"%urb | %urb",inv->currentMagazineAmount[slot],inv->wepAmmo[12]); break; // DC-05 Riotgun
+        case 47: sFormat(buf,bufSize,"%url | %url",inv->currentMagazineAmount[slot],inv->wepAmmo[11]); break; // MM-76 Railgun
+        case 48: sFormat(buf,bufSize,"%urb | %urb",inv->currentMagazineAmount[slot],inv->wepAmmo[12]); break; // DC-05 Riotgun
         case 49: // RF-07 Skorpion
-            if (alt) StringFormat(buf,bufSize,"%ulg | %usm, %ulg",mag,inv->wepAmmo[13],inv->wepAmmoSecondary[13]);
-            else     StringFormat(buf,bufSize,"%usm | %usm, %ulg",mag,inv->wepAmmo[13],inv->wepAmmoSecondary[13]);
+            if (alt) sFormat(buf,bufSize,"%ulg | %usm, %ulg",mag,inv->wepAmmo[13],inv->wepAmmoSecondary[13]);
+            else     sFormat(buf,bufSize,"%usm | %usm, %ulg",mag,inv->wepAmmo[13],inv->wepAmmoSecondary[13]);
             break;
         default: break;
     }
@@ -759,7 +759,7 @@ void CyberDataFragmentOnTriggerEnter(u16 self, u16 other) {
 // CyberItem
 void CyberItemInitBeforeLoad(u16 self) {
     Entity* e = &Eng_Global->instances[self];
-    if (Eng_Global->difficultyMission == 0 && e->index == 448) flag_set(&e->entflags,EF_ACTIVE,false); // item_cyber_data
+    if (Eng_Global->diffMis == 0 && e->index == 448) flag_set(&e->entflags,EF_ACTIVE,false); // item_cyber_data
 }
 
 void CyberItemOnTriggerEnter(u16 self, u16 other) {
@@ -782,9 +782,9 @@ void CyberIceOnTriggerEnter(u16 self, u16 other) {
 void CyberMineInitBeforeLoad(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     e->damage = 55.0f;
-    if (Eng_Global->difficultyCyber < 3) { if (random_range(0.0f,1.0f) < 0.2f) flag_set(&e->entflags,EF_ACTIVE,false); e->damage = 33.0f; }
-    if (Eng_Global->difficultyCyber < 2) { if (random_range(0.0f,1.0f) < 0.33f) flag_set(&e->entflags,EF_ACTIVE,false); e->damage = 22.0f; }
-    if (Eng_Global->difficultyCyber < 1) { if (random_range(0.0f,1.0f) < 0.50f) flag_set(&e->entflags,EF_ACTIVE,false); e->damage = 11.0f; }
+    if (Eng_Global->diffCyb < 3) { if (random_range(0.0f,1.0f) < 0.2f) flag_set(&e->entflags,EF_ACTIVE,false); e->damage = 33.0f; }
+    if (Eng_Global->diffCyb < 2) { if (random_range(0.0f,1.0f) < 0.33f) flag_set(&e->entflags,EF_ACTIVE,false); e->damage = 22.0f; }
+    if (Eng_Global->diffCyb < 1) { if (random_range(0.0f,1.0f) < 0.50f) flag_set(&e->entflags,EF_ACTIVE,false); e->damage = 11.0f; }
 }
 
 void CyberMineOnTriggerEnter(u16 self, u16 other) {
@@ -799,7 +799,7 @@ void CyberMineOnTriggerEnter(u16 self, u16 other) {
 void CyberPushOnTriggerStay(u16 self, u16 other) {
     Entity* e = &Eng_Global->instances[self];
     Entity* player = &Eng_Global->instances[PLAYER1];
-    if (Eng_Global->difficultyCyber < 1 || other != PLAYER1) return;
+    if (Eng_Global->diffCyb < 1 || other != PLAYER1) return;
     player->inCyberTube = true;
     AddForce(PLAYER1,V3_ScaleByF(e->direction,e->force * (float)Eng_Global->deltaTime),false);
     Sys_Music.cyberTube = true;
@@ -985,7 +985,7 @@ void func_forcebridge(u16 self) {
     if (e->activatedScale.x <= 0.02f) e->activatedScale.x = 2.56f;
     if (e->activatedScale.y <= 0.02f) e->activatedScale.y = 0.08f;
     if (e->activatedScale.z <= 0.02f) e->activatedScale.z = 2.56f;
-    if (!e->active) { e->modelIndex = MODEL_IDX_MAX; e->collider = COLTYPE_NONE; }
+    if (!e->active) { e->modelIndex = MAX_MDLS; e->collider = COLTYPE_NONE; }
     switch (e->fieldColor) {
         case ForceFieldColor_Red:      e->texIndex = 38; break;
         case ForceFieldColor_Green:    e->texIndex = 40; break;
@@ -1011,7 +1011,7 @@ void ForceBridgeDeactivate(u16 self, bool isSilent) {
     
     if (!isSilent) play_wav(sounds[102],1.0f,e->position,true);
     e->active = false; e->lerping = true;
-    e->modelIndex = MODEL_IDX_MAX; e->collider = COLTYPE_NONE;
+    e->modelIndex = MAX_MDLS; e->collider = COLTYPE_NONE;
 }
 
 void ForceBridgeToggle(u16 self) {
@@ -1095,7 +1095,7 @@ void TextureChangerInitAfterLoad(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (!e->currentTexture) return;
     e->texIndex = e->altTexIndex;
-    if (e->altGlowIndex < MAX_VALID_TEXTURE) e->glowIndex = e->altGlowIndex;
+    if (e->altGlowIndex < MAX_TXRS) e->glowIndex = e->altGlowIndex;
 }
 
 void TextureChangerToggle(u16 self) {
@@ -1105,7 +1105,7 @@ void TextureChangerToggle(u16 self) {
         e->glowIndex = EDefs[e->index].glowIndex;
     } else {
         e->texIndex = e->altTexIndex;
-        if (e->altGlowIndex < MAX_VALID_TEXTURE) e->glowIndex = e->altGlowIndex;
+        if (e->altGlowIndex < MAX_TXRS) e->glowIndex = e->altGlowIndex;
     }
     e->currentTexture = !e->currentTexture;
 }
@@ -1207,7 +1207,7 @@ void ButtonSwitchUseTargets(u16 self, u16 activator) {
 
 void ButtonSwitchUse(u16 self, u16 activator) {
     Entity* e = &Eng_Global->instances[self];
-    if (Eng_Cheats->superoverride || Eng_Global->difficultyMission == 0) EntitySetLocked(e,false);
+    if (Eng_Cheats->superoverride || Eng_Global->diffMis == 0) EntitySetLocked(e,false);
     else if (GetCurrentLevelSecurity() > e->securityThreshold) { UIBlockedBySecurity(e->position); return; }
     if ((e->entflags & EF_LOCKED) != 0) {
         CenterStatusPrint("%s",Eng_Text->stringTable[e->lockedMessageLingdex]);
@@ -1247,11 +1247,11 @@ void HealingBedUse(u16 self, u16 owner) {
 //=============================================================================
 // TargetIO
 void UseTargets(u16 activator, const char* targetname) {
-    if (StringIsEmpty(targetname)) return;
+    if (sEmpty(targetname)) return;
     
     bool succeeded = false;
     for (u16 i = START_INDEX_LEVEL_INSTANCES; i < Eng_Global->loadedInstances; i++) {
-        if (!StringsEqual(Eng_Global->instances[i].targetname,targetname)) continue;
+        if (!sEqual(Eng_Global->instances[i].targetname,targetname)) continue;
         
         DualLog("Successfully found matching targetname %s for entity %u and activator ioflags:%u\n",targetname,i,Eng_Global->instances[activator].ioflags);
         Targetted(activator,i);
@@ -1835,7 +1835,7 @@ void PlayerEnergyUpdate(void) {
 }
 //=============================================================================
 // GrenadeActivate
-static bool GrenadeIsNPCMine(u16 self) { return Eng_Global->instances[self].layer != Layer_PlayerBullets; }
+static bool GrenadeIsNPCMine(u16 self) { return Eng_Global->instances[self].layer != L_PlayerBullets; }
 void GrenadeExplode(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     // TODO: DamageData + ApplyImpactForceSphere(damage,attackType,penetration,offense,damage*1.5f,e->position,e->strength,1.0f)
@@ -1998,7 +1998,7 @@ static float ApplyAttackTypeAdjustments(u16 self,float take,AttackType at) {
 static void UseDeathTargets(u16 self) {
     if (self == PLAYER1 || self == PLAYER2) return;
     Entity* e = &Eng_Global->instances[self];
-    if (!StringIsEmpty(e->target)) UseTargets(self,e->target);
+    if (!sEmpty(e->target)) UseTargets(self,e->target);
 }
 
 static void TeleportAway(u16 self) {
@@ -2043,7 +2043,7 @@ static void HideSelf(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (e->index == 279) return; // screens keep mesh visible
     
-    e->modelIndex = MODEL_IDX_MAX;
+    e->modelIndex = MAX_MDLS;
     e->gravity = 0.0f;
 }
 
@@ -2099,7 +2099,7 @@ static void VaporizeCorpse(u16 self,bool energyVaporized) {
     u16 fx = e->deathBurst;
     if (fx == 0) fx = 1; // PoolType_CorpseHit fallback
     if (energyVaporized) fx = 2; // PoolType_Vaporize
-    e->modelIndex = MODEL_IDX_MAX;
+    e->modelIndex = MAX_MDLS;
     bool isNPC = ConstIndexIsNPC(e->index);
     bool isSearchable = ConstIndexIsSearchable(e->index);
     if (isNPC || isSearchable) DeleteInstance(self);
@@ -2258,7 +2258,7 @@ void HealthManagerInitAfterLoad(u16 self) {
         } else {
             if (e->health < 0.0f) e->health = npcTable[e->index - 419].health;
         }
-        if (Eng_Global->difficultyCombat == 0) { e->health = 1.0f; }
+        if (Eng_Global->diffCbt == 0) { e->health = 1.0f; }
         if (e->entflags & EF_ACT_AS_CORPSE_ONLY) {
             e->health = 0.0f; e->cyberHealth = 0.0f;
             UseDeathTargets(self);
@@ -2943,26 +2943,26 @@ void UseGrenade(u16 playerIndex, int index) { // TODO
 // }
 // 
 // void TestBits(bool testIfTrue, UseData ud, TargetIO tio) {
-//     if (RobotSpawnDeactivated && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.RobotSpawnDeactivated, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (IsotopeInstalled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.IsotopeInstalled, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (ShieldActivated && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.ShieldActivated, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (LaserSafetyOverriden && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.LaserSafetyOverriden, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (LaserDestroyed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.LaserDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (BetaGroveCyberUnlocked && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.BetaGroveCyberUnlocked, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (GroveAlphaJettisonEnabled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.GroveAlphaJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (GroveBetaJettisonEnabled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.GroveBetaJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (GroveDeltaJettisonEnabled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.GroveDeltaJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (MasterJettisonBroken && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse)))TargetOnGatePassed(Const.a.questData.MasterJettisonBroken, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (Relay428Fixed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.Relay428Fixed, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (MasterJettisonEnabled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.MasterJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (BetaGroveJettisoned && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.BetaGroveJettisoned, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (AntennaNorthDestroyed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.AntennaNorthDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (AntennaSouthDestroyed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.AntennaSouthDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (AntennaEastDestroyed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.AntennaEastDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (AntennaWestDestroyed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.AntennaWestDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (SelfDestructActivated && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.SelfDestructActivated, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (BridgeSeparated && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.BridgeSeparated, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (IsolinearChipsetInstalled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.IsolinearChipsetInstalled, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (RobotSpawnDeactivated && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.RobotSpawnDeactivated, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (IsotopeInstalled && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.IsotopeInstalled, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (ShieldActivated && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.ShieldActivated, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (LaserSafetyOverriden && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.LaserSafetyOverriden, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (LaserDestroyed && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.LaserDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (BetaGroveCyberUnlocked && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.BetaGroveCyberUnlocked, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (GroveAlphaJettisonEnabled && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.GroveAlphaJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (GroveBetaJettisonEnabled && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.GroveBetaJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (GroveDeltaJettisonEnabled && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.GroveDeltaJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (MasterJettisonBroken && (!sEmpty(target) || !sEmpty(targetIfFalse)))TargetOnGatePassed(Const.a.questData.MasterJettisonBroken, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (Relay428Fixed && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.Relay428Fixed, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (MasterJettisonEnabled && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.MasterJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (BetaGroveJettisoned && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.BetaGroveJettisoned, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (AntennaNorthDestroyed && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.AntennaNorthDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (AntennaSouthDestroyed && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.AntennaSouthDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (AntennaEastDestroyed && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.AntennaEastDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (AntennaWestDestroyed && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.AntennaWestDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (SelfDestructActivated && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.SelfDestructActivated, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (BridgeSeparated && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.BridgeSeparated, testIfTrue, ud, tio, target, targetIfFalse);
+//     if (IsolinearChipsetInstalled && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.IsolinearChipsetInstalled, testIfTrue, ud, tio, target, targetIfFalse);
 // }
 //================================================================================
 // Doors
@@ -2987,7 +2987,7 @@ static void DoorSetClipFrame(u16 self, u8 clip, u16 frame) { ChangeAnim(&Eng_Glo
 static void DoorSyncLayer(u16 self) {
     Entity* e = &Eng_Global->instances[self];
     if (!e->changeLayerOnOpenClose) return;
-    e->layer = DoorIsAjar(e) ? Layer_InterDebris : Layer_Door;
+    e->layer = DoorIsAjar(e) ? L_InterDebris : L_Door;
 }
 
 static void DoorOpen(u16 self) {
@@ -3069,8 +3069,8 @@ void DoorUse(u16 self, u16 activator) {
     if (activator == NULLENT) return;
     if (GetCurrentLevelSecurity() > e->securityThreshold) { UIBlockedBySecurity(e->position); return; }
     
-    if (Eng_Cheats->superoverride || Eng_Global->difficultyMission <= 0) { EntitySetLocked(e,false); e->requiredAccessCard = AccessCardType_None; }
-    if (Eng_Global->difficultyMission <= 1) { e->requiredAccessCard = AccessCardType_None; }
+    if (Eng_Cheats->superoverride || Eng_Global->diffMis <= 0) { EntitySetLocked(e,false); e->requiredAccessCard = AccessCardType_None; }
+    if (Eng_Global->diffMis <= 1) { e->requiredAccessCard = AccessCardType_None; }
     if (e->useFinished >= Eng_Global->pauseRelativeTime) return;
     
     e->useFinished = Eng_Global->pauseRelativeTime + e->useTimeDelay;
@@ -3201,7 +3201,7 @@ static inline __attribute__((always_inline)) void Frob(Vector3 pos, Vector3 forw
     Vector3 dir = ScreenPointToRay(forward,right);
     Eng_Global->debugLine_start = pos;
     Eng_Global->debugLine_end = (Vector3){dir.x * FROB_DISTANCE + pos.x,dir.y * FROB_DISTANCE + pos.y,dir.z * FROB_DISTANCE + pos.z};
-    RaycastHit tempHit = Raycast(pos,dir,FROB_DISTANCE,LAYER_MASK_PLAYER_FROB);
+    RaycastHit tempHit = Raycast(pos,dir,FROB_DISTANCE,LMASK_PLAYER_FROB);
     Eng_Global->debugLineFinished = Eng_Global->pauseRelativeTime + 3.0;
     if (!tempHit.hit) { CenterStatusPrint("%s",Eng_Text->stringTable[30]); return; }
     Eng_Global->debugLine_end = tempHit.point;
@@ -3222,7 +3222,7 @@ MOD_TO_ENGINE void ModUpdate(void) {
     PatchUpdate(PLAYER1);
     HardwareUpdate(PLAYER1);
     if (Use()) Frob(Eng_Global->instances[PLAYER1].position,Eng_Global->instances[PLAYER1].forward,Eng_Global->instances[PLAYER1].right);
-    if (Eng_Global->pauseRelativeTime < Eng_Global->debugLineFinished && (Eng_Global->debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Eng_Global->debugLine_start,Eng_Global->debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f});
+    if (Eng_Global->pauseRelativeTime < Eng_Global->debugLineFinished && (Eng_Global->debugLineVertCount + 6) < (MAX_WIRELINE_VRTS * 3)) AddDebugLine(Eng_Global->debugLine_start,Eng_Global->debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f});
     for (u16 i = START_INDEX_LEVEL_INSTANCES; i < Eng_Global->loadedInstances; ++i) {
         Entity* e = &Eng_Global->instances[i];
         TextureSequenceUpdate(i);
@@ -3317,7 +3317,7 @@ void SearchableInit(u16 i) {
 }
 //================================================================================
 // Entity Init
-u8 GetCurrentLevelSecurity(void) { return (Eng_Global->difficultyMission < 1 || Eng_Cheats->superoverride) ? 0u : Eng_Global->levelSecurity[Eng_Global->curLev]; }
+u8 GetCurrentLevelSecurity(void) { return (Eng_Global->diffMis < 1 || Eng_Cheats->superoverride) ? 0u : Eng_Global->levelSecurity[Eng_Global->curLev]; }
 u16 GetImpactType(u16 instanceIdx) {
     switch (Eng_Global->instances[instanceIdx].bloodType) {
         case BloodType_None:         return 729; // SparksSmall
@@ -3334,9 +3334,9 @@ u16 GetImpactType(u16 instanceIdx) {
 
 void UsableInit(u16 i) {
     Entity* e = &Eng_Global->instances[i];
-    if (Eng_Global->difficultyPuzzle == 3 && e->index == 361 && random_range(0.0f,1.0f) < 0.33f) DeleteInstance(i); // 33% chance of not spawning logic probes on Puzzle difficulty of 3
-    if (Eng_Global->difficultyMission <= 1 && ConstIndexIsAccessCard(e->index)) DeleteInstance(i); // Remove access cards on Mission difficulty 1 or 0
-    if (Eng_Global->difficultyMission == 0 && e->index == 313) DeleteInstance(i); // Remove audiologs on Mission difficulty 0
+    if (Eng_Global->diffPuz == 3 && e->index == 361 && random_range(0.0f,1.0f) < 0.33f) DeleteInstance(i); // 33% chance of not spawning logic probes on Puzzle difficulty of 3
+    if (Eng_Global->diffMis <= 1 && ConstIndexIsAccessCard(e->index)) DeleteInstance(i); // Remove access cards on Mission difficulty 1 or 0
+    if (Eng_Global->diffMis == 0 && e->index == 313) DeleteInstance(i); // Remove audiologs on Mission difficulty 0
 }
 
 void MFDInit(SystemUI* ui) {
@@ -3391,7 +3391,7 @@ void InventoryInit(InventorySystem* inv) {
 
 MOD_TO_ENGINE void PlayerInit(u16 i) {
     Eng_Global->instances[i].index = 767;
-    Eng_Global->instances[i].layer = Layer_Player;
+    Eng_Global->instances[i].layer = L_Player;
     Eng_Global->instances[i].position = (Vector3){10.52f,-43.792f + 0.84f,20.2908f}; // Start Actual: Puts player on Medical Level in actual game start position.  Added 0.84f
     Eng_Global->instances[i].scale = (Vector3){1.0f,1.0f,1.0f};
     Eng_Global->instances[i].rotation = (Quaternion){0.0f,0.7071f,0.0f,0.7071f}; // 90deg rotation CW about Y axis as viewed from the top looking down onto player
@@ -3417,11 +3417,11 @@ MOD_TO_ENGINE void ModInitAfterLoad(void) {
         if (i == PLAYER1 || i == PLAYER2 || ConstIndexIsDynamicObject(constIndex) || (ConstIndexIsNPC(constIndex) && constIndex < 443/*not cyber*/)) e->gravity = 1.0f;
         else e->gravity = 0.0f;
         
-        if (ConstIndexIsGeometry(constIndex)) e->layer = Layer_Geometry;
-        else if (ConstIndexIsDoor(constIndex)) e->layer = Layer_Door;
+        if (ConstIndexIsGeometry(constIndex)) e->layer = L_Geometry;
+        else if (ConstIndexIsDoor(constIndex)) e->layer = L_Door;
         else if (ConstIndexIsUsableObject(constIndex)) UsableInit(i);
         else if (ConstIndexIsDoor(e->index)) DoorInitAfterLoad(i);
-        else if (ConstIndexIsNPC(constIndex)) { e->layer = Layer_NPC; /* TODO AIInit funcion */ }
+        else if (ConstIndexIsNPC(constIndex)) { e->layer = L_NPC; /* TODO AIInit funcion */ }
         else if (ConstIndexIsSearchable(constIndex)) SearchableInit(i);
         else if (constIndex == 515) func_forcebridge(i); // func_forcebridge
         else if (constIndex == 517) FuncWallInitAfterLoad(i);
@@ -3434,7 +3434,7 @@ MOD_TO_ENGINE void ModInitAfterLoad(void) {
         else if (ConstIndexIsButtonSwitch(e->index)) ButtonSwitchInitAfterLoad(i);
         else if (constIndex >= 448 && constIndex <= 457) CyberItemInitBeforeLoad(i);
         else if (constIndex == 480) CyberMineInitBeforeLoad(i);
-        if (!StringIsEmpty(e->targetname) && (e->ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE)) flag_set(&e->entflags,EF_ACTIVE,false);
+        if (!sEmpty(e->targetname) && (e->ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE)) flag_set(&e->entflags,EF_ACTIVE,false);
     }
 }
 

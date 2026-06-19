@@ -19,7 +19,6 @@ typedef u8 ColliderType;
 typedef u16 Text;
 typedef struct {Vector3 point; Vector3 normal; float distance; u16 hitInstanceIndex; bool hit;} RaycastHit;
 typedef struct {float speed; u16 frameStart,frameEnd,frameStartModelIndex; u8 framerate;} AnimationClip;
-typedef struct {Vector3 center,halfExtents; Quaternion rot;} ShapeBox; typedef struct {Vector3 center; float radius;} ShapeSphere; typedef struct {Vector3 tip,base; float radius;} ShapeCapsule;
 #define LIGHTON 1
 #define SHADON  2
 #define LIGHT_AND_SHADOW_ON 3
@@ -31,18 +30,18 @@ typedef struct { Vector3 pos; float intensity; Color3 col; u32 lflags; float ran
 typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSteps[32]; bool stepIsLerping[32],lerpUp; u8 currentStep,numIntervalSteps,numLerpSteps; } LightAnimation; // Separate from main lights buffer struct since it's not used very often
 #define INSTANCE_COUNT 7680 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
 #define LIGHT_COUNT 2048
-#define MODEL_IDX_MAX 6805
-#define MAX_VALID_TEXTURE 2048
-#define MAX_TOTAL_PIXELS 30000000u
+#define MAX_MDLS 6000
+#define MAX_TXRS 2048
+#define MAX_TOTAL_PIXELS 29900000u
 #define MAX_UNIQUE_COLORS 1048576u
-#define MAX_ANIMATED_MODELS 64
-#define MAX_ANIMATION_CLIPS_PER_MODEL 32
-#define MAX_DEBUG_LINE_VERTS 512000
+#define MAX_ANIMS 64
+#define MAX_ANIMCLIPS 32
+#define MAX_WIRELINE_VRTS 512000
 #define MAX_PORTALS 64 // Max is 49 on Citadel level 7
 #define MAX_KEYS 512
 #define MAX_MOUSE_BUTTONS 8
 #define MAX_CHANNELS 48 // Max concurrent sounds, must keep track of for volume setting
-#define VERTEX_ATTRIBUTES_SIZE 16
+#define VRT_ATT_SZ 16
 #define DOUBLE_CLICK_TIME 0.5f
 #define PLAYER_MAX_WALK_SPEED 3.2f
 #define PLAYER_MAX_SPRINT_SPEED 8.8f
@@ -183,27 +182,27 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define CURSOR_SCREEN_PERCENTAGE 0.02f
 #define FONT_NORMAL 0
 #define FONT_STOPD  1
-#define TEXT_WHITE                0
-#define TEXT_YELLOW               1
-#define TEXT_DARK_YELLOW          2
-#define TEXT_GREEN                3
-#define TEXT_RED                  4
-#define TEXT_ORANGE               5
-#define TEXT_STOPD_RED            6
-#define TEXT_STOPD_RED_HIGHLIGHT  7
-#define TEXT_STOPD_RED_PAUSETITLE 8
-#define TEXT_GREEN_MENU           9
-#define TEXT_GREEN_MENU_SHADOW   10
-#define TEXT_GREEN_MENU_GLOW     11
-#define TEXT_RED_MENU            12
+#define T_WHITE                0
+#define T_YELLOW               1
+#define T_DARK_YELLOW          2
+#define T_GREEN                3
+#define T_RED                  4
+#define T_ORANGE               5
+#define T_STOPD_RED            6
+#define T_STOPD_RED_HIGHLIGHT  7
+#define T_STOPD_RED_PAUSETITLE 8
+#define T_GREEN_MENU           9
+#define T_GREEN_MENU_SHADOW   10
+#define T_GREEN_MENU_GLOW     11
+#define T_RED_MENU            12
 #define SAVE_REMINDER_TIME 7.0f // 7secs ~is human short-term memory length
 #define CREDITS_PAGES 22
 #define TARGET_ID_LENGTH 32 // Max needed 22 + 5 for ID + 1 for space between them = 28
 #define SOUNDS_COUNT 670
-#define TEXT_DATA_FILEBUFFER_SIZE 65536 // 16 pages
-#define TEXT_STRING_COUNT 1100
-#define TEXT_LOCALIZATION_MAX_LENGTH 1280
-#define TEXT_LOGS_COUNT 134
+#define T_DATA_FILEBUFFER_SIZE 65536 // 16 pages
+#define T_STRING_COUNT 1100
+#define T_LOCALIZATION_MAX_LENGTH 1280
+#define T_LOGS_COUNT 134
 #define MAX_DYNAMIC_ENTITIES 512
 #define TERMINAL_VELOCITY 10.0f
 #define PHYS_FLOAT_TO_INT_SCALEF 100.0f
@@ -240,85 +239,60 @@ typedef u8 ButtonType;       static const u8 ButtonType_Generic=0,ButtonType_Gen
 typedef u8 TabMSG;           static const u8 TabMSG_None=0,TabMSG_Search=1,TabMSG_AudioLog=2,TabMSG_Keypad=3,TabMSG_Elevator=4,TabMSG_GridPuzzle=5,TabMSG_WirePuzzle=6,TabMSG_EReader=7,TabMSG_Weapon=8,TabMSG_SystemAnalyzer=9;
 typedef u8 PuzzleCellType;   static const u8 PuzzleCellType_Off=0,PuzzleCellType_Standard=1,PuzzleCellType_And=2,PuzzleCellType_Bypass=3;
 typedef u8 PuzzleGridType;   static const u8 PuzzleGridType_King=0,PuzzleGridType_Queen=1,PuzzleGridType_Knight=2,PuzzleGridType_Rook=3,PuzzleGridType_Bishop=4,PuzzleGridType_Pawn=5;
-static const u32 Layer_Default          = 1U;
-static const u32 Layer_TransparentFX    = 2U;
-//                                        4U   // unused (formerly IgnoreRaycast)
-//                                        8U   // unused
-static const u32 Layer_Water            = 16U; static const u32 Layer_BlocksRaycast = 16U;  // same as Water
-static const u32 Layer_UI               = 32U;
-//                                        64U  // unused
-//                                        128U // unused
-static const u32 Layer_GunViewModel     = 256U;
-static const u32 Layer_Geometry         = 512U;
-static const u32 Layer_NPC              = 1024U;
-static const u32 Layer_PlayerBullets    = 2048U;
-static const u32 Layer_Player           = 4096U;
-static const u32 Layer_Corpse           = 8192U;
-static const u32 Layer_PhysObjects      = 16384U;
-//                                        32768U // unused (formerly Sky)
-static const u32 Layer_PlayerTriggerOnly= 65536U;
-static const u32 Layer_Trigger          = 131072U;
-static const u32 Layer_Door             = 262144U;
-static const u32 Layer_InterDebris      = 524288U;
-static const u32 Layer_Player2          = 1048576U;
-//                                        2097152U // unused (formerly Player3)
-//                                        4194304U // unused (formerly Player4)
-static const u32 Layer_NPCTrigger       = 8388608U;
-static const u32 Layer_NPCBullet        = 16777216U;
-static const u32 Layer_NPCClip          = 33554432U;
-static const u32 Layer_Clip             = 67108864U;
-static const u32 Layer_Automap          = 134217728U;
-static const u32 Layer_Culling          = 268435456U;
-static const u32 Layer_CorpseSearchable = 536870912U;
-//                                        1073741824U // unused
-static const u32 Layer_NULL             = 2147483648U;
-#define LAYER_MASK_PLAYER_COLLIDESWITH   (Layer_Clip|Layer_NPCBullet|Layer_Player2|Layer_Door|Layer_Trigger|Layer_PlayerTriggerOnly|Layer_Default|Layer_TransparentFX|Layer_Geometry|Layer_NPC)
-#define LAYER_MASK_NPC_COLLIDESWITH      (Layer_Clip|Layer_NPCClip|Layer_PlayerBullets|Layer_Player2|Layer_Player|Layer_Door|Layer_Trigger|Layer_NPCTrigger|Layer_Default|Layer_TransparentFX|Layer_Geometry|Layer_NPC)
-#define LAYER_MASK_NPC_SIGHT             (Layer_Default|Layer_Geometry|Layer_Door|Layer_InterDebris|Layer_PhysObjects|Layer_Player)
-#define LAYER_MASK_NPC_ATTACK            (Layer_Default|Layer_Geometry|Layer_NPC|Layer_Door|Layer_InterDebris|Layer_PhysObjects|Layer_Player)
-#define LAYER_MASK_NPC_COLLISION         (Layer_Default|Layer_TransparentFX|Layer_Geometry|Layer_NPC|Layer_Door|Layer_InterDebris|Layer_Player|Layer_Clip|Layer_NPCClip|Layer_PhysObjects)
-#define LAYER_MASK_PLAYER_FROB           (Layer_Default|Layer_Geometry|Layer_Water|Layer_Door|Layer_InterDebris|Layer_PhysObjects|Layer_CorpseSearchable)
-#define LAYER_MASK_PLAYER_TARGET_ID_FROB (Layer_Default|Layer_Geometry|Layer_Door|Layer_NPC|Layer_CorpseSearchable)
-#define LAYER_MASK_PLAYER_ATTACK         (Layer_Default|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Door|Layer_InterDebris|Layer_PhysObjects|Layer_CorpseSearchable)
-#define LAYER_MASK_EXPLOSION             (Layer_Default|Layer_Geometry|Layer_NPC|Layer_PlayerBullets|Layer_Door|Layer_InterDebris|Layer_PhysObjects|Layer_Player|Layer_Player2|Layer_CorpseSearchable)
-#define LAYER_MASK_PLAYER_FEET           (Layer_Default|Layer_Geometry)
-typedef struct {
-	i32 InputCodeSettings[42];
-	u16 ScreenWidth,ScreenHeight;
-    float ScreenCenterX,ScreenCenterY;
-	bool Fullscreen;
-	u8 FOV,Brightness,Gamma,FXAA,Shadows,Reflections,Vsync,ModelDetail,GI,SpeakerMode,Reverb,VolumeMaster,VolumeMusic,VolumeMessage,VolumeEffects,Language,DynamicMusic;
-	u8 Footsteps,InvertLook,InvertInventoryCycling,InvertCyberspaceLook,QuickItemPickup,QuickReloadWeapons,MouseSensitivity,NoShootMode,HeadBob,SSR_RES,CurrentMonitor;
-} SettingsSystem;
+static const u32 L_Default          = 1U;
+static const u32 L_TransparentFX    = 2U;
+//                                    4U   // unused (formerly IgnoreRaycast)
+//                                    8U   // unused
+static const u32 L_Water            = 16U; static const u32 L_BlocksRaycast = 16U;  // same as Water
+static const u32 L_UI               = 32U;
+//                                    64U  // unused
+//                                    128U // unused
+static const u32 L_GunViewModel     = 256U;
+static const u32 L_Geometry         = 512U;
+static const u32 L_NPC              = 1024U;
+static const u32 L_PlayerBullets    = 2048U;
+static const u32 L_Player           = 4096U;
+static const u32 L_Corpse           = 8192U;
+static const u32 L_PhysObjects      = 16384U;
+//                                    32768U // unused (formerly Sky)
+static const u32 L_PlayerTriggerOnly= 65536U;
+static const u32 L_Trigger          = 131072U;
+static const u32 L_Door             = 262144U;
+static const u32 L_InterDebris      = 524288U;
+static const u32 L_Player2          = 1048576U;
+//                                    2097152U // unused (formerly Player3)
+//                                    4194304U // unused (formerly Player4)
+static const u32 L_NPCTrigger       = 8388608U;
+static const u32 L_NPCBullet        = 16777216U;
+static const u32 L_NPCClip          = 33554432U;
+static const u32 L_Clip             = 67108864U;
+static const u32 L_Automap          = 134217728U;
+static const u32 L_Culling          = 268435456U;
+static const u32 L_CorpseSearchable = 536870912U;
+//                                    1073741824U // unused
+static const u32 L_NULL             = 2147483648U;
+#define LMASK_PLAYER_COLLIDESWITH   (L_Clip|L_NPCBullet|L_Player2|L_Door|L_Trigger|L_PlayerTriggerOnly|L_Default|L_TransparentFX|L_Geometry|L_NPC)
+#define LMASK_NPC_COLLIDESWITH      (L_Clip|L_NPCClip|L_PlayerBullets|L_Player2|L_Player|L_Door|L_Trigger|L_NPCTrigger|L_Default|L_TransparentFX|L_Geometry|L_NPC)
+#define LMASK_NPC_SIGHT             (L_Default|L_Geometry|L_Door|L_InterDebris|L_PhysObjects|L_Player)
+#define LMASK_NPC_ATTACK            (L_Default|L_Geometry|L_NPC|L_Door|L_InterDebris|L_PhysObjects|L_Player)
+#define LMASK_NPC_COLLISION         (L_Default|L_TransparentFX|L_Geometry|L_NPC|L_Door|L_InterDebris|L_Player|L_Clip|L_NPCClip|L_PhysObjects)
+#define LMASK_PLAYER_FROB           (L_Default|L_Geometry|L_Water|L_Door|L_InterDebris|L_PhysObjects|L_CorpseSearchable)
+#define LMASK_PLAYER_TARGET_ID_FROB (L_Default|L_Geometry|L_Door|L_NPC|L_CorpseSearchable)
+#define LMASK_PLAYER_ATTACK         (L_Default|L_Geometry|L_NPC|L_PlayerBullets|L_Door|L_InterDebris|L_PhysObjects|L_CorpseSearchable)
+#define LMASK_EXPLOSION             (L_Default|L_Geometry|L_NPC|L_PlayerBullets|L_Door|L_InterDebris|L_PhysObjects|L_Player|L_Player2|L_CorpseSearchable)
+#define LMASK_PLAYER_FEET           (L_Default|L_Geometry)
+typedef struct { i32 InputCodeSettings[42]; u16 ScreenWidth,ScreenHeight; float ScreenCenterX,ScreenCenterY; bool Fullscreen; u8 FOV,Brightness,Gamma,FXAA,Shadows,Reflections,Vsync,ModelDetail,GI,SpeakerMode,Reverb,VolumeMaster,VolumeMusic,VolumeMessage,VolumeEffects,Language,DynamicMusic; u8 Footsteps,InvertLook,InvertInventoryCycling,InvertCyberspaceLook,QuickItemPickup,QuickReloadWeapons,MouseSensitivity,NoShootMode,HeadBob,SSR_RES,CurrentMonitor; } SettingsSystem;
 typedef struct { bool god,noclip,notarget,bottomless,superoverride,fatigueCheat,redbull,consoleActive,noHUD,showLocation,showFPS,showPhys,editMode; u8 dizzyLevel; } CheatsSystem;
 typedef struct {
-	i32 lastMultiMediaTabOpened;
-	bool lastWeaponSideRH,lastItemSideRH,lastAutomapSideRH,lastTargetSideRH,lastDataSideRH,lastSearchSideRH,lastLogSideRH,lastLogSecondarySideRH,lastMinigameSideRH;
-	double logFinished;
-	bool logActive;
+	double logFinished,blinkFinished,beepFinished,tickFinished,/*Visual only, Time.time controlled*/ centerTabsTickFinished;/*Visual only, Time.time controlled*/ 
+	i32 lastMultiMediaTabOpened,applyButtonReferenceIndex,curCenterTab,wep16index,tempSpriteIndex,count;
+	u16 linkedElevatorDoor,tetheredPGP,tetheredPWP,tetheredSearchable,tetheredKeypadElevator,tetheredKeypadKeycode,elevButtonSpawnIdx[8];
+	u8 highlightTickCount[4],beepCount,elevButtonLevelIdx[8],elevCurrentFloor;
+	bool lastWeaponSideRH,lastItemSideRH,lastAutomapSideRH,lastTargetSideRH,lastDataSideRH,lastSearchSideRH,lastLogSideRH,lastLogSecondarySideRH,lastMinigameSideRH,logActive,paperLogInUse,usingObject,isBlocking,isRH,centerTabNotified[4],highlightStatus[4],audPaused,mouseClickHeldOverGUI,buttonsEnabled[8],buttonsDarkened[8];
 	AudioLogType logType;
-	u16 linkedElevatorDoor;
 	Vector3 objectInUsePos;
-	u16 tetheredPGP,tetheredPWP,tetheredSearchable,tetheredKeypadElevator,tetheredKeypadKeycode;
-	bool paperLogInUse,usingObject;
-	i32 applyButtonReferenceIndex,curCenterTab;
-    bool isBlocking,isRH;
-	i32 wep16index,tempSpriteIndex;
-	double tickFinished; // Visual only, Time.time controlled
-	i32 count;
-	bool centerTabNotified[4];
-	double centerTabsTickFinished; // Visual only, Time.time controlled
-	bool highlightStatus[4];
-	u8 highlightTickCount[4];
-	double blinkFinished,beepFinished;
-	u8 beepCount;
-	bool audPaused,mouseClickHeldOverGUI;
-    u8 elevButtonLevelIdx[8];
-    u16 elevButtonSpawnIdx[8];
-    bool buttonsEnabled[8],buttonsDarkened[8];
-    u8 elevCurrentFloor;
 } SystemUI;
-typedef struct { char stringTable[TEXT_STRING_COUNT][TEXT_LOCALIZATION_MAX_LENGTH]; u16 audioLogImagesRefIndicesLH[TEXT_LOGS_COUNT],audioLogImagesRefIndicesRH[TEXT_LOGS_COUNT]; u8 audioLogType[TEXT_LOGS_COUNT],audioLogLevelFound[TEXT_LOGS_COUNT]; size_t file_size,filelog_size; u8* file_data,*filelog_data; } TextSystem; // Hefty table for localization support.
+typedef struct { char stringTable[T_STRING_COUNT][T_LOCALIZATION_MAX_LENGTH]; u16 audioLogImagesRefIndicesLH[T_LOGS_COUNT],audioLogImagesRefIndicesRH[T_LOGS_COUNT]; u8 audioLogType[T_LOGS_COUNT],audioLogLevelFound[T_LOGS_COUNT]; size_t file_size,filelog_size; u8* file_data,*filelog_data; } TextSystem; // Hefty table for localization support.
 #define PATCH_BERSERK   1
 #define PATCH_DETOX     2
 #define PATCH_GENIUS    4
@@ -384,217 +358,95 @@ typedef struct { char stringTable[TEXT_STRING_COUNT][TEXT_LOCALIZATION_MAX_LENGT
 #define MINIGAME_EEL_ZAPPER 16
 #define MINIGAME_ROAD       32
 #define MINIGAME_TRIOPTOE   64
-// Hw referenceIndex, ref14Index
-// Sys 21,0 // Nav 22,1 // Ere 23,2  // Sen 24,3
-// Trg 25,4 // Shi 26,5 // Bio 27,6  // Lan 28,7
-// Env 29,8 // Boo 30,9 // Jum 31,10 // Nig 32,11
+// Hw referenceIndex,ref14Index::Sys 21,0 Nav 22,1 Ere 23,2 Sen 24,3 Trg 25,4 Shi 26,5 Bio 27,6 Lan 28,7 Env 29,8 Boo 30,9 Jum 31,10 Nig 32,11
 typedef struct {
-    u32 accessCardOwned;
-    u8 hasSoft,softVersions[7];
-    u16 numLogsFromLevel[10];
-    int lastAddedIndex;
-	bool beepDone,logPaused,hasNewEmail,hasNewNotes;
-	int emailCurrent,emailIndex;
-    u8 hasMinigame;
-    u16 hasHardware,hardwareIsActive;
-    u8 hardwareVersion[HW_COUNT],hardwareVersionSetting[HW_COUNT];
-    u16 hardwareInvReferenceIndex[HW_COUNT];
-    int hardwareInvCurrent; // Current slot in the general inventory (14 slots).
-	int hardwareInvIndex; // Current index to the item look-up table.
-	int generalInventoryIndexRef[14];
-    double nitroTimeSetting,earthShakerTimeSetting;
-    bool currentCyberItem,isPulserNotDrill;
-    int globalLookupIndex;
-    int weaponInventoryIndices[7],weaponInventoryAmmoIndices[7];
-    u8 numweapons;
-    bool wepLoadedWithAlternate[7];
-    u8 currentMagazineAmount[7],currentMagazineAmount2[7];
-    u32 wepAmmo[16],wepAmmoSecondary[16];
-    float weaponEnergySetting[16];
-    bool justChangedWeap,overloadEnabled,recoiling;
-    i16 weaponCurrentPending,weaponIndexPending;
-    double justFired,waitTilNextFire,reloadFinished,lerpStartTime,dropFinished;
-    float reloadLerpValue,sparqSetting,ionSetting,blasterSetting,plasmaSetting,stungunSetting;
-    u8 lerpUp;
-	float energySliderClickedTime,cyberWeaponAttackFinished,targetY;
-    u16 heldObjectIndex,heldObjectCustomIndex,heldObjectAmmo,heldObjectAmmo2;
-    bool heldObjectLoadedAlternate,holdingObject,grenadeActive;
-    u16 weaponIndex,currentSearchItem;
-    float currentEnergyWeaponHeat[7];
-    u8 grenAmmo[7],grenConstIndex[7],grenadeCurrent,generalInvCurrent;
-    u16 generalInvIndex,generalInvCustomIndex[14];
-    bool hasNewLogs,hasNewData;
-    u8 patchCurrent,patchCounts[7],cyberItemIndex;
-    float fatigue,radiated,resetAfterDeathTime,energy,maxEnergy;
-    u16 patchActive,drainJPM;
-    double playerHealthTimer,berserkFinishedTime,berserkIncrementFinishedTime,detoxFinishedTime,geniusFinishedTime,mediFinishedTime,reflexFinishedTime,sightFinishedTime;
-    double sightSideEffectFinishedTime,staminupFinishedTime,turboCyberTime,turboFinished,energyDrainTickFinished,painSoundFinished,radSoundFinished,radFXFinished;
-    int berserkIncrement;
-    float radAdjust;
-    float initialRadiation;
-    bool playerDead;
-    i16 ladderState;
-    bool staminupActive,hasLog[134],readLog[134];
+    double nitroTimeSetting,earthShakerTimeSetting,justFired,waitTilNextFire,reloadFinished,lerpStartTime,dropFinished,playerHealthTimer,berserkFinishedTime,berserkIncrementFinishedTime,detoxFinishedTime,geniusFinishedTime,mediFinishedTime,reflexFinishedTime,sightFinishedTime,
+           sightSideEffectFinishedTime,staminupFinishedTime,turboCyberTime,turboFinished,energyDrainTickFinished,painSoundFinished,radSoundFinished,radFXFinished;
+    float weaponEnergySetting[16],reloadLerpValue,sparqSetting,ionSetting,blasterSetting,plasmaSetting,stungunSetting,energySliderClickedTime,cyberWeaponAttackFinished,targetY,currentEnergyWeaponHeat[7],fatigue,radiated,resetAfterDeathTime,energy,maxEnergy,radAdjust,initialRadiation;
+    u32 accessCardOwned,wepAmmo[16],wepAmmoSecondary[16];
+    i32 lastAddedIndex,emailCurrent,emailIndex,globalLookupIndex,weaponInventoryIndices[7],weaponInventoryAmmoIndices[7],hardwareInvCurrent,/*Current slot in the general inventory (14 slots).*/hardwareInvIndex,/*Current index to the item look-up table.*/generalInventoryIndexRef[14],berserkIncrement;
+    i16 ladderState,weaponCurrentPending,weaponIndexPending;
+    u16 numLogsFromLevel[10],hasHardware,hardwareIsActive,hardwareInvReferenceIndex[HW_COUNT],heldObjectIndex,heldObjectCustomIndex,heldObjectAmmo,heldObjectAmmo2,weaponIndex,currentSearchItem,generalInvIndex,generalInvCustomIndex[14],patchActive,drainJPM;
+    u8 lerpUp,hasSoft,softVersions[7],hasMinigame,numweapons,currentMagazineAmount[7],currentMagazineAmount2[7],hardwareVersion[HW_COUNT],hardwareVersionSetting[HW_COUNT],grenAmmo[7],grenConstIndex[7],grenadeCurrent,generalInvCurrent,patchCurrent,patchCounts[7],cyberItemIndex;
+	bool playerDead,beepDone,logPaused,hasNewEmail,hasNewNotes,currentCyberItem,isPulserNotDrill,wepLoadedWithAlternate[7],staminupActive,hasLog[134],readLog[134],justChangedWeap,overloadEnabled,recoiling,heldObjectLoadedAlternate,holdingObject,grenadeActive,hasNewLogs,hasNewData;
 } InventorySystem;
-
 typedef struct { float damage,penetration,offense,armorvalue,defense,impactVelocity; Vector3 attacknormal,hitpoint; AttackType attackType; u16 owner,hitIdx; bool isOtherNPC,berserkActive; } DamageData;
 typedef /*FAT*/ struct  {
-    u32 entflags;
+    u32 entflags,layer,ioflags;
     u16 modelIndex,index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
     Vector3 position;
-    float radius,shadRadius;
-    Vector3 scale,forward,right;
-    Quaternion rotation;
-    
-    // Rendering
+    Vector3 scale,forward,right,velocity,angularVelocity,lastPosition,lastAngularVelocity,topPoint,targetPosition,startPosition,activatedScale,direction;
+    float radius,shadRadius,gravity,inertiaTensor[6],invInertiaTensor[6];
+    Quaternion rotation;    
     u16 texIndex,glowIndex,specIndex,normIndex,lodIndex,colliderMeshIndex;
-    u8 camView;
-    
-    // Physics
-    u32 layer;
-    Vector3 velocity,angularVelocity,lastPosition,lastAngularVelocity;
-    float gravity;
-    float inertiaTensor[6];
-    float invInertiaTensor[6];
-    bool  inertiaTensorValid;
-    
+    i32 cellIndex; i16 cellX,cellZ;
+    u8 portalIndex,clip,numclips,texAnimClip,camView; // If this is a door, index into portal array for toggling state.
+    bool inertiaTensorValid,colliding,cardchunk,kinematic;
     Vector3 colliderCenter; // Offset relative to .position's global worldspace xyz location
     Vector3 colliderSize; // x,y,z for Box, x for Sphere radius, else x, y, z for Capsule radius, height, and direction (0.0f = X-Axis, 1.0f = Y-Axis, 2.0f = Z-Axis respectively, default 1.0f)
-    Vector3 topPoint,targetPosition,startPosition,activatedScale,direction;
     ColliderType/*u8*/ collider;
     FuncStates/*u8*/ startState,funcState;
     BodyState/*u8*/ bodyState;
-
-    float targetPositionY,speed,percentAjar,percentMoved;
-    float mass,angularDrag,inertia;
-    Vector3 accumulatedForce;
-    float dynamicFriction,staticFriction,bounciness;
-    bool colliding,cardchunk,kinematic;
-    float volume; // Audio
-    
-    // Logic and I/O
-    u32 ioflags;
-    float health,cyberHealth;
+    float health,cyberHealth,targetPositionY,speed,percentAjar,percentMoved,mass,angularDrag,inertia,dynamicFriction,staticFriction,bounciness,volume,timeForTranquilization,gracePeriodFinished,meleeDamageFinished,idleTime,attack1SoundTime,attack2SoundTime,attack3SoundTime,timeTillEnemyChangeFinished,timeTillDeadFinished,timeTillPainFinished,huntFinished,
+          randomWaitForNextAttack1Finished,randomWaitForNextAttack2Finished,randomWaitForNextAttack3Finished,attackFinished,attack2Finished,attack3Finished,deathBurstFinished,tranquilizeFinished,wanderFinished,timeSinceMovedEnough,posCheckFinished,currentFrameFinished,animSwapFinished,delay,damage,itemLifeTime,minutes,seconds,randomMin,randomMax,timeInterval,
+          cyberTimer,intervalFinished,delayFireFinished,delayResetFinished,delayFinished,tickFinished,tickTime,useFinished,waitBeforeClose,lasersFinished,amount,resetTime,minSecurityLevel,ajarPercentage,useTimeDelay,timeBeforeLasersOn,force,strength,offStrengthFactor,distancePaddingToTopPoint,initialBurstFinished,justUsed,timerFinished,randomItemDropChance[4];
+    Vector3 accumulatedForce;    
     u8 securityThreshold,lerpUp;
-    char targetname[TARGET_STRING_LENGTH];
-    char target[TARGET_STRING_LENGTH];
-    char target2[TARGET_STRING_LENGTH];
-    char currenttarget[TARGET_STRING_LENGTH];
-    char targetIfFalse[TARGET_STRING_LENGTH];
-    u16 enemy,altTexIndex,altGlowIndex,messageIndex,teleportID,targetDestinationID;
+    u16 enemy,altTexIndex,altGlowIndex,messageIndex,teleportID,targetDestinationID,recentMostActivator,countToTrigger,counter,activateSFX,lockedSFX,messageLingdex,lockedMessageLingdex,animationNum,frame,texFrame,texGlowFrame,texAnimLight,texAnimLight2,lookUpIndex,contents[4],customIndex[4],useableItemIndex,usableCustomIndex,randomItem[4],randomItemCustomIndex[4];
     i16 version,SFXIndex,SFXLockedIndex,textIndex,emailIndex,ammo,ammo2;
-    float delay,damage,itemLifeTime,minutes,seconds,randomMin,randomMax;
-    float timeInterval,cyberTimer,intervalFinished,delayFireFinished,delayResetFinished;
-    bool searchableInUse,generateContents,dontReset,onlyOnce,ignoreSecondaryTriggers,allDone,currentTexture,useRandomTimes,active; // Lawdy, we'll make these bitflags someday
-    bool touchEnabled,broken,stayOpen,startOpen,ajar,blocked,targetAlreadyDone,toggleLasers,targettingOnlyUnlocks;
-    bool changeLayerOnOpenClose,despawnInstead,doSelfAfterList,destroyAfterListInsteadOfDeactivate,iceActive;
-    bool forceFieldDirectionX,forceFieldDirectionY,forceFieldDirectionZ,heldObjectLoadedAlternate,changeTexOnActive,blinkTexOnActive;
-    u16 recentMostActivator,countToTrigger,counter,activateSFX,lockedSFX,messageLingdex,lockedMessageLingdex;
+    bool searchableInUse,generateContents,dontReset,onlyOnce,ignoreSecondaryTriggers,allDone,currentTexture,useRandomTimes,active,touchEnabled,broken,stayOpen,startOpen,ajar,blocked,targetAlreadyDone,toggleLasers,targettingOnlyUnlocks,changeLayerOnOpenClose,despawnInstead,doSelfAfterList,
+         destroyAfterListInsteadOfDeactivate,iceActive,forceFieldDirectionX,forceFieldDirectionY,forceFieldDirectionZ,heldObjectLoadedAlternate,changeTexOnActive,blinkTexOnActive,alternateOn,lerping,onlyTargetOnce,autoPlayEmail,inCyberTube,noiseFinished,textureAnimating,textureGlowAnimating,
+         textureAnimationStopsAtDead,texAnimInReverse,texAnimRandom;
     u8 maxRandomItems; // [0 4]
-    u16 lookUpIndex,contents[4],customIndex[4],useableItemIndex,usableCustomIndex,randomItem[4],randomItemCustomIndex[4];
-    float randomItemDropChance[4];
     AttackType attackType;
     AccessCardType requiredAccessCard;
-    float delayFinished,tickFinished,tickTime,useFinished,waitBeforeClose,lasersFinished,amount,resetTime,minSecurityLevel,ajarPercentage,useTimeDelay,timeBeforeLasersOn,force,strength,offStrengthFactor,distancePaddingToTopPoint,initialBurstFinished,justUsed,timerFinished;
     BloodType bloodType;
     DoorState doorOpen;
     ForceFieldColor fieldColor;
-    bool lerping,onlyTargetOnce,autoPlayEmail,inCyberTube,noiseFinished;
     TrackType trackType;
     MusicType musicType;
-
-    // Animation
-    u8 clip,numclips,texAnimClip;
-    u16 animationNum,frame,texFrame,texGlowFrame;
-    bool textureAnimating,textureGlowAnimating,textureAnimationStopsAtDead,texAnimInReverse,texAnimRandom;
-    u16 texAnimLight,texAnimLight2;
-    i32 cellIndex; i16 cellX,cellZ;
-    u8 portalIndex; // If this is a door, index into portal array for toggling state.
     DoorState doorState;
-    float currentFrameFinished,animSwapFinished;
-    bool alternateOn;
-    u16 mainSwitchMaterial;
+    u16 mainSwitchMaterial,deathBurst;
     AIState currentState; // NPC logic
-    u16 deathBurst;
-    float timeForTranquilization,gracePeriodFinished,meleeDamageFinished,idleTime,attack1SoundTime,attack2SoundTime,attack3SoundTime;
-    float timeTillEnemyChangeFinished,timeTillDeadFinished,timeTillPainFinished,huntFinished;
-    float randomWaitForNextAttack1Finished,randomWaitForNextAttack2Finished,randomWaitForNextAttack3Finished;
-    float attackFinished,attack2Finished,attack3Finished,deathBurstFinished,tranquilizeFinished,wanderFinished,timeSinceMovedEnough,posCheckFinished;
     Vector3 currentDestination,lastKnownEnemyPos,targettingPosition,idealTransformForward,idealPos;
-    char texAnimResourceFolder[TARGET_STRING_LENGTH];
-    // phew what a porker of a struct, it's been a eatin!
-} Entity;
-
+    char targetname[TARGET_STRING_LENGTH],target[TARGET_STRING_LENGTH],target2[TARGET_STRING_LENGTH],currenttarget[TARGET_STRING_LENGTH],targetIfFalse[TARGET_STRING_LENGTH],texAnimResourceFolder[TARGET_STRING_LENGTH];
+} Entity; // phew what a porker of a struct, it's been a eatin!
 typedef struct { Entity* entries; u32 count; u32 capacity; } DataParser;
-typedef struct { u8 dataType; const char* fieldName; } EntityField;
 typedef __builtin_va_list va_list;
 typedef struct { char soundPath[128]; } ma_sound;
 typedef struct {
-    u32 frame,lastFrameSecCount,framesPerLastSecond,worstFPS,debugLineVertCount,shotsFired,grenadesThrown,savesScummed;
+    u32 lastFrameSecCount,worstFPS,debugLineVertCount,shotsFired,grenadesThrown,savesScummed;
     u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,loadedInstances; // Numbers of instances of entities and lights loaded (always for just the current level)
     float farPlane[14],damageDealt,damageReceived,timeScale,worldMin_x[14],worldMin_z[14],voxelMinCenterX[14],voxelMinCenterZ[14];
 	double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,debugLineFinished,shakeFinished,last_time,last_topframe_time,last_physics_time,deltaTime,current_time,screenshotTimeout,pauseRelativeTime,absoluteTime,statusTextDecayFinished,justSavedTimeStamp;
     i32 fogFac,cursorPosition_x,cursorPosition_y; // Separate internal cursor from system cursor.  This gets relatively pushed around by real cursor movement to give consistent platform behavior.
 	Vector3 debugLine_start,debugLine_end,cyberspaceRecallPoint;
-	bool inventoryMode,levelCurrentlyLoading;
-    bool introNotPlayed;
-    u8 levelSecurity[14],startLevel,numLevels,curLev,difficultyCombat,difficultyPuzzle,difficultyMission,difficultyCyber,creditsPageIndex;
-	bool gamePaused,menuActive,gameFinished;
-	bool creditsActive,decoyActive,boosterActive,uiIsBlocking,mouseClickHeldOverGUI,geniusActive;
-    bool (*GetKey)(i32 settingIndex);
-    bool (*GetKeyPressed)(i32 settingIndex);
+    u8 levelSecurity[14],startLevel,numLevels,curLev,diffCbt,diffPuz,diffMis,diffCyb,creditsPageIndex;
+	bool inventoryMode,levelCurrentlyLoading,introNotPlayed,gamePaused,menuActive,gameFinished,creditsActive,decoyActive,boosterActive,uiIsBlocking,mouseClickHeldOverGUI,geniusActive,(*GetKey)(i32 settingIndex),(*GetKeyPressed)(i32 settingIndex);
     InventorySystem invP1,invP2;
     Entity instances[INSTANCE_COUNT];
     Color fogColor[14];
-	char global_dllname[256],global_winicon[256],playerName[27];
-    char audiologNames[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH],audiologSubjects[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH],audiologSenders[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH],audioLogSpeech2Text[TEXT_LOGS_COUNT][TEXT_LOCALIZATION_MAX_LENGTH];
+	char global_dllname[256],global_winicon[256],playerName[27],audiologNames[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH],audiologSubjects[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH],audiologSenders[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH],audioLogSpeech2Text[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH];
 } GlobalContext; // Savable complete game state data
-
-static inline __attribute__((always_inline)) void flag_setu16(u16 *flags, u16 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
-static inline __attribute__((always_inline)) void flag_set(u32 *flags, u32 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
-
-// Math, Vectors, Quaternions
+#define PI 3.14159265f
+#define TAU 6.2831853f
 #define vabs(x) ((x) < 0 ? -(x) : (x))
 #define vmin(a,b) ((a) < (b) ? (a) : (b))
 #define vmax(a,b) ((a) > (b) ? (a) : (b))
-#define PI 3.14159265f
-#define TAU 6.2831853f
-static inline __attribute__((always_inline)) float vfloor(float x) { int i = (int)x; return (float)(i > x ? i - 1 : i); }
-static inline __attribute__((always_inline)) float vceil(float x) { int i = (int)x; return (float)(x > 0 && x > (float)i ? i + 1 : i); }
 #define vclamp(x,a,b) vmin(vmax(x,a),b)
 #define vsqrtf(x) __builtin_sqrtf(x)
+static inline __attribute__((always_inline)) float vfloor(float x) { int i = (int)x; return (float)(i > x ? i - 1 : i); }
+static inline __attribute__((always_inline)) float vceil(float x) { int i = (int)x; return (float)(x > 0 && x > (float)i ? i + 1 : i); }
 static inline __attribute__((always_inline)) float vsign(float x) { return x < 0.0f ? -1.0f : 1.0f; } // Follow Unity Sign convention where 0 = 1.0f sign.
 static inline __attribute__((always_inline)) float vsinf(float x) { x -= TAU * vfloor(x / TAU); if (x > PI) { x -= TAU; } float s = (4/PI)*x - (4/(PI*PI))*x*vabs(x); return 0.225f*(s*vabs(s) - s) + s; }
 static inline __attribute__((always_inline)) float vcosf(float x) { return vsinf(x + 1.57079632f); }
-static inline __attribute__((always_inline)) float vacosf(float x) {
-    float negate = (x < 0.0f) ? 1.0f : 0.0f;
-    x = vabs(x); float ret = (-0.0187293f * x + 0.0742610f) * x - 0.2121144f; ret = (ret * x + 1.5707288f) * vsqrtf(1.0f - x); ret = ret - 2.0f * negate * ret;
-    return negate * PI + (1.0f - 2.0f * negate) * ret;
-}
+static inline __attribute__((always_inline)) float vacosf(float x) { float negate = (x < 0.0f) ? 1.0f : 0.0f; x = vabs(x); float ret = (-0.0187293f * x + 0.0742610f) * x - 0.2121144f; ret = (ret * x + 1.5707288f) * vsqrtf(1.0f - x); ret = ret - 2.0f * negate * ret; return negate * PI + (1.0f - 2.0f * negate) * ret; }
 static inline __attribute__((always_inline)) float vtan(float x) { return vsinf(x) / vcosf(x); }
 static inline __attribute__((always_inline)) float vcot(float x) { float x2 = x * x; float t = x + (x2 * x) * 0.33333333f; return 1.0f / t; }
 static inline __attribute__((always_inline)) float deg2rad(float degrees) { return degrees * (PI / 180.0f); }
-static inline __attribute__((always_inline)) float vlog2f(float x) {
-    union { float f; unsigned int i; } v = { x };
-    int e = (int)((v.i >> 23) & 255) - 127;
-    v.i = (v.i & 0x7FFFFF) | 0x3F800000;   // normalize mantissa to [1,2)
-    float m = v.f;
-    float p = m - 1.0f;
-    float log2m = p * (1.3465558f + p * (-0.33942322f + p * 0.028794660f)); // polynomial approximation of log2(m)
-    return (float)e + log2m;
-}
-
+static inline __attribute__((always_inline)) float vlog2f(float x) { union { float f; unsigned int i; } v = { x }; int e = (int)((v.i >> 23) & 255) - 127; v.i = (v.i & 0x7FFFFF) | 0x3F800000;/*normalize mantissa to [1,2)*/ float m = v.f; float p = m - 1.0f; float log2m = p * (1.3465558f + p * (-0.33942322f + p * 0.028794660f)); /*polynomial approx of log2(m)*/ return (float)e + log2m; }
 static inline __attribute__((always_inline)) float vlog(float x) { return vlog2f(x) * 0.69314718f; }
-static inline __attribute__((always_inline)) float vexp2f(float x) {
-    float ip = vfloor(x);
-    float fp = x - ip;
-    float p = 1.0f + fp * (0.69314718f + fp * (0.24022651f + fp * 0.05550411f)); // poly approximation for 2^fp on [0,1]
-    int ei = (int)ip + 127;
-    unsigned int bits = (unsigned int)(ei << 23);
-    union { unsigned int i; float f; } u = { bits };
-    return u.f * p;
-}
-
+static inline __attribute__((always_inline)) float vexp2f(float x) { float ip = vfloor(x); float fp = x - ip; float p = 1.0f + fp * (0.69314718f + fp * (0.24022651f + fp * 0.05550411f)); /*poly approximation for 2^fp on [0,1]*/ int ei = (int)ip + 127; unsigned int bits = (unsigned int)(ei << 23); union { unsigned int i; float f; } u = { bits }; return u.f * p; }
 static inline __attribute__((always_inline)) float vexp(float x) { return vexp2f(x * 1.4426950409f); } // 1/ln(2)
 static inline __attribute__((always_inline)) float vpow(float a, float b) { return vexp(b * vlog(a)); }
 static inline __attribute__((always_inline)) i32 clamp(i32 val, i32 min, i32 max) { return (val > max) ? max : ((val < min) ? min : val); }
@@ -614,7 +466,7 @@ static inline __attribute__((always_inline)) Vector3 V3_Normalize(Vector3 v) { f
 static inline __attribute__((always_inline)) float squareDistance2D(float x1, float z1, float x2, float z2) { float dx = x2 - x1; float dz = z2 - z1; return dx * dx + dz * dz; }
 static inline __attribute__((always_inline)) float squareDistance3D(float x1, float y1, float z1, float x2, float y2, float z2) { float dx = x2 - x1; float dy = y2 - y1; float dz = z2 - z1; return dx * dx + dy * dy + dz * dz; }
 static inline __attribute__((always_inline)) Quaternion quat_multiply(Quaternion q1, Quaternion q2) { return (Quaternion){(q1.w * q2.x + q1.x * q2.w + q1.y * q2.z - q1.z * q2.y),(q1.w * q2.y - q1.x * q2.z + q1.y * q2.w + q1.z * q2.x),(q1.w * q2.z + q1.x * q2.y - q1.y * q2.x + q1.z * q2.w),(q1.w * q2.w - q1.x * q2.x - q1.y * q2.y - q1.z * q2.z)}; } // Hamilton product, rotates q1 by q2
-static inline __attribute__((always_inline)) Vector3 quat_rotate_vector(Quaternion q, Vector3 v) { Quaternion r = quat_multiply((quat_multiply(q, (Quaternion){v.x,v.y,v.z,0.0f})),(Quaternion){-q.x,-q.y,-q.z,q.w}); return (Vector3){r.x,r.y,r.z}; } // Returns rotated input vector rotated by a quaternion.
+static inline __attribute__((always_inline)) Vector3 quat_rot_v3(Quaternion q, Vector3 v) { Quaternion r = quat_multiply((quat_multiply(q, (Quaternion){v.x,v.y,v.z,0.0f})),(Quaternion){-q.x,-q.y,-q.z,q.w}); return (Vector3){r.x,r.y,r.z}; } // Returns rotated input vector rotated by a quaternion.
 static inline __attribute__((always_inline)) u8 hardware14fromConstdex(u16 c) { return clamp(c - 21,0,14); }
 static inline __attribute__((always_inline)) bool ConstIndexIsPortalBlockingDoor(u16 entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }// All doors except see-through doors.
 static inline __attribute__((always_inline)) bool ConstIndexInBounds(int c) { return (c >= 0 && c <= 760); }
@@ -635,3 +487,5 @@ static inline __attribute__((always_inline)) bool ConstIndexIsStaticObjectSaveab
 static inline __attribute__((always_inline)) bool ConstIndexIsStaticObjectImmutable(int c) { return ((c >= 527 && c < 530) || (c >= 532 && c < 546) || (c >= 547 && c < 553) || c == 554 || (c >= 556 && c < 594) || c == 595 || c == 597 || c == 599 || c == 601 || c == 603 || (c >= 616 && c < 688) || c == 693 || c == 696 || c == 697 || c == 698 || (c >= 704 && c < 717) || c == 720 || (c >= 733 && c < 736) || (c >= 737 && c < 739) || c == 746 || c == 747 || (c >= 750 && c <= 759 && c != 755)); }
 static inline __attribute__((always_inline)) int CompareMemoryForNBytes(const void *s1, const void *s2, size_t n) { const u8 *p1 = (const u8 *)s1; const u8 *p2 = (const u8 *)s2; while (n--) { if (*p1 != *p2) {return *p1 - *p2;} p1++; p2++; } return 0; } // memcmp replacement
 static inline __attribute__((always_inline)) void* MoveMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n) { u8 *d = (u8*)dst; const u8* s = (const u8*)src; if (d < s) { while (n--) { *d++ = *s++; } } else if (d > s) { d += n; s += n; while (n--) { *--d = *--s; } } return dst; } // memmove replacement
+static inline __attribute__((always_inline)) void flag_setu16(u16 *flags, u16 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
+static inline __attribute__((always_inline)) void flag_set(u32 *flags, u32 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }

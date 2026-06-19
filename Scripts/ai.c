@@ -62,8 +62,8 @@ float deathBurstTimer[NUM_AI_TYPES] = {0.0f,0.0f, 0.1f,0.0f,0.1f,0.1f,0.2f,0.1f,
 void SetHuntFinished(u16 i) {
     u16 npcID = Eng_Global->instances[i].index - 419;
     Eng_Global->instances[i].huntFinished = Eng_Global->pauseRelativeTime;
-    int diff = Eng_Global->difficultyCombat;
-    if (npcTable[npcID].type == NPCType_Cyber) diff = Eng_Global->difficultyCyber;
+    int diff = Eng_Global->diffCbt;
+    if (npcTable[npcID].type == NPCType_Cyber) diff = Eng_Global->diffCyb;
     if (diff <= 1) { // More forgetful on easy.
         Eng_Global->instances[i].huntFinished += vmax((npcTable[npcID].huntTime * 0.75),60.0);
     } else if (diff >= 3) { // Good memory on hard.
@@ -75,7 +75,7 @@ void SetHuntFinished(u16 i) {
 
 MOD_TO_ENGINE void InitializeAIAfterLoad(u16 i) {
     Entity* e = &Eng_Global->instances[i];
-    e->layer = Layer_NPC;
+    e->layer = L_NPC;
     u16 npcID = e->index - 419;
     e->idleTime = Eng_Global->pauseRelativeTime + (double)random_range(npcTable[npcID].timeIdleSFXMin,npcTable[npcID].timeIdleSFXMax);
     e->attack1SoundTime = e->attack2SoundTime = e->attack3SoundTime = Eng_Global->pauseRelativeTime;
@@ -108,8 +108,8 @@ MOD_TO_ENGINE void InitializeAIAfterLoad(u16 i) {
 
     e->attackFinished = Eng_Global->pauseRelativeTime + 1.0;
     e->idealTransformForward = e->forward;
-    //StringCopyInto_A_From_B(e->targetID,npcTable[npcID].name,TARGET_ID_LENGTH);
-    //StringFormat(e->targetID,TARGET_ID_LENGTH * sizeof(char),"%s %05u",npcTable[npcID].name,npcCountInWorldPerType[npcID]++); // TODO
+    //scpy_to_a_from_b(e->targetID,npcTable[npcID].name,TARGET_ID_LENGTH);
+    //sFormat(e->targetID,TARGET_ID_LENGTH * sizeof(char),"%s %05u",npcTable[npcID].name,npcCountInWorldPerType[npcID]++); // TODO
     u8 c;
     switch (e->currentState) {
         case AIState_Walk:    c = ANIM_WALK;    break;
@@ -255,7 +255,7 @@ static void aiac_dead(Entity* self) {
 void AIAnimationControllerUpdate(u16 idx) {
     Entity* self = &Eng_Global->instances[idx];
     if (!(self->entflags & EF_ACTIVE))        return;
-    if (self->animationNum >= MAX_ANIMATED_MODELS)  return;
+    if (self->animationNum >= MAX_ANIMS)  return;
     if (self->currentState == AIState_Dying) { aiac_dying(self); return; }
     if (self->currentState == AIState_Dead)  { aiac_dead(self);  return; }
     if (self->entflags & EF_ASLEEP)     { aiac_idle(self);  return; }
@@ -277,8 +277,8 @@ static bool AICheckIfEnemyInSight(Entity* self) {
     u16 eidx = self->enemy;
     if (!eidx || !ai_has_health(self)) return false;
     Entity* en = &Eng_Global->instances[eidx];
-    bool enIsNPC = (en->layer & Layer_NPC) != 0;
-    int diff = ai_is_cyber(self) ? Eng_Global->difficultyCyber : Eng_Global->difficultyCombat;
+    bool enIsNPC = (en->layer & L_NPC) != 0;
+    int diff = ai_is_cyber(self) ? Eng_Global->diffCyb : Eng_Global->diffCbt;
     if (!ai_is_cyber(self) && !enIsNPC && !PositionVisibleFromPlayerCell(self->position.x, self->position.z)) return false;
     if (diff == 0 && (self->index - 419) != 28) return false;
     if (Eng_Cheats->notarget && !enIsNPC) {
@@ -296,7 +296,7 @@ static bool AICheckIfEnemyInSight(Entity* self) {
 
     Vector3 spos = ai_sight_pos(self);
     Vector3 lineN = V3_Normalize(V3_AsubB(en->position, spos));
-    RaycastHit hit = Raycast(spos, lineN, npcTable[self->index - 419].sightRange, LAYER_MASK_NPC_SIGHT);
+    RaycastHit hit = Raycast(spos, lineN, npcTable[self->index - 419].sightRange, LMASK_NPC_SIGHT);
     if (hit.hit) {
         if (hit.hitInstanceIndex == eidx) { flag_set(&self->entflags, EF_ENEM_IN_LOS, true); return true; }
         // Smart NPCs try to open doors blocking line-of-sight
@@ -305,7 +305,7 @@ static bool AICheckIfEnemyInSight(Entity* self) {
             u16 hi = hit.hitInstanceIndex;
             if (hi && V3_SqDist(hit.point, spos) < 4.0f && ConstIndexIsDoor(Eng_Global->instances[hi].index)) {
                 Entity* dr = &Eng_Global->instances[hi];
-                if ((dr->doorOpen == DoorState_Closed || (dr->doorOpen == DoorState_Closing && Eng_Global->difficultyCombat > 2)) && !(dr->entflags & EF_LOCKED) && GetCurrentLevelSecurity() <= dr->securityThreshold && (dr->requiredAccessCard == AccessCardType_None)) DoorActuate(hi);
+                if ((dr->doorOpen == DoorState_Closed || (dr->doorOpen == DoorState_Closing && Eng_Global->diffCbt > 2)) && !(dr->entflags & EF_LOCKED) && GetCurrentLevelSecurity() <= dr->securityThreshold && (dr->requiredAccessCard == AccessCardType_None)) DoorActuate(hi);
             }
         }
     }
@@ -315,7 +315,7 @@ static bool AICheckIfEnemyInSight(Entity* self) {
 
 static void AISetHuntFinished(Entity* self) {
     self->huntFinished = Eng_Global->pauseRelativeTime;
-    int diff = ai_is_cyber(self) ? Eng_Global->difficultyCyber : Eng_Global->difficultyCombat;
+    int diff = ai_is_cyber(self) ? Eng_Global->diffCyb : Eng_Global->diffCbt;
     double ht = npcTable[self->index - 419].huntTime;
     double mn = 60.0;
     if      (diff <= 1) self->huntFinished += (ht * 0.75 > mn ? ht * 0.75 : mn);
@@ -348,7 +348,7 @@ static void AIPlaySightSound(Entity* self) {
 }
 
 static bool AICheckIfPlayerInSight(Entity* self) {
-    int diff = ai_is_cyber(self) ? Eng_Global->difficultyCyber : Eng_Global->difficultyCombat;
+    int diff = ai_is_cyber(self) ? Eng_Global->diffCyb : Eng_Global->diffCbt;
     if (!ai_is_cyber(self) && !PositionVisibleFromPlayerCell(self->position.x, self->position.z)) return false;
     if (diff == 0 && (self->index - 419) != 28) return false;
     if (self->enemy) return AICheckIfEnemyInSight(self);
@@ -370,12 +370,12 @@ static bool AICheckIfPlayerInSight(Entity* self) {
     float angle = vacosf(cosA) * (180.0f / PI);
     bool makingNoise = Eng_Global->instances[PLAYER1].noiseFinished > Eng_Global->pauseRelativeTime;
     if (angle < npc->fov * 0.5f) {
-        RaycastHit hit = Raycast(spos, checkN, dist + 0.1f, LAYER_MASK_NPC_SIGHT);
+        RaycastHit hit = Raycast(spos, checkN, dist + 0.1f, LMASK_NPC_SIGHT);
         if (hit.hit && hit.hitInstanceIndex == PLAYER1) { flag_set(&self->entflags, EF_ENEM_IN_LOS, true); AISetEnemy(self, PLAYER1); AIPlaySightSound(self); return true; }
         if (!hit.hit && makingNoise && dist < npc->hearingRange) { AISetEnemy(self, PLAYER1); AIPlaySightSound(self); return true; }
     } else {
         if (dist < npc->distToSeeBehind) {
-            RaycastHit hit = Raycast(spos, checkN, dist + 0.1f, LAYER_MASK_NPC_SIGHT);
+            RaycastHit hit = Raycast(spos, checkN, dist + 0.1f, LMASK_NPC_SIGHT);
             if (hit.hit && hit.hitInstanceIndex == PLAYER1) { flag_set(&self->entflags, EF_ENEM_IN_LOS, true); AISetEnemy(self, PLAYER1); AIPlaySightSound(self); return true; }
         }
         if (makingNoise && dist < npc->hearingRange) { AISetEnemy(self, PLAYER1); AIPlaySightSound(self); return true; }
@@ -430,7 +430,7 @@ bool AICheckPain(Entity* self) {
     if (atkIdx && self->timeTillEnemyChangeFinished < Eng_Global->pauseRelativeTime) {
         self->timeTillEnemyChangeFinished = Eng_Global->pauseRelativeTime + npcTable[self->index - 419].timeToChangeEnemy;
         Entity* atk = &Eng_Global->instances[atkIdx];
-        bool atkIsPlayer = (atk->layer & Layer_Player) != 0;
+        bool atkIsPlayer = (atk->layer & L_Player) != 0;
         if (!atkIsPlayer && ConstIndexIsNPC(atk->index)) {
             NPCType mt = npcTable[self->index - 419].type, at = npcTable[atk->index - 419].type;
             bool canFight = atk->index != self->index;
@@ -538,7 +538,7 @@ static void AIWalk(Entity* self) {
             if (npcTable[self->index - 419].moveType != AIMoveType_Fly) {
                 Vector3 spos = ai_sight_pos(self);
                 Vector3 cp = { spos.x + self->forward.x*0.48f, spos.y, spos.z + self->forward.z*0.48f };
-                RaycastHit gh = Raycast(cp,(Vector3){0,-1,0},CELL_SIZE,LAYER_MASK_NPC_COLLISION);
+                RaycastHit gh = Raycast(cp,(Vector3){0,-1,0},CELL_SIZE,LMASK_NPC_COLLISION);
                 if (!gh.hit) { mv.x = 0.0f; mv.z = 0.0f; }
             }
             mv.y = self->velocity.y;
@@ -673,7 +673,7 @@ static void AIRun(u16 selfIdx) {
         if (AIWithinAngleToTarget(self)) {
             if (ndat->hopsOnMove) AIHopMove(self);
             else AIRunMove(self);
-        } else if (Eng_Global->difficultyCombat >= 2 && random_range(0.0f,1.0f) < 0.5f) {
+        } else if (Eng_Global->diffCbt >= 2 && random_range(0.0f,1.0f) < 0.5f) {
             AIFace(self, self->currentDestination);
         }
     }
@@ -708,12 +708,12 @@ static void AIDyingSetup(Entity* self) {
     else { self->gravity = 1.0f; self->kinematic=true; }
 
     flag_set(&self->entflags, EF_ASLEEP, false);
-    self->layer = Layer_Corpse;
+    self->layer = L_Corpse;
     flag_set(&self->entflags, EF_FIRST_SIGHTING, true);
     self->timeTillDeadFinished = Eng_Global->pauseRelativeTime + npc->timeTillDead;
 //     if (npc->switchMaterialOnDeath && self->dyingTexture) self->texIndex = self->dyingTexture; // TODO Handle hopper and zerog texture changes
     if (self->index == 428 || self->index == 439) self->velocity = (Vector3){0.0f, self->velocity.z, 0.0f}; // Index-specific velocity patch (Exec bot and Zero-G mutant)
-    if (self->index == 433) self->layer = Layer_Corpse; // Hopper: enable capsule collider (implicit in layer change)
+    if (self->index == 433) self->layer = L_Corpse; // Hopper: enable capsule collider (implicit in layer change)
     flag_set(&self->entflags, EF_DYING_SETUP, true);
 }
 
@@ -725,8 +725,8 @@ static void AIDying(Entity* self) {
         self->currentState = AIState_Dead;
     }
 
-    if (AIDeactivatesVisibleMeshWhileDying(self)) self->modelIndex = MODEL_IDX_MAX;
-    if (self->index == 439) self->layer = Layer_Corpse | Layer_CorpseSearchable; // Zero-G mutant enables search collider while still dying
+    if (AIDeactivatesVisibleMeshWhileDying(self)) self->modelIndex = MAX_MDLS;
+    if (self->index == 439) self->layer = L_Corpse | L_CorpseSearchable; // Zero-G mutant enables search collider while still dying
 }
 
 static void AIDead(u16 idx) {
@@ -737,21 +737,21 @@ static void AIDead(u16 idx) {
     flag_set(&self->entflags, EF_DYING_SETUP,  false);
     if (self->entflags & EF_DEAD_CHECKS_DONE) return;
 
-    if (AIDeactivatesVisibleMeshWhileDying(self)) self->modelIndex = MODEL_IDX_MAX;
+    if (AIDeactivatesVisibleMeshWhileDying(self)) self->modelIndex = MAX_MDLS;
     self->currentState = AIState_Dead;
-    self->layer = Layer_Corpse;
+    self->layer = L_Corpse;
     if (self->entflags & EF_TELEPORT_ON_DEATH) {
         self->gravity = 1.0f;
-        self->modelIndex = MODEL_IDX_MAX;
+        self->modelIndex = MAX_MDLS;
         // TODO: TeleportAway(ai_self_idx(self)), DeleteInstance(idx);
     } else if (ai_is_cyber(self)) {
         self->gravity = 0.0f;
-        self->modelIndex = MODEL_IDX_MAX;
+        self->modelIndex = MAX_MDLS;
         // TODO: Gib(ai_self_idx(self)) — spawn gibs
         DeleteInstance(idx);
     } else {
         // Enable search collider for non-gib corpses (Avian Mutant index 2 always searchable)
-        self->layer = Layer_Corpse | Layer_CorpseSearchable;
+        self->layer = L_Corpse | L_CorpseSearchable;
         self->velocity.x = 0.0f; self->velocity.z = 0.0f;
         if (self->index != 433) self->gravity = 1.0f;// Hopper deactivates itself
     }
@@ -844,7 +844,7 @@ static void ProjectileRaycast(Entity* self, int n) {
     }
 
     MuzzleBurst(self,n);
-    RaycastHit hit = Raycast(spos, dir, range, LAYER_MASK_NPC_ATTACK);
+    RaycastHit hit = Raycast(spos, dir, range, LMASK_NPC_ATTACK);
     if (!hit.hit) return;
 
     u16 hi = hit.hitInstanceIndex;
@@ -883,7 +883,7 @@ static void ProjectileLaunched(Entity* self, int n) {
     if (!bb || bb >= INSTANCE_COUNT) return;
 
     Entity* proj   = &Eng_Global->instances[bb];
-    proj->layer    = Layer_NPCBullet;
+    proj->layer    = L_NPCBullet;
     proj->position = spos;
     proj->forward  = dir;
     // TODO: store damage data into projectile entity fields for deferred impact
@@ -985,8 +985,8 @@ static void AIFlierMoveToHoverHeight(Entity* self) {
         self->idealPos.z = self->position.z;
     } else {
         Vector3 sp = ai_sight_pos(self);
-        RaycastHit dn = Raycast(sp, (Vector3){0,-1,0}, npc->sightRange, LAYER_MASK_NPC_SIGHT);
-        RaycastHit up = Raycast(sp, (Vector3){0, 1,0}, npc->sightRange, LAYER_MASK_NPC_SIGHT);
+        RaycastHit dn = Raycast(sp, (Vector3){0,-1,0}, npc->sightRange, LMASK_NPC_SIGHT);
+        RaycastHit up = Raycast(sp, (Vector3){0, 1,0}, npc->sightRange, LMASK_NPC_SIGHT);
         float dDn = dn.hit ? dn.distance : 0.0f, dUp = up.hit ? up.distance : 0.0f;
         float yH  = npc->flightHeight * (npc->flightHeightIsPercentage ? dDn + dUp : 1.0f);
         Vector3 fp = dn.hit ? dn.point : self->position;
@@ -1012,7 +1012,7 @@ float AITranquilize(u16 idx, float amount, bool energy) {
 }
 
 void AIAlert(u16 idx) {
-    if (Eng_Global->difficultyCombat == 0) return;
+    if (Eng_Global->diffCbt == 0) return;
     Entity* self = &Eng_Global->instances[idx];
     AISetEnemy(self, PLAYER1);
     self->currentDestination = Eng_Global->instances[PLAYER1].position;

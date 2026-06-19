@@ -110,7 +110,7 @@ extern int lev5SecCode;
 extern int lev6SecCode;
 extern Entity EDefs[MAX_ENTITIES];
 extern bool vmailActive;
-extern const AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS_PER_MODEL];
+extern const AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS];
 extern const char* sounds[SOUNDS_COUNT];
 
 // Mod Inlines
@@ -184,4 +184,4 @@ void TakeEnergy(float drain);
 void GiveEnergy(float give, EnergyType type);
 void BioMonitorInit();
 void BioMonitorUpdate(u16 p);
-void* MemCpyFromBtoAForNBytes(void *dst, const void *src, size_t n); // memcpy replacement
+void* mcpy(void *dst, const void *src, size_t n); // memcpy replacement

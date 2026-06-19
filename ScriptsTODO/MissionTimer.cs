@@ -38,7 +38,7 @@ public class MissionTimer : MonoBehaviour {
 		
 		QuestLogNotesManager.a.UpdateToNextMission(nextMissionIndex);
 
-		if (Eng_Global->difficultyMission < 3) return; // Don't update timer on lower skill settings.
+		if (Eng_Global->diffMis < 3) return; // Don't update timer on lower skill settings.
 		t = newTimerAmount;
 		currentMissionIndex = nextMissionIndex;
 		currentMission = Eng_Text->stringTable[misTextIndex];
@@ -46,7 +46,7 @@ public class MissionTimer : MonoBehaviour {
     }
 
     void Update() {
-		if (Eng_Global->difficultyMission < 3) return;
+		if (Eng_Global->diffMis < 3) return;
 		if (Eng_Global->gamePaused) return;
 		if (Eng_Global->menuActive) return;
 		if (MouseLookScript.a.inCyberSpace) return; // timer doesn't count down in cyberspace, yay!

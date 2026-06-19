@@ -24,7 +24,7 @@ public class KeypadKeycode : MonoBehaviour {
 	}
 
 	public void Use (UseData ud) {
-	    if (Eng_Cheats->superoverride || Eng_Global->difficultyMission == 0) {
+	    if (Eng_Cheats->superoverride || Eng_Global->diffMis == 0) {
 	        locked = false; // SHODAN can go anywhere!  Full security override!
 		} else if (GetCurrentLevelSecurity() > securityThreshhold) {
 		    Eng_UI->BlockedBySecurity(Eng_Global->instances[i].position);

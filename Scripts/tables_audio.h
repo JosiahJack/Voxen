@@ -671,7 +671,7 @@ const char* sounds[SOUNDS_COUNT] = {
     "./Audio/physics/footsteps/Wood/woodcrate_jump3.wav",
 };
 
-const char* audioLogs[TEXT_LOGS_COUNT] = {
+const char* audioLogs[T_LOGS_COUNT] = {
     "./Audio/logs/ghiran-2.wav",
     "./Audio/logs/steinberg-1.wav",
     "./Audio/logs/raines-1.wav",

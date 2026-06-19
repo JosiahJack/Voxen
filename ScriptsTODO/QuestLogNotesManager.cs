@@ -33,7 +33,7 @@
 			a.notes[i].SetActive(false);
 		}
 
-		if (Eng_Global->difficultyMission == 0) {
+		if (Eng_Global->diffMis == 0) {
 			flag_set(&SELF.entflags, EF_ACTIVE, false);
 			return;
 		}
@@ -95,7 +95,7 @@
 	}
 
 	public void LogAdded(int logCustomIndex) {
-		if (Eng_Global->difficultyMission == 0) return;
+		if (Eng_Global->diffMis == 0) return;
 		// Not checking for eReader present here...best to assume so we don't
 		// have to do all this later and remember it and save it in save file.
 
@@ -186,7 +186,7 @@
 	}
 
 	public void NodesDestroyed(int levelIndex) {
-		if (Eng_Global->difficultyMission == 0) return;
+		if (Eng_Global->diffMis == 0) return;
 
 		switch (levelIndex) {
 			case 1: // Level 1

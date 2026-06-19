@@ -865,7 +865,7 @@
 			inputtingMovement = true;
 		}
 
-		if (Eng_Global->difficultyCyber > 1) {
+		if (Eng_Global->diffCyb > 1) {
 			if (rbody.velocity.magnitude < walkAcceleration * 0.05f) {
 				tempVec = MouseCursor.a.GetCursorScreenPointForRay();
 				tempVec = MouseLookScript.a.playerCamera.ScreenPointToRay(tempVec).direction;
