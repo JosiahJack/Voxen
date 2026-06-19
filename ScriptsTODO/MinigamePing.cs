@@ -24,7 +24,7 @@ public class MinigamePing : MonoBehaviour {
     private float ballSpeed = 10f;
     private float computerVel;
     private float playerVel;
-    private Vector2 ballDir;
+    private V2 ballDir;
     private float paddleWidthH = 18f; // Half lengths
     private float paddleHeightH = 6f;
     private float ballSideH = 6f;
@@ -48,8 +48,8 @@ public class MinigamePing : MonoBehaviour {
         servecount = 0;
         playerServing = random_range(0.0f,1.0f) < 0.5f ? true : false;
         UpdateScoreText();
-        playerPaddle.localPosition = (Vector3){0.0f,-100.0f,0.0f);
-        computerPaddle.localPosition = (Vector3){0.0f,100.0f,0.0f);
+        playerPaddle.localPosition = (V3){0.0f,-100.0f,0.0f);
+        computerPaddle.localPosition = (V3){0.0f,100.0f,0.0f);
         gameOver.SetActive(false);
         winPizzazz.SetActive(false);
         ResetBall();
@@ -60,7 +60,7 @@ public class MinigamePing : MonoBehaviour {
         playerScoreText.text = playerScore.ToString();
     }
 
-    private Vector2 GetNewBallDirection() {
+    private V2 GetNewBallDirection() {
         float dirX = random_range(-0.3f,0.3f);
         float dirY = 1f;
         if (playerScore == 0 && computerScore == 0) {
@@ -74,28 +74,28 @@ public class MinigamePing : MonoBehaviour {
             }
         }
 
-        return new Vector2(dirX,dirY);
+        return new V2(dirX,dirY);
     }
 
     private void ResetBall() {
-        ball.localPosition = (Vector3){0f,0f,0f);
-        computerPaddle.localPosition = (Vector3){0f,100f,0f);
+        ball.localPosition = (V3){0f,0f,0f);
+        computerPaddle.localPosition = (V3){0f,100f,0f);
         ballDir = GetNewBallDirection();
-        ballResetFinished = Eng_Global->pauseRelativeTime + 2.5f;
+        ballResetFinished = World->pauseRelativeTime + 2.5f;
     }
 
     void Update() {
-        if (Eng_Global->gamePaused) return;
-		if (Eng_Global->menuActive) return;
-        if (frameFinished >= Eng_Global->pauseRelativeTime) return;
+        if (World->gamePaused) return;
+		if (World->menuActive) return;
+        if (frameFinished >= World->pauseRelativeTime) return;
         if (gameOver.activeInHierarchy) return;
 
-        frameFinished = Eng_Global->pauseRelativeTime + (1f/30f); // 30fps, it's a potato.
+        frameFinished = World->pauseRelativeTime + (1f/30f); // 30fps, it's a potato.
         PlayerPaddleUpdate();
-        if (ballResetFinished >= Eng_Global->pauseRelativeTime + 1f) return;
+        if (ballResetFinished >= World->pauseRelativeTime + 1f) return;
 
         ComputerPaddleUpdate();
-        if (ballResetFinished >= Eng_Global->pauseRelativeTime) return;
+        if (ballResetFinished >= World->pauseRelativeTime) return;
 
         BallUpdate();
     }
@@ -106,7 +106,7 @@ public class MinigamePing : MonoBehaviour {
         y = ball.localPosition.y;
         x += ballDir.x * ballSpeed;
         y += ballDir.y * ballSpeed;
-        ball.localPosition = (Vector3){x,y,0f);
+        ball.localPosition = (V3){x,y,0f);
         if (ball.localPosition.y < -160f) { // More than 133 gives delay.
             computerScore++;
             servecount++;
@@ -151,11 +151,11 @@ public class MinigamePing : MonoBehaviour {
         if (ball.localPosition.x < -122f) {
             ballDir.x *= -1f;
             ballImg.color = ballHitColor;
-            ball.localPosition = (Vector3){-121.9f,ball.localPosition.y,0f);
+            ball.localPosition = (V3){-121.9f,ball.localPosition.y,0f);
         } else if (ball.localPosition.x > 122f) {
             ballDir.x *= -1f;
             ballImg.color = ballHitColor;
-            ball.localPosition = (Vector3){121.9f,ball.localPosition.y,0f);
+            ball.localPosition = (V3){121.9f,ball.localPosition.y,0f);
         }
 
         // Hit paddles
@@ -188,7 +188,7 @@ public class MinigamePing : MonoBehaviour {
                     if (ballDir.x > 1f) ballDir.x = 1f;
                     else if (ballDir.x < -1f) ballDir.x = -1f;
 
-                    ball.localPosition = (Vector3){
+                    ball.localPosition = (V3){
                         ball.localPosition.x,
                         playerPaddle.localPosition.y + paddleHeightH + ballSideH + 0.05f,
                         0f
@@ -231,7 +231,7 @@ public class MinigamePing : MonoBehaviour {
                     if (ballDir.x > 1f) ballDir.x = 1f;
                     else if (ballDir.x < -1f) ballDir.x = -1f;
 
-                    ball.localPosition = (Vector3){
+                    ball.localPosition = (V3){
                         ball.localPosition.x,
                         computerPaddle.localPosition.y - paddleHeightH - ballSideH - 0.05f,
                         0f
@@ -256,7 +256,7 @@ public class MinigamePing : MonoBehaviour {
             x = 128f - paddleWidthH;
             playerVel = 0f;
         }
-        playerPaddle.localPosition = (Vector3){x,-100f,0f);
+        playerPaddle.localPosition = (V3){x,-100f,0f);
     }
 
     private void ComputerPaddleUpdate() {
@@ -272,7 +272,7 @@ public class MinigamePing : MonoBehaviour {
             x = 128f - paddleWidthH;
             computerVel = 0f;
         }
-        computerPaddle.localPosition = (Vector3){x,100f,0f);
+        computerPaddle.localPosition = (V3){x,100f,0f);
     }
 
     private void GameOver() {

@@ -12,8 +12,8 @@
 __attribute__((used)) AutoSplitterData autoSplitter = {0x1337133713371337,0,false,0}; // Fore use with LiveSplit or other future speedrunner utilities for doing speedruns
 //=============================================================================
 // Initialization
-GlobalContext* Eng_Global; CheatsSystem*  Eng_Cheats; SettingsSystem* Eng_Settings; TextSystem* Eng_Text; SystemUI* Eng_UI; // From Engine
-MOD_TO_ENGINE void ModLink(GlobalContext* g,CheatsSystem* c,SettingsSystem* s,TextSystem* t,SystemUI* ui){Eng_Global=g;Eng_Cheats=c;Eng_Settings=s;Eng_Text=t;Eng_UI=ui;}
+GlobalContext* World; CheatsSystem*  Eng_Cheats; SettingsSystem* Settings; TextSystem* Eng_Text; SystemUI* Eng_UI; // From Engine
+MOD_TO_ENGINE void ModLink(GlobalContext* g,CheatsSystem* c,SettingsSystem* s,TextSystem* t,SystemUI* ui){World=g;Eng_Cheats=c;Settings=s;Eng_Text=t;Eng_UI=ui;}
 int lev1SecCode,lev2SecCode,lev3SecCode,lev4SecCode,lev5SecCode,lev6SecCode;
 #ifdef WINDOWS
 MOD_TO_ENGINE i32 __stdcall DllMain(void* hinstDLL, unsigned long fdwReason, void* lpReserved) { (void)hinstDLL; (void)lpReserved; switch (fdwReason) {} return 1; }
@@ -34,37 +34,37 @@ void ResetHeldItem(u16 p) {
     inv->heldObjectLoadedAlternate = inv->holdingObject = inv->grenadeActive = false;
 }
 
-Vector3 ScreenPointToRay(Vector3 fwd, Vector3 rt) {
-    u16 swidth = Eng_Settings->ScreenWidth, sheight = Eng_Settings->ScreenHeight;
-    float offsetX = Eng_Global->cursorPosition_x - ((float)swidth * 0.5f);
-    float offsetY = Eng_Global->cursorPosition_y - ((float)sheight * 0.5f);
+V3 ScreenPointToRay(V3 fwd, V3 rt) {
+    u16 swidth = Settings->ScreenWidth, sheight = Settings->ScreenHeight;
+    float offsetX = World->cursorPosition_x - ((float)swidth * 0.5f);
+    float offsetY = World->cursorPosition_y - ((float)sheight * 0.5f);
     float ndcX = offsetX / ((float)swidth * 0.5f);
     float ndcY = -offsetY / ((float)sheight * 0.5f);
-    float tanFov = vtan((float)Eng_Settings->FOV * 0.5f * PI / 180.0f);
+    float tanFov = vtan((float)Settings->FOV * 0.5f * PI / 180.0f);
     float aspect3D = (float)swidth / (float)sheight;
-    Vector3 view = (Vector3){ndcX * tanFov * aspect3D,ndcY * tanFov,-1.0f};
+    V3 view = (V3){ndcX * tanFov * aspect3D,ndcY * tanFov,-1.0f};
     view = V3_Normalize(view);
-    Vector3 flipForward = (Vector3){-fwd.x,-fwd.y,-fwd.z};
-    Vector3 up = V3_Normalize(V3_Cross(rt,flipForward));
-    return (Vector3){view.x * rt.x + view.y * up.x + view.z * flipForward.x,view.x * rt.y + view.y * up.y + view.z * flipForward.y,view.x * rt.z + view.y * up.z + view.z * flipForward.z};
+    V3 flipForward = (V3){-fwd.x,-fwd.y,-fwd.z};
+    V3 up = V3_Normalize(V3_Cross(rt,flipForward));
+    return (V3){view.x * rt.x + view.y * up.x + view.z * flipForward.x,view.x * rt.y + view.y * up.y + view.z * flipForward.y,view.x * rt.z + view.y * up.z + view.z * flipForward.z};
 }
 
 void DropHeldItem(u16 p) {
     InventorySystem* inv = Inv(p);
-    Entity* ply = &Eng_Global->instances[p];
-    if (inv->heldObjectIndex >= Eng_Global->loadedInstances) { ResetHeldItem(p); return; }
-    if (inv->dropFinished > Eng_Global->pauseRelativeTime) return;
+    Entity* ply = &World->instances[p];
+    if (inv->heldObjectIndex >= World->loadedInstances) { ResetHeldItem(p); return; }
+    if (inv->dropFinished > World->pauseRelativeTime) return;
     
-    inv->dropFinished = Eng_Global->pauseRelativeTime + 0.2; // Prevent immediate regrab at high fps
+    inv->dropFinished = World->pauseRelativeTime + 0.2; // Prevent immediate regrab at high fps
     u16 newent = AddInstance(inv->heldObjectIndex,ply->position);
-    Entity* tossObject = &Eng_Global->instances[newent];
+    Entity* tossObject = &World->instances[newent];
     tossObject->usableCustomIndex = inv->heldObjectCustomIndex;
     tossObject->ammo = inv->heldObjectAmmo;
     tossObject->ammo2 = inv->heldObjectAmmo2;
     tossObject->heldObjectLoadedAlternate = inv->heldObjectLoadedAlternate;
     tossObject->position = ply->position;
     flag_set(&tossObject->entflags,EF_RIGIDBODY,true);
-    Vector3 tossDir = V3_Normalize(ScreenPointToRay(ply->forward,ply->right));
+    V3 tossDir = V3_Normalize(ScreenPointToRay(ply->forward,ply->right));
     tossObject->position = V3_AplusB(ply->position,V3_ScaleByF(tossDir,0.48f));
     tossObject->velocity = V3_ScaleByF(tossDir,10.0f);
     DualLog("Dropping held object type %u at pos %f %f %f, with force %f %f %f\n",tossObject->index,tossObject->position.x,tossObject->position.y,tossObject->position.z,tossObject->velocity.x,tossObject->velocity.y,tossObject->velocity.z);
@@ -264,7 +264,7 @@ static void PlayLog(u16 p,int logIndex) {
     if (!(inv->hasHardware & HW_ERD)) return;
 //     if (inv->logSoundInited) { SoundStop(&inv->logSound); SoundUninit(&inv->logSound); inv->logSoundInited = false; }
 //     if (!SoundInit(sounds[Eng_Text->audioLogSoundIndex[logIndex]],0,NULL,NULL,&inv->logSound)) {
-//         SoundSetVolume(&inv->logSound,(float)Eng_Settings->VolumeMessage / 100.0f);
+//         SoundSetVolume(&inv->logSound,(float)Settings->VolumeMessage / 100.0f);
 //         SoundStart(&inv->logSound);
 //         inv->logSoundInited = true;
 //     }
@@ -323,7 +323,7 @@ static void PlayLog(u16 p,int logIndex) {
 //                 break;
 //         }
 //    }
-    CenterStatusPrint("%s%s",Eng_Text->stringTable[1020],Eng_Global->audiologNames[logIndex]); // "Playing <name>"
+    CenterStatusPrint("%s%s",Eng_Text->stringTable[1020],World->audiologNames[logIndex]); // "Playing <name>"
     // TODO: SendAudioLogToDataTab(logIndex) — engine-side data tab notification
 }
 
@@ -344,9 +344,9 @@ void AddAudioLogToInventory(u16 p,int index) {
     else if (Eng_Text->audioLogType[index] == AudioLogType_Normal) inv->hasNewLogs  = true;
     if (inv->hasHardware & HW_ERD) {
         // "Audio log <name> picked up. Press <key> to play." — TODO: key binding name interp
-        CenterStatusPrint("%s%s%s",Eng_Text->stringTable[36],Eng_Global->audiologNames[index],Eng_Text->stringTable[38]);
+        CenterStatusPrint("%s%s%s",Eng_Text->stringTable[36],World->audiologNames[index],Eng_Text->stringTable[38]);
     } else {
-        CenterStatusPrint("%s%s%s",Eng_Text->stringTable[36],Eng_Global->audiologNames[index],Eng_Text->stringTable[310]);
+        CenterStatusPrint("%s%s%s",Eng_Text->stringTable[36],World->audiologNames[index],Eng_Text->stringTable[310]);
     }
 }
 
@@ -398,24 +398,24 @@ static void UseTurbo(u16 p) {
     InventorySystem* inv = Inv(p);
     if (inv->softVersions[SW_TURBO] <= 0) { inv->hasSoft &= (u8)~(1u << SW_TURBO); return; }
     if (--inv->softVersions[SW_TURBO] == 0) inv->hasSoft &= (u8)~(1u << SW_TURBO);
-    if (inv->turboFinished > Eng_Global->pauseRelativeTime) inv->turboFinished += inv->turboCyberTime;
-    else                                                    inv->turboFinished = inv->turboCyberTime + Eng_Global->pauseRelativeTime;
+    if (inv->turboFinished > World->pauseRelativeTime) inv->turboFinished += inv->turboCyberTime;
+    else                                                    inv->turboFinished = inv->turboCyberTime + World->pauseRelativeTime;
 }
 
 static void UseDecoy(u16 p) {
     InventorySystem* inv = Inv(p);
-    if (Eng_Global->decoyActive) { CenterStatusPrint("%s",Eng_Text->stringTable[537]); return; }
+    if (World->decoyActive) { CenterStatusPrint("%s",Eng_Text->stringTable[537]); return; }
     if (inv->softVersions[SW_DECOY] <= 0) { inv->hasSoft &= (u8)~(1u << SW_DECOY); return; }
     if (--inv->softVersions[SW_DECOY] == 0) inv->hasSoft &= (u8)~(1u << SW_DECOY);
     u16 decoyIdx = SpawnDynamicObject(417,true); // 417 = CyberDecoy constIndex
-    if (decoyIdx != U16_MAX) Eng_Global->instances[decoyIdx].position = PE(p)->position;
+    if (decoyIdx != U16_MAX) World->instances[decoyIdx].position = PE(p)->position;
 }
 
 static void UseRecall(u16 p) {
     InventorySystem* inv = Inv(p);
     if (inv->softVersions[SW_RECALL] <= 0) return;
     if (--inv->softVersions[SW_RECALL] == 0) inv->hasSoft &= (u8)~(1u << SW_RECALL);
-    PE(p)->position = Eng_Global->cyberspaceRecallPoint;
+    PE(p)->position = World->cyberspaceRecallPoint;
 }
 
 void UseCyberspaceItem(u16 p) {
@@ -456,14 +456,14 @@ void CycleCyberSpaceItemDn(u16 p) {
 bool AddSoftwareItem(u16 p,u16 index,int vers) {
     InventorySystem* inv = Inv(p);
     Entity* player       = PE(p);
-    float sfxVol         = (float)Eng_Settings->VolumeEffects / 100.0f;
+    float sfxVol         = (float)Settings->VolumeEffects / 100.0f;
     switch(index) {
         case 450/*item_cyber_drill*/:
             if (inv->isPulserNotDrill && !(inv->hasSoft & (1u << SW_PULSER))) inv->isPulserNotDrill = false;
             if (vers > inv->softVersions[SW_DRILL]) inv->softVersions[SW_DRILL] = (u8)vers;
             else CenterStatusPrint("%s",Eng_Text->stringTable[46]);
             inv->hasSoft |= (1u << SW_DRILL);
-            play_wav(sounds[86],sfxVol,(Vector3){},false);
+            play_wav(sounds[86],sfxVol,(V3){},false);
             CenterStatusPrint("%s%d%s",Eng_Text->stringTable[444],inv->softVersions[SW_DRILL],Eng_Text->stringTable[458]);
             return true;
         case 454/*item_cyber_pulser*/:
@@ -471,35 +471,35 @@ bool AddSoftwareItem(u16 p,u16 index,int vers) {
             if (vers > inv->softVersions[SW_PULSER]) inv->softVersions[SW_PULSER] = (u8)vers;
             else CenterStatusPrint("%s",Eng_Text->stringTable[46]);
             inv->hasSoft |= (1u << SW_PULSER);
-            play_wav(sounds[86],sfxVol,(Vector3){},false);
+            play_wav(sounds[86],sfxVol,(V3){},false);
             CenterStatusPrint("%s%d%s",Eng_Text->stringTable[445],inv->softVersions[SW_PULSER],Eng_Text->stringTable[458]);
             return true;
         case 456/*item_cyber_shield*/:
             if (vers > inv->softVersions[SW_SHIELD]) inv->softVersions[SW_SHIELD] = (u8)vers;
             else CenterStatusPrint("%s",Eng_Text->stringTable[46]);
             inv->hasSoft |= (1u << SW_SHIELD);
-            play_wav(sounds[86],sfxVol,(Vector3){},false);
+            play_wav(sounds[86],sfxVol,(V3){},false);
             CenterStatusPrint("%s%d%s",Eng_Text->stringTable[446],inv->softVersions[SW_SHIELD],Eng_Text->stringTable[458]);
             return true;
         case 457/*item_cyber_turbo*/:
             if (inv->cyberItemIndex < 0) inv->cyberItemIndex = 0;
             inv->softVersions[SW_TURBO]++;
             inv->hasSoft |= (1u << SW_TURBO);
-            play_wav(sounds[86],sfxVol,(Vector3){},false);
+            play_wav(sounds[86],sfxVol,(V3){},false);
             CenterStatusPrint("%s",Eng_Text->stringTable[447]);
             return true;
         case 449/*item_cyber_decoy*/:
             if (inv->cyberItemIndex < 0) inv->cyberItemIndex = 1;
             inv->softVersions[SW_DECOY]++;
             inv->hasSoft |= (1u << SW_DECOY);
-            play_wav(sounds[86],sfxVol,(Vector3){},false);
+            play_wav(sounds[86],sfxVol,(V3){},false);
             CenterStatusPrint("%s",Eng_Text->stringTable[448]);
             return true;
         case 455/*item_cyber_recall*/:
             if (inv->cyberItemIndex < 0) inv->cyberItemIndex = 2;
             inv->softVersions[SW_RECALL]++;
             inv->hasSoft |= (1u << SW_RECALL);
-            play_wav(sounds[86],sfxVol,(Vector3){},false);
+            play_wav(sounds[86],sfxVol,(V3){},false);
             CenterStatusPrint("%s",Eng_Text->stringTable[449]);
             return true;
         case 451/* ;) item_cyber_game*/: {
@@ -507,19 +507,19 @@ bool AddSoftwareItem(u16 p,u16 index,int vers) {
             inv->hasNewData  = true;
             inv->hasMinigame |= (u8)(1u << vers);
             static const u16 gameMsg[7] = {450,451,452,453,454,455,456};
-            play_wav(sounds[86],sfxVol,(Vector3){},false);
+            play_wav(sounds[86],sfxVol,(V3){},false);
             CenterStatusPrint("%s",Eng_Text->stringTable[gameMsg[vers]]);
             return true;
         }
         case 448/*item_cyber_data*/:
             inv->hasNewData = true;
             if (vers >= 0 && vers < T_LOGS_COUNT) inv->hasLog[vers] = true;
-            play_wav(sounds[87],sfxVol,(Vector3){},false);
+            play_wav(sounds[87],sfxVol,(V3){},false);
             CenterStatusPrint("%s",Eng_Text->stringTable[457]);
             return true;
         case 452/*item_cyber_integrity*/:
             if (player->cyberHealth >= 255.0f) return false;
-            play_wav(sounds[86],sfxVol,(Vector3){},false);
+            play_wav(sounds[86],sfxVol,(V3){},false);
             player->cyberHealth += 77.0f;
             if (player->cyberHealth > 255.0f) player->cyberHealth = 255.0f;
             // TODO: DrawTicks(true) — HUD cyber health tick refresh
@@ -739,8 +739,8 @@ void AddItemToInventory(u16 p, int index, int customIndex) {
 }
 //=============================================================================
 // CyberDecoy
-void CyberDecoyEnable(u16 self) { (void)self; Eng_Global->decoyActive = true; }
-void CyberDecoyDisable(u16 self) { (void)self; Eng_Global->decoyActive = false; }
+void CyberDecoyEnable(u16 self) { (void)self; World->decoyActive = true; }
+void CyberDecoyDisable(u16 self) { (void)self; World->decoyActive = false; }
 //=============================================================================
 // CyberExit
 void CyberExitOnTriggerEnter(u16 self, u16 other) {
@@ -751,19 +751,19 @@ void CyberExitOnTriggerEnter(u16 self, u16 other) {
 //=============================================================================
 // CyberDataFragment
 void CyberDataFragmentOnTriggerEnter(u16 self, u16 other) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (other != PLAYER1) return;
     UICyberSprint((u16)e->textIndex);
 }
 //=============================================================================
 // CyberItem
 void CyberItemInitBeforeLoad(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
-    if (Eng_Global->diffMis == 0 && e->index == 448) flag_set(&e->entflags,EF_ACTIVE,false); // item_cyber_data
+    Entity* e = &World->instances[self];
+    if (World->diffMis == 0 && e->index == 448) flag_set(&e->entflags,EF_ACTIVE,false); // item_cyber_data
 }
 
 void CyberItemOnTriggerEnter(u16 self, u16 other) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (other != PLAYER1) return;
     if (!AddSoftwareItem(PLAYER1,e->index,e->version)) return;
     flag_set(&e->entflags,EF_ACTIVE,false);
@@ -772,7 +772,7 @@ void CyberItemOnTriggerEnter(u16 self, u16 other) {
 // CyberIce
 void CyberIceOnTriggerEnter(u16 self, u16 other) {
     (void)self;
-    Entity* e = &Eng_Global->instances[other];
+    Entity* e = &World->instances[other];
     if (!(e->entflags & EF_RIGIDBODY)) return;
     e->layer = 24;
     e->velocity = V3_ScaleByF(e->velocity,-1.0f);
@@ -780,15 +780,15 @@ void CyberIceOnTriggerEnter(u16 self, u16 other) {
 //=============================================================================
 // CyberMine
 void CyberMineInitBeforeLoad(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     e->damage = 55.0f;
-    if (Eng_Global->diffCyb < 3) { if (random_range(0.0f,1.0f) < 0.2f) flag_set(&e->entflags,EF_ACTIVE,false); e->damage = 33.0f; }
-    if (Eng_Global->diffCyb < 2) { if (random_range(0.0f,1.0f) < 0.33f) flag_set(&e->entflags,EF_ACTIVE,false); e->damage = 22.0f; }
-    if (Eng_Global->diffCyb < 1) { if (random_range(0.0f,1.0f) < 0.50f) flag_set(&e->entflags,EF_ACTIVE,false); e->damage = 11.0f; }
+    if (World->diffCyb < 3) { if (random_range(0.0f,1.0f) < 0.2f) flag_set(&e->entflags,EF_ACTIVE,false); e->damage = 33.0f; }
+    if (World->diffCyb < 2) { if (random_range(0.0f,1.0f) < 0.33f) flag_set(&e->entflags,EF_ACTIVE,false); e->damage = 22.0f; }
+    if (World->diffCyb < 1) { if (random_range(0.0f,1.0f) < 0.50f) flag_set(&e->entflags,EF_ACTIVE,false); e->damage = 11.0f; }
 }
 
 void CyberMineOnTriggerEnter(u16 self, u16 other) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (other != PLAYER1) return;
     PlayerTakeDamage(PLAYER1,e->damage);
     play_wav(sounds[67],1.0f,e->position,false);
@@ -797,11 +797,11 @@ void CyberMineOnTriggerEnter(u16 self, u16 other) {
 //=============================================================================
 // CyberPush
 void CyberPushOnTriggerStay(u16 self, u16 other) {
-    Entity* e = &Eng_Global->instances[self];
-    Entity* player = &Eng_Global->instances[PLAYER1];
-    if (Eng_Global->diffCyb < 1 || other != PLAYER1) return;
+    Entity* e = &World->instances[self];
+    Entity* player = &World->instances[PLAYER1];
+    if (World->diffCyb < 1 || other != PLAYER1) return;
     player->inCyberTube = true;
-    AddForce(PLAYER1,V3_ScaleByF(e->direction,e->force * (float)Eng_Global->deltaTime),false);
+    AddForce(PLAYER1,V3_ScaleByF(e->direction,e->force * (float)World->deltaTime),false);
     Sys_Music.cyberTube = true;
 }
 
@@ -809,25 +809,25 @@ void CyberPushOnTriggerExit(u16 self, u16 other) {
     (void)self;
     if (other != PLAYER1) return;
     
-    Eng_Global->instances[other].inCyberTube = false;
+    World->instances[other].inCyberTube = false;
     Sys_Music.cyberTube = false;
 }
 //=============================================================================
 // CyberDoor
 void CyberDoorOnCollisionEnter(u16 self, u16 other) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (!ConstIndexIsDoor(e->index) || (other != PLAYER1 && other != PLAYER2)) return;
     CenterStatusPrint("%s  %s",Eng_Text->stringTable[e->messageIndex],Eng_Text->stringTable[601]);
 }
 //=============================================================================
 // CyberSwitch
 void CyberSwitchInitAfterLoad(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (e->iceActive) flag_set(&e->entflags,EF_ACTIVE,true); // TODO Visual subobject parity removed with hierarchy removal.
 }
 
 void CyberSwitchOnTriggerEnter(u16 self, u16 other) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (e->active || other != PLAYER1) return;
     UICyberSprint((u16)e->textIndex);
     e->active = true;
@@ -836,13 +836,13 @@ void CyberSwitchOnTriggerEnter(u16 self, u16 other) {
 //=============================================================================
 // CyberTimer
 void CyberTimerInitAfterLoad(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     e->cyberTimer = 600.0f;
-    e->timerFinished = Eng_Global->pauseRelativeTime + 1.0;
+    e->timerFinished = World->pauseRelativeTime + 1.0;
 }
 
 void CyberTimerReset(u16 self, int diff) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     switch (diff) {
         case 0: e->cyberTimer = 600.0f; break;
         case 1: e->cyberTimer = 300.0f; break;
@@ -852,14 +852,14 @@ void CyberTimerReset(u16 self, int diff) {
 }
 
 void CyberTimerUpdate(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (e->cyberTimer <= 0.0f) { UIExitCyberspace(); return; }
-    if (e->timerFinished >= Eng_Global->pauseRelativeTime) return;
+    if (e->timerFinished >= World->pauseRelativeTime) return;
     
     e->cyberTimer -= 1.0f;
     e->minutes = vfloor(e->cyberTimer / 60.0f);
     e->seconds = e->cyberTimer - (e->minutes * 60.0f);
-    e->timerFinished = Eng_Global->pauseRelativeTime + 1.0;
+    e->timerFinished = World->pauseRelativeTime + 1.0;
 }
 
 //=============================================================================
@@ -884,42 +884,42 @@ void LadderOnTriggerExit(u16 self, u16 other) {
 //=============================================================================
 // SearchFX
 void SearchFXResetEnable(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (e->itemLifeTime <= 0.0f) e->itemLifeTime = 3.0f;
-    e->delayFinished = Eng_Global->pauseRelativeTime + e->itemLifeTime;
+    e->delayFinished = World->pauseRelativeTime + e->itemLifeTime;
 }
 
 void SearchFXResetUpdate(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
-    if (e->delayFinished >= Eng_Global->pauseRelativeTime) return;
+    Entity* e = &World->instances[self];
+    if (e->delayFinished >= World->pauseRelativeTime) return;
     flag_set(&e->entflags,EF_ACTIVE,false);
 }
 //=============================================================================
 // ExplosionLife
 void ExplosionLifeInitAfterLoad(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (e->tickTime <= 0.0f) e->tickTime = 0.05f;
     if (e->delay <= 0.0f) e->delay = 0.8f;
-    e->delayFinished = Eng_Global->pauseRelativeTime + e->delay;
+    e->delayFinished = World->pauseRelativeTime + e->delay;
 }
 
 void ExplosionLifeUpdate(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
-    if (!(e->entflags & EF_ACTIVE) || e->delayFinished >= Eng_Global->pauseRelativeTime) return;
+    Entity* e = &World->instances[self];
+    if (!(e->entflags & EF_ACTIVE) || e->delayFinished >= World->pauseRelativeTime) return;
     if (e->dontReset) flag_set(&e->entflags,EF_ACTIVE,false);
     else DeleteInstance(self);
 }
 //=============================================================================
 // DelayedSpawn
 void DelayedSpawnEnable(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
-    e->timerFinished = Eng_Global->pauseRelativeTime + e->delay;
+    Entity* e = &World->instances[self];
+    e->timerFinished = World->pauseRelativeTime + e->delay;
     e->active = true;
 }
 
 void DelayedSpawnUpdate(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
-    if (!e->active || e->timerFinished >= Eng_Global->pauseRelativeTime) return;
+    Entity* e = &World->instances[self];
+    if (!e->active || e->timerFinished >= World->pauseRelativeTime) return;
     
     e->active = false;
     if (!e->doSelfAfterList) return;
@@ -932,8 +932,8 @@ void DelayedSpawnUpdate(u16 self) {
 //=============================================================================
 // FuncWall
 void FuncWallInitAfterLoad(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
-    Vector3 tempVec = V3_AsubB(e->position,e->targetPosition);
+    Entity* e = &World->instances[self];
+    V3 tempVec = V3_AsubB(e->position,e->targetPosition);
     float distTotal = V3_Dist(e->startPosition,e->targetPosition);
     tempVec = V3_ScaleByF(V3_Normalize(tempVec),-1.0f);
     if (e->funcState == FuncStates_AjarMovingTarget) tempVec = V3_ScaleByF(tempVec,distTotal * e->percentAjar);
@@ -944,32 +944,32 @@ void FuncWallInitAfterLoad(u16 self) {
     SetPosition(e,V3_AplusB(e->position,tempVec),true); // Force it like a teleport
 }
 
-void FuncWallMoveStart(u16 self) { Eng_Global->instances[self].funcState = FuncStates_MovingStart; Eng_Global->instances[self].tickFinished = Eng_Global->pauseRelativeTime + 10.0f; }
-void FuncWallMoveTarget(u16 self) { Eng_Global->instances[self].funcState = FuncStates_MovingTarget; Eng_Global->instances[self].tickFinished = Eng_Global->pauseRelativeTime + 10.0f; }
+void FuncWallMoveStart(u16 self) { World->instances[self].funcState = FuncStates_MovingStart; World->instances[self].tickFinished = World->pauseRelativeTime + 10.0f; }
+void FuncWallMoveTarget(u16 self) { World->instances[self].funcState = FuncStates_MovingTarget; World->instances[self].tickFinished = World->pauseRelativeTime + 10.0f; }
 void FuncWallTargetted(u16 self, u16 activator) {
     (void)activator;
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (e->funcState == FuncStates_Start || e->funcState == FuncStates_MovingStart || e->funcState == FuncStates_AjarMovingTarget) FuncWallMoveTarget(self);
     else FuncWallMoveStart(self);
     play_wav(sounds[76],1.0f,e->position,true);
 }
 
 void FuncWallUpdate(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
-    Vector3 goal = e->funcState == FuncStates_MovingStart ? e->startPosition : e->targetPosition;
+    Entity* e = &World->instances[self];
+    V3 goal = e->funcState == FuncStates_MovingStart ? e->startPosition : e->targetPosition;
     FuncStates doneState = e->funcState == FuncStates_MovingStart ? FuncStates_Start : FuncStates_Target;
-    if (e->funcState == FuncStates_Start) { SetPosition(e,e->startPosition,true); e->velocity = (Vector3){0.0f,0.0f,0.0f}; e->percentMoved = 0.0f; return; }
-    if (e->funcState == FuncStates_Target) { SetPosition(e,e->targetPosition,true); e->velocity = (Vector3){0.0f,0.0f,0.0f}; e->percentMoved = 1.0f; return; }
+    if (e->funcState == FuncStates_Start) { SetPosition(e,e->startPosition,true); e->velocity = (V3){0.0f,0.0f,0.0f}; e->percentMoved = 0.0f; return; }
+    if (e->funcState == FuncStates_Target) { SetPosition(e,e->targetPosition,true); e->velocity = (V3){0.0f,0.0f,0.0f}; e->percentMoved = 1.0f; return; }
     if (e->funcState != FuncStates_MovingStart && e->funcState != FuncStates_MovingTarget) return;
-    Vector3 delta = V3_AsubB(goal,e->position);
+    V3 delta = V3_AsubB(goal,e->position);
     float distanceLeft = V3_Mag(delta);
     float total = V3_Dist(e->startPosition,e->targetPosition);
-    float dist = e->speed * (float)Eng_Global->deltaTime;
-    if (distanceLeft <= dist || e->tickFinished < Eng_Global->pauseRelativeTime) {
+    float dist = e->speed * (float)World->deltaTime;
+    if (distanceLeft <= dist || e->tickFinished < World->pauseRelativeTime) {
         SetPosition(e,goal,true);
         e->funcState = doneState;
         e->percentMoved = doneState == FuncStates_Target ? 1.0f : 0.0f;
-        e->velocity = (Vector3){0.0f,0.0f,0.0f};
+        e->velocity = (V3){0.0f,0.0f,0.0f};
         return;
     }
     if (distanceLeft > 0.0001f) SetPosition(e,V3_AplusB(e->position,V3_ScaleByF(V3_Normalize(delta),dist)),true);
@@ -978,9 +978,9 @@ void FuncWallUpdate(u16 self) {
 //=============================================================================
 // ForceBridge
 void func_forcebridge(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     e->tickTime = 0.05f;
-    e->tickFinished = Eng_Global->pauseRelativeTime + e->tickTime + (double)random_range(0.0f,1.0f);
+    e->tickFinished = World->pauseRelativeTime + e->tickTime + (double)random_range(0.0f,1.0f);
     e->lerping = true;
     if (e->activatedScale.x <= 0.02f) e->activatedScale.x = 2.56f;
     if (e->activatedScale.y <= 0.02f) e->activatedScale.y = 0.08f;
@@ -996,17 +996,17 @@ void func_forcebridge(u16 self) {
 }
 
 void ForceBridgeActivate(u16 self, bool isSilent) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (e->active) return;
     
     if (!isSilent) play_wav(sounds[102],1.0f,e->position,true);
     e->modelIndex = 78; e->collider = COLTYPE_BOX;
     e->active = e->lerping = true;
-    e->scale = (Vector3){ e->forceFieldDirectionX ? 0.1f : e->activatedScale.x, e->forceFieldDirectionY ? 0.1f : e->activatedScale.y, e->forceFieldDirectionZ ? 0.1f : e->activatedScale.z };
+    e->scale = (V3){ e->forceFieldDirectionX ? 0.1f : e->activatedScale.x, e->forceFieldDirectionY ? 0.1f : e->activatedScale.y, e->forceFieldDirectionZ ? 0.1f : e->activatedScale.z };
 }
 
 void ForceBridgeDeactivate(u16 self, bool isSilent) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (!e->active) return;
     
     if (!isSilent) play_wav(sounds[102],1.0f,e->position,true);
@@ -1015,26 +1015,26 @@ void ForceBridgeDeactivate(u16 self, bool isSilent) {
 }
 
 void ForceBridgeToggle(u16 self) {
-    if (Eng_Global->instances[self].active) ForceBridgeDeactivate(self,false);
+    if (World->instances[self].active) ForceBridgeDeactivate(self,false);
     else ForceBridgeActivate(self,false);
 }
 
 void ForceBridgeUpdate(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
-    if (e->tickFinished >= Eng_Global->pauseRelativeTime) return;
-    e->tickFinished = Eng_Global->pauseRelativeTime + e->tickTime;
+    Entity* e = &World->instances[self];
+    if (e->tickFinished >= World->pauseRelativeTime) return;
+    e->tickFinished = World->pauseRelativeTime + e->tickTime;
     if (e->active) {
         if (!e->lerping) return;
         float sx = e->forceFieldDirectionX ? lerp(e->scale.x,e->activatedScale.x,e->tickTime * 2.0f) : e->scale.x;
         float sy = e->forceFieldDirectionY ? lerp(e->scale.y,e->activatedScale.y,e->tickTime * 2.0f) : e->scale.y;
         float sz = e->forceFieldDirectionZ ? lerp(e->scale.z,e->activatedScale.z,e->tickTime * 2.0f) : e->scale.z;
-        e->scale = (Vector3){sx,sy,sz};
+        e->scale = (V3){sx,sy,sz};
         if (vabs(e->activatedScale.x - sx) < 0.08f && vabs(e->activatedScale.y - sy) < 0.08f && vabs(e->activatedScale.z - sz) < 0.08f) { e->scale = e->activatedScale; e->lerping = false; }
     } else if (e->lerping) {
         float sx = e->forceFieldDirectionX ? lerp(e->scale.x,0.0f,e->tickTime * 2.0f) : e->scale.x;
         float sy = e->forceFieldDirectionY ? lerp(e->scale.y,0.0f,e->tickTime * 2.0f) : e->scale.y;
         float sz = e->forceFieldDirectionZ ? lerp(e->scale.z,0.0f,e->tickTime * 2.0f) : e->scale.z;
-        e->scale = (Vector3){sx,sy,sz};
+        e->scale = (V3){sx,sy,sz};
         if (sx < 0.08f || sy < 0.08f || sz < 0.08f) { flag_set(&e->entflags,EF_ACTIVE,false); e->collider = COLTYPE_NONE; e->lerping = false; }
     }
 }
@@ -1044,30 +1044,30 @@ void ForceBridgeUpdate(u16 self) {
 static u16 TeleportTouch_allTeleportTouches[8];
 static bool TeleportTouch_initialized;
 void TeleportTouchInitAfterLoad(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (!TeleportTouch_initialized) { for (u8 i = 0; i < 8; i++) TeleportTouch_allTeleportTouches[i] = U16_MAX; TeleportTouch_initialized = true; }
     if (e->teleportID >= 8) { DeleteInstance(self); return; }
     TeleportTouch_allTeleportTouches[e->teleportID] = self;
 }
 
 void TeleportTouchOnTriggerEnter(u16 self, u16 other) {
-    Entity* e = &Eng_Global->instances[self];
-    Entity* player = &Eng_Global->instances[PLAYER1];
+    Entity* e = &World->instances[self];
+    Entity* player = &World->instances[PLAYER1];
     if (!e->touchEnabled || other != PLAYER1) return;
-    if (player->health <= 0.0f || e->justUsed >= Eng_Global->pauseRelativeTime) return;
+    if (player->health <= 0.0f || e->justUsed >= World->pauseRelativeTime) return;
     u16 dest = e->targetDestinationID < 8 ? TeleportTouch_allTeleportTouches[e->targetDestinationID] : U16_MAX;
     if (dest == U16_MAX) return;
-    player->position = Eng_Global->instances[dest].position;
-    Eng_Global->instances[dest].justUsed = Eng_Global->pauseRelativeTime + 1.0;
-    play_wav(sounds[106],1.0f,Eng_Global->instances[dest].position,false);
+    player->position = World->instances[dest].position;
+    World->instances[dest].justUsed = World->pauseRelativeTime + 1.0;
+    play_wav(sounds[106],1.0f,World->instances[dest].position,false);
 }
 
 //=============================================================================
 // Trigger
-void TriggerUseTargets(u16 self, u16 activator) { UseTargets(activator,Eng_Global->instances[self].target); }
-void TriggerDelayedTarget(u16 self, u16 activator) { Eng_Global->instances[self].delayFireFinished = Eng_Global->pauseRelativeTime + Eng_Global->instances[self].delay; TriggerUseTargets(self,activator); }
+void TriggerUseTargets(u16 self, u16 activator) { UseTargets(activator,World->instances[self].target); }
+void TriggerDelayedTarget(u16 self, u16 activator) { World->instances[self].delayFireFinished = World->pauseRelativeTime + World->instances[self].delay; TriggerUseTargets(self,activator); }
 void TriggerTriggerTripped(u16 self, u16 other) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (other != PLAYER1 && other != PLAYER2) return;
     if (e->recentMostActivator && e->ignoreSecondaryTriggers) return;
     e->recentMostActivator = other;
@@ -1075,15 +1075,15 @@ void TriggerTriggerTripped(u16 self, u16 other) {
     if (e->delay <= 0.0f) TriggerUseTargets(self,other); else TriggerDelayedTarget(self,other);
 }
 
-void TriggerOnTriggerEnter(u16 self, u16 other) { if (!Eng_Global->instances[self].allDone) TriggerTriggerTripped(self,other); }
-void TriggerOnTriggerStay(u16 self, u16 other) { if (!Eng_Global->instances[self].allDone) TriggerTriggerTripped(self,other); }
-void TriggerTargetted(u16 self, u16 activator) { if (Eng_Global->instances[self].ignoreSecondaryTriggers) Eng_Global->instances[self].recentMostActivator = activator; }
+void TriggerOnTriggerEnter(u16 self, u16 other) { if (!World->instances[self].allDone) TriggerTriggerTripped(self,other); }
+void TriggerOnTriggerStay(u16 self, u16 other) { if (!World->instances[self].allDone) TriggerTriggerTripped(self,other); }
+void TriggerTargetted(u16 self, u16 activator) { if (World->instances[self].ignoreSecondaryTriggers) World->instances[self].recentMostActivator = activator; }
 //=============================================================================
 // TriggerCounter
-void TriggerCounterTarget(u16 self, u16 activator) { UseTargets(activator,Eng_Global->instances[self].target); }
-void TriggerCounterDelayedTarget(u16 self, u16 activator) { Eng_Global->instances[self].delayFinished = Eng_Global->pauseRelativeTime + Eng_Global->instances[self].delay; TriggerCounterTarget(self,activator); }
+void TriggerCounterTarget(u16 self, u16 activator) { UseTargets(activator,World->instances[self].target); }
+void TriggerCounterDelayedTarget(u16 self, u16 activator) { World->instances[self].delayFinished = World->pauseRelativeTime + World->instances[self].delay; TriggerCounterTarget(self,activator); }
 void TriggerCounterTargetted(u16 self, u16 activator) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     e->counter++;
     if (e->counter != e->countToTrigger) return;
     if (e->delay <= 0.0f) TriggerCounterTarget(self,activator); else TriggerCounterDelayedTarget(self,activator);
@@ -1092,14 +1092,14 @@ void TriggerCounterTargetted(u16 self, u16 activator) {
 //=============================================================================
 // TextureChanger
 void TextureChangerInitAfterLoad(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (!e->currentTexture) return;
     e->texIndex = e->altTexIndex;
     if (e->altGlowIndex < MAX_TXRS) e->glowIndex = e->altGlowIndex;
 }
 
 void TextureChangerToggle(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (e->currentTexture) {
         e->texIndex = EDefs[e->index].texIndex;
         e->glowIndex = EDefs[e->index].glowIndex;
@@ -1113,101 +1113,101 @@ void TextureChangerToggle(u16 self) {
 //=============================================================================
 // GravityLift
 void GravityLiftInitAfterLoad(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (e->strength <= 0.0f) e->strength = 12.0f;
     if (e->offStrengthFactor <= 0.0f) e->offStrengthFactor = 0.3f;
     if (e->distancePaddingToTopPoint <= 0.0f) e->distancePaddingToTopPoint = 0.32f;
-    e->topPoint = (Vector3){ 0.0f, e->position.y + (e->colliderSize.y * 0.5f), 0.0f };
+    e->topPoint = (V3){ 0.0f, e->position.y + (e->colliderSize.y * 0.5f), 0.0f };
 }
 
 // TODO just poll bounds and apply in trigger loop, yeesh
 // void GravityLiftOnTriggerExit(u16 self, u16 other) {
 //     (void)self;
-//     if (other == PLAYER1) Eng_Global->instances[PLAYER1].gravity = 1.0f;
+//     if (other == PLAYER1) World->instances[PLAYER1].gravity = 1.0f;
 // }
 // 
 // void GravityLiftOnForce(u16 self, u16 other, bool initial) {
-//     Entity* e = &Eng_Global->instances[self];
-//     Entity* o = &Eng_Global->instances[other];
-//     if (other == PLAYER1) flag_set(&Eng_Global->instances[PLAYER1].entflags,EF_GRAV_LIFT_STATE,true);
+//     Entity* e = &World->instances[self];
+//     Entity* o = &World->instances[other];
+//     if (other == PLAYER1) flag_set(&World->instances[PLAYER1].entflags,EF_GRAV_LIFT_STATE,true);
 //     float topY = e->position.y + (e->colliderSize.y * 0.5f);
 //     float dist = topY - o->position.y + 0.48f;
 //     float velY = o->velocity.y < 0.0f ? 0.0f : o->velocity.y;
-//     if (dist < e->distancePaddingToTopPoint) AddForce(other,(Vector3){0.0f,9.81f - velY,0.0f},false); // TODO accel-vs-force parity
+//     if (dist < e->distancePaddingToTopPoint) AddForce(other,(V3){0.0f,9.81f - velY,0.0f},false); // TODO accel-vs-force parity
 //     else if (o->velocity.y < (e->strength * o->mass)) {
 //         float yForce = (e->strength * o->mass) - o->velocity.y;
-//         if (initial || e->initialBurstFinished > Eng_Global->pauseRelativeTime) yForce *= 2.0f;
-//         AddForce(other,(Vector3){0.0f,yForce,0.0f},false);
+//         if (initial || e->initialBurstFinished > World->pauseRelativeTime) yForce *= 2.0f;
+//         AddForce(other,(V3){0.0f,yForce,0.0f},false);
 //     }
 // }
 // 
 // void GravityLiftOffForce(u16 self, u16 other, bool initial) {
-//     Entity* e = &Eng_Global->instances[self];
-//     Entity* o = &Eng_Global->instances[other];
-//     if (other == PLAYER1) flag_set(&Eng_Global->instances[PLAYER1].entflags,EF_GRAV_LIFT_STATE,true);
+//     Entity* e = &World->instances[self];
+//     Entity* o = &World->instances[other];
+//     if (other == PLAYER1) flag_set(&World->instances[PLAYER1].entflags,EF_GRAV_LIFT_STATE,true);
 //     if (o->velocity.y < e->offStrengthFactor) {
 //         float yForce = e->offStrengthFactor - o->velocity.y;
-//         if (initial || e->initialBurstFinished > Eng_Global->pauseRelativeTime) yForce *= 2.0f;
-//         AddForce(other,(Vector3){0.0f,yForce,0.0f},false);
+//         if (initial || e->initialBurstFinished > World->pauseRelativeTime) yForce *= 2.0f;
+//         AddForce(other,(V3){0.0f,yForce,0.0f},false);
 //     }
 // }
 // 
 // void GravityLiftOnTriggerEnter(u16 self, u16 other) {
-//     Eng_Global->instances[self].initialBurstFinished = Eng_Global->pauseRelativeTime + 1.0f;
-//     if (Eng_Global->instances[self].active) GravityLiftOnForce(self,other,true);
+//     World->instances[self].initialBurstFinished = World->pauseRelativeTime + 1.0f;
+//     if (World->instances[self].active) GravityLiftOnForce(self,other,true);
 //     else GravityLiftOffForce(self,other,true);
 // }
 // 
 // void GravityLiftOnTriggerStay(u16 self, u16 other) {
-//     if (Eng_Global->instances[self].active) GravityLiftOnForce(self,other,false);
+//     if (World->instances[self].active) GravityLiftOnForce(self,other,false);
 //     else GravityLiftOffForce(self,other,false);
 // }
 
-void GravityLiftToggle(u16 self) { Eng_Global->instances[self].active = !Eng_Global->instances[self].active; }
+void GravityLiftToggle(u16 self) { World->instances[self].active = !World->instances[self].active; }
 
 //=============================================================================
 // LogicTimer
 void LogicTimerInitBeforeLoad(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (e->timeInterval <= 0.0f) e->timeInterval = 0.35f;
     if (e->randomMin <= 0.0f) e->randomMin = 5.0f;
     if (e->randomMax <= 0.0f) e->randomMax = 10.0f;
-    e->intervalFinished = Eng_Global->pauseRelativeTime + (e->useRandomTimes ? (double)random_range(e->randomMin,e->randomMax) : (double)e->timeInterval);
+    e->intervalFinished = World->pauseRelativeTime + (e->useRandomTimes ? (double)random_range(e->randomMin,e->randomMax) : (double)e->timeInterval);
 }
 
-void LogicTimerUseTargets(u16 self) { UseTargets(self,Eng_Global->instances[self].target); }
+void LogicTimerUseTargets(u16 self) { UseTargets(self,World->instances[self].target); }
 void LogicTimerUpdate(u16 self) {
     return; // TODO for testing!  Was getting annoyed by target i/o troubleshooting messages from lev1 broken door firing constantly.
-    Entity* e = &Eng_Global->instances[self];
-    if (!e->active || e->intervalFinished >= Eng_Global->pauseRelativeTime) return;
-    e->intervalFinished = Eng_Global->pauseRelativeTime + (e->useRandomTimes ? (double)random_range(e->randomMin,e->randomMax) : (double)e->timeInterval);
+    Entity* e = &World->instances[self];
+    if (!e->active || e->intervalFinished >= World->pauseRelativeTime) return;
+    e->intervalFinished = World->pauseRelativeTime + (e->useRandomTimes ? (double)random_range(e->randomMin,e->randomMax) : (double)e->timeInterval);
     LogicTimerUseTargets(self);
 }
 
-void LogicTimerTargetted(u16 self, u16 activator) { (void)activator; Eng_Global->instances[self].active = !Eng_Global->instances[self].active; }
+void LogicTimerTargetted(u16 self, u16 activator) { (void)activator; World->instances[self].active = !World->instances[self].active; }
 //=============================================================================
 // ButtonSwitch
 void ButtonSwitchInitAfterLoad(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     e->delayFinished = 0.0f;
-    if (e->active) e->tickFinished = Eng_Global->pauseRelativeTime + 1.5 + (double)random_range(0.0f,1.0f);
+    if (e->active) e->tickFinished = World->pauseRelativeTime + 1.5 + (double)random_range(0.0f,1.0f);
 }
 
 void ButtonSwitchUseTargets(u16 self, u16 activator) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     DualLog("ButtonSwitchUseTargets, targeting:%s,ioflags:%u\n",e->target,e->ioflags);
     UseTargets(activator,e->target);
     e->active = !e->active;
     e->alternateOn = e->active;
     if (e->changeTexOnActive) {
         e->texIndex = e->alternateOn ? e->altTexIndex : e->mainSwitchMaterial;
-        if (e->blinkTexOnActive && e->active) e->tickFinished = Eng_Global->pauseRelativeTime + 1.5f;
+        if (e->blinkTexOnActive && e->active) e->tickFinished = World->pauseRelativeTime + 1.5f;
     }
 }
 
 void ButtonSwitchUse(u16 self, u16 activator) {
-    Entity* e = &Eng_Global->instances[self];
-    if (Eng_Cheats->superoverride || Eng_Global->diffMis == 0) EntitySetLocked(e,false);
+    Entity* e = &World->instances[self];
+    if (Eng_Cheats->superoverride || World->diffMis == 0) EntitySetLocked(e,false);
     else if (GetCurrentLevelSecurity() > e->securityThreshold) { UIBlockedBySecurity(e->position); return; }
     if ((e->entflags & EF_LOCKED) != 0) {
         CenterStatusPrint("%s",Eng_Text->stringTable[e->lockedMessageLingdex]);
@@ -1217,17 +1217,17 @@ void ButtonSwitchUse(u16 self, u16 activator) {
     
     if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
     CenterStatusPrint("%s",Eng_Text->stringTable[e->messageIndex]);
-    if (e->delay > 0.0f) { e->recentMostActivator = activator; e->delayFinished = Eng_Global->pauseRelativeTime + e->delay; }
+    if (e->delay > 0.0f) { e->recentMostActivator = activator; e->delayFinished = World->pauseRelativeTime + e->delay; }
     else ButtonSwitchUseTargets(self,activator);
 }
 
 void ButtonSwitchUpdate(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
-    if (e->delayFinished > 0.0 && e->delayFinished < Eng_Global->pauseRelativeTime) { e->delayFinished = 0.0; ButtonSwitchUseTargets(self,e->recentMostActivator); }
-    if (e->blinkTexOnActive && e->active && e->tickFinished < Eng_Global->pauseRelativeTime) {
+    Entity* e = &World->instances[self];
+    if (e->delayFinished > 0.0 && e->delayFinished < World->pauseRelativeTime) { e->delayFinished = 0.0; ButtonSwitchUseTargets(self,e->recentMostActivator); }
+    if (e->blinkTexOnActive && e->active && e->tickFinished < World->pauseRelativeTime) {
         e->alternateOn = !e->alternateOn;
         e->texIndex = e->alternateOn ? e->altTexIndex : e->mainSwitchMaterial;
-        e->tickFinished = Eng_Global->pauseRelativeTime + e->tickTime;
+        e->tickFinished = World->pauseRelativeTime + e->tickTime;
     }
 }
 
@@ -1235,7 +1235,7 @@ void ButtonSwitchTargetted(u16 self, u16 activator) { ButtonSwitchUse(self,activ
 //=============================================================================
 // HealingBed
 void HealingBedUse(u16 self, u16 owner) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (GetCurrentLevelSecurity() <= (u8)e->minSecurityLevel) {
         if (!e->broken) {
             HealthManagerHealingBed(PLAYER1,e->amount,true);
@@ -1250,10 +1250,10 @@ void UseTargets(u16 activator, const char* targetname) {
     if (sEmpty(targetname)) return;
     
     bool succeeded = false;
-    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < Eng_Global->loadedInstances; i++) {
-        if (!sEqual(Eng_Global->instances[i].targetname,targetname)) continue;
+    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < World->loadedInstances; i++) {
+        if (!sEqual(World->instances[i].targetname,targetname)) continue;
         
-        DualLog("Successfully found matching targetname %s for entity %u and activator ioflags:%u\n",targetname,i,Eng_Global->instances[activator].ioflags);
+        DualLog("Successfully found matching targetname %s for entity %u and activator ioflags:%u\n",targetname,i,World->instances[activator].ioflags);
         Targetted(activator,i);
         succeeded = true;
     }
@@ -1261,11 +1261,11 @@ void UseTargets(u16 activator, const char* targetname) {
 }
 
 void Targetted(u16 activator, u16 self) {
-    Entity* e = &Eng_Global->instances[self];
-    Entity* a = &Eng_Global->instances[activator];
+    Entity* e = &World->instances[self];
+    Entity* a = &World->instances[activator];
     DualLog("Targetted running with a->ioflags:%u, e->index:%u, door conditions:%u\n",a->ioflags,e->index,((a->ioflags & TARG_IOFLAGS_DOOROPEN) && ConstIndexIsDoor(e->index)));
     if (e->index == 709) { CenterStatusPrint("%s",Eng_Text->stringTable[e->messageLingdex]); return; } // info_message
-    if (e->index == 708) { Eng_Global->gameFinished = true; return; }
+    if (e->index == 708) { World->gameFinished = true; return; }
     
     if (e->index == 707 /*info_email*/) EmailTargetted(self,activator);
     if (a->ioflags & TARG_IOFLAGS_TRIPTRIGGER) {
@@ -1278,7 +1278,7 @@ void Targetted(u16 activator, u16 self) {
     
     if (ConstIndexIsButtonSwitch(e->index)) ButtonSwitchTargetted(self,activator);
     if ((a->ioflags & TARG_IOFLAGS_DOOROPEN) && ConstIndexIsDoor(e->index)) { DualLog("Running DoorForceOpen from ioflag DOOROPEN on entity %u\n",self); DoorForceOpen(self); }
-    else if ((a->ioflags & TARG_IOFLAGS_DOOROPENIFUNLOCKED) && ConstIndexIsDoor(e->index) && ((e->entflags & EF_LOCKED) == 0) && (e->requiredAccessCard == AccessCardType_None || (Eng_Global->invP1.accessCardOwned & (1u << e->requiredAccessCard)))) DoorForceOpen(self);
+    else if ((a->ioflags & TARG_IOFLAGS_DOOROPENIFUNLOCKED) && ConstIndexIsDoor(e->index) && ((e->entflags & EF_LOCKED) == 0) && (e->requiredAccessCard == AccessCardType_None || (World->invP1.accessCardOwned & (1u << e->requiredAccessCard)))) DoorForceOpen(self);
     else if ((a->ioflags & TARG_IOFLAGS_DOORCLOSE) && ConstIndexIsDoor(e->index)) DoorForceClose(self);
     else if (ConstIndexIsDoor(e->index)) DoorTargetted(self,activator);
     
@@ -1298,30 +1298,30 @@ void Targetted(u16 activator, u16 self) {
 // VaporizeButton
 void VaporizeClick(void) { // TODO
 //     Eng_UI->mouseClickHeldOverGUI = true;
-//     if (Eng_Global->invP1.generalInvCurrent == 0) return; // Access Cards index.
+//     if (World->invP1.generalInvCurrent == 0) return; // Access Cards index.
 // 
-//     int cur = Eng_Global->invP1.generalInvCurrent;
-//     Eng_Global->invP1.generalInventoryIndexRef[cur] = -1; // Remove item
-//     Eng_Global->invP1.generalInvCurrent -= 1;
-//     if (Eng_Global->invP1.generalInvCurrent < 0) {
-//         Eng_Global->invP1.generalInvCurrent = 0; // Bound to lowest, but only
+//     int cur = World->invP1.generalInvCurrent;
+//     World->invP1.generalInventoryIndexRef[cur] = -1; // Remove item
+//     World->invP1.generalInvCurrent -= 1;
+//     if (World->invP1.generalInvCurrent < 0) {
+//         World->invP1.generalInvCurrent = 0; // Bound to lowest, but only
 //     }									   // since it is Access Cards.
 // 
 // 
-//     cur = Eng_Global->invP1.generalInvCurrent;
-//     if (Eng_Global->invP1.generalInventoryIndexRef[cur] < 0) {
+//     cur = World->invP1.generalInvCurrent;
+//     if (World->invP1.generalInventoryIndexRef[cur] < 0) {
 //         for (int i=13; i >= 0; i--) {
-//             if (Eng_Global->invP1.generalInventoryIndexRef[i] >= 0) {
-//                 Eng_Global->invP1.generalInvCurrent = i;
+//             if (World->invP1.generalInventoryIndexRef[i] >= 0) {
+//                 World->invP1.generalInvCurrent = i;
 //                 break; // Found last item in inventory.
 //             }
 //         }
 //     }
 // 
-//     cur = Eng_Global->invP1.generalInvCurrent;
-//     int indexRef = Eng_Global->invP1.generalInventoryIndexRef[cur];
-//     if (Eng_Global->invP1.generalInvCurrent == 0) {
-//         if (Eng_Global->invP1.HasAnyAccessCards()) {
+//     cur = World->invP1.generalInvCurrent;
+//     int indexRef = World->invP1.generalInventoryIndexRef[cur];
+//     if (World->invP1.generalInvCurrent == 0) {
+//         if (World->invP1.HasAnyAccessCards()) {
 //             Eng_UI->SendInfoToItemTab(indexRef);
 //         } else {
 //             // If no access cards, reset item tab to show nothing.
@@ -1329,7 +1329,7 @@ void VaporizeClick(void) { // TODO
 //             PtrExit();
 //         }
 //     } else {
-//         GeneralInvButton genbut = Eng_Global->invP1.genButtons[cur].GetComponent<GeneralInvButton>();
+//         GeneralInvButton genbut = World->invP1.genButtons[cur].GetComponent<GeneralInvButton>();
 //         Eng_UI->SendInfoToItemTab(indexRef,genbut.customIndex);
 //     }
 }
@@ -1378,10 +1378,10 @@ static double creditsVidFinished  = 0.0;
 static u8 creditsVidPhase    = 0;
 
 void CreditsOnEnable(void) {
-    Eng_Global->creditsActive    = true;
-    Eng_Global->creditsPageIndex = 0;
-    creditsVidStartTime          = Eng_Global->absoluteTime;
-    creditsVidFinished           = Eng_Global->absoluteTime + 37.2;
+    World->creditsActive    = true;
+    World->creditsPageIndex = 0;
+    creditsVidStartTime          = World->absoluteTime;
+    creditsVidFinished           = World->absoluteTime + 37.2;
     creditsVidPhase              = 0;
     // TODO: start outro.webm video playback via engine video player
     // TODO: render Eng_Text->stringTable[610] as endVideoText1 (phase 0)
@@ -1390,15 +1390,15 @@ void CreditsOnEnable(void) {
 }
 
 void CreditsUpdate(void) {
-    if (!Eng_Global->creditsActive) return;
-    double elapsed = Eng_Global->absoluteTime - creditsVidStartTime;
+    if (!World->creditsActive) return;
+    double elapsed = World->absoluteTime - creditsVidStartTime;
 
     // Drive video text phase transitions
     if (creditsVidFinished > 0.0) {
         if (elapsed >  7.0 && creditsVidPhase == 0) creditsVidPhase = 1; // TODO: swap text1->text2 visibility
         if (elapsed > 11.0 && creditsVidPhase == 1) creditsVidPhase = 2; // TODO: swap text2->text3 visibility
         if (elapsed > 14.0 && creditsVidPhase == 2) creditsVidPhase = 3; // TODO: hide text3
-        if (Eng_Global->absoluteTime >= creditsVidFinished) {
+        if (World->absoluteTime >= creditsVidFinished) {
             creditsVidFinished = 0.0;
             creditsVidPhase    = 3;
             // TODO: deactivate exitVideo overlay and all text phases
@@ -1414,19 +1414,19 @@ void CreditsUpdate(void) {
     if (creditsVidFinished > 0.0) return; // absorb all click input while video playing
 
     if (Attack()) { // left click — advance
-        if (!(Eng_Global->creditsPageIndex >= CREDITS_PAGES)) {
-            ++Eng_Global->creditsPageIndex;
-            if (!Eng_Global->gameFinished && Eng_Global->creditsPageIndex == 1) ++Eng_Global->creditsPageIndex; // skip stats page when not finishing game
-            if (Eng_Global->creditsPageIndex >= CREDITS_PAGES) Eng_Global->creditsPageIndex = CREDITS_PAGES; // bottom
+        if (!(World->creditsPageIndex >= CREDITS_PAGES)) {
+            ++World->creditsPageIndex;
+            if (!World->gameFinished && World->creditsPageIndex == 1) ++World->creditsPageIndex; // skip stats page when not finishing game
+            if (World->creditsPageIndex >= CREDITS_PAGES) World->creditsPageIndex = CREDITS_PAGES; // bottom
         } else {
-            Eng_Global->creditsActive = false;
+            World->creditsActive = false;
             MenuGoBack();
         }
         return;
     }
 
     if (ToggleMode()) { // right click — go back a page
-        if (Eng_Global->creditsPageIndex > 0) --Eng_Global->creditsPageIndex;
+        if (World->creditsPageIndex > 0) --World->creditsPageIndex;
     }
 }
 //=============================================================================
@@ -1441,55 +1441,55 @@ void CreditsUpdate(void) {
 // tickFinished    = next alpha decay tick (already on Entity)
 // animSwapFinished = conwayFinished (already on Entity)
 void CyberWallInitAfterLoad(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     e->volume        = CYBERWALL_ALPHA_MIN;
-    e->tickFinished  = Eng_Global->pauseRelativeTime + CYBERWALL_INIT_DELAY;
+    e->tickFinished  = World->pauseRelativeTime + CYBERWALL_INIT_DELAY;
     e->animSwapFinished = 0.0;
     // TODO: push e->volume to chunk_frag.glsl as _CenterAlpha uniform or
     // per-instance draw param for this geometry instance's material slot
 }
 
 void CyberWallUpdate(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
-    if (Eng_Global->pauseRelativeTime < e->tickFinished) return;
+    Entity* e = &World->instances[self];
+    if (World->pauseRelativeTime < e->tickFinished) return;
     if (e->volume > CYBERWALL_ALPHA_MIN) {
         e->volume -= CYBERWALL_ALPHA_STEP;
         if (e->volume < CYBERWALL_ALPHA_MIN) e->volume = CYBERWALL_ALPHA_MIN;
     }
-    e->tickFinished = Eng_Global->pauseRelativeTime + CYBERWALL_TICK;
+    e->tickFinished = World->pauseRelativeTime + CYBERWALL_TICK;
 }
 
 void CyberWallHit(u16 self) { // Called by projectile hit, collision, or ConwaySignal propagation from adjacent wall
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     e->volume = CYBERWALL_ALPHA_MAX;
     // TODO: push e->volume to renderer as _CenterAlpha for this instance
 }
 
 void CyberWallConwaySignal(u16 self) { // Called when a conway propagation signal arrives from a neighbour TODO Conway's game of life propagation on world x,z plane
-    Eng_Global->instances[self].animSwapFinished = Eng_Global->pauseRelativeTime + CYBERWALL_CONWAY_TIME;
+    World->instances[self].animSwapFinished = World->pauseRelativeTime + CYBERWALL_CONWAY_TIME;
 }
 //=============================================================================
 // CyborgConversionToggle
 void CyborgConversionToggleTargetted(void) {
-    bool active = (Eng_Global->ressurectionActiveLevels >> Eng_Global->curLev) & 1u;
-    flag_setu16(&Eng_Global->ressurectionActiveLevels,(1u << Eng_Global->curLev),!active);
-    if (Eng_Global->curLev == 6) flag_setu16(&Eng_Global->ressurectionActiveLevels, (1u<<10|1u<<11|1u<<12),!active); // Set groves 10,11,12 when 6 gets toggled as they don't have their own switch
-    play_wav(sounds[active ? 183 : 184],Eng_Settings->VolumeMessage,(Vector3){},false); // "vox_cybconvcancelled" : "vox_cybconvenabled"
+    bool active = (World->ressurectionActiveLevels >> World->curLev) & 1u;
+    flag_setu16(&World->ressurectionActiveLevels,(1u << World->curLev),!active);
+    if (World->curLev == 6) flag_setu16(&World->ressurectionActiveLevels, (1u<<10|1u<<11|1u<<12),!active); // Set groves 10,11,12 when 6 gets toggled as they don't have their own switch
+    play_wav(sounds[active ? 183 : 184],Settings->VolumeMessage,(V3){},false); // "vox_cybconvcancelled" : "vox_cybconvenabled"
     CenterStatusPrint("%s",Eng_Text->stringTable[active ? 591 : 592]);
 }
 //=============================================================================
 // ElevatorButton
 // static const char* elevFloorLabels[14] = {"R","1","2","3","4","5","6","7","8","9","G1","G2","G4","C"};
 void ElevatorButtonClick(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     Eng_UI->mouseClickHeldOverGUI = true;
     if (Eng_UI->linkedElevatorDoor == U16_MAX) {
         CenterStatusPrint("%s",Eng_Text->stringTable[6]); // Too far away from that.
         return;
     }
-    Entity* door = &Eng_Global->instances[Eng_UI->linkedElevatorDoor];
+    Entity* door = &World->instances[Eng_UI->linkedElevatorDoor];
     bool doorClosed = door->doorOpen == DoorState_Closed;
-    float dist = V3_Dist(Eng_UI->objectInUsePos,Eng_Global->instances[PLAYER1].position);
+    float dist = V3_Dist(Eng_UI->objectInUsePos,World->instances[PLAYER1].position);
     if (dist > ELEVATOR_PAD_TETHER_DIST && !doorClosed) {
         CenterStatusPrint("%s",Eng_Text->stringTable[6]); // Too far away from that.
         return;
@@ -1504,10 +1504,10 @@ void ElevatorButtonClick(u16 self) {
     }
     // TODO: call engine LoadLevel(e->teleportID, spawnPos) — destination spawn
     // position comes from instance[e->targetDestinationID].position if set
-    // (targetDestinationID != U16_MAX), else Vector3 zero.
+    // (targetDestinationID != U16_MAX), else V3 zero.
     // LoadLevel is engine-side level transition, not yet in interop.h.
 //     if (floorAccessible) { // floorAccessible set from the us_puz_elevatorkeypad, us_puz_elevatorkeypad2, us_puz_elevatorkeypad3, or us_puz_elevatorkeypad4 entity
-//         LoadLevel(levelIndex,targetDestination.Eng_Global->instances[i].position);
+//         LoadLevel(levelIndex,targetDestination.World->instances[i].position);
 //     } else {
 //         CenterStatusPrint("%s", Eng_Text->stringTable[8]);
 //     }
@@ -1515,8 +1515,8 @@ void ElevatorButtonClick(u16 self) {
 //=============================================================================
 // Email
 void EmailTargetted(u16 self, u16 activator) {
-    (void)activator; Entity* e = &Eng_Global->instances[self]; u16 idx = e->emailIndex;
-    InventorySystem* inv = &Eng_Global->invP1;
+    (void)activator; Entity* e = &World->instances[self]; u16 idx = e->emailIndex;
+    InventorySystem* inv = &World->invP1;
     if (inv->hasLog[idx]) return;
     
     inv->hasLog[idx] = inv->hasNewEmail = true; inv->lastAddedIndex = idx;
@@ -1530,9 +1530,9 @@ void EmailTargetted(u16 self, u16 activator) {
 static double overloadClickFinished = 0.0;
 
 void OverloadButtonAction(void) {
-    if (overloadClickFinished >= Eng_Global->pauseRelativeTime) return;
-    overloadClickFinished = Eng_Global->pauseRelativeTime + OVERLOAD_CLICK_DEBOUNCE;
-    InventorySystem* inv = &Eng_Global->invP1;
+    if (overloadClickFinished >= World->pauseRelativeTime) return;
+    overloadClickFinished = World->pauseRelativeTime + OVERLOAD_CLICK_DEBOUNCE;
+    InventorySystem* inv = &World->invP1;
     if (inv->currentEnergyWeaponHeat[inv->weaponIndex] > OVERLOAD_HEAT_THRESHOLD) {
         CenterStatusPrint("%s",Eng_Text->stringTable[12]); // Weapon too hot
         return;
@@ -1555,14 +1555,14 @@ void OverloadEnergyClick(void) {
 
 // Called by weapon fire system after overload shot discharges
 void OverloadFired(void) {
-    Eng_Global->invP1.overloadEnabled = false;
+    World->invP1.overloadEnabled = false;
     // Render-time: normalButtonSprite, textDisabledColor
 }
 
 // Called from weapon pane render — returns visual state for renderer to act on
 // 0 = normal+clickable, 1 = overloaded, 2 = disabled (post-fire/too hot)
 u8 OverloadButtonVisualState(void) {
-    InventorySystem* inv = &Eng_Global->invP1;
+    InventorySystem* inv = &World->invP1;
     if (inv->currentEnergyWeaponHeat[inv->weaponIndex] > OVERLOAD_HEAT_THRESHOLD) return 2;
     if (inv->overloadEnabled) return 1;
     return 0;
@@ -1589,7 +1589,7 @@ static void ApplyHealthkit(void) {
     InventorySystem* inv = Inv(PLAYER1);
     if (inv->energy >= 255.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[303]); return; } // Energy full
     
-    Eng_Global->instances[PLAYER1].health = 255.0f;
+    World->instances[PLAYER1].health = 255.0f;
     // TODO: Eng_UI->DrawTicks(true) — HUD health tick refresh, MFDManager
     inv->generalInventoryIndexRef[inv->hardwareInvCurrent] = -1;
 }
@@ -1614,14 +1614,14 @@ void GeneralInvApply(int buttonIdx,int customIdx) {
         // TODO: Eng_UI->SendInfoToItemTab(81), OpenTab access cards — MFDManager
         return;
     }
-    Eng_Global->invP1.hardwareInvCurrent = buttonIdx;
-    int itemIdx = Eng_Global->invP1.generalInventoryIndexRef[buttonIdx];
+    World->invP1.hardwareInvCurrent = buttonIdx;
+    int itemIdx = World->invP1.generalInventoryIndexRef[buttonIdx];
     switch (itemIdx) {
         case 52: ApplyBattery();     break;
         case 53: ApplyIcadBattery(); break;
         case 55: ApplyHealthkit();   break;
         default:
-            Eng_Global->invP1.hardwareInvCurrent = buttonIdx;
+            World->invP1.hardwareInvCurrent = buttonIdx;
             // TODO: Eng_UI->SendInfoToItemTab(itemIdx,customIdx), OpenTab — MFDManager
             (void)customIdx;
             break;
@@ -1643,16 +1643,16 @@ void GeneralInvDoubleClick(int buttonIdx,int customIdx) { Eng_UI->mouseClickHeld
 #define TARGID_DISPLAY_NAME    (1ull << 63)
 
 float TargetIDGetSensingRange(bool manual) {
-    u8 ver = Eng_Global->invP1.hardwareVersion[HW_TID_IDX];
+    u8 ver = World->invP1.hardwareVersion[HW_TID_IDX];
     if (manual) return (ver >= 4) ? 18.0f : 13.0f;
     return (ver <= 2) ? 0.0f : ((ver == 3) ? 13.0f : 20.0f);
 }
 
-float TargetIDGetTetherRange(void) { return (Eng_Global->invP1.hardwareVersion[HW_TID_IDX] >= 4) ? 22.0f : 15.0f; }
+float TargetIDGetTetherRange(void) { return (World->invP1.hardwareVersion[HW_TID_IDX] >= 4) ? 22.0f : 15.0f; }
 static void TargetIDDeactivate(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (e->enemy != WORLD) {
-        Entity* npc = &Eng_Global->instances[e->enemy];
+        Entity* npc = &World->instances[e->enemy];
         flag_set(&npc->entflags,EF_TARGID_ATTACHED,false);
         e->enemy = NULLENT;
     }
@@ -1661,12 +1661,12 @@ static void TargetIDDeactivate(u16 self) {
 }
 
 void TargetIDSendDamageReceive(u16 self,float damage,AttackType attackType) {
-    Entity* e   = &Eng_Global->instances[self];
+    Entity* e   = &World->instances[self];
     if (e->enemy == NULLENT) return;
-    Entity* npc = &Eng_Global->instances[e->enemy];
+    Entity* npc = &World->instances[e->enemy];
     if (attackType == AttackType_Tranq) {
         e->textIndex         = 536; // STUNNED
-        e->animSwapFinished  = Eng_Global->pauseRelativeTime - 1.0; // expire damage text
+        e->animSwapFinished  = World->pauseRelativeTime - 1.0; // expire damage text
     } else {
         float mh = npcTable[npc->index - 419].health;
         if      (damage > mh * 0.75f) e->textIndex = 514; // SEVERE DAMAGE
@@ -1674,31 +1674,31 @@ void TargetIDSendDamageReceive(u16 self,float damage,AttackType attackType) {
         else if (damage > mh * 0.25f) e->textIndex = 513; // NORMAL DAMAGE
         else if (damage > 0.0f)       e->textIndex = 512; // MINOR DAMAGE
         else                          e->textIndex = 511; // NO DAMAGE
-        e->animSwapFinished = Eng_Global->pauseRelativeTime
+        e->animSwapFinished = World->pauseRelativeTime
                               + ((damage == 0.0f) ? TARGETID_DAMAGE_TIME_MISS
                                                   : TARGETID_DAMAGE_TIME_HIT);
     }
 }
 
 void TargetIDUpdate(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (!(e->entflags & EF_ACTIVE)) return;
 
     // Deactivation checks
     if (e->enemy == NULLENT) { TargetIDDeactivate(self); return; }
-    Entity* npc = &Eng_Global->instances[e->enemy];
+    Entity* npc = &World->instances[e->enemy];
     if (npc->health <= 0.0f) { TargetIDDeactivate(self); return; }
-    if (V3_Dist(e->position,Eng_Global->instances[PLAYER1].position) > TARGETID_LINK_DIST) { TargetIDDeactivate(self); return; }
-    if (e->tickFinished < Eng_Global->pauseRelativeTime) { TargetIDDeactivate(self); return; }
+    if (V3_Dist(e->position,World->instances[PLAYER1].position) > TARGETID_LINK_DIST) { TargetIDDeactivate(self); return; }
+    if (e->tickFinished < World->pauseRelativeTime) { TargetIDDeactivate(self); return; }
 
     SetPosition(e,npc->position,true); // Track parent NPC position
-    bool stunned = npc->tranquilizeFinished > Eng_Global->pauseRelativeTime;
+    bool stunned = npc->tranquilizeFinished > World->pauseRelativeTime;
     flag_set(&e->entflags,EF_ASLEEP,stunned);
     if (e->textIndex >= 0) {
-        if (stunned && e->animSwapFinished < Eng_Global->pauseRelativeTime) e->textIndex = 536; // STUNNED
-        else if (e->animSwapFinished < Eng_Global->pauseRelativeTime) {
+        if (stunned && e->animSwapFinished < World->pauseRelativeTime) e->textIndex = 536; // STUNNED
+        else if (e->animSwapFinished < World->pauseRelativeTime) {
             e->textIndex = -1;
-            if (!(Eng_Global->invP1.hasHardware & HW_TID)) { TargetIDDeactivate(self); return; }
+            if (!(World->invP1.hasHardware & HW_TID)) { TargetIDDeactivate(self); return; }
         }
     }
 
@@ -1716,7 +1716,7 @@ void TargetIDUpdate(u16 self) {
 }
 
 void TargetIDInitAfterLoad(u16 self) {
-    Entity* e        = &Eng_Global->instances[self];
+    Entity* e        = &World->instances[self];
     e->textIndex     = -1;
     e->enemy        = NULLENT;
     e->tickFinished  = 0.0;
@@ -1745,21 +1745,21 @@ static const u16 hwDrainJPM[12][4] = {
 };
 
 static void TargetIdentifierSenseTargets(void) {
-    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < Eng_Global->loadedInstances; i++) {
-        Entity* e = &Eng_Global->instances[i];
+    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < World->loadedInstances; i++) {
+        Entity* e = &World->instances[i];
         if (!(e->entflags & EF_ACTIVE))         continue;
         if (!ConstIndexIsNPC(e->index))              continue;
         if (e->entflags & EF_DEAD)              continue;
         if (e->entflags & EF_TARGID_ATTACHED)   continue;
-        if (V3_Dist(e->position,Eng_Global->instances[PLAYER1].position) > TargetIDGetSensingRange(false))        continue;
+        if (V3_Dist(e->position,World->instances[PLAYER1].position) > TargetIDGetSensingRange(false))        continue;
         // TODO: CreateTargetIDInstance — weapon/targetting system
     }
 }
 
-MOD_TO_ENGINE void SetModFatigue(float val) { Eng_Global->invP1.fatigue = val; }
-MOD_TO_ENGINE bool ModRequestsGrayscale(void) {return (/*(Eng_Global->invP1.hasHardware & HW_INF) && */(Eng_Global->invP1.hardwareIsActive & HW_INF) > 0); }
+MOD_TO_ENGINE void SetModFatigue(float val) { World->invP1.fatigue = val; }
+MOD_TO_ENGINE bool ModRequestsGrayscale(void) {return (/*(World->invP1.hasHardware & HW_INF) && */(World->invP1.hardwareIsActive & HW_INF) > 0); }
 static void DeactivateHardwareOnEnergyDepleted(void) {
-    InventorySystem* inv = &Eng_Global->invP1;
+    InventorySystem* inv = &World->invP1;
     u16* active = &inv->hardwareIsActive;
     flag_set((u32*)active, HW_SNS, false);
     // TODO: SensaroundOff() — hardware button manager effects
@@ -1792,7 +1792,7 @@ void TakeEnergy(float take) {
     inv->energy -= take;
     if (inv->energy <= 0.0f) {
         inv->energy = 0.0f;
-        play_wav(sounds[84],Eng_Settings->VolumeEffects,(Vector3){},false); // energy_gone
+        play_wav(sounds[84],Settings->VolumeEffects,(V3){},false); // energy_gone
         CenterStatusPrint("%s",Eng_Text->stringTable[314]); // Power supply exhausted.
         DeactivateHardwareOnEnergyDepleted();
     }
@@ -1802,23 +1802,23 @@ void GiveEnergy(float give,EnergyType type) {
     InventorySystem* inv = Inv(PLAYER1);
     inv->energy += give;
     if (inv->energy > 255.0f) inv->energy = 255.0f;
-    if (type == EnergyType_Battery)       play_wav(sounds[79], Eng_Settings->VolumeEffects,(Vector3){},false); // batteryuse
-    if (type == EnergyType_ChargeStation) play_wav(sounds[100],Eng_Settings->VolumeEffects,(Vector3){},false); // chargingstation
+    if (type == EnergyType_Battery)       play_wav(sounds[79], Settings->VolumeEffects,(V3){},false); // batteryuse
+    if (type == EnergyType_ChargeStation) play_wav(sounds[100],Settings->VolumeEffects,(V3){},false); // chargingstation
 }
 
 void PlayerEnergyInit(void) {
     InventorySystem* inv = Inv(PLAYER1);
     inv->energy = 54.0f;
-    inv->energyDrainTickFinished = Eng_Global->pauseRelativeTime + ENERGY_TICK + random_range(0.0f,1.0f);
+    inv->energyDrainTickFinished = World->pauseRelativeTime + ENERGY_TICK + random_range(0.0f,1.0f);
     inv->drainJPM = 0;
 }
 
 void PlayerEnergyUpdate(void) {
-    InventorySystem* inv = &Eng_Global->invP1;
+    InventorySystem* inv = &World->invP1;
     if (inv->hasHardware & HW_TID) TargetIdentifierSenseTargets();
-    if (inv->energyDrainTickFinished > Eng_Global->pauseRelativeTime) return;
+    if (inv->energyDrainTickFinished > World->pauseRelativeTime) return;
     
-    inv->energyDrainTickFinished = Eng_Global->pauseRelativeTime + ENERGY_TICK;
+    inv->energyDrainTickFinished = World->pauseRelativeTime + ENERGY_TICK;
     bool anyDrain = false; u8 ver; inv->drainJPM = 0;
     for (int hw = 3; hw <= 11; hw++) {
         u16 bit = (u16)(1u << hw);
@@ -1835,19 +1835,19 @@ void PlayerEnergyUpdate(void) {
 }
 //=============================================================================
 // GrenadeActivate
-static bool GrenadeIsNPCMine(u16 self) { return Eng_Global->instances[self].layer != L_PlayerBullets; }
+static bool GrenadeIsNPCMine(u16 self) { return World->instances[self].layer != L_PlayerBullets; }
 void GrenadeExplode(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     // TODO: DamageData + ApplyImpactForceSphere(damage,attackType,penetration,offense,damage*1.5f,e->position,e->strength,1.0f)
-    if (!GrenadeIsNPCMine(self)) { Entity* p = &Eng_Global->instances[PLAYER1]; p->noiseFinished = Eng_Global->pauseRelativeTime + 2.0; }
+    if (!GrenadeIsNPCMine(self)) { Entity* p = &World->instances[PLAYER1]; p->noiseFinished = World->pauseRelativeTime + 2.0; }
     i16 idx = (i16)e->index;
     int soundIndex = 60;
     switch (idx) {
-        case 7: case 11: soundIndex = 64; Eng_Global->fogFac += 5;  break; // frag, mine
-        case 8: case 10: soundIndex = 60; Eng_Global->fogFac += 7;  break; // conc, earth
+        case 7: case 11: soundIndex = 64; World->fogFac += 5;  break; // frag, mine
+        case 8: case 10: soundIndex = 60; World->fogFac += 7;  break; // conc, earth
         case 9:  soundIndex = 67;                           break; // emp
-        case 12: soundIndex = 60; Eng_Global->fogFac += 6;  break; // nitro
-        case 13: soundIndex = 63; Eng_Global->fogFac += 10; break; // gas
+        case 12: soundIndex = 60; World->fogFac += 6;  break; // nitro
+        case 13: soundIndex = 63; World->fogFac += 10; break; // gas
     }
     
     play_wav(sounds[soundIndex],1.0f,e->position,true);
@@ -1857,28 +1857,28 @@ void GrenadeExplode(u16 self) {
 }
 
 void GrenadeActivate(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     i16 idx = (i16)e->index;
     switch (idx) {
 //         case 7: case 8: case 9: flag_set(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
-//         case 10: e->timerFinished = Eng_Global->pauseRelativeTime + Eng_Global->invP1.earthShakerTimeSetting; flag_set(&e->ioflags,GREN_FLAG_USE_TIMER,true); break;
+//         case 10: e->timerFinished = World->pauseRelativeTime + World->invP1.earthShakerTimeSetting; flag_set(&e->ioflags,GREN_FLAG_USE_TIMER,true); break;
 //         case 11: flag_set(&e->ioflags,GREN_FLAG_USE_PROX,true); flag_set(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,false);                                        break;
-//         case 12: e->timerFinished = Eng_Global->pauseRelativeTime + Eng_Global->invP1.nitroTimeSetting; flag_set(&e->ioflags,GREN_FLAG_USE_TIMER,true);       break;
+//         case 12: e->timerFinished = World->pauseRelativeTime + World->invP1.nitroTimeSetting; flag_set(&e->ioflags,GREN_FLAG_USE_TIMER,true);       break;
 //         case 13: flag_set(&e->ioflags,GREN_FLAG_EXPLODE_CONTACT,true); break;
         default: return;
     }
 }
 
 void GrenadeUpdate(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if ((i16)e->index == 14) { GrenadeExplode(self); return; } // Plastique
     
-//     if ((e->ioflags & GREN_FLAG_USE_TIMER) && e->timerFinished < Eng_Global->pauseRelativeTime) GrenadeExplode(self); TODO
+//     if ((e->ioflags & GREN_FLAG_USE_TIMER) && e->timerFinished < World->pauseRelativeTime) GrenadeExplode(self); TODO
 }
 
 // Called by physics collision callback when grenade touches anything
 void GrenadeOnCollision(u16 self) { (void)self;
-//     if (Eng_Global->instances[self].ioflags & GREN_FLAG_EXPLODE_CONTACT) GrenadeExplode(self); TODO
+//     if (World->instances[self].ioflags & GREN_FLAG_EXPLODE_CONTACT) GrenadeExplode(self); TODO
 }
 //=============================================================================
 // ProjectileEffectImpact
@@ -1886,12 +1886,12 @@ void GrenadeOnCollision(u16 self) { (void)self;
 // TODO: TakeDamage(u16 target, DamageData* dd) -> float — health manager
 // TODO: Tranquilize(u16 target, float amount, bool fromProjectile) -> float
 // TODO: ApplyImpactForceSphere — needs OverlapSphere from physics, engine-side
-// TODO: ApplyImpactForce(u16 target, float vel, Vector3 normal, Vector3 pt)
-// TODO: SpawnImpactEffect(u16 impactType, Vector3 pos) — object pool
+// TODO: ApplyImpactForce(u16 target, float vel, V3 normal, V3 pt)
+// TODO: SpawnImpactEffect(u16 impactType, V3 pos) — object pool
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
-static void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, Vector3 hitPos,Vector3 hitNormal) {
-    Entity* e   = &Eng_Global->instances[self];
+static void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 hitNormal) {
+    Entity* e   = &World->instances[self];
     if (hitIdx == e->recentMostActivator) return; // hit own host, ignore
     e->counter++;
     DamageData dd = {
@@ -1906,23 +1906,23 @@ static void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, Vector3 hitPo
         .attackType    = e->attackType,
         .owner         = e->recentMostActivator,
         .hitIdx        = hitIdx,
-        .isOtherNPC    = ConstIndexIsNPC(Eng_Global->instances[hitIdx].index),
-        .berserkActive = (Eng_Global->invP1.patchActive & PATCH_BERSERK) != 0,
+        .isOtherNPC    = ConstIndexIsNPC(World->instances[hitIdx].index),
+        .berserkActive = (World->invP1.patchActive & PATCH_BERSERK) != 0,
     };
 
     // Railgun sphere impact
     if (e->lookUpIndex == 5) { // TODO: replace magic with named PoolType enum
         // TODO: ApplyImpactForceSphere(dd, e->position, 3.2f, 1.0f)
-        Eng_Global->fogFac += 4;
+        World->fogFac += 4;
     }
 
-    Entity* hit = &Eng_Global->instances[hitIdx];
+    Entity* hit = &World->instances[hitIdx];
     if (hit->health > 0.0f || hit->cyberHealth > 0.0f) {
         // TODO: dd.damage = GetDamageTakeAmount(&dd)
         if (e->counter < e->countToTrigger) dd.damage *= 0.85f; // per-hit falloff
         dd.impactVelocity = dd.damage * 1.5f;
         if (e->counter > 0) dd.impactVelocity /= 3.0f;
-        if (Eng_Global->curLev != LEVEL_CYBERSPACE
+        if (World->curLev != LEVEL_CYBERSPACE
             && e->recentMostActivator == PLAYER1) {
             // TODO: ApplyImpactForce(hitIdx, dd.impactVelocity, dd.attacknormal, hitPos)
         }
@@ -1932,7 +1932,7 @@ static void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, Vector3 hitPo
         if (dd.isOtherNPC) {
             if (!(hit->entflags & EF_ASLEEP)) Sys_Music.inCombat = true;
             if (dd.attackType == AttackType_Tranq) {
-//                 float stunAmount = vclamp(3.0f + (Eng_Global->invP1.stungunSetting
+//                 float stunAmount = vclamp(3.0f + (World->invP1.stungunSetting
 //                                           / 100.0f) * 7.0f, 3.0f, 10.0f);
                 // TODO: tranq = Tranquilize(hitIdx, stunAmount, true)
             }
@@ -1951,7 +1951,7 @@ static void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, Vector3 hitPo
 #pragma GCC diagnostic pop
 
 void ProjectileEffectImpactInitAfterLoad(u16 self) {
-    Entity* e       = &Eng_Global->instances[self];
+    Entity* e       = &World->instances[self];
     e->counter      = 0;
     if (e->countToTrigger < 1) e->countToTrigger = 1;
 }
@@ -1981,14 +1981,14 @@ static const i16 objectDeathSound[] = {
 };
 
 static bool IsCyberEntity(u16 self) {
-    if (Eng_Global->curLev == LEVEL_CYBERSPACE) return true;
-    Entity* e = &Eng_Global->instances[self];
+    if (World->curLev == LEVEL_CYBERSPACE) return true;
+    Entity* e = &World->instances[self];
     if (self != PLAYER1 && e->cyberHealth > 0.0f) return true;
     return (ConstIndexIsNPC(e->index) && (e->index - 419) > 23); // 24-28 are cyber enemies
 }
 
 static float ApplyAttackTypeAdjustments(u16 self,float take,AttackType at) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (!ConstIndexIsNPC(e->index) || e->health <= 0.0f) return take;
     NPCType t = npcTable[e->index - 419].type;
     if (at >= 12) return take;
@@ -1997,31 +1997,31 @@ static float ApplyAttackTypeAdjustments(u16 self,float take,AttackType at) {
 
 static void UseDeathTargets(u16 self) {
     if (self == PLAYER1 || self == PLAYER2) return;
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (!sEmpty(e->target)) UseTargets(self,e->target);
 }
 
 static void TeleportAway(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (e->entflags & EF_TELEPORT_ON_DEATH) return; // already done, flag reused as teleportDone
     flag_set(&e->entflags,EF_TELEPORT_ON_DEATH,true);
     e->collider        = COLTYPE_NONE;
     e->gravity         = 0.0f;
-    e->velocity        = (Vector3){0,0,0};
-    e->angularVelocity = (Vector3){0,0,0};
+    e->velocity        = (V3){0,0,0};
+    e->angularVelocity = (V3){0,0,0};
     e->modelIndex      = U16_MAX; // remove from rendering
     // TODO: activate teleport effect particle instance at e->position
 }
 
 static void DropSearchables(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     // TODO: NotifySearchThatSearchableWasDestroyed()
     for (int i = 0; i < 4; i++) {
         if (e->contents[i] == U16_MAX) continue;
         u16 spawned = SpawnDynamicObject(e->contents[i] + 307,true);
         if (spawned != U16_MAX) {
-            Eng_Global->instances[spawned].position   = e->position;
-            Eng_Global->instances[spawned].customIndex[0] = e->customIndex[i];
+            World->instances[spawned].position   = e->position;
+            World->instances[spawned].customIndex[0] = e->customIndex[i];
         } else CenterStatusPrint("BUG: Failed to instantiate object being dropped on gib.");
         
         e->contents[i] = e->customIndex[i] = U16_MAX;
@@ -2030,8 +2030,8 @@ static void DropSearchables(u16 self) {
 
 static void CreateDeathEffects(u16 self,u16 fxPoolType) {
     if (fxPoolType == 0) return; // PoolType_None
-    Entity* e = &Eng_Global->instances[self];
-    Vector3 pos = e->position;
+    Entity* e = &World->instances[self];
+    V3 pos = e->position;
     // Use collider center offset if present
     if (e->collider != COLTYPE_NONE) {
         pos = V3_AplusB(pos,e->colliderCenter);
@@ -2040,7 +2040,7 @@ static void CreateDeathEffects(u16 self,u16 fxPoolType) {
 }
 
 static void HideSelf(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (e->index == 279) return; // screens keep mesh visible
     
     e->modelIndex = MAX_MDLS;
@@ -2048,7 +2048,7 @@ static void HideSelf(u16 self) {
 }
 
 static void NPCDeath(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (e->entflags & EF_DEAD_CHECKS_DONE) return;
     flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true);
     CreateDeathEffects(self,e->deathBurst);
@@ -2058,7 +2058,7 @@ static void NPCDeath(u16 self) {
 }
 
 static void ObjectDeath(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (e->entflags & EF_DEAD_CHECKS_DONE) return;
     if (e->entflags & EF_DEATH_BURST_DONE) { // gibOnDeath reuses DEATH_BURST_DONE
         // Gib path
@@ -2084,7 +2084,7 @@ static void ObjectDeath(u16 self) {
 }
 
 static void ScreenDeath(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (e->entflags & EF_DEAD_CHECKS_DONE) return;
     flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true);
     play_wav(sounds[69],1.0f,e->position,true); // screen_destroy
@@ -2093,7 +2093,7 @@ static void ScreenDeath(u16 self) {
 }
 
 static void VaporizeCorpse(u16 self,bool energyVaporized) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true);
     DropSearchables(self);
     u16 fx = e->deathBurst;
@@ -2107,7 +2107,7 @@ static void VaporizeCorpse(u16 self,bool energyVaporized) {
 }
 
 static void Death(u16 self,bool energyVaporized) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (e->entflags & EF_DEAD_CHECKS_DONE) return;
     UseDeathTargets(self);
     bool isNPC = ConstIndexIsNPC(e->index);
@@ -2126,12 +2126,12 @@ static void Death(u16 self,bool energyVaporized) {
     else if (doTeleport) TeleportAway(self);
     else if (isGrenade) GrenadeExplode(self);
     if (isNPC && !doTeleport) NPCDeath(self);
-    else if (self == PLAYER1 || self == PLAYER2) Eng_Global->deaths++;
+    else if (self == PLAYER1 || self == PLAYER2) World->deaths++;
     flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true);
 }
 
 float TakeDamage(u16 self,DamageData dd) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (Eng_Cheats->god && (self == PLAYER1 || self == PLAYER2)) return 0.0f;
     bool isCyber = IsCyberEntity(self);
     float* hp    = isCyber ? &e->cyberHealth : &e->health;
@@ -2157,8 +2157,8 @@ float TakeDamage(u16 self,DamageData dd) {
         float absorb = 0.0f;
         if (isCyber) {
             // Cyber C-Shield software absorption
-            if (Eng_Global->invP1.hasSoft & (1 << SW_SHIELD)) {
-                u8 sv = Eng_Global->invP1.softVersions[SW_SHIELD];
+            if (World->invP1.hasSoft & (1 << SW_SHIELD)) {
+                u8 sv = World->invP1.softVersions[SW_SHIELD];
                 absorb = (sv <= 9) ? sv * 0.05f : 0.0f;
                 take *= (1.0f - absorb);
                 if (take <= 0.0f) return 0.0f;
@@ -2169,7 +2169,7 @@ float TakeDamage(u16 self,DamageData dd) {
                 // TODO: empstatic.Flash(2), BiomonitorEnergyPulse(11f) — FX systems
                 TakeEnergy(11.0f);
             }
-            InventorySystem* inv = &Eng_Global->invP1;
+            InventorySystem* inv = &World->invP1;
             if ((inv->hardwareIsActive & HW_SHD) && (inv->hasHardware & HW_SHD)) {
                 float thresh = 0.0f;
                 switch (inv->hardwareVersion[HW_SHD_IDX]) {
@@ -2182,43 +2182,43 @@ float TakeDamage(u16 self,DamageData dd) {
                 if (absorb > 0.0f) {
                     if (absorb < 1.0f) absorb = vclamp(absorb + random_range(-0.08f,0.08f),0.0f,1.0f);
                     take *= (1.0f - absorb);
-                    play_wav(sounds[94],Eng_Settings->VolumeEffects,(Vector3){},false); // shield absorb
+                    play_wav(sounds[94],Settings->VolumeEffects,(V3){},false); // shield absorb
                     int abs = (int)(absorb * 100.0f);
                     CenterStatusPrint("%s%d%s",Eng_Text->stringTable[208],abs,Eng_Text->stringTable[209]);
                     // TODO: shield screen flash effect
                 }
             }
             if (take > 0.0f && (absorb < 0.4f || random_range(0.0f,1.0f) < 0.5f)) {
-                play_wav(sounds[140],Eng_Settings->VolumeEffects,(Vector3){},false); // player pain
+                play_wav(sounds[140],Settings->VolumeEffects,(V3){},false); // player pain
                 // TODO: pstatic.Flash(take>15?2:take>10?1:0) — pain flash FX
             }
-            if (dd.owner != NULLENT && ConstIndexIsNPC(Eng_Global->instances[dd.owner].index))
-                e->noiseFinished = Eng_Global->pauseRelativeTime; // justHurtByEnemy for music system
+            if (dd.owner != NULLENT && ConstIndexIsNPC(World->instances[dd.owner].index))
+                e->noiseFinished = World->pauseRelativeTime; // justHurtByEnemy for music system
         }
     }
 
     if (isCyber) {
         e->cyberHealth -= take;
         if (isPlayer) {
-            Eng_Global->damageReceived += take;
+            World->damageReceived += take;
             // TODO: DrawTicks(true)
             if (e->cyberHealth <= 0.0f) {
                 // TODO: ExitCyberspace()
                 return 0.0f;
             }
         }
-        if (dd.owner == PLAYER1 || dd.owner == PLAYER2) Eng_Global->damageDealt += take;
+        if (dd.owner == PLAYER1 || dd.owner == PLAYER2) World->damageDealt += take;
     } else {
         // Camera constIndex 477 gets one-shot by tranq
         if (e->index == 477 && dd.attackType == AttackType_Tranq) take = e->health + 1.0f;
         take = ApplyAttackTypeAdjustments(self,take,dd.attackType);
         e->health -= take;
         if (isPlayer) {
-            Eng_Global->damageReceived += take;
+            World->damageReceived += take;
             Sys_Music.inCombat = true;
             // TODO: DrawTicks(true)
         }
-        if (dd.owner == PLAYER1 || dd.owner == PLAYER2) Eng_Global->damageDealt += take;
+        if (dd.owner == PLAYER1 || dd.owner == PLAYER2) World->damageDealt += take;
     }
 
     if (isNPC && (e->health > 0.0f || (isCyber && e->cyberHealth > 0.0f))) {
@@ -2230,12 +2230,12 @@ float TakeDamage(u16 self,DamageData dd) {
 
     if (isCyber) {
         if (e->cyberHealth <= 0.0f) {
-            if (!e->iceActive && isNPC) Eng_Global->cyberkills++;
+            if (!e->iceActive && isNPC) World->cyberkills++;
             Death(self,false);
         }
     } else {
         if (e->health <= 0.0f) {
-            if (isNPC) Eng_Global->kills++;
+            if (isNPC) World->kills++;
             Death(self,dd.attackType == AttackType_EnergyBeam);
         }
     }
@@ -2243,13 +2243,13 @@ float TakeDamage(u16 self,DamageData dd) {
 }
 
 void HealthManagerInitAfterLoad(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     bool isPlayer = (self == PLAYER1 || self == PLAYER2);
     bool isNPC    = ConstIndexIsNPC(e->index);
     if (isPlayer) {
         e->health      = 211.0f;
         e->cyberHealth = 255.0f;
-        e->noiseFinished = Eng_Global->pauseRelativeTime - 31.0; // guarantee no combat music on start
+        e->noiseFinished = World->pauseRelativeTime - 31.0; // guarantee no combat music on start
         return;
     }
     if (isNPC) {
@@ -2258,7 +2258,7 @@ void HealthManagerInitAfterLoad(u16 self) {
         } else {
             if (e->health < 0.0f) e->health = npcTable[e->index - 419].health;
         }
-        if (Eng_Global->diffCbt == 0) { e->health = 1.0f; }
+        if (World->diffCbt == 0) { e->health = 1.0f; }
         if (e->entflags & EF_ACT_AS_CORPSE_ONLY) {
             e->health = 0.0f; e->cyberHealth = 0.0f;
             UseDeathTargets(self);
@@ -2270,43 +2270,43 @@ void HealthManagerInitAfterLoad(u16 self) {
 //================================================================================
 // Inventory Mode
 MOD_TO_ENGINE void ForceShootMode(void) {
-    if (Eng_Settings->NoShootMode) return; // We are being like the original now!
+    if (Settings->NoShootMode) return; // We are being like the original now!
 
     Eng_UI->mouseClickHeldOverGUI = false;
 //     CloseFullmap(); // TODO
-    Eng_Global->inventoryMode = false; Eng_Global->cursorPosition_x = 663; Eng_Global->cursorPosition_y = 371; IgnoreNextMouseDelta(); // Centered on UI baseline resolution 1366x768
-//     if (vmailActive) { Eng_Global->invP1.DeactivateVMail(); vmailActive = false; } // TODO
+    World->inventoryMode = false; World->cursorPosition_x = 663; World->cursorPosition_y = 371; IgnoreNextMouseDelta(); // Centered on UI baseline resolution 1366x768
+//     if (vmailActive) { World->invP1.DeactivateVMail(); vmailActive = false; } // TODO
 }
 
-void ForceInventoryMode(void) { Eng_Global->inventoryMode = true; Eng_Global->cursorPosition_x = 663; Eng_Global->cursorPosition_y = 371; IgnoreNextMouseDelta(); } // Centered on UI baseline resolution 1366x768
-void ToggleInventoryMode(void) { if (Eng_Global->inventoryMode) {ForceShootMode();} else {ForceInventoryMode();} }
+void ForceInventoryMode(void) { World->inventoryMode = true; World->cursorPosition_x = 663; World->cursorPosition_y = 371; IgnoreNextMouseDelta(); } // Centered on UI baseline resolution 1366x768
+void ToggleInventoryMode(void) { if (World->inventoryMode) {ForceShootMode();} else {ForceInventoryMode();} }
 //================================================================================
 // Hardware
 void HardwareBioOff(void) {
-    Eng_Global->invP1.hardwareIsActive &= ~HW_BIO;
+    World->invP1.hardwareIsActive &= ~HW_BIO;
     if (Eng_Cheats->showFPS) return;
     // TODO: BiomonitorClearGraphs() — engine-side graph reset
     // TODO: deactivate bioMonitorContainer — engine reads BioMonitorActive()
 }
 void HardwareBioOn(void) {
-    Eng_Global->invP1.hardwareIsActive |= HW_BIO;
+    World->invP1.hardwareIsActive |= HW_BIO;
     // TODO: activate bioMonitorContainer — engine reads BioMonitorActive()
 }
 void HardwareBioAction(void) {
     InventorySystem* inv = Inv(PLAYER1);
-    if (Eng_Global->invP1.hardwareVersionSetting[HW_BIO_IDX] == 0 && inv->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
+    if (World->invP1.hardwareVersionSetting[HW_BIO_IDX] == 0 && inv->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
     
-    play_wav(sounds[78],SfxVol(),(Vector3){},false);
+    play_wav(sounds[78],SfxVol(),(V3){},false);
     if (BioMonitorActive(PLAYER1)) HardwareBioOff(); else HardwareBioOn();
 }
 void HardwareBioClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareBioAction(); }
 
 void HardwareSensaroundOn(void) {
-    Eng_Global->invP1.hardwareIsActive |= HW_SNS;
+    World->invP1.hardwareIsActive |= HW_SNS;
     // TODO: activate sensaround cameras/overlays — engine reads hardwareIsActive & HW_SNS + version
 }
 void HardwareSensaroundOff(void) {
-    Eng_Global->invP1.hardwareIsActive &= ~HW_SNS;
+    World->invP1.hardwareIsActive &= ~HW_SNS;
     // TODO: deactivate sensaround cameras, restore tabs — engine reads hardwareIsActive & HW_SNS
 }
 void HardwareSensaroundAction(void) {
@@ -2314,20 +2314,20 @@ void HardwareSensaroundAction(void) {
     if (inv->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
     
     if (inv->hardwareIsActive & HW_SNS) {
-        play_wav(sounds[82],SfxVol(),(Vector3){},false); HardwareSensaroundOff();
+        play_wav(sounds[82],SfxVol(),(V3){},false); HardwareSensaroundOff();
     } else {
-        play_wav(sounds[93],SfxVol(),(Vector3){},false); HardwareSensaroundOn();
+        play_wav(sounds[93],SfxVol(),(V3){},false); HardwareSensaroundOn();
     }
 }
 
 void HardwareSensaroundClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareSensaroundAction(); }
 
 void HardwareShieldOn(void) {
-    Eng_Global->invP1.hardwareIsActive |= HW_SHD;
+    World->invP1.hardwareIsActive |= HW_SHD;
     // TODO: ShieldActivateFX — engine reads hardwareIsActive & HW_SHD
 }
 
-void HardwareShieldOff(void) { Eng_Global->invP1.hardwareIsActive &= ~HW_SHD; }
+void HardwareShieldOff(void) { World->invP1.hardwareIsActive &= ~HW_SHD; }
 void HardwareShieldOffWithEffects(void) {
     HardwareShieldOff();
     // TODO: ShieldDeactivateFX — engine reads hardwareIsActive & HW_SHD
@@ -2337,21 +2337,21 @@ void HardwareShieldAction(void) {
     InventorySystem* inv = Inv(PLAYER1);
     if (inv->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
     
-    if (Eng_Global->invP1.hardwareIsActive & HW_SHD) {
-        play_wav(sounds[95],SfxVol(),(Vector3){},false); HardwareShieldOffWithEffects();
+    if (World->invP1.hardwareIsActive & HW_SHD) {
+        play_wav(sounds[95],SfxVol(),(V3){},false); HardwareShieldOffWithEffects();
     } else {
-        play_wav(sounds[96],SfxVol(),(Vector3){},false); HardwareShieldOn();
+        play_wav(sounds[96],SfxVol(),(V3){},false); HardwareShieldOn();
     }
 }
 
 void HardwareShieldClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareShieldAction(); }
 
 void HardwareLanternOn(void) {
-    Eng_Global->invP1.hardwareIsActive |= HW_LAN;
+    World->invP1.hardwareIsActive |= HW_LAN;
     // TODO: enable headlight at lanternBrightness[hardwareVersionSetting[HW_LAN_IDX]] — engine reads bitmask + version
 }
 void HardwareLanternOff(void) {
-    Eng_Global->invP1.hardwareIsActive &= ~HW_LAN;
+    World->invP1.hardwareIsActive &= ~HW_LAN;
     // TODO: disable headlight — engine reads hardwareIsActive & HW_LAN
 }
 
@@ -2359,59 +2359,59 @@ void HardwareLanternAction(void) {
     InventorySystem* inv = Inv(PLAYER1);
     if (inv->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
     
-    play_wav(sounds[78],SfxVol(),(Vector3){},false);
-    if (Eng_Global->invP1.hardwareIsActive & HW_LAN) HardwareLanternOff(); else HardwareLanternOn();
+    play_wav(sounds[78],SfxVol(),(V3){},false);
+    if (World->invP1.hardwareIsActive & HW_LAN) HardwareLanternOff(); else HardwareLanternOn();
 }
 
 void HardwareLanternClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareLanternAction(); }
 
 void HardwareInfraredOn(void) {
-    Eng_Global->invP1.hardwareIsActive |= HW_INF;
+    World->invP1.hardwareIsActive |= HW_INF;
     // TODO: enable infrared light + grayscale on player/sensaround cameras — engine reads bitmask
 }
 
 void HardwareInfraredOff(void) {
-    Eng_Global->invP1.hardwareIsActive &= ~HW_INF;
+    World->invP1.hardwareIsActive &= ~HW_INF;
     // TODO: disable infrared light + grayscale — engine reads bitmask
 }
 void HardwareInfraredAction(void) {
     InventorySystem* inv = Inv(PLAYER1);
     if (inv->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
     
-    bool wasOn = (Eng_Global->invP1.hardwareIsActive & HW_INF) != 0;
-    play_wav(wasOn ? sounds[82] : sounds[98],SfxVol(),(Vector3){},false);
+    bool wasOn = (World->invP1.hardwareIsActive & HW_INF) != 0;
+    play_wav(wasOn ? sounds[82] : sounds[98],SfxVol(),(V3){},false);
     if (wasOn) HardwareInfraredOff(); else HardwareInfraredOn();
 }
 
 void HardwareInfraredClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareInfraredAction(); }
 
 void HardwareEReaderAction(void) {
-    play_wav(sounds[97],SfxVol(),(Vector3){},false);
-    Eng_Global->invP1.hardwareIsActive |= HW_ERD;
+    play_wav(sounds[97],SfxVol(),(V3){},false);
+    World->invP1.hardwareIsActive |= HW_ERD;
     // TODO: OpenEReaderInItemsTab() — engine-side tab open
 }
 
 void HardwareEReaderClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareEReaderAction(); }
 
-void HardwareBoosterOn(void)  { Eng_Global->invP1.hardwareIsActive |=  HW_BST; }
-void HardwareBoosterOff(void) { Eng_Global->invP1.hardwareIsActive &= ~HW_BST; }
+void HardwareBoosterOn(void)  { World->invP1.hardwareIsActive |=  HW_BST; }
+void HardwareBoosterOff(void) { World->invP1.hardwareIsActive &= ~HW_BST; }
 void HardwareBoosterAction(void) {
     InventorySystem* inv = Inv(PLAYER1);
     if (BoosterSetToBoost(PLAYER1) && inv->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
     
-    play_wav(sounds[78],SfxVol(),(Vector3){},false);
-    if (Eng_Global->invP1.hardwareIsActive & HW_BST) HardwareBoosterOff(); else HardwareBoosterOn();
+    play_wav(sounds[78],SfxVol(),(V3){},false);
+    if (World->invP1.hardwareIsActive & HW_BST) HardwareBoosterOff(); else HardwareBoosterOn();
 }
 
 void HardwareBoosterClick(void) { Eng_UI->mouseClickHeldOverGUI = true; HardwareBoosterAction(); }
 
-void HardwareJumpJetsOn(void)  { Eng_Global->invP1.hardwareIsActive |=  HW_JET; }
-void HardwareJumpJetsOff(void) { Eng_Global->invP1.hardwareIsActive &= ~HW_JET; }
+void HardwareJumpJetsOn(void)  { World->invP1.hardwareIsActive |=  HW_JET; }
+void HardwareJumpJetsOff(void) { World->invP1.hardwareIsActive &= ~HW_JET; }
 void HardwareJumpJetsAction(u16 p) {
     InventorySystem* inv = Inv(p);
     if (inv->energy <= 0.0f) { CenterStatusPrint("%s",Eng_Text->stringTable[314]); return; }
     
-    play_wav(sounds[78],SfxVol(),(Vector3){},false);
+    play_wav(sounds[78],SfxVol(),(V3){},false);
     JumpJetsToggle(PLAYER1);
     if (JumpJetsActive(PLAYER1)) HardwareJumpJetsOn(); else HardwareJumpJetsOff();
 }
@@ -2422,15 +2422,15 @@ void HardwareJumpJetsClick(u16 p) { Eng_UI->mouseClickHeldOverGUI = true; Hardwa
 #define LANTERN_RANGE 11.52f
 Color3 lantCol = (Color3){1.0f,1.0f,1.0f};
 u16 headmountedLanternLight;
-Vector3 lanternPos;
+V3 lanternPos;
 float lanternVersionBrightness[3] = {0.875f,1.4f,1.75f};
 void HardwareUpdate(u16 p) {
     InventorySystem* inv = Inv(p);
     bool infraredOn = /*(inv->hasHardware & HW_INF) && */(inv->hardwareIsActive & HW_INF) > 0;
     bool lanternOn = /*(inv->hasHardware & HW_LAN) && */(inv->hardwareIsActive & HW_LAN) > 0;
     if (lanternOn || infraredOn) { // Update headmounted lantern/infrared's light (infrared overrides lantern brightness/range)
-        Vector3 ppos = Eng_Global->instances[p].position;
-        lanternPos = (Vector3){ppos.x + 0.04f,ppos.y + 0.24f,ppos.z + 0.04f};
+        V3 ppos = World->instances[p].position;
+        lanternPos = (V3){ppos.x + 0.04f,ppos.y + 0.24f,ppos.z + 0.04f};
         float intensity = infraredOn ? 0.8f : lanternVersionBrightness[inv->hardwareVersionSetting[7]];
         UpdateLight(headmountedLanternLight,lanternPos,lantCol,infraredOn ? INFRARED_RANGE : LANTERN_RANGE,intensity,intensity,0.0f,0.0f,QUAT_IDENTITY,true,true);
     } else UpdateLight(headmountedLanternLight,lanternPos,lantCol,11.52f,0.0f,0.0f,0.0f,0.0f,QUAT_IDENTITY,false,false);
@@ -2445,8 +2445,8 @@ void PatchInit(u16 p) {
     inv->berserkIncrement     = 0;
     inv->patchActive          = 0;
     inv->staminupActive       = false;
-    Eng_Global->timeScale   = DEFAULT_TIME_SCALE;
-    Eng_Global->geniusActive = false;
+    World->timeScale   = DEFAULT_TIME_SCALE;
+    World->geniusActive = false;
     // TODO: sightLight disabled, sightDimming disabled — engine reads patchActive & PATCH_SIGHT + sightFinishedTime
     // TODO: BerserkFX disabled — engine reads patchActive & PATCH_BERSERK + berserkIncrement
 }
@@ -2454,60 +2454,60 @@ void PatchInit(u16 p) {
 void PatchUpdate(u16 playerIdx) {
     InventorySystem* inv = Inv(playerIdx);
     if (inv->patchActive & PATCH_DETOX) { // Detox
-        if (inv->detoxFinishedTime < Eng_Global->pauseRelativeTime) inv->patchActive -= PATCH_DETOX;
+        if (inv->detoxFinishedTime < World->pauseRelativeTime) inv->patchActive -= PATCH_DETOX;
         // effect: engine reads PATCH_DETOX bit to ameliorate radiation — no gamecode action needed
     }
 
     if (inv->patchActive & PATCH_MEDI) { // Medi
-        if (inv->mediFinishedTime < Eng_Global->pauseRelativeTime && inv->mediFinishedTime != -1.0)
+        if (inv->mediFinishedTime < World->pauseRelativeTime && inv->mediFinishedTime != -1.0)
             { inv->patchActive -= PATCH_MEDI; inv->mediFinishedTime = -1.0; }
     }
 
     // Reflex — uses absoluteTime (wall clock) so timescale doesn't affect own expiry
     if (inv->patchActive & PATCH_REFLEX) {
-        if (inv->reflexFinishedTime < Eng_Global->absoluteTime && inv->reflexFinishedTime != -1.0) {
+        if (inv->reflexFinishedTime < World->absoluteTime && inv->reflexFinishedTime != -1.0) {
             inv->patchActive       -= PATCH_REFLEX;
             inv->reflexFinishedTime = -1.0;
-            Eng_Global->timeScale = DEFAULT_TIME_SCALE;
+            World->timeScale = DEFAULT_TIME_SCALE;
         } else {
-            Eng_Global->timeScale = REFLEX_TIME_SCALE;
+            World->timeScale = REFLEX_TIME_SCALE;
         }
     } else {
-        if (Eng_Global->timeScale != DEFAULT_TIME_SCALE) Eng_Global->timeScale = DEFAULT_TIME_SCALE;
+        if (World->timeScale != DEFAULT_TIME_SCALE) World->timeScale = DEFAULT_TIME_SCALE;
     }
    
     if (inv->patchActive & PATCH_BERSERK) { // Berserk
-        if (inv->berserkFinishedTime < Eng_Global->pauseRelativeTime) {
+        if (inv->berserkFinishedTime < World->pauseRelativeTime) {
             inv->berserkIncrement = 0;
             inv->patchActive -= PATCH_BERSERK;
             // TODO: BerserkFX disable + reset — engine reads patchActive & PATCH_BERSERK
         } else {
             // TODO: BerserkFX enable — engine reads patchActive & PATCH_BERSERK
-            if (inv->berserkIncrementFinishedTime < Eng_Global->pauseRelativeTime) {
+            if (inv->berserkIncrementFinishedTime < World->pauseRelativeTime) {
                 inv->berserkIncrement++;
                 if (inv->berserkIncrement > 6) inv->berserkIncrement = 6;
-                inv->berserkIncrementFinishedTime = Eng_Global->pauseRelativeTime + (BERSERK_TIME / 5.0f);
+                inv->berserkIncrementFinishedTime = World->pauseRelativeTime + (BERSERK_TIME / 5.0f);
                 // TODO: engine reads berserkIncrement for texture swap + strength increment
             }
         }
     }
 
     if (inv->patchActive & PATCH_GENIUS) { // Genius
-        if (inv->geniusFinishedTime < Eng_Global->pauseRelativeTime) {
+        if (inv->geniusFinishedTime < World->pauseRelativeTime) {
             inv->patchActive          -= PATCH_GENIUS;
-            Eng_Global->geniusActive = false;
+            World->geniusActive = false;
         } else {
-            Eng_Global->geniusActive = true;
+            World->geniusActive = true;
         }
     }
 
     if (inv->patchActive & PATCH_SIGHT) { // Sight
-        if (inv->sightFinishedTime < Eng_Global->pauseRelativeTime && inv->sightFinishedTime != -1.0) {
+        if (inv->sightFinishedTime < World->pauseRelativeTime && inv->sightFinishedTime != -1.0) {
             inv->sightFinishedTime          = -1.0;
-            inv->sightSideEffectFinishedTime = Eng_Global->pauseRelativeTime + SIGHT_SIDE_EFFECT_TIME;
+            inv->sightSideEffectFinishedTime = World->pauseRelativeTime + SIGHT_SIDE_EFFECT_TIME;
             // TODO: sightLight disable, sightDimming enable — engine reads sightFinishedTime == -1 + side effect active
         }
-        if (inv->sightSideEffectFinishedTime < Eng_Global->pauseRelativeTime && inv->sightSideEffectFinishedTime != -1.0) {
+        if (inv->sightSideEffectFinishedTime < World->pauseRelativeTime && inv->sightSideEffectFinishedTime != -1.0) {
             inv->sightSideEffectFinishedTime = -1.0;
             inv->sightFinishedTime           = -1.0;
             inv->patchActive                -= PATCH_SIGHT;
@@ -2516,7 +2516,7 @@ void PatchUpdate(u16 playerIdx) {
     }
 
     if (inv->patchActive & PATCH_STAMINUP) { // Staminup
-        if (inv->staminupFinishedTime < Eng_Global->pauseRelativeTime) {
+        if (inv->staminupFinishedTime < World->pauseRelativeTime) {
             inv->staminupActive  = false;
             inv->fatigue         = 100.0f; // side effect on expiry
             inv->patchActive    -= PATCH_STAMINUP;
@@ -2542,8 +2542,8 @@ void PatchDisableAll(void) {
     inv->staminupActive               = false;
     inv->fatigue                      = 0.0f;
     inv->patchActive                  = 0;
-    Eng_Global->timeScale           = DEFAULT_TIME_SCALE;
-    Eng_Global->geniusActive        = false;
+    World->timeScale           = DEFAULT_TIME_SCALE;
+    World->geniusActive        = false;
     // TODO: sightLight/sightDimming disable — engine reads patchActive == 0
     // TODO: BerserkFX disable + reset — engine reads patchActive & PATCH_BERSERK
 }
@@ -2559,25 +2559,25 @@ void PatchDisableAll(void) {
 	int[] levelCameraDestroyedCount;
 	int[] levelSmallNodeDestroyedCount;
 	int[] levelLargeNodeDestroyedCount;
-	Vector3[] ressurectionLocation;
+	V3[] ressurectionLocation;
 	bool[] ressurectionActive;
 	u16[] ressurectionBayDoor;
-	Vector3[] elevatorTargetDestinations;
+	V3[] elevatorTargetDestinations;
     
 	bool RessurectPlayer() {
-		if (!ressurectionActive[Eng_Global->curLev]) return false;
+		if (!ressurectionActive[World->curLev]) return false;
 
-		if (Eng_Global->curLev == 10 || Eng_Global->curLev == 11 || Eng_Global->curLev == 12) {
+		if (World->curLev == 10 || World->curLev == 11 || World->curLev == 12) {
 			LoadLevel(6,ressurectionLocation[currentLevel].position);
 			ressurectionBayDoor[6].ForceClose();
 		} else {
-			if (Eng_Global->curLev >= 0 || Eng_Global->curLev < 13) Eng_Global->instances[PLAYER1].position = ressurectionLocation[Eng_Global->curLev];
+			if (World->curLev >= 0 || World->curLev < 13) World->instances[PLAYER1].position = ressurectionLocation[World->curLev];
 		}
 
 		// Activate death screen and readouts for "BRAIN ACTIVITY SATISFACTORY..." ya debatable right etc. etc.
 // 		PlayerReferenceManager.a.playerDeathRessurectEffect.SetActive(true); // TODO
 		PlayTrack(TrackType_Revive,MusicType_Override);
-		Eng_Global->instances[PLAYER1].ressurectingFinished = Eng_Global->pauseRelativeTime + 3f;
+		World->instances[PLAYER1].ressurectingFinished = World->pauseRelativeTime + 3f;
 		return true;
 	}
 	
@@ -2615,20 +2615,20 @@ void PatchDisableAll(void) {
 // Grenades
 void UseGrenade(u16 playerIndex, int index) { // TODO
     (void)playerIndex; (void)index;
-    if (Eng_Global->invP1.holdingObject) { CenterStatusPrint("%s",Eng_Text->stringTable[311]); return; } // Can't use grenade, hands full
+    if (World->invP1.holdingObject) { CenterStatusPrint("%s",Eng_Text->stringTable[311]); return; } // Can't use grenade, hands full
 
     ForceInventoryMode();  // Inventory mode is turned on when picking something up.
     ResetHeldItem(playerIndex);
-    Eng_Global->invP1.grenadeActive = true;
+    World->invP1.grenadeActive = true;
     CenterStatusPrint("%s%s",Eng_Text->stringTable[index + 326],Eng_Text->stringTable[320]); // activated, grenade is LIVE!
 //     switch(index) { // Subtract one from the correct grenade inventory TODO
-//         case 7:  Eng_Global->invP1.heldObject = Const.a.GetPrefab(370); RemoveGrenade(0); break; // Frag
-//         case 8:  Eng_Global->invP1.heldObject = Const.a.GetPrefab(372); RemoveGrenade(3); break; // Concussion
-//         case 9:  Eng_Global->invP1.heldObject = Const.a.GetPrefab(387); RemoveGrenade(1); break; // EMP
-//         case 10: Eng_Global->invP1.heldObject = Const.a.GetPrefab(389); RemoveGrenade(6); break; // Earth Shaker
-//         case 11: Eng_Global->invP1.heldObject = Const.a.GetPrefab(402); RemoveGrenade(4); break; // Land Mine
-//         case 12: Eng_Global->invP1.heldObject = Const.a.GetPrefab(403); RemoveGrenade(5); break; // Nitropak
-//         case 13: Eng_Global->invP1.heldObject = Const.a.GetPrefab(404); RemoveGrenade(2); break; // Gas
+//         case 7:  World->invP1.heldObject = Const.a.GetPrefab(370); RemoveGrenade(0); break; // Frag
+//         case 8:  World->invP1.heldObject = Const.a.GetPrefab(372); RemoveGrenade(3); break; // Concussion
+//         case 9:  World->invP1.heldObject = Const.a.GetPrefab(387); RemoveGrenade(1); break; // EMP
+//         case 10: World->invP1.heldObject = Const.a.GetPrefab(389); RemoveGrenade(6); break; // Earth Shaker
+//         case 11: World->invP1.heldObject = Const.a.GetPrefab(402); RemoveGrenade(4); break; // Land Mine
+//         case 12: World->invP1.heldObject = Const.a.GetPrefab(403); RemoveGrenade(5); break; // Nitropak
+//         case 13: World->invP1.heldObject = Const.a.GetPrefab(404); RemoveGrenade(2); break; // Gas
 //     }
     
 //     PutObjectInHand(index,-1,0,0,false,true);
@@ -2646,25 +2646,25 @@ void UseGrenade(u16 playerIndex, int index) { // TODO
 // }
 // 
 // void EnableBits(u16 i) {
-//     Eng_Global->instances[WORLD].ioflags |= Eng_Global->instances[i].ioflags;
+//     World->instances[WORLD].ioflags |= World->instances[i].ioflags;
 //     
-//     if (Eng_Global->instances[i].ioflags & QUESTBIT_ROBOT_SPAWN_DEACTIVATED) DualLog("QUESTBIT_ROBOT_SPAWN_DEACTIVATED: 1");
-//     if (Eng_Global->instances[i].ioflags & QUESTBIT_ISOTOPE_INSTALLED) DualLog("QUESTBIT_ISOTOPE_INSTALLED: 1");
-//     if (Eng_Global->instances[i].ioflags & QUESTBIT_SHIELD_ACTIVATED) {
+//     if (World->instances[i].ioflags & QUESTBIT_ROBOT_SPAWN_DEACTIVATED) DualLog("QUESTBIT_ROBOT_SPAWN_DEACTIVATED: 1");
+//     if (World->instances[i].ioflags & QUESTBIT_ISOTOPE_INSTALLED) DualLog("QUESTBIT_ISOTOPE_INSTALLED: 1");
+//     if (World->instances[i].ioflags & QUESTBIT_SHIELD_ACTIVATED) {
 //         DualLog("QUESTBIT_SHIELD_ACTIVATED: 1");
 //         QuestLogNotesManager.a.notes[8].SetActive(true);
 //         QuestLogNotesManager.a.checkBoxes[8].isOn = Const.a.questData.ShieldActivated;
 //         QuestLogNotesManager.a.labels[8].text = Eng_Text->stringTable[560];
 //     }
 //     
-//     if (Eng_Global->instances[i].ioflags & QUESTBIT_LASER_SAFETY_OVERRIDEN) {
+//     if (World->instances[i].ioflags & QUESTBIT_LASER_SAFETY_OVERRIDEN) {
 //         DualLog("QUESTBIT_LASER_SAFETY_OVERRIDEN: 1");
 //         QuestLogNotesManager.a.notes[7].SetActive(true);
 //         QuestLogNotesManager.a.checkBoxes[7].isOn = Const.a.questData.LaserSafetyOverriden;
 //         QuestLogNotesManager.a.labels[7].text = Eng_Text->stringTable[559];
 //     }
 //     
-//     if (Eng_Global->instances[i].ioflags & QUESTBIT_LASER_DESTROYED) {
+//     if (World->instances[i].ioflags & QUESTBIT_LASER_DESTROYED) {
 //         DualLog("QUESTBIT_LASER_DESTROYED: 1");
 //         if (AutoSplitterData.missionSplitID == 1) AutoSplitterData.missionSplitID++;
 //         QuestLogNotesManager.a.notes[9].SetActive(true);
@@ -2672,27 +2672,27 @@ void UseGrenade(u16 playerIndex, int index) { // TODO
 //         QuestLogNotesManager.a.labels[9].text = Eng_Text->stringTable[561];
 //     }
 //     
-//     if (Eng_Global->instances[i].ioflags & QUESTBIT_BETA_GROVE_CYBER_UNLOCKED) {
+//     if (World->instances[i].ioflags & QUESTBIT_BETA_GROVE_CYBER_UNLOCKED) {
 //         DualLog("QUESTBIT_BETA_GROVE_CYBER_UNLOCKED: 1");
 //         QuestLogNotesManager.a.notes[12].SetActive(true);
 //     }
 //     
-//     if (Eng_Global->instances[i].ioflags & QUESTBIT_GROVE_ALPHA_JETTISON_ENABLED) {
+//     if (World->instances[i].ioflags & QUESTBIT_GROVE_ALPHA_JETTISON_ENABLED) {
 //         DualLog("QUESTBIT_GROVE_ALPHA_JETTISON_ENABLED: 1");
 //         QuestLogNotesManager.a.notes[12].SetActive(true);
 //     }
 //     
-//     if (Eng_Global->instances[i].ioflags & QUESTBIT_GROVE_BETA_JETTISON_ENABLED) {
+//     if (World->instances[i].ioflags & QUESTBIT_GROVE_BETA_JETTISON_ENABLED) {
 //         DualLog("QUESTBIT_GROVE_BETA_JETTISON_ENABLED: 1");
 //         QuestLogNotesManager.a.notes[12].SetActive(true);
 //     }
 //     
-//     if (Eng_Global->instances[i].ioflags & QUESTBIT_GROVE_DELTA_JETTISON_ENABLED) {
+//     if (World->instances[i].ioflags & QUESTBIT_GROVE_DELTA_JETTISON_ENABLED) {
 //         DualLog("QUESTBIT_GROVE_DELTA_JETTISON_ENABLED: 1");
 //         QuestLogNotesManager.a.notes[12].SetActive(true);
 //     }
 //     
-//     if (Eng_Global->instances[i].ioflags & QUESTBIT_MASTER_JETTISON_BROKEN) {
+//     if (World->instances[i].ioflags & QUESTBIT_MASTER_JETTISON_BROKEN) {
 //         DualLog("QUESTBIT_MASTER_JETTISON_BROKEN: 1");
 //         if (AutoSplitterData.missionSplitID == 2) AutoSplitterData.missionSplitID++;
 //         QuestLogNotesManager.a.notes[12].SetActive(true);
@@ -2700,7 +2700,7 @@ void UseGrenade(u16 playerIndex, int index) { // TODO
 //         QuestLogNotesManager.a.labels[11].text = Eng_Text->stringTable[563]; // Set:Diagnose and repair broken relay
 //     }
 //     
-//     if (Eng_Global->instances[i].ioflags & QUESTBIT_RELAY_428_FIXED) {
+//     if (World->instances[i].ioflags & QUESTBIT_RELAY_428_FIXED) {
 //         DualLog("QUESTBIT_RELAY_428_FIXED: 1");
 //         QuestLogNotesManager.a.notes[11].SetActive(true);
 //         QuestLogNotesManager.a.checkBoxes[11].isOn = Const.a.questData.Relay428Fixed;
@@ -2708,7 +2708,7 @@ void UseGrenade(u16 playerIndex, int index) { // TODO
 //         QuestLogNotesManager.a.labels[11].text += Eng_Text->stringTable[564]; // Add:: 428.
 //     }
 //     
-//     if (Eng_Global->instances[i].ioflags & QUESTBIT_MASTER_JETTISON_ENABLED) {
+//     if (World->instances[i].ioflags & QUESTBIT_MASTER_JETTISON_ENABLED) {
 //         DualLog("QUESTBIT_MASTER_JETTISON_ENABLED: 1");
 //         if (AutoSplitterData.missionSplitID == 3) AutoSplitterData.missionSplitID++;
 //         QuestLogNotesManager.a.notes[10].SetActive(true);
@@ -2716,7 +2716,7 @@ void UseGrenade(u16 playerIndex, int index) { // TODO
 //         QuestLogNotesManager.a.labels[10].text = Eng_Text->stringTable[562];
 //     }
 //     
-//     if (Eng_Global->instances[i].ioflags & QUESTBIT_BETA_GROVE_JETTISONED) {
+//     if (World->instances[i].ioflags & QUESTBIT_BETA_GROVE_JETTISONED) {
 //         DualLog("QUESTBIT_BETA_GROVE_JETTISONED: 1");
 //         if (AutoSplitterData.missionSplitID == 4) AutoSplitterData.missionSplitID++;
 //         QuestLogNotesManager.a.notes[12].SetActive(true);
@@ -2726,27 +2726,27 @@ void UseGrenade(u16 playerIndex, int index) { // TODO
 //         QuestLogNotesManager.a.labels[13].text = Eng_Text->stringTable[566];
 //     }
 //     
-//     if (Eng_Global->instances[i].ioflags & QUESTBIT_ANTENNA_NORTH_DESTROYED) {
+//     if (World->instances[i].ioflags & QUESTBIT_ANTENNA_NORTH_DESTROYED) {
 //         DualLog("QUESTBIT_ANTENNA_NORTH_DESTROYED: 1");
 //         QuestLogNotesManager.a.notes[13].SetActive(true);
 //     }
 //     
-//     if (Eng_Global->instances[i].ioflags & QUESTBIT_ANTENNA_SOUTH_DESTROYED) {
+//     if (World->instances[i].ioflags & QUESTBIT_ANTENNA_SOUTH_DESTROYED) {
 //         DualLog("QUESTBIT_ANTENNA_SOUTH_DESTROYED: 1");
 //         QuestLogNotesManager.a.notes[13].SetActive(true);
 //     }
 //     
-//     if (Eng_Global->instances[i].ioflags & QUESTBIT_ANTENNA_EAST_DESTROYED) {
+//     if (World->instances[i].ioflags & QUESTBIT_ANTENNA_EAST_DESTROYED) {
 //         DualLog("QUESTBIT_ANTENNA_EAST_DESTROYED: 1");
 //         QuestLogNotesManager.a.notes[13].SetActive(true);
 //     }
 //     
-//     if (Eng_Global->instances[i].ioflags & QUESTBIT_ANTENNA_WEST_DESTROYED) {
+//     if (World->instances[i].ioflags & QUESTBIT_ANTENNA_WEST_DESTROYED) {
 //         DualLog("QUESTBIT_ANTENNA_WEST_DESTROYED: 1");
 //         QuestLogNotesManager.a.notes[13].SetActive(true);
 //     }
 //     
-//     if (Eng_Global->instances[i].ioflags & QUESTBIT_SELF_DESTRUCT_ACTIVATED) {
+//     if (World->instances[i].ioflags & QUESTBIT_SELF_DESTRUCT_ACTIVATED) {
 //         DualLog("QUESTBIT_SELF_DESTRUCT_ACTIVATED: 1");
 //         QuestLogNotesManager.a.notes[0].SetActive(true);
 //         QuestLogNotesManager.a.notes[1].SetActive(true);
@@ -2770,7 +2770,7 @@ void UseGrenade(u16 playerIndex, int index) { // TODO
 //         QuestLogNotesManager.a.labels[15].text = Eng_Text->stringTable[568]; // Set:Escape on escape pod.
 //     }
 //     
-//     if (Eng_Global->instances[i].ioflags & QUESTBIT_BRIDGE_SEPARATED) {
+//     if (World->instances[i].ioflags & QUESTBIT_BRIDGE_SEPARATED) {
 //         DualLog("QUESTBIT_BRIDGE_SEPARATED: 1");
 //         QuestLogNotesManager.a.notes[0].SetActive(true);
 //         QuestLogNotesManager.a.notes[1].SetActive(true);
@@ -2796,7 +2796,7 @@ void UseGrenade(u16 playerIndex, int index) { // TODO
 //         QuestLogNotesManager.a.labels[17].text = Eng_Text->stringTable[570]; // Set:Destroy SHODAN.
 //     }
 //     
-//     if (Eng_Global->instances[i].ioflags & QUESTBIT_ISOLINEAR_CHIPSET_INSTALLED) DualLog("QUESTBIT_ISOLINEAR_CHIPSET_INSTALLED: 1");
+//     if (World->instances[i].ioflags & QUESTBIT_ISOLINEAR_CHIPSET_INSTALLED) DualLog("QUESTBIT_ISOLINEAR_CHIPSET_INSTALLED: 1");
 // }
 // 
 // void DisableBits() {
@@ -2970,7 +2970,7 @@ enum { DOOR_CLIP_IDLE_CLOSED = 0, DOOR_CLIP_OPENING = 1, DOOR_CLIP_IDLE_OPEN = 2
 void ChangeAnim(Entity* e, u8 clip);
 static AnimationClip DoorGetClip(const Entity* e, u8 clip) { return modelAnimationClips[e->animationNum][clip]; }
 static float DoorClamp01(float v) { if (v < 0.0f) return 0.0f; if (v > 1.0f) return 1.0f; return v; }
-static bool DoorInventoryHasAccessCard(AccessCardType card) { return card == AccessCardType_None || (Eng_Global->invP1.accessCardOwned & (1u << card)); }
+static bool DoorInventoryHasAccessCard(AccessCardType card) { return card == AccessCardType_None || (World->invP1.accessCardOwned & (1u << card)); }
 static bool DoorIsAjar(const Entity* e) { return e->doorOpen == DoorState_Open || e->doorOpen == DoorState_Opening; }
 static float DoorGetProgress(const Entity* e, u8 clip) {
     AnimationClip c = DoorGetClip(e,clip); if (c.frameEnd <= c.frameStart) return 1.0f;
@@ -2983,36 +2983,36 @@ static u16 DoorFrameFromProgress(AnimationClip c, float t) {
     return (u16)(c.frameStart + (u16)(DoorClamp01(t) * (float)span));
 }
 
-static void DoorSetClipFrame(u16 self, u8 clip, u16 frame) { ChangeAnim(&Eng_Global->instances[self],clip); (void)frame; }
+static void DoorSetClipFrame(u16 self, u8 clip, u16 frame) { ChangeAnim(&World->instances[self],clip); (void)frame; }
 static void DoorSyncLayer(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (!e->changeLayerOnOpenClose) return;
     e->layer = DoorIsAjar(e) ? L_InterDebris : L_Door;
 }
 
 static void DoorOpen(u16 self) {
     DualLog("opening door %u\n",self);
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     DoorSetClipFrame(self,DOOR_CLIP_OPENING,DoorGetClip(e,DOOR_CLIP_OPENING).frameStart);
     e->doorOpen = e->doorState = DoorState_Opening;
-    e->waitBeforeClose = Eng_Global->pauseRelativeTime + e->delay;
+    e->waitBeforeClose = World->pauseRelativeTime + e->delay;
     DoorSyncLayer(self);
     if (e->SFXIndex > 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
 }
 
 static void DoorClose(u16 self) {
     DualLog("closing door %u\n",self);
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     DoorSetClipFrame(self,DOOR_CLIP_CLOSING,DoorGetClip(e,DOOR_CLIP_CLOSING).frameStart);
     e->doorOpen = e->doorState = DoorState_Closing;
     DoorSyncLayer(self);
     if (e->SFXIndex > 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
 }
 
-void DoorForceOpen(u16 self) { Eng_Global->instances[self].requiredAccessCard = AccessCardType_None; EntitySetLocked(&Eng_Global->instances[self],false); DoorOpen(self); }
-void DoorForceClose(u16 self) { if (Eng_Global->instances[self].doorOpen == DoorState_Closed) {return;} DoorClose(self); }
+void DoorForceOpen(u16 self) { World->instances[self].requiredAccessCard = AccessCardType_None; EntitySetLocked(&World->instances[self],false); DoorOpen(self); }
+void DoorForceClose(u16 self) { if (World->instances[self].doorOpen == DoorState_Closed) {return;} DoorClose(self); }
 void DoorActuate(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (e->doorOpen == DoorState_Open) { DoorClose(self); return; }
     if (e->doorOpen == DoorState_Closed) { DoorOpen(self); return; }
     
@@ -3031,14 +3031,14 @@ void DoorActuate(u16 self) {
         AnimationClip c = DoorGetClip(e,DOOR_CLIP_OPENING);
         DoorSetClipFrame(self,DOOR_CLIP_OPENING,DoorFrameFromProgress(c,1.0f - t));
         e->doorOpen = e->doorState = DoorState_Opening;
-        e->waitBeforeClose = Eng_Global->pauseRelativeTime + e->delay;
+        e->waitBeforeClose = World->pauseRelativeTime + e->delay;
         DoorSyncLayer(self);
         if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
     }
 }
 
 void DoorInitAfterLoad(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (e->startOpen) e->stayOpen = true;
     if (e->useTimeDelay <= 0.0f) e->useTimeDelay = 0.15f;
     if (e->lockedMessageLingdex <= 0) e->lockedMessageLingdex = 3;
@@ -3065,15 +3065,15 @@ void DoorInitAfterLoad(u16 self) {
 
 void DoorUse(u16 self, u16 activator) {
     DualLog("Door use called by activator %u\n",activator);
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (activator == NULLENT) return;
     if (GetCurrentLevelSecurity() > e->securityThreshold) { UIBlockedBySecurity(e->position); return; }
     
-    if (Eng_Cheats->superoverride || Eng_Global->diffMis <= 0) { EntitySetLocked(e,false); e->requiredAccessCard = AccessCardType_None; }
-    if (Eng_Global->diffMis <= 1) { e->requiredAccessCard = AccessCardType_None; }
-    if (e->useFinished >= Eng_Global->pauseRelativeTime) return;
+    if (Eng_Cheats->superoverride || World->diffMis <= 0) { EntitySetLocked(e,false); e->requiredAccessCard = AccessCardType_None; }
+    if (World->diffMis <= 1) { e->requiredAccessCard = AccessCardType_None; }
+    if (e->useFinished >= World->pauseRelativeTime) return;
     
-    e->useFinished = Eng_Global->pauseRelativeTime + e->useTimeDelay;
+    e->useFinished = World->pauseRelativeTime + e->useTimeDelay;
     if (e->requiredAccessCard != AccessCardType_None) {
         if (!DoorInventoryHasAccessCard(e->requiredAccessCard)) {
             CenterStatusPrint("%s",Eng_Text->stringTable[2]); // TODO Access-card-specific status text.
@@ -3093,9 +3093,9 @@ void DoorUse(u16 self, u16 activator) {
     DoorActuate(self);
 }
 
-void DoorTargetted(u16 self, u16 activator) { if ((Eng_Global->instances[self].entflags & EF_LOCKED) != 0) EntitySetLocked(&Eng_Global->instances[self],false); if (!Eng_Global->instances[self].targettingOnlyUnlocks) DoorUse(self,activator); }
+void DoorTargetted(u16 self, u16 activator) { if ((World->instances[self].entflags & EF_LOCKED) != 0) EntitySetLocked(&World->instances[self],false); if (!World->instances[self].targettingOnlyUnlocks) DoorUse(self,activator); }
 void DoorUpdate(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (e->blocked) return; // TODO frame-pause blocked doors instead of fully skipping.
     if (e->ajar) return;
     AnimationClip opening = DoorGetClip(e,DOOR_CLIP_OPENING);
@@ -3109,13 +3109,13 @@ void DoorUpdate(u16 self) {
         DoorSetClipFrame(self,DOOR_CLIP_IDLE_CLOSED,DoorGetClip(e,DOOR_CLIP_IDLE_CLOSED).frameStart);
         DoorSyncLayer(self);
     }
-    if (Eng_Global->pauseRelativeTime > e->waitBeforeClose && e->doorOpen == DoorState_Open && !e->stayOpen && !e->startOpen) DoorClose(self);
+    if (World->pauseRelativeTime > e->waitBeforeClose && e->doorOpen == DoorState_Open && !e->stayOpen && !e->startOpen) DoorClose(self);
 }
 //================================================================================
 // Misc
 MOD_TO_ENGINE u16 SpawnDynamicObject(int val, bool cheat) {
     if (!ConstIndexInBounds(val)) { DualLogError("Const index out of bounds: %u", val); return NULLENT; }
-    if (cheat) DualLog("Cheat spawn constIndex %u, level: %u, from cheat: %u, name: ", val, Eng_Global->curLev, cheat);
+    if (cheat) DualLog("Cheat spawn constIndex %u, level: %u, from cheat: %u, name: ", val, World->curLev, cheat);
     if (ConstIndexIsGeometry(val) && !Eng_Cheats->editMode) { CenterStatusPrint("Indices 0 through 306 (level geometry chunks) not possible when not on edit mode!"); return NULLENT; }
     u16 entityIndexInInstanceTable = NULLENT;
     return entityIndexInInstanceTable;
@@ -3129,19 +3129,19 @@ MOD_TO_ENGINE float GetBasePlayerSpeed(u16 p, bool running) {
     bool isSprinting = Sprint();
     if (Eng_Cheats->noclip && isSprinting) return PLAYER_MAX_CYBER_SPEED * 2.5f;
     if (Eng_Cheats->noclip) return PLAYER_MAX_CYBER_SPEED * 1.5f;
-    if (Eng_Global->curLev == LEVEL_CYBERSPACE) return PLAYER_MAX_CYBER_SPEED; //Cyber space speed
+    if (World->curLev == LEVEL_CYBERSPACE) return PLAYER_MAX_CYBER_SPEED; //Cyber space speed
 
     float retval = PLAYER_MAX_WALK_SPEED, bonus = 0.0f;
-    if (Eng_Global->boosterActive) bonus = PLAYER_BOOSTER_SPEED_BOOST;
-    BodyState bodyState = Eng_Global->instances[PLAYER1].bodyState;
+    if (World->boosterActive) bonus = PLAYER_BOOSTER_SPEED_BOOST;
+    BodyState bodyState = World->instances[PLAYER1].bodyState;
     switch (bodyState) {
         case BodyState_StandingUp   : case BodyState_Standing:  retval = PLAYER_MAX_WALK_SPEED;   break;
         case BodyState_CrouchingDown: case BodyState_Crouch:    retval = PLAYER_MAX_CROUCH_SPEED; break;
         case BodyState_Prone:         case BodyState_ProningDown: case BodyState_ProningUp: retval = PLAYER_MAX_PRONE_SPEED; break;
     }
 
-    if ((isSprinting || Eng_Global->boosterActive) && running) {
-        if (inv->fatigue > 80.0f && Eng_Global->boosterActive) retval = PLAYER_MAX_SPRINT_SPEED_FATIGUED;
+    if ((isSprinting || World->boosterActive) && running) {
+        if (inv->fatigue > 80.0f && World->boosterActive) retval = PLAYER_MAX_SPRINT_SPEED_FATIGUED;
         else                                                   retval = PLAYER_MAX_SPRINT_SPEED;
 
         if (bodyState == BodyState_Standing || bodyState == BodyState_Crouch || bodyState == BodyState_CrouchingDown) {
@@ -3160,16 +3160,16 @@ void SearchObject(int searchable, bool first) {
         // TODO highlight Item tab in mfd
         firstTimeSearch = false;
     }
-    if (Eng_Global->instances[searchable].searchableInUse) {
+    if (World->instances[searchable].searchableInUse) {
         for (int i=0;i<4;i++) {
-            if (Eng_Global->instances[searchable].contents[i] >= 0) break;
+            if (World->instances[searchable].contents[i] >= 0) break;
         }
-    } else play_wav(sounds[91],0.75f,(Vector3){},false);
+    } else play_wav(sounds[91],0.75f,(V3){},false);
 }
 
 void UseEntity(u16 p, u16 i) {
     InventorySystem* inv = Inv(p);
-    Entity* ent = &Eng_Global->instances[i];
+    Entity* ent = &World->instances[i];
     if (ConstIndexIsSearchable(ent->index)) { inv->currentSearchItem = i; SearchObject(i,firstTimeSearch); DualLog("Search\n"); }
     else if (ConstIndexIsDoor(ent->index)) DoorUse(i,PLAYER1);
     else if (ConstIndexIsNPC(ent->index)) DualLog("Can't use NPC\n");
@@ -3182,7 +3182,7 @@ void UseEntity(u16 p, u16 i) {
         inv->heldObjectAmmo = ent->ammo;
         inv->heldObjectAmmo2 = ent->ammo2;
         inv->heldObjectLoadedAlternate = ent->heldObjectLoadedAlternate;
-        if (Eng_Settings->QuickItemPickup) { AddItemToInventory(p,ent->index,ent->usableCustomIndex); ResetHeldItem(p); }
+        if (Settings->QuickItemPickup) { AddItemToInventory(p,ent->index,ent->usableCustomIndex); ResetHeldItem(p); }
 		else { CenterStatusPrint("%s%s",Eng_Text->stringTable[inv->heldObjectIndex - 307 + 326],Eng_Text->stringTable[319]); /* picked up.*/ ForceInventoryMode(); } // Inventory mode is turned on when picking something up
 
 		DeleteInstance(i);
@@ -3190,22 +3190,22 @@ void UseEntity(u16 p, u16 i) {
 }
 
 #define FROB_DISTANCE 4.9f
-static inline __attribute__((always_inline)) void Frob(Vector3 pos, Vector3 forward, Vector3 right) {
-    if (Eng_Global->curLev == LEVEL_CYBERSPACE) return;
+static void Frob(V3 pos, V3 forward, V3 right) {
+    if (World->curLev == LEVEL_CYBERSPACE) return;
     if (vmailActive) { DeactivateVMail(); vmailActive = false; return; }
-    if (Eng_Global->uiIsBlocking) return;
+    if (World->uiIsBlocking) return;
     
     InventorySystem* inv = Inv(PLAYER1);
     if (inv->holdingObject) { DropHeldItem(PLAYER1); return; }
 
-    Vector3 dir = ScreenPointToRay(forward,right);
-    Eng_Global->debugLine_start = pos;
-    Eng_Global->debugLine_end = (Vector3){dir.x * FROB_DISTANCE + pos.x,dir.y * FROB_DISTANCE + pos.y,dir.z * FROB_DISTANCE + pos.z};
+    V3 dir = ScreenPointToRay(forward,right);
+    World->debugLine_start = pos;
+    World->debugLine_end = (V3){dir.x * FROB_DISTANCE + pos.x,dir.y * FROB_DISTANCE + pos.y,dir.z * FROB_DISTANCE + pos.z};
     RaycastHit tempHit = Raycast(pos,dir,FROB_DISTANCE,LMASK_PLAYER_FROB);
-    Eng_Global->debugLineFinished = Eng_Global->pauseRelativeTime + 3.0;
+    World->debugLineFinished = World->pauseRelativeTime + 3.0;
     if (!tempHit.hit) { CenterStatusPrint("%s",Eng_Text->stringTable[30]); return; }
-    Eng_Global->debugLine_end = tempHit.point;
-    DualLog("Raycast hit!  Hit object %u of entity type %u at hit point %f %f %f\n",tempHit.hitInstanceIndex,Eng_Global->instances[tempHit.hitInstanceIndex].index,tempHit.point.x,tempHit.point.y,tempHit.point.z);
+    World->debugLine_end = tempHit.point;
+    DualLog("Raycast hit!  Hit object %u of entity type %u at hit point %f %f %f\n",tempHit.hitInstanceIndex,World->instances[tempHit.hitInstanceIndex].index,tempHit.point.x,tempHit.point.y,tempHit.point.z);
     UseEntity(PLAYER1,tempHit.hitInstanceIndex);
 }
 
@@ -3216,15 +3216,15 @@ bool FrobWithHeldObject(void) {
 //================================================================================
 // Update
 MOD_TO_ENGINE void ModUpdate(void) {
-    if (Eng_Global->gamePaused || Eng_Global->menuActive) return;
+    if (World->gamePaused || World->menuActive) return;
     
     WeaponsUpdate();
     PatchUpdate(PLAYER1);
     HardwareUpdate(PLAYER1);
-    if (Use()) Frob(Eng_Global->instances[PLAYER1].position,Eng_Global->instances[PLAYER1].forward,Eng_Global->instances[PLAYER1].right);
-    if (Eng_Global->pauseRelativeTime < Eng_Global->debugLineFinished && (Eng_Global->debugLineVertCount + 6) < (MAX_WIRELINE_VRTS * 3)) AddDebugLine(Eng_Global->debugLine_start,Eng_Global->debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f});
-    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < Eng_Global->loadedInstances; ++i) {
-        Entity* e = &Eng_Global->instances[i];
+    if (Use()) Frob(World->instances[PLAYER1].position,World->instances[PLAYER1].forward,World->instances[PLAYER1].right);
+    if (World->pauseRelativeTime < World->debugLineFinished && (World->debugLineVertCount + 6) < (MAX_WIRELINE_VRTS * 3)) AddWireLine(World->debugLine_start,World->debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f});
+    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < World->loadedInstances; ++i) {
+        Entity* e = &World->instances[i];
         TextureSequenceUpdate(i);
         u16 constdex = e->index;
         if (constdex == 718) ExplosionLifeUpdate(i);
@@ -3233,7 +3233,7 @@ MOD_TO_ENGINE void ModUpdate(void) {
         if (constdex == 701) LogicTimerUpdate(i);
         if (e->doSelfAfterList || e->despawnInstead || e->destroyAfterListInsteadOfDeactivate) DelayedSpawnUpdate(i);
         if (e->itemLifeTime > 0.0f) SearchFXResetUpdate(i);
-        if (Eng_Global->curLev == LEVEL_CYBERSPACE && e->cyberTimer > 0.0f) CyberTimerUpdate(i);
+        if (World->curLev == LEVEL_CYBERSPACE && e->cyberTimer > 0.0f) CyberTimerUpdate(i);
         if (constdex == 515) ForceBridgeUpdate(i);
         if (constdex == 517) FuncWallUpdate(i);
         if (constdex == 21 || constdex == 22) CyberWallUpdate(i);
@@ -3243,83 +3243,83 @@ MOD_TO_ENGINE void ModUpdate(void) {
 }
 //================================================================================
 // Input
-MOD_TO_ENGINE bool Forward(void) { return Eng_Global->GetKey(0); }
-MOD_TO_ENGINE bool StrafeLeft(void) { return Eng_Global->GetKey(1); }
-MOD_TO_ENGINE bool Backpedal(void) { return Eng_Global->GetKey(2); }
-MOD_TO_ENGINE bool StrafeRight(void) { return Eng_Global->GetKey(3); }
-MOD_TO_ENGINE bool Jump(void) { return Eng_Global->GetKey(4); }
-MOD_TO_ENGINE bool JumpDown(void) { return Eng_Global->GetKeyPressed(4); }
-MOD_TO_ENGINE bool Crouch(void) { return Eng_Global->GetKeyPressed(5); }
-MOD_TO_ENGINE bool Prone(void) { return Eng_Global->GetKeyPressed(6); }
-MOD_TO_ENGINE bool LeanLeft(void) { return Eng_Global->GetKey(7); }
-MOD_TO_ENGINE bool LeanRight(void) { return Eng_Global->GetKey(8); }
-MOD_TO_ENGINE bool Sprint(void) { return Eng_Global->GetKey(9); }
-MOD_TO_ENGINE bool TurnLeft(void) { return Eng_Global->GetKey(10); }
-MOD_TO_ENGINE bool TurnRight(void) { return Eng_Global->GetKey(11); }
-MOD_TO_ENGINE bool LookUp(void) { return Eng_Global->GetKey(12); }
-MOD_TO_ENGINE bool LookDown(void) { return Eng_Global->GetKey(13); }
-MOD_TO_ENGINE bool RecentLog(void) { return Eng_Global->GetKeyPressed(14); }
-MOD_TO_ENGINE bool Biomonitor(void) { return Eng_Global->GetKeyPressed(15); }
-MOD_TO_ENGINE bool Sensaround(void) { return Eng_Global->GetKeyPressed(16); }
-MOD_TO_ENGINE bool Lantern(void) { return Eng_Global->GetKeyPressed(17); }
-MOD_TO_ENGINE bool Shield(void) { return Eng_Global->GetKeyPressed(18); }
-MOD_TO_ENGINE bool Infrared(void) { return Eng_Global->GetKeyPressed(19); }
-MOD_TO_ENGINE bool Email(void) { return Eng_Global->GetKeyPressed(20); }
-MOD_TO_ENGINE bool Booster(void) { return Eng_Global->GetKeyPressed(21); }
-MOD_TO_ENGINE bool Jumpjets(void) { return Eng_Global->GetKeyPressed(22); }
-MOD_TO_ENGINE bool Attack(void) { return Eng_Global->GetKeyPressed(23); }
-MOD_TO_ENGINE bool Use(void) { return Eng_Global->GetKeyPressed(24); }
-MOD_TO_ENGINE bool Menu(void) { return Eng_Global->GetKeyPressed(25); }
-MOD_TO_ENGINE bool ToggleMode(void) { return Eng_Global->GetKeyPressed(26); }
-MOD_TO_ENGINE bool Reload(void) { return Eng_Global->GetKeyPressed(27); }
-MOD_TO_ENGINE bool WeaponCycUp(void) { return Eng_Global->GetKeyPressed(28); }
-MOD_TO_ENGINE bool WeaponCycDown(void) { return Eng_Global->GetKeyPressed(29); }
-MOD_TO_ENGINE bool Grenade(void) { return Eng_Global->GetKeyPressed(30); }
-MOD_TO_ENGINE bool GrenadeCycUp(void) { return Eng_Global->GetKeyPressed(31); }
-MOD_TO_ENGINE bool GrenadeCycDown(void) { return Eng_Global->GetKeyPressed(32); }
-MOD_TO_ENGINE bool ChangeAmmoType(void) { return Eng_Global->GetKeyPressed(33); }
-MOD_TO_ENGINE bool Patch(void) { return Eng_Global->GetKeyPressed(34); }
-MOD_TO_ENGINE bool PatchCycUp(void) { return Eng_Global->GetKeyPressed(35); }
-MOD_TO_ENGINE bool PatchCycDown(void) { return Eng_Global->GetKeyPressed(36); }
-MOD_TO_ENGINE bool Map(void) { return Eng_Global->GetKeyPressed(37); }
-MOD_TO_ENGINE bool SwimUp(void) { return Eng_Global->GetKey(38); }
-MOD_TO_ENGINE bool SwimDn(void) { return Eng_Global->GetKey(39); }
-MOD_TO_ENGINE bool Console(void) { return Eng_Global->GetKeyPressed(-1); }
-MOD_TO_ENGINE bool TakeScreenshot(void) { return Eng_Global->GetKeyPressed(41); }
+MOD_TO_ENGINE bool Forward(void) { return World->GetKey(0); }
+MOD_TO_ENGINE bool StrafeLeft(void) { return World->GetKey(1); }
+MOD_TO_ENGINE bool Backpedal(void) { return World->GetKey(2); }
+MOD_TO_ENGINE bool StrafeRight(void) { return World->GetKey(3); }
+MOD_TO_ENGINE bool Jump(void) { return World->GetKey(4); }
+MOD_TO_ENGINE bool JumpDown(void) { return World->GetKeyPressed(4); }
+MOD_TO_ENGINE bool Crouch(void) { return World->GetKeyPressed(5); }
+MOD_TO_ENGINE bool Prone(void) { return World->GetKeyPressed(6); }
+MOD_TO_ENGINE bool LeanLeft(void) { return World->GetKey(7); }
+MOD_TO_ENGINE bool LeanRight(void) { return World->GetKey(8); }
+MOD_TO_ENGINE bool Sprint(void) { return World->GetKey(9); }
+MOD_TO_ENGINE bool TurnLeft(void) { return World->GetKey(10); }
+MOD_TO_ENGINE bool TurnRight(void) { return World->GetKey(11); }
+MOD_TO_ENGINE bool LookUp(void) { return World->GetKey(12); }
+MOD_TO_ENGINE bool LookDown(void) { return World->GetKey(13); }
+MOD_TO_ENGINE bool RecentLog(void) { return World->GetKeyPressed(14); }
+MOD_TO_ENGINE bool Biomonitor(void) { return World->GetKeyPressed(15); }
+MOD_TO_ENGINE bool Sensaround(void) { return World->GetKeyPressed(16); }
+MOD_TO_ENGINE bool Lantern(void) { return World->GetKeyPressed(17); }
+MOD_TO_ENGINE bool Shield(void) { return World->GetKeyPressed(18); }
+MOD_TO_ENGINE bool Infrared(void) { return World->GetKeyPressed(19); }
+MOD_TO_ENGINE bool Email(void) { return World->GetKeyPressed(20); }
+MOD_TO_ENGINE bool Booster(void) { return World->GetKeyPressed(21); }
+MOD_TO_ENGINE bool Jumpjets(void) { return World->GetKeyPressed(22); }
+MOD_TO_ENGINE bool Attack(void) { return World->GetKeyPressed(23); }
+MOD_TO_ENGINE bool Use(void) { return World->GetKeyPressed(24); }
+MOD_TO_ENGINE bool Menu(void) { return World->GetKeyPressed(25); }
+MOD_TO_ENGINE bool ToggleMode(void) { return World->GetKeyPressed(26); }
+MOD_TO_ENGINE bool Reload(void) { return World->GetKeyPressed(27); }
+MOD_TO_ENGINE bool WeaponCycUp(void) { return World->GetKeyPressed(28); }
+MOD_TO_ENGINE bool WeaponCycDown(void) { return World->GetKeyPressed(29); }
+MOD_TO_ENGINE bool Grenade(void) { return World->GetKeyPressed(30); }
+MOD_TO_ENGINE bool GrenadeCycUp(void) { return World->GetKeyPressed(31); }
+MOD_TO_ENGINE bool GrenadeCycDown(void) { return World->GetKeyPressed(32); }
+MOD_TO_ENGINE bool ChangeAmmoType(void) { return World->GetKeyPressed(33); }
+MOD_TO_ENGINE bool Patch(void) { return World->GetKeyPressed(34); }
+MOD_TO_ENGINE bool PatchCycUp(void) { return World->GetKeyPressed(35); }
+MOD_TO_ENGINE bool PatchCycDown(void) { return World->GetKeyPressed(36); }
+MOD_TO_ENGINE bool Map(void) { return World->GetKeyPressed(37); }
+MOD_TO_ENGINE bool SwimUp(void) { return World->GetKey(38); }
+MOD_TO_ENGINE bool SwimDn(void) { return World->GetKey(39); }
+MOD_TO_ENGINE bool Console(void) { return World->GetKeyPressed(-1); }
+MOD_TO_ENGINE bool TakeScreenshot(void) { return World->GetKeyPressed(41); }
 
 MOD_TO_ENGINE void ProcessInput(void) {
     if (Console()) ToggleConsole();
-    if (Menu() && !Eng_Global->menuActive) { Eng_Global->gamePaused = !Eng_Global->gamePaused; return; }
-    if (Menu() && Eng_Global->menuActive) { MenuGoBack(); return; }
-    if (Eng_Global->gamePaused || Eng_Global->menuActive || Eng_Cheats->consoleActive) return; // Pause/Menu barrier <<<<<<<
+    if (Menu() && !World->menuActive) { World->gamePaused = !World->gamePaused; return; }
+    if (Menu() && World->menuActive) { MenuGoBack(); return; }
+    if (World->gamePaused || World->menuActive || Eng_Cheats->consoleActive) return; // Pause/Menu barrier <<<<<<<
     
     if (ToggleMode()) ToggleInventoryMode();
-    if (Lantern()) Eng_Global->invP1.hardwareIsActive ^= HW_LAN;
-    if (Infrared()) Eng_Global->invP1.hardwareIsActive ^= HW_INF;
+    if (Lantern()) World->invP1.hardwareIsActive ^= HW_LAN;
+    if (Infrared()) World->invP1.hardwareIsActive ^= HW_INF;
     ApplyPlayerMovements();
 }
 
-MOD_TO_ENGINE void CheckAndTakeScreenshot(void) { if (TakeScreenshot() && Eng_Global->current_time > Eng_Global->screenshotTimeout) Screenshot(); }
+MOD_TO_ENGINE void CheckAndTakeScreenshot(void) { if (TakeScreenshot() && World->current_time > World->screenshotTimeout) Screenshot(); }
 
 void SearchableInit(u16 i) {
     int numRandomGeneratedItems = 0;
-    if (Eng_Global->instances[i].generateContents) {
+    if (World->instances[i].generateContents) {
         for(int j=0;j<4;j++) {
-            if (Eng_Global->instances[i].randomItemDropChance[j] <= 0.0f) continue;
+            if (World->instances[i].randomItemDropChance[j] <= 0.0f) continue;
             u8 tempInt = random_range_u8(0,100);
-            if (((float)tempInt / 100.0f) <= Eng_Global->instances[i].randomItemDropChance[j]) {
-                Eng_Global->instances[i].contents[numRandomGeneratedItems] = Eng_Global->instances[i].randomItem[j];
+            if (((float)tempInt / 100.0f) <= World->instances[i].randomItemDropChance[j]) {
+                World->instances[i].contents[numRandomGeneratedItems] = World->instances[i].randomItem[j];
                 numRandomGeneratedItems++;
-                if (numRandomGeneratedItems > Eng_Global->instances[i].maxRandomItems) break;
+                if (numRandomGeneratedItems > World->instances[i].maxRandomItems) break;
             }
         }
     }
 }
 //================================================================================
 // Entity Init
-u8 GetCurrentLevelSecurity(void) { return (Eng_Global->diffMis < 1 || Eng_Cheats->superoverride) ? 0u : Eng_Global->levelSecurity[Eng_Global->curLev]; }
+u8 GetCurrentLevelSecurity(void) { return (World->diffMis < 1 || Eng_Cheats->superoverride) ? 0u : World->levelSecurity[World->curLev]; }
 u16 GetImpactType(u16 instanceIdx) {
-    switch (Eng_Global->instances[instanceIdx].bloodType) {
+    switch (World->instances[instanceIdx].bloodType) {
         case BloodType_None:         return 729; // SparksSmall
         case BloodType_Red:          return 724; // BloodSpurtSmall
         case BloodType_Yellow:       return 723; // BloodSpurtSmallYellow
@@ -3333,18 +3333,18 @@ u16 GetImpactType(u16 instanceIdx) {
 }
 
 void UsableInit(u16 i) {
-    Entity* e = &Eng_Global->instances[i];
-    if (Eng_Global->diffPuz == 3 && e->index == 361 && random_range(0.0f,1.0f) < 0.33f) DeleteInstance(i); // 33% chance of not spawning logic probes on Puzzle difficulty of 3
-    if (Eng_Global->diffMis <= 1 && ConstIndexIsAccessCard(e->index)) DeleteInstance(i); // Remove access cards on Mission difficulty 1 or 0
-    if (Eng_Global->diffMis == 0 && e->index == 313) DeleteInstance(i); // Remove audiologs on Mission difficulty 0
+    Entity* e = &World->instances[i];
+    if (World->diffPuz == 3 && e->index == 361 && random_range(0.0f,1.0f) < 0.33f) DeleteInstance(i); // 33% chance of not spawning logic probes on Puzzle difficulty of 3
+    if (World->diffMis <= 1 && ConstIndexIsAccessCard(e->index)) DeleteInstance(i); // Remove access cards on Mission difficulty 1 or 0
+    if (World->diffMis == 0 && e->index == 313) DeleteInstance(i); // Remove audiologs on Mission difficulty 0
 }
 
 void MFDInit(SystemUI* ui) {
     ui->lastMultiMediaTabOpened = MULTI_MEDIA_TAB_EMAIL_TABLE;
-    ui->logFinished = Eng_Global->pauseRelativeTime;
-    ui->tickFinished = ui->centerTabsTickFinished = Eng_Global->current_time + 0.1 + (double)random_range(0.0f,1.0f);
-    ui->blinkFinished = 1.0 + Eng_Global->pauseRelativeTime;
-    ui->beepFinished = 3.0 + Eng_Global->pauseRelativeTime;
+    ui->logFinished = World->pauseRelativeTime;
+    ui->tickFinished = ui->centerTabsTickFinished = World->current_time + 0.1 + (double)random_range(0.0f,1.0f);
+    ui->blinkFinished = 1.0 + World->pauseRelativeTime;
+    ui->beepFinished = 3.0 + World->pauseRelativeTime;
 }
 
 void InventoryInit(InventorySystem* inv) {
@@ -3379,41 +3379,41 @@ void InventoryInit(InventorySystem* inv) {
     inv->blasterSetting = 15.0f;
     inv->plasmaSetting = 40.0f;
     inv->stungunSetting = 20.0f;
-    inv->justFired = (Eng_Global->pauseRelativeTime - 31.0); // Set >30s before pauseRelativeTime to not immediately play action music.
-    inv->energyDrainTickFinished = Eng_Global->pauseRelativeTime + 0.1 + (double)random_range(0.5f, 1.0f);
+    inv->justFired = (World->pauseRelativeTime - 31.0); // Set >30s before pauseRelativeTime to not immediately play action music.
+    inv->energyDrainTickFinished = World->pauseRelativeTime + 0.1 + (double)random_range(0.5f, 1.0f);
     inv->energy = 54.0f;
     inv->maxEnergy = 255.0f;
     inv->resetAfterDeathTime = 0.5;
-    inv->painSoundFinished = Eng_Global->pauseRelativeTime;
-    inv->radSoundFinished = Eng_Global->pauseRelativeTime;
-    inv->radFXFinished = Eng_Global->pauseRelativeTime;
+    inv->painSoundFinished = World->pauseRelativeTime;
+    inv->radSoundFinished = World->pauseRelativeTime;
+    inv->radFXFinished = World->pauseRelativeTime;
 }
 
 MOD_TO_ENGINE void PlayerInit(u16 i) {
-    Eng_Global->instances[i].index = 767;
-    Eng_Global->instances[i].layer = L_Player;
-    Eng_Global->instances[i].position = (Vector3){10.52f,-43.792f + 0.84f,20.2908f}; // Start Actual: Puts player on Medical Level in actual game start position.  Added 0.84f
-    Eng_Global->instances[i].scale = (Vector3){1.0f,1.0f,1.0f};
-    Eng_Global->instances[i].rotation = (Quaternion){0.0f,0.7071f,0.0f,0.7071f}; // 90deg rotation CW about Y axis as viewed from the top looking down onto player
-    Eng_Global->instances[i].entflags = EF_ACTIVE|EF_RIGIDBODY;
-    Eng_Global->instances[i].collider = COLTYPE_CAP;
-    Eng_Global->instances[i].colliderCenter.y = -0.84f;
-    Eng_Global->instances[i].colliderSize = (Vector3){0.48f,2.0f,1.0f}; // Radius, Overall height including end radii (Unity convention, blech), Direction, 1.0 == Y-Axis
-    Eng_Global->instances[i].mass = 1.0f;
-    Eng_Global->instances[i].velocity = (Vector3){0.0f,0.0f,0.0f};
-    Eng_Global->instances[i].gravity = 1.0f;
-    Eng_Global->instances[i].dynamicFriction = 0.6f; Eng_Global->instances[i].staticFriction = 0.8f;
-    Eng_Global->instances[i].health = 200.0f;
-    Eng_Global->instances[i].noiseFinished = Eng_Global->pauseRelativeTime;
-    if (i == PLAYER1) InventoryInit(&Eng_Global->invP1);
-    else if (i == PLAYER2) InventoryInit(&Eng_Global->invP2);
+    World->instances[i].index = 767;
+    World->instances[i].layer = L_Player;
+    World->instances[i].position = (V3){10.52f,-43.792f + 0.84f,20.2908f}; // Start Actual: Puts player on Medical Level in actual game start position.  Added 0.84f
+    World->instances[i].scale = (V3){1.0f,1.0f,1.0f};
+    World->instances[i].rotation = (Quaternion){0.0f,0.7071f,0.0f,0.7071f}; // 90deg rotation CW about Y axis as viewed from the top looking down onto player
+    World->instances[i].entflags = EF_ACTIVE|EF_RIGIDBODY;
+    World->instances[i].collider = COLTYPE_CAP;
+    World->instances[i].colliderCenter.y = -0.84f;
+    World->instances[i].colliderSize = (V3){0.48f,2.0f,1.0f}; // Radius, Overall height including end radii (Unity convention, blech), Direction, 1.0 == Y-Axis
+    World->instances[i].mass = 1.0f;
+    World->instances[i].velocity = (V3){0.0f,0.0f,0.0f};
+    World->instances[i].gravity = 1.0f;
+    World->instances[i].dynamicFriction = 0.6f; World->instances[i].staticFriction = 0.8f;
+    World->instances[i].health = 200.0f;
+    World->instances[i].noiseFinished = World->pauseRelativeTime;
+    if (i == PLAYER1) InventoryInit(&World->invP1);
+    else if (i == PLAYER2) InventoryInit(&World->invP2);
 }
 
 #include "credits.h"
 MOD_TO_ENGINE const char** GetCreditsText(void) { return creditPages; }
 MOD_TO_ENGINE void ModInitAfterLoad(void) {
-    for (int i=PLAYER1;i<Eng_Global->loadedInstances;++i) {
-        Entity* e = &Eng_Global->instances[i]; u16 constIndex = e->index;
+    for (int i=PLAYER1;i<World->loadedInstances;++i) {
+        Entity* e = &World->instances[i]; u16 constIndex = e->index;
         if (i == PLAYER1 || i == PLAYER2 || ConstIndexIsDynamicObject(constIndex) || (ConstIndexIsNPC(constIndex) && constIndex < 443/*not cyber*/)) e->gravity = 1.0f;
         else e->gravity = 0.0f;
         
@@ -3439,7 +3439,7 @@ MOD_TO_ENGINE void ModInitAfterLoad(void) {
 }
 
 u16 GetCrosshairTexture(void) {
-    switch(Eng_Global->invP1.weaponIndex) {
+    switch(World->invP1.weaponIndex) {
         case 36: case 38: case 43: case 45: case 48: return 1121; // red
         case 37: case 40: case 50: return 1253; // blue
         case 41: case 42: return 1166; // orange
@@ -3452,9 +3452,9 @@ u16 GetCrosshairTexture(void) {
 }
 
 u16 GetCursorTexture(void) {
-    if (Eng_Global->gamePaused || Eng_Global->menuActive) return 1261; // Red standard cursor
-    if (!Eng_Global->invP1.holdingObject) return GetCrosshairTexture();
-    switch(Eng_Global->invP1.heldObjectIndex) {
+    if (World->gamePaused || World->menuActive) return 1261; // Red standard cursor
+    if (!World->invP1.holdingObject) return GetCrosshairTexture();
+    switch(World->invP1.heldObjectIndex) {
         case 308: return 838; // item_paper_wad
         case 309: return 764; // item_beaker
         case 310: return 767; // item_beverage

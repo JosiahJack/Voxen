@@ -22,18 +22,18 @@ public class SpawnManager : MonoBehaviour {
 	private static StringBuilder s1 = new StringBuilder();
 
 	void Start() {
-		delayFinished = Eng_Global->pauseRelativeTime;
-		if (Eng_Global->diffCbt == 1) {
+		delayFinished = World->pauseRelativeTime;
+		if (World->diffCbt == 1) {
 			numberToSpawn = (int) vfloor(numberToSpawn*0.5f);
 			if (numberToSpawn < 1) numberToSpawn = 1;
 		}
 
-		if (Eng_Global->diffCbt == 3) {
+		if (World->diffCbt == 3) {
 			numberToSpawn = (int) vfloor(numberToSpawn*1.5f);
 			if (numberToSpawn < 1) numberToSpawn = 1;
 		}
 
-		if (Eng_Global->diffCbt > 3) {
+		if (World->diffCbt > 3) {
 			numberToSpawn = (int) vfloor(numberToSpawn*5f); // Hehe :)
 		}
 	}
@@ -41,12 +41,12 @@ public class SpawnManager : MonoBehaviour {
 	public void Activate(bool alertEnemies) {
 		alertEnemiesOnAwake = alertEnemies;
 		active = true;
-		delayFinished = Eng_Global->pauseRelativeTime;
+		delayFinished = World->pauseRelativeTime;
 	}
 
 	void Update() {
-		if (Eng_Global->gamePaused) return;
-		if (Eng_Global->menuActive) return;
+		if (World->gamePaused) return;
+		if (World->menuActive) return;
 		if (!active) return;
 
 		if (LevelManager.a.npcsm[LevelManager.a.currentLevel] == null) return;
@@ -68,29 +68,29 @@ public class SpawnManager : MonoBehaviour {
 		if (numberActive != count) numberActive = count;
 
 		if (numberActive >= numberToSpawn) return;
-		if (delayFinished >= Eng_Global->pauseRelativeTime) return; // Not yet.
+		if (delayFinished >= World->pauseRelativeTime) return; // Not yet.
 
-		delayFinished = Eng_Global->pauseRelativeTime
+		delayFinished = World->pauseRelativeTime
 						+ random_range(minDelayBetweenSpawns,
 									   maxDelayBetweenSpawns);
 
 		Spawn(index); // spawn then wait randomized amount of time
 		count++;
 		if (count >= numberToSpawn) {
-			delayFinished = Eng_Global->pauseRelativeTime + allSpawnedResetDelay;
+			delayFinished = World->pauseRelativeTime + allSpawnedResetDelay;
 		}
 	}
 
 	void Spawn(int index) {
-		if (Eng_Global->diffCbt == 0) return; // Not on combat diff 0
+		if (World->diffCbt == 0) return; // Not on combat diff 0
 
 		DualLog("Spawning new enemy " + index.ToString());
 		dynamicObjectsContainer = LevelManager.a.GetCurrentDynamicContainer();
-		Vector3 spot = GetRandomLocation();
+		V3 spot = GetRandomLocation();
 		if (spot.x == 0 && spot.y == 0 && spot.z == 0) return;
 
-		u16 instGO = SpawnDynamicObject(index,Eng_Global->curLev,false,null,-1);
-        SetPosition(&Eng_Global->instances[instGO],spot,true);
+		u16 instGO = SpawnDynamicObject(index,World->curLev,false,null,-1);
+        SetPosition(&World->instances[instGO],spot,true);
         if (!alertEnemiesOnAwake) {
             if (aic.index != 14) aic.wandering = true;
             return;
@@ -99,26 +99,26 @@ public class SpawnManager : MonoBehaviour {
         aic.SetEnemy(Const.a.player1Capsule,Const.a.player1TargettingPos);
 	}
 
-	Vector3 GetRandomLocation() {
+	V3 GetRandomLocation() {
 		int randpos;
 		randpos = random_range(0,(spawnLocations.Length-1));
-		Vector3 retval = spawnLocations[randpos].position;
-		if (!AreaClear(retval)) return (Vector3){0,0,0);
-		if (!AreaHidden(retval)) return (Vector3){0,0,0);
+		V3 retval = spawnLocations[randpos].position;
+		if (!AreaClear(retval)) return (V3){0,0,0);
+		if (!AreaHidden(retval)) return (V3){0,0,0);
 		return retval;
 	}
 
 
-	RaycastHit AreaClear(Vector3 spot) { // CapsuleCast using largest NPC's bounding capsule to check area is clear.
-		return Physics.CapsuleCast(spot + (Vector3){0.0f,0.52f,0.0f},spot + (Vector3){0.0f,-0.52f,0.0f},0.48f,(Vector3){0.0f,0.0f,0.0f},out hit,0.02f,Const.a.layerMaskNPCCollision);
+	RaycastHit AreaClear(V3 spot) { // CapsuleCast using largest NPC's bounding capsule to check area is clear.
+		return Physics.CapsuleCast(spot + (V3){0.0f,0.52f,0.0f},spot + (V3){0.0f,-0.52f,0.0f},0.48f,(V3){0.0f,0.0f,0.0f},out hit,0.02f,Const.a.layerMaskNPCCollision);
 	}
 
-	bool AreaHidden(Vector3 spot) {
-		Vector3 plyPos = Const.a.player1Capsule.Eng_Global->instances[i].position;
+	bool AreaHidden(V3 spot) {
+		V3 plyPos = Const.a.player1Capsule.World->instances[i].position;
 		if (V3_Dist(plyPos,spot) > 50.0f) return true;
 
 		int mask = Const.a.layerMaskNPCAttack;
-		Vector3 ray = (plyPos - spot).normalized;
+		V3 ray = (plyPos - spot).normalized;
 		RaycastHit tempHit;
 		if (Raycast(spot,ray,out tempHit,50.0f,mask)) {
 			if (tempHit.collider.CompareTag("Player")) return false;

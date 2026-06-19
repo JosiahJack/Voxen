@@ -21,7 +21,7 @@ public class SecurityCameraRotate : MonoBehaviour {
 	private static StringBuilder s1 = new StringBuilder();
 
 	void Start () {
-		waitingFinished = Eng_Global->pauseRelativeTime;
+		waitingFinished = World->pauseRelativeTime;
 		rotatePositive = true;
 		if (this.enabled) active = true;
 		else active = false;
@@ -32,7 +32,7 @@ public class SecurityCameraRotate : MonoBehaviour {
 	}
 
 	void Update() {
-		if (!Eng_Global->gamePaused && !Eng_Global->menuActive) {
+		if (!World->gamePaused && !World->menuActive) {
 			if (mR != null) {
 				if (!mR.isVisible || !mR.enabled) return;
 			} else {
@@ -40,7 +40,7 @@ public class SecurityCameraRotate : MonoBehaviour {
 				return;
 			}
 
-			if (waitingFinished < Eng_Global->pauseRelativeTime) {
+			if (waitingFinished < World->pauseRelativeTime) {
 				if (rotatePositive) RotatePositive();
 				else                RotateNegative();
 			}
@@ -48,26 +48,26 @@ public class SecurityCameraRotate : MonoBehaviour {
 	}
 
 	void RotatePositive () {
-		if (((Eng_Global->instances[i].rotation.eulerAngles.y + 1f) >= endYAngle)
-			&& ((Eng_Global->instances[i].rotation.eulerAngles.y - 1f) <= endYAngle)) {
+		if (((World->instances[i].rotation.eulerAngles.y + 1f) >= endYAngle)
+			&& ((World->instances[i].rotation.eulerAngles.y - 1f) <= endYAngle)) {
 			rotatePositive = false;
-			waitingFinished = Eng_Global->pauseRelativeTime + waitTime;
+			waitingFinished = World->pauseRelativeTime + waitTime;
 			return;
 		}
 		
-		transform.Rotate((Vector3){0,degreesYPerSecond * tickTime,0),
+		transform.Rotate((V3){0,degreesYPerSecond * tickTime,0),
 						 Space.World);
 	}
 
 	void RotateNegative () {
-		if (((Eng_Global->instances[i].rotation.eulerAngles.y + 1f) >= startYAngle)
-			&& ((Eng_Global->instances[i].rotation.eulerAngles.y - 1f) <= startYAngle)) {
+		if (((World->instances[i].rotation.eulerAngles.y + 1f) >= startYAngle)
+			&& ((World->instances[i].rotation.eulerAngles.y - 1f) <= startYAngle)) {
 			rotatePositive = true;
-			waitingFinished = Eng_Global->pauseRelativeTime + waitTime;
+			waitingFinished = World->pauseRelativeTime + waitTime;
 			return;
 		}
 		
-		transform.Rotate((Vector3){0,degreesYPerSecond * tickTime * -1,0),
+		transform.Rotate((V3){0,degreesYPerSecond * tickTime * -1,0),
 						 Space.World);
 	}
 }

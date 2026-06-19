@@ -2,7 +2,7 @@
 #include "common.h" // Types needed first
 #define MOD_INTEROP_MOD
 #include "interop.h"
-extern GlobalContext* Eng_Global; extern CheatsSystem* Eng_Cheats; extern SettingsSystem* Eng_Settings; extern TextSystem* Eng_Text; extern SystemUI* Eng_UI;
+extern GlobalContext* World; extern CheatsSystem* Eng_Cheats; extern SettingsSystem* Settings; extern TextSystem* Eng_Text; extern SystemUI* Eng_UI;
 // For use with LiveSplit or other future speedrunner utilities for doing speedruns
 typedef struct __attribute__((packed, aligned(8))) { u64 magicNumber; double thisRunTime; bool isLoading; i32 missionSplitID; } AutoSplitterData;
 extern AutoSplitterData autoSplitter;
@@ -114,15 +114,15 @@ extern const AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS];
 extern const char* sounds[SOUNDS_COUNT];
 
 // Mod Inlines
-static inline __attribute__((always_inline)) void EntitySetLocked(Entity* e, bool locked) { DualLog("Unlocking entity with index %u\n",(u16)(e - Eng_Global->instances)); flag_set(&e->entflags,EF_LOCKED,locked); }
-static inline __attribute__((always_inline)) void UIBlockedBySecurity(Vector3 tetherPoint) { (void)tetherPoint; CenterStatusPrint("%s",Eng_Text->stringTable[25]); }
-static inline __attribute__((always_inline)) void UICyberSprint(u16 textIndex) { CenterStatusPrint("%s",Eng_Text->stringTable[textIndex]); }
-static inline __attribute__((always_inline)) void UIExitCyberspace() { CenterStatusPrint("%s",Eng_Text->stringTable[601]); }
-static inline __attribute__((always_inline)) void HealthManagerHealingBed(u16 playerIdx, float amount, bool flashBed) { (void)flashBed; Entity* p = &Eng_Global->instances[playerIdx]; p->health = vmin(255.0f,p->health + amount); }
-static inline __attribute__((always_inline)) void PlayerTakeDamage(u16 playerIdx, float damage) { Entity* p = &Eng_Global->instances[playerIdx]; p->health -= damage; if (p->health < 0.0f) p->health = 0.0f; }
-static inline __attribute__((always_inline)) Entity* PE(u16 p) { return &Eng_Global->instances[p]; }
-static inline __attribute__((always_inline)) float SfxVol() { return (float)Eng_Settings->VolumeEffects / 100.0f; }
-static inline __attribute__((always_inline)) InventorySystem* Inv(u16 p) { return p == PLAYER1 ? &Eng_Global->invP1 : &Eng_Global->invP2; }
+INLINE void EntitySetLocked(Entity* e, bool locked) { DualLog("Unlocking entity with index %u\n",(u16)(e - World->instances)); flag_set(&e->entflags,EF_LOCKED,locked); }
+INLINE void UIBlockedBySecurity(V3 tetherPoint) { (void)tetherPoint; CenterStatusPrint("%s",Eng_Text->stringTable[25]); }
+INLINE void UICyberSprint(u16 textIndex) { CenterStatusPrint("%s",Eng_Text->stringTable[textIndex]); }
+INLINE void UIExitCyberspace() { CenterStatusPrint("%s",Eng_Text->stringTable[601]); }
+INLINE void HealthManagerHealingBed(u16 playerIdx, float amount, bool flashBed) { (void)flashBed; Entity* p = &World->instances[playerIdx]; p->health = vmin(255.0f,p->health + amount); }
+INLINE void PlayerTakeDamage(u16 playerIdx, float damage) { Entity* p = &World->instances[playerIdx]; p->health -= damage; if (p->health < 0.0f) p->health = 0.0f; }
+INLINE Entity* PE(u16 p) { return &World->instances[p]; }
+INLINE float SfxVol() { return (float)Settings->VolumeEffects / 100.0f; }
+INLINE InventorySystem* Inv(u16 p) { return p == PLAYER1 ? &World->invP1 : &World->invP2; }
 
 // Mod Shared Functions across TU's
 void WeaponsUpdate();
@@ -175,7 +175,7 @@ void ResetHeldItem(u16 p);
 void DropHeldItem(u16 p);
 void AddItemToInventory(u16 p, int index, int customIndex);
 void TextureSequenceUpdate(u16 self);
-u16 AddInstance(u16 entIdx, Vector3 pos);
+u16 AddInstance(u16 entIdx, V3 pos);
 void DeleteInstance(u16 i);
 u8 GetCurrentLevelSecurity();
 u16 GetImpactType(u16 instanceIdx);

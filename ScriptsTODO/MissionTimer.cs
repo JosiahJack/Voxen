@@ -21,8 +21,8 @@ public class MissionTimer : MonoBehaviour {
 	void Awake() {
 		a = this;
 		a.t = 6000f;
-		a.timerFinished = Eng_Global->pauseRelativeTime + 1f;
-		a.currentMission = Eng_Text->stringTable[504];
+		a.timerFinished = World->pauseRelativeTime + 1f;
+		a.currentMission = Text->stringTable[504];
 		a.currentMissionIndex = 0;
 		a.timesUP = false;
 	}
@@ -38,21 +38,21 @@ public class MissionTimer : MonoBehaviour {
 		
 		QuestLogNotesManager.a.UpdateToNextMission(nextMissionIndex);
 
-		if (Eng_Global->diffMis < 3) return; // Don't update timer on lower skill settings.
+		if (World->diffMis < 3) return; // Don't update timer on lower skill settings.
 		t = newTimerAmount;
 		currentMissionIndex = nextMissionIndex;
-		currentMission = Eng_Text->stringTable[misTextIndex];
+		currentMission = Text->stringTable[misTextIndex];
 		if (currentMissionIndex == 4) lastTimer = true; // No gameover for last timer.
     }
 
     void Update() {
-		if (Eng_Global->diffMis < 3) return;
-		if (Eng_Global->gamePaused) return;
-		if (Eng_Global->menuActive) return;
+		if (World->diffMis < 3) return;
+		if (World->gamePaused) return;
+		if (World->menuActive) return;
 		if (MouseLookScript.a.inCyberSpace) return; // timer doesn't count down in cyberspace, yay!
 
 		if (timesUP) {
-			if (Eng_Global->instances[PLAYER1].health > 0f) {
+			if (World->instances[PLAYER1].health > 0f) {
 				PlayerHealth.a.radiationArea = true;
 				PlayerHealth.a.GiveRadiation(0.1f); // Every frame! Muahaha!!!
 				return;
@@ -61,8 +61,8 @@ public class MissionTimer : MonoBehaviour {
 
 		if (t <= 0) {
 			if (lastTimer) {
-				text.text = Eng_Text->stringTable[869];
-				timerTypeText.text = Eng_Text->stringTable[509];
+				text.text = Text->stringTable[869];
+				timerTypeText.text = Text->stringTable[509];
 				timesUP = true;
 				return;
 			} else {
@@ -85,13 +85,13 @@ public class MissionTimer : MonoBehaviour {
 			case 3: if (Const.a.questData.BridgeSeparated) UpdateToNextMission(2700f,506,4); break;
 		}
 
-		if (timerFinished < Eng_Global->pauseRelativeTime) {
+		if (timerFinished < World->pauseRelativeTime) {
 			t -= 1f;
 			minutes = vfloor(t/60f);
 			seconds = t - (minutes*60);
 			text.text = (minutes.ToString("00") + ":" + seconds.ToString("00"));
 			timerTypeText.text = currentMission;
-			timerFinished = Eng_Global->pauseRelativeTime + 1f;
+			timerFinished = World->pauseRelativeTime + 1f;
 		}
     }
 }

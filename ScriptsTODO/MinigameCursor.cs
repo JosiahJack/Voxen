@@ -47,7 +47,7 @@ public class MinigameCursor : MonoBehaviour {
 
         minigameMouseX = (minigameMouseX * panelWidth) - offset;
         minigameMouseY = (minigameMouseY * panelWidth) - offset;
-        minigameCursor.localPosition = (Vector3){minigameMouseX,minigameMouseY,0f);
+        minigameCursor.localPosition = (V3){minigameMouseX,minigameMouseY,0f);
         mouseOverPanel = (overX && overY);
     }
 }

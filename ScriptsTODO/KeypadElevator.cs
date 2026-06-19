@@ -26,14 +26,14 @@ public class KeypadElevator : MonoBehaviour {
 		padInUse = false;
 		if (linkedDoor == null) {
 			DualLog("BUG: no linked Door for KeypadElevator at location: "
-					  + Eng_Global->instances[i].position.ToString());
+					  + World->instances[i].position.ToString());
 		}
 	}
 
 	public void Use (UseData ud) {
-		if (GetCurrentLevelSecurity() > securityThreshhold) { BlockedBySecurity(Eng_Global->instances[i].position); return; }
+		if (GetCurrentLevelSecurity() > securityThreshhold) { BlockedBySecurity(World->instances[i].position); return; }
 
-		if (Eng_Cheats->superoverride || Eng_Global->diffMis == 0) locked = false; // SHODAN can go anywhere!  Full security override!
+		if (Eng_Cheats->superoverride || World->diffMis == 0) locked = false; // SHODAN can go anywhere!  Full security override!
 		if (locked) {
 			CenterStatusPrint(lockedMessageIndex); // Target something because we are locked like an info_message to say hey we are locked, e.g. vox: "Non emergency life pods disabled."
 			UseTargets(gameObject,ud,lockedTarget);
@@ -42,7 +42,7 @@ public class KeypadElevator : MonoBehaviour {
 
 		padInUse = true;
 		Utils.PlayUIOneShotSavable(91);
-		Eng_UI->SendElevatorKeypadToDataTab(this,buttonsEnabled,buttonsDarkened,buttonText,targetDestination,Eng_Global->instances[i].position,linkedDoor,currentFloor);
+		Eng_UI->SendElevatorKeypadToDataTab(this,buttonsEnabled,buttonsDarkened,buttonText,targetDestination,World->instances[i].position,linkedDoor,currentFloor);
 	}
 
 	public void SendDataBackToPanel() { padInUse = false; }

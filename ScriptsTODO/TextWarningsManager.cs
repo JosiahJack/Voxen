@@ -22,7 +22,7 @@ public class TextWarningsManager : MonoBehaviour {
 			warningTexts[i] = warningTextGObjects[i].GetComponent<Text>();
 			if (warningTexts[i] != null) warningTexts[i].text = System.String.Empty;
 			initialized[i] = false;
-			finishedTime[i] = Eng_Global->pauseRelativeTime;
+			finishedTime[i] = World->pauseRelativeTime;
 			uniqueID[i] = -1;
 		}
 	}
@@ -32,7 +32,7 @@ public class TextWarningsManager : MonoBehaviour {
 
 		for (int i=setIndex;i>=0;i--) {
 			if (uniqueID[i] == id) { setIndex = i; break;}
-			if (finishedTime[i] < Eng_Global->pauseRelativeTime) { setIndex = i; break;}
+			if (finishedTime[i] < World->pauseRelativeTime) { setIndex = i; break;}
 		}
 
 		if (id == 322) forcedReference = 0;
@@ -49,15 +49,15 @@ public class TextWarningsManager : MonoBehaviour {
 		else
 			if (warningLifeTimes[setIndex] < warningDefaultLifeTime) warningLifeTimes[setIndex] = warningDefaultLifeTime;
 
-		finishedTime[setIndex] = Eng_Global->pauseRelativeTime + warningLifeTimes[setIndex];
+		finishedTime[setIndex] = World->pauseRelativeTime + warningLifeTimes[setIndex];
 	}
 
 	void Update() {
-		if (Eng_Global->gamePaused || Eng_Global->menuActive) return;
+		if (World->gamePaused || World->menuActive) return;
 
 		for (int i=0;i<warningTextGObjects.Length;i++) {
 			if (!sEmpty(warningTexts[i].text)) {
-				if (finishedTime[i] < Eng_Global->pauseRelativeTime) {
+				if (finishedTime[i] < World->pauseRelativeTime) {
 					warningTexts[i].text = System.String.Empty;
 					if (warningTextGObjects[i].activeInHierarchy) warningTextGObjects[i].SetActive(false);
 					continue;

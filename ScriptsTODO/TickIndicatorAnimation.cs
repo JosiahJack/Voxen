@@ -17,14 +17,14 @@ public class TickIndicatorAnimation : MonoBehaviour {
 
 	void Update() {
 		if (!gameObject.activeSelf) return;
-		if (Eng_Global->menuActive) return;
+		if (World->menuActive) return;
 
-		if (nextthink < Eng_Global->pauseRelativeTime) {
+		if (nextthink < World->pauseRelativeTime) {
 			if (healthIndicator) {
-				if (Eng_Global->instances[PLAYER1].health > 176) {
+				if (World->instances[PLAYER1].health > 176) {
 					if (indicator.overrideSprite != indicatorImages[0]) indicator.overrideSprite = indicatorImages[0];
 				} else {
-					if (Eng_Global->instances[PLAYER1].health > 88) {
+					if (World->instances[PLAYER1].health > 88) {
 						if (indicator.overrideSprite != indicatorImages[1]) indicator.overrideSprite = indicatorImages[1];
 					} else {
 						switch (tick) {
@@ -55,7 +55,7 @@ public class TickIndicatorAnimation : MonoBehaviour {
 			}
 			tick++;
 			if (tick > 5) tick = 0;
-			nextthink = Eng_Global->pauseRelativeTime + thinkTime;
+			nextthink = World->pauseRelativeTime + thinkTime;
 		}
 	}
 }

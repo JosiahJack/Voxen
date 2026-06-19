@@ -11,7 +11,7 @@ public class ObjectImpact : MonoBehaviour {
 	// Internal references, required
 	AudioSource SFXSource;
 	Rigidbody rbody;
-	Vector3 oldVelocity;
+	V3 oldVelocity;
 
 	void Start () {
 		rbody = GetComponent<Rigidbody>();
@@ -20,8 +20,8 @@ public class ObjectImpact : MonoBehaviour {
 	}
 
 	void OnCollisionEnter(Collision collision) {
-		if (Eng_Global->gamePaused) return;
-		if (Eng_Global->menuActive) return;
+		if (World->gamePaused) return;
+		if (World->menuActive) return;
 		if (collision == null) return;
 
 		if (collision.relativeVelocity.sqrMagnitude > (minVolumeSpeed * minVolumeSpeed)) {

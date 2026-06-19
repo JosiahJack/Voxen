@@ -60,7 +60,7 @@ public class PuzzleWire : MonoBehaviour {
 	private float tempF;
 	private int selectedWire;
 	private bool selectedWireLH;
-	private Vector3 tempVec;
+	private V3 tempVec;
 	private bool blinkState;
 	private float blinkTimeFinished;
 	public float actualValue;
@@ -130,14 +130,14 @@ public class PuzzleWire : MonoBehaviour {
 	}
 
 	void Update() {
-		if (!Eng_Global->gamePaused && !Eng_Global->menuActive) {
+		if (!World->gamePaused && !World->menuActive) {
 			if (Solved) return;
 
 			if (selectedWire != -1) {
-				if (blinkTimeFinished < Eng_Global->pauseRelativeTime) {
+				if (blinkTimeFinished < World->pauseRelativeTime) {
 					BlinkSelectedIndicator();
 					blinkState = !blinkState;
-					blinkTimeFinished = Eng_Global->pauseRelativeTime + blinkTime;
+					blinkTimeFinished = World->pauseRelativeTime + blinkTime;
 				}
 			} else {
 				DisableAllSelectedIndicators();
@@ -150,7 +150,7 @@ public class PuzzleWire : MonoBehaviour {
 						numberOfWires++;
 				}
 
-				if (Eng_Global->diffPuz == 3) {
+				if (World->diffPuz == 3) {
 					// Set all wire colors to the same on hard
 					wireColors[0] = rememberColors[0];
 					wireColors[1] = rememberColors[1];
@@ -191,7 +191,7 @@ public class PuzzleWire : MonoBehaviour {
 				}
 			} else {
 				DisableGeniusHints();
-				if (Eng_Global->diffPuz == 3) {
+				if (World->diffPuz == 3) {
 					// Set all wire colors to the same on hard
 					wireColors[0] = HUDColor.Yellow;
 					wireColors[1] = HUDColor.Yellow;
@@ -317,7 +317,7 @@ public class PuzzleWire : MonoBehaviour {
 		theme = sentTheme;
 		wireColors = sentHUDColors;
 		rememberColors = sentHUDColors;
-		if (Eng_Global->diffPuz == 3) {
+		if (World->diffPuz == 3) {
 			// Set all wire colors to the same on hard
 			wireColors[0] = HUDColor.Yellow;
 			wireColors[1] = HUDColor.Yellow;
@@ -335,18 +335,18 @@ public class PuzzleWire : MonoBehaviour {
 		EvaluatePuzzle();
 		ChangeAppearance();
 
-		if (udSent.mainIndex == 54 || Eng_Global->diffPuz == 0) PuzzleSolved(true);
+		if (udSent.mainIndex == 54 || World->diffPuz == 0) PuzzleSolved(true);
 	}
 
-	private Vector3 GetPositionOfLHNode(int index) {
-		tempVec = (Vector3){0.0f,0.0f,0.0f};
+	private V3 GetPositionOfLHNode(int index) {
+		tempVec = (V3){0.0f,0.0f,0.0f};
 		tempVec.x = 0;
 		tempVec.y = nodeYOffset * -1 * index;
 		return tempVec;
 	}
 
-	private Vector3 GetPositionOfRHNode(int index) {
-		tempVec = (Vector3){0.0f,0.0f,0.0f};
+	private V3 GetPositionOfRHNode(int index) {
+		tempVec = (V3){0.0f,0.0f,0.0f};
 		tempVec.x = nodeXOffset;
 		tempVec.y = nodeYOffset * -1 * index;
 		return tempVec;
@@ -438,7 +438,7 @@ public class PuzzleWire : MonoBehaviour {
 		DisableAllSelectedIndicators();
 		selectedWireLH = true;
 		blinkState = true;
-		blinkTimeFinished = Eng_Global->pauseRelativeTime + blinkTime;
+		blinkTimeFinished = World->pauseRelativeTime + blinkTime;
 		BlinkSelectedIndicator();
 		ChangeAppearance();
 		//EvaluatePuzzle();
@@ -460,7 +460,7 @@ public class PuzzleWire : MonoBehaviour {
 		DisableAllSelectedIndicators();
 		selectedWireLH = false;
 		blinkState = true;
-		blinkTimeFinished = Eng_Global->pauseRelativeTime + blinkTime;
+		blinkTimeFinished = World->pauseRelativeTime + blinkTime;
 		BlinkSelectedIndicator();
 		ChangeAppearance();
 		//EvaluatePuzzle();
@@ -637,7 +637,7 @@ public class PuzzleWire : MonoBehaviour {
 		if (wire5RHPosition == wire5RHTarget && wireIsActive[4]) tempF += 0.19f;
 		if (wire6RHPosition == wire6RHTarget && wireIsActive[5]) tempF += 0.19f;
 		if (wire7RHPosition == wire7RHTarget && wireIsActive[6]) tempF += 0.19f;
-		if (Eng_Global->diffPuz == 1) tempF += 0.19f;
+		if (World->diffPuz == 1) tempF += 0.19f;
 		actualValue = tempF;
 		if (tempF > 0.92f || AllWiresCorrect()) PuzzleSolved(false);
 	}

@@ -96,13 +96,13 @@ public class PuzzleGrid : MonoBehaviour {
 		EvaluatePuzzle();
 		UpdateCellImages();
 
-		if (udSender.mainIndex == 54 || Eng_Global->diffPuz == 0) {
+		if (udSender.mainIndex == 54 || World->diffPuz == 0) {
 			PuzzleSolved(true);
 		}
 	}
 
 	void Update() {
-		if (!Eng_Global->gamePaused && !Eng_Global->menuActive) UpdateCellImages();
+		if (!World->gamePaused && !World->menuActive) UpdateCellImages();
 	}
 
 	public void OnGridCellClick (int index) {
@@ -110,7 +110,7 @@ public class PuzzleGrid : MonoBehaviour {
 		if (puzzleSolved) return;
 
 		if (cellType[index] == PuzzleCellType.Standard) {
-			if (Eng_Global->diffPuz == 1) {
+			if (World->diffPuz == 1) {
 				King(index); // Easy puzzle difficulty.  Chose King instead of Pawn to help speed up the puzzle by the antenna trap on Level 7
 			} else {
 				switch (gridType) {
@@ -134,7 +134,7 @@ public class PuzzleGrid : MonoBehaviour {
 			if (puzzleSolved) return;
 
 			if (cellType[index] == PuzzleCellType.Standard) {
-				if (Eng_Global->diffPuz == 1) {
+				if (World->diffPuz == 1) {
 					HoverKing(index); // Easy puzzle difficulty.  Chose King instead of Pawn to help speed up the puzzle by the antenna trap on Level 7
 				} else {
 					switch (gridType) {

@@ -34,13 +34,13 @@ static const AmbientDef* ambient_def_by_index(u16 idx) {
 }
 
 MOD_TO_ENGINE void UpdateAmbientSounds(void) {
-    if (Eng_Global->gamePaused || Eng_Global->menuActive) return;
+    if (World->gamePaused || World->menuActive) return;
     
-    const Vector3* player = &Eng_Global->instances[PLAYER1].position;
+    const V3* player = &World->instances[PLAYER1].position;
     const float max_range = 7.68f, max_range_sq = 7.68f * 7.68f;
     for (u16 i = 0; i < loadedAmbients; ++i) {
         const u16 ent_idx = ambientRegistry[i];
-        const Entity* ent = &Eng_Global->instances[ent_idx];
+        const Entity* ent = &World->instances[ent_idx];
         const AmbientDef* def = ambient_def_by_index(ent->index);
         if (!def) { DualLogError("  [SKIP] Entity %u has unknown index %u\n", ent_idx, ent->index); continue; }
 
@@ -76,13 +76,13 @@ MOD_TO_ENGINE void UpdateAmbientSounds(void) {
 MOD_TO_ENGINE void ResetLevelAudio(void) {
     loadedAmbients = 0;
     mset(ambientRegistry, 0, loadedAmbients * sizeof(u16));
-    for (u16 i = START_INDEX_LEVEL_INSTANCES; i<Eng_Global->loadedInstances;++i) {
-        if (ConstIndexIsAmbient(Eng_Global->instances[i].index)) {
+    for (u16 i = START_INDEX_LEVEL_INSTANCES; i<World->loadedInstances;++i) {
+        if (ConstIndexIsAmbient(World->instances[i].index)) {
             ambientRegistry[loadedAmbients] = i;
             loadedAmbients++;
             if (loadedAmbients >= MAX_AMBIENT_NOISES) { DualLogError("%u exceeded max number of ambient noises %u!\n",loadedAmbients,MAX_AMBIENT_NOISES); break; }
             
-            Eng_Global->instances[i].volume = EDefs[Eng_Global->instances[i].index].volume * 0.5f;
+            World->instances[i].volume = EDefs[World->instances[i].index].volume * 0.5f;
         }
     }
 }

@@ -36,7 +36,7 @@
 	bool CheatWallSticky; // save
     bool CheatNoclip; // save
     bool staminupActive = false;
-	public Vector2 horizontalMovement;
+	public V2 horizontalMovement;
 	public float verticalMovement;
 	float jumpTime; // save
 	private float crouchingVelocity = 1f;
@@ -45,7 +45,7 @@
 	private int layerMask;
 	Rigidbody rbody;
 	private float fallDamageSpeed = 11.72f;
-	Vector3 oldVelocity; // save
+	V3 oldVelocity; // save
 	private float jumpFatigue = 6.5f;
 	private float fatigueWanePerTick = 1f;
 	private float fatigueWanePerTickCrouched = 2f;
@@ -81,31 +81,31 @@
 	float jumpLandSoundFinished; // save
 	float jumpJetEnergySuckTickFinished; // save
 	private float jumpJetEnergySuckTick = 1f;
-	private Vector3 tempVec;
-	private Vector2 tempVec2;
+	private V3 tempVec;
+	private V2 tempVec2;
 	private int tempInt;
 	private float leanSpeed = 70f;
 	bool Notarget = false; // for cheat to disable enemy sight checks against this player
 	bool fatigueWarned; // save
 	private float burstForce = 35f;
 	float doubleJumpFinished; // save
-	private Vector3 playerHome;
+	private V3 playerHome;
 	float turboFinished = 0f; // save
 	float turboCyberTime = 15f;
 	bool inCyberTube = false;
 	float stepFinished;
 	float rustleFinished;
 	private int doubleJumpTicks = 0;
-	private Vector3 tempVecRbody;
+	private V3 tempVecRbody;
 	private bool inputtingMovement;
 	private float accel;
 	private RaycastHit tempHit;
 	public float floorDot;
-	public Vector3 floorAng;
+	public V3 floorAng;
 	private float slideAngle = 0.9f;
 	private float gravFinished;
 	private float bodyLerpGravityOffDelayFinished;
-	private static Vector3 feetOffset = (Vector3){0f,-0.48f,0f);
+	private static V3 feetOffset = (V3){0f,-0.48f,0f);
 	
 	public static PlayerMovement a;
 
@@ -118,9 +118,9 @@
 		bodyState = BodyState_Standing;
 		cyberDesetup = false;
 		oldBodyState = bodyState;
-		fatigueFinished = Eng_Global->pauseRelativeTime;
-		fatigueFinished2 = Eng_Global->pauseRelativeTime;
-		ladderSFXFinished = Eng_Global->pauseRelativeTime;
+		fatigueFinished = World->pauseRelativeTime;
+		fatigueFinished2 = World->pauseRelativeTime;
+		ladderSFXFinished = World->pauseRelativeTime;
 		rbody = GetComponent<Rigidbody>();
 		oldVelocity = rbody.velocity;
 		capsuleCollider = GetComponent<CapsuleCollider>();
@@ -130,24 +130,24 @@
 		staminupActive = false;
 		cyberCollider = GetComponent<SphereCollider>();
 		consoleActivated = false;
-		jumpLandSoundFinished = Eng_Global->pauseRelativeTime;
+		jumpLandSoundFinished = World->pauseRelativeTime;
 		justJumped = false;
-		jumpSFXFinished = Eng_Global->pauseRelativeTime;
+		jumpSFXFinished = World->pauseRelativeTime;
 		fatigueWarned = false;
-		jumpJetEnergySuckTickFinished = Eng_Global->pauseRelativeTime;
-		Eng_Global->instances[PLAYER1].ressurectingFinished = Eng_Global->pauseRelativeTime;
+		jumpJetEnergySuckTickFinished = World->pauseRelativeTime;
+		World->instances[PLAYER1].ressurectingFinished = World->pauseRelativeTime;
 		tempInt = -1;
-		doubleJumpFinished = Eng_Global->pauseRelativeTime;
+		doubleJumpFinished = World->pauseRelativeTime;
 		doubleJumpTicks = 0;
-		turboFinished = Eng_Global->pauseRelativeTime;
-		stepFinished = Eng_Global->pauseRelativeTime;
-		rustleFinished = Eng_Global->pauseRelativeTime;
+		turboFinished = World->pauseRelativeTime;
+		stepFinished = World->pauseRelativeTime;
+		rustleFinished = World->pauseRelativeTime;
 		bodyLerpGravityOffDelayFinished = 0;
     }
 
 	void Update() {
-		if (Eng_Global->gamePaused
-			|| (ressurectingFinished >= Eng_Global->pauseRelativeTime)) {
+		if (World->gamePaused
+			|| (ressurectingFinished >= World->pauseRelativeTime)) {
 			return;
 		}
 
@@ -159,7 +159,7 @@
 			CyberDestupOrNoclipMaintain();
 		} else {
 			PlayerHealth.a.makingNoise = true; // Cyber enemies more aware.
-			PlayerHealth.a.noiseFinished = Eng_Global->pauseRelativeTime + 0.5f;
+			PlayerHealth.a.noiseFinished = World->pauseRelativeTime + 0.5f;
 		}
 
 		isSprinting = GetSprintInputState();
@@ -167,18 +167,18 @@
 		Prone();
 		EndCrouchProneTransition();
 		FatigueApply(); // Here fatigue me out, except in cyberspace
-		Automap.a.UpdateAutomap(Eng_Global->instances[i].position); // Update the map.
+		Automap.a.UpdateAutomap(World->instances[i].position); // Update the map.
 	}
 
 	void FixedUpdate() {
 		// Readout for debugging in Inspector.
 		playerSpeedActual = rbody.velocity.magnitude;
 		
-		Vector2 hz = new Vector2(rbody.velocity.x, rbody.velocity.z);
+		V2 hz = new V2(rbody.velocity.x, rbody.velocity.z);
 		playerSpeedHorizontalActual = hz.magnitude;
 
-		if (Eng_Global->gamePaused || Eng_Global->menuActive) return;
-		if (ressurectingFinished > Eng_Global->pauseRelativeTime) return;
+		if (World->gamePaused || World->menuActive) return;
+		if (ressurectingFinished > World->pauseRelativeTime) return;
 		if (consoleActivated) return;
 
 		// Crouch/Prone by shrinking the capsule height.
@@ -220,7 +220,7 @@
 															// Already passed
 															// rbody.velocity.z
 															// into the .y of
-															// this Vector2.
+															// this V2.
 		// Clamp vertical movement speed.
 		verticalMovement = GetClampedVerticalMovement();
 		RigidbodySetVelocityY(rbody, verticalMovement);
@@ -239,7 +239,7 @@
 		if (inCyberSpace) return;
 
 		// Using value of 1.06 = (player capsule height / 2) + 0.06 = 1 + 0.06;
-		bool successfulRay = Raycast(Eng_Global->instances[i].position, Vector3.down,
+		bool successfulRay = Raycast(World->instances[i].position, V3.down,
 											 out tempHit,1.1f,
 											 Const.a.layerMaskPlayerFeet);
 
@@ -270,22 +270,22 @@
 		if (rbody.velocity.sqrMagnitude <= 0.05f) SFXClothes.Stop();
 		if ((vabs(relForward) + vabs(relSideways)) == 0) return;
 
-		if (rustleFinished < Eng_Global->pauseRelativeTime) {
-			rustleFinished = Eng_Global->pauseRelativeTime + (isSprinting ? random_range(0.4f,0.6f) : random_range(0.8f,1.2f));
+		if (rustleFinished < World->pauseRelativeTime) {
+			rustleFinished = World->pauseRelativeTime + (isSprinting ? random_range(0.4f,0.6f) : random_range(0.8f,1.2f));
 			AudioClip rustle = sounds[random_range_u32(459,465 + 1)];
 			Utils.PlayOneShotSavable(SFXClothes,rustle,random_range(0.3f,0.5f));
 		}
 
 		if (!grounded) return;
 
-		successfulRay = Raycast(Eng_Global->instances[i].position, Vector3.down,out tempHit,feetRayLength,Const.a.layerMaskPlayerFeet);
+		successfulRay = Raycast(World->instances[i].position, V3.down,out tempHit,feetRayLength,Const.a.layerMaskPlayerFeet);
 		if (tempHit.collider == null) return;
 		other = tempHit.collider.transform.gameObject;
 
 		// Footsteps
-		if (stepFinished < Eng_Global->pauseRelativeTime) {
-			stepFinished = Eng_Global->pauseRelativeTime + (isSprinting ? random_range(0.2f,0.3f) : random_range(0.35f,0.65f));
-			FootStepType fstep = GetFootstepTypeForPrefab(Eng_Global->instances[other].constIndex);
+		if (stepFinished < World->pauseRelativeTime) {
+			stepFinished = World->pauseRelativeTime + (isSprinting ? random_range(0.2f,0.3f) : random_range(0.35f,0.65f));
+			FootStepType fstep = GetFootstepTypeForPrefab(World->instances[other].constIndex);
 			AudioClip stcp = FootStepSound(fstep);
 			Utils.PlayOneShotSavable(SFXFootsteps,stcp,random_range(0.4f,0.55f));
 		}
@@ -299,7 +299,7 @@
 
 		float retval = maxWalkSpeed;
 		bonus = 0f;
-		if (Eng_Global->invP1.BoosterActive()) bonus = boosterSpeedBoost;
+		if (World->invP1.BoosterActive()) bonus = boosterSpeedBoost;
 		switch (bodyState) {
 			case BodyState_Standing: 		retval = maxWalkSpeed;   break;
 			case BodyState_Crouch: 			retval = maxCrouchSpeed; break;
@@ -310,8 +310,8 @@
 			case BodyState_ProningUp: 		retval = maxProneSpeed;  break;
 		}
 
-		if ((isSprinting || Eng_Global->invP1.BoosterActive()) && running) {
-			if (Eng_Global->instances[PLAYER1].fatigue > 80f && !Eng_Global->invP1.BoosterActive()) {
+		if ((isSprinting || World->invP1.BoosterActive()) && running) {
+			if (World->instances[PLAYER1].fatigue > 80f && !World->invP1.BoosterActive()) {
 				retval = maxSprintSpeedFatigued;
 			} else {
 				retval = maxSprintSpeed;
@@ -345,7 +345,7 @@
 		case BodyState_StandingUp:
 			lastCrouchRatio = currentCrouchRatio;
 			currentCrouchRatio = smooth_damp(currentCrouchRatio,1.01f, ref crouchingVelocity, transitionToCrouchSec);
-			LocalPositionSetY(transform,(((currentCrouchRatio - lastCrouchRatio) * capsuleHeight) / 2) + Eng_Global->instances[i].position.y);
+			LocalPositionSetY(transform,(((currentCrouchRatio - lastCrouchRatio) * capsuleHeight) / 2) + World->instances[i].position.y);
 			break;
 		case BodyState_ProningDown:
 			currentCrouchRatio = smooth_damp(currentCrouchRatio,-0.01f, ref crouchingVelocity, transitionToCrouchSec);
@@ -353,7 +353,7 @@
 		case BodyState_ProningUp: // Prone to crouch
 			lastCrouchRatio = currentCrouchRatio;
 			currentCrouchRatio = smooth_damp(currentCrouchRatio,1.01f, ref crouchingVelocity, (transitionToCrouchSec + transitionToProneAdd));
-			LocalPositionSetY(transform,(((currentCrouchRatio - lastCrouchRatio) * capsuleHeight) / 2) + Eng_Global->instances[i].position.y);
+			LocalPositionSetY(transform,(((currentCrouchRatio - lastCrouchRatio) * capsuleHeight) / 2) + World->instances[i].position.y);
 			break;
 		}
 	}
@@ -368,13 +368,13 @@
 		if (GetInput.a.StrafeRight()) relSideways = 1f;
 
 		// Now check for thumbstick/joystick input
-		Vector2 leftThumbstick = new Vector2(
+		V2 leftThumbstick = new V2(
 			Input.GetAxisRaw("JoyAxis1"), // Horizontal Left < 0, Right > 0
 			Input.GetAxisRaw("JoyAxis2") * -1f // Vertical Down > 0,
 											   //   Up < 0 Inverted
 		);
 
-		Vector2 leftTouchstick = GetInput.a.leftTS.Coordinate();
+		V2 leftTouchstick = GetInput.a.leftTS.Coordinate();
 		relForward += leftThumbstick.y + leftTouchstick.y;
 		relSideways += leftThumbstick.x + leftTouchstick.x;
 
@@ -432,10 +432,10 @@
 		}
 
 		tempVecRbody = rbody.velocity;
-		Vector3 movDir = rbody.velocity;
+		V3 movDir = rbody.velocity;
 		movDir.y = 0;
 		movDir = movDir.normalized;
-		if (Vector3.Dot(movDir,floorAng) < 0f && running) return;
+		if (V3.Dot(movDir,floorAng) < 0f && running) return;
 
 		deceleration = walkDeacceleration;
 		if (!grounded && ladderState < 1 && !justJumped) deceleration *= 1.5f;
@@ -447,7 +447,7 @@
 											  deceleration);
 			if (isSprinting && running) return;
 		} else {
-			if (Eng_Global->invP1.BoosterActive()) {
+			if (World->invP1.BoosterActive()) {
 				deceleration = walkDeaccelerationBooster;
 			}
 
@@ -495,7 +495,7 @@
 			leanShift = leanMaxShift * (leanTarget/(leanMaxAngle * -1));
 		}
 		leanTransform.localRotation = Quaternion.Euler(0, 0, leanTarget);
-		leanTransform.localPosition = (Vector3){leanShift,0,0);
+		leanTransform.localPosition = (V3){leanShift,0,0);
 	}
 
 	bool GetGravity() {
@@ -511,10 +511,10 @@
 			return true;
 		} else {
 			if (bodyLerpGravityOffDelayFinished == 0) {
-				bodyLerpGravityOffDelayFinished = Eng_Global->pauseRelativeTime + 0.25f;
+				bodyLerpGravityOffDelayFinished = World->pauseRelativeTime + 0.25f;
 			}
 
-			if (bodyLerpGravityOffDelayFinished > Eng_Global->pauseRelativeTime) {
+			if (bodyLerpGravityOffDelayFinished > World->pauseRelativeTime) {
 				return true;
 			}
 		}
@@ -529,9 +529,9 @@
 	// Get input for Jump and set impulse time, removed
 	// "&& (ladderState == 0)" since I want to be able to jump off a ladder
 	void Jump() {
-		if (CheatNoclip && !Eng_Global->invP1.JumpJetsActive()) return;
+		if (CheatNoclip && !World->invP1.JumpJetsActive()) return;
 
-		if (doubleJumpFinished < Eng_Global->pauseRelativeTime) {
+		if (doubleJumpFinished < World->pauseRelativeTime) {
 			doubleJumpTicks--;
 			if (doubleJumpTicks < 0) doubleJumpTicks = 0;
 		}
@@ -539,29 +539,29 @@
 		if ((!gravliftState && GetInput.a.Jump()) || gravliftState && GetInput.a.JumpDown()) {
 
 			if (!justJumped) {
-				if (grounded || gravliftState || Eng_Global->invP1.JumpJetsActive()) {
+				if (grounded || gravliftState || World->invP1.JumpJetsActive()) {
 					jumpTime = jumpImpulseTime;
-					doubleJumpFinished = Eng_Global->pauseRelativeTime + Const.doubleClickTime;
+					doubleJumpFinished = World->pauseRelativeTime + Const.doubleClickTime;
 					doubleJumpTicks++;
 					justJumped = true;
-					if (!Eng_Global->invP1.JumpJetsActive() && !Eng_Global->invP1.BoosterActive()) Eng_Global->instances[PLAYER1].fatigue += jumpFatigue;
+					if (!World->invP1.JumpJetsActive() && !World->invP1.BoosterActive()) World->instances[PLAYER1].fatigue += jumpFatigue;
 				} else {
 					if (ladderState > 1) {
 						jumpTime = jumpImpulseTime;
 						justJumped = true;
-						if (!Eng_Global->invP1.JumpJetsActive() && !Eng_Global->invP1.BoosterActive()) {
-							Eng_Global->instances[PLAYER1].fatigue += jumpFatigue;
+						if (!World->invP1.JumpJetsActive() && !World->invP1.BoosterActive()) {
+							World->instances[PLAYER1].fatigue += jumpFatigue;
 						}
 					}
 				}
 			}
 
-			if (Eng_Global->invP1.BoosterActive() && Eng_Global->invP1.BoosterSetToBoost()) {
+			if (World->invP1.BoosterActive() && World->invP1.BoosterSetToBoost()) {
 				if (justJumped && doubleJumpTicks == 2) {
 					// Booster thrust
-					rbody.AddForce((Vector3){transform.forward.x * burstForce, transform.forward.y * burstForce, transform.forward.z * burstForce), ForceMode.Impulse);
+					rbody.AddForce((V3){transform.forward.x * burstForce, transform.forward.y * burstForce, transform.forward.z * burstForce), ForceMode.Impulse);
 					PlayerHealth.a.makingNoise = true;
-					PlayerHealth.a.noiseFinished = Eng_Global->pauseRelativeTime + 0.5f;
+					PlayerHealth.a.noiseFinished = World->pauseRelativeTime + 0.5f;
 					TakeEnergy(22f);
 					if (BiomonitorGraphSystem.a != null) {
 						BiomonitorEnergyPulse(22f);
@@ -572,31 +572,31 @@
 					doubleJumpTicks = 0;
 
 					// Make sure we can't do it again right away.
-					doubleJumpFinished = Eng_Global->pauseRelativeTime - 1f;
+					doubleJumpFinished = World->pauseRelativeTime - 1f;
 				}
 			}
 		}
 
-		if (staminupActive || FatigueCheat) Eng_Global->instances[PLAYER1].fatigue = 0.0f;
+		if (staminupActive || FatigueCheat) World->instances[PLAYER1].fatigue = 0.0f;
 		
 		// Perform Jump
 		float jumpVelocityApply = jumpVelocity * rbody.mass;
-		Vector3 jumpVel = new Vector3 (0,jumpVelocityApply,0);
+		V3 jumpVel = new V3 (0,jumpVelocityApply,0);
 		float jumpTimeMod = jumpTime;
 		if (isSprinting) jumpTimeMod *= 0.5f;
 		while (jumpTimeMod > 0) { // Why is this a `while` instead of an `if`??
 							   // Because otherwise it don't work, duh!
 			jumpTimeMod -= Time.smoothDeltaTime;
-			if (Eng_Global->instances[PLAYER1].fatigue > 80.0f && !Eng_Global->invP1.JumpJetsActive()) {
+			if (World->instances[PLAYER1].fatigue > 80.0f && !World->invP1.JumpJetsActive()) {
 				jumpVelocityApply = jumpVelocityFatigued * rbody.mass;
 				jumpVel.y = jumpVelocityApply;
 			}
 
-			if (Eng_Global->invP1.JumpJetsActive()) {
+			if (World->invP1.JumpJetsActive()) {
 				float energysuck = 25f;
 				jumpVelocityApply = jumpVelocityBoots * rbody.mass;
 				jumpVel.y = jumpVelocityApply;
-				switch (Eng_Global->invP1.hardwareVersionSetting[10]) {
+				switch (World->invP1.hardwareVersionSetting[10]) {
 					case 0: energysuck = 11f; break;
 					case 1: energysuck = 26f; break;
 					case 2: energysuck = 22f; break;
@@ -604,8 +604,8 @@
 
 				if (PlayerEnergy.a.energy >= energysuck) {
 					rbody.AddForce(jumpVel,ForceMode.Force);  // huhnh!
-					if (jumpJetEnergySuckTickFinished < Eng_Global->pauseRelativeTime) {
-						jumpJetEnergySuckTickFinished = Eng_Global->pauseRelativeTime + jumpJetEnergySuckTick;
+					if (jumpJetEnergySuckTickFinished < World->pauseRelativeTime) {
+						jumpJetEnergySuckTickFinished = World->pauseRelativeTime + jumpJetEnergySuckTick;
 						TakeEnergy(energysuck);
 						if (BiomonitorGraphSystem.a != null) {
 							BiomonitorEnergyPulse(energysuck);
@@ -624,17 +624,17 @@
 			}
 		}
 
-		if (justJumped && !Eng_Global->invP1.JumpJetsActive()) {
+		if (justJumped && !World->invP1.JumpJetsActive()) {
 			// Play jump sound
-			if (jumpSFXFinished < Eng_Global->pauseRelativeTime) {
-				jumpSFXFinished = Eng_Global->pauseRelativeTime + jumpSFXIntervalTime;
+			if (jumpSFXFinished < World->pauseRelativeTime) {
+				jumpSFXFinished = World->pauseRelativeTime + jumpSFXIntervalTime;
 				SFX.pitch = 1f;
 				float jumpSFXVolume = 1.0f;
-				if (Eng_Global->instances[PLAYER1].fatigue > 80.0f) jumpSFXVolume = 0.5f; // Quietly, we tired.
+				if (World->instances[PLAYER1].fatigue > 80.0f) jumpSFXVolume = 0.5f; // Quietly, we tired.
 				
 				PlayerHealth.a.makingNoise = true;
-				PlayerHealth.a.noiseFinished = Eng_Global->pauseRelativeTime + 0.5f;
-				Raycast(Eng_Global->instances[i].position, Vector3.down,
+				PlayerHealth.a.noiseFinished = World->pauseRelativeTime + 0.5f;
+				Raycast(World->instances[i].position, V3.down,
 								out tempHit,feetRayLength,
 								Const.a.layerMaskPlayerFeet);
 				
@@ -649,7 +649,7 @@
 				if (prefID == null) { Utils.PlayOneShotSavable(SFX,SFXJump,jumpSFXVolume); return; }
 				
 				FootStepType fstep = GetFootstepTypeForPrefab(prefID.constIndex);
-				play_wav(sounds[JumpSound(fstep)],jumpSFXVolume,V3_AsubB(Eng_Global->instances[i].position,feetOffset),true);
+				play_wav(sounds[JumpSound(fstep)],jumpSFXVolume,V3_AsubB(World->instances[i].position,feetOffset),true);
 			}
 			justJumped = false;
 		}
@@ -665,10 +665,10 @@
 		float sidForce = 0f;
 		float forForce = 0f;
 		float upForce = 0f;
-		if (grounded || Eng_Global->invP1.JumpJetsActive()) {
+		if (grounded || World->invP1.JumpJetsActive()) {
 			// Ladder climb, allow while grounded
 			float bonus = 1f;
-			if (Eng_Global->invP1.JumpJetsActive()) bonus = 2f;
+			if (World->invP1.JumpJetsActive()) bonus = 2f;
 
 			sidForce = relSideways * walkAcceleration * Time.deltaTime;
 			forForce = relForward * walkAcceleration * Time.deltaTime;
@@ -679,12 +679,12 @@
 			rbody.AddRelativeForce(sidForce,upForce,forForce);
 		} else {
 			// Climbing off the ground
-			if (ladderSFXFinished < Eng_Global->pauseRelativeTime
+			if (ladderSFXFinished < World->pauseRelativeTime
 				&& rbody.velocity.y > ladderSpeed * 0.5f) {
 
 				SFX.pitch = (random_range(0.8f,1.2f));
 				Utils.PlayOneShotSavable(SFX,SFXLadder,0.2f);
-				ladderSFXFinished = Eng_Global->pauseRelativeTime
+				ladderSFXFinished = World->pauseRelativeTime
 									+ ladderSFXIntervalTime;
 			}
 
@@ -699,7 +699,7 @@
 			rbody.AddRelativeForce(sidForce,upForce,forForce);
 		}
 
-		if (Eng_Global->invP1.BoosterActive() && Eng_Global->invP1.BoosterSetToSkates()) {
+		if (World->invP1.BoosterActive() && World->invP1.BoosterSetToSkates()) {
 			deceleration = walkDeaccelerationBooster;
 		} else {
 			deceleration = walkDeacceleration;
@@ -730,16 +730,16 @@
 			forForce *= 2.00f;
 		}
 
-		Vector3 movDir = rbody.velocity;
+		V3 movDir = rbody.velocity;
 		movDir.y = 0;
 		movDir = movDir.normalized;
 		if (floorDot < 0.98f) {
-			if (Vector3.Dot(movDir,floorAng) < 0f) {
-				if (Eng_Global->invP1.BoosterActive()) forForce *= 2f;
+			if (V3.Dot(movDir,floorAng) < 0f) {
+				if (World->invP1.BoosterActive()) forForce *= 2f;
 			}
 		}
 
-		if (grounded || Eng_Global->invP1.JumpJetsActive()) {
+		if (grounded || World->invP1.JumpJetsActive()) {
 			// Normal walking
 			runTime += Time.deltaTime;
 			if (relForward == 0 && relSideways == 0) runTime = 0;
@@ -749,11 +749,11 @@
 			movDir.y = 0;
 			if (floorDot > 0.9f) rbody.velocity = movDir;
 			movDir = movDir.normalized;
-			if (fatigueFinished2 < Eng_Global->pauseRelativeTime && movDir.sqrMagnitude > 0f && grounded && (relForward != 0 || relSideways != 0)) {
-				fatigueFinished2 = Eng_Global->pauseRelativeTime + fatigueWaneTickSecs;
-				if (!Eng_Global->invP1.BoosterActive()) {
-					if (isSprinting) Eng_Global->instances[PLAYER1].fatigue += fatiguePerSprintTick;
-					else Eng_Global->instances[PLAYER1].fatigue += fatiguePerWalkTick;
+			if (fatigueFinished2 < World->pauseRelativeTime && movDir.sqrMagnitude > 0f && grounded && (relForward != 0 || relSideways != 0)) {
+				fatigueFinished2 = World->pauseRelativeTime + fatigueWaneTickSecs;
+				if (!World->invP1.BoosterActive()) {
+					if (isSprinting) World->instances[PLAYER1].fatigue += fatiguePerSprintTick;
+					else World->instances[PLAYER1].fatigue += fatiguePerWalkTick;
 				}
 			}
 		} else {
@@ -790,7 +790,7 @@
 		}
 		
 		if (velChange >= 3f) {
-			Raycast(Eng_Global->instances[i].position, Vector3.down,out tempHit,feetRayLength,Const.a.layerMaskPlayerFeet);
+			Raycast(World->instances[i].position, V3.down,out tempHit,feetRayLength,Const.a.layerMaskPlayerFeet);
 			if (tempHit.collider == null) return;
 			
 			GameObject hitGO = tempHit.collider.transform.gameObject;
@@ -804,7 +804,7 @@
 			
 			FootStepType fstep = GetFootstepTypeForPrefab(prefID.constIndex);
 			float vol = vmax(vmin(1f - ((fallDamageSpeed - velChange) / fallDamageSpeed),1f),0.5f);
-			play_wav(sounds[JumpLandSound(fstep)],vol,V3_AsubB(Eng_Global->instances[i].position,feetOffset),true);
+			play_wav(sounds[JumpLandSound(fstep)],vol,V3_AsubB(World->instances[i].position,feetOffset),true);
 		}
 	}
 
@@ -813,7 +813,7 @@
 		if (CheatNoclip) return;
 
 		leanTransform.localRotation = Quaternion.Euler(0, 0, 0);
-		leanTransform.localPosition = (Vector3){0,0,0);
+		leanTransform.localPosition = (V3){0,0,0);
 		if (rbody.velocity.magnitude > maxCyberUltimateSpeed) {
 			// Limit movement speed in all axes x,y,z in cyberspace
 			RigidbodySetVelocity(rbody, maxCyberUltimateSpeed);
@@ -822,57 +822,57 @@
 		inputtingMovement = false;
 
 		if (GetInput.a.Forward()) {
-			if (turboFinished > Eng_Global->pauseRelativeTime) {
-				if (Vector3.Project(rbody.velocity, (cameraObject.transform.forward)).magnitude < playerSpeed * 2f)
+			if (turboFinished > World->pauseRelativeTime) {
+				if (V3.Project(rbody.velocity, (cameraObject.transform.forward)).magnitude < playerSpeed * 2f)
 					rbody.AddForce(cameraObject.transform.forward * walkAcceleration * 1.3f * 2f * Time.deltaTime,ForceMode.Acceleration); // double speed with turbo on
 			} else {
-				if (Vector3.Project(rbody.velocity, cameraObject.transform.forward).magnitude < playerSpeed)
+				if (V3.Project(rbody.velocity, cameraObject.transform.forward).magnitude < playerSpeed)
 					rbody.AddForce(cameraObject.transform.forward * walkAcceleration * 1.3f * Time.deltaTime,ForceMode.Acceleration);
 			}
 			inputtingMovement = true;
 		}
 
 		if (GetInput.a.Backpedal()) {
-			if (turboFinished > Eng_Global->pauseRelativeTime) {
-				if (Vector3.Project(rbody.velocity, (cameraObject.transform.forward * -1f)).magnitude < playerSpeed * 2f)
+			if (turboFinished > World->pauseRelativeTime) {
+				if (V3.Project(rbody.velocity, (cameraObject.transform.forward * -1f)).magnitude < playerSpeed * 2f)
 				rbody.AddForce(cameraObject.transform.forward * walkAcceleration * 1.3f * 2f * Time.deltaTime * -1f,ForceMode.Acceleration); // double speed with turbo on
 			} else {
-				if (Vector3.Project(rbody.velocity, cameraObject.transform.forward * -1f).magnitude < playerSpeed) 
+				if (V3.Project(rbody.velocity, cameraObject.transform.forward * -1f).magnitude < playerSpeed) 
 				rbody.AddForce(cameraObject.transform.forward * walkAcceleration * 1.3f * Time.deltaTime * -1f,ForceMode.Acceleration);
 			}
 			inputtingMovement = true;
 		}
 
 		if (GetInput.a.StrafeLeft()) {
-			if (turboFinished > Eng_Global->pauseRelativeTime) {
-				if (Vector3.Project(rbody.velocity, (cameraObject.transform.right * -1f)).magnitude < playerSpeed * 2f)
+			if (turboFinished > World->pauseRelativeTime) {
+				if (V3.Project(rbody.velocity, (cameraObject.transform.right * -1f)).magnitude < playerSpeed * 2f)
 				rbody.AddForce(cameraObject.transform.right * walkAcceleration * 1.3f * 2f * Time.deltaTime * -1f,ForceMode.Acceleration); // double speed with turbo on
 			} else {
-				if (Vector3.Project(rbody.velocity, cameraObject.transform.right * -1f).magnitude < playerSpeed) 
+				if (V3.Project(rbody.velocity, cameraObject.transform.right * -1f).magnitude < playerSpeed) 
 				rbody.AddForce(cameraObject.transform.right * walkAcceleration * 1.3f * Time.deltaTime * -1f,ForceMode.Acceleration);
 			}
 			inputtingMovement = true;
 		}
 
 		if (GetInput.a.StrafeRight()) {
-			if (turboFinished > Eng_Global->pauseRelativeTime) {
-				if (Vector3.Project(rbody.velocity, cameraObject.transform.right).magnitude < playerSpeed * 2f)
+			if (turboFinished > World->pauseRelativeTime) {
+				if (V3.Project(rbody.velocity, cameraObject.transform.right).magnitude < playerSpeed * 2f)
 				rbody.AddForce(cameraObject.transform.right * walkAcceleration * 1.3f * 2f * Time.deltaTime,ForceMode.Acceleration); // double speed with turbo on
 			} else {
-				if (Vector3.Project(rbody.velocity, cameraObject.transform.right).magnitude < playerSpeed) 
+				if (V3.Project(rbody.velocity, cameraObject.transform.right).magnitude < playerSpeed) 
 				rbody.AddForce(cameraObject.transform.right * walkAcceleration * 1.3f * Time.deltaTime,ForceMode.Acceleration);
 			}
 			inputtingMovement = true;
 		}
 
-		if (Eng_Global->diffCyb > 1) {
+		if (World->diffCyb > 1) {
 			if (rbody.velocity.magnitude < walkAcceleration * 0.05f) {
 				tempVec = MouseCursor.a.GetCursorScreenPointForRay();
 				tempVec = MouseLookScript.a.playerCamera.ScreenPointToRay(tempVec).direction;
 				rbody.AddForce(tempVec * walkAcceleration*0.05f * Time.deltaTime); // turbo doesn't affect detrimental forces :)
 			}
 		} else {
-			if (!inputtingMovement && !inCyberTube) rbody.velocity = (Vector3){0.0f,0.0f,0.0f};
+			if (!inputtingMovement && !inCyberTube) rbody.velocity = (V3){0.0f,0.0f,0.0f};
 		}
 	}
 
@@ -884,8 +884,8 @@
 		if (GetInput.a.SwimDn()) rbody.AddRelativeForce(0, 4f * walkAcceleration * Time.deltaTime * -1, 0);
 	}
 
-	Vector2 GetClampedHorizontalMovement() {
-		horizontalMovement = new Vector2(rbody.velocity.x, rbody.velocity.z);
+	V2 GetClampedHorizontalMovement() {
+		horizontalMovement = new V2(rbody.velocity.x, rbody.velocity.z);
 		if (horizontalMovement.magnitude > playerSpeed) {
 			horizontalMovement = horizontalMovement.normalized;
 			horizontalMovement *= playerSpeed; // Cap velocity to current max.
@@ -901,28 +901,28 @@
 	}
 
 	void FatigueApply() {
-		if (Eng_Global->instances[PLAYER1].fatigue > 100.0f) Eng_Global->instances[PLAYER1].fatigue = 100.0f; // Clamp at 100% maximum
-		if (Eng_Global->instances[PLAYER1].fatigue <   0.0f) Eng_Global->instances[PLAYER1].fatigue =   0.0f; // Clamp at   0% minimum.
-		if (Eng_Global->instances[PLAYER1].fatigue > 80.0f && !fatigueWarned && !inCyberSpace) {
-			twm.SendWarning(Eng_Text->stringTable[868],0.1f,0,HUDColor.White,324);
+		if (World->instances[PLAYER1].fatigue > 100.0f) World->instances[PLAYER1].fatigue = 100.0f; // Clamp at 100% maximum
+		if (World->instances[PLAYER1].fatigue <   0.0f) World->instances[PLAYER1].fatigue =   0.0f; // Clamp at   0% minimum.
+		if (World->instances[PLAYER1].fatigue > 80.0f && !fatigueWarned && !inCyberSpace) {
+			twm.SendWarning(Text->stringTable[868],0.1f,0,HUDColor.White,324);
 			fatigueWarned = true;
 		} else fatigueWarned = false;
 
 		if (inCyberSpace) return;
-		if (CheatNoclip || FatigueCheat) { Eng_Global->instances[PLAYER1].fatigue = 0.0f; return; }
-		if (fatigueFinished >= Eng_Global->pauseRelativeTime) return;
+		if (CheatNoclip || FatigueCheat) { World->instances[PLAYER1].fatigue = 0.0f; return; }
+		if (fatigueFinished >= World->pauseRelativeTime) return;
 
-		fatigueFinished = Eng_Global->pauseRelativeTime + fatigueWaneTickSecs;
+		fatigueFinished = World->pauseRelativeTime + fatigueWaneTickSecs;
 		switch (bodyState) {
-			case BodyState_Standing:    Eng_Global->instances[PLAYER1].fatigue -= fatigueWanePerTick; break;
-			case BodyState_Crouch:      Eng_Global->instances[PLAYER1].fatigue -= fatigueWanePerTickCrouched; break;
-			case BodyState_StandingUp:  Eng_Global->instances[PLAYER1].fatigue -= fatigueWanePerTickCrouched; break;
-			case BodyState_ProningDown: Eng_Global->instances[PLAYER1].fatigue -= fatigueWanePerTickCrouched; break;
-			case BodyState_Prone:       Eng_Global->instances[PLAYER1].fatigue -= fatigueWanePerTickProne; break;
-			case BodyState_ProningUp:   Eng_Global->instances[PLAYER1].fatigue -= fatigueWanePerTickProne; break;
-			default:                    Eng_Global->instances[PLAYER1].fatigue -= fatigueWanePerTick; break;
+			case BodyState_Standing:    World->instances[PLAYER1].fatigue -= fatigueWanePerTick; break;
+			case BodyState_Crouch:      World->instances[PLAYER1].fatigue -= fatigueWanePerTickCrouched; break;
+			case BodyState_StandingUp:  World->instances[PLAYER1].fatigue -= fatigueWanePerTickCrouched; break;
+			case BodyState_ProningDown: World->instances[PLAYER1].fatigue -= fatigueWanePerTickCrouched; break;
+			case BodyState_Prone:       World->instances[PLAYER1].fatigue -= fatigueWanePerTickProne; break;
+			case BodyState_ProningUp:   World->instances[PLAYER1].fatigue -= fatigueWanePerTickProne; break;
+			default:                    World->instances[PLAYER1].fatigue -= fatigueWanePerTick; break;
 		}
-		if (Eng_Global->instances[PLAYER1].fatigue < 0) Eng_Global->instances[PLAYER1].fatigue = 0; // Clamp at 0% minimum.
+		if (World->instances[PLAYER1].fatigue < 0) World->instances[PLAYER1].fatigue = 0; // Clamp at 0% minimum.
 	}
 
 	void EndCrouchProneTransition() {
@@ -968,7 +968,7 @@
 			if (bodyState == BodyState_Prone || bodyState == BodyState_ProningDown) {
 				if (CantStand()) {
 					if (CantCrouch()) {
-						CenterStatusPrint("%s", Eng_Text->stringTable[188]);
+						CenterStatusPrint("%s", Text->stringTable[188]);
 						return; // Can't crouch here
 					} else bodyState = BodyState_ProningUp; // Can't stand, but can crouch here
 
@@ -991,16 +991,16 @@
 		float ofsY = ((1f - Const.a.playerCameraOffsetY) + 0.02f
 					 + ((1f - currentCrouchRatio) * 1.6f)); // Crouch/Prone add
 
-		Vector3 ofs = (Vector3){0f,ofsY,0f);
-		return Physics.CheckCapsule(cameraObject.Eng_Global->instances[i].position,
-									cameraObject.Eng_Global->instances[i].position + ofs,
+		V3 ofs = (V3){0f,ofsY,0f);
+		return Physics.CheckCapsule(cameraObject.World->instances[i].position,
+									cameraObject.World->instances[i].position + ofs,
 									capsuleRadius,layerMask);
 	}
 
 	bool CantCrouch() {
-		return Physics.CheckCapsule(cameraObject.Eng_Global->instances[i].position,
-									cameraObject.Eng_Global->instances[i].position
-									+ (Vector3){0f,0.2f,0f),
+		return Physics.CheckCapsule(cameraObject.World->instances[i].position,
+									cameraObject.World->instances[i].position
+									+ (V3){0f,0.2f,0f),
 									capsuleRadius,layerMask);
 	}
 
@@ -1011,14 +1011,14 @@
 		if (!GetInput.a.Crouch()) return;
 
 		if ((bodyState == BodyState_Crouch) || (bodyState == BodyState_CrouchingDown)) {
-			if (CantStand()) CenterStatusPrint("%s", Eng_Text->stringTable[187]); // Can't stand here
+			if (CantStand()) CenterStatusPrint("%s", Text->stringTable[187]); // Can't stand here
 			else bodyState = BodyState_StandingUp; // Start standing up
 		} else {
 			if ((bodyState == BodyState_Standing) || (bodyState == BodyState_StandingUp)) {
 				bodyState = BodyState_CrouchingDown; // Start crouching down
 			} else {
 				if ((bodyState == BodyState_Prone) || (bodyState == BodyState_ProningDown)) {
-					if ((CantCrouch())) { CenterStatusPrint("%s", Eng_Text->stringTable[188]); return; } // Can't crouch here
+					if ((CantCrouch())) { CenterStatusPrint("%s", Text->stringTable[188]); return; } // Can't crouch here
 					
 					bodyState = BodyState_ProningUp; // Start getting up to crouch
 				}
@@ -1073,7 +1073,7 @@
 
 	// Reset grounded to false when player is mid-air
 	void OnCollisionExit (){
-		if (!Eng_Global->gamePaused && !Eng_Global->menuActive) {
+		if (!World->gamePaused && !World->menuActive) {
 			// Automatically set grounded to false to prevent ability to climb any wall (Cheat!)
 			if (!CheatWallSticky) {
 				grounded = false;
@@ -1085,17 +1085,17 @@
 
 	// Sets grounded based on normal angle of the impact point (NOTE: This is not the surface normal!)
 	void OnCollisionStay(Collision collision) {
-		if (Eng_Global->gamePaused || inCyberSpace) return;
+		if (World->gamePaused || inCyberSpace) return;
 		
 		int contactCount = collision.contactCount;
 		float maxSlope = 0.35f;
-		if (Eng_Global->invP1.BoosterActive()) maxSlope = 0.7f;
+		if (World->invP1.BoosterActive()) maxSlope = 0.7f;
 		for(tempInt=0;tempInt<collision.contactCount;tempInt++) {
 			contactPoint = collision.GetContact(tempInt);;
 			floorAng = contactPoint.normal;
-			floorDot = Vector3.Dot(floorAng,Vector3.up);
+			floorDot = V3.Dot(floorAng,V3.up);
 			if (floorDot <= 1f && floorDot >= maxSlope) {
-				if (!grounded) stepFinished = Eng_Global->pauseRelativeTime;
+				if (!grounded) stepFinished = World->pauseRelativeTime;
 				grounded = true;
 				return;
 			}

@@ -35,17 +35,17 @@ public class SystemAnalyzer : MonoBehaviour {
 	}
     // Start is called before the first frame update
     void Update() {
-		descSecurity.text = Eng_Text->stringTable[474];
-		security.text = LevelManager.a.levelSecurity[LevelManager.a.currentLevel] + Eng_Text->stringTable[307];
-		descLaser.text = Eng_Text->stringTable[475];
-		laser.text = Const.a.questData.LaserDestroyed ? Eng_Text->stringTable[486] : Eng_Text->stringTable[485];
-		descLifepod.text = Eng_Text->stringTable[476];
-		lifepod.text = Const.a.questData.SelfDestructActivated ? Eng_Text->stringTable[488] : Eng_Text->stringTable[487];
-		descShield.text = Eng_Text->stringTable[477];
-		shield.text = Const.a.questData.ShieldActivated ? Eng_Text->stringTable[490] : Eng_Text->stringTable[489];
-		descReactor.text = Eng_Text->stringTable[478];
-		reactor.text = Const.a.questData.SelfDestructActivated ? Eng_Text->stringTable[491] : Eng_Text->stringTable[492];
-		descProcessor.text = Eng_Text->stringTable[479];
+		descSecurity.text = Text->stringTable[474];
+		security.text = LevelManager.a.levelSecurity[LevelManager.a.currentLevel] + Text->stringTable[307];
+		descLaser.text = Text->stringTable[475];
+		laser.text = Const.a.questData.LaserDestroyed ? Text->stringTable[486] : Text->stringTable[485];
+		descLifepod.text = Text->stringTable[476];
+		lifepod.text = Const.a.questData.SelfDestructActivated ? Text->stringTable[488] : Text->stringTable[487];
+		descShield.text = Text->stringTable[477];
+		shield.text = Const.a.questData.ShieldActivated ? Text->stringTable[490] : Text->stringTable[489];
+		descReactor.text = Text->stringTable[478];
+		reactor.text = Const.a.questData.SelfDestructActivated ? Text->stringTable[491] : Text->stringTable[492];
+		descProcessor.text = Text->stringTable[479];
 		int nodeCount = 0;
 		for (int i=0;i<14;i++) {
 			nodeCount += LevelManager.a.levelSmallNodeCount[i];
@@ -54,31 +54,31 @@ public class SystemAnalyzer : MonoBehaviour {
 			nodeCount -= LevelManager.a.levelLargeNodeDestroyedCount[i];
 		}
 		processor.text = nodeCount.ToString();
-		descProgram.text = Eng_Text->stringTable[480];
+		descProgram.text = Text->stringTable[480];
 		if (!Const.a.questData.LaserDestroyed) {
-			program.text = Eng_Text->stringTable[494];
+			program.text = Text->stringTable[494];
 		} else {
 			if (!Const.a.questData.BetaGroveJettisoned) {
-				program.text = Eng_Text->stringTable[495];
+				program.text = Text->stringTable[495];
 			} else {
 				if (!(Const.a.questData.AntennaNorthDestroyed && Const.a.questData.AntennaSouthDestroyed && Const.a.questData.AntennaWestDestroyed && Const.a.questData.AntennaEastDestroyed)) {
-					program.text = Eng_Text->stringTable[496];
+					program.text = Text->stringTable[496];
 				} else {
 					if (!Const.a.questData.BridgeSeparated) {
-						program.text = Eng_Text->stringTable[497];
+						program.text = Text->stringTable[497];
 					} else {
-						program.text = Eng_Text->stringTable[498];
+						program.text = Text->stringTable[498];
 					}
 				}
 			}
 		}
-		descAlpha.text = Eng_Text->stringTable[481];
-		alpha.text = Eng_Text->stringTable[492];
-		descBeta.text = Eng_Text->stringTable[482];
-		beta.text = Const.a.questData.BetaGroveJettisoned ? Eng_Text->stringTable[493] : Eng_Text->stringTable[492];
-		descGamma.text = Eng_Text->stringTable[483];
-		gamma.text = Eng_Text->stringTable[493];
-		descDelta.text = Eng_Text->stringTable[484];
-		delta.text = Eng_Text->stringTable[492];
+		descAlpha.text = Text->stringTable[481];
+		alpha.text = Text->stringTable[492];
+		descBeta.text = Text->stringTable[482];
+		beta.text = Const.a.questData.BetaGroveJettisoned ? Text->stringTable[493] : Text->stringTable[492];
+		descGamma.text = Text->stringTable[483];
+		gamma.text = Text->stringTable[493];
+		descDelta.text = Text->stringTable[484];
+		delta.text = Text->stringTable[492];
 	}
 }

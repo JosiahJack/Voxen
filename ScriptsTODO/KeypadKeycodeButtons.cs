@@ -113,8 +113,8 @@ public class KeypadKeycodeButtons : MonoBehaviour {
 	}
 
 	void Update() {
-		if (Eng_Global->gamePaused) return;
-		if (Eng_Global->menuActive)  return;
+		if (World->gamePaused) return;
+		if (World->menuActive)  return;
 		if (keypad == null) return;
 
 		digit1s.digitIndex = entryOnes;

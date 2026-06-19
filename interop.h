@@ -125,7 +125,7 @@ ENGINE_TO_MOD double get_time(void);
 ENGINE_TO_MOD float lerp(float min, float max, float val);
 ENGINE_TO_MOD float inverse_lerp(float min, float max, float val);
 ENGINE_TO_MOD float smooth_damp(float current, float target, float *current_velocity, float smooth_time);
-ENGINE_TO_MOD void play_wav(const char* path, float volume, Vector3 pos, bool positional);
+ENGINE_TO_MOD void play_wav(const char* path, float volume, V3 pos, bool positional);
 ENGINE_TO_MOD void play_message(const char* path);
 ENGINE_TO_MOD void play_mp3(const char* path, i32 fade_in_ms);
 ENGINE_TO_MOD void mp3_clear(void);
@@ -136,11 +136,11 @@ ENGINE_TO_MOD void MP3Resume(void);
 ENGINE_TO_MOD bool sEmpty(const char* a);
 ENGINE_TO_MOD bool sEqual(const char* a, const char* b);
 ENGINE_TO_MOD void scpy_to_a_from_b(char* a, const char* b, size_t bufferSize);
-ENGINE_TO_MOD RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, u32 layerMask);
-ENGINE_TO_MOD void RaycastAll(Vector3 origin, Vector3 dir, float distance, u32 layerMask, RaycastHit* hits, u16 maxCount);
-ENGINE_TO_MOD RaycastHit CapsuleCast(Vector3 start, Vector3 end, float capsuleRadius, float castDist, u32 layerMask, bool hitTriggers);
-ENGINE_TO_MOD bool CheckCapsule(Vector3 start, Vector3 end, float capsuleRadius, float capsuleHeight, u32 layerMask);
-ENGINE_TO_MOD void AddDebugLine(Vector3 start, Vector3 end, Color col);
+ENGINE_TO_MOD RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask);
+ENGINE_TO_MOD void RaycastAll(V3 origin, V3 dir, float distance, u32 layerMask, RaycastHit* hits, u16 maxCount);
+ENGINE_TO_MOD RaycastHit CapsuleCast(V3 start, V3 end, float capsuleRadius, float castDist, u32 layerMask, bool hitTriggers);
+ENGINE_TO_MOD bool CheckCapsule(V3 start, V3 end, float capsuleRadius, float capsuleHeight, u32 layerMask);
+ENGINE_TO_MOD void AddWireLine(V3 start, V3 end, Color col);
 ENGINE_TO_MOD i32 PosGetCellCoords(float pos_x, float pos_z);
 ENGINE_TO_MOD int sFormat(char* buffer, size_t bufferSize, const char* format, ...); // snprintf replacement
 ENGINE_TO_MOD bool PositionVisibleFromPlayerCell(float x, float z);
@@ -157,27 +157,27 @@ ENGINE_TO_MOD void ToggleConsole(void);
 ENGINE_TO_MOD void MenuGoBack(void);
 ENGINE_TO_MOD void IgnoreNextMouseDelta(void);
 ENGINE_TO_MOD void ApplyPlayerMovements(void);
-ENGINE_TO_MOD void AddForce(u16 idx, Vector3 force, bool isImpulse);
+ENGINE_TO_MOD void AddForce(u16 idx, V3 force, bool isImpulse);
 ENGINE_TO_MOD void CenterStatusPrint(const char* fmt, ...);
 ENGINE_TO_MOD void PortalCulling(void);
 ENGINE_TO_MOD char* sLevelFileUpToEndLine(char* buf, int size);
 ENGINE_TO_MOD void LoadLevel(u8 curlevel);
 ENGINE_TO_MOD void LoadFieldIntoLight(char* trimmed_key, char* trimmed_value, char* initialLine, u32 lineNum, Light* lit, LightAnimation* lan, u16 lightIdx);
 ENGINE_TO_MOD i32 AddLight(Light* lit, LightAnimation* lanim);
-ENGINE_TO_MOD void UpdateLight(u16 lightsIdx, Vector3 pos, Color3 col, float range, float intensity, float maxIntensity, float minIntensity, float spotAng, Quaternion spotDir, bool on, bool shadOn);
+ENGINE_TO_MOD void UpdateLight(u16 lightsIdx, V3 pos, Color3 col, float range, float intensity, float maxIntensity, float minIntensity, float spotAng, Quaternion spotDir, bool on, bool shadOn);
 ENGINE_TO_MOD void InitializeEntity(Entity* entry);
 ENGINE_TO_MOD size_t slen(const char* s);
 ENGINE_TO_MOD char* StringFindFirstCharWithin(const char *s, char c);
 ENGINE_TO_MOD bool cEmpty(const char c);
 ENGINE_TO_MOD void AddDoorPortal(u16 entIdx, u16 parent);
 ENGINE_TO_MOD bool ToggleDoorPortal(u8 portalIdx, u16 doorIdx, u16 closedModelIndex);
-ENGINE_TO_MOD Vector3 GetLocalTransformedPos(Entity* originator, Vector3 offsetFromOriginator);
+ENGINE_TO_MOD V3 GetLocalTransformedPos(Entity* originator, V3 offsetFromOriginator);
 ENGINE_TO_MOD void TurnLightOff(u16 litIdx);
-ENGINE_TO_MOD void AddCamView(Vector3 pos, Quaternion rot, u8 fov, u16 width, u16 height, float near, float far);
-ENGINE_TO_MOD void SetPosition(Entity* e, Vector3 newpos, bool teleport);
+ENGINE_TO_MOD void AddCamView(V3 pos, Quaternion rot, u8 fov, u16 width, u16 height, float near, float far);
+ENGINE_TO_MOD void SetPosition(Entity* e, V3 newpos, bool teleport);
 
 // Common inlines that need to span both engine and gamecode
-static inline __attribute__((always_inline)) u32 parse_numberu32(const char* str, const char* line, u32 lineNum) {
+INLINE u32 parse_numberu32(const char* str, const char* line, u32 lineNum) {
     if (str == 0 || *str == '\0') { DualLogError("Invalid blank string from line[%d]: %s\n", lineNum+1, line); return 0; }
     while (cEmpty((char)*str)) str++;
     while (cEmpty(*str)) str++;
@@ -193,10 +193,10 @@ static inline __attribute__((always_inline)) u32 parse_numberu32(const char* str
     return (u32)result;
 }
 
-static inline __attribute__((always_inline)) u16 parse_numberu16(const char* str, const char* line, u32 lineNum) { u32 retval = parse_numberu32(str, line, lineNum); if (retval > U16_MAX) { DualLogError("Value %u out of range for u16 from line[%d]: %s\n", retval, lineNum+1, line); return 0; } return (u16)retval; }
-static inline __attribute__((always_inline)) u8 parse_numberu8(const char* str, const char* line, u32 lineNum) { u32 retval = parse_numberu32(str, line, lineNum); if (retval > U8_MAX) { DualLogError("Value %u out of range for u8 from line[%d]: %s\n", retval, lineNum+1, line); return 0; } return (u8)retval; }
-static inline __attribute__((always_inline)) bool parse_bool(const char* str, const char* line, u32 lineNum) { u32 parseval = parse_numberu32(str, line, lineNum); if (parseval > 1) {DualLogWarn("Loaded %u but expected boolean from line[%u]: %s\n",parseval, lineNum+1, line);} return parseval > 0 ? true : false; }
-static inline __attribute__((always_inline)) i32 parse_numberi32(const char* str, const char* line, u32 lineNum) {
+INLINE u16 parse_numberu16(const char* str, const char* line, u32 lineNum) { u32 retval = parse_numberu32(str, line, lineNum); if (retval > U16_MAX) { DualLogError("Value %u out of range for u16 from line[%d]: %s\n", retval, lineNum+1, line); return 0; } return (u16)retval; }
+INLINE u8 parse_numberu8(const char* str, const char* line, u32 lineNum) { u32 retval = parse_numberu32(str, line, lineNum); if (retval > U8_MAX) { DualLogError("Value %u out of range for u8 from line[%d]: %s\n", retval, lineNum+1, line); return 0; } return (u8)retval; }
+INLINE bool parse_bool(const char* str, const char* line, u32 lineNum) { u32 parseval = parse_numberu32(str, line, lineNum); if (parseval > 1) {DualLogWarn("Loaded %u but expected boolean from line[%u]: %s\n",parseval, lineNum+1, line);} return parseval > 0 ? true : false; }
+INLINE i32 parse_numberi32(const char* str, const char* line, u32 lineNum) {
     if (str == 0 || *str == '\0') { DualLogError("Invalid blank string from line[%d]: %s\n", lineNum+1, line); return 0; }
     while (cEmpty((char)*str)) str++;
     bool negative = false;
@@ -206,9 +206,9 @@ static inline __attribute__((always_inline)) i32 parse_numberi32(const char* str
     while (*str >= '0' && *str <= '9') { result = result * 10L + (*str - '0'); str++; }
     return (i32)(negative ? -result : result);
 }
-static inline __attribute__((always_inline)) i16 parse_numberi16(const char* str, const char* line, u32 lineNum) { i32 retval = parse_numberi32(str, line, lineNum); if (retval < -32768 || retval > 32767) { DualLogError("Value %d out of range for i16 from line[%d]: %s\n", retval, lineNum+1, line); return 0; } return (i16)retval; }
-static inline __attribute__((always_inline)) i8 parse_numberi8(const char* str, const char* line, u32 lineNum) { i32 retval = parse_numberi32(str, line, lineNum); if (retval < -128 || retval > 127) { DualLogError("Value %d out of range for i8 from line[%d]: %s\n", retval, lineNum+1, line); return 0; } return (i8)retval; }
-static inline __attribute__((always_inline)) float parse_float(const char* str, const char* line, u32 lineNum) {
+INLINE i16 parse_numberi16(const char* str, const char* line, u32 lineNum) { i32 retval = parse_numberi32(str, line, lineNum); if (retval < -32768 || retval > 32767) { DualLogError("Value %d out of range for i16 from line[%d]: %s\n", retval, lineNum+1, line); return 0; } return (i16)retval; }
+INLINE i8 parse_numberi8(const char* str, const char* line, u32 lineNum) { i32 retval = parse_numberi32(str, line, lineNum); if (retval < -128 || retval > 127) { DualLogError("Value %d out of range for i8 from line[%d]: %s\n", retval, lineNum+1, line); return 0; } return (i8)retval; }
+INLINE float parse_float(const char* str, const char* line, u32 lineNum) {
     if (str == 0 || *str == '\0') { DualLogError("Invalid blank string from line[%d]: %s\n", lineNum+1, line); return 0.0f; }
     
     while (cEmpty(*str)) str++;

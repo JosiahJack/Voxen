@@ -68,7 +68,7 @@
 		hardwareButtonsContainer.SetActive(false);
 		viewWeaponsContainer.SetActive(false);
 		CyberTimer ct = cyberTimer.GetComponent<CyberTimer>();
-		if (ct != null) ct.Reset(Eng_Global->diffCyb);
+		if (ct != null) ct.Reset(World->diffCyb);
 		CenterTabButtonClickSilent(3,true);
 		
 	}
@@ -82,7 +82,7 @@
 		ctbButtonMain.SetActive(true);
 		ctbButtonHardware.SetActive(true);
 		ctbButtonGeneral.SetActive(true);
-		if (Eng_Global->invP1.hardwareIsActive[3]) Eng_UI->hwb.UnhideSensaround();
+		if (World->invP1.hardwareIsActive[3]) Eng_UI->hwb.UnhideSensaround();
 		tabButtonsLHButtons.SetActive(true);
 		tabButtonsRHButtons.SetActive(true);
 		Config.SetSEGI(); // Turn it back on if setting is on.
@@ -195,9 +195,9 @@
 		float checkVal = 0;
 		if (health) {
 			if (MouseLookScript.a.inCyberSpace) {
-				checkVal = Eng_Global->instances[PLAYER1].cyberHealth;
+				checkVal = World->instances[PLAYER1].cyberHealth;
 			} else {
-				checkVal = Eng_Global->instances[PLAYER1].health;
+				checkVal = World->instances[PLAYER1].health;
 			}
 		} else {
 			checkVal = PlayerEnergy.a.energy;
@@ -230,9 +230,9 @@
 		for (int i=0; i<7; i++) {
 			WeaponButton wepbut = wepbutMan.wepButtonsScripts[i];
 			GameObject buttonGO = wepbut.gameObject;
-			if (Eng_Global->invP1.weaponInventoryIndices[i] > 0) {
+			if (World->invP1.weaponInventoryIndices[i] > 0) {
 				if (!buttonGO.activeInHierarchy) buttonGO.SetActive(true);
-				wepbut.useableItemIndex = Eng_Global->invP1.weaponInventoryIndices[i];
+				wepbut.useableItemIndex = World->invP1.weaponInventoryIndices[i];
 				if (!wepbutMan.wepCountsText[i].activeInHierarchy) {
 					wepbutMan.wepCountsText[i].SetActive(true);
 				}
@@ -374,25 +374,25 @@
 			// General Inventory
 			// ----------------------------------------------------------------
 			GameObject invbtn = 
-				Eng_Global->invP1.genButtons[Eng_Global->invP1.generalInvCurrent];
+				World->invP1.genButtons[World->invP1.generalInvCurrent];
 
 			if (invbtn != null) {
 				invbtn.GetComponent<GeneralInvButton>().DoubleClick();
 			}
 
-			int nextIndex = Eng_Global->invP1.generalInvIndex - 1;
+			int nextIndex = World->invP1.generalInvIndex - 1;
 			if (nextIndex < 0) nextIndex = 0;
-			Eng_Global->invP1.generalInvIndex = nextIndex;
+			World->invP1.generalInvIndex = nextIndex;
 
 			// Set item tab to next general inv current.
-			SendInfoToItemTab(Eng_Global->invP1.generalInvIndex);
+			SendInfoToItemTab(World->invP1.generalInvIndex);
 		} else {
 			// Patches
 			// ----------------------------------------------------------------
-			Eng_Global->invP1.patchButtonScripts[Eng_Global->invP1.patchCurrent].DoubleClick();
+			World->invP1.patchButtonScripts[World->invP1.patchCurrent].DoubleClick();
 
 			// Set item tab to next patch.
-			SendInfoToItemTab(Eng_Global->invP1.patchIndex);
+			SendInfoToItemTab(World->invP1.patchIndex);
 		}
 	}
 
@@ -407,12 +407,12 @@
 				return;
 			}
 			for (int i=0;i<4;i++) {
-				if (contEng_Global->instances[i] > -1) {
+				if (contWorld->instances[i] > -1) {
 					searchCloseButtonRH.SetActive(true);
 					searchItemImagesRH[i].SetActive(true);
 					searchItemImagesRH[i].GetComponent<Image>().overrideSprite = null;
-					searchItemImagesRH[i].GetComponent<Image>().overrideSprite = Const.a.GetSpriteFromTexture(contEng_Global->instances[i]);
-					searchContainerRH.contEng_Global->instances[i] = contEng_Global->instances[i];
+					searchItemImagesRH[i].GetComponent<Image>().overrideSprite = Const.a.GetSpriteFromTexture(contWorld->instances[i]);
+					searchContainerRH.contWorld->instances[i] = contWorld->instances[i];
 					searchContainerRH.customIndex[i] = customIndex[i];
 				}
 			}
@@ -427,12 +427,12 @@
 				return;
 			}
 			for (int i=0;i<4;i++) {
-				if (contEng_Global->instances[i] > -1) {
+				if (contWorld->instances[i] > -1) {
 					searchCloseButtonLH.SetActive(true);
 					searchItemImagesLH[i].SetActive(true);
 					searchItemImagesLH[i].GetComponent<Image>().overrideSprite = null;
-					searchItemImagesLH[i].GetComponent<Image>().overrideSprite = Const.a.GetSpriteFromTexture(contEng_Global->instances[i]);
-					searchContainerLH.contEng_Global->instances[i] = contEng_Global->instances[i];
+					searchItemImagesLH[i].GetComponent<Image>().overrideSprite = Const.a.GetSpriteFromTexture(contWorld->instances[i]);
+					searchContainerLH.contWorld->instances[i] = contWorld->instances[i];
 					searchContainerLH.customIndex[i] = customIndex[i];
 				}
 			}
@@ -440,26 +440,26 @@
 		}
 	}
 
-	public void SendSearchToDataTab(string name, int contentCount, int[] resultContents, int[] resultsIndices, Vector3 searchPosition, SearchableItem si, bool useFX) {
+	public void SendSearchToDataTab(string name, int contentCount, int[] resultContents, int[] resultsIndices, V3 searchPosition, SearchableItem si, bool useFX) {
 		PrefabIdentifier pid = si.gameObject.GetComponent<PrefabIdentifier>();
 		string headerName = name;
 		if (pid != null) {
 			switch(pid.constIndex) {
-				case 464: headerName = Eng_Text->stringTable[895]; break;
-				case 465: headerName = Eng_Text->stringTable[897]; break;
-				case 530: headerName = Eng_Text->stringTable[898]; break;
-				case 466: headerName = Eng_Text->stringTable[897]; break;
-				case 467: headerName = Eng_Text->stringTable[897]; break;
-				case 468: headerName = Eng_Text->stringTable[897]; break;
-				case 469: headerName = Eng_Text->stringTable[897]; break;
-				case 470: headerName = Eng_Text->stringTable[897]; break;
-				case 471: headerName = Eng_Text->stringTable[897]; break;
-				case 472: headerName = Eng_Text->stringTable[899]; break;
-				case 473: headerName = Eng_Text->stringTable[899]; break;
-				case 474: headerName = Eng_Text->stringTable[899]; break;
-				case 475: headerName = Eng_Text->stringTable[899]; break;
-				case 476: headerName = Eng_Text->stringTable[899]; break;
-				case 531: headerName = Eng_Text->stringTable[896]; break;
+				case 464: headerName = Text->stringTable[895]; break;
+				case 465: headerName = Text->stringTable[897]; break;
+				case 530: headerName = Text->stringTable[898]; break;
+				case 466: headerName = Text->stringTable[897]; break;
+				case 467: headerName = Text->stringTable[897]; break;
+				case 468: headerName = Text->stringTable[897]; break;
+				case 469: headerName = Text->stringTable[897]; break;
+				case 470: headerName = Text->stringTable[897]; break;
+				case 471: headerName = Text->stringTable[897]; break;
+				case 472: headerName = Text->stringTable[899]; break;
+				case 473: headerName = Text->stringTable[899]; break;
+				case 474: headerName = Text->stringTable[899]; break;
+				case 475: headerName = Text->stringTable[899]; break;
+				case 476: headerName = Text->stringTable[899]; break;
+				case 531: headerName = Text->stringTable[896]; break;
 			}
 		}
 
@@ -528,7 +528,7 @@
 										 PuzzleGridType gtype, int start,
 										 int end, int width, int height,
 										 HUDColor colors, string t1, 
-										 UseData ud, Vector3 tetherPoint,
+										 UseData ud, V3 tetherPoint,
 										 PuzzleGridPuzzle pgp) {
 		if (lastDataSideRH) {
 			// Send to RH tab
@@ -554,7 +554,7 @@
 		usingObject = true;
 	}
 
-	public void SendWirePuzzleToDataTab(bool[] sentWiresOn, bool[] sentNodeRowsActive, int[] sentCurrentPositionsLeft, int[] sentCurrentPositionsRight, int[] sentTargetsLeft, int[] sentTargetsRight, HUDColor theme, HUDColor[] wireColors, string t1, UseData udSent,Vector3 tetherPoint, PuzzleWirePuzzle pwp) {
+	public void SendWirePuzzleToDataTab(bool[] sentWiresOn, bool[] sentNodeRowsActive, int[] sentCurrentPositionsLeft, int[] sentCurrentPositionsRight, int[] sentTargetsLeft, int[] sentTargetsRight, HUDColor theme, HUDColor[] wireColors, string t1, UseData udSent,V3 tetherPoint, PuzzleWirePuzzle pwp) {
 		TabReset(lastDataSideRH);
 		if (lastDataSideRH) {
 			// Send to RH tab
@@ -572,7 +572,7 @@
 		usingObject = true;
 	}
 
-	public void SendPaperLogToDataTab(int index,Vector3 tetherPoint) {
+	public void SendPaperLogToDataTab(int index,V3 tetherPoint) {
 		if (Const.a.audioLogImagesRefIndicesLH[index] != 0) { // LH, but only
 															  // if has image.
 			TabReset(false);
@@ -617,7 +617,7 @@
 		logReaderContainer.GetComponent<LogTextReaderManager>().SendTextToReader(index);
 		logTable.SetActive(false);
 		logLevelsFolder.SetActive(false);
-		if (Const.a.audioLogs[index] != null) logFinished = Eng_Global->pauseRelativeTime + Const.a.audioLogs[index].length + 0.1f; //add slight delay after log is finished playing to make sure we don't cut off audio in case there's a frame delay for audio start
+		if (Const.a.audioLogs[index] != null) logFinished = World->pauseRelativeTime + Const.a.audioLogs[index].length + 0.1f; //add slight delay after log is finished playing to make sure we don't cut off audio in case there's a frame delay for audio start
 		logActive = true;
 		logType = Const.a.audioLogType[index];
 	}
@@ -668,7 +668,7 @@
 		}
 	}
 
-	public void BlockedBySecurity(Vector3 tetherPoint) {
+	public void BlockedBySecurity(V3 tetherPoint) {
 		TabReset(lastDataSideRH);
 		if (lastDataSideRH) {
 			OpenTab(4,true,TabMSG.None,0,Handedness.RH);
@@ -684,7 +684,7 @@
 		usingObject = true;
 	}
 
-	public void SendKeypadKeycodeToDataTab(int keycode, Vector3 tetherPoint,
+	public void SendKeypadKeycodeToDataTab(int keycode, V3 tetherPoint,
 										   KeypadKeycode keypad,
 										   bool alreadySolved) {
 		if (keycode < 0 || keypad == null) {
@@ -717,7 +717,7 @@
 			kkb.keycode = keycode;
 			kkb.keypad = keypad;
 			kkb.ResetEntry();
-			if (Eng_Global->diffMis <= 1) {
+			if (World->diffMis <= 1) {
 				kkb.currentEntry = keycode;
 			}
 		} else {
@@ -728,7 +728,7 @@
 			kkb.keycode = keycode;
 			kkb.keypad = keypad;
 			kkb.ResetEntry();
-			if (Eng_Global->diffMis <= 1) {
+			if (World->diffMis <= 1) {
 				kkb.currentEntry = keycode;
 			}
 		}
@@ -768,7 +768,7 @@
 					searchItemImagesRH[i].SetActive(false);
 					searchItemImagesRH[i].GetComponent<Image>().overrideSprite = null;
 					searchItemImagesRH[i].GetComponent<Image>().overrideSprite = Const.a.GetSpriteFromTexture(101);
-					searchContainerRH.contEng_Global->instances[i] = -1;
+					searchContainerRH.contWorld->instances[i] = -1;
 					searchContainerRH.customIndex[i] = -1;
 				}
 			}
@@ -784,7 +784,7 @@
 					searchItemImagesLH[i].SetActive(false);
 					searchItemImagesLH[i].GetComponent<Image>().overrideSprite = null;
 					searchItemImagesLH[i].GetComponent<Image>().overrideSprite = Const.a.GetSpriteFromTexture(101);
-					searchContainerLH.contEng_Global->instances[i] = -1;
+					searchContainerLH.contWorld->instances[i] = -1;
 					searchContainerLH.customIndex[i] = -1;
 				}
 			}
@@ -811,16 +811,16 @@
 		Utils.Deactivate(energyHeatTicksLH);
 		Utils.Deactivate(overloadButtonLH);
 		if (loadNormalAmmoButtonTextLH != null) {
-			if (normdex > 0 && normdex < Eng_Text->stringTable.Length) {
-				loadNormalAmmoButtonTextLH.text = Eng_Text->stringTable[normdex];
+			if (normdex > 0 && normdex < Text->stringTable.Length) {
+				loadNormalAmmoButtonTextLH.text = Text->stringTable[normdex];
 			} else {
 				loadNormalAmmoButtonTextLH.text = "";
 			}
 		}
 
 		if (loadAlternateAmmoButtonTextLH != null) {
-			if (altdex > 0 && altdex < Eng_Text->stringTable.Length) {
-				loadAlternateAmmoButtonTextLH.text = Eng_Text->stringTable[altdex];
+			if (altdex > 0 && altdex < Text->stringTable.Length) {
+				loadAlternateAmmoButtonTextLH.text = Text->stringTable[altdex];
 			} else {
 				loadAlternateAmmoButtonTextLH.text = "";
 			}
@@ -836,16 +836,16 @@
 		Utils.Deactivate(energyHeatTicksRH);
 		Utils.Deactivate(overloadButtonRH);
 		if (loadNormalAmmoButtonTextRH != null) {
-			if (normdex > 0 && normdex < Eng_Text->stringTable.Length) {
-				loadNormalAmmoButtonTextRH.text = Eng_Text->stringTable[normdex];
+			if (normdex > 0 && normdex < Text->stringTable.Length) {
+				loadNormalAmmoButtonTextRH.text = Text->stringTable[normdex];
 			} else {
 				loadNormalAmmoButtonTextRH.text = "";
 			}
 		}
 
 		if (loadAlternateAmmoButtonTextRH != null) {
-			if (altdex > 0 && altdex < Eng_Text->stringTable.Length) {
-				loadAlternateAmmoButtonTextRH.text = Eng_Text->stringTable[altdex];
+			if (altdex > 0 && altdex < Text->stringTable.Length) {
+				loadAlternateAmmoButtonTextRH.text = Text->stringTable[altdex];
 			} else {
 				loadAlternateAmmoButtonTextRH.text = "";
 			}
@@ -909,23 +909,23 @@
 	void ChangeAmmoButtons(GameObject loadNormalAmmoButton, GameObject loadAlternateAmmoButton) {
 		if (loadNormalAmmoButton == null || loadAlternateAmmoButton == null) return;
 
-		int wep16index = Get16WeaponIndexFromConstIndex(Eng_Global->invP1.weaponIndex);
+		int wep16index = Get16WeaponIndexFromConstIndex(World->invP1.weaponIndex);
 		if (wep16index == 1 || wep16index == 4 || wep16index == 10 || wep16index == 14 || wep16index == 15) return; // Already hidden.
 
 		Image norm = loadNormalAmmoButton.GetComponent<Image>();
 		Image anorm = loadAlternateAmmoButton.GetComponent<Image>();
-		if (Eng_Global->invP1.wepLoadedWithAlternate[Eng_Global->invP1.weaponCurrent]) {
-			SetAmmoIcons(Eng_Global->invP1.weaponIndex,true);
+		if (World->invP1.wepLoadedWithAlternate[World->invP1.weaponCurrent]) {
+			SetAmmoIcons(World->invP1.weaponIndex,true);
 			norm.overrideSprite = ammoButtonDeHighlighted;
-			if (Eng_Global->invP1.currentMagazineAmount2[Eng_Global->invP1.weaponCurrent] > 0) {
+			if (World->invP1.currentMagazineAmount2[World->invP1.weaponCurrent] > 0) {
 				anorm.overrideSprite = ammoButtonHighlighted;
 			} else {
 				anorm.overrideSprite = ammoButtonDeHighlighted;
 			}
 		} else {
-			SetAmmoIcons(Eng_Global->invP1.weaponIndex,false);
+			SetAmmoIcons(World->invP1.weaponIndex,false);
 			anorm.overrideSprite = ammoButtonDeHighlighted;
-			if (Eng_Global->invP1.currentMagazineAmount[Eng_Global->invP1.weaponCurrent] > 0) {
+			if (World->invP1.currentMagazineAmount[World->invP1.weaponCurrent] > 0) {
 				norm.overrideSprite = ammoButtonHighlighted;
 			} else {
 				norm.overrideSprite = ammoButtonDeHighlighted;
@@ -934,18 +934,18 @@
 	}
 
 	public void UpdateHUDAmmoCountsEither() {
-		if (Eng_Global->invP1.weaponCurrent >= 0) {
-			if (Eng_Global->invP1.wepLoadedWithAlternate[Eng_Global->invP1.weaponCurrent]) {
-				UpdateHUDAmmoCounts(Eng_Global->invP1.currentMagazineAmount2[Eng_Global->invP1.weaponCurrent]);
+		if (World->invP1.weaponCurrent >= 0) {
+			if (World->invP1.wepLoadedWithAlternate[World->invP1.weaponCurrent]) {
+				UpdateHUDAmmoCounts(World->invP1.currentMagazineAmount2[World->invP1.weaponCurrent]);
 			} else {
-				UpdateHUDAmmoCounts(Eng_Global->invP1.currentMagazineAmount[Eng_Global->invP1.weaponCurrent]);
+				UpdateHUDAmmoCounts(World->invP1.currentMagazineAmount[World->invP1.weaponCurrent]);
 			}
 		}
 	}
 
 	void UpdateAmmoAndLoadButtons() {
-		if (Eng_Global->invP1.weaponCurrent < 0
-			|| Eng_Global->invP1.weaponCurrentPending >= 0) {
+		if (World->invP1.weaponCurrent < 0
+			|| World->invP1.weaponCurrentPending >= 0) {
 
 			return;
 		}
@@ -957,7 +957,7 @@
 
 	public void SetWepInfo(int index) { // Expects usableItem index.
 		if (index >= 0) {
-			weptextRH.text = weptextLH.text = Eng_Text->stringTable[index + 326];
+			weptextRH.text = weptextLH.text = Text->stringTable[index + 326];
 			iconRH.overrideSprite = iconLH.overrideSprite = Const.a.useableItemsIcons[index];
 		} else {
 			weptextRH.text = weptextLH.text = "";
@@ -968,19 +968,19 @@
 
 	public void ReturnToLastTab(bool isRightHand) {
 		usingObject = false;
-		objectInUsePos = (Vector3){999f,999f,999f); // out of bounds
+		objectInUsePos = (V3){999f,999f,999f); // out of bounds
 		if (isRightHand) {
 			rightTC.ReturnToLastTab();
 			if (rightTC.lastTab == 4) {
 				if (tetheredPGP == null && tetheredPWP == null && tetheredKeypadElevator == null && tetheredKeypadKeycode == null && tetheredSearchable == null) {
-					if (Eng_Global->invP1.hasHardware[0]) sysAnalyzerRH.SetActive(true);
+					if (World->invP1.hasHardware[0]) sysAnalyzerRH.SetActive(true);
 				}
 			}
 		} else {
 			leftTC.ReturnToLastTab();
 			if (leftTC.lastTab == 4) {
 				if (tetheredPGP == null && tetheredPWP == null && tetheredKeypadElevator == null && tetheredKeypadKeycode == null && tetheredSearchable == null) {
-					if (Eng_Global->invP1.hasHardware[0]) sysAnalyzerLH.SetActive(true);
+					if (World->invP1.hasHardware[0]) sysAnalyzerLH.SetActive(true);
 				}
 			}
 		}
@@ -1033,7 +1033,7 @@
 
 	public void NotifyToCenterTab(int tabNum) {
 		tabNotified[tabNum] = true;
-		centerTabsTickFinished = Eng_Global->pauseRelativeTime + centerTabsTickTime;
+		centerTabsTickFinished = World->pauseRelativeTime + centerTabsTickTime;
 		ToggleHighlightOnCenterTabButton(tabNum);
 	}
 
@@ -1047,7 +1047,7 @@
 
 		Utils.PlayUIOneShotSavable(97);
 		CenterTabButtonClickSilent(tabNum,false);
-		if (Eng_Global->invP1.hardwareIsActive[3]) {
+		if (World->invP1.hardwareIsActive[3]) {
 			hwb.SensaroundOff();
 			Utils.PlayUIOneShotSavable(82); // deactivate
 		}
@@ -1218,7 +1218,7 @@
 		Eng_UI->mouseClickHeldOverGUI = true;
 		ResetMultiMediaTabs();
 		dataTab.SetActive(true);
-		Eng_Global->invP1.hasNewData = false;
+		World->invP1.hasNewData = false;
 		multiMediaHeaderLabel.text = "DATA";
 		lastMultiMediaTabOpened = MULTI_MEDIA_TAB_DATA_TABLE;
 		ersbLH.SetEReaderSectionsButtonsHighlights(2);
@@ -1231,7 +1231,7 @@
 		Eng_UI->mouseClickHeldOverGUI = true;
 		ResetMultiMediaTabs();
 		notesTab.SetActive(true);
-		Eng_Global->invP1.hasNewNotes = false;
+		World->invP1.hasNewNotes = false;
 		multiMediaHeaderLabel.text = "NOTES";
 		lastMultiMediaTabOpened = MULTI_MEDIA_TAB_NOTES;
 		ersbLH.SetEReaderSectionsButtonsHighlights(3);
@@ -1263,7 +1263,7 @@
 	}
 
 	public void MinigameStart_Ping() {
-		CenterStatusPrint("%s", Eng_Text->stringTable[1021] + " PING");
+		CenterStatusPrint("%s", Text->stringTable[1021] + " PING");
 		minigameButtonsContainer.SetActive(false);
 		minigameViewContainer.SetActive(true);
 		minigamePingSpaceContainer.SetActive(true);
@@ -1272,7 +1272,7 @@
 	}
 
 	public void MinigameStart_15() {
-		CenterStatusPrint("%s", Eng_Text->stringTable[1021] + " 15");
+		CenterStatusPrint("%s", Text->stringTable[1021] + " 15");
 		minigameButtonsContainer.SetActive(false);
 		minigameViewContainer.SetActive(true);
 		minigame15SpaceContainer.SetActive(true);
@@ -1281,7 +1281,7 @@
 	}
 
 	public void MinigameStart_Wing0() {
-		CenterStatusPrint("%s", Eng_Text->stringTable[1021] + " WING-0");
+		CenterStatusPrint("%s", Text->stringTable[1021] + " WING-0");
 		minigameButtonsContainer.SetActive(false);
 		minigameViewContainer.SetActive(true);
 		minigameWing0SpaceContainer.SetActive(true);
@@ -1290,7 +1290,7 @@
 	}
 
 	public void MinigameStart_Botbounce() {
-		CenterStatusPrint("%s", Eng_Text->stringTable[1021] + " BOTBOUNCE");
+		CenterStatusPrint("%s", Text->stringTable[1021] + " BOTBOUNCE");
 		minigameButtonsContainer.SetActive(false);
 		minigameViewContainer.SetActive(true);
 		minigameBotbounceSpaceContainer.SetActive(true);
@@ -1299,7 +1299,7 @@
 	}
 
 	public void MinigameStart_EelZapper() {
-		CenterStatusPrint("%s", Eng_Text->stringTable[1021] + " EEL ZAPPER");
+		CenterStatusPrint("%s", Text->stringTable[1021] + " EEL ZAPPER");
 		minigameButtonsContainer.SetActive(false);
 		minigameViewContainer.SetActive(true);
 		minigameEelZapperSpaceContainer.SetActive(true);
@@ -1308,7 +1308,7 @@
 	}
 
 	public void MinigameStart_Road() {
-		CenterStatusPrint("%s", Eng_Text->stringTable[1021] + " ROAD");
+		CenterStatusPrint("%s", Text->stringTable[1021] + " ROAD");
 		minigameButtonsContainer.SetActive(false);
 		minigameViewContainer.SetActive(true);
 		minigameRoadSpaceContainer.SetActive(true);
@@ -1317,7 +1317,7 @@
 	}
 
 	public void MinigameStart_TriopToe() {
-		CenterStatusPrint("%s", Eng_Text->stringTable[1021] + " TRIOPTOE");
+		CenterStatusPrint("%s", Text->stringTable[1021] + " TRIOPTOE");
 		minigameButtonsContainer.SetActive(false);
 		minigameViewContainer.SetActive(true);
 		minigameTriopToeSpaceContainer.SetActive(true);
@@ -1328,7 +1328,7 @@
 	// The original seemed to have planned for 9 minigames.  Maybe I'll make my
 	// own new ones someday.
 	public void MinigameStart_CorporateConquer() {
-		CenterStatusPrint("%s", Eng_Text->stringTable[1021] + " CORP CONQ");
+		CenterStatusPrint("%s", Text->stringTable[1021] + " CORP CONQ");
 		minigameButtonsContainer.SetActive(false);
 		minigameViewContainer.SetActive(true);
 		minigameCorpConqSpaceContainer.SetActive(true);
@@ -1337,7 +1337,7 @@
 	}
 
 	public void MinigameStart_Chess() {
-		CenterStatusPrint("%s", Eng_Text->stringTable[1021] + " Chess");
+		CenterStatusPrint("%s", Text->stringTable[1021] + " Chess");
 		minigameButtonsContainer.SetActive(false);
 		minigameViewContainer.SetActive(true);
 		minigameChessSpaceContainer.SetActive(true);

@@ -56,15 +56,15 @@ const AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS] = { // speed, 
 };
 
 MOD_TO_ENGINE void UpdateAnims(void) {
-    if (Eng_Global->gamePaused || Eng_Global->menuActive) return;
+    if (World->gamePaused || World->menuActive) return;
     
-    static double lastPauseTime = 0.0; if (lastPauseTime == 0.0) lastPauseTime = Eng_Global->pauseRelativeTime;
-    double animDT = Eng_Global->pauseRelativeTime - lastPauseTime; lastPauseTime = Eng_Global->pauseRelativeTime;
+    static double lastPauseTime = 0.0; if (lastPauseTime == 0.0) lastPauseTime = World->pauseRelativeTime;
+    double animDT = World->pauseRelativeTime - lastPauseTime; lastPauseTime = World->pauseRelativeTime;
     if (animDT > 0.1) animDT = 0.1; if (animDT <= 0.0) return;
     
     bool portalsNeedUpdated = false;
     for (u16 i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
-        Entity* e = &Eng_Global->instances[i];
+        Entity* e = &World->instances[i];
         if (e->modelIndex >= MAX_MDLS || !(e->entflags & EF_ACTIVE) || e->animationNum >= MAX_ANIMS || e->numclips == 0 || e->clip >= e->numclips) continue;
         AnimationClip* clip = (AnimationClip*)&modelAnimationClips[e->animationNum][e->clip]; if (clip->framerate <= 0 || clip->speed <= 0) continue;
 
@@ -193,7 +193,7 @@ static const TextureAnimClip textureAnimClips[NUM_TEXTURE_CLIPS] = {
 };
 
 void TextureSequenceInit(u16 self, char* trimmed_value) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (e->index == 526) return; // Skip prop_console02 for now, will need to split its screen off.
     if (trimmed_value[0] == '\0') { e->textureAnimating = false; e->modelIndex = EDefs[e->index].modelIndex; return; }
     
@@ -211,11 +211,11 @@ void TextureSequenceInit(u16 self, char* trimmed_value) {
 }
 
 void TextureSequenceUpdate(u16 self) {
-    Entity* e = &Eng_Global->instances[self];
+    Entity* e = &World->instances[self];
     if (!e->textureAnimating) return;
-    if (e->tickFinished >= Eng_Global->pauseRelativeTime) return;
+    if (e->tickFinished >= World->pauseRelativeTime) return;
 
-    e->tickFinished = Eng_Global->pauseRelativeTime + e->tickTime;
+    e->tickFinished = World->pauseRelativeTime + e->tickTime;
     const TextureAnimClip* clip = &textureAnimClips[e->texAnimClip];
     if (e->texAnimRandom && (!e->textureAnimationStopsAtDead || e->health > 0.0f)) {
         e->texFrame = random_range_u32(0, clip->length - 1);

@@ -1,4 +1,5 @@
 // common.h - Shared items between engine and gamecode (e.g. enums)
+#define INLINE static inline __attribute__((always_inline))
 typedef __INT8_TYPE__   i8; typedef  __UINT8_TYPE__  u8; //  8bit types
 typedef __INT16_TYPE__ i16; typedef __UINT16_TYPE__ u16; typedef u16 half; // 16bit types
 typedef __INT32_TYPE__ i32; typedef __UINT32_TYPE__ u32; // 32bit types
@@ -13,11 +14,11 @@ typedef __INT64_TYPE__ i64; typedef __UINT64_TYPE__ u64; typedef __SIZE_TYPE__ s
 #define true 1
 #define false 0
 typedef struct { float r,g,b; } Color3; typedef struct { float r,g,b,a; } Color;
-typedef struct { float x,y; } Vector2;  typedef struct { float x,y,z; } Vector3; typedef struct { float x,y,z,w; } Quaternion;
+typedef struct { float x,y; } V2;  typedef struct { float x,y,z; } V3; typedef struct { float x,y,z,w; } Quaternion;
 #define QUAT_IDENTITY ((Quaternion){0.0f,0.0f,0.0f,1.0f})
 typedef u8 ColliderType;
 typedef u16 Text;
-typedef struct {Vector3 point; Vector3 normal; float distance; u16 hitInstanceIndex; bool hit;} RaycastHit;
+typedef struct {V3 point; V3 normal; float distance; u16 hitInstanceIndex; bool hit;} RaycastHit;
 typedef struct {float speed; u16 frameStart,frameEnd,frameStartModelIndex; u8 framerate;} AnimationClip;
 #define LIGHTON 1
 #define SHADON  2
@@ -26,7 +27,7 @@ typedef struct {float speed; u16 frameStart,frameEnd,frameStartModelIndex; u8 fr
 #define LDIR    8
 #define LDIRTY 16
 #define LERPON 32
-typedef struct { Vector3 pos; float intensity; Color3 col; u32 lflags; float range,spotAng,maxIntensity,minIntensity; Quaternion spotDir; } Light; // 64bytes, one cache line, packed for GL transfer
+typedef struct { V3 pos; float intensity; Color3 col; u32 lflags; float range,spotAng,maxIntensity,minIntensity; Quaternion spotDir; } Light; // 64bytes, one cache line, packed for GL transfer
 typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSteps[32]; bool stepIsLerping[32],lerpUp; u8 currentStep,numIntervalSteps,numLerpSteps; } LightAnimation; // Separate from main lights buffer struct since it's not used very often
 #define INSTANCE_COUNT 7680 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
 #define LIGHT_COUNT 2048
@@ -290,7 +291,7 @@ typedef struct {
 	u8 highlightTickCount[4],beepCount,elevButtonLevelIdx[8],elevCurrentFloor;
 	bool lastWeaponSideRH,lastItemSideRH,lastAutomapSideRH,lastTargetSideRH,lastDataSideRH,lastSearchSideRH,lastLogSideRH,lastLogSecondarySideRH,lastMinigameSideRH,logActive,paperLogInUse,usingObject,isBlocking,isRH,centerTabNotified[4],highlightStatus[4],audPaused,mouseClickHeldOverGUI,buttonsEnabled[8],buttonsDarkened[8];
 	AudioLogType logType;
-	Vector3 objectInUsePos;
+	V3 objectInUsePos;
 } SystemUI;
 typedef struct { char stringTable[T_STRING_COUNT][T_LOCALIZATION_MAX_LENGTH]; u16 audioLogImagesRefIndicesLH[T_LOGS_COUNT],audioLogImagesRefIndicesRH[T_LOGS_COUNT]; u8 audioLogType[T_LOGS_COUNT],audioLogLevelFound[T_LOGS_COUNT]; size_t file_size,filelog_size; u8* file_data,*filelog_data; } TextSystem; // Hefty table for localization support.
 #define PATCH_BERSERK   1
@@ -370,27 +371,27 @@ typedef struct {
     u8 lerpUp,hasSoft,softVersions[7],hasMinigame,numweapons,currentMagazineAmount[7],currentMagazineAmount2[7],hardwareVersion[HW_COUNT],hardwareVersionSetting[HW_COUNT],grenAmmo[7],grenConstIndex[7],grenadeCurrent,generalInvCurrent,patchCurrent,patchCounts[7],cyberItemIndex;
 	bool playerDead,beepDone,logPaused,hasNewEmail,hasNewNotes,currentCyberItem,isPulserNotDrill,wepLoadedWithAlternate[7],staminupActive,hasLog[134],readLog[134],justChangedWeap,overloadEnabled,recoiling,heldObjectLoadedAlternate,holdingObject,grenadeActive,hasNewLogs,hasNewData;
 } InventorySystem;
-typedef struct { float damage,penetration,offense,armorvalue,defense,impactVelocity; Vector3 attacknormal,hitpoint; AttackType attackType; u16 owner,hitIdx; bool isOtherNPC,berserkActive; } DamageData;
+typedef struct { float damage,penetration,offense,armorvalue,defense,impactVelocity; V3 attacknormal,hitpoint; AttackType attackType; u16 owner,hitIdx; bool isOtherNPC,berserkActive; } DamageData;
 typedef /*FAT*/ struct  {
     u32 entflags,layer,ioflags;
     u16 modelIndex,index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
-    Vector3 position;
-    Vector3 scale,forward,right,velocity,angularVelocity,lastPosition,lastAngularVelocity,topPoint,targetPosition,startPosition,activatedScale,direction;
+    V3 position;
+    V3 scale,forward,right,velocity,angularVelocity,lastPosition,lastAngularVelocity,topPoint,targetPosition,startPosition,activatedScale,direction;
     float radius,shadRadius,gravity,inertiaTensor[6],invInertiaTensor[6];
     Quaternion rotation;    
-    u16 texIndex,glowIndex,specIndex,normIndex,lodIndex,colliderMeshIndex;
+    u16 texIndex,glowIndex,specIndex,normIndex,lodIndex,colMeshIndex;
     i32 cellIndex; i16 cellX,cellZ;
     u8 portalIndex,clip,numclips,texAnimClip,camView; // If this is a door, index into portal array for toggling state.
     bool inertiaTensorValid,colliding,cardchunk,kinematic;
-    Vector3 colliderCenter; // Offset relative to .position's global worldspace xyz location
-    Vector3 colliderSize; // x,y,z for Box, x for Sphere radius, else x, y, z for Capsule radius, height, and direction (0.0f = X-Axis, 1.0f = Y-Axis, 2.0f = Z-Axis respectively, default 1.0f)
+    V3 colliderCenter; // Offset relative to .position's global worldspace xyz location
+    V3 colliderSize; // x,y,z for Box, x for Sphere radius, else x, y, z for Capsule radius, height, and direction (0.0f = X-Axis, 1.0f = Y-Axis, 2.0f = Z-Axis respectively, default 1.0f)
     ColliderType/*u8*/ collider;
     FuncStates/*u8*/ startState,funcState;
     BodyState/*u8*/ bodyState;
     float health,cyberHealth,targetPositionY,speed,percentAjar,percentMoved,mass,angularDrag,inertia,dynamicFriction,staticFriction,bounciness,volume,timeForTranquilization,gracePeriodFinished,meleeDamageFinished,idleTime,attack1SoundTime,attack2SoundTime,attack3SoundTime,timeTillEnemyChangeFinished,timeTillDeadFinished,timeTillPainFinished,huntFinished,
           randomWaitForNextAttack1Finished,randomWaitForNextAttack2Finished,randomWaitForNextAttack3Finished,attackFinished,attack2Finished,attack3Finished,deathBurstFinished,tranquilizeFinished,wanderFinished,timeSinceMovedEnough,posCheckFinished,currentFrameFinished,animSwapFinished,delay,damage,itemLifeTime,minutes,seconds,randomMin,randomMax,timeInterval,
           cyberTimer,intervalFinished,delayFireFinished,delayResetFinished,delayFinished,tickFinished,tickTime,useFinished,waitBeforeClose,lasersFinished,amount,resetTime,minSecurityLevel,ajarPercentage,useTimeDelay,timeBeforeLasersOn,force,strength,offStrengthFactor,distancePaddingToTopPoint,initialBurstFinished,justUsed,timerFinished,randomItemDropChance[4];
-    Vector3 accumulatedForce;    
+    V3 accumulatedForce;    
     u8 securityThreshold,lerpUp;
     u16 enemy,altTexIndex,altGlowIndex,messageIndex,teleportID,targetDestinationID,recentMostActivator,countToTrigger,counter,activateSFX,lockedSFX,messageLingdex,lockedMessageLingdex,animationNum,frame,texFrame,texGlowFrame,texAnimLight,texAnimLight2,lookUpIndex,contents[4],customIndex[4],useableItemIndex,usableCustomIndex,randomItem[4],randomItemCustomIndex[4];
     i16 version,SFXIndex,SFXLockedIndex,textIndex,emailIndex,ammo,ammo2;
@@ -408,7 +409,7 @@ typedef /*FAT*/ struct  {
     DoorState doorState;
     u16 mainSwitchMaterial,deathBurst;
     AIState currentState; // NPC logic
-    Vector3 currentDestination,lastKnownEnemyPos,targettingPosition,idealTransformForward,idealPos;
+    V3 currentDestination,lastKnownEnemyPos,targettingPosition,idealTransformForward,idealPos;
     char targetname[TARGET_STRING_LENGTH],target[TARGET_STRING_LENGTH],target2[TARGET_STRING_LENGTH],currenttarget[TARGET_STRING_LENGTH],targetIfFalse[TARGET_STRING_LENGTH],texAnimResourceFolder[TARGET_STRING_LENGTH];
 } Entity; // phew what a porker of a struct, it's been a eatin!
 typedef struct { Entity* entries; u32 count; u32 capacity; } DataParser;
@@ -420,7 +421,7 @@ typedef struct {
     float farPlane[14],damageDealt,damageReceived,timeScale,worldMin_x[14],worldMin_z[14],voxelMinCenterX[14],voxelMinCenterZ[14];
 	double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,debugLineFinished,shakeFinished,last_time,last_topframe_time,last_physics_time,deltaTime,current_time,screenshotTimeout,pauseRelativeTime,absoluteTime,statusTextDecayFinished,justSavedTimeStamp;
     i32 fogFac,cursorPosition_x,cursorPosition_y; // Separate internal cursor from system cursor.  This gets relatively pushed around by real cursor movement to give consistent platform behavior.
-	Vector3 debugLine_start,debugLine_end,cyberspaceRecallPoint;
+	V3 debugLine_start,debugLine_end,cyberspaceRecallPoint;
     u8 levelSecurity[14],startLevel,numLevels,curLev,diffCbt,diffPuz,diffMis,diffCyb,creditsPageIndex;
 	bool inventoryMode,levelCurrentlyLoading,introNotPlayed,gamePaused,menuActive,gameFinished,creditsActive,decoyActive,boosterActive,uiIsBlocking,mouseClickHeldOverGUI,geniusActive,(*GetKey)(i32 settingIndex),(*GetKeyPressed)(i32 settingIndex);
     InventorySystem invP1,invP2;
@@ -435,57 +436,57 @@ typedef struct {
 #define vmax(a,b) ((a) > (b) ? (a) : (b))
 #define vclamp(x,a,b) vmin(vmax(x,a),b)
 #define vsqrtf(x) __builtin_sqrtf(x)
-static inline __attribute__((always_inline)) float vfloor(float x) { int i = (int)x; return (float)(i > x ? i - 1 : i); }
-static inline __attribute__((always_inline)) float vceil(float x) { int i = (int)x; return (float)(x > 0 && x > (float)i ? i + 1 : i); }
-static inline __attribute__((always_inline)) float vsign(float x) { return x < 0.0f ? -1.0f : 1.0f; } // Follow Unity Sign convention where 0 = 1.0f sign.
-static inline __attribute__((always_inline)) float vsinf(float x) { x -= TAU * vfloor(x / TAU); if (x > PI) { x -= TAU; } float s = (4/PI)*x - (4/(PI*PI))*x*vabs(x); return 0.225f*(s*vabs(s) - s) + s; }
-static inline __attribute__((always_inline)) float vcosf(float x) { return vsinf(x + 1.57079632f); }
-static inline __attribute__((always_inline)) float vacosf(float x) { float negate = (x < 0.0f) ? 1.0f : 0.0f; x = vabs(x); float ret = (-0.0187293f * x + 0.0742610f) * x - 0.2121144f; ret = (ret * x + 1.5707288f) * vsqrtf(1.0f - x); ret = ret - 2.0f * negate * ret; return negate * PI + (1.0f - 2.0f * negate) * ret; }
-static inline __attribute__((always_inline)) float vtan(float x) { return vsinf(x) / vcosf(x); }
-static inline __attribute__((always_inline)) float vcot(float x) { float x2 = x * x; float t = x + (x2 * x) * 0.33333333f; return 1.0f / t; }
-static inline __attribute__((always_inline)) float deg2rad(float degrees) { return degrees * (PI / 180.0f); }
-static inline __attribute__((always_inline)) float vlog2f(float x) { union { float f; unsigned int i; } v = { x }; int e = (int)((v.i >> 23) & 255) - 127; v.i = (v.i & 0x7FFFFF) | 0x3F800000;/*normalize mantissa to [1,2)*/ float m = v.f; float p = m - 1.0f; float log2m = p * (1.3465558f + p * (-0.33942322f + p * 0.028794660f)); /*polynomial approx of log2(m)*/ return (float)e + log2m; }
-static inline __attribute__((always_inline)) float vlog(float x) { return vlog2f(x) * 0.69314718f; }
-static inline __attribute__((always_inline)) float vexp2f(float x) { float ip = vfloor(x); float fp = x - ip; float p = 1.0f + fp * (0.69314718f + fp * (0.24022651f + fp * 0.05550411f)); /*poly approximation for 2^fp on [0,1]*/ int ei = (int)ip + 127; unsigned int bits = (unsigned int)(ei << 23); union { unsigned int i; float f; } u = { bits }; return u.f * p; }
-static inline __attribute__((always_inline)) float vexp(float x) { return vexp2f(x * 1.4426950409f); } // 1/ln(2)
-static inline __attribute__((always_inline)) float vpow(float a, float b) { return vexp(b * vlog(a)); }
-static inline __attribute__((always_inline)) i32 clamp(i32 val, i32 min, i32 max) { return (val > max) ? max : ((val < min) ? min : val); }
-static inline __attribute__((always_inline)) float vround(float val) { return (val >= 0.0f) ? (float)(int)(val + 0.5f) : (float)(int)(val - 0.5f); }
-static inline __attribute__((always_inline)) Vector3 V3_AplusB(Vector3 a, Vector3 b) { return (Vector3){a.x + b.x, a.y + b.y, a.z + b.z}; }
-static inline __attribute__((always_inline)) Vector3 V3_AsubB(Vector3 a, Vector3 b) { return (Vector3){a.x - b.x, a.y - b.y, a.z - b.z}; }
-static inline __attribute__((always_inline)) Vector3 V3_ScaleByF(Vector3 v, float s) { return (Vector3){v.x * s, v.y * s, v.z * s}; }
-static inline __attribute__((always_inline)) Vector3 mul_v3_v3_elementwise(Vector3 v, Vector3 w) { return (Vector3){v.x * w.x, v.y * w.y, v.z * w.z}; }
-static inline __attribute__((always_inline)) float dot(float x1, float y1, float z1, float x2, float y2, float z2) { return x1*x2 + y1*y2 + z1*z2; }
-static inline __attribute__((always_inline)) float V3_dot(Vector3 a, Vector3 b) { return dot(a.x,a.y,a.z, b.x,b.y,b.z); }
-static inline __attribute__((always_inline)) float quat_dot(Quaternion a, Quaternion b) { return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w; }
-static inline __attribute__((always_inline)) float V3_Mag(const Vector3 v) { return vsqrtf(V3_dot(v,v)); }
-static inline __attribute__((always_inline)) float V3_SqDist(Vector3 a, Vector3 b) { Vector3 d = V3_AsubB(a, b); return V3_dot(d,d); }
-static inline __attribute__((always_inline)) float V3_Dist(Vector3 a, Vector3 b) { return V3_Mag(V3_AsubB(a,b)); }
-static inline __attribute__((always_inline)) Vector3 V3_Cross(Vector3 a, Vector3 b) { return (Vector3){a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x}; }
-static inline __attribute__((always_inline)) Vector3 V3_Normalize(Vector3 v) { float len = V3_Mag(v); return len > 0.000001f ? (Vector3){v.x / len, v.y / len, v.z / len} : v; }
-static inline __attribute__((always_inline)) float squareDistance2D(float x1, float z1, float x2, float z2) { float dx = x2 - x1; float dz = z2 - z1; return dx * dx + dz * dz; }
-static inline __attribute__((always_inline)) float squareDistance3D(float x1, float y1, float z1, float x2, float y2, float z2) { float dx = x2 - x1; float dy = y2 - y1; float dz = z2 - z1; return dx * dx + dy * dy + dz * dz; }
-static inline __attribute__((always_inline)) Quaternion quat_multiply(Quaternion q1, Quaternion q2) { return (Quaternion){(q1.w * q2.x + q1.x * q2.w + q1.y * q2.z - q1.z * q2.y),(q1.w * q2.y - q1.x * q2.z + q1.y * q2.w + q1.z * q2.x),(q1.w * q2.z + q1.x * q2.y - q1.y * q2.x + q1.z * q2.w),(q1.w * q2.w - q1.x * q2.x - q1.y * q2.y - q1.z * q2.z)}; } // Hamilton product, rotates q1 by q2
-static inline __attribute__((always_inline)) Vector3 quat_rot_v3(Quaternion q, Vector3 v) { Quaternion r = quat_multiply((quat_multiply(q, (Quaternion){v.x,v.y,v.z,0.0f})),(Quaternion){-q.x,-q.y,-q.z,q.w}); return (Vector3){r.x,r.y,r.z}; } // Returns rotated input vector rotated by a quaternion.
-static inline __attribute__((always_inline)) u8 hardware14fromConstdex(u16 c) { return clamp(c - 21,0,14); }
-static inline __attribute__((always_inline)) bool ConstIndexIsPortalBlockingDoor(u16 entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }// All doors except see-through doors.
-static inline __attribute__((always_inline)) bool ConstIndexInBounds(int c) { return (c >= 0 && c <= 760); }
-static inline __attribute__((always_inline)) bool ConstIndexIsGeometry(int c) { return (c >= 0 && c <= 306 && c != 112 && c != 279) || c == 760; }
-static inline __attribute__((always_inline)) bool ConstIndexIsDoor(int c) { return (c >= 496 && c < 515); }
-static inline __attribute__((always_inline)) bool ConstIndexIsLightStaticSaveable(int c) { return c == 748; }
-static inline __attribute__((always_inline)) bool ConstIndexIsGenericTransform(int c) { return c == 749; }
-static inline __attribute__((always_inline)) bool ConstIndexIsNPC(int c) { return (c >= 419 && c < 448); }
-static inline __attribute__((always_inline)) bool ConstIndexIsCorpse(int c) { return (c >= 465 && c < 472); }
-static inline __attribute__((always_inline)) bool ConstIndexIsHardware(int c) { return (c >= 328) && (c <= 339); }
-static inline __attribute__((always_inline)) bool ConstIndexIsAmbient(int c) { return (c >= 621 && c <= 655); }
-static inline __attribute__((always_inline)) bool ConstIndexIsButtonSwitch(int c) { return ((c >= 688 && c <= 692) || c == 694 || c == 695); }
-static inline __attribute__((always_inline)) bool ConstIndexIsSearchable(int c) { return ((c >= 464 && c <= 476) || c == 530 || c == 531); }
-static inline __attribute__((always_inline)) bool ConstIndexIsUsableObject(u16 c) { return ((c >= 307 && c <= 404) || c == 417); }
-static inline __attribute__((always_inline)) bool ConstIndexIsAccessCard(u16 c) { return ((c >= 388 && c <= 398) || c == 417); }
-static inline __attribute__((always_inline)) bool ConstIndexIsDynamicObject(u16 c) { return (c >= 307 && c <= 404) ||  c == 417 || (c >= 419 && c <= 428) || (c >= 430 && c <= 437) || (c >= 440 && c <= 442) || (c >= 458 && c <= 463) || (c >= 465 && c <= 476); }
-static inline __attribute__((always_inline)) bool ConstIndexIsStaticObjectSaveable(int c) { return (c == 112 || c == 279 || (c >= 448 && c < 458) || c == 480 || c == 516 || (c >= 518 && c <= 526) || c == 530 || c == 531 || c == 546 || c == 555 || c == 594 || c == 596 || c == 598 || (c >= 600 && c < 603) || (c >= 604 && c < 616) || (c >= 688 && c < 693) || c == 694 || c == 695 || (c >= 699 && c < 704) || (c >= 741 && c < 746)); }
-static inline __attribute__((always_inline)) bool ConstIndexIsStaticObjectImmutable(int c) { return ((c >= 527 && c < 530) || (c >= 532 && c < 546) || (c >= 547 && c < 553) || c == 554 || (c >= 556 && c < 594) || c == 595 || c == 597 || c == 599 || c == 601 || c == 603 || (c >= 616 && c < 688) || c == 693 || c == 696 || c == 697 || c == 698 || (c >= 704 && c < 717) || c == 720 || (c >= 733 && c < 736) || (c >= 737 && c < 739) || c == 746 || c == 747 || (c >= 750 && c <= 759 && c != 755)); }
-static inline __attribute__((always_inline)) int CompareMemoryForNBytes(const void *s1, const void *s2, size_t n) { const u8 *p1 = (const u8 *)s1; const u8 *p2 = (const u8 *)s2; while (n--) { if (*p1 != *p2) {return *p1 - *p2;} p1++; p2++; } return 0; } // memcmp replacement
-static inline __attribute__((always_inline)) void* MoveMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n) { u8 *d = (u8*)dst; const u8* s = (const u8*)src; if (d < s) { while (n--) { *d++ = *s++; } } else if (d > s) { d += n; s += n; while (n--) { *--d = *--s; } } return dst; } // memmove replacement
-static inline __attribute__((always_inline)) void flag_setu16(u16 *flags, u16 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
-static inline __attribute__((always_inline)) void flag_set(u32 *flags, u32 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
+INLINE float vfloor(float x) { int i = (int)x; return (float)(i > x ? i - 1 : i); }
+INLINE float vceil(float x) { int i = (int)x; return (float)(x > 0 && x > (float)i ? i + 1 : i); }
+INLINE float vsign(float x) { return x < 0.0f ? -1.0f : 1.0f; } // Follow Unity Sign convention where 0 = 1.0f sign.
+INLINE float vsinf(float x) { x -= TAU * vfloor(x / TAU); if (x > PI) { x -= TAU; } float s = (4/PI)*x - (4/(PI*PI))*x*vabs(x); return 0.225f*(s*vabs(s) - s) + s; }
+INLINE float vcosf(float x) { return vsinf(x + 1.57079632f); }
+INLINE float vacosf(float x) { float negate = (x < 0.0f) ? 1.0f : 0.0f; x = vabs(x); float ret = (-0.0187293f * x + 0.0742610f) * x - 0.2121144f; ret = (ret * x + 1.5707288f) * vsqrtf(1.0f - x); ret = ret - 2.0f * negate * ret; return negate * PI + (1.0f - 2.0f * negate) * ret; }
+INLINE float vtan(float x) { return vsinf(x) / vcosf(x); }
+INLINE float vcot(float x) { float x2 = x * x; float t = x + (x2 * x) * 0.33333333f; return 1.0f / t; }
+INLINE float deg2rad(float degrees) { return degrees * (PI / 180.0f); }
+INLINE float vlog2f(float x) { union { float f; unsigned int i; } v = { x }; int e = (int)((v.i >> 23) & 255) - 127; v.i = (v.i & 0x7FFFFF) | 0x3F800000;/*normalize mantissa to [1,2)*/ float m = v.f; float p = m - 1.0f; float log2m = p * (1.3465558f + p * (-0.33942322f + p * 0.028794660f)); /*polynomial approx of log2(m)*/ return (float)e + log2m; }
+INLINE float vlog(float x) { return vlog2f(x) * 0.69314718f; }
+INLINE float vexp2f(float x) { float ip = vfloor(x); float fp = x - ip; float p = 1.0f + fp * (0.69314718f + fp * (0.24022651f + fp * 0.05550411f)); /*poly approximation for 2^fp on [0,1]*/ int ei = (int)ip + 127; unsigned int bits = (unsigned int)(ei << 23); union { unsigned int i; float f; } u = { bits }; return u.f * p; }
+INLINE float vexp(float x) { return vexp2f(x * 1.4426950409f); } // 1/ln(2)
+INLINE float vpow(float a, float b) { return vexp(b * vlog(a)); }
+INLINE i32 clamp(i32 val, i32 min, i32 max) { return (val > max) ? max : ((val < min) ? min : val); }
+INLINE float vround(float val) { return (val >= 0.0f) ? (float)(int)(val + 0.5f) : (float)(int)(val - 0.5f); }
+INLINE V3 V3_AplusB(V3 a, V3 b) { return (V3){a.x + b.x, a.y + b.y, a.z + b.z}; }
+INLINE V3 V3_AsubB(V3 a, V3 b) { return (V3){a.x - b.x, a.y - b.y, a.z - b.z}; }
+INLINE V3 V3_ScaleByF(V3 v, float s) { return (V3){v.x * s, v.y * s, v.z * s}; }
+INLINE V3 mul_v3_v3_elementwise(V3 v, V3 w) { return (V3){v.x * w.x, v.y * w.y, v.z * w.z}; }
+INLINE float dot(float x1, float y1, float z1, float x2, float y2, float z2) { return x1*x2 + y1*y2 + z1*z2; }
+INLINE float V3_dot(V3 a, V3 b) { return dot(a.x,a.y,a.z, b.x,b.y,b.z); }
+INLINE float quat_dot(Quaternion a, Quaternion b) { return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w; }
+INLINE float V3_Mag(const V3 v) { return vsqrtf(V3_dot(v,v)); }
+INLINE float V3_SqDist(V3 a, V3 b) { V3 d = V3_AsubB(a, b); return V3_dot(d,d); }
+INLINE float V3_Dist(V3 a, V3 b) { return V3_Mag(V3_AsubB(a,b)); }
+INLINE V3 V3_Cross(V3 a, V3 b) { return (V3){a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x}; }
+INLINE V3 V3_Normalize(V3 v) { float len = V3_Mag(v); return len > 0.000001f ? (V3){v.x / len, v.y / len, v.z / len} : v; }
+INLINE float squareDistance2D(float x1, float z1, float x2, float z2) { float dx = x2 - x1; float dz = z2 - z1; return dx * dx + dz * dz; }
+INLINE float squareDistance3D(float x1, float y1, float z1, float x2, float y2, float z2) { float dx = x2 - x1; float dy = y2 - y1; float dz = z2 - z1; return dx * dx + dy * dy + dz * dz; }
+INLINE Quaternion quat_multiply(Quaternion q1, Quaternion q2) { return (Quaternion){(q1.w * q2.x + q1.x * q2.w + q1.y * q2.z - q1.z * q2.y),(q1.w * q2.y - q1.x * q2.z + q1.y * q2.w + q1.z * q2.x),(q1.w * q2.z + q1.x * q2.y - q1.y * q2.x + q1.z * q2.w),(q1.w * q2.w - q1.x * q2.x - q1.y * q2.y - q1.z * q2.z)}; } // Hamilton product, rotates q1 by q2
+INLINE V3 quat_rot_v3(Quaternion q, V3 v) { Quaternion r = quat_multiply((quat_multiply(q, (Quaternion){v.x,v.y,v.z,0.0f})),(Quaternion){-q.x,-q.y,-q.z,q.w}); return (V3){r.x,r.y,r.z}; } // Returns rotated input vector rotated by a quaternion.
+INLINE u8 hardware14fromConstdex(u16 c) { return clamp(c - 21,0,14); }
+INLINE bool ConstIndexIsPortalBlockingDoor(u16 entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }// All doors except see-through doors.
+INLINE bool ConstIndexInBounds(int c) { return (c >= 0 && c <= 760); }
+INLINE bool ConstIndexIsGeometry(int c) { return (c >= 0 && c <= 306 && c != 112 && c != 279) || c == 760; }
+INLINE bool ConstIndexIsDoor(int c) { return (c >= 496 && c < 515); }
+INLINE bool ConstIndexIsLightStaticSaveable(int c) { return c == 748; }
+INLINE bool ConstIndexIsGenericTransform(int c) { return c == 749; }
+INLINE bool ConstIndexIsNPC(int c) { return (c >= 419 && c < 448); }
+INLINE bool ConstIndexIsCorpse(int c) { return (c >= 465 && c < 472); }
+INLINE bool ConstIndexIsHardware(int c) { return (c >= 328) && (c <= 339); }
+INLINE bool ConstIndexIsAmbient(int c) { return (c >= 621 && c <= 655); }
+INLINE bool ConstIndexIsButtonSwitch(int c) { return ((c >= 688 && c <= 692) || c == 694 || c == 695); }
+INLINE bool ConstIndexIsSearchable(int c) { return ((c >= 464 && c <= 476) || c == 530 || c == 531); }
+INLINE bool ConstIndexIsUsableObject(u16 c) { return ((c >= 307 && c <= 404) || c == 417); }
+INLINE bool ConstIndexIsAccessCard(u16 c) { return ((c >= 388 && c <= 398) || c == 417); }
+INLINE bool ConstIndexIsDynamicObject(u16 c) { return (c >= 307 && c <= 404) ||  c == 417 || (c >= 419 && c <= 428) || (c >= 430 && c <= 437) || (c >= 440 && c <= 442) || (c >= 458 && c <= 463) || (c >= 465 && c <= 476); }
+INLINE bool ConstIndexIsStaticObjectSaveable(int c) { return (c == 112 || c == 279 || (c >= 448 && c < 458) || c == 480 || c == 516 || (c >= 518 && c <= 526) || c == 530 || c == 531 || c == 546 || c == 555 || c == 594 || c == 596 || c == 598 || (c >= 600 && c < 603) || (c >= 604 && c < 616) || (c >= 688 && c < 693) || c == 694 || c == 695 || (c >= 699 && c < 704) || (c >= 741 && c < 746)); }
+INLINE bool ConstIndexIsStaticObjectImmutable(int c) { return ((c >= 527 && c < 530) || (c >= 532 && c < 546) || (c >= 547 && c < 553) || c == 554 || (c >= 556 && c < 594) || c == 595 || c == 597 || c == 599 || c == 601 || c == 603 || (c >= 616 && c < 688) || c == 693 || c == 696 || c == 697 || c == 698 || (c >= 704 && c < 717) || c == 720 || (c >= 733 && c < 736) || (c >= 737 && c < 739) || c == 746 || c == 747 || (c >= 750 && c <= 759 && c != 755)); }
+INLINE int CompareMemoryForNBytes(const void *s1, const void *s2, size_t n) { const u8 *p1 = (const u8 *)s1; const u8 *p2 = (const u8 *)s2; while (n--) { if (*p1 != *p2) {return *p1 - *p2;} p1++; p2++; } return 0; } // memcmp replacement
+INLINE void* MoveMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n) { u8 *d = (u8*)dst; const u8* s = (const u8*)src; if (d < s) { while (n--) { *d++ = *s++; } } else if (d > s) { d += n; s += n; while (n--) { *--d = *--s; } } return dst; } // memmove replacement
+INLINE void flag_setu16(u16 *flags, u16 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
+INLINE void flag_set(u32 *flags, u32 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }

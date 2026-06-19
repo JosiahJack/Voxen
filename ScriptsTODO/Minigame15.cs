@@ -35,9 +35,9 @@ public class Minigame15 : MonoBehaviour {
     public int row4Up;
     public int row4Dn;
     public bool[] sliding = new bool[17];
-    public Vector2[] slideDir = new Vector2[17];
-    private Vector3 pos;
-    public Vector3[] position = new Vector3[17];
+    public V2[] slideDir = new V2[17];
+    private V3 pos;
+    public V3[] position = new V3[17];
     private float slideTickFinished;
 
     void OnEnable() {
@@ -50,7 +50,7 @@ public class Minigame15 : MonoBehaviour {
         // TODO: Pick image, set size, hide numbers if using image.
         for (int i=1;i<=16;i++) { curNum[i] = i; sliding[i] = false; }
         int sixteenIndex = 16;
-        int shuffleIter = Eng_Global->diffPuz * 5;
+        int shuffleIter = World->diffPuz * 5;
         while (shuffleIter > 0) {
             int randIter = 32;
             while (randIter > 0) { // Find cell next to empty slot
@@ -66,31 +66,31 @@ public class Minigame15 : MonoBehaviour {
             shuffleIter--;
         }
 
-        position[1]  = (Vector3){-48f, 48f,-1f);
-        position[2]  = (Vector3){-16f, 48f,-1f);
-        position[3]  = (Vector3){ 16f, 48f,-1f);
-        position[4]  = (Vector3){ 48f, 48f,-1f);
-        position[5]  = (Vector3){-48f, 16f,-1f);
-        position[6]  = (Vector3){-16f, 16f,-1f);
-        position[7]  = (Vector3){ 16f, 16f,-1f);
-        position[8]  = (Vector3){ 48f, 16f,-1f);
-        position[9]  = (Vector3){-48f,-16f,-1f);
-        position[10] = (Vector3){-16f,-16f,-1f);
-        position[11] = (Vector3){ 16f,-16f,-1f);
-        position[12] = (Vector3){ 48f,-16f,-1f);
-        position[13] = (Vector3){-48f,-48f,-1f);
-        position[14] = (Vector3){-16f,-48f,-1f);
-        position[15] = (Vector3){ 16f,-48f,-1f);
-        position[16] = (Vector3){ 48f,-48f,-1f);
+        position[1]  = (V3){-48f, 48f,-1f);
+        position[2]  = (V3){-16f, 48f,-1f);
+        position[3]  = (V3){ 16f, 48f,-1f);
+        position[4]  = (V3){ 48f, 48f,-1f);
+        position[5]  = (V3){-48f, 16f,-1f);
+        position[6]  = (V3){-16f, 16f,-1f);
+        position[7]  = (V3){ 16f, 16f,-1f);
+        position[8]  = (V3){ 48f, 16f,-1f);
+        position[9]  = (V3){-48f,-16f,-1f);
+        position[10] = (V3){-16f,-16f,-1f);
+        position[11] = (V3){ 16f,-16f,-1f);
+        position[12] = (V3){ 48f,-16f,-1f);
+        position[13] = (V3){-48f,-48f,-1f);
+        position[14] = (V3){-16f,-48f,-1f);
+        position[15] = (V3){ 16f,-48f,-1f);
+        position[16] = (V3){ 48f,-48f,-1f);
 
         for (int i=1;i<=16;i++) {
             numText[i].text = curNum[i].ToString();
             if (curNum[i] == 16) numText[i].text = "";
             tileImage[i].rectTransform.localPosition =
-                (Vector3){position[i].x,position[i].y,0f);
+                (V3){position[i].x,position[i].y,0f);
         }
 
-        slideTickFinished = Eng_Global->pauseRelativeTime;
+        slideTickFinished = World->pauseRelativeTime;
     }
 
     private void SetAlignments() {
@@ -121,8 +121,8 @@ public class Minigame15 : MonoBehaviour {
     }
 
     void Update() {
-        if (Eng_Global->gamePaused) return;
-        if (Eng_Global->menuActive) return;
+        if (World->gamePaused) return;
+        if (World->menuActive) return;
 
         if      (AABBCursorCheck(col1Left,col1Right,row1Up,row1Dn)) BtnCheck(1);
         else if (AABBCursorCheck(col2Left,col2Right,row1Up,row1Dn)) BtnCheck(2);
@@ -153,11 +153,11 @@ public class Minigame15 : MonoBehaviour {
             }
         }
 
-        if (slideTickFinished < Eng_Global->pauseRelativeTime) {
-            float tdiff = Eng_Global->pauseRelativeTime - slideTickFinished;
+        if (slideTickFinished < World->pauseRelativeTime) {
+            float tdiff = World->pauseRelativeTime - slideTickFinished;
             float tickCount = tdiff / 0.04f;
             float shift = tickCount * 12f;
-            slideTickFinished = Eng_Global->pauseRelativeTime + 0.04f;
+            slideTickFinished = World->pauseRelativeTime + 0.04f;
             for (int i=1;i<=16;i++) {
                 if (!sliding[i]) continue;
 
@@ -174,7 +174,7 @@ public class Minigame15 : MonoBehaviour {
                 if (slidingUp) y = pos.y + shift;
                 else if (slidingDown) y = pos.y - shift;
 
-                sliderButton.localPosition = (Vector3){x,y,-1f);
+                sliderButton.localPosition = (V3){x,y,-1f);
                 float curx = sliderButton.localPosition.x;
                 float cury = sliderButton.localPosition.y;
                 if (   (slidingLeft  && curx <= position[i].x)
@@ -187,7 +187,7 @@ public class Minigame15 : MonoBehaviour {
                     tileImage[i].color = plainColor;
                     numText[i].text = curNum[i].ToString();
                     sliding[i] = false;
-                    slideDir[i] = Vector2.zero;
+                    slideDir[i] = V2.zero;
                 }
 
                 break;
@@ -209,9 +209,9 @@ public class Minigame15 : MonoBehaviour {
             xdiff = vabs(xdiff) > 2f ? xdiff : 0f;
             float ydiff = position[to].y - position[from].y;
             ydiff = vabs(ydiff) > 2f ? ydiff : 0f;
-            Vector2 sliddirBefore = new Vector2(xdiff,ydiff);
-            slideDir[to] = new Vector2(Utils.Sign(xdiff),Utils.Sign(ydiff));
-            slideTickFinished = Eng_Global->pauseRelativeTime + 0.1f;
+            V2 sliddirBefore = new V2(xdiff,ydiff);
+            slideDir[to] = new V2(Utils.Sign(xdiff),Utils.Sign(ydiff));
+            slideTickFinished = World->pauseRelativeTime + 0.1f;
         }
 
         curNum[to] = fromNum;

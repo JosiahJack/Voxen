@@ -59,11 +59,11 @@ void BioMonitorClearGraphs(void) {
     }
     for (int y=0;y<BIOM_GRAPH_H;y++) bioMonitor.currentColors[y] = bioMonitor.backgroundColor;
     bioMonitor.ymax = (BIOM_GRAPH_H - 1);
-    bioMonitor.beatFinished  = Eng_Global->pauseRelativeTime;
-    bioMonitor.tick0Finished = Eng_Global->pauseRelativeTime + bioMonitor.tick0;
-    bioMonitor.tick1Finished = Eng_Global->pauseRelativeTime + bioMonitor.tick1;
-    bioMonitor.tick2Finished = Eng_Global->pauseRelativeTime + bioMonitor.tick2;
-    bioMonitor.tickFinished  = Eng_Global->pauseRelativeTime + bioMonitor.tick;
+    bioMonitor.beatFinished  = World->pauseRelativeTime;
+    bioMonitor.tick0Finished = World->pauseRelativeTime + bioMonitor.tick0;
+    bioMonitor.tick1Finished = World->pauseRelativeTime + bioMonitor.tick1;
+    bioMonitor.tick2Finished = World->pauseRelativeTime + bioMonitor.tick2;
+    bioMonitor.tickFinished  = World->pauseRelativeTime + bioMonitor.tick;
     bioMonitor.currentIndex0 = (int)(BIOM_GRAPH_W * random_range(0.0f,1.0f));
     bioMonitor.currentIndex1 = (int)(BIOM_GRAPH_W * random_range(0.0f,1.0f));
     bioMonitor.currentIndex2 = (int)(BIOM_GRAPH_W * random_range(0.0f,1.0f));
@@ -207,16 +207,16 @@ void BioMonitorUpdate(u16 p) {
          if (inv->fatigue >= 80.0f)                         bioMonitor.fatigue = 532; // High!
     else if (inv->fatigue <  80.0f && inv->fatigue > 30.0f) bioMonitor.fatigue = 533; // Moderate
 
-    if (bioMonitor.beatFinished < Eng_Global->pauseRelativeTime) bioMonitor.heartRate = vfloor((70.0f + ((inv->fatigue / 100.0f) * 110.0f)) * random_range(0.95f,1.05f));
+    if (bioMonitor.beatFinished < World->pauseRelativeTime) bioMonitor.heartRate = vfloor((70.0f + ((inv->fatigue / 100.0f) * 110.0f)) * random_range(0.95f,1.05f));
     if (inv->hardwareVersion[HW_BIO_IDX] > 1 && (inv->patchActive & 127)) {
-//         bioMonitor.patchesActiveText = Eng_Text->stringTable[528]; // TODO actually render text
-//         if (inv->patchActive & PATCH_MEDI))     { tempStr.Append(Eng_Text->stringTable[520]); tempStr.Append(" "); }
-//         if (inv->patchActive & PATCH_STAMINUP)) { tempStr.Append(Eng_Text->stringTable[521]); tempStr.Append(" "); }
-//         if (inv->patchActive & PATCH_SIGHT))    { tempStr.Append(Eng_Text->stringTable[522]); tempStr.Append(" "); }
-//         if (inv->patchActive & PATCH_GENIUS))   { tempStr.Append(Eng_Text->stringTable[523]); tempStr.Append(" "); }
-//         if (inv->patchActive & PATCH_BERSERK))  { tempStr.Append(Eng_Text->stringTable[524]); tempStr.Append(" "); }
-//         if (inv->patchActive & PATCH_REFLEX))   { tempStr.Append(Eng_Text->stringTable[525]); tempStr.Append(" "); }
-//         if (inv->patchActive & PATCH_DETOX))    { tempStr.Append(Eng_Text->stringTable[530]); }
+//         bioMonitor.patchesActiveText = Text->stringTable[528]; // TODO actually render text
+//         if (inv->patchActive & PATCH_MEDI))     { tempStr.Append(Text->stringTable[520]); tempStr.Append(" "); }
+//         if (inv->patchActive & PATCH_STAMINUP)) { tempStr.Append(Text->stringTable[521]); tempStr.Append(" "); }
+//         if (inv->patchActive & PATCH_SIGHT))    { tempStr.Append(Text->stringTable[522]); tempStr.Append(" "); }
+//         if (inv->patchActive & PATCH_GENIUS))   { tempStr.Append(Text->stringTable[523]); tempStr.Append(" "); }
+//         if (inv->patchActive & PATCH_BERSERK))  { tempStr.Append(Text->stringTable[524]); tempStr.Append(" "); }
+//         if (inv->patchActive & PATCH_REFLEX))   { tempStr.Append(Text->stringTable[525]); tempStr.Append(" "); }
+//         if (inv->patchActive & PATCH_DETOX))    { tempStr.Append(Text->stringTable[530]); }
 //         patchEffects.text = tempStr.ToString();
     }
 
@@ -230,31 +230,31 @@ void BioMonitorUpdate(u16 p) {
 
     // Chi Brain Waves
     float brainFactor = 0.15f;
-    if (inv->geniusFinishedTime > Eng_Global->pauseRelativeTime) brainFactor = 0.35f + random_range(-0.3f,0.3f);
-    if (Eng_Cheats->showFPS) bioMonitor.chiValue = (((float)Eng_Global->thisFrameTime/16.0f) * 0.5f) - 2.0f;
-    else                     bioMonitor.chiValue = (float)(vsinf(Eng_Global->pauseRelativeTime * 10.0 * (double)brainFactor));
+    if (inv->geniusFinishedTime > World->pauseRelativeTime) brainFactor = 0.35f + random_range(-0.3f,0.3f);
+    if (Eng_Cheats->showFPS) bioMonitor.chiValue = (((float)World->thisFrameTime/16.0f) * 0.5f) - 2.0f;
+    else                     bioMonitor.chiValue = (float)(vsinf(World->pauseRelativeTime * 10.0 * (double)brainFactor));
 
     // ECG: Create shifted sine wave for heart beat.
     // Apply percent fatigued to 200bpm max heart rate with baseline 50bpm.
     float fatigueFactor = ((inv->fatigue / 100.0f) * 120.0f) + 20.0f;
     fatigueFactor = fatigueFactor / 60.0f;
-    if (bioMonitor.beatFinished < Eng_Global->pauseRelativeTime) bioMonitor.beatFinished = Eng_Global->pauseRelativeTime + (1.0 / (double)fatigueFactor);
-    bioMonitor.beatShift = (bioMonitor.beatFinished - Eng_Global->pauseRelativeTime) / (1.0 / (double)fatigueFactor);
+    if (bioMonitor.beatFinished < World->pauseRelativeTime) bioMonitor.beatFinished = World->pauseRelativeTime + (1.0 / (double)fatigueFactor);
+    bioMonitor.beatShift = (bioMonitor.beatFinished - World->pauseRelativeTime) / (1.0 / (double)fatigueFactor);
     if (bioMonitor.beatShift > 0.94f) bioMonitor.ecgValue = vsinf(bioMonitor.beatShift * 35.0f);
     else bioMonitor.ecgValue = 0.0f;
 
         // Inject variation when beating
     if (bioMonitor.ecgValue > beatThresh || bioMonitor.ecgValue < (beatThresh * -1.0f)) bioMonitor.ecgValue += random_range_i32(-beatVariation,beatVariation);
-    if (bioMonitor.tick0Finished < Eng_Global->pauseRelativeTime) {
-        bioMonitor.tick0Finished = Eng_Global->pauseRelativeTime + bioMonitor.tick0;
+    if (bioMonitor.tick0Finished < World->pauseRelativeTime) {
+        bioMonitor.tick0Finished = World->pauseRelativeTime + bioMonitor.tick0;
         Push(0,bioMonitor.ergValue); IncrementERG();
         Push(0,bioMonitor.ergValue); IncrementERG();
         Push(0,bioMonitor.ergValue);
     }
 
-    if (bioMonitor.tick1Finished < Eng_Global->pauseRelativeTime) {
-        if (Eng_Cheats->showFPS) bioMonitor.tick1Finished = Eng_Global->pauseRelativeTime + bioMonitor.tick2;
-        else                     bioMonitor.tick1Finished = Eng_Global->pauseRelativeTime + bioMonitor.tick1;
+    if (bioMonitor.tick1Finished < World->pauseRelativeTime) {
+        if (Eng_Cheats->showFPS) bioMonitor.tick1Finished = World->pauseRelativeTime + bioMonitor.tick2;
+        else                     bioMonitor.tick1Finished = World->pauseRelativeTime + bioMonitor.tick1;
 
         Push(1,bioMonitor.chiValue); IncrementCHI();
         Push(1,bioMonitor.chiValue); IncrementCHI();
@@ -262,8 +262,8 @@ void BioMonitorUpdate(u16 p) {
         Push(1,bioMonitor.chiValue);
     }
 
-    if (bioMonitor.tick2Finished < Eng_Global->pauseRelativeTime) {
-        bioMonitor.tick2Finished = Eng_Global->pauseRelativeTime + bioMonitor.tick2;
+    if (bioMonitor.tick2Finished < World->pauseRelativeTime) {
+        bioMonitor.tick2Finished = World->pauseRelativeTime + bioMonitor.tick2;
         Push(2,bioMonitor.ecgValue); IncrementECG();
         Push(2,bioMonitor.ecgValue);
     }
@@ -305,8 +305,8 @@ void BioMonitorUpdate(u16 p) {
         }
     }
 
-    if (bioMonitor.tickFinished < Eng_Global->pauseRelativeTime) {
-        bioMonitor.tickFinished = Eng_Global->pauseRelativeTime + bioMonitor.tick;
+    if (bioMonitor.tickFinished < World->pauseRelativeTime) {
+        bioMonitor.tickFinished = World->pauseRelativeTime + bioMonitor.tick;
         IncrementERG(); IncrementCHI(); IncrementECG();
     }
     
