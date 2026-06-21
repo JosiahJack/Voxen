@@ -3,7 +3,7 @@
 Entity EDefs[MAX_ENTITIES];
 #define GEOMETRY_LOD_CARD_MODEL_IDX 178
 void* mcpy(void *dst, const void *src, size_t n) { u8 *d=(u8 *)dst; const u8 *s=(const u8 *)src; while (n--) {*d++=*s++;} return dst; } // memcpy replacement
-MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(void) { // Global conditions for all entities.  No sense inflating the table data in entity.c
+MOD_TO_ENGINE void ModEDefsInitAfterLoad(void) { // Global conditions for all entities.  No sense inflating the table data in entity.c
     mset(EDefs,0,sizeof(Entity)); 
     for (int i=0;i<768;++i) { EDefs[i].index = i; EDefs[i].modelIndex = MAX_MDLS; EDefs[i].rotation = QUAT_IDENTITY; EDefs[i].lodIndex = MAX_MDLS; }
     
@@ -795,7 +795,7 @@ MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(void) { // Global condition
         
         if (!EDefs[i].layer) EDefs[i].layer = L_Default;
         flag_set(&EDefs[i].entflags,EF_ACTIVE,true); // Individual value setting to allow mods to set custom starting flags themselves. (or here too if they want, tis your oyster).
-        flag_set(&EDefs[i].entflags,EF_RIGIDBODY,ConstIndexIsDynamicObject(EDefs[i].index));
+        flag_set(&EDefs[i].entflags,EF_RIGIDBODY,IdxIsDynamicObject(EDefs[i].index));
         if (EDefs[i].cardchunk) {
             EDefs[i].lodIndex = GEOMETRY_LOD_CARD_MODEL_IDX;
             EDefs[i].collider = COLTYPE_BOX;
@@ -804,18 +804,18 @@ MOD_TO_ENGINE void ModEntityDefinitionsInitAfterLoad(void) { // Global condition
         }
         
         EDefs[i].currentFrameFinished = World->pauseRelativeTime + 0.1;
-        if (ConstIndexIsButtonSwitch(EDefs[i].index)) { EDefs[i].lockedMessageLingdex = 193; EDefs[i].tickTime = 1.5; } // ButtonSwitch
+        if (IdxIsButtonSwitch(EDefs[i].index)) { EDefs[i].lockedMessageLingdex = 193; EDefs[i].tickTime = 1.5; } // ButtonSwitch
     }
 }
 
 u16 AddInstance(u16 entIdx, V3 pos) {
     if (entIdx >= MAX_ENTITIES) { DualLogError("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d, skipped\n",entIdx,MAX_ENTITIES); return INSTANCE_COUNT; }
     
-    u16 i = World->loadedInstances;
+    u16 i = World->instCount;
     Entity* e = &World->instances[i];
     e->index = entIdx;
     SetPosition(e,pos,true); // Marks dirty internally, using true to force as if twere teleported.
-    if (ConstIndexIsNPC(entIdx)) InitializeAIAfterLoad(i);
+    if (IdxIsNPC(entIdx)) InitializeAIAfterLoad(i);
     e->cardchunk = EDefs[entIdx].cardchunk;
     e->modelIndex = EDefs[entIdx].modelIndex;
     e->colMeshIndex = EDefs[entIdx].colMeshIndex;
@@ -833,15 +833,15 @@ u16 AddInstance(u16 entIdx, V3 pos) {
     e->mass = EDefs[entIdx].mass > 0.0f ? EDefs[entIdx].mass : 1.0f; e->angularDrag = EDefs[entIdx].angularDrag > 0.0f ? EDefs[entIdx].angularDrag : 0.05f;
     e->gravity = EDefs[entIdx].gravity > 0.0f ? EDefs[entIdx].gravity : 1.0f;
     World->instances[i].lockedMessageLingdex = EDefs[entIdx].lockedMessageLingdex;
-    World->loadedInstances++;
+    World->instCount++;
     return i;
 }
 
 void DeleteInstance(u16 i) {
-    if (i <= PLAYER2 || i >= World->loadedInstances) return; // Don't delete null ent, player 1, nor player 2 or already empty slots.
+    if (i <= PLAYER2 || i >= World->instCount) return; // Don't delete null ent, player 1, nor player 2 or already empty slots.
 
-    mcpy(&World->instances[i],&World->instances[World->loadedInstances - 1],sizeof(Entity));
-    --World->loadedInstances; // Shift final marker.  It's history!
+    mcpy(&World->instances[i],&World->instances[World->instCount - 1],sizeof(Entity));
+    --World->instCount; // Shift final marker.  It's history!
 }
 
 static const Color fogLUT[14] = { {0.3207547f, 0.29200783f,0.29200783f,0.07f},/*0*/  {0.34509805f,0.38431373f,0.49019608f,0.055f},/*1*/  {0.47058824f,0.3882353f, 0.3928334f,0.05f},/*2*/  {0.32941177f,0.29411766f,0.2509804f,0.065f},/*3*/ {0.3882353f,0.452415f, 0.47058824f,0.075f},/*4*/
@@ -868,13 +868,13 @@ MOD_TO_ENGINE void SetGlobalsModData() {
 MOD_TO_ENGINE void LoadLevelMod(u8 lev) {
     u8 curlevel = vclamp(lev,0,13); World->curLev = curlevel;
     World->levelCurrentlyLoading = true;
-    World->loadedInstances = 3; // 0 == NULL, 1 == Player1, 2 == Player2
+    World->instCount = 3; // 0 == NULL, 1 == Player1, 2 == Player2
     if (curlevel == 1) {
         AddCamView((V3){-19.2301f,-42.6604f,-49.7453f},(Quaternion){0.2375f,0.0008f,-0.0002f,0.9713f},75u,256u,256u,2.21f,11.5f);
         AddCamView((V3){7.664583f,-44.88017f,-14.26742f},(Quaternion){0.0f,0.9999f,0.0129f,0.0f},60u,256u,256u,2.192f,20.6f);
     } // TODO other level camviews
 
-    for (u16 idx = START_INDEX_LEVEL_INSTANCES; idx < INSTANCE_COUNT; idx++) InitializeEntity(&World->instances[idx]);
+    for (u16 idx = INSTS_1ST_IDX; idx < INSTANCE_COUNT; idx++) InitializeEntity(&World->instances[idx]);
     mset(entsFromFile,0,INSTANCE_COUNT * sizeof(Entity));
     mset(lightsFromFile,0,LIGHT_COUNT * sizeof(Light));
     mset(lanimsFromFile,0,LIGHT_COUNT * sizeof(LightAnimation));
@@ -1054,7 +1054,7 @@ MOD_TO_ENGINE void LoadLevelMod(u8 lev) {
         scpy_to_a_from_b(par->target,src->target,TARGET_STRING_LENGTH);
         scpy_to_a_from_b(par->targetname,src->targetname,TARGET_STRING_LENGTH);
         scpy_to_a_from_b(par->texAnimResourceFolder,src->texAnimResourceFolder,TARGET_STRING_LENGTH);
-        if (ConstIndexIsPortalBlockingDoor(entIdx)) AddDoorPortal(entIdx, parent); // Only at load, not in AddInstance
+        if (IdxIsPortalBlockingDoor(entIdx)) AddDoorPortal(entIdx, parent); // Only at load, not in AddInstance
         if (entIdx == 525) { // prop_console01
             V3 ofs1 = GetLocalTransformedPos(par,(V3){5.81f,2.29f,38.05f-38.3552f});
             V3 ofs2 = GetLocalTransformedPos(par,(V3){-10.1f,0.9f,18.21f-38.3552f});

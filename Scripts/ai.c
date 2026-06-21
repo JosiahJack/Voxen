@@ -303,7 +303,7 @@ static bool AICheckIfEnemyInSight(Entity* self) {
         NPCType t = npcTable[self->index - 419].type;
         if (t != NPCType_Mutant && t != NPCType_Supermutant && t != NPCType_Cyber) {
             u16 hi = hit.hitInstanceIndex;
-            if (hi && V3_SqDist(hit.point, spos) < 4.0f && ConstIndexIsDoor(World->instances[hi].index)) {
+            if (hi && V3_SqDist(hit.point, spos) < 4.0f && IdxIsDoor(World->instances[hi].index)) {
                 Entity* dr = &World->instances[hi];
                 if ((dr->doorOpen == DoorState_Closed || (dr->doorOpen == DoorState_Closing && World->diffCbt > 2)) && !(dr->entflags & EF_LOCKED) && GetCurrentLevelSecurity() <= dr->securityThreshold && (dr->requiredAccessCard == AccessCardType_None)) DoorActuate(hi);
             }
@@ -431,7 +431,7 @@ bool AICheckPain(Entity* self) {
         self->timeTillEnemyChangeFinished = World->pauseRelativeTime + npcTable[self->index - 419].timeToChangeEnemy;
         Entity* atk = &World->instances[atkIdx];
         bool atkIsPlayer = (atk->layer & L_Player) != 0;
-        if (!atkIsPlayer && ConstIndexIsNPC(atk->index)) {
+        if (!atkIsPlayer && IdxIsNPC(atk->index)) {
             NPCType mt = npcTable[self->index - 419].type, at = npcTable[atk->index - 419].type;
             bool canFight = atk->index != self->index;
             if ((mt == NPCType_Robot && self->enemy) || ((mt == NPCType_Cyborg || mt == NPCType_Supercyborg || mt == NPCType_Robot) && (at == NPCType_Cyborg || at == NPCType_Supercyborg || at == NPCType_Robot))) canFight = false;            
@@ -577,8 +577,8 @@ static void AIHunt(Entity* self) {
 }
 
 float DistToEnemy(u16 self, u16 enem) {
-    if (self >= World->loadedInstances) return 100000.0f;
-    if (enem >= World->loadedInstances) return 100000.0f;
+    if (self >= World->instCount) return 100000.0f;
+    if (enem >= World->instCount) return 100000.0f;
     
     V3 selfPos = World->instances[self].position, enemPos = World->instances[enem].position;
     V3 d = V3_AsubB(selfPos,enemPos); return V3_dot(d,d);
@@ -855,7 +855,7 @@ static void ProjectileRaycast(Entity* self, int n) {
     dd.impactVelocity = dd.damage;
     bool hitPlayer = (hi == PLAYER1 || hi == PLAYER2);
     if (hitPlayer) dd.impactVelocity *= 0.5f;
-    dd.isOtherNPC = !hitPlayer && ConstIndexIsNPC(World->instances[hi].index);
+    dd.isOtherNPC = !hitPlayer && IdxIsNPC(World->instances[hi].index);
     if (hi) ai_apply_damage(dd, hi);
     u16 impactCI = GetImpactType(hi);
     if (impactCI) {
@@ -898,7 +898,7 @@ static void AIExplodeAttack(Entity* self) {
     float radius = npcTable[self->index - 419].attack3Radius; float force  = npcTable[self->index - 419].attack3Force;
     V3 epos = ai_sight_pos(self);
     DamageData dd = SetNPCData(self, 3);
-    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < World->loadedInstances; ++i) {
+    for (u16 i = INSTS_1ST_IDX; i < World->instCount; ++i) {
         Entity* t = &World->instances[i];
         if (!(t->entflags & EF_ACTIVE)) continue;
         

@@ -842,7 +842,7 @@ void WeaponsUpdate(void) {
 // 
 // 	// TargetID Instance
 // 	void CreateTargetIDInstance(float dmgFinal, u16 npcIdx, float tranq) {
-// 		 if (!ConstIndexIsNPC(World->instances[npcIdx].index) || World->instances[npcIdx].health <= 0f) return;
+// 		 if (!IdxIsNPC(World->instances[npcIdx].index) || World->instances[npcIdx].health <= 0f) return;
 //          if (!(World->invP1.hasHardware & HW_TID) || tranq > 0.0f) return;
 // 		if (World->instances[npcIdx].linkedTargetID) return; // Let SendDamageReceive handle updates
 // /*

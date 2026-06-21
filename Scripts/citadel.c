@@ -52,7 +52,7 @@ V3 ScreenPointToRay(V3 fwd, V3 rt) {
 void DropHeldItem(u16 p) {
     InventorySystem* inv = Inv(p);
     Entity* ply = &World->instances[p];
-    if (inv->heldObjectIndex >= World->loadedInstances) { ResetHeldItem(p); return; }
+    if (inv->heldObjectIndex >= World->instCount) { ResetHeldItem(p); return; }
     if (inv->dropFinished > World->pauseRelativeTime) return;
     
     inv->dropFinished = World->pauseRelativeTime + 0.2; // Prevent immediate regrab at high fps
@@ -262,11 +262,11 @@ static void PlayLog(u16 p,int logIndex) {
     if (logIndex < 0) return;
     InventorySystem* inv = Inv(p);
     if (!(inv->hasHardware & HW_ERD)) return;
-//     if (inv->logSoundInited) { SoundStop(&inv->logSound); SoundUninit(&inv->logSound); inv->logSoundInited = false; }
-//     if (!SoundInit(sounds[Eng_Text->audioLogSoundIndex[logIndex]],0,NULL,NULL,&inv->logSound)) {
-//         SoundSetVolume(&inv->logSound,(float)Settings->VolumeMessage / 100.0f);
-//         SoundStart(&inv->logSound);
-//         inv->logSoundInited = true;
+//     if (inv->logSndInited) { SndStop(&inv->logSound); SndUninit(&inv->logSound); inv->logSndInited = false; }
+//     if (!SndInit(sounds[Eng_Text->audioLogSoundIndex[logIndex]],0,NULL,NULL,&inv->logSound)) {
+//         SndSetVolume(&inv->logSound,(float)Settings->VolumeMessage / 100.0f);
+//         SndStart(&inv->logSound);
+//         inv->logSndInited = true;
 //     }
 //     inv->readLog[logIndex] = true;
 //     if (Eng_Text->audioLogType[logIndex] == AudioLogType_Vmail) {
@@ -641,7 +641,7 @@ void InventoryUpdate(u16 p) {
     if (GrenadeCycUp())  { if (PE(p)->inCyberTube) CycleCyberSpaceItemUp(p); else GrenadeCycleUp(p); }
     if (GrenadeCycDown()){ if (PE(p)->inCyberTube) CycleCyberSpaceItemDn(p); else GrenadeCycleDown(p); }
     if (RecentLog() && (inv->hasHardware & HW_ERD)) {
-        bool playing = false;//GetSoundIsPlaying(&inv->logSound); TODO
+        bool playing = false;//SndPlaying(&inv->logSound); TODO
         if (inv->lastAddedIndex >= 0 && !playing) {
             int temp = inv->lastAddedIndex;
             PlayLog(p,temp);
@@ -649,7 +649,7 @@ void InventoryUpdate(u16 p) {
             if (inv->lastAddedIndex == temp) inv->lastAddedIndex = -1;
             CheckForUnreadLogs(p);
         } else {
-//             SoundStop(&inv->logSound); TODO
+//             SndStop(&inv->logSound); TODO
             int temp = inv->lastAddedIndex;
             inv->lastAddedIndex = FindNextUnreadLog(p);
             if (inv->lastAddedIndex == temp) inv->lastAddedIndex = -1;
@@ -816,7 +816,7 @@ void CyberPushOnTriggerExit(u16 self, u16 other) {
 // CyberDoor
 void CyberDoorOnCollisionEnter(u16 self, u16 other) {
     Entity* e = &World->instances[self];
-    if (!ConstIndexIsDoor(e->index) || (other != PLAYER1 && other != PLAYER2)) return;
+    if (!IdxIsDoor(e->index) || (other != PLAYER1 && other != PLAYER2)) return;
     CenterStatusPrint("%s  %s",Eng_Text->stringTable[e->messageIndex],Eng_Text->stringTable[601]);
 }
 //=============================================================================
@@ -1250,7 +1250,7 @@ void UseTargets(u16 activator, const char* targetname) {
     if (sEmpty(targetname)) return;
     
     bool succeeded = false;
-    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < World->loadedInstances; i++) {
+    for (u16 i = INSTS_1ST_IDX; i < World->instCount; i++) {
         if (!sEqual(World->instances[i].targetname,targetname)) continue;
         
         DualLog("Successfully found matching targetname %s for entity %u and activator ioflags:%u\n",targetname,i,World->instances[activator].ioflags);
@@ -1263,7 +1263,7 @@ void UseTargets(u16 activator, const char* targetname) {
 void Targetted(u16 activator, u16 self) {
     Entity* e = &World->instances[self];
     Entity* a = &World->instances[activator];
-    DualLog("Targetted running with a->ioflags:%u, e->index:%u, door conditions:%u\n",a->ioflags,e->index,((a->ioflags & TARG_IOFLAGS_DOOROPEN) && ConstIndexIsDoor(e->index)));
+    DualLog("Targetted running with a->ioflags:%u, e->index:%u, door conditions:%u\n",a->ioflags,e->index,((a->ioflags & TARG_IOFLAGS_DOOROPEN) && IdxIsDoor(e->index)));
     if (e->index == 709) { CenterStatusPrint("%s",Eng_Text->stringTable[e->messageLingdex]); return; } // info_message
     if (e->index == 708) { World->gameFinished = true; return; }
     
@@ -1274,13 +1274,13 @@ void Targetted(u16 activator, u16 self) {
     }
     
     if (a->ioflags & TARG_IOFLAGS_UNLOCK) EntitySetLocked(e,false);
-    if ((a->ioflags & TARG_IOFLAGS_LOCK) && ConstIndexIsDoor(e->index)) EntitySetLocked(e,true);
+    if ((a->ioflags & TARG_IOFLAGS_LOCK) && IdxIsDoor(e->index)) EntitySetLocked(e,true);
     
-    if (ConstIndexIsButtonSwitch(e->index)) ButtonSwitchTargetted(self,activator);
-    if ((a->ioflags & TARG_IOFLAGS_DOOROPEN) && ConstIndexIsDoor(e->index)) { DualLog("Running DoorForceOpen from ioflag DOOROPEN on entity %u\n",self); DoorForceOpen(self); }
-    else if ((a->ioflags & TARG_IOFLAGS_DOOROPENIFUNLOCKED) && ConstIndexIsDoor(e->index) && ((e->entflags & EF_LOCKED) == 0) && (e->requiredAccessCard == AccessCardType_None || (World->invP1.accessCardOwned & (1u << e->requiredAccessCard)))) DoorForceOpen(self);
-    else if ((a->ioflags & TARG_IOFLAGS_DOORCLOSE) && ConstIndexIsDoor(e->index)) DoorForceClose(self);
-    else if (ConstIndexIsDoor(e->index)) DoorTargetted(self,activator);
+    if (IdxIsButtonSwitch(e->index)) ButtonSwitchTargetted(self,activator);
+    if ((a->ioflags & TARG_IOFLAGS_DOOROPEN) && IdxIsDoor(e->index)) { DualLog("Running DoorForceOpen from ioflag DOOROPEN on entity %u\n",self); DoorForceOpen(self); }
+    else if ((a->ioflags & TARG_IOFLAGS_DOOROPENIFUNLOCKED) && IdxIsDoor(e->index) && ((e->entflags & EF_LOCKED) == 0) && (e->requiredAccessCard == AccessCardType_None || (World->invP1.accessCardOwned & (1u << e->requiredAccessCard)))) DoorForceOpen(self);
+    else if ((a->ioflags & TARG_IOFLAGS_DOORCLOSE) && IdxIsDoor(e->index)) DoorForceClose(self);
+    else if (IdxIsDoor(e->index)) DoorTargetted(self,activator);
     
     if (a->ioflags & TARG_IOFLAGS_FBRIDGE_ACTIVATE) ForceBridgeActivate(self,false);
     else if (a->ioflags & TARG_IOFLAGS_FBRIDGE_DEACTIVATE) ForceBridgeDeactivate(self,false);
@@ -1745,10 +1745,10 @@ static const u16 hwDrainJPM[12][4] = {
 };
 
 static void TargetIdentifierSenseTargets(void) {
-    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < World->loadedInstances; i++) {
+    for (u16 i = INSTS_1ST_IDX; i < World->instCount; i++) {
         Entity* e = &World->instances[i];
         if (!(e->entflags & EF_ACTIVE))         continue;
-        if (!ConstIndexIsNPC(e->index))              continue;
+        if (!IdxIsNPC(e->index))              continue;
         if (e->entflags & EF_DEAD)              continue;
         if (e->entflags & EF_TARGID_ATTACHED)   continue;
         if (V3_Dist(e->position,World->instances[PLAYER1].position) > TargetIDGetSensingRange(false))        continue;
@@ -1906,7 +1906,7 @@ static void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 
         .attackType    = e->attackType,
         .owner         = e->recentMostActivator,
         .hitIdx        = hitIdx,
-        .isOtherNPC    = ConstIndexIsNPC(World->instances[hitIdx].index),
+        .isOtherNPC    = IdxIsNPC(World->instances[hitIdx].index),
         .berserkActive = (World->invP1.patchActive & PATCH_BERSERK) != 0,
     };
 
@@ -1984,12 +1984,12 @@ static bool IsCyberEntity(u16 self) {
     if (World->curLev == LEVEL_CYBERSPACE) return true;
     Entity* e = &World->instances[self];
     if (self != PLAYER1 && e->cyberHealth > 0.0f) return true;
-    return (ConstIndexIsNPC(e->index) && (e->index - 419) > 23); // 24-28 are cyber enemies
+    return (IdxIsNPC(e->index) && (e->index - 419) > 23); // 24-28 are cyber enemies
 }
 
 static float ApplyAttackTypeAdjustments(u16 self,float take,AttackType at) {
     Entity* e = &World->instances[self];
-    if (!ConstIndexIsNPC(e->index) || e->health <= 0.0f) return take;
+    if (!IdxIsNPC(e->index) || e->health <= 0.0f) return take;
     NPCType t = npcTable[e->index - 419].type;
     if (at >= 12) return take;
     return take * attackTypeMult[t][at];
@@ -2100,8 +2100,8 @@ static void VaporizeCorpse(u16 self,bool energyVaporized) {
     if (fx == 0) fx = 1; // PoolType_CorpseHit fallback
     if (energyVaporized) fx = 2; // PoolType_Vaporize
     e->modelIndex = MAX_MDLS;
-    bool isNPC = ConstIndexIsNPC(e->index);
-    bool isSearchable = ConstIndexIsSearchable(e->index);
+    bool isNPC = IdxIsNPC(e->index);
+    bool isSearchable = IdxIsSearchable(e->index);
     if (isNPC || isSearchable) DeleteInstance(self);
     CreateDeathEffects(self,fx);
 }
@@ -2110,11 +2110,11 @@ static void Death(u16 self,bool energyVaporized) {
     Entity* e = &World->instances[self];
     if (e->entflags & EF_DEAD_CHECKS_DONE) return;
     UseDeathTargets(self);
-    bool isNPC = ConstIndexIsNPC(e->index);
-    bool isObj = ConstIndexIsDynamicObject(e->index);
+    bool isNPC = IdxIsNPC(e->index);
+    bool isObj = IdxIsDynamicObject(e->index);
     if (e->entflags & EF_ACT_AS_CORPSE_ONLY) { e->entflags |= EF_DEAD_CHECKS_DONE; return; }
 //     bool gib        = (e->entflags & EF_DEATH_BURST_DONE) != 0;
-    bool vaporize   = (ConstIndexIsNPC(e->index) && e->health <= 0.0f) || ConstIndexIsCorpse(e->index); // vaporizeCorpse maps to VISIBLE being set
+    bool vaporize   = (IdxIsNPC(e->index) && e->health <= 0.0f) || IdxIsCorpse(e->index); // vaporizeCorpse maps to VISIBLE being set
     bool isScreen   = (e->index == 279);
     bool isGrenade  = (e->entflags & EF_ISGRENADE) != 0;
     bool isCam      = (e->index == 477);
@@ -2135,9 +2135,9 @@ float TakeDamage(u16 self,DamageData dd) {
     if (Eng_Cheats->god && (self == PLAYER1 || self == PLAYER2)) return 0.0f;
     bool isCyber = IsCyberEntity(self);
     float* hp    = isCyber ? &e->cyberHealth : &e->health;
-    bool isNPC   = ConstIndexIsNPC(e->index);
+    bool isNPC   = IdxIsNPC(e->index);
     bool isPlayer = (self == PLAYER1 || self == PLAYER2);
-//     bool isObj   = ConstIndexIsDynamicObject(e->index);
+//     bool isObj   = IdxIsDynamicObject(e->index);
     bool isGrenade = (e->entflags & EF_ISGRENADE) != 0;
 //     bool isScreen  = (e->index == 279);
     bool isCam     = (e->index == 477);
@@ -2192,7 +2192,7 @@ float TakeDamage(u16 self,DamageData dd) {
                 play_wav(sounds[140],Settings->VolumeEffects,(V3){},false); // player pain
                 // TODO: pstatic.Flash(take>15?2:take>10?1:0) — pain flash FX
             }
-            if (dd.owner != NULLENT && ConstIndexIsNPC(World->instances[dd.owner].index))
+            if (dd.owner != NULLENT && IdxIsNPC(World->instances[dd.owner].index))
                 e->noiseFinished = World->pauseRelativeTime; // justHurtByEnemy for music system
         }
     }
@@ -2245,7 +2245,7 @@ float TakeDamage(u16 self,DamageData dd) {
 void HealthManagerInitAfterLoad(u16 self) {
     Entity* e = &World->instances[self];
     bool isPlayer = (self == PLAYER1 || self == PLAYER2);
-    bool isNPC    = ConstIndexIsNPC(e->index);
+    bool isNPC    = IdxIsNPC(e->index);
     if (isPlayer) {
         e->health      = 211.0f;
         e->cyberHealth = 255.0f;
@@ -3116,7 +3116,7 @@ void DoorUpdate(u16 self) {
 MOD_TO_ENGINE u16 SpawnDynamicObject(int val, bool cheat) {
     if (!ConstIndexInBounds(val)) { DualLogError("Const index out of bounds: %u", val); return NULLENT; }
     if (cheat) DualLog("Cheat spawn constIndex %u, level: %u, from cheat: %u, name: ", val, World->curLev, cheat);
-    if (ConstIndexIsGeometry(val) && !Eng_Cheats->editMode) { CenterStatusPrint("Indices 0 through 306 (level geometry chunks) not possible when not on edit mode!"); return NULLENT; }
+    if (IdxIsGeometry(val) && !Eng_Cheats->editMode) { CenterStatusPrint("Indices 0 through 306 (level geometry chunks) not possible when not on edit mode!"); return NULLENT; }
     u16 entityIndexInInstanceTable = NULLENT;
     return entityIndexInInstanceTable;
 }
@@ -3170,12 +3170,12 @@ void SearchObject(int searchable, bool first) {
 void UseEntity(u16 p, u16 i) {
     InventorySystem* inv = Inv(p);
     Entity* ent = &World->instances[i];
-    if (ConstIndexIsSearchable(ent->index)) { inv->currentSearchItem = i; SearchObject(i,firstTimeSearch); DualLog("Search\n"); }
-    else if (ConstIndexIsDoor(ent->index)) DoorUse(i,PLAYER1);
-    else if (ConstIndexIsNPC(ent->index)) DualLog("Can't use NPC\n");
-    else if (ConstIndexIsButtonSwitch(ent->index)) ButtonSwitchUse(i,PLAYER1);
-    else if (ConstIndexIsGeometry(ent->index)) DualLog("Can't use modular geometry\n");
-    else if (ConstIndexIsUsableObject(ent->index)) {
+    if (IdxIsSearchable(ent->index)) { inv->currentSearchItem = i; SearchObject(i,firstTimeSearch); DualLog("Search\n"); }
+    else if (IdxIsDoor(ent->index)) DoorUse(i,PLAYER1);
+    else if (IdxIsNPC(ent->index)) DualLog("Can't use NPC\n");
+    else if (IdxIsButtonSwitch(ent->index)) ButtonSwitchUse(i,PLAYER1);
+    else if (IdxIsGeometry(ent->index)) DualLog("Can't use modular geometry\n");
+    else if (IdxIsUsableObject(ent->index)) {
         inv->holdingObject = true;
         inv->heldObjectIndex = ent->index;
         inv->heldObjectCustomIndex = ent->usableCustomIndex;
@@ -3223,13 +3223,13 @@ MOD_TO_ENGINE void ModUpdate(void) {
     HardwareUpdate(PLAYER1);
     if (Use()) Frob(World->instances[PLAYER1].position,World->instances[PLAYER1].forward,World->instances[PLAYER1].right);
     if (World->pauseRelativeTime < World->debugLineFinished && (World->debugLineVertCount + 6) < (MAX_WIRELINE_VRTS * 3)) AddWireLine(World->debugLine_start,World->debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f});
-    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < World->loadedInstances; ++i) {
+    for (u16 i = INSTS_1ST_IDX; i < World->instCount; ++i) {
         Entity* e = &World->instances[i];
         TextureSequenceUpdate(i);
         u16 constdex = e->index;
         if (constdex == 718) ExplosionLifeUpdate(i);
-        if (ConstIndexIsButtonSwitch(constdex)) ButtonSwitchUpdate(i);
-        if (ConstIndexIsDoor(constdex)) DoorUpdate(i);
+        if (IdxIsButtonSwitch(constdex)) ButtonSwitchUpdate(i);
+        if (IdxIsDoor(constdex)) DoorUpdate(i);
         if (constdex == 701) LogicTimerUpdate(i);
         if (e->doSelfAfterList || e->despawnInstead || e->destroyAfterListInsteadOfDeactivate) DelayedSpawnUpdate(i);
         if (e->itemLifeTime > 0.0f) SearchFXResetUpdate(i);
@@ -3285,7 +3285,7 @@ MOD_TO_ENGINE bool Map(void) { return World->GetKeyPressed(37); }
 MOD_TO_ENGINE bool SwimUp(void) { return World->GetKey(38); }
 MOD_TO_ENGINE bool SwimDn(void) { return World->GetKey(39); }
 MOD_TO_ENGINE bool Console(void) { return World->GetKeyPressed(-1); }
-MOD_TO_ENGINE bool TakeScreenshot(void) { return World->GetKeyPressed(41); }
+MOD_TO_ENGINE bool ScrshotPressed(void) { return World->GetKeyPressed(41); }
 
 MOD_TO_ENGINE void ProcessInput(void) {
     if (Console()) ToggleConsole();
@@ -3298,8 +3298,6 @@ MOD_TO_ENGINE void ProcessInput(void) {
     if (Infrared()) World->invP1.hardwareIsActive ^= HW_INF;
     ApplyPlayerMovements();
 }
-
-MOD_TO_ENGINE void CheckAndTakeScreenshot(void) { if (TakeScreenshot() && World->current_time > World->screenshotTimeout) Screenshot(); }
 
 void SearchableInit(u16 i) {
     int numRandomGeneratedItems = 0;
@@ -3335,7 +3333,7 @@ u16 GetImpactType(u16 instanceIdx) {
 void UsableInit(u16 i) {
     Entity* e = &World->instances[i];
     if (World->diffPuz == 3 && e->index == 361 && random_range(0.0f,1.0f) < 0.33f) DeleteInstance(i); // 33% chance of not spawning logic probes on Puzzle difficulty of 3
-    if (World->diffMis <= 1 && ConstIndexIsAccessCard(e->index)) DeleteInstance(i); // Remove access cards on Mission difficulty 1 or 0
+    if (World->diffMis <= 1 && IdxIsAccessCard(e->index)) DeleteInstance(i); // Remove access cards on Mission difficulty 1 or 0
     if (World->diffMis == 0 && e->index == 313) DeleteInstance(i); // Remove audiologs on Mission difficulty 0
 }
 
@@ -3412,17 +3410,17 @@ MOD_TO_ENGINE void PlayerInit(u16 i) {
 #include "credits.h"
 MOD_TO_ENGINE const char** GetCreditsText(void) { return creditPages; }
 MOD_TO_ENGINE void ModInitAfterLoad(void) {
-    for (int i=PLAYER1;i<World->loadedInstances;++i) {
+    for (int i=PLAYER1;i<World->instCount;++i) {
         Entity* e = &World->instances[i]; u16 constIndex = e->index;
-        if (i == PLAYER1 || i == PLAYER2 || ConstIndexIsDynamicObject(constIndex) || (ConstIndexIsNPC(constIndex) && constIndex < 443/*not cyber*/)) e->gravity = 1.0f;
+        if (i == PLAYER1 || i == PLAYER2 || IdxIsDynamicObject(constIndex) || (IdxIsNPC(constIndex) && constIndex < 443/*not cyber*/)) e->gravity = 1.0f;
         else e->gravity = 0.0f;
         
-        if (ConstIndexIsGeometry(constIndex)) e->layer = L_Geometry;
-        else if (ConstIndexIsDoor(constIndex)) e->layer = L_Door;
-        else if (ConstIndexIsUsableObject(constIndex)) UsableInit(i);
-        else if (ConstIndexIsDoor(e->index)) DoorInitAfterLoad(i);
-        else if (ConstIndexIsNPC(constIndex)) { e->layer = L_NPC; /* TODO AIInit funcion */ }
-        else if (ConstIndexIsSearchable(constIndex)) SearchableInit(i);
+        if (IdxIsGeometry(constIndex)) e->layer = L_Geometry;
+        else if (IdxIsDoor(constIndex)) e->layer = L_Door;
+        else if (IdxIsUsableObject(constIndex)) UsableInit(i);
+        else if (IdxIsDoor(e->index)) DoorInitAfterLoad(i);
+        else if (IdxIsNPC(constIndex)) { e->layer = L_NPC; /* TODO AIInit funcion */ }
+        else if (IdxIsSearchable(constIndex)) SearchableInit(i);
         else if (constIndex == 515) func_forcebridge(i); // func_forcebridge
         else if (constIndex == 517) FuncWallInitAfterLoad(i);
         else if (constIndex == 596) GravityLiftInitAfterLoad(i);
@@ -3431,7 +3429,7 @@ MOD_TO_ENGINE void ModInitAfterLoad(void) {
         else if (constIndex == 555) { } // prop_cyber_switch CyberSwitchInitAfterLoad(i);
         else if (constIndex == 21 || constIndex == 22) CyberWallInitAfterLoad(i); // chunk_cyberpanel or chunk_cyberpanel_slice45
         else if (constIndex == 736) TargetIDInitAfterLoad(i);
-        else if (ConstIndexIsButtonSwitch(e->index)) ButtonSwitchInitAfterLoad(i);
+        else if (IdxIsButtonSwitch(e->index)) ButtonSwitchInitAfterLoad(i);
         else if (constIndex >= 448 && constIndex <= 457) CyberItemInitBeforeLoad(i);
         else if (constIndex == 480) CyberMineInitBeforeLoad(i);
         if (!sEmpty(e->targetname) && (e->ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE)) flag_set(&e->entflags,EF_ACTIVE,false);

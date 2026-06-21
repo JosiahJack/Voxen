@@ -1,7 +1,4 @@
 // voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake
-#if defined(LINUX)
-    //#define DEBUG_RAM_OUTPUT
-#endif
 #include "common.h"
 #define MOD_INTEROP_ENGINE
 #include "interop.h"
@@ -39,34 +36,26 @@ ENGINE_TO_MOD void DualLogError(const char* fmt, ...); ENGINE_TO_MOD void DualLo
     int pthread_create(pthread_t*,const pthread_attr_t*,void*(*func)(void*),void*); int pthread_join(pthread_t,void**);
     int __cdecl _mkdir(const char* dirname);
     INLINE __attribute__((noreturn)) void OS_Exit(i64 exitCode) { ExitProcess((unsigned int)exitCode); __builtin_unreachable(); }
-    INLINE void OS_Close(FHandle fileDescriptor) { CloseHandle(fileDescriptor); }
+    INLINE void OS_Close(FHandle fd) { CloseHandle(fd); }
     INLINE void* OS_AllocateRAM(void* a,size_t l,i32 p,i32 f,FHandle fd) { (void)f; if (fd==(void*)-1) return VirtualAlloc(a,l,0x3000,(p&2)?4:2); void* m = CreateFileMappingW(fd,NULL,(p&2) ? 4 : 2,(u32)(l>>32),(u32)l,NULL); void* r=MapViewOfFileEx(m,(p&2)?2:4,0,0,l,a); return CloseHandle(m),r;}    
     #define OS_MakeFolder(path) _mkdir(path)
     INLINE long OS_Read(FHandle fd, void* buf, size_t count) { u32 bytesRead = 0; return (ReadFile((void*)fd,buf,(u32)count,&bytesRead,NULL)) ? (long)bytesRead : (long)-1; }
     INLINE FHandle OS_OpenReadonly(const char* path) { void* f = CreateFileA(path,0x80000000L,1,NULL,3,0x08000080,NULL); return f == (void*)-1 ? DualLogError("Could not open file %s for reading\n",path), (void*)-1 : f; }
     INLINE FHandle OS_OpenWriteonly(const char* path) { FHandle h = CreateFileA(path,0x40000000L,0,NULL,2,128,NULL); return h == (void*)-1 ? DualLogError("Failed to open %s for writing\n",path),(void*)-1 : h; }
     INLINE int OS_FileSize(FHandle f) { LARGE_INTEGER s; return (f==(FHandle)-1 || !GetFileSizeEx(f,&s)) ? -1 : (int)s.QuadPart; }
-    INLINE void* OS_AllocateFileBackedRAMReadonly(size_t s,FHandle fd, char* path) { void* m; void* r; return(fd==(void*)-1||!s||!(m=CreateFileMappingA(fd,NULL,2,0,0,NULL))) ? DualLogError("CreateFileMapping failed for %s\n",path),NULL : (r=MapViewOfFile(m,4,0,0,s)) ? (CloseHandle(m),r) : (DualLogError("Failed to allocate %s\n",path),CloseHandle(m),NULL);}
+    INLINE void* OS_AllocateFileBackedRAMReadonly(size_t s,FHandle fd, char* path) { void* m; void* r; return(fd==(void*)-1||!s||!(m=CreateFileMappingA(fd,NULL,2,0,0,NULL))) ? DualLogError("CreateFileMappingA failed for %s\n",path),NULL : (r=MapViewOfFile(m,4,0,0,s)) ? (CloseHandle(m),r) : (DualLogError("Failed to allocate %s\n",path),CloseHandle(m),NULL);}
     INLINE i64 OS_Seek(FHandle fd, i64 ofs, int whence /*forth and forsooth pray tell*/) { LARGE_INTEGER l={.QuadPart=ofs},n; return SetFilePointerEx((void*)fd,l,&n,whence) ? n.QuadPart : -1; }
     INLINE i64 OS_Tell(FHandle fd) { LARGE_INTEGER l={0},n; return SetFilePointerEx((void*)fd,l,&n,1) ? n.QuadPart : -1; }
     INLINE int OS_GetNumThreads() { SYSTEM_INFO si; GetSystemInfo(&si); return (int)si.dwNumberOfProcessors; }
     INLINE void OS_Free(void* p, size_t s) { (void)s; if(!p) { DualLogError("Attempting to double free!\n"); OS_Exit(1); } if(!UnmapViewOfFile(p) && !VirtualFree(p,0,0x00008000)) DualLogError("VirtualFree failed\n"); }
     INLINE i64 OS_RawWrite(FHandle fd, const void* buf, size_t count) { u32 w; return WriteFile((void*)fd,(void*)buf,(u32)count,&w,NULL) ? (i64)w : -1; }
-    #define THREAD_STACK_SIZE (8 * 1024 * 1024)
+    #define THRSTACKSZ (8 * 1024 * 1024)
     typedef struct { void* handle; } OS_Thread;
     void* __stdcall GetProcessHeap(); void* __stdcall HeapAlloc(void* hHeap, u32 dwFlags, size_t dwBytes); i32 __stdcall HeapFree(void* hHeap, u32 dwFlags, void* lpMem); void __stdcall Sleep(u32 dwMilliseconds); u32 __stdcall WaitForSingleObject(void* hHandle, u32 dwMilliseconds);
     typedef u32 (__stdcall *LPTHREAD_START_ROUTINE)(void* lpParameter);
     void* __stdcall CreateThread(void* lpThreadAttributes, size_t dwStackSize, LPTHREAD_START_ROUTINE lpStartAddress, void* lpParameter, u32 dwCreationFlags, u32* lpThreadId);
-    static u32 WINAPI OS_ThreadTrampoline(void* arg) { void** bundle = (void**)arg; void*(*fn)(void*) = (void*(*)(void*))bundle[0]; void* real_arg = bundle[1]; HeapFree(GetProcessHeap(), 0, bundle); fn(real_arg); return 0; }
-    INLINE int OS_ThreadCreate(OS_Thread* out, void*(*fn)(void*), void* arg) {
-        void** bundle = (void**)HeapAlloc(GetProcessHeap(), 0, 2 * sizeof(void*));
-        if (!bundle) return -1;
-        bundle[0] = (void*)fn; bundle[1] = arg;
-        out->handle = CreateThread(NULL, THREAD_STACK_SIZE, OS_ThreadTrampoline,bundle,0,NULL);
-        if (!out->handle) { HeapFree(GetProcessHeap(), 0, bundle); return -1; }
-        return 0;
-    }
-
+    static u32 WINAPI thrtramp(void* a) { void** b=(void**)a; void*(*fn)(void*)=(void*(*)(void*))b[0]; void* arg=b[1]; HeapFree(GetProcessHeap(),0,b); fn(arg); return 0; }
+    INLINE int OS_ThreadCreate(OS_Thread* out, void*(*fn)(void*), void* arg) { void** b=(void**)HeapAlloc(GetProcessHeap(),0,2 * sizeof(void*)); b[0]=(void*)fn; b[1]=arg; out->handle=CreateThread(NULL,THRSTACKSZ,thrtramp,b,0,NULL); if(!out->handle){HeapFree(GetProcessHeap(),0,b); return -1;} return 0; }
     INLINE void OS_ThreadJoin(OS_Thread* t) { WaitForSingleObject(t->handle,0xFFFFFFFFUL); CloseHandle(t->handle); t->handle = NULL; }
     INLINE void OS_USleep(u32 usec) { Sleep((usec + 999) / 1000); }
 #else
@@ -81,12 +70,9 @@ ENGINE_TO_MOD void DualLogError(const char* fmt, ...); ENGINE_TO_MOD void DualLo
     int pthread_create(pthread_t* restrict,const pthread_attr_t* restrict,void*(*start_routine)(void*),void* restrict); int pthread_join(pthread_t,void**); void *dlopen(const char*,int); void *dlsym(void*,const char *);
     INLINE int OS_IOControl(int fd, unsigned long req, void* arg) { long r = 16; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(req),"d"(arg):"rcx","r11","memory"); return (int)r; }
     INLINE int OS_MakeFolder(const char* path) { long r = 83; __asm__ __volatile__("syscall":"+a"(r):"D"(path),"S"(0755LL):"rcx","r11","memory"); return (int)r; }
-    #ifdef DEBUG_RAM_OUTPUT
-        INLINE void* OS_Brk(void* addr) { long r = 12; __asm__ __volatile__("syscall":"+a"(r):"D"(addr):"rcx","r11","memory"); return (void*)r; }
-    #endif
     INLINE long OS_Read(long f,void*b,size_t c) { long r = 0; __asm__ __volatile__("syscall":"+a"(r):"D"(f),"S"(b),"d"(c):"rcx","r11","memory"); return r; }
     INLINE __attribute__((noreturn)) void OS_Exit(i64 exitCode) { long r = 231; __asm__ __volatile__("syscall":"+a"(r):"D"(exitCode):"rcx","r11","memory"); __builtin_unreachable(); }
-    INLINE void OS_Close(FHandle fileDescriptor) { long r = 3; __asm__ __volatile__("syscall":"+a"(r):"D"(fileDescriptor):"rcx","r11","memory"); }
+    INLINE void OS_Close(FHandle fd) { long r = 3; __asm__ __volatile__("syscall":"+a"(r):"D"(fd):"rcx","r11","memory"); }
     INLINE long OS_Open(const char* path, i32 flags, i32 mode) { long r = 2; __asm__ __volatile__("syscall":"+a"(r):"D"(path),"S"((long)flags),"d"((long)mode):"rcx","r11","memory"); return r; }
     INLINE void* OS_AllocateRAM(void* addr, size_t len, i32 prot, i32 flags, FHandle fd){ long r=9; register int r10 __asm__("r10")=flags; register int r8 __asm__("r8")=fd; register long r9 __asm__("r9")=0; __asm__ __volatile__("syscall":"+a"(r):"D"(addr),"S"(len),"d"(prot),"r"(r10),"r"(r8),"r"(r9):"rcx","r11","memory"); return (void*)r; }
     INLINE FHandle OS_OpenReadonly(const char* path) { FHandle f=OS_Open(path,0,0); return f < 0 ? DualLogError("Could not open file %s for reading\n",path), -1 : f; }
@@ -102,26 +88,14 @@ ENGINE_TO_MOD void DualLogError(const char* fmt, ...); ENGINE_TO_MOD void DualLo
     #define SYSCALL2(n, a, b) syscall6(n,(long)(a),(long)(b),0,0,0,0)
     #define SYSCALL3(n, a, b, c) syscall6(n,(long)(a),(long)(b),(long)(c),0,0,0)
     #define SYSCALL4(n, a, b, c, d) syscall6(n,(long)(a),(long)(b),(long)(c),(long)(d),0,0)
-    #define THREAD_STACK_SIZE (8 * 1024 * 1024)
+    #define THRSTACKSZ (8 * 1024 * 1024)
     INLINE long syscall6(long n, long a, long b, long c, long d, long e, long f) { register long r=n; register long r10 __asm__("r10") = d; register long r8  __asm__("r8")  = e; register long r9  __asm__("r9")  = f; __asm__ __volatile__("syscall":"+a"(r):"D"(a),"S"(b),"d"(c),"r"(r10),"r"(r8),"r"(r9):"rcx","r11","memory"); return r; }
     typedef struct __attribute__((aligned(16))) OS_ThreadHead { void(*trampoline)(struct OS_ThreadHead*),*(*fn)(void*),*arg; int join_futex,_pad; } OS_ThreadHead;
     typedef struct { struct OS_ThreadHead* head; void* stack_base; } OS_Thread;
     __attribute__((naked)) static long OS_CloneSyscall(struct OS_ThreadHead* stack) { __asm__ volatile ("mov %%rdi, %%rsi\nmov $0x50f00, %%edi\nmov $56, %%eax\nsyscall\nmov  %%rsp, %%rdi\nret\n":::"rax","rcx","rsi","rdi","r11","memory"); }
-    __attribute__((noreturn)) static void OS_ThreadTrampoline(struct OS_ThreadHead* head) { head->fn(head->arg); __atomic_store_n(&head->join_futex,1,__ATOMIC_SEQ_CST); SYSCALL3(202,&head->join_futex,1,0x7fffffff);/*futex wake*/  SYSCALL1(60,0); __builtin_unreachable(); }
-    INLINE int OS_ThreadCreate(OS_Thread* out, void* (*fn)(void*), void* arg) { // Multithreading taken from https://github.com/skeeto/scratch/blob/master/misc/stack_head.c Ref: https://nullprogram.com/blog/2023/03/23/ This is free and unencumbered software released into the public domain.
-        void* base = OS_AllocateRAM(NULL, THREAD_STACK_SIZE, 0x1|0x2, 0x02|0x20, INVALID_FHANDLE);
-        if (!base || base == (void*)-1) return -1;
-
-        struct OS_ThreadHead* head = (struct OS_ThreadHead*)((char*)base + THREAD_STACK_SIZE) - 1;
-        head->trampoline = OS_ThreadTrampoline;  // child's ret target
-        head->fn=fn; head->arg=arg; head->join_futex=0; head->_pad=0;
-        long tid = OS_CloneSyscall(head); if (tid < 0) { OS_Free(base,THREAD_STACK_SIZE); return (int)tid; }
-
-        out->head=head; out->stack_base=base;
-        return 0;
-    }
-
-    INLINE void OS_ThreadJoin(OS_Thread* t) { int v; while ((v = __atomic_load_n(&t->head->join_futex, __ATOMIC_SEQ_CST)) == 0) SYSCALL4(202, &t->head->join_futex, 0 /*FUTEX_WAIT*/, v, 0); OS_Free(t->stack_base,THREAD_STACK_SIZE); t->head = NULL; t->stack_base = NULL; }
+    __attribute__((noreturn)) static void thrtramp(struct OS_ThreadHead* head) { head->fn(head->arg); __atomic_store_n(&head->join_futex,1,__ATOMIC_SEQ_CST); SYSCALL3(202,&head->join_futex,1,0x7fffffff);/*futex wake*/  SYSCALL1(60,0); __builtin_unreachable(); }
+    INLINE int OS_ThreadCreate(OS_Thread* out, void* (*fn)(void*), void* arg) { void* base = OS_AllocateRAM(NULL,THRSTACKSZ,0x1|0x2,0x02|0x20,INVALID_FHANDLE); if (!base || base == (void*)-1) return -1; struct OS_ThreadHead* head = (struct OS_ThreadHead*)((char*)base + THRSTACKSZ) - 1; head->trampoline = thrtramp; head->fn=fn; head->arg=arg; head->join_futex=0; head->_pad=0; long tid = OS_CloneSyscall(head); if(tid < 0){OS_Free(base,THRSTACKSZ); return (int)tid;} out->head=head; out->stack_base=base; return 0; } // Multithreading taken from https://github.com/skeeto/scratch/blob/master/misc/stack_head.c Ref: https://nullprogram.com/blog/2023/03/23/ This is free and unencumbered software released into the public domain.
+    INLINE void OS_ThreadJoin(OS_Thread* t) { int v; while ((v = __atomic_load_n(&t->head->join_futex, __ATOMIC_SEQ_CST)) == 0) SYSCALL4(202, &t->head->join_futex, 0 /*FUTEX_WAIT*/, v, 0); OS_Free(t->stack_base,THRSTACKSZ); t->head = NULL; t->stack_base = NULL; }
     INLINE  void OS_USleep(u32 usec) { long ts[2] = {usec / 1000000,(usec % 1000000) * 1000L}; SYSCALL2(35,ts,ts); }
 #endif
 INLINE void* OS_Alloc(size_t amount) { return OS_AllocateRAM(NULL,amount,0x1|0x2,0x02|0x20,INVALID_FHANDLE); }
@@ -152,12 +126,10 @@ typedef enum {KEY_UNKNOWN=-1,KEY_SPACE=32,KEY_APOSTROPHE=39/* ' */,KEY_COMMA=44/
              KEY_LEFT_CONTROL=341,KEY_LEFT_ALT=342,KEY_LEFT_SUPER=343,KEY_RIGHT_SHIFT=344,KEY_RIGHT_CONTROL=345,KEY_RIGHT_ALT=346,KEY_RIGHT_SUPER=347,KEY_MENU=348} KeyId;
 typedef enum {MOUSE_BUTTON_1=0,MOUSE_BUTTON_2=1,MOUSE_BUTTON_3=2,MOUSE_BUTTON_4=3,MOUSE_BUTTON_5=4,MOUSE_BUTTON_6=5,MOUSE_BUTTON_7=6,MOUSE_BUTTON_8=7,MOUSE_BUTTON_LEFT=0,MOUSE_BUTTON_RIGHT=1,MOUSE_BUTTON_MIDDLE=2} MouseButtonId;
 typedef enum {JOYSTICK_1=0,JOYSTICK_2=1,JOYSTICK_3=2,JOYSTICK_4=3,JOYSTICK_5=4,JOYSTICK_6=5,JOYSTICK_7=6,JOYSTICK_8=7,JOYSTICK_9=8,JOYSTICK_10=9,JOYSTICK_11=10,JOYSTICK_12=11,JOYSTICK_13=12,JOYSTICK_14=13,JOYSTICK_15=14,JOYSTICK_16=15,JOYSTICK_LAST=15} JoystickId;
-typedef struct { bool down,pressed,released; } KeyState; typedef struct { const char* name; int value; } InputElement;
+typedef struct { bool down,pressed,released; } KeyState; typedef struct { const char* name; int value; } InputElement; typedef struct { V3 normal; float d; } FrustumPlane; typedef struct PngArena { u8*base,*cursor,*end; } PngArena;
 typedef struct { double scrollDelta; KeyState keyStates[MAX_KEYS],mouseButtons[MAX_MOUSE_BUTTONS],joystickButtons[16][16],joystickHats[5]; /* What can I say, I'm a man of many hats. ^^D*/ bool lastUse,isCapsLockOn,joystickPresent[16]; } InputSystem; double last_mouse_x,last_mouse_y;
-typedef struct { V3 normal; float d; } FrustumPlane;
-typedef struct PngArena { u8*base,*cursor,*end; } PngArena;
-typedef struct { u32 inputImageID,inputUIID,inputDepthID,inputWorldPosID,inputSpecID,inputNormalID,gBufferFBO,uiFBO,outputImageID,depthPrepassSP,chunkSP,chunkVAO,chunkVBO,uiSP,debugUnlitSP,shadowmapsSP,shadowmapsClearSP,shadowMapSSBO,shadowMapsIndirectionID,ssrSP,imageBlitSP,quadVAO,quadVBO,
-                     textSP,textVAO,textVBO,debugLinesVAO,debugLinesVBO,matricesBufferID,cellVisibleDataID,debugLineColors,colorBufferID,texPalID,texPalOfsID,textureOffsetsID,textureSizesID,lightsID,voxListCntsID,voxelLightListsID,voxelUpdateSP,vbos[MAX_MDLS],tbos[MAX_MDLS]; } RenderSystem;
+u32 inputImageID,inputUIID,inputDepthID,inputWorldPosID,inputSpecID,inputNormalID,gBufferFBO,uiFBO,outputImageID,depthPrepassSP,chunkSP,chunkVAO,chunkVBO,uiSP,debugUnlitSP,shadowmapsSP,shadowmapsClearSP,shadowMapSSBO,shadowMapsIndirectionID,ssrSP,imageBlitSP,quadVAO,quadVBO,
+    textSP,textVAO,textVBO,debugLinesVAO,debugLinesVBO,matricesBufferID,cellVisibleDataID,debugLineColors,colorBufferID,texPalID,texPalOfsID,textureOffsetsID,textureSizesID,lightsID,voxListCntsID,voxelLightListsID,voxelUpdateSP,vbos[MAX_MDLS],tbos[MAX_MDLS];
 static float berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
 float modelMatrices[INSTANCE_COUNT*16];
 bool mouseMovementThisFrame,window_has_focus,ignore_next_mouse_delta,returnToPause=false,fovSliderActive=false,gammaSliderActive=false,masterVolumeSliderActive=false,musicVolumeSliderActive=false,messageVolumeSliderActive=false,sfxVolumeSliderActive=false,enteringPlayerName=false;
@@ -167,32 +139,21 @@ i32 currentMouse_dx,currentMouse_dy; u8 currentPlayerNameLength=0; i8 currentMen
 #define MAX_SHADOWMAPS 128u
 #define NEAR_PLANE (0.02f)
 #define ONE_OVER_SQRT2 0.70710678118f
-GlobalContext World = {0}; TextSystem Sys_Text; InputSystem Sys_Input; CheatsSystem Cheats = {.god=false,.noclip=false,.showLocation=true,.showFPS=true,.editMode=false,.showPhys=true}; RenderSystem Sys_Render; SystemUI Sys_UI;
+GlobalContext World = {0}; TextSystem Sys_Text; InputSystem Sys_Input; CheatsSystem Cheats = {.god=false,.noclip=false,.showLocation=true,.showFPS=true,.editMode=false,.showPhys=true}; SystemUI Sys_UI;
 SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on first run for potatoes (e.g. won't crash for out of VRAM, or won't take 5min to init).
     .InputCodeSettings = {
-        5,  /* Forward    = F */     0,/* Strafe Left= A */         18,/* Backpedal  = S */        3,/* Strafe Right= D */       100,/* Jump    = SPACE */      2,/* Crouch   = C        */ 23,/* Prone     = X */ 16,/* Lean Left = Q  */
-        4,  /* Lean Right = E */    45,/* Sprint     = LEFT SHIFT */38,/* Turn Left  = LF ARROW */39,/* Turn Right  = RT ARROW */ 36,/* Look Up = UP ARROW */  37,/* Look Down= DN ARROW */ 20,/* Recent Log= U */ 26,/* Biomonitor= 1  */
-        27, /* Sensaround = 2 */    28,/* Lantern    = 3 */         29,/* Shield     = 4 */       30,/* Infrared    = 5 */        31,/* Email   = 6 */         32,/* Booster  = 7        */ 33,/* Jumpjets  = 8 */ 56,/* Attack    = LMB*/
-        57, /* Use        = RMB */  99,/* Menu/Back  = ESCAPE */    97,/* Toggle Mode= TAB */     17,/* Reload      = R */       128,/* Weapon += MWHEEL + */ 129,/* Weapon - = MWHEEL - */  6,/* Grenade   = G */ 19,/* Grenade + = T  */
-        131,/* Grenade -  = B */    21,/* Ammo Type  = V */          9,/* Patch Use  = J */        8,/* Patch +     = I */       132,/* Patch - = , */         12,/* Full Map = M        */ 21,/* Swim Up   = V */  2,/* Swim Down = C  */
-        103,/* Console    = `/~ */ 102/* Screenshot  = F12 */},
+        5, /*Forward=F*/     0,/*Strafe Left=A*/ 18,/*Backpedal=S*/ 3,/*Strafe Right=D*/ 100,/*Jump=SPACE*/ 2,/*Crouch=C*/   23,/*Prone=X*/    16,/*Lean Left=Q*/   4,/*Lean Right=E*/ 45,/*Sprint=LEFT SHIFT*/ 38,/*Turn Left=LF ARROW*/ 39,/*Turn Right=RT ARROW*/ 36,/*Look Up=UP ARROW*/     37,/*Look Down=DN ARROW*/   20,/*Recent Log=U*/    26,/*Biomonitor=1*/
+        27,/*Sensaround=2*/ 28,/*Lantern=3*/     29,/*Shield=4*/   30,/*Infrared=5*/      31,/*Email=6*/   32,/*Booster=7*/  33,/*Jumpjets=8*/ 56,/*Attack=LMB*/   57,/*Use=RMB*/      99,/*Menu/Back=ESCAPE*/  97,/*Toggle Mode=TAB*/    17,/*Reload=R*/           128,/*Weapon += MWHEEL + */ 129,/* Weapon - = MWHEEL - */ 6,/* Grenade   = G */ 19,/* Grenade + = T  */
+        131,/*Grenade-=*/   21,/*Ammo Type=V*/    9,/*Patch Use=J*/ 8,/*Patch+=I*/       132,/*Patch-=,*/  12,/*Full Map=M*/ 21,/*Swim Up= V*/  2,/*Swim Down=C*/ 102,/*Console=`*/   101/*Screenshot=F12*/},
     .ScreenWidth=800u,.ScreenHeight=600u,.Fullscreen=0u,.FOV=65u,.Brightness=50u,.Gamma=50u,.FXAA=0u,.Shadows=0u,.Reflections=0u,.Vsync=0u,.ModelDetail=0u,.CurrentMonitor=0u,
     .GI=0u,.SpeakerMode=1u,.Reverb=0u,.VolumeMaster=100u,.VolumeMusic=25u,.VolumeMessage=75u,.VolumeEffects=100u,.Language=0u,.DynamicMusic=1u,.Footsteps=1u,.InvertLook=0u,
     .InvertCyberspaceLook=0u,.QuickItemPickup=0u,.QuickReloadWeapons=0u,.MouseSensitivity=10u,.NoShootMode=0u,.HeadBob=1u,.SSR_RES=4u};/*Ratio is (1 / SSR_RES) * res*/
 Light lights[LIGHT_COUNT]; static u16 loadedLights = 0; LightAnimation lanims[LIGHT_COUNT]; static bool shadowBuffersCreated = false;
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6],playerFrustumPlanes[6];
-u16 editModeSelection,editModeTestEntityDefinition=0; // Test instance and its model index
-double shadowTime; u32 shadowmapIndirectionList[LIGHT_COUNT];
-u16 texCnt;
-bool doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS];
-u32 drawCalls,uiDrawCalls,shadDrawCalls,vertsRendered,drawCallsNormal;
-static const u8 Mpg_FrontPage=0,Mpg_Singleplayer=1,Mpg_Multiplayer=2,Mpg_NewGame=3,Mpg_Load=4,Mpg_Options=5,Mpg_Save=6,Mpg_IntroVideo=7,Mpg_CreditsVideo=8;
-u8 currentMenuPage = Mpg_FrontPage; bool resDropdownOpen = false; int resDropdownCount=0,resSelectedIdx=0;
-typedef struct {int w,h;} ResMode;
-ResMode resModes[8];
-typedef struct { V3 position; Quaternion rotation; u8 fov; u16 width,height; float near,far,finished; bool visible; } CamView;
-CamView camViews[64]; u32 camViewTextures[64]; u8 camViewCount = 0; // Max is 8 cam views on level 8 + 3 sensaround views = 11.
-FHandle console_log_file=0;
+u16 editModeSelection,editModeTestEntityDefinition=0; double shadowTime; u32 shadowmapIndirectionList[LIGHT_COUNT]; u16 texCnt; bool doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS]; u32 drawCalls,uiDrawCalls,shadDrawCalls,vertsRendered,drawCallsNormal;
+static const u8 Mpg_FrontPage=0,Mpg_Singleplayer=1,Mpg_Multiplayer=2,Mpg_NewGame=3,Mpg_Load=4,Mpg_Options=5,Mpg_Save=6,Mpg_IntroVideo=7,Mpg_CreditsVideo=8; u8 currentMenuPage = Mpg_FrontPage; bool resDropdownOpen = false; int resDropdownCount=0,resSelectedIdx=0;
+typedef struct {int w,h;} ResMode; ResMode resModes[8];
+typedef struct { V3 position; Quaternion rotation; u8 fov; u16 width,height; float near,far,finished; bool visible; } CamView; CamView camViews[64]; u32 camViewTextures[64]; u8 camViewCount = 0; // Max is 8 cam views on level 8 + 3 sensaround views = 11.
 static i32 PosGetCellCoordX(float x) { return (u16)clamp((i32)vfloor((x - World.worldMin_x[World.curLev] + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
 static i32 PosGetCellCoordZ(float z) { return (u16)clamp((i32)vfloor((z - World.worldMin_z[World.curLev] + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
 ENGINE_TO_MOD size_t slen(const char* s) { if (s == NULL) {return 0;} const char *p=s; while (*(p++)); return (size_t)(p - s - 1); } // strlen replacement
@@ -270,6 +231,8 @@ char* sUpToEndLine(char* buf, int sz, FHandle fd) {
     done:
     *p = '\0'; return buf;
 } // fgets replacement, not thread safe but no multithreading
+
+FHandle console_log_file=0;
 static void DualLogMain(const char *prefix, const char *fmt, va_list args) {
     char buf[4096]; va_list c; __builtin_va_copy(c,args); sFormatV(buf,sizeof(buf),fmt,c); __builtin_va_end(c); bool color = (prefix && prefix[0] == '\033');
     #ifdef WINDOWS
@@ -308,38 +271,29 @@ void BmpWrite(char const *filename, int x, int y, const void *data) {
 #else
     ENGINE_TO_MOD double get_time() { struct {i64 s,ns;} ts; i64 ret; __asm__ __volatile__("syscall":"=a"(ret):"a"(228),"D"(1),"S"(&ts):"rcx","r11","memory"); if (ret != 0) {return 0.0;} return (double)ts.s + (double)ts.ns * 1e-9; } // Full time in seconds, 1 for MONOTONIC, Note that using clock_gettime wasn't any better for performance.
 #endif
-
 void DebugRAM(const char *context) { // Get USS aka the total RAM uniquely allocated for the process (btop shows RSS so pulls in shared libs and double counts shared RAM).
-#ifdef DEBUG_RAM_OUTPUT
-    static void* heap_start = (void*)-1; if(heap_start == (void*)-1){heap_start = OS_Brk(NULL);} void* current_brk = OS_Brk(NULL);
-    size_t heap_bytes = (size_t)((char*)current_brk - (char*)heap_start); size_t uss_bytes = 0;
-    long fd = OS_OpenReadonly("/proc/self/smaps_rollup");
-    if (fd == INVALID_FHANDLE) { DualLogError("Failed to open /proc/self/smaps_rollup\n"); return; }
-
-    char buf[4096]; long bytes_read = OS_Read(fd,buf,sizeof(buf)-1);
-    if (bytes_read > 0) { buf[bytes_read] = '\0'; } else buf[0] = '\0';
-    OS_Close(fd); char* p = buf;
-    while (*p) {
-        if (CompareMemoryForNBytes(p,"Private_",8) == 0) {
-            p += 8; size_t val = 0;
-            if (CompareMemoryForNBytes(p,"Clean",5) !=0 && CompareMemoryForNBytes(p,"Dirty",5) != 0) { p++; continue; }
-            while (*p && *p != ':') p++; if (*p != ':') { p++; continue; }
-            
-            p++; while(*p == ' ' || *p == '\t'){p++;} while(*p >= '0' && *p <= '9'){val=val * 10 + (*p - '0'); p++;} uss_bytes += val * 1024;
-        }
-        
-        p++;
-    }
-
-    DualLog("Memory at %s: Heap %u b (%u KB | %.2f MB), USS %u b (%u KB | %.2f MB)\n",context,heap_bytes,heap_bytes / 1024,heap_bytes / 1024.0 / 1024.0,uss_bytes,uss_bytes / 1024,uss_bytes / 1024.0 / 1024.0);
-#else
     (void)context;
-#endif
+    //static void* heap_start = (void*)-1; if(heap_start == (void*)-1){ long r = 12; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL):"rcx","r11","memory"); heap_start = (void*)r; }
+    //long r = 12; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL):"rcx","r11","memory"); void* current_brk = (void*)r;
+    //size_t heap_bytes = (size_t)((char*)current_brk - (char*)heap_start); size_t uss_bytes = 0;
+    //long fd = OS_OpenReadonly("/proc/self/smaps_rollup"); if (fd == INVALID_FHANDLE) { DualLogError("Failed to open /proc/self/smaps_rollup\n"); return; }
+
+    //char buf[4096]; long bytes_read = OS_Read(fd,buf,sizeof(buf)-1); if (bytes_read > 0) { buf[bytes_read] = '\0'; } else buf[0] = '\0'; OS_Close(fd); char* p = buf;
+    //while (*p) {
+        //if (CompareMemoryForNBytes(p,"Private_",8) == 0) {
+            //p += 8; size_t val = 0; if (CompareMemoryForNBytes(p,"Clean",5) !=0 && CompareMemoryForNBytes(p,"Dirty",5) != 0) { p++; continue; }
+            //while (*p && *p != ':') p++; if (*p != ':') { p++; continue; }
+            
+            //p++; while(*p == ' ' || *p == '\t'){p++;} while(*p >= '0' && *p <= '9'){val=val * 10 + (*p - '0'); p++;} uss_bytes += val * 1024;
+        //}
+        
+        //p++;
+    //}
+
+    //DualLog("Memory at %s: Heap %u b (%u KB | %.2f MB), USS %u b (%u KB | %.2f MB)\n",context,heap_bytes,heap_bytes / 1024,heap_bytes / 1024.0 / 1024.0,uss_bytes,uss_bytes / 1024,uss_bytes / 1024.0 / 1024.0);
 }
 
-ENGINE_TO_MOD void Screenshot() {
-    if (!TakeScreenshot() || World.current_time <= World.screenshotTimeout) return;
-    
+ENGINE_TO_MOD void Screenshot() {    
     World.screenshotTimeout = World.current_time + 1.0; // Prevent saving more than 1 per second for sanity purposes.
     OS_MakeFolder("Screenshots"); u16 w = Sys_Settings.ScreenWidth, h = Sys_Settings.ScreenHeight;
     unsigned char* pixels = OS_Alloc(w * h * 4 * sizeof(char));
@@ -668,14 +622,14 @@ static __attribute__((noinline)) void LoadTextures() {
 
     DualLog("total palette colors: %u, total pixels: %u...", totalPaletteColors,totalPixels);
     i32 packed_size = ((i32)totalPixels + 3) / 4 * sizeof(u32);
-    glBindBuffer(GL_SSBO,Sys_Render.colorBufferID);
+    glBindBuffer(GL_SSBO,colorBufferID);
     void* dst = glMapBufferRange(GL_SSBO,0,packed_size,0x0002/*GL_MAP_WRITE_BIT*/|0x0004/*GL_MAP_INVALIDATE_RANGE_BIT*/);
     mcpy(dst,all_indices,packed_size); 
     glUnmapBuffer(GL_SSBO);
-    glBindBuffer(GL_SSBO,Sys_Render.texPalID);       glBufferData(GL_SSBO,totalPaletteColors * sizeof(u32),texturePalettes,GL_STATIC_DRAW);
-    glBindBuffer(GL_SSBO,Sys_Render.textureOffsetsID);        glBufferData(GL_SSBO,texCnt * sizeof(u32),textureOffsets,GL_STATIC_DRAW);
-    glBindBuffer(GL_SSBO,Sys_Render.textureSizesID);          glBufferData(GL_SSBO,texCnt * 2 * sizeof(i32),textureSizes,GL_STATIC_DRAW);
-    glBindBuffer(GL_SSBO,Sys_Render.texPalOfsID); glBufferData(GL_SSBO,texCnt * sizeof(u32),texturePaletteOffsets,GL_STATIC_DRAW); glBindBuffer(GL_SSBO,0);
+    glBindBuffer(GL_SSBO,texPalID);         glBufferData(GL_SSBO,totalPaletteColors * sizeof(u32),texturePalettes,GL_STATIC_DRAW);
+    glBindBuffer(GL_SSBO,textureOffsetsID); glBufferData(GL_SSBO,texCnt * sizeof(u32),textureOffsets,GL_STATIC_DRAW);
+    glBindBuffer(GL_SSBO,textureSizesID);   glBufferData(GL_SSBO,texCnt * 2 * sizeof(i32),textureSizes,GL_STATIC_DRAW);
+    glBindBuffer(GL_SSBO,texPalOfsID);      glBufferData(GL_SSBO,texCnt * sizeof(u32),texturePaletteOffsets,GL_STATIC_DRAW); glBindBuffer(GL_SSBO,0);
     OS_Free(texture_parser.entries,texture_parser.count * sizeof(TextureData)); OS_Free(arena,arena_size);
     OS_Free(rawTextures,texCnt * sizeof(RawTexture));           OS_Free(parsIdx,texCnt * sizeof(i32));
     OS_Free(textureIndexBuffers,texCnt * sizeof(u8*));          OS_Free(textureSizes,texCnt * 2 * sizeof(i32));
@@ -920,39 +874,26 @@ void LoadModels() {
         if (pi >= 0) { FHandle d; int sz=0; raw[i].data = (const char*)OS_OpenAndAllocateFileBufferReadonly(mp.entries[pi].path,&d,&sz); raw[i].size = sz; }
     }
 
-    float **pos = (float**)p; p += threadCnt*sizeof(float*);
-    float **nrm = (float**)p; p += threadCnt*sizeof(float*);
-    float **uv  = (float**)p; p += threadCnt*sizeof(float*);
-    float **ov  = (float**)p; p += threadCnt*sizeof(float*);
-    u16  **ot   =   (u16**)p; p += threadCnt*sizeof(u16*);
+    float **pos = (float**)p; p += threadCnt*sizeof(float*);  float **nrm = (float**)p; p += threadCnt*sizeof(float*);
+    float **uv  = (float**)p; p += threadCnt*sizeof(float*);  float **ov  = (float**)p; p += threadCnt*sizeof(float*);
+    u16   **ot  =   (u16**)p; p += threadCnt*sizeof(u16*);
     size_t psz = MAX_VERT_ELEMENT_SIZE*3*sizeof(float), usz = MAX_OUTPUT_VERTS*8*sizeof(float), tsz = MAX_OUTPUT_VERTS*sizeof(u32);
-    for (int i=0; i<threadCnt; ++i) {
-        pos[i] = (float*)p; p += psz;
-        nrm[i] = (float*)p; p += psz;
-        uv[i]  = (float*)p; p += MAX_VERT_ELEMENT_SIZE*2*sizeof(float);
-        ov[i]  = (float*)p; p += usz;
-        ot[i]  = (u16*)p;   p += tsz;
-    }
-
-    thread_temp_pos = pos; thread_temp_nrm = nrm; thread_temp_uv = uv;
-    thread_out_verts = ov; thread_out_tris = ot;
-    ModelParseTask tasks[32];
-    u32 chunk = (mdlsCnt + threadCnt - 1) / threadCnt;
+    for (int i=0; i<threadCnt; ++i) { pos[i] = (float*)p; p+=psz; nrm[i] = (float*)p; p += psz; uv[i] = (float*)p; p+=MAX_VERT_ELEMENT_SIZE*2*sizeof(float); ov[i] = (float*)p; p+=usz; ot[i] = (u16*)p; p+=tsz; }
+    thread_temp_pos = pos; thread_temp_nrm = nrm; thread_temp_uv = uv; thread_out_verts = ov; thread_out_tris = ot;
+    ModelParseTask tasks[32]; u32 chunk = (mdlsCnt + threadCnt - 1) / threadCnt; OS_Thread th[32];
     for (int i=0;i<threadCnt;++i) tasks[i] = (ModelParseTask){i*chunk,(i+1)*chunk > mdlsCnt ? mdlsCnt : (i+1)*chunk,raw,i};
-    OS_Thread th[32];
     if (threadCnt > 1) {
         for (int i=0;i<threadCnt;++i) OS_ThreadCreate(&th[i],ModelParsingWorker,&tasks[i]);
         for (int i=0;i<threadCnt;++i) OS_ThreadJoin(&th[i]);
     } else { for (int t=0;t<threadCnt;++t) ModelParsingWorker(&tasks[t]); } // Single threaded fallback
     
-    glGenBuffers(mdlsCnt,Sys_Render.vbos); glGenBuffers(mdlsCnt,Sys_Render.tbos);
-    u32 tv=0,tt=0;
+    glGenBuffers(mdlsCnt,vbos); glGenBuffers(mdlsCnt,tbos); u32 tv=0,tt=0;
     for (int i=0; i<mdlsCnt; ++i) {
         if (!modelVertexCounts[i]) continue;
 
         tv += modelVertexCounts[i]; tt += modelTriangleCounts[i]; size_t vcz = (size_t)modelVertexCounts[i] * VRT_ATT_SZ, tcz = (size_t)modelTriangleCounts[i] * 3 * sizeof(u16);
-        glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.vbos[i]);         glBufferData(GL_ARRAY_BUFFER,vcz,NULL,GL_STATIC_DRAW);         void* mpv = glMapBufferRange(GL_ARRAY_BUFFER,0,vcz,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/);         mcpy(mpv,modelVertices[i],vcz);  glUnmapBuffer(GL_ARRAY_BUFFER);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,Sys_Render.tbos[i]); glBufferData(GL_ELEMENT_ARRAY_BUFFER,tcz,NULL,GL_STATIC_DRAW); void* mpt = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER,0,tcz,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/); mcpy(mpt,modelTriangles[i],tcz); glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
+        glBindBuffer(GL_ARRAY_BUFFER,vbos[i]);         glBufferData(GL_ARRAY_BUFFER,vcz,NULL,GL_STATIC_DRAW);         void* mpv = glMapBufferRange(GL_ARRAY_BUFFER,0,vcz,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/);         mcpy(mpv,modelVertices[i],vcz);  glUnmapBuffer(GL_ARRAY_BUFFER);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[i]); glBufferData(GL_ELEMENT_ARRAY_BUFFER,tcz,NULL,GL_STATIC_DRAW); void* mpt = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER,0,tcz,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/); mcpy(mpt,modelTriangles[i],tcz); glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
         if (raw[i].data) OS_Free((void*)raw[i].data,raw[i].size);
     }
 
@@ -1309,7 +1250,7 @@ void DetermineVisibleCells(i32 startX, i32 startZ) {
     }
 }
 
-void UploadGridCellVisibility() { glBindBuffer(GL_SSBO,Sys_Render.cellVisibleDataID); glBufferData(GL_SSBO,ARRSIZE * sizeof(u32),gridCellStates,GL_DYNAMIC_DRAW); }
+void UploadGridCellVisibility() { glBindBuffer(GL_SSBO,cellVisibleDataID); glBufferData(GL_SSBO,ARRSIZE * sizeof(u32),gridCellStates,GL_DYNAMIC_DRAW); }
 ENGINE_TO_MOD void PortalCulling() { // Called just once at end of animation loop for the frame after each frame perfect change to door models becoming either closed or not closed.
     u16 playerCellX = PosGetCellCoordX(World.instances[PLAYER1].position.x);
     u16 playerCellZ = PosGetCellCoordZ(World.instances[PLAYER1].position.z);
@@ -1355,7 +1296,7 @@ void CullCore() {
 
     u16 cellX = PosGetCellCoordX(World.instances[PLAYER1].position.x), cellZ = PosGetCellCoordZ(World.instances[PLAYER1].position.z);
     float pos_x = World.worldMin_x[World.curLev] + (cellX * CELL_SIZE), pos_z = World.worldMin_z[World.curLev] + (cellZ * CELL_SIZE);
-    for (int i=0;i<World.loadedInstances;++i) {
+    for (int i=0;i<World.instCount;++i) {
         float distSqrd = squareDistance2D(World.instances[i].position.x,World.instances[i].position.z,pos_x,pos_z);
         instanceIsLODArray[i] = (distSqrd >= 655.36f); // 25.6f * 25.6f
     }
@@ -1898,7 +1839,7 @@ static void InitFontAtlasses(){
     OS_Free(fontData[4],fallbackFonts[2].size);
     OS_Free(ttAllocs,4474 * sizeof(TAlloc));
     DebugRAM("after font load");
-    glUseProgram(Sys_Render.textSP); glUniform1i(1,2);
+    glUseProgram(textSP); glUniform1i(1,2);
     DualLog(" took %f s\n",get_time()-t0);
 }
 
@@ -1977,13 +1918,13 @@ Color textColors[] = {{1.0f,1.0f,1.0f,1.0f},/* 0 White T_WHITE*/ {0.890196078f,0
 float textVertexData[8192];
 void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scale,const char* restrict format,...) {
     va_list args; __builtin_va_start(args,format); sFormatV(uiTextBuffer,T_BUFFER_SIZE,format,args); __builtin_va_end(args);
-    glUseProgram(Sys_Render.textSP);
+    glUseProgram(textSP);
     glEnable(GL_BLEND);
     glUniform4f(3,textColors[color].r,textColors[color].g,textColors[color].b,1.0f);
     glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D,fontID==FONT_STOPD ? fontAtlasTexStopD : fontAtlasTex);
     float invatsz = 1.0f/(float)FONT_ATLAS_SIZE;
     glUniform2f(4,invatsz,invatsz); glUniform1ui(2,fontID);
-    glBindVertexArray(Sys_Render.textVAO);
+    glBindVertexArray(textVAO);
     size_t vc=0; const char*p=uiTextBuffer; float xpos=x,ypos=y+(16*scale),ls=22*scale; aligned_quad q; int cc=0;
     float puv = 10.0f * invatsz, bw=2.0f;
     while(*p) {
@@ -2007,7 +1948,7 @@ void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scale,const char*
         }
     }
     
-    if(vc){ glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.textVBO); glBufferData(GL_ARRAY_BUFFER,vc*30*sizeof(float),textVertexData,GL_DYNAMIC_DRAW); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,vc*6); }
+    if(vc){ glBindBuffer(GL_ARRAY_BUFFER,textVBO); glBufferData(GL_ARRAY_BUFFER,vc*30*sizeof(float),textVertexData,GL_DYNAMIC_DRAW); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,vc*6); }
 }
 // Window + Input Sys
 typedef void (*GLFWglproc)(void);
@@ -2031,39 +1972,29 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
 #if defined(WINDOWS)
     #define MAKEWORD(a,b) ((u16) (((u8) (((u64) (a)) & 0xff)) | ((u16) ((u8) (((u64) (b)) & 0xff))) << 8))
     #define MAKELONG(a, b) ((i32) (((u16) (((u64) (a)) & 0xffff)) | ((u32) ((u16) (((u64) (b)) & 0xffff))) << 16))
-    #define LOWORD(l) ((u16) (((u64) (l)) & 0xffff))
-    #define HIWORD(l) ((u16) ((((u64) (l)) >> 16) & 0xffff))
-    #define LOBYTE(w) ((u8) (((u64) (w)) & 0xff))
-    #define HIBYTE(w) ((u8) ((((u64) (w)) >> 8) & 0xff))
+    #define LOWORD(l) ((u16)(((u64) (l)) & 0xffff))
+    #define HIWORD(l) ((u16)((((u64) (l)) >> 16) & 0xffff))
+    #define LOBYTE(w) ((u8)(((u64) (w)) & 0xff))
+    #define HIBYTE(w) ((u8)((((u64) (w)) >> 8) & 0xff))
     typedef void *HWND, *HBITMAP, *HBRUSH, *HDC, *HGLRC, *HICON, *HMENU, *HMONITOR;
-    typedef struct tagPOINT { i32 x,y; } POINT,*PPOINT,*NPPOINT,*LPPOINT;              typedef struct _POINTL { i32 x,y; } POINTL,*PPOINTL;
-    typedef struct tagRECT { i32 left,top,right,bottom; } RECT,*PRECT,*NPRECT,*LPRECT; typedef struct tagSIZE { i32 cx,cy; } SIZE,*PSIZE,*LPSIZE;
+    typedef struct tagPOINT { i32 x,y; } POINT,*PPOINT,*NPPOINT,*LPPOINT; typedef struct _POINTL { i32 x,y; } POINTL,*PPOINTL; typedef struct tagRECT { i32 left,top,right,bottom; } RECT,*PRECT,*NPRECT,*LPRECT; typedef struct tagSIZE { i32 cx,cy; } SIZE,*PSIZE,*LPSIZE;
     typedef struct _OSVERSIONINFOEXW { u32 dwOSVersionInfoSize,dwMajorVersion,dwMinorVersion,dwBuildNumber,dwPlatformId; u16 szCSDVersion[128]; u16 wServicePackMajor,wServicePackMinor,wSuiteMask; u8 wProductType,wReserved; } OSVERSIONINFOEXW;
     int __cdecl wcscmp(const u16 *_Str1,const u16 *_Str2); u16* wcscpy(u16* restrict destination, const u16* restrict source);
     #define MAKEINTATOM(i) (u16*)((u64)((u16)(i)))
-    typedef struct _devicemodeW {
-        u16 dmDeviceName[32]; u16 dmSpecVersion,dmDriverVersion,dmSize,dmDriverExtra; u32 dmFields;
-        union { struct { i16 dmOrientation,dmPaperSize,dmPaperLength,dmPaperWidth,dmScale,dmCopies,dmDefaultSource,dmPrintQuality; }; struct { POINTL dmPosition; u32 dmDisplayOrientation,dmDisplayFixedOutput; }; };
-        i16 dmColor,dmDuplex,dmYResolution,dmTTOption,dmCollate; u16 dmFormName[32],dmLogPixels; u32 dmBitsPerPel,dmPelsWidth,dmPelsHeight; union { u32 dmDisplayFlags,dmNup; };
-        u32 dmDisplayFrequency,dmICMMethod,dmICMIntent,dmMediaType,dmDitherType,dmReserved1,dmReserved2,dmPanningWidth,dmPanningHeight;
-    } DEVMODEW,*LPDEVMODEW;
+    typedef struct _devicemodeW {u16 dmDeviceName[32]; u16 dmSpecVersion,dmDriverVersion,dmSize,dmDriverExtra; u32 dmFields; union { struct { i16 dmOrientation,dmPaperSize,dmPaperLength,dmPaperWidth,dmScale,dmCopies,dmDefaultSource,dmPrintQuality; }; struct { POINTL dmPosition; u32 dmDisplayOrientation,dmDisplayFixedOutput; }; };
+                                 i16 dmColor,dmDuplex,dmYResolution,dmTTOption,dmCollate; u16 dmFormName[32],dmLogPixels; u32 dmBitsPerPel,dmPelsWidth,dmPelsHeight; union { u32 dmDisplayFlags,dmNup; }; u32 dmDisplayFrequency,dmICMMethod,dmICMIntent,dmMediaType,dmDitherType,dmReserved1,dmReserved2,dmPanningWidth,dmPanningHeight; } DEVMODEW,*LPDEVMODEW;
     typedef i64 (__stdcall *WNDPROC)(HWND,u32,u64,i64); typedef i32 (__stdcall *MONITORENUMPROC)(HMONITOR,HDC,LPRECT,i64);
-    typedef struct _ICONINFO { i32 fIcon; u32 xHotspot,yHotspot; HBITMAP hbmMask,hbmColor; } ICONINFO; typedef ICONINFO *PICONINFO;
-    typedef struct tagMSG { HWND hwnd; u32 message; u64 wParam; i64 lParam; u32 time; POINT pt; } MSG,*PMSG,*NPMSG,*LPMSG;
-    typedef struct tagMONITORINFO { u32 cbSize; RECT rcMonitor; RECT rcWork; u32 dwFlags; } MONITORINFO,*LPMONITORINFO;
-    typedef struct tagMONITORINFOEXW { u32 cbSize; RECT rcMonitor; RECT rcWork; u32 dwFlags; u16 szDevice[32]; } MONITORINFOEXW;
+    typedef struct _ICONINFO { i32 fIcon; u32 xHotspot,yHotspot; HBITMAP hbmMask,hbmColor; } ICONINFO; typedef ICONINFO *PICONINFO; typedef struct tagMSG { HWND hwnd; u32 message; u64 wParam; i64 lParam; u32 time; POINT pt; } MSG,*PMSG,*NPMSG,*LPMSG;
+    typedef struct tagMONITORINFO { u32 cbSize; RECT rcMonitor; RECT rcWork; u32 dwFlags; } MONITORINFO,*LPMONITORINFO;             typedef struct tagMONITORINFOEXW { u32 cbSize; RECT rcMonitor; RECT rcWork; u32 dwFlags; u16 szDevice[32]; } MONITORINFOEXW;
     typedef struct tagWINDOWPLACEMENT { u32 length; u32 flags; u32 showCmd; POINT ptMinPosition; POINT ptMaxPosition; RECT rcNormalPosition; } WINDOWPLACEMENT;
     typedef struct tagWNDCLASSEXW { u32 cbSize,style; WNDPROC lpfnWndProc; i32 cbClsExtra,cbWndExtra; HINSTANCE hInstance; HICON hIcon,hCursor; HBRUSH hbrBackground; u16 *lpszMenuName,*lpszClassName; HICON hIconSm; } WNDCLASSEXW;
     typedef struct {u16 wButtons; u8 bLeftTrigger,bRightTrigger; i16 sThumbLX,sThumbLY,sThumbRX,sThumbRY; } XINPUT_GAMEPAD; typedef struct {u16 wLeftMotorSpeed, wRightMotorSpeed;} XINPUT_VIBRATION;
     typedef struct {u8 Type,SubType; u16 Flags; XINPUT_GAMEPAD Gamepad; XINPUT_VIBRATION Vibration;} XINPUT_CAPABILITIES;   typedef struct {u32 dwPacketNumber; XINPUT_GAMEPAD Gamepad;} XINPUT_STATE;
     typedef u32 (WINAPI * PFN_XInputGetCapabilities)(u32,u32,XINPUT_CAPABILITIES*);                                         typedef u32 (WINAPI * PFN_XInputGetState)(u32,XINPUT_STATE*);
     typedef struct { u32 dbch_size,dbch_devicetype,dbch_reserved; } DEV_BROADCAST_HDR;                                      typedef struct { u32 dbcc_size,dbcc_devicetype,dbcc_reserved; GUID dbcc_classguid; u16 dbcc_name[1]; } DEV_BROADCAST_DEVICEINTERFACE_W;
-    typedef i32 (WINAPI * PFN_DwmIsCompositionEnabled)(i32*);                   typedef i32 (WINAPI * PFN_DwmFlush)();
-    typedef i32 (WINAPI * PFN_RtlVerifyVersionInfo)(OSVERSIONINFOEXW*,u32,u64); typedef i32 (WINAPI * PFN_SWE)(int);
-    typedef i32 (WINAPI * PFN_GPFAIVA)(HDC,int,int,u32,const int*,int*);        typedef HGLRC (WINAPI * FP_CCAA)(HDC,HGLRC,const int*);
-    typedef HGLRC (WINAPI * PFN_CC)(HDC);                                       typedef PROC (WINAPI * PFN_wglGetProcAddress)(const char*);
-    typedef HDC (WINAPI * PFN_wglGetCurrentDC)();                               typedef HGLRC (WINAPI * PFN_wglGetCurrentContext)();
-    typedef i32 (WINAPI * PFN_wglMakeCurrent)(HDC,HGLRC);
+    typedef i32 (WINAPI * PFN_DwmIsCompositionEnabled)(i32*);            typedef i32 (WINAPI * PFN_DwmFlush)();                  typedef i32 (WINAPI * PFN_RtlVerifyVersionInfo)(OSVERSIONINFOEXW*,u32,u64); typedef i32 (WINAPI * PFN_SWE)(int);
+    typedef i32 (WINAPI * PFN_GPFAIVA)(HDC,int,int,u32,const int*,int*); typedef HGLRC (WINAPI * FP_CCAA)(HDC,HGLRC,const int*); typedef HGLRC (WINAPI * PFN_CC)(HDC);                                       typedef PROC (WINAPI * PFN_wglGetProcAddress)(const char*);
+    typedef HDC (WINAPI * PFN_wglGetCurrentDC)();                        typedef HGLRC (WINAPI * PFN_wglGetCurrentContext)();    typedef i32 (WINAPI * PFN_wglMakeCurrent)(HDC,HGLRC);
     typedef struct WGLContext { HDC dc; HGLRC handle; int interval; } WGLContext;
     typedef struct _GLFWlibraryWGL { HINSTANCE instance; PFN_CC CreateContext; PFN_wglGetProcAddress GetProcAddress; PFN_wglGetCurrentDC GetCurrentDC; PFN_wglGetCurrentContext GetCurrentContext; PFN_wglMakeCurrent MakeCurrent; PFN_SWE SwapIntervalEXT; PFN_GPFAIVA GetPixelFormatAttribivARB; FP_CCAA CreateContextAttribsARB; } _GLFWlibraryWGL;
     typedef struct _GLFWwindowWin32 { HWND handle; i32 cursorTracked,frameAction,keymenu; int width,height,lastCursorPosX,lastCursorPosY; } _GLFWwindowWin32;
@@ -2561,20 +2492,15 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     }
     
     static void processEvent(XEvent* event) {
-        unsigned int keycode=0; Bool filtered=0;
-        if (event->type==2/*KeyPress*/ || event->type==3/*KeyRelease*/) keycode=event->xkey.keycode;
-        filtered=_glfw.x11.xlib.FilterEvent(event,0L);
+        unsigned int keycode=0; if (event->type==2/*KeyPress*/ || event->type==3/*KeyRelease*/) keycode=event->xkey.keycode;
+        Bool filtered=_glfw.x11.xlib.FilterEvent(event,0L);
         if (event->type==_glfw.x11.randr.eventBase+1/*notify*/) { _glfw.x11.randr.UpdateConfiguration(event); PollMonitors(); return; }
         if (event->type==35/*GenericEvent*/) return;
         _GLFWwindow* win=NULL; if (_glfw.x11.xlib.FindContext(_glfw.x11.display,event->xany.window,_glfw.x11.context,(XPointer*)&win)!=0) return;
 
         switch (event->type) {
             case 21/*ReparentNotify*/: win->x11.parent=event->xreparent.parent; return;
-            case 2/*KeyPress*/:
-            case 3/*KeyRelease*/: {
-                const int key=translateKey(keycode),action=(event->type==2/*KeyPress*/)?INPUT_PRESS:INPUT_RELEASE;
-                if (key!=KEY_UNKNOWN) InputKey(win,key,action);
-                return; }
+            case 2/*KeyPress*/: case 3/*KeyRelease*/: { const int key=translateKey(keycode),action=(event->type==2/*KeyPress*/)?INPUT_PRESS:INPUT_RELEASE; if (key!=KEY_UNKNOWN) {InputKey(win,key,action);} return; }
             case 4/*ButtonPress*/: {
                 if      (event->xbutton.button==1) InputMouseClick(win,MOUSE_BUTTON_LEFT,INPUT_PRESS);
                 else if (event->xbutton.button==2) InputMouseClick(win,MOUSE_BUTTON_MIDDLE,INPUT_PRESS);
@@ -3379,20 +3305,26 @@ void CycleToNextMonitor() {
     SaveConfig(); CenterWindowOnMonitor();
 }
 // Phys Sys
-#define MAX_COLLISION_ITERATIONS 4
-#define RESTITUTION 0.5f
-#define FRICTION 0.2f
+#define MAX_COLLISION_ITERATIONS 64
+#define RESTITUTION 0.15f
+#define FRICTION 0.8f
 #define STEP_MIN_NORMAL_Y 0.7f
 #define PHY_EPSILON 0.0001f
 #define MAX_SUBSTEPS 10
 #define MAX_SPEED 8.0f // m/s
 #define MAX_STEP_SIZE (0.1f / MAX_SPEED) // 0.01 s
 #define MAX_ANGULAR_SPEED 5.0f
+#define MANIFOLD_MAX 4
+#define MANIFOLD_TIE_MARGIN 0.005f
+#define MANIFOLD_ALIGN_THRESHOLD 0.8f
+#define MANIFOLD_DEDUP_DIST_SQ 1e-5f
+#define CVXMSH_HULL_CACHE 512
 typedef struct {V3 ctr,halfExtents; Quaternion rot;} ShapeBox; typedef struct {V3 ctr; float rad;} ShapeSphere;/*Et tu brute?*/ typedef struct {V3 tip,base; float rad;} ShapeCapsule;
 ENGINE_TO_MOD void SetPosition(Entity* e, V3 newpos, bool teleport) { float d = V3_Dist(e->position,newpos); if ((d > 0.001f && d < 0.1f) || teleport) {e->position = newpos;} }
 u16 dynamicEntities[512], dynamicEntityCount;
-typedef struct { bool hit; V3 point,normal; float overlapAmount; } OverlapResult;
+typedef struct { bool hit; V3 point,normal; float overlapAmount; } OverlapResult; typedef struct { V3 point; float pen; } ManifoldPt; typedef struct { V3 normal; ManifoldPt p[MANIFOLD_MAX]; int n; float maxPen; } Manifold;
 INLINE u32 PosGetCellCoordsP(i32 cx, i32 cz) { cx = clamp(cx,0,WORLDX_0BASED); cz = clamp(cz,0,WORLDX_0BASED); return (u32)cz * WORLDX + (u32)cx; }
+static inline Manifold OverlapToManifold(OverlapResult r) { Manifold m = {0}; if (r.hit && r.overlapAmount > PHY_EPSILON) { m.normal = r.normal; m.n = 1; m.p[0] = (ManifoldPt){r.point, r.overlapAmount}; m.maxPen = r.overlapAmount; } return m; }
 static inline OverlapResult SphSph(V3 a, float ar, V3 b, float br) {
     V3 delta = V3_AsubB(a,b); float dist = V3_Mag(delta), radSum = (ar + br); V3 n = (dist < PHY_EPSILON) ? (V3){0,1,0} : V3_ScaleByF(delta,1.0f / dist);
     return (dist < radSum) ? (OverlapResult){true,V3_AplusB(b,V3_ScaleByF(n,br)),n,radSum - dist} : (OverlapResult){0,{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f},0.0f};
@@ -3593,6 +3525,7 @@ static u16 cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX];
 float GetColRad(Entity *e) { if (e->collider == COLTYPE_BOX) { float hx = e->colliderSize.x * 0.5f * e->scale.x, hy = e->colliderSize.y * 0.5f * e->scale.y, hz = e->colliderSize.z * 0.5f * e->scale.z; return vsqrtf(hx*hx + hy*hy + hz*hz); } return e->colliderSize.x; }
 Quaternion quat_from_axis_angle(V3 axis, float angle) { float half = angle * 0.5f; float s = vsinf(half); return (Quaternion){axis.x * s,axis.y * s,axis.z * s,vcosf(half)}; }
 Quaternion quat_normalize(Quaternion q) { float len2 = q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w; if (len2 < PHY_EPSILON) {return (Quaternion){0,0,0,1};} float inv = 1.0f / vsqrtf(len2); q.x *= inv; q.y *= inv; q.z *= inv; q.w *= inv; return q; }
+static inline bool V3_IsSane(V3 v) { return (v.x<=1e6f && v.x>=-1e6f && v.y<=1e6f && v.y>=-1e6f && v.z<=1e6f && v.z>=-1e6f); } // false for NaN/Inf too: comparisons against NaN are always false
 static void ApplyVelocity(Entity *e, float dt) {
     V3 acc = {0.0f,-9.81f*e->gravity,0.0f};
     u16 edx = (u16)(e - World.instances);
@@ -3601,6 +3534,7 @@ static void ApplyVelocity(Entity *e, float dt) {
     e->velocity = V3_AplusB(e->velocity,V3_ScaleByF(acc,dt));
     float speed = V3_Mag(e->velocity);
     if (speed > MAX_SPEED) e->velocity = V3_ScaleByF(V3_ScaleByF(e->velocity, 1.0f / speed),MAX_SPEED);
+    if (!V3_IsSane(e->velocity)) e->velocity = (V3){0.0f,0.0f,0.0f}; // catches what the MAX_SPEED check above can't: NaN/Inf compare false, so it falls through unclamped without this
     float linDrag = vexp(-2.0f * dt);
     e->velocity = V3_ScaleByF(e->velocity,linDrag);
     SetPosition(e,V3_AplusB(e->position,V3_ScaleByF(e->velocity,dt)),false); // pos += (d = v*t)
@@ -3609,6 +3543,7 @@ static void ApplyVelocity(Entity *e, float dt) {
         e->angularVelocity = V3_ScaleByF(e->angularVelocity,angDrag); // 1. Apply continuous angular drag over time
         float avel = V3_Mag(e->angularVelocity); 
         if (avel > MAX_ANGULAR_SPEED) { e->angularVelocity = V3_ScaleByF(e->angularVelocity,MAX_ANGULAR_SPEED / avel); avel = MAX_ANGULAR_SPEED; }
+        if (!V3_IsSane(e->angularVelocity)) { e->angularVelocity = (V3){0.0f,0.0f,0.0f}; avel = 0.0f; }
         if (avel > PHY_EPSILON) { Quaternion dq = quat_from_axis_angle(V3_ScaleByF(e->angularVelocity,1.f / avel),avel * dt); e->rotation = quat_normalize(quat_multiply(dq,e->rotation)); } // 2. Integrate rotation
     } else e->angularVelocity = (V3){0.0f,0.0f,0.0f};
 }
@@ -3635,7 +3570,7 @@ static void ComputeConvexMeshInertiaTensor(Entity *e) { // Called for each entit
     
     if (vabs(volAcc) < PHY_EPSILON) return;
     
-    float s = e->mass / (volAcc * 60.f), so = e->mass / (volAcc * 120.f);
+    float s = e->mass / (volAcc * 10.f), so = e->mass / (volAcc * 20.f);
     float r = modelBounds[mi] * vmax(vmax(e->scale.x, e->scale.y), e->scale.z); // Calculate raw local inertia tensor bounds
     float sphericalI = (2.0f / 5.0f) * e->mass * r * r, mn = sphericalI * 0.1f;
     float Ixx = vmax((acc[1]+acc[2])*s, mn), Iyy = vmax((acc[0]+acc[2])*s, mn), Izz = vmax((acc[0]+acc[1])*s, mn);
@@ -3716,6 +3651,7 @@ static V3 MeshSupport(u16 m, const float* M, V3 d) {
     return b;
 }
 
+static inline V3 CachedSupport(const V3* v, u32 n, V3 d) { V3 best = v[0]; float top = V3_dot(v[0],d); for (u32 i = 1; i < n; ++i) { float dot = V3_dot(v[i],d); if (dot > top) { top = dot; best = v[i]; } } return best; }
 typedef struct { V3 v[4]; int n; } Simplex3D;
 static inline V3 MinkowskiSupport(u16 mA, const float* mxA, u16 mB, const float* mxB, V3 d) { return V3_AsubB(MeshSupport(mA,mxA,d), MeshSupport(mB,mxB,(V3){-d.x,-d.y,-d.z})); }
 static inline V3 TP(V3 a, V3 b, V3 c) { return V3_Cross(V3_Cross(a,b),c); }
@@ -3773,178 +3709,44 @@ static inline EPAFace MakeEPAFace(const EPAVert* vb, int a, int b, int c) {
     return (EPAFace){a,b,c,n,d};
 }
 
-static inline V3 EPAContactPoint(const EPAVert* ev, int a, int b, int c, V3 n, float d) { // Barycentric projection of origin onto triangle (a,b,c) -> interpolate wA for contact point
-    V3 pa=ev[a].v, pb=ev[b].v, pc=ev[c].v; V3 proj = V3_ScaleByF(n, d); // origin projected onto face plane
-    V3 v0=V3_AsubB(pb,pa), v1=V3_AsubB(pc,pa), v2=V3_AsubB(proj,pa);
-    float d00=V3_dot(v0,v0), d01=V3_dot(v0,v1), d11=V3_dot(v1,v1), d20=V3_dot(v2,v0), d21=V3_dot(v2,v1);
-    float inv=1.f/(d00*d11-d01*d01+PHY_EPSILON);
-    float v=(d11*d20-d01*d21)*inv, w=(d00*d21-d01*d20)*inv, u=1.f-v-w;
-    return (V3){u*ev[a].wA.x+v*ev[b].wA.x+w*ev[c].wA.x, u*ev[a].wA.y+v*ev[b].wA.y+w*ev[c].wA.y, u*ev[a].wA.z+v*ev[b].wA.z+w*ev[c].wA.z};
+static inline V3 EPAContactPoint(const EPAVert* ev, int a, int b, int c, V3 n, float d) {
+    V3 pa = ev[a].v;
+    V3 pb = ev[b].v;
+    V3 pc = ev[c].v;
+
+    V3 v0 = V3_AsubB(pb, pa);
+    V3 v1 = V3_AsubB(pc, pa);
+    V3 v2 = V3_AsubB((V3){0,0,0}, pa);   // Vector from pa to origin (in Minkowski space)
+
+    float d00 = V3_dot(v0, v0);
+    float d01 = V3_dot(v0, v1);
+    float d11 = V3_dot(v1, v1);
+    float d20 = V3_dot(v2, v0);
+    float d21 = V3_dot(v2, v1);
+
+    float denom = d00 * d11 - d01 * d01 + PHY_EPSILON;
+    float v = (d11 * d20 - d01 * d21) * (1.0f / denom);
+    float w = (d00 * d21 - d01 * d20) * (1.0f / denom);
+    float u = 1.0f - v - w;
+
+    // Clamp to avoid numerical blow-up / negative weights causing jitter
+    u = vmax(u, 0.0f);
+    v = vmax(v, 0.0f);
+    w = vmax(w, 0.0f);
+    float sum = u + v + w;
+    if (sum > PHY_EPSILON) {
+        u /= sum; v /= sum; w /= sum;
+    }
+
+    return (V3){
+        u*ev[a].wA.x + v*ev[b].wA.x + w*ev[c].wA.x,
+        u*ev[a].wA.y + v*ev[b].wA.y + w*ev[c].wA.y,
+        u*ev[a].wA.z + v*ev[b].wA.z + w*ev[c].wA.z
+    };
 }
 
-static OverlapResult CvxCvx(u16 meshA, u16 meshB, const float* matA, const float* matB) {
-    OverlapResult r = {0}; if (meshA >= MAX_MDLS || meshB >= MAX_MDLS) return r;
-    Simplex3D s = {0}; V3 dir = {0.0f,1.0f,0.0f};
-    s.v[s.n++] = MinkowskiSupport(meshA,matA,meshB,matB,dir);
-    dir = (V3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
-    if (V3_dot(dir,dir) < PHY_EPSILON) dir=(V3){0.0f,1.0f,0.0f};
-    for (int it=0;it<64;++it) {
-        V3 sup = MinkowskiSupport(meshA,matA,meshB,matB,dir);
-        if (V3_dot(sup,dir) < PHY_EPSILON) return r;
-        s.v[s.n++] = sup;
-        if (!GJKNextSimplex(&s,&dir) || (V3_dot(dir,dir) < PHY_EPSILON)) { r.hit=true; break; }
-    }
-    if (!r.hit) return r;
-
-    static const V3 kAxes[6] = {{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
-    for (int d=0;s.n<4 && d<6;++d) {
-        V3 sup = MinkowskiSupport(meshA,matA,meshB,matB,kAxes[d]); bool dup=false;
-        for (int k=0;k<s.n;k++) { V3 dv=V3_AsubB(sup,s.v[k]); dup|=(V3_dot(dv,dv)<PHY_EPSILON*PHY_EPSILON); }
-        if (!dup) s.v[s.n++]=sup;
-    }
-    if (s.n < 4) { r.hit=true; return r; }
-
-    EPAVert ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0, nf=0;
-    for (int i=0;i<4;i++) { ev[nv].wA=MeshSupport(meshA,matA,s.v[i]); ev[nv].wB=MeshSupport(meshB,matB,(V3){-s.v[i].x,-s.v[i].y,-s.v[i].z}); ev[nv].v=s.v[i]; nv++; }
-    static const int kTetFaces[4][3] = {{0,1,2},{0,3,1},{0,2,3},{1,3,2}};
-    for (int f=0;f<4;f++) { EPAFace face = MakeEPAFace(ev, kTetFaces[f][0], kTetFaces[f][1], kTetFaces[f][2]); if (face.d >= 0.f && nf < EPA_MAX_FACES) ef[nf++]=face; }
-    for (int it=0; it<32; ++it) {
-        int bf=-1; float bd=1e9f;
-        for (int f=0;f<nf;f++) if(ef[f].d<bd){bd=ef[f].d;bf=f;}
-        if (bf<0) break;
-        V3 bn=ef[bf].n; V3 wA=MeshSupport(meshA,matA,bn); V3 wB=MeshSupport(meshB,matB,(V3){-bn.x,-bn.y,-bn.z}); V3 sup=V3_AsubB(wA,wB);
-        float sdot = V3_dot(bn,sup);
-        if (sdot - bd < PHY_EPSILON) { r.normal=bn; r.overlapAmount=bd; r.point=EPAContactPoint(ev,ef[bf].a,ef[bf].b,ef[bf].c,bn,bd); return r; }
-        if (nv >= EPA_MAX_VERTS) break;
-        
-        ev[nv].v=sup; ev[nv].wA=wA; ev[nv].wB=wB;
-        int edges[EPA_MAX_EDGES][2],ne=0,keep[EPA_MAX_FACES],nk=0;
-        for (int f=0;f<nf;f++) {
-            if (V3_dot(ef[f].n, V3_AsubB(sup,ev[ef[f].a].v)) > 0.f) {
-                int fv[3]={ef[f].a,ef[f].b,ef[f].c};
-                for (int e=0;e<3;e++) { int ea=fv[e],eb=fv[(e+1)%3]; bool found=false;
-                    for (int k=0;k<ne;k++) if(edges[k][0]==eb&&edges[k][1]==ea){edges[k][0]=edges[--ne][0];edges[k][1]=edges[ne][1];found=true;break;}
-                    
-                    if (!found&&ne<EPA_MAX_EDGES){edges[ne][0]=ea;edges[ne++][1]=eb;} }
-            } else keep[nk++]=f;
-        }
-        nf=0; for(int k=0;k<nk;k++) ef[nf++]=ef[keep[k]];
-        for(int k=0;k<ne&&nf<EPA_MAX_FACES;k++){EPAFace face=MakeEPAFace(ev,edges[k][0],edges[k][1],nv);if(face.d>=0.f)ef[nf++]=face;}
-        nv++;
-    }
-    r.hit=true; return r;
-}
-
-static OverlapResult CapCvx(ShapeCapsule cap, u16 mesh, const float* mx) {
-    OverlapResult r = {0}; if (mesh >= MAX_MDLS || !modelVertexCounts[mesh]) return r;
-    
-    #define CSUP_A(d) CapsuleSupport(cap, d)
-    #define CSUP_B(d) MeshSupport(mesh, mx, (V3){-(d).x,-(d).y,-(d).z})
-    #define CSUP(d)   V3_AsubB(CSUP_A(d), CSUP_B(d))
-    Simplex3D s = {0}; V3 dir = {0,1,0};
-    s.v[s.n++] = CSUP(dir); dir = (V3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
-    if (V3_dot(dir,dir) < PHY_EPSILON) dir=(V3){0,1,0};
-    for (int it=0; it<64; ++it) {
-        V3 sup=CSUP(dir); if (V3_dot(sup,dir)<PHY_EPSILON) return r;
-        
-        s.v[s.n++]=sup;
-        if (!GJKNextSimplex(&s,&dir)) { r.hit=true; break; }
-        if (V3_dot(dir,dir)<PHY_EPSILON) { r.hit=true; break; }
-    }
-    if (!r.hit) return r;
-    static const V3 kAx[6]={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
-    for (int d=0;s.n<4&&d<6;++d) {
-        V3 sup=CSUP(kAx[d]); bool dup=false;
-        for (int k=0;k<s.n;k++){V3 dv=V3_AsubB(sup,s.v[k]);dup|=(V3_dot(dv,dv)<PHY_EPSILON*PHY_EPSILON);}
-        if (!dup) s.v[s.n++]=sup;
-    }
-    if (s.n<4){r.hit=true;return r;}
-    EPAVert ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0,nf=0;
-    for (int i=0;i<4;i++){ev[nv].wA=CSUP_A(s.v[i]);ev[nv].wB=CSUP_B(s.v[i]);ev[nv].v=s.v[i];nv++;}
-    static const int kTF[4][3]={{0,1,2},{0,3,1},{0,2,3},{1,3,2}};
-    for (int f=0;f<4;f++){EPAFace face=MakeEPAFace(ev,kTF[f][0],kTF[f][1],kTF[f][2]);if(face.d>=0.f&&nf<EPA_MAX_FACES)ef[nf++]=face;}
-    for (int it=0;it<32;++it){
-        int bf=-1; float bd=1e9f;
-        for (int f=0;f<nf;f++) if(ef[f].d<bd){bd=ef[f].d;bf=f;}
-        if (bf<0) break;
-        V3 bn=ef[bf].n; V3 wA=CSUP_A(bn); V3 wB=CSUP_B(bn); V3 sup=V3_AsubB(wA,wB);
-        if (V3_dot(bn,sup)-bd<PHY_EPSILON){r.normal=bn;r.overlapAmount=bd;r.point=EPAContactPoint(ev,ef[bf].a,ef[bf].b,ef[bf].c,bn,bd);return r;}
-        if (nv>=EPA_MAX_VERTS) break;
-        
-        ev[nv].v=sup; ev[nv].wA=wA; ev[nv].wB=wB;
-        int edges[EPA_MAX_EDGES][2],ne=0,keep[EPA_MAX_FACES],nk=0;
-        for (int f=0;f<nf;f++){
-            if (V3_dot(ef[f].n,V3_AsubB(sup,ev[ef[f].a].v))>0.f){
-                int fv[3]={ef[f].a,ef[f].b,ef[f].c};
-                for (int e=0;e<3;e++){int ea=fv[e],eb=fv[(e+1)%3];bool found=false;
-                    for (int k=0;k<ne;k++)if(edges[k][0]==eb&&edges[k][1]==ea){edges[k][0]=edges[--ne][0];edges[k][1]=edges[ne][1];found=true;break;}
-                    if (!found&&ne<EPA_MAX_EDGES){edges[ne][0]=ea;edges[ne++][1]=eb;}}
-            } else keep[nk++]=f;
-        }
-        nf=0;for(int k=0;k<nk;k++)ef[nf++]=ef[keep[k]];
-        for(int k=0;k<ne&&nf<EPA_MAX_FACES;k++){EPAFace face=MakeEPAFace(ev,edges[k][0],edges[k][1],nv);if(face.d>=0.f)ef[nf++]=face;}
-        nv++;
-    }
-    #undef CSUP_A
-    #undef CSUP_B
-    #undef CSUP
-    r.hit=true; return r;
-}
-
-static OverlapResult BoxCvx(ShapeBox box, u16 mesh, const float* mx) {
-    OverlapResult r = {0}; if (mesh >= MAX_MDLS || !modelVertexCounts[mesh]) return r;
-    #define BSUP(d)   V3_AsubB(BoxSupport(box,d),MeshSupport(mesh,mx,(V3){-(d).x,-(d).y,-(d).z}))
-    Simplex3D s={0}; V3 dir={0,1,0};
-    s.v[s.n++]=BSUP(dir); dir=(V3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
-    if (V3_dot(dir,dir)<PHY_EPSILON) dir=(V3){0,1,0};
-    for (int it=0;it<64;++it){
-        V3 sup=BSUP(dir); if (V3_dot(sup,dir)<PHY_EPSILON) return r;
-        s.v[s.n++]=sup;
-        if (!GJKNextSimplex(&s,&dir)){r.hit=true;break;}
-        if (V3_dot(dir,dir)<PHY_EPSILON){r.hit=true;break;}
-    }
-    if (!r.hit) return r;
-    static const V3 kAx[6]={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
-    for (int d=0;s.n<4&&d<6;++d){
-        V3 sup=BSUP(kAx[d]); bool dup=false;
-        for (int k=0;k<s.n;k++){V3 dv=V3_AsubB(sup,s.v[k]);dup|=(V3_dot(dv,dv)<PHY_EPSILON*PHY_EPSILON);}
-        if (!dup) s.v[s.n++]=sup;
-    }
-    if (s.n<4){r.hit=true;return r;}
-    EPAVert ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0,nf=0;
-    for (int i=0;i<4;i++){ev[nv].wA=BoxSupport(box,s.v[i]);ev[nv].wB=MeshSupport(mesh,mx,(V3){-s.v[i].x,-s.v[i].y,-s.v[i].z});ev[nv].v=s.v[i];nv++;}
-    static const int kTF[4][3]={{0,1,2},{0,3,1},{0,2,3},{1,3,2}};
-    for (int f=0;f<4;f++){EPAFace face=MakeEPAFace(ev,kTF[f][0],kTF[f][1],kTF[f][2]);if(face.d>=0.f&&nf<EPA_MAX_FACES)ef[nf++]=face;}
-    for (int it=0;it<32;++it){
-        int bf=-1; float bd=1e9f;
-        for (int f=0;f<nf;f++) if(ef[f].d<bd){bd=ef[f].d;bf=f;}
-        if (bf<0) break;
-        V3 bn=ef[bf].n; V3 wA=BoxSupport(box,bn); V3 wB=MeshSupport(mesh,mx,(V3){-bn.x,-bn.y,-bn.z}); V3 sup=V3_AsubB(wA,wB);
-        if (V3_dot(bn,sup)-bd<PHY_EPSILON){r.normal=bn;r.overlapAmount=bd;r.point=EPAContactPoint(ev,ef[bf].a,ef[bf].b,ef[bf].c,bn,bd);return r;}
-        if (nv>=EPA_MAX_VERTS) break;
-        ev[nv].v=sup; ev[nv].wA=wA; ev[nv].wB=wB;
-        int edges[EPA_MAX_EDGES][2],ne=0,keep[EPA_MAX_FACES],nk=0;
-        for (int f=0;f<nf;f++){
-            if (V3_dot(ef[f].n,V3_AsubB(sup,ev[ef[f].a].v))>0.f){
-                int fv[3]={ef[f].a,ef[f].b,ef[f].c};
-                for (int e=0;e<3;e++){int ea=fv[e],eb=fv[(e+1)%3];bool found=false;
-                    for (int k=0;k<ne;k++)if(edges[k][0]==eb&&edges[k][1]==ea){edges[k][0]=edges[--ne][0];edges[k][1]=edges[ne][1];found=true;break;}
-                    if (!found&&ne<EPA_MAX_EDGES){edges[ne][0]=ea;edges[ne++][1]=eb;}}
-            } else keep[nk++]=f;
-        }
-        nf=0;for(int k=0;k<nk;k++)ef[nf++]=ef[keep[k]];
-        for(int k=0;k<ne&&nf<EPA_MAX_FACES;k++){EPAFace face=MakeEPAFace(ev,edges[k][0],edges[k][1],nv);if(face.d>=0.f)ef[nf++]=face;}
-        nv++;
-    }
-    #undef BSUP
-    r.hit=true; return r;
-}
-
-static void inline FeatureOverlap(V3 sc, float sr, V3 pt, OverlapResult* r) {
-    V3 delta=V3_AsubB(sc,pt); float dist2=V3_dot(delta,delta);
-    if (dist2 < sr*sr) { float dist=vsqrtf(vmax(dist2,0.0f)); OverlapResult t={true,pt,(dist>PHY_EPSILON) ? V3_ScaleByF(delta,1.0f/dist) : (V3){0.0f,1.0f,0.0f},sr - dist}; if(t.overlapAmount>r->overlapAmount) *r=t; }
-}
-
+static inline Manifold MakeEPAManifold(const EPAVert* ev, int a, int b, int c, V3 n, float d) { Manifold m = {0};  m.normal = n;  m.maxPen = d; m.n = 1; m.p[0] = (ManifoldPt){ EPAContactPoint(ev, a, b, c, n, d), d }; return m; }
+static void inline FeatureOverlap(V3 sc, float sr, V3 pt, OverlapResult* r) { V3 delta=V3_AsubB(sc,pt); float dist2=V3_dot(delta,delta); if (dist2 < sr*sr) { float dist=vsqrtf(vmax(dist2,0.0f)); OverlapResult t={true,pt,(dist>PHY_EPSILON) ? V3_ScaleByF(delta,1.0f/dist) : (V3){0.0f,1.0f,0.0f},sr - dist}; if(t.overlapAmount>r->overlapAmount) *r=t; } }
 static OverlapResult SphMsh(V3 sc, float sr, u16 mesh, const float* mx) { // Triangle-soup mesh support: test sphere/capsule against all triangles of a static mesh.  Returns deepest overlapping triangle result.  Normal points from mesh toward mover. Voronoi region closest point.
     OverlapResult r = {0}; if (mesh >= MAX_MDLS) return r;
     u32 triCount = modelTriangleCounts[mesh]; if (!triCount) return r;
@@ -3984,28 +3786,185 @@ static OverlapResult SphMsh(V3 sc, float sr, u16 mesh, const float* mx) { // Tri
 }
 
 static OverlapResult CapMsh(ShapeCapsule cap, u16 mesh, const float* mx) { OverlapResult rb = SphMsh(cap.base,cap.rad,mesh,mx); OverlapResult rt = SphMsh(cap.tip,cap.rad,mesh,mx); return (rt.overlapAmount > rb.overlapAmount) ? rt : rb; } // TODO: Connectivity needed or is snowman ala System Shock 1 fine enough?  Might prove funny if player can get stuck with top and bottom on either side of door while leaning like in original.
-static OverlapResult SphCvx(V3 sc, float sr, u16 mesh, const float* mx) {
-    OverlapResult r = {0}; if (mesh >= MAX_MDLS || !modelVertexCounts[mesh]) return r;
+static Manifold CvxCvx(u16 meshA, u16 meshB, const float* matA, const float* matB) {
+    Manifold m = {0}; if (meshA >= MAX_MDLS || meshB >= MAX_MDLS) return m;
+    Simplex3D s = {0}; V3 dir = {0.0f,1.0f,0.0f};
+    s.v[s.n++] = MinkowskiSupport(meshA,matA,meshB,matB,dir);
+    dir = (V3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
+    if (V3_dot(dir,dir) < PHY_EPSILON) dir=(V3){0.0f,1.0f,0.0f};
+    bool hit=false;
+    for (int it=0;it<64;++it) {
+        V3 sup = MinkowskiSupport(meshA,matA,meshB,matB,dir);
+        if (V3_dot(sup,dir) < PHY_EPSILON) return m;
+        s.v[s.n++] = sup;
+        if (!GJKNextSimplex(&s,&dir) || (V3_dot(dir,dir) < PHY_EPSILON)) { hit=true; break; }
+    }
+    if (!hit) return m;
+
+    static const V3 kAxes[6] = {{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
+    for (int d=0;s.n<4 && d<6;++d) {
+        V3 sup = MinkowskiSupport(meshA,matA,meshB,matB,kAxes[d]); bool dup=false;
+        for (int k=0;k<s.n;k++) { V3 dv=V3_AsubB(sup,s.v[k]); dup|=(V3_dot(dv,dv)<PHY_EPSILON*PHY_EPSILON); }
+        if (!dup) s.v[s.n++]=sup;
+    }
+    if (s.n < 4) return m;
+
+    EPAVert ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0, nf=0;
+    for (int i=0;i<4;i++) { ev[nv].wA=MeshSupport(meshA,matA,s.v[i]); ev[nv].wB=MeshSupport(meshB,matB,(V3){-s.v[i].x,-s.v[i].y,-s.v[i].z}); ev[nv].v=s.v[i]; nv++; }
+    static const int kTetFaces[4][3] = {{0,1,2},{0,3,1},{0,2,3},{1,3,2}};
+    for (int f=0;f<4;f++) { EPAFace face = MakeEPAFace(ev, kTetFaces[f][0], kTetFaces[f][1], kTetFaces[f][2]); if (face.d >= 0.f && nf < EPA_MAX_FACES) ef[nf++]=face; }
+    for (int it=0; it<32; ++it) {
+        int bf=-1; float bd=1e9f;
+        for (int f=0;f<nf;f++) if(ef[f].d<bd){bd=ef[f].d;bf=f;}
+        if (bf<0) break;
+        V3 bn=ef[bf].n; V3 wA=MeshSupport(meshA,matA,bn); V3 wB=MeshSupport(meshB,matB,(V3){-bn.x,-bn.y,-bn.z}); V3 sup=V3_AsubB(wA,wB);
+        if (V3_dot(bn,sup) - bd < PHY_EPSILON) return MakeEPAManifold(ev,ef[bf].a,ef[bf].b,ef[bf].c,bn,bd);
+        if (nv >= EPA_MAX_VERTS) break;
+
+        ev[nv].v=sup; ev[nv].wA=wA; ev[nv].wB=wB;
+        int edges[EPA_MAX_EDGES][2],ne=0,keep[EPA_MAX_FACES],nk=0;
+        for (int f=0;f<nf;f++) {
+            if (V3_dot(ef[f].n, V3_AsubB(sup,ev[ef[f].a].v)) > 0.f) {
+                int fv[3]={ef[f].a,ef[f].b,ef[f].c};
+                for (int e=0;e<3;e++) { int ea=fv[e],eb=fv[(e+1)%3]; bool found=false;
+                    for (int k=0;k<ne;k++) if(edges[k][0]==eb&&edges[k][1]==ea){edges[k][0]=edges[--ne][0];edges[k][1]=edges[ne][1];found=true;break;}
+                    if (!found&&ne<EPA_MAX_EDGES){edges[ne][0]=ea;edges[ne++][1]=eb;} }
+            } else keep[nk++]=f;
+        }
+        nf=0; for(int k=0;k<nk;k++) ef[nf++]=ef[keep[k]];
+        for(int k=0;k<ne&&nf<EPA_MAX_FACES;k++){EPAFace face=MakeEPAFace(ev,edges[k][0],edges[k][1],nv);if(face.d>=0.f)ef[nf++]=face;}
+        nv++;
+    }
+    return m;
+}
+
+static Manifold CapCvx(ShapeCapsule cap, u16 mesh, const float* mx) {
+    Manifold m = {0}; if (mesh >= MAX_MDLS || !modelVertexCounts[mesh]) return m;
+    #define CSUP_A(d) CapsuleSupport(cap, d)
+    #define CSUP_B(d) MeshSupport(mesh, mx, (V3){-(d).x,-(d).y,-(d).z})
+    #define CSUP(d)   V3_AsubB(CSUP_A(d), CSUP_B(d))
+    Simplex3D s = {0}; V3 dir = {0,1,0};
+    s.v[s.n++] = CSUP(dir); dir = (V3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
+    if (V3_dot(dir,dir) < PHY_EPSILON) dir=(V3){0,1,0};
+    bool hit=false;
+    for (int it=0; it<64; ++it) {
+        V3 sup=CSUP(dir); if (V3_dot(sup,dir)<PHY_EPSILON) return m;
+        s.v[s.n++]=sup;
+        if (!GJKNextSimplex(&s,&dir)) { hit=true; break; }
+        if (V3_dot(dir,dir)<PHY_EPSILON) { hit=true; break; }
+    }
+    if (!hit) return m;
+    static const V3 kAx[6]={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
+    for (int d=0;s.n<4&&d<6;++d) {
+        V3 sup=CSUP(kAx[d]); bool dup=false;
+        for (int k=0;k<s.n;k++){V3 dv=V3_AsubB(sup,s.v[k]);dup|=(V3_dot(dv,dv)<PHY_EPSILON*PHY_EPSILON);}
+        if (!dup) s.v[s.n++]=sup;
+    }
+    if (s.n<4) return m;
+    EPAVert ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0,nf=0;
+    for (int i=0;i<4;i++){ev[nv].wA=CSUP_A(s.v[i]);ev[nv].wB=CSUP_B(s.v[i]);ev[nv].v=s.v[i];nv++;}
+    static const int kTF[4][3]={{0,1,2},{0,3,1},{0,2,3},{1,3,2}};
+    for (int f=0;f<4;f++){EPAFace face=MakeEPAFace(ev,kTF[f][0],kTF[f][1],kTF[f][2]);if(face.d>=0.f&&nf<EPA_MAX_FACES)ef[nf++]=face;}
+    for (int it=0;it<32;++it){
+        int bf=-1; float bd=1e9f;
+        for (int f=0;f<nf;f++) if(ef[f].d<bd){bd=ef[f].d;bf=f;}
+        if (bf<0) break;
+        V3 bn=ef[bf].n; V3 wA=CSUP_A(bn); V3 wB=CSUP_B(bn); V3 sup=V3_AsubB(wA,wB);
+        if (V3_dot(bn,sup)-bd<PHY_EPSILON) return MakeEPAManifold(ev,ef[bf].a,ef[bf].b,ef[bf].c,bn,bd);
+        if (nv>=EPA_MAX_VERTS) break;
+        ev[nv].v=sup; ev[nv].wA=wA; ev[nv].wB=wB;
+        int edges[EPA_MAX_EDGES][2],ne=0,keep[EPA_MAX_FACES],nk=0;
+        for (int f=0;f<nf;f++){
+            if (V3_dot(ef[f].n,V3_AsubB(sup,ev[ef[f].a].v))>0.f){
+                int fv[3]={ef[f].a,ef[f].b,ef[f].c};
+                for (int e=0;e<3;e++){int ea=fv[e],eb=fv[(e+1)%3];bool found=false;
+                    for (int k=0;k<ne;k++)if(edges[k][0]==eb&&edges[k][1]==ea){edges[k][0]=edges[--ne][0];edges[k][1]=edges[ne][1];found=true;break;}
+                    if (!found&&ne<EPA_MAX_EDGES){edges[ne][0]=ea;edges[ne++][1]=eb;}}
+            } else keep[nk++]=f;
+        }
+        nf=0;for(int k=0;k<nk;k++)ef[nf++]=ef[keep[k]];
+        for(int k=0;k<ne&&nf<EPA_MAX_FACES;k++){EPAFace face=MakeEPAFace(ev,edges[k][0],edges[k][1],nv);if(face.d>=0.f)ef[nf++]=face;}
+        nv++;
+    }
+    #undef CSUP_A
+    #undef CSUP_B
+    #undef CSUP
+    return m;
+}
+
+static Manifold BoxCvx(ShapeBox box, u16 mesh, const float* mx) {
+    Manifold m = {0}; if (mesh >= MAX_MDLS || !modelVertexCounts[mesh]) return m;
+    #define BSUP(d) V3_AsubB(BoxSupport(box,d),MeshSupport(mesh,mx,(V3){-(d).x,-(d).y,-(d).z}))
+    Simplex3D s={0}; V3 dir={0,1,0};
+    s.v[s.n++]=BSUP(dir); dir=(V3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
+    if (V3_dot(dir,dir)<PHY_EPSILON) dir=(V3){0,1,0};
+    bool hit=false;
+    for (int it=0;it<64;++it){
+        V3 sup=BSUP(dir); if (V3_dot(sup,dir)<PHY_EPSILON) return m;
+        s.v[s.n++]=sup;
+        if (!GJKNextSimplex(&s,&dir)){hit=true;break;}
+        if (V3_dot(dir,dir)<PHY_EPSILON){hit=true;break;}
+    }
+    if (!hit) return m;
+    static const V3 kAx[6]={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
+    for (int d=0;s.n<4&&d<6;++d){
+        V3 sup=BSUP(kAx[d]); bool dup=false;
+        for (int k=0;k<s.n;k++){V3 dv=V3_AsubB(sup,s.v[k]);dup|=(V3_dot(dv,dv)<PHY_EPSILON*PHY_EPSILON);}
+        if (!dup) s.v[s.n++]=sup;
+    }
+    if (s.n<4) return m;
+    EPAVert ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0,nf=0;
+    for (int i=0;i<4;i++){ev[nv].wA=BoxSupport(box,s.v[i]);ev[nv].wB=MeshSupport(mesh,mx,(V3){-s.v[i].x,-s.v[i].y,-s.v[i].z});ev[nv].v=s.v[i];nv++;}
+    static const int kTF[4][3]={{0,1,2},{0,3,1},{0,2,3},{1,3,2}};
+    for (int f=0;f<4;f++){EPAFace face=MakeEPAFace(ev,kTF[f][0],kTF[f][1],kTF[f][2]);if(face.d>=0.f&&nf<EPA_MAX_FACES)ef[nf++]=face;}
+    for (int it=0;it<32;++it){
+        int bf=-1; float bd=1e9f;
+        for (int f=0;f<nf;f++) if(ef[f].d<bd){bd=ef[f].d;bf=f;}
+        if (bf<0) break;
+        V3 bn=ef[bf].n; V3 wA=BoxSupport(box,bn); V3 wB=MeshSupport(mesh,mx,(V3){-bn.x,-bn.y,-bn.z}); V3 sup=V3_AsubB(wA,wB);
+        if (V3_dot(bn,sup)-bd<PHY_EPSILON) return MakeEPAManifold(ev,ef[bf].a,ef[bf].b,ef[bf].c,bn,bd);
+        if (nv>=EPA_MAX_VERTS) break;
+        ev[nv].v=sup; ev[nv].wA=wA; ev[nv].wB=wB;
+        int edges[EPA_MAX_EDGES][2],ne=0,keep[EPA_MAX_FACES],nk=0;
+        for (int f=0;f<nf;f++){
+            if (V3_dot(ef[f].n,V3_AsubB(sup,ev[ef[f].a].v))>0.f){
+                int fv[3]={ef[f].a,ef[f].b,ef[f].c};
+                for (int e=0;e<3;e++){int ea=fv[e],eb=fv[(e+1)%3];bool found=false;
+                    for (int k=0;k<ne;k++)if(edges[k][0]==eb&&edges[k][1]==ea){edges[k][0]=edges[--ne][0];edges[k][1]=edges[ne][1];found=true;break;}
+                    if (!found&&ne<EPA_MAX_EDGES){edges[ne][0]=ea;edges[ne++][1]=eb;}}
+            } else keep[nk++]=f;
+        }
+        nf=0;for(int k=0;k<nk;k++)ef[nf++]=ef[keep[k]];
+        for(int k=0;k<ne&&nf<EPA_MAX_FACES;k++){EPAFace face=MakeEPAFace(ev,edges[k][0],edges[k][1],nv);if(face.d>=0.f)ef[nf++]=face;}
+        nv++;
+    }
+    #undef BSUP
+    return m;
+}
+
+static Manifold SphCvx(V3 sc, float sr, u16 mesh, const float* mx) {
+    Manifold m = {0}; if (mesh >= MAX_MDLS || !modelVertexCounts[mesh]) return m;
     #define SPHSUP_A(d) ({ V3 _d=(d); float _L=V3_dot(_d,_d); V3_AplusB(sc,(_L>PHY_EPSILON)?V3_ScaleByF(_d,sr/vsqrtf(_L)):(V3){0,sr,0}); })
     #define SPHSUP_B(d) MeshSupport(mesh,mx,(V3){-(d).x,-(d).y,-(d).z})
     #define MSKSUP(d)   V3_AsubB(SPHSUP_A(d),SPHSUP_B(d))
     Simplex3D s={0}; V3 dir={0,1,0};
     s.v[s.n++]=MSKSUP(dir); dir=(V3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
     if (V3_dot(dir,dir)<PHY_EPSILON) dir=(V3){0,1,0};
+    bool hit=false;
     for (int it=0;it<32;++it) {
-        V3 sup=MSKSUP(dir); if (V3_dot(sup,dir)<PHY_EPSILON) return r;
+        V3 sup=MSKSUP(dir); if (V3_dot(sup,dir)<PHY_EPSILON) return m;
         s.v[s.n++]=sup;
-        if (!GJKNextSimplex(&s,&dir)){r.hit=true;break;}
-        if (V3_dot(dir,dir)<PHY_EPSILON){r.hit=true;break;}
+        if (!GJKNextSimplex(&s,&dir)){hit=true;break;}
+        if (V3_dot(dir,dir)<PHY_EPSILON){hit=true;break;}
     }
-    if (!r.hit) return r;
+    if (!hit) return m;
     static const V3 kAx[6]={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
     for (int d=0;s.n<4&&d<6;++d) {
         V3 sup=MSKSUP(kAx[d]); bool dup=false;
         for (int k=0;k<s.n;k++){V3 dv=V3_AsubB(sup,s.v[k]);dup|=V3_dot(dv,dv)<PHY_EPSILON*PHY_EPSILON;}
         if (!dup) s.v[s.n++]=sup;
     }
-    if (s.n<4){r.hit=true;return r;}
+    if (s.n<4) return m;
     EPAVert ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0,nf=0;
     for (int i=0;i<4;i++){ev[nv].v=s.v[i];ev[nv].wA=SPHSUP_A(s.v[i]);ev[nv].wB=SPHSUP_B(s.v[i]);nv++;}
     static const int kTF[4][3]={{0,1,2},{0,3,1},{0,2,3},{1,3,2}};
@@ -4015,7 +3974,7 @@ static OverlapResult SphCvx(V3 sc, float sr, u16 mesh, const float* mx) {
         for (int f=0;f<nf;f++) if(ef[f].d<bd){bd=ef[f].d;bf=f;}
         if (bf<0) break;
         V3 bn=ef[bf].n; V3 wA=SPHSUP_A(bn); V3 wB=SPHSUP_B(bn); V3 sup=V3_AsubB(wA,wB);
-        if (V3_dot(bn,sup)-bd<PHY_EPSILON){r.normal=bn;r.overlapAmount=bd;r.point=wB;return r;}
+        if (V3_dot(bn,sup)-bd<PHY_EPSILON) { m.normal=bn; m.maxPen=bd; m.n=1; m.p[0]=(ManifoldPt){wB,bd}; return m; }
         if (nv>=EPA_MAX_VERTS) break;
         ev[nv].v=sup;ev[nv].wA=wA;ev[nv].wB=wB;
         int edges[EPA_MAX_EDGES][2],ne=0,keep[EPA_MAX_FACES],nk=0;
@@ -4034,91 +3993,96 @@ static OverlapResult SphCvx(V3 sc, float sr, u16 mesh, const float* mx) {
     #undef SPHSUP_A
     #undef SPHSUP_B
     #undef MSKSUP
-    r.hit=true;return r;
+    return m;
 }
 
 typedef struct {V3 mn,mx;} AABB3;
 static inline V3 TriSupport(V3 ta, V3 tb, V3 tc, V3 d) { float d1 = V3_dot(ta,d), d2 = V3_dot(tb,d), d3 = V3_dot(tc,d); return d1 > d2 ? (d1 > d3 ? ta : tc) : (d2 > d3 ? tb : tc); }
-static OverlapResult CvxMsh(u16 hullMesh, const float* hullMx, u16 triMesh, const float* triMx) {
-    OverlapResult best_r = {0}; if (hullMesh >= MAX_MDLS || triMesh >= MAX_MDLS) return best_r;
+static Manifold CvxMsh(u16 hullMesh, const float* hullMx, u16 triMesh, const float* triMx) {
+    Manifold best = {0}; if (hullMesh >= MAX_MDLS || triMesh >= MAX_MDLS) {return best;}
+    u32 hn = modelVertexCounts[hullMesh]; if (!hn) return best;
+    bool cached = hn <= CVXMSH_HULL_CACHE; // falls back to uncached path if a hull is ever bigger than this — never wrong, just slower
+    V3 hv[CVXMSH_HULL_CACHE];
     AABB3 hb = { {1e9f,1e9f,1e9f}, {-1e9f,-1e9f,-1e9f} };
-    u32 n = modelVertexCounts[hullMesh]; const u8* vb = modelVertices[hullMesh];
-    for (u32 i=0;i<n;++i) { 
+    const u8* vb = modelVertices[hullMesh];
+    for (u32 i=0;i<hn;++i) {
         const u8* p = vb + i*VRT_ATT_SZ;
         V3 w = MvVert(hullMx,(V3){half_to_float(*(half*)(p+0)),half_to_float(*(half*)(p+2)),half_to_float(*(half*)(p+4))});
-        hb.mn.x=vmin(hb.mn.x,w.x); hb.mn.y=vmin(hb.mn.y,w.y); hb.mn.z=vmin(hb.mn.z,w.z); hb.mx.x=vmax(hb.mx.x,w.x); hb.mx.y=vmax(hb.mx.y,w.y); hb.mx.z=vmax(hb.mx.z,w.z);
+        if (cached) hv[i]=w;
+        hb.mn.x=vmin(hb.mn.x,w.x); hb.mn.y=vmin(hb.mn.y,w.y); hb.mn.z=vmin(hb.mn.z,w.z);
+        hb.mx.x=vmax(hb.mx.x,w.x); hb.mx.y=vmax(hb.mx.y,w.y); hb.mx.z=vmax(hb.mx.z,w.z);
     }
-    
-    u32 triCount = modelTriangleCounts[triMesh]; if (!triCount) return best_r;
+    V3 hext = V3_AsubB(hb.mx,hb.mn);
+    float spreadEps = vmax(0.02f, vmax(hext.x,vmax(hext.y,hext.z)) * 0.15f); // min spacing between manifold points, scaled to hull size
+    #define HSUP(d) (cached ? CachedSupport(hv,hn,(d)) : MeshSupport(hullMesh,hullMx,(d)))
+
+    u32 triCount = modelTriangleCounts[triMesh]; if (!triCount) return best;
     for (u32 ti = 0; ti < triCount; ++ti) {
         u32 i0 = modelTriangles[triMesh][ti * 3 + 0], i1 = modelTriangles[triMesh][ti * 3 + 1], i2 = modelTriangles[triMesh][ti * 3 + 2];
         V3 ta = MvVert(triMx,(V3){ half_to_float(*(half*)(modelVertices[triMesh] + i0 * VRT_ATT_SZ + 0)), half_to_float(*(half*)(modelVertices[triMesh] + i0 * VRT_ATT_SZ + 2)), half_to_float(*(half*)(modelVertices[triMesh] + i0 * VRT_ATT_SZ + 4)) });
         V3 tb = MvVert(triMx,(V3){ half_to_float(*(half*)(modelVertices[triMesh] + i1 * VRT_ATT_SZ + 0)), half_to_float(*(half*)(modelVertices[triMesh] + i1 * VRT_ATT_SZ + 2)), half_to_float(*(half*)(modelVertices[triMesh] + i1 * VRT_ATT_SZ + 4)) });
-        V3 tc = MvVert(triMx,(V3){ half_to_float(*(half*)(modelVertices[triMesh] + i2 * VRT_ATT_SZ + 0)), half_to_float(*(half*)(modelVertices[triMesh] + i2 * VRT_ATT_SZ + 2)), half_to_float(*(half*)(modelVertices[triMesh] + i2 * VRT_ATT_SZ + 4)) });        
+        V3 tc = MvVert(triMx,(V3){ half_to_float(*(half*)(modelVertices[triMesh] + i2 * VRT_ATT_SZ + 0)), half_to_float(*(half*)(modelVertices[triMesh] + i2 * VRT_ATT_SZ + 2)), half_to_float(*(half*)(modelVertices[triMesh] + i2 * VRT_ATT_SZ + 4)) });
         if (vmin(ta.x, vmin(tb.x, tc.x)) > hb.mx.x || vmax(ta.x, vmax(tb.x, tc.x)) < hb.mn.x || vmin(ta.y, vmin(tb.y, tc.y)) > hb.mx.y || vmax(ta.y, vmax(tb.y, tc.y)) < hb.mn.y || vmin(ta.z, vmin(tb.z, tc.z)) > hb.mx.z || vmax(ta.z, vmax(tb.z, tc.z)) < hb.mn.z) continue;
 
-        Simplex3D s = {0}; 
+        Simplex3D s = {0};
         V3 dir = {0.0f,1.0f,0.0f};
-        V3 wA0 = MeshSupport(hullMesh,hullMx,dir); // GJK Initialization (First Point)
+        V3 wA0 = HSUP(dir);
         V3 wB0 = TriSupport(ta,tb,tc,(V3){-dir.x,-dir.y,-dir.z});
         s.v[s.n++] = V3_AsubB(wA0,wB0);
         dir = (V3){-s.v[0].x, -s.v[0].y, -s.v[0].z};
         if (V3_dot(dir, dir) < PHY_EPSILON) dir = (V3){0.0f,1.0f,0.0f};
         bool hit = false;
         for (int it = 0; it < 32; ++it) {
-            V3 wA = MeshSupport(hullMesh,hullMx,dir), wB = TriSupport(ta,tb,tc,(V3){-dir.x,-dir.y,-dir.z});
+            V3 wA = HSUP(dir), wB = TriSupport(ta,tb,tc,(V3){-dir.x,-dir.y,-dir.z});
             V3 sup = V3_AsubB(wA,wB); if (V3_dot(sup, dir) < PHY_EPSILON) break;
-            
             s.v[s.n++] = sup;
             if (!GJKNextSimplex(&s, &dir)) { hit = true; break; }
             if (V3_dot(dir, dir) < PHY_EPSILON) { hit = true; break; }
         }
-        
         if (!hit) continue;
-        while (s.n < 4) { // Construct a proper tetrahedron dynamically from GJK points to prevent injecting skewed world-space boundary values.
+        while (s.n < 4) {
             V3 fallbackDir = {0.0f, 1.0f, 0.0f};
             if (s.n == 1) fallbackDir = (vabs(s.v[0].x) > 0.5f) ? (V3){0.0f, 1.0f, 0.0f} : (V3){1.0f, 0.0f, 0.0f};
             else if (s.n == 2) { V3 edge = V3_AsubB(s.v[1], s.v[0]); fallbackDir = V3_Cross(edge, (vabs(edge.x) > 0.5f) ? (V3){0.0f, 1.0f, 0.0f} : (V3){1.0f, 0.0f, 0.0f}); }
             else if (s.n == 3) { V3 e1 = V3_AsubB(s.v[1], s.v[0]); V3 e2 = V3_AsubB(s.v[2], s.v[0]); fallbackDir = V3_Cross(e1, e2); }
             float fLen = V3_Mag(fallbackDir);
             fallbackDir = (fLen > PHY_EPSILON) ? V3_ScaleByF(fallbackDir, 1.0f / fLen) : (V3){0.0f, 1.0f, 0.0f};
-            V3 wA = MeshSupport(hullMesh,hullMx,fallbackDir);
+            V3 wA = HSUP(fallbackDir);
             V3 wB = TriSupport(ta,tb,tc,(V3){-fallbackDir.x,-fallbackDir.y,-fallbackDir.z});
             V3 sup = V3_AsubB(wA,wB);
             bool dup = false;
             for (int k = 0; k < s.n; k++) { V3 dv = V3_AsubB(sup, s.v[k]); dup |= (V3_dot(dv, dv) < PHY_EPSILON * PHY_EPSILON); }
             if (!dup) s.v[s.n++] = sup;
             else {
-                fallbackDir = (V3){-fallbackDir.x, -fallbackDir.y, -fallbackDir.z}; // Handle a degenerate coplanar shape by flipping vector direction
-                wA = MeshSupport(hullMesh, hullMx, fallbackDir);
+                fallbackDir = (V3){-fallbackDir.x, -fallbackDir.y, -fallbackDir.z};
+                wA = HSUP(fallbackDir);
                 wB = TriSupport(ta, tb, tc, (V3){-fallbackDir.x, -fallbackDir.y, -fallbackDir.z});
                 s.v[s.n++] = V3_AsubB(wA, wB);
             }
         }
 
         EPAVert ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv = 0, nf = 0;
-        ev[nv].v = s.v[0]; ev[nv].wA = MeshSupport(hullMesh,hullMx,s.v[0]); ev[nv].wB = TriSupport(ta,tb,tc,(V3){-s.v[0].x,-s.v[0].y,-s.v[0].z}); nv++;
-        ev[nv].v = s.v[1]; ev[nv].wA = MeshSupport(hullMesh,hullMx,s.v[1]); ev[nv].wB = TriSupport(ta,tb,tc,(V3){-s.v[1].x,-s.v[1].y,-s.v[1].z}); nv++;
-        ev[nv].v = s.v[2]; ev[nv].wA = MeshSupport(hullMesh,hullMx,s.v[2]); ev[nv].wB = TriSupport(ta,tb,tc,(V3){-s.v[2].x,-s.v[2].y,-s.v[2].z}); nv++;
-        ev[nv].v = s.v[3]; ev[nv].wA = MeshSupport(hullMesh,hullMx,s.v[3]); ev[nv].wB = TriSupport(ta,tb,tc,(V3){-s.v[3].x,-s.v[3].y,-s.v[3].z}); nv++;
+        ev[nv].v = s.v[0]; ev[nv].wA = HSUP(s.v[0]); ev[nv].wB = TriSupport(ta,tb,tc,(V3){-s.v[0].x,-s.v[0].y,-s.v[0].z}); nv++;
+        ev[nv].v = s.v[1]; ev[nv].wA = HSUP(s.v[1]); ev[nv].wB = TriSupport(ta,tb,tc,(V3){-s.v[1].x,-s.v[1].y,-s.v[1].z}); nv++;
+        ev[nv].v = s.v[2]; ev[nv].wA = HSUP(s.v[2]); ev[nv].wB = TriSupport(ta,tb,tc,(V3){-s.v[2].x,-s.v[2].y,-s.v[2].z}); nv++;
+        ev[nv].v = s.v[3]; ev[nv].wA = HSUP(s.v[3]); ev[nv].wB = TriSupport(ta,tb,tc,(V3){-s.v[3].x,-s.v[3].y,-s.v[3].z}); nv++;
         static const int kTF[4][3] = {{0,1,2}, {0,3,1}, {0,2,3}, {1,3,2}};
         EPAFace face0 = MakeEPAFace(ev,kTF[0][0],kTF[0][1],kTF[0][2]); if (face0.d >= 0.0f && nf < EPA_MAX_FACES) ef[nf++] = face0;
         EPAFace face1 = MakeEPAFace(ev,kTF[1][0],kTF[1][1],kTF[1][2]); if (face1.d >= 0.0f && nf < EPA_MAX_FACES) ef[nf++] = face1;
         EPAFace face2 = MakeEPAFace(ev,kTF[2][0],kTF[2][1],kTF[2][2]); if (face2.d >= 0.0f && nf < EPA_MAX_FACES) ef[nf++] = face2;
         EPAFace face3 = MakeEPAFace(ev,kTF[3][0],kTF[3][1],kTF[3][2]); if (face3.d >= 0.0f && nf < EPA_MAX_FACES) ef[nf++] = face3;
-        OverlapResult r = {0};
+
+        bool tHit=false; V3 tN={0}; float tD=0; V3 tP={0};
         for (int it = 0; it < 32; ++it) {
             int bf = -1; float bd = 1e9f;
             for (int f = 0; f < nf; f++) { if (ef[f].d < bd) { bd = ef[f].d; bf = f; } }
             if (bf < 0) break;
-            
-            V3 bn = ef[bf].n; 
-            V3 wA = MeshSupport(hullMesh,hullMx,bn);
+            V3 bn = ef[bf].n;
+            V3 wA = HSUP(bn);
             V3 wB = TriSupport(ta,tb,tc,(V3){-bn.x,-bn.y,-bn.z});
             V3 sup = V3_AsubB(wA,wB);
-            if (V3_dot(bn, sup) - bd < PHY_EPSILON) { r.normal = bn; r.overlapAmount = bd; r.hit = true; r.point = EPAContactPoint(ev, ef[bf].a, ef[bf].b, ef[bf].c,bn,bd); break; }
+            if (V3_dot(bn, sup) - bd < PHY_EPSILON) { tHit=true; tN=bn; tD=bd; tP=EPAContactPoint(ev, ef[bf].a, ef[bf].b, ef[bf].c,bn,bd); break; }
             if (nv >= EPA_MAX_VERTS) break;
-            
             ev[nv].v = sup; ev[nv].wA = wA; ev[nv].wB = wB;
             int edges[EPA_MAX_EDGES][2], ne = 0, keep[EPA_MAX_FACES], nk = 0;
             for (int f=0;f<nf;f++) {
@@ -4129,24 +4093,33 @@ static OverlapResult CvxMsh(u16 hullMesh, const float* hullMx, u16 triMesh, cons
                         for (int k = 0; k < ne; k++) {
                             if (edges[k][0] == eb && edges[k][1] == ea) { edges[k][0] = edges[--ne][0]; edges[k][1] = edges[ne][1]; found = true; break; }
                         }
-                        
                         if (!found && ne < EPA_MAX_EDGES) { edges[ne][0] = ea; edges[ne++][1] = eb; }
                     }
                 } else keep[nk++] = f;
             }
-            
             nf = 0; for (int k = 0; k < nk; k++) ef[nf++] = ef[keep[k]];
-            for (int k = 0; k < ne && nf < EPA_MAX_FACES; k++) {
-                EPAFace face = MakeEPAFace(ev, edges[k][0], edges[k][1], nv);
-                if (face.d >= 0.0f) ef[nf++] = face;
-            }
+            for (int k = 0; k < ne && nf < EPA_MAX_FACES; k++) { EPAFace face = MakeEPAFace(ev, edges[k][0], edges[k][1], nv); if (face.d >= 0.0f) ef[nf++] = face; }
             nv++;
         }
 
-        if (r.hit && (!best_r.hit || r.overlapAmount > best_r.overlapAmount + 0.002f || (vabs(r.overlapAmount - best_r.overlapAmount) <= 0.002f && V3_dot(r.normal, (V3){0.0f, 1.0f, 0.0f}) > V3_dot(best_r.normal, (V3){0.0f, 1.0f, 0.0f})))) best_r = r;
+        if (tHit) {
+            if (!best.n) { best.normal=tN; best.maxPen=tD; best.p[best.n++]=(ManifoldPt){tP,tD}; }
+            else {
+                float align = V3_dot(tN,best.normal);
+                if (align > MANIFOLD_ALIGN_THRESHOLD) {
+                    bool better = (tD > best.maxPen + MANIFOLD_TIE_MARGIN) || (vabs(tD-best.maxPen) <= MANIFOLD_TIE_MARGIN && V3_dot(tN,(V3){0,1,0}) > V3_dot(best.normal,(V3){0,1,0}));
+                    if (better) { best.normal=tN; best.maxPen=tD; }
+                    bool spread=true;
+                    for (int k=0;k<best.n;++k) { V3 dv=V3_AsubB(tP,best.p[k].point); if (V3_dot(dv,dv)<spreadEps*spreadEps) { spread=false; if (tD>best.p[k].pen) best.p[k].pen=tD; break; } }
+                    if (spread && best.n<MANIFOLD_MAX) best.p[best.n++]=(ManifoldPt){tP,tD};
+                } else if (tD > best.maxPen + MANIFOLD_TIE_MARGIN) {
+                    best.n=0; best.normal=tN; best.maxPen=tD; best.p[best.n++]=(ManifoldPt){tP,tD};
+                }
+            }
+        }
     }
-    
-    return best_r;
+    #undef HSUP
+    return best;
 }
 
 AABB3 BoxWorldAABB(ShapeBox b) { V3 x,y,z; obb_axes(b.rot,&x,&y,&z); V3 hx=V3_ScaleByF(x,b.halfExtents.x), hy=V3_ScaleByF(y,b.halfExtents.y), hz=V3_ScaleByF(z,b.halfExtents.z); V3 e ={vabs(hx.x)+vabs(hy.x)+vabs(hz.x),vabs(hx.y)+vabs(hy.y)+vabs(hz.y),vabs(hx.z)+vabs(hy.z)+vabs(hz.z)}; return (AABB3){V3_AsubB(b.ctr,e),V3_AplusB(b.ctr,e)}; } 
@@ -4228,23 +4201,18 @@ static float GetMomentOfInertia(Entity *e, V3 n) { // Returns moment of inertia 
     return vmax(V3_dot(ln,In),PHY_EPSILON);
 }
 
-static void ApplyCollisionResponse(Entity *e, Entity *o, OverlapResult* ov) {
-    float overlap = ov->overlapAmount; if (overlap < PHY_EPSILON) return;
-    bool oStatic = (!(o->entflags & EF_RIGIDBODY) || o->mass < 0.001f || o->collider == COLTYPE_NONE || o->collider == COLTYPE_MSH); if ((o->collider == COLTYPE_MSH && e->collider == COLTYPE_MSH)) return;
-    
-    DrawSphereContact(ov->point,0.02f);
-    V3 n = ov->normal, contactPoint = ov->point;
+static void ResolveContactVelocity(Entity *e, Entity *o, V3 n, V3 contactPoint, bool oStatic) {
     V3 rAarm = V3_AsubB(contactPoint, e->position), rBarm = oStatic ? (V3){0,0,0} : V3_AsubB(contactPoint, o->position);
-    V3 rAxN = V3_Cross(rAarm, n); // Evaluate inertia around the NORMAL torque axis (r x n)
+    V3 rAxN = V3_Cross(rAarm, n);
     float rAxN_lenSq = V3_dot(rAxN, rAxN);
     float iA = (rAxN_lenSq > PHY_EPSILON) ? GetMomentOfInertia(e, V3_ScaleByF(rAxN, 1.0f / vsqrtf(rAxN_lenSq))) : 1.0f;
     float invIA = (iA > PHY_EPSILON) ? 1.0f / iA : 0.0f;
-    float angTermA = ConstIndexIsNPC(e->index) ? 0.0f : rAxN_lenSq * invIA;
+    float angTermA = IdxIsNPC(e->index) ? 0.0f : rAxN_lenSq * invIA;
     V3 rBxN = V3_Cross(rBarm, n);
     float rBxN_lenSq = V3_dot(rBxN, rBxN);
     float iB = (oStatic || rBxN_lenSq < PHY_EPSILON) ? 0.0f : GetMomentOfInertia(o, V3_ScaleByF(rBxN, 1.0f / vsqrtf(rBxN_lenSq)));
     float invIB = (iB > PHY_EPSILON && !oStatic) ? 1.0f / iB : 0.0f;
-    float angTermB = (oStatic || ConstIndexIsNPC(o->index)) ? 0.0f : rBxN_lenSq * invIB;
+    float angTermB = (oStatic || IdxIsNPC(o->index)) ? 0.0f : rBxN_lenSq * invIB;
     V3 vAtA = V3_AplusB(e->velocity, V3_Cross(e->angularVelocity, rAarm));
     V3 vAtB = oStatic ? (V3){0,0,0} : V3_AplusB(o->velocity, V3_Cross(o->angularVelocity, rBarm));
     V3 relVel = V3_AsubB(vAtA, vAtB);
@@ -4254,13 +4222,14 @@ static void ApplyCollisionResponse(Entity *e, Entity *o, OverlapResult* ov) {
     float invMassB = oStatic || o->mass < 0.001f ? 0.0f : 1.0f / o->mass;
     float invSum = invMassA + invMassB + angTermA + angTermB; if (invSum < PHY_EPSILON) return;
 
-    float e_r = vmax(e->bounciness, oStatic ? 0.0f : o->bounciness);
+    float e_r = (vn < -0.1) ? vmax(e->bounciness, oStatic ? 0.0f : o->bounciness) : 0.0f;
     float j = -(1.0f + e_r) * vn / invSum;
-    e->velocity = V3_AplusB(e->velocity, V3_ScaleByF(n, j * invMassA)); // Apply Normal Impulse
+    j = vmax(j,0.0f);
+    e->velocity = V3_AplusB(e->velocity, V3_ScaleByF(n, j * invMassA));
     if (!oStatic) o->velocity = V3_AsubB(o->velocity, V3_ScaleByF(n, j * invMassB));
     V3 Jn = V3_ScaleByF(n,j);
-    if (e->collider != COLTYPE_CAP && !ConstIndexIsNPC(e->index)) e->angularVelocity = V3_AplusB(e->angularVelocity, V3_ScaleByF(V3_Cross(rAarm, Jn), invIA));
-    if (!oStatic && o->collider != COLTYPE_CAP && !ConstIndexIsNPC(o->index)) o->angularVelocity = V3_AsubB(o->angularVelocity, V3_ScaleByF(V3_Cross(rBarm, Jn), invIB));
+    if (e->collider != COLTYPE_CAP && !IdxIsNPC(e->index)) e->angularVelocity = V3_AplusB(e->angularVelocity, V3_ScaleByF(V3_Cross(rAarm, Jn), invIA));
+    if (!oStatic && o->collider != COLTYPE_CAP && !IdxIsNPC(o->index)) o->angularVelocity = V3_AsubB(o->angularVelocity, V3_ScaleByF(V3_Cross(rBarm, Jn), invIB));
     V3 vAtA2 = V3_AplusB(e->velocity, V3_Cross(e->angularVelocity, rAarm));
     V3 vAtB2 = oStatic ? (V3){0.0f,0.0f,0.0f} : V3_AplusB(o->velocity, V3_Cross(o->angularVelocity, rBarm));
     V3 relVel2 = V3_AsubB(vAtA2, vAtB2);
@@ -4268,35 +4237,50 @@ static void ApplyCollisionResponse(Entity *e, Entity *o, OverlapResult* ov) {
     float tLen = V3_Mag(tangent);
     if (tLen > 0.0001f) {
         tangent = V3_ScaleByF(tangent, 1.f / tLen);
-        V3 rAxT = V3_Cross(rAarm, tangent); // Evaluate inertia around the TANGENT torque axis (r x t)
+        V3 rAxT = V3_Cross(rAarm, tangent);
         float rAxT_lenSq = V3_dot(rAxT, rAxT);
         float iAT = (rAxT_lenSq > PHY_EPSILON) ? GetMomentOfInertia(e, V3_ScaleByF(rAxT, 1.0f / vsqrtf(rAxT_lenSq))) : 1.0f;
         float invIAT = (iAT > PHY_EPSILON) ? 1.0f / iAT : 0.0f;
-        float angTermAT = ConstIndexIsNPC(e->index) ? 0.0f : rAxT_lenSq * invIAT;
+        float angTermAT = IdxIsNPC(e->index) ? 0.0f : rAxT_lenSq * invIAT;
         V3 rBxT = V3_Cross(rBarm, tangent);
         float rBxT_lenSq = V3_dot(rBxT, rBxT);
         float iBT = (oStatic || rBxT_lenSq < PHY_EPSILON) ? 0.0f : GetMomentOfInertia(o, V3_ScaleByF(rBxT, 1.0f / vsqrtf(rBxT_lenSq)));
         float invIBT = (iBT > PHY_EPSILON && !oStatic) ? 1.0f / iBT : 0.0f;
-        float angTermBT = (oStatic || ConstIndexIsNPC(o->index)) ? 0.0f : rBxT_lenSq * invIBT;
+        float angTermBT = (oStatic || IdxIsNPC(o->index)) ? 0.0f : rBxT_lenSq * invIBT;
         float invSumT = invMassA + invMassB + angTermAT + angTermBT;
         float mu = (e->dynamicFriction + (oStatic ? 0.4f : o->dynamicFriction)) * 0.5f;
         float jt = -V3_dot(relVel2, tangent) / invSumT;
         jt = vclamp(jt * mu, mu * -vabs(j), mu * vabs(j));
-        V3 Jt = V3_ScaleByF(tangent, jt); // Apply Tangent (Friction) Impulse
+        V3 Jt = V3_ScaleByF(tangent, jt);
         e->velocity = V3_AplusB(e->velocity, V3_ScaleByF(tangent, jt * invMassA));
-        if (e->collider != COLTYPE_CAP && !ConstIndexIsNPC(e->index)) e->angularVelocity = V3_AplusB(e->angularVelocity,V3_ScaleByF(V3_Cross(rAarm, Jt),invIAT));
+        if (e->collider != COLTYPE_CAP && !IdxIsNPC(e->index)) e->angularVelocity = V3_AplusB(e->angularVelocity,V3_ScaleByF(V3_Cross(rAarm, Jt),invIAT));
         if (!oStatic) {
             o->velocity = V3_AsubB(o->velocity,V3_ScaleByF(tangent,jt * invMassB));
-            if (o->collider != COLTYPE_CAP && !ConstIndexIsNPC(o->index)) o->angularVelocity = V3_AsubB(o->angularVelocity,V3_ScaleByF(V3_Cross(rBarm,Jt),invIBT));
+            if (o->collider != COLTYPE_CAP && !IdxIsNPC(o->index)) o->angularVelocity = V3_AsubB(o->angularVelocity,V3_ScaleByF(V3_Cross(rBarm,Jt),invIBT));
         }
     }
-    
-    float angDelta = vabs(V3_Mag(e->angularVelocity) - V3_Mag(e->lastAngularVelocity));
-    e->angularVelocity = V3_ScaleByF(e->angularVelocity,1.0f - angDelta); // Dampen large deltas
     e->lastAngularVelocity = e->angularVelocity;
-    float correction = vmin(vmax(overlap - 0.001f, 0.0f) * 0.2f, 0.04f); float corrA = correction * invMassA / (invMassA + invMassB + PHY_EPSILON), corrB = correction * invMassB / (invMassA + invMassB + PHY_EPSILON);
-    SetPosition(e,V3_AplusB(e->position, V3_ScaleByF(n,corrA)), false); // Positional correction (Baumgarte Stabilization)
+}
+
+static void ApplyPositionalCorrection(Entity *e, Entity *o, V3 n, float overlap, bool oStatic) {
+    float invMassA = e->mass < 0.001f ? 1.0f : 1.0f / e->mass;
+    float invMassB = oStatic || o->mass < 0.001f ? 0.0f : 1.0f / o->mass;
+    float correction = vmin(vmax(overlap - 0.001f, 0.0f) * 0.2f, 0.04f);
+    float corrA = correction * invMassA / (invMassA + invMassB + PHY_EPSILON), corrB = correction * invMassB / (invMassA + invMassB + PHY_EPSILON);
+    SetPosition(e,V3_AplusB(e->position, V3_ScaleByF(n,corrA)), false);
     if (!oStatic) SetPosition(o,V3_AsubB(o->position,V3_ScaleByF(n,corrB)), false);
+}
+
+static void ApplyManifoldResponse(Entity *e, Entity *o, const Manifold *m) {
+    if (!m->n) return;
+    bool oStatic = (!(o->entflags & EF_RIGIDBODY) || o->mass < 0.001f || o->collider == COLTYPE_NONE || o->collider == COLTYPE_MSH);
+    if (o->collider == COLTYPE_MSH && e->collider == COLTYPE_MSH) return;
+    for (int i = 0; i < m->n; ++i) DrawSphereContact(m->p[i].point, 0.02f);
+    int iters = (m->n > 1) ? MAX_COLLISION_ITERATIONS : 1; // single-point contacts converge in one pass — no need to pay for more
+    for (int it = 0; it < iters; ++it)
+        for (int i = 0; i < m->n; ++i)
+            ResolveContactVelocity(e, o, m->normal, m->p[i].point, oStatic);
+    ApplyPositionalCorrection(e, o, m->normal, m->maxPen, oStatic);
 }
 
 void Physics() {
@@ -4306,11 +4290,11 @@ void Physics() {
     World.last_physics_time = World.pauseRelativeTime;
     u8 substeps = (u8)vclamp((u32)(dt / MAX_STEP_SIZE + 0.5f), 1u, (u32)MAX_SUBSTEPS);
     float dtsub = dt / (float)substeps; dynamicEntityCount = 0;
-    for (int i = 0; i < World.loadedInstances && dynamicEntityCount < 512; ++i) { Entity *e = &World.instances[i]; if ((e->entflags & EF_RIGIDBODY) && (e->entflags & EF_ACTIVE) && e->collider != COLTYPE_NONE) {dynamicEntities[dynamicEntityCount++] = i;} }
-    for (int i = 0; i < World.loadedInstances; ++i) { Entity *e = &World.instances[i]; e->cellX = (i16)PosGetCellCoordX(e->position.x); e->cellZ = (i16)PosGetCellCoordZ(e->position.z); e->cellIndex = PosGetCellCoordsP(e->cellX,e->cellZ); e->radius = (e->modelIndex < MAX_MDLS) ? modelBounds[e->modelIndex] * vmax(vmax(e->scale.x,e->scale.y),e->scale.z) : GetColRad(e); e->colliding = false; } // Update cell index for all entities
+    for (int i = 0; i < World.instCount && dynamicEntityCount < 512; ++i) { Entity *e = &World.instances[i]; if ((e->entflags & EF_RIGIDBODY) && (e->entflags & EF_ACTIVE) && e->collider != COLTYPE_NONE) {dynamicEntities[dynamicEntityCount++] = i;} }
+    for (int i = 0; i < World.instCount; ++i) { Entity *e = &World.instances[i]; e->cellX = (i16)PosGetCellCoordX(e->position.x); e->cellZ = (i16)PosGetCellCoordZ(e->position.z); e->cellIndex = PosGetCellCoordsP(e->cellX,e->cellZ); e->radius = (e->modelIndex < MAX_MDLS) ? modelBounds[e->modelIndex] * vmax(vmax(e->scale.x,e->scale.y),e->scale.z) : GetColRad(e); e->colliding = false; } // Update cell index for all entities
     for (u8 s = 0; s < substeps; ++s) { // dynamicEntityCount found to be only 335 on level 1
         mset(cellCounts,0,sizeof(cellCounts));
-        for (u16 i = 0; i < World.loadedInstances; ++i) { Entity *e = &World.instances[i]; u32 cell = (u32)e->cellIndex; if (cell < WORLDX*WORLDX && cellCounts[cell] < 127) cellLists[cell][cellCounts[cell]++] = i; } // Build broadphase grid (~0.013ms)        
+        for (u16 i = 0; i < World.instCount; ++i) { Entity *e = &World.instances[i]; u32 cell = (u32)e->cellIndex; if (cell < WORLDX*WORLDX && cellCounts[cell] < 127) cellLists[cell][cellCounts[cell]++] = i; } // Build broadphase grid (~0.013ms)        
         for (u16 i = 0; i < dynamicEntityCount; ++i) { u16 idx = dynamicEntities[i]; Entity *e = &World.instances[idx]; ApplyVelocity(e,dtsub); } // Integrate all dynamic bodies (~0.005ms)
         ShapeSphere sa,sb; ShapeBox ba,bb; ShapeCapsule ca,cb;
         for (u16 i = 0; i < dynamicEntityCount; ++i) { // Collision detection and resolution (~32.9ms)
@@ -4318,59 +4302,58 @@ void Physics() {
 
             i32 cx = PosGetCellCoordX(e->position.x); i32 cz = PosGetCellCoordZ(e->position.z); u32 mask = GetCollisionMask(e->layer);
             float searchRad = e->radius + V3_Mag(e->velocity) * dtsub + 0.5f; i32 radCells = (i32)(searchRad / CELL_SIZE) + 2;
-            typedef struct { OverlapResult r; u16 otherIdx; } Contact;
+            typedef struct { Manifold m; u16 otherIdx; } Contact;
             Contact contacts[16]; int contactCount = 0;
-            for (i32 dx = -radCells; dx <= radCells; ++dx) { // Collect all overlaps this substep and resolve each, found radCells to be 3 or less, mostly 2
+            for (i32 dx = -radCells; dx <= radCells; ++dx) {
                 for (i32 dz = -radCells; dz <= radCells; ++dz) {
                     u32 cell = PosGetCellCoordsP(cx + dx,cz + dz); if (cell >= WORLDX*WORLDX) continue;
-                    
                     for (u16 k = 0; k < cellCounts[cell]; ++k) {
-                        u16 b = cellLists[cell][k]; if (b == a) continue; // Skip self
+                        u16 b = cellLists[cell][k]; if (b == a) continue;
                         Entity *o = &World.instances[b]; if (!(mask & o->layer) || o->collider == COLTYPE_NONE) continue;
                         V3 deltaPos = V3_AsubB(e->position,o->position); float distSq = V3_dot(deltaPos,deltaPos), combinedRadius = e->radius * 2.f + o->radius * 2.f; if (distSq > combinedRadius * combinedRadius) continue;
 
-                        OverlapResult r = {0};
-                        if      (e->collider == COLTYPE_CAP && o->collider == COLTYPE_CAP) { Entity_GetCap(e,&ca); Entity_GetCap(o,&cb); r=CapCap(ca,cb); }
-                        else if (e->collider == COLTYPE_CAP && o->collider == COLTYPE_BOX) { Entity_GetCap(e,&ca); Entity_GetBox(o,&bb); r=CapBox(ca,bb); }
-                        else if (e->collider == COLTYPE_BOX && o->collider == COLTYPE_CAP) { Entity_GetBox(e,&bb); Entity_GetCap(o,&ca); r=CapBox(ca,bb); if(r.hit){r.normal=V3_ScaleByF(r.normal,-1.0f);} }
-                        else if (e->collider == COLTYPE_BOX && o->collider == COLTYPE_BOX) { Entity_GetBox(e,&ba); Entity_GetBox(o,&bb); r=BoxBox(ba,bb); }
-                        else if (e->collider == COLTYPE_SPH && o->collider == COLTYPE_BOX) { Entity_GetSph(e,&sa); Entity_GetBox(o,&ba); r=SphBox(sa.ctr,sa.rad,ba); }
-                        else if (e->collider == COLTYPE_BOX && o->collider == COLTYPE_SPH) { Entity_GetBox(e,&ba); Entity_GetSph(o,&sa); r=SphBox(sa.ctr,sa.rad,ba); if(r.hit){r.normal=V3_ScaleByF(r.normal,-1.0f);} }
-                        else if (e->collider == COLTYPE_SPH && o->collider == COLTYPE_SPH) { Entity_GetSph(e,&sa); Entity_GetSph(o,&sb); r=SphSph(sa.ctr,sa.rad,sb.ctr,sb.rad); }
-                        else if (e->collider == COLTYPE_CAP && o->collider == COLTYPE_MSH) { Entity_GetCap(e,&ca);                       r=CapMsh(ca,o->modelIndex,&modelMatrices[b*16]); }
-                        else if (e->collider == COLTYPE_SPH && o->collider == COLTYPE_MSH) { Entity_GetSph(e,&sa);                       r=SphMsh(sa.ctr,sa.rad,o->modelIndex,&modelMatrices[b*16]); }
-                        else if (e->collider == COLTYPE_BOX && o->collider == COLTYPE_MSH) { Entity_GetBox(e,&ba);                       r=BoxMsh(ba,o->modelIndex,&modelMatrices[b*16]); }
-                        else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_MSH) {                                             r=CvxMsh(e->colMeshIndex,&modelMatrices[a*16],o->modelIndex,&modelMatrices[b*16]); if(r.hit){r.normal=V3_ScaleByF(r.normal,-1.0f);} }
-                        else if (e->collider == COLTYPE_CAP && o->collider == COLTYPE_CVX) { Entity_GetCap(e,&ca);                       r=CapCvx(ca,o->colMeshIndex,&modelMatrices[b*16]); }
-                        else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_CAP) { Entity_GetCap(o,&cb);                       r=CapCvx(cb,e->colMeshIndex,&modelMatrices[a*16]); }
-                        else if (e->collider == COLTYPE_SPH && o->collider == COLTYPE_CVX) { Entity_GetSph(e,&sa);                       r=SphCvx(sa.ctr,sa.rad,o->colMeshIndex,&modelMatrices[b*16]); }
-                        else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_SPH) { Entity_GetSph(o,&sb);                       r=SphCvx(sb.ctr,sb.rad,e->colMeshIndex,&modelMatrices[a*16]); if(r.hit){r.normal=V3_ScaleByF(r.normal,-1.0f);} }
-                        else if (e->collider == COLTYPE_BOX && o->collider == COLTYPE_CVX) { Entity_GetBox(e,&ba);                       r=BoxCvx(ba,o->colMeshIndex,&modelMatrices[b*16]); if(r.hit){r.normal=V3_ScaleByF(r.normal,-1.0f);} }
-                        else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_BOX) { Entity_GetBox(o,&bb);                       r=BoxCvx(bb,e->colMeshIndex,&modelMatrices[a*16]); }
-                        else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_CVX) {                                             r=CvxCvx(e->colMeshIndex,o->colMeshIndex,&modelMatrices[a*16],&modelMatrices[b*16]); if(r.hit){r.normal=V3_ScaleByF(r.normal,-1.0f);} }
-                        else { r=SphSph(e->position,GetColRad(e),o->position,GetColRad(o)); } // Fallback
+                        Manifold mf = {0};
+                        if      (e->collider == COLTYPE_CAP && o->collider == COLTYPE_CAP) { Entity_GetCap(e,&ca); Entity_GetCap(o,&cb); mf=OverlapToManifold(CapCap(ca,cb)); }
+                        else if (e->collider == COLTYPE_CAP && o->collider == COLTYPE_BOX) { Entity_GetCap(e,&ca); Entity_GetBox(o,&bb); mf=OverlapToManifold(CapBox(ca,bb)); }
+                        else if (e->collider == COLTYPE_BOX && o->collider == COLTYPE_CAP) { Entity_GetBox(e,&bb); Entity_GetCap(o,&ca); OverlapResult r=CapBox(ca,bb); if(r.hit) r.normal=V3_ScaleByF(r.normal,-1.0f); mf=OverlapToManifold(r); }
+                        else if (e->collider == COLTYPE_BOX && o->collider == COLTYPE_BOX) { Entity_GetBox(e,&ba); Entity_GetBox(o,&bb); mf=OverlapToManifold(BoxBox(ba,bb)); }
+                        else if (e->collider == COLTYPE_SPH && o->collider == COLTYPE_BOX) { Entity_GetSph(e,&sa); Entity_GetBox(o,&ba); mf=OverlapToManifold(SphBox(sa.ctr,sa.rad,ba)); }
+                        else if (e->collider == COLTYPE_BOX && o->collider == COLTYPE_SPH) { Entity_GetBox(e,&ba); Entity_GetSph(o,&sa); OverlapResult r=SphBox(sa.ctr,sa.rad,ba); if(r.hit) r.normal=V3_ScaleByF(r.normal,-1.0f); mf=OverlapToManifold(r); }
+                        else if (e->collider == COLTYPE_SPH && o->collider == COLTYPE_SPH) { Entity_GetSph(e,&sa); Entity_GetSph(o,&sb); mf=OverlapToManifold(SphSph(sa.ctr,sa.rad,sb.ctr,sb.rad)); }
+                        else if (e->collider == COLTYPE_CAP && o->collider == COLTYPE_MSH) { Entity_GetCap(e,&ca); mf=OverlapToManifold(CapMsh(ca,o->modelIndex,&modelMatrices[b*16])); }
+                        else if (e->collider == COLTYPE_SPH && o->collider == COLTYPE_MSH) { Entity_GetSph(e,&sa); mf=OverlapToManifold(SphMsh(sa.ctr,sa.rad,o->modelIndex,&modelMatrices[b*16])); }
+                        else if (e->collider == COLTYPE_BOX && o->collider == COLTYPE_MSH) { Entity_GetBox(e,&ba); mf=OverlapToManifold(BoxMsh(ba,o->modelIndex,&modelMatrices[b*16])); }
+                        else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_MSH) { mf=CvxMsh(e->colMeshIndex,&modelMatrices[a*16],o->modelIndex,&modelMatrices[b*16]); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
+                        else if (e->collider == COLTYPE_CAP && o->collider == COLTYPE_CVX) { Entity_GetCap(e,&ca); mf=CapCvx(ca,o->colMeshIndex,&modelMatrices[b*16]); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
+                        else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_CAP) { Entity_GetCap(o,&cb); mf=CapCvx(cb,e->colMeshIndex,&modelMatrices[a*16]); }
+                        else if (e->collider == COLTYPE_SPH && o->collider == COLTYPE_CVX) { Entity_GetSph(e,&sa); mf=SphCvx(sa.ctr,sa.rad,o->colMeshIndex,&modelMatrices[b*16]); }
+                        else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_SPH) { Entity_GetSph(o,&sb); mf=SphCvx(sb.ctr,sb.rad,e->colMeshIndex,&modelMatrices[a*16]); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
+                        else if (e->collider == COLTYPE_BOX && o->collider == COLTYPE_CVX) { Entity_GetBox(e,&ba); mf=BoxCvx(ba,o->colMeshIndex,&modelMatrices[b*16]); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
+                        else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_BOX) { Entity_GetBox(o,&bb); mf=BoxCvx(bb,e->colMeshIndex,&modelMatrices[a*16]); }
+                        else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_CVX) { mf=CvxCvx(e->colMeshIndex,o->colMeshIndex,&modelMatrices[a*16],&modelMatrices[b*16]); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
+                        else { mf=OverlapToManifold(SphSph(e->position,GetColRad(e),o->position,GetColRad(o))); }
 
-                        if (r.hit && r.overlapAmount > PHY_EPSILON && contactCount < 16) contacts[contactCount++] = (Contact){r,b};
+                        if (mf.n && contactCount < 16) contacts[contactCount++] = (Contact){mf,b};
                     }
                 }
             }
-            
-            for (int cta=0;cta<contactCount-1;++cta) { // Resolve all contacts, largest overlap first, simple insertion sort
-                for (int ctb=cta+1;ctb<contactCount;++ctb) { if (contacts[ctb].r.overlapAmount > contacts[cta].r.overlapAmount) {Contact tmp=contacts[cta]; contacts[cta]=contacts[ctb]; contacts[ctb]=tmp;} }
-            }
+
+            for (int cta=0;cta<contactCount-1;++cta)
+                for (int ctb=cta+1;ctb<contactCount;++ctb)
+                    if (contacts[ctb].m.maxPen > contacts[cta].m.maxPen) { Contact tmp=contacts[cta]; contacts[cta]=contacts[ctb]; contacts[ctb]=tmp; }
 
             for (int c = 0; c < contactCount; ++c) {
-                OverlapResult *ov = &contacts[c].r; u16 j = contacts[c].otherIdx;
+                Manifold *mfp = &contacts[c].m; u16 j = contacts[c].otherIdx;
                 Entity *o = (j < INSTANCE_COUNT) ? &World.instances[j] : NULL; e->colliding = true; if (o) o->colliding = true;
-                if (o && (o->entflags & EF_RIGIDBODY) && o->collider != COLTYPE_MSH) ApplyCollisionResponse(e,o,ov);
-                else { Entity staticProxy = {0}; staticProxy.mass=0.0f; staticProxy.dynamicFriction=0.4f; staticProxy.collider=COLTYPE_NONE; ApplyCollisionResponse(e,&staticProxy,ov); }
+                if (o && (o->entflags & EF_RIGIDBODY) && o->collider != COLTYPE_MSH) ApplyManifoldResponse(e,o,mfp);
+                else { Entity staticProxy = {0}; staticProxy.mass=0.0f; staticProxy.dynamicFriction=0.4f; staticProxy.collider=COLTYPE_NONE; ApplyManifoldResponse(e,&staticProxy,mfp); }
             }
 
             e->accumulatedForce = (V3){0.0f,0.0f,0.0f};
         }
     }
     
-    for (int i = 0; i < World.loadedInstances; ++i) { Entity *e = &World.instances[i]; e->cellX = (i16)PosGetCellCoordX(e->position.x); e->cellZ = (i16)PosGetCellCoordZ(e->position.z); e->cellIndex = PosGetCellCoordsP(e->cellX, e->cellZ); } // Update cells for next substep
+    for (int i = 0; i < World.instCount; ++i) { Entity *e = &World.instances[i]; e->cellX = (i16)PosGetCellCoordX(e->position.x); e->cellZ = (i16)PosGetCellCoordZ(e->position.z); e->cellIndex = PosGetCellCoordsP(e->cellX, e->cellZ); } // Update cells for next substep
 }
 
 ENGINE_TO_MOD void AddForce(u16 i, V3 f, bool imp) { Entity *e = &World.instances[i]; if (imp) { e->velocity = V3_AplusB(e->velocity,V3_ScaleByF(f,1.0f / vmax(e->mass,0.001f))); } else { e->accumulatedForce = V3_AplusB(e->accumulatedForce,f); } }
@@ -4378,17 +4361,14 @@ ENGINE_TO_MOD void ApplyPlayerMovements() {
     float h = (float)Forward() - (float)Backpedal(), s = (float)StrafeRight() - (float)StrafeLeft();
     float vertInput = (float)SwimUp() - (float)SwimDn();
     Entity *p = &World.instances[PLAYER1];
-    Quaternion rot = p->rotation; float y2 = rot.y * rot.y;  float xz = rot.x * rot.z;  float wy = rot.w * rot.y;
-    p->forward = V3_Normalize((V3){ 2.0f * (xz + wy), 2.0f * (rot.y * rot.z - rot.w * rot.x), 1.0f - 2.0f * (rot.x * rot.x + y2) });
-    p->right   = V3_Normalize((V3){ 1.0f - 2.0f * (y2 + rot.z * rot.z), 2.0f * (rot.x * rot.y + rot.w * rot.z), 2.0f * (xz - wy) });
-    V3 input = V3_Normalize((V3){p->forward.x*h + p->right.x*s, vertInput, p->forward.z*h + p->right.z*s});
-    float speed = GetBasePlayerSpeed(PLAYER1,V3_Mag(input) > 0.1f) * 1.75f, accel = World.boosterActive ? 1.0f : 3.0f;
-    V3 cur = p->velocity; 
-    V3 targetVel = V3_ScaleByF(input, speed);
-    if (vabs(vertInput) < 0.001f) targetVel.y = cur.y;
-    V3 dv = V3_AsubB(targetVel, cur);
+    Quaternion r = p->rotation; float y2 = r.y*r.y; float xz = r.x*r.z; float wy = r.w*r.y;
+    p->forward=V3_Normalize((V3){ 2.0f * (xz + wy), 2.0f * (r.y*r.z - r.w*r.x), 1.0f - 2.0f * (r.x*r.x + y2) }); p->right=V3_Normalize((V3){ 1.0f - 2.0f * (y2 + r.z*r.z), 2.0f * (r.x*r.y + r.w*r.z), 2.0f * (xz - wy) });
+    V3 w = V3_Normalize((V3){p->forward.x*h + p->right.x*s,vertInput,p->forward.z*h + p->right.z*s});
+    float speed = GetBasePlayerSpeed(PLAYER1,V3_Mag(w) > 0.1f) * 1.75f, accel = World.boosterActive ? 1.0f : 3.0f;
+    V3 targetVel = V3_ScaleByF(w,speed); if (vabs(vertInput) < 0.001f) targetVel.y = p->velocity.y;
+    V3 dv = V3_AsubB(targetVel,p->velocity);
     dv = (V3){vclamp(dv.x,-10.0f,10.0f), vclamp(dv.y,-10.0f,10.0f), vclamp(dv.z,-10.0f,10.0f)};
-    p->velocity = V3_AplusB(cur, V3_ScaleByF(dv, accel * vclamp((float)World.deltaTime,0.0005f,0.1f)));
+    p->velocity = V3_AplusB(p->velocity,V3_ScaleByF(dv,accel * vclamp((float)World.deltaTime,0.0005f,0.1f)));
 }
 // Console Sys - CHEATS!
 static i32 currentEntryLength=0, numHistory=0, historyPos=0; char consoleEntryText[T_BUFFER_SIZE],history[7][T_BUFFER_SIZE];
@@ -4469,7 +4449,7 @@ static void cmd_help() { CenterStatusPrint("There's no one to save you now Hacke
 static void cmd_nomoney() { CenterStatusPrint("Nice try, there's no money here."); }
 static void cmd_god() { Cheats.god = !Cheats.god; CenterStatusPrint("god mode: %s", Cheats.god ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
 static void cmd_energy() { Cheats.redbull = !Cheats.redbull; if (Cheats.redbull) {CenterStatusPrint("%s", Sys_Text.stringTable[1006]);/*"I feel the power! 0 energy consumption!"*/} else {CenterStatusPrint("%s", Sys_Text.stringTable[1005]);/*Energy usage normal*/} }
-static void SetSkyRotateSpeed() { static const float skyRotateSpeeds[] = { 0.05f, 1.0f, 2.5f, 3.75f, 6.25f }; glUseProgram(Sys_Render.imageBlitSP); glUniform1f(30,skyRotateSpeeds[Cheats.dizzyLevel]); }
+static void SetSkyRotateSpeed() { static const float skyRotateSpeeds[] = { 0.05f, 1.0f, 2.5f, 3.75f, 6.25f }; glUseProgram(imageBlitSP); glUniform1f(30,skyRotateSpeeds[Cheats.dizzyLevel]); }
 static void cmd_dizzy() { Cheats.dizzyLevel = (Cheats.dizzyLevel >= 3) ? 0 : Cheats.dizzyLevel + 1; SetSkyRotateSpeed(); }
 static void cmd_bottomless() { Cheats.bottomless = !Cheats.bottomless; if (Cheats.bottomless) {CenterStatusPrint("bottomlessclip! %s",Sys_Text.stringTable[1002]);/*"Bring it!"*/} else {CenterStatusPrint("%s",Sys_Text.stringTable[1003]);/*"Hose disconnected from interdimensional wormhole. Normal ammo operation restored."*/} }
 static void cmd_nohud() { Cheats.noHUD = !Cheats.noHUD; if (Cheats.noHUD) {CenterStatusPrint("%s",Sys_Text.stringTable[1004]);/*"No HUD! Enjoy the cinematic screenshot experience!"*/} else { CenterStatusPrint("HUD %s",Sys_Text.stringTable[1000]);/*"ACTIVATED"*/} }
@@ -5388,15 +5368,15 @@ ENGINE_TO_MOD void play_message(const char *path) {
     log_samples=buf; log_frame_count=frames; log_frame_pos=0; log_playing=true;
 }
 
-ENGINE_TO_MOD i32 SoundInit(const char *path,ma_sound *pSound) { wav_channel_t *w=(wav_channel_t*)pSound; u32 frames; size_t allocSize=0; float *buf=load_wav(path,&frames,&allocSize); if (!buf) return -1; w->samples=buf; w->allocSize=allocSize; w->frame_count=frames; w->frame_pos=0; w->volume=1.0f; w->looping=false; w->positional=false; w->playing=false; return 0; }
-ENGINE_TO_MOD i32 SoundStart(ma_sound *pSound) { wav_channel_t *w = (wav_channel_t*)pSound; w->frame_pos = 0; w->playing = true; for (u32 i=0;i<ext_count;++i) if (ext_ch[i] == w) return 0; if (ext_count < MAX_CHANNELS) ext_ch[ext_count++] = w; return 0; }
-ENGINE_TO_MOD i32 SoundStop(ma_sound *pSound) { ((wav_channel_t*)pSound)->playing=false; return 0; }
-ENGINE_TO_MOD void SoundUninit(ma_sound *s) { wav_channel_t *w = (wav_channel_t*)s; if (w->samples) { OS_Free(w->samples,w->allocSize); w->samples = NULL; w->allocSize = 0; } w->playing = false; for (u32 i=0;i<ext_count;++i) if (ext_ch[i] == w) { ext_ch[i] = ext_ch[--ext_count]; break; } }
-ENGINE_TO_MOD void SoundSetVolume(ma_sound *pSound, float volume) { ((wav_channel_t*)pSound)->volume=volume; }
+ENGINE_TO_MOD i32 SndInit(const char *path,ma_sound *pSound) { wav_channel_t *w=(wav_channel_t*)pSound; u32 frames; size_t allocSize=0; float *buf=load_wav(path,&frames,&allocSize); if (!buf) return -1; w->samples=buf; w->allocSize=allocSize; w->frame_count=frames; w->frame_pos=0; w->volume=1.0f; w->looping=false; w->positional=false; w->playing=false; return 0; }
+ENGINE_TO_MOD i32 SndStart(ma_sound *pSound) { wav_channel_t *w = (wav_channel_t*)pSound; w->frame_pos = 0; w->playing = true; for (u32 i=0;i<ext_count;++i) if (ext_ch[i] == w) return 0; if (ext_count < MAX_CHANNELS) ext_ch[ext_count++] = w; return 0; }
+ENGINE_TO_MOD i32 SndStop(ma_sound *pSound) { ((wav_channel_t*)pSound)->playing=false; return 0; }
+ENGINE_TO_MOD void SndUninit(ma_sound *s) { wav_channel_t *w = (wav_channel_t*)s; if (w->samples) { OS_Free(w->samples,w->allocSize); w->samples = NULL; w->allocSize = 0; } w->playing = false; for (u32 i=0;i<ext_count;++i) if (ext_ch[i] == w) { ext_ch[i] = ext_ch[--ext_count]; break; } }
+ENGINE_TO_MOD void SndSetVolume(ma_sound *pSound, float volume) { ((wav_channel_t*)pSound)->volume=volume; }
 ENGINE_TO_MOD void SoundSetLooping(ma_sound *pSound, i32 loop) { ((wav_channel_t*)pSound)->looping=(bool)loop; }
-ENGINE_TO_MOD bool GetSoundIsPlaying(ma_sound *pSound)  { return ((wav_channel_t*)pSound)->playing; }
-ENGINE_TO_MOD i32 SoundGetCurrentFrameCursor(const ma_sound *pSound,u64 *pCursor) { *pCursor=((wav_channel_t*)pSound)->frame_pos; return 0; }
-ENGINE_TO_MOD float SoundGetLength(ma_sound *pSound) { wav_channel_t *w=(wav_channel_t*)pSound; return (w->samples&&AUDIO_RATE)?(float)w->frame_count/(float)AUDIO_RATE:0.0f; }
+ENGINE_TO_MOD bool SndPlaying(ma_sound *pSound)  { return ((wav_channel_t*)pSound)->playing; }
+ENGINE_TO_MOD i32 SndFrmCurpos(const ma_sound *pSound,u64 *pCursor) { *pCursor=((wav_channel_t*)pSound)->frame_pos; return 0; }
+ENGINE_TO_MOD float SndLen(ma_sound *pSound) { wav_channel_t *w=(wav_channel_t*)pSound; return (w->samples&&AUDIO_RATE)?(float)w->frame_count/(float)AUDIO_RATE:0.0f; }
 static void mp3_open_slot(i32 s, const char *path, float fade_from, float fade_to, i32 fade_ms) {
     mp3_channel_t *m = &mp3_ch[s]; if (m->open) { mp3_uninit(&m->dec); m->open=false; } if (!mp3_init_file(&m->dec,path)) { DualLog("ERROR: Failed to load MP3 %s\n",path); return; }
     m->src_rate = m->dec.sampleRate; m->total_frames = mp3_get_pcm_frame_count(&m->dec); mp3_seek_to_pcm_frame(&m->dec,0); m->frames_decoded = 0; m->open = true; m->fade_target = fade_to;
@@ -5477,7 +5457,7 @@ RaycastHit RayTriangle(V3 origin, V3 dir, V3 posA, V3 posB, V3 posC, V3 normA, V
  
 ENGINE_TO_MOD RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
     RaycastHit result = { .hit = false, .distance = maxDist, .point = {0.0f, 0.0f, 0.0f}, .normal = {0.0f, 0.0f, 0.0f}, .hitInstanceIndex = INSTANCE_COUNT };
-    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
+    for (u16 i = INSTS_1ST_IDX; i < INSTANCE_COUNT; ++i) {
         if (!(layerMask & World.instances[i].layer)) continue;
         u16 mindex = World.instances[i].modelIndex; if (mindex >= mdlsCnt) continue;
         
@@ -5487,7 +5467,7 @@ ENGINE_TO_MOD RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask
         float distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z, radBounds = vmax(modelBounds[mindex], 1.81f); 
         float maxDistToObj = vmax(maxDist - radBounds,maxDist); if (distSqrd >= (maxDistToObj * maxDistToObj)) continue;
         
-        if (!ConstIndexIsPortalBlockingDoor(World.instances[i].index)) {
+        if (!IdxIsPortalBlockingDoor(World.instances[i].index)) {
             if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (World.instances[i].index != 754 || !SkyIsVisible())) continue;
         }
         
@@ -5581,13 +5561,13 @@ void LoadConfig() {
         }
     }
 
-    Sys_Settings.ScreenWidth = vmax(Sys_Settings.ScreenWidth,320);
-    Sys_Settings.ScreenHeight = vmax(Sys_Settings.ScreenHeight,200);
+    Sys_Settings.ScreenWidth = vmax(Sys_Settings.ScreenWidth,320); Sys_Settings.ScreenHeight = vmax(Sys_Settings.ScreenHeight,200);
     OS_Close(f);
 }
 
 void FilePrintString(FHandle f, const char* fmt, ...) { va_list a; __builtin_va_start(a,fmt); char b[128]; va_list c; __builtin_va_copy(c,a); sFormatV(b,sizeof(b),fmt,c); __builtin_va_end(c); OS_RawWrite(f,b,slen(b)); __builtin_va_end(a); }
 void SaveConfig() {
+    DualLog("Saving config\n");
     FHandle f = OS_OpenWriteonly("./Data/Config.ini");
     for (int i=0;i<configTableSize;++i) {
         if (configTable[i].type == SETTING_U8)         FilePrintString(f,"%s = %u\n",configTable[i].name,*(u8*)configTable[i].ptr);
@@ -5601,27 +5581,19 @@ void SaveConfig() {
 // Credits Sys
 char creditStats[4096]; const char** creditPages = NULL;
 INLINE float GetScore(float stupid, bool isFinal) {
-    float victories = (float)(World.kills + World.cyberkills);
-    if (isFinal) victories -= vmin(World.ressurections * 10.0f, victories * 0.666f);
-    float secs  = vfloor((float)World.pauseRelativeTime / 3600.0f);
-    float score = victories * 10000.0f;
-    score -= vmin(score * 0.666f, secs * 100.0f);
-    score *= (stupid + 1.0f) / 37.0f;
-    if (stupid > 35.0f) score += 2222222.0f;
+    float victories = (float)(World.kills + World.cyberkills); if (isFinal) {victories -= vmin(World.ressurections * 10.0f, victories * 0.666f);}
+    float secs  = vfloor((float)World.pauseRelativeTime / 3600.0f), score = victories * 10000.0f;
+    score -= vmin(score * 0.666f, secs * 100.0f); score *= (stupid + 1.0f) / 37.0f; if (stupid > 35.0f) {score += 2222222.0f;}
     return vfloor(score);
 }
 
 INLINE void DecomposeTime(double t, u32* h, u32* m, double* s) { double tb = vfloor(t / 3600.0); *h = (u32)tb; t -= tb * 3600.0; tb = vfloor(t / 60.0); *m = (u32)tb; *s = t - tb * 60.0; }
 INLINE void CreditsStats() {
-    size_t off = 0;
+    size_t off = 0; u32 h,m; double s;
     off += sFormat(creditStats + off, sizeof(creditStats),"============================================================================\nCITADEL\n============================================================================\nCONGRATULATIONS %s\n",World.playerName);
-    u32 h,m; double s;
-    DecomposeTime(World.pauseRelativeTime,&h,&m,&s);
-    off += sFormat(creditStats + off, sizeof(creditStats),"Straight Time: %uh %um %.3fs\n",h,m,s);
-    DecomposeTime(World.absoluteTime,&h,&m,&s);
-    off += sFormat(creditStats + off,sizeof(creditStats),"Total Time (with reload from deaths): %uh %um %.3fs\n",h,m,s);
-    float stupid = ((float)(World.diffCbt * World.diffCbt)) + ((float)(World.diffPuz * World.diffPuz)) + ((float)(World.diffMis * World.diffMis)) + ((float)(World.diffCyb * World.diffCyb));
-    u32 finalSubscore = GetScore(stupid,false), finalScore = (u32)GetScore(stupid,true);
+    DecomposeTime(World.pauseRelativeTime,&h,&m,&s); off += sFormat(creditStats + off, sizeof(creditStats),"Straight Time: %uh %um %.3fs\n",h,m,s);
+    DecomposeTime(World.absoluteTime,&h,&m,&s);      off += sFormat(creditStats + off,sizeof(creditStats),"Total Time (with reload from deaths): %uh %um %.3fs\n",h,m,s);
+    float stupid = ((float)(World.diffCbt * World.diffCbt)) + ((float)(World.diffPuz * World.diffPuz)) + ((float)(World.diffMis * World.diffMis)) + ((float)(World.diffCyb * World.diffCyb)); u32 finalSubscore = GetScore(stupid,false), finalScore = (u32)GetScore(stupid,true);
     off += sFormat(creditStats + off,sizeof(creditStats),"Kills: %u\nKills in Cyberspace: %u\nScoreSubtotal: %u\nDeaths: %u\nRessurections: %u\n",World.kills,World.cyberkills,(u32)finalSubscore,World.deaths,World.ressurections);
     off += sFormat(creditStats + off,sizeof(creditStats),"Combat: %u | Puzzle: %u | Mission: %u | Cyber: %u\n",World.diffCbt,World.diffPuz,World.diffMis,World.diffCyb);
     off += sFormat(creditStats + off,sizeof(creditStats),"Difficulty Index: %.2f\nFinal Score: %u\n\n",stupid,finalScore);
@@ -5635,11 +5607,8 @@ INLINE u32 CompileShader(u32 type, const char* source, const char* name) { u32 s
 INLINE u32 LinkProgram(u32* s, i32 num, const char* name) { u32 p = glCreateProgram(); for (i32 i=0;i<num;++i) { glAttachShader(p,s[i]); } glLinkProgram(p); i32 ok; glGetProgramiv(p,0x8B82/*GL_LINK_STATUS*/,&ok); if (!ok) ShaderError(p,name); return p; }
 u32 CompileAnyShader(const char* v, const char* s, const char* name) { return (v) ? LinkProgram((u32[]){CompileShader(0x8B31/*GL_VERTEX_SHADER*/,v,name),CompileShader(0x8B30/*GL_FRAGMENT_SHADER*/,s,name)},2,name) : LinkProgram((u32[]){CompileShader(0x91B9/*GL_COMPUTE_SHADER*/,s,name)},1,name); }
 void CompileShaders() {
-    Sys_Render.depthPrepassSP= CompileAnyShader(depthPrepassVertSrc,depthPrepassFragSrc,"DPre");/*Depth Prepass*/ Sys_Render.chunkSP          = CompileAnyShader(vertSrc,fragSrc,"Main");
-    Sys_Render.uiSP          = CompileAnyShader(vertUISrc,fragUISrc,"UI");                                        Sys_Render.debugUnlitSP     = CompileAnyShader(debugUnlitVertSrc,debugUnlitFragSrc,"Ln");/*Line Drawing Unlit*/
-    Sys_Render.shadowmapsSP  = CompileAnyShader(shadowmapVertSrc,shadowmapFragSrc,"Shad");                        Sys_Render.textSP           = CompileAnyShader(textVertSrc,textFragSrc,"Txt");
-    Sys_Render.imageBlitSP   = CompileAnyShader(quadVertSrc,quadFragSrc,"Comp"); /*Image Blit Composite Pass*/    Sys_Render.ssrSP            = CompileAnyShader(NULL,ssrComputeSrc,"SSR");
-    Sys_Render.voxelUpdateSP = CompileAnyShader(NULL,voxelUpdateComputeSrc,"Vox"); /*Voxel Update*/               Sys_Render.shadowmapsClearSP= CompileAnyShader(NULL,shadowmapsClearComputeSrc,"ShadCl"); /*Shadowmaps Clear*/
+    depthPrepassSP=CompileAnyShader(depthPrepassVertSrc,depthPrepassFragSrc,"DPre"); chunkSP=CompileAnyShader(vertSrc,fragSrc,"Main"); uiSP=CompileAnyShader(vertUISrc,fragUISrc,"UI"); debugUnlitSP=CompileAnyShader(debugUnlitVertSrc,debugUnlitFragSrc,"Ln"); shadowmapsSP=CompileAnyShader(shadowmapVertSrc,shadowmapFragSrc,"Shad");
+    textSP=CompileAnyShader(textVertSrc,textFragSrc,"Txt"); imageBlitSP=CompileAnyShader(quadVertSrc,quadFragSrc,"Comp"); ssrSP=CompileAnyShader(NULL,ssrCSSrc,"SSR"); voxelUpdateSP=CompileAnyShader(NULL,voxUpdCSSrc,"Vox"); shadowmapsClearSP=CompileAnyShader(NULL,shadClearCSSrc,"ShadCl");
 }
 
 u32 MakeSSBO(u32* id, u32 bindx, size_t sz, const void* d, u32 typ) { glGenBuffers(1,id); glBindBuffer(GL_SSBO,*id); glBufferData(GL_SSBO,sz,d,typ); glBindBufferBase(GL_SSBO,bindx,*id); return *id; }
@@ -5771,9 +5740,8 @@ void UpdateLights() {
         }
     }
 
-    glBindBuffer(GL_SSBO,Sys_Render.lightsID); glBufferData(GL_SSBO,loadedLights * sizeof(Light),lights,GL_DYNAMIC_DRAW);
-    glUseProgram(Sys_Render.voxelUpdateSP);
-    glUniform3f(5,World.instances[PLAYER1].position.x,World.instances[PLAYER1].position.y,World.instances[PLAYER1].position.z);
+    glBindBuffer(GL_SSBO,lightsID); glBufferData(GL_SSBO,loadedLights * sizeof(Light),lights,GL_DYNAMIC_DRAW);
+    glUseProgram(voxelUpdateSP); glUniform3f(5,World.instances[PLAYER1].position.x,World.instances[PLAYER1].position.y,World.instances[PLAYER1].position.z);
     glDispatchCompute((VOXELS_X+15)/16,(VOXELS_Z+15)/16,1);
 }
 
@@ -5786,25 +5754,14 @@ ENGINE_TO_MOD void UpdateLight(u16 i, V3 pos, Color3 col, float range, float int
 #undef CHGD
 
 void RenderUIImage(i16 x, i16 y, i16 width, i16 height, u32 texIndex) {
-    glUseProgram(Sys_Render.uiSP);
-    glDisable(GL_BLEND);
-    glBindVertexArray(Sys_Render.textVAO);
-    glUniform1ui(0,texIndex);
-    glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.textVBO);
+    glUseProgram(uiSP); glDisable(GL_BLEND); glBindVertexArray(textVAO); glUniform1ui(0,texIndex); glBindBuffer(GL_ARRAY_BUFFER,textVBO);
     float x1=x + width, y1=y + height, z=0.0f;
     float vertices[30] = {x,y1,z,0.0f,0.0f,x1,y,z,1.0f,1.0f,x1,y1,z,1.0f,0.0f,x,y1,z,0.0f,0.0f,x,y,z,0.0f,1.0f,x1,y,z,1.0f,1.0f};
     glBufferData(GL_ARRAY_BUFFER,30 * sizeof(float),vertices,GL_DYNAMIC_DRAW);
-    glDrawArrays(0x0004/*GL_TRIANGLES*/,0,6);
-    drawCalls++; uiDrawCalls++; vertsRendered += 6;    
-    glBindBuffer(GL_ARRAY_BUFFER,0);
+    glDrawArrays(0x0004/*GL_TRIANGLES*/,0,6); drawCalls++; uiDrawCalls++; vertsRendered += 6; glBindBuffer(GL_ARRAY_BUFFER,0);
 }
 
-void ClearAll() {
-    glBindFramebuffer(GL_FRAMEBUFFER,Sys_Render.gBufferFBO); glClearColor(0.0f,0.0f,0.0f,1.0f); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-    glBindFramebuffer(GL_FRAMEBUFFER,Sys_Render.uiFBO);      glClearColor(0.0f,0.0f,0.0f,0.0f); glClear(GL_COLOR_BUFFER_BIT);
-    glBindFramebuffer(GL_FRAMEBUFFER,0);                     glClearColor(0.0f,0.0f,0.0f,1.0f); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-}
-
+void ClearAll() { glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO); glClearColor(0,0,0,1); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); glBindFramebuffer(GL_FRAMEBUFFER,uiFBO); glClearColor(0,0,0,0); glClear(GL_COLOR_BUFFER_BIT); glBindFramebuffer(GL_FRAMEBUFFER,0); glClearColor(0,0,0,1); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); }
 void RenderLoadingProgress(i32 offset, const char * restrict text) { ClearAll(); glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); RenderFormattedText(683 - offset,379,T_WHITE,FONT_NORMAL,1.0f,text); ((_GLFWwindow*)window)->context.swapBuffers(((_GLFWwindow*)window)); }
 static __attribute__((noinline)) void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, unsigned char* bmp) {
     if (*id == 0) {glGenTextures(1,id);} glBindTexture(GL_TEXTURE_2D,*id);
@@ -5815,28 +5772,24 @@ static void GenBTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 
 void UpdateScreenSize(i32 width, i32 height) {
     u16 w = Sys_Settings.ScreenWidth = vmax(vmin((u16)width,7680u),320u), h = Sys_Settings.ScreenHeight = vmax(vmin((u16)height,4320u),200u); // Cap at minimum Quake resolution and maximum 8k.
     float wf = (float)w, hf = (float)h; Sys_Settings.ScreenCenterX = wf * 0.5f; Sys_Settings.ScreenCenterY = hf * 0.5f;
-    glViewport(0,0,w,h); RenderSystem* rs = &Sys_Render;
-    glUseProgram(rs->imageBlitSP); glUniform1ui(2,w); glUniform1ui(3,h); glUniform1i(26,Sys_Settings.SSR_RES);
-    glUseProgram(rs->chunkSP); glUniform1ui(6,w); glUniform1ui(7,h);
-    glUseProgram(rs->ssrSP); glUniform1ui(0,w / Sys_Settings.SSR_RES); glUniform1ui(1,h / Sys_Settings.SSR_RES); glUniform1i(2,Sys_Settings.SSR_RES);
-    GenBTexture(&rs->inputImageID,     GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/); // Lit Raster
-    GenBTexture(&rs->inputSpecID,      GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/); // Specular Colors
-    GenBTexture(&rs->inputNormalID,    GL_RG16F,w,h, GL_RGB,        GL_FLOAT,0x2600/*GL_NEAREST*/); // Normal XYZ
-    GenBTexture(&rs->inputDepthID,0x81A7/*GL_DEPTH_COMPONENT32*/,w,h,0x1902/*GL_DEPTH_COMPONENT*/,GL_FLOAT,0x2600/*GL_NEAREST*/); // Raster Depth
-    GenBTexture(&rs->outputImageID,GL_RGBA8,w / Sys_Settings.SSR_RES,h / Sys_Settings.SSR_RES,GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/);
-    glBindFramebuffer(GL_FRAMEBUFFER,rs->gBufferFBO);
-    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,rs->inputImageID,0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT1,GL_TEXTURE_2D,rs->inputSpecID,0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT2,GL_TEXTURE_2D,rs->inputNormalID,0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER,0x8D00/*GL_DEPTH_ATTACHMENT*/,GL_TEXTURE_2D,rs->inputDepthID,0);
-    glBindImageTexture(0,rs->inputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);      // Main Rendered Color
-    glBindImageTexture(2,rs->inputSpecID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);       // Specular
-    glBindImageTexture(4,rs->outputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);     // SSR result
-    glBindImageTexture(5,rs->inputNormalID,0,GL_FALSE,0,GL_READ_WRITE,GL_RG16F);     // Normal XYZ
-    glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_2D,rs->outputImageID);
-    glBindFramebuffer(GL_FRAMEBUFFER,0);
-    ignore_next_mouse_delta = true;
+    glViewport(0,0,w,h);
+    glUseProgram(imageBlitSP); glUniform1ui(2,w); glUniform1ui(3,h); glUniform1i(26,Sys_Settings.SSR_RES); glUseProgram(chunkSP); glUniform1ui(6,w); glUniform1ui(7,h); glUseProgram(ssrSP); glUniform1ui(0,w / Sys_Settings.SSR_RES); glUniform1ui(1,h / Sys_Settings.SSR_RES); glUniform1i(2,Sys_Settings.SSR_RES);
+    GenBTexture(&inputImageID, GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/); // Lit Raster
+    GenBTexture(&inputSpecID,  GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/); // Specular Colors
+    GenBTexture(&inputNormalID,GL_RG16F,w,h, GL_RGB,        GL_FLOAT,0x2600/*GL_NEAREST*/); // Normal XYZ
+    GenBTexture(&inputDepthID,0x81A7/*GL_DEPTH_COMPONENT32*/,w,h,0x1902/*GL_DEPTH_COMPONENT*/,GL_FLOAT,0x2600/*GL_NEAREST*/); // Raster Depth
+    GenBTexture(&outputImageID,GL_RGBA8,w / Sys_Settings.SSR_RES,h / Sys_Settings.SSR_RES,GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/);
+    glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,inputImageID,0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT1,GL_TEXTURE_2D,inputSpecID,0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT2,GL_TEXTURE_2D,inputNormalID,0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER,0x8D00/*GL_DEPTH_ATTACHMENT*/,GL_TEXTURE_2D,inputDepthID,0);
+    glBindImageTexture(0,inputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);      // Main Rendered Color
+    glBindImageTexture(2,inputSpecID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);       // Specular
+    glBindImageTexture(4,outputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);     // SSR result
+    glBindImageTexture(5,inputNormalID,0,GL_FALSE,0,GL_READ_WRITE,GL_RG16F);     // Normal XYZ
+    glActiveTexture(GL_TEXTURE4); glBindTexture(GL_TEXTURE_2D,outputImageID);
+    glBindFramebuffer(GL_FRAMEBUFFER,0); ignore_next_mouse_delta = true;
 }
 
 ENGINE_TO_MOD void AddCamView(V3 p, Quaternion r, u8 fv, u16 w, u16 h, float nr, float fr) { camViews[camViewCount] = (CamView){p,r,fv,w,h,nr,fr,World.pauseRelativeTime + (camViewCount * 0.05f) + 0.5f,false};/*Staggered for perf*/ GenBTexture(&camViewTextures[camViewCount],GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/); camViewCount++; }
@@ -5878,8 +5831,8 @@ u8 UI_MenuButton(i16 bX, i16 bY, u8 menuItem, i16 bW, i16 bH,  i16 tX, i16 tY, c
     bool over = false; u8 retvalue = 0u;
     retvalue = UI_Button(bX,bY,bW,bH,&over,menuItem); if (!retvalue) retvalue = (MenuEnter() && currentMenuItem == menuItem);
     over = over || currentMenuItem == menuItem;
-    RenderFormattedText(tX,tY,over ? T_STOPD_RED : T_RED_MENU,FONT_STOPD,1.5f,text);
-    RenderUIImage(pX,pY, 40,40,over ? 1029 : 1028); // Menu pad
+    RenderFormattedText(tX,tY,over ? T_STOPD_RED : T_RED_MENU,FONT_STOPD,1.5f,text); 
+    RenderUIImage(pX,pY,40,40,over ? 1029 : 1028); // Menu pad
     return retvalue;
 }
 
@@ -5898,11 +5851,7 @@ ENGINE_TO_MOD void MenuGoBack() {
     else if (currentMenuPage == Mpg_Load || currentMenuPage == Mpg_NewGame || currentMenuPage == Mpg_IntroVideo || currentMenuPage == Mpg_CreditsVideo) currentMenuPage = Mpg_Singleplayer;
 }
 
-void CreateShadowBuffers() {
-    Sys_Render.shadowMapSSBO           = MakeSSBO(&Sys_Render.shadowMapSSBO,           5,(MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(u32), NULL, GL_STATIC_DRAW);    
-    Sys_Render.shadowMapsIndirectionID = MakeSSBO(&Sys_Render.shadowMapsIndirectionID, 6,LIGHT_COUNT * sizeof(u32),NULL,GL_STATIC_DRAW); shadowBuffersCreated = true;
-}
-
+void CreateShadowBuffers() { shadowMapSSBO=MakeSSBO(&shadowMapSSBO,5,(MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(u32),NULL,GL_STATIC_DRAW); shadowMapsIndirectionID=MakeSSBO(&shadowMapsIndirectionID,6,LIGHT_COUNT * sizeof(u32),NULL,GL_STATIC_DRAW); shadowBuffersCreated=true; }
 void ChangeMenuPage(u8 pg) { currentMenuPage = pg; currentMenuItem = currentMenuTab = 0; }
 void RenderMenu() {    
     if (currentMenuPage != Mpg_IntroVideo && currentMenuPage != Mpg_CreditsVideo && currentMenuPage != Mpg_Options) RenderUIImage(-417,-384, 2200,1536, 1026); // Menu background
@@ -6088,21 +6037,10 @@ void RenderPausedUI() {
 typedef struct { float x,y,z,r,g,b,a; } DebugLineVertex;
 DebugLineVertex debugLineVerts[MAX_WIRELINE_VRTS * 2];
 INLINE void DrawDebugLines(float* viewProj) {
-    if (Cheats.noclip) return;
-    if (World.debugLineVertCount == 0) return;
+    if (World.debugLineVertCount == 0) {return;}
 
-    glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.debugLinesVBO);
-    glBufferSubData(GL_ARRAY_BUFFER,0,World.debugLineVertCount * sizeof(DebugLineVertex),debugLineVerts);
-    CHECK_GL_ERROR(); // 1282 here
-    glUseProgram(Sys_Render.debugUnlitSP);
-    glUniformMatrix4fv(0,1,GL_FALSE,viewProj);
-    glLineWidth(1.0f);
-    glDisable(GL_DEPTH_TEST);
-    glBindVertexArray(Sys_Render.debugLinesVAO);
-    glDrawArrays(0x0001/*GL_LINES*/,0,World.debugLineVertCount);
-    glEnable(GL_DEPTH_TEST);
-    drawCalls++; vertsRendered += World.debugLineVertCount;
-    World.debugLineVertCount = 0;
+    glBindBuffer(GL_ARRAY_BUFFER,debugLinesVBO); glBufferSubData(GL_ARRAY_BUFFER,0,World.debugLineVertCount * sizeof(DebugLineVertex),debugLineVerts); glUseProgram(debugUnlitSP); glUniformMatrix4fv(0,1,GL_FALSE,viewProj); glLineWidth(1.0f); glDisable(GL_DEPTH_TEST); glBindVertexArray(debugLinesVAO); 
+    glDrawArrays(0x0001/*GL_LINES*/,0,World.debugLineVertCount); drawCalls++; vertsRendered += World.debugLineVertCount; glEnable(GL_DEPTH_TEST); World.debugLineVertCount = 0;
 }
 
 ENGINE_TO_MOD void AddWireLine(V3 start, V3 end, Color col) {
@@ -6110,11 +6048,9 @@ ENGINE_TO_MOD void AddWireLine(V3 start, V3 end, Color col) {
 
     int i = World.debugLineVertCount;
     debugLineVerts[i].x = start.x; debugLineVerts[i].y = start.y; debugLineVerts[i].z = start.z;
-    debugLineVerts[i].r = col.r; debugLineVerts[i].g = col.g; 
-    debugLineVerts[i].b = col.b; debugLineVerts[i].a = col.a; i++;
+    debugLineVerts[i].r = col.r; debugLineVerts[i].g = col.g; debugLineVerts[i].b = col.b; debugLineVerts[i].a = col.a; i++;
     debugLineVerts[i].x = end.x; debugLineVerts[i].y = end.y; debugLineVerts[i].z = end.z;
-    debugLineVerts[i].r = col.r; debugLineVerts[i].g = col.g; 
-    debugLineVerts[i].b = col.b; debugLineVerts[i].a = col.a; i++;
+    debugLineVerts[i].r = col.r; debugLineVerts[i].g = col.g; debugLineVerts[i].b = col.b; debugLineVerts[i].a = col.a; i++;
     World.debugLineVertCount = i;
 }
 
@@ -6181,8 +6117,8 @@ static inline __attribute__((always_inline,hot)) u16 GetAndBindModel(u16 i, u16 
     u16 modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && World.instances[i].lodIndex < mdlsCnt ? World.instances[i].lodIndex : World.instances[i].modelIndex;
     if (currentModelType == modelType && currentModelType != 0) return currentModelType;
     
-    glBindVertexBuffer(0,Sys_Render.vbos[modelType],0,VRT_ATT_SZ);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,Sys_Render.tbos[modelType]);
+    glBindVertexBuffer(0,vbos[modelType],0,VRT_ATT_SZ);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[modelType]);
     return modelType;
 }
 
@@ -6198,53 +6134,39 @@ static __attribute__((hot)) void RenderShadowmaps() {
         if (unlikely(!(lights[i].lflags & SHADON) || !(lights[i].lflags & LIGHTON))) continue;
 
         V3 lightPos = lights[i].pos;
-        float intensity = lights[i].maxIntensity; // Much more stable than actual intensity (from fade/flickers).  Since gated by on above, this is fine now.
-        if (unlikely(intensity < 0.1f)) continue;
+        float intensity = lights[i].maxIntensity; /*Much more stable than actual intensity (from fade/flickers).  Since gated by on above, this is fine now.*/ if (unlikely(intensity < 0.1f)) continue;
         
         float range =  lights[i].range;
-        float luminosity = (intensity / (range * range));
-        if (luminosity < 0.008f && (range < 8.0f || intensity < 0.5f)) continue;
+        float luminosity = (intensity / (range * range)); if (luminosity < 0.008f && (range < 8.0f || intensity < 0.5f)) continue;
         
         u16 cellX = PosGetCellCoordX(lightPos.x), cellZ = PosGetCellCoordZ(lightPos.z);
         int lightCellIdx = (cellZ * WORLDX) + cellX; u8 r = vceil(range * (1.0f / CELL_SIZE));
         bool inPVS = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
-        if (likely(!inPVS)) inPVS = NeighborhoodInPVS(cellX,cellZ,r);
-        if (!inPVS) continue;
+        if (likely(!inPVS)) inPVS = NeighborhoodInPVS(cellX,cellZ,r); if (!inPVS) continue;
         
         float dx = lightPos.x - playerPos.x, dy = lightPos.y - playerPos.y, dz = lightPos.z - playerPos.z;
         float distSqrdToPlayer = dx*dx + dy*dy + dz*dz;
-        float dotResult = (dx*pf.x + dy*pf.y + dz*pf.z);
-        if (dotResult < 0.0f && distSqrdToPlayer > (range * range)) continue;
+        float dotResult = (dx*pf.x + dy*pf.y + dz*pf.z); if (dotResult < 0.0f && distSqrdToPlayer > (range * range)) continue;
 
         candidates[numShadowsCouldRender] = i; numShadowsCouldRender++; if (numShadowsCouldRender >= MAX_SHADOWMAPS) break;
     }
 
     if (numShadowsCouldRender > 0) { // Added since there is now work between here and the for loop so this is beneficial to check.
-        glUseProgram(Sys_Render.shadowmapsClearSP); // Clear shadowmaps.  One might think that this would be less performant than standard shadowmap FBO with gl clears and textures but in fact this is faster on all but the oldest hardware (e.g. 10yrs old is fine, 13yrs suffers a small hit).
-        for (u32 c=0;c<numShadowsCouldRender;++c) {
-            glUniform1ui(0,c); glDispatchCompute(groupX_shadClear,6,1);
-        }
-
+        glUseProgram(shadowmapsClearSP); // Clear shadowmaps.  One might think that this would be less performant than standard shadowmap FBO with gl clears and textures but in fact this is faster on all but the oldest hardware (e.g. 10yrs old is fine, 13yrs suffers a small hit).
+        for (u32 c=0;c<numShadowsCouldRender;++c) { glUniform1ui(0,c); glDispatchCompute(groupX_shadClear,6,1); }
         shadDrawCalls = 0;
         glViewport(0,0,SHADOW_MAP_SIZE,SHADOW_MAP_SIZE);
-        glUseProgram(Sys_Render.shadowmapsSP);
-        u32 shadowmapOffsetHead = 0U;
-        mset(shadowCasterIndices,0,SC_MAX*sizeof(u16));
-        u32 numShadowCasters = 0;
-        for (int i=START_INDEX_LEVEL_INSTANCES;i<INSTANCE_COUNT;++i) {
+        glUseProgram(shadowmapsSP);
+        u32 shadowmapOffsetHead = 0U; mset(shadowCasterIndices,0,SC_MAX*sizeof(u16)); u32 numShadowCasters = 0;
+        for (int i=INSTS_1ST_IDX;i<INSTANCE_COUNT;++i) {
             if (EntNotVisible(i,(World.instances[i].entflags & EF_NO_SHADOWS))) continue;
-
-            shadowCasterIndices[numShadowCasters] = i;
-            numShadowCasters++;
-            if (numShadowCasters >= (SC_MAX)) break; // Ran out of shadowcasters max for frame.
+            shadowCasterIndices[numShadowCasters] = i; numShadowCasters++; if (numShadowCasters >= (SC_MAX)) break; // Ran out of shadowcasters max for frame.
         }
         
-        u16 shadowMapIdx=0,currentModelType=0,currentTexIndex=0; bool currentIsTransparent=0;
-        bool useDetail = Sys_Settings.ModelDetail;
+        u16 shadowMapIdx=0,currentModelType=0,currentTexIndex=0; bool currentIsTransparent=0,useDetail=Sys_Settings.ModelDetail;
         for (u32 c = 0; c < numShadowsCouldRender; ++c, ++shadowMapIdx) { // Render top MAX_SHADOWMAPS candidates
             u16 lightIdx = candidates[c];
-            float effectiveRadius = vmin(lights[lightIdx].range,15.36f);
-            u16 nearbyMeshCount = 0;
+            float effectiveRadius = vmin(lights[lightIdx].range,15.36f); u16 nearbyMeshCount = 0; 
             V3 lpos = lights[lightIdx].pos;
             float cellCenterX=vround(lpos.x / CELL_SIZE) * CELL_SIZE, cellCenterZ=vround(lpos.z / CELL_SIZE) * CELL_SIZE;
             V3 deltaCellCenter = V3_AsubB((V3){lpos.x,0.0f,lpos.z},(V3){cellCenterX,0.0f,cellCenterZ});
@@ -6257,7 +6179,7 @@ static __attribute__((hot)) void RenderShadowmaps() {
                 float distToLightSqrd = V3_dot(d,d);
                 float radSum = (effectiveRadius + e->radius);
                 if (distToLightSqrd >= radSum * radSum) continue;
-                if (skipNPCs && ConstIndexIsNPC(e->index)) continue;
+                if (skipNPCs && IdxIsNPC(e->index)) continue;
                 
                 shadows_nearMeshes[nearbyMeshCount].index = j; shadows_nearMeshes[nearbyMeshCount].depth = distToLightSqrd; 
                 nearbyMeshCount++; if (nearbyMeshCount >= SHADOW_NEARMESH_MAX) { DualLogWarn("Shadowmapping needs larger nearMeshes count than %u!  Skipping some renderables for light %u!\n", SHADOW_NEARMESH_MAX, lightIdx); break; }
@@ -6279,7 +6201,7 @@ static __attribute__((hot)) void RenderShadowmaps() {
 
                     glUniform1ui(0,i);
                     u16 modelType = (instanceIsLODArray[i] || useDetail < 1u) && e->lodIndex < mdlsCnt ? e->lodIndex : e->modelIndex;
-                    if (currentModelType != modelType || currentModelType == 0) { currentModelType = modelType; glBindVertexBuffer(0,Sys_Render.vbos[modelType],0,VRT_ATT_SZ); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,Sys_Render.tbos[modelType]); }
+                    if (currentModelType != modelType || currentModelType == 0) { currentModelType = modelType; glBindVertexBuffer(0,vbos[modelType],0,VRT_ATT_SZ); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[modelType]); }
                     if (currentTexIndex != e->texIndex) { currentTexIndex = e->texIndex; glUniform1ui(6,e->texIndex); }
                     bool texIsTransparent = transparentTexture[e->texIndex];
                     if (currentIsTransparent != texIsTransparent) { currentIsTransparent = texIsTransparent; glUniform1ui(8,(u32)currentIsTransparent); }
@@ -6290,8 +6212,7 @@ static __attribute__((hot)) void RenderShadowmaps() {
             shadowmapOffsetHead += (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) * 6;
         }
 
-        glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
-        glBindBuffer(GL_SSBO,Sys_Render.shadowMapsIndirectionID); glBufferData(GL_SSBO,loadedLights * sizeof(u32),shadowmapIndirectionList,GL_DYNAMIC_DRAW);
+        glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); glBindBuffer(GL_SSBO,shadowMapsIndirectionID); glBufferData(GL_SSBO,loadedLights * sizeof(u32),shadowmapIndirectionList,GL_DYNAMIC_DRAW);
     }
 
     shadowTime = get_time() - shadowStartTime;
@@ -6301,14 +6222,13 @@ DepthSort visibleInstances[INSTANCE_COUNT];
 INLINE bool DetermineIfInstanceVisible(u16 i, bool otherCondition, bool skyVisible, V3 playerPos, float* distSqrd) {
     if (EntNotVisible(i,otherCondition)) return false; // must be transparent && transparents or neither
     
-    Entity* e = &World.instances[i];
-    u16 instCellIdx = e->cellIndex; u16 entIdx = e->index;
+    Entity* e = &World.instances[i]; u16 instCellIdx = e->cellIndex; u16 entIdx = e->index;
     V3 delta = V3_AsubB(e->position,playerPos);
     *distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
     float radius = modelBounds[e->modelIndex] * 2.0f * vmax(vmax(e->scale.x,e->scale.y),e->scale.z);
     if (!SphereInFrustum(playerFrustumPlanes,e->position,radius) && (entIdx != 754 || !skyVisible) && i != editModeSelection) return false;
     
-    if (ConstIndexIsPortalBlockingDoor(entIdx)) { // Extra checks only needed for opaque portal blocking doors.
+    if (IdxIsPortalBlockingDoor(entIdx)) { // Extra checks only needed for opaque portal blocking doors.
         bool inPVS = (gridCellStates[instCellIdx] & CELL_VISIBLE);
         if (!inPVS) {inPVS = NeighborhoodInPVS(e->cellX,e->cellZ,2u);} if (!inPVS) return false;
     } else {
@@ -6330,7 +6250,7 @@ __attribute__((pure)) i32 dsortInv(const void* a, const void* b) { float da = ((
         if (Cheats.showPhys) {if (e->collider == COLTYPE_BOX) {DrawBoxCollider(e);} else if (e->collider == COLTYPE_SPH) {DrawSphereCollider(e);} else if (e->collider == COLTYPE_CVX) {DrawMeshCollider(e);} else if (e->collider == COLTYPE_MSH) {DrawMeshCollider(e);} else if (e->collider == COLTYPE_CAP) {DrawCapsuleCollider(e);}} \
         DrawAngularVelocity(e); \
         glUniform1ui(17,tex==316?1u:0u); glUniform1ui(25,constIndex); glUniform1f(27,e->volume); glUniform1ui(13,(tex==36||tex==887) ? 1u : 0u); \
-        if (grayscaleEnabled) { float npcHeat = ConstIndexIsNPC(constIndex) ? ((constIndex==419 || constIndex==422 || constIndex==424 || constIndex==429 || constIndex==430 || constIndex==431||constIndex==433||constIndex==437||constIndex==438||constIndex==441) ? 1.5f : 4.0f) : 0.0f; glUniform1f(9,npcHeat); } \
+        if (grayscaleEnabled) { float npcHeat = IdxIsNPC(constIndex) ? ((constIndex==419 || constIndex==422 || constIndex==424 || constIndex==429 || constIndex==430 || constIndex==431||constIndex==433||constIndex==437||constIndex==438||constIndex==441) ? 1.5f : 4.0f) : 0.0f; glUniform1f(9,npcHeat); } \
         glUniform1ui(30,e->camView < camViewCount ? 1u : 0u); \
         if(e->camView < camViewCount) { glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D,camViewTextures[e->camView]); glUniform2ui(28,camViews[e->camView].width,camViews[e->camView].height); glUniform1i(29,6); } \
         if((curN) != (norm) || norm==0) { curN=norm; glUniform1ui( 1,(u32)norm); } \
@@ -6386,19 +6306,19 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     float view[16],viewProj[16],invViewRot[9],invViewProj[16];
     GetProjections(view,viewProj,invViewRot,invViewProj,sfov,aspect3D,snear,sfar);
     ExtractFrustumPlanes(viewProj,playerFrustumPlanes);
-    glBindVertexArray(Sys_Render.chunkVAO); // Common vao for RenderDynamicShadowmaps and Rasterized Geometry
+    glBindVertexArray(chunkVAO); // Common vao for RenderDynamicShadowmaps and Rasterized Geometry
     glEnable(GL_DEPTH_TEST);
     if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps();
     UpdateLights(); // This is where the voxels get updated!
     for (int i=0;i<LIGHT_COUNT;++i) flag_set(&lights[i].lflags,LDIRTY,false);
     glViewport(0,0,swidth,sheight);
     ClearAll();
-    glBindFramebuffer(GL_FRAMEBUFFER,Sys_Render.gBufferFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO);
     glEnable(GL_CULL_FACE); glDisable(GL_BLEND); // Opaques
     u16 visibleCount = 0, currentTexIndex = 0, currentNormIndex = 0, currentGlowIndex = 0, currentSpecIndex = 0, currentModelType = 0, opaqueCount = 0;
     bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX); float distSqrd = sfar * sfar;
     DepthSort tmpTransparent[MAX_VISIBLE]; u16 tcnt = 0;
-    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < World.loadedInstances; ++i) { // Determine base visibility
+    for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { // Determine base visibility
         if (!DetermineIfInstanceVisible(i,false,skyVisible,playerPos,&distSqrd)) continue;
        
         if (transparentTexture[World.instances[i].texIndex]) { tmpTransparent[tcnt].index = i; tmpTransparent[tcnt].depth = distSqrd; tcnt++; }
@@ -6407,7 +6327,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
 
     mcpy(visibleInstances + opaqueCount,tmpTransparent,tcnt * sizeof(DepthSort));
     visibleCount = opaqueCount + tcnt;
-    glUseProgram(Sys_Render.depthPrepassSP); // Depth Prepass - Eliminates some overdraw for ~6.1% performance improvement in spite of added draw calls
+    glUseProgram(depthPrepassSP); // Depth Prepass - Eliminates some overdraw for ~6.1% performance improvement in spite of added draw calls
     glUniformMatrix4fv(2,1,0,viewProj);
     glEnable(GL_DEPTH_TEST); glColorMask(0,0,0,0); glDepthMask(1); glDepthFunc(0x0201/*GL_LESS*/); glDisable(GL_BLEND);
     if (opaqueCount > 1) qsort_new(visibleInstances,opaqueCount,sizeof(DepthSort),dsortInv);
@@ -6425,7 +6345,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         glDrawElements(0x0004/*GL_TRIANGLES*/,vertCount,GL_UNSIGNED_SHORT,0); drawCalls++; vertsRendered += vertCount;
     }
 
-    glUseProgram(Sys_Render.chunkSP); /*Main Pass*/ glUniformMatrix4fv(2,1,0,viewProj); glUniform1ui(25,0u); // default constIndex
+    glUseProgram(chunkSP); /*Main Pass*/ glUniformMatrix4fv(2,1,0,viewProj); glUniform1ui(25,0u); // default constIndex
     bool grayscaleEnabled = ModRequestsGrayscale(), refOn = Sys_Settings.Reflections;              glUniform1ui(26,(u32)grayscaleEnabled);
     float fogActual = World.fogColor[World.curLev].a + (float)(World.fogFac / 255u); // Alpha is base density for level.
     glUniform3f(12,World.fogColor[World.curLev].r * fogActual,World.fogColor[World.curLev].g * fogActual,World.fogColor[World.curLev].b * fogActual); // Fog Color(which is density)
@@ -6457,7 +6377,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     }
     
     if (camView) {
-        glBindFramebuffer(0x8CA8/*GL_READ_FRAMEBUFFER*/,Sys_Render.gBufferFBO);
+        glBindFramebuffer(0x8CA8/*GL_READ_FRAMEBUFFER*/,gBufferFBO);
         glReadBuffer(GL_COLOR_ATTACHMENT0);
         glBindTexture(GL_TEXTURE_2D,camViewTextures[camViewIdx]);
         glCopyTexSubImage2D(GL_TEXTURE_2D,0,0,0,0,0,swidth,sheight);
@@ -6466,52 +6386,40 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     }
 
     if (unlikely(World.debugLineVertCount > 1)) DrawDebugLines(viewProj); // Draw Debug Lines
-    glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D,Sys_Render.inputDepthID);
+    glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D,inputDepthID);
     if (likely(refOn > 0u)) { // Screen Space Reflections
-        glUseProgram(Sys_Render.ssrSP); glUniform3f(3,playerPos.x,playerPos.y,playerPos.z); glUniform1i(5,3);
+        glUseProgram(ssrSP); glUniform3f(3,playerPos.x,playerPos.y,playerPos.z); glUniform1i(5,3);
         glUniformMatrix4fv(6,1,0,invViewProj);     glUniformMatrix4fv(4,1,GL_FALSE,viewProj);
         u32 groupX_ssr = ((Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES) + 31) / 32, groupY_ssr = ((Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES) + 31) / 32;
         glDispatchCompute(groupX_ssr,groupY_ssr,1);
     }
     
-    glBindFramebuffer(GL_FRAMEBUFFER,Sys_Render.uiFBO); glViewport(0,0,1366,768);
+    glBindFramebuffer(GL_FRAMEBUFFER,uiFBO); glViewport(0,0,1366,768);
     glDisable(GL_CULL_FACE);
     World.last_time = RenderUI();
     if ((World.inventoryMode && !Cheats.noHUD) || World.menuActive || World.gamePaused) RenderUIImage((i16)(World.cursorPosition_x) - 20,(i16)(World.cursorPosition_y) - 20,40,40,GetCursorTexture());
     else RenderUIImage(663,364,40,40,GetCursorTexture()); // Centered on UI baseline resolution 1366x768
     glBindFramebuffer(GL_FRAMEBUFFER,0); glViewport(0,0,swidth,sheight); // Restore normal output size for final composite blit
 
-    glUseProgram(Sys_Render.imageBlitSP);
-    glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,Sys_Render.inputImageID);
-    glUniform1i(4,4); // outputImage texture sampler2D, don't remember why when active texture is texture 0. meh.... oh maybe to not read and write same binding?
-    glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D,Sys_Render.inputUIID);
-    glUniform1i(31,1); glUniform1i(32,3); glUniformMatrix4fv(33,1,0,invViewProj);
+    glUseProgram(imageBlitSP); glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,inputImageID); glUniform1i(4,4); // outputImage texture sampler2D, don't remember why when active texture is texture 0. meh.... oh maybe to not read and write same binding?
+    glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D,inputUIID); glUniform1i(31,1); glUniform1i(32,3); glUniformMatrix4fv(33,1,0,invViewProj);
     double berserkTimeRemainingNormalized = World.invP1.berserkFinishedTime > 0.0001 ? (World.invP1.berserkFinishedTime - World.pauseRelativeTime) / BERSERK_TIME : 0.0;
     if (World.invP1.berserkFinishedTime < World.pauseRelativeTime && World.invP1.berserkFinishedTime > 0.0001) World.invP1.berserkFinishedTime = berserkTimeRemainingNormalized = 0.0;
-    glUniform1ui(5,refOn);           glUniform1ui(6,Sys_Settings.FXAA);                          glUniform1f(14,Sys_Settings.FOV);
-    glUniform1f(16,aspect3D);        glUniform1ui(22,Sys_Settings.Shadows);                      glUniform1f(9,(float)berserkTimeRemainingNormalized);
-    glUniform1f(10,berserkSeedTime); glUniform1ui(11,Sys_Settings.Brightness);                   glUniform3f(12,deg2rad(cam_yaw),deg2rad(cam_pitch),deg2rad(cam_roll));
-    glUniform3f(13,px,py,pz);        glUniform1f(15,(float)World.pauseRelativeTime * 0.1f); 
-    glUniform1ui(17,(gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || World.curLev == LEVEL_CYBERSPACE);
-    glUniform1ui(18,(gridCellStates[playerCellIdx] & CELL_SEES_SUN) && World.curLev != LEVEL_CYBERSPACE);
-    glUniform1ui(19,((World.curLev >= 10 && World.curLev < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
+    glUniform1ui(5,refOn); glUniform1ui(6,Sys_Settings.FXAA); glUniform1f(14,Sys_Settings.FOV); glUniform1f(16,aspect3D); glUniform1ui(22,Sys_Settings.Shadows); glUniform1f(9,(float)berserkTimeRemainingNormalized); glUniform1f(10,berserkSeedTime); glUniform1ui(11,Sys_Settings.Brightness);
+    glUniform3f(12,deg2rad(cam_yaw),deg2rad(cam_pitch),deg2rad(cam_roll)); glUniform3f(13,px,py,pz); glUniform1f(15,(float)World.pauseRelativeTime * 0.1f); glUniform1ui(17,(gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || World.curLev == LEVEL_CYBERSPACE);
+    glUniform1ui(18,(gridCellStates[playerCellIdx] & CELL_SEES_SUN) && World.curLev != LEVEL_CYBERSPACE); glUniform1ui(19,((World.curLev >= 10 && World.curLev < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
     u32 shieldOnType = 0u; // No shield green tint.
     if (World.instances[WORLD].ioflags & QUESTBIT_SHIELD_ACTIVATED) {
-        if (World.curLev == 6 || World.curLev == 7) shieldOnType = 2u; // Shielding only below player for lower levels.
-        else if (World.curLev <= 5) shieldOnType = 1u; // Shielding everywhere as levels fully within shield.
+        if (World.curLev == 6 || World.curLev == 7) {shieldOnType = 2u;/*Shielding only below player for lower levels.*/ } else if (World.curLev <= 5) {shieldOnType = 1u;/*Shielding everywhere as levels fully within shield.*/}
     }
    
     glUniform1ui(20,shieldOnType);
     Color painStaticColor = GetPainStaticColor(); glUniform3f(23,painStaticColor.r,painStaticColor.g,painStaticColor.b);
     glUniformMatrix4fv(24,1,0,viewProj);          glUniformMatrix3fv(25,1,0,invViewRot);        glUniform1i(27,0); // Texture 0 for the rendered geometry color buffer
-    glUniform1f(28,GetPainStatic());              glUniform1ui(29,(u32)ModRequestsGrayscale()); // Grayscale
-    glBindVertexArray(Sys_Render.quadVAO);
-    glDisable(GL_DEPTH_TEST);
-    glDrawArrays(0x0006/*GL_TRIANGLE_FAN*/,0,4);
-    drawCalls++; vertsRendered += 4;
+    glUniform1f(28,GetPainStatic());              glUniform1ui(29,(u32)ModRequestsGrayscale()); glBindVertexArray(quadVAO); glDisable(GL_DEPTH_TEST);
+    glDrawArrays(0x0006/*GL_TRIANGLE_FAN*/,0,4); drawCalls++; vertsRendered += 4;
     if ((World.last_time - World.lastFrameSecCountTime) >= 1.00) { // Update Diagnostic Poll
-        World.lastFrameSecCountTime = World.last_time;
-        globalframesPerLastSecond = globalframe - World.lastFrameSecCount;
+        World.lastFrameSecCountTime = World.last_time; globalframesPerLastSecond = globalframe - World.lastFrameSecCount;
         if (globalframesPerLastSecond < World.worstFPS && globalframe > 2000) World.worstFPS = globalframesPerLastSecond; // After startup, keep track of worst framerate seen.
         World.lastFrameSecCount = globalframe;
     }
@@ -6537,24 +6445,17 @@ void UpdateInstanceMatrix4x4s() {
     if (unlikely(World.gamePaused || World.menuActive)) return;
     
     i32 dirtyMin = -1, dirtyMax = -1;
-    for (u32 i = START_INDEX_LEVEL_INSTANCES; i < World.loadedInstances; i++) {        
+    for (u32 i = INSTS_1ST_IDX; i < World.instCount; i++) {        
         Entity *e = &World.instances[i];
-        float x=e->rotation.x, y=e->rotation.y, z=e->rotation.z, w=e->rotation.w;
-        float x2=x*x, y2=y*y, z2=z*z, xy=x*y, xz=x*z, yz=y*z, wx=w*x, wy=w*y, wz=w*z;
-        float sclx=e->scale.x, scly=e->scale.y, sclz=e->scale.z;
-        u32 m = i*16;
-        modelMatrices[m+0] =(1.0f-2.0f*(y2+z2))*sclx; modelMatrices[m+1] =      (2.0f*(xy+wz))*sclx; modelMatrices[m+2] =      (2.0f*(xz-wy))*sclx;
-        modelMatrices[m+4] =      (2.0f*(xy-wz))*scly; modelMatrices[m+5] =(1.0f-2.0f*(x2+z2))*scly; modelMatrices[m+6] =      (2.0f*(yz+wx))*scly;
-        modelMatrices[m+8] =      (2.0f*(xz+wy))*sclz; modelMatrices[m+9] =      (2.0f*(yz-wx))*sclz; modelMatrices[m+10]=(1.0f-2.0f*(x2+y2))*sclz;
-        modelMatrices[m+12]=e->position.x; modelMatrices[m+13]=e->position.y; modelMatrices[m+14]=e->position.z; modelMatrices[m+15]=1.0f;
-        if (dirtyMin < 0) dirtyMin = (i32)i;
-        dirtyMax = (i32)i;
+        float x=e->rotation.x, y=e->rotation.y, z=e->rotation.z, w=e->rotation.w; float x2=x*x, y2=y*y, z2=z*z, xy=x*y, xz=x*z, yz=y*z, wx=w*x, wy=w*y, wz=w*z; float sclx=e->scale.x, scly=e->scale.y, sclz=e->scale.z; u32 m = i*16;
+        modelMatrices[m+0]=(1.0f-2.0f*(y2+z2))*sclx; modelMatrices[m+1]=(2.0f*(xy+wz))*sclx; modelMatrices[m+2]=(2.0f*(xz-wy))*sclx; modelMatrices[m+4]=(2.0f*(xy-wz))*scly; modelMatrices[m+5]=(1.0f-2.0f*(x2+z2))*scly; modelMatrices[m+6]=(2.0f*(yz+wx))*scly;
+        modelMatrices[m+8]=(2.0f*(xz+wy))*sclz; modelMatrices[m+9]=(2.0f*(yz-wx))*sclz; modelMatrices[m+10]=(1.0f-2.0f*(x2+y2))*sclz; modelMatrices[m+12]=e->position.x; modelMatrices[m+13]=e->position.y; modelMatrices[m+14]=e->position.z; modelMatrices[m+15]=1.0f;
+        if (dirtyMin < 0) {dirtyMin = (i32)i;} dirtyMax = (i32)i;
     }
     if (dirtyMin < 0) return;
-    glBindBuffer(GL_SSBO,Sys_Render.matricesBufferID);
-    u32 offsetFloats = (u32)dirtyMin * 16;
-    u32 countFloats  = ((u32)dirtyMax - (u32)dirtyMin + 1) * 16;
-    glBufferSubData(GL_SSBO, offsetFloats * sizeof(float), countFloats * sizeof(float), modelMatrices + offsetFloats);
+    glBindBuffer(GL_SSBO,matricesBufferID);
+    u32 offsetFloats = (u32)dirtyMin * 16; u32 countFloats  = ((u32)dirtyMax - (u32)dirtyMin + 1) * 16;
+    glBufferSubData(GL_SSBO,offsetFloats * sizeof(float),countFloats * sizeof(float),modelMatrices + offsetFloats);
 }
 // Init && Main
 ENGINE_TO_MOD void InitializeEntity(Entity* e) { mset(e,0,sizeof(Entity)); e->index=U16_MAX; e->entflags=EF_ACTIVE; e->kinematic=true; e->layer=L_Default; e->camView=255; e->tickTime = 0.35f; e->angularDrag = 0.05f; e->modelIndex=e->lodIndex=e->colMeshIndex=MAX_MDLS; e->texIndex=e->glowIndex=e->specIndex=e->normIndex = MAX_TXRS; e->scale.x=e->scale.y=e->scale.z=e->mass=e->volume=e->rotation.w=1.0f; e->dynamicFriction = e->staticFriction = 0.6f; }
@@ -6574,26 +6475,17 @@ ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
     LoadLevelMod(curlevel);
     OS_Close(levelFileHandle);
     for (int i=0;i<loadedLights;++i) lightsNewPosition[i]=lights[i].pos;
-    DualLog("Loaded %d entities, %u static lights for Level %d... took %f secs\n",World.loadedInstances,loadedLights,curlevel,get_time() - start_time);
+    DualLog("Loaded %d entities, %u static lights for Level %d... took %f secs\n",World.instCount,loadedLights,curlevel,get_time() - start_time);
     RenderLoadingProgress(110,"Initialize entities...");
-    for (int i=PLAYER1;i<World.loadedInstances;++i) {
-        Entity* e = &World.instances[i];
-        i32 cellIdx = PosGetCellCoords(e->position.x,e->position.z);
-        e->cellIndex = cellIdx; e->cellX=PosGetCellCoordX(e->position.x); e->cellZ=PosGetCellCoordZ(e->position.z);
-        e->radius = modelBounds[e->modelIndex]*vmax(vmax(e->scale.x,e->scale.y),e->scale.z);
-        e->shadRadius = e->radius * 1.41;
+    for (int i=PLAYER1;i<World.instCount;++i) {
+        Entity* e = &World.instances[i]; i32 cellIdx = PosGetCellCoords(e->position.x,e->position.z); e->cellIndex = cellIdx; e->cellX=PosGetCellCoordX(e->position.x); e->cellZ=PosGetCellCoordZ(e->position.z); e->radius = modelBounds[e->modelIndex]*vmax(vmax(e->scale.x,e->scale.y),e->scale.z); e->shadRadius = e->radius * 1.41;
         ComputeConvexMeshInertiaTensor(e);
-        if (e->mass < 0.001f && e->collider != COLTYPE_NONE && e->collider != COLTYPE_MSH && (e->entflags & EF_RIGIDBODY)) e->mass = 0.2f; // At least something!
+        if (e->mass < 0.001f && e->collider != COLTYPE_NONE && e->collider != COLTYPE_MSH && (e->entflags & EF_RIGIDBODY)) {e->mass = 0.2f; /*At least something!*/}
     }
     
     ModInitAfterLoad(); ResetLevelAudio(); ResetLevelMusic(); creditPages = GetCreditsText();
-    RenderLoadingProgress(110,"Loading cull system...");
-    CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
-    glUseProgram(Sys_Render.voxelUpdateSP);
-    glUniform2f(0,World.voxelMinCenterX[World.curLev],World.voxelMinCenterZ[World.curLev]);
-    glUniform1f(1,World.farPlane[World.curLev] * World.farPlane[World.curLev]);
-    glUniform1ui(2,loadedLights);
-    glUniform2f(3,World.worldMin_x[World.curLev],World.worldMin_z[World.curLev]); 
+    RenderLoadingProgress(110,"Loading cull system..."); CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
+    glUseProgram(voxelUpdateSP); glUniform2f(0,World.voxelMinCenterX[World.curLev],World.voxelMinCenterZ[World.curLev]); glUniform1f(1,World.farPlane[World.curLev] * World.farPlane[World.curLev]); glUniform1ui(2,loadedLights); glUniform2f(3,World.worldMin_x[World.curLev],World.worldMin_z[World.curLev]); 
     RenderLoadingProgress(120,"Loading voxel lighting data...");
     for (u16 i = 0; i < loadedLights; i++) { lightsNewPosition[i] = lights[i].pos; }
     mset(shadowmapIndirectionList,MAX_SHADOWMAPS + 1,loadedLights * sizeof(u32)); // Set to invalid values for all
@@ -6615,10 +6507,8 @@ __attribute__((cold)) void NewGame() { // Reset World States
 	World.ressurections = World.deaths = World.kills = World.cyberkills = 0u; World.shotsFired = World.grenadesThrown = World.savesScummed = 0U; World.creditsPageIndex = 0u;
     for (int i=0;i<14;++i) World.levelSecurity[i] = 100u;
     InputClearRisingAndFallingEdges();
-    currentMouse_dx = currentMouse_dy = 0; last_mouse_x = last_mouse_y = 0;
-    ignore_next_mouse_delta = true;
-    Sys_Input.isCapsLockOn = false; // As far as we're concerned, don't worry about OS actual state.
-    Sys_Input.lastUse = false;
+    currentMouse_dx = currentMouse_dy = 0; last_mouse_x = last_mouse_y = 0; ignore_next_mouse_delta = true;
+    Sys_Input.lastUse = Sys_Input.isCapsLockOn = false; // As far as we're concerned, don't worry about OS capslock actual state.
     LoadLevel(World.startLevel); // Must be after entities!
     ModNewGame();
 }
@@ -6661,34 +6551,34 @@ void InitalizeEnvironment() {
     glFrontFace(0x0901/*GL_CCW*/); // Set triangle winding order
     glBlendFuncSeparate(0x0302/*GL_SRC_ALPHA*/, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/, 1, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/);
     CompileShaders();
-    u32 vaos[4],vbos[4]; glGenVertexArrays(4,vaos); glGenBuffers(4,vbos);
-    Sys_Render.quadVAO = vaos[0]; Sys_Render.chunkVAO = vaos[1]; Sys_Render.textVAO = vaos[2]; Sys_Render.debugLinesVAO = vaos[3];
-    Sys_Render.quadVBO = vbos[0]; Sys_Render.chunkVBO = vbos[1]; Sys_Render.textVBO = vbos[2]; Sys_Render.debugLinesVBO = vbos[3]; 
+    u32 tvaos[4],tvbos[4]; glGenVertexArrays(4,tvaos); glGenBuffers(4,tvbos);
+    quadVAO = tvaos[0]; chunkVAO = tvaos[1]; textVAO = tvaos[2]; debugLinesVAO = tvaos[3];
+    quadVBO = tvbos[0]; chunkVBO = tvbos[1]; textVBO = tvbos[2]; debugLinesVBO = tvbos[3]; 
     float quadBlit_vertices[] = {1.0f,-1.0f,1.0f,0.0f, 1.0f,1.0f,1.0f,1.0f, -1.0f,1.0f,0.0f,1.0f, -1.0f,-1.0f,0.0f,0.0f}; // 4 verts, 4 floats each x,y,u,v
-    glBindVertexArray(Sys_Render.quadVAO); glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.quadVBO); glBufferData(GL_ARRAY_BUFFER,sizeof(quadBlit_vertices),quadBlit_vertices,GL_STATIC_DRAW);
+    glBindVertexArray(quadVAO); glBindBuffer(GL_ARRAY_BUFFER,quadVBO); glBufferData(GL_ARRAY_BUFFER,sizeof(quadBlit_vertices),quadBlit_vertices,GL_STATIC_DRAW);
     glVertexAttribFormat(0,2,GL_FLOAT,GL_FALSE,0);                 glVertexAttribBinding(0,0); glEnableVertexAttribArray(0); // pos xy float @ offset 0
     glVertexAttribFormat(1,2,GL_FLOAT,GL_FALSE,2 * sizeof(float)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1); // uv (s,t)
-    glBindVertexBuffer(0,Sys_Render.quadVBO,0,4 * sizeof(float));
-    glBindVertexArray(Sys_Render.chunkVAO);
+    glBindVertexBuffer(0,quadVBO,0,4 * sizeof(float));
+    glBindVertexArray(chunkVAO);
     glVertexAttribFormat(0,3,0x140B/*GL_HALF_FLOAT*/,GL_FALSE,0);  glVertexAttribBinding(0,0); glEnableVertexAttribArray(0); // pos xyz half-float @ offset 0
     glVertexAttribFormat(1,3,0x140B/*GL_HALF_FLOAT*/,GL_FALSE,6);  glVertexAttribBinding(1,0); glEnableVertexAttribArray(1); // normal xyz float   @ offset 6  (after 3×2 bytes)
     glVertexAttribFormat(2,2,0x140B/*GL_HALF_FLOAT*/,GL_FALSE,12); glVertexAttribBinding(2,0); glEnableVertexAttribArray(2); // uv st float
-    glBindVertexArray(Sys_Render.textVAO);
+    glBindVertexArray(textVAO);
     glVertexAttribFormat(0,3,GL_FLOAT,GL_FALSE,0);                 glVertexAttribBinding(0,0); glEnableVertexAttribArray(0); // pos (x,y,z) 4 floats per vertex, stride = 4*sizeof(float)
     glVertexAttribFormat(1,2,GL_FLOAT,GL_FALSE,3 * sizeof(float)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1); // uv (s,t)
-    glBindVertexBuffer(0, Sys_Render.textVBO,0,5 * sizeof(float));
-    glBindVertexArray(Sys_Render.debugLinesVAO); glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.debugLinesVBO); glBufferData(GL_ARRAY_BUFFER,MAX_WIRELINE_VRTS * 2 * sizeof(DebugLineVertex),NULL,GL_DYNAMIC_DRAW);
+    glBindVertexBuffer(0, textVBO,0,5 * sizeof(float));
+    glBindVertexArray(debugLinesVAO); glBindBuffer(GL_ARRAY_BUFFER,debugLinesVBO); glBufferData(GL_ARRAY_BUFFER,MAX_WIRELINE_VRTS * 2 * sizeof(DebugLineVertex),NULL,GL_DYNAMIC_DRAW);
     glVertexAttribFormat(0,3,GL_FLOAT,GL_FALSE,__builtin_offsetof(DebugLineVertex,x)); glVertexAttribBinding(0,0); glEnableVertexAttribArray(0);
     glVertexAttribFormat(1,4,GL_FLOAT,GL_FALSE,__builtin_offsetof(DebugLineVertex,r)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1);
-    glBindVertexBuffer(0,Sys_Render.debugLinesVBO,0,sizeof(DebugLineVertex));
+    glBindVertexBuffer(0,debugLinesVBO,0,sizeof(DebugLineVertex));
     InitFontAtlasses();
-    GenerateAndBindTexture(&Sys_Render.inputUIID,GL_RGBA8,1366,768,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/,NULL); // UI Fixed Size Raster
-    glGenFramebuffers(1,&Sys_Render.uiFBO);
-    glBindFramebuffer(GL_FRAMEBUFFER,Sys_Render.uiFBO);
-    glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D,Sys_Render.inputUIID); glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,Sys_Render.inputUIID,0);
+    GenerateAndBindTexture(&inputUIID,GL_RGBA8,1366,768,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/,NULL); // UI Fixed Size Raster
+    glGenFramebuffers(1,&uiFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER,uiFBO);
+    glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D,inputUIID); glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,inputUIID,0);
     u32 drawBuffersUI[] = {GL_COLOR_ATTACHMENT0}; glDrawBuffers(1,drawBuffersUI);
     u32 uistatus = glCheckFramebufferStatus(GL_FRAMEBUFFER); if (uistatus != 0x8CD5/*GL_FRAMEBUFFER_COMPLETE*/) DualLogError("UI Framebuffer incomplete: Error code %d\n",uistatus);
-    glBindImageTexture(0,Sys_Render.inputUIID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);/* UI Rendered Color*/ glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,Sys_Render.inputUIID,0);
+    glBindImageTexture(0,inputUIID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);/* UI Rendered Color*/ glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,inputUIID,0);
     RenderLoadingProgress(40,"Loading...");
     float* m = shadowmapsPerspectiveProjection; float lightRangeMax=15.36f; float viewRange=(lightRangeMax - NEAR_PLANE);
     m[0]=1.0f; m[1]=0.0f; m[2]=0.0f; m[3]=0.0f; m[4]=0.0f; m[5]=1.0f; m[6]=0.0f; m[7]=0.0f; m[8]=0.0f; m[9]=0.0f; m[10]=-(lightRangeMax + NEAR_PLANE) / viewRange; m[11]=-1.0f; m[12]=0.0f; m[13]=0.0f; m[14]=-2.0f * lightRangeMax * NEAR_PLANE / viewRange; m[15]=0.0f;
@@ -6701,24 +6591,24 @@ void InitalizeEnvironment() {
     #undef X
     ModLink(&World,&Cheats,&Sys_Settings,&Sys_Text,&Sys_UI); // Link engine to mod
     World.GetKey=GetKey; World.GetKeyPressed=GetKeyPressed; // Link mod to engine
-    ModEntityDefinitionsInitAfterLoad();
-    glGenFramebuffers(1,&Sys_Render.gBufferFBO);
+    ModEDefsInitAfterLoad();
+    glGenFramebuffers(1,&gBufferFBO);
     ChangeFullScreenWindowed(); SetSkyRotateSpeed(); SetVSync(); LoadTextForLanguage(Sys_Settings.Language); LoadLogTextForLanguage(Sys_Settings.Language); // Apply settings after loading of text and game data.
-    glBindFramebuffer(GL_FRAMEBUFFER,Sys_Render.gBufferFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO);
     u32 drawBuffers[] = {GL_COLOR_ATTACHMENT0,GL_COLOR_ATTACHMENT1,GL_COLOR_ATTACHMENT2};
     glDrawBuffers(3,drawBuffers);
     u32 status = glCheckFramebufferStatus(GL_FRAMEBUFFER); if (status != 0x8CD5/*GL_FRAMEBUFFER_COMPLETE*/) DualLogError("Framebuffer incomplete: Error code %d\n",status);
     float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1}; u32 MAX_LIGHTS_PER_VOXEL = 32;
     mcpy(&modelMatrices[0],mat,16 * sizeof(float)); // Null instance matrix used for UI
-    Sys_Render.matricesBufferID = MakeSSBO(&Sys_Render.matricesBufferID, 1,INSTANCE_COUNT * 16 * sizeof(float),modelMatrices,GL_STATIC_DRAW);     Sys_Render.cellVisibleDataID= MakeSSBO(&Sys_Render.cellVisibleDataID,7,ARRSIZE * sizeof(u32),NULL,GL_STATIC_DRAW);
-    Sys_Render.voxListCntsID    = MakeSSBO(&Sys_Render.voxListCntsID,    2,VOXEL_COUNT * sizeof(u32),NULL,GL_STATIC_DRAW);                        Sys_Render.texPalID         = MakeSSBO(&Sys_Render.texPalID,         8,MAX_UNIQUE_COLORS * sizeof(u32),NULL,GL_STATIC_DRAW);
-    Sys_Render.voxelLightListsID= MakeSSBO(&Sys_Render.voxelLightListsID,3,VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(u32),NULL,GL_STATIC_DRAW); Sys_Render.texPalOfsID      = MakeSSBO(&Sys_Render.texPalOfsID,      9,MAX_TXRS * sizeof(u32),NULL,GL_STATIC_DRAW);
-    Sys_Render.lightsID         = MakeSSBO(&Sys_Render.lightsID,         4,LIGHT_COUNT * sizeof(Light),NULL,GL_STATIC_DRAW);                      Sys_Render.colorBufferID    = MakeSSBO(&Sys_Render.colorBufferID,   12,MAX_TOTAL_PIXELS * sizeof(u8),NULL,GL_STATIC_DRAW);
-    if (Sys_Settings.Shadows) CreateShadowBuffers();                    /*5,6*/                                                                   Sys_Render.textureOffsetsID = MakeSSBO(&Sys_Render.textureOffsetsID,14,MAX_TXRS * sizeof(u32),NULL,GL_STATIC_DRAW);
-                                                                                                                                                  Sys_Render.textureSizesID   = MakeSSBO(&Sys_Render.textureSizesID,  15,MAX_TXRS * 2 * sizeof(i32),NULL, GL_STATIC_DRAW);
-    glUseProgram(Sys_Render.shadowmapsSP);  glUniform1ui( 9,SHADOW_MAP_SIZE);   glUseProgram(Sys_Render.shadowmapsClearSP); glUniform1ui(1,SHADOW_MAP_SIZE);
-    glUseProgram(Sys_Render.chunkSP);       glUniform1ui(21,SHADOW_MAP_SIZE); glUniform1f(22,(float)SHADOW_MAP_SIZE); glUniform1ui(23,LIGHT_COUNT); glUniform1ui(24,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);
-    glUseProgram(Sys_Render.voxelUpdateSP); glUniform1ui( 4,SHADOW_MAP_SIZE); glUniform1ui(6,(u32)MAX_LIGHTS_PER_VOXEL);
+    matricesBufferID = MakeSSBO(&matricesBufferID, 1,INSTANCE_COUNT * 16 * sizeof(float),modelMatrices,GL_STATIC_DRAW);     cellVisibleDataID= MakeSSBO(&cellVisibleDataID,7,ARRSIZE * sizeof(u32),NULL,GL_STATIC_DRAW);
+    voxListCntsID    = MakeSSBO(&voxListCntsID,    2,VOXEL_COUNT * sizeof(u32),NULL,GL_STATIC_DRAW);                        texPalID         = MakeSSBO(&texPalID,         8,MAX_UNIQUE_COLORS * sizeof(u32),NULL,GL_STATIC_DRAW);
+    voxelLightListsID= MakeSSBO(&voxelLightListsID,3,VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(u32),NULL,GL_STATIC_DRAW); texPalOfsID      = MakeSSBO(&texPalOfsID,      9,MAX_TXRS * sizeof(u32),NULL,GL_STATIC_DRAW);
+    lightsID         = MakeSSBO(&lightsID,         4,LIGHT_COUNT * sizeof(Light),NULL,GL_STATIC_DRAW);                      colorBufferID    = MakeSSBO(&colorBufferID,   12,MAX_TOTAL_PIXELS * sizeof(u8),NULL,GL_STATIC_DRAW);
+    if (Sys_Settings.Shadows) CreateShadowBuffers();                    /*5,6*/                                             textureOffsetsID = MakeSSBO(&textureOffsetsID,14,MAX_TXRS * sizeof(u32),NULL,GL_STATIC_DRAW);
+                                                                                                                            textureSizesID   = MakeSSBO(&textureSizesID,  15,MAX_TXRS * 2 * sizeof(i32),NULL, GL_STATIC_DRAW);
+    glUseProgram(shadowmapsSP);  glUniform1ui( 9,SHADOW_MAP_SIZE);   glUseProgram(shadowmapsClearSP); glUniform1ui(1,SHADOW_MAP_SIZE);
+    glUseProgram(chunkSP);       glUniform1ui(21,SHADOW_MAP_SIZE); glUniform1f(22,(float)SHADOW_MAP_SIZE); glUniform1ui(23,LIGHT_COUNT); glUniform1ui(24,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);
+    glUseProgram(voxelUpdateSP); glUniform1ui( 4,SHADOW_MAP_SIZE); glUniform1ui(6,(u32)MAX_LIGHTS_PER_VOXEL);
     threadCnt = clamp(OS_GetNumThreads(),1,32);
     RenderLoadingProgress(100,"Loading textures..."); LoadTextures();
     RenderLoadingProgress(92,"Loading models...");    LoadModels();
@@ -6735,24 +6625,23 @@ i32 main() {
     while(1) {
         if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad); queuedLevelToLoad = 255u; continue; }
 
-        World.current_time  = get_time();              World.deltaTime          = World.current_time - World.last_topframe_time;
+        World.current_time  = get_time();              World.deltaTime     = World.current_time - World.last_topframe_time;
         World.absoluteTime += World.deltaTime;    World.last_topframe_time = World.current_time;
         if (!World.gamePaused && !World.menuActive) World.pauseRelativeTime += World.deltaTime;
         InputProcessing(); // Before anims and physics to allow them to respond immediately.
         UpdateAnims();     // Before physics to allow model swap out to affect physics state immediately.  Before rendering to affect shadowmaps immediately.
         Physics(); ModUpdate(); // After physics so mod/gamecode can modify velocities before next frame.
-        UpdateAmbientSounds(); UpdateMusic();
+        if (!World.gamePaused && !World.menuActive) {MixAmbs();}
+        UpdateMusic();
         drawCalls = uiDrawCalls = shadDrawCalls = vertsRendered = 0;
         RenderCameraViews(); CullCore(); UpdateInstanceMatrix4x4s();
         Render(false/*!camview*/,0u);
-        CheckAndTakeScreenshot();
+        if (ScrshotPressed() && World.current_time > World.screenshotTimeout) Screenshot();
         InputClearRisingAndFallingEdges();
         globalframe++; World.cpuTime = get_time() - World.current_time;           // Measure time over everything this frame before GPU swap buffers for diagnostic text.
         ((_GLFWwindow*)window)->context.swapBuffers(((_GLFWwindow*)window)); // Present frame (almost always waiting for GPU since GPU bound).
         CHECK_GL_ERROR(); // Lone catch for inadvertent issues.
-        #ifdef DEBUG_RAM_OUTPUT
         { static const u32 dbgFrm[] = {4,100,200,500,1000}; static const char* dbgLbl[] = {"frame 4","frame 100","frame 200","frame 500","frame 1000"}; for (int d=0;d<5;d++) if (globalframe == dbgFrm[d]) {DebugRAM(dbgLbl[d]); break;} }
-        #endif
     }
     return 0;
 }

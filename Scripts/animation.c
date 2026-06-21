@@ -63,7 +63,7 @@ MOD_TO_ENGINE void UpdateAnims(void) {
     if (animDT > 0.1) animDT = 0.1; if (animDT <= 0.0) return;
     
     bool portalsNeedUpdated = false;
-    for (u16 i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
+    for (u16 i = INSTS_1ST_IDX; i < INSTANCE_COUNT; ++i) {
         Entity* e = &World->instances[i];
         if (e->modelIndex >= MAX_MDLS || !(e->entflags & EF_ACTIVE) || e->animationNum >= MAX_ANIMS || e->numclips == 0 || e->clip >= e->numclips) continue;
         AnimationClip* clip = (AnimationClip*)&modelAnimationClips[e->animationNum][e->clip]; if (clip->framerate <= 0 || clip->speed <= 0) continue;
@@ -75,7 +75,7 @@ MOD_TO_ENGINE void UpdateAnims(void) {
             e->currentFrameFinished -= (double)framesToAdvance * timePerFrame;
             e->frame = (frameCount <= 1) ? clip->frameStart : clip->frameStart + ((e->frame - clip->frameStart + framesToAdvance) % frameCount);
             e->modelIndex = clip->frameStartModelIndex + (e->frame - clip->frameStart);
-            if (ConstIndexIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, modelAnimationClips[e->animationNum][ANIM_IDLE_CLOSED].frameStartModelIndex)) portalsNeedUpdated = true;
+            if (IdxIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, modelAnimationClips[e->animationNum][ANIM_IDLE_CLOSED].frameStartModelIndex)) portalsNeedUpdated = true;
         }
     }
     

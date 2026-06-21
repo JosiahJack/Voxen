@@ -58,9 +58,9 @@ gh() {
 }
 
 # Shaders and their C variable names
-gh ./Shaders/ssr.compute              ssrComputeSrc
-gh ./Shaders/voxels.compute           voxelUpdateComputeSrc
-gh ./Shaders/shadowmaps_clear.compute shadowmapsClearComputeSrc
+gh ./Shaders/ssr.compute              ssrCSSrc
+gh ./Shaders/voxels.compute           voxUpdCSSrc
+gh ./Shaders/shadowmaps_clear.compute shadClearCSSrc
 gh ./Shaders/depth_prepass_vert.glsl  depthPrepassVertSrc
 gh ./Shaders/depth_prepass.glsl       depthPrepassFragSrc
 gh ./Shaders/debugunlit_vert.glsl     debugUnlitVertSrc

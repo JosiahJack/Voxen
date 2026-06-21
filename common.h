@@ -67,7 +67,7 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define WORLD   0u // Much like Quake, the world is entity 0.  Aand also like Quake, world is nullent and is 0.
 #define PLAYER1 1u
 #define PLAYER2 2u
-#define START_INDEX_LEVEL_INSTANCES 3
+#define INSTS_1ST_IDX 3
 #define WORLDX 64
 #define WORLDZ WORLDX
 #define WORLDY 18 // Level 8 is only 17.5 cells tall!!  Could be 16 if I make the ceiling same height in last room as in original.
@@ -417,7 +417,7 @@ typedef __builtin_va_list va_list;
 typedef struct { char soundPath[128]; } ma_sound;
 typedef struct {
     u32 lastFrameSecCount,worstFPS,debugLineVertCount,shotsFired,grenadesThrown,savesScummed;
-    u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,loadedInstances; // Numbers of instances of entities and lights loaded (always for just the current level)
+    u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,instCount; // Numbers of instances of entities and lights loaded (always for just the current level)
     float farPlane[14],damageDealt,damageReceived,timeScale,worldMin_x[14],worldMin_z[14],voxelMinCenterX[14],voxelMinCenterZ[14];
 	double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,debugLineFinished,shakeFinished,last_time,last_topframe_time,last_physics_time,deltaTime,current_time,screenshotTimeout,pauseRelativeTime,absoluteTime,statusTextDecayFinished,justSavedTimeStamp;
     i32 fogFac,cursorPosition_x,cursorPosition_y; // Separate internal cursor from system cursor.  This gets relatively pushed around by real cursor movement to give consistent platform behavior.
@@ -460,7 +460,7 @@ INLINE float dot(float x1, float y1, float z1, float x2, float y2, float z2) { r
 INLINE float V3_dot(V3 a, V3 b) { return dot(a.x,a.y,a.z, b.x,b.y,b.z); }
 INLINE float quat_dot(Quaternion a, Quaternion b) { return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w; }
 INLINE float V3_Mag(const V3 v) { return vsqrtf(V3_dot(v,v)); }
-INLINE float V3_SqDist(V3 a, V3 b) { V3 d = V3_AsubB(a, b); return V3_dot(d,d); }
+INLINE float V3_SqDist(V3 a, V3 b) { V3 d = V3_AsubB(a,b); return V3_dot(d,d); }
 INLINE float V3_Dist(V3 a, V3 b) { return V3_Mag(V3_AsubB(a,b)); }
 INLINE V3 V3_Cross(V3 a, V3 b) { return (V3){a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x}; }
 INLINE V3 V3_Normalize(V3 v) { float len = V3_Mag(v); return len > 0.000001f ? (V3){v.x / len, v.y / len, v.z / len} : v; }
@@ -469,23 +469,23 @@ INLINE float squareDistance3D(float x1, float y1, float z1, float x2, float y2, 
 INLINE Quaternion quat_multiply(Quaternion q1, Quaternion q2) { return (Quaternion){(q1.w * q2.x + q1.x * q2.w + q1.y * q2.z - q1.z * q2.y),(q1.w * q2.y - q1.x * q2.z + q1.y * q2.w + q1.z * q2.x),(q1.w * q2.z + q1.x * q2.y - q1.y * q2.x + q1.z * q2.w),(q1.w * q2.w - q1.x * q2.x - q1.y * q2.y - q1.z * q2.z)}; } // Hamilton product, rotates q1 by q2
 INLINE V3 quat_rot_v3(Quaternion q, V3 v) { Quaternion r = quat_multiply((quat_multiply(q, (Quaternion){v.x,v.y,v.z,0.0f})),(Quaternion){-q.x,-q.y,-q.z,q.w}); return (V3){r.x,r.y,r.z}; } // Returns rotated input vector rotated by a quaternion.
 INLINE u8 hardware14fromConstdex(u16 c) { return clamp(c - 21,0,14); }
-INLINE bool ConstIndexIsPortalBlockingDoor(u16 entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }// All doors except see-through doors.
+INLINE bool IdxIsPortalBlockingDoor(u16 entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }// All doors except see-through doors.
 INLINE bool ConstIndexInBounds(int c) { return (c >= 0 && c <= 760); }
-INLINE bool ConstIndexIsGeometry(int c) { return (c >= 0 && c <= 306 && c != 112 && c != 279) || c == 760; }
-INLINE bool ConstIndexIsDoor(int c) { return (c >= 496 && c < 515); }
-INLINE bool ConstIndexIsLightStaticSaveable(int c) { return c == 748; }
-INLINE bool ConstIndexIsGenericTransform(int c) { return c == 749; }
-INLINE bool ConstIndexIsNPC(int c) { return (c >= 419 && c < 448); }
-INLINE bool ConstIndexIsCorpse(int c) { return (c >= 465 && c < 472); }
-INLINE bool ConstIndexIsHardware(int c) { return (c >= 328) && (c <= 339); }
-INLINE bool ConstIndexIsAmbient(int c) { return (c >= 621 && c <= 655); }
-INLINE bool ConstIndexIsButtonSwitch(int c) { return ((c >= 688 && c <= 692) || c == 694 || c == 695); }
-INLINE bool ConstIndexIsSearchable(int c) { return ((c >= 464 && c <= 476) || c == 530 || c == 531); }
-INLINE bool ConstIndexIsUsableObject(u16 c) { return ((c >= 307 && c <= 404) || c == 417); }
-INLINE bool ConstIndexIsAccessCard(u16 c) { return ((c >= 388 && c <= 398) || c == 417); }
-INLINE bool ConstIndexIsDynamicObject(u16 c) { return (c >= 307 && c <= 404) ||  c == 417 || (c >= 419 && c <= 428) || (c >= 430 && c <= 437) || (c >= 440 && c <= 442) || (c >= 458 && c <= 463) || (c >= 465 && c <= 476); }
-INLINE bool ConstIndexIsStaticObjectSaveable(int c) { return (c == 112 || c == 279 || (c >= 448 && c < 458) || c == 480 || c == 516 || (c >= 518 && c <= 526) || c == 530 || c == 531 || c == 546 || c == 555 || c == 594 || c == 596 || c == 598 || (c >= 600 && c < 603) || (c >= 604 && c < 616) || (c >= 688 && c < 693) || c == 694 || c == 695 || (c >= 699 && c < 704) || (c >= 741 && c < 746)); }
-INLINE bool ConstIndexIsStaticObjectImmutable(int c) { return ((c >= 527 && c < 530) || (c >= 532 && c < 546) || (c >= 547 && c < 553) || c == 554 || (c >= 556 && c < 594) || c == 595 || c == 597 || c == 599 || c == 601 || c == 603 || (c >= 616 && c < 688) || c == 693 || c == 696 || c == 697 || c == 698 || (c >= 704 && c < 717) || c == 720 || (c >= 733 && c < 736) || (c >= 737 && c < 739) || c == 746 || c == 747 || (c >= 750 && c <= 759 && c != 755)); }
+INLINE bool IdxIsGeometry(int c) { return (c >= 0 && c <= 306 && c != 112 && c != 279) || c == 760; }
+INLINE bool IdxIsDoor(int c) { return (c >= 496 && c < 515); }
+INLINE bool IdxIsLightStaticSaveable(int c) { return c == 748; }
+INLINE bool IdxIsGenericTransform(int c) { return c == 749; }
+INLINE bool IdxIsNPC(int c) { return (c >= 419 && c < 448); }
+INLINE bool IdxIsCorpse(int c) { return (c >= 465 && c < 472); }
+INLINE bool IdxIsHardware(int c) { return (c >= 328) && (c <= 339); }
+INLINE bool IdxIsAmbient(int c) { return (c >= 621 && c <= 655); }
+INLINE bool IdxIsButtonSwitch(int c) { return ((c >= 688 && c <= 692) || c == 694 || c == 695); }
+INLINE bool IdxIsSearchable(int c) { return ((c >= 464 && c <= 476) || c == 530 || c == 531); }
+INLINE bool IdxIsUsableObject(u16 c) { return ((c >= 307 && c <= 404) || c == 417); }
+INLINE bool IdxIsAccessCard(u16 c) { return ((c >= 388 && c <= 398) || c == 417); }
+INLINE bool IdxIsDynamicObject(u16 c) { return (c >= 307 && c <= 404) ||  c == 417 || (c >= 419 && c <= 428) || (c >= 430 && c <= 437) || (c >= 440 && c <= 442) || (c >= 458 && c <= 463) || (c >= 465 && c <= 476); }
+INLINE bool IdxIsStaticObjectSaveable(int c) { return (c == 112 || c == 279 || (c >= 448 && c < 458) || c == 480 || c == 516 || (c >= 518 && c <= 526) || c == 530 || c == 531 || c == 546 || c == 555 || c == 594 || c == 596 || c == 598 || (c >= 600 && c < 603) || (c >= 604 && c < 616) || (c >= 688 && c < 693) || c == 694 || c == 695 || (c >= 699 && c < 704) || (c >= 741 && c < 746)); }
+INLINE bool IdxIsStaticObjectImmutable(int c) { return ((c >= 527 && c < 530) || (c >= 532 && c < 546) || (c >= 547 && c < 553) || c == 554 || (c >= 556 && c < 594) || c == 595 || c == 597 || c == 599 || c == 601 || c == 603 || (c >= 616 && c < 688) || c == 693 || c == 696 || c == 697 || c == 698 || (c >= 704 && c < 717) || c == 720 || (c >= 733 && c < 736) || (c >= 737 && c < 739) || c == 746 || c == 747 || (c >= 750 && c <= 759 && c != 755)); }
 INLINE int CompareMemoryForNBytes(const void *s1, const void *s2, size_t n) { const u8 *p1 = (const u8 *)s1; const u8 *p2 = (const u8 *)s2; while (n--) { if (*p1 != *p2) {return *p1 - *p2;} p1++; p2++; } return 0; } // memcmp replacement
 INLINE void* MoveMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n) { u8 *d = (u8*)dst; const u8* s = (const u8*)src; if (d < s) { while (n--) { *d++ = *s++; } } else if (d > s) { d += n; s += n; while (n--) { *--d = *--s; } } return dst; } // memmove replacement
 INLINE void flag_setu16(u16 *flags, u16 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
