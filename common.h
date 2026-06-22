@@ -10,7 +10,7 @@ typedef __INT64_TYPE__ i64; typedef __UINT64_TYPE__ u64; typedef __SIZE_TYPE__ s
 #ifndef U16_MAX
     #define U16_MAX 65535
 #endif
-#define bool unsigned char
+#define bool u8
 #define true 1
 #define false 0
 typedef struct { float r,g,b; } Color3; typedef struct { float r,g,b,a; } Color;
@@ -445,9 +445,9 @@ INLINE float vacosf(float x) { float negate = (x < 0.0f) ? 1.0f : 0.0f; x = vabs
 INLINE float vtan(float x) { return vsinf(x) / vcosf(x); }
 INLINE float vcot(float x) { float x2 = x * x; float t = x + (x2 * x) * 0.33333333f; return 1.0f / t; }
 INLINE float deg2rad(float degrees) { return degrees * (PI / 180.0f); }
-INLINE float vlog2f(float x) { union { float f; unsigned int i; } v = { x }; int e = (int)((v.i >> 23) & 255) - 127; v.i = (v.i & 0x7FFFFF) | 0x3F800000;/*normalize mantissa to [1,2)*/ float m = v.f; float p = m - 1.0f; float log2m = p * (1.3465558f + p * (-0.33942322f + p * 0.028794660f)); /*polynomial approx of log2(m)*/ return (float)e + log2m; }
+INLINE float vlog2f(float x) { union { float f; u32 i; } v = { x }; int e = (int)((v.i >> 23) & 255) - 127; v.i = (v.i & 0x7FFFFF) | 0x3F800000;/*normalize mantissa to [1,2)*/ float m = v.f; float p = m - 1.0f; float log2m = p * (1.3465558f + p * (-0.33942322f + p * 0.028794660f)); /*polynomial approx of log2(m)*/ return (float)e + log2m; }
 INLINE float vlog(float x) { return vlog2f(x) * 0.69314718f; }
-INLINE float vexp2f(float x) { float ip = vfloor(x); float fp = x - ip; float p = 1.0f + fp * (0.69314718f + fp * (0.24022651f + fp * 0.05550411f)); /*poly approximation for 2^fp on [0,1]*/ int ei = (int)ip + 127; unsigned int bits = (unsigned int)(ei << 23); union { unsigned int i; float f; } u = { bits }; return u.f * p; }
+INLINE float vexp2f(float x) { float ip = vfloor(x); float fp = x - ip; float p = 1.0f + fp * (0.69314718f + fp * (0.24022651f + fp * 0.05550411f)); /*poly approximation for 2^fp on [0,1]*/ int ei = (int)ip + 127; u32 bits = (u32)(ei << 23); union { u32 i; float f; } u = { bits }; return u.f * p; }
 INLINE float vexp(float x) { return vexp2f(x * 1.4426950409f); } // 1/ln(2)
 INLINE float vpow(float a, float b) { return vexp(b * vlog(a)); }
 INLINE i32 clamp(i32 val, i32 min, i32 max) { return (val > max) ? max : ((val < min) ? min : val); }

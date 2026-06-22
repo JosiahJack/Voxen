@@ -22,7 +22,7 @@ ENGINE_TO_MOD void DualLogError(const char* fmt, ...); ENGINE_TO_MOD void DualLo
     #define WINAPI __stdcall
     #define INVALID_FHANDLE ((void*) (i64)-1)
     typedef void* FHandle; typedef i64 (WINAPI *PROC)(); typedef i64 (WINAPI *FARPROC)(); typedef i64 (WINAPI *NEARPROC)();
-    typedef struct { unsigned long Data1; unsigned short Data2,Data3; u8 Data4[8]; } GUID; typedef struct { int unused; } *HINSTANCE; typedef HINSTANCE HMODULE;  typedef struct { u32 nLength; void* lpSecurityDescriptor; i32 bInheritHandle; } *LPSECURITY_ATTRIBUTES;
+    typedef struct { unsigned long Data1; u16 Data2,Data3; u8 Data4[8]; } GUID; typedef struct { int unused; } *HINSTANCE; typedef HINSTANCE HMODULE;  typedef struct { u32 nLength; void* lpSecurityDescriptor; i32 bInheritHandle; } *LPSECURITY_ATTRIBUTES;
     typedef struct { i64 QuadPart; } LARGE_INTEGER; typedef LARGE_INTEGER *PLARGE_INTEGER; typedef struct { u64 Internal,InternalHigh; union {struct {u32 Offset,OffsetHigh;} DUMMYSTRUCTNAME; void* Pointer;} DUMMYUNIONNAME; void* hEvent; } OVERLAPPED, *LPOVERLAPPED;
     typedef struct { union { u32 dwOemId; struct { u16 wProcessorArchitecture,wReserved; } DUMMYSTRUCTNAME; } DUMMYUNIONNAME; u32 dwPageSize; void* lpMinimumApplicationAddress,*lpMaximumApplicationAddress; u64 dwActiveProcessorMask; u32 dwNumberOfProcessors,dwProcessorType,dwAllocationGranularity; u16 wProcessorLevel,wProcessorRevision; } SYSTEM_INFO, *LPSYSTEM_INFO;
     DECLSPEC_IMPORT void* WINAPI CreateFileMappingA(void*,LPSECURITY_ATTRIBUTES,u32,u32,u32,const char*); DECLSPEC_IMPORT i32 WINAPI VirtualFree(void*,u64,u32);                  DECLSPEC_IMPORT void* WINAPI VirtualAlloc(void*,u64,u32,u32 flProtect);
@@ -35,7 +35,7 @@ ENGINE_TO_MOD void DualLogError(const char* fmt, ...); ENGINE_TO_MOD void DualLo
     struct timespec { i64 tv_sec; i32 tv_nsec; }; struct sched_param { int sched_priority; }; typedef uintptr_t pthread_t; typedef intptr_t pthread_mutex_t,pthread_cond_t; typedef int pthread_condattr_t; typedef u32 pthread_mutexattr_t; typedef struct pthread_attr_t { unsigned p_state; void *stack; size_t s_size; struct sched_param param; } pthread_attr_t;
     int pthread_create(pthread_t*,const pthread_attr_t*,void*(*func)(void*),void*); int pthread_join(pthread_t,void**);
     int __cdecl _mkdir(const char* dirname);
-    INLINE __attribute__((noreturn)) void OS_Exit(i64 exitCode) { ExitProcess((unsigned int)exitCode); __builtin_unreachable(); }
+    INLINE __attribute__((noreturn)) void OS_Exit(i64 exitCode) { ExitProcess((u32)exitCode); __builtin_unreachable(); }
     INLINE void OS_Close(FHandle fd) { CloseHandle(fd); }
     INLINE void* OS_AllocateRAM(void* a,size_t l,i32 p,i32 f,FHandle fd) { (void)f; if (fd==(void*)-1) return VirtualAlloc(a,l,0x3000,(p&2)?4:2); void* m = CreateFileMappingW(fd,NULL,(p&2) ? 4 : 2,(u32)(l>>32),(u32)l,NULL); void* r=MapViewOfFileEx(m,(p&2)?2:4,0,0,l,a); return CloseHandle(m),r;}    
     #define OS_MakeFolder(path) _mkdir(path)
@@ -65,8 +65,7 @@ ENGINE_TO_MOD void DualLogError(const char* fmt, ...); ENGINE_TO_MOD void DualLo
     #define OS_DlSym(handle,name) dlsym((handle),(name))
     #define INVALID_FHANDLE -1
     struct input_id { u16 bustype,vendor,product,version;}; struct input_absinfo {i32 value,minimum,maximum,fuzz,flat,resolution;}; struct input_event { struct { long tv_sec,tv_usec; } time; u16 type,code; i32 value; };
-    typedef int FHandle;
-    struct timespec { i64 tv_sec,tv_nsec; }; typedef u64 pthread_t; typedef u32 pthread_mutexattr_t; typedef struct { u8 _[40]; } pthread_mutex_t; typedef struct { u8 _[48]; } pthread_cond_t; typedef int pthread_condattr_t; typedef struct { unsigned int flags; void* stack; } pthread_attr_t;
+    typedef int FHandle; struct timespec {i64 tv_sec,tv_nsec;}; typedef u64 pthread_t; typedef u32 pthread_mutexattr_t; typedef struct {u8 _[40];} pthread_mutex_t; typedef struct {u8 _[48];} pthread_cond_t; typedef int pthread_condattr_t; typedef struct {u32 flags; void* stack;} pthread_attr_t;
     int pthread_create(pthread_t* restrict,const pthread_attr_t* restrict,void*(*start_routine)(void*),void* restrict); int pthread_join(pthread_t,void**); void *dlopen(const char*,int); void *dlsym(void*,const char *);
     INLINE int OS_IOControl(int fd, unsigned long req, void* arg) { long r = 16; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(req),"d"(arg):"rcx","r11","memory"); return (int)r; }
     INLINE int OS_MakeFolder(const char* path) { long r = 83; __asm__ __volatile__("syscall":"+a"(r):"D"(path),"S"(0755LL):"rcx","r11","memory"); return (int)r; }
@@ -102,7 +101,7 @@ INLINE void* OS_Alloc(size_t amount) { return OS_AllocateRAM(NULL,amount,0x1|0x2
 INLINE void* OS_Calloc(size_t amount, size_t count) { return OS_AllocateRAM(NULL,amount * count,0x1|0x2,0x02|0x20,INVALID_FHANDLE); }
 INLINE void OS_Write(FHandle f,const void* buf, size_t s, const char* p) { size_t total=0; while(total < s) { i64 w=OS_RawWrite(f,(const char*)buf + total,s - total); if(w < 0) { DualLogError("Write error to %s: %s[%d]\n",p,w,(i32)-w); OS_Exit(1); } total += (size_t)w; } }
 INLINE void* OS_OpenAndAllocateFileBufferReadonly(const char* p,FHandle* f,int* s){void* r;return((*f=OS_OpenReadonly(p))==(FHandle)-1)?*s=0,(void*)0:((*s=OS_FileSize(*f))<=0)?DualLogError("Skipping empty:%s\n",p),OS_Close(*f),OS_Exit(1),NULL:(r=OS_AllocateFileBackedRAMReadonly(*s,*f,(char*)p))?(OS_Close(*f),r):NULL;}
-void* mcpy(void *dst, const void *src, size_t n) { unsigned char *d=(unsigned char *)dst; const unsigned char *s=(const unsigned char *)src; while (n--) {*d++=*s++;} return dst; } // memcpy replacement
+void* mcpy(void *dst, const void *src, size_t n) { u8 *d=(u8 *)dst; const u8 *s=(const u8 *)src; while (n--) {*d++=*s++;} return dst; } // memcpy replacement
 INLINE void* OS_Realloc(void* old, size_t olds, size_t news) { void* n; return !old ? OS_Alloc(news) : news <= olds ? old : (n=OS_Alloc(news)) ? (mcpy(n,old,olds),OS_Free(old,olds),n) : 0; }
 enum {GL_ARRAY_BUFFER=0x8892,GL_DEPTH_BUFFER_BIT=0x00000100,GL_READ_WRITE=0x88BA,GL_SSBO=0x90D2,GL_CULL_FACE=0x0B44,GL_BLEND=0x0BE2,GL_DEPTH_TEST=0x0B71,GL_RGB=0x1907,GL_TEXTURE0=0x84C0,GL_TEXTURE5=0x84C5,GL_COLOR_ATTACHMENT0=0x8CE0,GL_RG16F=0x822F,GL_TEXTURE1=0x84C1,GL_TEXTURE6=0x84C6,GL_COLOR_ATTACHMENT1=0x8CE1,GL_ELEMENT_ARRAY_BUFFER=0x8893,GL_RGB16F=0x881B,GL_TEXTURE2=0x84C2,
       GL_TEXTURE_2D=0x0DE1,GL_COLOR_ATTACHMENT2=0x8CE2,GL_FALSE=0,GL_RGBA=0x1908,GL_TEXTURE3=0x84C3,GL_UNSIGNED_BYTE=0x1401,GL_COLOR_ATTACHMENT3=0x8CE3,GL_FLOAT=0x1406,GL_RGBA32F=0x8814,GL_TEXTURE4=0x84C4,GL_FRAMEBUFFER=0x8D40,GL_COLOR_ATTACHMENT4=0x8CE4,GL_UNSIGNED_SHORT=0x1403,GL_RGBA8=0x8058,GL_COLOR_BUFFER_BIT=0x00004000,GL_STATIC_DRAW=0x88E4,GL_DYNAMIC_DRAW=0x88E8};
@@ -157,7 +156,7 @@ typedef struct { V3 position; Quaternion rotation; u8 fov; u16 width,height; flo
 static i32 PosGetCellCoordX(float x) { return (u16)clamp((i32)vfloor((x - World.worldMin_x[World.curLev] + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
 static i32 PosGetCellCoordZ(float z) { return (u16)clamp((i32)vfloor((z - World.worldMin_z[World.curLev] + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
 ENGINE_TO_MOD size_t slen(const char* s) { if (s == NULL) {return 0;} const char *p=s; while (*(p++)); return (size_t)(p - s - 1); } // strlen replacement
-char* data_parser_trim(char* s) { while(cEmpty((unsigned char)*s)){s++;} if (*s == 0){return s;} char* e=s + slen(s) - 1; while(e > s && cEmpty((unsigned char)*e)){e--;} e[1]=0; return s; }
+char* data_parser_trim(char* s) { while(cEmpty((u8)*s)){s++;} if (*s == 0){return s;} char* e=s + slen(s) - 1; while(e > s && cEmpty((u8)*e)){e--;} e[1]=0; return s; }
 i32 s2i32(const char *str) { // atoi replacement, needed separately from fast_atoi for user console input
     while (cEmpty(*str)) {str++;} int sign = 1; if (*str == '-') { sign = -1; str++; } else if (*str == '+') {str++;} if (*str < '0' || *str > '9') return 0;
     
@@ -169,7 +168,7 @@ i32 s2i32(const char *str) { // atoi replacement, needed separately from fast_at
 ENGINE_TO_MOD bool cEmpty(const char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r'; } // isspace replacement
 ENGINE_TO_MOD bool sEmpty(const char* a) { if (!a || *a == '\0') {return true;} for (size_t i=0;a[i]!='\0';++i) { if(!cEmpty(a[i])){return false;} } return true; } // C# String.IsNullOrWhiteSpace replacement
 ENGINE_TO_MOD bool sEqual(const char* a, const char* b) { size_t sz = slen(a); if(sz != slen(b)) {return false;} for(size_t i=0;i<sz;++i) { if(a[i] != b[i]){return false;} if(a[i] == '\0'){break;} } return true; } // !strcmp replacement (hated its inverted logic)
-int sCompUpToLen(const char* s1, const char* s2, size_t n) { const unsigned char *p1 = (const unsigned char*)s1, *p2 = (const unsigned char*)s2; while (n-- > 0) { if (*p1 != *p2) {return (*p1 < *p2) ? -1 : 1;}  if (*p1 == '\0') {break;} p1++; p2++; } return 0; } // !strncmp replacement (yes inverted for sanity)
+int sCompUpToLen(const char* s1, const char* s2, size_t n) { const u8 *p1 = (const u8*)s1, *p2 = (const u8*)s2; while (n-- > 0) { if (*p1 != *p2) {return (*p1 < *p2) ? -1 : 1;}  if (*p1 == '\0') {break;} p1++; p2++; } return 0; } // !strncmp replacement (yes inverted for sanity)
 ENGINE_TO_MOD void scpy_to_a_from_b(char* a, const char* b, size_t bufsz) { size_t szb=slen(b); if (szb>=bufsz) { DualLogError("scpy_to_a_from_b: B bigger than buffer\n"); OS_Exit(1); } for(size_t i=0;i<szb;++i){a[i]=b[i];} a[szb] = '\0'; } // strcpy replacement
 void sCpy2aSubFromb(char* a, size_t subsz, const char* b, size_t bufsz) { if (subsz >= bufsz) { DualLogError("sCpy2aSubFromb substring overflow!\n"); OS_Exit(1); } bool ended=0; for(size_t i= 0;i<subsz;++i){ if(!ended && b[i] == '\0'){ended=1;} if(ended){a[i]='\0';}else{a[i]=b[i];} } a[subsz]='\0'; } // strncpy replacement (hopefully my mnemonic "a_subfrom_b" will help)
 void sCat(char* a, const char* b, size_t bufsz) { size_t sza=slen(a), szb=slen(b); if (sza + szb >= bufsz) { DualLogError("sCat overflow\n"); } char* dest = a + sza; for(size_t i=0;i<szb;++i){dest[i]=b[i];} dest[szb]='\0'; } // strcat replacement
@@ -207,8 +206,8 @@ ENGINE_TO_MOD int sFormatV(char* buf, size_t bufsz, const char* f, va_list args)
         while (*f >= '0' && *f <= '9') { width = width * 10 + (*f - '0'); f++; }
         int decimals = 9; if (*f == '.') { f++; if (*f >= '1' && *f <= '9') { decimals = *f - '0'; } f++; }
         switch (*f) {
-            case 'x': { unsigned int val=__builtin_va_arg(args,unsigned int); char num[32]; int i=0; const char* hexChars="0123456789abcdef"; do {num[i++]=hexChars[val % 16]; val/=16;}while(val); while(i < width && pos < bufsz - 1){buf[pos++]=padChar; width--;} while(i-- > 0 && pos < bufsz - 1){buf[pos++] = num[i];} } break;
-            case 'u': { unsigned int val=__builtin_va_arg(args,unsigned int); char num[32]; int i=0; do{num[i++]='0' + (val % 10); val/=10; }while(val); while(i < width && pos < bufsz - 1){buf[pos++]=padChar; width--;} while(i-- > 0 && pos < bufsz - 1){buf[pos++]=num[i];} } break;
+            case 'x': { u32 val=__builtin_va_arg(args,u32); char num[32]; int i=0; const char* hexChars="0123456789abcdef"; do {num[i++]=hexChars[val % 16]; val/=16;}while(val); while(i < width && pos < bufsz - 1){buf[pos++]=padChar; width--;} while(i-- > 0 && pos < bufsz - 1){buf[pos++] = num[i];} } break;
+            case 'u': { u32 val=__builtin_va_arg(args,u32); char num[32]; int i=0; do{num[i++]='0' + (val % 10); val/=10; }while(val); while(i < width && pos < bufsz - 1){buf[pos++]=padChar; width--;} while(i-- > 0 && pos < bufsz - 1){buf[pos++]=num[i];} } break;
             case 'c': { char c=(char)__builtin_va_arg(args,int); if(pos < bufsz - 1){buf[pos++]=c;} } break;
             case 'd': { case 'i': { int val=__builtin_va_arg(args,int); if(val < 0){ if(pos < bufsz - 1){buf[pos++] = '-';} val=-val; } char num[32]; int i=0; do{num[i++]='0' + (val % 10); val/=10;}while(val); while(i < width && pos < bufsz - 1){buf[pos++] = padChar; width--;} while(i-- > 0 && pos < bufsz - 1){buf[pos++] = num[i];} } } break;
             case 's': { const char* s=__builtin_va_arg(args,const char*); size_t len = slen(s); if(pos + len >= bufsz){len = bufsz - pos - 1;}; for(size_t i=0;i<len;++i){buf[pos++] = s[i];} } break;
@@ -241,27 +240,24 @@ static void DualLogMain(const char *prefix, const char *fmt, va_list args) {
         FHandle out = color ? 2 : 1;
     #endif
     if (prefix) { OS_RawWrite(out,prefix,slen(prefix)); OS_RawWrite(out,"\033[0m ",5); } OS_RawWrite(out,buf,slen(buf));
-    if (console_log_file != INVALID_FHANDLE) {
-        if (prefix) { OS_Write(console_log_file, prefix, slen(prefix),"console.log"); OS_Write(console_log_file,"\033[0m ",5,"console.log"); }
-        OS_Write(console_log_file, buf, slen(buf),"console.log");
-    }
+    if (console_log_file != INVALID_FHANDLE) { if(prefix){OS_Write(console_log_file,prefix,slen(prefix),"console.log"); OS_Write(console_log_file,"\033[0m ",5,"console.log");} OS_Write(console_log_file, buf, slen(buf),"console.log"); }
 }
 // Misc Helpers
-ENGINE_TO_MOD void DualLog(const char* fmt, ...) { va_list args; __builtin_va_start(args,fmt); DualLogMain(NULL,fmt,args); __builtin_va_end(args); }
-ENGINE_TO_MOD void DualLogWarn(const char* fmt, ...) { va_list args; __builtin_va_start(args,fmt); DualLogMain("\033[1;38;5;208mWARN:",fmt,args); __builtin_va_end(args); }
-ENGINE_TO_MOD void DualLogError(const char* fmt, ...) { va_list args; __builtin_va_start(args,fmt); DualLogMain("\033[1;31mERROR:",fmt,args); __builtin_va_end(args); }
-void* mset(void *dst, int c, size_t n) { unsigned char *p=(unsigned char *)dst; unsigned char v=(unsigned char)c; while (n--) {*p++=v;} return dst; } // memset replacement
+ENGINE_TO_MOD void DualLog(const char* s, ...) { va_list a; __builtin_va_start(a,s); DualLogMain(NULL,s,a); __builtin_va_end(a); }
+ENGINE_TO_MOD void DualLogWarn(const char* s, ...) { va_list a; __builtin_va_start(a,s); DualLogMain("\033[1;38;5;208mWARN:",s,a); __builtin_va_end(a); }
+ENGINE_TO_MOD void DualLogError(const char* s, ...) { va_list a; __builtin_va_start(a,s); DualLogMain("\033[1;31mERROR:",s,a); __builtin_va_end(a); }
+void* mset(void *dst, int c, size_t n) { u8 *p=(u8 *)dst; u8 v=(u8)c; while (n--) {*p++=v;} return dst; } // memset replacement
 void BmpWrite(char const *filename, int x, int y, const void *data) {
     FHandle f = OS_OpenWriteonly(filename);
     if (f == INVALID_FHANDLE) { DualLogError("Failed to open %s for writing\n", filename); return; }
 
     u32 fileSize = 14 + 108 + (u32)x * y * 4; // BMP file header (14 bytes)
-    unsigned char fileHeader[14] = {'B','M',fileSize & 0xFF,(fileSize >> 8) & 0xFF,(fileSize >> 16) & 0xFF,(fileSize >> 24) & 0xFF,0,0,0,0,14 + 108,0,0,0};
-    unsigned char infoHeader[108]={0}; *(u32*)(infoHeader+0)=108;/*size*/
+    u8 fileHeader[14] = {'B','M',fileSize & 0xFF,(fileSize >> 8) & 0xFF,(fileSize >> 16) & 0xFF,(fileSize >> 24) & 0xFF,0,0,0,0,14 + 108,0,0,0};
+    u8 infoHeader[108]={0}; *(u32*)(infoHeader+0)=108;/*size*/
     *(u32*)(infoHeader+4)=(u32)x;/*w*/ *(u32*)(infoHeader+8)=(u32)-y;/*h*/ *(u16*)(infoHeader+12)=1;/*planes*/ *(u16*)(infoHeader+14)=32;/*bit count*/ *(u32*)(infoHeader+16)=3;/*bit fields*/
     *(u32*)(infoHeader+40)=0x000000FF;/*Red*/ *(u32*)(infoHeader + 44) = 0x0000FF00;/*Green*/ *(u32*)(infoHeader + 48) = 0x00FF0000;/*Blue*/ *(u32*)(infoHeader + 52) = 0x00000000;/*Alpha*/
     OS_Write(f,fileHeader,14,filename); OS_Write(f,infoHeader,108,filename);
-    const unsigned char *pixels = (const unsigned char *)data;
+    const u8 *pixels = (const u8 *)data;
     for (int j=y-1;j>=0;--j) OS_Write(f,(void*)(pixels + j*x*4),(size_t)x*4,filename);
     OS_Close(f);
 }
@@ -296,7 +292,7 @@ void DebugRAM(const char *context) { // Get USS aka the total RAM uniquely alloc
 ENGINE_TO_MOD void Screenshot() {    
     World.screenshotTimeout = World.current_time + 1.0; // Prevent saving more than 1 per second for sanity purposes.
     OS_MakeFolder("Screenshots"); u16 w = Sys_Settings.ScreenWidth, h = Sys_Settings.ScreenHeight;
-    unsigned char* pixels = OS_Alloc(w * h * 4 * sizeof(char));
+    u8* pixels = OS_Alloc(w * h * 4 * sizeof(char));
     glReadPixels(0,0,w,h,GL_RGBA,GL_UNSIGNED_BYTE,pixels);
     V3 p = World.instances[PLAYER1].position;
     char filename[96]; sFormat(filename,sizeof(filename),"Screenshots/%.2f_x%.1f_y%.1f_z%.1f.bmp",get_time(),p.x,p.y,p.z);
@@ -332,19 +328,19 @@ ENGINE_TO_MOD V3 GetLocalTransformedPos(Entity* originator, V3 offsetFromOrigina
 static inline int pntz(size_t p[2]) { return (p[0] != 1) ? __builtin_ctzll(p[0] - 1) : (p[1] ? 8 * sizeof(size_t) + __builtin_ctzll(p[1]) : 0); }
 static inline void shl(size_t p[2], int n) { if (n >= 8 * (int)sizeof(size_t)) { p[1] = p[0]; p[0] = 0; n -= 8 * sizeof(size_t); } if (n) { p[1] = (p[1] << n) | (p[0] >> (8 * sizeof(size_t) - n)); p[0] <<= n; } }
 static inline void shr(size_t p[2], int n) { if (n >= 8 * (int)sizeof(size_t)) { p[0] = p[1]; p[1] = 0; n -= 8 * sizeof(size_t); } if (n) { p[0] = (p[0] >> n) | (p[1] << (8 * sizeof(size_t) - n)); p[1] >>= n; } }
-static void scycle(size_t w, unsigned char* ar[], int n) { unsigned char tmp[256]; size_t l; if (n<2) {return;} ar[n]=tmp; while(w){ l=w<256?w:256; mcpy(ar[n],ar[0],l); for(int i=0;i<n;i++){mcpy(ar[i],ar[i+1],l);ar[i]+=l;} w-=l; } }
+static void scycle(size_t w, u8* ar[], int n) { u8 tmp[256]; size_t l; if (n<2) {return;} ar[n]=tmp; while(w){ l=w<256?w:256; mcpy(ar[n],ar[0],l); for(int i=0;i<n;i++){mcpy(ar[i],ar[i+1],l);ar[i]+=l;} w-=l; } }
 typedef int (*cmpfun)(const void*,const void*); typedef int (*cmpfun_r)(const void*,const void*,void*);
-static void sift(unsigned char* hd, size_t w, cmpfun_r cmp, void* arg, int ps, size_t lp[]) { unsigned char* ar[(16*sizeof(size_t))]; int i=1; ar[0]=hd; while (ps>1) { unsigned char* rt=hd-w, *lf=rt-lp[ps-2]; if(cmp(ar[0],lf,arg)>=0 && cmp(ar[0],rt,arg)>=0){break;} if(cmp(lf,rt,arg)>=0){ar[i++&((16*sizeof(size_t))-1)]=lf; hd=lf; ps--;}else{ar[i++&((16*sizeof(size_t))-1)]=rt; hd=rt; ps-=2;} } scycle(w,ar,i&((16*sizeof(size_t))-1)); }
-static void trinkle(unsigned char* hd, size_t w, cmpfun_r cmp, void* arg, size_t pp[2], int ps, int trusty, size_t lp[]) {
-    unsigned char* ar[(16*sizeof(size_t))]; int i=1; ar[0]=hd; size_t p[2]={pp[0],pp[1]};
-    while (p[0]!=1||p[1]!=0) { unsigned char* ss=hd-lp[ps]; if(cmp(ss,ar[0],arg)<=0){break;} if(!trusty&&ps>1){ unsigned char* rt=hd-w,*lf=rt-lp[ps-2]; if(cmp(rt,ss,arg)>=0||cmp(lf,ss,arg)>=0){break;} } ar[i++&((16*sizeof(size_t))-1)]=ss; hd=ss; int t=pntz(p); shr(p,t); ps+=t; trusty=0; }
+static void sift(u8* hd, size_t w, cmpfun_r cmp, void* arg, int ps, size_t lp[]) { u8* ar[(16*sizeof(size_t))]; int i=1; ar[0]=hd; while (ps>1) { u8* rt=hd-w, *lf=rt-lp[ps-2]; if(cmp(ar[0],lf,arg)>=0 && cmp(ar[0],rt,arg)>=0){break;} if(cmp(lf,rt,arg)>=0){ar[i++&((16*sizeof(size_t))-1)]=lf; hd=lf; ps--;}else{ar[i++&((16*sizeof(size_t))-1)]=rt; hd=rt; ps-=2;} } scycle(w,ar,i&((16*sizeof(size_t))-1)); }
+static void trinkle(u8* hd, size_t w, cmpfun_r cmp, void* arg, size_t pp[2], int ps, int trusty, size_t lp[]) {
+    u8* ar[(16*sizeof(size_t))]; int i=1; ar[0]=hd; size_t p[2]={pp[0],pp[1]};
+    while (p[0]!=1||p[1]!=0) { u8* ss=hd-lp[ps]; if(cmp(ss,ar[0],arg)<=0){break;} if(!trusty&&ps>1){ u8* rt=hd-w,*lf=rt-lp[ps-2]; if(cmp(rt,ss,arg)>=0||cmp(lf,ss,arg)>=0){break;} } ar[i++&((16*sizeof(size_t))-1)]=ss; hd=ss; int t=pntz(p); shr(p,t); ps+=t; trusty=0; }
     if (!trusty) { scycle(w,ar,i&((16*sizeof(size_t))-1)); sift(hd,w,cmp,arg,ps,lp); }
 }
 
 void qsort_new(void* base, size_t nel, size_t w, cmpfun cmp) {
     size_t lp[12*sizeof(size_t)], p[2]={1,0}, size=w*nel; int ps=1,trail; if (!size) return;
     
-    unsigned char* hd=base, *high=hd+size-w; for (size_t i=2;lp[0]=lp[1]=w,(lp[i]=lp[i-2]+lp[i-1]+w)<size;i++)/*empty body*/; cmpfun_r cmp_r=(cmpfun_r)(void*)cmp; void* arg=NULL;
+    u8* hd=base, *high=hd+size-w; for (size_t i=2;lp[0]=lp[1]=w,(lp[i]=lp[i-2]+lp[i-1]+w)<size;i++)/*empty body*/; cmpfun_r cmp_r=(cmpfun_r)(void*)cmp; void* arg=NULL;
     while (hd<high) {
         if ((p[0]&3)==3) { sift(hd,w,cmp_r,arg,ps,lp); shr(p,2); ps+=2; }
         else { if(lp[ps-1]>=((size_t)(high-hd))){trinkle(hd,w,cmp_r,arg,p,ps,0,lp);}else {sift(hd,w,cmp_r,arg,ps,lp);}    if(ps==1){shl(p,1); ps=0;}else{shl(p,ps-1); ps=1;} }
@@ -382,7 +378,7 @@ static i32 PngHuf(PngHuffman* z, const u8* sl, i32 num) {
     } return 1;
 }
 
-#define REFILL(z) if(z->num_bits<16){do{z->code_buffer|=(unsigned int)(*z->zbuffer++)<<z->num_bits;z->num_bits+=8;}while(z->num_bits<=24);}
+#define REFILL(z) if(z->num_bits<16){do{z->code_buffer|=(u32)(*z->zbuffer++)<<z->num_bits;z->num_bits+=8;}while(z->num_bits<=24);}
 static u32 PngZReceive(pngzbuf* z, int n) { REFILL(z); u32 k=z->code_buffer&((1u<<n)-1); z->code_buffer>>=n; z->num_bits-=n; return k; }
 static u32 PngHuffman_decode(pngzbuf* a, PngHuffman* z) { REFILL(a); int b=z->fast[a->code_buffer&511], s; if(b){ s=b>>9; a->code_buffer>>=s; a->num_bits-=s; return b&511; } int k=BitReverse(a->code_buffer,16); for(s=10; k>=z->maxcode[s]; ++s); b=(k>>(16-s))-z->firstcode[s]+z->firstsymbol[s]; a->code_buffer>>=s; a->num_bits-=s; return z->value[b]; }
 static int PngParseHuffmanBlock(pngzbuf* a) {
@@ -562,7 +558,7 @@ static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
     OS_Free(data, sz); return true;
 }
 
-typedef struct { int width,height; unsigned char* pixels; } GLFWimage;
+typedef struct { int width,height; u8* pixels; } GLFWimage;
 void VSetWindowIcon(GLFWimage*);
 static __attribute__((noinline)) void LoadTextures() {
     double start_time = get_time();
@@ -641,7 +637,7 @@ static __attribute__((noinline)) void LoadTextures() {
     int windowIconFileSize = OS_FileSize(fp);
     u8* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize,fp,World.global_winicon);    
     OS_Close(fp); PngArenaInit(&png_arena_main);
-    int w=1,h=1; unsigned char* pixels = PngLoad(file_buffer,windowIconFileSize,&w,&h,&png_arena_main);
+    int w=1,h=1; u8* pixels = PngLoad(file_buffer,windowIconFileSize,&w,&h,&png_arena_main);
     if (!pixels) { DualLogError("Failed to load icon: %s\n",World.global_winicon); OS_Exit(1); }
     
     GLFWimage image = (GLFWimage){w,h,pixels}; VSetWindowIcon(&image);
@@ -942,7 +938,7 @@ bool GridCellBlock(u16 i,V3 pos,V3 newPos) {
     return false;
 }
 
-static unsigned char* LoadCullPNG(const char* name, int level) {
+static u8* LoadCullPNG(const char* name, int level) {
     char path[256]; sFormat(path, sizeof(path),"./Data/%s_%d.png",name,level);
     FHandle fp = OS_OpenReadonly(path);
     OS_Seek(fp,0,2); size_t size = OS_Tell(fp);
@@ -952,7 +948,7 @@ static unsigned char* LoadCullPNG(const char* name, int level) {
     OS_Seek(fp,0,0); size_t read_size = OS_Read(fp,cullingFileBuffer,size); OS_Close(fp);
     if (read_size != size) { DualLogError("Failed to read %s\n",path); OS_Exit(1); }
     
-    int w, h; unsigned char* pixels = PngLoad(cullingFileBuffer,size,&w,&h,&png_arena_main);
+    int w, h; u8* pixels = PngLoad(cullingFileBuffer,size,&w,&h,&png_arena_main);
     if (!pixels) { DualLogError("STB failed: %s\n",path); OS_Exit(1); }
     OS_Free(cullingFileBuffer,MAX_CULL_FILESIZE * sizeof(u8));
     return pixels;
@@ -961,26 +957,26 @@ static unsigned char* LoadCullPNG(const char* name, int level) {
 #define PIXEL_IDX(x, z) ((x) + ((WORLDZ - 1 - (z)) * WORLDX)) * 4 // 4 channels, flip z to have desired bottom-left origin 0,0 vs png's top-left
 void DetermineClosedEdges() {
     PngArenaInit(&png_arena_main); u16 totalOpenCells = 0;
-    unsigned char* openPixels = LoadCullPNG("worldcellopen",World.curLev);
+    u8* openPixels = LoadCullPNG("worldcellopen",World.curLev);
     for (i32 x=0;x<WORLDX;++x) {
         for (i32 z=0;z<WORLDZ;++z) {
             i32 cellIdx = (z * WORLDX) + x;
             gridCellStates[cellIdx] &= ~CELL_OPEN;
             i32 pixelIdx = PIXEL_IDX(x,z);
-            unsigned char or = openPixels[pixelIdx + 0], og = openPixels[pixelIdx + 1], ob = openPixels[pixelIdx + 2];
+            u8 or = openPixels[pixelIdx + 0], og = openPixels[pixelIdx + 1], ob = openPixels[pixelIdx + 2];
             if (or > 0 || og > 0 || ob > 0) { gridCellStates[cellIdx] |= CELL_OPEN; totalOpenCells++; }
             else gridCellStates[cellIdx] |= CELL_CLOSEDNORTH|CELL_CLOSEDEAST|CELL_CLOSEDSOUTH|CELL_CLOSEDWEST; // Also force close the edges for closed cells even if above edges image said tweren't closed edges.
         }
     }
 
     gridCellStates[0] |= CELL_OPEN; // Force the fallback error cell to be open (forced visible later, open is static, visible is transient)
-    unsigned char* edgePixels = LoadCullPNG("worldedgesclosed",World.curLev);
+    u8* edgePixels = LoadCullPNG("worldedgesclosed",World.curLev);
     for (i32 x=0;x<WORLDX;x++) {
         for (i32 z=0;z<WORLDZ;z++) {
             i32 cellIdx = (z * WORLDX) + x;
             gridCellStates[cellIdx] &= ~(CELL_CLOSEDNORTH|CELL_CLOSEDEAST|CELL_CLOSEDSOUTH|CELL_CLOSEDWEST); // Mark all edges not closed
             i32 pixelIdx = PIXEL_IDX(x,z);
-            unsigned char cr = edgePixels[pixelIdx + 0], cg = edgePixels[pixelIdx + 1], cb = edgePixels[pixelIdx + 2], ca = edgePixels[pixelIdx + 3];
+            u8 cr = edgePixels[pixelIdx + 0], cg = edgePixels[pixelIdx + 1], cb = edgePixels[pixelIdx + 2], ca = edgePixels[pixelIdx + 3];
             if (cr > 127) gridCellStates[cellIdx] |= CELL_CLOSEDNORTH;
             if (cg > 127) gridCellStates[cellIdx] |= CELL_CLOSEDEAST;
             if (cb > 127) gridCellStates[cellIdx] |= CELL_CLOSEDSOUTH;
@@ -989,11 +985,11 @@ void DetermineClosedEdges() {
         }
     }
         
-    unsigned char* skyPixels = LoadCullPNG("worldcellskyvis",World.curLev);
+    u8* skyPixels = LoadCullPNG("worldcellskyvis",World.curLev);
     for (i32 x=0;x<WORLDX;++x) {
         for (i32 z=0;z<WORLDZ;++z) {
             i32 cellIdx = (z * WORLDX) + x; i32 pixelIdx = PIXEL_IDX(x,z);
-            unsigned char sr = skyPixels[pixelIdx + 0], sg = skyPixels[pixelIdx + 1], sb = skyPixels[pixelIdx + 2];
+            u8 sr = skyPixels[pixelIdx + 0], sg = skyPixels[pixelIdx + 1], sb = skyPixels[pixelIdx + 2];
             if (sr > 127 && sg < 127 && sb < 127) gridCellStates[cellIdx] &= ~(CELL_SEES_SUN|CELL_SEES_SKYBOX); // All red cells marked as -1, no sky or sun.
             else if (sr <= 127 && sg <= 127 && sb > 127) gridCellStates[cellIdx] |= CELL_SEES_SUN|CELL_SEES_SKYBOX; // All blue cells marked as sky visible.  Sun + Sky.
             else { gridCellStates[cellIdx] &= ~CELL_SEES_SKYBOX; gridCellStates[cellIdx] |= CELL_SEES_SUN; } // All white and black cells marked as 0.  Only sees Sun.
@@ -1356,7 +1352,7 @@ static u32 ttULONG (u8*p){return((u32)p[0]<<24)|((u32)p[1]<<16)|((u32)p[2]<<8)|p
 static i32 ttLONG  (u8*p){return((i32)p[0]<<24)|((i32)p[1]<<16)|((i32)p[2]<<8)|p[3];}
 #define stbtt_tag4(p,a,b,c,d) ((p)[0]==(a)&&(p)[1]==(b)&&(p)[2]==(c)&&(p)[3]==(d))
 #define stbtt_tag(p,s) stbtt_tag4(p,s[0],s[1],s[2],s[3])
-typedef struct { unsigned char*data; int cursor,size; } stbtt__buf;
+typedef struct { u8*data; int cursor,size; } stbtt__buf;
 static stbtt__buf stbtt__new_buf(const void*p,size_t s){stbtt__buf r;r.data=(u8*)p;r.size=(int)s;r.cursor=0;return r;}
 static u8  _bg8(stbtt__buf*b){return b->cursor>=b->size?0:b->data[b->cursor++];}
 static u8  _bp8(stbtt__buf*b){return b->cursor>=b->size?0:b->data[b->cursor];}
@@ -1381,11 +1377,11 @@ static stbtt__buf _dict_get(stbtt__buf*b, int key) {
 static void _dict_ints(stbtt__buf*b,int key,int n,u32*out) { stbtt__buf op = _dict_get(b,key); for (int i=0;i<n && op.cursor<op.size;++i) {out[i] = (u32)_cff_int(&op);} }
 static stbtt__buf _cff_idx_get(stbtt__buf b,int i){_bsk(&b,0);int n=_bg(&b,2),os=_bg8(&b);_bskip(&b,i*os);int s=_bg(&b,os),e=_bg(&b,os);return _brange(&b,2+(n+1)*os+s,e-s);}
 enum{STBTT_vmove=1,STBTT_vline,STBTT_vcurve,STBTT_vcubic};
-typedef struct{i16 x,y,cx,cy,cx1,cy1;unsigned char type,padding;}stbtt_vertex;
-typedef struct{void*userdata;unsigned char*data;int fontstart,numGlyphs,loca,head,glyf,hhea,hmtx,index_map,indexToLocFormat;stbtt__buf cff,charstrings,gsubrs,subrs,fontdicts,fdselect;}stbtt_fontinfo;
+typedef struct{i16 x,y,cx,cy,cx1,cy1;u8 type,padding;}stbtt_vertex;
+typedef struct{void*userdata;u8*data;int fontstart,numGlyphs,loca,head,glyf,hhea,hmtx,index_map,indexToLocFormat;stbtt__buf cff,charstrings,gsubrs,subrs,fontdicts,fdselect;}stbtt_fontinfo;
 static u32 _find_table(u8*d,u32 fs,const char*tag){i32 n=ttUSHORT(d+fs+4);u32 td=fs+12;for(i32 i=0;i<n;++i){u32 l=td+16*i;if(stbtt_tag(d+l+0,tag))return ttULONG(d+l+8);}return 0;}
 static stbtt__buf _get_subrs(stbtt__buf cff,stbtt__buf fd){u32 so=0,pl[2]={0,0};_dict_ints(&fd,18,2,pl);if(!pl[1]||!pl[0])return stbtt__new_buf(NULL,0);stbtt__buf pd=_brange(&cff,pl[1],pl[0]);_dict_ints(&pd,19,1,&so);if(!so)return stbtt__new_buf(NULL,0);_bsk(&cff,pl[1]+so);return _cff_idx(&cff);}
-static int stbtt_InitFont_internal(stbtt_fontinfo* info, unsigned char* data, int fs) {
+static int stbtt_InitFont_internal(stbtt_fontinfo* info, u8* data, int fs) {
     u32 cmap,t,i,nt;info->data=data;info->fontstart=fs;info->cff=stbtt__new_buf(NULL,0);
     cmap=_find_table(data,fs,"cmap"); info->loca=_find_table(data,fs,"loca"); info->head=_find_table(data,fs,"head");
     info->glyf=_find_table(data,fs,"glyf"); info->hhea=_find_table(data,fs,"hhea"); info->hmtx=_find_table(data,fs,"hmtx");
@@ -1411,13 +1407,13 @@ static int stbtt_InitFont_internal(stbtt_fontinfo* info, unsigned char* data, in
     info->indexToLocFormat=ttUSHORT(data+info->head+50);return 1;
 }
 
-static int _font_offset(unsigned char*d,int idx){
+static int _font_offset(u8*d,int idx){
     if(stbtt_tag4(d,'1',0,0,0)||stbtt_tag(d,"typ1")||stbtt_tag(d,"OTTO")||stbtt_tag4(d,0,1,0,0)||stbtt_tag(d,"true"))return idx==0?0:-1;
     if(stbtt_tag(d,"ttcf")&&(ttULONG(d+4)==0x00010000||ttULONG(d+4)==0x00020000)){i32 n=ttLONG(d+8);if(idx>=n)return -1;return ttULONG(d+12+idx*4);}
     return -1;
 }
 
-static __attribute__((pure)) int stbtt_GetFontOffsetForIndex(const unsigned char*d,int i){return _font_offset((unsigned char*)d,i);}
+static __attribute__((pure)) int stbtt_GetFontOffsetForIndex(const u8*d,int i){return _font_offset((u8*)d,i);}
 static __attribute__((pure)) int stbtt_FindGlyphIndex(const stbtt_fontinfo*info,int cp){
     u8*d=info->data;u32 im=info->index_map;u16 fmt=ttUSHORT(d+im);
     if(fmt==0) { i32 b=ttUSHORT(d+im+2); return cp<b-6 ? (*(u8*)(d+im+6+cp)) : 0; }
@@ -1571,7 +1567,7 @@ static void GetGlyphBitmapBoxSubpixel(const stbtt_fontinfo*font,int g,float sx,f
     else{if(ix0)*ix0=(int)vfloor(x0*sx+shx);if(iy0)*iy0=(int)vfloor(-y1*sy+shy);if(ix1)*ix1=(int)vceil(x1*sx+shx);if(iy1)*iy1=(int)vceil(-y0*sy+shy);}
 }
 
-typedef struct{int w,h,stride;unsigned char*pixels;}stbtt__bitmap;
+typedef struct{int w,h,stride;u8*pixels;}stbtt__bitmap;
 typedef struct tt_heapchk{ struct tt_heapchk* next; }tt_heapchk;
 typedef struct{ tt_heapchk* head; void* first_free; int remaining; }stbtt__hheap;
 static void* _hha(stbtt__hheap* hh,size_t sz) { if(hh->first_free){void*p=hh->first_free;hh->first_free=*(void**)p;return p;} if(!hh->remaining) {int c=sz<32?2000:sz<128?800:100;tt_heapchk*ck=(tt_heapchk*)TempAlloc(sizeof(*ck)+sz*c); if(!ck){return NULL;} ck->next=hh->head; hh->head=ck; hh->remaining=c;} --hh->remaining; return(char*)hh->head+sizeof(tt_heapchk)+sz*hh->remaining; }
@@ -1631,7 +1627,7 @@ static void _rse(stbtt__bitmap*res,stbtt__edge*e,int n,int ox,int oy){
             }++e;
         }
         if(active)_fae(sl,sl2+1,res->w,active,syt);
-        {float sum=0;for(i=0;i<res->w;++i){float k;int m;sum+=sl2[i];k=(float)vabs(sl[i]+sum)*255.0f+0.5f;m=(int)k;if(m>255)m=255;res->pixels[j*res->stride+i]=(unsigned char)m;}}
+        {float sum=0;for(i=0;i<res->w;++i){float k;int m;sum+=sl2[i];k=(float)vabs(sl[i]+sum)*255.0f+0.5f;m=(int)k;if(m>255)m=255;res->pixels[j*res->stride+i]=(u8)m;}}
         step=&active;while(*step){stbtt__active_edge*z=*step;z->fx+=z->fdx;step=&(*step)->next;}++y;++j;}
     tt_heapchk* c = hh.head; while(c){ tt_heapchk* hp = c->next; TempFree(c); c = hp;} if(sl != sd) TempFree(sl);
 }
@@ -1675,7 +1671,7 @@ static void _rasterize(stbtt__bitmap*res,V2*pts,int*wc,int nw,float sx,float sy,
     _esort(e,n);_rse(res,e,n,ox,oy);TempFree(e);
 }
 
-void stbtt_MakeGlyphBitmapSubpixel(const stbtt_fontinfo*info,unsigned char*out,int ow,int oh,int ostr,float sx,float sy,float shx,float shy,int g){
+void stbtt_MakeGlyphBitmapSubpixel(const stbtt_fontinfo*info,u8*out,int ow,int oh,int ostr,float sx,float sy,float shx,float shy,int g){
     stbtt_vertex*v;int ix0,iy0,nv=stbtt_GetGlyphShape(info,g,&v);stbtt__bitmap gbm;
     GetGlyphBitmapBoxSubpixel(info,g,sx,sy,shx,shy,&ix0,&iy0,0,0);gbm.pixels=out;gbm.w=ow;gbm.h=oh;gbm.stride=ostr;
     float scale=sx>sy?sy:sx;int wc=0;int*wl=NULL;V2*win=_flatten(v,nv,0.35f/scale,&wl,&wc);
@@ -1683,15 +1679,15 @@ void stbtt_MakeGlyphBitmapSubpixel(const stbtt_fontinfo*info,unsigned char*out,i
 }
 
 typedef int stbrp_coord; typedef struct{int width,height,x,y,bottom_y;}stbrp_context;
-typedef struct{unsigned char x;}stbrp_node; typedef struct{stbrp_coord x,y;int id,w,h,was_packed;}stbrp_rect;
+typedef struct{u8 x;}stbrp_node; typedef struct{stbrp_coord x,y;int id,w,h,was_packed;}stbrp_rect;
 static void stbrp_pack_rects(stbrp_context*con,stbrp_rect*rects,int n){
     int i;for(i=0;i<n;++i){if(con->x+rects[i].w>con->width){con->x=0;con->y=con->bottom_y;}if(con->y+rects[i].h>con->height)break;rects[i].x=con->x;rects[i].y=con->y;rects[i].was_packed=1;con->x+=rects[i].w;if(con->y+rects[i].h>con->bottom_y)con->bottom_y=con->y+rects[i].h;}for(;i<n;++i)rects[i].was_packed=0;
 }
 
-typedef struct{unsigned short x0,y0,x1,y1;float xoff,yoff,xadvance,xoff2,yoff2;}stbtt_packedchar;
+typedef struct{u16 x0,y0,x1,y1;float xoff,yoff,xadvance,xoff2,yoff2;}stbtt_packedchar;
 typedef struct{float x0,y0,s0,t0,x1,y1,s1,t1;} aligned_quad;
-typedef struct{void*uac;void*pack_info;int width,height,stride_in_bytes,padding,skip_missing;unsigned int h_oversample,v_oversample;unsigned char*pixels;}stbtt_pack_context;
-typedef struct{float font_size;int first_unicode_codepoint_in_range;int*array_of_unicode_codepoints;int num_chars;stbtt_packedchar*chardata_for_range;unsigned char h_oversample,v_oversample;}FPackRange;
+typedef struct{void*uac;void*pack_info;int width,height,stride_in_bytes,padding,skip_missing;u32 h_oversample,v_oversample;u8*pixels;}stbtt_pack_context;
+typedef struct{float font_size;int first_unicode_codepoint_in_range;int*array_of_unicode_codepoints;int num_chars;stbtt_packedchar*chardata_for_range;u8 h_oversample,v_oversample;}FPackRange;
 static void stbtt_GetPackedQuad(const stbtt_packedchar*cd, int pw, int ph, int ci, float*xpos, float*ypos, aligned_quad*q, int ai){
     float ipw=1.0f/pw,iph=1.0f/ph;const stbtt_packedchar*b=cd+ci;
     if(ai){float x=vfloor((*xpos+b->xoff)+0.5f),y=vfloor((*ypos+b->yoff)+0.5f);q->x0=x;q->y0=y;q->x1=x+b->xoff2-b->xoff;q->y1=y+b->yoff2-b->yoff;}
@@ -1699,26 +1695,26 @@ static void stbtt_GetPackedQuad(const stbtt_packedchar*cd, int pw, int ph, int c
     q->s0=b->x0*ipw;q->t0=b->y0*iph;q->s1=b->x1*ipw;q->t1=b->y1*iph;*xpos+=b->xadvance;
 }
 
-int stbtt_PackBegin(stbtt_pack_context*spc,unsigned char* px, int pw, int ph, int str, int pad, void* a){
+int stbtt_PackBegin(stbtt_pack_context*spc,u8* px, int pw, int ph, int str, int pad, void* a){
     stbrp_context*ctx=(stbrp_context*)TempAlloc(sizeof(*ctx)); *ctx=(stbrp_context){pw-pad,ph-pad,0,0,0}; if(px) mset(px,0,(size_t)(pw*ph));
     return *spc=(stbtt_pack_context){a,ctx,pw,ph,str ? str : pw,pad,0,1,1,px},1;
 }
 
 #define STBTT_MAX_OVERSAMPLE 8
 #define OVER_MASK (STBTT_MAX_OVERSAMPLE-1)
-static void _hpre(unsigned char*p,int w,int h,int str,unsigned int kw){for(int j=0;j<h;++j,p+=str){unsigned char buf[STBTT_MAX_OVERSAMPLE]={0};int tot=0;for(int i=0;i<w;++i){if(i<=w-(int)kw){tot+=p[i]-buf[i&OVER_MASK];buf[(i+kw)&OVER_MASK]=p[i];}else tot-=buf[i&OVER_MASK];p[i]=(unsigned char)(tot/kw);}}}
-static void _vpre(unsigned char*p,int w,int h,int str,unsigned int kw){for(int j=0;j<w;++j,++p){unsigned char buf[STBTT_MAX_OVERSAMPLE]={0};int tot=0;for(int i=0;i<h;++i){if(i<=h-(int)kw){tot+=p[i*str]-buf[i&OVER_MASK];buf[(i+kw)&OVER_MASK]=p[i*str];}else tot-=buf[i&OVER_MASK];p[i*str]=(unsigned char)(tot/kw);}}}
+static void _hpre(u8*p,int w,int h,int str,u32 kw){for(int j=0;j<h;++j,p+=str){u8 buf[STBTT_MAX_OVERSAMPLE]={0};int tot=0;for(int i=0;i<w;++i){if(i<=w-(int)kw){tot+=p[i]-buf[i&OVER_MASK];buf[(i+kw)&OVER_MASK]=p[i];}else tot-=buf[i&OVER_MASK];p[i]=(u8)(tot/kw);}}}
+static void _vpre(u8*p,int w,int h,int str,u32 kw){for(int j=0;j<w;++j,++p){u8 buf[STBTT_MAX_OVERSAMPLE]={0};int tot=0;for(int i=0;i<h;++i){if(i<=h-(int)kw){tot+=p[i*str]-buf[i&OVER_MASK];buf[(i+kw)&OVER_MASK]=p[i*str];}else tot-=buf[i&OVER_MASK];p[i*str]=(u8)(tot/kw);}}}
 static float _oshift(int os){return os?-(float)(os-1)/(2.0f*(float)os):0.0f;}
-static int stbtt_PackFontRanges(stbtt_pack_context*spc,const unsigned char*fontdata,int fi,FPackRange*ranges,int nr){
+static int stbtt_PackFontRanges(stbtt_pack_context*spc,const u8*fontdata,int fi,FPackRange*ranges,int nr){
     stbtt_fontinfo info;int n=0;stbrp_rect*rects;
     for (int i=0;i<nr;++i) { for(int j=0;j<ranges[i].num_chars;++j) ranges[i].chardata_for_range[j].x0 = ranges[i].chardata_for_range[j].y0 = ranges[i].chardata_for_range[j].x1 = ranges[i].chardata_for_range[j].y1 = 0; }
     for (int i=0;i<nr;++i) n+=ranges[i].num_chars;
     rects=(stbrp_rect*)TempAlloc(sizeof(*rects)*(size_t)n);if(!rects)return 0;
     info.userdata = spc->uac;
-    stbtt_InitFont_internal(&info,(unsigned char*)fontdata,stbtt_GetFontOffsetForIndex(fontdata,fi));
+    stbtt_InitFont_internal(&info,(u8*)fontdata,stbtt_GetFontOffsetForIndex(fontdata,fi));
     int mga=0,k=0;
     for (int i=0;i<nr;++i) {
-        float fh=ranges[i].font_size,sc=fh>0 ? stbtt_ScaleForPixelHeight(&info,fh) : stbtt_ScaleForMappingEmToPixels(&info,-fh); ranges[i].h_oversample = (unsigned char)spc->h_oversample; ranges[i].v_oversample=(unsigned char)spc->v_oversample;
+        float fh=ranges[i].font_size,sc=fh>0 ? stbtt_ScaleForPixelHeight(&info,fh) : stbtt_ScaleForMappingEmToPixels(&info,-fh); ranges[i].h_oversample = (u8)spc->h_oversample; ranges[i].v_oversample=(u8)spc->v_oversample;
         for (int j=0;j<ranges[i].num_chars;++j){
             int x0,y0,x1,y1,cp=ranges[i].array_of_unicode_codepoints ? ranges[i].array_of_unicode_codepoints[j] : ranges[i].first_unicode_codepoint_in_range+j, g=stbtt_FindGlyphIndex(&info,cp);
             if (g == 0 && (spc->skip_missing || mga)) { rects[k].w=rects[k].h=0;
@@ -1749,7 +1745,7 @@ static int stbtt_PackFontRanges(stbtt_pack_context*spc,const unsigned char*fontd
                 int adv,lsb; stbtt_GetGlyphHMetrics(&info,g,&adv,&lsb);
                 int x0,y0,x1,y1;
                 GetGlyphBitmapBoxSubpixel(&info,g,sc * spc->h_oversample,sc * spc->v_oversample,0,0,&x0,&y0,&x1,&y1);
-                unsigned char* p_pixels = spc->pixels + r->x + r->y * spc->stride_in_bytes;
+                u8* p_pixels = spc->pixels + r->x + r->y * spc->stride_in_bytes;
                 stbtt_MakeGlyphBitmapSubpixel(&info,p_pixels,r->w - spc->h_oversample + 1,r->h - spc->v_oversample + 1,spc->stride_in_bytes,sc * spc->h_oversample,sc * spc->v_oversample,0,0,g);
                 if (spc->h_oversample > 1) _hpre(p_pixels,r->w,r->h,spc->stride_in_bytes,spc->h_oversample);
                 if (spc->v_oversample > 1) _vpre(p_pixels,r->w,r->h,spc->stride_in_bytes,spc->v_oversample);
@@ -1776,8 +1772,8 @@ u32 fontAtlasTex,fontAtlasTexStopD;
 stbtt_packedchar fontPackedChar[MAX_GLYPHS],fontPackedCharStopD[MAX_GLYPHS];
 float fixedNumberAdvanceWidth=0.0f,fixedNumberAdvanceWidthStopD=0.0f;
 static const char* fallbackFontPaths[]={"./Fonts/FreeSerifBold.ttf","./Fonts/cambriab.ttf","./Fonts/NotoSansCJK-Bold.ttc"}, *fontPaths[]={"./Fonts/SystemShockText.ttf","./Fonts/StopD.ttf"};
-static stbtt_fontinfo fontInfo[5]; static unsigned char *fontData[5]; static char uiTextBuffer[T_BUFFER_SIZE];
-typedef struct{char*path;unsigned char*data;size_t size;stbtt_fontinfo info;}LoadedFont;
+static stbtt_fontinfo fontInfo[5]; static u8 *fontData[5]; static char uiTextBuffer[T_BUFFER_SIZE];
+typedef struct{char*path;u8*data;size_t size;stbtt_fontinfo info;}LoadedFont;
 LoadedFont fallbackFonts[3];
 typedef struct{i32 first,count,startIndex;}GlyphRange;
 GlyphRange fontRanges[]     ={{0x0020,0x7E - 0x20 + 1,0},{0x00A0,0xFF - 0xA0 + 1,95},{0x0400,0x04FF - 0x0400 + 1,95+96},{0x3040,0x30FF - 0x3040 + 1,95+96+256}};
@@ -1802,7 +1798,7 @@ static int GetGlyphAndFont(u32 cp,stbtt_fontinfo**outFont,u8 fontID){
     return 0;
 }
 
-static void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, unsigned char* bmp);
+static void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, u8* bmp);
 static void InitFontAtlasses(){
     DebugRAM("start font load");
     double t0=get_time();DualLog("Loading    5 fonts...");
@@ -1815,10 +1811,10 @@ static void InitFontAtlasses(){
     fallbackFonts[0]=LoadFallbackFont(fallbackFontPaths[0],2,0);
     fallbackFonts[1]=LoadFallbackFont(fallbackFontPaths[1],3,0);
     fallbackFonts[2]=LoadFallbackFont(fallbackFontPaths[2],4,2);
-    unsigned char*bmp=OS_Alloc(FONT_ATLAS_SIZE*FONT_ATLAS_SIZE); // Primary atlas
+    u8*bmp=OS_Alloc(FONT_ATLAS_SIZE*FONT_ATLAS_SIZE); // Primary atlas
     stbtt_pack_context pc;stbtt_PackBegin(&pc,bmp,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0,16,NULL);pc.h_oversample=3;pc.v_oversample=3;pc.skip_missing=1;numPackedGlyphs=0;
     for(int r=0;r<numFontRanges;++r){fontRanges[r].startIndex=numPackedGlyphs;
-        for(int i=0;i<fontRanges[r].count;++i){if(numPackedGlyphs>=MAX_GLYPHS)break;u32 cp=fontRanges[r].first+i;stbtt_fontinfo*font=&fontInfo[0];unsigned char*data=fontData[0];
+        for(int i=0;i<fontRanges[r].count;++i){if(numPackedGlyphs>=MAX_GLYPHS)break;u32 cp=fontRanges[r].first+i;stbtt_fontinfo*font=&fontInfo[0];u8*data=fontData[0];
             int g=stbtt_FindGlyphIndex(font,cp);if(!g){g=GetGlyphAndFont(cp,&font,FONT_NORMAL);if(!g)continue;data=(font==&fontInfo[0])?fontData[0]:((LoadedFont*)((char*)font-__builtin_offsetof(LoadedFont,info)))->data;}
             float h=20.0f;if(font!=&fontInfo[0])h*=1.2f;FPackRange range={h,cp,NULL,1,&fontPackedChar[numPackedGlyphs],0,0};stbtt_PackFontRanges(&pc,data,0,&range,1);
             int idx=numPackedGlyphs++;if(cp>='0'&&cp<='9')fixedNumberAdvanceWidth=vmax(fixedNumberAdvanceWidth,fontPackedChar[idx].xadvance);}}
@@ -1826,7 +1822,7 @@ static void InitFontAtlasses(){
     mset(bmp,0,FONT_ATLAS_SIZE*FONT_ATLAS_SIZE); // Secondary atlas
     stbtt_pack_context pc2;stbtt_PackBegin(&pc2,bmp,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0,16,NULL);pc2.h_oversample=3;pc2.v_oversample=3;pc2.skip_missing=1;numPackedGlyphsStopD=0;
     for(int r=0;r<numFontRanges;++r){fontRangesStopD[r].startIndex=numPackedGlyphsStopD;
-        for(int i=0;i<fontRangesStopD[r].count;++i){if(numPackedGlyphsStopD>=MAX_GLYPHS)break;u32 cp=fontRangesStopD[r].first+i;stbtt_fontinfo*font=&fontInfo[1];unsigned char*data=fontData[1];
+        for(int i=0;i<fontRangesStopD[r].count;++i){if(numPackedGlyphsStopD>=MAX_GLYPHS)break;u32 cp=fontRangesStopD[r].first+i;stbtt_fontinfo*font=&fontInfo[1];u8*data=fontData[1];
             int g=stbtt_FindGlyphIndex(font,cp);if(!g){g=GetGlyphAndFont(cp,&font,FONT_STOPD);if(!g)continue;data=(font==&fontInfo[0])?fontData[0]:((LoadedFont*)((char*)font-__builtin_offsetof(LoadedFont,info)))->data;}
             float h=54.0f;if(font!=&fontInfo[1])h*=1.2f;FPackRange range={h,cp,NULL,1,&fontPackedCharStopD[numPackedGlyphsStopD],0,0};stbtt_PackFontRanges(&pc2,data,0,&range,1);
             int idx=numPackedGlyphsStopD++;if(cp>='0'&&cp<='9')fixedNumberAdvanceWidthStopD=vmax(fixedNumberAdvanceWidthStopD,fontPackedCharStopD[idx].xadvance);}}
@@ -1928,7 +1924,7 @@ void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scale,const char*
     size_t vc=0; const char*p=uiTextBuffer; float xpos=x,ypos=y+(16*scale),ls=22*scale; aligned_quad q; int cc=0;
     float puv = 10.0f * invatsz, bw=2.0f;
     while(*p) {
-        const unsigned char*s=(const unsigned char*)p; u32 cp=0;
+        const u8*s=(const u8*)p; u32 cp=0;
         if (*s<0x80) { cp=*s++; }
         else if ((*s&0xE0)==0xC0) { cp=(*s&0x1F)<< 6; cp|=(s[1]&0x3F); s+=2; }
         else if ((*s&0xF0)==0xE0) { cp=(*s&0x0F)<<12; cp|=(s[1]&0x3F)<<6;  cp|=(s[2]&0x3F); s+=3; }
@@ -1953,19 +1949,15 @@ void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scale,const char*
 // Window + Input Sys
 typedef void (*GLFWglproc)(void);
 typedef struct GLFWwindow GLFWwindow; GLFWwindow* window;
-typedef struct { int width,height,redBits,greenBits,blueBits,refreshRate; } GLFWvidmode;
-typedef struct { unsigned char buttons[15]; float axes[6]; } GLFWgamepadstate;
+typedef struct { int width,height,redBits,greenBits,blueBits,refreshRate; } vidmode;
+typedef struct { u8 buttons[15]; float axes[6]; } GLFWgamepadstate;
 typedef void (*GLFWproc)(void); typedef struct _GLFWfbconfig _GLFWfbconfig; typedef struct _GLFWcontext _GLFWcontext; typedef struct _GLFWwindow _GLFWwindow; typedef struct _GLFWlibrary _GLFWlibrary; typedef struct _GLFWmonitor _GLFWmonitor; typedef struct _GLFWjoystick _GLFWjoystick;
 void UpdateScreenSize(i32 width, i32 height); void SaveConfig();
 struct _GLFWfbconfig { int redBits,greenBits,blueBits,alphaBits,depthBits,stencilBits,accumRedBits,accumGreenBits,accumBlueBits,accumAlphaBits; i32 samples,stereo,sRGB,doublebuffer; uintptr_t handle; };
 extern _GLFWlibrary _glfw;
 GLFWproc PlatformGetModuleSymbol(void* module, const char* name);
-void InputWindowFocus(i32 focused); void InputKey(_GLFWwindow* window, int key, int action); void InputMouseClick(_GLFWwindow* window, int button, int action);
-void InputCursorPos(_GLFWwindow* window, double xpos, double ypos);  void JoystickConnection(_GLFWjoystick* js, int event);         void InputJoystickAxis(_GLFWjoystick* js, int axis, float value);
-void InputJoystickButton(_GLFWjoystick* js, int button, char value); void InputJoystickHat(_GLFWjoystick* js, int hat, char value); void InputMonitor(_GLFWmonitor* monitor, int action, int placement);
-const _GLFWfbconfig* ChooseFBConfig(const _GLFWfbconfig* alternatives, unsigned int count);
-_GLFWmonitor* AllocMonitor(const char* name, int widthMM, int heightMM); _GLFWjoystick* _glfwAllocJoystick(const char* name, const char* guid, int axisCount, int buttonCount, int hatCount);
-void _glfwFreeJoystick(_GLFWjoystick* js);
+void InputWindowFocus(i32); void InputKey(_GLFWwindow*,int,int); void InputMouseClick(_GLFWwindow*,int,int); void InputCursorPos(_GLFWwindow*,double,double);  void JoystickConnection(_GLFWjoystick*,int); void InputJoystickAxis(_GLFWjoystick*,int,float); void InputJoystickButton(_GLFWjoystick*,int,char); void InputJoystickHat(_GLFWjoystick*,int,char);
+void InputMonitor(_GLFWmonitor*,int,int); const _GLFWfbconfig* ChooseFBConfig(const _GLFWfbconfig* alternatives, u32); _GLFWmonitor* AllocMonitor(const char*,int,int); _GLFWjoystick* _glfwAllocJoystick(const char*,const char*,int,int,int); void FreeJoystick(_GLFWjoystick*);
 #define INPUT_RELEASE 0
 #define INPUT_PRESS   1
 #define INPUT_REPEAT  2
@@ -2020,14 +2012,14 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     DECLSPEC_IMPORT i32 WINAPI EnumDisplayDevicesW(u16*,u32,PDISPLAY_DEVICEW,u32);               DECLSPEC_IMPORT i32 WINAPI EnumDisplaySettingsExW(u16*,u32,LPDEVMODEW,u32); DECLSPEC_IMPORT i32 WINAPI SetPixelFormat(HDC,i32,const PIXELFORMATDESCRIPTOR *);            DECLSPEC_IMPORT i32 WINAPI ChoosePixelFormat(HDC hdc,const PIXELFORMATDESCRIPTOR *ppfd);
     DECLSPEC_IMPORT i32 WINAPI DescribePixelFormat(HDC,i32,u32,LPPIXELFORMATDESCRIPTOR);         DECLSPEC_IMPORT HBITMAP WINAPI CreateBitmap(i32,i32,u32,u32,const void *);  DECLSPEC_IMPORT HBITMAP WINAPI CreateDIBSection(HDC,const BITMAPINFO*,u32,void**,void*,u32); DECLSPEC_IMPORT i32 WINAPI GetDeviceCaps(HDC,i32);
     u16* CreateWideStringFromUTF8Win32(const char* source); i32 IsWindowsVersionOrGreaterWin32(u16 major, u16 minor, u16 sp); void _glfwPollMonitorsWin32();
-    struct _GLFWjoystick { i32 allocated,connected; size_t axesSize,buttonsSize,hatsSize; float*  axes; int axisCount; unsigned char* buttons; int buttonCount; unsigned char* hats; int hatCount; char name[128],guid[33]; _GLFWjoystickWin32 win32; };
+    struct _GLFWjoystick { i32 allocated,connected; size_t axesSize,buttonsSize,hatsSize; float*  axes; int axisCount; u8* buttons; int buttonCount; u8* hats; int hatCount; char name[128],guid[33]; _GLFWjoystickWin32 win32; };
     struct _GLFWlibrary { _GLFWmonitor** monitors; int monitorCount; i32 joysticksInitialized; _GLFWjoystick joysticks[JOYSTICK_LAST + 1]; _GLFWlibraryWin32 win32; _GLFWlibraryWGL wgl; };
     struct _GLFWcontext { int client,source,major,minor; FGL_GIV GetIntegerv; void (*makeCurrent)(_GLFWwindow*); void (*swapBuffers)(_GLFWwindow*); void (*swapInterval)(int); GLFWglproc (*getProcAddress)(const char*); WGLContext wgl; };
-    struct _GLFWwindow { i32 decorated,doublebuffer; GLFWvidmode videoMode; int cursorMode; char mouseButtons[8],keys[349]; double virtualCursorPosX,virtualCursorPosY; _GLFWcontext context; _GLFWwindowWin32 win32; };
-    struct _GLFWmonitor { char name[128]; int widthMM,heightMM; GLFWvidmode currentMode; _GLFWmonitorWin32 win32; };
+    struct _GLFWwindow { i32 decorated,doublebuffer; vidmode videoMode; int cursorMode; char mouseButtons[8],keys[349]; double virtualCursorPosX,virtualCursorPosY; _GLFWcontext context; _GLFWwindowWin32 win32; };
+    struct _GLFWmonitor { char name[128]; int widthMM,heightMM; vidmode currentMode; _GLFWmonitorWin32 win32; };
     static u32 getWindowStyle(const _GLFWwindow* w) { return 0x060A0000 | (w->decorated ? 0x00C00000 : 0x80000000); } // clipping,sysmenu,minimize,title,border,and borderless raw
     static HICON createIcon(const GLFWimage* image,int xhot,int yhot,i32 icon) {
-        HDC dc; HICON handle; HBITMAP color,mask; unsigned char* target=NULL; unsigned char* source=image->pixels;
+        HDC dc; HICON handle; HBITMAP color,mask; u8* target=NULL; u8* source=image->pixels;
         BITMAPV5HEADER bi={0}; bi.bV5Size=sizeof(bi); bi.bV5Width=image->width; bi.bV5Height=-image->height; bi.bV5Planes=1; bi.bV5BitCount=32; bi.bV5Compression=3; bi.bV5RedMask=0x00ff0000; bi.bV5GreenMask=0x0000ff00; bi.bV5BlueMask=0x000000ff; bi.bV5AlphaMask=0xff000000;
         dc=GetDC(NULL); color=CreateDIBSection(dc,(BITMAPINFO*)&bi,0,(void**)&target,NULL,(u32)0U); ReleaseDC(NULL,dc); mask=CreateBitmap(image->width,image->height,1,1,NULL);
         for (int i=0;i<image->width*image->height;i++) { target[0]=source[2]; target[1]=source[1]; target[2]=source[0]; target[3]=source[3]; target+=4; source+=4; }
@@ -2140,26 +2132,20 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     char* CreateUTF8FromWideStringWin32(const u16* src, int* size) { *size = WideCharToMultiByte(65001,0,(u16*)src,-1,NULL,0,NULL,NULL); char* target = OS_Calloc(*size,1); WideCharToMultiByte(65001,0,(u16*)src,-1,target,*size,NULL,NULL); return target; }
     i32 IsWindowsVersionOrGreaterWin32(u16 major, u16 minor, u16 sp) {
         OSVERSIONINFOEXW osvi={0}; osvi.dwOSVersionInfoSize=sizeof(osvi), osvi.dwMajorVersion=major, osvi.dwMinorVersion=minor, osvi.wServicePackMajor=sp;
-        u32 mask=0x0000002|0x0000001|0x0000020;
-        u64 cond=VerSetConditionMask(VerSetConditionMask(VerSetConditionMask(0,0x0000002,3),0x0000001,3),0x0000020,3);
+        u32 mask=0x0000002|0x0000001|0x0000020; u64 cond=VerSetConditionMask(VerSetConditionMask(VerSetConditionMask(0,0x0000002,3),0x0000001,3),0x0000020,3);
         return _glfw.win32.ntdll.RtlVerifyVersionInfo(&osvi,mask,cond)==0;
     }
 
-    static void closeJoystick(_GLFWjoystick* js) { JoystickConnection(js,0x00040002/*disconnected*/); _glfwFreeJoystick(js); }
+    static void closeJoystick(_GLFWjoystick* js) { JoystickConnection(js,0x00040002/*disconnected*/); FreeJoystick(js); }
     void _glfwDetectJoystickConnectionWin32() {
         if (_glfw.win32.xinput.instance) {
             for (u32 index=0;index<4;index++) {
-                int jid; char guid[33]; XINPUT_CAPABILITIES xic; _GLFWjoystick* js;
-                for (jid = 0;  jid <= JOYSTICK_LAST;  jid++) {
-                    if (_glfw.joysticks[jid].connected && _glfw.joysticks[jid].win32.index == index) break;
-                }
+                int jid; XINPUT_CAPABILITIES xic; _GLFWjoystick* js;
+                for (jid = 0;  jid <= JOYSTICK_LAST;  jid++) { if (_glfw.joysticks[jid].connected && _glfw.joysticks[jid].win32.index == index) {break;} }
+                if (jid <= JOYSTICK_LAST || _glfw.win32.xinput.GetCapabilities(index,0,&xic) != 0) continue;
 
-                if (jid <= JOYSTICK_LAST) continue;
-                if (_glfw.win32.xinput.GetCapabilities(index,0,&xic) != 0) continue;
-
-                sFormat(guid,sizeof(guid),"78696e707574%02x000000000000000000",xic.SubType & 0xff);
-                js = _glfwAllocJoystick("Gamepad", guid, 6, 10, 1);
-                if (!js) continue;
+                char guid[33]; sFormat(guid,sizeof(guid),"78696e707574%02x000000000000000000",xic.SubType & 0xff);
+                js = _glfwAllocJoystick("Gamepad",guid,6,10,1); if (!js) continue;
 
                 js->win32.index = index;
                 JoystickConnection(js,0x00040001/*connected*/);
@@ -2185,27 +2171,16 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
         return  1;
     }
     
-    void _glfwDetectJoystickDisconnectionWin32() { for (int jid = 0;  jid <= JOYSTICK_LAST;  jid++) { _GLFWjoystick* js = _glfw.joysticks + jid; if (js->connected) {PollJoystick(js);} } }
-    static i32 __stdcall monitorCallback(HMONITOR handle, HDC dc, RECT* rect, i64 data) {
-        MONITORINFOEXW mi; (void)dc; (void)rect;
-        mset(&mi,0,sizeof(mi));
-        mi.cbSize = sizeof(mi);
-        if (GetMonitorInfoW(handle, (MONITORINFO*) &mi)) {
-            _GLFWmonitor* monitor = (_GLFWmonitor*) data;
-            if (wcscmp(mi.szDevice, monitor->win32.adapterName) == 0) monitor->win32.handle = handle;
-        }
-
-        return 1;
-    }
-
+    void _glfwDetectJoystickDisconnectionWin32() { for(int jid=0;jid<=JOYSTICK_LAST;jid++){_GLFWjoystick* js = _glfw.joysticks + jid; if(js->connected){PollJoystick(js);}} }
+    static i32 __stdcall monitorCallback(HMONITOR h, HDC c, RECT* r, i64 d) { MONITORINFOEXW mi; (void)c; (void)r; mset(&mi,0,sizeof(mi)); mi.cbSize = sizeof(mi); if (GetMonitorInfoW(h,(MONITORINFO*)&mi)) { _GLFWmonitor* monitor = (_GLFWmonitor*)d; if (wcscmp(mi.szDevice, monitor->win32.adapterName) == 0) {monitor->win32.handle = h;} } return 1; }
     static _GLFWmonitor* createMonitor(DISPLAY_DEVICEW* adapter, DISPLAY_DEVICEW* display) {
-        _GLFWmonitor* monitor; int widthMM,heightMM,nameSize=0; HDC dc; DEVMODEW dm; RECT rect;
+        _GLFWmonitor* monitor; int widthMM,heightMM,nameSize=0; HDC dc; RECT rect;
         char* name = CreateUTF8FromWideStringWin32(display ? display->DeviceString : adapter->DeviceString,&nameSize);
-        mset(&dm,0,sizeof(dm)); dm.dmSize = sizeof(dm);
+        DEVMODEW dm; mset(&dm,0,sizeof(dm)); dm.dmSize = sizeof(dm);
         EnumDisplaySettingsW(adapter->DeviceName,0xFFFFFFFFU,&dm);
-        dc = CreateDCW(L"DISPLAY", adapter->DeviceName,NULL,NULL);
+        dc = CreateDCW(L"DISPLAY",adapter->DeviceName,NULL,NULL);
         if (IsWindowsVersionOrGreaterWin32(HIBYTE(0x0603),LOBYTE(0x0603),0)) { widthMM  = GetDeviceCaps(dc,4); heightMM = GetDeviceCaps(dc,6); } // Is Windows 8.10 or greater
-        else { widthMM  = (int) (dm.dmPelsWidth * 25.4f / GetDeviceCaps(dc,88)); heightMM = (int) (dm.dmPelsHeight * 25.4f / GetDeviceCaps(dc,90)); }
+        else { widthMM  = (int) (dm.dmPelsWidth * 25.4f / GetDeviceCaps(dc,88)); heightMM = (int)(dm.dmPelsHeight * 25.4f / GetDeviceCaps(dc,90)); }
 
         DeleteDC(dc); monitor = AllocMonitor(name,widthMM,heightMM); OS_Free(name,nameSize);
         if (adapter->StateFlags & 0x08000000/*DISPLAY_DEVICE_MODESPRUNED*/) monitor->win32.modesPruned =  1;
@@ -2231,11 +2206,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
                 if (!(display.StateFlags&1)) continue;
 
                 for (i=0;i<disconnectedCount;++i) {
-                    if (disconnected[i] && wcscmp(disconnected[i]->win32.displayName,display.DeviceName) == 0) {
-                        disconnected[i] = NULL;
-                        EnumDisplayMonitors(NULL,NULL,monitorCallback,(i64)_glfw.monitors[i]);
-                        break;
-                    }
+                    if (disconnected[i] && wcscmp(disconnected[i]->win32.displayName,display.DeviceName) == 0) { disconnected[i] = NULL; EnumDisplayMonitors(NULL,NULL,monitorCallback,(i64)_glfw.monitors[i]); break; }
                 }
 
                 if (i < disconnectedCount) continue;
@@ -2249,7 +2220,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
                 if (i < disconnectedCount) continue;
                 monitor = createMonitor(&adapter,NULL); if (!monitor) { OS_Free(disconnected,_glfw.monitorCount*sizeof(_GLFWmonitor*)); return; }
 
-                InputMonitor(monitor, 0x00040001/*connected*/, type);
+                InputMonitor(monitor,0x00040001/*connected*/,type);
             }
         }
 
@@ -2273,9 +2244,9 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
         return DefWindowProcW(hWnd,uMsg,wParam,lParam);
     }
 
-    void GetMonitorPos(_GLFWmonitor* monitor, int* xpos, int* ypos) { DEVMODEW dm; mset(&dm,0,sizeof(dm)); dm.dmSize = sizeof(dm); EnumDisplaySettingsExW(monitor->win32.adapterName,0xFFFFFFFFU,&dm,0x00000004); *xpos = dm.dmPosition.x; *ypos = dm.dmPosition.y; }
-    void GetMonitorWorkarea(_GLFWmonitor* monitor, int* xpos, int* ypos, int* width, int* height) { MONITORINFO mi = {0}; mi.cbSize = sizeof(mi); GetMonitorInfoW(monitor->win32.handle, &mi); *xpos = mi.rcWork.left; *ypos = mi.rcWork.top; *width = mi.rcWork.right - mi.rcWork.left; *height = mi.rcWork.bottom - mi.rcWork.top; }
-    void GetVideoMode(_GLFWmonitor* monitor, GLFWvidmode* mode) { DEVMODEW dm; mset(&dm,0,sizeof(dm)); dm.dmSize = sizeof(dm); EnumDisplaySettingsW(monitor->win32.adapterName,0xFFFFFFFFU,&dm); mode->width=dm.dmPelsWidth; mode->height=dm.dmPelsHeight; mode->refreshRate=dm.dmDisplayFrequency; }
+    void GetMonitorPos(_GLFWmonitor* monitor, int* x, int* y) { DEVMODEW dm; mset(&dm,0,sizeof(dm)); dm.dmSize = sizeof(dm); EnumDisplaySettingsExW(monitor->win32.adapterName,0xFFFFFFFFU,&dm,0x00000004); *x = dm.dmPosition.x; *y = dm.dmPosition.y; }
+    void GetMonitorWorkarea(_GLFWmonitor* monitor, int* x, int* y, int* width, int* height) { MONITORINFO mi = {0}; mi.cbSize = sizeof(mi); GetMonitorInfoW(monitor->win32.handle, &mi); *x = mi.rcWork.left; *y = mi.rcWork.top; *width = mi.rcWork.right - mi.rcWork.left; *height = mi.rcWork.bottom - mi.rcWork.top; }
+    void GetVideoMode(_GLFWmonitor* monitor, vidmode* mode) { DEVMODEW dm; mset(&dm,0,sizeof(dm)); dm.dmSize = sizeof(dm); EnumDisplaySettingsW(monitor->win32.adapterName,0xFFFFFFFFU,&dm); mode->width=dm.dmPelsWidth; mode->height=dm.dmPelsHeight; mode->refreshRate=dm.dmDisplayFrequency; }
     static int choosePixelFormatWGL(_GLFWwindow* win) {
         int attribs[24],values[24],attribCount=0,i,pixelFormat,nativeCount,usableCount=0;
         const int query = 0x2000/*num pixel formats*/; _glfw.wgl.GetPixelFormatAttribivARB(win->context.wgl.dc,1,0,1,&query,&nativeCount);
@@ -2284,8 +2255,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
         attribs[attribCount++] = 0x2019/*b bits*/; attribs[attribCount++] = 0x201b/*a bits*/; attribs[attribCount++] = 0x2022/*depth bits*/; attribs[attribCount++] = 0x2023/*stencil bits*/;
         _GLFWfbconfig* usableConfigs = OS_Calloc(nativeCount,sizeof(_GLFWfbconfig));
         for (i = 0; i < nativeCount; i++) {
-            _GLFWfbconfig* u = usableConfigs + usableCount; pixelFormat = i + 1;
-            _glfw.wgl.GetPixelFormatAttribivARB(win->context.wgl.dc,pixelFormat,0,attribCount,attribs,values);
+            _GLFWfbconfig* u = usableConfigs + usableCount; pixelFormat = i + 1; _glfw.wgl.GetPixelFormatAttribivARB(win->context.wgl.dc,pixelFormat,0,attribCount,attribs,values);
             if (values[0] == 0 || values[1] == 0/* support OpenGL + draw to window */ || values[2] != 0x202b/*type rgba*/ || values[3] == 0x2025/*no accel*/ || values[4] !=  1) continue;
             
             u->redBits=values[5]; u->greenBits=values[6]; u->blueBits=values[7]; u->alphaBits=values[8]; u->depthBits=values[9]; u->stencilBits=values[10]; u->handle=pixelFormat; usableCount++;
@@ -2300,13 +2270,12 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     static void swapBuffersWGL(_GLFWwindow* win) { if (!IsWindowsVersionOrGreaterWin32(HIBYTE(0x0602),LOBYTE(0x0602),0)) { i32 enabled = 0; if ((i32)(_glfw.win32.dwmapi.IsCompositionEnabled(&enabled) >= 0) && enabled) { int count = vabs(win->context.wgl.interval); while (count--) {_glfw.win32.dwmapi.Flush();} } }/*>=Win8.0*/ SwapBuffers(win->context.wgl.dc); }
     static void swapIntervalWGL(int interval) { ((_GLFWwindow*)window)->context.wgl.interval = interval; if (!IsWindowsVersionOrGreaterWin32(HIBYTE(0x0602),LOBYTE(0x0602),0)) { i32 enabled = 0; if ((i32)(_glfw.win32.dwmapi.IsCompositionEnabled(&enabled) >= 0) && enabled) interval = 0; }/*>=Win8.0*/ _glfw.wgl.SwapIntervalEXT(interval); }
     static GLFWglproc getProcAddressWGL(const char* procname) { const GLFWglproc proc = (GLFWglproc)wglGetProcAddress(procname); if (proc) {return proc;} return (GLFWglproc)PlatformGetModuleSymbol(_glfw.wgl.instance,procname); }
-    void glfwSetWindowPosition(GLFWwindow* handle, int xpos, int ypos) { _GLFWwindow* win = (_GLFWwindow*)handle; RECT rect = {xpos,ypos,xpos,ypos}; AdjustWindowRectEx(&rect,getWindowStyle(win),0,0x00040000/*WS_EX_APPWINDOW*/); SetWindowPos(win->win32.handle,((HWND)0),rect.left,rect.top,0,0,0x0010|0x0200|0x0001|0x0004); }
+    void SetWindowPosition(GLFWwindow* handle, int x, int y) { _GLFWwindow* win = (_GLFWwindow*)handle; RECT rect = {x,y,x,y}; AdjustWindowRectEx(&rect,getWindowStyle(win),0,0x00040000/*WS_EX_APPWINDOW*/); SetWindowPos(win->win32.handle,((HWND)0),rect.left,rect.top,0,0,0x0010|0x0200|0x0001|0x0004); }
 #else // LINUX
     typedef u8 KeyCode; typedef u16 Rotation,SubpixelOrder,Connection; typedef i32 Bool; typedef int Status; typedef u64 XID,Mask,Atom,VisualID,Time,KeySym; typedef char *XPointer; typedef u32 XcursorUInt;
     typedef struct _XcursorImage { XcursorUInt version; XcursorUInt size,width,height,xhot,yhot; XcursorUInt delay; XcursorUInt *pixels; } XcursorImage;
     typedef struct { i64 flags; int x,y, width,height,min_width,min_height,max_width,max_height,width_inc,height_inc; struct {int x; int y;} min_aspect,max_aspect; int base_width, base_height; int win_gravity; } XSizeHints;
-    typedef XID Window,Drawable,Font,Pixmap,Cursor,Colormap;
-    typedef struct _XExtData { int number; struct _XExtData *next; int (*free_private)(struct _XExtData*); XPointer private_data; } XExtData;
+    typedef XID Window,Drawable,Font,Pixmap,Cursor,Colormap; typedef struct _XExtData { int number; struct _XExtData *next; int (*free_private)(struct _XExtData*); XPointer private_data; } XExtData;
     typedef struct { int extension, major_opcode, first_event, first_error; } XExtCodes; typedef struct { int depth, bits_per_pixel, scanline_pad; } XPixmapFormatValues;
     typedef struct _XGC *GC; typedef struct { XExtData *ext_data; VisualID visualid; int class; u64 red_mask, green_mask, blue_mask; int bits_per_rgb; int map_entries;} Visual; 
     typedef struct { int depth,nvisuals; Visual *visuals; } Depth;
@@ -2314,8 +2283,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     typedef struct { XExtData *ext_data; int depth, bits_per_pixel, scanline_pad; } ScreenFormat;
     typedef struct { Pixmap background_pixmap; u64 background_pixel; Pixmap border_pixmap; u64 border_pixel; int bit_gravity, win_gravity, backing_store; u64 backing_planes, backing_pixel; int save_under; i64 event_mask, do_not_propagate_mask; int override_redirect; Colormap colormap; Cursor cursor; } XSetWindowAttributes;
     typedef struct { int x,y,width,height,border_width,depth; Visual *visual; Window root; int class,bit_gravity,win_gravity,backing_store; u64 backing_planes,backing_pixel; int save_under; Colormap colormap; int map_installed,map_state; i64 all_event_masks,your_event_mask,do_not_propagate_mask; i32 override_redirect; Screen *screen; } XWindowAttributes;
-    typedef struct _XDisplay Display;
-    typedef struct { XExtData *ext_data; struct _XPrivate *private1; int fd, private2, proto_major_version, proto_minor_version; char *vendor; XID private3, private4, private5; int private6; XID (*resource_alloc)(struct _XDisplay*); int byte_order, bitmap_unit, bitmap_pad, bitmap_bit_order, nformats; ScreenFormat *pixmap_format; int private8; struct _XPrivate *private9, *private10; int qlen; u64 last_request_read,request; XPointer private11,private12,private13,private14; unsigned max_request_size; struct _XrmHashBucketRec *db; int (*private15)(struct _XDisplay*); char *display_name; i32 default_screen, nscreens; Screen *screens; u64 motion_buffer, private16; i32 min_keycode,max_keycode; XPointer private17,private18; i32 private19; char *xdefaults; } *_XPrivDisplay;
+    typedef struct _XDisplay Display; typedef struct { XExtData *ext_data; struct _XPrivate *private1; int fd, private2, proto_major_version, proto_minor_version; char *vendor; XID private3, private4, private5; int private6; XID (*resource_alloc)(struct _XDisplay*); int byte_order, bitmap_unit, bitmap_pad, bitmap_bit_order, nformats; ScreenFormat *pixmap_format; int private8; struct _XPrivate *private9, *private10; int qlen; u64 last_request_read,request; XPointer private11,private12,private13,private14; unsigned max_request_size; struct _XrmHashBucketRec *db; int (*private15)(struct _XDisplay*); char *display_name; i32 default_screen, nscreens; Screen *screens; u64 motion_buffer, private16; i32 min_keycode,max_keycode; XPointer private17,private18; i32 private19; char *xdefaults; } *_XPrivDisplay;
     typedef struct { int a; u64 b; int c; void *d; u64 e,f,g,h; int i,j,k,l; u32 m,keycode; int n; } XKeyEvent; // Don't care the names of the unused fields here, so just stuff alphabet in there
     typedef struct { int a; u64 b; int c; Display *d; Window e,f,g; Time h; int i,j,k,l; u32 m,button; int n; } XButtonEvent;  typedef struct { int a; u64 b; int c; Display *d; Window e,f,g; Time h; int x,y,i,j; u32 k; char l; int m; } XMotionEvent;
     typedef struct { int a; u64 b; int c; Display *d; Window e,f,g; Time h; int x,y,i,j,k,l; int m,n; u32 o; } XCrossingEvent; typedef struct { int a; u64 b; i32 c; Display *d; Window e; int mode,f; } XFocusChangeEvent;
@@ -2324,29 +2292,27 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     typedef struct { int a; u64 b; int send_event; Display *c; Window window; } XAnyEvent;
     typedef struct { int type; u64 serial; int send_event; Display *display; int extension, evtype; u32 cookie; void *data; } XGenericEventCookie;
     typedef union _XEvent { int type; XAnyEvent xany; XKeyEvent xkey; XButtonEvent xbutton; XMotionEvent xmotion; XCrossingEvent xcrossing; XFocusChangeEvent xfocus; u8 p0[528]; XReparentEvent xreparent; XConfigureEvent xconfigure; u8 p1[648]; XClientMessageEvent xclient; u8 p2[224]; } XEvent;
-    typedef struct _XIC *XIC;
-    typedef struct { Visual *visual; VisualID visualid; int screen,depth; int class; u64 red_mask,green_mask,blue_mask; int colormap_size,bits_per_rgb; } XVisualInfo;
+    typedef struct _XIC *XIC; typedef struct { Visual *visual; VisualID visualid; int screen,depth; int class; u64 red_mask,green_mask,blue_mask; int colormap_size,bits_per_rgb; } XVisualInfo;
     typedef int XContext; typedef XID RROutput,RRCrtc,RRMode; typedef u64 XRRModeFlags;
     typedef struct { RRMode id; u32 width,height; u64 dotClock; u32 hSyncStart,hSyncEnd,hTotal,hSkew,vSyncStart,vSyncEnd,vTotal; char *name; u32 nameLength; XRRModeFlags modeFlags; } XRRModeInfo;
     typedef struct { Time timestamp; Time configTimestamp; int ncrtc; RRCrtc *crtcs; int noutput; RROutput *outputs; int nmode; XRRModeInfo *modes; } XRRScreenResources;
-    typedef struct { Time timestamp; RRCrtc crtc; char *name; int nameLen; unsigned long mm_width; unsigned long mm_height; Connection connection; SubpixelOrder subpixel_order; i32 ncrtc; RRCrtc *crtcs; i32 nclone; RROutput *clones; i32 nmode,npreferred; RRMode *modes; } XRROutputInfo;
-    typedef struct { Time timestamp; i32 x,y; u32 width,height; RRMode mode; Rotation rotation; i32 noutput; RROutput *outputs; Rotation rotations; i32 npossible; RROutput *possible; } XRRCrtcInfo;
-    typedef XID GLXWindow,GLXDrawable; typedef struct __GLXFBConfig* GLXFBConfig; typedef struct __GLXcontext* GLXContext;
-    typedef void(*__GLXextproc)();                                          typedef XSizeHints*(*PFN_XAllocSizeHints)();                               typedef int(*PFN_XChangeProperty)(Display*,Window,Atom,Atom,int,int,const unsigned char*,int);
+    typedef struct { Time timestamp; RRCrtc crtc; char *name; int nameLen; u64 mm_width,mm_height; Connection connection; SubpixelOrder subpixel_order; i32 ncrtc; RRCrtc *crtcs; i32 nclone; RROutput *clones; i32 nmode,npreferred; RRMode *modes; } XRROutputInfo;
+    typedef struct { Time timestamp; i32 x,y; u32 width,height; RRMode mode; Rotation rotation; i32 noutput; RROutput *outputs; Rotation rotations; i32 npossible; RROutput *possible; } XRRCrtcInfo; typedef XID GLXWindow,GLXDrawable; typedef struct __GLXFBConfig* GLXFBConfig; typedef struct __GLXcontext* GLXContext;
+    typedef void(*__GLXextproc)();                                          typedef XSizeHints*(*PFN_XAllocSizeHints)();                               typedef int(*PFN_XChangeProperty)(Display*,Window,Atom,Atom,int,int,const u8*,int);
     typedef Bool(*PFN_XCheckTypedWindowEvent)(Display*,Window,int,XEvent*); typedef void(*PFN_XRRFreeOutputInfo)(XRROutputInfo*);                      typedef Colormap(*PFN_XCreateColormap)(Display*,Window,Visual*,int);
-    typedef int(*PFN_XDefineCursor)(Display*,Window,Cursor);                typedef int(*PFN_XDeleteProperty)(Display*,Window,Atom);                   typedef Window(*PFN_XCreateWindow)(Display*,Window,int,int,unsigned int,unsigned int,unsigned int,int,unsigned int,Visual*,unsigned long,XSetWindowAttributes*);
+    typedef int(*PFN_XDefineCursor)(Display*,Window,Cursor);                typedef int(*PFN_XDeleteProperty)(Display*,Window,Atom);                   typedef Window(*PFN_XCreateWindow)(Display*,Window,int,int,u32,u32,u32,int,u32,Visual*,u64,XSetWindowAttributes*);
     typedef int(*PFN_XDisplayKeycodes)(Display*,int*,int*);                 typedef Bool(*PFN_XFilterEvent)(XEvent*,Window);                           typedef int(*PFN_XFindContext)(Display*,XID,XContext,XPointer*);
-    typedef int(*PFN_XFree)(void*);                                         typedef void(*PFN_XFreeEventData)(Display*,XGenericEventCookie*);          typedef int(*PFN_XGrabPointer)(Display*,Window,Bool,unsigned int,int,int,Window,Cursor,Time);
+    typedef int(*PFN_XFree)(void*);                                         typedef void(*PFN_XFreeEventData)(Display*,XGenericEventCookie*);          typedef int(*PFN_XGrabPointer)(Display*,Window,Bool,u32,int,int,Window,Cursor,Time);
     typedef KeySym*(*PFN_XGetKeyboardMapping)(Display*,KeyCode,int,int*);   typedef Status(*PFN_XGetWMNormalHints)(Display*,Window,XSizeHints*,long*); typedef Status(*PFN_XGetWindowAttributes)(Display*,Window,XWindowAttributes*);
-    typedef Atom(*PFN_XInternAtom)(Display*,const char*,Bool);              typedef int(*PFN_XGetInputFocus)(Display*,Window*,int*);                   typedef int(*PFN_XGetWindowProperty)(Display*,Window,Atom,long,long,Bool,Atom,Atom*,int*,unsigned long*,unsigned long*,unsigned char**); 
-    typedef int(*PFN_XMapWindow)(Display*,Window);                          typedef int(*PFN_XMoveWindow)(Display*,Window,int,int);                    typedef int(*PFN_XMoveResizeWindow)(Display*,Window,int,int,unsigned int,unsigned int);
+    typedef Atom(*PFN_XInternAtom)(Display*,const char*,Bool);              typedef int(*PFN_XGetInputFocus)(Display*,Window*,int*);                   typedef int(*PFN_XGetWindowProperty)(Display*,Window,Atom,long,long,Bool,Atom,Atom*,int*,u64*,u64*,u8**);
+    typedef int(*PFN_XMapWindow)(Display*,Window);                          typedef int(*PFN_XMoveWindow)(Display*,Window,int,int);                    typedef int(*PFN_XMoveResizeWindow)(Display*,Window,int,int,u32,u32);
     typedef Status(*PFN_XInitThreads)();                                    typedef int(*PFN_XNextEvent)(Display*,XEvent*);                            typedef XRRCrtcInfo*(*PFN_XRRGetCrtcInfo)(Display*,XRRScreenResources*,RRCrtc);
-    typedef int(*PFN_XPending)(Display*);                                   typedef Bool(*PFN_XQueryExtension)(Display*,const char*,int*,int*,int*);   typedef Bool(*PFN_XQueryPointer)(Display*,Window,Window*,Window*,int*,int*,int*,int*,unsigned int*);
-    typedef int(*PFN_XRaiseWindow)(Display*,Window);                        typedef int(*PFN_XSaveContext)(Display*,XID,XContext,const char*);         typedef int(*PFN_XResizeWindow)(Display*,Window,unsigned int,unsigned int);
+    typedef int(*PFN_XPending)(Display*);                                   typedef Bool(*PFN_XQueryExtension)(Display*,const char*,int*,int*,int*);   typedef Bool(*PFN_XQueryPointer)(Display*,Window,Window*,Window*,int*,int*,int*,int*,u32*);
+    typedef int(*PFN_XRaiseWindow)(Display*,Window);                        typedef int(*PFN_XSaveContext)(Display*,XID,XContext,const char*);         typedef int(*PFN_XResizeWindow)(Display*,Window,u32,u32);
     typedef Status(*PFN_XSendEvent)(Display*,Window,Bool,long,XEvent*);     typedef void(*PFN_XSetICFocus)(XIC);                                       typedef int(*PFN_XSetInputFocus)(Display*,Window,int,Time);
     typedef void(*PFN_XSetWMNormalHints)(Display*,Window,XSizeHints*);      typedef Status(*PFN_XSetWMProtocols)(Display*,Window,Atom*,int);           typedef Bool(*PFN_XTranslateCoordinates)(Display*,Window,Window,int,int,int*,int*,Window*);
-    typedef int(*PFN_XUndefineCursor)(Display*,Window);                     typedef void(*PFN_XUnsetICFocus)(XIC);                                     typedef int(*PFN_XWarpPointer)(Display*,Window,Window,int,int,unsigned int,unsigned int,int,int);
-    typedef void(*PFN_XRRFreeCrtcInfo)(XRRCrtcInfo*);                       typedef int(*PFN_XUngrabPointer)(Display*,Time);                           typedef int(*PFN_XChangeWindowAttributes)(Display*,Window,unsigned long,XSetWindowAttributes*); 
+    typedef int(*PFN_XUndefineCursor)(Display*,Window);                     typedef void(*PFN_XUnsetICFocus)(XIC);                                     typedef int(*PFN_XWarpPointer)(Display*,Window,Window,int,int,u32,u32,int,int);
+    typedef void(*PFN_XRRFreeCrtcInfo)(XRRCrtcInfo*);                       typedef int(*PFN_XUngrabPointer)(Display*,Time);                           typedef int(*PFN_XChangeWindowAttributes)(Display*,Window,u64,XSetWindowAttributes*);
     typedef void(*PFN_XRRFreeScreenResources)(XRRScreenResources*);         typedef Display*(*PFN_XOpenDisplay)(const char*);                          typedef XRROutputInfo*(*PFN_XRRGetOutputInfo)(Display*,XRRScreenResources*,RROutput);
     typedef RROutput(*PFN_XRRGetOutputPrimary)(Display*,Window);            typedef void(*PFN_XRRSelectInput)(Display*,Window,int);                    typedef XRRScreenResources*(*PFN_XRRGetScreenResourcesCurrent)(Display*,Window);
     typedef int(*PFN_XRRUpdateConfiguration)(XEvent*);                      typedef XcursorImage*(*PFN_XCIC)(int,int);                   typedef void(*PFN_XCID)(XcursorImage*);
@@ -2371,111 +2337,63 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
                                      struct {void* handle; int eventBase,errorBase,major,minor; PFN_XRRFreeCrtcInfo FreeCrtcInfo; PFN_XRRFreeOutputInfo FreeOutputInfo; PFN_XRRFreeScreenResources FreeScreenResources; PFN_XRRGetCrtcInfo GetCrtcInfo; PFN_XRRGetOutputInfo GetOutputInfo; PFN_XRRGetOutputPrimary GetOutputPrimary;
                                              PFN_XRRGetScreenResourcesCurrent GetScreenResourcesCurrent; PFN_XRRSelectInput SelectInput; PFN_XRRUpdateConfiguration UpdateConfiguration;}randr; } _GLFWlibraryX11; 
     PFN_XNextEvent XNextEvent;
-    typedef struct _GLFWmonitorX11 { RROutput output; RRCrtc crtc; int index; } _GLFWmonitorX11;
-    typedef struct _GLFWjoystickLinux { FHandle fd; char path[260]; int keyMap[0x300/*KEY_CNT*/ - 0x100/*BTN_MISC*/],absMap[0x40/*ABS_CNT*/]; struct input_absinfo absInfo[0x40/*ABS_CNT*/]; int hats[4][2]; } _GLFWjoystickLinux;
-    typedef struct _GLFWlibraryLinux { int inotify,watch; i32 dropped; } _GLFWlibraryLinux;
+    typedef struct _GLFWmonitorX11 { RROutput output; RRCrtc crtc; int index; } _GLFWmonitorX11; typedef struct _GLFWjoystickLinux { FHandle fd; char path[260]; int keyMap[0x300/*KEY_CNT*/ - 0x100/*BTN_MISC*/],absMap[0x40/*ABS_CNT*/]; struct input_absinfo absInfo[0x40/*ABS_CNT*/]; int hats[4][2]; } _GLFWjoystickLinux; typedef struct _GLFWlibraryLinux { int inotify,watch; i32 dropped; } _GLFWlibraryLinux;
     void GetCursorPosV(_GLFWwindow*,double*,double*); void SetCursorPosV(_GLFWwindow*,double,double);
-    struct _GLFWjoystick { i32 allocated,connected; size_t axesSize,buttonsSize,hatsSize; float*  axes; int axisCount; unsigned char* buttons; int buttonCount; unsigned char* hats; int hatCount; char name[128],guid[33]; _GLFWjoystickLinux linjs; };
+    struct _GLFWjoystick { i32 allocated,connected; size_t axesSize,buttonsSize,hatsSize; float*  axes; int axisCount; u8* buttons; int buttonCount; u8* hats; int hatCount; char name[128],guid[33]; _GLFWjoystickLinux linjs; };
     struct _GLFWlibrary { _GLFWmonitor** monitors; int monitorCount; i32 joysticksInitialized; _GLFWjoystick joysticks[JOYSTICK_LAST + 1]; _GLFWlibraryX11 x11; _GLFWlibraryGLX glx; _GLFWlibraryLinux linjs; };
     struct _GLFWcontext { int client,source,major,minor; FGL_GIV GetIntegerv; void (*makeCurrent)(_GLFWwindow*); void (*swapBuffers)(_GLFWwindow*); void (*swapInterval)(int); GLFWglproc (*getProcAddress)(const char*); _GLFWcontextGLX glx; };
-    struct _GLFWwindow { i32 decorated,doublebuffer; GLFWvidmode videoMode; int minwidth,minheight,maxwidth,maxheight,cursorMode; char mouseButtons[8],keys[349]; double virtualCursorPosX,virtualCursorPosY; _GLFWcontext context; _GLFWwindowX11 x11; };
-    struct _GLFWmonitor { char name[128]; int widthMM,heightMM; GLFWvidmode currentMode; _GLFWmonitorX11 x11; };
+    struct _GLFWwindow { i32 decorated,doublebuffer; vidmode videoMode; int minwidth,minheight,maxwidth,maxheight,cursorMode; char mouseButtons[8],keys[349]; double virtualCursorPosX,virtualCursorPosY; _GLFWcontext context; _GLFWwindowX11 x11; };
+    struct _GLFWmonitor { char name[128]; int widthMM,heightMM; vidmode currentMode; _GLFWmonitorX11 x11; };
     void* _glfwPlatformLoadModule(const char* path) { return dlopen(path,2); }
     GLFWproc PlatformGetModuleSymbol(void* module, const char* name) { return dlsym(module,name); }
-    unsigned long _glfwGetWindowPropertyX11(Window win, Atom prop, Atom type, u8** val) { Atom actType; i32 actFmt; u64 itemCount,bytesAfter; _glfw.x11.xlib.GetWindowProperty(_glfw.x11.display,win,prop,0,2147483647,0,type,&actType,&actFmt,&itemCount,&bytesAfter,val); return itemCount; }
+    u64 _glfwGetWindowPropertyX11(Window win, Atom prop, Atom type, u8** val) { Atom actType; i32 actFmt; u64 itemCount,bytesAfter; _glfw.x11.xlib.GetWindowProperty(_glfw.x11.display,win,prop,0,2147483647,0,type,&actType,&actFmt,&itemCount,&bytesAfter,val); return itemCount; }
     static int translateKey(int scancode) { return (scancode<0||scancode>255) ? KEY_UNKNOWN : _glfw.x11.keycodes[scancode]; }
-    static void sendEventToWM(_GLFWwindow* win, Atom type, i64 a, i64 b, i64 c, i64 d, i64 e) {
-        XEvent event={33/*ClientMessage*/}; event.xclient.window = win->x11.handle; event.xclient.format = 32; event.xclient.message_type = type; 
-        event.xclient.data.l[0]=a; event.xclient.data.l[1]=b; event.xclient.data.l[2]=c; event.xclient.data.l[3]=d; event.xclient.data.l[4]=e;
-        _glfw.x11.xlib.SendEvent(_glfw.x11.display,_glfw.x11.root,0,(1L<<19)|(1L<<20),&event);
-    }
-
-    static void updateNormalHints(_GLFWwindow* win, int w, int h) { XSizeHints* hs=_glfw.x11.xlib.AllocSizeHints(); i64 sup; _glfw.x11.xlib.GetWMNormalHints(_glfw.x11.display,win->x11.handle,hs,&sup); hs->flags &= ~((1L << 4)|(1L << 5)|(1L << 7)); hs->flags|=((1L << 4)|(1L << 5)); hs->min_width=hs->max_width=w; hs->min_height=hs->max_height=h; _glfw.x11.xlib.SetWMNormalHints(_glfw.x11.display,win->x11.handle,hs); _glfw.x11.xlib.Free(hs); }
+    static void sendEventToWM(_GLFWwindow* win, Atom type, i64 a, i64 b, i64 c, i64 d, i64 f) { XEvent e={33/*ClientMessage*/}; e.xclient.window = win->x11.handle; e.xclient.format = 32; e.xclient.message_type = type; e.xclient.data.l[0]=a; e.xclient.data.l[1]=b; e.xclient.data.l[2]=c; e.xclient.data.l[3]=d; e.xclient.data.l[4]=f; _glfw.x11.xlib.SendEvent(_glfw.x11.display,_glfw.x11.root,0,(1L<<19)|(1L<<20),&e); }
+    static void updateNormalHints(_GLFWwindow* win, int w, int h) { XSizeHints* hs=_glfw.x11.xlib.AllocSizeHints(); i64 s; _glfw.x11.xlib.GetWMNormalHints(_glfw.x11.display,win->x11.handle,hs,&s); hs->flags &= ~((1L<<4)|(1L<<5)|(1L<<7)); hs->flags|=((1L<<4)|(1L<<5)); hs->min_width=hs->max_width=w; hs->min_height=hs->max_height=h; _glfw.x11.xlib.SetWMNormalHints(_glfw.x11.display,win->x11.handle,hs); _glfw.x11.xlib.Free(hs); }
     static void updateCursorImage(_GLFWwindow* win) { if (win->cursorMode==0x00034001/*GLFW_CURSOR_NORMAL*/) { _glfw.x11.xlib.UndefineCursor(_glfw.x11.display,win->x11.handle); } else {_glfw.x11.xlib.DefineCursor(_glfw.x11.display,win->x11.handle,_glfw.x11.hiddenCursorHandle);} }
     static void captureCursor(_GLFWwindow* win) { _glfw.x11.xlib.GrabPointer(_glfw.x11.display,win->x11.handle,1,(1L<<2)|(1L<<3)|(1L<<6),1/*GrabModeAsync*/,1/*GrabModeAsync*/,win->x11.handle,0L,0L); }
     static void releaseCursor() { _glfw.x11.xlib.UngrabPointer(_glfw.x11.display,0L); }
     static void disableCursor(_GLFWwindow* win) { _glfw.x11.disabledCursorWindow=win; GetCursorPosV(win,&_glfw.x11.restoreCurPosX,&_glfw.x11.restoreCurPosY); updateCursorImage(win); captureCursor(win); }
     static void enableCursor(_GLFWwindow* win) { _glfw.x11.disabledCursorWindow = NULL; releaseCursor(); SetCursorPosV(win,_glfw.x11.restoreCurPosX,_glfw.x11.restoreCurPosY); updateCursorImage(win); }
-    void GetMonitorPos(_GLFWmonitor* monitor, int* xpos, int* ypos) {
-        XRRScreenResources* sr = _glfw.x11.randr.GetScreenResourcesCurrent(_glfw.x11.display, _glfw.x11.root);
-        XRRCrtcInfo* ci = _glfw.x11.randr.GetCrtcInfo(_glfw.x11.display, sr, monitor->x11.crtc);
-        if (ci) { *xpos = ci->x; *ypos = ci->y; _glfw.x11.randr.FreeCrtcInfo(ci); }
-        _glfw.x11.randr.FreeScreenResources(sr);
-    }
-
+    void GetMonitorPos(_GLFWmonitor* monitor, int* x, int* y) { XRRScreenResources* sr=_glfw.x11.randr.GetScreenResourcesCurrent(_glfw.x11.display,_glfw.x11.root); XRRCrtcInfo* ci=_glfw.x11.randr.GetCrtcInfo(_glfw.x11.display,sr,monitor->x11.crtc); if(ci){*x=ci->x; *y=ci->y; _glfw.x11.randr.FreeCrtcInfo(ci);} _glfw.x11.randr.FreeScreenResources(sr); }
     void SetWindowIcon(const GLFWimage* image) {
-        int longCount=0;
-        longCount+=2+image[0].width*image[0].height;
-        unsigned long* icon=OS_Calloc(longCount,sizeof(unsigned long)), *target=icon;
-        *target++=image[0].width; *target++=image[0].height;
-        for (int j=0;j<image[0].width*image[0].height;++j) *target++=(((unsigned long)image[0].pixels[j*4+0])<<16)|(((unsigned long)image[0].pixels[j*4+1])<<8)|(((unsigned long)image[0].pixels[j*4+2])<<0)|(((unsigned long)image[0].pixels[j*4+3])<<24);
-        _glfw.x11.xlib.ChangeProperty(_glfw.x11.display,((_GLFWwindow*)window)->x11.handle,_glfw.x11.NET_WM_ICON,((Atom) 6),32,0/*PropModeReplace*/,(unsigned char*)icon,longCount);
-        OS_Free(icon,longCount*sizeof(unsigned long));
+        int longCount=0; longCount+=2+image[0].width*image[0].height; u64* icon=OS_Calloc(longCount,sizeof(u64)), *target=icon; *target++=image[0].width; *target++=image[0].height;
+        for (int j=0;j<image[0].width*image[0].height;++j) *target++=(((u64)image[0].pixels[j*4+0])<<16)|(((u64)image[0].pixels[j*4+1])<<8)|(((u64)image[0].pixels[j*4+2])<<0)|(((u64)image[0].pixels[j*4+3])<<24);
+        _glfw.x11.xlib.ChangeProperty(_glfw.x11.display,((_GLFWwindow*)window)->x11.handle,_glfw.x11.NET_WM_ICON,((Atom) 6),32,0/*PropModeReplace*/,(u8*)icon,longCount);
+        OS_Free(icon,longCount*sizeof(u64));
     }
 
     void GetWindowSize(_GLFWwindow* win, int* width, int* height) { XWindowAttributes attribs; _glfw.x11.xlib.GetWindowAttributes(_glfw.x11.display,win->x11.handle,&attribs); *width=attribs.width; *height=attribs.height; }
     void SetWindowSize(_GLFWwindow* win, int width, int height) { width=vmax(1,width); height=vmax(1,height); updateNormalHints(win,width,height); _glfw.x11.xlib.ResizeWindow(_glfw.x11.display,win->x11.handle,width,height); }
-    void SetWindowMonitor(_GLFWwindow* win,int xpos,int ypos,int width,int height) {
+    void SetWindowMonitor(_GLFWwindow* win,int x,int y,int width,int height) {
         updateNormalHints(win,width,height);
         if (_glfw.x11.NET_WM_STATE && _glfw.x11.NET_WM_STATE_FULLSCREEN) sendEventToWM(win,_glfw.x11.NET_WM_STATE,0/*remove*/,_glfw.x11.NET_WM_STATE_FULLSCREEN,0,1,0);
-        else {
-            XSetWindowAttributes attributes; attributes.override_redirect=0;
-            _glfw.x11.xlib.ChangeWindowAttributes(_glfw.x11.display,win->x11.handle,(1L<<9)/*override redirect*/,&attributes);
-            win->x11.overrideRedirect=0;
-        }
-        
+        else { XSetWindowAttributes attributes; attributes.override_redirect=0; _glfw.x11.xlib.ChangeWindowAttributes(_glfw.x11.display,win->x11.handle,(1L<<9)/*override redirect*/,&attributes); win->x11.overrideRedirect=0; }
         _glfw.x11.xlib.DeleteProperty(_glfw.x11.display,win->x11.handle,_glfw.x11.NET_WM_BYPASS_COMPOSITOR);
-        _glfw.x11.xlib.MoveResizeWindow(_glfw.x11.display,win->x11.handle,xpos,ypos,width,height);
+        _glfw.x11.xlib.MoveResizeWindow(_glfw.x11.display,win->x11.handle,x,y,width,height);
     }
     
     i32 WindowFocused() { Window focused; int state; _glfw.x11.xlib.GetInputFocus(_glfw.x11.display,&focused,&state); return ((_GLFWwindow*)window)->x11.handle==focused; }
     i32 WindowVisible() { XWindowAttributes wa; _glfw.x11.xlib.GetWindowAttributes(_glfw.x11.display,((_GLFWwindow*)window)->x11.handle,&wa); return wa.map_state==2/*IsViewable*/; }
-    void GetWindowPos(_GLFWwindow* win, int* xpos, int* ypos) { Window dummy; _glfw.x11.xlib.TranslateCoordinates(_glfw.x11.display,win->x11.handle,_glfw.x11.root,0,0,xpos,ypos,&dummy); }
-    void SetWindowPos(_GLFWwindow* win, int xpos, int ypos) {
-        if (!WindowVisible()) {
-            long supplied; XSizeHints* hints=_glfw.x11.xlib.AllocSizeHints();
-            if (_glfw.x11.xlib.GetWMNormalHints(_glfw.x11.display,win->x11.handle,hints,&supplied)) { hints->flags|=(1L << 2)/*PPosition*/; hints->x=hints->y=0; _glfw.x11.xlib.SetWMNormalHints(_glfw.x11.display,win->x11.handle,hints); }
-            _glfw.x11.xlib.Free(hints);
-        }
-        _glfw.x11.xlib.MoveWindow(_glfw.x11.display,win->x11.handle,xpos,ypos);
-    }
-
-    void SetWindowDecorated(_GLFWwindow* win,i32 enabled) {
-        struct { unsigned long flags,functions,decorations; long input_mode; unsigned long status; } hints={0};
-        hints.flags=2; hints.decorations=enabled?1:0;
-        _glfw.x11.xlib.ChangeProperty(_glfw.x11.display,win->x11.handle,_glfw.x11.MOTIF_WM_HINTS,_glfw.x11.MOTIF_WM_HINTS,32,0/*PropModeReplace*/,(unsigned char*)&hints,sizeof(hints)/sizeof(long));
-    }
-
-    void GetCursorPosV(_GLFWwindow* win, double* xpos, double* ypos) { Window root,child; int rootX,rootY,childX,childY; unsigned int mask; _glfw.x11.xlib.QueryPointer(_glfw.x11.display,win->x11.handle,&root,&child,&rootX,&rootY,&childX,&childY,&mask); *xpos=childX; *ypos=childY; }
+    void GetWindowPos(_GLFWwindow* win, int* x, int* y) { Window dummy; _glfw.x11.xlib.TranslateCoordinates(_glfw.x11.display,win->x11.handle,_glfw.x11.root,0,0,x,y,&dummy); }
+    void SetWindowPos(_GLFWwindow* win, int x, int y) { if (!WindowVisible()) { i64 s; XSizeHints* h=_glfw.x11.xlib.AllocSizeHints(); if (_glfw.x11.xlib.GetWMNormalHints(_glfw.x11.display,win->x11.handle,h,&s)) {h->flags|=(1L << 2)/*PPosition*/; h->x=h->y=0; _glfw.x11.xlib.SetWMNormalHints(_glfw.x11.display,win->x11.handle,h);} _glfw.x11.xlib.Free(h); } _glfw.x11.xlib.MoveWindow(_glfw.x11.display,win->x11.handle,x,y); }
+    void SetWindowDecorated(_GLFWwindow* win,i32 enabled) { struct {u64 flags,functions,decorations; i64 input_mode; u64 status;} hints={0}; hints.flags=2; hints.decorations=enabled?1:0; _glfw.x11.xlib.ChangeProperty(_glfw.x11.display,win->x11.handle,_glfw.x11.MOTIF_WM_HINTS,_glfw.x11.MOTIF_WM_HINTS,32,0/*PropModeReplace*/,(u8*)&hints,sizeof(hints)/sizeof(i64)); }
+    void GetCursorPosV(_GLFWwindow* win, double* xpos, double* ypos) { Window root,child; int rootX,rootY,childX,childY; u32 mask; _glfw.x11.xlib.QueryPointer(_glfw.x11.display,win->x11.handle,&root,&child,&rootX,&rootY,&childX,&childY,&mask); *xpos=childX; *ypos=childY; }
     void SetCursorPosV(_GLFWwindow* win, double x, double y) { win->x11.warpCursorPosX=(int)x; win->x11.warpCursorPosY=(int)y; _glfw.x11.xlib.WarpPointer(_glfw.x11.display,0L,win->x11.handle,0,0,0,0,(int)x,(int)y); }    
     static const XRRModeInfo* getModeInfo(const XRRScreenResources* sr, RRMode id) { for (int i = 0;  i < sr->nmode;  i++){ if (sr->modes[i].id == id) {return sr->modes + i;} } return NULL; }
-    static GLFWvidmode vidmodeFromModeInfo(const XRRModeInfo* mi, const XRRCrtcInfo* ci) {
-        GLFWvidmode mode;
-        if (ci->rotation == 2 || ci->rotation == 8) {  mode.width  = mi->height; mode.height = mi->width; } // ==90, ==270
-        else { mode.width = mi->width; mode.height = mi->height; }
-        mode.refreshRate = (mi->hTotal && mi->vTotal) ? (int)vround((double) mi->dotClock / ((double) mi->hTotal * (double) mi->vTotal)) : 0;
-        return mode;
-    }
-
+    static vidmode vidmodeFromModeInfo(const XRRModeInfo* mi, const XRRCrtcInfo* ci) { vidmode mode; if(ci->rotation == 2 || ci->rotation == 8){mode.width=mi->height; mode.height=mi->width;/*90,270*/} else { mode.width = mi->width; mode.height = mi->height; } mode.refreshRate = (mi->hTotal && mi->vTotal) ? (int)vround((double) mi->dotClock / ((double) mi->hTotal * (double) mi->vTotal)) : 0; return mode; }
     void PollMonitors() {
-        int disconnectedCount; _GLFWmonitor** disconnected = NULL;
         XRRScreenResources* sr = _glfw.x11.randr.GetScreenResourcesCurrent(_glfw.x11.display,_glfw.x11.root);
         RROutput primary = _glfw.x11.randr.GetOutputPrimary(_glfw.x11.display,_glfw.x11.root);
-        disconnectedCount = _glfw.monitorCount;
+        int disconnectedCount = _glfw.monitorCount; _GLFWmonitor** disconnected = NULL;
         if (disconnectedCount) { disconnected = OS_Calloc(_glfw.monitorCount,sizeof(_GLFWmonitor*)); mcpy(disconnected,_glfw.monitors,_glfw.monitorCount * sizeof(_GLFWmonitor*)); }
         for (int i = 0;  i < sr->noutput;  i++) {
             int j, type, widthMM, heightMM;
             XRROutputInfo* oi = _glfw.x11.randr.GetOutputInfo(_glfw.x11.display, sr, sr->outputs[i]);
             if (oi->connection != 0/*connected*/ || oi->crtc == 0L) { _glfw.x11.randr.FreeOutputInfo(oi); continue; }
-
-            for (j = 0;  j < disconnectedCount;  j++) {
-                if (disconnected[j] && disconnected[j]->x11.output == sr->outputs[i]) { disconnected[j] = NULL; break; }
-            }
-
+            for (j=0;j<disconnectedCount;++j) { if(disconnected[j] && disconnected[j]->x11.output == sr->outputs[i]){disconnected[j]=NULL; break;} }
             if (j < disconnectedCount) { _glfw.x11.randr.FreeOutputInfo(oi); continue; }
-
-            XRRCrtcInfo* ci = _glfw.x11.randr.GetCrtcInfo(_glfw.x11.display, sr, oi->crtc);
-            if (!ci) { _glfw.x11.randr.FreeOutputInfo(oi); continue; }
+            XRRCrtcInfo* ci = _glfw.x11.randr.GetCrtcInfo(_glfw.x11.display, sr, oi->crtc); if (!ci) { _glfw.x11.randr.FreeOutputInfo(oi); continue; }
 
             if (ci->rotation == 2 || ci->rotation == 8) { widthMM  = oi->mm_height; heightMM = oi->mm_width; } // == 90, == 270
             else { widthMM  = oi->mm_width; heightMM = oi->mm_height; }
@@ -2487,12 +2405,12 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
         }
 
         _glfw.x11.randr.FreeScreenResources(sr);
-        for (int i = 0;  i < disconnectedCount;  i++) { if (disconnected[i]) {InputMonitor(disconnected[i],0x00040002/*disconnected*/,0);} }
+        for (int i=0;i<disconnectedCount;++i) { if (disconnected[i]) {InputMonitor(disconnected[i],0x00040002/*disconnected*/,0);} }
         if (disconnected) OS_Free(disconnected,_glfw.monitorCount*sizeof(_GLFWmonitor*));
     }
     
     static void processEvent(XEvent* event) {
-        unsigned int keycode=0; if (event->type==2/*KeyPress*/ || event->type==3/*KeyRelease*/) keycode=event->xkey.keycode;
+        u32 keycode=0; if (event->type==2/*KeyPress*/ || event->type==3/*KeyRelease*/) keycode=event->xkey.keycode;
         Bool filtered=_glfw.x11.xlib.FilterEvent(event,0L);
         if (event->type==_glfw.x11.randr.eventBase+1/*notify*/) { _glfw.x11.randr.UpdateConfiguration(event); PollMonitors(); return; }
         if (event->type==35/*GenericEvent*/) return;
@@ -2566,18 +2484,15 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     }
 
     void GetMonitorWorkarea(_GLFWmonitor* monitor,int* xpos,int* ypos,int* width,int* height) {
-        int areaX = 0, areaY = 0, areaWidth = 0, areaHeight = 0;
-        XRRScreenResources* sr = _glfw.x11.randr.GetScreenResourcesCurrent(_glfw.x11.display,_glfw.x11.root);
-        XRRCrtcInfo* ci = _glfw.x11.randr.GetCrtcInfo(_glfw.x11.display,sr,monitor->x11.crtc);
-        const XRRModeInfo* mi = getModeInfo(sr,ci->mode);
-        areaX = ci->x, areaY = ci->y;
+        int areaWidth = 0, areaHeight = 0; XRRScreenResources* sr = _glfw.x11.randr.GetScreenResourcesCurrent(_glfw.x11.display,_glfw.x11.root); XRRCrtcInfo* ci = _glfw.x11.randr.GetCrtcInfo(_glfw.x11.display,sr,monitor->x11.crtc);
+        const XRRModeInfo* mi = getModeInfo(sr,ci->mode); int areaX = ci->x, areaY = ci->y;
         if (ci->rotation == 2 || ci->rotation == 8) { areaWidth = mi->height, areaHeight = mi->width; } // ==90, ==270
         else { areaWidth = mi->width, areaHeight = mi->height; }
         _glfw.x11.randr.FreeCrtcInfo(ci); _glfw.x11.randr.FreeScreenResources(sr);
         if (_glfw.x11.NET_WORKAREA && _glfw.x11.NET_CURRENT_DESKTOP) {
             Atom *extents = NULL, *desktop = NULL;
-            const unsigned long extentCount = _glfwGetWindowPropertyX11(_glfw.x11.root,_glfw.x11.NET_WORKAREA,((Atom) 6),(unsigned char**) &extents);
-            if (_glfwGetWindowPropertyX11(_glfw.x11.root,_glfw.x11.NET_CURRENT_DESKTOP,((Atom) 6),(unsigned char**) &desktop) > 0) {
+            const unsigned long extentCount = _glfwGetWindowPropertyX11(_glfw.x11.root,_glfw.x11.NET_WORKAREA,((Atom) 6),(u8**) &extents);
+            if (_glfwGetWindowPropertyX11(_glfw.x11.root,_glfw.x11.NET_CURRENT_DESKTOP,((Atom) 6),(u8**) &desktop) > 0) {
                 if (extentCount >= 4 && *desktop < extentCount / 4) {
                     const int gx = extents[*desktop * 4 + 0], gy = extents[*desktop * 4 + 1], gw = extents[*desktop * 4 + 2], gh = extents[*desktop * 4 + 3];
                     if (areaX < gx) { areaWidth  -= gx - areaX, areaX = gx; }
@@ -2591,14 +2506,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
         *xpos = areaX; *ypos = areaY; *width = areaWidth; *height = areaHeight;
     }
 
-    void GetVideoMode(_GLFWmonitor* monitor,GLFWvidmode* mode) {
-        XRRScreenResources* sr = _glfw.x11.randr.GetScreenResourcesCurrent(_glfw.x11.display,_glfw.x11.root);
-        const XRRModeInfo* mi = NULL;
-        XRRCrtcInfo* ci = _glfw.x11.randr.GetCrtcInfo(_glfw.x11.display,sr,monitor->x11.crtc);
-        if (ci) { mi = getModeInfo(sr,ci->mode); if (mi) {*mode = vidmodeFromModeInfo(mi,ci);} _glfw.x11.randr.FreeCrtcInfo(ci); }
-        _glfw.x11.randr.FreeScreenResources(sr);
-    }
-
+    void GetVideoMode(_GLFWmonitor* m, vidmode* v) { XRRScreenResources* sr = _glfw.x11.randr.GetScreenResourcesCurrent(_glfw.x11.display,_glfw.x11.root); const XRRModeInfo* mi=NULL; XRRCrtcInfo* ci = _glfw.x11.randr.GetCrtcInfo(_glfw.x11.display,sr,m->x11.crtc); if(ci){ mi = getModeInfo(sr,ci->mode); if(mi){*v = vidmodeFromModeInfo(mi,ci);} _glfw.x11.randr.FreeCrtcInfo(ci); } _glfw.x11.randr.FreeScreenResources(sr); }
     static int translateKeySyms(const KeySym* keysyms, int width) {
         if (width > 1) { // Numpad with numlock ON (keysyms[1]) - contiguous 0xffb0..0xffb9
             if (keysyms[1] >= 0xffb0 && keysyms[1] <= 0xffb9) return KEY_KP_0 + (keysyms[1] - 0xffb0);
@@ -2641,10 +2549,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     }
 
     static void createKeyTables() {
-        int scancodeMin, scancodeMax;
-        mset(_glfw.x11.keycodes,-1,sizeof(_glfw.x11.keycodes));
-        mset(_glfw.x11.scancodes,-1,sizeof(_glfw.x11.scancodes));
-        _glfw.x11.xlib.DisplayKeycodes(_glfw.x11.display,&scancodeMin,&scancodeMax);
+        int scancodeMin, scancodeMax; mset(_glfw.x11.keycodes,-1,sizeof(_glfw.x11.keycodes)); mset(_glfw.x11.scancodes,-1,sizeof(_glfw.x11.scancodes)); _glfw.x11.xlib.DisplayKeycodes(_glfw.x11.display,&scancodeMin,&scancodeMax);
         int width; KeySym* keysyms = _glfw.x11.xlib.GetKeyboardMapping(_glfw.x11.display,scancodeMin,scancodeMax - scancodeMin + 1,&width);
         for (int sc = scancodeMin; sc <= scancodeMax; sc++) {
             if (_glfw.x11.keycodes[sc] < 0) _glfw.x11.keycodes[sc] = translateKeySyms(&keysyms[(sc - scancodeMin) * width],width);
@@ -2672,25 +2577,11 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
         }
     }
 
-    static void pollAbsState(_GLFWjoystick* js) {
-        for (int code=0;code<0x40/*ABS_CNT*/;code++) {
-            if (js->linjs.absMap[code] < 0) continue;
-
-            struct input_absinfo* info = &js->linjs.absInfo[code];
-            if (OS_IOControl(js->linjs.fd,(0x80184540 + (code)),info) < 0) continue;
-
-            handleAbsEvent(js, code, info->value);
-        }
-    }
-
+    static void pollAbsState(_GLFWjoystick* js) { for (int code=0;code<0x40/*ABS_CNT*/;code++) { if (js->linjs.absMap[code] < 0) {continue;} struct input_absinfo* info = &js->linjs.absInfo[code]; if (OS_IOControl(js->linjs.fd,(0x80184540 + (code)),info) < 0) {continue;} handleAbsEvent(js,code,info->value); } }
     #define isBitSet(bit, arr) (arr[(bit) / 8] & (1 << ((bit) % 8)))
     #define EVIOCGBIT(ev, len) (0x80004520 + (ev) + ((len) << 16))
     static i32 openJoystickDevice(const char* path) {
-        for (int jid = 0;  jid <= JOYSTICK_LAST;  jid++) {
-            if (!_glfw.joysticks[jid].connected) continue;
-            if (sEqual(_glfw.joysticks[jid].linjs.path,path)) return 0;
-        }
-
+        for (int jid = 0;  jid <= JOYSTICK_LAST;  jid++) { if(!_glfw.joysticks[jid].connected){continue;} if(sEqual(_glfw.joysticks[jid].linjs.path,path)){return 0;} }
         _GLFWjoystickLinux linjs = {0}; linjs.fd = OS_Open(path,00004000|02000000,0); if (linjs.fd == -1) return 0;
 
         char evBits[(0x20/*EV_CNT*/ + 7) / 8] = {0},keyBits[(0x300/*KEY_CNT*/ + 7) / 8] = {0},absBits[(0x40/*ABS_CNT*/ + 7) / 8] = {0};
@@ -2703,35 +2594,23 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
         else sFormat(guid,sizeof(guid),"%02x%02x0000%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x00",id.bustype & 0xff, id.bustype >> 8,name[0], name[1], name[2], name[3],name[4], name[5], name[6], name[7],name[8], name[9], name[10]);
 
         int axisCount = 0, buttonCount = 0, hatCount = 0;
-        for (int code=0x100/*BTN_MISC*/;code<0x300/*KEY_CNT*/;code++) {
-            if (!isBitSet(code,keyBits)) continue;
-
-            linjs.keyMap[code - 0x100/*BTN_MISC*/] = buttonCount++;
-        }
-
+        for (int code=0x100/*BTN_MISC*/;code<0x300/*KEY_CNT*/;code++) { if(!isBitSet(code,keyBits)){continue;} linjs.keyMap[code - 0x100/*BTN_MISC*/]=buttonCount++; }
         for (int code=0;code<0x40/*ABS_CNT*/;code++) {
             linjs.absMap[code] = -1; if (!isBitSet(code,absBits)) continue;
 
             if (code >= 0x10/*ABS_HAT0X*/ && code <= 0x17/*ABS_HAT3Y*/) { linjs.absMap[code] = hatCount; hatCount++; code++; } // Skip the Y axis
-            else {
-                if (OS_IOControl(linjs.fd,(0x80184540 + (code)), &linjs.absInfo[code]) < 0) continue;
-
-                linjs.absMap[code] = axisCount++;
-            }
+            else { if(OS_IOControl(linjs.fd,(0x80184540 + (code)),&linjs.absInfo[code]) < 0){continue;} linjs.absMap[code]=axisCount++; }
         }
 
-        _GLFWjoystick* js = _glfwAllocJoystick(name,guid,axisCount,buttonCount,hatCount);
-        if (!js) { OS_Close(linjs.fd); return 0; }
+        _GLFWjoystick* js = _glfwAllocJoystick(name,guid,axisCount,buttonCount,hatCount); if (!js) { OS_Close(linjs.fd); return 0; }
 
-        scpy_to_a_from_b(linjs.path,path,sizeof(linjs.path));
-        mcpy(&js->linjs,&linjs,sizeof(linjs));
-        pollAbsState(js); JoystickConnection(js,0x00040001/*connected*/);
+        scpy_to_a_from_b(linjs.path,path,sizeof(linjs.path)); mcpy(&js->linjs,&linjs,sizeof(linjs)); pollAbsState(js); JoystickConnection(js,0x00040001/*connected*/);
         return  1;
     }
     
-    struct linux_dirent64 { u64 d_ino; i64 d_off; unsigned short d_reclen; unsigned char d_type; char d_name[]; };
+    struct linux_dirent64 { u64 d_ino; i64 d_off; u16 d_reclen; u8 d_type; char d_name[]; };
     struct inotify_event { i32 wd; u32 mask,cookie,len; char name[]; };
-    static void closeJoystick(_GLFWjoystick* js) { JoystickConnection(js,0x00040002/*disconnected*/); if (js->linjs.fd > 0) { OS_Close(js->linjs.fd); js->linjs.fd = -1; } _glfwFreeJoystick(js); }    
+    static void closeJoystick(_GLFWjoystick* js) { JoystickConnection(js,0x00040002/*disconnected*/); if (js->linjs.fd > 0) { OS_Close(js->linjs.fd); js->linjs.fd = -1; } FreeJoystick(js); }
     static i32 isEventDevice(const char* name) { if (!name || !sCompUpToLen(name, "event", 5) || name[5] == '\0') {return 0;} for (const char* p=name+5;*p;++p) if (*p < '0' || *p > '9') {return 0;} return 1; }
     static void iterateInputDevices(void (*callback)(const char* fullpath)) {
         const char* dirname = "/dev/input"; FHandle fd = OS_Open(dirname,00200000|02000000,0); if (fd < 0) return;
@@ -2776,7 +2655,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
 
     i32 InitJoysticks() {
         const char* dirname = "/dev/input";
-        {register long rax __asm__("rax") = 294/*__NR_inotify_init1*/; register unsigned int rdi __asm__("rdi") = 0x800/*IN_NONBLOCK*/|0x80000/*IN_CLOEXEC*/; 
+        {register long rax __asm__("rax") = 294/*__NR_inotify_init1*/; register u32 rdi __asm__("rdi") = 0x800/*IN_NONBLOCK*/|0x80000/*IN_CLOEXEC*/;
         __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi) : "rcx", "r11", "memory");
         _glfw.linjs.inotify = (int)rax; }
         if (_glfw.linjs.inotify >= 0) {
@@ -2830,7 +2709,7 @@ void _glfwFreeJoystick(_GLFWjoystick* js);
     static void swapBuffersGLX(_GLFWwindow* win) { _glfw.glx.SwapBuffers(_glfw.x11.display, win->context.glx.window); }
     static void swapIntervalGLX(int interval) { _GLFWwindow* handle = (_GLFWwindow*)window; _glfw.glx.SwapIntervalEXT(_glfw.x11.display,handle->context.glx.window,interval); }
     static GLFWglproc getProcAddressGLX(const char* procname) { return _glfw.glx.GetProcAddress((const u8*) procname); }
-    void glfwSetWindowPosition(GLFWwindow* handle, int xpos, int ypos) { _GLFWwindow* win = (_GLFWwindow*)handle; SetWindowPos(win,xpos,ypos); }
+    void SetWindowPosition(GLFWwindow* handle, int xpos, int ypos) { _GLFWwindow* win = (_GLFWwindow*)handle; SetWindowPos(win,xpos,ypos); }
 #endif
 _GLFWlibrary _glfw={0};
 int WindowInit() {
@@ -2884,9 +2763,9 @@ int WindowInit() {
             _glfw.x11.UTF8_STRING=IA("UTF8_STRING");  _glfw.x11.WM_PROTOCOLS=IA("WM_PROTOCOLS"); _glfw.x11.WM_STATE   =IA("WM_STATE");             _glfw.x11.WM_DELETE_WINDOW=IA("WM_DELETE_WINDOW");          _glfw.x11.NET_SUPPORTED =IA("_NET_SUPPORTED"); _glfw.x11.NET_SUPPORTING_WM_CHECK=IA("_NET_SUPPORTING_WM_CHECK");
             _glfw.x11.NET_WM_ICON=IA("_NET_WM_ICON"); _glfw.x11.NET_WM_PING =IA("_NET_WM_PING"); _glfw.x11.NET_WM_NAME=IA("_NET_WM_NAME"); _glfw.x11.NET_WM_BYPASS_COMPOSITOR=IA("_NET_WM_BYPASS_COMPOSITOR"); _glfw.x11.MOTIF_WM_HINTS=IA("_MOTIF_WM_HINTS");
         #undef IA
-        Window* wfr = NULL; _glfwGetWindowPropertyX11(_glfw.x11.root,_glfw.x11.NET_SUPPORTING_WM_CHECK,((Atom) 33),(unsigned char**)&wfr);
-        Window* wfc = NULL; _glfwGetWindowPropertyX11(*wfr,_glfw.x11.NET_SUPPORTING_WM_CHECK,((Atom) 33),(unsigned char**)&wfc);
-        _glfw.x11.xlib.Free(wfr); _glfw.x11.xlib.Free(wfc); Atom* sa = NULL; const unsigned long ac = _glfwGetWindowPropertyX11(_glfw.x11.root,_glfw.x11.NET_SUPPORTED,((Atom) 4),(unsigned char**)&sa);
+        Window* wfr = NULL; _glfwGetWindowPropertyX11(_glfw.x11.root,_glfw.x11.NET_SUPPORTING_WM_CHECK,((Atom) 33),(u8**)&wfr);
+        Window* wfc = NULL; _glfwGetWindowPropertyX11(*wfr,_glfw.x11.NET_SUPPORTING_WM_CHECK,((Atom) 33),(u8**)&wfc);
+        _glfw.x11.xlib.Free(wfr); _glfw.x11.xlib.Free(wfc); Atom* sa = NULL; const unsigned long ac = _glfwGetWindowPropertyX11(_glfw.x11.root,_glfw.x11.NET_SUPPORTED,((Atom) 4),(u8**)&sa);
         #define GA(name) getAtomIfSupported(sa, ac, name)
             _glfw.x11.NET_WM_STATE=GA("_NET_WM_STATE"); _glfw.x11.NET_WM_STATE_FULLSCREEN=GA("_NET_WM_STATE_FULLSCREEN"); _glfw.x11.NET_WM_WINDOW_TYPE=GA("_NET_WM_WINDOW_TYPE"); _glfw.x11.NET_WM_WINDOW_TYPE_NORMAL=GA("_NET_WM_WINDOW_TYPE_NORMAL"); _glfw.x11.NET_WORKAREA=GA("_NET_WORKAREA"); _glfw.x11.NET_CURRENT_DESKTOP=GA("_NET_CURRENT_DESKTOP"); _glfw.x11.NET_ACTIVE_WINDOW=GA("_NET_ACTIVE_WINDOW");
         #undef GA
@@ -2944,22 +2823,13 @@ void InputMonitor(_GLFWmonitor* monitor, int action, int placement) {
 
 _GLFWmonitor* AllocMonitor(const char* n, int w, int h) { _GLFWmonitor* monitor = OS_Calloc(1, sizeof(_GLFWmonitor)); monitor->widthMM = w; monitor->heightMM = h; scpy_to_a_from_b(monitor->name,n,sizeof(monitor->name)); return monitor; }
 _GLFWmonitor** glfwGetMonitors(int* count) { *count = _glfw.monitorCount; return (_GLFWmonitor**) _glfw.monitors; }
-_GLFWmonitor* glfwGetPrimaryMonitor(void) { if (!_glfw.monitorCount) {return NULL;} return (_GLFWmonitor*) _glfw.monitors[0]; }
+_GLFWmonitor* GetPrimaryMonitor(void) { if (!_glfw.monitorCount) {return NULL;} return (_GLFWmonitor*) _glfw.monitors[0]; }
 void glfwGetMonitorPos(_GLFWmonitor* handle, int* xpos, int* ypos) { *xpos = 0; *ypos = 0; _GLFWmonitor* monitor = (_GLFWmonitor*)handle; GetMonitorPos(monitor,xpos,ypos); }
 void glfwGetMonitorWorkarea(_GLFWmonitor* handle, int* xpos, int* ypos, int* width, int* height) { *xpos=*ypos=*width=*height=0; _GLFWmonitor* monitor = (_GLFWmonitor*)handle; GetMonitorWorkarea(monitor,xpos,ypos,width,height); }
-const GLFWvidmode* glfwGetVideoMode(_GLFWmonitor* handle) { _GLFWmonitor* monitor=(_GLFWmonitor*)handle; GetVideoMode(monitor,&monitor->currentMode); return &monitor->currentMode; }
-void InputWindowFocus(i32 focused) {
-    window_has_focus = focused != 0; ignore_next_mouse_delta = true;
-    _GLFWwindow* win = (_GLFWwindow*)window;
-    if (!focused) {
-        for (int k=0;k<=348;++k) { if (win->keys[k]         == INPUT_PRESS) {       InputKey(win,k,INPUT_RELEASE);} }
-        for (int b=0;b<=  7;++b) { if (win->mouseButtons[b] == INPUT_PRESS) {InputMouseClick(win,b,INPUT_RELEASE);} }
-    }
-}
-
+const vidmode* glfwGetVideoMode(_GLFWmonitor* handle) { _GLFWmonitor* monitor=(_GLFWmonitor*)handle; GetVideoMode(monitor,&monitor->currentMode); return &monitor->currentMode; }
+void InputWindowFocus(i32 f) { window_has_focus = f != 0; ignore_next_mouse_delta = true; _GLFWwindow* win = (_GLFWwindow*)window; if (!f) { for (int k=0;k<=348;++k) { if (win->keys[k] == INPUT_PRESS) {InputKey(win,k,INPUT_RELEASE);} } for (int b=0;b<=  7;++b) { if (win->mouseButtons[b] == INPUT_PRESS) {InputMouseClick(win,b,INPUT_RELEASE);} } } }
 GLFWwindow* VCreateWindow(int width, int height, char* title) {
-    _GLFWwindow* win = OS_Calloc(1,sizeof(_GLFWwindow));
-    win->videoMode = (GLFWvidmode){width,height,8,8,8,-1}; win->decorated = win->doublebuffer = 1; win->cursorMode = 0x00034003/*disabled*/;
+    _GLFWwindow* win = OS_Calloc(1,sizeof(_GLFWwindow)); win->videoMode = (vidmode){width,height,8,8,8,-1}; win->decorated = win->doublebuffer = 1; win->cursorMode = 0x00034003/*disabled*/;
 #ifdef WINDOWS
     u32 style = getWindowStyle(win);
     WNDCLASSEXW wc= (WNDCLASSEXW){sizeof(wc),0x23/*Redraws + Owns Device Context*/,windowProc,0,0,_glfw.win32.instance,NULL,NULL,NULL,NULL,L"Voxen",NULL};
@@ -3038,22 +2908,19 @@ GLFWwindow* VCreateWindow(int width, int height, char* title) {
     closest = ChooseFBConfig(usableConfigs,usableCount); native = (GLXFBConfig)closest->handle;
     _glfw.x11.xlib.Free(nativeConfigs); if (usableConfigs) OS_Free(usableConfigs,nativeCount*sizeof(_GLFWfbconfig));
     result = _glfw.glx.GetVisualFromFBConfig(_glfw.x11.display,native);
-    Visual* visual=result->visual; int depth = result->depth; _glfw.x11.xlib.Free(result);
-    int xpos=0,ypos=0;
+    Visual* visual=result->visual; int depth = result->depth; _glfw.x11.xlib.Free(result); int xpos=0,ypos=0;
     win->x11.colormap=_glfw.x11.xlib.CreateColormap(_glfw.x11.display,_glfw.x11.root,visual,0);
     XSetWindowAttributes wa = {0}; wa.colormap = win->x11.colormap; wa.event_mask = 0x63807F;
-    win->x11.parent=_glfw.x11.root;
-    win->x11.handle=_glfw.x11.xlib.CreateWindow(_glfw.x11.display,_glfw.x11.root,xpos,ypos,width,height,0,depth,1/*output only*/,visual,(1L<<3)/*border pixel*/|(1L<<13)/*colormap*/|(1L<<11)/*event mask*/,&wa);
+    win->x11.parent=_glfw.x11.root; win->x11.handle=_glfw.x11.xlib.CreateWindow(_glfw.x11.display,_glfw.x11.root,xpos,ypos,width,height,0,depth,1/*output only*/,visual,(1L<<3)/*border pixel*/|(1L<<13)/*colormap*/|(1L<<11)/*event mask*/,&wa);
     _glfw.x11.xlib.SaveContext(_glfw.x11.display,win->x11.handle,_glfw.x11.context,(XPointer)win); // Needed to allow input.
     Atom protocols[]={_glfw.x11.WM_DELETE_WINDOW,_glfw.x11.NET_WM_PING};
     _glfw.x11.xlib.SetWMProtocols(_glfw.x11.display,win->x11.handle,protocols,sizeof(protocols)/sizeof(Atom));
     if (_glfw.x11.NET_WM_WINDOW_TYPE && _glfw.x11.NET_WM_WINDOW_TYPE_NORMAL) { Atom type=_glfw.x11.NET_WM_WINDOW_TYPE_NORMAL;
-    _glfw.x11.xlib.ChangeProperty(_glfw.x11.display,win->x11.handle,_glfw.x11.NET_WM_WINDOW_TYPE,((Atom) 4),32,0/*PropModeReplace*/,(unsigned char*)&type,1); }
+    _glfw.x11.xlib.ChangeProperty(_glfw.x11.display,win->x11.handle,_glfw.x11.NET_WM_WINDOW_TYPE,((Atom) 4),32,0/*PropModeReplace*/,(u8*)&type,1); }
     XSizeHints* szhints=_glfw.x11.xlib.AllocSizeHints();
-    szhints->flags|=((1L << 4)/*PMinSize*/|(1L << 5)/*PMaxSize*/); szhints->min_width=szhints->max_width=width; szhints->min_height=szhints->max_height=height;
-    szhints->flags|=(1L << 9)/*PWinGravity*/; szhints->win_gravity=10/*static gravity*/;
+    szhints->flags|=((1L << 4)/*PMinSize*/|(1L << 5)/*PMaxSize*/); szhints->min_width=szhints->max_width=width; szhints->min_height=szhints->max_height=height; szhints->flags|=(1L << 9)/*PWinGravity*/; szhints->win_gravity=10/*static gravity*/;
     _glfw.x11.xlib.SetWMNormalHints(_glfw.x11.display,win->x11.handle,szhints); _glfw.x11.xlib.Free(szhints);
-    _glfw.x11.xlib.ChangeProperty(_glfw.x11.display,win->x11.handle,_glfw.x11.NET_WM_NAME,_glfw.x11.UTF8_STRING,8,0/*PropModeReplace*/,(unsigned char*)title,slen(title)); // Set title
+    _glfw.x11.xlib.ChangeProperty(_glfw.x11.display,win->x11.handle,_glfw.x11.NET_WM_NAME,_glfw.x11.UTF8_STRING,8,0/*PropModeReplace*/,(u8*)title,slen(title)); // Set title
     GetWindowPos(win,&win->x11.xpos,&win->x11.ypos); GetWindowSize(win,&win->x11.width,&win->x11.height);
     int attribs[40],index=0; attribs[index++] = 0x2091/*major*/; attribs[index++] = 4; attribs[index++] = 0x2092/*minor*/; attribs[index++] = 3; /*OpenGL 4.3*/ attribs[index++] = 0x9126/*profile mask arb*/; attribs[index++] = 1/*core profile*/; attribs[index++] = 0L; attribs[index++] = 0L;
     win->context.glx.handle     = _glfw.glx.CreateContextAttribsARB(_glfw.x11.display,native,NULL,1,attribs); win->context.glx.window  = _glfw.glx.CreateWindow(_glfw.x11.display,native,win->x11.handle,NULL);
@@ -3066,7 +2933,7 @@ GLFWwindow* VCreateWindow(int width, int height, char* title) {
 }
 
 void VSetWindowIcon(GLFWimage* images) { SetWindowIcon(images); }
-void glfwSetWindowSize(int width, int height) { _GLFWwindow* win = (_GLFWwindow*)window; win->videoMode.width=width; win->videoMode.height=height; SetWindowSize(win,width,height); }
+void VSetWindowSize(int w, int h) { _GLFWwindow* win = (_GLFWwindow*)window; win->videoMode.width=w; win->videoMode.height=h; SetWindowSize(win,w,h); }
 void glfwSetWindowMonitor(int xpos, int ypos, int width, int height) { _GLFWwindow* win = (_GLFWwindow*)window; win->videoMode.width=width; win->videoMode.height=height; SetWindowMonitor(win,xpos,ypos,width,height); }
 InputElement inputElements[134]={{"A",KEY_A},{"B",KEY_B},{"C",KEY_C},{"D",KEY_D},{"E",KEY_E},{"F",KEY_F},{"G",KEY_G},{"H",KEY_H},{"I",KEY_I},{"J",KEY_J},{"K",KEY_K},{"L",KEY_L},{"M",KEY_M},{"N",KEY_N},{"O",KEY_O},{"P",KEY_P},{"Q",KEY_Q},{"R",KEY_R},{"S",KEY_S},{"T",KEY_T},{"U",KEY_U},{"V",KEY_V},{"W",KEY_W},{"X",KEY_X},{"Y",KEY_Y},{"Z",KEY_Z},
                                  {"1",KEY_1},{"2",KEY_2},{"3",KEY_3},{"4",KEY_4},{"5",KEY_5},{"6",KEY_6},{"7",KEY_7},{"8",KEY_8},{"9",KEY_9},{"0",KEY_0},{"UPARROW",KEY_UP},{"DNARROW",KEY_DOWN},{"LFARROW",KEY_LEFT},{"RTARROW",KEY_RIGHT},{"NUM1",KEY_KP_1},{"NUM2",KEY_KP_2},{"NUM3",KEY_KP_3},{"NUM+",KEY_KP_ADD},{"ENTER",KEY_ENTER},
@@ -3177,59 +3044,37 @@ _GLFWjoystick* _glfwAllocJoystick(const char* name,const char* guid,int axisCoun
     return js;
 }
 
-bool JoystickPresent(int jid) {
-    if (jid < 0 || jid > JOYSTICK_LAST || (!_glfw.joysticksInitialized && !InitJoysticks())) return false;
-    
-    _glfw.joysticksInitialized = 1; _GLFWjoystick* js = _glfw.joysticks + jid; return js->connected ? PollJoystick(js) : false;
-}
-
-void _glfwFreeJoystick(_GLFWjoystick* js) { OS_Free(js->axes,js->axesSize); OS_Free(js->buttons,js->buttonsSize); OS_Free(js->hats,js->hatsSize); mset(js,0,sizeof(_GLFWjoystick)); }
+bool JoystickPresent(int jid) { if (jid < 0 || jid > JOYSTICK_LAST || (!_glfw.joysticksInitialized && !InitJoysticks())) {return false;} _glfw.joysticksInitialized = 1; _GLFWjoystick* js = _glfw.joysticks + jid; return js->connected ? PollJoystick(js) : false; }
+void FreeJoystick(_GLFWjoystick* js) { OS_Free(js->axes,js->axesSize); OS_Free(js->buttons,js->buttonsSize); OS_Free(js->hats,js->hatsSize); mset(js,0,sizeof(_GLFWjoystick)); }
 void InputProcessing() {
-    mouseMovementThisFrame = false; 
-    PollEvents();
+    mouseMovementThisFrame = false; PollEvents();
     for (int jid = JOYSTICK_1; jid <= JOYSTICK_LAST; ++jid) { // Input Poll
         if (!JoystickPresent(jid)) continue;
         _GLFWjoystick* js = _glfw.joysticks + jid; if (!js->connected) continue;
 
-        PollJoystick(js);
-        int totalButtons = js->buttonCount + js->hatCount * 4;
-        for (int i = 0; i < totalButtons && i < 16; ++i) {
-            KeyState* k = &Sys_Input.joystickButtons[jid - JOYSTICK_1][i];
-            bool down = js->buttons[i] == INPUT_PRESS;
-            k->pressed = down && !k->down; k->released = !down && k->down; k->down = down;
-        }
-
+        PollJoystick(js); int totalButtons = js->buttonCount + js->hatCount * 4;
+        for (int i = 0; i < totalButtons && i < 16; ++i) { KeyState* k = &Sys_Input.joystickButtons[jid - JOYSTICK_1][i]; bool down = js->buttons[i] == INPUT_PRESS; k->pressed = down && !k->down; k->released = !down && k->down; k->down = down; }
         for (int i = 0; i < js->hatCount && i < 5; ++i) { Sys_Input.joystickHats[i].down = js->hats[i]; }
 //         for (int i = 0; i < js->axisCount && i < MAX_JOYSTICK_AXES; ++i) { Sys_Input.joystickAxes[jid - JOYSTICK_1][i] = js->axes[i]; } TODO??
     }
 
     if (Sys_Input.keyStates[KEY_E].pressed) play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f,(V3){},false);
-    if (window_has_focus) {
-        if (Sys_Input.keyStates[KEY_CAPS_LOCK].pressed) Sys_Input.isCapsLockOn = !Sys_Input.isCapsLockOn; // Change capslock state to match keyboard having toggled.  Must always happen regardless of paused/menu.
-        ProcessInput(); // Calls ApplyPlayerMovements(), needs called without checking paused state for menus handling.
-    }
+    if (window_has_focus) { if(Sys_Input.keyStates[KEY_CAPS_LOCK].pressed){Sys_Input.isCapsLockOn=!Sys_Input.isCapsLockOn;} ProcessInput(); }
 }
 
 void SetVSync() { ((_GLFWwindow*)window)->context.swapInterval((i32)Sys_Settings.Vsync); }
 void InputClearRisingAndFallingEdges() { for (i32 i=0;i<MAX_KEYS;++i) {Sys_Input.keyStates[i].pressed = Sys_Input.keyStates[i].released = false;} for (i32 i=0;i<MAX_MOUSE_BUTTONS;i++) {Sys_Input.mouseButtons[i].pressed = Sys_Input.mouseButtons[i].released = false;} Sys_Input.scrollDelta = 0; currentMouse_dx = currentMouse_dy = 0; } // Can't memset as we want to preserve down state
 void CenterWindowOnMonitor() {
-    int monitorCount; _GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
-    if (Sys_Settings.CurrentMonitor > (monitorCount - 1)) { Sys_Settings.CurrentMonitor = 0; SaveConfig(); }
-    int mx,my; _GLFWmonitor* next = monitors[Sys_Settings.CurrentMonitor];
-    glfwGetMonitorPos(next,&mx,&my);
-    const GLFWvidmode* mode = glfwGetVideoMode(next);
-    int xpos = mx + (mode->width - Sys_Settings.ScreenWidth) / 2, ypos = my + (mode->height - Sys_Settings.ScreenHeight) / 2;
-    glfwSetWindowPosition(window,xpos,ypos);
-    ignore_next_mouse_delta = true;
+    int c; _GLFWmonitor** monitors = glfwGetMonitors(&c); if (Sys_Settings.CurrentMonitor > (c - 1)) { Sys_Settings.CurrentMonitor = 0; SaveConfig(); }
+    int mx,my; _GLFWmonitor* next = monitors[Sys_Settings.CurrentMonitor]; glfwGetMonitorPos(next,&mx,&my);
+    const vidmode* mode = glfwGetVideoMode(next); int xpos = mx + (mode->width - Sys_Settings.ScreenWidth) / 2, ypos = my + (mode->height - Sys_Settings.ScreenHeight) / 2;
+    SetWindowPosition(window,xpos,ypos); ignore_next_mouse_delta = true;
 }
 
 _GLFWmonitor* GetCurrentMonitor() {
-    int wx=0,wy=0,ww=0,wh=0; GetWindowPos(((_GLFWwindow*)window),&wx,&wy); GetWindowSize(((_GLFWwindow*)window),&ww,&wh);
-    _GLFWmonitor* bestMonitor = glfwGetPrimaryMonitor();
-    int bestArea=0,monitorCount; _GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
-    for (int i=0;i<monitorCount;++i) {
-        int mx,my; glfwGetMonitorPos(monitors[i],&mx,&my);
-        const GLFWvidmode* mode = glfwGetVideoMode(monitors[i]);
+    int wx=0,wy=0,ww=0,wh=0; GetWindowPos(((_GLFWwindow*)window),&wx,&wy); GetWindowSize(((_GLFWwindow*)window),&ww,&wh); _GLFWmonitor* bestMonitor = GetPrimaryMonitor(); int bestArea=0,c; _GLFWmonitor** monitors = glfwGetMonitors(&c);
+    for (int i=0;i<c;++i) {
+        int mx,my; glfwGetMonitorPos(monitors[i],&mx,&my); const vidmode* mode = glfwGetVideoMode(monitors[i]);
         int left=vmax(wx,mx), right=vmin(wx + ww,mx + mode->width), top=vmax(wy,my), bottom=vmin(wy + wh,my + mode->height);
         int area = (right > left && bottom > top) ? (right - left) * (bottom - top) : 0;
         if (area > bestArea) { bestArea = area; bestMonitor = monitors[i]; }
@@ -3240,22 +3085,16 @@ _GLFWmonitor* GetCurrentMonitor() {
 void ChangeResolution() {
     if (resDropdownCount < 1) return;
 
-    resSelectedIdx = (resSelectedIdx + 1) % resDropdownCount;
-    Sys_Settings.ScreenWidth  = (u32)resModes[resSelectedIdx].w; Sys_Settings.ScreenHeight = (u32)resModes[resSelectedIdx].h;
-    _GLFWmonitor* monitor = GetCurrentMonitor(); if (!monitor) monitor = glfwGetPrimaryMonitor();
-    int mx,my; glfwGetMonitorPos(monitor,&mx,&my);
-    const GLFWvidmode* desktop = glfwGetVideoMode(monitor);
-    int xpos = mx + (desktop->width - (int)Sys_Settings.ScreenWidth) / 2, ypos = my + (desktop->height - (int)Sys_Settings.ScreenHeight) / 2;
-    glfwSetWindowSize((int)Sys_Settings.ScreenWidth,(int)Sys_Settings.ScreenHeight);
-    glfwSetWindowPosition(window,xpos,ypos);
-    UpdateScreenSize((int)Sys_Settings.ScreenWidth,(int)Sys_Settings.ScreenHeight);
-    resDropdownOpen = false;
-    SaveConfig();
+    resSelectedIdx = (resSelectedIdx + 1) % resDropdownCount; Sys_Settings.ScreenWidth = (u32)resModes[resSelectedIdx].w; Sys_Settings.ScreenHeight = (u32)resModes[resSelectedIdx].h;
+    _GLFWmonitor* monitor = GetCurrentMonitor(); if(!monitor){monitor=GetPrimaryMonitor();}
+    int mx,my; glfwGetMonitorPos(monitor,&mx,&my); const vidmode* desktop = glfwGetVideoMode(monitor);
+    int x = mx + (desktop->width - (int)Sys_Settings.ScreenWidth) / 2, y = my + (desktop->height - (int)Sys_Settings.ScreenHeight) / 2;
+    VSetWindowSize((int)Sys_Settings.ScreenWidth,(int)Sys_Settings.ScreenHeight); SetWindowPosition(window,x,y); UpdateScreenSize((int)Sys_Settings.ScreenWidth,(int)Sys_Settings.ScreenHeight);
+    resDropdownOpen = false; SaveConfig();
 }
 
 void GatherResolutionModes() {
-    resDropdownCount = 0; _GLFWmonitor* monitor = GetCurrentMonitor(); if (!monitor) monitor = glfwGetPrimaryMonitor();
-    const GLFWvidmode* desktop = glfwGetVideoMode(monitor); if (!desktop) return;
+    resDropdownCount = 0; _GLFWmonitor* monitor = GetCurrentMonitor(); if (!monitor){monitor=GetPrimaryMonitor();} const vidmode* desktop = glfwGetVideoMode(monitor); if(!desktop){return;}
 
     static const struct {int w,h;} commonRes[] = {{320,200},{640,400},{640,480},{800,600},{1024,768},{1280,720},{1280,800},{1366,768},{1440,900},{1600,900},{1920,1080},{2560,1440}};
     int maxW = desktop->width, maxH = desktop->height,j;
@@ -3268,27 +3107,14 @@ void GatherResolutionModes() {
 
     if (resDropdownCount < 8) resModes[resDropdownCount++] = (ResMode){desktop->width,desktop->height};
     resSelectedIdx = 0;
-    for (int i = 0; i < resDropdownCount; ++i) {
-        if (resModes[i].w == (int)Sys_Settings.ScreenWidth && resModes[i].h == (int)Sys_Settings.ScreenHeight) { resSelectedIdx = i; break; }
-    }
+    for (int i = 0; i < resDropdownCount; ++i) { if(resModes[i].w == (int)Sys_Settings.ScreenWidth && resModes[i].h == (int)Sys_Settings.ScreenHeight){resSelectedIdx=i; break;} }
 }
 
 void ChangeFullScreenWindowed() {
-    int x,y,w,h,mx,my,monitorCount; _GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
-    _GLFWmonitor* monitor = monitors[Sys_Settings.CurrentMonitor];
-    const GLFWvidmode* mode = glfwGetVideoMode(monitor);
-    glfwGetMonitorWorkarea(monitor,&x,&y,&w,&h);
+    int x,y,w,h,mx,my,monitorCount; _GLFWmonitor** monitors = glfwGetMonitors(&monitorCount); _GLFWmonitor* monitor = monitors[Sys_Settings.CurrentMonitor]; const vidmode* mode = glfwGetVideoMode(monitor); glfwGetMonitorWorkarea(monitor,&x,&y,&w,&h);
     ((_GLFWwindow*)window)->decorated = (i32)(!Sys_Settings.Fullscreen); SetWindowDecorated(((_GLFWwindow*)window),(i32)(!Sys_Settings.Fullscreen));
-    if (Sys_Settings.Fullscreen) {
-        glfwSetWindowMonitor(x,y,w,h);
-        Sys_Settings.ScreenWidth = w; Sys_Settings.ScreenHeight = h;
-    } else {
-        glfwGetMonitorPos(monitor,&mx,&my);
-        Sys_Settings.ScreenWidth  = vmax(vmin((w*3)/4,1366),320); Sys_Settings.ScreenHeight = vmax(vmin((h*3)/4,768),200);
-        int xpos = mx + (mode->width - Sys_Settings.ScreenWidth) / 2, ypos = my + (mode->height - Sys_Settings.ScreenHeight) / 2;
-        glfwSetWindowMonitor(xpos,ypos,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
-    }
-
+    if (Sys_Settings.Fullscreen) {glfwSetWindowMonitor(x,y,w,h); Sys_Settings.ScreenWidth = w; Sys_Settings.ScreenHeight = h;}
+    else { glfwGetMonitorPos(monitor,&mx,&my); Sys_Settings.ScreenWidth  = vmax(vmin((w*3)/4,1366),320); Sys_Settings.ScreenHeight = vmax(vmin((h*3)/4,768),200); int x=mx + (mode->width - Sys_Settings.ScreenWidth) / 2, y=my + (mode->height - Sys_Settings.ScreenHeight) / 2; glfwSetWindowMonitor(x,y,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); }
     UpdateScreenSize(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
 }
 
@@ -3710,39 +3536,14 @@ static inline EPAFace MakeEPAFace(const EPAVert* vb, int a, int b, int c) {
 }
 
 static inline V3 EPAContactPoint(const EPAVert* ev, int a, int b, int c, V3 n, float d) {
-    V3 pa = ev[a].v;
-    V3 pb = ev[b].v;
-    V3 pc = ev[c].v;
-
-    V3 v0 = V3_AsubB(pb, pa);
-    V3 v1 = V3_AsubB(pc, pa);
-    V3 v2 = V3_AsubB((V3){0,0,0}, pa);   // Vector from pa to origin (in Minkowski space)
-
-    float d00 = V3_dot(v0, v0);
-    float d01 = V3_dot(v0, v1);
-    float d11 = V3_dot(v1, v1);
-    float d20 = V3_dot(v2, v0);
-    float d21 = V3_dot(v2, v1);
-
-    float denom = d00 * d11 - d01 * d01 + PHY_EPSILON;
-    float v = (d11 * d20 - d01 * d21) * (1.0f / denom);
-    float w = (d00 * d21 - d01 * d20) * (1.0f / denom);
-    float u = 1.0f - v - w;
-
-    // Clamp to avoid numerical blow-up / negative weights causing jitter
-    u = vmax(u, 0.0f);
-    v = vmax(v, 0.0f);
-    w = vmax(w, 0.0f);
+    V3 pa = ev[a].v; V3 pb = ev[b].v; V3 pc = ev[c].v;
+    V3 v0 = V3_AsubB(pb, pa); V3 v1 = V3_AsubB(pc, pa); V3 v2 = V3_AsubB((V3){0,0,0}, pa);   // Vector from pa to origin (in Minkowski space)
+    float d00 = V3_dot(v0, v0); float d01 = V3_dot(v0, v1); float d11 = V3_dot(v1, v1); float d20 = V3_dot(v2, v0); float d21 = V3_dot(v2, v1);
+    float denom = d00 * d11 - d01 * d01 + PHY_EPSILON; float v = (d11 * d20 - d01 * d21) * (1.0f / denom); float w = (d00 * d21 - d01 * d20) * (1.0f / denom); float u = 1.0f - v - w;
+    u = vmax(u, 0.0f); v = vmax(v, 0.0f); w = vmax(w, 0.0f); // Clamp to avoid numerical blow-up / negative weights causing jitter
     float sum = u + v + w;
-    if (sum > PHY_EPSILON) {
-        u /= sum; v /= sum; w /= sum;
-    }
-
-    return (V3){
-        u*ev[a].wA.x + v*ev[b].wA.x + w*ev[c].wA.x,
-        u*ev[a].wA.y + v*ev[b].wA.y + w*ev[c].wA.y,
-        u*ev[a].wA.z + v*ev[b].wA.z + w*ev[c].wA.z
-    };
+    if (sum > PHY_EPSILON) {u /= sum; v /= sum; w /= sum;}
+    return (V3){u*ev[a].wA.x + v*ev[b].wA.x + w*ev[c].wA.x,u*ev[a].wA.y + v*ev[b].wA.y + w*ev[c].wA.y,u*ev[a].wA.z + v*ev[b].wA.z + w*ev[c].wA.z};
 }
 
 static inline Manifold MakeEPAManifold(const EPAVert* ev, int a, int b, int c, V3 n, float d) { Manifold m = {0};  m.normal = n;  m.maxPen = d; m.n = 1; m.p[0] = (ManifoldPt){ EPAContactPoint(ev, a, b, c, n, d), d }; return m; }
@@ -4421,7 +4222,7 @@ static int ParseLevelArg(const char* arg) {
     if (!arg || !*arg) return -1;
 
     char clean[64] = {0}; int j = 0;
-    for (int i = 0; arg[i] && j < 60; i++) { if (arg[i] != ' ' && arg[i] != '_') clean[j++] = c2Lower((unsigned char)arg[i]); }   clean[j] = '\0';
+    for (int i = 0; arg[i] && j < 60; i++) { if (arg[i] != ' ' && arg[i] != '_') clean[j++] = c2Lower((u8)arg[i]); }   clean[j] = '\0';
     if (sEqual(clean, "r")      || sFindSub(clean, "reactor")) return 0;
     if (sFindSub(clean, "g1") || sFindSub(clean, "10")) return 10;
     if (sFindSub(clean, "g2") || sFindSub(clean, "11")) return 11;
@@ -4510,9 +4311,9 @@ void ProcessConsoleCommand(const char* command) {
 
     char ts[T_BUFFER_SIZE]; sCpy2aSubFromb(ts,sizeof(ts)-1,command,T_BUFFER_SIZE);
     ts[sizeof(ts)-1] = '\0';
-    const char* command_trimmed = ts;    while (*command_trimmed && cEmpty((unsigned char)*command_trimmed)) command_trimmed++;
-    const char* space = command_trimmed; while (*space && !cEmpty((unsigned char)*space)) space++;
-    const char* arg_start = space;       while (*arg_start && cEmpty((unsigned char)*arg_start)) arg_start++;
+    const char* command_trimmed = ts;    while (*command_trimmed && cEmpty((u8)*command_trimmed)) command_trimmed++;
+    const char* space = command_trimmed; while (*space && !cEmpty((u8)*space)) space++;
+    const char* arg_start = space;       while (*arg_start && cEmpty((u8)*arg_start)) arg_start++;
     AddToHistory(command);
     bool commandProcessed = false;
     for (u16 i=0;consoleCmds[i].name!=NULL;++i) {
@@ -4643,7 +4444,7 @@ extern SettingsSystem Sys_Settings; extern GlobalContext World;
     #define _IOWR(type, nr, size) _IOC(2U | 1U, (type), (nr), sizeof(size))
     typedef u64 snd_pcm_uframes_t; typedef i64 snd_pcm_sframes_t; struct snd_mask { u32 bits[8]; }; struct snd_interval { u32 min,max,openmin:1, openmax:1, integer:1, empty:1; };
     struct snd_pcm_hw_params { u32 flags; struct snd_mask masks[3]; struct snd_mask mres[5]; struct snd_interval intervals[12]; struct snd_interval ires[9]; u32 rmask,cmask,info,msbits,rate_num,rate_den; snd_pcm_uframes_t fifo_size; u8 reserved[64]; };
-    struct snd_pcm_sw_params { int tstamp_mode; unsigned int period_step,sleep_min; snd_pcm_uframes_t avail_min,xfer_align,start_threshold,stop_threshold,silence_threshold,silence_size,boundary; u32 proto,tstamp_type; u8 reserved[56]; }; 
+    struct snd_pcm_sw_params { int tstamp_mode; u32 period_step,sleep_min; snd_pcm_uframes_t avail_min,xfer_align,start_threshold,stop_threshold,silence_threshold,silence_size,boundary; u32 proto,tstamp_type; u8 reserved[56]; };
     struct snd_pcm_mmap_status { int state,pad1; snd_pcm_uframes_t hw_ptr; struct timespec tstamp; int suspended_state; struct timespec audio_tstamp; };
     struct snd_pcm_mmap_control { snd_pcm_uframes_t appl_ptr; snd_pcm_uframes_t avail_min; };
     struct snd_pcm_sync_ptr { u32 flags; union { struct snd_pcm_mmap_status  status; u8 reserved[64]; } s; union { struct snd_pcm_mmap_control control; u8 reserved[64]; } c; };
@@ -4660,7 +4461,7 @@ extern SettingsSystem Sys_Settings; extern GlobalContext World;
     static void hw_params_get_interval(struct snd_pcm_hw_params *p, int parameter, u32 *min, u32 *max) { struct snd_interval *i = get_interval_struct(p,parameter); *min = i->min + i->openmin; *max = i->max - i->openmax; }
     static u32 hw_params_get(struct snd_pcm_hw_params *p, int parameter, u32 value) { u32 r, t; return (parameter >= 0 && parameter <= 2) ? hw_params_get_mask(p,parameter,value) : ((parameter >= 8 && parameter <= 19) ? (hw_params_get_interval(p,parameter,&r,&t),r) : 0); }
     static void hw_params_fill(struct snd_pcm_hw_params *p) { mset(p,0,sizeof(*p)); mset(p->masks,0xff,sizeof(p->masks)); p->rmask = p->info = 0xffffffffU; for (int i=0;i<=11;i++) { p->intervals[i].min = 0; p->intervals[i].max = 0xffffffffU; } }
-    unsigned long pcm_gethw(pcm_params_t *p, pcm_param_t param, unsigned int val) { return hw_params_get(&p->hw_params,param,val); } 
+    unsigned long pcm_gethw(pcm_params_t *p, pcm_param_t param, u32 val) { return hw_params_get(&p->hw_params,param,val); }
     unsigned long pcm_getsw(pcm_params_t *p, pcm_param_t param) { pcm_sw_params_t *sw = &p->sw_params; return ((u64*)&sw->avail_min)[param - 22]; }
     int pcm_params_setup(int fd, pcm_params_t *p) {
         if (ioctl(fd,_IOWR('A',0x11,struct snd_pcm_hw_params),&p->hw_params) == -1) return -1;
@@ -5763,7 +5564,7 @@ void RenderUIImage(i16 x, i16 y, i16 width, i16 height, u32 texIndex) {
 
 void ClearAll() { glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO); glClearColor(0,0,0,1); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); glBindFramebuffer(GL_FRAMEBUFFER,uiFBO); glClearColor(0,0,0,0); glClear(GL_COLOR_BUFFER_BIT); glBindFramebuffer(GL_FRAMEBUFFER,0); glClearColor(0,0,0,1); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); }
 void RenderLoadingProgress(i32 offset, const char * restrict text) { ClearAll(); glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); RenderFormattedText(683 - offset,379,T_WHITE,FONT_NORMAL,1.0f,text); ((_GLFWwindow*)window)->context.swapBuffers(((_GLFWwindow*)window)); }
-static __attribute__((noinline)) void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, unsigned char* bmp) {
+static __attribute__((noinline)) void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, u8* bmp) {
     if (*id == 0) {glGenTextures(1,id);} glBindTexture(GL_TEXTURE_2D,*id);
     glTexImage2D(GL_TEXTURE_2D,0,internalFormat,width,height,0,format,type,bmp);
     glTexParameteri(GL_TEXTURE_2D,0x2801/*GL_TEXTURE_MIN_FILTER*/,filt); glTexParameteri(GL_TEXTURE_2D,0x2800/*GL_TEXTURE_MAG_FILTER*/,filt);
@@ -6521,16 +6322,13 @@ void InitalizeEnvironment() {
     console_log_file = OS_OpenWriteonly("./voxen.log"); // Initialize log system for all prints to go to both stdout and voxen.log file
     DebugRAM("program start");
     DualLog("Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed\nEntity size: %u\n",sizeof(Entity));
-    WindowInit();
-    globalframe=0,World.menuActive=true,World.screenshotTimeout=1.0,World.creditsPageIndex=1,World.diffCbt=World.diffCyb=World.diffPuz=World.diffMis=2,World.deaths=0,World.worstFPS=0,World.cursorPosition_x=680,World.cursorPosition_y=384;
+    WindowInit(); threadCnt = clamp(OS_GetNumThreads(),1,32); globalframe=0,World.menuActive=true,World.screenshotTimeout=1.0,World.creditsPageIndex=1,World.diffCbt=World.diffCyb=World.diffPuz=World.diffMis=2,World.deaths=0,World.worstFPS=0,World.cursorPosition_x=680,World.cursorPosition_y=384;
     DualLog("Loading game definition...");
-    FHandle gmFP = OS_OpenReadonly("./Data/gamedata.txt");
-    if (!gmFP) { DualLogError("\nCannot open ./Data/gamedata.txt\n"); OS_Exit(1);  }
+    FHandle gmFP = OS_OpenReadonly("./Data/gamedata.txt"); if (!gmFP) { DualLogError("\nCannot open ./Data/gamedata.txt\n"); OS_Exit(1);  }
     
     char gmLine[512],global_modname[256],global_dllname[256]; u32 lineNum = 0;
     while (sUpToEndLine(gmLine,sizeof(gmLine),gmFP)) {
-        lineNum++;
-        char* s = data_parser_trim(gmLine); if (*s == 0 || (s[0] == '/' && s[1] == '/')) continue;
+        lineNum++; char* s = data_parser_trim(gmLine); if (*s == 0 || (s[0] == '/' && s[1] == '/')) continue;
         char* colon = StringFindFirstCharWithin(s, ':'); if (!colon) continue;
         *colon = '\0'; char* key = data_parser_trim(s); char* val = data_parser_trim(colon + 1); if (*key == 0 || *val == 0) continue;
 
@@ -6545,8 +6343,7 @@ void InitalizeEnvironment() {
     CenterWindowOnMonitor();
     SetGLContext_GetFunctionPointers();
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); ((_GLFWwindow*)window)->context.swapBuffers(((_GLFWwindow*)window)); // Black out the window as early as possible for better presentation.
-    i32 major=0,minor=0; glGetIntegerv(0x821B/*GL_MAJOR_VERSION*/,&major); glGetIntegerv(0x821C/*GL_MINOR_VERSION*/,&minor);
-    if (major < 4 || (major == 4 && minor < 3)) { DualLogError("Need OpenGL >= 4.3, got %d.%d\n",major,minor); OS_Exit(1); }
+    i32 major=0,minor=0; glGetIntegerv(0x821B/*GL_MAJOR_VERSION*/,&major); glGetIntegerv(0x821C/*GL_MINOR_VERSION*/,&minor); if (major < 4 || (major == 4 && minor < 3)) { DualLogError("Need OpenGL >= 4.3, got %d.%d\n",major,minor); OS_Exit(1); }
     
     glFrontFace(0x0901/*GL_CCW*/); // Set triangle winding order
     glBlendFuncSeparate(0x0302/*GL_SRC_ALPHA*/, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/, 1, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/);
@@ -6609,7 +6406,6 @@ void InitalizeEnvironment() {
     glUseProgram(shadowmapsSP);  glUniform1ui( 9,SHADOW_MAP_SIZE);   glUseProgram(shadowmapsClearSP); glUniform1ui(1,SHADOW_MAP_SIZE);
     glUseProgram(chunkSP);       glUniform1ui(21,SHADOW_MAP_SIZE); glUniform1f(22,(float)SHADOW_MAP_SIZE); glUniform1ui(23,LIGHT_COUNT); glUniform1ui(24,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);
     glUseProgram(voxelUpdateSP); glUniform1ui( 4,SHADOW_MAP_SIZE); glUniform1ui(6,(u32)MAX_LIGHTS_PER_VOXEL);
-    threadCnt = clamp(OS_GetNumThreads(),1,32);
     RenderLoadingProgress(100,"Loading textures..."); LoadTextures();
     RenderLoadingProgress(92,"Loading models...");    LoadModels();
     if (World.introNotPlayed) {} // TODO: Play intro
