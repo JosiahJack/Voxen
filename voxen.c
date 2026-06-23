@@ -18,23 +18,18 @@ ENGINE_TO_MOD void DualLogError(const char* fmt, ...); ENGINE_TO_MOD void DualLo
     #define MOD_EXTENSION ".dll" // e.g. Citadel.dll
     #define OS_DlOpen(path)       LoadLibraryA(path)
     #define OS_DlSym(handle,name) GetProcAddress((handle),(name))
-    #define DECLSPEC_IMPORT __declspec (dllimport)
+    #define DLL_IMP __declspec (dllimport)
     #define WINAPI __stdcall
     #define INVALID_FHANDLE ((void*) (i64)-1)
     typedef void* FHandle; typedef i64 (WINAPI *PROC)(); typedef i64 (WINAPI *FARPROC)(); typedef i64 (WINAPI *NEARPROC)();
     typedef struct { unsigned long Data1; u16 Data2,Data3; u8 Data4[8]; } GUID; typedef struct { int unused; } *HINSTANCE; typedef HINSTANCE HMODULE;  typedef struct { u32 nLength; void* lpSecurityDescriptor; i32 bInheritHandle; } *LPSECURITY_ATTRIBUTES;
     typedef struct { i64 QuadPart; } LARGE_INTEGER; typedef LARGE_INTEGER *PLARGE_INTEGER; typedef struct { u64 Internal,InternalHigh; union {struct {u32 Offset,OffsetHigh;} DUMMYSTRUCTNAME; void* Pointer;} DUMMYUNIONNAME; void* hEvent; } OVERLAPPED, *LPOVERLAPPED;
     typedef struct { union { u32 dwOemId; struct { u16 wProcessorArchitecture,wReserved; } DUMMYSTRUCTNAME; } DUMMYUNIONNAME; u32 dwPageSize; void* lpMinimumApplicationAddress,*lpMaximumApplicationAddress; u64 dwActiveProcessorMask; u32 dwNumberOfProcessors,dwProcessorType,dwAllocationGranularity; u16 wProcessorLevel,wProcessorRevision; } SYSTEM_INFO, *LPSYSTEM_INFO;
-    DECLSPEC_IMPORT void* WINAPI CreateFileMappingA(void*,LPSECURITY_ATTRIBUTES,u32,u32,u32,const char*); DECLSPEC_IMPORT i32 WINAPI VirtualFree(void*,u64,u32);                  DECLSPEC_IMPORT void* WINAPI VirtualAlloc(void*,u64,u32,u32 flProtect);
-    DECLSPEC_IMPORT void* WINAPI CreateFileA(const char*,u32,u32,LPSECURITY_ATTRIBUTES,u32,u32,void*);    DECLSPEC_IMPORT i32 WINAPI ReadFile(void*,void*,u32,u32*,LPOVERLAPPED); DECLSPEC_IMPORT i32 WINAPI WriteFile(void*,void*,u32,u32*,LPOVERLAPPED);
-    DECLSPEC_IMPORT i32 WINAPI SetFilePointerEx(void*,LARGE_INTEGER,PLARGE_INTEGER,u32);                  DECLSPEC_IMPORT i32 WINAPI GetFileSizeEx(void*,PLARGE_INTEGER);         DECLSPEC_IMPORT i32 WINAPI CloseHandle(void*);
-    DECLSPEC_IMPORT void* WINAPI MapViewOfFileEx(void*,u32,u32,u32,u64,void*);                            DECLSPEC_IMPORT void* WINAPI MapViewOfFile(void*,u32,u32,u32,u64);      DECLSPEC_IMPORT i32 WINAPI UnmapViewOfFile(void*);
-    DECLSPEC_IMPORT void* WINAPI CreateFileMappingW(void*,LPSECURITY_ATTRIBUTES,u32,u32,u32,u16*);        DECLSPEC_IMPORT void* WINAPI GetStdHandle(u32);                         DECLSPEC_IMPORT i32 WINAPI QueryPerformanceCounter(LARGE_INTEGER*);
-    DECLSPEC_IMPORT i32 WINAPI QueryPerformanceFrequency(LARGE_INTEGER*);                                 DECLSPEC_IMPORT void WINAPI GetSystemInfo(LPSYSTEM_INFO);               DECLSPEC_IMPORT HINSTANCE WINAPI LoadLibraryA(const char*);
-    DECLSPEC_IMPORT FARPROC WINAPI GetProcAddress(HINSTANCE,const char*);                                 DECLSPEC_IMPORT __declspec (noreturn) void WINAPI ExitProcess(u32);
+    DLL_IMP void* WINAPI CreateFileMappingA(void*,LPSECURITY_ATTRIBUTES,u32,u32,u32,const char*); DLL_IMP i32 WINAPI VirtualFree(void*,u64,u32);    DLL_IMP void* WINAPI VirtualAlloc(void*,u64,u32,u32);         DLL_IMP i32 WINAPI ReadFile(void*,void*,u32,u32*,LPOVERLAPPED);    DLL_IMP i32 WINAPI GetFileSizeEx(void*,PLARGE_INTEGER);          DLL_IMP i32 WINAPI UnmapViewOfFile(void*); DLL_IMP FARPROC WINAPI GetProcAddress(HINSTANCE,const char*);
+    DLL_IMP void* WINAPI CreateFileA(const char*,u32,u32,LPSECURITY_ATTRIBUTES,u32,u32,void*);    DLL_IMP void* WINAPI GetStdHandle(u32);           DLL_IMP i32 WINAPI QueryPerformanceCounter(LARGE_INTEGER*);   DLL_IMP void* WINAPI MapViewOfFileEx(void*,u32,u32,u32,u64,void*); DLL_IMP i32 WINAPI WriteFile(void*,void*,u32,u32*,LPOVERLAPPED); DLL_IMP i32 WINAPI CloseHandle(void*);     DLL_IMP __declspec (noreturn) void WINAPI ExitProcess(u32);
+    DLL_IMP i32 WINAPI SetFilePointerEx(void*,LARGE_INTEGER,PLARGE_INTEGER,u32);                  DLL_IMP void WINAPI GetSystemInfo(LPSYSTEM_INFO); DLL_IMP i32 WINAPI QueryPerformanceFrequency(LARGE_INTEGER*); DLL_IMP void* WINAPI MapViewOfFile(void*,u32,u32,u32,u64);         DLL_IMP HINSTANCE WINAPI LoadLibraryA(const char*);              DLL_IMP void* WINAPI CreateFileMappingW(void*,LPSECURITY_ATTRIBUTES,u32,u32,u32,u16*);
     struct timespec { i64 tv_sec; i32 tv_nsec; }; struct sched_param { int sched_priority; }; typedef uintptr_t pthread_t; typedef intptr_t pthread_mutex_t,pthread_cond_t; typedef int pthread_condattr_t; typedef u32 pthread_mutexattr_t; typedef struct pthread_attr_t { unsigned p_state; void *stack; size_t s_size; struct sched_param param; } pthread_attr_t;
-    int pthread_create(pthread_t*,const pthread_attr_t*,void*(*func)(void*),void*); int pthread_join(pthread_t,void**);
-    int __cdecl _mkdir(const char* dirname);
+    int pthread_create(pthread_t*,const pthread_attr_t*,void*(*func)(void*),void*); int pthread_join(pthread_t,void**); int __cdecl _mkdir(const char* dirname);
     INLINE __attribute__((noreturn)) void OS_Exit(i64 exitCode) { ExitProcess((u32)exitCode); __builtin_unreachable(); }
     INLINE void OS_Close(FHandle fd) { CloseHandle(fd); }
     INLINE void* OS_AllocateRAM(void* a,size_t l,i32 p,i32 f,FHandle fd) { (void)f; if (fd==(void*)-1) return VirtualAlloc(a,l,0x3000,(p&2)?4:2); void* m = CreateFileMappingW(fd,NULL,(p&2) ? 4 : 2,(u32)(l>>32),(u32)l,NULL); void* r=MapViewOfFileEx(m,(p&2)?2:4,0,0,l,a); return CloseHandle(m),r;}    
@@ -1407,25 +1402,20 @@ static int stbtt_InitFont_internal(stbtt_fontinfo* info, u8* data, int fs) {
     info->indexToLocFormat=ttUSHORT(data+info->head+50);return 1;
 }
 
-static int _font_offset(u8*d,int idx){
-    if(stbtt_tag4(d,'1',0,0,0)||stbtt_tag(d,"typ1")||stbtt_tag(d,"OTTO")||stbtt_tag4(d,0,1,0,0)||stbtt_tag(d,"true"))return idx==0?0:-1;
-    if(stbtt_tag(d,"ttcf")&&(ttULONG(d+4)==0x00010000||ttULONG(d+4)==0x00020000)){i32 n=ttLONG(d+8);if(idx>=n)return -1;return ttULONG(d+12+idx*4);}
-    return -1;
-}
-
+static int _font_offset(u8*d,int idx){ if(stbtt_tag4(d,'1',0,0,0)||stbtt_tag(d,"typ1")||stbtt_tag(d,"OTTO")||stbtt_tag4(d,0,1,0,0)||stbtt_tag(d,"true")){return idx==0?0:-1;} if(stbtt_tag(d,"ttcf")&&(ttULONG(d+4)==0x00010000||ttULONG(d+4)==0x00020000)){i32 n=ttLONG(d+8);if(idx>=n){return -1;}return ttULONG(d+12+idx*4);} return -1; }
 static __attribute__((pure)) int stbtt_GetFontOffsetForIndex(const u8*d,int i){return _font_offset((u8*)d,i);}
 static __attribute__((pure)) int stbtt_FindGlyphIndex(const stbtt_fontinfo*info,int cp){
     u8*d=info->data;u32 im=info->index_map;u16 fmt=ttUSHORT(d+im);
     if(fmt==0) { i32 b=ttUSHORT(d+im+2); return cp<b-6 ? (*(u8*)(d+im+6+cp)) : 0; }
     if(fmt==6) { u32 f=ttUSHORT(d+im+6),n=ttUSHORT(d+im+8); return(u32)cp>=f&&(u32)cp<f+n?ttUSHORT(d+im+10+(cp-f)*2):0;}
     if(fmt==2)return 0;
+
     if(fmt==4){
-        u16 sc=ttUSHORT(d+im+6)>>1,sr=ttUSHORT(d+im+8)>>1,es=ttUSHORT(d+im+10),rs=ttUSHORT(d+im+12)>>1;
-        u32 ec=im+14,s=ec;if(cp>0xffff)return 0;
+        u16 sc=ttUSHORT(d+im+6)>>1,sr=ttUSHORT(d+im+8)>>1,es=ttUSHORT(d+im+10),rs=ttUSHORT(d+im+12)>>1; u32 ec=im+14,s=ec;if(cp>0xffff)return 0;
+
         if (cp>=ttUSHORT(d+s+rs*2)) s+=rs*2;s-=2;
         while(es) { sr>>=1; u16 e=ttUSHORT(d+s+sr*2); if(cp>e) {s+=sr*2;} --es; }
-        s+=2;{u16 it=(u16)((s-ec)>>1),st=ttUSHORT(d+im+14+sc*2+2+2*it),la=ttUSHORT(d+ec+2*it);
-        if(cp<st||cp>la)return 0;u16 off=ttUSHORT(d+im+14+sc*6+2+2*it);
+        s+=2;{u16 it=(u16)((s-ec)>>1),st=ttUSHORT(d+im+14+sc*2+2+2*it),la=ttUSHORT(d+ec+2*it); if(cp<st||cp>la)return 0;u16 off=ttUSHORT(d+im+14+sc*6+2+2*it);
         return off?ttUSHORT(d+off+(cp-st)*2+im+14+sc*6+2+2*it):(u16)(cp+ttSHORT(d+im+14+sc*4+2+2*it));}
     }
     if(fmt==12||fmt==13){u32 ng=ttULONG(d+im+12);i32 lo=0,hi=(i32)ng;
@@ -1435,13 +1425,7 @@ static __attribute__((pure)) int stbtt_FindGlyphIndex(const stbtt_fontinfo*info,
 }
 
 static void _sv(stbtt_vertex*v,u8 t,i32 x,i32 y,i32 cx,i32 cy){v->type=t;v->x=(i16)x;v->y=(i16)y;v->cx=(i16)cx;v->cy=(i16)cy;}
-static int _glyf_off(const stbtt_fontinfo*info,int gi){
-    if(gi>=info->numGlyphs||info->indexToLocFormat>=2)return-1;
-    int g1,g2;if(info->indexToLocFormat==0){g1=info->glyf+ttUSHORT(info->data+info->loca+gi*2)*2;g2=info->glyf+ttUSHORT(info->data+info->loca+gi*2+2)*2;}
-    else{g1=info->glyf+ttULONG(info->data+info->loca+gi*4);g2=info->glyf+ttULONG(info->data+info->loca+gi*4+4);}
-    return g1==g2?-1:g1;
-}
-
+static int _glyf_off(const stbtt_fontinfo*info,int gi){ if(gi>=info->numGlyphs||info->indexToLocFormat>=2){return-1;} int g1,g2;if(info->indexToLocFormat==0){g1=info->glyf+ttUSHORT(info->data+info->loca+gi*2)*2;g2=info->glyf+ttUSHORT(info->data+info->loca+gi*2+2)*2;} else{g1=info->glyf+ttULONG(info->data+info->loca+gi*4);g2=info->glyf+ttULONG(info->data+info->loca+gi*4+4);} return g1==g2?-1:g1; }
 static int _close_shape(stbtt_vertex*v,int n,int wo,int so,i32 sx,i32 sy,i32 scx,i32 scy,i32 cx,i32 cy){
     if(so){if(wo)_sv(&v[n++],STBTT_vcurve,(cx+scx)>>1,(cy+scy)>>1,cx,cy);_sv(&v[n++],STBTT_vcurve,sx,sy,scx,scy);}
     else{if(wo)_sv(&v[n++],STBTT_vcurve,sx,sy,cx,cy);else _sv(&v[n++],STBTT_vline,sx,sy,0,0);}
@@ -1498,16 +1482,8 @@ static void _csclose(stbtt__csctx*c){if(c->first_x!=c->x||c->first_y!=c->y)_csv(
 static void _csmove(stbtt__csctx*c,float dx,float dy){_csclose(c);c->first_x=c->x=c->x+dx;c->first_y=c->y=c->y+dy;_csv(c,STBTT_vmove,(int)c->x,(int)c->y,0,0,0,0);}
 static void _csline(stbtt__csctx*c,float dx,float dy){c->x+=dx;c->y+=dy;_csv(c,STBTT_vline,(int)c->x,(int)c->y,0,0,0,0);}
 static void _cscurve(stbtt__csctx*c,float d1,float e1,float d2,float e2,float d3,float e3){float cx1=c->x+d1,cy1=c->y+e1,cx2=cx1+d2,cy2=cy1+e2;c->x=cx2+d3;c->y=cy2+e3;_csv(c,STBTT_vcubic,(int)c->x,(int)c->y,(int)cx1,(int)cy1,(int)cx2,(int)cy2);}
-static stbtt__buf _subr(stbtt__buf idx,int n){
-    _bsk(&idx,0); int c = _bg(&idx,2);
-    int bias = (c >= 33900) ? 32768 : ((c >= 1240) ? 1131 : 107); n+=bias;
-    return (n<0 || n>=c) ? stbtt__new_buf(NULL,0) : _cff_idx_get(idx,n);
-}
-static stbtt__buf _cid_subrs(const stbtt_fontinfo*info,int gi){stbtt__buf fd=info->fdselect;int nr,st,end,v,fmt,sel=-1,i;_bsk(&fd,0);fmt=_bg8(&fd);
-    if(fmt==0){_bskip(&fd,gi);sel=_bg8(&fd);}
-    else if(fmt==3){nr=_bg(&fd,2);st=_bg(&fd,2);for(i=0;i<nr;i++){v=_bg8(&fd);end=_bg(&fd,2);if(gi>=st&&gi<end){sel=v;break;}st=end;}}
-    if(sel==-1)return stbtt__new_buf(NULL,0);return _get_subrs(info->cff,_cff_idx_get(info->fontdicts,sel));}
-
+static stbtt__buf _subr(stbtt__buf idx,int n){ _bsk(&idx,0); int c = _bg(&idx,2); int bias = (c >= 33900) ? 32768 : ((c >= 1240) ? 1131 : 107); n+=bias; return (n<0 || n>=c) ? stbtt__new_buf(NULL,0) : _cff_idx_get(idx,n); }
+static stbtt__buf _cid_subrs(const stbtt_fontinfo*info,int gi){stbtt__buf fd=info->fdselect;int nr,st,end,v,fmt,sel=-1,i;_bsk(&fd,0);fmt=_bg8(&fd); if(fmt==0){_bskip(&fd,gi);sel=_bg8(&fd);} else if(fmt==3){nr=_bg(&fd,2);st=_bg(&fd,2);for(i=0;i<nr;i++){v=_bg8(&fd);end=_bg(&fd,2);if(gi>=st&&gi<end){sel=v;break;}st=end;}} if(sel==-1){return stbtt__new_buf(NULL,0);}return _get_subrs(info->cff,_cff_idx_get(info->fontdicts,sel));}
 static int _run_cs(const stbtt_fontinfo*info,int gi,stbtt__csctx*c){
     int hdr=1,mb=0,ssh=0,sp=0,hs=0,i,b0;float s[48],f;
     stbtt__buf ss[10],subrs=info->subrs,b=_cff_idx_get(info->charstrings,gi);
@@ -1562,18 +1538,11 @@ static void stbtt_GetGlyphHMetrics(const stbtt_fontinfo*info,int gi,int*adv,int*
 
 static __attribute__((pure)) float stbtt_ScaleForPixelHeight(const stbtt_fontinfo*info,float h){return h/(float)(ttSHORT(info->data+info->hhea+4)-ttSHORT(info->data+info->hhea+6));}
 static __attribute__((pure)) float stbtt_ScaleForMappingEmToPixels(const stbtt_fontinfo*info,float px){return px/(float)ttUSHORT(info->data+info->head+18);}
-static void GetGlyphBitmapBoxSubpixel(const stbtt_fontinfo*font,int g,float sx,float sy,float shx,float shy,int*ix0,int*iy0,int*ix1,int*iy1){
-    int x0=0,y0=0,x1,y1;if(!stbtt_GetGlyphBox(font,g,&x0,&y0,&x1,&y1)){if(ix0)*ix0=0;if(iy0)*iy0=0;if(ix1)*ix1=0;if(iy1)*iy1=0;}
-    else{if(ix0)*ix0=(int)vfloor(x0*sx+shx);if(iy0)*iy0=(int)vfloor(-y1*sy+shy);if(ix1)*ix1=(int)vceil(x1*sx+shx);if(iy1)*iy1=(int)vceil(-y0*sy+shy);}
-}
-
-typedef struct{int w,h,stride;u8*pixels;}stbtt__bitmap;
-typedef struct tt_heapchk{ struct tt_heapchk* next; }tt_heapchk;
-typedef struct{ tt_heapchk* head; void* first_free; int remaining; }stbtt__hheap;
+static void GetGlyphBitmapBoxSubpixel(const stbtt_fontinfo*font,int g,float sx,float sy,float shx,float shy,int*ix0,int*iy0,int*ix1,int*iy1){ int x0=0,y0=0,x1,y1;if(!stbtt_GetGlyphBox(font,g,&x0,&y0,&x1,&y1)){if(ix0)*ix0=0;if(iy0)*iy0=0;if(ix1)*ix1=0;if(iy1)*iy1=0;} else{if(ix0)*ix0=(int)vfloor(x0*sx+shx);if(iy0)*iy0=(int)vfloor(-y1*sy+shy);if(ix1)*ix1=(int)vceil(x1*sx+shx);if(iy1)*iy1=(int)vceil(-y0*sy+shy);} }
+typedef struct{int w,h,stride;u8*pixels;}stbtt__bitmap; typedef struct tt_heapchk{ struct tt_heapchk* next; }tt_heapchk; typedef struct{ tt_heapchk* head; void* first_free; int remaining; }stbtt__hheap;
 static void* _hha(stbtt__hheap* hh,size_t sz) { if(hh->first_free){void*p=hh->first_free;hh->first_free=*(void**)p;return p;} if(!hh->remaining) {int c=sz<32?2000:sz<128?800:100;tt_heapchk*ck=(tt_heapchk*)TempAlloc(sizeof(*ck)+sz*c); if(!ck){return NULL;} ck->next=hh->head; hh->head=ck; hh->remaining=c;} --hh->remaining; return(char*)hh->head+sizeof(tt_heapchk)+sz*hh->remaining; }
 static void _hhf(stbtt__hheap* hh,void*p) { *(void**)p=hh->first_free;hh->first_free=p; }
-typedef struct{ float x0,y0,x1,y1; int invert; }stbtt__edge;
-typedef struct stbtt__active_edge{ struct stbtt__active_edge*next; float fx,fdx,fdy,direction,sy,ey; }stbtt__active_edge;
+typedef struct{ float x0,y0,x1,y1; int invert; }stbtt__edge; typedef struct stbtt__active_edge{ struct stbtt__active_edge*next; float fx,fdx,fdy,direction,sy,ey; }stbtt__active_edge;
 static void _hce(float*sl,int x,stbtt__active_edge*e,float x0,float y0,float x1,float y1){
     if(y0==y1||y0>e->ey||y1<e->sy)return;if(y0<e->sy){x0+=(x1-x0)*(e->sy-y0)/(y1-y0);y0=e->sy;}if(y1>e->ey){x1+=(x1-x0)*(e->ey-y1)/(y1-y0);y1=e->ey;}
     if(x0<=x&&x1<=x)sl[x]+=e->direction*(y1-y0);else if(x0>=x+1&&x1>=x+1);else sl[x]+=e->direction*(y1-y0)*(1.0f-((x0-(float)x)+(x1-(float)x))/2.0f);
@@ -1606,24 +1575,14 @@ static void _fae(float*sl,float*sf,int len,stbtt__active_edge*e,float yt){
 }
 
 static void _rse(stbtt__bitmap*res,stbtt__edge*e,int n,int ox,int oy){
-    stbtt__hheap hh={0,0,0};stbtt__active_edge*active=NULL;int y,j=0,i;
-    float sd[129],*sl,*sl2;if(res->w>64)sl=(float*)TempAlloc((size_t)(res->w*2+1)*sizeof(float));else sl=sd;
-    sl2=sl+res->w;y=oy;e[n].y0=(float)(oy+res->h)+1;
+    stbtt__hheap hh={0,0,0}; stbtt__active_edge*active=NULL; int y,j=0,i; float sd[129],*sl,*sl2; if(res->w>64)sl=(float*)TempAlloc((size_t)(res->w*2+1)*sizeof(float));else sl=sd; sl2=sl+res->w;y=oy;e[n].y0=(float)(oy+res->h)+1;
     while(j<res->h){float syt=(float)y,syb=(float)y+1;stbtt__active_edge**step=&active;
         mset(sl,0,(size_t)res->w*sizeof(sl[0]));mset(sl2,0,((size_t)res->w+1)*sizeof(sl[0]));
         while(*step){stbtt__active_edge*z=*step;if(z->ey<=syt){*step=z->next;z->direction=0;_hhf(&hh,z);}else step=&(*step)->next;}
         while(e->y0<=syb){
             if(e->y0!=e->y1){
                 stbtt__active_edge* z=(stbtt__active_edge*)_hha(&hh,sizeof(*z));
-                if(z) {
-                    float dxdy = (e->x1-e->x0)/(e->y1-e->y0);
-                    z->fdx = dxdy; z->fdy = dxdy ? 1.0f/dxdy : 0;
-                    z->fx = e->x0 + dxdy * (syt - e->y0) - (float)ox;
-                    z->direction = e->invert ? 1.0f : -1.0f;
-                    z->sy = e->y0; z->ey = e->y1; z->next = 0;
-                    if(j == 0 && oy != 0 && z->ey < syt) z->ey = syt;
-                    z->next = active; active = z;
-                }
+                if(z) { float dxdy = (e->x1-e->x0)/(e->y1-e->y0); z->fdx = dxdy; z->fdy = dxdy ? 1.0f/dxdy : 0; z->fx = e->x0 + dxdy * (syt - e->y0) - (float)ox; z->direction = e->invert ? 1.0f : -1.0f; z->sy = e->y0; z->ey = e->y1; z->next = 0; if(j == 0 && oy != 0 && z->ey < syt){z->ey=syt;} z->next = active; active = z; }
             }++e;
         }
         if(active)_fae(sl,sl2+1,res->w,active,syt);
@@ -1914,15 +1873,11 @@ Color textColors[] = {{1.0f,1.0f,1.0f,1.0f},/* 0 White T_WHITE*/ {0.890196078f,0
 float textVertexData[8192];
 void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scale,const char* restrict format,...) {
     va_list args; __builtin_va_start(args,format); sFormatV(uiTextBuffer,T_BUFFER_SIZE,format,args); __builtin_va_end(args);
-    glUseProgram(textSP);
-    glEnable(GL_BLEND);
-    glUniform4f(3,textColors[color].r,textColors[color].g,textColors[color].b,1.0f);
+    glUseProgram(textSP); glEnable(GL_BLEND); glUniform4f(3,textColors[color].r,textColors[color].g,textColors[color].b,1.0f);
     glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D,fontID==FONT_STOPD ? fontAtlasTexStopD : fontAtlasTex);
     float invatsz = 1.0f/(float)FONT_ATLAS_SIZE;
-    glUniform2f(4,invatsz,invatsz); glUniform1ui(2,fontID);
-    glBindVertexArray(textVAO);
-    size_t vc=0; const char*p=uiTextBuffer; float xpos=x,ypos=y+(16*scale),ls=22*scale; aligned_quad q; int cc=0;
-    float puv = 10.0f * invatsz, bw=2.0f;
+    glUniform2f(4,invatsz,invatsz); glUniform1ui(2,fontID); glBindVertexArray(textVAO);
+    size_t vc=0; const char*p=uiTextBuffer; float xpos=x,ypos=y+(16*scale),ls=22*scale; aligned_quad q; int cc=0; float puv = 10.0f * invatsz, bw=2.0f;
     while(*p) {
         const u8*s=(const u8*)p; u32 cp=0;
         if (*s<0x80) { cp=*s++; }
@@ -1931,33 +1886,23 @@ void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scale,const char*
         else if ((*s&0xF8)==0xF0) { cp=(*s&0x07)<<18; cp|=(s[1]&0x3F)<<12; cp|=(s[2]&0x3F)<<6; cp|=(s[3]&0x3F); s+=4; }
         else s++;
 
-        p = (const char*)s; cc++;
-        if (cp=='\n'||cc>120) { xpos=x; ypos+=ls; cc=0; continue; }
+        p = (const char*)s; cc++; if (cp=='\n'||cc>120) { xpos=x; ypos+=ls; cc=0; continue; }
+
         int idx=CodepointToPackedIndex(cp,fontID);
         stbtt_GetPackedQuad((fontID==FONT_STOPD) ? fontPackedCharStopD : fontPackedChar,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,idx,&xpos,&ypos,&q,1);
-        float vx0=q.x0*scale-bw,vy0=q.y0*scale-bw,vx1=q.x1*scale+bw,vy1=q.y1*scale+bw;
-        float s0=q.s0-puv,t0=q.t0-puv,s1=q.s1+puv,t1=q.t1+puv,z=0.0f;
-        float tv[30] = { vx0,vy0,z,s0,t0,vx1,vy1,z,s1,t1,vx1,vy0,z,s1,t0,vx0,vy0,z,s0,t0,vx0,vy1,z,s0,t1,vx1,vy1,z,s1,t1 };
+        float vx0=q.x0*scale-bw,vy0=q.y0*scale-bw,vx1=q.x1*scale+bw,vy1=q.y1*scale+bw; float s0=q.s0-puv,t0=q.t0-puv,s1=q.s1+puv,t1=q.t1+puv,z=0.0f; float tv[30] = { vx0,vy0,z,s0,t0,vx1,vy1,z,s1,t1,vx1,vy0,z,s1,t0,vx0,vy0,z,s0,t0,vx0,vy1,z,s0,t1,vx1,vy1,z,s1,t1 };
         mcpy(textVertexData+vc*30,tv,sizeof(tv)); vc++;
-        if (cp>='0' && cp<='9') {
-            if (fontID == FONT_STOPD) { xpos=q.x0 + ((fontID == FONT_STOPD) ? fixedNumberAdvanceWidthStopD : fixedNumberAdvanceWidth); }
-        }
+        if (cp>='0' && cp<='9') { if(fontID == FONT_STOPD){xpos=q.x0 + ((fontID == FONT_STOPD) ? fixedNumberAdvanceWidthStopD : fixedNumberAdvanceWidth);} }
     }
     
     if(vc){ glBindBuffer(GL_ARRAY_BUFFER,textVBO); glBufferData(GL_ARRAY_BUFFER,vc*30*sizeof(float),textVertexData,GL_DYNAMIC_DRAW); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,vc*6); }
 }
 // Window + Input Sys
-typedef void (*GLFWglproc)(void);
-typedef struct GLFWwindow GLFWwindow; GLFWwindow* window;
-typedef struct { int width,height,redBits,greenBits,blueBits,refreshRate; } vidmode;
-typedef struct { u8 buttons[15]; float axes[6]; } GLFWgamepadstate;
+typedef void (*GLFWglproc)(void); typedef struct GLFWwindow GLFWwindow; GLFWwindow* window; typedef struct { int width,height,redBits,greenBits,blueBits,refreshRate; } vidmode; typedef struct { u8 buttons[15]; float axes[6]; } GLFWgamepadstate;
 typedef void (*GLFWproc)(void); typedef struct _GLFWfbconfig _GLFWfbconfig; typedef struct _GLFWcontext _GLFWcontext; typedef struct _GLFWwindow _GLFWwindow; typedef struct _GLFWlibrary _GLFWlibrary; typedef struct _GLFWmonitor _GLFWmonitor; typedef struct _GLFWjoystick _GLFWjoystick;
-void UpdateScreenSize(i32 width, i32 height); void SaveConfig();
-struct _GLFWfbconfig { int redBits,greenBits,blueBits,alphaBits,depthBits,stencilBits,accumRedBits,accumGreenBits,accumBlueBits,accumAlphaBits; i32 samples,stereo,sRGB,doublebuffer; uintptr_t handle; };
-extern _GLFWlibrary _glfw;
-GLFWproc PlatformGetModuleSymbol(void* module, const char* name);
-void InputWindowFocus(i32); void InputKey(_GLFWwindow*,int,int); void InputMouseClick(_GLFWwindow*,int,int); void InputCursorPos(_GLFWwindow*,double,double);  void JoystickConnection(_GLFWjoystick*,int); void InputJoystickAxis(_GLFWjoystick*,int,float); void InputJoystickButton(_GLFWjoystick*,int,char); void InputJoystickHat(_GLFWjoystick*,int,char);
-void InputMonitor(_GLFWmonitor*,int,int); const _GLFWfbconfig* ChooseFBConfig(const _GLFWfbconfig* alternatives, u32); _GLFWmonitor* AllocMonitor(const char*,int,int); _GLFWjoystick* _glfwAllocJoystick(const char*,const char*,int,int,int); void FreeJoystick(_GLFWjoystick*);
+struct _GLFWfbconfig { int redBits,greenBits,blueBits,alphaBits,depthBits,stencilBits,accumRedBits,accumGreenBits,accumBlueBits,accumAlphaBits; i32 samples,stereo,sRGB,doublebuffer; uintptr_t handle; }; extern _GLFWlibrary _glfw;
+GLFWproc PlatformGetModuleSymbol(void* module, const char* name); void UpdateScreenSize(i32 width, i32 height); void SaveConfig(); void InputWindowFocus(i32); void InputKey(_GLFWwindow*,int,int); void InputMouseClick(_GLFWwindow*,int,int); void InputCursorPos(_GLFWwindow*,double,double); void JoystickConnection(_GLFWjoystick*,int); void InputJoystickAxis(_GLFWjoystick*,int,float);
+void InputJoystickButton(_GLFWjoystick*,int,char); void InputJoystickHat(_GLFWjoystick*,int,char); void InputMonitor(_GLFWmonitor*,int,int); const _GLFWfbconfig* ChooseFBConfig(const _GLFWfbconfig* alternatives, u32); _GLFWmonitor* AllocMonitor(const char*,int,int); _GLFWjoystick* _glfwAllocJoystick(const char*,const char*,int,int,int); void FreeJoystick(_GLFWjoystick*);
 #define INPUT_RELEASE 0
 #define INPUT_PRESS   1
 #define INPUT_REPEAT  2
@@ -2000,17 +1945,17 @@ void InputMonitor(_GLFWmonitor*,int,int); const _GLFWfbconfig* ChooseFBConfig(co
     typedef struct tagRGBQUAD { u8 rgbBlue,rgbGreen,rgbRed,rgbReserved; } RGBQUAD;
     typedef struct tagBITMAPINFOHEADER { u32 biSize; i32 biWidth,biHeight; u16 biPlanes,biBitCount; u32 biCompression; u32 biSizeImage; i32 biXPelsPerMeter; i32 biYPelsPerMeter; u32 biClrUsed; u32 biClrImportant; } BITMAPINFOHEADER,*LPBITMAPINFOHEADER,*PBITMAPINFOHEADER;
     typedef struct tagBITMAPINFO { BITMAPINFOHEADER bmiHeader; RGBQUAD bmiColors[1]; } BITMAPINFO,*LPBITMAPINFO,*PBITMAPINFO;
-    DECLSPEC_IMPORT HICON WINAPI CreateIconIndirect(PICONINFO); DECLSPEC_IMPORT HDC WINAPI GetDC(HWND);                     DECLSPEC_IMPORT i32 WINAPI GetModuleHandleExW(u32,const u16*,HINSTANCE*);            DECLSPEC_IMPORT int WINAPI ReleaseDC(HWND,HDC);             DECLSPEC_IMPORT i32 WINAPI SetCursorPos(int,int);           DECLSPEC_IMPORT int WINAPI WideCharToMultiByte(u32,u32,u16*,int,char*,int,const char*,i32*);
-    DECLSPEC_IMPORT HICON WINAPI SetCursor(HICON);              DECLSPEC_IMPORT i32 WINAPI GetCursorPos(LPPOINT);           DECLSPEC_IMPORT int WINAPI MultiByteToWideChar(u32,u32,const char*,int,u16*,int);    DECLSPEC_IMPORT i32 WINAPI ClipCursor(const RECT*);         DECLSPEC_IMPORT i32 WINAPI ClientToScreen(HWND,LPPOINT);    DECLSPEC_IMPORT HDC WINAPI CreateDCW(const u16*,const u16*,const u16*,const DEVMODEW*);
-    DECLSPEC_IMPORT void* WINAPI GetPropW(HWND,u16*);           DECLSPEC_IMPORT i32 WINAPI GetMessageTime();                DECLSPEC_IMPORT i32 WINAPI GetClientRect(HWND,LPRECT); /*Haha get rect!*/            DECLSPEC_IMPORT HICON WINAPI LoadCursorW(HINSTANCE,u16*);   DECLSPEC_IMPORT u32 WINAPI MapVirtualKeyW(u32,u32);         DECLSPEC_IMPORT i32 WINAPI SetWindowPos(HWND,HWND,int,int,int,int,u32);    
-    DECLSPEC_IMPORT HWND WINAPI SetCapture(HWND hWnd);          DECLSPEC_IMPORT i32 WINAPI ReleaseCapture();                DECLSPEC_IMPORT i32 WINAPI PeekMessageW(LPMSG,HWND,u32,u32,u32);                     DECLSPEC_IMPORT i32 WINAPI AdjustWindowRect(LPRECT,u32,i32);DECLSPEC_IMPORT i32 WINAPI GetWindowLongW(HWND,int);        DECLSPEC_IMPORT i64 WINAPI DefWindowProcW(HWND,u32,u64,i64);
-    DECLSPEC_IMPORT HMONITOR WINAPI MonitorFromWindow(HWND,u32);DECLSPEC_IMPORT HWND WINAPI GetActiveWindow();              DECLSPEC_IMPORT i32 WINAPI AdjustWindowRectEx(LPRECT,u32,i32,u32);                   DECLSPEC_IMPORT i64 WINAPI SendMessageW(HWND,u32,u64,i64);  DECLSPEC_IMPORT i32 WINAPI SetWindowLongW(HWND,int,i32);    DECLSPEC_IMPORT i32 WINAPI GetMonitorInfoW(HMONITOR,LPMONITORINFO);
-    DECLSPEC_IMPORT i32 WINAPI TranslateMessage(const MSG*);    DECLSPEC_IMPORT i16 WINAPI GetKeyState(int);                DECLSPEC_IMPORT i64 WINAPI DispatchMessageW(const MSG*);                             DECLSPEC_IMPORT i32 WINAPI ShowWindow(HWND,int);            DECLSPEC_IMPORT i32 WINAPI BringWindowToTop(HWND);          DECLSPEC_IMPORT i32 WINAPI SetWindowPlacement(HWND,const WINDOWPLACEMENT*);
-    DECLSPEC_IMPORT HWND WINAPI SetFocus(HWND);                 DECLSPEC_IMPORT i32 WINAPI SetForegroundWindow(HWND);       DECLSPEC_IMPORT i32 WINAPI GetWindowPlacement(HWND,WINDOWPLACEMENT*);                DECLSPEC_IMPORT i32 WINAPI SetPropW(HWND,u16*,void*);       DECLSPEC_IMPORT i32 WINAPI OffsetRect(LPRECT,int,int);      DECLSPEC_IMPORT HWND WINAPI CreateWindowExW(u32,u16*,u16*,u32,int,int,int,int,HWND,HMENU,HINSTANCE,void*);
-    DECLSPEC_IMPORT u64 WINAPI VerSetConditionMask(u64,u32,u8); DECLSPEC_IMPORT HDC WINAPI wglGetCurrentDC();               DECLSPEC_IMPORT u16 WINAPI RegisterClassExW(const WNDCLASSEXW *);                    DECLSPEC_IMPORT i32 WINAPI DeleteObject(void*);             DECLSPEC_IMPORT i32 WINAPI DeleteDC(HDC);                   DECLSPEC_IMPORT void* WINAPI RegisterDeviceNotificationW(void*,void*,u32);
-    DECLSPEC_IMPORT i32 WINAPI SwapBuffers(HDC);                DECLSPEC_IMPORT HGLRC WINAPI wglGetCurrentContext();        DECLSPEC_IMPORT i32 WINAPI EnumDisplayMonitors(HDC,const RECT*,MONITORENUMPROC,i64); DECLSPEC_IMPORT i32 WINAPI wglMakeCurrent(HDC,HGLRC);       DECLSPEC_IMPORT PROC WINAPI wglGetProcAddress(const char*); DECLSPEC_IMPORT i32 WINAPI EnumDisplaySettingsW(u16*,u32,LPDEVMODEW); 
-    DECLSPEC_IMPORT i32 WINAPI EnumDisplayDevicesW(u16*,u32,PDISPLAY_DEVICEW,u32);               DECLSPEC_IMPORT i32 WINAPI EnumDisplaySettingsExW(u16*,u32,LPDEVMODEW,u32); DECLSPEC_IMPORT i32 WINAPI SetPixelFormat(HDC,i32,const PIXELFORMATDESCRIPTOR *);            DECLSPEC_IMPORT i32 WINAPI ChoosePixelFormat(HDC hdc,const PIXELFORMATDESCRIPTOR *ppfd);
-    DECLSPEC_IMPORT i32 WINAPI DescribePixelFormat(HDC,i32,u32,LPPIXELFORMATDESCRIPTOR);         DECLSPEC_IMPORT HBITMAP WINAPI CreateBitmap(i32,i32,u32,u32,const void *);  DECLSPEC_IMPORT HBITMAP WINAPI CreateDIBSection(HDC,const BITMAPINFO*,u32,void**,void*,u32); DECLSPEC_IMPORT i32 WINAPI GetDeviceCaps(HDC,i32);
+    DLL_IMP HICON WINAPI CreateIconIndirect(PICONINFO); DLL_IMP HDC WINAPI GetDC(HWND);                     DLL_IMP i32 WINAPI GetModuleHandleExW(u32,const u16*,HINSTANCE*);            DLL_IMP int WINAPI ReleaseDC(HWND,HDC);             DLL_IMP i32 WINAPI SetCursorPos(int,int);           DLL_IMP int WINAPI WideCharToMultiByte(u32,u32,u16*,int,char*,int,const char*,i32*);
+    DLL_IMP HICON WINAPI SetCursor(HICON);              DLL_IMP i32 WINAPI GetCursorPos(LPPOINT);           DLL_IMP int WINAPI MultiByteToWideChar(u32,u32,const char*,int,u16*,int);    DLL_IMP i32 WINAPI ClipCursor(const RECT*);         DLL_IMP i32 WINAPI ClientToScreen(HWND,LPPOINT);    DLL_IMP HDC WINAPI CreateDCW(const u16*,const u16*,const u16*,const DEVMODEW*);
+    DLL_IMP void* WINAPI GetPropW(HWND,u16*);           DLL_IMP i32 WINAPI GetMessageTime();                DLL_IMP i32 WINAPI GetClientRect(HWND,LPRECT); /*Haha get rect!*/            DLL_IMP HICON WINAPI LoadCursorW(HINSTANCE,u16*);   DLL_IMP u32 WINAPI MapVirtualKeyW(u32,u32);         DLL_IMP i32 WINAPI SetWindowPos(HWND,HWND,int,int,int,int,u32);
+    DLL_IMP HWND WINAPI SetCapture(HWND hWnd);          DLL_IMP i32 WINAPI ReleaseCapture();                DLL_IMP i32 WINAPI PeekMessageW(LPMSG,HWND,u32,u32,u32);                     DLL_IMP i32 WINAPI AdjustWindowRect(LPRECT,u32,i32);DLL_IMP i32 WINAPI GetWindowLongW(HWND,int);        DLL_IMP i64 WINAPI DefWindowProcW(HWND,u32,u64,i64);
+    DLL_IMP HMONITOR WINAPI MonitorFromWindow(HWND,u32);DLL_IMP HWND WINAPI GetActiveWindow();              DLL_IMP i32 WINAPI AdjustWindowRectEx(LPRECT,u32,i32,u32);                   DLL_IMP i64 WINAPI SendMessageW(HWND,u32,u64,i64);  DLL_IMP i32 WINAPI SetWindowLongW(HWND,int,i32);    DLL_IMP i32 WINAPI GetMonitorInfoW(HMONITOR,LPMONITORINFO);
+    DLL_IMP i32 WINAPI TranslateMessage(const MSG*);    DLL_IMP i16 WINAPI GetKeyState(int);                DLL_IMP i64 WINAPI DispatchMessageW(const MSG*);                             DLL_IMP i32 WINAPI ShowWindow(HWND,int);            DLL_IMP i32 WINAPI BringWindowToTop(HWND);          DLL_IMP i32 WINAPI SetWindowPlacement(HWND,const WINDOWPLACEMENT*);
+    DLL_IMP HWND WINAPI SetFocus(HWND);                 DLL_IMP i32 WINAPI SetForegroundWindow(HWND);       DLL_IMP i32 WINAPI GetWindowPlacement(HWND,WINDOWPLACEMENT*);                DLL_IMP i32 WINAPI SetPropW(HWND,u16*,void*);       DLL_IMP i32 WINAPI OffsetRect(LPRECT,int,int);      DLL_IMP HWND WINAPI CreateWindowExW(u32,u16*,u16*,u32,int,int,int,int,HWND,HMENU,HINSTANCE,void*);
+    DLL_IMP u64 WINAPI VerSetConditionMask(u64,u32,u8); DLL_IMP HDC WINAPI wglGetCurrentDC();               DLL_IMP u16 WINAPI RegisterClassExW(const WNDCLASSEXW *);                    DLL_IMP i32 WINAPI DeleteObject(void*);             DLL_IMP i32 WINAPI DeleteDC(HDC);                   DLL_IMP void* WINAPI RegisterDeviceNotificationW(void*,void*,u32);
+    DLL_IMP i32 WINAPI SwapBuffers(HDC);                DLL_IMP HGLRC WINAPI wglGetCurrentContext();        DLL_IMP i32 WINAPI EnumDisplayMonitors(HDC,const RECT*,MONITORENUMPROC,i64); DLL_IMP i32 WINAPI wglMakeCurrent(HDC,HGLRC);       DLL_IMP PROC WINAPI wglGetProcAddress(const char*); DLL_IMP i32 WINAPI EnumDisplaySettingsW(u16*,u32,LPDEVMODEW);
+    DLL_IMP i32 WINAPI EnumDisplayDevicesW(u16*,u32,PDISPLAY_DEVICEW,u32);               DLL_IMP i32 WINAPI EnumDisplaySettingsExW(u16*,u32,LPDEVMODEW,u32); DLL_IMP i32 WINAPI SetPixelFormat(HDC,i32,const PIXELFORMATDESCRIPTOR *);            DLL_IMP i32 WINAPI ChoosePixelFormat(HDC hdc,const PIXELFORMATDESCRIPTOR *ppfd);
+    DLL_IMP i32 WINAPI DescribePixelFormat(HDC,i32,u32,LPPIXELFORMATDESCRIPTOR);         DLL_IMP HBITMAP WINAPI CreateBitmap(i32,i32,u32,u32,const void *);  DLL_IMP HBITMAP WINAPI CreateDIBSection(HDC,const BITMAPINFO*,u32,void**,void*,u32); DLL_IMP i32 WINAPI GetDeviceCaps(HDC,i32);
     u16* CreateWideStringFromUTF8Win32(const char* source); i32 IsWindowsVersionOrGreaterWin32(u16 major, u16 minor, u16 sp); void _glfwPollMonitorsWin32();
     struct _GLFWjoystick { i32 allocated,connected; size_t axesSize,buttonsSize,hatsSize; float*  axes; int axisCount; u8* buttons; int buttonCount; u8* hats; int hatCount; char name[128],guid[33]; _GLFWjoystickWin32 win32; };
     struct _GLFWlibrary { _GLFWmonitor** monitors; int monitorCount; i32 joysticksInitialized; _GLFWjoystick joysticks[JOYSTICK_LAST + 1]; _GLFWlibraryWin32 win32; _GLFWlibraryWGL wgl; };
@@ -2073,13 +2018,8 @@ void InputMonitor(_GLFWmonitor*,int,int); const _GLFWfbconfig* ChooseFBConfig(co
                 if (i>7) {ReleaseCapture();} if (uMsg == 0x020B/*WM_XBUTTONDOWN*/ || uMsg == 0x020C/*WM_XBUTTONUP*/) return 1;
                 return 0; }
             case 0x0200/*WM_MOUSEMOVE*/: {                
-                const int x=((int)(short)(lParam & 0xFFFF)), y=((int)(short)(lParam >> 16));
-                if (win->cursorMode==0x00034003/*CURSOR_DISABLED*/) {
-                    const int dx=x-win->win32.lastCursorPosX,dy=y-win->win32.lastCursorPosY;
-                    if (_glfw.win32.disabledCursorWindow!=win) break;
-                    InputCursorPos(win,win->virtualCursorPosX+dx,win->virtualCursorPosY+dy);
-                }
-                
+                const int x=((int)(i16)(lParam & 0xFFFF)), y=((int)(i16)(lParam >> 16));
+                if (win->cursorMode==0x00034003/*CURSOR_DISABLED*/) { const int dx=x-win->win32.lastCursorPosX,dy=y-win->win32.lastCursorPosY; if (_glfw.win32.disabledCursorWindow!=win) {break;} InputCursorPos(win,win->virtualCursorPosX+dx,win->virtualCursorPosY+dy); }
                 win->win32.lastCursorPosX=x; win->win32.lastCursorPosY=y;
                 return 0; }
             case 0x02A3/*WM_MOUSELEAVE*/: { win->win32.cursorTracked=0; return 0; }
@@ -2130,12 +2070,7 @@ void InputMonitor(_GLFWmonitor*,int,int); const _GLFWfbconfig* ChooseFBConfig(co
 
     u16* CreateWideStringFromUTF8Win32(const char* src) { u16* target; int count = MultiByteToWideChar(65001,0,(char*)src,-1,NULL,0); target = OS_Calloc(count,sizeof(u16)); MultiByteToWideChar(65001,0,(char*)src,-1,target,count); return target; }
     char* CreateUTF8FromWideStringWin32(const u16* src, int* size) { *size = WideCharToMultiByte(65001,0,(u16*)src,-1,NULL,0,NULL,NULL); char* target = OS_Calloc(*size,1); WideCharToMultiByte(65001,0,(u16*)src,-1,target,*size,NULL,NULL); return target; }
-    i32 IsWindowsVersionOrGreaterWin32(u16 major, u16 minor, u16 sp) {
-        OSVERSIONINFOEXW osvi={0}; osvi.dwOSVersionInfoSize=sizeof(osvi), osvi.dwMajorVersion=major, osvi.dwMinorVersion=minor, osvi.wServicePackMajor=sp;
-        u32 mask=0x0000002|0x0000001|0x0000020; u64 cond=VerSetConditionMask(VerSetConditionMask(VerSetConditionMask(0,0x0000002,3),0x0000001,3),0x0000020,3);
-        return _glfw.win32.ntdll.RtlVerifyVersionInfo(&osvi,mask,cond)==0;
-    }
-
+    i32 IsWindowsVersionOrGreaterWin32(u16 major, u16 minor, u16 sp) { OSVERSIONINFOEXW osvi={0}; osvi.dwOSVersionInfoSize=sizeof(osvi), osvi.dwMajorVersion=major, osvi.dwMinorVersion=minor, osvi.wServicePackMajor=sp; u32 mask=0x0000002|0x0000001|0x0000020; u64 cond=VerSetConditionMask(VerSetConditionMask(VerSetConditionMask(0,0x0000002,3),0x0000001,3),0x0000020,3); return _glfw.win32.ntdll.RtlVerifyVersionInfo(&osvi,mask,cond)==0; }
     static void closeJoystick(_GLFWjoystick* js) { JoystickConnection(js,0x00040002/*disconnected*/); FreeJoystick(js); }
     void _glfwDetectJoystickConnectionWin32() {
         if (_glfw.win32.xinput.instance) {
@@ -2143,17 +2078,14 @@ void InputMonitor(_GLFWmonitor*,int,int); const _GLFWfbconfig* ChooseFBConfig(co
                 int jid; XINPUT_CAPABILITIES xic; _GLFWjoystick* js;
                 for (jid = 0;  jid <= JOYSTICK_LAST;  jid++) { if (_glfw.joysticks[jid].connected && _glfw.joysticks[jid].win32.index == index) {break;} }
                 if (jid <= JOYSTICK_LAST || _glfw.win32.xinput.GetCapabilities(index,0,&xic) != 0) continue;
+                char guid[33]; sFormat(guid,sizeof(guid),"78696e707574%02x000000000000000000",xic.SubType & 0xff); js = _glfwAllocJoystick("Gamepad",guid,6,10,1); if (!js) continue;
 
-                char guid[33]; sFormat(guid,sizeof(guid),"78696e707574%02x000000000000000000",xic.SubType & 0xff);
-                js = _glfwAllocJoystick("Gamepad",guid,6,10,1); if (!js) continue;
-
-                js->win32.index = index;
-                JoystickConnection(js,0x00040001/*connected*/);
+                js->win32.index = index; JoystickConnection(js,0x00040001/*connected*/);
             }
         }
     }
 
-    i32 InitJoysticks() { _glfwDetectJoystickConnectionWin32(); return  1; }
+    i32 InitJoysticks() { _glfwDetectJoystickConnectionWin32(); return 1; }
     i32 PollJoystick(_GLFWjoystick* js) {
         u32 result; XINPUT_STATE xis;
         const u16 buttons[14] = {0x0001/*XINPUT_GAMEPAD_DPAD_UP*/,0x0002/*XINPUT_GAMEPAD_DPAD_DOWN*/,0x0008/*XINPUT_GAMEPAD_DPAD_RIGHT*/,0x0004/*XINPUT_GAMEPAD_DPAD_LEFT*/,0x1000/*XINPUT_GAMEPAD_A*/,0x2000/*XINPUT_GAMEPAD_B*/,0x4000/*XINPUT_GAMEPAD_X*/,0x8000/*XINPUT_GAMEPAD_Y*/,0x0100/*XINPUT_GAMEPAD_LEFT_SHOULDER*/,0x0200/*XINPUT_GAMEPAD_RIGHT_SHOULDER*/,0x0020/*XINPUT_GAMEPAD_BACK*/,0x0010/*XINPUT_GAMEPAD_START*/,0x0040/*XINPUT_GAMEPAD_LEFT_THUMB*/,0x0080/*XINPUT_GAMEPAD_RIGHT_THUMB*/};
@@ -2167,7 +2099,7 @@ void InputMonitor(_GLFWmonitor*,int,int); const _GLFWfbconfig* ChooseFBConfig(co
         int dpad = ((const int[]){0,1,2,3,4,0,0,0,8,0,0,0,0,0,0,0})[xis.Gamepad.wButtons & 0xF];
         if ((dpad & JOYHAT_RIGHT) && (dpad & JOYHAT_LEFT)) dpad &= ~(JOYHAT_RIGHT | JOYHAT_LEFT);
         if ((dpad & JOYHAT_UP) && (dpad & JOYHAT_DOWN)) dpad &= ~(JOYHAT_UP | JOYHAT_DOWN);
-        InputJoystickHat(js, 0, dpad);
+        InputJoystickHat(js,0,dpad);
         return  1;
     }
     
@@ -2195,20 +2127,14 @@ void InputMonitor(_GLFWmonitor*,int,int); const _GLFWfbconfig* ChooseFBConfig(co
         int i, disconnectedCount = _glfw.monitorCount; _GLFWmonitor** disconnected = NULL; u32 adapterIndex,displayIndex; DISPLAY_DEVICEW adapter, display; _GLFWmonitor* monitor;
         if (disconnectedCount) { disconnected = OS_Calloc(_glfw.monitorCount,sizeof(_GLFWmonitor*)); mcpy(disconnected,_glfw.monitors,_glfw.monitorCount * sizeof(_GLFWmonitor*)); }
         for (adapterIndex = 0;;adapterIndex++) {
-            int type = 1; mset(&adapter,0,sizeof(adapter)); adapter.cb = sizeof(adapter);
-            if (!EnumDisplayDevicesW(NULL, adapterIndex, &adapter, 0)) break;
+            int type = 1; mset(&adapter,0,sizeof(adapter)); adapter.cb = sizeof(adapter); if (!EnumDisplayDevicesW(NULL,adapterIndex,&adapter,0)) break;
             if (!(adapter.StateFlags&1)) continue;
 
             if (adapter.StateFlags & 0x00000004/*DISPLAY_DEVICE_PRIMARY_DEVICE*/) type = 0;
             for (displayIndex=0;;++displayIndex) {
-                mset(&display,0,sizeof(display)); display.cb = sizeof(display);
-                if (!EnumDisplayDevicesW(adapter.DeviceName, displayIndex, &display, 0)) break;
+                mset(&display,0,sizeof(display)); display.cb = sizeof(display); if (!EnumDisplayDevicesW(adapter.DeviceName,displayIndex,&display,0)) break;
                 if (!(display.StateFlags&1)) continue;
-
-                for (i=0;i<disconnectedCount;++i) {
-                    if (disconnected[i] && wcscmp(disconnected[i]->win32.displayName,display.DeviceName) == 0) { disconnected[i] = NULL; EnumDisplayMonitors(NULL,NULL,monitorCallback,(i64)_glfw.monitors[i]); break; }
-                }
-
+                for (i=0;i<disconnectedCount;++i) { if(disconnected[i] && wcscmp(disconnected[i]->win32.displayName,display.DeviceName) == 0){disconnected[i] = NULL; EnumDisplayMonitors(NULL,NULL,monitorCallback,(i64)_glfw.monitors[i]); break;} }
                 if (i < disconnectedCount) continue;
                 monitor = createMonitor(&adapter,&display); if (!monitor) { OS_Free(disconnected,_glfw.monitorCount*sizeof(_GLFWmonitor*)); return; }
 
@@ -2298,34 +2224,19 @@ void InputMonitor(_GLFWmonitor*,int,int); const _GLFWfbconfig* ChooseFBConfig(co
     typedef struct { Time timestamp; Time configTimestamp; int ncrtc; RRCrtc *crtcs; int noutput; RROutput *outputs; int nmode; XRRModeInfo *modes; } XRRScreenResources;
     typedef struct { Time timestamp; RRCrtc crtc; char *name; int nameLen; u64 mm_width,mm_height; Connection connection; SubpixelOrder subpixel_order; i32 ncrtc; RRCrtc *crtcs; i32 nclone; RROutput *clones; i32 nmode,npreferred; RRMode *modes; } XRROutputInfo;
     typedef struct { Time timestamp; i32 x,y; u32 width,height; RRMode mode; Rotation rotation; i32 noutput; RROutput *outputs; Rotation rotations; i32 npossible; RROutput *possible; } XRRCrtcInfo; typedef XID GLXWindow,GLXDrawable; typedef struct __GLXFBConfig* GLXFBConfig; typedef struct __GLXcontext* GLXContext;
-    typedef void(*__GLXextproc)();                                          typedef XSizeHints*(*PFN_XAllocSizeHints)();                               typedef int(*PFN_XChangeProperty)(Display*,Window,Atom,Atom,int,int,const u8*,int);
-    typedef Bool(*PFN_XCheckTypedWindowEvent)(Display*,Window,int,XEvent*); typedef void(*PFN_XRRFreeOutputInfo)(XRROutputInfo*);                      typedef Colormap(*PFN_XCreateColormap)(Display*,Window,Visual*,int);
-    typedef int(*PFN_XDefineCursor)(Display*,Window,Cursor);                typedef int(*PFN_XDeleteProperty)(Display*,Window,Atom);                   typedef Window(*PFN_XCreateWindow)(Display*,Window,int,int,u32,u32,u32,int,u32,Visual*,u64,XSetWindowAttributes*);
-    typedef int(*PFN_XDisplayKeycodes)(Display*,int*,int*);                 typedef Bool(*PFN_XFilterEvent)(XEvent*,Window);                           typedef int(*PFN_XFindContext)(Display*,XID,XContext,XPointer*);
-    typedef int(*PFN_XFree)(void*);                                         typedef void(*PFN_XFreeEventData)(Display*,XGenericEventCookie*);          typedef int(*PFN_XGrabPointer)(Display*,Window,Bool,u32,int,int,Window,Cursor,Time);
-    typedef KeySym*(*PFN_XGetKeyboardMapping)(Display*,KeyCode,int,int*);   typedef Status(*PFN_XGetWMNormalHints)(Display*,Window,XSizeHints*,long*); typedef Status(*PFN_XGetWindowAttributes)(Display*,Window,XWindowAttributes*);
-    typedef Atom(*PFN_XInternAtom)(Display*,const char*,Bool);              typedef int(*PFN_XGetInputFocus)(Display*,Window*,int*);                   typedef int(*PFN_XGetWindowProperty)(Display*,Window,Atom,long,long,Bool,Atom,Atom*,int*,u64*,u64*,u8**);
-    typedef int(*PFN_XMapWindow)(Display*,Window);                          typedef int(*PFN_XMoveWindow)(Display*,Window,int,int);                    typedef int(*PFN_XMoveResizeWindow)(Display*,Window,int,int,u32,u32);
-    typedef Status(*PFN_XInitThreads)();                                    typedef int(*PFN_XNextEvent)(Display*,XEvent*);                            typedef XRRCrtcInfo*(*PFN_XRRGetCrtcInfo)(Display*,XRRScreenResources*,RRCrtc);
-    typedef int(*PFN_XPending)(Display*);                                   typedef Bool(*PFN_XQueryExtension)(Display*,const char*,int*,int*,int*);   typedef Bool(*PFN_XQueryPointer)(Display*,Window,Window*,Window*,int*,int*,int*,int*,u32*);
-    typedef int(*PFN_XRaiseWindow)(Display*,Window);                        typedef int(*PFN_XSaveContext)(Display*,XID,XContext,const char*);         typedef int(*PFN_XResizeWindow)(Display*,Window,u32,u32);
-    typedef Status(*PFN_XSendEvent)(Display*,Window,Bool,long,XEvent*);     typedef void(*PFN_XSetICFocus)(XIC);                                       typedef int(*PFN_XSetInputFocus)(Display*,Window,int,Time);
-    typedef void(*PFN_XSetWMNormalHints)(Display*,Window,XSizeHints*);      typedef Status(*PFN_XSetWMProtocols)(Display*,Window,Atom*,int);           typedef Bool(*PFN_XTranslateCoordinates)(Display*,Window,Window,int,int,int*,int*,Window*);
-    typedef int(*PFN_XUndefineCursor)(Display*,Window);                     typedef void(*PFN_XUnsetICFocus)(XIC);                                     typedef int(*PFN_XWarpPointer)(Display*,Window,Window,int,int,u32,u32,int,int);
-    typedef void(*PFN_XRRFreeCrtcInfo)(XRRCrtcInfo*);                       typedef int(*PFN_XUngrabPointer)(Display*,Time);                           typedef int(*PFN_XChangeWindowAttributes)(Display*,Window,u64,XSetWindowAttributes*);
-    typedef void(*PFN_XRRFreeScreenResources)(XRRScreenResources*);         typedef Display*(*PFN_XOpenDisplay)(const char*);                          typedef XRROutputInfo*(*PFN_XRRGetOutputInfo)(Display*,XRRScreenResources*,RROutput);
-    typedef RROutput(*PFN_XRRGetOutputPrimary)(Display*,Window);            typedef void(*PFN_XRRSelectInput)(Display*,Window,int);                    typedef XRRScreenResources*(*PFN_XRRGetScreenResourcesCurrent)(Display*,Window);
-    typedef int(*PFN_XRRUpdateConfiguration)(XEvent*);                      typedef XcursorImage*(*PFN_XCIC)(int,int);                   typedef void(*PFN_XCID)(XcursorImage*);
-    typedef Bool(*FGL_XQUERYEXTENSIONPROC)(Display*,int*,int*);            typedef int(*FGL_XGETFBCONFIGATTRIBPROC)(Display*,GLXFBConfig,int,int*);  typedef Cursor(*PFN_XCILC)(Display*,const XcursorImage*);
-    typedef Bool(*FGL_XQUERYVERSIONPROC)(Display*,int*,int*);              typedef Bool(*FGL_XMAKECURRENTPROC)(Display*,GLXDrawable,GLXContext);     typedef void(*FGL_XSWAPBUFFERSPROC)(Display*,GLXDrawable);
-    typedef const char*(*FGL_XQUERYEXTENSIONSSTRINGPROC)(Display*,int);    typedef GLXFBConfig*(*FGL_XGETFBCONFIGSPROC)(Display*,int,int*);          typedef GLXContext(*FGL_XCREATENEWCONTEXTPROC)(Display*,GLXFBConfig,int,GLXContext,Bool);
-    typedef __GLXextproc(*FGL_XGETPROCADDRESSPROC)(const u8*);             typedef void(*FGL_XSWAPINTERVALEXTPROC)(Display*,GLXDrawable,int);        typedef XVisualInfo*(*FGL_XGETVISUALFROMFBCONFIGPROC)(Display*,GLXFBConfig);
-    typedef GLXWindow(*FGL_XCREATEWINDOWPROC)(Display*,GLXFBConfig,Window,const int*); typedef GLXContext(*FGL_XCREATECONTEXTATTRIBSARBPROC)(Display*,GLXFBConfig,GLXContext,Bool,const int*);
-    typedef struct _GLFWcontextGLX { GLXContext handle; GLXWindow window; GLXFBConfig fbconfig; } _GLFWcontextGLX;
-    typedef struct _GLFWlibraryGLX { int major,minor,eventBase,errorBase; void* handle; FGL_XGETFBCONFIGSPROC GetFBConfigs; FGL_XGETFBCONFIGATTRIBPROC GetFBConfigAttrib; FGL_XQUERYEXTENSIONPROC QueryExtension; FGL_XQUERYVERSIONPROC QueryVersion; FGL_XMAKECURRENTPROC MakeCurrent; FGL_XSWAPBUFFERSPROC SwapBuffers;
-                                     FGL_XQUERYEXTENSIONSSTRINGPROC QueryExtensionsString; FGL_XCREATENEWCONTEXTPROC CreateNewContext; FGL_XGETVISUALFROMFBCONFIGPROC GetVisualFromFBConfig; FGL_XCREATEWINDOWPROC CreateWindow; FGL_XGETPROCADDRESSPROC GetProcAddress; FGL_XSWAPINTERVALEXTPROC SwapIntervalEXT;
-                                     FGL_XCREATECONTEXTATTRIBSARBPROC CreateContextAttribsARB; } _GLFWlibraryGLX;
-                                     
+    typedef void(*__GLXextproc)();                               typedef XSizeHints*(*PFN_XAllocSizeHints)();                       typedef int(*PFN_XChangeProperty)(Display*,Window,Atom,Atom,int,int,const u8*,int);         typedef void(*PFN_XCID)(XcursorImage*);                         typedef void(*PFN_XRRFreeOutputInfo)(XRROutputInfo*);                    typedef Colormap(*PFN_XCreateColormap)(Display*,Window,Visual*,int);
+    typedef int(*PFN_XDefineCursor)(Display*,Window,Cursor);     typedef int(*PFN_XDeleteProperty)(Display*,Window,Atom);           typedef int(*PFN_XDisplayKeycodes)(Display*,int*,int*);                                     typedef Bool(*PFN_XFilterEvent)(XEvent*,Window);                typedef int(*PFN_XFindContext)(Display*,XID,XContext,XPointer*);         typedef Window(*PFN_XCreateWindow)(Display*,Window,int,int,u32,u32,u32,int,u32,Visual*,u64,XSetWindowAttributes*);
+    typedef int(*PFN_XFree)(void*);                              typedef void(*PFN_XFreeEventData)(Display*,XGenericEventCookie*);  typedef int(*PFN_XGrabPointer)(Display*,Window,Bool,u32,int,int,Window,Cursor,Time);        typedef void(*PFN_XSetICFocus)(XIC);                            typedef KeySym*(*PFN_XGetKeyboardMapping)(Display*,KeyCode,int,int*);    typedef Status(*PFN_XGetWMNormalHints)(Display*,Window,XSizeHints*,long*);
+    typedef Atom(*PFN_XInternAtom)(Display*,const char*,Bool);   typedef int(*PFN_XGetInputFocus)(Display*,Window*,int*);           typedef int(*PFN_XMapWindow)(Display*,Window);                                              typedef int(*PFN_XMoveWindow)(Display*,Window,int,int);         typedef int(*PFN_XMoveResizeWindow)(Display*,Window,int,int,u32,u32);    typedef int(*PFN_XGetWindowProperty)(Display*,Window,Atom,long,long,Bool,Atom,Atom*,int*,u64*,u64*,u8**);
+    typedef Status(*PFN_XInitThreads)();                         typedef int(*PFN_XNextEvent)(Display*,XEvent*);                    typedef XRRCrtcInfo*(*PFN_XRRGetCrtcInfo)(Display*,XRRScreenResources*,RRCrtc);             typedef int(*PFN_XPending)(Display*);                           typedef Bool(*PFN_XQueryExtension)(Display*,const char*,int*,int*,int*); typedef Bool(*PFN_XQueryPointer)(Display*,Window,Window*,Window*,int*,int*,int*,int*,u32*);
+    typedef int(*PFN_XRaiseWindow)(Display*,Window);             typedef int(*PFN_XSaveContext)(Display*,XID,XContext,const char*); typedef int(*PFN_XResizeWindow)(Display*,Window,u32,u32);                                   typedef XcursorImage*(*PFN_XCIC)(int,int);                      typedef Status(*PFN_XSendEvent)(Display*,Window,Bool,long,XEvent*);      typedef int(*PFN_XSetInputFocus)(Display*,Window,int,Time);
+    typedef void(*PFN_XUnsetICFocus)(XIC);                       typedef Status(*PFN_XSetWMProtocols)(Display*,Window,Atom*,int);   typedef Bool(*PFN_XTranslateCoordinates)(Display*,Window,Window,int,int,int*,int*,Window*); typedef int(*PFN_XUndefineCursor)(Display*,Window);             typedef void(*PFN_XSetWMNormalHints)(Display*,Window,XSizeHints*);       typedef int(*PFN_XWarpPointer)(Display*,Window,Window,int,int,u32,u32,int,int);
+    typedef void(*PFN_XRRFreeCrtcInfo)(XRRCrtcInfo*);            typedef int(*PFN_XUngrabPointer)(Display*,Time);                   typedef int(*PFN_XChangeWindowAttributes)(Display*,Window,u64,XSetWindowAttributes*);       typedef void(*PFN_XRRFreeScreenResources)(XRRScreenResources*); typedef Display*(*PFN_XOpenDisplay)(const char*);                        typedef XRROutputInfo*(*PFN_XRRGetOutputInfo)(Display*,XRRScreenResources*,RROutput);
+    typedef RROutput(*PFN_XRRGetOutputPrimary)(Display*,Window); typedef void(*PFN_XRRSelectInput)(Display*,Window,int);            typedef XRRScreenResources*(*PFN_XRRGetScreenResourcesCurrent)(Display*,Window);            typedef int(*PFN_XRRUpdateConfiguration)(XEvent*);              typedef Bool(*PFN_XCheckTypedWindowEvent)(Display*,Window,int,XEvent*);  typedef Status(*PFN_XGetWindowAttributes)(Display*,Window,XWindowAttributes*);
+    typedef Bool(*GLX_QEP)(Display*,int*,int*);                  typedef int(*GLX_GFBCAP)(Display*,GLXFBConfig,int,int*);           typedef GLXContext(*GLX_CNCP)(Display*,GLXFBConfig,int,GLXContext,Bool);                    typedef Bool(*GLX_QVP)(Display*,int*,int*);                     typedef Bool(*GLX_MCP)(Display*,GLXDrawable,GLXContext);                 typedef void(*GLX_SBP)(Display*,GLXDrawable);
+    typedef Cursor(*PFN_XCILC)(Display*,const XcursorImage*);    typedef const char*(*GLX_QESP)(Display*,int);                      typedef GLXFBConfig*(*GLX_GFBCP)(Display*,int,int*);                                        typedef __GLXextproc(*GLX_GPAP)(const u8*);                     typedef void(*GLX_SIEP)(Display*,GLXDrawable,int);                       typedef XVisualInfo*(*GLX_GVFFBCP)(Display*,GLXFBConfig);
+    typedef GLXWindow(*GLX_CWP)(Display*,GLXFBConfig,Window,const int*); typedef GLXContext(*GLX_CCAA)(Display*,GLXFBConfig,GLXContext,Bool,const int*); typedef struct _GLFWcontextGLX { GLXContext handle; GLXWindow window; GLXFBConfig fbconfig; } _GLFWcontextGLX;
+    typedef struct _GLFWlibraryGLX { int major,minor,eventBase,errorBase; void* handle; GLX_GFBCP GetFBConfigs; GLX_GFBCAP GetFBConfigAttrib; GLX_QEP QueryExtension; GLX_QVP QueryVersion; GLX_MCP MakeCurrent; GLX_SBP SwapBuffers; GLX_QESP QueryExtensionsString; GLX_CNCP CreateNewContext; GLX_GVFFBCP GetVisualFromFBConfig; GLX_CWP CreateWindow; GLX_GPAP GetProcAddress; GLX_SIEP SwapIntervalEXT; GLX_CCAA CreateContextAttribsARB; } _GLFWlibraryGLX;
     typedef struct _GLFWwindowX11 { Colormap colormap; Window handle,parent; XIC ic; i32 overrideRedirect; int width,height,xpos,ypos,lastCursorPosX,lastCursorPosY,warpCursorPosX,warpCursorPosY; } _GLFWwindowX11;
     typedef struct _GLFWlibraryX11 { Display* display; int screen; Window root; Cursor hiddenCursorHandle; XContext context; short int keycodes[256],scancodes[349]; double restoreCurPosX, restoreCurPosY; _GLFWwindow* disabledCursorWindow;
                                      Atom NET_SUPPORTED,NET_SUPPORTING_WM_CHECK,WM_PROTOCOLS,WM_STATE,WM_DELETE_WINDOW,NET_WM_NAME,NET_WM_ICON,NET_WM_PING,NET_WM_WINDOW_TYPE,NET_WM_WINDOW_TYPE_NORMAL,NET_WM_STATE,NET_WM_STATE_FULLSCREEN,NET_WM_BYPASS_COMPOSITOR,NET_WORKAREA,NET_CURRENT_DESKTOP,NET_ACTIVE_WINDOW,MOTIF_WM_HINTS,UTF8_STRING;
@@ -2334,10 +2245,8 @@ void InputMonitor(_GLFWmonitor*,int,int); const _GLFWfbconfig* ChooseFBConfig(co
                                      PFN_XGetWindowAttributes GetWindowAttributes; PFN_XGetWindowProperty GetWindowProperty; PFN_XGrabPointer GrabPointer; PFN_XInternAtom InternAtom; PFN_XMapWindow MapWindow; PFN_XMoveResizeWindow MoveResizeWindow; PFN_XMoveWindow MoveWindow; PFN_XPending Pending; PFN_XQueryExtension QueryExtension;
                                      PFN_XQueryPointer QueryPointer; PFN_XRaiseWindow RaiseWindow; PFN_XResizeWindow ResizeWindow; PFN_XSaveContext SaveContext; PFN_XSendEvent SendEvent; PFN_XSetICFocus SetICFocus; PFN_XSetInputFocus SetInputFocus; PFN_XSetWMNormalHints SetWMNormalHints; PFN_XSetWMProtocols SetWMProtocols;
                                      PFN_XTranslateCoordinates TranslateCoordinates; PFN_XUndefineCursor UndefineCursor; PFN_XUngrabPointer UngrabPointer; PFN_XUnsetICFocus UnsetICFocus; PFN_XWarpPointer WarpPointer; } xlib;
-                                     struct {void* handle; int eventBase,errorBase,major,minor; PFN_XRRFreeCrtcInfo FreeCrtcInfo; PFN_XRRFreeOutputInfo FreeOutputInfo; PFN_XRRFreeScreenResources FreeScreenResources; PFN_XRRGetCrtcInfo GetCrtcInfo; PFN_XRRGetOutputInfo GetOutputInfo; PFN_XRRGetOutputPrimary GetOutputPrimary;
-                                             PFN_XRRGetScreenResourcesCurrent GetScreenResourcesCurrent; PFN_XRRSelectInput SelectInput; PFN_XRRUpdateConfiguration UpdateConfiguration;}randr; } _GLFWlibraryX11; 
-    PFN_XNextEvent XNextEvent;
-    typedef struct _GLFWmonitorX11 { RROutput output; RRCrtc crtc; int index; } _GLFWmonitorX11; typedef struct _GLFWjoystickLinux { FHandle fd; char path[260]; int keyMap[0x300/*KEY_CNT*/ - 0x100/*BTN_MISC*/],absMap[0x40/*ABS_CNT*/]; struct input_absinfo absInfo[0x40/*ABS_CNT*/]; int hats[4][2]; } _GLFWjoystickLinux; typedef struct _GLFWlibraryLinux { int inotify,watch; i32 dropped; } _GLFWlibraryLinux;
+                                     struct {void* handle; int eventBase,errorBase,major,minor; PFN_XRRFreeCrtcInfo FreeCrtcInfo; PFN_XRRFreeOutputInfo FreeOutputInfo; PFN_XRRFreeScreenResources FreeScreenResources; PFN_XRRGetCrtcInfo GetCrtcInfo; PFN_XRRGetOutputInfo GetOutputInfo; PFN_XRRGetOutputPrimary GetOutputPrimary; PFN_XRRGetScreenResourcesCurrent GetScreenResourcesCurrent; PFN_XRRSelectInput SelectInput; PFN_XRRUpdateConfiguration UpdateConfiguration;}randr; } _GLFWlibraryX11;
+    PFN_XNextEvent XNextEvent; typedef struct _GLFWmonitorX11 { RROutput output; RRCrtc crtc; int index; } _GLFWmonitorX11; typedef struct _GLFWjoystickLinux { FHandle fd; char path[260]; int keyMap[0x300/*KEY_CNT*/ - 0x100/*BTN_MISC*/],absMap[0x40/*ABS_CNT*/]; struct input_absinfo absInfo[0x40/*ABS_CNT*/]; int hats[4][2]; } _GLFWjoystickLinux; typedef struct _GLFWlibraryLinux { int inotify,watch; i32 dropped; } _GLFWlibraryLinux;
     void GetCursorPosV(_GLFWwindow*,double*,double*); void SetCursorPosV(_GLFWwindow*,double,double);
     struct _GLFWjoystick { i32 allocated,connected; size_t axesSize,buttonsSize,hatsSize; float*  axes; int axisCount; u8* buttons; int buttonCount; u8* hats; int hatCount; char name[128],guid[33]; _GLFWjoystickLinux linjs; };
     struct _GLFWlibrary { _GLFWmonitor** monitors; int monitorCount; i32 joysticksInitialized; _GLFWjoystick joysticks[JOYSTICK_LAST + 1]; _GLFWlibraryX11 x11; _GLFWlibraryGLX glx; _GLFWlibraryLinux linjs; };
@@ -2872,21 +2781,21 @@ GLFWwindow* VCreateWindow(int width, int height, char* title) {
 #else
     const char* names[] = {"libGLX.so.0","libGL.so.1","libGL.so",NULL};
     for (int i=0;names[i] && !_glfw.glx.handle;i++) _glfw.glx.handle = _glfwPlatformLoadModule(names[i]);
-    _glfw.glx.GetFBConfigs = (FGL_XGETFBCONFIGSPROC)PlatformGetModuleSymbol(_glfw.glx.handle,"glXGetFBConfigs");
-    _glfw.glx.GetFBConfigAttrib = (FGL_XGETFBCONFIGATTRIBPROC)PlatformGetModuleSymbol(_glfw.glx.handle,"glXGetFBConfigAttrib");
-    _glfw.glx.QueryExtension = (FGL_XQUERYEXTENSIONPROC)PlatformGetModuleSymbol(_glfw.glx.handle,"glXQueryExtension");
-    _glfw.glx.QueryVersion = (FGL_XQUERYVERSIONPROC)PlatformGetModuleSymbol(_glfw.glx.handle,"glXQueryVersion");
-    _glfw.glx.MakeCurrent = (FGL_XMAKECURRENTPROC)PlatformGetModuleSymbol(_glfw.glx.handle,"glXMakeCurrent");
-    _glfw.glx.SwapBuffers = (FGL_XSWAPBUFFERSPROC)PlatformGetModuleSymbol(_glfw.glx.handle,"glXSwapBuffers");
-    _glfw.glx.QueryExtensionsString = (FGL_XQUERYEXTENSIONSSTRINGPROC)PlatformGetModuleSymbol(_glfw.glx.handle,"glXQueryExtensionsString");
-    _glfw.glx.CreateNewContext = (FGL_XCREATENEWCONTEXTPROC)PlatformGetModuleSymbol(_glfw.glx.handle,"glXCreateNewContext");
-    _glfw.glx.CreateWindow = (FGL_XCREATEWINDOWPROC)PlatformGetModuleSymbol(_glfw.glx.handle,"glXCreateWindow");
-    _glfw.glx.GetVisualFromFBConfig = (FGL_XGETVISUALFROMFBCONFIGPROC)PlatformGetModuleSymbol(_glfw.glx.handle,"glXGetVisualFromFBConfig");
-    _glfw.glx.GetProcAddress = (FGL_XGETPROCADDRESSPROC)PlatformGetModuleSymbol(_glfw.glx.handle,"glXGetProcAddress");
+    _glfw.glx.GetFBConfigs = (GLX_GFBCP)PlatformGetModuleSymbol(_glfw.glx.handle,"glXGetFBConfigs");
+    _glfw.glx.GetFBConfigAttrib = (GLX_GFBCAP)PlatformGetModuleSymbol(_glfw.glx.handle,"glXGetFBConfigAttrib");
+    _glfw.glx.QueryExtension = (GLX_QEP)PlatformGetModuleSymbol(_glfw.glx.handle,"glXQueryExtension");
+    _glfw.glx.QueryVersion = (GLX_QVP)PlatformGetModuleSymbol(_glfw.glx.handle,"glXQueryVersion");
+    _glfw.glx.MakeCurrent = (GLX_MCP)PlatformGetModuleSymbol(_glfw.glx.handle,"glXMakeCurrent");
+    _glfw.glx.SwapBuffers = (GLX_SBP)PlatformGetModuleSymbol(_glfw.glx.handle,"glXSwapBuffers");
+    _glfw.glx.QueryExtensionsString = (GLX_QESP)PlatformGetModuleSymbol(_glfw.glx.handle,"glXQueryExtensionsString");
+    _glfw.glx.CreateNewContext = (GLX_CNCP)PlatformGetModuleSymbol(_glfw.glx.handle,"glXCreateNewContext");
+    _glfw.glx.CreateWindow = (GLX_CWP)PlatformGetModuleSymbol(_glfw.glx.handle,"glXCreateWindow");
+    _glfw.glx.GetVisualFromFBConfig = (GLX_GVFFBCP)PlatformGetModuleSymbol(_glfw.glx.handle,"glXGetVisualFromFBConfig");
+    _glfw.glx.GetProcAddress = (GLX_GPAP)PlatformGetModuleSymbol(_glfw.glx.handle,"glXGetProcAddress");
     _glfw.glx.QueryExtension(_glfw.x11.display,&_glfw.glx.errorBase,&_glfw.glx.eventBase);
     _glfw.glx.QueryVersion(_glfw.x11.display,&_glfw.glx.major,&_glfw.glx.minor);
-    _glfw.glx.SwapIntervalEXT = (FGL_XSWAPINTERVALEXTPROC)getProcAddressGLX("glXSwapIntervalEXT");
-    _glfw.glx.CreateContextAttribsARB = (FGL_XCREATECONTEXTATTRIBSARBPROC)getProcAddressGLX("glXCreateContextAttribsARB");
+    _glfw.glx.SwapIntervalEXT = (GLX_SIEP)getProcAddressGLX("glXSwapIntervalEXT");
+    _glfw.glx.CreateContextAttribsARB = (GLX_CCAA)getProcAddressGLX("glXCreateContextAttribsARB");
     GLXFBConfig native; XVisualInfo* result;
     GLXFBConfig* nativeConfigs; _GLFWfbconfig* usableConfigs; const _GLFWfbconfig* closest; int nativeCount,usableCount;
     nativeConfigs = _glfw.glx.GetFBConfigs(_glfw.x11.display, _glfw.x11.screen, &nativeCount);        
@@ -3114,7 +3023,7 @@ void ChangeFullScreenWindowed() {
     int x,y,w,h,mx,my,monitorCount; _GLFWmonitor** monitors = glfwGetMonitors(&monitorCount); _GLFWmonitor* monitor = monitors[Sys_Settings.CurrentMonitor]; const vidmode* mode = glfwGetVideoMode(monitor); glfwGetMonitorWorkarea(monitor,&x,&y,&w,&h);
     ((_GLFWwindow*)window)->decorated = (i32)(!Sys_Settings.Fullscreen); SetWindowDecorated(((_GLFWwindow*)window),(i32)(!Sys_Settings.Fullscreen));
     if (Sys_Settings.Fullscreen) {glfwSetWindowMonitor(x,y,w,h); Sys_Settings.ScreenWidth = w; Sys_Settings.ScreenHeight = h;}
-    else { glfwGetMonitorPos(monitor,&mx,&my); Sys_Settings.ScreenWidth  = vmax(vmin((w*3)/4,1366),320); Sys_Settings.ScreenHeight = vmax(vmin((h*3)/4,768),200); int x=mx + (mode->width - Sys_Settings.ScreenWidth) / 2, y=my + (mode->height - Sys_Settings.ScreenHeight) / 2; glfwSetWindowMonitor(x,y,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); }
+    else { glfwGetMonitorPos(monitor,&mx,&my); Sys_Settings.ScreenWidth = vmax(vmin((w*3)/4,1366),320); Sys_Settings.ScreenHeight = vmax(vmin((h*3)/4,768),200); glfwSetWindowMonitor(mx + (mode->width - Sys_Settings.ScreenWidth) / 2,my + (mode->height - Sys_Settings.ScreenHeight) / 2,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); }
     UpdateScreenSize(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
 }
 
@@ -3526,61 +3435,33 @@ static bool GJKNextSimplex(Simplex3D *s, V3 *dir) {
 #define EPA_MAX_EDGES (EPA_MAX_FACES*3)
 typedef struct { int a,b,c; V3 n; float d; } EPAFace;
 typedef struct { V3 v, wA, wB; } EPAVert;
-static inline EPAFace MakeEPAFace(const EPAVert* vb, int a, int b, int c) {
-    V3 n = V3_Cross(V3_AsubB(vb[b].v,vb[a].v),V3_AsubB(vb[c].v,vb[a].v));
-    float L = V3_Mag(n); if (L < PHY_EPSILON) return (EPAFace){a,b,c,{0},0.f};
-    
-    n = V3_ScaleByF(n,1.f/L); float d = V3_dot(n,vb[a].v);
-    if (d < 0.f) { n=(V3){-n.x,-n.y,-n.z}; d=-d; int t=b;b=c;c=t; }
-    return (EPAFace){a,b,c,n,d};
+static inline EPAFace MakeEPAFace(const EPAVert* vb, int a, int b, int c) { V3 n = V3_Cross(V3_AsubB(vb[b].v,vb[a].v),V3_AsubB(vb[c].v,vb[a].v)); float L = V3_Mag(n); if(L < PHY_EPSILON){return (EPAFace){a,b,c,{0},0.f};} n = V3_ScaleByF(n,1.f/L); float d = V3_dot(n,vb[a].v); if(d < 0.f){n=(V3){-n.x,-n.y,-n.z}; d=-d; int t=b;b=c;c=t;} return (EPAFace){a,b,c,n,d}; }
+static inline V3 EPAContactPoint(const EPAVert* ev, int a, int b, int c) {
+    V3 pa=ev[a].v, pb=ev[b].v, pc=ev[c].v; V3 v0=V3_AsubB(pb,pa), v1=V3_AsubB(pc,pa), v2=V3_AsubB((V3){0,0,0},pa); float d00 = V3_dot(v0,v0); float d01 = V3_dot(v0,v1); float d11 = V3_dot(v1,v1); float d20 = V3_dot(v2,v0); float d21 = V3_dot(v2,v1);
+    float denom = d00 * d11 - d01 * d01 + PHY_EPSILON; float v = vmax((d11 * d20 - d01 * d21) * (1.0f / denom),0.0f); float w = vmax((d00 * d21 - d01 * d20) * (1.0f / denom),0.0f); float u = vmax(1.0f - v - w,0.0f);
+    float sum = u + v + w; if (sum > PHY_EPSILON) {u /= sum; v /= sum; w /= sum;} return (V3){u*ev[a].wA.x + v*ev[b].wA.x + w*ev[c].wA.x,u*ev[a].wA.y + v*ev[b].wA.y + w*ev[c].wA.y,u*ev[a].wA.z + v*ev[b].wA.z + w*ev[c].wA.z};
 }
 
-static inline V3 EPAContactPoint(const EPAVert* ev, int a, int b, int c, V3 n, float d) {
-    V3 pa = ev[a].v; V3 pb = ev[b].v; V3 pc = ev[c].v;
-    V3 v0 = V3_AsubB(pb, pa); V3 v1 = V3_AsubB(pc, pa); V3 v2 = V3_AsubB((V3){0,0,0}, pa);   // Vector from pa to origin (in Minkowski space)
-    float d00 = V3_dot(v0, v0); float d01 = V3_dot(v0, v1); float d11 = V3_dot(v1, v1); float d20 = V3_dot(v2, v0); float d21 = V3_dot(v2, v1);
-    float denom = d00 * d11 - d01 * d01 + PHY_EPSILON; float v = (d11 * d20 - d01 * d21) * (1.0f / denom); float w = (d00 * d21 - d01 * d20) * (1.0f / denom); float u = 1.0f - v - w;
-    u = vmax(u, 0.0f); v = vmax(v, 0.0f); w = vmax(w, 0.0f); // Clamp to avoid numerical blow-up / negative weights causing jitter
-    float sum = u + v + w;
-    if (sum > PHY_EPSILON) {u /= sum; v /= sum; w /= sum;}
-    return (V3){u*ev[a].wA.x + v*ev[b].wA.x + w*ev[c].wA.x,u*ev[a].wA.y + v*ev[b].wA.y + w*ev[c].wA.y,u*ev[a].wA.z + v*ev[b].wA.z + w*ev[c].wA.z};
-}
-
-static inline Manifold MakeEPAManifold(const EPAVert* ev, int a, int b, int c, V3 n, float d) { Manifold m = {0};  m.normal = n;  m.maxPen = d; m.n = 1; m.p[0] = (ManifoldPt){ EPAContactPoint(ev, a, b, c, n, d), d }; return m; }
+static inline Manifold MakeEPAManifold(const EPAVert* ev, int a, int b, int c, V3 n, float d) { Manifold m = {0};  m.normal = n;  m.maxPen = d; m.n = 1; m.p[0] = (ManifoldPt){ EPAContactPoint(ev,a,b,c), d }; return m; }
 static void inline FeatureOverlap(V3 sc, float sr, V3 pt, OverlapResult* r) { V3 delta=V3_AsubB(sc,pt); float dist2=V3_dot(delta,delta); if (dist2 < sr*sr) { float dist=vsqrtf(vmax(dist2,0.0f)); OverlapResult t={true,pt,(dist>PHY_EPSILON) ? V3_ScaleByF(delta,1.0f/dist) : (V3){0.0f,1.0f,0.0f},sr - dist}; if(t.overlapAmount>r->overlapAmount) *r=t; } }
 static OverlapResult SphMsh(V3 sc, float sr, u16 mesh, const float* mx) { // Triangle-soup mesh support: test sphere/capsule against all triangles of a static mesh.  Returns deepest overlapping triangle result.  Normal points from mesh toward mover. Voronoi region closest point.
-    OverlapResult r = {0}; if (mesh >= MAX_MDLS) return r;
-    u32 triCount = modelTriangleCounts[mesh]; if (!triCount) return r;
+    OverlapResult r = {0}; if (mesh >= MAX_MDLS) {return r;} u32 triCount = modelTriangleCounts[mesh]; if (!triCount){return r;}
 
     for (u32 ti = 0; ti < triCount; ++ti) {
         u32 i0 = modelTriangles[mesh][ti*3+0], i1 = modelTriangles[mesh][ti*3+1], i2 = modelTriangles[mesh][ti*3+2];
         #define RV(i) MvVert(mx,(V3){half_to_float(*(half*)(modelVertices[mesh]+(i)*VRT_ATT_SZ+0)), half_to_float(*(half*)(modelVertices[mesh]+(i)*VRT_ATT_SZ+2)), half_to_float(*(half*)(modelVertices[mesh]+(i)*VRT_ATT_SZ+4))})
         V3 a=RV(i0), b=RV(i1), c=RV(i2);
         #undef RV
-        V3 ab=V3_AsubB(b,a), ac=V3_AsubB(c,a), ap=V3_AsubB(sc,a); // Closest point on triangle to sphere center
-        float d1=V3_dot(ab,ap), d2=V3_dot(ac,ap);
-        if (d1 <= 0.0f && d2 <= 0.0f) { FeatureOverlap(sc,sr,a,&r); continue; } // Vertex A region
-        
-        V3 bp=V3_AsubB(sc,b);
-        float d3=V3_dot(ab,bp), d4=V3_dot(ac,bp);
-        if (d3 >= 0.0f && d4 <= d3)   { FeatureOverlap(sc,sr,b,&r); continue; } // Vertex B region
-        
-        V3 cp=V3_AsubB(sc,c);
-        float d5=V3_dot(ab,cp), d6=V3_dot(ac,cp);
-        if (d6>=0.f && d5<=d6) { FeatureOverlap(sc,sr,c,&r); continue; } // Vertex C region
-        
-        float vc=d1*d4-d3*d2;
-        if (vc<=0.f && d1>=0.f && d3<=0.f) { float v=d1/(d1-d3); V3 pt=V3_AplusB(a,V3_ScaleByF(ab,v)); FeatureOverlap(sc,sr,pt,&r); continue; } // Edge AB region
-        
-        float vb=d5*d2-d1*d6;
-        if (vb<=0.f && d2>=0.f && d6<=0.f) { float w=d2/(d2-d6); V3 pt=V3_AplusB(a,V3_ScaleByF(ac,w)); FeatureOverlap(sc,sr,pt,&r); continue; } // Edge AC region
-        
-        float va=d3*d6-d5*d4;
-        if (va<=0.f && (d4-d3)>=0.f && (d5-d6)>=0.f) { float w=(d4-d3)/((d4-d3)+(d5-d6)); V3 bc=V3_AsubB(c,b); V3 pt=V3_AplusB(b,V3_ScaleByF(bc,w)); FeatureOverlap(sc,sr,pt,&r); continue; } // Edge BC region
+        V3 ab=V3_AsubB(b,a), ac=V3_AsubB(c,a);
+        V3 ap=V3_AsubB(sc,a); float d1=V3_dot(ab,ap), d2=V3_dot(ac,ap); if(d1 <= 0.0f && d2 <= 0.0f){FeatureOverlap(sc,sr,a,&r); continue;} // Vertex A region
+        V3 bp=V3_AsubB(sc,b); float d3=V3_dot(ab,bp), d4=V3_dot(ac,bp); if(d3 >= 0.0f && d4 <= d3){FeatureOverlap(sc,sr,b,&r); continue;} // Vertex B region
+        V3 cp=V3_AsubB(sc,c); float d5=V3_dot(ab,cp), d6=V3_dot(ac,cp); if(d6>=0.f && d5<=d6){FeatureOverlap(sc,sr,c,&r); continue;} // Vertex C region
+        float vc=d1*d4-d3*d2; if (vc<=0.f && d1>=0.f && d3<=0.f) { float v=d1/(d1-d3); V3 pt=V3_AplusB(a,V3_ScaleByF(ab,v)); FeatureOverlap(sc,sr,pt,&r); continue; } // Edge AB region
+        float vb=d5*d2-d1*d6; if (vb<=0.f && d2>=0.f && d6<=0.f) { float w=d2/(d2-d6); V3 pt=V3_AplusB(a,V3_ScaleByF(ac,w)); FeatureOverlap(sc,sr,pt,&r); continue; } // Edge AC region
+        float va=d3*d6-d5*d4; if (va<=0.f && (d4-d3)>=0.f && (d5-d6)>=0.f) { float w=(d4-d3)/((d4-d3)+(d5-d6)); V3 bc=V3_AsubB(c,b); V3 pt=V3_AplusB(b,V3_ScaleByF(bc,w)); FeatureOverlap(sc,sr,pt,&r); continue; } // Edge BC region
         V3 n = V3_Cross(ab,ac); float nLen=V3_Mag(n); if(nLen<PHY_EPSILON) continue; // Face region — project onto triangle plane
 
-        n=V3_ScaleByF(n,1.f/nLen); float dist=V3_dot(n,ap); // signed distance from plane (positive = above)
-        float absDist=vabs(dist);
+        n=V3_ScaleByF(n,1.f/nLen); float dist=V3_dot(n,ap); float absDist=vabs(dist);
         if (absDist < sr) { V3 fn = (dist >= 0.0f) ? n : (V3){-n.x,-n.y,-n.z}; OverlapResult t={true,V3_AsubB(sc,V3_ScaleByF(fn,absDist)),fn,sr-absDist}; if(t.overlapAmount>r.overlapAmount) {r=t;} } // Back-face: if sphere is below the triangle, flip normal so response pushes it out correctly
     }
     return r;
@@ -3589,9 +3470,7 @@ static OverlapResult SphMsh(V3 sc, float sr, u16 mesh, const float* mx) { // Tri
 static OverlapResult CapMsh(ShapeCapsule cap, u16 mesh, const float* mx) { OverlapResult rb = SphMsh(cap.base,cap.rad,mesh,mx); OverlapResult rt = SphMsh(cap.tip,cap.rad,mesh,mx); return (rt.overlapAmount > rb.overlapAmount) ? rt : rb; } // TODO: Connectivity needed or is snowman ala System Shock 1 fine enough?  Might prove funny if player can get stuck with top and bottom on either side of door while leaning like in original.
 static Manifold CvxCvx(u16 meshA, u16 meshB, const float* matA, const float* matB) {
     Manifold m = {0}; if (meshA >= MAX_MDLS || meshB >= MAX_MDLS) return m;
-    Simplex3D s = {0}; V3 dir = {0.0f,1.0f,0.0f};
-    s.v[s.n++] = MinkowskiSupport(meshA,matA,meshB,matB,dir);
-    dir = (V3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
+    Simplex3D s = {0}; V3 dir = {0.0f,1.0f,0.0f}; s.v[s.n++] = MinkowskiSupport(meshA,matA,meshB,matB,dir); dir = (V3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
     if (V3_dot(dir,dir) < PHY_EPSILON) dir=(V3){0.0f,1.0f,0.0f};
     bool hit=false;
     for (int it=0;it<64;++it) {
@@ -3644,24 +3523,14 @@ static Manifold CapCvx(ShapeCapsule cap, u16 mesh, const float* mx) {
     #define CSUP_A(d) CapsuleSupport(cap, d)
     #define CSUP_B(d) MeshSupport(mesh, mx, (V3){-(d).x,-(d).y,-(d).z})
     #define CSUP(d)   V3_AsubB(CSUP_A(d), CSUP_B(d))
-    Simplex3D s = {0}; V3 dir = {0,1,0};
-    s.v[s.n++] = CSUP(dir); dir = (V3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
-    if (V3_dot(dir,dir) < PHY_EPSILON) dir=(V3){0,1,0};
-    bool hit=false;
-    for (int it=0; it<64; ++it) {
-        V3 sup=CSUP(dir); if (V3_dot(sup,dir)<PHY_EPSILON) return m;
-        s.v[s.n++]=sup;
-        if (!GJKNextSimplex(&s,&dir)) { hit=true; break; }
-        if (V3_dot(dir,dir)<PHY_EPSILON) { hit=true; break; }
-    }
+    Simplex3D s = {0}; V3 dir = {0,1,0}; s.v[s.n++] = CSUP(dir); dir = (V3){-s.v[0].x,-s.v[0].y,-s.v[0].z}; if(V3_dot(dir,dir) < PHY_EPSILON){dir=(V3){0,1,0};} bool hit=false;
+    for (int it=0;it<64;++it) { V3 sup=CSUP(dir); if(V3_dot(sup,dir)<PHY_EPSILON){return m;} s.v[s.n++]=sup; if(!GJKNextSimplex(&s,&dir)){hit=true; break;} if(V3_dot(dir,dir)<PHY_EPSILON){hit=true; break;} }
     if (!hit) return m;
+
     static const V3 kAx[6]={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
-    for (int d=0;s.n<4&&d<6;++d) {
-        V3 sup=CSUP(kAx[d]); bool dup=false;
-        for (int k=0;k<s.n;k++){V3 dv=V3_AsubB(sup,s.v[k]);dup|=(V3_dot(dv,dv)<PHY_EPSILON*PHY_EPSILON);}
-        if (!dup) s.v[s.n++]=sup;
-    }
+    for (int d=0;s.n<4&&d<6;++d) { V3 sup=CSUP(kAx[d]); bool dup=false; for(int k=0;k<s.n;k++){V3 dv=V3_AsubB(sup,s.v[k]);dup|=(V3_dot(dv,dv)<PHY_EPSILON*PHY_EPSILON);} if(!dup){s.v[s.n++]=sup;} }
     if (s.n<4) return m;
+
     EPAVert ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0,nf=0;
     for (int i=0;i<4;i++){ev[nv].wA=CSUP_A(s.v[i]);ev[nv].wB=CSUP_B(s.v[i]);ev[nv].v=s.v[i];nv++;}
     static const int kTF[4][3]={{0,1,2},{0,3,1},{0,2,3},{1,3,2}};
@@ -3670,9 +3539,9 @@ static Manifold CapCvx(ShapeCapsule cap, u16 mesh, const float* mx) {
         int bf=-1; float bd=1e9f;
         for (int f=0;f<nf;f++) if(ef[f].d<bd){bd=ef[f].d;bf=f;}
         if (bf<0) break;
-        V3 bn=ef[bf].n; V3 wA=CSUP_A(bn); V3 wB=CSUP_B(bn); V3 sup=V3_AsubB(wA,wB);
-        if (V3_dot(bn,sup)-bd<PHY_EPSILON) return MakeEPAManifold(ev,ef[bf].a,ef[bf].b,ef[bf].c,bn,bd);
+        V3 bn=ef[bf].n; V3 wA=CSUP_A(bn), wB=CSUP_B(bn); V3 sup=V3_AsubB(wA,wB); if(V3_dot(bn,sup)-bd<PHY_EPSILON){return MakeEPAManifold(ev,ef[bf].a,ef[bf].b,ef[bf].c,bn,bd);}
         if (nv>=EPA_MAX_VERTS) break;
+
         ev[nv].v=sup; ev[nv].wA=wA; ev[nv].wB=wB;
         int edges[EPA_MAX_EDGES][2],ne=0,keep[EPA_MAX_FACES],nk=0;
         for (int f=0;f<nf;f++){
@@ -3700,19 +3569,10 @@ static Manifold BoxCvx(ShapeBox box, u16 mesh, const float* mx) {
     s.v[s.n++]=BSUP(dir); dir=(V3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
     if (V3_dot(dir,dir)<PHY_EPSILON) dir=(V3){0,1,0};
     bool hit=false;
-    for (int it=0;it<64;++it){
-        V3 sup=BSUP(dir); if (V3_dot(sup,dir)<PHY_EPSILON) return m;
-        s.v[s.n++]=sup;
-        if (!GJKNextSimplex(&s,&dir)){hit=true;break;}
-        if (V3_dot(dir,dir)<PHY_EPSILON){hit=true;break;}
-    }
+    for (int it=0;it<64;++it){ V3 sup=BSUP(dir); if(V3_dot(sup,dir)<PHY_EPSILON){return m;} s.v[s.n++]=sup; if (!GJKNextSimplex(&s,&dir)){hit=true;break;} if (V3_dot(dir,dir)<PHY_EPSILON){hit=true;break;} }
     if (!hit) return m;
     static const V3 kAx[6]={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
-    for (int d=0;s.n<4&&d<6;++d){
-        V3 sup=BSUP(kAx[d]); bool dup=false;
-        for (int k=0;k<s.n;k++){V3 dv=V3_AsubB(sup,s.v[k]);dup|=(V3_dot(dv,dv)<PHY_EPSILON*PHY_EPSILON);}
-        if (!dup) s.v[s.n++]=sup;
-    }
+    for (int d=0;s.n<4&&d<6;++d){ V3 sup=BSUP(kAx[d]); bool dup=false; for (int k=0;k<s.n;k++){V3 dv=V3_AsubB(sup,s.v[k]);dup|=(V3_dot(dv,dv)<PHY_EPSILON*PHY_EPSILON);} if(!dup){s.v[s.n++]=sup;} }
     if (s.n<4) return m;
     EPAVert ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0,nf=0;
     for (int i=0;i<4;i++){ev[nv].wA=BoxSupport(box,s.v[i]);ev[nv].wB=MeshSupport(mesh,mx,(V3){-s.v[i].x,-s.v[i].y,-s.v[i].z});ev[nv].v=s.v[i];nv++;}
@@ -3722,11 +3582,12 @@ static Manifold BoxCvx(ShapeBox box, u16 mesh, const float* mx) {
         int bf=-1; float bd=1e9f;
         for (int f=0;f<nf;f++) if(ef[f].d<bd){bd=ef[f].d;bf=f;}
         if (bf<0) break;
+
         V3 bn=ef[bf].n; V3 wA=BoxSupport(box,bn); V3 wB=MeshSupport(mesh,mx,(V3){-bn.x,-bn.y,-bn.z}); V3 sup=V3_AsubB(wA,wB);
         if (V3_dot(bn,sup)-bd<PHY_EPSILON) return MakeEPAManifold(ev,ef[bf].a,ef[bf].b,ef[bf].c,bn,bd);
         if (nv>=EPA_MAX_VERTS) break;
-        ev[nv].v=sup; ev[nv].wA=wA; ev[nv].wB=wB;
-        int edges[EPA_MAX_EDGES][2],ne=0,keep[EPA_MAX_FACES],nk=0;
+
+        ev[nv].v=sup; ev[nv].wA=wA; ev[nv].wB=wB; int edges[EPA_MAX_EDGES][2],ne=0,keep[EPA_MAX_FACES],nk=0;
         for (int f=0;f<nf;f++){
             if (V3_dot(ef[f].n,V3_AsubB(sup,ev[ef[f].a].v))>0.f){
                 int fv[3]={ef[f].a,ef[f].b,ef[f].c};
@@ -3748,24 +3609,14 @@ static Manifold SphCvx(V3 sc, float sr, u16 mesh, const float* mx) {
     #define SPHSUP_A(d) ({ V3 _d=(d); float _L=V3_dot(_d,_d); V3_AplusB(sc,(_L>PHY_EPSILON)?V3_ScaleByF(_d,sr/vsqrtf(_L)):(V3){0,sr,0}); })
     #define SPHSUP_B(d) MeshSupport(mesh,mx,(V3){-(d).x,-(d).y,-(d).z})
     #define MSKSUP(d)   V3_AsubB(SPHSUP_A(d),SPHSUP_B(d))
-    Simplex3D s={0}; V3 dir={0,1,0};
-    s.v[s.n++]=MSKSUP(dir); dir=(V3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
-    if (V3_dot(dir,dir)<PHY_EPSILON) dir=(V3){0,1,0};
-    bool hit=false;
-    for (int it=0;it<32;++it) {
-        V3 sup=MSKSUP(dir); if (V3_dot(sup,dir)<PHY_EPSILON) return m;
-        s.v[s.n++]=sup;
-        if (!GJKNextSimplex(&s,&dir)){hit=true;break;}
-        if (V3_dot(dir,dir)<PHY_EPSILON){hit=true;break;}
-    }
+    Simplex3D s={0}; V3 dir={0,1,0}; s.v[s.n++]=MSKSUP(dir); dir=(V3){-s.v[0].x,-s.v[0].y,-s.v[0].z}; if(V3_dot(dir,dir)<PHY_EPSILON){dir=(V3){0,1,0};} bool hit=false;
+    for (int it=0;it<32;++it) { V3 sup=MSKSUP(dir); if(V3_dot(sup,dir)<PHY_EPSILON){return m;} s.v[s.n++]=sup; if (!GJKNextSimplex(&s,&dir)){hit=true;break;} if (V3_dot(dir,dir)<PHY_EPSILON){hit=true;break;} }
     if (!hit) return m;
+
     static const V3 kAx[6]={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
-    for (int d=0;s.n<4&&d<6;++d) {
-        V3 sup=MSKSUP(kAx[d]); bool dup=false;
-        for (int k=0;k<s.n;k++){V3 dv=V3_AsubB(sup,s.v[k]);dup|=V3_dot(dv,dv)<PHY_EPSILON*PHY_EPSILON;}
-        if (!dup) s.v[s.n++]=sup;
-    }
+    for (int d=0;s.n<4&&d<6;++d) { V3 sup=MSKSUP(kAx[d]); bool dup=false; for (int k=0;k<s.n;k++){V3 dv=V3_AsubB(sup,s.v[k]);dup|=V3_dot(dv,dv)<PHY_EPSILON*PHY_EPSILON;} if(!dup){s.v[s.n++]=sup;} }
     if (s.n<4) return m;
+
     EPAVert ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0,nf=0;
     for (int i=0;i<4;i++){ev[nv].v=s.v[i];ev[nv].wA=SPHSUP_A(s.v[i]);ev[nv].wB=SPHSUP_B(s.v[i]);nv++;}
     static const int kTF[4][3]={{0,1,2},{0,3,1},{0,2,3},{1,3,2}};
@@ -3807,59 +3658,34 @@ static Manifold CvxMsh(u16 hullMesh, const float* hullMx, u16 triMesh, const flo
     AABB3 hb = { {1e9f,1e9f,1e9f}, {-1e9f,-1e9f,-1e9f} };
     const u8* vb = modelVertices[hullMesh];
     for (u32 i=0;i<hn;++i) {
-        const u8* p = vb + i*VRT_ATT_SZ;
-        V3 w = MvVert(hullMx,(V3){half_to_float(*(half*)(p+0)),half_to_float(*(half*)(p+2)),half_to_float(*(half*)(p+4))});
-        if (cached) hv[i]=w;
-        hb.mn.x=vmin(hb.mn.x,w.x); hb.mn.y=vmin(hb.mn.y,w.y); hb.mn.z=vmin(hb.mn.z,w.z);
-        hb.mx.x=vmax(hb.mx.x,w.x); hb.mx.y=vmax(hb.mx.y,w.y); hb.mx.z=vmax(hb.mx.z,w.z);
+        const u8* p = vb + i*VRT_ATT_SZ; V3 w = MvVert(hullMx,(V3){half_to_float(*(half*)(p+0)),half_to_float(*(half*)(p+2)),half_to_float(*(half*)(p+4))}); if (cached) hv[i]=w;
+        hb.mn.x=vmin(hb.mn.x,w.x); hb.mn.y=vmin(hb.mn.y,w.y); hb.mn.z=vmin(hb.mn.z,w.z); hb.mx.x=vmax(hb.mx.x,w.x); hb.mx.y=vmax(hb.mx.y,w.y); hb.mx.z=vmax(hb.mx.z,w.z);
     }
-    V3 hext = V3_AsubB(hb.mx,hb.mn);
-    float spreadEps = vmax(0.02f, vmax(hext.x,vmax(hext.y,hext.z)) * 0.15f); // min spacing between manifold points, scaled to hull size
+    V3 hext = V3_AsubB(hb.mx,hb.mn); float spreadEps = vmax(0.02f, vmax(hext.x,vmax(hext.y,hext.z)) * 0.15f); // min spacing between manifold points, scaled to hull size
     #define HSUP(d) (cached ? CachedSupport(hv,hn,(d)) : MeshSupport(hullMesh,hullMx,(d)))
-
     u32 triCount = modelTriangleCounts[triMesh]; if (!triCount) return best;
     for (u32 ti = 0; ti < triCount; ++ti) {
         u32 i0 = modelTriangles[triMesh][ti * 3 + 0], i1 = modelTriangles[triMesh][ti * 3 + 1], i2 = modelTriangles[triMesh][ti * 3 + 2];
         V3 ta = MvVert(triMx,(V3){ half_to_float(*(half*)(modelVertices[triMesh] + i0 * VRT_ATT_SZ + 0)), half_to_float(*(half*)(modelVertices[triMesh] + i0 * VRT_ATT_SZ + 2)), half_to_float(*(half*)(modelVertices[triMesh] + i0 * VRT_ATT_SZ + 4)) });
         V3 tb = MvVert(triMx,(V3){ half_to_float(*(half*)(modelVertices[triMesh] + i1 * VRT_ATT_SZ + 0)), half_to_float(*(half*)(modelVertices[triMesh] + i1 * VRT_ATT_SZ + 2)), half_to_float(*(half*)(modelVertices[triMesh] + i1 * VRT_ATT_SZ + 4)) });
         V3 tc = MvVert(triMx,(V3){ half_to_float(*(half*)(modelVertices[triMesh] + i2 * VRT_ATT_SZ + 0)), half_to_float(*(half*)(modelVertices[triMesh] + i2 * VRT_ATT_SZ + 2)), half_to_float(*(half*)(modelVertices[triMesh] + i2 * VRT_ATT_SZ + 4)) });
-        if (vmin(ta.x, vmin(tb.x, tc.x)) > hb.mx.x || vmax(ta.x, vmax(tb.x, tc.x)) < hb.mn.x || vmin(ta.y, vmin(tb.y, tc.y)) > hb.mx.y || vmax(ta.y, vmax(tb.y, tc.y)) < hb.mn.y || vmin(ta.z, vmin(tb.z, tc.z)) > hb.mx.z || vmax(ta.z, vmax(tb.z, tc.z)) < hb.mn.z) continue;
+        if (vmin(ta.x,vmin(tb.x,tc.x)) > hb.mx.x || vmax(ta.x,vmax(tb.x,tc.x)) < hb.mn.x || vmin(ta.y,vmin(tb.y,tc.y)) > hb.mx.y || vmax(ta.y,vmax(tb.y,tc.y)) < hb.mn.y || vmin(ta.z,vmin(tb.z,tc.z)) > hb.mx.z || vmax(ta.z,vmax(tb.z,tc.z)) < hb.mn.z) continue;
 
-        Simplex3D s = {0};
-        V3 dir = {0.0f,1.0f,0.0f};
-        V3 wA0 = HSUP(dir);
-        V3 wB0 = TriSupport(ta,tb,tc,(V3){-dir.x,-dir.y,-dir.z});
-        s.v[s.n++] = V3_AsubB(wA0,wB0);
-        dir = (V3){-s.v[0].x, -s.v[0].y, -s.v[0].z};
-        if (V3_dot(dir, dir) < PHY_EPSILON) dir = (V3){0.0f,1.0f,0.0f};
+        Simplex3D s={0}; V3 dir={0.0f,1.0f,0.0f}; V3 wA0=HSUP(dir); V3 wB0=TriSupport(ta,tb,tc,(V3){-dir.x,-dir.y,-dir.z}); s.v[s.n++]=V3_AsubB(wA0,wB0); dir=(V3){-s.v[0].x, -s.v[0].y, -s.v[0].z}; if(V3_dot(dir,dir) < PHY_EPSILON){dir=(V3){0.0f,1.0f,0.0f};}
         bool hit = false;
-        for (int it = 0; it < 32; ++it) {
-            V3 wA = HSUP(dir), wB = TriSupport(ta,tb,tc,(V3){-dir.x,-dir.y,-dir.z});
-            V3 sup = V3_AsubB(wA,wB); if (V3_dot(sup, dir) < PHY_EPSILON) break;
-            s.v[s.n++] = sup;
-            if (!GJKNextSimplex(&s, &dir)) { hit = true; break; }
-            if (V3_dot(dir, dir) < PHY_EPSILON) { hit = true; break; }
-        }
+        for (int it=0;it<32;++it) { V3 wA=HSUP(dir), wB=TriSupport(ta,tb,tc,(V3){-dir.x,-dir.y,-dir.z}); V3 sup=V3_AsubB(wA,wB); if(V3_dot(sup,dir) < PHY_EPSILON){break;} s.v[s.n++]=sup; if(!GJKNextSimplex(&s,&dir)){hit=true; break;} if(V3_dot(dir,dir) < PHY_EPSILON){hit=true; break;} }
         if (!hit) continue;
         while (s.n < 4) {
-            V3 fallbackDir = {0.0f, 1.0f, 0.0f};
+            V3 fallbackDir = {0.0f,1.0f,0.0f};
             if (s.n == 1) fallbackDir = (vabs(s.v[0].x) > 0.5f) ? (V3){0.0f, 1.0f, 0.0f} : (V3){1.0f, 0.0f, 0.0f};
             else if (s.n == 2) { V3 edge = V3_AsubB(s.v[1], s.v[0]); fallbackDir = V3_Cross(edge, (vabs(edge.x) > 0.5f) ? (V3){0.0f, 1.0f, 0.0f} : (V3){1.0f, 0.0f, 0.0f}); }
             else if (s.n == 3) { V3 e1 = V3_AsubB(s.v[1], s.v[0]); V3 e2 = V3_AsubB(s.v[2], s.v[0]); fallbackDir = V3_Cross(e1, e2); }
             float fLen = V3_Mag(fallbackDir);
             fallbackDir = (fLen > PHY_EPSILON) ? V3_ScaleByF(fallbackDir, 1.0f / fLen) : (V3){0.0f, 1.0f, 0.0f};
-            V3 wA = HSUP(fallbackDir);
-            V3 wB = TriSupport(ta,tb,tc,(V3){-fallbackDir.x,-fallbackDir.y,-fallbackDir.z});
-            V3 sup = V3_AsubB(wA,wB);
-            bool dup = false;
+            V3 wA = HSUP(fallbackDir), wB = TriSupport(ta,tb,tc,(V3){-fallbackDir.x,-fallbackDir.y,-fallbackDir.z}); V3 sup = V3_AsubB(wA,wB); bool dup = false;
             for (int k = 0; k < s.n; k++) { V3 dv = V3_AsubB(sup, s.v[k]); dup |= (V3_dot(dv, dv) < PHY_EPSILON * PHY_EPSILON); }
             if (!dup) s.v[s.n++] = sup;
-            else {
-                fallbackDir = (V3){-fallbackDir.x, -fallbackDir.y, -fallbackDir.z};
-                wA = HSUP(fallbackDir);
-                wB = TriSupport(ta, tb, tc, (V3){-fallbackDir.x, -fallbackDir.y, -fallbackDir.z});
-                s.v[s.n++] = V3_AsubB(wA, wB);
-            }
+            else { fallbackDir = (V3){-fallbackDir.x, -fallbackDir.y, -fallbackDir.z}; wA = HSUP(fallbackDir); wB = TriSupport(ta, tb, tc, (V3){-fallbackDir.x, -fallbackDir.y, -fallbackDir.z}); s.v[s.n++] = V3_AsubB(wA, wB); }
         }
 
         EPAVert ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv = 0, nf = 0;
@@ -3872,28 +3698,22 @@ static Manifold CvxMsh(u16 hullMesh, const float* hullMx, u16 triMesh, const flo
         EPAFace face1 = MakeEPAFace(ev,kTF[1][0],kTF[1][1],kTF[1][2]); if (face1.d >= 0.0f && nf < EPA_MAX_FACES) ef[nf++] = face1;
         EPAFace face2 = MakeEPAFace(ev,kTF[2][0],kTF[2][1],kTF[2][2]); if (face2.d >= 0.0f && nf < EPA_MAX_FACES) ef[nf++] = face2;
         EPAFace face3 = MakeEPAFace(ev,kTF[3][0],kTF[3][1],kTF[3][2]); if (face3.d >= 0.0f && nf < EPA_MAX_FACES) ef[nf++] = face3;
-
         bool tHit=false; V3 tN={0}; float tD=0; V3 tP={0};
         for (int it = 0; it < 32; ++it) {
             int bf = -1; float bd = 1e9f;
             for (int f = 0; f < nf; f++) { if (ef[f].d < bd) { bd = ef[f].d; bf = f; } }
             if (bf < 0) break;
-            V3 bn = ef[bf].n;
-            V3 wA = HSUP(bn);
-            V3 wB = TriSupport(ta,tb,tc,(V3){-bn.x,-bn.y,-bn.z});
-            V3 sup = V3_AsubB(wA,wB);
-            if (V3_dot(bn, sup) - bd < PHY_EPSILON) { tHit=true; tN=bn; tD=bd; tP=EPAContactPoint(ev, ef[bf].a, ef[bf].b, ef[bf].c,bn,bd); break; }
+            V3 bn = ef[bf].n; V3 wA = HSUP(bn); V3 wB = TriSupport(ta,tb,tc,(V3){-bn.x,-bn.y,-bn.z}); V3 sup = V3_AsubB(wA,wB);
+            if (V3_dot(bn, sup) - bd < PHY_EPSILON) { tHit=true; tN=bn; tD=bd; tP=EPAContactPoint(ev,ef[bf].a,ef[bf].b,ef[bf].c); break; }
             if (nv >= EPA_MAX_VERTS) break;
-            ev[nv].v = sup; ev[nv].wA = wA; ev[nv].wB = wB;
-            int edges[EPA_MAX_EDGES][2], ne = 0, keep[EPA_MAX_FACES], nk = 0;
+
+            ev[nv].v = sup; ev[nv].wA = wA; ev[nv].wB = wB; int edges[EPA_MAX_EDGES][2], ne = 0, keep[EPA_MAX_FACES], nk = 0;
             for (int f=0;f<nf;f++) {
                 if (V3_dot(ef[f].n,V3_AsubB(sup,ev[ef[f].a].v)) > 0.0f) {
                     int fv[3] = {ef[f].a, ef[f].b, ef[f].c};
                     for (int e = 0; e < 3; e++) {
                         int ea = fv[e], eb = fv[(e + 1) % 3]; bool found = false;
-                        for (int k = 0; k < ne; k++) {
-                            if (edges[k][0] == eb && edges[k][1] == ea) { edges[k][0] = edges[--ne][0]; edges[k][1] = edges[ne][1]; found = true; break; }
-                        }
+                        for (int k = 0; k < ne; k++) { if (edges[k][0] == eb && edges[k][1] == ea) { edges[k][0] = edges[--ne][0]; edges[k][1] = edges[ne][1]; found = true; break; } }
                         if (!found && ne < EPA_MAX_EDGES) { edges[ne][0] = ea; edges[ne++][1] = eb; }
                     }
                 } else keep[nk++] = f;
@@ -3913,9 +3733,7 @@ static Manifold CvxMsh(u16 hullMesh, const float* hullMx, u16 triMesh, const flo
                     bool spread=true;
                     for (int k=0;k<best.n;++k) { V3 dv=V3_AsubB(tP,best.p[k].point); if (V3_dot(dv,dv)<spreadEps*spreadEps) { spread=false; if (tD>best.p[k].pen) best.p[k].pen=tD; break; } }
                     if (spread && best.n<MANIFOLD_MAX) best.p[best.n++]=(ManifoldPt){tP,tD};
-                } else if (tD > best.maxPen + MANIFOLD_TIE_MARGIN) {
-                    best.n=0; best.normal=tN; best.maxPen=tD; best.p[best.n++]=(ManifoldPt){tP,tD};
-                }
+                } else if (tD > best.maxPen + MANIFOLD_TIE_MARGIN) { best.n=0; best.normal=tN; best.maxPen=tD; best.p[best.n++]=(ManifoldPt){tP,tD}; }
             }
         }
     }
@@ -3925,30 +3743,22 @@ static Manifold CvxMsh(u16 hullMesh, const float* hullMx, u16 triMesh, const flo
 
 AABB3 BoxWorldAABB(ShapeBox b) { V3 x,y,z; obb_axes(b.rot,&x,&y,&z); V3 hx=V3_ScaleByF(x,b.halfExtents.x), hy=V3_ScaleByF(y,b.halfExtents.y), hz=V3_ScaleByF(z,b.halfExtents.z); V3 e ={vabs(hx.x)+vabs(hy.x)+vabs(hz.x),vabs(hx.y)+vabs(hy.y)+vabs(hz.y),vabs(hx.z)+vabs(hy.z)+vabs(hz.z)}; return (AABB3){V3_AsubB(b.ctr,e),V3_AplusB(b.ctr,e)}; } 
 static OverlapResult BoxMsh(ShapeBox box, u16 triMesh, const float* triMx) {
-    OverlapResult r = {0}; if (triMesh >= MAX_MDLS) return r;
-    u32 triCount = modelTriangleCounts[triMesh]; if (!triCount) return r;
+    OverlapResult r={0}; if(triMesh >= MAX_MDLS){return r;} u32 triCount=modelTriangleCounts[triMesh]; if(!triCount){return r;}
 
-    AABB3 hb = BoxWorldAABB(box);
-    float skin = 0.02f; hb.mn.x-=skin; hb.mn.y-=skin; hb.mn.z-=skin; hb.mx.x+=skin; hb.mx.y+=skin; hb.mx.z+=skin;
-    V3 ax,ay,az; obb_axes(box.rot,&ax,&ay,&az);
+    AABB3 hb = BoxWorldAABB(box); float skin = 0.02f; hb.mn.x-=skin; hb.mn.y-=skin; hb.mn.z-=skin; hb.mx.x+=skin; hb.mx.y+=skin; hb.mx.z+=skin; V3 ax,ay,az; obb_axes(box.rot,&ax,&ay,&az);
     V3 hx = V3_ScaleByF(ax, box.halfExtents.x), hy = V3_ScaleByF(ay,box.halfExtents.y), hz = V3_ScaleByF(az,box.halfExtents.z);
-    V3 verts[8] = {V3_AplusB(V3_AplusB(V3_AplusB(box.ctr,hx),hy),hz),V3_AplusB(V3_AsubB(V3_AplusB(box.ctr,hx),hy),hz),V3_AplusB(V3_AplusB(V3_AsubB(box.ctr,hx),hy),hz),V3_AplusB(V3_AsubB(V3_AsubB(box.ctr,hx),hy),hz),
-                    V3_AsubB(V3_AplusB(V3_AplusB(box.ctr,hx),hy),hz), V3_AsubB(V3_AsubB(V3_AplusB(box.ctr,hx),hy),hz), V3_AsubB(V3_AplusB(V3_AsubB(box.ctr,hx),hy),hz), V3_AsubB(V3_AsubB(V3_AsubB(box.ctr,hx),hy),hz)};
-    for (u32 vi = 0; vi < 8; ++vi) {
+    V3 verts[8] = {V3_AplusB(V3_AplusB(V3_AplusB(box.ctr,hx),hy),hz), V3_AplusB(V3_AsubB(V3_AplusB(box.ctr,hx),hy),hz), V3_AplusB(V3_AplusB(V3_AsubB(box.ctr,hx),hy),hz), V3_AplusB(V3_AsubB(V3_AsubB(box.ctr,hx),hy),hz), V3_AsubB(V3_AplusB(V3_AplusB(box.ctr,hx),hy),hz), V3_AsubB(V3_AsubB(V3_AplusB(box.ctr,hx),hy),hz), V3_AsubB(V3_AplusB(V3_AsubB(box.ctr,hx),hy),hz), V3_AsubB(V3_AsubB(V3_AsubB(box.ctr,hx),hy),hz)};
+    for (u32 vi=0;vi<8;++vi) {
         V3 wv = verts[vi];
-        for (u32 ti = 0; ti < triCount; ++ti) {
+        for (u32 ti=0;ti<triCount;++ti) {
             u32 i0 = modelTriangles[triMesh][ti*3+0], i1 = modelTriangles[triMesh][ti*3+1], i2 = modelTriangles[triMesh][ti*3+2];
             #define TRV(i) MvVert(triMx,(V3){half_to_float(*(half*)(modelVertices[triMesh]+(i)*VRT_ATT_SZ+0)),half_to_float(*(half*)(modelVertices[triMesh]+(i)*VRT_ATT_SZ+2)),half_to_float(*(half*)(modelVertices[triMesh]+(i)*VRT_ATT_SZ+4))})
             V3 ta=TRV(i0),tb=TRV(i1),tc=TRV(i2);
             #undef TRV
             if (vmin(ta.x,vmin(tb.x,tc.x))>hb.mx.x || vmax(ta.x,vmax(tb.x,tc.x))<hb.mn.x || vmin(ta.y,vmin(tb.y,tc.y))>hb.mx.y || vmax(ta.y,vmax(tb.y,tc.y))<hb.mn.y || vmin(ta.z,vmin(tb.z,tc.z))>hb.mx.z || vmax(ta.z,vmax(tb.z,tc.z))<hb.mn.z) continue;
 
-            V3 ab=V3_AsubB(tb,ta), ac=V3_AsubB(tc,ta), ap=V3_AsubB(wv,ta);
-            float d1=V3_dot(ab,ap), d2=V3_dot(ac,ap);
-            V3 bp=V3_AsubB(wv,tb); float d3=V3_dot(ab,bp), d4=V3_dot(ac,bp);
-            V3 cp=V3_AsubB(wv,tc); float d5=V3_dot(ab,cp), d6=V3_dot(ac,cp);
-            float vc=d1*d4-d3*d2, vb_=d5*d2-d1*d6, va=d3*d6-d5*d4;
-            V3 closest; bool inFace=false;
+            V3 ab=V3_AsubB(tb,ta), ac=V3_AsubB(tc,ta), ap=V3_AsubB(wv,ta); float d1=V3_dot(ab,ap), d2=V3_dot(ac,ap); V3 bp=V3_AsubB(wv,tb); float d3=V3_dot(ab,bp), d4=V3_dot(ac,bp); V3 cp=V3_AsubB(wv,tc); float d5=V3_dot(ab,cp), d6=V3_dot(ac,cp);
+            float vc=d1*d4-d3*d2, vb_=d5*d2-d1*d6, va=d3*d6-d5*d4; V3 closest; bool inFace=false;
             if      (d1 <= 0.0f && d2 <= 0.0f) closest=ta;
             else if (d3 >= 0.0f && d4 <= d3)   closest=tb;
             else if (d6 >= 0.0f && d5 <= d6)   closest=tc;
@@ -3958,16 +3768,8 @@ static OverlapResult BoxMsh(ShapeBox box, u16 triMesh, const float* triMx) {
             else { inFace=true; V3 n_=V3_Cross(ab,ac); float L=V3_Mag(n_); if(L<PHY_EPSILON) continue; n_=V3_ScaleByF(n_,1.f/L); closest=V3_AsubB(wv,V3_ScaleByF(n_,V3_dot(n_,ap))); }
 
             V3 delta=V3_AsubB(wv,closest); float dist2=V3_dot(delta,delta); float pen=0.f; V3 fn;
-            if (inFace) {
-                V3 n_=V3_Cross(ab,ac); float L=V3_Mag(n_); if(L<PHY_EPSILON) continue;
-                n_=V3_ScaleByF(n_,1.f/L); float sd=V3_dot(n_,ap); if (vabs(sd)<PHY_EPSILON) continue;
-                pen=vabs(sd); fn=(sd>0.f)?n_:(V3){-n_.x,-n_.y,-n_.z};
-            } else {
-                if (dist2<PHY_EPSILON*PHY_EPSILON) continue;
-                float dist=vsqrtf(dist2); V3 n_=V3_Cross(ab,ac); float L=V3_Mag(n_); if(L<PHY_EPSILON) continue;
-                n_=V3_ScaleByF(n_,1.f/L); float sd=V3_dot(n_,ap); if (sd>=0.f) continue;
-                pen=dist; fn=V3_ScaleByF(delta,1.f/dist);
-            }
+            if (inFace) { V3 n_=V3_Cross(ab,ac); float L=V3_Mag(n_); if(L<PHY_EPSILON){continue;} n_=V3_ScaleByF(n_,1.f/L); float sd=V3_dot(n_,ap); if(vabs(sd)<PHY_EPSILON){continue;} pen=vabs(sd); fn=(sd>0.f)?n_:(V3){-n_.x,-n_.y,-n_.z}; }
+            else { if (dist2<PHY_EPSILON*PHY_EPSILON){continue;} float dist=vsqrtf(dist2); V3 n_=V3_Cross(ab,ac); float L=V3_Mag(n_); if(L<PHY_EPSILON){continue;} n_=V3_ScaleByF(n_,1.f/L); float sd=V3_dot(n_,ap); if (sd>=0.f){continue;} pen=dist; fn=V3_ScaleByF(delta,1.f/dist); }
             if (pen>r.overlapAmount) r=(OverlapResult){true,closest,fn,pen};
         }
     }
@@ -3976,15 +3778,9 @@ static OverlapResult BoxMsh(ShapeBox box, u16 triMesh, const float* triMx) {
 
 static OverlapResult CapBox(ShapeCapsule cap, ShapeBox box) {
     OverlapResult best = SphBox(cap.base,cap.rad,box), rt = SphBox(cap.tip,cap.rad,box); if (rt.hit && rt.overlapAmount > best.overlapAmount) best = rt;
-    V3 ax,ay,az; obb_axes(box.rot,&ax,&ay,&az);
-    V3 d = V3_AsubB(cap.tip,cap.base);
-    float segLen = V3_Mag(d); if (segLen < PHY_EPSILON) return best;
+    V3 ax,ay,az; obb_axes(box.rot,&ax,&ay,&az); V3 d = V3_AsubB(cap.tip,cap.base); float segLen = V3_Mag(d); if (segLen < PHY_EPSILON) return best;
     
-    V3 dUnit = V3_ScaleByF(d, 1.f / segLen);
-    V3 toBase = V3_AsubB(cap.base,box.ctr);
-    float ts[6]; int nt = 0;
-    float dax = V3_dot(dUnit,ax) * segLen, day = V3_dot(dUnit,ay) * segLen, daz = V3_dot(dUnit,az) * segLen;
-    float bax = V3_dot(toBase,ax),         bay = V3_dot(toBase,ay),         baz = V3_dot(toBase,az);
+    V3 dUnit=V3_ScaleByF(d, 1.f / segLen); V3 toBase=V3_AsubB(cap.base,box.ctr); float ts[6]; int nt=0; float dax=V3_dot(dUnit,ax) * segLen, day=V3_dot(dUnit,ay) * segLen, daz=V3_dot(dUnit,az) * segLen; float bax=V3_dot(toBase,ax), bay=V3_dot(toBase,ay), baz=V3_dot(toBase,az);
     if (vabs(dax) > PHY_EPSILON) { float t0 = (-box.halfExtents.x - bax) / dax, t1 = (box.halfExtents.x - bax) / dax; if (t0 > t1) { float tmp = t0; t0 = t1; t1 = tmp; } t0 = vclamp(t0,0.0f,1.0f); t1 = vclamp(t1,0.0f,1.f); ts[nt++] = t0; ts[nt++] = t1; }
     if (vabs(day) > PHY_EPSILON) { float t0 = (-box.halfExtents.y - bay) / day, t1 = (box.halfExtents.y - bay) / day; if (t0 > t1) { float tmp = t0; t0 = t1; t1 = tmp; } t0 = vclamp(t0,0.0f,1.0f); t1 = vclamp(t1,0.0f,1.f); ts[nt++] = t0; ts[nt++] = t1; }
     if (vabs(daz) > PHY_EPSILON) { float t0 = (-box.halfExtents.z - baz) / daz, t1 = (box.halfExtents.z - baz) / daz; if (t0 > t1) { float tmp = t0; t0 = t1; t1 = tmp; } t0 = vclamp(t0,0.0f,1.0f); t1 = vclamp(t1,0.0f,1.f); ts[nt++] = t0; ts[nt++] = t1; }
@@ -3997,79 +3793,44 @@ static float GetMomentOfInertia(Entity *e, V3 n) { // Returns moment of inertia 
     if (e->collider != COLTYPE_CVX || !e->inertiaTensorValid) { float r = (e->collider == COLTYPE_MSH) ? modelBounds[e->modelIndex] : (e->collider == COLTYPE_CVX) ? modelBounds[e->colMeshIndex] : GetColRad(e); return (2.f / 5.f) * e->mass * r * r; }
    
     V3 ln = quat_rot_v3((Quaternion){-e->rotation.x,-e->rotation.y,-e->rotation.z,e->rotation.w},n); // Use quat conjugate to rotate n into entity local space, then apply I * n, dot with n: gives I_n = n^T * I * n
-    float Ixx=e->inertiaTensor[0], Iyy=e->inertiaTensor[1], Izz=e->inertiaTensor[2], Ixy=e->inertiaTensor[3], Ixz=e->inertiaTensor[4], Iyz=e->inertiaTensor[5];
-    V3 In = {Ixx*ln.x + Ixy*ln.y + Ixz*ln.z, Ixy*ln.x + Iyy*ln.y + Iyz*ln.z, Ixz*ln.x + Iyz*ln.y + Izz*ln.z}; // I*ln (matrix-vector: products of inertia were already negated at generation)
+    V3 In = {e->inertiaTensor[0]*ln.x + e->inertiaTensor[3]*ln.y + e->inertiaTensor[4]*ln.z, e->inertiaTensor[3]*ln.x + e->inertiaTensor[1]*ln.y + e->inertiaTensor[5]*ln.z, e->inertiaTensor[4]*ln.x + e->inertiaTensor[5]*ln.y + e->inertiaTensor[2]*ln.z}; // I*ln (matrix-vector: products of inertia were already negated at generation)
     return vmax(V3_dot(ln,In),PHY_EPSILON);
 }
 
 static void ResolveContactVelocity(Entity *e, Entity *o, V3 n, V3 contactPoint, bool oStatic) {
-    V3 rAarm = V3_AsubB(contactPoint, e->position), rBarm = oStatic ? (V3){0,0,0} : V3_AsubB(contactPoint, o->position);
-    V3 rAxN = V3_Cross(rAarm, n);
-    float rAxN_lenSq = V3_dot(rAxN, rAxN);
-    float iA = (rAxN_lenSq > PHY_EPSILON) ? GetMomentOfInertia(e, V3_ScaleByF(rAxN, 1.0f / vsqrtf(rAxN_lenSq))) : 1.0f;
-    float invIA = (iA > PHY_EPSILON) ? 1.0f / iA : 0.0f;
-    float angTermA = IdxIsNPC(e->index) ? 0.0f : rAxN_lenSq * invIA;
-    V3 rBxN = V3_Cross(rBarm, n);
-    float rBxN_lenSq = V3_dot(rBxN, rBxN);
-    float iB = (oStatic || rBxN_lenSq < PHY_EPSILON) ? 0.0f : GetMomentOfInertia(o, V3_ScaleByF(rBxN, 1.0f / vsqrtf(rBxN_lenSq)));
-    float invIB = (iB > PHY_EPSILON && !oStatic) ? 1.0f / iB : 0.0f;
-    float angTermB = (oStatic || IdxIsNPC(o->index)) ? 0.0f : rBxN_lenSq * invIB;
-    V3 vAtA = V3_AplusB(e->velocity, V3_Cross(e->angularVelocity, rAarm));
-    V3 vAtB = oStatic ? (V3){0,0,0} : V3_AplusB(o->velocity, V3_Cross(o->angularVelocity, rBarm));
-    V3 relVel = V3_AsubB(vAtA, vAtB);
-    float vn = V3_dot(relVel, n); if (vn > 0.01f) return;
+    V3 rAarm = V3_AsubB(contactPoint, e->position), rBarm = oStatic ? (V3){0,0,0} : V3_AsubB(contactPoint, o->position); V3 rAxN = V3_Cross(rAarm, n);
+    float rAxN_lenSq = V3_dot(rAxN, rAxN); float iA = (rAxN_lenSq > PHY_EPSILON) ? GetMomentOfInertia(e, V3_ScaleByF(rAxN, 1.0f / vsqrtf(rAxN_lenSq))) : 1.0f;
+    float invIA = (iA > PHY_EPSILON) ? 1.0f / iA : 0.0f; float angTermA = IdxIsNPC(e->index) ? 0.0f : rAxN_lenSq * invIA; V3 rBxN = V3_Cross(rBarm, n); float rBxN_lenSq = V3_dot(rBxN, rBxN);
+    float iB = (oStatic || rBxN_lenSq < PHY_EPSILON) ? 0.0f : GetMomentOfInertia(o, V3_ScaleByF(rBxN, 1.0f / vsqrtf(rBxN_lenSq))); float invIB = (iB > PHY_EPSILON && !oStatic) ? 1.0f / iB : 0.0f;
+    float angTermB = (oStatic || IdxIsNPC(o->index)) ? 0.0f : rBxN_lenSq * invIB; V3 vAtA = V3_AplusB(e->velocity,V3_Cross(e->angularVelocity,rAarm)); V3 vAtB = oStatic ? (V3){0,0,0} : V3_AplusB(o->velocity,V3_Cross(o->angularVelocity,rBarm));
+    V3 relVel = V3_AsubB(vAtA, vAtB); float vn = V3_dot(relVel, n); if (vn > 0.01f) return;
+    float invMassA = e->mass < 0.001f ? 1.0f : 1.0f / e->mass; float invMassB = oStatic || o->mass < 0.001f ? 0.0f : 1.0f / o->mass; float invSum = invMassA + invMassB + angTermA + angTermB; if (invSum < PHY_EPSILON) return;
 
-    float invMassA = e->mass < 0.001f ? 1.0f : 1.0f / e->mass;
-    float invMassB = oStatic || o->mass < 0.001f ? 0.0f : 1.0f / o->mass;
-    float invSum = invMassA + invMassB + angTermA + angTermB; if (invSum < PHY_EPSILON) return;
-
-    float e_r = (vn < -0.1) ? vmax(e->bounciness, oStatic ? 0.0f : o->bounciness) : 0.0f;
-    float j = -(1.0f + e_r) * vn / invSum;
-    j = vmax(j,0.0f);
-    e->velocity = V3_AplusB(e->velocity, V3_ScaleByF(n, j * invMassA));
+    float e_r = (vn < -0.1) ? vmax(e->bounciness, oStatic ? 0.0f : o->bounciness) : 0.0f; float j = -(1.0f + e_r) * vn / invSum; j = vmax(j,0.0f); e->velocity = V3_AplusB(e->velocity, V3_ScaleByF(n, j * invMassA));
     if (!oStatic) o->velocity = V3_AsubB(o->velocity, V3_ScaleByF(n, j * invMassB));
     V3 Jn = V3_ScaleByF(n,j);
-    if (e->collider != COLTYPE_CAP && !IdxIsNPC(e->index)) e->angularVelocity = V3_AplusB(e->angularVelocity, V3_ScaleByF(V3_Cross(rAarm, Jn), invIA));
-    if (!oStatic && o->collider != COLTYPE_CAP && !IdxIsNPC(o->index)) o->angularVelocity = V3_AsubB(o->angularVelocity, V3_ScaleByF(V3_Cross(rBarm, Jn), invIB));
-    V3 vAtA2 = V3_AplusB(e->velocity, V3_Cross(e->angularVelocity, rAarm));
-    V3 vAtB2 = oStatic ? (V3){0.0f,0.0f,0.0f} : V3_AplusB(o->velocity, V3_Cross(o->angularVelocity, rBarm));
-    V3 relVel2 = V3_AsubB(vAtA2, vAtB2);
-    V3 tangent = V3_AsubB(relVel2, V3_ScaleByF(n, V3_dot(relVel2, n)));
+    if (e->collider != COLTYPE_CAP && !IdxIsNPC(e->index)) e->angularVelocity = V3_AplusB(e->angularVelocity,V3_ScaleByF(V3_Cross(rAarm,Jn),invIA));
+    if (!oStatic && o->collider != COLTYPE_CAP && !IdxIsNPC(o->index)) o->angularVelocity = V3_AsubB(o->angularVelocity,V3_ScaleByF(V3_Cross(rBarm,Jn),invIB));
+    V3 vAtA2 = V3_AplusB(e->velocity, V3_Cross(e->angularVelocity,rAarm)); V3 vAtB2 = oStatic ? (V3){0.0f,0.0f,0.0f} : V3_AplusB(o->velocity,V3_Cross(o->angularVelocity,rBarm)); V3 relVel2 = V3_AsubB(vAtA2, vAtB2); V3 tangent = V3_AsubB(relVel2,V3_ScaleByF(n, V3_dot(relVel2,n)));
     float tLen = V3_Mag(tangent);
     if (tLen > 0.0001f) {
         tangent = V3_ScaleByF(tangent, 1.f / tLen);
         V3 rAxT = V3_Cross(rAarm, tangent);
-        float rAxT_lenSq = V3_dot(rAxT, rAxT);
-        float iAT = (rAxT_lenSq > PHY_EPSILON) ? GetMomentOfInertia(e, V3_ScaleByF(rAxT, 1.0f / vsqrtf(rAxT_lenSq))) : 1.0f;
-        float invIAT = (iAT > PHY_EPSILON) ? 1.0f / iAT : 0.0f;
-        float angTermAT = IdxIsNPC(e->index) ? 0.0f : rAxT_lenSq * invIAT;
-        V3 rBxT = V3_Cross(rBarm, tangent);
-        float rBxT_lenSq = V3_dot(rBxT, rBxT);
+        float rAxT_lenSq = V3_dot(rAxT, rAxT); float iAT = (rAxT_lenSq > PHY_EPSILON) ? GetMomentOfInertia(e, V3_ScaleByF(rAxT, 1.0f / vsqrtf(rAxT_lenSq))) : 1.0f; float invIAT = (iAT > PHY_EPSILON) ? 1.0f / iAT : 0.0f;
+        float angTermAT = IdxIsNPC(e->index) ? 0.0f : rAxT_lenSq * invIAT; V3 rBxT = V3_Cross(rBarm, tangent); float rBxT_lenSq = V3_dot(rBxT, rBxT);
         float iBT = (oStatic || rBxT_lenSq < PHY_EPSILON) ? 0.0f : GetMomentOfInertia(o, V3_ScaleByF(rBxT, 1.0f / vsqrtf(rBxT_lenSq)));
-        float invIBT = (iBT > PHY_EPSILON && !oStatic) ? 1.0f / iBT : 0.0f;
-        float angTermBT = (oStatic || IdxIsNPC(o->index)) ? 0.0f : rBxT_lenSq * invIBT;
-        float invSumT = invMassA + invMassB + angTermAT + angTermBT;
-        float mu = (e->dynamicFriction + (oStatic ? 0.4f : o->dynamicFriction)) * 0.5f;
-        float jt = -V3_dot(relVel2, tangent) / invSumT;
-        jt = vclamp(jt * mu, mu * -vabs(j), mu * vabs(j));
-        V3 Jt = V3_ScaleByF(tangent, jt);
-        e->velocity = V3_AplusB(e->velocity, V3_ScaleByF(tangent, jt * invMassA));
+        float invIBT = (iBT > PHY_EPSILON && !oStatic) ? 1.0f / iBT : 0.0f; float angTermBT = (oStatic || IdxIsNPC(o->index)) ? 0.0f : rBxT_lenSq * invIBT; float invSumT = invMassA + invMassB + angTermAT + angTermBT;
+        float mu = (e->dynamicFriction + (oStatic ? 0.4f : o->dynamicFriction)) * 0.5f; float jt = -V3_dot(relVel2, tangent) / invSumT; jt = vclamp(jt * mu, mu * -vabs(j), mu * vabs(j));
+        V3 Jt = V3_ScaleByF(tangent, jt); e->velocity = V3_AplusB(e->velocity, V3_ScaleByF(tangent, jt * invMassA));
         if (e->collider != COLTYPE_CAP && !IdxIsNPC(e->index)) e->angularVelocity = V3_AplusB(e->angularVelocity,V3_ScaleByF(V3_Cross(rAarm, Jt),invIAT));
-        if (!oStatic) {
-            o->velocity = V3_AsubB(o->velocity,V3_ScaleByF(tangent,jt * invMassB));
-            if (o->collider != COLTYPE_CAP && !IdxIsNPC(o->index)) o->angularVelocity = V3_AsubB(o->angularVelocity,V3_ScaleByF(V3_Cross(rBarm,Jt),invIBT));
-        }
+        if (!oStatic) { o->velocity = V3_AsubB(o->velocity,V3_ScaleByF(tangent,jt * invMassB)); if(o->collider != COLTYPE_CAP && !IdxIsNPC(o->index)){o->angularVelocity = V3_AsubB(o->angularVelocity,V3_ScaleByF(V3_Cross(rBarm,Jt),invIBT));} }
     }
     e->lastAngularVelocity = e->angularVelocity;
 }
 
 static void ApplyPositionalCorrection(Entity *e, Entity *o, V3 n, float overlap, bool oStatic) {
-    float invMassA = e->mass < 0.001f ? 1.0f : 1.0f / e->mass;
-    float invMassB = oStatic || o->mass < 0.001f ? 0.0f : 1.0f / o->mass;
-    float correction = vmin(vmax(overlap - 0.001f, 0.0f) * 0.2f, 0.04f);
-    float corrA = correction * invMassA / (invMassA + invMassB + PHY_EPSILON), corrB = correction * invMassB / (invMassA + invMassB + PHY_EPSILON);
-    SetPosition(e,V3_AplusB(e->position, V3_ScaleByF(n,corrA)), false);
-    if (!oStatic) SetPosition(o,V3_AsubB(o->position,V3_ScaleByF(n,corrB)), false);
+    float iMA = e->mass < 0.001f ? 1.0f : 1.0f / e->mass; float iMB = oStatic || o->mass < 0.001f ? 0.0f : 1.0f / o->mass, c = vmin(vmax(overlap - 0.001f, 0.0f) * 0.2f, 0.04f);
+    float cA = c * iMA / (iMA + iMB + PHY_EPSILON), cB = c * iMB / (iMA + iMB + PHY_EPSILON); SetPosition(e,V3_AplusB(e->position,V3_ScaleByF(n,cA)),false); if (!oStatic) SetPosition(o,V3_AsubB(o->position,V3_ScaleByF(n,cB)),false);
 }
 
 static void ApplyManifoldResponse(Entity *e, Entity *o, const Manifold *m) {
@@ -4270,83 +4031,53 @@ static void cmd_git(const char* arg) {
     else CenterStatusPrint("Branch name not recognized. Contact your TriopBucket representative.");
 }
 
-static void cmd_restart()        { CenterStatusPrint("Yeah...better not"); }                                              static void cmd_cd()             { CenterStatusPrint("Attempting to access directory... already at root"); }
-static void cmd_justinbailey()   { CenterStatusPrint("Well, you don't have a suit already so..."); }                      static void cmd_woodstock()      { CenterStatusPrint("How much wood could a woodchuck chuck...there's no wood in SPACE!"); }
-static void cmd_zelda()          { CenterStatusPrint("Too late, already been to level 1"); }                              static void cmd_quarry()         { CenterStatusPrint("There's obsidian on levels 6 and 8 if you want to feel decadent,\notherwise we are lacking in the stone department."); }
-static void cmd_allyourbase()    { CenterStatusPrint("ERROR: SHODAN has overriden your command, remove SHODAN first."); } static void cmd_iamironman()     { CenterStatusPrint("That's nice dear."); }
-static void cmd_idkfa()          { CenterStatusPrint("I can only hold 7 weapons!! Nice try dearies!"); }                  static void cmd_ai()             { CenterStatusPrint("Only AI allowed around here is SHODAN"); }
-static void cmd_aireal()         { CenterStatusPrint("In my magnificence, I shape clay, crafting new lifeforms..."); }    static void cmd_quit()           { OS_Exit(0); }
+static void cmd_restart()     { CenterStatusPrint("Yeah...better not"); }                             static void cmd_cd()          { CenterStatusPrint("Attempting to access directory... already at root"); }
+static void cmd_justinbailey(){ CenterStatusPrint("Well, you don't have a suit already so..."); }     static void cmd_woodstock()   { CenterStatusPrint("How much wood could a woodchuck chuck...there's no wood in SPACE!"); }
+static void cmd_zelda()       { CenterStatusPrint("Too late, already been to level 1"); }             static void cmd_quarry()      { CenterStatusPrint("There's obsidian on levels 6 and 8 if you want to feel decadent,\notherwise we are lacking in the stone department."); }
+static void cmd_iamironman(){ CenterStatusPrint("That's nice dear."); }                               static void cmd_allyourbase() { CenterStatusPrint("ERROR: SHODAN has overriden your command, remove SHODAN first."); }
+static void cmd_idkfa()       { CenterStatusPrint("I can only hold 7 weapons!! Nice try dearies!"); } static void cmd_ai()          { CenterStatusPrint("Only AI allowed around here is SHODAN"); }
+static void cmd_quit()      { OS_Exit(0); }                                                           static void cmd_aireal()      { CenterStatusPrint("In my magnificence, I shape clay, crafting new lifeforms..."); }
 static const ConsoleCommand consoleCmds[] = {
-    { "noclip",  {.noArg=cmd_noclip}, CMD_NOARG},{"idclip",      {.noArg=cmd_noclip},CMD_NOARG},      {"no clip",       {.noArg = cmd_noclip},      CMD_NOARG}, {"showphys",{.noArg = cmd_showphys},CMD_NOARG},
-    { "god",     {.noArg=cmd_god}, CMD_NOARG},   {"overwhelming",{.noArg=cmd_god},   CMD_NOARG},      {"whosyourdaddy", {.noArg = cmd_god},         CMD_NOARG},
-    { "iddqd",   {.noArg=cmd_god}, CMD_NOARG},   {"notarget",    {.noArg=cmd_notarget},CMD_NOARG},    {"no target",     {.noArg = cmd_notarget},    CMD_NOARG},
-    { "editmode",{.noArg=cmd_edit},CMD_NOARG},   {"edit",        {.noArg=cmd_edit},  CMD_NOARG},      {"edit mode",     {.noArg = cmd_edit},        CMD_NOARG},
-    { "editor",  {.noArg=cmd_edit},CMD_NOARG},   {"undo",        {.noArg=cmd_undo},  CMD_NOARG},      {"showfps",       {.noArg = cmd_showfps},     CMD_NOARG},
-    { "show fps",{.noArg=cmd_showfps},CMD_NOARG},{"showlocation",{.noArg=cmd_showlocation},CMD_NOARG},{"show location", {.noArg = cmd_showlocation},CMD_NOARG},
-    { "nohud",   {.noArg=cmd_nohud},CMD_NOARG},  {"no hud",      {.noArg=cmd_nohud}, CMD_NOARG},      {"bottomlessclip",{.noArg = cmd_bottomless},  CMD_NOARG},
-    { "bottomless clip",{.noArg=cmd_bottomless},CMD_NOARG},{"load",{.withStr=cmd_loadlevel},CMD_STR}, {"loadarsenal",   {.withStr = cmd_loadarsenal}, CMD_STR}, 
-    { "load arsenal", {.withStr = cmd_loadarsenal}, CMD_STR}, { "summon_obj", {.withInt = cmd_summon}, CMD_INT}, {"summonobj",{.withInt = cmd_summon},CMD_INT},
-    { "motherlode",    {.noArg=cmd_nomoney},        CMD_NOARG},{"rosebud",           {.noArg=cmd_nomoney},          CMD_NOARG},{"kaching",        {.noArg=cmd_nomoney},       CMD_NOARG},
-    { "money",         {.noArg=cmd_nomoney},        CMD_NOARG},{"dizzy",             {.noArg=cmd_dizzy},            CMD_NOARG},{"help",           {.noArg=cmd_help},          CMD_NOARG},
-    { "ifeelthepower", {.noArg = cmd_energy},       CMD_NOARG},{ "power",            {.noArg=cmd_energy},           CMD_NOARG},{"energy",         {.noArg=cmd_energy},        CMD_NOARG},
-    { "i feel the power",{.noArg = cmd_energy},     CMD_NOARG},{"i am shodan",       {.noArg=cmd_iamshodan},        CMD_NOARG},{"iamshodan",      {.noArg=cmd_iamshodan},     CMD_NOARG},
-    { "mr. bean",      {.noArg = cmd_mrbean},       CMD_NOARG},{"simon foster",      {.noArg=cmd_simonfoster},      CMD_NOARG},{"richard branson",{.noArg=cmd_richardbranson},CMD_NOARG},
-    { "john wardley",  {.noArg = cmd_johnwardley},  CMD_NOARG},{"john mace",         {.noArg=cmd_johnmace},         CMD_NOARG},{"melanie warn",   {.noArg=cmd_melaniewarn},   CMD_NOARG},
-    { "damon hill",    {.noArg = cmd_damonhill},    CMD_NOARG},{"michael schumacher",{.noArg=cmd_michaelschumacher},CMD_NOARG},{"tony day",       {.noArg=cmd_tonyday},       CMD_NOARG},
-    { "katie brayshaw",{.noArg = cmd_katiebrayshaw},CMD_NOARG},{"sudo",              {.noArg=cmd_sudo},             CMD_NOARG},{"admin",          {.noArg=cmd_sudo},          CMD_NOARG},
-    { "git",           {.withStr=cmd_git},            CMD_STR},{"restart",           {.noArg=cmd_restart},          CMD_NOARG},{"quit",           {.noArg=cmd_quit},          CMD_NOARG},
-    { "exit",          {.noArg = cmd_quit},         CMD_NOARG},{"cd",                {.noArg=cmd_cd},               CMD_NOARG},{"./",             {.noArg=cmd_cd},            CMD_NOARG},
-    { "kill",          {.noArg = cmd_kill},         CMD_NOARG},{"suicide",           {.noArg=cmd_kill},             CMD_NOARG},{"die",            {.noArg=cmd_kill},          CMD_NOARG},
-    { "justinbailey",  {.noArg = cmd_justinbailey}, CMD_NOARG},{"woodstock",         {.noArg=cmd_woodstock},        CMD_NOARG},{"quarry",         {.noArg=cmd_quarry},        CMD_NOARG},
-    { "zelda",         {.noArg = cmd_zelda},        CMD_NOARG},{"allyourbasearebelongtous",{.noArg=cmd_allyourbase},CMD_NOARG},{"all your base",  {.noArg=cmd_allyourbase},   CMD_NOARG},
-    { "i am iron man", {.noArg = cmd_iamironman},   CMD_NOARG},{"i am amazing",      {.noArg=cmd_iamironman},       CMD_NOARG},{"i am cool",      {.noArg=cmd_iamironman},    CMD_NOARG},
-    { "i am best",     {.noArg = cmd_iamironman},   CMD_NOARG},{"idkfa",             {.noArg=cmd_idkfa},            CMD_NOARG},{"impulse 9",      {.noArg=cmd_idkfa},         CMD_NOARG},
-    { "undo",          {.noArg = cmd_undo},         CMD_NOARG},{"shake",             {.noArg=cmd_shake},            CMD_NOARG},{"tired",          {.noArg=cmd_staminup},      CMD_NOARG},
-    { "staminup",      {.noArg = cmd_staminup},     CMD_NOARG},{"grok",              {.noArg=cmd_ai},               CMD_NOARG},{"chatgpt",        {.noArg=cmd_ai},            CMD_NOARG},
-    { "claude",        {.noArg = cmd_ai},           CMD_NOARG},{"gemini",            {.noArg=cmd_ai},               CMD_NOARG},{"shodan",         {.noArg=cmd_aireal},        CMD_NOARG}, {NULL,{.raw = NULL},CMD_NOARG} // sizeof helper
-};
+    {"noclip",         {.noArg=cmd_noclip},        CMD_NOARG},{"idclip",          {.noArg=cmd_noclip},CMD_NOARG},         {"no clip",     {.noArg = cmd_noclip},CMD_NOARG},  {"showphys",      {.noArg = cmd_showphys},CMD_NOARG},  { "god",           {.noArg=cmd_god}, CMD_NOARG},       {"overwhelming",            {.noArg=cmd_god}, CMD_NOARG},
+    {"whosyourdaddy",  {.noArg = cmd_god},         CMD_NOARG},{"iddqd",           {.noArg=cmd_god}, CMD_NOARG},           {"notarget",    {.noArg=cmd_notarget},CMD_NOARG},  {"no target",     {.noArg = cmd_notarget},CMD_NOARG},  {"editmode",       {.noArg=cmd_edit},CMD_NOARG},       {"edit",                    {.noArg=cmd_edit},CMD_NOARG},
+    {"edit mode",      {.noArg = cmd_edit},        CMD_NOARG},{"editor",          {.noArg=cmd_edit},CMD_NOARG},           {"undo",        {.noArg=cmd_undo},    CMD_NOARG},  {"showfps",       {.noArg = cmd_showfps}, CMD_NOARG},  {"show fps",       {.noArg=cmd_showfps},CMD_NOARG},    {"showlocation",            {.noArg=cmd_showlocation},CMD_NOARG},
+    {"show location",  {.noArg = cmd_showlocation},CMD_NOARG},{"nohud",           {.noArg=cmd_nohud},CMD_NOARG},          {"no hud",      {.noArg=cmd_nohud},   CMD_NOARG},  {"bottomlessclip",{.noArg = cmd_bottomless},CMD_NOARG},{"bottomless clip",{.noArg=cmd_bottomless},CMD_NOARG}, {"load",                    {.withStr=cmd_loadlevel},CMD_STR},
+    {"loadarsenal",    {.withStr = cmd_loadarsenal}, CMD_STR},{"load arsenal",    {.withStr = cmd_loadarsenal},CMD_STR},  {"summon_obj",  {.withInt = cmd_summon},CMD_INT},  {"summonobj",     {.withInt = cmd_summon},CMD_INT},    {"motherlode",     {.noArg=cmd_nomoney},   CMD_NOARG}, {"rosebud",                 {.noArg=cmd_nomoney},CMD_NOARG},
+    {"kaching",        {.noArg=cmd_nomoney},       CMD_NOARG},{"money",           {.noArg=cmd_nomoney},CMD_NOARG},        {"dizzy",       {.noArg=cmd_dizzy},   CMD_NOARG},  {"help",          {.noArg=cmd_help},        CMD_NOARG},{"ifeelthepower",  {.noArg = cmd_energy},  CMD_NOARG}, {"power",                   {.noArg=cmd_energy}, CMD_NOARG},
+    {"energy",         {.noArg=cmd_energy},        CMD_NOARG},{"i feel the power",{.noArg = cmd_energy},CMD_NOARG},       {"i am shodan", {.noArg=cmd_iamshodan},CMD_NOARG}, {"iamshodan",     {.noArg=cmd_iamshodan},   CMD_NOARG},{"mr. bean",       {.noArg = cmd_mrbean},  CMD_NOARG}, {"simon foster",            {.noArg=cmd_simonfoster},CMD_NOARG},
+    {"richard branson",{.noArg=cmd_richardbranson},CMD_NOARG},{"john wardley",    {.noArg = cmd_johnwardley},CMD_NOARG},  {"john mace",   {.noArg=cmd_johnmace}, CMD_NOARG}, {"melanie warn",  {.noArg=cmd_melaniewarn}, CMD_NOARG},{"damon hill",     {.noArg = cmd_damonhill},CMD_NOARG},{"michael schumacher",      {.noArg=cmd_michaelschumacher},CMD_NOARG},
+    {"tony day",       {.noArg=cmd_tonyday},       CMD_NOARG},{"katie brayshaw",  {.noArg = cmd_katiebrayshaw},CMD_NOARG},{"sudo",        {.noArg=cmd_sudo},     CMD_NOARG}, {"admin",         {.noArg=cmd_sudo},        CMD_NOARG},{"git",            {.withStr=cmd_git},CMD_STR},        {"restart",                 {.noArg=cmd_restart},CMD_NOARG},
+    {"quit",           {.noArg=cmd_quit},          CMD_NOARG},{"exit",            {.noArg = cmd_quit},         CMD_NOARG},{"cd",          {.noArg=cmd_cd},        CMD_NOARG},{"./",            {.noArg=cmd_cd},          CMD_NOARG},{"kill",           {.noArg = cmd_kill},     CMD_NOARG},{"suicide",                 {.noArg=cmd_kill},CMD_NOARG},
+    {"die",            {.noArg=cmd_kill},          CMD_NOARG},{"justinbailey",    {.noArg = cmd_justinbailey}, CMD_NOARG},{"woodstock",   {.noArg=cmd_woodstock}, CMD_NOARG},{"quarry",        {.noArg=cmd_quarry},      CMD_NOARG},{"zelda",          {.noArg = cmd_zelda},    CMD_NOARG},{"allyourbasearebelongtous",{.noArg=cmd_allyourbase},CMD_NOARG},
+    {"all your base",  {.noArg=cmd_allyourbase},   CMD_NOARG},{"i am iron man",   {.noArg = cmd_iamironman},   CMD_NOARG},{"i am amazing",{.noArg=cmd_iamironman},CMD_NOARG},{"i am cool",     {.noArg=cmd_iamironman},  CMD_NOARG},{"i am best",      {.noArg =cmd_iamironman},CMD_NOARG},{"idkfa",                   {.noArg=cmd_idkfa},      CMD_NOARG},
+    {"impulse 9",      {.noArg=cmd_idkfa},         CMD_NOARG},{"undo",            {.noArg = cmd_undo},         CMD_NOARG},{"shake",       {.noArg=cmd_shake},     CMD_NOARG},{"tired",         {.noArg=cmd_staminup},    CMD_NOARG},{"staminup",       {.noArg = cmd_staminup}, CMD_NOARG},{"grok",                    {.noArg=cmd_ai},         CMD_NOARG},
+    {"chatgpt",        {.noArg=cmd_ai},            CMD_NOARG},{"claude",          {.noArg = cmd_ai},           CMD_NOARG},{"gemini",      {.noArg=cmd_ai},        CMD_NOARG},{"shodan",        {.noArg=cmd_aireal},      CMD_NOARG},{NULL,{.raw = NULL},CMD_NOARG}/*sizeof helper*/ };
+void ProcessConsoleCommand(const char* c) {
+    if (c == NULL || slen(c) == 0) { ToggleConsole(); return; }
 
-void ProcessConsoleCommand(const char* command) {
-    if (command == NULL || slen(command) == 0) { ToggleConsole(); return; }
-
-    char ts[T_BUFFER_SIZE]; sCpy2aSubFromb(ts,sizeof(ts)-1,command,T_BUFFER_SIZE);
-    ts[sizeof(ts)-1] = '\0';
-    const char* command_trimmed = ts;    while (*command_trimmed && cEmpty((u8)*command_trimmed)) command_trimmed++;
-    const char* space = command_trimmed; while (*space && !cEmpty((u8)*space)) space++;
-    const char* arg_start = space;       while (*arg_start && cEmpty((u8)*arg_start)) arg_start++;
-    AddToHistory(command);
-    bool commandProcessed = false;
+    char ts[T_BUFFER_SIZE]; sCpy2aSubFromb(ts,sizeof(ts)-1,c,T_BUFFER_SIZE); ts[sizeof(ts)-1] = '\0';
+    const char* ct=ts; while(*ct && cEmpty((u8)*ct)){ct++;} const char* space=ct; while(*space && !cEmpty((u8)*space)){space++;} const char* arg_start=space; while(*arg_start && cEmpty((u8)*arg_start)){arg_start++;} AddToHistory(c); bool commandProcessed = false;
     for (u16 i=0;consoleCmds[i].name!=NULL;++i) {
         const ConsoleCommand* cmd = &consoleCmds[i];
-        if (CommandMatch(command_trimmed,cmd->name)) {
-                   if (cmd->type == CMD_NOARG) {             cmd->func.noArg();                              commandProcessed = true;
-            } else if (cmd->type == CMD_STR && *arg_start) { cmd->func.withStr(*arg_start ? arg_start : ""); commandProcessed = true;
-            } else { // CMD_INT
-                if (!*arg_start) CenterStatusPrint("Missing argument, usage: %s <number>",cmd->name);
-                else { cmd->func.withInt(s2i32(arg_start)); commandProcessed = true; }
-            }
+        if (CommandMatch(ct,cmd->name)) {
+            if (cmd->type == CMD_NOARG) {cmd->func.noArg(); commandProcessed = true; } else if (cmd->type == CMD_STR && *arg_start) { cmd->func.withStr(*arg_start ? arg_start : ""); commandProcessed = true;
+            } else { if(!*arg_start){CenterStatusPrint("Missing argument, usage: %s <number>",cmd->name);}else{cmd->func.withInt(s2i32(arg_start)); commandProcessed=true;} }
         }
     }
 
-    if (!commandProcessed) CenterStatusPrint("%s%s",Sys_Text.stringTable[1014],command_trimmed); // "Unknown command or function: "
-    consoleEntryText[0] = currentEntryLength = 0; historyPos = numHistory; // Position beyond newest for empty
-    ToggleConsole();
+    if (!commandProcessed){CenterStatusPrint("%s%s",Sys_Text.stringTable[1014],ct);} /*"Unknown command or function: "*/ consoleEntryText[0] = currentEntryLength = 0; historyPos = numHistory; /*Position beyond newest for empt*/ ToggleConsole();
 }
 
 void ConsoleEmulator(i32 keycode) {
     if (keycode == KEY_UP || keycode == KEY_DOWN) { RecallHistory(keycode == KEY_UP ? 1 : -1); return; }
     if (keycode == KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { consoleEntryText[0]='\0'; currentEntryLength=0; return; } // Clear the input
-    
     if (keycode >= KEY_A && keycode <= KEY_Z) { // Handle alphabet keys
         if (currentEntryLength < (T_BUFFER_SIZE - 1)) { // Ensure we don't overflow the buffer
             char c = 'a' + (keycode - KEY_A); // Map keycode to lowercase character
             consoleEntryText[currentEntryLength] = c; consoleEntryText[currentEntryLength + 1] = '\0'; currentEntryLength++;
         }
     } else if (keycode >= KEY_1 && keycode <= KEY_9) { // Handle number keys 1-9
-        if (currentEntryLength < (T_BUFFER_SIZE - 1)) {
-            char c = '1' + (keycode - KEY_1); // Map to '1'-'9'
-            consoleEntryText[currentEntryLength] = c; consoleEntryText[currentEntryLength + 1] = '\0'; currentEntryLength++;
-        }
+        if (currentEntryLength < (T_BUFFER_SIZE - 1)) { char c = '1' + (keycode - KEY_1); /*Map to '1'-'9'*/ consoleEntryText[currentEntryLength] = c; consoleEntryText[currentEntryLength + 1] = '\0'; currentEntryLength++; }
     } else if (keycode == KEY_0) { // Handle '0'
         if (currentEntryLength < (T_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]='0'; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; }
     } else if (keycode == KEY_MINUS || keycode == KEY_KP_SUBTRACT) {
@@ -4374,40 +4105,24 @@ extern SettingsSystem Sys_Settings; extern GlobalContext World;
     typedef struct{ i32(__stdcall*q)(void*,const void*,void**); u32(__stdcall*a)(void*); u32(__stdcall*Release)(void*); i32(__stdcall* Activate)(void*,const void*,u32,void*,void**);} IMMDeviceVtbl; struct IMMDevice{IMMDeviceVtbl*lpVtbl;};
     typedef struct{ i32(__stdcall*q)(void*,const void*,void**); u32(__stdcall*a)(void*); u32(__stdcall*Release)(void*); i32(__stdcall*e)(void*,int,u32,void**); i32(__stdcall*GetDefaultAudioEndpoint)(void*,int,int,IMMDevice**);}IMMDeviceEnumeratorVtbl;struct IMMDeviceEnumerator{IMMDeviceEnumeratorVtbl*lpVtbl;};
     typedef struct IAudioClient IAudioClient; typedef struct IAudioRenderClient IAudioRenderClient; typedef struct { u16 t,n; u32 s, a; u16 b,w,c; } WAVEFORMATEX;
-    typedef struct IAudioClientVtbl { i32 (__stdcall *QueryInterface)(void*, const void*,void**); u32 (__stdcall *AddRef)(void*); u32 (__stdcall *Release)(void*); i32 (__stdcall *Initialize)(void*,int,u32,i64,i64,const WAVEFORMATEX*,const void*); 
-        i32 (__stdcall *GetBufferSize)(void*,u32*); i32 (__stdcall *GetStreamLength)(void*,i64*); i32 (__stdcall *GetCurrentPadding)(void*,u32*); i32 (__stdcall *IsFormatSupported)(void*, int, const WAVEFORMATEX*, WAVEFORMATEX**); 
-        i32 (__stdcall *GetMixFormat)(void*,WAVEFORMATEX**); i32 (__stdcall *GetDevicePeriod)(void*,i64*,i64*); i32 (__stdcall *Start)(void*); i32 (__stdcall *Stop)(void*); i32 (__stdcall *Reset)(void*); i32 (__stdcall *SetEventHandle)(void*,void*);
-        i32 (__stdcall *GetService)(void*,const void*,void**);
-    } IAudioClientVtbl;
-    struct IAudioClient { IAudioClientVtbl* lpVtbl; };
-    typedef struct IAudioRenderClientVtbl { i32 (__stdcall *QueryInterface)(void*,const void*,void**); u32 (__stdcall *AddRef)(void*); u32 (__stdcall *Release)(void*); i32 (__stdcall *GetBuffer)(void*,u32,u8**); i32 (__stdcall *ReleaseBuffer)(void*,u32,u32); } IAudioRenderClientVtbl;
-    struct IAudioRenderClient { IAudioRenderClientVtbl* lpVtbl; };
-    typedef struct IUnknown IUnknown; typedef struct IUnknownVtbl { i32 (__stdcall *QueryInterface)(IUnknown* This, const GUID* riid, void** ppvObject); u32 (__stdcall *AddRef)(IUnknown* This); u32 (__stdcall *Release)(IUnknown* This); } IUnknownVtbl; struct IUnknown { const IUnknownVtbl* lpVtbl; };
-    typedef u32 snd_pcm_uframes_t; typedef struct { int format,access,rate,channels,period_frames,periods; } pcm_params_t; typedef struct { snd_pcm_uframes_t hw_ptr; }  pcm_status_t; typedef struct { snd_pcm_uframes_t appl_ptr; } pcm_control_t;
-    typedef struct { pcm_status_t status; pcm_control_t control; } pcm_sync_t; 
-    typedef struct {IAudioClient *client; IAudioRenderClient *render; u32 buffer_frames; i32 rate,channels,period_frames; bool open; } wasapi_dev_t;
-    extern i32 WINAPI CoInitializeEx(void*,u32); extern i32 WINAPI CoCreateInstance(const GUID*,IUnknown*,u32,REFIID,void**);
-    static wasapi_dev_t wasapi_devs[8]; static int wasapi_dev_count = 0;
+    typedef struct IAudioClientVtbl { i32 (__stdcall *QueryInterface)(void*, const void*,void**); u32 (__stdcall *AddRef)(void*); u32 (__stdcall *Release)(void*); i32 (__stdcall *Initialize)(void*,int,u32,i64,i64,const WAVEFORMATEX*,const void*); i32 (__stdcall *GetBufferSize)(void*,u32*); i32 (__stdcall *GetStreamLength)(void*,i64*); i32 (__stdcall *GetCurrentPadding)(void*,u32*);
+        i32 (__stdcall *IsFormatSupported)(void*, int, const WAVEFORMATEX*, WAVEFORMATEX**); i32 (__stdcall *GetMixFormat)(void*,WAVEFORMATEX**); i32 (__stdcall *GetDevicePeriod)(void*,i64*,i64*); i32 (__stdcall *Start)(void*); i32 (__stdcall *Stop)(void*); i32 (__stdcall *Reset)(void*); i32 (__stdcall *SetEventHandle)(void*,void*); i32 (__stdcall *GetService)(void*,const void*,void**); } IAudioClientVtbl;
+    struct IAudioClient { IAudioClientVtbl* lpVtbl; }; typedef struct IAudioRenderClientVtbl { i32 (__stdcall *QueryInterface)(void*,const void*,void**); u32 (__stdcall *AddRef)(void*); u32 (__stdcall *Release)(void*); i32 (__stdcall *GetBuffer)(void*,u32,u8**); i32 (__stdcall *ReleaseBuffer)(void*,u32,u32); } IAudioRenderClientVtbl;
+    struct IAudioRenderClient { IAudioRenderClientVtbl* lpVtbl; }; typedef struct IUnknown IUnknown; typedef struct IUnknownVtbl { i32 (__stdcall *QueryInterface)(IUnknown* This, const GUID* riid, void** ppvObject); u32 (__stdcall *AddRef)(IUnknown* This); u32 (__stdcall *Release)(IUnknown* This); } IUnknownVtbl; struct IUnknown { const IUnknownVtbl* lpVtbl; };
+    typedef u32 snd_pcm_uframes_t; typedef struct { int format,access,rate,channels,period_frames,periods; } pcm_params_t; typedef struct { snd_pcm_uframes_t hw_ptr; }  pcm_status_t; typedef struct { snd_pcm_uframes_t appl_ptr; } pcm_control_t; typedef struct { pcm_status_t status; pcm_control_t control; } pcm_sync_t; typedef struct {IAudioClient *client; IAudioRenderClient *render; u32 buffer_frames; i32 rate,channels,period_frames; bool open; } wasapi_dev_t;
+    i32 WINAPI CoInitializeEx(void*,u32); i32 WINAPI CoCreateInstance(const GUID*,IUnknown*,u32,REFIID,void**); static wasapi_dev_t wasapi_devs[8]; static int wasapi_dev_count = 0;
     #define FD_TO_IDX(fd) ((int)(intptr_t)(fd)-100)
     #define IDX_TO_FD(i)  ((FHandle)(intptr_t)((i)+100))
     static const GUID IID_IAudioClient = {0x1CB9AD4C,0xDBFA,0x4C32,{0xB1,0x78,0xC2,0xF5,0x68,0xA7,0x03,0xB2}}; static const GUID IID_IAudioRenderClient = {0xF294ACFC,0x3146,0x4483,{0xA7,0xBF,0xAD,0xDC,0xA7,0xC2,0x60,0xE2}};
-    static int wasapi_init_device(IMMDevice *dev,int rate,int channels,int period_frames,int periods) {
-        if (wasapi_dev_count>=8) return -1;
-        
-        wasapi_dev_t *w = &wasapi_devs[wasapi_dev_count]; 
-        i32 hr = dev->lpVtbl->Activate(dev,&IID_IAudioClient,23,NULL,(void**)&w->client); if (FAILED(hr)) { DualLogError("WASAPI Activate failed, %u\n",hr); return -1; }
-        
-        WAVEFORMATEX fmt = {1,(u16)channels,(u32)rate,(u32)(rate*channels*2),(u16)(channels*2),16,0}; i64 buf_dur = (i64)(period_frames*periods)*10000000LL/rate;
-        hr = w->client->lpVtbl->Initialize(w->client,0,524288,buf_dur,0,&fmt,NULL); if (FAILED(hr)) { w->client->lpVtbl->Release(w->client); return -1; }
-        
-        w->client->lpVtbl->GetBufferSize(w->client,&w->buffer_frames);
-        hr = w->client->lpVtbl->GetService(w->client,&IID_IAudioRenderClient,(void**)&w->render); if (FAILED(hr)) { w->client->lpVtbl->Release(w->client); return -1; }
-        
-        w->client->lpVtbl->Start(w->client);w->rate=rate; w->channels=channels; w->period_frames=period_frames; w->open=true;
-        return wasapi_dev_count++;
+    static int wasapi_init_device(IMMDevice *dev,int r,int ch,int period_frames,int p) {
+        if(wasapi_dev_count>=8){return -1;}
+        wasapi_dev_t *w=&wasapi_devs[wasapi_dev_count]; i32 hr=dev->lpVtbl->Activate(dev,&IID_IAudioClient,23,NULL,(void**)&w->client); if(FAILED(hr)){DualLogError("WASAPI Activate failed, %u\n",hr); return -1;}
+        WAVEFORMATEX fmt = {1,(u16)ch,(u32)r,(u32)(r*ch*2),(u16)(ch*2),16,0}; i64 buf_dur = (i64)(period_frames*p)*10000000LL/r; hr = w->client->lpVtbl->Initialize(w->client,0,524288,buf_dur,0,&fmt,NULL); if(FAILED(hr)){w->client->lpVtbl->Release(w->client); return -1;}
+        w->client->lpVtbl->GetBufferSize(w->client,&w->buffer_frames); hr = w->client->lpVtbl->GetService(w->client,&IID_IAudioRenderClient,(void**)&w->render); if(FAILED(hr)){ w->client->lpVtbl->Release(w->client); return -1;}
+        w->client->lpVtbl->Start(w->client);w->rate=r; w->channels=ch; w->period_frames=period_frames; w->open=true; return wasapi_dev_count++;
     }
     
-    static const GUID CLSID_MMDeviceEnumerator_ = {0xBCDE0395,0xE52F,0x467C,{0x8E,0x3D,0xC4,0x57,0x92,0x91,0x69,0x2E}}; static const GUID IID_IMMDeviceEnumerator_  = {0xA95664D2,0x9614,0x4F35,{0xA7,0x46,0xDE,0x8D,0xB6,0x36,0x17,0xE6}};
+    static const GUID CLSID_MMDeviceEnumerator_ = {0xBCDE0395,0xE52F,0x467C,{0x8E,0x3D,0xC4,0x57,0x92,0x91,0x69,0x2E}}; static const GUID IID_IMMDeviceEnumerator_ = {0xA95664D2,0x9614,0x4F35,{0xA7,0x46,0xDE,0x8D,0xB6,0x36,0x17,0xE6}};
     FHandle pcm_open_all(int rate,int channels,int period_frames,int periods) {
         CoInitializeEx(NULL,0); IMMDeviceEnumerator *en = NULL; if (FAILED(CoCreateInstance(&CLSID_MMDeviceEnumerator_,NULL,23,&IID_IMMDeviceEnumerator_,(void**)&en))) { DualLogError("CoCreateInstance fail\n"); return INVALID_FHANDLE; }
         IMMDevice *dev = NULL; i32 hr = en->lpVtbl->GetDefaultAudioEndpoint(en,0,0,&dev); en->lpVtbl->Release(en); if (FAILED(hr)||!dev) return INVALID_FHANDLE;
@@ -4415,26 +4130,9 @@ extern SettingsSystem Sys_Settings; extern GlobalContext World;
         return IDX_TO_FD(0);
     }
 
-    int pcm_sync(FHandle fd, pcm_sync_t *sync) {
-        int idx=FD_TO_IDX(fd); if (idx<0||idx>=wasapi_dev_count||!wasapi_devs[idx].open) return -1;
-        
-        wasapi_dev_t *w=&wasapi_devs[idx];
-        u32 padding=0; w->client->lpVtbl->GetCurrentPadding(w->client,&padding);
-        snd_pcm_uframes_t base = (w->buffer_frames>(u32)(w->period_frames*4)) ? w->buffer_frames-(u32)(w->period_frames*4) : 0;
-        sync->status.hw_ptr=base; sync->control.appl_ptr=base+padding;
-        return 0;
-    }
-
+    int pcm_sync(FHandle fd, pcm_sync_t *sync) { int idx=FD_TO_IDX(fd); if(idx<0||idx>=wasapi_dev_count||!wasapi_devs[idx].open){return -1;} wasapi_dev_t *w=&wasapi_devs[idx]; u32 padding=0; w->client->lpVtbl->GetCurrentPadding(w->client,&padding); snd_pcm_uframes_t base = (w->buffer_frames>(u32)(w->period_frames*4)) ? w->buffer_frames-(u32)(w->period_frames*4) : 0; sync->status.hw_ptr=base; sync->control.appl_ptr=base+padding; return 0; }
     int pcm_prepare(FHandle fd) { int i = FD_TO_IDX(fd); if (i < 0 || i >= wasapi_dev_count) return -1; wasapi_dev_t *w = &wasapi_devs[i]; return w->client->lpVtbl->Stop(w->client),w->client->lpVtbl->Reset(w->client),w->client->lpVtbl->Start(w->client), 0; }
-    int pcm_write(void *buf, int frames) {
-        for (int i=0;i<wasapi_dev_count;i++) {
-            wasapi_dev_t *w=&wasapi_devs[i]; if (!w->open) continue;
-            u8* data = NULL; if (FAILED(w->render->lpVtbl->GetBuffer(w->render,(u32)frames,&data))) { pcm_prepare(IDX_TO_FD(i)); continue; }
-            
-            mcpy(data,buf,frames*w->channels*2); w->render->lpVtbl->ReleaseBuffer(w->render,(u32)frames,0);
-        }
-        return frames;
-    }
+    int pcm_write(void *buf, int frames) { for (int i=0;i<wasapi_dev_count;i++) { wasapi_dev_t *w=&wasapi_devs[i]; if(!w->open){continue;} u8* data = NULL; if(FAILED(w->render->lpVtbl->GetBuffer(w->render,(u32)frames,&data))){pcm_prepare(IDX_TO_FD(i)); continue;} mcpy(data,buf,frames*w->channels*2); w->render->lpVtbl->ReleaseBuffer(w->render,(u32)frames,0); } return frames; }
 #else
     int ioctl(int fd, u64 request, ...);
     #define _IOC(dir, type, nr, size) (((dir) << 30) | ((type) << 8) | ((nr) << 0) | ((size) << 16))
@@ -4492,7 +4190,25 @@ extern SettingsSystem Sys_Settings; extern GlobalContext World;
 #define MP3_HDR_IS_FRAME_576(h)        ((h[1] & 14) == 2)
 #define MP3_HDR_IS_LAYER_1(h)          ((h[1] & 6) == 6)
 #define MP3_OFFSET_PTR(p,offset) ((void*)((u8*)(p)+(offset)))
-#include "mp3.h" // Huffman tables
+static u8 g_halfrate[2][3][15]={ {{0,4,8,12,16,20,24,28,32,40,48,56,64,72,80},{0,4,8,12,16,20,24,28,32,40,48,56,64,72,80},{0,16,24,28,32,40,48,56,64,72,80,88,96,112,128}},{{0,16,20,24,28,32,40,48,56,64,80,96,112,128,160},{0,16,24,28,32,40,48,56,64,80,96,112,128,160,192},{0,16,32,48,64,80,96,112,128,144,160,176,192,208,224}} };
+static u8 g_scf_long[8][23]={{0},{12,12,12,12,12,12,16,20,24,28,32,40,48,56,64,76,90,2,2,2,2,2,0},{0},{6,6,6,6,6,6,8,10,12,14,16,18,22,26,32,38,46,54,62,70,76,36,0},{0},{4,4,4,4,4,4,6,6,8,8,10,12,16,20,24,28,34,42,50,54,76,158,0},{4,4,4,4,4,4,6,6,6,8,10,12,16,18,22,28,34,40,46,54,54,192,0},{4,4,4,4,4,4,6,6,8,10,12,16,20,24,30,38,46,56,68,84,102,26,0}};
+static u8 g_scf_short[8][40]={{4,4,4,4,4,4,4,4,4,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,30,30,30,40,40,40,18,18,18,0},{8,8,8,8,8,8,8,8,8,12,12,12,16,16,16,20,20,20,24,24,24,28,28,28,36,36,36,2,2,2,2,2,2,2,2,2,26,26,26,0},{4,4,4,4,4,4,4,4,4,6,6,6,6,6,6,8,8,8,10,10,10,14,14,14,18,18,18,26,26,26,32,32,32,42,42,42,18,18,18,0 },{4,4,4,4,4,4,4,4,4,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,32,32,32,44,44,44,12,12,12,0 }, { 4,4,4,4,4,4,4,4,4,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,30,30,30,40,40,40,18,18,18,0 },{4,4,4,4,4,4,4,4,4,4,4,4,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,22,22,22,30,30,30,56,56,56,0},{4,4,4,4,4,4,4,4,4,4,4,4,6,6,6,6,6,6,10,10,10,12,12,12,14,14,14,16,16,16,20,20,20,26,26,26,66,66,66,0},{4,4,4,4,4,4,4,4,4,4,4,4,6,6,6,8,8,8,12,12,12,16,16,16,20,20,20,26,26,26,34,34,34,42,42,42,12,12,12,0}};
+static u8 g_scf_mixed[8][40]={{6,6,6,6,6,6,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,30,30,30,40,40,40,18,18,18,0},{12,12,12,4,4,4,8,8,8,12,12,12,16,16,16,20,20,20,24,24,24,28,28,28,36,36,36,2,2,2,2,2,2,2,2,2,26,26,26,0},{6,6,6,6,6,6,6,6,6,6,6,6,8,8,8,10,10,10,14,14,14,18,18,18,26,26,26,32,32,32,42,42,42,18,18,18,0},{6,6,6,6,6,6,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,32,32,32,44,44,44,12,12,12,0},{6,6,6,6,6,6,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,24,24,24,30,30,30,40,40,40,18,18,18,0},{4,4,4,4,4,4,6,6,4,4,4,6,6,6,8,8,8,10,10,10,12,12,12,14,14,14,18,18,18,22,22,22,30,30,30,56,56,56,0},{4,4,4,4,4,4,6,6,4,4,4,6,6,6,6,6,6,10,10,10,12,12,12,14,14,14,16,16,16,20,20,20,26,26,26,66,66,66,0},{4,4,4,4,4,4,6,6,4,4,4,6,6,6,8,8,8,12,12,12,16,16,16,20,20,20,26,26,26,34,34,34,42,42,42,12,12,12,0}};
+static const u8 g_sfc_long_024[23] = { 6,6,6,6,6,6,8,10,12,14,16,20,24,28,32,38,46,52,60,68,58,54,0 };
+static const u8 g_scf_partitions[3][28]={{6,5,5,5,6,5,5,5,6,5,7,3,11,10,0,0,7,7,7,0,6,6,6,3,8,8,5,0}, {8,9,6,12,6,9,9,9,6,9,12,6,15,18,0,0,6,15,12,0,6,12,9,6,6,18,9,0}, {9,9,6,12,9,9,9,9,9,9,12,6,18,18,0,0,12,12,12,0,12,9,9,6,15,12,9,0}};
+static const float g_mp3_pow43[129+16]={ 0,-1,-2.519842f,-4.326749f,-6.349604f,-8.549880f,-10.902724f,-13.390518f,-16.000000f,-18.720754f,-21.544347f,-24.463781f,-27.473142f,-30.567351f,-33.741992f,-36.993181f,0,1,2.519842f,4.326749f,6.349604f,8.549880f,10.902724f,13.390518f,16.000000f,18.720754f,21.544347f,24.463781f,27.473142f,30.567351f,33.741992f,36.993181f,40.317474f,43.711787f,47.173345f,50.699631f,54.288352f,57.937408f,61.644865f,65.408941f,69.227979f,73.100443f,77.024898f,81.000000f,85.024491f,89.097188f,93.216975f,97.382800f,101.593667f,105.848633f,110.146801f,114.487321f,118.869381f,123.292209f,127.755065f,132.257246f,136.798076f,141.376907f,145.993119f,150.646117f,155.335327f,160.060199f,164.820202f,169.614826f,174.443577f,179.305980f,184.201575f,189.129918f,194.090580f,199.083145f,204.107210f,209.162385f,214.248292f,219.364564f,224.510845f,229.686789f,234.892058f,240.126328f,245.389280f,250.680604f,256.000000f,261.347174f,266.721841f,272.123723f,277.552547f,283.008049f,288.489971f,293.998060f,299.532071f,305.091761f,310.676898f,316.287249f,321.922592f,327.582707f,333.267377f,338.976394f,344.709550f,350.466646f,356.247482f,362.051866f,367.879608f,373.730522f,379.604427f,385.501143f,391.420496f,397.362314f,403.326427f,409.312672f,415.320884f,421.350905f,427.402579f,433.475750f,439.570269f,445.685987f,451.822757f,457.980436f,464.158883f,470.357960f,476.577530f,482.817459f,489.077615f,495.357868f,501.658090f,507.978156f,514.317941f,520.677324f,527.056184f,533.454404f,539.871867f,546.308458f,552.764065f,559.238575f,565.731879f,572.243870f,578.774440f,585.323483f,591.890898f,598.476581f,605.080431f,611.702349f,618.342238f,625.000000f,631.675540f,638.368763f,645.079578f };
+static const i16 tabs[]={ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,785,785,785,785,784,784,784,784,513,513,513,513,513,513,513,513,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,-255,1313,1298,1282,785,785,785,785,784,784,784,784,769,769,769,769,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,290,288,-255,1313,1298,1282,769,769,769,769,529,529,529,529,529,529,529,529,528,528,528,528,528,528,528,528,512,512,512,512,512,512,512,512,290,288,-253,-318,-351,-367,785,785,785,785,784,784,784,784,769,769,769,769,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,819,818,547,547,275,275,275,275,561,560,515,546,289,274,288,258,
+    -254,-287,1329,1299,1314,1312,1057,1057,1042,1042,1026,1026,784,784,784,784,529,529,529,529,529,529,529,529,769,769,769,769,768,768,768,768,563,560,306,306,291,259,-252,-413,-477,-542,1298,-575,1041,1041,784,784,784,784,769,769,769,769,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,-383,-399,1107,1092,1106,1061,849,849,789,789,1104,1091,773,773,1076,1075,341,340,325,309,834,804,577,577,532,532,516,516,832,818,803,816,561,561,531,531,515,546,289,289,288,258,-252,-429,-493,-559,1057,1057,1042,1042,529,529,529,529,529,529,529,529,784,784,784,784,769,769,769,769,512,512,512,512,512,512,512,512,-382,1077,-415,1106,1061,1104,849,849,789,789,1091,1076,1029,1075,834,834,597,581,340,340,339,324,804,833,532,532,832,772,818,803,817,787,816,771,290,290,290,290,288,258,
+    -253,-349,-414,-447,-463,1329,1299,-479,1314,1312,1057,1057,1042,1042,1026,1026,785,785,785,785,784,784,784,784,769,769,769,769,768,768,768,768,-319,851,821,-335,836,850,805,849,341,340,325,336,533,533,579,579,564,564,773,832,578,548,563,516,321,276,306,291,304,259,-251,-572,-733,-830,-863,-879,1041,1041,784,784,784,784,769,769,769,769,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,-511,-527,-543,1396,1351,1381,1366,1395,1335,1380,-559,1334,1138,1138,1063,1063,1350,1392,1031,1031,1062,1062,1364,1363,1120,1120,1333,1348,881,881,881,881,375,374,359,373,343,358,341,325,791,791,1123,1122,-703,1105,1045,-719,865,865,790,790,774,774,1104,1029,338,293,323,308,-799,-815,833,788,772,818,803,816,322,292,307,320,561,531,515,546,289,274,288,258,
+    -251,-525,-605,-685,-765,-831,-846,1298,1057,1057,1312,1282,785,785,785,785,784,784,784,784,769,769,769,769,512,512,512,512,512,512,512,512,1399,1398,1383,1367,1382,1396,1351,-511,1381,1366,1139,1139,1079,1079,1124,1124,1364,1349,1363,1333,882,882,882,882,807,807,807,807,1094,1094,1136,1136,373,341,535,535,881,775,867,822,774,-591,324,338,-671,849,550,550,866,864,609,609,293,336,534,534,789,835,773,-751,834,804,308,307,833,788,832,772,562,562,547,547,305,275,560,515,290,290,-252,-397,-477,-557,-622,-653,-719,-735,-750,1329,1299,1314,1057,1057,1042,1042,1312,1282,1024,1024,785,785,785,785,784,784,784,784,769,769,769,769,-383,1127,1141,1111,1126,1140,1095,1110,869,869,883,883,1079,1109,882,882,375,374,807,868,838,881,791,-463,867,822,368,263,852,837,836,-543,610,610,550,550,352,336,534,534,865,774,851,821,850,805,593,533,579,564,773,832,578,578,548,548,577,577,307,276,306,291,516,560,259,259,
+    -250,-2107,-2507,-2764,-2909,-2974,-3007,-3023,1041,1041,1040,1040,769,769,769,769,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,-767,-1052,-1213,-1277,-1358,-1405,-1469,-1535,-1550,-1582,-1614,-1647,-1662,-1694,-1726,-1759,-1774,-1807,-1822,-1854,-1886,1565,-1919,-1935,-1951,-1967,1731,1730,1580,1717,-1983,1729,1564,-1999,1548,-2015,-2031,1715,1595,-2047,1714,-2063,1610,-2079,1609,-2095,1323,1323,1457,1457,1307,1307,1712,1547,1641,1700,1699,1594,1685,1625,1442,1442,1322,1322,-780,-973,-910,1279,1278,1277,1262,1276,1261,1275,1215,1260,1229,-959,974,974,989,989,-943,735,478,478,495,463,506,414,-1039,1003,958,1017,927,942,987,957,431,476,1272,1167,1228,-1183,1256,-1199,895,895,941,941,1242,1227,1212,1135,1014,1014,490,489,503,487,910,1013,985,925,863,894,970,955,1012,847,-1343,831,755,755,984,909,428,366,754,559,-1391,752,486,457,924,997,698,698,983,893,740,740,908,877,739,739,667,667,953,938,497,287,271,271,683,606,590,712,726,574,302,302,738,736,481,286,526,725,605,711,636,724,696,651,589,681,666,710,364,467,573,695,466,466,301,465,379,379,709,604,665,679,316,316,634,633,436,436,464,269,424,394,452,332,438,363,347,408,393,448,331,422,362,407,392,421,346,406,391,376,375,359,1441,1306,-2367,1290,-2383,1337,-2399,-2415,1426,1321,-2431,1411,1336,-2447,-2463,-2479,1169,1169,1049,1049,1424,1289,1412,1352,1319,-2495,1154,1154,1064,1064,1153,1153,416,390,360,404,403,389,344,374,373,343,358,372,327,357,342,311,356,326,1395,1394,1137,1137,1047,1047,1365,1392,1287,1379,1334,1364,1349,1378,1318,1363,792,792,792,792,1152,1152,1032,1032,1121,1121,1046,1046,1120,1120,1030,1030,-2895,1106,1061,1104,849,849,789,789,1091,1076,1029,1090,1060,1075,833,833,309,324,532,532,832,772,818,803,561,561,531,560,515,546,289,274,288,258,
+    -250,-1179,-1579,-1836,-1996,-2124,-2253,-2333,-2413,-2477,-2542,-2574,-2607,-2622,-2655,1314,1313,1298,1312,1282,785,785,785,785,1040,1040,1025,1025,768,768,768,768,-766,-798,-830,-862,-895,-911,-927,-943,-959,-975,-991,-1007,-1023,-1039,-1055,-1070,1724,1647,-1103,-1119,1631,1767,1662,1738,1708,1723,-1135,1780,1615,1779,1599,1677,1646,1778,1583,-1151,1777,1567,1737,1692,1765,1722,1707,1630,1751,1661,1764,1614,1736,1676,1763,1750,1645,1598,1721,1691,1762,1706,1582,1761,1566,-1167,1749,1629,767,766,751,765,494,494,735,764,719,749,734,763,447,447,748,718,477,506,431,491,446,476,461,505,415,430,475,445,504,399,460,489,414,503,383,474,429,459,502,502,746,752,488,398,501,473,413,472,486,271,480,270,-1439,-1455,1357,-1471,-1487,-1503,1341,1325,-1519,1489,1463,1403,1309,-1535,1372,1448,1418,1476,1356,1462,1387,-1551,1475,1340,1447,1402,1386,-1567,1068,1068,1474,1461,455,380,468,440,395,425,410,454,364,467,466,464,453,269,409,448,268,432,1371,1473,1432,1417,1308,1460,1355,1446,1459,1431,1083,1083,1401,1416,1458,1445,1067,1067,1370,1457,1051,1051,1291,1430,1385,1444,1354,1415,1400,1443,1082,1082,1173,1113,1186,1066,1185,1050,-1967,1158,1128,1172,1097,1171,1081,-1983,1157,1112,416,266,375,400,1170,1142,1127,1065,793,793,1169,1033,1156,1096,1141,1111,1155,1080,1126,1140,898,898,808,808,897,897,792,792,1095,1152,1032,1125,1110,1139,1079,1124,882,807,838,881,853,791,-2319,867,368,263,822,852,837,866,806,865,-2399,851,352,262,534,534,821,836,594,594,549,549,593,593,533,533,848,773,579,579,564,578,548,563,276,276,577,576,306,291,516,560,305,305,275,259,
+    -251,-892,-2058,-2620,-2828,-2957,-3023,-3039,1041,1041,1040,1040,769,769,769,769,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,-511,-527,-543,-559,1530,-575,-591,1528,1527,1407,1526,1391,1023,1023,1023,1023,1525,1375,1268,1268,1103,1103,1087,1087,1039,1039,1523,-604,815,815,815,815,510,495,509,479,508,463,507,447,431,505,415,399,-734,-782,1262,-815,1259,1244,-831,1258,1228,-847,-863,1196,-879,1253,987,987,748,-767,493,493,462,477,414,414,686,669,478,446,461,445,474,429,487,458,412,471,1266,1264,1009,1009,799,799,-1019,-1276,-1452,-1581,-1677,-1757,-1821,-1886,-1933,-1997,1257,1257,1483,1468,1512,1422,1497,1406,1467,1496,1421,1510,1134,1134,1225,1225,1466,1451,1374,1405,1252,1252,1358,1480,1164,1164,1251,1251,1238,1238,1389,1465,-1407,1054,1101,-1423,1207,-1439,830,830,1248,1038,1237,1117,1223,1148,1236,1208,411,426,395,410,379,269,1193,1222,1132,1235,1221,1116,976,976,1192,1162,1177,1220,1131,1191,963,963,-1647,961,780,-1663,558,558,994,993,437,408,393,407,829,978,813,797,947,-1743,721,721,377,392,844,950,828,890,706,706,812,859,796,960,948,843,934,874,571,571,-1919,690,555,689,421,346,539,539,944,779,918,873,932,842,903,888,570,570,931,917,674,674,-2575,1562,-2591,1609,-2607,1654,1322,1322,1441,1441,1696,1546,1683,1593,1669,1624,1426,1426,1321,1321,1639,1680,1425,1425,1305,1305,1545,1668,1608,1623,1667,1592,1638,1666,1320,1320,1652,1607,1409,1409,1304,1304,1288,1288,1664,1637,1395,1395,1335,1335,1622,1636,1394,1394,1319,1319,1606,1621,1392,1392,1137,1137,1137,1137,345,390,360,375,404,373,1047,-2751,-2767,-2783,1062,1121,1046,-2799,1077,-2815,1106,1061,789,789,1105,1104,263,355,310,340,325,354,352,262,339,324,1091,1076,1029,1090,1060,1075,833,833,788,788,1088,1028,818,818,803,803,561,561,531,531,816,771,546,546,289,274,288,258,
+    -253,-317,-381,-446,-478,-509,1279,1279,-811,-1179,-1451,-1756,-1900,-2028,-2189,-2253,-2333,-2414,-2445,-2511,-2526,1313,1298,-2559,1041,1041,1040,1040,1025,1025,1024,1024,1022,1007,1021,991,1020,975,1019,959,687,687,1018,1017,671,671,655,655,1016,1015,639,639,758,758,623,623,757,607,756,591,755,575,754,559,543,543,1009,783,-575,-621,-685,-749,496,-590,750,749,734,748,974,989,1003,958,988,973,1002,942,987,957,972,1001,926,986,941,971,956,1000,910,985,925,999,894,970,-1071,-1087,-1102,1390,-1135,1436,1509,1451,1374,-1151,1405,1358,1480,1420,-1167,1507,1494,1389,1342,1465,1435,1450,1326,1505,1310,1493,1373,1479,1404,1492,1464,1419,428,443,472,397,736,526,464,464,486,457,442,471,484,482,1357,1449,1434,1478,1388,1491,1341,1490,1325,1489,1463,1403,1309,1477,1372,1448,1418,1433,1476,1356,1462,1387,-1439,1475,1340,1447,1402,1474,1324,1461,1371,1473,269,448,1432,1417,1308,1460,-1711,1459,-1727,1441,1099,1099,1446,1386,1431,1401,-1743,1289,1083,1083,1160,1160,1458,1445,1067,1067,1370,1457,1307,1430,1129,1129,1098,1098,268,432,267,416,266,400,-1887,1144,1187,1082,1173,1113,1186,1066,1050,1158,1128,1143,1172,1097,1171,1081,420,391,1157,1112,1170,1142,1127,1065,1169,1049,1156,1096,1141,1111,1155,1080,1126,1154,1064,1153,1140,1095,1048,-2159,1125,1110,1137,-2175,823,823,1139,1138,807,807,384,264,368,263,868,838,853,791,867,822,852,837,866,806,865,790,-2319,851,821,836,352,262,850,805,849,-2399,533,533,835,820,336,261,578,548,563,577,532,532,832,772,562,562,547,547,305,275,560,515,290,290,288,258};
+static const u8 tab32[]={130,162,193,209,44,28,76,140,9,9,9,9,9,9,9,9,190,254,222,238,126,94,157,157,109,61,173,205}; static const u8 tab33[]={252,236,220,204,188,172,156,140,124,108,92,76,60,44,28,12};
+static const i16 tabindex[2*16]={0,32,64,98,0,132,180,218,292,364,426,538,648,746,0,1126,1460,1460,1460,1460,1460,1460,1460,1460,1842,1842,1842,1842,1842,1842,1842,1842}; static const u8 g_linbits[]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,3,4,6,8,10,13,4,5,6,7,8,9,11,13};
+static const float g_sec[24]={10.19000816f,0.50060302f,0.50241929f,3.40760851f,0.50547093f,0.52249861f,2.05778098f,0.51544732f,0.56694406f,1.48416460f,0.53104258f,0.64682180f,1.16943991f,0.55310392f,0.78815460f,0.97256821f,0.58293498f,1.06067765f,0.83934963f,0.62250412f,1.72244716f,0.74453628f,0.67480832f,5.10114861f};
+static const float g_win[]={ -1,26,-31,208,218,401,-519,2063,2000,4788,-5517,7134,5959,35640,-39336,74992,-1,24,-35,202,222,347,-581,2080,1952,4425,-5879,7640,5288,33791,-41176,74856,-1,21,-38,196,225,294,-645,2087,1893,4063,-6237,8092,4561,31947,-43006,74630,-1,19,-41,190,227,244,-711,2085,1822,3705,-6589,8492,3776,30112,-44821,74313,-1,17,-45,183,228,197,-779,2075,1739,3351,-6935,8840,2935,28289,-46617,73908,-1,16,-49,176,228,153,-848,2057,1644,3004,-7271,9139,2037,26482,-48390,73415,-2,14,-53,169,227,111,-919,2032,1535,2663,-7597,9389,1082,24694,-50137,72835,-2,13,-58,161,224,72,-991,2001,1414,2330,-7910,9592,70,22929,-51853,72169,-2,11,-63,154,221,36,-1064,1962,1280,2006,-8209,9750,-998,21189,-53534,71420,-2,10,-68,147,215,2,-1137,1919,1131,1692,-8491,9863,-2122,19478,-55178,70590,-3,9,-73,139,208,-29,-1210,1870,970,1388,-8755,9935,-3300,17799,-56778,69679,-3,8,-79,132,200,-57,-1283,1817,794,1095,-8998,9966,-4533,16155,-58333,68692,-4,7,-85,125,189,-83,-1356,1759,605,814,-9219,9959,-5818,14548,-59838,67629,-4,7,-91,117,177,-106,-1428,1698,402,545,-9416,9916,-7154,12980,-61289,66494,-5,6,-97,111,163,-127,-1498,1634,185,288,-9585,9838,-8540,11455,-62684,65290};
 typedef struct { int frame_bytes,channels,sample_rate,layer,bitrate_kbps; } mp3dec_frame_info;
 typedef struct { const u8 *buf; int pos,limit; } mp3_bs;
 typedef struct { const u8 *sfbtab; u16 part_23_length,big_values,scalefac_compress; u8 global_gain,block_type,mixed_block_flag,n_long_sfb,n_short_sfb,table_select[3],region_count[3],subblock_gain[3],preflag,scalefac_scale,count1_table,scfsi; } mp3L3_gr_info;
@@ -4528,11 +4244,7 @@ static int mp3L3_read_side_info(mp3_bs *bs, mp3L3_gr_info *gr, const u8 *hdr) {
             }
             tables=mp3_bs_get_bits(bs,10)<<5;
             gr->subblock_gain[0]=(u8)mp3_bs_get_bits(bs,3); gr->subblock_gain[1]=(u8)mp3_bs_get_bits(bs,3); gr->subblock_gain[2]=(u8)mp3_bs_get_bits(bs,3);
-        } else {
-            gr->block_type=0; gr->mixed_block_flag=0;
-            tables=mp3_bs_get_bits(bs,15);
-            gr->region_count[0]=(u8)mp3_bs_get_bits(bs,4); gr->region_count[1]=(u8)mp3_bs_get_bits(bs,3); gr->region_count[2]=255;
-        }
+        } else { gr->block_type=0; gr->mixed_block_flag=0; tables=mp3_bs_get_bits(bs,15); gr->region_count[0]=(u8)mp3_bs_get_bits(bs,4); gr->region_count[1]=(u8)mp3_bs_get_bits(bs,3); gr->region_count[2]=255; }
         gr->table_select[0]=(u8)(tables>>10); gr->table_select[1]=(u8)((tables>>5)&31); gr->table_select[2]=(u8)((tables)&31);
         gr->preflag=(u8)(MP3_HDR_TEST_MPEG1(hdr) ? mp3_bs_get_bits(bs,1) : (gr->scalefac_compress>=500));
         gr->scalefac_scale=(u8)mp3_bs_get_bits(bs,1); gr->count1_table=(u8)mp3_bs_get_bits(bs,1); gr->scfsi=(u8)((scfsi>>12)&15);
@@ -4545,13 +4257,7 @@ static int mp3L3_read_side_info(mp3_bs *bs, mp3L3_gr_info *gr, const u8 *hdr) {
 static void mp3L3_read_scalefactors(u8 *scf, u8 *ist_pos, const u8 *scf_size, const u8 *scf_count, mp3_bs *bs, int scfsi) {
     for (int i=0; i<4&&scf_count[i]; i++,scfsi*=2) {
         int cnt = scf_count[i];
-        if (scfsi & 8) mcpy(scf,ist_pos,cnt);
-        else {
-            int bits=scf_size[i];
-            if (!bits) { mset(scf,0,cnt); mset(ist_pos,0,cnt); }
-            else { int max_scf=(scfsi<0)?((1<<bits)-1):-1; for (int k=0;k<cnt;k++) {int s=mp3_bs_get_bits(bs,bits); ist_pos[k]=(u8)(s==max_scf?-1:s); scf[k]=(u8)s;} }
-        }
-        
+        if (scfsi & 8) {mcpy(scf,ist_pos,cnt);} else { int bits=scf_size[i]; if(!bits){mset(scf,0,cnt); mset(ist_pos,0,cnt);} else {int max_scf=(scfsi<0)?((1<<bits)-1):-1; for (int k=0;k<cnt;k++) {int s=mp3_bs_get_bits(bs,bits); ist_pos[k]=(u8)(s==max_scf?-1:s); scf[k]=(u8)s;} } }
         ist_pos+=cnt; scf+=cnt;
     }
     
@@ -4575,11 +4281,7 @@ static void mp3L3_decode_scalefactors(const u8 *hdr, u8 *ist_pos, mp3_bs *bs, co
     mp3L3_read_scalefactors(iscf,ist_pos,scf_size,scf_partition,bs,scfsi);
     if (gr->n_short_sfb) {
         int sh=3-scf_shift;
-        for (i=0;i<gr->n_short_sfb;i+=3) {
-            iscf[gr->n_long_sfb+i+0]=(u8)(iscf[gr->n_long_sfb+i+0]+(gr->subblock_gain[0]<<sh));
-            iscf[gr->n_long_sfb+i+1]=(u8)(iscf[gr->n_long_sfb+i+1]+(gr->subblock_gain[1]<<sh));
-            iscf[gr->n_long_sfb+i+2]=(u8)(iscf[gr->n_long_sfb+i+2]+(gr->subblock_gain[2]<<sh));
-        }
+        for (i=0;i<gr->n_short_sfb;i+=3) { iscf[gr->n_long_sfb+i+0]=(u8)(iscf[gr->n_long_sfb+i+0]+(gr->subblock_gain[0]<<sh)); iscf[gr->n_long_sfb+i+1]=(u8)(iscf[gr->n_long_sfb+i+1]+(gr->subblock_gain[1]<<sh)); iscf[gr->n_long_sfb+i+2]=(u8)(iscf[gr->n_long_sfb+i+2]+(gr->subblock_gain[2]<<sh)); }
     } else if (gr->preflag) { static const u8 g_preamp[10]={1,1,1,1,2,2,3,3,3,2}; for (i=0;i<10;i++) {iscf[11+i]=(u8)(iscf[11+i]+g_preamp[i]);} }
     
     gain_exp=gr->global_gain+-1*4-210-(MP3_HDR_IS_MS_STEREO(hdr)?2:0);
@@ -4587,29 +4289,13 @@ static void mp3L3_decode_scalefactors(const u8 *hdr, u8 *ist_pos, mp3_bs *bs, co
     for (i=0;i<(int)(gr->n_long_sfb+gr->n_short_sfb);i++) scf[i]=mp3L3_ldexp_q2(gain,iscf[i]<<scf_shift);
 }
 
-static float mp3L3_pow_43(int x) {
-    if (x<129) return g_mp3_pow43[16+x];
-    
-    int mult=256; if (x<1024) { mult=16; x<<=3; }
-    int sign=2*x&64;
-    float frac=(float)((x&63)-sign)/((x&~63)+sign);
-    return g_mp3_pow43[16+((x+sign)>>6)]*(1.f+frac*((4.f/3)+frac*(2.f/9)))*mult;
-}
-
-
+static float mp3L3_pow_43(int x) { if(x<129){return g_mp3_pow43[16+x];} int mult=256; if(x<1024){mult=16; x<<=3;} int sign=2*x&64; float frac=(float)((x&63)-sign)/((x&~63)+sign); return g_mp3_pow43[16+((x+sign)>>6)]*(1.f+frac*((4.f/3)+frac*(2.f/9)))*mult; }
 static void mp3L3_huffman(float *dst, mp3_bs *bs, const mp3L3_gr_info *gr_info, const float *scf, int layer3gr_limit) {
     #define MP3_FLUSH_BITS(n) { bs_cache<<=(n); bs_sh+=(n); }
-    #define MP3_CHECK_BITS    while(bs_sh>=0){bs_cache|=(u32)*bs_next_ptr++<<bs_sh;bs_sh-=8;}
-    float one=0.0f;
-    int ireg=0,big_val_cnt=gr_info->big_values;
-    const u8 *sfb=gr_info->sfbtab;
-    const u8 *bs_next_ptr=bs->buf+bs->pos/8;
-    u32 bs_cache=(((bs_next_ptr[0]*256u+bs_next_ptr[1])*256u+bs_next_ptr[2])*256u+bs_next_ptr[3])<<(bs->pos&7);
-    int pairs_to_decode,np,bs_sh=(bs->pos&7)-8;
-    bs_next_ptr+=4;
+    float one=0.0f; int ireg=0,big_val_cnt=gr_info->big_values; const u8 *sfb=gr_info->sfbtab; const u8 *bs_next_ptr=bs->buf+bs->pos/8;
+    u32 bs_cache=(((bs_next_ptr[0]*256u+bs_next_ptr[1])*256u+bs_next_ptr[2])*256u+bs_next_ptr[3])<<(bs->pos&7); int pairs_to_decode,np,bs_sh=(bs->pos&7)-8; bs_next_ptr+=4;
     while (big_val_cnt>0) {
-        int tab_num=gr_info->table_select[ireg], sfb_cnt=gr_info->region_count[ireg++];
-        const i16 *codebook=tabs+tabindex[tab_num]; int linbits=g_linbits[tab_num];
+        int tab_num=gr_info->table_select[ireg], sfb_cnt=gr_info->region_count[ireg++]; const i16 *codebook=tabs+tabindex[tab_num]; int linbits=g_linbits[tab_num];
         if (linbits) {
             do {
                 np=*sfb++/2; pairs_to_decode=vmin(big_val_cnt,np); one=*scf++;
@@ -4619,12 +4305,12 @@ static void mp3L3_huffman(float *dst, mp3_bs *bs, const mp3L3_gr_info *gr_info, 
                     MP3_FLUSH_BITS(leaf>>8);
                     for (j=0;j<2;j++,dst++,leaf>>=4){
                         int lsb=leaf&0x0F;
-                        if (lsb==15) { lsb += (bs_cache>>(32-(linbits))); MP3_FLUSH_BITS(linbits); MP3_CHECK_BITS; *dst= one * mp3L3_pow_43(lsb) * ((i32)bs_cache < 0 ? -1 : 1); }
+                        if (lsb==15) { lsb += (bs_cache>>(32-(linbits))); MP3_FLUSH_BITS(linbits); while(bs_sh>=0){bs_cache|=(u32)*bs_next_ptr++<<bs_sh;bs_sh-=8;}; *dst= one * mp3L3_pow_43(lsb) * ((i32)bs_cache < 0 ? -1 : 1); }
                         else *dst=g_mp3_pow43[16+lsb-16*(bs_cache>>31)]*one;
                         MP3_FLUSH_BITS(lsb?1:0);
                     }
 
-                    MP3_CHECK_BITS;
+                    while(bs_sh>=0){bs_cache|=(u32)*bs_next_ptr++<<bs_sh;bs_sh-=8;};
                 } while(--pairs_to_decode);
             } while((big_val_cnt-=np)>0&&--sfb_cnt>=0);
         } else {
@@ -4635,7 +4321,7 @@ static void mp3L3_huffman(float *dst, mp3_bs *bs, const mp3L3_gr_info *gr_info, 
                     while (leaf<0){MP3_FLUSH_BITS(w);w=leaf&7;leaf=codebook[(bs_cache>>(32-w))-(leaf>>3)];}
                     MP3_FLUSH_BITS(leaf>>8);
                     for (j=0;j<2;j++,dst++,leaf>>=4) { int lsb=leaf&0x0F; *dst=g_mp3_pow43[16+lsb-16*(bs_cache>>31)]*one; MP3_FLUSH_BITS(lsb?1:0); }
-                    MP3_CHECK_BITS;
+                    while(bs_sh>=0){bs_cache|=(u32)*bs_next_ptr++<<bs_sh;bs_sh-=8;};
                 } while(--pairs_to_decode);
             } while((big_val_cnt-=np)>0&&--sfb_cnt>=0);
         }
@@ -4649,15 +4335,15 @@ static void mp3L3_huffman(float *dst, mp3_bs *bs, const mp3L3_gr_info *gr_info, 
         if (((bs_next_ptr-bs->buf)*8-24+bs_sh)>layer3gr_limit) break;
         if(!--np) { np=*sfb++/2; if(!np) {break;} one=*scf++; }; if(leaf&(128>>0)){dst[0]=((i32)bs_cache<0)?-one:one;MP3_FLUSH_BITS(1)} if(leaf&(128>>1)){dst[1]=((i32)bs_cache<0)?-one:one;MP3_FLUSH_BITS(1)}
         if(!--np) { np=*sfb++/2; if(!np) {break;} one=*scf++; }; if(leaf&(128>>2)){dst[2]=((i32)bs_cache<0)?-one:one;MP3_FLUSH_BITS(1)} if(leaf&(128>>3)){dst[3]=((i32)bs_cache<0)?-one:one;MP3_FLUSH_BITS(1)}
-        MP3_CHECK_BITS;
+        while(bs_sh>=0){bs_cache|=(u32)*bs_next_ptr++<<bs_sh;bs_sh-=8;};
     }
 
     bs->pos=layer3gr_limit;
 }
 
-static void mp3L3_midside_stereo(float *left, int n) { int i=0; float *right=left+576; for (; i<n; i++) { float a=left[i],b=right[i]; left[i]=a+b; right[i]=a-b; } }
-static void mp3L3_intensity_stereo_band(float *left, int n, float kl, float kr) { int i; for(i=0;i<n;i++){left[i+576]=left[i]*kr;left[i]=left[i]*kl;} }
-static void mp3L3_stereo_top_band(const float *right, const u8 *sfb, int nbands, int max_band[3]) { int i,k; max_band[0]=max_band[1]=max_band[2]=-1; for (i=0;i<nbands;i++){for(k=0;k<sfb[i];k+=2){if(right[k]!=0||right[k+1]!=0){max_band[i%3]=i;break;}}right+=sfb[i];} }
+static void mp3L3_midside_stereo(float *l, int n) { int i=0; float *r=l+576; for (; i<n; i++) { float a=l[i],b=r[i]; l[i]=a+b; r[i]=a-b; } }
+static void mp3L3_intensity_stereo_band(float *l, int n, float kl, float kr) { int i; for(i=0;i<n;i++){l[i+576]=l[i]*kr; l[i]=l[i]*kl;} }
+static void mp3L3_stereo_top_band(const float *r, const u8 *sfb, int nbands, int max_band[3]) { int i,k; max_band[0]=max_band[1]=max_band[2]=-1; for (i=0;i<nbands;i++){for(k=0;k<sfb[i];k+=2){if(r[k]!=0||r[k+1]!=0){max_band[i%3]=i;break;}}r+=sfb[i];} }
 static void mp3L3_stereo_process(float *left, const u8 *ist_pos, const u8 *sfb, const u8 *hdr, int max_band[3], int mpeg2_sh) {
     static const float g_pan[7*2]={0,1,0.21132487f,0.78867513f,0.36602540f,0.63397460f,0.5f,0.5f,0.63397460f,0.36602540f,0.78867513f,0.21132487f,1,0};
     unsigned i,max_pos=MP3_HDR_TEST_MPEG1(hdr)?7:64;
@@ -4665,11 +4351,9 @@ static void mp3L3_stereo_process(float *left, const u8 *ist_pos, const u8 *sfb, 
         unsigned ipos=ist_pos[i];
         if ((int)i>max_band[i%3]&&ipos<max_pos){
             float kl,kr,s=MP3_HDR_TEST_MS_STEREO(hdr)?1.41421356f:1;
-            if(MP3_HDR_TEST_MPEG1(hdr)){kl=g_pan[2*ipos];kr=g_pan[2*ipos+1];}
-            else{kl=1;kr=mp3L3_ldexp_q2(1,(ipos+1)>>1<<mpeg2_sh);if(ipos&1){kl=kr;kr=1;}}
+            if(MP3_HDR_TEST_MPEG1(hdr)){kl=g_pan[2*ipos];kr=g_pan[2*ipos+1];} else {kl=1;kr=mp3L3_ldexp_q2(1,(ipos+1)>>1<<mpeg2_sh);if(ipos&1){kl=kr;kr=1;}}
             mp3L3_intensity_stereo_band(left,sfb[i],kl*s,kr*s);
         } else if (MP3_HDR_TEST_MS_STEREO(hdr)) mp3L3_midside_stereo(left,sfb[i]);
-
         left+=sfb[i];
     }
 }
@@ -4681,31 +4365,13 @@ static void mp3L3_intensity_stereo(float *left, u8 *ist_pos, const mp3L3_gr_info
     mp3L3_stereo_process(left,ist_pos,gr->sfbtab,hdr,max_band,gr[1].scalefac_compress&1);
 }
 
-static void mp3L3_reorder(float *grbuf, float *scratch, const u8 *sfb) {
-    int i,len; float *src=grbuf,*dst=scratch;
-    for(;0!=(len=*sfb);sfb+=3,src+=2*len){for(i=0;i<len;i++,src++){*dst++=src[0*len];*dst++=src[1*len];*dst++=src[2*len];}}
-    mcpy(grbuf,scratch,(dst-scratch)*sizeof(float));
-}
-
+static void mp3L3_reorder(float *grbuf, float *scratch, const u8 *sfb) { int i,len; float *src=grbuf,*dst=scratch; for(;0!=(len=*sfb);sfb+=3,src+=2*len){for(i=0;i<len;i++,src++){*dst++=src[0*len];*dst++=src[1*len];*dst++=src[2*len];}} mcpy(grbuf,scratch,(dst-scratch)*sizeof(float)); }
 static void mp3L3_antialias(float *grbuf, int nbands) {
     static const float g_aa[2][8]={{0.85749293f,0.88174200f,0.94962865f,0.98331459f,0.99551782f,0.99916056f,0.99989920f,0.99999316f},{0.51449576f,0.47173197f,0.31337745f,0.18191320f,0.09457419f,0.04096558f,0.01419856f,0.00369997f}};
-    for(;nbands>0;nbands--,grbuf+=18){
-        int i=0;
-        for(;i<8;i++){float u=grbuf[18+i],d=grbuf[17-i];grbuf[18+i]=u*g_aa[0][i]-d*g_aa[1][i];grbuf[17-i]=u*g_aa[1][i]+d*g_aa[0][i];}
-    }
+    for(;nbands>0;nbands--,grbuf+=18){ int i=0; for(;i<8;i++){float u=grbuf[18+i],d=grbuf[17-i];grbuf[18+i]=u*g_aa[0][i]-d*g_aa[1][i];grbuf[17-i]=u*g_aa[1][i]+d*g_aa[0][i];} }
 }
 
-static void mp3L3_dct3_9(float *y) {
-    float s1,s3,s5,s7,t0,t2,t4,s0=y[0],s2=y[2],s4=y[4],s6=y[6],s8=y[8];
-    t0=s0+s6*0.5f; s0-=s6; t4=(s4+s2)*0.93969262f; t2=(s8+s2)*0.76604444f;
-    s6=(s4-s8)*0.17364818f; s4+=s8-s2; s2=s0-s4*0.5f; y[4]=s4+s0;
-    s8=t0-t2+s6; s0=t0-t4+t2; s4=t0+t4-s6;
-    s1=y[1]; s3=y[3]; s5=y[5]; s7=y[7];
-    s3*=0.86602540f; t0=(s5+s1)*0.98480775f; t4=(s5-s7)*0.34202014f; t2=(s1+s7)*0.64278761f;
-    s1=(s1-s5-s7)*0.86602540f; s5=t0-s3-t2; s7=t4-s3-t0; s3=t4+s3-t2;
-    y[0]=s4-s7; y[1]=s2+s1; y[2]=s0-s3; y[3]=s8+s5; y[5]=s8-s5; y[6]=s0+s3; y[7]=s2-s1; y[8]=s4+s7;
-}
-
+static void mp3L3_dct3_9(float *y) { float s1,s3,s5,s7,t0,t2,t4,s0=y[0],s2=y[2],s4=y[4],s6=y[6],s8=y[8]; t0=s0+s6*0.5f; s0-=s6; t4=(s4+s2)*0.93969262f; t2=(s8+s2)*0.76604444f; s6=(s4-s8)*0.17364818f; s4+=s8-s2; s2=s0-s4*0.5f; y[4]=s4+s0; s8=t0-t2+s6; s0=t0-t4+t2; s4=t0+t4-s6; s1=y[1]; s3=y[3]; s5=y[5]; s7=y[7]; s3*=0.86602540f; t0=(s5+s1)*0.98480775f; t4=(s5-s7)*0.34202014f; t2=(s1+s7)*0.64278761f; s1=(s1-s5-s7)*0.86602540f; s5=t0-s3-t2; s7=t4-s3-t0; s3=t4+s3-t2; y[0]=s4-s7; y[1]=s2+s1; y[2]=s0-s3; y[3]=s8+s5; y[5]=s8-s5; y[6]=s0+s3; y[7]=s2-s1; y[8]=s4+s7; }
 static void mp3L3_imdct36(float *grbuf, float *overlap, const float *win, int nbands) {
     int i,j;
     static const float g_twid9[18]={0.73727734f,0.79335334f,0.84339145f,0.88701083f,0.92387953f,0.95371695f,0.97629601f,0.99144486f,0.99904822f,0.67559021f,0.60876143f,0.53729961f,0.46174861f,0.38268343f,0.30070580f,0.21643961f,0.13052619f,0.04361938f};
@@ -4731,20 +4397,9 @@ static void imdct12(float *x,float *dst,float *overlap){
 static void mp3L3_imdct_short(float *grbuf,float *overlap,int nbands){ for(;nbands>0;nbands--,overlap+=9,grbuf+=18){float tmp[18]; mcpy(tmp,grbuf,sizeof(tmp)); mcpy(grbuf,overlap,6*sizeof(float)); imdct12(tmp,grbuf+6,overlap+6); imdct12(tmp+1,grbuf+12,overlap+6); imdct12(tmp+2,overlap,overlap+6);} }
 static void mp3L3_change_sign(float *grbuf){int b,i;for(b=0,grbuf+=18;b<32;b+=2,grbuf+=36)for(i=1;i<18;i+=2)grbuf[i]=-grbuf[i];}
 static const float g_mdct_window[2][18]={{0.99904822f,0.99144486f,0.97629601f,0.95371695f,0.92387953f,0.88701083f,0.84339145f,0.79335334f,0.73727734f,0.04361938f,0.13052619f,0.21643961f,0.30070580f,0.38268343f,0.46174861f,0.53729961f,0.60876143f,0.67559021f},{1,1,1,1,1,1,0.99144486f,0.92387953f,0.79335334f,0,0,0,0,0,0,0.13052619f,0.38268343f,0.60876143f}};
-static void mp3L3_imdct_gr(float *grbuf,float *overlap,unsigned block_type,unsigned n_long_bands){
-    if (n_long_bands){mp3L3_imdct36(grbuf,overlap,g_mdct_window[0],n_long_bands);grbuf+=18*n_long_bands;overlap+=9*n_long_bands;}
-    if (block_type==2) {mp3L3_imdct_short(grbuf,overlap,32-n_long_bands);} else {mp3L3_imdct36(grbuf,overlap,g_mdct_window[block_type==3],32-n_long_bands);}
-}
-
+static void mp3L3_imdct_gr(float *grbuf,float *overlap,unsigned block_type,unsigned n_long_bands){ if (n_long_bands){mp3L3_imdct36(grbuf,overlap,g_mdct_window[0],n_long_bands);grbuf+=18*n_long_bands;overlap+=9*n_long_bands;} if (block_type==2) {mp3L3_imdct_short(grbuf,overlap,32-n_long_bands);} else {mp3L3_imdct36(grbuf,overlap,g_mdct_window[block_type==3],32-n_long_bands);} }
 static void mp3L3_save_reservoir(mp3dec *h, mp3dec_scratch *s) { int pos=(s->bs.pos+7)/8u,remains=s->bs.limit/8u-pos; if (remains>511){pos+=remains-511;remains=511;} if (remains>0) {MoveMemoryFromBtoAForNBytes(h->reserv_buf,s->maindata+pos,remains);} h->reserv=remains; }
-static int mp3L3_restore_reservoir(mp3dec *h, mp3_bs *bs, mp3dec_scratch *s, int main_data_begin) { 
-    int frame_bytes=(bs->limit-bs->pos)/8,bytes_have=vmin(h->reserv,main_data_begin);
-    mcpy(s->maindata,h->reserv_buf+vmax(0,h->reserv-main_data_begin),vmin(h->reserv,main_data_begin));
-    mcpy(s->maindata+bytes_have,bs->buf+bs->pos/8,frame_bytes);
-    s->bs.buf=s->maindata; s->bs.pos=0; s->bs.limit=(bytes_have+frame_bytes) * 8;
-    return h->reserv>=main_data_begin;
-}
-
+static int mp3L3_restore_reservoir(mp3dec *h, mp3_bs *bs, mp3dec_scratch *s, int main_data_begin) { int frame_bytes=(bs->limit-bs->pos)/8,bytes_have=vmin(h->reserv,main_data_begin); mcpy(s->maindata,h->reserv_buf+vmax(0,h->reserv-main_data_begin),vmin(h->reserv,main_data_begin)); mcpy(s->maindata+bytes_have,bs->buf+bs->pos/8,frame_bytes); s->bs.buf=s->maindata; s->bs.pos=0; s->bs.limit=(bytes_have+frame_bytes) * 8; return h->reserv>=main_data_begin; }
 static void mp3L3_decode(mp3dec *h, mp3dec_scratch *s, mp3L3_gr_info *gr_info, int nch){
     int ch; for(ch=0;ch<nch;ch++) { int limit=s->bs.pos+gr_info[ch].part_23_length; mp3L3_decode_scalefactors(h->header,s->ist_pos[ch],&s->bs,gr_info+ch,s->scf,ch); mp3L3_huffman(s->grbuf[ch],&s->bs,gr_info+ch,s->scf,limit); }
     if (MP3_HDR_TEST_I_STEREO(h->header)) mp3L3_intensity_stereo(s->grbuf[0],s->ist_pos[1],gr_info,h->header);
@@ -4752,9 +4407,7 @@ static void mp3L3_decode(mp3dec *h, mp3dec_scratch *s, mp3L3_gr_info *gr_info, i
     for(ch=0;ch<nch;ch++,gr_info++){
         int aa_bands=31,n_long_bands=(gr_info->mixed_block_flag?2:0)<<(int)(MP3_HDR_GET_SAMPLE_RATEHDR(h->header)==2);
         if (gr_info->n_short_sfb){aa_bands=n_long_bands-1;mp3L3_reorder(s->grbuf[ch]+n_long_bands*18,s->syn[0],gr_info->sfbtab+gr_info->n_long_sfb);}
-        mp3L3_antialias(s->grbuf[ch],aa_bands);
-        mp3L3_imdct_gr(s->grbuf[ch],h->mdct_overlap[ch],gr_info->block_type,n_long_bands);
-        mp3L3_change_sign(s->grbuf[ch]);
+        mp3L3_antialias(s->grbuf[ch],aa_bands); mp3L3_imdct_gr(s->grbuf[ch],h->mdct_overlap[ch],gr_info->block_type,n_long_bands); mp3L3_change_sign(s->grbuf[ch]);
     }
 }
 
@@ -4777,47 +4430,39 @@ static void mp3d_DCT_II(float *grbuf, int n){
 typedef float mp3_sample_t;
 static float mp3d_scale_pcm(float sample) { return sample*(1.f/32768.f); }
 static void mp3d_synth_pair(mp3_sample_t *pcm, int nch, const float *z){
-    float a; a =(z[14*64]-z[    0])*29; a+=(z[ 1*64]+z[13*64])*213; a+=(z[12*64]-z[ 2*64])*459; a+=(z[ 3*64]+z[11*64])*2037; a+=(z[10*64]-z[ 4*64])*5153; a+=(z[ 5*64]+z[ 9*64])*6574; a+=(z[ 8*64]-z[ 6*64])*37489; a+=z[7*64]*75038;
+    float a; a =(z[14*64]-z[0])*29; a+=(z[1*64]+z[13*64])*213; a+=(z[12*64]-z[2*64])*459; a+=(z[ 3*64]+z[11*64])*2037; a+=(z[10*64]-z[4*64])*5153; a+=(z[5*64]+z[9*64])*6574; a+=(z[8*64]-z[6*64])*37489; a+=z[7*64]*75038;
     pcm[0]=mp3d_scale_pcm(a); z+=2; a =z[14*64]*104; a+=z[12*64]*1567; a+=z[10*64]*9727; a+=z[8*64]*64019; a+=z[6*64]*-9975; a+=z[4*64]*-45; a+=z[2*64]*146; a+=z[0*64]*-5; pcm[16*nch]=mp3d_scale_pcm(a);
 }
 
 static void mp3d_synth(float *xl, mp3_sample_t *dstl, int nch, float *lins){
-    int i; float *xr=xl+576*(nch-1); mp3_sample_t *dstr=dstl+(nch-1);
-    float *zlin=lins+15*64; const float *w=g_win;
-    zlin[4*15]=xl[18*16];zlin[4*15+1]=xr[18*16];zlin[4*15+2]=xl[0];zlin[4*15+3]=xr[0];
-    zlin[4*31]=xl[1+18*16];zlin[4*31+1]=xr[1+18*16];zlin[4*31+2]=xl[1];zlin[4*31+3]=xr[1];
-    mp3d_synth_pair(dstr,nch,lins+4*15+1); mp3d_synth_pair(dstr+32*nch,nch,lins+4*15+64+1);
-    mp3d_synth_pair(dstl,nch,lins+4*15);   mp3d_synth_pair(dstl+32*nch,nch,lins+4*15+64);
+    int i; float *xr=xl+576*(nch-1); mp3_sample_t *dstr=dstl+(nch-1); float *zlin=lins+15*64; const float *w=g_win;
+    zlin[4*15]=xl[18*16];zlin[4*15+1]=xr[18*16];zlin[4*15+2]=xl[0];zlin[4*15+3]=xr[0]; zlin[4*31]=xl[1+18*16];zlin[4*31+1]=xr[1+18*16];zlin[4*31+2]=xl[1];zlin[4*31+3]=xr[1];
+    mp3d_synth_pair(dstr,nch,lins+4*15+1); mp3d_synth_pair(dstr+32*nch,nch,lins+4*15+64+1); mp3d_synth_pair(dstl,nch,lins+4*15); mp3d_synth_pair(dstl+32*nch,nch,lins+4*15+64);
     for(i=14;i>=0;i--){
         #define MP3_LOAD(k) float w0=*w++;float w1=*w++;float *vz=&zlin[4*i-k*64];float *vy=&zlin[4*i-(15-k)*64];
         #define MP3_S0(k) {int j;MP3_LOAD(k) for(j=0;j<4;j++)b[j]=vz[j]*w1+vy[j]*w0,a[j]=vz[j]*w0-vy[j]*w1;}
         #define MP3_S1(k) {int j;MP3_LOAD(k) for(j=0;j<4;j++)b[j]+=vz[j]*w1+vy[j]*w0,a[j]+=vz[j]*w0-vy[j]*w1;}
         #define MP3_S2(k) {int j;MP3_LOAD(k) for(j=0;j<4;j++)b[j]+=vz[j]*w1+vy[j]*w0,a[j]+=vy[j]*w1-vz[j]*w0;}
         float a[4],b[4];
-        zlin[4*i]=xl[18*(31-i)];zlin[4*i+1]=xr[18*(31-i)];zlin[4*i+2]=xl[1+18*(31-i)];zlin[4*i+3]=xr[1+18*(31-i)];
-        zlin[4*(i+16)]=xl[1+18*(1+i)];zlin[4*(i+16)+1]=xr[1+18*(1+i)];zlin[4*(i-16)+2]=xl[18*(1+i)];zlin[4*(i-16)+3]=xr[18*(1+i)];
+        zlin[4*i]=xl[18*(31-i)]; zlin[4*i+1]=xr[18*(31-i)]; zlin[4*i+2]=xl[1+18*(31-i)]; zlin[4*i+3]=xr[1+18*(31-i)]; zlin[4*(i+16)]=xl[1+18*(1+i)];zlin[4*(i+16)+1]=xr[1+18*(1+i)];zlin[4*(i-16)+2]=xl[18*(1+i)];zlin[4*(i-16)+3]=xr[18*(1+i)];
         MP3_S0(0) MP3_S2(1) MP3_S1(2) MP3_S2(3) MP3_S1(4) MP3_S2(5) MP3_S1(6) MP3_S2(7)
-        dstr[(15-i)*nch]=mp3d_scale_pcm(a[1]); dstr[(17+i)*nch]=mp3d_scale_pcm(b[1]);
-        dstl[(15-i)*nch]=mp3d_scale_pcm(a[0]); dstl[(17+i)*nch]=mp3d_scale_pcm(b[0]);
-        dstr[(47-i)*nch]=mp3d_scale_pcm(a[3]); dstr[(49+i)*nch]=mp3d_scale_pcm(b[3]);
-        dstl[(47-i)*nch]=mp3d_scale_pcm(a[2]); dstl[(49+i)*nch]=mp3d_scale_pcm(b[2]);
+        dstr[(15-i)*nch]=mp3d_scale_pcm(a[1]); dstr[(17+i)*nch]=mp3d_scale_pcm(b[1]); dstl[(15-i)*nch]=mp3d_scale_pcm(a[0]); dstl[(17+i)*nch]=mp3d_scale_pcm(b[0]); dstr[(47-i)*nch]=mp3d_scale_pcm(a[3]); dstr[(49+i)*nch]=mp3d_scale_pcm(b[3]); dstl[(47-i)*nch]=mp3d_scale_pcm(a[2]); dstl[(49+i)*nch]=mp3d_scale_pcm(b[2]);
     }
 }
 
 static void mp3d_synth_granule(float *qmf_state, float *grbuf, int nbands, int nch, mp3_sample_t *pcm, float *lins){ for(int i=0;i<nch;i++) {mp3d_DCT_II(grbuf+576*i,nbands);} mcpy(lins,qmf_state,sizeof(float)*15*64); for(int i=0;i<nbands;i+=2) {mp3d_synth(grbuf+i,pcm+32*nch*i,nch,lins+i*64);} mcpy(qmf_state,lins+nbands*64,sizeof(float)*15*64); }
 static int mp3d_match_frame(const u8 *hdr, int mp3_bytes, int frame_bytes){ for(int i=0,nmatch=0;nmatch<10;nmatch++){ i+=mp3_hdr_frame_bytes(hdr+i,frame_bytes)+mp3_hdr_padding(hdr+i); if (i + 4 > mp3_bytes) {return nmatch>0;} if (!mp3_hdr_compare(hdr,hdr+i)) {return 0;} } return 1; }
-static int mp3d_find_frame(const u8 *mp3, int mp3_bytes, int *free_format_bytes, int *ptr_frame_bytes){
+static int mp3d_find_frame(const u8 *mp3, int mp3_bytes, int *ffb, int *ptr_frame_bytes){
     int i,k;
     for(i=0;i<mp3_bytes-4;i++,mp3++){
         if (mp3_hdr_valid(mp3)){
-            int frame_bytes=mp3_hdr_frame_bytes(mp3,*free_format_bytes);
-            int frame_and_padding=frame_bytes+mp3_hdr_padding(mp3);
+            int frame_bytes=mp3_hdr_frame_bytes(mp3,*ffb); int fp=frame_bytes+mp3_hdr_padding(mp3);
             for(k=4;!frame_bytes&&k<2304&&i+2*k<mp3_bytes - 4;k++){
-                if (mp3_hdr_compare(mp3,mp3+k)) { int fb=k-mp3_hdr_padding(mp3),nextfb=fb+mp3_hdr_padding(mp3+k); if (i + k + nextfb + 4 > mp3_bytes || !mp3_hdr_compare(mp3,mp3+k+nextfb)) continue; frame_and_padding=k; frame_bytes=fb; *free_format_bytes=fb; }
+                if (mp3_hdr_compare(mp3,mp3+k)) { int fb=k-mp3_hdr_padding(mp3),nextfb=fb+mp3_hdr_padding(mp3+k); if (i + k + nextfb + 4 > mp3_bytes || !mp3_hdr_compare(mp3,mp3+k+nextfb)) continue; fp=k; frame_bytes=fb; *ffb=fb; }
             }
 
-            if((frame_bytes&&i+frame_and_padding<=mp3_bytes&&mp3d_match_frame(mp3,mp3_bytes-i,frame_bytes))||(!i&&frame_and_padding==mp3_bytes)){*ptr_frame_bytes=frame_and_padding;return i;}
-            *free_format_bytes=0;
+            if((frame_bytes&&i+fp<=mp3_bytes&&mp3d_match_frame(mp3,mp3_bytes-i,frame_bytes))||(!i&&fp==mp3_bytes)){*ptr_frame_bytes=fp;return i;}
+            *ffb=0;
         }
     }
     *ptr_frame_bytes=0; return mp3_bytes;
@@ -4833,25 +4478,15 @@ static int mp3dec_decode_frame(mp3dec *dec, const u8 *mp3, int mp3_bytes, void *
     }
     if (!frame_size){ mset(dec,0,sizeof(mp3dec)); i=mp3d_find_frame(mp3,mp3_bytes,&dec->free_format_bytes,&frame_size); if (!frame_size || i + frame_size > mp3_bytes) {info->frame_bytes=i;return 0;} }
     
-    hdr=mp3+i;
-    mcpy(dec->header,hdr,4);
-    info->frame_bytes=i+frame_size;
-    info->channels=MP3_HDR_IS_MONO(hdr) ? 1 : 2;
-    info->sample_rate=mp3_hdr_sample_rate_hz(hdr);
-    info->layer = 4 - MP3_HDR_GET_LAYER(hdr);
-    info->bitrate_kbps=mp3_hdr_bitrate_kbps(hdr);
-    bs_frame[0].buf=hdr + 4; bs_frame[0].pos=0; bs_frame[0].limit=(frame_size - 4) * 8;
-    if(MP3_HDR_IS_CRC(hdr)) mp3_bs_get_bits(bs_frame,16);
-    if(info->layer!=3) return 0;  /* Layer 1/2 not supported */
+    hdr=mp3+i; mcpy(dec->header,hdr,4); info->frame_bytes=i+frame_size; info->channels=MP3_HDR_IS_MONO(hdr) ? 1 : 2; info->sample_rate=mp3_hdr_sample_rate_hz(hdr); info->layer = 4 - MP3_HDR_GET_LAYER(hdr); info->bitrate_kbps=mp3_hdr_bitrate_kbps(hdr);
+    bs_frame[0].buf=hdr + 4; bs_frame[0].pos=0; bs_frame[0].limit=(frame_size - 4) * 8; if(MP3_HDR_IS_CRC(hdr)){mp3_bs_get_bits(bs_frame,16);} if(info->layer!=3){return 0;}  /* Layer 1/2 not supported */
         
-    int main_data_begin=mp3L3_read_side_info(bs_frame,dec->scratch.gr_info,hdr);
-    if(main_data_begin<0||bs_frame->pos>bs_frame->limit){mp3dec_init(dec);return 0;}
+    int main_data_begin=mp3L3_read_side_info(bs_frame,dec->scratch.gr_info,hdr); if(main_data_begin<0||bs_frame->pos>bs_frame->limit){mp3dec_init(dec); return 0;}
     success=mp3L3_restore_reservoir(dec,bs_frame,&dec->scratch,main_data_begin);
     if(success&&pcm!=NULL){
         for(igr=0;igr<(MP3_HDR_TEST_MPEG1(hdr)?2:1);igr++,pcm=MP3_OFFSET_PTR(pcm,sizeof(mp3_sample_t)*576*info->channels)){ mset(dec->scratch.grbuf[0],0,576 * 2 * sizeof(float)); mp3L3_decode(dec,&dec->scratch,dec->scratch.gr_info+igr*info->channels,info->channels); mp3d_synth_granule(dec->qmf_state,dec->scratch.grbuf[0],18,info->channels,(mp3_sample_t*)pcm,dec->scratch.syn[0]); }
     }
-    mp3L3_save_reservoir(dec,&dec->scratch);
-    return success*mp3_hdr_frame_samples(dec->header);
+    mp3L3_save_reservoir(dec,&dec->scratch); return success*mp3_hdr_frame_samples(dec->header);
 }
 
 static size_t mp3_on_read_os(void *ud, void *buf, size_t n) { FHandle f = (FHandle)(uintptr_t)ud; if (f == INVALID_FHANDLE) {return 0;} long result = OS_Read(f,buf,n); return (result > 0) ? (size_t)result : 0; }
@@ -4904,8 +4539,7 @@ static void mp3_skip_id3v2(mp3 *p) {
         u32 sz = (((u32)h[6] & 0x7F) << 21) | (((u32)h[7] & 0x7F) << 14) | (((u32)h[8] & 0x7F) << 7) | ((u32)h[9] & 0x7F);
         if (h[5] & 0x10) sz += 10;
         mp3_on_seek_os(p->pUserData,(int)sz,1); // SEEK_CUR
-        p->streamStartOffset += 10 + sz;
-        p->streamCursor = p->streamStartOffset;
+        p->streamStartOffset += 10 + sz; p->streamCursor=p->streamStartOffset;
     } else mp3_on_seek_os(p->pUserData,0,0); // SEEK_SET
 }
 
@@ -4915,34 +4549,19 @@ static bool mp3_init_internal(mp3 *p) {
     if (mp3_on_seek_os(p->pUserData, 0, 2)) { // SEEK_END
         i64 slen = OS_Tell((FHandle)(uintptr_t)p->pUserData);
         if (slen > 0) {
-            if (slen > 128) {
-                char tag[3]; mp3_on_seek_os(p->pUserData,-128,2); if (mp3_on_read(p, tag, 3) == 3 && tag[0]=='T' && tag[1]=='A' && tag[2]=='G') slen -= 128;
-            }
-            
+            if (slen > 128) { char tag[3]; mp3_on_seek_os(p->pUserData,-128,2); if (mp3_on_read(p, tag, 3) == 3 && tag[0]=='T' && tag[1]=='A' && tag[2]=='G') slen -= 128; }
             p->streamLength = (u64)slen;
         }
         
         mp3_on_seek_os(p->pUserData,0,0); p->streamCursor = 0;
     }
 
-    mp3_skip_id3v2(p); mp3dec_frame_info firstFrameInfo;
-    u32 firstFramePCMFrameCount = mp3_decode_next_frame_ex(p,(mp3_sample_t*)p->pcmFrames,&firstFrameInfo);
+    mp3_skip_id3v2(p); mp3dec_frame_info firstFrameInfo; u32 firstFramePCMFrameCount = mp3_decode_next_frame_ex(p,(mp3_sample_t*)p->pcmFrames,&firstFrameInfo);
     if (firstFramePCMFrameCount == 0) { OS_Free(p->pData,p->dataCapacity); p->pData = NULL; p->dataCapacity = 0; return false; }
-
-    p->channels=p->mp3FChan; p->sampleRate=p->mp3FrameSampleRate;
-    return true;
+    p->channels=p->mp3FChan; p->sampleRate=p->mp3FrameSampleRate; return true;
 }
 
-static bool mp3_init_file(mp3 *pMP3, const char *pFilePath) {
-    if (!pMP3 || !pFilePath) return false;
-    mset(pMP3,0,sizeof(mp3)); FHandle f = OS_OpenReadonly(pFilePath); if (f == INVALID_FHANDLE) return false;
-
-    pMP3->pUserData = (void*)(uintptr_t)f;
-    bool result = mp3_init_internal(pMP3);
-    if (!result) { OS_Close(f); return false; }
-    return true;
-}
-
+static bool mp3_init_file(mp3 *pMP3, const char *path) { if(!pMP3 || !path){return false;} mset(pMP3,0,sizeof(mp3)); FHandle f=OS_OpenReadonly(path); if(f == INVALID_FHANDLE){return false;} pMP3->pUserData=(void*)(uintptr_t)f; bool r=mp3_init_internal(pMP3); if(!r){OS_Close(f); return false;} return true; }
 static void mp3_uninit(mp3 *pMP3) { if (!pMP3) {return;}   if (pMP3->pUserData) {OS_Close((FHandle)(uintptr_t)pMP3->pUserData); pMP3->pUserData=NULL;}   OS_Free(pMP3->pData, pMP3->dataCapacity); pMP3->pData = NULL; pMP3->dataCapacity = 0; }
 static void mp3_reset(mp3 *p) { p->pcmFConsInMP3F=0; p->pcmFRemInMP3F=0; p->currentPCMFrame=0; p->dataSize=0; p->atEnd=0; mp3dec_init(&p->decoder); }
 static bool mp3_seek_to_start_of_stream(mp3 *p){u64 o=p->streamStartOffset;if(!mp3_on_seek(p,o<=0x7FFFFFFF?(int)o:0x7FFFFFFF,0))return 0;if(o>0x7FFFFFFF){o-=0x7FFFFFFF;while(o>0){int c=(o<=0x7FFFFFFF)?(int)o:0x7FFFFFFF;if(!mp3_on_seek(p,c,1))return 0;o-=c;}}mp3_reset(p);return 1;}
@@ -4955,14 +4574,8 @@ static u64 mp3_read_pcm_frames_raw(mp3 *p, u64 framesToRead, void *pBufferOut){
         if(p->totalPCMFrameCount != (((u64)0xFFFFFFFF << 32) | (u64)0xFFFFFFFF) && p->totalPCMFrameCount > p->paddingInPCMFrames){
             if(p->currentPCMFrame<(p->totalPCMFrameCount-p->paddingInPCMFrames)){ u64 rem=(p->totalPCMFrameCount-p->paddingInPCMFrames)-p->currentPCMFrame; if(framesToConsume>rem) framesToConsume=(u32)rem; } else break;
         }
-        if(pBufferOut){
-            float *out=(float*)MP3_OFFSET_PTR(pBufferOut,sizeof(float)*totalFramesRead*p->channels);
-            float *in =(float*)MP3_OFFSET_PTR(&p->pcmFrames[0],sizeof(float)*p->pcmFConsInMP3F*p->mp3FChan);
-            mcpy(out,in,sizeof(float)*framesToConsume*p->channels);
-        }
-        p->currentPCMFrame+=framesToConsume; p->pcmFConsInMP3F+=framesToConsume;
-        p->pcmFRemInMP3F-=framesToConsume;
-        totalFramesRead+=framesToConsume; framesToRead-=framesToConsume;
+        if(pBufferOut){ float *out=(float*)MP3_OFFSET_PTR(pBufferOut,sizeof(float)*totalFramesRead*p->channels); float *in =(float*)MP3_OFFSET_PTR(&p->pcmFrames[0],sizeof(float)*p->pcmFConsInMP3F*p->mp3FChan); mcpy(out,in,sizeof(float)*framesToConsume*p->channels); }
+        p->currentPCMFrame+=framesToConsume; p->pcmFConsInMP3F+=framesToConsume; p->pcmFRemInMP3F-=framesToConsume; totalFramesRead+=framesToConsume; framesToRead-=framesToConsume;
         if(framesToRead==0) break;
         if(p->totalPCMFrameCount != (((u64)0xFFFFFFFF << 32) | (u64)0xFFFFFFFF) && p->totalPCMFrameCount > p->paddingInPCMFrames && p->currentPCMFrame >= (p->totalPCMFrameCount - p->paddingInPCMFrames)) break;
         if(mp3_decode_next_frame(p)==0) break;
@@ -4970,40 +4583,19 @@ static u64 mp3_read_pcm_frames_raw(mp3 *p, u64 framesToRead, void *pBufferOut){
     return totalFramesRead;
 }
 
-static u64 mp3_read_pcm_frames_f32(mp3 *pMP3, u64 framesToRead, float *pBufferOut){ if(!pMP3) {return 0;} return mp3_read_pcm_frames_raw(pMP3,framesToRead,pBufferOut); }
-static bool mp3_seek_to_pcm_frame(mp3 *pMP3, u64 frameIndex){
-    if(!pMP3) return 0;
-    if(frameIndex==0) return mp3_seek_to_start_of_stream(pMP3);
-    if(frameIndex<pMP3->currentPCMFrame){ if(!mp3_seek_to_start_of_stream(pMP3)) {return 0;} }
-    
-    u64 toSkip=frameIndex-pMP3->currentPCMFrame; u64 skipped=mp3_read_pcm_frames_f32(pMP3,toSkip,NULL);
-    return skipped==toSkip;
-}
-
-static u64 mp3_get_pcm_frame_count(mp3 *pMP3){    
-    u64 total;
-    if(pMP3->totalPCMFrameCount != (((u64)0xFFFFFFFF << 32) | (u64)0xFFFFFFFF)){
-        total=pMP3->totalPCMFrameCount;
-        if(total>=pMP3->delayInPCMFrames)   total-=pMP3->delayInPCMFrames;
-        if(total>=pMP3->paddingInPCMFrames) total-=pMP3->paddingInPCMFrames;
-        return total;
-    }
-
-    u64 savedFrame=pMP3->currentPCMFrame;
-    if(!mp3_seek_to_start_of_stream(pMP3)) return 0;
-    total=0;
-    for(;;){u32 n=mp3_decode_next_frame_ex(pMP3,NULL,NULL);if(!n)break;total+=n;}
-    mp3_seek_to_start_of_stream(pMP3); mp3_seek_to_pcm_frame(pMP3,savedFrame);
-    return total;
+static u64 mp3_read_pcm_frames_f32(mp3* m, u64 framesToRead, float *pBufferOut){ if(!m) {return 0;} return mp3_read_pcm_frames_raw(m,framesToRead,pBufferOut); }
+static bool mp3_seek_to_pcm_frame(mp3* m, u64 fidx){ if(!m) {return 0;} if(fidx==0){return mp3_seek_to_start_of_stream(m);} if(fidx<m->currentPCMFrame){ if(!mp3_seek_to_start_of_stream(m)) {return 0;} } u64 toSkip=fidx-m->currentPCMFrame; u64 skipped=mp3_read_pcm_frames_f32(m,toSkip,NULL); return skipped==toSkip; }
+static u64 mp3_get_pcm_frame_count(mp3* pMP3){
+    u64 total; if(pMP3->totalPCMFrameCount != (((u64)0xFFFFFFFF << 32) | (u64)0xFFFFFFFF)){ total=pMP3->totalPCMFrameCount; if(total>=pMP3->delayInPCMFrames){total-=pMP3->delayInPCMFrames;} if(total>=pMP3->paddingInPCMFrames){total-=pMP3->paddingInPCMFrames;} return total; }
+    u64 savedFrame=pMP3->currentPCMFrame; if(!mp3_seek_to_start_of_stream(pMP3)) return 0;
+    total=0; for(;;){ u32 n=mp3_decode_next_frame_ex(pMP3,NULL,NULL); if(!n){break;}total+=n; } mp3_seek_to_start_of_stream(pMP3); mp3_seek_to_pcm_frame(pMP3,savedFrame); return total;
 }
 
 typedef struct { FHandle fp; u16 channels,bitsPerSample,fmtTag; u32 sampleRate; u64 totalPCMFrameCount,dataChunkDataPos,bytesRemaining; } WaveFile;
 static u16 WavU16LE(const u8 *d) { return (u16)(d[0]|(d[1]<<8)); }
 static u32 WavU32LE(const u8 *d) { return (u32)(d[0]|(d[1]<<8)|(d[2]<<16)|(d[3]<<24)); }
 static bool WavInit(WaveFile *w, const char *path) {
-    u8 buf[36]; mset(w,0,sizeof(*w));
-    w->fp = OS_OpenReadonly(path);
-    if (w->fp == INVALID_FHANDLE) return false;
+    u8 buf[36]; mset(w,0,sizeof(*w)); w->fp = OS_OpenReadonly(path); if (w->fp == INVALID_FHANDLE) return false;
     if (OS_Read(w->fp, buf, 12) != 12) goto fail;
     if (CompareMemoryForNBytes(buf,"RIFF",4) != 0) goto fail;
     if (CompareMemoryForNBytes(buf+8,"WAVE",4) != 0) goto fail;
@@ -5014,24 +4606,23 @@ static bool WavInit(WaveFile *w, const char *path) {
         u32 chunkSize = WavU32LE(szBuf);
         if (CompareMemoryForNBytes(chunkId, "fmt ", 4) == 0) {
             if (chunkSize < 16) goto fail;
-            
-            u8 fmt[18]; u32 toRead = chunkSize < 18 ? chunkSize : 18;
-            if (OS_Read(w->fp,fmt,toRead) != (long)toRead) goto fail;
+            u8 fmt[18]; u32 toRead = chunkSize < 18 ? chunkSize : 18; if (OS_Read(w->fp,fmt,toRead) != (long)toRead) goto fail;
+
             if (chunkSize > toRead) OS_Seek(w->fp, (i64)(chunkSize - toRead),1);
             w->fmtTag = WavU16LE(fmt+0); w->channels = WavU16LE(fmt+2); w->sampleRate = WavU32LE(fmt+4); w->bitsPerSample = WavU16LE(fmt+14);
             if (w->fmtTag == 0xFFFE && toRead >= 18) {
                 u16 cbSize = WavU16LE(fmt + 16);
-                if (cbSize >= 22) {
-                    u8 ext[22]; if (OS_Read(w->fp,ext,22) == 22) w->fmtTag = WavU16LE(ext + 6);
-                }
+                if (cbSize >= 22) { u8 ext[22]; if(OS_Read(w->fp,ext,22) == 22){w->fmtTag=WavU16LE(ext + 6);} }
             }
             if (w->fmtTag != 0x1) goto fail; // PCM format
             if (w->bitsPerSample != 8 && w->bitsPerSample != 16) goto fail;
+
             got_fmt = true;
         } else if (CompareMemoryForNBytes(chunkId,"data",4) == 0) {
             w->dataChunkDataPos = (u64)OS_Tell(w->fp);
             u32 bpf = (u32)w->channels * (w->bitsPerSample / 8);
             if (bpf == 0) goto fail;
+
             w->bytesRemaining = chunkSize - (chunkSize % bpf);
             w->totalPCMFrameCount = w->bytesRemaining / bpf;
             got_data = true;
@@ -5049,14 +4640,13 @@ static u64 WavReadPCMFrames(WaveFile *w, u64 framesToRead, float *out) {
     if (!w || !out || framesToRead == 0) return 0;
     u32 bps = w->bitsPerSample; u32 bpf = (u32)w->channels * (bps / 8); if (bpf == 0) return 0;
 
-    u64 framesLeft = w->bytesRemaining / bpf; if (framesToRead > framesLeft) framesToRead = framesLeft;
-    u64 totalRead = 0; u8  tmp[4096];
+    u64 framesLeft=w->bytesRemaining / bpf; if(framesToRead > framesLeft){framesToRead=framesLeft;}
+    u64 totalRead=0; u8  tmp[4096];
     while (framesToRead > 0) {
         u64 batchFrames=framesToRead; u64 batchBytes=batchFrames * bpf;
         if (batchBytes > sizeof(tmp)) { batchFrames = sizeof(tmp) / bpf; batchBytes  = batchFrames * bpf; }
-        size_t got = OS_Read(w->fp,tmp,(size_t)batchBytes);
-        u64 gotFrames = got / bpf;
-        u64 samples   = gotFrames * w->channels;
+        size_t got=OS_Read(w->fp,tmp,(size_t)batchBytes);
+        u64 gotFrames=got / bpf; u64 samples=gotFrames * w->channels;
         if (bps == 8) { for (u64 i = 0; i < samples; i++) {*out++ = (tmp[i] / 255.0f) * 2.0f - 1.0f;} }
         else { for (u64 i = 0; i < samples; i++) {i16 s; mcpy(&s,tmp + i*2,2); *out++ = s * (1.0f / 32768.0f);} } // 16bit LE
 
@@ -5072,43 +4662,28 @@ static mp3_channel_t mp3_ch[2]; static float *log_samples; static size_t log_all
 static float *resample_stereo(float *src, size_t srcSize, u32 *frames, u32 src_rate, size_t* allocSize) {
     if (src_rate == AUDIO_RATE) return src;
     
-    u32 sf = *frames, df = (u32)((u64)sf*AUDIO_RATE/src_rate);
-    float *dst = (float*)OS_Alloc(df*2*sizeof(float)); *allocSize = df*2*sizeof(float);
-    float ratio = (float)sf/(float)df;
+    u32 sf = *frames, df = (u32)((u64)sf*AUDIO_RATE/src_rate); float *dst = (float*)OS_Alloc(df*2*sizeof(float)); *allocSize = df*2*sizeof(float); float ratio = (float)sf/(float)df;
     for (u32 i = 0; i < df; i++) { float pos = i*ratio; u32 a = (u32)pos, b = a+1<sf?a+1:a; float t = pos-(float)a; dst[i*2+0] = src[a*2+0]+t*(src[b*2+0]-src[a*2+0]); dst[i*2+1] = src[a*2+1]+t*(src[b*2+1]-src[a*2+1]); }
     OS_Free(src,srcSize); *frames = df; return dst;
 }
 
 static void WavUnInit(WaveFile *w) { if (w->fp != INVALID_FHANDLE) { OS_Close(w->fp); w->fp = INVALID_FHANDLE; } }
 static float *load_wav(const char *path,u32 *out_frames, size_t* allocSize) {
-    WaveFile wav; if (!WavInit(&wav,path)) return NULL;
-    if (wav.channels > 2) { WavUnInit(&wav); return NULL; }
+    WaveFile wav; if (!WavInit(&wav,path)) {return NULL;} if (wav.channels > 2) { WavUnInit(&wav); return NULL; }
     
-    u64 frames = wav.totalPCMFrameCount;
-    float *buf = (float*)OS_Alloc(frames*AUDIO_CHANNELS*sizeof(float)); size_t bufSize = frames*AUDIO_CHANNELS*sizeof(float);
-    u64 got = WavReadPCMFrames(&wav,frames,buf);
+    u64 frames = wav.totalPCMFrameCount; float *buf = (float*)OS_Alloc(frames*AUDIO_CHANNELS*sizeof(float)); size_t bufSize = frames*AUDIO_CHANNELS*sizeof(float); u64 got = WavReadPCMFrames(&wav,frames,buf);
     if (wav.channels == 1) for (i64 i=(i64)got-1;i>=0;i--) { buf[i*2+1]=buf[i]; buf[i*2]=buf[i]; }
-    u32 src_rate = wav.sampleRate;
-    WavUnInit(&wav);
-    *out_frames = (u32)got;
-    return resample_stereo(buf,bufSize,out_frames,src_rate,allocSize); // Reallocates and returns new buffer, freeing the buf alloc'ed here
+    u32 src_rate = wav.sampleRate; WavUnInit(&wav); *out_frames = (u32)got; return resample_stereo(buf,bufSize,out_frames,src_rate,allocSize); // Reallocates and returns new buffer, freeing the buf alloc'ed here
 }
 
 static void wave_mix(wav_channel_t* w, float* mix) {
-    float vol = w->volume * (Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeEffects/100.0f); V3 pos = w->pos;
-    V3 d = {pos.x-World.instances[PLAYER1].position.x,pos.y-World.instances[PLAYER1].position.y,pos.z-World.instances[PLAYER1].position.z};
-    float dist = vsqrtf(d.x*d.x+d.y*d.y+d.z*d.z);
-    float spatial_atten = (dist >= 64.0f) ? 0.0f : ((dist <= 1.0f) ? 1.0f : 1.0f-(dist-1.0f)/63.0f);
+    float vol = w->volume * (Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeEffects/100.0f); V3 pos = w->pos; float dist = V3_Dist(pos,World.instances[PLAYER1].position); float spatial_atten = (dist >= 64.0f) ? 0.0f : ((dist <= 1.0f) ? 1.0f : 1.0f-(dist-1.0f)/63.0f);
     if (w->positional) vol *= spatial_atten;
-    for (i32 f = 0; f < AUDIO_FRAMES; f++) {
-        if (w->frame_pos >= w->frame_count) { if (w->looping) w->frame_pos=0; else { w->playing=false; break; } }
-        mix[f*2+0] += w->samples[w->frame_pos*2+0]*vol; mix[f*2+1] += w->samples[w->frame_pos*2+1]*vol; w->frame_pos++;
-    }
+    for (i32 f = 0; f < AUDIO_FRAMES; f++) { if (w->frame_pos >= w->frame_count){ if (w->looping){w->frame_pos=0;}else{w->playing=false; break;} } mix[f*2+0] += w->samples[w->frame_pos*2+0]*vol; mix[f*2+1] += w->samples[w->frame_pos*2+1]*vol; w->frame_pos++; }
 }
 
 static void audio_mix_period(i16 *out) {
-    float mix[AUDIO_FRAMES*AUDIO_CHANNELS];
-    mset(mix,0,sizeof(mix));
+    float mix[AUDIO_FRAMES*AUDIO_CHANNELS]; mset(mix,0,sizeof(mix));
     for (u32 c=0;c<wav_count;c++) { wav_channel_t* w = &wav_ch[c]; if (w->playing && w->samples) {wave_mix(w,mix);} }
     for (u32 c=0;c<ext_count;c++) { wav_channel_t* w =  ext_ch[c]; if (w->playing && w->samples) {wave_mix(w,mix);} }
     if (log_playing && log_samples) {
@@ -5255,32 +4830,21 @@ RaycastHit RayTriangle(V3 origin, V3 dir, V3 posA, V3 posB, V3 posC, V3 normA, V
     float u = V3_dot(edgeAC,dao) * invDet, v = -V3_dot(edgeAB,dao) * invDet; float w = 1.0f - u - v;
     return (RaycastHit){.point=V3_AplusB(origin,V3_ScaleByF(dir,dst)), .normal=V3_Normalize(V3_AplusB(V3_AplusB(V3_ScaleByF(normA,w),V3_ScaleByF(normB,u)),V3_ScaleByF(normC,v))), .distance=dst, .hitInstanceIndex=INSTANCE_COUNT, .hit=vabs(determinant) >= 1E-8f && dst >= 0 && u >= 0 && v >= 0 && w >= 0};
 }
- 
+
 ENGINE_TO_MOD RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
     RaycastHit result = { .hit = false, .distance = maxDist, .point = {0.0f, 0.0f, 0.0f}, .normal = {0.0f, 0.0f, 0.0f}, .hitInstanceIndex = INSTANCE_COUNT };
     for (u16 i = INSTS_1ST_IDX; i < INSTANCE_COUNT; ++i) {
         if (!(layerMask & World.instances[i].layer)) continue;
         u16 mindex = World.instances[i].modelIndex; if (mindex >= mdlsCnt) continue;
         
-        V3 objPos = World.instances[i].position;
-        u16 instCellIdx = PosGetCellCoords(objPos.x,objPos.z);
-        V3 delta = V3_AsubB(objPos,origin);
-        float distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z, radBounds = vmax(modelBounds[mindex], 1.81f); 
+        V3 objPos = World.instances[i].position; u16 instCellIdx = PosGetCellCoords(objPos.x,objPos.z); V3 delta = V3_AsubB(objPos,origin); float distSqrd = V3_dot(delta,delta), radBounds = vmax(modelBounds[mindex],1.81f);
         float maxDistToObj = vmax(maxDist - radBounds,maxDist); if (distSqrd >= (maxDistToObj * maxDistToObj)) continue;
-        
-        if (!IdxIsPortalBlockingDoor(World.instances[i].index)) {
-            if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (World.instances[i].index != 754 || !SkyIsVisible())) continue;
-        }
-        
-        u32 triCount = modelTriangleCounts[mindex];
-        if (triCount < 1) continue;
-        
+        if (!IdxIsPortalBlockingDoor(World.instances[i].index)) { if(((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (World.instances[i].index != 754 || !SkyIsVisible())){continue;} }
+        u32 triCount = modelTriangleCounts[mindex]; if (triCount < 1) continue;
+
         float M[16];
         mcpy(M,&modelMatrices[i * 16],16 * sizeof(float));
-        float m00=M[0], m10=M[1], m20=M[2];
-        float m01=M[4], m11=M[5], m21=M[6];
-        float m02=M[8], m12=M[9], m22=M[10];
-        float tx=M[12], ty=M[13], tz=M[14];
+        float m00=M[0], m10=M[1], m20=M[2], m01=M[4], m11=M[5], m21=M[6], m02=M[8], m12=M[9], m22=M[10], tx=M[12], ty=M[13], tz=M[14];
         float sclx = vsqrtf(m00*m00 + m10*m10 + m20*m20); float sclx2 = sclx * sclx;
         float scly = vsqrtf(m01*m01 + m11*m11 + m21*m21); float scly2 = scly * scly;
         float sclz = vsqrtf(m02*m02 + m12*m12 + m22*m22); float sclz2 = sclz * sclz;
@@ -5296,21 +4860,14 @@ ENGINE_TO_MOD RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask
             V3 normA ={half_to_float( *(half*)(modelVertices[mindex] + bA + 6) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 8) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 10) )};
             V3 normB ={half_to_float( *(half*)(modelVertices[mindex] + bB + 6) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 8) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 10) )};
             V3 normC ={half_to_float( *(half*)(modelVertices[mindex] + bC + 6) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 8) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 10) )};
-            RaycastHit tryTri = RayTriangle(localOrigin,localDir,posA,posB,posC,normA,normB,normC);
-            if (!tryTri.hit) continue;
+            RaycastHit tryTri = RayTriangle(localOrigin,localDir,posA,posB,posC,normA,normB,normC); if (!tryTri.hit) continue;
             
             V3 worldPoint = { m00*tryTri.point.x + m01*tryTri.point.y + m02*tryTri.point.z + tx, m10*tryTri.point.x + m11*tryTri.point.y + m12*tryTri.point.z + ty, m20*tryTri.point.x + m21*tryTri.point.y + m22*tryTri.point.z + tz };
-            V3 toHit = V3_AsubB(worldPoint, origin);
-            float worldDist = vsqrtf(toHit.x*toHit.x + toHit.y*toHit.y + toHit.z*toHit.z);
-            if (worldDist >= result.distance) continue;
+            float worldDist = V3_Dist(worldPoint,origin); if (worldDist >= result.distance) continue;
             
             V3 worldNormal = { (m00/sclx)*tryTri.normal.x + (m01/scly)*tryTri.normal.y + (m02/sclz)*tryTri.normal.z, (m10/sclx)*tryTri.normal.x + (m11/scly)*tryTri.normal.y + (m12/sclz)*tryTri.normal.z, (m20/sclx)*tryTri.normal.x + (m21/scly)*tryTri.normal.y + (m22/sclz)*tryTri.normal.z };
             worldNormal = V3_Normalize(worldNormal);
-            result.hit              = true;
-            result.point            = worldPoint;
-            result.normal           = V3_Normalize(worldNormal);
-            result.distance         = worldDist;
-            result.hitInstanceIndex = i;
+            result.hit=true; result.point=worldPoint; result.normal=V3_Normalize(worldNormal); result.distance=worldDist; result.hitInstanceIndex=i;
         }
     }
     
@@ -6024,8 +5581,7 @@ INLINE bool DetermineIfInstanceVisible(u16 i, bool otherCondition, bool skyVisib
     if (EntNotVisible(i,otherCondition)) return false; // must be transparent && transparents or neither
     
     Entity* e = &World.instances[i]; u16 instCellIdx = e->cellIndex; u16 entIdx = e->index;
-    V3 delta = V3_AsubB(e->position,playerPos);
-    *distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
+    V3 delta = V3_AsubB(e->position,playerPos); *distSqrd = V3_dot(delta,delta);
     float radius = modelBounds[e->modelIndex] * 2.0f * vmax(vmax(e->scale.x,e->scale.y),e->scale.z);
     if (!SphereInFrustum(playerFrustumPlanes,e->position,radius) && (entIdx != 754 || !skyVisible) && i != editModeSelection) return false;
     
@@ -6317,8 +5873,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
 void GoIntoGame() { NewGame(); PlayGameMusic(); DualLog("Player named \"%s\" started the game!\n", World.playerName); }
 void* mod_handle = NULL;
 void InitalizeEnvironment() {
-    double game_start_time = get_time();
-    random_range_rng = (u32)game_start_time; // Seed global rand uniquely with time since system boot.
+    double game_start_time = get_time(); random_range_rng = (u32)game_start_time; // Seed global rand uniquely with time since system boot.
     console_log_file = OS_OpenWriteonly("./voxen.log"); // Initialize log system for all prints to go to both stdout and voxen.log file
     DebugRAM("program start");
     DualLog("Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed\nEntity size: %u\n",sizeof(Entity));
@@ -6403,8 +5958,8 @@ void InitalizeEnvironment() {
     lightsID         = MakeSSBO(&lightsID,         4,LIGHT_COUNT * sizeof(Light),NULL,GL_STATIC_DRAW);                      colorBufferID    = MakeSSBO(&colorBufferID,   12,MAX_TOTAL_PIXELS * sizeof(u8),NULL,GL_STATIC_DRAW);
     if (Sys_Settings.Shadows) CreateShadowBuffers();                    /*5,6*/                                             textureOffsetsID = MakeSSBO(&textureOffsetsID,14,MAX_TXRS * sizeof(u32),NULL,GL_STATIC_DRAW);
                                                                                                                             textureSizesID   = MakeSSBO(&textureSizesID,  15,MAX_TXRS * 2 * sizeof(i32),NULL, GL_STATIC_DRAW);
-    glUseProgram(shadowmapsSP);  glUniform1ui( 9,SHADOW_MAP_SIZE);   glUseProgram(shadowmapsClearSP); glUniform1ui(1,SHADOW_MAP_SIZE);
-    glUseProgram(chunkSP);       glUniform1ui(21,SHADOW_MAP_SIZE); glUniform1f(22,(float)SHADOW_MAP_SIZE); glUniform1ui(23,LIGHT_COUNT); glUniform1ui(24,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);
+    glUseProgram(shadowmapsSP);  glUniform1ui( 9,SHADOW_MAP_SIZE); glUseProgram(shadowmapsClearSP);           glUniform1ui(1,SHADOW_MAP_SIZE);
+    glUseProgram(chunkSP);       glUniform1ui(21,SHADOW_MAP_SIZE); glUniform1f(22,(float)SHADOW_MAP_SIZE);    glUniform1ui(23,LIGHT_COUNT); glUniform1ui(24,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);
     glUseProgram(voxelUpdateSP); glUniform1ui( 4,SHADOW_MAP_SIZE); glUniform1ui(6,(u32)MAX_LIGHTS_PER_VOXEL);
     RenderLoadingProgress(100,"Loading textures..."); LoadTextures();
     RenderLoadingProgress(92,"Loading models...");    LoadModels();
@@ -6421,8 +5976,7 @@ i32 main() {
     while(1) {
         if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad); queuedLevelToLoad = 255u; continue; }
 
-        World.current_time  = get_time();              World.deltaTime     = World.current_time - World.last_topframe_time;
-        World.absoluteTime += World.deltaTime;    World.last_topframe_time = World.current_time;
+        World.current_time=get_time(); World.deltaTime=World.current_time - World.last_topframe_time; World.absoluteTime+=World.deltaTime; World.last_topframe_time=World.current_time;
         if (!World.gamePaused && !World.menuActive) World.pauseRelativeTime += World.deltaTime;
         InputProcessing(); // Before anims and physics to allow them to respond immediately.
         UpdateAnims();     // Before physics to allow model swap out to affect physics state immediately.  Before rendering to affect shadowmaps immediately.
