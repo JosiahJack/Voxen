@@ -146,7 +146,7 @@
     }
 
 	void Update() {
-		if (World->gamePaused
+		if (World->paused
 			|| (ressurectingFinished >= World->pauseRelativeTime)) {
 			return;
 		}
@@ -177,7 +177,7 @@
 		V2 hz = new V2(rbody.velocity.x, rbody.velocity.z);
 		playerSpeedHorizontalActual = hz.magnitude;
 
-		if (World->gamePaused || World->menuActive) return;
+		if (World->paused || World->menuActive) return;
 		if (ressurectingFinished > World->pauseRelativeTime) return;
 		if (consoleActivated) return;
 
@@ -1073,7 +1073,7 @@
 
 	// Reset grounded to false when player is mid-air
 	void OnCollisionExit (){
-		if (!World->gamePaused && !World->menuActive) {
+		if (!World->paused && !World->menuActive) {
 			// Automatically set grounded to false to prevent ability to climb any wall (Cheat!)
 			if (!CheatWallSticky) {
 				grounded = false;
@@ -1085,7 +1085,7 @@
 
 	// Sets grounded based on normal angle of the impact point (NOTE: This is not the surface normal!)
 	void OnCollisionStay(Collision collision) {
-		if (World->gamePaused || inCyberSpace) return;
+		if (World->paused || inCyberSpace) return;
 		
 		int contactCount = collision.contactCount;
 		float maxSlope = 0.35f;

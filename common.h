@@ -121,32 +121,32 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define EF_LOCKED               (1ull << 27)
 #define EF_HAS_CAMERA_VIEW      (1ull << 28)
 #define EF_DAMAGE_ON_USE        (1ull << 29)
-#define QUESTBIT_ROBOT_SPAWN_DEACTIVATED      (1ull <<  0)
-#define QUESTBIT_ISOTOPE_INSTALLED            (1ull <<  1)
-#define QUESTBIT_SHIELD_ACTIVATED             (1ull <<  2)
-#define QUESTBIT_LASER_SAFETY_OVERRIDEN       (1ull <<  3)
-#define QUESTBIT_LASER_DESTROYED              (1ull <<  4)
-#define QUESTBIT_BETA_GROVE_CYBER_UNLOCKED    (1ull <<  5)
-#define QUESTBIT_GROVE_ALPHA_JETTISON_ENABLED (1ull <<  6)
-#define QUESTBIT_GROVE_BETA_JETTISON_ENABLED  (1ull <<  7)
-#define QUESTBIT_GROVE_DELTA_JETTISON_ENABLED (1ull <<  8)
-#define QUESTBIT_MASTER_JETTISON_BROKEN       (1ull <<  9)
-#define QUESTBIT_RELAY_428_FIXED              (1ull << 10)
-#define QUESTBIT_MASTER_JETTISON_ENABLED      (1ull << 11)
-#define QUESTBIT_BETA_GROVE_JETTISONED        (1ull << 12)
-#define QUESTBIT_ANTENNA_NORTH_DESTROYED      (1ull << 13)
-#define QUESTBIT_ANTENNA_SOUTH_DESTROYED      (1ull << 14)
-#define QUESTBIT_ANTENNA_EAST_DESTROYED       (1ull << 15)
-#define QUESTBIT_ANTENNA_WEST_DESTROYED       (1ull << 16)
-#define QUESTBIT_SELF_DESTRUCT_ACTIVATED      (1ull << 17)
-#define QUESTBIT_BRIDGE_SEPARATED             (1ull << 18)
-#define QUESTBIT_ISOLINEAR_CHIPSET_INSTALLED  (1ull << 19)
-#define QUESTBIT_LEV1_CODE_LOCKED             (1ull << 20)
-#define QUESTBIT_LEV2_CODE_LOCKED             (1ull << 21)
-#define QUESTBIT_LEV3_CODE_LOCKED             (1ull << 22)
-#define QUESTBIT_LEV4_CODE_LOCKED             (1ull << 23)
-#define QUESTBIT_LEV5_CODE_LOCKED             (1ull << 24)
-#define QUESTBIT_LEV6_CODE_LOCKED             (1ull << 25)
+#define Q_ROBOT_SPAWN_DEACTIVATED      (1ull <<  0)
+#define Q_ISOTOPE_INSTALLED            (1ull <<  1)
+#define Q_SHIELD_ACTIVATED             (1ull <<  2)
+#define Q_LASER_SAFETY_OVERRIDEN       (1ull <<  3)
+#define Q_LASER_DESTROYED              (1ull <<  4)
+#define Q_BETA_GROVE_CYBER_UNLOCKED    (1ull <<  5)
+#define Q_GROVE_ALPHA_JETTISON_ENABLED (1ull <<  6)
+#define Q_GROVE_BETA_JETTISON_ENABLED  (1ull <<  7)
+#define Q_GROVE_DELTA_JETTISON_ENABLED (1ull <<  8)
+#define Q_MASTER_JETTISON_BROKEN       (1ull <<  9)
+#define Q_RELAY_428_FIXED              (1ull << 10)
+#define Q_MASTER_JETTISON_ENABLED      (1ull << 11)
+#define Q_BETA_GROVE_JETTISONED        (1ull << 12)
+#define Q_ANTENNA_NORTH_DESTROYED      (1ull << 13)
+#define Q_ANTENNA_SOUTH_DESTROYED      (1ull << 14)
+#define Q_ANTENNA_EAST_DESTROYED       (1ull << 15)
+#define Q_ANTENNA_WEST_DESTROYED       (1ull << 16)
+#define Q_SELF_DESTRUCT_ACTIVATED      (1ull << 17)
+#define Q_BRIDGE_SEPARATED             (1ull << 18)
+#define Q_ISOLINEAR_CHIPSET_INSTALLED  (1ull << 19)
+#define Q_LEV1_CODE_LOCKED             (1ull << 20)
+#define Q_LEV2_CODE_LOCKED             (1ull << 21)
+#define Q_LEV3_CODE_LOCKED             (1ull << 22)
+#define Q_LEV4_CODE_LOCKED             (1ull << 23)
+#define Q_LEV5_CODE_LOCKED             (1ull << 24)
+#define Q_LEV6_CODE_LOCKED             (1ull << 25)
 #define TARG_IOFLAGS_TRIPTRIGGER        (1ull << 0) // Action bits.  What do we want our target to do, e.g. turn on a light or close a door or activate force bridge.  Using multiple bools to allow for multiple actions to be attempted on all the targets.
 #define TARG_IOFLAGS_DOOROPEN           (1ull << 1)
 #define TARG_IOFLAGS_DOOROPENIFUNLOCKED (1ull << 2)
@@ -419,11 +419,11 @@ typedef struct {
     u32 lastFrameSecCount,worstFPS,debugLineVertCount,shotsFired,grenadesThrown,savesScummed;
     u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,instCount; // Numbers of instances of entities and lights loaded (always for just the current level)
     float farPlane[14],damageDealt,damageReceived,timeScale,worldMin_x[14],worldMin_z[14],voxelMinCenterX[14],voxelMinCenterZ[14];
-	double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,debugLineFinished,shakeFinished,last_time,last_topframe_time,last_physics_time,deltaTime,current_time,screenshotTimeout,pauseRelativeTime,absoluteTime,statusTextDecayFinished,justSavedTimeStamp;
+	double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,debugLineFinished,shakeFinished,last_time,last_physics_time,deltaTime,current_time,screenshotTimeout,pauseRelativeTime,absoluteTime,statusTextDecayFinished,justSavedTimeStamp;
     i32 fogFac,cursorPosition_x,cursorPosition_y; // Separate internal cursor from system cursor.  This gets relatively pushed around by real cursor movement to give consistent platform behavior.
 	V3 debugLine_start,debugLine_end,cyberspaceRecallPoint;
     u8 levelSecurity[14],startLevel,numLevels,curLev,diffCbt,diffPuz,diffMis,diffCyb,creditsPageIndex;
-	bool inventoryMode,levelCurrentlyLoading,introNotPlayed,gamePaused,menuActive,gameFinished,creditsActive,decoyActive,boosterActive,uiIsBlocking,mouseClickHeldOverGUI,geniusActive,(*GetKey)(i32 settingIndex),(*GetKeyPressed)(i32 settingIndex);
+	bool inventoryMode,levelCurrentlyLoading,introNotPlayed,paused,menuActive,gameFinished,creditsActive,decoyActive,boosterActive,uiIsBlocking,mouseClickHeldOverGUI,geniusActive,(*GetKey)(i32 settingIndex),(*GetKeyPressed)(i32 settingIndex);
     InventorySystem invP1,invP2;
     Entity instances[INSTANCE_COUNT];
     Color fogColor[14];
@@ -438,18 +438,14 @@ typedef struct {
 #define vsqrtf(x) __builtin_sqrtf(x)
 INLINE float vfloor(float x) { int i = (int)x; return (float)(i > x ? i - 1 : i); }
 INLINE float vceil(float x) { int i = (int)x; return (float)(x > 0 && x > (float)i ? i + 1 : i); }
-INLINE float vsign(float x) { return x < 0.0f ? -1.0f : 1.0f; } // Follow Unity Sign convention where 0 = 1.0f sign.
 INLINE float vsinf(float x) { x -= TAU * vfloor(x / TAU); if (x > PI) { x -= TAU; } float s = (4/PI)*x - (4/(PI*PI))*x*vabs(x); return 0.225f*(s*vabs(s) - s) + s; }
 INLINE float vcosf(float x) { return vsinf(x + 1.57079632f); }
 INLINE float vacosf(float x) { float negate = (x < 0.0f) ? 1.0f : 0.0f; x = vabs(x); float ret = (-0.0187293f * x + 0.0742610f) * x - 0.2121144f; ret = (ret * x + 1.5707288f) * vsqrtf(1.0f - x); ret = ret - 2.0f * negate * ret; return negate * PI + (1.0f - 2.0f * negate) * ret; }
 INLINE float vtan(float x) { return vsinf(x) / vcosf(x); }
 INLINE float vcot(float x) { float x2 = x * x; float t = x + (x2 * x) * 0.33333333f; return 1.0f / t; }
 INLINE float deg2rad(float degrees) { return degrees * (PI / 180.0f); }
-INLINE float vlog2f(float x) { union { float f; u32 i; } v = { x }; int e = (int)((v.i >> 23) & 255) - 127; v.i = (v.i & 0x7FFFFF) | 0x3F800000;/*normalize mantissa to [1,2)*/ float m = v.f; float p = m - 1.0f; float log2m = p * (1.3465558f + p * (-0.33942322f + p * 0.028794660f)); /*polynomial approx of log2(m)*/ return (float)e + log2m; }
-INLINE float vlog(float x) { return vlog2f(x) * 0.69314718f; }
 INLINE float vexp2f(float x) { float ip = vfloor(x); float fp = x - ip; float p = 1.0f + fp * (0.69314718f + fp * (0.24022651f + fp * 0.05550411f)); /*poly approximation for 2^fp on [0,1]*/ int ei = (int)ip + 127; u32 bits = (u32)(ei << 23); union { u32 i; float f; } u = { bits }; return u.f * p; }
 INLINE float vexp(float x) { return vexp2f(x * 1.4426950409f); } // 1/ln(2)
-INLINE float vpow(float a, float b) { return vexp(b * vlog(a)); }
 INLINE i32 clamp(i32 val, i32 min, i32 max) { return (val > max) ? max : ((val < min) ? min : val); }
 INLINE float vround(float val) { return (val >= 0.0f) ? (float)(int)(val + 0.5f) : (float)(int)(val - 0.5f); }
 INLINE V3 V3_AplusB(V3 a, V3 b) { return (V3){a.x + b.x, a.y + b.y, a.z + b.z}; }
@@ -464,13 +460,11 @@ INLINE float V3_SqDist(V3 a, V3 b) { V3 d = V3_AsubB(a,b); return V3_dot(d,d); }
 INLINE float V3_Dist(V3 a, V3 b) { return V3_Mag(V3_AsubB(a,b)); }
 INLINE V3 V3_Cross(V3 a, V3 b) { return (V3){a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x}; }
 INLINE V3 V3_Normalize(V3 v) { float len = V3_Mag(v); return len > 0.000001f ? (V3){v.x / len, v.y / len, v.z / len} : v; }
-INLINE float squareDistance2D(float x1, float z1, float x2, float z2) { float dx = x2 - x1; float dz = z2 - z1; return dx * dx + dz * dz; }
-INLINE float squareDistance3D(float x1, float y1, float z1, float x2, float y2, float z2) { float dx = x2 - x1; float dy = y2 - y1; float dz = z2 - z1; return dx * dx + dy * dy + dz * dz; }
 INLINE Quaternion quat_multiply(Quaternion q1, Quaternion q2) { return (Quaternion){(q1.w * q2.x + q1.x * q2.w + q1.y * q2.z - q1.z * q2.y),(q1.w * q2.y - q1.x * q2.z + q1.y * q2.w + q1.z * q2.x),(q1.w * q2.z + q1.x * q2.y - q1.y * q2.x + q1.z * q2.w),(q1.w * q2.w - q1.x * q2.x - q1.y * q2.y - q1.z * q2.z)}; } // Hamilton product, rotates q1 by q2
 INLINE V3 quat_rot_v3(Quaternion q, V3 v) { Quaternion r = quat_multiply((quat_multiply(q, (Quaternion){v.x,v.y,v.z,0.0f})),(Quaternion){-q.x,-q.y,-q.z,q.w}); return (V3){r.x,r.y,r.z}; } // Returns rotated input vector rotated by a quaternion.
 INLINE u8 hardware14fromConstdex(u16 c) { return clamp(c - 21,0,14); }
 INLINE bool IdxIsPortalBlockingDoor(u16 entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }// All doors except see-through doors.
-INLINE bool ConstIndexInBounds(int c) { return (c >= 0 && c <= 760); }
+INLINE bool IdxInBounds(int c) { return (c >= 0 && c <= 760); }
 INLINE bool IdxIsGeometry(int c) { return (c >= 0 && c <= 306 && c != 112 && c != 279) || c == 760; }
 INLINE bool IdxIsDoor(int c) { return (c >= 496 && c < 515); }
 INLINE bool IdxIsLightStaticSaveable(int c) { return c == 748; }
@@ -486,7 +480,7 @@ INLINE bool IdxIsAccessCard(u16 c) { return ((c >= 388 && c <= 398) || c == 417)
 INLINE bool IdxIsDynamicObject(u16 c) { return (c >= 307 && c <= 404) ||  c == 417 || (c >= 419 && c <= 428) || (c >= 430 && c <= 437) || (c >= 440 && c <= 442) || (c >= 458 && c <= 463) || (c >= 465 && c <= 476); }
 INLINE bool IdxIsStaticObjectSaveable(int c) { return (c == 112 || c == 279 || (c >= 448 && c < 458) || c == 480 || c == 516 || (c >= 518 && c <= 526) || c == 530 || c == 531 || c == 546 || c == 555 || c == 594 || c == 596 || c == 598 || (c >= 600 && c < 603) || (c >= 604 && c < 616) || (c >= 688 && c < 693) || c == 694 || c == 695 || (c >= 699 && c < 704) || (c >= 741 && c < 746)); }
 INLINE bool IdxIsStaticObjectImmutable(int c) { return ((c >= 527 && c < 530) || (c >= 532 && c < 546) || (c >= 547 && c < 553) || c == 554 || (c >= 556 && c < 594) || c == 595 || c == 597 || c == 599 || c == 601 || c == 603 || (c >= 616 && c < 688) || c == 693 || c == 696 || c == 697 || c == 698 || (c >= 704 && c < 717) || c == 720 || (c >= 733 && c < 736) || (c >= 737 && c < 739) || c == 746 || c == 747 || (c >= 750 && c <= 759 && c != 755)); }
-INLINE int CompareMemoryForNBytes(const void *s1, const void *s2, size_t n) { const u8 *p1 = (const u8 *)s1; const u8 *p2 = (const u8 *)s2; while (n--) { if (*p1 != *p2) {return *p1 - *p2;} p1++; p2++; } return 0; } // memcmp replacement
-INLINE void* MoveMemoryFromBtoAForNBytes(void *dst, const void *src, size_t n) { u8 *d = (u8*)dst; const u8* s = (const u8*)src; if (d < s) { while (n--) { *d++ = *s++; } } else if (d > s) { d += n; s += n; while (n--) { *--d = *--s; } } return dst; } // memmove replacement
+INLINE  int  mcmp(const void *s1, const void *s2, size_t n) { const u8 *p1 = (const u8 *)s1; const u8 *p2 = (const u8 *)s2; while (n--) { if (*p1 != *p2) {return *p1 - *p2;} p1++; p2++; } return 0; } // memcmp replacement
+INLINE void* mmov(void *dst, const void *src, size_t n) { u8 *d = (u8*)dst; const u8* s = (const u8*)src; if (d < s) { while (n--) { *d++ = *s++; } } else if (d > s) { d += n; s += n; while (n--) { *--d = *--s; } } return dst; } // memmove replacement
 INLINE void flag_setu16(u16 *flags, u16 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
 INLINE void flag_set(u32 *flags, u32 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }

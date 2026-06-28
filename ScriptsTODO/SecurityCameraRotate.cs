@@ -32,7 +32,7 @@ public class SecurityCameraRotate : MonoBehaviour {
 	}
 
 	void Update() {
-		if (!World->gamePaused && !World->menuActive) {
+		if (!World->paused && !World->menuActive) {
 			if (mR != null) {
 				if (!mR.isVisible || !mR.enabled) return;
 			} else {

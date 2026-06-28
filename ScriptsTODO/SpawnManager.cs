@@ -45,7 +45,7 @@ public class SpawnManager : MonoBehaviour {
 	}
 
 	void Update() {
-		if (World->gamePaused) return;
+		if (World->paused) return;
 		if (World->menuActive) return;
 		if (!active) return;
 

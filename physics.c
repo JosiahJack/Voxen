@@ -878,7 +878,7 @@ static void ApplyManifoldResponse(Entity *e, Entity *o, const Manifold *m) {
 }
 
 void Physics() {
-    if (World.gamePaused || World.menuActive) return;
+    if (World.paused || World.menuActive) return;
 
     float dt = vclamp((float)(World.pauseRelativeTime - World.last_physics_time), 0.0005f, 0.1f);
     World.last_physics_time = World.pauseRelativeTime;

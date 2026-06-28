@@ -145,7 +145,7 @@ void MusicTriggerExit(u16 other) {
 }
 
 MOD_TO_ENGINE void UpdateMusic(void) {
-    if (World->gamePaused && !World->menuActive) { MP3Pause(); return; }
+    if (World->paused && !World->menuActive) { MP3Pause(); return; }
     MP3Resume();
     float remaining = GetMP3RemainingTime(); if (remaining > AUD_BUFFER_T) return;
 

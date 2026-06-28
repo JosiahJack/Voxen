@@ -56,7 +56,7 @@ const AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS] = { // speed, 
 };
 
 MOD_TO_ENGINE void UpdateAnims(void) {
-    if (World->gamePaused || World->menuActive) return;
+    if (World->paused || World->menuActive) return;
     
     static double lastPauseTime = 0.0; if (lastPauseTime == 0.0) lastPauseTime = World->pauseRelativeTime;
     double animDT = World->pauseRelativeTime - lastPauseTime; lastPauseTime = World->pauseRelativeTime;

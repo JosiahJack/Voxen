@@ -33,7 +33,7 @@ public class MaterialFlash : MonoBehaviour {
 	}
 
     void Update() {
-		if (!World->gamePaused && !World->menuActive) {
+		if (!World->paused && !World->menuActive) {
 			if (Const.a.questData.SelfDestructActivated) isFlashing = true;
 
 			if (isFlashing) {

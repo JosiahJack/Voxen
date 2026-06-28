@@ -53,7 +53,7 @@ public class UseableAttachment : MonoBehaviour {
 	}
 
 	void Update() {
-		if (World->gamePaused || World->menuActive) return;
+		if (World->paused || World->menuActive) return;
 		if (!activated) return;
 
 		if (timerFinished != -1f) { // Plastique delayed effect (to give player time to escape of course)

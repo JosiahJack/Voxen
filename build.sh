@@ -107,7 +107,7 @@ if [ "$PLATFORM" = "windows" ]; then
     LINKER=$CC
     CFLAGS="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe -Wl,-Bstatic -lmingw32 -lmingwex"
     CFLAGSGC="-D_WIN32 -DWINDOWS $COMMON_CFLAGS -mno-stack-arg-probe -nostdlib -D__NO_INLINE__ -mstackrealign"
-    LDFLAGS="$COMMON_LFLAGS -L. -lgdi32 -lopengl32 -lole32 -static-libgcc -Wl,--out-implib=voxen.lib -Xlinker /pdb:Citadel.pdb"
+    LDFLAGS="$COMMON_LFLAGS -L. -lgdi32 -lole32 -static-libgcc -Wl,--out-implib=voxen.lib -Xlinker /pdb:Citadel.pdb"
     LDFLAGSGC="$COMMON_LFLAGS -shared -Wl,-Bstatic -Wl,--allow-shlib-undefined -Wl,--subsystem,windows -nostdlib -Wl,--entry,DllMain -L. -lvoxen -Xlinker /pdb:Citadel.pdb"
     BINARY_NAME="voxen.exe"
     BINARY_NAMEGC="Citadel.dll"

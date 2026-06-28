@@ -47,7 +47,7 @@ public class TeleportFXStatic : MonoBehaviour {
 	}
 
 	void Update() {
-		if (!World->gamePaused && !World->menuActive) {
+		if (!World->paused && !World->menuActive) {
 			if (effectFinished < World->pauseRelativeTime) Deactivate();
 			if (flipTime < World->pauseRelativeTime) {
 				flipTime = World->pauseRelativeTime + intervalTime;

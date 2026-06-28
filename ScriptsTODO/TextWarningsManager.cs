@@ -53,7 +53,7 @@ public class TextWarningsManager : MonoBehaviour {
 	}
 
 	void Update() {
-		if (World->gamePaused || World->menuActive) return;
+		if (World->paused || World->menuActive) return;
 
 		for (int i=0;i<warningTextGObjects.Length;i++) {
 			if (!sEmpty(warningTexts[i].text)) {

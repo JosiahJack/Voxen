@@ -113,7 +113,7 @@ public class KeypadKeycodeButtons : MonoBehaviour {
 	}
 
 	void Update() {
-		if (World->gamePaused) return;
+		if (World->paused) return;
 		if (World->menuActive)  return;
 		if (keypad == null) return;
 

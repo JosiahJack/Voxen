@@ -20,7 +20,7 @@ public class ObjectImpact : MonoBehaviour {
 	}
 
 	void OnCollisionEnter(Collision collision) {
-		if (World->gamePaused) return;
+		if (World->paused) return;
 		if (World->menuActive) return;
 		if (collision == null) return;
 

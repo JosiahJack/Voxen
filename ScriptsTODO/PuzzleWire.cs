@@ -130,7 +130,7 @@ public class PuzzleWire : MonoBehaviour {
 	}
 
 	void Update() {
-		if (!World->gamePaused && !World->menuActive) {
+		if (!World->paused && !World->menuActive) {
 			if (Solved) return;
 
 			if (selectedWire != -1) {

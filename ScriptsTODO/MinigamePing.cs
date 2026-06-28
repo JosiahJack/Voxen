@@ -85,7 +85,7 @@ public class MinigamePing : MonoBehaviour {
     }
 
     void Update() {
-        if (World->gamePaused) return;
+        if (World->paused) return;
 		if (World->menuActive) return;
         if (frameFinished >= World->pauseRelativeTime) return;
         if (gameOver.activeInHierarchy) return;

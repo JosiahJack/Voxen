@@ -47,7 +47,7 @@ public class MissionTimer : MonoBehaviour {
 
     void Update() {
 		if (World->diffMis < 3) return;
-		if (World->gamePaused) return;
+		if (World->paused) return;
 		if (World->menuActive) return;
 		if (MouseLookScript.a.inCyberSpace) return; // timer doesn't count down in cyberspace, yay!
 

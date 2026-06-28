@@ -11,7 +11,7 @@ public class TouchEnergyDrain : MonoBehaviour {
 	}
 
 	void  OnCollisionEnter (Collision col) {
-		if (World->gamePaused) return;
+		if (World->paused) return;
 		if (World->menuActive) return;
 
 		if (tickFinished < World->pauseRelativeTime) {

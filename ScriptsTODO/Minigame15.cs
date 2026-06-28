@@ -121,7 +121,7 @@ public class Minigame15 : MonoBehaviour {
     }
 
     void Update() {
-        if (World->gamePaused) return;
+        if (World->paused) return;
         if (World->menuActive) return;
 
         if      (AABBCursorCheck(col1Left,col1Right,row1Up,row1Dn)) BtnCheck(1);

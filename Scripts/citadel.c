@@ -2648,76 +2648,76 @@ void UseGrenade(u16 playerIndex, int index) { // TODO
 // void EnableBits(u16 i) {
 //     World->instances[WORLD].ioflags |= World->instances[i].ioflags;
 //     
-//     if (World->instances[i].ioflags & QUESTBIT_ROBOT_SPAWN_DEACTIVATED) DualLog("QUESTBIT_ROBOT_SPAWN_DEACTIVATED: 1");
-//     if (World->instances[i].ioflags & QUESTBIT_ISOTOPE_INSTALLED) DualLog("QUESTBIT_ISOTOPE_INSTALLED: 1");
-//     if (World->instances[i].ioflags & QUESTBIT_SHIELD_ACTIVATED) {
-//         DualLog("QUESTBIT_SHIELD_ACTIVATED: 1");
+//     if (World->instances[i].ioflags & Q_ROBOT_SPAWN_DEACTIVATED) DualLog("Q_ROBOT_SPAWN_DEACTIVATED: 1");
+//     if (World->instances[i].ioflags & Q_ISOTOPE_INSTALLED) DualLog("Q_ISOTOPE_INSTALLED: 1");
+//     if (World->instances[i].ioflags & Q_SHIELD_ACTIVATED) {
+//         DualLog("Q_SHIELD_ACTIVATED: 1");
 //         QuestLogNotesManager.a.notes[8].SetActive(true);
 //         QuestLogNotesManager.a.checkBoxes[8].isOn = Const.a.questData.ShieldActivated;
 //         QuestLogNotesManager.a.labels[8].text = Eng_Text->stringTable[560];
 //     }
 //     
-//     if (World->instances[i].ioflags & QUESTBIT_LASER_SAFETY_OVERRIDEN) {
-//         DualLog("QUESTBIT_LASER_SAFETY_OVERRIDEN: 1");
+//     if (World->instances[i].ioflags & Q_LASER_SAFETY_OVERRIDEN) {
+//         DualLog("Q_LASER_SAFETY_OVERRIDEN: 1");
 //         QuestLogNotesManager.a.notes[7].SetActive(true);
 //         QuestLogNotesManager.a.checkBoxes[7].isOn = Const.a.questData.LaserSafetyOverriden;
 //         QuestLogNotesManager.a.labels[7].text = Eng_Text->stringTable[559];
 //     }
 //     
-//     if (World->instances[i].ioflags & QUESTBIT_LASER_DESTROYED) {
-//         DualLog("QUESTBIT_LASER_DESTROYED: 1");
+//     if (World->instances[i].ioflags & Q_LASER_DESTROYED) {
+//         DualLog("Q_LASER_DESTROYED: 1");
 //         if (AutoSplitterData.missionSplitID == 1) AutoSplitterData.missionSplitID++;
 //         QuestLogNotesManager.a.notes[9].SetActive(true);
 //         QuestLogNotesManager.a.checkBoxes[9].isOn = Const.a.questData.LaserDestroyed;
 //         QuestLogNotesManager.a.labels[9].text = Eng_Text->stringTable[561];
 //     }
 //     
-//     if (World->instances[i].ioflags & QUESTBIT_BETA_GROVE_CYBER_UNLOCKED) {
-//         DualLog("QUESTBIT_BETA_GROVE_CYBER_UNLOCKED: 1");
+//     if (World->instances[i].ioflags & Q_BETA_GROVE_CYBER_UNLOCKED) {
+//         DualLog("Q_BETA_GROVE_CYBER_UNLOCKED: 1");
 //         QuestLogNotesManager.a.notes[12].SetActive(true);
 //     }
 //     
-//     if (World->instances[i].ioflags & QUESTBIT_GROVE_ALPHA_JETTISON_ENABLED) {
-//         DualLog("QUESTBIT_GROVE_ALPHA_JETTISON_ENABLED: 1");
+//     if (World->instances[i].ioflags & Q_GROVE_ALPHA_JETTISON_ENABLED) {
+//         DualLog("Q_GROVE_ALPHA_JETTISON_ENABLED: 1");
 //         QuestLogNotesManager.a.notes[12].SetActive(true);
 //     }
 //     
-//     if (World->instances[i].ioflags & QUESTBIT_GROVE_BETA_JETTISON_ENABLED) {
-//         DualLog("QUESTBIT_GROVE_BETA_JETTISON_ENABLED: 1");
+//     if (World->instances[i].ioflags & Q_GROVE_BETA_JETTISON_ENABLED) {
+//         DualLog("Q_GROVE_BETA_JETTISON_ENABLED: 1");
 //         QuestLogNotesManager.a.notes[12].SetActive(true);
 //     }
 //     
-//     if (World->instances[i].ioflags & QUESTBIT_GROVE_DELTA_JETTISON_ENABLED) {
-//         DualLog("QUESTBIT_GROVE_DELTA_JETTISON_ENABLED: 1");
+//     if (World->instances[i].ioflags & Q_GROVE_DELTA_JETTISON_ENABLED) {
+//         DualLog("Q_GROVE_DELTA_JETTISON_ENABLED: 1");
 //         QuestLogNotesManager.a.notes[12].SetActive(true);
 //     }
 //     
-//     if (World->instances[i].ioflags & QUESTBIT_MASTER_JETTISON_BROKEN) {
-//         DualLog("QUESTBIT_MASTER_JETTISON_BROKEN: 1");
+//     if (World->instances[i].ioflags & Q_MASTER_JETTISON_BROKEN) {
+//         DualLog("Q_MASTER_JETTISON_BROKEN: 1");
 //         if (AutoSplitterData.missionSplitID == 2) AutoSplitterData.missionSplitID++;
 //         QuestLogNotesManager.a.notes[12].SetActive(true);
 //         QuestLogNotesManager.a.notes[11].SetActive(true);
 //         QuestLogNotesManager.a.labels[11].text = Eng_Text->stringTable[563]; // Set:Diagnose and repair broken relay
 //     }
 //     
-//     if (World->instances[i].ioflags & QUESTBIT_RELAY_428_FIXED) {
-//         DualLog("QUESTBIT_RELAY_428_FIXED: 1");
+//     if (World->instances[i].ioflags & Q_RELAY_428_FIXED) {
+//         DualLog("Q_RELAY_428_FIXED: 1");
 //         QuestLogNotesManager.a.notes[11].SetActive(true);
 //         QuestLogNotesManager.a.checkBoxes[11].isOn = Const.a.questData.Relay428Fixed;
 //         QuestLogNotesManager.a.labels[11].text = Eng_Text->stringTable[563]; // Set:Diagnose and repair broken relay
 //         QuestLogNotesManager.a.labels[11].text += Eng_Text->stringTable[564]; // Add:: 428.
 //     }
 //     
-//     if (World->instances[i].ioflags & QUESTBIT_MASTER_JETTISON_ENABLED) {
-//         DualLog("QUESTBIT_MASTER_JETTISON_ENABLED: 1");
+//     if (World->instances[i].ioflags & Q_MASTER_JETTISON_ENABLED) {
+//         DualLog("Q_MASTER_JETTISON_ENABLED: 1");
 //         if (AutoSplitterData.missionSplitID == 3) AutoSplitterData.missionSplitID++;
 //         QuestLogNotesManager.a.notes[10].SetActive(true);
 //         QuestLogNotesManager.a.checkBoxes[10].isOn = Const.a.questData.MasterJettisonEnabled;
 //         QuestLogNotesManager.a.labels[10].text = Eng_Text->stringTable[562];
 //     }
 //     
-//     if (World->instances[i].ioflags & QUESTBIT_BETA_GROVE_JETTISONED) {
-//         DualLog("QUESTBIT_BETA_GROVE_JETTISONED: 1");
+//     if (World->instances[i].ioflags & Q_BETA_GROVE_JETTISONED) {
+//         DualLog("Q_BETA_GROVE_JETTISONED: 1");
 //         if (AutoSplitterData.missionSplitID == 4) AutoSplitterData.missionSplitID++;
 //         QuestLogNotesManager.a.notes[12].SetActive(true);
 //         QuestLogNotesManager.a.checkBoxes[12].isOn = Const.a.questData.BetaGroveJettisoned;
@@ -2726,28 +2726,28 @@ void UseGrenade(u16 playerIndex, int index) { // TODO
 //         QuestLogNotesManager.a.labels[13].text = Eng_Text->stringTable[566];
 //     }
 //     
-//     if (World->instances[i].ioflags & QUESTBIT_ANTENNA_NORTH_DESTROYED) {
-//         DualLog("QUESTBIT_ANTENNA_NORTH_DESTROYED: 1");
+//     if (World->instances[i].ioflags & Q_ANTENNA_NORTH_DESTROYED) {
+//         DualLog("Q_ANTENNA_NORTH_DESTROYED: 1");
 //         QuestLogNotesManager.a.notes[13].SetActive(true);
 //     }
 //     
-//     if (World->instances[i].ioflags & QUESTBIT_ANTENNA_SOUTH_DESTROYED) {
-//         DualLog("QUESTBIT_ANTENNA_SOUTH_DESTROYED: 1");
+//     if (World->instances[i].ioflags & Q_ANTENNA_SOUTH_DESTROYED) {
+//         DualLog("Q_ANTENNA_SOUTH_DESTROYED: 1");
 //         QuestLogNotesManager.a.notes[13].SetActive(true);
 //     }
 //     
-//     if (World->instances[i].ioflags & QUESTBIT_ANTENNA_EAST_DESTROYED) {
-//         DualLog("QUESTBIT_ANTENNA_EAST_DESTROYED: 1");
+//     if (World->instances[i].ioflags & Q_ANTENNA_EAST_DESTROYED) {
+//         DualLog("Q_ANTENNA_EAST_DESTROYED: 1");
 //         QuestLogNotesManager.a.notes[13].SetActive(true);
 //     }
 //     
-//     if (World->instances[i].ioflags & QUESTBIT_ANTENNA_WEST_DESTROYED) {
-//         DualLog("QUESTBIT_ANTENNA_WEST_DESTROYED: 1");
+//     if (World->instances[i].ioflags & Q_ANTENNA_WEST_DESTROYED) {
+//         DualLog("Q_ANTENNA_WEST_DESTROYED: 1");
 //         QuestLogNotesManager.a.notes[13].SetActive(true);
 //     }
 //     
-//     if (World->instances[i].ioflags & QUESTBIT_SELF_DESTRUCT_ACTIVATED) {
-//         DualLog("QUESTBIT_SELF_DESTRUCT_ACTIVATED: 1");
+//     if (World->instances[i].ioflags & Q_SELF_DESTRUCT_ACTIVATED) {
+//         DualLog("Q_SELF_DESTRUCT_ACTIVATED: 1");
 //         QuestLogNotesManager.a.notes[0].SetActive(true);
 //         QuestLogNotesManager.a.notes[1].SetActive(true);
 //         QuestLogNotesManager.a.notes[2].SetActive(true);
@@ -2770,8 +2770,8 @@ void UseGrenade(u16 playerIndex, int index) { // TODO
 //         QuestLogNotesManager.a.labels[15].text = Eng_Text->stringTable[568]; // Set:Escape on escape pod.
 //     }
 //     
-//     if (World->instances[i].ioflags & QUESTBIT_BRIDGE_SEPARATED) {
-//         DualLog("QUESTBIT_BRIDGE_SEPARATED: 1");
+//     if (World->instances[i].ioflags & Q_BRIDGE_SEPARATED) {
+//         DualLog("Q_BRIDGE_SEPARATED: 1");
 //         QuestLogNotesManager.a.notes[0].SetActive(true);
 //         QuestLogNotesManager.a.notes[1].SetActive(true);
 //         QuestLogNotesManager.a.notes[2].SetActive(true);
@@ -2796,7 +2796,7 @@ void UseGrenade(u16 playerIndex, int index) { // TODO
 //         QuestLogNotesManager.a.labels[17].text = Eng_Text->stringTable[570]; // Set:Destroy SHODAN.
 //     }
 //     
-//     if (World->instances[i].ioflags & QUESTBIT_ISOLINEAR_CHIPSET_INSTALLED) DualLog("QUESTBIT_ISOLINEAR_CHIPSET_INSTALLED: 1");
+//     if (World->instances[i].ioflags & Q_ISOLINEAR_CHIPSET_INSTALLED) DualLog("Q_ISOLINEAR_CHIPSET_INSTALLED: 1");
 // }
 // 
 // void DisableBits() {
@@ -3114,7 +3114,7 @@ void DoorUpdate(u16 self) {
 //================================================================================
 // Misc
 MOD_TO_ENGINE u16 SpawnDynamicObject(int val, bool cheat) {
-    if (!ConstIndexInBounds(val)) { DualLogError("Const index out of bounds: %u", val); return NULLENT; }
+    if (!IdxInBounds(val)) { DualLogError("Const index out of bounds: %u", val); return NULLENT; }
     if (cheat) DualLog("Cheat spawn constIndex %u, level: %u, from cheat: %u, name: ", val, World->curLev, cheat);
     if (IdxIsGeometry(val) && !Eng_Cheats->editMode) { CenterStatusPrint("Indices 0 through 306 (level geometry chunks) not possible when not on edit mode!"); return NULLENT; }
     u16 entityIndexInInstanceTable = NULLENT;
@@ -3216,7 +3216,7 @@ bool FrobWithHeldObject(void) {
 //================================================================================
 // Update
 MOD_TO_ENGINE void ModUpdate(void) {
-    if (World->gamePaused || World->menuActive) return;
+    if (World->paused || World->menuActive) return;
     
     WeaponsUpdate();
     PatchUpdate(PLAYER1);
@@ -3289,9 +3289,9 @@ MOD_TO_ENGINE bool ScrshotPressed(void) { return World->GetKeyPressed(41); }
 
 MOD_TO_ENGINE void ProcessInput(void) {
     if (Console()) ToggleConsole();
-    if (Menu() && !World->menuActive) { World->gamePaused = !World->gamePaused; return; }
+    if (Menu() && !World->menuActive) { World->paused = !World->paused; return; }
     if (Menu() && World->menuActive) { MenuGoBack(); return; }
-    if (World->gamePaused || World->menuActive || Eng_Cheats->consoleActive) return; // Pause/Menu barrier <<<<<<<
+    if (World->paused || World->menuActive || Eng_Cheats->consoleActive) return; // Pause/Menu barrier <<<<<<<
     
     if (ToggleMode()) ToggleInventoryMode();
     if (Lantern()) World->invP1.hardwareIsActive ^= HW_LAN;
@@ -3450,7 +3450,7 @@ u16 GetCrosshairTexture(void) {
 }
 
 u16 GetCursorTexture(void) {
-    if (World->gamePaused || World->menuActive) return 1261; // Red standard cursor
+    if (World->paused || World->menuActive) return 1261; // Red standard cursor
     if (!World->invP1.holdingObject) return GetCrosshairTexture();
     switch(World->invP1.heldObjectIndex) {
         case 308: return 838; // item_paper_wad
