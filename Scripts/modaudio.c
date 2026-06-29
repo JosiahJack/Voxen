@@ -3,7 +3,7 @@
 #include "tables_audio.h"
 #define MAXAMB 256
 static u16 ambs = 0;
-typedef struct { ma_sound sound; u32 loaded; float length_sec; } AmbientSlot;
+typedef struct { wav_channel_t sound; u32 loaded; float length_sec; } AmbientSlot;
 typedef struct { u16 index; const char* filename; } AmbientDef;
 u16 ambReg[MAXAMB]; // For ambient_ type entities that play looped sound
 static AmbientSlot ambientSlots[MAXAMB] = {0};
@@ -23,7 +23,7 @@ MOD_TO_ENGINE void MixAmbs(void) {
                 char path[512]; sFormat(path,sizeof(path),"./Audio/ambient/%s",def->filename);
                 int r = SndInit(path,&slot->sound); if(r != 0){continue;}
                 slot->length_sec = SndLen(&slot->sound); if(slot->length_sec <= 0.0f) {SndUninit(&slot->sound); continue;}
-                SoundSetLooping(&slot->sound,1);
+                SoundSetLooping(&slot->sound,true);
                 slot->loaded = 1;
             }
             if (!SndPlaying(&slot->sound)) SndStart(&slot->sound);

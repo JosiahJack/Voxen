@@ -414,7 +414,7 @@ typedef /*FAT*/ struct  {
 } Entity; // phew what a porker of a struct, it's been a eatin!
 typedef struct { Entity* entries; u32 count; u32 capacity; } DataParser;
 typedef __builtin_va_list va_list;
-typedef struct { char soundPath[128]; } ma_sound;
+typedef struct { char soundPath[128]; float *samples; u32 frame_count,frame_pos; float volume; bool looping,positional,playing; V3 pos; size_t allocSize; } wav_channel_t;
 typedef struct {
     u32 lastFrameSecCount,worstFPS,debugLineVertCount,shotsFired,grenadesThrown,savesScummed;
     u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,instCount; // Numbers of instances of entities and lights loaded (always for just the current level)
