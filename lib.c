@@ -135,10 +135,12 @@ ENGINE_TO_MOD void Screenshot() {
 
 u32 random_range_rng = 0x12345678u;
 u32 xs32() { u32 x = random_range_rng; x ^= x << 13; x ^= x >> 17; x ^= x << 5; return random_range_rng = x ? x : 0xdeadbeefu; }
-ENGINE_TO_MOD u8 random_range_u8(u8 a, u8 b) { if (a > b) { u8 temp = a; a = b; b = temp; } u32 r = (u32)b - a; u32 t = 256u - (256u % r), v; do v = (u8)xs32(); while (v >= t); return (a==b) ? a : a + (v % r); }
-ENGINE_TO_MOD u32 random_range_u32(u32 a, u32 b) { if (a > b) { u32 temp = a; a = b; b = temp; } return (a==b) ? a : a + (u32)(((u64)xs32() * ((u64)b - a)) >> 32); }
-ENGINE_TO_MOD i32 random_range_i32(i32 a, i32 b) { if (a > b) { i32 temp = a; a = b; b = temp; } return (a==b) ? a : a + (i32)(((u64)xs32() * ((u32)b - (u32)a)) >> 32); }
-ENGINE_TO_MOD float random_range(float a, float b) { return a + (b - a) * ((float)(xs32() >> 8) * (1.0f / (1U << 24))); }
+ENGINE_TO_MOD u8 random_range_u8(u8 a, u8 b) { if (a > b) { u8 temp = a; a = b; b = temp; } if (a == b) {return a;} u32 r = (u32)b - a + 1u; u32 v,limit = 256u - (256u % r); do { v = xs32() & 0xFFu; } while (v >= limit); return (u8)(a + (v % r)); }
+ENGINE_TO_MOD u32 random_range_u32(u32 a, u32 b) { if (a > b) { u32 temp = a; a = b; b = temp; } if (a == b) {return a;} u64 range = (u64)b - a + 1u; return a + (u32)(((u64)xs32() * range) >> 32);  }
+ENGINE_TO_MOD i32 random_range_i32(i32 a, i32 b) { if (a > b) { i32 temp = a; a = b; b = temp; } if (a == b) {return a;} u64 range = (u64)((i64)b - a + 1); return a + (i32)(((u64)xs32() * range) >> 32); }
+ENGINE_TO_MOD float random_range(float a, float b) { float factor = ((float)(xs32() >> 8)) * (1.0f / 16777216.0f); return a + (b - a) * factor; }
+u32 rand() { return xs32() & 0xFFFFu; }
+#define RAND_MAX 65535
 ENGINE_TO_MOD float lerp(float min, float max, float val) { return min + (max - min) * vclamp(val,0.0f,1.0f); }
 ENGINE_TO_MOD float inverse_lerp(float min, float max, float val) { return (min == max) ? 0.0f : vclamp((val - min) / (max - min),0.0f,1.0f); }
 ENGINE_TO_MOD float smooth_damp(float current, float target, float *current_velocity, float smooth_time) { 

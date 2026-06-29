@@ -21,7 +21,7 @@ MOD_TO_ENGINE void MixAmbs(void) {
             if (!slot->loaded) {
                 SndUninit(&slot->sound);
                 char path[512]; sFormat(path,sizeof(path),"./Audio/ambient/%s",def->filename);
-                int r = SndInit(path,&slot->sound); if(r != 0){continue;}
+                if (SndInit(path,&slot->sound) != 0) continue;
                 slot->length_sec = SndLen(&slot->sound); if(slot->length_sec <= 0.0f) {SndUninit(&slot->sound); continue;}
                 SoundSetLooping(&slot->sound,true);
                 slot->loaded = 1;

@@ -27,41 +27,7 @@ static float *load_wav(const char *path,u32 *out_frames, size_t* sz) {
 }
 
 i32 GetFreeWavSlot() { i32 retval = -1; for (u32 i = 0; i < wav_count; i++) { if (!wav_ch[i].playing && wav_ch[i].samples) {OS_Free(wav_ch[i].samples,wav_ch[i].allocSize); wav_ch[i].samples = NULL; wav_ch[i].allocSize = 0; retval=i; } } return retval; }
-void play_synth_plastic_tap(float volume) {
-    float duration_seconds = 0.09f; 
-    u32 frames = (u32)(AUDIO_RATE * duration_seconds);
-    size_t sz = frames * 2 * sizeof(float);
-    float* buf = (float*)OS_Alloc(sz);
-    for (u32 t = 0; t < frames; t++) {
-        float time = (float)t / (float)AUDIO_RATE;
-        float transient_part = (random_range(0.0f,1.0f) * 2.0f - 1.0f) * (vexp(-600.0f * time)) * 0.5f;
-        float sine1 = vsinf(2.0f * 3.14159265f * 800.0f * time), sine2 = vsinf(2.0f * 3.14159265f * 1100.0f * time);
-        float body_resonance = (sine1 * 0.6f) + (sine2 * 0.4f);
-        float body_env = vexp(-45.0f * time);
-        float body_part = body_resonance * body_env * 0.4f;
-        float final_sample = transient_part + body_part;
-        if (final_sample > 1.0f) final_sample = 1.0f;
-        if (final_sample < -1.0f) final_sample = -1.0f;
-        buf[t * 2 + 0] = final_sample; // Left
-        buf[t * 2 + 1] = final_sample; // Right
-    }
-    i32 slot = GetFreeWavSlot();
-    if (slot == -1 && wav_count < MAX_CHANNELS) slot = wav_count++;
-    if (slot == -1) { OS_Free(buf,sz); return; }
-    wav_ch[slot] = (wav_channel_t){ .samples = buf, .allocSize = sz, .frame_count = frames, .frame_pos = 0, .volume = volume, .looping = false, .positional = false, .playing = true };
-}
-
-void play_synth_sine(float frequency, float duration_seconds, float volume) {
-    u32 frames = (u32)(AUDIO_RATE * duration_seconds);
-    size_t sz = frames * 2 * sizeof(float);
-    float* buf = (float*)OS_Alloc(sz); 
-    for (u32 t = 0; t < frames; t++) { float sample = vsinf(2.0f * 3.14159265f * frequency * (float)t / (float)AUDIO_RATE); buf[t * 2 + 0] = sample; /*L*/ buf[t * 2 + 1] = sample; /*R*/ }
-    i32 slot = GetFreeWavSlot();
-    if (slot == -1 && wav_count < MAX_CHANNELS) slot = wav_count++;
-    if (slot == -1) { OS_Free(buf,sz); return; }   
-    wav_ch[slot] = (wav_channel_t){ .samples = buf, .allocSize = sz, .frame_count = frames, .frame_pos = 0, .volume = volume, .looping = false, .positional = false, .playing = true };
-}
-
+#include "synth.c" // Audio Synthesis Engine
 static void wave_mix(wav_channel_t* w, float* mix) {
     float vol = w->volume * (Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeEffects/100.0f); V3 pos = w->pos; float dist = V3_Dist(pos,World.instances[PLAYER1].position); float spatial_atten = (dist >= 64.0f) ? 0.0f : ((dist <= 1.0f) ? 1.0f : 1.0f-(dist-1.0f)/63.0f);
     if (w->positional) vol *= spatial_atten;
@@ -70,8 +36,9 @@ static void wave_mix(wav_channel_t* w, float* mix) {
 
 static void audio_mix_period(i16 *out) {
     float mix[AUDIO_FRAMES*AUDIO_CHANNELS]; mset(mix,0,sizeof(mix));
-    for (u32 c=0;c<wav_count;c++) { wav_channel_t* w = &wav_ch[c]; if (w->playing && w->samples) {wave_mix(w,mix);} }
-    for (u32 c=0;c<ext_count;c++) { wav_channel_t* w =  ext_ch[c]; if (w->playing && w->samples) {wave_mix(w,mix);} }
+    for (u32 c=0;c<wav_count;c++) { if ( wav_ch[c].playing &&  wav_ch[c].samples) {wave_mix(&wav_ch[c],mix);} } // General wav file playback
+    for (u32 c=0;c<ext_count;c++) { if (ext_ch[c]->playing && ext_ch[c]->samples) {wave_mix(ext_ch[c], mix);} } // Looped Ambients
+    for (u32 c=0;c<MAX_SYNTH_VOICES;c++) if (syn_ch[c].active) synth_mix(&syn_ch[c],mix); // Synthesized audio (oh yes!)
     if (log_playing && log_samples) {
         float vol = (Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeMessage/100.0f);
         for (i32 f = 0; f < AUDIO_FRAMES; f++) {

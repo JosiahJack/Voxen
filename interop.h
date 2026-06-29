@@ -112,7 +112,7 @@
         #define ENGINE_TO_MOD __attribute__((visibility("default")))
     #endif
 #endif
-ENGINE_TO_MOD void* mset(void *dst, int c, size_t n);
+ENGINE_TO_MOD void* mset(void *dst, i32 c, size_t n);
 ENGINE_TO_MOD void DualLog(const char* fmt, ...);
 ENGINE_TO_MOD void DualLogWarn(const char* fmt, ...);
 ENGINE_TO_MOD void DualLogError(const char* fmt, ...);
@@ -141,7 +141,7 @@ ENGINE_TO_MOD RaycastHit CapsuleCast(V3 start, V3 end, float capsuleRadius, floa
 ENGINE_TO_MOD bool CheckCapsule(V3 start, V3 end, float capsuleRadius, float capsuleHeight, u32 layerMask);
 ENGINE_TO_MOD void AddWireLine(V3 start, V3 end, Color col);
 ENGINE_TO_MOD i32 PosGetCellCoords(float pos_x, float pos_z);
-ENGINE_TO_MOD int sFormat(char* buffer, size_t bufferSize, const char* format, ...); // snprintf replacement
+ENGINE_TO_MOD i32 sFormat(char* buffer, size_t bufferSize, const char* format, ...); // snprintf replacement
 ENGINE_TO_MOD bool PositionVisibleFromPlayerCell(float x, float z);
 ENGINE_TO_MOD void SndUninit(wav_channel_t* snd);
 ENGINE_TO_MOD i32 SndInit(const char* path, wav_channel_t* pSound);
@@ -159,7 +159,7 @@ ENGINE_TO_MOD void ApplyPlayerMovements(void);
 ENGINE_TO_MOD void AddForce(u16 idx, V3 force, bool isImpulse);
 ENGINE_TO_MOD void CenterStatusPrint(const char* fmt, ...);
 ENGINE_TO_MOD void PortalCulling(void);
-ENGINE_TO_MOD char* sLevelFileUpToEndLine(char* buf, int size);
+ENGINE_TO_MOD char* sLevelFileUpToEndLine(char* buf, i32 size);
 ENGINE_TO_MOD void LoadLevel(u8 curlevel);
 ENGINE_TO_MOD void LoadFieldIntoLight(char* trimmed_key, char* trimmed_value, char* initialLine, u32 lineNum, Light* lit, LightAnimation* lan, u16 lightIdx);
 ENGINE_TO_MOD i32 AddLight(Light* lit, LightAnimation* lanim);
@@ -184,7 +184,7 @@ INLINE u32 parse_numberu32(const char* str, const char* line, u32 lineNum) {
     if (*str == '-') { DualLogError("Invalid input, negative not allowed (%s)\n      from line[%d]: %s\n", str, lineNum+1, line); return 0; }
     unsigned long result = 0;
     while (*str >= '0' && *str <= '9') {
-        int digit = *str - '0';
+        i32 digit = *str - '0';
         result = result * 10uL + (unsigned long)digit;
         str++;
     }

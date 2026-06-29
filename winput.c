@@ -952,6 +952,12 @@ bool JoystickPresent(int jid) { if (jid < 0 || jid > JOYSTICK_LAST || (!WinSys.j
 void FreeJoystick(WinSysjoystick* js) { OS_Free(js->axes,js->axesSize); OS_Free(js->buttons,js->buttonsSize); OS_Free(js->hats,js->hatsSize); mset(js,0,sizeof(WinSysjoystick)); }
 void play_synth_sine(float frequency, float duration_seconds, float volume);
 void play_synth_plastic_tap(float volume);
+void play_synth_laser(float volume);
+void play_synth_vent(float vol);
+void play_synth_door_thud(float vol);
+void play_synth_spark(float vol);
+void play_synth_clink(float freq,float decay,float volume);
+void play_synth_search(float volume,float freq_lo,float freq_hi);
 void InputProcessing() {
     mouseMovementThisFrame = false; PollEvents();
     for (int jid = JOYSTICK_1; jid <= JOYSTICK_LAST; ++jid) { // Input Poll
@@ -964,8 +970,11 @@ void InputProcessing() {
     }
 
     if (Sys_Input.keyStates[KEY_E].pressed) play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f,(V3){},false);
-    if (Sys_Input.keyStates[KEY_T].pressed) play_synth_sine(440.0f,0.5f,0.02f);
-    if (Sys_Input.keyStates[KEY_R].pressed) play_synth_plastic_tap(0.2f);
+    if (Sys_Input.keyStates[KEY_W].pressed) play_synth_vent(0.2f);
+    if (Sys_Input.keyStates[KEY_T].pressed) play_synth_door_thud(0.2f);
+    if (Sys_Input.keyStates[KEY_R].pressed) play_synth_spark(0.2f);
+    if (Sys_Input.keyStates[KEY_Y].pressed) play_synth_laser(0.2f);
+    if (Sys_Input.keyStates[KEY_U].pressed) play_synth_plastic_tap(0.2f);
     if (window_has_focus) { if(Sys_Input.keyStates[KEY_CAPS_LOCK].pressed){Sys_Input.isCapsLockOn=!Sys_Input.isCapsLockOn;} ProcessInput(); }
 }
 
