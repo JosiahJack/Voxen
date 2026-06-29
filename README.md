@@ -23,13 +23,12 @@ Further, the procedural sky is hardcoded and not intended to be a general sky sy
 Modifications are of course welcome, however.  The hope is that everything is quite
 straightforward. (TBD shaders part of mod/gamecode?)
 
-Using GLFW3.5(what's left of it) and OpenGL 4.3+, this engine attempts to achieve
-maximum compatibility and maximum performance with minimal footprint.  Heavy use of 
-SSBOs is made though this is still compatible with old hardware and GL drivers from
-15yrs ago; further very few GL extensions are used to further widen compatibility.
-Careful handling of CPU to GPU transfers is made to minimize VRAM and to prevent 
-naughty GL drivers duplicating that VRAM into the CPU RAM space which is also kept
-minimal.
+Using OpenGL 4.3+, this engine attempts to achieve maximum compatibility and maximum 
+performance with minimal footprint.  Heavy use of SSBOs is made though this is still 
+compatible with old hardware and GL drivers from 15yrs ago; further very few GL extensions 
+are used to further widen compatibility.  Careful handling of CPU to GPU transfers 
+is made to minimize VRAM and to prevent naughty GL drivers duplicating that VRAM into 
+the CPU RAM space which is also kept minimal.
 
 All texture and model data is loaded from disk directly for ease of development
 and full mod support by design.  Any intermediate format is internal to the engine.
@@ -70,8 +69,6 @@ Single command:
 ```bash
 sudo apt install zig libgl1-mesa-dev
 ```
-
-Notes: Glfw remnants still present, bundled together in glfw.c as I ever continue to reduce dependencies.
 
 ## System Architecture
 
@@ -225,10 +222,10 @@ Built engine successfully.
 Built mod gamecode successfully.
 Built engine and mod in 954 ms
 Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed
-GLFW init took 0.010394029 secs
-Load Config.ini, glfw create window and GL context took 0.081719108 secs
+WinSys init took 0.010394029 secs
+Load Config.ini, create window and GL context took 0.081719108 secs
 GL function loading took 0.000441692 secs
-Set monitor, Set GLFW callbacks, Compile shaders took 0.004927384 secs
+Set monitor, Set WinSys callbacks, Compile shaders took 0.004927384 secs
 GL buffer definitions took 0.000161770 secs
 Loading game definition... Citadel:: num levels: 14, start level: 1... took 0.000048480 secs
 Reloading mod code...dlopen-ing...done!
@@ -258,10 +255,10 @@ Built engine and mod in 395 ms
 Memory at program start: Heap 0 bytes (0 KB | 0.00 MB), USS 35565568 bytes (34732 KB | 33.92 MB)
 Memory at InitializeEnvironment start: Heap 0 bytes (0 KB | 0.00 MB), USS 35565568 bytes (34732 KB | 33.92 MB)
 Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed
-GLFW init took 0.011530377 secs
-Load Config.ini, glfw create window and GL context took 0.073844631 secs
+WinSys init took 0.011530377 secs
+Load Config.ini, create window and GL context took 0.073844631 secs
 GL function loading took 0.000458672 secs
-Set monitor, Set GLFW callbacks, Compile shaders took 0.004821350 secs
+Set monitor, Set WinSys callbacks, Compile shaders took 0.004821350 secs
 GL buffer definitions took 0.000160161 secs
 Loading game definition... Citadel:: num levels: 14, start level: 1... took 0.000090910 secs
 Reloading mod code...dlopen-ing...done!
