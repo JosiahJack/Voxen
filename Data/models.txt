@@ -578,8 +578,8 @@ index: 305
 #Models/npc_cyborgassassin_throwingstar.obj
 index: 307
 
-#Models/npc_cyborg_diegoteleportfx.obj
-index: 311
+
+
 
 #Models/reac1_1_slice45.obj
 index: 339

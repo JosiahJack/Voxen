@@ -1,7 +1,9 @@
 // textures.c - 2D Texture Loading System
 u32 totalPixels,totalPaletteColors;
 typedef struct { u16 index; bool transparent; bool doublesided; char path[128]; } TextureData; typedef struct { TextureData* entries; u32 count; u32 capacity; } TextureDataParser; typedef struct { const char* data; int size; } RawTexture;
-typedef struct TextureParseTask { u32 start_tex; u32 end_tex; RawTexture* raw_textures; i32* parsIdx; const TextureDataParser* parser; int tid; } TextureParseTask;                 typedef struct { u32 img_x, img_y; i32 img_n, img_out_n; u8* img_buffer, *img_buffer_end; } PngContext;
+typedef struct { u32 img_x, img_y; i32 img_n, img_out_n; u8* img_buffer, *img_buffer_end; } PngContext;
+typedef struct { u8* indices; u32* palette,palSize; i32 w, h; } TexResult;
+typedef struct TextureParseTask { u32 texCnt; _Atomic u32* shared_idx; RawTexture* raw_textures; i32* parsIdx; const TextureDataParser* parser; TexResult* results;int tid; } TextureParseTask;
 typedef struct { PngContext* s; u8* idata, *expanded, *out; } PngData; typedef struct { u16 fast[1<<9], firstcode[16], firstsymbol[16], value[288]; i32 maxcode[17]; u8 size[288]; } PngHuffman; typedef struct { u8 *zbuffer, *zbuffer_end, *zout, *zout_start; i32 num_bits; u32 code_buffer; PngHuffman z_length, z_distance; } pngzbuf;
 enum { PNGFmt_none=0, PNGFmt_sub=1, PNGFmt_up=2, PNGFmt_avg=3, PNGFmt_paeth=4, PNGFmt_avg_first, PNGFmt_paeth_first };
 PngArena png_arena_main; static PngArena* thread_png_arenas = NULL; static u8** textureIndexBuffers = NULL; static u32** texturePaletteBuffers = NULL; static u32* texturePaletteSizes = NULL; static i32* textureWidths = NULL; static i32* textureHeights = NULL;
@@ -125,33 +127,49 @@ u8* PngLoad(const u8* buffer, int len, int* x, int* y, PngArena* arena) {
 }
 
 static void* TextureParsingWorker(void* arg) {
-    TextureParseTask* t = (TextureParseTask*)arg;
-    for (u32 i = t->start_tex; i < t->end_tex; ++i) {
-        i32 pIdx = t->parsIdx[i]; if (unlikely(pIdx < 0 || pIdx >= (i32)t->parser->count)) continue;
-        doubleSidedTexture[i] = t->parser->entries[pIdx].doublesided; transparentTexture[i] = t->parser->entries[pIdx].transparent;
-        const char* d = t->raw_textures[i].data; int sz = t->raw_textures[i].size; if (unlikely(!d || sz <= 0)) continue;
-        int w=0, h=0; u8 *pix = PngLoad((const u8*)d, sz, &w, &h, &thread_png_arenas[t->tid]);
-        if (!pix || w < 1 || h < 1) { OS_Free((void*)d,(size_t)sz); continue; }
-        u32 nP = (u32)w * h; u8 *idx = (u8*)OS_Alloc(nP); u32 *pal = (u32*)OS_Alloc(256 * sizeof(u32)); u32 pSz = 0; u16 hash[1024] = {0}; // Use u16 to store 0 = empty
+    TextureParseTask* t = (TextureParseTask*)arg; u32 i;
+    while ((i = __atomic_fetch_add((u32*)t->shared_idx, 1, 5)) < t->texCnt) { // Dynamic Work Stealing: Threads fetch next available index automatically
+        i32 pIdx = t->parsIdx[i]; 
+        if (unlikely(pIdx < 0 || pIdx >= (i32)t->parser->count)) continue;
+        doubleSidedTexture[i] = t->parser->entries[pIdx].doublesided; 
+        transparentTexture[i] = t->parser->entries[pIdx].transparent;
+        const char* d = t->raw_textures[i].data; 
+        int sz = t->raw_textures[i].size; 
+        if (unlikely(!d || sz <= 0)) continue;
+        int w=0, h=0; u8 *pix = PngLoad((const u8*)d,sz,&w,&h,&thread_png_arenas[t->tid]); if (!pix || w < 1 || h < 1) { OS_Free((void*)d,(size_t)sz); continue; }
+        u32 nP = (u32)w * h; u8 *idx = (u8*)OS_Alloc(nP); u32 *pal = (u32*)OS_Alloc(256 * sizeof(u32)); u32 pSz = 0; 
+        u32 exact_hash[8192]; mset(exact_hash,0xFF,sizeof(exact_hash));// Fast Exact Match Hash Map (8192 slots), 0xFFFFFFFF = empty
+        u8 exact_idx[8192]; 
+        u8 nearest_cache[32768]; mset(nearest_cache,0xFF,sizeof(nearest_cache)); // 15-bit Color Space Cache for fast nearest-neighbor fallback
         for (u32 p = 0; p < nP; ++p) {
             u32 c = ((u32*)pix)[p];
-            u32 s = (c * 0x9e3779b9u) & 1023;
-            while (hash[s]) { if (pal[hash[s]-1] == c) { idx[p] = (u8)(hash[s]-1); goto found; } s = (s + 1) & 1023; }
-            if (pSz < 256) { pal[pSz] = c; idx[p] = (u8)pSz; hash[s] = (u16)(++pSz); }
-            else { // Fallback: nearest color (rare if textures are reasonable)
-                u32 best = 0, bestDist = ~0u;
-                u8 r1 = c, g1 = c>>8, b1 = c>>16, a1 = c>>24;
-                for (u32 k = 0; k < pSz; ++k) {
+            u32 h_val = (c * 0x9E3779B9u); // Murmur-style avalanche hash
+            h_val ^= h_val >> 16;
+            u32 slot = h_val & 8191;
+            while (exact_hash[slot] != 0xFFFFFFFF) { if (exact_hash[slot] == c) { idx[p] = exact_idx[slot]; goto found; }  slot = (slot + 1) & 8191; }
+            if (pSz < 256) { 
+                pal[pSz] = c; 
+                idx[p] = (u8)pSz; 
+                exact_hash[slot] = c;
+                exact_idx[slot] = (u8)pSz;
+                pSz++; 
+            } else { // Fallback: Check Nearest Neighbor Cache first (R5 G5 B5)
+                u32 cache_key = ((c & 0xF8) << 7) | ((c & 0xF800) >> 1) | ((c & 0xF80000) >> 9);
+                if (nearest_cache[cache_key] != 0xFF) { idx[p] = nearest_cache[cache_key]; goto found; }
+                u32 best = 0, bestDist = ~0u; // Cache Miss: Full Search
+                i32 r1 = c & 255, g1 = (c>>8) & 255, b1 = (c>>16) & 255, a1 = c>>24;
+                for (u32 k = 0; k < 256; ++k) {
                     u32 pc = pal[k]; 
                     i32 dr = (pc&255)-r1, dg = ((pc>>8)&255)-g1, db = ((pc>>16)&255)-b1, da = (pc>>24)-a1;
                     u32 dist = dr*dr + dg*dg + db*db + da*da;
                     if (dist < bestDist) { bestDist = dist; best = k; }
                 }
                 idx[p] = (u8)best;
+                nearest_cache[cache_key] = (u8)best; // Update Cache
             }
             found:;
         }
-        textureIndexBuffers[i] = idx; texturePaletteBuffers[i] = pal; texturePaletteSizes[i] = pSz; textureWidths[i] = w; textureHeights[i] = h;
+        t->results[i] = (TexResult){.indices = idx, .palette = pal, .palSize = pSz, .w = w, .h = h};
         OS_Free((void*)d,(size_t)sz);
     }
     return NULL;
@@ -213,79 +231,87 @@ void VSetWindowIcon(WinSysIcon*);
 static __attribute__((noinline)) void LoadTextures() {
     double start_time = get_time();
     texCnt = totalPixels = totalPaletteColors = 0u;
-    TextureDataParser texture_parser; if (unlikely(!ParseTextureData(&texture_parser,MAX_TXRS, "./Data/textures.txt"))) { DualLogError("Could not parse ./Data/textures.txt!\n"); OS_Exit(1); }
+    TextureDataParser texture_parser; 
+    if (unlikely(!ParseTextureData(&texture_parser, MAX_TXRS, "./Data/textures.txt"))) { DualLogError("Could not parse ./Data/textures.txt!\n"); OS_Exit(1); }
     i32 maxIndex = -1;
-    for (u32 k = 0; k < texture_parser.count; ++k) { if (texture_parser.entries[k].index > maxIndex && texture_parser.entries[k].index != U16_MAX) maxIndex = texture_parser.entries[k].index; }
+    for (u32 k = 0; k < texture_parser.count; ++k) { if (texture_parser.entries[k].index > maxIndex && texture_parser.entries[k].index != U16_MAX) {maxIndex = texture_parser.entries[k].index;} }
     texCnt = (u16)(maxIndex + 1);
     i32* parsIdx = OS_Alloc(texCnt * sizeof(i32));
     mset(parsIdx, -1, texCnt * sizeof(i32));
-    for (u32 k = 0; k < texture_parser.count; ++k) { if (texture_parser.entries[k].index < texCnt) parsIdx[texture_parser.entries[k].index] = (i32)k; }
+    for (u32 k = 0; k < texture_parser.count; ++k) { if (texture_parser.entries[k].index < texCnt) {parsIdx[texture_parser.entries[k].index] = (i32)k;} }
     DualLog("Loading textures (%u) ... ", texture_parser.count);
     RawTexture* rawTextures = OS_Alloc(texCnt * sizeof(RawTexture));
-    mset(rawTextures,0,texCnt * sizeof(RawTexture));
+    mset(rawTextures, 0, texCnt * sizeof(RawTexture));
     for (u32 i = 0; i < texCnt; ++i) {
         i32 p = parsIdx[i]; if (p < 0) continue;
         const char* path = texture_parser.entries[p].path;
         FHandle dummy_fd;
-        int size = 0; rawTextures[i].data = (const char*)OS_OpenAndAllocateFileBufferReadonly(path,&dummy_fd,&size);
+        int size = 0; 
+        rawTextures[i].data = (const char*)OS_OpenAndAllocateFileBufferReadonly(path, &dummy_fd, &size);
         rawTextures[i].size = size;
     }
     thread_png_arenas = (PngArena*)OS_Alloc((size_t)threadCnt * sizeof(PngArena));
     for (int t = 0; t < threadCnt; ++t) { thread_png_arenas[t].base = NULL; PngArenaInit(&thread_png_arenas[t]); }
-    textureIndexBuffers = OS_Alloc(texCnt * sizeof(u8*)); texturePaletteBuffers = OS_Alloc(texCnt * sizeof(u32*));
-    texturePaletteSizes = OS_Alloc(texCnt * sizeof(u32));         textureWidths = OS_Alloc(texCnt * sizeof(i32));
-    textureHeights      = OS_Alloc(texCnt * sizeof(i32));
-    TextureParseTask tasks[32]; u32 chunk = (texCnt + (u32)threadCnt - 1U) / (u32)threadCnt;
-    for (int t = 0; t < threadCnt; ++t) { u32 start = ((u32)t * chunk); tasks[t] = (TextureParseTask){.start_tex=start,.end_tex=clamp(start+chunk,0,texCnt),.raw_textures=rawTextures,.parsIdx=parsIdx,.parser=&texture_parser,.tid=t}; }
+    TexResult* texResults = OS_Alloc(texCnt * sizeof(TexResult)); // Unified result struct allocation
+    mset(texResults, 0, texCnt * sizeof(TexResult));
+    TextureParseTask tasks[32]; 
     OS_Thread workers[32];
-    for (int t = 0; t < threadCnt; ++t) OS_ThreadCreate(&workers[t],TextureParsingWorker,&tasks[t]);
-    for (int t = 0; t < threadCnt; ++t) OS_ThreadJoin(&workers[t]); //     for (int t = 0; t < threadCnt; ++t) TextureParsingWorker(&tasks[t]); // Single threaded alternative
+    _Atomic u32 shared_idx = 0; // The shared thread counter
+    for (int t = 0; t < threadCnt; ++t) { tasks[t] = (TextureParseTask){.texCnt = texCnt, .shared_idx = &shared_idx, .raw_textures = rawTextures, .parsIdx = parsIdx, .parser = &texture_parser, .results = texResults,.tid = t}; OS_ThreadCreate(&workers[t], TextureParsingWorker, &tasks[t]); }
+    for (int t = 0; t < threadCnt; ++t) OS_ThreadJoin(&workers[t]);
     totalPixels = totalPaletteColors = 0u;
-    for (u16 i = 0; i < texCnt; ++i) { if (textureIndexBuffers[i]) { totalPixels += (u32)textureWidths[i] * textureHeights[i]; totalPaletteColors += texturePaletteSizes[i]; } }
-    size_t offsets_size = texCnt * sizeof(u32), palettes_size = totalPaletteColors * sizeof(u32), indices_size = totalPixels;
-    size_t arena_size = offsets_size + palettes_size + indices_size;
-    void* arena = OS_AllocateRAM(arena_size,0x1|0x2,0x20|0x02|0x08000,INVALID_FHANDLE);
+    for (u16 i = 0; i < texCnt; ++i) { if (texResults[i].indices) { totalPixels += (u32)texResults[i].w * texResults[i].h; totalPaletteColors += texResults[i].palSize; } }
+    size_t offsets_size = texCnt * sizeof(u32); size_t palettes_size = totalPaletteColors * sizeof(u32); size_t indices_size = totalPixels; size_t arena_size = offsets_size + palettes_size + indices_size;
+    void* arena = OS_AllocateRAM(arena_size, 0x1|0x2, 0x20|0x02|0x08000, INVALID_FHANDLE);
     u8* cur = (u8*)arena;
     u32* textureOffsets = (u32*)cur; cur += offsets_size;
     i32* textureSizes = OS_Alloc(texCnt * 2 * sizeof(i32));
     u32* texturePaletteOffsets = OS_Alloc(texCnt * sizeof(u32));
     u32* texturePalettes = (u32*)cur; cur += palettes_size;
-    u8* all_indices = cur; u32 pixel_base = 0, color_base = 0;
-    for (u16 i=0;i<texCnt;++i) {
-        if (!textureIndexBuffers[i]) continue;
-        u32 numP = (u32)textureWidths[i] * textureHeights[i]; u32 palS = texturePaletteSizes[i];
-        textureOffsets[i] = pixel_base; texturePaletteOffsets[i] = color_base;
-        textureSizes[i*2]     = textureWidths[i]; textureSizes[i*2 + 1] = textureHeights[i];
-        mcpy(all_indices + pixel_base,textureIndexBuffers[i],numP);
-        mcpy(texturePalettes + color_base,texturePaletteBuffers[i],palS * sizeof(u32));
-        pixel_base += numP; color_base += palS;
-        OS_Free(textureIndexBuffers[i],numP); OS_Free(texturePaletteBuffers[i],palS * sizeof(u32));
+    u8* all_indices = cur; 
+    u32 pixel_base = 0, color_base = 0;
+    for (u16 i=0; i<texCnt; ++i) {
+        if (!texResults[i].indices) continue;
+        u32 numP = (u32)texResults[i].w * texResults[i].h; 
+        u32 palS = texResults[i].palSize;
+        textureOffsets[i] = pixel_base; 
+        texturePaletteOffsets[i] = color_base;
+        textureSizes[i*2]     = texResults[i].w; 
+        textureSizes[i*2 + 1] = texResults[i].h;
+        mcpy(all_indices + pixel_base, texResults[i].indices, numP);
+        mcpy(texturePalettes + color_base, texResults[i].palette, palS * sizeof(u32));
+        pixel_base += numP; 
+        color_base += palS;
+        OS_Free(texResults[i].indices, numP); 
+        OS_Free(texResults[i].palette, palS * sizeof(u32));
     }
-    DualLog("total palette colors: %u, total pixels: %u...", totalPaletteColors,totalPixels);
+    DualLog("total palette colors: %u, total pixels: %u...", totalPaletteColors, totalPixels);
     i32 packed_size = ((i32)totalPixels + 3) / 4 * sizeof(u32);
-    glBindBuffer(GL_SSBO,colorBufferID);
-    void* dst = glMapBufferRange(GL_SSBO,0,packed_size,0x0002/*GL_MAP_WRITE_BIT*/|0x0004/*GL_MAP_INVALIDATE_RANGE_BIT*/);
-    mcpy(dst,all_indices,packed_size); 
-    glUnmapBuffer(GL_SSBO);
-    glBindBuffer(GL_SSBO,texPalID);         glBufferData(GL_SSBO,totalPaletteColors * sizeof(u32),texturePalettes,GL_STATIC_DRAW);
-    glBindBuffer(GL_SSBO,textureOffsetsID); glBufferData(GL_SSBO,texCnt * sizeof(u32),textureOffsets,GL_STATIC_DRAW);
-    glBindBuffer(GL_SSBO,textureSizesID);   glBufferData(GL_SSBO,texCnt * 2 * sizeof(i32),textureSizes,GL_STATIC_DRAW);
-    glBindBuffer(GL_SSBO,texPalOfsID);      glBufferData(GL_SSBO,texCnt * sizeof(u32),texturePaletteOffsets,GL_STATIC_DRAW); glBindBuffer(GL_SSBO,0);
-    OS_Free(texture_parser.entries,texture_parser.count * sizeof(TextureData)); OS_Free(arena,arena_size);
-    OS_Free(rawTextures,texCnt * sizeof(RawTexture));           OS_Free(parsIdx,texCnt * sizeof(i32));
-    OS_Free(textureIndexBuffers,texCnt * sizeof(u8*));          OS_Free(textureSizes,texCnt * 2 * sizeof(i32));
-    OS_Free(texturePaletteBuffers,texCnt * sizeof(u32*));       OS_Free(texturePaletteSizes,texCnt * sizeof(u32));
-    OS_Free(texturePaletteOffsets,texCnt * sizeof(u32));        OS_Free(textureWidths,texCnt * sizeof(i32));
-    OS_Free(textureHeights,texCnt * sizeof(i32));               for (int t=0;t<threadCnt;++t) OS_Free(thread_png_arenas[t].base,16777216);
-    OS_Free(thread_png_arenas,(size_t)threadCnt * sizeof(PngArena));
-    FHandle fp = OS_OpenReadonly(World.global_winicon); // Load window icon
+    glBindBuffer(GL_SSBO, colorBufferID);
+    void* dst = glMapBufferRange(GL_SSBO,0,packed_size,0x0002|0x0004);
+    mcpy(dst,all_indices,packed_size); glUnmapBuffer(GL_SSBO);
+    glBindBuffer(GL_SSBO, texPalID);         glBufferData(GL_SSBO, totalPaletteColors * sizeof(u32), texturePalettes, GL_STATIC_DRAW);
+    glBindBuffer(GL_SSBO, textureOffsetsID); glBufferData(GL_SSBO, texCnt * sizeof(u32), textureOffsets, GL_STATIC_DRAW);
+    glBindBuffer(GL_SSBO, textureSizesID);   glBufferData(GL_SSBO, texCnt * 2 * sizeof(i32), textureSizes, GL_STATIC_DRAW);
+    glBindBuffer(GL_SSBO, texPalOfsID);      glBufferData(GL_SSBO, texCnt * sizeof(u32), texturePaletteOffsets, GL_STATIC_DRAW); glBindBuffer(GL_SSBO, 0);
+    OS_Free(texture_parser.entries, texture_parser.count * sizeof(TextureData)); OS_Free(arena, arena_size);
+    OS_Free(rawTextures, texCnt * sizeof(RawTexture));                           OS_Free(parsIdx, texCnt * sizeof(i32));
+    OS_Free(texResults, texCnt * sizeof(TexResult));                             OS_Free(textureSizes, texCnt * 2 * sizeof(i32));
+    OS_Free(texturePaletteOffsets, texCnt * sizeof(u32));        
+    for (int t=0; t<threadCnt; ++t) OS_Free(thread_png_arenas[t].base, 16777216);
+    OS_Free(thread_png_arenas, (size_t)threadCnt * sizeof(PngArena));
+    FHandle fp = OS_OpenReadonly(World.global_winicon);
     int windowIconFileSize = OS_FileSize(fp);
-    u8* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize,fp,World.global_winicon);    
+    u8* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize, fp, World.global_winicon);    
     OS_Close(fp); PngArenaInit(&png_arena_main);
-    int w=1,h=1; u8* pixels = PngLoad(file_buffer,windowIconFileSize,&w,&h,&png_arena_main);
-    if (!pixels) { DualLogError("Failed to load icon: %s\n",World.global_winicon); OS_Exit(1); }
-    WinSysIcon image = (WinSysIcon){w,h,pixels}; VSetWindowIcon(&image);
-    OS_Free(file_buffer,windowIconFileSize); OS_Free(png_arena_main.base,16777216); png_arena_main.base = NULL;
-    DualLog(" took %.6f secs\n",get_time() - start_time);
+    int w=1, h=1; 
+    u8* pixels = PngLoad(file_buffer, windowIconFileSize, &w, &h, &png_arena_main);
+    if (!pixels) { DualLogError("Failed to load icon: %s\n", World.global_winicon); OS_Exit(1); }
+    WinSysIcon image = (WinSysIcon){w,h,pixels}; 
+    VSetWindowIcon(&image);
+    OS_Free(file_buffer, windowIconFileSize); 
+    OS_Free(png_arena_main.base, 16777216); 
+    png_arena_main.base = NULL;
+    DualLog(" took %.6f secs\n", get_time() - start_time);
     DebugRAM("After LoadTextures and after deallocation");
 }

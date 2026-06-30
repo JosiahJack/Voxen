@@ -1,9 +1,9 @@
 // models.c - 3D Models Loading System
 u8** modelVertices = NULL; u16** modelTriangles = NULL; u32 modelVertexCounts[MAX_MDLS] = {0}; u16 modelTriangleCounts[MAX_MDLS] = {0}; float modelBounds[MAX_MDLS] = {0}; u16 mdlsCnt = 0;
 #define MAX_VERT_ELEMENT_SIZE 6964
-#define MAX_OUTPUT_VERTS      36364
+#define MAX_OUTPUT_VERTS      32364
 static float **thread_temp_pos = NULL, **thread_temp_nrm = NULL, **thread_temp_uv = NULL, **thread_out_verts = NULL; static u16** thread_out_tris = NULL;
-typedef struct { const char* data; int size; } RawOBJ; typedef struct { u16 index; bool animated; u8 animationNum; char path[128]; } ModelData; typedef struct { ModelData* entries; u32 count; u32 capacity; } ModelDataParser;
+typedef struct { const char* data; const char* name; int size; } RawOBJ; typedef struct { u16 index; bool animated; u8 animationNum; char path[128]; } ModelData; typedef struct { ModelData* entries; u32 count; u32 capacity; } ModelDataParser;
 INLINE half float_to_half(float f) {
     u32 x; mcpy(&x,&f,4);
     u32 s = x>>31, ue = (x>>23)&0xff; i32 e = (i32)ue-127; u32 m = x&0x7fffff;
@@ -45,7 +45,7 @@ static u8* OptimizeVertexFetch(u8* v, u32* vc, u16* idx, u32 ic, size_t stride) 
     return nv;
 }
 
-static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, const char* __restrict d, int fs, float* __restrict tp, float* __restrict tn, float* __restrict tu, float* __restrict sv, u16* __restrict st, u8** ov, u32* ovc, u16** ot, u16* otc) {
+static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, const char* __restrict d, int fs, float* __restrict tp, float* __restrict tn, float* __restrict tu, float* __restrict sv, u16* __restrict st, u8** ov, u32* ovc, u16** ot, u16* otc, const char* name) {
     *ov = NULL; *ot = NULL; *ovc = *otc = 0;
     u32 pc=0,nc=0,uc=0,ec=0;
     float mx=1e9f,my=1e9f,mz=1e9f,Mx=-1e9f,My=-1e9f,Mz=-1e9f;
@@ -82,7 +82,7 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, c
             }
             if (nv < 3) goto skip;
             for (int k=1; k<nv-1; ++k) {
-                if (unlikely(ec + 3 > MAX_OUTPUT_VERTS)) {DualLogError("vert overflow!\n"); return false;}
+                if (unlikely(ec + 3 > MAX_OUTPUT_VERTS)) {DualLogError("vert overflow %s!\n",name); return false;}
                 u32 tri[3] = {0, (u32)k, (u32)(k+1)};
                 for (int t=0; t<3; ++t) {
                     int ix = tri[t]; u32 v = vi[ix] ? vi[ix]-1 : 0; u32 tex = (ti[ix] && ti[ix] <= uc) ? ti[ix]-1 : 0; u32 nrm = (ni[ix] && ni[ix] <= nc) ? ni[ix]-1 : 0; float* dst = sv + (ec<<3);
@@ -125,7 +125,7 @@ static void* ModelParsingWorker(void* arg) {
     ModelParseTask* t = arg;
     for (u32 i = t->start; i < t->end; ++i) {
         RawOBJ obj = t->raw[i]; if (unlikely(!obj.data || obj.size <= 0)) continue;
-        if (!ParseOBJ(i,obj.data,obj.size,thread_temp_pos[t->tid],thread_temp_nrm[t->tid],thread_temp_uv[t->tid],thread_out_verts[t->tid],thread_out_tris[t->tid],&modelVertices[i],&modelVertexCounts[i],&modelTriangles[i],&modelTriangleCounts[i])) continue;
+        if (!ParseOBJ(i,obj.data,obj.size,thread_temp_pos[t->tid],thread_temp_nrm[t->tid],thread_temp_uv[t->tid],thread_out_verts[t->tid],thread_out_tris[t->tid],&modelVertices[i],&modelVertexCounts[i],&modelTriangles[i],&modelTriangleCounts[i],obj.name)) continue;
     }
     return NULL;
 }
@@ -189,7 +189,7 @@ void LoadModels() {
     mset(idxmap, -1, n*sizeof(i32));
     for (u32 i=0; i<mp.count; ++i) if (mp.entries[i].index != U16_MAX) idxmap[mp.entries[i].index] = (i32)i;
     RawOBJ* raw = (RawOBJ*)p; p += n*sizeof(RawOBJ);
-    for (u32 i=0; i<n; ++i) { i32 pi = idxmap[i]; if(pi >= 0){ FHandle d; int sz=0; raw[i].data=(const char*)OS_OpenAndAllocateFileBufferReadonly(mp.entries[pi].path,&d,&sz); raw[i].size=sz;} }
+    for (u32 i=0; i<n; ++i) { i32 pi = idxmap[i]; if(pi >= 0){ FHandle d; int sz=0; raw[i].data=(const char*)OS_OpenAndAllocateFileBufferReadonly(mp.entries[pi].path,&d,&sz); raw[i].size=sz; raw[i].name=mp.entries[pi].path;} }
     float **pos = (float**)p; p += threadCnt*sizeof(float*);  float **nrm = (float**)p; p += threadCnt*sizeof(float*);
     float **uv  = (float**)p; p += threadCnt*sizeof(float*);  float **ov  = (float**)p; p += threadCnt*sizeof(float*);
     u16   **ot  =   (u16**)p; p += threadCnt*sizeof(u16*);
