@@ -1,50 +1,61 @@
 // models.c - 3D Models Loading System
 u8** modelVertices = NULL; u16** modelTriangles = NULL; u32 modelVertexCounts[MAX_MDLS] = {0}; u16 modelTriangleCounts[MAX_MDLS] = {0}; float modelBounds[MAX_MDLS] = {0}; u16 mdlsCnt = 0;
 #define MAX_VERT_ELEMENT_SIZE 6964
-#define MAX_OUTPUT_VERTS      32364
-static float **thread_temp_pos = NULL, **thread_temp_nrm = NULL, **thread_temp_uv = NULL, **thread_out_verts = NULL; static u16** thread_out_tris = NULL;
+#define MAX_OUTPUT_VERTS      20960
+static float **thrd_pos = NULL, **thread_temp_nrm = NULL, **thrd_uv = NULL, **thrd_verts = NULL; static u16** thrd_tris = NULL;
 typedef struct { const char* data; const char* name; int size; } RawOBJ; typedef struct { u16 index; bool animated; u8 animationNum; char path[128]; } ModelData; typedef struct { ModelData* entries; u32 count; u32 capacity; } ModelDataParser;
 INLINE half float_to_half(float f) {
-    u32 x; mcpy(&x,&f,4);
-    u32 s = x>>31, ue = (x>>23)&0xff; i32 e = (i32)ue-127; u32 m = x&0x7fffff;
-    if (ue == 0xff) return m ? (half)(0x7e00|(m>>13)|(s<<15)) : (half)((s<<15)|0x7c00);
-    if (!ue && !m) return (half)(s<<15);
-    if (e <= -24) return (half)(s<<15);
-    if (e <= -14) { m = (m|0x800000) >> (-e-1); return (half)((s<<15)|(m>>13)); }
-    if (e <= 15) { m += 0x1000; if (m >= 0x800000) { m = 0; e++; } return (half)((s<<15)|((e+15)<<10)|(m>>13)); }
-    return (half)((s<<15)|0x7c00);
+    u32 x; mcpy(&x,&f,4); u32 ue = (x>>23)&0xff; i32 e = (i32)ue - 127; u32 m = x&0x7fffff; u32 m_norm_pre = m + 0x1000; u32 carry = -(u32)(m_norm_pre >= 0x800000);
+    u32 res_m=(/*nan*/(0x7c00|((-(u32)(m != 0))&(0x0200|(m>>13))))&(-(u32)(ue == 0xff))) | ((((m|0x800000)>>((u32)(-e - 1)&31))>>13)&(-(u32)((e <= -14)&(e > -24)&(ue != 0xff)))) | ((((u32)((e + (carry&1)) + 15)<<10) | ((m_norm_pre&~carry)>>13)) & (-(u32)((e <= 15)&(e > -14)&(ue != 0xff)))) | (/*overflow*/0x7c00&(-(u32)((e > 15)&(ue != 0xff))));
+    return (half)(((x>>31)<<15) | res_m);
 }
 
 INLINE float fast_atof(const char** p) { float v=0,s=1; while (**p == ' ' || **p == '\t') {(*p)++;} if (**p == '-') {s = -1; (*p)++;} while (**p >= '0' && **p <= '9') {v = v*10 + (*(*p)++ - '0');} if (**p == '.') {(*p)++; float sub=0.1f; while (**p >= '0' && **p <= '9') {v += (*(*p)++ - '0')*sub; sub *= 0.1f;}} return s * v; }
 INLINE i32 fast_atoi(const char** p) { i32 v = 0, s = 1; while (**p == ' ' || **p == '\t') (*p)++; if (**p == '-') { s = -1; (*p)++; } while (**p >= '0' && **p <= '9') {v = v*10 + (*(*p)++ - '0');} return v * s; }
 typedef struct { u32 idx,key; } TriSort;
 int cmp(const void* a, const void* b) { u32 ka=((const TriSort*)a)->key, kb=((const TriSort*)b)->key; return (ka > kb) - (ka < kb); } // branchless 1 or -1
+static void RadixSortTriangles(TriSort* src, TriSort* temp, u32 count) {
+    if (count < 2) return;
+    u32 b0[256] = {0};
+    u32 b1[256] = {0};
+    for (u32 i = 0; i < count; ++i) {u16 key = src[i].key; b0[key & 0xFF]++; b1[(key >> 8) & 0xFF]++;}
+    u32 sum0 = 0, sum1 = 0;
+    for (u32 i = 0; i < 256; ++i) { u32 t0 = b0[i]; u32 t1 = b1[i]; b0[i] = sum0; b1[i] = sum1; sum0 += t0; sum1 += t1; }
+    for (u32 i = 0; i < count; ++i) {u32 radix0 = src[i].key & 0xFF; u32 dest = b0[radix0]++; temp[dest] = src[i];}
+    for (u32 i = 0; i < count; ++i) { u32 radix1 = (temp[i].key >> 8) & 0xFF; u32 dest = b1[radix1]++; src[dest] = temp[i]; }
+}
+
 static void OptimizeVertexCache(u16* idx, u32 ic, u32 vc) {
     if (ic < 3 || !vc) return;
     u32 tc = ic / 3;
-    TriSort* t = OS_Alloc(tc*sizeof(TriSort));
-    for (u32 i=0; i<tc; ++i) { u16* p = idx+i*3; u32 m = p[0]<p[1]?p[0]:p[1]; m = m<p[2]?m:p[2]; t[i].idx = i; t[i].key = m; }
-    qsort_new(t, tc, sizeof(TriSort), cmp);
-    u16* n = OS_Alloc(ic*sizeof(u16));
-    for (u32 i=0; i<tc; ++i) { u16* s=idx+t[i].idx*3; u16* d=n+i*3; d[0]=s[0];d[1]=s[1];d[2]=s[2]; }
-    mcpy(idx,n,ic*sizeof(u16));
-    OS_Free(n, ic*sizeof(u16)); OS_Free(t, tc*sizeof(TriSort));
+    size_t total_mem = (tc * sizeof(TriSort)) + (tc * sizeof(TriSort)) + (ic * sizeof(u16));
+    u8* scratch = OS_Alloc(total_mem);
+    TriSort* t     = (TriSort*)scratch;
+    TriSort* t_tmp = (TriSort*)(scratch + (tc * sizeof(TriSort)));
+    u16* n         = (u16*)(scratch + (tc * sizeof(TriSort) * 2));
+    for (u32 i = 0; i < tc; ++i) { u16* p = idx + i * 3; u32 m = p[0] < p[1] ? p[0] : p[1]; m = m < p[2] ? m : p[2]; t[i].idx = i; t[i].key = (u16)m; }
+    RadixSortTriangles(t, t_tmp, tc);
+    for (u32 i = 0; i < tc; ++i) { u16* s = idx + t[i].idx * 3; u16* d = n + i * 3; d[0] = s[0]; d[1] = s[1]; d[2] = s[2]; }
+    mcpy(idx, n, ic * sizeof(u16));
+    OS_Free(scratch, total_mem);
 }
 
 static u8* OptimizeVertexFetch(u8* v, u32* vc, u16* idx, u32 ic, size_t stride) {
     u32 oc = *vc; if (!oc || !ic) return v;
-    u32 *remap = OS_Alloc(oc*sizeof(u32)), *first = OS_Alloc(oc*sizeof(u32));
-    mset(remap,0xFF,oc*sizeof(u32));
+    u32* remap = OS_Alloc(oc * sizeof(u32)); mset(remap,0xFF,oc * sizeof(u32));
     u32 nc = 0;
-    for (u32 i=0; i<ic; ++i) { u32 id = idx[i]; if (id < oc && remap[id] == 0xFFFFFFFFU) { remap[id] = nc; first[nc] = id; ++nc; } }
-    u8* nv = OS_Alloc(nc*stride);
-    for (u32 i=0; i<nc; ++i) mcpy(nv+i*stride,v+first[i]*stride,stride);
-    for (u32 i=0; i<ic; ++i) if (idx[i] < oc) idx[i] = (u16)remap[idx[i]];
+    for (u32 i = 0; i < ic; ++i) { u32 id = idx[i]; if (id < oc && remap[id] == 0xFFFFFFFFU) { remap[id] = nc; ++nc; } }
+    u8* nv = OS_Alloc(nc * stride);
+    mset(remap,0xFF,oc * sizeof(u32));
+    u32 write_ptr=0;
+    for (u32 i=0;i<ic;++i) { u32 id = idx[i]; if (id < oc) { if (remap[id] == 0xFFFFFFFFU) { remap[id] = write_ptr; mcpy(nv + write_ptr * stride, v + id * stride, stride); write_ptr++; } idx[i]=(u16)remap[id]; } }
     *vc = nc;
-    OS_Free(remap,oc*sizeof(u32)); OS_Free(first,oc*sizeof(u32));
+    OS_Free(remap,oc * sizeof(u32));
     return nv;
 }
 
+#define HASH_SIZE 65536
+u32 ht[HASH_SIZE];
 static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, const char* __restrict d, int fs, float* __restrict tp, float* __restrict tn, float* __restrict tu, float* __restrict sv, u16* __restrict st, u8** ov, u32* ovc, u16** ot, u16* otc, const char* name) {
     *ov = NULL; *ot = NULL; *ovc = *otc = 0;
     u32 pc=0,nc=0,uc=0,ec=0;
@@ -98,8 +109,6 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, c
         } else while (p < e && *p != '\n') ++p;
     }
     if (unlikely(!ec)) return false;
-    #define HASH_SIZE 65536
-    u32* ht = OS_Alloc(HASH_SIZE * sizeof(u32));
     mset(ht,0xFF,HASH_SIZE * sizeof(u32));
     u32* rem = (u32*)st; u32 ucnt = 0;
     for (u32 i=0; i<ec; ++i) {
@@ -116,7 +125,7 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, c
     for (u32 i=0;i<ec;++i) ft[i] = (u16)rem[i];
     OptimizeVertexCache(ft,ec,ucnt);
     u32 oldc = ucnt; u8* optv = OptimizeVertexFetch(fv,&ucnt,ft,ec,VRT_ATT_SZ); OS_Free(fv,oldc * VRT_ATT_SZ);
-    *ov = optv; *ovc = ucnt; *ot = ft; *otc = ec/3; modelBounds[mindex] = vmax(vabs(mx),vmax(vabs(my),vmax(vabs(mz),vmax(Mx,vmax(My,Mz))))); OS_Free(ht,HASH_SIZE * sizeof(u32));
+    *ov = optv; *ovc = ucnt; *ot = ft; *otc = ec/3; modelBounds[mindex] = vmax(vabs(mx),vmax(vabs(my),vmax(vabs(mz),vmax(Mx,vmax(My,Mz)))));
     return true;
 }
 
@@ -125,7 +134,7 @@ static void* ModelParsingWorker(void* arg) {
     ModelParseTask* t = arg;
     for (u32 i = t->start; i < t->end; ++i) {
         RawOBJ obj = t->raw[i]; if (unlikely(!obj.data || obj.size <= 0)) continue;
-        if (!ParseOBJ(i,obj.data,obj.size,thread_temp_pos[t->tid],thread_temp_nrm[t->tid],thread_temp_uv[t->tid],thread_out_verts[t->tid],thread_out_tris[t->tid],&modelVertices[i],&modelVertexCounts[i],&modelTriangles[i],&modelTriangleCounts[i],obj.name)) continue;
+        if (!ParseOBJ(i,obj.data,obj.size,thrd_pos[t->tid],thread_temp_nrm[t->tid],thrd_uv[t->tid],thrd_verts[t->tid],thrd_tris[t->tid],&modelVertices[i],&modelVertexCounts[i],&modelTriangles[i],&modelTriangleCounts[i],obj.name)) continue;
     }
     return NULL;
 }
@@ -195,7 +204,7 @@ void LoadModels() {
     u16   **ot  =   (u16**)p; p += threadCnt*sizeof(u16*);
     size_t psz = MAX_VERT_ELEMENT_SIZE*3*sizeof(float), usz = MAX_OUTPUT_VERTS*8*sizeof(float), tsz = MAX_OUTPUT_VERTS*sizeof(u32);
     for (int i=0; i<threadCnt; ++i) { pos[i] = (float*)p; p+=psz; nrm[i] = (float*)p; p += psz; uv[i] = (float*)p; p+=MAX_VERT_ELEMENT_SIZE*2*sizeof(float); ov[i] = (float*)p; p+=usz; ot[i] = (u16*)p; p+=tsz; }
-    thread_temp_pos = pos; thread_temp_nrm = nrm; thread_temp_uv = uv; thread_out_verts = ov; thread_out_tris = ot;
+    thrd_pos = pos; thread_temp_nrm = nrm; thrd_uv = uv; thrd_verts = ov; thrd_tris = ot;
     ModelParseTask tasks[32]; u32 chunk = (mdlsCnt + threadCnt - 1) / threadCnt; OS_Thread th[32];
     for (int i=0;i<threadCnt;++i) tasks[i] = (ModelParseTask){i*chunk,(i+1)*chunk > mdlsCnt ? mdlsCnt : (i+1)*chunk,raw,i};
     if (threadCnt > 1) {
