@@ -17,6 +17,77 @@ static void synth_mix(SynthVoice* v, float* mix) {
     }
 }
 
+static float LP(float *s, float in, float rc) { *s += rc*(in-*s); return *s; }
+static float HP(float *s, float in, float rc) { return in-LP(s,in,rc); }
+static float BP(float *s1,float *s2,float in,float rc) { float a=LP(s1,in,rc); float b=LP(s2,a,rc); return a-b; }
+static float Phasor(float *ph, float freq) { *ph += freq/AUDIO_RATE; if (*ph>=1.0f) *ph-=1.0f; return *ph; }
+static float Osc(float *ph, float freq) { return vsinf(6.28318f*Phasor(ph,freq)); }
+static float FMOsc(float *ph_c,float *ph_m,float freq_c,float freq_m,float idx) { float m=Osc(ph_m,freq_m); return Osc(ph_c,freq_c+m*idx); }
+static float GenLaser(SynthVoice* v) {
+    float t=(float)v->frame/AUDIO_RATE, env=vexp(-v->p[3]*t);
+    float fc=v->p[0]*(1.0f+v->p[1]*t);
+    float fm=FMOsc(&v->s[0],&v->s[1],fc,v->p[2],fc*0.8f*env);
+    return fm*env;
+}
+void play_synth_laser(float volume,float freq,float sweep,float fmrate,float decay) {
+    SynthVoice* v=SynTrigger(GenLaser,0.3f,volume);
+    if (v) { v->p[0]=freq; v->p[1]=sweep; v->p[2]=fmrate; v->p[3]=decay; }
+}
+
+static float GenDoor(SynthVoice* v) {
+    float t=(float)v->frame/AUDIO_RATE, dur=(float)v->frames/AUDIO_RATE;
+    float thud=vsinf(6.28318f*v->p[0]*t)*vexp(-8.0f*t)*1.5f;
+    float rc=0.08f+0.05f*vsinf(6.28318f*3.0f*t);
+    float hiss=BP(&v->s[0],&v->s[1],SynRandBi(),rc)*0.6f;
+    return thud+hiss*vsinf(3.14159265f*(t/dur));
+}
+void play_synth_door(float volume,float pitch) { SynthVoice* v=SynTrigger(GenDoor,1.2f,volume); if(v) v->p[0]=pitch; }
+
+static float GenHiss(SynthVoice* v) { return HP(&v->s[0],SynRandBi(),v->p[0])*v->p[1]; }
+SynthVoice* play_synth_hiss(float volume,float cutoff) { SynthVoice* v=SynTrigger(GenHiss,0.0f,volume); if(v){v->p[0]=cutoff;v->p[1]=1.0f;} return v; }
+
+static float GenPipe(SynthVoice* v) { return BP(&v->s[0],&v->s[1],SynRandBi(),v->p[0])*v->p[1]; }
+SynthVoice* play_synth_pipe(float volume,float resonance_rc) { SynthVoice* v=SynTrigger(GenPipe,0.0f,volume); if(v){v->p[0]=resonance_rc;v->p[1]=2.0f;} return v; }
+
+static float GenImpact(SynthVoice* v) {
+    float t=(float)v->frame/AUDIO_RATE, env=vexp(-v->p[1]*t);
+    if (v->frame%4==0) v->s[2]=SynRandBi();
+    float noise=LP(&v->s[0],v->s[2],0.3f), ring=vsinf(6.28318f*v->p[0]*t)*env;
+    return (noise*env*v->p[2])+(ring*v->p[3]);
+}
+void play_synth_impact(float volume,float ring_freq,float decay,float noise_amt,float ring_amt) {
+    SynthVoice* v=SynTrigger(GenImpact,0.5f,volume);
+    if (v) { v->p[0]=ring_freq; v->p[1]=decay; v->p[2]=noise_amt; v->p[3]=ring_amt; }
+}
+
+static float GenCrackle(SynthVoice* v) {
+    float env=vexp(-v->p[1]*(float)v->frame/AUDIO_RATE);
+    if (v->s[3]<=0.0f) { if ((rand()%100)<(i32)v->p[2]) { v->s[3]=AUDIO_RATE*random_range(0.004f,0.012f); v->s[4]=1.0f; v->s[5]=0.93f; } else v->s[4]=0.0f; }
+    else { v->s[3]-=1.0f; v->s[4]*=v->s[5]; }
+    float active=(v->s[4]>0.01f)?SynRandBi()*v->s[4]:0.0f;
+    v->s[1]+=v->p[0]*(active-v->s[1]); v->s[2]+=v->p[0]*(v->s[1]-v->s[2]);
+    return (v->s[1]-v->s[2])*3.5f*env;
+}
+void play_synth_crackle(float volume,float rc,float decay,float burst_chance,float seconds) {
+    SynthVoice* v=SynTrigger(GenCrackle,seconds,volume); if (v) { v->p[0]=rc; v->p[1]=decay; v->p[2]=burst_chance; }
+}
+
+static float GenBoom(SynthVoice* v) {
+    float env=vexp(-v->p[1]*(float)v->frame/AUDIO_RATE);
+    return Osc(&v->s[0],v->p[0])*env*0.7f + LP(&v->s[1],SynRandBi(),0.15f)*env*0.8f;
+}
+void play_synth_explosion(float volume,float rumble_freq,float decay) { SynthVoice* v=SynTrigger(GenBoom,1.0f,volume); if(v){v->p[0]=rumble_freq;v->p[1]=decay;} }
+
+static float GenShield(SynthVoice* v) {
+    float wobble=vsinf(6.28318f*6.0f*(float)v->frame/AUDIO_RATE)*30.0f;
+    return Osc(&v->s[0],v->p[0]+wobble)*LP(&v->s[1],v->p[1],0.002f);
+}
+SynthVoice* play_synth_shield(float volume,float freq) { SynthVoice* v=SynTrigger(GenShield,0.0f,volume); if(v){v->p[0]=freq;v->p[1]=1.0f;} return v; }
+void synth_shield_set(SynthVoice* v,float target) { v->p[1]=target; } // 1=power up, 0=deplete; LP smooths the ramp
+
+
+
+
 // A simple One-Pole Low Pass Filter (Very efficient for C)
 // This makes things sound like they are behind a door or inside a pipe.
 float apply_lpf(float input, float* prev_out, float cutoff) {
@@ -50,13 +121,6 @@ float get_env(SynthVoice* v, float attack_time) {
     return 1.0f; 
 }
 
-// --- SCI-FI SUITE ---
-
-// Laser Pulse: High FM Modulation + Fast Decay
-static float GenLaser(SynthVoice* v) {
-    float env = (v->frame < 2000) ? (1.0f - (float)v->frame/2000.0f) : 0.0f; // Sharp decay
-    return GenFM(v) * env;
-}
 
 // Vent Hiss / Pipe Fluid: Filtered Noise
 static float GenVent(SynthVoice* v) {
@@ -66,36 +130,16 @@ static float GenVent(SynthVoice* v) {
     return filtered;
 }
 
-// Heavy Door / Blast: Low Frequency Sine + Filtered Noise (The "Thud")
-static float GenDoor(SynthVoice* v) {
-    float env = vexp(-0.001f * (float)v->frame); // Longer decay
-    float base = vsinf(6.28f * v->p[0] * (float)v->frame / AUDIO_RATE);
-    float noise = apply_lpf(GetNoise(v), &v->s[3], 400.0f); // Muffled "crunch"
-    return (base + noise) * env;
-}
-
-// Electric Spark: High-frequency noise bursts
 static float GenSpark(SynthVoice* v) {
     float raw = GetNoise(v);
     if (rand() % 10 > 8) raw *= 2.0f; // Random "crackle" spikes
     return raw * 0.5f;
 }
 
-// --- PUBLIC API ---
-
-void play_synth_laser(float vol) { 
-    SynthVoice* v = SynTrigger(GenLaser, 0.4f, vol); 
-    if(v) { v->p[0] = 800.0f; v->p[1] = 200.0f; } // High freq, high FM
-}
 
 void play_synth_vent(float vol) { 
     SynthVoice* v = SynTrigger(GenVent, 2.0f, vol); 
     if(v) { v->p[2] = 800.0f; } // Muffled filter
-}
-
-void play_synth_door_thud(float vol) { 
-    SynthVoice* v = SynTrigger(GenDoor, 1.5f, vol); 
-    if(v) { v->p[0] = 60.0f; } // Very low frequency
 }
 
 void play_synth_spark(float vol) { 

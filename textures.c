@@ -74,26 +74,35 @@ static u8 first_row_filter[5] = {PNGFmt_none, PNGFmt_sub, PNGFmt_none, PNGFmt_av
 inline static i32 PngPaeth(i32 a, i32 b, i32 c) { i32 p = a+b-c, pa = vabs(p-a), pb = vabs(p-b), pc = vabs(p-c); return (pa <= pb && pa <= pc) ? a : (pb <= pc ? b : c); }
 static i32 CreatePngImageArena(PngArena* arena, PngData* a, u8* raw, u32 raw_len, i32 out_n, u32 x, u32 y, i32 img_n) {
     u32 i, j, stride = x * out_n, w_bytes = (img_n * x * 8 + 7) >> 3; i32 k, f;
-    if (raw_len < (w_bytes + 1) * y) return 0; a->out = (u8*)PngArenaAlloc(arena, (size_t)x * y * out_n);
+    if (raw_len < (w_bytes + 1) * y) return 0;
+    a->out = (u8*)PngArenaAlloc(arena, (size_t)x * y * out_n);
     for (j = 0; j < y; ++j) {
-        u8 *cur = a->out + stride * j, *prior = (j > 0) ? cur - stride : a->out;
-        if ((f = *raw++) > 4) return 0; if (j == 0) f = first_row_filter[f];
-        for (k = 0; k < img_n; ++k) {
-            if (f == PNGFmt_up) cur[k] = raw[k] + prior[k];
-            else if (f == PNGFmt_avg) cur[k] = raw[k] + (prior[k] >> 1);
-            else if (f == PNGFmt_paeth) cur[k] = raw[k] + PngPaeth(0, prior[k], 0);
-            else cur[k] = raw[k];
+        u8 *cur = a->out + stride * j;
+        u8 *prior = (j > 0) ? cur - stride : a->out;
+        if ((f = *raw++) > 4) return 0;
+        if (j == 0) f = first_row_filter[f];
+        switch (f) { /* First pixel (left neighbor is implicitly 0) */
+            case PNGFmt_none:
+            case PNGFmt_sub: for (k = 0; k < img_n; ++k) cur[k] = raw[k]; break;
+            case PNGFmt_up: for (k = 0; k < img_n; ++k) cur[k] = raw[k] + prior[k]; break;
+            case PNGFmt_avg: for (k = 0; k < img_n; ++k) cur[k] = raw[k] + (prior[k] >> 1); break;
+            case PNGFmt_paeth: for (k = 0; k < img_n; ++k) cur[k] = raw[k] + PngPaeth(0, prior[k], 0); break;
+            case PNGFmt_avg_first: for (k = 0; k < img_n; ++k) cur[k] = raw[k] + (0 >> 1);  /* left doesn't exist */ break;
+            default: return 0;
         }
-        if (img_n != out_n) cur[img_n] = 255; raw += img_n; cur += out_n; prior += out_n;
-        for (i = x - 1; i >= 1; --i, cur[img_n] = (img_n != out_n ? 255 : cur[img_n]), raw += img_n, cur += out_n, prior += out_n)
-            for (k = 0; k < img_n; ++k) {
-                if (f == PNGFmt_none) cur[k] = raw[k];
-                else if (f == PNGFmt_sub) cur[k] = raw[k] + cur[k - out_n];
-                else if (f == PNGFmt_up) cur[k] = raw[k] + prior[k];
-                else if (f == PNGFmt_avg) cur[k] = raw[k] + ((prior[k] + cur[k - out_n]) >> 1);
-                else if (f == PNGFmt_paeth) cur[k] = raw[k] + PngPaeth(cur[k - out_n], prior[k], prior[k - out_n]);
-                else if (f == PNGFmt_avg_first) cur[k] = raw[k] + (cur[k - out_n] >> 1);
-            }
+        if (img_n != out_n) cur[img_n] = 255;
+        raw += img_n;
+        cur += out_n;
+        prior += out_n;
+        switch (f) { /* Remaining pixels in the row */
+            case PNGFmt_none: for (i = x - 1; i >= 1; --i, cur[img_n] = (img_n != out_n ? 255 : cur[img_n]), raw += img_n, cur += out_n, prior += out_n) { for (k = 0; k < img_n; ++k) cur[k] = raw[k]; } break;
+            case PNGFmt_sub: for (i = x - 1; i >= 1; --i, cur[img_n] = (img_n != out_n ? 255 : cur[img_n]), raw += img_n, cur += out_n, prior += out_n) { for (k = 0; k < img_n; ++k) cur[k] = raw[k] + cur[k - out_n]; } break;
+            case PNGFmt_up: for (i = x - 1; i >= 1; --i, cur[img_n] = (img_n != out_n ? 255 : cur[img_n]), raw += img_n, cur += out_n, prior += out_n) { for (k = 0; k < img_n; ++k) cur[k] = raw[k] + prior[k]; } break;
+            case PNGFmt_avg: for (i = x - 1; i >= 1; --i, cur[img_n] = (img_n != out_n ? 255 : cur[img_n]), raw += img_n, cur += out_n, prior += out_n) { for (k = 0; k < img_n; ++k) cur[k] = raw[k] + ((prior[k] + cur[k - out_n]) >> 1); } break;
+            case PNGFmt_paeth: for (i = x - 1; i >= 1; --i, cur[img_n] = (img_n != out_n ? 255 : cur[img_n]), raw += img_n, cur += out_n, prior += out_n) { for (k = 0; k < img_n; ++k) cur[k] = raw[k] + PngPaeth(cur[k - out_n], prior[k], prior[k - out_n]); } break;
+            case PNGFmt_avg_first: for (i = x - 1; i >= 1; --i, cur[img_n] = (img_n != out_n ? 255 : cur[img_n]), raw += img_n, cur += out_n, prior += out_n) { for (k = 0; k < img_n; ++k) cur[k] = raw[k] + (cur[k - out_n] >> 1); } break;
+            default: return 0;
+        }
     }
     return 1;
 }
@@ -122,23 +131,28 @@ static void* TextureParsingWorker(void* arg) {
         doubleSidedTexture[i] = t->parser->entries[pIdx].doublesided; transparentTexture[i] = t->parser->entries[pIdx].transparent;
         const char* d = t->raw_textures[i].data; int sz = t->raw_textures[i].size; if (unlikely(!d || sz <= 0)) continue;
         int w=0, h=0; u8 *pix = PngLoad((const u8*)d, sz, &w, &h, &thread_png_arenas[t->tid]);
-        if (!pix || w < 1 || h < 1) { OS_Free((void*)d, (size_t)sz); continue; }
-        u32 nP = (u32)w * h, pSz = 0, *pal = (u32*)OS_Alloc(1024); u8 *idx = (u8*)OS_Alloc(nP), hash[1024] = {0};
+        if (!pix || w < 1 || h < 1) { OS_Free((void*)d,(size_t)sz); continue; }
+        u32 nP = (u32)w * h; u8 *idx = (u8*)OS_Alloc(nP); u32 *pal = (u32*)OS_Alloc(256 * sizeof(u32)); u32 pSz = 0; u16 hash[1024] = {0}; // Use u16 to store 0 = empty
         for (u32 p = 0; p < nP; ++p) {
-            u32 c = ((u32*)pix)[p], s = (c * 0x9e3779b9u) & 1023;
-            while (hash[s]) { if (pal[hash[s]-1] == c) { idx[p] = hash[s]-1; goto found; } s = (s+1) & 1023; }
-            if (pSz >= 256) {
-                u32 bIdx = 0, bDist = -1; u8 r1=c, g1=c>>8, b1=c>>16, a1=c>>24;
-                for (u32 k=0; k<pSz; k++) {
-                    i32 dr=(pal[k]&255)-r1, dg=((pal[k]>>8)&255)-g1, db=((pal[k]>>16)&255)-b1, da=(pal[k]>>24)-a1;
-                    u32 dst = dr*dr + dg*dg + db*db + da*da; if (dst < bDist) { bDist = dst; bIdx = k; }
+            u32 c = ((u32*)pix)[p];
+            u32 s = (c * 0x9e3779b9u) & 1023;
+            while (hash[s]) { if (pal[hash[s]-1] == c) { idx[p] = (u8)(hash[s]-1); goto found; } s = (s + 1) & 1023; }
+            if (pSz < 256) { pal[pSz] = c; idx[p] = (u8)pSz; hash[s] = (u16)(++pSz); }
+            else { // Fallback: nearest color (rare if textures are reasonable)
+                u32 best = 0, bestDist = ~0u;
+                u8 r1 = c, g1 = c>>8, b1 = c>>16, a1 = c>>24;
+                for (u32 k = 0; k < pSz; ++k) {
+                    u32 pc = pal[k]; 
+                    i32 dr = (pc&255)-r1, dg = ((pc>>8)&255)-g1, db = ((pc>>16)&255)-b1, da = (pc>>24)-a1;
+                    u32 dist = dr*dr + dg*dg + db*db + da*da;
+                    if (dist < bestDist) { bestDist = dist; best = k; }
                 }
-                idx[p] = bIdx; continue;
+                idx[p] = (u8)best;
             }
-            pal[pSz] = c; idx[p] = pSz; hash[s] = (u8)(++pSz); found:;
+            found:;
         }
         textureIndexBuffers[i] = idx; texturePaletteBuffers[i] = pal; texturePaletteSizes[i] = pSz; textureWidths[i] = w; textureHeights[i] = h;
-        OS_Free((void*)d, (size_t)sz);
+        OS_Free((void*)d,(size_t)sz);
     }
     return NULL;
 }

@@ -27,7 +27,7 @@ void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, 
 void InitFontAtlasses(){
     DebugRAM("start font load");
     double t0=get_time();DualLog("Loading    5 fonts...");
-    ttAllocs = OS_Alloc(4474 * sizeof(TAlloc));
+    ttAllocs = OS_Alloc(4674 * sizeof(TAlloc));
     FHandle fd1,fd2;int sz1,sz2;
     fontData[0]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[0],&fd1,&sz1);
     fontData[1]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[1],&fd2,&sz2);
@@ -45,7 +45,7 @@ void InitFontAtlasses(){
             int idx=numPackedGlyphs++;if(cp>='0'&&cp<='9')fixedNumberAdvanceWidth=vmax(fixedNumberAdvanceWidth,fontPackedChar[idx].xadvance);
         }
     }
-    TempFree(pc.pack_info);GenerateAndBindTexture(&fontAtlasTex,0x8229/*GL_R8*/,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0x1903/*GL_RED*/,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,bmp);
+    ttfree(pc.pack_info);GenerateAndBindTexture(&fontAtlasTex,0x8229/*GL_R8*/,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0x1903/*GL_RED*/,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,bmp);
     mset(bmp,0,FONT_ATLAS_SIZE*FONT_ATLAS_SIZE); // Secondary atlas
     stbtt_pack_context pc2;stbtt_PackBegin(&pc2,bmp,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0,16,NULL);pc2.h_oversample=3;pc2.v_oversample=3;pc2.skip_missing=1;numPackedGlyphsStopD=0;
     for(int r=0;r<numFontRanges;++r){fontRangesStopD[r].startIndex=numPackedGlyphsStopD;
@@ -55,14 +55,14 @@ void InitFontAtlasses(){
             int idx=numPackedGlyphsStopD++;if(cp>='0'&&cp<='9')fixedNumberAdvanceWidthStopD=vmax(fixedNumberAdvanceWidthStopD,fontPackedCharStopD[idx].xadvance);
         }
     }
-    TempFree(pc2.pack_info);GenerateAndBindTexture(&fontAtlasTexStopD,0x8229/*GL_R8*/,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0x1903/*GL_RED*/,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,bmp);
+    ttfree(pc2.pack_info);GenerateAndBindTexture(&fontAtlasTexStopD,0x8229/*GL_R8*/,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0x1903/*GL_RED*/,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,bmp);
     OS_Free(bmp,FONT_ATLAS_SIZE*FONT_ATLAS_SIZE);
     OS_Free(fontData[0],sz1);
     OS_Free(fontData[1],sz2);
     OS_Free(fontData[2],fallbackFonts[0].size);
     OS_Free(fontData[3],fallbackFonts[1].size);
     OS_Free(fontData[4],fallbackFonts[2].size);
-    OS_Free(ttAllocs,4474 * sizeof(TAlloc));
+    OS_Free(ttAllocs,4674 * sizeof(TAlloc));
     DebugRAM("after font load");
     glUseProgram(textSP); glUniform1i(1,2);
     DualLog(" took %f s\n",get_time()-t0);

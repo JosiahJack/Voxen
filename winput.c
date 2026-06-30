@@ -950,14 +950,9 @@ WinSysjoystick* WinSysAllocJoystick(const char* name,const char* guid,int axisCo
 
 bool JoystickPresent(int jid) { if (jid < 0 || jid > JOYSTICK_LAST || (!WinSys.joysInited && !InitJoysticks())) {return false;} WinSys.joysInited = 1; WinSysjoystick* js = WinSys.joysticks + jid; return js->connected ? PollJoystick(js) : false; }
 void FreeJoystick(WinSysjoystick* js) { OS_Free(js->axes,js->axesSize); OS_Free(js->buttons,js->buttonsSize); OS_Free(js->hats,js->hatsSize); mset(js,0,sizeof(WinSysjoystick)); }
-void play_synth_sine(float frequency, float duration_seconds, float volume);
-void play_synth_plastic_tap(float volume);
-void play_synth_laser(float volume);
-void play_synth_vent(float vol);
-void play_synth_door_thud(float vol);
-void play_synth_spark(float vol);
-void play_synth_clink(float freq,float decay,float volume);
-void play_synth_search(float volume,float freq_lo,float freq_hi);
+void play_synth_laser(float volume,float freq,float sweep,float fmrate,float decay);
+void play_synth_door(float volume,float pitch);
+void play_synth_impact(float volume,float ring_freq,float decay,float noise_amt,float ring_amt);
 void InputProcessing() {
     mouseMovementThisFrame = false; PollEvents();
     for (int jid = JOYSTICK_1; jid <= JOYSTICK_LAST; ++jid) { // Input Poll
@@ -969,12 +964,13 @@ void InputProcessing() {
 //         for (int i = 0; i < js->axisCount && i < MAX_JOYSTICK_AXES; ++i) { Sys_Input.joystickAxes[jid - JOYSTICK_1][i] = js->axes[i]; } TODO??
     }
 
+    float v = 0.1f;
     if (Sys_Input.keyStates[KEY_E].pressed) play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f,(V3){},false);
-    if (Sys_Input.keyStates[KEY_W].pressed) play_synth_vent(0.2f);
-    if (Sys_Input.keyStates[KEY_T].pressed) play_synth_door_thud(0.2f);
-    if (Sys_Input.keyStates[KEY_R].pressed) play_synth_spark(0.2f);
-    if (Sys_Input.keyStates[KEY_Y].pressed) play_synth_laser(0.2f);
-    if (Sys_Input.keyStates[KEY_U].pressed) play_synth_plastic_tap(0.2f);
+    if (Sys_Input.keyStates[KEY_W].pressed) play_synth_door(v,50); // thud slide
+    if (Sys_Input.keyStates[KEY_T].pressed) play_synth_impact(v,4500,18,0.3f,0.6f); // Glass ting
+    if (Sys_Input.keyStates[KEY_R].pressed) play_synth_impact(v,1800,30,0.5f,0.3f); // cartridge drop
+    if (Sys_Input.keyStates[KEY_Y].pressed) play_synth_laser(v,800,-2.0f,40,12);
+    if (Sys_Input.keyStates[KEY_U].pressed) play_synth_laser(v,800,2.0f,40,12);
     if (window_has_focus) { if(Sys_Input.keyStates[KEY_CAPS_LOCK].pressed){Sys_Input.isCapsLockOn=!Sys_Input.isCapsLockOn;} ProcessInput(); }
 }
 
