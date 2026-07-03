@@ -54,8 +54,7 @@ static u8* OptimizeVertexFetch(u8* v, u32* vc, u16* idx, u32 ic, size_t stride) 
     return nv;
 }
 
-#define HASH_SIZE 65536
-u32 ht[HASH_SIZE];
+#define HASH_SIZE 32768
 static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, const char* __restrict d, int fs, float* __restrict tp, float* __restrict tn, float* __restrict tu, float* __restrict sv, u16* __restrict st, u8** ov, u32* ovc, u16** ot, u16* otc, const char* name) {
     *ov = NULL; *ot = NULL; *ovc = *otc = 0;
     u32 pc=0,nc=0,uc=0,ec=0;
@@ -109,6 +108,7 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, c
         } else while (p < e && *p != '\n') ++p;
     }
     if (unlikely(!ec)) return false;
+    u32 ht[HASH_SIZE];
     mset(ht,0xFF,HASH_SIZE * sizeof(u32));
     u32* rem = (u32*)st; u32 ucnt = 0;
     for (u32 i=0; i<ec; ++i) {

@@ -44,7 +44,7 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define MAX_CHANNELS 48 // Max concurrent sounds, must keep track of for volume setting
 #define VRT_ATT_SZ 16
 #define DOUBLE_CLICK_TIME 0.5f
-#define PLAYER_MAX_WALK_SPEED 3.2f
+#define PLAYER_MAX_WALK_SPEED 3.6f
 #define PLAYER_MAX_SPRINT_SPEED 8.8f
 #define PLAYER_MAX_CYBER_SPEED 5.0f
 #define PLAYER_MAX_CYBER_ULTIMATE_SPEED 12.0f

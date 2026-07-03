@@ -6,7 +6,7 @@ typedef struct { u8* indices; u32* palette,palSize; i32 w, h; } TexResult;
 typedef struct TextureParseTask { u32 texCnt; _Atomic u32* shared_idx; RawTexture* raw_textures; i32* parsIdx; const TextureDataParser* parser; TexResult* results;int tid; } TextureParseTask;
 typedef struct { PngContext* s; u8* idata, *expanded, *out; } PngData; typedef struct { u16 fast[1<<9], firstcode[16], firstsymbol[16], value[288]; i32 maxcode[17]; u8 size[288]; } PngHuffman; typedef struct { u8 *zbuffer, *zbuffer_end, *zout, *zout_start; i32 num_bits; u32 code_buffer; PngHuffman z_length, z_distance; } pngzbuf;
 enum { PNGFmt_none=0, PNGFmt_sub=1, PNGFmt_up=2, PNGFmt_avg=3, PNGFmt_paeth=4, PNGFmt_avg_first, PNGFmt_paeth_first };
-PngArena png_arena_main; static PngArena* thread_png_arenas = NULL; static u8** textureIndexBuffers = NULL; static u32** texturePaletteBuffers = NULL; static u32* texturePaletteSizes = NULL; static i32* textureWidths = NULL; static i32* textureHeights = NULL;
+PngArena png_arena_main; static PngArena* thread_png_arenas = NULL;
 void PngArenaInit(PngArena* arena) { if (!arena->base) { arena->base = OS_Alloc(16777216); arena->cursor = arena->base; arena->end = arena->base + 16777216; } }
 void* PngArenaAlloc(PngArena* a, size_t s) { if(!a->base||a->cursor+s>a->end)return NULL; void* p=a->cursor; a->cursor+=s; return p; }
 static u32 PngGet32be(PngContext* s) { const u8* p = s->img_buffer; s->img_buffer += 4; return (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3]; }

@@ -116,7 +116,7 @@ else
     LINKER=$CC
     CFLAGS="$COMMON_CFLAGS -fno-plt -fno-semantic-interposition -fno-builtin"
     CFLAGSGC="$COMMON_CFLAGS -DLINUX -fno-plt -fPIC -fno-semantic-interposition"
-    LDFLAGS="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -ldl -nostdlib"
+    LDFLAGS="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -ldl"
     BINARY_NAME="voxen"
     BINARY_NAMEGC="Citadel.so"
     LDFLAGSGC="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -nostdlib -Wl,-soname,$BINARY_NAMEGC"

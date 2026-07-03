@@ -68,7 +68,6 @@
     X(bool, ModRequestsGrayscale, (void)) \
     X(const char**, GetCreditsText, (void)) \
     X(void, SetGlobalsModData, (void)) 
-
 #ifdef MOD_INTEROP_MOD  // mod.h usage:
     // Interop - To Engine
     #if defined(_WIN32)
@@ -98,8 +97,6 @@
         #undef X
     #endif
 #endif
-    
-// ----------------------------------------------------------------------------
 // Engine Functions::
 #ifdef MOD_INTEROP_MOD // mod.h usage:
     // Interop - To Engine
@@ -174,7 +171,6 @@ ENGINE_TO_MOD V3 GetLocalTransformedPos(Entity* originator, V3 offsetFromOrigina
 ENGINE_TO_MOD void TurnLightOff(u16 litIdx);
 ENGINE_TO_MOD void AddCamView(V3 pos, Quaternion rot, u8 fov, u16 width, u16 height, float near, float far);
 ENGINE_TO_MOD void SetPosition(Entity* e, V3 newpos, bool teleport);
-
 // Common inlines that need to span both engine and gamecode
 INLINE u32 parse_numberu32(const char* str, const char* line, u32 lineNum) {
     if (str == 0 || *str == '\0') { DualLogError("Invalid blank string from line[%d]: %s\n", lineNum+1, line); return 0; }
@@ -183,12 +179,7 @@ INLINE u32 parse_numberu32(const char* str, const char* line, u32 lineNum) {
     if (*str == '+') str++;
     if (*str == '-') { DualLogError("Invalid input, negative not allowed (%s)\n      from line[%d]: %s\n", str, lineNum+1, line); return 0; }
     unsigned long result = 0;
-    while (*str >= '0' && *str <= '9') {
-        i32 digit = *str - '0';
-        result = result * 10uL + (unsigned long)digit;
-        str++;
-    }
-
+    while (*str >= '0' && *str <= '9') { i32 digit = *str - '0'; result = result * 10uL + (unsigned long)digit; str++; }
     return (u32)result;
 }
 
@@ -209,36 +200,21 @@ INLINE i16 parse_numberi16(const char* str, const char* line, u32 lineNum) { i32
 INLINE i8 parse_numberi8(const char* str, const char* line, u32 lineNum) { i32 retval = parse_numberi32(str, line, lineNum); if (retval < -128 || retval > 127) { DualLogError("Value %d out of range for i8 from line[%d]: %s\n", retval, lineNum+1, line); return 0; } return (i8)retval; }
 INLINE float parse_float(const char* str, const char* line, u32 lineNum) {
     if (str == 0 || *str == '\0') { DualLogError("Invalid blank string from line[%d]: %s\n", lineNum+1, line); return 0.0f; }
-    
     while (cEmpty(*str)) str++;
     bool negative = false;
     if (*str == '-') { negative = true; str++; }
     else if (*str == '+') { str++; }
-
     double value = 0.0;
     bool has_digit = false;
-    while (*str >= '0' && *str <= '9') { // Integer part
-        value = value * 10.0 + (*str - '0');
-        str++;
-        has_digit = true;
-    }
-
+    while (*str >= '0' && *str <= '9') { value = value * 10.0 + (*str - '0'); str++; has_digit = true; } // Integer part
     if (*str == '.') { // Decimal part
         str++;
         double frac = 0.0;
         double place = 0.1;
-        while (*str >= '0' && *str <= '9') {
-            frac += (*str - '0') * place;
-            place *= 0.1;
-            str++;
-            has_digit = true;
-        }
-
+        while (*str >= '0' && *str <= '9') { frac += (*str - '0') * place; place *= 0.1; str++; has_digit = true; }
         value += frac;
     }
-
     if (!has_digit) return 0.0f;
-
     if (negative) value = -value;
     return (float)value;
 }
