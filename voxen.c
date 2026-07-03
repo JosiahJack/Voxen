@@ -135,7 +135,7 @@ i32 currentMouse_dx,currentMouse_dy; u8 currentPlayerNameLength=0; i8 currentMen
 #define MAX_SHADOWMAPS 128u
 #define NEAR_PLANE (0.02f)
 #define ONE_OVER_SQRT2 0.70710678118f
-GlobalContext World = {0}; TextSystem Sys_Text; InputSystem Sys_Input; CheatsSystem Cheats = {.god=false,.noclip=false,.showLocation=true,.showFPS=true,.editMode=false,.showPhys=true}; SystemUI Sys_UI;
+GlobalContext World = {0}; TextSystem Sys_Text; InputSystem Sys_Input; CheatsSystem Cheats = {.god=false,.noclip=false,.showLocation=true,.showFPS=true,.editMode=false,.showPhys=false}; SystemUI Sys_UI;
 SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on first run for potatoes (e.g. won't crash for out of VRAM, or won't take 5min to init).
     .InputCodeSettings = {
         5, /*Forward=F*/     0,/*Strafe Left=A*/ 18,/*Backpedal=S*/ 3,/*Strafe Right=D*/ 100,/*Jump=SPACE*/ 2,/*Crouch=C*/   23,/*Prone=X*/    16,/*Lean Left=Q*/   4,/*Lean Right=E*/ 45,/*Sprint=LEFT SHIFT*/ 38,/*Turn Left=LF ARROW*/ 39,/*Turn Right=RT ARROW*/ 36,/*Look Up=UP ARROW*/     37,/*Look Down=DN ARROW*/   20,/*Recent Log=U*/    26,/*Biomonitor=1*/

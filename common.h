@@ -436,6 +436,7 @@ typedef struct {
 #define vmax(a,b) ((a) > (b) ? (a) : (b))
 #define vclamp(x,a,b) vmin(vmax(x,a),b)
 #define vsqrtf(x) __builtin_sqrtf(x)
+INLINE float vinvsqtf(float v) { long i; float x2,y; const float threehalfs = 1.5F; x2 = v * 0.5F; y = v; i = * (long*)&y; i = 0x5f3759df - ( i >> 1 ); y = * (float*)&i; y = y * (threehalfs - (x2 * y * y)); return y; }
 INLINE float vfloor(float x) { int i = (int)x; return (float)(i > x ? i - 1 : i); }
 INLINE float vceil(float x) { int i = (int)x; return (float)(x > 0 && x > (float)i ? i + 1 : i); }
 INLINE float vsinf(float x) { x -= TAU * vfloor(x / TAU); if (x > PI) { x -= TAU; } float s = (4/PI)*x - (4/(PI*PI))*x*vabs(x); return 0.225f*(s*vabs(s) - s) + s; }

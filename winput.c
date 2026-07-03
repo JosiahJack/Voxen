@@ -688,7 +688,7 @@ void InputJoystickButton(WinSysjoystick*,int,char); void InputJoystickHat(WinSys
         WinSys.glx.CreateContextAttribsARB = (GLX_CCAA)getProcAddressGLX("glXCreateContextAttribsARB");
         GLXFBConfig native; XVisualInfo* result;
         GLXFBConfig* nativeConfigs; WinSysfbconfig* usableConfigs; const WinSysfbconfig* closest; int nativeCount,usableCount;
-        nativeConfigs = WinSys.glx.GetFBConfigs(WinSys.x11.display, WinSys.x11.screen, &nativeCount);        
+        nativeConfigs = WinSys.glx.GetFBConfigs(WinSys.x11.display,WinSys.x11.screen,&nativeCount);        
         usableConfigs = OS_Calloc(nativeCount,sizeof(WinSysfbconfig)); usableCount = 0;
         for (int i = 0;  i < nativeCount;  i++) {
             const GLXFBConfig n = nativeConfigs[i];
@@ -927,15 +927,9 @@ void JoystickConnection(WinSysjoystick* js, int e) {
     Sys_Input.joystickPresent[jid] = (e == 0x00040001/*connected*/); if (!Sys_Input.joystickPresent[jid]) { mset(Sys_Input.joystickButtons,0,sizeof(Sys_Input.joystickButtons)); mset(Sys_Input.joystickHats,0,sizeof(Sys_Input.joystickHats)); } // Clear
 }
 
-void InputJoystickAxis(WinSysjoystick* js,int axis,float value) { js->axes[axis] = value; }
-void InputJoystickButton(WinSysjoystick* js,int button,char value) { js->buttons[button] = value; }
-void InputJoystickHat(WinSysjoystick* js,int hat,char value) {
-    int base = js->buttonCount + hat * 4;
-    js->buttons[base+0] = (value & 0x01) ? INPUT_PRESS : INPUT_RELEASE; js->buttons[base+1] = (value & 0x02) ? INPUT_PRESS : INPUT_RELEASE; 
-    js->buttons[base+2] = (value & 0x04) ? INPUT_PRESS : INPUT_RELEASE; js->buttons[base+3] = (value & 0x08) ? INPUT_PRESS : INPUT_RELEASE;
-    js->hats[hat] = value;
-}
-
+void InputJoystickAxis(WinSysjoystick* js,int axis, float value) { js->axes[axis] = value; }
+void InputJoystickButton(WinSysjoystick* js,int button, char value) { js->buttons[button] = value; }
+void InputJoystickHat(WinSysjoystick* js, int hat, char value) { int base=js->buttonCount + hat * 4; js->buttons[base+0]=(value & 0x01) ? INPUT_PRESS : INPUT_RELEASE; js->buttons[base+1]=(value & 0x02) ? INPUT_PRESS : INPUT_RELEASE; js->buttons[base+2]=(value & 0x04) ? INPUT_PRESS : INPUT_RELEASE; js->buttons[base+3]=(value & 0x08) ? INPUT_PRESS : INPUT_RELEASE; js->hats[hat]=value; }
 WinSysjoystick* WinSysAllocJoystick(const char* name,const char* guid,int axisCount,int buttonCount,int hatCount) {
     int jid; WinSysjoystick* js;
     for (jid = 0; jid <= JOYSTICK_LAST; jid++) { if (!WinSys.joysticks[jid].allocated) break; }
