@@ -114,7 +114,7 @@ void Entity_GetCap(const Entity *e, ShapeCapsule *out) {
     float r = e->colliderSize.x; float hi = vmax(0.0f, (e->colliderSize.y * 0.5f) - r); V3 wc,axis;
     u16 edx = (u16)(e - World.instances);
     if (edx == PLAYER1 || edx == PLAYER2 || e->layer == L_NPC) { wc = V3_AplusB(e->position, e->colliderCenter); axis = (V3){0.0f,1.0f,0.0f}; } // Force player capsules to remain strictly upright, ignoring camera pitch/roll
-    else { wc = V3_AplusB(e->position, quat_rot_v3(e->rotation, e->colliderCenter)); axis = (e->colliderSize.z < 0.5f) ? quat_rot_v3(e->rotation,(V3){1,0,0}) : (e->colliderSize.z < 1.5f) ? quat_rot_v3(e->rotation,(V3){0,1,0}) : quat_rot_v3(e->rotation,(V3){0,0,1}); }
+    else { wc = V3_AplusB(e->position, quat_rot_v3(e->rotation,e->colliderCenter)); axis = (e->colliderSize.z < 0.5f) ? quat_rot_v3(e->rotation,(V3){1,0,0}) : (e->colliderSize.z < 1.5f) ? quat_rot_v3(e->rotation,(V3){0,1,0}) : quat_rot_v3(e->rotation,(V3){0,0,1}); }
     out->rad = r; out->base = V3_AsubB(wc,V3_ScaleByF(axis,hi)); out->tip  = V3_AplusB(wc,V3_ScaleByF(axis,hi));
 }
 
@@ -974,14 +974,20 @@ void Physics() {
     World.last_physics_time = World.pauseRelativeTime;
     u8 substeps = (u8)vclamp((u32)(dt / MAX_STEP_SIZE + 0.5f), 1u, (u32)MAX_SUBSTEPS);
     float dtsub = dt / (float)substeps; dynamicEntityCount = 0;
-    for (int i = 0; i < World.instCount && dynamicEntityCount < 512; ++i) { Entity *e = &World.instances[i]; if ((e->entflags & EF_RIGIDBODY) && (e->entflags & EF_ACTIVE) && e->collider != COLTYPE_NONE) {dynamicEntities[dynamicEntityCount++] = i;} }
-    for (int i = 0; i < World.instCount; ++i) { Entity *e = &World.instances[i]; e->cellX = (i16)PosGetCellCoordX(e->position.x); e->cellZ = (i16)PosGetCellCoordZ(e->position.z); e->cellIndex = PosGetCellCoordsP(e->cellX,e->cellZ); e->radius = (e->modelIndex < MAX_MDLS) ? modelBounds[e->modelIndex] * vmax(vmax(e->scale.x,e->scale.y),e->scale.z) : GetColRad(e); e->colliding = false; } // Update cell index for all entities
-    for (u8 s = 0; s < substeps; ++s) { // dynamicEntityCount found to be only 335 on level 1
+    for (u16 i=0;i<World.instCount && dynamicEntityCount < 512;++i) { Entity *e = &World.instances[i]; if ((e->entflags & EF_RIGIDBODY) && (e->entflags & EF_ACTIVE) && e->collider != COLTYPE_NONE) {dynamicEntities[dynamicEntityCount++] = i;} }
+    for (u8 s=0;s<substeps;++s) { // dynamicEntityCount found to be only 335 on level 1
         mset(cellCounts,0,sizeof(cellCounts));
-        for (u16 i = 0; i < World.instCount; ++i) { Entity *e = &World.instances[i]; u32 cell = (u32)e->cellIndex; if (cell < WORLDX*WORLDX && cellCounts[cell] < 127) cellLists[cell][cellCounts[cell]++] = i; } // Build broadphase grid
-        for (u16 i = 0; i < dynamicEntityCount; ++i) { u16 idx = dynamicEntities[i]; Entity *e = &World.instances[idx]; ApplyVelocity(e,dtsub); } // Integrate all dynamic bodies
+        for (u16 i=0;i<World.instCount;++i) { // Update cell index for all entities and build broadphase grid
+            Entity *e = &World.instances[i];
+            e->cellX=(i16)PosGetCellCoordX(e->position.x);
+            e->cellZ=(i16)PosGetCellCoordZ(e->position.z);
+            e->cellIndex=PosGetCellCoordsP(e->cellX,e->cellZ); // Subte difference than PosGetCellCoords... and I don't remember why!?
+            e->radius=(e->modelIndex < MAX_MDLS) ? modelBounds[e->modelIndex] * vmax(vmax(e->scale.x,e->scale.y),e->scale.z) : GetColRad(e);
+            u32 cell=(u32)e->cellIndex; if(cell < WORLDX*WORLDX && cellCounts[cell] < 127){cellLists[cell][cellCounts[cell]++]=i;}
+        }
+        for (u16 i=0;i<dynamicEntityCount;++i) { u16 idx = dynamicEntities[i]; Entity *e = &World.instances[idx]; ApplyVelocity(e,dtsub); } // Integrate all dynamic bodies
         ShapeSphere sa,sb; ShapeBox ba,bb; ShapeCapsule ca,cb;
-        for (u16 i = 0; i < dynamicEntityCount; ++i) { // Collision detection and resolution
+        for (u16 i=0;i<dynamicEntityCount;++i) { // Collision detection and resolution
             u16 a = dynamicEntities[i]; Entity *e = &World.instances[a]; if (e->collider == COLTYPE_MSH || (Cheats.noclip && (a == PLAYER1 || a == PLAYER2))) continue;
             i32 cx = PosGetCellCoordX(e->position.x);
             i32 cz = PosGetCellCoordZ(e->position.z);
@@ -994,15 +1000,10 @@ void Physics() {
                 for (i32 dz = -radCells; dz <= radCells; ++dz) {
                     u32 cell = PosGetCellCoordsP(cx + dx,cz + dz); if (cell >= WORLDX*WORLDX) continue;
                     for (u16 k = 0; k < cellCounts[cell]; ++k) {
-                        u16 b = cellLists[cell][k];
-                        if (b == a) continue;
-                        Entity *o = &World.instances[b];
-                        if (!(mask & o->layer) || o->collider == COLTYPE_NONE) continue;
+                        u16 b = cellLists[cell][k];      if (b == a) continue;
                         if (Cheats.noclip && (b == PLAYER1 || b == PLAYER2)) continue;
-                        //if (b < a && o->collider != COLTYPE_MSH && (o->entflags & EF_RIGIDBODY) && (o->entflags & EF_ACTIVE)) continue; // Must b
-                        V3 deltaPos = V3_AsubB(e->position,o->position);
-                        float distSq = V3_dot(deltaPos,deltaPos), combinedRadius = e->radius * 2.f + o->radius * 2.f;
-                        if (distSq > combinedRadius * combinedRadius) continue;
+                        Entity *o = &World.instances[b]; if (!(mask & o->layer) || o->collider == COLTYPE_NONE) continue;
+                        V3 deltaPos = V3_AsubB(e->position,o->position); float diamSum = e->radius * 2.0f + o->radius * 2.0f; if (V3_dot(deltaPos,deltaPos) > diamSum * diamSum) continue;
                         Manifold mf = {0};
                         if      (e->collider == COLTYPE_CAP && o->collider == COLTYPE_CAP) { Entity_GetCap(e,&ca); Entity_GetCap(o,&cb); mf=OverlapToManifold(CapCap(ca,cb)); }
                         else if (e->collider == COLTYPE_CAP && o->collider == COLTYPE_BOX) { Entity_GetCap(e,&ca); Entity_GetBox(o,&bb); mf=OverlapToManifold(CapBox(ca,bb)); }
@@ -1033,7 +1034,7 @@ void Physics() {
                 for (int ctb=cta+1;ctb<contactCount;++ctb) { if (contacts[ctb].m.maxPen > contacts[cta].m.maxPen) { Contact tmp=contacts[cta]; contacts[cta]=contacts[ctb]; contacts[ctb]=tmp; } }
             }
             
-            flag_set(&e->entflags,EF_GROUNDED,false);
+            e->colliding=false; flag_set(&e->entflags,EF_GROUNDED,false);
             for (int c = 0; c < contactCount; ++c) {
                 Manifold *mfp = &contacts[c].m; u16 j = contacts[c].otherIdx;
                 e->colliding = true;
