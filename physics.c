@@ -211,7 +211,21 @@ static void DrawAngularVelocity(Entity *e) {
 }
 
 static u16 cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX];
-float GetColRad(Entity *e) { if (e->collider == COLTYPE_BOX) { float hx = e->colliderSize.x * 0.5f * e->scale.x, hy = e->colliderSize.y * 0.5f * e->scale.y, hz = e->colliderSize.z * 0.5f * e->scale.z; return vsqrtf(hx*hx + hy*hy + hz*hz); } return e->colliderSize.x; }
+float GetColRad(Entity *e) {
+    if (e->collider == COLTYPE_BOX) {
+        float hx = e->colliderSize.x * 0.5f * e->scale.x, hy = e->colliderSize.y * 0.5f * e->scale.y, hz = e->colliderSize.z * 0.5f * e->scale.z;
+        return vsqrtf(hx*hx + hy*hy + hz*hz);
+    }
+    if (e->collider == COLTYPE_CAP) {
+        ShapeCapsule cap;
+        Entity_GetCap(e, &cap);  // reuses existing upright logic for players/NPCs
+        float db = V3_Mag(V3_AsubB(e->position, cap.base)) + cap.rad;
+        float dt = V3_Mag(V3_AsubB(e->position, cap.tip)) + cap.rad;
+        return vmax(db, dt);  // exact bounding radius from entity's .position
+    }
+    return e->colliderSize.x;
+}
+
 Quaternion quat_from_axis_angle(V3 axis, float angle) { float half = angle * 0.5f; float s = vsinf(half); return (Quaternion){axis.x * s,axis.y * s,axis.z * s,vcosf(half)}; }
 Quaternion quat_normalize(Quaternion q) { float len2 = q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w; if (len2 < PHY_EPSILON) {return (Quaternion){0,0,0,1};} float inv = 1.0f / vsqrtf(len2); q.x *= inv; q.y *= inv; q.z *= inv; q.w *= inv; return q; }
 static inline bool V3_IsSane(V3 v) { return (v.x<=1e6f && v.x>=-1e6f && v.y<=1e6f && v.y>=-1e6f && v.z<=1e6f && v.z>=-1e6f); } // false for NaN/Inf too: comparisons against NaN are always false
@@ -384,8 +398,8 @@ static bool GJKNextSimplex(Simplex3D *s, V3 *dir) {
     #undef SWP
 }
 
-#define EPA_MAX_FACES 16
-#define EPA_MAX_VERTS 48
+#define EPA_MAX_FACES 64
+#define EPA_MAX_VERTS 128
 #define EPA_MAX_EDGES (EPA_MAX_FACES*3)
 typedef struct { int a,b,c; V3 n; float d; } EPAFace;
 typedef struct { V3 v, wA, wB; } EPAVert;
@@ -922,14 +936,11 @@ static void ResolveContactVelocity(Entity *e, Entity *o, V3 n, V3 rAarm, V3 rBar
 }
 
 static void ApplyPositionalCorrection(Entity *e, Entity *o, V3 n, const Manifold *m, bool oStatic) {
-    float iMA = e->mass < 0.001f ? 1.0f : 1.0f / e->mass;
-    float iMB = oStatic || o->mass < 0.001f ? 0.0f : 1.0f / o->mass;
-    float avgPen = 0.0f;
+    float iMA = e->mass < 0.001f ? 1.0f : 1.0f / e->mass, iMB = oStatic || o->mass < 0.001f ? 0.0f : 1.0f / o->mass, avgPen = 0.0f;
     for (int i = 0; i < m->n; ++i) {avgPen += m->p[i].pen;}
     if (m->n > 0) avgPen /= (float)m->n;
-    float c = vmin(vmax(avgPen - 0.02f, 0.0f) * 0.1f, 0.04f);
-    float cA = c * iMA / (iMA + iMB + PHY_EPSILON);
-    float cB = c * iMB / (iMA + iMB + PHY_EPSILON);
+    float c = vmax(avgPen - 0.005f, 0.0f) * 0.9f;
+    float cA = c * iMA / (iMA + iMB + PHY_EPSILON), cB = c * iMB / (iMA + iMB + PHY_EPSILON);
     SetPosition(e, V3_AplusB(e->position, V3_ScaleByF(n, cA)), false);
     if (!oStatic) SetPosition(o, V3_AsubB(o->position, V3_ScaleByF(n, cB)), false);
 }
@@ -938,7 +949,7 @@ static void ApplyManifoldResponse(Entity *e, Entity *o, const Manifold *m) {
     if (!m->n) return;
     bool oStatic = (!(o->entflags & EF_RIGIDBODY) || o->mass < 0.001f || o->collider == COLTYPE_NONE || o->collider == COLTYPE_MSH);
     if (o->collider == COLTYPE_MSH && e->collider == COLTYPE_MSH) return;
-    for (int i = 0; i < m->n; ++i) DrawSphereContact(m->p[i].point, 0.02f);
+    for (int i = 0; i < m->n; ++i) { if(m->p[i].pen > 0.0f){DrawSphereContact(m->p[i].point,0.02f);} }
     V3 rA[MANIFOLD_MAX], rB[MANIFOLD_MAX];
     float targetVn[MANIFOLD_MAX], accumN[MANIFOLD_MAX] = {0}, accumT[MANIFOLD_MAX] = {0};
     for (int i = 0; i < m->n; ++i) {
@@ -967,10 +978,10 @@ void Physics() {
     for (int i = 0; i < World.instCount; ++i) { Entity *e = &World.instances[i]; e->cellX = (i16)PosGetCellCoordX(e->position.x); e->cellZ = (i16)PosGetCellCoordZ(e->position.z); e->cellIndex = PosGetCellCoordsP(e->cellX,e->cellZ); e->radius = (e->modelIndex < MAX_MDLS) ? modelBounds[e->modelIndex] * vmax(vmax(e->scale.x,e->scale.y),e->scale.z) : GetColRad(e); e->colliding = false; } // Update cell index for all entities
     for (u8 s = 0; s < substeps; ++s) { // dynamicEntityCount found to be only 335 on level 1
         mset(cellCounts,0,sizeof(cellCounts));
-        for (u16 i = 0; i < World.instCount; ++i) { Entity *e = &World.instances[i]; u32 cell = (u32)e->cellIndex; if (cell < WORLDX*WORLDX && cellCounts[cell] < 127) cellLists[cell][cellCounts[cell]++] = i; } // Build broadphase grid (~0.013ms)
-        for (u16 i = 0; i < dynamicEntityCount; ++i) { u16 idx = dynamicEntities[i]; Entity *e = &World.instances[idx]; ApplyVelocity(e,dtsub); } // Integrate all dynamic bodies (~0.005ms)
+        for (u16 i = 0; i < World.instCount; ++i) { Entity *e = &World.instances[i]; u32 cell = (u32)e->cellIndex; if (cell < WORLDX*WORLDX && cellCounts[cell] < 127) cellLists[cell][cellCounts[cell]++] = i; } // Build broadphase grid
+        for (u16 i = 0; i < dynamicEntityCount; ++i) { u16 idx = dynamicEntities[i]; Entity *e = &World.instances[idx]; ApplyVelocity(e,dtsub); } // Integrate all dynamic bodies
         ShapeSphere sa,sb; ShapeBox ba,bb; ShapeCapsule ca,cb;
-        for (u16 i = 0; i < dynamicEntityCount; ++i) { // Collision detection and resolution (~32.9ms)
+        for (u16 i = 0; i < dynamicEntityCount; ++i) { // Collision detection and resolution
             u16 a = dynamicEntities[i]; Entity *e = &World.instances[a]; if (e->collider == COLTYPE_MSH || (Cheats.noclip && (a == PLAYER1 || a == PLAYER2))) continue;
             i32 cx = PosGetCellCoordX(e->position.x);
             i32 cz = PosGetCellCoordZ(e->position.z);
@@ -988,7 +999,7 @@ void Physics() {
                         Entity *o = &World.instances[b];
                         if (!(mask & o->layer) || o->collider == COLTYPE_NONE) continue;
                         if (Cheats.noclip && (b == PLAYER1 || b == PLAYER2)) continue;
-                        if (b < a && o->collider != COLTYPE_MSH && (o->entflags & EF_RIGIDBODY) && (o->entflags & EF_ACTIVE)) continue;
+                        //if (b < a && o->collider != COLTYPE_MSH && (o->entflags & EF_RIGIDBODY) && (o->entflags & EF_ACTIVE)) continue; // Must b
                         V3 deltaPos = V3_AsubB(e->position,o->position);
                         float distSq = V3_dot(deltaPos,deltaPos), combinedRadius = e->radius * 2.f + o->radius * 2.f;
                         if (distSq > combinedRadius * combinedRadius) continue;
@@ -1021,9 +1032,14 @@ void Physics() {
             for (int cta=0;cta<contactCount-1;++cta) {
                 for (int ctb=cta+1;ctb<contactCount;++ctb) { if (contacts[ctb].m.maxPen > contacts[cta].m.maxPen) { Contact tmp=contacts[cta]; contacts[cta]=contacts[ctb]; contacts[ctb]=tmp; } }
             }
+            
+            flag_set(&e->entflags,EF_GROUNDED,false);
             for (int c = 0; c < contactCount; ++c) {
                 Manifold *mfp = &contacts[c].m; u16 j = contacts[c].otherIdx;
-                Entity *o = (j < INSTANCE_COUNT) ? &World.instances[j] : NULL; e->colliding = true; if (o) o->colliding = true;
+                e->colliding = true;
+                Entity *o = (j < INSTANCE_COUNT) ? &World.instances[j] : NULL;
+                if (o) o->colliding = true;
+                if (V3_dot(mfp->normal,(V3){0.0f,1.0f,0.0f}) >= 0.574f/*cos(55deg)*/) {e->entflags |= EF_GROUNDED;} // Only Apply flag to the one the normal points to.
                 if (o && (o->entflags & EF_RIGIDBODY) && o->collider != COLTYPE_MSH) ApplyManifoldResponse(e,o,mfp);
                 else { Entity staticProxy = {0}; staticProxy.mass=0.0f; staticProxy.dynamicFriction=0.4f; staticProxy.collider=COLTYPE_NONE; ApplyManifoldResponse(e,&staticProxy,mfp); }
             }

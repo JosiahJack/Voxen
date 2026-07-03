@@ -568,7 +568,7 @@ MOD_TO_ENGINE void ModEDefsInitAfterLoad(void) { // Global conditions for all en
     /*543 prop_chair04*/         EDefs[543].modelIndex=41;  EDefs[543].texIndex=195; 
     /*544 prop_chair05*/         EDefs[544].modelIndex=42;  EDefs[544].texIndex=195; 
     /*545 prop_chandelier*/      EDefs[545].modelIndex=496;  EDefs[545].texIndex=644; 
-    /*546 prop_charge_station*/  EDefs[546].modelIndex=44;  EDefs[546].texIndex=77;  EDefs[546].glowIndex=76; 
+    /*546 prop_charge_station*/  EDefs[546].modelIndex=44;  EDefs[546].texIndex=77;  EDefs[546].glowIndex=76; EDefs[546].collider=COLTYPE_MSH; EDefs[546].colMeshIndex=44;
     /*547 prop_clothes*/         EDefs[547].modelIndex=47;  EDefs[547].texIndex=97; 
     /*548 prop_computer*/        EDefs[548].modelIndex=48; 
     /*549 prop_couch*/           EDefs[549].modelIndex=59; 
