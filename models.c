@@ -17,30 +17,16 @@ void InitializeFloatToHalfLUT() {
     }
 }
 
-INLINE half float_to_half(float f) { u32 f_bits; mcpy(&f_bits,&f,4); u32 i = (f_bits >> 23) & 0x1FF; return (half)(base_table[i] + ((f_bits & 0x007FFFFF) >> shift_table[i])); }// Extract the index using the sign bit (bit 31) and the exponent (bits 23-30), then combine the base exponent/sign with the shifted mantissa bits
-INLINE float fast_atof(const char** p) {
-    const char* c = *p;
-    while (*c == ' ' || *c == '\t') c++;
-    float s = 1.0f;
-    if (*c == '-') { s = -1.0f; c++; }
-    float v = 0.0f;
-    while (*c >= '0' && *c <= '9') { v = v * 10.0f + (*c - '0'); c++; }
-    if (*c == '.') { c++; float sub = 0.1f; while (*c >= '0' && *c <= '9') { v += (*c - '0') * sub; sub *= 0.1f; c++; } }
-    *p = c;
-    return s * v;
+INLINE half float_to_half(float f) {
+    u32 f_bits; mcpy(&f_bits,&f,4);
+    u32 i = (f_bits >> 23) & 0x1FF;
+    u8 sh = shift_table[i];
+    u32 mant = (f_bits & 0x007FFFFF) + (1u << (sh - 1)); // round-to-nearest: bias by half the truncated range before the shift; carry ripples into base_table[i]'s exponent bits via the '+' below.  This fixes seams between modular wall "chunks"
+    return (half)(base_table[i] + (mant >> sh));
 }
 
-INLINE i32 fast_atoi(const char** p) {
-    const char* c = *p;
-    while (*c == ' ' || *c == '\t') c++;
-    i32 s = 1;
-    if (*c == '-') { s = -1; c++; }
-    i32 v = 0;
-    while (*c >= '0' && *c <= '9') { v = v * 10 + (*c - '0'); c++; }
-    *p = c;
-    return v * s;
-}
-
+INLINE float fast_atof(const char** p) { const char* c=*p; while (*c == ' ' || *c == '\t') {c++;} float s=1.0f; if(*c == '-'){s=-1.0f; c++;} float v=0.0f; while (*c >= '0' && *c <= '9') { v=v * 10.0f + (*c - '0'); c++; } if (*c == '.') { c++; float sub=0.1f; while (*c >= '0' && *c <= '9') { v += (*c - '0') * sub; sub*=0.1f; c++; } } *p=c; return s * v; }
+INLINE i32 fast_atoi(const char** p) { const char* c = *p; while (*c == ' ' || *c == '\t') {c++;} i32 s=1; if(*c == '-'){s=-1; c++;} i32 v = 0; while (*c >= '0' && *c <= '9') { v = v * 10 + (*c - '0'); c++; } *p = c; return v * s; }
 typedef struct { u32 idx,key; } TriSort;
 int cmp(const void* a, const void* b) { u32 ka=((const TriSort*)a)->key, kb=((const TriSort*)b)->key; return (ka > kb) - (ka < kb); } // branchless 1 or -1
 static void RadixSortTriangles(TriSort* src, TriSort* temp, u32 count) {
@@ -90,15 +76,9 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, c
         if (*p == '#') { while (p < e && *p != '\n') ++p; continue; }
         if (*p == 'v') {
             ++p;
-            if (*p == ' ') { if (unlikely(pc >= MAX_VERT_ELEMENT_SIZE)) return false;
-                ++p; tp[pc*3] = fast_atof(&p); tp[pc*3+1] = fast_atof(&p); tp[pc*3+2] = fast_atof(&p); ++pc;
-            } else if (*p == 'n' && p[1] == ' ') { p += 2;
-                if (unlikely(nc >= MAX_VERT_ELEMENT_SIZE)) return false;
-                tn[nc*3] = fast_atof(&p); tn[nc*3+1] = fast_atof(&p); tn[nc*3+2] = fast_atof(&p); ++nc;
-            } else if (*p == 't' && p[1] == ' ') { p += 2;
-                if (unlikely(uc >= MAX_VERT_ELEMENT_SIZE)) return false;
-                tu[uc*2] = fast_atof(&p); tu[uc*2+1] = fast_atof(&p); ++uc;
-            }
+            if (*p == ' ') { if (unlikely(pc >= MAX_VERT_ELEMENT_SIZE)) {return false;} ++p; tp[pc*3] = fast_atof(&p); tp[pc*3+1] = fast_atof(&p); tp[pc*3+2] = fast_atof(&p); ++pc; }
+            else if (*p == 'n' && p[1] == ' ') { p += 2; if (unlikely(nc >= MAX_VERT_ELEMENT_SIZE)) {return false;} tn[nc*3] = fast_atof(&p); tn[nc*3+1] = fast_atof(&p); tn[nc*3+2] = fast_atof(&p); ++nc; }
+            else if (*p == 't' && p[1] == ' ') { p += 2; if (unlikely(uc >= MAX_VERT_ELEMENT_SIZE)) {return false;} tu[uc*2] = fast_atof(&p); tu[uc*2+1] = fast_atof(&p); ++uc; }
         } else if (*p == 'f' && p[1] == ' ') {
             p += 2;
             u32 vi[8]={0}, ti[8]={0}, ni[8]={0}; int nv = 0;
@@ -132,7 +112,6 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, c
         } else while (p < e && *p != '\n') ++p;
     }
     if (unlikely(!ec)) return false;
-
     u32 used_slots_count = 0;
     u32* rem = (u32*)st; u32 ucnt = 0;
     for (u32 i=0; i<ec; ++i) {
@@ -144,25 +123,15 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, c
         mcpy(sv+(ucnt<<3), v, 32);
         ++ucnt; nxt:;
     }
-
     for (u32 i=0;i<ec;++i) ft[i] = (u16)rem[i];
-
     OptimizeVertexCache(ft,ec,ucnt,cache_scr);
     u8* optv_src = OptimizeVertexFetch((u8*)sv,&ucnt,ft,ec,CPU_VRT_SZ,remap_scr,nv_scr);
-
-    // Copy out precisely sized final persistent mesh chunks since buffers are recycled
-    u8* final_v = OS_Alloc((size_t)ucnt * CPU_VRT_SZ);
+    u8* final_v = OS_Alloc((size_t)ucnt * CPU_VRT_SZ); // Copy out precisely sized final persistent mesh chunks since buffers are recycled
     mcpy(final_v, optv_src, (size_t)ucnt * CPU_VRT_SZ);
     u16* final_t = OS_Alloc(ec * sizeof(u16));
     mcpy(final_t, ft, ec * sizeof(u16));
-
     *ov = final_v; *ovc = ucnt; *ot = final_t; *otc = ec/3; modelBounds[mindex] = vmax(vabs(mx),vmax(vabs(my),vmax(vabs(mz),vmax(Mx,vmax(My,Mz)))));
-
-    // Clean up only the dirty hash slots so ht is pristine for the next model
-    for (u32 i = 0; i < used_slots_count; ++i) {
-        ht[ht_used[i]] = 0xFFFFFFFFU;
-    }
-
+    for (u32 i = 0; i < used_slots_count; ++i) {ht[ht_used[i]] = 0xFFFFFFFFU;}
     return true;
 }
 
@@ -171,9 +140,7 @@ static void* ModelParsingWorker(void* arg) {
     ModelParseTask* t = arg;
     for (u32 i = t->start; i < t->end; ++i) {
         RawOBJ obj = t->raw[i]; if (unlikely(!obj.data || obj.size <= 0)) continue;
-        if (!ParseOBJ(i,obj.data,obj.size,thrd_pos[t->tid],thread_temp_nrm[t->tid],thrd_uv[t->tid],thrd_verts[t->tid],thrd_tris[t->tid],thrd_ht[t->tid],thrd_ht_used[t->tid],
-                     thrd_ft_scratch[t->tid],thrd_remap_scratch[t->tid],thrd_nv_scratch[t->tid],thrd_cache_scratch[t->tid],
-                     &modelVertices[i],&modelVertexCounts[i],&modelTriangles[i],&modelTriangleCounts[i],obj.name)) continue;
+        if (!ParseOBJ(i,obj.data,obj.size,thrd_pos[t->tid],thread_temp_nrm[t->tid],thrd_uv[t->tid],thrd_verts[t->tid],thrd_tris[t->tid],thrd_ht[t->tid],thrd_ht_used[t->tid],thrd_ft_scratch[t->tid],thrd_remap_scratch[t->tid],thrd_nv_scratch[t->tid],thrd_cache_scratch[t->tid],&modelVertices[i],&modelVertexCounts[i],&modelTriangles[i],&modelTriangleCounts[i],obj.name)) continue;
     }
     return NULL;
 }
@@ -230,51 +197,35 @@ void LoadModels() {
     DualLog("Loading models (%d) ...",mp.count);
     u32 maxid = 0; for (u32 i=0; i<mp.count; ++i) { if (mp.entries[i].index != U16_MAX && mp.entries[i].index > maxid) maxid = mp.entries[i].index; } mdlsCnt = (u16)maxid + 1;
     modelVertices = OS_Alloc(mdlsCnt * sizeof(u8*)); modelTriangles = OS_Alloc(mdlsCnt * sizeof(u16*));
-    size_t n = mdlsCnt;
     InitializeFloatToHalfLUT();
-    // Size computations for the new thread scratchpad arenas
-    size_t ft_sz = (size_t)MAX_OUTPUT_VERTS * sizeof(u16);
-    size_t remap_sz = (size_t)MAX_OUTPUT_VERTS * sizeof(u32);
-    size_t nv_sz = (size_t)MAX_OUTPUT_VERTS * CPU_VRT_SZ;
-    size_t cache_sz = ((MAX_OUTPUT_VERTS/3) * sizeof(TriSort)) * 2 + (MAX_OUTPUT_VERTS * sizeof(u16));
-
-    size_t arena = n*sizeof(i32) + n*sizeof(RawOBJ) + 11*threadCnt*sizeof(void*) + 
-                   (size_t)threadCnt * ((MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*2)*sizeof(float) + 
-                   MAX_OUTPUT_VERTS*8*sizeof(float) + MAX_OUTPUT_VERTS*sizeof(u32) + HASH_SIZE*sizeof(u32) + MAX_OUTPUT_VERTS*sizeof(u32) +
-                   ft_sz + remap_sz + nv_sz + cache_sz);
-                   
+    size_t ft_sz = (size_t)MAX_OUTPUT_VERTS * sizeof(u16), remap_sz = (size_t)MAX_OUTPUT_VERTS * sizeof(u32), nv_sz = (size_t)MAX_OUTPUT_VERTS * CPU_VRT_SZ, cache_sz = ((MAX_OUTPUT_VERTS/3) * sizeof(TriSort)) * 2 + (MAX_OUTPUT_VERTS * sizeof(u16));
+    size_t arena = mdlsCnt*sizeof(i32) + mdlsCnt*sizeof(RawOBJ) + 11*threadCnt*sizeof(void*) + (size_t)threadCnt * ((MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*2)*sizeof(float) + MAX_OUTPUT_VERTS*8*sizeof(float) + MAX_OUTPUT_VERTS*sizeof(u32) + HASH_SIZE*sizeof(u32) + MAX_OUTPUT_VERTS*sizeof(u32) + ft_sz + remap_sz + nv_sz + cache_sz);
     void* arena_base = OS_Alloc(arena); char* p = arena_base;
-    i32* idxmap = (i32*)p; p += n*sizeof(i32);
-    mset(idxmap, -1, n*sizeof(i32));
+    i32* idxmap = (i32*)p; p += mdlsCnt*sizeof(i32);
+    mset(idxmap, -1, mdlsCnt*sizeof(i32));
     for (u32 i=0; i<mp.count; ++i) if (mp.entries[i].index != U16_MAX) idxmap[mp.entries[i].index] = (i32)i;
-    RawOBJ* raw = (RawOBJ*)p; p += n*sizeof(RawOBJ);
-    for (u32 i=0; i<n; ++i) { i32 pi = idxmap[i]; if(pi >= 0){ FHandle d; int sz=0; raw[i].data=(const char*)OS_OpenAndAllocateFileBufferReadonly(mp.entries[pi].path,&d,&sz); raw[i].size=sz; raw[i].name=mp.entries[pi].path;} }
-    
+    RawOBJ* raw = (RawOBJ*)p; p += mdlsCnt*sizeof(RawOBJ);
+    for (u32 i=0; i<mdlsCnt; ++i) { i32 pi = idxmap[i]; if(pi >= 0){ FHandle d; int sz=0; raw[i].data=(const char*)OS_OpenAndAllocateFileBufferReadonly(mp.entries[pi].path,&d,&sz); raw[i].size=sz; raw[i].name=mp.entries[pi].path;} }
     float **pos = (float**)p; p += threadCnt*sizeof(float*); float **nrm = (float**)p; p += threadCnt*sizeof(float*);
     float **uv = (float**)p; p += threadCnt*sizeof(float*); float **ov = (float**)p; p += threadCnt*sizeof(float*);
     u16 **ot = (u16**)p; p += threadCnt*sizeof(u16*);
     u32 **ht = (u32**)p; p += threadCnt*sizeof(u32*); u32 **ht_used = (u32**)p; p += threadCnt*sizeof(u32*);
-    
     u16 **ft_scr = (u16**)p; p += threadCnt*sizeof(u16*);
     u32 **remap_scr = (u32**)p; p += threadCnt*sizeof(u32*); u8 **nv_scr = (u8**)p; p += threadCnt*sizeof(u8*);
     u8 **cache_scr = (u8**)p; p += threadCnt*sizeof(u8*);
-    
     size_t psz = MAX_VERT_ELEMENT_SIZE*3*sizeof(float), usz = MAX_OUTPUT_VERTS*8*sizeof(float), tsz = MAX_OUTPUT_VERTS*sizeof(u32);
     for (int i=0; i<threadCnt; ++i) { 
         pos[i] = (float*)p; p+=psz; nrm[i] = (float*)p; p += psz; uv[i] = (float*)p; p+=MAX_VERT_ELEMENT_SIZE*2*sizeof(float); 
         ov[i] = (float*)p; p+=usz; ot[i] = (u16*)p; p+=tsz; 
         ht[i] = (u32*)p; p+=HASH_SIZE*sizeof(u32); ht_used[i] = (u32*)p; p+=MAX_OUTPUT_VERTS*sizeof(u32);
-        
         ft_scr[i] = (u16*)p; p+=ft_sz;
         remap_scr[i] = (u32*)p; p+=remap_sz; nv_scr[i] = (u8*)p; p+=nv_sz;
         cache_scr[i] = (u8*)p; p+=cache_sz;
-        
         mset(ht[i], 0xFF, HASH_SIZE * sizeof(u32));
     }
     thrd_pos = pos; thread_temp_nrm = nrm; thrd_uv = uv; thrd_verts = ov; thrd_tris = ot;
     thrd_ht = ht; thrd_ht_used = ht_used;
     thrd_ft_scratch = ft_scr; thrd_remap_scratch = remap_scr; thrd_nv_scratch = nv_scr; thrd_cache_scratch = cache_scr;
-    
     ModelParseTask tasks[32]; u32 chunk = (mdlsCnt + threadCnt - 1) / threadCnt; OS_Thread th[32];
     for (int i=0;i<threadCnt;++i) tasks[i] = (ModelParseTask){i*chunk,(i+1)*chunk > mdlsCnt ? mdlsCnt : (i+1)*chunk,raw,i};
     if (threadCnt > 1) {
