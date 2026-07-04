@@ -126,27 +126,32 @@ u8* PngLoad(const u8* buffer, int len, int* x, int* y, PngArena* arena) {
     Label_parsesuccess: *x = z.s->img_x; *y = z.s->img_y; return z.out;
 }
 
+#define TEXHASH_SZ 256
 static void* TextureParsingWorker(void* arg) {
     TextureParseTask* t = (TextureParseTask*)arg; u32 i;
-    while ((i = __atomic_fetch_add((u32*)t->shared_idx, 1, 5)) < t->texCnt) { // Dynamic Work Stealing: Threads fetch next available index automatically
+    while ((i = __atomic_fetch_add((u32*)t->shared_idx,1,0)) < t->texCnt) { // Dynamic Work Stealing: Threads fetch next available index automatically
         i32 pIdx = t->parsIdx[i]; 
         if (unlikely(pIdx < 0 || pIdx >= (i32)t->parser->count)) continue;
         doubleSidedTexture[i] = t->parser->entries[pIdx].doublesided; 
         transparentTexture[i] = t->parser->entries[pIdx].transparent;
+        
+        FHandle dummy_fd; int size=0; t->raw_textures[i].data=(const char*)OS_OpenAndAllocateFileBufferReadonly(t->parser->entries[pIdx].path,&dummy_fd,&size);
+        t->raw_textures[i].size=size;
+        
         const char* d = t->raw_textures[i].data; 
         int sz = t->raw_textures[i].size; 
         if (unlikely(!d || sz <= 0)) continue;
         int w=0, h=0; u8 *pix = PngLoad((const u8*)d,sz,&w,&h,&thread_png_arenas[t->tid]); if (!pix || w < 1 || h < 1) { OS_Free((void*)d,(size_t)sz); continue; }
         u32 nP = (u32)w * h; u8 *idx = (u8*)OS_Alloc(nP); u32 *pal = (u32*)OS_Alloc(256 * sizeof(u32)); u32 pSz = 0; 
-        u32 exact_hash[8192]; mset(exact_hash,0xFF,sizeof(exact_hash));// Fast Exact Match Hash Map (8192 slots), 0xFFFFFFFF = empty
-        u8 exact_idx[8192]; 
-        u8 nearest_cache[32768]; mset(nearest_cache,0xFF,sizeof(nearest_cache)); // 15-bit Color Space Cache for fast nearest-neighbor fallback
+        u32 exact_hash[TEXHASH_SZ]; mset(exact_hash,0xFF,sizeof(exact_hash));// Fast Exact Match Hash Map, 0xFFFFFFFF = empty
+        u8 exact_idx[TEXHASH_SZ]; 
+        u8 nearest_cache[32768]; bool nearclear = false; // 15-bit Color Space Cache for fast nearest-neighbor fallback
         for (u32 p = 0; p < nP; ++p) {
             u32 c = ((u32*)pix)[p];
             u32 h_val = (c * 0x9E3779B9u); // Murmur-style avalanche hash
             h_val ^= h_val >> 16;
-            u32 slot = h_val & 8191;
-            while (exact_hash[slot] != 0xFFFFFFFF) { if (exact_hash[slot] == c) { idx[p] = exact_idx[slot]; goto found; }  slot = (slot + 1) & 8191; }
+            u32 slot = h_val & (TEXHASH_SZ - 1);
+            while (exact_hash[slot] != 0xFFFFFFFF) { if (exact_hash[slot] == c) { idx[p] = exact_idx[slot]; goto found; }  slot = (slot + 1) & (TEXHASH_SZ - 1); }
             if (pSz < 256) { 
                 pal[pSz] = c; 
                 idx[p] = (u8)pSz; 
@@ -154,6 +159,7 @@ static void* TextureParsingWorker(void* arg) {
                 exact_idx[slot] = (u8)pSz;
                 pSz++; 
             } else { // Fallback: Check Nearest Neighbor Cache first (R5 G5 B5)
+                if (!nearclear) { mset(nearest_cache,0xFF,sizeof(nearest_cache)); nearclear = true; }
                 u32 cache_key = ((c & 0xF8) << 7) | ((c & 0xF800) >> 1) | ((c & 0xF80000) >> 9);
                 if (nearest_cache[cache_key] != 0xFF) { idx[p] = nearest_cache[cache_key]; goto found; }
                 u32 best = 0, bestDist = ~0u; // Cache Miss: Full Search
@@ -242,14 +248,14 @@ static __attribute__((noinline)) void LoadTextures() {
     DualLog("Loading textures (%u) ... ", texture_parser.count);
     RawTexture* rawTextures = OS_Alloc(texCnt * sizeof(RawTexture));
     mset(rawTextures, 0, texCnt * sizeof(RawTexture));
-    for (u32 i = 0; i < texCnt; ++i) {
-        i32 p = parsIdx[i]; if (p < 0) continue;
-        const char* path = texture_parser.entries[p].path;
-        FHandle dummy_fd;
-        int size = 0; 
-        rawTextures[i].data = (const char*)OS_OpenAndAllocateFileBufferReadonly(path, &dummy_fd, &size);
-        rawTextures[i].size = size;
-    }
+//     for (u32 i = 0; i < texCnt; ++i) {
+//         i32 p = parsIdx[i]; if (p < 0) continue;
+//         const char* path = texture_parser.entries[p].path;
+//         FHandle dummy_fd;
+//         int size = 0; 
+//         rawTextures[i].data = (const char*)OS_OpenAndAllocateFileBufferReadonly(path, &dummy_fd, &size);
+//         rawTextures[i].size = size;
+//     }
     thread_png_arenas = (PngArena*)OS_Alloc((size_t)threadCnt * sizeof(PngArena));
     for (int t = 0; t < threadCnt; ++t) { thread_png_arenas[t].base = NULL; PngArenaInit(&thread_png_arenas[t]); }
     TexResult* texResults = OS_Alloc(texCnt * sizeof(TexResult)); // Unified result struct allocation

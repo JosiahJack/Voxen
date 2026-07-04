@@ -43,6 +43,7 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define MAX_MOUSE_BUTTONS 8
 #define MAX_CHANNELS 48 // Max concurrent sounds, must keep track of for volume setting
 #define VRT_ATT_SZ 16
+#define CPU_VRT_SZ 32
 #define DOUBLE_CLICK_TIME 0.5f
 #define PLAYER_MAX_WALK_SPEED 3.6f
 #define PLAYER_MAX_SPRINT_SPEED 8.8f

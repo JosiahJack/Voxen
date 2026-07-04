@@ -3,7 +3,7 @@ u8** modelVertices = NULL; u16** modelTriangles = NULL; u32 modelVertexCounts[MA
 #define MAX_VERT_ELEMENT_SIZE 6964
 #define MAX_OUTPUT_VERTS 20960
 static float **thrd_pos = NULL, **thread_temp_nrm = NULL, **thrd_uv = NULL, **thrd_verts = NULL; static u16** thrd_tris = NULL; static u32** thrd_ht = NULL; static u32** thrd_ht_used = NULL; 
-static u8** thrd_fv_scratch = NULL; static u16** thrd_ft_scratch = NULL; static u32** thrd_remap_scratch = NULL; static u8** thrd_nv_scratch = NULL; static u8** thrd_cache_scratch = NULL;
+static u16** thrd_ft_scratch = NULL; static u32** thrd_remap_scratch = NULL; static u8** thrd_nv_scratch = NULL; static u8** thrd_cache_scratch = NULL;
 typedef struct { const char* data; const char* name; int size; } RawOBJ; typedef struct { u16 index; bool animated; u8 animationNum; char path[128]; } ModelData; typedef struct { ModelData* entries; u32 count; u32 capacity; } ModelDataParser;
 static u16 base_table[512]; static u8 shift_table[512];
 void InitializeFloatToHalfLUT() {
@@ -40,6 +40,7 @@ INLINE i32 fast_atoi(const char** p) {
     *p = c;
     return v * s;
 }
+
 typedef struct { u32 idx,key; } TriSort;
 int cmp(const void* a, const void* b) { u32 ka=((const TriSort*)a)->key, kb=((const TriSort*)b)->key; return (ka > kb) - (ka < kb); } // branchless 1 or -1
 static void RadixSortTriangles(TriSort* src, TriSort* temp, u32 count) {
@@ -52,6 +53,7 @@ static void RadixSortTriangles(TriSort* src, TriSort* temp, u32 count) {
     for (u32 i = 0; i < count; ++i) {u32 radix0 = src[i].key & 0xFF; u32 dest = b0[radix0]++; temp[dest] = src[i];}
     for (u32 i = 0; i < count; ++i) { u32 radix1 = (temp[i].key >> 8) & 0xFF; u32 dest = b1[radix1]++; src[dest] = temp[i]; }
 }
+
 static void OptimizeVertexCache(u16* idx, u32 ic, u32 vc, u8* scratch) {
     if (ic < 3 || !vc) return;
     u32 tc = ic / 3;
@@ -63,6 +65,7 @@ static void OptimizeVertexCache(u16* idx, u32 ic, u32 vc, u8* scratch) {
     for (u32 i = 0; i < tc; ++i) { u16* s = idx + t[i].idx * 3; u16* d = n + i * 3; d[0] = s[0]; d[1] = s[1]; d[2] = s[2]; }
     mcpy(idx, n, ic * sizeof(u16));
 }
+
 static u8* OptimizeVertexFetch(u8* v, u32* vc, u16* idx, u32 ic, size_t stride, u32* remap, u8* nv) {
     u32 oc = *vc; if (!oc || !ic) return v;
     mset(remap,0xFF,oc * sizeof(u32));
@@ -74,8 +77,9 @@ static u8* OptimizeVertexFetch(u8* v, u32* vc, u16* idx, u32 ic, size_t stride, 
     *vc = nc;
     return nv;
 }
+
 #define HASH_SIZE 32768
-static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, const char* __restrict d, int fs, float* __restrict tp, float* __restrict tn, float* __restrict tu, float* __restrict sv, u16* __restrict st, u32* __restrict ht, u32* __restrict ht_used, u8* __restrict fv, u16* __restrict ft, u32* __restrict remap_scr, u8* __restrict nv_scr, u8* __restrict cache_scr, u8** ov, u32* ovc, u16** ot, u16* otc, const char* name) {
+static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, const char* __restrict d, int fs, float* __restrict tp, float* __restrict tn, float* __restrict tu, float* __restrict sv, u16* __restrict st, u32* __restrict ht, u32* __restrict ht_used, u16* __restrict ft, u32* __restrict remap_scr, u8* __restrict nv_scr, u8* __restrict cache_scr, u8** ov, u32* ovc, u16** ot, u16* otc, const char* name) {
     *ov = NULL; *ot = NULL; *ovc = *otc = 0;
     u32 pc=0,nc=0,uc=0,ec=0;
     float mx=1e9f,my=1e9f,mz=1e9f,Mx=-1e9f,My=-1e9f,Mz=-1e9f;
@@ -140,17 +144,15 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, c
         mcpy(sv+(ucnt<<3), v, 32);
         ++ucnt; nxt:;
     }
-    
-    u8* dst = fv;
-    for (u32 i=0;i<ucnt;++i) { const float* src = sv + (i<<3); for(u32 j=0;j<8;++j){*(half*)dst = float_to_half(src[j]); dst += 2;} }
+
     for (u32 i=0;i<ec;++i) ft[i] = (u16)rem[i];
-    
+
     OptimizeVertexCache(ft,ec,ucnt,cache_scr);
-    u8* optv_src = OptimizeVertexFetch(fv,&ucnt,ft,ec,VRT_ATT_SZ,remap_scr,nv_scr);
-    
+    u8* optv_src = OptimizeVertexFetch((u8*)sv,&ucnt,ft,ec,CPU_VRT_SZ,remap_scr,nv_scr);
+
     // Copy out precisely sized final persistent mesh chunks since buffers are recycled
-    u8* final_v = OS_Alloc((size_t)ucnt * VRT_ATT_SZ);
-    mcpy(final_v, optv_src, (size_t)ucnt * VRT_ATT_SZ);
+    u8* final_v = OS_Alloc((size_t)ucnt * CPU_VRT_SZ);
+    mcpy(final_v, optv_src, (size_t)ucnt * CPU_VRT_SZ);
     u16* final_t = OS_Alloc(ec * sizeof(u16));
     mcpy(final_t, ft, ec * sizeof(u16));
 
@@ -163,17 +165,19 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, c
 
     return true;
 }
+
 typedef struct { u32 start, end; RawOBJ* raw; int tid; } ModelParseTask;
 static void* ModelParsingWorker(void* arg) {
     ModelParseTask* t = arg;
     for (u32 i = t->start; i < t->end; ++i) {
         RawOBJ obj = t->raw[i]; if (unlikely(!obj.data || obj.size <= 0)) continue;
         if (!ParseOBJ(i,obj.data,obj.size,thrd_pos[t->tid],thread_temp_nrm[t->tid],thrd_uv[t->tid],thrd_verts[t->tid],thrd_tris[t->tid],thrd_ht[t->tid],thrd_ht_used[t->tid],
-                     thrd_fv_scratch[t->tid],thrd_ft_scratch[t->tid],thrd_remap_scratch[t->tid],thrd_nv_scratch[t->tid],thrd_cache_scratch[t->tid],
+                     thrd_ft_scratch[t->tid],thrd_remap_scratch[t->tid],thrd_nv_scratch[t->tid],thrd_cache_scratch[t->tid],
                      &modelVertices[i],&modelVertexCounts[i],&modelTriangles[i],&modelTriangleCounts[i],obj.name)) continue;
     }
     return NULL;
 }
+
 bool ParseModelData(ModelDataParser *p, u16 maxSz, const char *fn) {
     FHandle fd; int sz; char* buf = OS_OpenAndAllocateFileBufferReadonly(fn, &fd, &sz);
     char *c = buf, *e = buf + sz; u32 maxidx = 0, ln = 0;
@@ -218,6 +222,7 @@ bool ParseModelData(ModelDataParser *p, u16 maxSz, const char *fn) {
     OS_Free(buf, sz);
     return true;
 }
+
 void LoadModels() {
     double startModelTime = get_time();
     ModelDataParser mp = {0};
@@ -228,16 +233,15 @@ void LoadModels() {
     size_t n = mdlsCnt;
     InitializeFloatToHalfLUT();
     // Size computations for the new thread scratchpad arenas
-    size_t fv_sz = (size_t)MAX_OUTPUT_VERTS * VRT_ATT_SZ;
     size_t ft_sz = (size_t)MAX_OUTPUT_VERTS * sizeof(u16);
     size_t remap_sz = (size_t)MAX_OUTPUT_VERTS * sizeof(u32);
-    size_t nv_sz = (size_t)MAX_OUTPUT_VERTS * VRT_ATT_SZ;
+    size_t nv_sz = (size_t)MAX_OUTPUT_VERTS * CPU_VRT_SZ;
     size_t cache_sz = ((MAX_OUTPUT_VERTS/3) * sizeof(TriSort)) * 2 + (MAX_OUTPUT_VERTS * sizeof(u16));
 
-    size_t arena = n*sizeof(i32) + n*sizeof(RawOBJ) + 12*threadCnt*sizeof(void*) + 
+    size_t arena = n*sizeof(i32) + n*sizeof(RawOBJ) + 11*threadCnt*sizeof(void*) + 
                    (size_t)threadCnt * ((MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*2)*sizeof(float) + 
                    MAX_OUTPUT_VERTS*8*sizeof(float) + MAX_OUTPUT_VERTS*sizeof(u32) + HASH_SIZE*sizeof(u32) + MAX_OUTPUT_VERTS*sizeof(u32) +
-                   fv_sz + ft_sz + remap_sz + nv_sz + cache_sz);
+                   ft_sz + remap_sz + nv_sz + cache_sz);
                    
     void* arena_base = OS_Alloc(arena); char* p = arena_base;
     i32* idxmap = (i32*)p; p += n*sizeof(i32);
@@ -251,7 +255,7 @@ void LoadModels() {
     u16 **ot = (u16**)p; p += threadCnt*sizeof(u16*);
     u32 **ht = (u32**)p; p += threadCnt*sizeof(u32*); u32 **ht_used = (u32**)p; p += threadCnt*sizeof(u32*);
     
-    u8 **fv_scr = (u8**)p; p += threadCnt*sizeof(u8*); u16 **ft_scr = (u16**)p; p += threadCnt*sizeof(u16*);
+    u16 **ft_scr = (u16**)p; p += threadCnt*sizeof(u16*);
     u32 **remap_scr = (u32**)p; p += threadCnt*sizeof(u32*); u8 **nv_scr = (u8**)p; p += threadCnt*sizeof(u8*);
     u8 **cache_scr = (u8**)p; p += threadCnt*sizeof(u8*);
     
@@ -261,7 +265,7 @@ void LoadModels() {
         ov[i] = (float*)p; p+=usz; ot[i] = (u16*)p; p+=tsz; 
         ht[i] = (u32*)p; p+=HASH_SIZE*sizeof(u32); ht_used[i] = (u32*)p; p+=MAX_OUTPUT_VERTS*sizeof(u32);
         
-        fv_scr[i] = (u8*)p; p+=fv_sz; ft_scr[i] = (u16*)p; p+=ft_sz;
+        ft_scr[i] = (u16*)p; p+=ft_sz;
         remap_scr[i] = (u32*)p; p+=remap_sz; nv_scr[i] = (u8*)p; p+=nv_sz;
         cache_scr[i] = (u8*)p; p+=cache_sz;
         
@@ -269,7 +273,7 @@ void LoadModels() {
     }
     thrd_pos = pos; thread_temp_nrm = nrm; thrd_uv = uv; thrd_verts = ov; thrd_tris = ot;
     thrd_ht = ht; thrd_ht_used = ht_used;
-    thrd_fv_scratch = fv_scr; thrd_ft_scratch = ft_scr; thrd_remap_scratch = remap_scr; thrd_nv_scratch = nv_scr; thrd_cache_scratch = cache_scr;
+    thrd_ft_scratch = ft_scr; thrd_remap_scratch = remap_scr; thrd_nv_scratch = nv_scr; thrd_cache_scratch = cache_scr;
     
     ModelParseTask tasks[32]; u32 chunk = (mdlsCnt + threadCnt - 1) / threadCnt; OS_Thread th[32];
     for (int i=0;i<threadCnt;++i) tasks[i] = (ModelParseTask){i*chunk,(i+1)*chunk > mdlsCnt ? mdlsCnt : (i+1)*chunk,raw,i};
@@ -281,7 +285,11 @@ void LoadModels() {
     for (int i=0; i<mdlsCnt; ++i) {
         if (!modelVertexCounts[i]) continue;
         tv += modelVertexCounts[i]; tt += modelTriangleCounts[i]; size_t vcz = (size_t)modelVertexCounts[i] * VRT_ATT_SZ, tcz = (size_t)modelTriangleCounts[i] * 3 * sizeof(u16);
-        glBindBuffer(GL_ARRAY_BUFFER,vbos[i]); glBufferData(GL_ARRAY_BUFFER,vcz,NULL,GL_STATIC_DRAW); void* mpv = glMapBufferRange(GL_ARRAY_BUFFER,0,vcz,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/); mcpy(mpv,modelVertices[i],vcz); glUnmapBuffer(GL_ARRAY_BUFFER);
+        glBindBuffer(GL_ARRAY_BUFFER,vbos[i]); glBufferData(GL_ARRAY_BUFFER,vcz,NULL,GL_STATIC_DRAW);
+        half* mpv = (half*)glMapBufferRange(GL_ARRAY_BUFFER,0,vcz,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/);
+        const float* csrc = (const float*)modelVertices[i]; u32 elems = modelVertexCounts[i] * 8;
+        for (u32 k=0;k<elems;++k) mpv[k] = float_to_half(csrc[k]);
+        glUnmapBuffer(GL_ARRAY_BUFFER);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[i]); glBufferData(GL_ELEMENT_ARRAY_BUFFER,tcz,NULL,GL_STATIC_DRAW); void* mpt = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER,0,tcz,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/); mcpy(mpt,modelTriangles[i],tcz); glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
         if (raw[i].data) OS_Free((void*)raw[i].data,raw[i].size);
     }

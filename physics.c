@@ -12,7 +12,7 @@
 #define MANIFOLD_TIE_MARGIN 0.005f
 #define MANIFOLD_ALIGN_THRESHOLD 0.8f
 #define MANIFOLD_DEDUP_DIST_SQ 1e-5f
-#define CVXMSH_HULL_CACHE 512
+#define CVXMSH_HULL_CACHE 1024
 typedef struct {V3 ctr,hExt; Quaternion rot;} ShapeBox;
 typedef struct {V3 ctr; float rad;} ShapeSphere;
 typedef struct {V3 tip,base; float rad;} ShapeCapsule;
@@ -153,8 +153,8 @@ void DrawMeshCollider(Entity *e) {
     float M[16]; mcpy(M,&modelMatrices[idx*16],64);
     float m00=M[0],m10=M[1],m20=M[2],m01=M[4],m11=M[5],m21=M[6],m02=M[8],m12=M[9],m22=M[10],tx=M[12],ty=M[13],tz=M[14];
     for (u32 j=0;j<triCount;j++) {
-        u32 bA=(u32)modelTriangles[mi][j*3+0]*VRT_ATT_SZ,bB=(u32)modelTriangles[mi][j*3+1]*VRT_ATT_SZ,bC=(u32)modelTriangles[mi][j*3+2]*VRT_ATT_SZ;
-        #define LV(b) (V3){half_to_float(*(half*)(modelVertices[mi]+(b)+0)),half_to_float(*(half*)(modelVertices[mi]+(b)+2)),half_to_float(*(half*)(modelVertices[mi]+(b)+4))}
+        u32 bA=(u32)modelTriangles[mi][j*3+0]*CPU_VRT_SZ,bB=(u32)modelTriangles[mi][j*3+1]*CPU_VRT_SZ,bC=(u32)modelTriangles[mi][j*3+2]*CPU_VRT_SZ;
+        #define LV(b) (V3){*(float*)(modelVertices[mi]+(b)+0),*(float*)(modelVertices[mi]+(b)+4),*(float*)(modelVertices[mi]+(b)+8)}
         #define XFORM(v) (V3){m00*(v).x+m01*(v).y+m02*(v).z+tx,m10*(v).x+m11*(v).y+m12*(v).z+ty,m20*(v).x+m21*(v).y+m22*(v).z+tz}
         V3 wA=XFORM(LV(bA)),wB=XFORM(LV(bB)),wC=XFORM(LV(bC));
         #undef LV
@@ -220,38 +220,15 @@ float GetColRad(Entity *e) {
 
 Quaternion quat_from_axis_angle(V3 axis, float angle) { float half = angle * 0.5f; float s = vsinf(half); return (Quaternion){axis.x * s,axis.y * s,axis.z * s,vcosf(half)}; }
 Quaternion quat_normalize(Quaternion q) { float len2 = q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w; if (len2 < PHY_EPSILON) {return (Quaternion){0,0,0,1};} float inv=vinvsqtf(len2); q.x*=inv; q.y*=inv; q.z*=inv; q.w*=inv; return q; }
-static inline bool V3_IsSane(V3 v) { return (v.x<=1e6f && v.x>=-1e6f && v.y<=1e6f && v.y>=-1e6f && v.z<=1e6f && v.z>=-1e6f); } // false for NaN/Inf too: comparisons against NaN are always false
-static void ApplyVelocity(Entity *e, float dt) {
-    V3 acc = {0.0f,-9.81f*e->gravity,0.0f};
-    u16 edx = (u16)(e - World.instances);
-    if ((edx == PLAYER1 || edx == PLAYER2) && Cheats.noclip) acc.y = 0.0f;
-    acc = V3_AplusB(acc,V3_ScaleByF(e->accumulatedForce,1.0f / e->mass));
-    e->velocity = V3_AplusB(e->velocity,V3_ScaleByF(acc,dt));
-    float speed = V3_Mag(e->velocity);
-    if (speed > MAX_SPEED) e->velocity = V3_ScaleByF(V3_ScaleByF(e->velocity, 1.0f / speed),MAX_SPEED);
-    if (!V3_IsSane(e->velocity)) e->velocity = (V3){0.0f,0.0f,0.0f}; // catches what the MAX_SPEED check above can't: NaN/Inf compare false, so it falls through unclamped without this
-    float linDrag = vexp(-2.0f * dt);
-    e->velocity = V3_ScaleByF(e->velocity,linDrag);
-    SetPosition(e,V3_AplusB(e->position,V3_ScaleByF(e->velocity,dt)),false); // pos += (d = v*t)
-    if (e->collider != COLTYPE_CAP) {
-        float angDrag = vexp(-e->angularDrag * dt);
-        e->angularVelocity = V3_ScaleByF(e->angularVelocity,angDrag); // 1. Apply continuous angular drag over time
-        float avel = V3_Mag(e->angularVelocity);
-        if (avel > MAX_ANGULAR_SPEED) { e->angularVelocity = V3_ScaleByF(e->angularVelocity,MAX_ANGULAR_SPEED / avel); avel = MAX_ANGULAR_SPEED; }
-        if (!V3_IsSane(e->angularVelocity)) { e->angularVelocity = (V3){0.0f,0.0f,0.0f}; avel = 0.0f; }
-        if (avel > PHY_EPSILON) { Quaternion dq = quat_from_axis_angle(V3_ScaleByF(e->angularVelocity,1.f / avel),avel * dt); e->rotation = quat_normalize(quat_multiply(dq,e->rotation)); } // 2. Integrate rotation
-    } else e->angularVelocity = (V3){0.0f,0.0f,0.0f};
-}
-
 static void ComputeConvexMeshInertiaTensor(Entity *e) { // Uses signed tetrahedron decomposition approach for inertia tensor derivation for convex meshes using origin as one of the points and going out to each tri to form each tetrahedron, one per tri.
     u16 mi = e->colMeshIndex; e->inertiaTensorValid = false;
     if (mi >= MAX_MDLS || !modelTriangleCounts[mi] || !modelVertexCounts[mi]) return;
     float acc[6] = {0}; float volAcc = 0.f; u32 triCount = modelTriangleCounts[mi]; // acc[0]=x², acc[1]=y², acc[2]=z² to keep things clean and explicitly isolated
     for (u32 ti = 0; ti < triCount; ++ti) {
         u32 i0=modelTriangles[mi][ti*3+0], i1=modelTriangles[mi][ti*3+1], i2=modelTriangles[mi][ti*3+2];
-        V3 v0 = (V3){half_to_float(*(half*)(modelVertices[mi]+(i0)*VRT_ATT_SZ+0)), half_to_float(*(half*)(modelVertices[mi]+(i0)*VRT_ATT_SZ+2)), half_to_float(*(half*)(modelVertices[mi]+(i0)*VRT_ATT_SZ+4))};
-        V3 v1 = (V3){half_to_float(*(half*)(modelVertices[mi]+(i1)*VRT_ATT_SZ+0)), half_to_float(*(half*)(modelVertices[mi]+(i1)*VRT_ATT_SZ+2)), half_to_float(*(half*)(modelVertices[mi]+(i1)*VRT_ATT_SZ+4))};
-        V3 v2 = (V3){half_to_float(*(half*)(modelVertices[mi]+(i2)*VRT_ATT_SZ+0)), half_to_float(*(half*)(modelVertices[mi]+(i2)*VRT_ATT_SZ+2)), half_to_float(*(half*)(modelVertices[mi]+(i2)*VRT_ATT_SZ+4))};
+        V3 v0 = (V3){*(float*)(modelVertices[mi]+(i0)*CPU_VRT_SZ+0), *(float*)(modelVertices[mi]+(i0)*CPU_VRT_SZ+4), *(float*)(modelVertices[mi]+(i0)*CPU_VRT_SZ+8)};
+        V3 v1 = (V3){*(float*)(modelVertices[mi]+(i1)*CPU_VRT_SZ+0), *(float*)(modelVertices[mi]+(i1)*CPU_VRT_SZ+4), *(float*)(modelVertices[mi]+(i1)*CPU_VRT_SZ+8)};
+        V3 v2 = (V3){*(float*)(modelVertices[mi]+(i2)*CPU_VRT_SZ+0), *(float*)(modelVertices[mi]+(i2)*CPU_VRT_SZ+4), *(float*)(modelVertices[mi]+(i2)*CPU_VRT_SZ+8)};
         float det = V3_dot(v0,V3_Cross(v1,v2)); volAcc += det;
         acc[0] += det * (v0.x*v0.x + v0.x*v1.x + v1.x*v1.x + v0.x*v2.x + v1.x*v2.x + v2.x*v2.x); // ∫x² Pure covariance components
         acc[1] += det * (v0.y*v0.y + v0.y*v1.y + v1.y*v1.y + v0.y*v2.y + v1.y*v2.y + v2.y*v2.y); // ∫y²
@@ -331,7 +308,7 @@ static inline V3 MvVert(const float* M, V3 v) { return (V3){ M[0]*v.x + M[4]*v.y
 static V3 MeshSupport(u16 m, const float* M, V3 d) {
     u32 n = modelVertexCounts[m]; if (!n) {return (V3){0};}
     const u8* vb = modelVertices[m]; V3 b={0}; float top=-1e9f;
-    for (u32 i=0;i<n;++i) {const u8* p=vb + i*VRT_ATT_SZ; V3 w=MvVert(M,(V3){half_to_float(*(half*)(p+0)),half_to_float(*(half*)(p+2)),half_to_float(*(half*)(p+4))}); float dot=V3_dot(w,d); b=(dot>top) ? (top=dot,w) : b;}
+    for (u32 i=0;i<n;++i) {const u8* p=vb + i*CPU_VRT_SZ; V3 w=MvVert(M,(V3){*(float*)(p+0),*(float*)(p+4),*(float*)(p+8)}); float dot=V3_dot(w,d); b=(dot>top) ? (top=dot,w) : b;}
     return b;
 }
 
@@ -345,7 +322,7 @@ static inline HullCache CacheHull(u16 m, const float* M) { // one-time world-spa
     HullCache h; h.n = modelVertexCounts[m]; h.ok = h.n && h.n <= CVXMSH_HULL_CACHE;
     if (!h.ok) return h;
     const u8* vb = modelVertices[m];
-    for (u32 i=0;i<h.n;++i) { const u8* p=vb+i*VRT_ATT_SZ; h.v[i]=MvVert(M,(V3){half_to_float(*(half*)(p+0)),half_to_float(*(half*)(p+2)),half_to_float(*(half*)(p+4))}); }
+    for (u32 i=0;i<h.n;++i) { const u8* p=vb+i*CPU_VRT_SZ; h.v[i]=MvVert(M,(V3){*(float*)(p+0),*(float*)(p+4),*(float*)(p+8)}); }
     return h;
 }
 
@@ -409,7 +386,7 @@ static OverlapResult SphMsh(V3 sc, float sr, u16 mesh, const float* mx) { // Tri
     OverlapResult r = {0}; if (mesh >= MAX_MDLS) {return r;} u32 triCount = modelTriangleCounts[mesh]; if (!triCount){return r;}
     for (u32 ti = 0; ti < triCount; ++ti) {
         u32 i0 = modelTriangles[mesh][ti*3+0], i1 = modelTriangles[mesh][ti*3+1], i2 = modelTriangles[mesh][ti*3+2];
-        #define RV(i) MvVert(mx,(V3){half_to_float(*(half*)(modelVertices[mesh]+(i)*VRT_ATT_SZ+0)), half_to_float(*(half*)(modelVertices[mesh]+(i)*VRT_ATT_SZ+2)), half_to_float(*(half*)(modelVertices[mesh]+(i)*VRT_ATT_SZ+4))})
+        #define RV(i) MvVert(mx,(V3){*(float*)(modelVertices[mesh]+(i)*CPU_VRT_SZ+0), *(float*)(modelVertices[mesh]+(i)*CPU_VRT_SZ+4), *(float*)(modelVertices[mesh]+(i)*CPU_VRT_SZ+8)})
         V3 a=RV(i0), b=RV(i1), c=RV(i2);
         #undef RV
         V3 ab=V3_AsubB(b,a), ac=V3_AsubB(c,a);
@@ -706,16 +683,16 @@ static Manifold CvxMsh(u16 hullMesh, const float* hullMx, u16 triMesh, const flo
     HullCache hc = CacheHull(hullMesh, hullMx); if (!hc.n) return best;
     AABB3 hb = { {1e9f,1e9f,1e9f}, {-1e9f,-1e9f,-1e9f} };
     if (hc.ok) { for (u32 i=0;i<hc.n;++i) { V3 w=hc.v[i]; hb.mn.x=vmin(hb.mn.x,w.x); hb.mn.y=vmin(hb.mn.y,w.y); hb.mn.z=vmin(hb.mn.z,w.z); hb.mx.x=vmax(hb.mx.x,w.x); hb.mx.y=vmax(hb.mx.y,w.y); hb.mx.z=vmax(hb.mx.z,w.z); } }
-    else { const u8* vb = modelVertices[hullMesh]; for (u32 i=0;i<hc.n;++i) { const u8* p=vb+i*VRT_ATT_SZ; V3 w=MvVert(hullMx,(V3){half_to_float(*(half*)(p+0)),half_to_float(*(half*)(p+2)),half_to_float(*(half*)(p+4))}); hb.mn.x=vmin(hb.mn.x,w.x); hb.mn.y=vmin(hb.mn.y,w.y); hb.mn.z=vmin(hb.mn.z,w.z); hb.mx.x=vmax(hb.mx.x,w.x); hb.mx.y=vmax(hb.mx.y,w.y); hb.mx.z=vmax(hb.mx.z,w.z); } } 
+    else { const u8* vb = modelVertices[hullMesh]; for (u32 i=0;i<hc.n;++i) { const u8* p=vb+i*CPU_VRT_SZ; V3 w=MvVert(hullMx,(V3){*(float*)(p+0),*(float*)(p+4),*(float*)(p+8)}); hb.mn.x=vmin(hb.mn.x,w.x); hb.mn.y=vmin(hb.mn.y,w.y); hb.mn.z=vmin(hb.mn.z,w.z); hb.mx.x=vmax(hb.mx.x,w.x); hb.mx.y=vmax(hb.mx.y,w.y); hb.mx.z=vmax(hb.mx.z,w.z); } } 
     V3 hext = V3_AsubB(hb.mx,hb.mn); float spreadEps = vmax(0.02f, vmax(hext.x,vmax(hext.y,hext.z)) * 0.15f); 
     float wscaleH = V3_Mag((V3){hullMx[0],hullMx[1],hullMx[2]}); float thicknessTolerance = vclamp(modelBounds[hullMesh] * wscaleH * 0.06f, 0.003f, 0.02f);
     #define HSUP(d) HullSupport(&hc,hullMesh,hullMx,(d))
     u32 triCount = modelTriangleCounts[triMesh]; if (!triCount) return best;
     for (u32 ti = 0; ti < triCount; ++ti) {
         u32 i0 = modelTriangles[triMesh][ti * 3 + 0], i1 = modelTriangles[triMesh][ti * 3 + 1], i2 = modelTriangles[triMesh][ti * 3 + 2];
-        V3 ta = MvVert(triMx,(V3){ half_to_float(*(half*)(modelVertices[triMesh] + i0 * VRT_ATT_SZ + 0)), half_to_float(*(half*)(modelVertices[triMesh] + i0 * VRT_ATT_SZ + 2)), half_to_float(*(half*)(modelVertices[triMesh] + i0 * VRT_ATT_SZ + 4)) });
-        V3 tb = MvVert(triMx,(V3){ half_to_float(*(half*)(modelVertices[triMesh] + i1 * VRT_ATT_SZ + 0)), half_to_float(*(half*)(modelVertices[triMesh] + i1 * VRT_ATT_SZ + 2)), half_to_float(*(half*)(modelVertices[triMesh] + i1 * VRT_ATT_SZ + 4)) });
-        V3 tc = MvVert(triMx,(V3){ half_to_float(*(half*)(modelVertices[triMesh] + i2 * VRT_ATT_SZ + 0)), half_to_float(*(half*)(modelVertices[triMesh] + i2 * VRT_ATT_SZ + 2)), half_to_float(*(half*)(modelVertices[triMesh] + i2 * VRT_ATT_SZ + 4)) });
+        V3 ta = MvVert(triMx,(V3){ *(float*)(modelVertices[triMesh] + i0 * CPU_VRT_SZ + 0), *(float*)(modelVertices[triMesh] + i0 * CPU_VRT_SZ + 4), *(float*)(modelVertices[triMesh] + i0 * CPU_VRT_SZ + 8) });
+        V3 tb = MvVert(triMx,(V3){ *(float*)(modelVertices[triMesh] + i1 * CPU_VRT_SZ + 0), *(float*)(modelVertices[triMesh] + i1 * CPU_VRT_SZ + 4), *(float*)(modelVertices[triMesh] + i1 * CPU_VRT_SZ + 8) });
+        V3 tc = MvVert(triMx,(V3){ *(float*)(modelVertices[triMesh] + i2 * CPU_VRT_SZ + 0), *(float*)(modelVertices[triMesh] + i2 * CPU_VRT_SZ + 4), *(float*)(modelVertices[triMesh] + i2 * CPU_VRT_SZ + 8) });
         if (vmin(ta.x,vmin(tb.x,tc.x)) > hb.mx.x || vmax(ta.x,vmax(tb.x,tc.x)) < hb.mn.x || vmin(ta.y,vmin(tb.y,tc.y)) > hb.mx.y || vmax(ta.y,vmax(tb.y,tc.y)) < hb.mn.y || vmin(ta.z,vmin(tb.z,tc.z)) > hb.mx.z || vmax(ta.z,vmax(tb.z,tc.z)) < hb.mn.z) continue;
 
         Simplex3D s={0}; V3 dir={0.0f,1.0f,0.0f}; 
@@ -832,7 +809,7 @@ static OverlapResult BoxMsh(ShapeBox box, u16 triMesh, const float* triMx) {
     V3 verts[8] = {V3_AplusB(V3_AplusB(V3_AplusB(box.ctr,hx),hy),hz), V3_AplusB(V3_AsubB(V3_AplusB(box.ctr,hx),hy),hz), V3_AplusB(V3_AplusB(V3_AsubB(box.ctr,hx),hy),hz), V3_AplusB(V3_AsubB(V3_AsubB(box.ctr,hx),hy),hz), V3_AsubB(V3_AplusB(V3_AplusB(box.ctr,hx),hy),hz), V3_AsubB(V3_AsubB(V3_AplusB(box.ctr,hx),hy),hz), V3_AsubB(V3_AplusB(V3_AsubB(box.ctr,hx),hy),hz), V3_AsubB(V3_AsubB(V3_AsubB(box.ctr,hx),hy),hz)};
     for (u32 ti=0;ti<triCount;++ti) {
         u32 i0 = modelTriangles[triMesh][ti*3+0], i1 = modelTriangles[triMesh][ti*3+1], i2 = modelTriangles[triMesh][ti*3+2];
-        #define TRV(i) MvVert(triMx,(V3){half_to_float(*(half*)(modelVertices[triMesh]+(i)*VRT_ATT_SZ+0)),half_to_float(*(half*)(modelVertices[triMesh]+(i)*VRT_ATT_SZ+2)),half_to_float(*(half*)(modelVertices[triMesh]+(i)*VRT_ATT_SZ+4))})
+        #define TRV(i) MvVert(triMx,(V3){*(float*)(modelVertices[triMesh]+(i)*CPU_VRT_SZ+0),*(float*)(modelVertices[triMesh]+(i)*CPU_VRT_SZ+4),*(float*)(modelVertices[triMesh]+(i)*CPU_VRT_SZ+8)})
         V3 ta=TRV(i0),tb=TRV(i1),tc=TRV(i2);
         #undef TRV
         if (vmin(ta.x,vmin(tb.x,tc.x))>hb.mx.x || vmax(ta.x,vmax(tb.x,tc.x))<hb.mn.x || vmin(ta.y,vmin(tb.y,tc.y))>hb.mx.y || vmax(ta.y,vmax(tb.y,tc.y))<hb.mn.y || vmin(ta.z,vmin(tb.z,tc.z))>hb.mx.z || vmax(ta.z,vmax(tb.z,tc.z))<hb.mn.z) continue;
@@ -959,6 +936,7 @@ static void ApplyManifoldResponse(Entity *e, Entity *o, const Manifold *m) {
     ApplyPositionalCorrection(e,o,m->normal,m,oStatic);
 }
 
+static inline bool V3_IsSane(V3 v) { return (v.x<=1e6f && v.x>=-1e6f && v.y<=1e6f && v.y>=-1e6f && v.z<=1e6f && v.z>=-1e6f); } // false for NaN/Inf too: comparisons against NaN are always false
 void Physics() {
     if (World.paused || World.menuActive) return;
     float dt = vclamp((float)(World.pauseRelativeTime - World.last_physics_time), 0.0005f, 0.1f);
@@ -976,7 +954,29 @@ void Physics() {
             e->radius = (e->collider == COLTYPE_MSH || e->collider == COLTYPE_CVX) ? modelBounds[e->collider == COLTYPE_CVX ? e->colMeshIndex : e->modelIndex] * vmax(vmax(e->scale.x,e->scale.y),e->scale.z) : GetColRad(e);
             u32 cell=(u32)e->cellIndex; if(cell < WORLDX*WORLDX && cellCounts[cell] < 127){cellLists[cell][cellCounts[cell]++]=i;}
         }
-        for (u16 i=0;i<dynamicEntityCount;++i) { u16 idx = dynamicEntities[i]; Entity *e = &World.instances[idx]; ApplyVelocity(e,dtsub); } // Integrate all dynamic bodies
+        for (u16 i=0;i<dynamicEntityCount;++i) { // Integrate all dynamic bodies
+            u16 idx = dynamicEntities[i];
+            Entity *e = &World.instances[idx];
+            V3 acc = {0.0f,-9.81f*e->gravity,0.0f};
+            u16 edx = (u16)(e - World.instances);
+            if ((edx == PLAYER1 || edx == PLAYER2) && Cheats.noclip) acc.y = 0.0f;
+            acc = V3_AplusB(acc,V3_ScaleByF(e->accumulatedForce,1.0f / e->mass));
+            e->velocity = V3_AplusB(e->velocity,V3_ScaleByF(acc,dtsub));
+            float speed = V3_Mag(e->velocity);
+            if (speed > MAX_SPEED) e->velocity = V3_ScaleByF(V3_ScaleByF(e->velocity, 1.0f / speed),MAX_SPEED);
+            if (!V3_IsSane(e->velocity)) e->velocity = (V3){0.0f,0.0f,0.0f}; // catches what the MAX_SPEED check above can't: NaN/Inf compare false, so it falls through unclamped without this
+            float linDrag = vexp(-2.0f * dtsub);
+            e->velocity = V3_ScaleByF(e->velocity,linDrag);
+            SetPosition(e,V3_AplusB(e->position,V3_ScaleByF(e->velocity,dtsub)),false); // pos += (d = v*t)
+            if (e->collider != COLTYPE_CAP) {
+                float angDrag = vexp(-e->angularDrag * dtsub);
+                e->angularVelocity = V3_ScaleByF(e->angularVelocity,angDrag); // 1. Apply continuous angular drag over time
+                float avel = V3_Mag(e->angularVelocity);
+                if (avel > MAX_ANGULAR_SPEED) { e->angularVelocity = V3_ScaleByF(e->angularVelocity,MAX_ANGULAR_SPEED / avel); avel = MAX_ANGULAR_SPEED; }
+                if (!V3_IsSane(e->angularVelocity)) { e->angularVelocity = (V3){0.0f,0.0f,0.0f}; avel = 0.0f; }
+                if (avel > PHY_EPSILON) { Quaternion dq = quat_from_axis_angle(V3_ScaleByF(e->angularVelocity,1.f / avel),avel * dtsub); e->rotation = quat_normalize(quat_multiply(dq,e->rotation)); } // 2. Integrate rotation
+            } else e->angularVelocity = (V3){0.0f,0.0f,0.0f};
+        }
         ShapeSphere sa,sb; ShapeBox ba,bb; ShapeCapsule ca,cb;
         for (u16 i=0;i<dynamicEntityCount;++i) { // Collision detection and resolution
             u16 a = dynamicEntities[i]; Entity *e = &World.instances[a]; if (e->collider == COLTYPE_MSH || (Cheats.noclip && (a == PLAYER1 || a == PLAYER2))) continue;
