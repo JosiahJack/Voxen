@@ -17,7 +17,7 @@ typedef struct {V3 ctr,hExt; Quaternion rot;} ShapeBox;
 typedef struct {V3 ctr; float rad;} ShapeSphere;
 typedef struct {V3 tip,base; float rad;} ShapeCapsule;
 typedef struct { V3 v[4];/*Minkowski difference vertices (wA - wB)*/   V3 wA[4];/*Cached support points from Shape A (e.g., Convex Hull)*/   V3 wB[4];/*Cached support points from Shape B (e.g., Triangle)*/   i32 n;/*Vertex count*/ } Simplex3D;
-ENGINE_TO_MOD void SetPosition(Entity* e, V3 newpos, bool teleport) { float d = V3_Dist(e->position,newpos); if ((d > 0.001f && d < 0.1f) || teleport) {e->position = newpos;} }
+ENGINE_TO_MOD void SetPosition(Entity* e, V3 newpos, bool teleport) { u16 idx=(u16)(e - World.instances); float d = V3_Dist(World.position[idx],newpos); if ((d > 0.001f && d < 0.1f) || teleport) {World.position[idx] = newpos;} }
 u16 dynamicEntities[512], dynamicEntityCount;
 typedef struct { bool hit; V3 point,normal; float overlapAmount; } OverlapResult; typedef struct { V3 point; float pen; } ManifoldPt; typedef struct { V3 normal; ManifoldPt p[MANIFOLD_MAX]; i32 n; float maxPen; } Manifold;
 INLINE u32 PosGetCellCoordsP(i32 cx, i32 cz) { cx = clamp(cx,0,WORLDX_0BASED); cz = clamp(cz,0,WORLDX_0BASED); return (u32)cz * WORLDX + (u32)cx; }
@@ -107,19 +107,20 @@ static u32 GetCollisionMask(u32 layer) {
 
 void Entity_GetCap(const Entity *e, ShapeCapsule *out) {
     float r = e->colliderSize.x; float hi = vmax(0.0f, (e->colliderSize.y * 0.5f) - r); V3 wc,axis;
-    u16 edx = (u16)(e - World.instances);
-    if (edx == PLAYER1 || edx == PLAYER2 || e->layer == L_NPC) { wc = V3_AplusB(e->position, e->colliderCenter); axis = (V3){0.0f,1.0f,0.0f}; } // Force player capsules to remain strictly upright, ignoring camera pitch/roll
-    else { wc = V3_AplusB(e->position, quat_rot_v3(e->rotation,e->colliderCenter)); axis = (e->colliderSize.z < 0.5f) ? quat_rot_v3(e->rotation,(V3){1,0,0}) : (e->colliderSize.z < 1.5f) ? quat_rot_v3(e->rotation,(V3){0,1,0}) : quat_rot_v3(e->rotation,(V3){0,0,1}); }
+    u16 idx=(u16)(e - World.instances);
+    if (idx == PLAYER1 || idx == PLAYER2 || e->layer == L_NPC) { wc = V3_AplusB(World.position[idx], e->colliderCenter); axis = (V3){0.0f,1.0f,0.0f}; } // Force player capsules to remain strictly upright, ignoring camera pitch/roll
+    else { wc = V3_AplusB(World.position[idx], quat_rot_v3(World.rotation[idx],e->colliderCenter)); axis = (e->colliderSize.z < 0.5f) ? quat_rot_v3(World.rotation[idx],(V3){1,0,0}) : (e->colliderSize.z < 1.5f) ? quat_rot_v3(World.rotation[idx],(V3){0,1,0}) : quat_rot_v3(World.rotation[idx],(V3){0,0,1}); }
     out->rad = r; out->base = V3_AsubB(wc,V3_ScaleByF(axis,hi)); out->tip  = V3_AplusB(wc,V3_ScaleByF(axis,hi));
 }
 
-void Entity_GetBox(const Entity *e, ShapeBox *out) { out->ctr=V3_AplusB(e->position,quat_rot_v3(e->rotation,e->colliderCenter)); out->hExt=(V3){e->colliderSize.x*0.5f * e->scale.x,e->colliderSize.y*0.5f * e->scale.y,e->colliderSize.z*0.5f * e->scale.z}; out->rot=e->rotation; }
-void Entity_GetSph(const Entity *e, ShapeSphere *out) { out->ctr=V3_AplusB(e->position,quat_rot_v3(e->rotation,e->colliderCenter)); out->rad = e->colliderSize.x * vmax(e->scale.x,vmax(e->scale.y,e->scale.z)); }
+void Entity_GetBox(const Entity *e, ShapeBox *out) { u16 idx=(u16)(e - World.instances); out->ctr=V3_AplusB(World.position[idx],quat_rot_v3(World.rotation[idx],e->colliderCenter)); out->hExt=(V3){e->colliderSize.x*0.5f * World.scale[idx].x,e->colliderSize.y*0.5f * World.scale[idx].y,e->colliderSize.z*0.5f * World.scale[idx].z}; out->rot=World.rotation[idx]; }
+void Entity_GetSph(const Entity *e, ShapeSphere *out) { u16 idx=(u16)(e - World.instances); out->ctr=V3_AplusB(World.position[idx],quat_rot_v3(World.rotation[idx],e->colliderCenter)); out->rad = e->colliderSize.x * vmax(World.scale[idx].x,vmax(World.scale[idx].y,World.scale[idx].z)); }
 static inline Color ColliderColor(Entity *e) { return (!(e->entflags & EF_RIGIDBODY)) ? textColors[T_GREEN_MENU_SHADOW] : ((e->colliding) ? textColors[T_RED] : textColors[T_GREEN]); }
 static void DrawVelocityVector(Entity *e) {
     if (!(e->entflags & EF_RIGIDBODY)) return;
-    V3 tip = V3_AplusB(e->position,V3_ScaleByF(e->velocity,0.25f)); AddWireLine(e->position,tip,textColors[T_ORANGE]);
-    V3 perp = V3_Normalize(V3_Cross(e->velocity,(vabs(e->velocity.y/V3_Mag(e->velocity)) < 0.9f) ? (V3){0,1,0} : (V3){1,0,0}));
+    u16 idx=(u16)(e - World.instances);
+    V3 tip = V3_AplusB(World.position[idx],V3_ScaleByF(World.velocity[idx],0.25f)); AddWireLine(World.position[idx],tip,textColors[T_ORANGE]);
+    V3 perp = V3_Normalize(V3_Cross(World.velocity[idx],(vabs(World.velocity[idx].y/V3_Mag(World.velocity[idx])) < 0.9f) ? (V3){0,1,0} : (V3){1,0,0}));
     AddWireLine(V3_AplusB(tip,V3_ScaleByF(perp,0.05f)),V3_AsubB(tip,V3_ScaleByF(perp,0.05f)),textColors[T_ORANGE]); // Small cross at tip so zero-length vecs are still visible when barely moving
 }
 
@@ -187,33 +188,35 @@ void DrawCapsuleCollider(Entity *e) {
 static void DrawAngularVelocity(Entity *e) {
     if (!Cheats.showPhys) return;
     if (!(e->entflags & EF_RIGIDBODY)) return;
-    if (V3_Mag(e->angularVelocity) < 0.0001f) return; // skip near-zero
+    u16 idx=(u16)(e - World.instances);
+    if (V3_Mag(World.angularVelocity[idx]) < 0.0001f) return; // skip near-zero
     Color purple = (Color){0.5f, 0.0f, 1.0f, 1.0f};
     float scale = 0.35f;
-    V3 dir = V3_Normalize(e->angularVelocity);
-    V3 tip = V3_AplusB(e->position, V3_ScaleByF(e->angularVelocity, scale));
-    AddWireLine(e->position, tip, purple); // Arrow (line vector)
+    V3 dir = V3_Normalize(World.angularVelocity[idx]);
+    V3 tip = V3_AplusB(World.position[idx], V3_ScaleByF(World.angularVelocity[idx], scale));
+    AddWireLine(World.position[idx], tip, purple); // Arrow (line vector)
     V3 ref = (vabs(dir.y) < 0.9f) ? (V3){0,1,0} : (V3){1,0,0};
-    V3 perp = V3_Normalize(V3_Cross(dir, ref));
-    V3 perp2 = V3_Cross(dir, perp);
-    AddWireLine(V3_AplusB(tip, V3_ScaleByF(perp,  0.05f)),V3_AplusB(tip, V3_ScaleByF(perp, -0.05f)), purple); // Small cross at tip so zero-length vectors are still visible
-    AddWireLine(V3_AplusB(tip, V3_ScaleByF(perp2, 0.05f)),V3_AplusB(tip, V3_ScaleByF(perp2,-0.05f)), purple);
+    V3 perp = V3_Normalize(V3_Cross(dir,ref));
+    V3 perp2 = V3_Cross(dir,perp);
+    AddWireLine(V3_AplusB(tip,V3_ScaleByF(perp,  0.05f)),V3_AplusB(tip, V3_ScaleByF(perp, -0.05f)), purple); // Small cross at tip so zero-length vectors are still visible
+    AddWireLine(V3_AplusB(tip,V3_ScaleByF(perp2, 0.05f)),V3_AplusB(tip, V3_ScaleByF(perp2,-0.05f)), purple);
     float rad = 0.6f; // Quarter circle arc (visualizes rotation plane + sense)
     float step = 1.57079632679f / 8.0f; // quarter circle divided into 8 segments
     V3 axis = dir; V3 p1 = V3_Normalize(V3_Cross(axis,ref)); V3 p2 = V3_Cross(axis,p1); // Find two vectors perpendicular to angular axis
-    V3 prev = V3_AplusB(e->position, V3_ScaleByF(p1,rad));
-    for (int i = 1; i <= 8; ++i) { float a = i * step; float c = vcosf(a); float s = vsinf(a); V3 cur = V3_AplusB(e->position,V3_AplusB(V3_ScaleByF(p1,c * rad),V3_ScaleByF(p2,s * rad))); AddWireLine(prev,cur,purple); prev = cur; }
+    V3 prev = V3_AplusB(World.position[idx], V3_ScaleByF(p1,rad));
+    for (int i = 1; i <= 8; ++i) { float a = i * step; float c = vcosf(a); float s = vsinf(a); V3 cur = V3_AplusB(World.position[idx],V3_AplusB(V3_ScaleByF(p1,c * rad),V3_ScaleByF(p2,s * rad))); AddWireLine(prev,cur,purple); prev = cur; }
 }
 
 static u16 cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX];
 float GetColRad(Entity *e) {
-    if (e->collider == COLTYPE_BOX) { float hx = e->colliderSize.x * 0.5f * e->scale.x, hy = e->colliderSize.y * 0.5f * e->scale.y, hz = e->colliderSize.z * 0.5f * e->scale.z; return vsqrtf(hx*hx + hy*hy + hz*hz); }
+    u16 idx=(u16)(e - World.instances);
+    if (e->collider == COLTYPE_BOX) { float hx = e->colliderSize.x * 0.5f * World.scale[idx].x, hy = e->colliderSize.y * 0.5f * World.scale[idx].y, hz = e->colliderSize.z * 0.5f * World.scale[idx].z; return vsqrtf(hx*hx + hy*hy + hz*hz); }
     if (e->collider == COLTYPE_CAP) {
         ShapeCapsule cap;
-        Entity_GetCap(e, &cap);  // reuses existing upright logic for players/NPCs
-        float db = V3_Mag(V3_AsubB(e->position, cap.base)) + cap.rad;
-        float dt = V3_Mag(V3_AsubB(e->position, cap.tip)) + cap.rad;
-        return vmax(db, dt);  // exact bounding radius from entity's .position
+        Entity_GetCap(e,&cap);  // reuses existing upright logic for players/NPCs
+        float db = V3_Mag(V3_AsubB(World.position[idx],cap.base)) + cap.rad;
+        float dt = V3_Mag(V3_AsubB(World.position[idx],cap.tip)) + cap.rad;
+        return vmax(db,dt);  // exact bounding radius from entity's .position
     }
     return e->colliderSize.x;
 }
@@ -223,6 +226,8 @@ Quaternion quat_normalize(Quaternion q) { float len2 = q.x*q.x + q.y*q.y + q.z*q
 static void ComputeConvexMeshInertiaTensor(Entity *e) { // Uses signed tetrahedron decomposition approach for inertia tensor derivation for convex meshes using origin as one of the points and going out to each tri to form each tetrahedron, one per tri.
     u16 mi = e->colMeshIndex; e->inertiaTensorValid = false;
     if (mi >= MAX_MDLS || !modelTriangleCounts[mi] || !modelVertexCounts[mi]) return;
+    
+    u16 edx=(u16)(e - World.instances);
     float acc[6] = {0}; float volAcc = 0.f; u32 triCount = modelTriangleCounts[mi]; // acc[0]=x², acc[1]=y², acc[2]=z² to keep things clean and explicitly isolated
     for (u32 ti = 0; ti < triCount; ++ti) {
         u32 i0=modelTriangles[mi][ti*3+0], i1=modelTriangles[mi][ti*3+1], i2=modelTriangles[mi][ti*3+2];
@@ -238,7 +243,7 @@ static void ComputeConvexMeshInertiaTensor(Entity *e) { // Uses signed tetrahedr
         acc[5] += det * (v0.y*v0.z + v0.y*v1.z + v0.y*v2.z + v1.y*v0.z + v1.y*v1.z + v1.y*v2.z + v2.y*v0.z + v2.y*v1.z + v2.y*v2.z); // ∫yz
     }
     if (vabs(volAcc) < PHY_EPSILON) return;
-    float sx = e->scale.x, sy = e->scale.y, sz = e->scale.z; // Scale integration values by actual mesh dimensions quadratically
+    float sx = World.scale[edx].x, sy = World.scale[edx].y, sz = World.scale[edx].z; // Scale integration values by actual mesh dimensions quadratically
     float x2 = acc[0] * sx * sx; float y2 = acc[1] * sy * sy; float z2 = acc[2] * sz * sz; float xy = acc[3] * sx * sy; float xz = acc[4] * sx * sz; float yz = acc[5] * sy * sz;
     float s = e->mass / (volAcc * 10.0f); float so = e->mass / (volAcc * 10.0f);
     float r = modelBounds[mi] * vmax(vmax(sx, sy), sz);
@@ -848,12 +853,13 @@ static OverlapResult CapBox(ShapeCapsule cap, ShapeBox box) {
 }
 
 static V3 ApplyInvTensor(Entity *e, V3 v) { // Helper to apply the local 3x3 inverse inertia tensor to a world-space vector
-    if (e->collider != COLTYPE_CVX || !e->inertiaTensorValid) { float r = (e->collider == COLTYPE_MSH) ? modelBounds[e->modelIndex] : ((e->collider == COLTYPE_CVX) ? modelBounds[e->colMeshIndex] : GetColRad(e)); float i = (2.0f / 5.0f) * e->mass * r * r; float invI = (i > PHY_EPSILON) ? 1.0f / i : 0.0f; return V3_ScaleByF(v, invI); } // Fallback for non-convex or uninitialized objects (treat as sphere)
-    Quaternion qInv = {-e->rotation.x, -e->rotation.y, -e->rotation.z, e->rotation.w};
+    if (e->collider != COLTYPE_CVX || !e->inertiaTensorValid) { float r = (e->collider == COLTYPE_MSH) ? modelBounds[e->modelIndex] : ((e->collider == COLTYPE_CVX) ? modelBounds[e->colMeshIndex] : GetColRad(e)); float i = (2.0f / 5.0f) * e->mass * r * r; float invI = (i > PHY_EPSILON) ? 1.0f / i : 0.0f; return V3_ScaleByF(v,invI); } // Fallback for non-convex or uninitialized objects (treat as sphere)
+    u16 idx=(u16)(e - World.instances);
+    Quaternion qInv = {-World.rotation[idx].x,-World.rotation[idx].y,-World.rotation[idx].z,World.rotation[idx].w};
     V3 loc = quat_rot_v3(qInv, v); // 1. Rotate vector into local space (Conjugate quaternion)
     float* invI = e->invInertiaTensor;
     V3 res = {loc.x * invI[0] + loc.y * invI[3] + loc.z * invI[4],loc.x * invI[3] + loc.y * invI[1] + loc.z * invI[5],loc.x * invI[4] + loc.y * invI[5] + loc.z * invI[2]}; // 2. Multiply by the symmetric 3x3 inverse inertia tensor matrix
-    return quat_rot_v3(e->rotation, res); // 3. Rotate the result back to world space
+    return quat_rot_v3(World.rotation[idx],res); // 3. Rotate the result back to world space
 }
 
 static void ResolveContactVelocity(Entity *e, Entity *o, V3 n, V3 rAarm, V3 rBarm, float targetVn, float *accumN, float *accumT, bool oStatic) {
@@ -861,8 +867,10 @@ static void ResolveContactVelocity(Entity *e, Entity *o, V3 n, V3 rAarm, V3 rBar
     V3 invI_rAxN = IdxIsNPC(e->index) ? (V3){0,0,0} : ApplyInvTensor(e, rAxN);
     V3 invI_rBxN = (oStatic || IdxIsNPC(o->index)) ? (V3){0,0,0} : ApplyInvTensor(o, rBxN);
     float angTermA = V3_dot(rAxN, invI_rAxN), angTermB = oStatic ? 0.0f : V3_dot(rBxN, invI_rBxN);
-    V3 vAtA = V3_AplusB(e->velocity, V3_Cross(e->angularVelocity, rAarm));
-    V3 vAtB = oStatic ? (V3){0,0,0} : V3_AplusB(o->velocity, V3_Cross(o->angularVelocity, rBarm));
+    u16 edx=(u16)(e - World.instances);
+    u16 odx=(u16)(o - World.instances);
+    V3 vAtA = V3_AplusB(World.velocity[edx],V3_Cross(World.angularVelocity[edx],rAarm));
+    V3 vAtB = oStatic ? (V3){0,0,0} : V3_AplusB(World.velocity[odx],V3_Cross(World.angularVelocity[odx],rBarm));
     float vn = V3_dot(V3_AsubB(vAtA, vAtB), n);
     float invMassA = e->mass < 0.001f ? 1.0f : 1.0f / e->mass;
     float invMassB = (oStatic || o->mass < 0.001f) ? 0.0f : 1.0f / o->mass;
@@ -872,12 +880,12 @@ static void ResolveContactVelocity(Entity *e, Entity *o, V3 n, V3 rAarm, V3 rBar
     float newAccumN = vmax(*accumN + j, 0.0f);
     j = newAccumN - *accumN; *accumN = newAccumN;
     V3 impulse = V3_ScaleByF(n, j);
-    e->velocity = V3_AplusB(e->velocity, V3_ScaleByF(impulse, invMassA));
-    if (!oStatic) o->velocity = V3_AsubB(o->velocity, V3_ScaleByF(impulse, invMassB));
-    if (e->collider != COLTYPE_CAP && !IdxIsNPC(e->index)) e->angularVelocity = V3_AplusB(e->angularVelocity, ApplyInvTensor(e, V3_Cross(rAarm, impulse)));
-    if (!oStatic && o->collider != COLTYPE_CAP && !IdxIsNPC(o->index)) o->angularVelocity = V3_AsubB(o->angularVelocity, ApplyInvTensor(o, V3_Cross(rBarm, impulse)));
-    V3 vAtA2 = V3_AplusB(e->velocity, V3_Cross(e->angularVelocity, rAarm));
-    V3 vAtB2 = oStatic ? (V3){0,0,0} : V3_AplusB(o->velocity, V3_Cross(o->angularVelocity, rBarm));
+    World.velocity[edx] = V3_AplusB(World.velocity[edx], V3_ScaleByF(impulse, invMassA));
+    if (!oStatic) World.velocity[odx] = V3_AsubB(World.velocity[odx], V3_ScaleByF(impulse, invMassB));
+    if (e->collider != COLTYPE_CAP && !IdxIsNPC(e->index)) World.angularVelocity[edx] = V3_AplusB(World.angularVelocity[edx], ApplyInvTensor(e, V3_Cross(rAarm, impulse)));
+    if (!oStatic && o->collider != COLTYPE_CAP && !IdxIsNPC(o->index)) World.angularVelocity[odx] = V3_AsubB(World.angularVelocity[odx], ApplyInvTensor(o, V3_Cross(rBarm, impulse)));
+    V3 vAtA2 = V3_AplusB(World.velocity[edx], V3_Cross(World.angularVelocity[edx], rAarm));
+    V3 vAtB2 = oStatic ? (V3){0,0,0} : V3_AplusB(World.velocity[odx], V3_Cross(World.angularVelocity[odx], rBarm));
     V3 relVel2 = V3_AsubB(vAtA2, vAtB2);
     V3 tangent = V3_AsubB(relVel2, V3_ScaleByF(n, V3_dot(relVel2, n)));
     float tLen = V3_Mag(tangent);
@@ -894,13 +902,12 @@ static void ResolveContactVelocity(Entity *e, Entity *o, V3 n, V3 rAarm, V3 rBar
             float newAccumT = vclamp(*accumT + jt, -maxT, maxT);
             jt = newAccumT - *accumT; *accumT = newAccumT;
             V3 fImpulse = V3_ScaleByF(tangent, jt);
-            e->velocity = V3_AplusB(e->velocity, V3_ScaleByF(fImpulse, invMassA));
-            if (!oStatic) o->velocity = V3_AsubB(o->velocity, V3_ScaleByF(fImpulse, invMassB));
-            if (e->collider != COLTYPE_CAP && !IdxIsNPC(e->index)) e->angularVelocity = V3_AplusB(e->angularVelocity, ApplyInvTensor(e, V3_Cross(rAarm, fImpulse)));
-            if (!oStatic && o->collider != COLTYPE_CAP && !IdxIsNPC(o->index)) o->angularVelocity = V3_AsubB(o->angularVelocity, ApplyInvTensor(o, V3_Cross(rBarm, fImpulse)));
+            World.velocity[edx] = V3_AplusB(World.velocity[edx], V3_ScaleByF(fImpulse, invMassA));
+            if (!oStatic) World.velocity[odx] = V3_AsubB(World.velocity[odx], V3_ScaleByF(fImpulse, invMassB));
+            if (e->collider != COLTYPE_CAP && !IdxIsNPC(e->index)) World.angularVelocity[edx] = V3_AplusB(World.angularVelocity[edx], ApplyInvTensor(e, V3_Cross(rAarm, fImpulse)));
+            if (!oStatic && o->collider != COLTYPE_CAP && !IdxIsNPC(o->index)) World.angularVelocity[odx] = V3_AsubB(World.angularVelocity[odx], ApplyInvTensor(o, V3_Cross(rBarm, fImpulse)));
         }
     }
-    e->lastAngularVelocity = e->angularVelocity;
 }
 
 static void ApplyPositionalCorrection(Entity *e, Entity *o, V3 n, const Manifold *m, bool oStatic) {
@@ -909,8 +916,10 @@ static void ApplyPositionalCorrection(Entity *e, Entity *o, V3 n, const Manifold
     if (m->n > 0) avgPen /= (float)m->n;
     float c = vmax(avgPen - 0.005f, 0.0f) * 0.9f;
     float cA = c * iMA / (iMA + iMB + PHY_EPSILON), cB = c * iMB / (iMA + iMB + PHY_EPSILON);
-    SetPosition(e, V3_AplusB(e->position, V3_ScaleByF(n, cA)), false);
-    if (!oStatic) SetPosition(o, V3_AsubB(o->position, V3_ScaleByF(n, cB)), false);
+    u16 edx=(u16)(e - World.instances);
+    u16 odx=(u16)(o - World.instances);
+    SetPosition(e, V3_AplusB(World.position[edx], V3_ScaleByF(n, cA)), false);
+    if (!oStatic) SetPosition(o, V3_AsubB(World.position[odx], V3_ScaleByF(n, cB)), false);
 }
 
 static void ApplyManifoldResponse(Entity *e, Entity *o, const Manifold *m) {
@@ -920,11 +929,13 @@ static void ApplyManifoldResponse(Entity *e, Entity *o, const Manifold *m) {
     for (int i = 0; i < m->n; ++i) { if(m->p[i].pen > 0.0f){DrawSphereContact(m->p[i].point,0.02f);} }
     V3 rA[MANIFOLD_MAX], rB[MANIFOLD_MAX];
     float targetVn[MANIFOLD_MAX], accumN[MANIFOLD_MAX] = {0}, accumT[MANIFOLD_MAX] = {0};
+    u16 edx=(u16)(e - World.instances);
+    u16 odx=(u16)(o - World.instances);
     for (int i = 0; i < m->n; ++i) {
-        rA[i] = V3_AsubB(m->p[i].point, e->position);
-        rB[i] = oStatic ? (V3){0,0,0} : V3_AsubB(m->p[i].point, o->position);
-        V3 vAtA = V3_AplusB(e->velocity, V3_Cross(e->angularVelocity, rA[i]));
-        V3 vAtB = oStatic ? (V3){0,0,0} : V3_AplusB(o->velocity, V3_Cross(o->angularVelocity, rB[i]));
+        rA[i] = V3_AsubB(m->p[i].point, World.position[edx]);
+        rB[i] = oStatic ? (V3){0,0,0} : V3_AsubB(m->p[i].point, World.position[odx]);
+        V3 vAtA = V3_AplusB(World.velocity[edx], V3_Cross(World.angularVelocity[edx], rA[i]));
+        V3 vAtB = oStatic ? (V3){0,0,0} : V3_AplusB(World.velocity[odx], V3_Cross(World.angularVelocity[odx], rB[i]));
         float vn0 = V3_dot(V3_AsubB(vAtA, vAtB), m->normal);
         float e_r = (vn0 < -0.5f) ? vmax(e->bounciness, oStatic ? 0.0f : o->bounciness) : 0.0f;
         targetVn[i] = (vn0 < -0.5f) ? -e_r * vn0 : 0.0f; // frozen once per manifold — recomputing this from live vn each pass was the source of the runaway
@@ -948,10 +959,10 @@ void Physics() {
         mset(cellCounts,0,sizeof(cellCounts));
         for (u16 i=0;i<World.instCount;++i) { // Update cell index for all entities and build broadphase grid
             Entity *e = &World.instances[i];
-            e->cellX=(i16)PosGetCellCoordX(e->position.x);
-            e->cellZ=(i16)PosGetCellCoordZ(e->position.z);
+            e->cellX=(i16)PosGetCellCoordX(World.position[i].x);
+            e->cellZ=(i16)PosGetCellCoordZ(World.position[i].z);
             e->cellIndex=PosGetCellCoordsP(e->cellX,e->cellZ); // Subte difference than PosGetCellCoords... and I don't remember why!?
-            e->radius = (e->collider == COLTYPE_MSH || e->collider == COLTYPE_CVX) ? modelBounds[e->collider == COLTYPE_CVX ? e->colMeshIndex : e->modelIndex] * vmax(vmax(e->scale.x,e->scale.y),e->scale.z) : GetColRad(e);
+            e->radius = (e->collider == COLTYPE_MSH || e->collider == COLTYPE_CVX) ? modelBounds[e->collider == COLTYPE_CVX ? e->colMeshIndex : e->modelIndex] * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z) : GetColRad(e);
             u32 cell=(u32)e->cellIndex; if(cell < WORLDX*WORLDX && cellCounts[cell] < 127){cellLists[cell][cellCounts[cell]++]=i;}
         }
         for (u16 i=0;i<dynamicEntityCount;++i) { // Integrate all dynamic bodies
@@ -961,29 +972,29 @@ void Physics() {
             u16 edx = (u16)(e - World.instances);
             if ((edx == PLAYER1 || edx == PLAYER2) && Cheats.noclip) acc.y = 0.0f;
             acc = V3_AplusB(acc,V3_ScaleByF(e->accumulatedForce,1.0f / e->mass));
-            e->velocity = V3_AplusB(e->velocity,V3_ScaleByF(acc,dtsub));
-            float speed = V3_Mag(e->velocity);
-            if (speed > MAX_SPEED) e->velocity = V3_ScaleByF(V3_ScaleByF(e->velocity, 1.0f / speed),MAX_SPEED);
-            if (!V3_IsSane(e->velocity)) e->velocity = (V3){0.0f,0.0f,0.0f}; // catches what the MAX_SPEED check above can't: NaN/Inf compare false, so it falls through unclamped without this
+            World.velocity[i] = V3_AplusB(World.velocity[i],V3_ScaleByF(acc,dtsub));
+            float speed = V3_Mag(World.velocity[i]);
+            if (speed > MAX_SPEED) World.velocity[i] = V3_ScaleByF(V3_ScaleByF(World.velocity[i], 1.0f / speed),MAX_SPEED);
+            if (!V3_IsSane(World.velocity[i])) World.velocity[i] = (V3){0.0f,0.0f,0.0f}; // catches what the MAX_SPEED check above can't: NaN/Inf compare false, so it falls through unclamped without this
             float linDrag = vexp(-2.0f * dtsub);
-            e->velocity = V3_ScaleByF(e->velocity,linDrag);
-            SetPosition(e,V3_AplusB(e->position,V3_ScaleByF(e->velocity,dtsub)),false); // pos += (d = v*t)
+            World.velocity[i] = V3_ScaleByF(World.velocity[i],linDrag);
+            SetPosition(e,V3_AplusB(World.position[i],V3_ScaleByF(World.velocity[i],dtsub)),false); // pos += (d = v*t)
             if (e->collider != COLTYPE_CAP) {
                 float angDrag = vexp(-e->angularDrag * dtsub);
-                e->angularVelocity = V3_ScaleByF(e->angularVelocity,angDrag); // 1. Apply continuous angular drag over time
-                float avel = V3_Mag(e->angularVelocity);
-                if (avel > MAX_ANGULAR_SPEED) { e->angularVelocity = V3_ScaleByF(e->angularVelocity,MAX_ANGULAR_SPEED / avel); avel = MAX_ANGULAR_SPEED; }
-                if (!V3_IsSane(e->angularVelocity)) { e->angularVelocity = (V3){0.0f,0.0f,0.0f}; avel = 0.0f; }
-                if (avel > PHY_EPSILON) { Quaternion dq = quat_from_axis_angle(V3_ScaleByF(e->angularVelocity,1.f / avel),avel * dtsub); e->rotation = quat_normalize(quat_multiply(dq,e->rotation)); } // 2. Integrate rotation
-            } else e->angularVelocity = (V3){0.0f,0.0f,0.0f};
+                World.angularVelocity[i] = V3_ScaleByF(World.angularVelocity[i],angDrag); // 1. Apply continuous angular drag over time
+                float avel = V3_Mag(World.angularVelocity[i]);
+                if (avel > MAX_ANGULAR_SPEED) { World.angularVelocity[i] = V3_ScaleByF(World.angularVelocity[i],MAX_ANGULAR_SPEED / avel); avel = MAX_ANGULAR_SPEED; }
+                if (!V3_IsSane(World.angularVelocity[i])) { World.angularVelocity[i] = (V3){0.0f,0.0f,0.0f}; avel = 0.0f; }
+                if (avel > PHY_EPSILON) { Quaternion dq = quat_from_axis_angle(V3_ScaleByF(World.angularVelocity[i],1.f / avel),avel * dtsub); World.rotation[i] = quat_normalize(quat_multiply(dq,World.rotation[i])); } // 2. Integrate rotation
+            } else World.angularVelocity[i] = (V3){0.0f,0.0f,0.0f};
         }
         ShapeSphere sa,sb; ShapeBox ba,bb; ShapeCapsule ca,cb;
         for (u16 i=0;i<dynamicEntityCount;++i) { // Collision detection and resolution
             u16 a = dynamicEntities[i]; Entity *e = &World.instances[a]; if (e->collider == COLTYPE_MSH || (Cheats.noclip && (a == PLAYER1 || a == PLAYER2))) continue;
-            i32 cx = PosGetCellCoordX(e->position.x);
-            i32 cz = PosGetCellCoordZ(e->position.z);
+            i32 cx = PosGetCellCoordX(World.position[i].x);
+            i32 cz = PosGetCellCoordZ(World.position[i].z);
             u32 mask = GetCollisionMask(e->layer);
-            float searchRad = e->radius + V3_Mag(e->velocity) * dtsub + 0.5f;
+            float searchRad = e->radius + V3_Mag(World.velocity[i]) * dtsub + 0.5f;
             i32 radCells = (i32)(searchRad / CELL_SIZE) + 2;
             typedef struct { Manifold m; u16 otherIdx; } Contact;
             Contact contacts[16]; int contactCount = 0;
@@ -995,7 +1006,7 @@ void Physics() {
                         if (b < a && (World.instances[b].entflags & EF_RIGIDBODY)) continue; // Prevent double processing dynamic vs dynamic
                         if (Cheats.noclip && (b == PLAYER1 || b == PLAYER2)) continue;
                         Entity *o = &World.instances[b]; if (!(mask & o->layer) || o->collider == COLTYPE_NONE) continue;
-                        V3 deltaPos = V3_AsubB(e->position,o->position); float rr = e->radius * 1.42f + o->radius * 1.42f; if (V3_dot(deltaPos,deltaPos) > rr * rr) continue;
+                        V3 deltaPos = V3_AsubB(World.position[i],World.position[b]); float rr = e->radius * 1.42f + o->radius * 1.42f; if (V3_dot(deltaPos,deltaPos) > rr * rr) continue;
                         Manifold mf = {0};
                         if      (e->collider == COLTYPE_CAP && o->collider == COLTYPE_CAP) { Entity_GetCap(e,&ca); Entity_GetCap(o,&cb); mf=OverlapToManifold(CapCap(ca,cb)); }
                         else if (e->collider == COLTYPE_CAP && o->collider == COLTYPE_BOX) { Entity_GetCap(e,&ca); Entity_GetBox(o,&bb); mf=OverlapToManifold(CapBox(ca,bb)); }
@@ -1017,7 +1028,7 @@ void Physics() {
                         else if (e->collider == COLTYPE_BOX && o->collider == COLTYPE_CVX) { Entity_GetBox(e,&ba); mf=BoxCvx(ba,o->colMeshIndex,&modelMatrices[b*16]); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); } // support=box(e)-mesh(o): e is 'A', flip
                         else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_BOX) { Entity_GetBox(o,&bb); mf=BoxCvx(bb,e->colMeshIndex,&modelMatrices[a*16]); } // support=box(o)-mesh(e): e is 'B', no flip
                         else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_CVX) { mf=CvxCvx(e->colMeshIndex,o->colMeshIndex,&modelMatrices[a*16],&modelMatrices[b*16]); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); } // support=meshA(e)-meshB(o): e is 'A', flip
-                        else { mf=OverlapToManifold(SphSph(e->position,e->colliderSize.x,o->position,o->colliderSize.x)); }
+                        else { mf=OverlapToManifold(SphSph(World.position[i],e->colliderSize.x,World.position[b],o->colliderSize.x)); }
                         if (mf.n && contactCount < 16) contacts[contactCount++] = (Contact){mf,b};
                     }
                 }
@@ -1039,20 +1050,20 @@ void Physics() {
             e->accumulatedForce = (V3){0.0f,0.0f,0.0f};
         }
     }
-    for (int i = 0; i < World.instCount; ++i) { Entity *e = &World.instances[i]; e->cellX = (i16)PosGetCellCoordX(e->position.x); e->cellZ = (i16)PosGetCellCoordZ(e->position.z); e->cellIndex = PosGetCellCoordsP(e->cellX, e->cellZ); } // Update cells for next substep
+    for (int i = 0; i < World.instCount; ++i) { Entity *e = &World.instances[i]; e->cellX = (i16)PosGetCellCoordX(World.position[i].x); e->cellZ = (i16)PosGetCellCoordZ(World.position[i].z); e->cellIndex = PosGetCellCoordsP(e->cellX, e->cellZ); } // Update cells for next substep
 }
 
-ENGINE_TO_MOD void AddForce(u16 i, V3 f, bool imp) { Entity *e = &World.instances[i]; if (imp) { e->velocity = V3_AplusB(e->velocity,V3_ScaleByF(f,1.0f / vmax(e->mass,0.001f))); } else { e->accumulatedForce = V3_AplusB(e->accumulatedForce,f); } }
+ENGINE_TO_MOD void AddForce(u16 i, V3 f, bool imp) { Entity *e = &World.instances[i]; if (imp) { World.velocity[i] = V3_AplusB(World.velocity[i],V3_ScaleByF(f,1.0f / vmax(e->mass,0.001f))); } else { e->accumulatedForce = V3_AplusB(e->accumulatedForce,f); } }
 ENGINE_TO_MOD void ApplyPlayerMovements() {
     float h = (float)Forward() - (float)Backpedal(), s = (float)StrafeRight() - (float)StrafeLeft();
     float vertInput = (float)SwimUp() - (float)SwimDn();
     Entity *p = &World.instances[PLAYER1];
-    Quaternion r = p->rotation; float y2 = r.y*r.y; float xz = r.x*r.z; float wy = r.w*r.y;
+    Quaternion r = World.rotation[PLAYER1]; float y2 = r.y*r.y; float xz = r.x*r.z; float wy = r.w*r.y;
     p->forward=V3_Normalize((V3){ 2.0f * (xz + wy), 2.0f * (r.y*r.z - r.w*r.x), 1.0f - 2.0f * (r.x*r.x + y2) }); p->right=V3_Normalize((V3){ 1.0f - 2.0f * (y2 + r.z*r.z), 2.0f * (r.x*r.y + r.w*r.z), 2.0f * (xz - wy) });
     V3 w = V3_Normalize((V3){p->forward.x*h + p->right.x*s,vertInput,p->forward.z*h + p->right.z*s});
     float speed = GetBasePlayerSpeed(PLAYER1,V3_Mag(w) > 0.1f) * 1.75f, accel = World.boosterActive ? 1.0f : 3.0f;
-    V3 targetVel = V3_ScaleByF(w,speed); if (vabs(vertInput) < 0.001f) targetVel.y = p->velocity.y;
-    V3 dv = V3_AsubB(targetVel,p->velocity);
+    V3 targetVel = V3_ScaleByF(w,speed); if (vabs(vertInput) < 0.001f) targetVel.y = World.velocity[PLAYER1].y;
+    V3 dv = V3_AsubB(targetVel,World.velocity[PLAYER1]);
     dv = (V3){vclamp(dv.x,-10.0f,10.0f), vclamp(dv.y,-10.0f,10.0f), vclamp(dv.z,-10.0f,10.0f)};
-    p->velocity = V3_AplusB(p->velocity,V3_ScaleByF(dv,accel * vclamp((float)World.deltaTime,0.0005f,0.1f)));
+    World.velocity[PLAYER1] = V3_AplusB(World.velocity[PLAYER1],V3_ScaleByF(dv,accel * vclamp((float)World.deltaTime,0.0005f,0.1f)));
 }

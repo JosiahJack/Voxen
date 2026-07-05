@@ -56,18 +56,17 @@ void DropHeldItem(u16 p) {
     if (inv->dropFinished > World->pauseRelativeTime) return;
     
     inv->dropFinished = World->pauseRelativeTime + 0.2; // Prevent immediate regrab at high fps
-    u16 newent = AddInstance(inv->heldObjectIndex,ply->position);
+    u16 newent = AddInstance(inv->heldObjectIndex,World->position[p]);
     Entity* tossObject = &World->instances[newent];
     tossObject->usableCustomIndex = inv->heldObjectCustomIndex;
     tossObject->ammo = inv->heldObjectAmmo;
     tossObject->ammo2 = inv->heldObjectAmmo2;
     tossObject->heldObjectLoadedAlternate = inv->heldObjectLoadedAlternate;
-    tossObject->position = ply->position;
+    World->position[newent] = World->position[p];
     flag_set(&tossObject->entflags,EF_RIGIDBODY,true);
     V3 tossDir = V3_Normalize(ScreenPointToRay(ply->forward,ply->right));
-    tossObject->position = V3_AplusB(ply->position,V3_ScaleByF(tossDir,0.48f));
-    tossObject->velocity = V3_ScaleByF(tossDir,10.0f);
-    DualLog("Dropping held object type %u at pos %f %f %f, with force %f %f %f\n",tossObject->index,tossObject->position.x,tossObject->position.y,tossObject->position.z,tossObject->velocity.x,tossObject->velocity.y,tossObject->velocity.z);
+    World->position[newent] = V3_AplusB(World->position[p],V3_ScaleByF(tossDir,0.48f));
+    World->velocity[newent] = V3_ScaleByF(tossDir,10.0f);
     ResetHeldItem(p);
 }
 
@@ -408,14 +407,14 @@ static void UseDecoy(u16 p) {
     if (inv->softVersions[SW_DECOY] <= 0) { inv->hasSoft &= (u8)~(1u << SW_DECOY); return; }
     if (--inv->softVersions[SW_DECOY] == 0) inv->hasSoft &= (u8)~(1u << SW_DECOY);
     u16 decoyIdx = SpawnDynamicObject(417,true); // 417 = CyberDecoy constIndex
-    if (decoyIdx != U16_MAX) World->instances[decoyIdx].position = PE(p)->position;
+    if (decoyIdx != U16_MAX) World->position[decoyIdx] = World->position[p];
 }
 
 static void UseRecall(u16 p) {
     InventorySystem* inv = Inv(p);
     if (inv->softVersions[SW_RECALL] <= 0) return;
     if (--inv->softVersions[SW_RECALL] == 0) inv->hasSoft &= (u8)~(1u << SW_RECALL);
-    PE(p)->position = World->cyberspaceRecallPoint;
+    World->position[p] = World->cyberspaceRecallPoint;
 }
 
 void UseCyberspaceItem(u16 p) {
@@ -453,10 +452,10 @@ void CycleCyberSpaceItemDn(u16 p) {
     }
 }
 
-bool AddSoftwareItem(u16 p,u16 index,int vers) {
+bool AddSoftwareItem(u16 p, u16 index, int vers) {
     InventorySystem* inv = Inv(p);
-    Entity* player       = PE(p);
-    float sfxVol         = (float)Settings->VolumeEffects / 100.0f;
+    Entity* player = &World->instances[p];
+    float sfxVol = (float)Settings->VolumeEffects / 100.0f;
     switch(index) {
         case 450/*item_cyber_drill*/:
             if (inv->isPulserNotDrill && !(inv->hasSoft & (1u << SW_PULSER))) inv->isPulserNotDrill = false;
@@ -633,13 +632,13 @@ bool AddWeaponToInventory(u16 p,int index,int ammo1,int ammo2,bool loadedAlt) {
 void InventoryUpdate(u16 p) {
     InventorySystem* inv = Inv(p);
     if (Grenade()) {
-        if (PE(p)->inCyberTube) UseCyberspaceItem(p);
+        if (World->instances[p].inCyberTube) UseCyberspaceItem(p);
         else if (inv->grenadeCurrent >= 0 && inv->grenadeCurrent < 7 && inv->grenAmmo[inv->grenadeCurrent] > 0) UseGrenade(p,inv->grenConstIndex[inv->grenadeCurrent]);
         else CenterStatusPrint("%s",Eng_Text->stringTable[322]); // Out of grenades.
     }
     
-    if (GrenadeCycUp())  { if (PE(p)->inCyberTube) CycleCyberSpaceItemUp(p); else GrenadeCycleUp(p); }
-    if (GrenadeCycDown()){ if (PE(p)->inCyberTube) CycleCyberSpaceItemDn(p); else GrenadeCycleDown(p); }
+    if (GrenadeCycUp())  { if (World->instances[p].inCyberTube) CycleCyberSpaceItemUp(p); else GrenadeCycleUp(p); }
+    if (GrenadeCycDown()){ if (World->instances[p].inCyberTube) CycleCyberSpaceItemDn(p); else GrenadeCycleDown(p); }
     if (RecentLog() && (inv->hasHardware & HW_ERD)) {
         bool playing = false;//SndPlaying(&inv->logSound); TODO
         if (inv->lastAddedIndex >= 0 && !playing) {
@@ -770,13 +769,7 @@ void CyberItemOnTriggerEnter(u16 self, u16 other) {
 }
 //=============================================================================
 // CyberIce
-void CyberIceOnTriggerEnter(u16 self, u16 other) {
-    (void)self;
-    Entity* e = &World->instances[other];
-    if (!(e->entflags & EF_RIGIDBODY)) return;
-    e->layer = 24;
-    e->velocity = V3_ScaleByF(e->velocity,-1.0f);
-}
+void CyberIceOnTriggerEnter(u16 self, u16 other) { (void)self; Entity* e = &World->instances[other]; if (!(e->entflags & EF_RIGIDBODY)) return; e->layer = 24; World->velocity[other] = V3_ScaleByF(World->velocity[other],-1.0f); }
 //=============================================================================
 // CyberMine
 void CyberMineInitBeforeLoad(u16 self) {
@@ -787,13 +780,7 @@ void CyberMineInitBeforeLoad(u16 self) {
     if (World->diffCyb < 1) { if (random_range(0.0f,1.0f) < 0.50f) flag_set(&e->entflags,EF_ACTIVE,false); e->damage = 11.0f; }
 }
 
-void CyberMineOnTriggerEnter(u16 self, u16 other) {
-    Entity* e = &World->instances[self];
-    if (other != PLAYER1) return;
-    PlayerTakeDamage(PLAYER1,e->damage);
-    play_wav(sounds[67],1.0f,e->position,false);
-    flag_set(&e->entflags,EF_ACTIVE,false);
-}
+void CyberMineOnTriggerEnter(u16 self, u16 other) { Entity* e = &World->instances[self]; if (other != PLAYER1) return; PlayerTakeDamage(PLAYER1,e->damage); play_wav(sounds[67],1.0f,World->position[self],false); flag_set(&e->entflags,EF_ACTIVE,false); }
 //=============================================================================
 // CyberPush
 void CyberPushOnTriggerStay(u16 self, u16 other) {
@@ -805,13 +792,7 @@ void CyberPushOnTriggerStay(u16 self, u16 other) {
     Sys_Music.cyberTube = true;
 }
 
-void CyberPushOnTriggerExit(u16 self, u16 other) {
-    (void)self;
-    if (other != PLAYER1) return;
-    
-    World->instances[other].inCyberTube = false;
-    Sys_Music.cyberTube = false;
-}
+void CyberPushOnTriggerExit(u16 self, u16 other) { (void)self; if (other != PLAYER1) {return;} World->instances[other].inCyberTube = false; Sys_Music.cyberTube = false; }
 //=============================================================================
 // CyberDoor
 void CyberDoorOnCollisionEnter(u16 self, u16 other) {
@@ -933,7 +914,7 @@ void DelayedSpawnUpdate(u16 self) {
 // FuncWall
 void FuncWallInitAfterLoad(u16 self) {
     Entity* e = &World->instances[self];
-    V3 tempVec = V3_AsubB(e->position,e->targetPosition);
+    V3 tempVec = V3_AsubB(World->position[self],e->targetPosition);
     float distTotal = V3_Dist(e->startPosition,e->targetPosition);
     tempVec = V3_ScaleByF(V3_Normalize(tempVec),-1.0f);
     if (e->funcState == FuncStates_AjarMovingTarget) tempVec = V3_ScaleByF(tempVec,distTotal * e->percentAjar);
@@ -941,7 +922,7 @@ void FuncWallInitAfterLoad(u16 self) {
     else if (e->funcState == FuncStates_MovingStart) tempVec = V3_ScaleByF(tempVec,distTotal * (1.0f - e->percentMoved));
     else tempVec = V3_ScaleByF(tempVec,distTotal * e->percentMoved);
     
-    SetPosition(e,V3_AplusB(e->position,tempVec),true); // Force it like a teleport
+    SetPosition(e,V3_AplusB(World->position[self],tempVec),true); // Force it like a teleport
 }
 
 void FuncWallMoveStart(u16 self) { World->instances[self].funcState = FuncStates_MovingStart; World->instances[self].tickFinished = World->pauseRelativeTime + 10.0f; }
@@ -951,17 +932,17 @@ void FuncWallTargetted(u16 self, u16 activator) {
     Entity* e = &World->instances[self];
     if (e->funcState == FuncStates_Start || e->funcState == FuncStates_MovingStart || e->funcState == FuncStates_AjarMovingTarget) FuncWallMoveTarget(self);
     else FuncWallMoveStart(self);
-    play_wav(sounds[76],1.0f,e->position,true);
+    play_wav(sounds[76],1.0f,World->position[self],true);
 }
 
 void FuncWallUpdate(u16 self) {
     Entity* e = &World->instances[self];
     V3 goal = e->funcState == FuncStates_MovingStart ? e->startPosition : e->targetPosition;
     FuncStates doneState = e->funcState == FuncStates_MovingStart ? FuncStates_Start : FuncStates_Target;
-    if (e->funcState == FuncStates_Start) { SetPosition(e,e->startPosition,true); e->velocity = (V3){0.0f,0.0f,0.0f}; e->percentMoved = 0.0f; return; }
-    if (e->funcState == FuncStates_Target) { SetPosition(e,e->targetPosition,true); e->velocity = (V3){0.0f,0.0f,0.0f}; e->percentMoved = 1.0f; return; }
+    if (e->funcState == FuncStates_Start) { SetPosition(e,e->startPosition,true); World->velocity[self] = (V3){0.0f,0.0f,0.0f}; e->percentMoved = 0.0f; return; }
+    if (e->funcState == FuncStates_Target) { SetPosition(e,e->targetPosition,true); World->velocity[self] = (V3){0.0f,0.0f,0.0f}; e->percentMoved = 1.0f; return; }
     if (e->funcState != FuncStates_MovingStart && e->funcState != FuncStates_MovingTarget) return;
-    V3 delta = V3_AsubB(goal,e->position);
+    V3 delta = V3_AsubB(goal,World->position[self]);
     float distanceLeft = V3_Mag(delta);
     float total = V3_Dist(e->startPosition,e->targetPosition);
     float dist = e->speed * (float)World->deltaTime;
@@ -969,11 +950,11 @@ void FuncWallUpdate(u16 self) {
         SetPosition(e,goal,true);
         e->funcState = doneState;
         e->percentMoved = doneState == FuncStates_Target ? 1.0f : 0.0f;
-        e->velocity = (V3){0.0f,0.0f,0.0f};
+        World->velocity[self] = (V3){0.0f,0.0f,0.0f};
         return;
     }
-    if (distanceLeft > 0.0001f) SetPosition(e,V3_AplusB(e->position,V3_ScaleByF(V3_Normalize(delta),dist)),true);
-    if (total > 0.0001f) e->percentMoved = V3_Dist(e->startPosition,e->position) / total;
+    if (distanceLeft > 0.0001f) SetPosition(e,V3_AplusB(World->position[self],V3_ScaleByF(V3_Normalize(delta),dist)),true);
+    if (total > 0.0001f) e->percentMoved = V3_Dist(e->startPosition,World->position[self]) / total;
 }
 //=============================================================================
 // ForceBridge
@@ -996,45 +977,34 @@ void func_forcebridge(u16 self) {
 }
 
 void ForceBridgeActivate(u16 self, bool isSilent) {
-    Entity* e = &World->instances[self];
-    if (e->active) return;
-    
-    if (!isSilent) play_wav(sounds[102],1.0f,e->position,true);
-    e->modelIndex = 78; e->collider = COLTYPE_BOX;
-    e->active = e->lerping = true;
-    e->scale = (V3){ e->forceFieldDirectionX ? 0.1f : e->activatedScale.x, e->forceFieldDirectionY ? 0.1f : e->activatedScale.y, e->forceFieldDirectionZ ? 0.1f : e->activatedScale.z };
+    Entity* e = &World->instances[self]; if (e->active) {return;}
+    if (!isSilent) play_wav(sounds[102],1.0f,World->position[self],true);
+    e->modelIndex = 78; e->collider = COLTYPE_BOX; e->active = e->lerping = true; World->scale[self] = (V3){ e->forceFieldDirectionX ? 0.1f : e->activatedScale.x, e->forceFieldDirectionY ? 0.1f : e->activatedScale.y, e->forceFieldDirectionZ ? 0.1f : e->activatedScale.z };
 }
 
 void ForceBridgeDeactivate(u16 self, bool isSilent) {
-    Entity* e = &World->instances[self];
-    if (!e->active) return;
-    
-    if (!isSilent) play_wav(sounds[102],1.0f,e->position,true);
-    e->active = false; e->lerping = true;
-    e->modelIndex = MAX_MDLS; e->collider = COLTYPE_NONE;
+    Entity* e = &World->instances[self]; if (!e->active) {return;}
+    if (!isSilent) {play_wav(sounds[102],1.0f,World->position[self],true);}
+    e->active = false; e->lerping = true; e->modelIndex = MAX_MDLS; e->collider = COLTYPE_NONE;
 }
 
-void ForceBridgeToggle(u16 self) {
-    if (World->instances[self].active) ForceBridgeDeactivate(self,false);
-    else ForceBridgeActivate(self,false);
-}
-
+void ForceBridgeToggle(u16 self) { if (World->instances[self].active) {ForceBridgeDeactivate(self,false); } else {ForceBridgeActivate(self,false);} }
 void ForceBridgeUpdate(u16 self) {
     Entity* e = &World->instances[self];
     if (e->tickFinished >= World->pauseRelativeTime) return;
     e->tickFinished = World->pauseRelativeTime + e->tickTime;
     if (e->active) {
         if (!e->lerping) return;
-        float sx = e->forceFieldDirectionX ? lerp(e->scale.x,e->activatedScale.x,e->tickTime * 2.0f) : e->scale.x;
-        float sy = e->forceFieldDirectionY ? lerp(e->scale.y,e->activatedScale.y,e->tickTime * 2.0f) : e->scale.y;
-        float sz = e->forceFieldDirectionZ ? lerp(e->scale.z,e->activatedScale.z,e->tickTime * 2.0f) : e->scale.z;
-        e->scale = (V3){sx,sy,sz};
-        if (vabs(e->activatedScale.x - sx) < 0.08f && vabs(e->activatedScale.y - sy) < 0.08f && vabs(e->activatedScale.z - sz) < 0.08f) { e->scale = e->activatedScale; e->lerping = false; }
+        float sx = e->forceFieldDirectionX ? lerp(World->scale[self].x,e->activatedScale.x,e->tickTime * 2.0f) : World->scale[self].x;
+        float sy = e->forceFieldDirectionY ? lerp(World->scale[self].y,e->activatedScale.y,e->tickTime * 2.0f) : World->scale[self].y;
+        float sz = e->forceFieldDirectionZ ? lerp(World->scale[self].z,e->activatedScale.z,e->tickTime * 2.0f) : World->scale[self].z;
+        World->scale[self] = (V3){sx,sy,sz};
+        if (vabs(e->activatedScale.x - sx) < 0.08f && vabs(e->activatedScale.y - sy) < 0.08f && vabs(e->activatedScale.z - sz) < 0.08f) { World->scale[self] = e->activatedScale; e->lerping = false; }
     } else if (e->lerping) {
-        float sx = e->forceFieldDirectionX ? lerp(e->scale.x,0.0f,e->tickTime * 2.0f) : e->scale.x;
-        float sy = e->forceFieldDirectionY ? lerp(e->scale.y,0.0f,e->tickTime * 2.0f) : e->scale.y;
-        float sz = e->forceFieldDirectionZ ? lerp(e->scale.z,0.0f,e->tickTime * 2.0f) : e->scale.z;
-        e->scale = (V3){sx,sy,sz};
+        float sx = e->forceFieldDirectionX ? lerp(World->scale[self].x,0.0f,e->tickTime * 2.0f) : World->scale[self].x;
+        float sy = e->forceFieldDirectionY ? lerp(World->scale[self].y,0.0f,e->tickTime * 2.0f) : World->scale[self].y;
+        float sz = e->forceFieldDirectionZ ? lerp(World->scale[self].z,0.0f,e->tickTime * 2.0f) : World->scale[self].z;
+        World->scale[self] = (V3){sx,sy,sz};
         if (sx < 0.08f || sy < 0.08f || sz < 0.08f) { flag_set(&e->entflags,EF_ACTIVE,false); e->collider = COLTYPE_NONE; e->lerping = false; }
     }
 }
@@ -1057,9 +1027,9 @@ void TeleportTouchOnTriggerEnter(u16 self, u16 other) {
     if (player->health <= 0.0f || e->justUsed >= World->pauseRelativeTime) return;
     u16 dest = e->targetDestinationID < 8 ? TeleportTouch_allTeleportTouches[e->targetDestinationID] : U16_MAX;
     if (dest == U16_MAX) return;
-    player->position = World->instances[dest].position;
+    World->position[PLAYER1] = World->position[dest];
     World->instances[dest].justUsed = World->pauseRelativeTime + 1.0;
-    play_wav(sounds[106],1.0f,World->instances[dest].position,false);
+    play_wav(sounds[106],1.0f,World->position[dest],false);
 }
 
 //=============================================================================
@@ -1117,7 +1087,7 @@ void GravityLiftInitAfterLoad(u16 self) {
     if (e->strength <= 0.0f) e->strength = 12.0f;
     if (e->offStrengthFactor <= 0.0f) e->offStrengthFactor = 0.3f;
     if (e->distancePaddingToTopPoint <= 0.0f) e->distancePaddingToTopPoint = 0.32f;
-    e->topPoint = (V3){ 0.0f, e->position.y + (e->colliderSize.y * 0.5f), 0.0f };
+    e->topPoint = (V3){ 0.0f,World->position[self].y + (e->colliderSize.y * 0.5f), 0.0f };
 }
 
 // TODO just poll bounds and apply in trigger loop, yeesh
@@ -1130,8 +1100,8 @@ void GravityLiftInitAfterLoad(u16 self) {
 //     Entity* e = &World->instances[self];
 //     Entity* o = &World->instances[other];
 //     if (other == PLAYER1) flag_set(&World->instances[PLAYER1].entflags,EF_GRAV_LIFT_STATE,true);
-//     float topY = e->position.y + (e->colliderSize.y * 0.5f);
-//     float dist = topY - o->position.y + 0.48f;
+//     float topY = World->position[self].y + (e->colliderSize.y * 0.5f);
+//     float dist = topY - World->position[other].y + 0.48f;
 //     float velY = o->velocity.y < 0.0f ? 0.0f : o->velocity.y;
 //     if (dist < e->distancePaddingToTopPoint) AddForce(other,(V3){0.0f,9.81f - velY,0.0f},false); // TODO accel-vs-force parity
 //     else if (o->velocity.y < (e->strength * o->mass)) {
@@ -1208,14 +1178,14 @@ void ButtonSwitchUseTargets(u16 self, u16 activator) {
 void ButtonSwitchUse(u16 self, u16 activator) {
     Entity* e = &World->instances[self];
     if (Eng_Cheats->superoverride || World->diffMis == 0) EntitySetLocked(e,false);
-    else if (GetCurrentLevelSecurity() > e->securityThreshold) { UIBlockedBySecurity(e->position); return; }
+    else if (GetCurrentLevelSecurity() > e->securityThreshold) { UIBlockedBySecurity(World->position[self]); return; }
     if ((e->entflags & EF_LOCKED) != 0) {
         CenterStatusPrint("%s",Eng_Text->stringTable[e->lockedMessageLingdex]);
-        if (e->SFXLockedIndex >= 0 && e->SFXLockedIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXLockedIndex],1.0f,e->position,true);
+        if (e->SFXLockedIndex >= 0 && e->SFXLockedIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXLockedIndex],1.0f,World->position[self],true);
         return;
     }
     
-    if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
+    if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,World->position[self],true);
     CenterStatusPrint("%s",Eng_Text->stringTable[e->messageIndex]);
     if (e->delay > 0.0f) { e->recentMostActivator = activator; e->delayFinished = World->pauseRelativeTime + e->delay; }
     else ButtonSwitchUseTargets(self,activator);
@@ -1240,9 +1210,9 @@ void HealingBedUse(u16 self, u16 owner) {
         if (!e->broken) {
             HealthManagerHealingBed(PLAYER1,e->amount,true);
             CenterStatusPrint("%s",Eng_Text->stringTable[23],owner);
-            play_wav(sounds[103],1.0f,e->position,false);
+            play_wav(sounds[103],1.0f,World->position[self],false);
         } else CenterStatusPrint("%s",Eng_Text->stringTable[24],owner);
-    } else UIBlockedBySecurity(e->position);
+    } else UIBlockedBySecurity(World->position[self]);
 }
 //=============================================================================
 // TargetIO
@@ -1489,7 +1459,7 @@ void ElevatorButtonClick(u16 self) {
     }
     Entity* door = &World->instances[Eng_UI->linkedElevatorDoor];
     bool doorClosed = door->doorOpen == DoorState_Closed;
-    float dist = V3_Dist(Eng_UI->objectInUsePos,World->instances[PLAYER1].position);
+    float dist = V3_Dist(Eng_UI->objectInUsePos,World->position[PLAYER1]);
     if (dist > ELEVATOR_PAD_TETHER_DIST && !doorClosed) {
         CenterStatusPrint("%s",Eng_Text->stringTable[6]); // Too far away from that.
         return;
@@ -1503,11 +1473,11 @@ void ElevatorButtonClick(u16 self) {
         return;
     }
     // TODO: call engine LoadLevel(e->teleportID, spawnPos) — destination spawn
-    // position comes from instance[e->targetDestinationID].position if set
+    // position comes from position[e->targetDestinationID] if set
     // (targetDestinationID != U16_MAX), else V3 zero.
     // LoadLevel is engine-side level transition, not yet in interop.h.
 //     if (floorAccessible) { // floorAccessible set from the us_puz_elevatorkeypad, us_puz_elevatorkeypad2, us_puz_elevatorkeypad3, or us_puz_elevatorkeypad4 entity
-//         LoadLevel(levelIndex,targetDestination.World->instances[i].position);
+//         LoadLevel(levelIndex,targetDestination.World->position[i]);
 //     } else {
 //         CenterStatusPrint("%s", Eng_Text->stringTable[8]);
 //     }
@@ -1688,10 +1658,10 @@ void TargetIDUpdate(u16 self) {
     if (e->enemy == NULLENT) { TargetIDDeactivate(self); return; }
     Entity* npc = &World->instances[e->enemy];
     if (npc->health <= 0.0f) { TargetIDDeactivate(self); return; }
-    if (V3_Dist(e->position,World->instances[PLAYER1].position) > TARGETID_LINK_DIST) { TargetIDDeactivate(self); return; }
+    if (V3_Dist(World->position[self],World->position[PLAYER1]) > TARGETID_LINK_DIST) { TargetIDDeactivate(self); return; }
     if (e->tickFinished < World->pauseRelativeTime) { TargetIDDeactivate(self); return; }
 
-    SetPosition(e,npc->position,true); // Track parent NPC position
+    SetPosition(e,World->position[e->enemy],true); // Track parent NPC position
     bool stunned = npc->tranquilizeFinished > World->pauseRelativeTime;
     flag_set(&e->entflags,EF_ASLEEP,stunned);
     if (e->textIndex >= 0) {
@@ -1751,7 +1721,7 @@ static void TargetIdentifierSenseTargets(void) {
         if (!IdxIsNPC(e->index))              continue;
         if (e->entflags & EF_DEAD)              continue;
         if (e->entflags & EF_TARGID_ATTACHED)   continue;
-        if (V3_Dist(e->position,World->instances[PLAYER1].position) > TargetIDGetSensingRange(false))        continue;
+        if (V3_Dist(World->position[i],World->position[PLAYER1]) > TargetIDGetSensingRange(false))        continue;
         // TODO: CreateTargetIDInstance — weapon/targetting system
     }
 }
@@ -1838,7 +1808,7 @@ void PlayerEnergyUpdate(void) {
 static bool GrenadeIsNPCMine(u16 self) { return World->instances[self].layer != L_PlayerBullets; }
 void GrenadeExplode(u16 self) {
     Entity* e = &World->instances[self];
-    // TODO: DamageData + ApplyImpactForceSphere(damage,attackType,penetration,offense,damage*1.5f,e->position,e->strength,1.0f)
+    // TODO: DamageData + ApplyImpactForceSphere(damage,attackType,penetration,offense,damage*1.5f,World->position[self],e->strength,1.0f)
     if (!GrenadeIsNPCMine(self)) { Entity* p = &World->instances[PLAYER1]; p->noiseFinished = World->pauseRelativeTime + 2.0; }
     i16 idx = (i16)e->index;
     int soundIndex = 60;
@@ -1850,8 +1820,8 @@ void GrenadeExplode(u16 self) {
         case 13: soundIndex = 63; World->fogFac += 10; break; // gas
     }
     
-    play_wav(sounds[soundIndex],1.0f,e->position,true);
-    // TODO: SpawnExplosionEffect(e->position, explosionType)
+    play_wav(sounds[soundIndex],1.0f,World->position[self],true);
+    // TODO: SpawnExplosionEffect(World->position[self], explosionType)
     // TODO: Shake(-1,-1) — screen shake system
     DeleteInstance(self);
 }
@@ -1912,7 +1882,7 @@ static void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 
 
     // Railgun sphere impact
     if (e->lookUpIndex == 5) { // TODO: replace magic with named PoolType enum
-        // TODO: ApplyImpactForceSphere(dd, e->position, 3.2f, 1.0f)
+        // TODO: ApplyImpactForceSphere(dd, World->position[self], 3.2f, 1.0f)
         World->fogFac += 4;
     }
 
@@ -2005,12 +1975,12 @@ static void TeleportAway(u16 self) {
     Entity* e = &World->instances[self];
     if (e->entflags & EF_TELEPORT_ON_DEATH) return; // already done, flag reused as teleportDone
     flag_set(&e->entflags,EF_TELEPORT_ON_DEATH,true);
-    e->collider        = COLTYPE_NONE;
-    e->gravity         = 0.0f;
-    e->velocity        = (V3){0,0,0};
-    e->angularVelocity = (V3){0,0,0};
-    e->modelIndex      = U16_MAX; // remove from rendering
-    // TODO: activate teleport effect particle instance at e->position
+    e->collider = COLTYPE_NONE;
+    e->gravity = 0.0f;
+    World->velocity[self] = (V3){0,0,0};
+    World->angularVelocity[self] = (V3){0,0,0};
+    e->modelIndex = U16_MAX; // remove from rendering
+    // TODO: activate teleport effect particle instance at self position
 }
 
 static void DropSearchables(u16 self) {
@@ -2020,7 +1990,7 @@ static void DropSearchables(u16 self) {
         if (e->contents[i] == U16_MAX) continue;
         u16 spawned = SpawnDynamicObject(e->contents[i] + 307,true);
         if (spawned != U16_MAX) {
-            World->instances[spawned].position   = e->position;
+            World->position[spawned] = World->position[self];
             World->instances[spawned].customIndex[0] = e->customIndex[i];
         } else CenterStatusPrint("BUG: Failed to instantiate object being dropped on gib.");
         
@@ -2031,11 +2001,9 @@ static void DropSearchables(u16 self) {
 static void CreateDeathEffects(u16 self,u16 fxPoolType) {
     if (fxPoolType == 0) return; // PoolType_None
     Entity* e = &World->instances[self];
-    V3 pos = e->position;
+    V3 pos = World->position[self];
     // Use collider center offset if present
-    if (e->collider != COLTYPE_NONE) {
-        pos = V3_AplusB(pos,e->colliderCenter);
-    }
+    if (e->collider != COLTYPE_NONE) { pos = V3_AplusB(pos,e->colliderCenter); }
     // TODO: SpawnEffectFromPool(fxPoolType, pos)
 }
 
@@ -2052,7 +2020,7 @@ static void NPCDeath(u16 self) {
     if (e->entflags & EF_DEAD_CHECKS_DONE) return;
     flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true);
     CreateDeathEffects(self,e->deathBurst);
-    if (e->index == 419) play_wav(sounds[64],1.0f,e->position,true); // npc_autobomb: explosion1
+    if (e->index == 419) play_wav(sounds[64],1.0f,World->position[self],true); // npc_autobomb: explosion1
     if (npcTable[e->index - 419].type == NPCType_Cyber) DeleteInstance(self);
     // else: keep collider alive to prevent falling through floor (Unity physics note preserved)
 }
@@ -2079,7 +2047,7 @@ static void ObjectDeath(u16 self) {
     u16 idx = e->index;
     i16 soundex = 62; // default: crate_break
     if (idx < 527 && objectDeathSound[idx] != 0) soundex = objectDeathSound[idx];
-    play_wav(sounds[soundex],1.0f,e->position,true);
+    play_wav(sounds[soundex],1.0f,World->position[self],true);
     if (e->deathBurst != 0) HideSelf(self);
 }
 
@@ -2087,7 +2055,7 @@ static void ScreenDeath(u16 self) {
     Entity* e = &World->instances[self];
     if (e->entflags & EF_DEAD_CHECKS_DONE) return;
     flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true);
-    play_wav(sounds[69],1.0f,e->position,true); // screen_destroy
+    play_wav(sounds[69],1.0f,World->position[self],true); // screen_destroy
     // TODO: stop ImageSequenceTextureArray animation for this instance
     if (e->entflags & EF_DEATH_BURST_DONE) ObjectDeath(self); // gib path
 }
@@ -2429,7 +2397,7 @@ void HardwareUpdate(u16 p) {
     bool infraredOn = /*(inv->hasHardware & HW_INF) && */(inv->hardwareIsActive & HW_INF) > 0;
     bool lanternOn = /*(inv->hasHardware & HW_LAN) && */(inv->hardwareIsActive & HW_LAN) > 0;
     if (lanternOn || infraredOn) { // Update headmounted lantern/infrared's light (infrared overrides lantern brightness/range)
-        V3 ppos = World->instances[p].position;
+        V3 ppos = World->position[p];
         lanternPos = (V3){ppos.x + 0.04f,ppos.y + 0.24f,ppos.z + 0.04f};
         float intensity = infraredOn ? 0.8f : lanternVersionBrightness[inv->hardwareVersionSetting[7]];
         UpdateLight(headmountedLanternLight,lanternPos,lantCol,infraredOn ? INFRARED_RANGE : LANTERN_RANGE,intensity,intensity,0.0f,0.0f,QUAT_IDENTITY,true,true);
@@ -2997,7 +2965,7 @@ static void DoorOpen(u16 self) {
     e->doorOpen = e->doorState = DoorState_Opening;
     e->waitBeforeClose = World->pauseRelativeTime + e->delay;
     DoorSyncLayer(self);
-    if (e->SFXIndex > 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
+    if (e->SFXIndex > 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,World->position[self],true);
 }
 
 static void DoorClose(u16 self) {
@@ -3006,7 +2974,7 @@ static void DoorClose(u16 self) {
     DoorSetClipFrame(self,DOOR_CLIP_CLOSING,DoorGetClip(e,DOOR_CLIP_CLOSING).frameStart);
     e->doorOpen = e->doorState = DoorState_Closing;
     DoorSyncLayer(self);
-    if (e->SFXIndex > 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
+    if (e->SFXIndex > 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,World->position[self],true);
 }
 
 void DoorForceOpen(u16 self) { World->instances[self].requiredAccessCard = AccessCardType_None; EntitySetLocked(&World->instances[self],false); DoorOpen(self); }
@@ -3022,7 +2990,7 @@ void DoorActuate(u16 self) {
         DoorSetClipFrame(self,DOOR_CLIP_CLOSING,DoorFrameFromProgress(c,1.0f - t));
         e->doorOpen = e->doorState = DoorState_Closing;
         DoorSyncLayer(self);
-        if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
+        if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,World->position[self],true);
         return;
     }
     
@@ -3033,7 +3001,7 @@ void DoorActuate(u16 self) {
         e->doorOpen = e->doorState = DoorState_Opening;
         e->waitBeforeClose = World->pauseRelativeTime + e->delay;
         DoorSyncLayer(self);
-        if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,e->position,true);
+        if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,World->position[self],true);
     }
 }
 
@@ -3067,7 +3035,7 @@ void DoorUse(u16 self, u16 activator) {
     DualLog("Door use called by activator %u\n",activator);
     Entity* e = &World->instances[self];
     if (activator == NULLENT) return;
-    if (GetCurrentLevelSecurity() > e->securityThreshold) { UIBlockedBySecurity(e->position); return; }
+    if (GetCurrentLevelSecurity() > e->securityThreshold) { UIBlockedBySecurity(World->position[self]); return; }
     
     if (Eng_Cheats->superoverride || World->diffMis <= 0) { EntitySetLocked(e,false); e->requiredAccessCard = AccessCardType_None; }
     if (World->diffMis <= 1) { e->requiredAccessCard = AccessCardType_None; }
@@ -3077,14 +3045,14 @@ void DoorUse(u16 self, u16 activator) {
     if (e->requiredAccessCard != AccessCardType_None) {
         if (!DoorInventoryHasAccessCard(e->requiredAccessCard)) {
             CenterStatusPrint("%s",Eng_Text->stringTable[2]); // TODO Access-card-specific status text.
-            if (e->SFXLockedIndex >= 0 && e->SFXLockedIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXLockedIndex],0.7f,e->position,true);
+            if (e->SFXLockedIndex >= 0 && e->SFXLockedIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXLockedIndex],0.7f,World->position[self],true);
             return;
         } else e->requiredAccessCard = AccessCardType_None; // TODO Access-card granted status text.
     }
     
     if ((e->entflags & EF_LOCKED) != 0) {        
         CenterStatusPrint("%s",Eng_Text->stringTable[e->lockedMessageLingdex]);
-        if (e->SFXLockedIndex >= 0 && e->SFXLockedIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXLockedIndex],0.55f,e->position,true);
+        if (e->SFXLockedIndex >= 0 && e->SFXLockedIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXLockedIndex],0.55f,World->position[self],true);
         return;
     }
 
@@ -3221,7 +3189,7 @@ MOD_TO_ENGINE void ModUpdate(void) {
     WeaponsUpdate();
     PatchUpdate(PLAYER1);
     HardwareUpdate(PLAYER1);
-    if (Use()) Frob(World->instances[PLAYER1].position,World->instances[PLAYER1].forward,World->instances[PLAYER1].right);
+    if (Use()) Frob(World->position[PLAYER1],World->instances[PLAYER1].forward,World->instances[PLAYER1].right);
     if (World->pauseRelativeTime < World->debugLineFinished && (World->debugLineVertCount + 6) < (MAX_WIRELINE_VRTS * 3)) AddWireLine(World->debugLine_start,World->debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f});
     for (u16 i = INSTS_1ST_IDX; i < World->instCount; ++i) {
         Entity* e = &World->instances[i];
@@ -3390,15 +3358,15 @@ void InventoryInit(InventorySystem* inv) {
 MOD_TO_ENGINE void PlayerInit(u16 i) {
     World->instances[i].index = 767;
     World->instances[i].layer = L_Player;
-    World->instances[i].position = (V3){10.52f,-43.792f + 0.84f,20.2908f}; // Start Actual: Puts player on Medical Level in actual game start position.  Added 0.84f
-    World->instances[i].scale = (V3){1.0f,1.0f,1.0f};
-    World->instances[i].rotation = (Quaternion){0.0f,0.7071f,0.0f,0.7071f}; // 90deg rotation CW about Y axis as viewed from the top looking down onto player
+    World->position[i] = (V3){10.52f,-43.792f + 0.84f,20.2908f}; // Start Actual: Puts player on Medical Level in actual game start position.  Added 0.84f
+    World->scale[i] = (V3){1.0f,1.0f,1.0f};
+    World->rotation[i] = (Quaternion){0.0f,0.7071f,0.0f,0.7071f}; // 90deg rotation CW about Y axis as viewed from the top looking down onto player
     World->instances[i].entflags = EF_ACTIVE|EF_RIGIDBODY;
     World->instances[i].collider = COLTYPE_CAP;
     World->instances[i].colliderCenter.y = -0.84f;
     World->instances[i].colliderSize = (V3){0.48f,2.0f,1.0f}; // Radius, Overall height including end radii (Unity convention, blech), Direction, 1.0 == Y-Axis
     World->instances[i].mass = 1.0f;
-    World->instances[i].velocity = (V3){0.0f,0.0f,0.0f};
+    World->velocity[i] = (V3){0.0f,0.0f,0.0f};
     World->instances[i].gravity = 1.0f;
     World->instances[i].dynamicFriction = 0.6f; World->instances[i].staticFriction = 0.8f;
     World->instances[i].health = 200.0f;

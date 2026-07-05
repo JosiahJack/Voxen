@@ -26,11 +26,11 @@ bool GridCellBlock(u16 i,V3 pos,V3 newPos) {
     i32 ccx=PosGetCellCoordX(pos.x),    ccz=PosGetCellCoordZ(pos.z);
     i32 ncx=PosGetCellCoordX(newPos.x), ncz=PosGetCellCoordZ(newPos.z);
     i32 cc=(ccz*WORLDX)+ccx, nc=(ncz*WORLDX)+ncx;
-    if (ncz>ccz && (gridCellStates[cc]&CELL_CLOSEDNORTH)) { World.instances[i].velocity.z=-0.1f; return true; }
-    if (ncz<ccz && (gridCellStates[cc]&CELL_CLOSEDSOUTH)) { World.instances[i].velocity.z= 0.1f; return true; }
-    if (ncx>ccx && (gridCellStates[cc]&CELL_CLOSEDEAST))  { World.instances[i].velocity.x=-0.1f; return true; }
-    if (ncx<ccx && (gridCellStates[cc]&CELL_CLOSEDWEST))  { World.instances[i].velocity.x= 0.1f; return true; }
-    if (!(gridCellStates[nc]&CELL_OPEN)) { V3 dir=V3_Normalize(World.instances[i].velocity); World.instances[i].velocity=V3_ScaleByF(dir,-0.1f); return true; }
+    if (ncz>ccz && (gridCellStates[cc]&CELL_CLOSEDNORTH)) { World.velocity[i].z=-0.1f; return true; }
+    if (ncz<ccz && (gridCellStates[cc]&CELL_CLOSEDSOUTH)) { World.velocity[i].z= 0.1f; return true; }
+    if (ncx>ccx && (gridCellStates[cc]&CELL_CLOSEDEAST))  { World.velocity[i].x=-0.1f; return true; }
+    if (ncx<ccx && (gridCellStates[cc]&CELL_CLOSEDWEST))  { World.velocity[i].x= 0.1f; return true; }
+    if (!(gridCellStates[nc]&CELL_OPEN)) { V3 dir=V3_Normalize(World.velocity[i]); World.velocity[i]=V3_ScaleByF(dir,-0.1f); return true; }
     return false;
 }
 
@@ -91,7 +91,7 @@ ENGINE_TO_MOD void AddDoorPortal(u16 entIdx, u16 parent) {
     if (entIdx == 499 || entIdx == 509) return; // Don't add bulkheads
     float nudgeAmount = 0.32f;
     Entity* door = &World.instances[parent]; door->portalIndex = numActivePortals; bool isOpen = (door->doorState != DoorState_Closed); // Allows for any of DoorState_Open, DoorState_Opening, or DoorState_Closing to be considered open as far as portals are concerned so we can draw objects between the door panels.
-    float obj_x = door->position.x; float obj_z = door->position.z;
+    float obj_x = World.position[parent].x; float obj_z = World.position[parent].z;
     u16 cellCurrent = (PosGetCellCoordZ(obj_z) * WORLDX) + PosGetCellCoordX(obj_x);
     u16    cellIndexUp = PosGetCellCoordZ(obj_z + nudgeAmount),   cellIndexDn = PosGetCellCoordZ(obj_z - nudgeAmount), cellIndexRight = PosGetCellCoordX(obj_x + nudgeAmount), cellIndexLeft = PosGetCellCoordX(obj_x - nudgeAmount);
     u16 cellN_idx = PosGetCellCoords(obj_x,obj_z + nudgeAmount), cellS_idx = PosGetCellCoords(obj_x,obj_z - nudgeAmount), cellE_idx = PosGetCellCoords(obj_x + nudgeAmount,obj_z), cellW_idx = PosGetCellCoords(obj_x - nudgeAmount,obj_z);
@@ -273,16 +273,16 @@ ENGINE_TO_MOD void PortalCulling() { // Called just once at end of animation loo
             else               { gridCellStates[cellIdxA] |= CELL_CLOSEDWEST;  gridCellStates[cellIdxB] |= CELL_CLOSEDEAST; }
         }
     }
-    DetermineVisibleCells(PosGetCellCoordX(World.instances[PLAYER1].position.x),PosGetCellCoordZ(World.instances[PLAYER1].position.z)); // Recompute full PVS with new closed edges for all portal states.  So much for the precomputed set.
+    DetermineVisibleCells(PosGetCellCoordX(World.position[PLAYER1].x),PosGetCellCoordZ(World.position[PLAYER1].z)); // Recompute full PVS with new closed edges for all portal states.  So much for the precomputed set.
     for (u16 i=0;i<loadedLights;++i) { u16 lcell=(lights[i].pos.z * WORLDX) + lights[i].pos.x; if (!previousLightVisible[i] && (gridCellStates[lcell] & CELL_VISIBLE)) {flag_set(&lights[i].lflags,LDIRTY,true);} }
     glBindBuffer(GL_SSBO,cellVisibleDataID); glBufferData(GL_SSBO,ARRSIZE * sizeof(u32),gridCellStates,GL_DYNAMIC_DRAW);
 }
 
 void CullCore() {
-    playerCellIdx = PosGetCellCoords(World.instances[PLAYER1].position.x,World.instances[PLAYER1].position.z); if (World.curLev >= LEVEL_CYBERSPACE) return;
-    u16 cellX = PosGetCellCoordX(World.instances[PLAYER1].position.x), cellZ = PosGetCellCoordZ(World.instances[PLAYER1].position.z);
+    playerCellIdx = PosGetCellCoords(World.position[PLAYER1].x,World.position[PLAYER1].z); if (World.curLev >= LEVEL_CYBERSPACE) return;
+    u16 cellX = PosGetCellCoordX(World.position[PLAYER1].x), cellZ = PosGetCellCoordZ(World.position[PLAYER1].z);
     float pos_x = World.worldMin_x[World.curLev] + (cellX * CELL_SIZE), pos_z = World.worldMin_z[World.curLev] + (cellZ * CELL_SIZE);
-    for (int i=0;i<World.instCount;++i) { float dx = pos_x - World.instances[i].position.x, dz = pos_z - World.instances[i].position.z; float distSqrd = dx*dx + dz*dz; instanceIsLODArray[i] = (distSqrd >= 655.36f);/*25.6f * 25.6f*/ }
+    for (int i=0;i<World.instCount;++i) { float dx = pos_x - World.position[i].x, dz = pos_z - World.position[i].z; float distSqrd = dx*dx + dz*dz; instanceIsLODArray[i] = (distSqrd >= 655.36f);/*25.6f * 25.6f*/ }
     PortalCulling(); // Update based on portal states.
 }
 
@@ -299,7 +299,7 @@ void CullInit() {
         }
     }
     
-    playerCellIdx = PosGetCellCoords(World.instances[PLAYER1].position.x,World.instances[PLAYER1].position.z);
+    playerCellIdx = PosGetCellCoords(World.position[PLAYER1].x,World.position[PLAYER1].z);
     i32 cellToCellIdx = playerCellIdx * ARRSIZE;
     for (i32 z=0;z<WORLDZ;++z) { for (i32 x=0;x<WORLDX;++x) { i32 cellIdx = (z * WORLDX) + x; size_t flat_idx = (size_t)(cellToCellIdx + cellIdx); if (get_cull_bit(precomputedVisibleCellsFromHere,flat_idx)) {gridCellStates[cellIdx] |= CELL_VISIBLE;} } } /*Get visible before putting meshes into their cells so we can nudge them a little.*/
     gridCellStates[0] |= CELL_VISIBLE;/* Errors default to 0 so draw them anyways.*/ DualLog(" took %f secs\n",get_time() - start_time);

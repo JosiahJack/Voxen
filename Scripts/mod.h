@@ -120,7 +120,6 @@ INLINE void UICyberSprint(u16 textIndex) { CenterStatusPrint("%s",Eng_Text->stri
 INLINE void UIExitCyberspace() { CenterStatusPrint("%s",Eng_Text->stringTable[601]); }
 INLINE void HealthManagerHealingBed(u16 playerIdx, float amount, bool flashBed) { (void)flashBed; Entity* p = &World->instances[playerIdx]; p->health = vmin(255.0f,p->health + amount); }
 INLINE void PlayerTakeDamage(u16 playerIdx, float damage) { Entity* p = &World->instances[playerIdx]; p->health -= damage; if (p->health < 0.0f) p->health = 0.0f; }
-INLINE Entity* PE(u16 p) { return &World->instances[p]; }
 INLINE float SfxVol() { return (float)Settings->VolumeEffects / 100.0f; }
 INLINE InventorySystem* Inv(u16 p) { return p == PLAYER1 ? &World->invP1 : &World->invP2; }
 

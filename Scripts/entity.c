@@ -5,7 +5,7 @@ Entity EDefs[MAX_ENTITIES];
 void* mcpy(void *dst, const void *src, size_t n) { u8 *d=(u8 *)dst; const u8 *s=(const u8 *)src; while (n--) {*d++=*s++;} return dst; } // memcpy replacement
 MOD_TO_ENGINE void ModEDefsInitAfterLoad(void) { // Global conditions for all entities.  No sense inflating the table data in entity.c
     mset(EDefs,0,sizeof(Entity)); 
-    for (int i=0;i<768;++i) { EDefs[i].index = i; EDefs[i].modelIndex = MAX_MDLS; EDefs[i].rotation = QUAT_IDENTITY; EDefs[i].lodIndex = MAX_MDLS; }
+    for (int i=0;i<768;++i) { EDefs[i].index = i; EDefs[i].modelIndex = MAX_MDLS; EDefs[i].lodIndex = MAX_MDLS; }
     
     // Modular Wall, Ceiling, Floor Chunks
     for (int i=0;i<=306;++i) EDefs[i].cardchunk = true; // Mark these all to have box colliders added... except for slices below:
@@ -852,6 +852,9 @@ static const V2 levMins[14]={{-37.3600f,-52.7600f},/*0*/  {-53.8000f,-64.0800f},
 static const float lFars[14] = { 56.32f/*R*/, 56.32f/*1*/, 51.2f/*2*/, 51.2f/*3*/, 40.96f/*4*/, 58.88f/*5*/, 79.36f/*6*/, 56.32f/*7*/, 69.12f/*8*/, 53.76f/*9*/,  51.2f/*10*/,  51.2f/*11*/, 38.4f/*12*/, 71.68f/*13*/};
 extern u16 headmountedLanternLight;
 Entity entsFromFile[INSTANCE_COUNT];
+V3 positionFromFile[INSTANCE_COUNT];
+V3 scaleFromFile[INSTANCE_COUNT];
+Quaternion rotationFromFile[INSTANCE_COUNT];
 Light lightsFromFile[LIGHT_COUNT];
 LightAnimation lanimsFromFile[LIGHT_COUNT];
 char lineSpace[LINE_LEN_MAX];
@@ -873,9 +876,11 @@ MOD_TO_ENGINE void LoadLevelMod(u8 lev) {
         AddCamView((V3){-19.2301f,-42.6604f,-49.7453f},(Quaternion){0.2375f,0.0008f,-0.0002f,0.9713f},75u,256u,256u,2.21f,11.5f);
         AddCamView((V3){7.664583f,-44.88017f,-14.26742f},(Quaternion){0.0f,0.9999f,0.0129f,0.0f},60u,256u,256u,2.192f,20.6f);
     } // TODO other level camviews
-
     for (u16 idx = INSTS_1ST_IDX; idx < INSTANCE_COUNT; idx++) InitializeEntity(&World->instances[idx]);
     mset(entsFromFile,0,INSTANCE_COUNT * sizeof(Entity));
+    mset(positionFromFile,0,INSTANCE_COUNT * sizeof(V3));
+    mset(scaleFromFile,0,INSTANCE_COUNT * sizeof(V3));
+    mset(rotationFromFile,0,INSTANCE_COUNT * sizeof(Quaternion));
     mset(lightsFromFile,0,LIGHT_COUNT * sizeof(Light));
     mset(lanimsFromFile,0,LIGHT_COUNT * sizeof(LightAnimation));
     mset(lineSpace,0,LINE_LEN_MAX * sizeof(char));
@@ -918,16 +923,16 @@ MOD_TO_ENGINE void LoadLevelMod(u8 lev) {
             else {
                 Entity* inst = &entsFromFile[entCount];
                      if (sEqual(trimmed_key,"constIndex"))      inst->index = parse_numberu16(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"localPosition.x")) inst->position.x = parse_float(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"localPosition.y")) inst->position.y = parse_float(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"localPosition.z")) inst->position.z = parse_float(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"localRotation.x")) inst->rotation.x = parse_float(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"localRotation.y")) inst->rotation.y = parse_float(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"localRotation.z")) inst->rotation.z = parse_float(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"localRotation.w")) inst->rotation.w = parse_float(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"localScale.x"))    inst->scale.x = parse_float(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"localScale.y"))    inst->scale.y = parse_float(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"localScale.z"))    inst->scale.z = parse_float(trimmed_value,initialLine,lineNum);
+                else if (sEqual(trimmed_key,"localPosition.x")) positionFromFile[entCount].x = parse_float(trimmed_value,initialLine,lineNum);
+                else if (sEqual(trimmed_key,"localPosition.y")) positionFromFile[entCount].y = parse_float(trimmed_value,initialLine,lineNum);
+                else if (sEqual(trimmed_key,"localPosition.z")) positionFromFile[entCount].z = parse_float(trimmed_value,initialLine,lineNum);
+                else if (sEqual(trimmed_key,"localRotation.x")) rotationFromFile[entCount].x = parse_float(trimmed_value,initialLine,lineNum);
+                else if (sEqual(trimmed_key,"localRotation.y")) rotationFromFile[entCount].y = parse_float(trimmed_value,initialLine,lineNum);
+                else if (sEqual(trimmed_key,"localRotation.z")) rotationFromFile[entCount].z = parse_float(trimmed_value,initialLine,lineNum);
+                else if (sEqual(trimmed_key,"localRotation.w")) rotationFromFile[entCount].w = parse_float(trimmed_value,initialLine,lineNum);
+                else if (sEqual(trimmed_key,"localScale.x"))    scaleFromFile[entCount].x = parse_float(trimmed_value,initialLine,lineNum);
+                else if (sEqual(trimmed_key,"localScale.y"))    scaleFromFile[entCount].y = parse_float(trimmed_value,initialLine,lineNum);
+                else if (sEqual(trimmed_key,"localScale.z"))    scaleFromFile[entCount].z = parse_float(trimmed_value,initialLine,lineNum);
                 else if (sEqual(trimmed_key,"go.activeSelf"))   { activeStateRead = true; flag_set(&inst->entflags, EF_ACTIVE, parse_bool(trimmed_value,initialLine,lineNum)); }
                 else if (sEqual(trimmed_key,"amount"))          inst->amount = parse_float(trimmed_value,initialLine,lineNum);
                 else if (sEqual(trimmed_key,"resetTime"))       inst->resetTime = parse_float(trimmed_value,initialLine,lineNum);
@@ -1015,11 +1020,11 @@ MOD_TO_ENGINE void LoadLevelMod(u8 lev) {
     for (i32 e=0;e<totalEnts;++e) {
         Entity* src = &entsFromFile[e];
         u16 entIdx = src->index;
-        u16 parent = AddInstance(entIdx,src->position);
+        u16 parent = AddInstance(entIdx,positionFromFile[e]);
         Entity* par = &World->instances[parent];
-        par->lastPosition          = par->position;
-        par->rotation              = src->rotation;
-        par->scale                 = src->scale;
+        par->lastPosition          = positionFromFile[e];
+        World->rotation[parent]    = rotationFromFile[e];
+        World->scale[parent]       = scaleFromFile[e];
         par->entflags             |= src->entflags; // bitor `|` since AddInstance already set flags from entity definitions.
         par->ioflags               = src->ioflags;
         par->amount                = src->amount;
@@ -1063,7 +1068,7 @@ MOD_TO_ENGINE void LoadLevelMod(u8 lev) {
             LightAnimation lam={0};
             par->texAnimLight  = AddLight(&lit1,&lam);
             par->texAnimLight2 = AddLight(&lit2,&lam);
-        } else if (entIdx == 309 || entIdx == 365 || entIdx == 369) par->position.y += 0.12f; // item_beaker || item_flask || item_testtube: Move up to account for CG mod (origin moved vs Unity version)
+        } else if (entIdx == 309 || entIdx == 365 || entIdx == 369) World->position[parent].y += 0.12f; // item_beaker || item_flask || item_testtube: Move up to account for CG mod (origin moved vs Unity version)
         else if (entIdx == 279) { // chunk_screen
             V3 ofs1 = GetLocalTransformedPos(par,(V3){0.0f,-0.08f,0.0f});
             Light lit1 = (Light){.pos=ofs1,.col=(Color3){0.909803922f,0.929411765f,1.0f},.range=3.2f,.intensity=1.575f,.maxIntensity=1.575f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
@@ -1082,10 +1087,10 @@ MOD_TO_ENGINE void LoadLevelMod(u8 lev) {
         } else if (par->index == 746) { // weapon_grenadeenergmine_live
             par->textureAnimating = true; par->texAnimClip = 2; par->texFrame = 0;
         } else if (entIdx == 720) {
-            /*u16 mist = */AddInstance(648,par->position); // ambient_mist
+            /*u16 mist = */AddInstance(648,World->position[parent]); // ambient_mist
         } else if (entIdx == 733) {
-            /*u16 pipewater = */AddInstance(649,par->position); // ambient_pipewater_loop
-            /*u16 rain = */AddInstance(653,(V3){par->position.x,par->position.y - 1.26f,par->position.z}); // ambient_rain
+            /*u16 pipewater = */AddInstance(649,World->position[parent]); // ambient_pipewater_loop
+            /*u16 rain = */AddInstance(653,(V3){World->position[parent].x,World->position[parent].y - 1.26f,World->position[parent].z}); // ambient_rain
         }
         
         if (par->texAnimResourceFolder[0] != '\0' && par->tickTime <= 0.01f) par->tickTime = 0.35f;
@@ -1094,13 +1099,13 @@ MOD_TO_ENGINE void LoadLevelMod(u8 lev) {
     
     for (int i = 0; i < lightsIdx; ++i) { if (!(lightsFromFile[i].lflags & LSPOT)){lightsFromFile[i].spotAng=0.0f;} AddLight(&lightsFromFile[i],&lanimsFromFile[i]); } // Add all level lights
     if (curlevel == 1 || curlevel == 2 || curlevel == 5 || curlevel == 6 || curlevel == 7) { // Shield generators
-        u16 shd1 = AddInstance(754, (V3){-51.30664f,  -47.42f,  56.42651f}); World->instances[shd1].rotation = (Quaternion){0.0f,0.0f,0.0f,1.0f};
-        u16 shd2 = AddInstance(754, (V3){ 71.5f,      -47.42f, -66.6f    }); World->instances[shd2].rotation = (Quaternion){0.0f,0.0f,0.0f,1.0f};
-        u16 shd3 = AddInstance(754, (V3){-51.306650f, -47.42f, -66.66652f}); World->instances[shd3].rotation = (Quaternion){0.0f,0.0f,0.0f,1.0f};
-        u16 shd4 = AddInstance(754, (V3){ 71.78664f,  -47.42f,  56.42651f}); World->instances[shd4].rotation = (Quaternion){0.0f,0.0f,0.0f,1.0f};
+        u16 shd1 = AddInstance(754, (V3){-51.30664f,  -47.42f,  56.42651f}); World->rotation[shd1] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
+        u16 shd2 = AddInstance(754, (V3){ 71.5f,      -47.42f, -66.6f    }); World->rotation[shd2] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
+        u16 shd3 = AddInstance(754, (V3){-51.306650f, -47.42f, -66.66652f}); World->rotation[shd3] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
+        u16 shd4 = AddInstance(754, (V3){ 71.78664f,  -47.42f,  56.42651f}); World->rotation[shd4] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
     }
 
-    Light hl = (Light){.pos=World->instances[PLAYER1].position,.col=(Color3){1.0f,1.0f,1.0f},.range=11.52f,.lflags=LIGHTON,.intensity=0.0f,.minIntensity=0.0f,.maxIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY};
+    Light hl = (Light){.pos=World->position[PLAYER1],.col=(Color3){1.0f,1.0f,1.0f},.range=11.52f,.lflags=LIGHTON,.intensity=0.0f,.minIntensity=0.0f,.maxIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY};
     LightAnimation lam = {0};
     headmountedLanternLight = AddLight(&hl,&lam); lightsIdx++;
 }

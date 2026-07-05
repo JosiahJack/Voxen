@@ -15,9 +15,9 @@ MOD_TO_ENGINE void MixAmbs(void) {
     for (u16 i=0;i<ambs;++i) {
         Entity* ent = &World->instances[ambReg[i]];
         const AmbientDef* def = NULL; for (size_t j=0;j<MAXAMB;++j) { if (ambientSounds[j].index==ent->index) {def = &ambientSounds[j]; break; } }
-        float d = V3_Dist(World->instances[PLAYER1].position,ent->position);
+        float d = V3_Dist(World->position[PLAYER1],World->position[ambReg[i]]);
         AmbientSlot* slot = &ambientSlots[(size_t)(def - ambientSounds)];
-        if (d < 7.68f && PositionVisibleFromPlayerCell(ent->position.x,ent->position.z)) {
+        if (d < 7.68f && PositionVisibleFromPlayerCell(World->position[ambReg[i]].x,World->position[ambReg[i]].z)) {
             if (!slot->loaded) {
                 SndUninit(&slot->sound);
                 char path[512]; sFormat(path,sizeof(path),"./Audio/ambient/%s",def->filename);

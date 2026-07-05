@@ -376,10 +376,8 @@ typedef struct { float damage,penetration,offense,armorvalue,defense,impactVeloc
 typedef /*FAT*/ struct  {
     u32 entflags,layer,ioflags;
     u16 modelIndex,index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
-    V3 position;
-    V3 scale,forward,right,velocity,angularVelocity,lastPosition,lastAngularVelocity,topPoint,targetPosition,startPosition,activatedScale,direction;
+    V3 forward,right,lastPosition/*used for NPC logic, not physics*/,topPoint,targetPosition,startPosition,activatedScale,direction;
     float radius,shadRadius,gravity,inertiaTensor[6],invInertiaTensor[6];
-    Quaternion rotation;    
     u16 texIndex,glowIndex,specIndex,normIndex,lodIndex,colMeshIndex;
     i32 cellIndex; i16 cellX,cellZ;
     u8 portalIndex,clip,numclips,texAnimClip,camView; // If this is a door, index into portal array for toggling state.
@@ -427,6 +425,8 @@ typedef struct {
 	bool inventoryMode,levelCurrentlyLoading,introNotPlayed,paused,menuActive,gameFinished,creditsActive,decoyActive,boosterActive,uiIsBlocking,mouseClickHeldOverGUI,geniusActive,(*GetKey)(i32 settingIndex),(*GetKeyPressed)(i32 settingIndex);
     InventorySystem invP1,invP2;
     Entity instances[INSTANCE_COUNT];
+    V3 position[INSTANCE_COUNT],scale[INSTANCE_COUNT],velocity[INSTANCE_COUNT],angularVelocity[INSTANCE_COUNT];
+    Quaternion rotation[INSTANCE_COUNT];
     Color fogColor[14];
 	char global_dllname[256],global_winicon[256],playerName[27],audiologNames[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH],audiologSubjects[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH],audiologSenders[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH],audioLogSpeech2Text[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH];
 } GlobalContext; // Savable complete game state data

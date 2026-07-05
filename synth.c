@@ -8,13 +8,8 @@ void SynStop(SynthVoice* v) { v->active=false; } // for frames==0 (indefinite) v
 static float SynRandBi(void) { return (float)rand()/(float)RAND_MAX*2.0f-1.0f; }
 static void synth_mix(SynthVoice* v, float* mix) {
     float vol = v->vol*(Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeEffects/100.0f);
-    if (v->positional) { float dist=V3_Dist(v->pos,World.instances[PLAYER1].position); vol *= (dist>=64.0f)?0.0f:((dist<=1.0f)?1.0f:1.0f-(dist-1.0f)/63.0f); }
-    for (i32 f=0;f<AUDIO_FRAMES;f++) {
-        if (v->frames && v->frame>=v->frames) { v->active=false; return; }
-        float s = v->fn(v)*vol;
-        mix[f*2+0]+=s; mix[f*2+1]+=s;
-        v->frame++;
-    }
+    if (v->positional) { float dist=V3_Dist(v->pos,World.position[PLAYER1]); vol *= (dist>=64.0f)?0.0f:((dist<=1.0f)?1.0f:1.0f-(dist-1.0f)/63.0f); }
+    for (i32 f=0;f<AUDIO_FRAMES;f++) { if (v->frames && v->frame>=v->frames) { v->active=false; return; } float s = v->fn(v)*vol; mix[f*2+0]+=s; mix[f*2+1]+=s; v->frame++; }
 }
 
 static float LP(float *s, float in, float rc) { *s += rc*(in-*s); return *s; }
@@ -46,20 +41,9 @@ static float GenBoom(SynthVoice* v) { float env=vexp(-v->p[1]*(float)v->frame/AU
 void play_synth_explosion(float volume,float rumble_freq,float decay) { SynthVoice* v=SynTrigger(GenBoom,1.0f,volume); if(v){v->p[0]=rumble_freq;v->p[1]=decay;} }
 static float GenShield(SynthVoice* v) { float wobble=vsinf(6.28318f*6.0f*(float)v->frame/AUDIO_RATE)*30.0f; return Osc(&v->s[0],v->p[0]+wobble)*LP(&v->s[1],v->p[1],0.002f); }
 SynthVoice* play_synth_shield(float volume,float freq) { SynthVoice* v=SynTrigger(GenShield,0.0f,volume); if(v){v->p[0]=freq;v->p[1]=1.0f;} return v; }
-void synth_shield_set(SynthVoice* v,float target) { v->p[1]=target; } // 1=power up, 0=deplete; LP smooths the ramp
-
-// simple one pole Low Pass Filter (Very efficient for C)
-// This makes things sound like they are behind a door or inside a pipe.
-float apply_lpf(float input, float* prev_out, float cutoff) {
-    // Simple alpha calculation based on sample rate
-    float alpha = cutoff / (cutoff + 1000.0f); 
-    *prev_out = *prev_out + alpha * (input - *prev_out);
-    return *prev_out;
-}
-
-// FM Synthesis: A "Gritty" Sine wave
-// Instead of a pure sine, this creates the metallic 'zing' of lasers/electronics.
-float GenFM(SynthVoice* v) { float t = (float)v->frame / AUDIO_RATE; float mod = vsinf(2.0f * PI * 1.0f * t) * v->p[1]; return vsinf(2.0f * PI * v->p[0] * t + mod); }
+void synth_shield_set(SynthVoice* v,float target) { v->p[1]=target; } // 1=power up, 0=deplete; LP smooths the ramp 
+float apply_lpf(float input, float* prev_out, float cutoff) { float alpha=cutoff / (cutoff + 1000.0f); *prev_out=*prev_out + alpha * (input - *prev_out); return *prev_out; } // simple one pole Low Pass Filter (Very efficient for C).  This makes things sound like they are behind a door or inside a pipe.
+float GenFM(SynthVoice* v) { float t = (float)v->frame / AUDIO_RATE; float mod = vsinf(2.0f * PI * 1.0f * t) * v->p[1]; return vsinf(2.0f * PI * v->p[0] * t + mod); } // FM Synthesis: A "Gritty" Sine wave.  Instead of a pure sine, this creates the metallic 'zing' of lasers/electronics.
 float GetNoise(SynthVoice* v) { float raw = ((float)rand() / (float)RAND_MAX) * 2.0f - 1.0f; v->s[3] = raw; return raw; }
 float get_env(SynthVoice* v, float attack_time) { float t = (float)v->frame / AUDIO_RATE; if (t < attack_time) return t / attack_time; return 1.0f; }
 static float GenVent(SynthVoice* v) { float raw = GetNoise(v); float filtered = apply_lpf(raw, &v->s[2], v->p[2]); return filtered; }

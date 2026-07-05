@@ -308,7 +308,7 @@ void UpdateLights() {
         }
     }
     glBindBuffer(GL_SSBO,lightsID); glBufferData(GL_SSBO,loadedLights * sizeof(Light),lights,GL_DYNAMIC_DRAW);
-    glUseProgram(voxelUpdateSP); glUniform3f(5,World.instances[PLAYER1].position.x,World.instances[PLAYER1].position.y,World.instances[PLAYER1].position.z);
+    glUseProgram(voxelUpdateSP); glUniform3f(5,World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z);
     glDispatchCompute((VOXELS_X+15)/16,(VOXELS_Z+15)/16,1);
 }
 
@@ -627,10 +627,10 @@ static double RenderUI() {
                                                                    RenderUIImage(400,752,64,32,MFD_CenterTab == 0 ? 1024 : 1021); RenderUIImage(480,752,64,32,MFD_CenterTab == 1 ? 1024 : 1021); RenderUIImage(560,752,64,32,MFD_CenterTab == 2 ? 1024 : 1021); RenderUIImage(902,752,64,32,MFD_CenterTab == 3 ? 1024 : 1021);
     }
     i16 debugTextStartY = 48; // Diagnostics / Debugging
-    if (Cheats.showLocation && !World.menuActive) RenderFormattedText(16, debugTextStartY, T_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f",World.instances[PLAYER1].position.x,World.instances[PLAYER1].position.y,World.instances[PLAYER1].position.z,World.instances[PLAYER1].rotation.x,World.instances[PLAYER1].rotation.y,World.instances[PLAYER1].rotation.z,World.instances[PLAYER1].rotation.w);
+    if (Cheats.showLocation && !World.menuActive) RenderFormattedText(16, debugTextStartY, T_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f",World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z,World.rotation[PLAYER1].x,World.rotation[PLAYER1].y,World.rotation[PLAYER1].z,World.rotation[PLAYER1].w);
     i16 lineSpacing = 18;
     if (!World.menuActive && !Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 1),T_WHITE,FONT_NORMAL,1.0f,"playerCellIdx: %u, Shadow cpu ms: %.3f",playerCellIdx,shadowTime * 1000);
-    if (!World.menuActive && !Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 2),T_WHITE,FONT_NORMAL,1.0f,"Player velocity: %.2f, %.2f, %.2f, Grounded: %u",World.instances[PLAYER1].velocity.x,World.instances[PLAYER1].velocity.y,World.instances[PLAYER1].velocity.z,World.instances[PLAYER1].entflags & EF_GROUNDED);
+    if (!World.menuActive && !Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 2),T_WHITE,FONT_NORMAL,1.0f,"Player velocity: %.2f, %.2f, %.2f, Grounded: %u",World.velocity[PLAYER1].x,World.velocity[PLAYER1].y,World.velocity[PLAYER1].z,World.instances[PLAYER1].entflags & EF_GROUNDED);
     RenderFormattedText(16,debugTextStartY + (lineSpacing * 4),T_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d  dx:%d dy:%d",World.cursorPosition_x,World.cursorPosition_y,currentMouse_dx,currentMouse_dy);
     if (Cheats.consoleActive) RenderFormattedText(16,0,T_WHITE,FONT_NORMAL,1.0f, "] %s",consoleEntryText);
     if (World.statusTextDecayFinished > World.current_time) RenderFormattedText(460,114,T_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
@@ -667,7 +667,7 @@ static __attribute__((hot)) void RenderShadowmaps() {
     double shadowStartTime = get_time();
     mset(candidates,0,MAX_SHADOWMAPS*sizeof(u16));
     u16 numShadowsCouldRender = 0;
-    V3 playerPos = World.instances[PLAYER1].position, pf = World.instances[PLAYER1].forward;
+    V3 playerPos = World.position[PLAYER1], pf = World.instances[PLAYER1].forward;
     for (u16 i = 0; i < loadedLights; ++i) { // Collect candidates: only lights that are enabled and in PVS
         if (unlikely(!(lights[i].lflags & SHADON) || !(lights[i].lflags & LIGHTON))) continue;
         V3 lightPos = lights[i].pos;
@@ -702,7 +702,7 @@ static __attribute__((hot)) void RenderShadowmaps() {
             for (u16 shadowCasterInstanceIdx = 0; shadowCasterInstanceIdx < numShadowCasters; shadowCasterInstanceIdx++) {
                 u16 j = shadowCasterIndices[shadowCasterInstanceIdx];
                 Entity* e = &World.instances[j];
-                V3 d = V3_AsubB(e->position,lpos);
+                V3 d = V3_AsubB(World.position[j],lpos);
                 float distToLightSqrd = V3_dot(d,d);
                 float radSum = (effectiveRadius + e->radius);
                 if (distToLightSqrd >= radSum * radSum) continue;
@@ -721,7 +721,7 @@ static __attribute__((hot)) void RenderShadowmaps() {
                 for (u16 j = 0; j < nearbyMeshCount; ++j) {
                     int i = shadows_nearMeshes[j].index;
                     Entity* e = &World.instances[i];
-                    if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face],e->position,e->shadRadius)) continue;
+                    if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face],World.position[i],e->shadRadius)) continue;
                     glUniform1ui(0,i);
                     u16 modelType = (instanceIsLODArray[i] || useDetail < 1u) && e->lodIndex < mdlsCnt ? e->lodIndex : e->modelIndex;
                     if (currentModelType != modelType || currentModelType == 0) { currentModelType = modelType; glBindVertexBuffer(0,vbos[modelType],0,VRT_ATT_SZ); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[modelType]); }
@@ -742,9 +742,9 @@ DepthSort visibleInstances[INSTANCE_COUNT];
 INLINE bool DetermineIfInstanceVisible(u16 i, bool otherCondition, bool skyVisible, V3 playerPos, float* distSqrd) {
     if (EntNotVisible(i,otherCondition)) return false; // must be transparent && transparents or neither
     Entity* e = &World.instances[i]; u16 instCellIdx = e->cellIndex; u16 entIdx = e->index;
-    V3 delta = V3_AsubB(e->position,playerPos); *distSqrd = V3_dot(delta,delta);
-    float radius = modelBounds[e->modelIndex] * 2.0f * vmax(vmax(e->scale.x,e->scale.y),e->scale.z);
-    if (!SphereInFrustum(playerFrustumPlanes,e->position,radius) && (entIdx != 754 || !skyVisible) && i != editModeSelection) return false;
+    V3 delta = V3_AsubB(World.position[i],playerPos); *distSqrd = V3_dot(delta,delta);
+    float radius = modelBounds[e->modelIndex] * 2.0f * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z);
+    if (!SphereInFrustum(playerFrustumPlanes,World.position[i],radius) && (entIdx != 754 || !skyVisible) && i != editModeSelection) return false;
     if (IdxIsPortalBlockingDoor(entIdx)) { // Extra checks only needed for opaque portal blocking doors.
         bool inPVS = (gridCellStates[instCellIdx] & CELL_VISIBLE);
         if (!inPVS) {inPVS = NeighborhoodInPVS(e->cellX,e->cellZ,2u);} if (!inPVS) return false;
@@ -806,7 +806,7 @@ void GetProjections(float* view, float* viewProj, float* invViewRot, float* invV
     m[0] = f / aspect3D; m[1] = 0.0f; m[2] = 0.0f; m[3] = 0.0f; m[4] = 0.0f; m[5] = f; m[6] = 0.0f; m[7] = 0.0f;
     m[8] = 0.0f; m[9] = 0.0f; m[10]= -(sfar + snear) / (sfar - snear); m[11]= -1.0f;
     m[12]= 0.0f; m[13]= 0.0f; m[14]= -2.0f * sfar * snear / (sfar - snear); m[15]= 0.0f;
-    mat4_lookat_from(view,&World.instances[PLAYER1].rotation,World.instances[PLAYER1].position);
+    mat4_lookat_from(view,&World.rotation[PLAYER1],World.position[PLAYER1]);
     mul_mat4(viewProj,rasterPerspectiveProjection,view);
     invViewRot[0]=view[0]; invViewRot[1]=view[4]; invViewRot[2]=view[8]; invViewRot[3]=view[1]; invViewRot[4]=view[5]; invViewRot[5]=view[9]; invViewRot[6]=view[2]; invViewRot[7]=view[6]; invViewRot[8]=view[10];
     mat4_inverse(viewProj,invViewProj);
@@ -816,7 +816,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     u16 swidth = camView ? camViews[camViewIdx].width : Sys_Settings.ScreenWidth, sheight = camView ? camViews[camViewIdx].height : Sys_Settings.ScreenHeight;
     float sfov = camView ? (float)camViews[camViewIdx].fov : (float)Sys_Settings.FOV;
     float snear = camView ? camViews[camViewIdx].near : NEAR_PLANE; float sfar = camView ? camViews[camViewIdx].far : World.farPlane[World.curLev];
-    V3 playerPos = World.instances[PLAYER1].position;
+    V3 playerPos = World.position[PLAYER1];
     float px=playerPos.x, py=playerPos.y, pz=playerPos.z, aspect3D=(float)swidth / (float)sheight;
     float view[16],viewProj[16],invViewRot[9],invViewProj[16];
     GetProjections(view,viewProj,invViewRot,invViewProj,sfov,aspect3D,snear,sfar);
@@ -849,7 +849,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         u16 i = visibleInstances[visibleIndex].index;
         Entity* e = &World.instances[i]; u16 tex = e->texIndex;
         if (transparentTexture[tex]) { glEnable(GL_CULL_FACE); glEnable(GL_BLEND); } // Transparents (with sort)
-        else if (doubleSidedTexture[tex] || e->scale.x < 0.0f || e->scale.y < 0.0f || e->scale.z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided
+        else if (doubleSidedTexture[tex] || World.scale[i].x < 0.0f || World.scale[i].y < 0.0f || World.scale[i].z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided
         else { glEnable(GL_CULL_FACE); glDisable(GL_BLEND); } // Opaque
         currentModelType = GetAndBindModel(i,currentModelType);
         glUniform1ui(3,(u32)tex);
@@ -869,7 +869,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         u16 i = visibleInstances[visibleIndex].index;
         Entity* e = &World.instances[i]; u16 tex = e->texIndex; u32 constIndex = e->index;
         if (transparentTexture[tex]) continue;
-        else if (doubleSidedTexture[tex] || e->scale.x < 0.0f || e->scale.y < 0.0f || e->scale.z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided (either)
+        else if (doubleSidedTexture[tex] || World.scale[i].x < 0.0f || World.scale[i].y < 0.0f || World.scale[i].z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided (either)
         else { glEnable(GL_CULL_FACE); glDisable(GL_BLEND); } // Opaque
         DRAW_ENTITY(currentNormIndex,currentTexIndex,currentGlowIndex,currentSpecIndex,currentModelType)
     }
@@ -878,7 +878,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         u16 i = visibleInstances[visibleIndex].index;
         Entity* e = &World.instances[i]; u16 tex = e->texIndex; u32 constIndex = e->index;
         if (transparentTexture[tex]) { glEnable(GL_CULL_FACE); glEnable(GL_BLEND); } // Transparents (with sort)
-        else if (doubleSidedTexture[tex] || e->scale.x < 0.0f || e->scale.y < 0.0f || e->scale.z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided (either)
+        else if (doubleSidedTexture[tex] || World.scale[i].x < 0.0f || World.scale[i].y < 0.0f || World.scale[i].z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided (either)
         else continue; // Opaque
         if ((constIndex >= 561 && constIndex <= 565) || (constIndex >= 568 && constIndex <= 573)) glDepthFunc(0x0202/*GL_EQUAL*/); // Cutouts
         else glDepthFunc(0x0203/*GL_LEQUAL*/); // Actual alphas
@@ -929,22 +929,25 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
 
 void RenderCameraViews() { // Render in-world camera views.  Pops player position to elsewhere, renders to tiny fbo, pops player back.
     if (unlikely(World.paused || World.menuActive || camViewCount == 0 || World.curLev >= LEVEL_CYBERSPACE)) return;
-    V3 tempPlayerPos = World.instances[PLAYER1].position; Quaternion tempPlayerRot = World.instances[PLAYER1].rotation;
+    V3 tempPlayerPos = World.position[PLAYER1]; Quaternion tempPlayerRot = World.rotation[PLAYER1];
     for (int cm=0;cm<camViewCount;++cm) {
-        if (camViews[cm].finished < World.pauseRelativeTime && camViews[cm].visible) { camViews[cm].finished = World.pauseRelativeTime + 0.5f; World.instances[PLAYER1].position = camViews[cm].position; World.instances[PLAYER1].rotation = camViews[cm].rotation; CullCore(); Render(true/*camview*/,cm); }
+        if (camViews[cm].finished < World.pauseRelativeTime && camViews[cm].visible) { camViews[cm].finished = World.pauseRelativeTime + 0.5f; World.position[PLAYER1] = camViews[cm].position; World.rotation[PLAYER1] = camViews[cm].rotation; CullCore(); Render(true/*camview*/,cm); }
     }
 
-    World.instances[PLAYER1].position = tempPlayerPos; World.instances[PLAYER1].rotation = tempPlayerRot; // Restore player for normal render.
+    World.position[PLAYER1] = tempPlayerPos; World.rotation[PLAYER1] = tempPlayerRot; // Restore player for normal render.
 }
 
 void UpdateInstanceMatrix4x4s() {
     if (unlikely(World.paused || World.menuActive)) return;
     i32 dirtyMin = -1, dirtyMax = -1;
     for (u32 i = INSTS_1ST_IDX; i < World.instCount; i++) {        
-        Entity *e = &World.instances[i];
-        float x=e->rotation.x, y=e->rotation.y, z=e->rotation.z, w=e->rotation.w; float x2=x*x, y2=y*y, z2=z*z, xy=x*y, xz=x*z, yz=y*z, wx=w*x, wy=w*y, wz=w*z; float sclx=e->scale.x, scly=e->scale.y, sclz=e->scale.z; u32 m = i*16;
-        modelMatrices[m+0]=(1.0f-2.0f*(y2+z2))*sclx; modelMatrices[m+1]=(2.0f*(xy+wz))*sclx; modelMatrices[m+2]=(2.0f*(xz-wy))*sclx; modelMatrices[m+4]=(2.0f*(xy-wz))*scly; modelMatrices[m+5]=(1.0f-2.0f*(x2+z2))*scly; modelMatrices[m+6]=(2.0f*(yz+wx))*scly;
-        modelMatrices[m+8]=(2.0f*(xz+wy))*sclz; modelMatrices[m+9]=(2.0f*(yz-wx))*sclz; modelMatrices[m+10]=(1.0f-2.0f*(x2+y2))*sclz; modelMatrices[m+12]=e->position.x; modelMatrices[m+13]=e->position.y; modelMatrices[m+14]=e->position.z; modelMatrices[m+15]=1.0f;
+        float x=World.rotation[i].x, y=World.rotation[i].y, z=World.rotation[i].z, w=World.rotation[i].w;
+        float x2=x*x, y2=y*y, z2=z*z, xy=x*y, xz=x*z, yz=y*z, wx=w*x, wy=w*y, wz=w*z;
+        float sclx=World.scale[i].x, scly=World.scale[i].y, sclz=World.scale[i].z; u32 m = i*16;
+        modelMatrices[m+0]=(1.0f-2.0f*(y2+z2))*sclx; modelMatrices[m+1]=(2.0f*(xy+wz))*sclx;      modelMatrices[m+2]=(2.0f*(xz-wy))*sclx; // 3,7,11 == 0.0f, no need to set all the time.
+        modelMatrices[m+4]=(2.0f*(xy-wz))*scly;      modelMatrices[m+5]=(1.0f-2.0f*(x2+z2))*scly; modelMatrices[m+6]=(2.0f*(yz+wx))*scly;
+        modelMatrices[m+8]=(2.0f*(xz+wy))*sclz;      modelMatrices[m+9]=(2.0f*(yz-wx))*sclz;      modelMatrices[m+10]=(1.0f-2.0f*(x2+y2))*sclz;
+        modelMatrices[m+12]=World.position[i].x;     modelMatrices[m+13]=World.position[i].y;     modelMatrices[m+14]=World.position[i].z;      modelMatrices[m+15]=1.0f;
         if (dirtyMin < 0) {dirtyMin = (i32)i;} dirtyMax = (i32)i;
     }
     if (dirtyMin < 0) return;
@@ -953,7 +956,7 @@ void UpdateInstanceMatrix4x4s() {
     glBufferSubData(GL_SSBO,offsetFloats * sizeof(float),countFloats * sizeof(float),modelMatrices + offsetFloats);
 }
 // Init && Main
-ENGINE_TO_MOD void InitializeEntity(Entity* e) { mset(e,0,sizeof(Entity)); e->index=U16_MAX; e->entflags=EF_ACTIVE; e->kinematic=true; e->layer=L_Default; e->camView=255; e->tickTime = 0.35f; e->angularDrag = 0.05f; e->modelIndex=e->lodIndex=e->colMeshIndex=MAX_MDLS; e->texIndex=e->glowIndex=e->specIndex=e->normIndex = MAX_TXRS; e->scale.x=e->scale.y=e->scale.z=e->mass=e->volume=e->rotation.w=1.0f; e->dynamicFriction = e->staticFriction = 0.6f; }
+ENGINE_TO_MOD void InitializeEntity(Entity* e) { mset(e,0,sizeof(Entity)); u16 idx=(u16)(e - World.instances); e->index=U16_MAX; e->entflags=EF_ACTIVE; e->kinematic=true; e->layer=L_Default; e->camView=255; e->tickTime = 0.35f; e->angularDrag = 0.05f; e->modelIndex=e->lodIndex=e->colMeshIndex=MAX_MDLS; e->texIndex=e->glowIndex=e->specIndex=e->normIndex = MAX_TXRS; World.scale[idx].x=World.scale[idx].y=World.scale[idx].z=e->mass=e->volume=World.rotation[idx].w=1.0f; e->dynamicFriction = e->staticFriction = 0.6f; }
 ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
     double start_time = get_time();
     DebugRAM("start of LoadLevel");
@@ -973,7 +976,7 @@ ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
     DualLog("Loaded %d entities, %u static lights for Level %d... took %f secs\n",World.instCount,loadedLights,curlevel,get_time() - start_time);
     RenderLoading(110,"Initialize entities...");
     for (int i=PLAYER1;i<World.instCount;++i) {
-        Entity* e = &World.instances[i]; i32 cellIdx = PosGetCellCoords(e->position.x,e->position.z); e->cellIndex = cellIdx; e->cellX=PosGetCellCoordX(e->position.x); e->cellZ=PosGetCellCoordZ(e->position.z); e->radius = modelBounds[e->modelIndex]*vmax(vmax(e->scale.x,e->scale.y),e->scale.z); e->shadRadius = e->radius * 1.41;
+        Entity* e = &World.instances[i]; i32 cellIdx = PosGetCellCoords(World.position[i].x,World.position[i].z); e->cellIndex = cellIdx; e->cellX=PosGetCellCoordX(World.position[i].x); e->cellZ=PosGetCellCoordZ(World.position[i].z); e->radius = modelBounds[e->modelIndex]*vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z); e->shadRadius = e->radius * 1.41;
         ComputeConvexMeshInertiaTensor(e);
         if (e->mass < 0.001f && e->collider != COLTYPE_NONE && e->collider != COLTYPE_MSH && (e->entflags & EF_RIGIDBODY)) {e->mass = 0.2f; /*At least something!*/}
     }

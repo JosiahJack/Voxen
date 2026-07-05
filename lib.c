@@ -127,8 +127,7 @@ ENGINE_TO_MOD void Screenshot() {
     OS_MakeFolder("Screenshots"); u16 w = Sys_Settings.ScreenWidth, h = Sys_Settings.ScreenHeight;
     u8* pixels = OS_Alloc(w * h * 4 * sizeof(char));
     glReadPixels(0,0,w,h,GL_RGBA,GL_UNSIGNED_BYTE,pixels);
-    V3 p = World.instances[PLAYER1].position;
-    char filename[96]; sFormat(filename,sizeof(filename),"Screenshots/%.2f_x%.1f_y%.1f_z%.1f.bmp",get_time(),p.x,p.y,p.z);
+    char filename[96]; sFormat(filename,sizeof(filename),"Screenshots/%.2f_x%.1f_y%.1f_z%.1f.bmp",get_time(),World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z);
     BmpWrite(filename,w,h,pixels); DualLog("Saved screenshot %s\n",filename);
     OS_Free(pixels,w * h * 4 * sizeof(char));
 }
@@ -159,7 +158,7 @@ ENGINE_TO_MOD float smooth_damp(float current, float target, float *current_velo
 
 FHandle levelFileHandle;
 ENGINE_TO_MOD char* sLevelFileUpToEndLine(char* buf, int size) { return sUpToEndLine(buf,size,levelFileHandle); }
-ENGINE_TO_MOD V3 GetLocalTransformedPos(Entity* originator, V3 offsetFromOriginator) { V3 scaledOfs = mul_v3_v3_elementwise(offsetFromOriginator,originator->scale); V3 rotatedOfs = quat_rot_v3(originator->rotation,scaledOfs); V3 result = V3_AplusB(originator->position,rotatedOfs); return result; }
+ENGINE_TO_MOD V3 GetLocalTransformedPos(Entity* originator, V3 offsetFromOriginator) { u16 idx=(u16)(originator - World.instances); V3 scaledOfs = mul_v3_v3_elementwise(offsetFromOriginator,World.scale[idx]); V3 rotatedOfs = quat_rot_v3(World.rotation[idx],scaledOfs); V3 result = V3_AplusB(World.position[idx],rotatedOfs); return result; }
 static inline int pntz(size_t p[2]) { return (p[0] != 1) ? __builtin_ctzll(p[0] - 1) : (p[1] ? 8 * sizeof(size_t) + __builtin_ctzll(p[1]) : 0); }
 static inline void shl(size_t p[2], int n) { if (n >= 8 * (int)sizeof(size_t)) { p[1] = p[0]; p[0] = 0; n -= 8 * sizeof(size_t); } if (n) { p[1] = (p[1] << n) | (p[0] >> (8 * sizeof(size_t) - n)); p[0] <<= n; } }
 static inline void shr(size_t p[2], int n) { if (n >= 8 * (int)sizeof(size_t)) { p[0] = p[1]; p[1] = 0; n -= 8 * sizeof(size_t); } if (n) { p[0] = (p[0] >> n) | (p[1] << (8 * sizeof(size_t) - n)); p[1] >>= n; } }
@@ -183,5 +182,3 @@ void qsort_new(void* base, size_t nel, size_t w, cmpfun cmp) {
     trinkle(hd,w,cmp_r,arg,p,ps,0,lp);
     while (ps!=1||p[0]!=1||p[1]!=0) { if(ps<=1) {trail=pntz(p); shr(p,trail); ps+=trail;}else{shl(p,2); ps-=2; p[0]^=7; shr(p,1); trinkle(hd-lp[ps]-w,w,cmp_r,arg,p,ps+1,1,lp); shl(p,1); p[0]|=1; trinkle(hd-w,w,cmp_r,arg,p,ps,1,lp);} hd-=w; }
 }
-
-float half_to_float(half h) { u32 s=(h&0x8000)<<16,e=(h&0x7C00)>>10,m=(h&0x03FF),out; if (e == 0){ if(m == 0){out = s;}else{ e = 1; while((m & 0x0400) == 0){m <<= 1; e--;} m &= 0x03FF; e+=(127 - 15); out = s | (e << 23) | (m << 13); } }else if(e == 31){out = s | 0x7F800000 | (m << 13);}else{e = e + (127 - 15); out = s | (e << 23) | (m << 13);} float f; mcpy(&f,&out,4); return f; }

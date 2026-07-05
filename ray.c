@@ -1,5 +1,4 @@
 // ray.c - Raycast System.  This is an exact polygonal casting system for high accuracty separate from the physics engine entirely except for layers.
-float half_to_float(half h);
 RaycastHit RayTriangle(V3 origin, V3 dir, V3 posA, V3 posB, V3 posC, V3 normA, V3 normB, V3 normC) {
     V3 edgeAB = V3_AsubB(posB,posA), edgeAC = V3_AsubB(posC,posA); V3 normalVector = V3_Cross(edgeAB,edgeAC);
     V3 ao = V3_AsubB(origin,posA); V3 dao = V3_Cross(ao,dir);
@@ -13,7 +12,7 @@ ENGINE_TO_MOD RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask
     for (u16 i = INSTS_1ST_IDX; i < INSTANCE_COUNT; ++i) {
         if (!(layerMask & World.instances[i].layer)) continue;
         u16 mindex = World.instances[i].modelIndex; if (mindex >= mdlsCnt) continue;
-        V3 objPos = World.instances[i].position; u16 instCellIdx = PosGetCellCoords(objPos.x,objPos.z); V3 delta = V3_AsubB(objPos,origin); float distSqrd = V3_dot(delta,delta), radBounds = vmax(modelBounds[mindex],1.81f);
+        V3 objPos = World.position[i]; u16 instCellIdx = PosGetCellCoords(objPos.x,objPos.z); V3 delta = V3_AsubB(objPos,origin); float distSqrd = V3_dot(delta,delta), radBounds = vmax(modelBounds[mindex],1.81f);
         float maxDistToObj = vmax(maxDist - radBounds,maxDist); if (distSqrd >= (maxDistToObj * maxDistToObj)) continue;
         if (!IdxIsPortalBlockingDoor(World.instances[i].index)) { if(((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (World.instances[i].index != 754 || !SkyIsVisible())){continue;} }
         u32 triCount = modelTriangleCounts[mindex]; if (triCount < 1) continue;
@@ -28,13 +27,13 @@ ENGINE_TO_MOD RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask
         V3 localDir =    {(dir.x*m00 + dir.y*m10 + dir.z*m20) / sclx2, (dir.x*m01 + dir.y*m11 + dir.z*m21) / scly2, (dir.x*m02 + dir.y*m12 + dir.z*m22) / sclz2};
         localDir = V3_Normalize(localDir);
         for (u32 j=0;j<triCount;++j) {
-            u32 bA = (u32)modelTriangles[mindex][j*3 + 0] * VRT_ATT_SZ, bB = (u32)modelTriangles[mindex][j*3 + 1] * VRT_ATT_SZ, bC = (u32)modelTriangles[mindex][j*3 + 2] * VRT_ATT_SZ;
-            V3 posA = {half_to_float( *(half*)(modelVertices[mindex] + bA + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 4) )};
-            V3 posB = {half_to_float( *(half*)(modelVertices[mindex] + bB + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 4) )};
-            V3 posC = {half_to_float( *(half*)(modelVertices[mindex] + bC + 0) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 2) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 4) )};
-            V3 normA ={half_to_float( *(half*)(modelVertices[mindex] + bA + 6) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 8) ), half_to_float( *(half*)(modelVertices[mindex] + bA + 10) )};
-            V3 normB ={half_to_float( *(half*)(modelVertices[mindex] + bB + 6) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 8) ), half_to_float( *(half*)(modelVertices[mindex] + bB + 10) )};
-            V3 normC ={half_to_float( *(half*)(modelVertices[mindex] + bC + 6) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 8) ), half_to_float( *(half*)(modelVertices[mindex] + bC + 10) )};
+            u32 bA = (u32)modelTriangles[mindex][j*3 + 0] * CPU_VRT_SZ, bB = (u32)modelTriangles[mindex][j*3 + 1] * CPU_VRT_SZ, bC = (u32)modelTriangles[mindex][j*3 + 2] * CPU_VRT_SZ;
+            V3 posA = {*(float*)(modelVertices[mindex] + bA + 0), *(float*)(modelVertices[mindex] + bA + 4), *(float*)(modelVertices[mindex] + bA + 8)};
+            V3 posB = {*(float*)(modelVertices[mindex] + bB + 0), *(float*)(modelVertices[mindex] + bB + 4), *(float*)(modelVertices[mindex] + bB + 8)};
+            V3 posC = {*(float*)(modelVertices[mindex] + bC + 0), *(float*)(modelVertices[mindex] + bC + 4), *(float*)(modelVertices[mindex] + bC + 8)};
+            V3 normA ={*(float*)(modelVertices[mindex] + bA + 12), *(float*)(modelVertices[mindex] + bA + 16), *(float*)(modelVertices[mindex] + bA + 20)};
+            V3 normB ={*(float*)(modelVertices[mindex] + bB + 12), *(float*)(modelVertices[mindex] + bB + 16), *(float*)(modelVertices[mindex] + bB + 20)};
+            V3 normC ={*(float*)(modelVertices[mindex] + bC + 12), *(float*)(modelVertices[mindex] + bC + 16), *(float*)(modelVertices[mindex] + bC + 20)};
             RaycastHit tryTri = RayTriangle(localOrigin,localDir,posA,posB,posC,normA,normB,normC); if (!tryTri.hit) continue;
             V3 worldPoint = { m00*tryTri.point.x + m01*tryTri.point.y + m02*tryTri.point.z + tx, m10*tryTri.point.x + m11*tryTri.point.y + m12*tryTri.point.z + ty, m20*tryTri.point.x + m21*tryTri.point.y + m22*tryTri.point.z + tz };
             float worldDist = V3_Dist(worldPoint,origin); if (worldDist >= result.distance) continue;

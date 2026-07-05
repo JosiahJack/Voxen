@@ -918,7 +918,7 @@ void InputCursorPos(WinSyswindow* win, double xpos, double ypos) { // static con
     float s = vclamp((float)Sys_Settings.MouseSensitivity / 100.0f, 0.01f, 1.0f) * 0.2f;
     cam_yaw += (float)currentMouse_dx * s; if (cam_yaw >= 360.0f) {cam_yaw -= 360.0f;} if (cam_yaw < 0.0f)     {cam_yaw  += 360.0f;}
     cam_pitch+=(float)currentMouse_dy * s; if (cam_pitch > 89.0f) {cam_pitch = 89.0f;} if (cam_pitch < -89.0f) {cam_pitch = -89.0f;} // Avoid gimbal lock at pure 90deg
-    quat_from_yaw_pitch_roll(&World.instances[PLAYER1].rotation,cam_yaw,cam_pitch,(World.curLev == LEVEL_CYBERSPACE) ? cam_roll : 0.0f);
+    quat_from_yaw_pitch_roll(&World.rotation[PLAYER1],cam_yaw,cam_pitch,(World.curLev == LEVEL_CYBERSPACE) ? cam_roll : 0.0f);
 }
 
 void JoystickConnection(WinSysjoystick* js, int e) {
