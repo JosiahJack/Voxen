@@ -62,7 +62,7 @@ static void cmd_loadlevel(const char* arg) {
     if (World.menuActive) { CenterStatusPrint("%s", Sys_Text.stringTable[1015]); return; } // "Cannot load levels via cheat while on the main menu!"
     int level = ParseLevelArg(arg); if (level == -2) return; // Already printed g3 message
     if (level < 0 || level > 12) { CenterStatusPrint("cmd_loadlevel invalid level argument %u",level); return; }
-    CenterStatusPrint("Loading level %u",level); queuedLevelToLoad = level; LoadLevel(level); SetPosition(&World.instances[PLAYER1],ressurectionLocations[level > 9 ? 6 : level],true); (void)cyberSpaceEntryLocations;
+    CenterStatusPrint("Loading level %u",level); queuedLevelToLoad = level; LoadLevel(level); SetPosition(PLAYER1,ressurectionLocations[level > 9 ? 6 : level],true); (void)cyberSpaceEntryLocations;
 }
 
 static void cmd_loadarsenal(const char* arg) { int level = ParseLevelArg(arg); if (level >= 0 && level < World.numLevels) { EnableCheatArsenal(level); } }

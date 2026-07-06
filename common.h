@@ -490,20 +490,17 @@ int lev6SecCode;
 bool vmailActive;
 extern const char* sounds[SOUNDS_COUNT];
 typedef /*FAT*/ struct  {
-    u32 entflags,layer,ioflags;
+    u32 entflags,ioflags;
     u16 modelIndex,index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
     V3 forward,right,lastPosition/*used for NPC logic, not physics*/,topPoint,targetPosition,startPosition,activatedScale,direction;
-    float radius,shadRadius,gravity,inertiaTensor[6],invInertiaTensor[6];
+    float shadRadius;
     u16 texIndex,glowIndex,specIndex,normIndex,lodIndex,colMeshIndex;
     i32 cellIndex; i16 cellX,cellZ;
     u8 portalIndex,clip,numclips,texAnimClip,camView; // If this is a door, index into portal array for toggling state.
-    bool inertiaTensorValid,colliding,cardchunk,kinematic;
-    V3 colliderCenter; // Offset relative to .position's global worldspace xyz location
-    V3 colliderSize; // x,y,z for Box, x for Sphere radius, else x, y, z for Capsule radius, height, and direction (0.0f = X-Axis, 1.0f = Y-Axis, 2.0f = Z-Axis respectively, default 1.0f)
-    ColliderType/*u8*/ collider;
+    bool cardchunk,kinematic;
     FuncStates/*u8*/ startState,funcState;
     BodyState/*u8*/ bodyState;
-    float health,cyberHealth,targetPositionY,speed,percentAjar,percentMoved,mass,angularDrag,inertia,dynamicFriction,staticFriction,bounciness,volume,timeForTranquilization,gracePeriodFinished,meleeDamageFinished,idleTime,attack1SoundTime,attack2SoundTime,attack3SoundTime,timeTillEnemyChangeFinished,timeTillDeadFinished,timeTillPainFinished,huntFinished,
+    float health,cyberHealth,targetPositionY,speed,percentAjar,percentMoved,volume,timeForTranquilization,gracePeriodFinished,meleeDamageFinished,idleTime,attack1SoundTime,attack2SoundTime,attack3SoundTime,timeTillEnemyChangeFinished,timeTillDeadFinished,timeTillPainFinished,huntFinished,
           randomWaitForNextAttack1Finished,randomWaitForNextAttack2Finished,randomWaitForNextAttack3Finished,attackFinished,attack2Finished,attack3Finished,deathBurstFinished,tranquilizeFinished,wanderFinished,timeSinceMovedEnough,posCheckFinished,currentFrameFinished,animSwapFinished,delay,damage,itemLifeTime,minutes,seconds,randomMin,randomMax,timeInterval,
           cyberTimer,intervalFinished,delayFireFinished,delayResetFinished,delayFinished,tickFinished,tickTime,useFinished,waitBeforeClose,lasersFinished,amount,resetTime,minSecurityLevel,ajarPercentage,useTimeDelay,timeBeforeLasersOn,force,strength,offStrengthFactor,distancePaddingToTopPoint,initialBurstFinished,justUsed,timerFinished,randomItemDropChance[4];
     V3 accumulatedForce;    
@@ -541,8 +538,26 @@ typedef struct {
 	bool inventoryMode,levelCurrentlyLoading,introNotPlayed,paused,menuActive,gameFinished,creditsActive,decoyActive,boosterActive,uiIsBlocking,mouseClickHeldOverGUI,geniusActive;
     InventorySystem invP1,invP2;
     Entity instances[INSTANCE_COUNT];
-    V3 position[INSTANCE_COUNT],scale[INSTANCE_COUNT],velocity[INSTANCE_COUNT],angularVelocity[INSTANCE_COUNT];
+    V3 position[INSTANCE_COUNT];
+    V3 scale[INSTANCE_COUNT];
+    V3 velocity[INSTANCE_COUNT];
+    V3 angularVelocity[INSTANCE_COUNT];
+    V3 colliderCenter[INSTANCE_COUNT]; // Offset relative to .position's global worldspace xyz location
+    V3 colliderSize[INSTANCE_COUNT]; // x,y,z for Box, x for Sphere radius, else x, y, z for Capsule radius, height, and direction (0.0f = X-Axis, 1.0f = Y-Axis, 2.0f = Z-Axis respectively, default 1.0f)
+    ColliderType/*u8*/ collider[INSTANCE_COUNT];
     Quaternion rotation[INSTANCE_COUNT];
+    u32 layer[INSTANCE_COUNT];
+    float mass[INSTANCE_COUNT];
+    float radius[INSTANCE_COUNT];
+    float gravity[INSTANCE_COUNT];
+    float inertiaTensor[INSTANCE_COUNT][6];
+    float invInertiaTensor[INSTANCE_COUNT][6];
+    float angularDrag[INSTANCE_COUNT];
+    float dynamicFriction[INSTANCE_COUNT];
+    float staticFriction[INSTANCE_COUNT];
+    float bounciness[INSTANCE_COUNT];
+    bool invTnsrValid[INSTANCE_COUNT];
+    bool colliding[INSTANCE_COUNT];
     Color fogColor[14];
 	char global_dllname[256],global_winicon[256],playerName[27],audiologNames[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH],audiologSubjects[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH],audiologSenders[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH],audioLogSpeech2Text[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH];
 } GlobalContext; // Savable complete game state data

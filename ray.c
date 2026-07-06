@@ -10,7 +10,7 @@ RaycastHit RayTriangle(V3 origin, V3 dir, V3 posA, V3 posB, V3 posC, V3 normA, V
 RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
     RaycastHit result = { .hit = false, .distance = maxDist, .point = {0.0f, 0.0f, 0.0f}, .normal = {0.0f, 0.0f, 0.0f}, .hitInstanceIndex = INSTANCE_COUNT };
     for (u16 i = INSTS_1ST_IDX; i < INSTANCE_COUNT; ++i) {
-        if (!(layerMask & World.instances[i].layer)) continue;
+        if (!(layerMask & World.layer[i])) continue;
         u16 mindex = World.instances[i].modelIndex; if (mindex >= mdlsCnt) continue;
         V3 objPos = World.position[i]; u16 instCellIdx = PosGetCellCoords(objPos.x,objPos.z); V3 delta = V3_AsubB(objPos,origin); float distSqrd = V3_dot(delta,delta), radBounds = vmax(modelBounds[mindex],1.81f);
         float maxDistToObj = vmax(maxDist - radBounds,maxDist); if (distSqrd >= (maxDistToObj * maxDistToObj)) continue;

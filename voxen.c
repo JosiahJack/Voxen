@@ -210,7 +210,7 @@ void GeneralInvApply(int buttonIdx, int customIdx);
 bool InventoryAddSoftwareItem(u16 p, u16 type, int vers);
 int Get16WeaponIndexFromConstIndex(int index);
 void UseGrenade(u16 playerIndex, int index);
-bool AICheckPain(Entity* self);
+bool AICheckPain(u16);
 void ResetHeldItem(u16 p);
 void DropHeldItem(u16 p);
 void AddItemToInventory(u16 p, int index, int customIndex);
@@ -722,8 +722,8 @@ __attribute__((pure)) i32 dsortInv(const void* a, const void* b) { float da = ((
 #define MAX_VISIBLE 4096
 #define DRAW_ENTITY(curN,curT,curG,curS,curM) { \
         u16 glow=e->glowIndex,norm=e->normIndex,spec=e->specIndex; \
-        if (Cheats.showPhys) {if (e->collider == COLTYPE_BOX) {DrawBoxCollider(e);} else if (e->collider == COLTYPE_SPH) {DrawSphereCollider(e);} else if (e->collider == COLTYPE_CVX) {DrawMeshCollider(e);} else if (e->collider == COLTYPE_MSH) {DrawMeshCollider(e);} else if (e->collider == COLTYPE_CAP) {DrawCapsuleCollider(e);}} \
-        DrawAngularVelocity(e); \
+        if (Cheats.showPhys) {if (e->collider == COLTYPE_BOX) {DrawBoxCollider(i);} else if (e->collider == COLTYPE_SPH) {DrawSphereCollider(i);} else if (e->collider == COLTYPE_CVX) {DrawMeshCollider(i);} else if (e->collider == COLTYPE_MSH) {DrawMeshCollider(i);} else if (e->collider == COLTYPE_CAP) {DrawCapsuleCollider(i);}} \
+        DrawAngularVelocity(i); \
         glUniform1ui(17,tex==316?1u:0u); glUniform1ui(25,constIndex); glUniform1f(27,e->volume); glUniform1ui(13,(tex==36||tex==887) ? 1u : 0u); \
         if (grayscaleEnabled) { float npcHeat = IdxIsNPC(constIndex) ? ((constIndex==419 || constIndex==422 || constIndex==424 || constIndex==429 || constIndex==430 || constIndex==431||constIndex==433||constIndex==437||constIndex==438||constIndex==441) ? 1.5f : 4.0f) : 0.0f; glUniform1f(9,npcHeat); } \
         glUniform1ui(30,e->camView < camViewCount ? 1u : 0u); \
@@ -934,9 +934,14 @@ void LoadLevel(u8 curlevel) {
     DualLog("Loaded %d entities, %u static lights for Level %d... took %f secs\n",World.instCount,loadedLights,curlevel,get_time() - start_time);
     RenderLoading(110,"Initialize entities...");
     for (int i=PLAYER1;i<World.instCount;++i) {
-        Entity* e = &World.instances[i]; i32 cellIdx = PosGetCellCoords(World.position[i].x,World.position[i].z); e->cellIndex = cellIdx; e->cellX=PosGetCellCoordX(World.position[i].x); e->cellZ=PosGetCellCoordZ(World.position[i].z); e->radius = modelBounds[e->modelIndex]*vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z); e->shadRadius = e->radius * 1.41;
-        ComputeConvexMeshInertiaTensor(e);
-        if (e->mass < 0.001f && e->collider != COLTYPE_NONE && e->collider != COLTYPE_MSH && (e->entflags & EF_RIGIDBODY)) {e->mass = 0.2f; /*At least something!*/}
+        i32 cellIdx = PosGetCellCoords(World.position[i].x,World.position[i].z);
+        World.instances[i].cellIndex = cellIdx;
+        World.instances[i].cellX=PosGetCellCoordX(World.position[i].x);
+        World.instances[i].cellZ=PosGetCellCoordZ(World.position[i].z);
+        World.instances[i].radius = modelBounds[World.instances[i].modelIndex]*vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z);
+        World.instances[i].shadRadius = World.instances[i].radius * 1.41;
+        ComputeConvexMeshInertiaTensor(i);
+        if (World.instances[i].mass < 0.001f && World.collider[i] != COLTYPE_NONE && World.collider[i] != COLTYPE_MSH && (World.instances[i].entflags & EF_RIGIDBODY)) {World.instances[i].mass = 0.2f; /*At least something!*/}
     }
     ModInitAfterLoad(); ResetLevelAudio(); ResetLevelMusic();
     RenderLoading(110,"Loading cull system..."); CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
@@ -958,6 +963,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
         World.farPlane[i] = lFars[i];
         World.fogColor[i] = fogLUT[i]; World.fogColor[i].a *= 3.8f;
     }
+    World.instances[0].mass = 0.0f; World.instances[0].dynamicFriction = 0.4f; World.instances[0].collider=COLTYPE_NONE; // Static proxy just uses world.
     currentMenuItem = currentMenuTab = 0; currentMenuPage = Mpg_FrontPage;
     World.pauseRelativeTime = World.last_physics_time = 0.0; World.pauseRelativeTime=World.last_physics_time=0.0; World.deltaTime=0.0166666666f;
     mset(World.instances,0,3 * sizeof(Entity)); // Blank out player entities
