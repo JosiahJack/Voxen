@@ -249,7 +249,6 @@ void AIAnimationControllerUpdate(u16 idx) {
 static bool AICheckIfEnemyInSight(u16 idx) {
     u16 eidx = World.instances[idx].enemy;
     if (!eidx || !ai_has_health(&World.instances[idx])) return false;
-    Entity* en = &World.instances[eidx];
     bool enIsNPC = (World.layer[eidx] & L_NPC) != 0;
     int diff = ai_is_cyber(&World.instances[idx]) ? World.diffCyb : World.diffCbt;
     if (!ai_is_cyber(&World.instances[idx]) && !enIsNPC && !PositionVisibleFromPlayerCell(World.position[idx].x,World.position[idx].z)) return false;
@@ -280,7 +279,7 @@ static bool AICheckIfEnemyInSight(u16 idx) {
 
 static void AISetHuntFinished(u16 idx) {
     World.instances[idx].huntFinished = World.pauseRelativeTime;
-    int diff = ai_is_cyber(self) ? World.diffCyb : World.diffCbt;
+    int diff = ai_is_cyber(&World.instances[idx]) ? World.diffCyb : World.diffCbt;
     double ht = npcTable[World.instances[idx].index - 419].huntTime;
     double mn = 60.0;
     if      (diff <= 1) World.instances[idx].huntFinished += (ht * 0.75 > mn ? ht * 0.75 : mn);
@@ -293,7 +292,7 @@ static void AISetEnemy(u16 idx, u16 eidx) {
     
     World.instances[idx].enemy = eidx;
     World.instances[idx].posCheckFinished = World.pauseRelativeTime + AI_POS_CHECK_DELAY;
-    flag_set(&World.instances[idx]entflags,EF_WANDERING,false);
+    flag_set(&World.instances[idx].entflags,EF_WANDERING,false);
     World.instances[idx].wanderFinished = World.pauseRelativeTime;
     World.instances[idx].lastPosition = World.position[idx];
     World.instances[idx].lastKnownEnemyPos = World.position[eidx];
@@ -416,7 +415,7 @@ bool AICheckPain(u16 self) {
 }
 
 static void AIIdle(u16 sidx) {
-    if (World.instances[sidx].enemy && ai_has_health(self)) { World.instances[sidx].currentState = AIState_Run; return; }
+    if (World.instances[sidx].enemy && ai_has_health(&World.instances[sidx])) { World.instances[sidx].currentState = AIState_Run; return; }
     NPCTable* npc = &npcTable[World.instances[sidx].index - 419];
     if (World.instances[sidx].idleTime < World.pauseRelativeTime) {
         int sidle = sfxIdle[World.instances[sidx].index - 419];
@@ -424,7 +423,7 @@ static void AIIdle(u16 sidx) {
         World.instances[sidx].idleTime = World.pauseRelativeTime + random_range(npc->timeIdleSFXMin, npc->timeIdleSFXMax);
     }
     if (World.instances[sidx].entflags & EF_ASLEEP) { World.instances[sidx].kinematic=true; World.velocity[sidx] = (V3){0,0,0}; }
-    AICheckPain(self);
+    AICheckPain(sidx);
 }
 
 static V3 AIGetWanderPoint(Entity* self) {
@@ -467,20 +466,20 @@ static void AIWalk(u16 self) {
     if (World.instances[self].entflags & EF_ACT_AS_TURRET) { World.instances[self].currentState = AIState_Idle; return; }
     if (npcTable[World.instances[self].index - 419].moveType == AIMoveType_None) return;
     if (World.instances[self].tranquilizeFinished >= World.pauseRelativeTime) return;
-    u16 sidx=(u16)(self - World.instances);
+    u16 sidx = self;
     if (!PositionVisibleFromPlayerCell(World.position[sidx].x,World.position[sidx].z)) return;
-    float dist = V3_Dist(ai_sight_pos(self),World.instances[self].currentDestination);
+    float dist = V3_Dist(ai_sight_pos(&World.instances[self]),World.instances[self].currentDestination);
     if (World.instances[self].entflags & EF_WANDERING) {
-        if (World.instances[self].wanderFinished < World.pauseRelativeTime || dist < AI_STOP_DIST * 0.5f) { World.instances[self].wanderFinished = World.pauseRelativeTime + random_range(3.0f, 8.0f); World.instances[self].currentDestination = AIGetWanderPoint(self); }
+        if (World.instances[self].wanderFinished < World.pauseRelativeTime || dist < AI_STOP_DIST * 0.5f) { World.instances[self].wanderFinished = World.pauseRelativeTime + random_range(3.0f, 8.0f); World.instances[self].currentDestination = AIGetWanderPoint(&World.instances[self]); }
     }
-    if (dist > AI_STOP_DIST && AIWithinAngleToTarget(self)) {
+    if (dist > AI_STOP_DIST && AIWithinAngleToTarget(&World.instances[self])) {
         if (npcTable[World.instances[self].index - 419].hopsOnMove) {
             AIHopMove(self);
         } else {
             float ws  = npcTable[World.instances[self].index - 419].walkSpeed;
             V3 mv = { World.instances[self].forward.x*ws,World.instances[self].forward.y*ws,World.instances[self].forward.z*ws };
             if (npcTable[World.instances[self].index - 419].moveType != AIMoveType_Fly) {
-                V3 spos = ai_sight_pos(self);
+                V3 spos = ai_sight_pos(&World.instances[self]);
                 V3 cp = { spos.x + World.instances[self].forward.x*0.48f, spos.y, spos.z + World.instances[self].forward.z*0.48f };
                 RaycastHit gh = Raycast(cp,(V3){0,-1,0},CELL_SIZE,LMASK_NPC_COLLISION);
                 if (!gh.hit) { mv.x = 0.0f; mv.z = 0.0f; }
@@ -596,7 +595,7 @@ static void AIRun(u16 selfIdx) {
     if (AICanAttack(selfIdx, far,3,&rangeToEnemy)) { AIStartAttack(self,3); return; }
     if (ndat->moveType != AIMoveType_None && rangeToEnemy > AI_STOP_DIST_SQ) {
         if (AIWithinAngleToTarget(self)) {
-            if (ndat->hopsOnMove) AIHopMove(self);
+            if (ndat->hopsOnMove) AIHopMove(selfIdx);
             else AIRunMove(selfIdx);
         } else if (World.diffCbt >= 2 && random_range(0.0f,1.0f) < 0.5f) {
             AIFace(self,self->currentDestination);
@@ -613,12 +612,12 @@ static void AIDying(u16 i) {
         float dbt = deathBurstTimer[World.instances[i].index - 419];
         if (dbt > 0.0f) { World.instances[i].deathBurstFinished = World.pauseRelativeTime + dbt; }
         else if (!(World.instances[i].entflags & EF_DEATH_BURST_DONE)) { /*TODO Enable deathburst effects*/ }
-        u16 sidx=(u16)(self - World.instances);
+        u16 sidx = i;
         if (!(World.instances[i].entflags & EF_ACT_AS_CORPSE_ONLY) && !(World.instances[i].entflags & EF_TELEPORT_ON_DEATH)) {
             int sded = sfxDeath[World.instances[i].index - 419];
             if (sded >= 0 && sded < (i16)SOUNDS_COUNT) play_wav(sounds[sded],World.instances[i].volume,World.position[sidx],true);
         }
-        if (ai_is_cyber(self)) World.gravity[i] = 0.0f; // Physics for death
+        if (ai_is_cyber(&World.instances[i])) World.gravity[i] = 0.0f; // Physics for death
         else { World.gravity[i] = 1.0f; World.instances[i].kinematic=true; }
         flag_set(&World.instances[i].entflags, EF_ASLEEP, false);
         World.layer[i] = L_Corpse;
@@ -630,7 +629,7 @@ static void AIDying(u16 i) {
         flag_set(&World.instances[i].entflags, EF_DYING_SETUP, true);
     }
     if (World.instances[i].timeTillDeadFinished < World.pauseRelativeTime) { flag_set(&World.instances[i].entflags,EF_DEAD,true); flag_set(&World.instances[i].entflags,EF_DYING,false); World.instances[i].currentState = AIState_Dead; }
-    if (AIDeactivatesVisibleMeshWhileDying(self)) World.instances[i].modelIndex = MAX_MDLS;
+    if (AIDeactivatesVisibleMeshWhileDying(&World.instances[i])) World.instances[i].modelIndex = MAX_MDLS;
     if (World.instances[i].index == 439) World.layer[i] = L_Corpse | L_CorpseSearchable; // Zero-G mutant enables search collider while still dying
 }
 
@@ -664,7 +663,7 @@ static void AIDead(u16 idx) {
 
 static DamageData SetNPCData(Entity* self, int n) {
     DamageData dd = {0};
-    NPCTable* npc = &npcTable[World.instances[idx].index - 419];
+    NPCTable* npc = &npcTable[self->index - 419];
     dd.owner = (u16)(self - World.instances);
     switch (n) {
         case 1: dd.damage = npc->damage;  dd.attackType = npc->attackType;  break;
@@ -787,12 +786,12 @@ static void ProjectileLaunched(Entity* self, int n) {
     if (!bb || bb >= INSTANCE_COUNT) return;
 
     Entity* proj   = &World.instances[bb];
-    proj->layer    = L_NPCBullet;
+    World.layer[bb] = L_NPCBullet;
     World.position[bb] = spos;
     proj->forward  = dir;
     // TODO: store damage data into projectile entity fields for deferred impact
     V3 shove = V3_ScaleByF(dir, launchSpd);
-    if (vabs(self->gravity) > 0.05f) { shove.x += World.velocity[sidx].x; shove.z += World.velocity[sidx].z; }
+    if (vabs(World.gravity[sidx]) > 0.05f) { shove.x += World.velocity[sidx].x; shove.z += World.velocity[sidx].z; }
     World.velocity[bb] = (V3){0,0,0};
     AddForce(bb,shove,true);
     flag_set(&proj->entflags,EF_ACTIVE | EF_RIGIDBODY,true);

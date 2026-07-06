@@ -663,7 +663,7 @@ static __attribute__((hot)) void RenderShadowmaps() {
                 Entity* e = &World.instances[j];
                 V3 d = V3_AsubB(World.position[j],lpos);
                 float distToLightSqrd = V3_dot(d,d);
-                float radSum = (effectiveRadius + e->radius);
+                float radSum = (effectiveRadius + World.radius[j]);
                 if (distToLightSqrd >= radSum * radSum) continue;
                 if (skipNPCs && IdxIsNPC(e->index)) continue;
                 shadows_nearMeshes[nearbyMeshCount].index = j; shadows_nearMeshes[nearbyMeshCount].depth = distToLightSqrd; 
@@ -722,7 +722,7 @@ __attribute__((pure)) i32 dsortInv(const void* a, const void* b) { float da = ((
 #define MAX_VISIBLE 4096
 #define DRAW_ENTITY(curN,curT,curG,curS,curM) { \
         u16 glow=e->glowIndex,norm=e->normIndex,spec=e->specIndex; \
-        if (Cheats.showPhys) {if (e->collider == COLTYPE_BOX) {DrawBoxCollider(i);} else if (e->collider == COLTYPE_SPH) {DrawSphereCollider(i);} else if (e->collider == COLTYPE_CVX) {DrawMeshCollider(i);} else if (e->collider == COLTYPE_MSH) {DrawMeshCollider(i);} else if (e->collider == COLTYPE_CAP) {DrawCapsuleCollider(i);}} \
+        if (Cheats.showPhys) {if (World.collider[i] == COLTYPE_BOX) {DrawBoxCollider(i);} else if (World.collider[i] == COLTYPE_SPH) {DrawSphereCollider(i);} else if (World.collider[i] == COLTYPE_CVX) {DrawMeshCollider(i);} else if (World.collider[i] == COLTYPE_MSH) {DrawMeshCollider(i);} else if (World.collider[i] == COLTYPE_CAP) {DrawCapsuleCollider(i);}} \
         DrawAngularVelocity(i); \
         glUniform1ui(17,tex==316?1u:0u); glUniform1ui(25,constIndex); glUniform1f(27,e->volume); glUniform1ui(13,(tex==36||tex==887) ? 1u : 0u); \
         if (grayscaleEnabled) { float npcHeat = IdxIsNPC(constIndex) ? ((constIndex==419 || constIndex==422 || constIndex==424 || constIndex==429 || constIndex==430 || constIndex==431||constIndex==433||constIndex==437||constIndex==438||constIndex==441) ? 1.5f : 4.0f) : 0.0f; glUniform1f(9,npcHeat); } \
@@ -938,10 +938,10 @@ void LoadLevel(u8 curlevel) {
         World.instances[i].cellIndex = cellIdx;
         World.instances[i].cellX=PosGetCellCoordX(World.position[i].x);
         World.instances[i].cellZ=PosGetCellCoordZ(World.position[i].z);
-        World.instances[i].radius = modelBounds[World.instances[i].modelIndex]*vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z);
-        World.instances[i].shadRadius = World.instances[i].radius * 1.41;
+        World.radius[i] = modelBounds[World.instances[i].modelIndex]*vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z);
+        World.instances[i].shadRadius = World.radius[i] * 1.41;
         ComputeConvexMeshInertiaTensor(i);
-        if (World.instances[i].mass < 0.001f && World.collider[i] != COLTYPE_NONE && World.collider[i] != COLTYPE_MSH && (World.instances[i].entflags & EF_RIGIDBODY)) {World.instances[i].mass = 0.2f; /*At least something!*/}
+        if (World.mass[i] < 0.001f && World.collider[i] != COLTYPE_NONE && World.collider[i] != COLTYPE_MSH && (World.instances[i].entflags & EF_RIGIDBODY)) {World.mass[i] = 0.2f; /*At least something!*/}
     }
     ModInitAfterLoad(); ResetLevelAudio(); ResetLevelMusic();
     RenderLoading(110,"Loading cull system..."); CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
@@ -963,13 +963,13 @@ __attribute__((cold)) void NewGame() { // Reset World States
         World.farPlane[i] = lFars[i];
         World.fogColor[i] = fogLUT[i]; World.fogColor[i].a *= 3.8f;
     }
-    World.instances[0].mass = 0.0f; World.instances[0].dynamicFriction = 0.4f; World.instances[0].collider=COLTYPE_NONE; // Static proxy just uses world.
+    World.mass[0] = 0.0f; World.dynamicFriction[0] = 0.4f; World.collider[0]=COLTYPE_NONE; // Static proxy just uses world.
     currentMenuItem = currentMenuTab = 0; currentMenuPage = Mpg_FrontPage;
     World.pauseRelativeTime = World.last_physics_time = 0.0; World.pauseRelativeTime=World.last_physics_time=0.0; World.deltaTime=0.0166666666f;
     mset(World.instances,0,3 * sizeof(Entity)); // Blank out player entities
     PlayerInit(PLAYER1); PlayerInit(PLAYER2); cam_yaw = 90.0f; cam_pitch = 0.0f; cam_roll = 0.0f; World.inventoryMode = Sys_Settings.NoShootMode;
     World.gameFinished = World.creditsActive = World.decoyActive = false; World.damageDealt = World.damageReceived = 0.0f;
-	World.ressurections = World.deaths = World.kills = World.cyberkills = 0u; World.shotsFired = World.grenadesThrown = World.savesScummed = 0U; World.creditsPageIndex = 0u;
+        World.ressurections = World.deaths = World.kills = World.cyberkills = 0u; World.shotsFired = World.grenadesThrown = World.savesScummed = 0U; World.creditsPageIndex = 0u;
     for (int i=0;i<14;++i) World.levelSecurity[i] = 100u;
     ResetInput();
     currentMouse_dx = currentMouse_dy = 0; last_mouse_x = last_mouse_y = 0; ignore_next_mouse_delta = true;

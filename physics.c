@@ -149,7 +149,7 @@ void DrawSphereWireframe(Color col, ShapeSphere s) {
 void DrawSphereCollider(u16 i) { Color col = ColliderColor(i); ShapeSphere s = Entity_GetSph(i); DrawSphereWireframe(col,s); DrawVelocityVector(i); }
 void DrawSphereContact(V3 pos, float rad) { if (Cheats.showPhys) {Color col = (Color){0.0f,0.0f,1.0f,1.0f}; ShapeSphere s = (ShapeSphere){pos,rad}; DrawSphereWireframe(col,s);} }
 void DrawMeshCollider(u16 i) {
-    Color col = ColliderColor(i); u16 mi= (World.collider[i].collider == COLTYPE_CVX) ? World.colMeshIndex[i].colMeshIndex : World.instances[i].modelIndex; if (mi >= MAX_MDLS || mi >= mdlsCnt) return;
+    Color col = ColliderColor(i); u16 mi= (World.collider[i] == COLTYPE_CVX) ? World.instances[i].colMeshIndex : World.instances[i].modelIndex; if (mi >= MAX_MDLS || mi >= mdlsCnt) return;
     u32 triCount=modelTriangleCounts[mi]; if (!triCount) return;
     float M[16]; mcpy(M,&modelMatrices[i*16],64);
     float m00=M[0],m10=M[1],m20=M[2],m01=M[4],m11=M[5],m21=M[6],m02=M[8],m12=M[9],m22=M[10],tx=M[12],ty=M[13],tz=M[14];
@@ -187,8 +187,8 @@ void DrawCapsuleCollider(u16 i) {
 
 static void DrawAngularVelocity(u16 i) {
     if (!Cheats.showPhys) return;
-    if (!(e->entflags & EF_RIGIDBODY)) return;
-    u16 idx=(u16)(e - World.instances);
+    if (!(World.instances[i].entflags & EF_RIGIDBODY)) return;
+    u16 idx = i;
     if (V3_Mag(World.angularVelocity[idx]) < 0.0001f) return; // skip near-zero
     Color purple = (Color){0.5f, 0.0f, 1.0f, 1.0f};
     float scale = 0.35f;
@@ -204,7 +204,7 @@ static void DrawAngularVelocity(u16 i) {
     float step = 1.57079632679f / 8.0f; // quarter circle divided into 8 segments
     V3 axis = dir; V3 p1 = V3_Normalize(V3_Cross(axis,ref)); V3 p2 = V3_Cross(axis,p1); // Find two vectors perpendicular to angular axis
     V3 prev = V3_AplusB(World.position[idx], V3_ScaleByF(p1,rad));
-    for (int i = 1; i <= 8; ++i) { float a = i * step; float c = vcosf(a); float s = vsinf(a); V3 cur = V3_AplusB(World.position[idx],V3_AplusB(V3_ScaleByF(p1,c * rad),V3_ScaleByF(p2,s * rad))); AddWireLine(prev,cur,purple); prev = cur; }
+    for (int j= 1;j<=8;++j) { float a = j * step; float c = vcosf(a); float s = vsinf(a); V3 cur = V3_AplusB(World.position[idx],V3_AplusB(V3_ScaleByF(p1,c * rad),V3_ScaleByF(p2,s * rad))); AddWireLine(prev,cur,purple); prev = cur; }
 }
 
 static u16 cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX];
@@ -924,7 +924,7 @@ static void ApplyManifoldResponse(u16 a, u16 b, const Manifold *m) {
         V3 vAtA = V3_AplusB(World.velocity[a],V3_Cross(World.angularVelocity[a],rA[i]));
         V3 vAtB = bStatic ? (V3){0,0,0} : V3_AplusB(World.velocity[b],V3_Cross(World.angularVelocity[b],rB[i]));
         float vn0 = V3_dot(V3_AsubB(vAtA,vAtB),m->normal);
-        float e_r = (vn0 < -0.5f) ? vmax(World.instances[a].bounciness,bStatic ? 0.0f : World.instances[b].bounciness) : 0.0f;
+        float e_r = (vn0 < -0.5f) ? vmax(World.bounciness[a],bStatic ? 0.0f : World.bounciness[b]) : 0.0f;
         targetVn[i] = (vn0 < -0.5f) ? -e_r * vn0 : 0.0f; // frozen once per manifold — recomputing this from live vn each pass was the source of the runaway
     }
     int iters = (m->n > 1) ? MAX_COLLISION_ITERATIONS : 1;
@@ -948,14 +948,14 @@ void Physics() {
             World.instances[i].cellX=(i16)PosGetCellCoordX(World.position[i].x);
             World.instances[i].cellZ=(i16)PosGetCellCoordZ(World.position[i].z);
             World.instances[i].cellIndex=PosGetCellCoordsP(World.instances[i].cellX,World.instances[i].cellZ); // Subte difference than PosGetCellCoords... and I don't remember why!?
-            World.instances[i].radius = (World.collider[i] == COLTYPE_MSH || World.collider[i] == COLTYPE_CVX)
+            World.radius[i] = (World.collider[i] == COLTYPE_MSH || World.collider[i] == COLTYPE_CVX)
                                         ? (modelBounds[World.collider[i] == COLTYPE_CVX ? World.instances[i].colMeshIndex : World.instances[i].modelIndex] * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z))
                                         : GetColRad(i);
             u32 cell=(u32)World.instances[i].cellIndex; if(cell < WORLDX*WORLDX && cellCounts[cell] < 127){cellLists[cell][cellCounts[cell]++]=i;}
         }
         for (u16 i=0;i<dynamicEntityCount;++i) { // Integrate all dynamic bodies
             u16 idx = dynamicEntities[i];
-            V3 acc = {0.0f,-9.81f * World.instances[idx].gravity,0.0f};
+            V3 acc = {0.0f,-9.81f * World.gravity[idx],0.0f};
             if ((idx == PLAYER1 || idx == PLAYER2) && Cheats.noclip) acc.y = 0.0f;
             acc = V3_AplusB(acc,V3_ScaleByF(World.instances[idx].accumulatedForce,1.0f / World.mass[idx]));
             World.velocity[idx] = V3_AplusB(World.velocity[idx],V3_ScaleByF(acc,dtsub));
@@ -966,7 +966,7 @@ void Physics() {
             World.velocity[idx] = V3_ScaleByF(World.velocity[idx],linDrag);
             SetPosition(idx,V3_AplusB(World.position[idx],V3_ScaleByF(World.velocity[idx],dtsub)),false); // pos += (d = v*t)
             if (World.collider[idx] != COLTYPE_CAP) {
-                float angDrag = vexp(-World.instances[idx].angularDrag * dtsub);
+                float angDrag = vexp(-World.angularDrag[idx] * dtsub);
                 World.angularVelocity[idx] = V3_ScaleByF(World.angularVelocity[idx],angDrag); // 1. Apply continuous angular drag over time
                 float avel = V3_Mag(World.angularVelocity[idx]);
                 if (avel > MAX_ANGULAR_SPEED) { World.angularVelocity[idx] = V3_ScaleByF(World.angularVelocity[idx],MAX_ANGULAR_SPEED / avel); avel = MAX_ANGULAR_SPEED; }
@@ -975,11 +975,11 @@ void Physics() {
             } else World.angularVelocity[idx] = (V3){0.0f,0.0f,0.0f};
         }
         for (u16 i=0;i<dynamicEntityCount;++i) { // Collision detection and resolution
-            u16 a = dynamicEntities[i]; Entity *e = &World.instances[a]; if (World.collider[a] == COLTYPE_MSH || (Cheats.noclip && (a == PLAYER1 || a == PLAYER2))) continue;
+            u16 a = dynamicEntities[i]; if (World.collider[a] == COLTYPE_MSH || (Cheats.noclip && (a == PLAYER1 || a == PLAYER2))) continue;
             i32 cx = PosGetCellCoordX(World.position[a].x);
             i32 cz = PosGetCellCoordZ(World.position[a].z);
-            u32 mask = GetCollisionMask(World.instances[a].layer);
-            float searchRad = World.instances[a].radius + V3_Mag(World.velocity[a]) * dtsub + 0.5f;
+            u32 mask = GetCollisionMask(World.layer[a]);
+            float searchRad = World.radius[a] + V3_Mag(World.velocity[a]) * dtsub + 0.5f;
             i32 radCells = (i32)(searchRad / CELL_SIZE) + 2;
             typedef struct { Manifold m; u16 otherIdx; } Contact;
             Contact contacts[16]; int contactCount = 0;
@@ -990,8 +990,8 @@ void Physics() {
                         u16 b = cellLists[cell][k];      if (b == a) continue;
                         if (b < a && (World.instances[b].entflags & EF_RIGIDBODY)) continue; // Prevent double processing dynamic vs dynamic
                         if (Cheats.noclip && (b == PLAYER1 || b == PLAYER2)) continue;
-                        Entity *o = &World.instances[b]; if (!(mask & World.instances[b].layer) || World.collider[b] == COLTYPE_NONE) continue;
-                        V3 deltaPos = V3_AsubB(World.position[a],World.position[b]); float rr = World.instances[a].radius * 1.42f + World.instances[b].radius * 1.42f; if (V3_dot(deltaPos,deltaPos) > rr * rr) continue;
+                        if (!(mask & World.layer[b]) || World.collider[b] == COLTYPE_NONE) continue;
+                        V3 deltaPos = V3_AsubB(World.position[a],World.position[b]); float rr = World.radius[a] * 1.42f + World.radius[b] * 1.42f; if (V3_dot(deltaPos,deltaPos) > rr * rr) continue;
                         Manifold mf = {0};
                         if      (World.collider[a] == COLTYPE_CAP && World.collider[b] == COLTYPE_CAP) { mf = OverlapToManifold(CapCap(Entity_GetCap(a),Entity_GetCap(b))); }
                         else if (World.collider[a] == COLTYPE_CAP && World.collider[b] == COLTYPE_BOX) { mf = OverlapToManifold(CapBox(Entity_GetCap(a),Entity_GetBox(b))); }
@@ -999,7 +999,7 @@ void Physics() {
                         else if (World.collider[a] == COLTYPE_SPH && World.collider[b] == COLTYPE_CAP) { ShapeSphere sa = Entity_GetSph(a); ShapeCapsule cb = Entity_GetCap(b); OverlapResult r1 = SphSph(sa.ctr,sa.rad,cb.base,cb.rad); OverlapResult r2 = SphSph(sa.ctr,sa.rad,cb.tip,cb.rad); mf=OverlapToManifold(r2.overlapAmount > r1.overlapAmount ? r2 : r1); }
                         else if (World.collider[a] == COLTYPE_BOX && World.collider[b] == COLTYPE_CAP) { OverlapResult r = CapBox(Entity_GetCap(b),Entity_GetBox(a)); if(r.hit) r.normal=V3_ScaleByF(r.normal,-1.0f); mf=OverlapToManifold(r); }
                         else if (World.collider[a] == COLTYPE_BOX && World.collider[b] == COLTYPE_BOX) { mf = OverlapToManifold(BoxBox(Entity_GetBox(a),Entity_GetBox(b))); }
-                        else if (World.collider[a] == COLTYPE_SPH && World.collider[b] == COLTYPE_BOX) { Entity_GetSph(e,&sa); mf = OverlapToManifold(SphBox(sa.ctr,sa.rad,Entity_GetBox(b))); }
+                        else if (World.collider[a] == COLTYPE_SPH && World.collider[b] == COLTYPE_BOX) { ShapeSphere sa = Entity_GetSph(a); mf = OverlapToManifold(SphBox(sa.ctr,sa.rad,Entity_GetBox(b))); }
                         else if (World.collider[a] == COLTYPE_BOX && World.collider[b] == COLTYPE_SPH) { ShapeSphere sa = Entity_GetSph(b); OverlapResult r = SphBox(sa.ctr,sa.rad,Entity_GetBox(a)); if(r.hit) r.normal=V3_ScaleByF(r.normal,-1.0f); mf=OverlapToManifold(r); }
                         else if (World.collider[a] == COLTYPE_SPH && World.collider[b] == COLTYPE_SPH) { ShapeSphere sa = Entity_GetSph(a); ShapeSphere sb = Entity_GetSph(b); mf = OverlapToManifold(SphSph(sa.ctr,sa.rad,sb.ctr,sb.rad)); }
                         else if (World.collider[a] == COLTYPE_CAP && World.collider[b] == COLTYPE_MSH) { mf = OverlapToManifold(CapMsh(Entity_GetCap(a),World.instances[b].modelIndex,&modelMatrices[b*16])); }
@@ -1027,9 +1027,9 @@ void Physics() {
                 Manifold *mfp = &contacts[c].m; u16 j = contacts[c].otherIdx;
                 World.colliding[a] = true;
                 bool jIs = (j < INSTANCE_COUNT);
-                if (jIs) World.colliding[j]. = true;
+                if (jIs) World.colliding[j] = true;
                 if (V3_dot(mfp->normal,(V3){0.0f,1.0f,0.0f}) >= 0.574f/*cos(55deg)*/) {World.instances[a].entflags |= EF_GROUNDED;} // Only Apply flag to the one the normal points to.
-                if (jIs && (World.instances[j].entflags & EF_RIGIDBODY) && World.instances[j].collider != COLTYPE_MSH) ApplyManifoldResponse(a,jIs ? j : INSTANCE_COUNT,mfp);
+                if (jIs && (World.instances[j].entflags & EF_RIGIDBODY) && World.collider[j] != COLTYPE_MSH) ApplyManifoldResponse(a,jIs ? j : INSTANCE_COUNT,mfp);
                 else ApplyManifoldResponse(a,0,mfp); // Static proxy just uses world, already has mass at 0 and decent default 0.4 friction.
             }
             World.instances[a].accumulatedForce = (V3){0.0f,0.0f,0.0f};

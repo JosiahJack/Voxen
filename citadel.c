@@ -765,7 +765,7 @@ void CyberItemOnTriggerEnter(u16 self, u16 other) {
 }
 //=============================================================================
 // CyberIce
-void CyberIceOnTriggerEnter(u16 self, u16 other) { (void)self; Entity* e = &World.instances[other]; if (!(e->entflags & EF_RIGIDBODY)) return; e->layer = 24; World.velocity[other] = V3_ScaleByF(World.velocity[other],-1.0f); }
+void CyberIceOnTriggerEnter(u16 self, u16 other) { (void)self; Entity* e = &World.instances[other]; if (!(e->entflags & EF_RIGIDBODY)) return; World.layer[other] = 24; World.velocity[other] = V3_ScaleByF(World.velocity[other],-1.0f); }
 //=============================================================================
 // CyberMine
 void CyberMineInitBeforeLoad(u16 self) {
@@ -961,7 +961,7 @@ void func_forcebridge(u16 self) {
     if (e->activatedScale.x <= 0.02f) e->activatedScale.x = 2.56f;
     if (e->activatedScale.y <= 0.02f) e->activatedScale.y = 0.08f;
     if (e->activatedScale.z <= 0.02f) e->activatedScale.z = 2.56f;
-    if (!e->active) { e->modelIndex = MAX_MDLS; e->collider = COLTYPE_NONE; }
+    if (!e->active) { e->modelIndex = MAX_MDLS; World.collider[self] = COLTYPE_NONE; }
     switch (e->fieldColor) {
         case ForceFieldColor_Red:      e->texIndex = 38; break;
         case ForceFieldColor_Green:    e->texIndex = 40; break;
@@ -974,13 +974,13 @@ void func_forcebridge(u16 self) {
 void ForceBridgeActivate(u16 self, bool isSilent) {
     Entity* e = &World.instances[self]; if (e->active) {return;}
     if (!isSilent) play_wav(sounds[102],1.0f,World.position[self],true);
-    e->modelIndex = 78; e->collider = COLTYPE_BOX; e->active = e->lerping = true; World.scale[self] = (V3){ e->forceFieldDirectionX ? 0.1f : e->activatedScale.x, e->forceFieldDirectionY ? 0.1f : e->activatedScale.y, e->forceFieldDirectionZ ? 0.1f : e->activatedScale.z };
+    e->modelIndex = 78; World.collider[self] = COLTYPE_BOX; e->active = e->lerping = true; World.scale[self] = (V3){ e->forceFieldDirectionX ? 0.1f : e->activatedScale.x, e->forceFieldDirectionY ? 0.1f : e->activatedScale.y, e->forceFieldDirectionZ ? 0.1f : e->activatedScale.z };
 }
 
 void ForceBridgeDeactivate(u16 self, bool isSilent) {
     Entity* e = &World.instances[self]; if (!e->active) {return;}
     if (!isSilent) {play_wav(sounds[102],1.0f,World.position[self],true);}
-    e->active = false; e->lerping = true; e->modelIndex = MAX_MDLS; e->collider = COLTYPE_NONE;
+    e->active = false; e->lerping = true; e->modelIndex = MAX_MDLS; World.collider[self] = COLTYPE_NONE;
 }
 
 void ForceBridgeToggle(u16 self) { if (World.instances[self].active) {ForceBridgeDeactivate(self,false); } else {ForceBridgeActivate(self,false);} }
@@ -1000,7 +1000,7 @@ void ForceBridgeUpdate(u16 self) {
         float sy = e->forceFieldDirectionY ? lerp(World.scale[self].y,0.0f,e->tickTime * 2.0f) : World.scale[self].y;
         float sz = e->forceFieldDirectionZ ? lerp(World.scale[self].z,0.0f,e->tickTime * 2.0f) : World.scale[self].z;
         World.scale[self] = (V3){sx,sy,sz};
-        if (sx < 0.08f || sy < 0.08f || sz < 0.08f) { flag_set(&e->entflags,EF_ACTIVE,false); e->collider = COLTYPE_NONE; e->lerping = false; }
+        if (sx < 0.08f || sy < 0.08f || sz < 0.08f) { flag_set(&e->entflags,EF_ACTIVE,false); World.collider[self] = COLTYPE_NONE; e->lerping = false; }
     }
 }
 
@@ -1081,7 +1081,7 @@ void GravityLiftInitAfterLoad(u16 self) {
 }
 
 // TODO just poll bounds and apply in trigger loop, yeesh
-void GravityLiftOnTriggerExit(u16 other) { if (other == PLAYER1) World.instances[PLAYER1].gravity = 1.0f; }
+void GravityLiftOnTriggerExit(u16 other) { if (other == PLAYER1) World.gravity[PLAYER1] = 1.0f; }
 // void GravityLiftOnForce(u16 self, u16 other, bool initial) {
 //     if (other == PLAYER1) flag_set(&World.instances[PLAYER1].entflags,EF_GRAV_LIFT_STATE,true);
 //     float topY = World.position[self].y + (World.colliderSize[self].y * 0.5f);
@@ -1255,7 +1255,7 @@ void VaporizeClick(void) { // TODO
 //     World.invP1.generalInvCurrent -= 1;
 //     if (World.invP1.generalInvCurrent < 0) {
 //         World.invP1.generalInvCurrent = 0; // Bound to lowest, but only
-//     }									   // since it is Access Cards.
+//     }                                                                           // since it is Access Cards.
 // 
 // 
 //     cur = World.invP1.generalInvCurrent;
@@ -1783,7 +1783,7 @@ void PlayerEnergyUpdate(void) {
 }
 //=============================================================================
 // GrenadeActivate
-static bool GrenadeIsNPCMine(u16 self) { return World.instances[self].layer != L_PlayerBullets; }
+static bool GrenadeIsNPCMine(u16 self) { return World.layer[self] != L_PlayerBullets; }
 void GrenadeExplode(u16 self) {
     Entity* e = &World.instances[self];
     // TODO: DamageData + ApplyImpactForceSphere(damage,attackType,penetration,offense,damage*1.5f,World.position[self],e->strength,1.0f)
@@ -1974,7 +1974,7 @@ static void DropSearchables(u16 self) {
 }
 
 static void CreateDeathEffects(u16 self,u16 fxPoolType) { if (fxPoolType == 0) {return; /*PoolType_None*/} V3 pos = World.position[self]; if (World.collider[self] != COLTYPE_NONE) { pos = V3_AplusB(pos,World.colliderCenter[self]); } /*TODO: SpawnEffectFromPool(fxPoolType, pos);*/ }
-static void HideSelf(u16 self) { if (World.instances[self].index == 279) {return; /*tv screens keep mesh visible*/} World.instances[self].modelIndex = MAX_MDLS; World.instances[self].gravity = 0.0f; }
+static void HideSelf(u16 self) { if (World.instances[self].index == 279) {return; /*tv screens keep mesh visible*/} World.instances[self].modelIndex = MAX_MDLS; World.gravity[self] = 0.0f; }
 static void NPCDeath(u16 self) {
     if (World.instances[self].entflags & EF_DEAD_CHECKS_DONE) {return;}
     flag_set(&World.instances[self].entflags,EF_DEAD_CHECKS_DONE,true);
@@ -2046,7 +2046,7 @@ static void Death(u16 self,bool energyVaporized) {
     bool isGrenade  = (e->entflags & EF_ISGRENADE) != 0;
     bool isCam      = (e->index == 477);
     bool doTeleport = (e->entflags & EF_TELEPORT_ON_DEATH) != 0; // REQUIRE_RESET reused as teleportOnDeath
-    if (e->iceActive) e->collider = COLTYPE_NONE;
+    if (e->iceActive) World.collider[self] = COLTYPE_NONE;
     if (vaporize && !isCam && !isGrenade) VaporizeCorpse(self,energyVaporized);
     else if (isObj)    ObjectDeath(self);
     else if (isScreen) ScreenDeath(self);
@@ -2547,64 +2547,64 @@ void PatchDisableAll(void) {
 //================================================================================
 // Security
 /*
-	int[] levelSecurity;
-	int[] levelCameraCount;
-	int[] levelLargeNodeCount;
-	int[] levelSmallNodeCount;
-	int[] levelCameraDestroyedCount;
-	int[] levelSmallNodeDestroyedCount;
-	int[] levelLargeNodeDestroyedCount;
-	V3[] ressurectionLocation;
-	bool[] ressurectionActive;
-	u16[] ressurectionBayDoor;
-	V3[] elevatorTargetDestinations;
+        int[] levelSecurity;
+        int[] levelCameraCount;
+        int[] levelLargeNodeCount;
+        int[] levelSmallNodeCount;
+        int[] levelCameraDestroyedCount;
+        int[] levelSmallNodeDestroyedCount;
+        int[] levelLargeNodeDestroyedCount;
+        V3[] ressurectionLocation;
+        bool[] ressurectionActive;
+        u16[] ressurectionBayDoor;
+        V3[] elevatorTargetDestinations;
     
-	bool RessurectPlayer() {
-		if (!ressurectionActive[World.curLev]) return false;
+        bool RessurectPlayer() {
+                if (!ressurectionActive[World.curLev]) return false;
 
-		if (World.curLev == 10 || World.curLev == 11 || World.curLev == 12) {
-			LoadLevel(6,ressurectionLocation[currentLevel].position);
-			ressurectionBayDoor[6].ForceClose();
-		} else {
-			if (World.curLev >= 0 || World.curLev < 13) World.instances[PLAYER1].position = ressurectionLocation[World.curLev];
-		}
+                if (World.curLev == 10 || World.curLev == 11 || World.curLev == 12) {
+                        LoadLevel(6,ressurectionLocation[currentLevel].position);
+                        ressurectionBayDoor[6].ForceClose();
+                } else {
+                        if (World.curLev >= 0 || World.curLev < 13) World.instances[PLAYER1].position = ressurectionLocation[World.curLev];
+                }
 
-		// Activate death screen and readouts for "BRAIN ACTIVITY SATISFACTORY..." ya debatable right etc. etc.
-// 		PlayerReferenceManager.a.playerDeathRessurectEffect.SetActive(true); // TODO
-		PlayTrack(TrackType_Revive,MusicType_Override);
-		World.instances[PLAYER1].ressurectingFinished = World.pauseRelativeTime + 3f;
-		return true;
-	}
-	
-	// Typical level
-	// 4 CPU nodes
-	// 20 cameras
-	// 100% = 4x + 20y
-	// Assuming that a good camera percentage is 2-3%, CPU % would be about 10-15 each
-	void ReduceCurrentLevelSecurity(SecurityType stype) {
-		float camScore = 4;
-		float nodeSmallScore = 10;
-		float nodeLargeScore = 27;
-		float secscoreTotal = (levelCameraCount[currentLevel] * camScore) + (levelSmallNodeCount[currentLevel] * nodeSmallScore) + (levelLargeNodeCount[currentLevel] * nodeLargeScore);
-		float secDrop = camScore; // default to camScore
-		switch (stype) {
-			case SecurityType_None: return;
-			case SecurityType_Camera: secDrop = ((camScore/secscoreTotal) * 100); levelCameraDestroyedCount[currentLevel]++; break; // 1 camera divided by the total, so 2/ say (40+60) = 2/100 = 0.02, or 2% using the example numbers above
-			case SecurityType_NodeSmall: secDrop = ((nodeSmallScore/secscoreTotal) * 100); levelSmallNodeDestroyedCount[currentLevel]++; break;
-			case SecurityType_NodeLarge: secDrop = ((nodeLargeScore/secscoreTotal) * 100); levelLargeNodeDestroyedCount[currentLevel]++; break;
-		}
-		levelSecurity[currentLevel] -= (int)secDrop;
-		if (levelSecurity [currentLevel] < 0) levelSecurity [currentLevel] = 0;
-		if ((levelLargeNodeDestroyedCount[currentLevel] == levelLargeNodeCount[currentLevel]) && (levelSmallNodeDestroyedCount[currentLevel] == levelSmallNodeCount[currentLevel]) && (levelCameraDestroyedCount[currentLevel] == levelCameraCount[currentLevel])) {
-			levelSecurity[currentLevel] = 0;
-		}
-		CenterStatusPrint("%s", Sys_Text.stringTable[306] + levelSecurity[currentLevel].ToString() + Sys_Text.stringTable[307]);
+                // Activate death screen and readouts for "BRAIN ACTIVITY SATISFACTORY..." ya debatable right etc. etc.
+//              PlayerReferenceManager.a.playerDeathRessurectEffect.SetActive(true); // TODO
+                PlayTrack(TrackType_Revive,MusicType_Override);
+                World.instances[PLAYER1].ressurectingFinished = World.pauseRelativeTime + 3f;
+                return true;
+        }
+        
+        // Typical level
+        // 4 CPU nodes
+        // 20 cameras
+        // 100% = 4x + 20y
+        // Assuming that a good camera percentage is 2-3%, CPU % would be about 10-15 each
+        void ReduceCurrentLevelSecurity(SecurityType stype) {
+                float camScore = 4;
+                float nodeSmallScore = 10;
+                float nodeLargeScore = 27;
+                float secscoreTotal = (levelCameraCount[currentLevel] * camScore) + (levelSmallNodeCount[currentLevel] * nodeSmallScore) + (levelLargeNodeCount[currentLevel] * nodeLargeScore);
+                float secDrop = camScore; // default to camScore
+                switch (stype) {
+                        case SecurityType_None: return;
+                        case SecurityType_Camera: secDrop = ((camScore/secscoreTotal) * 100); levelCameraDestroyedCount[currentLevel]++; break; // 1 camera divided by the total, so 2/ say (40+60) = 2/100 = 0.02, or 2% using the example numbers above
+                        case SecurityType_NodeSmall: secDrop = ((nodeSmallScore/secscoreTotal) * 100); levelSmallNodeDestroyedCount[currentLevel]++; break;
+                        case SecurityType_NodeLarge: secDrop = ((nodeLargeScore/secscoreTotal) * 100); levelLargeNodeDestroyedCount[currentLevel]++; break;
+                }
+                levelSecurity[currentLevel] -= (int)secDrop;
+                if (levelSecurity [currentLevel] < 0) levelSecurity [currentLevel] = 0;
+                if ((levelLargeNodeDestroyedCount[currentLevel] == levelLargeNodeCount[currentLevel]) && (levelSmallNodeDestroyedCount[currentLevel] == levelSmallNodeCount[currentLevel]) && (levelCameraDestroyedCount[currentLevel] == levelCameraCount[currentLevel])) {
+                        levelSecurity[currentLevel] = 0;
+                }
+                CenterStatusPrint("%s", Sys_Text.stringTable[306] + levelSecurity[currentLevel].ToString() + Sys_Text.stringTable[307]);
 
-		// Notify quest log if all nodes were destroyed
-		if (levelLargeNodeDestroyedCount[currentLevel] == levelLargeNodeCount[currentLevel]) {
-			if (QuestLogNotesManager.a != null) QuestLogNotesManager.a.NodesDestroyed(currentLevel);
-		}
-	}
+                // Notify quest log if all nodes were destroyed
+                if (levelLargeNodeDestroyedCount[currentLevel] == levelLargeNodeCount[currentLevel]) {
+                        if (QuestLogNotesManager.a != null) QuestLogNotesManager.a.NodesDestroyed(currentLevel);
+                }
+        }
 }*/
 //=============================================================================
 // Grenades
@@ -2982,7 +2982,7 @@ static void DoorSetClipFrame(u16 self, u8 clip, u16 frame) { ChangeAnim(&World.i
 static void DoorSyncLayer(u16 self) {
     Entity* e = &World.instances[self];
     if (!e->changeLayerOnOpenClose) return;
-    e->layer = DoorIsAjar(e) ? L_InterDebris : L_Door;
+    World.layer[self] = DoorIsAjar(e) ? L_InterDebris : L_Door;
 }
 
 static void DoorOpen(u16 self) {
@@ -3146,9 +3146,9 @@ void UseEntity(u16 p, u16 i) {
         inv->heldObjectAmmo2 = ent->ammo2;
         inv->heldObjectLoadedAlternate = ent->heldObjectLoadedAlternate;
         if (Sys_Settings.QuickItemPickup) { AddItemToInventory(p,ent->index,ent->usableCustomIndex); ResetHeldItem(p); }
-		else { CenterStatusPrint("%s%s",Sys_Text.stringTable[inv->heldObjectIndex - 307 + 326],Sys_Text.stringTable[319]); /* picked up.*/ ForceInventoryMode(); } // Inventory mode is turned on when picking something up
+                else { CenterStatusPrint("%s%s",Sys_Text.stringTable[inv->heldObjectIndex - 307 + 326],Sys_Text.stringTable[319]); /* picked up.*/ ForceInventoryMode(); } // Inventory mode is turned on when picking something up
 
-		DeleteInstance(i);
+                DeleteInstance(i);
     } else CenterStatusPrint("%s%s",Sys_Text.stringTable[29],"name");
 }
 
