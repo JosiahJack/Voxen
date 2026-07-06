@@ -29,7 +29,7 @@ public class UseableAttachment : MonoBehaviour {
 				// Z-44 Plastique Explosive
 				activated = true;
 				targettedObject.SendMessageUpwards("Use", ud);
-				timerFinished = World->pauseRelativeTime + timeTillPlastiqueExplode;
+				timerFinished = World.pauseRelativeTime + timeTillPlastiqueExplode;
 				break;
 			case 57:
 				// Interface Demodulator
@@ -53,11 +53,11 @@ public class UseableAttachment : MonoBehaviour {
 	}
 
 	void Update() {
-		if (World->paused || World->menuActive) return;
+		if (World.paused || World.menuActive) return;
 		if (!activated) return;
 
 		if (timerFinished != -1f) { // Plastique delayed effect (to give player time to escape of course)
-			if (timerFinished < World->pauseRelativeTime) {
+			if (timerFinished < World.pauseRelativeTime) {
 				explosion.SetActive (true);
 				for (int i = 0; i < destructables.Length; i++) {
 					destructables [i].SetActive (false); // blow up the walls and floor

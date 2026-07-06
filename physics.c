@@ -17,7 +17,7 @@ typedef struct {V3 ctr,hExt; Quaternion rot;} ShapeBox;
 typedef struct {V3 ctr; float rad;} ShapeSphere;
 typedef struct {V3 tip,base; float rad;} ShapeCapsule;
 typedef struct { V3 v[4];/*Minkowski difference vertices (wA - wB)*/   V3 wA[4];/*Cached support points from Shape A (e.g., Convex Hull)*/   V3 wB[4];/*Cached support points from Shape B (e.g., Triangle)*/   i32 n;/*Vertex count*/ } Simplex3D;
-ENGINE_TO_MOD void SetPosition(Entity* e, V3 newpos, bool teleport) { u16 idx=(u16)(e - World.instances); float d = V3_Dist(World.position[idx],newpos); if ((d > 0.001f && d < 0.1f) || teleport) {World.position[idx] = newpos;} }
+void SetPosition(Entity* e, V3 newpos, bool teleport) { u16 idx=(u16)(e - World.instances); float d = V3_Dist(World.position[idx],newpos); if ((d > 0.001f && d < 0.1f) || teleport) {World.position[idx] = newpos;} }
 u16 dynamicEntities[512], dynamicEntityCount;
 typedef struct { bool hit; V3 point,normal; float overlapAmount; } OverlapResult; typedef struct { V3 point; float pen; } ManifoldPt; typedef struct { V3 normal; ManifoldPt p[MANIFOLD_MAX]; i32 n; float maxPen; } Manifold;
 INLINE u32 PosGetCellCoordsP(i32 cx, i32 cz) { cx = clamp(cx,0,WORLDX_0BASED); cz = clamp(cz,0,WORLDX_0BASED); return (u32)cz * WORLDX + (u32)cx; }
@@ -972,29 +972,29 @@ void Physics() {
             u16 edx = (u16)(e - World.instances);
             if ((edx == PLAYER1 || edx == PLAYER2) && Cheats.noclip) acc.y = 0.0f;
             acc = V3_AplusB(acc,V3_ScaleByF(e->accumulatedForce,1.0f / e->mass));
-            World.velocity[i] = V3_AplusB(World.velocity[i],V3_ScaleByF(acc,dtsub));
-            float speed = V3_Mag(World.velocity[i]);
-            if (speed > MAX_SPEED) World.velocity[i] = V3_ScaleByF(V3_ScaleByF(World.velocity[i], 1.0f / speed),MAX_SPEED);
-            if (!V3_IsSane(World.velocity[i])) World.velocity[i] = (V3){0.0f,0.0f,0.0f}; // catches what the MAX_SPEED check above can't: NaN/Inf compare false, so it falls through unclamped without this
+            World.velocity[idx] = V3_AplusB(World.velocity[idx],V3_ScaleByF(acc,dtsub));
+            float speed = V3_Mag(World.velocity[idx]);
+            if (speed > MAX_SPEED) World.velocity[idx] = V3_ScaleByF(V3_ScaleByF(World.velocity[idx], 1.0f / speed),MAX_SPEED);
+            if (!V3_IsSane(World.velocity[idx])) World.velocity[idx] = (V3){0.0f,0.0f,0.0f}; // catches what the MAX_SPEED check above can't: NaN/Inf compare false, so it falls through unclamped without this
             float linDrag = vexp(-2.0f * dtsub);
-            World.velocity[i] = V3_ScaleByF(World.velocity[i],linDrag);
-            SetPosition(e,V3_AplusB(World.position[i],V3_ScaleByF(World.velocity[i],dtsub)),false); // pos += (d = v*t)
+            World.velocity[idx] = V3_ScaleByF(World.velocity[idx],linDrag);
+            SetPosition(e,V3_AplusB(World.position[idx],V3_ScaleByF(World.velocity[idx],dtsub)),false); // pos += (d = v*t)
             if (e->collider != COLTYPE_CAP) {
                 float angDrag = vexp(-e->angularDrag * dtsub);
-                World.angularVelocity[i] = V3_ScaleByF(World.angularVelocity[i],angDrag); // 1. Apply continuous angular drag over time
-                float avel = V3_Mag(World.angularVelocity[i]);
-                if (avel > MAX_ANGULAR_SPEED) { World.angularVelocity[i] = V3_ScaleByF(World.angularVelocity[i],MAX_ANGULAR_SPEED / avel); avel = MAX_ANGULAR_SPEED; }
-                if (!V3_IsSane(World.angularVelocity[i])) { World.angularVelocity[i] = (V3){0.0f,0.0f,0.0f}; avel = 0.0f; }
-                if (avel > PHY_EPSILON) { Quaternion dq = quat_from_axis_angle(V3_ScaleByF(World.angularVelocity[i],1.f / avel),avel * dtsub); World.rotation[i] = quat_normalize(quat_multiply(dq,World.rotation[i])); } // 2. Integrate rotation
-            } else World.angularVelocity[i] = (V3){0.0f,0.0f,0.0f};
+                World.angularVelocity[idx] = V3_ScaleByF(World.angularVelocity[idx],angDrag); // 1. Apply continuous angular drag over time
+                float avel = V3_Mag(World.angularVelocity[idx]);
+                if (avel > MAX_ANGULAR_SPEED) { World.angularVelocity[idx] = V3_ScaleByF(World.angularVelocity[idx],MAX_ANGULAR_SPEED / avel); avel = MAX_ANGULAR_SPEED; }
+                if (!V3_IsSane(World.angularVelocity[idx])) { World.angularVelocity[idx] = (V3){0.0f,0.0f,0.0f}; avel = 0.0f; }
+                if (avel > PHY_EPSILON) { Quaternion dq = quat_from_axis_angle(V3_ScaleByF(World.angularVelocity[idx],1.f / avel),avel * dtsub); World.rotation[idx] = quat_normalize(quat_multiply(dq,World.rotation[idx])); } // 2. Integrate rotation
+            } else World.angularVelocity[idx] = (V3){0.0f,0.0f,0.0f};
         }
         ShapeSphere sa,sb; ShapeBox ba,bb; ShapeCapsule ca,cb;
         for (u16 i=0;i<dynamicEntityCount;++i) { // Collision detection and resolution
             u16 a = dynamicEntities[i]; Entity *e = &World.instances[a]; if (e->collider == COLTYPE_MSH || (Cheats.noclip && (a == PLAYER1 || a == PLAYER2))) continue;
-            i32 cx = PosGetCellCoordX(World.position[i].x);
-            i32 cz = PosGetCellCoordZ(World.position[i].z);
+            i32 cx = PosGetCellCoordX(World.position[a].x);
+            i32 cz = PosGetCellCoordZ(World.position[a].z);
             u32 mask = GetCollisionMask(e->layer);
-            float searchRad = e->radius + V3_Mag(World.velocity[i]) * dtsub + 0.5f;
+            float searchRad = e->radius + V3_Mag(World.velocity[a]) * dtsub + 0.5f;
             i32 radCells = (i32)(searchRad / CELL_SIZE) + 2;
             typedef struct { Manifold m; u16 otherIdx; } Contact;
             Contact contacts[16]; int contactCount = 0;
@@ -1006,7 +1006,7 @@ void Physics() {
                         if (b < a && (World.instances[b].entflags & EF_RIGIDBODY)) continue; // Prevent double processing dynamic vs dynamic
                         if (Cheats.noclip && (b == PLAYER1 || b == PLAYER2)) continue;
                         Entity *o = &World.instances[b]; if (!(mask & o->layer) || o->collider == COLTYPE_NONE) continue;
-                        V3 deltaPos = V3_AsubB(World.position[i],World.position[b]); float rr = e->radius * 1.42f + o->radius * 1.42f; if (V3_dot(deltaPos,deltaPos) > rr * rr) continue;
+                        V3 deltaPos = V3_AsubB(World.position[a],World.position[b]); float rr = e->radius * 1.42f + o->radius * 1.42f; if (V3_dot(deltaPos,deltaPos) > rr * rr) continue;
                         Manifold mf = {0};
                         if      (e->collider == COLTYPE_CAP && o->collider == COLTYPE_CAP) { Entity_GetCap(e,&ca); Entity_GetCap(o,&cb); mf=OverlapToManifold(CapCap(ca,cb)); }
                         else if (e->collider == COLTYPE_CAP && o->collider == COLTYPE_BOX) { Entity_GetCap(e,&ca); Entity_GetBox(o,&bb); mf=OverlapToManifold(CapBox(ca,bb)); }
@@ -1028,7 +1028,7 @@ void Physics() {
                         else if (e->collider == COLTYPE_BOX && o->collider == COLTYPE_CVX) { Entity_GetBox(e,&ba); mf=BoxCvx(ba,o->colMeshIndex,&modelMatrices[b*16]); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); } // support=box(e)-mesh(o): e is 'A', flip
                         else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_BOX) { Entity_GetBox(o,&bb); mf=BoxCvx(bb,e->colMeshIndex,&modelMatrices[a*16]); } // support=box(o)-mesh(e): e is 'B', no flip
                         else if (e->collider == COLTYPE_CVX && o->collider == COLTYPE_CVX) { mf=CvxCvx(e->colMeshIndex,o->colMeshIndex,&modelMatrices[a*16],&modelMatrices[b*16]); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); } // support=meshA(e)-meshB(o): e is 'A', flip
-                        else { mf=OverlapToManifold(SphSph(World.position[i],e->colliderSize.x,World.position[b],o->colliderSize.x)); }
+                        else { mf=OverlapToManifold(SphSph(World.position[a],e->colliderSize.x,World.position[b],o->colliderSize.x)); }
                         if (mf.n && contactCount < 16) contacts[contactCount++] = (Contact){mf,b};
                     }
                 }
@@ -1053,8 +1053,38 @@ void Physics() {
     for (int i = 0; i < World.instCount; ++i) { Entity *e = &World.instances[i]; e->cellX = (i16)PosGetCellCoordX(World.position[i].x); e->cellZ = (i16)PosGetCellCoordZ(World.position[i].z); e->cellIndex = PosGetCellCoordsP(e->cellX, e->cellZ); } // Update cells for next substep
 }
 
-ENGINE_TO_MOD void AddForce(u16 i, V3 f, bool imp) { Entity *e = &World.instances[i]; if (imp) { World.velocity[i] = V3_AplusB(World.velocity[i],V3_ScaleByF(f,1.0f / vmax(e->mass,0.001f))); } else { e->accumulatedForce = V3_AplusB(e->accumulatedForce,f); } }
-ENGINE_TO_MOD void ApplyPlayerMovements() {
+void AddForce(u16 i, V3 f, bool imp) { Entity *e = &World.instances[i]; if (imp) { World.velocity[i] = V3_AplusB(World.velocity[i],V3_ScaleByF(f,1.0f / vmax(e->mass,0.001f))); } else { e->accumulatedForce = V3_AplusB(e->accumulatedForce,f); } }
+float GetBasePlayerSpeed(u16 p, bool running) {
+    InventorySystem* inv = Inv(p);
+    bool isSprinting = Sprint();
+    if (Cheats.noclip && isSprinting) return PLAYER_MAX_CYBER_SPEED * 2.5f;
+    if (Cheats.noclip) return PLAYER_MAX_CYBER_SPEED * 1.5f;
+    if (World.curLev == LEVEL_CYBERSPACE) return PLAYER_MAX_CYBER_SPEED; //Cyber space speed
+
+    float retval = PLAYER_MAX_WALK_SPEED, bonus = 0.0f;
+    if (World.boosterActive) bonus = PLAYER_BOOSTER_SPEED_BOOST;
+    BodyState bodyState = World.instances[PLAYER1].bodyState;
+    switch (bodyState) {
+        case BodyState_StandingUp   : case BodyState_Standing:  retval = PLAYER_MAX_WALK_SPEED;   break;
+        case BodyState_CrouchingDown: case BodyState_Crouch:    retval = PLAYER_MAX_CROUCH_SPEED; break;
+        case BodyState_Prone:         case BodyState_ProningDown: case BodyState_ProningUp: retval = PLAYER_MAX_PRONE_SPEED; break;
+    }
+
+    if ((isSprinting || World.boosterActive) && running) {
+        if (inv->fatigue > 80.0f && World.boosterActive) retval = PLAYER_MAX_SPRINT_SPEED_FATIGUED;
+        else                                                   retval = PLAYER_MAX_SPRINT_SPEED;
+
+        if (bodyState == BodyState_Standing || bodyState == BodyState_Crouch || bodyState == BodyState_CrouchingDown) {
+            retval -= ((PLAYER_MAX_WALK_SPEED - PLAYER_MAX_CROUCH_SPEED) * 1.5f); // Subtract off the difference in speed between walking and crouching from the sprint speed
+        } else if (bodyState == BodyState_Prone || bodyState == BodyState_ProningDown || bodyState == BodyState_ProningUp) {
+            retval -= ((PLAYER_MAX_WALK_SPEED - PLAYER_MAX_PRONE_SPEED) * 2.0f); // Subtract off the difference in speed between walking and proning from the sprint speed.
+        }
+    }
+
+    return retval + bonus;
+}
+
+void ApplyPlayerMovements() {
     float h = (float)Forward() - (float)Backpedal(), s = (float)StrafeRight() - (float)StrafeLeft();
     float vertInput = (float)SwimUp() - (float)SwimDn();
     Entity *p = &World.instances[PLAYER1];

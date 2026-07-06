@@ -1,18 +1,11 @@
 // voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake
 #include "common.h"
-#define MOD_INTEROP_ENGINE
-#include "interop.h"
 typedef __UINTPTR_TYPE__ uintptr_t; typedef __INTPTR_TYPE__ intptr_t;
 #define likely(x)   __builtin_expect(!!(x),1)
 #define unlikely(x) __builtin_expect(!!(x),0)
 #define NULL ((void *)0)
-#if defined(_WIN32) // Interop - To Mod (keep same as interop.h!!)
-    #define ENGINE_TO_MOD __declspec(dllexport) __cdecl
-#else
-    #define ENGINE_TO_MOD __attribute__((visibility("default")))
-#endif
 #define assert(cond) do { if (!(cond)) { DualLogError("[%s:%d]:%s(): Assert fail:%s\n",__FILE__,__LINE__,__func__,#cond); *(volatile int*)0 = 0; } } while(0) // Force a crash for debug
-ENGINE_TO_MOD void DualLogError(const char* fmt, ...); ENGINE_TO_MOD void DualLog(const char* fmt, ...); char* sFindSub(const char* haystack, const char* needle);
+char* sFindSub(const char* haystack, const char* needle);
 #if defined(_WIN32)
     #define WINDOWS
     #define MOD_EXTENSION ".dll" // e.g. Citadel.dll
@@ -53,7 +46,7 @@ ENGINE_TO_MOD void DualLogError(const char* fmt, ...); ENGINE_TO_MOD void DualLo
     INLINE int OS_ThreadCreate(OS_Thread* out, void*(*fn)(void*), void* arg) { void** b=(void**)HeapAlloc(GetProcessHeap(),0,2 * sizeof(void*)); b[0]=(void*)fn; b[1]=arg; out->handle=CreateThread(NULL,THRSTACKSZ,thrtramp,b,0,NULL); if(!out->handle){HeapFree(GetProcessHeap(),0,b); return -1;} return 0; }
     INLINE void OS_ThreadJoin(OS_Thread* t) { WaitForSingleObject(t->handle,0xFFFFFFFFUL); CloseHandle(t->handle); t->handle = NULL; }
     INLINE void OS_USleep(u32 usec) { Sleep((usec + 999) / 1000); }
-    ENGINE_TO_MOD double get_time() { static LARGE_INTEGER frequency,counter; static i32 init=0; if (!init) { QueryPerformanceFrequency(&frequency); init=1; } QueryPerformanceCounter(&counter); return (double)counter.QuadPart / frequency.QuadPart; }
+    double get_time() { static LARGE_INTEGER frequency,counter; static i32 init=0; if (!init) { QueryPerformanceFrequency(&frequency); init=1; } QueryPerformanceCounter(&counter); return (double)counter.QuadPart / frequency.QuadPart; }
 #else
     #define LINUX
     #define MOD_EXTENSION ".so" // e.g. Citadel.so
@@ -92,7 +85,7 @@ ENGINE_TO_MOD void DualLogError(const char* fmt, ...); ENGINE_TO_MOD void DualLo
     INLINE int OS_ThreadCreate(OS_Thread* out, void* (*fn)(void*), void* arg) { void* base = OS_AllocateRAM(THRSTACKSZ,0x1|0x2,0x02|0x20,INVALID_FHANDLE); if (!base || base == (void*)-1) return -1; struct OS_ThreadHead* head = (struct OS_ThreadHead*)((char*)base + THRSTACKSZ) - 1; head->trampoline = thrtramp; head->fn=fn; head->arg=arg; head->join_futex=0; head->_pad=0; long tid = OS_CloneSyscall(head); if(tid < 0){OS_Free(base,THRSTACKSZ); return (int)tid;} out->head=head; out->stack_base=base; return 0; } // Multithreading taken from https://github.com/skeeto/scratch/blob/master/misc/stack_head.c Ref: https://nullprogram.com/blog/2023/03/23/ This is free and unencumbered software released into the public domain.
     INLINE void OS_ThreadJoin(OS_Thread* t) { int v; while ((v = __atomic_load_n(&t->head->join_futex, __ATOMIC_SEQ_CST)) == 0) SYSCALL4(202, &t->head->join_futex, 0 /*FUTEX_WAIT*/, v, 0); OS_Free(t->stack_base,THRSTACKSZ); t->head = NULL; t->stack_base = NULL; }
     INLINE  void OS_USleep(u32 usec) { long ts[2] = {usec / 1000000,(usec % 1000000) * 1000L}; SYSCALL2(35,ts,ts); }
-    ENGINE_TO_MOD double get_time() { struct {i64 s,ns;} ts; i64 ret; __asm__ __volatile__("syscall":"=a"(ret):"a"(228),"D"(1),"S"(&ts):"rcx","r11","memory"); if (ret != 0) {return 0.0;} return (double)ts.s + (double)ts.ns * 1e-9; } // Full time in seconds, 1 for MONOTONIC, Note that using clock_gettime wasn't any better for performance.
+    double get_time() { struct {i64 s,ns;} ts; i64 ret; __asm__ __volatile__("syscall":"=a"(ret):"a"(228),"D"(1),"S"(&ts):"rcx","r11","memory"); if (ret != 0) {return 0.0;} return (double)ts.s + (double)ts.ns * 1e-9; } // Full time in seconds, 1 for MONOTONIC, Note that using clock_gettime wasn't any better for performance.
 #endif
 INLINE void* OS_Alloc(size_t amount) { return OS_AllocateRAM(amount,0x1|0x2,0x02|0x20,INVALID_FHANDLE); } 
 INLINE void* OS_Calloc(size_t amount, size_t count) { return OS_Alloc(amount * count); }
@@ -135,22 +128,33 @@ i32 currentMouse_dx,currentMouse_dy; u8 currentPlayerNameLength=0; i8 currentMen
 #define MAX_SHADOWMAPS 128u
 #define NEAR_PLANE (0.02f)
 #define ONE_OVER_SQRT2 0.70710678118f
-GlobalContext World = {0}; TextSystem Sys_Text; InputSystem Sys_Input; CheatsSystem Cheats = {.god=false,.noclip=false,.showLocation=true,.showFPS=true,.editMode=false,.showPhys=false}; SystemUI Sys_UI;
-SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on first run for potatoes (e.g. won't crash for out of VRAM, or won't take 5min to init).
-    .InputCodeSettings = {
-        5, /*Forward=F*/     0,/*Strafe Left=A*/ 18,/*Backpedal=S*/ 3,/*Strafe Right=D*/ 100,/*Jump=SPACE*/ 2,/*Crouch=C*/   23,/*Prone=X*/    16,/*Lean Left=Q*/   4,/*Lean Right=E*/ 45,/*Sprint=LEFT SHIFT*/ 38,/*Turn Left=LF ARROW*/ 39,/*Turn Right=RT ARROW*/ 36,/*Look Up=UP ARROW*/     37,/*Look Down=DN ARROW*/   20,/*Recent Log=U*/    26,/*Biomonitor=1*/
-        27,/*Sensaround=2*/ 28,/*Lantern=3*/     29,/*Shield=4*/   30,/*Infrared=5*/      31,/*Email=6*/   32,/*Booster=7*/  33,/*Jumpjets=8*/ 56,/*Attack=LMB*/   57,/*Use=RMB*/      99,/*Menu/Back=ESCAPE*/  97,/*Toggle Mode=TAB*/    17,/*Reload=R*/           128,/*Weapon += MWHEEL + */ 129,/* Weapon - = MWHEEL - */ 6,/* Grenade   = G */ 19,/* Grenade + = T  */
-        131,/*Grenade-=*/   21,/*Ammo Type=V*/    9,/*Patch Use=J*/ 8,/*Patch+=I*/       132,/*Patch-=,*/  12,/*Full Map=M*/ 21,/*Swim Up= V*/  2,/*Swim Down=C*/ 102,/*Console=`*/   101/*Screenshot=F12*/},
-    .ScreenWidth=800u,.ScreenHeight=600u,.Fullscreen=0u,.FOV=65u,.Brightness=50u,.Gamma=50u,.FXAA=0u,.Shadows=0u,.Reflections=0u,.Vsync=0u,.ModelDetail=0u,.CurrentMonitor=0u,
-    .GI=0u,.SpeakerMode=1u,.Reverb=0u,.VolumeMaster=100u,.VolumeMusic=25u,.VolumeMessage=75u,.VolumeEffects=100u,.Language=0u,.DynamicMusic=1u,.Footsteps=1u,.InvertLook=0u,
-    .InvertCyberspaceLook=0u,.QuickItemPickup=0u,.QuickReloadWeapons=0u,.MouseSensitivity=10u,.NoShootMode=0u,.HeadBob=1u,.SSR_RES=4u};/*Ratio is (1 / SSR_RES) * res*/
+InputSystem Sys_Input; CheatsSystem Cheats = {.god=false,.noclip=false,.showLocation=true,.showFPS=true,.editMode=false,.showPhys=false}; SystemUI Sys_UI;
 Light lights[LIGHT_COUNT]; static u16 loadedLights = 0; LightAnimation lanims[LIGHT_COUNT]; static bool shadowBuffersCreated = false;
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6],playerFrustumPlanes[6];
 u16 editModeSelection,editModeTestEntityDefinition=0; double shadowTime; u32 shadowmapIndirectionList[LIGHT_COUNT]; u16 texCnt; bool doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS]; u32 drawCalls,uiDrawCalls,shadDrawCalls,vertsRendered,drawCallsNormal;
 static const u8 Mpg_FrontPage=0,Mpg_Singleplayer=1,Mpg_Multiplayer=2,Mpg_NewGame=3,Mpg_Load=4,Mpg_Options=5,Mpg_Save=6,Mpg_IntroVideo=7,Mpg_CreditsVideo=8; u8 currentMenuPage = Mpg_FrontPage; bool resDropdownOpen = false; int resDropdownCount=0,resSelectedIdx=0;
 typedef struct {int w,h;} ResMode; ResMode resModes[8];
 typedef struct { V3 position; Quaternion rotation; u8 fov; u16 width,height; float near,far,finished; bool visible; } CamView; CamView camViews[64]; u32 camViewTextures[64]; u8 camViewCount = 0; // Max is 8 cam views on level 8 + 3 sensaround views = 11.
+extern Entity EDefs[MAX_ENTITIES];
 #include "lib.c" // LibC Replacements and Helpers
+void TurnLightOff(u16 litIdx) { if (litIdx < loadedLights) {flag_set(&lights[litIdx].lflags,LIGHTON,false);} }
+typedef struct { float x,y,z,r,g,b,a; } DebugLineVertex;
+DebugLineVertex debugLineVerts[MAX_WIRELINE_VRTS * 2];
+INLINE void DrawDebugLines(float* viewProj) {
+    if (World.debugLineVertCount == 0) {return;}
+    glBindBuffer(GL_ARRAY_BUFFER,debugLinesVBO); glBufferSubData(GL_ARRAY_BUFFER,0,World.debugLineVertCount * sizeof(DebugLineVertex),debugLineVerts); glUseProgram(debugUnlitSP); glUniformMatrix4fv(0,1,GL_FALSE,viewProj); glLineWidth(1.0f); glDisable(GL_DEPTH_TEST); glBindVertexArray(debugLinesVAO); 
+    glDrawArrays(0x0001/*GL_LINES*/,0,World.debugLineVertCount); drawCalls++; vertsRendered += World.debugLineVertCount; glEnable(GL_DEPTH_TEST); World.debugLineVertCount = 0;
+}
+
+void AddWireLine(V3 start, V3 end, Color col) {
+    if (World.debugLineVertCount >= MAX_WIRELINE_VRTS - 2) return;
+    int i = World.debugLineVertCount;
+    debugLineVerts[i].x = start.x; debugLineVerts[i].y = start.y; debugLineVerts[i].z = start.z;
+    debugLineVerts[i].r = col.r; debugLineVerts[i].g = col.g; debugLineVerts[i].b = col.b; debugLineVerts[i].a = col.a; i++;
+    debugLineVerts[i].x = end.x; debugLineVerts[i].y = end.y; debugLineVerts[i].z = end.z;
+    debugLineVerts[i].r = col.r; debugLineVerts[i].g = col.g; debugLineVerts[i].b = col.b; debugLineVerts[i].a = col.a; i++;
+    World.debugLineVertCount = i;
+}
 #include "textures.c" // 2D Texture Load System
 #include "models.c" // 3D Model Load System
 #include "culling.c" // Culling System
@@ -160,8 +164,74 @@ typedef struct { V3 position; Quaternion rotation; u8 fov; u16 width,height; flo
 #include "console.c" // Console Sys - CHEATS!
 #include "audio.c" // Audio Sys
 #include "ray.c" // Raycast Sys
+// Game Specific Code
+void WeaponsUpdate();
+void UseTargets(u16 activator, const char* targetname);
+void Targetted(u16 activator, u16 self);
+void ButtonSwitchTargetted(u16 self, u16 activator);
+void ButtonSwitchUse(u16 self, u16 activator);
+void DoorUse(u16 self, u16 activator);
+void DoorTargetted(u16 self, u16 activator);
+void DoorActuate(u16 self);
+void DoorForceOpen(u16 self);
+void DoorForceClose(u16 self);
+void TriggerTargetted(u16 self, u16 activator);
+void TriggerCounterTargetted(u16 self, u16 activator);
+void FuncWallTargetted(u16 self, u16 activator);
+void ButtonSwitchInitAfterLoad(u16 self);
+void DoorInitAfterLoad(u16 self);
+void FuncWallInitAfterLoad(u16 self);
+void ForceBridgeInitBeforeLoad(u16 self);
+void ForceBridgeInitAfterLoad(u16 self);
+void GravityLiftInitAfterLoad(u16 self);
+void LogicTimerInitBeforeLoad(u16 self);
+void TeleportTouchInitAfterLoad(u16 self);
+void TextureChangerInitAfterLoad(u16 self);
+void CyberItemInitBeforeLoad(u16 self);
+void CyberMineInitBeforeLoad(u16 self);
+void CyberTimerInitAfterLoad(u16 self);
+void CyberSwitchInitAfterLoad(u16 self);
+void ExplosionLifeInitAfterLoad(u16 self);
+void ExplosionLifeUpdate(u16 self);
+void EmailTargetted(u16 self, u16 activator);
+void ForceBridgeActivate(u16 self, bool isSilent);
+void ForceBridgeToggle(u16 self);
+void GravityLiftToggle(u16 self);
+void TextureChangerToggle(u16 self);
+void ButtonSwitchUpdate(u16 self);
+void DoorUpdate(u16 self);
+void ForceBridgeUpdate(u16 self);
+void FuncWallUpdate(u16 self);
+void LogicTimerUpdate(u16 self);
+void DelayedSpawnUpdate(u16 self);
+void SearchFXResetUpdate(u16 self);
+void CyberTimerUpdate(u16 self);
+void GeneralInvApply(int buttonIdx, int customIdx);
+bool InventoryAddSoftwareItem(u16 p, u16 type, int vers);
+int Get16WeaponIndexFromConstIndex(int index);
+void UseGrenade(u16 playerIndex, int index);
+bool AICheckPain(Entity* self);
+void ResetHeldItem(u16 p);
+void DropHeldItem(u16 p);
+void AddItemToInventory(u16 p, int index, int customIndex);
+void TextureSequenceUpdate(u16 self);
+u16 AddInstance(u16 entIdx, V3 pos);
+void DeleteInstance(u16 i);
+u8 GetCurrentLevelSecurity();
+u16 GetImpactType(u16 instanceIdx);
+const char* GetPrefabNameFromIndex(int constIndex);
+void TakeEnergy(float drain);
+void GiveEnergy(float give, EnergyType type);
+void BioMonitorInit();
+void BioMonitorUpdate(u16 p);
+#include "citadel.c"
+#include "entity.c"
+#include "weapons.c"
+#include "automap.c"
+#include "biomonitor.c" // End game specific code includes
+#include "ai.c"
 // Credits Sys
-char creditStats[4096]; const char** creditPages = NULL;
+char creditStats[4096];
 INLINE float GetScore(float stupid, bool isFinal) {
     float victories = (float)(World.kills + World.cyberkills); if (isFinal) {victories -= vmin(World.ressurections * 10.0f, victories * 0.666f);}
     float secs  = vfloor((float)World.pauseRelativeTime / 3600.0f), score = victories * 10000.0f;
@@ -217,47 +287,6 @@ void ExtractFrustumPlanes(float* m, FrustumPlane* ps) {
     for (int i=0;i<6;i++) { float len = V3_Mag(ps[i].normal); if(len > 1e-6f){ps[i].normal.x /= len; ps[i].normal.y /= len; ps[i].normal.z /= len; ps[i].d /= len;} } //Normalize (could use V3_Normalize but need len for d term of FrustumPlane).
 }
 
-V3 lightsNewPosition[LIGHT_COUNT];
-ENGINE_TO_MOD i32 AddLight(Light* lit, LightAnimation* lanim) {
-    i32 i = loadedLights; loadedLights++; if (loadedLights >= LIGHT_COUNT) { DualLogError("Too many lights %u added in level %d!\n",i,World.curLev); OS_Exit(1); }
-    mcpy(&lights[i],lit,sizeof(Light)); mcpy(&lanims[i],lanim,sizeof(LightAnimation));
-    lightsNewPosition[i] = lit->pos; flag_set(&lights[i].lflags,LDIRTY,true);
-    return i;
-}
-
-ENGINE_TO_MOD void TurnLightOff(u16 litIdx) { if (litIdx < loadedLights) {flag_set(&lights[litIdx].lflags,LIGHTON,false);} }
-bool alreadyReadLightOnOnce[LIGHT_COUNT] = {0};
-ENGINE_TO_MOD void LoadFieldIntoLight(char* k, char* v, char* il, u32 ln, Light* lit, LightAnimation* lam, u16 lIdx) {
-    char* br = StringFindFirstCharWithin(k,'[');
-    if (br) {
-        int i = parse_numberu32(br + 1,il,ln);
-        if (i >= 0 && i < 32) { if(k[12] == 's'){lam->intervalSteps[i] = parse_float(v,il,ln);}else{lam->stepIsLerping[i] = parse_float(v,il,ln);} } /*"intervalSteps[" index 12 is 's', "intervalStepisLerping[" index 12 is 'i'*/
-        return;
-    }
-    static const struct { const char* key; u16 offset; u8 type; } map[] = {
-        {"currentStep",    __builtin_offsetof(LightAnimation,currentStep),1},{"lerpValue",      __builtin_offsetof(LightAnimation,lerpValue),0},{"intervalSteps.Length",__builtin_offsetof(LightAnimation,numIntervalSteps),1},{"intervalStepisLerping.Length",__builtin_offsetof(LightAnimation, numLerpSteps),1},
-        {"localPosition.x",__builtin_offsetof(Light,pos.x),0},               {"localPosition.y",__builtin_offsetof(Light,pos.y),0},             {"localPosition.z",     __builtin_offsetof(Light,pos.z),0},                    {"localRotation.x",             __builtin_offsetof(Light,spotDir.x),0},
-        {"localRotation.y",__builtin_offsetof(Light,spotDir.y),0},           {"localRotation.z",__builtin_offsetof(Light,spotDir.z),0},         {"localRotation.w",     __builtin_offsetof(Light,spotDir.w),0},                {"range",                       __builtin_offsetof(Light,range),0},
-        {"spotAngle",      __builtin_offsetof(Light,spotAng),0},             {"minIntensity",   __builtin_offsetof(Light,minIntensity),0},      {"maxIntensity",        __builtin_offsetof(Light,maxIntensity),0},             {"color.r",__builtin_offsetof(Light,col.r),0},{"color.g",__builtin_offsetof(Light,col.g),0},{"color.b",__builtin_offsetof(Light,col.b),0}
-    };
-    for (int i = 0; i < (int)(sizeof(map)/sizeof(map[0])); i++) {
-        if (sEqual(k, map[i].key)) { // Types: 0 = float, 1 = u8.  Check key prefix to decide if pointing at 'lit' or 'lam'
-            void* dest = (k[0] == 'l' && k[1] == 'o') ? (void*)lit : (void*)lam;
-            if (k[0] == 'r' || k[0] == 's' || k[0] == 'm' || k[0] == 'c') {
-                if (k[1] != 'u') dest = (void*)lit; // range, spot, max, color (not currentStep)
-            }
-            char* ptr = (char*)dest + map[i].offset;
-            if (map[i].type == 0) *(float*)ptr = parse_float(v,il,ln);
-            else                  *(u8*)ptr = parse_numberu8(v,il,ln);
-            return;
-        }
-    }
-    if (sEqual(k,"intensity")) lit->intensity = lit->maxIntensity = parse_float(v,il,ln) * 0.35f;
-    else if (sEqual(k,"type")) flag_set(&lit->lflags, (v[0] == 'S') ? LSPOT : LDIR, true);
-    else if (sEqual(k,"lightOn") && !alreadyReadLightOnOnce[lIdx]) { alreadyReadLightOnOnce[lIdx] = true; flag_set(&lit->lflags,LIGHTON,parse_bool(v,il,ln)); }
-    else if (sEqual(k,"lerpOn")) flag_set(&lit->lflags,LERPON,parse_bool(v,il,ln));
-}
-
 INLINE void mul_mat4(float *out, const float *a, const float *b) { // out = a * b
     out[0] =  a[0] * b[0]  + a[4] * b[1]  + a[8]  * b[2] + a[12]  * b[3]; out[1] =  a[1] * b[0]  + a[5] * b[1]  + a[9]  * b[2] + a[13]  * b[3];
     out[2] =  a[2] * b[0]  + a[6] * b[1] + a[10]  * b[2] + a[14]  * b[3]; out[3] =  a[3] * b[0]  + a[7] * b[1] + a[11]  * b[2] + a[15]  * b[3];
@@ -268,57 +297,6 @@ INLINE void mul_mat4(float *out, const float *a, const float *b) { // out = a * 
     out[12] = a[0] * b[12] + a[4] * b[13] + a[8] * b[14] + a[12] * b[15]; out[13] = a[1] * b[12] + a[5] * b[13] + a[9] * b[14] + a[13] * b[15];
     out[14] = a[2] * b[12] + a[6] * b[13] + a[10]* b[14] + a[14] * b[15]; out[15] = a[3] * b[12] + a[7] * b[13] + a[11]* b[14] + a[15] * b[15];
 }
-
-Quaternion cubeQuats[6] = {{0.0f,ONE_OVER_SQRT2,0.0f,ONE_OVER_SQRT2}/*+X:Right*/,{0.0f,-ONE_OVER_SQRT2,0.0f,ONE_OVER_SQRT2}/*-X:Left*/,{-ONE_OVER_SQRT2,0.0f,0.0f,ONE_OVER_SQRT2}/*+Y:Up*/,{ONE_OVER_SQRT2,0.0f,0.0f,ONE_OVER_SQRT2}/*-Y:Down*/,{0.0f,0.0f,0.0f,1.0f}/*+Z:Forward*/,{0.0f,1.0f,0.0f,0.0f}/*-Z:Backward*/ };
-void UpdateLights() {
-    for (u16 lightIdx = 0; lightIdx < loadedLights; ++lightIdx) {
-        V3 lightPos = lightsNewPosition[lightIdx];
-        lights[lightIdx].pos = lightPos;
-        if (lights[lightIdx].lflags & LDIRTY) { // Marked all as true at level load.
-            flag_set(&lights[lightIdx].lflags,LDIRTY,false);
-            #pragma GCC unroll 6
-            for (int j=0;j<6;++j) { // Update to new position
-                mat4_lookat_from((float*)lightView[lightIdx][j],&cubeQuats[j],lightPos);
-                mul_mat4((float*)lightViewProj[lightIdx][j],shadowmapsPerspectiveProjection,(float*)lightView[lightIdx][j]);
-                ExtractFrustumPlanes((float*)lightViewProj[lightIdx][j],lightFrustumPlanes[lightIdx][j]);
-            }
-        }
-    }
-    if (!World.paused && !World.menuActive) {
-        for (int i=0;i<loadedLights;++i) { // Just lerps/flickers in intensity
-            if (lanims[i].numIntervalSteps < 1) continue;
-            if (!(lights[i].lflags & LIGHTON)) { lights[i].intensity = 0.0f; continue; }
-            if (lanims[i].lerpTime < (float)World.pauseRelativeTime) {
-                lights[i].intensity = lanims[i].lerpUp ? lights[i].maxIntensity : lights[i].minIntensity; // Pick target to lerp towards
-                lanims[i].lerpUp = !lanims[i].lerpUp;
-                lanims[i].currentStep++; if (lanims[i].currentStep >= lanims[i].numIntervalSteps) lanims[i].currentStep = 0; // Wrap and start over continuous looping
-                lanims[i].lerpStepTime = lanims[i].intervalSteps[lanims[i].currentStep];
-                lanims[i].lerpTime = (float)World.pauseRelativeTime + lanims[i].lerpStepTime;
-                lanims[i].lerpStartTime = (float)World.pauseRelativeTime;
-            } else if (lights[i].lflags & LERPON) {
-                if (lanims[i].currentStep < lanims[i].numLerpSteps) {
-                    if (lanims[i].stepIsLerping[lanims[i].currentStep]) {
-                        lanims[i].lerpValue = ((float)World.pauseRelativeTime - lanims[i].lerpStartTime)/(lanims[i].lerpTime - lanims[i].lerpStartTime); // percent towards goal time
-                        float lerpVal = lanims[i].lerpUp ? lanims[i].lerpValue : (1.0f - lanims[i].lerpValue);
-                        lanims[i].lerpValue = lights[i].minIntensity + ((lights[i].maxIntensity - lights[i].minIntensity) * lerpVal);
-                        lights[i].intensity = lanims[i].lerpValue;
-                    }
-                }
-            }
-        }
-    }
-    glBindBuffer(GL_SSBO,lightsID); glBufferData(GL_SSBO,loadedLights * sizeof(Light),lights,GL_DYNAMIC_DRAW);
-    glUseProgram(voxelUpdateSP); glUniform3f(5,World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z);
-    glDispatchCompute((VOXELS_X+15)/16,(VOXELS_Z+15)/16,1);
-}
-
-#define CHGD(a,b) (vabs((a) - (b)) > 0.0001f)
-ENGINE_TO_MOD void UpdateLight(u16 i, V3 pos, Color3 col, float range, float intensity, float max, float min, float spotAng, Quaternion spotDir, bool on, bool shad) {
-    bool changed = ((!!(lights[i].lflags & SHADON) - shad) || (!!(lights[i].lflags & LIGHTON) -  on) || CHGD(lights[i].range,range) || CHGD(lights[i].pos.x,pos.x) || CHGD(lights[i].pos.y,pos.y) || CHGD(lights[i].pos.z,pos.z));
-    lights[i].intensity=intensity; lights[i].minIntensity=min; lights[i].maxIntensity=max; lights[i].spotAng=spotAng; lights[i].spotDir=spotDir; lights[i].col=col; lights[i].pos=lightsNewPosition[i]=pos; lights[i].range=range;
-    flag_set(&lights[i].lflags,19,(lights[i].lflags&LDIRTY)|changed<<4|on|shad<<1);
-}
-#undef CHGD
 
 void RenderUIImage(i16 x, i16 y, i16 width, i16 height, u32 texIndex) {
     glUseProgram(uiSP); glDisable(GL_BLEND); glBindVertexArray(textVAO); glUniform1ui(0,texIndex); glBindBuffer(GL_ARRAY_BUFFER,textVBO);
@@ -353,7 +331,6 @@ void UpdateScreenSize(i32 width, i32 height) {
     glBindFramebuffer(GL_FRAMEBUFFER,0); ignore_next_mouse_delta = true;
 }
 
-ENGINE_TO_MOD void AddCamView(V3 p, Quaternion r, u8 fv, u16 w, u16 h, float nr, float fr) { camViews[camViewCount] = (CamView){p,r,fv,w,h,nr,fr,World.pauseRelativeTime + (camViewCount * 0.05f) + 0.5f,false};/*Staggered for perf*/ GenBTexture(&camViewTextures[camViewCount],GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/); camViewCount++; }
 bool MenuEnter() { return (Sys_Input.keyStates[KEY_KP_ENTER].pressed || Sys_Input.keyStates[KEY_ENTER].pressed); }
 static inline __attribute__((always_inline,pure)) bool CursorIsOverBounds(float startX, float endX, float startY, float endY) { return World.cursorPosition_x >= startX && World.cursorPosition_x <= endX  /* 0 == left */ && World.cursorPosition_y >= startY && World.cursorPosition_y <= endY; /* 0 ==  top */ }
 u8 UI_Interactable(i16 x, i16 y, float w, float h, bool* cursorOver, i8 this, bool sustained) {
@@ -402,7 +379,7 @@ bool UI_Checkbox(i16 x, i16 y, i8 mitem, u16 textIdx, bool currentlyOn) {
 }
 
 void UI_HeaderText(i16 x, const char* text) { RenderFormattedText(x,50,T_GREEN_MENU_SHADOW,FONT_STOPD,1.75f,text); RenderFormattedText(x,46,T_GREEN_MENU_GLOW,FONT_STOPD,1.75f,text); RenderFormattedText(x,48,T_GREEN_MENU,FONT_STOPD,1.75f,text); }
-ENGINE_TO_MOD void MenuGoBack() {
+void MenuGoBack() {
     if (returnToPause) { returnToPause = false; World.paused = true; World.menuActive = false; PlayGameMusic(); }
     if (currentMenuPage == Mpg_Singleplayer || currentMenuPage == Mpg_Multiplayer || currentMenuPage == Mpg_Options) currentMenuPage = Mpg_FrontPage;//News
     else if (currentMenuPage == Mpg_Load || currentMenuPage == Mpg_NewGame || currentMenuPage == Mpg_IntroVideo || currentMenuPage == Mpg_CreditsVideo) currentMenuPage = Mpg_Singleplayer;
@@ -581,24 +558,6 @@ void RenderPausedUI() {
     if (UI_Button(522,714, 322,42, &overQuit, 5) || (MenuEnter() && currentMenuItem == 5)) OS_Exit(0);
     overQuit = overQuit || currentMenuItem == 5;
     RenderFormattedText(572,690,overQuit ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.0f,/*"QUIT GAME"*/Sys_Text.stringTable[729]);
-}
-
-typedef struct { float x,y,z,r,g,b,a; } DebugLineVertex;
-DebugLineVertex debugLineVerts[MAX_WIRELINE_VRTS * 2];
-INLINE void DrawDebugLines(float* viewProj) {
-    if (World.debugLineVertCount == 0) {return;}
-    glBindBuffer(GL_ARRAY_BUFFER,debugLinesVBO); glBufferSubData(GL_ARRAY_BUFFER,0,World.debugLineVertCount * sizeof(DebugLineVertex),debugLineVerts); glUseProgram(debugUnlitSP); glUniformMatrix4fv(0,1,GL_FALSE,viewProj); glLineWidth(1.0f); glDisable(GL_DEPTH_TEST); glBindVertexArray(debugLinesVAO); 
-    glDrawArrays(0x0001/*GL_LINES*/,0,World.debugLineVertCount); drawCalls++; vertsRendered += World.debugLineVertCount; glEnable(GL_DEPTH_TEST); World.debugLineVertCount = 0;
-}
-
-ENGINE_TO_MOD void AddWireLine(V3 start, V3 end, Color col) {
-    if (World.debugLineVertCount >= MAX_WIRELINE_VRTS - 2) return;
-    int i = World.debugLineVertCount;
-    debugLineVerts[i].x = start.x; debugLineVerts[i].y = start.y; debugLineVerts[i].z = start.z;
-    debugLineVerts[i].r = col.r; debugLineVerts[i].g = col.g; debugLineVerts[i].b = col.b; debugLineVerts[i].a = col.a; i++;
-    debugLineVerts[i].x = end.x; debugLineVerts[i].y = end.y; debugLineVerts[i].z = end.z;
-    debugLineVerts[i].r = col.r; debugLineVerts[i].g = col.g; debugLineVerts[i].b = col.b; debugLineVerts[i].a = col.a; i++;
-    World.debugLineVertCount = i;
 }
 
 u8 MFD_LefTab=0,MFD_CenterTab=0,MFD_RightTab=0;
@@ -956,8 +915,7 @@ void UpdateInstanceMatrix4x4s() {
     glBufferSubData(GL_SSBO,offsetFloats * sizeof(float),countFloats * sizeof(float),modelMatrices + offsetFloats);
 }
 // Init && Main
-ENGINE_TO_MOD void InitializeEntity(Entity* e) { mset(e,0,sizeof(Entity)); u16 idx=(u16)(e - World.instances); e->index=U16_MAX; e->entflags=EF_ACTIVE; e->kinematic=true; e->layer=L_Default; e->camView=255; e->tickTime = 0.35f; e->angularDrag = 0.05f; e->modelIndex=e->lodIndex=e->colMeshIndex=MAX_MDLS; e->texIndex=e->glowIndex=e->specIndex=e->normIndex = MAX_TXRS; World.scale[idx].x=World.scale[idx].y=World.scale[idx].z=e->mass=e->volume=World.rotation[idx].w=1.0f; e->dynamicFriction = e->staticFriction = 0.6f; }
-ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
+void LoadLevel(u8 curlevel) {
     double start_time = get_time();
     DebugRAM("start of LoadLevel");
     World.levelCurrentlyLoading = true; World.paused = false; World.menuActive = false;
@@ -980,7 +938,7 @@ ENGINE_TO_MOD void LoadLevel(u8 curlevel) {
         ComputeConvexMeshInertiaTensor(e);
         if (e->mass < 0.001f && e->collider != COLTYPE_NONE && e->collider != COLTYPE_MSH && (e->entflags & EF_RIGIDBODY)) {e->mass = 0.2f; /*At least something!*/}
     }
-    ModInitAfterLoad(); ResetLevelAudio(); ResetLevelMusic(); creditPages = GetCreditsText();
+    ModInitAfterLoad(); ResetLevelAudio(); ResetLevelMusic();
     RenderLoading(110,"Loading cull system..."); CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
     glUseProgram(voxelUpdateSP); glUniform2f(0,World.voxelMinCenterX[World.curLev],World.voxelMinCenterZ[World.curLev]); glUniform1f(1,World.farPlane[World.curLev] * World.farPlane[World.curLev]); glUniform1ui(2,loadedLights); glUniform2f(3,World.worldMin_x[World.curLev],World.worldMin_z[World.curLev]); 
     RenderLoading(120,"Loading voxel lighting data...");
@@ -994,7 +952,12 @@ __attribute__((cold)) void NewGame() { // Reset World States
     DualLog("Loading new game...\n");
     RenderLoading(100,"Loading new game...");
     World.menuActive = World.paused = enteringPlayerName = fovSliderActive = gammaSliderActive = masterVolumeSliderActive = musicVolumeSliderActive = messageVolumeSliderActive = sfxVolumeSliderActive = returnToPause = false;
-    SetGlobalsModData();
+    for (int i=0;i<World.numLevels;++i) {
+        World.worldMin_x[i] = levMins[i].x; World.worldMin_z[i] = levMins[i].y;
+        World.voxelMinCenterX[i] = World.worldMin_x[i] + VOXEL_HALF; World.voxelMinCenterZ[i] = World.worldMin_z[i] + VOXEL_HALF;
+        World.farPlane[i] = lFars[i];
+        World.fogColor[i] = fogLUT[i]; World.fogColor[i].a *= 3.8f;
+    }
     currentMenuItem = currentMenuTab = 0; currentMenuPage = Mpg_FrontPage;
     World.pauseRelativeTime = World.last_physics_time = 0.0; World.pauseRelativeTime=World.last_physics_time=0.0; World.deltaTime=0.0166666666f;
     mset(World.instances,0,3 * sizeof(Entity)); // Blank out player entities
@@ -1009,8 +972,9 @@ __attribute__((cold)) void NewGame() { // Reset World States
     ModNewGame();
 }
 
+
+// Init
 void GoIntoGame() { NewGame(); PlayGameMusic(); DualLog("Player named \"%s\" started the game!\n", World.playerName); }
-void* mod_handle = NULL;
 void InitalizeEnvironment() {
     double game_start_time = get_time(); random_range_rng = (u32)game_start_time; // Seed global rand uniquely with time since system boot.
     console_log_file = OS_OpenWriteonly("./voxen.log"); // Initialize log system for all prints to go to both stdout and voxen.log file
@@ -1070,17 +1034,15 @@ void InitalizeEnvironment() {
     RenderLoading(40,"Loading...");
     float* m = shadowmapsPerspectiveProjection; float lightRangeMax=15.36f; float viewRange=(lightRangeMax - NEAR_PLANE);
     m[0]=1.0f; m[1]=0.0f; m[2]=0.0f; m[3]=0.0f; m[4]=0.0f; m[5]=1.0f; m[6]=0.0f; m[7]=0.0f; m[8]=0.0f; m[9]=0.0f; m[10]=-(lightRangeMax + NEAR_PLANE) / viewRange; m[11]=-1.0f; m[12]=0.0f; m[13]=0.0f; m[14]=-2.0f * lightRangeMax * NEAR_PLANE / viewRange; m[15]=0.0f;
-    InitSCFTables(); InitAudio();
-    char mod_path[256]; scpy_to_a_from_b(mod_path,"./",256); sCat(mod_path,global_dllname,256); sCat(mod_path,MOD_EXTENSION,256);
-    mod_handle = OS_DlOpen(mod_path); if (!mod_handle) { DualLogError("Failed to load mod at:%s",mod_path); OS_Exit(1); }
-    #define X(ret, name, params) name = (ret (*) params)OS_DlSym(mod_handle,#name); if(!name) DualLogError("Failed to load mod function: %s",#name);
-    MOD_FUNCTION_LIST(X)
-    #undef X
-    ModLink(&World,&Cheats,&Sys_Settings,&Sys_Text,&Sys_UI); // Link engine to mod
-    World.GetKey=GetKey; World.GetKeyPressed=GetKeyPressed; // Link mod to engine
+    InitSCFTables();
+    InitAudio();
     ModEDefsInitAfterLoad();
     glGenFramebuffers(1,&gBufferFBO);
-    ChangeFullScreenWindowed(); SetSkyRotateSpeed(); SetVSync(); LoadTextForLanguage(Sys_Settings.Language); LoadLogTextForLanguage(Sys_Settings.Language); // Apply settings after loading of text and game data.
+    ChangeFullScreenWindowed();
+    SetSkyRotateSpeed();
+    SetVSync();
+    LoadTextForLanguage(Sys_Settings.Language);
+    LoadLogTextForLanguage(Sys_Settings.Language);
     glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO);
     u32 drawBuffers[] = {GL_COLOR_ATTACHMENT0,GL_COLOR_ATTACHMENT1,GL_COLOR_ATTACHMENT2};
     glDrawBuffers(3,drawBuffers);

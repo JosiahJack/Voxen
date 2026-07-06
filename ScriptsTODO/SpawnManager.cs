@@ -22,18 +22,18 @@ public class SpawnManager : MonoBehaviour {
 	private static StringBuilder s1 = new StringBuilder();
 
 	void Start() {
-		delayFinished = World->pauseRelativeTime;
-		if (World->diffCbt == 1) {
+		delayFinished = World.pauseRelativeTime;
+		if (World.diffCbt == 1) {
 			numberToSpawn = (int) vfloor(numberToSpawn*0.5f);
 			if (numberToSpawn < 1) numberToSpawn = 1;
 		}
 
-		if (World->diffCbt == 3) {
+		if (World.diffCbt == 3) {
 			numberToSpawn = (int) vfloor(numberToSpawn*1.5f);
 			if (numberToSpawn < 1) numberToSpawn = 1;
 		}
 
-		if (World->diffCbt > 3) {
+		if (World.diffCbt > 3) {
 			numberToSpawn = (int) vfloor(numberToSpawn*5f); // Hehe :)
 		}
 	}
@@ -41,12 +41,12 @@ public class SpawnManager : MonoBehaviour {
 	public void Activate(bool alertEnemies) {
 		alertEnemiesOnAwake = alertEnemies;
 		active = true;
-		delayFinished = World->pauseRelativeTime;
+		delayFinished = World.pauseRelativeTime;
 	}
 
 	void Update() {
-		if (World->paused) return;
-		if (World->menuActive) return;
+		if (World.paused) return;
+		if (World.menuActive) return;
 		if (!active) return;
 
 		if (LevelManager.a.npcsm[LevelManager.a.currentLevel] == null) return;
@@ -68,29 +68,29 @@ public class SpawnManager : MonoBehaviour {
 		if (numberActive != count) numberActive = count;
 
 		if (numberActive >= numberToSpawn) return;
-		if (delayFinished >= World->pauseRelativeTime) return; // Not yet.
+		if (delayFinished >= World.pauseRelativeTime) return; // Not yet.
 
-		delayFinished = World->pauseRelativeTime
+		delayFinished = World.pauseRelativeTime
 						+ random_range(minDelayBetweenSpawns,
 									   maxDelayBetweenSpawns);
 
 		Spawn(index); // spawn then wait randomized amount of time
 		count++;
 		if (count >= numberToSpawn) {
-			delayFinished = World->pauseRelativeTime + allSpawnedResetDelay;
+			delayFinished = World.pauseRelativeTime + allSpawnedResetDelay;
 		}
 	}
 
 	void Spawn(int index) {
-		if (World->diffCbt == 0) return; // Not on combat diff 0
+		if (World.diffCbt == 0) return; // Not on combat diff 0
 
 		DualLog("Spawning new enemy " + index.ToString());
 		dynamicObjectsContainer = LevelManager.a.GetCurrentDynamicContainer();
 		V3 spot = GetRandomLocation();
 		if (spot.x == 0 && spot.y == 0 && spot.z == 0) return;
 
-		u16 instGO = SpawnDynamicObject(index,World->curLev,false,null,-1);
-        SetPosition(&World->instances[instGO],spot,true);
+		u16 instGO = SpawnDynamicObject(index,World.curLev,false,null,-1);
+        SetPosition(&World.instances[instGO],spot,true);
         if (!alertEnemiesOnAwake) {
             if (aic.index != 14) aic.wandering = true;
             return;
@@ -114,7 +114,7 @@ public class SpawnManager : MonoBehaviour {
 	}
 
 	bool AreaHidden(V3 spot) {
-		V3 plyPos = Const.a.player1Capsule.World->instances[i].position;
+		V3 plyPos = Const.a.player1Capsule.World.instances[i].position;
 		if (V3_Dist(plyPos,spot) > 50.0f) return true;
 
 		int mask = Const.a.layerMaskNPCAttack;

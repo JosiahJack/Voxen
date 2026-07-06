@@ -55,11 +55,11 @@ public class PuzzleGridPuzzle : MonoBehaviour {
 		}
 
 		if (GetCurrentLevelSecurity() > securityThreshhold) {
-			Eng_UI->BlockedBySecurity(World->instances[i].position);
+			Sys_UI.BlockedBySecurity(World.instances[i].position);
 			return;
 		}
 
-		if (Eng_Cheats->superoverride || World->diffMis == 0) {
+		if (Cheats.superoverride || World.diffMis == 0) {
 			// SHODAN can go anywhere!  Full security override!
 			locked = false;
 		}
@@ -85,10 +85,10 @@ public class PuzzleGridPuzzle : MonoBehaviour {
 			alreadyOpen = true;
 		}
 
-		Eng_UI->SendGridPuzzleToDataTab(grid,cellType,gridType,
+		Sys_UI.SendGridPuzzleToDataTab(grid,cellType,gridType,
 											 sourceIndex,outputIndex,width,
 											 height,theme,target,ud,
-											 World->instances[i].position,this);
+											 World.instances[i].position,this);
 	}
 
 	public void UseTargets (GameObject owner) {

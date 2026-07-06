@@ -1,7 +1,7 @@
 // lib.c - LibC replacement functions and other misc helpers.
 static i32 PosGetCellCoordX(float x) { return (u16)clamp((i32)vfloor((x - World.worldMin_x[World.curLev] + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
 static i32 PosGetCellCoordZ(float z) { return (u16)clamp((i32)vfloor((z - World.worldMin_z[World.curLev] + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
-ENGINE_TO_MOD size_t slen(const char* s) { if (s == NULL) {return 0;} const char *p=s; while (*(p++)); return (size_t)(p - s - 1); } // strlen replacement
+size_t slen(const char* s) { if (s == NULL) {return 0;} const char *p=s; while (*(p++)); return (size_t)(p - s - 1); } // strlen replacement
 char* data_parser_trim(char* s) { while(cEmpty((u8)*s)){s++;} if (*s == 0){return s;} char* e=s + slen(s) - 1; while(e > s && cEmpty((u8)*e)){e--;} e[1]=0; return s; }
 i32 s2i32(const char *str) { // atoi replacement, needed separately from fast_atoi for user console input
     while (cEmpty(*str)) {str++;} int sign = 1; if (*str == '-') { sign = -1; str++; } else if (*str == '+') {str++;} if (*str < '0' || *str > '9') return 0;
@@ -10,17 +10,17 @@ i32 s2i32(const char *str) { // atoi replacement, needed separately from fast_at
     return (i32)(sign * result);
 }
 
-ENGINE_TO_MOD bool cEmpty(const char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r'; } // isspace replacement
-ENGINE_TO_MOD bool sEmpty(const char* a) { if (!a || *a == '\0') {return true;} for (size_t i=0;a[i]!='\0';++i) { if(!cEmpty(a[i])){return false;} } return true; } // C# String.IsNullOrWhiteSpace replacement
-ENGINE_TO_MOD bool sEqual(const char* a, const char* b) { size_t sz = slen(a); if(sz != slen(b)) {return false;} for(size_t i=0;i<sz;++i) { if(a[i] != b[i]){return false;} if(a[i] == '\0'){break;} } return true; } // !strcmp replacement (hated its inverted logic)
+bool cEmpty(const char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r'; } // isspace replacement
+bool sEmpty(const char* a) { if (!a || *a == '\0') {return true;} for (size_t i=0;a[i]!='\0';++i) { if(!cEmpty(a[i])){return false;} } return true; } // C# String.IsNullOrWhiteSpace replacement
+bool sEqual(const char* a, const char* b) { size_t sz = slen(a); if(sz != slen(b)) {return false;} for(size_t i=0;i<sz;++i) { if(a[i] != b[i]){return false;} if(a[i] == '\0'){break;} } return true; } // !strcmp replacement (hated its inverted logic)
 int sCompUpToLen(const char* s1, const char* s2, size_t n) { const u8 *p1 = (const u8*)s1, *p2 = (const u8*)s2; while (n-- > 0) { if (*p1 != *p2) {return (*p1 < *p2) ? -1 : 1;}  if (*p1 == '\0') {break;} p1++; p2++; } return 0; } // !strncmp replacement (yes inverted for sanity)
-ENGINE_TO_MOD void scpy_to_a_from_b(char* a, const char* b, size_t bufsz) { size_t szb=slen(b); if (szb>=bufsz) { DualLogError("scpy_to_a_from_b: B bigger than buffer\n"); OS_Exit(1); } for(size_t i=0;i<szb;++i){a[i]=b[i];} a[szb] = '\0'; } // strcpy replacement
+void scpy_to_a_from_b(char* a, const char* b, size_t bufsz) { size_t szb=slen(b); if (szb>=bufsz) { DualLogError("scpy_to_a_from_b: B bigger than buffer\n"); OS_Exit(1); } for(size_t i=0;i<szb;++i){a[i]=b[i];} a[szb] = '\0'; } // strcpy replacement
 void sCpy2aSubFromb(char* a, size_t subsz, const char* b, size_t bufsz) { if (subsz >= bufsz) { DualLogError("sCpy2aSubFromb substring overflow!\n"); OS_Exit(1); } bool ended=0; for(size_t i= 0;i<subsz;++i){ if(!ended && b[i] == '\0'){ended=1;} if(ended){a[i]='\0';}else{a[i]=b[i];} } a[subsz]='\0'; } // strncpy replacement (hopefully my mnemonic "a_subfrom_b" will help)
 void sCat(char* a, const char* b, size_t bufsz) { size_t sza=slen(a), szb=slen(b); if (sza + szb >= bufsz) { DualLogError("sCat overflow\n"); } char* dest = a + sza; for(size_t i=0;i<szb;++i){dest[i]=b[i];} dest[szb]='\0'; } // strcat replacement
 char c2Lower(const char c) { return c + ((c >= 'A' && c <= 'Z') ? 32 : 0); } // If uppercase 'A'-'Z' (65-90), +32 into 'a'-'z' (97-122)
 char* sFindSub(const char* s, const char* sub) { if (sub[0] == '\0') {return (char*)s;} for (size_t i = 0; s[i] != '\0'; ++i) { if (s[i] == sub[0]/*Only look if first matches*/) { size_t si=i, subi=0; while (s[si] != '\0' && sub[subi] != '\0' && s[si] == sub[subi]){si++; subi++;} if(sub[subi] == '\0'){return (char*)&s[i];} } } return NULL;/*No match*/ } // strstr replacement
 const char* StringFindLastChar(const char* str, const char c) { const char* lastSeen = NULL; do { if (*str == c) lastSeen = str; } while (*str++); return lastSeen; } // strrchr replacement
-ENGINE_TO_MOD char* StringFindFirstCharWithin(const char *s, char c) { char* stringwalker = (char*)s; while (*stringwalker != c) { if (!*stringwalker) {return NULL;} stringwalker++; } return stringwalker; } // strchr replacement
+char* StringFindFirstCharWithin(const char *s, char c) { char* stringwalker = (char*)s; while (*stringwalker != c) { if (!*stringwalker) {return NULL;} stringwalker++; } return stringwalker; } // strchr replacement
 void double2str(char* dest, double value, int decs, size_t bufsz) {
     if (decs < 0 || decs > 9) { DualLogError("double2str: too many decimals\n"); OS_Exit(1); }
     if (value < 0.0) { if (bufsz < 2) {DualLogError("double2str: buffer too small A\n"); OS_Exit(1);} *dest++ = '-'; bufsz--; value = -value; }
@@ -37,7 +37,7 @@ void double2str(char* dest, double value, int decs, size_t bufsz) {
     dest[decs] = '\0';
 }
 
-ENGINE_TO_MOD int sFormatV(char* buf, size_t bufsz, const char* f, va_list args) {
+int sFormatV(char* buf, size_t bufsz, const char* f, va_list args) {
     if (bufsz == 0) return 0;
     size_t pos = 0;
     while (*f && pos < bufsz - 1) {
@@ -61,7 +61,7 @@ ENGINE_TO_MOD int sFormatV(char* buf, size_t bufsz, const char* f, va_list args)
     return (int)pos;
 }
 
-ENGINE_TO_MOD int sFormat(char* buffer, size_t bufsz, const char* format, ...) { va_list args; __builtin_va_start(args,format); int ret = sFormatV(buffer,bufsz,format,args); __builtin_va_end(args); return ret; } // snprintf replacement
+int sFormat(char* buffer, size_t bufsz, const char* format, ...) { va_list args; __builtin_va_start(args,format); int ret = sFormatV(buffer,bufsz,format,args); __builtin_va_end(args); return ret; } // snprintf replacement
 char* sUpToEndLine(char* buf, int sz, FHandle fd) {
     if (sz <= 1 || buf == NULL) {return NULL;}
     char* p=buf; int rem = sz - 1; static int pos=0, end=0; static char b[4096];
@@ -82,9 +82,9 @@ static void DualLogMain(const char *prefix, const char *fmt, va_list args) {
     if (console_log_file != INVALID_FHANDLE) { if(prefix){OS_Write(console_log_file,prefix,slen(prefix),"console.log"); OS_Write(console_log_file,"\033[0m ",5,"console.log");} OS_Write(console_log_file, buf, slen(buf),"console.log"); }
 }
 // Misc Helpers
-ENGINE_TO_MOD void DualLog(const char* s, ...) { va_list a; __builtin_va_start(a,s); DualLogMain(NULL,s,a); __builtin_va_end(a); }
-ENGINE_TO_MOD void DualLogWarn(const char* s, ...) { va_list a; __builtin_va_start(a,s); DualLogMain("\033[1;38;5;208mWARN:",s,a); __builtin_va_end(a); }
-ENGINE_TO_MOD void DualLogError(const char* s, ...) { va_list a; __builtin_va_start(a,s); DualLogMain("\033[1;31mERROR:",s,a); __builtin_va_end(a); }
+void DualLog(const char* s, ...) { va_list a; __builtin_va_start(a,s); DualLogMain(NULL,s,a); __builtin_va_end(a); }
+void DualLogWarn(const char* s, ...) { va_list a; __builtin_va_start(a,s); DualLogMain("\033[1;38;5;208mWARN:",s,a); __builtin_va_end(a); }
+void DualLogError(const char* s, ...) { va_list a; __builtin_va_start(a,s); DualLogMain("\033[1;31mERROR:",s,a); __builtin_va_end(a); }
 void* mset(void *dst, int c, size_t n) { u8 *p=(u8 *)dst; u8 v=(u8)c; while (n--) {*p++=v;} return dst; } // memset replacement
 void BmpWrite(char const *filename, int x, int y, const void *data) {
     FHandle f = OS_OpenWriteonly(filename);
@@ -122,7 +122,7 @@ void DebugRAM(const char *context) { // Get USS aka the total RAM uniquely alloc
     //DualLog("Mem at %s: Heap %ub(%uKB|%.2fMB), USS %ub(%uKB|%.2fMB)\n",context,heap_bytes,heap_bytes / 1024,heap_bytes / 1024.0 / 1024.0,uss_bytes,uss_bytes / 1024,uss_bytes / 1024.0 / 1024.0);
 }
 
-ENGINE_TO_MOD void Screenshot() {    
+void Screenshot() {    
     World.screenshotTimeout = World.current_time + 1.0; // Prevent saving more than 1 per second for sanity purposes.
     OS_MakeFolder("Screenshots"); u16 w = Sys_Settings.ScreenWidth, h = Sys_Settings.ScreenHeight;
     u8* pixels = OS_Alloc(w * h * 4 * sizeof(char));
@@ -134,15 +134,15 @@ ENGINE_TO_MOD void Screenshot() {
 
 u32 random_range_rng = 0x12345678u;
 u32 xs32() { u32 x = random_range_rng; x ^= x << 13; x ^= x >> 17; x ^= x << 5; return random_range_rng = x ? x : 0xdeadbeefu; }
-ENGINE_TO_MOD u8 random_range_u8(u8 a, u8 b) { if (a > b) { u8 temp = a; a = b; b = temp; } if (a == b) {return a;} u32 r = (u32)b - a + 1u; u32 v,limit = 256u - (256u % r); do { v = xs32() & 0xFFu; } while (v >= limit); return (u8)(a + (v % r)); }
-ENGINE_TO_MOD u32 random_range_u32(u32 a, u32 b) { if (a > b) { u32 temp = a; a = b; b = temp; } if (a == b) {return a;} u64 range = (u64)b - a + 1u; return a + (u32)(((u64)xs32() * range) >> 32);  }
-ENGINE_TO_MOD i32 random_range_i32(i32 a, i32 b) { if (a > b) { i32 temp = a; a = b; b = temp; } if (a == b) {return a;} u64 range = (u64)((i64)b - a + 1); return a + (i32)(((u64)xs32() * range) >> 32); }
-ENGINE_TO_MOD float random_range(float a, float b) { float factor = ((float)(xs32() >> 8)) * (1.0f / 16777216.0f); return a + (b - a) * factor; }
+u8 random_range_u8(u8 a, u8 b) { if (a > b) { u8 temp = a; a = b; b = temp; } if (a == b) {return a;} u32 r = (u32)b - a + 1u; u32 v,limit = 256u - (256u % r); do { v = xs32() & 0xFFu; } while (v >= limit); return (u8)(a + (v % r)); }
+u32 random_range_u32(u32 a, u32 b) { if (a > b) { u32 temp = a; a = b; b = temp; } if (a == b) {return a;} u64 range = (u64)b - a + 1u; return a + (u32)(((u64)xs32() * range) >> 32);  }
+i32 random_range_i32(i32 a, i32 b) { if (a > b) { i32 temp = a; a = b; b = temp; } if (a == b) {return a;} u64 range = (u64)((i64)b - a + 1); return a + (i32)(((u64)xs32() * range) >> 32); }
+float random_range(float a, float b) { float factor = ((float)(xs32() >> 8)) * (1.0f / 16777216.0f); return a + (b - a) * factor; }
 u32 rand() { return xs32() & 0xFFFFu; }
 #define RAND_MAX 65535
-ENGINE_TO_MOD float lerp(float min, float max, float val) { return min + (max - min) * vclamp(val,0.0f,1.0f); }
-ENGINE_TO_MOD float inverse_lerp(float min, float max, float val) { return (min == max) ? 0.0f : vclamp((val - min) / (max - min),0.0f,1.0f); }
-ENGINE_TO_MOD float smooth_damp(float current, float target, float *current_velocity, float smooth_time) { 
+float lerp(float min, float max, float val) { return min + (max - min) * vclamp(val,0.0f,1.0f); }
+float inverse_lerp(float min, float max, float val) { return (min == max) ? 0.0f : vclamp((val - min) / (max - min),0.0f,1.0f); }
+float smooth_damp(float current, float target, float *current_velocity, float smooth_time) { 
     if (smooth_time < 0.0001f) smooth_time = 0.0001f;
     float omega = 2.0f / smooth_time;
     float x = omega * (float)World.deltaTime;
@@ -157,8 +157,8 @@ ENGINE_TO_MOD float smooth_damp(float current, float target, float *current_velo
 }
 
 FHandle levelFileHandle;
-ENGINE_TO_MOD char* sLevelFileUpToEndLine(char* buf, int size) { return sUpToEndLine(buf,size,levelFileHandle); }
-ENGINE_TO_MOD V3 GetLocalTransformedPos(Entity* originator, V3 offsetFromOriginator) { u16 idx=(u16)(originator - World.instances); V3 scaledOfs = mul_v3_v3_elementwise(offsetFromOriginator,World.scale[idx]); V3 rotatedOfs = quat_rot_v3(World.rotation[idx],scaledOfs); V3 result = V3_AplusB(World.position[idx],rotatedOfs); return result; }
+char* sLevelFileUpToEndLine(char* buf, int size) { return sUpToEndLine(buf,size,levelFileHandle); }
+V3 GetLocalTransformedPos(Entity* originator, V3 offsetFromOriginator) { u16 idx=(u16)(originator - World.instances); V3 scaledOfs = mul_v3_v3_elementwise(offsetFromOriginator,World.scale[idx]); V3 rotatedOfs = quat_rot_v3(World.rotation[idx],scaledOfs); V3 result = V3_AplusB(World.position[idx],rotatedOfs); return result; }
 static inline int pntz(size_t p[2]) { return (p[0] != 1) ? __builtin_ctzll(p[0] - 1) : (p[1] ? 8 * sizeof(size_t) + __builtin_ctzll(p[1]) : 0); }
 static inline void shl(size_t p[2], int n) { if (n >= 8 * (int)sizeof(size_t)) { p[1] = p[0]; p[0] = 0; n -= 8 * sizeof(size_t); } if (n) { p[1] = (p[1] << n) | (p[0] >> (8 * sizeof(size_t) - n)); p[0] <<= n; } }
 static inline void shr(size_t p[2], int n) { if (n >= 8 * (int)sizeof(size_t)) { p[0] = p[1]; p[1] = 0; n -= 8 * sizeof(size_t); } if (n) { p[0] = (p[0] >> n) | (p[1] << (8 * sizeof(size_t) - n)); p[1] >>= n; } }

@@ -865,9 +865,9 @@ KeyState* GetCodeMapping(int settingIndex) {
 }
 
 bool GetKeyRiseEdgeOrHeld(int sI, bool onRise) { i32 i = Sys_Settings.InputCodeSettings[sI]; if (i == 128) {return Sys_Input.scrollDelta > 0;} if (i == 129) {return Sys_Input.scrollDelta < 0;} KeyState* k = GetCodeMapping(sI); return onRise ? k->pressed : k->down; }
-ENGINE_TO_MOD bool GetKey(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,false); }  // True while held down.
-ENGINE_TO_MOD bool GetKeyPressed(int settingIndex) { return (settingIndex < 0) ? Sys_Input.keyStates[KEY_GRAVE_ACCENT].pressed : GetKeyRiseEdgeOrHeld(settingIndex,true); } // True 1st frame down.
-ENGINE_TO_MOD void IgnoreNextMouseDelta() { ignore_next_mouse_delta = true; }
+bool GetKey(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,false); }  // True while held down.
+bool GetKeyPressed(int settingIndex) { return (settingIndex < 0) ? Sys_Input.keyStates[KEY_GRAVE_ACCENT].pressed : GetKeyRiseEdgeOrHeld(settingIndex,true); } // True 1st frame down.
+void IgnoreNextMouseDelta() { ignore_next_mouse_delta = true; }
 void TextEntry(i32 k) {
     if (k == KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { World.playerName[0] = '\0'; currentPlayerNameLength = 0; return; }
     if (k == KEY_ENTER || k == KEY_KP_ENTER) { currentMenuItem++; return; }
@@ -944,9 +944,65 @@ WinSysjoystick* WinSysAllocJoystick(const char* name,const char* guid,int axisCo
 
 bool JoystickPresent(int jid) { if (jid < 0 || jid > JOYSTICK_LAST || (!WinSys.joysInited && !InitJoysticks())) {return false;} WinSys.joysInited = 1; WinSysjoystick* js = WinSys.joysticks + jid; return js->connected ? PollJoystick(js) : false; }
 void FreeJoystick(WinSysjoystick* js) { OS_Free(js->axes,js->axesSize); OS_Free(js->buttons,js->buttonsSize); OS_Free(js->hats,js->hatsSize); mset(js,0,sizeof(WinSysjoystick)); }
+bool Forward(void) { return GetKey(0); }
+bool StrafeLeft(void) { return GetKey(1); }
+bool Backpedal(void) { return GetKey(2); }
+bool StrafeRight(void) { return GetKey(3); }
+bool Jump(void) { return GetKey(4); }
+bool JumpDown(void) { return GetKeyPressed(4); }
+bool Crouch(void) { return GetKeyPressed(5); }
+bool Prone(void) { return GetKeyPressed(6); }
+bool LeanLeft(void) { return GetKey(7); }
+bool LeanRight(void) { return GetKey(8); }
+bool Sprint(void) { return GetKey(9); }
+bool TurnLeft(void) { return GetKey(10); }
+bool TurnRight(void) { return GetKey(11); }
+bool LookUp(void) { return GetKey(12); }
+bool LookDown(void) { return GetKey(13); }
+bool RecentLog(void) { return GetKeyPressed(14); }
+bool Biomonitor(void) { return GetKeyPressed(15); }
+bool Sensaround(void) { return GetKeyPressed(16); }
+bool Lantern(void) { return GetKeyPressed(17); }
+bool Shield(void) { return GetKeyPressed(18); }
+bool Infrared(void) { return GetKeyPressed(19); }
+bool Email(void) { return GetKeyPressed(20); }
+bool Booster(void) { return GetKeyPressed(21); }
+bool Jumpjets(void) { return GetKeyPressed(22); }
+bool Attack(void) { return GetKeyPressed(23); }
+bool Use(void) { return GetKeyPressed(24); }
+bool Menu(void) { return GetKeyPressed(25); }
+bool ToggleMode(void) { return GetKeyPressed(26); }
+bool Reload(void) { return GetKeyPressed(27); }
+bool WeaponCycUp(void) { return GetKeyPressed(28); }
+bool WeaponCycDown(void) { return GetKeyPressed(29); }
+bool Grenade(void) { return GetKeyPressed(30); }
+bool GrenadeCycUp(void) { return GetKeyPressed(31); }
+bool GrenadeCycDown(void) { return GetKeyPressed(32); }
+bool ChangeAmmoType(void) { return GetKeyPressed(33); }
+bool Patch(void) { return GetKeyPressed(34); }
+bool PatchCycUp(void) { return GetKeyPressed(35); }
+bool PatchCycDown(void) { return GetKeyPressed(36); }
+bool Map(void) { return GetKeyPressed(37); }
+bool SwimUp(void) { return GetKey(38); }
+bool SwimDn(void) { return GetKey(39); }
+bool Console(void) { return GetKeyPressed(-1); }
+bool ScrshotPressed(void) { return GetKeyPressed(41); }
+void ToggleConsole(); void MenuGoBack(); void ToggleInventoryMode(); void ApplyPlayerMovements();
+void ProcessInput(void) {
+    if (Console()) ToggleConsole();
+    if (Menu() && !World.menuActive) { World.paused = !World.paused; return; }
+    if (Menu() && World.menuActive) { MenuGoBack(); return; }
+    if (World.paused || World.menuActive || Cheats.consoleActive) return; // Pause/Menu barrier <<<<<<<
+    if (ToggleMode()) ToggleInventoryMode();
+    if (Lantern()) World.invP1.hardwareIsActive ^= HW_LAN;
+    if (Infrared()) World.invP1.hardwareIsActive ^= HW_INF;
+    ApplyPlayerMovements();
+}
+
 void play_synth_laser(float volume,float freq,float sweep,float fmrate,float decay);
 void play_synth_door(float volume,float pitch);
 void play_synth_impact(float volume,float ring_freq,float decay,float noise_amt,float ring_amt);
+void play_wav(const char *path,float volume,V3 pos,bool positional);
 void InputProcessing() {
     mouseMovementThisFrame = false; PollEvents();
     for (int jid = JOYSTICK_1; jid <= JOYSTICK_LAST; ++jid) { // Input Poll
@@ -1031,8 +1087,6 @@ void CycleToNextMonitor() {
     SaveConfig(); CenterWindowOnMonitor();
 }
 
-char statusText[T_BUFFER_SIZE];
-void CenterStatusPrint(const char * restrict fmt, ...) { va_list args; __builtin_va_start(args, fmt); sFormatV(statusText,T_BUFFER_SIZE,fmt,args); __builtin_va_end(args); DualLog("%s\n",statusText); World.statusTextDecayFinished = get_time() + 3.5;/*secs decay time before text dissappears.*/ }
 // Configuration Options Settings Sys
 typedef enum { SETTING_U8, SETTING_U16, SETTING_INPUT } SettingType; typedef struct { const char* name; void* ptr; SettingType type; } Setting;
 #define S_U8(n, v)  { n, &Sys_Settings.v, SETTING_U8 }

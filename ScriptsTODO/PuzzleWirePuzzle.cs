@@ -60,11 +60,11 @@ public class PuzzleWirePuzzle : MonoBehaviour {
 		}
 
 		if (GetCurrentLevelSecurity() > securityThreshhold) {
-			Eng_UI->BlockedBySecurity(World->instances[i].position);
+			Sys_UI.BlockedBySecurity(World.instances[i].position);
 			return;
 		}
 
-		if (Eng_Cheats->superoverride || World->diffMis == 0) {
+		if (Cheats.superoverride || World.diffMis == 0) {
 			// SHODAN can go anywhere!  Full security override!
 			locked = false;
 		}
@@ -85,13 +85,13 @@ public class PuzzleWirePuzzle : MonoBehaviour {
 
 		CenterStatusPrint(190); //Puzzle accessed
 		inUse = true;
-		Eng_UI->SendWirePuzzleToDataTab(wiresOn,rowsActive,
+		Sys_UI.SendWirePuzzleToDataTab(wiresOn,rowsActive,
 											 currentPositionsLeft,
 											 currentPositionsRight,
 											 solutionPositionsLeft,
 											 solutionPositionsRight,theme,
 											 wireColors,target,ud,
-											 World->instances[i].position,this);
+											 World.instances[i].position,this);
 	}
 
 	public void UseTargets (GameObject owner) {

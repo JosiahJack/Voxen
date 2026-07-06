@@ -9,7 +9,7 @@
 
 	// Called by Automap.cs.  This handles the UI changes to make room.
 	public void AutomapGoFull() {
-		Eng_UI->mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		
 		ctbButtonMain.SetActive(false);
 		ctbButtonHardware.SetActive(false);
@@ -26,7 +26,7 @@
 
 	// Handles returning UI back to how it was before clearing the board.
 	public void CloseFullmap() {
-		Eng_UI->mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		if (!Const.a.noHUD) {
 			Utils.Activate(ctbButtonMain);
 			Utils.Activate(ctbButtonHardware);
@@ -45,7 +45,7 @@
 
 	// Called by MouseLookScript.cs
 	public void EnterCyberspace() {
-		Eng_UI->hwb.HideSensaround();
+		Sys_UI.hwb.HideSensaround();
 		TabReset(true); // right
 		TabReset(false); // left
 		rightTC.TurnAllTabsOff();
@@ -68,7 +68,7 @@
 		hardwareButtonsContainer.SetActive(false);
 		viewWeaponsContainer.SetActive(false);
 		CyberTimer ct = cyberTimer.GetComponent<CyberTimer>();
-		if (ct != null) ct.Reset(World->diffCyb);
+		if (ct != null) ct.Reset(World.diffCyb);
 		CenterTabButtonClickSilent(3,true);
 		
 	}
@@ -82,7 +82,7 @@
 		ctbButtonMain.SetActive(true);
 		ctbButtonHardware.SetActive(true);
 		ctbButtonGeneral.SetActive(true);
-		if (World->invP1.hardwareIsActive[3]) Eng_UI->hwb.UnhideSensaround();
+		if (World.invP1.hardwareIsActive[3]) Sys_UI.hwb.UnhideSensaround();
 		tabButtonsLHButtons.SetActive(true);
 		tabButtonsRHButtons.SetActive(true);
 		Config.SetSEGI(); // Turn it back on if setting is on.
@@ -118,7 +118,7 @@
 	}
 
 	public void ClosePuzzleGrid() {
-		Eng_UI->mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		PuzzleGrid pg = puzzleGridLH.GetComponent<PuzzleGrid>();
 		PuzzleGrid pgr = puzzleGridRH.GetComponent<PuzzleGrid>();
 		tetheredPGP.SendDataBackToPanel(pg);
@@ -130,7 +130,7 @@
 	}
 
 	public void ClosePuzzleWire() {
-		Eng_UI->mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		PuzzleWire pw = puzzleWireLH.GetComponent<PuzzleWire>();
 		PuzzleWire pwr = puzzleWireRH.GetComponent<PuzzleWire>();
 		tetheredPWP.SendDataBackToPanel(pw,false);
@@ -142,7 +142,7 @@
 	}
 
 	public void CloseElevatorPad() {
-		Eng_UI->mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		tetheredKeypadElevator.SendDataBackToPanel();
 		
 		TurnOffElevatorPad();
@@ -152,7 +152,7 @@
 	}
 
 	public void CloseKeycodePad() {
-		Eng_UI->mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		TurnOffKeypad();
 		
 		tetheredKeypadKeycode = null;
@@ -160,7 +160,7 @@
 	}
 
 	public void CloseSearch() {
-		Eng_UI->mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		
 		if (tetheredSearchable != null) tetheredSearchable.ResetSearchable(false);
 		tetheredSearchable = null;
@@ -185,7 +185,7 @@
 	}
 
 	public void ClosePaperLog() {
-		Eng_UI->mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		
 		CenterTabButtonClickSilent(curCenterTab,false);
 	}
@@ -195,9 +195,9 @@
 		float checkVal = 0;
 		if (health) {
 			if (MouseLookScript.a.inCyberSpace) {
-				checkVal = World->instances[PLAYER1].cyberHealth;
+				checkVal = World.instances[PLAYER1].cyberHealth;
 			} else {
-				checkVal = World->instances[PLAYER1].health;
+				checkVal = World.instances[PLAYER1].health;
 			}
 		} else {
 			checkVal = PlayerEnergy.a.energy;
@@ -230,9 +230,9 @@
 		for (int i=0; i<7; i++) {
 			WeaponButton wepbut = wepbutMan.wepButtonsScripts[i];
 			GameObject buttonGO = wepbut.gameObject;
-			if (World->invP1.weaponInventoryIndices[i] > 0) {
+			if (World.invP1.weaponInventoryIndices[i] > 0) {
 				if (!buttonGO.activeInHierarchy) buttonGO.SetActive(true);
-				wepbut.useableItemIndex = World->invP1.weaponInventoryIndices[i];
+				wepbut.useableItemIndex = World.invP1.weaponInventoryIndices[i];
 				if (!wepbutMan.wepCountsText[i].activeInHierarchy) {
 					wepbutMan.wepCountsText[i].SetActive(true);
 				}
@@ -363,7 +363,7 @@
 
 	// Clicking [Apply] button on left or right MFD's Item Tab to apply current patch or general inventory item.
 	public void ApplyButtonClicked() {
-		Eng_UI->mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		itemTabLH.applyButton.SetActive(false);
 		itemTabRH.applyButton.SetActive(false);
 		if (applyButtonReferenceIndex < 0) return;
@@ -374,25 +374,25 @@
 			// General Inventory
 			// ----------------------------------------------------------------
 			GameObject invbtn = 
-				World->invP1.genButtons[World->invP1.generalInvCurrent];
+				World.invP1.genButtons[World.invP1.generalInvCurrent];
 
 			if (invbtn != null) {
 				invbtn.GetComponent<GeneralInvButton>().DoubleClick();
 			}
 
-			int nextIndex = World->invP1.generalInvIndex - 1;
+			int nextIndex = World.invP1.generalInvIndex - 1;
 			if (nextIndex < 0) nextIndex = 0;
-			World->invP1.generalInvIndex = nextIndex;
+			World.invP1.generalInvIndex = nextIndex;
 
 			// Set item tab to next general inv current.
-			SendInfoToItemTab(World->invP1.generalInvIndex);
+			SendInfoToItemTab(World.invP1.generalInvIndex);
 		} else {
 			// Patches
 			// ----------------------------------------------------------------
-			World->invP1.patchButtonScripts[World->invP1.patchCurrent].DoubleClick();
+			World.invP1.patchButtonScripts[World.invP1.patchCurrent].DoubleClick();
 
 			// Set item tab to next patch.
-			SendInfoToItemTab(World->invP1.patchIndex);
+			SendInfoToItemTab(World.invP1.patchIndex);
 		}
 	}
 
@@ -407,12 +407,12 @@
 				return;
 			}
 			for (int i=0;i<4;i++) {
-				if (contWorld->instances[i] > -1) {
+				if (contWorld.instances[i] > -1) {
 					searchCloseButtonRH.SetActive(true);
 					searchItemImagesRH[i].SetActive(true);
 					searchItemImagesRH[i].GetComponent<Image>().overrideSprite = null;
-					searchItemImagesRH[i].GetComponent<Image>().overrideSprite = Const.a.GetSpriteFromTexture(contWorld->instances[i]);
-					searchContainerRH.contWorld->instances[i] = contWorld->instances[i];
+					searchItemImagesRH[i].GetComponent<Image>().overrideSprite = Const.a.GetSpriteFromTexture(contWorld.instances[i]);
+					searchContainerRH.contWorld.instances[i] = contWorld.instances[i];
 					searchContainerRH.customIndex[i] = customIndex[i];
 				}
 			}
@@ -427,12 +427,12 @@
 				return;
 			}
 			for (int i=0;i<4;i++) {
-				if (contWorld->instances[i] > -1) {
+				if (contWorld.instances[i] > -1) {
 					searchCloseButtonLH.SetActive(true);
 					searchItemImagesLH[i].SetActive(true);
 					searchItemImagesLH[i].GetComponent<Image>().overrideSprite = null;
-					searchItemImagesLH[i].GetComponent<Image>().overrideSprite = Const.a.GetSpriteFromTexture(contWorld->instances[i]);
-					searchContainerLH.contWorld->instances[i] = contWorld->instances[i];
+					searchItemImagesLH[i].GetComponent<Image>().overrideSprite = Const.a.GetSpriteFromTexture(contWorld.instances[i]);
+					searchContainerLH.contWorld.instances[i] = contWorld.instances[i];
 					searchContainerLH.customIndex[i] = customIndex[i];
 				}
 			}
@@ -617,7 +617,7 @@
 		logReaderContainer.GetComponent<LogTextReaderManager>().SendTextToReader(index);
 		logTable.SetActive(false);
 		logLevelsFolder.SetActive(false);
-		if (Const.a.audioLogs[index] != null) logFinished = World->pauseRelativeTime + Const.a.audioLogs[index].length + 0.1f; //add slight delay after log is finished playing to make sure we don't cut off audio in case there's a frame delay for audio start
+		if (Const.a.audioLogs[index] != null) logFinished = World.pauseRelativeTime + Const.a.audioLogs[index].length + 0.1f; //add slight delay after log is finished playing to make sure we don't cut off audio in case there's a frame delay for audio start
 		logActive = true;
 		logType = Const.a.audioLogType[index];
 	}
@@ -717,7 +717,7 @@
 			kkb.keycode = keycode;
 			kkb.keypad = keypad;
 			kkb.ResetEntry();
-			if (World->diffMis <= 1) {
+			if (World.diffMis <= 1) {
 				kkb.currentEntry = keycode;
 			}
 		} else {
@@ -728,7 +728,7 @@
 			kkb.keycode = keycode;
 			kkb.keypad = keypad;
 			kkb.ResetEntry();
-			if (World->diffMis <= 1) {
+			if (World.diffMis <= 1) {
 				kkb.currentEntry = keycode;
 			}
 		}
@@ -768,7 +768,7 @@
 					searchItemImagesRH[i].SetActive(false);
 					searchItemImagesRH[i].GetComponent<Image>().overrideSprite = null;
 					searchItemImagesRH[i].GetComponent<Image>().overrideSprite = Const.a.GetSpriteFromTexture(101);
-					searchContainerRH.contWorld->instances[i] = -1;
+					searchContainerRH.contWorld.instances[i] = -1;
 					searchContainerRH.customIndex[i] = -1;
 				}
 			}
@@ -784,7 +784,7 @@
 					searchItemImagesLH[i].SetActive(false);
 					searchItemImagesLH[i].GetComponent<Image>().overrideSprite = null;
 					searchItemImagesLH[i].GetComponent<Image>().overrideSprite = Const.a.GetSpriteFromTexture(101);
-					searchContainerLH.contWorld->instances[i] = -1;
+					searchContainerLH.contWorld.instances[i] = -1;
 					searchContainerLH.customIndex[i] = -1;
 				}
 			}
@@ -909,23 +909,23 @@
 	void ChangeAmmoButtons(GameObject loadNormalAmmoButton, GameObject loadAlternateAmmoButton) {
 		if (loadNormalAmmoButton == null || loadAlternateAmmoButton == null) return;
 
-		int wep16index = Get16WeaponIndexFromConstIndex(World->invP1.weaponIndex);
+		int wep16index = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex);
 		if (wep16index == 1 || wep16index == 4 || wep16index == 10 || wep16index == 14 || wep16index == 15) return; // Already hidden.
 
 		Image norm = loadNormalAmmoButton.GetComponent<Image>();
 		Image anorm = loadAlternateAmmoButton.GetComponent<Image>();
-		if (World->invP1.wepLoadedWithAlternate[World->invP1.weaponCurrent]) {
-			SetAmmoIcons(World->invP1.weaponIndex,true);
+		if (World.invP1.wepLoadedWithAlternate[World.invP1.weaponCurrent]) {
+			SetAmmoIcons(World.invP1.weaponIndex,true);
 			norm.overrideSprite = ammoButtonDeHighlighted;
-			if (World->invP1.currentMagazineAmount2[World->invP1.weaponCurrent] > 0) {
+			if (World.invP1.currentMagazineAmount2[World.invP1.weaponCurrent] > 0) {
 				anorm.overrideSprite = ammoButtonHighlighted;
 			} else {
 				anorm.overrideSprite = ammoButtonDeHighlighted;
 			}
 		} else {
-			SetAmmoIcons(World->invP1.weaponIndex,false);
+			SetAmmoIcons(World.invP1.weaponIndex,false);
 			anorm.overrideSprite = ammoButtonDeHighlighted;
-			if (World->invP1.currentMagazineAmount[World->invP1.weaponCurrent] > 0) {
+			if (World.invP1.currentMagazineAmount[World.invP1.weaponCurrent] > 0) {
 				norm.overrideSprite = ammoButtonHighlighted;
 			} else {
 				norm.overrideSprite = ammoButtonDeHighlighted;
@@ -934,18 +934,18 @@
 	}
 
 	public void UpdateHUDAmmoCountsEither() {
-		if (World->invP1.weaponCurrent >= 0) {
-			if (World->invP1.wepLoadedWithAlternate[World->invP1.weaponCurrent]) {
-				UpdateHUDAmmoCounts(World->invP1.currentMagazineAmount2[World->invP1.weaponCurrent]);
+		if (World.invP1.weaponCurrent >= 0) {
+			if (World.invP1.wepLoadedWithAlternate[World.invP1.weaponCurrent]) {
+				UpdateHUDAmmoCounts(World.invP1.currentMagazineAmount2[World.invP1.weaponCurrent]);
 			} else {
-				UpdateHUDAmmoCounts(World->invP1.currentMagazineAmount[World->invP1.weaponCurrent]);
+				UpdateHUDAmmoCounts(World.invP1.currentMagazineAmount[World.invP1.weaponCurrent]);
 			}
 		}
 	}
 
 	void UpdateAmmoAndLoadButtons() {
-		if (World->invP1.weaponCurrent < 0
-			|| World->invP1.weaponCurrentPending >= 0) {
+		if (World.invP1.weaponCurrent < 0
+			|| World.invP1.weaponCurrentPending >= 0) {
 
 			return;
 		}
@@ -973,14 +973,14 @@
 			rightTC.ReturnToLastTab();
 			if (rightTC.lastTab == 4) {
 				if (tetheredPGP == null && tetheredPWP == null && tetheredKeypadElevator == null && tetheredKeypadKeycode == null && tetheredSearchable == null) {
-					if (World->invP1.hasHardware[0]) sysAnalyzerRH.SetActive(true);
+					if (World.invP1.hasHardware[0]) sysAnalyzerRH.SetActive(true);
 				}
 			}
 		} else {
 			leftTC.ReturnToLastTab();
 			if (leftTC.lastTab == 4) {
 				if (tetheredPGP == null && tetheredPWP == null && tetheredKeypadElevator == null && tetheredKeypadKeycode == null && tetheredSearchable == null) {
-					if (World->invP1.hasHardware[0]) sysAnalyzerLH.SetActive(true);
+					if (World.invP1.hasHardware[0]) sysAnalyzerLH.SetActive(true);
 				}
 			}
 		}
@@ -1033,12 +1033,12 @@
 
 	public void NotifyToCenterTab(int tabNum) {
 		tabNotified[tabNum] = true;
-		centerTabsTickFinished = World->pauseRelativeTime + centerTabsTickTime;
+		centerTabsTickFinished = World.pauseRelativeTime + centerTabsTickTime;
 		ToggleHighlightOnCenterTabButton(tabNum);
 	}
 
 	public void CenterTabButtonClick(int tabNum) {
-		Eng_UI->mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		CenterTabButtonAction(tabNum);
 	}
 
@@ -1047,7 +1047,7 @@
 
 		Utils.PlayUIOneShotSavable(97);
 		CenterTabButtonClickSilent(tabNum,false);
-		if (World->invP1.hardwareIsActive[3]) {
+		if (World.invP1.hardwareIsActive[3]) {
 			hwb.SensaroundOff();
 			Utils.PlayUIOneShotSavable(82); // deactivate
 		}
@@ -1172,7 +1172,7 @@
 	public void OpenLogTableContents() {
 		DisableAllCenterTabs();
 		DataReaderContentTab.SetActive(true);
-		Eng_UI->mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		ResetMultiMediaTabs();
 		startingSubTab.SetActive(true);
 		multiMediaHeaderLabel.text = "LOGS";
@@ -1184,7 +1184,7 @@
 	public void OpenLogsLevelFolder(int curlevel) {
 		DisableAllCenterTabs();
 		DataReaderContentTab.SetActive(true);
-		Eng_UI->mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		ResetMultiMediaTabs();
 		secondaryTab1.SetActive(true);
 		multiMediaHeaderLabel.text = "Level " + curlevel.ToString() + " Logs";
@@ -1195,7 +1195,7 @@
 	public void OpenLogTextReader() {
 		DisableAllCenterTabs();
 		DataReaderContentTab.SetActive(true);
-		Eng_UI->mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		ResetMultiMediaTabs();
 		secondaryTab2.SetActive(true);
 	}
@@ -1203,7 +1203,7 @@
 	public void OpenEmailTableContents() {
 		DisableAllCenterTabs();
 		DataReaderContentTab.SetActive(true);
-		Eng_UI->mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		ResetMultiMediaTabs();
 		emailTab.SetActive(true);
 		multiMediaHeaderLabel.text = "EMAIL";
@@ -1215,10 +1215,10 @@
 	public void OpenDataTableContents() {
 		DisableAllCenterTabs();
 		DataReaderContentTab.SetActive(true);
-		Eng_UI->mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		ResetMultiMediaTabs();
 		dataTab.SetActive(true);
-		World->invP1.hasNewData = false;
+		World.invP1.hasNewData = false;
 		multiMediaHeaderLabel.text = "DATA";
 		lastMultiMediaTabOpened = MULTI_MEDIA_TAB_DATA_TABLE;
 		ersbLH.SetEReaderSectionsButtonsHighlights(2);
@@ -1228,10 +1228,10 @@
 	public void OpenNotesTableContents() {
 		DisableAllCenterTabs();
 		DataReaderContentTab.SetActive(true);
-		Eng_UI->mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		ResetMultiMediaTabs();
 		notesTab.SetActive(true);
-		World->invP1.hasNewNotes = false;
+		World.invP1.hasNewNotes = false;
 		multiMediaHeaderLabel.text = "NOTES";
 		lastMultiMediaTabOpened = MULTI_MEDIA_TAB_NOTES;
 		ersbLH.SetEReaderSectionsButtonsHighlights(3);

@@ -1,5 +1,4 @@
 // weapons.c - Weapon System
-#include "mod.h"
 float delayBetweenShotsForWeapon[16]={1.0f,0.6f,0.5f,0.1f,0.8f,1.6f,0.65f,0.8f,0.6f,0.5f,1.2f,0.9f,0.5f,0.08f,1.1f,0.75f};
 float delayBetweenShotsForWeapon2[16]={1.0f,4.5f,0.5f,0.15f,4.0f,1.6f,0.75f,0.8f,0.6f,0.5f,1.2f,0.9f,0.5f,0.08f,5.0f,0.75f};
 float damagePerHitForWeapon[16]={75.0f,12.0f,15.0f,10.0f,18.0f,150.0f,15.0f,60.0f,45.0f,22.0f,50.0f,185.0f,6.0f,35.0f,6.0f,2.0f};
@@ -42,16 +41,16 @@ AttackType attackTypeForWeapon[16]={
 //     private float heatTickTime = 0.50f;
 // 	private float wepYRot;
 //     void Start() {
-//         heatTickFinished = World->pauseRelativeTime + heatTickTime;
+//         heatTickFinished = World.pauseRelativeTime + heatTickTime;
 // 		reloadContainerHome = reloadContainer.localPosition;
 // 
-// 		// Set less than 30s before World->pauseRelativeTime to guarantee we
+// 		// Set less than 30s before World.pauseRelativeTime to guarantee we
 // 		// don't immediately play action music.
-// 		justFired = (World->pauseRelativeTime - 31f);
+// 		justFired = (World.pauseRelativeTime - 31f);
 // 
-// 		energySliderClickedTime = World->pauseRelativeTime;
+// 		energySliderClickedTime = World.pauseRelativeTime;
 // 		playercapRbody = playerCapsule.GetComponent<Rigidbody>();
-// 		cyberWeaponAttackFinished = World->pauseRelativeTime;
+// 		cyberWeaponAttackFinished = World.pauseRelativeTime;
 // 		wepYRot = 0f;
 // 		sparqSetting = 50f;
 // 		ionSetting = 100f;
@@ -59,16 +58,16 @@ AttackType attackTypeForWeapon[16]={
 // 		plasmaSetting = 40f;
 // 		stungunSetting = 20f;
 // 		reloadLerpValue = 0;
-// 		reloadFinished = World->pauseRelativeTime;
-// 		lerpStartTime = World->pauseRelativeTime;
-// 		World->fogFac = 0;
+// 		reloadFinished = World.pauseRelativeTime;
+// 		lerpStartTime = World.pauseRelativeTime;
+// 		World.fogFac = 0;
 //     }
 // 
 //     void GetWeaponData(int index) {
 //         if (index < 0) return;
-// 		if (World->invP1.weaponCurrent < 0) return;
+// 		if (World.invP1.weaponCurrent < 0) return;
 // 
-//         if (World->invP1.wepLoadedWithAlternate[World->invP1.weaponCurrent]) {
+//         if (World.invP1.wepLoadedWithAlternate[World.invP1.weaponCurrent]) {
 // 			// Alternate (2)
 //             damageData.damage = Const.a.damagePerHitForWeapon2[index];
 //             damageData.delayBetweenShots = 
@@ -91,7 +90,7 @@ AttackType attackTypeForWeapon[16]={
 //         damageData.energyDrainHi = Const.a.energyDrainHiForWeapon[index];
 //         damageData.energyDrainOver = Const.a.energyDrainOverloadForWeapon[index];
 //         damageData.attackType = Const.a.attackTypeForWeapon[index];
-//         damageData.berserkActive = (Utils.CheckFlags(World->instances[PLAYER1].patchActive,PlayerPatch.PATCH_BERSERK));
+//         damageData.berserkActive = (Utils.CheckFlags(World.instances[PLAYER1].patchActive,PlayerPatch.PATCH_BERSERK));
 //     }
 
 int Get16WeaponIndexFromConstIndex(int index) {
@@ -117,41 +116,41 @@ int Get16WeaponIndexFromConstIndex(int index) {
 }
 
 //     bool CurrentWeaponUsesEnergy () {
-//         if (World->invP1.weaponIndex == 37 || World->invP1.weaponIndex == 40 ||
-// 			World->invP1.weaponIndex == 46 || World->invP1.weaponIndex == 50 ||
-// 			World->invP1.weaponIndex == 51)
+//         if (World.invP1.weaponIndex == 37 || World.invP1.weaponIndex == 40 ||
+// 			World.invP1.weaponIndex == 46 || World.invP1.weaponIndex == 50 ||
+// 			World.invP1.weaponIndex == 51)
 // 			return true;
 //         return false;
 //     }
 // 
 //     bool WeaponsHaveAnyHeat() {
-// 		if (World->invP1.redbull) return false;
-// 		if (World->invP1.currentEnergyWeaponHeat[0] > 0f) return true;
-// 		if (World->invP1.currentEnergyWeaponHeat[1] > 0f) return true;
-// 		if (World->invP1.currentEnergyWeaponHeat[2] > 0f) return true;
-// 		if (World->invP1.currentEnergyWeaponHeat[3] > 0f) return true;
-// 		if (World->invP1.currentEnergyWeaponHeat[4] > 0f) return true;
-// 		if (World->invP1.currentEnergyWeaponHeat[5] > 0f) return true;
-// 		if (World->invP1.currentEnergyWeaponHeat[6] > 0f) return true;
+// 		if (World.invP1.redbull) return false;
+// 		if (World.invP1.currentEnergyWeaponHeat[0] > 0f) return true;
+// 		if (World.invP1.currentEnergyWeaponHeat[1] > 0f) return true;
+// 		if (World.invP1.currentEnergyWeaponHeat[2] > 0f) return true;
+// 		if (World.invP1.currentEnergyWeaponHeat[3] > 0f) return true;
+// 		if (World.invP1.currentEnergyWeaponHeat[4] > 0f) return true;
+// 		if (World.invP1.currentEnergyWeaponHeat[5] > 0f) return true;
+// 		if (World.invP1.currentEnergyWeaponHeat[6] > 0f) return true;
 //         return false;
 //     }
 // 
 //     void HeatBleedOff() {
-//         if (heatTickFinished < World->pauseRelativeTime) {
-// 			World->fogFac--;
-// 			if (World->fogFac < 0) World->fogFac = 0;
+//         if (heatTickFinished < World.pauseRelativeTime) {
+// 			World.fogFac--;
+// 			if (World.fogFac < 0) World.fogFac = 0;
 // 			if (WeaponsHaveAnyHeat() || CurrentWeaponUsesEnergy()) {
-// 				World->invP1.currentEnergyWeaponHeat[0] -= 10f; if (World->invP1.currentEnergyWeaponHeat[0] <= 0.0f) World->invP1.currentEnergyWeaponHeat[0] = 0.0f;
-// 				World->invP1.currentEnergyWeaponHeat[1] -= 10f; if (World->invP1.currentEnergyWeaponHeat[1] <= 0.0f) World->invP1.currentEnergyWeaponHeat[1] = 0.0f;
-// 				World->invP1.currentEnergyWeaponHeat[2] -= 10f; if (World->invP1.currentEnergyWeaponHeat[2] <= 0.0f) World->invP1.currentEnergyWeaponHeat[2] = 0.0f;
-// 				World->invP1.currentEnergyWeaponHeat[3] -= 10f; if (World->invP1.currentEnergyWeaponHeat[3] <= 0.0f) World->invP1.currentEnergyWeaponHeat[3] = 0.0f;
-// 				World->invP1.currentEnergyWeaponHeat[4] -= 10f; if (World->invP1.currentEnergyWeaponHeat[4] <= 0.0f) World->invP1.currentEnergyWeaponHeat[4] = 0.0f;
-// 				World->invP1.currentEnergyWeaponHeat[5] -= 10f; if (World->invP1.currentEnergyWeaponHeat[5] <= 0.0f) World->invP1.currentEnergyWeaponHeat[5] = 0.0f;
-// 				World->invP1.currentEnergyWeaponHeat[6] -= 10f; if (World->invP1.currentEnergyWeaponHeat[6] <= 0.0f) World->invP1.currentEnergyWeaponHeat[6] = 0.0f;
-// 				if (CurrentWeaponUsesEnergy()) energheatMgr.HeatBleed(World->invP1.currentEnergyWeaponHeat[World->invP1.weaponCurrent]); // update hud heat ticks if current weapon uses energy
+// 				World.invP1.currentEnergyWeaponHeat[0] -= 10f; if (World.invP1.currentEnergyWeaponHeat[0] <= 0.0f) World.invP1.currentEnergyWeaponHeat[0] = 0.0f;
+// 				World.invP1.currentEnergyWeaponHeat[1] -= 10f; if (World.invP1.currentEnergyWeaponHeat[1] <= 0.0f) World.invP1.currentEnergyWeaponHeat[1] = 0.0f;
+// 				World.invP1.currentEnergyWeaponHeat[2] -= 10f; if (World.invP1.currentEnergyWeaponHeat[2] <= 0.0f) World.invP1.currentEnergyWeaponHeat[2] = 0.0f;
+// 				World.invP1.currentEnergyWeaponHeat[3] -= 10f; if (World.invP1.currentEnergyWeaponHeat[3] <= 0.0f) World.invP1.currentEnergyWeaponHeat[3] = 0.0f;
+// 				World.invP1.currentEnergyWeaponHeat[4] -= 10f; if (World.invP1.currentEnergyWeaponHeat[4] <= 0.0f) World.invP1.currentEnergyWeaponHeat[4] = 0.0f;
+// 				World.invP1.currentEnergyWeaponHeat[5] -= 10f; if (World.invP1.currentEnergyWeaponHeat[5] <= 0.0f) World.invP1.currentEnergyWeaponHeat[5] = 0.0f;
+// 				World.invP1.currentEnergyWeaponHeat[6] -= 10f; if (World.invP1.currentEnergyWeaponHeat[6] <= 0.0f) World.invP1.currentEnergyWeaponHeat[6] = 0.0f;
+// 				if (CurrentWeaponUsesEnergy()) energheatMgr.HeatBleed(World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent]); // update hud heat ticks if current weapon uses energy
 // 			}
 // 			
-//             heatTickFinished = World->pauseRelativeTime + heatTickTime;
+//             heatTickFinished = World.pauseRelativeTime + heatTickTime;
 //         }
 //     }
 // 
@@ -159,7 +158,7 @@ int Get16WeaponIndexFromConstIndex(int index) {
 // 		float strength = Const.a.recoilForWeapon[i];
 // 		//DualLog("Recoil from gun index: "+i.ToString()+" with strength of " +strength.ToString());
 // 		if (strength <= 0f) return;
-// 		if (World->instances[PLAYER1].fatigue > 80.0f) strength = strength * 2f;
+// 		if (World.instances[PLAYER1].fatigue > 80.0f) strength = strength * 2f;
 // 		strength = strength * 0.25f;
 // 		V3 wepJoltPosition = (V3){reloadContainer.localPosition.x - (strength * 0.5f * random_range(-1.0f,1.0f)), reloadContainer.localPosition.y, (reloadContainerHome.z - strength));
 // 		if (wepJoltPosition.x > 999f) wepJoltPosition.x = 0;
@@ -196,10 +195,10 @@ int Get16WeaponIndexFromConstIndex(int index) {
 // 
 // 	void UpdateWeaponReloadDip() {
 // 		// Move weapon transform up/down for reload "animation" & weapon swap.
-// 		int i = Get16WeaponIndexFromConstIndex(World->invP1.weaponIndex);
+// 		int i = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex);
 // 		if (i < 0 || i > 15) i = 0;
-// 		if (reloadFinished > World->pauseRelativeTime) {
-// 			float elapsed = (World->pauseRelativeTime - lerpStartTime);
+// 		if (reloadFinished > World.pauseRelativeTime) {
+// 			float elapsed = (World.pauseRelativeTime - lerpStartTime);
 // 
 // 			// Percent towards goal time total (both halves of the action).
 // 			reloadLerpValue = (elapsed/(reloadFinished-lerpStartTime));//Const.a.reloadTime[i]);
@@ -230,36 +229,36 @@ int Get16WeaponIndexFromConstIndex(int index) {
 // 
 // 
 // 	public void CompleteWeaponChange() {
-// 		if (World->invP1.weaponCurrentPending == -1) return;
+// 		if (World.invP1.weaponCurrentPending == -1) return;
 // 
 // 		// Set current weapon 7 slot
-// 		World->invP1.weaponCurrent = World->invP1.weaponCurrentPending;
+// 		World.invP1.weaponCurrent = World.invP1.weaponCurrentPending;
 //         if (CurrentWeaponUsesEnergy()) {
 // 			// Update hud heat ticks if current weapon uses energy
-// 			int iC = World->invP1.weaponCurrent;
-// 			energheatMgr.HeatBleed(World->invP1.currentEnergyWeaponHeat[iC]);
+// 			int iC = World.invP1.weaponCurrent;
+// 			energheatMgr.HeatBleed(World.invP1.currentEnergyWeaponHeat[iC]);
 // 		}
 // 
 // 		// Set current weapon inventory lookup index
-// 		World->invP1.weaponIndex = World->invP1.weaponIndexPending;
+// 		World.invP1.weaponIndex = World.invP1.weaponIndexPending;
 // 
 // 		// Reset pending indices now that transition is done
-// 		World->invP1.weaponCurrentPending = -1;
-// 		World->invP1.weaponIndexPending = -1;
+// 		World.invP1.weaponCurrentPending = -1;
+// 		World.invP1.weaponIndexPending = -1;
 // 
 // 		// Update the ammo icons.
-// 		int ind = World->invP1.weaponIndex;
+// 		int ind = World.invP1.weaponIndex;
 // 		bool alt = false;
-// 		if (ind >= 0 && ind < 16) alt = World->invP1.wepLoadedWithAlternate[ind];
-// 		Eng_UI->SetAmmoIcons(ind,alt);
-// 		Eng_UI->SetWepInfo(World->invP1.weaponIndex);
-// 		World->invP1.UpdateWeaponViewModels();
+// 		if (ind >= 0 && ind < 16) alt = World.invP1.wepLoadedWithAlternate[ind];
+// 		Sys_UI.SetAmmoIcons(ind,alt);
+// 		Sys_UI.SetWepInfo(World.invP1.weaponIndex);
+// 		World.invP1.UpdateWeaponViewModels();
 // 	}
 // 
 // 	public void StartWeaponDip(float delay) {
 // 		if (delay < 0) delay = 0;
-// 		reloadFinished = World->pauseRelativeTime + delay;
-// 		lerpStartTime = World->pauseRelativeTime;
+// 		reloadFinished = World.pauseRelativeTime + delay;
+// 		lerpStartTime = World.pauseRelativeTime;
 // 	}
 // 
 // 	void RotateViewWeapon() {
@@ -282,11 +281,11 @@ void CheckAttackInput(u16 p) {
     // Check for other things that must capture and override clicks
     if (Attack()) {
         DualLog("Mouse clicked!\n");
-        if (vmailActive) { vmailActive = false; inv->waitTilNextFire = World->pauseRelativeTime + 0.8; return; }
-        if (World->curLev == LEVEL_CYBERSPACE) { /*FireCyberWeapon();*/ return; }
+        if (vmailActive) { vmailActive = false; inv->waitTilNextFire = World.pauseRelativeTime + 0.8; return; }
+        if (World.curLev == LEVEL_CYBERSPACE) { /*FireCyberWeapon();*/ return; }
 
-        if (inv->holdingObject && !World->mouseClickHeldOverGUI) { // !Just clicked
-            if (!World->uiIsBlocking) { DropHeldItem(p); return; }
+        if (inv->holdingObject && !World.mouseClickHeldOverGUI) { // !Just clicked
+            if (!World.uiIsBlocking) { DropHeldItem(p); return; }
 
             AddItemToInventory(p,inv->heldObjectIndex,inv->heldObjectCustomIndex); ResetHeldItem(p); return;
         }
@@ -294,9 +293,9 @@ void CheckAttackInput(u16 p) {
 
     int wepdex = Get16WeaponIndexFromConstIndex(inv->weaponIndex);
     if (wepdex == -1) return; // No weapon.
-    //if (World->uiIsBlocking) return;
+    //if (World.uiIsBlocking) return;
     if (inv->holdingObject) return;
-    if (World->mouseClickHeldOverGUI) return;
+    if (World.mouseClickHeldOverGUI) return;
 
     //StartNormalAttack(wepdex);
 }
@@ -304,7 +303,7 @@ void CheckAttackInput(u16 p) {
 void WeaponsUpdate(void) {
     // Slowly cool off any weapons that have been heated from firing
 //     HeatBleedOff();
-    if (World->fogFac > 255) World->fogFac = 255;
+    if (World.fogFac > 255) World.fogFac = 255;
 //     UpdateWeaponReloadDip();
 //     RotateViewWeapon();
 //     Recoiling();
@@ -318,9 +317,9 @@ void WeaponsUpdate(void) {
 // 
 //     GetWeaponData(wep16Index);
 //     if (Attack()
-//         && waitTilNextFire < World->pauseRelativeTime
-//         && (World->pauseRelativeTime - energySliderClickedTime) > 0.1f
-//         && reloadFinished < World->pauseRelativeTime) {
+//         && waitTilNextFire < World.pauseRelativeTime
+//         && (World.pauseRelativeTime - energySliderClickedTime) > 0.1f
+//         && reloadFinished < World.pauseRelativeTime) {
 // 
 //         StartCoroutine(CheckUIStateAndAttack(wep16Index));
 //     }
@@ -329,15 +328,15 @@ void WeaponsUpdate(void) {
 // 	IEnumerator CheckUIStateAndAttack(int wepdex) {
 // 		yield return null; // Ensure next frame
 // 
-// 		if (World->uiIsBlocking) yield break;
-// 		if (World->invP1.holdingObject) yield break;
-// 		if (Eng_UI->mouseClickHeldOverGUI) yield break;
-// 		if (reloadFinished >= World->pauseRelativeTime) yield break;
-// 		if (waitTilNextFire >= World->pauseRelativeTime) yield break;
+// 		if (World.uiIsBlocking) yield break;
+// 		if (World.invP1.holdingObject) yield break;
+// 		if (Sys_UI.mouseClickHeldOverGUI) yield break;
+// 		if (reloadFinished >= World.pauseRelativeTime) yield break;
+// 		if (waitTilNextFire >= World.pauseRelativeTime) yield break;
 // 		if (wepdex < 0 || wepdex > 15) yield break;
 // 		if (Automap.a.inFullMap) yield break;
 // 
-// 		justFired = World->pauseRelativeTime; // set justFired so that Music.cs can see it and play corresponding music in a little bit from now or keep playing action music
+// 		justFired = World.pauseRelativeTime; // set justFired so that Music.cs can see it and play corresponding music in a little bit from now or keep playing action music
 // 		// Check weapon type and check ammo before firing
 // 		switch (wepdex) {
 // 			case 1: goto case 15;
@@ -354,13 +353,13 @@ void WeaponsUpdate(void) {
 // 				// Energy weapons so check energy level
 // 				// Even if we have only 1 energy, we still fire with all we've got up to the energy level setting of course
 // 				if (PlayerEnergy.a.energy > 0
-// 					|| World->invP1.bottomless
-// 					|| World->invP1.redbull) {
-// 					if (World->invP1.currentEnergyWeaponHeat[World->invP1.weaponCurrent] > overheatedPercent
-// 						&& !World->invP1.bottomless
-// 						&& !World->invP1.redbull) {
+// 					|| World.invP1.bottomless
+// 					|| World.invP1.redbull) {
+// 					if (World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent] > overheatedPercent
+// 						&& !World.invP1.bottomless
+// 						&& !World.invP1.redbull) {
 // 						Utils.PlayUIOneShotSavable(238); // noammo
-// 						waitTilNextFire = World->pauseRelativeTime + 0.8f;
+// 						waitTilNextFire = World.pauseRelativeTime + 0.8f;
 // 						CenterStatusPrint(11);
 // 					} else {
 // 						FireWeapon(wepdex, false); // weapon index, isSilent == false so play normal SFX
@@ -371,21 +370,21 @@ void WeaponsUpdate(void) {
 // 				break;
 // 			default:
 // 				// Uses normal ammo, check versus alternate or normal to see if we have ammo then fire
-// 				if (World->invP1.wepLoadedWithAlternate[World->invP1.weaponCurrent]) {
-// 					if (World->invP1.currentMagazineAmount2[World->invP1.weaponCurrent] > 0
-// 						|| World->invP1.bottomless) {
+// 				if (World.invP1.wepLoadedWithAlternate[World.invP1.weaponCurrent]) {
+// 					if (World.invP1.currentMagazineAmount2[World.invP1.weaponCurrent] > 0
+// 						|| World.invP1.bottomless) {
 // 						FireWeapon(wepdex, false); // weapon index, isSilent == false so play normal SFX
 // 					} else {
 // 						Utils.PlayUIOneShotSavable(238); // noammo
-// 						waitTilNextFire = World->pauseRelativeTime + 0.8f;
+// 						waitTilNextFire = World.pauseRelativeTime + 0.8f;
 // 					}
 // 				} else {
-// 					if (World->invP1.currentMagazineAmount[World->invP1.weaponCurrent] > 0
-// 						|| World->invP1.bottomless) {
+// 					if (World.invP1.currentMagazineAmount[World.invP1.weaponCurrent] > 0
+// 						|| World.invP1.bottomless) {
 // 						FireWeapon(wepdex, false); // weapon index, isSilent == false so play normal SFX
 // 					} else {
 // 						Utils.PlayUIOneShotSavable(238); // noammo
-// 						waitTilNextFire = World->pauseRelativeTime + 0.8f;
+// 						waitTilNextFire = World.pauseRelativeTime + 0.8f;
 // 					}
 // 				}
 // 				break;
@@ -393,62 +392,62 @@ void WeaponsUpdate(void) {
 // 	}
 // 
 // 	void CheckReloadInput() {
-// 		if (reloadFinished >= World->pauseRelativeTime) return;
+// 		if (reloadFinished >= World.pauseRelativeTime) return;
 // 		if (!GetInput.a.Reload()) return;
 // 
 // 		if (Const.a.InputQuickReloadWeapons) {
 // 			// Press reload once, to do both unload then reload
-// 			World->invP1.Reload();
+// 			World.invP1.Reload();
 // 			return;
 // 		}
 // 
-// 		if (World->invP1.weaponCurrent < 0) return;
+// 		if (World.invP1.weaponCurrent < 0) return;
 // 
 // 		// First press reload to unload, then press again to load
-// 		int wep16index = WeaponFire.Get16WeaponIndexFromConstIndex(World->invP1.weaponIndex);
+// 		int wep16index = WeaponFire.Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex);
 // 		if (wep16index < 0) return;
 // 
-// 		if (World->invP1.wepLoadedWithAlternate[World->invP1.weaponCurrent]) {
-// 			if (World->invP1.currentMagazineAmount2[World->invP1.weaponCurrent] <= 0
-// 				|| World->invP1.wepAmmoSecondary[wep16index] <= 0) { // True for no wepAmmoSecondary causes Reload to run and display no ammo message.
-// 				World->invP1.Reload();
+// 		if (World.invP1.wepLoadedWithAlternate[World.invP1.weaponCurrent]) {
+// 			if (World.invP1.currentMagazineAmount2[World.invP1.weaponCurrent] <= 0
+// 				|| World.invP1.wepAmmoSecondary[wep16index] <= 0) { // True for no wepAmmoSecondary causes Reload to run and display no ammo message.
+// 				World.invP1.Reload();
 // 			} else {
-// 				World->invP1.Unload(false);
+// 				World.invP1.Unload(false);
 // 			}
 // 		} else {
-// 			if (World->invP1.currentMagazineAmount[World->invP1.weaponCurrent] <= 0
-// 				|| World->invP1.wepAmmo[wep16index] <= 0) { // True for no wepAmmo causes Reload to run and display no ammo message.
-// 				World->invP1.Reload();
+// 			if (World.invP1.currentMagazineAmount[World.invP1.weaponCurrent] <= 0
+// 				|| World.invP1.wepAmmo[wep16index] <= 0) { // True for no wepAmmo causes Reload to run and display no ammo message.
+// 				World.invP1.Reload();
 // 			} else {
-// 				World->invP1.Unload(false);
+// 				World.invP1.Unload(false);
 // 			}
 // 		}
 // 	}
 // 
 // 	void CheckAmmoChangeInput() {
-// 		if (reloadFinished >= World->pauseRelativeTime) return;
+// 		if (reloadFinished >= World.pauseRelativeTime) return;
 // 		if (!GetInput.a.ChangeAmmoType()) return;
 // 
-// 		World->invP1.ChangeAmmoType();
+// 		World.invP1.ChangeAmmoType();
 // 	}
 // 
 // 	public void FireCyberWeapon() {
-// 		if (cyberWeaponAttackFinished < World->pauseRelativeTime) {
-// 			if (World->invP1.isPulserNotDrill) {
-// 				if (World->invP1.hasSoft[1]) {
+// 		if (cyberWeaponAttackFinished < World.pauseRelativeTime) {
+// 			if (World.invP1.isPulserNotDrill) {
+// 				if (World.invP1.hasSoft[1]) {
 // 					// Fire pulser
 // 					Const.a.shotsFired++;
-// 					if (World->invP1.hasSoft[1]) FireCyberBeachball(true,railgunShotForce,492);
+// 					if (World.invP1.hasSoft[1]) FireCyberBeachball(true,railgunShotForce,492);
 // 					Utils.PlayUIOneShotSavable(258); // wpulser
-// 					cyberWeaponAttackFinished = World->pauseRelativeTime + 0.08f;
+// 					cyberWeaponAttackFinished = World.pauseRelativeTime + 0.08f;
 // 				}
 // 			} else {
-// 				if (World->invP1.hasSoft[0]) {
+// 				if (World.invP1.hasSoft[0]) {
 // 					// Fire I.C.E. drill
 // 					Const.a.shotsFired++;
-// 					if (World->invP1.hasSoft[0]) FireCyberBeachball(false,plasmaShotForce,495);
+// 					if (World.invP1.hasSoft[0]) FireCyberBeachball(false,plasmaShotForce,495);
 // 					Utils.PlayUIOneShotSavable(241); // wdrill baby drill
-// 					cyberWeaponAttackFinished = World->pauseRelativeTime + 0.5f;
+// 					cyberWeaponAttackFinished = World.pauseRelativeTime + 0.5f;
 // 				}
 // 			}
 // 		}
@@ -459,10 +458,10 @@ void WeaponsUpdate(void) {
 //         // like a beachball for collisions with enemies, but act like a baseball for walls/floor to prevent hitting corners
 //         GameObject beachball = SpawnDynamicObject(prefabID,-1);
 //         if (beachball != null) {
-// 			damageData.damage = 10f * World->invP1.softVersions[0];
+// 			damageData.damage = 10f * World.invP1.softVersions[0];
 // 			if (isPulser) {
 // 				// Cyberspace enemies don't have much health.
-// 				damageData.damage = 1f + (0.25f * World->invP1.softVersions[1]);
+// 				damageData.damage = 1f + (0.25f * World.invP1.softVersions[1]);
 // 			}
 // 
 //             damageData.owner = playerCapsule;
@@ -470,9 +469,9 @@ void WeaponsUpdate(void) {
 // 			if (!isPulser) damageData.attackType = AttackType.Drill;
 //             beachball.GetComponent<ProjectileEffectImpact>().dd = damageData;
 //             beachball.GetComponent<ProjectileEffectImpact>().host = playerCapsule;
-//             beachball.World->instances[i].position = playerCamera.World->instances[i].position;
+//             beachball.World.instances[i].position = playerCamera.World.instances[i].position;
 // 			MouseLookScript.a.SetCameraFocusPoint();
-//             tempVec = MouseLookScript.a.cameraFocusPoint - playerCamera.World->instances[i].position;
+//             tempVec = MouseLookScript.a.cameraFocusPoint - playerCamera.World.instances[i].position;
 //             beachball.transform.forward = tempVec.normalized;
 //             beachball.SetActive(true);
 //             V3 shove = beachball.transform.forward * shoveForce;
@@ -481,34 +480,34 @@ void WeaponsUpdate(void) {
 //         }
 // 	}
 // 
-//     // index is used to get recoil down at the bottom and pass along ref for damageData, otherwise the cases use World->invP1.weaponIndex
+//     // index is used to get recoil down at the bottom and pass along ref for damageData, otherwise the cases use World.invP1.weaponIndex
 //     void FireWeapon(int index, bool isSilent) {
 // 		PlayerHealth.a.makingNoise = true;
-// 		PlayerHealth.a.noiseFinished = World->pauseRelativeTime + 0.5f;
+// 		PlayerHealth.a.noiseFinished = World.pauseRelativeTime + 0.5f;
 // 		GameObject smoke = null;
-//         switch (World->invP1.weaponIndex) {
+//         switch (World.invP1.weaponIndex) {
 //             case 36:
 //                 //Mark3 Assault Rifle
 //                 if (!isSilent) Utils.PlayUIOneShotSavable(251); // wmarksman
 //                 if (DidRayHit(index)) HitScanFire(index);
 // 				muzFlashMK3.SetActive(true);
-// 				smoke = Instantiate(muzSmokeMK3,muzFlashMK3.World->instances[i].position,Const.a.quaternionIdentity) as GameObject;
+// 				smoke = Instantiate(muzSmokeMK3,muzFlashMK3.World.instances[i].position,Const.a.quaternionIdentity) as GameObject;
 // 				smoke.transform.parent = reloadContainer;
 // 				smoke.SetActive(true);
-// 				World->fogFac += 2;
+// 				World.fogFac += 2;
 //                 break;
 //             case 37:
 //                 //ER-90 Blaster
-// 				blasterSetting = World->invP1.weaponEnergySetting[World->invP1.weaponCurrent];
+// 				blasterSetting = World.invP1.weaponEnergySetting[World.invP1.weaponCurrent];
 // 				//DualLog("Blaster fired with energy setting of " + blasterSetting.ToString());
 // 				if (!isSilent) Utils.PlayUIOneShotSavable(239); // wblaster
 // 				if (DidRayHit(index)) HitScanFire(index);
 // 				muzFlashBlaster.SetActive(true);
 //                 if (overloadEnabled) {
-//                     World->invP1.currentEnergyWeaponHeat[World->invP1.weaponCurrent] = 100f;
+//                     World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent] = 100f;
 //                 } else {
-//                     World->invP1.currentEnergyWeaponHeat[World->invP1.weaponCurrent] += blasterSetting;
-// 					if (World->invP1.currentEnergyWeaponHeat[World->invP1.weaponCurrent] > 100f) World->invP1.currentEnergyWeaponHeat[World->invP1.weaponCurrent] = 100f; // cap it
+//                     World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent] += blasterSetting;
+// 					if (World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent] > 100f) World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent] = 100f; // cap it
 //                 }
 //                 break;
 //             case 38:
@@ -522,23 +521,23 @@ void WeaponsUpdate(void) {
 //                 if (!isSilent) Utils.PlayUIOneShotSavable(243); // wflechette
 //                 if (DidRayHit(index)) HitScanFire(index);
 // 				muzFlashFlechette.SetActive(true);
-// 				smoke = Instantiate(muzSmokeFlechette,muzFlashFlechette.World->instances[i].position,Const.a.quaternionIdentity) as GameObject;
+// 				smoke = Instantiate(muzSmokeFlechette,muzFlashFlechette.World.instances[i].position,Const.a.quaternionIdentity) as GameObject;
 // 				smoke.transform.parent = reloadContainer;
 // 				smoke.SetActive(true);
-// 				World->fogFac += 1;
+// 				World.fogFac += 1;
 // 				break;
 //             case 40:
 //                 //RW-45 Ion Beam
-// 				ionSetting = World->invP1.weaponEnergySetting[World->invP1.weaponCurrent];
+// 				ionSetting = World.invP1.weaponEnergySetting[World.invP1.weaponCurrent];
 // 				//DualLog("Ion rifle fired with energy setting of " + ionSetting.ToString());
 //                 if (!isSilent) Utils.PlayUIOneShotSavable(245); // wion
 //                 if (DidRayHit(index)) HitScanFire(index);
 // 				muzFlashIonBeam.SetActive(true);
 //                 if (overloadEnabled) {
-//                     World->invP1.currentEnergyWeaponHeat[World->invP1.weaponCurrent] = 100f;
+//                     World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent] = 100f;
 //                 } else {
-//                     World->invP1.currentEnergyWeaponHeat[World->invP1.weaponCurrent] += ionSetting;
-// 					if (World->invP1.currentEnergyWeaponHeat[World->invP1.weaponCurrent] > 100f) World->invP1.currentEnergyWeaponHeat[World->invP1.weaponCurrent] = 100f; // cap it
+//                     World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent] += ionSetting;
+// 					if (World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent] > 100f) World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent] = 100f; // cap it
 //                 }
 //                 break;
 //             case 41:
@@ -554,10 +553,10 @@ void WeaponsUpdate(void) {
 //                 if (!isSilent) Utils.PlayUIOneShotSavable(249); // wmagnum
 //                 if (DidRayHit(index)) HitScanFire(index);
 // 				muzFlashMagnum.SetActive(true);
-// 				smoke = Instantiate(muzSmokeMagnum,muzFlashMagnum.World->instances[i].position,Const.a.quaternionIdentity) as GameObject;
+// 				smoke = Instantiate(muzSmokeMagnum,muzFlashMagnum.World.instances[i].position,Const.a.quaternionIdentity) as GameObject;
 // 				smoke.transform.parent = reloadContainer;
 // 				smoke.SetActive(true);
-// 				World->fogFac += 3;
+// 				World.fogFac += 3;
 //                 break;
 //             case 44:
 //                 //SB-20 Magpulse
@@ -570,23 +569,23 @@ void WeaponsUpdate(void) {
 //                 if (!isSilent) Utils.PlayUIOneShotSavable(255); // wpistol
 //                 if (DidRayHit(index)) HitScanFire(index);
 // 				muzFlashPistol.SetActive(true);
-// 				smoke = Instantiate(muzSmokePistol,muzFlashPistol.World->instances[i].position,Const.a.quaternionIdentity) as GameObject;
+// 				smoke = Instantiate(muzSmokePistol,muzFlashPistol.World.instances[i].position,Const.a.quaternionIdentity) as GameObject;
 // 				smoke.transform.parent = reloadContainer;
 // 				smoke.SetActive(true);
-// 				World->fogFac += 1;
+// 				World.fogFac += 1;
 //                 break;
 //             case 46:
 //                 //LG-XX Plasma Rifle
-// 				plasmaSetting = World->invP1.weaponEnergySetting[World->invP1.weaponCurrent];
+// 				plasmaSetting = World.invP1.weaponEnergySetting[World.invP1.weaponCurrent];
 // 				//DualLog("Plasma rifle fired with energy setting of " + plasmaSetting.ToString());
 //                 if (!isSilent) Utils.PlayUIOneShotSavable(257); // wplasma
 //                 FirePlasma(index);
 // 				muzFlashPlasma.SetActive(true);
 //                 if (overloadEnabled) {
-//                     World->invP1.currentEnergyWeaponHeat[World->invP1.weaponCurrent] = 100f;
+//                     World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent] = 100f;
 //                 } else {
-//                     World->invP1.currentEnergyWeaponHeat[World->invP1.weaponCurrent] += plasmaSetting;
-// 					if (World->invP1.currentEnergyWeaponHeat[World->invP1.weaponCurrent] > 100f) World->invP1.currentEnergyWeaponHeat[World->invP1.weaponCurrent] = 100f; // cap it
+//                     World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent] += plasmaSetting;
+// 					if (World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent] > 100f) World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent] = 100f; // cap it
 //                 }
 //                 break;
 //             case 47:
@@ -594,55 +593,55 @@ void WeaponsUpdate(void) {
 //                 if (!isSilent) Utils.PlayUIOneShotSavable(259); // wrailgun
 //                 FireRailgun(index);
 // 				muzFlashRailgun.SetActive(true);
-// 				smoke = Instantiate(muzSmokeRailgun,muzFlashRailgun.World->instances[i].position,Const.a.quaternionIdentity) as GameObject;
+// 				smoke = Instantiate(muzSmokeRailgun,muzFlashRailgun.World.instances[i].position,Const.a.quaternionIdentity) as GameObject;
 // 				smoke.transform.parent = reloadContainer;
 // 				smoke.SetActive(true);
-// 				World->fogFac += 2;
+// 				World.fogFac += 2;
 //                 break;
 //             case 48:
 //                 //DC-05 Riotgun
 //                 if (!isSilent) Utils.PlayUIOneShotSavable(262); // wriotgun
 //                 if (DidRayHit(index)) HitScanFire(index);
 // 				muzFlashRiotgun.SetActive(true);
-// 				smoke = Instantiate(muzSmokeRiotgun,muzFlashRiotgun.World->instances[i].position,Const.a.quaternionIdentity) as GameObject;
+// 				smoke = Instantiate(muzSmokeRiotgun,muzFlashRiotgun.World.instances[i].position,Const.a.quaternionIdentity) as GameObject;
 // 				smoke.transform.parent = reloadContainer;
 // 				smoke.SetActive(true);
-// 				World->fogFac += 4;
+// 				World.fogFac += 4;
 //                 break;
 //             case 49:
 //                 //RF-07 Skorpion
 //                 if (!isSilent) Utils.PlayUIOneShotSavable(263); // wskorpion
 //                 if (DidRayHit(index)) HitScanFire(index);
 // 				muzFlashSkorpion.SetActive(true);
-// 				smoke = Instantiate(muzSmokeSkorpion,muzFlashSkorpion.World->instances[i].position,Const.a.quaternionIdentity) as GameObject;
+// 				smoke = Instantiate(muzSmokeSkorpion,muzFlashSkorpion.World.instances[i].position,Const.a.quaternionIdentity) as GameObject;
 // 				smoke.transform.parent = reloadContainer;
 // 				smoke.SetActive(true);
-// 				World->fogFac += 2;
+// 				World.fogFac += 2;
 //                 break;
 //             case 50:
 //                 //Sparq Beam
-// 				sparqSetting = World->invP1.weaponEnergySetting[World->invP1.weaponCurrent];
+// 				sparqSetting = World.invP1.weaponEnergySetting[World.invP1.weaponCurrent];
 //                 if (!isSilent) Utils.PlayUIOneShotSavable(264); // wsparq
 //                 if (DidRayHit(index)) HitScanFire(index);
 // 				muzFlashSparq.SetActive(true);
 //                 if (overloadEnabled) {
-//                     World->invP1.currentEnergyWeaponHeat[World->invP1.weaponCurrent] = 100f;
+//                     World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent] = 100f;
 //                 } else {
-//                     World->invP1.currentEnergyWeaponHeat[World->invP1.weaponCurrent] += sparqSetting;
-// 					if (World->invP1.currentEnergyWeaponHeat[World->invP1.weaponCurrent] > 100f) World->invP1.currentEnergyWeaponHeat[World->invP1.weaponCurrent] = 100f; // cap it
+//                     World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent] += sparqSetting;
+// 					if (World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent] > 100f) World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent] = 100f; // cap it
 //                 }
 //                 break;
 //             case 51:
 //                 //DH-07 Stungun
-// 				stungunSetting = World->invP1.weaponEnergySetting[World->invP1.weaponCurrent];
+// 				stungunSetting = World.invP1.weaponEnergySetting[World.invP1.weaponCurrent];
 //                 if (!isSilent) Utils.PlayUIOneShotSavable(265); // wstungun
 //                 FireStungun(index);
 // 				muzFlashStungun.SetActive(true);
 //                 if (overloadEnabled) {
-//                     World->invP1.currentEnergyWeaponHeat[World->invP1.weaponCurrent] = 100f;
+//                     World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent] = 100f;
 //                 } else {
-//                     World->invP1.currentEnergyWeaponHeat[World->invP1.weaponCurrent] += stungunSetting;
-// 					if (World->invP1.currentEnergyWeaponHeat[World->invP1.weaponCurrent] > 100f) World->invP1.currentEnergyWeaponHeat[World->invP1.weaponCurrent] = 100f; // cap it
+//                     World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent] += stungunSetting;
+// 					if (World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent] > 100f) World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent] = 100f; // cap it
 //                 }
 //                 break;
 //         }
@@ -659,15 +658,15 @@ void WeaponsUpdate(void) {
 //             if (index == 1 || index == 4 || index == 10 || index == 14 || index == 15) {
 //                 if (overloadEnabled) {
 //                     energoverButton.OverloadFired();
-//                     if (!World->invP1.bottomless && !World->invP1.redbull) {
+//                     if (!World.invP1.bottomless && !World.invP1.redbull) {
 // 						TakeEnergy(Const.a.energyDrainOverloadForWeapon[index]); //take large amount
 // 						if (BiomonitorGraphSystem.a != null) {
 // 							BiomonitorEnergyPulse(Const.a.energyDrainOverloadForWeapon[index]);
 // 						}
 // 					}
 //                 } else {
-//                     float takeEnerg = (World->invP1.weaponEnergySetting[World->invP1.weaponCurrent] / 100f) * (Const.a.energyDrainHiForWeapon[index] - Const.a.energyDrainLowForWeapon[index]);
-//                     if (!World->invP1.bottomless && !World->invP1.redbull) {
+//                     float takeEnerg = (World.invP1.weaponEnergySetting[World.invP1.weaponCurrent] / 100f) * (Const.a.energyDrainHiForWeapon[index] - Const.a.energyDrainLowForWeapon[index]);
+//                     if (!World.invP1.bottomless && !World.invP1.redbull) {
 // 						TakeEnergy(takeEnerg);
 // 						if (BiomonitorGraphSystem.a != null) {
 // 							BiomonitorEnergyPulse(takeEnerg);
@@ -675,10 +674,10 @@ void WeaponsUpdate(void) {
 // 					}
 //                 }
 //             } else {
-//                 if (World->invP1.wepLoadedWithAlternate[World->invP1.weaponCurrent]) {
-//                     if (!World->invP1.bottomless) World->invP1.currentMagazineAmount2[World->invP1.weaponCurrent]--; // Take ammo away
+//                 if (World.invP1.wepLoadedWithAlternate[World.invP1.weaponCurrent]) {
+//                     if (!World.invP1.bottomless) World.invP1.currentMagazineAmount2[World.invP1.weaponCurrent]--; // Take ammo away
 //                 } else {
-//                     if (!World->invP1.bottomless) World->invP1.currentMagazineAmount[World->invP1.weaponCurrent]--; // Take ammo away
+//                     if (!World.invP1.bottomless) World.invP1.currentMagazineAmount[World.invP1.weaponCurrent]--; // Take ammo away
 //                 }
 //             }
 //             
@@ -686,18 +685,18 @@ void WeaponsUpdate(void) {
 //         }
 // 
 // 		Recoil(index);
-//         if (World->invP1.wepLoadedWithAlternate[World->invP1.weaponCurrent]
+//         if (World.invP1.wepLoadedWithAlternate[World.invP1.weaponCurrent]
 // 			|| overloadEnabled) {
 // 
 //             overloadEnabled = false;
-//             waitTilNextFire = World->pauseRelativeTime
+//             waitTilNextFire = World.pauseRelativeTime
 // 							  + Const.a.delayBetweenShotsForWeapon2[index];
 //         } else {
-//             waitTilNextFire = World->pauseRelativeTime
+//             waitTilNextFire = World.pauseRelativeTime
 // 							  + Const.a.delayBetweenShotsForWeapon[index];
 //         }
 // 
-// 		World->invP1.UpdateAmmoText();
+// 		World.invP1.UpdateAmmoText();
 //     }
 // 
 //     bool DidRayHit(int wep16Index) {
@@ -759,9 +758,9 @@ void WeaponsUpdate(void) {
 // 			Quaternion.LookRotation(tempHit.normal*-1,V3.up),
 // 			hitGO.transform);
 // 
-// 		Quaternion roll = impactMark.World->instances[i].rotation;
+// 		Quaternion roll = impactMark.World.instances[i].rotation;
 // 		roll *= Quaternion.Euler(0f,0f,random_range(0,3) * 90f);
-// 		impactMark.World->instances[i].rotation = roll;
+// 		impactMark.World.instances[i].rotation = roll;
 // 		GameObject dynamicObjectsContainer = LevelManager.a.GetCurrentDynamicContainer();
 // 		impactMark.transform.parent = dynamicObjectsContainer.transform;
 // 	}
@@ -805,12 +804,12 @@ void WeaponsUpdate(void) {
 //         else  if (wep16index == 4) laserIndex = 407; // Yellow laser for ion
 // 
 // 		GameObject dynamicObjectsContainer = LevelManager.a.GetCurrentDynamicContainer();
-// 		GameObject lasertracer = Instantiate(Const.a.GetPrefab(laserIndex),World->instances[i].position,Const.a.quaternionIdentity) as GameObject;
+// 		GameObject lasertracer = Instantiate(Const.a.GetPrefab(laserIndex),World.instances[i].position,Const.a.quaternionIdentity) as GameObject;
 // 
 // 		// Temporary object only, no need to save or mark as instantiated.
 // 		if (lasertracer != null) {
 // 			lasertracer.transform.SetParent(dynamicObjectsContainer.transform,true);
-// 			tempVec = World->instances[i].position;
+// 			tempVec = World.instances[i].position;
 // 			tempVec.y += verticalOffset;
 // 			lasertracer.GetComponent<LaserDrawing>().startPoint = tempVec;
 // 			lasertracer.GetComponent<LaserDrawing>().endPoint = tempHit.point;
@@ -834,7 +833,7 @@ void WeaponsUpdate(void) {
 //         ener_max = Const.a.energyDrainHiForWeapon[wep16Index];
 // 		// Calculates damage based on min and max values and applies a curve of the slopes based on the linear plotting of the slope from min at min to max at max...that makes sense right?
 // 		// Right then, the beautifully ugly formula:
-// 		retval = ((World->invP1.weaponEnergySetting[World->invP1.weaponCurrent]/100f)*((dmg_max/ener_max)-(dmg_min/ener_min)) + 3f) * (((World->invP1.weaponEnergySetting[World->invP1.weaponCurrent])/100f)*(ener_max-ener_min) + ener_min);
+// 		retval = ((World.invP1.weaponEnergySetting[World.invP1.weaponCurrent]/100f)*((dmg_max/ener_max)-(dmg_min/ener_min)) + 3f) * (((World.invP1.weaponEnergySetting[World.invP1.weaponCurrent])/100f)*(ener_max-ener_min) + ener_min);
 // 		//DualLog("returning DamageForPower of " + retval.ToString() + ", for wep16Index of " + wep16Index.ToString());
 // 		return retval;
 // 		// You gotta love maths!  There is a spreadsheet for this (.ods LibreOffice file format, found with src code) that shows the calculations to make this dmg curve. 
@@ -842,17 +841,17 @@ void WeaponsUpdate(void) {
 // 
 // 	// TargetID Instance
 // 	void CreateTargetIDInstance(float dmgFinal, u16 npcIdx, float tranq) {
-// 		 if (!IdxIsNPC(World->instances[npcIdx].index) || World->instances[npcIdx].health <= 0f) return;
-//          if (!(World->invP1.hasHardware & HW_TID) || tranq > 0.0f) return;
-// 		if (World->instances[npcIdx].linkedTargetID) return; // Let SendDamageReceive handle updates
+// 		 if (!IdxIsNPC(World.instances[npcIdx].index) || World.instances[npcIdx].health <= 0f) return;
+//          if (!(World.invP1.hasHardware & HW_TID) || tranq > 0.0f) return;
+// 		if (World.instances[npcIdx].linkedTargetID) return; // Let SendDamageReceive handle updates
 // /*
 // 		float linkDistForTargID = TargetID.GetTargetIDTetherRange();
-// 		bool showHealth = World->invP1.hasHardware[4] && World->invP1.hardwareVersion[4] > 2;
-// 		bool showRange = World->invP1.hasHardware[4];
-// 		bool showAttitude = World->invP1.hasHardware[4] && World->invP1.hardwareVersion[4] > 1;
-// 		bool showName = World->invP1.hasHardware[4] && World->invP1.hardwareVersion[4] > 1;
+// 		bool showHealth = World.invP1.hasHardware[4] && World.invP1.hardwareVersion[4] > 2;
+// 		bool showRange = World.invP1.hasHardware[4];
+// 		bool showAttitude = World.invP1.hasHardware[4] && World.invP1.hardwareVersion[4] > 1;
+// 		bool showName = World.invP1.hasHardware[4] && World.invP1.hardwareVersion[4] > 1;
 // 
-// 		GameObject idFrame = Instantiate(Const.a.GetPrefab(736), World->instances[npcIdx].position, Const.a.quaternionIdentity) as GameObject;
+// 		GameObject idFrame = Instantiate(Const.a.GetPrefab(736), World.instances[npcIdx].position, Const.a.quaternionIdentity) as GameObject;
 // 		if (idFrame == null) return;
 // 
 // 		TargetID tid = idFrame.GetComponent<TargetID>();
@@ -862,18 +861,18 @@ void WeaponsUpdate(void) {
 // 		tid.linkedHM = hm;
 // 		hm.linkedTargetID = tid;
 // 
-// 		if (!World->invP1.hasHardware[4] || tranq > 0f || dmgFinal == 0f) {
+// 		if (!World.invP1.hasHardware[4] || tranq > 0f || dmgFinal == 0f) {
 // 			tid.currentText = tranq > 0f ? Text->stringTable[536] : (dmgFinal == 0f ? Text->stringTable[511] : "");
 // 			tid.lifetime += tranq;
-// 			tid.damageTimeFinished = vmax(World->pauseRelativeTime + tranq,tid.damageTimeFinished + tranq);
-// 			tid.lifetimeFinished = World->pauseRelativeTime + tid.lifetime;
+// 			tid.damageTimeFinished = vmax(World.pauseRelativeTime + tranq,tid.damageTimeFinished + tranq);
+// 			tid.lifetimeFinished = World.pauseRelativeTime + tid.lifetime;
 // 		} else {
 // 			tid.currentText = ""; // Set by SendDamageReceive
 // 			tid.lifetime = 9999999f;
-// 			tid.lifetimeFinished = World->pauseRelativeTime + tid.lifetime;
+// 			tid.lifetimeFinished = World.pauseRelativeTime + tid.lifetime;
 // 			tid.damageTime = 2.5f;
 // 			if (tranq > 2.5f) tid.damageTime = tranq;
-// 			tid.damageTimeFinished = World->pauseRelativeTime + tid.damageTime;
+// 			tid.damageTimeFinished = World.pauseRelativeTime + tid.damageTime;
 // 		}
 // 
 // 		// Center on what we just shot
@@ -914,7 +913,7 @@ void WeaponsUpdate(void) {
 // 		float textdmg_Ofs = textname_Ofs - 0.18f; // def: 1.1f, e.g. MINOR
 // 		float textnum_Ofs = textname_Ofs - 0.09f; // def: 1.19f, e.g. 3.8M Idle
 // 
-// 		idFrame.World->instances[i].position = hm.World->instances[i].position;
+// 		idFrame.World.instances[i].position = hm.World.instances[i].position;
 // 		idFrame.SetActive(true);
 // 		tid.linkedHM = hm;
 // 		hm.linkedTargetID = tid;
@@ -969,7 +968,7 @@ void WeaponsUpdate(void) {
 //             CreateStandardImpactEffects(); // standard blood spurts/robot sparks
 // 
 // 			// the only exception
-// 			if (wep16Index == 2 && World->invP1.wepLoadedWithAlternate[World->invP1.weaponCurrent]) {
+// 			if (wep16Index == 2 && World.invP1.wepLoadedWithAlternate[World.invP1.weaponCurrent]) {
 // 				damageData.attackType = AttackType.Tranq; // tranquilize the untranquil....yes
 // 			}
 //         }
@@ -996,7 +995,7 @@ void WeaponsUpdate(void) {
 //         damageData.hit = tempHit;
 // 		damageData.attacknormal = MouseCursor.a.GetCursorScreenPointForRay();
 //         damageData.attacknormal = playerCamera.ScreenPointToRay(damageData.attacknormal).direction;
-//         if (World->invP1.wepLoadedWithAlternate[World->invP1.weaponCurrent]) {
+//         if (World.invP1.wepLoadedWithAlternate[World.invP1.weaponCurrent]) {
 //             damageData.damage = Const.a.damagePerHitForWeapon2[wep16Index];
 // 			damageData.offense = Const.a.offenseForWeapon2[wep16Index];
 // 			damageData.penetration = Const.a.penetrationForWeapon2[wep16Index];
@@ -1106,14 +1105,14 @@ void WeaponsUpdate(void) {
 // 				if (prefID != null && !isRapier) {
 // 					FootStepType fstep = PlayerMovement.a.GetFootstepTypeForPrefab(prefID.constIndex);
 // 					AudioClip stcp = PlayerMovement.a.JumpLandSound(fstep);
-// 					play_wav(World->instances[i].position,stcp,1f);
-// 					play_wav(World->instances[i].position,hit,0.65f);	
+// 					play_wav(World.instances[i].position,stcp,1f);
+// 					play_wav(World.instances[i].position,hit,0.65f);	
 // 				} else {
-// 					play_wav(World->instances[i].position,hit,1f);	
+// 					play_wav(World.instances[i].position,hit,1f);	
 // 				}
 // 
 // 				PlayerHealth.a.makingNoise = true;
-// 				PlayerHealth.a.noiseFinished = World->pauseRelativeTime+0.5f;
+// 				PlayerHealth.a.noiseFinished = World.pauseRelativeTime+0.5f;
 // 			}
 // 			yield break;
 // 		}
@@ -1132,7 +1131,7 @@ void WeaponsUpdate(void) {
 // 		if (tempHM.isNPC && !tempHM.aic.asleep) Music.a.inCombat = true;
 // 		if (!silent) {
 // 			PlayerHealth.a.makingNoise = true;
-// 			PlayerHealth.a.noiseFinished = World->pauseRelativeTime + 0.5f;
+// 			PlayerHealth.a.noiseFinished = World.pauseRelativeTime + 0.5f;
 // 			if ((tempHM.bloodType == BloodType_Red)
 // 				|| (tempHM.bloodType == BloodType_Yellow)
 // 				|| (tempHM.bloodType == BloodType_Green)) {
@@ -1199,8 +1198,8 @@ void WeaponsUpdate(void) {
 // 			if (hm == null) continue;
 // 			if (!hm.gameObject.activeInHierarchy) continue;
 // 
-// 			if (V3_Dist(hm.World->instances[i].position,
-// 								 playerCapsule.World->instances[i].position)
+// 			if (V3_Dist(hm.World.instances[i].position,
+// 								 playerCapsule.World.instances[i].position)
 // 				>= meleescanDistance) {
 // 
 // 				continue;
@@ -1208,11 +1207,11 @@ void WeaponsUpdate(void) {
 // 
 // 			MouseLookScript.a.SetCameraFocusPoint();
 // 			tempVec = MouseLookScript.a.cameraFocusPoint
-// 						- playerCamera.World->instances[i].position;
+// 						- playerCamera.World.instances[i].position;
 // 
 // 			tempVec = tempVec.normalized;
-// 			V3 ang = hm.World->instances[i].position
-// 							- playerCamera.World->instances[i].position;
+// 			V3 ang = hm.World.instances[i].position
+// 							- playerCamera.World.instances[i].position;
 // 
 // 			ang = ang.normalized;
 // 			float dot = V3.Dot(tempVec,ang);
@@ -1263,9 +1262,9 @@ void WeaponsUpdate(void) {
 // 			damageData.penetration = Const.a.penetrationForWeapon[index16];
 //             beachball.GetComponent<ProjectileEffectImpact>().dd = damageData;
 //             beachball.GetComponent<ProjectileEffectImpact>().host = playerCapsule;
-//             beachball.World->instances[i].position = playerCamera.World->instances[i].position;
+//             beachball.World.instances[i].position = playerCamera.World.instances[i].position;
 // 			MouseLookScript.a.SetCameraFocusPoint();
-//             tempVec = MouseLookScript.a.cameraFocusPoint - playerCamera.World->instances[i].position;
+//             tempVec = MouseLookScript.a.cameraFocusPoint - playerCamera.World.instances[i].position;
 //             beachball.transform.forward = tempVec.normalized;
 //             beachball.SetActive(true);
 //             V3 shove = beachball.transform.forward * shoveForce;
@@ -1315,16 +1314,16 @@ void WeaponsUpdate(void) {
 // 	}
 // 
 // 	void WeaponsUpdate() {
-// 		int index = World->invP1.weaponCurrent; // 0 to 6, 7 slots
+// 		int index = World.invP1.weaponCurrent; // 0 to 6, 7 slots
 // 		// Changed from this:
-// 		// Get16WeaponIndexFromConstIndex(World->invP1.weaponIndex); 0 to 15
+// 		// Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex); 0 to 15
 // 		if (index < 0) return;
 // 
-// 		if (World->invP1.weaponIndex == -1
-// 		    || World->invP1.weaponIndex == 41
-// 			|| World->invP1.weaponIndex == 42
+// 		if (World.invP1.weaponIndex == -1
+// 		    || World.invP1.weaponIndex == 41
+// 			|| World.invP1.weaponIndex == 42
 // 			|| MouseLookScript.a.inCyberSpace
-// 			|| World->invP1.weaponCurrentPending >= 0) {
+// 			|| World.invP1.weaponCurrentPending >= 0) {
 // 				tempis[0] = 10; // blank
 // 				tempis[1] = 10; // blank
 // 				tempis[2] = 10; // blank
@@ -1334,10 +1333,10 @@ void WeaponsUpdate(void) {
 // 				return;
 // 		}
 // 
-// 		if (World->invP1.wepLoadedWithAlternate[World->invP1.weaponCurrent]) {
-// 			UpdateDigits(World->invP1.currentMagazineAmount2[index]);
+// 		if (World.invP1.wepLoadedWithAlternate[World.invP1.weaponCurrent]) {
+// 			UpdateDigits(World.invP1.currentMagazineAmount2[index]);
 // 		} else {
-// 			UpdateDigits(World->invP1.currentMagazineAmount[index]);
+// 			UpdateDigits(World.invP1.currentMagazineAmount[index]);
 // 		}
 // 	}
 // }
@@ -1412,23 +1411,23 @@ void WeaponsUpdate(void) {
 // 		Utils.Deactivate(ViewModelSkorpion);
 // 		Utils.Deactivate(ViewModelSparq);
 // 		Utils.Deactivate(ViewModelStungun);
-// 		Utils.Deactivate(Eng_UI->energySliderLH);
-// 		Utils.Deactivate(Eng_UI->energyHeatTicksLH);
-// 		Utils.Deactivate(Eng_UI->overloadButtonLH);
-// 		Utils.Deactivate(Eng_UI->unloadButtonLH);
-// 		Utils.Deactivate(Eng_UI->loadNormalAmmoButtonLH);
-// 		Utils.Deactivate(Eng_UI->loadAlternateAmmoButtonLH);
+// 		Utils.Deactivate(Sys_UI.energySliderLH);
+// 		Utils.Deactivate(Sys_UI.energyHeatTicksLH);
+// 		Utils.Deactivate(Sys_UI.overloadButtonLH);
+// 		Utils.Deactivate(Sys_UI.unloadButtonLH);
+// 		Utils.Deactivate(Sys_UI.loadNormalAmmoButtonLH);
+// 		Utils.Deactivate(Sys_UI.loadAlternateAmmoButtonLH);
 // 
-// 		Utils.Deactivate(Eng_UI->energySliderRH);
-// 		Utils.Deactivate(Eng_UI->energyHeatTicksRH);
-// 		Utils.Deactivate(Eng_UI->overloadButtonRH);
-// 		Utils.Deactivate(Eng_UI->unloadButtonRH);
-// 		Utils.Deactivate(Eng_UI->loadNormalAmmoButtonRH);
-// 		Utils.Deactivate(Eng_UI->loadAlternateAmmoButtonRH);
+// 		Utils.Deactivate(Sys_UI.energySliderRH);
+// 		Utils.Deactivate(Sys_UI.energyHeatTicksRH);
+// 		Utils.Deactivate(Sys_UI.overloadButtonRH);
+// 		Utils.Deactivate(Sys_UI.unloadButtonRH);
+// 		Utils.Deactivate(Sys_UI.loadNormalAmmoButtonRH);
+// 		Utils.Deactivate(Sys_UI.loadAlternateAmmoButtonRH);
 // 	}
 // 
 // 	public void RemoveWeapon(int weaponButton7Index) {
-// 		WeaponButtonsManager wepbutMan = Eng_UI->wepbutMan;
+// 		WeaponButtonsManager wepbutMan = Sys_UI.wepbutMan;
 // 		WeaponButton wepbut = wepbutMan.wepButtonsScripts[0];
 // 		if (weaponButton7Index != weaponCurrent) {
 // 			if (weaponButton7Index > weaponCurrent) return; // No list shift.
@@ -1439,20 +1438,20 @@ void WeaponsUpdate(void) {
 // 
 // 		SetAllViewModelsDeactive();
 // 		WeaponFire.a.reloadFinished = 0;
-// 		int initialIndex = World->invP1.weaponCurrent;
+// 		int initialIndex = World.invP1.weaponCurrent;
 // 		if (initialIndex < 0) initialIndex = 0;
 // 		if (initialIndex > 6) initialIndex = 0;
 // 		int nextIndex = initialIndex - 1; // add 1 to get slot above this
 // 		if (nextIndex < 0) nextIndex = 6; // wraparound to top
 // 		int countCheck = 0;
-// 		bool buttonNotValid = (World->invP1.weaponInventoryIndices[nextIndex] == -1);
+// 		bool buttonNotValid = (World.invP1.weaponInventoryIndices[nextIndex] == -1);
 // 		while (buttonNotValid) {
 // 			countCheck++;
 // 			if (countCheck > 13) return; // no weapons!  don't runaway loop
 // 
 // 			nextIndex--;
 // 			if (nextIndex < 0) nextIndex = 6;
-// 			buttonNotValid = (World->invP1.weaponInventoryIndices[nextIndex] == -1);
+// 			buttonNotValid = (World.invP1.weaponInventoryIndices[nextIndex] == -1);
 // 		}
 // 
 // 		wepbut = wepbutMan.wepButtonsScripts[nextIndex];
@@ -1475,15 +1474,15 @@ void WeaponsUpdate(void) {
 // 		WeaponFire.a.StartWeaponDip(0);
 // 		currentMagazineAmount[weaponButton7Index] = 0; // Zero out ammo
 // 		currentMagazineAmount2[weaponButton7Index] = 0;
-// 		Eng_UI->UpdateHUDAmmoCountsEither();
-// 		Eng_UI->SetWepInfo(-1);
-// 		Eng_UI->OpenTab(0, true, TabMSG.Weapon, 0,Handedness.LH);
+// 		Sys_UI.UpdateHUDAmmoCountsEither();
+// 		Sys_UI.SetWepInfo(-1);
+// 		Sys_UI.OpenTab(0, true, TabMSG.Weapon, 0,Handedness.LH);
 // 	}
 // 
 // 	public void WeaponChange(int useableItemIndex, int buttonIndex) {
-// 		if (WeaponFire.a.reloadFinished > World->pauseRelativeTime) return;
+// 		if (WeaponFire.a.reloadFinished > World.pauseRelativeTime) return;
 // 		if (useableItemIndex == -1 || buttonIndex > 6 || buttonIndex < 0) {
-// 			Eng_UI->SetAmmoIcons(-1,false); // Clear the ammo icons.
+// 			Sys_UI.SetAmmoIcons(-1,false); // Clear the ammo icons.
 // 			//DualLog("Early exit on WeaponChange() in WeaponCurrent.cs!");
 // 			return;
 // 		}
@@ -1497,14 +1496,14 @@ void WeaponsUpdate(void) {
 // 		WeaponFire.a.StartWeaponDip(Const.a.reloadTime[wep16index]);
 // 		weaponCurrentPending = buttonIndex;
 // 		weaponIndexPending = useableItemIndex;
-// 		Eng_UI->SetWepInfo(-1);
-// 		Eng_UI->UpdateHUDAmmoCountsEither();
+// 		Sys_UI.SetWepInfo(-1);
+// 		Sys_UI.UpdateHUDAmmoCountsEither();
 // 	}
 // 
 // 	void WeaponChangeUpdate() {
 // 		if (justChangedWeap) {
 // 			justChangedWeap = false;
-// 			Eng_UI->SetAmmoIcons(-1,false); // Clear it.
+// 			Sys_UI.SetAmmoIcons(-1,false); // Clear it.
 // 			UpdateWeaponViewModels();
 // 		}
 // 
@@ -1520,27 +1519,27 @@ void WeaponsUpdate(void) {
 // 			useableIndex = -1;
 // 		}
 // 
-// 		Eng_UI->HideAmmoAndEnergyItems();
+// 		Sys_UI.HideAmmoAndEnergyItems();
 // 		SetAllViewModelsDeactive();
 // 		switch (setWep) {
 // 			case 36: // "LOAD MAGNESIUM", "LOAD PENETRATOR"
-// 				Eng_UI->ShowAmmoItems(539,540);
+// 				Sys_UI.ShowAmmoItems(539,540);
 // 				Utils.Activate(ViewModelAssault);
 // 				break;
 // 			case 37:
-// 				Eng_UI->ShowEnergyItems();
+// 				Sys_UI.ShowEnergyItems();
 // 				Utils.Activate(ViewModelBlaster);
 // 				break;
 // 			case 38: // "LOAD NEEDLE", "LOAD TRANQ"
-// 				Eng_UI->ShowAmmoItems(541,542);
+// 				Sys_UI.ShowAmmoItems(541,542);
 // 				Utils.Activate(ViewModelDartgun);
 // 				break;
 // 			case 39: // "LOAD HORNET", "LOAD SPLINTER"
-// 				Eng_UI->ShowAmmoItems(543,544);
+// 				Sys_UI.ShowAmmoItems(543,544);
 // 				Utils.Activate(ViewModelFlechette);
 // 				break;
 // 			case 40:
-// 				Eng_UI->ShowEnergyItems();
+// 				Sys_UI.ShowEnergyItems();
 // 				Utils.Activate(ViewModelIon);
 // 				break;
 // 			case 41:
@@ -1550,42 +1549,42 @@ void WeaponsUpdate(void) {
 // 				Utils.Activate(ViewModelPipe);
 // 				break;
 // 			case 43: // "LOAD HOLLOW TIP", "LOAD HEAVY SLUG"
-// 				Eng_UI->ShowAmmoItems(545,546);
+// 				Sys_UI.ShowAmmoItems(545,546);
 // 				Utils.Activate(ViewModelMagnum);
 // 				break;
 // 			case 44: // "LOAD CARTRIDGE"
-// 				Eng_UI->ShowAmmoItems(547,-1);
+// 				Sys_UI.ShowAmmoItems(547,-1);
 // 				Utils.Activate(ViewModelMagpulse);
-// 				Eng_UI->HideAlternateAmmoButton();
+// 				Sys_UI.HideAlternateAmmoButton();
 // 				break;
 // 			case 45: // "LOAD STANDARD", "LOAD TEFLON"
-// 				Eng_UI->ShowAmmoItems(548,549);
+// 				Sys_UI.ShowAmmoItems(548,549);
 // 				Utils.Activate(ViewModelPistol);
 // 				break;
 // 			case 46:
-// 				Eng_UI->ShowEnergyItems();
+// 				Sys_UI.ShowEnergyItems();
 // 				Utils.Activate(ViewModelPlasma);
 // 				break;
 // 			case 47: // "LOAD RAIL CLIP"
-// 				Eng_UI->ShowAmmoItems(550,-1);
+// 				Sys_UI.ShowAmmoItems(550,-1);
 // 				Utils.Activate(ViewModelRailgun);
-// 				Eng_UI->HideAlternateAmmoButton();
+// 				Sys_UI.HideAlternateAmmoButton();
 // 				break;
 // 			case 48:  // "LOAD RUBBER SLUG"
-// 				Eng_UI->ShowAmmoItems(551,-1);
+// 				Sys_UI.ShowAmmoItems(551,-1);
 // 				Utils.Activate(ViewModelRiotgun);
-// 				Eng_UI->HideAlternateAmmoButton();
+// 				Sys_UI.HideAlternateAmmoButton();
 // 				break;
 // 			case 49: // "LOAD SLAG", "LOAD LARGE SLAG"
-// 				Eng_UI->ShowAmmoItems(552,553);
+// 				Sys_UI.ShowAmmoItems(552,553);
 // 				Utils.Activate(ViewModelSkorpion);
 // 				break;
 // 			case 50:
-// 				Eng_UI->ShowEnergyItems();
+// 				Sys_UI.ShowEnergyItems();
 // 				Utils.Activate(ViewModelSparq);
 // 				break;
 // 			case 51:
-// 				Eng_UI->ShowEnergyItems();
+// 				Sys_UI.ShowEnergyItems();
 // 				Utils.Activate(ViewModelStungun);
 // 				break;
 // 		}
@@ -1600,28 +1599,28 @@ void WeaponsUpdate(void) {
 // 		}
 // 
 // 		if (wep16index == 1 || wep16index == 4 || wep16index == 10 || wep16index == 14 || wep16index == 15) {
-// 			if (Eng_UI->overloadButtonLH.activeInHierarchy) {
-// 				Eng_UI->overloadButtonLH.GetComponent<EnergyOverloadButton>().OverloadButtonAction();
+// 			if (Sys_UI.overloadButtonLH.activeInHierarchy) {
+// 				Sys_UI.overloadButtonLH.GetComponent<EnergyOverloadButton>().OverloadButtonAction();
 // 			}
 // 
-// 			if (Eng_UI->overloadButtonRH.activeInHierarchy) {
-// 				Eng_UI->overloadButtonRH.GetComponent<EnergyOverloadButton>().OverloadButtonAction();
+// 			if (Sys_UI.overloadButtonRH.activeInHierarchy) {
+// 				Sys_UI.overloadButtonRH.GetComponent<EnergyOverloadButton>().OverloadButtonAction();
 // 			}
 // 		} else {
-// 			if (World->invP1.wepLoadedWithAlternate[weaponCurrent]) {
-// 				if (World->invP1.wepAmmo[wep16index] > 0) {
-// 				World->invP1.wepLoadedWithAlternate[weaponCurrent] = false;
+// 			if (World.invP1.wepLoadedWithAlternate[weaponCurrent]) {
+// 				if (World.invP1.wepAmmo[wep16index] > 0) {
+// 				World.invP1.wepLoadedWithAlternate[weaponCurrent] = false;
 // 				// Take bullets out of the clip, put them back into the ammo stockpile, then zero out the clip amount, did I say clip?  I mean magazine but whatever
-// 				World->invP1.wepAmmoSecondary[wep16index] += currentMagazineAmount2[weaponCurrent];
+// 				World.invP1.wepAmmoSecondary[wep16index] += currentMagazineAmount2[weaponCurrent];
 // 				currentMagazineAmount2[weaponCurrent] = 0;
 // 				LoadPrimaryAmmoType(false);
 // 				} else {
 // 					CenterStatusPrint(535); //No more of ammo type to load.
 // 				}
 // 			} else {
-// 				if (World->invP1.wepAmmoSecondary[wep16index] > 0) {
-// 					World->invP1.wepLoadedWithAlternate[weaponCurrent] = true;
-// 					World->invP1.wepAmmo[wep16index] += currentMagazineAmount[weaponCurrent];
+// 				if (World.invP1.wepAmmoSecondary[wep16index] > 0) {
+// 					World.invP1.wepLoadedWithAlternate[weaponCurrent] = true;
+// 					World.invP1.wepAmmo[wep16index] += currentMagazineAmount[weaponCurrent];
 // 					currentMagazineAmount[weaponCurrent] = 0;
 // 					LoadSecondaryAmmoType(false);
 // 				} else {
@@ -1633,30 +1632,30 @@ void WeaponsUpdate(void) {
 // 
 // 	public void LoadPrimaryAmmoType(bool isSilent) {
 // 		int wep16index = Get16WeaponIndexFromConstIndex(weaponIndex);
-// 		if (!World->invP1.wepLoadedWithAlternate[weaponCurrent]) { // Already loaded with normal.
+// 		if (!World.invP1.wepLoadedWithAlternate[weaponCurrent]) { // Already loaded with normal.
 // 			if (currentMagazineAmount[weaponCurrent] == Const.a.magazinePitchCountForWeapon[wep16index]) {
 // 				CenterStatusPrint(191); //Current weapon magazine already full.
 // 				return;
 // 			}
 // 			
-// 			if (currentMagazineAmount[weaponCurrent] == World->invP1.wepAmmo[wep16index]) {
+// 			if (currentMagazineAmount[weaponCurrent] == World.invP1.wepAmmo[wep16index]) {
 // 				CenterStatusPrint(535); // No more of ammo type to load
 // 				return;
 // 			}
 // 		}
 // 
 // 		Unload(true);
-// 		World->invP1.wepLoadedWithAlternate[weaponCurrent] = false;
+// 		World.invP1.wepLoadedWithAlternate[weaponCurrent] = false;
 // 
 // 		// Put bullets into the magazine
-// 		if (World->invP1.wepAmmo[wep16index] >= Const.a.magazinePitchCountForWeapon[wep16index]) {
+// 		if (World.invP1.wepAmmo[wep16index] >= Const.a.magazinePitchCountForWeapon[wep16index]) {
 // 			currentMagazineAmount[weaponCurrent] = Const.a.magazinePitchCountForWeapon[wep16index];
 // 		} else {
-// 			currentMagazineAmount[weaponCurrent] = World->invP1.wepAmmo[wep16index];
+// 			currentMagazineAmount[weaponCurrent] = World.invP1.wepAmmo[wep16index];
 // 		}
 // 
 // 		// Take bullets out of the ammo stockpile
-// 		World->invP1.wepAmmo[wep16index] -= currentMagazineAmount[weaponCurrent];
+// 		World.invP1.wepAmmo[wep16index] -= currentMagazineAmount[weaponCurrent];
 // 
 // 		if (!isSilent) {
 // 			if (wep16index == 0 || wep16index == 3) {
@@ -1667,7 +1666,7 @@ void WeaponsUpdate(void) {
 // 		}
 // 
 // 		// Update the counter on the HUD
-// 		Eng_UI->UpdateHUDAmmoCounts(currentMagazineAmount[weaponCurrent]);
+// 		Sys_UI.UpdateHUDAmmoCounts(currentMagazineAmount[weaponCurrent]);
 // 		WeaponFire.a.StartWeaponDip(Const.a.reloadTime[wep16index]);
 // 
 // 		// Pop it back to start to be sure
@@ -1677,30 +1676,30 @@ void WeaponsUpdate(void) {
 // 
 // 	public void LoadSecondaryAmmoType(bool isSilent) {
 // 		int wep16index = Get16WeaponIndexFromConstIndex(weaponIndex);
-// 		if (World->invP1.wepLoadedWithAlternate[weaponCurrent]) { // Already loaded with alternate
+// 		if (World.invP1.wepLoadedWithAlternate[weaponCurrent]) { // Already loaded with alternate
 // 			if (currentMagazineAmount2[weaponCurrent] == Const.a.magazinePitchCountForWeapon2[wep16index]) {
 // 				CenterStatusPrint(191); //Current weapon magazine already full.
 // 				return;
 // 			}
 // 			
-// 			if (currentMagazineAmount2[weaponCurrent] == World->invP1.wepAmmoSecondary[wep16index]) {
+// 			if (currentMagazineAmount2[weaponCurrent] == World.invP1.wepAmmoSecondary[wep16index]) {
 // 				CenterStatusPrint(535); // No more of ammo type to load
 // 				return;
 // 			}
 // 		}
 // 
 // 		Unload(true);
-// 		World->invP1.wepLoadedWithAlternate[weaponCurrent] = true;
+// 		World.invP1.wepLoadedWithAlternate[weaponCurrent] = true;
 // 
 // 		// Put bullets into the magazine
-// 		if (World->invP1.wepAmmoSecondary[wep16index] >= Const.a.magazinePitchCountForWeapon2[wep16index]) {
+// 		if (World.invP1.wepAmmoSecondary[wep16index] >= Const.a.magazinePitchCountForWeapon2[wep16index]) {
 // 			currentMagazineAmount2[weaponCurrent] = Const.a.magazinePitchCountForWeapon2[wep16index];
 // 		} else {
-// 			currentMagazineAmount2[weaponCurrent] = World->invP1.wepAmmoSecondary[wep16index];
+// 			currentMagazineAmount2[weaponCurrent] = World.invP1.wepAmmoSecondary[wep16index];
 // 		}
 // 
 // 		// Take bullets out of the ammo stockpile
-// 		World->invP1.wepAmmoSecondary[wep16index] -= currentMagazineAmount2[weaponCurrent];
+// 		World.invP1.wepAmmoSecondary[wep16index] -= currentMagazineAmount2[weaponCurrent];
 // 
 // 		if (!isSilent) {
 // 			if (wep16index == 0 || wep16index == 3) {
@@ -1711,7 +1710,7 @@ void WeaponsUpdate(void) {
 // 		}
 // 
 // 		// Update the counter on the HUD
-// 		Eng_UI->UpdateHUDAmmoCounts(currentMagazineAmount2[weaponCurrent]);
+// 		Sys_UI.UpdateHUDAmmoCounts(currentMagazineAmount2[weaponCurrent]);
 // 		WeaponFire.a.StartWeaponDip(Const.a.reloadTime[wep16index]);
 // 
 // 		// Pop it back to start to be sure
@@ -1729,18 +1728,18 @@ void WeaponsUpdate(void) {
 // 		if (wep16index == -1) return; // we don't have a weapon at all right now :)
 // 
 // 		// Take bullets out of the clip, put them back into the ammo stockpile, then zero out the clip amount, did I say clip?  I mean magazine but whatever
-// 		if (World->invP1.wepLoadedWithAlternate[weaponCurrent]) {
-// 			World->invP1.wepAmmoSecondary[wep16index] += currentMagazineAmount2[weaponCurrent];
+// 		if (World.invP1.wepLoadedWithAlternate[weaponCurrent]) {
+// 			World.invP1.wepAmmoSecondary[wep16index] += currentMagazineAmount2[weaponCurrent];
 // 			currentMagazineAmount2[weaponCurrent] = 0;
 // 
 // 			// Update the counter on the HUD
-// 			Eng_UI->UpdateHUDAmmoCounts(currentMagazineAmount2[weaponCurrent]);
+// 			Sys_UI.UpdateHUDAmmoCounts(currentMagazineAmount2[weaponCurrent]);
 // 		} else {
-// 			World->invP1.wepAmmo[wep16index] += currentMagazineAmount[weaponCurrent];
+// 			World.invP1.wepAmmo[wep16index] += currentMagazineAmount[weaponCurrent];
 // 			currentMagazineAmount[weaponCurrent] = 0;
 // 
 // 			// Update the counter on the HUD
-// 			Eng_UI->UpdateHUDAmmoCounts(currentMagazineAmount[weaponCurrent]);
+// 			Sys_UI.UpdateHUDAmmoCounts(currentMagazineAmount[weaponCurrent]);
 // 		}
 // 		if (!isSilent) Utils.PlayUIOneShotSavable(260); // wreload
 // 	}
@@ -1761,14 +1760,14 @@ void WeaponsUpdate(void) {
 // 
 // 		if (weaponCurrent < 0) return;
 // 
-// 		if (World->invP1.wepLoadedWithAlternate[weaponCurrent]) {
+// 		if (World.invP1.wepLoadedWithAlternate[weaponCurrent]) {
 // 			if (currentMagazineAmount2[weaponCurrent] == Const.a.magazinePitchCountForWeapon2[wep16index]) {
 // 				CenterStatusPrint(191); //Current weapon magazine already full.
 // 				return;
 // 			}
 // 
-// 			if (World->invP1.wepAmmoSecondary[wep16index] <= 0) {
-// 				if (World->invP1.wepAmmo[wep16index] <= 0) {
+// 			if (World.invP1.wepAmmoSecondary[wep16index] <= 0) {
+// 				if (World.invP1.wepAmmo[wep16index] <= 0) {
 // 					CenterStatusPrint(305); //No more of any ammo type to load.
 // 					return;
 // 				} else {
@@ -1784,8 +1783,8 @@ void WeaponsUpdate(void) {
 // 				return;
 // 			}
 // 
-// 			if (World->invP1.wepAmmo[wep16index] <= 0) {
-// 				if (World->invP1.wepAmmoSecondary[wep16index] <= 0) {
+// 			if (World.invP1.wepAmmo[wep16index] <= 0) {
+// 				if (World.invP1.wepAmmoSecondary[wep16index] <= 0) {
 // 					CenterStatusPrint(305); //No more of any ammo type to load.
 // 					return;
 // 				} else {
@@ -1805,27 +1804,27 @@ void WeaponsUpdate(void) {
 
 // void WeaponCycleUp() {
 //     if (MouseLookScript.a.inCyberSpace) {
-//         World->invP1.isPulserNotDrill = !World->invP1.isPulserNotDrill; // There's only two cyberspace weapons, up is down.
+//         World.invP1.isPulserNotDrill = !World.invP1.isPulserNotDrill; // There's only two cyberspace weapons, up is down.
 //         Utils.PlayUIOneShotSavable(80); // changeweapon
-//         if (World->invP1.isPulserNotDrill) {
-//             World->invP1.pulserButtonText.Select(true);
-//             World->invP1.drillButtonText.Select(false);
+//         if (World.invP1.isPulserNotDrill) {
+//             World.invP1.pulserButtonText.Select(true);
+//             World.invP1.drillButtonText.Select(false);
 //         } else {
-//             World->invP1.pulserButtonText.Select(false);
-//             World->invP1.drillButtonText.Select(true);
+//             World.invP1.pulserButtonText.Select(false);
+//             World.invP1.drillButtonText.Select(true);
 //         }
 //     } else {
 //         if (Const.a.InputInvertInventoryCycling) wepbutMan.WeaponCycleDown();
 //         else {
-//             if (WeaponFire.a.reloadFinished > World->pauseRelativeTime) return;
+//             if (WeaponFire.a.reloadFinished > World.pauseRelativeTime) return;
 // 
-//             int initialIndex = World->invP1.weaponCurrent;
+//             int initialIndex = World.invP1.weaponCurrent;
 //             if (initialIndex < 0) initialIndex = 0;
 //             if (initialIndex > 6) initialIndex = 0;
 //             int nextIndex = initialIndex + 1; // add 1 to get slot above this
 //             if (nextIndex > 6) nextIndex = 0; // wraparound to bottom
 //             int countCheck = 0;
-//             bool buttonNotValid = (World->invP1.weaponInventoryIndices[nextIndex] == -1);
+//             bool buttonNotValid = (World.invP1.weaponInventoryIndices[nextIndex] == -1);
 //             while (buttonNotValid) {
 //                 countCheck++;
 //                 if (countCheck > 13) {
@@ -1833,12 +1832,12 @@ void WeaponsUpdate(void) {
 //                 }
 //                 nextIndex++;
 //                 if (nextIndex > 6) nextIndex = 0;
-//                 buttonNotValid = (World->invP1.weaponInventoryIndices[nextIndex] == -1);
+//                 buttonNotValid = (World.invP1.weaponInventoryIndices[nextIndex] == -1);
 //             }
 // 
 //             if (wepButtonsScripts[nextIndex].gameObject.activeSelf
 //                 && nextIndex != initialIndex) {
-//                 World->invP1.WeaponChange(wepButtonsScripts[nextIndex].useableItemIndex, wepButtonsScripts[nextIndex].WepButtonIndex);
+//                 World.invP1.WeaponChange(wepButtonsScripts[nextIndex].useableItemIndex, wepButtonsScripts[nextIndex].WepButtonIndex);
 //             }
 //         }
 //     }
@@ -1847,27 +1846,27 @@ void WeaponsUpdate(void) {
 // void WeaponCycleDown() {
 //     if (MouseLookScript.a.inCyberSpace) {
 //         // There's only two cyberspace weapons, up is down.
-//         World->invP1.isPulserNotDrill = !World->invP1.isPulserNotDrill;
+//         World.invP1.isPulserNotDrill = !World.invP1.isPulserNotDrill;
 //         Utils.PlayUIOneShotSavable(80); // changeweapon
-//         if (World->invP1.isPulserNotDrill) {
-//             World->invP1.pulserButtonText.Select(true);
-//             World->invP1.drillButtonText.Select(false);
+//         if (World.invP1.isPulserNotDrill) {
+//             World.invP1.pulserButtonText.Select(true);
+//             World.invP1.drillButtonText.Select(false);
 //         } else {
-//             World->invP1.pulserButtonText.Select(false);
-//             World->invP1.drillButtonText.Select(true);
+//             World.invP1.pulserButtonText.Select(false);
+//             World.invP1.drillButtonText.Select(true);
 //         }
 //     } else {
 //         if (Const.a.InputInvertInventoryCycling) wepbutMan.WeaponCycleUp();
 //         else {
-//             if (WeaponFire.a.reloadFinished > World->pauseRelativeTime) return;
+//             if (WeaponFire.a.reloadFinished > World.pauseRelativeTime) return;
 // 
-//             int initialIndex = World->invP1.weaponCurrent;
+//             int initialIndex = World.invP1.weaponCurrent;
 //             if (initialIndex < 0) initialIndex = 0;
 //             if (initialIndex > 6) initialIndex = 0;
 //             int nextIndex = initialIndex - 1; // add 1 to get slot above this
 //             if (nextIndex < 0) nextIndex = 6; // wraparound to top
 //             int countCheck = 0;
-//             bool buttonNotValid = (World->invP1.weaponInventoryIndices[nextIndex] == -1);
+//             bool buttonNotValid = (World.invP1.weaponInventoryIndices[nextIndex] == -1);
 //             while (buttonNotValid) {
 //                 countCheck++;
 //                 if (countCheck > 13) {
@@ -1875,12 +1874,12 @@ void WeaponsUpdate(void) {
 //                 }
 //                 nextIndex--;
 //                 if (nextIndex < 0) nextIndex = 6;
-//                 buttonNotValid = (World->invP1.weaponInventoryIndices[nextIndex] == -1);
+//                 buttonNotValid = (World.invP1.weaponInventoryIndices[nextIndex] == -1);
 //             }
 // 
 //             if (wepButtonsScripts[nextIndex].gameObject.activeSelf
 //                 && nextIndex != initialIndex) {
-//                 World->invP1.WeaponChange(wepButtonsScripts[nextIndex].useableItemIndex,
+//                 World.invP1.WeaponChange(wepButtonsScripts[nextIndex].useableItemIndex,
 //                                                 wepButtonsScripts[nextIndex].WepButtonIndex);
 //             }
 //         }

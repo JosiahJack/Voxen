@@ -1,8 +1,5 @@
 // text.c - Text and Font Rendering/Loading System
 #include "stbtt.h"
-#define T_BUFFER_SIZE 1024
-#define FONT_ATLAS_SIZE 4672
-#define MAX_GLYPHS 4096
 int numPackedGlyphs=0,numPackedGlyphsStopD=0;
 u32 fontAtlasTex,fontAtlasTexStopD;
 stbtt_packedchar fontPackedChar[MAX_GLYPHS],fontPackedCharStopD[MAX_GLYPHS];

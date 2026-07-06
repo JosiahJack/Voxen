@@ -28,7 +28,7 @@ public class KeypadKeycodeButtons : MonoBehaviour {
 	}
 	
 	public void Keypress (int button) {
-		Eng_UI->mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		KeypressAction(button);
 	}
 
@@ -113,8 +113,8 @@ public class KeypadKeycodeButtons : MonoBehaviour {
 	}
 
 	void Update() {
-		if (World->paused) return;
-		if (World->menuActive)  return;
+		if (World.paused) return;
+		if (World.menuActive)  return;
 		if (keypad == null) return;
 
 		digit1s.digitIndex = entryOnes;

@@ -5,8 +5,8 @@ u32 gridCellStates[ARRSIZE],precomputedVisibleCellsFromHere[524288]; // 4096 * 4
 u16 playerCellIdx = 0u; bool instanceIsLODArray[INSTANCE_COUNT]; Portal activePortals[MAX_PORTALS]; static u8 numActivePortals = 0;
 __attribute__((pure)) bool get_cull_bit(const u32* arr, int idx) { return (arr[idx >> 5] >> (idx & 31)) & 1; }
 INLINE void set_cull_bit(u32* arr, int idx, bool val) {u32* w = arr + (idx >> 5); u32 m = 1U << (idx & 31); *w = val ? (*w | m) : (*w & ~m);}
-ENGINE_TO_MOD i32 PosGetCellCoords(float x, float z) { return (PosGetCellCoordZ(z) * WORLDX) + PosGetCellCoordX(x); }
-ENGINE_TO_MOD bool PositionVisibleFromPlayerCell(float x, float z) { return (get_cull_bit(precomputedVisibleCellsFromHere,((playerCellIdx * ARRSIZE)/*cellIdx*/ + PosGetCellCoords(x,z)/*subIdx*/)/*flat_idx*/)); }
+i32 PosGetCellCoords(float x, float z) { return (PosGetCellCoordZ(z) * WORLDX) + PosGetCellCoordX(x); }
+bool PositionVisibleFromPlayerCell(float x, float z) { return (get_cull_bit(precomputedVisibleCellsFromHere,((playerCellIdx * ARRSIZE)/*cellIdx*/ + PosGetCellCoords(x,z)/*subIdx*/)/*flat_idx*/)); }
 INLINE bool XZPairInBounds(i32 x, i32 z) { return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0); }
 bool SkyIsVisible() { return ((gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || World.curLev == LEVEL_CYBERSPACE); }
 bool SkySunIsVisible() { return ((gridCellStates[playerCellIdx] & CELL_SEES_SUN) && World.curLev != LEVEL_CYBERSPACE); }
@@ -87,7 +87,7 @@ void DetermineClosedEdges() {
     OS_Free(png_arena_main.base, 16777216); png_arena_main.base = NULL; DualLog("found %d open cells...",totalOpenCells);
 }
 
-ENGINE_TO_MOD void AddDoorPortal(u16 entIdx, u16 parent) {
+void AddDoorPortal(u16 entIdx, u16 parent) {
     if (entIdx == 499 || entIdx == 509) return; // Don't add bulkheads
     float nudgeAmount = 0.32f;
     Entity* door = &World.instances[parent]; door->portalIndex = numActivePortals; bool isOpen = (door->doorState != DoorState_Closed); // Allows for any of DoorState_Open, DoorState_Opening, or DoorState_Closing to be considered open as far as portals are concerned so we can draw objects between the door panels.
@@ -109,7 +109,7 @@ ENGINE_TO_MOD void AddDoorPortal(u16 entIdx, u16 parent) {
     numActivePortals++;
 }
 
-ENGINE_TO_MOD bool ToggleDoorPortal(u8 p, u16 dr, u16 closedMdx) { if (p >= MAX_PORTALS) {return false;} Portal* prt = &activePortals[p]; bool currentState=prt->open; u16 mdx=World.instances[dr].modelIndex; if (mdx == closedMdx &&  currentState) { prt->open=false; prt->dirty=true; } else if (mdx != closedMdx && !currentState) { prt->open=true; prt->dirty=true; } return true; }
+bool ToggleDoorPortal(u8 p, u16 dr, u16 closedMdx) { if (p >= MAX_PORTALS) {return false;} Portal* prt = &activePortals[p]; bool currentState=prt->open; u16 mdx=World.instances[dr].modelIndex; if (mdx == closedMdx &&  currentState) { prt->open=false; prt->dirty=true; } else if (mdx != closedMdx && !currentState) { prt->open=true; prt->dirty=true; } return true; }
 i32 CastRayCellCheck(i32 x, i32 z, i32 lastX, i32 lastZ) {
     if (lastX != x || lastZ != z) {
         if (XZPairInBounds(lastX, lastZ)) { 
@@ -258,7 +258,7 @@ void DetermineVisibleCells(i32 startX, i32 startZ) {
     }
 }
 
-ENGINE_TO_MOD void PortalCulling() { // Called just once at end of animation loop for the frame after each frame perfect change to door models becoming either closed or not closed.
+void PortalCulling() { // Called just once at end of animation loop for the frame after each frame perfect change to door models becoming either closed or not closed.
     bool previousLightVisible[LIGHT_COUNT]; mset(previousLightVisible,false,LIGHT_COUNT * sizeof(bool));
     for (u16 i=0;i<loadedLights;++i) { u16 lcell = (lights[i].pos.z * WORLDX) + lights[i].pos.x; if (gridCellStates[lcell] & CELL_VISIBLE) {previousLightVisible[i]=true;} }
     for (u8 portalIdx=0;portalIdx<MAX_PORTALS;++portalIdx) {

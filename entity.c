@@ -1,9 +1,7 @@
-#include "mod.h"
 #define LINE_LEN_MAX 81920
 Entity EDefs[MAX_ENTITIES];
 #define GEOMETRY_LOD_CARD_MODEL_IDX 178
-void* mcpy(void *dst, const void *src, size_t n) { u8 *d=(u8 *)dst; const u8 *s=(const u8 *)src; while (n--) {*d++=*s++;} return dst; } // memcpy replacement
-MOD_TO_ENGINE void ModEDefsInitAfterLoad(void) { // Global conditions for all entities.  No sense inflating the table data in entity.c
+void ModEDefsInitAfterLoad(void) { // Global conditions for all entities.  No sense inflating the table data in entity.c
     mset(EDefs,0,sizeof(Entity)); 
     for (int i=0;i<768;++i) { EDefs[i].index = i; EDefs[i].modelIndex = MAX_MDLS; EDefs[i].lodIndex = MAX_MDLS; }
     
@@ -803,16 +801,17 @@ MOD_TO_ENGINE void ModEDefsInitAfterLoad(void) { // Global conditions for all en
             EDefs[i].colliderSize = (V3){2.56f,0.32f,2.56f};
         }
         
-        EDefs[i].currentFrameFinished = World->pauseRelativeTime + 0.1;
+        EDefs[i].currentFrameFinished = World.pauseRelativeTime + 0.1;
         if (IdxIsButtonSwitch(EDefs[i].index)) { EDefs[i].lockedMessageLingdex = 193; EDefs[i].tickTime = 1.5; } // ButtonSwitch
     }
 }
 
+void InitializeAIAfterLoad(u16 i);
 u16 AddInstance(u16 entIdx, V3 pos) {
     if (entIdx >= MAX_ENTITIES) { DualLogError("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d, skipped\n",entIdx,MAX_ENTITIES); return INSTANCE_COUNT; }
     
-    u16 i = World->instCount;
-    Entity* e = &World->instances[i];
+    u16 i = World.instCount;
+    Entity* e = &World.instances[i];
     e->index = entIdx;
     SetPosition(e,pos,true); // Marks dirty internally, using true to force as if twere teleported.
     if (IdxIsNPC(entIdx)) InitializeAIAfterLoad(i);
@@ -832,16 +831,16 @@ u16 AddInstance(u16 entIdx, V3 pos) {
     e->collider = EDefs[entIdx].collider; e->colliderCenter = EDefs[entIdx].colliderCenter; e->colliderSize = EDefs[entIdx].colliderSize;
     e->mass = EDefs[entIdx].mass > 0.0f ? EDefs[entIdx].mass : 1.0f; e->angularDrag = EDefs[entIdx].angularDrag > 0.0f ? EDefs[entIdx].angularDrag : 0.05f;
     e->gravity = EDefs[entIdx].gravity > 0.0f ? EDefs[entIdx].gravity : 1.0f;
-    World->instances[i].lockedMessageLingdex = EDefs[entIdx].lockedMessageLingdex;
-    World->instCount++;
+    World.instances[i].lockedMessageLingdex = EDefs[entIdx].lockedMessageLingdex;
+    World.instCount++;
     return i;
 }
 
 void DeleteInstance(u16 i) {
-    if (i <= PLAYER2 || i >= World->instCount) return; // Don't delete null ent, player 1, nor player 2 or already empty slots.
+    if (i <= PLAYER2 || i >= World.instCount) return; // Don't delete null ent, player 1, nor player 2 or already empty slots.
 
-    mcpy(&World->instances[i],&World->instances[World->instCount - 1],sizeof(Entity));
-    --World->instCount; // Shift final marker.  It's history!
+    mcpy(&World.instances[i],&World.instances[World.instCount - 1],sizeof(Entity));
+    --World.instCount; // Shift final marker.  It's history!
 }
 
 static const Color fogLUT[14] = { {0.3207547f, 0.29200783f,0.29200783f,0.07f},/*0*/  {0.34509805f,0.38431373f,0.49019608f,0.055f},/*1*/  {0.47058824f,0.3882353f, 0.3928334f,0.05f},/*2*/  {0.32941177f,0.29411766f,0.2509804f,0.065f},/*3*/ {0.3882353f,0.452415f, 0.47058824f,0.075f},/*4*/
@@ -859,24 +858,18 @@ Light lightsFromFile[LIGHT_COUNT];
 LightAnimation lanimsFromFile[LIGHT_COUNT];
 char lineSpace[LINE_LEN_MAX];
 char initialLine[LINE_LEN_MAX];
-MOD_TO_ENGINE void SetGlobalsModData() {
-    for (int i=0;i<World->numLevels;++i) {
-        World->worldMin_x[i] = levMins[i].x; World->worldMin_z[i] = levMins[i].y;
-        World->voxelMinCenterX[i] = World->worldMin_x[i] + VOXEL_HALF; World->voxelMinCenterZ[i] = World->worldMin_z[i] + VOXEL_HALF;
-        World->farPlane[i] = lFars[i];
-        World->fogColor[i] = fogLUT[i]; World->fogColor[i].a *= 3.8f;
-    }
-}
-
-MOD_TO_ENGINE void LoadLevelMod(u8 lev) {
-    u8 curlevel = vclamp(lev,0,13); World->curLev = curlevel;
-    World->levelCurrentlyLoading = true;
-    World->instCount = 3; // 0 == NULL, 1 == Player1, 2 == Player2
+void InitializeEntity(Entity* e) { mset(e,0,sizeof(Entity)); u16 idx=(u16)(e - World.instances); e->index=U16_MAX; e->entflags=EF_ACTIVE; e->kinematic=true; e->layer=L_Default; e->camView=255; e->tickTime = 0.35f; e->angularDrag = 0.05f; e->modelIndex=e->lodIndex=e->colMeshIndex=MAX_MDLS; e->texIndex=e->glowIndex=e->specIndex=e->normIndex = MAX_TXRS; World.scale[idx].x=World.scale[idx].y=World.scale[idx].z=e->mass=e->volume=World.rotation[idx].w=1.0f; e->dynamicFriction = e->staticFriction = 0.6f; }
+static void GenBTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt);
+void AddCamView(V3 p, Quaternion r, u8 fv, u16 w, u16 h, float nr, float fr) { camViews[camViewCount] = (CamView){p,r,fv,w,h,nr,fr,World.pauseRelativeTime + (camViewCount * 0.05f) + 0.5f,false};/*Staggered for perf*/ GenBTexture(&camViewTextures[camViewCount],GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/); camViewCount++; }
+void LoadLevelMod(u8 lev) {
+    u8 curlevel = vclamp(lev,0,13); World.curLev = curlevel;
+    World.levelCurrentlyLoading = true;
+    World.instCount = 3; // 0 == NULL, 1 == Player1, 2 == Player2
     if (curlevel == 1) {
         AddCamView((V3){-19.2301f,-42.6604f,-49.7453f},(Quaternion){0.2375f,0.0008f,-0.0002f,0.9713f},75u,256u,256u,2.21f,11.5f);
         AddCamView((V3){7.664583f,-44.88017f,-14.26742f},(Quaternion){0.0f,0.9999f,0.0129f,0.0f},60u,256u,256u,2.192f,20.6f);
     } // TODO other level camviews
-    for (u16 idx = INSTS_1ST_IDX; idx < INSTANCE_COUNT; idx++) InitializeEntity(&World->instances[idx]);
+    for (u16 idx = INSTS_1ST_IDX; idx < INSTANCE_COUNT; idx++) InitializeEntity(&World.instances[idx]);
     mset(entsFromFile,0,INSTANCE_COUNT * sizeof(Entity));
     mset(positionFromFile,0,INSTANCE_COUNT * sizeof(V3));
     mset(scaleFromFile,0,INSTANCE_COUNT * sizeof(V3));
@@ -958,9 +951,9 @@ MOD_TO_ENGINE void LoadLevelMod(u8 lev) {
                 else if (sEqual(trimmed_key,"toggleLasers"))    inst->toggleLasers = parse_bool(trimmed_value,initialLine,lineNum);
                 else if (sEqual(trimmed_key,"targettingOnlyUnlocks")) inst->targettingOnlyUnlocks = parse_bool(trimmed_value,initialLine,lineNum);
                 else if (sEqual(trimmed_key,"changeLayerOnOpenClose")) inst->changeLayerOnOpenClose = parse_bool(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"useFinished"))     inst->useFinished = parse_float(trimmed_value,initialLine,lineNum) + World->pauseRelativeTime;
-                else if (sEqual(trimmed_key,"waitBeforeClose")) inst->waitBeforeClose = parse_float(trimmed_value,initialLine,lineNum) + World->pauseRelativeTime;
-                else if (sEqual(trimmed_key,"lasersFinished"))  inst->lasersFinished = parse_float(trimmed_value,initialLine,lineNum) + World->pauseRelativeTime;
+                else if (sEqual(trimmed_key,"useFinished"))     inst->useFinished = parse_float(trimmed_value,initialLine,lineNum) + World.pauseRelativeTime;
+                else if (sEqual(trimmed_key,"waitBeforeClose")) inst->waitBeforeClose = parse_float(trimmed_value,initialLine,lineNum) + World.pauseRelativeTime;
+                else if (sEqual(trimmed_key,"lasersFinished"))  inst->lasersFinished = parse_float(trimmed_value,initialLine,lineNum) + World.pauseRelativeTime;
                 else if (sEqual(trimmed_key,"changeMatOnActive")) inst->changeTexOnActive = parse_bool(trimmed_value,initialLine,lineNum);
                 else if (sEqual(trimmed_key,"blinkWhenActive")) inst->blinkTexOnActive = parse_bool(trimmed_value,initialLine,lineNum);
                 else if (sEqual(trimmed_key,"doorOpen"))        flag_set(&inst->ioflags,TARG_IOFLAGS_DOOROPEN,parse_bool(trimmed_value,initialLine,lineNum));
@@ -1021,10 +1014,10 @@ MOD_TO_ENGINE void LoadLevelMod(u8 lev) {
         Entity* src = &entsFromFile[e];
         u16 entIdx = src->index;
         u16 parent = AddInstance(entIdx,positionFromFile[e]);
-        Entity* par = &World->instances[parent];
+        Entity* par = &World.instances[parent];
         par->lastPosition          = positionFromFile[e];
-        World->rotation[parent]    = rotationFromFile[e];
-        World->scale[parent]       = scaleFromFile[e];
+        World.rotation[parent]    = rotationFromFile[e];
+        World.scale[parent]       = scaleFromFile[e];
         par->entflags             |= src->entflags; // bitor `|` since AddInstance already set flags from entity definitions.
         par->ioflags               = src->ioflags;
         par->amount                = src->amount;
@@ -1068,7 +1061,7 @@ MOD_TO_ENGINE void LoadLevelMod(u8 lev) {
             LightAnimation lam={0};
             par->texAnimLight  = AddLight(&lit1,&lam);
             par->texAnimLight2 = AddLight(&lit2,&lam);
-        } else if (entIdx == 309 || entIdx == 365 || entIdx == 369) World->position[parent].y += 0.12f; // item_beaker || item_flask || item_testtube: Move up to account for CG mod (origin moved vs Unity version)
+        } else if (entIdx == 309 || entIdx == 365 || entIdx == 369) World.position[parent].y += 0.12f; // item_beaker || item_flask || item_testtube: Move up to account for CG mod (origin moved vs Unity version)
         else if (entIdx == 279) { // chunk_screen
             V3 ofs1 = GetLocalTransformedPos(par,(V3){0.0f,-0.08f,0.0f});
             Light lit1 = (Light){.pos=ofs1,.col=(Color3){0.909803922f,0.929411765f,1.0f},.range=3.2f,.intensity=1.575f,.maxIntensity=1.575f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
@@ -1087,10 +1080,10 @@ MOD_TO_ENGINE void LoadLevelMod(u8 lev) {
         } else if (par->index == 746) { // weapon_grenadeenergmine_live
             par->textureAnimating = true; par->texAnimClip = 2; par->texFrame = 0;
         } else if (entIdx == 720) {
-            /*u16 mist = */AddInstance(648,World->position[parent]); // ambient_mist
+            /*u16 mist = */AddInstance(648,World.position[parent]); // ambient_mist
         } else if (entIdx == 733) {
-            /*u16 pipewater = */AddInstance(649,World->position[parent]); // ambient_pipewater_loop
-            /*u16 rain = */AddInstance(653,(V3){World->position[parent].x,World->position[parent].y - 1.26f,World->position[parent].z}); // ambient_rain
+            /*u16 pipewater = */AddInstance(649,World.position[parent]); // ambient_pipewater_loop
+            /*u16 rain = */AddInstance(653,(V3){World.position[parent].x,World.position[parent].y - 1.26f,World.position[parent].z}); // ambient_rain
         }
         
         if (par->texAnimResourceFolder[0] != '\0' && par->tickTime <= 0.01f) par->tickTime = 0.35f;
@@ -1099,13 +1092,13 @@ MOD_TO_ENGINE void LoadLevelMod(u8 lev) {
     
     for (int i = 0; i < lightsIdx; ++i) { if (!(lightsFromFile[i].lflags & LSPOT)){lightsFromFile[i].spotAng=0.0f;} AddLight(&lightsFromFile[i],&lanimsFromFile[i]); } // Add all level lights
     if (curlevel == 1 || curlevel == 2 || curlevel == 5 || curlevel == 6 || curlevel == 7) { // Shield generators
-        u16 shd1 = AddInstance(754, (V3){-51.30664f,  -47.42f,  56.42651f}); World->rotation[shd1] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
-        u16 shd2 = AddInstance(754, (V3){ 71.5f,      -47.42f, -66.6f    }); World->rotation[shd2] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
-        u16 shd3 = AddInstance(754, (V3){-51.306650f, -47.42f, -66.66652f}); World->rotation[shd3] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
-        u16 shd4 = AddInstance(754, (V3){ 71.78664f,  -47.42f,  56.42651f}); World->rotation[shd4] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
+        u16 shd1 = AddInstance(754, (V3){-51.30664f,  -47.42f,  56.42651f}); World.rotation[shd1] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
+        u16 shd2 = AddInstance(754, (V3){ 71.5f,      -47.42f, -66.6f    }); World.rotation[shd2] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
+        u16 shd3 = AddInstance(754, (V3){-51.306650f, -47.42f, -66.66652f}); World.rotation[shd3] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
+        u16 shd4 = AddInstance(754, (V3){ 71.78664f,  -47.42f,  56.42651f}); World.rotation[shd4] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
     }
 
-    Light hl = (Light){.pos=World->position[PLAYER1],.col=(Color3){1.0f,1.0f,1.0f},.range=11.52f,.lflags=LIGHTON,.intensity=0.0f,.minIntensity=0.0f,.maxIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY};
+    Light hl = (Light){.pos=World.position[PLAYER1],.col=(Color3){1.0f,1.0f,1.0f},.range=11.52f,.lflags=LIGHTON,.intensity=0.0f,.minIntensity=0.0f,.maxIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY};
     LightAnimation lam = {0};
     headmountedLanternLight = AddLight(&hl,&lam); lightsIdx++;
 }

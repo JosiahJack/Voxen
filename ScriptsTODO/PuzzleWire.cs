@@ -130,14 +130,14 @@ public class PuzzleWire : MonoBehaviour {
 	}
 
 	void Update() {
-		if (!World->paused && !World->menuActive) {
+		if (!World.paused && !World.menuActive) {
 			if (Solved) return;
 
 			if (selectedWire != -1) {
-				if (blinkTimeFinished < World->pauseRelativeTime) {
+				if (blinkTimeFinished < World.pauseRelativeTime) {
 					BlinkSelectedIndicator();
 					blinkState = !blinkState;
-					blinkTimeFinished = World->pauseRelativeTime + blinkTime;
+					blinkTimeFinished = World.pauseRelativeTime + blinkTime;
 				}
 			} else {
 				DisableAllSelectedIndicators();
@@ -150,7 +150,7 @@ public class PuzzleWire : MonoBehaviour {
 						numberOfWires++;
 				}
 
-				if (World->diffPuz == 3) {
+				if (World.diffPuz == 3) {
 					// Set all wire colors to the same on hard
 					wireColors[0] = rememberColors[0];
 					wireColors[1] = rememberColors[1];
@@ -191,7 +191,7 @@ public class PuzzleWire : MonoBehaviour {
 				}
 			} else {
 				DisableGeniusHints();
-				if (World->diffPuz == 3) {
+				if (World.diffPuz == 3) {
 					// Set all wire colors to the same on hard
 					wireColors[0] = HUDColor.Yellow;
 					wireColors[1] = HUDColor.Yellow;
@@ -317,7 +317,7 @@ public class PuzzleWire : MonoBehaviour {
 		theme = sentTheme;
 		wireColors = sentHUDColors;
 		rememberColors = sentHUDColors;
-		if (World->diffPuz == 3) {
+		if (World.diffPuz == 3) {
 			// Set all wire colors to the same on hard
 			wireColors[0] = HUDColor.Yellow;
 			wireColors[1] = HUDColor.Yellow;
@@ -335,7 +335,7 @@ public class PuzzleWire : MonoBehaviour {
 		EvaluatePuzzle();
 		ChangeAppearance();
 
-		if (udSent.mainIndex == 54 || World->diffPuz == 0) PuzzleSolved(true);
+		if (udSent.mainIndex == 54 || World.diffPuz == 0) PuzzleSolved(true);
 	}
 
 	private V3 GetPositionOfLHNode(int index) {
@@ -391,7 +391,7 @@ public class PuzzleWire : MonoBehaviour {
 	}
 
 	public void ClickLHNode(int spot) {
-		Eng_UI->mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		if (Solved) return;
 
 		if (selectedWireLH) {
@@ -407,7 +407,7 @@ public class PuzzleWire : MonoBehaviour {
 	}
 
 	public void ClickRHNode(int spot) {
-		Eng_UI->mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		if (Solved) return;
 
 		if (!selectedWireLH) {
@@ -438,7 +438,7 @@ public class PuzzleWire : MonoBehaviour {
 		DisableAllSelectedIndicators();
 		selectedWireLH = true;
 		blinkState = true;
-		blinkTimeFinished = World->pauseRelativeTime + blinkTime;
+		blinkTimeFinished = World.pauseRelativeTime + blinkTime;
 		BlinkSelectedIndicator();
 		ChangeAppearance();
 		//EvaluatePuzzle();
@@ -460,7 +460,7 @@ public class PuzzleWire : MonoBehaviour {
 		DisableAllSelectedIndicators();
 		selectedWireLH = false;
 		blinkState = true;
-		blinkTimeFinished = World->pauseRelativeTime + blinkTime;
+		blinkTimeFinished = World.pauseRelativeTime + blinkTime;
 		BlinkSelectedIndicator();
 		ChangeAppearance();
 		//EvaluatePuzzle();
@@ -637,7 +637,7 @@ public class PuzzleWire : MonoBehaviour {
 		if (wire5RHPosition == wire5RHTarget && wireIsActive[4]) tempF += 0.19f;
 		if (wire6RHPosition == wire6RHTarget && wireIsActive[5]) tempF += 0.19f;
 		if (wire7RHPosition == wire7RHTarget && wireIsActive[6]) tempF += 0.19f;
-		if (World->diffPuz == 1) tempF += 0.19f;
+		if (World.diffPuz == 1) tempF += 0.19f;
 		actualValue = tempF;
 		if (tempF > 0.92f || AllWiresCorrect()) PuzzleSolved(false);
 	}

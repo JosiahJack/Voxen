@@ -86,7 +86,7 @@ public class ItemTabManager : MonoBehaviour {
 				acc = (AccessCardType)cardTypes.GetValue(i);
 				if (acc == AccessCardType_None) continue;
 
-				if (World->invP1.HasAccessCard(acc)) s1.Append(" " + AccessCardCodeForType(acc));
+				if (World.invP1.HasAccessCard(acc)) s1.Append(" " + AccessCardCodeForType(acc));
 			}
 
 			accessCardListText.text = s1.ToString();
@@ -101,7 +101,7 @@ public class ItemTabManager : MonoBehaviour {
 			vaporizeButton.SetActive(false);
 			grenadeTimerSlider.SetActive(false);
 			grenadeTimerSliderSlider.SetActive(false);
-			Eng_UI->applyButtonReferenceIndex = constIndex;
+			Sys_UI.applyButtonReferenceIndex = constIndex;
 		} else {
 			applyButton.SetActive(false);
 		}

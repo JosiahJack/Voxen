@@ -205,6 +205,37 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define T_STRING_COUNT 1100
 #define T_LOCALIZATION_MAX_LENGTH 1280
 #define T_LOGS_COUNT 134
+#define T_BUFFER_SIZE 1024
+#define FONT_ATLAS_SIZE 4672
+#define MAX_GLYPHS 4096
+#define MULTI_MEDIA_TAB_EMAIL_TABLE 0
+#define MULTI_MEDIA_TAB_LOG_TABLE   1
+#define MULTI_MEDIA_TAB_DATA_TABLE  2
+#define MULTI_MEDIA_TAB_NOTES       3
+#define ANIM_LOOP_ALL 0
+#define ANIM_IDLE_CLOSED 0
+#define ANIM_OPENING     1
+#define ANIM_IDLE_OPEN   2
+#define ANIM_CLOSING     3
+#define ANIM_INSTALL     4
+#define ANIM_INSTALLED   5
+#define ANIM_INACTIVE   0
+#define ANIM_ACTIVATE   1
+#define ANIM_ACTIVATED  2
+#define ANIM_DEACTIVATE 3
+#define ANIM_IDLE    0
+#define ANIM_WALK    1
+#define ANIM_RUN     2
+#define ANIM_ATTACK1 3
+#define ANIM_ATTACK2 4
+#define ANIM_ATTACK3 5
+#define ANIM_PAIN    6
+#define ANIM_PAIN2   7
+#define ANIM_PAIN3   8
+#define ANIM_DYING   9
+#define ANIM_ATTACK_MISS 1
+#define ANIM_ATTACK_HIT  2
+#define NUM_AI_TYPES 29
 #define MAX_DYNAMIC_ENTITIES 512
 #define TERMINAL_VELOCITY 10.0f
 #define PHYS_FLOAT_TO_INT_SCALEF 100.0f
@@ -284,6 +315,15 @@ static const u32 L_NULL             = 2147483648U;
 #define LMASK_EXPLOSION             (L_Default|L_Geometry|L_NPC|L_PlayerBullets|L_Door|L_InterDebris|L_PhysObjects|L_Player|L_Player2|L_CorpseSearchable)
 #define LMASK_PLAYER_FEET           (L_Default|L_Geometry)
 typedef struct { i32 InputCodeSettings[42]; u16 ScreenWidth,ScreenHeight; float ScreenCenterX,ScreenCenterY; bool Fullscreen; u8 FOV,Brightness,Gamma,FXAA,Shadows,Reflections,Vsync,ModelDetail,GI,SpeakerMode,Reverb,VolumeMaster,VolumeMusic,VolumeMessage,VolumeEffects,Language,DynamicMusic; u8 Footsteps,InvertLook,InvertInventoryCycling,InvertCyberspaceLook,QuickItemPickup,QuickReloadWeapons,MouseSensitivity,NoShootMode,HeadBob,SSR_RES,CurrentMonitor; } SettingsSystem;
+SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on first run for potatoes (e.g. won't crash for out of VRAM, or won't take 5min to init).
+    .InputCodeSettings = {
+        5, /*Forward=F*/     0,/*Strafe Left=A*/ 18,/*Backpedal=S*/ 3,/*Strafe Right=D*/ 100,/*Jump=SPACE*/ 2,/*Crouch=C*/   23,/*Prone=X*/    16,/*Lean Left=Q*/   4,/*Lean Right=E*/ 45,/*Sprint=LEFT SHIFT*/ 38,/*Turn Left=LF ARROW*/ 39,/*Turn Right=RT ARROW*/ 36,/*Look Up=UP ARROW*/     37,/*Look Down=DN ARROW*/   20,/*Recent Log=U*/    26,/*Biomonitor=1*/
+        27,/*Sensaround=2*/ 28,/*Lantern=3*/     29,/*Shield=4*/   30,/*Infrared=5*/      31,/*Email=6*/   32,/*Booster=7*/  33,/*Jumpjets=8*/ 56,/*Attack=LMB*/   57,/*Use=RMB*/      99,/*Menu/Back=ESCAPE*/  97,/*Toggle Mode=TAB*/    17,/*Reload=R*/           128,/*Weapon += MWHEEL + */ 129,/* Weapon - = MWHEEL - */ 6,/* Grenade   = G */ 19,/* Grenade + = T  */
+        131,/*Grenade-=*/   21,/*Ammo Type=V*/    9,/*Patch Use=J*/ 8,/*Patch+=I*/       132,/*Patch-=,*/  12,/*Full Map=M*/ 21,/*Swim Up= V*/  2,/*Swim Down=C*/ 102,/*Console=`*/   101/*Screenshot=F12*/},
+    .ScreenWidth=800u,.ScreenHeight=600u,.Fullscreen=0u,.FOV=65u,.Brightness=50u,.Gamma=50u,.FXAA=0u,.Shadows=0u,.Reflections=0u,.Vsync=0u,.ModelDetail=0u,.CurrentMonitor=0u,
+    .GI=0u,.SpeakerMode=1u,.Reverb=0u,.VolumeMaster=100u,.VolumeMusic=25u,.VolumeMessage=75u,.VolumeEffects=100u,.Language=0u,.DynamicMusic=1u,.Footsteps=1u,.InvertLook=0u,
+    .InvertCyberspaceLook=0u,.QuickItemPickup=0u,.QuickReloadWeapons=0u,.MouseSensitivity=10u,.NoShootMode=0u,.HeadBob=1u,.SSR_RES=4u};/*Ratio is (1 / SSR_RES) * res*/
+
 typedef struct { bool god,noclip,notarget,bottomless,superoverride,fatigueCheat,redbull,consoleActive,noHUD,showLocation,showFPS,showPhys,editMode; u8 dizzyLevel; } CheatsSystem;
 typedef struct {
 	double logFinished,blinkFinished,beepFinished,tickFinished,/*Visual only, Time.time controlled*/ centerTabsTickFinished;/*Visual only, Time.time controlled*/ 
@@ -295,6 +335,7 @@ typedef struct {
 	V3 objectInUsePos;
 } SystemUI;
 typedef struct { char stringTable[T_STRING_COUNT][T_LOCALIZATION_MAX_LENGTH]; u16 audioLogImagesRefIndicesLH[T_LOGS_COUNT],audioLogImagesRefIndicesRH[T_LOGS_COUNT]; u8 audioLogType[T_LOGS_COUNT],audioLogLevelFound[T_LOGS_COUNT]; size_t file_size,filelog_size; u8* file_data,*filelog_data; } TextSystem; // Hefty table for localization support.
+TextSystem Sys_Text;
 #define PATCH_BERSERK   1
 #define PATCH_DETOX     2
 #define PATCH_GENIUS    4
@@ -373,6 +414,81 @@ typedef struct {
 	bool playerDead,beepDone,logPaused,hasNewEmail,hasNewNotes,currentCyberItem,isPulserNotDrill,wepLoadedWithAlternate[7],staminupActive,hasLog[134],readLog[134],justChangedWeap,overloadEnabled,recoiling,heldObjectLoadedAlternate,holdingObject,grenadeActive,hasNewLogs,hasNewData;
 } InventorySystem;
 typedef struct { float damage,penetration,offense,armorvalue,defense,impactVelocity; V3 attacknormal,hitpoint; AttackType attackType; u16 owner,hitIdx; bool isOtherNPC,berserkActive; } DamageData;
+typedef struct __attribute__((packed, aligned(8))) { u64 magicNumber; double thisRunTime; bool isLoading; i32 missionSplitID; } AutoSplitterData; // For use with LiveSplit or other future speedrunner utilities for doing speedruns
+extern AutoSplitterData autoSplitter;
+typedef struct {
+	const char* name;
+	AttackType attackType,attackType2,attackType3;
+	float damage,damage2,damage3,range,range2,range3,health,healthForCyberNPC;
+	PerceptionLevel perception;
+	float disruptability,armorvalue,defense;
+	AIMoveType moveType;
+	float yawSpeed;
+	float fov;
+	float fovAttack;
+	float fovStartMovement;
+	float distToSeeBehind;
+	float sightRange;
+	float walkSpeed;
+	float runSpeed;
+	float attack1Speed;
+	float attack2Speed;
+	float attack3Speed;
+	float attack3Force;
+	float attack3Radius;
+	float timeToPain;
+	float timeBetweenPain;
+	float timeTillDead;
+	float timeToActualAttack1;
+	float timeToActualAttack2;
+	float timeToActualAttack3;
+	float timeBetweenAttack1;
+	float timeBetweenAttack2;
+	float timeBetweenAttack3;
+	float timeToChangeEnemy;
+	float timeIdleSFXMin;
+	float timeIdleSFXMax;
+	float timeAttack1WaitMin;
+	float timeAttack1WaitMax;
+	float timeAttack1WaitChance;
+	float timeAttack2WaitMin;
+	float timeAttack2WaitMax;
+	float timeAttack2WaitChance;
+	float timeAttack3WaitMin;
+	float timeAttack3WaitMax;
+	float timeAttack3WaitChance;
+	int attack1ProjectileLaunchedType; // Unused
+	int attack2ProjectileLaunchedType; // Unused
+	int attack3ProjectileLaunchedType; // Unused
+	float projectileSpeedAttack1;
+	float projectileSpeedAttack2;
+	float projectileSpeedAttack3;
+	bool hasLaserOnAttack1;
+	bool hasLaserOnAttack2;
+	bool hasLaserOnAttack3;
+	bool explodeOnAttack3;
+	bool preactivateMeleeColliders; // Unused
+	double huntTime;
+	float flightHeight;
+	bool flightHeightIsPercentage;
+	bool switchMaterialOnDeath;
+	float hearingRange;
+	float timeForTranquilization;
+	bool hopsOnMove;
+	NPCType type;
+	int projectile1Prefab,projectile2Prefab,projectile3Prefab;
+} NPCTable;
+extern NPCTable npcTable[NUM_AI_TYPES];
+typedef struct { double clipFinished,combatImpulseFinished; bool inCombat,inZone,twoPlaying,distortion,cyberTube,elevator,levelEntry; } MusicSystem;
+extern MusicSystem Sys_Music;
+int lev1SecCode;
+int lev2SecCode;
+int lev3SecCode;
+int lev4SecCode;
+int lev5SecCode;
+int lev6SecCode;
+bool vmailActive;
+extern const char* sounds[SOUNDS_COUNT];
 typedef /*FAT*/ struct  {
     u32 entflags,layer,ioflags;
     u16 modelIndex,index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
@@ -422,7 +538,7 @@ typedef struct {
     i32 fogFac,cursorPosition_x,cursorPosition_y; // Separate internal cursor from system cursor.  This gets relatively pushed around by real cursor movement to give consistent platform behavior.
 	V3 debugLine_start,debugLine_end,cyberspaceRecallPoint;
     u8 levelSecurity[14],startLevel,numLevels,curLev,diffCbt,diffPuz,diffMis,diffCyb,creditsPageIndex;
-	bool inventoryMode,levelCurrentlyLoading,introNotPlayed,paused,menuActive,gameFinished,creditsActive,decoyActive,boosterActive,uiIsBlocking,mouseClickHeldOverGUI,geniusActive,(*GetKey)(i32 settingIndex),(*GetKeyPressed)(i32 settingIndex);
+	bool inventoryMode,levelCurrentlyLoading,introNotPlayed,paused,menuActive,gameFinished,creditsActive,decoyActive,boosterActive,uiIsBlocking,mouseClickHeldOverGUI,geniusActive;
     InventorySystem invP1,invP2;
     Entity instances[INSTANCE_COUNT];
     V3 position[INSTANCE_COUNT],scale[INSTANCE_COUNT],velocity[INSTANCE_COUNT],angularVelocity[INSTANCE_COUNT];
@@ -430,6 +546,7 @@ typedef struct {
     Color fogColor[14];
 	char global_dllname[256],global_winicon[256],playerName[27],audiologNames[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH],audiologSubjects[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH],audiologSenders[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH],audioLogSpeech2Text[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH];
 } GlobalContext; // Savable complete game state data
+GlobalContext World = {0};
 #define PI 3.14159265f
 #define TAU 6.2831853f
 #define vabs(x) ((x) < 0 ? -(x) : (x))
@@ -482,7 +599,68 @@ INLINE bool IdxIsAccessCard(u16 c) { return ((c >= 388 && c <= 398) || c == 417)
 INLINE bool IdxIsDynamicObject(u16 c) { return (c >= 307 && c <= 404) ||  c == 417 || (c >= 419 && c <= 428) || (c >= 430 && c <= 437) || (c >= 440 && c <= 442) || (c >= 458 && c <= 463) || (c >= 465 && c <= 476); }
 INLINE bool IdxIsStaticObjectSaveable(int c) { return (c == 112 || c == 279 || (c >= 448 && c < 458) || c == 480 || c == 516 || (c >= 518 && c <= 526) || c == 530 || c == 531 || c == 546 || c == 555 || c == 594 || c == 596 || c == 598 || (c >= 600 && c < 603) || (c >= 604 && c < 616) || (c >= 688 && c < 693) || c == 694 || c == 695 || (c >= 699 && c < 704) || (c >= 741 && c < 746)); }
 INLINE bool IdxIsStaticObjectImmutable(int c) { return ((c >= 527 && c < 530) || (c >= 532 && c < 546) || (c >= 547 && c < 553) || c == 554 || (c >= 556 && c < 594) || c == 595 || c == 597 || c == 599 || c == 601 || c == 603 || (c >= 616 && c < 688) || c == 693 || c == 696 || c == 697 || c == 698 || (c >= 704 && c < 717) || c == 720 || (c >= 733 && c < 736) || (c >= 737 && c < 739) || c == 746 || c == 747 || (c >= 750 && c <= 759 && c != 755)); }
+
+void DualLogError(const char* fmt, ...); void DualLogWarn(const char* s, ...); void DualLog(const char* fmt, ...); bool cEmpty(const char c);
+
 INLINE  int  mcmp(const void *s1, const void *s2, size_t n) { const u8 *p1 = (const u8 *)s1; const u8 *p2 = (const u8 *)s2; while (n--) { if (*p1 != *p2) {return *p1 - *p2;} p1++; p2++; } return 0; } // memcmp replacement
 INLINE void* mmov(void *dst, const void *src, size_t n) { u8 *d = (u8*)dst; const u8* s = (const u8*)src; if (d < s) { while (n--) { *d++ = *s++; } } else if (d > s) { d += n; s += n; while (n--) { *--d = *--s; } } return dst; } // memmove replacement
 INLINE void flag_setu16(u16 *flags, u16 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
 INLINE void flag_set(u32 *flags, u32 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
+INLINE u32 parse_numberu32(const char* str, const char* line, u32 lineNum) {
+    if (str == 0 || *str == '\0') { DualLogError("Invalid blank string from line[%d]: %s\n", lineNum+1, line); return 0; }
+    while (cEmpty((char)*str)) str++;
+    while (cEmpty(*str)) str++;
+    if (*str == '+') str++;
+    if (*str == '-') { DualLogError("Invalid input, negative not allowed (%s)\n      from line[%d]: %s\n", str, lineNum+1, line); return 0; }
+    unsigned long result = 0;
+    while (*str >= '0' && *str <= '9') { i32 digit = *str - '0'; result = result * 10uL + (unsigned long)digit; str++; }
+    return (u32)result;
+}
+
+INLINE u16 parse_numberu16(const char* str, const char* line, u32 lineNum) { u32 retval = parse_numberu32(str, line, lineNum); if (retval > U16_MAX) { DualLogError("Value %u out of range for u16 from line[%d]: %s\n", retval, lineNum+1, line); return 0; } return (u16)retval; }
+INLINE u8 parse_numberu8(const char* str, const char* line, u32 lineNum) { u32 retval = parse_numberu32(str, line, lineNum); if (retval > U8_MAX) { DualLogError("Value %u out of range for u8 from line[%d]: %s\n", retval, lineNum+1, line); return 0; } return (u8)retval; }
+INLINE bool parse_bool(const char* str, const char* line, u32 lineNum) { u32 parseval = parse_numberu32(str, line, lineNum); if (parseval > 1) {DualLogWarn("Loaded %u but expected boolean from line[%u]: %s\n",parseval, lineNum+1, line);} return parseval > 0 ? true : false; }
+INLINE i32 parse_numberi32(const char* str, const char* line, u32 lineNum) {
+    if (str == 0 || *str == '\0') { DualLogError("Invalid blank string from line[%d]: %s\n", lineNum+1, line); return 0; }
+    while (cEmpty((char)*str)) str++;
+    bool negative = false;
+    if (*str == '+') str++;
+    else if (*str == '-') { negative = true; str++; }
+    long result = 0;
+    while (*str >= '0' && *str <= '9') { result = result * 10L + (*str - '0'); str++; }
+    return (i32)(negative ? -result : result);
+}
+INLINE i16 parse_numberi16(const char* str, const char* line, u32 lineNum) { i32 retval = parse_numberi32(str, line, lineNum); if (retval < -32768 || retval > 32767) { DualLogError("Value %d out of range for i16 from line[%d]: %s\n", retval, lineNum+1, line); return 0; } return (i16)retval; }
+INLINE i8 parse_numberi8(const char* str, const char* line, u32 lineNum) { i32 retval = parse_numberi32(str, line, lineNum); if (retval < -128 || retval > 127) { DualLogError("Value %d out of range for i8 from line[%d]: %s\n", retval, lineNum+1, line); return 0; } return (i8)retval; }
+INLINE float parse_float(const char* str, const char* line, u32 lineNum) {
+    if (str == 0 || *str == '\0') { DualLogError("Invalid blank string from line[%d]: %s\n", lineNum+1, line); return 0.0f; }
+    while (cEmpty(*str)) str++;
+    bool negative = false;
+    if (*str == '-') { negative = true; str++; }
+    else if (*str == '+') { str++; }
+    double value = 0.0;
+    bool has_digit = false;
+    while (*str >= '0' && *str <= '9') { value = value * 10.0 + (*str - '0'); str++; has_digit = true; } // Integer part
+    if (*str == '.') { // Decimal part
+        str++;
+        double frac = 0.0;
+        double place = 0.1;
+        while (*str >= '0' && *str <= '9') { frac += (*str - '0') * place; place *= 0.1; str++; has_digit = true; }
+        value += frac;
+    }
+    if (!has_digit) return 0.0f;
+    if (negative) value = -value;
+    return (float)value;
+}
+
+double get_time(); int sFormatV(char* buf, size_t bufsz, const char* f, va_list args);
+char statusText[T_BUFFER_SIZE];
+void CenterStatusPrint(const char * restrict fmt, ...) { va_list args; __builtin_va_start(args, fmt); sFormatV(statusText,T_BUFFER_SIZE,fmt,args); __builtin_va_end(args); DualLog("%s\n",statusText); World.statusTextDecayFinished = get_time() + 3.5;/*secs decay time before text dissappears.*/ }
+INLINE void EntitySetLocked(Entity* e, bool locked) { DualLog("Unlocking entity with index %u\n",(u16)(e - World.instances)); flag_set(&e->entflags,EF_LOCKED,locked); }
+INLINE void UIBlockedBySecurity(V3 tetherPoint) { (void)tetherPoint; CenterStatusPrint("%s",Sys_Text.stringTable[25]); }
+INLINE void UICyberSprint(u16 textIndex) { CenterStatusPrint("%s",Sys_Text.stringTable[textIndex]); }
+INLINE void UIExitCyberspace() { CenterStatusPrint("%s",Sys_Text.stringTable[601]); }
+INLINE void HealthManagerHealingBed(u16 playerIdx, float amount, bool flashBed) { (void)flashBed; Entity* p = &World.instances[playerIdx]; p->health = vmin(255.0f,p->health + amount); }
+INLINE void PlayerTakeDamage(u16 playerIdx, float damage) { Entity* p = &World.instances[playerIdx]; p->health -= damage; if (p->health < 0.0f) p->health = 0.0f; }
+INLINE float SfxVol() { return (float)Sys_Settings.VolumeEffects / 100.0f; }
+INLINE InventorySystem* Inv(u16 p) { return p == PLAYER1 ? &World.invP1 : &World.invP2; }

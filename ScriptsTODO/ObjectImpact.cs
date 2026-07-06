@@ -20,8 +20,8 @@ public class ObjectImpact : MonoBehaviour {
 	}
 
 	void OnCollisionEnter(Collision collision) {
-		if (World->paused) return;
-		if (World->menuActive) return;
+		if (World.paused) return;
+		if (World.menuActive) return;
 		if (collision == null) return;
 
 		if (collision.relativeVelocity.sqrMagnitude > (minVolumeSpeed * minVolumeSpeed)) {

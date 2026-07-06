@@ -21,7 +21,7 @@ public class SecurityCameraRotate : MonoBehaviour {
 	private static StringBuilder s1 = new StringBuilder();
 
 	void Start () {
-		waitingFinished = World->pauseRelativeTime;
+		waitingFinished = World.pauseRelativeTime;
 		rotatePositive = true;
 		if (this.enabled) active = true;
 		else active = false;
@@ -32,7 +32,7 @@ public class SecurityCameraRotate : MonoBehaviour {
 	}
 
 	void Update() {
-		if (!World->paused && !World->menuActive) {
+		if (!World.paused && !World.menuActive) {
 			if (mR != null) {
 				if (!mR.isVisible || !mR.enabled) return;
 			} else {
@@ -40,7 +40,7 @@ public class SecurityCameraRotate : MonoBehaviour {
 				return;
 			}
 
-			if (waitingFinished < World->pauseRelativeTime) {
+			if (waitingFinished < World.pauseRelativeTime) {
 				if (rotatePositive) RotatePositive();
 				else                RotateNegative();
 			}
@@ -48,10 +48,10 @@ public class SecurityCameraRotate : MonoBehaviour {
 	}
 
 	void RotatePositive () {
-		if (((World->instances[i].rotation.eulerAngles.y + 1f) >= endYAngle)
-			&& ((World->instances[i].rotation.eulerAngles.y - 1f) <= endYAngle)) {
+		if (((World.instances[i].rotation.eulerAngles.y + 1f) >= endYAngle)
+			&& ((World.instances[i].rotation.eulerAngles.y - 1f) <= endYAngle)) {
 			rotatePositive = false;
-			waitingFinished = World->pauseRelativeTime + waitTime;
+			waitingFinished = World.pauseRelativeTime + waitTime;
 			return;
 		}
 		
@@ -60,10 +60,10 @@ public class SecurityCameraRotate : MonoBehaviour {
 	}
 
 	void RotateNegative () {
-		if (((World->instances[i].rotation.eulerAngles.y + 1f) >= startYAngle)
-			&& ((World->instances[i].rotation.eulerAngles.y - 1f) <= startYAngle)) {
+		if (((World.instances[i].rotation.eulerAngles.y + 1f) >= startYAngle)
+			&& ((World.instances[i].rotation.eulerAngles.y - 1f) <= startYAngle)) {
 			rotatePositive = true;
-			waitingFinished = World->pauseRelativeTime + waitTime;
+			waitingFinished = World.pauseRelativeTime + waitTime;
 			return;
 		}
 		

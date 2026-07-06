@@ -50,7 +50,7 @@ public class Minigame15 : MonoBehaviour {
         // TODO: Pick image, set size, hide numbers if using image.
         for (int i=1;i<=16;i++) { curNum[i] = i; sliding[i] = false; }
         int sixteenIndex = 16;
-        int shuffleIter = World->diffPuz * 5;
+        int shuffleIter = World.diffPuz * 5;
         while (shuffleIter > 0) {
             int randIter = 32;
             while (randIter > 0) { // Find cell next to empty slot
@@ -90,7 +90,7 @@ public class Minigame15 : MonoBehaviour {
                 (V3){position[i].x,position[i].y,0f);
         }
 
-        slideTickFinished = World->pauseRelativeTime;
+        slideTickFinished = World.pauseRelativeTime;
     }
 
     private void SetAlignments() {
@@ -121,8 +121,8 @@ public class Minigame15 : MonoBehaviour {
     }
 
     void Update() {
-        if (World->paused) return;
-        if (World->menuActive) return;
+        if (World.paused) return;
+        if (World.menuActive) return;
 
         if      (AABBCursorCheck(col1Left,col1Right,row1Up,row1Dn)) BtnCheck(1);
         else if (AABBCursorCheck(col2Left,col2Right,row1Up,row1Dn)) BtnCheck(2);
@@ -153,11 +153,11 @@ public class Minigame15 : MonoBehaviour {
             }
         }
 
-        if (slideTickFinished < World->pauseRelativeTime) {
-            float tdiff = World->pauseRelativeTime - slideTickFinished;
+        if (slideTickFinished < World.pauseRelativeTime) {
+            float tdiff = World.pauseRelativeTime - slideTickFinished;
             float tickCount = tdiff / 0.04f;
             float shift = tickCount * 12f;
-            slideTickFinished = World->pauseRelativeTime + 0.04f;
+            slideTickFinished = World.pauseRelativeTime + 0.04f;
             for (int i=1;i<=16;i++) {
                 if (!sliding[i]) continue;
 
@@ -211,7 +211,7 @@ public class Minigame15 : MonoBehaviour {
             ydiff = vabs(ydiff) > 2f ? ydiff : 0f;
             V2 sliddirBefore = new V2(xdiff,ydiff);
             slideDir[to] = new V2(Utils.Sign(xdiff),Utils.Sign(ydiff));
-            slideTickFinished = World->pauseRelativeTime + 0.1f;
+            slideTickFinished = World.pauseRelativeTime + 0.1f;
         }
 
         curNum[to] = fromNum;

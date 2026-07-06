@@ -39,8 +39,8 @@ public class ImageSequenceTextureArrayUI : MonoBehaviour {
 	}
 	
 	void Update() {
-		if (!World->paused || playOnMenu) {
-			if (!World->menuActive || playOnMenu) {
+		if (!World.paused || playOnMenu) {
+			if (!World.menuActive || playOnMenu) {
 				if (deactivateAtEnd && playDone) flag_set(&SELF.entflags, EF_ACTIVE, false);
 				if (stopAtEnd && playDone) return;
 
@@ -61,7 +61,7 @@ public class ImageSequenceTextureArrayUI : MonoBehaviour {
 	IEnumerator PlayLoop(float delay) {
 		yield return new WaitForSeconds(delay); // Wait for the time defined at the delay parameter.
 TryAgain:
-		if (World->paused && !playOnMenu) {
+		if (World.paused && !playOnMenu) {
 			yield return null;
 			goto TryAgain;
 		}
