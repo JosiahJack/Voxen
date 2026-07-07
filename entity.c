@@ -10,7 +10,6 @@ float EDefsstaticFriction[MAX_ENTITIES];
 float EDefsbounciness[MAX_ENTITIES];
 float EDefsangularDrag[MAX_ENTITIES];
 float EDefsgravity[MAX_ENTITIES];
-float EDefsradius[MAX_ENTITIES];
 #define GEOMETRY_LOD_CARD_MODEL_IDX 178
 void ModEDefsInitAfterLoad(void) { // Global conditions for all entities.  No sense inflating the table data in entity.c
     mset(EDefs,0,sizeof(Entity)); 
