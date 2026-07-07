@@ -987,8 +987,10 @@ bool SwimUp(void) { return GetKey(38); }
 bool SwimDn(void) { return GetKey(39); }
 bool Console(void) { return GetKeyPressed(-1); }
 bool ScrshotPressed(void) { return GetKeyPressed(41); }
-void ToggleConsole(); void MenuGoBack(); void ToggleInventoryMode(); void ApplyPlayerMovements();
+void ToggleConsole(); void MenuGoBack(); void ToggleInventoryMode(); void ApplyPlayerMovements(); void SaveGame(u8 slot, const char* savename); void LoadGame(u8 slot);
 void ProcessInput(void) {
+    if (Sys_Input.keyStates[KEY_F6].pressed && (get_time() - World.justSavedTimeStamp) > 0.2) { Sys_Input.keyStates[KEY_F6].pressed = false; SaveGame(7,"quicksave"); return; }
+    if (Sys_Input.keyStates[KEY_F9].pressed && (get_time() - World.justSavedTimeStamp) > 0.2) { Sys_Input.keyStates[KEY_F9].pressed = false; LoadGame(7); return; }
     if (Console()) ToggleConsole();
     if (Menu() && !World.menuActive) { World.paused = !World.paused; return; }
     if (Menu() && World.menuActive) { MenuGoBack(); return; }

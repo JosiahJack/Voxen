@@ -9,7 +9,7 @@
 
 	// Called by Automap.cs.  This handles the UI changes to make room.
 	public void AutomapGoFull() {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		World.Sys_UI.mouseClickHeldOverGUI = true;
 		
 		ctbButtonMain.SetActive(false);
 		ctbButtonHardware.SetActive(false);
@@ -26,7 +26,7 @@
 
 	// Handles returning UI back to how it was before clearing the board.
 	public void CloseFullmap() {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		World.Sys_UI.mouseClickHeldOverGUI = true;
 		if (!Const.a.noHUD) {
 			Utils.Activate(ctbButtonMain);
 			Utils.Activate(ctbButtonHardware);
@@ -45,7 +45,7 @@
 
 	// Called by MouseLookScript.cs
 	public void EnterCyberspace() {
-		Sys_UI.hwb.HideSensaround();
+		World.Sys_UI.hwb.HideSensaround();
 		TabReset(true); // right
 		TabReset(false); // left
 		rightTC.TurnAllTabsOff();
@@ -82,7 +82,7 @@
 		ctbButtonMain.SetActive(true);
 		ctbButtonHardware.SetActive(true);
 		ctbButtonGeneral.SetActive(true);
-		if (World.invP1.hardwareIsActive[3]) Sys_UI.hwb.UnhideSensaround();
+		if (World.invP1.hardwareIsActive[3]) World.Sys_UI.hwb.UnhideSensaround();
 		tabButtonsLHButtons.SetActive(true);
 		tabButtonsRHButtons.SetActive(true);
 		Config.SetSEGI(); // Turn it back on if setting is on.
@@ -118,7 +118,7 @@
 	}
 
 	public void ClosePuzzleGrid() {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		World.Sys_UI.mouseClickHeldOverGUI = true;
 		PuzzleGrid pg = puzzleGridLH.GetComponent<PuzzleGrid>();
 		PuzzleGrid pgr = puzzleGridRH.GetComponent<PuzzleGrid>();
 		tetheredPGP.SendDataBackToPanel(pg);
@@ -130,7 +130,7 @@
 	}
 
 	public void ClosePuzzleWire() {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		World.Sys_UI.mouseClickHeldOverGUI = true;
 		PuzzleWire pw = puzzleWireLH.GetComponent<PuzzleWire>();
 		PuzzleWire pwr = puzzleWireRH.GetComponent<PuzzleWire>();
 		tetheredPWP.SendDataBackToPanel(pw,false);
@@ -142,7 +142,7 @@
 	}
 
 	public void CloseElevatorPad() {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		World.Sys_UI.mouseClickHeldOverGUI = true;
 		tetheredKeypadElevator.SendDataBackToPanel();
 		
 		TurnOffElevatorPad();
@@ -152,7 +152,7 @@
 	}
 
 	public void CloseKeycodePad() {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		World.Sys_UI.mouseClickHeldOverGUI = true;
 		TurnOffKeypad();
 		
 		tetheredKeypadKeycode = null;
@@ -160,7 +160,7 @@
 	}
 
 	public void CloseSearch() {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		World.Sys_UI.mouseClickHeldOverGUI = true;
 		
 		if (tetheredSearchable != null) tetheredSearchable.ResetSearchable(false);
 		tetheredSearchable = null;
@@ -185,7 +185,7 @@
 	}
 
 	public void ClosePaperLog() {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		World.Sys_UI.mouseClickHeldOverGUI = true;
 		
 		CenterTabButtonClickSilent(curCenterTab,false);
 	}
@@ -363,7 +363,7 @@
 
 	// Clicking [Apply] button on left or right MFD's Item Tab to apply current patch or general inventory item.
 	public void ApplyButtonClicked() {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		World.Sys_UI.mouseClickHeldOverGUI = true;
 		itemTabLH.applyButton.SetActive(false);
 		itemTabRH.applyButton.SetActive(false);
 		if (applyButtonReferenceIndex < 0) return;
@@ -1038,7 +1038,7 @@
 	}
 
 	public void CenterTabButtonClick(int tabNum) {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		World.Sys_UI.mouseClickHeldOverGUI = true;
 		CenterTabButtonAction(tabNum);
 	}
 
@@ -1172,7 +1172,7 @@
 	public void OpenLogTableContents() {
 		DisableAllCenterTabs();
 		DataReaderContentTab.SetActive(true);
-		Sys_UI.mouseClickHeldOverGUI = true;
+		World.Sys_UI.mouseClickHeldOverGUI = true;
 		ResetMultiMediaTabs();
 		startingSubTab.SetActive(true);
 		multiMediaHeaderLabel.text = "LOGS";
@@ -1184,7 +1184,7 @@
 	public void OpenLogsLevelFolder(int curlevel) {
 		DisableAllCenterTabs();
 		DataReaderContentTab.SetActive(true);
-		Sys_UI.mouseClickHeldOverGUI = true;
+		World.Sys_UI.mouseClickHeldOverGUI = true;
 		ResetMultiMediaTabs();
 		secondaryTab1.SetActive(true);
 		multiMediaHeaderLabel.text = "Level " + curlevel.ToString() + " Logs";
@@ -1195,7 +1195,7 @@
 	public void OpenLogTextReader() {
 		DisableAllCenterTabs();
 		DataReaderContentTab.SetActive(true);
-		Sys_UI.mouseClickHeldOverGUI = true;
+		World.Sys_UI.mouseClickHeldOverGUI = true;
 		ResetMultiMediaTabs();
 		secondaryTab2.SetActive(true);
 	}
@@ -1203,7 +1203,7 @@
 	public void OpenEmailTableContents() {
 		DisableAllCenterTabs();
 		DataReaderContentTab.SetActive(true);
-		Sys_UI.mouseClickHeldOverGUI = true;
+		World.Sys_UI.mouseClickHeldOverGUI = true;
 		ResetMultiMediaTabs();
 		emailTab.SetActive(true);
 		multiMediaHeaderLabel.text = "EMAIL";
@@ -1215,7 +1215,7 @@
 	public void OpenDataTableContents() {
 		DisableAllCenterTabs();
 		DataReaderContentTab.SetActive(true);
-		Sys_UI.mouseClickHeldOverGUI = true;
+		World.Sys_UI.mouseClickHeldOverGUI = true;
 		ResetMultiMediaTabs();
 		dataTab.SetActive(true);
 		World.invP1.hasNewData = false;
@@ -1228,7 +1228,7 @@
 	public void OpenNotesTableContents() {
 		DisableAllCenterTabs();
 		DataReaderContentTab.SetActive(true);
-		Sys_UI.mouseClickHeldOverGUI = true;
+		World.Sys_UI.mouseClickHeldOverGUI = true;
 		ResetMultiMediaTabs();
 		notesTab.SetActive(true);
 		World.invP1.hasNewNotes = false;

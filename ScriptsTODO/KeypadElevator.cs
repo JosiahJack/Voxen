@@ -42,7 +42,7 @@ public class KeypadElevator : MonoBehaviour {
 
 		padInUse = true;
 		Utils.PlayUIOneShotSavable(91);
-		Sys_UI.SendElevatorKeypadToDataTab(this,buttonsEnabled,buttonsDarkened,buttonText,targetDestination,World.instances[i].position,linkedDoor,currentFloor);
+		World.Sys_UI.SendElevatorKeypadToDataTab(this,buttonsEnabled,buttonsDarkened,buttonText,targetDestination,World.instances[i].position,linkedDoor,currentFloor);
 	}
 
 	public void SendDataBackToPanel() { padInUse = false; }

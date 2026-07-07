@@ -1106,3 +1106,31 @@ void LoadLevelMod(u8 lev) {
     LightAnimation lam = {0};
     headmountedLanternLight = AddLight(&hl,&lam); lightsIdx++;
 }
+
+#pragma pack(push, 1)
+typedef struct { u32 magicNumber; u32 version; char savename[56]; } SaveHeader; // 64 bytes total for a clean cache-line aligned header
+#pragma pack(pop)
+void SaveGame(u8 slot, const char* savename) {
+    if (slot > 7) return; // Keep slots bounded
+    char path[] = "./Data/sav0.bin"; path[10] = '0' + slot;
+    FHandle fd = OS_OpenWriteonly(path); if (fd == (FHandle)-1) { DualLogError("Failed to open save file for writing: %s\n", path); return; }
+    SaveHeader header = {0}; header.version = 1; header.magicNumber = 0x56415343; // 'CSAV'
+    if (savename) { int i = 0; while (savename[i] != '\0' && i < 55) { header.savename[i] = savename[i]; i++; } header.savename[i] = '\0'; }
+    World.justSavedTimeStamp = get_time();
+    OS_Write(fd,&header,sizeof(SaveHeader),path);
+    OS_Write(fd,&World,sizeof(GlobalContext),path);
+    OS_Close(fd);
+    CenterStatusPrint("Game saved to slot %d...done!",slot);
+}
+
+void LoadGame(u8 slot) {
+    if (slot > 7) return;
+    char path[] = "./Data/sav0.bin"; path[10] = '0' + slot;
+    FHandle fd = OS_OpenReadonly(path); if (fd == (FHandle)-1) { DualLogError("Save file not found or inaccessible: %s\n", path); return; }
+    SaveHeader header; long bytesRead = OS_Read(fd,&header,sizeof(SaveHeader));
+    if (bytesRead != sizeof(SaveHeader) || header.magicNumber != 0x56415343) { DualLogError("Invalid or corrupted save file header: %s\n", path); OS_Close(fd); return; }
+    bytesRead = OS_Read(fd, &World, sizeof(GlobalContext)); if (bytesRead != sizeof(GlobalContext)) { DualLogWarn("Warning: Save file %s size mismatch. Struct may have changed.\n",path); }
+    OS_Close(fd);
+    SetLevelPointers(World.currentLevel); // VERY IMPORTANT to fix up any pointers* in the World. struct!!  ASLR scrambles the addresses on subsequent binary runs.
+    CenterStatusPrint("Loaded Game: %s", header.savename);
+}

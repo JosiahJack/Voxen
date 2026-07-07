@@ -29,7 +29,8 @@ typedef struct {float speed; u16 frameStart,frameEnd,frameStartModelIndex; u8 fr
 #define LERPON 32
 typedef struct { V3 pos; float intensity; Color3 col; u32 lflags; float range,spotAng,maxIntensity,minIntensity; Quaternion spotDir; } Light; // 64bytes, one cache line, packed for GL transfer
 typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSteps[32]; bool stepIsLerping[32],lerpUp; u8 currentStep,numIntervalSteps,numLerpSteps; } LightAnimation; // Separate from main lights buffer struct since it's not used very often
-#define INSTANCE_COUNT 7680 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
+#define INSTANCE_COUNT 16384 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
+#define MAX_LEVELS 14 // Total number of levels loaded into RAM simultaneously.  World.levelInstances[MAX_LEVELS][INSTANCE_COUNT] holds them all.
 #define LIGHT_COUNT 2048
 #define MAX_MDLS 6000
 #define MAX_TXRS 2048
@@ -326,13 +327,13 @@ SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on f
 
 typedef struct { bool god,noclip,notarget,bottomless,superoverride,fatigueCheat,redbull,consoleActive,noHUD,showLocation,showFPS,showPhys,editMode; u8 dizzyLevel; } CheatsSystem;
 typedef struct {
-	double logFinished,blinkFinished,beepFinished,tickFinished,/*Visual only, Time.time controlled*/ centerTabsTickFinished;/*Visual only, Time.time controlled*/ 
-	i32 lastMultiMediaTabOpened,applyButtonReferenceIndex,curCenterTab,wep16index,tempSpriteIndex,count;
-	u16 linkedElevatorDoor,tetheredPGP,tetheredPWP,tetheredSearchable,tetheredKeypadElevator,tetheredKeypadKeycode,elevButtonSpawnIdx[8];
-	u8 highlightTickCount[4],beepCount,elevButtonLevelIdx[8],elevCurrentFloor;
-	bool lastWeaponSideRH,lastItemSideRH,lastAutomapSideRH,lastTargetSideRH,lastDataSideRH,lastSearchSideRH,lastLogSideRH,lastLogSecondarySideRH,lastMinigameSideRH,logActive,paperLogInUse,usingObject,isBlocking,isRH,centerTabNotified[4],highlightStatus[4],audPaused,mouseClickHeldOverGUI,buttonsEnabled[8],buttonsDarkened[8];
-	AudioLogType logType;
-	V3 objectInUsePos;
+        double logFinished,blinkFinished,beepFinished,tickFinished,/*Visual only, Time.time controlled*/ centerTabsTickFinished;/*Visual only, Time.time controlled*/ 
+        i32 lastMultiMediaTabOpened,applyButtonReferenceIndex,curCenterTab,wep16index,tempSpriteIndex,count;
+        u16 linkedElevatorDoor,tetheredPGP,tetheredPWP,tetheredSearchable,tetheredKeypadElevator,tetheredKeypadKeycode,elevButtonSpawnIdx[8];
+        u8 highlightTickCount[4],beepCount,elevButtonLevelIdx[8],elevCurrentFloor;
+        bool lastWeaponSideRH,lastItemSideRH,lastAutomapSideRH,lastTargetSideRH,lastDataSideRH,lastSearchSideRH,lastLogSideRH,lastLogSecondarySideRH,lastMinigameSideRH,logActive,paperLogInUse,usingObject,isBlocking,isRH,centerTabNotified[4],highlightStatus[4],audPaused,mouseClickHeldOverGUI,buttonsEnabled[8],buttonsDarkened[8],vmailActive;;
+        AudioLogType logType;
+        V3 objectInUsePos;
 } SystemUI;
 typedef struct { char stringTable[T_STRING_COUNT][T_LOCALIZATION_MAX_LENGTH]; u16 audioLogImagesRefIndicesLH[T_LOGS_COUNT],audioLogImagesRefIndicesRH[T_LOGS_COUNT]; u8 audioLogType[T_LOGS_COUNT],audioLogLevelFound[T_LOGS_COUNT]; size_t file_size,filelog_size; u8* file_data,*filelog_data; } TextSystem; // Hefty table for localization support.
 TextSystem Sys_Text;
@@ -411,83 +412,75 @@ typedef struct {
     i16 ladderState,weaponCurrentPending,weaponIndexPending;
     u16 numLogsFromLevel[10],hasHardware,hardwareIsActive,hardwareInvReferenceIndex[HW_COUNT],heldObjectIndex,heldObjectCustomIndex,heldObjectAmmo,heldObjectAmmo2,weaponIndex,currentSearchItem,generalInvIndex,generalInvCustomIndex[14],patchActive,drainJPM;
     u8 lerpUp,hasSoft,softVersions[7],hasMinigame,numweapons,currentMagazineAmount[7],currentMagazineAmount2[7],hardwareVersion[HW_COUNT],hardwareVersionSetting[HW_COUNT],grenAmmo[7],grenConstIndex[7],grenadeCurrent,generalInvCurrent,patchCurrent,patchCounts[7],cyberItemIndex;
-	bool playerDead,beepDone,logPaused,hasNewEmail,hasNewNotes,currentCyberItem,isPulserNotDrill,wepLoadedWithAlternate[7],staminupActive,hasLog[134],readLog[134],justChangedWeap,overloadEnabled,recoiling,heldObjectLoadedAlternate,holdingObject,grenadeActive,hasNewLogs,hasNewData;
+        bool playerDead,beepDone,logPaused,hasNewEmail,hasNewNotes,currentCyberItem,isPulserNotDrill,wepLoadedWithAlternate[7],staminupActive,hasLog[134],readLog[134],justChangedWeap,overloadEnabled,recoiling,heldObjectLoadedAlternate,holdingObject,grenadeActive,hasNewLogs,hasNewData;
 } InventorySystem;
 typedef struct { float damage,penetration,offense,armorvalue,defense,impactVelocity; V3 attacknormal,hitpoint; AttackType attackType; u16 owner,hitIdx; bool isOtherNPC,berserkActive; } DamageData;
 typedef struct __attribute__((packed, aligned(8))) { u64 magicNumber; double thisRunTime; bool isLoading; i32 missionSplitID; } AutoSplitterData; // For use with LiveSplit or other future speedrunner utilities for doing speedruns
 extern AutoSplitterData autoSplitter;
 typedef struct {
-	const char* name;
-	AttackType attackType,attackType2,attackType3;
-	float damage,damage2,damage3,range,range2,range3,health,healthForCyberNPC;
-	PerceptionLevel perception;
-	float disruptability,armorvalue,defense;
-	AIMoveType moveType;
-	float yawSpeed;
-	float fov;
-	float fovAttack;
-	float fovStartMovement;
-	float distToSeeBehind;
-	float sightRange;
-	float walkSpeed;
-	float runSpeed;
-	float attack1Speed;
-	float attack2Speed;
-	float attack3Speed;
-	float attack3Force;
-	float attack3Radius;
-	float timeToPain;
-	float timeBetweenPain;
-	float timeTillDead;
-	float timeToActualAttack1;
-	float timeToActualAttack2;
-	float timeToActualAttack3;
-	float timeBetweenAttack1;
-	float timeBetweenAttack2;
-	float timeBetweenAttack3;
-	float timeToChangeEnemy;
-	float timeIdleSFXMin;
-	float timeIdleSFXMax;
-	float timeAttack1WaitMin;
-	float timeAttack1WaitMax;
-	float timeAttack1WaitChance;
-	float timeAttack2WaitMin;
-	float timeAttack2WaitMax;
-	float timeAttack2WaitChance;
-	float timeAttack3WaitMin;
-	float timeAttack3WaitMax;
-	float timeAttack3WaitChance;
-	int attack1ProjectileLaunchedType; // Unused
-	int attack2ProjectileLaunchedType; // Unused
-	int attack3ProjectileLaunchedType; // Unused
-	float projectileSpeedAttack1;
-	float projectileSpeedAttack2;
-	float projectileSpeedAttack3;
-	bool hasLaserOnAttack1;
-	bool hasLaserOnAttack2;
-	bool hasLaserOnAttack3;
-	bool explodeOnAttack3;
-	bool preactivateMeleeColliders; // Unused
-	double huntTime;
-	float flightHeight;
-	bool flightHeightIsPercentage;
-	bool switchMaterialOnDeath;
-	float hearingRange;
-	float timeForTranquilization;
-	bool hopsOnMove;
-	NPCType type;
-	int projectile1Prefab,projectile2Prefab,projectile3Prefab;
+        const char* name;
+        AttackType attackType,attackType2,attackType3;
+        float damage,damage2,damage3,range,range2,range3,health,healthForCyberNPC;
+        PerceptionLevel perception;
+        float disruptability,armorvalue,defense;
+        AIMoveType moveType;
+        float yawSpeed;
+        float fov;
+        float fovAttack;
+        float fovStartMovement;
+        float distToSeeBehind;
+        float sightRange;
+        float walkSpeed;
+        float runSpeed;
+        float attack1Speed;
+        float attack2Speed;
+        float attack3Speed;
+        float attack3Force;
+        float attack3Radius;
+        float timeToPain;
+        float timeBetweenPain;
+        float timeTillDead;
+        float timeToActualAttack1;
+        float timeToActualAttack2;
+        float timeToActualAttack3;
+        float timeBetweenAttack1;
+        float timeBetweenAttack2;
+        float timeBetweenAttack3;
+        float timeToChangeEnemy;
+        float timeIdleSFXMin;
+        float timeIdleSFXMax;
+        float timeAttack1WaitMin;
+        float timeAttack1WaitMax;
+        float timeAttack1WaitChance;
+        float timeAttack2WaitMin;
+        float timeAttack2WaitMax;
+        float timeAttack2WaitChance;
+        float timeAttack3WaitMin;
+        float timeAttack3WaitMax;
+        float timeAttack3WaitChance;
+        int attack1ProjectileLaunchedType; // Unused
+        int attack2ProjectileLaunchedType; // Unused
+        int attack3ProjectileLaunchedType; // Unused
+        float projectileSpeedAttack1;
+        float projectileSpeedAttack2;
+        float projectileSpeedAttack3;
+        bool hasLaserOnAttack1;
+        bool hasLaserOnAttack2;
+        bool hasLaserOnAttack3;
+        bool explodeOnAttack3;
+        bool preactivateMeleeColliders; // Unused
+        double huntTime;
+        float flightHeight;
+        bool flightHeightIsPercentage;
+        bool switchMaterialOnDeath;
+        float hearingRange;
+        float timeForTranquilization;
+        bool hopsOnMove;
+        NPCType type;
+        int projectile1Prefab,projectile2Prefab,projectile3Prefab;
 } NPCTable;
 extern NPCTable npcTable[NUM_AI_TYPES];
 typedef struct { double clipFinished,combatImpulseFinished; bool inCombat,inZone,twoPlaying,distortion,cyberTube,elevator,levelEntry; } MusicSystem;
-extern MusicSystem Sys_Music;
-int lev1SecCode;
-int lev2SecCode;
-int lev3SecCode;
-int lev4SecCode;
-int lev5SecCode;
-int lev6SecCode;
-bool vmailActive;
 extern const char* sounds[SOUNDS_COUNT];
 typedef /*FAT*/ struct  {
     u32 entflags,ioflags;
@@ -531,35 +524,84 @@ typedef struct {
     u32 lastFrameSecCount,worstFPS,debugLineVertCount,shotsFired,grenadesThrown,savesScummed;
     u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,instCount; // Numbers of instances of entities and lights loaded (always for just the current level)
     float farPlane[14],damageDealt,damageReceived,timeScale,worldMin_x[14],worldMin_z[14],voxelMinCenterX[14],voxelMinCenterZ[14];
-	double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,debugLineFinished,shakeFinished,last_time,last_physics_time,deltaTime,current_time,screenshotTimeout,pauseRelativeTime,absoluteTime,statusTextDecayFinished,justSavedTimeStamp;
+        double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,debugLineFinished,shakeFinished,last_time,last_physics_time,deltaTime,current_time,screenshotTimeout,pauseRelativeTime,absoluteTime,statusTextDecayFinished,justSavedTimeStamp;
     i32 fogFac,cursorPosition_x,cursorPosition_y; // Separate internal cursor from system cursor.  This gets relatively pushed around by real cursor movement to give consistent platform behavior.
-	V3 debugLine_start,debugLine_end,cyberspaceRecallPoint;
+        V3 debugLine_start,debugLine_end,cyberspaceRecallPoint;
     u8 levelSecurity[14],startLevel,numLevels,curLev,diffCbt,diffPuz,diffMis,diffCyb,creditsPageIndex;
-	bool inventoryMode,levelCurrentlyLoading,introNotPlayed,paused,menuActive,gameFinished,creditsActive,decoyActive,boosterActive,uiIsBlocking,mouseClickHeldOverGUI,geniusActive;
+    int lev1SecCode,lev2SecCode,lev3SecCode,lev4SecCode,lev5SecCode,lev6SecCode;
+    u8 currentLevel; // Which level's per-level arrays the pointers (instances, position, etc.) currently point to.  Usually equals curLev, but diverges briefly during cross-level target I/O.
+    bool levelDataLoaded[14]; // True once a level's data has been read from ./Data/level#.txt into levelInstances[lev]/levelPosition[lev]/etc.
+    bool inventoryMode,levelCurrentlyLoading,introNotPlayed,paused,menuActive,gameFinished,creditsActive,decoyActive,boosterActive,uiIsBlocking,mouseClickHeldOverGUI,geniusActive;
     InventorySystem invP1,invP2;
-    Entity instances[INSTANCE_COUNT];
-    V3 position[INSTANCE_COUNT];
-    V3 scale[INSTANCE_COUNT];
-    V3 velocity[INSTANCE_COUNT];
-    V3 angularVelocity[INSTANCE_COUNT];
-    V3 colliderCenter[INSTANCE_COUNT]; // Offset relative to .position's global worldspace xyz location
-    V3 colliderSize[INSTANCE_COUNT]; // x,y,z for Box, x for Sphere radius, else x, y, z for Capsule radius, height, and direction (0.0f = X-Axis, 1.0f = Y-Axis, 2.0f = Z-Axis respectively, default 1.0f)
-    ColliderType/*u8*/ collider[INSTANCE_COUNT];
-    Quaternion rotation[INSTANCE_COUNT];
-    u32 layer[INSTANCE_COUNT];
-    float mass[INSTANCE_COUNT];
-    float radius[INSTANCE_COUNT];
-    float gravity[INSTANCE_COUNT];
-    float inertiaTensor[INSTANCE_COUNT][6];
-    float invInertiaTensor[INSTANCE_COUNT][6];
-    float angularDrag[INSTANCE_COUNT];
-    float dynamicFriction[INSTANCE_COUNT];
-    float staticFriction[INSTANCE_COUNT];
-    float bounciness[INSTANCE_COUNT];
-    bool invTnsrValid[INSTANCE_COUNT];
-    bool colliding[INSTANCE_COUNT];
+    SystemUI Sys_UI;
+    MusicSystem Sys_Music;
+    // ===== Per-level parallel arrays (SoA) for cache-hot physics/render loops =====
+    // The active level is selected by pointers below; SetLevelPointers(lev) swaps them.
+    Entity levelInstances[MAX_LEVELS][INSTANCE_COUNT];
+    V3 levelPosition[MAX_LEVELS][INSTANCE_COUNT];
+    V3 levelScale[MAX_LEVELS][INSTANCE_COUNT];
+    V3 levelVelocity[MAX_LEVELS][INSTANCE_COUNT];
+    V3 levelAngularVelocity[MAX_LEVELS][INSTANCE_COUNT];
+    V3 levelColliderCenter[MAX_LEVELS][INSTANCE_COUNT]; // Offset relative to .position's global worldspace xyz location
+    V3 levelColliderSize[MAX_LEVELS][INSTANCE_COUNT]; // x,y,z for Box, x for Sphere radius, else x, y, z for Capsule radius, height, and direction (0.0f = X-Axis, 1.0f = Y-Axis, 2.0f = Z-Axis respectively, default 1.0f)
+    ColliderType/*u8*/ levelCollider[MAX_LEVELS][INSTANCE_COUNT];
+    Quaternion levelRotation[MAX_LEVELS][INSTANCE_COUNT];
+    u32 levelLayer[MAX_LEVELS][INSTANCE_COUNT];
+    float levelMass[MAX_LEVELS][INSTANCE_COUNT];
+    float levelRadius[MAX_LEVELS][INSTANCE_COUNT];
+    float levelGravity[MAX_LEVELS][INSTANCE_COUNT];
+    float levelInertiaTensor[MAX_LEVELS][INSTANCE_COUNT][6];
+    float levelInvInertiaTensor[MAX_LEVELS][INSTANCE_COUNT][6];
+    float levelAngularDrag[MAX_LEVELS][INSTANCE_COUNT];
+    float levelDynamicFriction[MAX_LEVELS][INSTANCE_COUNT];
+    float levelStaticFriction[MAX_LEVELS][INSTANCE_COUNT];
+    float levelBounciness[MAX_LEVELS][INSTANCE_COUNT];
+    bool levelInvTnsrValid[MAX_LEVELS][INSTANCE_COUNT];
+    bool levelColliding[MAX_LEVELS][INSTANCE_COUNT];
+    u16 levelInstCount[MAX_LEVELS]; // Per-level instance count (parallel to instCount which always mirrors the active level's count).
+    // ===== Active-level pointers (the "current instances[]") =====
+    // All existing call sites use World.instances[i], World.position[i], etc. unchanged;
+    // these pointers simply redirect to the active level's row in the levelXxx[] arrays.
+    Entity* instances;
+    V3* position;
+    V3* scale;
+    V3* velocity;
+    V3* angularVelocity;
+    V3* colliderCenter;
+    V3* colliderSize;
+    ColliderType* collider;
+    Quaternion* rotation;
+    u32* layer;
+    float* mass;
+    float* radius;
+    float* gravity;
+    float (*inertiaTensor)[6];
+    float (*invInertiaTensor)[6];
+    float* angularDrag;
+    float* dynamicFriction;
+    float* staticFriction;
+    float* bounciness;
+    bool* invTnsrValid;
+    bool* colliding;
+    // instCount remains a scalar u16 (declared above) and mirrors levelInstCount[currentLevel].
     Color fogColor[14];
-	char global_dllname[256],global_winicon[256],playerName[27],audiologNames[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH],audiologSubjects[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH],audiologSenders[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH],audioLogSpeech2Text[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH];
+    // ===== Cross-level Target I/O cache =====
+    // When UseTargets iterates across all 14 levels looking for matching targetname(s), it swaps the
+    // active-level pointers to each level in turn.  The `activator` entity, however, lives in the
+    // entry level (the level that was active when UseTargets was called) and its index is NOT valid
+    // in other levels' instances arrays.  These fields cache the activator entity + ioflags at the
+    // outermost UseTargets call so Targetted() and the functions it calls can still read the
+    // activator's ioflags regardless of which level the pointers currently point to.
+    // targetIOActive is true while inside the outermost UseTargets call (used to nest recursive
+    // UseTargets calls correctly — e.g. DoorUse → UseTargets — without re-caching or prematurely
+    // clearing the cache).  targetIOEntryLevel saves the level that was active on entry so the
+    // outermost call can restore the pointers when it finishes.
+    Entity targetIOActivatorEntity;
+    u32 targetIOActivatorIoflags;
+    u16 targetIOActivatorIdx;
+    u8 targetIOEntryLevel;
+    bool targetIOActive;
+        char global_dllname[256],global_winicon[256],playerName[27],audiologNames[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH],audiologSubjects[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH],audiologSenders[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH],audioLogSpeech2Text[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH];
 } GlobalContext; // Savable complete game state data
 GlobalContext World = {0};
 #define PI 3.14159265f
@@ -671,6 +713,74 @@ INLINE float parse_float(const char* str, const char* line, u32 lineNum) {
 double get_time(); int sFormatV(char* buf, size_t bufsz, const char* f, va_list args);
 char statusText[T_BUFFER_SIZE];
 void CenterStatusPrint(const char * restrict fmt, ...) { va_list args; __builtin_va_start(args, fmt); sFormatV(statusText,T_BUFFER_SIZE,fmt,args); __builtin_va_end(args); DualLog("%s\n",statusText); World.statusTextDecayFinished = get_time() + 3.5;/*secs decay time before text dissappears.*/ }
+// Forward declarations for mcpy/mset (defined in voxen.c) so the INLINE helpers below can use them.
+void* mcpy(void *dst, const void *src, size_t n);
+void* mset(void *dst, int c, size_t n);
+// SetLevelPointers: Repoints all the active-level SoA pointers (World.instances, World.position, etc.)
+// to the per-level arrays for level `lev`.  Also mirrors levelInstCount[lev] into World.instCount.
+// This is the single "pointer swap" entry point used by:
+//   - LoadLevel()          (set up the active level after a switch)
+//   - LoadAllLevels()      (set up the level about to be populated from disk)
+//   - UseTargets()         (briefly swap to each level to fire target I/O cross-level, then swap back)
+// All existing World.instances[i] / World.position[i] / ... call sites keep working unchanged
+// because the pointers redirect to the currently active level's row in levelXxx[].
+INLINE void SetLevelPointers(u8 lev) {
+    if (lev >= MAX_LEVELS) return;
+    World.currentLevel = lev;
+    World.instances        = World.levelInstances[lev];
+    World.position         = World.levelPosition[lev];
+    World.scale            = World.levelScale[lev];
+    World.velocity         = World.levelVelocity[lev];
+    World.angularVelocity  = World.levelAngularVelocity[lev];
+    World.colliderCenter   = World.levelColliderCenter[lev];
+    World.colliderSize     = World.levelColliderSize[lev];
+    World.collider         = World.levelCollider[lev];
+    World.rotation         = World.levelRotation[lev];
+    World.layer            = World.levelLayer[lev];
+    World.mass             = World.levelMass[lev];
+    World.radius           = World.levelRadius[lev];
+    World.gravity          = World.levelGravity[lev];
+    World.inertiaTensor    = World.levelInertiaTensor[lev];
+    World.invInertiaTensor = World.levelInvInertiaTensor[lev];
+    World.angularDrag      = World.levelAngularDrag[lev];
+    World.dynamicFriction  = World.levelDynamicFriction[lev];
+    World.staticFriction   = World.levelStaticFriction[lev];
+    World.bounciness       = World.levelBounciness[lev];
+    World.invTnsrValid     = World.levelInvTnsrValid[lev];
+    World.colliding        = World.levelColliding[lev];
+    World.instCount        = World.levelInstCount[lev];
+}
+// CopyPlayerState: Copies the player-entity slots (PLAYER1=1, PLAYER2=2) — including the Entity
+// struct and all parallel SoA arrays — from srcLevel to dstLevel.  Used by LoadLevel() to carry
+// the player's state (position, health, ioflags, inventory-derived flags, etc.) across level
+// switches so the player doesn't "reset" to the NewGame state when entering a new level.
+// Note: slot 0 (WORLD/NULL) is per-level static geometry and is NOT copied.
+INLINE void CopyPlayerState(u8 srcLevel, u8 dstLevel) {
+    if (srcLevel >= MAX_LEVELS || dstLevel >= MAX_LEVELS || srcLevel == dstLevel) return;
+    for (u16 s = PLAYER1; s <= PLAYER2; ++s) { // s = 1, 2
+        World.levelInstances[dstLevel][s]            = World.levelInstances[srcLevel][s];
+        World.levelPosition[dstLevel][s]             = World.levelPosition[srcLevel][s];
+        World.levelScale[dstLevel][s]                = World.levelScale[srcLevel][s];
+        World.levelVelocity[dstLevel][s]             = World.levelVelocity[srcLevel][s];
+        World.levelAngularVelocity[dstLevel][s]      = World.levelAngularVelocity[srcLevel][s];
+        World.levelColliderCenter[dstLevel][s]       = World.levelColliderCenter[srcLevel][s];
+        World.levelColliderSize[dstLevel][s]         = World.levelColliderSize[srcLevel][s];
+        World.levelCollider[dstLevel][s]             = World.levelCollider[srcLevel][s];
+        World.levelRotation[dstLevel][s]             = World.levelRotation[srcLevel][s];
+        World.levelLayer[dstLevel][s]                = World.levelLayer[srcLevel][s];
+        World.levelMass[dstLevel][s]                 = World.levelMass[srcLevel][s];
+        World.levelRadius[dstLevel][s]               = World.levelRadius[srcLevel][s];
+        World.levelGravity[dstLevel][s]              = World.levelGravity[srcLevel][s];
+        mcpy(World.levelInertiaTensor[dstLevel][s],    World.levelInertiaTensor[srcLevel][s],    6 * sizeof(float));
+        mcpy(World.levelInvInertiaTensor[dstLevel][s], World.levelInvInertiaTensor[srcLevel][s], 6 * sizeof(float));
+        World.levelAngularDrag[dstLevel][s]          = World.levelAngularDrag[srcLevel][s];
+        World.levelDynamicFriction[dstLevel][s]      = World.levelDynamicFriction[srcLevel][s];
+        World.levelStaticFriction[dstLevel][s]       = World.levelStaticFriction[srcLevel][s];
+        World.levelBounciness[dstLevel][s]           = World.levelBounciness[srcLevel][s];
+        World.levelInvTnsrValid[dstLevel][s]         = World.levelInvTnsrValid[srcLevel][s];
+        World.levelColliding[dstLevel][s]            = World.levelColliding[srcLevel][s];
+    }
+}
 INLINE void EntitySetLocked(Entity* e, bool locked) { DualLog("Unlocking entity with index %u\n",(u16)(e - World.instances)); flag_set(&e->entflags,EF_LOCKED,locked); }
 INLINE void UIBlockedBySecurity(V3 tetherPoint) { (void)tetherPoint; CenterStatusPrint("%s",Sys_Text.stringTable[25]); }
 INLINE void UICyberSprint(u16 textIndex) { CenterStatusPrint("%s",Sys_Text.stringTable[textIndex]); }

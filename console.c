@@ -5,10 +5,10 @@ static V3 cyberSpaceEntryLocations[8] = { {210.6834f,2.812f,-24.378f},/*0*/ {195
 void ForceShootMode(void) {
     if (Sys_Settings.NoShootMode) return; // We are being like the original now!
 
-    Sys_UI.mouseClickHeldOverGUI = false;
+    World.Sys_UI.mouseClickHeldOverGUI = false;
 //     CloseFullmap(); // TODO
     World.inventoryMode = false; World.cursorPosition_x = 663; World.cursorPosition_y = 371; IgnoreNextMouseDelta(); // Centered on UI baseline resolution 1366x768
-//     if (vmailActive) { World.invP1.DeactivateVMail(); vmailActive = false; } // TODO
+    if (World.Sys_UI.vmailActive) { /*World.invP1.DeactivateVMail(); TODO*/ World.Sys_UI.vmailActive = false; }
 }
 
 void ForceInventoryMode(void) { World.inventoryMode = true; World.cursorPosition_x = 663; World.cursorPosition_y = 371; IgnoreNextMouseDelta(); } // Centered on UI baseline resolution 1366x768

@@ -717,7 +717,6 @@ void ResetLevelAudio(void) { ambs=0; mset(ambReg,0,ambs * sizeof(u16)); for (u16
 // Music System
 #define BUFFER_MS 50
 #define AUD_BUFFER_T 0.05f
-MusicSystem Sys_Music;
 const char* levelMusicLooped[14] = {"./Audio/music/looped/track0.mp3","./Audio/music/looped/track1.mp3","./Audio/music/looped/track2.mp3","./Audio/music/looped/track3.mp3","./Audio/music/looped/track4.mp3",
                                     "./Audio/music/looped/track5.mp3","./Audio/music/looped/track6.mp3","./Audio/music/looped/track7.mp3","./Audio/music/looped/track8.mp3","./Audio/music/looped/track9.mp3",
                                     "./Audio/music/looped/track10.mp3","./Audio/music/looped/track11.mp3","./Audio/music/looped/track12.mp3","./Audio/music/looped/track13.mp3"};
@@ -782,32 +781,32 @@ const char* GetCorrespondingLevelClip(TrackType ttype) {
     }
 
     if (World.curLev == 0 || World.curLev == 5 || World.curLev == 7) { // 0  REACTOR, 5 FLIGHT, 7 ENGINEERING
-        if (Sys_Music.levelEntry)      return reactorMusic[6];
-        if (ttype == TrackType_Combat) return reactorMusic[random_range_u8(0,6)];
+        if (World.Sys_Music.levelEntry) return reactorMusic[6];
+        if (ttype == TrackType_Combat)  return reactorMusic[random_range_u8(0,6)];
         return reactorMusic[random_range_u8(6,13)];
     } else if (World.curLev == 1) { // 1  MEDICAL
-        if (Sys_Music.levelEntry) return medicalMusic[0];
-        if (ttype == TrackType_Combat) return medicalMusic[random_range_u8(5,11)];
+        if (World.Sys_Music.levelEntry) return medicalMusic[0];
+        if (ttype == TrackType_Combat)  return medicalMusic[random_range_u8(5,11)];
         return medicalMusic[random_range_u8(1,5)];
     } else if (World.curLev == 2 || World.curLev == 4) { // 2  SCIENCE, 4 STORAGE
-        if (Sys_Music.levelEntry)      return scienceMusic[0];
-        if (ttype == TrackType_Combat) return scienceMusic[random_range_u8(8,10)];
+        if (World.Sys_Music.levelEntry) return scienceMusic[0];
+        if (ttype == TrackType_Combat)  return scienceMusic[random_range_u8(8,10)];
         return scienceMusic[random_range_u8(1,8)];
     } else if (World.curLev == 8) { // 8 SECURITY
-        if (Sys_Music.levelEntry)      return securityMusic[9];
-        if (ttype == TrackType_Combat) return securityMusic[random_range_u8(0,6)];
+        if (World.Sys_Music.levelEntry) return securityMusic[9];
+        if (ttype == TrackType_Combat)  return securityMusic[random_range_u8(0,6)];
         return securityMusic[random_range_u8(6,19)];
     } else if (World.curLev == 6) { // 6 EXECUTIVE
-        if (Sys_Music.levelEntry)      return executiveMusic[0];
-        if (ttype == TrackType_Combat) return executiveMusic[random_range_u8(9,13)];
+        if (World.Sys_Music.levelEntry) return executiveMusic[0];
+        if (ttype == TrackType_Combat)  return executiveMusic[random_range_u8(9,13)];
         return executiveMusic[random_range_u8(0,10)];
     } else if (World.curLev == 10 || World.curLev == 11 || World.curLev == 12) { // 10, 12 GROVES
-        if (Sys_Music.levelEntry)      return groveMusic[19];
-        if (ttype == TrackType_Combat) return groveMusic[random_range_u8(0,9)];
+        if (World.Sys_Music.levelEntry) return groveMusic[19];
+        if (ttype == TrackType_Combat)  return groveMusic[random_range_u8(0,9)];
         return executiveMusic[random_range_u8(9,24)];
     } else if (World.curLev == 13) { // 13 CYBERSPACE
-        if (Sys_Music.levelEntry)           return cyberMusic[0];
-        if (Sys_Music.cyberTube)            return cyberMusic[random_range_u8(4,8)];
+        if (World.Sys_Music.levelEntry)     return cyberMusic[0];
+        if (World.Sys_Music.cyberTube)      return cyberMusic[random_range_u8(4,8)];
         if (random_range(0.0f,1.0f) < 0.5f) return cyberMusic[random_range_u8(1,5)];
         else                                return cyberMusic[8];
     }
@@ -831,14 +830,14 @@ void PlayTrack(TrackType ttype, MusicType mtype) {
     // Normal Dynamic Music System
     if (mtype == MusicType_Override) mp3_clear();
     play_mp3(GetCorrespondingLevelClip(ttype),BUFFER_MS);
-    if (!Sys_Music.elevator) Sys_Music.levelEntry = false; // already used by GetCorresponding... just now
+    if (!World.Sys_Music.elevator) World.Sys_Music.levelEntry = false; // already used by GetCorresponding... just now
 }
 
 void MusicNotifyZone(TrackType tt) {
-    Sys_Music.inZone = true;
+    World.Sys_Music.inZone = true;
     switch(tt) {
-        case TrackType_Elevator: Sys_Music.elevator = true; break;
-        case TrackType_Distortion: Sys_Music.distortion = true; break;
+        case TrackType_Elevator: World.Sys_Music.elevator = true; break;
+        case TrackType_Distortion: World.Sys_Music.distortion = true; break;
     }
 }
 
@@ -853,23 +852,23 @@ void MusicTriggerEnter(u16 self, u16 other) {
     }
 }
 
-void MusicTriggerExit(u16 other) { if (other == PLAYER1 || other == PLAYER2) { mp3_clear(); Sys_Music.inZone = Sys_Music.elevator = Sys_Music.distortion = false; } }// return to normal upon leaving the trigger
+void MusicTriggerExit(u16 other) { if (other == PLAYER1 || other == PLAYER2) { mp3_clear(); World.Sys_Music.inZone = World.Sys_Music.elevator = World.Sys_Music.distortion = false; } }// return to normal upon leaving the trigger
 void UpdateMusic(void) {
     if (World.paused && !World.menuActive) { MP3Pause(); return; }
     MP3Resume();
     float remaining = GetMP3RemainingTime(); if (remaining > AUD_BUFFER_T) return;
     if (World.menuActive) { play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500); return; }
-    if (Sys_Music.inCombat && !Sys_Music.inZone && Sys_Music.combatImpulseFinished < World.pauseRelativeTime) {
-        Sys_Music.inCombat = false;
+    if (World.Sys_Music.inCombat && !World.Sys_Music.inZone && World.Sys_Music.combatImpulseFinished < World.pauseRelativeTime) {
+        World.Sys_Music.inCombat = false;
         PlayTrack(TrackType_Combat, MusicType_Override);
-        Sys_Music.combatImpulseFinished = World.pauseRelativeTime + 20.0;
+        World.Sys_Music.combatImpulseFinished = World.pauseRelativeTime + 20.0;
         return;
     }
-    if (Sys_Music.inZone) {
-        if (Sys_Music.distortion) { PlayTrack(TrackType_Distortion, MusicType_Override); return; }
-        if (Sys_Music.elevator) { PlayTrack(TrackType_Elevator, MusicType_Override); return; }
+    if (World.Sys_Music.inZone) {
+        if (World.Sys_Music.distortion) { PlayTrack(TrackType_Distortion, MusicType_Override); return; }
+        if (World.Sys_Music.elevator) { PlayTrack(TrackType_Elevator, MusicType_Override); return; }
     }
     if (Sys_Settings.DynamicMusic || remaining <= AUD_BUFFER_T) PlayTrack(TrackType_Walking, MusicType_Walking);
 }
 
-void ResetLevelMusic(void) { mp3_clear(); Sys_Music.levelEntry = true; Sys_Music.inZone = Sys_Music.cyberTube = false; Sys_Music.clipFinished = Sys_Music.combatImpulseFinished = get_time(); Sys_Music.combatImpulseFinished += 5.0; }
+void ResetLevelMusic(void) { mp3_clear(); World.Sys_Music.levelEntry = true; World.Sys_Music.inZone = World.Sys_Music.cyberTube = false; World.Sys_Music.clipFinished = World.Sys_Music.combatImpulseFinished = get_time(); World.Sys_Music.combatImpulseFinished += 5.0; }

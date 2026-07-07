@@ -106,7 +106,7 @@ public class PuzzleGrid : MonoBehaviour {
 	}
 
 	public void OnGridCellClick (int index) {
-		Sys_UI.mouseClickHeldOverGUI = true;
+		World.Sys_UI.mouseClickHeldOverGUI = true;
 		if (puzzleSolved) return;
 
 		if (cellType[index] == PuzzleCellType.Standard) {

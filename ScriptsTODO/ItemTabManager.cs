@@ -101,7 +101,7 @@ public class ItemTabManager : MonoBehaviour {
 			vaporizeButton.SetActive(false);
 			grenadeTimerSlider.SetActive(false);
 			grenadeTimerSliderSlider.SetActive(false);
-			Sys_UI.applyButtonReferenceIndex = constIndex;
+			World.Sys_UI.applyButtonReferenceIndex = constIndex;
 		} else {
 			applyButton.SetActive(false);
 		}

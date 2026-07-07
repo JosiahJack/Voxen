@@ -10,16 +10,14 @@
 __attribute__((used)) AutoSplitterData autoSplitter = {0x1337133713371337,0,false,0}; // Fore use with LiveSplit or other future speedrunner utilities for doing speedruns
 //=============================================================================
 // Initialization
-int lev1SecCode,lev2SecCode,lev3SecCode,lev4SecCode,lev5SecCode,lev6SecCode;
 #ifdef WINDOWS
 i32 __stdcall DllMain(void* hinstDLL, unsigned long fdwReason, void* lpReserved) { (void)hinstDLL; (void)lpReserved; switch (fdwReason) {} return 1; }
 void* memset(void* dst, int c, size_t n) { return mset(dst,c,n); }
 #endif
-
 void ModNewGame(void) {
-    lev1SecCode = random_range_u8(0u,9u); lev2SecCode = random_range_u8(0u,9u);
-    lev3SecCode = random_range_u8(0u,9u); lev4SecCode = random_range_u8(0u,9u);
-    lev5SecCode = random_range_u8(0u,9u); lev6SecCode = random_range_u8(0u,9u); // Must do rand's repeatedly to prevent these all being the same number.
+    World.lev1SecCode = random_range_u8(0u,9u); World.lev2SecCode = random_range_u8(0u,9u);
+    World.lev3SecCode = random_range_u8(0u,9u); World.lev4SecCode = random_range_u8(0u,9u);
+    World.lev5SecCode = random_range_u8(0u,9u); World.lev6SecCode = random_range_u8(0u,9u); // Must do rand's repeatedly to prevent these all being the same number.
 }
 //=============================================================================
 // Inventory
@@ -265,7 +263,7 @@ static void PlayLog(u16 p,int logIndex) {
 //     }
 //     inv->readLog[logIndex] = true;
 //     if (Sys_Text.audioLogType[logIndex] == AudioLogType_Vmail) {
-//         vmailActive        = true;
+//         World.Sys_UI.vmailActive        = true;
 //         inv->vmailLogIndex = (i16)logIndex; // engine reads to select which .webm to play
 //         switch (logIndex) { // TODO
 //             case 119:
@@ -671,7 +669,7 @@ static bool firstTimeSearch = true;
 void AddItemFail(u16 p, int index) { DropHeldItem(p); CenterStatusPrint("%s%s%s", Sys_Text.stringTable[32],Sys_Text.stringTable[index + 326],Sys_Text.stringTable[318]); } // Inventory full.
 void AddItemToInventory(u16 p, int index, int customIndex) {
     InventorySystem* inv = Inv(p);
-    Sys_UI.mouseClickHeldOverGUI = true; // Prevent gun shooting.
+    World.Sys_UI.mouseClickHeldOverGUI = true; // Prevent gun shooting.
     if (index < 0) index = 0; // Good check on paper.
     if (index > 110) index = 94; // Way to get a head.
     if ((index >= 0 && index <= 5) || index == 33 || index == 35 || (index >= 52 && index < 59) || (index >= 61 && index <= 64) || (index >= 92 && index <= 101)) {
@@ -785,10 +783,10 @@ void CyberPushOnTriggerStay(u16 self, u16 other) {
     if (World.diffCyb < 1 || other != PLAYER1) return;
     player->inCyberTube = true;
     AddForce(PLAYER1,V3_ScaleByF(e->direction,e->force * (float)World.deltaTime),false);
-    Sys_Music.cyberTube = true;
+    World.Sys_Music.cyberTube = true;
 }
 
-void CyberPushOnTriggerExit(u16 self, u16 other) { (void)self; if (other != PLAYER1) {return;} World.instances[other].inCyberTube = false; Sys_Music.cyberTube = false; }
+void CyberPushOnTriggerExit(u16 self, u16 other) { (void)self; if (other != PLAYER1) {return;} World.instances[other].inCyberTube = false; World.Sys_Music.cyberTube = false; }
 //=============================================================================
 // CyberDoor
 void CyberDoorOnCollisionEnter(u16 self, u16 other) {
@@ -1196,58 +1194,113 @@ void HealingBedUse(u16 self, u16 owner) {
 }
 //=============================================================================
 // TargetIO
+// UseTargets: Level-agnostic target I/O.  Iterates over ALL loaded levels (0..numLevels-1), and for
+// each level swaps the active-level pointers (World.instances, World.position, etc.) to that level
+// via SetLevelPointers(), then searches the level's instances for any whose .targetname matches
+// `targetname` and calls Targetted(activator, i) for each match.  After all levels have been
+// iterated, swaps the pointers back to the entry level (the level that was active when UseTargets
+// was called).
+//
+// The activator entity lives in the entry level, but when we swap pointers to other levels the
+// activator's index is no longer valid in those levels' instances arrays.  To handle this, the
+// outermost UseTargets call caches the activator entity + ioflags into World.targetIOActivatorEntity
+// / World.targetIOActivatorIoflags, and Targetted() reads from those cached fields instead of
+// World.instances[activator] when World.targetIOActive is true.  This lets all the downstream
+// target functions (DoorUse, ButtonSwitchUse, etc.) keep using World.instances[activator] indexing
+// unchanged — they "still just think everything is in instances[]".
+//
+// Recursion: target functions (e.g. DoorUse → UseTargets) may recursively call UseTargets.  The
+// `targetIOActive` flag ensures only the outermost UseTargets caches the activator and restores
+// the entry level.  Inner (recursive) UseTargets calls save/restore their own entry level so the
+// outer iteration's level state is preserved across the recursion.
 void UseTargets(u16 activator, const char* targetname) {
     if (sEmpty(targetname)) return;
-    
-    bool succeeded = false;
-    for (u16 i = INSTS_1ST_IDX; i < World.instCount; i++) {
-        if (!sEqual(World.instances[i].targetname,targetname)) continue;
-        
-        DualLog("Successfully found matching targetname %s for entity %u and activator ioflags:%u\n",targetname,i,World.instances[activator].ioflags);
-        Targetted(activator,i);
-        succeeded = true;
+
+    // If this is the outermost UseTargets call, cache the activator entity + ioflags and record the
+    // entry level so we can restore the pointers when we're done.  Inner recursive calls skip the
+    // caching (the outer call's cache is still valid) but still save/restore their own entry level.
+    bool wasActive = World.targetIOActive;
+    u8 entryLevel = World.currentLevel;
+    if (!wasActive) {
+        World.targetIOActive = true;
+        World.targetIOEntryLevel = entryLevel;
+        World.targetIOActivatorIdx = activator;
+        World.targetIOActivatorEntity = World.instances[activator]; // Full snapshot — valid even after pointer swaps.
+        World.targetIOActivatorIoflags = World.instances[activator].ioflags;
     }
+
+    bool succeeded = false;
+    // Iterate every loaded level.  Entities in other levels won't update with this system until
+    // their level loads (e.g. a door that was targetted will have its state set to opening but not
+    // actually open until the player loads into that level) — this is the desired behavior.
+    for (u8 lev = 0; lev < World.numLevels; ++lev) {
+        // Skip levels whose data hasn't been loaded yet (e.g. if LoadAllLevels was interrupted).
+        if (!World.levelDataLoaded[lev]) continue;
+        // Swap the active-level pointers to this level if they aren't already pointing at it.
+        if (World.currentLevel != lev) SetLevelPointers(lev);
+
+        for (u16 i = INSTS_1ST_IDX; i < World.instCount; i++) {
+            if (!sEqual(World.instances[i].targetname,targetname)) continue;
+
+            DualLog("Successfully found matching targetname %s for entity %u (level %u) and activator ioflags:%u\n",targetname,i,lev,World.targetIOActivatorIoflags);
+            Targetted(activator,i);
+            succeeded = true;
+        }
+    }
+
+    // Restore the active-level pointers to the level that was active on entry to this UseTargets call.
+    // For the outermost call this is the player's current level (World.curLev); for a recursive call
+    // this is whatever level the outer iteration was on when the recursion happened.
+    if (World.currentLevel != entryLevel) SetLevelPointers(entryLevel);
+
     if (!succeeded) DualLogWarn("Failed to find a matching targetname for %s\n",targetname);
+
+    // Only the outermost UseTargets call clears the cache.
+    if (!wasActive) World.targetIOActive = false;
 }
 
 void Targetted(u16 activator, u16 self) {
     Entity* e = &World.instances[self];
-    Entity* a = &World.instances[activator];
-    DualLog("Targetted running with a->ioflags:%u, e->index:%u, door conditions:%u\n",a->ioflags,e->index,((a->ioflags & TARG_IOFLAGS_DOOROPEN) && IdxIsDoor(e->index)));
+    // When inside cross-level target I/O (World.targetIOActive), the `activator` index is only
+    // valid in the entry level — after a pointer swap it would dereference the wrong entity in the
+    // currently-pointed-to level.  Use the cached snapshot instead.  In normal (non-cross-level)
+    // usage, World.instances[activator] is still correct.
+    u32 aioflags = World.targetIOActive ? World.targetIOActivatorIoflags : World.instances[activator].ioflags;
+    DualLog("Targetted running with a->ioflags:%u, e->index:%u, door conditions:%u\n",aioflags,e->index,((aioflags & TARG_IOFLAGS_DOOROPEN) && IdxIsDoor(e->index)));
     if (e->index == 709) { CenterStatusPrint("%s",Sys_Text.stringTable[e->messageLingdex]); return; } // info_message
     if (e->index == 708) { World.gameFinished = true; return; }
-    
+
     if (e->index == 707 /*info_email*/) EmailTargetted(self,activator);
-    if (a->ioflags & TARG_IOFLAGS_TRIPTRIGGER) {
+    if (aioflags & TARG_IOFLAGS_TRIPTRIGGER) {
         if (e->index == 598 || e->index == 600) TriggerTargetted(self,activator);
         else if (e->index == 594) TriggerCounterTargetted(self,activator);
     }
-    
-    if (a->ioflags & TARG_IOFLAGS_UNLOCK) EntitySetLocked(e,false);
-    if ((a->ioflags & TARG_IOFLAGS_LOCK) && IdxIsDoor(e->index)) EntitySetLocked(e,true);
-    
+
+    if (aioflags & TARG_IOFLAGS_UNLOCK) EntitySetLocked(e,false);
+    if ((aioflags & TARG_IOFLAGS_LOCK) && IdxIsDoor(e->index)) EntitySetLocked(e,true);
+
     if (IdxIsButtonSwitch(e->index)) ButtonSwitchTargetted(self,activator);
-    if ((a->ioflags & TARG_IOFLAGS_DOOROPEN) && IdxIsDoor(e->index)) { DualLog("Running DoorForceOpen from ioflag DOOROPEN on entity %u\n",self); DoorForceOpen(self); }
-    else if ((a->ioflags & TARG_IOFLAGS_DOOROPENIFUNLOCKED) && IdxIsDoor(e->index) && ((e->entflags & EF_LOCKED) == 0) && (e->requiredAccessCard == AccessCardType_None || (World.invP1.accessCardOwned & (1u << e->requiredAccessCard)))) DoorForceOpen(self);
-    else if ((a->ioflags & TARG_IOFLAGS_DOORCLOSE) && IdxIsDoor(e->index)) DoorForceClose(self);
+    if ((aioflags & TARG_IOFLAGS_DOOROPEN) && IdxIsDoor(e->index)) { DualLog("Running DoorForceOpen from ioflag DOOROPEN on entity %u\n",self); DoorForceOpen(self); }
+    else if ((aioflags & TARG_IOFLAGS_DOOROPENIFUNLOCKED) && IdxIsDoor(e->index) && ((e->entflags & EF_LOCKED) == 0) && (e->requiredAccessCard == AccessCardType_None || (World.invP1.accessCardOwned & (1u << e->requiredAccessCard)))) DoorForceOpen(self);
+    else if ((aioflags & TARG_IOFLAGS_DOORCLOSE) && IdxIsDoor(e->index)) DoorForceClose(self);
     else if (IdxIsDoor(e->index)) DoorTargetted(self,activator);
-    
-    if (a->ioflags & TARG_IOFLAGS_FBRIDGE_ACTIVATE) ForceBridgeActivate(self,false);
-    else if (a->ioflags & TARG_IOFLAGS_FBRIDGE_DEACTIVATE) ForceBridgeDeactivate(self,false);
-    else if (a->ioflags & TARG_IOFLAGS_FBRIDGE_TOGGLE) ForceBridgeToggle(self);
-    
-    if (a->ioflags & TARG_IOFLAGS_GRAVLIFT_TOGGLE) GravityLiftToggle(self);
-    if (a->ioflags & TARG_IOFLAGS_TEXTURE_CHG_TOGGLE) TextureChangerToggle(self);
-    if (a->ioflags & TARG_IOFLAGS_FUNCWALL_MOVE) FuncWallTargetted(self,activator);
-    if (a->ioflags & TARG_IOFLAGS_SWITCH_LOCK_TOGGLE) EntitySetLocked(e,(e->entflags & EF_LOCKED) == 0);
-    if (a->ioflags & TARG_IOFLAGS_INST_ACTIVATE) flag_set(&e->entflags,EF_ACTIVE,true);
-    else if (a->ioflags & TARG_IOFLAGS_INST_DEACTIVATE) flag_set(&e->entflags,EF_ACTIVE,false);
-    else if (a->ioflags & TARG_IOFLAGS_INST_TOGGLE) flag_set(&e->entflags,EF_ACTIVE,!(e->entflags & EF_ACTIVE));
+
+    if (aioflags & TARG_IOFLAGS_FBRIDGE_ACTIVATE) ForceBridgeActivate(self,false);
+    else if (aioflags & TARG_IOFLAGS_FBRIDGE_DEACTIVATE) ForceBridgeDeactivate(self,false);
+    else if (aioflags & TARG_IOFLAGS_FBRIDGE_TOGGLE) ForceBridgeToggle(self);
+
+    if (aioflags & TARG_IOFLAGS_GRAVLIFT_TOGGLE) GravityLiftToggle(self);
+    if (aioflags & TARG_IOFLAGS_TEXTURE_CHG_TOGGLE) TextureChangerToggle(self);
+    if (aioflags & TARG_IOFLAGS_FUNCWALL_MOVE) FuncWallTargetted(self,activator);
+    if (aioflags & TARG_IOFLAGS_SWITCH_LOCK_TOGGLE) EntitySetLocked(e,(e->entflags & EF_LOCKED) == 0);
+    if (aioflags & TARG_IOFLAGS_INST_ACTIVATE) flag_set(&e->entflags,EF_ACTIVE,true);
+    else if (aioflags & TARG_IOFLAGS_INST_DEACTIVATE) flag_set(&e->entflags,EF_ACTIVE,false);
+    else if (aioflags & TARG_IOFLAGS_INST_TOGGLE) flag_set(&e->entflags,EF_ACTIVE,!(e->entflags & EF_ACTIVE));
 }
 //=============================================================================
 // VaporizeButton
 void VaporizeClick(void) { // TODO
-//     Sys_UI.mouseClickHeldOverGUI = true;
+//     World.Sys_UI.mouseClickHeldOverGUI = true;
 //     if (World.invP1.generalInvCurrent == 0) return; // Access Cards index.
 // 
 //     int cur = World.invP1.generalInvCurrent;
@@ -1272,15 +1325,15 @@ void VaporizeClick(void) { // TODO
 //     int indexRef = World.invP1.generalInventoryIndexRef[cur];
 //     if (World.invP1.generalInvCurrent == 0) {
 //         if (World.invP1.HasAnyAccessCards()) {
-//             Sys_UI.SendInfoToItemTab(indexRef);
+//             World.Sys_UI.SendInfoToItemTab(indexRef);
 //         } else {
 //             // If no access cards, reset item tab to show nothing.
-//             Sys_UI.SendInfoToItemTab(-1);
+//             World.Sys_UI.SendInfoToItemTab(-1);
 //             PtrExit();
 //         }
 //     } else {
 //         GeneralInvButton genbut = World.invP1.genButtons[cur].GetComponent<GeneralInvButton>();
-//         Sys_UI.SendInfoToItemTab(indexRef,genbut.customIndex);
+//         World.Sys_UI.SendInfoToItemTab(indexRef,genbut.customIndex);
 //     }
 }
 //=============================================================================
@@ -1432,14 +1485,14 @@ void CyborgConversionToggleTargetted(void) {
 // static const char* elevFloorLabels[14] = {"R","1","2","3","4","5","6","7","8","9","G1","G2","G4","C"};
 void ElevatorButtonClick(u16 self) {
     Entity* e = &World.instances[self];
-    Sys_UI.mouseClickHeldOverGUI = true;
-    if (Sys_UI.linkedElevatorDoor == U16_MAX) {
+    World.Sys_UI.mouseClickHeldOverGUI = true;
+    if (World.Sys_UI.linkedElevatorDoor == U16_MAX) {
         CenterStatusPrint("%s",Sys_Text.stringTable[6]); // Too far away from that.
         return;
     }
-    Entity* door = &World.instances[Sys_UI.linkedElevatorDoor];
+    Entity* door = &World.instances[World.Sys_UI.linkedElevatorDoor];
     bool doorClosed = door->doorOpen == DoorState_Closed;
-    float dist = V3_Dist(Sys_UI.objectInUsePos,World.position[PLAYER1]);
+    float dist = V3_Dist(World.Sys_UI.objectInUsePos,World.position[PLAYER1]);
     if (dist > ELEVATOR_PAD_TETHER_DIST && !doorClosed) {
         CenterStatusPrint("%s",Sys_Text.stringTable[6]); // Too far away from that.
         return;
@@ -1498,7 +1551,7 @@ void OverloadButtonAction(void) {
 }
 
 void OverloadEnergyClick(void) {
-    Sys_UI.mouseClickHeldOverGUI = true;
+    World.Sys_UI.mouseClickHeldOverGUI = true;
     OverloadButtonAction();
 }
 
@@ -1539,7 +1592,7 @@ static void ApplyHealthkit(void) {
     if (inv->energy >= 255.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[303]); return; } // Energy full
     
     World.instances[PLAYER1].health = 255.0f;
-    // TODO: Sys_UI.DrawTicks(true) — HUD health tick refresh, MFDManager
+    // TODO: World.Sys_UI.DrawTicks(true) — HUD health tick refresh, MFDManager
     inv->generalInventoryIndexRef[inv->hardwareInvCurrent] = -1;
 }
 
@@ -1548,11 +1601,11 @@ void GeneralInvUse(int buttonIdx,int customIdx) {
     inv->hardwareInvCurrent = buttonIdx;
     int itemIdx = inv->generalInventoryIndexRef[buttonIdx];
     if (buttonIdx == 0) {
-        // TODO: Sys_UI.SendInfoToItemTab(81) — access cards display, MFDManager
+        // TODO: World.Sys_UI.SendInfoToItemTab(81) — access cards display, MFDManager
         // TODO: SetCurrentAsLast for active side panel, MFDManager
         return;
     }
-    // TODO: Sys_UI.SendInfoToItemTab(itemIdx,customIdx) — MFDManager
+    // TODO: World.Sys_UI.SendInfoToItemTab(itemIdx,customIdx) — MFDManager
     // TODO: SetCurrentAsLast for active side panel, MFDManager
     (void)customIdx;
     (void)itemIdx;
@@ -1560,7 +1613,7 @@ void GeneralInvUse(int buttonIdx,int customIdx) {
 
 void GeneralInvApply(int buttonIdx,int customIdx) {
     if (buttonIdx == 0) {
-        // TODO: Sys_UI.SendInfoToItemTab(81), OpenTab access cards — MFDManager
+        // TODO: World.Sys_UI.SendInfoToItemTab(81), OpenTab access cards — MFDManager
         return;
     }
     World.invP1.hardwareInvCurrent = buttonIdx;
@@ -1571,14 +1624,14 @@ void GeneralInvApply(int buttonIdx,int customIdx) {
         case 55: ApplyHealthkit();   break;
         default:
             World.invP1.hardwareInvCurrent = buttonIdx;
-            // TODO: Sys_UI.SendInfoToItemTab(itemIdx,customIdx), OpenTab — MFDManager
+            // TODO: World.Sys_UI.SendInfoToItemTab(itemIdx,customIdx), OpenTab — MFDManager
             (void)customIdx;
             break;
     }
 }
 
-void GeneralInvClick(int buttonIdx,int customIdx) { Sys_UI.mouseClickHeldOverGUI = true; GeneralInvUse(buttonIdx,customIdx); }
-void GeneralInvDoubleClick(int buttonIdx,int customIdx) { Sys_UI.mouseClickHeldOverGUI = true; GeneralInvApply(buttonIdx,customIdx); }
+void GeneralInvClick(int buttonIdx,int customIdx) { World.Sys_UI.mouseClickHeldOverGUI = true; GeneralInvUse(buttonIdx,customIdx); }
+void GeneralInvDoubleClick(int buttonIdx,int customIdx) { World.Sys_UI.mouseClickHeldOverGUI = true; GeneralInvApply(buttonIdx,customIdx); }
 //=============================================================================
 // TargetID
 #define TARGETID_LINK_DIST       10.0f
@@ -1878,7 +1931,7 @@ static void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 
         float dmgFinal  = 0.0f; // placeholder until TakeDamage implemented
 //         float tranq     = -1.0f;
         if (dd.isOtherNPC) {
-            if (!(hit->entflags & EF_ASLEEP)) Sys_Music.inCombat = true;
+            if (!(hit->entflags & EF_ASLEEP)) World.Sys_Music.inCombat = true;
             if (dd.attackType == AttackType_Tranq) {
 //                 float stunAmount = vclamp(3.0f + (World.invP1.stungunSetting
 //                                           / 100.0f) * 7.0f, 3.0f, 10.0f);
@@ -2140,7 +2193,7 @@ float TakeDamage(u16 self,DamageData dd) {
         World.instances[self].health -= take;
         if (isPlayer) {
             World.damageReceived += take;
-            Sys_Music.inCombat = true;
+            World.Sys_Music.inCombat = true;
             // TODO: DrawTicks(true)
         }
         if (dd.owner == PLAYER1 || dd.owner == PLAYER2) World.damageDealt += take;
@@ -2301,7 +2354,7 @@ void HardwareBioAction(void) {
     play_wav(sounds[78],SfxVol(),(V3){},false);
     if (BioMonitorActive(PLAYER1)) HardwareBioOff(); else HardwareBioOn();
 }
-void HardwareBioClick(void) { Sys_UI.mouseClickHeldOverGUI = true; HardwareBioAction(); }
+void HardwareBioClick(void) { World.Sys_UI.mouseClickHeldOverGUI = true; HardwareBioAction(); }
 
 void HardwareSensaroundOn(void) {
     World.invP1.hardwareIsActive |= HW_SNS;
@@ -2322,7 +2375,7 @@ void HardwareSensaroundAction(void) {
     }
 }
 
-void HardwareSensaroundClick(void) { Sys_UI.mouseClickHeldOverGUI = true; HardwareSensaroundAction(); }
+void HardwareSensaroundClick(void) { World.Sys_UI.mouseClickHeldOverGUI = true; HardwareSensaroundAction(); }
 
 void HardwareShieldOn(void) {
     World.invP1.hardwareIsActive |= HW_SHD;
@@ -2346,7 +2399,7 @@ void HardwareShieldAction(void) {
     }
 }
 
-void HardwareShieldClick(void) { Sys_UI.mouseClickHeldOverGUI = true; HardwareShieldAction(); }
+void HardwareShieldClick(void) { World.Sys_UI.mouseClickHeldOverGUI = true; HardwareShieldAction(); }
 
 void HardwareLanternOn(void) {
     World.invP1.hardwareIsActive |= HW_LAN;
@@ -2365,7 +2418,7 @@ void HardwareLanternAction(void) {
     if (World.invP1.hardwareIsActive & HW_LAN) HardwareLanternOff(); else HardwareLanternOn();
 }
 
-void HardwareLanternClick(void) { Sys_UI.mouseClickHeldOverGUI = true; HardwareLanternAction(); }
+void HardwareLanternClick(void) { World.Sys_UI.mouseClickHeldOverGUI = true; HardwareLanternAction(); }
 
 void HardwareInfraredOn(void) {
     World.invP1.hardwareIsActive |= HW_INF;
@@ -2385,7 +2438,7 @@ void HardwareInfraredAction(void) {
     if (wasOn) HardwareInfraredOff(); else HardwareInfraredOn();
 }
 
-void HardwareInfraredClick(void) { Sys_UI.mouseClickHeldOverGUI = true; HardwareInfraredAction(); }
+void HardwareInfraredClick(void) { World.Sys_UI.mouseClickHeldOverGUI = true; HardwareInfraredAction(); }
 
 void HardwareEReaderAction(void) {
     play_wav(sounds[97],SfxVol(),(V3){},false);
@@ -2393,7 +2446,7 @@ void HardwareEReaderAction(void) {
     // TODO: OpenEReaderInItemsTab() — engine-side tab open
 }
 
-void HardwareEReaderClick(void) { Sys_UI.mouseClickHeldOverGUI = true; HardwareEReaderAction(); }
+void HardwareEReaderClick(void) { World.Sys_UI.mouseClickHeldOverGUI = true; HardwareEReaderAction(); }
 
 void HardwareBoosterOn(void)  { World.invP1.hardwareIsActive |=  HW_BST; }
 void HardwareBoosterOff(void) { World.invP1.hardwareIsActive &= ~HW_BST; }
@@ -2405,7 +2458,7 @@ void HardwareBoosterAction(void) {
     if (World.invP1.hardwareIsActive & HW_BST) HardwareBoosterOff(); else HardwareBoosterOn();
 }
 
-void HardwareBoosterClick(void) { Sys_UI.mouseClickHeldOverGUI = true; HardwareBoosterAction(); }
+void HardwareBoosterClick(void) { World.Sys_UI.mouseClickHeldOverGUI = true; HardwareBoosterAction(); }
 
 void HardwareJumpJetsOn(void)  { World.invP1.hardwareIsActive |=  HW_JET; }
 void HardwareJumpJetsOff(void) { World.invP1.hardwareIsActive &= ~HW_JET; }
@@ -2418,7 +2471,7 @@ void HardwareJumpJetsAction(u16 p) {
     if (JumpJetsActive(PLAYER1)) HardwareJumpJetsOn(); else HardwareJumpJetsOff();
 }
 
-void HardwareJumpJetsClick(u16 p) { Sys_UI.mouseClickHeldOverGUI = true; HardwareJumpJetsAction(p); }
+void HardwareJumpJetsClick(u16 p) { World.Sys_UI.mouseClickHeldOverGUI = true; HardwareJumpJetsAction(p); }
 void HardwareUpdate(u16 p) {
     InventorySystem* inv = Inv(p);
     bool infraredOn = /*(inv->hasHardware & HW_INF) && */(inv->hardwareIsActive & HW_INF) > 0;
@@ -3155,7 +3208,7 @@ void UseEntity(u16 p, u16 i) {
 #define FROB_DISTANCE 4.9f
 static void Frob(V3 pos, V3 forward, V3 right) {
     if (World.curLev == LEVEL_CYBERSPACE) return;
-    if (vmailActive) { DeactivateVMail(); vmailActive = false; return; }
+    if (World.Sys_UI.vmailActive) { DeactivateVMail(); World.Sys_UI.vmailActive = false; return; }
     if (World.uiIsBlocking) return;
     
     InventorySystem* inv = Inv(PLAYER1);

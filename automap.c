@@ -521,7 +521,7 @@ static const float camMaxAmount = 0.2548032f;
 // 	}
 // 
 // 	public void CloseFullmap() {
-// 		if (automapFull.activeInHierarchy) Sys_UI.CloseFullmap();
+// 		if (automapFull.activeInHierarchy) World.Sys_UI.CloseFullmap();
 // 		Utils.Deactivate(automapFull);
 // 		inFullMap = false;
 // 		if (inSideView) AutomapGoSide();

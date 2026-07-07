@@ -28,9 +28,9 @@ public class SystemAnalyzer : MonoBehaviour {
 	public Text delta;
 
 	public void Close() {
-		Sys_UI.sysAnalyzerLH.SetActive(false);
-		Sys_UI.sysAnalyzerRH.SetActive(false);
-		Sys_UI.mouseClickHeldOverGUI = true;
+		World.Sys_UI.sysAnalyzerLH.SetActive(false);
+		World.Sys_UI.sysAnalyzerRH.SetActive(false);
+		World.Sys_UI.mouseClickHeldOverGUI = true;
 		
 	}
     // Start is called before the first frame update

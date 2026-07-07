@@ -55,7 +55,7 @@ public class PuzzleGridPuzzle : MonoBehaviour {
 		}
 
 		if (GetCurrentLevelSecurity() > securityThreshhold) {
-			Sys_UI.BlockedBySecurity(World.instances[i].position);
+			World.Sys_UI.BlockedBySecurity(World.instances[i].position);
 			return;
 		}
 
@@ -85,7 +85,7 @@ public class PuzzleGridPuzzle : MonoBehaviour {
 			alreadyOpen = true;
 		}
 
-		Sys_UI.SendGridPuzzleToDataTab(grid,cellType,gridType,
+		World.Sys_UI.SendGridPuzzleToDataTab(grid,cellType,gridType,
 											 sourceIndex,outputIndex,width,
 											 height,theme,target,ud,
 											 World.instances[i].position,this);
