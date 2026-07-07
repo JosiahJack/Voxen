@@ -844,6 +844,7 @@ u16 AddInstance(u16 entIdx, V3 pos) {
     World.gravity[i] = EDefsgravity[entIdx] > 0.0f ? EDefsgravity[entIdx] : 1.0f;
     World.instances[i].lockedMessageLingdex = EDefs[entIdx].lockedMessageLingdex;
     World.instCount++;
+    World.levelInstCount[World.currentLevel] = World.instCount;
     return i;
 }
 
@@ -1107,30 +1108,131 @@ void LoadLevelMod(u8 lev) {
     headmountedLanternLight = AddLight(&hl,&lam); lightsIdx++;
 }
 
+INLINE size_t GetMaxCompressedSize(size_t srcSize) { return srcSize + (srcSize / 128) + 16; } // Worst-case buffer size for allocation
+size_t VoidSquasher(const u8* src, size_t srcSize, u8* dst, size_t dstCapacity) {
+    size_t s = 0; // source index
+    size_t d = 0; // dest index
+    while (s < srcSize) {
+        // 1. Hunt for Zeros
+        size_t zeroCount = 0;
+        while (s + zeroCount < srcSize && src[s + zeroCount] == 0) { zeroCount++; }
+        if (zeroCount > 0) {
+            if (zeroCount < 128) {
+                if (d >= dstCapacity) return 0; // Buffer overflow safeguard
+                dst[d++] = (u8)(0x80 + (zeroCount - 1));
+            } else {
+                if (d + 5 > dstCapacity) return 0;
+                dst[d++] = 0xFF;
+                u32 zCount32 = (u32)zeroCount;
+                mcpy(&dst[d], &zCount32, sizeof(u32)); // mcpy to avoid unaligned pointer UB
+                d += 4;
+            }
+            s += zeroCount;
+            continue; // Go back to hunting zeros
+        }
+        
+        // 2. Process Literal Data (Non-Zeros)
+        size_t litCount = 0;
+        // Optimization: It costs 2 bytes of overhead to break a literal run to compress 
+        // 1 or 2 zeros. We only break a literal run if we spot 3 or more zeros ahead.
+        while (s + litCount < srcSize && litCount < 128) {
+            if (src[s + litCount] == 0) {
+                size_t remain = srcSize - (s + litCount);
+                if (remain >= 3 && src[s + litCount + 1] == 0 && src[s + litCount + 2] == 0) { break; }// Found a juicy patch of zeros, break the literal run!
+            }
+            litCount++;
+        }
+        if (litCount > 0) { if (d + 1 + litCount > dstCapacity) {return 0;} dst[d++] = (u8)(litCount - 1); mcpy(&dst[d], &src[s], litCount); s += litCount; d += litCount; }
+    }
+    return d; // Return final compressed size
+}
+
+// Returns the decompressed size (should equal original size).
+size_t BlowBubblesOfVoid(const u8* src, size_t srcSize, u8* dst, size_t dstCapacity) {
+    size_t s = 0;
+    size_t d = 0;
+    while (s < srcSize && d < dstCapacity) {
+        u8 cmd = src[s++];
+        
+        if (cmd < 128) {
+            // Literal Run
+            size_t litCount = cmd + 1;
+            if (s + litCount > srcSize || d + litCount > dstCapacity) return 0; 
+            mcpy(&dst[d], &src[s], litCount);
+            s += litCount;
+            d += litCount;
+        } else if (cmd < 0xFF) {
+            // Short Zero Run
+            size_t zeroCount = cmd - 128 + 1;
+            if (d + zeroCount > dstCapacity) return 0;
+            mset(&dst[d], 0, zeroCount);
+            d += zeroCount;
+        } else {
+            // Long Zero Run
+            if (s + 4 > srcSize) return 0;
+            u32 zeroCount;
+            mcpy(&zeroCount, &src[s], sizeof(u32));
+            s += 4;
+            
+            if (d + zeroCount > dstCapacity) return 0;
+            mset(&dst[d], 0, zeroCount);
+            d += zeroCount;
+        }
+    }
+    return d;
+}
+
 #pragma pack(push, 1)
-typedef struct { u32 magicNumber; u32 version; char savename[56]; } SaveHeader; // 64 bytes total for a clean cache-line aligned header
+typedef struct { u32 magicNumber; u32 version; u32 uncompressedSize; u32 compressedSize; char savename[48]; } SaveHeader;
 #pragma pack(pop)
 void SaveGame(u8 slot, const char* savename) {
-    if (slot > 7) return; // Keep slots bounded
+    if (slot > 7) return;
     char path[] = "./Data/sav0.bin"; path[10] = '0' + slot;
-    FHandle fd = OS_OpenWriteonly(path); if (fd == (FHandle)-1) { DualLogError("Failed to open save file for writing: %s\n", path); return; }
-    SaveHeader header = {0}; header.version = 1; header.magicNumber = 0x56415343; // 'CSAV'
-    if (savename) { int i = 0; while (savename[i] != '\0' && i < 55) { header.savename[i] = savename[i]; i++; } header.savename[i] = '\0'; }
-    World.justSavedTimeStamp = get_time();
-    OS_Write(fd,&header,sizeof(SaveHeader),path);
-    OS_Write(fd,&World,sizeof(GlobalContext),path);
+    FHandle fd = OS_OpenWriteonly(path); if (fd == (FHandle)-1) return;
+    // Allocate memory for the compression buffer
+    size_t uncompressedSize = sizeof(GlobalContext);
+    size_t maxCompSize = GetMaxCompressedSize(uncompressedSize);
+    u8* compBuffer = (u8*)OS_Alloc(maxCompSize);
+    size_t finalCompSize = VoidSquasher((const u8*)&World,uncompressedSize,compBuffer,maxCompSize);
+    if (finalCompSize > 0) {
+        SaveHeader header = {0};
+        header.magicNumber = 0x56415343; // 'CSAV'
+        header.version = 2;              // Version 2 uses compression
+        header.uncompressedSize = (u32)uncompressedSize;
+        header.compressedSize = (u32)finalCompSize;
+        if (savename) {
+            int i = 0; while (savename[i] != '\0' && i < 47) { header.savename[i] = savename[i]; i++; }
+            header.savename[i] = '\0';
+        }
+        World.justSavedTimeStamp = get_time();
+        // Dump header, then the tiny compressed payload
+        OS_Write(fd, &header, sizeof(SaveHeader), path);
+        OS_Write(fd, compBuffer, finalCompSize, path);
+        CenterStatusPrint("Saved to Slot %d (Size: %u KB)", slot, (u32)(finalCompSize / 1024));
+    } else { DualLogError("Compression failed during SaveGame!\n"); }
+    OS_Free(compBuffer, maxCompSize);
     OS_Close(fd);
-    CenterStatusPrint("Game saved to slot %d...done!",slot);
 }
 
 void LoadGame(u8 slot) {
     if (slot > 7) return;
     char path[] = "./Data/sav0.bin"; path[10] = '0' + slot;
-    FHandle fd = OS_OpenReadonly(path); if (fd == (FHandle)-1) { DualLogError("Save file not found or inaccessible: %s\n", path); return; }
-    SaveHeader header; long bytesRead = OS_Read(fd,&header,sizeof(SaveHeader));
-    if (bytesRead != sizeof(SaveHeader) || header.magicNumber != 0x56415343) { DualLogError("Invalid or corrupted save file header: %s\n", path); OS_Close(fd); return; }
-    bytesRead = OS_Read(fd, &World, sizeof(GlobalContext)); if (bytesRead != sizeof(GlobalContext)) { DualLogWarn("Warning: Save file %s size mismatch. Struct may have changed.\n",path); }
+    FHandle fd = OS_OpenReadonly(path); if (fd == (FHandle)-1) return;
+    SaveHeader header;
+    if (OS_Read(fd, &header, sizeof(SaveHeader)) != sizeof(SaveHeader) || header.magicNumber != 0x56415343) { DualLogError("Corrupted save file header!\n"); OS_Close(fd); return; }
+    // Allocate memory to read the compressed file
+    u8* compBuffer = (u8*)OS_Alloc(header.compressedSize);
+    if (OS_Read(fd, compBuffer, header.compressedSize) == header.compressedSize) {
+        size_t result = BlowBubblesOfVoid(compBuffer, header.compressedSize, (u8*)&World, header.uncompressedSize); // Decompress straight into the World struct
+        if (result == header.uncompressedSize) {
+            // Memory addresses fixed!
+            SetLevelPointers(World.currentLevel);
+            CenterStatusPrint("Loaded Game: %s", header.savename);
+        } else {
+            DualLogError("Decompression failed! Expected %u bytes, got %u\n", header.uncompressedSize, (u32)result);
+        }
+    }
+    OS_Free(compBuffer, header.compressedSize);
     OS_Close(fd);
-    SetLevelPointers(World.currentLevel); // VERY IMPORTANT to fix up any pointers* in the World. struct!!  ASLR scrambles the addresses on subsequent binary runs.
-    CenterStatusPrint("Loaded Game: %s", header.savename);
+    for (int i=0;i<loadedLights;++i) { flag_set(&lights[i].lflags,LDIRTY,true); }
 }

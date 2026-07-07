@@ -1216,7 +1216,7 @@ i32 main() {
         if (!World.paused && !World.menuActive) {MixAmbs();}
         UpdateMusic();
         drawCalls = uiDrawCalls = shadDrawCalls = vertsRendered = 0; RenderCameraViews();
-        if (unlikely(!World.paused && !World.menuActive)) CullCore();
+        if (likely(!World.paused && !World.menuActive)) CullCore();
         UpdateInstanceMatrix4x4s();
         Render(false/*!camview*/,0u);
         if (ScrshotPressed() && World.current_time > World.screenshotTimeout) Screenshot();

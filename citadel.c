@@ -1,8 +1,7 @@
 // citadel.c - Gamelogic.  Most functionality is trivial so put it here.
 // TODO: Add camera view entities for other levels than just medical
 // TODO: Particle system
-// TODO: Voxel GI
-// TODO: Save/Load system
+// TODO: Voxel GI?
 // TODO: Directional lights for cyberspace
 // TODO: Directional light for sunlight
 // TODO: Directional light shadowmapping just for sunlight
