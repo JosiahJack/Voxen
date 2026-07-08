@@ -31,9 +31,9 @@ void ModEDefsInitAfterLoad(void) { // Global conditions for all entities.  No se
         flag_set(&EDefs[i].entflags,EF_RIGIDBODY,IdxIsDynamicObject(EDefs[i].index));
         if (EDefs[i].cardchunk) {
             EDefs[i].lodIndex = GEOMETRY_LOD_CARD_MODEL_IDX;
-            EDefscollider[i] = COLTYPE_BOX;
-            EDefscolliderCenter[i].y = 1.32f;
-            EDefscolliderSize[i] = (V3){2.56f,0.08f,2.56f};
+            EDefscollider[i] = COLTYPE_MSH;//COLTYPE_BOX;
+//             EDefscolliderCenter[i].y = 1.32f;
+//             EDefscolliderSize[i] = (V3){2.56f,0.08f,2.56f};
         }
         
         EDefs[i].currentFrameFinished = World.pauseRelativeTime + 0.1;
@@ -350,7 +350,7 @@ void ModEDefsInitAfterLoad(void) { // Global conditions for all entities.  No se
     for (int i=307;i<=404;++i) { EDefsangularDrag[i]=0.05f; EDefsdynamicFriction[i]=0.5f; EDefsstaticFriction[i]=0.6f; EDefsmass[i]=1.0f; } // Item
     /*307 item_paper_wad*/             EDefs[307].modelIndex=487; EDefs[307].texIndex=1250; EDefscollider[307]= COLTYPE_SPH; EDefscolliderCenter[307]=(V3){-0.001254f,-0.001190498f,0.006335999f}; EDefscolliderSize[307].x=0.0451f; EDefsmass[307]=0.06f;
     /*308 item_warecasing*/            EDefs[308].modelIndex=637; EDefs[308].texIndex=1251; EDefsmass[308]=0.8f;
-    /*309 item_beaker*/                EDefs[309].modelIndex=14;  EDefscollider[309]=COLTYPE_CVX; EDefs[309].colMeshIndex=682; EDefs[309].texIndex=36; EDefs[309].specIndex=1242;  EDefsmass[309]=0.28f;
+    /*309 item_beaker*/                EDefs[309].modelIndex=14;  EDefscollider[309]=COLTYPE_CVX; EDefs[309].colMeshIndex=682; EDefs[309].texIndex=36; EDefs[309].specIndex=1242;  EDefsmass[309]=0.28f; EDefsdynamicFriction[309]=0.1f; EDefsstaticFriction[309]=0.2f;
     /*310 item_beverage*/              EDefs[310].modelIndex=18;  EDefscollider[310]=COLTYPE_CVX; EDefs[310].colMeshIndex=683; EDefs[310].texIndex=37; EDefsmass[310]=0.12f;
     /*311 item_skull*/                 EDefs[311].modelIndex=593; EDefsmass[311]=0.451f;
     /*312 item_arm*/                   EDefs[312].modelIndex=7;   EDefs[312].texIndex=28; EDefscollider[312]=COLTYPE_CVX; EDefs[312].colMeshIndex=678;

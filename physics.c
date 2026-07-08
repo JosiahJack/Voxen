@@ -1,18 +1,19 @@
 // Phys Sys
 #define MAX_COLLISION_ITERATIONS 8
 #define RESTITUTION 0.15f
-#define FRICTION_SLIDE 0.2f
+#define FRICTION_SLIDE 0.25f
 #define FRICTION_ROLL 0.5f
+#define FRICTION_ROLL_RESISTANCE 0.03f  // true rolling resistance for round shapes
 #define STEP_MIN_NORMAL_Y 0.7f
 #define PHY_EPSILON 0.0001f
 #define MAX_SUBSTEPS 10
-#define MAX_SPEED 8.0f // m/s
+#define MAX_SPEED 16.666666f // m/s
 #define MAX_STEP_SIZE (0.1f / MAX_SPEED) // 0.01 s
-#define MAX_ANGULAR_SPEED 5.0f
+#define MAX_ANGULAR_SPEED 8.0f
 #define MANIFOLD_MAX 4
 #define MANIFOLD_TIE_MARGIN 0.005f
 #define MANIFOLD_ALIGN_THRESHOLD 0.8f
-#define MANIFOLD_DEDUP_DIST_SQ 1e-5f
+#define MANIFOLD_DEDUP_DIST_SQ 0.00001f
 #define CVXMSH_HULL_CACHE 1024
 typedef struct {V3 ctr,hExt; Quaternion rot;} ShapeBox;
 typedef struct {V3 ctr; float rad;} ShapeSphere;
@@ -1008,34 +1009,29 @@ static void ResolveContactVelocity(u16 a, u16 b, V3 n, V3 rAarm, V3 rBarm, float
     V3 relVel2 = V3_AsubB(vAtA2,vAtB2);
     V3 tangent = V3_AsubB(relVel2,V3_ScaleByF(n,V3_dot(relVel2,n)));
     float tLen = V3_Mag(tangent);
-
     if (tLen > 0.0001f) {
         tangent = V3_ScaleByF(tangent, 1.0f / tLen);
-
         V3 rAxT = V3_Cross(rAarm, tangent), rBxT = V3_Cross(rBarm,tangent);
         V3 invI_rAxT = IdxIsNPC(World.instances[a].index) ? (V3){0,0,0} : ApplyInvTensor(a,rAxT);
         V3 invI_rBxT = (bStatic || IdxIsNPC(World.instances[b].index)) ? (V3){0,0,0} : ApplyInvTensor(b,rBxT);
         float angTermAT = V3_dot(rAxT,invI_rAxT), angTermBT = bStatic ? 0.0f : V3_dot(rBxT,invI_rBxT);
-
         float invSumT = invMassA + invMassB + angTermAT + angTermBT;
         if (invSumT > PHY_EPSILON) {
             float jt = -V3_dot(relVel2, tangent) / invSumT;
-
             // Simple sliding vs rolling friction switch
-            float friction = (tLen > 0.15f) ? FRICTION_SLIDE : FRICTION_ROLL;
+            //float friction = (World.collider[a] == COLTYPE_CAP || World.collider[b] == COLTYPE_CAP) ?0.001f : ((tLen > 0.15f) ? FRICTION_SLIDE : FRICTION_ROLL);
+            float friction = (World.collider[a] == COLTYPE_CAP || World.collider[b] == COLTYPE_CAP) ? 0.001f
+                : (tLen > 0.15f) ? FRICTION_SLIDE
+                : ((World.collider[a] == COLTYPE_CVX || World.collider[a] == COLTYPE_SPH) ? FRICTION_ROLL_RESISTANCE : FRICTION_ROLL);
+                
             float maxT = friction * (*accumN);
-
             float newAccumT = vclamp(*accumT + jt, -maxT, maxT);
             jt = newAccumT - *accumT; *accumT = newAccumT;
-
             V3 fImpulse = V3_ScaleByF(tangent, jt);
             World.velocity[a] = V3_AplusB(World.velocity[a], V3_ScaleByF(fImpulse, invMassA));
             if (!bStatic) World.velocity[b] = V3_AsubB(World.velocity[b], V3_ScaleByF(fImpulse, invMassB));
-
-            if (World.collider[a] != COLTYPE_CAP && !IdxIsNPC(World.instances[a].index))
-                World.angularVelocity[a] = V3_AplusB(World.angularVelocity[a], ApplyInvTensor(a,V3_Cross(rAarm,fImpulse)));
-            if (!bStatic && World.collider[b] != COLTYPE_CAP && !IdxIsNPC(World.instances[b].index))
-                World.angularVelocity[b] = V3_AsubB(World.angularVelocity[b], ApplyInvTensor(b,V3_Cross(rBarm,fImpulse)));
+            if (World.collider[a] != COLTYPE_CAP && !IdxIsNPC(World.instances[a].index)) World.angularVelocity[a] = V3_AplusB(World.angularVelocity[a], ApplyInvTensor(a,V3_Cross(rAarm,fImpulse)));
+            if (!bStatic && World.collider[b] != COLTYPE_CAP && !IdxIsNPC(World.instances[b].index)) World.angularVelocity[b] = V3_AsubB(World.angularVelocity[b], ApplyInvTensor(b,V3_Cross(rBarm,fImpulse)));
         }
     }
 }
@@ -1106,8 +1102,8 @@ void Physics() {
             World.velocity[idx] = V3_ScaleByF(World.velocity[idx],linDrag);
             SetPosition(idx,V3_AplusB(World.position[idx],V3_ScaleByF(World.velocity[idx],dtsub)),false); // pos += (d = v*t)
             if (World.collider[idx] != COLTYPE_CAP) {
-                float angDrag = vexp(-World.angularDrag[idx] * dtsub);
-                World.angularVelocity[idx] = V3_ScaleByF(World.angularVelocity[idx],angDrag); // 1. Apply continuous angular drag over time
+                //float angDrag = vexp(-World.angularDrag[idx] * dtsub);
+                //World.angularVelocity[idx] = V3_ScaleByF(World.angularVelocity[idx],angDrag); // 1. Apply continuous angular drag over time
                 float avel = V3_Mag(World.angularVelocity[idx]);
                 if (avel > MAX_ANGULAR_SPEED) { World.angularVelocity[idx] = V3_ScaleByF(World.angularVelocity[idx],MAX_ANGULAR_SPEED / avel); avel = MAX_ANGULAR_SPEED; }
                 if (!V3_IsSane(World.angularVelocity[idx])) { World.angularVelocity[idx] = (V3){0.0f,0.0f,0.0f}; avel = 0.0f; }

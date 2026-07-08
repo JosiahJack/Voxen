@@ -4,7 +4,7 @@ RaycastHit RayTriangle(V3 origin, V3 dir, V3 posA, V3 posB, V3 posC, V3 normA, V
     V3 ao = V3_AsubB(origin,posA); V3 dao = V3_Cross(ao,dir);
     float determinant = -V3_dot(dir,normalVector); float invDet = 1.0f / determinant; float dst = V3_dot(ao, normalVector) * invDet;
     float u = V3_dot(edgeAC,dao) * invDet, v = -V3_dot(edgeAB,dao) * invDet; float w = 1.0f - u - v;
-    return (RaycastHit){.point=V3_AplusB(origin,V3_ScaleByF(dir,dst)), .normal=V3_Normalize(V3_AplusB(V3_AplusB(V3_ScaleByF(normA,w),V3_ScaleByF(normB,u)),V3_ScaleByF(normC,v))), .distance=dst, .hitInstanceIndex=INSTANCE_COUNT, .hit=vabs(determinant) >= 1E-8f && dst >= 0 && u >= 0 && v >= 0 && w >= 0};
+    return (RaycastHit){.point=V3_AplusB(origin,V3_ScaleByF(dir,dst)), .normal=V3_Normalize(V3_AplusB(V3_AplusB(V3_ScaleByF(normA,w),V3_ScaleByF(normB,u)),V3_ScaleByF(normC,v))), .distance=dst, .hitInstanceIndex=INSTANCE_COUNT, .hit=vabs(determinant) >= 0.00000001f && dst >= 0 && u >= 0 && v >= 0 && w >= 0};
 }
 
 RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
