@@ -521,7 +521,7 @@ typedef struct { Entity* entries; u32 count; u32 capacity; } DataParser;
 typedef __builtin_va_list va_list;
 typedef struct { char soundPath[128]; float *samples; u32 frame_count,frame_pos; float volume; bool looping,positional,playing; V3 pos; size_t allocSize; } wav_channel_t;
 typedef struct {
-    u32 lastFrameSecCount,worstFPS,debugLineVertCount,shotsFired,grenadesThrown,savesScummed;
+    u32 lastFrameSecCount,debugLineVertCount,shotsFired,grenadesThrown,savesScummed;
     u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,instCount; // Numbers of instances of entities and lights loaded (always for just the current level)
     float farPlane[14],damageDealt,damageReceived,timeScale,worldMin_x[14],worldMin_z[14],voxelMinCenterX[14],voxelMinCenterZ[14];
         double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,debugLineFinished,shakeFinished,last_time,last_physics_time,deltaTime,current_time,screenshotTimeout,pauseRelativeTime,absoluteTime,statusTextDecayFinished,justSavedTimeStamp;

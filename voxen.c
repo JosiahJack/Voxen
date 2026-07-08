@@ -142,7 +142,7 @@ u8 levelCamViewCount[MAX_LEVELS];
 //  camViewTextures[] array is repopulated from this storage so existing glBindTexture calls keep working.)
 u32 levelCamViewTextures[MAX_LEVELS][64];
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6],playerFrustumPlanes[6];
-u16 editModeSelection,editModeTestEntityDefinition=0; double shadowTime; u32 shadowmapIndirectionList[LIGHT_COUNT]; u16 texCnt; bool doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS]; u32 drawCalls,uiDrawCalls,shadDrawCalls,vertsRendered,drawCallsNormal;
+u16 editModeSelection,editModeTestEntityDefinition=0; double shadowTime; double physTime; u32 shadowmapIndirectionList[LIGHT_COUNT]; u16 texCnt; bool doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS]; u32 drawCalls,uiDrawCalls,shadDrawCalls,vertsRendered,drawCallsNormal;
 static const u8 Mpg_FrontPage=0,Mpg_Singleplayer=1,Mpg_Multiplayer=2,Mpg_NewGame=3,Mpg_Load=4,Mpg_Options=5,Mpg_Save=6,Mpg_IntroVideo=7,Mpg_CreditsVideo=8; u8 currentMenuPage = Mpg_FrontPage; bool resDropdownOpen = false; int resDropdownCount=0,resSelectedIdx=0;
 typedef struct {int w,h;} ResMode; ResMode resModes[8];
 extern Entity EDefs[MAX_ENTITIES];
@@ -599,7 +599,7 @@ static double RenderUI() {
     i16 debugTextStartY = 48; // Diagnostics / Debugging
     if (Cheats.showLocation && !World.menuActive) RenderFormattedText(16, debugTextStartY, T_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f",World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z,World.rotation[PLAYER1].x,World.rotation[PLAYER1].y,World.rotation[PLAYER1].z,World.rotation[PLAYER1].w);
     i16 lineSpacing = 18;
-    if (!World.menuActive && !Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 1),T_WHITE,FONT_NORMAL,1.0f,"playerCellIdx: %u, Shadow cpu ms: %.3f",playerCellIdx,shadowTime * 1000);
+    if (!World.menuActive && !Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 1),T_WHITE,FONT_NORMAL,1.0f,"playerCellIdx: %u, Shadow cpu ms: %.3f, Physics cpu ms: %.3f",playerCellIdx,shadowTime * 1000,physTime * 1000);
     if (!World.menuActive && !Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 2),T_WHITE,FONT_NORMAL,1.0f,"Player velocity: %.2f, %.2f, %.2f, Grounded: %u",World.velocity[PLAYER1].x,World.velocity[PLAYER1].y,World.velocity[PLAYER1].z,World.instances[PLAYER1].entflags & EF_GROUNDED);
     RenderFormattedText(16,debugTextStartY + (lineSpacing * 4),T_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d  dx:%d dy:%d",World.cursorPosition_x,World.cursorPosition_y,World.currentMouse_dx,World.currentMouse_dy);
     if (Cheats.consoleActive) RenderFormattedText(16,0,T_WHITE,FONT_NORMAL,1.0f, "] %s",consoleEntryText);
@@ -613,7 +613,7 @@ static double RenderUI() {
         if (World.thisFrameTime > 6.944444) timingColor = T_RED;
         drawCalls += 2; // Add two more for this text render ;)
         RenderFormattedText(16, debugTextStartY - lineSpacing, timingColor, FONT_NORMAL,1.0f, "ms: %.2f, CPU %.2f", World.thisFrameTime,World.cpuFrameTime);
-        RenderFormattedText(16 + 230.0f, debugTextStartY - lineSpacing, T_WHITE, FONT_NORMAL,1.0f, "(FPS:%d, Worst:%d),Drwclls:%d [G:%d UI:%d Sh:%d] Vrt:%d E:%u|M:%u|P:%u",globalframesPerLastSecond,World.worstFPS,drawCalls,drawCallsNormal,uiDrawCalls,shadDrawCalls,vertsRendered,Cheats.editMode,World.menuActive,World.paused);
+        RenderFormattedText(16 + 230.0f, debugTextStartY - lineSpacing, T_WHITE, FONT_NORMAL,1.0f, "(FPS:%d),Drwclls:%d [G:%d UI:%d Sh:%d] Vrt:%d E:%u|M:%u|P:%u",globalframesPerLastSecond,drawCalls,drawCallsNormal,uiDrawCalls,shadDrawCalls,vertsRendered,Cheats.editMode,World.menuActive,World.paused);
     }
     return time_now;
 }
@@ -898,7 +898,6 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glDrawArrays(0x0006/*GL_TRIANGLE_FAN*/,0,4); drawCalls++; vertsRendered += 4;
     if ((World.last_time - World.lastFrameSecCountTime) >= 1.00) { // Update Diagnostic Poll
         World.lastFrameSecCountTime = World.last_time; globalframesPerLastSecond = globalframe - World.lastFrameSecCount;
-        if (globalframesPerLastSecond < World.worstFPS && globalframe > 2000) World.worstFPS = globalframesPerLastSecond; // After startup, keep track of worst framerate seen.
         World.lastFrameSecCount = globalframe;
     }
 }
@@ -1120,7 +1119,7 @@ void InitalizeEnvironment() {
     // World.instances[i] / World.position[i] / etc.  Without this, the pointers would be NULL
     // (since GlobalContext is zero-initialized) and any access would crash.
     SetLevelPointers(0);
-    WindowInit(); threadCnt = clamp(OS_GetNumThreads(),1,32); globalframe=0,World.menuActive=true,World.screenshotTimeout=1.0,World.creditsPageIndex=1,World.diffCbt=World.diffCyb=World.diffPuz=World.diffMis=2,World.deaths=0,World.worstFPS=0,World.cursorPosition_x=680,World.cursorPosition_y=384;
+    WindowInit(); threadCnt = clamp(OS_GetNumThreads(),1,32); globalframe=0,World.menuActive=true,World.screenshotTimeout=1.0,World.creditsPageIndex=1,World.diffCbt=World.diffCyb=World.diffPuz=World.diffMis=2,World.deaths=0,World.cursorPosition_x=680,World.cursorPosition_y=384;
     DualLog("Loading game definition...");
     FHandle gmFP = OS_OpenReadonly("./Data/gamedata.txt"); if (!gmFP) { DualLogError("\nCannot open ./Data/gamedata.txt\n"); OS_Exit(1);  }
     char gmLine[512],global_modname[256],global_dllname[256]; u32 lineNum = 0;
@@ -1215,7 +1214,9 @@ i32 main() {
         double curtime = get_time(); World.deltaTime=curtime - World.current_time; World.absoluteTime+=World.deltaTime; World.current_time=curtime; if (!World.paused && !World.menuActive) World.pauseRelativeTime += World.deltaTime;
         InputProcessing(); // Before anims and physics to allow them to respond immediately.
         UpdateAnims();     // Before physics to allow model swap out to affect physics state immediately.  Before rendering to affect shadowmaps immediately.
+        double physStart = get_time();
         Physics();
+        physTime = get_time() - physStart;
         ModUpdate(); // After physics so mod/gamecode can modify velocities before next frame.
         if (!World.paused && !World.menuActive) {MixAmbs();}
         UpdateMusic();

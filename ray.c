@@ -27,6 +27,49 @@ RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
         V3 localOrigin = {(rel.x*m00 + rel.y*m10 + rel.z*m20) / sclx2, (rel.x*m01 + rel.y*m11 + rel.z*m21) / scly2, (rel.x*m02 + rel.y*m12 + rel.z*m22) / sclz2};
         V3 localDir =    {(dir.x*m00 + dir.y*m10 + dir.z*m20) / sclx2, (dir.x*m01 + dir.y*m11 + dir.z*m21) / scly2, (dir.x*m02 + dir.y*m12 + dir.z*m22) / sclz2};
         localDir = V3_Normalize(localDir);
+        // BVH-accelerated path: traverse the per-model octree in LOCAL space (the BVH node AABBs
+        // are local-space, so we test the local ray directly — no per-node matrix work).
+        // bestT tracks the closest hit in local-ray-parameter space; since worldDist = t * |M*localDir|
+        // (a constant scale per entity), pruning by bestT is equivalent to pruning by result.distance.
+        if (BvhHasBVH(mindex)) {
+            const BvhNode* nodes = modelBVHNodes[mindex];
+            const u16* triOrder = modelBVHTriOrder[mindex];
+            float minScale = vmin(sclx, vmin(scly, sclz)); if (minScale < 0.0001f) minScale = 0.0001f;
+            float localMax = maxDist / minScale;  // conservative local-space upper bound for the ray
+            float bestT = localMax;
+            const BvhNode* stack[64]; int sp = 0;
+            stack[sp++] = &nodes[0];
+            while (sp > 0) {
+                const BvhNode* node = stack[--sp];
+                float tEntry = BvhRayAABBHit(localOrigin, localDir, node->mn, node->mx, bestT);
+                if (tEntry < 0.0f) continue;  // ray misses node AABB or enters beyond bestT
+                if (node->triCount > 0) {
+                    for (u32 k = 0; k < node->triCount; k++) {
+                        u32 j = triOrder[node->triStart + k];
+                        u32 bA = (u32)modelTriangles[mindex][j*3 + 0] * CPU_VRT_SZ, bB = (u32)modelTriangles[mindex][j*3 + 1] * CPU_VRT_SZ, bC = (u32)modelTriangles[mindex][j*3 + 2] * CPU_VRT_SZ;
+                        V3 posA = {*(float*)(modelVertices[mindex] + bA + 0), *(float*)(modelVertices[mindex] + bA + 4), *(float*)(modelVertices[mindex] + bA + 8)};
+                        V3 posB = {*(float*)(modelVertices[mindex] + bB + 0), *(float*)(modelVertices[mindex] + bB + 4), *(float*)(modelVertices[mindex] + bB + 8)};
+                        V3 posC = {*(float*)(modelVertices[mindex] + bC + 0), *(float*)(modelVertices[mindex] + bC + 4), *(float*)(modelVertices[mindex] + bC + 8)};
+                        V3 normA ={*(float*)(modelVertices[mindex] + bA + 12), *(float*)(modelVertices[mindex] + bA + 16), *(float*)(modelVertices[mindex] + bA + 20)};
+                        V3 normB ={*(float*)(modelVertices[mindex] + bB + 12), *(float*)(modelVertices[mindex] + bB + 16), *(float*)(modelVertices[mindex] + bB + 20)};
+                        V3 normC ={*(float*)(modelVertices[mindex] + bC + 12), *(float*)(modelVertices[mindex] + bC + 16), *(float*)(modelVertices[mindex] + bC + 20)};
+                        RaycastHit tryTri = RayTriangle(localOrigin,localDir,posA,posB,posC,normA,normB,normC); if (!tryTri.hit) continue;
+                        V3 worldPoint = { m00*tryTri.point.x + m01*tryTri.point.y + m02*tryTri.point.z + tx, m10*tryTri.point.x + m11*tryTri.point.y + m12*tryTri.point.z + ty, m20*tryTri.point.x + m21*tryTri.point.y + m22*tryTri.point.z + tz };
+                        float worldDist = V3_Dist(worldPoint,origin); if (worldDist >= result.distance) continue;
+                        V3 worldNormal = { (m00/sclx)*tryTri.normal.x + (m01/scly)*tryTri.normal.y + (m02/sclz)*tryTri.normal.z, (m10/sclx)*tryTri.normal.x + (m11/scly)*tryTri.normal.y + (m12/sclz)*tryTri.normal.z, (m20/sclx)*tryTri.normal.x + (m21/scly)*tryTri.normal.y + (m22/sclz)*tryTri.normal.z };
+                        worldNormal = V3_Normalize(worldNormal);
+                        result.hit=true; result.point=worldPoint; result.normal=V3_Normalize(worldNormal); result.distance=worldDist; result.hitInstanceIndex=i;
+                        bestT = tryTri.distance;  // tighten BVH pruning for remaining nodes
+                    }
+                } else {
+                    for (int o = 0; o < 8; o++) {
+                        if (node->children[o] >= 0) stack[sp++] = &nodes[node->children[o]];
+                    }
+                }
+            }
+            continue;  // next entity
+        }
+        // Linear fallback (no BVH)
         for (u32 j=0;j<triCount;++j) {
             u32 bA = (u32)modelTriangles[mindex][j*3 + 0] * CPU_VRT_SZ, bB = (u32)modelTriangles[mindex][j*3 + 1] * CPU_VRT_SZ, bC = (u32)modelTriangles[mindex][j*3 + 2] * CPU_VRT_SZ;
             V3 posA = {*(float*)(modelVertices[mindex] + bA + 0), *(float*)(modelVertices[mindex] + bA + 4), *(float*)(modelVertices[mindex] + bA + 8)};

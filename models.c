@@ -190,6 +190,274 @@ bool ParseModelData(ModelDataParser *p, u16 maxSz, const char *fn) {
     return true;
 }
 
+// ==================== BVH (Octree) ====================
+// Per-model octree BVH in local model space, max 3 levels deep.
+// Built once per model at load time. Used by physics.c (SphMsh, BoxMsh, CvxMsh) and
+// ray.c (Raycast) to cull triangles via AABB overlap before the expensive per-triangle test.
+// Because this is a unity-build (models.c included before physics.c and ray.c), all the
+// static helpers and globals below are visible to the later translation units.
+#define BVH_MAX_DEPTH 3
+#define BVH_LEAF_MAX_TRIS 8
+#define BVH_MAX_NODES_PER_MDL 600   // 1 + 8 + 64 + 512 = 585 worst case, +safety
+#define BVH_MAX_TRIS_PER_MDL ((MAX_OUTPUT_VERTS + 2) / 3)  // ~6986
+
+typedef struct {
+    V3 mn, mx;          // Local-space AABB (union of triangle AABBs in this subtree)
+    u32 triStart;       // Leaf only: start index in modelBVHTriOrder
+    u16 triCount;       // 0 = internal node, >0 = leaf
+    i16 children[8];    // -1 = no child, else index into nodes array
+} BvhNode;
+
+BvhNode** modelBVHNodes = NULL;          // [mdlsCnt] array of BvhNode arrays (NULL if model has no BVH)
+u16**    modelBVHTriOrder = NULL;        // [mdlsCnt] array of u16 triangle-index arrays (reordered for leaf-contiguous ranges)
+u32      modelBVHNodeCounts[MAX_MDLS] = {0};
+u32      modelBVHTriOrderCounts[MAX_MDLS] = {0};
+
+// Build scratch (build is single-threaded, so static globals are fine)
+static BvhNode bvhBuildNodes[BVH_MAX_NODES_PER_MDL];
+static u16     bvhBuildTriOrder[BVH_MAX_TRIS_PER_MDL];
+static u8      bvhBuildTriOctants[BVH_MAX_TRIS_PER_MDL];
+static u16     bvhBuildTriScratch[BVH_MAX_TRIS_PER_MDL];
+static u32     bvhBuildNodeCount;
+static u32     bvhBuildTriCount;
+
+// Recursive centroid-based octree build. Each triangle goes into exactly one octant
+// (the one containing its centroid), so there is no triangle duplication. The node
+// AABB is the union of its triangles' AABBs (NOT the octant AABB) — this guarantees
+// that any query which overlaps a triangle also overlaps the triangle's ancestor
+// nodes, so traversal never misses a triangle.
+// triIdxArray is modified in-place: on return it is partitioned by octant so that
+// each child's triangles are contiguous (matches the leaf ranges written to bvhBuildTriOrder).
+static i32 BvhBuildOctree(u16 m, u16* triIdxArray, u32 triCount, u32 depth) {
+    if (triCount == 0) return -1;
+    if (bvhBuildNodeCount >= BVH_MAX_NODES_PER_MDL) depth = BVH_MAX_DEPTH;  // out of node budget -> force leaf
+
+    i32 nodeIdx = bvhBuildNodeCount++;
+    BvhNode* node = &bvhBuildNodes[nodeIdx];
+    node->triStart = 0; node->triCount = 0;
+    for (int i = 0; i < 8; i++) node->children[i] = -1;
+
+    // Compute node AABB = union of triangle AABBs (also needed for centroid computation)
+    V3 mn = {1e9f, 1e9f, 1e9f}, mx = {-1e9f, -1e9f, -1e9f};
+    for (u32 i = 0; i < triCount; i++) {
+        u32 triIdx = triIdxArray[i];
+        u32 i0 = modelTriangles[m][triIdx*3+0], i1 = modelTriangles[m][triIdx*3+1], i2 = modelTriangles[m][triIdx*3+2];
+        const float* v0 = (const float*)(modelVertices[m] + (size_t)i0*CPU_VRT_SZ);
+        const float* v1 = (const float*)(modelVertices[m] + (size_t)i1*CPU_VRT_SZ);
+        const float* v2 = (const float*)(modelVertices[m] + (size_t)i2*CPU_VRT_SZ);
+        mn.x = vmin(mn.x, vmin(vmin(v0[0], v1[0]), v2[0]));
+        mn.y = vmin(mn.y, vmin(vmin(v0[1], v1[1]), v2[1]));
+        mn.z = vmin(mn.z, vmin(vmin(v0[2], v1[2]), v2[2]));
+        mx.x = vmax(mx.x, vmax(vmax(v0[0], v1[0]), v2[0]));
+        mx.y = vmax(mx.y, vmax(vmax(v0[1], v1[1]), v2[1]));
+        mx.z = vmax(mx.z, vmax(vmax(v0[2], v1[2]), v2[2]));
+    }
+    node->mn = mn; node->mx = mx;
+
+    // Leaf condition: max depth reached, few triangles, or no node budget left for children
+    if (depth >= BVH_MAX_DEPTH || triCount <= BVH_LEAF_MAX_TRIS || bvhBuildNodeCount + 8 > BVH_MAX_NODES_PER_MDL) {
+        u32 startIdx = bvhBuildTriCount;
+        for (u32 i = 0; i < triCount && bvhBuildTriCount < BVH_MAX_TRIS_PER_MDL; i++) {
+            bvhBuildTriOrder[bvhBuildTriCount++] = triIdxArray[i];
+        }
+        node->triStart = startIdx;
+        node->triCount = (u16)triCount;
+        return nodeIdx;
+    }
+
+    // Centroid-based octant assignment
+    V3 center = V3_ScaleByF(V3_AplusB(mn, mx), 0.5f);
+    u32 octantCounts[8] = {0};
+    for (u32 i = 0; i < triCount; i++) {
+        u32 triIdx = triIdxArray[i];
+        u32 i0 = modelTriangles[m][triIdx*3+0], i1 = modelTriangles[m][triIdx*3+1], i2 = modelTriangles[m][triIdx*3+2];
+        const float* v0 = (const float*)(modelVertices[m] + (size_t)i0*CPU_VRT_SZ);
+        const float* v1 = (const float*)(modelVertices[m] + (size_t)i1*CPU_VRT_SZ);
+        const float* v2 = (const float*)(modelVertices[m] + (size_t)i2*CPU_VRT_SZ);
+        V3 centroid = {(v0[0]+v1[0]+v2[0])*(1.0f/3.0f), (v0[1]+v1[1]+v2[1])*(1.0f/3.0f), (v0[2]+v1[2]+v2[2])*(1.0f/3.0f)};
+        u8 oct = 0;
+        if (centroid.x >= center.x) oct |= 1;
+        if (centroid.y >= center.y) oct |= 2;
+        if (centroid.z >= center.z) oct |= 4;
+        bvhBuildTriOctants[i] = oct;
+        octantCounts[oct]++;
+    }
+
+    // Compute per-octant start offsets in scratch
+    u32 octantStarts[8];
+    u32 total = 0;
+    for (int o = 0; o < 8; o++) { octantStarts[o] = total; total += octantCounts[o]; }
+
+    // Partition triangles into scratch (stable per-octant)
+    u32 octantFill[8] = {0};
+    for (u32 i = 0; i < triCount; i++) {
+        u8 o = bvhBuildTriOctants[i];
+        bvhBuildTriScratch[octantStarts[o] + octantFill[o]++] = triIdxArray[i];
+    }
+    // Copy back to triIdxArray (now partitioned by octant, each octant contiguous)
+    for (u32 i = 0; i < triCount; i++) {
+        triIdxArray[i] = bvhBuildTriScratch[i];
+    }
+
+    // Recurse into each non-empty octant. The scratch arrays are reused at each depth
+    // because we have already copied the partitioned data back to triIdxArray.
+    for (int o = 0; o < 8; o++) {
+        if (octantCounts[o] == 0) continue;
+        i32 childIdx = BvhBuildOctree(m, triIdxArray + octantStarts[o], octantCounts[o], depth + 1);
+        if (childIdx >= 0) node->children[o] = (i16)childIdx;
+    }
+
+    // If every child failed (e.g., ran out of node budget), collapse this node into a leaf
+    bool anyChild = false;
+    for (int o = 0; o < 8; o++) {
+        if (node->children[o] >= 0) { anyChild = true; break; }
+    }
+    if (!anyChild) {
+        u32 startIdx = bvhBuildTriCount;
+        for (u32 i = 0; i < triCount && bvhBuildTriCount < BVH_MAX_TRIS_PER_MDL; i++) {
+            bvhBuildTriOrder[bvhBuildTriCount++] = triIdxArray[i];
+        }
+        node->triStart = startIdx;
+        node->triCount = (u16)triCount;
+    }
+    return nodeIdx;
+}
+
+static void BuildModelBVH(u16 m) {
+    if (m >= mdlsCnt || m >= MAX_MDLS) return;
+    modelBVHNodes[m] = NULL;
+    modelBVHTriOrder[m] = NULL;
+    modelBVHNodeCounts[m] = 0;
+    modelBVHTriOrderCounts[m] = 0;
+
+    u32 triCount = modelTriangleCounts[m];
+    if (triCount == 0 || triCount > BVH_MAX_TRIS_PER_MDL) return;  // too many tris -> skip BVH (linear fallback)
+    if (!modelVertices[m] || !modelTriangles[m]) return;
+
+    bvhBuildNodeCount = 0;
+    bvhBuildTriCount = 0;
+
+    // Initial triangle index list (separate from bvhBuildTriScratch which is used inside the recursion)
+    u16* initialTris = (u16*)OS_Alloc(triCount * sizeof(u16));
+    if (!initialTris) return;
+    for (u32 i = 0; i < triCount; i++) initialTris[i] = (u16)i;
+
+    i32 rootIdx = BvhBuildOctree(m, initialTris, triCount, 0);
+    OS_Free(initialTris, triCount * sizeof(u16));
+
+    if (rootIdx < 0 || bvhBuildNodeCount == 0) return;
+
+    // Allocate persistent storage and copy out of the build scratch
+    modelBVHNodes[m] = (BvhNode*)OS_Alloc(bvhBuildNodeCount * sizeof(BvhNode));
+    if (!modelBVHNodes[m]) return;
+    mcpy(modelBVHNodes[m], bvhBuildNodes, bvhBuildNodeCount * sizeof(BvhNode));
+    modelBVHNodeCounts[m] = bvhBuildNodeCount;
+
+    if (bvhBuildTriCount > 0) {
+        modelBVHTriOrder[m] = (u16*)OS_Alloc(bvhBuildTriCount * sizeof(u16));
+        if (modelBVHTriOrder[m]) {
+            mcpy(modelBVHTriOrder[m], bvhBuildTriOrder, bvhBuildTriCount * sizeof(u16));
+            modelBVHTriOrderCounts[m] = bvhBuildTriCount;
+        }
+    }
+}
+
+static void BuildAllBVHs(void) {
+    if (mdlsCnt == 0) return;
+    modelBVHNodes = (BvhNode**)OS_Alloc(mdlsCnt * sizeof(BvhNode*));
+    modelBVHTriOrder = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
+    for (u32 m = 0; m < mdlsCnt; m++) {
+        modelBVHNodes[m] = NULL;
+        modelBVHTriOrder[m] = NULL;
+    }
+    for (u16 m = 0; m < mdlsCnt; m++) {
+        BuildModelBVH(m);
+    }
+    u32 totalNodes = 0, totalTris = 0, bvhsBuilt = 0;
+    for (u16 m = 0; m < mdlsCnt; m++) {
+        if (modelBVHNodeCounts[m]) { bvhsBuilt++; totalNodes += modelBVHNodeCounts[m]; totalTris += modelBVHTriOrderCounts[m]; }
+    }
+    DualLog("BVH: %u models, %u nodes, %u tri-refs\n", bvhsBuilt, totalNodes, totalTris);
+}
+
+// ---- BVH traversal helpers (used by physics.c and ray.c) ----
+
+// Transform a local-space AABB to a world-space AABB (smallest world AABB containing
+// the transformed local AABB). Uses the column-major 4x4 matrix mx layout:
+//   col0 = mx[0..2], col1 = mx[4..6], col2 = mx[8..10], translation = mx[12..14]
+// For an affine M = T*R*S, the world AABB half-extents are sum_j(|R[i][j]| * S[j] * localHalf[j])
+// = sum_j(|M[i][j]| * localHalf[j]), and the center is M * localCenter.
+static inline void BvhNodeWorldAABB(const BvhNode* node, const float* mx, V3* wMn, V3* wMx) {
+    float m00=mx[0], m10=mx[1], m20=mx[2];
+    float m01=mx[4], m11=mx[5], m21=mx[6];
+    float m02=mx[8], m12=mx[9], m22=mx[10];
+    float tx=mx[12], ty=mx[13], tz=mx[14];
+    V3 lc = V3_ScaleByF(V3_AplusB(node->mn, node->mx), 0.5f);
+    V3 lh = V3_ScaleByF(V3_AsubB(node->mx, node->mn), 0.5f);
+    V3 wc = {m00*lc.x + m01*lc.y + m02*lc.z + tx, m10*lc.x + m11*lc.y + m12*lc.z + ty, m20*lc.x + m21*lc.y + m22*lc.z + tz};
+    V3 wh = {vabs(m00)*lh.x + vabs(m01)*lh.y + vabs(m02)*lh.z,
+             vabs(m10)*lh.x + vabs(m11)*lh.y + vabs(m12)*lh.z,
+             vabs(m20)*lh.x + vabs(m21)*lh.y + vabs(m22)*lh.z};
+    *wMn = V3_AsubB(wc, wh);
+    *wMx = V3_AplusB(wc, wh);
+}
+
+// Sphere-vs-AABB overlap test (inclusive on boundary so tangent spheres are not culled)
+static inline bool BvhSphereAABBOverlap(V3 sc, float sr, V3 mn, V3 mx) {
+    V3 cl = {vclamp(sc.x, mn.x, mx.x), vclamp(sc.y, mn.y, mx.y), vclamp(sc.z, mn.z, mx.z)};
+    V3 d = V3_AsubB(sc, cl);
+    return V3_dot(d, d) <= sr * sr;
+}
+
+// AABB-vs-AABB overlap test
+static inline bool BvhAABBOverlap(V3 aMn, V3 aMx, V3 bMn, V3 bMx) {
+    return (aMx.x >= bMn.x && aMn.x <= bMx.x &&
+            aMx.y >= bMn.y && aMn.y <= bMx.y &&
+            aMx.z >= bMn.z && aMn.z <= bMx.z);
+}
+
+// Ray-vs-AABB slab test. Returns entry t (>=0) if the ray hits the AABB within [0, maxDist],
+// or -1.0f if no hit. Handles axis-aligned rays (zero direction component) correctly.
+static inline float BvhRayAABBHit(V3 origin, V3 dir, V3 mn, V3 mx, float maxDist) {
+    float tmin = 0.0f, tmax = maxDist;
+    // X slab
+    if (vabs(dir.x) < 1e-8f) { if (origin.x < mn.x || origin.x > mx.x) return -1.0f; }
+    else {
+        float inv = 1.0f / dir.x;
+        float t1 = (mn.x - origin.x) * inv, t2 = (mx.x - origin.x) * inv;
+        if (t1 > t2) { float t = t1; t1 = t2; t2 = t; }
+        if (t1 > tmin) tmin = t1;
+        if (t2 < tmax) tmax = t2;
+        if (tmin > tmax) return -1.0f;
+    }
+    // Y slab
+    if (vabs(dir.y) < 1e-8f) { if (origin.y < mn.y || origin.y > mx.y) return -1.0f; }
+    else {
+        float inv = 1.0f / dir.y;
+        float t1 = (mn.y - origin.y) * inv, t2 = (mx.y - origin.y) * inv;
+        if (t1 > t2) { float t = t1; t1 = t2; t2 = t; }
+        if (t1 > tmin) tmin = t1;
+        if (t2 < tmax) tmax = t2;
+        if (tmin > tmax) return -1.0f;
+    }
+    // Z slab
+    if (vabs(dir.z) < 1e-8f) { if (origin.z < mn.z || origin.z > mx.z) return -1.0f; }
+    else {
+        float inv = 1.0f / dir.z;
+        float t1 = (mn.z - origin.z) * inv, t2 = (mx.z - origin.z) * inv;
+        if (t1 > t2) { float t = t1; t1 = t2; t2 = t; }
+        if (t1 > tmin) tmin = t1;
+        if (t2 < tmax) tmax = t2;
+        if (tmin > tmax) return -1.0f;
+    }
+    return tmin;
+}
+
+// Returns true if this model has a usable BVH (root node exists)
+static inline bool BvhHasBVH(u16 m) {
+    return (m < MAX_MDLS && modelBVHNodeCounts[m] && modelBVHNodes[m] != NULL);
+}
+
 void LoadModels() {
     double startModelTime = get_time();
     ModelDataParser mp = {0};
@@ -246,6 +514,7 @@ void LoadModels() {
     }
     glBindBuffer(GL_ARRAY_BUFFER,0); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0); glFlush(); glFinish();
     OS_Free(arena_base,arena); OS_Free(mp.entries,mp.count * sizeof(ModelData));
+    BuildAllBVHs();  // Build per-model octree BVH (max 3 levels) in local model space for physics/ray acceleration
     DualLog(" vertices: %u, tris: %u, %f secs\n",tv,tt,get_time() - startModelTime);
     DebugRAM("After LoadModels");
 }
