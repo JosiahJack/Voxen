@@ -526,10 +526,10 @@ static bool AICanAttack(u16 selfIdx, float dsq, u8 type, float* rangeToEnemy) {
 
     *rangeToEnemy = DistToEnemy(selfIdx,self->enemy);
     if (*rangeToEnemy >= dsq) return false;
-    AttackType att = type == 3 ? npcTable[self->index - 419].attackType3 : (type == 2 ? npcTable[self->index - 419].attackType2 : npcTable[self->index - 419].attackType);
-    if (att == AttackType_None) return false;
+    AttType att = type == 3 ? npcTable[self->index - 419].attackType3 : (type == 2 ? npcTable[self->index - 419].attackType2 : npcTable[self->index - 419].attackType);
+    if (att == Att_None) return false;
     if (type == 3) {
-        if (*rangeToEnemy < 7.0f && att == AttackType_ProjectileLaunched) {
+        if (*rangeToEnemy < 7.0f && att == Att_Ball) {
             int p = npcTable[self->index - 419].projectile3Prefab;
             if (p == 370 || p == 372 || p == 387 || p == 404) return false;
         }
@@ -817,12 +817,12 @@ static void AIExplodeAttack(Entity* self) {
     self->health = 0.0f; // Self-destruct
 }
 
-static void AIMakeAttack(Entity* self, AttackType att, int ind) {
+static void AIMakeAttack(Entity* self, AttType att, int ind) {
     if (ind < 1 || ind > 3) ind = 1; // Melee hitscan by default.
     switch (att) {
-        case AttackType_Melee:              ProjectileRaycast(self,ind);  break;
-        case AttackType_Projectile:         ProjectileRaycast(self,ind);  World.fogFac += 1; break;
-        case AttackType_ProjectileLaunched: ProjectileLaunched(self,ind); World.fogFac += 1; break;
+        case Att_Melee:              ProjectileRaycast(self,ind);  break;
+        case Att_HitS:         ProjectileRaycast(self,ind);  World.fogFac += 1; break;
+        case Att_Ball: ProjectileLaunched(self,ind); World.fogFac += 1; break;
         default: break;
     }
 }

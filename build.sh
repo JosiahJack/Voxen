@@ -104,7 +104,7 @@ if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
     LINKER=$CC
     CFLAGS="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe -Wl,-Bstatic -lmingw32 -lmingwex"
-    LDFLAGS="$COMMON_LFLAGS -L. -lgdi32 -lole32 -static-libgcc -Xlinker"
+    LDFLAGS="$COMMON_LFLAGS -L. -lgdi32 -lole32 -static-libgcc"
     BINARY_NAME="voxen.exe"
 else
     CC=$LINUX_CC

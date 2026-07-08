@@ -656,12 +656,9 @@ public class PuzzleWire : MonoBehaviour {
 	void PuzzleSolved(bool usedLogicProbe) {
 		actualValue = 1f;
 		slider.value = actualValue;
-		Solved = true;
+		Solved = puzzleWP.puzzleSolved = true;
 		Utils.PlayUIOneShotSavable(46);
-		puzzleWP.puzzleSolved = true;
 		puzzleWP.UseTargets(udSender.owner);
-		if (usedLogicProbe) {
-			MouseLookScript.a.ResetHeldItem();
-		}
+		if (usedLogicProbe) ResetHeldItem();
 	}
 }

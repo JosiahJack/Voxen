@@ -905,20 +905,19 @@ void quat_from_yaw_pitch_roll(Quaternion* q, float yaw_deg, float pitch_deg, flo
     q->w = cy*cp*cr + sy*sp*sr; q->x = cy*sp*cr + sy*cp*sr; /* X-axis (pitch) */ q->y = sy*cp*cr - cy*sp*sr; /* Y-axis (yaw) */ q->z = cy*cp*sr - sy*sp*cr; /* Z-axis (roll) */ // Skipping quat normalization, not needed
 } 
 
-float cam_pitch,cam_yaw=90.0f,cam_roll;
 void InputCursorPos(WinSyswindow* win, double xpos, double ypos) { // static const float HeadBobRate   = 0.2f, HeadBobAmount = 0.08f,bobTarget = 0.3f; TODO
     if (win->virtualCursorPosX == xpos && win->virtualCursorPosY == ypos) return;
     win->virtualCursorPosX = xpos; win->virtualCursorPosY = ypos; if (!window_has_focus) return;
-    currentMouse_dx = (i32)(xpos - last_mouse_x); currentMouse_dy = (i32)(ypos - last_mouse_y); last_mouse_x = xpos; last_mouse_y = ypos; if (ignore_next_mouse_delta) { ignore_next_mouse_delta = mouseMovementThisFrame = false; return; }
+    World.currentMouse_dx = (i32)(xpos - last_mouse_x); World.currentMouse_dy = (i32)(ypos - last_mouse_y); last_mouse_x = xpos; last_mouse_y = ypos; if (ignore_next_mouse_delta) { ignore_next_mouse_delta = mouseMovementThisFrame = false; return; }
     if ((World.inventoryMode && !Cheats.noHUD) || World.menuActive || World.paused) { // Uses UI baseline resolution 1366x768
-        i32 newX = clamp(World.cursorPosition_x + currentMouse_dx,0,1366); if (newX != World.cursorPosition_x) {mouseMovementThisFrame = true;} World.cursorPosition_x = newX;
-        i32 newY = clamp(World.cursorPosition_y + currentMouse_dy,0, 768); if (newY != World.cursorPosition_y) {mouseMovementThisFrame = true;} World.cursorPosition_y = newY;
+        i32 newX = clamp(World.cursorPosition_x + World.currentMouse_dx,0,1366); if (newX != World.cursorPosition_x) {mouseMovementThisFrame = true;} World.cursorPosition_x = newX;
+        i32 newY = clamp(World.cursorPosition_y + World.currentMouse_dy,0, 768); if (newY != World.cursorPosition_y) {mouseMovementThisFrame = true;} World.cursorPosition_y = newY;
     }
     if (World.paused || World.menuActive || World.inventoryMode) return;
     float s = vclamp((float)Sys_Settings.MouseSensitivity / 100.0f, 0.01f, 1.0f) * 0.2f;
-    cam_yaw += (float)currentMouse_dx * s; if (cam_yaw >= 360.0f) {cam_yaw -= 360.0f;} if (cam_yaw < 0.0f)     {cam_yaw  += 360.0f;}
-    cam_pitch+=(float)currentMouse_dy * s; if (cam_pitch > 89.0f) {cam_pitch = 89.0f;} if (cam_pitch < -89.0f) {cam_pitch = -89.0f;} // Avoid gimbal lock at pure 90deg
-    quat_from_yaw_pitch_roll(&World.rotation[PLAYER1],cam_yaw,cam_pitch,(World.curLev == LEVEL_CYBERSPACE) ? cam_roll : 0.0f);
+    World.cam_yaw += (float)World.currentMouse_dx * s; if (World.cam_yaw >= 360.0f) {World.cam_yaw -= 360.0f;} if (World.cam_yaw < 0.0f)     {World.cam_yaw  += 360.0f;}
+    World.cam_pitch+=(float)World.currentMouse_dy * s; if (World.cam_pitch > 89.0f) {World.cam_pitch = 89.0f;} if (World.cam_pitch < -89.0f) {World.cam_pitch = -89.0f;} // Avoid gimbal lock at pure 90deg
+    quat_from_yaw_pitch_roll(&World.rotation[PLAYER1],World.cam_yaw,World.cam_pitch,(World.curLev == LEVEL_CYBERSPACE) ? World.cam_roll : 0.0f);
 }
 
 void JoystickConnection(WinSysjoystick* js, int e) {
@@ -1027,7 +1026,7 @@ void InputProcessing() {
 }
 
 void SetVSync() { ((WinSyswindow*)window)->context.swapInterval((i32)Sys_Settings.Vsync); }
-void ResetInput() { for (i32 i=0;i<MAX_KEYS;++i) {Sys_Input.keyStates[i].pressed = Sys_Input.keyStates[i].released = false;} for (i32 i=0;i<MAX_MOUSE_BUTTONS;i++) {Sys_Input.mouseButtons[i].pressed = Sys_Input.mouseButtons[i].released = false;} Sys_Input.scrollDelta = 0; currentMouse_dx = currentMouse_dy = 0; } // Can't memset as we want to preserve down state
+void ResetInput() { for (i32 i=0;i<MAX_KEYS;++i) {Sys_Input.keyStates[i].pressed = Sys_Input.keyStates[i].released = false;} for (i32 i=0;i<MAX_MOUSE_BUTTONS;i++) {Sys_Input.mouseButtons[i].pressed = Sys_Input.mouseButtons[i].released = false;} Sys_Input.scrollDelta = 0; World.currentMouse_dx = World.currentMouse_dy = 0; } // Can't memset as we want to preserve down state
 void CenterWindowOnMonitor() {
     int c; WinSysmonitor** monitors = WinSysGetMonitors(&c); if (Sys_Settings.CurrentMonitor > (c - 1)) { Sys_Settings.CurrentMonitor = 0; SaveConfig(); }
     int mx,my; WinSysmonitor* next = monitors[Sys_Settings.CurrentMonitor]; WinSysGetMonitorPos(next,&mx,&my);

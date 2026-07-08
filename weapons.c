@@ -16,13 +16,7 @@ u8 magazinePitchCountForWeapon2[16]={8,0,15,60,0,0,0,12,10,20,0,0,0,100,0,0};
 float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0f,1.5f,2.0f,0.8f,0.8f};
 float recoilForWeapon[16]={1.3f,0.0f,0.1f,0.2f,0.0f,0.0f,0.0f,1.2f,0.8f,0.5f,1.5f,1.0f,0.9f,0.7f,0.0f,0.1f};
 float driftForWeapon[16] = {5.0f,0.0f,15.0f,50.0f,0.0f,0.0f,0.0f,8.0f,3.0f,3.0f,3.0f,12.0f,10.0f,30.0f,0.0f,3.0f};
-AttackType attackTypeForWeapon[16]={
-    AttackType_Projectile, AttackType_EnergyBeam,  AttackType_ProjectileNeedle,     AttackType_Projectile,
-    AttackType_EnergyBeam, AttackType_MeleeEnergy, AttackType_Projectile,           AttackType_Projectile,
-    AttackType_Magnetic,   AttackType_Projectile,  AttackType_ProjectileEnergyBeam, AttackType_ProjectileLaunched,
-    AttackType_Projectile, AttackType_Projectile,  AttackType_EnergyBeam,           AttackType_Tranq
-};
-
+AttType attackTypeForWeapon[16]={Att_HitS,Att_Beam,Att_PjNd,Att_HitS,Att_Beam,Att_MlEg,Att_HitS,Att_HitS,Att_Magn,Att_HitS,Att_PjBm,Att_Ball,Att_HitS,Att_HitS,Att_Beam,Att_Trnq};
 // 	// Internal references
 //     private float hitOffset = 0f;
 //     private float verticalOffset = -0.2f; // For laser beams
@@ -30,10 +24,10 @@ AttackType attackTypeForWeapon[16]={
 //     private float hitscanDistance = 200f;
 //     private float meleescanDistance = 3.2f;
 // 	private float overheatedPercent = 80f;
-//     private float magpulseShotForce = 2.2f;
-//     private float stungunShotForce = 2.2f;
-//     private float railgunShotForce = 5f;
-//     private float plasmaShotForce = 1.5f;
+float magpulseShotForce = 2.2f;
+float stungunShotForce = 2.2f;
+float railgunShotForce = 5.0f;
+float plasmaShotForce = 1.5f;
 // 	private float inventoryModeViewRotateMax = 48f;
 //     private float clipEnd;
 //     private float retval;
@@ -284,9 +278,9 @@ void CheckAttackInput(u16 p) {
         if (World.curLev == LEVEL_CYBERSPACE) { /*FireCyberWeapon();*/ return; }
 
         if (inv->holdingObject && !World.mouseClickHeldOverGUI) { // !Just clicked
-            if (!World.uiIsBlocking) { DropHeldItem(p); return; }
+            if (!World.uiIsBlocking) { DropHeldItem(); return; }
 
-            AddItemToInventory(p,inv->heldObjectIndex,inv->heldObjectCustomIndex); ResetHeldItem(p); return;
+            AddItemToInventory(p,inv->heldObjectIndex,inv->heldObjectCustomIndex); ResetHeldItem(); return;
         }
     }
 
@@ -464,8 +458,8 @@ void WeaponsUpdate(void) {
 // 			}
 // 
 //             damageData.owner = playerCapsule;
-//             damageData.attackType = AttackType.ProjectileLaunched;
-// 			if (!isPulser) damageData.attackType = AttackType.Drill;
+//             damageData.attackType = AttType.ProjectileLaunched;
+// 			if (!isPulser) damageData.attackType = AttType.Drill;
 //             beachball.GetComponent<ProjectileEffectImpact>().dd = damageData;
 //             beachball.GetComponent<ProjectileEffectImpact>().host = playerCapsule;
 //             beachball.World.instances[i].position = playerCamera.World.instances[i].position;
@@ -968,7 +962,7 @@ void WeaponsUpdate(void) {
 // 
 // 			// the only exception
 // 			if (wep16Index == 2 && World.invP1.wepLoadedWithAlternate[World.invP1.weaponCurrent]) {
-// 				damageData.attackType = AttackType.Tranq; // tranquilize the untranquil....yes
+// 				damageData.attackType = AttType.Tranq; // tranquilize the untranquil....yes
 // 			}
 //         }
 // 
@@ -978,7 +972,7 @@ void WeaponsUpdate(void) {
 // 		float tranq = -1f;
 //         if (damageData.other.CompareTag("NPC")) {
 //             damageData.isOtherNPC = true;
-// 			if (damageData.attackType == AttackType.Tranq) {
+// 			if (damageData.attackType == AttType.Tranq) {
 // 				// Using tempHit.transform instead of tempHit.collider.transform to ensure we get overall NPC parent instead of its children.
 // 				AIController taic = damageData.other.GetComponent<AIController>();
 // 				if (taic !=null) {
@@ -1008,7 +1002,7 @@ void WeaponsUpdate(void) {
 // 			damageData.penetration = Const.a.penetrationForWeapon[wep16Index];
 //         }
 //         
-// 		if (damageData.attackType != AttackType.Tranq) damageData.attackType = Const.a.attackTypeForWeapon[wep16Index]; // If check to handle exception setting it above
+// 		if (damageData.attackType != AttType.Tranq) damageData.attackType = Const.a.attackTypeForWeapon[wep16Index]; // If check to handle exception setting it above
 //         damageData.damage = DamageData.GetDamageTakeAmount(damageData);
 //         damageData.owner = playerCapsule;
 // 		damageData.impactVelocity = 80f;
@@ -1069,13 +1063,13 @@ void WeaponsUpdate(void) {
 // 		damageData.penetration = Const.a.penetrationForWeapon[index16];
 // 		damageData.owner = playerCapsule;
 // 		if (isRapier) {
-// 			damageData.attackType = AttackType.MeleeEnergy;
+// 			damageData.attackType = AttType.MeleeEnergy;
 // 			if (PlayerEnergy.a.energy < 4f) {
 // 				// Half pipe
 // 				damageData.damage = Const.a.damagePerHitForWeapon[6] / 2f;
 // 			}
 // 		} else {
-// 			damageData.attackType = AttackType.Melee;
+// 			damageData.attackType = AttType.Melee;
 // 		}
 // 
 // 		UseableObjectUse uou = targ.GetComponent<UseableObjectUse>();
@@ -1238,12 +1232,7 @@ void WeaponsUpdate(void) {
 // 
 //     // Projectile weapons
 //     //-------------------------------------------------------------------------
-//     void FirePlasma(int index16) { FireBeachball(index16,plasmaShotForce,485); }
-//     void FireRailgun(int index16) { FireBeachball(index16,railgunShotForce,484); }
-//     void FireMagpulse(int index16) { FireBeachball(index16,magpulseShotForce,482); }
-//     void FireStungun(int index16) { FireBeachball(index16,stungunShotForce,483); }
-// 
-// 	void FireBeachball(int index16, float shoveForce, int prefabID) {
+// void FireBeachball(int index16, float shoveForce, int prefabID) {
 //         // Create and hurl a beachball-like object.  On the developer
 // 		// commentary they said that the projectiles act like a beachball for
 // 		// collisions with enemies, but act like a baseball for walls/floor to
@@ -1280,6 +1269,11 @@ void WeaponsUpdate(void) {
 //         return retval;
 //     }
 // }
+
+// void FirePlasma(int index16) { FireBeachball(index16,plasmaShotForce,485); }
+// void FireRailgun(int index16) { FireBeachball(index16,railgunShotForce,484); }
+// void FireMagpulse(int index16) { FireBeachball(index16,magpulseShotForce,482); }
+// void FireStungun(int index16) { FireBeachball(index16,stungunShotForce,483); }
 
 // public class WeaponMagazineCounter : MonoBehaviour {
 // 	public Sprite[] indicatorSprites;

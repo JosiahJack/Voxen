@@ -61,7 +61,7 @@ public class InteractablePanel : MonoBehaviour {
 					}
 				}
 
-				MouseLookScript.a.ResetHeldItem();
+				ResetHeldItem();
 
 				// use the target now that we are active
 				UseTargets(gameObject,ud,target);

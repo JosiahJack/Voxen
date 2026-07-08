@@ -25,6 +25,20 @@ void ModEDefsInitAfterLoad(void) { // Global conditions for all entities.  No se
     EDefs[211].cardchunk = EDefs[212].cardchunk = EDefs[213].cardchunk = EDefs[219].cardchunk = EDefs[233].cardchunk = EDefs[242].cardchunk = EDefs[243].cardchunk = EDefs[246].cardchunk = false;
     EDefs[247].cardchunk = EDefs[248].cardchunk = EDefs[249].cardchunk = EDefs[255].cardchunk = EDefs[263].cardchunk = EDefs[264].cardchunk = EDefs[283].cardchunk = EDefs[284].cardchunk = false;
     EDefs[285].cardchunk = EDefs[291].cardchunk = EDefs[298].cardchunk = EDefs[299].cardchunk = EDefs[300].cardchunk = EDefs[301].cardchunk = EDefs[303].cardchunk = EDefs[188].cardchunk = false;
+    for (i32 i = 0; i < MAX_ENTITIES; i++) {        
+        if (!EDefslayer[i]) EDefslayer[i] = L_Default;
+        flag_set(&EDefs[i].entflags,EF_ACTIVE,true); // Individual value setting to allow mods to set custom starting flags themselves. (or here too if they want, tis your oyster).
+        flag_set(&EDefs[i].entflags,EF_RIGIDBODY,IdxIsDynamicObject(EDefs[i].index));
+        if (EDefs[i].cardchunk) {
+            EDefs[i].lodIndex = GEOMETRY_LOD_CARD_MODEL_IDX;
+            EDefscollider[i] = COLTYPE_BOX;
+            EDefscolliderCenter[i].y = 1.32f;
+            EDefscolliderSize[i] = (V3){2.56f,0.08f,2.56f};
+        }
+        
+        EDefs[i].currentFrameFinished = World.pauseRelativeTime + 0.1;
+        if (IdxIsButtonSwitch(EDefs[i].index)) { EDefs[i].lockedMessageLingdex = 193; EDefs[i].tickTime = 1.5; } // ButtonSwitch
+    } // Handle generics up front such that all below can override it.
     // Note that designated initializer method, e.g. { .modelIndex = 178, .texIndex = 0 } method will cause compiler to add the = 0 assignment for every field ballooning binary size to 11mb!  So we do this.  Straightforward and simple:
     /*  0 chunk_black*/                EDefs[  0].modelIndex=178; EDefs[  0].texIndex=0; 
     /*  1 chunk_blocker*/              EDefs[  1].modelIndex=178; EDefs[  1].texIndex=1230;EDefs[  1].normIndex=160; EDefs[  1].specIndex=1230;
@@ -175,12 +189,12 @@ void ModEDefsInitAfterLoad(void) { // Global conditions for all entities.  No se
     /*146 chunk_maint3_1_slice32_rh*/  EDefs[146].modelIndex=245; EDefs[146].texIndex=483;
     /*147 chunk_maint3_1_slice45*/     EDefs[147].modelIndex=247; EDefs[147].texIndex=483;
     /*148 chunk_maint3_1d*/            EDefs[148].modelIndex=243; EDefs[148].texIndex=482; EDefs[148].glowIndex=481;
-    /*149 chunk_med1_1*/               EDefs[149].modelIndex=249; EDefs[149].texIndex=486; EDefs[149].specIndex=1256; EDefs[149].normIndex=1255;
-    /*150 chunk_med1_1_half_top*/      EDefs[150].modelIndex=250; EDefs[150].texIndex=486; EDefs[150].specIndex=1256; EDefs[150].normIndex=1255;
-    /*151 chunk_med1_1_slice128high*/  EDefs[151].modelIndex=251; EDefs[151].texIndex=486; EDefs[151].specIndex=1256; EDefs[151].normIndex=1255;
-    /*152 chunk_med1_1_slice192RH*/    EDefs[152].modelIndex=252; EDefs[152].texIndex=486; EDefs[152].specIndex=1256; EDefs[152].normIndex=1255;
-    /*153 chunk_med1_1_slice256*/      EDefs[153].modelIndex=253; EDefs[153].texIndex=486; EDefs[153].specIndex=1256; EDefs[153].normIndex=1255;
-    /*154 chunk_med1_1d*/              EDefs[154].modelIndex=248; EDefs[154].texIndex=485; EDefs[154].glowIndex=484; EDefs[154].specIndex=1236; EDefs[154].normIndex=1255;
+    /*149 chunk_med1_1*/               EDefs[149].modelIndex=249; EDefs[149].texIndex=486; EDefs[149].specIndex=1256; EDefs[149].normIndex=1255; EDefscollider[149]=COLTYPE_MSH;
+    /*150 chunk_med1_1_half_top*/      EDefs[150].modelIndex=250; EDefs[150].texIndex=486; EDefs[150].specIndex=1256; EDefs[150].normIndex=1255; EDefscollider[150]=COLTYPE_MSH;
+    /*151 chunk_med1_1_slice128high*/  EDefs[151].modelIndex=251; EDefs[151].texIndex=486; EDefs[151].specIndex=1256; EDefs[151].normIndex=1255; EDefscollider[151]=COLTYPE_MSH;
+    /*152 chunk_med1_1_slice192RH*/    EDefs[152].modelIndex=252; EDefs[152].texIndex=486; EDefs[152].specIndex=1256; EDefs[152].normIndex=1255; EDefscollider[152]=COLTYPE_MSH;
+    /*153 chunk_med1_1_slice256*/      EDefs[153].modelIndex=253; EDefs[153].texIndex=486; EDefs[153].specIndex=1256; EDefs[153].normIndex=1255; EDefscollider[153]=COLTYPE_MSH;
+    /*154 chunk_med1_1d*/              EDefs[154].modelIndex=248; EDefs[154].texIndex=485; EDefs[154].glowIndex=484; EDefs[154].specIndex=1236; EDefs[154].normIndex=1255; EDefscollider[154]=COLTYPE_MSH;
     /*155 chunk_med1_2*/               EDefs[155].modelIndex=255; EDefs[155].texIndex=489; EDefs[155].glowIndex=488; EDefs[155].specIndex=1256;
     /*156 chunk_med1_2d*/              EDefs[156].modelIndex=254; EDefs[156].texIndex=487; EDefs[156].specIndex=1256;
     /*157 chunk_med1_3*/               EDefs[157].modelIndex=257; EDefs[157].texIndex=493; EDefs[157].glowIndex=492; EDefs[157].specIndex=1256;
@@ -189,12 +203,12 @@ void ModEDefsInitAfterLoad(void) { // Global conditions for all entities.  No se
     /*160 chunk_med1_5*/               EDefs[160].modelIndex=669; EDefs[160].texIndex=495; EDefs[160].specIndex=1256;
     /*161 chunk_med1_6*/               EDefs[161].modelIndex=259; EDefs[161].texIndex=496; EDefs[161].normIndex=509; EDefs[161].specIndex=1256;
     /*162 chunk_med1_7*/               EDefs[162].modelIndex=262; EDefs[162].texIndex=499; EDefs[162].specIndex=1268; EDefs[162].normIndex=498;
-    /*163 chunk_med1_7_slice14_64*/    EDefs[163].modelIndex=263; EDefs[163].texIndex=499; EDefs[163].specIndex=1268; EDefs[163].normIndex=1254;
-    /*164 chunk_med1_7_slice45_320lh*/ EDefs[164].modelIndex=264; EDefs[164].texIndex=499; EDefs[164].specIndex=1268; EDefs[164].normIndex=1254;
-    /*165 chunk_med1_7_slice45_320rh*/ EDefs[165].modelIndex=265; EDefs[165].texIndex=499; EDefs[165].specIndex=1268; EDefs[165].normIndex=1254;
-    /*166 chunk_med1_7_slice96high*/   EDefs[166].modelIndex=266; EDefs[166].texIndex=499; EDefs[166].specIndex=1268; EDefs[166].normIndex=1254;
-    /*167 chunk_med1_7d*/              EDefs[167].modelIndex=260; EDefs[167].texIndex=497; EDefs[167].specIndex=1269; EDefs[167].normIndex=1270;
-    /*168 chunk_med1_7d_slice128*/     EDefs[168].modelIndex=261; EDefs[168].texIndex=497; EDefs[168].specIndex=1269; EDefs[168].normIndex=1270;
+    /*163 chunk_med1_7_slice14_64*/    EDefs[163].modelIndex=263; EDefs[163].texIndex=499; EDefs[163].specIndex=1268; EDefs[163].normIndex=1254; EDefscollider[163]=COLTYPE_MSH;
+    /*164 chunk_med1_7_slice45_320lh*/ EDefs[164].modelIndex=264; EDefs[164].texIndex=499; EDefs[164].specIndex=1268; EDefs[164].normIndex=1254; EDefscollider[164]=COLTYPE_MSH;
+    /*165 chunk_med1_7_slice45_320rh*/ EDefs[165].modelIndex=265; EDefs[165].texIndex=499; EDefs[165].specIndex=1268; EDefs[165].normIndex=1254; EDefscollider[165]=COLTYPE_MSH;
+    /*166 chunk_med1_7_slice96high*/   EDefs[166].modelIndex=266; EDefs[166].texIndex=499; EDefs[166].specIndex=1268; EDefs[166].normIndex=1254; EDefscollider[166]=COLTYPE_MSH;
+    /*167 chunk_med1_7d*/              EDefs[167].modelIndex=260; EDefs[167].texIndex=497; EDefs[167].specIndex=1269; EDefs[167].normIndex=1270; EDefscollider[167]=COLTYPE_MSH;
+    /*168 chunk_med1_7d_slice128*/     EDefs[168].modelIndex=261; EDefs[168].texIndex=497; EDefs[168].specIndex=1269; EDefs[168].normIndex=1270; EDefscollider[168]=COLTYPE_MSH;
     /*169 chunk_med1_8*/               EDefs[169].modelIndex=268; EDefs[169].texIndex=503; EDefs[169].normIndex=502; EDefs[169].specIndex=1242;
     /*170 chunk_med1_8d*/              EDefs[170].modelIndex=267; EDefs[170].texIndex=501; EDefs[170].normIndex=163; EDefs[170].specIndex=1242;
     /*171 chunk_med1_9*/               EDefs[171].modelIndex=278; EDefs[171].texIndex=507; EDefs[171].normIndex=506; EDefs[171].specIndex=1267;
@@ -202,8 +216,8 @@ void ModEDefsInitAfterLoad(void) { // Global conditions for all entities.  No se
     /*173 unused*/
     /*174 chunk_med1_9d*/              EDefs[174].modelIndex=269; EDefs[174].texIndex=505; EDefs[174].normIndex=504; EDefs[174].specIndex=1267;
     /*175 unused*/
-    /*176 chunk_med1_9d_ofs112_90*/    EDefs[176].modelIndex=270; EDefs[176].texIndex=505; EDefs[176].normIndex=504; EDefs[176].specIndex=1267; EDefscollider[176]=COLTYPE_MSH; EDefs[176].colMeshIndex=270;
-    /*177 chunk_med1_9d_ofs144_90*/    EDefs[177].modelIndex=272; EDefs[177].texIndex=505; EDefs[177].normIndex=504; EDefs[177].specIndex=1267; EDefscollider[177]=COLTYPE_MSH; EDefs[177].colMeshIndex=272;
+    /*176 chunk_med1_9d_ofs112_90*/    EDefs[176].modelIndex=270; EDefs[176].texIndex=505; EDefs[176].normIndex=504; EDefs[176].specIndex=1267; EDefscollider[176]=COLTYPE_MSH;
+    /*177 chunk_med1_9d_ofs144_90*/    EDefs[177].modelIndex=272; EDefs[177].texIndex=505; EDefs[177].normIndex=504; EDefs[177].specIndex=1267; EDefscollider[177]=COLTYPE_MSH;
     /*178 chunk_med2_1*/               EDefs[178].modelIndex=280; EDefs[178].texIndex=513; EDefs[178].specIndex=1254; EDefs[178].glowIndex=511; EDefs[178].normIndex=512;
     /*179 chunk_med2_1_slice32RH*/     EDefs[179].modelIndex=281; EDefs[179].texIndex=513; EDefs[179].normIndex=512; EDefs[179].specIndex=1254;
     /*180 chunk_med2_1d*/              EDefs[180].modelIndex=279; EDefs[180].glowIndex=508; EDefs[180].texIndex=510; EDefs[180].specIndex=1254;
@@ -799,22 +813,6 @@ void ModEDefsInitAfterLoad(void) { // Global conditions for all entities.  No se
     /*765 unused*/
     /*766 unused*/
     /*767 player*/
-    for (i32 i = 0; i < MAX_ENTITIES; i++) {
-        if (EDefs[i].index == U16_MAX) continue;
-        
-        if (!EDefslayer[i]) EDefslayer[i] = L_Default;
-        flag_set(&EDefs[i].entflags,EF_ACTIVE,true); // Individual value setting to allow mods to set custom starting flags themselves. (or here too if they want, tis your oyster).
-        flag_set(&EDefs[i].entflags,EF_RIGIDBODY,IdxIsDynamicObject(EDefs[i].index));
-        if (EDefs[i].cardchunk) {
-            EDefs[i].lodIndex = GEOMETRY_LOD_CARD_MODEL_IDX;
-            EDefscollider[i] = COLTYPE_BOX;
-            EDefscolliderCenter[i].y = 1.44f;
-            EDefscolliderSize[i] = (V3){2.56f,0.32f,2.56f};
-        }
-        
-        EDefs[i].currentFrameFinished = World.pauseRelativeTime + 0.1;
-        if (IdxIsButtonSwitch(EDefs[i].index)) { EDefs[i].lockedMessageLingdex = 193; EDefs[i].tickTime = 1.5; } // ButtonSwitch
-    }
 }
 
 void InitializeAIAfterLoad(u16 i);
@@ -839,8 +837,11 @@ u16 AddInstance(u16 entIdx, V3 pos) {
     World.instances[i].kinematic = EDefs[entIdx].kinematic;
     flag_set(&World.instances[i].entflags,EF_RIGIDBODY,EDefs[entIdx].entflags & EF_RIGIDBODY);
     flag_set(&World.instances[i].entflags,EF_NO_SHADOWS,EDefs[entIdx].entflags & EF_NO_SHADOWS);
-    World.collider[i] = EDefscollider[entIdx]; World.colliderCenter[i] = EDefscolliderCenter[entIdx]; World.colliderSize[i] = EDefscolliderSize[entIdx];
-    World.mass[i] = EDefsmass[entIdx] > 0.0f ? EDefsmass[entIdx] : 1.0f; World.angularDrag[i] = EDefsangularDrag[entIdx] > 0.0f ? EDefsangularDrag[entIdx] : 0.05f;
+    World.collider[i] = EDefscollider[entIdx];
+    World.colliderCenter[i] = EDefscolliderCenter[entIdx];
+    World.colliderSize[i] = EDefscolliderSize[entIdx];
+    World.mass[i] = EDefsmass[entIdx] > 0.0f ? EDefsmass[entIdx] : 1.0f;
+    World.angularDrag[i] = EDefsangularDrag[entIdx] > 0.0f ? EDefsangularDrag[entIdx] : 0.05f;
     World.gravity[i] = EDefsgravity[entIdx] > 0.0f ? EDefsgravity[entIdx] : 1.0f;
     World.instances[i].lockedMessageLingdex = EDefs[entIdx].lockedMessageLingdex;
     World.instCount++;
@@ -1234,5 +1235,5 @@ void LoadGame(u8 slot) {
     }
     OS_Free(compBuffer, header.compressedSize);
     OS_Close(fd);
-    for (int i=0;i<loadedLights;++i) { flag_set(&lights[i].lflags,LDIRTY,true); }
+    for (int i=0;i<World.loadedLights;++i) { flag_set(&World.lights[i].lflags,LDIRTY,true); }
 }

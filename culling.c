@@ -260,7 +260,7 @@ void DetermineVisibleCells(i32 startX, i32 startZ) {
 
 void PortalCulling() { // Called just once at end of animation loop for the frame after each frame perfect change to door models becoming either closed or not closed.
     bool previousLightVisible[LIGHT_COUNT]; mset(previousLightVisible,false,LIGHT_COUNT * sizeof(bool));
-    for (u16 i=0;i<loadedLights;++i) { u16 lcell = (lights[i].pos.z * WORLDX) + lights[i].pos.x; if (gridCellStates[lcell] & CELL_VISIBLE) {previousLightVisible[i]=true;} }
+    for (u16 i=0;i<World.loadedLights;++i) { u16 lcell = (World.lights[i].pos.z * WORLDX) + World.lights[i].pos.x; if (gridCellStates[lcell] & CELL_VISIBLE) {previousLightVisible[i]=true;} }
     for (u8 portalIdx=0;portalIdx<MAX_PORTALS;++portalIdx) {
         Portal* prt = &activePortals[portalIdx]; if (!prt->dirty) continue;
         prt->dirty = false;
@@ -274,7 +274,7 @@ void PortalCulling() { // Called just once at end of animation loop for the fram
         }
     }
     DetermineVisibleCells(PosGetCellCoordX(World.position[PLAYER1].x),PosGetCellCoordZ(World.position[PLAYER1].z)); // Recompute full PVS with new closed edges for all portal states.  So much for the precomputed set.
-    for (u16 i=0;i<loadedLights;++i) { u16 lcell=(lights[i].pos.z * WORLDX) + lights[i].pos.x; if (!previousLightVisible[i] && (gridCellStates[lcell] & CELL_VISIBLE)) {flag_set(&lights[i].lflags,LDIRTY,true);} }
+    for (u16 i=0;i<World.loadedLights;++i) { u16 lcell=(World.lights[i].pos.z * WORLDX) + World.lights[i].pos.x; if (!previousLightVisible[i] && (gridCellStates[lcell] & CELL_VISIBLE)) {flag_set(&World.lights[i].lflags,LDIRTY,true);} }
     glBindBuffer(GL_SSBO,cellVisibleDataID); glBufferData(GL_SSBO,ARRSIZE * sizeof(u32),gridCellStates,GL_DYNAMIC_DRAW);
 }
 

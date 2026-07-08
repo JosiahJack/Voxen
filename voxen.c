@@ -122,23 +122,19 @@ u32 inputImageID,inputUIID,inputDepthID,inputWorldPosID,inputSpecID,inputNormalI
 static float berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
 float modelMatrices[INSTANCE_COUNT*16];
 bool mouseMovementThisFrame,window_has_focus,ignore_next_mouse_delta,returnToPause=false,fovSliderActive=false,gammaSliderActive=false,masterVolumeSliderActive=false,musicVolumeSliderActive=false,messageVolumeSliderActive=false,sfxVolumeSliderActive=false,enteringPlayerName=false;
-i32 currentMouse_dx,currentMouse_dy; u8 currentPlayerNameLength=0; i8 currentMenuItem=0, currentMenuTab=0, menuItemCount=4, menuTabCount=1; static int threadCnt=0; static u32 globalframe=0,globalframesPerLastSecond;
+u8 currentPlayerNameLength=0; i8 currentMenuItem=0, currentMenuTab=0, menuItemCount=4, menuTabCount=1; static int threadCnt=0; static u32 globalframe=0,globalframesPerLastSecond;
 #define CHECK_GL_ERROR() do { u32 err = glGetError(); if (err != 0) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
 #define SHADOW_MAP_SIZE 128u
 #define MAX_SHADOWMAPS 128u
 #define NEAR_PLANE (0.02f)
 #define ONE_OVER_SQRT2 0.70710678118f
 InputSystem Sys_Input; CheatsSystem Cheats = {.god=false,.noclip=false,.showLocation=true,.showFPS=true,.editMode=false,.showPhys=false};
-Light lights[LIGHT_COUNT]; static u16 loadedLights = 0; LightAnimation lanims[LIGHT_COUNT]; static bool shadowBuffersCreated = false;
+static bool shadowBuffersCreated = false;
 typedef struct { V3 position; Quaternion rotation; u8 fov; u16 width,height; float near,far,finished; bool visible; } CamView; // Max is 8 cam views on level 8 + 3 sensaround views = 11.
 CamView camViews[64]; u32 camViewTextures[64]; u8 camViewCount = 0;
-// Per-level cached lights/camViews storage.  Populated once by LoadLevelData() during LoadAllLevels()
-// at startup, then copied into the active globals (lights[]/camViews[]/etc.) by LoadLevel() on each
-// level switch.  This keeps the active-level globals intact for all existing call sites while still
-// allowing instant level switches with no disk I/O.
-Light levelLights[MAX_LEVELS][LIGHT_COUNT];
-LightAnimation levelLAnims[MAX_LEVELS][LIGHT_COUNT];
-u16 levelLoadedLights[MAX_LEVELS];
+// Per-level camViews storage (file-scope; camViews are not yet pointer-swapped into World struct).
+// Lights/lanims/lightsNewPosition are now pointer-swapped via World.levelLights[] in GlobalContext.
+
 CamView levelCamViews[MAX_LEVELS][64];
 u8 levelCamViewCount[MAX_LEVELS];
 // (camViewTextures are GPU handles; they are generated once per level by AddCamView during LoadLevelData
@@ -151,17 +147,19 @@ static const u8 Mpg_FrontPage=0,Mpg_Singleplayer=1,Mpg_Multiplayer=2,Mpg_NewGame
 typedef struct {int w,h;} ResMode; ResMode resModes[8];
 extern Entity EDefs[MAX_ENTITIES];
 #include "lib.c" // LibC Replacements and Helpers
-void TurnLightOff(u16 litIdx) { if (litIdx < loadedLights) {flag_set(&lights[litIdx].lflags,LIGHTON,false);} }
+void TurnLightOff(u16 litIdx) { if (litIdx < World.loadedLights) {flag_set(&World.lights[litIdx].lflags,LIGHTON,false);} }
 typedef struct { float x,y,z,r,g,b,a; } DebugLineVertex;
 DebugLineVertex debugLineVerts[MAX_WIRELINE_VRTS * 2];
 INLINE void DrawDebugLines(float* viewProj) {
     if (World.debugLineVertCount == 0) {return;}
+    
     glBindBuffer(GL_ARRAY_BUFFER,debugLinesVBO); glBufferSubData(GL_ARRAY_BUFFER,0,World.debugLineVertCount * sizeof(DebugLineVertex),debugLineVerts); glUseProgram(debugUnlitSP); glUniformMatrix4fv(0,1,GL_FALSE,viewProj); glLineWidth(1.0f); glDisable(GL_DEPTH_TEST); glBindVertexArray(debugLinesVAO); 
     glDrawArrays(0x0001/*GL_LINES*/,0,World.debugLineVertCount); drawCalls++; vertsRendered += World.debugLineVertCount; glEnable(GL_DEPTH_TEST); World.debugLineVertCount = 0;
 }
 
 void AddWireLine(V3 start, V3 end, Color col) {
     if (World.debugLineVertCount >= MAX_WIRELINE_VRTS - 2) return;
+    
     int i = World.debugLineVertCount;
     debugLineVerts[i].x = start.x; debugLineVerts[i].y = start.y; debugLineVerts[i].z = start.z;
     debugLineVerts[i].r = col.r; debugLineVerts[i].g = col.g; debugLineVerts[i].b = col.b; debugLineVerts[i].a = col.a; i++;
@@ -225,8 +223,6 @@ bool InventoryAddSoftwareItem(u16 p, u16 type, int vers);
 int Get16WeaponIndexFromConstIndex(int index);
 void UseGrenade(u16 playerIndex, int index);
 bool AICheckPain(u16);
-void ResetHeldItem(u16 p);
-void DropHeldItem(u16 p);
 void AddItemToInventory(u16 p, int index, int customIndex);
 void TextureSequenceUpdate(u16 self);
 u16 AddInstance(u16 entIdx, V3 pos);
@@ -273,8 +269,9 @@ INLINE u32 CompileShader(u32 type, const char* source, const char* name) { u32 s
 INLINE u32 LinkProgram(u32* s, i32 num, const char* name) { u32 p = glCreateProgram(); for (i32 i=0;i<num;++i) { glAttachShader(p,s[i]); } glLinkProgram(p); i32 ok; glGetProgramiv(p,0x8B82/*GL_LINK_STATUS*/,&ok); if (!ok) ShaderError(p,name); return p; }
 u32 CompileAnyShader(const char* v, const char* s, const char* name) { return (v) ? LinkProgram((u32[]){CompileShader(0x8B31/*GL_VERTEX_SHADER*/,v,name),CompileShader(0x8B30/*GL_FRAGMENT_SHADER*/,s,name)},2,name) : LinkProgram((u32[]){CompileShader(0x91B9/*GL_COMPUTE_SHADER*/,s,name)},1,name); }
 void CompileShaders() {
-    depthPrepassSP=CompileAnyShader(depthPrepassVertSrc,depthPrepassFragSrc,"DPre"); chunkSP=CompileAnyShader(vertSrc,fragSrc,"Main"); uiSP=CompileAnyShader(vertUISrc,fragUISrc,"UI"); debugUnlitSP=CompileAnyShader(debugUnlitVertSrc,debugUnlitFragSrc,"Ln"); shadowmapsSP=CompileAnyShader(shadowmapVertSrc,shadowmapFragSrc,"Shad");
-    textSP=CompileAnyShader(textVertSrc,textFragSrc,"Txt"); imageBlitSP=CompileAnyShader(quadVertSrc,quadFragSrc,"Comp"); ssrSP=CompileAnyShader(NULL,ssrCSSrc,"SSR"); voxelUpdateSP=CompileAnyShader(NULL,voxUpdCSSrc,"Vox"); shadowmapsClearSP=CompileAnyShader(NULL,shadClearCSSrc,"ShadCl");
+    depthPrepassSP=CompileAnyShader(depthPrepassVertSrc,depthPrepassFragSrc,"DPre"); chunkSP=CompileAnyShader(vertSrc,fragSrc,"Main"); uiSP=CompileAnyShader(vertUISrc,fragUISrc,"UI"); debugUnlitSP=CompileAnyShader(debugUnlitVertSrc,debugUnlitFragSrc,"Ln");
+    shadowmapsSP=CompileAnyShader(shadowmapVertSrc,shadowmapFragSrc,"Shad"); textSP=CompileAnyShader(textVertSrc,textFragSrc,"Txt"); imageBlitSP=CompileAnyShader(quadVertSrc,quadFragSrc,"Comp"); ssrSP=CompileAnyShader(NULL,ssrCSSrc,"SSR"); voxelUpdateSP=CompileAnyShader(NULL,voxUpdCSSrc,"Vox"); 
+    shadowmapsClearSP=CompileAnyShader(NULL,shadClearCSSrc,"ShadCl");
 }
 
 u32 MakeSSBO(u32* id, u32 bindx, size_t sz, const void* d, u32 typ) { glGenBuffers(1,id); glBindBuffer(GL_SSBO,*id); glBufferData(GL_SSBO,sz,d,typ); glBindBufferBase(GL_SSBO,bindx,*id); return *id; }
@@ -362,7 +359,7 @@ bool UI_Slider(i16 x, i16 y, i16 w, i16 h, i16 sliderPos, i16 xPosForLabel, u8 c
     RenderUIImage(x,y, w,h, 1079); // Slider background
     RenderUIImage(x + sliderPos,y, h,h,1078); // Slider handle
     if (UI_Interactable(xPosForLabel,y,xPosForLabel + w,h,&over,mindex,true)) *sliderActive = true;
-    if (*sliderActive && currentMouse_dx != 0) { i32 new = (i32)currentValue + vmin(vmax(currentMouse_dx,-1),1); *out = (u8)vmin(vmax(new,min),max); if (*out != currentValue) {changed = true;} }
+    if (*sliderActive && World.currentMouse_dx != 0) { i32 new = (i32)currentValue + vmin(vmax(World.currentMouse_dx,-1),1); *out = (u8)vmin(vmax(new,min),max); if (*out != currentValue) {changed = true;} }
     if (!AnyLeftRightMouseDown()) { if (*sliderActive) { *sliderActive = false; SaveConfig(); } }
     if (MenuEnter() && currentMenuItem == mindex) {
         bool shiftHeld = Sys_Input.keyStates[KEY_LEFT_SHIFT].down || Sys_Input.keyStates[KEY_RIGHT_SHIFT].down;
@@ -604,7 +601,7 @@ static double RenderUI() {
     i16 lineSpacing = 18;
     if (!World.menuActive && !Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 1),T_WHITE,FONT_NORMAL,1.0f,"playerCellIdx: %u, Shadow cpu ms: %.3f",playerCellIdx,shadowTime * 1000);
     if (!World.menuActive && !Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 2),T_WHITE,FONT_NORMAL,1.0f,"Player velocity: %.2f, %.2f, %.2f, Grounded: %u",World.velocity[PLAYER1].x,World.velocity[PLAYER1].y,World.velocity[PLAYER1].z,World.instances[PLAYER1].entflags & EF_GROUNDED);
-    RenderFormattedText(16,debugTextStartY + (lineSpacing * 4),T_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d  dx:%d dy:%d",World.cursorPosition_x,World.cursorPosition_y,currentMouse_dx,currentMouse_dy);
+    RenderFormattedText(16,debugTextStartY + (lineSpacing * 4),T_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d  dx:%d dy:%d",World.cursorPosition_x,World.cursorPosition_y,World.currentMouse_dx,World.currentMouse_dy);
     if (Cheats.consoleActive) RenderFormattedText(16,0,T_WHITE,FONT_NORMAL,1.0f, "] %s",consoleEntryText);
     if (World.statusTextDecayFinished > World.current_time) RenderFormattedText(460,114,T_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
     double time_now = get_time();
@@ -641,11 +638,11 @@ static __attribute__((hot)) void RenderShadowmaps() {
     mset(candidates,0,MAX_SHADOWMAPS*sizeof(u16));
     u16 numShadowsCouldRender = 0;
     V3 playerPos = World.position[PLAYER1], pf = World.instances[PLAYER1].forward;
-    for (u16 i = 0; i < loadedLights; ++i) { // Collect candidates: only lights that are enabled and in PVS
-        if (unlikely(!(lights[i].lflags & SHADON) || !(lights[i].lflags & LIGHTON))) continue;
-        V3 lightPos = lights[i].pos;
-        float intensity = lights[i].maxIntensity; /*Much more stable than actual intensity (from fade/flickers).  Since gated by on above, this is fine now.*/ if (unlikely(intensity < 0.1f)) continue;
-        float range =  lights[i].range; float luminosity = (intensity / (range * range)); if (luminosity < 0.008f && (range < 8.0f || intensity < 0.5f)) continue;
+    for (u16 i = 0; i < World.loadedLights; ++i) { // Collect candidates: only lights that are enabled and in PVS
+        if (unlikely(!(World.lights[i].lflags & SHADON) || !(World.lights[i].lflags & LIGHTON))) continue;
+        V3 lightPos = World.lights[i].pos;
+        float intensity = World.lights[i].maxIntensity; /*Much more stable than actual intensity (from fade/flickers).  Since gated by on above, this is fine now.*/ if (unlikely(intensity < 0.1f)) continue;
+        float range =  World.lights[i].range; float luminosity = (intensity / (range * range)); if (luminosity < 0.008f && (range < 8.0f || intensity < 0.5f)) continue;
         u16 cellX = PosGetCellCoordX(lightPos.x), cellZ = PosGetCellCoordZ(lightPos.z);
         int lightCellIdx = (cellZ * WORLDX) + cellX; u8 r = vceil(range * (1.0f / CELL_SIZE));
         bool inPVS = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
@@ -666,8 +663,8 @@ static __attribute__((hot)) void RenderShadowmaps() {
         u16 shadowMapIdx=0,currentModelType=0,currentTexIndex=0; bool currentIsTransparent=0,useDetail=Sys_Settings.ModelDetail;
         for (u32 c = 0; c < numShadowsCouldRender; ++c, ++shadowMapIdx) { // Render top MAX_SHADOWMAPS candidates
             u16 lightIdx = candidates[c];
-            float effectiveRadius = vmin(lights[lightIdx].range,15.36f); u16 nearbyMeshCount = 0; 
-            V3 lpos = lights[lightIdx].pos;
+            float effectiveRadius = vmin(World.lights[lightIdx].range,15.36f); u16 nearbyMeshCount = 0; 
+            V3 lpos = World.lights[lightIdx].pos;
             float cellCenterX=vround(lpos.x / CELL_SIZE) * CELL_SIZE, cellCenterZ=vround(lpos.z / CELL_SIZE) * CELL_SIZE;
             V3 deltaCellCenter = V3_AsubB((V3){lpos.x,0.0f,lpos.z},(V3){cellCenterX,0.0f,cellCenterZ});
             float distToCenterSqrd = V3_dot(deltaCellCenter,deltaCellCenter);
@@ -706,7 +703,7 @@ static __attribute__((hot)) void RenderShadowmaps() {
             }
             shadowmapOffsetHead += (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) * 6;
         }
-        glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); glBindBuffer(GL_SSBO,shadowMapsIndirectionID); glBufferData(GL_SSBO,loadedLights * sizeof(u32),shadowmapIndirectionList,GL_DYNAMIC_DRAW);
+        glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); glBindBuffer(GL_SSBO,shadowMapsIndirectionID); glBufferData(GL_SSBO,World.loadedLights * sizeof(u32),shadowmapIndirectionList,GL_DYNAMIC_DRAW);
     }
     shadowTime = get_time() - shadowStartTime;
 }
@@ -798,7 +795,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glEnable(GL_DEPTH_TEST);
     if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps();
     UpdateLights(); // This is where the voxels get updated!
-    for (int i=0;i<LIGHT_COUNT;++i) flag_set(&lights[i].lflags,LDIRTY,false);
+    for (int i=0;i<LIGHT_COUNT;++i) flag_set(&World.lights[i].lflags,LDIRTY,false);
     glViewport(0,0,swidth,sheight);
     ClearAll();
     glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO);
@@ -808,6 +805,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     DepthSort tmpTransparent[MAX_VISIBLE]; u16 tcnt = 0;
     for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { // Determine base visibility
         if (!DetermineIfInstanceVisible(i,false,skyVisible,playerPos,&distSqrd)) continue;
+        
         if (transparentTexture[World.instances[i].texIndex]) { tmpTransparent[tcnt].index = i; tmpTransparent[tcnt].depth = distSqrd; tcnt++; }
         else { visibleInstances[opaqueCount].index = i; visibleInstances[opaqueCount].depth = distSqrd; opaqueCount++; }
     }
@@ -842,10 +840,12 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         u16 i = visibleInstances[visibleIndex].index;
         Entity* e = &World.instances[i]; u16 tex = e->texIndex; u32 constIndex = e->index;
         if (transparentTexture[tex]) continue;
+        
         else if (doubleSidedTexture[tex] || World.scale[i].x < 0.0f || World.scale[i].y < 0.0f || World.scale[i].z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided (either)
         else { glEnable(GL_CULL_FACE); glDisable(GL_BLEND); } // Opaque
         DRAW_ENTITY(currentNormIndex,currentTexIndex,currentGlowIndex,currentSpecIndex,currentModelType)
     }
+    
     glDepthMask(1); currentTexIndex = currentNormIndex = currentGlowIndex = currentSpecIndex = currentModelType = 0; // Transparents Pass
     for (u16 visibleIndex = opaqueCount; visibleIndex < (opaqueCount + tcnt); ++visibleIndex) {
         u16 i = visibleInstances[visibleIndex].index;
@@ -853,10 +853,12 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         if (transparentTexture[tex]) { glEnable(GL_CULL_FACE); glEnable(GL_BLEND); } // Transparents (with sort)
         else if (doubleSidedTexture[tex] || World.scale[i].x < 0.0f || World.scale[i].y < 0.0f || World.scale[i].z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided (either)
         else continue; // Opaque
+        
         if ((constIndex >= 561 && constIndex <= 565) || (constIndex >= 568 && constIndex <= 573)) glDepthFunc(0x0202/*GL_EQUAL*/); // Cutouts
         else glDepthFunc(0x0203/*GL_LEQUAL*/); // Actual alphas
         DRAW_ENTITY(currentNormIndex,currentTexIndex,currentGlowIndex,currentSpecIndex,currentModelType)
     }
+    
     if (camView) {
         glBindFramebuffer(0x8CA8/*GL_READ_FRAMEBUFFER*/,gBufferFBO);
         glReadBuffer(GL_COLOR_ATTACHMENT0);
@@ -865,6 +867,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         glBindTexture(GL_TEXTURE_2D,0);
         return; // After copying render result, skip SSR and composite for camviews <<<<<<<<<<<<< CAM VIEW BARRIER
     }
+    
     if (unlikely(World.debugLineVertCount > 1)) DrawDebugLines(viewProj); // Draw Debug Lines
     glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D,inputDepthID);
     if (likely(refOn > 0u)) { // Screen Space Reflections
@@ -877,17 +880,17 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glDisable(GL_CULL_FACE);
     World.last_time = RenderUI();
     if ((World.inventoryMode && !Cheats.noHUD) || World.menuActive || World.paused) RenderUIImage((i16)(World.cursorPosition_x) - 20,(i16)(World.cursorPosition_y) - 20,40,40,GetCursorTexture());
-    else RenderUIImage(663,364,40,40,GetCursorTexture()); // Centered on UI baseline resolution 1366x768
+    else if (!Cheats.noHUD) RenderUIImage(663,364,40,40,GetCursorTexture()); // Centered on UI fixed resolution 1366x768 FBO
     glBindFramebuffer(GL_FRAMEBUFFER,0); glViewport(0,0,swidth,sheight); // Restore normal output size for final composite blit
     glUseProgram(imageBlitSP); glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,inputImageID); glUniform1i(4,4); // outputImage texture sampler2D, don't remember why when active texture is texture 0. meh.... oh maybe to not read and write same binding?
     glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D,inputUIID); glUniform1i(31,1); glUniform1i(32,3); glUniformMatrix4fv(33,1,0,invViewProj);
     double berserkTimeRemainingNormalized = World.invP1.berserkFinishedTime > 0.0001 ? (World.invP1.berserkFinishedTime - World.pauseRelativeTime) / BERSERK_TIME : 0.0;
     if (World.invP1.berserkFinishedTime < World.pauseRelativeTime && World.invP1.berserkFinishedTime > 0.0001) World.invP1.berserkFinishedTime = berserkTimeRemainingNormalized = 0.0;
     glUniform1ui(5,refOn); glUniform1ui(6,Sys_Settings.FXAA); glUniform1f(14,Sys_Settings.FOV); glUniform1f(16,aspect3D); glUniform1ui(22,Sys_Settings.Shadows); glUniform1f(9,(float)berserkTimeRemainingNormalized); glUniform1f(10,berserkSeedTime); glUniform1ui(11,Sys_Settings.Brightness);
-    glUniform3f(12,deg2rad(cam_yaw),deg2rad(cam_pitch),deg2rad(cam_roll)); glUniform3f(13,px,py,pz); glUniform1f(15,(float)World.pauseRelativeTime * 0.1f); glUniform1ui(17,(gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || World.curLev == LEVEL_CYBERSPACE);
+    glUniform3f(12,deg2rad(World.cam_yaw),deg2rad(World.cam_pitch),deg2rad(World.cam_roll)); glUniform3f(13,px,py,pz); glUniform1f(15,(float)World.pauseRelativeTime * 0.1f); glUniform1ui(17,(gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || World.curLev == LEVEL_CYBERSPACE);
     glUniform1ui(18,(gridCellStates[playerCellIdx] & CELL_SEES_SUN) && World.curLev != LEVEL_CYBERSPACE); glUniform1ui(19,((World.curLev >= 10 && World.curLev < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
     u32 shieldOnType = 0u; // No shield green tint.
-    if (World.instances[WORLD].ioflags & Q_SHIELD_ACTIVATED) { if (World.curLev == 6 || World.curLev == 7) {shieldOnType=2u;/*Shielding only below for levels 6+*/ } else if (World.curLev <= 5) {shieldOnType=1u;/*Shielding everywhere*/} }
+    if (World.instances[WORLD].ioflags & Q_SHIELD_ACTIVATED) { if (World.curLev == 6 || World.curLev == 7) {shieldOnType=2u;/*Shielding only below, levels 6+*/ } else if (World.curLev <= 5) {shieldOnType=1u;/*Shielding everywhere*/} }
     glUniform1ui(20,shieldOnType);
     Color painStaticColor = GetPainStaticColor(); glUniform3f(23,painStaticColor.r,painStaticColor.g,painStaticColor.b);
     glUniformMatrix4fv(24,1,0,viewProj);          glUniformMatrix3fv(25,1,0,invViewRot);        glUniform1i(27,0); // Texture 0 for the rendered geometry color buffer
@@ -902,6 +905,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
 
 void RenderCameraViews() { // Render in-world camera views.  Pops player position to elsewhere, renders to tiny fbo, pops player back.
     if (unlikely(World.paused || World.menuActive || camViewCount == 0 || World.curLev >= LEVEL_CYBERSPACE)) return;
+    
     V3 tempPlayerPos = World.position[PLAYER1]; Quaternion tempPlayerRot = World.rotation[PLAYER1];
     for (int cm=0;cm<camViewCount;++cm) {
         if (camViews[cm].finished < World.pauseRelativeTime && camViews[cm].visible) { camViews[cm].finished = World.pauseRelativeTime + 0.5f; World.position[PLAYER1] = camViews[cm].position; World.rotation[PLAYER1] = camViews[cm].rotation; CullCore(); Render(true/*camview*/,cm); }
@@ -912,6 +916,7 @@ void RenderCameraViews() { // Render in-world camera views.  Pops player positio
 
 void UpdateInstanceMatrix4x4s() {
     if (unlikely(World.paused || World.menuActive)) return;
+
     i32 dirtyMin = -1, dirtyMax = -1;
     for (u32 i = INSTS_1ST_IDX; i < World.instCount; i++) {        
         float x=World.rotation[i].x, y=World.rotation[i].y, z=World.rotation[i].z, w=World.rotation[i].w;
@@ -923,7 +928,9 @@ void UpdateInstanceMatrix4x4s() {
         modelMatrices[m+12]=World.position[i].x;     modelMatrices[m+13]=World.position[i].y;     modelMatrices[m+14]=World.position[i].z;      modelMatrices[m+15]=1.0f;
         if (dirtyMin < 0) {dirtyMin = (i32)i;} dirtyMax = (i32)i;
     }
+    
     if (dirtyMin < 0) return;
+    
     glBindBuffer(GL_SSBO,matricesBufferID);
     u32 offsetFloats = (u32)dirtyMin * 16; u32 countFloats  = ((u32)dirtyMax - (u32)dirtyMin + 1) * 16;
     glBufferSubData(GL_SSBO,offsetFloats * sizeof(float),countFloats * sizeof(float),modelMatrices + offsetFloats);
@@ -950,7 +957,7 @@ void LoadLevelData(u8 curlevel) {
     World.instCount = 3; // 0 == NULL, 1 == Player1, 2 == Player2 — reset before LoadLevelMod adds entities.
     // Clear/initialize the active lights + camViews globals so AddLight/AddCamView populate them fresh
     // for this level; we'll snapshot them into per-level storage at the end of this function.
-    mset(lights,0,LIGHT_COUNT * sizeof(Light)); mset(lanims,0,LIGHT_COUNT * sizeof(LightAnimation)); loadedLights = 0;
+    mset(World.lights,0,LIGHT_COUNT * sizeof(Light)); mset(World.lanims,0,LIGHT_COUNT * sizeof(LightAnimation)); World.loadedLights = 0;
     mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
     mset(camViews,0,64 * sizeof(CamView)); camViewCount = 0;
     char filename[20]; // Minimum size for 0 through 13.
@@ -958,8 +965,8 @@ void LoadLevelData(u8 curlevel) {
     levelFileHandle = OS_OpenReadonly(filename);
     LoadLevelMod(curlevel);
     OS_Close(levelFileHandle);
-    for (int i=0;i<loadedLights;++i) lightsNewPosition[i]=lights[i].pos;
-    DualLog("Loaded %d entities, %u static lights for Level %d... took %f secs\n",World.instCount,loadedLights,curlevel,get_time() - start_time);
+    for (int i=0;i<World.loadedLights;++i) World.lightsNewPosition[i]=World.lights[i].pos;
+    DualLog("Loaded %d entities, %u static lights for Level %d... took %f secs\n",World.instCount,World.loadedLights,curlevel,get_time() - start_time);
     RenderLoading(110,"Initialize entities...");
     for (int i=PLAYER1;i<World.instCount;++i) {
         i32 cellIdx = PosGetCellCoords(World.position[i].x,World.position[i].z);
@@ -972,11 +979,9 @@ void LoadLevelData(u8 curlevel) {
         if (World.mass[i] < 0.001f && World.collider[i] != COLTYPE_NONE && World.collider[i] != COLTYPE_MSH && (World.instances[i].entflags & EF_RIGIDBODY)) {World.mass[i] = 0.2f; /*At least something!*/}
     }
     ModInitAfterLoad();
-    // Snapshot the just-loaded lights/camViews into per-level storage so LoadLevel can later
-    // restore them instantly (no disk I/O) when this level becomes active again.
-    mcpy(levelLights[curlevel],lights,LIGHT_COUNT * sizeof(Light));
-    mcpy(levelLAnims[curlevel],lanims,LIGHT_COUNT * sizeof(LightAnimation));
-    levelLoadedLights[curlevel] = loadedLights;
+    // Lights/lanims are now pointer-swapped by SetLevelPointers — World.lights already points
+    // at World.levelLights[curlevel], so no snapshot mcpy needed. Only loadedLights count needs saving.
+    World.levelLoadedLights[curlevel] = World.loadedLights;
     mcpy(levelCamViews[curlevel],camViews,64 * sizeof(CamView));
     mcpy(levelCamViewTextures[curlevel],camViewTextures,64 * sizeof(u32));
     levelCamViewCount[curlevel] = camViewCount;
@@ -1034,27 +1039,24 @@ void LoadLevel(u8 curlevel) {
     // Set the active level and repoint all active-level SoA pointers at this level's per-level data.
     World.curLev = curlevel;
     SetLevelPointers(curlevel);
-    // Restore the cached lights/camViews for this level into the active globals so all existing
-    // call sites (lights[i], loadedLights, camViews[i], camViewCount, camViewTextures[i]) keep working.
-    mcpy(lights,levelLights[curlevel],LIGHT_COUNT * sizeof(Light));
-    mcpy(lanims,levelLAnims[curlevel],LIGHT_COUNT * sizeof(LightAnimation));
-    loadedLights = levelLoadedLights[curlevel];
+    // Lights/lanims/lightsNewPosition/loadedLights are now pointer-swapped by SetLevelPointers above —
+    // World.lights already points at World.levelLights[curlevel], so no mcpy needed.
     mcpy(camViews,levelCamViews[curlevel],64 * sizeof(CamView));
     mcpy(camViewTextures,levelCamViewTextures[curlevel],64 * sizeof(u32));
     camViewCount = levelCamViewCount[curlevel];
     mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
     mset(modelMatrices,0,INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16 — rebuilt from current level's transforms.
-    for (int i=0;i<loadedLights;++i) lightsNewPosition[i]=lights[i].pos;
-    DualLog("Switched to Level %d: %d entities, %u static lights... took %f secs\n",curlevel,World.instCount,loadedLights,curlevel,get_time() - start_time);
+    for (int i=0;i<World.loadedLights;++i) World.lightsNewPosition[i]=World.lights[i].pos;
+    DualLog("Switched to Level %d: %d entities, %u static lights... took %f secs\n",curlevel,World.instCount,World.loadedLights,curlevel,get_time() - start_time);
     // Per-active-level runtime setup (cull, audio, music, voxel uniforms, shadowmap indirection).
     // Note: per-entity init (cellIdx, radius, inertia, ModInitAfterLoad) was already done in
     // LoadLevelData and is preserved in the per-level arrays, so we don't repeat it here.
     ResetLevelAudio(); ResetLevelMusic();
     RenderLoading(110,"Loading cull system..."); CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
-    glUseProgram(voxelUpdateSP); glUniform2f(0,World.voxelMinCenterX[World.curLev],World.voxelMinCenterZ[World.curLev]); glUniform1f(1,World.farPlane[World.curLev] * World.farPlane[World.curLev]); glUniform1ui(2,loadedLights); glUniform2f(3,World.worldMin_x[World.curLev],World.worldMin_z[World.curLev]);
+    glUseProgram(voxelUpdateSP); glUniform2f(0,World.voxelMinCenterX[World.curLev],World.voxelMinCenterZ[World.curLev]); glUniform1f(1,World.farPlane[World.curLev] * World.farPlane[World.curLev]); glUniform1ui(2,World.loadedLights); glUniform2f(3,World.worldMin_x[World.curLev],World.worldMin_z[World.curLev]);
     RenderLoading(120,"Loading voxel lighting data...");
-    for (u16 i = 0; i < loadedLights; i++) { lightsNewPosition[i] = lights[i].pos; }
-    mset(shadowmapIndirectionList,MAX_SHADOWMAPS + 1,loadedLights * sizeof(u32)); // Set to invalid values for all
+    for (u16 i = 0; i < World.loadedLights; i++) { World.lightsNewPosition[i] = World.lights[i].pos; }
+    mset(shadowmapIndirectionList,MAX_SHADOWMAPS + 1,World.loadedLights * sizeof(u32)); // Set to invalid values for all
     World.levelCurrentlyLoading = false;
     DebugRAM("end of LoadLevel");
 }
@@ -1081,12 +1083,12 @@ __attribute__((cold)) void NewGame() { // Reset World States
     currentMenuItem = currentMenuTab = 0; currentMenuPage = Mpg_FrontPage;
     World.pauseRelativeTime = World.last_physics_time = 0.0; World.pauseRelativeTime=World.last_physics_time=0.0; World.deltaTime=0.0166666666f;
     mset(World.instances,0,3 * sizeof(Entity)); // Blank out player entities
-    PlayerInit(PLAYER1); PlayerInit(PLAYER2); cam_yaw = 90.0f; cam_pitch = 0.0f; cam_roll = 0.0f; World.inventoryMode = Sys_Settings.NoShootMode;
+    PlayerInit(PLAYER1); PlayerInit(PLAYER2); World.cam_yaw = 90.0f; World.cam_pitch = 0.0f; World.cam_roll = 0.0f; World.inventoryMode = Sys_Settings.NoShootMode;
     World.gameFinished = World.creditsActive = World.decoyActive = false; World.damageDealt = World.damageReceived = 0.0f;
         World.ressurections = World.deaths = World.kills = World.cyberkills = 0u; World.shotsFired = World.grenadesThrown = World.savesScummed = 0U; World.creditsPageIndex = 0u;
     for (int i=0;i<14;++i) World.levelSecurity[i] = 100u;
     ResetInput();
-    currentMouse_dx = currentMouse_dy = 0; last_mouse_x = last_mouse_y = 0; ignore_next_mouse_delta = true;
+    World.currentMouse_dx = World.currentMouse_dy = 0; last_mouse_x = last_mouse_y = 0; ignore_next_mouse_delta = true;
     Sys_Input.lastUse = Sys_Input.isCapsLockOn = false; // As far as we're concerned, don't worry about OS capslock actual state.
     // Replicate the player-entity slots (PLAYER1=1, PLAYER2=2) from level 0 to every other level
     // BEFORE LoadAllLevels.  Level data files do not populate slots 0..2 (LoadLevelMod only fills
@@ -1101,7 +1103,9 @@ __attribute__((cold)) void NewGame() { // Reset World States
     // clears and re-populates slots 3+), so the player slots replicated above survive intact.
     LoadAllLevels();
     LoadLevel(World.startLevel); // Must be after entities!  Fast pointer swap to startLevel.
-    ModNewGame();
+    World.lev1SecCode = random_range_u8(0u,9u); World.lev2SecCode = random_range_u8(0u,9u);
+    World.lev3SecCode = random_range_u8(0u,9u); World.lev4SecCode = random_range_u8(0u,9u);
+    World.lev5SecCode = random_range_u8(0u,9u); World.lev6SecCode = random_range_u8(0u,9u); // Must do rand's repeatedly to prevent these all being the same number.
 }
 
 

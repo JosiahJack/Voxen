@@ -7,60 +7,42 @@
 // TODO: Directional light shadowmapping just for sunlight
 // TODO: TARGET ID: Type-LevelNum(0#)EnemyNum(###),Example: Mutant-06003, EXCEPTIONS: Cyborg-00001 is Edward Diego
 __attribute__((used)) AutoSplitterData autoSplitter = {0x1337133713371337,0,false,0}; // Fore use with LiveSplit or other future speedrunner utilities for doing speedruns
-//=============================================================================
-// Initialization
-#ifdef WINDOWS
-i32 __stdcall DllMain(void* hinstDLL, unsigned long fdwReason, void* lpReserved) { (void)hinstDLL; (void)lpReserved; switch (fdwReason) {} return 1; }
-void* memset(void* dst, int c, size_t n) { return mset(dst,c,n); }
-#endif
-void ModNewGame(void) {
-    World.lev1SecCode = random_range_u8(0u,9u); World.lev2SecCode = random_range_u8(0u,9u);
-    World.lev3SecCode = random_range_u8(0u,9u); World.lev4SecCode = random_range_u8(0u,9u);
-    World.lev5SecCode = random_range_u8(0u,9u); World.lev6SecCode = random_range_u8(0u,9u); // Must do rand's repeatedly to prevent these all being the same number.
-}
-//=============================================================================
 // Inventory
-void ResetHeldItem(u16 p) {
-    InventorySystem* inv = Inv(p);
-    inv->heldObjectIndex = inv->heldObjectCustomIndex = U16_MAX;
-    inv->heldObjectAmmo = inv->heldObjectAmmo2 = 0;
-    inv->heldObjectLoadedAlternate = inv->holdingObject = inv->grenadeActive = false;
-}
-
 V3 ScreenPointToRay(V3 fwd, V3 rt) {
-    u16 swidth = Sys_Settings.ScreenWidth, sheight = Sys_Settings.ScreenHeight;
-    float offsetX = World.cursorPosition_x - ((float)swidth * 0.5f);
-    float offsetY = World.cursorPosition_y - ((float)sheight * 0.5f);
-    float ndcX = offsetX / ((float)swidth * 0.5f);
-    float ndcY = -offsetY / ((float)sheight * 0.5f);
+    float ndcX =  ((World.inventoryMode ? World.cursorPosition_x : 683.0f) - 683.0f) / 384.0f; // Normalize both axes by half-height 384 so aspect handled naturally
+    float ndcY = -((World.inventoryMode ? World.cursorPosition_y : 384.0f) - 384.0f) / 384.0f;
     float tanFov = vtan((float)Sys_Settings.FOV * 0.5f * PI / 180.0f);
-    float aspect3D = (float)swidth / (float)sheight;
-    V3 view = (V3){ndcX * tanFov * aspect3D,ndcY * tanFov,-1.0f};
-    view = V3_Normalize(view);
+    V3 view = V3_Normalize((V3){ndcX * tanFov,ndcY * tanFov,-1.0f});
     V3 flipForward = (V3){-fwd.x,-fwd.y,-fwd.z};
     V3 up = V3_Normalize(V3_Cross(rt,flipForward));
-    return (V3){view.x * rt.x + view.y * up.x + view.z * flipForward.x,view.x * rt.y + view.y * up.y + view.z * flipForward.y,view.x * rt.z + view.y * up.z + view.z * flipForward.z};
+    return (V3){view.x*rt.x + view.y*up.x + view.z*flipForward.x,
+                view.x*rt.y + view.y*up.y + view.z*flipForward.y,
+                view.x*rt.z + view.y*up.z + view.z*flipForward.z};
 }
 
-void DropHeldItem(u16 p) {
-    InventorySystem* inv = Inv(p);
-    Entity* ply = &World.instances[p];
-    if (inv->heldObjectIndex >= World.instCount) { ResetHeldItem(p); return; }
-    if (inv->dropFinished > World.pauseRelativeTime) return;
-    
-    inv->dropFinished = World.pauseRelativeTime + 0.2; // Prevent immediate regrab at high fps
-    u16 newent = AddInstance(inv->heldObjectIndex,World.position[p]);
+void ResetHeldItem() {
+    World.invP1.heldObjectIndex = World.invP1.heldObjectCustomIndex = U16_MAX;
+    World.invP1.heldObjectAmmo = World.invP1.heldObjectAmmo2 = 0;
+    World.invP1.heldObjectLoadedAlternate = World.invP1.holdingObject = World.invP1.grenActive=false;
+}
+
+void DropHeldItem() {
+    if (World.invP1.heldObjectIndex >= World.instCount) { ResetHeldItem(); return; }
+    if (World.invP1.dropFinished > World.pauseRelativeTime) return;
+
+    World.invP1.dropFinished = World.pauseRelativeTime + 0.2; // Prevent immediate regrab at high fps
+    u16 newent = AddInstance(World.invP1.heldObjectIndex,World.position[PLAYER1]);
     Entity* tossObject = &World.instances[newent];
-    tossObject->usableCustomIndex = inv->heldObjectCustomIndex;
-    tossObject->ammo = inv->heldObjectAmmo;
-    tossObject->ammo2 = inv->heldObjectAmmo2;
-    tossObject->heldObjectLoadedAlternate = inv->heldObjectLoadedAlternate;
-    World.position[newent] = World.position[p];
+    tossObject->usableCustomIndex = World.invP1.heldObjectCustomIndex;
+    tossObject->ammo = World.invP1.heldObjectAmmo;
+    tossObject->ammo2 = World.invP1.heldObjectAmmo2;
+    tossObject->heldObjectLoadedAlternate = World.invP1.heldObjectLoadedAlternate;
+    World.position[newent] = World.position[PLAYER1];
     flag_set(&tossObject->entflags,EF_RIGIDBODY,true);
-    V3 tossDir = V3_Normalize(ScreenPointToRay(ply->forward,ply->right));
-    World.position[newent] = V3_AplusB(World.position[p],V3_ScaleByF(tossDir,0.48f));
+    V3 tossDir = V3_Normalize(ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right));
+    World.position[newent] = V3_AplusB(World.position[PLAYER1],V3_ScaleByF(tossDir,0.48f));
     World.velocity[newent] = V3_ScaleByF(tossDir,10.0f);
-    ResetHeldItem(p);
+    ResetHeldItem();
 }
 
 void PatchUse(u16 playerIdx,int patchSlot) { (void)playerIdx; (void)patchSlot; } // TODO
@@ -529,14 +511,7 @@ bool AddSoftwareItem(u16 p, u16 index, int vers) {
 
 void RemoveWeapon(u16 p,int slot) { InventorySystem* inv =Inv(p); inv->weaponInventoryIndices[slot]=-1; inv->weaponInventoryAmmoIndices[slot]=-1; }
 static float DefaultEnergySettingForWeapon(int wep16Index) { return (wep16Index == 4) ? 5.0f : (wep16Index == 10) ? 13.0f : (wep16Index == 14) ? 2.0f : 3.0f; }
-void UpdateAmmoCount(u16 p) {
-    InventorySystem* inv = Inv(p);
-    inv->numweapons = 0;
-    for (int i = 0; i < 7; i++) if (inv->weaponInventoryIndices[i] >= 0) inv->numweapons++;
-}
-
-// Returns ammo display string for slot. Writes to caller-provided buffer.
-// Engine calls this per-frame for HUD weapon pane text.
+void UpdateAmmoCount() { World.invP1.numweapons=0; for (int i=0;i<7;i++) { if(World.invP1.weaponInventoryIndices[i] >= 0){World.invP1.numweapons++;} } }
 void GetWeaponAmmoText(u16 p,int slot,char* buf,size_t bufSize) {
     InventorySystem* inv = Inv(p);
     buf[0] = '\0';
@@ -616,7 +591,7 @@ bool AddWeaponToInventory(u16 p,int index,int ammo1,int ammo2,bool loadedAlt) {
             inv->wepLoadedWithAlternate[i] = false;
         }
         CenterStatusPrint("%s%s",Sys_Text.stringTable[index + 326],Sys_Text.stringTable[33]);
-        UpdateAmmoCount(p);
+        UpdateAmmoCount();
         return true;
     }
     return false;
@@ -665,19 +640,16 @@ extern u8 magazinePitchCountForWeapon2[16];
 static bool firstTimePickup = true;
 static bool firstTimeSearch = true;
 // Expects usableItem index
-void AddItemFail(u16 p, int index) { DropHeldItem(p); CenterStatusPrint("%s%s%s", Sys_Text.stringTable[32],Sys_Text.stringTable[index + 326],Sys_Text.stringTable[318]); } // Inventory full.
+void AddItemFail(int index) { DropHeldItem(); CenterStatusPrint("%s%s%s", Sys_Text.stringTable[32],Sys_Text.stringTable[index + 326],Sys_Text.stringTable[318]);/*Inventory full.*/ }
 void AddItemToInventory(u16 p, int index, int customIndex) {
     InventorySystem* inv = Inv(p);
     World.Sys_UI.mouseClickHeldOverGUI = true; // Prevent gun shooting.
     if (index < 0) index = 0; // Good check on paper.
     if (index > 110) index = 94; // Way to get a head.
-    if ((index >= 0 && index <= 5) || index == 33 || index == 35 || (index >= 52 && index < 59) || (index >= 61 && index <= 64) || (index >= 92 && index <= 101)) {
-        if (!AddGeneralObjectToInventory(p,index,customIndex)) AddItemFail(p,index);
-    } else if (index == 6) {
-        AddAudioLogToInventory(p,inv->heldObjectCustomIndex);
-    } else if (index >= 36 && index <= 51) {
-        if (!AddWeaponToInventory(p,index,inv->heldObjectAmmo,inv->heldObjectAmmo2,inv->heldObjectLoadedAlternate)) AddItemFail(p,index);
-    } else if (index == 34 || index == 81 || (index >= 83 && index <= 91) || index == 110) AddAccessCardToInventory(p,index);
+    if ((index >= 0 && index <= 5) || index == 33 || index == 35 || (index >= 52 && index < 59) || (index >= 61 && index <= 64) || (index >= 92 && index <= 101)) { if (!AddGeneralObjectToInventory(p,index,customIndex)) { AddItemFail(index); } }
+    else if (index == 6) { AddAudioLogToInventory(p,inv->heldObjectCustomIndex); }
+    else if (index >= 36 && index <= 51) { if (!AddWeaponToInventory(p,index,inv->heldObjectAmmo,inv->heldObjectAmmo2,inv->heldObjectLoadedAlternate)) { AddItemFail(index); } }
+    else if (index == 34 || index == 81 || (index >= 83 && index <= 91) || index == 110) AddAccessCardToInventory(p,index);
     else {
         switch (index) {
             case 7:  AddGrenadeToInventory(p,0,index); break; // Frag
@@ -1661,11 +1633,11 @@ static void TargetIDDeactivate(u16 self) {
     flag_set(&e->entflags,EF_ACTIVE,false);
 }
 
-void TargetIDSendDamageReceive(u16 self,float damage,AttackType attackType) {
+void TargetIDSendDamageReceive(u16 self,float damage,AttType attackType) {
     Entity* e   = &World.instances[self];
     if (e->enemy == NULLENT) return;
     Entity* npc = &World.instances[e->enemy];
-    if (attackType == AttackType_Tranq) {
+    if (attackType == Att_Trnq) {
         e->textIndex         = 536; // STUNNED
         e->animSwapFinished  = World.pauseRelativeTime - 1.0; // expire damage text
     } else {
@@ -1931,7 +1903,7 @@ static void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 
 //         float tranq     = -1.0f;
         if (dd.isOtherNPC) {
             if (!(hit->entflags & EF_ASLEEP)) World.Sys_Music.inCombat = true;
-            if (dd.attackType == AttackType_Tranq) {
+            if (dd.attackType == Att_Trnq) {
 //                 float stunAmount = vclamp(3.0f + (World.invP1.stungunSetting
 //                                           / 100.0f) * 7.0f, 3.0f, 10.0f);
                 // TODO: tranq = Tranquilize(hitIdx, stunAmount, true)
@@ -1958,7 +1930,7 @@ void ProjectileEffectImpactInitAfterLoad(u16 self) {
 //=============================================================================
 // HealthManager
 
-// Attack type damage multiplier table [NPCType][AttackType]
+// Attack type damage multiplier table [NPCType][AttType]
 // 1.0f = no change, 0.0f = immune, other = multiplier
 static const float attackTypeMult[7][12] = {
     // None  Melee  MelEn  EnBm   Mag    Proj   Needle ProjEB ProjLn Gas    Tranq  Drill
@@ -1987,7 +1959,7 @@ static bool IsCyberEntity(u16 self) {
     return (IdxIsNPC(e->index) && (e->index - 419) > 23); // 24-28 are cyber enemies
 }
 
-static float ApplyAttackTypeAdjustments(u16 self,float take,AttackType at) {
+static float ApplyAttTypeAdjustments(u16 self,float take,AttType at) {
     Entity* e = &World.instances[self];
     if (!IdxIsNPC(e->index) || e->health <= 0.0f) return take;
     NPCType t = npcTable[e->index - 419].type;
@@ -2120,8 +2092,8 @@ float TakeDamage(u16 self,DamageData dd) {
 //     bool isScreen  = (World.instances[self].index == 279); // TODO
     bool isCam = (World.instances[self].index == 477);
     if (isCyber) {
-        if (dd.attackType == AttackType_Drill && isNPC) return 0.0f;
-        if (dd.attackType != AttackType_Drill && World.instances[self].iceActive) return 0.0f;
+        if (dd.attackType == Att_Drill && isNPC) return 0.0f;
+        if (dd.attackType != Att_Drill && World.instances[self].iceActive) return 0.0f;
     }
     // Dead exceptions — still allow damage to gibs, ice, player, grenades, screens, cameras, teleporters
     if (*hp <= 0.0f) {
@@ -2141,7 +2113,7 @@ float TakeDamage(u16 self,DamageData dd) {
                 if (take <= 0.0f) return 0.0f;
             }
         } else {
-            if (dd.attackType == AttackType_Magnetic) {
+            if (dd.attackType == Att_Magn) {
                 take = 0.0f;
                 // TODO: empstatic.Flash(2), BiomonitorEnergyPulse(11f) — FX systems
                 TakeEnergy(11.0f);
@@ -2187,8 +2159,8 @@ float TakeDamage(u16 self,DamageData dd) {
         if (dd.owner == PLAYER1 || dd.owner == PLAYER2) World.damageDealt += take;
     } else {
         // Camera constIndex 477 gets one-shot by tranq
-        if (World.instances[self].index == 477 && dd.attackType == AttackType_Tranq) take = World.instances[self].health + 1.0f;
-        take = ApplyAttackTypeAdjustments(self,take,dd.attackType);
+        if (World.instances[self].index == 477 && dd.attackType == Att_Trnq) take = World.instances[self].health + 1.0f;
+        take = ApplyAttTypeAdjustments(self,take,dd.attackType);
         World.instances[self].health -= take;
         if (isPlayer) {
             World.damageReceived += take;
@@ -2208,7 +2180,7 @@ float TakeDamage(u16 self,DamageData dd) {
     if (isCyber) {
         if (World.instances[self].cyberHealth <= 0.0f) { if (!World.instances[self].iceActive && isNPC) {World.cyberkills++;} Death(self,false); }
     } else {
-        if (World.instances[self].health <= 0.0f) { if (isNPC) {World.kills++;} Death(self,dd.attackType == AttackType_EnergyBeam); }
+        if (World.instances[self].health <= 0.0f) { if (isNPC) {World.kills++;} Death(self,dd.attackType == Att_Beam); }
     }
     return take;
 }
@@ -2238,11 +2210,11 @@ void HealthManagerInitAfterLoad(u16 self) {
     }
 }
 // Lights
-V3 lightsNewPosition[LIGHT_COUNT];
 i32 AddLight(Light* lit, LightAnimation* lanim) {
-    i32 i = loadedLights; loadedLights++; if (loadedLights >= LIGHT_COUNT) { DualLogError("Too many lights %u added in level %d!\n",i,World.curLev); OS_Exit(1); }
-    mcpy(&lights[i],lit,sizeof(Light)); mcpy(&lanims[i],lanim,sizeof(LightAnimation));
-    lightsNewPosition[i] = lit->pos; flag_set(&lights[i].lflags,LDIRTY,true);
+    i32 i = World.loadedLights; World.loadedLights++; World.levelLoadedLights[World.currentLevel]++;
+    if (World.loadedLights >= LIGHT_COUNT) { DualLogError("Too many lights %u added in level %d!\n",i,World.curLev); OS_Exit(1); }
+    mcpy(&World.lights[i],lit,sizeof(Light)); mcpy(&World.lanims[i],lanim,sizeof(LightAnimation));
+    World.lightsNewPosition[i] = lit->pos; flag_set(&World.lights[i].lflags,LDIRTY,true);
     return i;
 }
 
@@ -2286,20 +2258,20 @@ V3 lanternPos;
 float lanternVersionBrightness[3] = {0.875f,1.4f,1.75f};
 #define CHGD(a,b) (vabs((a) - (b)) > 0.0001f)
 void UpdateLight(u16 i, V3 pos, Color3 col, float range, float intensity, float max, float min, float spotAng, Quaternion spotDir, bool on, bool shad) {
-    bool changed = ((!!(lights[i].lflags & SHADON) - shad) || (!!(lights[i].lflags & LIGHTON) -  on) || CHGD(lights[i].range,range) || CHGD(lights[i].pos.x,pos.x) || CHGD(lights[i].pos.y,pos.y) || CHGD(lights[i].pos.z,pos.z));
-    lights[i].intensity=intensity; lights[i].minIntensity=min; lights[i].maxIntensity=max; lights[i].spotAng=spotAng; lights[i].spotDir=spotDir; lights[i].col=col; lights[i].pos=lightsNewPosition[i]=pos; lights[i].range=range;
-    flag_set(&lights[i].lflags,19,(lights[i].lflags&LDIRTY)|changed<<4|on|shad<<1);
+    bool changed = ((!!(World.lights[i].lflags & SHADON) - shad) || (!!(World.lights[i].lflags & LIGHTON) -  on) || CHGD(World.lights[i].range,range) || CHGD(World.lights[i].pos.x,pos.x) || CHGD(World.lights[i].pos.y,pos.y) || CHGD(World.lights[i].pos.z,pos.z));
+    World.lights[i].intensity=intensity; World.lights[i].minIntensity=min; World.lights[i].maxIntensity=max; World.lights[i].spotAng=spotAng; World.lights[i].spotDir=spotDir; World.lights[i].col=col; World.lights[i].pos=World.lightsNewPosition[i]=pos; World.lights[i].range=range;
+    flag_set(&World.lights[i].lflags,19,(World.lights[i].lflags&LDIRTY)|changed<<4|on|shad<<1);
 }
 #undef CHGD
 
 void mat4_lookat_from(float*,Quaternion*,V3); INLINE void mul_mat4(float*,const float*,const float*); void ExtractFrustumPlanes(float*,FrustumPlane*);
 Quaternion cubeQuats[6] = {{0.0f,ONE_OVER_SQRT2,0.0f,ONE_OVER_SQRT2}/*+X:Right*/,{0.0f,-ONE_OVER_SQRT2,0.0f,ONE_OVER_SQRT2}/*-X:Left*/,{-ONE_OVER_SQRT2,0.0f,0.0f,ONE_OVER_SQRT2}/*+Y:Up*/,{ONE_OVER_SQRT2,0.0f,0.0f,ONE_OVER_SQRT2}/*-Y:Down*/,{0.0f,0.0f,0.0f,1.0f}/*+Z:Forward*/,{0.0f,1.0f,0.0f,0.0f}/*-Z:Backward*/ };
 void UpdateLights() {
-    for (u16 lightIdx = 0; lightIdx < loadedLights; ++lightIdx) {
-        V3 lightPos = lightsNewPosition[lightIdx];
-        lights[lightIdx].pos = lightPos;
-        if (lights[lightIdx].lflags & LDIRTY) { // Marked all as true at level load.
-            flag_set(&lights[lightIdx].lflags,LDIRTY,false);
+    for (u16 lightIdx=0;lightIdx<World.loadedLights;++lightIdx) {
+        V3 lightPos = World.lightsNewPosition[lightIdx];
+        World.lights[lightIdx].pos = lightPos;
+        if (World.lights[lightIdx].lflags & LDIRTY) { // Marked all as true at level load.
+            flag_set(&World.lights[lightIdx].lflags,LDIRTY,false);
             #pragma GCC unroll 6
             for (int j=0;j<6;++j) { // Update to new position
                 mat4_lookat_from((float*)lightView[lightIdx][j],&cubeQuats[j],lightPos);
@@ -2309,29 +2281,29 @@ void UpdateLights() {
         }
     }
     if (!World.paused && !World.menuActive) {
-        for (int i=0;i<loadedLights;++i) { // Just lerps/flickers in intensity
-            if (lanims[i].numIntervalSteps < 1) continue;
-            if (!(lights[i].lflags & LIGHTON)) { lights[i].intensity = 0.0f; continue; }
-            if (lanims[i].lerpTime < (float)World.pauseRelativeTime) {
-                lights[i].intensity = lanims[i].lerpUp ? lights[i].maxIntensity : lights[i].minIntensity; // Pick target to lerp towards
-                lanims[i].lerpUp = !lanims[i].lerpUp;
-                lanims[i].currentStep++; if (lanims[i].currentStep >= lanims[i].numIntervalSteps) lanims[i].currentStep = 0; // Wrap and start over continuous looping
-                lanims[i].lerpStepTime = lanims[i].intervalSteps[lanims[i].currentStep];
-                lanims[i].lerpTime = (float)World.pauseRelativeTime + lanims[i].lerpStepTime;
-                lanims[i].lerpStartTime = (float)World.pauseRelativeTime;
-            } else if (lights[i].lflags & LERPON) {
-                if (lanims[i].currentStep < lanims[i].numLerpSteps) {
-                    if (lanims[i].stepIsLerping[lanims[i].currentStep]) {
-                        lanims[i].lerpValue = ((float)World.pauseRelativeTime - lanims[i].lerpStartTime)/(lanims[i].lerpTime - lanims[i].lerpStartTime); // percent towards goal time
-                        float lerpVal = lanims[i].lerpUp ? lanims[i].lerpValue : (1.0f - lanims[i].lerpValue);
-                        lanims[i].lerpValue = lights[i].minIntensity + ((lights[i].maxIntensity - lights[i].minIntensity) * lerpVal);
-                        lights[i].intensity = lanims[i].lerpValue;
+        for (int i=0;i<World.loadedLights;++i) { // Just lerps/flickers in intensity
+            if (World.lanims[i].numIntervalSteps < 1) continue;
+            if (!(World.lights[i].lflags & LIGHTON)) { World.lights[i].intensity = 0.0f; continue; }
+            if (World.lanims[i].lerpTime < (float)World.pauseRelativeTime) {
+                World.lights[i].intensity = World.lanims[i].lerpUp ? World.lights[i].maxIntensity : World.lights[i].minIntensity; // Pick target to lerp towards
+                World.lanims[i].lerpUp = !World.lanims[i].lerpUp;
+                World.lanims[i].currentStep++; if (World.lanims[i].currentStep >= World.lanims[i].numIntervalSteps) World.lanims[i].currentStep = 0; // Wrap and start over continuous looping
+                World.lanims[i].lerpStepTime = World.lanims[i].intervalSteps[World.lanims[i].currentStep];
+                World.lanims[i].lerpTime = (float)World.pauseRelativeTime + World.lanims[i].lerpStepTime;
+                World.lanims[i].lerpStartTime = (float)World.pauseRelativeTime;
+            } else if (World.lights[i].lflags & LERPON) {
+                if (World.lanims[i].currentStep < World.lanims[i].numLerpSteps) {
+                    if (World.lanims[i].stepIsLerping[World.lanims[i].currentStep]) {
+                        World.lanims[i].lerpValue = ((float)World.pauseRelativeTime - World.lanims[i].lerpStartTime)/(World.lanims[i].lerpTime - World.lanims[i].lerpStartTime); // percent towards goal time
+                        float lerpVal = World.lanims[i].lerpUp ? World.lanims[i].lerpValue : (1.0f - World.lanims[i].lerpValue);
+                        World.lanims[i].lerpValue = World.lights[i].minIntensity + ((World.lights[i].maxIntensity - World.lights[i].minIntensity) * lerpVal);
+                        World.lights[i].intensity = World.lanims[i].lerpValue;
                     }
                 }
             }
         }
     }
-    glBindBuffer(GL_SSBO,lightsID); glBufferData(GL_SSBO,loadedLights * sizeof(Light),lights,GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_SSBO,lightsID); glBufferData(GL_SSBO,World.loadedLights * sizeof(Light),World.lights,GL_DYNAMIC_DRAW);
     glUseProgram(voxelUpdateSP); glUniform3f(5,World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z);
     glDispatchCompute((VOXELS_X+15)/16,(VOXELS_Z+15)/16,1);
 }
@@ -2665,8 +2637,8 @@ void UseGrenade(u16 playerIndex, int index) { // TODO
     if (World.invP1.holdingObject) { CenterStatusPrint("%s",Sys_Text.stringTable[311]); return; } // Can't use grenade, hands full
 
     ForceInventoryMode();  // Inventory mode is turned on when picking something up.
-    ResetHeldItem(playerIndex);
-    World.invP1.grenadeActive = true;
+    ResetHeldItem();
+    World.invP1.grenActive = true;
     CenterStatusPrint("%s%s",Sys_Text.stringTable[index + 326],Sys_Text.stringTable[320]); // activated, grenade is LIVE!
 //     switch(index) { // Subtract one from the correct grenade inventory TODO
 //         case 7:  World.invP1.heldObject = Const.a.GetPrefab(370); RemoveGrenade(0); break; // Frag
@@ -3197,10 +3169,10 @@ void UseEntity(u16 p, u16 i) {
         inv->heldObjectAmmo = ent->ammo;
         inv->heldObjectAmmo2 = ent->ammo2;
         inv->heldObjectLoadedAlternate = ent->heldObjectLoadedAlternate;
-        if (Sys_Settings.QuickItemPickup) { AddItemToInventory(p,ent->index,ent->usableCustomIndex); ResetHeldItem(p); }
-                else { CenterStatusPrint("%s%s",Sys_Text.stringTable[inv->heldObjectIndex - 307 + 326],Sys_Text.stringTable[319]); /* picked up.*/ ForceInventoryMode(); } // Inventory mode is turned on when picking something up
+        if (Sys_Settings.QuickItemPickup) { AddItemToInventory(p,ent->index,ent->usableCustomIndex); ResetHeldItem(); }
+        else { CenterStatusPrint("%s%s",Sys_Text.stringTable[inv->heldObjectIndex - 307 + 326],Sys_Text.stringTable[319]); /* picked up.*/ ForceInventoryMode(); } // Inventory mode is turned on when picking something up
 
-                DeleteInstance(i);
+        DeleteInstance(i);
     } else CenterStatusPrint("%s%s",Sys_Text.stringTable[29],"name");
 }
 
@@ -3211,24 +3183,18 @@ static void Frob(V3 pos, V3 forward, V3 right) {
     if (World.uiIsBlocking) return;
     
     InventorySystem* inv = Inv(PLAYER1);
-    if (inv->holdingObject) { DropHeldItem(PLAYER1); return; }
-
+    if (inv->holdingObject) { DropHeldItem(); return; }
+    
     V3 dir = ScreenPointToRay(forward,right);
     World.debugLine_start = pos;
     World.debugLine_end = (V3){dir.x * FROB_DISTANCE + pos.x,dir.y * FROB_DISTANCE + pos.y,dir.z * FROB_DISTANCE + pos.z};
     RaycastHit tempHit = Raycast(pos,dir,FROB_DISTANCE,LMASK_PLAYER_FROB);
     World.debugLineFinished = World.pauseRelativeTime + 3.0;
     if (!tempHit.hit) { CenterStatusPrint("%s",Sys_Text.stringTable[30]); return; }
+    
     World.debugLine_end = tempHit.point;
-    DualLog("Raycast hit!  Hit object %u of entity type %u at hit point %f %f %f\n",tempHit.hitInstanceIndex,World.instances[tempHit.hitInstanceIndex].index,tempHit.point.x,tempHit.point.y,tempHit.point.z);
     UseEntity(PLAYER1,tempHit.hitInstanceIndex);
 }
-
-bool FrobWithHeldObject(void) {
-    return false;
-    return true;
-}
-//================================================================================
 // Update
 void ModUpdate(void) {
     if (World.paused || World.menuActive) return;
@@ -3356,6 +3322,7 @@ void PlayerInit(u16 i) {
     World.colliderSize[i] = (V3){0.48f,2.0f,1.0f}; // Radius, Overall height including end radii (Unity convention, blech), Direction, 1.0 == Y-Axis
     World.mass[i] = 1.0f;
     World.velocity[i] = (V3){0.0f,0.0f,0.0f};
+    World.cam_yaw = 90.0f; World.cam_pitch = World.cam_roll = 0.0f;
     World.gravity[i] = 1.0f;
     World.dynamicFriction[i] = 0.6f; World.staticFriction[i] = 0.8f;
     World.instances[i].health = 200.0f;
@@ -3401,6 +3368,7 @@ u16 GetCrosshairTexture(void) {
         case 46: case 51: return 1161; // teal
         default: return 1260; // green
     }
+    
     return 1260;
 }
 
@@ -3508,4 +3476,4 @@ u16 GetCursorTexture(void) {
     }
     
     return 1250; // paper wad fallback to make issue obvious
-}//3903
+}

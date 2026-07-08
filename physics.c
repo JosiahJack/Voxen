@@ -1,7 +1,8 @@
 // Phys Sys
 #define MAX_COLLISION_ITERATIONS 8
 #define RESTITUTION 0.15f
-#define FRICTION 0.5f
+#define FRICTION_SLIDE 0.2f
+#define FRICTION_ROLL 0.5f
 #define STEP_MIN_NORMAL_Y 0.7f
 #define PHY_EPSILON 0.0001f
 #define MAX_SUBSTEPS 10
@@ -17,7 +18,17 @@ typedef struct {V3 ctr,hExt; Quaternion rot;} ShapeBox;
 typedef struct {V3 ctr; float rad;} ShapeSphere;
 typedef struct {V3 tip,base; float rad;} ShapeCapsule;
 typedef struct { V3 v[4];/*Minkowski difference vertices (wA - wB)*/   V3 wA[4];/*Cached support points from Shape A (e.g., Convex Hull)*/   V3 wB[4];/*Cached support points from Shape B (e.g., Triangle)*/   i32 n;/*Vertex count*/ } Simplex3D;
-void SetPosition(u16 i, V3 newpos, bool teleport) { float d = V3_Dist(World.position[i],newpos); if ((d > 0.001f && d < 0.1f) || teleport) {World.position[i] = newpos;} }
+#define MAX_SUBSTEP_DISPLACEMENT 0.08f
+static float posBudget[INSTANCE_COUNT]; // remaining |Δpos| entity i may receive this substep; reset every substep in Physics()
+void SetPosition(u16 i, V3 newpos, bool teleport) {
+    float d = V3_Dist(World.position[i],newpos); if (d < 0.001f) return;
+    if (teleport) {World.position[i] = newpos; return;}
+    float allowed = vmin(d, posBudget[i]); if (allowed < 0.001f) return;
+    V3 dir = V3_Normalize(V3_AsubB(newpos,World.position[i]));
+    World.position[i] = V3_AplusB(World.position[i],V3_ScaleByF(dir,allowed));
+    posBudget[i] -= allowed;
+}
+
 u16 dynamicEntities[512], dynamicEntityCount;
 typedef struct { bool hit; V3 point,normal; float overlapAmount; } OverlapResult; typedef struct { V3 point; float pen; } ManifoldPt; typedef struct { V3 normal; ManifoldPt p[MANIFOLD_MAX]; i32 n; float maxPen; } Manifold;
 INLINE u32 PosGetCellCoordsP(i32 cx, i32 cz) { cx = clamp(cx,0,WORLDX_0BASED); cz = clamp(cz,0,WORLDX_0BASED); return (u32)cz * WORLDX + (u32)cx; }
@@ -330,7 +341,7 @@ static bool GJKNextSimplex(Simplex3D *s, V3 *dir) {
     #define CPY(d,src) do{ s->v[d]=s->v[src]; s->wA[d]=s->wA[src]; s->wB[d]=s->wB[src]; } while(0)
     #define SWP(i,j) do{ V3 tv=s->v[i]; s->v[i]=s->v[j]; s->v[j]=tv; V3 ta=s->wA[i]; s->wA[i]=s->wA[j]; s->wA[j]=ta; V3 tb=s->wB[i]; s->wB[i]=s->wB[j]; s->wB[j]=tb; } while(0)
     if (s->n == 2) {
-        V3 AB = V3_AsubB(s->v[0], A);
+        V3 AB = V3_AsubB(s->v[0], A); if (AB.x + AB.y + AB.z < PHY_EPSILON) AB = V3_AplusB(AB,V3_ScaleByF(*dir,0.001f));
         if (V3_dot(AB, AO) > 0.f) *dir = TP(AB, AO, AB);
         else { s->n = 1; SET_A(0); *dir = AO; }
         if (V3_dot(*dir, *dir) < PHY_EPSILON) { V3 px = (vabs(AB.x) > 0.9f) ? (V3){0,1,0} : (V3){1,0,0}; *dir = V3_Cross(AB, px); }
@@ -860,43 +871,63 @@ static void ResolveContactVelocity(u16 a, u16 b, V3 n, V3 rAarm, V3 rBarm, float
     V3 invI_rAxN = IdxIsNPC(World.instances[a].index) ? (V3){0,0,0} : ApplyInvTensor(a,rAxN);
     V3 invI_rBxN = (bStatic || IdxIsNPC(World.instances[b].index)) ? (V3){0,0,0} : ApplyInvTensor(b,rBxN);
     float angTermA = V3_dot(rAxN,invI_rAxN), angTermB = bStatic ? 0.0f : V3_dot(rBxN,invI_rBxN);
+
     V3 vAtA = V3_AplusB(World.velocity[a],V3_Cross(World.angularVelocity[a],rAarm));
     V3 vAtB = bStatic ? (V3){0,0,0} : V3_AplusB(World.velocity[b],V3_Cross(World.angularVelocity[b],rBarm));
     float vn = V3_dot(V3_AsubB(vAtA, vAtB), n);
+
     float invMassA = World.mass[a] < 0.001f ? 1.0f : 1.0f / World.mass[a];
     float invMassB = (bStatic || World.mass[b] < 0.001f) ? 0.0f : 1.0f / World.mass[b];
     float invSum = invMassA + invMassB + angTermA + angTermB;
     if (invSum < PHY_EPSILON) return;
-    float j = (targetVn - vn) / invSum; // drive vn toward the frozen target, not toward 0-with-occasional-restitution
+
+    float j = (targetVn - vn) / invSum;
     float newAccumN = vmax(*accumN + j, 0.0f);
     j = newAccumN - *accumN; *accumN = newAccumN;
+
     V3 impulse = V3_ScaleByF(n,j);
     World.velocity[a] = V3_AplusB(World.velocity[a],V3_ScaleByF(impulse,invMassA));
     if (!bStatic) World.velocity[b] = V3_AsubB(World.velocity[b],V3_ScaleByF(impulse,invMassB));
-    if (World.collider[a] != COLTYPE_CAP && !IdxIsNPC(World.instances[a].index)) World.angularVelocity[a] = V3_AplusB(World.angularVelocity[a],ApplyInvTensor(a,V3_Cross(rAarm,impulse)));
-    if (!bStatic && World.collider[b] != COLTYPE_CAP && !IdxIsNPC(World.instances[b].index)) World.angularVelocity[b] = V3_AsubB(World.angularVelocity[b],ApplyInvTensor(b,V3_Cross(rBarm,impulse)));
+
+    if (World.collider[a] != COLTYPE_CAP && !IdxIsNPC(World.instances[a].index))
+        World.angularVelocity[a] = V3_AplusB(World.angularVelocity[a],ApplyInvTensor(a,V3_Cross(rAarm,impulse)));
+    if (!bStatic && World.collider[b] != COLTYPE_CAP && !IdxIsNPC(World.instances[b].index))
+        World.angularVelocity[b] = V3_AsubB(World.angularVelocity[b],ApplyInvTensor(b,V3_Cross(rBarm,impulse)));
+
+    // Tangential (friction)
     V3 vAtA2 = V3_AplusB(World.velocity[a], V3_Cross(World.angularVelocity[a],rAarm));
     V3 vAtB2 = bStatic ? (V3){0,0,0} : V3_AplusB(World.velocity[b], V3_Cross(World.angularVelocity[b],rBarm));
     V3 relVel2 = V3_AsubB(vAtA2,vAtB2);
     V3 tangent = V3_AsubB(relVel2,V3_ScaleByF(n,V3_dot(relVel2,n)));
     float tLen = V3_Mag(tangent);
+
     if (tLen > 0.0001f) {
         tangent = V3_ScaleByF(tangent, 1.0f / tLen);
+
         V3 rAxT = V3_Cross(rAarm, tangent), rBxT = V3_Cross(rBarm,tangent);
         V3 invI_rAxT = IdxIsNPC(World.instances[a].index) ? (V3){0,0,0} : ApplyInvTensor(a,rAxT);
         V3 invI_rBxT = (bStatic || IdxIsNPC(World.instances[b].index)) ? (V3){0,0,0} : ApplyInvTensor(b,rBxT);
         float angTermAT = V3_dot(rAxT,invI_rAxT), angTermBT = bStatic ? 0.0f : V3_dot(rBxT,invI_rBxT);
+
         float invSumT = invMassA + invMassB + angTermAT + angTermBT;
         if (invSumT > PHY_EPSILON) {
             float jt = -V3_dot(relVel2, tangent) / invSumT;
-            float maxT = FRICTION * (*accumN); // bounded by total normal impulse so far, not just this pass's slice of it
+
+            // Simple sliding vs rolling friction switch
+            float friction = (tLen > 0.15f) ? FRICTION_SLIDE : FRICTION_ROLL;
+            float maxT = friction * (*accumN);
+
             float newAccumT = vclamp(*accumT + jt, -maxT, maxT);
             jt = newAccumT - *accumT; *accumT = newAccumT;
+
             V3 fImpulse = V3_ScaleByF(tangent, jt);
             World.velocity[a] = V3_AplusB(World.velocity[a], V3_ScaleByF(fImpulse, invMassA));
             if (!bStatic) World.velocity[b] = V3_AsubB(World.velocity[b], V3_ScaleByF(fImpulse, invMassB));
-            if (World.collider[a] != COLTYPE_CAP && !IdxIsNPC(World.instances[a].index)) World.angularVelocity[a] = V3_AplusB(World.angularVelocity[a], ApplyInvTensor(a,V3_Cross(rAarm,fImpulse)));
-            if (!bStatic && World.collider[b] != COLTYPE_CAP && !IdxIsNPC(World.instances[b].index)) World.angularVelocity[b] = V3_AsubB(World.angularVelocity[b], ApplyInvTensor(b,V3_Cross(rBarm,fImpulse)));
+
+            if (World.collider[a] != COLTYPE_CAP && !IdxIsNPC(World.instances[a].index))
+                World.angularVelocity[a] = V3_AplusB(World.angularVelocity[a], ApplyInvTensor(a,V3_Cross(rAarm,fImpulse)));
+            if (!bStatic && World.collider[b] != COLTYPE_CAP && !IdxIsNPC(World.instances[b].index))
+                World.angularVelocity[b] = V3_AsubB(World.angularVelocity[b], ApplyInvTensor(b,V3_Cross(rBarm,fImpulse)));
         }
     }
 }
@@ -945,6 +976,7 @@ void Physics() {
     for (u8 s=0;s<substeps;++s) { // dynamicEntityCount found to be only 335 on level 1
         mset(cellCounts,0,sizeof(cellCounts));
         for (u16 i=0;i<World.instCount;++i) { // Update cell index for all entities and build broadphase grid
+            posBudget[i] = MAX_SUBSTEP_DISPLACEMENT;
             World.instances[i].cellX=(i16)PosGetCellCoordX(World.position[i].x);
             World.instances[i].cellZ=(i16)PosGetCellCoordZ(World.position[i].z);
             World.instances[i].cellIndex=PosGetCellCoordsP(World.instances[i].cellX,World.instances[i].cellZ); // Subte difference than PosGetCellCoords... and I don't remember why!?
@@ -982,7 +1014,7 @@ void Physics() {
             float searchRad = World.radius[a] + V3_Mag(World.velocity[a]) * dtsub + 0.5f;
             i32 radCells = (i32)(searchRad / CELL_SIZE) + 2;
             typedef struct { Manifold m; u16 otherIdx; } Contact;
-            Contact contacts[16]; int contactCount = 0;
+            Contact contacts[32]; int contactCount = 0;
             for (i32 dx = -radCells; dx <= radCells; ++dx) {
                 for (i32 dz = -radCells; dz <= radCells; ++dz) {
                     u32 cell = PosGetCellCoordsP(cx + dx,cz + dz); if (cell >= WORLDX*WORLDX) continue;
@@ -1014,7 +1046,7 @@ void Physics() {
                         else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_BOX) { mf = BoxCvx(Entity_GetBox(b),World.instances[a].colMeshIndex,&modelMatrices[a*16]); }
                         else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_CVX) { mf = CvxCvx(World.instances[a].colMeshIndex,World.instances[b].colMeshIndex,&modelMatrices[a*16],&modelMatrices[b*16]); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
                         else { mf=OverlapToManifold(SphSph(World.position[a],World.colliderSize[a].x,World.position[b],World.colliderSize[b].x)); }
-                        if (mf.n && contactCount < 16) contacts[contactCount++] = (Contact){mf,b};
+                        if (mf.n && contactCount < 32) contacts[contactCount++] = (Contact){mf,b};
                     }
                 }
             }

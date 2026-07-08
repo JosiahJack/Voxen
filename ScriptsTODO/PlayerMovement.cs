@@ -781,7 +781,7 @@
 			float falltake = fallDamage - random_range(0,68f);
 			if (falltake > hm.health && falltake - hm.health < 5f) falltake = hm.health - 1f; // some small saving grace
 			dd.damage = falltake; // No need for GetDamageTakeAmount since this is strictly internal to Player
-			dd.attackType = AttackType.None;
+			dd.attackType = AttType.None;
 			dd.offense = 0f;
 			dd.isOtherNPC = false;
 			// No impact force from fall damage.

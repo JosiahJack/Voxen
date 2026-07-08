@@ -251,7 +251,7 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define COLLIDER_CAPSULE_DIRECTION_Z_F 2.0f // Z-Axis
 typedef u8 BodyState;        static const u8 BodyState_Standing=0,BodyState_Crouch=1,BodyState_CrouchingDown=2,BodyState_StandingUp=3,BodyState_Prone=4,BodyState_ProningDown=5,BodyState_ProningUp=6;
 typedef u8 Handedness;       static const u8 Handedness_Center=0,Handedness_LH=1,Handedness_RH=2;
-typedef u8 AttackType;       static const u8 AttackType_None=0,AttackType_Melee=1,AttackType_MeleeEnergy=2,AttackType_EnergyBeam=3,AttackType_Magnetic=4,AttackType_Projectile=5,AttackType_ProjectileNeedle=6,AttackType_ProjectileEnergyBeam=7,AttackType_ProjectileLaunched=8,AttackType_Gas=9,AttackType_Tranq=10,AttackType_Drill=11;
+typedef u8 AttType;       static const u8 Att_None=0,Att_Melee=1,Att_MlEg=2,Att_Beam=3,Att_Magn=4,Att_HitS=5,Att_PjNd=6,Att_PjBm=7,Att_Ball=8,Att_Gas=9,Att_Trnq=10,Att_Drill=11;
 typedef u8 NPCType;          static const u8 NPCType_Mutant=0,NPCType_Supermutant=1,NPCType_Robot=2,NPCType_Cyborg=3,NPCType_Supercyborg=4,NPCType_Cyber=5,NPCType_MutantCyborg=6;
 typedef u8 PerceptionLevel;  static const u8 PerceptionLevel_Low=0,PerceptionLevel_Medium=1,PerceptionLevel_High=2,PerceptionLevel_Omniscient=3;
 typedef u8 AIState;          static const u8 AIState_Idle=0,AIState_Walk=1,AIState_Run=2,AIState_Attack1=3,AIState_Attack2=4,AIState_Attack3=5,AIState_Pain=6,AIState_Dying=7,AIState_Dead=8,AIState_Inspect=9,AIState_Interacting=10;
@@ -412,14 +412,14 @@ typedef struct {
     i16 ladderState,weaponCurrentPending,weaponIndexPending;
     u16 numLogsFromLevel[10],hasHardware,hardwareIsActive,hardwareInvReferenceIndex[HW_COUNT],heldObjectIndex,heldObjectCustomIndex,heldObjectAmmo,heldObjectAmmo2,weaponIndex,currentSearchItem,generalInvIndex,generalInvCustomIndex[14],patchActive,drainJPM;
     u8 lerpUp,hasSoft,softVersions[7],hasMinigame,numweapons,currentMagazineAmount[7],currentMagazineAmount2[7],hardwareVersion[HW_COUNT],hardwareVersionSetting[HW_COUNT],grenAmmo[7],grenConstIndex[7],grenadeCurrent,generalInvCurrent,patchCurrent,patchCounts[7],cyberItemIndex;
-        bool playerDead,beepDone,logPaused,hasNewEmail,hasNewNotes,currentCyberItem,isPulserNotDrill,wepLoadedWithAlternate[7],staminupActive,hasLog[134],readLog[134],justChangedWeap,overloadEnabled,recoiling,heldObjectLoadedAlternate,holdingObject,grenadeActive,hasNewLogs,hasNewData;
+        bool playerDead,beepDone,logPaused,hasNewEmail,hasNewNotes,currentCyberItem,isPulserNotDrill,wepLoadedWithAlternate[7],staminupActive,hasLog[134],readLog[134],justChangedWeap,overloadEnabled,recoiling,heldObjectLoadedAlternate,holdingObject,grenActive,hasNewLogs,hasNewData;
 } InventorySystem;
-typedef struct { float damage,penetration,offense,armorvalue,defense,impactVelocity; V3 attacknormal,hitpoint; AttackType attackType; u16 owner,hitIdx; bool isOtherNPC,berserkActive; } DamageData;
+typedef struct { float damage,penetration,offense,armorvalue,defense,impactVelocity; V3 attacknormal,hitpoint; AttType attackType; u16 owner,hitIdx; bool isOtherNPC,berserkActive; } DamageData;
 typedef struct __attribute__((packed, aligned(8))) { u64 magicNumber; double thisRunTime; bool isLoading; i32 missionSplitID; } AutoSplitterData; // For use with LiveSplit or other future speedrunner utilities for doing speedruns
 extern AutoSplitterData autoSplitter;
 typedef struct {
         const char* name;
-        AttackType attackType,attackType2,attackType3;
+        AttType attackType,attackType2,attackType3;
         float damage,damage2,damage3,range,range2,range3,health,healthForCyberNPC;
         PerceptionLevel perception;
         float disruptability,armorvalue,defense;
@@ -504,7 +504,7 @@ typedef /*FAT*/ struct  {
          destroyAfterListInsteadOfDeactivate,iceActive,forceFieldDirectionX,forceFieldDirectionY,forceFieldDirectionZ,heldObjectLoadedAlternate,changeTexOnActive,blinkTexOnActive,alternateOn,lerping,onlyTargetOnce,autoPlayEmail,inCyberTube,noiseFinished,textureAnimating,textureGlowAnimating,
          textureAnimationStopsAtDead,texAnimInReverse,texAnimRandom;
     u8 maxRandomItems; // [0 4]
-    AttackType attackType;
+    AttType attackType;
     AccessCardType requiredAccessCard;
     BloodType bloodType;
     DoorState doorOpen;
@@ -559,6 +559,10 @@ typedef struct {
     bool levelInvTnsrValid[MAX_LEVELS][INSTANCE_COUNT];
     bool levelColliding[MAX_LEVELS][INSTANCE_COUNT];
     u16 levelInstCount[MAX_LEVELS]; // Per-level instance count (parallel to instCount which always mirrors the active level's count).
+    Light levelLights[14][LIGHT_COUNT];
+    LightAnimation levelLAnims[14][LIGHT_COUNT];
+    V3 levelLightsNewPosition[14][LIGHT_COUNT];
+    u16 levelLoadedLights[14];
     // ===== Active-level pointers (the "current instances[]") =====
     // All existing call sites use World.instances[i], World.position[i], etc. unchanged;
     // these pointers simply redirect to the active level's row in the levelXxx[] arrays.
@@ -583,6 +587,10 @@ typedef struct {
     float* bounciness;
     bool* invTnsrValid;
     bool* colliding;
+    Light* lights;
+    LightAnimation* lanims;
+    V3* lightsNewPosition;
+    u16 loadedLights; // mirrors levelLoadedLights[currentLevel]
     // instCount remains a scalar u16 (declared above) and mirrors levelInstCount[currentLevel].
     Color fogColor[14];
     // ===== Cross-level Target I/O cache =====
@@ -600,6 +608,8 @@ typedef struct {
     u32 targetIOActivatorIoflags;
     u16 targetIOActivatorIdx;
     u8 targetIOEntryLevel;
+    float cam_pitch,cam_yaw,cam_roll;
+    i32 currentMouse_dx,currentMouse_dy;
     bool targetIOActive;
         char global_dllname[256],global_winicon[256],playerName[27],audiologNames[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH],audiologSubjects[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH],audiologSenders[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH],audioLogSpeech2Text[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH];
 } GlobalContext; // Savable complete game state data
@@ -749,6 +759,10 @@ INLINE void SetLevelPointers(u8 lev) {
     World.invTnsrValid     = World.levelInvTnsrValid[lev];
     World.colliding        = World.levelColliding[lev];
     World.instCount        = World.levelInstCount[lev];
+    World.lights            = World.levelLights[lev];
+    World.lanims            = World.levelLAnims[lev];
+    World.lightsNewPosition = World.levelLightsNewPosition[lev];
+    World.loadedLights      = World.levelLoadedLights[lev];
 }
 // CopyPlayerState: Copies the player-entity slots (PLAYER1=1, PLAYER2=2) — including the Entity
 // struct and all parallel SoA arrays — from srcLevel to dstLevel.  Used by LoadLevel() to carry

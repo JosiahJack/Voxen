@@ -436,7 +436,7 @@ public class PuzzleGrid : MonoBehaviour {
 				}
 			}
 			UpdateCellImages();
-			MouseLookScript.a.ResetHeldItem();
+			ResetHeldItem();
 		}
 		
 		UseTargets(null,udSender,target);
