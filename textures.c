@@ -1,9 +1,8 @@
 // textures.c - 2D Texture Loading System
 u32 totalPixels,totalPaletteColors;
-typedef struct { u16 index; bool transparent; bool doublesided; char path[128]; } TextureData; typedef struct { TextureData* entries; u32 count; u32 capacity; } TextureDataParser; typedef struct { const char* data; int size; } RawTexture;
-typedef struct { u32 img_x, img_y; i32 img_n, img_out_n; u8* img_buffer, *img_buffer_end; } PngContext;
-typedef struct { u8* indices; u32* palette,palSize; i32 w, h; } TexResult;
-typedef struct TextureParseTask { u32 texCnt; _Atomic u32* shared_idx; RawTexture* raw_textures; i32* parsIdx; const TextureDataParser* parser; TexResult* results;int tid; } TextureParseTask;
+typedef struct { u16 index; bool transparent; bool doublesided; char path[128]; } TextureData;          typedef struct { TextureData* entries; u32 count; u32 capacity; } TextureDataParser;
+typedef struct { u32 img_x, img_y; i32 img_n, img_out_n; u8* img_buffer, *img_buffer_end; } PngContext; typedef struct { u8* indices; u32* palette,palSize; i32 w, h; } TexResult;
+typedef struct TextureParseTask { u32 texCnt; _Atomic u32* shared_idx; i32* parsIdx; const TextureDataParser* parser; TexResult* results;int tid; } TextureParseTask;
 typedef struct { PngContext* s; u8* idata, *expanded, *out; } PngData; typedef struct { u16 fast[1<<9], firstcode[16], firstsymbol[16], value[288]; i32 maxcode[17]; u8 size[288]; } PngHuffman; typedef struct { u8 *zbuffer, *zbuffer_end, *zout, *zout_start; i32 num_bits; u32 code_buffer; PngHuffman z_length, z_distance; } pngzbuf;
 enum { PNGFmt_none=0, PNGFmt_sub=1, PNGFmt_up=2, PNGFmt_avg=3, PNGFmt_paeth=4, PNGFmt_avg_first, PNGFmt_paeth_first };
 PngArena png_arena_main; static PngArena* thread_png_arenas = NULL;
@@ -134,10 +133,7 @@ static void* TextureParsingWorker(void* arg) {
         if (unlikely(pIdx < 0 || pIdx >= (i32)t->parser->count)) continue;
         doubleSidedTexture[i] = t->parser->entries[pIdx].doublesided; 
         transparentTexture[i] = t->parser->entries[pIdx].transparent;
-        FHandle dummy_fd; int size=0; t->raw_textures[i].data=(const char*)OS_OpenAndAllocateFileBufferReadonly(t->parser->entries[pIdx].path,&dummy_fd,&size);
-        t->raw_textures[i].size=size;
-        const char* d = t->raw_textures[i].data; 
-        int sz = t->raw_textures[i].size; 
+        FHandle dummy_fd; int sz=0; const char* d =(const char*)OS_OpenAndAllocateFileBufferReadonly(t->parser->entries[pIdx].path,&dummy_fd,&sz);
         if (unlikely(!d || sz <= 0)) continue;
         int w=0, h=0; u8 *pix = PngLoad((const u8*)d,sz,&w,&h,&thread_png_arenas[t->tid]); if (!pix || w < 1 || h < 1) { OS_Free((void*)d,(size_t)sz); continue; }
         u32 nP = (u32)w * h; u8 *idx = (u8*)OS_Alloc(nP); u32 *pal = (u32*)OS_Alloc(256 * sizeof(u32)); u32 pSz = 0; 
@@ -244,16 +240,6 @@ static __attribute__((noinline)) void LoadTextures() {
     mset(parsIdx, -1, texCnt * sizeof(i32));
     for (u32 k = 0; k < texture_parser.count; ++k) { if (texture_parser.entries[k].index < texCnt) {parsIdx[texture_parser.entries[k].index] = (i32)k;} }
     DualLog("Loading textures (%u) ... ", texture_parser.count);
-    RawTexture* rawTextures = OS_Alloc(texCnt * sizeof(RawTexture));
-    mset(rawTextures, 0, texCnt * sizeof(RawTexture));
-//     for (u32 i = 0; i < texCnt; ++i) {
-//         i32 p = parsIdx[i]; if (p < 0) continue;
-//         const char* path = texture_parser.entries[p].path;
-//         FHandle dummy_fd;
-//         int size = 0; 
-//         rawTextures[i].data = (const char*)OS_OpenAndAllocateFileBufferReadonly(path, &dummy_fd, &size);
-//         rawTextures[i].size = size;
-//     }
     thread_png_arenas = (PngArena*)OS_Alloc((size_t)threadCnt * sizeof(PngArena));
     for (int t = 0; t < threadCnt; ++t) { thread_png_arenas[t].base = NULL; PngArenaInit(&thread_png_arenas[t]); }
     TexResult* texResults = OS_Alloc(texCnt * sizeof(TexResult)); // Unified result struct allocation
@@ -261,7 +247,7 @@ static __attribute__((noinline)) void LoadTextures() {
     TextureParseTask tasks[32]; 
     OS_Thread workers[32];
     _Atomic u32 shared_idx = 0; // The shared thread counter
-    for (int t = 0; t < threadCnt; ++t) { tasks[t] = (TextureParseTask){.texCnt = texCnt, .shared_idx = &shared_idx, .raw_textures = rawTextures, .parsIdx = parsIdx, .parser = &texture_parser, .results = texResults,.tid = t}; OS_ThreadCreate(&workers[t], TextureParsingWorker, &tasks[t]); }
+    for (int t = 0; t < threadCnt; ++t) { tasks[t] = (TextureParseTask){.texCnt = texCnt, .shared_idx = &shared_idx, .parsIdx = parsIdx, .parser = &texture_parser, .results = texResults,.tid = t}; OS_ThreadCreate(&workers[t], TextureParsingWorker, &tasks[t]); }
     for (int t = 0; t < threadCnt; ++t) OS_ThreadJoin(&workers[t]);
     totalPixels = totalPaletteColors = 0u;
     for (u16 i = 0; i < texCnt; ++i) { if (texResults[i].indices) { totalPixels += (u32)texResults[i].w * texResults[i].h; totalPaletteColors += texResults[i].palSize; } }
@@ -294,14 +280,13 @@ static __attribute__((noinline)) void LoadTextures() {
     glBindBuffer(GL_SSBO, colorBufferID);
     void* dst = glMapBufferRange(GL_SSBO,0,packed_size,0x0002|0x0004);
     mcpy(dst,all_indices,packed_size); glUnmapBuffer(GL_SSBO);
-    glBindBuffer(GL_SSBO, texPalID);         glBufferData(GL_SSBO, totalPaletteColors * sizeof(u32), texturePalettes, GL_STATIC_DRAW);
-    glBindBuffer(GL_SSBO, textureOffsetsID); glBufferData(GL_SSBO, texCnt * sizeof(u32), textureOffsets, GL_STATIC_DRAW);
-    glBindBuffer(GL_SSBO, textureSizesID);   glBufferData(GL_SSBO, texCnt * 2 * sizeof(i32), textureSizes, GL_STATIC_DRAW);
-    glBindBuffer(GL_SSBO, texPalOfsID);      glBufferData(GL_SSBO, texCnt * sizeof(u32), texturePaletteOffsets, GL_STATIC_DRAW); glBindBuffer(GL_SSBO, 0);
-    OS_Free(texture_parser.entries, texture_parser.count * sizeof(TextureData)); OS_Free(arena, arena_size);
-    OS_Free(rawTextures, texCnt * sizeof(RawTexture));                           OS_Free(parsIdx, texCnt * sizeof(i32));
-    OS_Free(texResults, texCnt * sizeof(TexResult));                             OS_Free(textureSizes, texCnt * 2 * sizeof(i32));
-    OS_Free(texturePaletteOffsets, texCnt * sizeof(u32));        
+    glBindBuffer(GL_SSBO,texPalID);         glBufferData(GL_SSBO,totalPaletteColors * sizeof(u32),texturePalettes, GL_STATIC_DRAW);
+    glBindBuffer(GL_SSBO,textureOffsetsID); glBufferData(GL_SSBO,texCnt * sizeof(u32),textureOffsets,GL_STATIC_DRAW);
+    glBindBuffer(GL_SSBO,textureSizesID);   glBufferData(GL_SSBO,texCnt * 2 * sizeof(i32),textureSizes,GL_STATIC_DRAW);
+    glBindBuffer(GL_SSBO,texPalOfsID);      glBufferData(GL_SSBO,texCnt * sizeof(u32),texturePaletteOffsets,GL_STATIC_DRAW); glBindBuffer(GL_SSBO,0);
+    OS_Free(texture_parser.entries, texture_parser.count * sizeof(TextureData)); OS_Free(arena,arena_size);
+    OS_Free(parsIdx,texCnt * sizeof(i32));                                      OS_Free(texResults,texCnt * sizeof(TexResult));
+    OS_Free(textureSizes,texCnt * 2 * sizeof(i32));                             OS_Free(texturePaletteOffsets,texCnt * sizeof(u32));        
     for (int t=0; t<threadCnt; ++t) OS_Free(thread_png_arenas[t].base, 16777216);
     OS_Free(thread_png_arenas, (size_t)threadCnt * sizeof(PngArena));
     FHandle fp = OS_OpenReadonly(World.global_winicon);
@@ -309,7 +294,7 @@ static __attribute__((noinline)) void LoadTextures() {
     u8* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize, fp, World.global_winicon);    
     OS_Close(fp); PngArenaInit(&png_arena_main);
     int w=1, h=1; 
-    u8* pixels = PngLoad(file_buffer, windowIconFileSize, &w, &h, &png_arena_main);
+    u8* pixels = PngLoad(file_buffer,windowIconFileSize,&w,&h,&png_arena_main);
     if (!pixels) { DualLogError("Failed to load icon: %s\n", World.global_winicon); OS_Exit(1); }
     WinSysIcon image = (WinSysIcon){w,h,pixels}; 
     VSetWindowIcon(&image);
@@ -321,15 +306,7 @@ static __attribute__((noinline)) void LoadTextures() {
 }
 
 #define NUM_TEXTURE_CLIPS 48
-typedef struct {
-    const u16 *frames;     // pointer into sequenceTextures[]
-    u8         length;     // how many frames (before wrapping / stopping)
-    bool            hasGlow;    // does this clip also animate the glow map?
-    const u16 *glowFrames; // can be NULL if !hasGlow
-    u8         glowLength;
-    const char*     name;
-} TextureAnimClip;
-
+typedef struct { const u16 *frames;  u8 length; bool hasGlow; const u16 *glowFrames; u8 glowLength; const char* name; } TextureAnimClip;
 u16 sequenceTextures[302]={
     1159,1160,881,1162,1163,1164, // scr_exp 01 - 06
     1310,1311,1312,1313, // bridg1_1 001 - 004
@@ -432,17 +409,12 @@ void TextureSequenceInit(u16 self, char* trimmed_value) {
     Entity* e = &World.instances[self];
     if (e->index == 526) return; // Skip prop_console02 for now, will need to split its screen off.
     if (trimmed_value[0] == '\0') { e->textureAnimating = false; e->modelIndex = EDefs[e->index].modelIndex; return; }
-    
     e->textureAnimating = true; e->textureGlowAnimating = false; e->texAnimLight = U16_MAX; e->texAnimLight2 = U16_MAX;
     e->texFrame = e->texGlowFrame = 0;
     if (sEqual(trimmed_value,"ScreenDestroyed")) { e->texAnimClip = NUM_TEXTURE_CLIPS - 1; return; }
     if (sEqual(trimmed_value,"MedCamView1")) { e->textureAnimating = false; e->camView = 0; return; } // Sensaround occupies slots 0,1,2 for center, left, right respectively.
     if (sEqual(trimmed_value,"MedCamView2")) { e->textureAnimating = false; e->camView = 1; return; }
-    
-    for (int i = 0; i < NUM_TEXTURE_CLIPS; ++i) {
-        if (sEqual(trimmed_value,textureAnimClips[i].name)) { e->texAnimClip = i; e->textureGlowAnimating = textureAnimClips[i].hasGlow; return; }
-    }
-    
+    for (int i=0;i<NUM_TEXTURE_CLIPS;++i) { if(sEqual(trimmed_value,textureAnimClips[i].name)){e->texAnimClip=i; e->textureGlowAnimating=textureAnimClips[i].hasGlow; return;} }
     e->textureAnimating = false; // Couldn't find match, just don't animate.
 }
 
@@ -450,7 +422,6 @@ void TextureSequenceUpdate(u16 self) {
     Entity* e = &World.instances[self];
     if (!e->textureAnimating) return;
     if (e->tickFinished >= World.pauseRelativeTime) return;
-
     e->tickFinished = World.pauseRelativeTime + e->tickTime;
     const TextureAnimClip* clip = &textureAnimClips[e->texAnimClip];
     if (e->texAnimRandom && (!e->textureAnimationStopsAtDead || e->health > 0.0f)) {
@@ -458,19 +429,10 @@ void TextureSequenceUpdate(u16 self) {
         if (clip->hasGlow) e->texGlowFrame = random_range_u32(0, clip->glowLength - 1);
     } else {
         if (e->texAnimInReverse) {
-            if (e->texFrame == 0) e->texFrame = clip->length - 1;
-            else                  e->texFrame++;
-
-            if (clip->hasGlow) {
-                if (e->texGlowFrame == 0) e->texGlowFrame = clip->glowLength - 1;
-                else                      e->texGlowFrame--;
-            }
-        } else {
-            e->texFrame = (e->texFrame + 1) % clip->length;
-            if (clip->hasGlow) e->texGlowFrame = (e->texGlowFrame + 1) % clip->glowLength;
-        }
+            if (e->texFrame == 0) { e->texFrame = clip->length - 1;} else { e->texFrame++; }
+            if (clip->hasGlow) { if(e->texGlowFrame == 0){e->texGlowFrame = clip->glowLength - 1;} else {e->texGlowFrame--;} }
+        } else { e->texFrame = (e->texFrame + 1) % clip->length; if(clip->hasGlow){e->texGlowFrame=(e->texGlowFrame + 1) % clip->glowLength;} }
     }
-
     if (e->textureAnimationStopsAtDead && e->health <= 0.0f && e->texFrame >= clip->length - 1) { e->textureAnimating = false; TurnLightOff(e->texAnimLight); TurnLightOff(e->texAnimLight2); }
     e->texIndex = sequenceTextures[ clip->frames[e->texFrame] ];
     if (clip->hasGlow && clip->glowFrames) e->glowIndex = sequenceTextures[ clip->glowFrames[e->texGlowFrame] ];
