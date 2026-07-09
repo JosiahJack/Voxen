@@ -3176,18 +3176,16 @@ static void Frob(V3 pos, V3 forward, V3 right) {
     if (World.curLev == LEVEL_CYBERSPACE) return;
     if (World.Sys_UI.vmailActive) { DeactivateVMail(); World.Sys_UI.vmailActive = false; return; }
     if (World.uiIsBlocking) return;
-    
     InventorySystem* inv = Inv(PLAYER1);
     if (inv->holdingObject) { DropHeldItem(); return; }
-    
     V3 dir = ScreenPointToRay(forward,right);
-    World.debugLine_start = pos;
-    World.debugLine_end = (V3){dir.x * FROB_DISTANCE + pos.x,dir.y * FROB_DISTANCE + pos.y,dir.z * FROB_DISTANCE + pos.z};
     RaycastHit tempHit = Raycast(pos,dir,FROB_DISTANCE,LMASK_PLAYER_FROB);
-    World.debugLineFinished = World.pauseRelativeTime + 3.0;
+    if (Cheats.showPhys) {
+        World.debugLine_start = pos;
+        World.debugLine_end = tempHit.hit ? tempHit.point : (V3){dir.x * FROB_DISTANCE + pos.x,dir.y * FROB_DISTANCE + pos.y,dir.z * FROB_DISTANCE + pos.z};
+        World.debugLineFinished = World.pauseRelativeTime + 3.0;
+    }
     if (!tempHit.hit) { CenterStatusPrint("%s",Sys_Text.stringTable[30]); return; }
-    
-    World.debugLine_end = tempHit.point;
     UseEntity(PLAYER1,tempHit.hitInstanceIndex);
 }
 // Update
