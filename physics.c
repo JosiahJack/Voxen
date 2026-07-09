@@ -228,45 +228,63 @@ float GetColRad(u16 i) {
 
 Quaternion quat_from_axis_angle(V3 axis, float angle) { float half = angle * 0.5f; float s = vsinf(half); return (Quaternion){axis.x * s,axis.y * s,axis.z * s,vcosf(half)}; }
 Quaternion quat_normalize(Quaternion q) { float len2 = q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w; if (len2 < PHY_EPSILON) {return (Quaternion){0,0,0,1};} float inv=vinvsqtf(len2); q.x*=inv; q.y*=inv; q.z*=inv; q.w*=inv; return q; }
-static void ComputeConvexMeshInertiaTensor(u16 i) { // Uses signed tetrahedron decomposition approach for inertia tensor derivation for convex meshes using origin as one of the points and going out to each tri to form each tetrahedron, one per tri.
-    u16 mi = World.instances[i].colMeshIndex; World.invTnsrValid[i] = false;
+static void ComputeConvexMeshInertiaTensor(u16 i) {
+    u16 mi = World.instances[i].colMeshIndex;
+    World.invTnsrValid[i]=false;
     if (mi >= MAX_MDLS || !modelTriangleCounts[mi] || !modelVertexCounts[mi]) return;
-    float acc[6] = {0}; float volAcc = 0.f; u32 triCount = modelTriangleCounts[mi]; // acc[0]=x², acc[1]=y², acc[2]=z² to keep things clean and explicitly isolated
-    for (u32 ti = 0; ti < triCount; ++ti) {
-        u32 i0=modelTriangles[mi][ti*3+0], i1=modelTriangles[mi][ti*3+1], i2=modelTriangles[mi][ti*3+2];
+    float acc[6]={0}; float cm[3]={0}; float volAcc=0.0f;
+    u32 triCount = modelTriangleCounts[mi];
+    for (u32 ti=0;ti<triCount;++ti) {
+        u32 i0 = modelTriangles[mi][ti*3+0], i1 = modelTriangles[mi][ti*3+1], i2 = modelTriangles[mi][ti*3+2];
         V3 v0 = (V3){*(float*)(modelVertices[mi]+(i0)*CPU_VRT_SZ+0), *(float*)(modelVertices[mi]+(i0)*CPU_VRT_SZ+4), *(float*)(modelVertices[mi]+(i0)*CPU_VRT_SZ+8)};
         V3 v1 = (V3){*(float*)(modelVertices[mi]+(i1)*CPU_VRT_SZ+0), *(float*)(modelVertices[mi]+(i1)*CPU_VRT_SZ+4), *(float*)(modelVertices[mi]+(i1)*CPU_VRT_SZ+8)};
         V3 v2 = (V3){*(float*)(modelVertices[mi]+(i2)*CPU_VRT_SZ+0), *(float*)(modelVertices[mi]+(i2)*CPU_VRT_SZ+4), *(float*)(modelVertices[mi]+(i2)*CPU_VRT_SZ+8)};
-        float det = V3_dot(v0,V3_Cross(v1,v2)); volAcc += det;
-        acc[0] += det * (v0.x*v0.x + v0.x*v1.x + v1.x*v1.x + v0.x*v2.x + v1.x*v2.x + v2.x*v2.x); // ∫x² Pure covariance components
-        acc[1] += det * (v0.y*v0.y + v0.y*v1.y + v1.y*v1.y + v0.y*v2.y + v1.y*v2.y + v2.y*v2.y); // ∫y²
-        acc[2] += det * (v0.z*v0.z + v0.z*v1.z + v1.z*v1.z + v0.z*v2.z + v1.z*v2.z + v2.z*v2.z); // ∫z²
-        acc[3] += det * (v0.x*v0.y + v0.x*v1.y + v0.x*v2.y + v1.x*v0.y + v1.x*v1.y + v1.x*v2.y + v2.x*v0.y + v2.x*v1.y + v2.x*v2.y); // ∫xy
-        acc[4] += det * (v0.x*v0.z + v0.x*v1.z + v0.x*v2.z + v1.x*v0.z + v1.x*v1.z + v1.x*v2.z + v2.x*v0.z + v2.x*v1.z + v2.x*v2.z); // ∫xz
-        acc[5] += det * (v0.y*v0.z + v0.y*v1.z + v0.y*v2.z + v1.y*v0.z + v1.y*v1.z + v1.y*v2.z + v2.y*v0.z + v2.y*v1.z + v2.y*v2.z); // ∫yz
+        float det = V3_dot(v0, V3_Cross(v1, v2));
+        volAcc += det;
+        cm[0] += det * (v0.x + v1.x + v2.x); // First moments for centroid (∫x dV = det/24 · (ax+bx+cx) per tet)
+        cm[1] += det * (v0.y + v1.y + v2.y);
+        cm[2] += det * (v0.z + v1.z + v2.z);
+        acc[0] += det * (v0.x*v0.x + v0.x*v1.x + v1.x*v1.x + v0.x*v2.x + v1.x*v2.x + v2.x*v2.x); // Diagonal second moments: 6 terms, divisor 60  (correct)
+        acc[1] += det * (v0.y*v0.y + v0.y*v1.y + v1.y*v1.y + v0.y*v2.y + v1.y*v2.y + v2.y*v2.y);
+        acc[2] += det * (v0.z*v0.z + v0.z*v1.z + v1.z*v1.z + v0.z*v2.z + v1.z*v2.z + v2.z*v2.z);
+        acc[3] += det * (2.0f*(v0.x*v0.y + v1.x*v1.y + v2.x*v2.y) + v0.x*v1.y + v1.x*v0.y + v0.x*v2.y + v2.x*v0.y + v1.x*v2.y + v2.x*v1.y); // Off-diagonal second moments: 12-term Mirtich formula, divisor 120, 2(ax·ay + bx·by + cx·cy) + cross terms
+        acc[4] += det * (2.0f*(v0.x*v0.z + v1.x*v1.z + v2.x*v2.z) + v0.x*v1.z + v1.x*v0.z + v0.x*v2.z + v2.x*v0.z + v1.x*v2.z + v2.x*v1.z);
+        acc[5] += det * (2.0f*(v0.y*v0.z + v1.y*v1.z + v2.y*v2.z) + v0.y*v1.z + v1.y*v0.z + v0.y*v2.z + v2.y*v0.z + v1.y*v2.z + v2.y*v1.z);
     }
     if (vabs(volAcc) < PHY_EPSILON) return;
-    float sx = World.scale[i].x, sy = World.scale[i].y, sz = World.scale[i].z; // Scale integration values by actual mesh dimensions quadratically
-    float x2 = acc[0] * sx * sx; float y2 = acc[1] * sy * sy; float z2 = acc[2] * sz * sz; float xy = acc[3] * sx * sy; float xz = acc[4] * sx * sz; float yz = acc[5] * sy * sz;
-    float s = World.mass[i] / (volAcc * 10.0f); float so = World.mass[i] / (volAcc * 10.0f);
-    float r = modelBounds[mi] * vmax(vmax(sx, sy), sz);
-    float mn = ((2.0f / 5.0f) * World.mass[i] * r * r) * 0.1f;
-    float Ixx = vmax((y2 + z2) * s, mn); // Construct the actual mass distribution tensor elements
-    float Iyy = vmax((x2 + z2) * s, mn);
-    float Izz = vmax((x2 + y2) * s, mn);
-    float Ixy = -xy * so; float Ixz = -xz * so; float Iyz = -yz * so;
-    World.inertiaTensor[i][0] = Ixx; World.inertiaTensor[i][1] = Iyy; World.inertiaTensor[i][2] = Izz;
-    World.inertiaTensor[i][3] = Ixy; World.inertiaTensor[i][4] = Ixz; World.inertiaTensor[i][5] = Iyz;
-    float det = Ixx * (Iyy * Izz - Iyz * Iyz) - Ixy * (Ixy * Izz - Ixz * Iyz) + Ixz * (Ixy * Iyz - Iyy * Ixz);
+    float sx = World.scale[i].x, sy = World.scale[i].y, sz = World.scale[i].z;
+    float sd = World.mass[i] / (volAcc * 10.0f); // Conversion factors: diagonal /60 → mass/(volAcc·10), off-diagonal /120 → mass/(volAcc·20).  Signed volAcc is intentional — signs cancel with signed acc[] values.
+    float so = World.mass[i] / (volAcc * 20.0f);
+    float cx  = cm[0] / (4.0f * volAcc); // Centroid: cx = (∫x dV) / V = cm[0]/24 / (volAcc/6) = cm[0]/(4·volAcc)
+    float cy  = cm[1] / (4.0f * volAcc);
+    float cz  = cm[2] / (4.0f * volAcc);
+    float scx = cx * sx, scy = cy * sy, scz = cz * sz;
+    float m   = World.mass[i];
+    float Ixx = sd * (acc[1]*sy*sy + acc[2]*sz*sz) - m * (scy*scy + scz*scz); // Inertia about origin (with scale), then parallel-axis shift to centroid
+    float Iyy = sd * (acc[0]*sx*sx + acc[2]*sz*sz) - m * (scx*scx + scz*scz);
+    float Izz = sd * (acc[0]*sx*sx + acc[1]*sy*sy) - m * (scx*scx + scy*scy);
+    float Ixy = -(so * acc[3] * sx*sy - m * scx * scy);
+    float Ixz = -(so * acc[4] * sx*sz - m * scx * scz);
+    float Iyz = -(so * acc[5] * sy*sz - m * scy * scz);
+    float r  = modelBounds[mi] * vmax(vmax(sx,sy),sz); // Safety floor
+    float mn = (2.0f / 5.0f) * m * r * r * 0.1f;
+    Ixx = vmax(Ixx,mn); Iyy = vmax(Iyy,mn); Izz = vmax(Izz,mn);
+    World.inertiaTensor[i][0]=Ixx; // Store packed symmetric tensor (6 elements)
+    World.inertiaTensor[i][1]=Iyy;
+    World.inertiaTensor[i][2]=Izz;
+    World.inertiaTensor[i][3]=Ixy;
+    World.inertiaTensor[i][4]=Ixz;
+    World.inertiaTensor[i][5]=Iyz;
+    float det = Ixx*(Iyy*Izz - Iyz*Iyz) - Ixy*(Ixy*Izz - Ixz*Iyz) + Ixz*(Ixy*Iyz - Iyy*Ixz); // Inverse: 3×3 symmetric
     if (vabs(det) < PHY_EPSILON) return;
     float invDet = 1.0f / det;
-    World.invInertiaTensor[i][0] = (Iyy * Izz - Iyz * Iyz) * invDet;
-    World.invInertiaTensor[i][1] = (Ixx * Izz - Ixz * Ixz) * invDet;
-    World.invInertiaTensor[i][2] = (Ixx * Iyy - Ixy * Ixy) * invDet;
-    World.invInertiaTensor[i][3] = (Ixz * Iyz - Ixy * Izz) * invDet;
-    World.invInertiaTensor[i][4] = (Ixy * Iyz - Ixz * Iyy) * invDet;
-    World.invInertiaTensor[i][5] = (Ixy * Ixz - Ixx * Iyz) * invDet;
-    World.invTnsrValid[i] = true;
+    World.invInertiaTensor[i][0]=(Iyy*Izz - Iyz*Iyz) * invDet; // invIxx
+    World.invInertiaTensor[i][1]=(Ixx*Izz - Ixz*Ixz) * invDet; // invIyy
+    World.invInertiaTensor[i][2]=(Ixx*Iyy - Ixy*Ixy) * invDet; // invIzz
+    World.invInertiaTensor[i][3]=(Ixz*Iyz - Ixy*Izz) * invDet; // invIxy
+    World.invInertiaTensor[i][4]=(Ixy*Iyz - Iyy*Ixz) * invDet; // invIxz
+    World.invInertiaTensor[i][5]=(Ixy*Ixz - Ixx*Iyz) * invDet; // invIyz
+    World.invTnsrValid[i]=true;
 }
 
 static OverlapResult BoxBox(ShapeBox a, ShapeBox b) {
@@ -799,16 +817,34 @@ static void CvxTriTest(CvxMshCtx* ctx, V3 ta, V3 tb, V3 tc) { // Per-triangle co
         }
         if (hc->ok && best->n > 0 && V3_dot(tN, best->normal) > MANIFOLD_ALIGN_THRESHOLD) {
             float planeDist = V3_dot(tN, deepPoint);
+            V3 v0 = V3_AsubB(tb,ta); // Pre-compute triangle edge data for barycentric bounds test
+            V3 v1 = V3_AsubB(tc,ta);
+            float d00 = V3_dot(v0,v0);
+            float d01 = V3_dot(v0,v1);
+            float d11 = V3_dot(v1,v1);
+            float denom = d00 * d11 - d01 * d01;
+            bool validTri = vabs(denom) > PHY_EPSILON;
+            float margin = 0.05f; // Barycentric margin (allows slight edge bleed for stability)
             for (u32 i = 0; i < hc->n; ++i) {
                 V3 pt = hc->v[i];
-                float distToPlane = V3_dot(tN, pt) - planeDist;
+                float distToPlane = V3_dot(tN,pt) - planeDist;
                 if (vabs(distToPlane) < thicknessTolerance) {
-                    float ptPen = tD - distToPlane;
-                    if (ptPen > 0.0f) {
-                        bool isDup = false;
-                        for (int k = 0; k < best->n; ++k) { V3 diff = V3_AsubB(pt, best->p[k].point); if (V3_dot(diff, diff) < spreadEps * spreadEps) { isDup = true; break; } }
-                        if (!isDup && best->n < MANIFOLD_MAX) best->p[best->n++] = (ManifoldPt){ pt, ptPen };
-                        if (best->n >= MANIFOLD_MAX) break;
+                    bool insideTri = false;
+                    if (validTri) { // Project point onto the triangle plane, barycentric test
+                        V3 projPt = V3_AsubB(pt,V3_ScaleByF(tN,distToPlane));
+                        V3 v2 = V3_AsubB(projPt,ta);
+                        float d20 = V3_dot(v2,v0); float d21 = V3_dot(v2,v1);
+                        float v = (d11 * d20 - d01 * d21) / denom; float w = (d00 * d21 - d01 * d20) / denom; float u = 1.0f - v - w;
+                        if (u >= -margin && v >= -margin && w >= -margin) {insideTri = true;}
+                    }
+                    if (insideTri) {
+                        float ptPen = tD - distToPlane;
+                        if (ptPen > 0.0f) {
+                            bool isDup = false;
+                            for (int k = 0; k < best->n; ++k) { V3 diff = V3_AsubB(pt, best->p[k].point); if (V3_dot(diff, diff) < spreadEps * spreadEps) { isDup=true; break; }  }
+                            if (!isDup && best->n < MANIFOLD_MAX) best->p[best->n++] = (ManifoldPt){ pt, ptPen };
+                            if (best->n >= MANIFOLD_MAX) break;
+                        }
                     }
                 }
             }
@@ -943,16 +979,29 @@ static OverlapResult CapBox(ShapeCapsule cap, ShapeBox box) {
     return best;
 }
 
+// Quaternion → 3×3 rotation matrix (row-major, column-vector convention: v' = R·v)
+static inline void quat_to_mat3(Quaternion q, float R[3][3]) {
+    float x = q.x, y = q.y, z = q.z, w = q.w;
+    float xx = x*x, yy = y*y, zz = z*z;
+    float xy = x*y, xz = x*z, yz = y*z;
+    float wx = w*x, wy = w*y, wz = w*z;
+    R[0][0] = 1.0f - 2.0f*(yy+zz); R[0][1] = 2.0f*(xy-wz);       R[0][2] = 2.0f*(xz+wy);
+    R[1][0] = 2.0f*(xy+wz);         R[1][1] = 1.0f - 2.0f*(xx+zz); R[1][2] = 2.0f*(yz-wx);
+    R[2][0] = 2.0f*(xz-wy);         R[2][1] = 2.0f*(yz+wx);        R[2][2] = 1.0f - 2.0f*(xx+yy);
+}
+
 static inline V3 ApplyInvTensor(u16 i, V3 v) {
     if (World.collider[i] != COLTYPE_CVX || !World.invTnsrValid[i]) {
         float r = (World.collider[i] == COLTYPE_MSH) ? modelBounds[World.instances[i].modelIndex] : ((World.collider[i] == COLTYPE_CVX) ? modelBounds[World.instances[i].colMeshIndex] : GetColRad(i));
         float inertia = (2.0f / 5.0f) * World.mass[i] * r * r;
-        float invI = (inertia > PHY_EPSILON) ? 1.0f / inertia : 0.0f;
-        return V3_ScaleByF(v, invI);
+        float invI = 1.0f / vmax(inertia,0.0f);
+        return V3_ScaleByF(v,invI);
     }
-   
-    float* invI = World.invInertiaTensor[i]; // Use precomputed 3x3 world inverse inertia matrix
-    return (V3){invI[0]*v.x + invI[1]*v.y + invI[2]*v.z,invI[3]*v.x + invI[4]*v.y + invI[5]*v.z,invI[6]*v.x + invI[7]*v.y + invI[8]*v.z};
+    float R[3][3]; quat_to_mat3(World.rotation[i],R);
+    float *I = World.invInertiaTensor[i];
+    float bx = R[0][0]*v.x + R[1][0]*v.y + R[2][0]*v.z; float by = R[0][1]*v.x + R[1][1]*v.y + R[2][1]*v.z; float bz = R[0][2]*v.x + R[1][2]*v.y + R[2][2]*v.z; // v_body = R^T · v_world
+    float wx = I[0]*bx + I[3]*by + I[4]*bz;             float wy = I[3]*bx + I[1]*by + I[5]*bz;             float wz = I[4]*bx + I[5]*by + I[2]*bz; // w_body = I^{-1} · v_body  (packed symmetric: [xx,yy,zz,xy,xz,yz])
+    return (V3){R[0][0]*wx + R[0][1]*wy + R[0][2]*wz,R[1][0]*wx + R[1][1]*wy + R[1][2]*wz,R[2][0]*wx + R[2][1]*wy + R[2][2]*wz};// w_world = R · w_body
 }
 
 static void ResolveContactVelocity(u16 a, u16 b, V3 n, V3 rAarm, V3 rBarm, float targetVn, float *accumN, float *accumT, bool bStatic) {
