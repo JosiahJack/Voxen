@@ -13,7 +13,7 @@ void ForceShootMode(void) {
 
 void ForceInventoryMode(void) { World.inventoryMode = true; World.cursorPosition_x = 663; World.cursorPosition_y = 371; IgnoreNextMouseDelta(); } // Centered on UI baseline resolution 1366x768
 void ToggleInventoryMode(void) { if (World.inventoryMode) {ForceShootMode();} else {ForceInventoryMode();} }
-void ToggleConsole() { static bool imWasActPrior = false; if (!Cheats.consoleActive) {imWasActPrior = World.inventoryMode;} Cheats.consoleActive = !Cheats.consoleActive; if (Cheats.consoleActive) { World.inventoryMode = true; } else if (!imWasActPrior && World.inventoryMode) {ForceShootMode();} }
+void ToggleConsole() { static bool imWasActPrior = false; if (!Cheats.consoleActive) {imWasActPrior = World.inventoryMode;} Cheats.consoleActive = !Cheats.consoleActive; World.paused = !World.paused; if (Cheats.consoleActive) { World.inventoryMode = true; } else if (!imWasActPrior && World.inventoryMode) {ForceShootMode();} }
 static void AddToHistory(const char* entry) {
     if (slen(entry) == 0 || (numHistory > 0 && sEqual(entry,history[numHistory - 1]))) return;
     if (numHistory < 7) { scpy_to_a_from_b(history[numHistory],entry,T_BUFFER_SIZE); numHistory++; }

@@ -3,10 +3,10 @@
 #define RESTITUTION 0.15f
 #define FRICTION_SLIDE 0.25f
 #define FRICTION_ROLL 0.5f
-#define FRICTION_ROLL_RESISTANCE 0.03f  // true rolling resistance for round shapes
+#define FRICTION_ROLL_RESISTANCE 0.05f  // true rolling resistance for round shapes
 #define STEP_MIN_NORMAL_Y 0.7f
 #define PHY_EPSILON 0.0001f
-#define MAX_SUBSTEPS 10
+#define MAX_SUBSTEPS 40
 #define MAX_SPEED 16.666666f // m/s
 #define MAX_STEP_SIZE (0.1f / MAX_SPEED) // 0.01 s
 #define MAX_ANGULAR_SPEED 8.0f
@@ -338,11 +338,6 @@ static V3 MeshSupport(u16 m, const float* M, V3 d) {
     return b;
 }
 
-static inline V3 CachedSupport(const V3* v, u32 n, V3 d) { V3 best = v[0]; float top = V3_dot(v[0],d); for (u32 i = 1; i < n; ++i) { float dot = V3_dot(v[i],d); if (dot > top) { top = dot; best = v[i]; } } return best; }
-static inline V3 MinkowskiSupport(u16 mA, const float* mxA, u16 mB, const float* mxB, V3 d) { return V3_AsubB(MeshSupport(mA,mxA,d), MeshSupport(mB,mxB,(V3){-d.x,-d.y,-d.z})); }
-static inline V3 TP(V3 a, V3 b, V3 c) { return V3_Cross(V3_Cross(a,b),c); }
-static inline V3 BoxSupport(ShapeBox b, V3 d) { V3 x,y,z; obb_axes(b.rot,&x,&y,&z); float kx = V3_dot(d,x) >= 0.0f ? 1.0f : -1.0f, ky = V3_dot(d,y) >= 0.0f ? 1.0f : -1.0f, kz = V3_dot(d,z) >= 0.0f ? 1.0f : -1.0f; return V3_AplusB(V3_AplusB(V3_AplusB(b.ctr,V3_ScaleByF(x,kx * b.hExt.x)),V3_ScaleByF(y,ky * b.hExt.y)),V3_ScaleByF(z,kz * b.hExt.z)); }
-static inline V3 CapsuleSupport(ShapeCapsule cap, V3 d) { float db = V3_dot(cap.base,d),dt = V3_dot(cap.tip,d); V3 best = (dt > db) ? cap.tip : cap.base; float L = V3_dot(d,d); if (L < PHY_EPSILON) {return best;} return V3_AplusB(best,V3_ScaleByF(d,cap.rad / vsqrtf(L))); }
 typedef struct { V3 v[CVXMSH_HULL_CACHE]; u32 n; bool ok; } HullCache;
 static inline HullCache CacheHull(u16 m, const float* M) { // one-time world-space vertex transform+decode; turns every later support query into a cached dot-product scan instead of re-decoding half floats and re-transforming the whole mesh
     HullCache h; h.n = modelVertexCounts[m]; h.ok = h.n && h.n <= CVXMSH_HULL_CACHE;
@@ -352,7 +347,19 @@ static inline HullCache CacheHull(u16 m, const float* M) { // one-time world-spa
     return h;
 }
 
+static inline V3 CachedSupport(const V3* v, u32 n, V3 d) { V3 best = v[0]; float top = V3_dot(v[0],d); for (u32 i = 1; i < n; ++i) { float dot = V3_dot(v[i],d); if (dot > top) { top = dot; best = v[i]; } } return best; }
+static inline V3 MinkowskiSupport(u16 mA, const float* mxA, u16 mB, const float* mxB, V3 d) { return V3_AsubB(MeshSupport(mA,mxA,d), MeshSupport(mB,mxB,(V3){-d.x,-d.y,-d.z})); }
+static inline V3 TP(V3 a, V3 b, V3 c) { return V3_Cross(V3_Cross(a,b),c); }
+static inline V3 SphSupport(ShapeSphere b, V3 d) { return ({ float _L=V3_dot(d,d); V3_AplusB(b.ctr,(_L>PHY_EPSILON)?V3_ScaleByF(d,b.rad/vsqrtf(_L)):(V3){0,b.rad,0}); }); }
+static inline V3 BoxSupport(ShapeBox b, V3 d) { V3 x,y,z; obb_axes(b.rot,&x,&y,&z); float kx = V3_dot(d,x) >= 0.0f ? 1.0f : -1.0f, ky = V3_dot(d,y) >= 0.0f ? 1.0f : -1.0f, kz = V3_dot(d,z) >= 0.0f ? 1.0f : -1.0f; return V3_AplusB(V3_AplusB(V3_AplusB(b.ctr,V3_ScaleByF(x,kx * b.hExt.x)),V3_ScaleByF(y,ky * b.hExt.y)),V3_ScaleByF(z,kz * b.hExt.z)); }
+static inline V3 CapsuleSupport(ShapeCapsule cap, V3 d) { float db = V3_dot(cap.base,d),dt = V3_dot(cap.tip,d); V3 best = (dt > db) ? cap.tip : cap.base; float L = V3_dot(d,d); if (L < PHY_EPSILON) {return best;} return V3_AplusB(best,V3_ScaleByF(d,cap.rad / vsqrtf(L))); }
 static inline V3 HullSupport(const HullCache* h, u16 m, const float* M, V3 d) { return h->ok ? CachedSupport(h->v,h->n,d) : MeshSupport(m,M,d); } // falls back to uncached scan only if hull exceeds cache size
+V3 GJKSupport(u16 prim, V3 d) {
+         if (World.collider[prim] == COLTYPE_SPH) return     SphSupport(Entity_GetSph(prim),d);
+    else if (World.collider[prim] == COLTYPE_BOX) return     BoxSupport(Entity_GetBox(prim),d);
+    else if (World.collider[prim] == COLTYPE_CAP) return CapsuleSupport(Entity_GetCap(prim),d);
+    return CapsuleSupport(Entity_GetCap(prim),d);
+}
 static bool GJKNextSimplex(Simplex3D *s, V3 *dir) {
     V3 A = s->v[s->n-1], AO = {-A.x, -A.y, -A.z};
     V3 wAA = s->wA[s->n-1], wBA = s->wB[s->n-1];
@@ -432,23 +439,14 @@ static OverlapResult SphMsh(V3 sc, float sr, u16 mesh, const float* mx) { // Tri
     // BVH-accelerated path: traverse the per-model octree, culling subtrees whose world AABB
     // does not overlap the query sphere. Only triangles in surviving leaf nodes are tested.
     if (BvhHasBVH(mesh)) {
-        const BvhNode* nodes = modelBVHNodes[mesh];
-        const u16* triOrder = modelBVHTriOrder[mesh];
-        const BvhNode* stack[64]; int sp = 0;
-        stack[sp++] = &nodes[0];
+        const BvhNode* nodes=modelBVHNodes[mesh];
+        const u16* triOrder=modelBVHTriOrder[mesh];
+        const BvhNode* stack[64]; int sp=0; stack[sp++]=&nodes[0];
         while (sp > 0) {
-            const BvhNode* node = stack[--sp];
-            V3 wMn, wMx; BvhNodeWorldAABB(node, mx, &wMn, &wMx);
+            const BvhNode* node=stack[--sp]; V3 wMn,wMx; BvhNodeWorldAABB(node,mx,&wMn,&wMx);
             if (!BvhSphereAABBOverlap(sc, sr, wMn, wMx)) continue;
-            if (node->triCount > 0) {
-                for (u32 i = 0; i < node->triCount; i++) {
-                    SphTriTest(sc, sr, mesh, triOrder[node->triStart + i], mx, &r);
-                }
-            } else {
-                for (int o = 0; o < 8; o++) {
-                    if (node->children[o] >= 0) stack[sp++] = &nodes[node->children[o]];
-                }
-            }
+            if (node->triCount > 0) { for (u32 i=0;i<node->triCount;++i) { SphTriTest(sc,sr,mesh,triOrder[node->triStart + i],mx,&r); } }
+            else                    { for (int o=0;o<8;++o) {      if(node->children[o] >= 0){stack[sp++]=&nodes[node->children[o]];} } }
         }
         return r;
     }
@@ -460,6 +458,7 @@ static OverlapResult SphMsh(V3 sc, float sr, u16 mesh, const float* mx) { // Tri
 }
 
 static OverlapResult CapMsh(ShapeCapsule cap, u16 mesh, const float* mx) { OverlapResult rb = SphMsh(cap.base,cap.rad,mesh,mx); OverlapResult rt = SphMsh(cap.tip,cap.rad,mesh,mx); return (rt.overlapAmount > rb.overlapAmount) ? rt : rb; } // TODO: Connectivity needed or is snowman ala System Shock 1 fine enough?  Might prove funny if player can get stuck with top and bottom on either side of door while leaning like in original.
+#define MANIFOLD_EPA_SEED EPAVert ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0, nf=0; for (int i = 0; i < 4; i++) { ev[nv].wA = s.wA[i]; ev[nv].wB = s.wB[i]; ev[nv].v = s.v[i]; nv++; } static const int kTetFaces[4][3] = {{0,1,2}, {0,3,1}, {0,2,3}, {1,3,2}};
 static Manifold CvxCvx(u16 meshA, u16 meshB, const float* matA, const float* matB) {
     Manifold m = {0}; if (meshA >= MAX_MDLS || meshB >= MAX_MDLS) return m;
     HullCache hcA = CacheHull(meshA, matA), hcB = CacheHull(meshB, matB);
@@ -488,10 +487,7 @@ static Manifold CvxCvx(u16 meshA, u16 meshB, const float* matA, const float* mat
         if (!dup) { s.wA[s.n] = wA; s.wB[s.n] = wB; s.v[s.n++] = sup; }
     }
     if (s.n < 4) return m;
-    EPAVert ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; 
-    int nv = 0, nf = 0;
-    for (int i = 0; i < 4; i++) { ev[nv].wA = s.wA[i]; ev[nv].wB = s.wB[i]; ev[nv].v = s.v[i]; nv++; }
-    static const int kTetFaces[4][3] = {{0,1,2}, {0,3,1}, {0,2,3}, {1,3,2}};
+    MANIFOLD_EPA_SEED
     for (int f = 0; f < 4; f++) { EPAFace face = MakeEPAFace(ev, kTetFaces[f][0], kTetFaces[f][1], kTetFaces[f][2]); if (face.d >= 0.f && nf < EPA_MAX_FACES) ef[nf++] = face; }
     for (int it = 0; it < 32; ++it) {
         int bf = -1; float bd = 1e9f;
@@ -547,17 +543,15 @@ static Manifold CvxCvx(u16 meshA, u16 meshB, const float* matA, const float* mat
     return m;
 }
 
-static Manifold CapCvx(ShapeCapsule cap, u16 mesh, const float* mx) {
+static Manifold PrimitiveCvx(u16 prim, u16 mesh, const float* mx) {
     Manifold m = {0}; if (mesh >= MAX_MDLS || !modelVertexCounts[mesh]) return m;
     HullCache hc = CacheHull(mesh,mx);
-    #define CSUP_A(d) CapsuleSupport(cap, d)
-    #define CSUP_B(d) HullSupport(&hc, mesh, mx, (V3){-(d).x,-(d).y,-(d).z})
-    Simplex3D s = {0}; V3 dir = {0,1,0}; 
-    V3 wA = CSUP_A(dir), wB = CSUP_B(dir);
+    Simplex3D s = {0}; V3 dir={0,1,0};
+    V3 wA = GJKSupport(prim,dir); V3 wB = HullSupport(&hc,mesh,mx,(V3){-dir.x,-dir.y,-dir.z});
     s.wA[s.n] = wA; s.wB[s.n] = wB; s.v[s.n++] = V3_AsubB(wA, wB); 
     dir = (V3){-s.v[0].x,-s.v[0].y,-s.v[0].z}; if(V3_dot(dir,dir) < PHY_EPSILON){dir=(V3){0,1,0};} bool hit=false;
     for (int it=0;it<64;++it) { 
-        wA = CSUP_A(dir); wB = CSUP_B(dir); V3 sup = V3_AsubB(wA, wB);
+        wA = GJKSupport(prim,dir); wB = HullSupport(&hc,mesh,mx,(V3){-dir.x,-dir.y,-dir.z}); V3 sup = V3_AsubB(wA, wB);
         if(V3_dot(sup,dir)<0){return m;} 
         s.wA[s.n] = wA; s.wB[s.n] = wB; s.v[s.n++] = sup; 
         if(!GJKNextSimplex(&s,&dir)){hit=true; break;} if(V3_dot(dir,dir)<0){hit=true; break;} 
@@ -565,23 +559,20 @@ static Manifold CapCvx(ShapeCapsule cap, u16 mesh, const float* mx) {
     if (!hit) return m;
     static const V3 kAx[6]={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
     for (int d=0;s.n<4&&d<6;++d) { 
-        wA = CSUP_A(kAx[d]); wB = CSUP_B(kAx[d]); V3 sup = V3_AsubB(wA, wB); bool dup=false; 
+        wA = GJKSupport(prim,kAx[d]); wB = HullSupport(&hc,mesh,mx,(V3){-kAx[d].x,-kAx[d].y,-kAx[d].z}); V3 sup = V3_AsubB(wA, wB); bool dup=false; 
         for(int k=0;k<s.n;k++){V3 dv=V3_AsubB(sup,s.v[k]);dup|=(V3_dot(dv,dv)<PHY_EPSILON*PHY_EPSILON);} 
         if(!dup){ s.wA[s.n] = wA; s.wB[s.n] = wB; s.v[s.n++] = sup; } 
     }
     if (s.n<4) return m;
-    EPAVert ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0,nf=0;
-    for (int i=0;i<4;i++){ev[nv].wA=s.wA[i];ev[nv].wB=s.wB[i];ev[nv].v=s.v[i];nv++;}
-    static const int kTF[4][3]={{0,1,2},{0,3,1},{0,2,3},{1,3,2}};
-    for (int f=0;f<4;f++){EPAFace face=MakeEPAFace(ev,kTF[f][0],kTF[f][1],kTF[f][2]);if(face.d>=0.f&&nf<EPA_MAX_FACES)ef[nf++]=face;}
+    MANIFOLD_EPA_SEED
+    for (int f=0;f<4;f++){EPAFace face=MakeEPAFace(ev,kTetFaces[f][0],kTetFaces[f][1],kTetFaces[f][2]);if(face.d>=0.f&&nf<EPA_MAX_FACES)ef[nf++]=face;}
     for (int it=0;it<32;++it){
         int bf=-1; float bd=1e9f;
         for (int f=0;f<nf;f++) if(ef[f].d<bd){bd=ef[f].d;bf=f;}
         if (bf<0) break;
-        V3 bn=ef[bf].n; wA=CSUP_A(bn); wB=CSUP_B(bn); V3 sup=V3_AsubB(wA,wB); 
+        V3 bn=ef[bf].n; wA=GJKSupport(prim,bn); wB=HullSupport(&hc,mesh,mx,(V3){-bn.x,-bn.y,-bn.z}); V3 sup=V3_AsubB(wA,wB); 
         if(V3_dot(bn,sup)-bd<PHY_EPSILON){return MakeEPAManifold(ev,ef[bf].a,ef[bf].b,ef[bf].c,bn,bd);}
         if (nv>=EPA_MAX_VERTS) break;
-
         ev[nv].v=sup; ev[nv].wA=wA; ev[nv].wB=wB;
         int edges[EPA_MAX_EDGES][2],ne=0,keep[EPA_MAX_FACES],nk=0;
         for (int f=0;f<nf;f++){
@@ -596,142 +587,11 @@ static Manifold CapCvx(ShapeCapsule cap, u16 mesh, const float* mx) {
         for(int k=0;k<ne&&nf<EPA_MAX_FACES;k++){EPAFace face=MakeEPAFace(ev,edges[k][0],edges[k][1],nv);if(face.d>=0.f)ef[nf++]=face;}
         nv++;
     }
-    #undef CSUP_A
-    #undef CSUP_B
     return m;
 }
-
-static Manifold BoxCvx(ShapeBox box, u16 mesh, const float* mx) {
-    Manifold m = {0}; if (mesh >= MAX_MDLS || !modelVertexCounts[mesh]) return m;
-    HullCache hc = CacheHull(mesh,mx);
-    #define BSUP_A(d) BoxSupport(box,d)
-    #define BSUP_B(d) HullSupport(&hc,mesh,mx,(V3){-(d).x,-(d).y,-(d).z})
-    Simplex3D s={0}; V3 dir={0,1,0};
-    V3 wA = BSUP_A(dir), wB = BSUP_B(dir);
-    s.wA[s.n] = wA; s.wB[s.n] = wB; s.v[s.n++]=V3_AsubB(wA, wB); 
-    dir=(V3){-s.v[0].x,-s.v[0].y,-s.v[0].z};
-    if (V3_dot(dir,dir)<PHY_EPSILON) dir=(V3){0,1,0};
-    bool hit=false;
-    for (int it=0;it<64;++it){ 
-        wA = BSUP_A(dir); wB = BSUP_B(dir); V3 sup=V3_AsubB(wA, wB); 
-        if(V3_dot(sup,dir)<0){return m;} 
-        s.wA[s.n] = wA; s.wB[s.n] = wB; s.v[s.n++]=sup; 
-        if (!GJKNextSimplex(&s,&dir)){hit=true;break;} if (V3_dot(dir,dir)<0){hit=true;break;} 
-    }
-    if (!hit) return m;
-    static const V3 kAx[6]={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
-    for (int d=0;s.n<4&&d<6;++d){ 
-        wA = BSUP_A(kAx[d]); wB = BSUP_B(kAx[d]); V3 sup=V3_AsubB(wA, wB); bool dup=false; 
-        for (int k=0;k<s.n;k++){V3 dv=V3_AsubB(sup,s.v[k]);dup|=(V3_dot(dv,dv)<PHY_EPSILON*PHY_EPSILON);} 
-        if(!dup){ s.wA[s.n] = wA; s.wB[s.n] = wB; s.v[s.n++]=sup; } 
-    }
-    if (s.n<4) return m;
-    EPAVert ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0,nf=0;
-    for (int i=0;i<4;i++){ev[nv].wA=s.wA[i];ev[nv].wB=s.wB[i];ev[nv].v=s.v[i];nv++;}
-    static const int kTF[4][3]={{0,1,2},{0,3,1},{0,2,3},{1,3,2}};
-    for (int f=0;f<4;f++){EPAFace face=MakeEPAFace(ev,kTF[f][0],kTF[f][1],kTF[f][2]);if(face.d>=0.f&&nf<EPA_MAX_FACES)ef[nf++]=face;}
-    for (int it=0;it<32;++it){
-        int bf=-1; float bd=1e9f;
-        for (int f=0;f<nf;f++) if(ef[f].d<bd){bd=ef[f].d;bf=f;}
-        if (bf<0) break;
-        V3 bn=ef[bf].n; wA=BSUP_A(bn); wB=BSUP_B(bn); V3 sup=V3_AsubB(wA,wB);
-        if (V3_dot(bn,sup)-bd<PHY_EPSILON) {
-            m.normal = bn; m.maxPen = bd;
-            V3 deepPoint = EPAContactPoint(ev, ef[bf].a, ef[bf].b, ef[bf].c);
-            m.p[0] = (ManifoldPt){ deepPoint, bd };
-            m.n = 1;
-            if (hc.ok) {
-                float planeDist = V3_dot(bn, deepPoint);
-                float wscaleM = V3_Mag((V3){mx[0],mx[1],mx[2]});
-                float thicknessTolerance = vclamp(modelBounds[mesh] * wscaleM * 0.06f, 0.003f, 0.02f);
-                for (u32 i = 0; i < hc.n; ++i) {
-                    V3 pt = hc.v[i];
-                    float distToPlane = V3_dot(bn, pt) - planeDist;
-                    if (vabs(distToPlane) < thicknessTolerance) {
-                        float ptPen = bd - distToPlane;
-                        if (ptPen > 0.0f) {
-                            bool isDup = false;
-                            for (int k = 0; k < m.n; ++k) { V3 diff = V3_AsubB(pt, m.p[k].point); if (V3_dot(diff, diff) < MANIFOLD_DEDUP_DIST_SQ) { isDup = true; break; } }
-                            if (!isDup && m.n < MANIFOLD_MAX) m.p[m.n++] = (ManifoldPt){ pt, ptPen };
-                            if (m.n >= MANIFOLD_MAX) break;
-                        }
-                    }
-                }
-            }
-            return m;
-        }
-        if (nv>=EPA_MAX_VERTS) break;
-        ev[nv].v=sup; ev[nv].wA=wA; ev[nv].wB=wB; int edges[EPA_MAX_EDGES][2],ne=0,keep[EPA_MAX_FACES],nk=0;
-        for (int f=0;f<nf;f++){
-            if (V3_dot(ef[f].n,V3_AsubB(sup,ev[ef[f].a].v))>0.f){
-                int fv[3]={ef[f].a,ef[f].b,ef[f].c};
-                for (int e=0;e<3;e++){int ea=fv[e],eb=fv[(e+1)%3];bool found=false;
-                    for (int k=0;k<ne;k++)if(edges[k][0]==eb&&edges[k][1]==ea){edges[k][0]=edges[--ne][0];edges[k][1]=edges[ne][1];found=true;break;}
-                    if (!found&&ne<EPA_MAX_EDGES){edges[ne][0]=ea;edges[ne++][1]=eb;}}
-            } else keep[nk++]=f;
-        }
-        nf=0;for(int k=0;k<nk;k++)ef[nf++]=ef[keep[k]];
-        for(int k=0;k<ne&&nf<EPA_MAX_FACES;k++){EPAFace face=MakeEPAFace(ev,edges[k][0],edges[k][1],nv);if(face.d>=0.f)ef[nf++]=face;}
-        nv++;
-    }
-    #undef BSUP_A
-    #undef BSUP_B
-    return m;
-}
-
-static Manifold SphCvx(V3 sc, float sr, u16 mesh, const float* mx) {
-    Manifold m = {0}; if (mesh >= MAX_MDLS || !modelVertexCounts[mesh]) return m;
-    HullCache hc = CacheHull(mesh,mx);
-    #define SPHSUP_A(d) ({ V3 _d=(d); float _L=V3_dot(_d,_d); V3_AplusB(sc,(_L>PHY_EPSILON)?V3_ScaleByF(_d,sr/vsqrtf(_L)):(V3){0,sr,0}); })
-    #define SPHSUP_B(d) HullSupport(&hc,mesh,mx,(V3){-(d).x,-(d).y,-(d).z})
-    Simplex3D s={0}; V3 dir={0,1,0}; 
-    V3 wA = SPHSUP_A(dir), wB = SPHSUP_B(dir);
-    s.wA[s.n] = wA; s.wB[s.n] = wB; s.v[s.n++]=V3_AsubB(wA, wB); 
-    dir=(V3){-s.v[0].x,-s.v[0].y,-s.v[0].z}; if(V3_dot(dir,dir)<PHY_EPSILON){dir=(V3){0,1,0};} bool hit=false;
-    for (int it=0;it<32;++it) { 
-        wA = SPHSUP_A(dir); wB = SPHSUP_B(dir); V3 sup=V3_AsubB(wA, wB); 
-        if(V3_dot(sup,dir)<0){return m;} 
-        s.wA[s.n] = wA; s.wB[s.n] = wB; s.v[s.n++]=sup; 
-        if (!GJKNextSimplex(&s,&dir)){hit=true;break;} if (V3_dot(dir,dir)<PHY_EPSILON){hit=true;break;} 
-    }
-    if (!hit) return m;
-    static const V3 kAx[6]={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
-    for (int d=0;s.n<4&&d<6;++d) { 
-        wA = SPHSUP_A(kAx[d]); wB = SPHSUP_B(kAx[d]); V3 sup=V3_AsubB(wA, wB); bool dup=false; 
-        for (int k=0;k<s.n;k++){V3 dv=V3_AsubB(sup,s.v[k]);dup|=V3_dot(dv,dv)<PHY_EPSILON*PHY_EPSILON;} 
-        if(!dup){ s.wA[s.n] = wA; s.wB[s.n] = wB; s.v[s.n++]=sup; } 
-    }
-    if (s.n<4) return m;
-    EPAVert ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0,nf=0;
-    for (int i=0;i<4;i++){ev[nv].v=s.v[i];ev[nv].wA=s.wA[i];ev[nv].wB=s.wB[i];nv++;}
-    static const int kTF[4][3]={{0,1,2},{0,3,1},{0,2,3},{1,3,2}};
-    for (int f=0;f<4;f++){EPAFace face=MakeEPAFace(ev,kTF[f][0],kTF[f][1],kTF[f][2]);if(face.d>=0.f&&nf<EPA_MAX_FACES)ef[nf++]=face;}
-    for (int it=0;it<32;++it){
-        int bf=-1; float bd=1e9f;
-        for (int f=0;f<nf;f++) if(ef[f].d<bd){bd=ef[f].d;bf=f;}
-        if (bf<0) break;
-        V3 bn=ef[bf].n; wA=SPHSUP_A(bn); wB=SPHSUP_B(bn); V3 sup=V3_AsubB(wA,wB);
-        if (V3_dot(bn,sup)-bd<PHY_EPSILON) { m.normal=bn; m.maxPen=bd; m.n=1; m.p[0]=(ManifoldPt){wB,bd}; return m; } 
-        if (nv>=EPA_MAX_VERTS) break;
-        ev[nv].v=sup;ev[nv].wA=wA;ev[nv].wB=wB;
-        int edges[EPA_MAX_EDGES][2],ne=0,keep[EPA_MAX_FACES],nk=0;
-        for (int f=0;f<nf;f++){
-            if (V3_dot(ef[f].n,V3_AsubB(sup,ev[ef[f].a].v))>0.f){
-                int fv[3]={ef[f].a,ef[f].b,ef[f].c};
-                for (int e=0;e<3;e++){int ea=fv[e],eb=fv[(e+1)%3];bool found=false;
-                    for (int k=0;k<ne;k++)if(edges[k][0]==eb&&edges[k][1]==ea){edges[k][0]=edges[--ne][0];edges[k][1]=edges[ne][1];found=true;break;}
-                    if (!found&&ne<EPA_MAX_EDGES){edges[ne][0]=ea;edges[ne++][1]=eb;}}
-            } else keep[nk++]=f;
-        }
-        nf=0;for(int k=0;k<nk;k++)ef[nf++]=ef[keep[k]];
-        for(int k=0;k<ne&&nf<EPA_MAX_FACES;k++){EPAFace face=MakeEPAFace(ev,edges[k][0],edges[k][1],nv);if(face.d>=0.f)ef[nf++]=face;}
-        nv++;
-    }
-    #undef SPHSUP_A
-    #undef SPHSUP_B
-    return m;
-}
-
+static Manifold SphCvx(u16 prim, u16 mesh, const float* mx) { return PrimitiveCvx(prim,mesh,mx); }
+static Manifold CapCvx(u16 prim, u16 mesh, const float* mx) { return PrimitiveCvx(prim,mesh,mx); }
+static Manifold BoxCvx(u16 prim, u16 mesh, const float* mx) { return PrimitiveCvx(prim,mesh,mx); }
 typedef struct {V3 mn,mx;} AABB3;
 static inline V3 TriSupport(V3 ta, V3 tb, V3 tc, V3 d) { float d1 = V3_dot(ta,d), d2 = V3_dot(tb,d), d3 = V3_dot(tc,d); return d1 > d2 ? (d1 > d3 ? ta : tc) : (d2 > d3 ? tb : tc); }
 typedef struct { HullCache hc; u16 hullMesh; const float* hullMx; AABB3 hb; float spreadEps, thicknessTolerance; Manifold best; } CvxMshCtx; // Context for CvxMsh per-triangle test, shared between BVH and linear paths.
@@ -771,13 +631,12 @@ static void CvxTriTest(CvxMshCtx* ctx, V3 ta, V3 tb, V3 tc) { // Per-triangle co
             s.wA[s.n] = wA; s.wB[s.n] = wB; s.v[s.n++] = V3_AsubB(wA, wB);
         }
     }
-    EPAVert ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv = 0, nf = 0;
-    for(int i = 0; i < 4; ++i) { ev[nv].v = s.v[i]; ev[nv].wA = s.wA[i]; ev[nv].wB = s.wB[i]; nv++; }
-    static const int kTF[4][3] = {{0,1,2}, {0,3,1}, {0,2,3}, {1,3,2}};
-    EPAFace face0 = MakeEPAFace(ev,kTF[0][0],kTF[0][1],kTF[0][2]); if (face0.d >= 0.0f && nf < EPA_MAX_FACES) ef[nf++] = face0;
-    EPAFace face1 = MakeEPAFace(ev,kTF[1][0],kTF[1][1],kTF[1][2]); if (face1.d >= 0.0f && nf < EPA_MAX_FACES) ef[nf++] = face1;
-    EPAFace face2 = MakeEPAFace(ev,kTF[2][0],kTF[2][1],kTF[2][2]); if (face2.d >= 0.0f && nf < EPA_MAX_FACES) ef[nf++] = face2;
-    EPAFace face3 = MakeEPAFace(ev,kTF[3][0],kTF[3][1],kTF[3][2]); if (face3.d >= 0.0f && nf < EPA_MAX_FACES) ef[nf++] = face3;
+    
+    MANIFOLD_EPA_SEED
+    EPAFace face0 = MakeEPAFace(ev,kTetFaces[0][0],kTetFaces[0][1],kTetFaces[0][2]); if (face0.d >= 0.0f && nf < EPA_MAX_FACES) ef[nf++] = face0;
+    EPAFace face1 = MakeEPAFace(ev,kTetFaces[1][0],kTetFaces[1][1],kTetFaces[1][2]); if (face1.d >= 0.0f && nf < EPA_MAX_FACES) ef[nf++] = face1;
+    EPAFace face2 = MakeEPAFace(ev,kTetFaces[2][0],kTetFaces[2][1],kTetFaces[2][2]); if (face2.d >= 0.0f && nf < EPA_MAX_FACES) ef[nf++] = face2;
+    EPAFace face3 = MakeEPAFace(ev,kTetFaces[3][0],kTetFaces[3][1],kTetFaces[3][2]); if (face3.d >= 0.0f && nf < EPA_MAX_FACES) ef[nf++] = face3;
     if (nf < 4) return;
     bool tHit=false; V3 tN={0}; float tD=0; V3 tP={0};
     for (int it = 0; it < 32; ++it) {
@@ -815,7 +674,7 @@ static void CvxTriTest(CvxMshCtx* ctx, V3 ta, V3 tb, V3 tc) { // Per-triangle co
                 if (spread && best->n < MANIFOLD_MAX) best->p[best->n++] = (ManifoldPt){deepPoint, tD};
             } else if (tD > best->maxPen + MANIFOLD_TIE_MARGIN) { best->n = 0; best->normal = tN; best->maxPen = tD; best->p[best->n++] = (ManifoldPt){deepPoint, tD}; }
         }
-        if (hc->ok && best->n > 0 && V3_dot(tN, best->normal) > MANIFOLD_ALIGN_THRESHOLD) {
+        if (hc->ok && best->n > 0 && V3_dot(tN,best->normal) > MANIFOLD_ALIGN_THRESHOLD) {
             float planeDist = V3_dot(tN, deepPoint);
             V3 v0 = V3_AsubB(tb,ta); // Pre-compute triangle edge data for barycentric bounds test
             V3 v1 = V3_AsubB(tc,ta);
@@ -824,7 +683,7 @@ static void CvxTriTest(CvxMshCtx* ctx, V3 ta, V3 tb, V3 tc) { // Per-triangle co
             float d11 = V3_dot(v1,v1);
             float denom = d00 * d11 - d01 * d01;
             bool validTri = vabs(denom) > PHY_EPSILON;
-            float margin = 0.05f; // Barycentric margin (allows slight edge bleed for stability)
+            float margin = 0.02f; // Barycentric margin (allows slight edge bleed for stability)
             for (u32 i = 0; i < hc->n; ++i) {
                 V3 pt = hc->v[i];
                 float distToPlane = V3_dot(tN,pt) - planeDist;
@@ -913,7 +772,7 @@ static inline void BoxTriTest(const V3 verts[8], u16 triMesh, u32 ti, const floa
     V3 tc=MvVert(triMx,(V3){*(float*)(modelVertices[triMesh]+(i2)*CPU_VRT_SZ+0),*(float*)(modelVertices[triMesh]+(i2)*CPU_VRT_SZ+4),*(float*)(modelVertices[triMesh]+(i2)*CPU_VRT_SZ+8)});
     if (vmin(ta.x,vmin(tb.x,tc.x))>hb.mx.x || vmax(ta.x,vmax(tb.x,tc.x))<hb.mn.x || vmin(ta.y,vmin(tb.y,tc.y))>hb.mx.y || vmax(ta.y,vmax(tb.y,tc.y))<hb.mn.y || vmin(ta.z,vmin(tb.z,tc.z))>hb.mx.z || vmax(ta.z,vmax(tb.z,tc.z))<hb.mn.z) return;
     V3 ab=V3_AsubB(tb,ta), ac=V3_AsubB(tc,ta);
-    V3 fn0=V3_Cross(ab,ac); float fL=V3_Mag(fn0); bool deg=fL<PHY_EPSILON; V3 faceN=deg?(V3){0,0,0}:V3_ScaleByF(fn0,1.f/fL); // hoisted: triangle-constant, was recomputed up to 3x per corner
+    V3 fn0=V3_Cross(ab,ac); float fL=V3_Mag(fn0); bool deg=fL<PHY_EPSILON; V3 faceN=deg?(V3){0,0,0}:V3_ScaleByF(fn0,1.f/fL);
     for (u32 vi=0;vi<8;++vi) {
         V3 wv = verts[vi];
         V3 ap=V3_AsubB(wv,ta); float d1=V3_dot(ab,ap), d2=V3_dot(ac,ap); V3 bp=V3_AsubB(wv,tb); float d3=V3_dot(ab,bp), d4=V3_dot(ac,bp); V3 cp=V3_AsubB(wv,tc); float d5=V3_dot(ab,cp), d6=V3_dot(ac,cp);
@@ -926,7 +785,7 @@ static inline void BoxTriTest(const V3 verts[8], u16 triMesh, u32 ti, const floa
         else if (va <= 0.0f && (d4-d3) >= 0.0f && (d5-d6) >= 0.0f) { float w=(d4-d3)/((d4-d3)+(d5-d6)); closest=V3_AplusB(tb,V3_ScaleByF(V3_AsubB(tc,tb),w)); }
         else { inFace=true; if(deg) continue; closest=V3_AsubB(wv,V3_ScaleByF(faceN,V3_dot(faceN,ap))); }
         V3 delta=V3_AsubB(wv,closest); float dist2=V3_dot(delta,delta); float pen=0.f; V3 fn;
-        if (inFace) { float sd=V3_dot(faceN,ap); if(vabs(sd)<PHY_EPSILON){continue;} pen=vabs(sd); fn=(sd>0.f)?faceN:(V3){-faceN.x,-faceN.y,-faceN.z}; }
+        if (inFace) { float sd=V3_dot(faceN,ap); if(sd>=-PHY_EPSILON){continue;} pen=-sd; fn=faceN; } // same fix as collectContact: only count corners actually behind the outward face
         else { if (dist2<PHY_EPSILON*PHY_EPSILON || deg){continue;} float dist=vsqrtf(dist2); float sd=V3_dot(faceN,ap); if (sd>=0.f){continue;} pen=dist; fn=V3_ScaleByF(delta,1.f/dist); }
         if (pen>r->overlapAmount) *r=(OverlapResult){true,closest,fn,pen};
     }
@@ -991,12 +850,7 @@ static inline void quat_to_mat3(Quaternion q, float R[3][3]) {
 }
 
 static inline V3 ApplyInvTensor(u16 i, V3 v) {
-    if (World.collider[i] != COLTYPE_CVX || !World.invTnsrValid[i]) {
-        float r = (World.collider[i] == COLTYPE_MSH) ? modelBounds[World.instances[i].modelIndex] : ((World.collider[i] == COLTYPE_CVX) ? modelBounds[World.instances[i].colMeshIndex] : GetColRad(i));
-        float inertia = (2.0f / 5.0f) * World.mass[i] * r * r;
-        float invI = 1.0f / vmax(inertia,0.0f);
-        return V3_ScaleByF(v,invI);
-    }
+    if (World.collider[i] != COLTYPE_CVX || !World.invTnsrValid[i]) { float r = (World.collider[i] == COLTYPE_MSH) ? modelBounds[World.instances[i].modelIndex] : ((World.collider[i] == COLTYPE_CVX) ? modelBounds[World.instances[i].colMeshIndex] : GetColRad(i)); return V3_ScaleByF(v,1.0f / vmax((2.0f / 5.0f) * World.mass[i] * r * r,0.0f)); }
     float R[3][3]; quat_to_mat3(World.rotation[i],R);
     float *I = World.invInertiaTensor[i];
     float bx = R[0][0]*v.x + R[1][0]*v.y + R[2][0]*v.z; float by = R[0][1]*v.x + R[1][1]*v.y + R[2][1]*v.z; float bz = R[0][2]*v.x + R[1][2]*v.y + R[2][2]*v.z; // v_body = R^T · v_world
@@ -1169,14 +1023,14 @@ void Physics() {
                         else if (World.collider[a] == COLTYPE_SPH && World.collider[b] == COLTYPE_SPH) { ShapeSphere sa = Entity_GetSph(a); ShapeSphere sb = Entity_GetSph(b); mf = OverlapToManifold(SphSph(sa.ctr,sa.rad,sb.ctr,sb.rad)); }
                         else if (World.collider[a] == COLTYPE_CAP && World.collider[b] == COLTYPE_MSH) { mf = OverlapToManifold(CapMsh(Entity_GetCap(a),World.instances[b].modelIndex,&modelMatrices[b*16])); }
                         else if (World.collider[a] == COLTYPE_SPH && World.collider[b] == COLTYPE_MSH) { ShapeSphere sa = Entity_GetSph(a); mf = OverlapToManifold(SphMsh(sa.ctr,sa.rad,World.instances[b].modelIndex,&modelMatrices[b*16])); }
-                        else if (World.collider[a] == COLTYPE_BOX && World.collider[b] == COLTYPE_MSH) { mf = OverlapToManifold(BoxMsh(Entity_GetBox(a),World.instances[b].modelIndex,&modelMatrices[b*16])); }
+                        else if (World.collider[a] == COLTYPE_BOX && World.collider[b] == COLTYPE_MSH) { mf = OverlapToManifold(BoxMsh(Entity_GetBox(a),World.instances[b].modelIndex,&modelMatrices[b*16])); } // SHOULD RETURN A MANIFOLD WITHOUT NEEDING OverlapToManifold()!
                         else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_MSH) { mf = CvxMsh(World.instances[a].colMeshIndex,&modelMatrices[a*16],World.instances[b].modelIndex,&modelMatrices[b*16]); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
-                        else if (World.collider[a] == COLTYPE_CAP && World.collider[b] == COLTYPE_CVX) { mf = CapCvx(Entity_GetCap(a),World.instances[b].colMeshIndex,&modelMatrices[b*16]); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
-                        else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_CAP) { mf = CapCvx(Entity_GetCap(b),World.instances[a].colMeshIndex,&modelMatrices[a*16]); }
-                        else if (World.collider[a] == COLTYPE_SPH && World.collider[b] == COLTYPE_CVX) { ShapeSphere sa = Entity_GetSph(a); mf = SphCvx(sa.ctr,sa.rad,World.instances[b].colMeshIndex,&modelMatrices[b*16]); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
-                        else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_SPH) { ShapeSphere sb = Entity_GetSph(b); mf = SphCvx(sb.ctr,sb.rad,World.instances[a].colMeshIndex,&modelMatrices[a*16]); }
-                        else if (World.collider[a] == COLTYPE_BOX && World.collider[b] == COLTYPE_CVX) { mf = BoxCvx(Entity_GetBox(a),World.instances[b].colMeshIndex,&modelMatrices[b*16]); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
-                        else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_BOX) { mf = BoxCvx(Entity_GetBox(b),World.instances[a].colMeshIndex,&modelMatrices[a*16]); }
+                        else if (World.collider[a] == COLTYPE_CAP && World.collider[b] == COLTYPE_CVX) { mf = CapCvx(a,World.instances[b].colMeshIndex,&modelMatrices[b*16]); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
+                        else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_CAP) { mf = CapCvx(b,World.instances[a].colMeshIndex,&modelMatrices[a*16]); }
+                        else if (World.collider[a] == COLTYPE_SPH && World.collider[b] == COLTYPE_CVX) { mf = SphCvx(a,World.instances[b].colMeshIndex,&modelMatrices[b*16]); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
+                        else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_SPH) { mf = SphCvx(b,World.instances[a].colMeshIndex,&modelMatrices[a*16]); }
+                        else if (World.collider[a] == COLTYPE_BOX && World.collider[b] == COLTYPE_CVX) { mf = BoxCvx(a,World.instances[b].colMeshIndex,&modelMatrices[b*16]); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
+                        else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_BOX) { mf = BoxCvx(b,World.instances[a].colMeshIndex,&modelMatrices[a*16]); }
                         else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_CVX) { mf = CvxCvx(World.instances[a].colMeshIndex,World.instances[b].colMeshIndex,&modelMatrices[a*16],&modelMatrices[b*16]); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
                         else { mf=OverlapToManifold(SphSph(World.position[a],World.colliderSize[a].x,World.position[b],World.colliderSize[b].x)); }
                         if (mf.n && contactCount < 32) contacts[contactCount++] = (Contact){mf,b};

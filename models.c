@@ -135,12 +135,128 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, c
     return true;
 }
 
+// ---------------------------------------------------------------------------------------------
+// Per-model octree BVH (max 3 levels), built in local model space for physics/ray acceleration.
+// Moved here (above ModelParsingWorker) so BVH construction can be invoked directly from within
+// each model-loading worker thread, immediately after that thread finishes parsing a given model
+// -- overlapping BVH build time with other threads' OBJ parsing instead of doing it as one big
+// serial pass after every model & every thread has already finished and joined.
+// ---------------------------------------------------------------------------------------------
+#define BVH_MAX_DEPTH 3
+#define BVH_LEAF_MAX_TRIS 8
+#define BVH_MAX_NODES_PER_MDL 586   // 1 + 8 + 64 + 512 = 585 worst case, +safety
+#define BVH_MAX_TRIS_PER_MDL ((MAX_OUTPUT_VERTS + 2) / 3)  // ~6986
+typedef struct { V3 mn,mx;  u32 triStart;  u16 triCount; i16 children[8]; } BvhNode;
+BvhNode** modelBVHNodes = NULL;          // [mdlsCnt] array of BvhNode arrays (NULL if model has no BVH)
+u16**    modelBVHTriOrder = NULL;        // [mdlsCnt] array of u16 triangle-index arrays (reordered for leaf-contiguous ranges)
+u32      modelBVHNodeCounts[MAX_MDLS] = {0};
+u32      modelBVHTriOrderCounts[MAX_MDLS] = {0};
+
+// Per-thread build scratch (replaces the old single set of file-scope scratch globals, which was
+// only safe when BVH building ran single-threaded after all parsing finished). Each model-loading
+// thread gets its own context, carved out of the same arena as the other per-thread scratch
+// buffers in LoadModels(), so multiple threads can build BVHs for different models concurrently
+// with zero contention/locking (each thread only ever writes modelBVHNodes[m]/modelBVHTriOrder[m]
+// for the model indices it owns).
+typedef struct {
+    BvhNode* nodes;        // [BVH_MAX_NODES_PER_MDL]
+    u8*      triOctants;   // [BVH_MAX_TRIS_PER_MDL]
+    u16*     triOrder;     // [BVH_MAX_TRIS_PER_MDL]
+    u16*     triScratch;   // [BVH_MAX_TRIS_PER_MDL]
+    u16*     initialTris;  // [BVH_MAX_TRIS_PER_MDL]
+    u32 nodeCount, triCount;
+} BvhBuildCtx;
+static BvhBuildCtx thrd_bvh_ctx[32];
+
+// Recursive centroid-based octree build. Each triangle goes into exactly one octant (the one containing its centroid), so there is no triangle duplication. The node
+// AABB is the union of its triangles' AABBs (NOT the octant AABB) — this guarantees that any query which overlaps a triangle also overlaps the triangle's ancestor
+// nodes, so traversal never misses a triangle. triIdxArray is modified in-place: on return it is partitioned by octant so that each child's triangles are contiguous (matches the leaf ranges written to ctx->triOrder).
+static i32 BvhBuildOctree(BvhBuildCtx* __restrict ctx, u16 m, u16* triIdxArray, u32 triCount, u32 depth) {
+    if (triCount == 0) return -1;
+    if (ctx->nodeCount >= BVH_MAX_NODES_PER_MDL) depth = BVH_MAX_DEPTH;  // out of node budget -> force leaf
+    i32 nodeIdx = ctx->nodeCount++;
+    BvhNode* node = &ctx->nodes[nodeIdx];
+    node->triStart = 0; node->triCount = 0;
+    for (int i = 0; i < 8; i++) node->children[i] = -1;
+    V3 mn = {1e9f, 1e9f, 1e9f}, mx = {-1e9f, -1e9f, -1e9f};
+    for (u32 i = 0; i < triCount; i++) { // Compute node AABB = union of triangle AABBs (also needed for centroid computation)
+        u32 triIdx = triIdxArray[i];
+        u32 i0 = modelTriangles[m][triIdx*3+0], i1 = modelTriangles[m][triIdx*3+1], i2 = modelTriangles[m][triIdx*3+2];
+        const float* v0 = (const float*)(modelVertices[m] + (size_t)i0*CPU_VRT_SZ);
+        const float* v1 = (const float*)(modelVertices[m] + (size_t)i1*CPU_VRT_SZ);
+        const float* v2 = (const float*)(modelVertices[m] + (size_t)i2*CPU_VRT_SZ);
+        mn.x = vmin(mn.x,vmin(vmin(v0[0],v1[0]),v2[0]));
+        mn.y = vmin(mn.y,vmin(vmin(v0[1],v1[1]),v2[1]));
+        mn.z = vmin(mn.z,vmin(vmin(v0[2],v1[2]),v2[2]));
+        mx.x = vmax(mx.x,vmax(vmax(v0[0],v1[0]),v2[0]));
+        mx.y = vmax(mx.y,vmax(vmax(v0[1],v1[1]),v2[1]));
+        mx.z = vmax(mx.z,vmax(vmax(v0[2],v1[2]),v2[2]));
+    }
+    node->mn = mn; node->mx = mx;
+    if (depth >= BVH_MAX_DEPTH || triCount <= BVH_LEAF_MAX_TRIS || ctx->nodeCount + 8 > BVH_MAX_NODES_PER_MDL) { // Leaf condition: max depth reached, few triangles, or no node budget left for children
+        u32 startIdx = ctx->triCount;
+        for (u32 i = 0; i < triCount && ctx->triCount < BVH_MAX_TRIS_PER_MDL; i++) { ctx->triOrder[ctx->triCount++] = triIdxArray[i]; }
+        node->triStart = startIdx; node->triCount = (u16)triCount;
+        return nodeIdx;
+    }
+    V3 center = V3_ScaleByF(V3_AplusB(mn,mx),0.5f); // Centroid-based octant assignment
+    u32 octantCounts[8] = {0};
+    for (u32 i=0;i<triCount;++i) {
+        u32 triIdx = triIdxArray[i];
+        u32 i0 = modelTriangles[m][triIdx*3+0], i1 = modelTriangles[m][triIdx*3+1], i2 = modelTriangles[m][triIdx*3+2];
+        const float* v0 = (const float*)(modelVertices[m] + (size_t)i0*CPU_VRT_SZ);
+        const float* v1 = (const float*)(modelVertices[m] + (size_t)i1*CPU_VRT_SZ);
+        const float* v2 = (const float*)(modelVertices[m] + (size_t)i2*CPU_VRT_SZ);
+        V3 centroid = {(v0[0]+v1[0]+v2[0])*(1.0f/3.0f), (v0[1]+v1[1]+v2[1])*(1.0f/3.0f), (v0[2]+v1[2]+v2[2])*(1.0f/3.0f)};
+        u8 oct = (u8)((centroid.x>=center.x) | ((centroid.y>=center.y)<<1) | ((centroid.z>=center.z)<<2));
+        ctx->triOctants[i] = oct;
+        octantCounts[oct]++;
+    }
+    u32 octantStarts[8];
+    u32 total = 0;
+    for (int o = 0; o < 8; o++) { octantStarts[o] = total; total += octantCounts[o]; } // Compute per-octant start offsets in scratch
+    u32 octantFill[8] = {0};
+    for (u32 i = 0; i < triCount; i++) { u8 o = ctx->triOctants[i]; ctx->triScratch[octantStarts[o] + octantFill[o]++] = triIdxArray[i]; } // Partition triangles into scratch (stable per-octant)
+    for (u32 i = 0; i < triCount; i++) { triIdxArray[i] = ctx->triScratch[i]; } // Copy back to triIdxArray (now partitioned by octant, each octant contiguous)
+    for (int o = 0; o < 8; o++) { // Recurse into each non-empty octant. The scratch arrays are reused at each depth because we have already copied the partitioned data back to triIdxArray.
+        if (octantCounts[o] == 0) continue;
+        i32 childIdx = BvhBuildOctree(ctx,m,triIdxArray + octantStarts[o],octantCounts[o],depth + 1);
+        if (childIdx >= 0) node->children[o] = (i16)childIdx;
+    }
+    return nodeIdx;
+}
+
+static void BuildModelBVH(BvhBuildCtx* ctx, u16 m) {
+    if (m >= mdlsCnt || m >= MAX_MDLS) return;
+    modelBVHNodes[m] = NULL;
+    modelBVHTriOrder[m] = NULL;
+    modelBVHNodeCounts[m] = 0;
+    modelBVHTriOrderCounts[m] = 0;
+    u32 triCount = modelTriangleCounts[m];
+    if (triCount == 0 || triCount > BVH_MAX_TRIS_PER_MDL) return;  // too many tris -> skip BVH (linear fallback)
+    if (!modelVertices[m] || !modelTriangles[m]) return;
+    ctx->nodeCount = ctx->triCount = 0;
+    u16* initialTris = ctx->initialTris; // per-thread scratch, avoids an OS_Alloc/OS_Free per model
+    for (u32 i = 0; i < triCount; i++) initialTris[i] = (u16)i;
+    i32 rootIdx = BvhBuildOctree(ctx, m, initialTris, triCount, 0);
+    if (rootIdx < 0 || ctx->nodeCount == 0) return;
+    modelBVHNodes[m] = (BvhNode*)OS_Alloc(ctx->nodeCount * sizeof(BvhNode));
+    mcpy(modelBVHNodes[m], ctx->nodes, ctx->nodeCount * sizeof(BvhNode));
+    modelBVHNodeCounts[m] = ctx->nodeCount;
+    if (ctx->triCount > 0) {
+        modelBVHTriOrder[m] = (u16*)OS_Alloc(ctx->triCount * sizeof(u16));
+        if (modelBVHTriOrder[m]) { mcpy(modelBVHTriOrder[m],ctx->triOrder,ctx->triCount * sizeof(u16)); modelBVHTriOrderCounts[m] = ctx->triCount; }
+    }
+}
+
 typedef struct { u32 start, end; RawOBJ* raw; int tid; } ModelParseTask;
 static void* ModelParsingWorker(void* arg) {
     ModelParseTask* t = arg;
+    BvhBuildCtx* bvhCtx = &thrd_bvh_ctx[t->tid];
     for (u32 i = t->start; i < t->end; ++i) {
         RawOBJ obj = t->raw[i]; if (unlikely(!obj.data || obj.size <= 0)) continue;
         if (!ParseOBJ(i,obj.data,obj.size,thrd_pos[t->tid],thread_temp_nrm[t->tid],thrd_uv[t->tid],thrd_verts[t->tid],thrd_tris[t->tid],thrd_ht[t->tid],thrd_ht_used[t->tid],thrd_ft_scratch[t->tid],thrd_remap_scratch[t->tid],thrd_nv_scratch[t->tid],thrd_cache_scratch[t->tid],&modelVertices[i],&modelVertexCounts[i],&modelTriangles[i],&modelTriangleCounts[i],obj.name)) continue;
+        BuildModelBVH(bvhCtx, (u16)i); // Build this model's BVH right away, inside the same worker thread, overlapping with other threads' OBJ parsing instead of a later serial pass.
     }
     return NULL;
 }
@@ -188,110 +304,6 @@ bool ParseModelData(ModelDataParser *p, u16 maxSz, const char *fn) {
     if (cur.path[0] && cur.index != U16_MAX && cur.index < cnt) ents[cur.index] = cur;
     OS_Free(buf, sz);
     return true;
-}
-
-#define BVH_MAX_DEPTH 3
-#define BVH_LEAF_MAX_TRIS 8
-#define BVH_MAX_NODES_PER_MDL 586   // 1 + 8 + 64 + 512 = 585 worst case, +safety
-#define BVH_MAX_TRIS_PER_MDL ((MAX_OUTPUT_VERTS + 2) / 3)  // ~6986
-typedef struct { V3 mn,mx;  u32 triStart;  u16 triCount; i16 children[8]; } BvhNode;
-BvhNode** modelBVHNodes = NULL;          // [mdlsCnt] array of BvhNode arrays (NULL if model has no BVH)
-u16**    modelBVHTriOrder = NULL;        // [mdlsCnt] array of u16 triangle-index arrays (reordered for leaf-contiguous ranges)
-u32      modelBVHNodeCounts[MAX_MDLS] = {0};
-u32      modelBVHTriOrderCounts[MAX_MDLS] = {0};
-static BvhNode bvhBuildNodes[BVH_MAX_NODES_PER_MDL];
-static u8 bvhBuildTriOctants[BVH_MAX_TRIS_PER_MDL];
-static u16 bvhBuildTriOrder[BVH_MAX_TRIS_PER_MDL],bvhBuildTriScratch[BVH_MAX_TRIS_PER_MDL];
-static u32 bvhBuildNodeCount,bvhBuildTriCount;
-
-// Recursive centroid-based octree build. Each triangle goes into exactly one octant (the one containing its centroid), so there is no triangle duplication. The node
-// AABB is the union of its triangles' AABBs (NOT the octant AABB) — this guarantees that any query which overlaps a triangle also overlaps the triangle's ancestor
-// nodes, so traversal never misses a triangle. triIdxArray is modified in-place: on return it is partitioned by octant so that each child's triangles are contiguous (matches the leaf ranges written to bvhBuildTriOrder).
-static i32 BvhBuildOctree(u16 m, u16* triIdxArray, u32 triCount, u32 depth) {
-    if (triCount == 0) return -1;
-    if (bvhBuildNodeCount >= BVH_MAX_NODES_PER_MDL) depth = BVH_MAX_DEPTH;  // out of node budget -> force leaf
-    i32 nodeIdx = bvhBuildNodeCount++;
-    BvhNode* node = &bvhBuildNodes[nodeIdx];
-    node->triStart = 0; node->triCount = 0;
-    for (int i = 0; i < 8; i++) node->children[i] = -1;
-    V3 mn = {1e9f, 1e9f, 1e9f}, mx = {-1e9f, -1e9f, -1e9f};
-    for (u32 i = 0; i < triCount; i++) { // Compute node AABB = union of triangle AABBs (also needed for centroid computation)
-        u32 triIdx = triIdxArray[i];
-        u32 i0 = modelTriangles[m][triIdx*3+0], i1 = modelTriangles[m][triIdx*3+1], i2 = modelTriangles[m][triIdx*3+2];
-        const float* v0 = (const float*)(modelVertices[m] + (size_t)i0*CPU_VRT_SZ);
-        const float* v1 = (const float*)(modelVertices[m] + (size_t)i1*CPU_VRT_SZ);
-        const float* v2 = (const float*)(modelVertices[m] + (size_t)i2*CPU_VRT_SZ);
-        mn.x = vmin(mn.x,vmin(vmin(v0[0],v1[0]),v2[0]));
-        mn.y = vmin(mn.y,vmin(vmin(v0[1],v1[1]),v2[1]));
-        mn.z = vmin(mn.z,vmin(vmin(v0[2],v1[2]),v2[2]));
-        mx.x = vmax(mx.x,vmax(vmax(v0[0],v1[0]),v2[0]));
-        mx.y = vmax(mx.y,vmax(vmax(v0[1],v1[1]),v2[1]));
-        mx.z = vmax(mx.z,vmax(vmax(v0[2],v1[2]),v2[2]));
-    }
-    node->mn = mn; node->mx = mx;
-    if (depth >= BVH_MAX_DEPTH || triCount <= BVH_LEAF_MAX_TRIS || bvhBuildNodeCount + 8 > BVH_MAX_NODES_PER_MDL) { // Leaf condition: max depth reached, few triangles, or no node budget left for children
-        u32 startIdx = bvhBuildTriCount;
-        for (u32 i = 0; i < triCount && bvhBuildTriCount < BVH_MAX_TRIS_PER_MDL; i++) { bvhBuildTriOrder[bvhBuildTriCount++] = triIdxArray[i]; }
-        node->triStart = startIdx; node->triCount = (u16)triCount;
-        return nodeIdx;
-    }
-    V3 center = V3_ScaleByF(V3_AplusB(mn,mx),0.5f); // Centroid-based octant assignment
-    u32 octantCounts[8] = {0};
-    for (u32 i=0;i<triCount;++i) {
-        u32 triIdx = triIdxArray[i];
-        u32 i0 = modelTriangles[m][triIdx*3+0], i1 = modelTriangles[m][triIdx*3+1], i2 = modelTriangles[m][triIdx*3+2];
-        const float* v0 = (const float*)(modelVertices[m] + (size_t)i0*CPU_VRT_SZ);
-        const float* v1 = (const float*)(modelVertices[m] + (size_t)i1*CPU_VRT_SZ);
-        const float* v2 = (const float*)(modelVertices[m] + (size_t)i2*CPU_VRT_SZ);
-        V3 centroid = {(v0[0]+v1[0]+v2[0])*(1.0f/3.0f), (v0[1]+v1[1]+v2[1])*(1.0f/3.0f), (v0[2]+v1[2]+v2[2])*(1.0f/3.0f)};
-        u8 oct = (u8)((centroid.x>=center.x) | ((centroid.y>=center.y)<<1) | ((centroid.z>=center.z)<<2));
-        bvhBuildTriOctants[i] = oct;
-        octantCounts[oct]++;
-    }
-    u32 octantStarts[8];
-    u32 total = 0;
-    for (int o = 0; o < 8; o++) { octantStarts[o] = total; total += octantCounts[o]; } // Compute per-octant start offsets in scratch
-    u32 octantFill[8] = {0};
-    for (u32 i = 0; i < triCount; i++) { u8 o = bvhBuildTriOctants[i]; bvhBuildTriScratch[octantStarts[o] + octantFill[o]++] = triIdxArray[i]; } // Partition triangles into scratch (stable per-octant)
-    for (u32 i = 0; i < triCount; i++) { triIdxArray[i] = bvhBuildTriScratch[i]; } // Copy back to triIdxArray (now partitioned by octant, each octant contiguous)
-    for (int o = 0; o < 8; o++) { // Recurse into each non-empty octant. The scratch arrays are reused at each depth because we have already copied the partitioned data back to triIdxArray.
-        if (octantCounts[o] == 0) continue;
-        i32 childIdx = BvhBuildOctree(m,triIdxArray + octantStarts[o],octantCounts[o],depth + 1);
-        if (childIdx >= 0) node->children[o] = (i16)childIdx;
-    }
-    return nodeIdx;
-}
-
-static void BuildModelBVH(u16 m) {
-    if (m >= mdlsCnt || m >= MAX_MDLS) return;
-    modelBVHNodes[m] = NULL;
-    modelBVHTriOrder[m] = NULL;
-    modelBVHNodeCounts[m] = 0;
-    modelBVHTriOrderCounts[m] = 0;
-    u32 triCount = modelTriangleCounts[m];
-    if (triCount == 0 || triCount > BVH_MAX_TRIS_PER_MDL) return;  // too many tris -> skip BVH (linear fallback)
-    if (!modelVertices[m] || !modelTriangles[m]) return;
-    bvhBuildNodeCount = bvhBuildTriCount = 0;
-    u16* initialTris = (u16*)OS_Alloc(triCount * sizeof(u16));
-    for (u32 i = 0; i < triCount; i++) initialTris[i] = (u16)i;
-    i32 rootIdx = BvhBuildOctree(m, initialTris, triCount, 0);
-    OS_Free(initialTris, triCount * sizeof(u16));
-    if (rootIdx < 0 || bvhBuildNodeCount == 0) return;
-    modelBVHNodes[m] = (BvhNode*)OS_Alloc(bvhBuildNodeCount * sizeof(BvhNode));
-    mcpy(modelBVHNodes[m], bvhBuildNodes, bvhBuildNodeCount * sizeof(BvhNode));
-    modelBVHNodeCounts[m] = bvhBuildNodeCount;
-    if (bvhBuildTriCount > 0) {
-        modelBVHTriOrder[m] = (u16*)OS_Alloc(bvhBuildTriCount * sizeof(u16));
-        if (modelBVHTriOrder[m]) { mcpy(modelBVHTriOrder[m],bvhBuildTriOrder,bvhBuildTriCount * sizeof(u16)); modelBVHTriOrderCounts[m] = bvhBuildTriCount; }
-    }
-}
-
-static void BuildAllBVHs(void) {
-    if (mdlsCnt == 0) return;
-    modelBVHNodes = (BvhNode**)OS_Alloc(mdlsCnt * sizeof(BvhNode*)); modelBVHTriOrder = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
-    u32 totalNodes = 0, totalTris = 0;
-    for (u32 m = 0; m < mdlsCnt; m++) { modelBVHNodes[m] = NULL; modelBVHTriOrder[m] = NULL; BuildModelBVH(m); if (modelBVHNodeCounts[m]) { totalNodes += modelBVHNodeCounts[m]; totalTris += modelBVHTriOrderCounts[m]; } }
-    DualLog(" %u BVH nodes, %u BVH tri-refs ",totalNodes,totalTris);
 }
 
 // Transform a local-space AABB to a world-space AABB (smallest world AABB containing
@@ -353,12 +365,17 @@ void LoadModels() {
     double startModelTime = get_time();
     ModelDataParser mp = {0};
     if (!ParseModelData(&mp, MAX_MDLS,"./Data/models.txt")) { DualLogError("Failed models.txt\n"); OS_Exit(1); }
-    DualLog("Loading models (%d) ...",mp.count);
+    DualLog("Loading   models (%d) ...",mp.count);
     u32 maxid = 0; for (u32 i=0; i<mp.count; ++i) { if (mp.entries[i].index != U16_MAX && mp.entries[i].index > maxid) maxid = mp.entries[i].index; } mdlsCnt = (u16)maxid + 1;
     modelVertices = OS_Alloc(mdlsCnt * sizeof(u8*)); modelTriangles = OS_Alloc(mdlsCnt * sizeof(u16*));
+    modelBVHNodes = (BvhNode**)OS_Alloc(mdlsCnt * sizeof(BvhNode*)); modelBVHTriOrder = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
+    for (u32 m=0; m<mdlsCnt; ++m) { modelBVHNodes[m] = NULL; modelBVHTriOrder[m] = NULL; } // Pre-allocated up-front (before threads start) so each worker can write modelBVHNodes[i]/modelBVHTriOrder[i] for the models it owns without any synchronization.
     InitializeFloatToHalfLUT();
     size_t ft_sz = (size_t)MAX_OUTPUT_VERTS * sizeof(u16), remap_sz = (size_t)MAX_OUTPUT_VERTS * sizeof(u32), nv_sz = (size_t)MAX_OUTPUT_VERTS * CPU_VRT_SZ, cache_sz = ((MAX_OUTPUT_VERTS/3) * sizeof(TriSort)) * 2 + (MAX_OUTPUT_VERTS * sizeof(u16));
-    size_t arena = mdlsCnt*sizeof(i32) + mdlsCnt*sizeof(RawOBJ) + 11*threadCnt*sizeof(void*) + (size_t)threadCnt * ((MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*2)*sizeof(float) + MAX_OUTPUT_VERTS*8*sizeof(float) + MAX_OUTPUT_VERTS*sizeof(u32) + HASH_SIZE*sizeof(u32) + MAX_OUTPUT_VERTS*sizeof(u32) + ft_sz + remap_sz + nv_sz + cache_sz);
+    size_t bvh_nodes_sz = (size_t)BVH_MAX_NODES_PER_MDL * sizeof(BvhNode);
+    size_t bvh_u8_sz = (size_t)BVH_MAX_TRIS_PER_MDL * sizeof(u8);
+    size_t bvh_u16_sz = (size_t)BVH_MAX_TRIS_PER_MDL * sizeof(u16); // used for triOrder, triScratch, initialTris (3x)
+    size_t arena = mdlsCnt*sizeof(i32) + mdlsCnt*sizeof(RawOBJ) + 16*threadCnt*sizeof(void*) + (size_t)threadCnt * ((MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*2)*sizeof(float) + MAX_OUTPUT_VERTS*8*sizeof(float) + MAX_OUTPUT_VERTS*sizeof(u32) + HASH_SIZE*sizeof(u32) + MAX_OUTPUT_VERTS*sizeof(u32) + ft_sz + remap_sz + nv_sz + cache_sz + bvh_nodes_sz + bvh_u8_sz + 3*bvh_u16_sz);
     void* arena_base = OS_Alloc(arena); char* p = arena_base;
     i32* idxmap = (i32*)p; p += mdlsCnt*sizeof(i32);
     mset(idxmap, -1, mdlsCnt*sizeof(i32));
@@ -372,6 +389,11 @@ void LoadModels() {
     u16 **ft_scr = (u16**)p; p += threadCnt*sizeof(u16*);
     u32 **remap_scr = (u32**)p; p += threadCnt*sizeof(u32*); u8 **nv_scr = (u8**)p; p += threadCnt*sizeof(u8*);
     u8 **cache_scr = (u8**)p; p += threadCnt*sizeof(u8*);
+    BvhNode **bvh_nodes_p = (BvhNode**)p; p += threadCnt*sizeof(BvhNode*);
+    u8 **bvh_oct_p = (u8**)p; p += threadCnt*sizeof(u8*);
+    u16 **bvh_order_p = (u16**)p; p += threadCnt*sizeof(u16*);
+    u16 **bvh_scr_p = (u16**)p; p += threadCnt*sizeof(u16*);
+    u16 **bvh_init_p = (u16**)p; p += threadCnt*sizeof(u16*);
     size_t psz = MAX_VERT_ELEMENT_SIZE*3*sizeof(float), usz = MAX_OUTPUT_VERTS*8*sizeof(float), tsz = MAX_OUTPUT_VERTS*sizeof(u32);
     for (int i=0; i<threadCnt; ++i) { 
         pos[i] = (float*)p; p+=psz; nrm[i] = (float*)p; p += psz; uv[i] = (float*)p; p+=MAX_VERT_ELEMENT_SIZE*2*sizeof(float); 
@@ -380,14 +402,20 @@ void LoadModels() {
         ft_scr[i] = (u16*)p; p+=ft_sz;
         remap_scr[i] = (u32*)p; p+=remap_sz; nv_scr[i] = (u8*)p; p+=nv_sz;
         cache_scr[i] = (u8*)p; p+=cache_sz;
+        bvh_nodes_p[i] = (BvhNode*)p; p += bvh_nodes_sz;
+        bvh_oct_p[i] = (u8*)p; p += bvh_u8_sz;
+        bvh_order_p[i] = (u16*)p; p += bvh_u16_sz;
+        bvh_scr_p[i] = (u16*)p; p += bvh_u16_sz;
+        bvh_init_p[i] = (u16*)p; p += bvh_u16_sz;
         mset(ht[i], 0xFF, HASH_SIZE * sizeof(u32));
+        thrd_bvh_ctx[i] = (BvhBuildCtx){ .nodes = bvh_nodes_p[i], .triOctants = bvh_oct_p[i], .triOrder = bvh_order_p[i], .triScratch = bvh_scr_p[i], .initialTris = bvh_init_p[i], .nodeCount = 0, .triCount = 0 };
     }
     thrd_pos = pos; thread_temp_nrm = nrm; thrd_uv = uv; thrd_verts = ov; thrd_tris = ot;
     thrd_ht = ht; thrd_ht_used = ht_used;
     thrd_ft_scratch = ft_scr; thrd_remap_scratch = remap_scr; thrd_nv_scratch = nv_scr; thrd_cache_scratch = cache_scr;
     ModelParseTask tasks[32]; u32 chunk = (mdlsCnt + threadCnt - 1) / threadCnt; OS_Thread th[32];
     for (int i=0;i<threadCnt;++i) tasks[i] = (ModelParseTask){i*chunk,(i+1)*chunk > mdlsCnt ? mdlsCnt : (i+1)*chunk,raw,i};
-    if (threadCnt > 1) {
+    if (threadCnt > 1) { // Each worker now parses its model range AND builds each model's BVH right after that model is parsed, all within the same thread -- overlapping BVH build cost with other threads' OBJ parsing instead of a separate serial post-pass.
         for (int i=0;i<threadCnt;++i) OS_ThreadCreate(&th[i],ModelParsingWorker,&tasks[i]);
         for (int i=0;i<threadCnt;++i) OS_ThreadJoin(&th[i]);
     } else { for (int t=0;t<threadCnt;++t) ModelParsingWorker(&tasks[t]); }
@@ -405,8 +433,8 @@ void LoadModels() {
     }
     glBindBuffer(GL_ARRAY_BUFFER,0); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0); glFlush(); glFinish();
     OS_Free(arena_base,arena); OS_Free(mp.entries,mp.count * sizeof(ModelData));
-    BuildAllBVHs();  // Build per-model octree BVH (max 3 levels) in local model space for physics/ray acceleration
-    DualLog(" vertices: %u, tris: %u, %f secs\n",tv,tt,get_time() - startModelTime);
+    u32 totalNodes = 0, totalTris = 0; for (u32 m = 0; m < mdlsCnt; m++) { totalNodes += modelBVHNodeCounts[m]; totalTris += modelBVHTriOrderCounts[m]; }
+    DualLog(" %u BVH nodes, %u BVH tri-refs vertices: %u, tris: %u, %f secs\n",totalNodes,totalTris,tv,tt,get_time() - startModelTime);
     DebugRAM("After LoadModels");
 }
 
