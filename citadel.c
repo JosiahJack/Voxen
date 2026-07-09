@@ -39,7 +39,7 @@ void DropHeldItem() {
     tossObject->heldObjectLoadedAlternate = World.invP1.heldObjectLoadedAlternate;
     World.position[newent] = World.position[PLAYER1];
     flag_set(&tossObject->entflags,EF_RIGIDBODY,true);
-    V3 tossDir = V3_Normalize(ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right));
+    V3 tossDir = ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right);
     World.position[newent] = V3_AplusB(World.position[PLAYER1],V3_ScaleByF(tossDir,0.48f));
     World.velocity[newent] = V3_ScaleByF(tossDir,10.0f);
     ResetHeldItem();
@@ -1205,14 +1205,9 @@ void UseTargets(u16 activator, const char* targetname) {
     // their level loads (e.g. a door that was targetted will have its state set to opening but not
     // actually open until the player loads into that level) — this is the desired behavior.
     for (u8 lev = 0; lev < World.numLevels; ++lev) {
-        // Skip levels whose data hasn't been loaded yet (e.g. if LoadAllLevels was interrupted).
-        if (!World.levelDataLoaded[lev]) continue;
-        // Swap the active-level pointers to this level if they aren't already pointing at it.
-        if (World.currentLevel != lev) SetLevelPointers(lev);
-
+        if (World.currentLevel != lev) SetLevelPointers(lev); // Swap the active-level pointers to this level if they aren't already pointing at it.
         for (u16 i = INSTS_1ST_IDX; i < World.instCount; i++) {
             if (!sEqual(World.instances[i].targetname,targetname)) continue;
-
             DualLog("Successfully found matching targetname %s for entity %u (level %u) and activator ioflags:%u\n",targetname,i,lev,World.targetIOActivatorIoflags);
             Targetted(activator,i);
             succeeded = true;

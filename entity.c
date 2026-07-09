@@ -202,19 +202,19 @@ void ModEDefsInitAfterLoad(void) { // Global conditions for all entities.  No se
     /*159 chunk_med1_4*/               EDefs[159].modelIndex=258; EDefs[159].texIndex=494; EDefs[159].specIndex=1256;
     /*160 chunk_med1_5*/               EDefs[160].modelIndex=669; EDefs[160].texIndex=495; EDefs[160].specIndex=1256;
     /*161 chunk_med1_6*/               EDefs[161].modelIndex=259; EDefs[161].texIndex=496; EDefs[161].normIndex=509; EDefs[161].specIndex=1256;
-    /*162 chunk_med1_7*/               EDefs[162].modelIndex=262; EDefs[162].texIndex=499; EDefs[162].specIndex=1268; EDefs[162].normIndex=498;
+    /*162 chunk_med1_7*/               EDefs[162].modelIndex=262; EDefs[162].texIndex=499; EDefs[162].specIndex=1268; EDefs[162].normIndex=498; EDefscollider[162]=COLTYPE_MSH;
     /*163 chunk_med1_7_slice14_64*/    EDefs[163].modelIndex=263; EDefs[163].texIndex=499; EDefs[163].specIndex=1268; EDefs[163].normIndex=1254; EDefscollider[163]=COLTYPE_MSH;
     /*164 chunk_med1_7_slice45_320lh*/ EDefs[164].modelIndex=264; EDefs[164].texIndex=499; EDefs[164].specIndex=1268; EDefs[164].normIndex=1254; EDefscollider[164]=COLTYPE_MSH;
     /*165 chunk_med1_7_slice45_320rh*/ EDefs[165].modelIndex=265; EDefs[165].texIndex=499; EDefs[165].specIndex=1268; EDefs[165].normIndex=1254; EDefscollider[165]=COLTYPE_MSH;
     /*166 chunk_med1_7_slice96high*/   EDefs[166].modelIndex=266; EDefs[166].texIndex=499; EDefs[166].specIndex=1268; EDefs[166].normIndex=1254; EDefscollider[166]=COLTYPE_MSH;
     /*167 chunk_med1_7d*/              EDefs[167].modelIndex=260; EDefs[167].texIndex=497; EDefs[167].specIndex=1269; EDefs[167].normIndex=1270; EDefscollider[167]=COLTYPE_MSH;
     /*168 chunk_med1_7d_slice128*/     EDefs[168].modelIndex=261; EDefs[168].texIndex=497; EDefs[168].specIndex=1269; EDefs[168].normIndex=1270; EDefscollider[168]=COLTYPE_MSH;
-    /*169 chunk_med1_8*/               EDefs[169].modelIndex=268; EDefs[169].texIndex=503; EDefs[169].normIndex=502; EDefs[169].specIndex=1242;
-    /*170 chunk_med1_8d*/              EDefs[170].modelIndex=267; EDefs[170].texIndex=501; EDefs[170].normIndex=163; EDefs[170].specIndex=1242;
-    /*171 chunk_med1_9*/               EDefs[171].modelIndex=278; EDefs[171].texIndex=507; EDefs[171].normIndex=506; EDefs[171].specIndex=1267;
+    /*169 chunk_med1_8*/               EDefs[169].modelIndex=268; EDefs[169].texIndex=503; EDefs[169].normIndex=502; EDefs[169].specIndex=1242; EDefscollider[169]=COLTYPE_MSH;
+    /*170 chunk_med1_8d*/              EDefs[170].modelIndex=267; EDefs[170].texIndex=501; EDefs[170].normIndex=163; EDefs[170].specIndex=1242; EDefscollider[170]=COLTYPE_MSH;
+    /*171 chunk_med1_9*/               EDefs[171].modelIndex=278; EDefs[171].texIndex=507; EDefs[171].normIndex=506; EDefs[171].specIndex=1267; EDefscollider[171]=COLTYPE_MSH;
     /*172 unused*/
     /*173 unused*/
-    /*174 chunk_med1_9d*/              EDefs[174].modelIndex=269; EDefs[174].texIndex=505; EDefs[174].normIndex=504; EDefs[174].specIndex=1267;
+    /*174 chunk_med1_9d*/              EDefs[174].modelIndex=269; EDefs[174].texIndex=505; EDefs[174].normIndex=504; EDefs[174].specIndex=1267; EDefscollider[174]=COLTYPE_MSH;
     /*175 unused*/
     /*176 chunk_med1_9d_ofs112_90*/    EDefs[176].modelIndex=270; EDefs[176].texIndex=505; EDefs[176].normIndex=504; EDefs[176].specIndex=1267; EDefscollider[176]=COLTYPE_MSH;
     /*177 chunk_med1_9d_ofs144_90*/    EDefs[177].modelIndex=272; EDefs[177].texIndex=505; EDefs[177].normIndex=504; EDefs[177].specIndex=1267; EDefscollider[177]=COLTYPE_MSH;

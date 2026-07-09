@@ -523,18 +523,18 @@ typedef struct { char soundPath[128]; float *samples; u32 frame_count,frame_pos;
 typedef struct {
     u32 lastFrameSecCount,debugLineVertCount,shotsFired,grenadesThrown,savesScummed;
     u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,instCount; // Numbers of instances of entities and lights loaded (always for just the current level)
-    float farPlane[14],damageDealt,damageReceived,timeScale,worldMin_x[14],worldMin_z[14],voxelMinCenterX[14],voxelMinCenterZ[14];
-        double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,debugLineFinished,shakeFinished,last_time,last_physics_time,deltaTime,current_time,screenshotTimeout,pauseRelativeTime,absoluteTime,statusTextDecayFinished,justSavedTimeStamp;
+    float farPlane[14],damageDealt,damageReceived,timeScale,worldMin_x[14],worldMin_z[14],voxMinCtrX[14],voxMinCtrZ[14];
+    double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,debugLineFinished,shakeFinished,last_time,last_physics_time,deltaTime,current_time,screenshotTimeout,pauseRelativeTime,absoluteTime,statusTextDecayFinished,justSavedTimeStamp;
     i32 fogFac,cursorPosition_x,cursorPosition_y; // Separate internal cursor from system cursor.  This gets relatively pushed around by real cursor movement to give consistent platform behavior.
-        V3 debugLine_start,debugLine_end,cyberspaceRecallPoint;
+    V3 debugLine_start,debugLine_end,cyberspaceRecallPoint;
     u8 levelSecurity[14],startLevel,numLevels,curLev,diffCbt,diffPuz,diffMis,diffCyb,creditsPageIndex;
     int lev1SecCode,lev2SecCode,lev3SecCode,lev4SecCode,lev5SecCode,lev6SecCode;
     u8 currentLevel; // Which level's per-level arrays the pointers (instances, position, etc.) currently point to.  Usually equals curLev, but diverges briefly during cross-level target I/O.
-    bool levelDataLoaded[14]; // True once a level's data has been read from ./Data/level#.txt into levelInstances[lev]/levelPosition[lev]/etc.
     bool inventoryMode,levelCurrentlyLoading,introNotPlayed,paused,menuActive,gameFinished,creditsActive,decoyActive,boosterActive,uiIsBlocking,mouseClickHeldOverGUI,geniusActive;
     InventorySystem invP1,invP2;
     SystemUI Sys_UI;
     MusicSystem Sys_Music;
+
     // ===== Per-level parallel arrays (SoA) for cache-hot physics/render loops =====
     // The active level is selected by pointers below; SetLevelPointers(lev) swaps them.
     Entity levelInstances[MAX_LEVELS][INSTANCE_COUNT];
@@ -563,6 +563,7 @@ typedef struct {
     LightAnimation levelLAnims[14][LIGHT_COUNT];
     V3 levelLightsNewPosition[14][LIGHT_COUNT];
     u16 levelLoadedLights[14];
+
     // ===== Active-level pointers (the "current instances[]") =====
     // All existing call sites use World.instances[i], World.position[i], etc. unchanged;
     // these pointers simply redirect to the active level's row in the levelXxx[] arrays.
@@ -723,17 +724,8 @@ INLINE float parse_float(const char* str, const char* line, u32 lineNum) {
 double get_time(); int sFormatV(char* buf, size_t bufsz, const char* f, va_list args);
 char statusText[T_BUFFER_SIZE];
 void CenterStatusPrint(const char * restrict fmt, ...) { va_list args; __builtin_va_start(args, fmt); sFormatV(statusText,T_BUFFER_SIZE,fmt,args); __builtin_va_end(args); DualLog("%s\n",statusText); World.statusTextDecayFinished = get_time() + 3.5;/*secs decay time before text dissappears.*/ }
-// Forward declarations for mcpy/mset (defined in voxen.c) so the INLINE helpers below can use them.
-void* mcpy(void *dst, const void *src, size_t n);
-void* mset(void *dst, int c, size_t n);
-// SetLevelPointers: Repoints all the active-level SoA pointers (World.instances, World.position, etc.)
-// to the per-level arrays for level `lev`.  Also mirrors levelInstCount[lev] into World.instCount.
-// This is the single "pointer swap" entry point used by:
-//   - LoadLevel()          (set up the active level after a switch)
-//   - LoadAllLevels()      (set up the level about to be populated from disk)
-//   - UseTargets()         (briefly swap to each level to fire target I/O cross-level, then swap back)
-// All existing World.instances[i] / World.position[i] / ... call sites keep working unchanged
-// because the pointers redirect to the currently active level's row in levelXxx[].
+void* mcpy(void *dst, const void *src, size_t n) { u8 *d=(u8 *)dst; const u8 *s=(const u8 *)src; while (n--) {*d++=*s++;} return dst; } // memcpy replacement
+void* mset(void *dst, int c, size_t n) { u8 *p=(u8 *)dst; u8 v=(u8)c; while (n--) {*p++=v;} return dst; } // memset replacement
 INLINE void SetLevelPointers(u8 lev) {
     if (lev >= MAX_LEVELS) return;
     World.currentLevel = lev;

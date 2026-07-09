@@ -1,5 +1,4 @@
-// voxels.compute
-// Compute shader for determining light lists for voxels and updating voxel tables 
+// voxels.compute - Compute shader for determining light lists for voxels and updating voxel tables 
 layout(local_size_x = 16, local_size_y = 16) in;
 struct Light { vec3 pos; float intensity; vec3 col; uint lflags; float range; float spotAng; float maxIntensity; float minIntensity; vec4 spotDir; };
 layout(std430,binding=2) buffer VoxelLightListCounts { uint voxelLightListCounts[]; };
@@ -8,7 +7,7 @@ layout(std430,binding=4) buffer LightIndices { Light lights[]; };
 layout(std430,binding=5) buffer ShadowMaps { uint shadowMaps[]; };
 layout(std430,binding=6) buffer ShadowMapsIndirection { uint shadowMapsIndirection[]; };
 layout(std430,binding=7) buffer CullingData { uint gridCellStates[]; };
-layout(location=0) uniform vec2 voxelMinCenter;
+layout(location=0) uniform vec2 voxMinCtr;
 layout(location=1) uniform float farPlaneSqd;
 layout(location=2) uniform uint loadedLights;
 layout(location=3) uniform vec2 worldMin;
@@ -56,55 +55,29 @@ void main() {
 
     uint voxelIndex = (gl_GlobalInvocationID.y * WORLD_X_VOXELCOUNT) + gl_GlobalInvocationID.x;
     uint baseOffset = voxelIndex * maxLightsPerVoxel;
+    float vx = voxMinCtr.x + float(gl_GlobalInvocationID.x) * VOXEL_SIZE; float vz = voxMinCtr.y + float(gl_GlobalInvocationID.y) * VOXEL_SIZE; float vy = 0.0;
+    float cdx = vx - camPos.x; float cdz = vz - camPos.z;
+    if ((cdx*cdx + cdz*cdz) > farPlaneSqd) { voxelLightListCounts[voxelIndex] = 0u; return; }
+    if (!VoxelOrNeighborVisible(vx, vz)) { voxelLightListCounts[voxelIndex] = 0u; return; }
 
-    float vx = voxelMinCenter.x + float(gl_GlobalInvocationID.x) * VOXEL_SIZE;
-    float vz = voxelMinCenter.y + float(gl_GlobalInvocationID.y) * VOXEL_SIZE;
-    float vy = 0.0; // adjust if your voxels have varying Y height
-
-    float cdx = vx - camPos.x;
-    float cdz = vz - camPos.z;
-    if ((cdx*cdx + cdz*cdz) > farPlaneSqd) {
-        voxelLightListCounts[voxelIndex] = 0u;
-        return;
-    }
-
-    if (!VoxelOrNeighborVisible(vx, vz)) {
-        voxelLightListCounts[voxelIndex] = 0u;
-        return;
-    }
-
-    uint count = 0u;
-    uint weakestSlot = 0u;
-    float weakestScore = 1e38;
+    uint count = 0u; uint weakestSlot = 0u; float weakestScore = 1e38;
     for (uint lightIdx = 0u; lightIdx < loadedLights; ++lightIdx) {
         vec3 lpos = lights[lightIdx].pos;
-        float lx = lpos.x;
-        float lz = lpos.z;
-        float dx = lx - vx;
-        float dz = lz - vz;
-        float range = lights[lightIdx].range;
-        float distSq = dx*dx + dz*dz;
-        if (distSq >= range*range) continue;
-
-        float intensity = lights[lightIdx].intensity;
-        if (intensity < 0.1) continue;
+        float lx = lpos.x;  float lz = lpos.z; float dx = lx - vx; float dz = lz - vz; float range = lights[lightIdx].range;
+        float distSq = dx*dx + dz*dz; if (distSq >= range*range) continue;
+        float intensity = lights[lightIdx].intensity; if (intensity < 0.1) continue;
         if (!CellVisible(lx, lz)) continue;
 
         if (count < maxLightsPerVoxel) {
             uniqueLightLists[baseOffset + count] = lightIdx;
-            if (intensity < weakestScore) {
-                weakestScore = intensity;
-                weakestSlot = count;
-            }
+            if (intensity < weakestScore) { weakestScore = intensity; weakestSlot = count; }
             count++;
         } else if (intensity > weakestScore) {
             uniqueLightLists[baseOffset + weakestSlot] = lightIdx;
-            // rescan for new weakest
             weakestScore = intensity;
             for (uint i = 0u; i < maxLightsPerVoxel; ++i) {
                 float s = lights[uniqueLightLists[baseOffset + i]].intensity;
-                if (s < weakestScore) { weakestScore = s; weakestSlot = i;
-                }
+                if (s < weakestScore) { weakestScore = s; weakestSlot = i; }
             }
         }
     }

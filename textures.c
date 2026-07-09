@@ -134,10 +134,8 @@ static void* TextureParsingWorker(void* arg) {
         if (unlikely(pIdx < 0 || pIdx >= (i32)t->parser->count)) continue;
         doubleSidedTexture[i] = t->parser->entries[pIdx].doublesided; 
         transparentTexture[i] = t->parser->entries[pIdx].transparent;
-        
         FHandle dummy_fd; int size=0; t->raw_textures[i].data=(const char*)OS_OpenAndAllocateFileBufferReadonly(t->parser->entries[pIdx].path,&dummy_fd,&size);
         t->raw_textures[i].size=size;
-        
         const char* d = t->raw_textures[i].data; 
         int sz = t->raw_textures[i].size; 
         if (unlikely(!d || sz <= 0)) continue;
@@ -197,7 +195,7 @@ static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
         }
         if (cur < end && (*cur == '\r' || *cur == '\n')) cur++;
     }
-    if (!m_idx || m_idx >= maxS) { if (!m_idx) DualLogWarn("No entries in %s\n", fn); else DualLogWarn("Index %u too large in %s\n", m_idx, fn); OS_Free(data, sz); return true; }
+    if (!m_idx || m_idx >= maxS) { if (!m_idx) DualLogWarn("No entries in %s\n", fn); else DualLogWarn("Index %u too large in %s\n",m_idx,fn); OS_Free(data,sz); return false; }
     p->entries = OS_Alloc((p->count = p->capacity = m_idx + 1) * sizeof(TextureData));
     for (u32 i = 0; i < p->count; ++i) p->entries[i] = (TextureData){.index = U16_MAX};
     TextureData e = {.index = U16_MAX}; line = 0; cur = data;

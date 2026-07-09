@@ -91,7 +91,6 @@ INLINE void* OS_Alloc(size_t amount) { return OS_AllocateRAM(amount,0x1|0x2,0x02
 INLINE void* OS_Calloc(size_t amount, size_t count) { return OS_Alloc(amount * count); }
 INLINE void OS_Write(FHandle f,const void* buf, size_t s, const char* p) { size_t total=0; while(total < s) { i64 w=OS_RawWrite(f,(const char*)buf + total,s - total); if(w < 0) { DualLogError("Write error to %s: %s[%d]\n",p,w,(i32)-w); OS_Exit(1); } total += (size_t)w; } }
 INLINE void* OS_OpenAndAllocateFileBufferReadonly(const char* p,FHandle* f,int* s){void* r;return((*f=OS_OpenReadonly(p))==(FHandle)-1)?*s=0,(void*)0:((*s=OS_FileSize(*f))<=0)?DualLogError("Skipping empty:%s\n",p),OS_Close(*f),OS_Exit(1),NULL:(r=OS_AllocateFileBackedRAMReadonly(*s,*f,(char*)p))?(OS_Close(*f),r):NULL;}
-void* mcpy(void *dst, const void *src, size_t n) { u8 *d=(u8 *)dst; const u8 *s=(const u8 *)src; while (n--) {*d++=*s++;} return dst; } // memcpy replacement
 INLINE void* OS_Realloc(void* old, size_t olds, size_t news) { void* n; return !old ? OS_Alloc(news) : news <= olds ? old : (n=OS_Alloc(news)) ? (mcpy(n,old,olds),OS_Free(old,olds),n) : 0; }
 enum {GL_ARRAY_BUFFER=0x8892,GL_DEPTH_BUFFER_BIT=0x00000100,GL_READ_WRITE=0x88BA,GL_SSBO=0x90D2,GL_CULL_FACE=0x0B44,GL_BLEND=0x0BE2,GL_DEPTH_TEST=0x0B71,GL_RGB=0x1907,GL_TEXTURE0=0x84C0,GL_TEXTURE5=0x84C5,GL_COLOR_ATTACHMENT0=0x8CE0,GL_RG16F=0x822F,GL_TEXTURE1=0x84C1,GL_TEXTURE6=0x84C6,GL_COLOR_ATTACHMENT1=0x8CE1,GL_ELEMENT_ARRAY_BUFFER=0x8893,GL_RGB16F=0x881B,GL_TEXTURE2=0x84C2,
       GL_TEXTURE_2D=0x0DE1,GL_COLOR_ATTACHMENT2=0x8CE2,GL_FALSE=0,GL_RGBA=0x1908,GL_TEXTURE3=0x84C3,GL_UNSIGNED_BYTE=0x1401,GL_COLOR_ATTACHMENT3=0x8CE3,GL_FLOAT=0x1406,GL_RGBA32F=0x8814,GL_TEXTURE4=0x84C4,GL_FRAMEBUFFER=0x8D40,GL_COLOR_ATTACHMENT4=0x8CE4,GL_UNSIGNED_SHORT=0x1403,GL_RGBA8=0x8058,GL_COLOR_BUFFER_BIT=0x00004000,GL_STATIC_DRAW=0x88E4,GL_DYNAMIC_DRAW=0x88E8};
@@ -935,27 +934,11 @@ void UpdateInstanceMatrix4x4s() {
     glBufferSubData(GL_SSBO,offsetFloats * sizeof(float),countFloats * sizeof(float),modelMatrices + offsetFloats);
 }
 // Init && Main
-// LoadLevelData: Reads ./Data/level<curlevel>.txt from disk and populates the per-level parallel arrays
-// (World.levelInstances[curlevel], World.levelPosition[curlevel], etc.) via LoadLevelMod, then runs the
-// per-entity init (cellIndex, radius, inertia) and ModInitAfterLoad.  Also snapshots lights/camViews
-// into the per-level storage (levelLights[], levelCamViews[], etc.) so LoadLevel can later switch
-// levels without any disk I/O.  This is called once per level at startup by LoadAllLevels().
-// It does NOT do per-active-level runtime setup (CullInit/audio/music/voxel uniforms) — that's LoadLevel's job.
 void LoadLevelData(u8 curlevel) {
-    double start_time = get_time();
-    DebugRAM("start of LoadLevelData");
-    World.levelCurrentlyLoading = true;
-    RenderLoading(100,"Loading level data...");
-    // Repoint all active-level pointers at this level's per-level arrays before any code touches
-    // World.instances[i] / World.position[i] / etc. — that way LoadLevelMod and AddInstance write
-    // into levelInstances[curlevel] instead of clobbering whatever level was previously active.
-    SetLevelPointers(curlevel);
-    World.curLev = curlevel; // LoadLevelMod and various callers read World.curLev during load.
-    // Clear this level's entity slot range and reset its instance counter.
+    World.curLev = curlevel;
+    SetLevelPointers(curlevel); // Ensures writing to correct current level
     mset(World.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the per-level entity array for this level.
     World.instCount = 3; // 0 == NULL, 1 == Player1, 2 == Player2 — reset before LoadLevelMod adds entities.
-    // Clear/initialize the active lights + camViews globals so AddLight/AddCamView populate them fresh
-    // for this level; we'll snapshot them into per-level storage at the end of this function.
     mset(World.lights,0,LIGHT_COUNT * sizeof(Light)); mset(World.lanims,0,LIGHT_COUNT * sizeof(LightAnimation)); World.loadedLights = 0;
     mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
     mset(camViews,0,64 * sizeof(CamView)); camViewCount = 0;
@@ -965,8 +948,6 @@ void LoadLevelData(u8 curlevel) {
     LoadLevelMod(curlevel);
     OS_Close(levelFileHandle);
     for (int i=0;i<World.loadedLights;++i) World.lightsNewPosition[i]=World.lights[i].pos;
-    DualLog("Loaded %d entities, %u static lights for Level %d... took %f secs\n",World.instCount,World.loadedLights,curlevel,get_time() - start_time);
-    RenderLoading(110,"Initialize entities...");
     for (int i=PLAYER1;i<World.instCount;++i) {
         i32 cellIdx = PosGetCellCoords(World.position[i].x,World.position[i].z);
         World.instances[i].cellIndex = cellIdx;
@@ -978,81 +959,44 @@ void LoadLevelData(u8 curlevel) {
         if (World.mass[i] < 0.001f && World.collider[i] != COLTYPE_NONE && World.collider[i] != COLTYPE_MSH && (World.instances[i].entflags & EF_RIGIDBODY)) {World.mass[i] = 0.2f; /*At least something!*/}
     }
     ModInitAfterLoad();
-    // Lights/lanims are now pointer-swapped by SetLevelPointers — World.lights already points
-    // at World.levelLights[curlevel], so no snapshot mcpy needed. Only loadedLights count needs saving.
     World.levelLoadedLights[curlevel] = World.loadedLights;
     mcpy(levelCamViews[curlevel],camViews,64 * sizeof(CamView));
     mcpy(levelCamViewTextures[curlevel],camViewTextures,64 * sizeof(u32));
     levelCamViewCount[curlevel] = camViewCount;
-    // Record the per-level instance count and mark this level as loaded.
     World.levelInstCount[curlevel] = World.instCount;
-    World.levelDataLoaded[curlevel] = true;
     World.levelCurrentlyLoading = false;
-    DebugRAM("end of LoadLevelData");
 }
 
-// LoadAllLevels: Pre-loads all 14 (or World.numLevels) level#.txt files into the per-level parallel
-// arrays at startup so that subsequent LoadLevel() calls are just fast pointer swaps.  Called once
-// from NewGame() before LoadLevel(startLevel).
 __attribute__((cold)) void LoadAllLevels(void) {
-    DualLog("Pre-loading all %u levels...\n",World.numLevels);
+    double start_time = get_time();
     DebugRAM("start of LoadAllLevels");
-    u8 savedCurLev = World.curLev;
-    for (u8 lev = 0; lev < World.numLevels; ++lev) {
-        if (World.levelDataLoaded[lev]) continue; // Already loaded (e.g. reload-after-save).
-        LoadLevelData(lev);
-    }
-    // Note: we do NOT restore World.curLev here — the caller (NewGame) will call LoadLevel(startLevel)
-    // which sets World.curLev = startLevel and runs all per-active-level setup.
-    (void)savedCurLev;
-    DualLog("All %u levels pre-loaded.\n",World.numLevels);
+    RenderLoading(100,"Loading level data...");
+    World.levelCurrentlyLoading = true;
+    for (u8 lev = 0; lev < World.numLevels; ++lev) LoadLevelData(lev);
+    DualLog("Entity counts::0:%u|1:%u|2:%u|3:%u|4:%u|5:%u|6:%u|7:%u|8:%u|9:%u|10:%u|11:%u|12:%u|13:%u\n Light counts::0:%u|1:%u|2:%u|3:%u|4:%u|5:%u|6:%u|7:%u|8:%u|9:%u|10:%u|11:%u|12:%u|13:%u\nLoad all levels... took %f secs\n",World.numLevels,
+            World.levelInstCount[0],World.levelInstCount[1],World.levelInstCount[2],World.levelInstCount[3],World.levelInstCount[4],World.levelInstCount[5],World.levelInstCount[6],World.levelInstCount[7],World.levelInstCount[8],World.levelInstCount[9],World.levelInstCount[10],World.levelInstCount[11],World.levelInstCount[12],World.levelInstCount[13],
+            World.levelLoadedLights[0],World.levelLoadedLights[1],World.levelLoadedLights[2],World.levelLoadedLights[3],World.levelLoadedLights[4],World.levelLoadedLights[5],World.levelLoadedLights[6],World.levelLoadedLights[7],World.levelLoadedLights[8],World.levelLoadedLights[9],World.levelLoadedLights[10],World.levelLoadedLights[11],World.levelLoadedLights[12],World.levelLoadedLights[13],
+            get_time() - start_time);
     DebugRAM("end of LoadAllLevels");
 }
 
-// LoadLevel: Switches the active level to curlevel.  Pre-condition: level data must already be
-// loaded (via LoadAllLevels at startup, or a prior LoadLevelData call).  If not yet loaded, falls
-// back to loading it from disk first.  Once data is loaded, this is the fast path: it assigns
-// World.currentLevel = curlevel, repoints all active-level pointers (World.instances, World.position,
-// etc.) at levelInstances[curlevel]/levelPosition[curlevel]/etc. via SetLevelPointers(), restores
-// the cached lights/camViews for this level, and re-runs the per-active-level runtime setup
-// (CullInit, audio, music, voxel uniforms, shadowmap indirection).  No disk I/O on the fast path.
 void LoadLevel(u8 curlevel) {
-    double start_time = get_time();
     DebugRAM("start of LoadLevel");
     World.levelCurrentlyLoading = true; World.paused = false; World.menuActive = false;
     RenderLoading(100,"Loading level...");
-    // If this level's data isn't loaded yet (e.g. a level was added after LoadAllLevels), load it.
-    // LoadLevelData will set World.curLev and SetLevelPointers itself.
-    if (!World.levelDataLoaded[curlevel]) LoadLevelData(curlevel);
-    // Before switching pointers to the new level, carry the player entities (PLAYER1, PLAYER2) from
-    // the currently-active level to the destination level.  This preserves the player's state
-    // (position, health, ioflags, inventory-derived flags, velocity, etc.) across level switches —
-    // without this, the player would "reset" to whatever state was stored in the destination
-    // level's slots 1/2 (which is the NewGame state copied by NewGame's player-slot replication loop).
-    // Skip if we're already on the destination level (no-op switch) or if the current level's data
-    // isn't loaded yet (first-time init).
-    if (World.currentLevel != curlevel && World.levelDataLoaded[World.currentLevel]) {
-        CopyPlayerState(World.currentLevel, curlevel);
-    }
-    // === The "merely assigns pointers" step from the design spec ===
-    // Set the active level and repoint all active-level SoA pointers at this level's per-level data.
+    if (World.currentLevel != curlevel) CopyPlayerState(World.currentLevel,curlevel);
     World.curLev = curlevel;
     SetLevelPointers(curlevel);
-    // Lights/lanims/lightsNewPosition/loadedLights are now pointer-swapped by SetLevelPointers above —
-    // World.lights already points at World.levelLights[curlevel], so no mcpy needed.
     mcpy(camViews,levelCamViews[curlevel],64 * sizeof(CamView));
     mcpy(camViewTextures,levelCamViewTextures[curlevel],64 * sizeof(u32));
     camViewCount = levelCamViewCount[curlevel];
     mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
-    mset(modelMatrices,0,INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16 — rebuilt from current level's transforms.
+    mset(modelMatrices,0,INSTANCE_COUNT * 16 * sizeof(float));
     for (int i=0;i<World.loadedLights;++i) World.lightsNewPosition[i]=World.lights[i].pos;
-    DualLog("Switched to Level %d: %d entities, %u static lights... took %f secs\n",curlevel,World.instCount,World.loadedLights,curlevel,get_time() - start_time);
-    // Per-active-level runtime setup (cull, audio, music, voxel uniforms, shadowmap indirection).
-    // Note: per-entity init (cellIdx, radius, inertia, ModInitAfterLoad) was already done in
-    // LoadLevelData and is preserved in the per-level arrays, so we don't repeat it here.
+    DualLog("Switched to Level %d\n",curlevel);
     ResetLevelAudio(); ResetLevelMusic();
-    RenderLoading(110,"Loading cull system..."); CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
-    glUseProgram(voxelUpdateSP); glUniform2f(0,World.voxelMinCenterX[World.curLev],World.voxelMinCenterZ[World.curLev]); glUniform1f(1,World.farPlane[World.curLev] * World.farPlane[World.curLev]); glUniform1ui(2,World.loadedLights); glUniform2f(3,World.worldMin_x[World.curLev],World.worldMin_z[World.curLev]);
+    RenderLoading(110,"Loading cull system..."); CullInit(); // Must be after level!
+    glUseProgram(voxelUpdateSP); glUniform2f(0,World.voxMinCtrX[World.curLev],World.voxMinCtrZ[World.curLev]); glUniform1f(1,World.farPlane[World.curLev] * World.farPlane[World.curLev]); glUniform1ui(2,World.loadedLights); glUniform2f(3,World.worldMin_x[World.curLev],World.worldMin_z[World.curLev]);
     RenderLoading(120,"Loading voxel lighting data...");
     for (u16 i = 0; i < World.loadedLights; i++) { World.lightsNewPosition[i] = World.lights[i].pos; }
     mset(shadowmapIndirectionList,MAX_SHADOWMAPS + 1,World.loadedLights * sizeof(u32)); // Set to invalid values for all
@@ -1064,18 +1008,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     DualLog("Loading new game...\n");
     RenderLoading(100,"Loading new game...");
     World.menuActive = World.paused = enteringPlayerName = fovSliderActive = gammaSliderActive = masterVolumeSliderActive = musicVolumeSliderActive = messageVolumeSliderActive = sfxVolumeSliderActive = returnToPause = false;
-    for (int i=0;i<World.numLevels;++i) {
-        World.worldMin_x[i] = levMins[i].x; World.worldMin_z[i] = levMins[i].y;
-        World.voxelMinCenterX[i] = World.worldMin_x[i] + VOXEL_HALF; World.voxelMinCenterZ[i] = World.worldMin_z[i] + VOXEL_HALF;
-        World.farPlane[i] = lFars[i];
-        World.fogColor[i] = fogLUT[i]; World.fogColor[i].a *= 3.8f;
-        // Mark each level's data as needing (re)load so LoadAllLevels will read it fresh from disk.
-        World.levelDataLoaded[i] = false;
-    }
-    // Point the active-level pointers at level 0 so the player-entity setup below writes into
-    // levelInstances[0]'s slots 0..2.  We'll then replicate those slots to all other levels BEFORE
-    // LoadAllLevels so that LoadLevelMod's headlight-position read (World.position[PLAYER1]) gets
-    // the correct player position for every level it loads.
+    for (int i=0;i<World.numLevels;++i) { World.worldMin_x[i] = levMins[i].x; World.worldMin_z[i] = levMins[i].y; World.voxMinCtrX[i] = World.worldMin_x[i] + VOXEL_HALF; World.voxMinCtrZ[i] = World.worldMin_z[i] + VOXEL_HALF; World.farPlane[i] = lFars[i]; World.fogColor[i] = fogLUT[i]; World.fogColor[i].a *= 3.8f; }
     SetLevelPointers(0);
     World.curLev = 0;
     World.mass[0] = 0.0f; World.dynamicFriction[0] = 0.4f; World.collider[0]=COLTYPE_NONE; // Static proxy just uses world.
@@ -1084,22 +1017,12 @@ __attribute__((cold)) void NewGame() { // Reset World States
     mset(World.instances,0,3 * sizeof(Entity)); // Blank out player entities
     PlayerInit(PLAYER1); PlayerInit(PLAYER2); World.cam_yaw = 90.0f; World.cam_pitch = 0.0f; World.cam_roll = 0.0f; World.inventoryMode = Sys_Settings.NoShootMode;
     World.gameFinished = World.creditsActive = World.decoyActive = false; World.damageDealt = World.damageReceived = 0.0f;
-        World.ressurections = World.deaths = World.kills = World.cyberkills = 0u; World.shotsFired = World.grenadesThrown = World.savesScummed = 0U; World.creditsPageIndex = 0u;
+    World.ressurections = World.deaths = World.kills = World.cyberkills = 0u; World.shotsFired = World.grenadesThrown = World.savesScummed = 0U; World.creditsPageIndex = 0u;
     for (int i=0;i<14;++i) World.levelSecurity[i] = 100u;
     ResetInput();
     World.currentMouse_dx = World.currentMouse_dy = 0; last_mouse_x = last_mouse_y = 0; ignore_next_mouse_delta = true;
     Sys_Input.lastUse = Sys_Input.isCapsLockOn = false; // As far as we're concerned, don't worry about OS capslock actual state.
-    // Replicate the player-entity slots (PLAYER1=1, PLAYER2=2) from level 0 to every other level
-    // BEFORE LoadAllLevels.  Level data files do not populate slots 0..2 (LoadLevelMod only fills
-    // slots 3..instCount), so without this copy the player would be uninitialized in non-startup
-    // levels.  Doing this before LoadAllLevels also ensures LoadLevelMod's headlight-position read
-    // (World.position[PLAYER1]) gets the correct player position for every level it loads.
-    // Slot 0 (WORLD/NULL) is per-level static geometry and is intentionally NOT replicated — each
-    // level's slot 0 stays at its zero-initialized defaults until LoadLevelData sets it up.
-    for (u8 lev = 1; lev < World.numLevels; ++lev) CopyPlayerState(0, lev);
-    // Pre-load all 14 levels' data from disk into per-level parallel arrays.  After this, LoadLevel
-    // is just a fast pointer swap with no disk I/O.  LoadLevelData preserves slots 0..2 (it only
-    // clears and re-populates slots 3+), so the player slots replicated above survive intact.
+    for (u8 lev = 1; lev < World.numLevels; ++lev) CopyPlayerState(0,lev);
     LoadAllLevels();
     LoadLevel(World.startLevel); // Must be after entities!  Fast pointer swap to startLevel.
     World.lev1SecCode = random_range_u8(0u,9u); World.lev2SecCode = random_range_u8(0u,9u);

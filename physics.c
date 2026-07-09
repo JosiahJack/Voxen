@@ -856,8 +856,7 @@ static Manifold CvxMsh(u16 hullMesh, const float* hullMx, u16 triMesh, const flo
         }
         return ctx.best;
     }
-    // Linear fallback (no BVH)
-    for (u32 ti = 0; ti < triCount; ++ti) {
+    for (u32 ti = 0; ti < triCount; ++ti) { // Linear fallback (no BVH)
         u32 i0 = modelTriangles[triMesh][ti * 3 + 0], i1 = modelTriangles[triMesh][ti * 3 + 1], i2 = modelTriangles[triMesh][ti * 3 + 2];
         V3 ta = MvVert(triMx,(V3){ *(float*)(modelVertices[triMesh] + (size_t)i0 * CPU_VRT_SZ + 0), *(float*)(modelVertices[triMesh] + (size_t)i0 * CPU_VRT_SZ + 4), *(float*)(modelVertices[triMesh] + (size_t)i0 * CPU_VRT_SZ + 8) });
         V3 tb = MvVert(triMx,(V3){ *(float*)(modelVertices[triMesh] + (size_t)i1 * CPU_VRT_SZ + 0), *(float*)(modelVertices[triMesh] + (size_t)i1 * CPU_VRT_SZ + 4), *(float*)(modelVertices[triMesh] + (size_t)i1 * CPU_VRT_SZ + 8) });
@@ -1162,7 +1161,6 @@ float GetBasePlayerSpeed(u16 p, bool running) {
     if (Cheats.noclip && isSprinting) return PLAYER_MAX_CYBER_SPEED * 2.5f;
     if (Cheats.noclip) return PLAYER_MAX_CYBER_SPEED * 1.5f;
     if (World.curLev == LEVEL_CYBERSPACE) return PLAYER_MAX_CYBER_SPEED; //Cyber space speed
-
     float retval = PLAYER_MAX_WALK_SPEED, bonus = 0.0f;
     if (World.boosterActive) bonus = PLAYER_BOOSTER_SPEED_BOOST;
     BodyState bodyState = World.instances[PLAYER1].bodyState;
@@ -1171,18 +1169,15 @@ float GetBasePlayerSpeed(u16 p, bool running) {
         case BodyState_CrouchingDown: case BodyState_Crouch:    retval = PLAYER_MAX_CROUCH_SPEED; break;
         case BodyState_Prone:         case BodyState_ProningDown: case BodyState_ProningUp: retval = PLAYER_MAX_PRONE_SPEED; break;
     }
-
     if ((isSprinting || World.boosterActive) && running) {
         if (inv->fatigue > 80.0f && World.boosterActive) retval = PLAYER_MAX_SPRINT_SPEED_FATIGUED;
         else                                                   retval = PLAYER_MAX_SPRINT_SPEED;
-
         if (bodyState == BodyState_Standing || bodyState == BodyState_Crouch || bodyState == BodyState_CrouchingDown) {
             retval -= ((PLAYER_MAX_WALK_SPEED - PLAYER_MAX_CROUCH_SPEED) * 1.5f); // Subtract off the difference in speed between walking and crouching from the sprint speed
         } else if (bodyState == BodyState_Prone || bodyState == BodyState_ProningDown || bodyState == BodyState_ProningUp) {
             retval -= ((PLAYER_MAX_WALK_SPEED - PLAYER_MAX_PRONE_SPEED) * 2.0f); // Subtract off the difference in speed between walking and proning from the sprint speed.
         }
     }
-
     return retval + bonus;
 }
 

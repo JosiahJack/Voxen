@@ -85,7 +85,6 @@ static void DualLogMain(const char *prefix, const char *fmt, va_list args) {
 void DualLog(const char* s, ...) { va_list a; __builtin_va_start(a,s); DualLogMain(NULL,s,a); __builtin_va_end(a); }
 void DualLogWarn(const char* s, ...) { va_list a; __builtin_va_start(a,s); DualLogMain("\033[1;38;5;208mWARN:",s,a); __builtin_va_end(a); }
 void DualLogError(const char* s, ...) { va_list a; __builtin_va_start(a,s); DualLogMain("\033[1;31mERROR:",s,a); __builtin_va_end(a); }
-void* mset(void *dst, int c, size_t n) { u8 *p=(u8 *)dst; u8 v=(u8)c; while (n--) {*p++=v;} return dst; } // memset replacement
 void BmpWrite(char const *filename, int x, int y, const void *data) {
     FHandle f = OS_OpenWriteonly(filename);
     if (f == INVALID_FHANDLE) { DualLogError("Failed to open %s for writing\n", filename); return; }
