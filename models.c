@@ -212,14 +212,7 @@ BvhNode** modelBVHNodes = NULL;          // [mdlsCnt] array of BvhNode arrays (N
 u16**    modelBVHTriOrder = NULL;        // [mdlsCnt] array of u16 triangle-index arrays (reordered for leaf-contiguous ranges)
 u32      modelBVHNodeCounts[MAX_MDLS] = {0};
 u32      modelBVHTriOrderCounts[MAX_MDLS] = {0};
-
-// Build scratch (build is single-threaded, so static globals are fine)
-static BvhNode bvhBuildNodes[BVH_MAX_NODES_PER_MDL];
-static u16     bvhBuildTriOrder[BVH_MAX_TRIS_PER_MDL];
-static u8      bvhBuildTriOctants[BVH_MAX_TRIS_PER_MDL];
-static u16     bvhBuildTriScratch[BVH_MAX_TRIS_PER_MDL];
-static u32     bvhBuildNodeCount;
-static u32     bvhBuildTriCount;
+static BvhNode bvhBuildNodes[BVH_MAX_NODES_PER_MDL]; static u8 bvhBuildTriOctants[BVH_MAX_TRIS_PER_MDL]; static u16 bvhBuildTriOrder[BVH_MAX_TRIS_PER_MDL],bvhBuildTriScratch[BVH_MAX_TRIS_PER_MDL]; static u32 bvhBuildNodeCount,bvhBuildTriCount;
 
 // Recursive centroid-based octree build. Each triangle goes into exactly one octant
 // (the one containing its centroid), so there is no triangle duplication. The node
@@ -366,21 +359,12 @@ static void BuildAllBVHs(void) {
     if (mdlsCnt == 0) return;
     modelBVHNodes = (BvhNode**)OS_Alloc(mdlsCnt * sizeof(BvhNode*));
     modelBVHTriOrder = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
-    for (u32 m = 0; m < mdlsCnt; m++) {
-        modelBVHNodes[m] = NULL;
-        modelBVHTriOrder[m] = NULL;
-    }
-    for (u16 m = 0; m < mdlsCnt; m++) {
-        BuildModelBVH(m);
-    }
+    for (u32 m = 0; m < mdlsCnt; m++) { modelBVHNodes[m] = NULL; modelBVHTriOrder[m] = NULL; }
+    for (u16 m = 0; m < mdlsCnt; m++) { BuildModelBVH(m); }
     u32 totalNodes = 0, totalTris = 0, bvhsBuilt = 0;
-    for (u16 m = 0; m < mdlsCnt; m++) {
-        if (modelBVHNodeCounts[m]) { bvhsBuilt++; totalNodes += modelBVHNodeCounts[m]; totalTris += modelBVHTriOrderCounts[m]; }
-    }
-    DualLog("BVH: %u models, %u nodes, %u tri-refs\n", bvhsBuilt, totalNodes, totalTris);
+    for (u16 m = 0; m < mdlsCnt; m++) { if (modelBVHNodeCounts[m]) { bvhsBuilt++; totalNodes += modelBVHNodeCounts[m]; totalTris += modelBVHTriOrderCounts[m]; } }
+    DualLog("BVH: %u models, %u nodes, %u tri-refs ", bvhsBuilt, totalNodes, totalTris);
 }
-
-// ---- BVH traversal helpers (used by physics.c and ray.c) ----
 
 // Transform a local-space AABB to a world-space AABB (smallest world AABB containing
 // the transformed local AABB). Uses the column-major 4x4 matrix mx layout:

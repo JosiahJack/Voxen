@@ -716,31 +716,16 @@ static Manifold SphCvx(V3 sc, float sr, u16 mesh, const float* mx) {
 
 typedef struct {V3 mn,mx;} AABB3;
 static inline V3 TriSupport(V3 ta, V3 tb, V3 tc, V3 d) { float d1 = V3_dot(ta,d), d2 = V3_dot(tb,d), d3 = V3_dot(tc,d); return d1 > d2 ? (d1 > d3 ? ta : tc) : (d2 > d3 ? tb : tc); }
-// Context for CvxMsh per-triangle test, shared between BVH and linear paths.
-typedef struct {
-    HullCache hc;
-    u16 hullMesh;
-    const float* hullMx;
-    AABB3 hb;
-    float spreadEps;
-    float thicknessTolerance;
-    Manifold best;
-} CvxMshCtx;
-
-// Per-triangle convex-hull-vs-triangle GJK+EPA test. Updates ctx->best with the deepest
-// contact found so far. Extracted so both the BVH traversal and linear fallback share logic.
-static void CvxTriTest(CvxMshCtx* ctx, V3 ta, V3 tb, V3 tc) {
+typedef struct { HullCache hc; u16 hullMesh; const float* hullMx; AABB3 hb; float spreadEps, thicknessTolerance; Manifold best; } CvxMshCtx; // Context for CvxMsh per-triangle test, shared between BVH and linear paths.
+static void CvxTriTest(CvxMshCtx* ctx, V3 ta, V3 tb, V3 tc) { // Per-triangle convex-hull-vs-triangle GJK+EPA test. Updates ctx->best with the deepest contact found so far. Extracted so both the BVH traversal and linear fallback share logic.
     HullCache* hc = &ctx->hc; u16 hullMesh = ctx->hullMesh; const float* hullMx = ctx->hullMx;
     Manifold* best = &ctx->best; float spreadEps = ctx->spreadEps; float thicknessTolerance = ctx->thicknessTolerance;
     #define HSUP(d) HullSupport(hc,hullMesh,hullMx,(d))
-    // Hull-vs-triangle AABB early-out (still useful inside leaves: cheap cull before GJK)
-    if (vmin(ta.x,vmin(tb.x,tc.x)) > ctx->hb.mx.x || vmax(ta.x,vmax(tb.x,tc.x)) < ctx->hb.mn.x || vmin(ta.y,vmin(tb.y,tc.y)) > ctx->hb.mx.y || vmax(ta.y,vmax(tb.y,tc.y)) < ctx->hb.mn.y || vmin(ta.z,vmin(tb.z,tc.z)) > ctx->hb.mx.z || vmax(ta.z,vmax(tb.z,tc.z)) < ctx->hb.mn.z) return;
-
+    if (vmin(ta.x,vmin(tb.x,tc.x)) > ctx->hb.mx.x || vmax(ta.x,vmax(tb.x,tc.x)) < ctx->hb.mn.x || vmin(ta.y,vmin(tb.y,tc.y)) > ctx->hb.mx.y || vmax(ta.y,vmax(tb.y,tc.y)) < ctx->hb.mn.y || vmin(ta.z,vmin(tb.z,tc.z)) > ctx->hb.mx.z || vmax(ta.z,vmax(tb.z,tc.z)) < ctx->hb.mn.z) return; // Hull-vs-triangle AABB early-out (still useful inside leaves: cheap cull before GJK)
     Simplex3D s={0}; V3 dir={0.0f,1.0f,0.0f};
     V3 wA = HSUP(dir); V3 wB = TriSupport(ta,tb,tc,(V3){-dir.x,-dir.y,-dir.z});
     s.wA[s.n] = wA; s.wB[s.n] = wB; s.v[s.n++] = V3_AsubB(wA, wB);
     dir=(V3){-s.v[0].x, -s.v[0].y, -s.v[0].z}; if(V3_dot(dir,dir) < PHY_EPSILON){dir=(V3){0.0f,1.0f,0.0f};}
-
     bool hit = false;
     for (int it=0;it<32;++it) {
         wA = HSUP(dir); wB = TriSupport(ta,tb,tc,(V3){-dir.x,-dir.y,-dir.z});
@@ -751,7 +736,6 @@ static void CvxTriTest(CvxMshCtx* ctx, V3 ta, V3 tb, V3 tc) {
         if(V3_dot(dir,dir) < 0){hit=true; break;}
     }
     if (!hit) return;
-
     while (s.n < 4) {
         V3 fallbackDir = {0.0f,1.0f,0.0f};
         if (s.n == 1) fallbackDir = (vabs(s.v[0].x) > 0.5f) ? (V3){0.0f, 1.0f, 0.0f} : (V3){1.0f, 0.0f, 0.0f};
@@ -769,7 +753,6 @@ static void CvxTriTest(CvxMshCtx* ctx, V3 ta, V3 tb, V3 tc) {
             s.wA[s.n] = wA; s.wB[s.n] = wB; s.v[s.n++] = V3_AsubB(wA, wB);
         }
     }
-
     EPAVert ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv = 0, nf = 0;
     for(int i = 0; i < 4; ++i) { ev[nv].v = s.v[i]; ev[nv].wA = s.wA[i]; ev[nv].wB = s.wB[i]; nv++; }
     static const int kTF[4][3] = {{0,1,2}, {0,3,1}, {0,2,3}, {1,3,2}};
@@ -778,7 +761,6 @@ static void CvxTriTest(CvxMshCtx* ctx, V3 ta, V3 tb, V3 tc) {
     EPAFace face2 = MakeEPAFace(ev,kTF[2][0],kTF[2][1],kTF[2][2]); if (face2.d >= 0.0f && nf < EPA_MAX_FACES) ef[nf++] = face2;
     EPAFace face3 = MakeEPAFace(ev,kTF[3][0],kTF[3][1],kTF[3][2]); if (face3.d >= 0.0f && nf < EPA_MAX_FACES) ef[nf++] = face3;
     if (nf < 4) return;
-
     bool tHit=false; V3 tN={0}; float tD=0; V3 tP={0};
     for (int it = 0; it < 32; ++it) {
         int bf = -1; float bd = 1e9f;
@@ -802,7 +784,6 @@ static void CvxTriTest(CvxMshCtx* ctx, V3 ta, V3 tb, V3 tc) {
         for (int k = 0; k < ne && nf < EPA_MAX_FACES; k++) { EPAFace face = MakeEPAFace(ev, edges[k][0], edges[k][1], nv); if (face.d >= 0.0f) ef[nf++] = face; }
         nv++;
     }
-
     if (tHit) {
         V3 deepPoint = tP;
         if (!best->n) {  best->normal = tN; best->maxPen = tD; best->p[best->n++] = (ManifoldPt){deepPoint, tD}; }

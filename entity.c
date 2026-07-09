@@ -31,9 +31,9 @@ void ModEDefsInitAfterLoad(void) { // Global conditions for all entities.  No se
         flag_set(&EDefs[i].entflags,EF_RIGIDBODY,IdxIsDynamicObject(EDefs[i].index));
         if (EDefs[i].cardchunk) {
             EDefs[i].lodIndex = GEOMETRY_LOD_CARD_MODEL_IDX;
-            EDefscollider[i] = COLTYPE_MSH;//COLTYPE_BOX;
-//             EDefscolliderCenter[i].y = 1.32f;
-//             EDefscolliderSize[i] = (V3){2.56f,0.08f,2.56f};
+            EDefscollider[i] = COLTYPE_BOX;
+            EDefscolliderCenter[i].y = 1.32f;
+            EDefscolliderSize[i] = (V3){2.56f,0.08f,2.56f};
         }
         
         EDefs[i].currentFrameFinished = World.pauseRelativeTime + 0.1;
