@@ -273,6 +273,7 @@ typedef u8 ButtonType;       static const u8 ButtonType_Generic=0,ButtonType_Gen
 typedef u8 TabMSG;           static const u8 TabMSG_None=0,TabMSG_Search=1,TabMSG_AudioLog=2,TabMSG_Keypad=3,TabMSG_Elevator=4,TabMSG_GridPuzzle=5,TabMSG_WirePuzzle=6,TabMSG_EReader=7,TabMSG_Weapon=8,TabMSG_SystemAnalyzer=9;
 typedef u8 PuzzleCellType;   static const u8 PuzzleCellType_Off=0,PuzzleCellType_Standard=1,PuzzleCellType_And=2,PuzzleCellType_Bypass=3;
 typedef u8 PuzzleGridType;   static const u8 PuzzleGridType_King=0,PuzzleGridType_Queen=1,PuzzleGridType_Knight=2,PuzzleGridType_Rook=3,PuzzleGridType_Bishop=4,PuzzleGridType_Pawn=5;
+typedef struct {V3 ctr,hExt; Quaternion rot;} ShapeBox; typedef struct {V3 ctr; float rad;} ShapeSphere; typedef struct {V3 tip,base; float rad;} ShapeCapsule;
 static const u32 L_Default          = 1U;
 static const u32 L_TransparentFX    = 2U;
 //                                    4U   // unused (formerly IgnoreRaycast)

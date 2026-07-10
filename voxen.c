@@ -119,7 +119,7 @@ typedef struct { double scrollDelta; KeyState keyStates[MAX_KEYS],mouseButtons[M
 u32 inputImageID,inputUIID,inputDepthID,inputWorldPosID,inputSpecID,inputNormalID,gBufferFBO,uiFBO,outputImageID,depthPrepassSP,chunkSP,chunkVAO,chunkVBO,uiSP,debugUnlitSP,shadowmapsSP,shadowmapsClearSP,shadowMapSSBO,shadowMapsIndirectionID,ssrSP,imageBlitSP,quadVAO,quadVBO,
     textSP,textVAO,textVBO,debugLinesVAO,debugLinesVBO,matricesBufferID,cellVisibleDataID,debugLineColors,colorBufferID,texPalID,texPalOfsID,textureOffsetsID,textureSizesID,lightsID,voxListCntsID,voxelLightListsID,voxelUpdateSP,vbos[MAX_MDLS],tbos[MAX_MDLS];
 static float berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
-float modelMatrices[INSTANCE_COUNT*16];
+float modelMatrices[INSTANCE_COUNT*16]; u8** modelVertices = NULL; u16** modelTriangles = NULL; u32 modelVertexCounts[MAX_MDLS] = {0}; u16 modelTriangleCounts[MAX_MDLS] = {0}; float modelBounds[MAX_MDLS] = {0}; u16 mdlsCnt = 0;
 bool mouseMovementThisFrame,window_has_focus,ignore_next_mouse_delta,returnToPause=false,fovSliderActive=false,gammaSliderActive=false,masterVolumeSliderActive=false,musicVolumeSliderActive=false,messageVolumeSliderActive=false,sfxVolumeSliderActive=false,enteringPlayerName=false;
 u8 currentPlayerNameLength=0; i8 currentMenuItem=0, currentMenuTab=0, menuItemCount=4, menuTabCount=1; static int threadCnt=0; static u32 globalframe=0,globalframesPerLastSecond;
 #define CHECK_GL_ERROR() do { u32 err = glGetError(); if (err != 0) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
@@ -138,6 +138,10 @@ typedef struct {int w,h;} ResMode; ResMode resModes[8];
 extern Entity EDefs[MAX_ENTITIES];
 #include "lib.c" // LibC Replacements and Helpers
 void TurnLightOff(u16 litIdx) { if (litIdx < World.loadedLights) {flag_set(&World.lights[litIdx].lflags,LIGHTON,false);} }
+Color textColors[] = {{1.0f,1.0f,1.0f,1.0f},/* 0 White T_WHITE*/ {0.890196078f,0.874509804f,0.0f,1.0f},/* 1 Yellow T_YELLOW*/  {0.623529412f,0.611764706f,0.0f,1.0f},/* 2 Dark Yellow (Yellow * 0.7f) T_DARK_YELLOW*/ {0.372549020f,0.654901961f,0.168627451f,1.0f},/* 3 Green T_GREEN*/ {0.917647059f,0.137254902f,0.168627451f,1.0f},/* 4 Red T_RED*/
+                      {1.0f,0.498039216f,0.0f,1.0f}, /* 5 Orange T_ORANGE*/ {0.674509804f,0.058823529f,0.070588235f,1.0f},/* 6 StopD Red T_STOPD_RED*/ {0.941176471f,0.282352941f,0.298039216f,1.0f},/* 7 StopD Red Highlight T_STOPD_RED_HIGHLIGHT*/ {0.909803922f,0.203921569f,0.219607843f,1.0f}, /* 8 StopD Red Pause Title T_STOPD_RED_PAUSETITLE*/
+                      {0.470588235f,0.721568627f,0.172549020f,1.0f},/* 9 Green Menu Title T_GREEN_MENU*/ {0.137254902f,0.356862745f,0.109803922f,1.0f},/* 10 Green Menu Title Shadow T_GREEN_MENU_SHADOW*/ {0.239215686f,0.466666667f,0.129411765f,1.0f}, /* 11 Green Menu Title Glow T_GREEN_MENU_GLOW*/ {0.392156863f,0.031372549f,0.039215686f,1.0f} /* 12 Red Menu Text Dark T_RED_MENU*/ };
+// Wireline Rendering
 typedef struct { float x,y,z,r,g,b,a; } DebugLineVertex;
 DebugLineVertex debugLineVerts[MAX_WIRELINE_VRTS * 2];
 INLINE void DrawDebugLines(float* viewProj) {
@@ -157,6 +161,80 @@ void AddWireLine(V3 start, V3 end, Color col) {
     debugLineVerts[i].r = col.r; debugLineVerts[i].g = col.g; debugLineVerts[i].b = col.b; debugLineVerts[i].a = col.a; i++;
     World.debugLineVertCount = i;
 }
+
+ShapeBox Entity_GetBox(u16 i); ShapeCapsule Entity_GetCap(u16 i); ShapeSphere Entity_GetSph(u16 i); void obb_axes(Quaternion q, V3 *ax, V3 *ay, V3 *az);
+inline Color ColliderColor(u16 i) { return (!(World.instances[i].entflags & EF_RIGIDBODY)) ? textColors[T_GREEN_MENU_SHADOW] : ((World.colliding[i]) ? textColors[T_RED] : textColors[T_GREEN]); }
+void DrawVelocityVector(u16 i) {
+    if (!(World.instances[i].entflags & EF_RIGIDBODY)) {return;}
+    V3 tip = V3_AplusB(World.position[i],V3_ScaleByF(World.velocity[i],0.25f)); AddWireLine(World.position[i],tip,textColors[T_ORANGE]); V3 perp = V3_Normalize(V3_Cross(World.velocity[i],(vabs(World.velocity[i].y/V3_Mag(World.velocity[i])) < 0.9f) ? (V3){0,1,0} : (V3){1,0,0}));
+    AddWireLine(V3_AplusB(tip,V3_ScaleByF(perp,0.05f)),V3_AsubB(tip,V3_ScaleByF(perp,0.05f)),textColors[T_ORANGE]); // Small cross at tip so zero-length vecs are still visible when barely moving
+}
+
+void DrawBoxCollider(u16 i) {
+    Color col = ColliderColor(i); ShapeBox b = Entity_GetBox(i); V3 ax,ay,az,c[8],px,py,pz; obb_axes(b.rot,&ax,&ay,&az);
+    px=V3_ScaleByF(ax,b.hExt.x); py=V3_ScaleByF(ay,b.hExt.y); pz=V3_ScaleByF(az,b.hExt.z);
+    for (int s=0;s<8;s++) { float sx=(s&1)?1.f:-1.f,sy=(s&2)?1.f:-1.f,sz=(s&4)?1.f:-1.f; c[s]=V3_AplusB(b.ctr,V3_AplusB(V3_AplusB(V3_ScaleByF(px,sx),V3_ScaleByF(py,sy)),V3_ScaleByF(pz,sz))); }
+    AddWireLine(c[0],c[1],col); AddWireLine(c[2],c[3],col); AddWireLine(c[4],c[5],col); AddWireLine(c[6],c[7],col); AddWireLine(c[0],c[2],col); AddWireLine(c[1],c[3],col); AddWireLine(c[4],c[6],col); AddWireLine(c[5],c[7],col); AddWireLine(c[0],c[4],col); AddWireLine(c[1],c[5],col); AddWireLine(c[2],c[6],col); AddWireLine(c[3],c[7],col);
+    DrawVelocityVector(i);
+}
+
+void DrawSphereWireframe(Color col, ShapeSphere s) { float step=6.28318530f/12; for (int seg=0;seg<12;seg++) { float a0=seg*step,a1=a0+step,c0=vcosf(a0),s0=vsinf(a0),c1=vcosf(a1),s1=vsinf(a1); AddWireLine(V3_AplusB(s.ctr,(V3){c0*s.rad,0,s0*s.rad}),V3_AplusB(s.ctr,(V3){c1*s.rad,0,s1*s.rad}),col); AddWireLine(V3_AplusB(s.ctr,(V3){c0*s.rad,s0*s.rad,0}),V3_AplusB(s.ctr,(V3){c1*s.rad,s1*s.rad,0}),col); AddWireLine(V3_AplusB(s.ctr,(V3){0,c0*s.rad,s0*s.rad}),V3_AplusB(s.ctr,(V3){0,c1*s.rad,s1*s.rad}),col); } }
+void DrawSphereCollider(u16 i) { Color col = ColliderColor(i); ShapeSphere s = Entity_GetSph(i); DrawSphereWireframe(col,s); DrawVelocityVector(i); }
+void DrawSphereContact(V3 pos, float rad) { if (Cheats.showPhys) {Color col = (Color){0.0f,0.0f,1.0f,1.0f}; ShapeSphere s = (ShapeSphere){pos,rad}; DrawSphereWireframe(col,s);} }
+void DrawMeshCollider(u16 i) {
+    Color col = ColliderColor(i); u16 mi= (World.collider[i] == COLTYPE_CVX) ? World.instances[i].colMeshIndex : World.instances[i].modelIndex; if (mi >= MAX_MDLS || mi >= mdlsCnt) return;
+    u32 triCount=modelTriangleCounts[mi]; if (!triCount) return;
+    float M[16]; mcpy(M,&modelMatrices[i*16],64);
+    float m00=M[0],m10=M[1],m20=M[2],m01=M[4],m11=M[5],m21=M[6],m02=M[8],m12=M[9],m22=M[10],tx=M[12],ty=M[13],tz=M[14];
+    for (u32 j=0;j<triCount;j++) {
+        u32 bA=(u32)modelTriangles[mi][j*3+0]*CPU_VRT_SZ,bB=(u32)modelTriangles[mi][j*3+1]*CPU_VRT_SZ,bC=(u32)modelTriangles[mi][j*3+2]*CPU_VRT_SZ;
+        #define LV(b) (V3){*(float*)(modelVertices[mi]+(b)+0),*(float*)(modelVertices[mi]+(b)+4),*(float*)(modelVertices[mi]+(b)+8)}
+        #define XFORM(v) (V3){m00*(v).x+m01*(v).y+m02*(v).z+tx,m10*(v).x+m11*(v).y+m12*(v).z+ty,m20*(v).x+m21*(v).y+m22*(v).z+tz}
+        V3 wA=XFORM(LV(bA)),wB=XFORM(LV(bB)),wC=XFORM(LV(bC));
+        #undef LV
+        #undef XFORM
+        AddWireLine(wA,wB,col); AddWireLine(wB,wC,col); AddWireLine(wC,wA,col);
+    }
+    DrawVelocityVector(i);
+}
+
+void DrawCapsuleCollider(u16 i) {
+    Color col = ColliderColor(i); ShapeCapsule cap = Entity_GetCap(i);
+    V3 axis=V3_Normalize(V3_AsubB(cap.tip,cap.base)); V3 ref=(vabs(axis.y)<0.9f)?(V3){0,1,0}:(V3){1,0,0}; V3 perp0=V3_Normalize(V3_Cross(axis,ref)),perp1=V3_Cross(axis,perp0);
+    float step=6.28318530f/12,r=cap.rad;
+    for (int seg=0;seg<12;seg++) {
+        float a0=seg*step,a1=a0+step,c0=vcosf(a0),s0=vsinf(a0),c1=vcosf(a1),s1=vsinf(a1);
+        V3 r0 = V3_AplusB(V3_ScaleByF(perp0,c0*r),V3_ScaleByF(perp1,s0*r)), r1=V3_AplusB(V3_ScaleByF(perp0,c1*r),V3_ScaleByF(perp1,s1*r));
+        AddWireLine(V3_AplusB(cap.base,r0),V3_AplusB(cap.base,r1),col); AddWireLine(V3_AplusB(cap.tip,r0),V3_AplusB(cap.tip,r1),col);
+    }
+    for (int seg=0;seg<6;seg++) {
+        float a0=seg*step,a1=a0+step,c0=vcosf(a0),s0=vsinf(a0),c1=vcosf(a1),s1=vsinf(a1);
+        AddWireLine(V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp0,c0*r),V3_ScaleByF(axis,-s0*r))),V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp0,c1*r),V3_ScaleByF(axis,-s1*r))),col);
+        AddWireLine(V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp1,c0*r),V3_ScaleByF(axis,-s0*r))),V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp1,c1*r),V3_ScaleByF(axis,-s1*r))),col);
+        AddWireLine(V3_AplusB(cap.tip, V3_AplusB(V3_ScaleByF(perp0,c0*r),V3_ScaleByF(axis, s0*r))),V3_AplusB(cap.tip, V3_AplusB(V3_ScaleByF(perp0,c1*r),V3_ScaleByF(axis, s1*r))),col);
+        AddWireLine(V3_AplusB(cap.tip, V3_AplusB(V3_ScaleByF(perp1,c0*r),V3_ScaleByF(axis, s0*r))),V3_AplusB(cap.tip, V3_AplusB(V3_ScaleByF(perp1,c1*r),V3_ScaleByF(axis, s1*r))),col);
+    }
+    for (int seg=0;seg<4;seg++) { float a=seg*(6.28318530f/4.f); V3 off=V3_AplusB(V3_ScaleByF(perp0,vcosf(a)*r),V3_ScaleByF(perp1,vsinf(a)*r)); AddWireLine(V3_AplusB(cap.base,off),V3_AplusB(cap.tip,off),col); }
+    DrawVelocityVector(i);
+}
+
+void DrawAngularVelocity(u16 i) {
+    if (!Cheats.showPhys) return;
+    if (!(World.instances[i].entflags & EF_RIGIDBODY)) return;
+    u16 idx = i;
+    if (V3_Mag(World.angularVelocity[idx]) < 0.0001f) return; // skip near-zero
+    Color purple = (Color){0.5f,0.0f,1.0f,1.0f};
+    float scale = 0.35f;
+    V3 dir = V3_Normalize(World.angularVelocity[idx]); V3 tip = V3_AplusB(World.position[idx], V3_ScaleByF(World.angularVelocity[idx], scale));
+    AddWireLine(World.position[idx], tip, purple); // Arrow (line vector)
+    V3 ref = (vabs(dir.y) < 0.9f) ? (V3){0,1,0} : (V3){1,0,0}; V3 perp = V3_Normalize(V3_Cross(dir,ref)); V3 perp2 = V3_Cross(dir,perp);
+    AddWireLine(V3_AplusB(tip,V3_ScaleByF(perp, 0.05f)),V3_AplusB(tip,V3_ScaleByF(perp, -0.05f)), purple); // Small cross at tip so zero-length vectors are still visible
+    AddWireLine(V3_AplusB(tip,V3_ScaleByF(perp2,0.05f)),V3_AplusB(tip,V3_ScaleByF(perp2,-0.05f)), purple);
+    float rad=0.6f; /*Quarter circle arc (visualizes rotation plane + sense)*/ float step = 1.57079632679f / 8.0f; /*quarter circle divided into 8 segments*/
+    V3 axis=dir; V3 p1=V3_Normalize(V3_Cross(axis,ref)); V3 p2=V3_Cross(axis,p1); V3 prev = V3_AplusB(World.position[idx], V3_ScaleByF(p1,rad)); // Find two vectors perpendicular to angular axis
+    for (int j=1;j<=8;++j) { float a = j * step; float c = vcosf(a); float s = vsinf(a); V3 cur = V3_AplusB(World.position[idx],V3_AplusB(V3_ScaleByF(p1,c * rad),V3_ScaleByF(p2,s * rad))); AddWireLine(prev,cur,purple); prev = cur; }
+}
+
 #include "textures.c" // 2D Texture Load System
 #include "models.c" // 3D Model Load System
 #include "culling.c" // Culling System
@@ -649,7 +727,11 @@ static __attribute__((hot)) void RenderShadowmaps() {
         glViewport(0,0,SHADOW_MAP_SIZE,SHADOW_MAP_SIZE);
         glUseProgram(shadowmapsSP);
         u32 shadowmapOffsetHead = 0U; mset(shadowCasterIndices,0,SC_MAX*sizeof(u16)); u32 numShadowCasters = 0;
-        for (int i=INSTS_1ST_IDX;i<INSTANCE_COUNT;++i) { if(EntNotVisible(i,(World.instances[i].entflags & EF_NO_SHADOWS))){continue;} shadowCasterIndices[numShadowCasters] = i; numShadowCasters++; if(numShadowCasters >= (SC_MAX)){break;}/*Ran out of shadowcasters max for frame.*/ }
+        for (int i=INSTS_1ST_IDX;i<INSTANCE_COUNT;++i) {
+            if(EntNotVisible(i,(World.instances[i].entflags & EF_NO_SHADOWS)) || IdxIsDynamicObject(World.instances[i].index)) {continue;}
+            
+            shadowCasterIndices[numShadowCasters] = i; numShadowCasters++; if(numShadowCasters >= (SC_MAX)){break;}/*Ran out of shadowcasters max for frame.*/
+        }
         u16 shadowMapIdx=0,currentModelType=0,currentTexIndex=0; bool currentIsTransparent=0,useDetail=Sys_Settings.ModelDetail;
         for (u32 c = 0; c < numShadowsCouldRender; ++c, ++shadowMapIdx) { // Render top MAX_SHADOWMAPS candidates
             u16 lightIdx = candidates[c];
@@ -934,7 +1016,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.curLev = 0;
     World.mass[0] = 0.0f; World.dynamicFriction[0] = 0.4f; World.collider[0]=COLTYPE_NONE; // Static proxy just uses world.
     currentMenuItem = currentMenuTab = 0; currentMenuPage = Mpg_FrontPage;
-    World.pauseRelativeTime = World.last_physics_time = 0.0; World.pauseRelativeTime=World.last_physics_time=0.0; World.deltaTime=0.0166666666f;
+    World.current_time = World.pauseRelativeTime = World.last_physics_time = World.pauseRelativeTime = World.last_physics_time=0.0; World.deltaTime=0.0166666666f;
     mset(World.instances,0,3 * sizeof(Entity)); // Blank out player entities
     PlayerInit(PLAYER1); PlayerInit(PLAYER2); World.cam_yaw = 90.0f; World.cam_pitch = 0.0f; World.cam_roll = 0.0f; World.inventoryMode = Sys_Settings.NoShootMode;
     World.gameFinished = World.creditsActive = World.decoyActive = false; World.damageDealt = World.damageReceived = 0.0f;
@@ -1054,12 +1136,20 @@ i32 main() {
     InitalizeEnvironment();
     while(1) {
         if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad); queuedLevelToLoad = 255u; continue; }
-        double curtime = get_time(); World.deltaTime=curtime - World.current_time; World.absoluteTime+=World.deltaTime; World.current_time=curtime; if (!World.paused && !World.menuActive) World.pauseRelativeTime += World.deltaTime;
+        double curtime = get_time(); World.deltaTime=World.current_time < 0.001f ? 0.000f : vmax(curtime - World.current_time,0.0); World.absoluteTime+=World.deltaTime; World.current_time=curtime;
+        if (!World.paused && !World.menuActive) {
+            if (World.pauseRelativeTime < 0.001f) World.pauseRelativeTime = World.last_physics_time = curtime;
+            World.pauseRelativeTime += World.deltaTime;
+        }
         InputProcessing(); // Before anims and physics to allow them to respond immediately.
         UpdateAnims();     // Before physics to allow model swap out to affect physics state immediately.  Before rendering to affect shadowmaps immediately.
-        double physStart = get_time();
-        Physics();
-        physTime = get_time() - physStart;
+        if (!World.paused && !World.menuActive) {
+            double physStart = get_time();
+            float dt = vclamp((float)(World.pauseRelativeTime - World.last_physics_time),0.0005f,0.1f);
+            World.last_physics_time = World.pauseRelativeTime;
+            Physics(dt);
+            physTime = get_time() - physStart;
+        } else physTime = 0.0;
         ModUpdate(); // After physics so mod/gamecode can modify velocities before next frame.
         if (!World.paused && !World.menuActive) {MixAmbs();}
         UpdateMusic();
