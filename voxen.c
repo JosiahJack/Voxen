@@ -130,16 +130,7 @@ u8 currentPlayerNameLength=0; i8 currentMenuItem=0, currentMenuTab=0, menuItemCo
 InputSystem Sys_Input; CheatsSystem Cheats = {.god=false,.noclip=false,.showLocation=true,.showFPS=true,.editMode=false,.showPhys=false};
 static bool shadowBuffersCreated = false;
 typedef struct { V3 position; Quaternion rotation; u8 fov; u16 width,height; float near,far,finished; bool visible; } CamView; // Max is 8 cam views on level 8 + 3 sensaround views = 11.
-CamView camViews[64]; u32 camViewTextures[64]; u8 camViewCount = 0;
-// Per-level camViews storage (file-scope; camViews are not yet pointer-swapped into World struct).
-// Lights/lanims/lightsNewPosition are now pointer-swapped via World.levelLights[] in GlobalContext.
-
-CamView levelCamViews[MAX_LEVELS][64];
-u8 levelCamViewCount[MAX_LEVELS];
-// (camViewTextures are GPU handles; they are generated once per level by AddCamView during LoadLevelData
-//  and the handles are simply preserved in the per-level array below.  On level switch, the active
-//  camViewTextures[] array is repopulated from this storage so existing glBindTexture calls keep working.)
-u32 levelCamViewTextures[MAX_LEVELS][64];
+CamView camViews[64]; u32 camViewTextures[64]; u8 camViewCount = 0; CamView levelCamViews[MAX_LEVELS][64]; u8 levelCamViewCount[MAX_LEVELS]; u32 levelCamViewTextures[MAX_LEVELS][64];
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6],playerFrustumPlanes[6];
 u16 editModeSelection,editModeTestEntityDefinition=0; double shadowTime; double physTime; u32 shadowmapIndirectionList[LIGHT_COUNT]; u16 texCnt; bool doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS]; u32 drawCalls,uiDrawCalls,shadDrawCalls,vertsRendered,drawCallsNormal;
 static const u8 Mpg_FrontPage=0,Mpg_Singleplayer=1,Mpg_Multiplayer=2,Mpg_NewGame=3,Mpg_Load=4,Mpg_Options=5,Mpg_Save=6,Mpg_IntroVideo=7,Mpg_CreditsVideo=8; u8 currentMenuPage = Mpg_FrontPage; bool resDropdownOpen = false; int resDropdownCount=0,resSelectedIdx=0;
@@ -934,76 +925,6 @@ void UpdateInstanceMatrix4x4s() {
     glBufferSubData(GL_SSBO,offsetFloats * sizeof(float),countFloats * sizeof(float),modelMatrices + offsetFloats);
 }
 // Init && Main
-void LoadLevelData(u8 curlevel) {
-    World.curLev = curlevel;
-    SetLevelPointers(curlevel); // Ensures writing to correct current level
-    mset(World.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the per-level entity array for this level.
-    World.instCount = 3; // 0 == NULL, 1 == Player1, 2 == Player2 — reset before LoadLevelMod adds entities.
-    mset(World.lights,0,LIGHT_COUNT * sizeof(Light)); mset(World.lanims,0,LIGHT_COUNT * sizeof(LightAnimation)); World.loadedLights = 0;
-    mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
-    mset(camViews,0,64 * sizeof(CamView)); camViewCount = 0;
-    char filename[20]; // Minimum size for 0 through 13.
-    sFormat(filename,sizeof(filename),"./Data/level%d.txt",curlevel);
-    levelFileHandle = OS_OpenReadonly(filename);
-    LoadLevelMod(curlevel);
-    OS_Close(levelFileHandle);
-    for (int i=0;i<World.loadedLights;++i) World.lightsNewPosition[i]=World.lights[i].pos;
-    for (int i=PLAYER1;i<World.instCount;++i) {
-        i32 cellIdx = PosGetCellCoords(World.position[i].x,World.position[i].z);
-        World.instances[i].cellIndex = cellIdx;
-        World.instances[i].cellX=PosGetCellCoordX(World.position[i].x);
-        World.instances[i].cellZ=PosGetCellCoordZ(World.position[i].z);
-        World.radius[i] = modelBounds[World.instances[i].modelIndex]*vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z);
-        World.instances[i].shadRadius = World.radius[i] * 1.41;
-        ComputeConvexMeshInertiaTensor(i);
-        if (World.mass[i] < 0.001f && World.collider[i] != COLTYPE_NONE && World.collider[i] != COLTYPE_MSH && (World.instances[i].entflags & EF_RIGIDBODY)) {World.mass[i] = 0.2f; /*At least something!*/}
-    }
-    ModInitAfterLoad();
-    World.levelLoadedLights[curlevel] = World.loadedLights;
-    mcpy(levelCamViews[curlevel],camViews,64 * sizeof(CamView));
-    mcpy(levelCamViewTextures[curlevel],camViewTextures,64 * sizeof(u32));
-    levelCamViewCount[curlevel] = camViewCount;
-    World.levelInstCount[curlevel] = World.instCount;
-    World.levelCurrentlyLoading = false;
-}
-
-__attribute__((cold)) void LoadAllLevels(void) {
-    double start_time = get_time();
-    DebugRAM("start of LoadAllLevels");
-    RenderLoading(100,"Loading level data...");
-    World.levelCurrentlyLoading = true;
-    for (u8 lev = 0; lev < World.numLevels; ++lev) LoadLevelData(lev);
-    DualLog("Entity counts::0:%u|1:%u|2:%u|3:%u|4:%u|5:%u|6:%u|7:%u|8:%u|9:%u|10:%u|11:%u|12:%u|13:%u\n Light counts::0:%u|1:%u|2:%u|3:%u|4:%u|5:%u|6:%u|7:%u|8:%u|9:%u|10:%u|11:%u|12:%u|13:%u\nLoad all levels... took %f secs\n",World.numLevels,
-            World.levelInstCount[0],World.levelInstCount[1],World.levelInstCount[2],World.levelInstCount[3],World.levelInstCount[4],World.levelInstCount[5],World.levelInstCount[6],World.levelInstCount[7],World.levelInstCount[8],World.levelInstCount[9],World.levelInstCount[10],World.levelInstCount[11],World.levelInstCount[12],World.levelInstCount[13],
-            World.levelLoadedLights[0],World.levelLoadedLights[1],World.levelLoadedLights[2],World.levelLoadedLights[3],World.levelLoadedLights[4],World.levelLoadedLights[5],World.levelLoadedLights[6],World.levelLoadedLights[7],World.levelLoadedLights[8],World.levelLoadedLights[9],World.levelLoadedLights[10],World.levelLoadedLights[11],World.levelLoadedLights[12],World.levelLoadedLights[13],
-            get_time() - start_time);
-    DebugRAM("end of LoadAllLevels");
-}
-
-void LoadLevel(u8 curlevel) {
-    DebugRAM("start of LoadLevel");
-    World.levelCurrentlyLoading = true; World.paused = false; World.menuActive = false;
-    RenderLoading(100,"Loading level...");
-    if (World.currentLevel != curlevel) CopyPlayerState(World.currentLevel,curlevel);
-    World.curLev = curlevel;
-    SetLevelPointers(curlevel);
-    mcpy(camViews,levelCamViews[curlevel],64 * sizeof(CamView));
-    mcpy(camViewTextures,levelCamViewTextures[curlevel],64 * sizeof(u32));
-    camViewCount = levelCamViewCount[curlevel];
-    mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
-    mset(modelMatrices,0,INSTANCE_COUNT * 16 * sizeof(float));
-    for (int i=0;i<World.loadedLights;++i) World.lightsNewPosition[i]=World.lights[i].pos;
-    DualLog("Switched to Level %d\n",curlevel);
-    ResetLevelAudio(); ResetLevelMusic();
-    RenderLoading(110,"Loading cull system..."); CullInit(); // Must be after level!
-    glUseProgram(voxelUpdateSP); glUniform2f(0,World.voxMinCtrX[World.curLev],World.voxMinCtrZ[World.curLev]); glUniform1f(1,World.farPlane[World.curLev] * World.farPlane[World.curLev]); glUniform1ui(2,World.loadedLights); glUniform2f(3,World.worldMin_x[World.curLev],World.worldMin_z[World.curLev]);
-    RenderLoading(120,"Loading voxel lighting data...");
-    for (u16 i = 0; i < World.loadedLights; i++) { World.lightsNewPosition[i] = World.lights[i].pos; }
-    mset(shadowmapIndirectionList,MAX_SHADOWMAPS + 1,World.loadedLights * sizeof(u32)); // Set to invalid values for all
-    World.levelCurrentlyLoading = false;
-    DebugRAM("end of LoadLevel");
-}
-
 __attribute__((cold)) void NewGame() { // Reset World States
     DualLog("Loading new game...\n");
     RenderLoading(100,"Loading new game...");
@@ -1029,7 +950,6 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.lev3SecCode = random_range_u8(0u,9u); World.lev4SecCode = random_range_u8(0u,9u);
     World.lev5SecCode = random_range_u8(0u,9u); World.lev6SecCode = random_range_u8(0u,9u); // Must do rand's repeatedly to prevent these all being the same number.
 }
-
 
 // Init
 void GoIntoGame() { NewGame(); PlayGameMusic(); DualLog("Player named \"%s\" started the game!\n", World.playerName); }

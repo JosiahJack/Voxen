@@ -815,6 +815,7 @@ void ModEDefsInitAfterLoad(void) { // Global conditions for all entities.  No se
     /*767 player*/
 }
 
+// Level Loading and Entity Management System
 void InitializeAIAfterLoad(u16 i);
 void DeleteInstance(u16 i) { if (i <= PLAYER2 || i >= World.instCount) return; flag_set(&World.instances[i].entflags,EF_ACTIVE,false); } // Don't delete null ent, player 1, nor player 2 or already empty slots.
 u16 AddInstance(u16 entIdx, V3 pos) {
@@ -1110,6 +1111,77 @@ void LoadLevelMod(u8 lev) {
     headmountedLanternLight = AddLight(&hl,&lam); lightsIdx++;
 }
 
+void LoadLevelData(u8 curlevel) {
+    World.curLev = curlevel;
+    SetLevelPointers(curlevel); // Ensures writing to correct current level
+    mset(World.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the per-level entity array for this level.
+    World.instCount = 3; // 0 == NULL, 1 == Player1, 2 == Player2 — reset before LoadLevelMod adds entities.
+    mset(World.lights,0,LIGHT_COUNT * sizeof(Light)); mset(World.lanims,0,LIGHT_COUNT * sizeof(LightAnimation)); World.loadedLights = 0;
+    mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
+    mset(camViews,0,64 * sizeof(CamView)); camViewCount = 0;
+    char filename[20]; // Minimum size for 0 through 13.
+    sFormat(filename,sizeof(filename),"./Data/level%d.txt",curlevel);
+    levelFileHandle = OS_OpenReadonly(filename);
+    LoadLevelMod(curlevel);
+    OS_Close(levelFileHandle);
+    for (int i=0;i<World.loadedLights;++i) World.lightsNewPosition[i]=World.lights[i].pos;
+    for (int i=PLAYER1;i<World.instCount;++i) {
+        i32 cellIdx = PosGetCellCoords(World.position[i].x,World.position[i].z);
+        World.instances[i].cellIndex = cellIdx;
+        World.instances[i].cellX=PosGetCellCoordX(World.position[i].x);
+        World.instances[i].cellZ=PosGetCellCoordZ(World.position[i].z);
+        World.radius[i] = modelBounds[World.instances[i].modelIndex]*vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z);
+        World.instances[i].shadRadius = World.radius[i] * 1.41;
+        ComputeConvexMeshInertiaTensor(i);
+        if (World.mass[i] < 0.001f && World.collider[i] != COLTYPE_NONE && World.collider[i] != COLTYPE_MSH && (World.instances[i].entflags & EF_RIGIDBODY)) {World.mass[i] = 0.2f; /*At least something!*/}
+    }
+    ModInitAfterLoad();
+    World.levelLoadedLights[curlevel] = World.loadedLights;
+    mcpy(levelCamViews[curlevel],camViews,64 * sizeof(CamView));
+    mcpy(levelCamViewTextures[curlevel],camViewTextures,64 * sizeof(u32));
+    levelCamViewCount[curlevel] = camViewCount;
+    World.levelInstCount[curlevel] = World.instCount;
+    World.levelCurrentlyLoading = false;
+}
+
+void RenderLoading(i32 offset, const char * restrict text);
+__attribute__((cold)) void LoadAllLevels(void) {
+    double start_time = get_time();
+    DebugRAM("start of LoadAllLevels");
+    RenderLoading(100,"Loading level data...");
+    World.levelCurrentlyLoading = true;
+    for (u8 lev = 0; lev < World.numLevels; ++lev) LoadLevelData(lev);
+    DualLog("Entity counts::0:%u|1:%u|2:%u|3:%u|4:%u|5:%u|6:%u|7:%u|8:%u|9:%u|10:%u|11:%u|12:%u|13:%u\n Light counts::0:%u|1:%u|2:%u|3:%u|4:%u|5:%u|6:%u|7:%u|8:%u|9:%u|10:%u|11:%u|12:%u|13:%u\nLoad all levels... took %f secs\n",World.numLevels,
+            World.levelInstCount[0],World.levelInstCount[1],World.levelInstCount[2],World.levelInstCount[3],World.levelInstCount[4],World.levelInstCount[5],World.levelInstCount[6],World.levelInstCount[7],World.levelInstCount[8],World.levelInstCount[9],World.levelInstCount[10],World.levelInstCount[11],World.levelInstCount[12],World.levelInstCount[13],
+            World.levelLoadedLights[0],World.levelLoadedLights[1],World.levelLoadedLights[2],World.levelLoadedLights[3],World.levelLoadedLights[4],World.levelLoadedLights[5],World.levelLoadedLights[6],World.levelLoadedLights[7],World.levelLoadedLights[8],World.levelLoadedLights[9],World.levelLoadedLights[10],World.levelLoadedLights[11],World.levelLoadedLights[12],World.levelLoadedLights[13],
+            get_time() - start_time);
+    DebugRAM("end of LoadAllLevels");
+}
+
+void LoadLevel(u8 curlevel) {
+    DebugRAM("start of LoadLevel");
+    World.levelCurrentlyLoading = true; World.paused = false; World.menuActive = false;
+    RenderLoading(100,"Loading level...");
+    if (World.currentLevel != curlevel) CopyPlayerState(World.currentLevel,curlevel);
+    World.curLev = curlevel;
+    SetLevelPointers(curlevel);
+    mcpy(camViews,levelCamViews[curlevel],64 * sizeof(CamView));
+    mcpy(camViewTextures,levelCamViewTextures[curlevel],64 * sizeof(u32));
+    camViewCount = levelCamViewCount[curlevel];
+    mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
+    mset(modelMatrices,0,INSTANCE_COUNT * 16 * sizeof(float));
+    for (int i=0;i<World.loadedLights;++i) World.lightsNewPosition[i]=World.lights[i].pos;
+    DualLog("Switched to Level %d\n",curlevel);
+    ResetLevelAudio(); ResetLevelMusic();
+    RenderLoading(110,"Loading cull system..."); CullInit(); // Must be after level!
+    glUseProgram(voxelUpdateSP); glUniform2f(0,World.voxMinCtrX[World.curLev],World.voxMinCtrZ[World.curLev]); glUniform1f(1,World.farPlane[World.curLev] * World.farPlane[World.curLev]); glUniform1ui(2,World.loadedLights); glUniform2f(3,World.worldMin_x[World.curLev],World.worldMin_z[World.curLev]);
+    RenderLoading(120,"Loading voxel lighting data...");
+    for (u16 i = 0; i < World.loadedLights; i++) { World.lightsNewPosition[i] = World.lights[i].pos; }
+    mset(shadowmapIndirectionList,MAX_SHADOWMAPS + 1,World.loadedLights * sizeof(u32)); // Set to invalid values for all
+    World.levelCurrentlyLoading = false;
+    DebugRAM("end of LoadLevel");
+}
+// Save Game System
 INLINE size_t GetMaxCompressedSize(size_t srcSize) { return srcSize + (srcSize / 128) + 16; } // Worst-case buffer size for allocation
 size_t VoidSquasher(const u8* src, size_t srcSize, u8* dst, size_t dstCapacity) {
     size_t s = 0; // source index
