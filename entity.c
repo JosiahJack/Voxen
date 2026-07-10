@@ -816,12 +816,14 @@ void ModEDefsInitAfterLoad(void) { // Global conditions for all entities.  No se
 }
 
 // Level Loading and Entity Management System
+void InitializeEntity(Entity* e) { mset(e,0,sizeof(Entity)); u16 idx=(u16)(e - World.instances); e->index=U16_MAX; e->entflags=EF_ACTIVE; e->kinematic=true; World.layer[idx]=L_Default; e->camView=255; e->tickTime = 0.35f; World.angularDrag[idx] = 0.05f; e->modelIndex=e->lodIndex=e->colMeshIndex=MAX_MDLS; e->texIndex=e->glowIndex=e->specIndex=e->normIndex = MAX_TXRS; World.scale[idx].x=World.scale[idx].y=World.scale[idx].z=World.mass[idx]=e->volume=World.rotation[idx].w=1.0f; World.dynamicFriction[idx] = World.staticFriction[idx] = 0.6f; }
 void InitializeAIAfterLoad(u16 i);
 void DeleteInstance(u16 i) { if (i <= PLAYER2 || i >= World.instCount) return; flag_set(&World.instances[i].entflags,EF_ACTIVE,false); } // Don't delete null ent, player 1, nor player 2 or already empty slots.
 u16 AddInstance(u16 entIdx, V3 pos) {
     if (entIdx >= MAX_ENTITIES) { DualLogError("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d, skipped\n",entIdx,MAX_ENTITIES); return 0; }
-    
+    if (World.instCount >= INSTANCE_COUNT) { DualLogError("\nToo many instances while adding entity %u, max instance count is %u, skipped\n", entIdx, INSTANCE_COUNT); return 0; }
     u16 i = World.instCount;
+    InitializeEntity(&World.instances[i]);
     World.instances[i].index = entIdx;
     SetPosition(i,pos,true); // Marks dirty internally, using true to force as if twere teleported.
     if (IdxIsNPC(entIdx)) InitializeAIAfterLoad(i);
@@ -857,165 +859,168 @@ static const V2 levMins[14]={{-37.3600f,-52.7600f},/*0*/  {-53.8000f,-64.0800f},
                                   {-24.0994f,-39.7972f},/*10*/ {-27.1772f,-28.3394f},/*11*/ {-18.05f,-30.50f},/*12*/ {-64.000f,-60.120f}/*13*/};
 static const float lFars[14] = { 56.32f/*R*/, 56.32f/*1*/, 51.2f/*2*/, 51.2f/*3*/, 40.96f/*4*/, 58.88f/*5*/, 79.36f/*6*/, 56.32f/*7*/, 69.12f/*8*/, 53.76f/*9*/,  51.2f/*10*/,  51.2f/*11*/, 38.4f/*12*/, 71.68f/*13*/};
 extern u16 headmountedLanternLight;
-Entity entsFromFile[INSTANCE_COUNT];
-V3 positionFromFile[INSTANCE_COUNT];
-V3 scaleFromFile[INSTANCE_COUNT];
-Quaternion rotationFromFile[INSTANCE_COUNT];
-Light lightsFromFile[LIGHT_COUNT];
-LightAnimation lanimsFromFile[LIGHT_COUNT];
-char lineSpace[LINE_LEN_MAX];
-char initialLine[LINE_LEN_MAX];
-void InitializeEntity(Entity* e) { mset(e,0,sizeof(Entity)); u16 idx=(u16)(e - World.instances); e->index=U16_MAX; e->entflags=EF_ACTIVE; e->kinematic=true; World.layer[idx]=L_Default; e->camView=255; e->tickTime = 0.35f; World.angularDrag[idx] = 0.05f; e->modelIndex=e->lodIndex=e->colMeshIndex=MAX_MDLS; e->texIndex=e->glowIndex=e->specIndex=e->normIndex = MAX_TXRS; World.scale[idx].x=World.scale[idx].y=World.scale[idx].z=World.mass[idx]=e->volume=World.rotation[idx].w=1.0f; World.dynamicFriction[idx] = World.staticFriction[idx] = 0.6f; }
+Entity entsFromFile[INSTANCE_COUNT]; V3 positionFromFile[INSTANCE_COUNT]; V3 scaleFromFile[INSTANCE_COUNT]; Quaternion rotationFromFile[INSTANCE_COUNT]; Light lightsFromFile[LIGHT_COUNT]; LightAnimation lanimsFromFile[LIGHT_COUNT];
 static void GenBTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt);
 void AddCamView(V3 p, Quaternion r, u8 fv, u16 w, u16 h, float nr, float fr) { camViews[camViewCount] = (CamView){p,r,fv,w,h,nr,fr,World.pauseRelativeTime + (camViewCount * 0.05f) + 0.5f,false};/*Staggered for perf*/ GenBTexture(&camViewTextures[camViewCount],GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/); camViewCount++; }
+static const char* mm_ptr; static const char* mm_end;
+#define KEY_EQ(lit) (keyLen == (int)(sizeof(lit)-1) && sCompUpToLen(key, lit, sizeof(lit)-1) == 0)
+static char* MmapGetLine(char* buf, int sz) {
+    if (mm_ptr >= mm_end) return NULL;
+    const char* start=mm_ptr; const char* p=start;
+    while (p < mm_end && *p != '\n') { ++p; }
+    int lineLen = (int)(p - start);
+    if (p < mm_end && *p == '\n') { mm_ptr=p + 1; }
+    else { mm_ptr=mm_end; }
+    if (lineLen >= sz) { lineLen = sz - 1; }
+    mcpy(buf,(void*)start,lineLen);
+    while (lineLen > 0 && (buf[lineLen - 1] == '\r' || buf[lineLen - 1] == '\n')) { --lineLen; }
+    buf[lineLen] = '\0';
+    return buf;
+}
+
+char lineSpace[LINE_LEN_MAX];
 void LoadLevelMod(u8 lev) {
-    u8 curlevel = vclamp(lev,0,13); World.curLev = curlevel;
+    u8 curlevel = vclamp(lev, 0, 13);
+    World.curLev = curlevel;
     World.levelCurrentlyLoading = true;
-    World.instCount = 3; // 0 == NULL, 1 == Player1, 2 == Player2
+    World.instCount = 3;
     if (curlevel == 1) {
         AddCamView((V3){-19.2301f,-42.6604f,-49.7453f},(Quaternion){0.2375f,0.0008f,-0.0002f,0.9713f},75u,256u,256u,2.21f,11.5f);
         AddCamView((V3){7.664583f,-44.88017f,-14.26742f},(Quaternion){0.0f,0.9999f,0.0129f,0.0f},60u,256u,256u,2.192f,20.6f);
     } // TODO other level camviews
-    for (u16 idx = INSTS_1ST_IDX; idx < INSTANCE_COUNT; idx++) InitializeEntity(&World.instances[idx]);
-    mset(entsFromFile,0,INSTANCE_COUNT * sizeof(Entity));
-    mset(positionFromFile,0,INSTANCE_COUNT * sizeof(V3));
-    mset(scaleFromFile,0,INSTANCE_COUNT * sizeof(V3));
-    mset(rotationFromFile,0,INSTANCE_COUNT * sizeof(Quaternion));
-    mset(lightsFromFile,0,LIGHT_COUNT * sizeof(Light));
-    mset(lanimsFromFile,0,LIGHT_COUNT * sizeof(LightAnimation));
     mset(lineSpace,0,LINE_LEN_MAX * sizeof(char));
-    mset(initialLine,0,LINE_LEN_MAX * sizeof(char));
-    for (int i = 0; i < LIGHT_COUNT; ++i) lightsFromFile[i].lflags = LIGHT_AND_SHADOW_ON;
-    u32 lineNum = 0;
-    i32 entCount = -1;  // incremented to 0 on first entity line
-    i32 lightsIdx = -1; // incremented to 0 on first light line
-    char* line = &lineSpace[0];
-    char firstKeyCheck[11];
-    while (sLevelFileUpToEndLine(lineSpace,LINE_LEN_MAX)) {
-        size_t len = slen(lineSpace);
-        while (len && (lineSpace[len - 1] == '\n' || lineSpace[len - 1] == '\r')) lineSpace[--len] = '\0';
+    u32 lineNum = 0; i32 entCount = -1, lightsIdx = -1;
+    char* line;
+    while (MmapGetLine(lineSpace, LINE_LEN_MAX)) {
+        lineNum++;
         line = lineSpace;
-        sFormat(initialLine,sizeof(initialLine),"%s",line);
-        mcpy(firstKeyCheck,line,10); firstKeyCheck[10] = '\0'; lineNum++;
-        bool isLight = !sEqual(firstKeyCheck,"constIndex");
-        if (isLight) { lightsIdx++; if (lightsIdx >= LIGHT_COUNT){DualLogError("Too many lights %u in level%d.txt!\n",lightsIdx,curlevel);continue;} }
-        else { entCount++; if (entCount >= INSTANCE_COUNT){DualLogError("Too many instances %u in level%d.txt!\n",entCount,curlevel);continue;} }
-        
+        char* firstColon = StringFindFirstCharWithin(line, ':');
+        int firstKeyLen = firstColon ? (int)(firstColon - line) : 0;
+        bool isLight = !(firstKeyLen == 10 && sCompUpToLen(line, "constIndex", 10) == 0);
+        Entity* inst = NULL;
+        Light*   lit  = NULL;
+        LightAnimation* lanim = NULL;
+        if (isLight) {
+            lightsIdx++;
+            if (lightsIdx >= LIGHT_COUNT) { DualLogError("Too many lights %u in level%d.txt!\n", lightsIdx, curlevel); continue; }
+            lit   = &lightsFromFile[lightsIdx];
+            lanim = &lanimsFromFile[lightsIdx];
+            // Zero this slot only (replaces the full-array mset + full-array lflags init)
+            mset(lit, 0, sizeof(Light));
+            mset(lanim, 0, sizeof(LightAnimation));
+            lit->lflags = LIGHT_AND_SHADOW_ON; // default per-light
+        } else {
+            entCount++;
+            if (entCount >= INSTANCE_COUNT) { DualLogError("Too many instances %u in level%d.txt!\n", entCount, curlevel); continue; }
+            inst = &entsFromFile[entCount];
+            // Zero this entity slot only
+            mset(inst, 0, sizeof(Entity));
+            mset(&positionFromFile[entCount], 0, sizeof(V3));
+            mset(&scaleFromFile[entCount],    0, sizeof(V3));
+            mset(&rotationFromFile[entCount], 0, sizeof(Quaternion));
+        }
+
         bool activeStateRead = false;
         while (line[0] != '\0') {
             char* pipe = StringFindFirstCharWithin(line, '|');
             char* kvString = line;
             if (pipe) { *pipe = '\0'; line = pipe + 1; }
-            else { line += slen(line); }
-            if (kvString[0] == '\0' || StringFindFirstCharWithin(kvString,':') == NULL) continue;
-            char* colon = StringFindFirstCharWithin(kvString,':'); if (colon[1] == '\0') continue;
-            
+            else       { line += slen(line); }
+            if (kvString[0] == '\0') continue;
+            char* colon = StringFindFirstCharWithin(kvString, ':');
+            if (!colon || colon[1] == '\0') continue;
             *colon = '\0';
-            char* key   = kvString; if (!key) { DualLogError("Invalid key-value pair at line %u: %s\n",lineNum,initialLine); continue; }
-            
+            char* key = kvString;
             char* value = colon + 1;
-            char trimmed_key[64],trimmed_value[256];
-            sFormat(trimmed_key,  sizeof(trimmed_key),  "%s",key);
-            sFormat(trimmed_value,sizeof(trimmed_value),"%s",value);
-            trimmed_key[sizeof(trimmed_key) - 1]     = '\0';
-            trimmed_value[sizeof(trimmed_value) - 1] = '\0';
-            if (isLight) LoadFieldIntoLight((char*)&trimmed_key,(char*)&trimmed_value,initialLine,lineNum,&lightsFromFile[lightsIdx],&lanimsFromFile[lightsIdx],lightsIdx);
-            else {
-                Entity* inst = &entsFromFile[entCount];
-                     if (sEqual(trimmed_key,"constIndex"))      inst->index = parse_numberu16(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"localPosition.x")) positionFromFile[entCount].x = parse_float(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"localPosition.y")) positionFromFile[entCount].y = parse_float(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"localPosition.z")) positionFromFile[entCount].z = parse_float(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"localRotation.x")) rotationFromFile[entCount].x = parse_float(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"localRotation.y")) rotationFromFile[entCount].y = parse_float(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"localRotation.z")) rotationFromFile[entCount].z = parse_float(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"localRotation.w")) rotationFromFile[entCount].w = parse_float(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"localScale.x"))    scaleFromFile[entCount].x = parse_float(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"localScale.y"))    scaleFromFile[entCount].y = parse_float(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"localScale.z"))    scaleFromFile[entCount].z = parse_float(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"go.activeSelf"))   { activeStateRead = true; flag_set(&inst->entflags, EF_ACTIVE, parse_bool(trimmed_value,initialLine,lineNum)); }
-                else if (sEqual(trimmed_key,"amount"))          inst->amount = parse_float(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"resetTime"))       inst->resetTime = parse_float(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"minSecurityLevel"))inst->minSecurityLevel = parse_float(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"damageOnUse"))     inst->damage = parse_float(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"target"))          scpy_to_a_from_b(inst->target,trimmed_value,TARGET_STRING_LENGTH);
-                else if (sEqual(trimmed_key,"targetname"))      scpy_to_a_from_b(inst->targetname,trimmed_value,TARGET_STRING_LENGTH);
-                else if (sEqual(trimmed_key,"securityThreshhold") || sEqual(trimmed_key,"securityThreshold")) inst->securityThreshold = parse_numberu8(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"messageIndex"))    inst->messageIndex = parse_numberi16(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"delay"))           inst->delay = parse_float(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"locked"))          flag_set(&inst->entflags,EF_LOCKED,parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"active"))          inst->active = parse_bool(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"alternateOn"))     inst->alternateOn = parse_bool(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"onlyTargetOnce"))  inst->onlyOnce = parse_bool(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"targetAlreadyDone")) inst->targetAlreadyDone = parse_bool(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"stayOpen"))        inst->stayOpen = parse_bool(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"startOpen"))       inst->startOpen = parse_bool(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"ajar"))            inst->ajar = parse_bool(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"ajarPercentage"))  inst->ajarPercentage = parse_float(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"useTimeDelay"))    inst->useTimeDelay = parse_float(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"blocked"))         inst->blocked = parse_bool(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"timeBeforeLasersOn")) inst->timeBeforeLasersOn = parse_float(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"toggleLasers"))    inst->toggleLasers = parse_bool(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"targettingOnlyUnlocks")) inst->targettingOnlyUnlocks = parse_bool(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"changeLayerOnOpenClose")) inst->changeLayerOnOpenClose = parse_bool(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"useFinished"))     inst->useFinished = parse_float(trimmed_value,initialLine,lineNum) + World.pauseRelativeTime;
-                else if (sEqual(trimmed_key,"waitBeforeClose")) inst->waitBeforeClose = parse_float(trimmed_value,initialLine,lineNum) + World.pauseRelativeTime;
-                else if (sEqual(trimmed_key,"lasersFinished"))  inst->lasersFinished = parse_float(trimmed_value,initialLine,lineNum) + World.pauseRelativeTime;
-                else if (sEqual(trimmed_key,"changeMatOnActive")) inst->changeTexOnActive = parse_bool(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"blinkWhenActive")) inst->blinkTexOnActive = parse_bool(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"doorOpen"))        flag_set(&inst->ioflags,TARG_IOFLAGS_DOOROPEN,parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"doorOpenIfUnlocked")
-                      || sEqual(trimmed_key,"doorToggle"))      flag_set(&inst->ioflags,TARG_IOFLAGS_DOOROPENIFUNLOCKED,parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"doorClose"))       flag_set(&inst->ioflags,TARG_IOFLAGS_DOORCLOSE,parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"doorLock") 
-                      || sEqual(trimmed_key,"lockElevatorPad")) flag_set(&inst->ioflags,TARG_IOFLAGS_LOCK,parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"doorUnlock")
-                      || sEqual(trimmed_key,"unlockSwitch")
-                      || sEqual(trimmed_key,"unlockElevatorPad")
-                      || sEqual(trimmed_key,"unlockKeycodePad")
-                      || sEqual(trimmed_key,"unlockPuzzlePad")) flag_set(&inst->ioflags,TARG_IOFLAGS_UNLOCK,parse_bool(trimmed_value,initialLine,lineNum));
-                
-                else if (sEqual(trimmed_key,"switchTrigger"))   flag_set(&inst->ioflags,TARG_IOFLAGS_SWITCHTRIGGER,parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"tripTrigger"))     flag_set(&inst->ioflags,TARG_IOFLAGS_TRIPTRIGGER,parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"forceBridgeActivate")) flag_set(&inst->ioflags,TARG_IOFLAGS_FBRIDGE_ACTIVATE,parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"forceBridgeDeactivate")) flag_set(&inst->ioflags,TARG_IOFLAGS_FBRIDGE_DEACTIVATE,parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"forceBridgeToggle")) flag_set(&inst->ioflags,TARG_IOFLAGS_FBRIDGE_TOGGLE,parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"gravityLiftToggle")) flag_set(&inst->ioflags,TARG_IOFLAGS_GRAVLIFT_TOGGLE,parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"textureChangeToggle")) flag_set(&inst->ioflags,TARG_IOFLAGS_TEXTURE_CHG_TOGGLE,parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"lightOn"))         flag_set(&inst->ioflags,TARG_IOFLAGS_LIGHT_ON,parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"lightOff"))        flag_set(&inst->ioflags,TARG_IOFLAGS_LIGHT_OFF,parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"lightToggle"))     flag_set(&inst->ioflags,TARG_IOFLAGS_LIGHT_TOGGLE,parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"funcwallMove"))    flag_set(&inst->ioflags,TARG_IOFLAGS_FUNCWALL_MOVE,parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"missionBitOn"))    flag_set(&inst->ioflags,TARG_IOFLAGS_MISSION_BIT_ON,parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"missionBitOff"))   flag_set(&inst->ioflags,TARG_IOFLAGS_MISSION_BIT_OFF,parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"missionBitToggle")) flag_set(&inst->ioflags,TARG_IOFLAGS_MISSION_BIT_TOGGLE,parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"switchLockToggle")) flag_set(&inst->ioflags,TARG_IOFLAGS_SWITCH_LOCK_TOGGLE, parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"GOSetActive"))     flag_set(&inst->ioflags,TARG_IOFLAGS_INST_ACTIVATE, parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"GOSetDeactive"))   flag_set(&inst->ioflags,TARG_IOFLAGS_INST_DEACTIVATE, parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"GOToggleActive"))  flag_set(&inst->ioflags,TARG_IOFLAGS_INST_TOGGLE, parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"disableThisGOOnAwake")) flag_set(&inst->ioflags,TARG_IOFLAGS_DISABLE_ON_AWAKE, parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"playSoundOnce"))   flag_set(&inst->ioflags,TARG_IOFLAGS_PLAY_SOUND_ONCE, parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"stopSound"))       flag_set(&inst->ioflags,TARG_IOFLAGS_STOP_SOUND, parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"startFlashingMaterials")) flag_set(&inst->ioflags,TARG_IOFLAGS_START_FLASHING_TEX, parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"stopFlashingMaterials")) flag_set(&inst->ioflags,TARG_IOFLAGS_STOP_FLASHING_TEX, parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"branchFlip"))      flag_set(&inst->ioflags,TARG_IOFLAGS_BRANCH_FLIP, parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"branchFlipOnly"))  flag_set(&inst->ioflags,TARG_IOFLAGS_BRANCH_FLIPONLY, parse_bool(trimmed_value,initialLine,lineNum));
-                else if (sEqual(trimmed_key,"resourceFolder") && *trimmed_value) scpy_to_a_from_b(inst->texAnimResourceFolder,trimmed_value,TARGET_STRING_LENGTH);
-                else if (sEqual(trimmed_key,"frameDelay"))      inst->tickTime = (double)parse_float(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"randomFrame"))     inst->texAnimRandom = parse_bool(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"reverseSequence")) inst->texAnimInReverse = parse_bool(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"messageLingdex"))  inst->messageLingdex = parse_numberi16(trimmed_value,initialLine,lineNum);
-                else if (sEqual(trimmed_key,"lockedMessageLingdex")) inst->lockedMessageLingdex = parse_numberi16(trimmed_value, initialLine, lineNum);
-                else if (sEqual(trimmed_key,"SFXIndex"))        inst->SFXIndex = (i16)parse_numberi16(trimmed_value, initialLine, lineNum);
-                else if (sEqual(trimmed_key,"requiredAccessCard")) inst->requiredAccessCard = parse_numberi8(trimmed_value, initialLine, lineNum);
-                else if (sEqual(trimmed_key,"doorOpenState"))   inst->doorOpen = parse_numberu8(trimmed_value, initialLine, lineNum);
+            int keyLen = (int)(colon - key); // length is free, no slen()
+            if (isLight) { LoadFieldIntoLight(key,value,lineSpace,lineNum,lit,lanim,lightsIdx);
+            } else {
+                // Use KEY_EQ for length-aware compares against literals (no slen on key).
+                // key/value are used directly instead of trimmed_key/trimmed_value.
+                if (KEY_EQ("constIndex"))           inst->index = parse_numberu16(value, lineSpace, lineNum);
+                else if (KEY_EQ("localPosition.x")) positionFromFile[entCount].x = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("localPosition.y")) positionFromFile[entCount].y = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("localPosition.z")) positionFromFile[entCount].z = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("localRotation.x")) rotationFromFile[entCount].x = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("localRotation.y")) rotationFromFile[entCount].y = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("localRotation.z")) rotationFromFile[entCount].z = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("localRotation.w")) rotationFromFile[entCount].w = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("localScale.x"))    scaleFromFile[entCount].x = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("localScale.y"))    scaleFromFile[entCount].y = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("localScale.z"))    scaleFromFile[entCount].z = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("go.activeSelf"))   { activeStateRead = true; flag_set(&inst->entflags, EF_ACTIVE, parse_bool(value, lineSpace, lineNum)); }
+                else if (KEY_EQ("amount"))          inst->amount = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("resetTime"))       inst->resetTime = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("minSecurityLevel"))inst->minSecurityLevel = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("damageOnUse"))     inst->damage = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("target"))          scpy_to_a_from_b(inst->target, value, TARGET_STRING_LENGTH);
+                else if (KEY_EQ("targetname"))      scpy_to_a_from_b(inst->targetname, value, TARGET_STRING_LENGTH);
+                else if (KEY_EQ("securityThreshhold") || KEY_EQ("securityThreshold")) inst->securityThreshold = parse_numberu8(value, lineSpace, lineNum);
+                else if (KEY_EQ("messageIndex"))    inst->messageIndex = parse_numberi16(value, lineSpace, lineNum);
+                else if (KEY_EQ("delay"))           inst->delay = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("locked"))          flag_set(&inst->entflags, EF_LOCKED, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("active"))          inst->active = parse_bool(value, lineSpace, lineNum);
+                else if (KEY_EQ("alternateOn"))     inst->alternateOn = parse_bool(value, lineSpace, lineNum);
+                else if (KEY_EQ("onlyTargetOnce"))  inst->onlyOnce = parse_bool(value, lineSpace, lineNum);
+                else if (KEY_EQ("targetAlreadyDone")) inst->targetAlreadyDone = parse_bool(value, lineSpace, lineNum);
+                else if (KEY_EQ("stayOpen"))        inst->stayOpen = parse_bool(value, lineSpace, lineNum);
+                else if (KEY_EQ("startOpen"))       inst->startOpen = parse_bool(value, lineSpace, lineNum);
+                else if (KEY_EQ("ajar"))            inst->ajar = parse_bool(value, lineSpace, lineNum);
+                else if (KEY_EQ("ajarPercentage"))  inst->ajarPercentage = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("useTimeDelay"))    inst->useTimeDelay = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("blocked"))         inst->blocked = parse_bool(value, lineSpace, lineNum);
+                else if (KEY_EQ("timeBeforeLasersOn")) inst->timeBeforeLasersOn = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("toggleLasers"))    inst->toggleLasers = parse_bool(value, lineSpace, lineNum);
+                else if (KEY_EQ("targettingOnlyUnlocks")) inst->targettingOnlyUnlocks = parse_bool(value, lineSpace, lineNum);
+                else if (KEY_EQ("changeLayerOnOpenClose")) inst->changeLayerOnOpenClose = parse_bool(value, lineSpace, lineNum);
+                else if (KEY_EQ("useFinished"))     inst->useFinished = parse_float(value, lineSpace, lineNum) + World.pauseRelativeTime;
+                else if (KEY_EQ("waitBeforeClose")) inst->waitBeforeClose = parse_float(value, lineSpace, lineNum) + World.pauseRelativeTime;
+                else if (KEY_EQ("lasersFinished"))  inst->lasersFinished = parse_float(value, lineSpace, lineNum) + World.pauseRelativeTime;
+                else if (KEY_EQ("changeMatOnActive")) inst->changeTexOnActive = parse_bool(value, lineSpace, lineNum);
+                else if (KEY_EQ("blinkWhenActive")) inst->blinkTexOnActive = parse_bool(value, lineSpace, lineNum);
+                else if (KEY_EQ("doorOpen"))        flag_set(&inst->ioflags, TARG_IOFLAGS_DOOROPEN, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("doorOpenIfUnlocked") || KEY_EQ("doorToggle")) flag_set(&inst->ioflags, TARG_IOFLAGS_DOOROPENIFUNLOCKED, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("doorClose"))       flag_set(&inst->ioflags, TARG_IOFLAGS_DOORCLOSE, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("doorLock") || KEY_EQ("lockElevatorPad")) flag_set(&inst->ioflags, TARG_IOFLAGS_LOCK, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("doorUnlock") || KEY_EQ("unlockSwitch") || KEY_EQ("unlockElevatorPad") || KEY_EQ("unlockKeycodePad") || KEY_EQ("unlockPuzzlePad")) flag_set(&inst->ioflags, TARG_IOFLAGS_UNLOCK, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("switchTrigger"))   flag_set(&inst->ioflags, TARG_IOFLAGS_SWITCHTRIGGER, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("tripTrigger"))     flag_set(&inst->ioflags, TARG_IOFLAGS_TRIPTRIGGER, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("forceBridgeActivate"))   flag_set(&inst->ioflags, TARG_IOFLAGS_FBRIDGE_ACTIVATE, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("forceBridgeDeactivate")) flag_set(&inst->ioflags, TARG_IOFLAGS_FBRIDGE_DEACTIVATE, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("forceBridgeToggle"))     flag_set(&inst->ioflags, TARG_IOFLAGS_FBRIDGE_TOGGLE, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("gravityLiftToggle"))     flag_set(&inst->ioflags, TARG_IOFLAGS_GRAVLIFT_TOGGLE, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("textureChangeToggle"))   flag_set(&inst->ioflags, TARG_IOFLAGS_TEXTURE_CHG_TOGGLE, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("lightOn"))         flag_set(&inst->ioflags, TARG_IOFLAGS_LIGHT_ON, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("lightOff"))        flag_set(&inst->ioflags, TARG_IOFLAGS_LIGHT_OFF, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("lightToggle"))     flag_set(&inst->ioflags, TARG_IOFLAGS_LIGHT_TOGGLE, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("funcwallMove"))    flag_set(&inst->ioflags, TARG_IOFLAGS_FUNCWALL_MOVE, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("missionBitOn"))    flag_set(&inst->ioflags, TARG_IOFLAGS_MISSION_BIT_ON, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("missionBitOff"))   flag_set(&inst->ioflags, TARG_IOFLAGS_MISSION_BIT_OFF, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("missionBitToggle"))flag_set(&inst->ioflags, TARG_IOFLAGS_MISSION_BIT_TOGGLE, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("switchLockToggle"))flag_set(&inst->ioflags, TARG_IOFLAGS_SWITCH_LOCK_TOGGLE, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("GOSetActive"))     flag_set(&inst->ioflags, TARG_IOFLAGS_INST_ACTIVATE, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("GOSetDeactive"))   flag_set(&inst->ioflags, TARG_IOFLAGS_INST_DEACTIVATE, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("GOToggleActive"))  flag_set(&inst->ioflags, TARG_IOFLAGS_INST_TOGGLE, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("disableThisGOOnAwake")) flag_set(&inst->ioflags, TARG_IOFLAGS_DISABLE_ON_AWAKE, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("playSoundOnce"))   flag_set(&inst->ioflags, TARG_IOFLAGS_PLAY_SOUND_ONCE, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("stopSound"))       flag_set(&inst->ioflags, TARG_IOFLAGS_STOP_SOUND, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("startFlashingMaterials")) flag_set(&inst->ioflags, TARG_IOFLAGS_START_FLASHING_TEX, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("stopFlashingMaterials"))  flag_set(&inst->ioflags, TARG_IOFLAGS_STOP_FLASHING_TEX, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("branchFlip"))      flag_set(&inst->ioflags, TARG_IOFLAGS_BRANCH_FLIP, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("branchFlipOnly"))  flag_set(&inst->ioflags, TARG_IOFLAGS_BRANCH_FLIPONLY, parse_bool(value, lineSpace, lineNum));
+                else if (KEY_EQ("resourceFolder") && *value) scpy_to_a_from_b(inst->texAnimResourceFolder, value, TARGET_STRING_LENGTH);
+                else if (KEY_EQ("frameDelay"))      inst->tickTime = (double)parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("randomFrame"))     inst->texAnimRandom = parse_bool(value, lineSpace, lineNum);
+                else if (KEY_EQ("reverseSequence")) inst->texAnimInReverse = parse_bool(value, lineSpace, lineNum);
+                else if (KEY_EQ("messageLingdex"))  inst->messageLingdex = parse_numberi16(value, lineSpace, lineNum);
+                else if (KEY_EQ("lockedMessageLingdex")) inst->lockedMessageLingdex = parse_numberi16(value, lineSpace, lineNum);
+                else if (KEY_EQ("SFXIndex"))        inst->SFXIndex = (i16)parse_numberi16(value, lineSpace, lineNum);
+                else if (KEY_EQ("requiredAccessCard")) inst->requiredAccessCard = parse_numberi8(value, lineSpace, lineNum);
+                else if (KEY_EQ("doorOpenState"))   inst->doorOpen = parse_numberu8(value, lineSpace, lineNum);
             }
         }
-
-        // Store activeStateRead alongside the parsed entity so the commit pass can use it.  Reuse a spare field or parallel array — here we use a bit in entflags as a sentinel.
         if (!isLight && !activeStateRead) flag_set(&entsFromFile[entCount].entflags,EF_ACTIVE,true); // Default active if not specified
     }
-
     i32 totalEnts = entCount + 1;
     for (i32 e=0;e<totalEnts;++e) {
         Entity* src = &entsFromFile[e];
@@ -1056,10 +1061,10 @@ void LoadLevelMod(u8 lev) {
         par->texAnimRandom         = src->texAnimRandom;
         par->texAnimInReverse      = src->texAnimInReverse;
         par->messageLingdex        = src->messageLingdex;
-        scpy_to_a_from_b(par->target,src->target,TARGET_STRING_LENGTH);
-        scpy_to_a_from_b(par->targetname,src->targetname,TARGET_STRING_LENGTH);
-        scpy_to_a_from_b(par->texAnimResourceFolder,src->texAnimResourceFolder,TARGET_STRING_LENGTH);
-        if (IdxIsPortalBlockingDoor(entIdx)) AddDoorPortal(entIdx, parent); // Only at load, not in AddInstance
+        scpy_to_a_from_b(par->target, src->target, TARGET_STRING_LENGTH);
+        scpy_to_a_from_b(par->targetname, src->targetname, TARGET_STRING_LENGTH);
+        scpy_to_a_from_b(par->texAnimResourceFolder, src->texAnimResourceFolder, TARGET_STRING_LENGTH);
+        if (IdxIsPortalBlockingDoor(entIdx)) AddDoorPortal(entIdx,parent); // Only at load, not in AddInstance
         if (entIdx == 525) { // prop_console01
             V3 ofs1 = GetLocalTransformedPos(par,(V3){5.81f,2.29f,38.05f-38.3552f});
             V3 ofs2 = GetLocalTransformedPos(par,(V3){-10.1f,0.9f,18.21f-38.3552f});
@@ -1068,15 +1073,15 @@ void LoadLevelMod(u8 lev) {
             LightAnimation lam={0};
             par->texAnimLight  = AddLight(&lit1,&lam);
             par->texAnimLight2 = AddLight(&lit2,&lam);
-        } else if (entIdx == 309 || entIdx == 365 || entIdx == 369) World.position[parent].y += 0.12f; // item_beaker || item_flask || item_testtube: Move up to account for CG mod (origin moved vs Unity version)
-        else if (entIdx >= 472 && entIdx <= 476) World.position[parent].y += 0.342f; // se_crate1, se_crate2, se_crate3, se_crate4, se_crate5
+        } else if (entIdx == 309 || entIdx == 365 || entIdx == 369) { World.position[parent].y += 0.12f; } // item_beaker || item_flask || item_testtube: Move up to account for CG mod (origin moved vs Unity version)
+        else if (entIdx >= 472 && entIdx <= 476) { World.position[parent].y += 0.342f; } // se_crate1, se_crate2, se_crate3, se_crate4, se_crate5: Move up to account for CG mod (origin moved vs Unity version)
         else if (entIdx == 279) { // chunk_screen
             V3 ofs1 = GetLocalTransformedPos(par,(V3){0.0f,-0.08f,0.0f});
             Light lit1 = (Light){.pos=ofs1,.col=(Color3){0.909803922f,0.929411765f,1.0f},.range=3.2f,.intensity=1.575f,.maxIntensity=1.575f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
             LightAnimation lam={0};
             par->texAnimLight = AddLight(&lit1,&lam);
         } else if (par->index == 574) { // prop_healingbed
-            V3 ofs1 = GetLocalTransformedPos(par,(V3){0.5292511f,0.065,0.915f});
+            V3 ofs1 = GetLocalTransformedPos(par,(V3){0.5292511f,0.065f,0.915f});
             V3 ofs2 = GetLocalTransformedPos(par,(V3){-0.5317497f,0.065f,1.039f});
             Light lit1 = (Light){.pos=ofs1,.col=(Color3){0.0f,0.925490196f,0.082352941f},.range=3.0f,.intensity=0.72f,.maxIntensity=0.72f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
             Light lit2 = (Light){.pos=ofs2,.col=(Color3){0.0f,0.925490196f,0.082352941f},.range=3.0f,.intensity=0.72f,.maxIntensity=0.72f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
@@ -1085,60 +1090,58 @@ void LoadLevelMod(u8 lev) {
             par->texAnimLight2 = AddLight(&lit2,&lam);
             par->textureAnimating = true; par->texAnimClip = 12; par->texFrame = 0;
             scpy_to_a_from_b(par->texAnimResourceFolder,"MedicalBed",TARGET_STRING_LENGTH);
-        } else if (par->index == 746) { // weapon_grenadeenergmine_live
-            par->textureAnimating = true; par->texAnimClip = 2; par->texFrame = 0;
-        } else if (entIdx == 720) {
-            /*u16 mist = */AddInstance(648,World.position[parent]); // ambient_mist
-        } else if (entIdx == 733) {
-            /*u16 pipewater = */AddInstance(649,World.position[parent]); // ambient_pipewater_loop
-            /*u16 rain = */AddInstance(653,(V3){World.position[parent].x,World.position[parent].y - 1.26f,World.position[parent].z}); // ambient_rain
-        }
-        
+        } else if (par->index == 746) { par->textureAnimating = true; par->texAnimClip = 2; par->texFrame = 0; } // weapon_grenadeenergmine_live
+        else if (entIdx == 720) { /*u16 mist=*/AddInstance(648,World.position[parent]); }// ambient_mist
+        else if (entIdx == 733) { /*u16 pipewater=*/AddInstance(649,World.position[parent]);/*ambient_pipewater_loop*/ /*u16 rain=*/AddInstance(653,(V3){World.position[parent].x,World.position[parent].y - 1.26f,World.position[parent].z});/*ambient_rain*/ }
         if (par->texAnimResourceFolder[0] != '\0' && par->tickTime <= 0.01f) par->tickTime = 0.35f;
-        TextureSequenceInit(parent,par->texAnimResourceFolder);
+        TextureSequenceInit(parent, par->texAnimResourceFolder);
     }
-    
-    for (int i = 0; i < lightsIdx; ++i) { if (!(lightsFromFile[i].lflags & LSPOT)){lightsFromFile[i].spotAng=0.0f;} AddLight(&lightsFromFile[i],&lanimsFromFile[i]); } // Add all level lights
+    for (int i=0;i<=lightsIdx;++i) { if (!(lightsFromFile[i].lflags & LSPOT)) {lightsFromFile[i].spotAng = 0.0f;} AddLight(&lightsFromFile[i],&lanimsFromFile[i]); }
     if (curlevel == 1 || curlevel == 2 || curlevel == 5 || curlevel == 6 || curlevel == 7) { // Shield generators
         u16 shd1 = AddInstance(754, (V3){-51.30664f,  -47.42f,  56.42651f}); World.rotation[shd1] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
         u16 shd2 = AddInstance(754, (V3){ 71.5f,      -47.42f, -66.6f    }); World.rotation[shd2] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
         u16 shd3 = AddInstance(754, (V3){-51.306650f, -47.42f, -66.66652f}); World.rotation[shd3] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
         u16 shd4 = AddInstance(754, (V3){ 71.78664f,  -47.42f,  56.42651f}); World.rotation[shd4] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
     }
-
     Light hl = (Light){.pos=World.position[PLAYER1],.col=(Color3){1.0f,1.0f,1.0f},.range=11.52f,.lflags=LIGHTON,.intensity=0.0f,.minIntensity=0.0f,.maxIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY};
     LightAnimation lam = {0};
-    headmountedLanternLight = AddLight(&hl,&lam); lightsIdx++;
+    headmountedLanternLight = AddLight(&hl, &lam);
 }
+#undef KEY_EQ
 
 void LoadLevelData(u8 curlevel) {
     World.curLev = curlevel;
     SetLevelPointers(curlevel); // Ensures writing to correct current level
-    mset(World.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the per-level entity array for this level.
-    World.instCount = 3; // 0 == NULL, 1 == Player1, 2 == Player2 — reset before LoadLevelMod adds entities.
-    mset(World.lights,0,LIGHT_COUNT * sizeof(Light)); mset(World.lanims,0,LIGHT_COUNT * sizeof(LightAnimation)); World.loadedLights = 0;
-    mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
-    mset(camViews,0,64 * sizeof(CamView)); camViewCount = 0;
+    mset(World.instances + 3, 0, (INSTANCE_COUNT - 3) * sizeof(Entity)); // Clear previous level slots. Claimed slots are fully initialized by AddInstance().
+    World.instCount = 3; // 0 == NULL, 1 == Player1, 2 == Player2
+    mset(World.lights, 0, LIGHT_COUNT * sizeof(Light));
+    mset(World.lanims, 0, LIGHT_COUNT * sizeof(LightAnimation));
+    World.loadedLights = 0;
+    mset(alreadyReadLightOnOnce, 0, sizeof(alreadyReadLightOnOnce));
+    mset(camViews, 0, 64 * sizeof(CamView));
+    camViewCount = 0;
     char filename[20]; // Minimum size for 0 through 13.
-    sFormat(filename,sizeof(filename),"./Data/level%d.txt",curlevel);
-    levelFileHandle = OS_OpenReadonly(filename);
+    sFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel);
+    FHandle fh; int fsize; void* fbuf = OS_OpenAndAllocateFileBufferReadonly(filename, &fh, &fsize); if (!fbuf) { OS_Exit(1); }
+    mm_ptr = (const char*)fbuf;
+    mm_end = mm_ptr + fsize;
     LoadLevelMod(curlevel);
-    OS_Close(levelFileHandle);
-    for (int i=0;i<World.loadedLights;++i) World.lightsNewPosition[i]=World.lights[i].pos;
-    for (int i=PLAYER1;i<World.instCount;++i) {
-        i32 cellIdx = PosGetCellCoords(World.position[i].x,World.position[i].z);
-        World.instances[i].cellIndex = cellIdx;
-        World.instances[i].cellX=PosGetCellCoordX(World.position[i].x);
-        World.instances[i].cellZ=PosGetCellCoordZ(World.position[i].z);
-        World.radius[i] = modelBounds[World.instances[i].modelIndex]*vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z);
-        World.instances[i].shadRadius = World.radius[i] * 1.41;
+    OS_Free(fbuf, (size_t)fsize);
+    for (int i = 0; i < World.loadedLights; ++i) World.lightsNewPosition[i] = World.lights[i].pos;
+    for (int i = PLAYER1; i < World.instCount; ++i) {
+        i32 cellIdx = PosGetCellCoords(World.position[i].x, World.position[i].z);
+        World.instances[i].cellIndex = cellIdx; 
+        World.instances[i].cellX = PosGetCellCoordX(World.position[i].x);
+        World.instances[i].cellZ = PosGetCellCoordZ(World.position[i].z);
+        World.radius[i] = modelBounds[World.instances[i].modelIndex] * vmax(vmax(World.scale[i].x, World.scale[i].y), World.scale[i].z);
+        World.instances[i].shadRadius = World.radius[i] * 1.41f;
         ComputeConvexMeshInertiaTensor(i);
-        if (World.mass[i] < 0.001f && World.collider[i] != COLTYPE_NONE && World.collider[i] != COLTYPE_MSH && (World.instances[i].entflags & EF_RIGIDBODY)) {World.mass[i] = 0.2f; /*At least something!*/}
+        if (World.mass[i] < 0.001f && World.collider[i] != COLTYPE_NONE && World.collider[i] != COLTYPE_MSH && (World.instances[i].entflags & EF_RIGIDBODY)) { World.mass[i]=0.2f;/*At least something!*/ }
     }
     ModInitAfterLoad();
     World.levelLoadedLights[curlevel] = World.loadedLights;
-    mcpy(levelCamViews[curlevel],camViews,64 * sizeof(CamView));
-    mcpy(levelCamViewTextures[curlevel],camViewTextures,64 * sizeof(u32));
+    mcpy(levelCamViews[curlevel], camViews, 64 * sizeof(CamView));
+    mcpy(levelCamViewTextures[curlevel], camViewTextures, 64 * sizeof(u32));
     levelCamViewCount[curlevel] = camViewCount;
     World.levelInstCount[curlevel] = World.instCount;
     World.levelCurrentlyLoading = false;
