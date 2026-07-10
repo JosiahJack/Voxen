@@ -1,3 +1,4 @@
+// credits.h - Credits for Citadel: The System Shock Fan Remake, salt the fries!
 const char* creditPages[]={
 "\n"
 "\n"

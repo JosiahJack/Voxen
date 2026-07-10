@@ -5,11 +5,11 @@
 This is a pure C (C11) rendering engine with a focus on high performance and 
 simplicity for first person shooter games.  This project was developed with 
 Citadel: The System Shock Fan Remake in mind but should be reasonably
-extendable and modifiable for anything, being based on FOSS MIT licensing and
-principles.  Please take this and make it your own for your own projects.
+modifiable for anything, being based on FOSS MIT licensing and principles.
+Please take this and make it your own for your own projects.
 
 The "Voxel Lit" portion of Voxen is in the representation of lighting 
-information using a voxel format that is an invisible 3D layer of data
+information using a voxel format that is an invisible layer of data
 overlayed with the normal full 3D polygonal mesh world such that lighting
 calculations for bounce lighting (GI), reflections, and other effects leverage 
 the spacial voxel data to optimize lighting calculations for high fidelity at
@@ -21,7 +21,7 @@ to Quake, Half-Life, and other classic games.  The voxel volume may work fine fo
 outdoor environments but Voxen is not intended to be used for large open world games.
 Further, the procedural sky is hardcoded and not intended to be a general sky system.
 Modifications are of course welcome, however.  The hope is that everything is quite
-straightforward. (TBD shaders part of mod/gamecode?)
+straightforward.  Shaders are embedded in the engine.
 
 Using OpenGL 4.3+, this engine attempts to achieve maximum compatibility and maximum 
 performance with minimal footprint.  Heavy use of SSBOs is made though this is still 
@@ -42,8 +42,8 @@ that has no libc usage, no external linking, and strict API interop with the eng
 
 ## Supported Platforms
 
-- **Linux (64-bit)**: Primarily Debian-based distros (e.g., Kubuntu, Xubuntu) with X11. Wayland support is not intentional.
-- **Windows (64-bit)**: Supports Windows 7+. Windows 11 support is not intentional.
+- **Linux (64-bit)**: Primarily Debian-based distros (e.g., Kubuntu, Xubuntu) with X11. Wayland support is not intentional.  YMMV via XWayland.
+- **Windows (64-bit)**: Supports Windows 7+.  Tested on Windows 10 and 11.
 - **MacOS (64-bit)**: Not supported due to OpenGL deprecation in favor of Metal.  Metal not supported at this time. TBD.
 
 ### Test Systems
@@ -92,7 +92,54 @@ Starts game loop:
   Render UI
 Exit with zero cleanup, let the OS handle it; does immediate fastest exit as user's time is important.
 
----
+### Table of Contents (Kind of):
+
+```
+❯ ls *.* ./Shaders/*.glsl ./Shaders/*.compute | grep -vE 'README.md|builds.csv|voxen.exe|voxen.log|build.sh|Citadel.pdb' | xargs perl -MList::Util=max -lne '$first{$ARGV} //= $_; $count{$ARGV} = $.; if(eof){$total += $.; $. = 0;} END { $max = max map {length} keys %first; printf "99999999 %7d total\n", $total; printf "%8d %-${max}s  %s\n", $count{$_}, $_, $first{$_} for keys %first }' 2>/dev/null | sort -nr | head -n 51 | sed 's/^99999999 //'
+  18352 total
+    3472 citadel.c                           // citadel.c - Gamelogic.  Most functionality is trivial so put it here.
+    1880 weapons.c                           // weapons.c - Weapon System
+    1316 entity.c                            // entity.c - Entity Definitions and Save Load System for levels and savegames
+    1145 winput.c                            // winput.c - Windowing and Input System interfacing with the OS.
+    1077 voxen.c                             // voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake.  Main translation unit.  Core renderer.  OS Shim Layer.
+    1004 ai.c                                // ai.c - AI logic control for NPC's enemies in the game.
+     932 tables_audio.h                      // tables_audio.h - Audio filepaths, footstep indirection tables, and synth tables
+     874 audio.c                             // audio.c - Audio System supporting .mp3 and .wav filetypes only, uses Windows WASAPI and Linux ALSA (uses "default" to work on PulseAudio and PipeWire or just ALSA+dmix systems, with raw ioctl fallback to all ALSA devices if "default" unavailable).  Mixes synthesized sounds as well.
+     864 physics.c                           // physics.c - Physics Engine - full rigidbody 3D with torque for sphere, box, capsule, convex mesh dynamic objects and same set plus arbitrary trisoup mesh colliders for statics.
+     797 common.h                            // common.h - Shared items between engine and gamecode (e.g. enums)
+     585 automap.c                           // automap.c - Automap System
+     528 ./Shaders/composite_frag.glsl       // composite.glsl - Full screen quad blit with compositing pass to combine rendered view with UI overlay.  Includes custom AA, VHS blur (subtle, magic!), SSR application with tapped blur, procedural skybox with stars and saturn and sun and station shield (if on!) that rotate to represent station rotation, berserk hallucinatory effect, screen rolling EMP effect, fog, grayscale for infrared hardware effect.
+     524 models.c                            // models.c - 3D Models Loading System
+     440 textures.c                          // textures.c - 2D Texture Loading System
+     387 credits.h                           // credits.h - Credits for Citadel: The System Shock Fan Remake, salt the fries!
+     380 stbtt.h                             // stb_truetype.h - v1.26 - public domain
+     319 ./Shaders/chunk_frag.glsl           // chunk_frag.glsl: Generic shader for all world objects
+     315 biomonitor.c                        // biomonotor.c - Biomonitor Graph and Text displays.
+     306 culling.c                           // culling.c - XZ 2D World Grid Cell Culling System 64x64 matching System Shock 1.
+     183 lib.c                               // lib.c - LibC replacement functions and other misc helpers.
+     166 text.c                              // text.c - Text and Font Rendering/Loading System
+     151 console.c                           // console.c - Console Emulator CHEATS!  Same type of tilde activated command entry as Quake or Half-Life or Source.
+     118 synth.c                             // synth.c - Audio Synthesis Engine, creates synthesized audio on the fly from math using zero RAM.
+      93 ray.c                               // ray.c - Raycast System.  This is an exact polygonal casting system for high accuracty separate from the physics engine entirely except for layers.
+      89 ./Shaders/ssr.compute               // ssr.compute - Compute shader for Screen Space Reflections 
+      86 ./Shaders/voxels.compute            // voxels.compute - Compute shader for determining light lists for voxels and updating voxel tables 
+      54 ./Shaders/text_frag.glsl            // text_frag.glsl - Text Fragment shader, supports both SystemShock font with black border around every character and StopD font with 3d drop shadow and top edge highlights
+      47 Citadel_Autosplitter.txt            // Citadel_Autosplitter.txt - This game uses the following sequential struct to store data for speedrunners to access using a utility like LiveSplit or other tool.  HAPPY SPEEDRUNNING!!
+      37 ./Shaders/shadowmap_frag.glsl       // shadowmap_frag.glsl - Shadowmap Fragment Shader, uses alpha cutout on textures for {fence style shadows.  Writes into SSBO via atomicMin on typecast float dist with * 100000 scaling.
+      33 ./Shaders/depth_prepass.glsl        // depth_prepass.glsl: Renders all opaque objects prior to main forward+ pass
+      31 Citadel_Autosplitter.asl            // Citadel_AutoSplitter.asl - AutoSplitter C# LiveSplit instruction file
+      30 ./Shaders/ui_frag.glsl              // ui_frag.glsl: Generic shader for unlit textured UI images (mostly cutouts)
+      18 ./Shaders/chunk_vert.glsl           // chunk_vert.glsl: Generic shader for unlit textured surfaces (all world geometry, items, enemies, doors, etc., without transparency for first pass prior to lighting.
+      17 ./Shaders/depth_prepass_vert.glsl   // chunk.glsl: Generic shader for unlit textured surfaces (all world geometry, items,
+      15 ./Shaders/shadowmap_vert.glsl       // shadowmap_vert.glsl - Shadowmap Vertex shader
+      12 ./Shaders/shadowmaps_clear.compute  // shadowmaps_clear.compute - Compute shader for clearing the distances for shadowmaps in the SSBO to 0xFFFFFFFF
+       6 ./Shaders/ui_vert.glsl              // ui_vert.glsl: Generic shader for unlit textured surfaces (all world geometry, items, enemies, doors, etc., without transparency for first pass prior to lighting.
+       6 ./Shaders/text_vert.glsl            // text_vert.glsl - Text Vertex Shader
+       6 ./Shaders/debugunlit_vert.glsl      // debugunlit_vert.glsl - Wireline Vertex Shader
+       5 ./Shaders/composite_vert.glsl       // imageblit.glsl - Full screen quad unlit textured for presenting image buffers such as results from compute shaders, image effects, post-processing, etc..
+       4 ./Shaders/debugunlit_frag.glsl      // debugunlit_frag.glsl - Wireline Fragment Shader, colored wirelines used for physics wireframe view of colliders, velocity debug vectors, angular velocity debug vector and arc for orientation, raycast debug vector, and weapon lasers 
+
+```
 
 ### Systems:
 
@@ -331,25 +378,6 @@ Binary size eval:
 ❯ size ./voxen
    text     data      bss      dec     hex filename
  909806 34310772 20152784 55373362 34cee32 ./voxen
-```
-
-```
-> ls *.* | grep -vE 'Citadel.dll|README.md|builds.csv|voxen.exe|Citadel.so|voxen.log|build.sh|Citadel.pdb' | xargs wc -l 2>/dev/null | sort -nr | head -n 50
-  8897 total
-  1541 voxen.c
-  1527 winput.c
-  1255 audio.c
-   730 physics.c
-   725 common.h
-   603 text.c
-   554 culling.c
-   409 helpers.c
-   365 models.c
-   292 textures.c
-   270 interop.h
-   253 console.c
-   229 gl.h
-   144 os.h
 ```
 
 Helper bash commands to generate frame sequences in models.txt:

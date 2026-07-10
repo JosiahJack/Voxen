@@ -1,3 +1,4 @@
+// Citadel_AutoSplitter.asl - AutoSplitter C# LiveSplit instruction file
 state("Citadel") {}
 
 init {

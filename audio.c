@@ -1,4 +1,4 @@
-// audio.c - Audio System
+// audio.c - Audio System supporting .mp3 and .wav filetypes only, uses Windows WASAPI and Linux ALSA (uses "default" to work on PulseAudio and PipeWire or just ALSA+dmix systems, with raw ioctl fallback to all ALSA devices if "default" unavailable).  Mixes synthesized sounds as well.
 #include "tables_audio.h"
 #define AUDIO_RATE      48000
 #define AUDIO_CHANNELS  2

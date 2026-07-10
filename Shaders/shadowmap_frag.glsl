@@ -1,4 +1,4 @@
-// Shadowmap Fragment Shader
+// shadowmap_frag.glsl - Shadowmap Fragment Shader, uses alpha cutout on textures for {fence style shadows.  Writes into SSBO via atomicMin on typecast float dist with * 100000 scaling.
 in vec3 FragPos;
 in vec2 TexCoord;
 layout(std430,binding=5) buffer ShadowMaps { uint depthData[]; };

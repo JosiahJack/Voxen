@@ -1,4 +1,4 @@
-// Text shader
+// text_vert.glsl - Text Vertex Shader
 layout(location = 0) in vec3 aPos;
 layout(location = 1) in vec2 aTexCoord;
 const mat4 projection = mat4(2.0/1366.0,0.0,0.0,0.0, 0.0,-2.0/768.0,0.0,0.0, 0.0,0.0,-1.0,0.0, -1.0,1.0,0.0,1.0);

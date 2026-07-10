@@ -1,4 +1,4 @@
-// synth.c - Audio Synthesis Engine
+// synth.c - Audio Synthesis Engine, creates synthesized audio on the fly from math using zero RAM.
 #define MAX_SYNTH_VOICES 16
 typedef struct SynthVoice SynthVoice; typedef float (*SynthFn)(SynthVoice*); struct SynthVoice { SynthFn fn; u32 frame,frames; float vol; V3 pos; bool positional,active; float p[4],s[4]; };
 static SynthVoice syn_ch[MAX_SYNTH_VOICES];

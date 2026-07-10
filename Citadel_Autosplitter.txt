@@ -1,5 +1,4 @@
-This game uses the following sequential struct to store data for speedrunners to access using a utility like LiveSplit or other
-
+// Citadel_Autosplitter.txt - This game uses the following sequential struct to store data for speedrunners to access using a utility like LiveSplit or other tool.  HAPPY SPEEDRUNNING!!
 magicNumber:
 is the handle for finding the struct stored in memory and referencing the bits immediately after.
 
@@ -13,7 +12,6 @@ reload a save game after dying (when ressurection was not active yet for that le
 
 isLoading:
 is a bool to indicate we are loading or not and therefore NOT increment the timer.
-
 
 =====================
 // SPOILERS WARNING //
@@ -39,7 +37,6 @@ The splits are as follows, the value is the resulting ID after the split:
 	14- SHODAN: As soon as SHODAN is defeated.
 	15- END: As soon as stats screen is reached on the credits. (if you click so fast that you go past the stats page, you can right click to go back)
 
-HAPPY SPEEDRUNNING!!
 
 
 The code as it is in mod.h:

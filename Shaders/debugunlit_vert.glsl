@@ -1,4 +1,4 @@
-// debugunlit_vert.glsl
+// debugunlit_vert.glsl - Wireline Vertex Shader
 layout(location=0) in vec3 aPos;
 layout(location=1) in vec4 aColor;
 layout(location=0) uniform mat4 u_ViewProj;

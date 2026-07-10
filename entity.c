@@ -1,3 +1,4 @@
+// entity.c - Entity Definitions and Save Load System for levels and savegames
 #define LINE_LEN_MAX 81920
 Entity EDefs[MAX_ENTITIES];
 V3 EDefscolliderCenter[MAX_ENTITIES]; // Offset relative to .position's global worldspace xyz location

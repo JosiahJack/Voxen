@@ -1,3 +1,4 @@
+// tables_audio.h - Audio filepaths, footstep indirection tables, and synth tables
 const char* sounds[SOUNDS_COUNT] = {
     "./Audio/misc/null.wav",
     "./Audio/ambient/ambient_frogs.wav",

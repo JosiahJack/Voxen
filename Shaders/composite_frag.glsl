@@ -1,4 +1,4 @@
-// composite.glsl - Full screen quad blit with compositing pass to combine rendered view with UI overlay.
+// composite.glsl - Full screen quad blit with compositing pass to combine rendered view with UI overlay.  Includes custom AA, VHS blur (subtle, magic!), SSR application with tapped blur, procedural skybox with stars and saturn and sun and station shield (if on!) that rotate to represent station rotation, berserk hallucinatory effect, screen rolling EMP effect, fog, grayscale for infrared hardware effect.
 in vec2 TexCoord;
 out vec4 FragColor;
 layout(location =  2) uniform uint screenWidth;

@@ -1,9 +1,9 @@
-// Phys Sys
+// physics.c - Physics Engine - full rigidbody 3D with torque for sphere, box, capsule, convex mesh dynamic objects and same set plus arbitrary trisoup mesh colliders for statics.
 #define FRICTION_SLIDE 1.0f // Directly apply tangential torque
 #define FRICTION_ROLL 0.05f
 #define PHY_EPSILON 0.0001f
 #define MAX_SPEED 16.666666f // m/s fastest projectile is railgun given 5.0 impulse with 0.3 mass = 5.0 / 0.3
-#define MAX_STEP_SIZE (0.1f / MAX_SPEED) // 0.01 s
+#define MAX_STEP_SIZE (0.08f / MAX_SPEED) // 0.01 s
 #define MAX_ANGULAR_SPEED 8.0f // Kind of arbitrary, meant to keep things sane
 #define MANIFOLD_MAX 4
 #define MANIFOLD_TIE_MARGIN 0.005f

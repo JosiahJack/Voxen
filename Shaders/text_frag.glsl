@@ -1,4 +1,4 @@
-// Text shader
+// text_frag.glsl - Text Fragment shader, supports both SystemShock font with black border around every character and StopD font with 3d drop shadow and top edge highlights
 in vec2 TexCoord;
 layout(location=0) out vec4 outUI; // GL_COLOR_ATTACHMENT0
 layout(location = 1) uniform sampler2D textTexture;  // GL_R8 SDF atlas
