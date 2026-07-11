@@ -701,8 +701,7 @@ void WeaponsUpdate(void) {
 // 		tempVec.y += random_range(-driftForWeapon[wep16Index],
 // 											  driftForWeapon[wep16Index]);
 // 
-//         if (Raycast(playerCamera.ScreenPointToRay(tempVec),out tempHit,
-// 							fireDistance,Const.a.layerMaskPlayerAttack)) {
+//         if (Raycast(playerCamera.ScreenPointToRay(tempVec),out tempHit,fireDistance,Const.a.layerMaskPlayerAttack)) {
 // 
 // 			tempHM = Utils.GetMainHealthManager(tempHit);
 //             return true;
@@ -1375,13 +1374,8 @@ void WeaponsUpdate(void) {
 // 		a = this;
 // 		a.weaponCurrent = 0; // Current slot in the weapon inventory (7 slots)
 // 		a.weaponIndex = -1; // Current index to the weapon look-up tables
-// 
 // 		// Put energy settings to lowest energy level as default
-// 		for (int j=0;j<7;j++) {
-// 			a.weaponEnergySetting[j] = 0f;
-// 			a.currentMagazineAmount[j] = 0;
-// 			a.currentMagazineAmount2[j] = 0;
-// 		}
+// 		for (int j=0;j<7;j++) { a.weaponEnergySetting[j] = 0f; a.currentMagazineAmount[j] = 0; a.currentMagazineAmount2[j] = 0; }
 // 		weaponCurrentPending = -1;
 // 		weaponIndexPending = -1;
 // 	}
@@ -1809,7 +1803,6 @@ void WeaponsUpdate(void) {
 //         if (Const.a.InputInvertInventoryCycling) wepbutMan.WeaponCycleDown();
 //         else {
 //             if (WeaponFire.a.reloadFinished > World.pauseRelativeTime) return;
-// 
 //             int initialIndex = World.invP1.weaponCurrent;
 //             if (initialIndex < 0) initialIndex = 0;
 //             if (initialIndex > 6) initialIndex = 0;
@@ -1826,54 +1819,32 @@ void WeaponsUpdate(void) {
 //                 if (nextIndex > 6) nextIndex = 0;
 //                 buttonNotValid = (World.invP1.weaponInventoryIndices[nextIndex] == -1);
 //             }
-// 
-//             if (wepButtonsScripts[nextIndex].gameObject.activeSelf
-//                 && nextIndex != initialIndex) {
-//                 World.invP1.WeaponChange(wepButtonsScripts[nextIndex].useableItemIndex, wepButtonsScripts[nextIndex].WepButtonIndex);
-//             }
+//             if (wepButtonsScripts[nextIndex].gameObject.activeSelf && nextIndex != initialIndex) { World.invP1.WeaponChange(wepButtonsScripts[nextIndex].useableItemIndex, wepButtonsScripts[nextIndex].WepButtonIndex); }
 //         }
 //     }
 // }
 
 // void WeaponCycleDown() {
-//     if (MouseLookScript.a.inCyberSpace) {
-//         // There's only two cyberspace weapons, up is down.
+//     if (MouseLookScript.a.inCyberSpace) { // There's only two cyberspace weapons, up is down.
 //         World.invP1.isPulserNotDrill = !World.invP1.isPulserNotDrill;
-//         Utils.PlayUIOneShotSavable(80); // changeweapon
-//         if (World.invP1.isPulserNotDrill) {
-//             World.invP1.pulserButtonText.Select(true);
-//             World.invP1.drillButtonText.Select(false);
-//         } else {
-//             World.invP1.pulserButtonText.Select(false);
-//             World.invP1.drillButtonText.Select(true);
-//         }
+//         Utils.PlayUIOneShotSavable(80); // changeweapon TODO
+//         if (World.invP1.isPulserNotDrill) { World.invP1.pulserButtonText.Select(true); World.invP1.drillButtonText.Select(false); } else { World.invP1.pulserButtonText.Select(false); World.invP1.drillButtonText.Select(true); }
 //     } else {
 //         if (Const.a.InputInvertInventoryCycling) wepbutMan.WeaponCycleUp();
 //         else {
 //             if (WeaponFire.a.reloadFinished > World.pauseRelativeTime) return;
-// 
 //             int initialIndex = World.invP1.weaponCurrent;
 //             if (initialIndex < 0) initialIndex = 0;
 //             if (initialIndex > 6) initialIndex = 0;
 //             int nextIndex = initialIndex - 1; // add 1 to get slot above this
 //             if (nextIndex < 0) nextIndex = 6; // wraparound to top
-//             int countCheck = 0;
-//             bool buttonNotValid = (World.invP1.weaponInventoryIndices[nextIndex] == -1);
+//             int countCheck = 0; bool buttonNotValid = (World.invP1.weaponInventoryIndices[nextIndex] == -1);
 //             while (buttonNotValid) {
-//                 countCheck++;
-//                 if (countCheck > 13) {
-//                     return; // no weapons!  don't runaway loop
-//                 }
-//                 nextIndex--;
-//                 if (nextIndex < 0) nextIndex = 6;
+//                 countCheck++; if (countCheck > 13) return; // no weapons!  don't runaway loop
+//                 nextIndex--; if (nextIndex < 0) nextIndex = 6;
 //                 buttonNotValid = (World.invP1.weaponInventoryIndices[nextIndex] == -1);
 //             }
-// 
-//             if (wepButtonsScripts[nextIndex].gameObject.activeSelf
-//                 && nextIndex != initialIndex) {
-//                 World.invP1.WeaponChange(wepButtonsScripts[nextIndex].useableItemIndex,
-//                                                 wepButtonsScripts[nextIndex].WepButtonIndex);
-//             }
+//             if (wepButtonsScripts[nextIndex].gameObject.activeSelf && nextIndex != initialIndex) { World.invP1.WeaponChange(wepButtonsScripts[nextIndex].useableItemIndex,wepButtonsScripts[nextIndex].WepButtonIndex); }
 //         }
 //     }
 // }
