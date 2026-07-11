@@ -929,28 +929,21 @@ void Targetted(u16 activator, u16 self) {
 }
 //=============================================================================
 // VaporizeButton
-void VaporizeClick(void) { // TODO
-//     World.Sys_UI.mouseClickHeldOverGUI = true;
-//     if (World.invP1.generalInvCurrent == 0) return; // Access Cards index.
-//     int cur = World.invP1.generalInvCurrent;
-//     World.invP1.generalInventoryIndexRef[cur] = -1; // Remove item
-//     World.invP1.generalInvCurrent -= 1;
-//     if (World.invP1.generalInvCurrent < 0) {
-//         World.invP1.generalInvCurrent = 0; // Bound to lowest, but only
-//     } // since it is Access Cards.
-//     cur = World.invP1.generalInvCurrent;
-//     if (World.invP1.generalInventoryIndexRef[cur] < 0) {
-//         for (int i=13; i >= 0; i--) {
-//             if (World.invP1.generalInventoryIndexRef[i] >= 0) { World.invP1.generalInvCurrent = i; break; } // Found last item in inventory.
-//         }
-//     }
-//     cur = World.invP1.generalInvCurrent;
-//     int indexRef = World.invP1.generalInventoryIndexRef[cur];
-//     if (World.invP1.generalInvCurrent == 0) {
-//         if (World.invP1.HasAnyAccessCards()) {
-//             World.Sys_UI.SendInfoToItemTab(indexRef);
-//         } else { World.Sys_UI.SendInfoToItemTab(-1); PtrExit(); } // If no access cards, reset item tab to show nothing.
-//     } else { GeneralInvButton genbut = World.invP1.genButtons[cur].GetComponent<GeneralInvButton>(); World.Sys_UI.SendInfoToItemTab(indexRef,genbut.customIndex); }
+void VaporizeClick(void) {
+    World.Sys_UI.mouseClickHeldOverGUI = true;
+    if (World.invP1.generalInvCurrent == 0) return; // Access Cards index — not vaporizable
+    int cur = World.invP1.generalInvCurrent;
+    World.invP1.generalInventoryIndexRef[cur] = -1; // Remove item
+    World.invP1.generalInvCurrent -= 1;
+    if (World.invP1.generalInvCurrent < 0) { World.invP1.generalInvCurrent = 0;/*Bound to lowest, but only since it is Access Cards.*/ }
+    cur = World.invP1.generalInvCurrent;
+    // If the new current slot is empty, walk backwards to find the last occupied slot.
+    if (World.invP1.generalInventoryIndexRef[cur] < 0) {
+        for (int i = 13; i >= 0; i--) {
+            if (World.invP1.generalInventoryIndexRef[i] >= 0) { World.invP1.generalInvCurrent = (i8)i; break; }
+        }
+    }
+    play_wav(sounds[89], SfxVol(), (V3){0.0f,0.0f,0.0f}, false); // vaporize sfx, Engine reads hardwareInvCurrent + generalInventoryIndexRef[] to redraw the item tab. We don't have SendInfoToItemTab here; the renderer polls generalInvCurrent on its own.
 }
 // AmmoIconManager
 #define AMMO_ICON_NONE    -1
@@ -1219,12 +1212,12 @@ void GrenadeOnCollision(u16 self) { (void)self; /*if (World.instances[self].iofl
 // ProjectileEffectImpact
 // TODO: GetDamageTakeAmount(DamageData* dd) — weapon/armor calculation system
 // TODO: TakeDamage(u16 target, DamageData* dd) -> float — health manager
-// TODO: Tranquilize(u16 target, float amount, bool fromProjectile) -> float
 // TODO: ApplyImpactForceSphere — needs OverlapSphere from physics, engine-side
 // TODO: ApplyImpactForce(u16 target, float vel, V3 normal, V3 pt)
 // TODO: SpawnImpactEffect(u16 impactType, V3 pos) — object pool
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
+float Tranquilize(u16 i, float amount, bool energy);
 static void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 hitNormal) {
     Entity* e   = &World.instances[self];
     if (hitIdx == e->recentMostActivator) return; // hit own host, ignore
@@ -1242,17 +1235,13 @@ static void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 
         }
         // TODO: float dmgFinal = TakeDamage(hitIdx, &dd)
         float dmgFinal  = 0.0f; // placeholder until TakeDamage implemented
-//         float tranq     = -1.0f;
+        float tranq = -1.0f;
         if (dd.isOtherNPC) {
             if (!(hit->entflags & EF_ASLEEP)) World.Sys_Music.inCombat = true;
-            if (dd.attackType == Att_Trnq) {
-//                 float stunAmount = vclamp(3.0f + (World.invP1.stungunSetting
-//                                           / 100.0f) * 7.0f, 3.0f, 10.0f);
-                // TODO: tranq = Tranquilize(hitIdx, stunAmount, true)
-            }
+            if (dd.attackType == Att_Trnq) { float stunAmount = vclamp(3.0f + (World.invP1.stungunSetting / 100.0f) * 7.0f, 3.0f, 10.0f); tranq = Tranquilize(hitIdx,stunAmount,true); }
         }
         if (dmgFinal < 0.0f) dmgFinal = 0.0f;
-        // TODO: CreateTargetIDInstance(dmgFinal, hitIdx, tranq)
+        (void)tranq; // TODO: CreateTargetIDInstance(dmgFinal, hitIdx, tranq)
         // TODO: SpawnImpactEffect(e->lookUpIndex, hitPos)
     }
 
@@ -1264,17 +1253,9 @@ static void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 
 }
 #pragma GCC diagnostic pop
 
-void ProjectileEffectImpactInitAfterLoad(u16 self) {
-    Entity* e       = &World.instances[self];
-    e->counter      = 0;
-    if (e->countToTrigger < 1) e->countToTrigger = 1;
-}
-//=============================================================================
+void ProjectileEffectImpactInitAfterLoad(u16 self) { Entity* e = &World.instances[self]; e->counter = 0; if (e->countToTrigger < 1) {e->countToTrigger = 1;} }
 // HealthManager
-
-// Attack type damage multiplier table [NPCType][AttType]
-// 1.0f = no change, 0.0f = immune, other = multiplier
-static const float attackTypeMult[7][12] = {
+static const float attackTypeMult[7][12] = { // Attack type damage multiplier table [NPCType][AttType], 1.0f = no change, 0.0f = immune, other = multiplier
     // None  Melee  MelEn  EnBm   Mag    Proj   Needle ProjEB ProjLn Gas    Tranq  Drill
     [NPCType_Mutant]      = {1,1,1,1,0,  1,2,1,1,2,1,1},
     [NPCType_Supermutant] = {1,1,1,1,0,  1,1,1,1,1.5,1,1},
@@ -1282,48 +1263,20 @@ static const float attackTypeMult[7][12] = {
     [NPCType_Cyborg]      = {1,1,1,1,2,  1,1,1,1,1,1,1},
     [NPCType_Supercyborg] = {1,1,1,1,2,  1,0,1,1,0,1,1},
     [NPCType_MutantCyborg]= {1,1,1,1,0.5,1,2,1,1,2,1.5,1},
-    [NPCType_Cyber]       = {1,1,1,1,1,  1,1,1,1,1,1,0},
-};
-
-// Object death sound table indexed by constIndex
-static const i16 objectDeathSound[] = {
+    [NPCType_Cyber]       = {1,1,1,1,1,  1,1,1,1,1,1,0},};
+static const i16 objectDeathSound[] = { // Object death sound table indexed by constIndex
     [458]=63,[459]=66,[460]=66,
     [464]=62,[465]=532,[466]=532,[467]=532,[468]=532,[469]=532,[470]=532,[471]=532,
     [472]=62,[473]=62,[474]=62,[475]=62,[476]=62,
     [477]=61,[478]=65,[479]=69,
-    [525]=68,[526]=68,
-};
-
-static bool IsCyberEntity(u16 self) {
-    if (World.curLev == LEVEL_CYBERSPACE) return true;
-    Entity* e = &World.instances[self];
-    if (self != PLAYER1 && e->cyberHealth > 0.0f) return true;
-    return (IdxIsNPC(e->index) && (e->index - 419) > 23); // 24-28 are cyber enemies
-}
-
-static float ApplyAttTypeAdjustments(u16 self,float take,AttType at) {
-    Entity* e = &World.instances[self];
-    if (!IdxIsNPC(e->index) || e->health <= 0.0f) return take;
-    NPCType t = npcTable[e->index - 419].type;
-    if (at >= 12) return take;
-    return take * attackTypeMult[t][at];
-}
-
-static void UseDeathTargets(u16 self) {
-    if (self == PLAYER1 || self == PLAYER2) return;
-    Entity* e = &World.instances[self];
-    if (!sEmpty(e->target)) UseTargets(self,e->target);
-}
-
+    [525]=68,[526]=68,};
+static bool IsCyberEntity(u16 self) { if (World.curLev == LEVEL_CYBERSPACE) {return true;} Entity* e = &World.instances[self]; if (self != PLAYER1 && e->cyberHealth > 0.0f) {return true;} return (IdxIsNPC(e->index) && (e->index - 419) > 23); } // 24-28 are cyber enemies
+static float ApplyAttTypeAdjustments(u16 self,float take,AttType at) { Entity* e = &World.instances[self]; if (!IdxIsNPC(e->index) || e->health <= 0.0f) {return take;} NPCType t = npcTable[e->index - 419].type; if (at >= 12) {return take;} return take * attackTypeMult[t][at]; }
+static void UseDeathTargets(u16 self) { if(self == PLAYER1){return;} if (!sEmpty(World.instances[self].target)){UseTargets(self,World.instances[self].target);} }
 static void TeleportAway(u16 self) { 
     if (World.instances[self].entflags & EF_TELEPORT_ON_DEATH) {return;}
     flag_set(&World.instances[self].entflags,EF_TELEPORT_ON_DEATH,true);
-    World.collider[self] = COLTYPE_NONE;
-    World.gravity[self] = 0.0f;
-    World.velocity[self] = (V3){0,0,0};
-    World.angularVelocity[self] = (V3){0,0,0};
-    World.instances[self].modelIndex = U16_MAX;
-    /*TODO: activate teleport effect particle instance at self position*/
+    World.collider[self] = COLTYPE_NONE; World.gravity[self] = 0.0f; World.velocity[self] = World.angularVelocity[self] = (V3){0,0,0}; World.instances[self].modelIndex = U16_MAX; /*TODO: activate teleport effect particle instance at self position*/
 }
 
 static void DropSearchables(u16 self) {

@@ -867,7 +867,7 @@
 
 		if (World.diffCyb > 1) {
 			if (rbody.velocity.magnitude < walkAcceleration * 0.05f) {
-				tempVec = MouseCursor.a.GetCursorScreenPointForRay();
+				tempVec = ScreenPointToRay();
 				tempVec = MouseLookScript.a.playerCamera.ScreenPointToRay(tempVec).direction;
 				rbody.AddForce(tempVec * walkAcceleration*0.05f * Time.deltaTime); // turbo doesn't affect detrimental forces :)
 			}
