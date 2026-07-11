@@ -245,7 +245,6 @@ void DrawAngularVelocity(u16 i) {
 #include "audio.c" // Audio Sys
 #include "ray.c" // Raycast Sys
 // Game Specific Code
-void WeaponsUpdate();
 void UseTargets(u16 activator, const char* targetname);
 void Targetted(u16 activator, u16 self);
 void ButtonSwitchTargetted(u16 self, u16 activator);
@@ -257,9 +256,7 @@ void DoorForceOpen(u16 self);
 void DoorForceClose(u16 self);
 void TriggerTargetted(u16 self, u16 activator);
 void TriggerCounterTargetted(u16 self, u16 activator);
-void FuncWallTargetted(u16 self, u16 activator);
 void ButtonSwitchInitAfterLoad(u16 self);
-void DoorInitAfterLoad(u16 self);
 void FuncWallInitAfterLoad(u16 self);
 void ForceBridgeInitBeforeLoad(u16 self);
 void ForceBridgeInitAfterLoad(u16 self);
@@ -289,9 +286,7 @@ void CyberTimerUpdate(u16 self);
 void GeneralInvApply(int buttonIdx, int customIdx);
 bool InventoryAddSoftwareItem(u16 p, u16 type, int vers);
 int Get16WeaponIndexFromConstIndex(int index);
-void UseGrenade(u16 playerIndex, int index);
 bool AICheckPain(u16);
-void AddItemToInventory(u16 p, int index, int customIndex);
 void TextureSequenceUpdate(u16 self);
 u16 AddInstance(u16 entIdx, V3 pos);
 void DeleteInstance(u16 i);
@@ -300,10 +295,8 @@ u16 GetImpactType(u16 instanceIdx);
 const char* GetPrefabNameFromIndex(int constIndex);
 void TakeEnergy(float drain);
 void GiveEnergy(float give, EnergyType type);
-void BioMonitorInit();
-void BioMonitorUpdate(u16 p);
-#include "citadel.c"
 #include "entity.c"
+#include "citadel.c"
 #include "weapons.c"
 #include "automap.c"
 #include "biomonitor.c" // End game specific code includes
@@ -1018,7 +1011,72 @@ __attribute__((cold)) void NewGame() { // Reset World States
     currentMenuItem = currentMenuTab = 0; currentMenuPage = Mpg_FrontPage;
     World.current_time = World.pauseRelativeTime = World.last_physics_time = World.pauseRelativeTime = World.last_physics_time=0.0; World.deltaTime=0.0166666666f;
     mset(World.instances,0,3 * sizeof(Entity)); // Blank out player entities
-    PlayerInit(PLAYER1); PlayerInit(PLAYER2); World.cam_yaw = 90.0f; World.cam_pitch = 0.0f; World.cam_roll = 0.0f; World.inventoryMode = Sys_Settings.NoShootMode;
+    World.instances[PLAYER1].index = 767;
+    World.layer[PLAYER1] = L_Player;
+    World.position[PLAYER1] = (V3){10.52f,-43.792f + 0.84f,20.2908f}; // Start Actual: Puts player on Medical Level in actual game start position.  Added 0.84f
+    World.scale[PLAYER1] = (V3){1.0f,1.0f,1.0f};
+    World.rotation[PLAYER1] = (Quaternion){0.0f,0.7071f,0.0f,0.7071f}; // 90deg rotation CW about Y axis as viewed from the top looking down onto player
+    World.instances[PLAYER1].entflags = EF_ACTIVE|EF_RIGIDBODY;
+    World.collider[PLAYER1] = COLTYPE_CAP;
+    World.colliderCenter[PLAYER1].y = -0.84f;
+    World.colliderSize[PLAYER1] = (V3){0.48f,2.0f,1.0f}; // Radius, Overall height including end radii (Unity convention, blech), Direction, 1.0 == Y-Axis
+    World.mass[PLAYER1] = 1.0f;
+    World.velocity[PLAYER1] = (V3){0.0f,0.0f,0.0f};
+    World.cam_yaw = 90.0f; World.cam_pitch = World.cam_roll = 0.0f;
+    World.gravity[PLAYER1] = 1.0f;
+    World.dynamicFriction[PLAYER1] = 0.6f; World.staticFriction[PLAYER1] = 0.8f;
+    World.instances[PLAYER1].health = 200.0f;
+    World.instances[PLAYER1].noiseFinished = World.pauseRelativeTime;
+    World.invP1.hardwareInvReferenceIndex[0]  = 21; // Hardcoded lookup indices into the Const main table.
+    World.invP1.hardwareInvReferenceIndex[1]  = 22;
+    World.invP1.hardwareInvReferenceIndex[2]  = 23;
+    World.invP1.hardwareInvReferenceIndex[3]  = 24;
+    World.invP1.hardwareInvReferenceIndex[4]  = 25;
+    World.invP1.hardwareInvReferenceIndex[5]  = 26;
+    World.invP1.hardwareInvReferenceIndex[6]  = 27;
+    World.invP1.hardwareInvReferenceIndex[7]  = 28;
+    World.invP1.hardwareInvReferenceIndex[8]  = 29;
+    World.invP1.hardwareInvReferenceIndex[9]  = 30;
+    World.invP1.hardwareInvReferenceIndex[10] = 31;
+    World.invP1.hardwareInvReferenceIndex[11] = 32;
+    World.invP1.hardwareInvReferenceIndex[12] =  0;
+    World.invP1.hardwareInvReferenceIndex[13] =  0;
+    World.invP1.generalInventoryIndexRef[0] = 81;
+    for (int i=1;i<HW_COUNT;i++) World.invP1.generalInventoryIndexRef[i] = -1; // Skips 0th index on purpose as it always holds access cards "item".
+    for (int i=0;i<HW_COUNT;++i) World.invP1.hardwareVersion[i] = World.invP1.hardwareVersionSetting[i] = 0;
+    World.invP1.nitroTimeSetting = NITRO_DEFAULT_TIME;
+    World.invP1.earthShakerTimeSetting = EARTH_SHAKER_DEFAULT_TIME;
+    World.invP1.lastAddedIndex = World.invP1.currentCyberItem = World.invP1.globalLookupIndex = -1;
+    World.invP1.hasNewEmail = World.invP1.hasNewNotes = true;
+    World.invP1.isPulserNotDrill = true;
+    for (int i=0;i<7;++i) World.invP1.weaponInventoryIndices[i] = World.invP1.weaponInventoryAmmoIndices[i] = -1;
+    World.invP1.sparqSetting = 50.0f;
+    World.invP1.ionSetting = 100.0f;
+    World.invP1.blasterSetting = 15.0f;
+    World.invP1.plasmaSetting = 40.0f;
+    World.invP1.stungunSetting = 20.0f;
+    World.invP1.justFired = (World.pauseRelativeTime - 31.0); // Set >30s before pauseRelativeTime to not immediately play action music.
+    World.invP1.energyDrainTickFinished = World.pauseRelativeTime + 0.1 + (double)random_range(0.5f, 1.0f);
+    World.invP1.energy = 54.0f;
+    World.invP1.maxEnergy = 255.0f;
+    World.invP1.resetAfterDeathTime = 0.5;
+    World.invP1.painSoundFinished = World.invP1.radSoundFinished = World.invP1.radFXFinished = World.pauseRelativeTime;
+    World.Sys_UI.lastMultiMediaTabOpened = MULTI_MEDIA_TAB_EMAIL_TABLE;
+    World.Sys_UI.logFinished = World.pauseRelativeTime;
+    World.Sys_UI.tickFinished = World.Sys_UI.centerTabsTickFinished = World.current_time + 0.1 + (double)random_range(0.0f,1.0f);
+    World.Sys_UI.blinkFinished = 1.0 + World.pauseRelativeTime;
+    World.Sys_UI.beepFinished = 3.0 + World.pauseRelativeTime;
+    World.invP1.mediFinishedTime   = -1.0;
+    World.invP1.reflexFinishedTime = -1.0;
+    World.invP1.sightFinishedTime  = -1.0;
+    World.invP1.berserkIncrement   = 0;
+    World.invP1.patchActive        = 0;
+    World.invP1.staminupActive     = false;
+    World.timeScale    = DEFAULT_TIME_SCALE;
+    World.geniusActive = false;
+    // TODO: sightLight disabled, sightDimming disabled — engine reads patchActive & PATCH_SIGHT + sightFinishedTime
+    // TODO: BerserkFX disabled — engine reads patchActive & PATCH_BERSERK + berserkIncrement
+    World.cam_yaw = 90.0f; World.cam_pitch = 0.0f; World.cam_roll = 0.0f; World.inventoryMode = Sys_Settings.NoShootMode;
     World.gameFinished = World.creditsActive = World.decoyActive = false; World.damageDealt = World.damageReceived = 0.0f;
     World.ressurections = World.deaths = World.kills = World.cyberkills = 0u; World.shotsFired = World.grenadesThrown = World.savesScummed = 0U; World.creditsPageIndex = 0u;
     for (int i=0;i<14;++i) World.levelSecurity[i] = 100u;

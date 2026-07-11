@@ -46,12 +46,12 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define VRT_ATT_SZ 16
 #define CPU_VRT_SZ 32
 #define DOUBLE_CLICK_TIME 0.5f
-#define PLAYER_MAX_WALK_SPEED 3.6f
-#define PLAYER_MAX_SPRINT_SPEED 8.8f
+#define WALK_SPEED 3.6f
+#define SPRINT_SPEED 8.8f
 #define PLAYER_MAX_CYBER_SPEED 5.0f
 #define PLAYER_MAX_CYBER_ULTIMATE_SPEED 12.0f
-#define PLAYER_MAX_SPRINT_SPEED_FATIGUED 5.5f
-#define PLAYER_MAX_CROUCH_SPEED 1.25f
+#define SPRINT_SPEED_FATIGUED 5.5f
+#define CROUCH_SPEED 1.25f
 #define PLAYER_MAX_PRONE_SPEED 0.5f
 #define PLAYER_BOOSTER_SPEED_BOOST 1.2f
 #define PLAYER_CROUCH_RATIO 0.6f
@@ -273,6 +273,7 @@ typedef u8 ButtonType;       static const u8 ButtonType_Generic=0,ButtonType_Gen
 typedef u8 TabMSG;           static const u8 TabMSG_None=0,TabMSG_Search=1,TabMSG_AudioLog=2,TabMSG_Keypad=3,TabMSG_Elevator=4,TabMSG_GridPuzzle=5,TabMSG_WirePuzzle=6,TabMSG_EReader=7,TabMSG_Weapon=8,TabMSG_SystemAnalyzer=9;
 typedef u8 PuzzleCellType;   static const u8 PuzzleCellType_Off=0,PuzzleCellType_Standard=1,PuzzleCellType_And=2,PuzzleCellType_Bypass=3;
 typedef u8 PuzzleGridType;   static const u8 PuzzleGridType_King=0,PuzzleGridType_Queen=1,PuzzleGridType_Knight=2,PuzzleGridType_Rook=3,PuzzleGridType_Bishop=4,PuzzleGridType_Pawn=5;
+enum { DOOR_CLIP_IDLE_CLOSED = 0, DOOR_CLIP_OPENING = 1, DOOR_CLIP_IDLE_OPEN = 2, DOOR_CLIP_CLOSING = 3 };
 typedef struct {V3 ctr,hExt; Quaternion rot;} ShapeBox; typedef struct {V3 ctr; float rad;} ShapeSphere; typedef struct {V3 tip,base; float rad;} ShapeCapsule;
 static const u32 L_Default          = 1U;
 static const u32 L_TransparentFX    = 2U;
@@ -795,4 +796,3 @@ INLINE void UIExitCyberspace() { CenterStatusPrint("%s",Sys_Text.stringTable[601
 INLINE void HealthManagerHealingBed(u16 playerIdx, float amount, bool flashBed) { (void)flashBed; Entity* p = &World.instances[playerIdx]; p->health = vmin(255.0f,p->health + amount); }
 INLINE void PlayerTakeDamage(u16 playerIdx, float damage) { Entity* p = &World.instances[playerIdx]; p->health -= damage; if (p->health < 0.0f) p->health = 0.0f; }
 INLINE float SfxVol() { return (float)Sys_Settings.VolumeEffects / 100.0f; }
-INLINE InventorySystem* Inv(u16 p) { return p == PLAYER1 ? &World.invP1 : &World.invP2; }

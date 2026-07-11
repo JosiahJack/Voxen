@@ -269,25 +269,24 @@ int Get16WeaponIndexFromConstIndex(int index) {
 // 	}
 // 
 
-void CheckAttackInput(u16 p) {
-    InventorySystem* inv = Inv(p);
+void CheckAttackInput() {
     // Check for other things that must capture and override clicks
     if (Attack()) {
         DualLog("Mouse clicked!\n");
-        if (World.Sys_UI.vmailActive) { World.Sys_UI.vmailActive = false; inv->waitTilNextFire = World.pauseRelativeTime + 0.8; return; }
+        if (World.Sys_UI.vmailActive) { World.Sys_UI.vmailActive = false; World.invP1.waitTilNextFire = World.pauseRelativeTime + 0.8; return; }
         if (World.curLev == LEVEL_CYBERSPACE) { /*FireCyberWeapon();*/ return; }
 
-        if (inv->holdingObject && !World.mouseClickHeldOverGUI) { // !Just clicked
+        if (World.invP1.holdingObject && !World.mouseClickHeldOverGUI) { // !Just clicked
             if (!World.uiIsBlocking) { DropHeldItem(); return; }
 
-            AddItemToInventory(p,inv->heldObjectIndex,inv->heldObjectCustomIndex); ResetHeldItem(); return;
+            AddItemToInventory(World.invP1.heldObjectIndex,World.invP1.heldObjectCustomIndex); ResetHeldItem(); return;
         }
     }
 
-    int wepdex = Get16WeaponIndexFromConstIndex(inv->weaponIndex);
+    int wepdex = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex);
     if (wepdex == -1) return; // No weapon.
     //if (World.uiIsBlocking) return;
-    if (inv->holdingObject) return;
+    if (World.invP1.holdingObject) return;
     if (World.mouseClickHeldOverGUI) return;
 
     //StartNormalAttack(wepdex);
@@ -300,7 +299,7 @@ void WeaponsUpdate(void) {
 //     UpdateWeaponReloadDip();
 //     RotateViewWeapon();
 //     Recoiling();
-//     CheckAttackInput(PLAYER1);
+//     CheckAttackInput();
 //     CheckReloadInput();
 //     CheckAmmoChangeInput();
 }

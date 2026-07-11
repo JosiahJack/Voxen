@@ -815,7 +815,60 @@ void ModEDefsInitAfterLoad(void) { // Global conditions for all entities.  No se
     /*766 unused*/
     /*767 player*/
 }
+// Lights
+i32 AddLight(Light* lit, LightAnimation* lanim) {
+    i32 i = World.loadedLights; World.loadedLights++; World.levelLoadedLights[World.currentLevel]++;
+    if (World.loadedLights >= LIGHT_COUNT) { DualLogError("Too many lights %u added in level %d!\n",i,World.curLev); OS_Exit(1); }
+    mcpy(&World.lights[i],lit,sizeof(Light)); mcpy(&World.lanims[i],lanim,sizeof(LightAnimation));
+    World.lightsNewPosition[i] = lit->pos; flag_set(&World.lights[i].lflags,LDIRTY,true);
+    return i;
+}
 
+bool alreadyReadLightOnOnce[LIGHT_COUNT] = {0};
+void LoadFieldIntoLight(char* k, char* v, char* il, u32 ln, Light* lit, LightAnimation* lam, u16 lIdx) {
+    char* br = StringFindFirstCharWithin(k,'[');
+    if (br) {
+        int i = parse_numberu32(br + 1,il,ln);
+        if (i >= 0 && i < 32) { if(k[12] == 's'){lam->intervalSteps[i] = parse_float(v,il,ln);}else{lam->stepIsLerping[i] = parse_float(v,il,ln);} } /*"intervalSteps[" index 12 is 's', "intervalStepisLerping[" index 12 is 'i'*/
+        return;
+    }
+    static const struct { const char* key; u16 offset; u8 type; } map[] = {
+        {"currentStep",    __builtin_offsetof(LightAnimation,currentStep),1},{"lerpValue",      __builtin_offsetof(LightAnimation,lerpValue),0},{"intervalSteps.Length",__builtin_offsetof(LightAnimation,numIntervalSteps),1},{"intervalStepisLerping.Length",__builtin_offsetof(LightAnimation, numLerpSteps),1},
+        {"localPosition.x",__builtin_offsetof(Light,pos.x),0},               {"localPosition.y",__builtin_offsetof(Light,pos.y),0},             {"localPosition.z",     __builtin_offsetof(Light,pos.z),0},                    {"localRotation.x",             __builtin_offsetof(Light,spotDir.x),0},
+        {"localRotation.y",__builtin_offsetof(Light,spotDir.y),0},           {"localRotation.z",__builtin_offsetof(Light,spotDir.z),0},         {"localRotation.w",     __builtin_offsetof(Light,spotDir.w),0},                {"range",                       __builtin_offsetof(Light,range),0},
+        {"spotAngle",      __builtin_offsetof(Light,spotAng),0},             {"minIntensity",   __builtin_offsetof(Light,minIntensity),0},      {"maxIntensity",        __builtin_offsetof(Light,maxIntensity),0},             {"color.r",__builtin_offsetof(Light,col.r),0},{"color.g",__builtin_offsetof(Light,col.g),0},{"color.b",__builtin_offsetof(Light,col.b),0}
+    };
+    for (int i = 0; i < (int)(sizeof(map)/sizeof(map[0])); i++) {
+        if (sEqual(k, map[i].key)) { // Types: 0 = float, 1 = u8.  Check key prefix to decide if pointing at 'lit' or 'lam'
+            void* dest = (k[0] == 'l' && k[1] == 'o') ? (void*)lit : (void*)lam;
+            if (k[0] == 'r' || k[0] == 's' || k[0] == 'm' || k[0] == 'c') {
+                if (k[1] != 'u') dest = (void*)lit; // range, spot, max, color (not currentStep)
+            }
+            char* ptr = (char*)dest + map[i].offset;
+            if (map[i].type == 0) *(float*)ptr = parse_float(v,il,ln);
+            else                  *(u8*)ptr = parse_numberu8(v,il,ln);
+            return;
+        }
+    }
+    if (sEqual(k,"intensity")) lit->intensity = lit->maxIntensity = parse_float(v,il,ln) * 0.35f;
+    else if (sEqual(k,"type")) flag_set(&lit->lflags, (v[0] == 'S') ? LSPOT : LDIR, true);
+    else if (sEqual(k,"lightOn") && !alreadyReadLightOnOnce[lIdx]) { alreadyReadLightOnOnce[lIdx] = true; flag_set(&lit->lflags,LIGHTON,parse_bool(v,il,ln)); }
+    else if (sEqual(k,"lerpOn")) flag_set(&lit->lflags,LERPON,parse_bool(v,il,ln));
+}
+
+#define INFRARED_RANGE 50.35f
+#define LANTERN_RANGE 11.52f
+Color3 lantCol = (Color3){1.0f,1.0f,1.0f};
+u16 headmountedLanternLight;
+V3 lanternPos;
+float lanternVersionBrightness[3] = {0.875f,1.4f,1.75f};
+#define CHGD(a,b) (vabs((a) - (b)) > 0.0001f)
+void UpdateLight(u16 i, V3 pos, Color3 col, float range, float intensity, float max, float min, float spotAng, Quaternion spotDir, bool on, bool shad) {
+    bool changed = ((!!(World.lights[i].lflags & SHADON) - shad) || (!!(World.lights[i].lflags & LIGHTON) -  on) || CHGD(World.lights[i].range,range) || CHGD(World.lights[i].pos.x,pos.x) || CHGD(World.lights[i].pos.y,pos.y) || CHGD(World.lights[i].pos.z,pos.z));
+    World.lights[i].intensity=intensity; World.lights[i].minIntensity=min; World.lights[i].maxIntensity=max; World.lights[i].spotAng=spotAng; World.lights[i].spotDir=spotDir; World.lights[i].col=col; World.lights[i].pos=World.lightsNewPosition[i]=pos; World.lights[i].range=range;
+    flag_set(&World.lights[i].lflags,19,(World.lights[i].lflags&LDIRTY)|changed<<4|on|shad<<1);
+}
+#undef CHGD
 // Level Loading and Entity Management System
 void InitializeEntity(Entity* e) { mset(e,0,sizeof(Entity)); u16 idx=(u16)(e - World.instances); e->index=U16_MAX; e->entflags=EF_ACTIVE; e->kinematic=true; World.layer[idx]=L_Default; e->camView=255; e->tickTime = 0.35f; World.angularDrag[idx] = 0.05f; e->modelIndex=e->lodIndex=e->colMeshIndex=MAX_MDLS; e->texIndex=e->glowIndex=e->specIndex=e->normIndex = MAX_TXRS; World.scale[idx].x=World.scale[idx].y=World.scale[idx].z=World.mass[idx]=e->volume=World.rotation[idx].w=1.0f; World.dynamicFriction[idx] = World.staticFriction[idx] = 0.6f; }
 void InitializeAIAfterLoad(u16 i);
@@ -1109,18 +1162,18 @@ void LoadLevelMod(u8 lev) {
     headmountedLanternLight = AddLight(&hl, &lam);
 }
 #undef KEY_EQ
-
+void func_forcebridge(u16 self); void CyberWallInitAfterLoad(u16 self);
+static float DoorClamp01(float v) { if (v < 0.0f) return 0.0f; if (v > 1.0f) return 1.0f; return v; }
+static AnimationClip DoorGetClip(const Entity* e, u8 clip) { return modelAnimationClips[e->animationNum][clip]; }
+static void DoorSetClipFrame(u16 self, u8 clip, u16 frame) { ChangeAnim(&World.instances[self],clip); (void)frame; }
+static u16 DoorFrameFromProgress(AnimationClip c, float t) { if(c.frameEnd <= c.frameStart){return c.frameStart;} u16 span = c.frameEnd - c.frameStart; return (u16)(c.frameStart + (u16)(DoorClamp01(t) * (float)span)); }
 void LoadLevelData(u8 curlevel) {
     World.curLev = curlevel;
     SetLevelPointers(curlevel); // Ensures writing to correct current level
-    mset(World.instances + 3, 0, (INSTANCE_COUNT - 3) * sizeof(Entity)); // Clear previous level slots. Claimed slots are fully initialized by AddInstance().
+    mset(World.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Clear previous level slots. Claimed slots are fully initialized by AddInstance().
     World.instCount = 3; // 0 == NULL, 1 == Player1, 2 == Player2
-    mset(World.lights, 0, LIGHT_COUNT * sizeof(Light));
-    mset(World.lanims, 0, LIGHT_COUNT * sizeof(LightAnimation));
-    World.loadedLights = 0;
-    mset(alreadyReadLightOnOnce, 0, sizeof(alreadyReadLightOnOnce));
-    mset(camViews, 0, 64 * sizeof(CamView));
-    camViewCount = 0;
+    mset(World.lights,0,LIGHT_COUNT * sizeof(Light)); mset(World.lanims,0,LIGHT_COUNT * sizeof(LightAnimation)); World.loadedLights=0; mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
+    mset(camViews,0,64 * sizeof(CamView)); camViewCount=0;
     char filename[20]; // Minimum size for 0 through 13.
     sFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel);
     FHandle fh; int fsize; void* fbuf = OS_OpenAndAllocateFileBufferReadonly(filename, &fh, &fsize); if (!fbuf) { OS_Exit(1); }
@@ -1131,21 +1184,64 @@ void LoadLevelData(u8 curlevel) {
     for (int i = 0; i < World.loadedLights; ++i) World.lightsNewPosition[i] = World.lights[i].pos;
     for (int i = PLAYER1; i < World.instCount; ++i) {
         i32 cellIdx = PosGetCellCoords(World.position[i].x, World.position[i].z);
-        World.instances[i].cellIndex = cellIdx; 
-        World.instances[i].cellX = PosGetCellCoordX(World.position[i].x);
-        World.instances[i].cellZ = PosGetCellCoordZ(World.position[i].z);
+        World.instances[i].cellIndex = cellIdx; World.instances[i].cellX = PosGetCellCoordX(World.position[i].x); World.instances[i].cellZ = PosGetCellCoordZ(World.position[i].z);
         World.radius[i] = modelBounds[World.instances[i].modelIndex] * vmax(vmax(World.scale[i].x, World.scale[i].y), World.scale[i].z);
         World.instances[i].shadRadius = World.radius[i] * 1.41f;
         ComputeConvexMeshInertiaTensor(i);
         if (World.mass[i] < 0.001f && World.collider[i] != COLTYPE_NONE && World.collider[i] != COLTYPE_MSH && (World.instances[i].entflags & EF_RIGIDBODY)) { World.mass[i]=0.2f;/*At least something!*/ }
     }
-    ModInitAfterLoad();
-    World.levelLoadedLights[curlevel] = World.loadedLights;
-    mcpy(levelCamViews[curlevel], camViews, 64 * sizeof(CamView));
-    mcpy(levelCamViewTextures[curlevel], camViewTextures, 64 * sizeof(u32));
-    levelCamViewCount[curlevel] = camViewCount;
-    World.levelInstCount[curlevel] = World.instCount;
-    World.levelCurrentlyLoading = false;
+    for (int i=PLAYER1;i<World.instCount;++i) {
+        u16 constIndex = World.instances[i].index;
+        if (i == PLAYER1 || i == PLAYER2 || IdxIsDynamicObject(constIndex) || (IdxIsNPC(constIndex) && constIndex < 443/*not cyber*/)) World.gravity[i] = 1.0f;
+        else World.gravity[i] = 0.0f;
+        if (IdxIsGeometry(constIndex)) World.layer[i] = L_Geometry;
+        else if (IdxIsDoor(constIndex)) World.layer[i] = L_Door;
+        else if (IdxIsUsableObject(constIndex)) {
+            if (World.diffPuz == 3 && World.instances[i].index == 361 && random_range(0.0f,1.0f) < 0.33f) DeleteInstance(i); // 33% chance of not spawning logic probes on Puzzle difficulty of 3
+            if (World.diffMis <= 1 && IdxIsAccessCard(World.instances[i].index)) DeleteInstance(i); // Remove access cards on Mission difficulty 1 or 0
+            if (World.diffMis == 0 && World.instances[i].index == 313) DeleteInstance(i); // Remove audiologs on Mission difficulty 0
+        } else if (IdxIsDoor(World.instances[i].index)) {
+            if (World.instances[i].startOpen) World.instances[i].stayOpen = true;
+            if (World.instances[i].useTimeDelay <= 0.0f) World.instances[i].useTimeDelay = 0.15f;
+            if (World.instances[i].lockedMessageLingdex <= 0) World.instances[i].lockedMessageLingdex = 3;
+            if (World.instances[i].SFXIndex < 0) World.instances[i].SFXIndex = 75;
+            if (World.instances[i].doorOpen > DoorState_Opening) World.instances[i].doorOpen = World.instances[i].startOpen ? DoorState_Open : DoorState_Closed;
+            World.instances[i].doorState = World.instances[i].doorOpen;
+            if (World.instances[i].ajar) {
+                AnimationClip c = DoorGetClip(&World.instances[i],DOOR_CLIP_OPENING);
+                DoorSetClipFrame(i,DOOR_CLIP_OPENING,DoorFrameFromProgress(c,World.instances[i].ajarPercentage));
+                World.instances[i].doorOpen = World.instances[i].doorState = DoorState_Opening;
+                return;
+            }
+            switch (World.instances[i].doorOpen) {
+                case DoorState_Open:    DoorSetClipFrame(i,DOOR_CLIP_IDLE_OPEN,DoorGetClip(&World.instances[i],DOOR_CLIP_IDLE_OPEN).frameStart); break;
+                case DoorState_Opening: DoorSetClipFrame(i,DOOR_CLIP_OPENING,DoorFrameFromProgress(DoorGetClip(&World.instances[i],DOOR_CLIP_OPENING),0.0f/*TODO percent of anim*/)); break;
+                case DoorState_Closing: DoorSetClipFrame(i,DOOR_CLIP_CLOSING,DoorFrameFromProgress(DoorGetClip(&World.instances[i],DOOR_CLIP_CLOSING),0.0f/*TODO percent of anim*/)); break;
+                default:                DoorSetClipFrame(i,DOOR_CLIP_IDLE_CLOSED,DoorGetClip(&World.instances[i],DOOR_CLIP_IDLE_CLOSED).frameStart); break;
+            }
+        } else if (IdxIsNPC(constIndex)) { World.layer[i] = L_NPC; /* TODO AIInit funcion */ }
+        else if (IdxIsSearchable(constIndex)) {
+            if (World.instances[i].generateContents) {
+                int numRandomGeneratedItems = 0;
+                for(int j=0;j<4;j++) {
+                    if (World.instances[i].randomItemDropChance[j] <= 0.0f) continue;
+                    u8 tempInt = random_range_u8(0,100);
+                    if (((float)tempInt / 100.0f) <= World.instances[i].randomItemDropChance[j]) { World.instances[i].contents[numRandomGeneratedItems] = World.instances[i].randomItem[j]; numRandomGeneratedItems++; if (numRandomGeneratedItems > World.instances[i].maxRandomItems) {break;} }
+                }
+            }
+        } else if (constIndex == 515) func_forcebridge(i); // func_forcebridge
+        else if (constIndex == 517) FuncWallInitAfterLoad(i);
+        else if (constIndex == 596) GravityLiftInitAfterLoad(i);
+        else if (constIndex == 701) LogicTimerInitBeforeLoad(i);
+        else if (constIndex == 556) TeleportTouchInitAfterLoad(i); // prop_cyberport
+        else if (constIndex == 555) { } // prop_cyber_switch CyberSwitchInitAfterLoad(i);
+        else if (constIndex == 21 || constIndex == 22) CyberWallInitAfterLoad(i); // chunk_cyberpanel or chunk_cyberpanel_slice45
+        else if (IdxIsButtonSwitch(World.instances[i].index)) ButtonSwitchInitAfterLoad(i);
+        else if (constIndex >= 448 && constIndex <= 457) CyberItemInitBeforeLoad(i);
+        else if (constIndex == 480) CyberMineInitBeforeLoad(i);
+        if (!sEmpty(World.instances[i].targetname) && (World.instances[i].ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE)) flag_set(&World.instances[i].entflags,EF_ACTIVE,false);
+    }
+    World.levelLoadedLights[curlevel] = World.loadedLights; mcpy(levelCamViews[curlevel],camViews,64 * sizeof(CamView)); mcpy(levelCamViewTextures[curlevel],camViewTextures,64 * sizeof(u32)); levelCamViewCount[curlevel] = camViewCount; World.levelInstCount[curlevel] = World.instCount; World.levelCurrentlyLoading = false; // Coppy the counts over
 }
 
 void RenderLoading(i32 offset, const char * restrict text);
