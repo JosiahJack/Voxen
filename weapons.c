@@ -208,6 +208,7 @@ float DamageForPower(int wep16) {
     return ((setting/100.0f)*((dmgMax/enerMax)-(dmgMin/enerMin)) + 3.0f) * ((setting/100.0f)*(enerMax-enerMin) + enerMin);
 }
 
+float TakeDamage(u16 self,DamageData dd);
 void HitScanFire(int wep16) {
     DamageData dd = {0};
     dd.hitIdx = wfx.tempHitEnt;

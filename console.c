@@ -41,7 +41,7 @@ void cmd_kill() { World.instances[PLAYER1].health = World.instances[PLAYER1].cyb
 void cmd_undo() { if (Cheats.editMode) { CenterStatusPrint("Last spawned object removed"); } else { CenterStatusPrint("Cannot undo when not in Edit Mode"); } } // TODO actually track and despawn last
 void ScreenShake(float force, double duration) { World.shakeFinished = World.pauseRelativeTime + duration; float shakeForce = (force < 0.48f) ? force : 0.48f; (void)shakeForce; } // TODO actually shake
 void Shake(float force) { float forc = (force <= 0.0f) ? 1.0f : force; ScreenShake(forc,1.0); }// The whole station is a shakin' and a movin'!
-void cmd_shake() { Shake(-1); CenterStatusPrint("SHAKIN LIKE A LEAF!"); }
+void cmd_shake() { Shake(-1.0f); CenterStatusPrint("SHAKIN LIKE A LEAF!"); }
 void cmd_edit() { Cheats.editMode = !Cheats.editMode; if (Cheats.editMode) { Cheats.noclip=Cheats.notarget=true; CenterStatusPrint("edit mode: %s","Edit Mode activated!"); } else { Cheats.noclip=Cheats.notarget=false; CenterStatusPrint("%s","Edit Mode deactivated"); } }
 int ParseLevelArg(const char* arg) {
     if (!arg || !*arg) return -1;
@@ -56,13 +56,13 @@ int ParseLevelArg(const char* arg) {
     return -1; // Invalid
 }
 
-u8 queuedLevelToLoad = 255u;
-void LoadLevel(u8 curlevel);
+u8 queuedLevelToLoad = 255u; V3 queuedLevelPos;
+void LoadLevel(u8 curlevel, V3 pos);
 static void cmd_loadlevel(const char* arg) {
     if (World.menuActive) { CenterStatusPrint("%s", Sys_Text.stringTable[1015]); return; } // "Cannot load levels via cheat while on the main menu!"
     int level = ParseLevelArg(arg); if (level == -2) return; // Already printed g3 message
     if (level < 0 || level > 12) { CenterStatusPrint("cmd_loadlevel invalid level argument %u",level); return; }
-    CenterStatusPrint("Loading level %u",level); queuedLevelToLoad = level; LoadLevel(level); SetPosition(PLAYER1,ressurectionLocations[level > 9 ? 6 : level],true); (void)cyberSpaceEntryLocations;
+    CenterStatusPrint("Loading level %u",level); queuedLevelToLoad = level; queuedLevelPos = ressurectionLocations[level > 9 ? 6 : level]; LoadLevel(level,queuedLevelPos); (void)cyberSpaceEntryLocations; // TODO: Handle level 13 entry based on currentLevel
 }
 
 static void cmd_loadarsenal(const char* arg) { int level = ParseLevelArg(arg); if (level >= 0 && level < World.numLevels) { EnableCheatArsenal(level); } }

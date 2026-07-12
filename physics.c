@@ -1,4 +1,4 @@
-// physics.c - Physics Engine - full rigidbody 3D with torque for sphere, box, capsule, convex mesh dynamic objects and same set plus arbitrary trisoup mesh colliders for statics.
+// physics.c - The Jack Physics Engine, By W. Josiah Jack MIT-0 -- full rigidbody 3D with torque for sphere, box, capsule, convex mesh dynamic objects and same set plus arbitrary trisoup mesh colliders for statics.
 #define FRICTION_SLIDE 1.0f // Directly apply tangential torque
 #define FRICTION_ROLL 0.05f
 #define PHY_EPSILON 0.0001f

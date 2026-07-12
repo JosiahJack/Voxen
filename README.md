@@ -96,28 +96,28 @@ Exit with zero cleanup, let the OS handle it; does immediate fastest exit as use
 
 ```
 ❯ ls *.* ./Shaders/*.glsl ./Shaders/*.compute | grep -vE 'README.md|builds.csv|voxen.exe|voxen.log|build.sh|Citadel.pdb' | xargs perl -MList::Util=max -lne '$first{$ARGV} //= $_; $count{$ARGV} = $.; if(eof){$total += $.; $. = 0;} END { $max = max map {length} keys %first; printf "99999999 %7d total\n", $total; printf "%8d %-${max}s  %s\n", $count{$_}, $_, $first{$_} for keys %first }' 2>/dev/null | sort -nr | head -n 51 | sed 's/^99999999 //'
-  18352 total
-    3472 citadel.c                           // citadel.c - Gamelogic.  Most functionality is trivial so put it here.
-    1880 weapons.c                           // weapons.c - Weapon System
-    1316 entity.c                            // entity.c - Entity Definitions and Save Load System for levels and savegames
-    1145 winput.c                            // winput.c - Windowing and Input System interfacing with the OS.
-    1077 voxen.c                             // voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake.  Main translation unit.  Core renderer.  OS Shim Layer.
-    1004 ai.c                                // ai.c - AI logic control for NPC's enemies in the game.
+  15503 total
+    2152 citadel.c                           // citadel.c - Gamelogic.  Most functionality is trivial so put it here.
+    1367 entity.c                            // entity.c - Entity Definitions and Save Load System for levels and savegames
+    1224 voxen.c                             // voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake.  Main translation unit.  Core renderer.  OS Shim Layer.
+    1143 winput.c                            // winput.c - Windowing and Input System interfacing with the OS.
      932 tables_audio.h                      // tables_audio.h - Audio filepaths, footstep indirection tables, and synth tables
-     874 audio.c                             // audio.c - Audio System supporting .mp3 and .wav filetypes only, uses Windows WASAPI and Linux ALSA (uses "default" to work on PulseAudio and PipeWire or just ALSA+dmix systems, with raw ioctl fallback to all ALSA devices if "default" unavailable).  Mixes synthesized sounds as well.
-     864 physics.c                           // physics.c - Physics Engine - full rigidbody 3D with torque for sphere, box, capsule, convex mesh dynamic objects and same set plus arbitrary trisoup mesh colliders for statics.
-     797 common.h                            // common.h - Shared items between engine and gamecode (e.g. enums)
+     911 ai.c                                // ai.c - AI logic control for NPC's enemies in the game.
+     870 audio.c                             // audio.c - Audio System supporting .mp3 and .wav filetypes only, uses Windows WASAPI and Linux ALSA (uses "default" to work on PulseAudio and PipeWire or just ALSA+dmix systems, with raw ioctl fallback to all ALSA devices if "default" unavailable).  Mixes synthesized sounds as well.
+     794 common.h                            // common.h - Shared items between engine and gamecode (e.g. enums)
+     588 physics.c                           // physics.c - The Jack Physics Engine, By W. Josiah Jack MIT-0 -- full rigidbody 3D with torque for sphere, box, capsule, convex mesh dynamic objects and same set plus arbitrary trisoup mesh colliders for statics.
      585 automap.c                           // automap.c - Automap System
+     537 weapons.c                           // weapons.c - Weapon System
      528 ./Shaders/composite_frag.glsl       // composite.glsl - Full screen quad blit with compositing pass to combine rendered view with UI overlay.  Includes custom AA, VHS blur (subtle, magic!), SSR application with tapped blur, procedural skybox with stars and saturn and sun and station shield (if on!) that rotate to represent station rotation, berserk hallucinatory effect, screen rolling EMP effect, fog, grayscale for infrared hardware effect.
-     524 models.c                            // models.c - 3D Models Loading System
+     523 models.c                            // models.c - 3D Models Loading System
      440 textures.c                          // textures.c - 2D Texture Loading System
      387 credits.h                           // credits.h - Credits for Citadel: The System Shock Fan Remake, salt the fries!
      380 stbtt.h                             // stb_truetype.h - v1.26 - public domain
      319 ./Shaders/chunk_frag.glsl           // chunk_frag.glsl: Generic shader for all world objects
-     315 biomonitor.c                        // biomonotor.c - Biomonitor Graph and Text displays.
+     313 biomonitor.c                        // biomonotor.c - Biomonitor Graph and Text displays.
      306 culling.c                           // culling.c - XZ 2D World Grid Cell Culling System 64x64 matching System Shock 1.
      183 lib.c                               // lib.c - LibC replacement functions and other misc helpers.
-     166 text.c                              // text.c - Text and Font Rendering/Loading System
+     163 text.c                              // text.c - Text and Font Rendering/Loading System
      151 console.c                           // console.c - Console Emulator CHEATS!  Same type of tilde activated command entry as Quake or Half-Life or Source.
      118 synth.c                             // synth.c - Audio Synthesis Engine, creates synthesized audio on the fly from math using zero RAM.
       93 ray.c                               // ray.c - Raycast System.  This is an exact polygonal casting system for high accuracty separate from the physics engine entirely except for layers.
@@ -138,7 +138,6 @@ Exit with zero cleanup, let the OS handle it; does immediate fastest exit as use
        6 ./Shaders/debugunlit_vert.glsl      // debugunlit_vert.glsl - Wireline Vertex Shader
        5 ./Shaders/composite_vert.glsl       // imageblit.glsl - Full screen quad unlit textured for presenting image buffers such as results from compute shaders, image effects, post-processing, etc..
        4 ./Shaders/debugunlit_frag.glsl      // debugunlit_frag.glsl - Wireline Fragment Shader, colored wirelines used for physics wireframe view of colliders, velocity debug vectors, angular velocity debug vector and arc for orientation, raycast debug vector, and weapon lasers 
-
 ```
 
 ### Systems:

@@ -1013,7 +1013,6 @@ __attribute__((cold)) void NewGame() { // Reset World States
     mset(World.instances,0,3 * sizeof(Entity)); // Blank out player entities
     World.instances[PLAYER1].index = 767;
     World.layer[PLAYER1] = L_Player;
-    World.position[PLAYER1] = (V3){10.52f,-43.792f + 0.84f,20.2908f}; // Start Actual: Puts player on Medical Level in actual game start position.  Added 0.84f
     World.scale[PLAYER1] = (V3){1.0f,1.0f,1.0f};
     World.rotation[PLAYER1] = (Quaternion){0.0f,0.7071f,0.0f,0.7071f}; // 90deg rotation CW about Y axis as viewed from the top looking down onto player
     World.instances[PLAYER1].entflags = EF_ACTIVE|EF_RIGIDBODY;
@@ -1085,7 +1084,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     Sys_Input.lastUse = Sys_Input.isCapsLockOn = false; // As far as we're concerned, don't worry about OS capslock actual state.
     for (u8 lev = 1; lev < World.numLevels; ++lev) CopyPlayerState(0,lev);
     LoadAllLevels();
-    LoadLevel(World.startLevel); // Must be after entities!  Fast pointer swap to startLevel.
+    LoadLevel(World.startLevel,(V3){10.52f,-43.792f + 0.84f,20.2908f}); // Must be after entities!  Fast pointer swap to startLevel. Start Actual: Puts player on Medical Level in actual game start position.
     World.lev1SecCode = random_range_u8(0u,9u); World.lev2SecCode = random_range_u8(0u,9u);
     World.lev3SecCode = random_range_u8(0u,9u); World.lev4SecCode = random_range_u8(0u,9u);
     World.lev5SecCode = random_range_u8(0u,9u); World.lev6SecCode = random_range_u8(0u,9u); // Must do rand's repeatedly to prevent these all being the same number.
@@ -1193,7 +1192,7 @@ void InitalizeEnvironment() {
 i32 main() {
     InitalizeEnvironment();
     while(1) {
-        if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad); queuedLevelToLoad = 255u; continue; }
+        if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad,queuedLevelPos); queuedLevelToLoad = 255u; continue; }
         double curtime = get_time(); World.deltaTime=World.current_time < 0.001f ? 0.000f : vmax(curtime - World.current_time,0.0); World.absoluteTime+=World.deltaTime; World.current_time=curtime;
         if (!World.paused && !World.menuActive) {
             if (World.pauseRelativeTime < 0.001f) World.pauseRelativeTime = World.last_physics_time = curtime;

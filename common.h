@@ -332,7 +332,7 @@ typedef struct {
         i32 lastMultiMediaTabOpened,applyButtonReferenceIndex,curCenterTab,wep16index,tempSpriteIndex,count;
         u16 linkedElevatorDoor,tetheredPGP,tetheredPWP,tetheredSearchable,tetheredKeypadElevator,tetheredKeypadKeycode,elevButtonSpawnIdx[8];
         u8 highlightTickCount[4],beepCount,elevButtonLevelIdx[8],elevCurrentFloor;
-        bool lastWeaponSideRH,lastItemSideRH,lastAutomapSideRH,lastTargetSideRH,lastDataSideRH,lastSearchSideRH,lastLogSideRH,lastLogSecondarySideRH,lastMinigameSideRH,logActive,paperLogInUse,usingObject,isBlocking,isRH,centerTabNotified[4],highlightStatus[4],audPaused,mouseClickHeldOverGUI,buttonsEnabled[8],buttonsDarkened[8],vmailActive;;
+        bool lastWeaponSideRH,lastItemSideRH,lastAutomapSideRH,lastTargetSideRH,lastDataSideRH,lastSearchSideRH,lastLogSideRH,lastLogSecondarySideRH,lastMinigameSideRH,logActive,paperLogInUse,usingObject,isBlocking,isRH,centerTabNotified[4],highlightStatus[4],audPaused,mouseClickHeldOverGUI,buttonsEnabled[8],buttonsDarkened[8],vmailActive;
         AudioLogType logType;
         V3 objectInUsePos;
 } SystemUI;
@@ -406,8 +406,8 @@ TextSystem Sys_Text;
 // Hw referenceIndex,ref14Index::Sys 21,0 Nav 22,1 Ere 23,2 Sen 24,3 Trg 25,4 Shi 26,5 Bio 27,6 Lan 28,7 Env 29,8 Boo 30,9 Jum 31,10 Nig 32,11
 typedef struct {
     double nitroTimeSetting,earthShakerTimeSetting,justFired,waitTilNextFire,reloadFinished,lerpStartTime,dropFinished,playerHealthTimer,berserkFinishedTime,berserkIncrementFinishedTime,detoxFinishedTime,geniusFinishedTime,mediFinishedTime,reflexFinishedTime,sightFinishedTime,
-           sightSideEffectFinishedTime,staminupFinishedTime,turboCyberTime,turboFinished,energyDrainTickFinished,painSoundFinished,radSoundFinished,radFXFinished;
-    float weaponEnergySetting[16],reloadLerpValue,sparqSetting,ionSetting,blasterSetting,plasmaSetting,stungunSetting,energySliderClickedTime,cyberWeaponAttackFinished,targetY,currentEnergyWeaponHeat[7],fatigue,radiated,resetAfterDeathTime,energy,maxEnergy,radAdjust,initialRadiation;
+           sightSideEffectFinishedTime,staminupFinishedTime,turboCyberTime,turboFinished,energyDrainTickFinished,painSoundFinished,radSoundFinished,radFXFinished,weaponDipFinished;
+    float weaponEnergySetting[16],reloadLerpValue,sparqSetting,ionSetting,blasterSetting,plasmaSetting,stungunSetting,energySliderClickedTime,cyberWeaponAttackFinished,targetY,currentEnergyWeaponHeat[7],fatigue,radiated,resetAfterDeathTime,energy,maxEnergy,radAdjust,initialRadiation,weaponDipLerp;
     u32 accessCardOwned,wepAmmo[16],wepAmmoSecondary[16];
     i32 lastAddedIndex,emailCurrent,emailIndex,globalLookupIndex,weaponInventoryIndices[7],weaponInventoryAmmoIndices[7],hardwareInvCurrent,/*Current slot in the general inventory (14 slots).*/hardwareInvIndex,/*Current index to the item look-up table.*/generalInventoryIndexRef[14],berserkIncrement;
     i16 ladderState,weaponCurrentPending,weaponIndexPending,weaponCurrent;
@@ -503,7 +503,7 @@ typedef /*FAT*/ struct  {
     i16 version,SFXIndex,SFXLockedIndex,textIndex,emailIndex,ammo,ammo2;
     bool searchableInUse,generateContents,dontReset,onlyOnce,ignoreSecondaryTriggers,allDone,currentTexture,useRandomTimes,active,touchEnabled,broken,stayOpen,startOpen,ajar,blocked,targetAlreadyDone,toggleLasers,targettingOnlyUnlocks,changeLayerOnOpenClose,despawnInstead,doSelfAfterList,
          destroyAfterListInsteadOfDeactivate,iceActive,forceFieldDirectionX,forceFieldDirectionY,forceFieldDirectionZ,heldObjectLoadedAlternate,changeTexOnActive,blinkTexOnActive,alternateOn,lerping,onlyTargetOnce,autoPlayEmail,inCyberTube,noiseFinished,textureAnimating,textureGlowAnimating,
-         textureAnimationStopsAtDead,texAnimInReverse,texAnimRandom;
+         textureAnimationStopsAtDead,texAnimInReverse,texAnimRandom,automapHidden,grenadeExplodeContact,grenadeUseTimer,grenadeUseProx;
     u8 maxRandomItems; // [0 4]
     AttType attackType;
     AccessCardType requiredAccessCard;
@@ -529,6 +529,7 @@ typedef struct {
     i32 fogFac,cursorPosition_x,cursorPosition_y; // Separate internal cursor from system cursor.  This gets relatively pushed around by real cursor movement to give consistent platform behavior.
     V3 debugLine_start,debugLine_end,cyberspaceRecallPoint;
     u8 levelSecurity[14],startLevel,numLevels,curLev,diffCbt,diffPuz,diffMis,diffCyb,creditsPageIndex;
+    u8 levelCameraCount[14],levelSmallNodeCount[14],levelLargeNodeCount[14],levelCameraDestroyedCount[14],levelSmallNodeDestroyedCount[14],levelLargeNodeDestroyedCount[14];
     int lev1SecCode,lev2SecCode,lev3SecCode,lev4SecCode,lev5SecCode,lev6SecCode;
     u8 currentLevel; // Which level's per-level arrays the pointers (instances, position, etc.) currently point to.  Usually equals curLev, but diverges briefly during cross-level target I/O.
     bool inventoryMode,levelCurrentlyLoading,introNotPlayed,paused,menuActive,gameFinished,creditsActive,decoyActive,boosterActive,uiIsBlocking,mouseClickHeldOverGUI,geniusActive;
@@ -759,7 +760,6 @@ INLINE void SetLevelPointers(u8 lev) {
 }
 // CopyPlayerState: Copies the player-entity slot — including the Entity struct and all parallel SoA arrays — from srcLevel to dstLevel.  Used by LoadLevel() to carry
 // the player's state (position, health, ioflags, inventory-derived flags, etc.) across level switches so the player doesn't "reset" to the NewGame state when entering a new level.
-// Note: slot 0 (WORLD/NULL) is per-level static geometry and is NOT copied.
 INLINE void CopyPlayerState(u8 srcLevel, u8 dstLevel) {
     if (srcLevel >= MAX_LEVELS || dstLevel >= MAX_LEVELS || srcLevel == dstLevel) return;
     u16 s = PLAYER1;
