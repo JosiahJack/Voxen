@@ -681,11 +681,8 @@ pthread_t audThreadID; void* AudThread(void* arg);
 void* AudThread(void* arg) { (void)arg; while (1) { AudioUpdate(); OS_USleep(1000); } return NULL; }
 // Looping Ambients SFX System
 #define MAXAMB 256
-static u16 ambs = 0;
-typedef struct { wav_channel_t sound; u32 loaded; float length_sec; } AmbientSlot;
-typedef struct { u16 index; const char* filename; } AmbientDef;
-u16 ambReg[MAXAMB]; // For ambient_ type entities that play looped sound
-static AmbientSlot ambientSlots[MAXAMB] = {0};
+typedef struct { wav_channel_t sound; u32 loaded; float length_sec; } AmbientSlot; typedef struct { u16 index; const char* filename; } AmbientDef;
+u16 ambReg[MAXAMB]; static AmbientSlot ambientSlots[MAXAMB] = {0}; static u16 ambs=0;
 static const AmbientDef ambientSounds[MAXAMB] = {
     {621,"airhiss.wav"},        {622,"clicker.wav"},  {623,"compressor.wav"},    {624,"dishwasher.wav"},{625,"drip_amb.wav"},{626,"fan1.wav"},         {627,"generator_gas.wav"},   {628,"gurgle.wav"},    {629,"icemaker.wav"},       {630,"intake.wav"},            {631,"lathe.wav"},        {632,"lev3loop1.wav"},    {633,"lev3loop2.wav"},
     {634,"lev3loop3.wav"},      {635,"lev3loop4.wav"},{636,"liquid_bubble.wav"}, {637,"lava2.wav"},     {638,"rain.wav"},    {639,"machgear_loop.wav"},{640,"machine_ambience.wav"},{641,"machine_go.wav"},{642,"machine_humamb7.wav"},{643,"machine_humlonoise.wav"},{644,"machine_loop1.wav"},{645,"machine_loop2.wav"},{646,"machinea1.wav"},
@@ -822,25 +819,14 @@ void PlayTrack(TrackType ttype, MusicType mtype) {
             else if (ttype == TrackType_Elevator)   play_mp3(levelMusicElevator[World.curLev],0);
             else if (ttype == TrackType_Distortion) play_mp3(levelMusicDistortion[World.curLev],0);
         } else play_mp3(levelMusicLooped[World.curLev],0);
-        
         return;
-    }
-    
-
-    // Normal Dynamic Music System
+    } // Normal Dynamic Music System
     if (mtype == MusicType_Override) mp3_clear();
     play_mp3(GetCorrespondingLevelClip(ttype),BUFFER_MS);
     if (!World.Sys_Music.elevator) World.Sys_Music.levelEntry = false; // already used by GetCorresponding... just now
 }
 
-void MusicNotifyZone(TrackType tt) {
-    World.Sys_Music.inZone = true;
-    switch(tt) {
-        case TrackType_Elevator: World.Sys_Music.elevator = true; break;
-        case TrackType_Distortion: World.Sys_Music.distortion = true; break;
-    }
-}
-
+void MusicNotifyZone(TrackType tt) { World.Sys_Music.inZone=true; World.Sys_Music.elevator=(tt == TrackType_Elevator); World.Sys_Music.distortion=(tt == TrackType_Distortion); }
 void MusicTriggerEnter(u16 self, u16 other) {
     if (World.instances[self].tickFinished < World.pauseRelativeTime) { // Prevent flickering retrigger when player slides along glancing angle of trigger volume.
         if (other == PLAYER1) { PlayTrack(World.instances[self].trackType,World.instances[self].musicType); MusicNotifyZone(World.instances[self].trackType); }        

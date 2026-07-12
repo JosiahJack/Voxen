@@ -171,8 +171,7 @@ void DrawVelocityVector(u16 i) {
 }
 
 void DrawBoxCollider(u16 i) {
-    Color col = ColliderColor(i); ShapeBox b = Entity_GetBox(i); V3 ax,ay,az,c[8],px,py,pz; obb_axes(b.rot,&ax,&ay,&az);
-    px=V3_ScaleByF(ax,b.hExt.x); py=V3_ScaleByF(ay,b.hExt.y); pz=V3_ScaleByF(az,b.hExt.z);
+    Color col = ColliderColor(i); ShapeBox b = Entity_GetBox(i); V3 ax,ay,az,c[8],px,py,pz; obb_axes(b.rot,&ax,&ay,&az); px=V3_ScaleByF(ax,b.hExt.x); py=V3_ScaleByF(ay,b.hExt.y); pz=V3_ScaleByF(az,b.hExt.z);
     for (int s=0;s<8;s++) { float sx=(s&1)?1.f:-1.f,sy=(s&2)?1.f:-1.f,sz=(s&4)?1.f:-1.f; c[s]=V3_AplusB(b.ctr,V3_AplusB(V3_AplusB(V3_ScaleByF(px,sx),V3_ScaleByF(py,sy)),V3_ScaleByF(pz,sz))); }
     AddWireLine(c[0],c[1],col); AddWireLine(c[2],c[3],col); AddWireLine(c[4],c[5],col); AddWireLine(c[6],c[7],col); AddWireLine(c[0],c[2],col); AddWireLine(c[1],c[3],col); AddWireLine(c[4],c[6],col); AddWireLine(c[5],c[7],col); AddWireLine(c[0],c[4],col); AddWireLine(c[1],c[5],col); AddWireLine(c[2],c[6],col); AddWireLine(c[3],c[7],col);
     DrawVelocityVector(i);
@@ -182,18 +181,13 @@ void DrawSphereWireframe(Color col, ShapeSphere s) { float step=6.28318530f/12; 
 void DrawSphereCollider(u16 i) { Color col = ColliderColor(i); ShapeSphere s = Entity_GetSph(i); DrawSphereWireframe(col,s); DrawVelocityVector(i); }
 void DrawSphereContact(V3 pos, float rad) { if (Cheats.showPhys) {Color col = (Color){0.0f,0.0f,1.0f,1.0f}; ShapeSphere s = (ShapeSphere){pos,rad}; DrawSphereWireframe(col,s);} }
 void DrawMeshCollider(u16 i) {
-    Color col = ColliderColor(i); u16 mi= (World.collider[i] == COLTYPE_CVX) ? World.instances[i].colMeshIndex : World.instances[i].modelIndex; if (mi >= MAX_MDLS || mi >= mdlsCnt) return;
-    u32 triCount=modelTriangleCounts[mi]; if (!triCount) return;
-    float M[16]; mcpy(M,&modelMatrices[i*16],64);
-    float m00=M[0],m10=M[1],m20=M[2],m01=M[4],m11=M[5],m21=M[6],m02=M[8],m12=M[9],m22=M[10],tx=M[12],ty=M[13],tz=M[14];
-    for (u32 j=0;j<triCount;j++) {
-        u32 bA=(u32)modelTriangles[mi][j*3+0]*CPU_VRT_SZ,bB=(u32)modelTriangles[mi][j*3+1]*CPU_VRT_SZ,bC=(u32)modelTriangles[mi][j*3+2]*CPU_VRT_SZ;
-        #define LV(b) (V3){*(float*)(modelVertices[mi]+(b)+0),*(float*)(modelVertices[mi]+(b)+4),*(float*)(modelVertices[mi]+(b)+8)}
-        #define XFORM(v) (V3){m00*(v).x+m01*(v).y+m02*(v).z+tx,m10*(v).x+m11*(v).y+m12*(v).z+ty,m20*(v).x+m21*(v).y+m22*(v).z+tz}
-        V3 wA=XFORM(LV(bA)),wB=XFORM(LV(bB)),wC=XFORM(LV(bC));
-        #undef LV
-        #undef XFORM
-        AddWireLine(wA,wB,col); AddWireLine(wB,wC,col); AddWireLine(wC,wA,col);
+    Color col = ColliderColor(i); u16 mi = (World.collider[i] == COLTYPE_CVX) ? World.instances[i].colMeshIndex : World.instances[i].modelIndex; if (mi >= MAX_MDLS || mi >= mdlsCnt) return;
+    u32 triCount = modelTriangleCounts[mi]; if (!triCount) return;
+    float M[16]; mcpy(M, &modelMatrices[i*16], 64); float m00=M[0],m10=M[1],m20=M[2],m01=M[4],m11=M[5],m21=M[6],m02=M[8],m12=M[9],m22=M[10],tx=M[12],ty=M[13],tz=M[14];
+    for (u32 j=0; j<triCount; j++) {
+        V3 w[3];
+        for (int k=0; k<3; k++) { float *v = (float*)(modelVertices[mi] + (u32)modelTriangles[mi][j*3+k] * CPU_VRT_SZ); w[k] = (V3){m00*v[0]+m01*v[1]+m02*v[2]+tx, m10*v[0]+m11*v[1]+m12*v[2]+ty, m20*v[0]+m21*v[1]+m22*v[2]+tz}; }
+        AddWireLine(w[0],w[1],col); AddWireLine(w[1],w[2],col); AddWireLine(w[2],w[0],col);
     }
     DrawVelocityVector(i);
 }
@@ -219,20 +213,14 @@ void DrawCapsuleCollider(u16 i) {
 }
 
 void DrawAngularVelocity(u16 i) {
-    if (!Cheats.showPhys) return;
-    if (!(World.instances[i].entflags & EF_RIGIDBODY)) return;
-    u16 idx = i;
-    if (V3_Mag(World.angularVelocity[idx]) < 0.0001f) return; // skip near-zero
-    Color purple = (Color){0.5f,0.0f,1.0f,1.0f};
-    float scale = 0.35f;
-    V3 dir = V3_Normalize(World.angularVelocity[idx]); V3 tip = V3_AplusB(World.position[idx], V3_ScaleByF(World.angularVelocity[idx], scale));
-    AddWireLine(World.position[idx], tip, purple); // Arrow (line vector)
-    V3 ref = (vabs(dir.y) < 0.9f) ? (V3){0,1,0} : (V3){1,0,0}; V3 perp = V3_Normalize(V3_Cross(dir,ref)); V3 perp2 = V3_Cross(dir,perp);
+    if (!(World.instances[i].entflags & EF_RIGIDBODY) || V3_Mag(World.angularVelocity[i]) < 0.0001f) return; // skip near-zero
+    Color purple = (Color){0.5f,0.0f,1.0f,1.0f}; V3 dir=V3_Normalize(World.angularVelocity[i]); V3 tip=V3_AplusB(World.position[i],V3_ScaleByF(World.angularVelocity[i],0.35f)); AddWireLine(World.position[i],tip,purple); // Arrow (line vector)
+    V3 ref=(vabs(dir.y) < 0.9f) ? (V3){0,1,0} : (V3){1,0,0}; V3 perp=V3_Normalize(V3_Cross(dir,ref)); V3 perp2 = V3_Cross(dir,perp);
     AddWireLine(V3_AplusB(tip,V3_ScaleByF(perp, 0.05f)),V3_AplusB(tip,V3_ScaleByF(perp, -0.05f)), purple); // Small cross at tip so zero-length vectors are still visible
     AddWireLine(V3_AplusB(tip,V3_ScaleByF(perp2,0.05f)),V3_AplusB(tip,V3_ScaleByF(perp2,-0.05f)), purple);
     float rad=0.6f; /*Quarter circle arc (visualizes rotation plane + sense)*/ float step = 1.57079632679f / 8.0f; /*quarter circle divided into 8 segments*/
-    V3 axis=dir; V3 p1=V3_Normalize(V3_Cross(axis,ref)); V3 p2=V3_Cross(axis,p1); V3 prev = V3_AplusB(World.position[idx], V3_ScaleByF(p1,rad)); // Find two vectors perpendicular to angular axis
-    for (int j=1;j<=8;++j) { float a = j * step; float c = vcosf(a); float s = vsinf(a); V3 cur = V3_AplusB(World.position[idx],V3_AplusB(V3_ScaleByF(p1,c * rad),V3_ScaleByF(p2,s * rad))); AddWireLine(prev,cur,purple); prev = cur; }
+    V3 axis=dir; V3 p1=V3_Normalize(V3_Cross(axis,ref)); V3 p2=V3_Cross(axis,p1); V3 prev = V3_AplusB(World.position[i], V3_ScaleByF(p1,rad)); // Find two vectors perpendicular to angular axis
+    for (int j=1;j<=8;++j) { float a = j * step; float c = vcosf(a); float s = vsinf(a); V3 cur = V3_AplusB(World.position[i],V3_AplusB(V3_ScaleByF(p1,c * rad),V3_ScaleByF(p2,s * rad))); AddWireLine(prev,cur,purple); prev = cur; }
 }
 
 #include "textures.c" // 2D Texture Load System
@@ -298,7 +286,6 @@ void GiveEnergy(float give, EnergyType type);
 #include "entity.c"
 #include "citadel.c"
 #include "weapons.c"
-#include "automap.c"
 #include "biomonitor.c" // End game specific code includes
 #include "ai.c"
 // Credits Sys
@@ -795,21 +782,19 @@ float GetPainStatic() { return 0.0f; } // TODO: Hook into pain/health management
 Color GetPainStaticColor() { return (Color){1.0f,0.0f,0.0f,1.0f}; } // TODO: Hook staticColor up to red or blue for pain or shield impact.
 __attribute__((pure)) i32 dsort(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (db > da) - (db < da); }
 __attribute__((pure)) i32 dsortInv(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (da > db) - (da < db); }
-#define MAX_VISIBLE 4096
-#define DRAW_ENTITY(curN,curT,curG,curS,curM) { \
-        u16 glow=e->glowIndex,norm=e->normIndex,spec=e->specIndex; \
-        if (Cheats.showPhys) {if (World.collider[i] == COLTYPE_BOX) {DrawBoxCollider(i);} else if (World.collider[i] == COLTYPE_SPH) {DrawSphereCollider(i);} else if (World.collider[i] == COLTYPE_CVX) {DrawMeshCollider(i);} else if (World.collider[i] == COLTYPE_MSH) {DrawMeshCollider(i);} else if (World.collider[i] == COLTYPE_CAP) {DrawCapsuleCollider(i);}} \
-        DrawAngularVelocity(i); \
-        glUniform1ui(17,tex==316?1u:0u); glUniform1ui(25,constIndex); glUniform1f(27,e->volume); glUniform1ui(13,(tex==36||tex==887) ? 1u : 0u); \
-        if (grayscaleEnabled) { float npcHeat = IdxIsNPC(constIndex) ? ((constIndex==419 || constIndex==422 || constIndex==424 || constIndex==429 || constIndex==430 || constIndex==431||constIndex==433||constIndex==437||constIndex==438||constIndex==441) ? 1.5f : 4.0f) : 0.0f; glUniform1f(9,npcHeat); } \
-        glUniform1ui(30,e->camView < camViewCount ? 1u : 0u); \
-        if(e->camView < camViewCount) { glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D,camViewTextures[e->camView]); glUniform2ui(28,camViews[e->camView].width,camViews[e->camView].height); glUniform1i(29,6); } \
-        if((curN) != (norm) || norm==0) { curN=norm; glUniform1ui( 1,(u32)norm); } \
-        if((curT) != ( tex) ||  tex==0) { curT= tex; glUniform1ui(18,(u32)tex ); } \
-        if((curG) != (glow) || glow==0) { curG=glow; glUniform1ui(19,(u32)glow); } \
-        if((curS) != (spec) || spec==0) { curS=spec; glUniform1ui(20,(u32)spec); } \
-        curM=GetAndBindModel(i,curM); u32 vc=modelTriangleCounts[curM]*3; glDrawElements(0x0004,vc,GL_UNSIGNED_SHORT,0); drawCalls++; vertsRendered+=vc; \
-     }
+void DrawEntity(Entity* e, u16 i, u16 constIndex, u16 tex, u16 curN, u16 curT, u16 curG, u16 curS, u16 curM, bool grayscaleEnabled) {
+    u16 glow=e->glowIndex,norm=e->normIndex,spec=e->specIndex;
+    if (Cheats.showPhys) {if (World.collider[i] == COLTYPE_BOX) {DrawBoxCollider(i);} else if (World.collider[i] == COLTYPE_SPH) {DrawSphereCollider(i);} else if (World.collider[i] == COLTYPE_CVX) {DrawMeshCollider(i);} else if (World.collider[i] == COLTYPE_MSH) {DrawMeshCollider(i);} else if (World.collider[i] == COLTYPE_CAP) {DrawCapsuleCollider(i);} DrawAngularVelocity(i);}
+    glUniform1ui(17,tex==316?1u:0u); glUniform1ui(25,constIndex); glUniform1f(27,e->volume); glUniform1ui(13,(tex==36||tex==887) ? 1u : 0u);
+    if (grayscaleEnabled) { float npcHeat = IdxIsNPC(constIndex) ? ((constIndex==419 || constIndex==422 || constIndex==424 || constIndex==429 || constIndex==430 || constIndex==431||constIndex==433||constIndex==437||constIndex==438||constIndex==441) ? 1.5f : 4.0f) : 0.0f; glUniform1f(9,npcHeat); }
+    glUniform1ui(30,e->camView < camViewCount ? 1u : 0u);
+    if(e->camView < camViewCount) { glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D,camViewTextures[e->camView]); glUniform2ui(28,camViews[e->camView].width,camViews[e->camView].height); glUniform1i(29,6); }
+    if((curN) != (norm) || norm==0) { curN=norm; glUniform1ui( 1,(u32)norm); }
+    if((curT) != ( tex) ||  tex==0) { curT= tex; glUniform1ui(18,(u32)tex ); }
+    if((curG) != (glow) || glow==0) { curG=glow; glUniform1ui(19,(u32)glow); }
+    if((curS) != (spec) || spec==0) { curS=spec; glUniform1ui(20,(u32)spec); }
+    curM=GetAndBindModel(i,curM); u32 vc=modelTriangleCounts[curM]*3; glDrawElements(0x0004,vc,GL_UNSIGNED_SHORT,0); drawCalls++; vertsRendered+=vc;
+}
 
 bool mat4_inverse(const float* m, float* out) {
     float inv[16],det;
@@ -867,11 +852,10 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glEnable(GL_CULL_FACE); glDisable(GL_BLEND); // Opaques
     u16 visibleCount = 0, currentTexIndex = 0, currentNormIndex = 0, currentGlowIndex = 0, currentSpecIndex = 0, currentModelType = 0, opaqueCount = 0;
     bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX); float distSqrd = sfar * sfar;
-    DepthSort tmpTransparent[MAX_VISIBLE]; u16 tcnt = 0;
+    DepthSort tmpTransparent[1024]; u16 tcnt = 0;
     for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { // Determine base visibility
         if (!DetermineIfInstanceVisible(i,false,skyVisible,playerPos,&distSqrd)) continue;
-        
-        if (transparentTexture[World.instances[i].texIndex]) { tmpTransparent[tcnt].index = i; tmpTransparent[tcnt].depth = distSqrd; tcnt++; }
+        if (transparentTexture[World.instances[i].texIndex]) { if(tcnt>1023){continue;} tmpTransparent[tcnt].index = i; tmpTransparent[tcnt].depth = distSqrd; tcnt++; }
         else { visibleInstances[opaqueCount].index = i; visibleInstances[opaqueCount].depth = distSqrd; opaqueCount++; }
     }
     mcpy(visibleInstances + opaqueCount,tmpTransparent,tcnt * sizeof(DepthSort));
@@ -905,10 +889,9 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         u16 i = visibleInstances[visibleIndex].index;
         Entity* e = &World.instances[i]; u16 tex = e->texIndex; u32 constIndex = e->index;
         if (transparentTexture[tex]) continue;
-        
         else if (doubleSidedTexture[tex] || World.scale[i].x < 0.0f || World.scale[i].y < 0.0f || World.scale[i].z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided (either)
         else { glEnable(GL_CULL_FACE); glDisable(GL_BLEND); } // Opaque
-        DRAW_ENTITY(currentNormIndex,currentTexIndex,currentGlowIndex,currentSpecIndex,currentModelType)
+        DrawEntity(e,i,constIndex,tex,currentNormIndex,currentTexIndex,currentGlowIndex,currentSpecIndex,currentModelType,grayscaleEnabled);
     }
     
     glDepthMask(1); currentTexIndex = currentNormIndex = currentGlowIndex = currentSpecIndex = currentModelType = 0; // Transparents Pass
@@ -921,7 +904,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         
         if ((constIndex >= 561 && constIndex <= 565) || (constIndex >= 568 && constIndex <= 573)) glDepthFunc(0x0202/*GL_EQUAL*/); // Cutouts
         else glDepthFunc(0x0203/*GL_LEQUAL*/); // Actual alphas
-        DRAW_ENTITY(currentNormIndex,currentTexIndex,currentGlowIndex,currentSpecIndex,currentModelType)
+        DrawEntity(e,i,constIndex,tex,currentNormIndex,currentTexIndex,currentGlowIndex,currentSpecIndex,currentModelType,grayscaleEnabled);
     }
     
     if (camView) {
@@ -1157,16 +1140,10 @@ void InitalizeEnvironment() {
     m[0]=1.0f; m[1]=0.0f; m[2]=0.0f; m[3]=0.0f; m[4]=0.0f; m[5]=1.0f; m[6]=0.0f; m[7]=0.0f; m[8]=0.0f; m[9]=0.0f; m[10]=-(lightRangeMax + NEAR_PLANE) / viewRange; m[11]=-1.0f; m[12]=0.0f; m[13]=0.0f; m[14]=-2.0f * lightRangeMax * NEAR_PLANE / viewRange; m[15]=0.0f;
     InitSCFTables();
     InitAudio();
-    ModEDefsInitAfterLoad();
+    ModEDefsInitAfterLoad(); // Set the values for all 768 entity definitions, a doozy of a function.
     glGenFramebuffers(1,&gBufferFBO);
-    ChangeFullScreenWindowed();
-    SetSkyRotateSpeed();
-    SetVSync();
-    LoadTextForLanguage(Sys_Settings.Language);
-    LoadLogTextForLanguage(Sys_Settings.Language);
-    glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO);
-    u32 drawBuffers[] = {GL_COLOR_ATTACHMENT0,GL_COLOR_ATTACHMENT1,GL_COLOR_ATTACHMENT2};
-    glDrawBuffers(3,drawBuffers);
+    ChangeFullScreenWindowed(); SetSkyRotateSpeed(); SetVSync(); LoadTextForLanguage(Sys_Settings.Language); LoadLogTextForLanguage(Sys_Settings.Language);
+    glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO); u32 drawBuffers[] = {GL_COLOR_ATTACHMENT0,GL_COLOR_ATTACHMENT1,GL_COLOR_ATTACHMENT2}; glDrawBuffers(3,drawBuffers);
     u32 status = glCheckFramebufferStatus(GL_FRAMEBUFFER); if (status != 0x8CD5/*GL_FRAMEBUFFER_COMPLETE*/) DualLogError("Framebuffer incomplete: Error code %d\n",status);
     float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1}; u32 MAX_LIGHTS_PER_VOXEL = 32;
     mcpy(&modelMatrices[0],mat,16 * sizeof(float)); // Null instance matrix used for UI
@@ -1194,16 +1171,11 @@ i32 main() {
     while(1) {
         if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad,queuedLevelPos); queuedLevelToLoad = 255u; continue; }
         double curtime = get_time(); World.deltaTime=World.current_time < 0.001f ? 0.000f : vmax(curtime - World.current_time,0.0); World.absoluteTime+=World.deltaTime; World.current_time=curtime;
-        if (!World.paused && !World.menuActive) {
-            if (World.pauseRelativeTime < 0.001f) World.pauseRelativeTime = World.last_physics_time = curtime;
-            World.pauseRelativeTime += World.deltaTime;
-        }
+        if (!World.paused && !World.menuActive) { if (World.pauseRelativeTime < 0.001f) {World.pauseRelativeTime = World.last_physics_time = curtime;} World.pauseRelativeTime += World.deltaTime; }
         InputProcessing(); // Before anims and physics to allow them to respond immediately.
         UpdateAnims();     // Before physics to allow model swap out to affect physics state immediately.  Before rendering to affect shadowmaps immediately.
         if (!World.paused && !World.menuActive) {
-            double physStart = get_time();
-            float dt = vclamp((float)(World.pauseRelativeTime - World.last_physics_time),0.0005f,0.1f);
-            World.last_physics_time = World.pauseRelativeTime;
+            double physStart = get_time(); float dt = vclamp((float)(World.pauseRelativeTime - World.last_physics_time),0.0005f,0.1f); World.last_physics_time = World.pauseRelativeTime;
             Physics(dt);
             physTime = get_time() - physStart;
         } else physTime = 0.0;

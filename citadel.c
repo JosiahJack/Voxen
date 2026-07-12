@@ -46,53 +46,34 @@ void PatchUse(int patchSlot) { (void)patchSlot; if (patchSlot < 0 || patchSlot >
         case 5: World.invP1.sightFinishedTime = World.pauseRelativeTime + SIGHT_TIME; World.invP1.sightSideEffectFinishedTime = -1.0; break;
         case 6: World.invP1.staminupFinishedTime = World.pauseRelativeTime + STAMINUP_TIME; World.invP1.staminupActive = true; World.invP1.fatigue = 0.0f; break;
     }
-    CenterStatusPrint("%s", Sys_Text.stringTable[patchMsg[patchSlot]]);
+    CenterStatusPrint("%s",Sys_Text.stringTable[patchMsg[patchSlot]]);
     if (World.invP1.patchCounts[World.invP1.patchCurrent] <= 0) { for (int i = 0; i < 7; i++) { if (World.invP1.patchCounts[i] > 0) { World.invP1.patchCurrent = (i8)i; break; } } }
-    play_wav(sounds[88], SfxVol(), (V3){0.0f,0.0f,0.0f}, false); }
+    play_wav(sounds[88],SfxVol(),(V3){0.0f,0.0f,0.0f},false);
+}
+
 void WeaponFireStartWeaponDip(float t) { (void)t; if (t <= 0.0f) { World.invP1.weaponDipLerp = 0.0f; World.invP1.weaponDipFinished = 0.0; return; } World.invP1.weaponDipFinished = World.pauseRelativeTime + (double)t; World.invP1.weaponDipLerp = 1.0f; }
 void WeaponFireCompleteWeaponChange(void) { World.invP1.justChangedWeap = false; World.invP1.weaponCurrentPending = -1; World.invP1.weaponIndexPending = -1; World.invP1.recoiling = false; }
 bool InventoryHasAccessCard(AccessCardType card) { return (World.invP1.accessCardOwned & (1u << card)) != 0; }
 bool InventoryHasAnyAccessCards() { return World.invP1.accessCardOwned != 0; }
 const char* AccessCardCodeForType(AccessCardType a) { // Called by ItemTabManager
     switch(a) {
-        case AccessCardType_Standard:    return "STD";
-        case AccessCardType_Medical:     return "MED";
-        case AccessCardType_Science:     return "SCI";
-        case AccessCardType_Admin:       return "ADM";
-        case AccessCardType_Group1:      return "Group-1";
-        case AccessCardType_Group2:      return "Group-2";
-        case AccessCardType_Group3:      return "Group-3";
-        case AccessCardType_Group4:      return "Group-4";
-        case AccessCardType_GroupA:      return "Group-A";
-        case AccessCardType_GroupB:      return "Group-B";
-        case AccessCardType_Storage:     return "STO";
-        case AccessCardType_Engineering: return "ENG";
-        case AccessCardType_Maintenance: return "MTN";
-        case AccessCardType_Security:    return "SEC";
-        case AccessCardType_Per1:        return "PER-1";
-        case AccessCardType_Per2:        return "PER-2";
-        case AccessCardType_Per3:        return "PER-3";
-        case AccessCardType_Per4:        return "PER-4";
+        case AccessCardType_Standard:    return "STD";     case AccessCardType_Medical:     return "MED";     case AccessCardType_Science:     return "SCI";
+        case AccessCardType_Admin:       return "ADM";     case AccessCardType_Group1:      return "Group-1"; case AccessCardType_Group2:      return "Group-2";
+        case AccessCardType_Group3:      return "Group-3"; case AccessCardType_Group4:      return "Group-4"; case AccessCardType_GroupA:      return "Group-A";
+        case AccessCardType_GroupB:      return "Group-B"; case AccessCardType_Storage:     return "STO";     case AccessCardType_Engineering: return "ENG";
+        case AccessCardType_Maintenance: return "MTN";     case AccessCardType_Security:    return "SEC";     case AccessCardType_Per1:        return "PER-1";
+        case AccessCardType_Per2:        return "PER-2";   case AccessCardType_Per3:        return "PER-3";   case AccessCardType_Per4:        return "PER-4";
         case AccessCardType_Per5:        return "PER-5";
-        default:                         return "Group-2";
-    }
+    } return "Group-2";
 }
 
 void AddAccessCardToInventory(int index) {
     AccessCardType card;
     switch(index) {
-        case  34: card = AccessCardType_Admin;       break;
-        case  81: card = AccessCardType_Standard;    break;
-        case  83: card = AccessCardType_Group1;      break;
-        case  84: card = AccessCardType_Science;     break;
-        case  85: card = AccessCardType_Engineering; break;
-        case  86: card = AccessCardType_GroupB;      break;
-        case  87: card = AccessCardType_Security;    break;
-        case  88: card = AccessCardType_Per5;        break;
-        case  89: card = AccessCardType_Medical;     break;
-        case  90: card = AccessCardType_Group3;      break;
-        case  91: card = AccessCardType_Group4;      break;
-        case 110: card = AccessCardType_Per1;        break;
+        case  34: card = AccessCardType_Admin;       break; case  81: card = AccessCardType_Standard;    break; case  83: card = AccessCardType_Group1;      break;
+        case  84: card = AccessCardType_Science;     break; case  85: card = AccessCardType_Engineering; break; case  86: card = AccessCardType_GroupB;      break;
+        case  87: card = AccessCardType_Security;    break; case  88: card = AccessCardType_Per5;        break; case  89: card = AccessCardType_Medical;     break;
+        case  90: card = AccessCardType_Group3;      break; case  91: card = AccessCardType_Group4;      break; case 110: card = AccessCardType_Per1;        break;
         default: CenterStatusPrint("BUG: Unmarked access card, defaulting to STD."); card = AccessCardType_Standard; break;
     }
     if (index == 87) { // Command card = STO + SEC + MTN
@@ -110,9 +91,7 @@ void AddHardwareToInventory(int index,int hwversion,bool overt) {
     if (hwversion < 0) { CenterStatusPrint("BUG: Hardware added with version < 0, using 0."); hwversion = 0; }
     if (hwversion > 0 && hwversion <= (int)World.invP1.hardwareVersion[index]) { if(overt){CenterStatusPrint("%s",Sys_Text.stringTable[46]);/*THAT WARE IS OBSOLETE. DISCARDED.*/} return; }
     static const u8 textIdx[12] = {21,22,23,24,25,26,27,28,29,30,31,32};
-    World.invP1.hardwareInvIndex = index; World.invP1.hasHardware |= (u16)(1u << index); World.invP1.hardwareVersion[index] = (u8)hwversion; World.invP1.hardwareVersionSetting[index]= hwversion > 0 ? (u8)(hwversion - 1) : 0;
-    // TODO: engine enables HUD hardware buttons from hasHardware bitmask on render
-    // TODO: nav unit (index 1): compass/automap HUD visibility from hasHardware & HW_NAV + version
+    World.invP1.hardwareInvIndex = index; World.invP1.hasHardware |= (u16)(1u << index); World.invP1.hardwareVersion[index] = (u8)hwversion; World.invP1.hardwareVersionSetting[index]= hwversion > 0 ? (u8)(hwversion - 1) : 0; // TODO: engine enables HUD hardware buttons from hasHardware bitmask on render, TODO: nav unit (index 1): compass/automap HUD visibility from hasHardware & HW_NAV + version
     if (overt) CenterStatusPrint("%s v%d",Sys_Text.stringTable[textIdx[index] + 326],hwversion);
 }
 
@@ -169,81 +148,29 @@ void AddGrenadeToInventory(int index, int useableIndex) {
 void RemoveGrenade(int index) { if(World.invP1.grenAmmo[index] > 0){World.invP1.grenAmmo[index]--;} if(!World.invP1.grenAmmo[index]){GrenadeCycleDown();} }
 void CheckForUnreadLogs() {
     int em = 0, lg = 0;
-    for (int i = T_LOGS_COUNT-1; i >= 0; i--) {
-        if (World.invP1.hasLog[i] && !World.invP1.readLog[i]) {
-            if (Sys_Text.audioLogType[i] == AudioLogType_Email) em++; else lg++;
-        }
-    }
-    if (!em) World.invP1.hasNewEmail = false;
-    if (!lg) World.invP1.hasNewLogs  = false;
+    for (int i = T_LOGS_COUNT-1; i >= 0; i--) { if (World.invP1.hasLog[i] && !World.invP1.readLog[i]) { if (Sys_Text.audioLogType[i] == AudioLogType_Email) {em++;} else {lg++;} } }
+    if (!em) {World.invP1.hasNewEmail = false;} if (!lg) {World.invP1.hasNewLogs  = false;}
 }
 
 static int FindNextUnreadLog() { for (int i = T_LOGS_COUNT-1; i >= 0; i--) { if(World.invP1.hasLog[i] && !World.invP1.readLog[i]){return i;} } return -1; }
 static void PlayLog(int logIndex) {
     if (logIndex < 0 || !(World.invP1.hasHardware & HW_ERD)) return;
 //     if (World.invP1.logSndInited) { SndStop(&World.invP1.logSound); SndUninit(&World.invP1.logSound); World.invP1.logSndInited = false; }
-//     if (!SndInit(sounds[Sys_Text.audioLogSoundIndex[logIndex]],0,NULL,NULL,&World.invP1.logSound)) {
-//         SndSetVolume(&World.invP1.logSound,(float)Sys_Settings.VolumeMessage / 100.0f);
-//         SndStart(&World.invP1.logSound);
-//         World.invP1.logSndInited = true;
-//     }
+//     if (!SndInit(sounds[Sys_Text.audioLogSoundIndex[logIndex]],0,NULL,NULL,&World.invP1.logSound)) { SndSetVolume(&World.invP1.logSound,(float)Sys_Settings.VolumeMessage / 100.0f); SndStart(&World.invP1.logSound); World.invP1.logSndInited = true; }
 //     World.invP1.readLog[logIndex] = true;
 //     if (Sys_Text.audioLogType[logIndex] == AudioLogType_Vmail) {
 //         World.Sys_UI.vmailActive        = true;
 //         World.invP1.vmailLogIndex = (i16)logIndex; // engine reads to select which .webm to play
 //         switch (logIndex) { // TODO
-//             case 119:
-//                 vmailbetajet.SetActive(true);
-//                 fileName = "betajet.webm";
-//                 Utils.ConfirmExistsMakeIfNot(basePath,fileName);
-//                 urlPath = Utils.SafePathCombine(basePath,fileName);
-//                 vmailbetajetVideo.url = urlPath;
-//                 vmailbetajetVideo.Play();
-//                 break;
-//             case 116:
-//                 vmailbridgesep.SetActive(true);
-//                 fileName = "bridgesep.webm";
-//                 Utils.ConfirmExistsMakeIfNot(basePath,fileName);
-//                 urlPath = Utils.SafePathCombine(basePath,fileName);
-//                 vmailbridgesepVideo.url = urlPath;
-//                 vmailbridgesepVideo.Play();
-//                 break;
-//             case 117:
-//                 vmailcitadestruct.SetActive(true);
-//                 fileName = "citadestruct.webm";
-//                 Utils.ConfirmExistsMakeIfNot(basePath,fileName);
-//                 urlPath = Utils.SafePathCombine(basePath,fileName);
-//                 vmailcitadestructVideo.url = urlPath;
-//                 vmailcitadestructVideo.Play();
-//                 break;
-//             case 110:
-//                 vmailgenstatus.SetActive(true);
-//                 fileName = "genstatus.webm";
-//                 Utils.ConfirmExistsMakeIfNot(basePath,fileName);
-//                 urlPath = Utils.SafePathCombine(basePath,fileName);
-//                 vmailgenstatusVideo.url = urlPath;
-//                 vmailgenstatusVideo.Play();
-//                 break;
-//             case 114:
-//                 vmaillaserdest.SetActive(true);
-//                 fileName = "laserdest.webm";
-//                 Utils.ConfirmExistsMakeIfNot(basePath,fileName);
-//                 urlPath = Utils.SafePathCombine(basePath,fileName);
-//                 vmaillaserdestVideo.url = urlPath;
-//                 vmaillaserdestVideo.Play();
-//                 break;
-//             case 120:
-//                 vmailshieldsup.SetActive(true);
-//                 fileName = "shieldsup.webm";
-//                 Utils.ConfirmExistsMakeIfNot(basePath,fileName);
-//                 urlPath = Utils.SafePathCombine(basePath,fileName);
-//                 vmailshieldsupVideo.url = urlPath;
-//                 vmailshieldsupVideo.Play();
-//                 break;
+//             case 119: vmailbetajet.SetActive(true); fileName = "betajet.webm"; Utils.ConfirmExistsMakeIfNot(basePath,fileName); urlPath = Utils.SafePathCombine(basePath,fileName); vmailbetajetVideo.url = urlPath; vmailbetajetVideo.Play(); break;
+//             case 116: vmailbridgesep.SetActive(true); fileName = "bridgesep.webm"; Utils.ConfirmExistsMakeIfNot(basePath,fileName); urlPath = Utils.SafePathCombine(basePath,fileName); vmailbridgesepVideo.url = urlPath; vmailbridgesepVideo.Play(); break;
+//             case 117: vmailcitadestruct.SetActive(true); fileName = "citadestruct.webm"; Utils.ConfirmExistsMakeIfNot(basePath,fileName); urlPath = Utils.SafePathCombine(basePath,fileName); vmailcitadestructVideo.url = urlPath; vmailcitadestructVideo.Play(); break;
+//             case 110: vmailgenstatus.SetActive(true); fileName = "genstatus.webm"; Utils.ConfirmExistsMakeIfNot(basePath,fileName); urlPath = Utils.SafePathCombine(basePath,fileName); vmailgenstatusVideo.url = urlPath; vmailgenstatusVideo.Play(); break;
+//             case 114: vmaillaserdest.SetActive(true); fileName = "laserdest.webm"; Utils.ConfirmExistsMakeIfNot(basePath,fileName); urlPath = Utils.SafePathCombine(basePath,fileName); vmaillaserdestVideo.url = urlPath; vmaillaserdestVideo.Play(); break;
+//             case 120: vmailshieldsup.SetActive(true); fileName = "shieldsup.webm"; Utils.ConfirmExistsMakeIfNot(basePath,fileName); urlPath = Utils.SafePathCombine(basePath,fileName); vmailshieldsupVideo.url = urlPath; vmailshieldsupVideo.Play(); break;
 //         }
 //    }
-    CenterStatusPrint("%s%s",Sys_Text.stringTable[1020],World.audiologNames[logIndex]); // "Playing <name>"
-    // TODO: SendAudioLogToDataTab(logIndex) — engine-side data tab notification
+    CenterStatusPrint("%s%s",Sys_Text.stringTable[1020],World.audiologNames[logIndex]); // "Playing <name>" // TODO: SendAudioLogToDataTab(logIndex) — engine-side data tab notification
 }
 
 void PlayLastAddedLog(int logIndex) { if(logIndex < 0){return;} PlayLog(logIndex); World.invP1.lastAddedIndex = -1; }
@@ -271,8 +198,7 @@ void PatchCycleDown() {
 }
 
 void PatchCycleUp() {
-    int next = World.invP1.patchCurrent + 1;
-    if (next > 6) next = 0;
+    int next = World.invP1.patchCurrent + 1; if (next > 6) next = 0;
     World.invP1.patchCurrent = (i8)next;
     for (int c=0;c<=13;++c) { if (World.invP1.patchCounts[next] > 0) {break;} if (c == 13) {return;} if (++next > 6) {next=0;} }
     World.invP1.patchCurrent = (i8)next;
@@ -1814,17 +1740,9 @@ void PatchDisableAll(void) {
 //     if (Relay428Fixed) {
 //         Const.a.questData.Relay428Fixed = !Const.a.questData.Relay428Fixed;
 //         QuestLogNotesManager.a.checkBoxes[11].isOn = Const.a.questData.Relay428Fixed;
-//         if (Const.a.questData.Relay428Fixed) {
-//             QuestLogNotesManager.a.notes[11].SetActive(true);
-//             QuestLogNotesManager.a.labels[11].text = Sys_Text.stringTable[563]; // Set:Diagnose and repair broken relay
-//             QuestLogNotesManager.a.labels[11].text += Sys_Text.stringTable[564]; // Add:: 428.
-//         }
+//         if (Const.a.questData.Relay428Fixed) { QuestLogNotesManager.a.notes[11].SetActive(true); QuestLogNotesManager.a.labels[11].text = Sys_Text.stringTable[563];/*Set:Diagnose and repair broken relay*/ QuestLogNotesManager.a.labels[11].text += Sys_Text.stringTable[564];/*Add:: 428.*/ }
 //     }
-//     if (MasterJettisonEnabled) {
-//         Const.a.questData.MasterJettisonEnabled = !Const.a.questData.MasterJettisonEnabled;
-//         QuestLogNotesManager.a.checkBoxes[10].isOn = Const.a.questData.MasterJettisonEnabled;
-//         if (Const.a.questData.MasterJettisonEnabled) { QuestLogNotesManager.a.notes[10].SetActive(true); QuestLogNotesManager.a.labels[10].text = Sys_Text.stringTable[562]; }
-//     }
+//     if (MasterJettisonEnabled) { Const.a.questData.MasterJettisonEnabled = !Const.a.questData.MasterJettisonEnabled; QuestLogNotesManager.a.checkBoxes[10].isOn = Const.a.questData.MasterJettisonEnabled; if (Const.a.questData.MasterJettisonEnabled) { QuestLogNotesManager.a.notes[10].SetActive(true); QuestLogNotesManager.a.labels[10].text = Sys_Text.stringTable[562]; } }
 //     if (BetaGroveJettisoned) {
 //         Const.a.questData.BetaGroveJettisoned = !Const.a.questData.BetaGroveJettisoned;
 //         QuestLogNotesManager.a.checkBoxes[12].isOn = Const.a.questData.BetaGroveJettisoned;
