@@ -315,9 +315,7 @@ void InputJoystickButton(WinSysjoystick*,int,char); void InputJoystickHat(WinSys
         wglSwapIntervalEXT = (PFN_SWE)wglGetProcAddress("wglSwapIntervalEXT");
         wglGetPixelFormatAttribivARB = (PFN_GPFAIVA)wglGetProcAddress("wglGetPixelFormatAttribivARB");
         wglMakeCurrent(pdc,prc);
-        int attribs[40],pixelFormat; PIXELFORMATDESCRIPTOR pfd2;
-        win->context.wgl.dc = GetDC(win->win32.handle);
-        pixelFormat = choosePixelFormatWGL(win);
+        int attribs[40],pixelFormat; PIXELFORMATDESCRIPTOR pfd2; win->context.wgl.dc = GetDC(win->win32.handle); pixelFormat = choosePixelFormatWGL(win);
         DescribePixelFormat(win->context.wgl.dc,pixelFormat,sizeof(pfd2),&pfd2); SetPixelFormat(win->context.wgl.dc,pixelFormat,&pfd2);
         int index=0; attribs[index++] = 0x2091/*major*/; attribs[index++] = 4;/*OpenGL 4.3*/ attribs[index++] = 0x2092/*minor*/; attribs[index++] = 3; attribs[index++] = 0x9126/*context profile mask*/; attribs[index++] = 1; attribs[index++] = 0; attribs[index++] = 0;
         win->context.wgl.handle = wglCreateContextAttribsARB(win->context.wgl.dc,NULL,attribs);
@@ -776,13 +774,13 @@ int WindowInit() {
         createKeyTables();
         #define IA(n) WinSys.x11.xlib.InternAtom(WinSys.x11.display,n,0)
             WinSys.x11.UTF8_STRING=IA("UTF8_STRING");  WinSys.x11.WM_PROTOCOLS=IA("WM_PROTOCOLS"); WinSys.x11.WM_STATE   =IA("WM_STATE");             WinSys.x11.WM_DELETE_WINDOW=IA("WM_DELETE_WINDOW");          WinSys.x11.NET_SUPPORTED =IA("_NET_SUPPORTED"); WinSys.x11.NET_SUPPORTING_WM_CHECK=IA("_NET_SUPPORTING_WM_CHECK");
-            WinSys.x11.NWM_ICON=IA("_NWM_ICON"); WinSys.x11.NWM_PING =IA("_NWM_PING"); WinSys.x11.NWM_NAME=IA("_NWM_NAME"); WinSys.x11.NWM_BYPASS_COMPOSITOR=IA("_NWM_BYPASS_COMPOSITOR"); WinSys.x11.MOTIF_WM_HINTS=IA("_MOTIF_WM_HINTS");
+            WinSys.x11.NWM_ICON=IA("_NET_WM_ICON"); WinSys.x11.NWM_PING =IA("_NET_WM_PING"); WinSys.x11.NWM_NAME=IA("_NET_WM_NAME"); WinSys.x11.NWM_BYPASS_COMPOSITOR=IA("_NET_WM_BYPASS_COMPOSITOR"); WinSys.x11.MOTIF_WM_HINTS=IA("_MOTIF_WM_HINTS");
         #undef IA
         Window* wfr = NULL; WinSysGetWindowPropertyX11(WinSys.x11.root,WinSys.x11.NET_SUPPORTING_WM_CHECK,((Atom) 33),(u8**)&wfr);
         Window* wfc = NULL; WinSysGetWindowPropertyX11(*wfr,WinSys.x11.NET_SUPPORTING_WM_CHECK,((Atom) 33),(u8**)&wfc);
         WinSys.x11.xlib.Free(wfr); WinSys.x11.xlib.Free(wfc); Atom* sa = NULL; const unsigned long ac = WinSysGetWindowPropertyX11(WinSys.x11.root,WinSys.x11.NET_SUPPORTED,((Atom) 4),(u8**)&sa);
         #define GA(name) getAtomIfSupported(sa, ac, name)
-            WinSys.x11.NWM_STATE=GA("_NWM_STATE"); WinSys.x11.NWM_STATE_FULLSCREEN=GA("_NWM_STATE_FULLSCREEN"); WinSys.x11.NWM_WINDOW_TYPE=GA("_NWM_WINDOW_TYPE"); WinSys.x11.NWM_WINDOW_TYPE_NORMAL=GA("_NWM_WINDOW_TYPE_NORMAL"); WinSys.x11.NET_WORKAREA=GA("_NET_WORKAREA"); WinSys.x11.NET_CURRENT_DESKTOP=GA("_NET_CURRENT_DESKTOP"); WinSys.x11.NET_ACTIVE_WINDOW=GA("_NET_ACTIVE_WINDOW");
+            WinSys.x11.NWM_STATE=GA("_NET_WM_STATE"); WinSys.x11.NWM_STATE_FULLSCREEN=GA("_NET_WM_STATE_FULLSCREEN"); WinSys.x11.NWM_WINDOW_TYPE=GA("_NET_WM_WINDOW_TYPE"); WinSys.x11.NWM_WINDOW_TYPE_NORMAL=GA("_NET_WM_WINDOW_TYPE_NORMAL"); WinSys.x11.NET_WORKAREA=GA("_NET_WORKAREA"); WinSys.x11.NET_CURRENT_DESKTOP=GA("_NET_CURRENT_DESKTOP"); WinSys.x11.NET_ACTIVE_WINDOW=GA("_NET_ACTIVE_WINDOW");
         #undef GA
         if (sa) WinSys.x11.xlib.Free(sa);
         XSetWindowAttributes wa; wa.event_mask = (1L<<22); WinSys.x11.xlib.CreateWindow(WinSys.x11.display,WinSys.x11.root,0,0,1,1,0,0,2/*input only*/,(&((_XPrivDisplay)(WinSys.x11.display))->screens[WinSys.x11.screen])->root_visual,(1L<<11)/*event mask*/,&wa);
