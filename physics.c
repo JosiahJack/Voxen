@@ -96,7 +96,7 @@ u32 GetCollisionMask(u32 layer) {
 ShapeCapsule Entity_GetCap(u16 i) {
     float scaleMax = vmax(World.scale[i].x,vmax(World.scale[i].y,World.scale[i].z));
     float r = World.colliderSize[i].x * scaleMax; float hi = vmax(0.0f, (World.colliderSize[i].y * 0.5f * scaleMax) - r); V3 wc,axis;
-    if (i == PLAYER1 || i == PLAYER2 || World.layer[i] == L_NPC) { wc = V3_AplusB(World.position[i], World.colliderCenter[i]); axis = (V3){0.0f,1.0f,0.0f};/*Player+NPC remain strictly upright*/ }
+    if (i == PLAYER1 || World.layer[i] == L_NPC) { wc = V3_AplusB(World.position[i], World.colliderCenter[i]); axis = (V3){0.0f,1.0f,0.0f};/*Player+NPC remain strictly upright*/ }
     else {
         wc = V3_AplusB(World.position[i], quat_rot_v3(World.rotation[i], World.colliderCenter[i]));
         axis = (World.colliderSize[i].z < 0.5f) ? quat_rot_v3(World.rotation[i], (V3){1,0,0}) : (World.colliderSize[i].z < 1.5f) ? quat_rot_v3(World.rotation[i], (V3){0,1,0}) : quat_rot_v3(World.rotation[i], (V3){0,0,1});
@@ -512,34 +512,19 @@ static Manifold BoxMsh(ShapeBox b,u16 m,const float *mx){
 static Overlap CapBox(ShapeCapsule c,ShapeBox b){ V3 d=V3_AsubB(c.tip,c.base);Overlap best=SphBox(c.base,c.rad,b),r=SphBox(c.tip,c.rad,b);if(r.pen>best.pen)best=r; if(V3_dot(d,d)>PHY_EPSILON*PHY_EPSILON)for(int k=1;k<8;k++){r=SphBox(V3_AplusB(c.base,V3_ScaleByF(d,k*.125f)),c.rad,b);if(r.pen>best.pen)best=r;} return best; }
 static inline void quat_to_mat3(Quaternion q, float R[3][3]) {// Get 3×3 rotation matrix (row-major, column-vector convention: v' = R·v)
     float x = q.x, y = q.y, z = q.z, w = q.w; float xx = x*x, yy = y*y, zz = z*z; float xy = x*y, xz = x*z, yz = y*z; float wx = w*x, wy = w*y, wz = w*z;
-    R[0][0] = 1.0f - 2.0f*(yy+zz);  R[0][1] = 2.0f*(xy-wz);        R[0][2] = 2.0f*(xz+wy);
-    R[1][0] = 2.0f*(xy+wz);         R[1][1] = 1.0f - 2.0f*(xx+zz); R[1][2] = 2.0f*(yz-wx);
-    R[2][0] = 2.0f*(xz-wy);         R[2][1] = 2.0f*(yz+wx);        R[2][2] = 1.0f - 2.0f*(xx+yy);
+    R[0][0] = 1.0f - 2.0f*(yy+zz);  R[0][1] = 2.0f*(xy-wz); R[0][2] = 2.0f*(xz+wy); R[1][0] = 2.0f*(xy+wz); R[1][1] = 1.0f - 2.0f*(xx+zz); R[1][2] = 2.0f*(yz-wx); R[2][0] = 2.0f*(xz-wy); R[2][1] = 2.0f*(yz+wx); R[2][2] = 1.0f - 2.0f*(xx+yy);
 }
 
 static inline V3 ApplyInvTensor(u16 i, V3 v) {
     if (World.collider[i] == COLTYPE_BOX) {
         ShapeBox b = Entity_GetBox(i); float m = World.mass[i];
         float hx = b.hExt.x, hy = b.hExt.y, hz = b.hExt.z;
-        
-        float Ixx = (1.0f / 3.0f) * m * (hy*hy + hz*hz); // principal moments (body space) for box with half-extents
-        float Iyy = (1.0f / 3.0f) * m * (hx*hx + hz*hz);
-        float Izz = (1.0f / 3.0f) * m * (hx*hx + hy*hy);
-        float invIxx = 1.0f / vmax(Ixx, 1e-6f);
-        float invIyy = 1.0f / vmax(Iyy, 1e-6f);
-        float invIzz = 1.0f / vmax(Izz, 1e-6f);
+        float Ixx = (1.0f / 3.0f) * m * (hy*hy + hz*hz); float Iyy = (1.0f / 3.0f) * m * (hx*hx + hz*hz); float Izz = (1.0f / 3.0f) * m * (hx*hx + hy*hy); // principal moments (body space) for box with half-extents
+        float invIxx = 1.0f / vmax(Ixx, 1e-6f); float invIyy = 1.0f / vmax(Iyy, 1e-6f); float invIzz = 1.0f / vmax(Izz, 1e-6f);
         float R[3][3]; quat_to_mat3(World.rotation[i], R);
-        float bx = R[0][0]*v.x + R[1][0]*v.y + R[2][0]*v.z;
-        float by = R[0][1]*v.x + R[1][1]*v.y + R[2][1]*v.z;
-        float bz = R[0][2]*v.x + R[1][2]*v.y + R[2][2]*v.z;
-        float wx = invIxx * bx;
-        float wy = invIyy * by;
-        float wz = invIzz * bz;
-        return (V3){
-            R[0][0]*wx + R[0][1]*wy + R[0][2]*wz,
-            R[1][0]*wx + R[1][1]*wy + R[1][2]*wz,
-            R[2][0]*wx + R[2][1]*wy + R[2][2]*wz
-        };
+        float bx = R[0][0]*v.x + R[1][0]*v.y + R[2][0]*v.z; float by = R[0][1]*v.x + R[1][1]*v.y + R[2][1]*v.z; float bz = R[0][2]*v.x + R[1][2]*v.y + R[2][2]*v.z;
+        float wx = invIxx * bx; float wy = invIyy * by; float wz = invIzz * bz;
+        return (V3){R[0][0]*wx + R[0][1]*wy + R[0][2]*wz,R[1][0]*wx + R[1][1]*wy + R[1][2]*wz,R[2][0]*wx + R[2][1]*wy + R[2][2]*wz};
     }
     if (World.collider[i] != COLTYPE_CVX || !World.invTnsrValid[i]) { float r = (World.collider[i] == COLTYPE_MSH) ? modelBounds[World.instances[i].modelIndex] : ((World.collider[i] == COLTYPE_CVX) ? modelBounds[World.instances[i].colMeshIndex] : GetColRad(i)); return V3_ScaleByF(v,1.0f / vmax((2.0f / 5.0f) * World.mass[i] * r * r,0.0f)); }
     float R[3][3]; quat_to_mat3(World.rotation[i],R);
@@ -549,7 +534,7 @@ static inline V3 ApplyInvTensor(u16 i, V3 v) {
     return (V3){R[0][0]*wx + R[0][1]*wy + R[0][2]*wz,R[1][0]*wx + R[1][1]*wy + R[1][2]*wz,R[2][0]*wx + R[2][1]*wy + R[2][2]*wz};// w_world = R · w_body
 }
 
-static void ResolveContactVelocity(u16 a, u16 b, V3 n, V3 rAarm, V3 rBarm, float targetVn, float *accumN, float *accumT, bool bStatic) {
+static void ResolveContactVelocity(u16 a, u16 b, V3 n, V3 rAarm, V3 rBarm, float targetVn, float *accumN, float* accumT, bool bStatic) {
     V3 rAxN = V3_Cross(rAarm,n), rBxN = V3_Cross(rBarm,n);
     V3 invI_rAxN = IdxIsNPC(World.instances[a].index) ? (V3){0,0,0} : ApplyInvTensor(a,rAxN);
     V3 invI_rBxN = (bStatic || IdxIsNPC(World.instances[b].index)) ? (V3){0,0,0} : ApplyInvTensor(b,rBxN);
@@ -560,13 +545,13 @@ static void ResolveContactVelocity(u16 a, u16 b, V3 n, V3 rAarm, V3 rBarm, float
     float invMassA = World.mass[a] < 0.001f ? 1.0f : 1.0f / World.mass[a];
     float invMassB = (bStatic || World.mass[b] < 0.001f) ? 0.0f : 1.0f / World.mass[b];
     float invSum = invMassA + invMassB + angTermA + angTermB; if (invSum < PHY_EPSILON) return;
-    float j = (targetVn - vn) / invSum; float newAccumN = vmax(*accumN + j, 0.0f); j = newAccumN - *accumN; *accumN = newAccumN;
+    float j = (targetVn - vn) / invSum; float newAccumN = vmax(*accumN + j, 0.0f); j = newAccumN - *accumN;* accumN = newAccumN;
     V3 impulse = V3_ScaleByF(n,j);
     World.velocity[a] = V3_AplusB(World.velocity[a],V3_ScaleByF(impulse,invMassA));
     if (!bStatic) World.velocity[b] = V3_AsubB(World.velocity[b],V3_ScaleByF(impulse,invMassB));
     if (World.collider[a] != COLTYPE_CAP && !IdxIsNPC(World.instances[a].index)) World.angularVelocity[a] = V3_AplusB(World.angularVelocity[a],ApplyInvTensor(a,V3_Cross(rAarm,impulse)));
     if (!bStatic && World.collider[b] != COLTYPE_CAP && !IdxIsNPC(World.instances[b].index)) World.angularVelocity[b] = V3_AsubB(World.angularVelocity[b],ApplyInvTensor(b,V3_Cross(rBarm,impulse)));
-    V3 vAtA2 = V3_AplusB(World.velocity[a], V3_Cross(World.angularVelocity[a],rAarm)); // Tangential (friction)
+    V3 vAtA2 = V3_AplusB(World.velocity[a], V3_Cross(World.angularVelocity[a],rAarm)); 
     V3 vAtB2 = bStatic ? (V3){0,0,0} : V3_AplusB(World.velocity[b], V3_Cross(World.angularVelocity[b],rBarm));
     V3 relVel2 = V3_AsubB(vAtA2,vAtB2);
     V3 tangent = V3_AsubB(relVel2,V3_ScaleByF(n,V3_dot(relVel2,n)));
@@ -580,10 +565,11 @@ static void ResolveContactVelocity(u16 a, u16 b, V3 n, V3 rAarm, V3 rBarm, float
         float invSumT = invMassA + invMassB + angTermAT + angTermBT;
         if (invSumT > PHY_EPSILON) {
             float jt = -V3_dot(relVel2, tangent) / invSumT;
-            float friction = (World.collider[a] == COLTYPE_CAP || World.collider[b] == COLTYPE_CAP) ? 0.001f : (tLen > 0.15f) ? FRICTION_SLIDE : FRICTION_ROLL;
-            float maxT = friction * (*accumN);
-            float newAccumT = vclamp(*accumT + jt, -maxT, maxT);
-            jt = newAccumT - *accumT; *accumT = newAccumT;
+            float friction;
+            bool aIsSpecial = (World.collider[a] == COLTYPE_CAP && (a == PLAYER1 || IdxIsNPC(World.instances[a].index)));
+            if (bStatic && aIsSpecial) { friction = 0.001f; } else { float mix = vclamp((tLen - 0.05f) / 0.10f, 0.0f, 1.0f); friction = FRICTION_ROLL + mix * (FRICTION_SLIDE - FRICTION_ROLL); }
+            float maxT = friction * (*accumN); float newAccumT = vclamp(*accumT + jt, -maxT, maxT);
+            jt = newAccumT - *accumT;* accumT = newAccumT;
             V3 fImpulse = V3_ScaleByF(tangent, jt);
             World.velocity[a] = V3_AplusB(World.velocity[a], V3_ScaleByF(fImpulse, invMassA));
             if (!bStatic) World.velocity[b] = V3_AsubB(World.velocity[b], V3_ScaleByF(fImpulse, invMassB));
@@ -608,12 +594,10 @@ static void ApplyManifoldResponse(u16 a, u16 b, const Manifold *m) {
         targetVn[i] = (vn0 < -0.5f) ? -e_r * vn0 : 0.0f; // frozen once per manifold — recomputing this from live vn each pass was the source of the runaway
     }
     int iters = (m->n > 1) ? 8 : 1; // Max collision iterations
-    for (int it=0;it<iters;++it) {
-        for (int i=0;i<m->n;++i) ResolveContactVelocity(a,b,m->normal,rA[i],rB[i],targetVn[i],&accumN[i],&accumT[i],bStatic);
-    }
+    for (int it=0;it<iters;++it) { for (int i=0;i<m->n;++i) ResolveContactVelocity(a,b,m->normal,rA[i],rB[i],targetVn[i],&accumN[i],&accumT[i],bStatic); }
     float invMassA = World.mass[a] < 0.001f ? 1.0f : 1.0f / World.mass[a], invMassB = bStatic || World.mass[b] < 0.001f ? 0.0f : 1.0f / World.mass[b], avgPen=0.0f;
     for (int i=0;i<m->n;++i) {avgPen += m->p[i].pen;}
-    if (m->n > 0) avgPen /= (float)m->n;
+    if (m->n > 0) {avgPen /= (float)m->n;}
     float c = vmax(avgPen - 0.005f,0.0f) * 0.9f;
     SetPosition(a,V3_AplusB(World.position[a],V3_ScaleByF(m->normal,c * invMassA / (invMassA + invMassB + PHY_EPSILON))),false); 
     if (!bStatic) SetPosition(b,V3_AsubB(World.position[b],V3_ScaleByF(m->normal,c * invMassB / (invMassA + invMassB + PHY_EPSILON))),false);
@@ -636,8 +620,7 @@ void Physics(float dt) {
         }
         for (u16 i=0;i<dynamicEntityCount;++i) { // Integrate all dynamic bodies
             u16 idx = dynamicEntities[i];
-            V3 acc = {0.0f,-9.81f * World.gravity[idx],0.0f};
-            if ((idx == PLAYER1 || idx == PLAYER2) && Cheats.noclip) acc.y = 0.0f;
+            V3 acc = {0.0f,-9.81f * World.gravity[idx],0.0f}; if ((idx == PLAYER1) && Cheats.noclip) acc.y = 0.0f;
             acc = V3_AplusB(acc,V3_ScaleByF(World.instances[idx].accumulatedForce,1.0f / World.mass[idx]));
             World.velocity[idx] = V3_AplusB(World.velocity[idx],V3_ScaleByF(acc,dtsub));
             float speed = V3_Mag(World.velocity[idx]);
@@ -654,9 +637,8 @@ void Physics(float dt) {
             } else World.angularVelocity[idx] = (V3){0.0f,0.0f,0.0f};
         }
         for (u16 i=0;i<dynamicEntityCount;++i) { // Collision detection and resolution
-            u16 a = dynamicEntities[i]; if (World.collider[a] == COLTYPE_MSH || (Cheats.noclip && (a == PLAYER1 || a == PLAYER2))) continue;
-            i32 cx = PosGetCellCoordX(World.position[a].x);
-            i32 cz = PosGetCellCoordZ(World.position[a].z);
+            u16 a = dynamicEntities[i]; if (World.collider[a] == COLTYPE_MSH || (Cheats.noclip && a == PLAYER1)) continue;
+            i32 cx = PosGetCellCoordX(World.position[a].x); i32 cz = PosGetCellCoordZ(World.position[a].z);
             u32 mask = GetCollisionMask(World.layer[a]);
             float searchRad = World.radius[a] + V3_Mag(World.velocity[a]) * dtsub + 0.5f;
             i32 radCells = (i32)(searchRad / CELL_SIZE) + 2;
@@ -668,7 +650,7 @@ void Physics(float dt) {
                     for (u16 k = 0; k < cellCounts[cell]; ++k) {
                         u16 b = cellLists[cell][k];      if (b == a) continue;
                         if (b < a && (World.instances[b].entflags & EF_RIGIDBODY)) continue; // Prevent double processing dynamic vs dynamic
-                        if (Cheats.noclip && (b == PLAYER1 || b == PLAYER2)) continue;
+                        if (Cheats.noclip && b == PLAYER1) continue;
                         if (!(mask & World.layer[b]) || World.collider[b] == COLTYPE_NONE) continue;
                         V3 deltaPos = V3_AsubB(World.position[a],World.position[b]); float rr = World.radius[a] * 1.42f + World.radius[b] * 1.42f; if (V3_dot(deltaPos,deltaPos) > rr * rr) continue;
                         Manifold mf = {0};

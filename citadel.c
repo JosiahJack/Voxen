@@ -544,7 +544,7 @@ void CyberMineInitBeforeLoad(u16 self) {
 void CyberMineOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (other != PLAYER1) return; PlayerTakeDamage(PLAYER1,e->damage); play_wav(sounds[67],1.0f,World.position[self],false); flag_set(&e->entflags,EF_ACTIVE,false); }
 void CyberPushOnTriggerStay(u16 self, u16 other) { Entity* e = &World.instances[self]; Entity* player = &World.instances[PLAYER1]; if (World.diffCyb < 1 || other != PLAYER1) {return;} player->inCyberTube = true; AddForce(PLAYER1,V3_ScaleByF(e->direction,e->force * (float)World.deltaTime),false); World.Sys_Music.cyberTube = true; }
 void CyberPushOnTriggerExit(u16 self, u16 other) { (void)self; if (other != PLAYER1) {return;} World.instances[other].inCyberTube = false; World.Sys_Music.cyberTube = false; }
-void CyberDoorOnCollisionEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (!IdxIsDoor(e->index) || (other != PLAYER1 && other != PLAYER2)) {return;} CenterStatusPrint("%s  %s",Sys_Text.stringTable[e->messageIndex],Sys_Text.stringTable[601]); }
+void CyberDoorOnCollisionEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (!IdxIsDoor(e->index) || (other != PLAYER1)) {return;} CenterStatusPrint("%s  %s",Sys_Text.stringTable[e->messageIndex],Sys_Text.stringTable[601]); }
 void CyberSwitchInitAfterLoad(u16 self) { Entity* e = &World.instances[self]; if (e->iceActive) {flag_set(&e->entflags,EF_ACTIVE,true);} } // TODO Visual subobject parity removed with hierarchy removal.
 void CyberSwitchOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (e->active || other != PLAYER1) {return;} UICyberSprint((u16)e->textIndex); e->active = true; UseTargets(other,e->target); }
 void CyberTimerInitAfterLoad(u16 self) { Entity* e = &World.instances[self]; e->cyberTimer = 600.0f; e->timerFinished = World.pauseRelativeTime + 1.0; }
@@ -691,7 +691,7 @@ void TriggerUseTargets(u16 self, u16 activator) { UseTargets(activator,World.ins
 void TriggerDelayedTarget(u16 self, u16 activator) { World.instances[self].delayFireFinished = World.pauseRelativeTime + World.instances[self].delay; TriggerUseTargets(self,activator); }
 void TriggerTriggerTripped(u16 self, u16 other) {
     Entity* e = &World.instances[self];
-    if (other != PLAYER1 && other != PLAYER2) return;
+    if (other != PLAYER1) return;
     if (e->recentMostActivator && e->ignoreSecondaryTriggers) return;
     e->recentMostActivator = other;
     if (e->onlyOnce) e->allDone = true;
@@ -1372,16 +1372,16 @@ static void Death(u16 self,bool energyVaporized) {
     else if (doTeleport) TeleportAway(self);
     else if (isGrenade) GrenadeExplode(self);
     if (isNPC && !doTeleport) NPCDeath(self);
-    else if (self == PLAYER1 || self == PLAYER2) World.deaths++;
+    else if (self == PLAYER1) World.deaths++;
     flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true);
 }
 
 float TakeDamage(u16 self,DamageData dd) {
-    if (Cheats.god && (self == PLAYER1 || self == PLAYER2)) return 0.0f;
+    if (Cheats.god && self == PLAYER1) return 0.0f;
     bool isCyber = IsCyberEntity(self);
     float* hp = isCyber ? &World.instances[self].cyberHealth : &World.instances[self].health;
     bool isNPC = IdxIsNPC(World.instances[self].index);
-    bool isPlayer = (self == PLAYER1 || self == PLAYER2);
+    bool isPlayer = (self == PLAYER1);
 //     bool isObj = IdxIsDynamicObject(World.instances[self].index); // TODO
     bool isGrenade = (World.instances[self].entflags & EF_ISGRENADE) != 0;
 //     bool isScreen  = (World.instances[self].index == 279); // TODO
@@ -1434,18 +1434,15 @@ float TakeDamage(u16 self,DamageData dd) {
 
     if (isCyber) {
         World.instances[self].cyberHealth -= take;
-        if (isPlayer) {
-            World.damageReceived += take; // TODO: DrawTicks(true)
-            if (World.instances[self].cyberHealth <= 0.0f) { return 0.0f; } // TODO: ExitCyberspace()
-        }
-        if (dd.owner == PLAYER1 || dd.owner == PLAYER2) World.damageDealt += take;
+        if (isPlayer) { World.damageReceived += take; /*TODO: DrawTicks(true)*/ if (World.instances[self].cyberHealth <= 0.0f) { return 0.0f; } /*TODO: ExitCyberspace()*/ }
+        if (dd.owner == PLAYER1) World.damageDealt += take;
     } else {
         // Camera constIndex 477 gets one-shot by tranq
         if (World.instances[self].index == 477 && dd.attackType == Att_Trnq) take = World.instances[self].health + 1.0f;
         take = ApplyAttTypeAdjustments(self,take,dd.attackType);
         World.instances[self].health -= take;
         if (isPlayer) { World.damageReceived += take; World.Sys_Music.inCombat = true; } // TODO: DrawTicks(true)
-        if (dd.owner == PLAYER1 || dd.owner == PLAYER2) World.damageDealt += take;
+        if (dd.owner == PLAYER1) World.damageDealt += take;
     }
     if (isNPC && (World.instances[self].health > 0.0f || (isCyber && World.instances[self].cyberHealth > 0.0f))) {
         if (npcTable[World.instances[self].index - 419].timeBetweenPain > 0.0f) flag_set(&World.instances[self].entflags,EF_GO_INTO_PAIN,true);

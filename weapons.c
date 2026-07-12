@@ -17,33 +17,15 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 float recoilForWeapon[16]={1.3f,0.0f,0.1f,0.2f,0.0f,0.0f,0.0f,1.2f,0.8f,0.5f,1.5f,1.0f,0.9f,0.7f,0.0f,0.1f};
 float driftForWeapon[16]={5.0f,0.0f,15.0f,50.0f,0.0f,0.0f,0.0f,8.0f,3.0f,3.0f,3.0f,12.0f,10.0f,30.0f,0.0f,3.0f};
 AttType attackTypeForWeapon[16]={Att_HitS,Att_Beam,Att_PjNd,Att_HitS,Att_Beam,Att_MlEg,Att_HitS,Att_HitS,Att_Magn,Att_HitS,Att_PjBm,Att_Ball,Att_HitS,Att_HitS,Att_Beam,Att_Trnq};
-// UI fire sounds and bullet-hole/muzzle-flash prefabs per wep16, keyed by weapon table position
-// (0)Assault (1)Blaster (2)Dartgun (3)Flechette (4)IonBeam (5)Rapier (6)Pipe (7)Magnum
-// (8)Magpulse (9)Pistol (10)Plasma (11)Railgun (12)Riotgun (13)Skorpion (14)SparqBeam (15)Stungun
-u16 wepFireSound[16]={251,239,240,243,245,246,254,249,250,255,257,259,262,263,264,265};
+u16 wepFireSound[16]={251,239,240,243,245,246,254,249,250,255,257,259,262,263,264,265}; //(0)Assault (1)Blaster (2)Dartgun (3)Flechette (4)IonBeam (5)Rapier (6)Pipe (7)Magnum (8)Magpulse (9)Pistol (10)Plasma (11)Railgun (12)Riotgun (13)Skorpion (14)SparqBeam (15)Stungun
 u16 wepBulletHolePrefab[16]={518,520,522,521,519,520,522,518,519,521,519,519,523,518,520,520};
 i8  wepFogInc[16]={2,0,0,1,0,0,0,3,0,1,0,2,4,2,0,0};
 u16 wepSmokePrefab[16]={506,0,0,509,0,0,0,507,0,510,0,511,512,513,0,0}; // 0 = no smoke for this weapon
 typedef enum { WC_STD=0, WC_MELEE=1, WC_ENERGY=2 } WepClass;
 WepClass wepClass[16]={WC_STD,WC_ENERGY,WC_STD,WC_STD,WC_ENERGY,WC_MELEE,WC_MELEE,WC_STD,WC_STD,WC_STD,WC_ENERGY,WC_STD,WC_STD,WC_STD,WC_ENERGY,WC_ENERGY};
-float magpulseShotForce=2.2f;
-float stungunShotForce=2.2f;
-float railgunShotForce=5.0f;
-float plasmaShotForce=1.5f;
-typedef struct {
-    float hitOffset,verticalOffset,fireDistance,hitscanDistance,meleescanDistance,overheatedPercent;
-    V3 reloadContainerHome,reloadContainerPos,tempVec;
-    Quaternion reloadContainerRot;
-    float wepYRot,targetY;
-    bool recoiling;
-    RaycastHit tempHit;
-    u16 tempHitEnt;
-    double pendingMeleeFinished;
-    int pendingMeleeWep16;
-    u16 pendingMeleeTarget;
-    bool pendingMeleeIsRapier,pendingMeleeSilent;
-    u16 pendingMeleeHitSnd,pendingMeleeMissSnd,pendingMeleeFleshSnd;
-} WeaponFireCtx;
+float magpulseShotForce=2.2f, stungunShotForce=2.2f, railgunShotForce=5.0f, plasmaShotForce=1.5f;
+typedef struct { float hitOffset,verticalOffset,fireDistance,hitscanDistance,meleescanDistance,overheatedPercent,wepYRot,targetY; V3 reloadContainerHome,reloadContainerPos,tempVec; Quaternion reloadContainerRot;
+                 bool recoiling,pendingMeleeIsRapier,pendingMeleeSilent; RaycastHit tempHit; u16 tempHitEnt; double pendingMeleeFinished; i32 pendingMeleeWep16; u16 pendingMeleeTarget; u16 pendingMeleeHitSnd,pendingMeleeMissSnd,pendingMeleeFleshSnd; } WeaponFireCtx;
 WeaponFireCtx wfx = { .verticalOffset=-0.2f,.fireDistance=200.0f,.hitscanDistance=200.0f,.meleescanDistance=3.2f, .overheatedPercent=80.0f,.reloadContainerHome={0},.pendingMeleeFinished=0.0 };
 INLINE Quaternion QuatEulerY(float degY) { float r=deg2rad(degY)*0.5f; return (Quaternion){0.0f,vsinf(r),0.0f,vcosf(r)}; }
 INLINE Quaternion QuatEulerZ(float degZ) { float r=deg2rad(degZ)*0.5f; return (Quaternion){0.0f,0.0f,vsinf(r),vcosf(r)}; }

@@ -872,7 +872,7 @@ void UpdateLight(u16 i, V3 pos, Color3 col, float range, float intensity, float 
 // Level Loading and Entity Management System
 void InitializeEntity(Entity* e) { mset(e,0,sizeof(Entity)); u16 idx=(u16)(e - World.instances); e->index=U16_MAX; e->entflags=EF_ACTIVE; e->kinematic=true; World.layer[idx]=L_Default; e->camView=255; e->tickTime = 0.35f; World.angularDrag[idx] = 0.05f; e->modelIndex=e->lodIndex=e->colMeshIndex=MAX_MDLS; e->texIndex=e->glowIndex=e->specIndex=e->normIndex = MAX_TXRS; World.scale[idx].x=World.scale[idx].y=World.scale[idx].z=World.mass[idx]=e->volume=World.rotation[idx].w=1.0f; World.dynamicFriction[idx] = World.staticFriction[idx] = 0.6f; }
 void InitializeAIAfterLoad(u16 i);
-void DeleteInstance(u16 i) { if (i <= PLAYER2 || i >= World.instCount) return; flag_set(&World.instances[i].entflags,EF_ACTIVE,false); } // Don't delete null ent, player 1, nor player 2 or already empty slots.
+void DeleteInstance(u16 i) { if (i <= PLAYER1 || i >= World.instCount) return; flag_set(&World.instances[i].entflags,EF_ACTIVE,false); } // Don't delete null ent, player 1, nor player 2 or already empty slots.
 u16 AddInstance(u16 entIdx, V3 pos) {
     if (entIdx >= MAX_ENTITIES) { DualLogError("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d, skipped\n",entIdx,MAX_ENTITIES); return 0; }
     if (World.instCount >= INSTANCE_COUNT) { DualLogError("\nToo many instances while adding entity %u, max instance count is %u, skipped\n", entIdx, INSTANCE_COUNT); return 0; }
@@ -1192,7 +1192,7 @@ void LoadLevelData(u8 curlevel) {
     }
     for (int i=PLAYER1;i<World.instCount;++i) {
         u16 constIndex = World.instances[i].index;
-        if (i == PLAYER1 || i == PLAYER2 || IdxIsDynamicObject(constIndex) || (IdxIsNPC(constIndex) && constIndex < 443/*not cyber*/)) World.gravity[i] = 1.0f;
+        if (i == PLAYER1 || IdxIsDynamicObject(constIndex) || (IdxIsNPC(constIndex) && constIndex < 443/*not cyber*/)) World.gravity[i] = 1.0f;
         else World.gravity[i] = 0.0f;
         if (IdxIsGeometry(constIndex)) World.layer[i] = L_Geometry;
         else if (IdxIsDoor(constIndex)) World.layer[i] = L_Door;

@@ -68,8 +68,7 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define NULLENT 0u
 #define WORLD   0u // Much like Quake, the world is entity 0.  Aand also like Quake, world is nullent and is 0.
 #define PLAYER1 1u
-#define PLAYER2 2u
-#define INSTS_1ST_IDX 3
+#define INSTS_1ST_IDX 2
 #define WORLDX 64
 #define WORLDZ WORLDX
 #define WORLDY 18 // Level 8 is only 17.5 cells tall!!  Could be 16 if I make the ceiling same height in last room as in original.
@@ -758,36 +757,33 @@ INLINE void SetLevelPointers(u8 lev) {
     World.lightsNewPosition = World.levelLightsNewPosition[lev];
     World.loadedLights      = World.levelLoadedLights[lev];
 }
-// CopyPlayerState: Copies the player-entity slots (PLAYER1=1, PLAYER2=2) — including the Entity
-// struct and all parallel SoA arrays — from srcLevel to dstLevel.  Used by LoadLevel() to carry
-// the player's state (position, health, ioflags, inventory-derived flags, etc.) across level
-// switches so the player doesn't "reset" to the NewGame state when entering a new level.
+// CopyPlayerState: Copies the player-entity slot — including the Entity struct and all parallel SoA arrays — from srcLevel to dstLevel.  Used by LoadLevel() to carry
+// the player's state (position, health, ioflags, inventory-derived flags, etc.) across level switches so the player doesn't "reset" to the NewGame state when entering a new level.
 // Note: slot 0 (WORLD/NULL) is per-level static geometry and is NOT copied.
 INLINE void CopyPlayerState(u8 srcLevel, u8 dstLevel) {
     if (srcLevel >= MAX_LEVELS || dstLevel >= MAX_LEVELS || srcLevel == dstLevel) return;
-    for (u16 s = PLAYER1; s <= PLAYER2; ++s) { // s = 1, 2
-        World.levelInstances[dstLevel][s]            = World.levelInstances[srcLevel][s];
-        World.levelPosition[dstLevel][s]             = World.levelPosition[srcLevel][s];
-        World.levelScale[dstLevel][s]                = World.levelScale[srcLevel][s];
-        World.levelVelocity[dstLevel][s]             = World.levelVelocity[srcLevel][s];
-        World.levelAngularVelocity[dstLevel][s]      = World.levelAngularVelocity[srcLevel][s];
-        World.levelColliderCenter[dstLevel][s]       = World.levelColliderCenter[srcLevel][s];
-        World.levelColliderSize[dstLevel][s]         = World.levelColliderSize[srcLevel][s];
-        World.levelCollider[dstLevel][s]             = World.levelCollider[srcLevel][s];
-        World.levelRotation[dstLevel][s]             = World.levelRotation[srcLevel][s];
-        World.levelLayer[dstLevel][s]                = World.levelLayer[srcLevel][s];
-        World.levelMass[dstLevel][s]                 = World.levelMass[srcLevel][s];
-        World.levelRadius[dstLevel][s]               = World.levelRadius[srcLevel][s];
-        World.levelGravity[dstLevel][s]              = World.levelGravity[srcLevel][s];
-        mcpy(World.levelInertiaTensor[dstLevel][s],    World.levelInertiaTensor[srcLevel][s],    6 * sizeof(float));
-        mcpy(World.levelInvInertiaTensor[dstLevel][s], World.levelInvInertiaTensor[srcLevel][s], 6 * sizeof(float));
-        World.levelAngularDrag[dstLevel][s]          = World.levelAngularDrag[srcLevel][s];
-        World.levelDynamicFriction[dstLevel][s]      = World.levelDynamicFriction[srcLevel][s];
-        World.levelStaticFriction[dstLevel][s]       = World.levelStaticFriction[srcLevel][s];
-        World.levelBounciness[dstLevel][s]           = World.levelBounciness[srcLevel][s];
-        World.levelInvTnsrValid[dstLevel][s]         = World.levelInvTnsrValid[srcLevel][s];
-        World.levelColliding[dstLevel][s]            = World.levelColliding[srcLevel][s];
-    }
+    u16 s = PLAYER1;
+    World.levelInstances[dstLevel][s]            = World.levelInstances[srcLevel][s];
+    World.levelPosition[dstLevel][s]             = World.levelPosition[srcLevel][s];
+    World.levelScale[dstLevel][s]                = World.levelScale[srcLevel][s];
+    World.levelVelocity[dstLevel][s]             = World.levelVelocity[srcLevel][s];
+    World.levelAngularVelocity[dstLevel][s]      = World.levelAngularVelocity[srcLevel][s];
+    World.levelColliderCenter[dstLevel][s]       = World.levelColliderCenter[srcLevel][s];
+    World.levelColliderSize[dstLevel][s]         = World.levelColliderSize[srcLevel][s];
+    World.levelCollider[dstLevel][s]             = World.levelCollider[srcLevel][s];
+    World.levelRotation[dstLevel][s]             = World.levelRotation[srcLevel][s];
+    World.levelLayer[dstLevel][s]                = World.levelLayer[srcLevel][s];
+    World.levelMass[dstLevel][s]                 = World.levelMass[srcLevel][s];
+    World.levelRadius[dstLevel][s]               = World.levelRadius[srcLevel][s];
+    World.levelGravity[dstLevel][s]              = World.levelGravity[srcLevel][s];
+    mcpy(World.levelInertiaTensor[dstLevel][s],    World.levelInertiaTensor[srcLevel][s],    6 * sizeof(float));
+    mcpy(World.levelInvInertiaTensor[dstLevel][s], World.levelInvInertiaTensor[srcLevel][s], 6 * sizeof(float));
+    World.levelAngularDrag[dstLevel][s]          = World.levelAngularDrag[srcLevel][s];
+    World.levelDynamicFriction[dstLevel][s]      = World.levelDynamicFriction[srcLevel][s];
+    World.levelStaticFriction[dstLevel][s]       = World.levelStaticFriction[srcLevel][s];
+    World.levelBounciness[dstLevel][s]           = World.levelBounciness[srcLevel][s];
+    World.levelInvTnsrValid[dstLevel][s]         = World.levelInvTnsrValid[srcLevel][s];
+    World.levelColliding[dstLevel][s]            = World.levelColliding[srcLevel][s];
 }
 INLINE void EntitySetLocked(Entity* e, bool locked) { DualLog("Unlocking entity with index %u\n",(u16)(e - World.instances)); flag_set(&e->entflags,EF_LOCKED,locked); }
 INLINE void UIBlockedBySecurity(V3 tetherPoint) { (void)tetherPoint; CenterStatusPrint("%s",Sys_Text.stringTable[25]); }
