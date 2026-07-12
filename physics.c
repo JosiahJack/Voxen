@@ -261,7 +261,8 @@ static inline void SphTriTest(V3 sc, float sr, u16 mesh, u32 ti, const float* mx
     float vb=d5*d2-d1*d6; if (vb<=0.f && d2>=0.f && d6<=0.f) { float w=d2/(d2-d6); V3 pt=V3_AplusB(a,V3_ScaleByF(ac,w)); FeatureOverlap(sc,sr,pt,r); return; }
     float va=d3*d6-d5*d4; if (va<=0.f && (d4-d3)>=0.f && (d5-d6)>=0.f) { float w=(d4-d3)/((d4-d3)+(d5-d6)); V3 bc=V3_AsubB(c,b); V3 pt=V3_AplusB(b,V3_ScaleByF(bc,w)); FeatureOverlap(sc,sr,pt,r); return; }
     V3 n = V3_Cross(ab,ac); float nLen=V3_Mag(n); if(nLen<PHY_EPSILON) return; n=V3_ScaleByF(n,1.f/nLen); float dist=V3_dot(n,ap), absDist=vabs(dist);
-    if (absDist < sr) { V3 fn = (dist >= 0.0f) ? n : (V3){-n.x,-n.y,-n.z}; Overlap t={true,V3_AsubB(sc,V3_ScaleByF(fn,absDist)),fn,sr-absDist}; if(t.pen>r->pen) *r=t; }
+    if (absDist < sr) { V3 fn = /*(dist >= 0.0f) ? n : Ah nope, want it to be one-sided so that if ever small objects just barely penetrate their center past the tri it doesn't pop it through the wall/floor*/ (V3){-n.x,-n.y,-n.z}; // For some reason it always needs negated to work properly.
+    Overlap t={true,V3_AsubB(sc,V3_ScaleByF(fn,absDist)),fn,sr-absDist}; if(t.pen>r->pen) *r=t; }
 }
 
 #define MANIFOLD_EPA_SEED EPAVert ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv=0, nf=0; for (int i = 0; i < 4; i++) { ev[nv].wA = s.wA[i]; ev[nv].wB = s.wB[i]; ev[nv].v = s.v[i]; nv++; } static const int kTetFaces[4][3] = {{0,1,2}, {0,3,1}, {0,2,3}, {1,3,2}};
@@ -370,7 +371,7 @@ static void CvxTriTest(CvxMshCtx* ctx, V3 ta, V3 tb, V3 tc) {
     for (int it=0;it<32;++it){
         int bf=-1; float bd=1e9f; for (int f=0;f<nf;f++)if(ef[f].d<bd){bd=ef[f].d;bf=f;} if(bf<0)break;
         V3 bn=ef[bf].n; wA=HSUP(bn); wB=TSUP(bn); V3 sup=V3_AsubB(wA,wB);
-        if(V3_dot(bn,sup)-bd<PHY_EPSILON){tHit=true; tN=bn; tD=bd; tP=EPAContactPoint(ev,ef[bf].a,ef[bf].b,ef[bf].c); break;}
+        if(V3_dot(bn,sup)-bd<PHY_EPSILON){V3 triN = V3_Normalize(V3_Cross(V3_AsubB(tb,ta),V3_AsubB(tc,ta))); if (V3_dot(bn,triN) < 0.0f) { bn = triN;/*Prevent thin object penetrations when walked on by ensuring triangles are treated as one-sided from tri normal*/} tHit=true; tN=bn; tD=bd; tP=EPAContactPoint(ev,ef[bf].a,ef[bf].b,ef[bf].c); break;}
         EPA_EXPAND();
     }
     if (tHit) {
@@ -483,9 +484,22 @@ static void ApplyManifoldResponse(u16 a, u16 b, const Manifold *m) {
     }
     int iters = (m->n > 1) ? 8 : 1;
     for (int it=0;it<iters;++it) { for (int i=0;i<m->n;++i) ResolveContactVelocity(a,b,m->normal,rA[i],rB[i],targetVn[i],&accumN[i],&accumT[i],bStatic,invMassA,invMassB,invSumN[i],canRotateA,canRotateB); }
-    float avgPen=0.0f; for (int i=0;i<m->n;++i) {avgPen += m->p[i].pen;} avgPen /= (float)m->n; float c = vmax(avgPen - 0.005f,0.0f) * 0.9f, massDiv = invMassA + invMassB + PHY_EPSILON;
+    float avgPen=0.0f; for (int i=0;i<m->n;++i) {avgPen += m->p[i].pen;} avgPen /= (float)m->n; float c = vmax(avgPen - 0.005f,0.0f) * 0.9f; // Baumgarte position correction.
+    float massDiv = invMassA + invMassB + PHY_EPSILON;
     SetPosition(a,V3_AplusB(World.position[a],V3_ScaleByF(m->normal,c * invMassA / massDiv)),false); 
     if (!bStatic) SetPosition(b,V3_AsubB(World.position[b],V3_ScaleByF(m->normal,c * invMassB / massDiv)),false);
+}
+
+static void EntityColliderMatrixNow(u16 i, float M[16]) { // Convex meshes need to keep their matrix4x4 up to date.
+    Quaternion q = World.rotation[i];
+    V3 sx = V3_ScaleByF(quat_rot_v3(q,(V3){1,0,0}),World.scale[i].x);
+    V3 sy = V3_ScaleByF(quat_rot_v3(q,(V3){0,1,0}),World.scale[i].y);
+    V3 sz = V3_ScaleByF(quat_rot_v3(q,(V3){0,0,1}),World.scale[i].z);
+    V3 p = World.position[i];
+    M[0]=sx.x; M[1]=sx.y; M[2]=sx.z; M[3]=0.0f;
+    M[4]=sy.x; M[5]=sy.y; M[6]=sy.z; M[7]=0.0f;
+    M[8]=sz.x; M[9]=sz.y; M[10]=sz.z; M[11]=0.0f;
+    M[12]=p.x; M[13]=p.y; M[14]=p.z; M[15]=1.0f;
 }
 
 static inline bool V3_IsSane(V3 v) { return (v.x<=1e6f && v.x>=-1e6f && v.y<=1e6f && v.y>=-1e6f && v.z<=1e6f && v.z>=-1e6f); }
@@ -495,7 +509,7 @@ void Physics(float dt) {
     for (u8 s=0;s<substeps;++s) {
         mset(cellCounts,0,sizeof(cellCounts));
         for (u16 i=0;i<World.instCount;++i) {
-            posBudget[i] = 0.08f; World.instances[i].cellX=(i16)PosGetCellCoordX(World.position[i].x); World.instances[i].cellZ=(i16)PosGetCellCoordZ(World.position[i].z);
+            posBudget[i] = 0.16f; World.instances[i].cellX=(i16)PosGetCellCoordX(World.position[i].x); World.instances[i].cellZ=(i16)PosGetCellCoordZ(World.position[i].z);
             World.instances[i].cellIndex=PosGetCellCoordsP(World.instances[i].cellX,World.instances[i].cellZ); World.radius[i] = GetColRad(i);
             u32 cell=(u32)World.instances[i].cellIndex; if(cell < WORLDX*WORLDX && cellCounts[cell] < 128){cellLists[cell][cellCounts[cell]++]=i;}
         }
@@ -525,8 +539,14 @@ void Physics(float dt) {
                         u16 b = cellLists[cell][k]; if (b == a) continue;
                         if (Cheats.noclip && b == PLAYER1) continue;
                         if (!(mask & World.layer[b]) || World.collider[b] == COLTYPE_NONE) continue;
+                        if ((World.instances[b].entflags & EF_RIGIDBODY) && b > a) continue;
                         V3 deltaPos = V3_AsubB(World.position[a],World.position[b]); float rr = (World.radius[a] + World.radius[b]) * 1.42f; if (V3_dot(deltaPos,deltaPos) > rr * rr) continue;
                         Manifold mf = {0};
+                        float matA[16], matB[16];
+                        const float *mxA = &modelMatrices[a*16];
+                        const float *mxB = &modelMatrices[b*16];
+                        if (World.collider[a] == COLTYPE_CVX) { EntityColliderMatrixNow(a,matA); mxA = matA; } // Not MSH as only CVX is dynamically moving during physics substeps.
+                        if (World.collider[b] == COLTYPE_CVX) { EntityColliderMatrixNow(b,matB); mxB = matB; }
                         if      (World.collider[a] == COLTYPE_CAP && World.collider[b] == COLTYPE_CAP) { mf = OverlapToManifold(CapCap(Entity_GetCap(a),Entity_GetCap(b))); }
                         else if (World.collider[a] == COLTYPE_CAP && World.collider[b] == COLTYPE_BOX) { mf = OverlapToManifold(CapBox(Entity_GetCap(a),Entity_GetBox(b))); }
                         else if (World.collider[a] == COLTYPE_CAP && World.collider[b] == COLTYPE_SPH) { Overlap r=SphCap(Entity_GetSph(b),Entity_GetCap(a)); if(r.hit) r.normal=V3_ScaleByF(r.normal,-1.f); mf=OverlapToManifold(r); }
@@ -536,17 +556,17 @@ void Physics(float dt) {
                         else if (World.collider[a] == COLTYPE_SPH && World.collider[b] == COLTYPE_BOX) { ShapeSphere sa = Entity_GetSph(a); mf = OverlapToManifold(SphBox(sa.ctr,sa.rad,Entity_GetBox(b))); }
                         else if (World.collider[a] == COLTYPE_BOX && World.collider[b] == COLTYPE_SPH) { ShapeSphere sa = Entity_GetSph(b); Overlap r = SphBox(sa.ctr,sa.rad,Entity_GetBox(a)); if(r.hit) r.normal=V3_ScaleByF(r.normal,-1.0f); mf=OverlapToManifold(r); }
                         else if (World.collider[a] == COLTYPE_SPH && World.collider[b] == COLTYPE_SPH) { ShapeSphere sa = Entity_GetSph(a), sb = Entity_GetSph(b); mf = OverlapToManifold(SphSph(sa.ctr,sa.rad,sb.ctr,sb.rad)); }
-                        else if (World.collider[a] == COLTYPE_CAP && World.collider[b] == COLTYPE_MSH) { mf = OverlapToManifold(CapMsh(Entity_GetCap(a),World.instances[b].modelIndex,&modelMatrices[b*16])); }
-                        else if (World.collider[a] == COLTYPE_SPH && World.collider[b] == COLTYPE_MSH) { ShapeSphere sa = Entity_GetSph(a); mf = OverlapToManifold(SphMsh(sa.ctr,sa.rad,World.instances[b].modelIndex,&modelMatrices[b*16])); }
-                        else if (World.collider[a] == COLTYPE_BOX && World.collider[b] == COLTYPE_MSH) { mf = BoxMsh(Entity_GetBox(a),World.instances[b].modelIndex,&modelMatrices[b*16]); }
-                        else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_MSH) { mf = CvxMsh(World.instances[a].colMeshIndex,&modelMatrices[a*16],World.instances[b].modelIndex,&modelMatrices[b*16]); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
-                        else if (World.collider[a] == COLTYPE_CAP && World.collider[b] == COLTYPE_CVX) { mf = PrimitiveCvx(a,World.instances[b].colMeshIndex,&modelMatrices[b*16]); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
-                        else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_CAP) { mf = PrimitiveCvx(b,World.instances[a].colMeshIndex,&modelMatrices[a*16]); }
-                        else if (World.collider[a] == COLTYPE_SPH && World.collider[b] == COLTYPE_CVX) { mf = PrimitiveCvx(a,World.instances[b].colMeshIndex,&modelMatrices[b*16]); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
-                        else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_SPH) { mf = PrimitiveCvx(b,World.instances[a].colMeshIndex,&modelMatrices[a*16]); }
-                        else if (World.collider[a] == COLTYPE_BOX && World.collider[b] == COLTYPE_CVX) { mf = PrimitiveCvx(a,World.instances[b].colMeshIndex,&modelMatrices[b*16]); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
-                        else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_BOX) { mf = PrimitiveCvx(b,World.instances[a].colMeshIndex,&modelMatrices[a*16]); }
-                        else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_CVX) { mf = CvxCvx(World.instances[a].colMeshIndex,World.instances[b].colMeshIndex,&modelMatrices[a*16],&modelMatrices[b*16]); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
+                        else if (World.collider[a] == COLTYPE_CAP && World.collider[b] == COLTYPE_MSH) { mf = OverlapToManifold(CapMsh(Entity_GetCap(a),World.instances[b].modelIndex,mxB)); }
+                        else if (World.collider[a] == COLTYPE_SPH && World.collider[b] == COLTYPE_MSH) { ShapeSphere sa = Entity_GetSph(a); mf = OverlapToManifold(SphMsh(sa.ctr,sa.rad,World.instances[b].modelIndex,mxB)); }
+                        else if (World.collider[a] == COLTYPE_BOX && World.collider[b] == COLTYPE_MSH) { mf = BoxMsh(Entity_GetBox(a),World.instances[b].modelIndex,mxB); }
+                        else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_MSH) { mf = CvxMsh(World.instances[a].colMeshIndex,mxA,World.instances[b].modelIndex,mxB); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
+                        else if (World.collider[a] == COLTYPE_CAP && World.collider[b] == COLTYPE_CVX) { mf = PrimitiveCvx(a,World.instances[b].colMeshIndex,mxB); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
+                        else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_CAP) { mf = PrimitiveCvx(b,World.instances[a].colMeshIndex,mxA); }
+                        else if (World.collider[a] == COLTYPE_SPH && World.collider[b] == COLTYPE_CVX) { mf = PrimitiveCvx(a,World.instances[b].colMeshIndex,mxB); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
+                        else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_SPH) { mf = PrimitiveCvx(b,World.instances[a].colMeshIndex,mxA); }
+                        else if (World.collider[a] == COLTYPE_BOX && World.collider[b] == COLTYPE_CVX) { mf = PrimitiveCvx(a,World.instances[b].colMeshIndex,mxB); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
+                        else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_BOX) { mf = PrimitiveCvx(b,World.instances[a].colMeshIndex,mxA); }
+                        else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_CVX) { mf = CvxCvx(World.instances[a].colMeshIndex,World.instances[b].colMeshIndex,mxA,mxB); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
                         else { mf=OverlapToManifold(SphSph(World.position[a],World.colliderSize[a].x,World.position[b],World.colliderSize[b].x)); }
                         if (mf.n && contactCount < 32) contacts[contactCount++] = (Contact){mf,b};
                     }
