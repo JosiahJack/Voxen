@@ -154,12 +154,8 @@ Overlap BoxBox(ShapeBox a, ShapeBox b) {
     return r;
 }
 
-inline V3 MvVert(const float* M, V3 v) { return (V3){ M[0]*v.x + M[4]*v.y + M[8]*v.z  + M[12], M[1]*v.x + M[5]*v.y + M[9]*v.z  + M[13], M[2]*v.x + M[6]*v.y + M[10]*v.z + M[14] }; }
+V3 MvVert(const float* M, V3 v) { return (V3){ M[0]*v.x + M[4]*v.y + M[8]*v.z  + M[12], M[1]*v.x + M[5]*v.y + M[9]*v.z  + M[13], M[2]*v.x + M[6]*v.y + M[10]*v.z + M[14] }; }
 inline void MeshTri(u16 m, u32 ti, const float* mx, V3* a, V3* b, V3* c) { u32 i0=modelTriangles[m][ti*3+0],i1=modelTriangles[m][ti*3+1],i2=modelTriangles[m][ti*3+2]; *a=MvVert(mx,MeshVert(m,i0)); *b=MvVert(mx,MeshVert(m,i1)); *c=MvVert(mx,MeshVert(m,i2)); }
-typedef struct { V3 v[CVXMSH_HULL_CACHE]; u32 n; bool ok; } HullCache;
-inline HullCache CacheHull(u16 m, const float* M) { HullCache h; h.n = modelVertexCounts[m]; h.ok = h.n && h.n <= CVXMSH_HULL_CACHE; if (!h.ok) { DualLogWarn("%u exceeds convex hull budget!\n",h.n); return h;} const u8* vb = modelVertices[m]; for (u32 i=0;i<h.n;++i) { const u8* p=vb+i*CPU_VRT_SZ; h.v[i]=MvVert(M,(V3){*(float*)(p+0),*(float*)(p+4),*(float*)(p+8)}); } return h; }
-inline V3 CachedSupport(const V3* v, u32 n, V3 d) { V3 best = v[0]; float top = V3_dot(v[0],d); for (u32 i = 1; i < n; ++i) { float dot = V3_dot(v[i],d); if (dot > top) { top = dot; best = v[i]; } } return best; }
-inline V3 TP(V3 a, V3 b, V3 c) { return V3_Cross(V3_Cross(a,b),c); }
 inline V3 SphSupport(ShapeSphere b, V3 d) { float L = V3_dot(d,d); return V3_AplusB(b.ctr, (L > PHY_EPSILON) ? V3_ScaleByF(d, b.rad / vsqrtf(L)) : (V3){0,b.rad,0}); }
 inline V3 BoxSupport(ShapeBox b, V3 d) { V3 x,y,z; obb_axes(b.rot,&x,&y,&z); float kx = V3_dot(d,x) >= 0.0f ? 1.0f : -1.0f, ky = V3_dot(d,y) >= 0.0f ? 1.0f : -1.0f, kz = V3_dot(d,z) >= 0.0f ? 1.0f : -1.0f; return V3_AplusB(V3_AplusB(V3_AplusB(b.ctr,V3_ScaleByF(x,kx*b.hExt.x)),V3_ScaleByF(y,ky*b.hExt.y)),V3_ScaleByF(z,kz*b.hExt.z)); }
 inline V3 CapsuleSupport(ShapeCapsule cap, V3 d) { float db = V3_dot(cap.base,d),dt = V3_dot(cap.tip,d); V3 best = (dt > db) ? cap.tip : cap.base; float L = V3_dot(d,d); if (L < PHY_EPSILON) {return best;} return V3_AplusB(best,V3_ScaleByF(d,cap.rad / vsqrtf(L))); }
@@ -180,14 +176,14 @@ bool GJKNextSimplex(Simplex3D *s, V3 *dir) {
     if (s->n == 2) {
         V3 AB = V3_AsubB(s->v[0], A);
         if (AB.x + AB.y + AB.z < PHY_EPSILON) AB = V3_AplusB(AB, V3_ScaleByF(*dir, 0.001f));
-        if (V3_dot(AB,AO) > 0.f){*dir = TP(AB,AO,AB);} else { s->n = 1; GJKSet(s,0,A,wAA,wBA); *dir = AO; }
+        if (V3_dot(AB,AO) > 0.f){*dir = V3_Cross(V3_Cross(AB,AO),AB);} else { s->n = 1; GJKSet(s,0,A,wAA,wBA); *dir = AO; }
         if (V3_dot(*dir,*dir) < PHY_EPSILON) { V3 px = (vabs(AB.x) > 0.9f) ? (V3){0,1,0} : (V3){1,0,0}; *dir = V3_Cross(AB,px); }
         return true;
     }
     if (s->n == 3) {
         V3 B=s->v[1], C=s->v[0], AB=V3_AsubB(B,A), AC=V3_AsubB(C,A), ABC=V3_Cross(AB,AC);
-        if (V3_dot(V3_Cross(ABC,AC),AO) > 0.f) { if (V3_dot(AC,AO) > 0.f) { GJKSet(s,1,A,wAA,wBA); s->n = 2; *dir = TP(AC,AO,AC); } else { goto line_AB3; } }
-        else if (V3_dot(V3_Cross(AB,ABC),AO) > 0.f) { line_AB3: if (V3_dot(AB,AO) > 0.f) { GJKCopy(s,0,1); GJKSet(s,1,A,wAA,wBA); s->n = 2; *dir = TP(AB,AO,AB); } else { GJKSet(s,0,A,wAA,wBA); s->n = 1; *dir = AO; } }
+        if (V3_dot(V3_Cross(ABC,AC),AO) > 0.f) { if (V3_dot(AC,AO) > 0.f) { GJKSet(s,1,A,wAA,wBA); s->n = 2; *dir = V3_Cross(V3_Cross(AC,AO),AC); } else { goto line_AB3; } }
+        else if (V3_dot(V3_Cross(AB,ABC),AO) > 0.f) { line_AB3: if (V3_dot(AB,AO) > 0.f) { GJKCopy(s,0,1); GJKSet(s,1,A,wAA,wBA); s->n = 2; *dir = V3_Cross(V3_Cross(AB,AO),AB); } else { GJKSet(s,0,A,wAA,wBA); s->n = 1; *dir = AO; } }
         else { if (V3_dot(ABC,AO) > 0.f) {*dir = ABC;} else { GJKSwap(s,0,1); *dir = (V3){-ABC.x,-ABC.y,-ABC.z}; } }
         return true;
     }
@@ -286,31 +282,6 @@ void BvhWalkSphMsh(V3 sc, float sr, u16 m, const float* mx, Overlap* r) {
 
 Overlap SphMsh(V3 sc, float sr, u16 m, const float* mx) { Overlap r={0}; if(m>=MAX_MDLS)return r; u32 tc=modelTriangleCounts[m]; if(!tc){return r;} if (BvhHasBVH(m)) { BvhWalkSphMsh(sc,sr,m,mx,&r); return r; } for(u32 ti=0;ti<tc;++ti){SphTriTest(sc,sr,m,ti,mx,&r);} return r; }
 Overlap CapMsh(ShapeCapsule c, u16 m, const float* mx) { Overlap best=SphMsh(c.base,c.rad,m,mx), rt=SphMsh(c.tip,c.rad,m,mx); if(rt.pen>best.pen)best=rt; V3 d=V3_AsubB(c.tip,c.base); if(V3_Mag(d)>PHY_EPSILON){/*Hey I was doing a snowman of just the end spheres, don't hate the simplicity, I only use capsules for npcs and player*/for(int k=1;k<6;++k){float t=(float)k/5.0f; Overlap rm=SphMsh(V3_AplusB(c.base,V3_ScaleByF(d,t)),c.rad,m,mx); if(rm.pen>best.pen)best=rm;}} return best; }
-Manifold CvxCvx(u16 meshA, u16 meshB, const float* matA, const float* matB) {
-    Manifold m={0}; if(meshA>=MAX_MDLS||meshB>=MAX_MDLS)return m; HullCache hcB=CacheHull(meshB,matB);
-    SupportCtx ctx = {.type = SUP_HULL_HULL, .meshA = meshA, .meshB = meshB, .matA = matA, .matB = matB};
-    GJKResult gjk = RunGJK(&ctx, 64); if(!gjk.hit)return m;
-    if(gjk.s.n<4) RunGJKFallback(&ctx, &gjk.s); if(gjk.s.n<4)return m;
-    EPAState epa; SeedEPA(&epa, &gjk.s);
-    for(int it=0;it<32;++it) {
-        int bf=-1; float bd=1e9f; for(int f=0;f<epa.nf;f++)if(epa.ef[f].d<bd){bd=epa.ef[f].d;bf=f;} if(bf<0)break;
-        V3 bn=epa.ef[bf].n; V3 wA,wB; GetSupportPair(&ctx,bn,&wA,&wB); V3 sup=V3_AsubB(wA,wB);
-        if (V3_dot(bn,sup)-bd<PHY_EPSILON) {
-            m.normal=bn; m.maxPen=bd; m.n=1; V3 deepPoint=EPAContactPoint(epa.ev,epa.ef[bf].a,epa.ef[bf].b,epa.ef[bf].c); m.p[0]=(ManifoldPt){deepPoint,bd};
-            if (hcB.ok) {
-                float planeDist=V3_dot(bn,deepPoint), wscaleB=V3_Mag((V3){matB[0],matB[1],matB[2]}), thicknessTolerance=vclamp(modelBounds[meshB]*wscaleB*0.06f,0.003f,0.02f);
-                for(u32 i=0;i<hcB.n;++i) {
-                    V3 pt=hcB.v[i]; float distToPlane=V3_dot(bn,pt)-planeDist;
-                    if (vabs(distToPlane)<thicknessTolerance) { float ptPen=bd-distToPlane; if(ptPen>0.0f) { bool isDup=false; for(int k=0;k<m.n;++k){V3 diff=V3_AsubB(pt,m.p[k].point); if(V3_dot(diff,diff)<0.00001f){isDup=true;break;}} if(!isDup&&m.n<MANIFOLD_MAX){m.p[m.n++]=(ManifoldPt){pt,ptPen};} if(m.n>=MANIFOLD_MAX)break; } }
-                }
-            }
-            return m;
-        }
-        if (!ExpandEPA(&epa,sup,wA,wB)) break;
-    }
-    return m;
-}
-
 Manifold PrimitiveCvx(u16 prim, u16 mesh, const float* mx) {
     Manifold m={0}; if(mesh>=MAX_MDLS||!modelVertexCounts[mesh])return m;
     SupportCtx ctx = {.type = SUP_PRIM_HULL, .prim = prim, .meshA = mesh, .matA = mx}; GJKResult gjk = RunGJK(&ctx, 64); if(!gjk.hit)return m;
@@ -324,13 +295,28 @@ Manifold PrimitiveCvx(u16 prim, u16 mesh, const float* mx) {
     return m;
 }
 
-typedef struct {V3 mn,mx;} AABB3; typedef struct { HullCache hc; u16 hullMesh; const float* hullMx; AABB3 hb; float spreadEps,thicknessTolerance; Manifold best; } CvxMshCtx;
+typedef struct {V3 mn,mx;} AABB3; 
+typedef struct { 
+    u16 hullMesh; 
+    const float* hullMx; 
+    AABB3 hb; 
+    float spreadEps, thicknessTolerance; 
+    Manifold best; 
+} CvxMshCtx;
 void CvxTriTest(CvxMshCtx* ctx, V3 ta, V3 tb, V3 tc) {
-    HullCache* hc=&ctx->hc; u16 hullMesh=ctx->hullMesh; const float* hullMx=ctx->hullMx; Manifold* best=&ctx->best; float spreadEps=ctx->spreadEps, thicknessTolerance=ctx->thicknessTolerance;
-    if (vmin(ta.x,vmin(tb.x,tc.x))>ctx->hb.mx.x || vmax(ta.x,vmax(tb.x,tc.x))<ctx->hb.mn.x || vmin(ta.y,vmin(tb.y,tc.y))>ctx->hb.mx.y || vmax(ta.y,vmax(tb.y,tc.y))<ctx->hb.mn.y || vmin(ta.z,vmin(tb.z,tc.z))>ctx->hb.mx.z || vmax(ta.z,vmax(tb.z,tc.z))<ctx->hb.mn.z) return;
+    u16 hullMesh=ctx->hullMesh; 
+    const float* hullMx=ctx->hullMx; 
+    Manifold* best=&ctx->best; 
+    float spreadEps=ctx->spreadEps, thicknessTolerance=ctx->thicknessTolerance;
+    
+    if (vmin(ta.x,vmin(tb.x,tc.x))>ctx->hb.mx.x || vmax(ta.x,vmax(tb.x,tc.x))<ctx->hb.mn.x || 
+        vmin(ta.y,vmin(tb.y,tc.y))>ctx->hb.mx.y || vmax(ta.y,vmax(tb.y,tc.y))<ctx->hb.mn.y || 
+        vmin(ta.z,vmin(tb.z,tc.z))>ctx->hb.mx.z || vmax(ta.z,vmax(tb.z,tc.z))<ctx->hb.mn.z) return;
+        
     SupportCtx supCtx = {.type = SUP_HULL_TRI, .meshA = hullMesh, .matA = hullMx, .ta = ta, .tb = tb, .tc = tc};
     GJKResult gjk = RunGJK(&supCtx, 32); if(!gjk.hit)return;
     Simplex3D *s = &gjk.s;
+    
     while (s->n<4) {
         V3 fallbackDir={0.0f,1.0f,0.0f};
         if(s->n==1) fallbackDir=(vabs(s->v[0].x)>0.5f)?(V3){0.0f,1.0f,0.0f}:(V3){1.0f,0.0f,0.0f};
@@ -341,14 +327,16 @@ void CvxTriTest(CvxMshCtx* ctx, V3 ta, V3 tb, V3 tc) {
         for (int k=0;k<s->n;k++){V3 dv=V3_AsubB(sup,s->v[k]); dup|=(V3_dot(dv,dv)<PHY_EPSILON*PHY_EPSILON);}
         if (!dup){s->wA[s->n]=wA; s->wB[s->n]=wB; s->v[s->n++]=sup;} else {fallbackDir=(V3){-fallbackDir.x,-fallbackDir.y,-fallbackDir.z}; GetSupportPair(&supCtx, fallbackDir, &wA, &wB); s->wA[s->n]=wA; s->wB[s->n]=wB; s->v[s->n++]=V3_AsubB(wA,wB);}
     }
+    
     EPAState epa; SeedEPA(&epa, s); if (epa.nf<4) return;
     bool tHit=false; V3 tN={0}; float tD=0; V3 tP={0};
     for (int it=0;it<32;++it){
         int bf=-1; float bd=1e9f; for (int f=0;f<epa.nf;f++)if(epa.ef[f].d<bd){bd=epa.ef[f].d;bf=f;} if(bf<0)break;
         V3 bn=epa.ef[bf].n; V3 wA, wB; GetSupportPair(&supCtx, bn, &wA, &wB); V3 sup=V3_AsubB(wA,wB);
-        if(V3_dot(bn,sup)-bd<PHY_EPSILON){V3 triN = V3_Normalize(V3_Cross(V3_AsubB(tb,ta),V3_AsubB(tc,ta))); if (V3_dot(bn,triN) < 0.0f) { bn = triN;/*Prevent thin object penetrations when walked on by ensuring triangles are treated as one-sided from tri normal*/} tHit=true; tN=bn; tD=bd; tP=EPAContactPoint(epa.ev,epa.ef[bf].a,epa.ef[bf].b,epa.ef[bf].c); break;}
+        if(V3_dot(bn,sup)-bd<PHY_EPSILON){V3 triN = V3_Normalize(V3_Cross(V3_AsubB(tb,ta),V3_AsubB(tc,ta))); if (V3_dot(bn,triN) < 0.0f) { bn = triN;} tHit=true; tN=bn; tD=bd; tP=EPAContactPoint(epa.ev,epa.ef[bf].a,epa.ef[bf].b,epa.ef[bf].c); break;}
         if (!ExpandEPA(&epa,sup,wA,wB)) break;
     }
+    
     if (tHit) {
         V3 deepPoint=tP;
         if (!best->n) { best->normal=tN; best->maxPen=tD; best->p[best->n++]=(ManifoldPt){deepPoint,tD}; }
@@ -360,10 +348,21 @@ void CvxTriTest(CvxMshCtx* ctx, V3 ta, V3 tb, V3 tc) {
                 if (spread&&best->n<MANIFOLD_MAX)best->p[best->n++]=(ManifoldPt){deepPoint,tD};
             } else if (tD>best->maxPen+MANIFOLD_TIE_MARGIN){best->n=0; best->normal=tN; best->maxPen=tD; best->p[best->n++]=(ManifoldPt){deepPoint,tD};}
         }
-        if (hc->ok && best->n>0 && V3_dot(tN,best->normal)>MANIFOLD_ALIGN_THRESHOLD) {
-            float planeDist=V3_dot(tN,deepPoint); V3 v0=V3_AsubB(tb,ta), v1=V3_AsubB(tc,ta); float d00=V3_dot(v0,v0), d01=V3_dot(v0,v1), d11=V3_dot(v1,v1), denom=d00*d11-d01*d01; bool validTri=vabs(denom)>PHY_EPSILON;
-            for (u32 i=0;i<hc->n;++i) {
-                V3 pt=hc->v[i]; float distToPlane=V3_dot(tN,pt)-planeDist;
+        
+        /* Direct iteration over modelVertices instead of HullCache */
+        u32 nVerts = modelVertexCounts[hullMesh];
+        if (nVerts > 0 && best->n>0 && V3_dot(tN,best->normal)>MANIFOLD_ALIGN_THRESHOLD) {
+            float planeDist=V3_dot(tN,deepPoint); 
+            V3 v0=V3_AsubB(tb,ta), v1=V3_AsubB(tc,ta); 
+            float d00=V3_dot(v0,v0), d01=V3_dot(v0,v1), d11=V3_dot(v1,v1), denom=d00*d11-d01*d01; 
+            bool validTri=vabs(denom)>PHY_EPSILON;
+            const u8* vb = modelVertices[hullMesh];
+            
+            for (u32 i=0;i<nVerts;++i) {
+                const u8* p = vb + i * CPU_VRT_SZ;
+                V3 ptLocal = *(V3*)p;
+                V3 pt = MvVert(hullMx, ptLocal);
+                float distToPlane=V3_dot(tN,pt)-planeDist;
                 if (vabs(distToPlane)<thicknessTolerance) {
                     bool insideTri=false;
                     if (validTri){V3 projPt=V3_AsubB(pt,V3_ScaleByF(tN,distToPlane)), v2=V3_AsubB(projPt,ta); float d20=V3_dot(v2,v0), d21=V3_dot(v2,v1), v=(d11*d20-d01*d21)/denom, w=(d00*d21-d01*d20)/denom, u=1.0f-v-w; if(u>=-0.02f&&v>=-0.02f&&w>=-0.02f)insideTri=true;}
@@ -387,10 +386,20 @@ void BvhWalkAABB_CvxTri(u16 triMesh, const float* triMx, AABB3 hb, CvxMshCtx* ct
 
 Manifold CvxMsh(u16 hullMesh, const float* hullMx, u16 triMesh, const float* triMx) {
     Manifold bestZero={0}; if(hullMesh>=MAX_MDLS||triMesh>=MAX_MDLS)return bestZero;
-    CvxMshCtx ctx; ctx.best=bestZero; ctx.hullMesh=hullMesh; ctx.hullMx=hullMx; ctx.hc=CacheHull(hullMesh,hullMx); if(!ctx.hc.n)return ctx.best;
+    CvxMshCtx ctx; ctx.best=bestZero; ctx.hullMesh=hullMesh; ctx.hullMx=hullMx;
+    
+    u32 n = modelVertexCounts[hullMesh];
+    if (n == 0) return ctx.best;
+
     AABB3 hb={{1e9f,1e9f,1e9f},{-1e9f,-1e9f,-1e9f}};
-    if (ctx.hc.ok) { for (u32 i=0;i<ctx.hc.n;++i) { V3 w=ctx.hc.v[i]; hb.mn.x=vmin(hb.mn.x,w.x); hb.mn.y=vmin(hb.mn.y,w.y); hb.mn.z=vmin(hb.mn.z,w.z); hb.mx.x=vmax(hb.mx.x,w.x); hb.mx.y=vmax(hb.mx.y,w.y); hb.mx.z=vmax(hb.mx.z,w.z); } }
-    else { for (u32 i=0;i<ctx.hc.n;++i) { V3 w=MvVert(hullMx,MeshVert(hullMesh,i)); hb.mn.x=vmin(hb.mn.x,w.x); hb.mn.y=vmin(hb.mn.y,w.y); hb.mn.z=vmin(hb.mn.z,w.z); hb.mx.x=vmax(hb.mx.x,w.x); hb.mx.y=vmax(hb.mx.y,w.y); hb.mx.z=vmax(hb.mx.z,w.z); } }
+    const u8* vb = modelVertices[hullMesh];
+    for (u32 i=0;i<n;++i) { 
+        const u8* p = vb + i * CPU_VRT_SZ;
+        V3 w = MvVert(hullMx, *(V3*)p); 
+        hb.mn.x=vmin(hb.mn.x,w.x); hb.mn.y=vmin(hb.mn.y,w.y); hb.mn.z=vmin(hb.mn.z,w.z); 
+        hb.mx.x=vmax(hb.mx.x,w.x); hb.mx.y=vmax(hb.mx.y,w.y); hb.mx.z=vmax(hb.mx.z,w.z); 
+    }
+    
     ctx.hb=hb; V3 hext=V3_AsubB(hb.mx,hb.mn); ctx.spreadEps=vmax(0.02f,vmax(hext.x,vmax(hext.y,hext.z))*0.15f);
     float wscaleH=V3_Mag((V3){hullMx[0],hullMx[1],hullMx[2]}); ctx.thicknessTolerance=vclamp(modelBounds[hullMesh]*wscaleH*0.06f,0.003f,0.02f);
     u32 triCount=modelTriangleCounts[triMesh]; if(!triCount)return ctx.best;
@@ -399,9 +408,59 @@ Manifold CvxMsh(u16 hullMesh, const float* hullMx, u16 triMesh, const float* tri
     return ctx.best;
 }
 
+Manifold CvxCvx(u16 meshA, u16 meshB, const float* matA, const float* matB) {
+    Manifold m={0}; if(meshA>=MAX_MDLS||meshB>=MAX_MDLS)return m;
+    SupportCtx ctx = {.type = SUP_HULL_HULL, .meshA = meshA, .meshB = meshB, .matA = matA, .matB = matB};
+    GJKResult gjk = RunGJK(&ctx, 64); if(!gjk.hit)return m;
+    if(gjk.s.n<4) RunGJKFallback(&ctx, &gjk.s); if(gjk.s.n<4)return m;
+    EPAState epa; SeedEPA(&epa, &gjk.s);
+    for(int it=0;it<32;++it) {
+        int bf=-1; float bd=1e9f; for(int f=0;f<epa.nf;f++)if(epa.ef[f].d<bd){bd=epa.ef[f].d;bf=f;} if(bf<0)break;
+        V3 bn=epa.ef[bf].n; V3 wA,wB; GetSupportPair(&ctx,bn,&wA,&wB); V3 sup=V3_AsubB(wA,wB);
+        if (V3_dot(bn,sup)-bd<PHY_EPSILON) {
+            m.normal=bn; m.maxPen=bd; m.n=1; V3 deepPoint=EPAContactPoint(epa.ev,epa.ef[bf].a,epa.ef[bf].b,epa.ef[bf].c); m.p[0]=(ManifoldPt){deepPoint,bd};
+            
+            /* Direct iteration over modelVertices[meshB] instead of HullCache */
+            u32 nVertsB = modelVertexCounts[meshB];
+            if (nVertsB > 0) {
+                float planeDist=V3_dot(bn,deepPoint), wscaleB=V3_Mag((V3){matB[0],matB[1],matB[2]}), thicknessTolerance=vclamp(modelBounds[meshB]*wscaleB*0.06f,0.003f,0.02f);
+                const u8* vb = modelVertices[meshB];
+                for(u32 i=0;i<nVertsB;++i) {
+                    const u8* p = vb + i * CPU_VRT_SZ;
+                    V3 ptLocal = *(V3*)p;
+                    V3 pt = MvVert(matB, ptLocal);
+                    float distToPlane=V3_dot(bn,pt)-planeDist;
+                    if (vabs(distToPlane)<thicknessTolerance) { 
+                        float ptPen=bd-distToPlane; 
+                        if(ptPen>0.0f) { 
+                            bool isDup=false; 
+                            for(int k=0;k<m.n;++k){V3 diff=V3_AsubB(pt,m.p[k].point); if(V3_dot(diff,diff)<0.00001f){isDup=true;break;}} 
+                            if(!isDup&&m.n<MANIFOLD_MAX){m.p[m.n++]=(ManifoldPt){pt,ptPen};} 
+                            if(m.n>=MANIFOLD_MAX)break; 
+                        } 
+                    }
+                }
+            }
+            return m;
+        }
+        if (!ExpandEPA(&epa,sup,wA,wB)) break;
+    }
+    return m;
+}
+
 Manifold BoxMsh(ShapeBox b,u16 m,const float* mx){
-    CvxMshCtx c={0};if(m>=MAX_MDLS||!modelTriangleCounts[m])return c.best; c.hullMesh=m; c.hullMx=mx; c.hc.n=8; c.hc.ok=true; V3 a[3]; float h[3]={b.hExt.x,b.hExt.y,b.hExt.z}; obb_axes(b.rot,a,a+1,a+2); AABB3 q={{1e9f,1e9f,1e9f},{-1e9f,-1e9f,-1e9f}};
-    for(int i=0;i<8;i++){V3 p=b.ctr;for(int k=0;k<3;k++)p=V3_AplusB(p,V3_ScaleByF(a[k],((i>>k)&1?1.f:-1.f)*h[k])); c.hc.v[i]=p; q.mn.x=vmin(q.mn.x,p.x); q.mn.y=vmin(q.mn.y,p.y); q.mn.z=vmin(q.mn.z,p.z); q.mx.x=vmax(q.mx.x,p.x); q.mx.y=vmax(q.mx.y,p.y); q.mx.z=vmax(q.mx.z,p.z);}
+    CvxMshCtx c={0};if(m>=MAX_MDLS||!modelTriangleCounts[m])return c.best; c.hullMesh=m; c.hullMx=mx; 
+    /* Local vert array for BoxMsh only */
+    V3 localVerts[8]; 
+    V3 a[3]; float h[3]={b.hExt.x,b.hExt.y,b.hExt.z}; obb_axes(b.rot,a,a+1,a+2); 
+    AABB3 q={{1e9f,1e9f,1e9f},{-1e9f,-1e9f,-1e9f}};
+    for(int i=0;i<8;i++){
+        V3 p=b.ctr;
+        for(int k=0;k<3;k++)p=V3_AplusB(p,V3_ScaleByF(a[k],((i>>k)&1?1.f:-1.f)*h[k])); 
+        localVerts[i] = p;
+        q.mn.x=vmin(q.mn.x,p.x); q.mn.y=vmin(q.mn.y,p.y); q.mn.z=vmin(q.mn.z,p.z); 
+        q.mx.x=vmax(q.mx.x,p.x); q.mx.y=vmax(q.mx.y,p.y); q.mx.z=vmax(q.mx.z,p.z);
+    }
     V3 e=V3_AsubB(q.mx,q.mn),skin={.01f,.01f,.01f}; c.spreadEps=vmax(.02f,vmax(e.x,vmax(e.y,e.z))*.15f); c.thicknessTolerance=vclamp(V3_Mag(b.hExt)*.06f,.003f,.02f); c.hb=(AABB3){V3_AsubB(q.mn,skin),V3_AplusB(q.mx,skin)};
     if (BvhHasBVH(m)) { BvhWalkAABB_CvxTri(m, mx, c.hb, &c); c.best.normal=V3_ScaleByF(c.best.normal,-1.f); return c.best; }
     for(u32 ti=0;ti<modelTriangleCounts[m];ti++){V3 x,y,z;MeshTri(m,ti,mx,&x,&y,&z);CvxTriTest(&c,x,y,z);} c.best.normal=V3_ScaleByF(c.best.normal,-1.f); return c.best;
