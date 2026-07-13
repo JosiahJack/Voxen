@@ -134,13 +134,6 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, c
     return true;
 }
 
-// ---------------------------------------------------------------------------------------------
-// Per-model octree BVH (max 3 levels), built in local model space for physics/ray acceleration.
-// Moved here (above ModelParsingWorker) so BVH construction can be invoked directly from within
-// each model-loading worker thread, immediately after that thread finishes parsing a given model
-// -- overlapping BVH build time with other threads' OBJ parsing instead of doing it as one big
-// serial pass after every model & every thread has already finished and joined.
-// ---------------------------------------------------------------------------------------------
 #define BVH_MAX_DEPTH 3
 #define BVH_LEAF_MAX_TRIS 8
 #define BVH_MAX_NODES_PER_MDL 586   // 1 + 8 + 64 + 512 = 585 worst case, +safety
@@ -150,21 +143,7 @@ BvhNode** modelBVHNodes = NULL;          // [mdlsCnt] array of BvhNode arrays (N
 u16**    modelBVHTriOrder = NULL;        // [mdlsCnt] array of u16 triangle-index arrays (reordered for leaf-contiguous ranges)
 u32      modelBVHNodeCounts[MAX_MDLS] = {0};
 u32      modelBVHTriOrderCounts[MAX_MDLS] = {0};
-
-// Per-thread build scratch (replaces the old single set of file-scope scratch globals, which was
-// only safe when BVH building ran single-threaded after all parsing finished). Each model-loading
-// thread gets its own context, carved out of the same arena as the other per-thread scratch
-// buffers in LoadModels(), so multiple threads can build BVHs for different models concurrently
-// with zero contention/locking (each thread only ever writes modelBVHNodes[m]/modelBVHTriOrder[m]
-// for the model indices it owns).
-typedef struct {
-    BvhNode* nodes;        // [BVH_MAX_NODES_PER_MDL]
-    u8*      triOctants;   // [BVH_MAX_TRIS_PER_MDL]
-    u16*     triOrder;     // [BVH_MAX_TRIS_PER_MDL]
-    u16*     triScratch;   // [BVH_MAX_TRIS_PER_MDL]
-    u16*     initialTris;  // [BVH_MAX_TRIS_PER_MDL]
-    u32 nodeCount, triCount;
-} BvhBuildCtx;
+typedef struct { BvhNode* nodes; u8* triOctants; u16 *triOrder, *triScratch,*initialTris; u32 nodeCount,triCount; } BvhBuildCtx;
 static BvhBuildCtx thrd_bvh_ctx[32];
 
 // Recursive centroid-based octree build. Each triangle goes into exactly one octant (the one containing its centroid), so there is no triangle duplication. The node
