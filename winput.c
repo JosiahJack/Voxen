@@ -284,7 +284,7 @@ void InputJoystickButton(WinSysjoystick*,int,char); void InputJoystickHat(WinSys
     static void swapIntervalWGL(int interval) { ((WinSyswindow*)window)->context.wgl.interval = interval; if (!IsWindowsVersionOrGreaterWin32(HIBYTE(0x0602),LOBYTE(0x0602),0)) { i32 enabled = 0; if ((i32)(WinSys.win32.dwmapi.IsCompositionEnabled(&enabled) >= 0) && enabled) interval = 0; }/*>=Win8.0*/ wglSwapIntervalEXT(interval); }
     static WinSysglproc getProcAddressWGL(const char* procname) { const WinSysglproc proc = (WinSysglproc)wglGetProcAddress(procname); if (proc) {return proc;} return (WinSysglproc)PlatformGetModuleSymbol(WinSys.wgl.instance,procname); }
     void SetWindowPosition(WinSyswindow* handle, int x, int y) { WinSyswindow* win = (WinSyswindow*)handle; RECT rect = {x,y,x,y}; AdjustWindowRectEx(&rect,getWindowStyle(win),0,0x00040000/*WS_EX_APPWINDOW*/); SetWindowPos(win->win32.handle,((HWND)0),rect.left,rect.top,0,0,0x0010|0x0200|0x0001|0x0004); }
-    WinSyswindow* VCreateWindow(int width, int height, char* title) {
+    WinSyswindow* VCreateWindow(int width, int height) {
         WinSyswindow* win = OS_Calloc(1,sizeof(WinSyswindow)); win->videoMode = (vidmode){width,height,8,8,8,-1}; win->decorated = win->doublebuffer = 1; win->cursorMode = 0x00034003/*disabled*/;
         u32 style = getWindowStyle(win);
         WNDCLASSEXW wc= (WNDCLASSEXW){sizeof(wc),0x23/*Redraws + Owns Device Context*/,windowProc,0,0,WinSys.win32.instance,NULL,NULL,NULL,NULL,L"Voxen",NULL};
@@ -292,7 +292,7 @@ void InputJoystickButton(WinSysjoystick*,int,char); void InputJoystickHat(WinSys
         RECT rect={0,0,width,height}; //AdjustWindowRectEx(&rect,style,0,0);
         int frameX,frameY; frameX=frameY=0x80000000;
         int frameWidth=rect.right-rect.left, frameHeight=rect.bottom-rect.top;
-        u16* wideTitle=CreateWideStringFromUTF8Win32(title);
+        u16* wideTitle=CreateWideStringFromUTF8Win32(GAME_TITLE);
         win->win32.handle=CreateWindowExW(0,(u16*)MAKEINTATOM(WinSys.win32.mainWindowClass),wideTitle,style,frameX,frameY,frameWidth,frameHeight,NULL,NULL,WinSys.win32.instance,(void*)NULL);
         SetPropW(win->win32.handle,L"WinSys",win);
         win->win32.keymenu=0; WINDOWPLACEMENT wp={0}; wp.length=sizeof(wp); AdjustWindowRectEx(&rect,style,0,0);
@@ -665,7 +665,7 @@ void InputJoystickButton(WinSysjoystick*,int,char); void InputJoystickHat(WinSys
     static void swapIntervalGLX(int interval) { WinSyswindow* handle = (WinSyswindow*)window; WinSys.glx.SwapIntervalEXT(WinSys.x11.display,handle->context.glx.window,interval); }
     static WinSysglproc getProcAddressGLX(const char* procname) { return WinSys.glx.GetProcAddress((const u8*) procname); }
     void SetWindowPosition(WinSyswindow* handle, int xpos, int ypos) { WinSyswindow* win = (WinSyswindow*)handle; SetWindowPos(win,xpos,ypos); }
-    WinSyswindow* VCreateWindow(int width, int height, char* title) {
+    WinSyswindow* VCreateWindow(int width, int height) {
         WinSyswindow* win = OS_Calloc(1,sizeof(WinSyswindow)); win->videoMode = (vidmode){width,height,8,8,8,-1}; win->decorated = win->doublebuffer = 1; win->cursorMode = 0x00034003/*disabled*/;
         const char* names[] = {"libGLX.so.0","libGL.so.1","libGL.so",NULL};
         for (int i=0;names[i] && !WinSys.glx.handle;i++) WinSys.glx.handle = WinSysPlatformLoadModule(names[i]);
@@ -715,7 +715,7 @@ void InputJoystickButton(WinSysjoystick*,int,char); void InputJoystickHat(WinSys
         XSizeHints* szhints=WinSys.x11.xlib.AllocSizeHints();
         szhints->flags|=((1L << 4)/*PMinSize*/|(1L << 5)/*PMaxSize*/); szhints->min_width=szhints->max_width=width; szhints->min_height=szhints->max_height=height; szhints->flags|=(1L << 9)/*PWinGravity*/; szhints->win_gravity=10/*static gravity*/;
         WinSys.x11.xlib.SetWMNormalHints(WinSys.x11.display,win->x11.handle,szhints); WinSys.x11.xlib.Free(szhints);
-        WinSys.x11.xlib.ChangeProperty(WinSys.x11.display,win->x11.handle,WinSys.x11.NWM_NAME,WinSys.x11.UTF8_STRING,8,0/*PropModeReplace*/,(u8*)title,slen(title)); // Set title
+        WinSys.x11.xlib.ChangeProperty(WinSys.x11.display,win->x11.handle,WinSys.x11.NWM_NAME,WinSys.x11.UTF8_STRING,8,0/*PropModeReplace*/,(u8*)GAME_TITLE,sizeof(GAME_TITLE) - 1); // Set title
         GetWindowPos(win,&win->x11.xpos,&win->x11.ypos); GetWindowSize(win,&win->x11.width,&win->x11.height);
         int attribs[40],index=0; attribs[index++] = 0x2091/*major*/; attribs[index++] = 4; attribs[index++] = 0x2092/*minor*/; attribs[index++] = 3; /*OpenGL 4.3*/ attribs[index++] = 0x9126/*profile mask arb*/; attribs[index++] = 1/*core profile*/; attribs[index++] = 0L; attribs[index++] = 0L;
         win->context.glx.handle     = WinSys.glx.CreateContextAttribsARB(WinSys.x11.display,native,NULL,1,attribs); win->context.glx.window  = WinSys.glx.CreateWindow(WinSys.x11.display,native,win->x11.handle,NULL);

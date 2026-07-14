@@ -1,4 +1,6 @@
 // voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake.  Main translation unit.  Core renderer.  OS Shim Layer.
+#define GAME_TITLE "Citadel"
+#define WIN_ICON "./Textures/UI/menudot1.png"
 #include "common.h"
 typedef __UINTPTR_TYPE__ uintptr_t; typedef __INTPTR_TYPE__ intptr_t;
 #define likely(x)   __builtin_expect(!!(x),1)
@@ -170,12 +172,13 @@ void DrawVelocityVector(u16 i) {
     AddWireLine(V3_AplusB(tip,V3_ScaleByF(perp,0.05f)),V3_AsubB(tip,V3_ScaleByF(perp,0.05f)),textColors[T_ORANGE]); // Small cross at tip so zero-length vecs are still visible when barely moving
 }
 
-void DrawBoxCollider(u16 i) {
-    Color col = ColliderColor(i); ShapeBox b = Entity_GetBox(i); V3 ax,ay,az,c[8],px,py,pz; obb_axes(b.rot,&ax,&ay,&az); px=V3_ScaleByF(ax,b.hExt.x); py=V3_ScaleByF(ay,b.hExt.y); pz=V3_ScaleByF(az,b.hExt.z);
+void DrawBoxColliderColored(u16 i, Color col) {
+    ShapeBox b = Entity_GetBox(i); V3 ax,ay,az,c[8],px,py,pz; obb_axes(b.rot,&ax,&ay,&az); px=V3_ScaleByF(ax,b.hExt.x); py=V3_ScaleByF(ay,b.hExt.y); pz=V3_ScaleByF(az,b.hExt.z);
     for (int s=0;s<8;s++) { float sx=(s&1)?1.f:-1.f,sy=(s&2)?1.f:-1.f,sz=(s&4)?1.f:-1.f; c[s]=V3_AplusB(b.ctr,V3_AplusB(V3_AplusB(V3_ScaleByF(px,sx),V3_ScaleByF(py,sy)),V3_ScaleByF(pz,sz))); }
     AddWireLine(c[0],c[1],col); AddWireLine(c[2],c[3],col); AddWireLine(c[4],c[5],col); AddWireLine(c[6],c[7],col); AddWireLine(c[0],c[2],col); AddWireLine(c[1],c[3],col); AddWireLine(c[4],c[6],col); AddWireLine(c[5],c[7],col); AddWireLine(c[0],c[4],col); AddWireLine(c[1],c[5],col); AddWireLine(c[2],c[6],col); AddWireLine(c[3],c[7],col);
     DrawVelocityVector(i);
 }
+void DrawBoxCollider(u16 i) { DrawBoxColliderColored(i,ColliderColor(i)); }
 
 void DrawSphereWireframe(Color col, ShapeSphere s) { float step=6.28318530f/12; for (int seg=0;seg<12;seg++) { float a0=seg*step,a1=a0+step,c0=vcosf(a0),s0=vsinf(a0),c1=vcosf(a1),s1=vsinf(a1); AddWireLine(V3_AplusB(s.ctr,(V3){c0*s.rad,0,s0*s.rad}),V3_AplusB(s.ctr,(V3){c1*s.rad,0,s1*s.rad}),col); AddWireLine(V3_AplusB(s.ctr,(V3){c0*s.rad,s0*s.rad,0}),V3_AplusB(s.ctr,(V3){c1*s.rad,s1*s.rad,0}),col); AddWireLine(V3_AplusB(s.ctr,(V3){0,c0*s.rad,s0*s.rad}),V3_AplusB(s.ctr,(V3){0,c1*s.rad,s1*s.rad}),col); } }
 void DrawSphereCollider(u16 i) { Color col = ColliderColor(i); ShapeSphere s = Entity_GetSph(i); DrawSphereWireframe(col,s); DrawVelocityVector(i); }
@@ -228,6 +231,7 @@ void DrawAngularVelocity(u16 i) {
 #include "culling.c" // Culling System
 #include "text.c" // Fonts and Text System
 #include "winput.c" // Window + Input System
+#include "trigger.c" // Trigger Volumes System
 #include "physics.c" // Physics System
 #include "console.c" // Console Sys - CHEATS!
 #include "audio.c" // Audio Sys
@@ -242,7 +246,6 @@ void DoorTargetted(u16 self, u16 activator);
 void DoorActuate(u16 self);
 void DoorForceOpen(u16 self);
 void DoorForceClose(u16 self);
-void TriggerTargetted(u16 self, u16 activator);
 void TriggerCounterTargetted(u16 self, u16 activator);
 void ButtonSwitchInitAfterLoad(u16 self);
 void FuncWallInitAfterLoad(u16 self);
@@ -277,7 +280,6 @@ int Get16WeaponIndexFromConstIndex(int index);
 bool AICheckPain(u16);
 void TextureSequenceUpdate(u16 self);
 u16 AddInstance(u16 entIdx, V3 pos);
-void DeleteInstance(u16 i);
 u8 GetCurrentLevelSecurity();
 u16 GetImpactType(u16 instanceIdx);
 const char* GetPrefabNameFromIndex(int constIndex);
@@ -1080,26 +1082,12 @@ void InitalizeEnvironment() {
     console_log_file = OS_OpenWriteonly("./voxen.log"); // Initialize log system for all prints to go to both stdout and voxen.log file
     DebugRAM("program start");
     DualLog("Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed\nEntity size: %u\n",sizeof(Entity));
-    // Initialize active-level pointers to level 0's per-level arrays before any code touches
-    // World.instances[i] / World.position[i] / etc.  Without this, the pointers would be NULL
-    // (since GlobalContext is zero-initialized) and any access would crash.
     SetLevelPointers(0);
     WindowInit(); threadCnt = clamp(OS_GetNumThreads(),1,32); globalframe=0,World.menuActive=true,World.screenshotTimeout=1.0,World.creditsPageIndex=1,World.diffCbt=World.diffCyb=World.diffPuz=World.diffMis=2,World.deaths=0,World.cursorPosition_x=680,World.cursorPosition_y=384;
     DualLog("Loading game definition...");
-    FHandle gmFP = OS_OpenReadonly("./Data/gamedata.txt"); if (!gmFP) { DualLogError("\nCannot open ./Data/gamedata.txt\n"); OS_Exit(1);  }
-    char gmLine[512],global_modname[256],global_dllname[256]; u32 lineNum = 0;
-    while (sUpToEndLine(gmLine,sizeof(gmLine),gmFP)) {
-        lineNum++; char* s = data_parser_trim(gmLine); if (*s == 0 || (s[0] == '/' && s[1] == '/')) continue;
-        char* colon = StringFindFirstCharWithin(s, ':'); if (!colon) continue;
-        *colon = '\0'; char* key = data_parser_trim(s); char* val = data_parser_trim(colon + 1); if (*key == 0 || *val == 0) continue;
-
-             if (sEqual(key,   "modname")) {  scpy_to_a_from_b(global_modname,val,sizeof(global_modname)); }                      else if (sEqual(key,   "dllname")) { scpy_to_a_from_b(global_dllname,val,sizeof(global_dllname)); }
-        else if (sEqual(key,"windowicon")) { scpy_to_a_from_b(World.global_winicon,val,sizeof(World.global_winicon)); } else if (sEqual(key,"levelcount")) { World.numLevels = parse_numberu8(val,gmLine,lineNum); }
-        else if (sEqual(key,"startlevel")) { World.startLevel = parse_numberu8(val,gmLine,lineNum); }
-    }
-    OS_Close(gmFP); DualLog(" %s:: num levels: %d, start level: %d\n",global_modname,World.numLevels,World.startLevel);
+    World.numLevels = 14; World.startLevel = 1; DualLog(" Citadel:: num levels: %d, start level: %d\n",World.numLevels,World.startLevel);
     LoadConfig(); // Get settings before setting window size.
-    window = VCreateWindow(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight,&global_modname[0]);
+    window = VCreateWindow(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
     CenterWindowOnMonitor();
     SetGLContext_GetFunctionPointers();
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); ((WinSyswindow*)window)->context.swapBuffers(((WinSyswindow*)window)); // Black out the window as early as possible for better presentation.

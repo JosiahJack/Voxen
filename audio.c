@@ -826,15 +826,6 @@ void PlayTrack(TrackType ttype, MusicType mtype) {
     if (!World.Sys_Music.elevator) World.Sys_Music.levelEntry = false; // already used by GetCorresponding... just now
 }
 
-void MusicNotifyZone(TrackType tt) { World.Sys_Music.inZone=true; World.Sys_Music.elevator=(tt == TrackType_Elevator); World.Sys_Music.distortion=(tt == TrackType_Distortion); }
-void MusicTriggerEnter(u16 self, u16 other) {
-    if (World.instances[self].tickFinished < World.pauseRelativeTime) { // Prevent flickering retrigger when player slides along glancing angle of trigger volume.
-        if (other == PLAYER1) { PlayTrack(World.instances[self].trackType,World.instances[self].musicType); MusicNotifyZone(World.instances[self].trackType); }        
-        World.instances[self].tickFinished = World.pauseRelativeTime + 0.1;
-    }
-}
-
-void MusicTriggerExit(u16 other) { if (other == PLAYER1) { mp3_clear(); World.Sys_Music.inZone = World.Sys_Music.elevator = World.Sys_Music.distortion = false; } }// return to normal upon leaving the trigger
 void UpdateMusic(void) {
     if (World.paused && !World.menuActive) { MP3Pause(); return; }
     MP3Resume();

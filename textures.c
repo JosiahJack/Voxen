@@ -289,13 +289,13 @@ static __attribute__((noinline)) void LoadTextures() {
     OS_Free(textureSizes,texCnt * 2 * sizeof(i32));                             OS_Free(texturePaletteOffsets,texCnt * sizeof(u32));        
     for (int t=0; t<threadCnt; ++t) OS_Free(thread_png_arenas[t].base, 16777216);
     OS_Free(thread_png_arenas, (size_t)threadCnt * sizeof(PngArena));
-    FHandle fp = OS_OpenReadonly(World.global_winicon);
+    FHandle fp = OS_OpenReadonly(WIN_ICON);
     int windowIconFileSize = OS_FileSize(fp);
-    u8* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize, fp, World.global_winicon);    
+    u8* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize,fp,WIN_ICON);    
     OS_Close(fp); PngArenaInit(&png_arena_main);
     int w=1, h=1; 
     u8* pixels = PngLoad(file_buffer,windowIconFileSize,&w,&h,&png_arena_main);
-    if (!pixels) { DualLogError("Failed to load icon: %s\n", World.global_winicon); OS_Exit(1); }
+    if (!pixels) { DualLogError("Failed to load icon: %s\n",WIN_ICON); OS_Exit(1); }
     WinSysIcon image = (WinSysIcon){w,h,pixels}; 
     VSetWindowIcon(&image);
     OS_Free(file_buffer, windowIconFileSize); 

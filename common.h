@@ -413,7 +413,7 @@ typedef struct {
     i16 ladderState,weaponCurrentPending,weaponIndexPending,weaponCurrent;
     u16 numLogsFromLevel[10],hasHardware,hardwareIsActive,hardwareInvReferenceIndex[HW_COUNT],heldObjectIndex,heldObjectCustomIndex,heldObjectAmmo,heldObjectAmmo2,weaponIndex,currentSearchItem,generalInvIndex,generalInvCustomIndex[14],patchActive,drainJPM;
     u8 lerpUp,hasSoft,softVersions[7],hasMinigame,numweapons,currentMagazineAmount[7],currentMagazineAmount2[7],hardwareVersion[HW_COUNT],hardwareVersionSetting[HW_COUNT],grenAmmo[7],grenConstIndex[7],grenadeCurrent,generalInvCurrent,patchCurrent,patchCounts[7],cyberItemIndex;
-        bool playerDead,beepDone,logPaused,hasNewEmail,hasNewNotes,currentCyberItem,isPulserNotDrill,wepLoadedWithAlternate[7],staminupActive,hasLog[134],readLog[134],justChangedWeap,overloadEnabled,recoiling,heldObjectLoadedAlternate,holdingObject,grenActive,hasNewLogs,hasNewData;
+    bool playerDead,beepDone,logPaused,hasNewEmail,hasNewNotes,currentCyberItem,isPulserNotDrill,wepLoadedWithAlternate[7],staminupActive,hasLog[134],readLog[134],justChangedWeap,overloadEnabled,recoiling,heldObjectLoadedAlternate,holdingObject,grenActive,hasNewLogs,hasNewData,radiationArea;
 } InventorySystem;
 typedef struct { float damage,penetration,offense,armorvalue,defense,impactVelocity; V3 attacknormal,hitpoint; AttType attackType; u16 owner,hitIdx; bool isOtherNPC,berserkActive; } DamageData;
 typedef struct __attribute__((packed, aligned(8))) { u64 magicNumber; double thisRunTime; bool isLoading; i32 missionSplitID; } AutoSplitterData; // For use with LiveSplit or other future speedrunner utilities for doing speedruns
@@ -494,7 +494,7 @@ typedef /*FAT*/ struct  {
     bool cardchunk,kinematic;
     FuncStates/*u8*/ startState,funcState;
     BodyState/*u8*/ bodyState;
-    float health,cyberHealth,targetPositionY,speed,percentAjar,percentMoved,volume,timeForTranquilization,gracePeriodFinished,meleeDamageFinished,idleTime,attack1SoundTime,attack2SoundTime,attack3SoundTime,timeTillEnemyChangeFinished,timeTillDeadFinished,timeTillPainFinished,huntFinished,
+    float health,cyberHealth,targetPositionY,radiation,speed,percentAjar,percentMoved,volume,timeForTranquilization,gracePeriodFinished,meleeDamageFinished,idleTime,attack1SoundTime,attack2SoundTime,attack3SoundTime,timeTillEnemyChangeFinished,timeTillDeadFinished,timeTillPainFinished,huntFinished,
           randomWaitForNextAttack1Finished,randomWaitForNextAttack2Finished,randomWaitForNextAttack3Finished,attackFinished,attack2Finished,attack3Finished,deathBurstFinished,tranquilizeFinished,wanderFinished,timeSinceMovedEnough,posCheckFinished,currentFrameFinished,animSwapFinished,delay,damage,itemLifeTime,minutes,seconds,randomMin,randomMax,timeInterval,
           cyberTimer,intervalFinished,delayFireFinished,delayResetFinished,delayFinished,tickFinished,tickTime,useFinished,waitBeforeClose,lasersFinished,amount,resetTime,minSecurityLevel,ajarPercentage,useTimeDelay,timeBeforeLasersOn,force,strength,offStrengthFactor,distancePaddingToTopPoint,initialBurstFinished,justUsed,timerFinished,randomItemDropChance[4];
     V3 accumulatedForce;    
@@ -502,7 +502,7 @@ typedef /*FAT*/ struct  {
     u16 enemy,altTexIndex,altGlowIndex,messageIndex,teleportID,targetDestinationID,recentMostActivator,countToTrigger,counter,activateSFX,lockedSFX,messageLingdex,lockedMessageLingdex,animationNum,frame,texFrame,texGlowFrame,texAnimLight,texAnimLight2,lookUpIndex,contents[4],customIndex[4],useableItemIndex,usableCustomIndex,randomItem[4],randomItemCustomIndex[4];
     i16 version,SFXIndex,SFXLockedIndex,textIndex,emailIndex,ammo,ammo2;
     bool searchableInUse,generateContents,dontReset,onlyOnce,ignoreSecondaryTriggers,allDone,currentTexture,useRandomTimes,active,touchEnabled,broken,stayOpen,startOpen,ajar,blocked,targetAlreadyDone,toggleLasers,targettingOnlyUnlocks,changeLayerOnOpenClose,despawnInstead,doSelfAfterList,
-         destroyAfterListInsteadOfDeactivate,iceActive,forceFieldDirectionX,forceFieldDirectionY,forceFieldDirectionZ,heldObjectLoadedAlternate,changeTexOnActive,blinkTexOnActive,alternateOn,lerping,onlyTargetOnce,autoPlayEmail,inCyberTube,noiseFinished,textureAnimating,textureGlowAnimating,
+         destroyAfterListInsteadOfDeactivate,iceActive,forceFieldDirectionX,forceFieldDirectionY,forceFieldDirectionZ,heldObjectLoadedAlternate,changeTexOnActive,blinkTexOnActive,alternateOn,lerping,onlyTargetOnce,autoPlayEmail,noiseFinished,textureAnimating,textureGlowAnimating,
          textureAnimationStopsAtDead,texAnimInReverse,texAnimRandom,automapHidden,grenadeExplodeContact,grenadeUseTimer,grenadeUseProx;
     u8 maxRandomItems; // [0 4]
     AttType attackType;
@@ -614,7 +614,7 @@ typedef struct {
     float cam_pitch,cam_yaw,cam_roll;
     i32 currentMouse_dx,currentMouse_dy;
     bool targetIOActive;
-        char global_dllname[256],global_winicon[256],playerName[27],audiologNames[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH],audiologSubjects[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH],audiologSenders[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH],audioLogSpeech2Text[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH];
+    char playerName[27],audiologNames[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH],audiologSubjects[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH],audiologSenders[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH],audioLogSpeech2Text[T_LOGS_COUNT][T_LOCALIZATION_MAX_LENGTH];
 } GlobalContext; // Savable complete game state data
 GlobalContext World = {0};
 #define PI 3.14159265f
@@ -669,6 +669,7 @@ INLINE bool IdxIsAccessCard(u16 c) { return ((c >= 388 && c <= 398) || c == 417)
 INLINE bool IdxIsDynamicObject(u16 c) { return (c >= 307 && c <= 404) ||  c == 417 || (c >= 419 && c <= 428) || (c >= 430 && c <= 437) || (c >= 440 && c <= 442) || (c >= 458 && c <= 463) || (c >= 465 && c <= 476); }
 INLINE bool IdxIsStaticObjectSaveable(int c) { return (c == 112 || c == 279 || (c >= 448 && c < 458) || c == 480 || c == 516 || (c >= 518 && c <= 526) || c == 530 || c == 531 || c == 546 || c == 555 || c == 594 || c == 596 || c == 598 || (c >= 600 && c < 603) || (c >= 604 && c < 616) || (c >= 688 && c < 693) || c == 694 || c == 695 || (c >= 699 && c < 704) || (c >= 741 && c < 746)); }
 INLINE bool IdxIsStaticObjectImmutable(int c) { return ((c >= 527 && c < 530) || (c >= 532 && c < 546) || (c >= 547 && c < 553) || c == 554 || (c >= 556 && c < 594) || c == 595 || c == 597 || c == 599 || c == 601 || c == 603 || (c >= 616 && c < 688) || c == 693 || c == 696 || c == 697 || c == 698 || (c >= 704 && c < 717) || c == 720 || (c >= 733 && c < 736) || (c >= 737 && c < 739) || c == 746 || c == 747 || (c >= 750 && c <= 759 && c != 755)); }
+INLINE float UsableOrDef(float cur, float def) { u32 c = *(u32*)&cur, d = *(u32*)&def; u32 m = 0 - ((c >> 31) | ((c & 0x7FFFFFFF) == 0)); u32 r = (m & d) | (~m & c); return *(float*)&r; }
 
 void DualLogError(const char* fmt, ...); void DualLogWarn(const char* s, ...); void DualLog(const char* fmt, ...); bool cEmpty(const char c);
 

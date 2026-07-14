@@ -641,7 +641,7 @@ void ModEDefsInitAfterLoad(void) { // Global conditions for all entities.  No se
     /*592 text_decal*/ EDefs[592].modelIndex=77;
     /*593 text_decalStopDSS1*/ EDefs[593].modelIndex=77; 
     /*594 trigger_counter*/
-    /*565 trigger_cyberpush*/
+    /*595 trigger_cyberpush*/
     /*596 trigger_gravitylift*/
     /*597 trigger_ladder*/
     /*598 trigger_multiple*/

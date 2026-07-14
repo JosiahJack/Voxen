@@ -233,40 +233,6 @@ void UseCyberspaceItem() {
 
 void CycleCyberSpaceItemUp() { int next = World.invP1.cyberItemIndex + 1; if (next > 2){next=0;} for (int c = 0; c <= 7; c++) { if (!(World.invP1.hasSoft & (1u << next))) { World.invP1.cyberItemIndex = (i8)next; return; } if (c == 7) { World.invP1.cyberItemIndex = -1; return; } if (++next > 2) {next = 0;} } }
 void CycleCyberSpaceItemDn() { int next = World.invP1.cyberItemIndex - 1; if (next < 0){next=2;} for (int c = 0; c <= 7; c++) { if (  World.invP1.hasSoft & (1u << next))  { World.invP1.cyberItemIndex = (i8)next; return; } if (c == 7) { World.invP1.cyberItemIndex = -1; return; } if (--next < 0) {next = 2;} } }
-bool AddSoftwareItem(u16 index, int vers) {
-    Entity* player = &World.instances[PLAYER1];
-    float sfxVol = (float)Sys_Settings.VolumeEffects / 100.0f;
-    switch(index) {
-        case 450/*item_cyber_drill*/:
-            if (World.invP1.isPulserNotDrill && !(World.invP1.hasSoft & (1u << SW_PULSER))) World.invP1.isPulserNotDrill = false;
-            if (vers > World.invP1.softVersions[SW_DRILL]) World.invP1.softVersions[SW_DRILL] = (u8)vers;
-            else CenterStatusPrint("%s",Sys_Text.stringTable[46]);
-            World.invP1.hasSoft |= (1u << SW_DRILL); play_wav(sounds[86],sfxVol,(V3){0.0f,0.0f,0.0f},false); CenterStatusPrint("%s%d%s",Sys_Text.stringTable[444],World.invP1.softVersions[SW_DRILL],Sys_Text.stringTable[458]); return true;
-        case 454/*item_cyber_pulser*/:
-            if (!World.invP1.isPulserNotDrill && !(World.invP1.hasSoft & (1u << SW_PULSER))) World.invP1.isPulserNotDrill = true;
-            if (vers > World.invP1.softVersions[SW_PULSER]) World.invP1.softVersions[SW_PULSER] = (u8)vers;
-            else CenterStatusPrint("%s",Sys_Text.stringTable[46]);
-            World.invP1.hasSoft |= (1u << SW_PULSER); play_wav(sounds[86],sfxVol,(V3){0.0f,0.0f,0.0f},false); CenterStatusPrint("%s%d%s",Sys_Text.stringTable[445],World.invP1.softVersions[SW_PULSER],Sys_Text.stringTable[458]); return true;
-        case 456/*item_cyber_shield*/:
-            if (vers > World.invP1.softVersions[SW_SHIELD]) World.invP1.softVersions[SW_SHIELD] = (u8)vers;
-            else CenterStatusPrint("%s",Sys_Text.stringTable[46]);
-            World.invP1.hasSoft |= (1u << SW_SHIELD); play_wav(sounds[86],sfxVol,(V3){0.0f,0.0f,0.0f},false); CenterStatusPrint("%s%d%s",Sys_Text.stringTable[446],World.invP1.softVersions[SW_SHIELD],Sys_Text.stringTable[458]); return true;
-        case 457/*item_cyber_turbo*/:
-            if (World.invP1.cyberItemIndex < 0) World.invP1.cyberItemIndex = 0;
-            World.invP1.softVersions[SW_TURBO]++; World.invP1.hasSoft |= (1u << SW_TURBO); play_wav(sounds[86],sfxVol,(V3){0.0f,0.0f,0.0f},false); CenterStatusPrint("%s",Sys_Text.stringTable[447]); return true;
-        case 449/*item_cyber_decoy*/:
-            if (World.invP1.cyberItemIndex < 0) World.invP1.cyberItemIndex = 1;
-            World.invP1.softVersions[SW_DECOY]++; World.invP1.hasSoft |= (1u << SW_DECOY); play_wav(sounds[86],sfxVol,(V3){0.0f,0.0f,0.0f},false); CenterStatusPrint("%s",Sys_Text.stringTable[448]); return true;
-        case 455/*item_cyber_recall*/: if (World.invP1.cyberItemIndex < 0){World.invP1.cyberItemIndex = 2;} World.invP1.softVersions[SW_RECALL]++; World.invP1.hasSoft |= (1u << SW_RECALL); play_wav(sounds[86],sfxVol,(V3){0.0f,0.0f,0.0f},false); CenterStatusPrint("%s",Sys_Text.stringTable[449]); return true;
-        case 451/* ;) item_cyber_game*/: { if (vers < 0 || vers >= 7){return false;} World.invP1.hasNewData  = true; World.invP1.hasMinigame |= (u8)(1u << vers); static const u16 gameMsg[7] = {450,451,452,453,454,455,456}; play_wav(sounds[86],sfxVol,(V3){0.0f,0.0f,0.0f},false); CenterStatusPrint("%s",Sys_Text.stringTable[gameMsg[vers]]); return true; }
-        case 448/*item_cyber_data*/: World.invP1.hasNewData = true; if (vers >= 0 && vers < T_LOGS_COUNT) {World.invP1.hasLog[vers] = true;} play_wav(sounds[87],sfxVol,(V3){0.0f,0.0f,0.0f},false); CenterStatusPrint("%s",Sys_Text.stringTable[457]); return true; 
-        case 452/*item_cyber_integrity*/: if (player->cyberHealth >= 255.0f) {return false;} play_wav(sounds[86],sfxVol,(V3){0.0f,0.0f,0.0f},false); player->cyberHealth += 77.0f; if (player->cyberHealth > 255.0f) {player->cyberHealth = 255.0f;} CenterStatusPrint("%s",Sys_Text.stringTable[459]); return true;
-        case 453/*item_cyber_keycard*/: World.invP1.hasNewData = true; if (vers < 0 || vers > 110) vers = 81; AddAccessCardToInventory(vers); return true;
-        default: break;
-    }
-    return false;
-}
-
 void RemoveWeapon(int slot) { World.invP1.weaponInventoryIndices[slot] = World.invP1.weaponInventoryAmmoIndices[slot] = -1; }
 static float DefaultEnergySettingForWeapon(int wep16Index) { return (wep16Index == 4) ? 5.0f : (wep16Index == 10) ? 13.0f : (wep16Index == 14) ? 2.0f : 3.0f; }
 void UpdateAmmoCount() { World.invP1.numweapons=0; for (int i=0;i<7;i++) { if(World.invP1.weaponInventoryIndices[i] >= 0){World.invP1.numweapons++;} } }
@@ -368,13 +334,13 @@ void UseGrenade(int index) {
 
 void InventoryUpdate() {
     if (Grenade()) {
-        if (World.instances[PLAYER1].inCyberTube) UseCyberspaceItem();
+        if (World.curLev == LEVEL_CYBERSPACE) UseCyberspaceItem();
         else if (World.invP1.grenadeCurrent >= 0 && World.invP1.grenadeCurrent < 7 && World.invP1.grenAmmo[World.invP1.grenadeCurrent] > 0) UseGrenade(World.invP1.grenConstIndex[World.invP1.grenadeCurrent]);
         else CenterStatusPrint("%s",Sys_Text.stringTable[322]); // Out of grenades.
     }
     
-    if (GrenadeCycUp())  { if (World.instances[PLAYER1].inCyberTube) CycleCyberSpaceItemUp(); else GrenadeCycleUp(); }
-    if (GrenadeCycDown()){ if (World.instances[PLAYER1].inCyberTube) CycleCyberSpaceItemDn(); else GrenadeCycleDown(); }
+    if (GrenadeCycUp())  { if (World.curLev == LEVEL_CYBERSPACE) CycleCyberSpaceItemUp(); else GrenadeCycleUp(); }
+    if (GrenadeCycDown()){ if (World.curLev == LEVEL_CYBERSPACE) CycleCyberSpaceItemDn(); else GrenadeCycleDown(); }
     if (RecentLog() && (World.invP1.hasHardware & HW_ERD)) {
         bool playing = false; //SndPlaying(&World.invP1.logSound); TODO
         if (World.invP1.lastAddedIndex >= 0 && !playing) {
@@ -469,26 +435,7 @@ void AddItemToInventory(int index, int customIndex) {
 // Cyber Elements
 void CyberDecoyEnable() { World.decoyActive = true; }
 void CyberDecoyDisable() { World.decoyActive = false; }
-void CyberExitOnTriggerEnter(u16 other) { if (other != PLAYER1) {return;} UIExitCyberspace(); }
-void CyberDataFragmentOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (other != PLAYER1) {return;} UICyberSprint((u16)e->textIndex); }
-void CyberItemInitBeforeLoad(u16 self) { Entity* e = &World.instances[self]; if (World.diffMis == 0 && e->index == 448) {flag_set(&e->entflags,EF_ACTIVE,false); /*item_cyber_data*/} }
-void CyberItemOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (other != PLAYER1) {return;} if (!AddSoftwareItem(e->index,e->version)) {return;} flag_set(&e->entflags,EF_ACTIVE,false); }
-void CyberIceOnTriggerEnter(u16 self, u16 other) { (void)self; Entity* e = &World.instances[other]; if (!(e->entflags & EF_RIGIDBODY)) return; World.layer[other] = 24; World.velocity[other] = V3_ScaleByF(World.velocity[other],-1.0f); }
-void CyberMineInitBeforeLoad(u16 self) {
-    Entity* e = &World.instances[self];
-    e->damage = 55.0f;
-    if (World.diffCyb < 3) { if (random_range(0.0f,1.0f) < 0.2f) flag_set(&e->entflags,EF_ACTIVE,false); e->damage = 33.0f; }
-    if (World.diffCyb < 2) { if (random_range(0.0f,1.0f) < 0.33f) flag_set(&e->entflags,EF_ACTIVE,false); e->damage = 22.0f; }
-    if (World.diffCyb < 1) { if (random_range(0.0f,1.0f) < 0.50f) flag_set(&e->entflags,EF_ACTIVE,false); e->damage = 11.0f; }
-}
-
-float TakeDamage(u16 self,DamageData dd);
-void CyberMineOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (other != PLAYER1) return; PlayerTakeDamage(PLAYER1,e->damage); play_wav(sounds[67],1.0f,World.position[self],false); flag_set(&e->entflags,EF_ACTIVE,false); }
-void CyberPushOnTriggerStay(u16 self, u16 other) { Entity* e = &World.instances[self]; Entity* player = &World.instances[PLAYER1]; if (World.diffCyb < 1 || other != PLAYER1) {return;} player->inCyberTube = true; AddForce(PLAYER1,V3_ScaleByF(e->direction,e->force * (float)World.deltaTime),false); World.Sys_Music.cyberTube = true; }
-void CyberPushOnTriggerExit(u16 self, u16 other) { (void)self; if (other != PLAYER1) {return;} World.instances[other].inCyberTube = false; World.Sys_Music.cyberTube = false; }
 void CyberDoorOnCollisionEnter(u16 self, u16 other) { if(other != PLAYER1){return;} CenterStatusPrint("%s  %s",Sys_Text.stringTable[World.instances[self].messageIndex],Sys_Text.stringTable[601]); }
-void CyberSwitchInitAfterLoad(u16 self) { Entity* e = &World.instances[self]; if (e->iceActive) {flag_set(&e->entflags,EF_ACTIVE,true);} } // TODO Visual subobject parity removed with hierarchy removal.
-void CyberSwitchOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (e->active || other != PLAYER1) {return;} UICyberSprint((u16)e->textIndex); e->active = true; UseTargets(other,e->target); }
 void CyberTimerInitAfterLoad(u16 self) { Entity* e = &World.instances[self]; e->cyberTimer = 600.0f; e->timerFinished = World.pauseRelativeTime + 1.0; }
 void CyberTimerReset(u16 self, int diff) { Entity* e = &World.instances[self]; switch (diff) { case 0: e->cyberTimer = 600.0f; break; case 1: e->cyberTimer = 300.0f; break; case 2: e->cyberTimer = 240.0f; break; case 3: e->cyberTimer = 180.0f; break; } }
 void CyberTimerUpdate(u16 self) { Entity* e=&World.instances[self]; if(e->cyberTimer <= 0.0f){UIExitCyberspace(); return;} if(e->timerFinished >= World.pauseRelativeTime){return;} e->cyberTimer-=1.0f; e->minutes=vfloor(e->cyberTimer / 60.0f); e->seconds = e->cyberTimer - (e->minutes * 60.0f); e->timerFinished = World.pauseRelativeTime + 1.0; }
@@ -501,9 +448,6 @@ void CyberWallConwaySignal(u16 self) { Entity* e = &World.instances[self]; e->an
     if (becomes) CyberWallHit(self); else e->volume = 0.02f;
     for (int i=0; i<nc; i++) { if (nb[i]==U16_MAX) continue; Entity* n = &World.instances[nb[i]]; if (n->animSwapFinished < World.pauseRelativeTime + 0.4) { n->animSwapFinished = World.pauseRelativeTime + 0.5; n->tickFinished = World.pauseRelativeTime + 0.5; } }
 } // Conway's game of life propagation on world x,z plane
-// Ladder
-void LadderOnTriggerEnter(u16 other) { if(other != PLAYER1){return;} World.invP1.ladderState++; if(World.invP1.ladderState < 1){World.invP1.ladderState=1;} }
-void LadderOnTriggerExit(u16 other) { if(other != PLAYER1){return;} World.invP1.ladderState--; if(World.invP1.ladderState < 0){World.invP1.ladderState=0;} }
 // SearchFX
 void SearchFXResetEnable(u16 self) { Entity* e = &World.instances[self]; if (e->itemLifeTime <= 0.0f) {e->itemLifeTime = 3.0f;} e->delayFinished = World.pauseRelativeTime + e->itemLifeTime; }
 void SearchFXResetUpdate(u16 self) { Entity* e = &World.instances[self]; if (e->delayFinished >= World.pauseRelativeTime) {return;} flag_set(&e->entflags,EF_ACTIVE,false); }
@@ -610,34 +554,7 @@ void ForceBridgeUpdate(u16 self) {
         if (sx < 0.08f || sy < 0.08f || sz < 0.08f) { flag_set(&e->entflags,EF_ACTIVE,false); World.collider[self] = COLTYPE_NONE; e->lerping = false; }
     }
 }
-// TeleportTouch
-static u16 TeleportTouch_allTeleportTouches[8];
-static bool TeleportTouch_initialized;
-void TeleportTouchInitAfterLoad(u16 self) {
-    Entity* e = &World.instances[self];
-    if (!TeleportTouch_initialized) { for (u8 i = 0; i < 8; i++) TeleportTouch_allTeleportTouches[i] = U16_MAX; TeleportTouch_initialized = true; }
-    if (e->teleportID >= 8) { DeleteInstance(self); return; }
-    TeleportTouch_allTeleportTouches[e->teleportID] = self;
-}
 
-void TeleportTouchOnTriggerEnter(u16 self, u16 other) {
-    Entity* e = &World.instances[self];
-    Entity* player = &World.instances[PLAYER1];
-    if (!e->touchEnabled || other != PLAYER1) return;
-    if (player->health <= 0.0f || e->justUsed >= World.pauseRelativeTime) return;
-    u16 dest = e->targetDestinationID < 8 ? TeleportTouch_allTeleportTouches[e->targetDestinationID] : U16_MAX;
-    if (dest == U16_MAX) return;
-    World.position[PLAYER1] = World.position[dest];
-    World.instances[dest].justUsed = World.pauseRelativeTime + 1.0;
-    play_wav(sounds[106],1.0f,World.position[dest],false);
-}
-// Trigger
-void TriggerUseTargets(u16 self, u16 activator) { UseTargets(activator,World.instances[self].target); }
-void TriggerDelayedTarget(u16 self, u16 activator) { World.instances[self].delayFireFinished = World.pauseRelativeTime + World.instances[self].delay; TriggerUseTargets(self,activator); }
-void TriggerTriggerTripped(u16 self, u16 other) { Entity* e=&World.instances[self]; if(other != PLAYER1 || (e->recentMostActivator && e->ignoreSecondaryTriggers)) return; e->recentMostActivator=other; if(e->onlyOnce){e->allDone=true;} if(e->delay <= 0.0f){TriggerUseTargets(self,other);}else{TriggerDelayedTarget(self,other);} }
-void TriggerOnTriggerEnter(u16 self, u16 other) { if (!World.instances[self].allDone) TriggerTriggerTripped(self,other); }
-void TriggerOnTriggerStay(u16 self, u16 other) { if (!World.instances[self].allDone) TriggerTriggerTripped(self,other); }
-void TriggerTargetted(u16 self, u16 activator) { if (World.instances[self].ignoreSecondaryTriggers) World.instances[self].recentMostActivator = activator; }
 // TriggerCounter
 void TriggerCounterTarget(u16 self, u16 activator) { UseTargets(activator,World.instances[self].target); }
 void TriggerCounterDelayedTarget(u16 self, u16 activator) { World.instances[self].delayFinished = World.pauseRelativeTime + World.instances[self].delay; TriggerCounterTarget(self,activator); }
@@ -655,50 +572,6 @@ void TextureChangerToggle(u16 self) {
     else { World.instances[self].texIndex = World.instances[self].altTexIndex; if (World.instances[self].altGlowIndex < MAX_TXRS) {World.instances[self].glowIndex = World.instances[self].altGlowIndex;} }
     World.instances[self].currentTexture = !World.instances[self].currentTexture;
 }
-// GravityLift
-void GravityLiftInitAfterLoad(u16 self) {
-    if (World.instances[self].strength <= 0.0f) World.instances[self].strength = 12.0f;
-    if (World.instances[self].offStrengthFactor <= 0.0f) World.instances[self].offStrengthFactor = 0.3f;
-    if (World.instances[self].distancePaddingToTopPoint <= 0.0f) World.instances[self].distancePaddingToTopPoint = 0.32f;
-    World.instances[self].topPoint = (V3){ 0.0f,World.position[self].y + (World.colliderSize[self].y * 0.5f), 0.0f };
-}
-
-// TODO just poll bounds and apply in trigger loop, yeesh
-void GravityLiftOnTriggerExit(u16 other) { if (other == PLAYER1) World.gravity[PLAYER1] = 1.0f; }
-// void GravityLiftOnForce(u16 self, u16 other, bool initial) {
-//     if (other == PLAYER1) flag_set(&World.instances[PLAYER1].entflags,EF_GRAV_LIFT_STATE,true);
-//     float topY = World.position[self].y + (World.colliderSize[self].y * 0.5f);
-//     float dist = topY - World.position[other].y + 0.48f;
-//     float velY = World.velocity[other].y < 0.0f ? 0.0f : World.velocity[other].y;
-//     if (dist < World.instances[self].distancePaddingToTopPoint) AddForce(other,(V3){0.0f,9.81f - velY,0.0f},false); // TODO accel-vs-force parity
-//     else if (World.velocity[other].y < (World.instances[self].strength * World.mass[other])) {
-//         float yForce = (World.instances[self].strength * World.mass[other]) - World.velocity[other].y;
-//         if (initial || World.instances[self].initialBurstFinished > World.pauseRelativeTime) yForce *= 2.0f;
-//         AddForce(other,(V3){0.0f,yForce,0.0f},false);
-//     }
-// }
-// 
-// void GravityLiftOffForce(u16 self, u16 other, bool initial) {
-//     if (other == PLAYER1) flag_set(&World.instances[PLAYER1].entflags,EF_GRAV_LIFT_STATE,true);
-//     if (World.velocity[other].y < World.instances[self].offStrengthFactor) {
-//         float yForce = World.instances[self].offStrengthFactor - World.velocity[other].y;
-//         if (initial || World.instances[self].initialBurstFinished > World.pauseRelativeTime) yForce *= 2.0f;
-//         AddForce(other,(V3){0.0f,yForce,0.0f},false);
-//     }
-// }
-// 
-// void GravityLiftOnTriggerEnter(u16 self, u16 other) {
-//     World.instances[self].initialBurstFinished = World.pauseRelativeTime + 1.0f;
-//     if (World.instances[self].active) GravityLiftOnForce(self,other,true);
-//     else GravityLiftOffForce(self,other,true);
-// }
-// 
-// void GravityLiftOnTriggerStay(u16 self, u16 other) {
-//     if (World.instances[self].active) GravityLiftOnForce(self,other,false);
-//     else GravityLiftOffForce(self,other,false);
-// }
-
-void GravityLiftToggle(u16 self) { World.instances[self].active = !World.instances[self].active; }
 // LogicTimer
 void LogicTimerInitBeforeLoad(u16 self) {
     Entity* e = &World.instances[self];
@@ -822,6 +695,7 @@ void UseTargets(u16 activator, const char* targetname) {
     if (!wasActive) World.targetIOActive = false; // Only the outermost UseTargets call clears the cache.
 }
 
+void TriggerTargetted(u16 self, u16 activator) { if (World.instances[self].ignoreSecondaryTriggers) World.instances[self].recentMostActivator = activator; }
 void Targetted(u16 activator, u16 self) {
     Entity* e = &World.instances[self];
     // When inside cross-level target I/O (World.targetIOActive), the `activator` index is only
@@ -1036,7 +910,7 @@ static void DeactivateHardwareOnEnergyDepleted(void) {
     flag_set((u32*)active,HW_INF,false); // TODO: InfraredOff()
 }
 
-void TakeEnergy(float take) { if (World.invP1.energy <= 0.0f || Cheats.redbull) {return;} World.invP1.energy -= take; if (World.invP1.energy <= 0.0f) { World.invP1.energy = 0.0f; play_wav(sounds[84],Sys_Settings.VolumeEffects,(V3){0.0f,0.0f,0.0f},false); /*energy_gone*/ CenterStatusPrint("%s",Sys_Text.stringTable[314]); /*Power supply exhausted.*/ DeactivateHardwareOnEnergyDepleted(); } }
+void TakeEnergy(float take) { if (World.invP1.energy <= 0.0f || Cheats.redbull) {return;} World.invP1.energy -= take; if (World.invP1.energy <= 0.0f) { World.invP1.energy = 0.0f; play_wav(sounds[84],Sys_Settings.VolumeEffects,(V3){0.0f,0.0f,0.0f},false);/*energy_gone*/ CenterStatusPrint("%s",Sys_Text.stringTable[314]); /*Power supply exhausted.*/ DeactivateHardwareOnEnergyDepleted(); } }
 void GiveEnergy(float give,EnergyType type) {
     World.invP1.energy += give;
     if (World.invP1.energy > 255.0f) World.invP1.energy = 255.0f;

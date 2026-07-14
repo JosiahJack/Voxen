@@ -25,6 +25,7 @@ Overlap CapCap(ShapeCapsule a, ShapeCapsule b) {
 }
 
 void obb_axes(Quaternion q, V3 *ax, V3 *ay, V3 *az) { *ax=quat_rot_v3(q,(V3){1,0,0}); *ay=quat_rot_v3(q,(V3){0,1,0}); *az=quat_rot_v3(q,(V3){0,0,1}); }
+bool PointInOBB(V3 pt, ShapeBox box) { V3 d=V3_AsubB(pt,box.ctr); V3 ax,ay,az; obb_axes(box.rot,&ax,&ay,&az); float lx = V3_dot(d,ax), ly = V3_dot(d,ay), lz = V3_dot(d,az); return (vabs(lx) <= box.hExt.x) && (vabs(ly) <= box.hExt.y) && (vabs(lz) <= box.hExt.z); }
 Overlap SphBox(V3 ctr, float rad, ShapeBox box) {
     Overlap r = {0}; V3 ax,ay,az; obb_axes(box.rot,&ax,&ay,&az); V3 d = V3_AsubB(ctr,box.ctr);
     float lx = V3_dot(d,ax), ly = V3_dot(d,ay), lz = V3_dot(d,az);
@@ -491,29 +492,34 @@ void EntityColliderMatrixNow(u16 i, float M[16]) { // Convex meshes need to keep
 }
 
 inline int V3_IsSane(V3 v) { union { float f; unsigned int i; } ux,uy,uz; ux.f = v.x; uy.f = v.y; uz.f = v.z; return !(((ux.i & 0x7FFFFFFF) >= 0x7F800000) | ((uy.i & 0x7FFFFFFF) >= 0x7F800000) | ((uz.i & 0x7FFFFFFF) >= 0x7F800000)); }
+u16 triggerVolumes[128]; u16 numTriggers;
 void Physics(float dt) {
     u8 substeps = (u8)vclamp((u32)(dt / MAX_STEP_SIZE + 0.5f),1u,(u32)40); float dtsub = dt / (float)substeps; dynamicEntityCount = 0;
     for (u16 i=0;i<World.instCount && dynamicEntityCount < 512;++i) { if ((World.instances[i].entflags & EF_RIGIDBODY) && (World.instances[i].entflags & EF_ACTIVE) && World.collider[i] != COLTYPE_NONE) {dynamicEntities[dynamicEntityCount++] = i;} }
     for (u8 s=0;s<substeps;++s) {
-        mset(cellCounts,0,sizeof(cellCounts));
+        mset(cellCounts,0,sizeof(cellCounts)); numTriggers=0;
+        for (u16 t=0;t<128;++t) triggerVolumes[t]=0xFFFF;
         for (u16 i=0;i<World.instCount;++i) {
             posBudget[i] = 0.64f; World.instances[i].cellX=(i16)PosGetCellCoordX(World.position[i].x); World.instances[i].cellZ=(i16)PosGetCellCoordZ(World.position[i].z);
             World.instances[i].cellIndex=PosGetCellCoordsP(World.instances[i].cellX,World.instances[i].cellZ); World.radius[i] = GetColRad(i);
             u32 cell=(u32)World.instances[i].cellIndex; if(cell < WORLDX*WORLDX && cellCounts[cell] < 128){cellLists[cell][cellCounts[cell]++]=i;}
+            u16 idx=World.instances[i].index;
+            if (((idx >= 595 && idx <= 601) || idx == 746) && (World.instances[i].entflags & EF_ACTIVE) && numTriggers < 128) triggerVolumes[numTriggers++] = i;
         }
-        for (u16 i=0;i<dynamicEntityCount;++i) {
-            u16 idx = dynamicEntities[i]; V3 acc = {0.0f,-9.81f * World.gravity[idx],0.0f}; if ((idx == PLAYER1) && Cheats.noclip) acc.y = 0.0f;
-            acc = V3_AplusB(acc,V3_ScaleByF(World.instances[idx].accumulatedForce,1.0f / World.mass[idx])); World.velocity[idx] = V3_AplusB(World.velocity[idx],V3_ScaleByF(acc,dtsub));
-            if (!V3_IsSane(World.velocity[idx])) { World.velocity[idx] = (V3){0.0f,0.0f,0.0f}; }
-            else { float speed = V3_Mag(World.velocity[idx]); if (speed > MAX_SPEED) World.velocity[idx] = V3_ScaleByF(World.velocity[idx], MAX_SPEED / speed); }
-            float linDrag = vexp(-2.0f * dtsub); World.velocity[idx] = V3_ScaleByF(World.velocity[idx],linDrag); SetPosition(idx,V3_AplusB(World.position[idx],V3_ScaleByF(World.velocity[idx],dtsub)),false);
-            if (World.collider[idx] != COLTYPE_CAP) {
-                if (!V3_IsSane(World.angularVelocity[idx])) { World.angularVelocity[idx] = (V3){0.0f,0.0f,0.0f}; }
+        if (numTriggers >= 127) DualLogWarn("Ran out of triggers!\n");
+        for (u16 i=0;i<dynamicEntityCount;++i) { // 1. Integrate velocity
+            u16 a=dynamicEntities[i]; V3 acc = {0.0f,-9.81f * World.gravity[a],0.0f}; if ((a == PLAYER1) && Cheats.noclip) acc.y = 0.0f;
+            acc = V3_AplusB(acc,V3_ScaleByF(World.instances[a].accumulatedForce,1.0f / World.mass[a])); World.velocity[a] = V3_AplusB(World.velocity[a],V3_ScaleByF(acc,dtsub));
+            if (!V3_IsSane(World.velocity[a])) { World.velocity[a]=(V3){0.0f,0.0f,0.0f}; }
+            else { float speed=V3_Mag(World.velocity[a]); if (speed > MAX_SPEED) World.velocity[a]=V3_ScaleByF(World.velocity[a],MAX_SPEED / speed); }
+            float linDrag = vexp(-2.0f * dtsub); World.velocity[a] = V3_ScaleByF(World.velocity[a],linDrag); SetPosition(a,V3_AplusB(World.position[a],V3_ScaleByF(World.velocity[a],dtsub)),false);
+            if (World.collider[a] != COLTYPE_CAP) {
+                if (!V3_IsSane(World.angularVelocity[a])) { World.angularVelocity[a] = (V3){0.0f,0.0f,0.0f}; }
                 else {
-                    float avel = V3_Mag(World.angularVelocity[idx]); if (avel > MAX_ANGULAR_SPEED) { World.angularVelocity[idx] = V3_ScaleByF(World.angularVelocity[idx],MAX_ANGULAR_SPEED / avel); avel = MAX_ANGULAR_SPEED; }
-                    if (avel > PHY_EPSILON) { Quaternion dq = quat_from_axis_angle(V3_ScaleByF(World.angularVelocity[idx],1.f / avel),avel * dtsub); World.rotation[idx] = quat_normalize(quat_multiply(dq,World.rotation[idx])); }
+                    float avel = V3_Mag(World.angularVelocity[a]); if (avel > MAX_ANGULAR_SPEED) { World.angularVelocity[a] = V3_ScaleByF(World.angularVelocity[a],MAX_ANGULAR_SPEED / avel); avel = MAX_ANGULAR_SPEED; }
+                    if (avel > PHY_EPSILON) { Quaternion dq = quat_from_axis_angle(V3_ScaleByF(World.angularVelocity[a],1.f / avel),avel * dtsub); World.rotation[a] = quat_normalize(quat_multiply(dq,World.rotation[a])); }
                 }
-            } else World.angularVelocity[idx] = (V3){0.0f,0.0f,0.0f};
+            } else World.angularVelocity[a] = (V3){0.0f,0.0f,0.0f};
         }
         for (u16 i=0;i<dynamicEntityCount;++i) {
             u16 a = dynamicEntities[i]; if (World.collider[a] == COLTYPE_MSH || (Cheats.noclip && a == PLAYER1)) continue;
@@ -521,14 +527,14 @@ void Physics(float dt) {
             float searchRad = World.radius[a] + V3_Mag(World.velocity[a]) * dtsub + 0.5f; i32 radCells = vmax((i32)(searchRad / CELL_SIZE) + 2,2);
             typedef struct { Manifold m; u16 otherIdx; } Contact; Contact contacts[32]; int contactCount = 0;
             for (i32 dx = -radCells; dx <= radCells; ++dx) {
-                for (i32 dz = -radCells; dz <= radCells; ++dz) {
+                for (i32 dz = -radCells; dz <= radCells; ++dz) { // 2. Collisions
                     u32 cell = PosGetCellCoordsP(cx + dx,cz + dz);
                     for (u16 k = 0; k < cellCounts[cell]; ++k) {
                         u16 b = cellLists[cell][k]; if (b == a) continue;
                         if (Cheats.noclip && b == PLAYER1) continue;
                         if (!(mask & World.layer[b]) || World.collider[b] == COLTYPE_NONE) continue;
                         if ((World.instances[b].entflags & EF_RIGIDBODY) && b > a) continue; // Prevent doubled restitutions causing ghosting.
-                        V3 deltaPos = V3_AsubB(World.position[a],World.position[b]); float rr = (World.radius[a] + World.radius[b]) * 1.42f; if (V3_dot(deltaPos,deltaPos) > rr * rr) continue;
+                        V3 deltaPos = V3_AsubB(World.position[a],World.position[b]); float rr = (World.radius[a] + World.radius[b]) + 2.56f/*One chunk extent*/; if (V3_dot(deltaPos,deltaPos) > rr * rr) continue;
                         Manifold mf = {0};
                         float matA[16], matB[16];
                         const float *mxA = &modelMatrices[a*16];
@@ -561,12 +567,32 @@ void Physics(float dt) {
                 }
             }
             World.colliding[a]=false; flag_set(&World.instances[a].entflags,EF_GROUNDED,false);
-            for (int c = 0; c < contactCount; ++c) {
+            for (int c = 0; c < contactCount; ++c) { // 3. Restitution
                 Manifold *mfp = &contacts[c].m; u16 j = contacts[c].otherIdx; World.colliding[a] = true; bool jIs = (j < INSTANCE_COUNT); if (jIs) World.colliding[j] = true;
                 if (V3_dot(mfp->normal,(V3){0.0f,1.0f,0.0f}) >= 0.574f) {World.instances[a].entflags |= EF_GROUNDED;}
                 if (jIs && (World.instances[j].entflags & EF_RIGIDBODY) && World.collider[j] != COLTYPE_MSH) ApplyManifoldResponse(a,j,mfp); else ApplyManifoldResponse(a,0,mfp);
             }
             World.instances[a].accumulatedForce = (V3){0.0f,0.0f,0.0f};
+        }
+        for (u16 i=0;i<numTriggers;++i) {
+            u16 self = triggerVolumes[i];
+            u16 trigdx=World.instances[self].index;
+            if (Cheats.showPhys) DrawBoxColliderColored(self,(Color){1.0f,0.642f,0.0f,0.5f});
+            for (u16 o=0;o<dynamicEntityCount;++o) { // 4. Triggers
+                u16 other = dynamicEntities[o]; if (World.collider[other] == COLTYPE_NONE || !(World.instances[other].entflags & EF_ACTIVE)) continue;
+                if (!PointInOBB(World.position[other],Entity_GetBox(self))) continue;
+                if (other != PLAYER1 && trigdx == 596) { trigger_gravitylift_touch(self,other); continue; }
+                World.Sys_Music.cyberTube = false; World.gravity[PLAYER1] = 1.0f; World.invP1.ladderState=0; World.Sys_Music.inZone = World.Sys_Music.elevator = World.Sys_Music.distortion = false; // Reset trigger sustained flags
+                switch(trigdx) {
+                    case 595/*trigger_cyberpush*/:   trigger_cyberpush_touch(self,other); break;
+                    case 596/*trigger_gravitylift*/: trigger_gravitylift_touch(self,other); break;
+                    case 597/*trigger_ladder*/:      World.invP1.ladderState=1; break;
+                    case 598/*trigger_multiple*/: case 600/*trigger_once*/: TriggerTriggerTripped(self,other); break;
+                    case 599/*trigger_music*/: { TrackType tt=World.instances[self].trackType; World.Sys_Music.inZone=true; World.Sys_Music.elevator=(tt == TrackType_Elevator); World.Sys_Music.distortion=(tt == TrackType_Distortion); break; }
+                    case 601/*trigger_radiation*/:            World.invP1.radiationArea=true;World.instances[PLAYER1].radiation=World.instances[self].radiation; break; // TODO bleedoff when !radiationArea, amelioration from envirosuit, detox patch negation for 30secs
+                    case 746/*weapon_grenadeenergmine_live*/: TakeEnergy(256.0f); break;
+                }
+            }
         }
     }
 }
