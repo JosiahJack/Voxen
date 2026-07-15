@@ -44,29 +44,6 @@ INLINE Quaternion QuatFromToRotation(V3 from,V3 to) {
     return (Quaternion){ax.x*invs,ax.y*invs,ax.z*invs,s*0.5f};
 }
 
-int Get16WeaponIndexFromConstIndex(int index) {
-    switch (index) {
-        case 36: return 0; // Mark3 Assault Rifle
-        case 37: return 1; // ER-90 Blaster
-        case 38: return 2; // SV-23 Dartgun
-        case 39: return 3; // AM-27 Flechette
-        case 40: return 4; // RW-45 Ion Beam
-        case 41: return 5; // TS-04 Laser Rapier
-        case 42: return 6; // Lead Pipe
-        case 43: return 7; // Magnum 2100
-        case 44: return 8; // SB-20 Magpulse
-        case 45: return 9; // ML-41 Pistol
-        case 46: return 10;// LG-XX Plasma Rifle
-        case 47: return 11;// MM-76 Railgun
-        case 48: return 12;// DC-05 Riotgun
-        case 49: return 13;// RF-07 Skorpion
-        case 50: return 14;// Sparq Beam
-        case 51: return 15;// DH-07 Stungun
-    }
-    return -1;
-}
-
-INLINE bool CurrentWeaponUsesEnergy(void) { int i = World.invP1.weaponIndex; return i==37 || i==40 || i==46 || i==50 || i==51; }
 INLINE bool WeaponsHaveAnyHeat(void) { if (Cheats.redbull) {return false;} for (int i=0;i<7;i++) {if (World.invP1.currentEnergyWeaponHeat[i] > 0.0f) {return true;}} return false; }
 void HeatBleedOff(void) {
     static double heatTickFinished = 0.0;

@@ -246,6 +246,7 @@ void AIAnimationControllerUpdate(u16 idx) {
     }
 }
 
+void DoorActuate(u16 self);
 static bool AICheckIfEnemyInSight(u16 idx) {
     u16 eidx = World.instances[idx].enemy;
     if (!eidx || !ai_has_health(&World.instances[idx])) return false;

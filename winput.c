@@ -430,16 +430,13 @@ void InputJoystickButton(WinSysjoystick*,int,char); void InputJoystickHat(WinSys
             for (j=0;j<disconnectedCount;++j) { if(disconnected[j] && disconnected[j]->x11.output == sr->outputs[i]){disconnected[j]=NULL; break;} }
             if (j < disconnectedCount) { WinSys.x11.randr.FreeOutputInfo(oi); continue; }
             XRRCrtcInfo* ci = WinSys.x11.randr.GetCrtcInfo(WinSys.x11.display, sr, oi->crtc); if (!ci) { WinSys.x11.randr.FreeOutputInfo(oi); continue; }
-
             if (ci->rotation == 2 || ci->rotation == 8) { widthMM  = oi->mm_height; heightMM = oi->mm_width; } // == 90, == 270
             else { widthMM  = oi->mm_width; heightMM = oi->mm_height; }
-            
             if (widthMM <= 0 || heightMM <= 0) { widthMM  = (int) (ci->width * 25.4f / 96.f); heightMM = (int) (ci->height * 25.4f / 96.f); }
             WinSysmonitor* monitor = AllocMonitor(oi->name, widthMM, heightMM);
             monitor->x11.output = sr->outputs[i]; monitor->x11.crtc   = oi->crtc;
             type = (monitor->x11.output == primary) ? 0 : 1; InputMonitor(monitor,0x00040001/*connected*/,type); WinSys.x11.randr.FreeOutputInfo(oi); WinSys.x11.randr.FreeCrtcInfo(ci);
         }
-
         WinSys.x11.randr.FreeScreenResources(sr);
         for (int i=0;i<disconnectedCount;++i) { if (disconnected[i]) {InputMonitor(disconnected[i],0x00040002/*disconnected*/,0);} }
         if (disconnected) OS_Free(disconnected,WinSys.monitorCount*sizeof(WinSysmonitor*));
@@ -451,10 +448,12 @@ void InputJoystickButton(WinSysjoystick*,int,char); void InputJoystickHat(WinSys
         if (e->type==WinSys.x11.randr.eventBase+1/*notify*/) { WinSys.x11.randr.UpdateConfiguration(e); PollMonitors(); return; }
         if (e->type==35/*GenericEvent*/) return;
         WinSyswindow* win=NULL; if (WinSys.x11.xlib.FindContext(WinSys.x11.display,e->xany.window,WinSys.x11.context,(XPointer*)&win)!=0) return;
-
         switch (e->type) {
             case 21/*ReparentNotify*/: win->x11.parent=e->xreparent.parent; return;
-            case 2/*KeyPress*/: case 3/*KeyRelease*/: { const int key=translateKey(keycode),action=(e->type==2/*KeyPress*/)?INPUT_PRESS:INPUT_RELEASE; if (key!=KEY_UNKNOWN) {InputKey(win,key,action);} return; }
+            case 2/*KeyPress*/: case 3/*KeyRelease*/: {
+                const int key=translateKey(keycode); if (key==KEY_UNKNOWN) {return;}
+                if (e->type==3/*KeyRelease*/) { XEvent next; if(WinSys.x11.xlib.CheckTypedWindowEvent(WinSys.x11.display,e->xany.window,2/*KeyPress*/,&next)){ if(next.xkey.keycode == keycode && next.xkey.h /*h is the time field*/ == e->xkey.h){InputKey(win,key,INPUT_PRESS); return;/*Ignore fake one made by repeater.*/}else{InputKey(win,key,INPUT_RELEASE); processEvent(&next); return;} }}
+                const int action=(e->type==2/*KeyPress*/)?INPUT_PRESS:INPUT_RELEASE; InputKey(win,key,action); return; }
             case 4: /* ButtonPress */ case 5: /* ButtonRelease */ {
                 const int btn = e->xbutton.button;
                 const int action = (e->type == 4) ? INPUT_PRESS : INPUT_RELEASE;
@@ -862,10 +861,6 @@ KeyState* GetCodeMapping(int settingIndex) {
     return &Sys_Input.keyStates[inputElements[i].value];
 }
 
-bool GetKeyRiseEdgeOrHeld(int sI, bool onRise) { i32 i = Sys_Settings.InputCodeSettings[sI]; if (i == 128) {return Sys_Input.scrollDelta > 0;} if (i == 129) {return Sys_Input.scrollDelta < 0;} KeyState* k = GetCodeMapping(sI); return onRise ? k->pressed : k->down; }
-bool GetKey(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,false); }  // True while held down.
-bool GetKeyPressed(int settingIndex) { return (settingIndex < 0) ? Sys_Input.keyStates[KEY_GRAVE_ACCENT].pressed : GetKeyRiseEdgeOrHeld(settingIndex,true); } // True 1st frame down.
-void IgnoreNextMouseDelta() { ignore_next_mouse_delta = true; }
 void TextEntry(i32 k) {
     if (k == KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { World.playerName[0] = '\0'; currentPlayerNameLength = 0; return; }
     if (k == KEY_ENTER || k == KEY_KP_ENTER) { currentMenuItem++; return; }
@@ -877,53 +872,31 @@ void TextEntry(i32 k) {
 
 void GoIntoGame(); void ConsoleEmulator(i32 keycode); extern bool enteringPlayerName;
 void InputKey(WinSyswindow* win,int key,int action) {
-    if (key >= 0 && key <= 348) {
-        i32 repeated = 0;
-        if (action == INPUT_RELEASE && win->keys[key] == INPUT_RELEASE) return;
-        if (action ==   INPUT_PRESS && win->keys[key] == INPUT_PRESS) repeated =  1;
-        win->keys[key] = (char)action; if (repeated) action = INPUT_REPEAT;
-    }
+    if (key >= 0 && key <= 348) { i32 repeated=0; if(action == INPUT_RELEASE && win->keys[key] == INPUT_RELEASE){return;} if (action ==   INPUT_PRESS && win->keys[key] == INPUT_PRESS){repeated=1;} win->keys[key]=(char)action; if(repeated){action=INPUT_REPEAT;} }
     if (!window_has_focus) return;
-    if (key == KEY_F10 && action) OS_Exit(0); // Suppress warnings about unused parameters forced upon me by WinSys3 dependency deadweight anchor.
-    if (World.menuActive && !returnToPause) {
-        if ((key == KEY_RIGHT_ALT || key == KEY_LEFT_ALT) && action && Sys_Input.keyStates[KEY_ENTER].down)                    GoIntoGame();
-        if (key == KEY_ENTER && action && (Sys_Input.keyStates[KEY_LEFT_ALT].down || Sys_Input.keyStates[KEY_RIGHT_ALT].down)) GoIntoGame();
-    }
+    if (key == KEY_F10 && action) OS_Exit(0);
+    if (World.menuActive && !returnToPause) { if (((key == KEY_RIGHT_ALT || key == KEY_LEFT_ALT) && action && Sys_Input.keyStates[KEY_ENTER].down) || (key == KEY_ENTER && action && (Sys_Input.keyStates[KEY_LEFT_ALT].down || Sys_Input.keyStates[KEY_RIGHT_ALT].down))){GoIntoGame();} }
     if (key >=0 && key < MAX_KEYS && (action == INPUT_PRESS || (action == INPUT_REPEAT && !(key == KEY_KP_ENTER || key == KEY_ENTER || key == KEY_TAB || key == KEY_ESCAPE)))) {
-        Sys_Input.keyStates[key].pressed = Sys_Input.keyStates[key].down = true;
+        Sys_Input.keyStates[key].down = true; if (action == INPUT_PRESS) Sys_Input.keyStates[key].pressed = true; else Sys_Input.keyStates[key].pressed = false;
         if (Cheats.consoleActive) ConsoleEmulator(key);
         else if (enteringPlayerName && World.menuActive) TextEntry(key);
-    } else if (key >= 0 && key < MAX_KEYS && action == INPUT_RELEASE) Sys_Input.keyStates[key].pressed = Sys_Input.keyStates[key].down = false;
+    } else if (key >= 0 && key < MAX_KEYS && action == INPUT_RELEASE) { Sys_Input.keyStates[key].pressed=false; Sys_Input.keyStates[key].down=false; }
 }
 
-void InputMouseClick(WinSyswindow* win, int button, int action) { if (button<0 || button>7) {return;} if (button<=7) {win->mouseButtons[button] = (char)action;} Sys_Input.mouseButtons[button].down = Sys_Input.mouseButtons[button].pressed = (action == 1); Sys_Input.mouseButtons[button].released = (action == 0); }
-void quat_from_yaw_pitch_roll(Quaternion* q, float yaw_deg, float pitch_deg, float roll_deg) {
-    float yaw = deg2rad(yaw_deg), pitch = deg2rad(pitch_deg), roll = deg2rad(roll_deg);  // Around Z (forward)
-    float cy = vcosf(yaw * 0.5f), sy = vsinf(yaw * 0.5f), cp = vcosf(pitch * 0.5f), sp = vsinf(pitch * 0.5f), cr = vcosf(roll * 0.5f), sr = vsinf(roll * 0.5f);
-    q->w = cy*cp*cr + sy*sp*sr; q->x = cy*sp*cr + sy*cp*sr; /* X-axis (pitch) */ q->y = sy*cp*cr - cy*sp*sr; /* Y-axis (yaw) */ q->z = cy*cp*sr - sy*sp*cr; /* Z-axis (roll) */ // Skipping quat normalization, not needed
-} 
-
+void InputMouseClick(WinSyswindow* win, int button, int action) { if (button<0 || button>7) {return;} char wasDown = win->mouseButtons[button]; win->mouseButtons[button] = (char)action; bool down = (action == 1); Sys_Input.mouseButtons[button].pressed  = down && !wasDown; Sys_Input.mouseButtons[button].released = !down && wasDown; Sys_Input.mouseButtons[button].down=down; }
+void quat_from_yaw_pitch_roll(Quaternion* q, float yaw_deg, float pitch_deg, float roll_deg) { float yaw=deg2rad(yaw_deg), pitch=deg2rad(pitch_deg), roll=deg2rad(roll_deg/*Around Z (forward)*/); float cy=vcosf(yaw * 0.5f), sy=vsinf(yaw * 0.5f), cp=vcosf(pitch * 0.5f), sp=vsinf(pitch * 0.5f), cr=vcosf(roll * 0.5f), sr=vsinf(roll * 0.5f); q->w=cy*cp*cr + sy*sp*sr; q->x=cy*sp*cr + sy*cp*sr;/*X(pitch)*/ q->y=sy*cp*cr - cy*sp*sr;/*Y(yaw)*/ q->z=cy*cp*sr - sy*sp*cr;/*Z(roll)*/ } // Skipping quat normalization, not needed
 void InputCursorPos(WinSyswindow* win, double xpos, double ypos) { // static const float HeadBobRate   = 0.2f, HeadBobAmount = 0.08f,bobTarget = 0.3f; TODO
-    if (win->virtualCursorPosX == xpos && win->virtualCursorPosY == ypos) return;
-    win->virtualCursorPosX = xpos; win->virtualCursorPosY = ypos; if (!window_has_focus) return;
-    World.currentMouse_dx = (i32)(xpos - last_mouse_x); World.currentMouse_dy = (i32)(ypos - last_mouse_y); last_mouse_x = xpos; last_mouse_y = ypos; if (ignore_next_mouse_delta) { ignore_next_mouse_delta = mouseMovementThisFrame = false; return; }
+    if (win->virtualCursorPosX == xpos && win->virtualCursorPosY == ypos) { last_mouse_x=xpos; last_mouse_y=ypos; return;}
+    win->virtualCursorPosX = xpos; win->virtualCursorPosY = ypos; if (!window_has_focus){return;}
+    if (ignore_next_mouse_delta) { World.currentMouse_dx = World.currentMouse_dy = 0; ignore_next_mouse_delta = mouseMovementThisFrame = false; return; }
+    World.currentMouse_dx = (i32)(xpos - last_mouse_x); World.currentMouse_dy = (i32)(ypos - last_mouse_y); last_mouse_x = xpos; last_mouse_y = ypos;
     if ((World.inventoryMode && !Cheats.noHUD) || World.menuActive || World.paused) { // Uses UI baseline resolution 1366x768
         i32 newX = clamp(World.cursorPosition_x + World.currentMouse_dx,0,1366); if (newX != World.cursorPosition_x) {mouseMovementThisFrame = true;} World.cursorPosition_x = newX;
         i32 newY = clamp(World.cursorPosition_y + World.currentMouse_dy,0, 768); if (newY != World.cursorPosition_y) {mouseMovementThisFrame = true;} World.cursorPosition_y = newY;
     }
-    if (World.paused || World.menuActive || World.inventoryMode) return;
-    float s = vclamp((float)Sys_Settings.MouseSensitivity / 100.0f, 0.01f, 1.0f) * 0.2f;
-    World.cam_yaw += (float)World.currentMouse_dx * s; if (World.cam_yaw >= 360.0f) {World.cam_yaw -= 360.0f;} if (World.cam_yaw < 0.0f)     {World.cam_yaw  += 360.0f;}
-    World.cam_pitch+=(float)World.currentMouse_dy * s; if (World.cam_pitch > 89.0f) {World.cam_pitch = 89.0f;} if (World.cam_pitch < -89.0f) {World.cam_pitch = -89.0f;} // Avoid gimbal lock at pure 90deg
-    quat_from_yaw_pitch_roll(&World.rotation[PLAYER1],World.cam_yaw,World.cam_pitch,(World.curLev == LEVEL_CYBERSPACE) ? World.cam_roll : 0.0f);
 }
 
-void JoystickConnection(WinSysjoystick* js, int e) {
-    js->connected = (e == 0x00040001/*connected*/) ? 1 : (e == 0x00040002/*disconnected*/) ? 0 : js->connected;    
-    int jid = (int)(js - WinSys.joysticks); if (jid > JOYSTICK_LAST) return;
-    Sys_Input.joystickPresent[jid] = (e == 0x00040001/*connected*/); if (!Sys_Input.joystickPresent[jid]) { mset(Sys_Input.joystickButtons,0,sizeof(Sys_Input.joystickButtons)); mset(Sys_Input.joystickHats,0,sizeof(Sys_Input.joystickHats)); } // Clear
-}
-
+void JoystickConnection(WinSysjoystick* js, int e) { js->connected=(e == 0x00040001/*connected*/) ? 1 : (e == 0x00040002/*disconnected*/) ? 0 : js->connected; int jid=(int)(js - WinSys.joysticks); if(jid > JOYSTICK_LAST){return;} Sys_Input.joystickPresent[jid]=(e == 0x00040001/*connected*/); if(!Sys_Input.joystickPresent[jid]){mset(Sys_Input.joystickButtons,0,sizeof(Sys_Input.joystickButtons)); mset(Sys_Input.joystickHats,0,sizeof(Sys_Input.joystickHats));} /*Clear*/ }
 void InputJoystickAxis(WinSysjoystick* js,int axis, float value) { js->axes[axis] = value; }
 void InputJoystickButton(WinSysjoystick* js,int button, char value) { js->buttons[button] = value; }
 void InputJoystickHat(WinSysjoystick* js, int hat, char value) { int base=js->buttonCount + hat * 4; js->buttons[base+0]=(value & 0x01) ? INPUT_PRESS : INPUT_RELEASE; js->buttons[base+1]=(value & 0x02) ? INPUT_PRESS : INPUT_RELEASE; js->buttons[base+2]=(value & 0x04) ? INPUT_PRESS : INPUT_RELEASE; js->buttons[base+3]=(value & 0x08) ? INPUT_PRESS : INPUT_RELEASE; js->hats[hat]=value; }
@@ -941,67 +914,30 @@ WinSysjoystick* WinSysAllocJoystick(const char* name,const char* guid,int axisCo
 
 bool JoystickPresent(int jid) { if (jid < 0 || jid > JOYSTICK_LAST || (!WinSys.joysInited && !InitJoysticks())) {return false;} WinSys.joysInited = 1; WinSysjoystick* js = WinSys.joysticks + jid; return js->connected ? PollJoystick(js) : false; }
 void FreeJoystick(WinSysjoystick* js) { OS_Free(js->axes,js->axesSize); OS_Free(js->buttons,js->buttonsSize); OS_Free(js->hats,js->hatsSize); mset(js,0,sizeof(WinSysjoystick)); }
-bool Forward(void) { return GetKey(0); }
-bool StrafeLeft(void) { return GetKey(1); }
-bool Backpedal(void) { return GetKey(2); }
-bool StrafeRight(void) { return GetKey(3); }
-bool Jump(void) { return GetKey(4); }
-bool JumpDown(void) { return GetKeyPressed(4); }
-bool Crouch(void) { return GetKeyPressed(5); }
-bool Prone(void) { return GetKeyPressed(6); }
-bool LeanLeft(void) { return GetKey(7); }
-bool LeanRight(void) { return GetKey(8); }
-bool Sprint(void) { return GetKey(9); }
-bool TurnLeft(void) { return GetKey(10); }
-bool TurnRight(void) { return GetKey(11); }
-bool LookUp(void) { return GetKey(12); }
-bool LookDown(void) { return GetKey(13); }
-bool RecentLog(void) { return GetKeyPressed(14); }
-bool Biomonitor(void) { return GetKeyPressed(15); }
-bool Sensaround(void) { return GetKeyPressed(16); }
-bool Lantern(void) { return GetKeyPressed(17); }
-bool Shield(void) { return GetKeyPressed(18); }
-bool Infrared(void) { return GetKeyPressed(19); }
-bool Email(void) { return GetKeyPressed(20); }
-bool Booster(void) { return GetKeyPressed(21); }
-bool Jumpjets(void) { return GetKeyPressed(22); }
-bool Attack(void) { return GetKeyPressed(23); }
-bool Use(void) { return GetKeyPressed(24); }
-bool Menu(void) { return GetKeyPressed(25); }
-bool ToggleMode(void) { return GetKeyPressed(26); }
-bool Reload(void) { return GetKeyPressed(27); }
-bool WeaponCycUp(void) { return GetKeyPressed(28); }
-bool WeaponCycDown(void) { return GetKeyPressed(29); }
-bool Grenade(void) { return GetKeyPressed(30); }
-bool GrenadeCycUp(void) { return GetKeyPressed(31); }
-bool GrenadeCycDown(void) { return GetKeyPressed(32); }
-bool ChangeAmmoType(void) { return GetKeyPressed(33); }
-bool Patch(void) { return GetKeyPressed(34); }
-bool PatchCycUp(void) { return GetKeyPressed(35); }
-bool PatchCycDown(void) { return GetKeyPressed(36); }
-bool Map(void) { return GetKeyPressed(37); }
-bool SwimUp(void) { return GetKey(38); }
-bool SwimDn(void) { return GetKey(39); }
-bool Console(void) { return GetKeyPressed(-1); }
-bool ScrshotPressed(void) { return GetKeyPressed(41); }
-void ToggleConsole(); void MenuGoBack(); void ToggleInventoryMode(); void ApplyPlayerMovements(); void SaveGame(u8 slot, const char* savename); void LoadGame(u8 slot);
-void ProcessInput(void) {
-    if (Sys_Input.keyStates[KEY_F6].pressed && (get_time() - World.justSavedTimeStamp) > 0.2) { Sys_Input.keyStates[KEY_F6].pressed = false; SaveGame(7,"quicksave"); return; }
-    if (Sys_Input.keyStates[KEY_F9].pressed && (get_time() - World.justSavedTimeStamp) > 0.2) { Sys_Input.keyStates[KEY_F9].pressed = false; LoadGame(7); return; }
-    if (Console()) ToggleConsole();
-    if (Menu() && !World.menuActive) { World.paused = !World.paused; return; }
-    if (Menu() && World.menuActive) { MenuGoBack(); return; }
-    if (World.paused || World.menuActive || Cheats.consoleActive) return; // Pause/Menu barrier <<<<<<<
-    if (ToggleMode()) ToggleInventoryMode();
-    if (Lantern()) World.invP1.hardwareIsActive ^= HW_LAN;
-    if (Infrared()) World.invP1.hardwareIsActive ^= HW_INF;
-    ApplyPlayerMovements();
-}
-
-void play_synth_laser(float volume,float freq,float sweep,float fmrate,float decay);
-void play_synth_door(float volume,float pitch);
-void play_synth_impact(float volume,float ring_freq,float decay,float noise_amt,float ring_amt);
-void play_wav(const char *path,float volume,V3 pos,bool positional);
+bool GetKeyRiseEdgeOrHeld(int sI, bool onRise) { i32 i = Sys_Settings.InputCodeSettings[sI]; if (i == 128) {return Sys_Input.scrollDelta > 0;} if (i == 129) {return Sys_Input.scrollDelta < 0;} KeyState* k = GetCodeMapping(sI); return onRise ? k->pressed : k->down; }
+bool GetKey(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,false); }  // True while held down.
+bool GetKeyPressed(int settingIndex) { return (settingIndex < 0) ? Sys_Input.keyStates[KEY_GRAVE_ACCENT].pressed : GetKeyRiseEdgeOrHeld(settingIndex,true); } // True 1st frame down.
+bool Forward(void) { return GetKey(0); }                bool StrafeLeft(void) { return GetKey(1); }             bool Backpedal(void) { return GetKey(2); }
+bool StrafeRight(void) { return GetKey(3); }            bool Jump(void) { return GetKey(4); }                   bool JumpDown(void) { return GetKeyPressed(4); }
+bool Crouch(void) { return GetKeyPressed(5); }          bool Prone(void) { return GetKeyPressed(6); }           bool LeanLeft(void) { return GetKey(7); }
+bool LeanRight(void) { return GetKey(8); }              bool Sprint(void) { return GetKey(9); }                 bool TurnLeft(void) { return GetKey(10); }
+bool TurnRight(void) { return GetKey(11); }             bool LookUp(void) { return GetKey(12); }                bool LookDown(void) { return GetKey(13); }
+bool RecentLog(void) { return GetKeyPressed(14); }      bool Biomonitor(void) { return GetKeyPressed(15); }     bool Sensaround(void) { return GetKeyPressed(16); }
+bool Lantern(void) { return GetKeyPressed(17); }        bool Shield(void) { return GetKeyPressed(18); }         bool Infrared(void) { return GetKeyPressed(19); }
+bool Email(void) { return GetKeyPressed(20); }          bool Booster(void) { return GetKeyPressed(21); }        bool Jumpjets(void) { return GetKeyPressed(22); }
+bool Attack(void) { return GetKeyPressed(23); }         bool Use(void) { return GetKeyPressed(24); }            bool Menu(void) { return GetKeyPressed(25); }
+bool ToggleMode(void) { return GetKeyPressed(26); }     bool Reload(void) { return GetKeyPressed(27); }         bool WeaponCycUp(void) { return GetKeyPressed(28); }
+bool WeaponCycDown(void) { return GetKeyPressed(29); }  bool Grenade(void) { return GetKeyPressed(30); }        bool GrenadeCycUp(void) { return GetKeyPressed(31); }
+bool GrenadeCycDown(void) { return GetKeyPressed(32); } bool ChangeAmmoType(void) { return GetKeyPressed(33); } bool Patch(void) { return GetKeyPressed(34); }
+bool PatchCycUp(void) { return GetKeyPressed(35); }     bool PatchCycDown(void) { return GetKeyPressed(36); }   bool Map(void) { return GetKeyPressed(37); }
+bool SwimUp(void) { return GetKey(38); }                bool SwimDn(void) { return GetKey(39); }                bool Console(void) { return GetKeyPressed(-1); }
+bool ScrshotPressed(void) { return GetKeyPressed(41); }                void DeactivateVMail(void); void CloseFullmap();
+void ForceShootMode(void) { if (Sys_Settings.NoShootMode){return;} World.Sys_UI.mouseClickHeldOverGUI=World.inventoryMode=false; CloseFullmap(); World.cursorPosition_x=663; World.cursorPosition_y=371/*Centered UI fixed 1366x768*/; ignore_next_mouse_delta=true; if(World.Sys_UI.vmailActive){DeactivateVMail(); World.Sys_UI.vmailActive=false;} }
+void ForceInventoryMode(void) { World.inventoryMode = true; World.cursorPosition_x = 663; World.cursorPosition_y = 371; ignore_next_mouse_delta = true; } // Centered on UI baseline resolution 1366x768
+void ToggleInventoryMode(void) { if (World.inventoryMode) {ForceShootMode();} else {ForceInventoryMode();} }
+void ToggleConsole() { static bool imWasActPrior = false; if (!Cheats.consoleActive) {imWasActPrior = World.inventoryMode;} Cheats.consoleActive = !Cheats.consoleActive; World.paused = !World.paused; if (Cheats.consoleActive) { World.inventoryMode = true; } else if (!imWasActPrior && World.inventoryMode) {ForceShootMode();} }
+void MenuGoBack(); void SaveGame(u8 slot, const char* savename); void LoadGame(u8 slot); void ApplyPlayerMovements(float dt);
+void play_synth_laser(float volume,float freq,float sweep,float fmrate,float decay); void play_synth_door(float volume,float pitch); void play_synth_impact(float volume,float ring_freq,float decay,float noise_amt,float ring_amt); void play_wav(const char *path,float volume,V3 pos,bool positional);
 void InputProcessing() {
     mouseMovementThisFrame = false; PollEvents();
     for (int jid = JOYSTICK_1; jid <= JOYSTICK_LAST; ++jid) { // Input Poll
@@ -1012,15 +948,32 @@ void InputProcessing() {
         for (int i = 0; i < js->hatCount && i < 5; ++i) { Sys_Input.joystickHats[i].down = js->hats[i]; }
 //         for (int i = 0; i < js->axisCount && i < MAX_JOYSTICK_AXES; ++i) { Sys_Input.joystickAxes[jid - JOYSTICK_1][i] = js->axes[i]; } TODO??
     }
-
-    float v = 0.1f;
-    if (Sys_Input.keyStates[KEY_E].pressed) play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f,(V3){0.0f,0.0f,0.0f},false);
-    if (Sys_Input.keyStates[KEY_W].pressed) play_synth_door(v,50); // thud slide
-    if (Sys_Input.keyStates[KEY_T].pressed) play_synth_impact(v,4500,18,0.3f,0.6f); // Glass ting
-    if (Sys_Input.keyStates[KEY_R].pressed) play_synth_impact(v,1800,30,0.5f,0.3f); // cartridge drop
-    if (Sys_Input.keyStates[KEY_Y].pressed) play_synth_laser(v,800,-2.0f,40,12);
-    if (Sys_Input.keyStates[KEY_U].pressed) play_synth_laser(v,800,2.0f,40,12);
-    if (window_has_focus) { if(Sys_Input.keyStates[KEY_CAPS_LOCK].pressed){Sys_Input.isCapsLockOn=!Sys_Input.isCapsLockOn;} ProcessInput(); }
+    if (window_has_focus) {
+        float v = 0.1f;
+        if (Sys_Input.keyStates[KEY_E].pressed) play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f,(V3){0.0f,0.0f,0.0f},false);
+        if (Sys_Input.keyStates[KEY_W].pressed) play_synth_door(v,50); // thud slide
+        if (Sys_Input.keyStates[KEY_T].pressed) play_synth_impact(v,4500,18,0.3f,0.6f); // Glass ting
+        if (Sys_Input.keyStates[KEY_R].pressed) play_synth_impact(v,1800,30,0.5f,0.3f); // cartridge drop
+        if (Sys_Input.keyStates[KEY_Y].pressed) play_synth_laser(v,800,-2.0f,40,12);
+        if (Sys_Input.keyStates[KEY_U].pressed) play_synth_laser(v,800,2.0f,40,12);
+        if (Sys_Input.keyStates[KEY_CAPS_LOCK].pressed) Sys_Input.isCapsLockOn = !Sys_Input.isCapsLockOn;
+        if (Sys_Input.keyStates[KEY_F6].pressed && (get_time() - World.justSavedTimeStamp) > 0.2) { Sys_Input.keyStates[KEY_F6].pressed = false; SaveGame(7,"quicksave"); return; }
+        if (Sys_Input.keyStates[KEY_F9].pressed && (get_time() - World.justSavedTimeStamp) > 0.2) { Sys_Input.keyStates[KEY_F9].pressed = false; LoadGame(7); return; }
+        if (Console()) ToggleConsole();
+        if (Menu() && !World.menuActive) { World.paused = !World.paused; return; }
+        if (Menu() && World.menuActive) { MenuGoBack(); return; }
+        if (World.paused || World.menuActive || Cheats.consoleActive) return; // Pause/Menu barrier <<<<<<<
+        if (ToggleMode()) ToggleInventoryMode();
+        if (Lantern()) World.invP1.hardwareIsActive ^= HW_LAN;
+        if (Infrared()) World.invP1.hardwareIsActive ^= HW_INF;
+        ApplyPlayerMovements(World.dt);
+        if (!World.paused && !World.menuActive) { // Apply mouselook/keyboardlook/joysticklook/lean
+            float s = vclamp((float)Sys_Settings.MouseSensitivity / 100.0f, 0.01f, 1.0f) * 0.2f;
+            World.cam_yaw += (float)World.currentMouse_dx * s; if (World.cam_yaw >= 360.0f) {World.cam_yaw -= 360.0f;} if (World.cam_yaw < 0.0f)     {World.cam_yaw  += 360.0f;}
+            World.cam_pitch+=(float)World.currentMouse_dy * s; if (World.cam_pitch > 89.0f) {World.cam_pitch = 89.0f;} if (World.cam_pitch < -89.0f) {World.cam_pitch = -89.0f;} // Avoid gimbal lock at pure 90deg
+            quat_from_yaw_pitch_roll(&World.rotation[PLAYER1],World.cam_yaw,World.cam_pitch,World.cam_roll);
+        }
+    }
 }
 
 void SetVSync() { ((WinSyswindow*)window)->context.swapInterval((i32)Sys_Settings.Vsync); }

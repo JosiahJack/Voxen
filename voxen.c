@@ -132,7 +132,7 @@ u8 currentPlayerNameLength=0; i8 currentMenuItem=0, currentMenuTab=0, menuItemCo
 InputSystem Sys_Input; CheatsSystem Cheats = {.god=false,.noclip=false,.showLocation=true,.showFPS=true,.editMode=false,.showPhys=false};
 static bool shadowBuffersCreated = false;
 typedef struct { V3 position; Quaternion rotation; u8 fov; u16 width,height; float near,far,finished; bool visible; } CamView; // Max is 8 cam views on level 8 + 3 sensaround views = 11.
-CamView camViews[64]; u32 camViewTextures[64]; u8 camViewCount = 0; CamView levelCamViews[MAX_LEVELS][64]; u8 levelCamViewCount[MAX_LEVELS]; u32 levelCamViewTextures[MAX_LEVELS][64];
+CamView camViews[64],levelCamViews[14][64]; u8 camViewCount,levelCamViewCount[14]; u32 camViewTextures[64],levelCamViewTextures[14][64];
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6],playerFrustumPlanes[6];
 u16 editModeSelection,editModeTestEntityDefinition=0; double shadowTime; double physTime; u32 shadowmapIndirectionList[LIGHT_COUNT]; u16 texCnt; bool doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS]; u32 drawCalls,uiDrawCalls,shadDrawCalls,vertsRendered,drawCallsNormal;
 static const u8 Mpg_FrontPage=0,Mpg_Singleplayer=1,Mpg_Multiplayer=2,Mpg_NewGame=3,Mpg_Load=4,Mpg_Options=5,Mpg_Save=6,Mpg_IntroVideo=7,Mpg_CreditsVideo=8; u8 currentMenuPage = Mpg_FrontPage; bool resDropdownOpen = false; int resDropdownCount=0,resSelectedIdx=0;
@@ -233,63 +233,98 @@ void DrawAngularVelocity(u16 i) {
 #include "winput.c" // Window + Input System
 #include "trigger.c" // Trigger Volumes System
 #include "physics.c" // Physics System
+// Player Movement
+float GetBasePlayerSpeed(u16 p,bool running){
+    bool sprint=Sprint(); if(Cheats.noclip)return PLAYER_MAX_CYBER_SPEED*(sprint?2.5f:1.5f); if(World.curLev==LEVEL_CYBERSPACE)return PLAYER_MAX_CYBER_SPEED;
+    BodyState b=World.instances[p].bodyState; float v=WALK_SPEED;
+    switch(b){ case BodyState_CrouchingDown: case BodyState_Crouch:v=CROUCH_SPEED; break; case BodyState_Prone: case BodyState_ProningDown: case BodyState_ProningUp:v=PLAYER_MAX_PRONE_SPEED; break; default:break; }
+    if ((sprint||World.boosterActive) && running) { v = World.invP1.fatigue > 80.0f && World.boosterActive ? SPRINT_SPEED_FATIGUED : SPRINT_SPEED;
+    if (b==BodyState_Standing||b==BodyState_Crouch||b==BodyState_CrouchingDown)  v -= (WALK_SPEED-CROUCH_SPEED)*1.5f;
+    else if(b==BodyState_Prone||b==BodyState_ProningDown||b==BodyState_ProningUp)v -= (WALK_SPEED-PLAYER_MAX_PRONE_SPEED)*2.f;}
+    return v + (World.boosterActive ? PLAYER_BOOSTER_SPEED_BOOST : 0.0f);
+}
+
+inline float smooth_damp(float cur, float targ, float* vel, float tm, float dt) { float o=2.0f / vmax(tm,0.0001f); float x=o * dt; float exp=1.0f / (1.0f + x + 0.48f * x * x + 0.235f * x * x * x); float d=cur - targ; float t=(*vel + o * d) * dt; *vel=(*vel - o * t) * exp; return targ + (d + t) * exp; }
+bool CantStand(u16 playerIdx, float targetHeight) { // I can't stand it.
+    float oldHeight = World.colliderSize[playerIdx].y; V3 oldPos = World.position[playerIdx];
+    World.colliderSize[playerIdx].y = targetHeight; // Temporarily morph player into the standing capsule
+    World.position[playerIdx].y += (targetHeight - oldHeight); 
+    bool blocked = false;
+    i32 cx = PosGetCellCoordX(World.position[playerIdx].x);
+    i32 cz = PosGetCellCoordZ(World.position[playerIdx].z);
+    u32 mask = GetCollisionMask(World.layer[playerIdx]);
+    for (i32 dx = -1; dx <= 1 && !blocked; ++dx) {
+        for (i32 dz = -1; dz <= 1 && !blocked; ++dz) {
+            u32 cell = PosGetCellCoordsP(cx + dx, cz + dz);
+            for (u16 k = 0; k < cellCounts[cell]; ++k) {
+                u16 b = cellLists[cell][k]; if (b == playerIdx || !(mask & World.layer[b]) || World.collider[b] == COLTYPE_NONE) continue;
+                if (World.collider[b] == COLTYPE_MSH) { Overlap r = CapMsh(Entity_GetCap(playerIdx),World.instances[b].modelIndex,&modelMatrices[b*16]); if (r.hit && r.pen > 0.08f) { blocked = true; break; } }
+            }
+        }
+    }
+    World.colliderSize[playerIdx].y = oldHeight;
+    World.position[playerIdx] = oldPos;
+    return blocked;
+}
+
+bool DoubleTapLeanLeft(void)  { if(!GetKeyPressed(7)){return false;} if (World.pauseRelativeTime < World.invP1.leanLeftTapFinished) { World.invP1.leanLeftTapFinished = 0.0; return true; } World.invP1.leanLeftTapFinished = World.pauseRelativeTime + 0.5; return false; }
+bool DoubleTapLeanRight(void) { if(!GetKeyPressed(8)){return false;} if (World.pauseRelativeTime < World.invP1.leanRightTapFinished) { World.invP1.leanRightTapFinished = 0.0; return true; } World.invP1.leanRightTapFinished = World.pauseRelativeTime + 0.5; return false; }
+void ApplyPlayerMovements(float dt) {
+    Entity *p = &World.instances[PLAYER1]; 
+    Quaternion r = World.rotation[PLAYER1]; 
+    float leanSpeed = 70.0f, leanMaxAngle = 35.0f;
+    float leanInput = (float)LeanLeft() - (float)LeanRight(); // Evaluates the continuous hold
+    bool doubleTapLean = DoubleTapLeanLeft() || DoubleTapLeanRight(); // Evaluates the time-windowed edge
+    if (doubleTapLean) DualLog("Double tapped lean!\n");
+    bool movingForward = Forward() > 0.1f, leanRight = leanInput < 0.0f, leanLeft = leanInput > 0.0f;
+    if (doubleTapLean) { World.invP1.leanTarget=0.0f; KeyState *kL=GetCodeMapping(7),*kR=GetCodeMapping(8); kL->pressed=kR->pressed=false; } // Pop back to upright
+    else {
+        if (leanLeft || leanRight) { if(leanLeft){World.invP1.leanRightTapFinished=0;} if(leanRight){World.invP1.leanLeftTapFinished=0;}/*Prevent dir change double taps*/ World.invP1.leanTarget = vclamp(World.invP1.leanTarget + (leanInput * leanSpeed * dt),-leanMaxAngle,leanMaxAngle); }
+        else if (movingForward) { if(vabs(World.invP1.leanTarget) < 0.5f){World.invP1.leanTarget = 0.0f;}else{World.invP1.leanTarget -= (World.invP1.leanTarget > 0.0f ? 1.0f : -1.0f) * leanSpeed * dt;} } // Smoothly move back to upright while moving forward.
+    }
+    World.cam_roll = World.invP1.leanTarget;
+    float targetRatio = 1.0f, crouchRatio = 0.6f, proneRatio = 0.2f, transitionSec = 0.2f;  
+    if (Crouch()) {
+        if (p->bodyState == BodyState_Crouch || p->bodyState == BodyState_CrouchingDown) { if(!CantStand(PLAYER1,PLAYER_HEIGHT)) {p->bodyState=BodyState_StandingUp;} }
+        else if (p->bodyState == BodyState_Standing || p->bodyState == BodyState_StandingUp){p->bodyState=BodyState_CrouchingDown;}
+        else if (p->bodyState == BodyState_Prone || p->bodyState == BodyState_ProningDown) {p->bodyState =BodyState_ProningUp;}
+    } else if (Prone()) { if (p->bodyState != BodyState_Prone && p->bodyState != BodyState_ProningDown){ p->bodyState=BodyState_ProningDown; } else { if(!CantStand(PLAYER1,PLAYER_HEIGHT)){p->bodyState=BodyState_StandingUp;} }}
+    switch (p->bodyState) {
+        case BodyState_CrouchingDown:targetRatio=-0.01f; break;      case BodyState_StandingUp:targetRatio=1.01f;  break; // Slightly past 1 or 0 to catch overshoot for proper state transition
+        case BodyState_ProningDown:  targetRatio=-0.01f; break;      case BodyState_ProningUp: targetRatio=1.01f; transitionSec += 0.1f; break;
+        case BodyState_Crouch:       targetRatio=crouchRatio; break; case BodyState_Prone:     targetRatio=proneRatio; break;                      default:targetRatio = 1.0f; break;
+    }
+    float lastRatio = World.invP1.currentCrouchRatio;
+    World.invP1.currentCrouchRatio = smooth_damp(lastRatio, targetRatio, &World.invP1.crouchingVelocity, transitionSec, dt); 
+    if (World.invP1.currentCrouchRatio >= 1.0f) { World.invP1.currentCrouchRatio = 1.0f; if(p->bodyState == BodyState_StandingUp){p->bodyState=BodyState_Standing;} }
+    else if (World.invP1.currentCrouchRatio <= crouchRatio && (p->bodyState == BodyState_CrouchingDown || p->bodyState == BodyState_ProningUp)) { World.invP1.currentCrouchRatio=crouchRatio; p->bodyState=BodyState_Crouch; }
+    else if (World.invP1.currentCrouchRatio <= proneRatio && p->bodyState == BodyState_ProningDown) { World.invP1.currentCrouchRatio=proneRatio; p->bodyState=BodyState_Prone; }
+    World.colliderSize[PLAYER1].y = PLAYER_HEIGHT * World.invP1.currentCrouchRatio;
+    float h = (float)Forward() - (float)Backpedal(), s = (float)StrafeRight() - (float)StrafeLeft(), vertInput = (float)SwimUp() - (float)SwimDn();
+    float y2 = r.y*r.y, xz = r.x*r.z, wy = r.w*r.y;
+    p->forward = V3_Normalize((V3){ 2.0f*(xz + wy), 2.0f*(r.y*r.z - r.w*r.x), 1.0f - 2.0f*(r.x*r.x + y2) }); 
+    p->right   = V3_Normalize((V3){ 1.0f - 2.0f*(y2 + r.z*r.z), 2.0f*(r.x*r.y + r.w*r.z), 2.0f*(xz - wy) });
+    V3 inputDir = { p->forward.x*h + p->right.x*s, vertInput, p->forward.z*h + p->right.z*s }; 
+    float inputLenSq = V3_dot(inputDir,inputDir);
+    V3 w = (inputLenSq > PHY_EPSILON) ? V3_ScaleByF(inputDir, 1.0f / vsqrtf(inputLenSq)) : (V3){0,0,0};
+    bool isRunning = (inputLenSq > 0.01f);
+    float speed = GetBasePlayerSpeed(PLAYER1,isRunning) * 1.75f, accel = World.boosterActive ? 1.0f : 3.0f;
+    V3 targetVel = V3_ScaleByF(w,speed); 
+    if (World.invP1.ladderState > 0) { float climbSpeed = (Sprint() && isRunning) ? 1.2f : 0.4f; targetVel = (V3){p->right.x * s * speed * 0.3f,h * climbSpeed * 25.0f,p->right.z * s * speed * 0.3f}; accel = 5.0f; }
+    else { if(vabs(vertInput) < 0.001f){targetVel.y=World.velocity[PLAYER1].y;} }
+    V3 dv = V3_AsubB(targetVel, World.velocity[PLAYER1]); 
+    dv = (V3){ vclamp(dv.x,-10.0f,10.0f), vclamp(dv.y,-10.0f,10.0f), vclamp(dv.z,-10.0f,10.0f) };
+    World.velocity[PLAYER1] = V3_AplusB(World.velocity[PLAYER1], V3_ScaleByF(dv, accel * vclamp(dt, 0.0005f, 0.1f)));
+}
 #include "console.c" // Console Sys - CHEATS!
 #include "audio.c" // Audio Sys
 #include "ray.c" // Raycast Sys
-// Game Specific Code
-void UseTargets(u16 activator, const char* targetname);
-void Targetted(u16 activator, u16 self);
-void ButtonSwitchTargetted(u16 self, u16 activator);
-void ButtonSwitchUse(u16 self, u16 activator);
-void DoorUse(u16 self, u16 activator);
-void DoorTargetted(u16 self, u16 activator);
-void DoorActuate(u16 self);
-void DoorForceOpen(u16 self);
-void DoorForceClose(u16 self);
-void TriggerCounterTargetted(u16 self, u16 activator);
-void ButtonSwitchInitAfterLoad(u16 self);
-void FuncWallInitAfterLoad(u16 self);
-void ForceBridgeInitBeforeLoad(u16 self);
-void ForceBridgeInitAfterLoad(u16 self);
-void GravityLiftInitAfterLoad(u16 self);
-void LogicTimerInitBeforeLoad(u16 self);
-void TeleportTouchInitAfterLoad(u16 self);
-void TextureChangerInitAfterLoad(u16 self);
-void CyberItemInitBeforeLoad(u16 self);
-void CyberMineInitBeforeLoad(u16 self);
-void CyberTimerInitAfterLoad(u16 self);
-void CyberSwitchInitAfterLoad(u16 self);
-void ExplosionLifeInitAfterLoad(u16 self);
-void ExplosionLifeUpdate(u16 self);
-void EmailTargetted(u16 self, u16 activator);
-void ForceBridgeActivate(u16 self, bool isSilent);
-void ForceBridgeToggle(u16 self);
-void GravityLiftToggle(u16 self);
-void TextureChangerToggle(u16 self);
-void ButtonSwitchUpdate(u16 self);
-void DoorUpdate(u16 self);
-void ForceBridgeUpdate(u16 self);
-void FuncWallUpdate(u16 self);
-void LogicTimerUpdate(u16 self);
-void DelayedSpawnUpdate(u16 self);
-void SearchFXResetUpdate(u16 self);
-void CyberTimerUpdate(u16 self);
-void GeneralInvApply(int buttonIdx, int customIdx);
-bool InventoryAddSoftwareItem(u16 p, u16 type, int vers);
-int Get16WeaponIndexFromConstIndex(int index);
-bool AICheckPain(u16);
-void TextureSequenceUpdate(u16 self);
-u16 AddInstance(u16 entIdx, V3 pos);
-u8 GetCurrentLevelSecurity();
-u16 GetImpactType(u16 instanceIdx);
-const char* GetPrefabNameFromIndex(int constIndex);
-void TakeEnergy(float drain);
-void GiveEnergy(float give, EnergyType type);
+#include "credits.h"
 #include "entity.c"
+#include "ai.c"
 #include "citadel.c"
 #include "weapons.c"
 #include "biomonitor.c" // End game specific code includes
-#include "ai.c"
 // Credits Sys
 char creditStats[4096];
 INLINE float GetScore(float stupid, bool isFinal) {
@@ -1001,31 +1036,14 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.scale[PLAYER1] = (V3){1.0f,1.0f,1.0f};
     World.rotation[PLAYER1] = (Quaternion){0.0f,0.7071f,0.0f,0.7071f}; // 90deg rotation CW about Y axis as viewed from the top looking down onto player
     World.instances[PLAYER1].entflags = EF_ACTIVE|EF_RIGIDBODY;
-    World.collider[PLAYER1] = COLTYPE_CAP;
-    World.colliderCenter[PLAYER1].y = -0.84f;
-    World.colliderSize[PLAYER1] = (V3){0.48f,2.0f,1.0f}; // Radius, Overall height including end radii (Unity convention, blech), Direction, 1.0 == Y-Axis
-    World.mass[PLAYER1] = 1.0f;
-    World.velocity[PLAYER1] = (V3){0.0f,0.0f,0.0f};
-    World.cam_yaw = 90.0f; World.cam_pitch = World.cam_roll = 0.0f;
-    World.gravity[PLAYER1] = 1.0f;
-    World.dynamicFriction[PLAYER1] = 0.6f; World.staticFriction[PLAYER1] = 0.8f;
-    World.instances[PLAYER1].health = 200.0f;
-    World.instances[PLAYER1].noiseFinished = World.pauseRelativeTime;
-    World.invP1.hardwareInvReferenceIndex[0]  = 21; // Hardcoded lookup indices into the Const main table.
-    World.invP1.hardwareInvReferenceIndex[1]  = 22;
-    World.invP1.hardwareInvReferenceIndex[2]  = 23;
-    World.invP1.hardwareInvReferenceIndex[3]  = 24;
-    World.invP1.hardwareInvReferenceIndex[4]  = 25;
-    World.invP1.hardwareInvReferenceIndex[5]  = 26;
-    World.invP1.hardwareInvReferenceIndex[6]  = 27;
-    World.invP1.hardwareInvReferenceIndex[7]  = 28;
-    World.invP1.hardwareInvReferenceIndex[8]  = 29;
-    World.invP1.hardwareInvReferenceIndex[9]  = 30;
-    World.invP1.hardwareInvReferenceIndex[10] = 31;
-    World.invP1.hardwareInvReferenceIndex[11] = 32;
-    World.invP1.hardwareInvReferenceIndex[12] =  0;
-    World.invP1.hardwareInvReferenceIndex[13] =  0;
-    World.invP1.generalInventoryIndexRef[0] = 81;
+    World.collider[PLAYER1] = COLTYPE_CAP; World.colliderCenter[PLAYER1].y = -PLAYER_CAM_OFFSET_Y; World.colliderSize[PLAYER1] = (V3){PLAYER_RADIUS,PLAYER_HEIGHT,COLLIDER_CAPSULE_DIRECTION_Y_F}; // Radius, Overall height including end radii (Unity convention, blech), Direction, 1.0 == Y-Axis
+    World.mass[PLAYER1] = 1.0f; World.velocity[PLAYER1] = (V3){0.0f,0.0f,0.0f};
+    World.cam_yaw = 90.0f; World.cam_pitch = World.cam_roll = World.invP1.leanTarget = World.invP1.leanShift = 0.0f; World.gravity[PLAYER1] = 1.0f; World.dynamicFriction[PLAYER1] = 0.6f; World.staticFriction[PLAYER1] = 0.8f; 
+    World.instances[PLAYER1].health = 200.0f; World.instances[PLAYER1].noiseFinished = World.pauseRelativeTime;
+    World.invP1.energy = 54.0f; World.invP1.energyDrainTickFinished = World.pauseRelativeTime + 0.1 + (double)random_range(0.5f, 1.0f);  World.invP1.maxEnergy = 255.0f;
+    World.invP1.hardwareInvReferenceIndex[0]  = 21; World.invP1.hardwareInvReferenceIndex[1]  = 22; World.invP1.hardwareInvReferenceIndex[2]  = 23; World.invP1.hardwareInvReferenceIndex[3]  = 24; World.invP1.hardwareInvReferenceIndex[4]  = 25; World.invP1.hardwareInvReferenceIndex[5]  = 26;
+    World.invP1.hardwareInvReferenceIndex[6]  = 27; World.invP1.hardwareInvReferenceIndex[7]  = 28; World.invP1.hardwareInvReferenceIndex[8]  = 29; World.invP1.hardwareInvReferenceIndex[9]  = 30; World.invP1.hardwareInvReferenceIndex[10] = 31; World.invP1.hardwareInvReferenceIndex[11] = 32;
+    World.invP1.hardwareInvReferenceIndex[12] =  0; World.invP1.hardwareInvReferenceIndex[13] =  0; World.invP1.generalInventoryIndexRef[0] = 81; // Hardcoded lookup indices into the Const main table.
     for (int i=1;i<HW_COUNT;i++) World.invP1.generalInventoryIndexRef[i] = -1; // Skips 0th index on purpose as it always holds access cards "item".
     for (int i=0;i<HW_COUNT;++i) World.invP1.hardwareVersion[i] = World.invP1.hardwareVersionSetting[i] = 0;
     World.invP1.nitroTimeSetting = NITRO_DEFAULT_TIME;
@@ -1034,32 +1052,10 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.invP1.hasNewEmail = World.invP1.hasNewNotes = true;
     World.invP1.isPulserNotDrill = true;
     for (int i=0;i<7;++i) World.invP1.weaponInventoryIndices[i] = World.invP1.weaponInventoryAmmoIndices[i] = -1;
-    World.invP1.sparqSetting = 50.0f;
-    World.invP1.ionSetting = 100.0f;
-    World.invP1.blasterSetting = 15.0f;
-    World.invP1.plasmaSetting = 40.0f;
-    World.invP1.stungunSetting = 20.0f;
-    World.invP1.justFired = (World.pauseRelativeTime - 31.0); // Set >30s before pauseRelativeTime to not immediately play action music.
-    World.invP1.energyDrainTickFinished = World.pauseRelativeTime + 0.1 + (double)random_range(0.5f, 1.0f);
-    World.invP1.energy = 54.0f;
-    World.invP1.maxEnergy = 255.0f;
-    World.invP1.resetAfterDeathTime = 0.5;
-    World.invP1.painSoundFinished = World.invP1.radSoundFinished = World.invP1.radFXFinished = World.pauseRelativeTime;
-    World.Sys_UI.lastMultiMediaTabOpened = MULTI_MEDIA_TAB_EMAIL_TABLE;
-    World.Sys_UI.logFinished = World.pauseRelativeTime;
-    World.Sys_UI.tickFinished = World.Sys_UI.centerTabsTickFinished = World.current_time + 0.1 + (double)random_range(0.0f,1.0f);
-    World.Sys_UI.blinkFinished = 1.0 + World.pauseRelativeTime;
-    World.Sys_UI.beepFinished = 3.0 + World.pauseRelativeTime;
-    World.invP1.mediFinishedTime   = -1.0;
-    World.invP1.reflexFinishedTime = -1.0;
-    World.invP1.sightFinishedTime  = -1.0;
-    World.invP1.berserkIncrement   = 0;
-    World.invP1.patchActive        = 0;
-    World.invP1.staminupActive     = false;
-    World.timeScale    = DEFAULT_TIME_SCALE;
-    World.geniusActive = false;
-    // TODO: sightLight disabled, sightDimming disabled — engine reads patchActive & PATCH_SIGHT + sightFinishedTime
-    // TODO: BerserkFX disabled — engine reads patchActive & PATCH_BERSERK + berserkIncrement
+    World.invP1.sparqSetting = 50.0f; World.invP1.ionSetting = 100.0f; World.invP1.blasterSetting = 15.0f; World.invP1.plasmaSetting = 40.0f; World.invP1.stungunSetting = 20.0f; World.invP1.justFired = (World.pauseRelativeTime - 31.0); // Set >30s before pauseRelativeTime to not immediately play action music.
+    World.invP1.resetAfterDeathTime = 0.5; World.invP1.painSoundFinished = World.invP1.radSoundFinished = World.invP1.radFXFinished = World.pauseRelativeTime; World.Sys_UI.lastMultiMediaTabOpened = MM_EMAIL_TABLE;
+    World.Sys_UI.logFinished = World.pauseRelativeTime; World.Sys_UI.tickFinished = World.Sys_UI.centerTabsTickFinished = World.current_time + 0.1 + (double)random_range(0.0f,1.0f); World.Sys_UI.blinkFinished = 1.0 + World.pauseRelativeTime; World.Sys_UI.beepFinished = 3.0 + World.pauseRelativeTime;
+    World.invP1.mediFinishedTime = World.invP1.reflexFinishedTime = World.invP1.sightFinishedTime = -1.0; World.invP1.berserkIncrement = World.invP1.patchActive = 0; World.invP1.staminupActive = World.geniusActive = false; World.timeScale = DEFAULT_TIME_SCALE; 
     World.cam_yaw = 90.0f; World.cam_pitch = 0.0f; World.cam_roll = 0.0f; World.inventoryMode = Sys_Settings.NoShootMode;
     World.gameFinished = World.creditsActive = World.decoyActive = false; World.damageDealt = World.damageReceived = 0.0f;
     World.ressurections = World.deaths = World.kills = World.cyberkills = 0u; World.shotsFired = World.grenadesThrown = World.savesScummed = 0U; World.creditsPageIndex = 0u;
@@ -1085,7 +1081,7 @@ void InitalizeEnvironment() {
     SetLevelPointers(0);
     WindowInit(); threadCnt = clamp(OS_GetNumThreads(),1,32); globalframe=0,World.menuActive=true,World.screenshotTimeout=1.0,World.creditsPageIndex=1,World.diffCbt=World.diffCyb=World.diffPuz=World.diffMis=2,World.deaths=0,World.cursorPosition_x=680,World.cursorPosition_y=384;
     DualLog("Loading game definition...");
-    World.numLevels = 14; World.startLevel = 1; DualLog(" Citadel:: num levels: %d, start level: %d\n",World.numLevels,World.startLevel);
+    World.numLevels = MAX_LEVELS; World.startLevel = 1/*medical*/; DualLog(" Citadel:: num levels: %d, start level: %d\n",World.numLevels,World.startLevel);
     LoadConfig(); // Get settings before setting window size.
     window = VCreateWindow(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
     CenterWindowOnMonitor();
@@ -1163,7 +1159,7 @@ i32 main() {
         InputProcessing(); // Before anims and physics to allow them to respond immediately.
         UpdateAnims();     // Before physics to allow model swap out to affect physics state immediately.  Before rendering to affect shadowmaps immediately.
         if (!World.paused && !World.menuActive) {
-            double physStart = get_time(); float dt = vclamp((float)(World.pauseRelativeTime - World.last_physics_time),0.0005f,0.1f); World.last_physics_time = World.pauseRelativeTime;
+            double physStart = get_time(); float dt = vclamp((float)(World.pauseRelativeTime - World.last_physics_time),0.0005f,0.1f); World.last_physics_time = World.pauseRelativeTime; World.dt = dt;
             Physics(dt);
             physTime = get_time() - physStart;
         } else physTime = 0.0;

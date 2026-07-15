@@ -20,31 +20,16 @@ typedef u8 ColliderType;
 typedef u16 Text;
 typedef struct {V3 point; V3 normal; float distance; u16 hitInstanceIndex; bool hit;} RaycastHit;
 typedef struct {float speed; u16 frameStart,frameEnd,frameStartModelIndex; u8 framerate;} AnimationClip;
-#define LIGHTON 1
-#define SHADON  2
-#define LIGHT_AND_SHADOW_ON 3
-#define LSPOT   4
-#define LDIR    8
-#define LDIRTY 16
-#define LERPON 32
+enum{LIGHTON=1,SHADON=2,LIGHT_AND_SHADOW_ON=3,LSPOT=4,LDIR=8,LDIRTY=16,LERPON=32};
 typedef struct { V3 pos; float intensity; Color3 col; u32 lflags; float range,spotAng,maxIntensity,minIntensity; Quaternion spotDir; } Light; // 64bytes, one cache line, packed for GL transfer
 typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSteps[32]; bool stepIsLerping[32],lerpUp; u8 currentStep,numIntervalSteps,numLerpSteps; } LightAnimation; // Separate from main lights buffer struct since it's not used very often
 #define INSTANCE_COUNT 16384 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
-#define MAX_LEVELS 14 // Total number of levels loaded into RAM simultaneously.  World.levelInstances[MAX_LEVELS][INSTANCE_COUNT] holds them all.
 #define LIGHT_COUNT 2048
-#define MAX_MDLS 6000
-#define MAX_TXRS 2048
-#define MAX_TOTAL_PIXELS 29900000u
-#define MAX_UNIQUE_COLORS 1048576u
-#define MAX_ANIMS 64
-#define MAX_ANIMCLIPS 32
-#define MAX_WIRELINE_VRTS 512000
-#define MAX_PORTALS 64 // Max is 49 on Citadel level 7
-#define MAX_KEYS 512
-#define MAX_MOUSE_BUTTONS 8
-#define MAX_CHANNELS 48 // Max concurrent sounds, must keep track of for volume setting
-#define VRT_ATT_SZ 16
-#define CPU_VRT_SZ 32
+enum{MAX_ENTITIES=768,/*Unique entity definition types, different than INSTANCE_COUNT which is the number of instances of any of these entities.*/
+     MAX_LEVELS=14,MAX_MDLS=6000,MAX_TXRS=2048,MAX_TOTAL_PIXELS=29900000u,MAX_UNIQUE_COLORS=1048576u,MAX_ANIMS=64,MAX_ANIMCLIPS=32,MAX_WIRELINE_VRTS=512000,MAX_PORTALS=56/*Max is 49 on Citadel level 7*/,MAX_KEYS=512,MAX_MOUSE_BUTTONS=8,
+     MAX_CHANNELS=48/*Max concurrent sounds, must keep track of for volume setting*/,MAX_GLYPHS=4096};
+#define VRT_ATT_SZ 16 // Half float VRAM representation of vertex for rendering performance.
+#define CPU_VRT_SZ 32 // Full float  RAM representation for physics performance (ironically).
 #define DOUBLE_CLICK_TIME 0.5f
 #define WALK_SPEED 3.6f
 #define SPRINT_SPEED 8.8f
@@ -61,16 +46,12 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define PLAYER_HEIGHT 2.00f
 #define PLAYER_CAM_OFFSET_Y 0.84f // Split capsule shape in the middle, camera is thus 0.16 away from top of the capsule ((2 / 2 = 1) - 0.84)
 #define ELEVATOR_PAD_TETHER_DIST 2.0f
-#define PLAYER_CAPSULE_TOTAL_HEIGHT 2.0f
-#define PLAYER_CAPSULE_RADIUS 0.48f
 #define LEVEL_CYBERSPACE 13
-#define MAX_ENTITIES 768 // Unique entity types, different than INSTANCE_COUNT which is the number of instances of any of these entities.
-#define NULLENT 0u
 #define WORLD   0u // Much like Quake, the world is entity 0.  Aand also like Quake, world is nullent and is 0.
 #define PLAYER1 1u
 #define INSTS_1ST_IDX 2
 #define WORLDX 64
-#define WORLDZ WORLDX
+#define WORLDZ 64
 #define WORLDY 18 // Level 8 is only 17.5 cells tall!!  Could be 16 if I make the ceiling same height in last room as in original.
 #define WORLDX_0BASED (WORLDX - 1)
 #define WORLDZ_0BASED (WORLDZ - 1)
@@ -84,119 +65,8 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define VOXELS_PER_CELL 8
 #define VOXEL_SIZE (CELL_SIZE / (float)VOXELS_PER_CELL)
 #define VOXEL_HALF (VOXEL_SIZE * 0.5f)
-#define CELL_VISIBLE       1u
-#define CELL_OPEN          2u
-#define CELL_CLOSEDNORTH   4u
-#define CELL_CLOSEDEAST    8u
-#define CELL_CLOSEDSOUTH  16u
-#define CELL_CLOSEDWEST   32u
-#define CELL_SEES_SUN     64u
-#define CELL_SEES_SKYBOX 128u
-#define EF_ACTIVE               (1ull <<  0) // Instance renders and updates
-#define EF_ISGRENADE            (1ull <<  1)
-#define EF_GROUNDED             (1ull <<  2)
-#define EF_RIGIDBODY            (1ull <<  3)
-#define EF_NO_SHADOWS           (1ull <<  4)
-#define EF_ASLEEP               (1ull <<  5) // Check if enemy starts out asleep such as the sleeping sec-2 bots on level 8 in the maintenance and recharge bays.
-#define EF_WALK_PATH_ON_START   (1ull <<  6)
-#define EF_TOUCHING_HURTS       (1ull <<  7)
-#define EF_ACT_AS_CORPSE_ONLY   (1ull <<  8)
-#define EF_DYING                (1ull <<  9)
-#define EF_DEATH_BURST_DONE     (1ull << 10)
-#define EF_DEAD                 (1ull << 11)
-#define EF_TELEPORT_ON_DEATH    (1ull << 12)
-#define EF_GO_INTO_PAIN         (1ull << 13)
-#define EF_WANDERING            (1ull << 14)
-#define EF_ACT_AS_TURRET        (1ull << 15)
-#define EF_TARGID_ATTACHED      (1ull << 16)
-#define EF_ENEM_IN_SIGHT        (1ull << 17)
-#define EF_ENEM_IN_FRONT        (1ull << 18)
-#define EF_ENEM_IN_FOV          (1ull << 19)
-#define EF_ENEM_IN_LOS          (1ull << 20)
-#define EF_FIRST_SIGHTING       (1ull << 21)
-#define EF_DYING_SETUP          (1ull << 22)
-#define EF_HAD_ENEMY            (1ull << 23)
-#define EF_SHOT_FIRED           (1ull << 24)
-#define EF_DEAD_CHECKS_DONE     (1ull << 25)
-#define EF_HOP_DONE             (1ull << 26)
-#define EF_LOCKED               (1ull << 27)
-#define EF_HAS_CAMERA_VIEW      (1ull << 28)
-#define EF_DAMAGE_ON_USE        (1ull << 29)
-#define Q_ROBOT_SPAWN_DEACTIVATED      (1ull <<  0)
-#define Q_ISOTOPE_INSTALLED            (1ull <<  1)
-#define Q_SHIELD_ACTIVATED             (1ull <<  2)
-#define Q_LASER_SAFETY_OVERRIDEN       (1ull <<  3)
-#define Q_LASER_DESTROYED              (1ull <<  4)
-#define Q_BETA_GROVE_CYBER_UNLOCKED    (1ull <<  5)
-#define Q_GROVE_ALPHA_JETTISON_ENABLED (1ull <<  6)
-#define Q_GROVE_BETA_JETTISON_ENABLED  (1ull <<  7)
-#define Q_GROVE_DELTA_JETTISON_ENABLED (1ull <<  8)
-#define Q_MASTER_JETTISON_BROKEN       (1ull <<  9)
-#define Q_RELAY_428_FIXED              (1ull << 10)
-#define Q_MASTER_JETTISON_ENABLED      (1ull << 11)
-#define Q_BETA_GROVE_JETTISONED        (1ull << 12)
-#define Q_ANTENNA_NORTH_DESTROYED      (1ull << 13)
-#define Q_ANTENNA_SOUTH_DESTROYED      (1ull << 14)
-#define Q_ANTENNA_EAST_DESTROYED       (1ull << 15)
-#define Q_ANTENNA_WEST_DESTROYED       (1ull << 16)
-#define Q_SELF_DESTRUCT_ACTIVATED      (1ull << 17)
-#define Q_BRIDGE_SEPARATED             (1ull << 18)
-#define Q_ISOLINEAR_CHIPSET_INSTALLED  (1ull << 19)
-#define Q_LEV1_CODE_LOCKED             (1ull << 20)
-#define Q_LEV2_CODE_LOCKED             (1ull << 21)
-#define Q_LEV3_CODE_LOCKED             (1ull << 22)
-#define Q_LEV4_CODE_LOCKED             (1ull << 23)
-#define Q_LEV5_CODE_LOCKED             (1ull << 24)
-#define Q_LEV6_CODE_LOCKED             (1ull << 25)
-#define TARG_IOFLAGS_TRIPTRIGGER        (1ull << 0) // Action bits.  What do we want our target to do, e.g. turn on a light or close a door or activate force bridge.  Using multiple bools to allow for multiple actions to be attempted on all the targets.
-#define TARG_IOFLAGS_DOOROPEN           (1ull << 1)
-#define TARG_IOFLAGS_DOOROPENIFUNLOCKED (1ull << 2)
-#define TARG_IOFLAGS_DOORCLOSE          (1ull << 3)
-#define TARG_IOFLAGS_LOCK               (1ull << 4)
-#define TARG_IOFLAGS_UNLOCK             (1ull << 5)
-#define TARG_IOFLAGS_SWITCHTRIGGER      (1ull << 6)
-#define TARG_IOFLAGS_CHGSTAT_RECHARGE   (1ull << 7)
-#define TARG_IOFLAGS_ENEMY_ALERT        (1ull << 8)
-#define TARG_IOFLAGS_FBRIDGE_ACTIVATE   (1ull << 9)
-#define TARG_IOFLAGS_FBRIDGE_DEACTIVATE (1ull << 10)
-#define TARG_IOFLAGS_FBRIDGE_TOGGLE     (1ull << 11)
-#define TARG_IOFLAGS_GRAVLIFT_TOGGLE    (1ull << 12)
-#define TARG_IOFLAGS_TEXTURE_CHG_TOGGLE (1ull << 13)
-#define TARG_IOFLAGS_LIGHT_ON           (1ull << 14)
-#define TARG_IOFLAGS_LIGHT_OFF          (1ull << 15)
-#define TARG_IOFLAGS_LIGHT_TOGGLE       (1ull << 16)
-#define TARG_IOFLAGS_FUNCWALL_MOVE      (1ull << 17)
-#define TARG_IOFLAGS_MISSION_BIT_ON     (1ull << 18)
-#define TARG_IOFLAGS_MISSION_BIT_OFF    (1ull << 19)
-#define TARG_IOFLAGS_MISSION_BIT_TOGGLE (1ull << 20)
-#define TARG_IOFLAGS_SWITCH_LOCK_TOGGLE (1ull << 21)
-#define TARG_IOFLAGS_INST_ACTIVATE      (1ull << 22)
-#define TARG_IOFLAGS_INST_DEACTIVATE    (1ull << 23)
-#define TARG_IOFLAGS_INST_TOGGLE        (1ull << 24)
-#define TARG_IOFLAGS_PLAY_SOUND_ONCE    (1ull << 25)
-#define TARG_IOFLAGS_STOP_SOUND         (1ull << 26)
-#define TARG_IOFLAGS_START_FLASHING_TEX (1ull << 27)
-#define TARG_IOFLAGS_STOP_FLASHING_TEX  (1ull << 28)
-#define TARG_IOFLAGS_BRANCH_FLIP        (1ull << 29)
-#define TARG_IOFLAGS_BRANCH_FLIPONLY    (1ull << 30)
-#define TARG_IOFLAGS_DISABLE_ON_AWAKE   (1ull << 31)
 #define TARGET_STRING_LENGTH 38
 #define CURSOR_SCREEN_PERCENTAGE 0.02f
-#define FONT_NORMAL 0
-#define FONT_STOPD  1
-#define T_WHITE                0
-#define T_YELLOW               1
-#define T_DARK_YELLOW          2
-#define T_GREEN                3
-#define T_RED                  4
-#define T_ORANGE               5
-#define T_STOPD_RED            6
-#define T_STOPD_RED_HIGHLIGHT  7
-#define T_STOPD_RED_PAUSETITLE 8
-#define T_GREEN_MENU           9
-#define T_GREEN_MENU_SHADOW   10
-#define T_GREEN_MENU_GLOW     11
-#define T_RED_MENU            12
 #define SAVE_REMINDER_TIME 7.0f // 7secs ~is human short-term memory length
 #define CREDITS_PAGES 22
 #define TARGET_ID_LENGTH 32 // Max needed 22 + 5 for ID + 1 for space between them = 28
@@ -207,105 +77,49 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 #define T_LOGS_COUNT 134
 #define T_BUFFER_SIZE 1024
 #define FONT_ATLAS_SIZE 4672
-#define MAX_GLYPHS 4096
-#define MULTI_MEDIA_TAB_EMAIL_TABLE 0
-#define MULTI_MEDIA_TAB_LOG_TABLE   1
-#define MULTI_MEDIA_TAB_DATA_TABLE  2
-#define MULTI_MEDIA_TAB_NOTES       3
-#define ANIM_LOOP_ALL 0
-#define ANIM_IDLE_CLOSED 0
-#define ANIM_OPENING     1
-#define ANIM_IDLE_OPEN   2
-#define ANIM_CLOSING     3
-#define ANIM_INSTALL     4
-#define ANIM_INSTALLED   5
-#define ANIM_INACTIVE   0
-#define ANIM_ACTIVATE   1
-#define ANIM_ACTIVATED  2
-#define ANIM_DEACTIVATE 3
-#define ANIM_IDLE    0
-#define ANIM_WALK    1
-#define ANIM_RUN     2
-#define ANIM_ATTACK1 3
-#define ANIM_ATTACK2 4
-#define ANIM_ATTACK3 5
-#define ANIM_PAIN    6
-#define ANIM_PAIN2   7
-#define ANIM_PAIN3   8
-#define ANIM_DYING   9
-#define ANIM_ATTACK_MISS 1
-#define ANIM_ATTACK_HIT  2
 #define NUM_AI_TYPES 29
 #define MAX_DYNAMIC_ENTITIES 512
 #define TERMINAL_VELOCITY 10.0f
 #define PHYS_FLOAT_TO_INT_SCALEF 100.0f
-#define COLTYPE_NONE 0
-#define COLTYPE_BOX 1
-#define COLTYPE_SPH 2
-#define COLTYPE_CAP 3
-#define COLTYPE_CVX 4
-#define COLTYPE_MSH 5
 #define COLLIDER_CAPSULE_DIRECTION_X_F 0.0f // X-Axis
 #define COLLIDER_CAPSULE_DIRECTION_Y_F 1.0f // Y-Axis
 #define COLLIDER_CAPSULE_DIRECTION_Z_F 2.0f // Z-Axis
-typedef u8 BodyState;        static const u8 BodyState_Standing=0,BodyState_Crouch=1,BodyState_CrouchingDown=2,BodyState_StandingUp=3,BodyState_Prone=4,BodyState_ProningDown=5,BodyState_ProningUp=6;
-typedef u8 Handedness;       static const u8 Handedness_Center=0,Handedness_LH=1,Handedness_RH=2;
-typedef u8 AttType;       static const u8 Att_None=0,Att_Melee=1,Att_MlEg=2,Att_Beam=3,Att_Magn=4,Att_HitS=5,Att_PjNd=6,Att_PjBm=7,Att_Ball=8,Att_Gas=9,Att_Trnq=10,Att_Drill=11;
-typedef u8 NPCType;          static const u8 NPCType_Mutant=0,NPCType_Supermutant=1,NPCType_Robot=2,NPCType_Cyborg=3,NPCType_Supercyborg=4,NPCType_Cyber=5,NPCType_MutantCyborg=6;
-typedef u8 PerceptionLevel;  static const u8 PerceptionLevel_Low=0,PerceptionLevel_Medium=1,PerceptionLevel_High=2,PerceptionLevel_Omniscient=3;
-typedef u8 AIState;          static const u8 AIState_Idle=0,AIState_Walk=1,AIState_Run=2,AIState_Attack1=3,AIState_Attack2=4,AIState_Attack3=5,AIState_Pain=6,AIState_Dying=7,AIState_Dead=8,AIState_Inspect=9,AIState_Interacting=10;
-typedef u8 AIMoveType;       static const u8 AIMoveType_Walk=0,AIMoveType_Fly=1,AIMoveType_Swim=2,AIMoveType_Cyber=3,AIMoveType_None=4;
-typedef u8 DoorState;        static const u8 DoorState_Closed=0,DoorState_Open=1,DoorState_Closing=2,DoorState_Opening=3;
-typedef u8 FuncStates;       static const u8 FuncStates_Start=0,FuncStates_Target=1,FuncStates_MovingStart=2,FuncStates_MovingTarget=3,FuncStates_AjarMovingStart=4,FuncStates_AjarMovingTarget=5;
-typedef u8 AccessCardType;   static const u8 AccessCardType_None=0,AccessCardType_Standard=1,AccessCardType_Medical=2,AccessCardType_Science=3,AccessCardType_Admin=4,AccessCardType_Group1=5,AccessCardType_Group2=6,AccessCardType_Group3=7,AccessCardType_Group4=8,AccessCardType_GroupA=9,AccessCardType_GroupB=10,AccessCardType_Storage=11,AccessCardType_Engineering=12,AccessCardType_Maintenance=13,AccessCardType_Security=14,AccessCardType_Per1=15,AccessCardType_Per2=16,AccessCardType_Per3=17,AccessCardType_Per4=18,AccessCardType_Per5=19;
-typedef u8 MusicType;        static const u8 MusicType_None=0,MusicType_Walking=1,MusicType_Combat=2,MusicType_Override=3;
-typedef u8 TrackType;        static const u8 TrackType_None=0,TrackType_Walking=1,TrackType_Combat=2,TrackType_Revive=3,TrackType_Death=4,TrackType_Cybertube=5,TrackType_Elevator=6,TrackType_Distortion=7;
-typedef u8 BloodType;        static const u8 BloodType_None=0,BloodType_Red=1,BloodType_Yellow=2,BloodType_Green=3,BloodType_Robot=4,BloodType_Leaf=5,BloodType_Mutation=6,BloodType_GrayMutation=7;
-typedef u8 SecurityType;     static const u8 SecurityType_None=0,SecurityType_Camera=1,SecurityType_NodeSmall=2,SecurityType_NodeLarge=3;
-typedef u8 AudioLogType;     static const u8 AudioLogType_TextOnly=0,AudioLogType_Normal=1,AudioLogType_Email=2,AudioLogType_Papers=3,AudioLogType_Vmail=4,AudioLogType_Game=5;
-typedef u8 EnergyType;       static const u8 EnergyType_Battery=0,EnergyType_ChargeStation=1;
-typedef u8 FootStepType;     static const u8 FootStepType_None=0,FootStepType_Carpet=1,FootStepType_Concrete=2,FootStepType_GrittyCrete=3,FootStepType_Grass=4,FootStepType_Gravel=5,FootStepType_Rock=6,FootStepType_Glass=7,FootStepType_Marble=8,FootStepType_Metal=9,FootStepType_Grate=10,FootStepType_Metal2=11,FootStepType_Metpanel=12,FootStepType_Panel=13,FootStepType_Plaster=14,FootStepType_Plastic=15,FootStepType_Plastic2=16,FootStepType_Rubber=17,FootStepType_Sand=18,FootStepType_Squish=19,FootStepType_Vent=20,FootStepType_Water=21,FootStepType_Wood=22,FootStepType_Wood2=23;
-typedef u8 MusicResourceType;static const u8 MusicResourceType_Menu=0,MusicResourceType_Medical=1,MusicResourceType_Science=2,MusicResourceType_Reactor=3,MusicResourceType_Executive=4,MusicResourceType_Grove=5,MusicResourceType_Cyber=6,MusicResourceType_Security=7,MusicResourceType_Revive=8,MusicResourceType_Death=9,MusicResourceType_Elevator=10,MusicResourceType_Distortion=11,MusicResourceType_Looped=12,MusicResourceType_Level=13;
-typedef u8 HUDColor;         static const u8 HUDColor_White=0,HUDColor_Red=1,HUDColor_Orange=2,HUDColor_Yellow=3,HUDColor_Green=4,HUDColor_Blue=5,HUDColor_Purple=6,HUDColor_Gray=7;
-typedef u8 ForceFieldColor;  static const u8 ForceFieldColor_Red=0,ForceFieldColor_Green=1,ForceFieldColor_Blue=2,ForceFieldColor_Purple=3,ForceFieldColor_RedFaint=4;
-typedef u8 ButtonType;       static const u8 ButtonType_Generic=0,ButtonType_GeneralInv=1,ButtonType_Patch=2,ButtonType_Grenade=3,ButtonType_Weapon=4,ButtonType_Search=5,ButtonType_None=6,ButtonType_PGrid=7,ButtonType_PWire=8,ButtonType_Vaporize=9,ButtonType_ShootMode=10,ButtonType_GrenadeTimerSlider=11;
-typedef u8 TabMSG;           static const u8 TabMSG_None=0,TabMSG_Search=1,TabMSG_AudioLog=2,TabMSG_Keypad=3,TabMSG_Elevator=4,TabMSG_GridPuzzle=5,TabMSG_WirePuzzle=6,TabMSG_EReader=7,TabMSG_Weapon=8,TabMSG_SystemAnalyzer=9;
-typedef u8 PuzzleCellType;   static const u8 PuzzleCellType_Off=0,PuzzleCellType_Standard=1,PuzzleCellType_And=2,PuzzleCellType_Bypass=3;
-typedef u8 PuzzleGridType;   static const u8 PuzzleGridType_King=0,PuzzleGridType_Queen=1,PuzzleGridType_Knight=2,PuzzleGridType_Rook=3,PuzzleGridType_Bishop=4,PuzzleGridType_Pawn=5;
+enum{CELL_VISIBLE=1u,CELL_OPEN=2u,CELL_CLOSEDNORTH=4u,CELL_CLOSEDEAST=8u,CELL_CLOSEDSOUTH=16u,CELL_CLOSEDWEST=32u,CELL_SEES_SUN=64u,CELL_SEES_SKYBOX=128u};
+enum{EF_ACTIVE=(1u<<0),EF_ISGRENADE=(1u<<1),EF_GROUNDED=(1u<<2),EF_RIGIDBODY=(1u<<3),EF_NO_SHADOWS=(1u<<4),EF_ASLEEP=(1u<<5),EF_WALK_PATH_ON_START=(1u<<6),EF_TOUCHING_HURTS=(1u<<7),EF_ACT_AS_CORPSE_ONLY=(1u<<8),EF_DYING=(1u<<9),EF_DEATH_BURST_DONE=(1u<<10),EF_DEAD=(1u<<11),EF_TELEPORT_ON_DEATH=(1u<<12),EF_GO_INTO_PAIN=(1u<<13),EF_WANDERING=(1u<<14),EF_ACT_AS_TURRET=(1u<<15),EF_TARGID_ATTACHED=(1u<<16),EF_ENEM_IN_SIGHT=(1u<<17),EF_ENEM_IN_FRONT=(1u<<18),EF_ENEM_IN_FOV=(1u<<19),EF_ENEM_IN_LOS=(1u<<20),EF_FIRST_SIGHTING=(1u<<21),EF_DYING_SETUP=(1u<<22),EF_HAD_ENEMY=(1u<<23),EF_SHOT_FIRED=(1u<<24),EF_DEAD_CHECKS_DONE=(1u<<25),EF_HOP_DONE=(1u<<26),EF_LOCKED=(1u<<27),EF_HAS_CAMERA_VIEW=(1u<<28),EF_DAMAGE_ON_USE=(1u<<29)};
+enum{Q_ROBOT_SPAWN_DEACTIVATED=(1u<<0),Q_ISOTOPE_INSTALLED=(1u<<1),Q_SHIELD_ACTIVATED=(1u<<2),Q_LASER_SAFETY_OVERRIDEN=(1u<<3),Q_LASER_DESTROYED=(1u<<4),Q_BETA_GROVE_CYBER_UNLOCKED=(1u<<5),Q_GROVE_ALPHA_JETTISON_ENABLED=(1u<<6),Q_GROVE_BETA_JETTISON_ENABLED=(1u<<7),Q_GROVE_DELTA_JETTISON_ENABLED=(1u<<8),Q_MASTER_JETTISON_BROKEN=(1u<<9),Q_RELAY_428_FIXED=(1u<<10),Q_MASTER_JETTISON_ENABLED=(1u<<11),Q_BETA_GROVE_JETTISONED=(1u<<12),Q_ANTENNA_NORTH_DESTROYED=(1u<<13),Q_ANTENNA_SOUTH_DESTROYED=(1u<<14),Q_ANTENNA_EAST_DESTROYED=(1u<<15),Q_ANTENNA_WEST_DESTROYED=(1u<<16),Q_SELF_DESTRUCT_ACTIVATED=(1u<<17),Q_BRIDGE_SEPARATED=(1u<<18),Q_ISOLINEAR_CHIPSET_INSTALLED=(1u<<19),Q_LEV1_CODE_LOCKED=(1u<<20),Q_LEV2_CODE_LOCKED=(1u<<21),Q_LEV3_CODE_LOCKED=(1u<<22),Q_LEV4_CODE_LOCKED=(1u<<23),Q_LEV5_CODE_LOCKED=(1u<<24),Q_LEV6_CODE_LOCKED=(1u<<25)};
+enum{TARG_IOFLAGS_TRIPTRIGGER=(1u<<0),TARG_IOFLAGS_DOOROPEN=(1u<<1),TARG_IOFLAGS_DOOROPENIFUNLOCKED=(1u<<2),TARG_IOFLAGS_DOORCLOSE=(1u<<3),TARG_IOFLAGS_LOCK=(1u<<4),TARG_IOFLAGS_UNLOCK=(1u<<5),TARG_IOFLAGS_SWITCHTRIGGER=(1u<<6),TARG_IOFLAGS_CHGSTAT_RECHARGE=(1u<<7),TARG_IOFLAGS_ENEMY_ALERT=(1u<<8),TARG_IOFLAGS_FBRIDGE_ACTIVATE=(1u<<9),TARG_IOFLAGS_FBRIDGE_DEACTIVATE=(1u<<10),TARG_IOFLAGS_FBRIDGE_TOGGLE=(1u<<11),TARG_IOFLAGS_GRAVLIFT_TOGGLE=(1u<<12),TARG_IOFLAGS_TEXTURE_CHG_TOGGLE=(1u<<13),TARG_IOFLAGS_LIGHT_ON=(1u<<14),TARG_IOFLAGS_LIGHT_OFF=(1u<<15),TARG_IOFLAGS_LIGHT_TOGGLE=(1u<<16),TARG_IOFLAGS_FUNCWALL_MOVE=(1u<<17),TARG_IOFLAGS_MISSION_BIT_ON=(1u<<18),TARG_IOFLAGS_MISSION_BIT_OFF=(1u<<19),TARG_IOFLAGS_MISSION_BIT_TOGGLE=(1u<<20),TARG_IOFLAGS_SWITCH_LOCK_TOGGLE=(1u<<21),TARG_IOFLAGS_INST_ACTIVATE=(1u<<22),TARG_IOFLAGS_INST_DEACTIVATE=(1u<<23),TARG_IOFLAGS_INST_TOGGLE=(1u<<24),TARG_IOFLAGS_PLAY_SOUND_ONCE=(1u<<25),TARG_IOFLAGS_STOP_SOUND=(1u<<26),TARG_IOFLAGS_START_FLASHING_TEX=(1u<<27),TARG_IOFLAGS_STOP_FLASHING_TEX=(1u<<28),TARG_IOFLAGS_BRANCH_FLIP=(1u<<29),TARG_IOFLAGS_BRANCH_FLIPONLY=(1u<<30),TARG_IOFLAGS_DISABLE_ON_AWAKE=(1u<<31)};
+enum{FONT_NORMAL=0,FONT_STOPD=1};
+enum{T_WHITE=0,T_YELLOW=1,T_DARK_YELLOW=2,T_GREEN=3,T_RED=4,T_ORANGE=5,T_STOPD_RED=6,T_STOPD_RED_HIGHLIGHT=7,T_STOPD_RED_PAUSETITLE=8,T_GREEN_MENU=9,T_GREEN_MENU_SHADOW=10,T_GREEN_MENU_GLOW=11,T_RED_MENU=12};
+enum{MM_EMAIL_TABLE=0,MM_LOG_TABLE=1,MM_DATA_TABLE=2,MM_NOTES=3};
+enum{ANIM_LOOP_ALL=0,ANIM_IDLE_CLOSED=0,ANIM_IDLE=0,ANIM_INACTIVE=0,ANIM_ATTACK_MISS=1,ANIM_OPENING=1,ANIM_WALK=1,ANIM_ACTIVATE=1,ANIM_ATTACK_HIT=2,ANIM_ACTIVATED=2,ANIM_IDLE_OPEN=2,ANIM_RUN=2,ANIM_CLOSING=3,ANIM_DEACTIVATE=3,ANIM_ATTACK1=3,ANIM_ATTACK2=4,ANIM_INSTALL=4,ANIM_ATTACK3=5,ANIM_INSTALLED=5,ANIM_PAIN=6,ANIM_PAIN2=7,ANIM_PAIN3=8,ANIM_DYING=9};
+enum {COLTYPE_NONE=0,COLTYPE_BOX=1,COLTYPE_SPH=2,COLTYPE_CAP=3,COLTYPE_CVX=4,COLTYPE_MSH=5};
+typedef enum { BodyState_Standing=0,BodyState_Crouch=1,BodyState_CrouchingDown=2,BodyState_StandingUp=3,BodyState_Prone=4,BodyState_ProningDown=5,BodyState_ProningUp=6 } BodyState;
+typedef enum { Handedness_Center=0,Handedness_LH=1,Handedness_RH=2 } Handedness;
+typedef enum { Att_None=0,Att_Melee=1,Att_MlEg=2,Att_Beam=3,Att_Magn=4,Att_HitS=5,Att_PjNd=6,Att_PjBm=7,Att_Ball=8,Att_Gas=9,Att_Trnq=10,Att_Drill=11 } AttType;
+typedef enum { NPCType_Mutant=0,NPCType_Supermutant=1,NPCType_Robot=2,NPCType_Cyborg=3,NPCType_Supercyborg=4,NPCType_Cyber=5,NPCType_MutantCyborg=6 } NPCType;
+typedef enum { PerceptionLevel_Low=0,PerceptionLevel_Medium=1,PerceptionLevel_High=2,PerceptionLevel_Omniscient=3 } PerceptionLevel;
+typedef enum { AIState_Idle=0,AIState_Walk=1,AIState_Run=2,AIState_Attack1=3,AIState_Attack2=4,AIState_Attack3=5,AIState_Pain=6,AIState_Dying=7,AIState_Dead=8,AIState_Inspect=9,AIState_Interacting=10 } AIState;
+typedef enum { AIMoveType_Walk=0,AIMoveType_Fly=1,AIMoveType_Swim=2,AIMoveType_Cyber=3,AIMoveType_None=4 } AIMoveType;
+typedef enum { DoorState_Closed=0,DoorState_Open=1,DoorState_Closing=2,DoorState_Opening=3 } DoorState;
+typedef enum { FuncStates_Start=0,FuncStates_Target=1,FuncStates_MovingStart=2,FuncStates_MovingTarget=3,FuncStates_AjarMovingStart=4,FuncStates_AjarMovingTarget=5 } FuncStates;
+typedef enum { AccessCardType_None=0,AccessCardType_Standard=1,AccessCardType_Medical=2,AccessCardType_Science=3,AccessCardType_Admin=4,AccessCardType_Group1=5,AccessCardType_Group2=6,AccessCardType_Group3=7,AccessCardType_Group4=8,AccessCardType_GroupA=9,AccessCardType_GroupB=10,AccessCardType_Storage=11,AccessCardType_Engineering=12,AccessCardType_Maintenance=13,AccessCardType_Security=14,AccessCardType_Per1=15,AccessCardType_Per2=16,AccessCardType_Per3=17,AccessCardType_Per4=18,AccessCardType_Per5=19 } AccessCardType;
+typedef enum { MusicType_None=0,MusicType_Walking=1,MusicType_Combat=2,MusicType_Override=3 } MusicType;
+typedef enum { TrackType_None=0,TrackType_Walking=1,TrackType_Combat=2,TrackType_Revive=3,TrackType_Death=4,TrackType_Cybertube=5,TrackType_Elevator=6,TrackType_Distortion=7 } TrackType;
+typedef enum { BloodType_None=0,BloodType_Red=1,BloodType_Yellow=2,BloodType_Green=3,BloodType_Robot=4,BloodType_Leaf=5,BloodType_Mutation=6,BloodType_GrayMutation=7 } BloodType;
+typedef enum { SecurityType_None=0,SecurityType_Camera=1,SecurityType_NodeSmall=2,SecurityType_NodeLarge=3 } SecurityType;
+typedef enum { AudioLogType_TextOnly=0,AudioLogType_Normal=1,AudioLogType_Email=2,AudioLogType_Papers=3,AudioLogType_Vmail=4,AudioLogType_Game=5 } AudioLogType;
+typedef enum { EnergyType_Battery=0,EnergyType_ChargeStation=1 } EnergyType;
+typedef enum { FootStepType_None=0,FootStepType_Carpet=1,FootStepType_Concrete=2,FootStepType_GrittyCrete=3,FootStepType_Grass=4,FootStepType_Gravel=5,FootStepType_Rock=6,FootStepType_Glass=7,FootStepType_Marble=8,FootStepType_Metal=9,FootStepType_Grate=10,FootStepType_Metal2=11,FootStepType_Metpanel=12,FootStepType_Panel=13,FootStepType_Plaster=14,FootStepType_Plastic=15,FootStepType_Plastic2=16,FootStepType_Rubber=17,FootStepType_Sand=18,FootStepType_Squish=19,FootStepType_Vent=20,FootStepType_Water=21,FootStepType_Wood=22,FootStepType_Wood2=23 } FootStepType;
+typedef enum { MusicResourceType_Menu=0,MusicResourceType_Medical=1,MusicResourceType_Science=2,MusicResourceType_Reactor=3,MusicResourceType_Executive=4,MusicResourceType_Grove=5,MusicResourceType_Cyber=6,MusicResourceType_Security=7,MusicResourceType_Revive=8,MusicResourceType_Death=9,MusicResourceType_Elevator=10,MusicResourceType_Distortion=11,MusicResourceType_Looped=12,MusicResourceType_Level=13 } MusicResourceType;
+typedef enum { HUDColor_White=0,HUDColor_Red=1,HUDColor_Orange=2,HUDColor_Yellow=3,HUDColor_Green=4,HUDColor_Blue=5,HUDColor_Purple=6,HUDColor_Gray=7 } HUDColor;
+typedef enum { ForceFieldColor_Red=0,ForceFieldColor_Green=1,ForceFieldColor_Blue=2,ForceFieldColor_Purple=3,ForceFieldColor_RedFaint=4 } ForceFieldColor;
+typedef enum { ButtonType_Generic=0,ButtonType_GeneralInv=1,ButtonType_Patch=2,ButtonType_Grenade=3,ButtonType_Weapon=4,ButtonType_Search=5,ButtonType_None=6,ButtonType_PGrid=7,ButtonType_PWire=8,ButtonType_Vaporize=9,ButtonType_ShootMode=10,ButtonType_GrenadeTimerSlider=11 } ButtonType;
+typedef enum { TabMSG_None=0,TabMSG_Search=1,TabMSG_AudioLog=2,TabMSG_Keypad=3,TabMSG_Elevator=4,TabMSG_GridPuzzle=5,TabMSG_WirePuzzle=6,TabMSG_EReader=7,TabMSG_Weapon=8,TabMSG_SystemAnalyzer=9 } TabMSG;
+typedef enum { PuzzleCellType_Off=0,PuzzleCellType_Standard=1,PuzzleCellType_And=2,PuzzleCellType_Bypass=3 } PuzzleCellType;
+typedef enum { PuzzleGridType_King=0,PuzzleGridType_Queen=1,PuzzleGridType_Knight=2,PuzzleGridType_Rook=3,PuzzleGridType_Bishop=4,PuzzleGridType_Pawn=5 } PuzzleGridType;
 enum { DOOR_CLIP_IDLE_CLOSED = 0, DOOR_CLIP_OPENING = 1, DOOR_CLIP_IDLE_OPEN = 2, DOOR_CLIP_CLOSING = 3 };
 typedef struct {V3 ctr,hExt; Quaternion rot;} ShapeBox; typedef struct {V3 ctr; float rad;} ShapeSphere; typedef struct {V3 tip,base; float rad;} ShapeCapsule;
-static const u32 L_Default          = 1U;
-static const u32 L_TransparentFX    = 2U;
-//                                    4U   // unused (formerly IgnoreRaycast)
-//                                    8U   // unused
-static const u32 L_Water            = 16U; static const u32 L_BlocksRaycast = 16U;  // same as Water
-static const u32 L_UI               = 32U;
-//                                    64U  // unused
-//                                    128U // unused
-static const u32 L_GunViewModel     = 256U;
-static const u32 L_Geometry         = 512U;
-static const u32 L_NPC              = 1024U;
-static const u32 L_PlayerBullets    = 2048U;
-static const u32 L_Player           = 4096U;
-static const u32 L_Corpse           = 8192U;
-static const u32 L_PhysObjects      = 16384U;
-//                                    32768U // unused (formerly Sky)
-static const u32 L_PlayerTriggerOnly= 65536U;
-static const u32 L_Trigger          = 131072U;
-static const u32 L_Door             = 262144U;
-static const u32 L_InterDebris      = 524288U;
-static const u32 L_Player2          = 1048576U;
-//                                    2097152U // unused (formerly Player3)
-//                                    4194304U // unused (formerly Player4)
-static const u32 L_NPCTrigger       = 8388608U;
-static const u32 L_NPCBullet        = 16777216U;
-static const u32 L_NPCClip          = 33554432U;
-static const u32 L_Clip             = 67108864U;
-static const u32 L_Automap          = 134217728U;
-static const u32 L_Culling          = 268435456U;
-static const u32 L_CorpseSearchable = 536870912U;
-//                                    1073741824U // unused
-static const u32 L_NULL             = 2147483648U;
+enum{L_Default=(1u<<0),L_TransparentFX=(1u<<1),L_Water=(1u<<4),L_BlocksRaycast=(1u<<4),L_UI=(1u<<5),L_GunViewModel=(1u<<8),L_Geometry=(1u<<9),L_NPC=(1u<<10),L_PlayerBullets=(1u<<11),L_Player=(1u<<12),L_Corpse=(1u<<13),L_PhysObjects=(1u<<14),L_PlayerTriggerOnly=(1u<<16),L_Trigger=(1u<<17),L_Door=(1u<<18),L_InterDebris=(1u<<19),L_Player2=(1u<<20),L_NPCTrigger=(1u<<23),L_NPCBullet=(1u<<24),L_NPCClip=(1u<<25),L_Clip=(1u<<26),L_Automap=(1u<<27),L_Culling=(1u<<28),L_CorpseSearchable=(1u<<29)};
 #define LMASK_PLAYER_COLLIDESWITH   (L_Clip|L_NPCBullet|L_Player2|L_Door|L_Trigger|L_PlayerTriggerOnly|L_Default|L_TransparentFX|L_Geometry|L_NPC)
 #define LMASK_NPC_COLLIDESWITH      (L_Clip|L_NPCClip|L_PlayerBullets|L_Player2|L_Player|L_Door|L_Trigger|L_NPCTrigger|L_Default|L_TransparentFX|L_Geometry|L_NPC)
 #define LMASK_NPC_SIGHT             (L_Default|L_Geometry|L_Door|L_InterDebris|L_PhysObjects|L_Player)
@@ -328,7 +142,7 @@ SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on f
 
 typedef struct { bool god,noclip,notarget,bottomless,superoverride,fatigueCheat,redbull,consoleActive,noHUD,showLocation,showFPS,showPhys,editMode; u8 dizzyLevel; } CheatsSystem;
 typedef struct {
-        double logFinished,blinkFinished,beepFinished,tickFinished,/*Visual only, Time.time controlled*/ centerTabsTickFinished;/*Visual only, Time.time controlled*/ 
+        double logFinished,blinkFinished,beepFinished,tickFinished,centerTabsTickFinished; 
         i32 lastMultiMediaTabOpened,applyButtonReferenceIndex,curCenterTab,wep16index,tempSpriteIndex,count;
         u16 linkedElevatorDoor,tetheredPGP,tetheredPWP,tetheredSearchable,tetheredKeypadElevator,tetheredKeypadKeycode,elevButtonSpawnIdx[8];
         u8 highlightTickCount[4],beepCount,elevButtonLevelIdx[8],elevCurrentFloor;
@@ -338,13 +152,6 @@ typedef struct {
 } SystemUI;
 typedef struct { char stringTable[T_STRING_COUNT][T_LOCALIZATION_MAX_LENGTH]; u16 audioLogImagesRefIndicesLH[T_LOGS_COUNT],audioLogImagesRefIndicesRH[T_LOGS_COUNT]; u8 audioLogType[T_LOGS_COUNT],audioLogLevelFound[T_LOGS_COUNT]; size_t file_size,filelog_size; u8* file_data,*filelog_data; } TextSystem; // Hefty table for localization support.
 TextSystem Sys_Text;
-#define PATCH_BERSERK   1
-#define PATCH_DETOX     2
-#define PATCH_GENIUS    4
-#define PATCH_MEDI      8
-#define PATCH_REFLEX   16
-#define PATCH_SIGHT    32
-#define PATCH_STAMINUP 64
 #define BERSERK_TIME  20.0
 #define DETOX_TIME    60.0
 #define GENIUS_TIME  180.0
@@ -364,50 +171,15 @@ TextSystem Sys_Text;
 #define EARTH_SHAKER_DEFAULT_TIME 10.0
 #define GLOBAL_SHAKE_DISTANCE 0.3f
 #define GLOBAL_SHAKE_FORCE    1.0f
-#define HW_COUNT 14
-#define HW_SYS    1 // System Analyzer
-#define HW_NAV    2 // Navigation Unit
-#define HW_ERD    4 // Datareader/EReader
-#define HW_SNS    8 // Sensaround
-#define HW_TID   16 // Target Identifier
-#define HW_SHD   32 // Energy Shield
-#define HW_BIO   64 // Biomonitor
-#define HW_LAN  128 // Head Mounted Lantern
-#define HW_ENV  256 // Envirosuit
-#define HW_BST  512 // Turbo Motion Booster
-#define HW_JET 1024 // Jump Jet Boots
-#define HW_INF 2048 // Infrared Night Sight Enhancement
-#define HW_SYS_IDX    0 // System Analyzer
-#define HW_NAV_IDX    1 // Navigation Unit
-#define HW_ERD_IDX    2 // Datareader/EReader
-#define HW_SNS_IDX    3 // Sensaround
-#define HW_TID_IDX    4 // Target Identifier
-#define HW_SHD_IDX    5 // Energy Shield
-#define HW_BIO_IDX    6 // Biomonitor
-#define HW_LAN_IDX    7 // Head Mounted Lantern
-#define HW_ENV_IDX    8 // Envirosuit
-#define HW_BST_IDX    9 // Turbo Motion Booster
-#define HW_JET_IDX   10 // Jump Jet Boots
-#define HW_INF_IDX   11 // Infrared Night Sight Enhancement
-#define SW_DRILL  0
-#define SW_PULSER 1
-#define SW_SHIELD 2
-#define SW_TURBO  3
-#define SW_DECOY  4
-#define SW_RECALL 5
-#define SW_GAMES  6
-#define MINIGAME_PING        1
-#define MINIGAME_15          2
-#define MINIGAME_WING0       4
-#define MINIGAME_BOTBOUNCE   8
-#define MINIGAME_EEL_ZAPPER 16
-#define MINIGAME_ROAD       32
-#define MINIGAME_TRIOPTOE   64
+enum{PATCH_BERSERK=1,PATCH_DETOX=2,PATCH_GENIUS=4,PATCH_MEDI=8,PATCH_REFLEX=16,PATCH_SIGHT=32,PATCH_STAMINUP=64};
+enum{HW_COUNT=14,HW_SYS=1/*System Analyzer*/,HW_NAV=2/*Navigation Unit*/,HW_ERD=4/*Datareader/EReader*/,HW_SNS=8/*Sensaround*/,HW_TID=16/*Target Identifier*/,HW_SHD=32/*Energy Shield*/,HW_BIO=64/*Biomonitor*/,HW_LAN=128/*Head Mounted Lantern*/,HW_ENV=256/*Envirosuit*/,HW_BST=512/*Turbo Motion Booster*/,HW_JET=1024/*Jump Jet Boots*/,HW_INF=2048/*Infrared Night Sight Enhancement*/};
+enum{HW_SYS_IDX=0/*System Analyzer*/,HW_NAV_IDX=1/*Navigation Unit*/,HW_ERD_IDX=2/*Datareader/EReader*/,HW_SNS_IDX=3/*Sensaround*/,HW_TID_IDX=4/*Target Identifier*/,HW_SHD_IDX=5/*Energy Shield*/,HW_BIO_IDX=6/*Biomonitor*/,HW_LAN_IDX=7/*Head Mounted Lantern*/,HW_ENV_IDX=8/*Envirosuit*/,HW_BST_IDX=9/*Turbo Motion Booster*/,HW_JET_IDX=10/*Jump Jet Boots*/,HW_INF_IDX=11/*Infrared Night Sight Enhancement*/};
+enum{SW_DRILL=0,SW_PULSER=1,SW_SHIELD=2,SW_TURBO=3,SW_DECOY=4,SW_RECALL=5,SW_GAMES=6};
+enum{MINIGAME_PING=1,MINIGAME_15=2,MINIGAME_WING0=4,MINIGAME_BOTBOUNCE=8,MINIGAME_EEL_ZAPPER=16,MINIGAME_ROAD=32,MINIGAME_TRIOPTOE=64};
 // Hw referenceIndex,ref14Index::Sys 21,0 Nav 22,1 Ere 23,2 Sen 24,3 Trg 25,4 Shi 26,5 Bio 27,6 Lan 28,7 Env 29,8 Boo 30,9 Jum 31,10 Nig 32,11
 typedef struct {
-    double nitroTimeSetting,earthShakerTimeSetting,justFired,waitTilNextFire,reloadFinished,lerpStartTime,dropFinished,playerHealthTimer,berserkFinishedTime,berserkIncrementFinishedTime,detoxFinishedTime,geniusFinishedTime,mediFinishedTime,reflexFinishedTime,sightFinishedTime,
-           sightSideEffectFinishedTime,staminupFinishedTime,turboCyberTime,turboFinished,energyDrainTickFinished,painSoundFinished,radSoundFinished,radFXFinished,weaponDipFinished;
-    float weaponEnergySetting[16],reloadLerpValue,sparqSetting,ionSetting,blasterSetting,plasmaSetting,stungunSetting,energySliderClickedTime,cyberWeaponAttackFinished,targetY,currentEnergyWeaponHeat[7],fatigue,radiated,resetAfterDeathTime,energy,maxEnergy,radAdjust,initialRadiation,weaponDipLerp;
+    double nitroTimeSetting,earthShakerTimeSetting,justFired,waitTilNextFire,reloadFinished,lerpStartTime,dropFinished,playerHealthTimer,berserkFinishedTime,berserkIncrementFinishedTime,detoxFinishedTime,geniusFinishedTime,mediFinishedTime,reflexFinishedTime,sightFinishedTime,leanLeftTapFinished,leanRightTapFinished,sightSideEffectFinishedTime,staminupFinishedTime,turboCyberTime,turboFinished,energyDrainTickFinished,painSoundFinished,radSoundFinished,radFXFinished,weaponDipFinished;
+    float weaponEnergySetting[16],reloadLerpValue,sparqSetting,ionSetting,blasterSetting,plasmaSetting,stungunSetting,energySliderClickedTime,cyberWeaponAttackFinished,targetY,currentEnergyWeaponHeat[7],fatigue,radiated,resetAfterDeathTime,energy,maxEnergy,radAdjust,initialRadiation,weaponDipLerp,currentCrouchRatio,leanTarget,leanShift,crouchingVelocity;
     u32 accessCardOwned,wepAmmo[16],wepAmmoSecondary[16];
     i32 lastAddedIndex,emailCurrent,emailIndex,globalLookupIndex,weaponInventoryIndices[7],weaponInventoryAmmoIndices[7],hardwareInvCurrent,/*Current slot in the general inventory (14 slots).*/hardwareInvIndex,/*Current index to the item look-up table.*/generalInventoryIndexRef[14],berserkIncrement;
     i16 ladderState,weaponCurrentPending,weaponIndexPending,weaponCurrent;
@@ -425,57 +197,15 @@ typedef struct {
         PerceptionLevel perception;
         float disruptability,armorvalue,defense;
         AIMoveType moveType;
-        float yawSpeed;
-        float fov;
-        float fovAttack;
-        float fovStartMovement;
-        float distToSeeBehind;
-        float sightRange;
-        float walkSpeed;
-        float runSpeed;
-        float attack1Speed;
-        float attack2Speed;
-        float attack3Speed;
-        float attack3Force;
-        float attack3Radius;
-        float timeToPain;
-        float timeBetweenPain;
-        float timeTillDead;
-        float timeToActualAttack1;
-        float timeToActualAttack2;
-        float timeToActualAttack3;
-        float timeBetweenAttack1;
-        float timeBetweenAttack2;
-        float timeBetweenAttack3;
-        float timeToChangeEnemy;
-        float timeIdleSFXMin;
-        float timeIdleSFXMax;
-        float timeAttack1WaitMin;
-        float timeAttack1WaitMax;
-        float timeAttack1WaitChance;
-        float timeAttack2WaitMin;
-        float timeAttack2WaitMax;
-        float timeAttack2WaitChance;
-        float timeAttack3WaitMin;
-        float timeAttack3WaitMax;
-        float timeAttack3WaitChance;
-        int attack1ProjectileLaunchedType; // Unused
-        int attack2ProjectileLaunchedType; // Unused
-        int attack3ProjectileLaunchedType; // Unused
-        float projectileSpeedAttack1;
-        float projectileSpeedAttack2;
-        float projectileSpeedAttack3;
-        bool hasLaserOnAttack1;
-        bool hasLaserOnAttack2;
-        bool hasLaserOnAttack3;
-        bool explodeOnAttack3;
-        bool preactivateMeleeColliders; // Unused
+        float yawSpeed,fov,fovAttack,fovStartMovement,distToSeeBehind,sightRange,walkSpeed,runSpeed,attack1Speed,attack2Speed,attack3Speed,attack3Force,attack3Radius,timeToPain,timeBetweenPain,timeTillDead,timeToActualAttack1,timeToActualAttack2,timeToActualAttack3;
+        float timeBetweenAttack1,timeBetweenAttack2,timeBetweenAttack3,timeToChangeEnemy,timeIdleSFXMin,timeIdleSFXMax,timeAttack1WaitMin,timeAttack1WaitMax,timeAttack1WaitChance,timeAttack2WaitMin,timeAttack2WaitMax,timeAttack2WaitChance,timeAttack3WaitMin,timeAttack3WaitMax,timeAttack3WaitChance;
+        int attack1ProjectileLaunchedType/*Unused*/,attack2ProjectileLaunchedType/*Unused*/,attack3ProjectileLaunchedType/*Unused*/; 
+        float projectileSpeedAttack1,projectileSpeedAttack2,projectileSpeedAttack3;
+        bool hasLaserOnAttack1,hasLaserOnAttack2,hasLaserOnAttack3,explodeOnAttack3,preactivateMeleeColliders; // Unused
         double huntTime;
         float flightHeight;
-        bool flightHeightIsPercentage;
-        bool switchMaterialOnDeath;
-        float hearingRange;
-        float timeForTranquilization;
+        bool flightHeightIsPercentage,switchMaterialOnDeath;
+        float hearingRange,timeForTranquilization;
         bool hopsOnMove;
         NPCType type;
         int projectile1Prefab,projectile2Prefab,projectile3Prefab;
@@ -524,21 +254,18 @@ typedef struct { char soundPath[128]; float *samples; u32 frame_count,frame_pos;
 typedef struct {
     u32 lastFrameSecCount,debugLineVertCount,shotsFired,grenadesThrown,savesScummed;
     u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,instCount; // Numbers of instances of entities and lights loaded (always for just the current level)
-    float farPlane[14],damageDealt,damageReceived,timeScale,worldMin_x[14],worldMin_z[14],voxMinCtrX[14],voxMinCtrZ[14];
+    float farPlane[MAX_LEVELS],damageDealt,damageReceived,timeScale,worldMin_x[MAX_LEVELS],worldMin_z[MAX_LEVELS],voxMinCtrX[MAX_LEVELS],voxMinCtrZ[MAX_LEVELS];
     double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,debugLineFinished,shakeFinished,last_time,last_physics_time,deltaTime,current_time,screenshotTimeout,pauseRelativeTime,absoluteTime,statusTextDecayFinished,justSavedTimeStamp;
     i32 fogFac,cursorPosition_x,cursorPosition_y; // Separate internal cursor from system cursor.  This gets relatively pushed around by real cursor movement to give consistent platform behavior.
     V3 debugLine_start,debugLine_end,cyberspaceRecallPoint;
-    u8 levelSecurity[14],startLevel,numLevels,curLev,diffCbt,diffPuz,diffMis,diffCyb,creditsPageIndex;
-    u8 levelCameraCount[14],levelSmallNodeCount[14],levelLargeNodeCount[14],levelCameraDestroyedCount[14],levelSmallNodeDestroyedCount[14],levelLargeNodeDestroyedCount[14];
+    u8 levelSecurity[MAX_LEVELS],startLevel,numLevels,curLev,diffCbt,diffPuz,diffMis,diffCyb,creditsPageIndex;
+    u8 levelCameraCount[MAX_LEVELS],levelSmallNodeCount[MAX_LEVELS],levelLargeNodeCount[MAX_LEVELS],levelCameraDestroyedCount[MAX_LEVELS],levelSmallNodeDestroyedCount[MAX_LEVELS],levelLargeNodeDestroyedCount[MAX_LEVELS];
     int lev1SecCode,lev2SecCode,lev3SecCode,lev4SecCode,lev5SecCode,lev6SecCode;
     u8 currentLevel; // Which level's per-level arrays the pointers (instances, position, etc.) currently point to.  Usually equals curLev, but diverges briefly during cross-level target I/O.
     bool inventoryMode,levelCurrentlyLoading,introNotPlayed,paused,menuActive,gameFinished,creditsActive,decoyActive,boosterActive,uiIsBlocking,mouseClickHeldOverGUI,geniusActive;
     InventorySystem invP1,invP2;
     SystemUI Sys_UI;
     MusicSystem Sys_Music;
-
-    // ===== Per-level parallel arrays (SoA) for cache-hot physics/render loops =====
-    // The active level is selected by pointers below; SetLevelPointers(lev) swaps them.
     Entity levelInstances[MAX_LEVELS][INSTANCE_COUNT];
     V3 levelPosition[MAX_LEVELS][INSTANCE_COUNT];
     V3 levelScale[MAX_LEVELS][INSTANCE_COUNT];
@@ -561,14 +288,10 @@ typedef struct {
     bool levelInvTnsrValid[MAX_LEVELS][INSTANCE_COUNT];
     bool levelColliding[MAX_LEVELS][INSTANCE_COUNT];
     u16 levelInstCount[MAX_LEVELS]; // Per-level instance count (parallel to instCount which always mirrors the active level's count).
-    Light levelLights[14][LIGHT_COUNT];
-    LightAnimation levelLAnims[14][LIGHT_COUNT];
-    V3 levelLightsNewPosition[14][LIGHT_COUNT];
-    u16 levelLoadedLights[14];
-
-    // ===== Active-level pointers (the "current instances[]") =====
-    // All existing call sites use World.instances[i], World.position[i], etc. unchanged;
-    // these pointers simply redirect to the active level's row in the levelXxx[] arrays.
+    Light levelLights[MAX_LEVELS][LIGHT_COUNT];
+    LightAnimation levelLAnims[MAX_LEVELS][LIGHT_COUNT];
+    V3 levelLightsNewPosition[MAX_LEVELS][LIGHT_COUNT];
+    u16 levelLoadedLights[MAX_LEVELS];
     Entity* instances;
     V3* position;
     V3* scale;
@@ -579,7 +302,7 @@ typedef struct {
     ColliderType* collider;
     Quaternion* rotation;
     u32* layer;
-    float* mass;
+    float* mass,dt;
     float* radius;
     float* gravity;
     float (*inertiaTensor)[6];
@@ -594,19 +317,7 @@ typedef struct {
     LightAnimation* lanims;
     V3* lightsNewPosition;
     u16 loadedLights; // mirrors levelLoadedLights[currentLevel]
-    // instCount remains a scalar u16 (declared above) and mirrors levelInstCount[currentLevel].
-    Color fogColor[14];
-    // ===== Cross-level Target I/O cache =====
-    // When UseTargets iterates across all 14 levels looking for matching targetname(s), it swaps the
-    // active-level pointers to each level in turn.  The `activator` entity, however, lives in the
-    // entry level (the level that was active when UseTargets was called) and its index is NOT valid
-    // in other levels' instances arrays.  These fields cache the activator entity + ioflags at the
-    // outermost UseTargets call so Targetted() and the functions it calls can still read the
-    // activator's ioflags regardless of which level the pointers currently point to.
-    // targetIOActive is true while inside the outermost UseTargets call (used to nest recursive
-    // UseTargets calls correctly — e.g. DoorUse → UseTargets — without re-caching or prematurely
-    // clearing the cache).  targetIOEntryLevel saves the level that was active on entry so the
-    // outermost call can restore the pointers when it finishes.
+    Color fogColor[MAX_LEVELS];
     Entity targetIOActivatorEntity;
     u32 targetIOActivatorIoflags;
     u16 targetIOActivatorIdx;
@@ -670,6 +381,9 @@ INLINE bool IdxIsDynamicObject(u16 c) { return (c >= 307 && c <= 404) ||  c == 4
 INLINE bool IdxIsStaticObjectSaveable(int c) { return (c == 112 || c == 279 || (c >= 448 && c < 458) || c == 480 || c == 516 || (c >= 518 && c <= 526) || c == 530 || c == 531 || c == 546 || c == 555 || c == 594 || c == 596 || c == 598 || (c >= 600 && c < 603) || (c >= 604 && c < 616) || (c >= 688 && c < 693) || c == 694 || c == 695 || (c >= 699 && c < 704) || (c >= 741 && c < 746)); }
 INLINE bool IdxIsStaticObjectImmutable(int c) { return ((c >= 527 && c < 530) || (c >= 532 && c < 546) || (c >= 547 && c < 553) || c == 554 || (c >= 556 && c < 594) || c == 595 || c == 597 || c == 599 || c == 601 || c == 603 || (c >= 616 && c < 688) || c == 693 || c == 696 || c == 697 || c == 698 || (c >= 704 && c < 717) || c == 720 || (c >= 733 && c < 736) || (c >= 737 && c < 739) || c == 746 || c == 747 || (c >= 750 && c <= 759 && c != 755)); }
 INLINE float UsableOrDef(float cur, float def) { u32 c = *(u32*)&cur, d = *(u32*)&def; u32 m = 0 - ((c >> 31) | ((c & 0x7FFFFFFF) == 0)); u32 r = (m & d) | (~m & c); return *(float*)&r; }
+INLINE int Get16WeaponIndexFromConstIndex(int i) { return (i >= 36 && i <= 51) ? (i - 36)/*36:Mark3 AR*//*37:ER-90 Blaster*//*38:SV-23 Dartgun*//*39:AM-27 Flechette*//*40:RW-45 Ion Beam*//*41:TS-04 Laser Rapier*//*42:Lead Pipe*//*43:Magnum 2100*//*44:SB-20 Magpulse*//*45:ML-41 Pistol*//*46:LG-XX Plasma*//*47:MM-76 Railgun*//*48:DC-05 Riotgun*//*49:RF-07 Skorpion*//*50:Sparq Beam*//*51:DH-07 Stungun*/ : -1; }
+INLINE bool CurrentWeaponUsesEnergy(void) { int i = World.invP1.weaponIndex; return i==37 || i==40 || i==46 || i==50 || i==51; }
+u16 GetImpactType(u16 instanceIdx){switch(World.instances[instanceIdx].bloodType){case BloodType_None:return 729;/*SparksSmall*/case BloodType_Red:return 724;/*BloodSpurtSmall*/case BloodType_Yellow:return 723;/*BloodSpurtSmallYellow*/case BloodType_Green:return 722;/*BloodSpurtSmallGreen*/case BloodType_Robot:return 730;/*SparksSmallBlue*/case BloodType_Leaf:return 756;/*LeafBurst*/case BloodType_Mutation:return 757;/*MutationBurst*/case BloodType_GrayMutation:return 758;/*GraytationBurst*/}return 729;/*SparksSmall*/}
 
 void DualLogError(const char* fmt, ...); void DualLogWarn(const char* s, ...); void DualLog(const char* fmt, ...); bool cEmpty(const char c);
 

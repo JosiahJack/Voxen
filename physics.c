@@ -9,7 +9,7 @@ void SetPosition(u16 i, V3 newpos, bool teleport) { float d=V3_Dist(World.positi
 inline u32 PosGetCellCoordsP(i32 cx, i32 cz) { cx = clamp(cx,0,WORLDX_0BASED); cz = clamp(cz,0,WORLDX_0BASED); return (u32)cz * WORLDX + (u32)cx; }
 inline Manifold OverlapToManifold(Overlap r) { Manifold m = {0}; if (r.hit && r.pen > PHY_EPSILON) { m.normal = r.normal; m.n = 1; m.p[0] = (ManifoldPt){r.point, r.pen}; m.maxPen = r.pen; } return m; }
 inline Overlap SphSph(V3 a, float ar, V3 b, float br) { V3 delta=V3_AsubB(a,b); float d2=V3_dot(delta,delta), rs=ar + br; if (d2 >= rs * rs) return (Overlap){0}; float d = vsqrtf(vmax(d2, 0.0f)); V3 n = (d < PHY_EPSILON) ? (V3){0,1,0} : V3_ScaleByF(delta,1.0f/d); return (Overlap){true,V3_AplusB(b,V3_ScaleByF(n,br)),n,rs - d}; }
-inline Overlap SphCap(ShapeSphere s, ShapeCapsule c) { V3 seg = V3_AsubB(c.tip,c.base); float segLen2 = V3_dot(seg,seg); if (segLen2 < PHY_EPSILON){return SphSph(s.ctr,s.rad,c.base,c.rad);} V3 toS = V3_AsubB(s.ctr,c.base); float t = V3_dot(toS,seg) / segLen2; t = vclamp(t,0.0f,1.0f); V3 closest = V3_AplusB(c.base,V3_ScaleByF(seg, t)); return SphSph(s.ctr, s.rad, closest, c.rad); }
+Overlap SphCap(ShapeSphere s, ShapeCapsule c) { V3 seg = V3_AsubB(c.tip,c.base); float segLen2 = V3_dot(seg,seg); if (segLen2 < PHY_EPSILON){return SphSph(s.ctr,s.rad,c.base,c.rad);} V3 toS = V3_AsubB(s.ctr,c.base); float t = V3_dot(toS,seg) / segLen2; t = vclamp(t,0.0f,1.0f); V3 closest = V3_AplusB(c.base,V3_ScaleByF(seg, t)); return SphSph(s.ctr, s.rad, closest, c.rad); }
 float ClosestSegmentSegment(V3 a0, V3 a1, V3 b0, V3 b1, float *sc, float *tc) { // Closest point between two line segments A0-A1 and B0-B1.  Returns squared distance and writes sc, tc (parameters on each segment).
     V3 d1 = V3_AsubB(a1,a0), d2 = V3_AsubB(b1,b0), r = V3_AsubB(a0,b0);
     float a = V3_dot(d1,d1), e = V3_dot(d2,d2), f = V3_dot(d2,r); if (a < PHY_EPSILON && e < PHY_EPSILON) { *sc = *tc = 0.0f; return V3_dot(r,r); }
@@ -161,7 +161,7 @@ inline V3 SphSupport(ShapeSphere b, V3 d) { float L = V3_dot(d,d); return V3_Apl
 inline V3 BoxSupport(ShapeBox b, V3 d) { V3 x,y,z; obb_axes(b.rot,&x,&y,&z); float kx = V3_dot(d,x) >= 0.0f ? 1.0f : -1.0f, ky = V3_dot(d,y) >= 0.0f ? 1.0f : -1.0f, kz = V3_dot(d,z) >= 0.0f ? 1.0f : -1.0f; return V3_AplusB(V3_AplusB(V3_AplusB(b.ctr,V3_ScaleByF(x,kx*b.hExt.x)),V3_ScaleByF(y,ky*b.hExt.y)),V3_ScaleByF(z,kz*b.hExt.z)); }
 inline V3 CapsuleSupport(ShapeCapsule cap, V3 d) { float db = V3_dot(cap.base,d),dt = V3_dot(cap.tip,d); V3 best = (dt > db) ? cap.tip : cap.base; float L = V3_dot(d,d); if (L < PHY_EPSILON) {return best;} return V3_AplusB(best,V3_ScaleByF(d,cap.rad / vsqrtf(L))); }
 inline V3 TransformDirectionByInverseTranspose(const float* M, V3 dWorld) { V3 dLocal; dLocal.x = M[0] * dWorld.x + M[1] * dWorld.y + M[2] * dWorld.z; dLocal.y = M[4] * dWorld.x + M[5] * dWorld.y + M[6] * dWorld.z; dLocal.z = M[8] * dWorld.x + M[9] * dWorld.y + M[10] * dWorld.z; return dLocal; }
-inline V3 HullSupport(u16 m, const float* M, V3 dWorld) {
+V3 HullSupport(u16 m, const float* M, V3 dWorld) {
     u32 n = modelVertexCounts[m]; if(!n){return (V3){0,0,0};}
     V3 dLocal = TransformDirectionByInverseTranspose(M, dWorld); const u8* vb = modelVertices[m]; const u8* p = vb; V3 bestLocal = *(V3*)p; float top = V3_dot(bestLocal,dLocal);
     for (u32 i=1;i<n;++i) { p += CPU_VRT_SZ; V3 vLocal = *(V3*)p; float dot = V3_dot(vLocal,dLocal); if (dot > top) { top = dot; bestLocal = vLocal; } }
@@ -499,7 +499,7 @@ void Physics(float dt) {
     for (u8 s=0;s<substeps;++s) {
         mset(cellCounts,0,sizeof(cellCounts)); numTriggers=0;
         for (u16 t=0;t<128;++t) triggerVolumes[t]=0xFFFF;
-        for (u16 i=0;i<World.instCount;++i) {
+        for (u16 i=0;i<World.instCount;++i) { // 0. Broadphase cell lists
             posBudget[i] = 0.64f; World.instances[i].cellX=(i16)PosGetCellCoordX(World.position[i].x); World.instances[i].cellZ=(i16)PosGetCellCoordZ(World.position[i].z);
             World.instances[i].cellIndex=PosGetCellCoordsP(World.instances[i].cellX,World.instances[i].cellZ); World.radius[i] = GetColRad(i);
             u32 cell=(u32)World.instances[i].cellIndex; if(cell < WORLDX*WORLDX && cellCounts[cell] < 128){cellLists[cell][cellCounts[cell]++]=i;}
@@ -508,11 +508,13 @@ void Physics(float dt) {
         }
         if (numTriggers >= 127) DualLogWarn("Ran out of triggers!\n");
         for (u16 i=0;i<dynamicEntityCount;++i) { // 1. Integrate velocity
-            u16 a=dynamicEntities[i]; V3 acc = {0.0f,-9.81f * World.gravity[a],0.0f}; if ((a == PLAYER1) && Cheats.noclip) acc.y = 0.0f;
+            u16 a=dynamicEntities[i]; V3 acc = {0.0f,-9.81f * World.gravity[a],0.0f}; if ((a == PLAYER1) && (Cheats.noclip || World.invP1.ladderState > 0)) acc.y = 0.0f;
             acc = V3_AplusB(acc,V3_ScaleByF(World.instances[a].accumulatedForce,1.0f / World.mass[a])); World.velocity[a] = V3_AplusB(World.velocity[a],V3_ScaleByF(acc,dtsub));
             if (!V3_IsSane(World.velocity[a])) { World.velocity[a]=(V3){0.0f,0.0f,0.0f}; }
             else { float speed=V3_Mag(World.velocity[a]); if (speed > MAX_SPEED) World.velocity[a]=V3_ScaleByF(World.velocity[a],MAX_SPEED / speed); }
-            float linDrag = vexp(-2.0f * dtsub); World.velocity[a] = V3_ScaleByF(World.velocity[a],linDrag); SetPosition(a,V3_AplusB(World.position[a],V3_ScaleByF(World.velocity[a],dtsub)),false);
+            float linDrag = vexp(-0.1f * dtsub); 
+            V3 vel = World.velocity[a]; vel.x *= linDrag; vel.z *= linDrag; World.velocity[a] = vel; // Y axis is unaffected, so gravity accumulates infinitely until MAX_SPEED
+            SetPosition(a,V3_AplusB(World.position[a],V3_ScaleByF(World.velocity[a],dtsub)),false);
             if (World.collider[a] != COLTYPE_CAP) {
                 if (!V3_IsSane(World.angularVelocity[a])) { World.angularVelocity[a] = (V3){0.0f,0.0f,0.0f}; }
                 else {
@@ -598,24 +600,3 @@ void Physics(float dt) {
 }
 
 void AddForce(u16 i, V3 f, bool imp) { if (imp) { World.velocity[i] = V3_AplusB(World.velocity[i],V3_ScaleByF(f,1.0f / vmax(World.mass[i],0.001f))); } else { World.instances[i].accumulatedForce = V3_AplusB(World.instances[i].accumulatedForce,f); } }
-float GetBasePlayerSpeed(u16 p,bool running){
-    bool sprint=Sprint(); if(Cheats.noclip)return PLAYER_MAX_CYBER_SPEED*(sprint?2.5f:1.5f); if(World.curLev==LEVEL_CYBERSPACE)return PLAYER_MAX_CYBER_SPEED;
-    BodyState b=World.instances[p].bodyState; float v=WALK_SPEED;
-    switch(b){ case BodyState_CrouchingDown: case BodyState_Crouch:v=CROUCH_SPEED; break; case BodyState_Prone: case BodyState_ProningDown: case BodyState_ProningUp:v=PLAYER_MAX_PRONE_SPEED; break; default:break; }
-    if ((sprint||World.boosterActive) && running) { v = World.invP1.fatigue > 80.0f && World.boosterActive ? SPRINT_SPEED_FATIGUED : SPRINT_SPEED;
-    if (b==BodyState_Standing||b==BodyState_Crouch||b==BodyState_CrouchingDown)  v -= (WALK_SPEED-CROUCH_SPEED)*1.5f;
-    else if(b==BodyState_Prone||b==BodyState_ProningDown||b==BodyState_ProningUp)v -= (WALK_SPEED-PLAYER_MAX_PRONE_SPEED)*2.f;}
-    return v + (World.boosterActive ? PLAYER_BOOSTER_SPEED_BOOST : 0.0f);
-}
-
-void ApplyPlayerMovements() {
-    float h = (float)Forward() - (float)Backpedal(), s = (float)StrafeRight() - (float)StrafeLeft(), vertInput = (float)SwimUp() - (float)SwimDn();
-    Entity *p = &World.instances[PLAYER1]; Quaternion r = World.rotation[PLAYER1]; float y2 = r.y*r.y, xz = r.x*r.z, wy = r.w*r.y;
-    p->forward=V3_Normalize((V3){ 2.0f*(xz + wy), 2.0f*(r.y*r.z - r.w*r.x), 1.0f - 2.0f*(r.x*r.x + y2) }); p->right=V3_Normalize((V3){ 1.0f - 2.0f*(y2 + r.z*r.z), 2.0f*(r.x*r.y + r.w*r.z), 2.0f*(xz - wy) });
-    V3 inputDir = { p->forward.x*h + p->right.x*s, vertInput, p->forward.z*h + p->right.z*s }; float inputLenSq = V3_dot(inputDir,inputDir);
-    V3 w = (inputLenSq > PHY_EPSILON) ? V3_ScaleByF(inputDir, 1.0f / vsqrtf(inputLenSq)) : (V3){0,0,0};
-    float speed = GetBasePlayerSpeed(PLAYER1,inputLenSq > 0.01f) * 1.75f, accel = World.boosterActive ? 1.0f : 3.0f;
-    V3 targetVel = V3_ScaleByF(w,speed); if (vabs(vertInput) < 0.001f) targetVel.y = World.velocity[PLAYER1].y;
-    V3 dv = V3_AsubB(targetVel,World.velocity[PLAYER1]); dv = (V3){vclamp(dv.x,-10.0f,10.0f), vclamp(dv.y,-10.0f,10.0f), vclamp(dv.z,-10.0f,10.0f)};
-    World.velocity[PLAYER1] = V3_AplusB(World.velocity[PLAYER1],V3_ScaleByF(dv,accel * vclamp((float)World.deltaTime,0.0005f,0.1f)));
-}

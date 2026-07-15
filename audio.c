@@ -714,9 +714,9 @@ void ResetLevelAudio(void) { ambs=0; mset(ambReg,0,ambs * sizeof(u16)); for (u16
 // Music System
 #define BUFFER_MS 50
 #define AUD_BUFFER_T 0.05f
-const char* levelMusicLooped[14] = {"./Audio/music/looped/track0.mp3","./Audio/music/looped/track1.mp3","./Audio/music/looped/track2.mp3","./Audio/music/looped/track3.mp3","./Audio/music/looped/track4.mp3",
-                                    "./Audio/music/looped/track5.mp3","./Audio/music/looped/track6.mp3","./Audio/music/looped/track7.mp3","./Audio/music/looped/track8.mp3","./Audio/music/looped/track9.mp3",
-                                    "./Audio/music/looped/track10.mp3","./Audio/music/looped/track11.mp3","./Audio/music/looped/track12.mp3","./Audio/music/looped/track13.mp3"};
+const char* levelMusicLooped[MAX_LEVELS] = {"./Audio/music/looped/track0.mp3","./Audio/music/looped/track1.mp3","./Audio/music/looped/track2.mp3","./Audio/music/looped/track3.mp3","./Audio/music/looped/track4.mp3",
+                                            "./Audio/music/looped/track5.mp3","./Audio/music/looped/track6.mp3","./Audio/music/looped/track7.mp3","./Audio/music/looped/track8.mp3","./Audio/music/looped/track9.mp3",
+                                            "./Audio/music/looped/track10.mp3","./Audio/music/looped/track11.mp3","./Audio/music/looped/track12.mp3","./Audio/music/looped/track13.mp3"};
 const char* reactorMusic[13] = {"./Audio/music/THM4-01_reactorcombat1.mp3","./Audio/music/THM4-02_reactorcombat2.mp3","./Audio/music/THM4-03_reactorcombat3.mp3",
                                 "./Audio/music/THM4-04_reactorcombat4.mp3","./Audio/music/THM4-05_reactorwalkingatocombat.mp3","./Audio/music/THM4-06_reactorwalkingbtocombat.mp3",
                                 "./Audio/music/THM4-09_reactorwalkinga1.mp3","./Audio/music/THM4-10_reactorwalkinga2.mp3","./Audio/music/THM4-11_reactorwalkingb1.mp3",
@@ -754,19 +754,19 @@ const char* levelMusicElevator[13] = {"./Audio/music/THM7-01_elevator1.mp3","./A
                                       "./Audio/music/THM7-06_elevator6.mp3","./Audio/music/THM7-07_elevator7.mp3","./Audio/music/THM7-08_elevator8.mp3",
                                       "./Audio/music/THM7-01_elevator1.mp3","./Audio/music/THM7-01_elevator1.mp3","./Audio/music/THM7-01_elevator1.mp3",
                                       "./Audio/music/THM7-01_elevator1.mp3"};
-const char* levelMusicRevive[14] = {"./Audio/music/THM4-18_reactorrevive.mp3","./Audio/music/THM1-18_medicalrevive.mp3","./Audio/music/THM3-19_sciencerevive.mp3","./Audio/music/THM3-19_sciencerevive.mp3",
-                                    "./Audio/music/THM3-19_sciencerevive.mp3","./Audio/music/THM1-18_medicalrevive.mp3","./Audio/music/THM2-18_executiverevive.mp3","./Audio/music/THM4-18_reactorrevive.mp3",
-                                    "./Audio/music/THM6-22_securityrevive.mp3","./Audio/music/THM1-18_medicalrevive.mp3","./Audio/music/THM2-18_executiverevive.mp3","./Audio/music/THM2-18_executiverevive.mp3",
-                                    "./Audio/music/THM2-18_executiverevive.mp3","./Audio/music/THM1-18_medicalrevive.mp3"};
-const char* levelMusicDistortion[14] = {"./Audio/music/THM6-49_securitydistorted.mp3","./Audio/music/THM1-48_medicaldistorted.mp3","./Audio/music/THM3-49_sciencedistorted.mp3",
+const char* levelMusicRevive[MAX_LEVELS] = {"./Audio/music/THM4-18_reactorrevive.mp3","./Audio/music/THM1-18_medicalrevive.mp3","./Audio/music/THM3-19_sciencerevive.mp3","./Audio/music/THM3-19_sciencerevive.mp3",
+                                            "./Audio/music/THM3-19_sciencerevive.mp3","./Audio/music/THM1-18_medicalrevive.mp3","./Audio/music/THM2-18_executiverevive.mp3","./Audio/music/THM4-18_reactorrevive.mp3",
+                                            "./Audio/music/THM6-22_securityrevive.mp3","./Audio/music/THM1-18_medicalrevive.mp3","./Audio/music/THM2-18_executiverevive.mp3","./Audio/music/THM2-18_executiverevive.mp3",
+                                            "./Audio/music/THM2-18_executiverevive.mp3","./Audio/music/THM1-18_medicalrevive.mp3"};
+const char* levelMusicDistortion[MAX_LEVELS] = {"./Audio/music/THM6-49_securitydistorted.mp3","./Audio/music/THM1-48_medicaldistorted.mp3","./Audio/music/THM3-49_sciencedistorted.mp3",
                                         "./Audio/music/THM3-49_sciencedistorted.mp3","./Audio/music/THM1-48_medicaldistorted.mp3","./Audio/music/THM1-48_medicaldistorted.mp3",
                                         "./Audio/music/THM2-46_executivedistorted.mp3","./Audio/music/THM1-48_medicaldistorted.mp3","./Audio/music/THM6-49_securitydistorted.mp3",
                                         "./Audio/music/THM1-48_medicaldistorted.mp3","./Audio/music/THM1-48_medicaldistorted.mp3","./Audio/music/THM1-48_medicaldistorted.mp3",
                                         "./Audio/music/THM1-48_medicaldistorted.mp3","./Audio/music/THM10-41_cyberdistorted.mp3"};
-const char* levelMusicDeath[14] = {"./Audio/music/THM0-17_death.mp3","./Audio/music/THM1-17_death.mp3","./Audio/music/THM3-18_death.mp3","./Audio/music/THM0-17_death.mp3",
-                                   "./Audio/music/THM3-18_death.mp3","./Audio/music/THM0-17_death.mp3","./Audio/music/THM2-17_death.mp3","./Audio/music/THM0-17_death.mp3",
-                                   "./Audio/music/THM6-21_death.mp3","./Audio/music/THM0-17_death.mp3","./Audio/music/THM5-17_death.mp3","./Audio/music/THM5-17_death.mp3",
-                                   "./Audio/music/THM5-17_death.mp3","./Audio/music/THM10-16_death.mp3"};
+const char* levelMusicDeath[MAX_LEVELS] = {"./Audio/music/THM0-17_death.mp3","./Audio/music/THM1-17_death.mp3","./Audio/music/THM3-18_death.mp3","./Audio/music/THM0-17_death.mp3",
+                                           "./Audio/music/THM3-18_death.mp3","./Audio/music/THM0-17_death.mp3","./Audio/music/THM2-17_death.mp3","./Audio/music/THM0-17_death.mp3",
+                                           "./Audio/music/THM6-21_death.mp3","./Audio/music/THM0-17_death.mp3","./Audio/music/THM5-17_death.mp3","./Audio/music/THM5-17_death.mp3",
+                                           "./Audio/music/THM5-17_death.mp3","./Audio/music/THM10-16_death.mp3"};
 void PlayMenuMusic(void) { mp3_clear(); play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500); }
 void PlayGameMusic(void) { mp3_clear(); /*play_mp3("./Audio/music/THM1-19_medicalstart.mp3",100);*/ }
 const char* GetCorrespondingLevelClip(TrackType ttype) {
@@ -776,7 +776,6 @@ const char* GetCorrespondingLevelClip(TrackType ttype) {
         case TrackType_Elevator:   return levelMusicElevator[World.curLev];
         case TrackType_Distortion: return levelMusicDistortion[World.curLev];
     }
-
     if (World.curLev == 0 || World.curLev == 5 || World.curLev == 7) { // 0  REACTOR, 5 FLIGHT, 7 ENGINEERING
         if (World.Sys_Music.levelEntry) return reactorMusic[6];
         if (ttype == TrackType_Combat)  return reactorMusic[random_range_u8(0,6)];
@@ -807,7 +806,6 @@ const char* GetCorrespondingLevelClip(TrackType ttype) {
         if (random_range(0.0f,1.0f) < 0.5f) return cyberMusic[random_range_u8(1,5)];
         else                                return cyberMusic[8];
     }
-
     return levelMusicLooped[0];
 }
 

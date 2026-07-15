@@ -1176,7 +1176,7 @@
 		ResetMultiMediaTabs();
 		startingSubTab.SetActive(true);
 		multiMediaHeaderLabel.text = "LOGS";
-		lastMultiMediaTabOpened = MULTI_MEDIA_TAB_LOG_TABLE;
+		lastMultiMediaTabOpened = MM_LOG_TABLE;
 		ersbLH.SetEReaderSectionsButtonsHighlights(1);
 		ersbRH.SetEReaderSectionsButtonsHighlights(1);
 	}
@@ -1207,7 +1207,7 @@
 		ResetMultiMediaTabs();
 		emailTab.SetActive(true);
 		multiMediaHeaderLabel.text = "EMAIL";
-		lastMultiMediaTabOpened = MULTI_MEDIA_TAB_EMAIL_TABLE;
+		lastMultiMediaTabOpened = MM_EMAIL_TABLE;
 		ersbLH.SetEReaderSectionsButtonsHighlights(0);
 		ersbRH.SetEReaderSectionsButtonsHighlights(0);
 	}
@@ -1220,7 +1220,7 @@
 		dataTab.SetActive(true);
 		World.invP1.hasNewData = false;
 		multiMediaHeaderLabel.text = "DATA";
-		lastMultiMediaTabOpened = MULTI_MEDIA_TAB_DATA_TABLE;
+		lastMultiMediaTabOpened = MM_DATA_TABLE;
 		ersbLH.SetEReaderSectionsButtonsHighlights(2);
 		ersbRH.SetEReaderSectionsButtonsHighlights(2);
 	}
@@ -1233,7 +1233,7 @@
 		notesTab.SetActive(true);
 		World.invP1.hasNewNotes = false;
 		multiMediaHeaderLabel.text = "NOTES";
-		lastMultiMediaTabOpened = MULTI_MEDIA_TAB_NOTES;
+		lastMultiMediaTabOpened = MM_NOTES;
 		ersbLH.SetEReaderSectionsButtonsHighlights(3);
 		ersbRH.SetEReaderSectionsButtonsHighlights(3);
 	}

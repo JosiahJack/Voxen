@@ -141,20 +141,6 @@ u32 rand() { return xs32() & 0xFFFFu; }
 #define RAND_MAX 65535
 float lerp(float min, float max, float val) { return min + (max - min) * vclamp(val,0.0f,1.0f); }
 float inverse_lerp(float min, float max, float val) { return (min == max) ? 0.0f : vclamp((val - min) / (max - min),0.0f,1.0f); }
-float smooth_damp(float current, float target, float *current_velocity, float smooth_time) { 
-    if (smooth_time < 0.0001f) smooth_time = 0.0001f;
-    float omega = 2.0f / smooth_time;
-    float x = omega * (float)World.deltaTime;
-    float exp = 1.0f / (1.0f + x + 0.48f * x * x + 0.235f * x * x * x);
-    float change = current - target, original_to = target;
-    target = current - change;
-    float temp = (*current_velocity + omega * change) * (float)World.deltaTime;
-    *current_velocity = (*current_velocity - omega * temp) * exp;
-    float output = target + (change + temp) * exp;
-    if ((original_to - current > 0.0f) == (output > original_to)) { output=original_to; *current_velocity=(output - original_to) / (float)World.deltaTime; }
-    return output;
-}
-
 FHandle levelFileHandle;
 char* sLevelFileUpToEndLine(char* buf, int size) { return sUpToEndLine(buf,size,levelFileHandle); }
 V3 GetLocalTransformedPos(Entity* originator, V3 offsetFromOriginator) { u16 idx=(u16)(originator - World.instances); V3 scaledOfs = mul_v3_v3_elementwise(offsetFromOriginator,World.scale[idx]); V3 rotatedOfs = quat_rot_v3(World.rotation[idx],scaledOfs); V3 result = V3_AplusB(World.position[idx],rotatedOfs); return result; }

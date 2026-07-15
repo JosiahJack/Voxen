@@ -1,11 +1,5 @@
 // citadel.c - Gamelogic.  Most functionality is trivial so put it here.
-// TODO: Add camera view entities for other levels than just medical
-// TODO: Particle system
-// TODO: Voxel GI?
-// TODO: Directional lights for cyberspace
-// TODO: Directional light for sunlight
-// TODO: Directional light shadowmapping just for sunlight
-// TODO: TARGET ID: Type-LevelNum(0#)EnemyNum(###),Example: Mutant-06003, EXCEPTIONS: Cyborg-00001 is Edward Diego
+// TODO: Add camera view entities for other levels than just medical, Particle system, Voxel GI?, Directional lights for cyberspace, Directional light for sunlight, Directional light shadowmapping just for sunlight, TARGET ID: Type-LevelNum(0#)EnemyNum(###),Example: Mutant-06003, EXCEPTIONS: Cyborg-00001 is Edward Diego
 __attribute__((used)) AutoSplitterData autoSplitter = {0x1337133713371337,0,false,0}; // Fore use with LiveSplit or other future speedrunner utilities for doing speedruns
 V3 ScreenPointToRay(V3 fwd, V3 rt) {
     float ndcX =  ((World.inventoryMode ? World.cursorPosition_x : 683.0f) - 683.0f) / 384.0f; // Normalize both axes by half-height 384 so aspect handled naturally
@@ -109,18 +103,17 @@ bool JumpJetsActive()     { return (World.invP1.hasHardware & HW_JET) && (World.
 // HideBioMonitor / UnHideBioMonitor: engine reads InventoryBioMonitorActive() for HUD visibility, no gamecode needed
 bool AddGeneralObjectToInventory(int index,int customIndex) {
     if (index < 0) return false;
-    for (int i = 1; i < 14; i++) {
+    for (int i=1;i<14;++i) {
         if (World.invP1.generalInventoryIndexRef[i] != -1) continue;
         if (!InventoryHasAnyAccessCards() && World.invP1.generalInvCurrent == 0) World.invP1.generalInvCurrent = (i8)i;
         World.invP1.generalInventoryIndexRef[i] = index;
-        World.invP1.generalInvCustomIndex[i]    = (i16)customIndex;
+        World.invP1.generalInvCustomIndex[i] = (i16)customIndex;
         CenterStatusPrint("%s%s",Sys_Text.stringTable[index + 326],Sys_Text.stringTable[31]);
         return true;
     }
     return false;
 }
 
-void GeneralInventoryActivate() { int cur=World.invP1.generalInvCurrent; if(cur < 0 || cur >= 14){DualLog("BUG: generalInvCurrent out of range at %d",cur); return;} GeneralInvApply(cur,World.invP1.generalInvCustomIndex[cur]); if(cur != 0)World.invP1.generalInventoryIndexRef[cur]=-1; }
 void GrenadeCycleDown() {
     int last = World.invP1.grenadeCurrent, next = last - 1; if (next < 0) next=6;
     for (int c = 0; c <= 13; c++) { if (World.invP1.grenAmmo[next] > 0){break;} if (c == 13){return;} if (--next < 0){next = 6;} }
@@ -638,95 +631,7 @@ void ButtonSwitchUpdate(u16 self) {
 }
 
 void ButtonSwitchTargetted(u16 self, u16 activator) { ButtonSwitchUse(self,activator); }
-// HealingBed
-void HealingBedUse(u16 self, u16 owner) {
-    Entity* e = &World.instances[self];
-    if (GetCurrentLevelSecurity() <= (u8)e->minSecurityLevel) {
-        if (!e->broken) {
-            HealthManagerHealingBed(PLAYER1,e->amount,true);
-            CenterStatusPrint("%s",Sys_Text.stringTable[23],owner);
-            play_wav(sounds[103],1.0f,World.position[self],false);
-        } else CenterStatusPrint("%s",Sys_Text.stringTable[24],owner);
-    } else UIBlockedBySecurity(World.position[self]);
-}
-// TargetIO
-// UseTargets: Level-agnostic target I/O.  Iterates over ALL loaded levels (0..numLevels-1), and for each level swaps the active-level pointers (World.instances, World.position, etc.) to that level
-// via SetLevelPointers(), then searches the level's instances for any whose .targetname matches `targetname` and calls Targetted(activator, i) for each match.  After all levels have been
-// iterated, swaps the pointers back to the entry level (the level that was active when UseTargets was called).
-//
-// The activator entity lives in the entry level, but when we swap pointers to other levels the activator's index is no longer valid in those levels' instances arrays.  To handle this, the
-// outermost UseTargets call caches the activator entity + ioflags into World.targetIOActivatorEntity / World.targetIOActivatorIoflags, and Targetted() reads from those cached fields instead of
-// World.instances[activator] when World.targetIOActive is true.  This lets all the downstream target functions (DoorUse, ButtonSwitchUse, etc.) keep using World.instances[activator] indexing 
-// unchanged — they "still just think everything is in instances[]".
-//
-// Recursion: target functions (e.g. DoorUse → UseTargets) may recursively call UseTargets.  The `targetIOActive` flag ensures only the outermost UseTargets caches the activator and restores 
-// the entry level.  Inner (recursive) UseTargets calls save/restore their own entry level so the outer iteration's level state is preserved across the recursion.
-void UseTargets(u16 activator, const char* targetname) {
-    if (sEmpty(targetname)) return;
-
-    // If this is the outermost UseTargets call, cache the activator entity + ioflags and record the entry level so we can restore the pointers when we're done.  Inner recursive calls skip the
-    // caching (the outer call's cache is still valid) but still save/restore their own entry level.
-    bool wasActive = World.targetIOActive;
-    u8 entryLevel = World.currentLevel;
-    if (!wasActive) {
-        World.targetIOActive = true;
-        World.targetIOEntryLevel = entryLevel;
-        World.targetIOActivatorIdx = activator;
-        World.targetIOActivatorEntity = World.instances[activator]; // Full snapshot — valid even after pointer swaps.
-        World.targetIOActivatorIoflags = World.instances[activator].ioflags;
-    }
-
-    bool succeeded = false;
-    // Iterate every loaded level.  Entities in other levels won't update with this system until their level loads (e.g. a door that was targetted will have its state set to opening but not
-    // actually open until the player loads into that level) — this is the desired behavior.
-    for (u8 lev = 0; lev < World.numLevels; ++lev) {
-        if (World.currentLevel != lev) SetLevelPointers(lev); // Swap the active-level pointers to this level if they aren't already pointing at it.
-        for (u16 i = INSTS_1ST_IDX; i < World.instCount; i++) {
-            if (!sEqual(World.instances[i].targetname,targetname)) continue;
-            DualLog("Successfully found matching targetname %s for entity %u (level %u) and activator ioflags:%u\n",targetname,i,lev,World.targetIOActivatorIoflags);
-            Targetted(activator,i);
-            succeeded = true;
-        }
-    }
-
-    // Restore the active-level pointers to the level that was active on entry to this UseTargets call.  For the outermost call this is the player's current level (World.curLev); for a recursive call this is whatever level the outer iteration was on when the recursion happened.
-    if (World.currentLevel != entryLevel) SetLevelPointers(entryLevel);
-    if (!succeeded) DualLogWarn("Failed to find a matching targetname for %s\n",targetname);
-    if (!wasActive) World.targetIOActive = false; // Only the outermost UseTargets call clears the cache.
-}
-
-void TriggerTargetted(u16 self, u16 activator) { if (World.instances[self].ignoreSecondaryTriggers) World.instances[self].recentMostActivator = activator; }
-void Targetted(u16 activator, u16 self) {
-    Entity* e = &World.instances[self];
-    // When inside cross-level target I/O (World.targetIOActive), the `activator` index is only
-    // valid in the entry level — after a pointer swap it would dereference the wrong entity in the
-    // currently-pointed-to level.  Use the cached snapshot instead.  In normal (non-cross-level)
-    // usage, World.instances[activator] is still correct.
-    u32 aioflags = World.targetIOActive ? World.targetIOActivatorIoflags : World.instances[activator].ioflags;
-    DualLog("Targetted running with a->ioflags:%u, e->index:%u, door conditions:%u\n",aioflags,e->index,((aioflags & TARG_IOFLAGS_DOOROPEN) && IdxIsDoor(e->index)));
-    if (e->index == 709) { CenterStatusPrint("%s",Sys_Text.stringTable[e->messageLingdex]); return; } // info_message
-    if (e->index == 708) { World.gameFinished = true; return; }
-    if (e->index == 707 /*info_email*/) EmailTargetted(self,activator);
-    if (aioflags & TARG_IOFLAGS_TRIPTRIGGER) { if (e->index == 598 || e->index == 600) {TriggerTargetted(self,activator);} else if (e->index == 594) {TriggerCounterTargetted(self,activator);} }
-    if (aioflags & TARG_IOFLAGS_UNLOCK) EntitySetLocked(e,false);
-    if ((aioflags & TARG_IOFLAGS_LOCK) && IdxIsDoor(e->index)) EntitySetLocked(e,true);
-    if (IdxIsButtonSwitch(e->index)) ButtonSwitchTargetted(self,activator);
-    if ((aioflags & TARG_IOFLAGS_DOOROPEN) && IdxIsDoor(e->index)) { DualLog("Running DoorForceOpen from ioflag DOOROPEN on entity %u\n",self); DoorForceOpen(self); }
-    else if ((aioflags & TARG_IOFLAGS_DOOROPENIFUNLOCKED) && IdxIsDoor(e->index) && ((e->entflags & EF_LOCKED) == 0) && (e->requiredAccessCard == AccessCardType_None || (World.invP1.accessCardOwned & (1u << e->requiredAccessCard)))) DoorForceOpen(self);
-    else if ((aioflags & TARG_IOFLAGS_DOORCLOSE) && IdxIsDoor(e->index)) DoorForceClose(self);
-    else if (IdxIsDoor(e->index)) DoorTargetted(self,activator);
-    if (aioflags & TARG_IOFLAGS_FBRIDGE_ACTIVATE) ForceBridgeActivate(self,false);
-    else if (aioflags & TARG_IOFLAGS_FBRIDGE_DEACTIVATE) ForceBridgeDeactivate(self,false);
-    else if (aioflags & TARG_IOFLAGS_FBRIDGE_TOGGLE) ForceBridgeToggle(self);
-    if (aioflags & TARG_IOFLAGS_GRAVLIFT_TOGGLE) GravityLiftToggle(self);
-    if (aioflags & TARG_IOFLAGS_TEXTURE_CHG_TOGGLE) TextureChangerToggle(self);
-    if (aioflags & TARG_IOFLAGS_FUNCWALL_MOVE) FuncWallTargetted(self);
-    if (aioflags & TARG_IOFLAGS_SWITCH_LOCK_TOGGLE) EntitySetLocked(e,(e->entflags & EF_LOCKED) == 0);
-    if (aioflags & TARG_IOFLAGS_INST_ACTIVATE) flag_set(&e->entflags,EF_ACTIVE,true);
-    else if (aioflags & TARG_IOFLAGS_INST_DEACTIVATE) flag_set(&e->entflags,EF_ACTIVE,false);
-    else if (aioflags & TARG_IOFLAGS_INST_TOGGLE) flag_set(&e->entflags,EF_ACTIVE,!(e->entflags & EF_ACTIVE));
-}
-//=============================================================================
+void HealingBedUse(u16 self, u16 owner) { Entity* e=&World.instances[self]; if (GetCurrentLevelSecurity() <= (u8)e->minSecurityLevel) { if(!e->broken){HealthManagerHealingBed(PLAYER1,e->amount,true); CenterStatusPrint("%s",Sys_Text.stringTable[23],owner); play_wav(sounds[103],1.0f,World.position[self],false);} else {CenterStatusPrint("%s",Sys_Text.stringTable[24],owner);} } else UIBlockedBySecurity(World.position[self]); }
 // VaporizeButton
 void VaporizeClick(void) {
     World.Sys_UI.mouseClickHeldOverGUI = true;
@@ -851,9 +756,9 @@ u8 OverloadButtonVisualState(void) { if (World.invP1.currentEnergyWeaponHeat[Wor
 #define TARGETID_DAMAGE_TIME_MISS 1.0f
 float TargetIDGetSensingRange(bool manual) { u8 ver = World.invP1.hardwareVersion[HW_TID_IDX]; if (manual) {return (ver >= 4) ? 18.0f : 13.0f;} return (ver <= 2) ? 0.0f : ((ver == 3) ? 13.0f : 20.0f); }
 float TargetIDGetTetherRange(void) { return (World.invP1.hardwareVersion[HW_TID_IDX] >= 4) ? 22.0f : 15.0f; }
-static void TargetIDDeactivate(u16 self) { Entity* e=&World.instances[self]; if(e->enemy != WORLD){Entity* npc=&World.instances[e->enemy]; flag_set(&npc->entflags,EF_TARGID_ATTACHED,false); e->enemy=NULLENT;} e->textIndex=-1; flag_set(&e->entflags,EF_ACTIVE,false); }
+static void TargetIDDeactivate(u16 self) { Entity* e=&World.instances[self]; if(e->enemy != WORLD){Entity* npc=&World.instances[e->enemy]; flag_set(&npc->entflags,EF_TARGID_ATTACHED,false); e->enemy=WORLD;} e->textIndex=-1; flag_set(&e->entflags,EF_ACTIVE,false); }
 void TargetIDSendDamageReceive(u16 self,float damage,AttType attackType) {
-    Entity* e = &World.instances[self]; if (e->enemy == NULLENT) return;
+    Entity* e = &World.instances[self]; if (e->enemy == WORLD) return;
     Entity* npc = &World.instances[e->enemy];
     if (attackType == Att_Trnq) { e->textIndex=536;/*STUNNED*/ e->animSwapFinished=World.pauseRelativeTime - 1.0;/*expire damage text*/ }
     else {
@@ -870,7 +775,7 @@ void TargetIDSendDamageReceive(u16 self,float damage,AttType attackType) {
 void TargetIDUpdate(u16 self) {
     Entity* e = &World.instances[self];
     if (!(e->entflags & EF_ACTIVE)) return;
-    if (e->enemy == NULLENT) { TargetIDDeactivate(self); return; }
+    if (e->enemy == WORLD) { TargetIDDeactivate(self); return; }
     Entity* npc = &World.instances[e->enemy];
     if (npc->health <= 0.0f) { TargetIDDeactivate(self); return; }
     if (V3_Dist(World.position[self],World.position[PLAYER1]) > TARGETID_LINK_DIST) { TargetIDDeactivate(self); return; }
@@ -886,15 +791,15 @@ void TargetIDUpdate(u16 self) {
 // PlayerEnergy
 static const float  hwDrain[12][4] = {[3]={0.01535f,0.03413f,0.02559f,0.0f},[5]={0.04096f,0.10239f,0.17919f,0.05119f},[6]={0.001706f,0.0f,0.0f,0.0f},[7]={0.02559f,0.04266f,0.05119f,0.0f},[9]={0.0f,0.02f,0.015f,0.0f},[11]={0.08533f,0.0f,0.0f,0.0f},};
 static const u16 hwDrainJPM[12][4] = {[3]={9,20,15,0},[5]={24,60,105,30},[6]={1,0,0,0},[7]={15,25,30,0},[9]={0,16,12,0},[11]={50,0,0,0},};
-void CreateTargetIDInstance(float damage, u16 hitIdx, float tranq) { if (hitIdx == NULLENT || hitIdx >= World.instCount) return; Entity* npc = &World.instances[hitIdx]; if (!(npc->entflags & EF_ACTIVE) || (npc->entflags & EF_TARGID_ATTACHED)) return; if (V3_Dist(World.position[hitIdx], World.position[PLAYER1]) > TargetIDGetTetherRange()) return; u16 tidIdx = SpawnDynamicObject(736, false); if (tidIdx == NULLENT || tidIdx == U16_MAX) return; Entity* tid = &World.instances[tidIdx]; tid->enemy = hitIdx; tid->tickFinished = World.pauseRelativeTime + 4.0; tid->textIndex = (tranq >= 0.0f) ? 536 : -1; tid->animSwapFinished = World.pauseRelativeTime + (tranq >= 0.0f ? 2.5 : 0.0); World.position[tidIdx] = World.position[hitIdx]; flag_set(&tid->entflags, EF_ACTIVE, true); flag_set(&npc->entflags, EF_TARGID_ATTACHED, true); if (damage > 0.0f) TargetIDSendDamageReceive(tidIdx, damage, Att_None); }
+void CreateTargetIDInstance(float damage, u16 hitIdx, float tranq) { if (hitIdx == WORLD || hitIdx >= World.instCount) return; Entity* npc = &World.instances[hitIdx]; if (!(npc->entflags & EF_ACTIVE) || (npc->entflags & EF_TARGID_ATTACHED)) return; if (V3_Dist(World.position[hitIdx], World.position[PLAYER1]) > TargetIDGetTetherRange()) return; u16 tidIdx = SpawnDynamicObject(736, false); if (tidIdx == WORLD || tidIdx == U16_MAX) return; Entity* tid = &World.instances[tidIdx]; tid->enemy = hitIdx; tid->tickFinished = World.pauseRelativeTime + 4.0; tid->textIndex = (tranq >= 0.0f) ? 536 : -1; tid->animSwapFinished = World.pauseRelativeTime + (tranq >= 0.0f ? 2.5 : 0.0); World.position[tidIdx] = World.position[hitIdx]; flag_set(&tid->entflags, EF_ACTIVE, true); flag_set(&npc->entflags, EF_TARGID_ATTACHED, true); if (damage > 0.0f) TargetIDSendDamageReceive(tidIdx, damage, Att_None); }
 static void TargetIdentifierSenseTargets(void) {
     for (u16 i = INSTS_1ST_IDX; i < World.instCount; i++) {
         Entity* e = &World.instances[i];
-        if (!(e->entflags & EF_ACTIVE))         continue;
+        if (!(e->entflags & EF_ACTIVE))       continue;
         if (!IdxIsNPC(e->index))              continue;
-        if (e->entflags & EF_DEAD)              continue;
-        if (e->entflags & EF_TARGID_ATTACHED)   continue;
-        if (V3_Dist(World.position[i],World.position[PLAYER1]) > TargetIDGetSensingRange(false))        continue;
+        if (e->entflags & EF_DEAD)            continue;
+        if (e->entflags & EF_TARGID_ATTACHED) continue;
+        if (V3_Dist(World.position[i],World.position[PLAYER1]) > TargetIDGetSensingRange(false)) continue;
         CreateTargetIDInstance(0.0f, i, -1.0f);
     }
 }
@@ -947,6 +852,7 @@ void GeneralInvUse(int buttonIdx,int customIdx) {
     (void)customIdx; (void)itemIdx;
 }
 
+void GeneralInvClick(int buttonIdx,int customIdx) { World.Sys_UI.mouseClickHeldOverGUI = true; GeneralInvUse(buttonIdx,customIdx); }
 void GeneralInvApply(int buttonIdx,int customIdx) {
     if (buttonIdx == 0) { return; } // TODO: World.Sys_UI.SendInfoToItemTab(81), OpenTab access cards — MFDManager
     World.invP1.hardwareInvCurrent = buttonIdx;
@@ -958,13 +864,12 @@ void GeneralInvApply(int buttonIdx,int customIdx) {
         default: World.invP1.hardwareInvCurrent = buttonIdx; (void)customIdx; break; // TODO: World.Sys_UI.SendInfoToItemTab(itemIdx,customIdx), OpenTab — MFDManager
     }
 }
-
-void GeneralInvClick(int buttonIdx,int customIdx) { World.Sys_UI.mouseClickHeldOverGUI = true; GeneralInvUse(buttonIdx,customIdx); }
 void GeneralInvDoubleClick(int buttonIdx,int customIdx) { World.Sys_UI.mouseClickHeldOverGUI = true; GeneralInvApply(buttonIdx,customIdx); }
+void GeneralInventoryActivate() { int cur=World.invP1.generalInvCurrent; if(cur < 0 || cur >= 14){DualLog("BUG: generalInvCurrent out of range at %d",cur); return;} GeneralInvApply(cur,World.invP1.generalInvCustomIndex[cur]); if(cur != 0)World.invP1.generalInventoryIndexRef[cur]=-1; }
 // GrenadeActivate
 static bool GrenadeIsNPCMine(u16 self) { return World.layer[self] != L_PlayerBullets; }
 void ApplyImpactForce(u16 target, float vel, V3 normal, V3 pt) {
-    if (target == NULLENT || target >= World.instCount || vel <= 0.0f) return;
+    if (target == WORLD || target >= World.instCount || vel <= 0.0f) return;
     Entity* e = &World.instances[target]; if (e->entflags & EF_DEAD) return;
     if (!(e->entflags & EF_RIGIDBODY) && target != PLAYER1) return;
     V3 n = V3_Normalize(normal); if (V3_Mag(n) < 0.0001f) {n = (V3){0.0f,1.0f,0.0f};/*At least make it pop off the floor*/} AddForce(target,V3_ScaleByF(n,vel),true);
@@ -986,10 +891,10 @@ void ApplyImpactForceSphere(DamageData* dd, V3 center, float radius, float baseV
     }
 }
 
-void SpawnExplosionEffect(V3 pos, int explosionType) { static const u16 prefabs[6] = {729,730,731,732,733,734}; int idx = (explosionType >= 0 && explosionType < 6) ? explosionType : 2; u16 fx = SpawnDynamicObject(prefabs[idx], false); if (fx == NULLENT || fx == U16_MAX) return; World.position[fx] = pos; Entity* e = &World.instances[fx]; flag_set(&e->entflags, EF_ACTIVE, true); if (e->delay <= 0.0f) e->delay = 0.8f; e->delayFinished = World.pauseRelativeTime + e->delay; }
+void SpawnExplosionEffect(V3 pos, int explosionType) { static const u16 prefabs[6] = {729,730,731,732,733,734}; int idx = (explosionType >= 0 && explosionType < 6) ? explosionType : 2; u16 fx = SpawnDynamicObject(prefabs[idx], false); if (fx == WORLD || fx == U16_MAX) return; World.position[fx] = pos; Entity* e = &World.instances[fx]; flag_set(&e->entflags, EF_ACTIVE, true); if (e->delay <= 0.0f) e->delay = 0.8f; e->delayFinished = World.pauseRelativeTime + e->delay; }
 void GrenadeExplode(u16 self) {
     Entity* e = &World.instances[self];
-    DamageData dd = {.damage=e->damage,.penetration=e->strength,.offense=e->speed,.armorvalue=0.0f,.defense=0.0f,.impactVelocity=e->damage*1.5f,.attacknormal=(V3){0.0f,1.0f,0.0f},.hitpoint=World.position[self],.attackType=e->attackType,.owner=e->recentMostActivator,.hitIdx=NULLENT,.isOtherNPC=false,.berserkActive=(World.invP1.patchActive & PATCH_BERSERK) != 0};
+    DamageData dd = {.damage=e->damage,.penetration=e->strength,.offense=e->speed,.armorvalue=0.0f,.defense=0.0f,.impactVelocity=e->damage*1.5f,.attacknormal=(V3){0.0f,1.0f,0.0f},.hitpoint=World.position[self],.attackType=e->attackType,.owner=e->recentMostActivator,.hitIdx=WORLD,.isOtherNPC=false,.berserkActive=(World.invP1.patchActive & PATCH_BERSERK) != 0};
     float radius = (e->strength > 0.0f) ? e->strength : 4.0f;
     ApplyImpactForceSphere(&dd, World.position[self], radius, e->damage * 1.5f);
     if (!GrenadeIsNPCMine(self)) { Entity* p = &World.instances[PLAYER1]; p->noiseFinished = World.pauseRelativeTime + 2.0; }
@@ -1024,10 +929,10 @@ void GrenadeUpdate(u16 self) { Entity* e = &World.instances[self]; if ((i16)e->i
 void GrenadeOnCollision(u16 self) { if (World.instances[self].grenadeExplodeContact) GrenadeExplode(self); }
 // ProjectileEffectImpact
 float GetDamageTakeAmount(DamageData* dd) { if (!dd) return 0.0f; float take = dd->damage; if (take <= 0.0f) return 0.0f; if (dd->berserkActive) take *= BERSERK_DAMAGE_MULTIPLIER; if (dd->defense > 0.0f && dd->offense < dd->defense) { float r = (dd->defense - dd->offense) / dd->defense; if (r > 0.85f) r = 0.85f; take *= (1.0f - r); } if (dd->armorvalue > 0.0f && dd->penetration < dd->armorvalue) { float a = (dd->armorvalue - dd->penetration) / dd->armorvalue; if (a > 0.85f) a = 0.85f; take *= (1.0f - a); } if (take < 0.0f) take = 0.0f; return take; }
-void SpawnImpactEffect(u16 impactType, V3 pos) { if (impactType == 0 || impactType == U16_MAX) return; u16 fx = SpawnDynamicObject(impactType, false); if (fx == NULLENT || fx == U16_MAX) return; World.position[fx] = pos; Entity* e = &World.instances[fx]; flag_set(&e->entflags, EF_ACTIVE, true); if (e->itemLifeTime <= 0.0f) e->itemLifeTime = 1.0f; e->delayFinished = World.pauseRelativeTime + e->itemLifeTime; }
+void SpawnImpactEffect(u16 impactType, V3 pos) { if (impactType == 0 || impactType == U16_MAX) return; u16 fx = SpawnDynamicObject(impactType, false); if (fx == WORLD || fx == U16_MAX) return; World.position[fx] = pos; Entity* e = &World.instances[fx]; flag_set(&e->entflags, EF_ACTIVE, true); if (e->itemLifeTime <= 0.0f) e->itemLifeTime = 1.0f; e->delayFinished = World.pauseRelativeTime + e->itemLifeTime; }
 void ExitCyberspace(void) { UIExitCyberspace(); if (World.curLev != LEVEL_CYBERSPACE) return; if (World.instances[PLAYER1].cyberHealth <= 0.0f) World.instances[PLAYER1].cyberHealth = 1.0f; LoadLevel(World.startLevel < World.numLevels ? World.startLevel : 0, (V3){0.0f,0.0f,0.0f}/*TODO Remember level and location player left to enter cyberspace!*/); }
 void ReduceCurrentLevelSecurity(SecurityType stype) { // Typical level: 4 CPU nodes. 20 cameras, 100% = 4x + 20y.  Assuming that a good camera percentage is 2-3%, CPU % would be about 10-15 each
-    u8 lev = World.curLev; if (lev >= MAX_LEVELS || stype == SecurityType_None) return;
+    u8 lev = World.curLev; if (lev >= 14 || stype == SecurityType_None) return;
     const float camScore=4.0f, nodeSmallScore=10.0f, nodeLargeScore=27.0f;
     float total = (World.levelCameraCount[lev]*camScore)+(World.levelSmallNodeCount[lev]*nodeSmallScore)+(World.levelLargeNodeCount[lev]*nodeLargeScore);
     if (total <= 0.0f) return;
@@ -1048,8 +953,7 @@ void ReduceCurrentLevelSecurity(SecurityType stype) { // Typical level: 4 CPU no
 #pragma GCC diagnostic ignored "-Wunused-function"
 float Tranquilize(u16 i, float amount, bool energy);
 static void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 hitNormal) {
-    Entity* e   = &World.instances[self];
-    if (hitIdx == e->recentMostActivator) return; // hit own host, ignore
+    Entity* e = &World.instances[self]; if (hitIdx == e->recentMostActivator) return; // hit own host, ignore
     e->counter++;
     DamageData dd = {.damage=e->damage,.penetration=e->strength,.offense=e->speed,.armorvalue=0.0f,.defense=0.0f,.impactVelocity= e->damage * 1.5f,.attacknormal=hitNormal,.hitpoint=hitPos,.attackType=e->attackType,.owner=e->recentMostActivator,.hitIdx=hitIdx,.isOtherNPC=IdxIsNPC(World.instances[hitIdx].index),.berserkActive=(World.invP1.patchActive & PATCH_BERSERK) != 0};
     Entity* hit = &World.instances[hitIdx];
@@ -1060,28 +964,18 @@ static void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 
         if (e->counter < e->countToTrigger) dd.damage *= 0.85f; // per-hit falloff
         dd.impactVelocity = dd.damage * 1.5f;
         if (e->counter > 0) dd.impactVelocity /= 3.0f;
-        if (World.curLev != LEVEL_CYBERSPACE && e->recentMostActivator == PLAYER1) {
-            ApplyImpactForce(hitIdx, dd.impactVelocity, dd.attacknormal, hitPos);
-        }
-        float dmgFinal = TakeDamage(hitIdx, dd);
+        if (World.curLev != LEVEL_CYBERSPACE && e->recentMostActivator == PLAYER1) { ApplyImpactForce(hitIdx,dd.impactVelocity,dd.attacknormal,hitPos); }
+        float dmgFinal = TakeDamage(hitIdx,dd);
         float tranq = -1.0f;
         if (dd.isOtherNPC) {
             if (!(hit->entflags & EF_ASLEEP)) World.Sys_Music.inCombat = true;
-            if (dd.attackType == Att_Trnq) {
-                float stunAmount = vclamp(3.0f + (World.invP1.stungunSetting / 100.0f) * 7.0f, 3.0f, 10.0f);
-                tranq = Tranquilize(hitIdx, stunAmount, true);
-            }
+            if (dd.attackType == Att_Trnq) { float stunAmount = vclamp(3.0f + (World.invP1.stungunSetting / 100.0f) * 7.0f, 3.0f, 10.0f); tranq = Tranquilize(hitIdx, stunAmount, true); }
         }
         if (dmgFinal < 0.0f) dmgFinal = 0.0f;
-        CreateTargetIDInstance(dmgFinal, hitIdx, tranq);
-        SpawnImpactEffect(GetImpactType(hitIdx), hitPos);
+        CreateTargetIDInstance(dmgFinal,hitIdx,tranq);
+        SpawnImpactEffect(GetImpactType(hitIdx),hitPos);
     }
-
-    if (e->counter >= e->countToTrigger) {
-        SpawnImpactEffect(GetImpactType(hitIdx), hitPos);
-        if (e->despawnInstead) DeleteInstance(self);
-        else flag_set(&e->entflags,EF_ACTIVE,false);
-    }
+    if (e->counter >= e->countToTrigger) { SpawnImpactEffect(GetImpactType(hitIdx),hitPos); if (e->despawnInstead){DeleteInstance(self);}else{flag_set(&e->entflags,EF_ACTIVE,false);} }
 }
 #pragma GCC diagnostic pop
 
@@ -1103,15 +997,7 @@ static const float attackTypeMult[7][12] = {
     [NPCType_Cyber]       = {1,1,1,1,1,  1,1,1,1,1,1,0},
 };
 
-// Object death sound table indexed by constIndex
-static const i16 objectDeathSound[] = {
-    [458]=63,[459]=66,[460]=66,
-    [464]=62,[465]=532,[466]=532,[467]=532,[468]=532,[469]=532,[470]=532,[471]=532,
-    [472]=62,[473]=62,[474]=62,[475]=62,[476]=62,
-    [477]=61,[478]=65,[479]=69,
-    [525]=68,[526]=68,
-};
-
+static const i16 objectDeathSound[] = {[458]=63,[459]=66,[460]=66,[464]=62,[465]=532,[466]=532,[467]=532,[468]=532,[469]=532,[470]=532,[471]=532,[472]=62,[473]=62,[474]=62,[475]=62,[476]=62,[477]=61,[478]=65,[479]=69,[525]=68,[526]=68,};
 static bool IsCyberEntity(u16 self) {
     if (World.curLev == LEVEL_CYBERSPACE) return true;
     Entity* e = &World.instances[self];
@@ -1289,7 +1175,7 @@ float TakeDamage(u16 self,DamageData dd) {
                 }
             }
             if (take > 0.0f && (absorb < 0.4f || random_range(0.0f,1.0f) < 0.5f)) { play_wav(sounds[140],Sys_Settings.VolumeEffects,(V3){0.0f,0.0f,0.0f},false);/*player pain*/ } // TODO: pstatic.Flash(take>15?2:take>10?1:0) — pain flash FX
-            if (dd.owner != NULLENT && IdxIsNPC(World.instances[dd.owner].index)) World.instances[self].noiseFinished = World.pauseRelativeTime; // justHurtByEnemy for music system
+            if (dd.owner != WORLD && IdxIsNPC(World.instances[dd.owner].index)) World.instances[self].noiseFinished = World.pauseRelativeTime; // justHurtByEnemy for music system
         }
     }
 
@@ -1701,8 +1587,8 @@ void DoorActuate(u16 self) {
 
 void DoorUse(u16 self, u16 activator) {
     DualLog("Door use called by activator %u\n",activator);
+    if (activator == WORLD) return;
     Entity* e = &World.instances[self];
-    if (activator == NULLENT) return;
     if (GetCurrentLevelSecurity() > e->securityThreshold) { UIBlockedBySecurity(World.position[self]); return; }
     if (Cheats.superoverride || World.diffMis <= 0) { EntitySetLocked(e,false); e->requiredAccessCard = AccessCardType_None; }
     if (World.diffMis <= 1) { e->requiredAccessCard = AccessCardType_None; }
@@ -1729,19 +1615,59 @@ void DoorUpdate(u16 self) {
     else if (e->doorOpen == DoorState_Closing && e->clip == DOOR_CLIP_CLOSING && e->frame >= closing.frameEnd) { e->doorOpen = e->doorState = DoorState_Closed; DoorSetClipFrame(self,DOOR_CLIP_IDLE_CLOSED,DoorGetClip(e,DOOR_CLIP_IDLE_CLOSED).frameStart); }
     if (World.pauseRelativeTime > e->waitBeforeClose && e->doorOpen == DoorState_Open && !e->stayOpen && !e->startOpen) DoorClose(self);
 }
+// Automap
+void CloseFullmap() {} // TODO
 // Misc
 u16 SpawnDynamicObject(int val, bool cheat) {
-    if (!IdxInBounds(val)) { DualLogError("Const index out of bounds: %u", val); return NULLENT; }
+    if (!IdxInBounds(val)) { DualLogError("Const index out of bounds: %u", val); return WORLD; }
     if (cheat) DualLog("Cheat spawn constIndex %u, level: %u, from cheat: %u, name: ", val, World.curLev, cheat);
-    if (IdxIsGeometry(val) && !Cheats.editMode) { CenterStatusPrint("Indices 0 through 306 (level geometry chunks) not possible when not on edit mode!"); return NULLENT; }
-    if (World.instCount >= INSTANCE_COUNT) { DualLogError("Failed to spawn constIndex %u: instance table full (%u/%u)", val, World.instCount, INSTANCE_COUNT); return NULLENT; }
+    if (IdxIsGeometry(val) && !Cheats.editMode) { CenterStatusPrint("Indices 0 through 306 (level geometry chunks) not possible when not on edit mode!"); return WORLD; }
+    if (World.instCount >= INSTANCE_COUNT) { DualLogError("Failed to spawn constIndex %u: instance table full (%u/%u)", val, World.instCount, INSTANCE_COUNT); return WORLD; }
     u16 entityIndexInInstanceTable = AddInstance((u16)val, (V3){0.0f,0.0f,0.0f});
     return entityIndexInInstanceTable;
 }
-
+// Vmail
 void DeactivateVMail(void) { World.Sys_UI.vmailActive = false; if (World.invP1.lastAddedIndex >= 0) { World.invP1.readLog[World.invP1.lastAddedIndex] = true; CheckForUnreadLogs(); } play_wav(sounds[82], SfxVol(), (V3){0.0f,0.0f,0.0f}, false); }
+// TargetIO: Full game cross-level target handling.  Iterates all loaded levels, temporarily swaps active pointers via SetLevelPointers(), finds matching targetname(s), and calls Targetted().  Activator from cur level. Recursion is safe via targetIOActive flag.
+void TriggerTargetted(u16 self, u16 activator) { if (World.instances[self].ignoreSecondaryTriggers) World.instances[self].recentMostActivator = activator; }
+void Targetted(u16 activator, u16 self) {
+    Entity* e = &World.instances[self]; u32 aioflags = World.targetIOActive ? World.targetIOActivatorIoflags : World.instances[activator].ioflags;
+    DualLog("Targetted a->ioflags:%u e:%u doorcond:%u\n", aioflags, e->index, ((aioflags & TARG_IOFLAGS_DOOROPEN) && IdxIsDoor(e->index)));
+    if (e->index == 709) { CenterStatusPrint("%s", Sys_Text.stringTable[e->messageLingdex]); return; } // info_message
+    if (e->index == 708) { World.gameFinished = true; return; }
+    if (e->index == 707) { EmailTargetted(self, activator); return; } // info_email
+    if (aioflags & TARG_IOFLAGS_TRIPTRIGGER) { if(e->index == 598 || e->index == 600){TriggerTargetted(self,activator);}else if(e->index == 594){TriggerCounterTargetted(self,activator);} }
+    if (aioflags & TARG_IOFLAGS_UNLOCK) EntitySetLocked(e, false);
+    if ((aioflags & TARG_IOFLAGS_LOCK) && IdxIsDoor(e->index)) EntitySetLocked(e, true);
+    if (IdxIsButtonSwitch(e->index)) ButtonSwitchTargetted(self, activator);
+    if ((aioflags & TARG_IOFLAGS_DOOROPEN) && IdxIsDoor(e->index)) { DoorForceOpen(self); } 
+    else if ((aioflags & TARG_IOFLAGS_DOOROPENIFUNLOCKED) && IdxIsDoor(e->index) && (e->entflags & EF_LOCKED) == 0 && (e->requiredAccessCard == AccessCardType_None || (World.invP1.accessCardOwned & (1u << e->requiredAccessCard)))) { DoorForceOpen(self); }
+    else if ((aioflags & TARG_IOFLAGS_DOORCLOSE) && IdxIsDoor(e->index)) { DoorForceClose(self); }
+    else if (IdxIsDoor(e->index)) { DoorTargetted(self, activator); }
+    if (aioflags & TARG_IOFLAGS_FBRIDGE_ACTIVATE) ForceBridgeActivate(self, false);
+    else if (aioflags & TARG_IOFLAGS_FBRIDGE_DEACTIVATE) ForceBridgeDeactivate(self, false);
+    else if (aioflags & TARG_IOFLAGS_FBRIDGE_TOGGLE) ForceBridgeToggle(self);
+    if (aioflags & TARG_IOFLAGS_GRAVLIFT_TOGGLE) GravityLiftToggle(self);
+    if (aioflags & TARG_IOFLAGS_TEXTURE_CHG_TOGGLE) TextureChangerToggle(self);
+    if (aioflags & TARG_IOFLAGS_FUNCWALL_MOVE) FuncWallTargetted(self);
+    if (aioflags & TARG_IOFLAGS_SWITCH_LOCK_TOGGLE) EntitySetLocked(e, (e->entflags & EF_LOCKED) == 0);
+    if (aioflags & TARG_IOFLAGS_INST_ACTIVATE) flag_set(&e->entflags, EF_ACTIVE, true);
+    else if (aioflags & TARG_IOFLAGS_INST_DEACTIVATE) flag_set(&e->entflags, EF_ACTIVE, false);
+    else if (aioflags & TARG_IOFLAGS_INST_TOGGLE) flag_set(&e->entflags, EF_ACTIVE, !(e->entflags & EF_ACTIVE));
+}
+
+void UseTargets(u16 activator, const char* targetname) {
+    if (sEmpty(targetname)) return;
+    bool wasActive=World.targetIOActive, succeeded=false; u8 entryLevel = World.currentLevel;
+    if (!wasActive) { World.targetIOActive = true; World.targetIOEntryLevel = entryLevel; World.targetIOActivatorIdx = activator; World.targetIOActivatorEntity = World.instances[activator]; World.targetIOActivatorIoflags = World.instances[activator].ioflags; }
+    for (u8 lev = 0; lev < World.numLevels; ++lev) {
+        if (World.currentLevel != lev) SetLevelPointers(lev);
+        for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if (!sEqual(World.instances[i].targetname,targetname)) {continue;} DualLog("Target hit: %s on %u (lev %u)\n",targetname,i,lev); Targetted(activator,i); succeeded=true; }
+    }
+    if (World.currentLevel != entryLevel) {SetLevelPointers(entryLevel);} if (!succeeded) {DualLogWarn("No target found: %s\n",targetname);} if (!wasActive) {World.targetIOActive=false;}
+}
 // Frob/Use
-void SearchObject(int searchable, bool first) { if (first) { firstTimeSearch = false; } World.Sys_UI.highlightStatus[MULTI_MEDIA_TAB_NOTES] = true; World.Sys_UI.highlightTickCount[MULTI_MEDIA_TAB_NOTES] = 3; World.Sys_UI.tickFinished = World.pauseRelativeTime; if (World.instances[searchable].searchableInUse) { for (int i=0;i<4;i++) { if (World.instances[searchable].contents[i] >= 0) break; } } else play_wav(sounds[91],0.75f,(V3){0.0f,0.0f,0.0f},false); }
+void SearchObject(int searchable, bool first) { if (first) { firstTimeSearch = false; } World.Sys_UI.highlightStatus[MM_NOTES] = true; World.Sys_UI.highlightTickCount[MM_NOTES] = 3; World.Sys_UI.tickFinished = World.pauseRelativeTime; if (World.instances[searchable].searchableInUse) { for (int i=0;i<4;i++) { if (World.instances[searchable].contents[i] >= 0) break; } } else play_wav(sounds[91],0.75f,(V3){0.0f,0.0f,0.0f},false); }
 void UseEntity(u16 i) {
     Entity* ent = &World.instances[i];
     if (IdxIsSearchable(ent->index)) { World.invP1.currentSearchItem = i; SearchObject(i,firstTimeSearch); DualLog("Search\n"); }
@@ -1758,7 +1684,6 @@ void UseEntity(u16 i) {
         World.invP1.heldObjectLoadedAlternate = ent->heldObjectLoadedAlternate;
         if (Sys_Settings.QuickItemPickup) { AddItemToInventory(ent->index,ent->usableCustomIndex); ResetHeldItem(); }
         else { CenterStatusPrint("%s%s",Sys_Text.stringTable[World.invP1.heldObjectIndex - 307 + 326],Sys_Text.stringTable[319]); /* picked up.*/ ForceInventoryMode(); } // Inventory mode is turned on when picking something up
-
         DeleteInstance(i);
     } else CenterStatusPrint("%s%s",Sys_Text.stringTable[29],"name");
 }
@@ -1803,142 +1728,39 @@ void ModUpdate(void) {
         if (constdex == 517) FuncWallUpdate(i);
         if (constdex == 21 || constdex == 22) CyberWallUpdate(i);
         if (constdex == 736) TargetIDUpdate(i);
-//         if (constdex == 596) { GravityLiftOnTriggerStay(i,PLAYER1); } // TODO: Must hook into trigger system
     }
-}
-// Init
-u8 GetCurrentLevelSecurity(void) { return (World.diffMis < 1 || Cheats.superoverride) ? 0u : World.levelSecurity[World.curLev]; }
-u16 GetImpactType(u16 instanceIdx) {
-    switch (World.instances[instanceIdx].bloodType) {
-        case BloodType_None:         return 729; // SparksSmall
-        case BloodType_Red:          return 724; // BloodSpurtSmall
-        case BloodType_Yellow:       return 723; // BloodSpurtSmallYellow
-        case BloodType_Green:        return 722; // BloodSpurtSmallGreen
-        case BloodType_Robot:        return 730; // SparksSmallBlue
-        case BloodType_Leaf:         return 756; // LeafBurst
-        case BloodType_Mutation:     return 757; // MutationBurst
-        case BloodType_GrayMutation: return 758; // GraytationBurst
-    }
-    return 729; // SparksSmall
 }
 
-#include "credits.h"
-const char** GetCreditsText(void) { return creditPages; } // TODO, tested this and it worked but need to hook it in to game end
-u16 GetCrosshairTexture(void) {
-    switch(World.invP1.weaponIndex) {
-        case 36: case 38: case 43: case 45: case 48: return 1121; // red
-        case 37: case 40: case 50: return 1253; // blue
-        case 41: case 42: return 1166; // orange
-        case 44: case 47: return 1122; // yellow
-        case 46: case 51: return 1161; // teal
-        default: return 1260; // green
+u16 GetCrosshairTexture(void) { switch(World.invP1.weaponIndex) { case 36:case 38:case 43:case 45:case 48:return 1121;/*red*/case 37:case 40:case 50:return 1253;/*blue*/case 41:case 42:return 1166;/*orange*/case 44:case 47:return 1122;/*yellow*/ case 46:case 51:return 1161;/*teal*/default:return 1260;/*green*/ } }
+u16 GetCursorTexture(void){
+    if(World.paused||World.menuActive)return 1261;/*Red standard cursor*/if(!World.invP1.holdingObject)return GetCrosshairTexture();
+    switch(World.invP1.heldObjectIndex){
+        case 312: case 313: return 605;/*item_arm, item_audiolog*/
+        case 364: return 969;/*item_chipset_interfacedemod*/
+        case 308: return 838;/*item_paper_wad*/              case 309: return 764;/*item_beaker*/              case 310: return 767;/*item_beverage*/              case 311: return 981;/*item_skull*/
+        case 314: return 853;/*weapon_grenadefrag*/          case 315: return 849;/*weapon_grenadeconc*/       case 316: return 851;/*weapon_grenadeemp*/          case 317: return 850;/*weapon_grenadeearth*/
+        case 318: return 860;/*weapon_grenademine*/          case 319: return 861;/*weapon_grenadenitro*/      case 320: return 859;/*weapon_grenadegas*/          case 321: return 974;/*item_patch_berserk*/
+        case 322: return 975;/*item_patch_detox*/            case 323: return 976;/*item_patch_genius*/        case 324: return 977;/*item_patch_medi*/            case 325: return 978;/*tem_patch_reflex*/
+        case 326: return 979;/*item_patch_sight*/            case 327: return 980;/*item_patch_staminup*/      case 328: return 882;/*item_hw_system*/             case 329: return 907;/*item_hw_navunit*/
+        case 330: return 902;/*item_hw_ereader*/             case 331: return 909;/*item_hw_sensaround*/       case 332: return 935;/*item_hw_targetid*/           case 333: return 911;/*item_hw_shield*/
+        case 334: return 900;/*item_hw_bio*/                 case 335: return 906;/*item_hw_lantern*/          case 336: return 903;/*item_hw_envirosuit*/         case 337: return 901;/*item_hw_booster*/
+        case 338: return 905;/*item_hw_jumpjets*/            case 339: return 904;/*item_hw_infrared*/         case 340: return 966;/*item_fireextinguisher*/      case 341: return 626;/*item_access_card_admin*/
+        case 342: return 845;/*item_workerhelmet*/           case 343: return 988;/*weapon_mk3*/               case 344: return 982;/*weapon_blaster*/             case 345: return 983;/*weapon_dartgun*/
+        case 346: return 984;/*weapon_flechette*/            case 347: return 985;/*weapon_ionrifle*/          case 348: return 1034;/*weapon_rapier*/             case 349: return 990;/*weapon_pipe*/
+        case 350: return 986;/*weapon_magnum*/               case 351: return 987;/*weapon_magpulse*/          case 352: return 1010;/*weapon_pistol*/             case 353: return 1019;/*weapon_plasma*/
+        case 354: return 1027;/*weapon_railgun*/             case 355: return 1035;/*weapon_riotgun*/          case 356: return 1036;/*weapon_skorpion*/           case 357: return 1052;/*weapon_sparqbeam*/
+        case 358: return 1065;/*weapon_stungun*/             case 359: return 965;/*item_battery*/             case 360: return 968;/*item_battery_icad*/          case 361: return 972;/*item_logic_probe*/
+        case 362: return 967;/*item_healthkit*/              case 363: return 973;/*item_plastique*/           case 365: return 766;/*item_flask*/                 case 366: return 969;/*item_chipset_bitflag*/
+        case 367: return 549;/*item_ammo_rubber*/            case 368: return 971;/*item_isotopex22*/          case 369: return 765;/*item_testtube*/              case 370: return 853;/*weapon_grenadefrag_live*/
+        case 371: return 970;/*item_chipset_isolinear*/      case 372: return 849;/*weapon_grenadeconc_live*/  case 373: return 420;/*item_ammo_needle*/           case 374: return 602;/*item_ammo_tranq*/
+        case 375: return 593;/*item_ammo_standard*/          case 376: return 597;/*item_ammo_teflon*/         case 377: return 411;/*item_ammo_hollow*/           case 378: return 561;/*item_ammo_slug*/
+        case 379: return 419;/*item_ammo_magnesium*/         case 380: return 421;/*item_ammo_penetrator*/     case 381: return 417;/*item_ammo_hornet*/           case 382: return 577;/*item_ammo_splinter*/
+        case 383: return 422;/*item_ammo_rail*/              case 384: return 551;/*item_ammo_slag*/           case 385: return 552;/*item_ammo_slaglarge*/        case 386: return 418;/*item_ammo_magcart*/
+        case 387: return 851;/*weapon_grenadeemp_live*/      case 388: return 762;/*item_access_card_std*/     case 389: return 850;/*weapon_grenadeearth_live*/   case 390: return 610;/*item_access_card_group1*/
+        case 391: return 621;/*item_access_card_science*/    case 392: return 609;/*item_access_card_eng*/     case 393: return 610;/*item_access_card_groupB*/    case 394: return 635;/*item_access_card_security*/
+        case 395: return 761;/*item_access_card_per5diego*/  case 396: return 632;/*item_access_card_medi*/    case 397: return 610;/*item_access_card_group3*/    case 398: return 624;/*item_access_card_purple*/
+        case 399: return 872;/*item_head_male*/              case 400: return 862;/*item_head_female*/         case 401: return 872;/*item_severedhead*/           case 402: return 860;/*weapon_grenademine_live*/
+        case 403: return 861;/*weapon_grenadenitro_live*/    case 404: return 859;/*weapon_grenadegas_live*/   case 417: return 760;/*item_access_card_perdarcy*/
     }
-    
-    return 1260;
-}
-
-u16 GetCursorTexture(void) {
-    if (World.paused || World.menuActive) return 1261; // Red standard cursor
-    if (!World.invP1.holdingObject) return GetCrosshairTexture();
-    switch(World.invP1.heldObjectIndex) {
-        case 308: return 838; // item_paper_wad
-        case 309: return 764; // item_beaker
-        case 310: return 767; // item_beverage
-        case 311: return 981; // item_skull
-        case 312: case 313: return 605; // item_arm, item_audiolog
-        case 314: return 853; // weapon_grenadefrag
-        case 315: return 849; // weapon_grenadeconc
-        case 316: return 851; // weapon_grenadeemp
-        case 317: return 850; // weapon_grenadeearth
-        case 318: return 860; // weapon_grenademine
-        case 319: return 861; // weapon_grenadenitro
-        case 320: return 859; // weapon_grenadegas
-        case 321: return 974; // item_patch_berserk
-        case 322: return 975; // item_patch_detox
-        case 323: return 976; // item_patch_genius
-        case 324: return 977; // item_patch_medi
-        case 325: return 978; // tem_patch_reflex
-        case 326: return 979; // item_patch_sight
-        case 327: return 980; // item_patch_staminup
-        case 328: return 882; // item_hw_system
-        case 329: return 907; // item_hw_navunit
-        case 330: return 902; // item_hw_ereader
-        case 331: return 909; // item_hw_sensaround
-        case 332: return 935; // item_hw_targetid
-        case 333: return 911; // item_hw_shield
-        case 334: return 900; // item_hw_bio
-        case 335: return 906; // item_hw_lantern
-        case 336: return 903; // item_hw_envirosuit
-        case 337: return 901; // item_hw_booster
-        case 338: return 905; // item_hw_jumpjets
-        case 339: return 904; // item_hw_infrared
-        case 340: return 966; // item_fireextinguisher
-        case 341: return 626; // item_access_card_admin
-        case 342: return 845; // item_workerhelmet
-        case 343: return 988; // weapon_mk3
-        case 344: return 982; // weapon_blaster
-        case 345: return 983; // weapon_dartgun
-        case 346: return 984; // weapon_flechette
-        case 347: return 985; // weapon_ionrifle
-        case 348: return 1034; // weapon_rapier
-        case 349: return 990; // weapon_pipe
-        case 350: return 986; // weapon_magnum
-        case 351: return 987; // weapon_magpulse
-        case 352: return 1010; // weapon_pistol
-        case 353: return 1019; // weapon_plasma
-        case 354: return 1027; // weapon_railgun
-        case 355: return 1035; // weapon_riotgun
-        case 356: return 1036; // weapon_skorpion
-        case 357: return 1052; // weapon_sparqbeam
-        case 358: return 1065; // weapon_stungun
-        case 359: return 965; // item_battery
-        case 360: return 968; // item_battery_icad
-        case 361: return 972; // item_logic_probe
-        case 362: return 967; // item_healthkit
-        case 363: return 973; // item_plastique
-        case 364: return 969; // item_chipset_interfacedemod
-        case 365: return 766; // item_flask
-        case 366: return 969; // item_chipset_bitflag
-        case 367: return 549; // item_ammo_rubber
-        case 368: return 971; // item_isotopex22
-        case 369: return 765; // item_testtube
-        case 370: return 853; // weapon_grenadefrag_live
-        case 371: return 970; // item_chipset_isolinear
-        case 372: return 849; // weapon_grenadeconc_live
-        case 373: return 420; // item_ammo_needle
-        case 374: return 602; // item_ammo_tranq
-        case 375: return 593; // item_ammo_standard
-        case 376: return 597; // item_ammo_teflon
-        case 377: return 411; // item_ammo_hollow
-        case 378: return 561; // item_ammo_slug
-        case 379: return 419; // item_ammo_magnesium
-        case 380: return 421; // item_ammo_penetrator
-        case 381: return 417; // item_ammo_hornet
-        case 382: return 577; // item_ammo_splinter
-        case 383: return 422; // item_ammo_rail
-        case 384: return 551; // item_ammo_slag
-        case 385: return 552; // item_ammo_slaglarge
-        case 386: return 418; // item_ammo_magcart
-        case 387: return 851; // weapon_grenadeemp_live
-        case 388: return 762; // item_access_card_std
-        case 389: return 850; // weapon_grenadeearth_live
-        case 390: return 610; // item_access_card_group1
-        case 391: return 621; // item_access_card_science
-        case 392: return 609; // item_access_card_eng
-        case 393: return 610; // item_access_card_groupB
-        case 394: return 635; // item_access_card_security
-        case 395: return 761; // item_access_card_per5diego
-        case 396: return 632; // item_access_card_medi
-        case 397: return 610; // item_access_card_group3
-        case 398: return 624; // item_access_card_purple
-        case 399: return 872; // item_head_male
-        case 400: return 862; // item_head_female
-        case 401: return 872; // item_severedhead
-        case 402: return 860; // weapon_grenademine_live
-        case 403: return 861; // weapon_grenadenitro_live
-        case 404: return 859; // weapon_grenadegas_live
-        case 417: return 760; // item_access_card_perdarcy
-    }
-    
-    return 1250; // paper wad fallback to make issue obvious
+    return 1250;/*paper wad fallback*/
 }
