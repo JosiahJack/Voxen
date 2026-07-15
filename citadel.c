@@ -1702,6 +1702,7 @@ static void Frob(V3 pos, V3 forward, V3 right) {
         World.debugLineFinished = World.pauseRelativeTime + 3.0;
     }
     if (!tempHit.hit) { CenterStatusPrint("%s",Sys_Text.stringTable[30]); return; }
+    if (PSys_PlayOneshot(0,tempHit.point) == U16_MAX) DualLog("Failed to play particle system 0\n");
     UseEntity(tempHit.hitInstanceIndex);
 }
 // Update

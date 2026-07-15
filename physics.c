@@ -76,15 +76,6 @@ ShapeCapsule Entity_GetCap(u16 i) {
 ShapeBox Entity_GetBox(u16 i) { return (ShapeBox){.ctr=V3_AplusB(World.position[i],quat_rot_v3(World.rotation[i],World.colliderCenter[i])),.hExt=(V3){World.colliderSize[i].x*0.5f * World.scale[i].x,World.colliderSize[i].y*0.5f * World.scale[i].y,World.colliderSize[i].z*0.5f * World.scale[i].z},.rot=World.rotation[i]}; }
 ShapeSphere Entity_GetSph(u16 i) { return (ShapeSphere){.ctr=V3_AplusB(World.position[i],quat_rot_v3(World.rotation[i],World.colliderCenter[i])),.rad = World.colliderSize[i].x * vmax(World.scale[i].x,vmax(World.scale[i].y,World.scale[i].z))}; }
 u16 cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX];
-float GetColRad(u16 i) {
-    u8 col = World.collider[i];
-    if (col == COLTYPE_MSH || col == COLTYPE_CVX) { u16 mIdx = (col == COLTYPE_CVX) ? World.instances[i].colMeshIndex : World.instances[i].modelIndex; return modelBounds[mIdx] * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z); }
-    if (col == COLTYPE_BOX) { float hx=World.colliderSize[i].x *0.5f* World.scale[i].x, hy=World.colliderSize[i].y *0.5f* World.scale[i].y, hz=World.colliderSize[i].z *0.5f* World.scale[i].z; return vsqrtf(hx*hx + hy*hy + hz*hz); }
-    if (col == COLTYPE_CAP) { ShapeCapsule cap=Entity_GetCap(i); V3 c=World.position[i]; float db=V3_Mag(V3_AsubB(c,cap.base)) + cap.rad; float dt=V3_Mag(V3_AsubB(c,cap.tip)) + cap.rad; return vmax(db,dt); }
-    if (col == COLTYPE_SPH) { return Entity_GetSph(i).rad; }
-    return World.colliderSize[i].x * vmax(World.scale[i].x, vmax(World.scale[i].y, World.scale[i].z));
-}
-
 Quaternion quat_from_axis_angle(V3 axis, float angle) { float half = angle * 0.5f; float s = vsinf(half); return (Quaternion){axis.x*s,axis.y*s,axis.z*s,vcosf(half)}; }
 Quaternion quat_normalize(Quaternion q) { float len2 = q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w; if (len2 < PHY_EPSILON) {return (Quaternion){0,0,0,1};} float inv=vinvsqtf(len2); q.x*=inv; q.y*=inv; q.z*=inv; q.w*=inv; return q; }
 inline V3 MeshVert(u16 m, u32 i) { const u8* p=modelVertices[m]+i*CPU_VRT_SZ; return (V3){*(float*)(p+0),*(float*)(p+4),*(float*)(p+8)}; }
@@ -160,11 +151,11 @@ inline void MeshTri(u16 m, u32 ti, const float* mx, V3* a, V3* b, V3* c) { u32 i
 inline V3 SphSupport(ShapeSphere b, V3 d) { float L = V3_dot(d,d); return V3_AplusB(b.ctr, (L > PHY_EPSILON) ? V3_ScaleByF(d, b.rad / vsqrtf(L)) : (V3){0,b.rad,0}); }
 inline V3 BoxSupport(ShapeBox b, V3 d) { V3 x,y,z; obb_axes(b.rot,&x,&y,&z); float kx = V3_dot(d,x) >= 0.0f ? 1.0f : -1.0f, ky = V3_dot(d,y) >= 0.0f ? 1.0f : -1.0f, kz = V3_dot(d,z) >= 0.0f ? 1.0f : -1.0f; return V3_AplusB(V3_AplusB(V3_AplusB(b.ctr,V3_ScaleByF(x,kx*b.hExt.x)),V3_ScaleByF(y,ky*b.hExt.y)),V3_ScaleByF(z,kz*b.hExt.z)); }
 inline V3 CapsuleSupport(ShapeCapsule cap, V3 d) { float db = V3_dot(cap.base,d),dt = V3_dot(cap.tip,d); V3 best = (dt > db) ? cap.tip : cap.base; float L = V3_dot(d,d); if (L < PHY_EPSILON) {return best;} return V3_AplusB(best,V3_ScaleByF(d,cap.rad / vsqrtf(L))); }
-inline V3 TransformDirectionByInverseTranspose(const float* M, V3 dWorld) { V3 dLocal; dLocal.x = M[0] * dWorld.x + M[1] * dWorld.y + M[2] * dWorld.z; dLocal.y = M[4] * dWorld.x + M[5] * dWorld.y + M[6] * dWorld.z; dLocal.z = M[8] * dWorld.x + M[9] * dWorld.y + M[10] * dWorld.z; return dLocal; }
 V3 HullSupport(u16 m, const float* M, V3 dWorld) {
-    u32 n = modelVertexCounts[m]; if(!n){return (V3){0,0,0};}
-    V3 dLocal = TransformDirectionByInverseTranspose(M, dWorld); const u8* vb = modelVertices[m]; const u8* p = vb; V3 bestLocal = *(V3*)p; float top = V3_dot(bestLocal,dLocal);
-    for (u32 i=1;i<n;++i) { p += CPU_VRT_SZ; V3 vLocal = *(V3*)p; float dot = V3_dot(vLocal,dLocal); if (dot > top) { top = dot; bestLocal = vLocal; } }
+    u32 n = modelVertexCounts[m];
+    V3 dLocal; dLocal.x = M[0] * dWorld.x + M[1] * dWorld.y + M[2] * dWorld.z; dLocal.y = M[4] * dWorld.x + M[5] * dWorld.y + M[6] * dWorld.z; dLocal.z = M[8] * dWorld.x + M[9] * dWorld.y + M[10] * dWorld.z;
+    const u8 *p; p=modelVertices[m]; V3 bestLocal=*(V3*)p; float top=bestLocal.x*dLocal.x + bestLocal.y*dLocal.y + bestLocal.z*dLocal.z;
+    for (u32 i=1;i<n;++i) { p += CPU_VRT_SZ; V3 vLocal = *(V3*)p; float dot =vLocal.x*dLocal.x + vLocal.y*dLocal.y + vLocal.z*dLocal.z; if (unlikely(dot > top)) { top = dot; bestLocal = vLocal; } }
     return MvVert(M,bestLocal);
 }
 
@@ -221,9 +212,9 @@ typedef enum { SUP_HULL_HULL, SUP_PRIM_HULL, SUP_HULL_TRI } SupportType;
 typedef struct { SupportType type; u16 prim,meshA,meshB; const float *matA,*matB; V3 ta,tb,tc; } SupportCtx;
 void GetSupportPair(const SupportCtx *ctx, V3 dir, V3 *wA, V3 *wB) {
     switch (ctx->type) {
-        case SUP_HULL_HULL: *wA = HullSupport(ctx->meshA, ctx->matA, dir); *wB = HullSupport(ctx->meshB, ctx->matB, (V3){-dir.x, -dir.y, -dir.z}); break;
-        case SUP_PRIM_HULL: *wA =  GJKSupport(ctx->prim, dir);             *wB = HullSupport(ctx->meshA, ctx->matA, (V3){-dir.x, -dir.y, -dir.z}); break;
-        case SUP_HULL_TRI:  *wA = HullSupport(ctx->meshA, ctx->matA, dir); *wB =  TriSupport(ctx->ta, ctx->tb, ctx->tc, (V3){-dir.x, -dir.y, -dir.z}); break;
+        case SUP_HULL_HULL: *wA = HullSupport(ctx->meshA,ctx->matA,dir); *wB = HullSupport(ctx->meshB,ctx->matB,(V3){-dir.x,-dir.y,-dir.z}); break;
+        case SUP_PRIM_HULL: *wA =  GJKSupport(ctx->prim,dir);            *wB = HullSupport(ctx->meshA,ctx->matA,(V3){-dir.x,-dir.y,-dir.z}); break;
+        case SUP_HULL_TRI:  *wA = HullSupport(ctx->meshA,ctx->matA,dir); *wB = TriSupport(ctx->ta,ctx->tb,ctx->tc,(V3){-dir.x,-dir.y,-dir.z}); break;
     }
 }
 
@@ -321,27 +312,26 @@ void CvxTriTest(CvxMshCtx* ctx, V3 ta, V3 tb, V3 tc) {
         if(V3_dot(bn,sup)-bd<PHY_EPSILON){V3 triN = V3_Normalize(V3_Cross(V3_AsubB(tb,ta),V3_AsubB(tc,ta))); if (V3_dot(bn,triN) < 0.0f) { bn = triN;/*Prevent thin object penetrations when walked on by ensuring triangles are treated as one-sided from tri normal*/} tHit=true; tN=bn; tD=bd; tP=EPAContactPoint(epa.ev,epa.ef[bf].a,epa.ef[bf].b,epa.ef[bf].c); break;}
         if (!ExpandEPA(&epa,sup,wA,wB)) break;
     }
-    if (tHit) {
-        V3 deepPoint=tP;
-        if (!best->n) { best->normal=tN; best->maxPen=tD; best->p[best->n++]=(ManifoldPt){deepPoint,tD}; }
-        else {
-            float align=V3_dot(tN,best->normal);
-            if (align>MANIFOLD_ALIGN_THRESHOLD) {
-                bool better=(tD>best->maxPen+MANIFOLD_TIE_MARGIN) || (vabs(tD-best->maxPen)<=MANIFOLD_TIE_MARGIN && V3_dot(tN,(V3){0,1,0})>V3_dot(best->normal,(V3){0,1,0})); if (better){best->normal=tN; best->maxPen=tD;} bool spread=true;
-                for (int k=0;k<best->n;++k){V3 dv=V3_AsubB(deepPoint,best->p[k].point); if(V3_dot(dv,dv)<spreadEps*spreadEps){spread=false; if(tD>best->p[k].pen)best->p[k].pen=tD; break;}}
-                if (spread&&best->n<MANIFOLD_MAX)best->p[best->n++]=(ManifoldPt){deepPoint,tD};
-            } else if (tD>best->maxPen+MANIFOLD_TIE_MARGIN){best->n=0; best->normal=tN; best->maxPen=tD; best->p[best->n++]=(ManifoldPt){deepPoint,tD};}
-        }
-        u32 hn = ctx->boxV ? ctx->boxN : modelVertexCounts[hullMesh];
-        if (hn && best->n>0 && V3_dot(tN,best->normal)>MANIFOLD_ALIGN_THRESHOLD) {
-            float planeDist=V3_dot(tN,deepPoint); V3 v0=V3_AsubB(tb,ta), v1=V3_AsubB(tc,ta); float d00=V3_dot(v0,v0), d01=V3_dot(v0,v1), d11=V3_dot(v1,v1), denom=d00*d11-d01*d01; bool validTri=vabs(denom)>PHY_EPSILON;
-            for (u32 i=0;i<hn;++i) {
-                V3 pt=ctx->boxV ? ctx->boxV[i] : MvVert(hullMx,MeshVert(hullMesh,i)); float distToPlane=V3_dot(tN,pt)-planeDist;
-                if (vabs(distToPlane)<thicknessTolerance) {
-                    bool insideTri=false;
-                    if (validTri){V3 projPt=V3_AsubB(pt,V3_ScaleByF(tN,distToPlane)), v2=V3_AsubB(projPt,ta); float d20=V3_dot(v2,v0), d21=V3_dot(v2,v1), v=(d11*d20-d01*d21)/denom, w=(d00*d21-d01*d20)/denom, u=1.0f-v-w; if(u>=-0.02f&&v>=-0.02f&&w>=-0.02f)insideTri=true;}
-                    if (insideTri){float ptPen=tD-distToPlane; if(ptPen>0.0f){bool isDup=false; for(int k=0;k<best->n;++k){V3 diff=V3_AsubB(pt,best->p[k].point); if(V3_dot(diff,diff)<spreadEps*spreadEps){isDup=true;break;}} if(!isDup&&best->n<MANIFOLD_MAX)best->p[best->n++]=(ManifoldPt){pt,ptPen}; if(best->n>=MANIFOLD_MAX)break;}}
-                }
+    if (!tHit) return;
+    V3 deepPoint=tP;
+    if (!best->n) { best->normal=tN; best->maxPen=tD; best->p[best->n++]=(ManifoldPt){deepPoint,tD}; }
+    else {
+        float align=V3_dot(tN,best->normal);
+        if (align>MANIFOLD_ALIGN_THRESHOLD) {
+            bool better=(tD>best->maxPen+MANIFOLD_TIE_MARGIN) || (vabs(tD-best->maxPen)<=MANIFOLD_TIE_MARGIN && V3_dot(tN,(V3){0,1,0})>V3_dot(best->normal,(V3){0,1,0})); if (better){best->normal=tN; best->maxPen=tD;} bool spread=true;
+            for (int k=0;k<best->n;++k){V3 dv=V3_AsubB(deepPoint,best->p[k].point); if(V3_dot(dv,dv)<spreadEps*spreadEps){spread=false; if(tD>best->p[k].pen)best->p[k].pen=tD; break;}}
+            if (spread&&best->n<MANIFOLD_MAX)best->p[best->n++]=(ManifoldPt){deepPoint,tD};
+        } else if (tD>best->maxPen+MANIFOLD_TIE_MARGIN){best->n=0; best->normal=tN; best->maxPen=tD; best->p[best->n++]=(ManifoldPt){deepPoint,tD};}
+    }
+    u32 hn = ctx->boxV ? ctx->boxN : modelVertexCounts[hullMesh];
+    if (hn && best->n>0 && V3_dot(tN,best->normal)>MANIFOLD_ALIGN_THRESHOLD) {
+        float planeDist=V3_dot(tN,deepPoint); V3 v0=V3_AsubB(tb,ta), v1=V3_AsubB(tc,ta); float d00=V3_dot(v0,v0), d01=V3_dot(v0,v1), d11=V3_dot(v1,v1), denom=d00*d11-d01*d01; bool validTri=vabs(denom)>PHY_EPSILON;
+        for (u32 i=0;i<hn;++i) {
+            V3 pt=ctx->boxV ? ctx->boxV[i] : MvVert(hullMx,MeshVert(hullMesh,i)); float distToPlane=V3_dot(tN,pt)-planeDist;
+            if (vabs(distToPlane)<thicknessTolerance) {
+                bool insideTri=false;
+                if (validTri){V3 projPt=V3_AsubB(pt,V3_ScaleByF(tN,distToPlane)), v2=V3_AsubB(projPt,ta); float d20=V3_dot(v2,v0), d21=V3_dot(v2,v1), v=(d11*d20-d01*d21)/denom, w=(d00*d21-d01*d20)/denom, u=1.0f-v-w; if(u>=-0.02f&&v>=-0.02f&&w>=-0.02f)insideTri=true;}
+                if (insideTri){float ptPen=tD-distToPlane; if(ptPen>0.0f){bool isDup=false; for(int k=0;k<best->n;++k){V3 diff=V3_AsubB(pt,best->p[k].point); if(V3_dot(diff,diff)<spreadEps*spreadEps){isDup=true;break;}} if(!isDup&&best->n<MANIFOLD_MAX)best->p[best->n++]=(ManifoldPt){pt,ptPen}; if(best->n>=MANIFOLD_MAX)break;}}
             }
         }
     }
@@ -433,7 +423,7 @@ V3 ApplyInvTensor(u16 i, V3 v) {
         float R[3][3]; quat_to_mat3(World.rotation[i],R); float bx=R[0][0]*v.x+R[1][0]*v.y+R[2][0]*v.z, by=R[0][1]*v.x+R[1][1]*v.y+R[2][1]*v.z, bz=R[0][2]*v.x+R[1][2]*v.y+R[2][2]*v.z;
         float wx=invIxx*bx, wy=invIyy*by, wz=invIzz*bz; return (V3){R[0][0]*wx+R[0][1]*wy+R[0][2]*wz, R[1][0]*wx+R[1][1]*wy+R[1][2]*wz, R[2][0]*wx+R[2][1]*wy+R[2][2]*wz};
     }
-    if (World.collider[i] != COLTYPE_CVX || !World.invTnsrValid[i]) { float r=(World.collider[i]==COLTYPE_MSH)?modelBounds[World.instances[i].modelIndex]:((World.collider[i]==COLTYPE_CVX)?modelBounds[World.instances[i].colMeshIndex]:GetColRad(i)); return V3_ScaleByF(v,1.0f/vmax((2.0f/5.0f)*World.mass[i]*r*r,0.0f)); }
+    if (World.collider[i] != COLTYPE_CVX || !World.invTnsrValid[i]) { float r=World.radius[i]; return V3_ScaleByF(v,1.0f/vmax((2.0f/5.0f)*World.mass[i]*r*r,0.0f)); }
     float R[3][3]; quat_to_mat3(World.rotation[i],R); float *I=World.invInertiaTensor[i];
     float bx=R[0][0]*v.x+R[1][0]*v.y+R[2][0]*v.z, by=R[0][1]*v.x+R[1][1]*v.y+R[2][1]*v.z, bz=R[0][2]*v.x+R[1][2]*v.y+R[2][2]*v.z;
     float wx=I[0]*bx+I[3]*by+I[4]*bz, wy=I[3]*bx+I[1]*by+I[5]*bz, wz=I[4]*bx+I[5]*by+I[2]*bz; return (V3){R[0][0]*wx+R[0][1]*wy+R[0][2]*wz, R[1][0]*wx+R[1][1]*wy+R[1][2]*wz, R[2][0]*wx+R[2][1]*wy+R[2][2]*wz};
@@ -495,16 +485,22 @@ inline int V3_IsSane(V3 v) { union { float f; unsigned int i; } ux,uy,uz; ux.f =
 u16 triggerVolumes[128]; u16 numTriggers;
 void Physics(float dt) {
     u8 substeps = (u8)vclamp((u32)(dt / MAX_STEP_SIZE + 0.5f),1u,(u32)40); float dtsub = dt / (float)substeps; dynamicEntityCount = 0;
-    for (u16 i=0;i<World.instCount && dynamicEntityCount < 512;++i) { if ((World.instances[i].entflags & EF_RIGIDBODY) && (World.instances[i].entflags & EF_ACTIVE) && World.collider[i] != COLTYPE_NONE) {dynamicEntities[dynamicEntityCount++] = i;} }
+    for (u16 i=0;i<World.instCount && dynamicEntityCount < 512;++i) {
+        if (World.collider[i] == COLTYPE_MSH || World.collider[i] == COLTYPE_CVX) { World.radius[i] = modelBounds[World.collider[i] == COLTYPE_CVX ? World.instances[i].colMeshIndex : World.instances[i].modelIndex] * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z); }
+        else if (likely(World.collider[i] == COLTYPE_BOX)) { World.radius[i] = vmax(World.colliderSize[i].x * 0.5f * World.scale[i].x,vmax(World.colliderSize[i].y * 0.5f * World.scale[i].y,World.colliderSize[i].z * 0.5f * World.scale[i].z)); }
+        else if (World.collider[i] == COLTYPE_SPH || World.collider[i] == COLTYPE_CAP) { World.radius[i] = vmax(World.colliderSize[i].x,World.colliderSize[i].y) * vmax(World.scale[i].x,vmax(World.scale[i].y,World.scale[i].z)); }
+        else World.radius[i] = World.colliderSize[i].x * vmax(World.scale[i].x,vmax(World.scale[i].y,World.scale[i].z));
+        if ((World.instances[i].entflags & EF_RIGIDBODY) && (World.instances[i].entflags & EF_ACTIVE) && World.collider[i] != COLTYPE_NONE) {dynamicEntities[dynamicEntityCount++]=i;}
+    }
     for (u8 s=0;s<substeps;++s) {
         mset(cellCounts,0,sizeof(cellCounts)); numTriggers=0;
         for (u16 t=0;t<128;++t) triggerVolumes[t]=0xFFFF;
         for (u16 i=0;i<World.instCount;++i) { // 0. Broadphase cell lists
             posBudget[i] = 0.64f; World.instances[i].cellX=(i16)PosGetCellCoordX(World.position[i].x); World.instances[i].cellZ=(i16)PosGetCellCoordZ(World.position[i].z);
-            World.instances[i].cellIndex=PosGetCellCoordsP(World.instances[i].cellX,World.instances[i].cellZ); World.radius[i] = GetColRad(i);
+            World.instances[i].cellIndex=PosGetCellCoordsP(World.instances[i].cellX,World.instances[i].cellZ);
             u32 cell=(u32)World.instances[i].cellIndex; if(cell < WORLDX*WORLDX && cellCounts[cell] < 128){cellLists[cell][cellCounts[cell]++]=i;}
             u16 idx=World.instances[i].index;
-            if (((idx >= 595 && idx <= 601) || idx == 746) && (World.instances[i].entflags & EF_ACTIVE) && numTriggers < 128) triggerVolumes[numTriggers++] = i;
+            if (unlikely(((idx >= 595 && idx <= 601) || idx == 746) && (World.instances[i].entflags & EF_ACTIVE) && numTriggers < 128)) triggerVolumes[numTriggers++] = i;
         }
         if (numTriggers >= 127) DualLogWarn("Ran out of triggers!\n");
         for (u16 i=0;i<dynamicEntityCount;++i) { // 1. Integrate velocity
@@ -516,7 +512,7 @@ void Physics(float dt) {
             V3 vel = World.velocity[a]; vel.x *= linDrag; vel.z *= linDrag; World.velocity[a] = vel; // Y axis is unaffected, so gravity accumulates infinitely until MAX_SPEED
             SetPosition(a,V3_AplusB(World.position[a],V3_ScaleByF(World.velocity[a],dtsub)),false);
             if (World.collider[a] != COLTYPE_CAP) {
-                if (!V3_IsSane(World.angularVelocity[a])) { World.angularVelocity[a] = (V3){0.0f,0.0f,0.0f}; }
+                if (unlikely(!V3_IsSane(World.angularVelocity[a]))) { World.angularVelocity[a] = (V3){0.0f,0.0f,0.0f}; }
                 else {
                     float avel = V3_Mag(World.angularVelocity[a]); if (avel > MAX_ANGULAR_SPEED) { World.angularVelocity[a] = V3_ScaleByF(World.angularVelocity[a],MAX_ANGULAR_SPEED / avel); avel = MAX_ANGULAR_SPEED; }
                     if (avel > PHY_EPSILON) { Quaternion dq = quat_from_axis_angle(V3_ScaleByF(World.angularVelocity[a],1.f / avel),avel * dtsub); World.rotation[a] = quat_normalize(quat_multiply(dq,World.rotation[a])); }
@@ -524,23 +520,20 @@ void Physics(float dt) {
             } else World.angularVelocity[a] = (V3){0.0f,0.0f,0.0f};
         }
         for (u16 i=0;i<dynamicEntityCount;++i) {
-            u16 a = dynamicEntities[i]; if (World.collider[a] == COLTYPE_MSH || (Cheats.noclip && a == PLAYER1)) continue;
+            u16 a = dynamicEntities[i]; if (unlikely(World.collider[a] == COLTYPE_MSH || (Cheats.noclip && a == PLAYER1))) continue;
             i32 cx = PosGetCellCoordX(World.position[a].x), cz = PosGetCellCoordZ(World.position[a].z); u32 mask = GetCollisionMask(World.layer[a]);
-            float searchRad = World.radius[a] + V3_Mag(World.velocity[a]) * dtsub + 0.5f; i32 radCells = vmax((i32)(searchRad / CELL_SIZE) + 2,2);
-            typedef struct { Manifold m; u16 otherIdx; } Contact; Contact contacts[32]; int contactCount = 0;
+            float searchRad = World.radius[a] + V3_Mag(World.velocity[a]) * dtsub; i32 radCells = vmax((i32)(searchRad / CELL_SIZE),1);
+            Manifold contactsMani[32]; u16 contactsOther[32]; int contactCount = 0;
             for (i32 dx = -radCells; dx <= radCells; ++dx) {
                 for (i32 dz = -radCells; dz <= radCells; ++dz) { // 2. Collisions
                     u32 cell = PosGetCellCoordsP(cx + dx,cz + dz);
                     for (u16 k = 0; k < cellCounts[cell]; ++k) {
-                        u16 b = cellLists[cell][k]; if (b == a) continue;
-                        if (Cheats.noclip && b == PLAYER1) continue;
+                        u16 b = cellLists[cell][k]; if (b == a || b >= INSTANCE_COUNT) continue;
+                        if (unlikely(Cheats.noclip && b == PLAYER1)) continue;
                         if (!(mask & World.layer[b]) || World.collider[b] == COLTYPE_NONE) continue;
-                        if ((World.instances[b].entflags & EF_RIGIDBODY) && b > a) continue; // Prevent doubled restitutions causing ghosting.
+                        if (unlikely((World.instances[b].entflags & EF_RIGIDBODY) && b > a)) continue; // Prevent doubled restitutions causing ghosting.
                         V3 deltaPos = V3_AsubB(World.position[a],World.position[b]); float rr = (World.radius[a] + World.radius[b]) + 2.56f/*One chunk extent*/; if (V3_dot(deltaPos,deltaPos) > rr * rr) continue;
-                        Manifold mf = {0};
-                        float matA[16], matB[16];
-                        const float *mxA = &modelMatrices[a*16];
-                        const float *mxB = &modelMatrices[b*16];
+                        Manifold mf = {0}; float matA[16], matB[16]; const float *mxA = &modelMatrices[a*16], *mxB = &modelMatrices[b*16];
                         if (World.collider[a] == COLTYPE_CVX) { EntityColliderMatrixNow(a,matA); mxA = matA; } // Not MSH as only CVX is dynamically moving during physics substeps.
                         if (World.collider[b] == COLTYPE_CVX) { EntityColliderMatrixNow(b,matB); mxB = matB; }
                         if      (World.collider[a] == COLTYPE_CAP && World.collider[b] == COLTYPE_CAP) { mf = OverlapToManifold(CapCap(Entity_GetCap(a),Entity_GetCap(b))); }
@@ -564,16 +557,12 @@ void Physics(float dt) {
                         else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_BOX) { mf = PrimitiveCvx(b,World.instances[a].colMeshIndex,mxA); }
                         else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_CVX) { mf = CvxCvx(World.instances[a].colMeshIndex,World.instances[b].colMeshIndex,mxA,mxB); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
                         else { mf=OverlapToManifold(SphSph(World.position[a],World.colliderSize[a].x,World.position[b],World.colliderSize[b].x)); }
-                        if (mf.n && contactCount < 32) contacts[contactCount++] = (Contact){mf,b};
+                        if (likely(mf.n && contactCount < 32)) { contactsMani[contactCount] = mf; contactsOther[contactCount] = b; contactCount++; }
                     }
                 }
             }
             World.colliding[a]=false; flag_set(&World.instances[a].entflags,EF_GROUNDED,false);
-            for (int c = 0; c < contactCount; ++c) { // 3. Restitution
-                Manifold *mfp = &contacts[c].m; u16 j = contacts[c].otherIdx; World.colliding[a] = true; bool jIs = (j < INSTANCE_COUNT); if (jIs) World.colliding[j] = true;
-                if (V3_dot(mfp->normal,(V3){0.0f,1.0f,0.0f}) >= 0.574f) {World.instances[a].entflags |= EF_GROUNDED;}
-                if (jIs && (World.instances[j].entflags & EF_RIGIDBODY) && World.collider[j] != COLTYPE_MSH) ApplyManifoldResponse(a,j,mfp); else ApplyManifoldResponse(a,0,mfp);
-            }
+            for (int c = 0; c < contactCount; ++c) { Manifold *mfp=&contactsMani[c]; World.colliding[a]=World.colliding[contactsOther[c]]=true; if (V3_dot(mfp->normal,(V3){0.0f,1.0f,0.0f}) >= 0.574f) {World.instances[a].entflags |= EF_GROUNDED;} ApplyManifoldResponse(a,contactsOther[c],mfp); } // 3. Restitution
             World.instances[a].accumulatedForce = (V3){0.0f,0.0f,0.0f};
         }
         for (u16 i=0;i<numTriggers;++i) {

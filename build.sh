@@ -73,6 +73,8 @@ gh ./Shaders/composite_vert.glsl      quadVertSrc
 gh ./Shaders/composite_frag.glsl      quadFragSrc
 gh ./Shaders/shadowmap_vert.glsl      shadowmapVertSrc
 gh ./Shaders/shadowmap_frag.glsl      shadowmapFragSrc
+gh ./Shaders/part_vert.glsl           particleVertSrc
+gh ./Shaders/part_frag.glsl           particleFragSrc
 cat > Shaders/shaders.h <<'EOF'
 #pragma once
 #include "text_vert.glsl.h"
@@ -92,6 +94,8 @@ cat > Shaders/shaders.h <<'EOF'
 #include "ssr.compute.h"
 #include "voxels.compute.h"
 #include "shadowmaps_clear.compute.h"
+#include "part_vert.glsl.h"
+#include "part_frag.glsl.h"
 EOF
 
 LINUX_CC="zig cc"
@@ -127,9 +131,9 @@ if ! $IS_CI; then
     case "$PLATFORM" in
         windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; wine ./voxen.exe ;;
 #         windows)  wine ./voxen.exe ;;
-        *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
+#         *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
 #         *)        strip --strip-all --strip-unneeded ./voxen; ./voxen ;;   # linux Alternate build methods to be able to look at symbols and debugging
-#         *)        ./voxen ;;   # linux
+        *)        ./voxen ;;   # linux
     esac
     rm -f ./Shaders/*.h "$TEMP_DIR"/*.o ./voxen.upx #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.
 fi

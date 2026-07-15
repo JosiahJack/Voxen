@@ -233,6 +233,7 @@ void DrawAngularVelocity(u16 i) {
 #include "winput.c" // Window + Input System
 #include "trigger.c" // Trigger Volumes System
 #include "physics.c" // Physics System
+#include "particles.c" // Particles System
 // Player Movement
 float GetBasePlayerSpeed(u16 p,bool running){
     bool sprint=Sprint(); if(Cheats.noclip)return PLAYER_MAX_CYBER_SPEED*(sprint?2.5f:1.5f); if(World.curLev==LEVEL_CYBERSPACE)return PLAYER_MAX_CYBER_SPEED;
@@ -358,7 +359,7 @@ u32 CompileAnyShader(const char* v, const char* s, const char* name) { return (v
 void CompileShaders() {
     depthPrepassSP=CompileAnyShader(depthPrepassVertSrc,depthPrepassFragSrc,"DPre"); chunkSP=CompileAnyShader(vertSrc,fragSrc,"Main"); uiSP=CompileAnyShader(vertUISrc,fragUISrc,"UI"); debugUnlitSP=CompileAnyShader(debugUnlitVertSrc,debugUnlitFragSrc,"Ln");
     shadowmapsSP=CompileAnyShader(shadowmapVertSrc,shadowmapFragSrc,"Shad"); textSP=CompileAnyShader(textVertSrc,textFragSrc,"Txt"); imageBlitSP=CompileAnyShader(quadVertSrc,quadFragSrc,"Comp"); ssrSP=CompileAnyShader(NULL,ssrCSSrc,"SSR"); voxelUpdateSP=CompileAnyShader(NULL,voxUpdCSSrc,"Vox"); 
-    shadowmapsClearSP=CompileAnyShader(NULL,shadClearCSSrc,"ShadCl");
+    shadowmapsClearSP=CompileAnyShader(NULL,shadClearCSSrc,"ShadCl"); psysSp=CompileAnyShader(particleVertSrc,particleFragSrc,"Psys");
 }
 
 u32 MakeSSBO(u32* id, u32 bindx, size_t sz, const void* d, u32 typ) { glGenBuffers(1,id); glBindBuffer(GL_SSBO,*id); glBufferData(GL_SSBO,sz,d,typ); glBindBufferBase(GL_SSBO,bindx,*id); return *id; }
@@ -982,7 +983,6 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         else { glEnable(GL_CULL_FACE); glDisable(GL_BLEND); } // Opaque
         DrawEntity(e,i,constIndex,tex,currentNormIndex,currentTexIndex,currentGlowIndex,currentSpecIndex,currentModelType,grayscaleEnabled);
     }
-    
     glDepthMask(1); currentTexIndex = currentNormIndex = currentGlowIndex = currentSpecIndex = currentModelType = 0; // Transparents Pass
     for (u16 visibleIndex = opaqueCount; visibleIndex < (opaqueCount + tcnt); ++visibleIndex) {
         u16 i = visibleInstances[visibleIndex].index;
@@ -990,12 +990,13 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         if (transparentTexture[tex]) { glEnable(GL_CULL_FACE); glEnable(GL_BLEND); } // Transparents (with sort)
         else if (doubleSidedTexture[tex] || World.scale[i].x < 0.0f || World.scale[i].y < 0.0f || World.scale[i].z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided (either)
         else continue; // Opaque
-        
         if ((constIndex >= 561 && constIndex <= 565) || (constIndex >= 568 && constIndex <= 573)) glDepthFunc(0x0202/*GL_EQUAL*/); // Cutouts
         else glDepthFunc(0x0203/*GL_LEQUAL*/); // Actual alphas
         DrawEntity(e,i,constIndex,tex,currentNormIndex,currentTexIndex,currentGlowIndex,currentSpecIndex,currentModelType,grayscaleEnabled);
     }
-    
+    V3 camUp = quat_rot_v3(World.rotation[PLAYER1],(V3){0,1,0});
+    V3 camRight = quat_rot_v3(World.rotation[PLAYER1],(V3){1,0,0});
+    PSys_Render(viewProj,playerPos,camUp,camRight,NEAR_PLANE,World.farPlane[World.curLev],inputDepthID); // Particles render
     if (camView) {
         glBindFramebuffer(0x8CA8/*GL_READ_FRAMEBUFFER*/,gBufferFBO);
         glReadBuffer(GL_COLOR_ATTACHMENT0);
@@ -1004,7 +1005,6 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         glBindTexture(GL_TEXTURE_2D,0);
         return; // After copying render result, skip SSR and composite for camviews <<<<<<<<<<<<< CAM VIEW BARRIER
     }
-    
     if (unlikely(World.debugLineVertCount > 1)) DrawDebugLines(viewProj); // Draw Debug Lines
     glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D,inputDepthID);
     if (likely(refOn > 0u)) { // Screen Space Reflections
@@ -1143,6 +1143,7 @@ void InitalizeEnvironment() {
     glFrontFace(0x0901/*GL_CCW*/); // Set triangle winding order
     glBlendFuncSeparate(0x0302/*GL_SRC_ALPHA*/, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/, 1, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/);
     CompileShaders();
+    PSys_Init();
     u32 tvaos[4],tvbos[4]; glGenVertexArrays(4,tvaos); glGenBuffers(4,tvbos);
     quadVAO = tvaos[0]; chunkVAO = tvaos[1]; textVAO = tvaos[2]; debugLinesVAO = tvaos[3];
     quadVBO = tvbos[0]; chunkVBO = tvbos[1]; textVBO = tvbos[2]; debugLinesVBO = tvbos[3]; 
@@ -1210,6 +1211,7 @@ i32 main() {
         if (!World.paused && !World.menuActive) { if (World.pauseRelativeTime < 0.001f) {World.pauseRelativeTime = World.last_physics_time = curtime;} World.pauseRelativeTime += World.deltaTime; }
         InputProcessing(); // Before anims and physics to allow them to respond immediately.
         UpdateAnims();     // Before physics to allow model swap out to affect physics state immediately.  Before rendering to affect shadowmaps immediately.
+        PSys_Update();     // Before physics to allow for particles to interact with static world.
         if (!World.paused && !World.menuActive) {
             double physStart = get_time(); float dt = vclamp((float)(World.pauseRelativeTime - World.last_physics_time),0.0005f,0.1f); World.last_physics_time = World.pauseRelativeTime; World.dt = dt;
             Physics(dt);
