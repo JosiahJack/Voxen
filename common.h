@@ -40,7 +40,7 @@ enum{MAX_ENTITIES=768,/*Unique entity definition types, different than INSTANCE_
 #define PLAYER_MAX_PRONE_SPEED 0.5f
 #define PLAYER_BOOSTER_SPEED_BOOST 1.2f
 #define PLAYER_CROUCH_RATIO 0.6f
-#define PLAYER_PRONE_RATIO 0.2f
+#define PLAYER_PRONE_RATIO 0.01f
 #define PLAYER_TRANSITION_TO_PRONE_ADD 0.10f
 #define PLAYER_RADIUS 0.48f
 #define PLAYER_HEIGHT 2.00f
@@ -179,13 +179,13 @@ enum{MINIGAME_PING=1,MINIGAME_15=2,MINIGAME_WING0=4,MINIGAME_BOTBOUNCE=8,MINIGAM
 // Hw referenceIndex,ref14Index::Sys 21,0 Nav 22,1 Ere 23,2 Sen 24,3 Trg 25,4 Shi 26,5 Bio 27,6 Lan 28,7 Env 29,8 Boo 30,9 Jum 31,10 Nig 32,11
 typedef struct {
     double nitroTimeSetting,earthShakerTimeSetting,justFired,waitTilNextFire,reloadFinished,lerpStartTime,dropFinished,playerHealthTimer,berserkFinishedTime,berserkIncrementFinishedTime,detoxFinishedTime,geniusFinishedTime,mediFinishedTime,reflexFinishedTime,sightFinishedTime,leanLeftTapFinished,leanRightTapFinished,sightSideEffectFinishedTime,staminupFinishedTime,turboCyberTime,turboFinished,energyDrainTickFinished,painSoundFinished,radSoundFinished,radFXFinished,weaponDipFinished;
-    float weaponEnergySetting[16],reloadLerpValue,sparqSetting,ionSetting,blasterSetting,plasmaSetting,stungunSetting,energySliderClickedTime,cyberWeaponAttackFinished,targetY,currentEnergyWeaponHeat[7],fatigue,radiated,resetAfterDeathTime,energy,maxEnergy,radAdjust,initialRadiation,weaponDipLerp,currentCrouchRatio,leanTarget,leanShift,crouchingVelocity;
+    float weaponEnergySetting[16],reloadLerpValue,sparqSetting,ionSetting,blasterSetting,plasmaSetting,stungunSetting,energySliderClickedTime,cyberWeaponAttackFinished,targetY,currentEnergyWeaponHeat[7],fatigue,radiated,resetAfterDeathTime,energy,maxEnergy,radAdjust,initialRadiation,weaponDipLerp,currentCrouchRatio,leanTarget,leanShift,crouchingVelocity,leanVelocity;
     u32 accessCardOwned,wepAmmo[16],wepAmmoSecondary[16];
     i32 lastAddedIndex,emailCurrent,emailIndex,globalLookupIndex,weaponInventoryIndices[7],weaponInventoryAmmoIndices[7],hardwareInvCurrent,/*Current slot in the general inventory (14 slots).*/hardwareInvIndex,/*Current index to the item look-up table.*/generalInventoryIndexRef[14],berserkIncrement;
     i16 ladderState,weaponCurrentPending,weaponIndexPending,weaponCurrent;
     u16 numLogsFromLevel[10],hasHardware,hardwareIsActive,hardwareInvReferenceIndex[HW_COUNT],heldObjectIndex,heldObjectCustomIndex,heldObjectAmmo,heldObjectAmmo2,weaponIndex,currentSearchItem,generalInvIndex,generalInvCustomIndex[14],patchActive,drainJPM;
     u8 lerpUp,hasSoft,softVersions[7],hasMinigame,numweapons,currentMagazineAmount[7],currentMagazineAmount2[7],hardwareVersion[HW_COUNT],hardwareVersionSetting[HW_COUNT],grenAmmo[7],grenConstIndex[7],grenadeCurrent,generalInvCurrent,patchCurrent,patchCounts[7],cyberItemIndex;
-    bool playerDead,beepDone,logPaused,hasNewEmail,hasNewNotes,currentCyberItem,isPulserNotDrill,wepLoadedWithAlternate[7],staminupActive,hasLog[134],readLog[134],justChangedWeap,overloadEnabled,recoiling,heldObjectLoadedAlternate,holdingObject,grenActive,hasNewLogs,hasNewData,radiationArea;
+    bool playerDead,beepDone,logPaused,hasNewEmail,hasNewNotes,currentCyberItem,isPulserNotDrill,wepLoadedWithAlternate[7],staminupActive,hasLog[134],readLog[134],justChangedWeap,overloadEnabled,recoiling,heldObjectLoadedAlternate,holdingObject,grenActive,hasNewLogs,hasNewData,radiationArea,leanResetting;
 } InventorySystem;
 typedef struct { float damage,penetration,offense,armorvalue,defense,impactVelocity; V3 attacknormal,hitpoint; AttType attackType; u16 owner,hitIdx; bool isOtherNPC,berserkActive; } DamageData;
 typedef struct __attribute__((packed, aligned(8))) { u64 magicNumber; double thisRunTime; bool isLoading; i32 missionSplitID; } AutoSplitterData; // For use with LiveSplit or other future speedrunner utilities for doing speedruns
@@ -267,55 +267,33 @@ typedef struct {
     SystemUI Sys_UI;
     MusicSystem Sys_Music;
     Entity levelInstances[MAX_LEVELS][INSTANCE_COUNT];
-    V3 levelPosition[MAX_LEVELS][INSTANCE_COUNT];
-    V3 levelScale[MAX_LEVELS][INSTANCE_COUNT];
-    V3 levelVelocity[MAX_LEVELS][INSTANCE_COUNT];
-    V3 levelAngularVelocity[MAX_LEVELS][INSTANCE_COUNT];
+    V3 levelPosition[MAX_LEVELS][INSTANCE_COUNT],levelScale[MAX_LEVELS][INSTANCE_COUNT],levelVelocity[MAX_LEVELS][INSTANCE_COUNT],levelAngularVelocity[MAX_LEVELS][INSTANCE_COUNT];
     V3 levelColliderCenter[MAX_LEVELS][INSTANCE_COUNT]; // Offset relative to .position's global worldspace xyz location
     V3 levelColliderSize[MAX_LEVELS][INSTANCE_COUNT]; // x,y,z for Box, x for Sphere radius, else x, y, z for Capsule radius, height, and direction (0.0f = X-Axis, 1.0f = Y-Axis, 2.0f = Z-Axis respectively, default 1.0f)
     ColliderType/*u8*/ levelCollider[MAX_LEVELS][INSTANCE_COUNT];
     Quaternion levelRotation[MAX_LEVELS][INSTANCE_COUNT];
     u32 levelLayer[MAX_LEVELS][INSTANCE_COUNT];
-    float levelMass[MAX_LEVELS][INSTANCE_COUNT];
-    float levelRadius[MAX_LEVELS][INSTANCE_COUNT];
-    float levelGravity[MAX_LEVELS][INSTANCE_COUNT];
-    float levelInertiaTensor[MAX_LEVELS][INSTANCE_COUNT][6];
-    float levelInvInertiaTensor[MAX_LEVELS][INSTANCE_COUNT][6];
-    float levelAngularDrag[MAX_LEVELS][INSTANCE_COUNT];
-    float levelDynamicFriction[MAX_LEVELS][INSTANCE_COUNT];
-    float levelStaticFriction[MAX_LEVELS][INSTANCE_COUNT];
-    float levelBounciness[MAX_LEVELS][INSTANCE_COUNT];
-    bool levelInvTnsrValid[MAX_LEVELS][INSTANCE_COUNT];
-    bool levelColliding[MAX_LEVELS][INSTANCE_COUNT];
+    float levelMass[MAX_LEVELS][INSTANCE_COUNT],levelRadius[MAX_LEVELS][INSTANCE_COUNT],levelGravity[MAX_LEVELS][INSTANCE_COUNT],levelInertiaTensor[MAX_LEVELS][INSTANCE_COUNT][6],levelInvInertiaTensor[MAX_LEVELS][INSTANCE_COUNT][6];
+    float levelAngularDrag[MAX_LEVELS][INSTANCE_COUNT],levelDynamicFriction[MAX_LEVELS][INSTANCE_COUNT],levelStaticFriction[MAX_LEVELS][INSTANCE_COUNT],levelBounciness[MAX_LEVELS][INSTANCE_COUNT];
+    bool levelInvTnsrValid[MAX_LEVELS][INSTANCE_COUNT],levelColliding[MAX_LEVELS][INSTANCE_COUNT];
     u16 levelInstCount[MAX_LEVELS]; // Per-level instance count (parallel to instCount which always mirrors the active level's count).
     Light levelLights[MAX_LEVELS][LIGHT_COUNT];
     LightAnimation levelLAnims[MAX_LEVELS][LIGHT_COUNT];
     V3 levelLightsNewPosition[MAX_LEVELS][LIGHT_COUNT];
     u16 levelLoadedLights[MAX_LEVELS];
     Entity* instances;
-    V3* position;
-    V3* scale;
-    V3* velocity;
-    V3* angularVelocity;
-    V3* colliderCenter;
-    V3* colliderSize;
+    V3* position,*scale,*velocity,*angularVelocity,*colliderCenter,*colliderSize;
     ColliderType* collider;
     Quaternion* rotation;
     u32* layer;
-    float* mass,dt;
-    float* radius;
-    float* gravity;
+    float* mass,dt,*radius,*gravity;
     float (*inertiaTensor)[6];
     float (*invInertiaTensor)[6];
-    float* angularDrag;
-    float* dynamicFriction;
-    float* staticFriction;
-    float* bounciness;
-    bool* invTnsrValid;
-    bool* colliding;
-    Light* lights;
-    LightAnimation* lanims;
-    V3* lightsNewPosition;
+    float *angularDrag,*dynamicFriction,*staticFriction,*bounciness;
+    bool *invTnsrValid,*colliding;
+    Light *lights;
+    LightAnimation *lanims;
+    V3 *lightsNewPosition;
     u16 loadedLights; // mirrors levelLoadedLights[currentLevel]
     Color fogColor[MAX_LEVELS];
     Entity targetIOActivatorEntity;

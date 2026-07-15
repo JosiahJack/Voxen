@@ -270,50 +270,52 @@ bool CantStand(u16 playerIdx, float targetHeight) { // I can't stand it.
 bool DoubleTapLeanLeft(void)  { if(!GetKeyPressed(7)){return false;} if (World.pauseRelativeTime < World.invP1.leanLeftTapFinished) { World.invP1.leanLeftTapFinished = 0.0; return true; } World.invP1.leanLeftTapFinished = World.pauseRelativeTime + 0.5; return false; }
 bool DoubleTapLeanRight(void) { if(!GetKeyPressed(8)){return false;} if (World.pauseRelativeTime < World.invP1.leanRightTapFinished) { World.invP1.leanRightTapFinished = 0.0; return true; } World.invP1.leanRightTapFinished = World.pauseRelativeTime + 0.5; return false; }
 void ApplyPlayerMovements(float dt) {
-    Entity *p = &World.instances[PLAYER1]; 
-    Quaternion r = World.rotation[PLAYER1]; 
-    float leanSpeed = 70.0f, leanMaxAngle = 35.0f;
-    float leanInput = (float)LeanLeft() - (float)LeanRight(); // Evaluates the continuous hold
-    bool doubleTapLean = DoubleTapLeanLeft() || DoubleTapLeanRight(); // Evaluates the time-windowed edge
-    if (doubleTapLean) DualLog("Double tapped lean!\n");
+    Entity *p = &World.instances[PLAYER1]; Quaternion r = World.rotation[PLAYER1]; float leanSpeed = 70.0f, leanMaxAngle = 35.0f; float leanInput = (float)LeanLeft() - (float)LeanRight(); bool doubleTapLean = DoubleTapLeanLeft() || DoubleTapLeanRight();
     bool movingForward = Forward() > 0.1f, leanRight = leanInput < 0.0f, leanLeft = leanInput > 0.0f;
-    if (doubleTapLean) { World.invP1.leanTarget=0.0f; KeyState *kL=GetCodeMapping(7),*kR=GetCodeMapping(8); kL->pressed=kR->pressed=false; } // Pop back to upright
-    else {
-        if (leanLeft || leanRight) { if(leanLeft){World.invP1.leanRightTapFinished=0;} if(leanRight){World.invP1.leanLeftTapFinished=0;}/*Prevent dir change double taps*/ World.invP1.leanTarget = vclamp(World.invP1.leanTarget + (leanInput * leanSpeed * dt),-leanMaxAngle,leanMaxAngle); }
-        else if (movingForward) { if(vabs(World.invP1.leanTarget) < 0.5f){World.invP1.leanTarget = 0.0f;}else{World.invP1.leanTarget -= (World.invP1.leanTarget > 0.0f ? 1.0f : -1.0f) * leanSpeed * dt;} } // Smoothly move back to upright while moving forward.
+    if (doubleTapLean) { World.invP1.leanResetting = true; World.invP1.leanVelocity = 0.0f; KeyState *kL = GetCodeMapping(7), *kR = GetCodeMapping(8); kL->pressed = kR->pressed = false; } // Double-tap lean: initiate smooth reset to upright over 0.2 seconds
+    if (World.invP1.leanResetting) { 
+        World.invP1.leanTarget = smooth_damp(World.invP1.leanTarget,0.0f,&World.invP1.leanVelocity,0.2f,dt); 
+        if(vabs(World.invP1.leanTarget) < 0.5f){World.invP1.leanTarget=World.invP1.leanVelocity=0.0f; World.invP1.leanResetting=false;} 
+    } else {
+        if (leanLeft || leanRight) { if(leanLeft){World.invP1.leanRightTapFinished =0;} if(leanRight){World.invP1.leanLeftTapFinished=0;} World.invP1.leanTarget=vclamp(World.invP1.leanTarget + (leanInput * leanSpeed * dt),-leanMaxAngle,leanMaxAngle); }
+        else if (movingForward) { if (vabs(World.invP1.leanTarget) < 0.5f) { World.invP1.leanTarget = 0.0f; } else { World.invP1.leanTarget -= (World.invP1.leanTarget > 0.0f ? 1.0f : -1.0f) * leanSpeed * dt; } }
     }
     World.cam_roll = World.invP1.leanTarget;
-    float targetRatio = 1.0f, crouchRatio = 0.6f, proneRatio = 0.2f, transitionSec = 0.2f;  
-    if (Crouch()) {
-        if (p->bodyState == BodyState_Crouch || p->bodyState == BodyState_CrouchingDown) { if(!CantStand(PLAYER1,PLAYER_HEIGHT)) {p->bodyState=BodyState_StandingUp;} }
-        else if (p->bodyState == BodyState_Standing || p->bodyState == BodyState_StandingUp){p->bodyState=BodyState_CrouchingDown;}
-        else if (p->bodyState == BodyState_Prone || p->bodyState == BodyState_ProningDown) {p->bodyState =BodyState_ProningUp;}
-    } else if (Prone()) { if (p->bodyState != BodyState_Prone && p->bodyState != BodyState_ProningDown){ p->bodyState=BodyState_ProningDown; } else { if(!CantStand(PLAYER1,PLAYER_HEIGHT)){p->bodyState=BodyState_StandingUp;} }}
+    float targetRatio=1.0f, transitionSec=0.2f; float currentRatio=World.invP1.currentCrouchRatio;
+    if (Crouch()) { // Crouch key always targets crouch ratio from any state
+        if (p->bodyState == BodyState_Crouch) { if (!CantStand(PLAYER1,PLAYER_HEIGHT)){p->bodyState = BodyState_StandingUp;}} // Already at crouch → toggle up to standing
+        else if (currentRatio > PLAYER_CROUCH_RATIO) { p->bodyState = BodyState_CrouchingDown;} // Above crouch → go down to crouch (handles "if standing up will go back to crouched")
+        else {p->bodyState=BodyState_ProningUp;} // Below crouch → go up to crouch (handles "if proning down will go back to crouched")
+    } else if (Prone()) {
+        if (p->bodyState == BodyState_Standing) { p->bodyState = BodyState_ProningDown; } // Standing → go to prone
+        else if (currentRatio > PLAYER_CROUCH_RATIO) { if (!CantStand(PLAYER1,PLAYER_HEIGHT)){p->bodyState=BodyState_StandingUp;}else{p->bodyState = BodyState_ProningDown;} } // Between crouch and standing → up to standing
+        else if (p->bodyState == BodyState_Crouch) { p->bodyState = BodyState_ProningDown; } // Crouch → go to prone
+        else { p->bodyState = BodyState_ProningUp; } // Between prone and crouch, or prone → up to crouch
+    }
     switch (p->bodyState) {
-        case BodyState_CrouchingDown:targetRatio=-0.01f; break;      case BodyState_StandingUp:targetRatio=1.01f;  break; // Slightly past 1 or 0 to catch overshoot for proper state transition
-        case BodyState_ProningDown:  targetRatio=-0.01f; break;      case BodyState_ProningUp: targetRatio=1.01f; transitionSec += 0.1f; break;
-        case BodyState_Crouch:       targetRatio=crouchRatio; break; case BodyState_Prone:     targetRatio=proneRatio; break;                      default:targetRatio = 1.0f; break;
+        case BodyState_CrouchingDown:targetRatio=-0.01f; break;                       case BodyState_StandingUp:targetRatio=1.01f;  break;      case BodyState_ProningDown:targetRatio=-0.01f; break; 
+        case BodyState_ProningUp:    targetRatio=1.01f; transitionSec+=0.1f; break; case BodyState_Crouch:    targetRatio=PLAYER_CROUCH_RATIO; break; case BodyState_Prone:      targetRatio=PLAYER_PRONE_RATIO; break; default: targetRatio=1.0f; break;
     }
     float lastRatio = World.invP1.currentCrouchRatio;
-    World.invP1.currentCrouchRatio = smooth_damp(lastRatio, targetRatio, &World.invP1.crouchingVelocity, transitionSec, dt); 
+    World.invP1.currentCrouchRatio = smooth_damp(lastRatio,targetRatio,&World.invP1.crouchingVelocity,transitionSec,dt);
     if (World.invP1.currentCrouchRatio >= 1.0f) { World.invP1.currentCrouchRatio = 1.0f; if(p->bodyState == BodyState_StandingUp){p->bodyState=BodyState_Standing;} }
-    else if (World.invP1.currentCrouchRatio <= crouchRatio && (p->bodyState == BodyState_CrouchingDown || p->bodyState == BodyState_ProningUp)) { World.invP1.currentCrouchRatio=crouchRatio; p->bodyState=BodyState_Crouch; }
-    else if (World.invP1.currentCrouchRatio <= proneRatio && p->bodyState == BodyState_ProningDown) { World.invP1.currentCrouchRatio=proneRatio; p->bodyState=BodyState_Prone; }
+    else if (p->bodyState == BodyState_CrouchingDown && World.invP1.currentCrouchRatio <= PLAYER_CROUCH_RATIO) { World.invP1.currentCrouchRatio = PLAYER_CROUCH_RATIO; p->bodyState = BodyState_Crouch; }
+    else if (p->bodyState == BodyState_ProningUp && World.invP1.currentCrouchRatio >= PLAYER_CROUCH_RATIO) { World.invP1.currentCrouchRatio = PLAYER_CROUCH_RATIO; p->bodyState = BodyState_Crouch; }
+    else if (p->bodyState == BodyState_ProningDown && World.invP1.currentCrouchRatio <= PLAYER_PRONE_RATIO) { World.invP1.currentCrouchRatio = PLAYER_PRONE_RATIO; p->bodyState = BodyState_Prone; }
     World.colliderSize[PLAYER1].y = PLAYER_HEIGHT * World.invP1.currentCrouchRatio;
-    float h = (float)Forward() - (float)Backpedal(), s = (float)StrafeRight() - (float)StrafeLeft(), vertInput = (float)SwimUp() - (float)SwimDn();
-    float y2 = r.y*r.y, xz = r.x*r.z, wy = r.w*r.y;
-    p->forward = V3_Normalize((V3){ 2.0f*(xz + wy), 2.0f*(r.y*r.z - r.w*r.x), 1.0f - 2.0f*(r.x*r.x + y2) }); 
-    p->right   = V3_Normalize((V3){ 1.0f - 2.0f*(y2 + r.z*r.z), 2.0f*(r.x*r.y + r.w*r.z), 2.0f*(xz - wy) });
-    V3 inputDir = { p->forward.x*h + p->right.x*s, vertInput, p->forward.z*h + p->right.z*s }; 
-    float inputLenSq = V3_dot(inputDir,inputDir);
-    V3 w = (inputLenSq > PHY_EPSILON) ? V3_ScaleByF(inputDir, 1.0f / vsqrtf(inputLenSq)) : (V3){0,0,0};
-    bool isRunning = (inputLenSq > 0.01f);
-    float speed = GetBasePlayerSpeed(PLAYER1,isRunning) * 1.75f, accel = World.boosterActive ? 1.0f : 3.0f;
-    V3 targetVel = V3_ScaleByF(w,speed); 
-    if (World.invP1.ladderState > 0) { float climbSpeed = (Sprint() && isRunning) ? 1.2f : 0.4f; targetVel = (V3){p->right.x * s * speed * 0.3f,h * climbSpeed * 25.0f,p->right.z * s * speed * 0.3f}; accel = 5.0f; }
-    else { if(vabs(vertInput) < 0.001f){targetVel.y=World.velocity[PLAYER1].y;} }
+    float h=(float)Forward() - (float)Backpedal(), s=(float)StrafeRight() - (float)StrafeLeft(), vertInput=(float)SwimUp() - (float)SwimDn();
+    float y2=r.y*r.y, xz=r.x*r.z, wy=r.w*r.y;
+    p->forward=V3_Normalize((V3){ 2.0f*(xz + wy),2.0f*(r.y*r.z - r.w*r.x),1.0f - 2.0f*(r.x*r.x + y2) }); p->right=V3_Normalize((V3){ 1.0f - 2.0f*(y2 + r.z*r.z),2.0f*(r.x*r.y + r.w*r.z),2.0f*(xz - wy) });
+    V3 inputDir={ p->forward.x*h + p->right.x*s,vertInput,p->forward.z*h + p->right.z*s}; 
+    float inputLenSq = V3_dot(inputDir,inputDir); V3 w = (inputLenSq > PHY_EPSILON) ? V3_ScaleByF(inputDir, 1.0f / vsqrtf(inputLenSq)) : (V3){0, 0, 0};
+    bool isRunning = (inputLenSq > 0.01f); float speed = GetBasePlayerSpeed(PLAYER1,isRunning) * 1.75f, accel=World.boosterActive ? 1.0f : 3.0f; V3 targetVel = V3_ScaleByF(w,speed); 
+    if (World.invP1.ladderState > 0) {
+        float climbSpeed = (Sprint() && isRunning) ? 1.2f : 0.4f;
+        targetVel = (V3){p->right.x * s * speed * 0.3f, h * climbSpeed * 25.0f, p->right.z * s * speed * 0.3f};
+        accel = 5.0f;
+    } else { if (vabs(vertInput) < 0.001f) { targetVel.y = World.velocity[PLAYER1].y; } }
     V3 dv = V3_AsubB(targetVel, World.velocity[PLAYER1]); 
-    dv = (V3){ vclamp(dv.x,-10.0f,10.0f), vclamp(dv.y,-10.0f,10.0f), vclamp(dv.z,-10.0f,10.0f) };
+    dv = (V3){ vclamp(dv.x, -10.0f, 10.0f), vclamp(dv.y, -10.0f, 10.0f), vclamp(dv.z, -10.0f, 10.0f) };
     World.velocity[PLAYER1] = V3_AplusB(World.velocity[PLAYER1], V3_ScaleByF(dv, accel * vclamp(dt, 0.0005f, 0.1f)));
 }
 #include "console.c" // Console Sys - CHEATS!
@@ -670,18 +672,68 @@ static double RenderUI() {
     if ((World.menuActive || World.paused)) {
         if (Sys_Input.keyStates[KEY_DOWN].pressed) currentMenuItem = (currentMenuItem + 1) >= menuItemCount ? 0 : (currentMenuItem + 1);
         else if (Sys_Input.keyStates[KEY_UP].pressed) currentMenuItem = (currentMenuItem - 1) < 0 ? (menuItemCount - 1) : (currentMenuItem - 1);
-    } else { // Normal UI
-                                                                                                                           if (!Cheats.noHUD) {RenderUIImage(672,0,22,22,1020);} /*Shoot mode button*/
-                                                                                                                           if (World.inventoryMode && Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed && CursorIsOverBounds(672,694,22,0)) ForceShootMode();
-        /*Left Tab Buttons*/                                                                                                                                                                                                                                                                                                                                           /*Right Tab Buttons*/
-        RenderUIImage(-16,552,32,40,MFD_LefTab == 0 ? 1024 : 1022);                                                                                                                                                                                                                                                           RenderUIImage(1350,552,32,40,MFD_RightTab == 0 ? 1024 : 1022);
-        RenderUIImage(-16,600,32,40,MFD_LefTab == 1 ? 1024 : 1022);                                                                                                                                                                                                                                                           RenderUIImage(1350,600,32,40,MFD_RightTab == 1 ? 1024 : 1022);
-        RenderUIImage(-16,648,32,40,MFD_LefTab == 2 ? 1024 : 1022);                                                                                                                                                                                                                                                           RenderUIImage(1350,648,32,40,MFD_RightTab == 2 ? 1024 : 1022);
-        RenderUIImage(-16,696,32,40,MFD_LefTab == 3 ? 1024 : 1022);                                                                                                                                                                                                                                                           RenderUIImage(1350,696,32,40,MFD_RightTab == 3 ? 1024 : 1022);
-                                                                                                                                                                                     /*Center Tab Buttons*/
-                                                                   RenderUIImage(400,752,64,32,MFD_CenterTab == 0 ? 1024 : 1021); RenderUIImage(480,752,64,32,MFD_CenterTab == 1 ? 1024 : 1021); RenderUIImage(560,752,64,32,MFD_CenterTab == 2 ? 1024 : 1021); RenderUIImage(902,752,64,32,MFD_CenterTab == 3 ? 1024 : 1021);
+    } else { /* Normal UI */
+//         if (World.Sys_UI.showTeleportFX) { /*TeleportFX*/ }
+//         if (World.Sys_UI.showRadiationFX) { /*RadiationFX*/ }
+//         if (World.Sys_UI.showHealingFX) { /*HealingFX*/ }
+//         if (World.Sys_UI.showShieldFX) { /*ShieldFX*/ }
+//         if (World.Sys_UI.showShieldActivation) { /*waveup*/ /*wavedn*/ }
+//         if (World.Sys_UI.showShieldDeactivation) { /*waveup*/ /*wavedn*/ }
+//         if (World.Sys_UI.showDeathRessurectionFX) { /*spawndelaycontainers...*/ }
+//         if (World.Sys_UI.showHardware) { /*ShieldButton*/ /*LanternButton*/ /*SensaroundButton*/ /*BioButton*/ /*NightVisionButton*/ /*EReaderButton*/ /*BoosterButton*/ /*JumpJetsButton*/ }
+        if (!Cheats.noHUD) {RenderUIImage(672,0,22,22,1020);} /*ShootModeButton*/
+        if (World.inventoryMode && Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed && CursorIsOverBounds(672,694,22,0)) ForceShootMode();
+//         if (World.Sys_UI.showTextWarnings) { /*WarningTexts...*/ }
+//         if (World.Sys_UI.showAutomapFull) { /*AutomapFullRawImage*/ /*PlayerIconFull*/ /*CloseFullmapButton*/ }
+//         if (World.Sys_UI.showMissionTimer) { /*MissionTimerT*/ /*MissionTimer*/ }
+        if (true/*World.Sys_UI.showLeftMFDPanel*/) {
+            if (MFD_LefTab == 0) { /*WeaponTabLH: WepNameTextLH, WepIconLH, ClipBox, EnergyHeatTicks, ReloadButtons, EnergySlider*/ }
+            else if (MFD_LefTab == 1) { /*ItemTabLH: ItemIcon, ItemText, Vaporize/Apply/Use Buttons, EReaderSections, AccessCardsList, Sliders*/ }
+            else if (MFD_LefTab == 2) { /*AutomapTabLH: AutomapMask, Overlays, PlayerIcon, ZoomIn/Out/Full/Side Buttons*/ }
+            else if (MFD_LefTab == 3) { /*TargetTabLH*/ }
+            else if (MFD_LefTab == 4) { /*DataTabLH: SecurityLH, DataHeaders, ElevatorUIControl, KeycodeUIControl, SearchContents, AudioLogInfo, PuzzleGrid, PuzzleWire, SystemAnalyzer Display*/ }
+//             if (World.Sys_UI.showSensaroundLH) { /*SensaroundLH Plane*/ }
+            if (true/*World.Sys_UI.showTabButtonsPanelLH*/) {
+                RenderUIImage(-16,552,32,40,MFD_LefTab == 0 ? 1024 : 1022); RenderUIImage(-16,600,32,40,MFD_LefTab == 1 ? 1024 : 1022); RenderUIImage(-16,648,32,40,MFD_LefTab == 2 ? 1024 : 1022); RenderUIImage(-16,696,32,40,MFD_LefTab == 3 ? 1024 : 1022); /*ButtonWeapon, ButtonItem, ButtonAutomap, ButtonTarget, ButtonData*/
+            }
+//             if (World.Sys_UI.showCyberTimer) { /*CyberTimerT*/ /*CyberTimer*/ }
+        }
+        if (true/*World.Sys_UI.showCenterMFDPanel*/) {
+            if (MFD_CenterTab == 0) { /*MainTab: WeaponInventory, WeaponShotsInventory, GrenadeInventory, PatchInventory*/ }
+            else if (MFD_CenterTab == 1) { /*HardwareTab: Label, HardwareInventory*/ }
+            else if (MFD_CenterTab == 2) { /*GeneralTab: Label, GeneralInventory, AccessCards*/ }
+            else if (MFD_CenterTab == 3) { /*SoftwareTab: Label, SoftwareInventory, ICEDrill, Pulser, Turbo, Decoy, Recall*/ }
+            else if (MFD_CenterTab == 4) { /*MultiMediaDataReader: LogTableofContents, LogsLevelFolder, LogTextReader, EmailTab, DataTab, NotesTab*/ }
+//             if (World.Sys_UI.showSensaroundCenter) { /*SensaroundCenter Plane*/ }
+            if (true/*World.Sys_UI.showCenterTabButtons*/) {
+                RenderUIImage(400,752,64,32,MFD_CenterTab == 0 ? 1024 : 1021); RenderUIImage(480,752,64,32,MFD_CenterTab == 1 ? 1024 : 1021); RenderUIImage(560,752,64,32,MFD_CenterTab == 2 ? 1024 : 1021); RenderUIImage(902,752,64,32,MFD_CenterTab == 3 ? 1024 : 1021); /*Main, Hardware, General, Software, AddToInventoryHelper*/
+            }
+        }
+        if (true/*World.Sys_UI.showRightMFDPanel*/) {
+            if (MFD_RightTab == 0) { /*WeaponTabRH: WepName, ClipBox, HeatTicks, Reload/Unload, EnergySlider*/ }
+            else if (MFD_RightTab == 1) { /*ItemTabRH: Icons, Actions, EReaderSections, Sliders*/ }
+            else if (MFD_RightTab == 2) { /*AutomapTabRH: AutomapMask, Zoom controls*/ }
+            else if (MFD_RightTab == 3) { /*TargetTabRH*/ }
+            else if (MFD_RightTab == 4) { /*DataTabRH: SecurityRH, Elevators, Keycodes, AudioLogs, Puzzles, SystemAnalyzer*/ }
+//             if (World.Sys_UI.showSensaroundRH) { /*SensaroundRH Plane*/ }
+            if (true/*World.Sys_UI.showTabButtonsPanelRH*/) {
+                RenderUIImage(1350,552,32,40,MFD_RightTab == 0 ? 1024 : 1022); RenderUIImage(1350,600,32,40,MFD_RightTab == 1 ? 1024 : 1022); RenderUIImage(1350,648,32,40,MFD_RightTab == 2 ? 1024 : 1022); RenderUIImage(1350,696,32,40,MFD_RightTab == 3 ? 1024 : 1022); /*ButtonWeapon, ButtonItem, ButtonAutomap, ButtonTarget, ButtonData*/
+            }
+        }
+//         if (World.Sys_UI.showBioMonitor) { /*Graph*/ /*Biomonitor texts, BPM, Patch, Fatigue*/ }
+//         if (World.Sys_UI.showEnergyTickPanel) { /*EnergyTickPanel*/ }
+//         if (World.Sys_UI.showHealthTickPanel) { /*HealthTickPanel*/ }
+//         if (World.Sys_UI.showEnergyIndicator) { /*EnergyIndicator*/ /*EnergySurge*/ /*EnergyDrainText*/ /*EnergyJPMText*/ }
+//         if (World.Sys_UI.showHealthIndicator) { /*HealthIndicator*/ /*HealthIndicatorCyber*/ }
+//         if (World.Sys_UI.showVmailPlayer) { /*VmailPlayer GenStatus, BetaJet, etc.*/ }
+//         if (World.Sys_UI.showSearchFX) { /*SearchFXLH*/ /*SearchFXRH*/ }
+//         if (World.Sys_UI.showTouchables) { /*MainMenuTouch, Console, Left/RightTouchstick, TouchSpace/LMB/Swim*/ }
+//         if (World.Sys_UI.showEMPStatic) { /*EMPStatic*/ }
+//         if (World.Sys_UI.showPainStatic) { /*PainStatic*/ }
+//         if (World.Sys_UI.showSightDimming) { /*SightDimming*/ }
+//         if (World.Sys_UI.showDeathFX) { /*DeathFXContainer*/ }
     }
-    i16 debugTextStartY = 48; // Diagnostics / Debugging
+    i16 debugTextStartY = 48; /* Diagnostics / Debugging */
     if (Cheats.showLocation && !World.menuActive) RenderFormattedText(16, debugTextStartY, T_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f",World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z,World.rotation[PLAYER1].x,World.rotation[PLAYER1].y,World.rotation[PLAYER1].z,World.rotation[PLAYER1].w);
     i16 lineSpacing = 18;
     if (!World.menuActive && !Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 1),T_WHITE,FONT_NORMAL,1.0f,"playerCellIdx: %u, Shadow cpu ms: %.3f, Physics cpu ms: %.3f",playerCellIdx,shadowTime * 1000,physTime * 1000);
@@ -696,7 +748,7 @@ static double RenderUI() {
         u8 timingColor = T_WHITE;
         if (vabs(World.thisFrameTime - World.cpuFrameTime) < 0.451) timingColor = T_GREEN;
         if (World.thisFrameTime > 6.944444) timingColor = T_RED;
-        drawCalls += 2; // Add two more for this text render ;)
+        drawCalls += 2; /* Add two more for this text render ;) */
         RenderFormattedText(16, debugTextStartY - lineSpacing, timingColor, FONT_NORMAL,1.0f, "ms: %.2f, CPU %.2f", World.thisFrameTime,World.cpuFrameTime);
         RenderFormattedText(16 + 230.0f, debugTextStartY - lineSpacing, T_WHITE, FONT_NORMAL,1.0f, "(FPS:%d),Drwclls:%d [G:%d UI:%d Sh:%d] Vrt:%d E:%u|M:%u|P:%u",globalframesPerLastSecond,drawCalls,drawCallsNormal,uiDrawCalls,shadDrawCalls,vertsRendered,Cheats.editMode,World.menuActive,World.paused);
     }
